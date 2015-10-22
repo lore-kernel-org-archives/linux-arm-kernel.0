@@ -1,70 +1,118 @@
-From: khilman@kernel.org (Kevin Hilman)
-Date: Thu, 22 Oct 2015 15:13:11 -0700
-Subject: [PATCH 1/2] ARM: ux500: add an SMP enablement type and move cpu
- nodes
-In-Reply-To: <CACRpkdb5eLWZKmbnuPJ1bBrQPqyH0wvh7SjJdVNN7XEiXkKf-w@mail.gmail.com>
-References: <1438586801-30115-1-git-send-email-linus.walleij@linaro.org>
- <CAMAWPa_nVyyhXfBm3HvPyVGpodJe_dfM0kX0kO+rPtO9mfkG=w@mail.gmail.com>
- <CACRpkdb5eLWZKmbnuPJ1bBrQPqyH0wvh7SjJdVNN7XEiXkKf-w@mail.gmail.com>
-Message-ID: <CAMAWPa9pVRY1evsZmZRyxY0JxRJ0tUhsug+xUDrw6mc8y4W9NQ@mail.gmail.com>
+From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
+Date: Thu, 22 Oct 2015 15:13:20 -0700
+Subject: [PATCH v6] can: xilinx: Convert to runtime_pm
+In-Reply-To: <1445489120-10933-1-git-send-email-appanad@xilinx.com>
+References: <1445489120-10933-1-git-send-email-appanad@xilinx.com>
+Message-ID: <20151022221320.GQ5257@xsjsorenbubuntu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 22, 2015 at 5:24 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
-> On Tue, Oct 20, 2015 at 6:52 AM, Kevin Hilman <khilman@kernel.org> wrote:
->> On Mon, Aug 3, 2015 at 12:26 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
->>> The "cpus" node cannot be inside the "soc" node, while this
->>> works for the CoreSight blocks, the early boot code will look
->>> for "cpus" directly under the root node, so this is a hard
->>> convention. So move the CPU nodes.
->>>
->>> Augment the "reg" property to match what is actually in the
->>> hardware: 0x300 and 0x301 respectively.
->>>
->>> Then add an SMP enablement type to be used by the SMP init
->>> code, "ste,dbx500-smp".
->>>
->>> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
->>> ---
->>> Hi ARM SoC people: please apply this as a fix for v4.2
->>> as it is prerequisite for 2/2 which is a more proper fix
->>> for the secondary CPU boot regression addressed by the
->>> fixed remappings patch.
->>
->> kernelci.org has had the ste-snowall failing in v4.2 stable[1] for
+Hi Kedar,
 
-Note the failure was for v4.2 stable...
+On Thu, 2015-10-22 at 10:15AM +0530, Kedareswara rao Appana wrote:
+> Instead of enabling/disabling clocks at several locations in the driver,
+> Use the runtime_pm framework. This consolidates the actions for runtime PM
+> In the appropriate callbacks and makes the driver more readable and mantainable.
+> 
+> Signed-off-by: Kedareswara rao Appana <appanad@xilinx.com>
+[...]
+>  /**
+>   * xcan_probe - Platform registration call
+> @@ -1072,7 +1103,7 @@ static int xcan_probe(struct platform_device *pdev)
+>  		return -ENOMEM;
+>  
+>  	priv = netdev_priv(ndev);
+> -	priv->dev = ndev;
+> +	priv->dev = &pdev->dev;
+>  	priv->can.bittiming_const = &xcan_bittiming_const;
+>  	priv->can.do_set_mode = xcan_do_set_mode;
+>  	priv->can.do_get_berr_counter = xcan_get_berr_counter;
+> @@ -1114,21 +1145,30 @@ static int xcan_probe(struct platform_device *pdev)
+>  		}
+>  	}
+>  
+> -	ret = clk_prepare_enable(priv->can_clk);
+> +	ret = clk_prepare(priv->can_clk);
+>  	if (ret) {
+>  		dev_err(&pdev->dev, "unable to enable device clock\n");
+>  		goto err_free;
+>  	}
+>  
+> -	ret = clk_prepare_enable(priv->bus_clk);
+> +	ret = clk_prepare(priv->bus_clk);
 
->> awhile, so I finally bisected[2] it down to this patch, which is in
->> mainline in the form of commit bf64dd262eaa (ARM: ux500: add an SMP
->> enablement type and move cpu nodes).  I confirmed that reverting that
->> commit on top of v4.2 gets the snowball booting again.
->>
->> Kevin
->>
->> [1] http://kernelci.org/boot/all/job/stable/kernel/v4.2.3/
->> [2] https://ci.linaro.org/view/people/job/tbaker-boot-bisect-bot/102/console
->
-> OK I tested the u8500_defconfig and it still works fine on
-> Snowball. So I have no clue what is causing this :(
-> (See below for my bootlog.)
->
-> - I first thought it was a multiplatform issue but it seems
->   not AFAICT from the logs.
+Are these clk_prepare calls needed here? The runtime PM calls do
+clk_prepare_enable and clk_disable_unprepare.
 
-It fails on both mutli_v7_defconfig and u8500_defconfig.
+>  	if (ret) {
+>  		dev_err(&pdev->dev, "unable to enable bus clock\n");
+> -		goto err_unprepare_disable_dev;
+> +		goto err_unprepare_dev;
+>  	}
+>  
+>  	priv->write_reg = xcan_write_reg_le;
+>  	priv->read_reg = xcan_read_reg_le;
+>  
+> +	pm_runtime_irq_safe(&pdev->dev);
+> +	pm_runtime_enable(&pdev->dev);
+> +	ret = pm_runtime_get_sync(&pdev->dev);
+> +	if (ret < 0) {
+> +		netdev_err(ndev, "%s: pm_runtime_get failed(%d)\n",
+> +			__func__, ret);
+> +		goto err_unprepare_busclk;
+> +	}
+> +
+>  	if (priv->read_reg(priv, XCAN_SR_OFFSET) != XCAN_SR_CONFIG_MASK) {
+>  		priv->write_reg = xcan_write_reg_be;
+>  		priv->read_reg = xcan_read_reg_be;
+> @@ -1141,22 +1181,26 @@ static int xcan_probe(struct platform_device *pdev)
+>  	ret = register_candev(ndev);
+>  	if (ret) {
+>  		dev_err(&pdev->dev, "fail to register failed (err=%d)\n", ret);
+> -		goto err_unprepare_disable_busclk;
+> +		goto err_disableclks;
+>  	}
+>  
+>  	devm_can_led_init(ndev);
+> -	clk_disable_unprepare(priv->bus_clk);
+> -	clk_disable_unprepare(priv->can_clk);
+> +
+> +	pm_runtime_put(&pdev->dev);
+> +
+>  	netdev_dbg(ndev, "reg_base=0x%p irq=%d clock=%d, tx fifo depth:%d\n",
+>  			priv->reg_base, ndev->irq, priv->can.clock.freq,
+>  			priv->tx_max);
+>  
+>  	return 0;
+>  
+> -err_unprepare_disable_busclk:
+> -	clk_disable_unprepare(priv->bus_clk);
+> -err_unprepare_disable_dev:
+> -	clk_disable_unprepare(priv->can_clk);
+> +err_disableclks:
+> +	pm_runtime_put(priv->dev);
+> +err_unprepare_busclk:
+> +	pm_runtime_disable(&pdev->dev);
+> +	clk_unprepare(priv->bus_clk);
+> +err_unprepare_dev:
+> +	clk_unprepare(priv->can_clk);
+>  err_free:
+>  	free_candev(ndev);
+>  err:
+> @@ -1175,11 +1219,11 @@ static int xcan_remove(struct platform_device *pdev)
+>  	struct net_device *ndev = platform_get_drvdata(pdev);
+>  	struct xcan_priv *priv = netdev_priv(ndev);
+>  
+> -	if (set_reset_mode(ndev) < 0)
+> -		netdev_err(ndev, "mode resetting failed!\n");
+> -
+>  	unregister_candev(ndev);
+> +	pm_runtime_disable(&pdev->dev);
+>  	netif_napi_del(&priv->napi);
+> +	clk_unprepare(priv->bus_clk);
+> +	clk_unprepare(priv->can_clk);
 
-> - Is the CI boot is using the latest device tree from
->   arch/arm/boot/dts/ste-snowball.dts?
+I think this can go away when the prepare calls in probe go away.
 
-Yes, it always uses the DT from the same tree that the kernel is built from.
-
-> 5070] starting kernel at 0x00008000, machine 3293
-> [    0.000000] Booting Linux on physical CPU 0x300
-> [    0.000000] Linux version 4.3.0-rc6-00001-gdff502ea54cb
-
-Ah, you're using mainline.  The boot failure we found is in stable
-v4.2 (and v4.1) which suggests that there's a patch/fix that's
-upstream but not yet backported to stable.
-
-Kevin
+	Thanks,
+	S?ren
