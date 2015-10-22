@@ -1,33 +1,239 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 22 Oct 2015 10:47:30 +0200
-Subject: [PATCH 2/4] cpufreq: imx6q: Fix wrong device in devm_kzalloc
+Date: Thu, 22 Oct 2015 10:47:31 +0200
+Subject: [PATCH 3/4] cpufreq: imx6q: Fix regulator/clock error handling
 In-Reply-To: <1445503652-777-1-git-send-email-s.hauer@pengutronix.de>
 References: <1445503652-777-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1445503652-777-3-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1445503652-777-4-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-devm_kzalloc must be called with the device that is actually probed,
-not with cpu_dev which resources are not freed when probe fails.
+When one of the regulator_get/clk_get calls fails the driver just
+returns -ENOENT. To properly handle the -EPROBE_DEFER case we have
+to forward the actual error value instead. This patch fixes that.
+
+Since all clocks/regulators are global static variables the IS_ERR()
+check in the error path in probe() may erroneously work on the values
+assigned in the previous probe run. This means we have to reinitialize
+the variables between two probe runs().
+
+The probe function already is quite overloaded, so this patch moves
+the regulator and clock allocation into a separate function and the
+dropping of these resourced into a corresponding cleanup function.
+This is easier to review for correctness than the current mix of
+reverse-cleanup and !IS_ERR checks at the end of probe().
+
+While at it leave a comment that these resource allocations can't use
+devm_* to prevent people from trying to convert it.
 
 Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 ---
- drivers/cpufreq/imx6q-cpufreq.c | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ drivers/cpufreq/imx6q-cpufreq.c | 166 ++++++++++++++++++++++++----------------
+ 1 file changed, 102 insertions(+), 64 deletions(-)
 
 diff --git a/drivers/cpufreq/imx6q-cpufreq.c b/drivers/cpufreq/imx6q-cpufreq.c
-index fabd144..7557d1e 100644
+index 7557d1e..ce0c6bd 100644
 --- a/drivers/cpufreq/imx6q-cpufreq.c
 +++ b/drivers/cpufreq/imx6q-cpufreq.c
-@@ -260,7 +260,8 @@ static int imx6q_cpufreq_probe(struct platform_device *pdev)
+@@ -176,6 +176,99 @@ static struct cpufreq_driver imx6q_cpufreq_driver = {
+ 	.attr = cpufreq_generic_attr,
+ };
+ 
++static int imx6q_cpufreq_get_resources(struct platform_device *pdev)
++{
++	/*
++	 * Do not use devm_* here. The resources are bound to the
++	 * cpu_dev and not to this drivers platform_device.
++	 */
++	arm_clk = clk_get(cpu_dev, "arm");
++	if (IS_ERR(arm_clk))
++		return PTR_ERR(arm_clk);
++
++	pll1_sys_clk = clk_get(cpu_dev, "pll1_sys");
++	if (IS_ERR(pll1_sys_clk))
++		return PTR_ERR(pll1_sys_clk);
++
++	pll1_sw_clk = clk_get(cpu_dev, "pll1_sw");
++	if (IS_ERR(pll1_sw_clk))
++		return PTR_ERR(pll1_sw_clk);
++
++	step_clk = clk_get(cpu_dev, "step");
++	if (IS_ERR(step_clk))
++		return PTR_ERR(step_clk);
++
++	pll2_pfd2_396m_clk = clk_get(cpu_dev, "pll2_pfd2_396m");
++	if (IS_ERR(pll2_pfd2_396m_clk))
++		return PTR_ERR(pll2_pfd2_396m_clk);
++
++	if (of_machine_is_compatible("fsl,imx6ul")) {
++		pll2_bus_clk = clk_get(cpu_dev, "pll2_bus");
++		if (IS_ERR(pll2_bus_clk))
++			return PTR_ERR(pll2_bus_clk);
++
++		secondary_sel_clk = clk_get(cpu_dev, "secondary_sel");
++		if (IS_ERR(secondary_sel_clk))
++			return PTR_ERR(secondary_sel_clk);
++	}
++
++	arm_reg = regulator_get(cpu_dev, "arm");
++	if (IS_ERR(arm_reg))
++		return PTR_ERR(arm_reg);
++
++	pu_reg = regulator_get_optional(cpu_dev, "pu");
++
++	soc_reg = regulator_get(cpu_dev, "soc");
++	if (IS_ERR(soc_reg))
++		return PTR_ERR(soc_reg);
++
++	return 0;
++}
++
++
++static void imx6q_cpufreq_put_resources(void)
++{
++	if (!IS_ERR_OR_NULL(arm_reg))
++		regulator_put(arm_reg);
++	arm_reg = NULL;
++
++	if (!IS_ERR_OR_NULL(pu_reg))
++		regulator_put(pu_reg);
++	pu_reg = NULL;
++
++	if (!IS_ERR_OR_NULL(soc_reg))
++		regulator_put(soc_reg);
++	soc_reg = NULL;
++
++	if (!IS_ERR_OR_NULL(arm_clk))
++		clk_put(arm_clk);
++	arm_clk = NULL;
++
++	if (!IS_ERR_OR_NULL(pll1_sys_clk))
++		clk_put(pll1_sys_clk);
++	pll1_sys_clk = NULL;
++
++	if (!IS_ERR_OR_NULL(pll1_sw_clk))
++		clk_put(pll1_sw_clk);
++	pll1_sw_clk = NULL;
++
++	if (!IS_ERR_OR_NULL(step_clk))
++		clk_put(step_clk);
++	step_clk = NULL;
++
++	if (!IS_ERR_OR_NULL(pll2_pfd2_396m_clk))
++		clk_put(pll2_pfd2_396m_clk);
++	pll2_pfd2_396m_clk = NULL;
++
++	if (!IS_ERR_OR_NULL(pll2_bus_clk))
++		clk_put(pll2_bus_clk);
++	pll2_bus_clk = NULL;
++
++	if (!IS_ERR_OR_NULL(secondary_sel_clk))
++		clk_put(secondary_sel_clk);
++	secondary_sel_clk = NULL;
++}
++
+ static int imx6q_cpufreq_probe(struct platform_device *pdev)
+ {
+ 	struct device_node *np;
+@@ -198,36 +291,9 @@ static int imx6q_cpufreq_probe(struct platform_device *pdev)
+ 		return -ENOENT;
  	}
  
- 	/* Make imx6_soc_volt array's size same as arm opp number */
--	imx6_soc_volt = devm_kzalloc(cpu_dev, sizeof(*imx6_soc_volt) * num, GFP_KERNEL);
-+	imx6_soc_volt = devm_kzalloc(&pdev->dev,
-+			sizeof(*imx6_soc_volt) * num, GFP_KERNEL);
- 	if (imx6_soc_volt == NULL) {
- 		ret = -ENOMEM;
- 		goto free_freq_table;
+-	arm_clk = clk_get(cpu_dev, "arm");
+-	pll1_sys_clk = clk_get(cpu_dev, "pll1_sys");
+-	pll1_sw_clk = clk_get(cpu_dev, "pll1_sw");
+-	step_clk = clk_get(cpu_dev, "step");
+-	pll2_pfd2_396m_clk = clk_get(cpu_dev, "pll2_pfd2_396m");
+-	if (IS_ERR(arm_clk) || IS_ERR(pll1_sys_clk) || IS_ERR(pll1_sw_clk) ||
+-	    IS_ERR(step_clk) || IS_ERR(pll2_pfd2_396m_clk)) {
+-		dev_err(cpu_dev, "failed to get clocks\n");
+-		ret = -ENOENT;
+-		goto put_clk;
+-	}
+-
+-	if (of_machine_is_compatible("fsl,imx6ul")) {
+-		pll2_bus_clk = clk_get(cpu_dev, "pll2_bus");
+-		secondary_sel_clk = clk_get(cpu_dev, "secondary_sel");
+-		if (IS_ERR(pll2_bus_clk) || IS_ERR(secondary_sel_clk)) {
+-			dev_err(cpu_dev, "failed to get clocks specific to imx6ul\n");
+-			ret = -ENOENT;
+-			goto put_clk;
+-		}
+-	}
+-
+-	arm_reg = regulator_get(cpu_dev, "arm");
+-	pu_reg = regulator_get_optional(cpu_dev, "pu");
+-	soc_reg = regulator_get(cpu_dev, "soc");
+-	if (IS_ERR(arm_reg) || IS_ERR(soc_reg)) {
+-		dev_err(cpu_dev, "failed to get regulators\n");
+-		ret = -ENOENT;
+-		goto put_reg;
+-	}
++	ret = imx6q_cpufreq_get_resources(pdev);
++	if (ret)
++		goto drop_resources;
+ 
+ 	/*
+ 	 * We expect an OPP table supplied by platform.
+@@ -239,7 +305,7 @@ static int imx6q_cpufreq_probe(struct platform_device *pdev)
+ 		ret = dev_pm_opp_of_add_table(cpu_dev);
+ 		if (ret < 0) {
+ 			dev_err(cpu_dev, "failed to init OPP table: %d\n", ret);
+-			goto put_reg;
++			goto drop_resources;
+ 		}
+ 
+ 		/* Because we have added the OPPs here, we must free them */
+@@ -348,28 +414,9 @@ free_freq_table:
+ out_free_opp:
+ 	if (free_opp)
+ 		dev_pm_opp_of_remove_table(cpu_dev);
+-put_reg:
+-	if (!IS_ERR(arm_reg))
+-		regulator_put(arm_reg);
+-	if (!IS_ERR(pu_reg))
+-		regulator_put(pu_reg);
+-	if (!IS_ERR(soc_reg))
+-		regulator_put(soc_reg);
+-put_clk:
+-	if (!IS_ERR(arm_clk))
+-		clk_put(arm_clk);
+-	if (!IS_ERR(pll1_sys_clk))
+-		clk_put(pll1_sys_clk);
+-	if (!IS_ERR(pll1_sw_clk))
+-		clk_put(pll1_sw_clk);
+-	if (!IS_ERR(step_clk))
+-		clk_put(step_clk);
+-	if (!IS_ERR(pll2_pfd2_396m_clk))
+-		clk_put(pll2_pfd2_396m_clk);
+-	if (!IS_ERR(pll2_bus_clk))
+-		clk_put(pll2_bus_clk);
+-	if (!IS_ERR(secondary_sel_clk))
+-		clk_put(secondary_sel_clk);
++drop_resources:
++	imx6q_cpufreq_put_resources();
++
+ 	of_node_put(np);
+ 	return ret;
+ }
+@@ -380,17 +427,8 @@ static int imx6q_cpufreq_remove(struct platform_device *pdev)
+ 	dev_pm_opp_free_cpufreq_table(cpu_dev, &freq_table);
+ 	if (free_opp)
+ 		dev_pm_opp_of_remove_table(cpu_dev);
+-	regulator_put(arm_reg);
+-	if (!IS_ERR(pu_reg))
+-		regulator_put(pu_reg);
+-	regulator_put(soc_reg);
+-	clk_put(arm_clk);
+-	clk_put(pll1_sys_clk);
+-	clk_put(pll1_sw_clk);
+-	clk_put(step_clk);
+-	clk_put(pll2_pfd2_396m_clk);
+-	clk_put(pll2_bus_clk);
+-	clk_put(secondary_sel_clk);
++
++	imx6q_cpufreq_put_resources();
+ 
+ 	return 0;
+ }
 -- 
 2.6.1
