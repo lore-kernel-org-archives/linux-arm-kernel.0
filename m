@@ -1,115 +1,57 @@
-From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Thu, 22 Oct 2015 14:22:33 +0100
-Subject: [PATCH] arm64: dts: Add idle-states for Juno
-In-Reply-To: <1430402268.2868.20.camel@linaro.org> (Jon Medhurst's message of
- "Thu, 30 Apr 2015 14:57:48 +0100")
-References: <1430402268.2868.20.camel@linaro.org>
-Message-ID: <9hheggnca1y.fsf@e105922-lin.cambridge.arm.com>
+From: eric.auger@linaro.org (Eric Auger)
+Date: Thu, 22 Oct 2015 15:26:55 +0200
+Subject: [PATCH v2 6/6] vfio: platform: move get/put reset at open/release
+In-Reply-To: <4304536.D7eNHjlsvD@wuerfel>
+References: <1445506922-6005-1-git-send-email-eric.auger@linaro.org>
+ <1445506922-6005-7-git-send-email-eric.auger@linaro.org>
+ <4304536.D7eNHjlsvD@wuerfel>
+Message-ID: <5628E41F.5050602@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-"Jon Medhurst (Tixy)" <tixy@linaro.org> writes:
+On 10/22/2015 12:29 PM, Arnd Bergmann wrote:
+> On Thursday 22 October 2015 11:42:02 Eric Auger wrote:
+>> Currently reset lookup is done on probe. This introduces a
+>> race with new registration mechanism in the case where the
+>> vfio-platform driver is bound to the device before its module
+>> is loaded: on the load, the probe happens which triggers the
+>> reset module load which itself attempts to get the symbol for
+>> the registration function (vfio_platform_register_reset). The
+>> symbol is not yet available hence the lookup fails. In case we
+>> do the lookup in the first open we are sure the vfio-platform
+>> module is loaded and vfio_platform_register_reset is available.
+>>
+>> Signed-off-by: Eric Auger <eric.auger@linaro.org>
+> 
+> I don't understand the explanation. I would expect the request_module()
+> call to block until the module is actually loaded. Is this not
+> what happens?
+> 
+>>         mutex_unlock(&driver_lock);
+>> @@ -181,6 +182,8 @@ static int vfio_platform_open(void *device_data)
+>>                 if (ret)
+>>                         goto err_irq;
+>>  
+>> +               vfio_platform_get_reset(vdev);
+>> +
+>>                 if (vdev->reset)
+>>                         vdev->reset(vdev);
+>>
+> 
+> This needs some error handling to ensure that the open() fails
+> if there is no reset handler.
 
-> From: Jon Medhurst <tixy@linaro.org>
->
-> Signed-off-by: Jon Medhurst <tixy@linaro.org>
+Is that really what we want? The code was meant to allow the use case
+where the VFIO platform driver would be used without such reset module.
 
-Apologies for resurrecting an old thread.
+I think the imperious need for a reset module depends on the device and
+more importantly depends on the IOMMU mapping. With QEMU VFIO
+integration this is needed because the whole VM memory is IOMMU mapped
+but in a simpler user-space driver context, we might live without.
 
-Following the discussion on this thread, even though certain concerns
-were raised, there wasn't any objection to $SUBJECT being merged.
+Any thought?
 
-I don't see this patch in any tree; perhaps it's slipped through the
-cracks.
-
-Could this be merged please?
-
-> ---
->
-> These have been kicking around out of tree for ages, any reason they
-> shouldn't be in mainline? Also, was unsure of what to put in commit
-> message.
->
->  arch/arm64/boot/dts/arm/juno.dts | 28 ++++++++++++++++++++++++++++
->  1 file changed, 28 insertions(+)
->
-> diff --git a/arch/arm64/boot/dts/arm/juno.dts b/arch/arm64/boot/dts/arm/juno.dts
-> index 133ee59..7a9a449 100644
-> --- a/arch/arm64/boot/dts/arm/juno.dts
-> +++ b/arch/arm64/boot/dts/arm/juno.dts
-> @@ -34,12 +34,35 @@
->  		#address-cells = <2>;
->  		#size-cells = <0>;
->  
-> +		idle-states {
-> +			entry-method = "arm,psci";
-> +
-> +			CPU_SLEEP_0: cpu-sleep-0 {
-> +				compatible = "arm,idle-state";
-> +				arm,psci-suspend-param = <0x0010000>;
-> +				local-timer-stop;
-> +				entry-latency-us = <100>;
-> +				exit-latency-us = <250>;
-> +				min-residency-us = <2000>;
-> +			};
-> +
-> +			CLUSTER_SLEEP_0: cluster-sleep-0 {
-> +				compatible = "arm,idle-state";
-> +				arm,psci-suspend-param = <0x1010000>;
-> +				local-timer-stop;
-> +				entry-latency-us = <800>;
-> +				exit-latency-us = <700>;
-> +				min-residency-us = <2500>;
-> +			};
-> +		};
-> +
->  		A57_0: cpu at 0 {
->  			compatible = "arm,cortex-a57","arm,armv8";
->  			reg = <0x0 0x0>;
->  			device_type = "cpu";
->  			enable-method = "psci";
->  			next-level-cache = <&A57_L2>;
-> +			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
->  		};
->  
->  		A57_1: cpu at 1 {
-> @@ -48,6 +71,7 @@
->  			device_type = "cpu";
->  			enable-method = "psci";
->  			next-level-cache = <&A57_L2>;
-> +			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
->  		};
->  
->  		A53_0: cpu at 100 {
-> @@ -56,6 +80,7 @@
->  			device_type = "cpu";
->  			enable-method = "psci";
->  			next-level-cache = <&A53_L2>;
-> +			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
->  		};
->  
->  		A53_1: cpu at 101 {
-> @@ -64,6 +89,7 @@
->  			device_type = "cpu";
->  			enable-method = "psci";
->  			next-level-cache = <&A53_L2>;
-> +			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
->  		};
->  
->  		A53_2: cpu at 102 {
-> @@ -72,6 +98,7 @@
->  			device_type = "cpu";
->  			enable-method = "psci";
->  			next-level-cache = <&A53_L2>;
-> +			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
->  		};
->  
->  		A53_3: cpu at 103 {
-> @@ -80,6 +107,7 @@
->  			device_type = "cpu";
->  			enable-method = "psci";
->  			next-level-cache = <&A53_L2>;
-> +			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
->  		};
->  
->  		A57_L2: l2-cache0 {
+Eric
+> 
+> 	Arnd
+> 
