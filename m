@@ -1,39 +1,40 @@
-From: jenskuske@gmail.com (Jens Kuske)
-Date: Thu, 22 Oct 2015 13:30:42 +0200
-Subject: [PATCH 5/6] ARM: dts: sunxi: Add Allwinner H3 DTSI
-In-Reply-To: <20151022091410.GW10947@lukather>
-References: <1445444428-4652-1-git-send-email-jenskuske@gmail.com>
- <1445444428-4652-2-git-send-email-jenskuske@gmail.com>
- <20151022080508.GN10947@lukather> <20151022102959.09f0a1f4@OPI2>
- <20151022084735.GR10947@lukather> <20151022105745.2cc158a3@OPI2>
- <20151022091410.GW10947@lukather>
-Message-ID: <5628C8E2.6040703@gmail.com>
+From: eric.auger@linaro.org (Eric Auger)
+Date: Thu, 22 Oct 2015 13:54:42 +0200
+Subject: [PATCH v2 3/6] vfio: platform: reset: calxedaxgmac: add reset
+ function registration
+In-Reply-To: <4810974.apRDTjc3oB@wuerfel>
+References: <1445506922-6005-1-git-send-email-eric.auger@linaro.org>
+ <1445506922-6005-4-git-send-email-eric.auger@linaro.org>
+ <4810974.apRDTjc3oB@wuerfel>
+Message-ID: <5628CE82.7090105@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22/10/15 11:14, Maxime Ripard wrote:
-> On Thu, Oct 22, 2015 at 10:57:45AM +0200, Jean-Francois Moine wrote:
->> On Thu, 22 Oct 2015 10:47:35 +0200
->> Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
+On 10/22/2015 12:13 PM, Arnd Bergmann wrote:
+> On Thursday 22 October 2015 11:41:59 Eric Auger wrote:
+>> This patch adds the reset function registration/unregistration.
 >>
->>> Not really. The uart0 reset is the bit 16, in the reset register 4.
->>>
->>> 4 * 32 + 16 = 44.
->>>
->>> Not 112, but still not 208 either.
->>
->> The registers are numbered 1..5, then
->>
->> (4 - 1) * 32 + 16 = 112
+>> Signed-off-by: Eric Auger <eric.auger@linaro.org>
 > 
-> Not on my version, and even then, UARTs are on the last reset
-> register, which would still make 144.
+> Looks good, except one thing:
+>> @@ -70,6 +69,8 @@ int vfio_platform_calxedaxgmac_reset(struct vfio_platform_device *vdev)
+>>  			return -ENOMEM;
+>>  	}
+>>  
+>> +	pr_info("VFIO reset of %s\n", vdev->name);
+>> +
+>>  	/* disable IRQ */
+>>  	writel(0, reg.ioaddr + XGMAC_DMA_INTR_ENA);
+>>  
 > 
-> Maxime
-> 
+> This probably slipped in from debugging, please remove it.
+Well actually this is not an oversight but some unappropriate tracing
+attempt I am afraid. I wanted to add a trace useful for the end-user to
+make sure the VFIO reset function was called. Do you forbid that or do
+recommend to use another tracing mechanism/level? In the past I tried
+dynamic tracing but with module loading mechanism I found it not that handy.
 
-There are holes between reg2 and reg3 and reg4 for some reason, but even
-if we would correct that with some of_xlate() function they won't
-completely line up with the gates.
-
-Jens
+Eric
+> 
+> 	Arnd
+> 
