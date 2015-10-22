@@ -1,161 +1,139 @@
-From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
-Date: Thu, 22 Oct 2015 15:03:37 +0200
-Subject: [PATCH v6 04/22] of: add function to allow probing a device from
- a OF node
-In-Reply-To: <10119606.2TraDKGPVy@vostro.rjw.lan>
-References: <1442844182-27787-1-git-send-email-tomeu.vizoso@collabora.com>
- <1442844182-27787-5-git-send-email-tomeu.vizoso@collabora.com>
- <10119606.2TraDKGPVy@vostro.rjw.lan>
-Message-ID: <CAAObsKCAX4DQGydQoYjJEYKTOEqpVozXdHnqXWdNYVkLsg7BVg@mail.gmail.com>
+From: linux.amoon@gmail.com (Anand Moon)
+Date: Thu, 22 Oct 2015 18:34:17 +0530
+Subject: [PATCHv2] ARM: dts: use vmmc-supply of emmc/sd for
+ exynos5422-odroidxu3
+In-Reply-To: <56283582.5010908@samsung.com>
+References: <1445345793-5189-1-git-send-email-linux.amoon@gmail.com>
+ <56283582.5010908@samsung.com>
+Message-ID: <CANAwSgQFqcM++D6FoTXTnZJryaoi92pEiSvbjyz8rj79VmGOMQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22 October 2015 at 03:06, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
-> On Monday, September 21, 2015 04:02:44 PM Tomeu Vizoso wrote:
->> Walks the OF tree up and finds the closest ancestor that has a struct
->> device associated with it, probing it if isn't bound to a driver yet.
+hi Krzysztof,
+
+On 22 October 2015 at 06:31, Krzysztof Kozlowski
+<k.kozlowski@samsung.com> wrote:
+> On 20.10.2015 21:56, Anand Moon wrote:
+>> Changes need for host controller to detect UHS-I highspeed cards.
+>> Changes in VDDQ_MMC2 voltage range help scale
+>> the required voltage to detect and load the microSD cards.
+>
+> Thanks for updating description of commit.
+>
 >>
->> The above should ensure that the dependency represented by the passed OF
->> node is available, because probing a device should cause its descendants
->> to be probed as well (when they get registered).
->>
->> Subsystems can use this when looking up resources for drivers, to reduce
->> the chances of deferred probes because of the probing order of devices.
->>
->> Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
+>> Signed-off-by: Anand Moon <linux.amoon@gmail.com>
 >> ---
+>> Changes based on git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git v4.4-next/dt-samsung branch
 >>
->> Changes in v5:
->> - Move the assignment to device_node->device for AMBA devices to another
->>   commit.
->> - Hold a reference to the struct device while it's in use in
->>   of_device_probe().
+>> Changes:
+>> Drop the ranp_delay for LDO9.
 >>
->> Changes in v4:
->> - Rename of_platform_probe to of_device_probe
->> - Use device_node.device instead of device_node.platform_dev
+>> Thanks to : Krzysztof, Doug Anderson, Jaehoon Chung for helping
+>> me out figure out the mmc core requirement.
 >>
->> Changes in v3:
->> - Set and use device_node.platform_dev instead of reversing the logic to
->>   find the platform device that encloses a device node.
->> - Drop the fwnode API to probe firmware nodes and add OF-only API for
->>   now. I think this same scheme could be used for machines with ACPI,
->>   but I haven't been able to find one that had to defer its probes because
->>   of the device probe order.
+>> Also drop the previous changes:
+>> use cd-gpio method to detect sd-card.
+>> Added UHS-I bus speed support.
 >>
->>  drivers/of/device.c       | 61 +++++++++++++++++++++++++++++++++++++++++++++++
->>  include/linux/of_device.h |  3 +++
->>  2 files changed, 64 insertions(+)
+>> [    4.713553] random: nonblocking pool is initialized
+>> [    4.718423] 14530000.hdmi supply hdmi-en not found, using dummy regulator
+>> [    4.726206] exynos-drm exynos-drm: bound 14400000.fimd (ops fimd_component_ops)
+>> [    4.732555] exynos-drm exynos-drm: bound 14450000.mixer (ops mixer_component_ops)
+>> [    4.740180] exynos-drm exynos-drm: bound 14530000.hdmi (ops hdmi_component_ops)
+>> [    4.746936] [drm] Supports vblank timestamp caching Rev 2 (21.10.2013).
+>> [    4.753428] [drm] No driver support for vblank timestamp query.
+>> [    4.940794] Console: switching to colour frame buffer device 274x77
+>> [    4.995344] exynos-drm exynos-drm: fb0:  frame buffer device
+>> [    5.024573] [drm] Initialized exynos 1.0.0 20110530 on minor 0
+>> [    5.031164] exynos-dwc3 usb at 12000000: no suspend clk specified
+>> [    5.054571] usb 2-1: new full-speed USB device number 2 using exynos-ohci
+>> [    5.159527] dwmmc_exynos 12220000.mmc: Busy; trying anyway
+>> [    5.163705] mmc_host mmc1: Timeout sending command (cmd 0x202000 arg 0x0 status 0x0)
+>> ---
+>>  arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi | 7 ++++++-
+>>  1 file changed, 6 insertions(+), 1 deletion(-)
 >>
->> diff --git a/drivers/of/device.c b/drivers/of/device.c
->> index 8b91ea241b10..836be71fc90e 100644
->> --- a/drivers/of/device.c
->> +++ b/drivers/of/device.c
->> @@ -286,3 +286,64 @@ int of_device_uevent_modalias(struct device *dev, struct kobj_uevent_env *env)
+>> diff --git a/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
+>> index 1af5bdc..a4be3e0 100644
+>> --- a/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
+>> +++ b/arch/arm/boot/dts/exynos5422-odroidxu3-common.dtsi
+>> @@ -182,9 +182,10 @@
 >>
->>       return 0;
->>  }
->> +
->> +/**
->> + * of_device_probe() - Probe device associated with OF node
->> + * @np: node to probe
->> + *
->> + * Probe the device associated with the passed device node.
->> + */
->> +void of_device_probe(struct device_node *np)
+>>                       ldo13_reg: LDO13 {
+>>                               regulator-name = "vdd_ldo13";
+>> -                             regulator-min-microvolt = <2800000>;
+>> +                             regulator-min-microvolt = <1800000>;
 >
-> Same question as from Greg: How does a subsystem know whether or not to use
-> this function?
+> You did not convinced me in previous discussion about the change to
+> 1.8V. I said that:
+>> On the same diagram few lines below:
+>> VDDQ_MMC2: 2.8V 250mA
+>
+> You responded:
+>> You are correct.
+>
+> So I am confused. Are you sure that this SD card block can/should
+> operate on 1.8V? Have you actually tried this?
+>
 
-Maybe I don't understand the comment, but as the commit message says,
-subsystems can use this when looking up resources for drivers. Or you
-mean that this information should be in the API docs?
+Look like I missed this point. Here is the link I would like to share.
 
-Thanks,
+http://www.hjreggel.net/cardspeed/cs_sdxc.html
+Section: Summary of SD modes
 
-Tomeu
+https://en.wikipedia.org/wiki/Secure_Digital
+Section: Power consumption
 
->> +{
->> +     struct device_node *target;
->> +     struct device *dev = NULL;
->> +
->> +     if (!of_root || !of_node_check_flag(of_root, OF_POPULATED_BUS))
->> +             return;
->> +
->> +     if (!np)
->> +             return;
->> +
->> +     of_node_get(np);
->> +
->> +     /* Find the closest ancestor that has a device associated */
->> +     for (target = np;
->> +          !of_node_is_root(target);
->> +          target = of_get_next_parent(target))
->> +             if (get_device(target->device)) {
->> +                     dev = target->device;
->> +                     break;
->> +             }
->> +
->> +     of_node_put(target);
->> +
->> +     if (!dev) {
->> +             pr_warn("Couldn't find a device for node '%s'\n",
->> +                     of_node_full_name(np));
->> +             return;
->> +     }
->> +
->> +     /*
->> +      * Device is bound or is being probed right now. If we have bad luck
->> +      * and the dependency isn't ready when it's needed, deferred probe
->> +      * will save us.
->> +      */
->> +     if (dev->driver)
->> +             goto out;
->> +
->> +     /*
->> +      * Probing a device should cause its descendants to be probed as
->> +      * well, which includes the passed device node.
->> +      */
->> +     if (device_attach(dev) != 1)
->> +             /*
->> +              * This cannot be a warning for now because clock nodes have a
->> +              * compatible string but the clock framework doesn't follow
->> +              * the device/driver model yet.
->> +              */
->> +             dev_dbg(dev, "Probe failed for %s\n", of_node_full_name(np));
->> +
->> +out:
->> +     put_device(dev);
->> +}
->> +EXPORT_SYMBOL_GPL(of_device_probe);
->> diff --git a/include/linux/of_device.h b/include/linux/of_device.h
->> index cc7dd687a89d..da8d489e73ad 100644
->> --- a/include/linux/of_device.h
->> +++ b/include/linux/of_device.h
->> @@ -40,6 +40,7 @@ extern ssize_t of_device_get_modalias(struct device *dev,
+Their different requirement for voltage requirement for UHS-I, the max
+value is around 3.3V
+
+>>                               regulator-max-microvolt = <2800000>;
+>>                               regulator-always-on;
+>> +                             regulator-ramp-delay = <12000>;
+>
+> NAK
+>
+> We've been talking about this. Sooo maaaanyyyy times.
+>
+> If you are going to send v3 please come up with detailed reasoning,
+> which will convince my stubborn mind.
+>
+
+Look like I missed this point. my typo. Will drop this in next version.
+No matter I try hard, it turn out I make silly and annoying mistake.
+
+-Anand Moon
+
+> Best regards,
+> Krzysztof
+>
+>>                       };
 >>
->>  extern void of_device_uevent(struct device *dev, struct kobj_uevent_env *env);
->>  extern int of_device_uevent_modalias(struct device *dev, struct kobj_uevent_env *env);
->> +extern void of_device_probe(struct device_node *np);
+>>                       ldo15_reg: LDO15 {
+>> @@ -213,6 +214,7 @@
+>>                               regulator-min-microvolt = <2800000>;
+>>                               regulator-max-microvolt = <2800000>;
+>>                               regulator-always-on;
+>> +                             regulator-ramp-delay = <12000>;
+>>                       };
 >>
->>  static inline void of_device_node_put(struct device *dev)
->>  {
->> @@ -84,6 +85,8 @@ static inline int of_device_uevent_modalias(struct device *dev,
->>       return -ENODEV;
->>  }
+>>                       ldo24_reg: LDO24 {
+>> @@ -338,6 +340,7 @@
+>>       samsung,dw-mshc-ddr-timing = <0 2>;
+>>       samsung,dw-mshc-hs400-timing = <0 2>;
+>>       samsung,read-strobe-delay = <90>;
+>> +     vmmc-supply = <&ldo3_reg>;
+>>       pinctrl-names = "default";
+>>       pinctrl-0 = <&sd0_clk &sd0_cmd &sd0_bus1 &sd0_bus4 &sd0_bus8 &sd0_cd &sd0_rclk>;
+>>       bus-width = <8>;
+>> @@ -355,6 +358,8 @@
+>>       pinctrl-names = "default";
+>>       pinctrl-0 = <&sd2_clk &sd2_cmd &sd2_cd &sd2_bus1 &sd2_bus4>;
+>>       bus-width = <4>;
+>> +     vmmc-supply = <&ldo19_reg>;
+>> +     vqmmc-supply = <&ldo13_reg>;
+>>       cap-sd-highspeed;
+>>  };
 >>
->> +static inline void of_device_probe(struct device_node *np) { }
->> +
->>  static inline void of_device_node_put(struct device *dev) { }
->>
->>  static inline const struct of_device_id *__of_match_device(
 >>
 >
-> --
-> I speak only for myself.
-> Rafael J. Wysocki, Intel Open Source Technology Center.
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
