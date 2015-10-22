@@ -1,41 +1,45 @@
-From: caesar.upstream@gmail.com (Caesar Wang)
-Date: Thu, 22 Oct 2015 09:27:55 +0800
-Subject: [PATCH v1 1/2] dt-bindings: Sync the dts to this document
-In-Reply-To: <CAL_JsqJFO8u0-3BSwBrBh4m7z4iEDPYLeEM9Ef8SLvuj1FYXmg@mail.gmail.com>
-References: <1445395380-5365-1-git-send-email-wxt@rock-chips.com>
- <1445395380-5365-2-git-send-email-wxt@rock-chips.com>
- <CAL_JsqJ6ZRjZbtc7dqo-g=CzO+H_FWcRqs2gBGH2HMBBM1xU3g@mail.gmail.com>
- <5627B309.9080309@gmail.com>
- <CAL_JsqJcwWkMXQzo6PbO2kfv3h7hkqtq6CJW0+W4Wc3eh6RTuQ@mail.gmail.com>
- <CAL_JsqJFO8u0-3BSwBrBh4m7z4iEDPYLeEM9Ef8SLvuj1FYXmg@mail.gmail.com>
-Message-ID: <56283B9B.70809@gmail.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Thu, 22 Oct 2015 10:28:19 +0900
+Subject: [PATCH v2] MAINTAINERS: ARM: EXYNOS: Add documentation and dt-bindings
+Message-ID: <1445477299-560-1-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Extend the Samsung Exynos maintainer entry to match SoC documentation
+and SoC dt-bindings directories. Without that some files, like
+bindings/arm/samsung/pmu.txt, are not matched by existing patterns.
 
+This also may serve as a hint where new documentation and bindings (not
+matching specific subsystem) should be put.
 
-? 2015?10?22? 09:18, Rob Herring ??:
-> On Wed, Oct 21, 2015 at 11:48 AM, Rob Herring <robh+dt@kernel.org> wrote:
->> On Wed, Oct 21, 2015 at 10:45 AM, Caesar Wang <caesar.upstream@gmail.com> wrote:
->>> Hi Rob,
->>>
->>> ? 2015?10?21? 23:18, Rob Herring ??:
->>>> On Tue, Oct 20, 2015 at 9:42 PM, Caesar Wang <wxt@rock-chips.com> wrote:
->>>>> Add the OTP gpio state, we need switch the pin to gpio state
->>>>> before the TSADC controller is reset.
-> Also, please fix the subject to be specific what binding you are changing.
->
-> dt-bindings: rockchip-thermal: <what the change is>
+Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Cc: Kukjin Kim <kgene@kernel.org>
+Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
 
-Sorry, Mr. Rob
-I just sent the patch.:-(
+---
 
+Changes since v1:
+1. Added Javier's reviewed-by
+2. Cover also power domain and sram bindings located now in separate
+   directory.
+---
+ MAINTAINERS | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-> Rob
->
->
->
->
-> -- 
-> Thanks,
-> Caesar
+diff --git a/MAINTAINERS b/MAINTAINERS
+index b556aad90930..6339926c77d6 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -1459,6 +1459,10 @@ F:	drivers/*/*s3c2410*
+ F:	drivers/*/*/*s3c2410*
+ F:	drivers/spi/spi-s3c*
+ F:	sound/soc/samsung/*
++F:	Documentation/arm/Samsung/
++F:	Documentation/devicetree/bindings/arm/samsung/
++F:	Documentation/devicetree/bindings/sram/samsung-sram.txt
++F:	Documentation/devicetree/bindings/power/pd-samsung.txt
+ N:	exynos
+ 
+ ARM/SAMSUNG MOBILE MACHINE SUPPORT
+-- 
+1.9.1
