@@ -1,120 +1,76 @@
-From: sbranden@broadcom.com (Scott Branden)
-Date: Thu, 22 Oct 2015 12:46:46 -0700
-Subject: [PATCH] clk: iproc: Make clocks visible options
-In-Reply-To: <1445541913-25066-1-git-send-email-jonmason@broadcom.com>
-References: <1445541913-25066-1-git-send-email-jonmason@broadcom.com>
-Message-ID: <56293D26.7080006@broadcom.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Thu, 22 Oct 2015 21:50:54 +0200
+Subject: [PATCH 1/9] clockevents/drivers/mtk: Fix spurious interrupt
+ leading to crash
+In-Reply-To: <1445288368-6440-1-git-send-email-daniel.lezcano@linaro.org>
+References: <56255943.6060807@linaro.org>
+ <1445288368-6440-1-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <CABuKBeJwpsM6szvPKYycfwW9kWgX1oweQy-dte4kyWAQbpRMow@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jon,
-
-comments inline.
-
-On 15-10-22 12:25 PM, Jon Mason wrote:
-> Make the clocks visible options that can be selected by anyone.  This
-> avoids the problems of:
->   1) Select is a reverse dependency and is hard for people to understand
->      and can sometimes be a pain to track down
-This doesn't make any sense to me - there are many selects in the system 
-and this is one of them.
->   2) Build coverage goes down because configs are hidden
->   3) Code bloat
+2015-10-19 22:59 GMT+02:00 Daniel Lezcano <daniel.lezcano@linaro.org>:
+> After analysis done by Yingjoe Chen, the timer appears to have a pending
+> interrupt when it is enabled.
 >
-> Patch suggested by Stephen Boyd
+> Fix this by acknowledging the pending interrupt when enabling the timer
+> interrupt.
 >
-> Signed-off-by: Jon Mason <jonmason@broadcom.com>
+> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+> Tested-by: Yingjoe Chen <yingjoe.chen@mediatek.com>
+
+Acked-by: Matthias Brugger <matthias.bgg@gmail.com>
+
 > ---
->   arch/arm/mach-bcm/Kconfig |  1 -
->   drivers/clk/bcm/Kconfig   | 35 ++++++++++++++++++++++++++++++++++-
->   drivers/clk/bcm/Makefile  |  7 +++----
->   3 files changed, 37 insertions(+), 6 deletions(-)
+>  drivers/clocksource/mtk_timer.c | 16 ++++++----------
+>  1 file changed, 6 insertions(+), 10 deletions(-)
 >
-> diff --git a/arch/arm/mach-bcm/Kconfig b/arch/arm/mach-bcm/Kconfig
-> index 679798b..cacaaec 100644
-> --- a/arch/arm/mach-bcm/Kconfig
-> +++ b/arch/arm/mach-bcm/Kconfig
-> @@ -14,7 +14,6 @@ config ARCH_BCM_IPROC
->   	select HAVE_ARM_SCU if SMP
->   	select HAVE_ARM_TWD if SMP
->   	select ARM_GLOBAL_TIMER
-> -	select COMMON_CLK_IPROC
-Please leave as is
->   	select CLKSRC_MMIO
->   	select ARCH_REQUIRE_GPIOLIB
->   	select ARM_AMBA
-> diff --git a/drivers/clk/bcm/Kconfig b/drivers/clk/bcm/Kconfig
-> index 46ee475..0352ccf 100644
-> --- a/drivers/clk/bcm/Kconfig
-> +++ b/drivers/clk/bcm/Kconfig
-> @@ -9,8 +9,41 @@ config CLK_BCM_KONA
->   	  in the BCM281xx and BCM21664 families.
+> diff --git a/drivers/clocksource/mtk_timer.c b/drivers/clocksource/mtk_timer.c
+> index 50f0641..c8badc4 100644
+> --- a/drivers/clocksource/mtk_timer.c
+> +++ b/drivers/clocksource/mtk_timer.c
+> @@ -141,14 +141,6 @@ static irqreturn_t mtk_timer_interrupt(int irq, void *dev_id)
+>         return IRQ_HANDLED;
+>  }
 >
->   config COMMON_CLK_IPROC
-> -	bool
-> +	bool "Broadcom iProc clock support"
-Please leave as is
-> +	depends on ARCH_BCM_IPROC
->   	depends on COMMON_CLK
-> +	default ARCH_BCM_IPROC
->   	help
->   	  Enable common clock framework support for Broadcom SoCs
->   	  based on the iProc architecture
-> +
-> +if COMMON_CLK_IPROC
-> +
-> +comment "Broadcom iProc clocks"
-> +
-> +config CLK_BCM_CYGNUS
-not needed
-> +	bool "Broadcom Cygnus clock support"
-> +	depends on COMMON_CLK_IPROC
-> +	depends on ARCH_BCM_CYGNUS
-> +	default ARCH_BCM_CYGNUS
-> +	help
-> +	  Enable common clock framework support for the Broadcom Cygnus SoC
-> +
-> +config CLK_BCM_NSP
-not needed
-> +	bool "Broadcom Northstar/Northstar Plus clock support"
-> +	depends on COMMON_CLK_IPROC
-> +	depends on ARCH_BCM_5301X || ARCH_BCM_NSP
-> +	default ARCH_BCM_5301X || ARCH_BCM_NSP
-> +	help
-> +	  Enable common clock framework support for the Broadcom Northstar and
-> +	  Northstar Plus SoCs
-> +
-> +config CLK_BCM_NS2
-> +	bool "Broadcom Northstar 2 clock support"
-> +	depends on ARM64
-|| COMPILE_TEST
-> +	depends on COMMON_CLK_IPROC
-select COMMON_CLK_IPROC
-> +	default ARCH_BCM_IPROC
-> +	help
-> +	  Enable common clock framework support for the Broadcom Northstar 2 SoC
-> +
-> +endif
-> diff --git a/drivers/clk/bcm/Makefile b/drivers/clk/bcm/Makefile
-> index 2d1cbc5..05d5830 100644
-> --- a/drivers/clk/bcm/Makefile
-> +++ b/drivers/clk/bcm/Makefile
-> @@ -3,7 +3,6 @@ obj-$(CONFIG_CLK_BCM_KONA)	+= clk-kona-setup.o
->   obj-$(CONFIG_CLK_BCM_KONA)	+= clk-bcm281xx.o
->   obj-$(CONFIG_CLK_BCM_KONA)	+= clk-bcm21664.o
->   obj-$(CONFIG_COMMON_CLK_IPROC)	+= clk-iproc-armpll.o clk-iproc-pll.o clk-iproc-asiu.o
-> -obj-$(CONFIG_COMMON_CLK_IPROC)	+= clk-ns2.o
-yes, change this one
-> -obj-$(CONFIG_ARCH_BCM_CYGNUS)	+= clk-cygnus.o
-you can leave this
-> -obj-$(CONFIG_ARCH_BCM_NSP)	+= clk-nsp.o
-you can leave this
-> -obj-$(CONFIG_ARCH_BCM_5301X)	+= clk-nsp.o
-and this
-> +obj-$(CONFIG_CLK_BCM_CYGNUS)	+= clk-cygnus.o
-no
-> +obj-$(CONFIG_CLK_BCM_NSP)	+= clk-nsp.o
-no
-> +obj-$(CONFIG_CLK_BCM_NS2)	+= clk-ns2.o
-yes needed
+> -static void mtk_timer_global_reset(struct mtk_clock_event_device *evt)
+> -{
+> -       /* Disable all interrupts */
+> -       writel(0x0, evt->gpt_base + GPT_IRQ_EN_REG);
+> -       /* Acknowledge all interrupts */
+> -       writel(0x3f, evt->gpt_base + GPT_IRQ_ACK_REG);
+> -}
+> -
+>  static void
+>  mtk_timer_setup(struct mtk_clock_event_device *evt, u8 timer, u8 option)
+>  {
+> @@ -168,6 +160,12 @@ static void mtk_timer_enable_irq(struct mtk_clock_event_device *evt, u8 timer)
+>  {
+>         u32 val;
 >
+> +       /* Disable all interrupts */
+> +       writel(0x0, evt->gpt_base + GPT_IRQ_EN_REG);
+> +
+> +       /* Acknowledge all spurious pending interrupts */
+> +       writel(0x3f, evt->gpt_base + GPT_IRQ_ACK_REG);
+> +
+>         val = readl(evt->gpt_base + GPT_IRQ_EN_REG);
+>         writel(val | GPT_IRQ_ENABLE(timer),
+>                         evt->gpt_base + GPT_IRQ_EN_REG);
+> @@ -220,8 +218,6 @@ static void __init mtk_timer_init(struct device_node *node)
+>         }
+>         rate = clk_get_rate(clk);
+>
+> -       mtk_timer_global_reset(evt);
+> -
+>         if (request_irq(evt->dev.irq, mtk_timer_interrupt,
+>                         IRQF_TIMER | IRQF_IRQPOLL, "mtk_timer", evt)) {
+>                 pr_warn("failed to setup irq %d\n", evt->dev.irq);
+> --
+> 1.9.1
+>
+
+
+
+-- 
+motzblog.wordpress.com
