@@ -1,118 +1,115 @@
-From: robh+dt@kernel.org (Rob Herring)
-Date: Thu, 22 Oct 2015 08:20:25 -0500
-Subject: [PATCH v11 5/6] Documentation: dt-bindings: pci: altera pcie
- device tree binding
-In-Reply-To: <1445506051-21688-6-git-send-email-lftan@altera.com>
-References: <1445506051-21688-1-git-send-email-lftan@altera.com>
- <1445506051-21688-6-git-send-email-lftan@altera.com>
-Message-ID: <CAL_JsqJg6cqwsgN6yT_9rUJ3ayFWzxa1sU2qN33jRj+nuPvMmA@mail.gmail.com>
+From: punit.agrawal@arm.com (Punit Agrawal)
+Date: Thu, 22 Oct 2015 14:22:33 +0100
+Subject: [PATCH] arm64: dts: Add idle-states for Juno
+In-Reply-To: <1430402268.2868.20.camel@linaro.org> (Jon Medhurst's message of
+ "Thu, 30 Apr 2015 14:57:48 +0100")
+References: <1430402268.2868.20.camel@linaro.org>
+Message-ID: <9hheggnca1y.fsf@e105922-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 22, 2015 at 4:27 AM, Ley Foon Tan <lftan@altera.com> wrote:
-> This patch adds the bindings for Altera PCIe host controller driver and
-> Altera PCIe MSI driver.
->
-> Signed-off-by: Ley Foon Tan <lftan@altera.com>
+"Jon Medhurst (Tixy)" <tixy@linaro.org> writes:
 
-Acked-by: Rob Herring <robh@kernel.org>
+> From: Jon Medhurst <tixy@linaro.org>
+>
+> Signed-off-by: Jon Medhurst <tixy@linaro.org>
+
+Apologies for resurrecting an old thread.
+
+Following the discussion on this thread, even though certain concerns
+were raised, there wasn't any objection to $SUBJECT being merged.
+
+I don't see this patch in any tree; perhaps it's slipped through the
+cracks.
+
+Could this be merged please?
 
 > ---
->  .../devicetree/bindings/pci/altera-pcie-msi.txt    | 28 +++++++++++++
->  .../devicetree/bindings/pci/altera-pcie.txt        | 49 ++++++++++++++++++++++
->  2 files changed, 77 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/pci/altera-pcie-msi.txt
->  create mode 100644 Documentation/devicetree/bindings/pci/altera-pcie.txt
 >
-> diff --git a/Documentation/devicetree/bindings/pci/altera-pcie-msi.txt b/Documentation/devicetree/bindings/pci/altera-pcie-msi.txt
-> new file mode 100644
-> index 0000000..09cd3bc
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/pci/altera-pcie-msi.txt
-> @@ -0,0 +1,28 @@
-> +* Altera PCIe MSI controller
-> +
-> +Required properties:
-> +- compatible:  should contain "altr,msi-1.0"
-> +- reg:         specifies the physical base address of the controller and
-> +               the length of the memory mapped region.
-> +- reg-names:   must include the following entries:
-> +               "csr": CSR registers
-> +               "vector_slave": vectors slave port region
-> +- interrupt-parent:    interrupt source phandle.
-> +- interrupts:  specifies the interrupt source of the parent interrupt
-> +               controller. The format of the interrupt specifier depends on the
-> +               parent interrupt controller.
-> +- num-vectors: number of vectors, range 1 to 32.
-> +- msi-controller:      indicates that this is MSI controller node
-> +
-> +
-> +Example
-> +msi0: msi at 0xFF200000 {
-> +       compatible = "altr,msi-1.0";
-> +       reg = <0xFF200000 0x00000010
-> +               0xFF200010 0x00000080>;
-> +       reg-names = "csr", "vector_slave";
-> +       interrupt-parent = <&hps_0_arm_gic_0>;
-> +       interrupts = <0 42 4>;
-> +       msi-controller;
-> +       num-vectors = <32>;
-> +};
-> diff --git a/Documentation/devicetree/bindings/pci/altera-pcie.txt b/Documentation/devicetree/bindings/pci/altera-pcie.txt
-> new file mode 100644
-> index 0000000..2951a6a
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/pci/altera-pcie.txt
-> @@ -0,0 +1,49 @@
-> +* Altera PCIe controller
-> +
-> +Required properties:
-> +- compatible : should contain "altr,pcie-root-port-1.0"
-> +- reg:         a list of physical base address and length for TXS and CRA.
-> +- reg-names:   must include the following entries:
-> +               "Txs": TX slave port region
-> +               "Cra": Control register access region
-> +- interrupt-parent:    interrupt source phandle.
-> +- interrupts:  specifies the interrupt source of the parent interrupt controller.
-> +               The format of the interrupt specifier depends on the parent interrupt
-> +               controller.
-> +- device_type: must be "pci"
-> +- #address-cells:      set to <3>
-> +- #size-cells: set to <2>
-> +- #interrupt-cells:    set to <1>
-> +- ranges:              describes the translation of addresses for root ports and standard
-> +               PCI regions.
-> +- interrupt-map-mask and interrupt-map: standard PCI properties to define the
-> +               mapping of the PCIe interface to interrupt numbers.
-> +
-> +Optional properties:
-> +- msi-parent:  Link to the hardware entity that serves as the MSI controller for this PCIe
-> +               controller.
-> +- bus-range:   PCI bus numbers covered
-> +
-> +Example
-> +       pcie_0: pcie at 0xc00000000 {
-> +               compatible = "altr,pcie-root-port-1.0";
-> +               reg = <0xc0000000 0x20000000>,
-> +                       <0xff220000 0x00004000>;
-> +               reg-names = "Txs", "Cra";
-> +               interrupt-parent = <&hps_0_arm_gic_0>;
-> +               interrupts = <0 40 4>;
-> +               interrupt-controller;
-> +               #interrupt-cells = <1>;
-> +               bus-range = <0x0 0xFF>;
-> +               device_type = "pci";
-> +               msi-parent = <&msi_to_gic_gen_0>;
-> +               #address-cells = <3>;
-> +               #size-cells = <2>;
-> +               interrupt-map-mask = <0 0 0 7>;
-> +               interrupt-map = <0 0 0 1 &pcie_0 1>,
-> +                                   <0 0 0 2 &pcie_0 2>,
-> +                                   <0 0 0 3 &pcie_0 3>,
-> +                                   <0 0 0 4 &pcie_0 4>;
-> +               ranges = <0x82000000 0x00000000 0x00000000 0xc0000000 0x00000000 0x10000000
-> +                           0x82000000 0x00000000 0x10000000 0xd0000000 0x00000000 0x10000000>;
-> +       };
-> --
-> 1.8.2.1
+> These have been kicking around out of tree for ages, any reason they
+> shouldn't be in mainline? Also, was unsure of what to put in commit
+> message.
 >
+>  arch/arm64/boot/dts/arm/juno.dts | 28 ++++++++++++++++++++++++++++
+>  1 file changed, 28 insertions(+)
+>
+> diff --git a/arch/arm64/boot/dts/arm/juno.dts b/arch/arm64/boot/dts/arm/juno.dts
+> index 133ee59..7a9a449 100644
+> --- a/arch/arm64/boot/dts/arm/juno.dts
+> +++ b/arch/arm64/boot/dts/arm/juno.dts
+> @@ -34,12 +34,35 @@
+>  		#address-cells = <2>;
+>  		#size-cells = <0>;
+>  
+> +		idle-states {
+> +			entry-method = "arm,psci";
+> +
+> +			CPU_SLEEP_0: cpu-sleep-0 {
+> +				compatible = "arm,idle-state";
+> +				arm,psci-suspend-param = <0x0010000>;
+> +				local-timer-stop;
+> +				entry-latency-us = <100>;
+> +				exit-latency-us = <250>;
+> +				min-residency-us = <2000>;
+> +			};
+> +
+> +			CLUSTER_SLEEP_0: cluster-sleep-0 {
+> +				compatible = "arm,idle-state";
+> +				arm,psci-suspend-param = <0x1010000>;
+> +				local-timer-stop;
+> +				entry-latency-us = <800>;
+> +				exit-latency-us = <700>;
+> +				min-residency-us = <2500>;
+> +			};
+> +		};
+> +
+>  		A57_0: cpu at 0 {
+>  			compatible = "arm,cortex-a57","arm,armv8";
+>  			reg = <0x0 0x0>;
+>  			device_type = "cpu";
+>  			enable-method = "psci";
+>  			next-level-cache = <&A57_L2>;
+> +			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
+>  		};
+>  
+>  		A57_1: cpu at 1 {
+> @@ -48,6 +71,7 @@
+>  			device_type = "cpu";
+>  			enable-method = "psci";
+>  			next-level-cache = <&A57_L2>;
+> +			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
+>  		};
+>  
+>  		A53_0: cpu at 100 {
+> @@ -56,6 +80,7 @@
+>  			device_type = "cpu";
+>  			enable-method = "psci";
+>  			next-level-cache = <&A53_L2>;
+> +			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
+>  		};
+>  
+>  		A53_1: cpu at 101 {
+> @@ -64,6 +89,7 @@
+>  			device_type = "cpu";
+>  			enable-method = "psci";
+>  			next-level-cache = <&A53_L2>;
+> +			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
+>  		};
+>  
+>  		A53_2: cpu at 102 {
+> @@ -72,6 +98,7 @@
+>  			device_type = "cpu";
+>  			enable-method = "psci";
+>  			next-level-cache = <&A53_L2>;
+> +			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
+>  		};
+>  
+>  		A53_3: cpu at 103 {
+> @@ -80,6 +107,7 @@
+>  			device_type = "cpu";
+>  			enable-method = "psci";
+>  			next-level-cache = <&A53_L2>;
+> +			cpu-idle-states = <&CPU_SLEEP_0 &CLUSTER_SLEEP_0>;
+>  		};
+>  
+>  		A57_L2: l2-cache0 {
