@@ -1,75 +1,50 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Thu, 22 Oct 2015 10:47:16 -0500
-Subject: [PATCH v4 5/6] PCI: layerscape: add PCIe support for LS1043a and
- LS2080a
-In-Reply-To: <1444979960-24100-5-git-send-email-Minghuan.Lian@freescale.com>
-References: <1444979960-24100-1-git-send-email-Minghuan.Lian@freescale.com>
- <1444979960-24100-5-git-send-email-Minghuan.Lian@freescale.com>
-Message-ID: <20151022154715.GB16360@localhost>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Thu, 22 Oct 2015 17:42:44 +0200
+Subject: [PATCH v4 0/5] mtd: pxa3xx_nand: rework the timing setup
+In-Reply-To: <CAAEAJfCmo5u6=5GN6+k8GsFhC0dg477gVYY+t77uODP-PgWLGw@mail.gmail.com>
+References: <1445416144-9194-1-git-send-email-antoine.tenart@free-electrons.com>
+ <20151022171259.57581575@free-electrons.com>
+ <CAAEAJfCmo5u6=5GN6+k8GsFhC0dg477gVYY+t77uODP-PgWLGw@mail.gmail.com>
+Message-ID: <20151022174244.61eaf79e@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[+cc Fabio, Lucas]
+Dear Ezequiel Garcia,
 
-Hi Minghuan,
+On Thu, 22 Oct 2015 12:22:24 -0300, Ezequiel Garcia wrote:
 
-On Fri, Oct 16, 2015 at 03:19:19PM +0800, Minghuan Lian wrote:
-> Both LS1043a and LS2080a are based on ARMv8 64-bit architecture
-> and have similar PCIe implementation. LUT is added to controller.
-> The patch removes the necessary fields from struct ls_pcie.
-> 
-> Signed-off-by: Minghuan Lian <Minghuan.Lian@freescale.com>
-> ---
-> This patch is based on v4.3-rc4 and [PATCH v10 3/6]
-> PCI: designware: Add ARM64 support.
-> 
-> change log
-> v4: 
-> 1. split to 6 patches.
-> 2. use ARCH_LAYERSCAPE instead of ARM64
-> 
-> v3:
-> 1. Use 8 or 16 bit access function to simplify code
-> 2. Add ls_add_pcie_port in accordance with other DesignWare-based drivers
-> 
-> v2:
-> 1. Rename ls2085a to ls2080a
-> 2. Add ls_pcie_msi_host_init()
-> 
->  drivers/pci/host/Kconfig          |  2 +-
->  drivers/pci/host/pci-layerscape.c | 72 +++++++++++++++++++++++++++++++++++----
->  2 files changed, 67 insertions(+), 7 deletions(-)
-> 
-> diff --git a/drivers/pci/host/Kconfig b/drivers/pci/host/Kconfig
-> index ae873be..8eb09ea 100644
-> --- a/drivers/pci/host/Kconfig
-> +++ b/drivers/pci/host/Kconfig
-> @@ -105,7 +105,7 @@ config PCI_XGENE_MSI
->  
->  config PCI_LAYERSCAPE
->  	bool "Freescale Layerscape PCIe controller"
-> -	depends on OF && ARM
-> +	depends on OF && (ARM || ARCH_LAYERSCAPE)
->  	select PCIE_DW
->  	select MFD_SYSCON
->  	help
-> diff --git a/drivers/pci/host/pci-layerscape.c b/drivers/pci/host/pci-layerscape.c
-> index 891e504..c53692a 100644
-> --- a/drivers/pci/host/pci-layerscape.c
-> +++ b/drivers/pci/host/pci-layerscape.c
-> @@ -31,23 +31,26 @@
->  #define LTSSM_STATE_MASK	0x3f
+> Could you compare NAND throughput using keep-config (keeping
+> the bootloader timings) and without keep-config (with ONFI timings) ?
 
-BTW, not related to *this* patch, but does LTSSM_STATE_MASK really need to
-be 0x3f (6 bits), or could it be 0x1f (5 bits)?
+Seems like we are within the measurement noise. I did each test only
+once, and the test lasts only a few seconds, but here are the results:
 
-I'd like to include Layerscape in the LTSSM_STATE_MASK cleanup done by
-Fabio:
+Without keep-config (i.e ONFI timings) :
 
-https://git.kernel.org/cgit/linux/kernel/git/helgaas/pci.git/commit/?h=pci/host-designware&id=4788fe6ebf4594c9a95b620cbff05147c8504823
+# time dd if=/dev/mtd3 of=/dev/null bs=1M
+32+0 records in
+32+0 records out
+real	0m 3.54s
+user	0m 0.00s
+sys	0m 0.26s
 
-I don't have specs for any of these devices, so I don't know if this is
-really something that can vary between the different DesignWare-based
-devices, or if they all should use a mask of 0x1f.
+With keep-config (i.e bootloader timings)
 
-Bjorn
+# time dd if=/dev/mtd3 of=/dev/null bs=1M
+32+0 records in
+32+0 records out
+real	0m 3.77s
+user	0m 0.00s
+sys	0m 0.21s
+
+I.e we are apparently slightly faster with the ONFI timings. However
+again, the test duration is very short, and I didn't repeat the test
+several times.
+
+Best regards,
+
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
