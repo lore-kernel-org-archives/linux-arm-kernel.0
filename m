@@ -1,83 +1,119 @@
-From: yankejian@huawei.com (Yankejian (Hackim Yim))
-Date: Thu, 22 Oct 2015 10:51:19 +0800
-Subject: [PATCH RESEND net-next] net: updates HNS config and documents
-In-Reply-To: <CAL_JsqJ+4BK2KDX5+t6GGEYv3pPDc+crktiMqgu6QTZi7WDrxw@mail.gmail.com>
-References: <1445308604-95860-1-git-send-email-yankejian@huawei.com>
- <CAL_JsqJ+4BK2KDX5+t6GGEYv3pPDc+crktiMqgu6QTZi7WDrxw@mail.gmail.com>
-Message-ID: <56284F27.4010109@huawei.com>
+From: jh80.chung@samsung.com (Jaehoon Chung)
+Date: Thu, 22 Oct 2015 11:54:06 +0900
+Subject: [PATCH 1/2] mmc: dw_mmc: exynos: Add the exynos3250 compatible
+In-Reply-To: <5628289C.90800@samsung.com>
+References: <1445409555-1684-1-git-send-email-jh80.chung@samsung.com>
+ <5628289C.90800@samsung.com>
+Message-ID: <56284FCE.3000108@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi, Krzysztof.
 
+On 10/22/2015 09:06 AM, Krzysztof Kozlowski wrote:
+> On 21.10.2015 15:39, Jaehoon Chung wrote:
+>> To check more exactly, add the exynos3250 compatible.
+>> Not use exynos5250 compatibility.
+> 
+> Hi,
+> 
+> I can't find any difference between old and new compatible. Maybe I am
+> missing something? Maybe there is a difference for these devices?
 
-? 2015/10/22 9:26, Rob Herring ??:
-> On Mon, Oct 19, 2015 at 9:36 PM, yankejian <yankejian@huawei.com> wrote:
->> updates the bindings documents and dtsi file according to the review
->> comments from Rob Herring <robh@kernel.org>
+Sorry, I needs to add more explanation about changing compatible.
+Exynos3250 has more registers than exynos5250 in dwmmc IP.
+Now, we used dwmmc controller with exynos5250 compatible.
+Then some codes can't run in dw-mmc.c, if SoC is exynos3250.
+For example, there is the checking point in dw_mci_exynos_config_hs400().
+
+static void dw_mci_exynos_config_hs400(struct dw_mci *host, u32 timing)
+{
+        struct dw_mci_exynos_priv_data *priv = host->priv;
+        u32 dqs, strobe;
+
+        /*
+         * Not supported to configure register
+         * related to HS400
+         */
+        if (priv->ctrl_type < DW_MCI_TYPE_EXYNOS5420)
+                return;
+
+        dqs = priv->saved_dqs_en;
+        strobe = priv->saved_strobe_ctrl;
+
+It can't use this feature with exynos5250 compatible.
+
+Does it need to change the compatible from exynos5250 to exynos3250?
+
+Beset Regards,
+Jaehoon Chung
+
+> 
+> Anyway if the code is the same then it should use exactly the same
+> compatible.
+> 
+> Best regards,
+> Krzysztof
+> 
 >>
->> Signed-off-by: yankejian <yankejian@huawei.com>
->> Signed-off-by: huangdaode <huangdaode@hisilicon.com>
-> 
-> Acked-by: Rob Herring <robh@kernel.org>
-> 
-
-Thanks!
-
+>> Signed-off-by: Jaehoon Chung <jh80.chung@samsung.com>
 >> ---
->>  Documentation/devicetree/bindings/net/hisilicon-hns-mdio.txt | 2 +-
->>  arch/arm64/boot/dts/hisilicon/hip05_hns.dtsi                 | 8 +++-----
->>  2 files changed, 4 insertions(+), 6 deletions(-)
+>>  Documentation/devicetree/bindings/mmc/exynos-dw-mshc.txt | 2 ++
+>>  drivers/mmc/host/dw_mmc-exynos.c                         | 7 +++++++
+>>  2 files changed, 9 insertions(+)
 >>
->> diff --git a/Documentation/devicetree/bindings/net/hisilicon-hns-mdio.txt b/Documentation/devicetree/bindings/net/hisilicon-hns-mdio.txt
->> index 9940aa0..9c23fdf 100644
->> --- a/Documentation/devicetree/bindings/net/hisilicon-hns-mdio.txt
->> +++ b/Documentation/devicetree/bindings/net/hisilicon-hns-mdio.txt
->> @@ -12,7 +12,7 @@ Example:
->>           mdio at 803c0000 {
->>                     #address-cells = <1>;
->>                     #size-cells = <0>;
->> -                   compatible = "hisilicon,mdio","hisilicon,hns-mdio";
->> +                   compatible = "hisilicon,hns-mdio","hisilicon,mdio";
->>                     reg = <0x0 0x803c0000 0x0 0x10000>;
+>> diff --git a/Documentation/devicetree/bindings/mmc/exynos-dw-mshc.txt b/Documentation/devicetree/bindings/mmc/exynos-dw-mshc.txt
+>> index aad9844..cd22ac9 100644
+>> --- a/Documentation/devicetree/bindings/mmc/exynos-dw-mshc.txt
+>> +++ b/Documentation/devicetree/bindings/mmc/exynos-dw-mshc.txt
+>> @@ -22,6 +22,8 @@ Required Properties:
+>>  	  specific extensions.
+>>  	- "samsung,exynos7-dw-mshc-smu": for controllers with Samsung Exynos7
+>>  	  specific extensions having an SMU.
+>> +	- "samsung,exynos3250-dw-mshc": for controllers with Samsung Exynos3250
+>> +	  specific extensions.
+>>  
+>>  * samsung,dw-mshc-ciu-div: Specifies the divider value for the card interface
+>>    unit (ciu) clock. This property is applicable only for Exynos5 SoC's and
+>> diff --git a/drivers/mmc/host/dw_mmc-exynos.c b/drivers/mmc/host/dw_mmc-exynos.c
+>> index 1e75309..1c96218 100644
+>> --- a/drivers/mmc/host/dw_mmc-exynos.c
+>> +++ b/drivers/mmc/host/dw_mmc-exynos.c
+>> @@ -32,6 +32,7 @@ enum dw_mci_exynos_type {
+>>  	DW_MCI_TYPE_EXYNOS5420_SMU,
+>>  	DW_MCI_TYPE_EXYNOS7,
+>>  	DW_MCI_TYPE_EXYNOS7_SMU,
+>> +	DW_MCI_TYPE_EXYNOS3250,
+>>  };
+>>  
+>>  /* Exynos implementation specific driver private data */
+>> @@ -73,6 +74,9 @@ static struct dw_mci_exynos_compatible {
+>>  	}, {
+>>  		.compatible	= "samsung,exynos7-dw-mshc-smu",
+>>  		.ctrl_type	= DW_MCI_TYPE_EXYNOS7_SMU,
+>> +	}, {
+>> +		.compatible	= "samsung,exynos3250-dw-mshc",
+>> +		.ctrl_type	= DW_MCI_TYPE_EXYNOS3250,
+>>  	},
+>>  };
+>>  
+>> @@ -467,6 +471,7 @@ static int dw_mci_exynos_execute_tuning(struct dw_mci_slot *slot)
+>>  	} while (start_smpl != smpl);
+>>  
+>>  	found = dw_mci_exynos_get_best_clksmpl(candiates);
+>> +
+>>  	if (found >= 0) {
+>>  		dw_mci_exynos_set_clksmpl(host, found);
+>>  		priv->tuned_sample = found;
+>> @@ -520,6 +525,8 @@ static const struct of_device_id dw_mci_exynos_match[] = {
+>>  			.data = &exynos_drv_data, },
+>>  	{ .compatible = "samsung,exynos7-dw-mshc-smu",
+>>  			.data = &exynos_drv_data, },
+>> +	{ .compatible = "samsung,exynos3250-dw-mshc",
+>> +			.data = &exynos_drv_data, },
+>>  	{},
+>>  };
+>>  MODULE_DEVICE_TABLE(of, dw_mci_exynos_match);
 >>
->>                     ethernet-phy at 0 {
->> diff --git a/arch/arm64/boot/dts/hisilicon/hip05_hns.dtsi b/arch/arm64/boot/dts/hisilicon/hip05_hns.dtsi
->> index 3500586..606dd5a 100644
->> --- a/arch/arm64/boot/dts/hisilicon/hip05_hns.dtsi
->> +++ b/arch/arm64/boot/dts/hisilicon/hip05_hns.dtsi
->> @@ -13,14 +13,12 @@ soc0: soc at 000000000 {
->>                 reg = <0x0 0x803c0000 0x0 0x10000
->>                        0x0 0x80000000 0x0 0x10000>;
->>
->> -               soc0_phy4: ethernet-phy at 4 {
->> +               soc0_phy0: ethernet-phy at 0 {
->>                         reg = <0x0>;
->> -                       device_type = "ethernet-phy";
->>                         compatible = "ethernet-phy-ieee802.3-c22";
->>                 };
->> -               soc0_phy5: ethernet-phy at 5 {
->> +               soc0_phy1: ethernet-phy at 1 {
->>                         reg = <0x1>;
->> -                       device_type = "ethernet-phy";
->>                         compatible = "ethernet-phy-ieee802.3-c22";
->>                 };
->>         };
->> @@ -37,7 +35,7 @@ soc0: soc at 000000000 {
->>                        0x0 0xc7000000 0x0 0x60000
->>                        >;
->>
->> -               phy-handle = <0 0 0 0 &soc0_phy4 &soc0_phy5 0 0>;
->> +               phy-handle = <0 0 0 0 &soc0_phy0 &soc0_phy1 0 0>;
->>                 interrupts = <
->>                         /* [14] ge fifo err 8 / xge 6**/
->>                         149 0x4 150 0x4 151 0x4 152 0x4
->> --
->> 1.9.1
->>
->> --
->> To unsubscribe from this list: send the line "unsubscribe devicetree" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 > 
-> .
 > 
