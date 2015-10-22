@@ -1,118 +1,40 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Thu, 22 Oct 2015 15:13:20 -0700
-Subject: [PATCH v6] can: xilinx: Convert to runtime_pm
-In-Reply-To: <1445489120-10933-1-git-send-email-appanad@xilinx.com>
-References: <1445489120-10933-1-git-send-email-appanad@xilinx.com>
-Message-ID: <20151022221320.GQ5257@xsjsorenbubuntu>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Thu, 22 Oct 2015 17:13:55 -0500
+Subject: [PATCH v11 2/6] pci: add Altera PCI vendor ID
+In-Reply-To: <1445506051-21688-3-git-send-email-lftan@altera.com>
+References: <1445506051-21688-1-git-send-email-lftan@altera.com>
+ <1445506051-21688-3-git-send-email-lftan@altera.com>
+Message-ID: <20151022221355.GJ21237@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kedar,
-
-On Thu, 2015-10-22 at 10:15AM +0530, Kedareswara rao Appana wrote:
-> Instead of enabling/disabling clocks at several locations in the driver,
-> Use the runtime_pm framework. This consolidates the actions for runtime PM
-> In the appropriate callbacks and makes the driver more readable and mantainable.
+On Thu, Oct 22, 2015 at 05:27:27PM +0800, Ley Foon Tan wrote:
+> Signed-off-by: Ley Foon Tan <lftan@altera.com>
+> ---
+>  include/linux/pci_ids.h | 2 ++
+>  1 file changed, 2 insertions(+)
 > 
-> Signed-off-by: Kedareswara rao Appana <appanad@xilinx.com>
-[...]
->  /**
->   * xcan_probe - Platform registration call
-> @@ -1072,7 +1103,7 @@ static int xcan_probe(struct platform_device *pdev)
->  		return -ENOMEM;
+> diff --git a/include/linux/pci_ids.h b/include/linux/pci_ids.h
+> index d9ba49c..08e4462 100644
+> --- a/include/linux/pci_ids.h
+> +++ b/include/linux/pci_ids.h
+> @@ -1550,6 +1550,8 @@
+>  #define PCI_DEVICE_ID_SERVERWORKS_CSB6LPC 0x0227
+>  #define PCI_DEVICE_ID_SERVERWORKS_HT1100LD 0x0408
 >  
->  	priv = netdev_priv(ndev);
-> -	priv->dev = ndev;
-> +	priv->dev = &pdev->dev;
->  	priv->can.bittiming_const = &xcan_bittiming_const;
->  	priv->can.do_set_mode = xcan_do_set_mode;
->  	priv->can.do_get_berr_counter = xcan_get_berr_counter;
-> @@ -1114,21 +1145,30 @@ static int xcan_probe(struct platform_device *pdev)
->  		}
->  	}
->  
-> -	ret = clk_prepare_enable(priv->can_clk);
-> +	ret = clk_prepare(priv->can_clk);
->  	if (ret) {
->  		dev_err(&pdev->dev, "unable to enable device clock\n");
->  		goto err_free;
->  	}
->  
-> -	ret = clk_prepare_enable(priv->bus_clk);
-> +	ret = clk_prepare(priv->bus_clk);
-
-Are these clk_prepare calls needed here? The runtime PM calls do
-clk_prepare_enable and clk_disable_unprepare.
-
->  	if (ret) {
->  		dev_err(&pdev->dev, "unable to enable bus clock\n");
-> -		goto err_unprepare_disable_dev;
-> +		goto err_unprepare_dev;
->  	}
->  
->  	priv->write_reg = xcan_write_reg_le;
->  	priv->read_reg = xcan_read_reg_le;
->  
-> +	pm_runtime_irq_safe(&pdev->dev);
-> +	pm_runtime_enable(&pdev->dev);
-> +	ret = pm_runtime_get_sync(&pdev->dev);
-> +	if (ret < 0) {
-> +		netdev_err(ndev, "%s: pm_runtime_get failed(%d)\n",
-> +			__func__, ret);
-> +		goto err_unprepare_busclk;
-> +	}
+> +#define PCI_VENDOR_ID_ALTERA		0x1172
 > +
->  	if (priv->read_reg(priv, XCAN_SR_OFFSET) != XCAN_SR_CONFIG_MASK) {
->  		priv->write_reg = xcan_write_reg_be;
->  		priv->read_reg = xcan_read_reg_be;
-> @@ -1141,22 +1181,26 @@ static int xcan_probe(struct platform_device *pdev)
->  	ret = register_candev(ndev);
->  	if (ret) {
->  		dev_err(&pdev->dev, "fail to register failed (err=%d)\n", ret);
-> -		goto err_unprepare_disable_busclk;
-> +		goto err_disableclks;
->  	}
->  
->  	devm_can_led_init(ndev);
-> -	clk_disable_unprepare(priv->bus_clk);
-> -	clk_disable_unprepare(priv->can_clk);
-> +
-> +	pm_runtime_put(&pdev->dev);
-> +
->  	netdev_dbg(ndev, "reg_base=0x%p irq=%d clock=%d, tx fifo depth:%d\n",
->  			priv->reg_base, ndev->irq, priv->can.clock.freq,
->  			priv->tx_max);
->  
->  	return 0;
->  
-> -err_unprepare_disable_busclk:
-> -	clk_disable_unprepare(priv->bus_clk);
-> -err_unprepare_disable_dev:
-> -	clk_disable_unprepare(priv->can_clk);
-> +err_disableclks:
-> +	pm_runtime_put(priv->dev);
-> +err_unprepare_busclk:
-> +	pm_runtime_disable(&pdev->dev);
-> +	clk_unprepare(priv->bus_clk);
-> +err_unprepare_dev:
-> +	clk_unprepare(priv->can_clk);
->  err_free:
->  	free_candev(ndev);
->  err:
-> @@ -1175,11 +1219,11 @@ static int xcan_remove(struct platform_device *pdev)
->  	struct net_device *ndev = platform_get_drvdata(pdev);
->  	struct xcan_priv *priv = netdev_priv(ndev);
->  
-> -	if (set_reset_mode(ndev) < 0)
-> -		netdev_err(ndev, "mode resetting failed!\n");
-> -
->  	unregister_candev(ndev);
-> +	pm_runtime_disable(&pdev->dev);
->  	netif_napi_del(&priv->napi);
-> +	clk_unprepare(priv->bus_clk);
-> +	clk_unprepare(priv->can_clk);
 
-I think this can go away when the prepare calls in probe go away.
+This doesn't seem to be used anywhere, so I'll drop this patch.
 
-	Thanks,
-	S?ren
+>  #define PCI_VENDOR_ID_SBE		0x1176
+>  #define PCI_DEVICE_ID_SBE_WANXL100	0x0301
+>  #define PCI_DEVICE_ID_SBE_WANXL200	0x0302
+> -- 
+> 1.8.2.1
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
