@@ -1,135 +1,82 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Thu, 22 Oct 2015 12:51:05 +0900
-Subject: [PATCH 1/2] mmc: dw_mmc: exynos: Add the exynos3250 compatible
-In-Reply-To: <56284FCE.3000108@samsung.com>
-References: <1445409555-1684-1-git-send-email-jh80.chung@samsung.com>
- <5628289C.90800@samsung.com> <56284FCE.3000108@samsung.com>
-Message-ID: <56285D29.7030502@samsung.com>
+From: caesar.upstream@gmail.com (Caesar Wang)
+Date: Thu, 22 Oct 2015 11:55:25 +0800
+Subject: [RESEND PATCH v2 1/2] dt-bindings: rockchip-thermal: Add the
+ "init" pinctrl in this document
+In-Reply-To: <CAD=FV=XdN_Lie9bjbr0M4-=neVGrLiahAAxyUEuE0kO2ZsusfQ@mail.gmail.com>
+References: <1445481048-20789-1-git-send-email-wxt@rock-chips.com>
+ <1445481048-20789-2-git-send-email-wxt@rock-chips.com>
+ <CAD=FV=XdN_Lie9bjbr0M4-=neVGrLiahAAxyUEuE0kO2ZsusfQ@mail.gmail.com>
+Message-ID: <56285E2D.2040707@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22.10.2015 11:54, Jaehoon Chung wrote:
-> Hi, Krzysztof.
-> 
-> On 10/22/2015 09:06 AM, Krzysztof Kozlowski wrote:
->> On 21.10.2015 15:39, Jaehoon Chung wrote:
->>> To check more exactly, add the exynos3250 compatible.
->>> Not use exynos5250 compatibility.
->>
->> Hi,
->>
->> I can't find any difference between old and new compatible. Maybe I am
->> missing something? Maybe there is a difference for these devices?
-> 
-> Sorry, I needs to add more explanation about changing compatible.
-> Exynos3250 has more registers than exynos5250 in dwmmc IP.
-> Now, we used dwmmc controller with exynos5250 compatible.
-> Then some codes can't run in dw-mmc.c, if SoC is exynos3250.
-> For example, there is the checking point in dw_mci_exynos_config_hs400().
-> 
-> static void dw_mci_exynos_config_hs400(struct dw_mci *host, u32 timing)
-> {
->         struct dw_mci_exynos_priv_data *priv = host->priv;
->         u32 dqs, strobe;
-> 
->         /*
->          * Not supported to configure register
->          * related to HS400
->          */
->         if (priv->ctrl_type < DW_MCI_TYPE_EXYNOS5420)
->                 return;
-> 
->         dqs = priv->saved_dqs_en;
->         strobe = priv->saved_strobe_ctrl;
-> 
-> It can't use this feature with exynos5250 compatible.
 
-Ahh, I see it now. I missed that context and commit message wasn't
-explaining this real reason. This real reason - supporting HS400 or
-other features not present on Exynos5250 - was not mentioned.
 
-The new compatible make sense now... but I am wondering if instead just
-"samsung,exynos5420-dw-mshc" should be used? I think it would give the
-same result as your change and if new compatible is not required then it
-will be better not to add it.
+? 2015?10?22? 11:45, Doug Anderson ??:
+> Caesar,
+>
+> On Wed, Oct 21, 2015 at 7:30 PM, Caesar Wang <wxt@rock-chips.com> wrote:
+>> The "init" pinctrl is defined we'll set
+>> pinctrl to this state before probe and then "default" after probe.
+>>
+>> Add the "init" pinctrl as the OTP gpio state, since we need switch
+>> the pin to gpio state before the TSADC controller is reset.
+>>
+>> As I know, the TSADC controller is reset, the tshut polarity will be
+>> a *low* signal in a short period of time for some devices.
+>>
+>> Says:
+>> The TSADC get the temperature on rockchip thermal.
+>>
+>> If T(current temperature) < (setting temperature), the OTP output the
+>> *high* signal.
+>> If T(current temperature) > (setting temperature), the OTP output the
+>> *low* Signal.
+>>
+>> In some cases, the OTP pin is connected to the PMIC, maybe the
+>> PMIC can accept the reset response time to avoid this issue.
+>>
+>> In other words, the system will be always reboot if we make the
+>> OTP pin is connected the others IC to control the power.
+>>
+>> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
+>> Reviewed-by: Douglas Anderson <dianders@chromium.org>
+>> ---
+>>
+>> Changes in v2:
+>>    - Add the 'init' pinctrl more decription in commit.
+>>    - Fix the subject to make more obvious in PATCH[1/2]
+>>    - Resend this patch v2 since fix the subject to be specific.
+>>
+>> Changes in v1:
+>>    - As the Doug comments, add the 'init' property to sync document.
+>>
+>>   Documentation/devicetree/bindings/thermal/rockchip-thermal.txt | 5 +++--
+>>   1 file changed, 3 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/Documentation/devicetree/bindings/thermal/rockchip-thermal.txt b/Documentation/devicetree/bindings/thermal/rockchip-thermal.txt
+>> index ef802de..28e84f7 100644
+>> --- a/Documentation/devicetree/bindings/thermal/rockchip-thermal.txt
+>> +++ b/Documentation/devicetree/bindings/thermal/rockchip-thermal.txt
+> I think Rob wanted something more in the "rockchip-thermal.txt"
+> document itself.  Like:
+>
+> Pinctrl states:
+> - During device probe a driver may glitch the output line.  If this is
+> not acceptable for your board, you can use the standard "init" and
+> "default" pinctrl states.  The "init" state will be set before device
+> probe and "default" after.
 
-Best regards,
-Krzysztof
+Sound resonable.
+Thanks Doug to explain!
 
-> 
-> Does it need to change the compatible from exynos5250 to exynos3250?
-> 
-> Beset Regards,
-> Jaehoon Chung
-> 
->>
->> Anyway if the code is the same then it should use exactly the same
->> compatible.
->>
->> Best regards,
->> Krzysztof
->>
->>>
->>> Signed-off-by: Jaehoon Chung <jh80.chung@samsung.com>
->>> ---
->>>  Documentation/devicetree/bindings/mmc/exynos-dw-mshc.txt | 2 ++
->>>  drivers/mmc/host/dw_mmc-exynos.c                         | 7 +++++++
->>>  2 files changed, 9 insertions(+)
->>>
->>> diff --git a/Documentation/devicetree/bindings/mmc/exynos-dw-mshc.txt b/Documentation/devicetree/bindings/mmc/exynos-dw-mshc.txt
->>> index aad9844..cd22ac9 100644
->>> --- a/Documentation/devicetree/bindings/mmc/exynos-dw-mshc.txt
->>> +++ b/Documentation/devicetree/bindings/mmc/exynos-dw-mshc.txt
->>> @@ -22,6 +22,8 @@ Required Properties:
->>>  	  specific extensions.
->>>  	- "samsung,exynos7-dw-mshc-smu": for controllers with Samsung Exynos7
->>>  	  specific extensions having an SMU.
->>> +	- "samsung,exynos3250-dw-mshc": for controllers with Samsung Exynos3250
->>> +	  specific extensions.
->>>  
->>>  * samsung,dw-mshc-ciu-div: Specifies the divider value for the card interface
->>>    unit (ciu) clock. This property is applicable only for Exynos5 SoC's and
->>> diff --git a/drivers/mmc/host/dw_mmc-exynos.c b/drivers/mmc/host/dw_mmc-exynos.c
->>> index 1e75309..1c96218 100644
->>> --- a/drivers/mmc/host/dw_mmc-exynos.c
->>> +++ b/drivers/mmc/host/dw_mmc-exynos.c
->>> @@ -32,6 +32,7 @@ enum dw_mci_exynos_type {
->>>  	DW_MCI_TYPE_EXYNOS5420_SMU,
->>>  	DW_MCI_TYPE_EXYNOS7,
->>>  	DW_MCI_TYPE_EXYNOS7_SMU,
->>> +	DW_MCI_TYPE_EXYNOS3250,
->>>  };
->>>  
->>>  /* Exynos implementation specific driver private data */
->>> @@ -73,6 +74,9 @@ static struct dw_mci_exynos_compatible {
->>>  	}, {
->>>  		.compatible	= "samsung,exynos7-dw-mshc-smu",
->>>  		.ctrl_type	= DW_MCI_TYPE_EXYNOS7_SMU,
->>> +	}, {
->>> +		.compatible	= "samsung,exynos3250-dw-mshc",
->>> +		.ctrl_type	= DW_MCI_TYPE_EXYNOS3250,
->>>  	},
->>>  };
->>>  
->>> @@ -467,6 +471,7 @@ static int dw_mci_exynos_execute_tuning(struct dw_mci_slot *slot)
->>>  	} while (start_smpl != smpl);
->>>  
->>>  	found = dw_mci_exynos_get_best_clksmpl(candiates);
->>> +
->>>  	if (found >= 0) {
->>>  		dw_mci_exynos_set_clksmpl(host, found);
->>>  		priv->tuned_sample = found;
->>> @@ -520,6 +525,8 @@ static const struct of_device_id dw_mci_exynos_match[] = {
->>>  			.data = &exynos_drv_data, },
->>>  	{ .compatible = "samsung,exynos7-dw-mshc-smu",
->>>  			.data = &exynos_drv_data, },
->>> +	{ .compatible = "samsung,exynos3250-dw-mshc",
->>> +			.data = &exynos_drv_data, },
->>>  	{},
->>>  };
->>>  MODULE_DEVICE_TABLE(of, dw_mci_exynos_match);
->>>
->>
->>
-> 
-> 
+>
+> _______________________________________________
+> Linux-rockchip mailing list
+> Linux-rockchip at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-rockchip
+
+
+-- 
+Thanks,
+Caesar
