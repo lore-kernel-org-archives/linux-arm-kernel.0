@@ -1,94 +1,117 @@
-From: alim.akhtar@samsung.com (Alim Akhtar)
-Date: Thu, 22 Oct 2015 09:24:47 +0530
-Subject: [PATCH v2 0/6] Switch to generic syscon regmap based drivers
-In-Reply-To: <56282B2D.6000708@samsung.com>
-References: <1445333085-22837-1-git-send-email-alim.akhtar@samsung.com>
- <CAGOxZ50G-ttivhVjbozUisA0HXcFz7bvRUuPR67xR88TTCa_wQ@mail.gmail.com>
- <CAGOxZ51_JPy51htzD_M_=qaPVUexkVhoA2ANLS2-rpK3QDT=8A@mail.gmail.com>
- <1606098.olLAyTIhB3@dell2.five-lan.de> <56272C1C.8040007@samsung.com>
- <562765F3.9010306@osg.samsung.com>
- <CAGOxZ52-ia8uhgGg5CiU9TSYkfAsRD52zvLqq++Y-mr4uaFOpg@mail.gmail.com>
- <5627A75E.60509@osg.samsung.com>
- <CAGOxZ537QuzBP4tcG9qh-+iXK-Y=WwZGiJ1-cwtLqwRf0a+wVA@mail.gmail.com>
- <56282B2D.6000708@samsung.com>
-Message-ID: <56285E07.9070500@samsung.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Thu, 22 Oct 2015 13:20:50 +0900
+Subject: Which is better to specify console, "console= " or "stdout-path" ?
+In-Reply-To: <5627BCBC.5040701@hurleysoftware.com>
+References: <CAK7LNAS9uBJ1cVmGBKae3W0tk8Siu1yeXOaeN6Kz11cksMqtsg@mail.gmail.com>
+ <562753A6.3070107@arm.com> <56278911.9050704@hurleysoftware.com>
+ <CAK7LNAQ_+_9K-y7bmpdGwcH2u4uqJhJhON1Ew4OvzSSa-amyvw@mail.gmail.com>
+ <5627BCBC.5040701@hurleysoftware.com>
+Message-ID: <CAK7LNASqjd_Xf53WKa=Ogesf80HQzEoKEyVtw-BMh7JF=jq+xQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Peter,
 
-
-On 10/22/2015 05:47 AM, Krzysztof Kozlowski wrote:
-> On 22.10.2015 00:01, Alim Akhtar wrote:
->> On Wed, Oct 21, 2015 at 8:25 PM, Javier Martinez Canillas
->> <javier@osg.samsung.com> wrote:
->>> Hello Alim,
->>>
->>> On 10/21/2015 04:50 PM, Alim Akhtar wrote:
->>>
->>> [snip]
->>>
->>>>>
->>>>> [0]:
->>>>>  From c9b250ee03bae338339b70693e906145c719f783 Mon Sep 17 00:00:00 2001
->>>>> From: Javier Martinez Canillas <javier@osg.samsung.com>
->>>>> Date: Wed, 21 Oct 2015 11:59:44 +0200
->>>>> Subject: [RFT PATCH] mmc: pwrseq: Use highest priority for eMMC restart
->>>>>   handler
->>>>>
->>>>> The pwrseq_emmc driver does a eMMC card reset before a system reboot to
->>>>> allow broken or limited ROM boot-loaders, that don't have an eMMC reset
->>>>> logic, to be able to read the second stage from the eMMC.
->>>>>
->>>>> But this has to be called before a system reboot handler and while most
->>>>> of them use the priority 128, there are other restart handlers (such as
->>>>> the syscon-reboot one) that use a higher priority. So, use the highest
->>>>> priority to make sure that the eMMC hw is reset before a system reboot.
->>>>>
->>>>> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
->>>>> ---
->>>> Looks good.
->>>> Reviewed-by: Alim Akhtar <alim.akhtar@samsung.com>
->>>>
->>>
->
-> +Cc Ulf,
->
-> Javier,
->
-> First of all, thanks Javier for digging into the issue. Actually I have
-> Odroid U3 but because of user-space limitations (which I need for other
-> work) I cannot test all of mainline patches there.
->
->
->>> Thanks, should I post it as a proper patch or are adding it to your
->>> series?
->> Suggest you to post as a patch collecting {Tested, Reviewed}-by (easy
->> for maintainers to pickup ) and probably CCing Ulf for his feedback.
+2015-10-22 1:26 GMT+09:00 Peter Hurley <peter@hurleysoftware.com>:
+> On 10/21/2015 11:38 AM, Masahiro Yamada wrote:
+>> Hi Peter.
 >>
->>> I think the latter is more reasonable so with an ack from Ulf,
->>> all patches can go through the linux-samsung tree.
+>> 2015-10-21 21:46 GMT+09:00 Peter Hurley <peter@hurleysoftware.com>:
+>>> On 10/21/2015 04:58 AM, Sudeep Holla wrote:
+>>>> On 21/10/15 06:09, Masahiro Yamada wrote:
+>>>>> I think there exist two ways to specify the console port and baudrate.
+>>>>>
+>>>>>
+>>>>> [1] Specify console in bootargs
+>>>>>
+>>>>>    chosen {
+>>>>>          bootargs = "console=ttyS0,115200";
+>>>>>    };
+>>>>>
+>>>>>
+>>>>> [2] Specify stdout-path
+>>>>>
+>>>>>     chosen {
+>>>>>           stdout-path = "serial0:115200n8";
+>>>>
+>>>> This will work for even early/boot console, so this is better than
+>>>> option [1]
 >>>
->> yes, that is reasonable, as I said, let Krzysztof and Ulf take a call here.
+>>> Be aware that options specified via /chosen/stdout-path are
+>>> currently ignored by earlycon. There were some hiccups getting the
+>>> initial support upstream; when 4.4 hits mainline, I'll resubmit
+>>> my series that implements the of_serial i/o properties and
+>>> options passthrough to earlycon setup.
+>>
+>>
+>> As I said in another thread ("serial: earlycon: allow to specify
+>> uartclk in earlycon kernel-parameter"),
+>> stdout-path can pass dev->baud, but not port->uartclk.
 >
-> Javier, Alim, Ulf,
+> That's true but I'm not seeing in that thread where you wrote that?
+
+Sorry, I made you confused.  I was talking about the kernel parameter (console=)
+in the thread.
+
+> My replies there were specific to uartclk on the kernel command line,
+> which isn't necessary if the bootloader has already initialized the
+> uart.
 >
-> I am not grabbing any more patches for v4.4 because I doubt that they
-> could be merged to arm-soc for this cycle. My last pull requests for
-> v4.4 is still pending...
+>> It is usually specified "clocks" phandle, but
+>> clk is not ready at the point of earlycon.
+>>
+>> It seems impossible to set up the baudrate even if the options are passed.
 >
-> This means that I plan to pick up these series for v4.5, after closing
-> v4.4 merge window (unless Kukjin picks it also). Because of that, we
-> have plenty of time, so my idea is:
-> 1. Wait for some comments from Ulf on Javier's fix.
-> 2. If the fix goes into v4.4, then problem solved.
-> 3. If not and it get acked, then it can go with this set.
-> 4. If not and it get applied by Ulf for v4.5, then a tag from him would
-> be a nice way to solve dependency.
->
-> Either way we don't have to hurry, I think.
->
-I am fine, no hurry, lets give these a bit more time to hear from other.
-Thanks
-> Best regards,
-> Krzysztof
->
+> It's difficult to understand what you're trying to do when I can't
+> see the code you're referring to.  For example, I only recently
+> understood that you're talking about a earlycon implementation
+> that you're working on and not the 8250 earlycon itself.
+
+Sorry again for making you confused.
+
+I was talking both.
+
+Now I am tackling on some ARM board porting.
+
+
+The board has a pure 8250 family device (compatible = "ns16550a") on it.
+
+In addition, there exist 8250-variant IPs inside the SoC.
+(this is similar to 8250, but slightly different.
+drivers/tty/serial/8250/8250_uniphier.c)
+
+
+What I want to do is:
+  [1] To use  drivers/tty/serial/8250/8250_early.c  for the on-board ns16550a.
+  [2] To implement my own EARLYCON_DECLARE() in
+drivers/tty/serial/8250/8250_uniphier.c
+
+
+
+> If you look at other non-8250 earlycons, you'll see they all ignore
+> the baud rate, on the assumption the bootloader already set it up.
+
+OK, I will do so for [2].
+
+
+> The 8250 earlycon is a little different because legacy platforms
+> do not initialize the uart.
+
+
+Make sense.
+
+For legacy platforms, earlycon initializes the uart,
+assuming the hard-coded "port->uartclk = BASE_BAUD * 16"
+is the value.
+
+
+For embedded boards such as ARM, the boot-loader should initialize the UART
+and the earlycon should preserve it because port->uartclk varies from
+board to board.
+(For example, the ns16550a on my board expects   BASE_BAUD is 1228000,
+but it does not match the one in include/asm-generic/serial.h )
+
+
+-- 
+Best Regards
+Masahiro Yamada
