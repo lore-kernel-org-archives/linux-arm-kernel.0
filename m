@@ -1,40 +1,32 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Thu, 22 Oct 2015 12:11:46 +0200
-Subject: [PATCH 2/4] cpufreq: imx6q: Fix wrong device in devm_kzalloc
-In-Reply-To: <1445503652-777-3-git-send-email-s.hauer@pengutronix.de>
-References: <1445503652-777-1-git-send-email-s.hauer@pengutronix.de>
- <1445503652-777-3-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1445508706.3173.25.camel@pengutronix.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 22 Oct 2015 12:12:23 +0200
+Subject: [PATCH v2 2/6] vfio: platform: reset: add
+ vfio_platform_reset_private.h
+In-Reply-To: <1445506922-6005-3-git-send-email-eric.auger@linaro.org>
+References: <1445506922-6005-1-git-send-email-eric.auger@linaro.org>
+ <1445506922-6005-3-git-send-email-eric.auger@linaro.org>
+Message-ID: <4144159.DC8Yilf9Tr@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag, den 22.10.2015, 10:47 +0200 schrieb Sascha Hauer:
-> devm_kzalloc must be called with the device that is actually probed,
-> not with cpu_dev which resources are not freed when probe fails.
+On Thursday 22 October 2015 11:41:58 Eric Auger wrote:
+> v2: creation
+> - this defines the module_vfio_reset_handler macro as suggested by Arnd
 > 
-> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> Although Arnd suggested me to remove the vfio_platform_register_reset
+> symbol_get (since the module manager can handle the case where the
+> vfio-platform driver is not loaded), I prefered to keep it while
+> introducing the macro. The rationale is, when using symbol_get/put
+> we are able to release the hold from the reset module on vfio-platform
+> as soon as the registration is complete and I think this makes sense.
 
-Reviewed-by: Lucas Stach <l.stach@pengutronix.de>
+This makes it highly unusual. I can't think of a good reason to allow
+unloading the vfio platform module while a reset module is registered,
+that just causes a memory leak (or possibly a crash) when you do
+unload the core module while it's used by a reset driver, it
+prevents the reset module from getting loaded without loading the
+vfio module first (because the autoloading doesn't work), and it
+means we don't catch build errors in invalid configurations where you
+have only the reset driver but not the vfio driver enabled.
 
-> ---
->  drivers/cpufreq/imx6q-cpufreq.c | 3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/cpufreq/imx6q-cpufreq.c b/drivers/cpufreq/imx6q-cpufreq.c
-> index fabd144..7557d1e 100644
-> --- a/drivers/cpufreq/imx6q-cpufreq.c
-> +++ b/drivers/cpufreq/imx6q-cpufreq.c
-> @@ -260,7 +260,8 @@ static int imx6q_cpufreq_probe(struct platform_device *pdev)
->  	}
->  
->  	/* Make imx6_soc_volt array's size same as arm opp number */
-> -	imx6_soc_volt = devm_kzalloc(cpu_dev, sizeof(*imx6_soc_volt) * num, GFP_KERNEL);
-> +	imx6_soc_volt = devm_kzalloc(&pdev->dev,
-> +			sizeof(*imx6_soc_volt) * num, GFP_KERNEL);
->  	if (imx6_soc_volt == NULL) {
->  		ret = -ENOMEM;
->  		goto free_freq_table;
-
--- 
-Pengutronix e.K.             | Lucas Stach                 |
-Industrial Linux Solutions   | http://www.pengutronix.de/  |
+	Arnd
