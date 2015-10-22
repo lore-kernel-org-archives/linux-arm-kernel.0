@@ -1,71 +1,84 @@
-From: wxt@rock-chips.com (Caesar Wang)
-Date: Thu, 22 Oct 2015 09:25:28 +0800
-Subject: [PATCH v2 0/2] fix the TSHUT issue on rockchip thermal
-Message-ID: <1445477130-17065-1-git-send-email-wxt@rock-chips.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Thu, 22 Oct 2015 10:25:30 +0900
+Subject: [PATCH v2 3/3] dt-bindings: EXYNOS: Document compatibles from other
+ vendors
+In-Reply-To: <1445477130-407-1-git-send-email-k.kozlowski@samsung.com>
+References: <1445477130-407-1-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <1445477130-407-3-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-We need the OTP pin is gpio state before resetting the TSADC controller,
-since the tshut polarity will generate a high signal.
+Document compatibles used on other Exynos-based boards (non-Samsung):
+FriendlyARM, Google, Hardkernel and Insignal.
 
-Says:
-The TSHUT temperature is setting more than 80 degree, the default
-tshut polarity is HIGH.
+Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Cc: Kukjin Kim <kgene@kernel.org>
+Cc: Javier Martinez Canillas <javier@osg.samsung.com>
+Cc: Hakjoo Kim <ruppi.kim@hardkernel.com>
+Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
 
-If T > 80C, the OTP output the High Signal.
-If T < 80C, the OTP output the Low Signal.
+---
 
-On the moment, the TSADC controller is reset, the tshut polarity will be
-Low in a short period of time.
+Changes since v1:
+1. Added Javier's reviewed-by
+---
+ .../bindings/arm/samsung/samsung-boards.txt        | 44 +++++++++++++++++++++-
+ 1 file changed, 43 insertions(+), 1 deletion(-)
 
-So:
-If T < 80C, the OTP output the High Signal.
-If T > 80C, the OTP output the Low Signal.
-
-In some cases, the OTP pin is connected to the PMIC, maybe the PMIC can
-accept the reset response time to avoid this issue.
-
-In other words, the system will be always reboot if we make the OTP pin
-is connected the others IC to control the power.
-
-This series patchs are depend on Doug's patch.(https://patchwork.kernel.org/patch/7454311/)
-
-This series patchs are based on the Linus master branch.
-
-518cd44 ARM: dts: rockchip: Add the OTP gpio pinctrl
-83e0bab dt-bindings: Add the "init" pinctrl in this document
-150426c drivers/pinctrl: Add the concept of an "init" state
-ce1fad2 Merge branch 'keys-fixes' of git://git.kernel.org/pub/scm/linux/kernel/git/dhowells/linux-fs
-1099f86 Merge git://git.kernel.org/pub/scm/linux/kernel/git/davem/net
-911b79c KEYS: Don't permit request_key() to construct a new keyring
-37850e3 net: bcmgenet: Fix early link interrupt enabling
-afc050d Merge tag 'wireless-drivers-for-davem-2015-10-17' of git://git.kernel.org/pub/scm/linux/kernel/git/kvalo/wireless-drivers
-e277de5 tunnels: Don't require remote endpoint or ID during creation.
-740dbc2 openvswitch: Scrub skb between namespaces
-....
-
-Tested on box board.
-
-
-Changes in v2:
-  - As the Rob comments, add the 'init' pinctrl more decription in document.
-  - fix the subject to make more obvious in PATCH[1/2]
-Series-changes: 1
-  - As the Doug comments, add the 'init' property to sync document.
-  - Add some commits for more obvious in PATCH[2/2]
-
-Changes in v1:
-  - As the Doug comments, drop the thermal driver patchs since
-    we can with pinctrl changing to work.
-  - As the Doug's patch to add the 'init' property.
-
-Caesar Wang (2):
-  dt-bindings: Add the "init" pinctrl in this document
-  ARM: dts: rockchip: Add the OTP gpio pinctrl
-
- Documentation/devicetree/bindings/thermal/rockchip-thermal.txt | 5 +++--
- arch/arm/boot/dts/rk3288.dtsi                                  | 9 +++++++--
- 2 files changed, 10 insertions(+), 4 deletions(-)
-
+diff --git a/Documentation/devicetree/bindings/arm/samsung/samsung-boards.txt b/Documentation/devicetree/bindings/arm/samsung/samsung-boards.txt
+index 43589d2466a7..da078702ae73 100644
+--- a/Documentation/devicetree/bindings/arm/samsung/samsung-boards.txt
++++ b/Documentation/devicetree/bindings/arm/samsung/samsung-boards.txt
+@@ -16,7 +16,49 @@ Required root node properties:
+ 	- "samsung,sd5v1"	- for Exynos5440-based Samsung board.
+ 	- "samsung,ssdk5440"	- for Exynos5440-based Samsung board.
+ 
+-Optional:
++* Other companies Exynos SoC based
++  * FriendlyARM
++        - "friendlyarm,tiny4412"  - for Exynos4412-based FriendlyARM
++                                    TINY4412 board.
++
++  * Google
++        - "google,pi"             - for Exynos5800-based Google Peach Pi
++                                    Rev 10+ board,
++          also: "google,pi-rev16", "google,pi-rev15", "google,pi-rev14",
++		"google,pi-rev13", "google,pi-rev12", "google,pi-rev11",
++                "google,pi-rev10", "google,peach".
++
++        - "google,pit"            - for Exynos5420-based Google Peach Pit
++                                    Rev 6+ (Exynos5420),
++          also: "google,pit-rev16", "google,pit-rev15", "google,pit-rev14",
++                "google,pit-rev13", "google,pit-rev12", "google,pit-rev11",
++                "google,pit-rev10", "google,pit-rev9", "google,pit-rev8",
++                "google,pit-rev7", "google,pit-rev6", "google,peach".
++
++        - "google,snow-rev4"      - for Exynos5250-based Google Snow board,
++          also: "google,snow"
++        - "google,snow-rev5"      - for Exynos5250-based Google Snow
++                                    Rev 5+ board.
++        - "google,spring"         - for Exynos5250-based Google Spring board.
++
++  * Hardkernel
++        - "hardkernel,odroid-u3"  - for Exynos4412-based Hardkernel Odroid U3.
++        - "hardkernel,odroid-x"   - for Exynos4412-based Hardkernel Odroid X.
++        - "hardkernel,odroid-x2"  - for Exynos4412-based Hardkernel Odroid X2.
++        - "hardkernel,odroid-xu3" - for Exynos5422-based Hardkernel Odroid XU3.
++        - "hardkernel,odroid-xu3-lite" - for Exynos5422-based Hardkernel
++                                         Odroid XU3 Lite board.
++        - "hardkernel,odroid-xu4" - for Exynos5422-based Hardkernel Odroid XU4.
++
++  * Insignal
++        - "insignal,arndale"      - for Exynos5250-based Insignal Arndale board.
++        - "insignal,arndale-octa" - for Exynos5420-based Insignal Arndale
++                                    Octa board.
++        - "insignal,origen"       - for Exynos4210-based Insignal Origen board.
++        - "insignal,origen4412    - for Exynos4412-based Insignal Origen board.
++
++
++Optional nodes:
+     - firmware node, specifying presence and type of secure firmware:
+         - compatible: only "samsung,secure-firmware" is currently supported
+         - reg: address of non-secure SYSRAM used for communication with firmware
 -- 
 1.9.1
