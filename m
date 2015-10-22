@@ -1,94 +1,55 @@
-From: yh.huang@mediatek.com (YH Huang)
-Date: Thu, 22 Oct 2015 23:29:02 +0800
-Subject: [RESEND PATCH] pwm-backlight: fix the panel power sequence
-In-Reply-To: <1444984313.3180.6.camel@pengutronix.de>
-References: <1444959454-1516-1-git-send-email-yh.huang@mediatek.com>
- <1444984313.3180.6.camel@pengutronix.de>
-Message-ID: <1445527742.27586.18.camel@mtksdaap41>
+From: alex.williamson@redhat.com (Alex Williamson)
+Date: Thu, 22 Oct 2015 09:40:44 -0600
+Subject: [PATCH v2 6/6] vfio: platform: move get/put reset at open/release
+In-Reply-To: <5628F17C.9030907@linaro.org>
+References: <1445506922-6005-1-git-send-email-eric.auger@linaro.org>
+ <4304536.D7eNHjlsvD@wuerfel> <5628E41F.5050602@linaro.org>
+ <9413126.UTMuRq7fA0@wuerfel> <5628F17C.9030907@linaro.org>
+Message-ID: <1445528444.5050.8.camel@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2015-10-16 at 10:31 +0200, Lucas Stach wrote:
-> Am Freitag, den 16.10.2015, 09:37 +0800 schrieb YH Huang:
-> > In order to match the panel power sequence, disable the enable_gpio
-> > in the probe function. Also, reorder the code in the power_on and
-> > power_off function to match the timing.
+On Thu, 2015-10-22 at 16:23 +0200, Eric Auger wrote:
+> On 10/22/2015 04:10 PM, Arnd Bergmann wrote:
+> > On Thursday 22 October 2015 15:26:55 Eric Auger wrote:
+> >>>> @@ -181,6 +182,8 @@ static int vfio_platform_open(void *device_data)
+> >>>>                 if (ret)
+> >>>>                         goto err_irq;
+> >>>>  
+> >>>> +               vfio_platform_get_reset(vdev);
+> >>>> +
+> >>>>                 if (vdev->reset)
+> >>>>                         vdev->reset(vdev);
+> >>>>
+> >>>
+> >>> This needs some error handling to ensure that the open() fails
+> >>> if there is no reset handler.
+> >>
+> >> Is that really what we want? The code was meant to allow the use case
+> >> where the VFIO platform driver would be used without such reset module.
+> >>
+> >> I think the imperious need for a reset module depends on the device and
+> >> more importantly depends on the IOMMU mapping. With QEMU VFIO
+> >> integration this is needed because the whole VM memory is IOMMU mapped
+> >> but in a simpler user-space driver context, we might live without.
+> >>
+> >> Any thought?
 > > 
-> You aren't specifying which panels power sequence you are matching here.
-> Are you sure you aren't breaking other panels with this patch?
-> 
-> Regards,
-> Lucas
-The panel sequence is:
-When powering on the panel, generate pwm signals fist and then enable it
-to show the backlight.
-When powering off the panel, do it opposite.
-In probe function, we keep the panel status from bootloader and don't
-enable or disable it by default.
-
-Do these changes break other panels?
-
-Regards,
-YH Huang
-
-
-> 
-> > Signed-off-by: YH Huang <yh.huang@mediatek.com>
-> > ---
-> >  drivers/video/backlight/pwm_bl.c |   15 +++++++++------
-> >  1 file changed, 9 insertions(+), 6 deletions(-)
+> > I would think we need a reset driver for any device that can start DMA,
+> > otherwise things can go wrong as soon as you attach it to a different domain
+> > while there is ongoing DMA.
 > > 
-> > diff --git a/drivers/video/backlight/pwm_bl.c b/drivers/video/backlight/pwm_bl.c
-> > index eff379b..99eca1e 100644
-> > --- a/drivers/video/backlight/pwm_bl.c
-> > +++ b/drivers/video/backlight/pwm_bl.c
-> > @@ -54,10 +54,11 @@ static void pwm_backlight_power_on(struct pwm_bl_data *pb, int brightness)
-> >  	if (err < 0)
-> >  		dev_err(pb->dev, "failed to enable power supply\n");
-> >  
-> > +	pwm_enable(pb->pwm);
-> > +
-> >  	if (pb->enable_gpio)
-> >  		gpiod_set_value(pb->enable_gpio, 1);
-> >  
-> > -	pwm_enable(pb->pwm);
-> >  	pb->enabled = true;
-> >  }
-> >  
-> > @@ -66,12 +67,12 @@ static void pwm_backlight_power_off(struct pwm_bl_data *pb)
-> >  	if (!pb->enabled)
-> >  		return;
-> >  
-> > -	pwm_config(pb->pwm, 0, pb->period);
-> > -	pwm_disable(pb->pwm);
-> > -
-> >  	if (pb->enable_gpio)
-> >  		gpiod_set_value(pb->enable_gpio, 0);
-> >  
-> > +	pwm_config(pb->pwm, 0, pb->period);
-> > +	pwm_disable(pb->pwm);
-> > +
-> >  	regulator_disable(pb->power_supply);
-> >  	pb->enabled = false;
-> >  }
-> > @@ -241,8 +242,7 @@ static int pwm_backlight_probe(struct platform_device *pdev)
-> >  	pb->dev = &pdev->dev;
-> >  	pb->enabled = false;
-> >  
-> > -	pb->enable_gpio = devm_gpiod_get_optional(&pdev->dev, "enable",
-> > -						  GPIOD_OUT_HIGH);
-> > +	pb->enable_gpio = devm_gpiod_get_optional(&pdev->dev, "enable");
-> >  	if (IS_ERR(pb->enable_gpio)) {
-> >  		ret = PTR_ERR(pb->enable_gpio);
-> >  		goto err_alloc;
-> > @@ -264,6 +264,9 @@ static int pwm_backlight_probe(struct platform_device *pdev)
-> >  		pb->enable_gpio = gpio_to_desc(data->enable_gpio);
-> >  	}
-> >  
-> > +	if (pb->enable_gpio)
-> > +		gpiod_direction_output(pb->enable_gpio, 0);
-> > +
-> >  	pb->power_supply = devm_regulator_get(&pdev->dev, "power");
-> >  	if (IS_ERR(pb->power_supply)) {
-> >  		ret = PTR_ERR(pb->power_supply);
+> > Maybe we could just allow devices to be attached without a reset handler,
+> > but then disallow DMA on them?
 > 
+> Well I am tempted to think that most assigned devices will perform DMA
+> accesses so to me this somehow comes to the same result, ie disallowing
+> functional passthrough for devices not properly/fully integrated.
+> 
+> Alex/Baptiste, any opinion on this?
+
+We have an IOMMU and the user doesn't get access to the device until the
+IOMMU domain is established.  So, ideally yes, we should have a way to
+reset the device, but I don't see it as a requirement.  Thanks,
+
+Alex
