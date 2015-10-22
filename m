@@ -1,74 +1,41 @@
-From: jonmason@broadcom.com (Jon Mason)
-Date: Thu, 22 Oct 2015 10:18:44 -0400
-Subject: [PATCH v3 08/10] clk: ns2: add clock support for Broadcom
- Northstar 2 SoC
-In-Reply-To: <20151022002246.GV19782@codeaurora.org>
-References: <1444938513-10758-1-git-send-email-jonmason@broadcom.com>
- <1444938513-10758-9-git-send-email-jonmason@broadcom.com>
- <56200F39.1060102@broadcom.com> <562012A8.8050707@broadcom.com>
- <562014C9.5070708@broadcom.com>
- <20151015211025.GP32089@broadcom.com>
- <56201766.9020206@broadcom.com> <562019DD.3000206@broadcom.com>
- <20151022002246.GV19782@codeaurora.org>
-Message-ID: <20151022141843.GD651@broadcom.com>
+From: m-karicheri2@ti.com (Murali Karicheri)
+Date: Thu, 22 Oct 2015 10:18:48 -0400
+Subject: [PATCH 1/5] ARM: Keystone: Enable PINCTRL for Keystone ARCH
+In-Reply-To: <5626E9BC.40300@oracle.com>
+References: <1445377809-12516-1-git-send-email-fcooper@ti.com>
+ <5626E9BC.40300@oracle.com>
+Message-ID: <5628F048.3000501@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 21, 2015 at 05:22:47PM -0700, Stephen Boyd wrote:
-> On 10/15, Scott Branden wrote:
-> > On 15-10-15 02:15 PM, Ray Jui wrote:
-> > >On 10/15/2015 2:10 PM, Jon Mason wrote:
-> > >>On Thu, Oct 15, 2015 at 02:04:09PM -0700, Scott Branden wrote:
-> > >>>On 15-10-15 01:55 PM, Ray Jui wrote:
-> > >>>>On 10/15/2015 1:40 PM, Scott Branden wrote:
-> > >>>>
-> > >>>>If using CONFIG_CLK_NS2, how is it going to be enabled/selected?
-> > >>>
-> > >>>Since CONFIG_ARCH_BCM_NS2 isn't "allowed" to be introduced we will
-> > >>>need to create and select a CONFIG_CLK_BCM_NS2 in the defconfig
-> > >>>instead.
-> > >>
-> > >>Is this better than the binary becoming slightly bigger?  I thought
-> > >>the extra complexity was worse than having an unused chunk of clk code
-> > >>(and Kona is already doing the same thing above).  I believe Ray was
-> > >>in agreement with me during the internal review of this code.
-> > >>
-> > >>Thanks,
-> > >>Jon
-> > >>
-> > >
-> > >Yes, I'm okay with leaving it as it is. I even prefer changing the
-> > >current Makefile to make all iProc based core clock drivers and SoC
-> > >specific clock tables under CONFIG_COMMON_CLK_IPROC, which is what some
-> > >of the other vendors do.
-> > >
-> > I'd leave it exactly as is then rather than pulling in more dead
-> > code when not needed.  This ns2 clock code is very minor compared to
-> > other code bloat in the kernel and drivers.
-> 
-> We should really make these visible options that can be selected
-> by anyone. Having selects in the ARCH config area is simple, but
-> also has some downsides:
-> 
->  1) select is a reverse dependency and is hard for people to
->  understand and can sometimes be a pain to track down
-> 
->  2) build coverage goes down because configs are hidden
-> 
->  3) we get code bloat like is being discussed here
-> 
-> So I'd really like to see someone take a good look at this whole
-> Makefile situation that's going on and clean it up so that
-> they're user visible options and then throw the config options
-> into the defconfig. It isn't going to block this series, but it
-> would be nice to do at some later point.
+On 10/20/2015 09:26 PM, santosh shilimkar wrote:
+> On 10/20/2015 2:50 PM, Franklin S Cooper Jr wrote:
+>> From: Franklin Cooper <fcooper@ti.com>
+>>
+>> Unlike other Keystone 2 devices, newer Keystone 2 SOCs may utilize
+>> pinmuxing which requires PINCTRL to be enabled. Therefore, enable
+>> PINCTRL for all Keystone 2 devices.
+>>
+>> Signed-off-by: Franklin S Cooper Jr <fcooper@ti.com>
+>> ---
+>>   arch/arm/mach-keystone/Kconfig | 1 +
+>>   1 file changed, 1 insertion(+)
+>>
+> I would be happy to add this one when I see pin
+> control data in DTS and its actually going to be
+> used in upstream kernel. Till then I don't want
+> to add this one.
+>
+Agree. It is too early to add the defconfig update and should be 
+deferred to when the DTS update is made. What if the newer keystone 2 
+SoC never end up in the tree?
 
-I'll do a pass at this today and send it out for review.
+Murali
+> Regards,
+> Santosh
+>
 
-Thanks,
-Jon
 
-> 
-> -- 
-> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-> a Linux Foundation Collaborative Project
+-- 
+Murali Karicheri
+Linux Kernel, Keystone
