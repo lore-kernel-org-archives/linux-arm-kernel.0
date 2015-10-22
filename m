@@ -1,35 +1,24 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Thu, 22 Oct 2015 09:48:39 -0700
-Subject: [GIT PULL] Second Round of Renesas ARM Based SoC Cleanup for v4.4
-In-Reply-To: <cover.1444868660.git.horms+renesas@verge.net.au>
-References: <cover.1444868660.git.horms+renesas@verge.net.au>
-Message-ID: <20151022164839.GB19953@localhost>
+Date: Thu, 22 Oct 2015 09:53:05 -0700
+Subject: [PATCH] ARM: Remove open-coded version of IRQCHIP_DECLARE
+In-Reply-To: <1445005270-18715-1-git-send-email-marc.zyngier@arm.com>
+References: <1445005270-18715-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20151022165305.GC19953@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 15, 2015 at 09:33:02AM +0900, Simon Horman wrote:
-> Hi Olof, Hi Kevin, Hi Arnd,
+On Fri, Oct 16, 2015 at 03:21:10PM +0100, Marc Zyngier wrote:
+> Now that the IRQCHIP_DECLARE macro has been moved to linux/irqchip.h,
+> it becomes possible to cleanup the open-coded versions of the same
+> macro that have been added to some private irqchips implementations.
 > 
-> Please consider these second round of Renesas ARM based SoC cleanup for v4.4.
-> 
-> This pull request is based on the previous round of
-> such requests, tagged as renesas-cleanup-for-v4.4,
-> which you have already pulled.
-> 
-> 
-> The following changes since commit 04418c23a9411b85b8789eab5f4397bcbd62b7b4:
-> 
->   ARM: shmobile: Remove legacy clock support leftovers (2015-09-14 10:06:56 +0900)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git tags/renesas-cleanup2-for-v4.4
-> 
-> for you to fetch changes up to 1fd377b3fc1e071702e27b2f828e3abd8b31c74d:
-> 
->   ARM: shmobile: R-Mobile: add missing of_node_put (2015-10-12 09:15:29 +0900)
+> Cc: Sascha Hauer <kernel@pengutronix.de>
+> Acked-by: Kukjin Kim <kgene@kernel.org>
+> Acked-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> Acked-by: Shawn Guo <shawnguo@kernel.org>
+> Acked-by: Tony Lindgren <tony@atomide.com>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 
-Merged, thanks!
-
+Applied to next/cleanup. Thanks!
 
 -Olof
