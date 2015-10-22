@@ -1,47 +1,29 @@
-From: moritz.fischer@ettus.com (Moritz Fischer)
-Date: Thu, 22 Oct 2015 11:56:09 -0700
-Subject: [PATCH] fpga: zynq-fpga: Fix issue with drvdata being overwritten.
-Message-ID: <1445540169-20715-1-git-send-email-moritz.fischer@ettus.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 22 Oct 2015 20:58:26 +0200
+Subject: [PATCH] ARM: dts: sun4i: Enable audio codec on Marsboard A10.
+In-Reply-To: <1445510336-4821-1-git-send-email-mamlinav@gmail.com>
+References: <1445510336-4821-1-git-send-email-mamlinav@gmail.com>
+Message-ID: <20151022185826.GB10947@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Upon registering a FPGA Manager low level driver, FPGA Manager
-core overwrites the platform drvdata pointer. Prior to this commit
-zynq-fpga falsely relied on this pointer to still be valid at remove()
-time.
+On Thu, Oct 22, 2015 at 01:38:56PM +0300, Aleksei Mamlin wrote:
+> Enable on-chip audio codec on the Marsboard A10.
+> 
+> Signed-off-by: Aleksei Mamlin <mamlinav@gmail.com>
 
-Reported-by: Alan Tull <atull@opensource.altera.com>
-Signed-off-by: Moritz Fischer <moritz.fischer@ettus.com>
----
- drivers/fpga/zynq-fpga.c | 7 ++++---
- 1 file changed, 4 insertions(+), 3 deletions(-)
+Applied, thanks!
 
-diff --git a/drivers/fpga/zynq-fpga.c b/drivers/fpga/zynq-fpga.c
-index 31db550..c2fb412 100644
---- a/drivers/fpga/zynq-fpga.c
-+++ b/drivers/fpga/zynq-fpga.c
-@@ -416,7 +416,6 @@ static int zynq_fpga_probe(struct platform_device *pdev)
- 	if (!priv)
- 		return -ENOMEM;
- 
--	platform_set_drvdata(pdev, priv);
- 	priv->dev = dev;
- 
- 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-@@ -477,10 +476,12 @@ static int zynq_fpga_probe(struct platform_device *pdev)
- static int zynq_fpga_remove(struct platform_device *pdev)
- {
- 	struct zynq_fpga_priv *priv;
-+	struct fpga_manager *mgr;
- 
--	fpga_mgr_unregister(&pdev->dev);
-+	mgr = platform_get_drvdata(pdev);
-+	priv = mgr->priv;
- 
--	priv = platform_get_drvdata(pdev);
-+	fpga_mgr_unregister(&pdev->dev);
- 
- 	clk_unprepare(priv->clk);
- 
+Maxime
+
 -- 
-2.6.2
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151022/4d8cfe6d/attachment.sig>
