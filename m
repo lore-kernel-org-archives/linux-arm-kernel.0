@@ -1,32 +1,202 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 22 Oct 2015 12:12:23 +0200
-Subject: [PATCH v2 2/6] vfio: platform: reset: add
- vfio_platform_reset_private.h
-In-Reply-To: <1445506922-6005-3-git-send-email-eric.auger@linaro.org>
-References: <1445506922-6005-1-git-send-email-eric.auger@linaro.org>
- <1445506922-6005-3-git-send-email-eric.auger@linaro.org>
-Message-ID: <4144159.DC8Yilf9Tr@wuerfel>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Thu, 22 Oct 2015 12:13:07 +0200
+Subject: [PATCH v2 1/2] dmaengine: hdmac: factorise memset descriptor
+ allocation
+In-Reply-To: <1445506860-22619-2-git-send-email-maxime.ripard@free-electrons.com>
+References: <1445506860-22619-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1445506860-22619-2-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <5628B6B3.50306@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 22 October 2015 11:41:58 Eric Auger wrote:
-> v2: creation
-> - this defines the module_vfio_reset_handler macro as suggested by Arnd
+Le 22/10/2015 11:40, Maxime Ripard a ?crit :
+> The memset and scatter gathered memset are going to use some common logic
+> to create their descriptors.
 > 
-> Although Arnd suggested me to remove the vfio_platform_register_reset
-> symbol_get (since the module manager can handle the case where the
-> vfio-platform driver is not loaded), I prefered to keep it while
-> introducing the macro. The rationale is, when using symbol_get/put
-> we are able to release the hold from the reset module on vfio-platform
-> as soon as the registration is complete and I think this makes sense.
+> Move that logic into a function of its own so that we can share it with the
+> future memset_sg callback.
+> 
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> ---
+>  drivers/dma/at_hdmac.c      | 97 ++++++++++++++++++++++++++-------------------
+>  drivers/dma/at_hdmac_regs.h |  2 +-
+>  2 files changed, 58 insertions(+), 41 deletions(-)
+> 
+> diff --git a/drivers/dma/at_hdmac.c b/drivers/dma/at_hdmac.c
+> index 58d406230d89..cad18f3660ae 100644
+> --- a/drivers/dma/at_hdmac.c
+> +++ b/drivers/dma/at_hdmac.c
+> @@ -458,10 +458,10 @@ atc_chain_complete(struct at_dma_chan *atchan, struct at_desc *desc)
+>  		dma_cookie_complete(txd);
+>  
+>  	/* If the transfer was a memset, free our temporary buffer */
+> -	if (desc->memset) {
+> +	if (desc->memset_buffer) {
+>  		dma_pool_free(atdma->memset_pool, desc->memset_vaddr,
+>  			      desc->memset_paddr);
+> -		desc->memset = false;
+> +		desc->memset_buffer = false;
+>  	}
+>  
+>  	/* move children to free_list */
+> @@ -881,6 +881,46 @@ err_desc_get:
+>  	return NULL;
+>  }
+>  
+> +static struct at_desc *atc_create_memset_desc(struct dma_chan *chan,
+> +					      dma_addr_t psrc,
+> +					      dma_addr_t pdst,
+> +					      size_t len)
+> +{
+> +	struct at_dma_chan *atchan = to_at_dma_chan(chan);
+> +	struct at_desc *desc;
+> +	size_t xfer_count;
+> +
+> +	u32 ctrla = ATC_SRC_WIDTH(2) | ATC_DST_WIDTH(2);
+> +	u32 ctrlb = ATC_DEFAULT_CTRLB | ATC_IEN |
+> +		ATC_SRC_ADDR_MODE_FIXED |
+> +		ATC_DST_ADDR_MODE_INCR |
+> +		ATC_FC_MEM2MEM;
+> +
+> +	xfer_count = len >> 2;
+> +	if (xfer_count > ATC_BTSIZE_MAX) {
+> +		dev_err(chan2dev(chan), "%s: buffer is too big\n",
+> +			__func__);
+> +		return NULL;
+> +	}
+> +
+> +	desc = atc_desc_get(atchan);
+> +	if (!desc) {
+> +		dev_err(chan2dev(chan), "%s: can't get a descriptor\n",
+> +			__func__);
+> +		return NULL;
+> +	}
+> +
+> +	desc->lli.saddr = psrc;
+> +	desc->lli.daddr = pdst;
+> +	desc->lli.ctrla = ctrla | xfer_count;
+> +	desc->lli.ctrlb = ctrlb;
+> +
+> +	desc->txd.cookie = 0;
+> +	desc->len = len;
+> +
+> +	return desc;
+> +}
+> +
+>  /**
+>   * atc_prep_dma_memset - prepare a memcpy operation
+>   * @chan: the channel to prepare operation on
+> @@ -893,12 +933,10 @@ static struct dma_async_tx_descriptor *
+>  atc_prep_dma_memset(struct dma_chan *chan, dma_addr_t dest, int value,
+>  		    size_t len, unsigned long flags)
+>  {
+> -	struct at_dma_chan	*atchan = to_at_dma_chan(chan);
+>  	struct at_dma		*atdma = to_at_dma(chan->device);
+> -	struct at_desc		*desc = NULL;
+> -	size_t			xfer_count;
+> -	u32			ctrla;
+> -	u32			ctrlb;
+> +	struct at_desc		*desc;
+> +	void __iomem		*vaddr;
+> +	dma_addr_t		paddr;
+>  
+>  	dev_vdbg(chan2dev(chan), "%s: d0x%x v0x%x l0x%zx f0x%lx\n", __func__,
+>  		dest, value, len, flags);
+> @@ -914,46 +952,26 @@ atc_prep_dma_memset(struct dma_chan *chan, dma_addr_t dest, int value,
+>  		return NULL;
+>  	}
+>  
+> -	xfer_count = len >> 2;
+> -	if (xfer_count > ATC_BTSIZE_MAX) {
+> -		dev_err(chan2dev(chan), "%s: buffer is too big\n",
+> +	vaddr = dma_pool_alloc(atdma->memset_pool, GFP_ATOMIC, &paddr);
+> +	if (!vaddr) {
+> +		dev_err(chan2dev(chan), "%s: couldn't allocate buffer\n",
+>  			__func__);
+>  		return NULL;
+>  	}
+> +	*(u32*)vaddr = value;
+>  
+> -	ctrlb =   ATC_DEFAULT_CTRLB | ATC_IEN
+> -		| ATC_SRC_ADDR_MODE_FIXED
+> -		| ATC_DST_ADDR_MODE_INCR
+> -		| ATC_FC_MEM2MEM;
+> -
+> -	ctrla = ATC_SRC_WIDTH(2) |
+> -		ATC_DST_WIDTH(2);
+> -
+> -	desc = atc_desc_get(atchan);
+> +	desc = atc_create_memset_desc(chan, paddr, dest, len);
+>  	if (!desc) {
+> -		dev_err(chan2dev(chan), "%s: can't get a descriptor\n",
+> +		dev_err(chan2dev(chan), "%s: couldn't get a descriptor\n",
+>  			__func__);
 
-This makes it highly unusual. I can't think of a good reason to allow
-unloading the vfio platform module while a reset module is registered,
-that just causes a memory leak (or possibly a crash) when you do
-unload the core module while it's used by a reset driver, it
-prevents the reset module from getting loaded without loading the
-vfio module first (because the autoloading doesn't work), and it
-means we don't catch build errors in invalid configurations where you
-have only the reset driver but not the vfio driver enabled.
+Nitpicking: as you already have a dev_err() for each error possible in
+the called function, you wouldn't need more log hereunder...
 
-	Arnd
+otherwise, I'm okay:
+Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+
+
+> -		return NULL;
+> +		goto err_free_buffer;
+>  	}
+>  
+> -	desc->memset_vaddr = dma_pool_alloc(atdma->memset_pool, GFP_ATOMIC,
+> -					    &desc->memset_paddr);
+> -	if (!desc->memset_vaddr) {
+> -		dev_err(chan2dev(chan), "%s: couldn't allocate buffer\n",
+> -			__func__);
+> -		goto err_put_desc;
+> -	}
+> -
+> -	*desc->memset_vaddr = value;
+> -	desc->memset = true;
+> -
+> -	desc->lli.saddr = desc->memset_paddr;
+> -	desc->lli.daddr = dest;
+> -	desc->lli.ctrla = ctrla | xfer_count;
+> -	desc->lli.ctrlb = ctrlb;
+> +	desc->memset_paddr = paddr;
+> +	desc->memset_vaddr = vaddr;
+> +	desc->memset_buffer = true;
+>  
+>  	desc->txd.cookie = -EBUSY;
+> -	desc->len = len;
+>  	desc->total_len = len;
+>  
+>  	/* set end-of-link on the descriptor */
+> @@ -963,12 +981,11 @@ atc_prep_dma_memset(struct dma_chan *chan, dma_addr_t dest, int value,
+>  
+>  	return &desc->txd;
+>  
+> -err_put_desc:
+> -	atc_desc_put(atchan, desc);
+> +err_free_buffer:
+> +	dma_pool_free(atdma->memset_pool, vaddr, paddr);
+>  	return NULL;
+>  }
+>  
+> -
+>  /**
+>   * atc_prep_slave_sg - prepare descriptors for a DMA_SLAVE transaction
+>   * @chan: DMA channel
+> diff --git a/drivers/dma/at_hdmac_regs.h b/drivers/dma/at_hdmac_regs.h
+> index c3bebbe899ac..d1cfc8c876f9 100644
+> --- a/drivers/dma/at_hdmac_regs.h
+> +++ b/drivers/dma/at_hdmac_regs.h
+> @@ -202,7 +202,7 @@ struct at_desc {
+>  	size_t				src_hole;
+>  
+>  	/* Memset temporary buffer */
+> -	bool				memset;
+> +	bool				memset_buffer;
+>  	dma_addr_t			memset_paddr;
+>  	int				*memset_vaddr;
+>  };
+> 
+
+
+-- 
+Nicolas Ferre
