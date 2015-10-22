@@ -1,32 +1,31 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 22 Oct 2015 10:14:30 +0200
-Subject: [PATCH 1/2] can: xilinx: use readl/writel instead of
- ioread/iowrite
-In-Reply-To: <1445489163-11045-1-git-send-email-appanad@xilinx.com>
-References: <1445489163-11045-1-git-send-email-appanad@xilinx.com>
-Message-ID: <4061693.oBld7AKBIp@wuerfel>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 22 Oct 2015 10:16:05 +0200
+Subject: [PATCH 3/6] pinctrl: sunxi: Add H3 PIO controller support
+In-Reply-To: <5627BDB6.6020501@gmail.com>
+References: <5627BDB6.6020501@gmail.com>
+Message-ID: <20151022081605.GO10947@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 22 October 2015 10:16:02 Kedareswara rao Appana wrote:
-> The driver only supports memory-mapped I/O [by ioremap()],
-> so readl/writel is actually the right thing to do, IMO.
-> During the validation of this driver or IP on ARM 64-bit processor
-> while sending lot of packets observed that the tx packet drop with iowrite
-> Putting the barriers for each tx fifo register write fixes this issue
-> Instead of barriers using writel also fixed this issue.
+On Wed, Oct 21, 2015 at 06:30:46PM +0200, Jens Kuske wrote:
+> The H3 uses the same pin controller as previous SoC's from Allwinner.
+> Add support for the pins controlled by the main PIO controller.
 > 
-> Signed-off-by: Kedareswara rao Appana <appanad@xilinx.com>
+> Signed-off-by: Jens Kuske <jenskuske@gmail.com>
 
-The two should really do the same thing: iowrite32() is just a static inline
-calling writel() on both ARM32 and ARM64. On which kernel version did you
-observe the difference? It's possible that an older version used
-CONFIG_GENERIC_IOMAP, which made this slightly more expensive.
+Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 
-If there are barriers that you want to get rid of for performance reasons,
-you should use writel_relaxed(), but be careful to synchronize them correctly
-with regard to DMA. It should be fine in this driver, as it does not
-perform any DMA, but be aware that there is no big-endian version of
-writel_relaxed() at the moment.
+Thanks!
+Maxime
 
-	Arnd
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151022/3442e66c/attachment.sig>
