@@ -1,80 +1,37 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Thu, 22 Oct 2015 14:57:27 +0900
-Subject: [PATCH 1/2] mmc: dw_mmc: exynos: Add the exynos3250 compatible
-In-Reply-To: <562870B4.2070109@samsung.com>
-References: <1445409555-1684-1-git-send-email-jh80.chung@samsung.com>
- <5628289C.90800@samsung.com> <56284FCE.3000108@samsung.com>
- <56285D29.7030502@samsung.com> <562870B4.2070109@samsung.com>
-Message-ID: <56287AC7.9020906@samsung.com>
+From: ijc@debian.org (Ian Campbell)
+Date: Thu, 22 Oct 2015 07:40:25 +0100
+Subject: I/O issues with writing to mtdblock devices on kirkwood
+In-Reply-To: <5628022A.9050707@mcfarlanes.me>
+References: <1444722697.16876.55.camel@debian.org>
+ <5626B4DC.8000407@mcfarlanes.me> <5627F4E8.3030907@mcfarlanes.me>
+ <1445461864.32735.21.camel@debian.org> <5628022A.9050707@mcfarlanes.me>
+Message-ID: <1445496025.32735.25.camel@debian.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22.10.2015 14:14, Jaehoon Chung wrote:
-> On 10/22/2015 12:51 PM, Krzysztof Kozlowski wrote:
->> On 22.10.2015 11:54, Jaehoon Chung wrote:
->>> Hi, Krzysztof.
->>>
->>> On 10/22/2015 09:06 AM, Krzysztof Kozlowski wrote:
->>>> On 21.10.2015 15:39, Jaehoon Chung wrote:
->>>>> To check more exactly, add the exynos3250 compatible.
->>>>> Not use exynos5250 compatibility.
->>>>
->>>> Hi,
->>>>
->>>> I can't find any difference between old and new compatible. Maybe I am
->>>> missing something? Maybe there is a difference for these devices?
->>>
->>> Sorry, I needs to add more explanation about changing compatible.
->>> Exynos3250 has more registers than exynos5250 in dwmmc IP.
->>> Now, we used dwmmc controller with exynos5250 compatible.
->>> Then some codes can't run in dw-mmc.c, if SoC is exynos3250.
->>> For example, there is the checking point in dw_mci_exynos_config_hs400().
->>>
->>> static void dw_mci_exynos_config_hs400(struct dw_mci *host, u32 timing)
->>> {
->>>         struct dw_mci_exynos_priv_data *priv = host->priv;
->>>         u32 dqs, strobe;
->>>
->>>         /*
->>>          * Not supported to configure register
->>>          * related to HS400
->>>          */
->>>         if (priv->ctrl_type < DW_MCI_TYPE_EXYNOS5420)
->>>                 return;
->>>
->>>         dqs = priv->saved_dqs_en;
->>>         strobe = priv->saved_strobe_ctrl;
->>>
->>> It can't use this feature with exynos5250 compatible.
->>
->> Ahh, I see it now. I missed that context and commit message wasn't
->> explaining this real reason. This real reason - supporting HS400 or
->> other features not present on Exynos5250 - was not mentioned.
-> 
-> Right, it's not enough to explain why needs this patch.
-> 
->>
->> The new compatible make sense now... but I am wondering if instead just
->> "samsung,exynos5420-dw-mshc" should be used? I think it would give the
->> same result as your change and if new compatible is not required then it
->> will be better not to add it.
-> 
-> I need to check whether it can be used with "samsung,exynos5420-dw-mshc".
-> If you don't want to add new compatible, then i will check Exynos5420 TRM.
-> Maybe, i think it can be used with it.
-> 
-> Is it good that use more exact compatible?
->
+On Wed, 2015-10-21 at 22:22 +0100, Iain McFarlane wrote:
 
-Actually one thing is the real compatibility of devices and second is
-the source code.
+> >> 3.16 - No SATA errors when updating initrd - the kernel is flashed using
+> >> dtb but how do I tell if it is used?
+> [...]
+> In which case it is using the board file
+> 
+> How do I force it to use the dtb?
 
-Looking at the source code, the behaviour for new exynos3250 compatible
-and "samsung,exynos5420-dw-mshc" would be the same, right? This would be
-a indication for reusing existing compatible. No need to create new one.
+If the DTB has been appended then it should Just Happen on reboot, I
+think. I'm 99% certain that the 3.16 kernel in Jessie had the options
+to enable DTB on this platform turned on. Specifically it should have
+ CONFIG_ARCH_KIRKWOOD_DT=y.
 
-However maybe the devices aren't really compatible and using the same
-compatible would prevent adding new features to Exynos5420?
+You say "the kernel is flashed using the dtb", please could you post
+the logs from flash-kernel to confirm this. And the dmesg from the
+subsequent boot (whether board or DTB) would be useful too.
 
-Best regards,
-Krzysztof
+> On a different note anyone know why udev would not be running modprobe? 
+> Every time I reboot this box I have to the reload any of the modules not
+> specified in the initrd even things like mvmdio to get the network working.
+
+I've no smart ideas, but you could maybe workaround by listing them in
+/etc/modules?
+
+Ian
