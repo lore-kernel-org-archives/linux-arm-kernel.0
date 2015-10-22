@@ -1,41 +1,69 @@
 From: jonmason@broadcom.com (Jon Mason)
-Date: Thu, 22 Oct 2015 10:16:19 -0400
-Subject: [PATCH v3 0/10] clk: iproc: add support for BCM NS, NSP, and NS2
-In-Reply-To: <20151021235144.GQ19782@codeaurora.org>
+Date: Thu, 22 Oct 2015 10:18:44 -0400
+Subject: [PATCH v3 08/10] clk: ns2: add clock support for Broadcom
+ Northstar 2 SoC
+In-Reply-To: <20151022002246.GV19782@codeaurora.org>
 References: <1444938513-10758-1-git-send-email-jonmason@broadcom.com>
- <20151021235144.GQ19782@codeaurora.org>
-Message-ID: <20151022141618.GC651@broadcom.com>
+ <1444938513-10758-9-git-send-email-jonmason@broadcom.com>
+ <56200F39.1060102@broadcom.com> <562012A8.8050707@broadcom.com>
+ <562014C9.5070708@broadcom.com>
+ <20151015211025.GP32089@broadcom.com>
+ <56201766.9020206@broadcom.com> <562019DD.3000206@broadcom.com>
+ <20151022002246.GV19782@codeaurora.org>
+Message-ID: <20151022141843.GD651@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 21, 2015 at 04:51:44PM -0700, Stephen Boyd wrote:
-> On 10/15, Jon Mason wrote:
-> > 
-> > v3 - Added a patch to fix cygnus clk link failures, and added back the
-> > DT documentation patches that were removed from v2.
-> > 
-> > v2 - Added a patch to change the Cygnus clk macros to uppercase,
-> > removed the device tree changes from the series (will send out those as
-> > an RFC), and other minor changes that Stephen Boyd requested.
-> > 
-> > This patch series adds support for the Broadcom Northstar, Northstar
-> > Plus, and Northstar 2 clocks.  Some slight modifications were necessary
-> > to clk-iproc-pll to get Northstar and Northstar Plus working, due to
-> > differences in register layout.  This is the reason why the first patch
-> > is necessary.  Some more modifications were necessary to clk-iproc-pll
-> > to get Northstar 2 working, due to differences in register layout (and
-> > resulting fallout in Cygnus and NSP).  This is the reason why the sixth
-> > and seventh patches are necessary.  The fifth patch is clean-up to
-> > prevent accidentally forgetting to adjust for the base write errata
-> > (which happened a few times, but was caught in internal review).
-> > 
+On Wed, Oct 21, 2015 at 05:22:47PM -0700, Stephen Boyd wrote:
+> On 10/15, Scott Branden wrote:
+> > On 15-10-15 02:15 PM, Ray Jui wrote:
+> > >On 10/15/2015 2:10 PM, Jon Mason wrote:
+> > >>On Thu, Oct 15, 2015 at 02:04:09PM -0700, Scott Branden wrote:
+> > >>>On 15-10-15 01:55 PM, Ray Jui wrote:
+> > >>>>On 10/15/2015 1:40 PM, Scott Branden wrote:
+> > >>>>
+> > >>>>If using CONFIG_CLK_NS2, how is it going to be enabled/selected?
+> > >>>
+> > >>>Since CONFIG_ARCH_BCM_NS2 isn't "allowed" to be introduced we will
+> > >>>need to create and select a CONFIG_CLK_BCM_NS2 in the defconfig
+> > >>>instead.
+> > >>
+> > >>Is this better than the binary becoming slightly bigger?  I thought
+> > >>the extra complexity was worse than having an unused chunk of clk code
+> > >>(and Kona is already doing the same thing above).  I believe Ray was
+> > >>in agreement with me during the internal review of this code.
+> > >>
+> > >>Thanks,
+> > >>Jon
+> > >>
+> > >
+> > >Yes, I'm okay with leaving it as it is. I even prefer changing the
+> > >current Makefile to make all iProc based core clock drivers and SoC
+> > >specific clock tables under CONFIG_COMMON_CLK_IPROC, which is what some
+> > >of the other vendors do.
+> > >
+> > I'd leave it exactly as is then rather than pulling in more dead
+> > code when not needed.  This ns2 clock code is very minor compared to
+> > other code bloat in the kernel and drivers.
 > 
-> Can you please use git cover-letter format where the diffstat for
-> the series is shown? Without that information here I started
-> applying patches until I realized this added dt-bindings headers,
-> thus probably needing some stable clk branch to pull into arm-soc.
+> We should really make these visible options that can be selected
+> by anyone. Having selects in the ARCH config area is simple, but
+> also has some downsides:
+> 
+>  1) select is a reverse dependency and is hard for people to
+>  understand and can sometimes be a pain to track down
+> 
+>  2) build coverage goes down because configs are hidden
+> 
+>  3) we get code bloat like is being discussed here
+> 
+> So I'd really like to see someone take a good look at this whole
+> Makefile situation that's going on and clean it up so that
+> they're user visible options and then throw the config options
+> into the defconfig. It isn't going to block this series, but it
+> would be nice to do at some later point.
 
-My apologies.  I will do so in the future.
+I'll do a pass at this today and send it out for review.
 
 Thanks,
 Jon
