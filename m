@@ -1,141 +1,70 @@
 From: khilman@kernel.org (Kevin Hilman)
-Date: Thu, 22 Oct 2015 15:07:06 -0700
-Subject: [PATCH v2 4/5] drivers: firmware: psci: add extended stateid
- power_state support
-In-Reply-To: <1436375811-10529-5-git-send-email-lorenzo.pieralisi@arm.com>
-References: <1436375811-10529-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1436375811-10529-5-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <CAMAWPa9ZLGidg3r8RJY9MANdmjPdJ07S7mmixQBf_g3YPce1_g@mail.gmail.com>
+Date: Thu, 22 Oct 2015 15:13:11 -0700
+Subject: [PATCH 1/2] ARM: ux500: add an SMP enablement type and move cpu
+ nodes
+In-Reply-To: <CACRpkdb5eLWZKmbnuPJ1bBrQPqyH0wvh7SjJdVNN7XEiXkKf-w@mail.gmail.com>
+References: <1438586801-30115-1-git-send-email-linus.walleij@linaro.org>
+ <CAMAWPa_nVyyhXfBm3HvPyVGpodJe_dfM0kX0kO+rPtO9mfkG=w@mail.gmail.com>
+ <CACRpkdb5eLWZKmbnuPJ1bBrQPqyH0wvh7SjJdVNN7XEiXkKf-w@mail.gmail.com>
+Message-ID: <CAMAWPa9pVRY1evsZmZRyxY0JxRJ0tUhsug+xUDrw6mc8y4W9NQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Jul 8, 2015 at 10:16 AM, Lorenzo Pieralisi
-<lorenzo.pieralisi@arm.com> wrote:
-> PSCI v1.0 augmented the power_state parameter format specification
-> (extended stateid) and introduced a way to probe it through the
-> PSCI_FEATURES interface.
->
-> This patch implements code that detects the power_state format at
-> run-time through the PSCI_FEATURES interface, so that the power_state
-> argument can be properly detected and validated in the kernel according
-> to the information provided through firmware.
->
-> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Cc: Mark Rutland <mark.rutland@arm.com>
+On Thu, Oct 22, 2015 at 5:24 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> On Tue, Oct 20, 2015 at 6:52 AM, Kevin Hilman <khilman@kernel.org> wrote:
+>> On Mon, Aug 3, 2015 at 12:26 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
+>>> The "cpus" node cannot be inside the "soc" node, while this
+>>> works for the CoreSight blocks, the early boot code will look
+>>> for "cpus" directly under the root node, so this is a hard
+>>> convention. So move the CPU nodes.
+>>>
+>>> Augment the "reg" property to match what is actually in the
+>>> hardware: 0x300 and 0x301 respectively.
+>>>
+>>> Then add an SMP enablement type to be used by the SMP init
+>>> code, "ste,dbx500-smp".
+>>>
+>>> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+>>> ---
+>>> Hi ARM SoC people: please apply this as a fix for v4.2
+>>> as it is prerequisite for 2/2 which is a more proper fix
+>>> for the secondary CPU boot regression addressed by the
+>>> fixed remappings patch.
+>>
+>> kernelci.org has had the ste-snowall failing in v4.2 stable[1] for
 
-kernelci.org started finding a new boot failures in the arm-soc tree
-on arm64 qemu[1] and it was bisected down to this patch, which is in
-arm-soc in the form of commit a5c00bb28da0 (drivers: firmware: psci:
-add extended stateid power_state support)
+Note the failure was for v4.2 stable...
 
-The patch doesn't revert cleanly, so I didn't dig much further, but
-this suggests that some more testing on qemu is needed (or does qemu
-need to be upgraded?)
+>> awhile, so I finally bisected[2] it down to this patch, which is in
+>> mainline in the form of commit bf64dd262eaa (ARM: ux500: add an SMP
+>> enablement type and move cpu nodes).  I confirmed that reverting that
+>> commit on top of v4.2 gets the snowball booting again.
+>>
+>> Kevin
+>>
+>> [1] http://kernelci.org/boot/all/job/stable/kernel/v4.2.3/
+>> [2] https://ci.linaro.org/view/people/job/tbaker-boot-bisect-bot/102/console
+>
+> OK I tested the u8500_defconfig and it still works fine on
+> Snowball. So I have no clue what is causing this :(
+> (See below for my bootlog.)
+>
+> - I first thought it was a multiplatform issue but it seems
+>   not AFAICT from the logs.
+
+It fails on both mutli_v7_defconfig and u8500_defconfig.
+
+> - Is the CI boot is using the latest device tree from
+>   arch/arm/boot/dts/ste-snowball.dts?
+
+Yes, it always uses the DT from the same tree that the kernel is built from.
+
+> 5070] starting kernel at 0x00008000, machine 3293
+> [    0.000000] Booting Linux on physical CPU 0x300
+> [    0.000000] Linux version 4.3.0-rc6-00001-gdff502ea54cb
+
+Ah, you're using mainline.  The boot failure we found is in stable
+v4.2 (and v4.1) which suggests that there's a patch/fix that's
+upstream but not yet backported to stable.
 
 Kevin
-
-[1] http://kernelci.org/boot/all/job/arm-soc/kernel/v4.3-rc5-557-g159ca7e43189/
-
-> ---
->  drivers/firmware/psci.c   | 34 ++++++++++++++++++++++++++++++++--
->  include/uapi/linux/psci.h | 12 ++++++++++++
->  2 files changed, 44 insertions(+), 2 deletions(-)
->
-> diff --git a/drivers/firmware/psci.c b/drivers/firmware/psci.c
-> index 24ef3a8..bd2ba5b 100644
-> --- a/drivers/firmware/psci.c
-> +++ b/drivers/firmware/psci.c
-> @@ -75,14 +75,34 @@ static u32 psci_function_id[PSCI_FN_MAX];
->                                 PSCI_0_2_POWER_STATE_TYPE_MASK | \
->                                 PSCI_0_2_POWER_STATE_AFFL_MASK)
->
-> +#define PSCI_1_0_EXT_POWER_STATE_MASK          \
-> +                               (PSCI_1_0_EXT_POWER_STATE_ID_MASK | \
-> +                               PSCI_1_0_EXT_POWER_STATE_TYPE_MASK)
-> +
-> +static u32 psci_cpu_suspend_feature;
-> +
-> +static inline bool psci_has_ext_power_state(void)
-> +{
-> +       return psci_cpu_suspend_feature &
-> +                               PSCI_1_0_FEATURES_CPU_SUSPEND_PF_MASK;
-> +}
-> +
->  bool psci_power_state_loses_context(u32 state)
->  {
-> -       return state & PSCI_0_2_POWER_STATE_TYPE_MASK;
-> +       const u32 mask = psci_has_ext_power_state() ?
-> +                                       PSCI_1_0_EXT_POWER_STATE_TYPE_MASK :
-> +                                       PSCI_0_2_POWER_STATE_TYPE_MASK;
-> +
-> +       return state & mask;
->  }
->
->  bool psci_power_state_is_valid(u32 state)
->  {
-> -       return !(state & ~PSCI_0_2_POWER_STATE_MASK);
-> +       const u32 valid_mask = psci_has_ext_power_state() ?
-> +                              PSCI_1_0_EXT_POWER_STATE_MASK :
-> +                              PSCI_0_2_POWER_STATE_MASK;
-> +
-> +       return !(state & ~valid_mask);
->  }
->
->  static int psci_to_linux_errno(int errno)
-> @@ -203,6 +223,14 @@ static int __init psci_features(u32 psci_func_id)
->                               psci_func_id, 0, 0);
->  }
->
-> +static void __init psci_init_cpu_suspend(void)
-> +{
-> +       int feature = psci_features(psci_function_id[PSCI_FN_CPU_SUSPEND]);
-> +
-> +       if (feature != PSCI_RET_NOT_SUPPORTED)
-> +               psci_cpu_suspend_feature = feature;
-> +}
-> +
->  /*
->   * Detect the presence of a resident Trusted OS which may cause CPU_OFF to
->   * return DENIED (which would be fatal).
-> @@ -287,6 +315,8 @@ static int __init psci_probe(void)
->
->         psci_init_migrate();
->
-> +       psci_init_cpu_suspend();
-> +
->         return 0;
->  }
->
-> diff --git a/include/uapi/linux/psci.h b/include/uapi/linux/psci.h
-> index 187b828d..0a9485f 100644
-> --- a/include/uapi/linux/psci.h
-> +++ b/include/uapi/linux/psci.h
-> @@ -58,6 +58,13 @@
->  #define PSCI_0_2_POWER_STATE_AFFL_MASK         \
->                                 (0x3 << PSCI_0_2_POWER_STATE_AFFL_SHIFT)
->
-> +/* PSCI extended power state encoding for CPU_SUSPEND function */
-> +#define PSCI_1_0_EXT_POWER_STATE_ID_MASK       0xfffffff
-> +#define PSCI_1_0_EXT_POWER_STATE_ID_SHIFT      0
-> +#define PSCI_1_0_EXT_POWER_STATE_TYPE_SHIFT    30
-> +#define PSCI_1_0_EXT_POWER_STATE_TYPE_MASK     \
-> +                               (0x1 << PSCI_1_0_EXT_POWER_STATE_TYPE_SHIFT)
-> +
->  /* PSCI v0.2 affinity level state returned by AFFINITY_INFO */
->  #define PSCI_0_2_AFFINITY_LEVEL_ON             0
->  #define PSCI_0_2_AFFINITY_LEVEL_OFF            1
-> @@ -78,6 +85,11 @@
->  #define PSCI_VERSION_MINOR(ver)                        \
->                 ((ver) & PSCI_VERSION_MINOR_MASK)
->
-> +/* PSCI features decoding (>=1.0) */
-> +#define PSCI_1_0_FEATURES_CPU_SUSPEND_PF_SHIFT 1
-> +#define PSCI_1_0_FEATURES_CPU_SUSPEND_PF_MASK  \
-> +                       (0x1 << PSCI_1_0_FEATURES_CPU_SUSPEND_PF_SHIFT)
-> +
->  /* PSCI return values (inclusive of all PSCI versions) */
->  #define PSCI_RET_SUCCESS                       0
->  #define PSCI_RET_NOT_SUPPORTED                 -1
-> --
-> 2.2.1
->
