@@ -1,42 +1,91 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 22 Oct 2015 12:29:13 +0200
-Subject: [PATCH v2 6/6] vfio: platform: move get/put reset at open/release
-In-Reply-To: <1445506922-6005-7-git-send-email-eric.auger@linaro.org>
-References: <1445506922-6005-1-git-send-email-eric.auger@linaro.org>
- <1445506922-6005-7-git-send-email-eric.auger@linaro.org>
-Message-ID: <4304536.D7eNHjlsvD@wuerfel>
+From: andrew@ncrmnt.org (andrew at ncrmnt.org)
+Date: Thu, 22 Oct 2015 10:36:18 +0000
+Subject: [RFC][PATCH 1/2] WIP: Devicetree bindings for Ion
+In-Reply-To: <vnkw8u6xts6n.fsf@codeaurora.org>
+References: <vnkw8u6xts6n.fsf@codeaurora.org>
+ <1444164433-9107-1-git-send-email-labbott@fedoraproject.org>
+ <1444164433-9107-2-git-send-email-labbott@fedoraproject.org>
+ <CAL_JsqJ+i3zC7UJ3BcdtOhdmQd8YnRC7bs3D2Ei5JD-4-C+A0g@mail.gmail.com>
+ <vnkwh9lwlymo.fsf@codeaurora.org>
+ <1c6ea0362f5336d9bc8acbfbd7ceae06@mail.ncrmnt.org>
+Message-ID: <93351858f57ca6e1220a0007f98baa25@cloud.ncrmnt.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 22 October 2015 11:42:02 Eric Auger wrote:
-> Currently reset lookup is done on probe. This introduces a
-> race with new registration mechanism in the case where the
-> vfio-platform driver is bound to the device before its module
-> is loaded: on the load, the probe happens which triggers the
-> reset module load which itself attempts to get the symbol for
-> the registration function (vfio_platform_register_reset). The
-> symbol is not yet available hence the lookup fails. In case we
-> do the lookup in the first open we are sure the vfio-platform
-> module is loaded and vfio_platform_register_reset is available.
+20 ??????? 2015 ?., 19:34, "Mitchel Humpherys" <mitchelh@codeaurora.org> ???????:
+> On Tue, Oct 13 2015 at 11:14:23 AM, Andrew <andrew@ncrmnt.org> wrote:
 > 
-> Signed-off-by: Eric Auger <eric.auger@linaro.org>
+>> On 2015-10-12 21:39, Mitchel Humpherys wrote:
+>>> On Tue, Oct 06 2015 at 05:35:41 PM, Rob Herring <robherring2@gmail.com>
+>>> wrote:
+>>>> On Tue, Oct 6, 2015 at 3:47 PM, Laura Abbott <labbott@fedoraproject.org>
+>>>> wrote:
+>>> 
+>>> [...]
+>>> 
+>>>>> +Example:
+>>>>> +
+>>>>> + ion {
+>>>>> + compatbile = "linux,ion";
+>>>>> + #address-cells = <1>;
+>>>>> + #size-cells = <0>;
+>>>>> +
+>>>>> + ion-system-heap {
+>>>>> + linux,ion-heap-id = <0>;
+>>>>> + linux,ion-heap-type = <ION_SYSTEM_HEAP_TYPE>;
+>>>>> + linux,ion-heap-name = "system";
+>>>> 
+>>>> How does this vary across platforms? Is all of this being pushed down
+>>>> to DT, because there is no coordination of this at the kernel ABI
+>>>> level across platforms. In other words, why can't heap 0 be hardcoded
+>>>> as system heap in the driver. It seems to me any 1 of these 3
+>>>> properties could be used to derive the other 2.
+>>> 
+>>> The heap-id<->heap-type mapping isn't necessarily 1:1. As Laura
+>>> indicated elsewhere on this thread, a given heap might need to be
+>>> contiguous on one platform but not on another. In that case you just
+>>> swap out the heap-type here and there's no need for userspace to change.
+>>> 
+>>> The heap-name, OTOH, could be derived from the heap-id, which is what we
+>>> hackishly do here [1] and here[2].
+>> 
+>> By the way, since we agreed that heap id and heap type mappings
+>> are not 1:1 - we have a problem with the current API.
+>> 
+>> In userspace we currently have this:
+>> 
+>> int ion_alloc(int fd, size_t len, size_t align, unsigned int heap_mask,
+>> unsigned int flags, ion_user_handle_t *handle);
+>> 
+>> We do not specify here what TYPE of heap we want the allocation to come
+>> from.
+>> This may lead to very unpleasant stuff when porting from one platfrom to
+>> another.
 
-I don't understand the explanation. I would expect the request_module()
-call to block until the module is actually loaded. Is this not
-what happens?
+Okay, I may be totally missing some point here then.
 
->         mutex_unlock(&driver_lock);
-> @@ -181,6 +182,8 @@ static int vfio_platform_open(void *device_data)
->                 if (ret)
->                         goto err_irq;
->  
-> +               vfio_platform_get_reset(vdev);
-> +
->                 if (vdev->reset)
->                         vdev->reset(vdev);
+> What "unpleasant stuff" are you referring to, exactly? 
+
+It's not really clear for me how (and at where - kernel or userspace) 
+we should properly sort out cases when the next device the pipeline 
+introduces some constraints on the buffer it can use. 
+
+For instance: camera can save data into a non-contiguous buffer, but the 
+image processing hardware (that may or may not be involved) expects the 
+buffer to be contiguous.
+
+> Abstracting the
+> heap type away from userspace has actually made our lives easier since
+> userspace doesn't need to know anything about the properties of the
+> underlying platform. It just asks for a buffer from the "camera" heap,
+> for example. On some platforms that's contiguous, on others it's not.
 > 
+> -Mitch
+> 
+> --
+> Qualcomm Innovation Center, Inc.
+> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+> a Linux Foundation Collaborative Project
 
-This needs some error handling to ensure that the open() fails
-if there is no reset handler.
-
-	Arnd
+Regards, 
+Andrew
