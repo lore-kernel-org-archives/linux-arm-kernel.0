@@ -1,75 +1,39 @@
-From: eric.auger@linaro.org (Eric Auger)
-Date: Thu, 22 Oct 2015 13:46:27 +0200
-Subject: [PATCH v2 5/6] vfio: platform: use list of registered reset
- function
-In-Reply-To: <20554656.kA5nRBgtaJ@wuerfel>
-References: <1445506922-6005-1-git-send-email-eric.auger@linaro.org>
- <1445506922-6005-6-git-send-email-eric.auger@linaro.org>
- <20554656.kA5nRBgtaJ@wuerfel>
-Message-ID: <5628CC93.7000801@linaro.org>
+From: jenskuske@gmail.com (Jens Kuske)
+Date: Thu, 22 Oct 2015 13:30:42 +0200
+Subject: [PATCH 5/6] ARM: dts: sunxi: Add Allwinner H3 DTSI
+In-Reply-To: <20151022091410.GW10947@lukather>
+References: <1445444428-4652-1-git-send-email-jenskuske@gmail.com>
+ <1445444428-4652-2-git-send-email-jenskuske@gmail.com>
+ <20151022080508.GN10947@lukather> <20151022102959.09f0a1f4@OPI2>
+ <20151022084735.GR10947@lukather> <20151022105745.2cc158a3@OPI2>
+ <20151022091410.GW10947@lukather>
+Message-ID: <5628C8E2.6040703@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/22/2015 12:19 PM, Arnd Bergmann wrote:
-> On Thursday 22 October 2015 11:42:01 Eric Auger wrote:
->> Remove the static lookup table and use the dynamic list of registered
->> reset functions instead. Also load the reset module through its alias.
->> The reset struct module pointer is stored in vfio_platform_device.
+On 22/10/15 11:14, Maxime Ripard wrote:
+> On Thu, Oct 22, 2015 at 10:57:45AM +0200, Jean-Francois Moine wrote:
+>> On Thu, 22 Oct 2015 10:47:35 +0200
+>> Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
 >>
->> We also remove the useless struct device pointer parameter in
->> vfio_platform_get_reset.
+>>> Not really. The uart0 reset is the bit 16, in the reset register 4.
+>>>
+>>> 4 * 32 + 16 = 44.
+>>>
+>>> Not 112, but still not 208 either.
 >>
->> This patch fixes the issue related to the usage of __symbol_get, which
->> besides from being moot, prevented compilation with CONFIG_MODULES
->> disabled.
+>> The registers are numbered 1..5, then
 >>
->> Also usage of MODULE_ALIAS makes possible to add a new reset module
->> without needing to update the framework. This was suggested by Arnd.
->>
->> Signed-off-by: Eric Auger <eric.auger@linaro.org>
->> Reported-by: Arnd Bergmann <arnd@arndb.de>
+>> (4 - 1) * 32 + 16 = 112
 > 
-> Looks good, just small style issues:
+> Not on my version, and even then, UARTs are on the last reset
+> register, which would still make 144.
 > 
->>
->> -			}
->> +	mutex_lock(&reset_lock);
->> +	list_for_each_entry(iter, &reset_list, link) {
->> +		if (!strcmp(iter->compat, compat) &&
->> +			try_module_get(iter->owner)) {
->> +			*module = iter->owner;
->> +			mutex_unlock(&reset_lock);
->> +			return iter->reset;
->>  		}
->>  	}
->> +
->> +	mutex_unlock(&reset_lock);
->> +	return NULL;
+> Maxime
 > 
-> Better use 'break' to have a single mutex_unlock and return  statement.
-OK
-> 
->> +
->>  
->>  static void vfio_platform_put_reset(struct vfio_platform_device *vdev)
->>  {
->> -	if (vdev->reset)
->> -		symbol_put_addr(vdev->reset);
->> +	if (vdev->reset) {
->> +		module_put(vdev->reset_module);
->> +		vdev->reset_module = NULL;
->> +		vdev->reset = NULL;
->> +	}
->>  }
-> 
-> This gets called from the remove callback. No need to clear those
-> struct members immediately before the kfree().
-I should have added those assignments in next patch actually. This
-latter moves the vfio_platform_put_reset call in the release function.
 
-Best Regards
+There are holes between reg2 and reg3 and reg4 for some reason, but even
+if we would correct that with some of_xlate() function they won't
+completely line up with the gates.
 
-Eric
-> 
-> 	Arnd
-> 
+Jens
