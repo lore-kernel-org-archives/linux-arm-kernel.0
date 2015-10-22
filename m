@@ -1,80 +1,57 @@
-From: w-kwok2@ti.com (Kwok, WingMan)
-Date: Thu, 22 Oct 2015 14:22:24 +0000
-Subject: [PATCH v3 1/2] phy: keystone: serdes driver for gbe 10gbe and pcie
-In-Reply-To: <CAL_JsqKSteJnz53YuBbgR1K9GWQDddkaqFo1aVxd8RsDam5jSw@mail.gmail.com>
-References: <1445432201-16007-1-git-send-email-w-kwok2@ti.com>
- <1445432201-16007-2-git-send-email-w-kwok2@ti.com>
- <CAL_JsqKSteJnz53YuBbgR1K9GWQDddkaqFo1aVxd8RsDam5jSw@mail.gmail.com>
-Message-ID: <230CBA6E4B6B6B418E8730AC28E6FC7E0422A2A6@DFLE11.ent.ti.com>
+From: eric.auger@linaro.org (Eric Auger)
+Date: Thu, 22 Oct 2015 16:23:56 +0200
+Subject: [PATCH v2 6/6] vfio: platform: move get/put reset at open/release
+In-Reply-To: <9413126.UTMuRq7fA0@wuerfel>
+References: <1445506922-6005-1-git-send-email-eric.auger@linaro.org>
+ <4304536.D7eNHjlsvD@wuerfel> <5628E41F.5050602@linaro.org>
+ <9413126.UTMuRq7fA0@wuerfel>
+Message-ID: <5628F17C.9030907@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 10/22/2015 04:10 PM, Arnd Bergmann wrote:
+> On Thursday 22 October 2015 15:26:55 Eric Auger wrote:
+>>>> @@ -181,6 +182,8 @@ static int vfio_platform_open(void *device_data)
+>>>>                 if (ret)
+>>>>                         goto err_irq;
+>>>>  
+>>>> +               vfio_platform_get_reset(vdev);
+>>>> +
+>>>>                 if (vdev->reset)
+>>>>                         vdev->reset(vdev);
+>>>>
+>>>
+>>> This needs some error handling to ensure that the open() fails
+>>> if there is no reset handler.
+>>
+>> Is that really what we want? The code was meant to allow the use case
+>> where the VFIO platform driver would be used without such reset module.
+>>
+>> I think the imperious need for a reset module depends on the device and
+>> more importantly depends on the IOMMU mapping. With QEMU VFIO
+>> integration this is needed because the whole VM memory is IOMMU mapped
+>> but in a simpler user-space driver context, we might live without.
+>>
+>> Any thought?
+> 
+> I would think we need a reset driver for any device that can start DMA,
+> otherwise things can go wrong as soon as you attach it to a different domain
+> while there is ongoing DMA.
+> 
+> Maybe we could just allow devices to be attached without a reset handler,
+> but then disallow DMA on them?
+
+Well I am tempted to think that most assigned devices will perform DMA
+accesses so to me this somehow comes to the same result, ie disallowing
+functional passthrough for devices not properly/fully integrated.
+
+Alex/Baptiste, any opinion on this?
+
+Thanks
+
+Eric
 
 
-> -----Original Message-----
-> From: Rob Herring [mailto:robh+dt at kernel.org]
-> Sent: Wednesday, October 21, 2015 6:55 PM
-> To: Kwok, WingMan
-> Cc: Pawel Moll; Mark Rutland; Ian Campbell; Kumar Gala; KISHON VIJAY ABRAHAM;
-> Quadros, Roger; Karicheri, Muralidharan; Bjorn Helgaas; Santosh Shilimkar;
-> Russell King - ARM Linux; devicetree at vger.kernel.org; linux-
-> kernel at vger.kernel.org; linux-pci at vger.kernel.org; linux-arm-
-> kernel at lists.infradead.org
-> Subject: Re: [PATCH v3 1/2] phy: keystone: serdes driver for gbe 10gbe and
-> pcie
 > 
-> On Wed, Oct 21, 2015 at 7:56 AM, WingMan Kwok <w-kwok2@ti.com> wrote:
-> > On TI's Keystone platforms, several peripherals such as the
-> > gbe ethernet switch, 10gbe ethernet switch and PCIe controller
-> > require the use of a SerDes for converting SoC parallel data into
-> > serialized data that can be output over a high-speed electrical
-> > interface, and also converting high-speed serial input data
-> > into parallel data that can be processed by the SoC.  The
-> > SerDeses used by those peripherals, though they may be different,
-> > are largely similar in functionality and setup.
-> >
-> > This patch provides a SerDes phy driver implementation that can be
-> > used by the above mentioned peripheral drivers to configure their
-> > respective SerDeses.
-> >
-> > Signed-off-by: WingMan Kwok <w-kwok2@ti.com>
-> > ---
-> >  Documentation/devicetree/bindings/phy/ti-phy.txt |  239 +++
+> 	Arnd
 > 
-> For the binding:
-> 
-> Acked-by: Rob Herring <robh@kernel.org>
-> 
-> 
-> One other comment:
-> 
-> > +       if (of_device_is_compatible(np, "ti,keystone-serdes-gbe")) {
-> > +               sc->phy_type = KSERDES_PHY_SGMII;
-> > +       } else if (of_device_is_compatible(np, "ti,keystone-serdes-xgbe"))
-> {
-> > +               sc->phy_type = KSERDES_PHY_XGE;
-> > +       } else if (of_device_is_compatible(np, "ti,keystone-serdes-pcie"))
-> {
-> > +               sc->phy_type = KSERDES_PHY_PCIE;
-> > +       } else {
-> > +               dev_err(dev, "unknown phy type\n");
-> > +               return -EINVAL;
-> > +       }
-> 
-> Use the match data to set the type:
-> 
-
-will do.
-
-> > +static const struct of_device_id kserdes_of_match[] = {
-> > +       { .compatible = "ti,keystone-serdes-gbe" },
-> > +       { .compatible = "ti,keystone-serdes-pcie" },
-> > +       { .compatible = "ti,keystone-serdes-xgbe" },
-> > +       { },
-> > +};
-> > +MODULE_DEVICE_TABLE(of, kserdes_of_match);
-> 
-> Rob
-
-Thanks,
-WingMan
