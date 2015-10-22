@@ -1,85 +1,71 @@
-From: chaotian.jing@mediatek.com (Chaotian Jing)
-Date: Thu, 22 Oct 2015 10:18:49 +0800
-Subject: [PATCH v2 0/9] Add tune support of Mediatek MMC driver
-In-Reply-To: <CAPDyKFrTrR5U7QoXpiWj29bUD5SEp4ccbx8qNs9HF0cYxuqdBw@mail.gmail.com>
-References: <1445332391-30530-1-git-send-email-chaotian.jing@mediatek.com>
- <CAPDyKFrTrR5U7QoXpiWj29bUD5SEp4ccbx8qNs9HF0cYxuqdBw@mail.gmail.com>
-Message-ID: <1445480329.1593.4.camel@mhfsdcap03>
+From: wxt@rock-chips.com (Caesar Wang)
+Date: Thu, 22 Oct 2015 10:30:46 +0800
+Subject: [RESEND PATCH v2 0/2] fix the TSHUT issue on rockchip thermal
+Message-ID: <1445481048-20789-1-git-send-email-wxt@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2015-10-20 at 18:41 +0200, Ulf Hansson wrote:
-> On 20 October 2015 at 11:13, Chaotian Jing <chaotian.jing@mediatek.com> wrote:
-> > Change in v2:
-> > Drop the 400mhz and use assigned-clock-parents to instead
-> > Split the original tune patch to several independent patches
-> > Re-write the mmc_send_tuning()
-> > Fix GPD checksum error
-> > Move the HS400 setting to ops->prepare_hs400_tuning()
-> > Modify SD driving settings
-> >
-> > Change in v1:
-> > Add DT bindings for eMMC hardware reset
-> > Add pinctrl of data strobe pin for HS400 mode
-> > Modify eMMC driving settings
-> > Add 400mhz source clock for HS400 mode
-> > Add eMMC HS200/HS400 mode support
-> > Add SD SDR50/SDR104 mode support
-> > Add implement of tune function with CMD19/CMD21
-> >
-> > Chaotian Jing (9):
-> >   mmc: core: Add DT bindings for eMMC hardware reset support
-> >   mmc: dt-bindings: update Mediatek MMC bindings
-> >   mmc: mediatek: make cmd_ints_mask to const
-> >   mmc: mediatek: change the argument "ddr" to "timing"
-> >   mmc: mediatek: fix got GPD checksum error interrupt when data transfer
-> >   mmc: mediatek: add implement of ops->hw_reset()
-> >   mmc: mmc: extend the mmc_send_tuning()
-> >   mmc: mediatek: add HS400 support
-> >   arm64: dts: mediatek: add HS200/HS400/SDR50/SDR104 support
-> >
-> >  Documentation/devicetree/bindings/mmc/mmc.txt    |   1 +
-> >  Documentation/devicetree/bindings/mmc/mtk-sd.txt |  11 +-
-> >  arch/arm64/boot/dts/mediatek/mt8173-evb.dts      |  27 ++-
-> >  drivers/mmc/core/host.c                          |   2 +
-> >  drivers/mmc/core/mmc_ops.c                       |   8 +-
-> >  drivers/mmc/host/dw_mmc-exynos.c                 |   4 +-
-> >  drivers/mmc/host/dw_mmc.c                        |   2 +-
-> >  drivers/mmc/host/dw_mmc.h                        |   2 +-
-> >  drivers/mmc/host/mtk-sd.c                        | 296 ++++++++++++++++++++---
-> >  drivers/mmc/host/sdhci-esdhc-imx.c               |   6 +-
-> >  drivers/mmc/host/sdhci-msm.c                     |   2 +-
-> >  drivers/mmc/host/sdhci-sirf.c                    |   2 +-
-> >  include/linux/mmc/core.h                         |   2 +-
-> >  13 files changed, 314 insertions(+), 51 deletions(-)
-> >
-> > --
-> > 1.8.1.1.dirty
-> 
-> I have reviewed the patches, I think they overall looks good! Some
-> comments though.
-> 
-> You need to split patch 9, the DT parts enabling hw reset shall go in
-> separately.
-> 
-Ok, will separate it at next revision.
+We need the OTP pin is gpio state before resetting the TSADC controller,
+since the tshut polarity will generate a high signal.
 
-> Regarding the hw-reset changes in patch1, patch6 and patch9, I believe
-> I requested you to separate the HW reset changes from $subject
-> patchset as they are unrelated, please do this.
-> 
-As you know, the hw-reset is a part of mmc retune.
-so that I add it to this series.
+Says:
+The TSHUT temperature is setting more than 80 degree, the default
+tshut polarity is HIGH.
 
-> Running checkpatch, it gave me warnings and errors for patch 8.
-> Patch7 didn't apply to my next branch.
-> 
+If T > 80C, the OTP output the High Signal.
+If T < 80C, the OTP output the Low Signal.
 
-I will fix the checkpatch warnings and errors at next revision.
-by the way, I tried to use "git am
-0007-mmc-mmc-extend-the-mmc_send_tuning.patch" in your branch,
-there was no conflict, so why couldn't apply it ?
-Thx!
+On the moment, the TSADC controller is reset, the tshut polarity will be
+Low in a short period of time.
 
-> Kind regards
-> Uffe
+So:
+If T < 80C, the OTP output the High Signal.
+If T > 80C, the OTP output the Low Signal.
+
+In some cases, the OTP pin is connected to the PMIC, maybe the PMIC can
+accept the reset response time to avoid this issue.
+
+In other words, the system will be always reboot if we make the OTP pin
+is connected the others IC to control the power.
+
+This series patchs are depend on Doug's patch.(https://patchwork.kernel.org/patch/7454311/)
+
+This series patchs are based on the Linus master branch.
+
+518cd44 ARM: dts: rockchip: Add the OTP gpio pinctrl
+83e0bab dt-bindings: Add the "init" pinctrl in this document
+150426c drivers/pinctrl: Add the concept of an "init" state
+ce1fad2 Merge branch 'keys-fixes' of git://git.kernel.org/pub/scm/linux/kernel/git/dhowells/linux-fs
+1099f86 Merge git://git.kernel.org/pub/scm/linux/kernel/git/davem/net
+911b79c KEYS: Don't permit request_key() to construct a new keyring
+37850e3 net: bcmgenet: Fix early link interrupt enabling
+afc050d Merge tag 'wireless-drivers-for-davem-2015-10-17' of git://git.kernel.org/pub/scm/linux/kernel/git/kvalo/wireless-drivers
+e277de5 tunnels: Don't require remote endpoint or ID during creation.
+740dbc2 openvswitch: Scrub skb between namespaces
+....
+
+Tested on box board.
+
+
+Changes in v2:
+  - Add the 'init' pinctrl more decription in commit.
+  - Fix the subject to make more obvious in PATCH[1/2]
+  - Resend this patch v2 since fix the subject to be specific.
+  - Add some commits for more obvious in PATCH[2/2]
+
+Changes in v1:
+  - As the Doug comments, add the 'init' property to sync document.
+  - As the Doug comments, drop the thermal driver patchs since
+    we can with pinctrl changing to work.
+  - As the Doug's patch to add the 'init' property.
+
+Caesar Wang (2):
+  dt-bindings: rockchip-thermal: Add the "init" pinctrl in this document
+  ARM: dts: rockchip: Add the OTP gpio pinctrl
+
+ Documentation/devicetree/bindings/thermal/rockchip-thermal.txt | 5 +++--
+ arch/arm/boot/dts/rk3288.dtsi                                  | 9 +++++++--
+ 2 files changed, 10 insertions(+), 4 deletions(-)
+
+-- 
+1.9.1
