@@ -1,84 +1,58 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Thu, 22 Oct 2015 09:06:52 +0900
-Subject: [PATCH 1/2] mmc: dw_mmc: exynos: Add the exynos3250 compatible
-In-Reply-To: <1445409555-1684-1-git-send-email-jh80.chung@samsung.com>
-References: <1445409555-1684-1-git-send-email-jh80.chung@samsung.com>
-Message-ID: <5628289C.90800@samsung.com>
+From: julian.calaby@gmail.com (Julian Calaby)
+Date: Thu, 22 Oct 2015 11:15:39 +1100
+Subject: [linux-sunxi] [PATCH 2/6] clk: sunxi: Add H3 clocks support
+In-Reply-To: <1445444007-4260-3-git-send-email-jenskuske@gmail.com>
+References: <1445444007-4260-1-git-send-email-jenskuske@gmail.com>
+ <1445444007-4260-3-git-send-email-jenskuske@gmail.com>
+Message-ID: <CAGRGNgWyNEOMVxeDFTAp_wJoaXL471spFjBTn+2s7YuKeJf71g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21.10.2015 15:39, Jaehoon Chung wrote:
-> To check more exactly, add the exynos3250 compatible.
-> Not use exynos5250 compatibility.
+Hi Jens,
 
-Hi,
-
-I can't find any difference between old and new compatible. Maybe I am
-missing something? Maybe there is a difference for these devices?
-
-Anyway if the code is the same then it should use exactly the same
-compatible.
-
-Best regards,
-Krzysztof
-
-> 
-> Signed-off-by: Jaehoon Chung <jh80.chung@samsung.com>
+On Thu, Oct 22, 2015 at 3:13 AM, Jens Kuske <jenskuske@gmail.com> wrote:
+> The H3 clock control unit is similar to the those of other sun8i family
+> members like the A23.
+>
+> It adds a new bus gates clock similar to the simple gates, but with a
+> different parent clock for each single gate.
+> Some of the gates use the new AHB2 clock as parent, whose clock source
+> is muxable between AHB1 and PLL6/2. The documentation isn't totally clear
+> about which devices belong to AHB2 now, especially USB EHIC/OHIC, so it
+> is mostly based on Allwinner kernel source code.
+>
+> Signed-off-by: Jens Kuske <jenskuske@gmail.com>
 > ---
->  Documentation/devicetree/bindings/mmc/exynos-dw-mshc.txt | 2 ++
->  drivers/mmc/host/dw_mmc-exynos.c                         | 7 +++++++
->  2 files changed, 9 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/mmc/exynos-dw-mshc.txt b/Documentation/devicetree/bindings/mmc/exynos-dw-mshc.txt
-> index aad9844..cd22ac9 100644
-> --- a/Documentation/devicetree/bindings/mmc/exynos-dw-mshc.txt
-> +++ b/Documentation/devicetree/bindings/mmc/exynos-dw-mshc.txt
-> @@ -22,6 +22,8 @@ Required Properties:
->  	  specific extensions.
->  	- "samsung,exynos7-dw-mshc-smu": for controllers with Samsung Exynos7
->  	  specific extensions having an SMU.
-> +	- "samsung,exynos3250-dw-mshc": for controllers with Samsung Exynos3250
-> +	  specific extensions.
->  
->  * samsung,dw-mshc-ciu-div: Specifies the divider value for the card interface
->    unit (ciu) clock. This property is applicable only for Exynos5 SoC's and
-> diff --git a/drivers/mmc/host/dw_mmc-exynos.c b/drivers/mmc/host/dw_mmc-exynos.c
-> index 1e75309..1c96218 100644
-> --- a/drivers/mmc/host/dw_mmc-exynos.c
-> +++ b/drivers/mmc/host/dw_mmc-exynos.c
-> @@ -32,6 +32,7 @@ enum dw_mci_exynos_type {
->  	DW_MCI_TYPE_EXYNOS5420_SMU,
->  	DW_MCI_TYPE_EXYNOS7,
->  	DW_MCI_TYPE_EXYNOS7_SMU,
-> +	DW_MCI_TYPE_EXYNOS3250,
->  };
->  
->  /* Exynos implementation specific driver private data */
-> @@ -73,6 +74,9 @@ static struct dw_mci_exynos_compatible {
->  	}, {
->  		.compatible	= "samsung,exynos7-dw-mshc-smu",
->  		.ctrl_type	= DW_MCI_TYPE_EXYNOS7_SMU,
-> +	}, {
-> +		.compatible	= "samsung,exynos3250-dw-mshc",
-> +		.ctrl_type	= DW_MCI_TYPE_EXYNOS3250,
->  	},
->  };
->  
-> @@ -467,6 +471,7 @@ static int dw_mci_exynos_execute_tuning(struct dw_mci_slot *slot)
->  	} while (start_smpl != smpl);
->  
->  	found = dw_mci_exynos_get_best_clksmpl(candiates);
-> +
->  	if (found >= 0) {
->  		dw_mci_exynos_set_clksmpl(host, found);
->  		priv->tuned_sample = found;
-> @@ -520,6 +525,8 @@ static const struct of_device_id dw_mci_exynos_match[] = {
->  			.data = &exynos_drv_data, },
->  	{ .compatible = "samsung,exynos7-dw-mshc-smu",
->  			.data = &exynos_drv_data, },
-> +	{ .compatible = "samsung,exynos3250-dw-mshc",
-> +			.data = &exynos_drv_data, },
->  	{},
->  };
->  MODULE_DEVICE_TABLE(of, dw_mci_exynos_match);
-> 
+>  Documentation/devicetree/bindings/clock/sunxi.txt |   2 +
+>  drivers/clk/sunxi/Makefile                        |   1 +
+>  drivers/clk/sunxi/clk-bus-gates.c                 | 105 ++++++++++++++++++++++
+>  drivers/clk/sunxi/clk-sunxi.c                     |  12 ++-
+>  4 files changed, 117 insertions(+), 3 deletions(-)
+>  create mode 100644 drivers/clk/sunxi/clk-bus-gates.c
+>
+> diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
+> index 7c4aee0..6293c65 100644
+> --- a/drivers/clk/sunxi/clk-sunxi.c
+> +++ b/drivers/clk/sunxi/clk-sunxi.c
+
+This hunk should be in patch 1:
+
+> @@ -1000,9 +1005,8 @@ static void __init sunxi_divs_clk_setup(struct device_node *node,
+>
+>                 for (i = 0; i < SUNXI_DIVS_BASE_NAME_MAX_LEN - 1 &&
+>                                                 clk_name[i] != '_' &&
+> -                                               clk_name[i] != '\0'; i++) {
+> +                                               clk_name[i] != '\0'; i++)
+>                         base_name[i] = clk_name[i];
+> -               }
+>
+>                 base_name[i] = '\0';
+>                 factors.name = base_name;
+
+Thanks,
+
+-- 
+Julian Calaby
+
+Email: julian.calaby at gmail.com
+Profile: http://www.google.com/profiles/julian.calaby/
