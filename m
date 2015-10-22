@@ -1,112 +1,48 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 22 Oct 2015 12:06:02 +0200
-Subject: [PATCH v2 1/6] vfio: platform: add capability to register a reset
- function
-In-Reply-To: <1445506922-6005-2-git-send-email-eric.auger@linaro.org>
-References: <1445506922-6005-1-git-send-email-eric.auger@linaro.org>
- <1445506922-6005-2-git-send-email-eric.auger@linaro.org>
-Message-ID: <4039449.LR9NiiaAaC@wuerfel>
+From: mturquette@baylibre.com (Michael Turquette)
+Date: Thu, 22 Oct 2015 03:11:16 -0700
+Subject: [RFC PATCH 0/8] clk: qoriq: Move chip-specific knowledge into
+ driver
+In-Reply-To: <1444435064.5185.16.camel@freescale.com>
+References: <1434682158-7243-1-git-send-email-scottwood@freescale.com>
+ <20150811182535.31346.52965@quantum>
+ <1443745589.5336.185.camel@freescale.com>
+ <1444435064.5185.16.camel@freescale.com>
+Message-ID: <20151022101116.20687.55089@quantum>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 22 October 2015 11:41:57 Eric Auger wrote:
-> In preparation for subsequent changes in reset function lookup,
-> lets introduce a dynamic list of reset combos (compat string,
-> reset module, reset function). The list can be populated/voided with
-> two new functions, vfio_platform_register/unregister_reset. Those are
-> not yet used in this patch.
+Quoting Scott Wood (2015-10-09 16:57:44)
+> On Thu, 2015-10-01 at 19:26 -0500, Scott Wood wrote:
+> > [Resending to updated e-mail address]
+> > 
+> > On Tue, 2015-08-11 at 11:25 -0700, Michael Turquette wrote:
+> > > Hi Scott,
+> > > 
+> > > Quoting Scott Wood (2015-06-18 19:49:10)
+> > > > The existing device tree bindings are error-prone and inflexible. 
+> > > > Correct the mistake by moving the knowledge into the driver, which
+> > > > has more flexibility in describing the quirks of each chip.  This leaves
+> > > > the device tree to its proper role of identifying a programming 
+> > > > interface
+> > > > rather than describing its individual registers.
+> > > 
+> > > Sorry for not responding to this one sooner. Fell through the cracks.
+> > > 
+> > > All of the changes to drives/clk/clk-qoriq.c look great to me. I assume
+> > > you need to keep all of these patches together and want to the take
+> > > through the freescale tree? If so feel free to add,
+> > > 
+> > > Acked-by: Michael Turquette <mturquette@baylibre.com>
+> > 
+> > Is the ack still valid for the v3 patchset?
+
+Yes. Looks Stephen beat me to it though.
+
+Regards,
+Mike
+
 > 
-> Signed-off-by: Eric Auger <eric.auger@linaro.org>
-
-Looks correct to me now, just a little style comments.
-
->  drivers/vfio/platform/vfio_platform_common.c  | 77 +++++++++++++++++++++++++++
->  drivers/vfio/platform/vfio_platform_private.h |  7 +++
->  2 files changed, 84 insertions(+)
+> ping
 > 
-> diff --git a/drivers/vfio/platform/vfio_platform_common.c b/drivers/vfio/platform/vfio_platform_common.c
-> index e43efb5..52a4c7b 100644
-> --- a/drivers/vfio/platform/vfio_platform_common.c
-> +++ b/drivers/vfio/platform/vfio_platform_common.c
-> @@ -23,6 +23,15 @@
->  
->  #include "vfio_platform_private.h"
->  
-> +struct vfio_platform_reset_node {
-> +	struct list_head link;
-> +	char *compat;
-> +	struct module *owner;
-> +	vfio_platform_reset_fn_t reset;
-> +};
-> +
-> +static LIST_HEAD(reset_list);
-> +static DEFINE_MUTEX(reset_lock);
->  static DEFINE_MUTEX(driver_lock);
-
-I wonder if having a single mutex here would be enough. If you don't expect
-drivers to register/unregister a lot, you could just use driver_lock here
-as well.
-
->  static const struct vfio_platform_reset_combo reset_lookup_table[] = {
-> @@ -573,3 +582,71 @@ struct vfio_platform_device *vfio_platform_remove_common(struct device *dev)
->  	return vdev;
->  }
->  EXPORT_SYMBOL_GPL(vfio_platform_remove_common);
-> +
-> +int vfio_platform_register_reset(struct module *reset_owner,
-> +				 const char *compat,
-> +				 vfio_platform_reset_fn_t reset)
-> +{
-> +	struct vfio_platform_reset_node *node, *iter;
-> +	bool found = false;
-> +
-> +	mutex_lock(&reset_lock);
-> +	list_for_each_entry(iter, &reset_list, link) {
-> +		if (!strcmp(iter->compat, compat)) {
-> +			found = true;
-> +			break;
-> +		}
-> +	}
-> +	if (found) {
-> +		mutex_unlock(&reset_lock);
-> +		return -EINVAL;
-> +	}
-
-This seems to be an unnecesssary safeguard. I would not bother
-with the search, or otherwise do a WARN_ON here.
-
-> +	node = kmalloc(sizeof(*node), GFP_KERNEL);
-> +	if (!node) {
-> +		mutex_unlock(&reset_lock);
-> +		return -ENOMEM;
-> +	}
-> +
-> +	node->compat = kstrdup(compat, GFP_KERNEL);
-> +	if (!node->compat) {
-> +		kfree(node);
-> +		mutex_unlock(&reset_lock);
-> +		return -ENOMEM;
-> +	}
-
-If you hold a lock, it's better to use a goto for handling errors
-and put the unlock and kfree there. I think it can be avoided
-entirely here though:
-
-It should be safe to define the interface as keeping a reference
-on the string and not do a kstrdup here. I would expect users to
-pass a string literal.
-
-We could even go as far as defining the entire interface as a shim,
-like
-
-#define vfio_platform_register_reset(__compat, __reset)	\
-static struct vfio_platform_reset_node __reset ## _node = {	\
-	.owner = THIS_MODULE,					\
-	.compat = __compat,					\
-	.reset = __reset,					\
-};								\
-__vfio_platform_register_reset(&__reset ## node);
-
-to make the function really simple.
-
-	Arnd
+> -Scott
+> 
