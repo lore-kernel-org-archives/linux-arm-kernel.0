@@ -1,77 +1,62 @@
-From: dingtianhong@huawei.com (Ding Tianhong)
-Date: Thu, 22 Oct 2015 17:28:56 +0800
-Subject: Problem about CPU stalling in hrtimer_intterrupts()
-In-Reply-To: <alpine.DEB.2.11.1510220942010.4012@nanos>
-References: <56288585.40204@huawei.com>
- <alpine.DEB.2.11.1510220942010.4012@nanos>
-Message-ID: <5628AC58.2030509@huawei.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Thu, 22 Oct 2015 10:37:54 +0100
+Subject: [PATCH 14/19] ARM: dts: shmobile/r8a7xxx: replace gpio-key, wakeup
+ with wakeup-source property
+In-Reply-To: <20151022005051.GD8879@verge.net.au>
+References: <1445422216-29375-1-git-send-email-sudeep.holla@arm.com>
+ <1445422216-29375-15-git-send-email-sudeep.holla@arm.com>
+ <CAMuHMdXpY7gSOPAGxh9Z_LurpL392y7Vx0pBe-FqfauXjVnMFQ@mail.gmail.com>
+ <56276787.6090900@arm.com> <20151022005051.GD8879@verge.net.au>
+Message-ID: <5628AE72.3020809@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015/10/22 15:43, Thomas Gleixner wrote:
-> On Thu, 22 Oct 2015, Yang Yingliang wrote:
->> I use the kernel-4.1.6 running on arm64.
->> My testcase is that it calls clock_settime and clock_adjtime alternately with
->> random params on each core. My system has 32 cores.
+
+
+On 22/10/15 01:50, Simon Horman wrote:
+> On Wed, Oct 21, 2015 at 11:23:03AM +0100, Sudeep Holla wrote:
 >>
->> I found the cpu stalling in  hrtimer_intterrupts(). So I added some debug info
->> in hrtimer_intterrupts() and found that the while loop runs 1020437660 times
->> and takes 98761 jiffies(HZ=250).
 >>
->> Some debug log is here:
->> ---start---
->> Jan 01 00:03:32 Linux kernel: i:0 basenow.tv64:4809284991830
->> hrtimer_get_softexpires_tv64(timer):4440120000000 ccpu0
->> timer:ffffffdffdec6138, timer->function:ffffffc000129b84
->> Jan 01 00:03:32 Linux kernel: i:0 basenow.tv64:4809284991830
->> hrtimer_get_softexpires_tv64(timer):4440120000000 ccpu0
-> 
-> Something is rearming a timer over and over with expiry time in the
-> past.
-> 
-> Thanks,
-> 
-> 	tglx
-> 
+>> On 21/10/15 11:18, Geert Uytterhoeven wrote:
+>>> On Wed, Oct 21, 2015 at 12:10 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
+>>>> Though the keyboard driver for GPIO buttons(gpio-keys) will continue to
+>>>> check for/support the legacy "gpio-key,wakeup" boolean property to
+>>>> enable gpio buttons as wakeup source, "wakeup-source" is the new
+>>>> standard binding.
+>>>>
+>>>> This patch replaces the legacy "gpio-key,wakeup" with the unified
+>>>> "wakeup-source" property in order to avoid any futher copy-paste
+>>>> duplication.
+>>>
+>>> Thanks!
+>>>
+>>> I made the same changes to my local tree a few weeks ago, but never found
+>>> time to send them out...
+>>>
+>>
+>> Ah OK, even I had these changes for long. I waited until I fixed all the
+>> binding documents(which was boring ;))
+>>
+>>>> Cc: Simon Horman <horms@verge.net.au>
+>>>> Cc: Magnus Damm <magnus.damm@gmail.com>
+>>>> Cc: linux-sh at vger.kernel.org
+>>>> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+>>>
+>>> Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
+>
+> Can I clarify that you would like me to pick up this patch?
+> If so I'm happy to do so.
+>
 
+Yes you can pick up this patch as it has no dependency on driver changes.
 
-Hi Thomas:
+> Else:
+>
+> Acked-by: Simon Horman <horms+renesas@verge.net.au>
+>
 
-This problem could only occur on the system with 32 cores, when I cut the cores to 16, this problem disappeared, 
-so I think there is some parallel problem when the 32 core set clock time together:
+Thanks.
 
-I try to reproduce the scene:
-
-1.do_settimeofday64
-2.update tk time
-3.update base time offset
-4.update expires_next
-
-the 3 and 4 will be called in softirq, but the hrtimer_interrupt may break the order and run before 3, I am not
-sure whether this could make the problem, do we need to update base time and expires_next in the hrtimer_interrupt?
-maybe I miss something, thanks for any suggestion.
-
-diff --git a/kernel/time/hrtimer.c b/kernel/time/hrtimer.c
-index 93ef7190..9adab23 100644
---- a/kernel/time/hrtimer.c
-+++ b/kernel/time/hrtimer.c
-@@ -1254,6 +1254,7 @@ void hrtimer_interrupt(struct clock_event_device *dev)
-
-raw_spin_lock(&cpu_base->lock);
-entry_time = now = hrtimer_update_base(cpu_base);
-+ hrtimer_force_reprogram(cpu_base, 0);
-retry:
-cpu_base->in_hrtirq = 1;
-
-
-Thanks
-
-Ding
-
-
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
-> 
+-- 
+Regards,
+Sudeep
