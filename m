@@ -1,40 +1,43 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Fri, 23 Oct 2015 12:36:18 +0100
-Subject: [PATCH v2 4/5] drivers: firmware: psci: add extended stateid
- power_state support
-In-Reply-To: <7012327.dvizHt4W5S@wuerfel>
-References: <1436375811-10529-1-git-send-email-lorenzo.pieralisi@arm.com>
- <3982126.UybqODJKJo@wuerfel> <20151023104457.GA9309@red-moon>
- <7012327.dvizHt4W5S@wuerfel>
-Message-ID: <20151023113618.GA29008@red-moon>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Fri, 23 Oct 2015 14:41:12 +0300
+Subject: [PATCH] drivers: net: cpsw: use module_platform_driver
+Message-ID: <1445600472-19242-1-git-send-email-grygorii.strashko@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 23, 2015 at 12:55:34PM +0200, Arnd Bergmann wrote:
-> On Friday 23 October 2015 11:44:58 Lorenzo Pieralisi wrote:
-> > 
-> > Problem with Qemu emulation is that it does not emulate the PSCI 1.0
-> > specs correctly (it does not even consider PSCI 1.0 functions proper PSCI
-> > calls), I tested it and I think we should update Qemu as we
-> > did with KVM kernel code instead of working around it by dodging the
-> > problem in the PSCI implementation by adding code that checks the
-> > PSCI version before issuing the PSCI calls through the respective
-> > conduit.
-> > 
-> > Thoughts appreciated.
-> 
-> I think we really cannot break existing qemu installations, but need
-> a way to detect whether we are dealing with a broken qemu (and warn
-> about that) or with a working PSCI implementation.
-> 
-> Fixing qemu is of course a good idea, but it's not sufficient.
+There is no reasons to probe cpsw from late_initcall level
+and it's not recommended. Hence, use module_platform_driver()
+to register and probe cpsw driver from module_init() level.
 
-I will patch the PSCI back-end in the kernel to issue PSCI_FEATURES calls
-only if the PSCI version detected is 1.0, therefore solving the issue, it
-is not necessary according to the specs, but that's belt and braces
-and sorts this niggle out.
+Cc: Tony Lindgren <tony@atomide.com>
+Acked-by: Mugunthan V N <mugunthanvnm@ti.com>
+Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+---
+ drivers/net/ethernet/ti/cpsw.c | 12 +-----------
+ 1 file changed, 1 insertion(+), 11 deletions(-)
 
-I will send a patch shortly to be applied on top of arm-soc drivers/psci.
-
-Thanks !
-Lorenzo
+diff --git a/drivers/net/ethernet/ti/cpsw.c b/drivers/net/ethernet/ti/cpsw.c
+index 8fc90f1..e35a34d 100644
+--- a/drivers/net/ethernet/ti/cpsw.c
++++ b/drivers/net/ethernet/ti/cpsw.c
+@@ -2578,17 +2578,7 @@ static struct platform_driver cpsw_driver = {
+ 	.remove = cpsw_remove,
+ };
+ 
+-static int __init cpsw_init(void)
+-{
+-	return platform_driver_register(&cpsw_driver);
+-}
+-late_initcall(cpsw_init);
+-
+-static void __exit cpsw_exit(void)
+-{
+-	platform_driver_unregister(&cpsw_driver);
+-}
+-module_exit(cpsw_exit);
++module_platform_driver(cpsw_driver);
+ 
+ MODULE_LICENSE("GPL");
+ MODULE_AUTHOR("Cyril Chemparathy <cyril@ti.com>");
+-- 
+2.6.2
