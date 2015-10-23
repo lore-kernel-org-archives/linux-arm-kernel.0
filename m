@@ -1,38 +1,73 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Fri, 23 Oct 2015 10:21:18 -0700
-Subject: [GIT PULL] Allwinner defconfig changes for 4.4
-In-Reply-To: <20151017170541.GA17582@lukather>
-References: <20151017170541.GA17582@lukather>
-Message-ID: <20151023172118.GH2224@localhost>
+Date: Fri, 23 Oct 2015 10:24:31 -0700
+Subject: [resend GIT PULL] ARM: mediatek: soc updates for v4.3
+In-Reply-To: <CABuKBeJUgmaswptkh1MdFfLyL0Yir7Umf=KQ3kW3B2A_=SU+0A@mail.gmail.com>
+References: <CABuKBeJUgmaswptkh1MdFfLyL0Yir7Umf=KQ3kW3B2A_=SU+0A@mail.gmail.com>
+Message-ID: <20151023172431.GI2224@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 17, 2015 at 07:05:41PM +0200, Maxime Ripard wrote:
-> Hi Arnd, Kevin, Olof,
+On Sun, Oct 18, 2015 at 02:20:17PM +0200, Matthias Brugger wrote:
+> Hi Arnd and Olof,
 > 
-> Please pull the following tag for the next merge window.
+> Please pull the following patches.
 > 
-> Thanks!
-> Maxime
+> I resend this pull request, because I forgot to add the arm mailing
+> list in the first place.
 > 
-> The following changes since commit 6ff33f3902c3b1c5d0db6b1e2c70b6d76fba357f:
+> Thanks,
+> Matthias
 > 
->   Linux 4.3-rc1 (2015-09-12 16:35:56 -0700)
+> ---
+> 
+> The following changes since commit 1f93e4a96c9109378204c147b3eec0d0e8100fde:
+> 
+>   Linux 4.3-rc2 (2015-09-20 14:32:34 -0700)
 > 
 > are available in the git repository at:
 > 
->   https://git.kernel.org/pub/scm/linux/kernel/git/mripard/linux.git tags/sunxi-defconfig-for-4.4
+>   https://github.com/mbgg/linux-mediatek.git tags/v4.3-next-soc
 > 
-> for you to fetch changes up to 21e29d9afd1024b63a311172bf57c41223665299:
+> for you to fetch changes up to 0cda07001a9454f371b7a7edabad55d99ef91157:
 > 
->   ARM: sunxi_defconfig: enable MODULE_UNLOAD (2015-09-21 09:05:13 +0200)
+>   ARM: mediatek: add smp bringup code (2015-10-14 15:34:44 +0200)
 > 
 > ----------------------------------------------------------------
-> Allwinner defconfig changes for 4.4
+> Do the initial setting of the pmic wrap interrupt before requesting
+> the interrupt.
+> This fixes the corner-case where the pmic is initialized by the bootloader, but
+> not the pmic watchdog.
 > 
-> A bunch of defconfig changes to enable support for new drivers.
+> Add support for active wakeup to the scpsys. This allows to keep the power of
+> a scpsys domain  during suspend state.
+> 
+> With version v4.3 new subsystem clocks are added to the clock dirver. In late
+> init the kernel turns off all unused clocks. This can provoke a hang if
+> the kernel tries to access the venc and venc_lt power domain registers.
+> Add the necessary parent clocks for this power domains to
+> the scpsys so that no random hang happens.
+> 
+> The bootloader of mt6589, mt8135 and mt1827 does not turn on the arm-arch-timer.
+> As there is no opensource bootloader in the near future for this architectures
+> we enable the arch timer at kernel boot. We need the arch timer for SMP boot.
+> 
+> Add support for SMP on mt6589, mt8127 and mt8135.
 
-Merged, thanks.
+Hi,
+
+
+>  arch/arm/mach-mediatek/Makefile      |   3 +
+>  arch/arm/mach-mediatek/mediatek.c    |  27 +++++++
+>  arch/arm/mach-mediatek/platsmp.c     | 141 +++++++++++++++++++++++++++++++++++
+>  drivers/soc/mediatek/mtk-pmic-wrap.c |  10 ++-
+>  drivers/soc/mediatek/mtk-scpsys.c    |  83 +++++++++++++++------
+
+The changes to driver/soc and the ones to arch/arm/mach-mediatek seem to be
+mostly independent functionally. For those that are, in the future please send
+drivers/soc in a separate branch (since we'd merge that through the drivers
+branch in our tree).
+
+Merged into next/soc. Thanks!
 
 
 -Olof
