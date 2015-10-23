@@ -1,20 +1,21 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 23 Oct 2015 22:39:15 +0200
-Subject: [PATCH v4 00/12] ARM64: Update support for FSL's LS2085A SoC
-In-Reply-To: <1445628721-10483-1-git-send-email-bhupesh.sharma@freescale.com>
-References: <1445628721-10483-1-git-send-email-bhupesh.sharma@freescale.com>
-Message-ID: <8597566.OLE6hhA6ha@wuerfel>
+Date: Fri, 23 Oct 2015 22:41:04 +0200
+Subject: [GIT PULL] Allwinner DT changes for 4.4, round 3
+In-Reply-To: <20151023180711.GA11749@lukather>
+References: <20151023180711.GA11749@lukather>
+Message-ID: <4745252.gLSrJNQ42D@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 24 October 2015 01:01:49 Bhupesh Sharma wrote:
-> This is the v4 of the patchset which updates the support for FSL's LS2085A SoC
-> which is now being renamed to LS2080A (and is based on ARMv8 architecture).
+On Friday 23 October 2015 20:07:11 Maxime Ripard wrote:
+> Allwinner DT changes for 4.4, round 3
 > 
-> Here is a description of what this patchset tries to achieve:
-> (v3 can be viewed here: http://www.spinics.net/lists/arm-kernel/msg452747.html)
+> A bunch of new boards, but mostly enable the support for the Audio Codec
+> on the older SoCs (A10, A10s, A13, A20, R8) and enable it on various
+> boards.
+> 
 > 
 
-Applied all patches except for 5/12, as explained. Thanks,
+Pulled into next/dt, thanks!
 
 	Arnd
