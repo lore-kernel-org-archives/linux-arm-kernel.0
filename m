@@ -1,34 +1,42 @@
-From: torvalds@linux-foundation.org (Linus Torvalds)
-Date: Fri, 23 Oct 2015 18:41:32 +0900 (JST)
-Subject: [GIT PULL] ARM: SoC fixes for 4.3-rc
-In-Reply-To: <6788509.osko4XNn1O@wuerfel>
-References: <6788509.osko4XNn1O@wuerfel>
-Message-ID: <alpine.LFD.2.20.1510231834520.24002@vaio.linux-foundation.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 23 Oct 2015 11:48:09 +0200
+Subject: [PATCH 08/13] clk: add ARM syscon ICST device tree bindings
+In-Reply-To: <20151015192325.GN4558@codeaurora.org>
+References: <1444916813-31024-1-git-send-email-linus.walleij@linaro.org>
+ <1444916813-31024-9-git-send-email-linus.walleij@linaro.org>
+ <20151015192325.GN4558@codeaurora.org>
+Message-ID: <CACRpkdbXLs7hP=8WH6uK_3mQQEy4Y6TJsjpt4=LpeT=jmF-9Kw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, Oct 15, 2015 at 9:23 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+> On 10/15, Linus Walleij wrote:
 
+>> +Required properties:
+>> +- lock-offset: the offset address into the system controller where the
+>> +  unlocking register is located
+>> +- vco-offset: the offset address into the system controller where the
+>> +  ICST control register is located (even 32 bit address)
+>
+> Is there any reason why we don't use a reg property for this?
 
-On Thu, 22 Oct 2015, Arnd Bergmann wrote:
-> 
-> are available in the git repository at:
-> 
->   git+ssh://gitolite at ra.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/fixes-for-linus
+Usually reg = <> is used with two (or more) tokens:
 
-What the heck happened to your pull request script? A sudden case of 
-script disease?
+reg = <phys_addr size>;
 
-That's just insane. "git+ssh"? "gitolite at ra.kernel.org"? Yeah, yeah, it 
-probably works for people with accounts, but please don't use those 
-private secure things in pull requests, particularly ones that go to 
-public mailing lists.
+The exception being things like I2C addresses which
+are just one token.
 
-And "git+ssh" may be a valid way to specify a git tree, but if you really 
-want to just use ssh (which you don't), just use "ssh://", or use the 
-shorter scp format ("host:path"). At least then it would be closer to fit 
-on a line, and less of the line noise..
+Since in this case, there is a "mother" reg property in the
+syscon-compatible node, which we are indexing into,
+it is confusing to use the same name for subnodes.
 
-Anyway, I've pulled using the sane externally visible verion, so no need 
-to resend, but check your scripting..
+Also there is a bunch of precedents doing it like this
+for sybdevices to system controllers, just
+git grep offset Documentation/devicetree/bindings
+will give you a bunch of them.
 
-            Linus
+(Fixing the spelling comments.)
+
+Yours,
+Linus Walleij
