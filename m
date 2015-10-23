@@ -1,15 +1,15 @@
 From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Fri, 23 Oct 2015 19:51:59 +0900
-Subject: [PATCH v2 1/2] i2c: uniphier: add UniPhier FIFO-less I2C driver
+Date: Fri, 23 Oct 2015 19:52:00 +0900
+Subject: [PATCH v2 2/2] i2c: uniphier_f: add UniPhier FIFO-builtin I2C driver
 In-Reply-To: <1445597520-6299-1-git-send-email-yamada.masahiro@socionext.com>
 References: <1445597520-6299-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <1445597520-6299-2-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <1445597520-6299-3-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for on-chip I2C controller used on old UniPhier SoCs
-such as PH1-LD4, PH1-sLD8, etc.  This adapter is so simple that
-it has no FIFO in it.
+Add support for on-chip I2C controller used on newer UniPhier SoCs
+such as PH1-Pro4, PH1-Pro5, etc.  This adapter is equipped with
+8-depth TX/RX FIFOs.
 
 Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
 ---
@@ -18,27 +18,26 @@ Changes in v2:
   - Delete if-block after platform_get_resource()
   - Add I2C_FUNC_SMBUS_EMUL to functionality
   - Add bindings document
-  - Add entry to MAINTAINERS
+  - Fix a typo in a comment block
 
- .../devicetree/bindings/i2c/i2c-uniphier.txt       |  25 ++
- MAINTAINERS                                        |   1 +
+ .../devicetree/bindings/i2c/i2c-uniphier-f.txt     |  25 +
  drivers/i2c/busses/Kconfig                         |   8 +
  drivers/i2c/busses/Makefile                        |   1 +
- drivers/i2c/busses/i2c-uniphier.c                  | 441 +++++++++++++++++++++
- 5 files changed, 476 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/i2c/i2c-uniphier.txt
- create mode 100644 drivers/i2c/busses/i2c-uniphier.c
+ drivers/i2c/busses/i2c-uniphier-f.c                | 584 +++++++++++++++++++++
+ 4 files changed, 618 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/i2c/i2c-uniphier-f.txt
+ create mode 100644 drivers/i2c/busses/i2c-uniphier-f.c
 
-diff --git a/Documentation/devicetree/bindings/i2c/i2c-uniphier.txt b/Documentation/devicetree/bindings/i2c/i2c-uniphier.txt
+diff --git a/Documentation/devicetree/bindings/i2c/i2c-uniphier-f.txt b/Documentation/devicetree/bindings/i2c/i2c-uniphier-f.txt
 new file mode 100644
-index 0000000..26f9d95
+index 0000000..27fc6f8
 --- /dev/null
-+++ b/Documentation/devicetree/bindings/i2c/i2c-uniphier.txt
++++ b/Documentation/devicetree/bindings/i2c/i2c-uniphier-f.txt
 @@ -0,0 +1,25 @@
-+UniPhier I2C controller (FIFO-less)
++UniPhier I2C controller (FIFO-builtin)
 +
 +Required properties:
-+- compatible: should be "socionext,uniphier-i2c".
++- compatible: should be "socionext,uniphier-fi2c".
 +- #address-cells: should be 1.
 +- #size-cells: should be 0.
 +- reg: offset and length of the register set for the device.
@@ -51,64 +50,52 @@ index 0000000..26f9d95
 +
 +Examples:
 +
-+	i2c0: i2c at 58400000 {
-+		compatible = "socionext,uniphier-i2c";
-+		reg = <0x58400000 0x40>;
++	i2c0: i2c at 58780000 {
++		compatible = "socionext,uniphier-fi2c";
++		reg = <0x58780000 0x80>;
 +		#address-cells = <1>;
 +		#size-cells = <0>;
-+		interrupts = <0 41 1>;
++		interrupts = <0 41 4>;
 +		clocks = <&i2c_clk>;
 +		clock-frequency = <100000>;
 +	};
-diff --git a/MAINTAINERS b/MAINTAINERS
-index fb7d2e4..b21c456 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -1607,6 +1607,7 @@ L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
- S:	Maintained
- F:	arch/arm/boot/dts/uniphier*
- F:	arch/arm/mach-uniphier/
-+F:	drivers/i2c/busses/i2c-uniphier*
- F:	drivers/pinctrl/uniphier/
- F:	drivers/tty/serial/8250/8250_uniphier.c
- N:	uniphier
 diff --git a/drivers/i2c/busses/Kconfig b/drivers/i2c/busses/Kconfig
-index 08b8617..2a176b0 100644
+index 2a176b0..0111219 100644
 --- a/drivers/i2c/busses/Kconfig
 +++ b/drivers/i2c/busses/Kconfig
-@@ -902,6 +902,14 @@ config I2C_TEGRA
- 	  If you say yes to this option, support will be included for the
- 	  I2C controller embedded in NVIDIA Tegra SOCs
+@@ -910,6 +910,14 @@ config I2C_UNIPHIER
+ 	  the UniPhier FIFO-less I2C interface embedded in PH1-LD4, PH1-sLD8,
+ 	  or older UniPhier SoCs.
  
-+config I2C_UNIPHIER
-+	tristate "UniPhier FIFO-less I2C controller"
++config I2C_UNIPHIER_F
++	tristate "UniPhier FIFO-builtin I2C controller"
 +	depends on ARCH_UNIPHIER
 +	help
 +	  If you say yes to this option, support will be included for
-+	  the UniPhier FIFO-less I2C interface embedded in PH1-LD4, PH1-sLD8,
-+	  or older UniPhier SoCs.
++	  the UniPhier FIFO-builtin I2C interface embedded in PH1-Pro4,
++	  PH1-Pro5, or newer UniPhier SoCs.
 +
  config I2C_VERSATILE
  	tristate "ARM Versatile/Realview I2C bus support"
  	depends on ARCH_VERSATILE || ARCH_REALVIEW || ARCH_VEXPRESS
 diff --git a/drivers/i2c/busses/Makefile b/drivers/i2c/busses/Makefile
-index 6df3b30..f9f0902 100644
+index f9f0902..37f2819 100644
 --- a/drivers/i2c/busses/Makefile
 +++ b/drivers/i2c/busses/Makefile
-@@ -87,6 +87,7 @@ obj-$(CONFIG_I2C_ST)		+= i2c-st.o
- obj-$(CONFIG_I2C_STU300)	+= i2c-stu300.o
+@@ -88,6 +88,7 @@ obj-$(CONFIG_I2C_STU300)	+= i2c-stu300.o
  obj-$(CONFIG_I2C_SUN6I_P2WI)	+= i2c-sun6i-p2wi.o
  obj-$(CONFIG_I2C_TEGRA)		+= i2c-tegra.o
-+obj-$(CONFIG_I2C_UNIPHIER)	+= i2c-uniphier.o
+ obj-$(CONFIG_I2C_UNIPHIER)	+= i2c-uniphier.o
++obj-$(CONFIG_I2C_UNIPHIER_F)	+= i2c-uniphier-f.o
  obj-$(CONFIG_I2C_VERSATILE)	+= i2c-versatile.o
  obj-$(CONFIG_I2C_WMT)		+= i2c-wmt.o
  obj-$(CONFIG_I2C_OCTEON)	+= i2c-octeon.o
-diff --git a/drivers/i2c/busses/i2c-uniphier.c b/drivers/i2c/busses/i2c-uniphier.c
+diff --git a/drivers/i2c/busses/i2c-uniphier-f.c b/drivers/i2c/busses/i2c-uniphier-f.c
 new file mode 100644
-index 0000000..e3c3861
+index 0000000..e8d03bc
 --- /dev/null
-+++ b/drivers/i2c/busses/i2c-uniphier.c
-@@ -0,0 +1,441 @@
++++ b/drivers/i2c/busses/i2c-uniphier-f.c
+@@ -0,0 +1,584 @@
 +/*
 + * Copyright (C) 2015 Masahiro Yamada <yamada.masahiro@socionext.com>
 + *
@@ -130,213 +117,360 @@ index 0000000..e3c3861
 +#include <linux/module.h>
 +#include <linux/platform_device.h>
 +
-+#define UNIPHIER_I2C_DTRM	0x00	/* TX register */
-+#define     UNIPHIER_I2C_DTRM_IRQEN	BIT(11)	/* enable interrupt */
-+#define     UNIPHIER_I2C_DTRM_STA	BIT(10)	/* start condition */
-+#define     UNIPHIER_I2C_DTRM_STO	BIT(9)	/* stop condition */
-+#define     UNIPHIER_I2C_DTRM_NACK	BIT(8)	/* do not return ACK */
-+#define     UNIPHIER_I2C_DTRM_RD	BIT(0)	/* read transaction */
-+#define UNIPHIER_I2C_DREC	0x04	/* RX register */
-+#define     UNIPHIER_I2C_DREC_MST	BIT(14)	/* 1 = master, 0 = slave */
-+#define     UNIPHIER_I2C_DREC_TX	BIT(13)	/* 1 = transmit, 0 = receive */
-+#define     UNIPHIER_I2C_DREC_STS	BIT(12)	/* stop condition detected */
-+#define     UNIPHIER_I2C_DREC_LRB	BIT(11)	/* no ACK */
-+#define     UNIPHIER_I2C_DREC_LAB	BIT(9)	/* arbitration lost */
-+#define     UNIPHIER_I2C_DREC_BBN	BIT(8)	/* bus not busy */
-+#define UNIPHIER_I2C_MYAD	0x08	/* slave address */
-+#define UNIPHIER_I2C_CLK	0x0c	/* clock frequency control */
-+#define UNIPHIER_I2C_BRST	0x10	/* bus reset */
-+#define     UNIPHIER_I2C_BRST_FOEN	BIT(1)	/* normal operation */
-+#define     UNIPHIER_I2C_BRST_RSCL	BIT(0)	/* release SCL */
-+#define UNIPHIER_I2C_HOLD	0x14	/* hold time control */
-+#define UNIPHIER_I2C_BSTS	0x18	/* bus status monitor */
-+#define     UNIPHIER_I2C_BSTS_SDA	BIT(1)	/* readback of SDA line */
-+#define     UNIPHIER_I2C_BSTS_SCL	BIT(0)	/* readback of SCL line */
-+#define UNIPHIER_I2C_NOISE	0x1c	/* noise filter control */
-+#define UNIPHIER_I2C_SETUP	0x20	/* setup time control */
++#define UNIPHIER_FI2C_CR	0x00	/* control register */
++#define     UNIPHIER_FI2C_CR_MST	BIT(3)	/* master mode */
++#define     UNIPHIER_FI2C_CR_STA	BIT(2)	/* start condition */
++#define     UNIPHIER_FI2C_CR_STO	BIT(1)	/* stop condition */
++#define     UNIPHIER_FI2C_CR_NACK	BIT(0)	/* do not return ACK */
++#define UNIPHIER_FI2C_DTTX	0x04	/* TX FIFO */
++#define     UNIPHIER_FI2C_DTTX_CMD	BIT(8)	/* send command (slave addr) */
++#define     UNIPHIER_FI2C_DTTX_RD	BIT(0)	/* read transaction */
++#define UNIPHIER_FI2C_DTRX	0x04	/* RX FIFO */
++#define UNIPHIER_FI2C_SLAD	0x0c	/* slave address */
++#define UNIPHIER_FI2C_CYC	0x10	/* clock cycle control */
++#define UNIPHIER_FI2C_LCTL	0x14	/* clock low period control */
++#define UNIPHIER_FI2C_SSUT	0x18	/* restart/stop setup time control */
++#define UNIPHIER_FI2C_DSUT	0x1c	/* data setup time control */
++#define UNIPHIER_FI2C_INT	0x20	/* interrupt status */
++#define UNIPHIER_FI2C_IE	0x24	/* interrupt enable */
++#define UNIPHIER_FI2C_IC	0x28	/* interrupt clear */
++#define     UNIPHIER_FI2C_INT_TE	BIT(9)	/* TX FIFO empty */
++#define     UNIPHIER_FI2C_INT_RF	BIT(8)	/* RX FIFO full */
++#define     UNIPHIER_FI2C_INT_TC	BIT(7)	/* send complete (STOP) */
++#define     UNIPHIER_FI2C_INT_RC	BIT(6)	/* receive complete (STOP) */
++#define     UNIPHIER_FI2C_INT_TB	BIT(5)	/* sent specified bytes */
++#define     UNIPHIER_FI2C_INT_RB	BIT(4)	/* received specified bytes */
++#define     UNIPHIER_FI2C_INT_NA	BIT(2)	/* no ACK */
++#define     UNIPHIER_FI2C_INT_AL	BIT(1)	/* arbitration lost */
++#define UNIPHIER_FI2C_SR	0x2c	/* status register */
++#define     UNIPHIER_FI2C_SR_DB		BIT(12)	/* device busy */
++#define     UNIPHIER_FI2C_SR_STS	BIT(11)	/* stop condition detected */
++#define     UNIPHIER_FI2C_SR_BB		BIT(8)	/* bus busy */
++#define     UNIPHIER_FI2C_SR_RFF	BIT(3)	/* RX FIFO full */
++#define     UNIPHIER_FI2C_SR_RNE	BIT(2)	/* RX FIFO not empty */
++#define     UNIPHIER_FI2C_SR_TNF	BIT(1)	/* TX FIFO not full */
++#define     UNIPHIER_FI2C_SR_TFE	BIT(0)	/* TX FIFO empty */
++#define UNIPHIER_FI2C_RST	0x34	/* reset control */
++#define     UNIPHIER_FI2C_RST_TBRST	BIT(2)	/* clear TX FIFO */
++#define     UNIPHIER_FI2C_RST_RBRST	BIT(1)	/* clear RX FIFO */
++#define     UNIPHIER_FI2C_RST_RST	BIT(0)	/* forcible bus reset */
++#define UNIPHIER_FI2C_BM	0x38	/* bus monitor */
++#define     UNIPHIER_FI2C_BM_SDAO	BIT(3)	/* output for SDA line */
++#define     UNIPHIER_FI2C_BM_SDAS	BIT(2)	/* readback of SDA line */
++#define     UNIPHIER_FI2C_BM_SCLO	BIT(1)	/* output for SCL line */
++#define     UNIPHIER_FI2C_BM_SCLS	BIT(0)	/* readback of SCL line */
++#define UNIPHIER_FI2C_NOISE	0x3c	/* noise filter control */
++#define UNIPHIER_FI2C_TBC	0x40	/* TX byte count setting */
++#define UNIPHIER_FI2C_RBC	0x44	/* RX byte count setting */
++#define UNIPHIER_FI2C_TBCM	0x48	/* TX byte count monitor */
++#define UNIPHIER_FI2C_RBCM	0x4c	/* RX byte count monitor */
++#define UNIPHIER_FI2C_BRST	0x50	/* bus reset */
++#define     UNIPHIER_FI2C_BRST_FOEN	BIT(1)	/* normal operation */
++#define     UNIPHIER_FI2C_BRST_RSCL	BIT(0)	/* release SCL */
 +
-+#define UNIPHIER_I2C_DEFAULT_SPEED	100000
-+#define UNIPHIER_I2C_MAX_SPEED		400000
++#define UNIPHIER_FI2C_INT_FAULTS	\
++				(UNIPHIER_FI2C_INT_NA | UNIPHIER_FI2C_INT_AL)
++#define UNIPHIER_FI2C_INT_STOP		\
++				(UNIPHIER_FI2C_INT_TC | UNIPHIER_FI2C_INT_RC)
 +
-+struct uniphier_i2c_priv {
++#define UNIPHIER_FI2C_RD		BIT(0)
++#define UNIPHIER_FI2C_STOP		BIT(1)
++#define UNIPHIER_FI2C_MANUAL_NACK	BIT(2)
++#define UNIPHIER_FI2C_BYTE_WISE		BIT(3)
++#define UNIPHIER_FI2C_DEFER_STOP_COMP	BIT(4)
++
++#define UNIPHIER_FI2C_DEFAULT_SPEED	100000
++#define UNIPHIER_FI2C_MAX_SPEED		400000
++#define UNIPHIER_FI2C_FIFO_SIZE		8
++
++struct uniphier_fi2c_priv {
 +	struct completion comp;
 +	struct i2c_adapter adap;
 +	void __iomem *membase;
 +	struct clk *clk;
++	unsigned int len;
++	u8 *buf;
++	u32 enabled_irqs;
++	int error;
++	unsigned int flags;
 +	unsigned int busy_cnt;
 +};
 +
-+static irqreturn_t uniphier_i2c_interrupt(int irq, void *dev_id)
++static void uniphier_fi2c_fill_txfifo(struct uniphier_fi2c_priv *priv,
++				      bool first)
 +{
-+	struct uniphier_i2c_priv *priv = dev_id;
++	int fifo_space = UNIPHIER_FI2C_FIFO_SIZE;
 +
 +	/*
-+	 * This hardware uses edge triggered interrupt.  Do not touch the
-+	 * hardware registers in this handler to make sure to catch the next
-+	 * interrupt edge.  Just send a complete signal and return.
++	 * TX-FIFO stores slave address in it for the first access.
++	 * Decrement the counter.
 +	 */
-+	complete(&priv->comp);
++	if (first)
++		fifo_space--;
++
++	while (priv->len) {
++		if (fifo_space-- <= 0)
++			break;
++
++		dev_dbg(&priv->adap.dev, "write data: %02x\n", *priv->buf);
++		writel(*priv->buf++, priv->membase + UNIPHIER_FI2C_DTTX);
++		priv->len--;
++	}
++}
++
++static void uniphier_fi2c_drain_rxfifo(struct uniphier_fi2c_priv *priv)
++{
++	int fifo_left = priv->flags & UNIPHIER_FI2C_BYTE_WISE ?
++						1 : UNIPHIER_FI2C_FIFO_SIZE;
++
++	while (priv->len) {
++		if (fifo_left-- <= 0)
++			break;
++
++		*priv->buf++ = readl(priv->membase + UNIPHIER_FI2C_DTRX);
++		dev_dbg(&priv->adap.dev, "read data: %02x\n", priv->buf[-1]);
++		priv->len--;
++	}
++}
++
++static void uniphier_fi2c_set_irqs(struct uniphier_fi2c_priv *priv)
++{
++	writel(priv->enabled_irqs, priv->membase + UNIPHIER_FI2C_IE);
++}
++
++static void uniphier_fi2c_clear_irqs(struct uniphier_fi2c_priv *priv)
++{
++	writel(-1, priv->membase + UNIPHIER_FI2C_IC);
++}
++
++static void uniphier_fi2c_stop(struct uniphier_fi2c_priv *priv)
++{
++	dev_dbg(&priv->adap.dev, "stop condition\n");
++
++	priv->enabled_irqs |= UNIPHIER_FI2C_INT_STOP;
++	uniphier_fi2c_set_irqs(priv);
++	writel(UNIPHIER_FI2C_CR_MST | UNIPHIER_FI2C_CR_STO,
++	       priv->membase + UNIPHIER_FI2C_CR);
++}
++
++static irqreturn_t uniphier_fi2c_interrupt(int irq, void *dev_id)
++{
++	struct uniphier_fi2c_priv *priv = dev_id;
++	u32 irq_status;
++
++	irq_status = readl(priv->membase + UNIPHIER_FI2C_INT);
++
++	dev_dbg(&priv->adap.dev,
++		"interrupt: enabled_irqs=%04x, irq_status=%04x\n",
++		priv->enabled_irqs, irq_status);
++
++	if (irq_status & UNIPHIER_FI2C_INT_STOP)
++		goto complete;
++
++	if (unlikely(irq_status & UNIPHIER_FI2C_INT_AL)) {
++		dev_dbg(&priv->adap.dev, "arbitration lost\n");
++		priv->error = -EAGAIN;
++		goto complete;
++	}
++
++	if (unlikely(irq_status & UNIPHIER_FI2C_INT_NA)) {
++		dev_dbg(&priv->adap.dev, "could not get ACK\n");
++		priv->error = -ENXIO;
++		if (priv->flags & UNIPHIER_FI2C_RD) {
++			/*
++			 * work around a hardware bug:
++			 * The receive-completed interrupt is never set even if
++			 * STOP condition is detected after the address phase
++			 * of read transaction fails to get ACK.
++			 * To avoid time-out error, we issue STOP here,
++			 * but do not wait for its completion.
++			 * It should be checked after exiting this handler.
++			 */
++			uniphier_fi2c_stop(priv);
++			priv->flags |= UNIPHIER_FI2C_DEFER_STOP_COMP;
++			goto complete;
++		}
++		goto stop;
++	}
++
++	if (irq_status & UNIPHIER_FI2C_INT_TE) {
++		if (!priv->len)
++			goto data_done;
++
++		uniphier_fi2c_fill_txfifo(priv, false);
++		goto handled;
++	}
++
++	if (irq_status & (UNIPHIER_FI2C_INT_RF | UNIPHIER_FI2C_INT_RB)) {
++		uniphier_fi2c_drain_rxfifo(priv);
++		if (!priv->len)
++			goto data_done;
++
++		if (unlikely(priv->flags & UNIPHIER_FI2C_MANUAL_NACK)) {
++			if (priv->len <= UNIPHIER_FI2C_FIFO_SIZE &&
++			    !(priv->flags & UNIPHIER_FI2C_BYTE_WISE)) {
++				dev_dbg(&priv->adap.dev,
++					"enable read byte count IRQ\n");
++				priv->enabled_irqs |= UNIPHIER_FI2C_INT_RB;
++				uniphier_fi2c_set_irqs(priv);
++				priv->flags |= UNIPHIER_FI2C_BYTE_WISE;
++			}
++			if (priv->len <= 1) {
++				dev_dbg(&priv->adap.dev, "set NACK\n");
++				writel(UNIPHIER_FI2C_CR_MST |
++				       UNIPHIER_FI2C_CR_NACK,
++				       priv->membase + UNIPHIER_FI2C_CR);
++			}
++		}
++
++		goto handled;
++	}
++
++	return IRQ_NONE;
++
++data_done:
++	if (priv->flags & UNIPHIER_FI2C_STOP) {
++stop:
++		uniphier_fi2c_stop(priv);
++	} else {
++complete:
++		priv->enabled_irqs = 0;
++		uniphier_fi2c_set_irqs(priv);
++		complete(&priv->comp);
++	}
++
++handled:
++	uniphier_fi2c_clear_irqs(priv);
 +
 +	return IRQ_HANDLED;
 +}
 +
-+static int uniphier_i2c_xfer_byte(struct i2c_adapter *adap, u32 txdata,
-+				  u32 *rxdatap)
++static void uniphier_fi2c_tx_init(struct uniphier_fi2c_priv *priv, u16 addr)
 +{
-+	struct uniphier_i2c_priv *priv = i2c_get_adapdata(adap);
-+	unsigned long time_left;
-+	u32 rxdata;
-+
-+	reinit_completion(&priv->comp);
-+
-+	txdata |= UNIPHIER_I2C_DTRM_IRQEN;
-+	dev_dbg(&adap->dev, "write data: 0x%04x\n", txdata);
-+	writel(txdata, priv->membase + UNIPHIER_I2C_DTRM);
-+
-+	time_left = wait_for_completion_timeout(&priv->comp, adap->timeout);
-+	if (unlikely(!time_left)) {
-+		dev_err(&adap->dev, "transaction timeout\n");
-+		return -ETIMEDOUT;
-+	}
-+
-+	rxdata = readl(priv->membase + UNIPHIER_I2C_DREC);
-+	dev_dbg(&adap->dev, "read data: 0x%04x\n", rxdata);
-+
-+	if (rxdatap)
-+		*rxdatap = rxdata;
-+
-+	return 0;
++	priv->enabled_irqs |= UNIPHIER_FI2C_INT_TE;
++	/* do not use TX byte counter */
++	writel(0, priv->membase + UNIPHIER_FI2C_TBC);
++	/* set slave address */
++	writel(UNIPHIER_FI2C_DTTX_CMD | addr << 1,
++	       priv->membase + UNIPHIER_FI2C_DTTX);
++	/* first chunk of data */
++	uniphier_fi2c_fill_txfifo(priv, true);
 +}
 +
-+static int uniphier_i2c_send_byte(struct i2c_adapter *adap, u32 txdata)
++static void uniphier_fi2c_rx_init(struct uniphier_fi2c_priv *priv, u16 addr)
 +{
-+	u32 rxdata;
-+	int ret;
++	priv->flags |= UNIPHIER_FI2C_RD;
 +
-+	ret = uniphier_i2c_xfer_byte(adap, txdata, &rxdata);
-+	if (ret)
-+		return ret;
-+
-+	if (unlikely(rxdata & UNIPHIER_I2C_DREC_LAB)) {
-+		dev_dbg(&adap->dev, "arbitration lost\n");
-+		return -EAGAIN;
-+	}
-+	if (unlikely(rxdata & UNIPHIER_I2C_DREC_LRB)) {
-+		dev_dbg(&adap->dev, "could not get ACK\n");
-+		return -ENXIO;
-+	}
-+
-+	return 0;
-+}
-+
-+static int uniphier_i2c_tx(struct i2c_adapter *adap, u16 addr, u16 len,
-+			   const u8 *buf)
-+{
-+	int ret;
-+
-+	dev_dbg(&adap->dev, "start condition\n");
-+	ret = uniphier_i2c_send_byte(adap, addr << 1 |
-+				     UNIPHIER_I2C_DTRM_STA |
-+				     UNIPHIER_I2C_DTRM_NACK);
-+	if (ret)
-+		return ret;
-+
-+	while (len--) {
-+		ret = uniphier_i2c_send_byte(adap,
-+					     UNIPHIER_I2C_DTRM_NACK | *buf++);
-+		if (ret)
-+			return ret;
++	if (likely(priv->len < 256)) {
++		/*
++		 * If possible, use RX byte counter.
++		 * It can automatically handle NACK for the last byte.
++		 */
++		writel(priv->len, priv->membase + UNIPHIER_FI2C_RBC);
++		priv->enabled_irqs |= UNIPHIER_FI2C_INT_RF |
++				      UNIPHIER_FI2C_INT_RB;
++	} else {
++		/*
++		 * The byte counter can not count over 256.  In this case,
++		 * do not use it at all.  Drain data when FIFO gets full,
++		 * but treat the last portion as a special case.
++		 */
++		writel(0, priv->membase + UNIPHIER_FI2C_RBC);
++		priv->flags |= UNIPHIER_FI2C_MANUAL_NACK;
++		priv->enabled_irqs |= UNIPHIER_FI2C_INT_RF;
 +	}
 +
-+	return 0;
++	/* set slave address with RD bit */
++	writel(UNIPHIER_FI2C_DTTX_CMD | UNIPHIER_FI2C_DTTX_RD | addr << 1,
++	       priv->membase + UNIPHIER_FI2C_DTTX);
 +}
 +
-+static int uniphier_i2c_rx(struct i2c_adapter *adap, u16 addr, u16 len,
-+			   u8 *buf)
++static void uniphier_fi2c_reset(struct uniphier_fi2c_priv *priv)
 +{
-+	int ret;
-+
-+	dev_dbg(&adap->dev, "start condition\n");
-+	ret = uniphier_i2c_send_byte(adap, addr << 1 |
-+				     UNIPHIER_I2C_DTRM_STA |
-+				     UNIPHIER_I2C_DTRM_NACK |
-+				     UNIPHIER_I2C_DTRM_RD);
-+	if (ret)
-+		return ret;
-+
-+	while (len--) {
-+		u32 rxdata;
-+
-+		ret = uniphier_i2c_xfer_byte(adap,
-+					     len ? 0 : UNIPHIER_I2C_DTRM_NACK,
-+					     &rxdata);
-+		if (ret)
-+			return ret;
-+		*buf++ = rxdata;
-+	}
-+
-+	return 0;
++	writel(UNIPHIER_FI2C_RST_RST, priv->membase + UNIPHIER_FI2C_RST);
 +}
 +
-+static int uniphier_i2c_stop(struct i2c_adapter *adap)
++static void uniphier_fi2c_prepare_operation(struct uniphier_fi2c_priv *priv)
 +{
-+	dev_dbg(&adap->dev, "stop condition\n");
-+	return uniphier_i2c_send_byte(adap, UNIPHIER_I2C_DTRM_STO |
-+				      UNIPHIER_I2C_DTRM_NACK);
++	writel(UNIPHIER_FI2C_BRST_FOEN | UNIPHIER_FI2C_BRST_RSCL,
++	       priv->membase + UNIPHIER_FI2C_BRST);
 +}
 +
-+static int uniphier_i2c_master_xfer_one(struct i2c_adapter *adap,
-+					struct i2c_msg *msg, bool stop)
++static void uniphier_fi2c_recover(struct uniphier_fi2c_priv *priv)
 +{
++	uniphier_fi2c_reset(priv);
++	i2c_recover_bus(&priv->adap);
++}
++
++static int uniphier_fi2c_master_xfer_one(struct i2c_adapter *adap,
++					 struct i2c_msg *msg, bool stop)
++{
++	struct uniphier_fi2c_priv *priv = i2c_get_adapdata(adap);
 +	bool is_read = msg->flags & I2C_M_RD;
-+	bool recovery = false;
-+	int ret;
++	unsigned long time_left;
 +
 +	dev_dbg(&adap->dev, "%s: addr=0x%02x, len=%d, stop=%d\n",
 +		is_read ? "receive" : "transmit", msg->addr, msg->len, stop);
 +
++	priv->len = msg->len;
++	priv->buf = msg->buf;
++	priv->enabled_irqs = UNIPHIER_FI2C_INT_FAULTS;
++	priv->error = 0;
++	priv->flags = 0;
++
++	if (stop)
++		priv->flags |= UNIPHIER_FI2C_STOP;
++
++	reinit_completion(&priv->comp);
++	uniphier_fi2c_clear_irqs(priv);
++	writel(UNIPHIER_FI2C_RST_TBRST | UNIPHIER_FI2C_RST_RBRST,
++	       priv->membase + UNIPHIER_FI2C_RST);	/* reset TX/RX FIFO */
++
 +	if (is_read)
-+		ret = uniphier_i2c_rx(adap, msg->addr, msg->len, msg->buf);
++		uniphier_fi2c_rx_init(priv, msg->addr);
 +	else
-+		ret = uniphier_i2c_tx(adap, msg->addr, msg->len, msg->buf);
++		uniphier_fi2c_tx_init(priv, msg->addr);
 +
-+	if (ret == -EAGAIN) /* could not acquire bus. bail out without STOP */
-+		return ret;
++	uniphier_fi2c_set_irqs(priv);
 +
-+	if (ret == -ETIMEDOUT) {
-+		/* This error is fatal.  Needs recovery. */
-+		stop = false;
-+		recovery = true;
++	dev_dbg(&adap->dev, "start condition\n");
++	writel(UNIPHIER_FI2C_CR_MST | UNIPHIER_FI2C_CR_STA,
++	       priv->membase + UNIPHIER_FI2C_CR);
++
++	time_left = wait_for_completion_timeout(&priv->comp, adap->timeout);
++	if (!time_left) {
++		dev_err(&adap->dev, "transaction timeout.\n");
++		uniphier_fi2c_recover(priv);
++		return -ETIMEDOUT;
 +	}
++	dev_dbg(&adap->dev, "complete\n");
 +
-+	if (stop) {
-+		int ret2 = uniphier_i2c_stop(adap);
++	if (unlikely(priv->flags & UNIPHIER_FI2C_DEFER_STOP_COMP)) {
++		u32 status = readl(priv->membase + UNIPHIER_FI2C_SR);
 +
-+		if (ret2) {
-+			/* Failed to issue STOP.  The bus needs recovery. */
-+			recovery = true;
-+			ret = ret ?: ret2;
++		if (!(status & UNIPHIER_FI2C_SR_STS) ||
++		    status & UNIPHIER_FI2C_SR_BB) {
++			dev_err(&adap->dev,
++				"stop condition was not completed.\n");
++			uniphier_fi2c_recover(priv);
++			return -EBUSY;
 +		}
 +	}
 +
-+	if (recovery)
-+		i2c_recover_bus(adap);
-+
-+	return ret;
++	return priv->error;
 +}
 +
-+static int uniphier_i2c_check_bus_busy(struct i2c_adapter *adap)
++static int uniphier_fi2c_check_bus_busy(struct i2c_adapter *adap)
 +{
-+	struct uniphier_i2c_priv *priv = i2c_get_adapdata(adap);
++	struct uniphier_fi2c_priv *priv = i2c_get_adapdata(adap);
 +
-+	if (!(readl(priv->membase + UNIPHIER_I2C_DREC) &
-+						UNIPHIER_I2C_DREC_BBN)) {
++	if (readl(priv->membase + UNIPHIER_FI2C_SR) & UNIPHIER_FI2C_SR_DB) {
 +		if (priv->busy_cnt++ > 3) {
 +			/*
 +			 * If bus busy continues too long, it is probably
 +			 * in a wrong state.  Try bus recovery.
 +			 */
-+			i2c_recover_bus(adap);
++			uniphier_fi2c_recover(priv);
 +			priv->busy_cnt = 0;
 +		}
 +
@@ -347,13 +481,13 @@ index 0000000..e3c3861
 +	return 0;
 +}
 +
-+static int uniphier_i2c_master_xfer(struct i2c_adapter *adap,
-+				    struct i2c_msg *msgs, int num)
++static int uniphier_fi2c_master_xfer(struct i2c_adapter *adap,
++				     struct i2c_msg *msgs, int num)
 +{
 +	struct i2c_msg *msg, *emsg = msgs + num;
 +	int ret;
 +
-+	ret = uniphier_i2c_check_bus_busy(adap);
++	ret = uniphier_fi2c_check_bus_busy(adap);
 +	if (ret)
 +		return ret;
 +
@@ -364,7 +498,7 @@ index 0000000..e3c3861
 +		if (msg->flags & I2C_M_STOP)
 +			stop = true;
 +
-+		ret = uniphier_i2c_master_xfer_one(adap, msg, stop);
++		ret = uniphier_fi2c_master_xfer_one(adap, msg, stop);
 +		if (ret)
 +			return ret;
 +	}
@@ -372,74 +506,66 @@ index 0000000..e3c3861
 +	return num;
 +}
 +
-+static u32 uniphier_i2c_functionality(struct i2c_adapter *adap)
++static u32 uniphier_fi2c_functionality(struct i2c_adapter *adap)
 +{
 +	return I2C_FUNC_I2C | I2C_FUNC_SMBUS_EMUL;
 +}
 +
-+static const struct i2c_algorithm uniphier_i2c_algo = {
-+	.master_xfer = uniphier_i2c_master_xfer,
-+	.functionality = uniphier_i2c_functionality,
++static const struct i2c_algorithm uniphier_fi2c_algo = {
++	.master_xfer = uniphier_fi2c_master_xfer,
++	.functionality = uniphier_fi2c_functionality,
 +};
 +
-+static void uniphier_i2c_reset(struct uniphier_i2c_priv *priv, bool reset_on)
++static int uniphier_fi2c_get_scl(struct i2c_adapter *adap)
 +{
-+	u32 val = UNIPHIER_I2C_BRST_RSCL;
++	struct uniphier_fi2c_priv *priv = i2c_get_adapdata(adap);
 +
-+	val |= reset_on ? 0 : UNIPHIER_I2C_BRST_FOEN;
-+	writel(val, priv->membase + UNIPHIER_I2C_BRST);
++	return !!(readl(priv->membase + UNIPHIER_FI2C_BM) &
++							UNIPHIER_FI2C_BM_SCLS);
 +}
 +
-+static int uniphier_i2c_get_scl(struct i2c_adapter *adap)
++static void uniphier_fi2c_set_scl(struct i2c_adapter *adap, int val)
 +{
-+	struct uniphier_i2c_priv *priv = i2c_get_adapdata(adap);
++	struct uniphier_fi2c_priv *priv = i2c_get_adapdata(adap);
 +
-+	return !!(readl(priv->membase + UNIPHIER_I2C_BSTS) &
-+							UNIPHIER_I2C_BSTS_SCL);
++	writel(val ? UNIPHIER_FI2C_BRST_RSCL : 0,
++	       priv->membase + UNIPHIER_FI2C_BRST);
 +}
 +
-+static void uniphier_i2c_set_scl(struct i2c_adapter *adap, int val)
++static int uniphier_fi2c_get_sda(struct i2c_adapter *adap)
 +{
-+	struct uniphier_i2c_priv *priv = i2c_get_adapdata(adap);
++	struct uniphier_fi2c_priv *priv = i2c_get_adapdata(adap);
 +
-+	writel(val ? UNIPHIER_I2C_BRST_RSCL : 0,
-+	       priv->membase + UNIPHIER_I2C_BRST);
++	return !!(readl(priv->membase + UNIPHIER_FI2C_BM) &
++							UNIPHIER_FI2C_BM_SDAS);
 +}
 +
-+static int uniphier_i2c_get_sda(struct i2c_adapter *adap)
++static void uniphier_fi2c_unprepare_recovery(struct i2c_adapter *adap)
 +{
-+	struct uniphier_i2c_priv *priv = i2c_get_adapdata(adap);
-+
-+	return !!(readl(priv->membase + UNIPHIER_I2C_BSTS) &
-+							UNIPHIER_I2C_BSTS_SDA);
++	uniphier_fi2c_prepare_operation(i2c_get_adapdata(adap));
 +}
 +
-+static void uniphier_i2c_unprepare_recovery(struct i2c_adapter *adap)
-+{
-+	uniphier_i2c_reset(i2c_get_adapdata(adap), false);
-+}
-+
-+static struct i2c_bus_recovery_info uniphier_i2c_bus_recovery_info = {
++static struct i2c_bus_recovery_info uniphier_fi2c_bus_recovery_info = {
 +	.recover_bus = i2c_generic_scl_recovery,
-+	.get_scl = uniphier_i2c_get_scl,
-+	.set_scl = uniphier_i2c_set_scl,
-+	.get_sda = uniphier_i2c_get_sda,
-+	.unprepare_recovery = uniphier_i2c_unprepare_recovery,
++	.get_scl = uniphier_fi2c_get_scl,
++	.set_scl = uniphier_fi2c_set_scl,
++	.get_sda = uniphier_fi2c_get_sda,
++	.unprepare_recovery = uniphier_fi2c_unprepare_recovery,
 +};
 +
-+static int uniphier_i2c_clk_init(struct device *dev,
-+				 struct uniphier_i2c_priv *priv)
++static int uniphier_fi2c_clk_init(struct device *dev,
++				  struct uniphier_fi2c_priv *priv)
 +{
 +	struct device_node *np = dev->of_node;
 +	unsigned long clk_rate;
-+	u32 bus_speed;
++	u32 bus_speed, clk_count;
 +	int ret;
 +
 +	if (of_property_read_u32(np, "clock-frequency", &bus_speed))
-+		bus_speed = UNIPHIER_I2C_DEFAULT_SPEED;
++		bus_speed = UNIPHIER_FI2C_DEFAULT_SPEED;
 +
-+	if (bus_speed > UNIPHIER_I2C_MAX_SPEED)
-+		bus_speed = UNIPHIER_I2C_MAX_SPEED;
++	if (bus_speed > UNIPHIER_FI2C_MAX_SPEED)
++		bus_speed = UNIPHIER_FI2C_MAX_SPEED;
 +
 +	/* Get input clk rate through clk driver */
 +	priv->clk = devm_clk_get(dev, NULL);
@@ -454,20 +580,24 @@ index 0000000..e3c3861
 +
 +	clk_rate = clk_get_rate(priv->clk);
 +
-+	uniphier_i2c_reset(priv, true);
++	uniphier_fi2c_reset(priv);
 +
-+	writel((clk_rate / bus_speed / 2 << 16) | (clk_rate / bus_speed),
-+	       priv->membase + UNIPHIER_I2C_CLK);
++	clk_count = clk_rate / bus_speed;
 +
-+	uniphier_i2c_reset(priv, false);
++	writel(clk_count, priv->membase + UNIPHIER_FI2C_CYC);
++	writel(clk_count / 2, priv->membase + UNIPHIER_FI2C_LCTL);
++	writel(clk_count / 2, priv->membase + UNIPHIER_FI2C_SSUT);
++	writel(clk_count / 16, priv->membase + UNIPHIER_FI2C_DSUT);
++
++	uniphier_fi2c_prepare_operation(priv);
 +
 +	return 0;
 +}
 +
-+static int uniphier_i2c_probe(struct platform_device *pdev)
++static int uniphier_fi2c_probe(struct platform_device *pdev)
 +{
 +	struct device *dev = &pdev->dev;
-+	struct uniphier_i2c_priv *priv;
++	struct uniphier_fi2c_priv *priv;
 +	struct resource *regs;
 +	int irq;
 +	int ret;
@@ -489,20 +619,20 @@ index 0000000..e3c3861
 +
 +	init_completion(&priv->comp);
 +	priv->adap.owner = THIS_MODULE;
-+	priv->adap.algo = &uniphier_i2c_algo;
++	priv->adap.algo = &uniphier_fi2c_algo;
 +	priv->adap.dev.parent = dev;
 +	priv->adap.dev.of_node = dev->of_node;
-+	strlcpy(priv->adap.name, "UniPhier I2C", sizeof(priv->adap.name));
-+	priv->adap.bus_recovery_info = &uniphier_i2c_bus_recovery_info;
++	strlcpy(priv->adap.name, "UniPhier FI2C", sizeof(priv->adap.name));
++	priv->adap.bus_recovery_info = &uniphier_fi2c_bus_recovery_info;
 +	i2c_set_adapdata(&priv->adap, priv);
 +	platform_set_drvdata(pdev, priv);
 +
-+	ret = uniphier_i2c_clk_init(dev, priv);
++	ret = uniphier_fi2c_clk_init(dev, priv);
 +	if (ret)
 +		return ret;
 +
-+	ret = devm_request_irq(dev, irq, uniphier_i2c_interrupt, 0, pdev->name,
-+			       priv);
++	ret = devm_request_irq(dev, irq, uniphier_fi2c_interrupt, 0,
++			       pdev->name, priv);
 +	if (ret) {
 +		dev_err(dev, "failed to request irq %d\n", irq);
 +		goto err;
@@ -521,9 +651,9 @@ index 0000000..e3c3861
 +	return ret;
 +}
 +
-+static int uniphier_i2c_remove(struct platform_device *pdev)
++static int uniphier_fi2c_remove(struct platform_device *pdev)
 +{
-+	struct uniphier_i2c_priv *priv = platform_get_drvdata(pdev);
++	struct uniphier_fi2c_priv *priv = platform_get_drvdata(pdev);
 +
 +	i2c_del_adapter(&priv->adap);
 +	clk_disable_unprepare(priv->clk);
@@ -531,24 +661,24 @@ index 0000000..e3c3861
 +	return 0;
 +}
 +
-+static const struct of_device_id uniphier_i2c_match[] = {
-+	{ .compatible = "socionext,uniphier-i2c" },
++static const struct of_device_id uniphier_fi2c_match[] = {
++	{ .compatible = "socionext,uniphier-fi2c" },
 +	{ /* sentinel */ }
 +};
-+MODULE_DEVICE_TABLE(of, uniphier_i2c_match);
++MODULE_DEVICE_TABLE(of, uniphier_fi2c_match);
 +
-+static struct platform_driver uniphier_i2c_drv = {
-+	.probe  = uniphier_i2c_probe,
-+	.remove = uniphier_i2c_remove,
++static struct platform_driver uniphier_fi2c_drv = {
++	.probe  = uniphier_fi2c_probe,
++	.remove = uniphier_fi2c_remove,
 +	.driver = {
-+		.name  = "uniphier-i2c",
-+		.of_match_table = uniphier_i2c_match,
++		.name  = "uniphier-fi2c",
++		.of_match_table = uniphier_fi2c_match,
 +	},
 +};
-+module_platform_driver(uniphier_i2c_drv);
++module_platform_driver(uniphier_fi2c_drv);
 +
 +MODULE_AUTHOR("Masahiro Yamada <yamada.masahiro@socionext.com>");
-+MODULE_DESCRIPTION("UniPhier I2C bus driver");
++MODULE_DESCRIPTION("UniPhier FIFO-builtin I2C bus driver");
 +MODULE_LICENSE("GPL");
 -- 
 1.9.1
