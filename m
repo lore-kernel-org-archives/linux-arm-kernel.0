@@ -1,43 +1,32 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Fri, 23 Oct 2015 10:18:08 -0700
-Subject: [GIT PULL] Allwinner DT changes for 4.4, round 2
-In-Reply-To: <20151017164325.GA13024@lukather>
-References: <20151017164325.GA13024@lukather>
-Message-ID: <20151023171808.GD2224@localhost>
+Date: Fri, 23 Oct 2015 10:18:52 -0700
+Subject: [GIT PULL 1/2] Rockchip drivers for 4.4 part 2
+In-Reply-To: <4398388.V5gVWEu8o6@diego>
+References: <4398388.V5gVWEu8o6@diego>
+Message-ID: <20151023171852.GE2224@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 17, 2015 at 06:43:25PM +0200, Maxime Ripard wrote:
+On Sat, Oct 17, 2015 at 06:45:10PM +0200, Heiko St?bner wrote:
 > Hi Arnd, Kevin, Olof,
 > 
-> Please pull the following pull request for the DT changes for the next
-> merge window, that comes on top of the first one.
+> as the tag says, some fixes for the new power-domain driver, that turned
+> up since the origin al pull-req.
 > 
-> Thanks!
-> Maxime
 > 
-> The following changes since commit 52095d179c5b3254fa87aaa6990e164c5cf21e12:
+> The following changes since commit 7c696693a4f54d12714738b45aee3e4302884ade:
 > 
->   ARM: dts: sun6i: hummingbird: Drop AXP221 DC1SW and DC5LDO supplies (2015-10-07 11:34:54 +0100)
+>   soc: rockchip: power-domain: Add power domain driver (2015-10-06 09:53:28 +0200)
 > 
 > are available in the git repository at:
 > 
->   https://git.kernel.org/pub/scm/linux/kernel/git/mripard/linux.git tags/sunxi-dt-for-4.4-2
+>   git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/v4.4-rockchip-drivers2
 > 
-> for you to fetch changes up to c2aa565107fb539a84494fe8dac5fd5eb5678123:
+> for you to fetch changes up to 4681347153dba01836aca18ebcfb4101c927d8ec:
 > 
->   ARM: dts: sun6i: Add a dts file for the Sinovoip BPI-M2 board (2015-10-17 18:24:11 +0200)
-> 
-> ----------------------------------------------------------------
-> Allwinner DT changes for 4.4, round 2
-> 
-> More DT patches for 4.4, mostly with new boards coming in (CHIP, BananaPi
-> M2, pcduino2), further consolidation for the q8-based designs and a bunch
-> of random patches enhancing support for existing boards
-> 
+>   dt-bindings: Correct paths in Rockchip power domains binding document (2015-10-16 17:38:36 +0200)
 
-Merged, thanks! I'll get my CHIP added in after KS I hope (I should be able to
-get the rest of my board addition backlog done by then as well).
+Thanks, merged.
 
 
 -Olof
