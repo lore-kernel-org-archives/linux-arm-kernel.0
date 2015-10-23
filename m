@@ -1,57 +1,42 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Fri, 23 Oct 2015 11:26:52 -0700
-Subject: [GIT PULL 1/2] Broadcom Device Tree changes for 4.4 (part 2)
-In-Reply-To: <1445280190-8812-2-git-send-email-f.fainelli@gmail.com>
+Date: Fri, 23 Oct 2015 11:02:38 -0700
+Subject: [GIT PULL 2/2] Broadcom SoC changes for v4.4 (part 2)
+In-Reply-To: <1445280190-8812-1-git-send-email-f.fainelli@gmail.com>
 References: <1445280190-8812-1-git-send-email-f.fainelli@gmail.com>
- <1445280190-8812-2-git-send-email-f.fainelli@gmail.com>
-Message-ID: <20151023182652.GE18961@localhost>
+Message-ID: <20151023180238.GD18961@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Florian,
 
-On Mon, Oct 19, 2015 at 11:43:10AM -0700, Florian Fainelli wrote:
-> The following changes since commit eef228e3191de0b62ef5913be216f25ba6b23a4c:
+On Mon, Oct 19, 2015 at 11:43:09AM -0700, Florian Fainelli wrote:
+> The following changes since commit c4a8ea9e0698945b182ba1e1063a0981b1f35139:
 > 
->   ARM: dts: move aliases back to .dts in Cygnus (2015-09-24 18:30:10 -0700)
+>   ARM: brcmstb: Setup BIU control registers during boot (2015-10-09 13:42:18 -0700)
 > 
 > are available in the git repository at:
 > 
->   http://github.com/Broadcom/stblinux tags/arm-soc/for-4.4/devicetree-part2
+>   http://github.com/Broadcom/stblinux tags/arm-soc/for-4.4/soc-part2
 > 
-> for you to fetch changes up to da6b53a6f7abc3d84260a9f0ff9849a88b44e11f:
+> for you to fetch changes up to d0317a5d496dfac6d11e281d61b7aae0d4192e81:
 > 
->   ARM: bcm2835: Switch to using the new clock driver support. (2015-10-19 11:32:24 -0700)
-> 
-> ----------------------------------------------------------------
-> This pull request contains the DT changes for BCM2835 in 4.4.  It
-> pulls in clk/clk-bcm2835 (which Stephen Boyd has said would be stable)
-> because the DT changes to enable the clock driver need the driver
-> itself to be present. These changes include the following:
-> 
-> - Eric Anholt, moves the bcm2835 clock driver under bcm/ where it belongs with
->   other Broadcom clock providers drivers, defines the binding for new clock
->   driver, adds support for programming the BCM2835 audio domain, adds the DDC I2C
->   controller to Device Tree, and finally migrates the Device Tree to use the new
->   clock driver binding
-> 
-> - Lubomir Rintel adds support for the Raspberry Pi Model A+ and B revision 2, and
->   remove the I2S controller which is non-existent on Raspberry Pi Model B
-> 
-> - Stefan Wahren adds an uart0 label for referencing the UART adapter
-> 
-> ----------------------------------------------------------------
-> Eric Anholt (5):
->       ARM: bcm2835: Add the DDC I2C controller to the device tree.
->       clk: bcm2835: Move under bcm/ with other Broadcom SoC clk drivers.
+>   ARM: bcm2835: Add the Raspberry Pi firmware driver (2015-10-19 11:08:40 -0700)
 
-I see this patch in the branch, and it's signed off both by Stephen and you,
-which makes me suspect you cherry-picked it over from their tree?
+I see this merge window has been a touch confusing on the broadcom side, and we
+should probably have pointed this out sooner:
 
-That means it'll exist in two copies and might cause pretty nasty conflicts at
-merge time if other changes have gone in on top of the separate commits.
-Instead, we ask that you share a branch with the same exact commits, since git
-will handle that appropriately and the patch will only be in the tree once.
+We normally prefer to separate out arch/arm/mach* changes as the usual soc
+changes, and keep drivers/soc and other drivers/* changes in separate branches,
+usually merged through our 'drivers' branch instead.
+
+I don't see what's "SoC" about the patch in this branch, and I don't think it's
+dependent on the other contents in previous SoC branches. So let's merge this
+as a separate driver branch, if that's ok?
+
+In other words, please send a new pull request that contains this without the
+SoC base, and we'll merge it through our next/drivers. Or, if you prefer, I
+can cherry-pick it out myself. I'll leave the choice up to you and what works
+for you in your workflow.
 
 
 -Olof
