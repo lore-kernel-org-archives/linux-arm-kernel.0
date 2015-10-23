@@ -1,61 +1,87 @@
 From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Fri, 23 Oct 2015 10:39:20 +0900
-Subject: [PATCH v3 2/3] dt-bindings: Consolidate Exynos SoC bindings
+Date: Fri, 23 Oct 2015 10:39:21 +0900
+Subject: [PATCH v3 3/3] dt-bindings: EXYNOS: Document compatibles from other
+ vendors
 In-Reply-To: <1445564361-16974-1-git-send-email-k.kozlowski@samsung.com>
 References: <1445564361-16974-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <1445564361-16974-2-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <1445564361-16974-3-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Exynos SoC Device Tree bindings are spread over arm/exynos/ and
-arm/samsung/ directories. There is no need for that separation and it
-actually confuses. Put power domain bindings under power/ and
-remaining samsung-boards.txt under arm/samsung/.
+Document compatibles used on other Exynos-based boards (non-Samsung):
+FriendlyARM, Google, Hardkernel and Insignal.
 
 Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 Cc: Kukjin Kim <kgene@kernel.org>
+Cc: Javier Martinez Canillas <javier@osg.samsung.com>
+Cc: Hakjoo Kim <ruppi.kim@hardkernel.com>
 Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
 
 ---
 
 Changes since v2:
-1. Update path pointing to pd-samsung.txt in samsung,sysmmu.txt.
+1. None
 
 Changes since v1:
-1. Move power_domain.txt to power/pd-samsung.txt.
-2. The smp-sysram.txt is moved in previous patch to sram/ directory
-   (Suggested by Rob Herring).
-3. Added Javier's reviewed-by. Although there are some differences since
-   v1 but this is merely re-organization. Please let me know if the
-   review tag is no longer valid.
+1. Added Javier's reviewed-by
 ---
- Documentation/devicetree/bindings/arm/{ => samsung}/samsung-boards.txt  | 0
- Documentation/devicetree/bindings/iommu/samsung,sysmmu.txt              | 2 +-
- .../bindings/{arm/exynos/power_domain.txt => power/pd-samsung.txt}      | 0
- 3 files changed, 1 insertion(+), 1 deletion(-)
- rename Documentation/devicetree/bindings/arm/{ => samsung}/samsung-boards.txt (100%)
- rename Documentation/devicetree/bindings/{arm/exynos/power_domain.txt => power/pd-samsung.txt} (100%)
+ .../bindings/arm/samsung/samsung-boards.txt        | 44 +++++++++++++++++++++-
+ 1 file changed, 43 insertions(+), 1 deletion(-)
 
-diff --git a/Documentation/devicetree/bindings/arm/samsung-boards.txt b/Documentation/devicetree/bindings/arm/samsung/samsung-boards.txt
-similarity index 100%
-rename from Documentation/devicetree/bindings/arm/samsung-boards.txt
-rename to Documentation/devicetree/bindings/arm/samsung/samsung-boards.txt
-diff --git a/Documentation/devicetree/bindings/iommu/samsung,sysmmu.txt b/Documentation/devicetree/bindings/iommu/samsung,sysmmu.txt
-index 729543c47046..bc620fe32a70 100644
---- a/Documentation/devicetree/bindings/iommu/samsung,sysmmu.txt
-+++ b/Documentation/devicetree/bindings/iommu/samsung,sysmmu.txt
-@@ -47,7 +47,7 @@ Required properties:
- - clocks: Required if the System MMU is needed to gate its clock.
- - power-domains: Required if the System MMU is needed to gate its power.
- 	  Please refer to the following document:
--	  Documentation/devicetree/bindings/arm/exynos/power_domain.txt
-+	  Documentation/devicetree/bindings/power/pd-samsung.txt
+diff --git a/Documentation/devicetree/bindings/arm/samsung/samsung-boards.txt b/Documentation/devicetree/bindings/arm/samsung/samsung-boards.txt
+index 43589d2466a7..da078702ae73 100644
+--- a/Documentation/devicetree/bindings/arm/samsung/samsung-boards.txt
++++ b/Documentation/devicetree/bindings/arm/samsung/samsung-boards.txt
+@@ -16,7 +16,49 @@ Required root node properties:
+ 	- "samsung,sd5v1"	- for Exynos5440-based Samsung board.
+ 	- "samsung,ssdk5440"	- for Exynos5440-based Samsung board.
  
- Examples:
- 	gsc_0: gsc at 13e00000 {
-diff --git a/Documentation/devicetree/bindings/arm/exynos/power_domain.txt b/Documentation/devicetree/bindings/power/pd-samsung.txt
-similarity index 100%
-rename from Documentation/devicetree/bindings/arm/exynos/power_domain.txt
-rename to Documentation/devicetree/bindings/power/pd-samsung.txt
+-Optional:
++* Other companies Exynos SoC based
++  * FriendlyARM
++        - "friendlyarm,tiny4412"  - for Exynos4412-based FriendlyARM
++                                    TINY4412 board.
++
++  * Google
++        - "google,pi"             - for Exynos5800-based Google Peach Pi
++                                    Rev 10+ board,
++          also: "google,pi-rev16", "google,pi-rev15", "google,pi-rev14",
++		"google,pi-rev13", "google,pi-rev12", "google,pi-rev11",
++                "google,pi-rev10", "google,peach".
++
++        - "google,pit"            - for Exynos5420-based Google Peach Pit
++                                    Rev 6+ (Exynos5420),
++          also: "google,pit-rev16", "google,pit-rev15", "google,pit-rev14",
++                "google,pit-rev13", "google,pit-rev12", "google,pit-rev11",
++                "google,pit-rev10", "google,pit-rev9", "google,pit-rev8",
++                "google,pit-rev7", "google,pit-rev6", "google,peach".
++
++        - "google,snow-rev4"      - for Exynos5250-based Google Snow board,
++          also: "google,snow"
++        - "google,snow-rev5"      - for Exynos5250-based Google Snow
++                                    Rev 5+ board.
++        - "google,spring"         - for Exynos5250-based Google Spring board.
++
++  * Hardkernel
++        - "hardkernel,odroid-u3"  - for Exynos4412-based Hardkernel Odroid U3.
++        - "hardkernel,odroid-x"   - for Exynos4412-based Hardkernel Odroid X.
++        - "hardkernel,odroid-x2"  - for Exynos4412-based Hardkernel Odroid X2.
++        - "hardkernel,odroid-xu3" - for Exynos5422-based Hardkernel Odroid XU3.
++        - "hardkernel,odroid-xu3-lite" - for Exynos5422-based Hardkernel
++                                         Odroid XU3 Lite board.
++        - "hardkernel,odroid-xu4" - for Exynos5422-based Hardkernel Odroid XU4.
++
++  * Insignal
++        - "insignal,arndale"      - for Exynos5250-based Insignal Arndale board.
++        - "insignal,arndale-octa" - for Exynos5420-based Insignal Arndale
++                                    Octa board.
++        - "insignal,origen"       - for Exynos4210-based Insignal Origen board.
++        - "insignal,origen4412    - for Exynos4412-based Insignal Origen board.
++
++
++Optional nodes:
+     - firmware node, specifying presence and type of secure firmware:
+         - compatible: only "samsung,secure-firmware" is currently supported
+         - reg: address of non-secure SYSRAM used for communication with firmware
 -- 
 1.9.1
