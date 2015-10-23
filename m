@@ -1,42 +1,44 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Fri, 23 Oct 2015 11:02:38 -0700
-Subject: [GIT PULL 2/2] Broadcom SoC changes for v4.4 (part 2)
-In-Reply-To: <1445280190-8812-1-git-send-email-f.fainelli@gmail.com>
-References: <1445280190-8812-1-git-send-email-f.fainelli@gmail.com>
-Message-ID: <20151023180238.GD18961@localhost>
+From: kgene@kernel.org (Kukjin Kim)
+Date: Sat, 24 Oct 2015 03:34:58 +0900
+Subject: [PATCH v5 8/8] ARM: EXYNOS: Remove SROM related register settings
+ from mach-exynos
+In-Reply-To: <1445332540-12814-9-git-send-email-pankaj.dubey@samsung.com>
+References: <1445332540-12814-1-git-send-email-pankaj.dubey@samsung.com>
+ <1445332540-12814-9-git-send-email-pankaj.dubey@samsung.com>
+Message-ID: <562A7DD2.2000000@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Florian,
-
-On Mon, Oct 19, 2015 at 11:43:09AM -0700, Florian Fainelli wrote:
-> The following changes since commit c4a8ea9e0698945b182ba1e1063a0981b1f35139:
+On 10/20/15 18:15, Pankaj Dubey wrote:
+> As now we have dedicated driver for SROM controller, it will take care
+> of saving register banks during S2R so we can safely remove these
+> settings from mach-exynos.
 > 
->   ARM: brcmstb: Setup BIU control registers during boot (2015-10-09 13:42:18 -0700)
+> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> ---
+>  arch/arm/mach-exynos/Kconfig                 |  2 ++
+>  arch/arm/mach-exynos/exynos.c                | 17 ---------
+>  arch/arm/mach-exynos/include/mach/map.h      |  3 --
+>  arch/arm/mach-exynos/regs-srom.h             | 53 ----------------------------
+>  arch/arm/mach-exynos/suspend.c               | 20 ++---------
+>  arch/arm/plat-samsung/include/plat/map-s5p.h |  1 -
+>  6 files changed, 4 insertions(+), 92 deletions(-)
+>  delete mode 100644 arch/arm/mach-exynos/regs-srom.h
 > 
-> are available in the git repository at:
-> 
->   http://github.com/Broadcom/stblinux tags/arm-soc/for-4.4/soc-part2
-> 
-> for you to fetch changes up to d0317a5d496dfac6d11e281d61b7aae0d4192e81:
-> 
->   ARM: bcm2835: Add the Raspberry Pi firmware driver (2015-10-19 11:08:40 -0700)
+> diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
+> index 3a10f1a..62c3139 100644
+> --- a/arch/arm/mach-exynos/Kconfig
+> +++ b/arch/arm/mach-exynos/Kconfig
+> @@ -27,6 +27,8 @@ menuconfig ARCH_EXYNOS
+>  	select SRAM
+>  	select THERMAL
+>  	select MFD_SYSCON
+> +	select SOC_SAMSUNG
+> +	select EXYNOS_SROM if PM
 
-I see this merge window has been a touch confusing on the broadcom side, and we
-should probably have pointed this out sooner:
+Please add them in alphabetical next time...I've changed the order in
+this time.
 
-We normally prefer to separate out arch/arm/mach* changes as the usual soc
-changes, and keep drivers/soc and other drivers/* changes in separate branches,
-usually merged through our 'drivers' branch instead.
-
-I don't see what's "SoC" about the patch in this branch, and I don't think it's
-dependent on the other contents in previous SoC branches. So let's merge this
-as a separate driver branch, if that's ok?
-
-In other words, please send a new pull request that contains this without the
-SoC base, and we'll merge it through our next/drivers. Or, if you prefer, I
-can cherry-pick it out myself. I'll leave the choice up to you and what works
-for you in your workflow.
-
-
--Olof
+Thanks,
+Kukjin
