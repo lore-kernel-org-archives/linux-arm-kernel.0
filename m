@@ -1,27 +1,67 @@
-From: timur@codeaurora.org (Timur Tabi)
-Date: Fri, 23 Oct 2015 07:35:06 -0500
-Subject: [PATCH] Revert "serial: amba-pl011: fix incorrect integer size in
- pl011_fifo_to_tty()"
-In-Reply-To: <20151023103056.GI4801@e103592.cambridge.arm.com>
-References: <1445594400-29095-1-git-send-email-shijie.huang@arm.com>
- <20151023103056.GI4801@e103592.cambridge.arm.com>
-Message-ID: <562A297A.9030204@codeaurora.org>
+From: eric.auger@linaro.org (Eric Auger)
+Date: Fri, 23 Oct 2015 14:37:08 +0200
+Subject: [PATCH v3 0/7] VFIO platform reset module rework
+Message-ID: <1445603835-14506-1-git-send-email-eric.auger@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dave Martin wrote:
->> >The commit 71a5cd8a4 makes the console hang for some times.
->> >This reverts commit 71a5cd8a4a2602a6e9010b557a23af0a54df87b6.
-> What hangs?  Input?  Output?  Both?
->
-> Is CREAD set on the terminal?  If only input hangs, it's possible CREAD
-> is not set and we were previously getting away with it, though I can't
-> easily see why it should be unset...
+This series fixes the current implementation by getting rid of the
+usage of __symbol_get which caused a compilation issue with
+CONFIG_MODULES disabled. On top of this, the usage of MODULE_ALIAS makes
+possible to add a new reset module without being obliged to update the
+framework. The new implementation relies on the reset module registering
+its reset function to the vfio-platform driver.
 
-Dave is right, the revert doesn't make any sense. Huang has a user-space 
-bug.  Please check to see if CREAD is set.  I'm pretty sure it isn't.
+The series is available at
+
+https://git.linaro.org/people/eric.auger/linux.git/shortlog/refs/heads/v4.3-rc6-rework-v3
+
+Best Regards
+
+Eric
+
+v2 -> v3:
+- use driver_mutex instead of reset_mutex
+- style fixes: single mutex_unlock
+- use static nodes; vfio_platform_register_reset now is a macro
+- vfio_platform_reset_private.h removed since reset_module_(un)register
+  disappear. No use of symbol_get anymore
+- new patch introducing vfio-platform-base
+- reset look-up moved back at vfio-platform probe time
+- new patch featuring dev_info/dev_warn
+
+v1 -> v2:
+* in vfio_platform_common.c:
+  - move reset lookup at load time and put reset at release: this is to
+    prevent a race between the 2 load module loads
+  - reset_list becomes static
+  - vfio_platform_register/unregister_reset take a const char * as compat
+  - fix node link
+  - remove old combo struct and cleanup proto of vfio_platform_get_reset
+  - add mutex to protect the reset list
+* in calxeda xgmac reset module
+  - introduce vfio_platform_reset_private.h
+  - use module_vfio_reset_handler macro
+  - do not export vfio_platform_calxedaxgmac_reset symbol anymore
+  - add a pr_info to show the device is reset by vfio reset module
+
+
+Eric Auger (7):
+  vfio: platform: introduce vfio-platform-base module
+  vfio: platform: add capability to register a reset function
+  vfio: platform: introduce module_vfio_reset_handler macro
+  vfio: platform: reset: calxedaxgmac: add reset function registration
+  vfio: platform: add compat in vfio_platform_device
+  vfio: platform: use list of registered reset function
+  vfio: platform: add dev_info on device reset
+
+ drivers/vfio/platform/Makefile                     |   6 +-
+ .../platform/reset/vfio_platform_calxedaxgmac.c    |   5 +-
+ drivers/vfio/platform/vfio_amba.c                  |   1 +
+ drivers/vfio/platform/vfio_platform.c              |   1 +
+ drivers/vfio/platform/vfio_platform_common.c       | 118 +++++++++++++++------
+ drivers/vfio/platform/vfio_platform_private.h      |  40 ++++++-
+ 6 files changed, 129 insertions(+), 42 deletions(-)
 
 -- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the
-Code Aurora Forum, hosted by The Linux Foundation.
+1.9.1
