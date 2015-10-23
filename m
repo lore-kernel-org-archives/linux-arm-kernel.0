@@ -1,43 +1,56 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Fri, 23 Oct 2015 08:25:50 -0700
-Subject: [PATCH v4 2/3] thermal: rockchip: support the sleep pinctrl state
- to avoid glitches in s2r
-In-Reply-To: <1445599528-18825-3-git-send-email-wxt@rock-chips.com>
-References: <1445599528-18825-1-git-send-email-wxt@rock-chips.com>
- <1445599528-18825-3-git-send-email-wxt@rock-chips.com>
-Message-ID: <CAD=FV=X2fCoQFU9sXT5tRtAt-oebkh=TCWrf74jHHrZNTV_nmA@mail.gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 23 Oct 2015 17:34:22 +0200
+Subject: [PATCH] arm64: Align .text section to PAGE_SIZE
+In-Reply-To: <1445610134-20528-1-git-send-email-jeremy.linton@arm.com>
+References: <1445610134-20528-1-git-send-email-jeremy.linton@arm.com>
+Message-ID: <CAKv+Gu_5YPiQOejsAUdVs7YbNJD4tFwuATYq6VNxuXbeRsoYkw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Caesar,
+Hi Jeremy,
 
-On Fri, Oct 23, 2015 at 4:25 AM, Caesar Wang <wxt@rock-chips.com> wrote:
-> When we come out of system suspend state (S3) the tsadc will have been
-> reset and back at its default state.  While reprogramming the tsadc
-> it's possible that we'll glitch the output and unintentionally cause
-> the "over temperature" GPIO to be asserted.  Since the over
-> temperature GPIO is often hooked up to something that will cause a
-> reboot or shutdown in hardware, this glitch can be catastrophic on
-> some boards.
+On 23 October 2015 at 16:22, Jeremy Linton <jeremy.linton@arm.com> wrote:
+> It appears that 64k page kernel's die early, in a somewhat random set
+
+nit: kernels
+
+> of locations when built without KVM. Most likely during memblock
+> manipulations (depending on kernel debug options).
 >
-> We'll add support for selecting the "sleep" pinctrl state at suspend
-> time.  Boards can use this to effectively disable the tsadc at suspend
-> time and avoid glitches when the system is resumed.
+
+It looks like fixup_executable() [with DEBUG_RODATA enabled] is the
+culprit here: it calls create mapping() with a size that gets rounded
+up to a multiple of PAGE_SIZE, which means the region that ends up
+getting its exec bits cleared is larger than it should. Perhaps it is
+better to fix that instead?
+
+> Normally when KVM is built into the kernel it has an explicit
+> PAGE_SIZE alignment requirement and that forces the text section to be
+> aligned to PAGE_SIZE. Without it, the alignment granularity is likely to
+> be 4k.
 >
-> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
+> This updates the linker script to assure that the the text section is
+> aligned to a minimum of PAGE_SIZE regardless of build options.
 >
+> Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
 > ---
+>  arch/arm64/kernel/vmlinux.lds.S | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 >
-> Changes in v4:
->   - take the Doug's commit as correct decription.
+> diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
+> index 8a5d97b..bf7b972 100644
+> --- a/arch/arm64/kernel/vmlinux.lds.S
+> +++ b/arch/arm64/kernel/vmlinux.lds.S
+> @@ -92,7 +92,7 @@ SECTIONS
+>                 HEAD_TEXT
+>         }
+>         ALIGN_DEBUG_RO
+> -       .text : {                       /* Real text segment            */
+> +       .text ALIGN(PAGE_SIZE) : {      /* Real text segment            */
+>                 _stext = .;             /* Text and read-only data      */
+>                         __exception_text_start = .;
+>                         *(.exception.text)
+> --
+> 2.4.3
 >
-> Changes in v3:
->   - Add the pinctrl state for in the suspend/resume.
 >
-> Changes in v2: None
-> Changes in v1: None
->
->  drivers/thermal/rockchip_thermal.c | 4 ++++
->  1 file changed, 4 insertions(+)
-
-Reviewed-by: Douglas Anderson <dianders@chromium.org>
