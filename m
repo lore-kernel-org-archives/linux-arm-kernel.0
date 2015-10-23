@@ -1,108 +1,50 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Fri, 23 Oct 2015 00:04:55 -0400
-Subject: [PATCH v3 2/3] thermal: rockchip: ensure the otp states before
- resetting the controller
-In-Reply-To: <1445565296-31517-3-git-send-email-wxt@rock-chips.com>
-References: <1445565296-31517-1-git-send-email-wxt@rock-chips.com>
- <1445565296-31517-3-git-send-email-wxt@rock-chips.com>
-Message-ID: <CAD=FV=WZqXRt4R_TTaz4LJxWo5B0fmrBjma52cVidpO=OkjcaQ@mail.gmail.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Fri, 23 Oct 2015 13:19:17 +0900
+Subject: [PATCH] Documentation: ARM: EXYNOS: Update bootloader interface on
+ Exynos542x
+Message-ID: <1445573957-28933-1-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Caesar,
+Update the documentation about:
+1. Usage of PMU_SPARE2 register.
+   Bootloaders on Exynos542x-based boards often use the register
+   PMU_SPARE2 (0x908) in the same way as on Exynos3250: as a indicator
+   the secondary CPU was booted on. The bootloader will set this value
+   to non-zero, after sucessfull power up of secondary CPU. In the same
+   time this booted CPU will stuck (spin) waiting for software reset.
+2. Exynos542x entry address for secondary CPU boot up after system
+   suspend (with MCPM enabled and in non-secure mode).
 
-On Thu, Oct 22, 2015 at 9:54 PM, Caesar Wang <wxt@rock-chips.com> wrote:
-> We need the OTP pin is gpio state before resetting the TSADC controller,
-> since the tshut polarity will generate a high signal.
->
-> Says:
-> The TSHUT temperature is setting more than 80 degree, the
-> default tshut polarity is high.
->
-> If T > 80C, the OTP output the high signal.
-> If T < 80C, the OTP output the low signal.
->
-> On the moment, the tshut polarity will be low in a short period of time
-> if the TSADC controller is reset.
->
-> So:
-> If T < 80C, the OTP output the High Signal.
-> If T > 80C, the OTP output the Low Signal.
->
-> In some cases, the OTP pin is connected to the PMIC, maybe the PMIC can
-> accept the reset response time to avoid this issue.
-> In other words, the system will be always reboot if we
-> make the OTP pin is connected the others IC to control the power.
->
-> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
->
-> ---
->
-> Changes in v3:
->   - Add the pinctrl state for in the suspend/resume.
->
-> Changes in v2: None
-> Changes in v1: None
->
->  drivers/thermal/rockchip_thermal.c | 4 ++++
->  1 file changed, 4 insertions(+)
->
-> diff --git a/drivers/thermal/rockchip_thermal.c b/drivers/thermal/rockchip_thermal.c
-> index c89ffb2..3b8fbda 100644
-> --- a/drivers/thermal/rockchip_thermal.c
-> +++ b/drivers/thermal/rockchip_thermal.c
-> @@ -642,6 +642,8 @@ static int __maybe_unused rockchip_thermal_suspend(struct device *dev)
->         clk_disable(thermal->pclk);
->         clk_disable(thermal->clk);
->
-> +       pinctrl_pm_select_sleep_state(dev);
-> +
->         return 0;
->  }
->
-> @@ -678,6 +680,8 @@ static int __maybe_unused rockchip_thermal_resume(struct device *dev)
->         for (i = 0; i < ARRAY_SIZE(thermal->sensors); i++)
->                 rockchip_thermal_toggle_sensor(&thermal->sensors[i], true);
->
-> +       pinctrl_pm_select_default_state(dev);
-> +
->         return 0;
->  }
+See arch/arm/mach-exynos/mcpm-exynos.c for source code.
 
-The patch looks totally fine, but the description is a little
-confusing.  Reading this patch it's all about adding support for the
-"sleep" state in the tsadc driver, but nothing in the description
-talks about that.  I'd expect something like:
-
-thermal: rockchip: support the sleep pinctrl state to avoid glitches in s2r
-
-When we come out of system suspend state (S3) the tsadc will have been
-reset and back at its default state.  While reprogramming the tsadc
-it's possible that we'll glitch the output and unintentionally cause
-the "over temperature" GPIO to be asserted.  Since the over
-temperature GPIO is often hooked up to something that will cause a
-reboot or shutdown in hardware, this glitch can be catastrophic on
-some boards.
-
-We'll add support for selecting the "sleep" pinctrl state at suspend
-time.  Boards can use this to effectively disable the tsadc at suspend
-time and avoid glitches when the system is resumed.
-
+Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 ---
+ Documentation/arm/Samsung/Bootloader-interface.txt | 5 +++--
+ 1 file changed, 3 insertions(+), 2 deletions(-)
 
-Note that although this pinctrl approach is fine IMHO, I am left
-wondering whether we could just change the tsadc init sequence to
-avoid the glitch.  I can't easily test myself, but if we can program
-the temperatures before re-enabling the tsadc would it avoid the
-problem too?  Like could we just swap things like:
-
-                thermal->chip->set_tshut_temp(id, thermal->regs,
-                                              thermal->hw_shut_temp);
-                thermal->chip->set_tshut_mode(id, thermal->regs,
-                                              thermal->tshut_mode);
-
-
-Does that help?
-
-
--Doug
+diff --git a/Documentation/arm/Samsung/Bootloader-interface.txt b/Documentation/arm/Samsung/Bootloader-interface.txt
+index df8d4fb85939..ed494ac0beb2 100644
+--- a/Documentation/arm/Samsung/Bootloader-interface.txt
++++ b/Documentation/arm/Samsung/Bootloader-interface.txt
+@@ -19,7 +19,7 @@ executing kernel.
+ Address:      sysram_ns_base_addr
+ Offset        Value                                        Purpose
+ =============================================================================
+-0x08          exynos_cpu_resume_ns                         System suspend
++0x08          exynos_cpu_resume_ns, mcpm_entry_point       System suspend
+ 0x0c          0x00000bad (Magic cookie)                    System suspend
+ 0x1c          exynos4_secondary_startup                    Secondary CPU boot
+ 0x1c + 4*cpu  exynos4_secondary_startup (Exynos4412)       Secondary CPU boot
+@@ -56,7 +56,8 @@ Offset        Value                                        Purpose
+ Address:      pmu_base_addr
+ Offset        Value                           Purpose
+ =============================================================================
+-0x0908        Non-zero (only Exynos3250)      Secondary CPU boot up indicator
++0x0908        Non-zero                        Secondary CPU boot up indicator
++                                              on Exynos3250 and Exynos542x
+ 
+ 
+ 4. Glossary
+-- 
+1.9.1
