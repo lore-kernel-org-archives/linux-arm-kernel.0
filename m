@@ -1,62 +1,118 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Fri, 23 Oct 2015 09:59:02 -0700
-Subject: [PATCH] drivers: psci: make PSCI 1.0 functions initialization
- version dependent
-In-Reply-To: <1445611610-12871-1-git-send-email-lorenzo.pieralisi@arm.com>
-References: <1445611610-12871-1-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <20151023165902.GA2224@localhost>
+Date: Fri, 23 Oct 2015 10:15:39 -0700
+Subject: [GIT PULL] pxa for v4.4
+In-Reply-To: <878u72zlif.fsf@belgarion.home>
+References: <878u72zlif.fsf@belgarion.home>
+Message-ID: <20151023171539.GB2224@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 23, 2015 at 03:46:50PM +0100, Lorenzo Pieralisi wrote:
-> The PSCI specifications [1] and the SMC calling convention mandate
-> that unimplemented functions ids must return NOT_SUPPORTED (0xffffffff)
-> if a function id is called but it is not implemented.
+On Fri, Oct 16, 2015 at 09:00:40PM +0200, Robert Jarzmik wrote:
+> Hi Arnd, Kevin and Olof,
 > 
-> Consequently, PSCI 1.0 function ids that require the 1.0 PSCI_FEATURES
-> call to be initialized:
+> This is the pxa pull request for 4.4 cycle. It is mainly magician enhancement
+> and fixes. Could you please consider pulling ?
 > 
-> CPU_SUSPEND (psci_init_cpu_suspend())
-> SYSTEM_SUSPEND (psci_init_system_suspend())
+> The following changes since commit 6ff33f3902c3b1c5d0db6b1e2c70b6d76fba357f:
 > 
-> call the PSCI_FEATURES function id independently of the detected
-> PSCI firmware version, since, if the PSCI_FEATURES function id is not
-> implemented, it must return NOT_SUPPORTED according to the PSCI
-> specifications, causing the initialization functions to fail as expected.
+>   Linux 4.3-rc1 (2015-09-12 16:35:56 -0700)
 > 
-> Some existing PSCI implementations (ie Qemu PSCI emulation), do not
-> comply with the SMC calling convention and fail if function ids that are
-> not implemented are called from the OS, causing boot failures.
+> are available in the git repository at:
 > 
-> To solve this issue, this patch adds code that checks the PSCI firmware
-> version before calling PSCI 1.0 initialization functions so that the
-> OS makes sure that it is calling 1.0 functions only if the firmware
-> version detected is 1.0 or greater, therefore avoiding PSCI calls
-> that are bound to fail and might cause system boot failures owing
-> to non-compliant PSCI firmware implementations.
-> 
-> [1] http://infocenter.arm.com/help/topic/com.arm.doc.den0022c/DEN0022C_Power_State_Coordination_Interface.pdf
-> 
-> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: Kevin Hilman <khilman@kernel.org>
-> Cc: Sudeep Holla <sudeep.holla@arm.com>
-> Cc: Olof Johansson <olof@lixom.net>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> ---
-> Arnd, Kevin, Olof,
-> 
-> this applies to current arm-soc drivers/psci branch, and solves the
-> issue Kevin detected through kernelci with Qemu emulation:
-> 
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-October/380304.html
+>   https://github.com/rjarzmik/linux.git pxa-for-4.4
 
-Bummer. It'd been nice to catch this before merging, especially since
-the branch had been around a while.
+Hi Robert,
 
-Anyway, I applied this to a drivers/psci2 branch that builds on top of the
-previous one. Please use psci2 as the base for other trees, so that mainline
-won't regress in case they get merged before our stuff.
+I'm glad to see all this activity on PXA! You're reaching the amount of new
+stuff that it's time to start splitting up in topics. I'll merge this branch
+for this release, but I'm also going to go through below and show you how this
+can/should be split up in the future.
+
+
+First, take a look at our tree and how it's organized. Look at my presentation
+from ELC 2014, or Arnd's from this year, to get an idea of the philosophy we
+use and roughly how we categorize patches.
+
+> ----------------------------------------------------------------
+> Arnd Bergmann (1):
+>       ARM: pxa: remove incorrect __init annotation on pxa27x_set_pwrmode
+
+This is a fix or cleanup.
+
+> Jarkko Nikula (1):
+>       ARM: pxa: Remove unused clock_enable field from struct pxa2xx_spi_master
+
+Cleanup.
+
+> 
+> Petr Cvek (22):
+>       ARM: pxa: magician: Fix indentation in machine files
+>       ARM: pxa: magician: Print more specific error message for global GPIOs
+>       ARM: pxa: magician: Optimize debug messages for LCD power
+>       ARM: pxa: magician: Change description of LCD power GPIO
+>       ARM: pxa: magician: Add new discovered EGPIO pins
+>       ARM: pxa: magician: Rename abstract LCD GPIOs
+>       ARM: pxa: magician: Optimize powerup delays for Samsung LCD
+>       ARM: pxa: magician: Rename charger cable detection EGPIOs
+>       ARM: pxa: magician: Optimize Samsung LCD refresh to 50Hz
+>       ARM: pxa: magician: Fix and add charging detection functions
+>       ARM: pxa: magician: Fix platform data for both PXA27x I2C controllers
+>       ARM: pxa: magician: Fix redundant GPIO request for pxaficp_ir
+>       ARM: pxa: magician: Fix support for Intel Strata NOR Flash
+>       ARM: pxa: magician: Fix wrongly enabled USB host ports
+>       ARM: pxa: magician: Remove definition of the STUART port
+>       ARM: pxa: magician: Add debug message for backlight brightness function
+>       ARM: pxa: magician: Add missing regulator for PWM backlight
+>       ARM: pxa: magician: Move platform_add_devices() to the end of magician_init()
+>       ARM: pxa: magician: Change comments to be more informative
+>       ARM: pxa: magician: Add support for MAX1587A Vcore regulator
+>       ARM: pxa: magician: Add support for PXA27x UDC
+>       ARM: pxa: magician: Remove pdata for pasic3-leds
+
+Most of these are fixes/cleanups. With a burst of patches like this it can
+sometimes be hard to rip them apart and put some in one bucked and others in
+another. Feel free to keep them in a separate topic in that case
+(magician-cleanup or similar)
+
+> Robert Jarzmik (2):
+>       ARM: pxa: add resources to pxaficp_ir
+>       ARM: pxa: mioa701: add wm9713 codec
+
+Board code, of which we tend to have almost none these days. :-)
+
+> Thierry Reding (17):
+>       ARM: pxa: colibri-pxa270-income: Use PWM lookup table
+>       ARM: pxa: ezx: Use PWM lookup table
+>       ARM: pxa: hx4700: Remove unused field initializers
+>       ARM: pxa: lpd270: Use PWM lookup table
+>       ARM: pxa: magician: Use PWM lookup table
+>       ARM: pxa: mainstone: Use PWM lookup table
+>       ARM: pxa: mioa701: Use PWM lookup table
+>       ARM: pxa: palm27x: Use PWM lookup table
+>       ARM: pxa: palmte2: Use PWM lookup table
+>       ARM: pxa: pcm990: Use PWM lookup table
+>       ARM: pxa: raumfeld: Use PWM lookup table
+>       ARM: pxa: viper: Use PWM lookup table
+>       ARM: pxa: palmtc: Use PWM lookup table
+>       ARM: pxa: cm-x300: Use PWM lookup table
+>       ARM: pxa: tavorevb: Use PWM lookup table
+>       ARM: pxa: z2: Use PWM lookup table
+>       ARM: pxa: zylonite: Use PWM lookup table
+
+This could also be a topic on its own. We'd merge it into the cleanup branch at
+our end, but you can provide it as a separate branch if you want.
+
+> Uwe Kleine-K??nig (1):
+>       ARM: pxa: raumfeld: make some variables static
+
+cleanup.
+
+
+Given that the bulk above was cleanup, that's also where I merged this branch
+this time around.
+
+Don't hesitate to ask if you have questions on how to handle this down the
+road.
 
 
 -Olof
