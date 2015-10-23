@@ -1,35 +1,38 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Fri, 23 Oct 2015 10:16:56 -0700
-Subject: [GIT PULL] ARM: mvebu: config for v4.4
-In-Reply-To: <87mvvhfs55.fsf@free-electrons.com>
-References: <87mvvhfs55.fsf@free-electrons.com>
-Message-ID: <20151023171656.GC2224@localhost>
+Date: Fri, 23 Oct 2015 10:19:09 -0700
+Subject: [GIT PULL 2/2] Rockchip dts32 changes for 4.4 part 2
+In-Reply-To: <1646281.IJhPY0x0MY@diego>
+References: <4398388.V5gVWEu8o6@diego>
+ <1646281.IJhPY0x0MY@diego>
+Message-ID: <20151023171909.GF2224@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 17, 2015 at 05:09:58PM +0200, Gregory CLEMENT wrote:
-> Hi,
+On Sat, Oct 17, 2015 at 06:47:50PM +0200, Heiko St?bner wrote:
+> Hi Arnd, Kevin, Olof,
 > 
-> Here is the first(and porbaly last) pull request for config for mvebu
-> for v4.4.
+> since the first pull, Sjoerd's spdif driver got accepted into ASoC, so
+> this adds the spdif devicetree-nodes to the two supported Rockchip arches.
 > 
-> I forgot thie one yesterdau when I sent my second PR series
+> If it's not to late, please pull.
 > 
-> Gregory
+> Thanks
+> Heiko
 > 
-> The following changes since commit 6ff33f3902c3b1c5d0db6b1e2c70b6d76fba357f:
 > 
->   Linux 4.3-rc1 (2015-09-12 16:35:56 -0700)
+> The following changes since commit b63af764ca5134341aa3a2836b356a65902ea9d4:
+> 
+>   ARM: dts: rockchip: add the support power-domain node on RK3288 SoCs (2015-10-08 22:41:11 +0200)
 > 
 > are available in the git repository at:
 > 
->   git://git.infradead.org/linux-mvebu.git tags/mvebu-config-4.4-1
+>   git://git.kernel.org/pub/scm/linux/kernel/git/mmind/linux-rockchip.git tags/v4.4-rockchip-dts32-2
 > 
-> for you to fetch changes up to ea592ed290c7b4f398227a3025f6e1ff94e767f0:
+> for you to fetch changes up to fea37552600872368a23019aef4bf8c09e0f0380:
 > 
->   ARM: mvebu: enable options for Seagate NAS in mvebu_v7_defconfig (2015-10-12 16:49:13 +0200)
+>   ARM: dts: rockchip: Add SPDIF optical out on Radxa Rock2 Square (2015-10-13 10:59:18 +0200)
 
-Merged, thanks.
+Merged, thanks!
 
 
 -Olof
