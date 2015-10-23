@@ -1,21 +1,121 @@
 From: vdonnefort@gmail.com (Vincent Donnefort)
-Date: Fri, 23 Oct 2015 12:59:57 +0200
-Subject: [PATCH v6] ARM: mvebu: add broken-idle option
-In-Reply-To: <87oafq2f0m.fsf@free-electrons.com>
+Date: Fri, 23 Oct 2015 12:59:58 +0200
+Subject: [PATCH] ARM: mvebu: add broken-idle option
+In-Reply-To: <1445597998-23751-1-git-send-email-vdonnefort@gmail.com>
 References: <87oafq2f0m.fsf@free-electrons.com>
-Message-ID: <1445597998-23751-1-git-send-email-vdonnefort@gmail.com>
+ <1445597998-23751-1-git-send-email-vdonnefort@gmail.com>
+Message-ID: <1445597998-23751-2-git-send-email-vdonnefort@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-changes for v6:
-- broken_idle() returns 1 when broken.
+The broken-idle option can be activated from the coherency-fabric DT
+node. This property allows to disable the idle capability, when the
+hardware doesn't support it, like the Seagate Personal Cloud boards.
 
-Vincent Donnefort (1):
-  ARM: mvebu: add broken-idle option
+Signed-off-by: Vincent Donnefort <vdonnefort@gmail.com>
 
- .../devicetree/bindings/arm/coherency-fabric.txt   |  5 ++++
- arch/arm/mach-mvebu/pmsu.c                         | 29 +++++++++++++++++++---
- 2 files changed, 31 insertions(+), 3 deletions(-)
-
+diff --git a/Documentation/devicetree/bindings/arm/coherency-fabric.txt b/Documentation/devicetree/bindings/arm/coherency-fabric.txt
+index 8dd4661..9b5c3f6 100644
+--- a/Documentation/devicetree/bindings/arm/coherency-fabric.txt
++++ b/Documentation/devicetree/bindings/arm/coherency-fabric.txt
+@@ -27,6 +27,11 @@ Required properties:
+  * For "marvell,armada-380-coherency-fabric", only one pair is needed
+    for the per-CPU fabric registers.
+ 
++Optional properties:
++
++- broken-idle: boolean to set when the Idle mode is not supported by the
++  hardware.
++
+ Examples:
+ 
+ coherency-fabric at d0020200 {
+diff --git a/arch/arm/mach-mvebu/pmsu.c b/arch/arm/mach-mvebu/pmsu.c
+index 4f4e222..0e97b97 100644
+--- a/arch/arm/mach-mvebu/pmsu.c
++++ b/arch/arm/mach-mvebu/pmsu.c
+@@ -379,6 +379,16 @@ static struct notifier_block mvebu_v7_cpu_pm_notifier = {
+ 
+ static struct platform_device mvebu_v7_cpuidle_device;
+ 
++static int broken_idle(struct device_node *np)
++{
++	if (of_property_read_bool(np, "broken-idle")) {
++		pr_warn("CPU idle is currently broken: disabling\n");
++		return 1;
++	}
++
++	return 0;
++}
++
+ static __init int armada_370_cpuidle_init(void)
+ {
+ 	struct device_node *np;
+@@ -387,7 +397,9 @@ static __init int armada_370_cpuidle_init(void)
+ 	np = of_find_compatible_node(NULL, NULL, "marvell,coherency-fabric");
+ 	if (!np)
+ 		return -ENODEV;
+-	of_node_put(np);
++
++	if (broken_idle(np))
++		goto end;
+ 
+ 	/*
+ 	 * On Armada 370, there is "a slow exit process from the deep
+@@ -406,6 +418,8 @@ static __init int armada_370_cpuidle_init(void)
+ 	mvebu_v7_cpuidle_device.dev.platform_data = armada_370_xp_cpu_suspend;
+ 	mvebu_v7_cpuidle_device.name = "cpuidle-armada-370";
+ 
++end:
++	of_node_put(np);
+ 	return 0;
+ }
+ 
+@@ -422,6 +436,10 @@ static __init int armada_38x_cpuidle_init(void)
+ 				     "marvell,armada-380-coherency-fabric");
+ 	if (!np)
+ 		return -ENODEV;
++
++	if (broken_idle(np))
++		goto end;
++
+ 	of_node_put(np);
+ 
+ 	np = of_find_compatible_node(NULL, NULL,
+@@ -430,7 +448,6 @@ static __init int armada_38x_cpuidle_init(void)
+ 		return -ENODEV;
+ 	mpsoc_base = of_iomap(np, 0);
+ 	BUG_ON(!mpsoc_base);
+-	of_node_put(np);
+ 
+ 	/* Set up reset mask when powering down the cpus */
+ 	reg = readl(mpsoc_base + MPCORE_RESET_CTL);
+@@ -450,6 +467,8 @@ static __init int armada_38x_cpuidle_init(void)
+ 	mvebu_v7_cpuidle_device.dev.platform_data = armada_38x_cpu_suspend;
+ 	mvebu_v7_cpuidle_device.name = "cpuidle-armada-38x";
+ 
++end:
++	of_node_put(np);
+ 	return 0;
+ }
+ 
+@@ -460,12 +479,16 @@ static __init int armada_xp_cpuidle_init(void)
+ 	np = of_find_compatible_node(NULL, NULL, "marvell,coherency-fabric");
+ 	if (!np)
+ 		return -ENODEV;
+-	of_node_put(np);
++
++	if (broken_idle(np))
++		goto end;
+ 
+ 	mvebu_cpu_resume = armada_370_xp_cpu_resume;
+ 	mvebu_v7_cpuidle_device.dev.platform_data = armada_370_xp_cpu_suspend;
+ 	mvebu_v7_cpuidle_device.name = "cpuidle-armada-xp";
+ 
++end:
++	of_node_put(np);
+ 	return 0;
+ }
+ 
 -- 
 2.1.4
