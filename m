@@ -1,56 +1,112 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Thu, 22 Oct 2015 22:44:55 -0700
-Subject: [PATCH] pinctrl-zynq: Initialize early
-In-Reply-To: <5629C62D.8030804@topic.nl>
-References: <1445513420-23527-1-git-send-email-mike.looijmans@topic.nl>
- <20151022160733.GH5257@xsjsorenbubuntu> <5629C62D.8030804@topic.nl>
-Message-ID: <20151023054455.GU5257@xsjsorenbubuntu>
+From: Minghuan.Lian@freescale.com (Lian M.H.)
+Date: Fri, 23 Oct 2015 05:48:11 +0000
+Subject: [PATCH v4 5/6] PCI: layerscape: add PCIe support for LS1043a and
+ LS2080a
+In-Reply-To: <20151022154715.GB16360@localhost>
+References: <1444979960-24100-1-git-send-email-Minghuan.Lian@freescale.com>
+ <1444979960-24100-5-git-send-email-Minghuan.Lian@freescale.com>
+ <20151022154715.GB16360@localhost>
+Message-ID: <DM2PR0301MB0640558021E0936464D93237E2260@DM2PR0301MB0640.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2015-10-23 at 07:31AM +0200, Mike Looijmans wrote:
-> On 22-10-15 18:07, S?ren Brinkmann wrote:
-> >Hi Mike,
-> >
-> >On Thu, 2015-10-22 at 01:30PM +0200, Mike Looijmans wrote:
-> >>Supplying pinmux configuration for e.g. gpio pins leads to deferred
-> >>probes because the pinctrl device is probed much later than gpio.
-> >>Move the init call to a much earlier stage so it probes before the
-> >>devices that may need it.
-> >>
-> >>Signed-off-by: Mike Looijmans <mike.looijmans@topic.nl>
-> >
-> >in general, the change should be OK, but neither on zc702 nor zc706 do I
-> >see a difference in respect to deferred probes. With and without the
-> >patch I see:
-> >     root at zynq:~# dmesg | grep -i defer
-> >     [    0.097021] zynq-gpio e000a000.gpio: could not find pctldev for node /amba/slcr at f8000000/pinctrl at 700/gpio0-default, deferring probe
-> >     root at zynq:~#
-> >
-> >If you have a case this patch improves things though, feel free to add my
-> >Tested-by: S?ren Brinkmann <soren.brinkmann@xilinx.com>
-> >
+Hi Bjorn,
+
+Our LTSSM mask is 0x3f because it includes the following states:
+0x20 S_RCVRY_EQ0
+0x21 S_RCVRY_EQ1
+0x22 S_RCVRY_EQ2
+0x23 S_RCVRY_EQ3
+
+And I checked DesignWare Cores PCI Express Controller Databook v4.21a and found the following descriptor:
+[5:0]: smlh_ltssm_state: LTSSM current state. Encoding is defined in workspace/src/include/cxpl_defs.vh
+
+So could we use the mask 0x3f for all SoCs?
+
+Anyway, LTSSM_PCIE_L0 in pci-layerscape.c can be replaced by LTSSM_STATE_L0 defined in pcie-designware.h.
+
+Thanks,
+Minghuan
+
+> -----Original Message-----
+> From: Bjorn Helgaas [mailto:helgaas at kernel.org]
+> Sent: Thursday, October 22, 2015 11:47 PM
+> To: Lian Minghuan-B31939 <Minghuan.Lian@freescale.com>
+> Cc: linux-pci at vger.kernel.org; linux-arm-kernel at lists.infradead.org; Zang
+> Roy-R61911 <tie-fei.zang@freescale.com>; Hu Mingkai-B21284
+> <Mingkai.Hu@freescale.com>; Yoder Stuart-B08248
+> <stuart.yoder@freescale.com>; Li Yang-Leo-R58472 <LeoLi@freescale.com>;
+> Arnd Bergmann <arnd@arndb.de>; Bjorn Helgaas <bhelgaas@google.com>;
+> Jingoo Han <jg1.han@samsung.com>; Zhou Wang
+> <wangzhou1@hisilicon.com>; Estevam Fabio-R49496
+> <Fabio.Estevam@freescale.com>; Lucas Stach <l.stach@pengutronix.de>
+> Subject: Re: [PATCH v4 5/6] PCI: layerscape: add PCIe support for LS1043a and
+> LS2080a
 > 
-> On the Florida boards there are i2c controlled clocks, power supplies and
-> reset signals. Replacing the Cadence I2C controller with a GPIO-bitbang
-> controller solved the I2C problems but caused a storm of dozens of deferred
-> probes because of the pinmux driver arriving even after the first probe
-> attempt of the i2c bus driver. Moving the pinmux driver to an earlier stage
-> solved that problem neatly, now the "zynq-pinctrl 700.pinctrl: zynq pinctrl
-> initialized" message appears after the OCM driver.
-
-OK, makes sense. Thanks for the background.
-
-> Judging from your comment the GPIO driver still probes earlier (I don't have
-> any GPIO-only pinmuxes yet), so maybe we should amend the patch to probe
-> even earlier. The pinmux driver doesn't depend on anything, so it can
-> potentially probe very early. What do you think?
-
-I'm pretty neutral on this one :) Hasn't the probe deferral mechanism
-been introduced to avoid having to create ordering through the initcall
-stages? But I agree, having the probe deferral notices is not particularly
-pretty. So, I'd definitely not oppose changing this.
-Though, there is one dependency on the SLCR regmap, but that is initialized
-fairly early.
-
-	S?ren
+> [+cc Fabio, Lucas]
+> 
+> Hi Minghuan,
+> 
+> On Fri, Oct 16, 2015 at 03:19:19PM +0800, Minghuan Lian wrote:
+> > Both LS1043a and LS2080a are based on ARMv8 64-bit architecture and
+> > have similar PCIe implementation. LUT is added to controller.
+> > The patch removes the necessary fields from struct ls_pcie.
+> >
+> > Signed-off-by: Minghuan Lian <Minghuan.Lian@freescale.com>
+> > ---
+> > This patch is based on v4.3-rc4 and [PATCH v10 3/6]
+> > PCI: designware: Add ARM64 support.
+> >
+> > change log
+> > v4:
+> > 1. split to 6 patches.
+> > 2. use ARCH_LAYERSCAPE instead of ARM64
+> >
+> > v3:
+> > 1. Use 8 or 16 bit access function to simplify code 2. Add
+> > ls_add_pcie_port in accordance with other DesignWare-based drivers
+> >
+> > v2:
+> > 1. Rename ls2085a to ls2080a
+> > 2. Add ls_pcie_msi_host_init()
+> >
+> >  drivers/pci/host/Kconfig          |  2 +-
+> >  drivers/pci/host/pci-layerscape.c | 72
+> > +++++++++++++++++++++++++++++++++++----
+> >  2 files changed, 67 insertions(+), 7 deletions(-)
+> >
+> > diff --git a/drivers/pci/host/Kconfig b/drivers/pci/host/Kconfig index
+> > ae873be..8eb09ea 100644
+> > --- a/drivers/pci/host/Kconfig
+> > +++ b/drivers/pci/host/Kconfig
+> > @@ -105,7 +105,7 @@ config PCI_XGENE_MSI
+> >
+> >  config PCI_LAYERSCAPE
+> >  	bool "Freescale Layerscape PCIe controller"
+> > -	depends on OF && ARM
+> > +	depends on OF && (ARM || ARCH_LAYERSCAPE)
+> >  	select PCIE_DW
+> >  	select MFD_SYSCON
+> >  	help
+> > diff --git a/drivers/pci/host/pci-layerscape.c
+> > b/drivers/pci/host/pci-layerscape.c
+> > index 891e504..c53692a 100644
+> > --- a/drivers/pci/host/pci-layerscape.c
+> > +++ b/drivers/pci/host/pci-layerscape.c
+> > @@ -31,23 +31,26 @@
+> >  #define LTSSM_STATE_MASK	0x3f
+> 
+> BTW, not related to *this* patch, but does LTSSM_STATE_MASK really need to
+> be 0x3f (6 bits), or could it be 0x1f (5 bits)?
+> 
+> I'd like to include Layerscape in the LTSSM_STATE_MASK cleanup done by
+> Fabio:
+> 
+> https://git.kernel.org/cgit/linux/kernel/git/helgaas/pci.git/commit/?h=pci/host
+> -designware&id=4788fe6ebf4594c9a95b620cbff05147c8504823
+> 
+> I don't have specs for any of these devices, so I don't know if this is really
+> something that can vary between the different DesignWare-based devices, or if
+> they all should use a mask of 0x1f.
+> 
+> Bjorn
