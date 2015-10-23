@@ -1,33 +1,45 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 23 Oct 2015 08:54:19 +0900
-Subject: [PATCH v6 04/22] of: add function to allow probing a device from
- a OF node
-In-Reply-To: <CAAObsKCAX4DQGydQoYjJEYKTOEqpVozXdHnqXWdNYVkLsg7BVg@mail.gmail.com>
-References: <1442844182-27787-1-git-send-email-tomeu.vizoso@collabora.com>
- <1442844182-27787-5-git-send-email-tomeu.vizoso@collabora.com>
- <10119606.2TraDKGPVy@vostro.rjw.lan>
- <CAAObsKCAX4DQGydQoYjJEYKTOEqpVozXdHnqXWdNYVkLsg7BVg@mail.gmail.com>
-Message-ID: <20151022235419.GF29919@sirena.org.uk>
+From: greg@kroah.com (Greg KH)
+Date: Thu, 22 Oct 2015 17:17:54 -0700
+Subject: [PATCH stable/v4.2.y] ARM: ux500: simplify secondary CPU boot
+In-Reply-To: <1445554568-4871-1-git-send-email-khilman@kernel.org>
+References: <1445554568-4871-1-git-send-email-khilman@kernel.org>
+Message-ID: <20151023001754.GB10983@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 22, 2015 at 03:03:37PM +0200, Tomeu Vizoso wrote:
-> On 22 October 2015 at 03:06, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
+On Thu, Oct 22, 2015 at 03:56:08PM -0700, Kevin Hilman wrote:
+> From: Linus Walleij <linus.walleij@linaro.org>
+> 
+> This removes a lot of ancient cruft from the Ux500 SMP boot.
+> Instead of the pen grab/release, just point the ROM to
+> secondary_boot() and start the second CPU there, then send
+> the IPI.
+> 
+> Use our own SMP enable method. This enables us to remove the
+> last static mapping and get both CPUs booting properly.
+> 
+> Tested this and it just works.
+> 
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> Signed-off-by: Olof Johansson <olof@lixom.net>
+> (cherry picked from commit c00def71efd919e8ae835a25f4f4c80a4b2d36d3)
+> Cc: <stable@vger.kernel.org> # v4.2+
+> Signed-off-by: Kevin Hilman <khilman@linaro.org>
+> ---
+> This patch was the 2nd in a 2-patch series.  Only the 1st patch made it
+> into v4.2, but this one is also needed for booting on the ste-snowball.
+> 
+>  arch/arm/mach-ux500/Makefile     |   2 +-
+>  arch/arm/mach-ux500/cpu-db8500.c |   1 -
+>  arch/arm/mach-ux500/headsmp.S    |  37 -----------
+>  arch/arm/mach-ux500/platsmp.c    | 132 ++++++++++++---------------------------
+>  arch/arm/mach-ux500/setup.h      |   1 -
+>  5 files changed, 40 insertions(+), 133 deletions(-)
+>  delete mode 100644 arch/arm/mach-ux500/headsmp.S
 
-> > Same question as from Greg: How does a subsystem know whether or not to use
-> > this function?
+This looks to me like a "new feature", is it a regression from something
+that used to work in 4.1?
 
-> Maybe I don't understand the comment, but as the commit message says,
-> subsystems can use this when looking up resources for drivers. Or you
-> mean that this information should be in the API docs?
+thanks,
 
-I'm pretty sure what he's suggesting here is changing to "should always"
-(ie, explain the situations when a subsystem would do this, including
-decision criteria if it's optional).
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151023/4e3f79b4/attachment-0001.sig>
+greg k-h
