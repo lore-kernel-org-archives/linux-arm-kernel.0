@@ -1,121 +1,39 @@
-From: vdonnefort@gmail.com (Vincent Donnefort)
-Date: Fri, 23 Oct 2015 12:59:58 +0200
-Subject: [PATCH] ARM: mvebu: add broken-idle option
-In-Reply-To: <1445597998-23751-1-git-send-email-vdonnefort@gmail.com>
-References: <87oafq2f0m.fsf@free-electrons.com>
- <1445597998-23751-1-git-send-email-vdonnefort@gmail.com>
-Message-ID: <1445597998-23751-2-git-send-email-vdonnefort@gmail.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Fri, 23 Oct 2015 19:59:54 +0900
+Subject: [PATCH 2/3] i2c: uniphier_f: add UniPhier FIFO-builtin I2C driver
+In-Reply-To: <20151022210618.GC1516@katana>
+References: <1438243942-26401-1-git-send-email-yamada.masahiro@socionext.com>
+ <1438243942-26401-3-git-send-email-yamada.masahiro@socionext.com>
+ <20151022210618.GC1516@katana>
+Message-ID: <CAK7LNATNazGG74DYvPXPUf5WE6K4356OzJnbxv4DuKjGC_g+kw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The broken-idle option can be activated from the coherency-fabric DT
-node. This property allows to disable the idle capability, when the
-hardware doesn't support it, like the Seagate Personal Cloud boards.
+2015-10-23 6:06 GMT+09:00 Wolfram Sang <wsa@the-dreams.de>:
+> On Thu, Jul 30, 2015 at 05:12:21PM +0900, Masahiro Yamada wrote:
+>> Add support for on-chip I2C controller used on newer UniPhier SoCs
+>> such as PH1-Pro4, PH1-Pro5, etc.  This adapter is equipped with
+>> 8-depth TX/RX FIFOs.
+>>
+>> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+>
+> Same comments as for the other driver.
 
-Signed-off-by: Vincent Donnefort <vdonnefort@gmail.com>
+Fixed in v2.
 
-diff --git a/Documentation/devicetree/bindings/arm/coherency-fabric.txt b/Documentation/devicetree/bindings/arm/coherency-fabric.txt
-index 8dd4661..9b5c3f6 100644
---- a/Documentation/devicetree/bindings/arm/coherency-fabric.txt
-+++ b/Documentation/devicetree/bindings/arm/coherency-fabric.txt
-@@ -27,6 +27,11 @@ Required properties:
-  * For "marvell,armada-380-coherency-fabric", only one pair is needed
-    for the per-CPU fabric registers.
- 
-+Optional properties:
-+
-+- broken-idle: boolean to set when the Idle mode is not supported by the
-+  hardware.
-+
- Examples:
- 
- coherency-fabric at d0020200 {
-diff --git a/arch/arm/mach-mvebu/pmsu.c b/arch/arm/mach-mvebu/pmsu.c
-index 4f4e222..0e97b97 100644
---- a/arch/arm/mach-mvebu/pmsu.c
-+++ b/arch/arm/mach-mvebu/pmsu.c
-@@ -379,6 +379,16 @@ static struct notifier_block mvebu_v7_cpu_pm_notifier = {
- 
- static struct platform_device mvebu_v7_cpuidle_device;
- 
-+static int broken_idle(struct device_node *np)
-+{
-+	if (of_property_read_bool(np, "broken-idle")) {
-+		pr_warn("CPU idle is currently broken: disabling\n");
-+		return 1;
-+	}
-+
-+	return 0;
-+}
-+
- static __init int armada_370_cpuidle_init(void)
- {
- 	struct device_node *np;
-@@ -387,7 +397,9 @@ static __init int armada_370_cpuidle_init(void)
- 	np = of_find_compatible_node(NULL, NULL, "marvell,coherency-fabric");
- 	if (!np)
- 		return -ENODEV;
--	of_node_put(np);
-+
-+	if (broken_idle(np))
-+		goto end;
- 
- 	/*
- 	 * On Armada 370, there is "a slow exit process from the deep
-@@ -406,6 +418,8 @@ static __init int armada_370_cpuidle_init(void)
- 	mvebu_v7_cpuidle_device.dev.platform_data = armada_370_xp_cpu_suspend;
- 	mvebu_v7_cpuidle_device.name = "cpuidle-armada-370";
- 
-+end:
-+	of_node_put(np);
- 	return 0;
- }
- 
-@@ -422,6 +436,10 @@ static __init int armada_38x_cpuidle_init(void)
- 				     "marvell,armada-380-coherency-fabric");
- 	if (!np)
- 		return -ENODEV;
-+
-+	if (broken_idle(np))
-+		goto end;
-+
- 	of_node_put(np);
- 
- 	np = of_find_compatible_node(NULL, NULL,
-@@ -430,7 +448,6 @@ static __init int armada_38x_cpuidle_init(void)
- 		return -ENODEV;
- 	mpsoc_base = of_iomap(np, 0);
- 	BUG_ON(!mpsoc_base);
--	of_node_put(np);
- 
- 	/* Set up reset mask when powering down the cpus */
- 	reg = readl(mpsoc_base + MPCORE_RESET_CTL);
-@@ -450,6 +467,8 @@ static __init int armada_38x_cpuidle_init(void)
- 	mvebu_v7_cpuidle_device.dev.platform_data = armada_38x_cpu_suspend;
- 	mvebu_v7_cpuidle_device.name = "cpuidle-armada-38x";
- 
-+end:
-+	of_node_put(np);
- 	return 0;
- }
- 
-@@ -460,12 +479,16 @@ static __init int armada_xp_cpuidle_init(void)
- 	np = of_find_compatible_node(NULL, NULL, "marvell,coherency-fabric");
- 	if (!np)
- 		return -ENODEV;
--	of_node_put(np);
-+
-+	if (broken_idle(np))
-+		goto end;
- 
- 	mvebu_cpu_resume = armada_370_xp_cpu_resume;
- 	mvebu_v7_cpuidle_device.dev.platform_data = armada_370_xp_cpu_suspend;
- 	mvebu_v7_cpuidle_device.name = "cpuidle-armada-xp";
- 
-+end:
-+	of_node_put(np);
- 	return 0;
- }
- 
+> And quite some debug messages left. Could you check if you still want
+> them or if they were mostly useful during development of the driver?
+
+Yes, I want to keep them.  I do not think they are too much.
+
+
+I will probably come back to these drivers when I find some time
+in order to implement further features such as the slave mode.   :)
+
+dev_dbg() might be useful for the new development
+as well as for checking something when hardware went wrong for some reason.
+
+
 -- 
-2.1.4
+Best Regards
+Masahiro Yamada
