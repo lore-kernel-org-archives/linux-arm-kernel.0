@@ -1,38 +1,71 @@
-From: panand@redhat.com (Pratyush Anand)
-Date: Fri, 23 Oct 2015 12:59:50 +0530
-Subject: [PATCH 08/16] arm64/kexec: Add core kexec support
-In-Reply-To: <1445361565.30908.68.camel@infradead.org>
-References: <cover.1445297709.git.geoff@infradead.org>
- <a1c2a702f127d9dade1f9af8ab13decb2ef1c0da.1445297709.git.geoff@infradead.org>
- <20151020085620.GC31893@dhcppc13.redhat.com>
- <1445361565.30908.68.camel@infradead.org>
-Message-ID: <20151023072950.GC25029@dhcppc13.redhat.com>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Fri, 23 Oct 2015 09:57:45 +0200
+Subject: [PATCH v5 1/4] ARM: mvebu: add broken-idle option
+In-Reply-To: <CAOesGMjUG0Ws7X7sw3H=8BNTNrwqmfPREpP0MK8RoJssAgiJ-g@mail.gmail.com>
+ (Olof Johansson's message of "Thu, 22 Oct 2015 10:40:57 -0700")
+References: <1444140824-24132-1-git-send-email-simon.guinot@sequanux.org>
+ <1444140824-24132-2-git-send-email-simon.guinot@sequanux.org>
+ <CAOesGMjUG0Ws7X7sw3H=8BNTNrwqmfPREpP0MK8RoJssAgiJ-g@mail.gmail.com>
+Message-ID: <87oafq2f0m.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 20/10/2015:10:19:25 AM, Geoff Levand wrote:
-> Hi,
-> 
-> On Tue, 2015-10-20 at 14:26 +0530, Pratyush Anand wrote:
-> > On 19/10/2015:11:38:53 PM, Geoff Levand wrote:
-> > > +static void soft_restart(unsigned long addr)
-> > > +{
-> > > +> > 	> > setup_mm_for_reboot();
-> > > +> > 	> > cpu_soft_restart(virt_to_phys(cpu_reset), addr,
-> > > +> > 	> > 	> > is_hyp_mode_available());
-> > 
-> > So now we do not flush cache for any memory region. Shouldn't we still flush
-> > at least kernel and purgatory segments. 
-> 
-> Relevant pages of the kexec list are flushed in the code following the comment
-> 'Invalidate dest page to PoC' of the arm64_relocate_new_kernel routine:
-> 
->  The dcache is turned off
->  The page is invalidated to PoC
->  The new page is written
+Hi Simon and Vincent,
+ 
+ On jeu., oct. 22 2015, Olof Johansson <olof@lixom.net> wrote:
 
-Thanks for clarifying it.
+>> +static int broken_idle(struct device_node *np)
+>> +{
+>> +       if (of_property_read_bool(np, "broken-idle")) {
+>> +               pr_warn("CPU idle is currently broken: disabling\n");
+>> +               return 0;
+>> +       }
+>> +
+>> +       return 1;
+>> +}
+>
+> This is confusing. The function is called broken_idle(), but it
+> returns 0 if idle is broken and 1 if it isn't.
+>
+> It means these tests look odd:
+>
+>> +
+>>  static __init int armada_370_cpuidle_init(void)
+>>  {
+>>         struct device_node *np;
+>> @@ -387,7 +397,9 @@ static __init int armada_370_cpuidle_init(void)
+>>         np = of_find_compatible_node(NULL, NULL, "marvell,coherency-fabric");
+>>         if (!np)
+>>                 return -ENODEV;
+>> -       of_node_put(np);
+>> +
+>> +       if (!broken_idle(np))
+>> +               goto end;
+>
+> So, the way I read this when I read just this code is: "If idle is NOT
+> broken, then don't bother set up any of the idle stuff".
+>
+> Please turn this the other way around so others don't make the same
+> mistake when reading the code.
+>
+> I know it might come across as bikesheddy and nitpicky, but
+> readability trumps most other things when it comes to new code. :-/
 
-I tested your kexec-v10.2 with mustang.
+Could you send an updated version ? Then I will be able to make a new
+pull request following it as requested by Olof. Then it will still be
+part of 4.4.
 
-Tested-by: Pratyush Anand <panand@redhat.com>
+Thanks,
+
+Gregory
+
+>
+>
+>
+> -Olof
+
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
