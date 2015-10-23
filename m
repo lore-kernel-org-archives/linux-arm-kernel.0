@@ -1,62 +1,77 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Fri, 23 Oct 2015 12:32:02 -0700
-Subject: [GIT PULL 1/2] Broadcom Device Tree changes for 4.4 (part 2)
-In-Reply-To: <20151023182652.GE18961@localhost>
-References: <1445280190-8812-1-git-send-email-f.fainelli@gmail.com>
- <1445280190-8812-2-git-send-email-f.fainelli@gmail.com>
- <20151023182652.GE18961@localhost>
-Message-ID: <562A8B32.5040906@gmail.com>
+From: kgene@kernel.org (Kukjin Kim)
+Date: Sat, 24 Oct 2015 04:35:43 +0900
+Subject: [GIT PULL] ARM: dts: Exynos for v4.4 (3rd)
+In-Reply-To: <1444974144-12928-2-git-send-email-k.kozlowski@samsung.com>
+References: <1444974144-12928-1-git-send-email-k.kozlowski@samsung.com>
+ <1444974144-12928-2-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <562A8C0F.8010902@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23/10/15 11:26, Olof Johansson wrote:
-> Hi Florian,
+On 10/16/15 14:42, Krzysztof Kozlowski wrote:
+> Dear Kukjin,
 > 
-> On Mon, Oct 19, 2015 at 11:43:10AM -0700, Florian Fainelli wrote:
->> The following changes since commit eef228e3191de0b62ef5913be216f25ba6b23a4c:
->>
->>   ARM: dts: move aliases back to .dts in Cygnus (2015-09-24 18:30:10 -0700)
->>
->> are available in the git repository at:
->>
->>   http://github.com/Broadcom/stblinux tags/arm-soc/for-4.4/devicetree-part2
->>
->> for you to fetch changes up to da6b53a6f7abc3d84260a9f0ff9849a88b44e11f:
->>
->>   ARM: bcm2835: Switch to using the new clock driver support. (2015-10-19 11:32:24 -0700)
->>
->> ----------------------------------------------------------------
->> This pull request contains the DT changes for BCM2835 in 4.4.  It
->> pulls in clk/clk-bcm2835 (which Stephen Boyd has said would be stable)
->> because the DT changes to enable the clock driver need the driver
->> itself to be present. These changes include the following:
->>
->> - Eric Anholt, moves the bcm2835 clock driver under bcm/ where it belongs with
->>   other Broadcom clock providers drivers, defines the binding for new clock
->>   driver, adds support for programming the BCM2835 audio domain, adds the DDC I2C
->>   controller to Device Tree, and finally migrates the Device Tree to use the new
->>   clock driver binding
->>
->> - Lubomir Rintel adds support for the Raspberry Pi Model A+ and B revision 2, and
->>   remove the I2S controller which is non-existent on Raspberry Pi Model B
->>
->> - Stefan Wahren adds an uart0 label for referencing the UART adapter
->>
->> ----------------------------------------------------------------
->> Eric Anholt (5):
->>       ARM: bcm2835: Add the DDC I2C controller to the device tree.
->>       clk: bcm2835: Move under bcm/ with other Broadcom SoC clk drivers.
+> Last batch of changes to DT for Exynos for v4.4.
+> Includes dependency - clock driver changes.
 > 
-> I see this patch in the branch, and it's signed off both by Stephen and you,
-> which makes me suspect you cherry-picked it over from their tree?
+> Best regards,
+> Krzysztof
 > 
-> That means it'll exist in two copies and might cause pretty nasty conflicts at
-> merge time if other changes have gone in on top of the separate commits.
-> Instead, we ask that you share a branch with the same exact commits, since git
-> will handle that appropriately and the patch will only be in the tree once.
+> 
+> The following changes since commit 9aaf43d9b59d6b5d8daeb3a4b9d894ea88fc34c5:
+> 
+>   clk: samsung: exynos5250: Add DISP1 clocks (2015-10-16 08:49:53 +0900)
+> 
+> are available in the git repository at:
+> 
+>   https://github.com/krzk/linux.git tags/samsung-dt-4.4-3
+> 
+> for you to fetch changes up to 1967da5699e660957737ec6c4015cfd8e428f0ff:
+> 
+>   ARM: dts: Add clocks to DISP1 domain in exynos5250 (2015-10-16 14:20:03 +0900)
+> 
+> ----------------------------------------------------------------
+> Last round (from my side) of v4.4 Device Tree improvements for Exynos
+> based boards:
+> 1. Fix USB OTG on Exynos3250 (Monk and Rinato), Exynos4210 (Trats
+>    and Universal) and Exynos4412 (Trats2).
+> 2. Fix HDMI and LVDS display on Snow (Exynos5250) after second Suspend to RAM.
+> 3. Minor cleanups and fixes.
+> 
+> ----------------------------------------------------------------
+> Krzysztof Kozlowski (2):
+>       Merge tag 'samsung-clk-exynos5250-4.4' into dt-for-next
 
-Just to clarify, are you okay with me merging a branch from Eric's tree,
-or do you want to see individual commits, except for those that appear
-in Stephen's tree (the clock changes basically)?
--- 
-Florian
+Since there is no the branch(tags/samsung-clk-exynos5250-4.4) in clk
+tree, I think we don't need to keep the branch as a topic and we can
+just take the patch with Stephen's ack...
+
+>       dt-bindings: Correct the example for Exynos power domain clocks
+> 
+> Laurent Pinchart (2):
+>       ARM: dts: Fix typo in regulator enable GPIO property in s5pv210-aquila
+>       ARM: dts: Fix typo in regulator enable GPIO property in s5pv210-goni
+> 
+> Marek Szyprowski (1):
+>       ARM: dts: Add vbus regulator to USB2 phy nodes on exynos3250, exynos4210 and exynos4412 boards
+> 
+> Tomeu Vizoso (1):
+>       ARM: dts: Add clocks to DISP1 domain in exynos5250
+> 
+>  Documentation/devicetree/bindings/arm/exynos/power_domain.txt | 5 ++---
+>  arch/arm/boot/dts/exynos3250-monk.dts                         | 1 +
+>  arch/arm/boot/dts/exynos3250-rinato.dts                       | 1 +
+>  arch/arm/boot/dts/exynos4210-trats.dts                        | 2 +-
+>  arch/arm/boot/dts/exynos4210-universal_c210.dts               | 2 +-
+>  arch/arm/boot/dts/exynos4412-trats2.dts                       | 1 +
+>  arch/arm/boot/dts/exynos5250.dtsi                             | 4 ++++
+>  arch/arm/boot/dts/s5pv210-aquila.dts                          | 2 +-
+>  arch/arm/boot/dts/s5pv210-goni.dts                            | 4 ++--
+>  9 files changed, 14 insertions(+), 8 deletions(-)
+
+In this case, please show all of diff status including merge branch ;-)
+
+Applied all of your tags/samsung-dt-4.4-3.
+
+Thanks,
+Kukjin
