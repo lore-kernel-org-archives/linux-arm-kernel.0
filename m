@@ -1,39 +1,47 @@
-From: jeremy.linton@arm.com (Jeremy Linton)
-Date: Fri, 23 Oct 2015 09:22:14 -0500
-Subject: [PATCH] arm64: Align .text section to PAGE_SIZE
-Message-ID: <1445610134-20528-1-git-send-email-jeremy.linton@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 23 Oct 2015 16:23:06 +0200
+Subject: [PATCH v3 6/7] vfio: platform: use list of registered reset
+ function
+In-Reply-To: <562A3FFC.4050504@linaro.org>
+References: <1445603835-14506-1-git-send-email-eric.auger@linaro.org>
+ <4934120.DeNtNjTIFs@wuerfel> <562A3FFC.4050504@linaro.org>
+Message-ID: <5844194.uTAR9RVtmZ@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It appears that 64k page kernel's die early, in a somewhat random set
-of locations when built without KVM. Most likely during memblock
-manipulations (depending on kernel debug options).
+On Friday 23 October 2015 16:11:08 Eric Auger wrote:
+> Hi Arnd,
+> On 10/23/2015 03:12 PM, Arnd Bergmann wrote:
+> > On Friday 23 October 2015 14:37:14 Eric Auger wrote:
+> >> Remove the static lookup table and use the dynamic list of registered
+> >> reset functions instead. Also load the reset module through its alias.
+> >> The reset struct module pointer is stored in vfio_platform_device.
+> >>
+> >> We also remove the useless struct device pointer parameter in
+> >> vfio_platform_get_reset.
+> >>
+> >> This patch fixes the issue related to the usage of __symbol_get, which
+> >> besides from being moot, prevented compilation with CONFIG_MODULES
+> >> disabled.
+> >>
+> >> Also usage of MODULE_ALIAS makes possible to add a new reset module
+> >> without needing to update the framework. This was suggested by Arnd.
+> >>
+> >> Signed-off-by: Eric Auger <eric.auger@linaro.org>
+> >> Reported-by: Arnd Bergmann <arnd@arndb.de>
+> >>
+> >>
+> > Reviewed-by: Arnd Bergmann <arnd@arndb.de>
+> > 
+> > but doesn't this need to come before patch 4/7?
+> Well I don't think so. In [4] we introduce the dynamic registration
+> method but until this patch we still use the old lookup method in the
+> static table. I tested and the reset lookup still works in [4].
+> If we put this one before the registration, the functionality will be
+> lost here.
+> 
 
-Normally when KVM is built into the kernel it has an explicit
-PAGE_SIZE alignment requirement and that forces the text section to be
-aligned to PAGE_SIZE. Without it, the alignment granularity is likely to
-be 4k.
+Ok, I see. I was getting confused by the removal of the EXPORT_SYMBOL
+statement there and thought it would break the __get_symbol call.
 
-This updates the linker script to assure that the the text section is
-aligned to a minimum of PAGE_SIZE regardless of build options.
-
-Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
----
- arch/arm64/kernel/vmlinux.lds.S | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
-index 8a5d97b..bf7b972 100644
---- a/arch/arm64/kernel/vmlinux.lds.S
-+++ b/arch/arm64/kernel/vmlinux.lds.S
-@@ -92,7 +92,7 @@ SECTIONS
- 		HEAD_TEXT
- 	}
- 	ALIGN_DEBUG_RO
--	.text : {			/* Real text segment		*/
-+	.text ALIGN(PAGE_SIZE) : {	/* Real text segment		*/
- 		_stext = .;		/* Text and read-only data	*/
- 			__exception_text_start = .;
- 			*(.exception.text)
--- 
-2.4.3
+	Arnd
