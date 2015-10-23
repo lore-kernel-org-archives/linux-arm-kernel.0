@@ -1,44 +1,39 @@
-From: eric.auger@linaro.org (Eric Auger)
-Date: Fri, 23 Oct 2015 16:15:06 +0200
-Subject: [PATCH v3 2/7] vfio: platform: add capability to register a reset
- function
-In-Reply-To: <5723752.hDK15zeNcm@wuerfel>
-References: <1445603835-14506-1-git-send-email-eric.auger@linaro.org>
- <1445603835-14506-3-git-send-email-eric.auger@linaro.org>
- <5723752.hDK15zeNcm@wuerfel>
-Message-ID: <562A40EA.40706@linaro.org>
+From: jeremy.linton@arm.com (Jeremy Linton)
+Date: Fri, 23 Oct 2015 09:22:14 -0500
+Subject: [PATCH] arm64: Align .text section to PAGE_SIZE
+Message-ID: <1445610134-20528-1-git-send-email-jeremy.linton@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/23/2015 03:07 PM, Arnd Bergmann wrote:
-> On Friday 23 October 2015 14:37:10 Eric Auger wrote:
->> +
->> +void vfio_platform_unregister_reset(const char *compat)
->> +{
->> +       struct vfio_platform_reset_node *iter, *temp;
->> +
->> +       mutex_lock(&driver_lock);
->> +       list_for_each_entry_safe(iter, temp, &reset_list, link) {
->> +               if (!strcmp(iter->compat, compat)) {
->> +                       list_del(&iter->link);
->> +                       break;
->> +               }
->> +       }
->> +
->> +       mutex_unlock(&driver_lock);
->> +}
->> +EXPORT_SYMBOL_GPL(vfio_platform_unregister_reset);
->>
-> 
-> This is slightly unsafe in case you ever get two drivers that register
-> with the same compat string. If we care about that, we could pass
-> and compare both the string and the function pointer, or the
-> vfio_platform_reset_node.
-OK
+It appears that 64k page kernel's die early, in a somewhat random set
+of locations when built without KVM. Most likely during memblock
+manipulations (depending on kernel debug options).
 
-Thanks
+Normally when KVM is built into the kernel it has an explicit
+PAGE_SIZE alignment requirement and that forces the text section to be
+aligned to PAGE_SIZE. Without it, the alignment granularity is likely to
+be 4k.
 
-Eric
-> 
-> 	Arnd
-> 
+This updates the linker script to assure that the the text section is
+aligned to a minimum of PAGE_SIZE regardless of build options.
+
+Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
+---
+ arch/arm64/kernel/vmlinux.lds.S | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
+index 8a5d97b..bf7b972 100644
+--- a/arch/arm64/kernel/vmlinux.lds.S
++++ b/arch/arm64/kernel/vmlinux.lds.S
+@@ -92,7 +92,7 @@ SECTIONS
+ 		HEAD_TEXT
+ 	}
+ 	ALIGN_DEBUG_RO
+-	.text : {			/* Real text segment		*/
++	.text ALIGN(PAGE_SIZE) : {	/* Real text segment		*/
+ 		_stext = .;		/* Text and read-only data	*/
+ 			__exception_text_start = .;
+ 			*(.exception.text)
+-- 
+2.4.3
