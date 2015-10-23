@@ -1,66 +1,86 @@
-From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Fri, 23 Oct 2015 10:25:54 -0400
-Subject: [PATCH v3 0/2] Common SerDes driver for TI's Keystone Platforms
-In-Reply-To: <3702663.07h6YO0UjY@wuerfel>
-References: <1445432201-16007-1-git-send-email-w-kwok2@ti.com>
- <56295B9E.9030201@ti.com>
- <CAPw-ZTk1vJA3YSwLHBNMYP0t5k2tW0HTKse+37rL8izWN33y-w@mail.gmail.com>
- <3702663.07h6YO0UjY@wuerfel>
-Message-ID: <562A4372.4040008@ti.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Fri, 23 Oct 2015 15:46:50 +0100
+Subject: [PATCH] drivers: psci: make PSCI 1.0 functions initialization version
+ dependent
+Message-ID: <1445611610-12871-1-git-send-email-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/23/2015 05:17 AM, Arnd Bergmann wrote:
-> On Thursday 22 October 2015 15:27:05 Loc Ho wrote:
->>>
->>> phy-xgene.c
->>> -----------
->>>
->>> Looking at other drivers under drivers/phy, I could find phy-xgene.c which
->>> is close Keystone SerDes driver (. This is called APM X-Gene Multi-Purpose
->>> PHY driver. It defines following mode per the driver code
->>>
->>>          MODE_SATA       = 0,    /* List them for simple reference */
->>>          MODE_SGMII      = 1,
->>>          MODE_PCIE       = 2,
->>>          MODE_USB        = 3,
->>>          MODE_XFI        = 4,
->>>
->>> But seems to support only MODE_SATA. From the code, it appears, this driver
->>> is expected to be enhanced in the future to support additional modes. I have
->>> copied the author to this email to participate in this discussion.
->>
->> Let me comment on this APM X-Gene driver. This driver is dead and
->> won't be supported in near or foreseeable future. And someday, it will
->> be ripped out. Based on experience, this solution (having PHY driver
->> in Linux) can't be supported across boards and etc as it is just too
->> much maintenance. And therefore, we followed Arnd B guidance and move
->> all this into the boot loader. From Linux or OS perspective, it only
->> cares about the interface in which its interface with. This is just
->> your reference and may be this will help you as well.
->
-> This depends a lot on the use case. If the chip is only used on server
-> parts that have a real firmware and you can deliver bug fixes for the
-> firmware if necessary, it's always best to do as much of the setup as
-> possible there, and let Linux see a simplified view of the hardware.
->
-> However, for embedded systems that tend to ship with a minimal binary
-> bootloader and no way to update that as an end-user, we rely on Linux
-> to know about all the hardware that requires some form of setup, which
-> is why we have all sorts of drivers and frameworks in the kernel that
-> a server can easily ignore.
->
-> While keystone can show up in servers that won't use this driver, my
-> impression is that its main market is actually in embedded space.
-It is in embedded space predominantly. From our experience, this has to 
-be a Linux driver and moving this to boot loader doesn't make sense.
+The PSCI specifications [1] and the SMC calling convention mandate
+that unimplemented functions ids must return NOT_SUPPORTED (0xffffffff)
+if a function id is called but it is not implemented.
 
-Murali
->
-> 	Arnd
->
+Consequently, PSCI 1.0 function ids that require the 1.0 PSCI_FEATURES
+call to be initialized:
 
+CPU_SUSPEND (psci_init_cpu_suspend())
+SYSTEM_SUSPEND (psci_init_system_suspend())
 
+call the PSCI_FEATURES function id independently of the detected
+PSCI firmware version, since, if the PSCI_FEATURES function id is not
+implemented, it must return NOT_SUPPORTED according to the PSCI
+specifications, causing the initialization functions to fail as expected.
+
+Some existing PSCI implementations (ie Qemu PSCI emulation), do not
+comply with the SMC calling convention and fail if function ids that are
+not implemented are called from the OS, causing boot failures.
+
+To solve this issue, this patch adds code that checks the PSCI firmware
+version before calling PSCI 1.0 initialization functions so that the
+OS makes sure that it is calling 1.0 functions only if the firmware
+version detected is 1.0 or greater, therefore avoiding PSCI calls
+that are bound to fail and might cause system boot failures owing
+to non-compliant PSCI firmware implementations.
+
+[1] http://infocenter.arm.com/help/topic/com.arm.doc.den0022c/DEN0022C_Power_State_Coordination_Interface.pdf
+
+Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Cc: Arnd Bergmann <arnd@arndb.de>
+Cc: Kevin Hilman <khilman@kernel.org>
+Cc: Sudeep Holla <sudeep.holla@arm.com>
+Cc: Olof Johansson <olof@lixom.net>
+Cc: Mark Rutland <mark.rutland@arm.com>
+---
+Arnd, Kevin, Olof,
+
+this applies to current arm-soc drivers/psci branch, and solves the
+issue Kevin detected through kernelci with Qemu emulation:
+
+http://lists.infradead.org/pipermail/linux-arm-kernel/2015-October/380304.html
+
+Tested on:
+
+- Juno host
+- AMD Seattle host
+- kvmtool arm64 guest (on Juno arm64 defconfig host)
+- Qemu x86 host (aarch64 emulation)
+
+A run on kernelci and consequent tested-by tags would be much appreciated,
+thanks for spotting this and for your help.
+
+Thanks,
+Lorenzo
+
+ drivers/firmware/psci.c | 7 ++++---
+ 1 file changed, 4 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/firmware/psci.c b/drivers/firmware/psci.c
+index 492db42..d24f35d 100644
+--- a/drivers/firmware/psci.c
++++ b/drivers/firmware/psci.c
+@@ -347,9 +347,10 @@ static int __init psci_probe(void)
+ 
+ 	psci_init_migrate();
+ 
+-	psci_init_cpu_suspend();
+-
+-	psci_init_system_suspend();
++	if (PSCI_VERSION_MAJOR(ver) >= 1) {
++		psci_init_cpu_suspend();
++		psci_init_system_suspend();
++	}
+ 
+ 	return 0;
+ }
 -- 
-Murali Karicheri
-Linux Kernel, Keystone
+2.5.1
