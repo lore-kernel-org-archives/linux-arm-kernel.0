@@ -1,379 +1,124 @@
-From: appana.durga.rao@xilinx.com (Kedareswara rao Appana)
-Date: Fri, 23 Oct 2015 10:53:38 +0530
-Subject: [PATCH v7] can: xilinx: Convert to runtime_pm
-Message-ID: <1445577818-26165-1-git-send-email-appanad@xilinx.com>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Fri, 23 Oct 2015 00:31:11 -0500
+Subject: [PATCH v11 3/6] pci:host: Add Altera PCIe host controller driver
+In-Reply-To: <1445506051-21688-4-git-send-email-lftan@altera.com>
+References: <1445506051-21688-1-git-send-email-lftan@altera.com>
+ <1445506051-21688-4-git-send-email-lftan@altera.com>
+Message-ID: <20151023053111.GK21237@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Instead of enabling/disabling clocks at several locations in the driver,
-Use the runtime_pm framework. This consolidates the actions for runtime PM
-In the appropriate callbacks and makes the driver more readable and mantainable.
+Hi Ley,
 
-Signed-off-by: Kedareswara rao Appana <appanad@xilinx.com>
----
-Changes for v7:
-  - Removed the unnecessary clk_prepare/clk_unprepare calls
-    From  the probe and remove as suggested by Soren.
-Changes for v6:
- - Updated the driver with review comments as suggested by Marc.
-Changes for v5:
- - Updated with the review comments.
-   Updated the remove fuction to use runtime_pm.
-Chnages for v4:
- - Updated with the review comments.
-Changes for v3:
-  - Converted the driver to use runtime_pm.
-Changes for v2:
-  - Removed the struct platform_device* from suspend/resume
-    as suggest by Lothar.
+On Thu, Oct 22, 2015 at 05:27:28PM +0800, Ley Foon Tan wrote:
+> This patch adds the Altera PCIe host controller driver.
 
- drivers/net/can/xilinx_can.c | 177 +++++++++++++++++++++++++------------------
- 1 file changed, 102 insertions(+), 75 deletions(-)
+> +static void altera_pcie_fixups(struct pci_bus *bus)
+> +{
+> +	struct pci_dev *dev;
+> +
+> +	list_for_each_entry(dev, &bus->devices, bus_list) {
+> +		altera_pcie_retrain(dev);
+> +		altera_pcie_fixup_res(dev);
+> +	}
+> +}
 
-diff --git a/drivers/net/can/xilinx_can.c b/drivers/net/can/xilinx_can.c
-index fc55e8e..fcb584f 100644
---- a/drivers/net/can/xilinx_can.c
-+++ b/drivers/net/can/xilinx_can.c
-@@ -32,6 +32,7 @@
- #include <linux/can/dev.h>
- #include <linux/can/error.h>
- #include <linux/can/led.h>
-+#include <linux/pm_runtime.h>
- 
- #define DRIVER_NAME	"xilinx_can"
- 
-@@ -138,7 +139,7 @@ struct xcan_priv {
- 	u32 (*read_reg)(const struct xcan_priv *priv, enum xcan_reg reg);
- 	void (*write_reg)(const struct xcan_priv *priv, enum xcan_reg reg,
- 			u32 val);
--	struct net_device *dev;
-+	struct device *dev;
- 	void __iomem *reg_base;
- 	unsigned long irq_flags;
- 	struct clk *bus_clk;
-@@ -843,6 +844,13 @@ static int xcan_open(struct net_device *ndev)
- 	struct xcan_priv *priv = netdev_priv(ndev);
- 	int ret;
- 
-+	ret = pm_runtime_get_sync(priv->dev);
-+	if (ret < 0) {
-+		netdev_err(ndev, "%s: pm_runtime_get failed(%d)\n",
-+				__func__, ret);
-+		return ret;
-+	}
-+
- 	ret = request_irq(ndev->irq, xcan_interrupt, priv->irq_flags,
- 			ndev->name, ndev);
- 	if (ret < 0) {
-@@ -850,29 +858,17 @@ static int xcan_open(struct net_device *ndev)
- 		goto err;
- 	}
- 
--	ret = clk_prepare_enable(priv->can_clk);
--	if (ret) {
--		netdev_err(ndev, "unable to enable device clock\n");
--		goto err_irq;
--	}
--
--	ret = clk_prepare_enable(priv->bus_clk);
--	if (ret) {
--		netdev_err(ndev, "unable to enable bus clock\n");
--		goto err_can_clk;
--	}
--
- 	/* Set chip into reset mode */
- 	ret = set_reset_mode(ndev);
- 	if (ret < 0) {
- 		netdev_err(ndev, "mode resetting failed!\n");
--		goto err_bus_clk;
-+		goto err_irq;
- 	}
- 
- 	/* Common open */
- 	ret = open_candev(ndev);
- 	if (ret)
--		goto err_bus_clk;
-+		goto err_irq;
- 
- 	ret = xcan_chip_start(ndev);
- 	if (ret < 0) {
-@@ -888,13 +884,11 @@ static int xcan_open(struct net_device *ndev)
- 
- err_candev:
- 	close_candev(ndev);
--err_bus_clk:
--	clk_disable_unprepare(priv->bus_clk);
--err_can_clk:
--	clk_disable_unprepare(priv->can_clk);
- err_irq:
- 	free_irq(ndev->irq, ndev);
- err:
-+	pm_runtime_put(priv->dev);
-+
- 	return ret;
- }
- 
-@@ -911,12 +905,11 @@ static int xcan_close(struct net_device *ndev)
- 	netif_stop_queue(ndev);
- 	napi_disable(&priv->napi);
- 	xcan_chip_stop(ndev);
--	clk_disable_unprepare(priv->bus_clk);
--	clk_disable_unprepare(priv->can_clk);
- 	free_irq(ndev->irq, ndev);
- 	close_candev(ndev);
- 
- 	can_led_event(ndev, CAN_LED_EVENT_STOP);
-+	pm_runtime_put(priv->dev);
- 
- 	return 0;
- }
-@@ -935,27 +928,20 @@ static int xcan_get_berr_counter(const struct net_device *ndev,
- 	struct xcan_priv *priv = netdev_priv(ndev);
- 	int ret;
- 
--	ret = clk_prepare_enable(priv->can_clk);
--	if (ret)
--		goto err;
--
--	ret = clk_prepare_enable(priv->bus_clk);
--	if (ret)
--		goto err_clk;
-+	ret = pm_runtime_get_sync(priv->dev);
-+	if (ret < 0) {
-+		netdev_err(ndev, "%s: pm_runtime_get failed(%d)\n",
-+				__func__, ret);
-+		return ret;
-+	}
- 
- 	bec->txerr = priv->read_reg(priv, XCAN_ECR_OFFSET) & XCAN_ECR_TEC_MASK;
- 	bec->rxerr = ((priv->read_reg(priv, XCAN_ECR_OFFSET) &
- 			XCAN_ECR_REC_MASK) >> XCAN_ESR_REC_SHIFT);
- 
--	clk_disable_unprepare(priv->bus_clk);
--	clk_disable_unprepare(priv->can_clk);
-+	pm_runtime_put(priv->dev);
- 
- 	return 0;
--
--err_clk:
--	clk_disable_unprepare(priv->can_clk);
--err:
--	return ret;
- }
- 
- 
-@@ -968,15 +954,45 @@ static const struct net_device_ops xcan_netdev_ops = {
- 
- /**
-  * xcan_suspend - Suspend method for the driver
-- * @dev:	Address of the platform_device structure
-+ * @dev:	Address of the device structure
-  *
-  * Put the driver into low power mode.
-- * Return: 0 always
-+ * Return: 0 on success and failure value on error
-  */
- static int __maybe_unused xcan_suspend(struct device *dev)
- {
--	struct platform_device *pdev = dev_get_drvdata(dev);
--	struct net_device *ndev = platform_get_drvdata(pdev);
-+	if (!device_may_wakeup(dev))
-+		return pm_runtime_force_suspend(dev);
-+
-+	return 0;
-+}
-+
-+/**
-+ * xcan_resume - Resume from suspend
-+ * @dev:	Address of the device structure
-+ *
-+ * Resume operation after suspend.
-+ * Return: 0 on success and failure value on error
-+ */
-+static int __maybe_unused xcan_resume(struct device *dev)
-+{
-+	if (!device_may_wakeup(dev))
-+		return pm_runtime_force_resume(dev);
-+
-+	return 0;
-+
-+}
-+
-+/**
-+ * xcan_runtime_suspend - Runtime suspend method for the driver
-+ * @dev:	Address of the device structure
-+ *
-+ * Put the driver into low power mode.
-+ * Return: 0 always
-+ */
-+static int __maybe_unused xcan_runtime_suspend(struct device *dev)
-+{
-+	struct net_device *ndev = dev_get_drvdata(dev);
- 	struct xcan_priv *priv = netdev_priv(ndev);
- 
- 	if (netif_running(ndev)) {
-@@ -987,43 +1003,55 @@ static int __maybe_unused xcan_suspend(struct device *dev)
- 	priv->write_reg(priv, XCAN_MSR_OFFSET, XCAN_MSR_SLEEP_MASK);
- 	priv->can.state = CAN_STATE_SLEEPING;
- 
--	clk_disable(priv->bus_clk);
--	clk_disable(priv->can_clk);
-+	clk_disable_unprepare(priv->bus_clk);
-+	clk_disable_unprepare(priv->can_clk);
- 
- 	return 0;
- }
- 
- /**
-- * xcan_resume - Resume from suspend
-- * @dev:	Address of the platformdevice structure
-+ * xcan_runtime_resume - Runtime resume from suspend
-+ * @dev:	Address of the device structure
-  *
-  * Resume operation after suspend.
-  * Return: 0 on success and failure value on error
-  */
--static int __maybe_unused xcan_resume(struct device *dev)
-+static int __maybe_unused xcan_runtime_resume(struct device *dev)
- {
--	struct platform_device *pdev = dev_get_drvdata(dev);
--	struct net_device *ndev = platform_get_drvdata(pdev);
-+	struct net_device *ndev = dev_get_drvdata(dev);
- 	struct xcan_priv *priv = netdev_priv(ndev);
- 	int ret;
-+	u32 isr, status;
- 
--	ret = clk_enable(priv->bus_clk);
-+	ret = clk_prepare_enable(priv->bus_clk);
- 	if (ret) {
- 		dev_err(dev, "Cannot enable clock.\n");
- 		return ret;
- 	}
--	ret = clk_enable(priv->can_clk);
-+	ret = clk_prepare_enable(priv->can_clk);
- 	if (ret) {
- 		dev_err(dev, "Cannot enable clock.\n");
- 		clk_disable_unprepare(priv->bus_clk);
- 		return ret;
- 	}
- 
--	priv->write_reg(priv, XCAN_MSR_OFFSET, 0);
--	priv->write_reg(priv, XCAN_SRR_OFFSET, XCAN_SRR_CEN_MASK);
--	priv->can.state = CAN_STATE_ERROR_ACTIVE;
-+	priv->write_reg(priv, XCAN_SRR_OFFSET, XCAN_SRR_RESET_MASK);
-+	isr = priv->read_reg(priv, XCAN_ISR_OFFSET);
-+	status = priv->read_reg(priv, XCAN_SR_OFFSET);
- 
- 	if (netif_running(ndev)) {
-+		if (isr & XCAN_IXR_BSOFF_MASK) {
-+			priv->can.state = CAN_STATE_BUS_OFF;
-+			priv->write_reg(priv, XCAN_SRR_OFFSET,
-+					XCAN_SRR_RESET_MASK);
-+		} else if ((status & XCAN_SR_ESTAT_MASK) ==
-+					XCAN_SR_ESTAT_MASK) {
-+			priv->can.state = CAN_STATE_ERROR_PASSIVE;
-+		} else if (status & XCAN_SR_ERRWRN_MASK) {
-+			priv->can.state = CAN_STATE_ERROR_WARNING;
-+		} else {
-+			priv->can.state = CAN_STATE_ERROR_ACTIVE;
-+		}
- 		netif_device_attach(ndev);
- 		netif_start_queue(ndev);
- 	}
-@@ -1031,7 +1059,10 @@ static int __maybe_unused xcan_resume(struct device *dev)
- 	return 0;
- }
- 
--static SIMPLE_DEV_PM_OPS(xcan_dev_pm_ops, xcan_suspend, xcan_resume);
-+static const struct dev_pm_ops xcan_dev_pm_ops = {
-+	SET_SYSTEM_SLEEP_PM_OPS(xcan_suspend, xcan_resume)
-+	SET_RUNTIME_PM_OPS(xcan_runtime_suspend, xcan_runtime_resume, NULL)
-+};
- 
- /**
-  * xcan_probe - Platform registration call
-@@ -1072,7 +1103,7 @@ static int xcan_probe(struct platform_device *pdev)
- 		return -ENOMEM;
- 
- 	priv = netdev_priv(ndev);
--	priv->dev = ndev;
-+	priv->dev = &pdev->dev;
- 	priv->can.bittiming_const = &xcan_bittiming_const;
- 	priv->can.do_set_mode = xcan_do_set_mode;
- 	priv->can.do_get_berr_counter = xcan_get_berr_counter;
-@@ -1114,21 +1145,18 @@ static int xcan_probe(struct platform_device *pdev)
- 		}
- 	}
- 
--	ret = clk_prepare_enable(priv->can_clk);
--	if (ret) {
--		dev_err(&pdev->dev, "unable to enable device clock\n");
--		goto err_free;
--	}
--
--	ret = clk_prepare_enable(priv->bus_clk);
--	if (ret) {
--		dev_err(&pdev->dev, "unable to enable bus clock\n");
--		goto err_unprepare_disable_dev;
--	}
--
- 	priv->write_reg = xcan_write_reg_le;
- 	priv->read_reg = xcan_read_reg_le;
- 
-+	pm_runtime_irq_safe(&pdev->dev);
-+	pm_runtime_enable(&pdev->dev);
-+	ret = pm_runtime_get_sync(&pdev->dev);
-+	if (ret < 0) {
-+		netdev_err(ndev, "%s: pm_runtime_get failed(%d)\n",
-+			__func__, ret);
-+		goto err_pmdisable;
-+	}
-+
- 	if (priv->read_reg(priv, XCAN_SR_OFFSET) != XCAN_SR_CONFIG_MASK) {
- 		priv->write_reg = xcan_write_reg_be;
- 		priv->read_reg = xcan_read_reg_be;
-@@ -1141,22 +1169,23 @@ static int xcan_probe(struct platform_device *pdev)
- 	ret = register_candev(ndev);
- 	if (ret) {
- 		dev_err(&pdev->dev, "fail to register failed (err=%d)\n", ret);
--		goto err_unprepare_disable_busclk;
-+		goto err_disableclks;
- 	}
- 
- 	devm_can_led_init(ndev);
--	clk_disable_unprepare(priv->bus_clk);
--	clk_disable_unprepare(priv->can_clk);
-+
-+	pm_runtime_put(&pdev->dev);
-+
- 	netdev_dbg(ndev, "reg_base=0x%p irq=%d clock=%d, tx fifo depth:%d\n",
- 			priv->reg_base, ndev->irq, priv->can.clock.freq,
- 			priv->tx_max);
- 
- 	return 0;
- 
--err_unprepare_disable_busclk:
--	clk_disable_unprepare(priv->bus_clk);
--err_unprepare_disable_dev:
--	clk_disable_unprepare(priv->can_clk);
-+err_disableclks:
-+	pm_runtime_put(priv->dev);
-+err_pmdisable:
-+	pm_runtime_disable(&pdev->dev);
- err_free:
- 	free_candev(ndev);
- err:
-@@ -1175,10 +1204,8 @@ static int xcan_remove(struct platform_device *pdev)
- 	struct net_device *ndev = platform_get_drvdata(pdev);
- 	struct xcan_priv *priv = netdev_priv(ndev);
- 
--	if (set_reset_mode(ndev) < 0)
--		netdev_err(ndev, "mode resetting failed!\n");
--
- 	unregister_candev(ndev);
-+	pm_runtime_disable(&pdev->dev);
- 	netif_napi_del(&priv->napi);
- 	free_candev(ndev);
- 
--- 
-2.1.2
+I'd really like to avoid this particular fixup because it's done
+between pci_scan_root_bus() and pci_assign_unassigned_bus_resources()
+and pci_bus_add_devices().  That path is almost 100% arch-independent,
+and someday we should be able to pull all that out into one PCI core
+interface.
+
+You might be able to do the link retrain fixup as a header quirk.
+That's not really ideal either, but I don't think we have a good
+mechanism of inserting per-host bridge hooks in the enumeration path.
+There are some pcibios_*() hooks, but those are per-arch, not per-host
+bridge, so they're not really what you want here.
+
+I think other host drivers have handled the "prevent enumeration of
+root complex resources" problem by adding a similar check in the
+config accessors.
+
+> +static int altera_pcie_cfg_write(struct pci_bus *bus, unsigned int devfn,
+> +				 int where, int size, u32 value)
+
+This needs a comment to the effect that this hardware can only generate
+32-bit config accesses.  We also need a printk in the probe routine so
+there's a note in dmesg so we have a clue that RW1C bits in config space
+may be corrupted.
+
+> +{
+> +	struct altera_pcie *pcie = bus->sysdata;
+> +	u32 data32;
+> +	u32 shift = 8 * (where & 3);
+> +	u8 byte_en;
+> +
+> +	if (!altera_pcie_valid_config(pcie, bus, PCI_SLOT(devfn)))
+> +		return PCIBIOS_DEVICE_NOT_FOUND;
+> +
+> +	switch (size) {
+> +	case 1:
+> +		data32 = (value & 0xff) << shift;
+> +		byte_en = 1 << (where & 3);
+> +		break;
+> +	case 2:
+> +		data32 = (value & 0xffff) << shift;
+> +		byte_en = 3 << (where & 3);
+> +		break;
+> +	default:
+> +		data32 = value;
+> +		byte_en = 0xf;
+> +		break;
+> +	}
+> +
+> +	return tlp_cfg_dword_write(pcie, bus->number, devfn,
+> +		(where & ~DWORD_MASK), byte_en, data32);
+> +}
+
+> +static void altera_pcie_isr(struct irq_desc *desc)
+> +{
+> +	struct irq_chip *chip = irq_desc_get_chip(desc);
+> +	struct altera_pcie *pcie;
+> +	unsigned long status;
+> +	u32 bit;
+> +	u32 virq;
+> +
+> +	chained_irq_enter(chip, desc);
+> +	pcie = irq_desc_get_handler_data(desc);
+> +
+> +	while ((status = cra_readl(pcie, P2A_INT_STATUS)
+> +		& P2A_INT_STS_ALL) != 0) {
+> +		for_each_set_bit(bit, &status, INTX_NUM) {
+> +			/* clear interrupts */
+> +			cra_writel(pcie, 1 << bit, P2A_INT_STATUS);
+> +
+> +			virq = irq_find_mapping(pcie->irq_domain, bit + 1);
+> +			if (virq)
+> +				generic_handle_irq(virq);
+> +			else
+> +				dev_err(&pcie->pdev->dev, "unexpected IRQ\n");
+
+Include the bit number here.  A printk string with no % substitutions
+is rarely as useful as it could be.
+
+> ...
+> +	bus = pci_scan_root_bus(&pdev->dev, pcie->root_bus_nr, &altera_pcie_ops,
+> +				pcie, &pcie->resources);
+> +	if (!bus)
+> +		return -ENOMEM;
+> +
+> +	altera_pcie_fixups(bus);
+> +	pci_fixup_irqs(pci_common_swizzle, of_irq_parse_and_map_pci);
+> +	pci_assign_unassigned_bus_resources(bus);
+> +	pci_bus_add_devices(bus);
+> +
+> +	/* Configure PCI Express setting. */
+> +	list_for_each_entry(child, &bus->children, node)
+> +		pcie_bus_configure_settings(child);
+
+This loop should be before pci_bus_add_devices().  When we call
+pci_bus_add_devices(), drivers may claim devices immediately, and the
+PCI core shouldn't be changing device configuration while a driver
+owns the device.
+
+Bjorn
