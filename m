@@ -1,12 +1,12 @@
-From: caesar.upstream@gmail.com (Caesar Wang)
-Date: Fri, 23 Oct 2015 14:32:27 +0800
+From: sasukewxt@163.com (Caesar Wang)
+Date: Fri, 23 Oct 2015 14:31:54 +0800
 Subject: [PATCH v3 2/3] thermal: rockchip: ensure the otp states before
  resetting the controller
 In-Reply-To: <CAD=FV=WZqXRt4R_TTaz4LJxWo5B0fmrBjma52cVidpO=OkjcaQ@mail.gmail.com>
 References: <1445565296-31517-1-git-send-email-wxt@rock-chips.com>
  <1445565296-31517-3-git-send-email-wxt@rock-chips.com>
  <CAD=FV=WZqXRt4R_TTaz4LJxWo5B0fmrBjma52cVidpO=OkjcaQ@mail.gmail.com>
-Message-ID: <5629D47B.2030204@gmail.com>
+Message-ID: <5629D45A.1090407@163.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -127,8 +127,3 @@ It didn't work on box board.
 > Linux-rockchip mailing list
 > Linux-rockchip at lists.infradead.org
 > http://lists.infradead.org/mailman/listinfo/linux-rockchip
-
-
--- 
-Thanks,
-Caesar
