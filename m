@@ -1,42 +1,35 @@
-From: yao.yuan@freescale.com (Yuan Yao)
-Date: Fri, 23 Oct 2015 09:59:13 +0800
-Subject: [PATCH v2 3/3] dma: dts: Add Freescale qDMA engine driver support
-In-Reply-To: <1445565553-1141-1-git-send-email-yao.yuan@freescale.com>
-References: <1445565553-1141-1-git-send-email-yao.yuan@freescale.com>
-Message-ID: <1445565553-1141-3-git-send-email-yao.yuan@freescale.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Fri, 23 Oct 2015 11:14:15 +0900
+Subject: [PATCHv2] ARM: dts: change the compatible from exynos5250 to
+ exynos5420 for mshc
+In-Reply-To: <1445565713-4000-1-git-send-email-jh80.chung@samsung.com>
+References: <1445565713-4000-1-git-send-email-jh80.chung@samsung.com>
+Message-ID: <562997F7.3060803@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add Freescale Queue Direct Memory Access(qDMA) controller support.
-This module can be found on LS-1 and LS-2 SoCs.
+On 23.10.2015 11:01, Jaehoon Chung wrote:
+> Exynos3250 and exnos5250 are some differences in Mobile Storage Host.
+> (For example, exynos3250 support the HS400 mode, but exynos5250 doesn't
+> support it.)
+> Exynos3250 can perform the similar function with exynos5420 compatible.
+> So this patch changes the compatible from exynos5250 to exynos5420
+> for mshc.
+> 
+> Signed-off-by: Jaehoon Chung <jh80.chung@samsung.com>
+> ---
+> Changelog v2:
+> 	- Drop "mmc: dw_mmc: exynos: Add the exynos3250 compatible" patch.
+> 	- Describe commit-message more detailedly than before.
+> 	- Change to exynos5420, not add new compatible (exynos3250).
+> 
+>  arch/arm/boot/dts/exynos3250.dtsi | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
 
-This add the legacy mode support for qDMA.
 
-Signed-off-by: Yuan Yao <yao.yuan@freescale.com>
----
- arch/arm/boot/dts/ls1021a.dtsi | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+Thanks! Looks good:
 
-diff --git a/arch/arm/boot/dts/ls1021a.dtsi b/arch/arm/boot/dts/ls1021a.dtsi
-index 9430a99..9d7073b 100644
---- a/arch/arm/boot/dts/ls1021a.dtsi
-+++ b/arch/arm/boot/dts/ls1021a.dtsi
-@@ -428,6 +428,16 @@
- 				 <&platform_clk 1>;
- 		};
- 
-+		qdma: qdma at 8389000 {
-+			      compatible = "fsl,ls1021a-qdma";
-+			      reg = <0x0 0x8389000 0x0 0x20000>;
-+			      interrupts = <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>,
-+					 <GIC_SPI 170 IRQ_TYPE_LEVEL_HIGH>;
-+			      interrupt-names = "qdma-tx", "qdma-err";
-+			      channels = <1>;
-+			      big-endian;
-+		};
-+
- 		mdio0: mdio at 2d24000 {
- 			compatible = "gianfar";
- 			device_type = "mdio";
--- 
-2.1.0.27.g96db324
+Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+
+Best regards,
+Krzysztof
