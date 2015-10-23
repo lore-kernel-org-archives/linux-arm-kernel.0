@@ -1,52 +1,68 @@
-From: Dave.Martin@arm.com (Dave Martin)
-Date: Fri, 23 Oct 2015 11:31:00 +0100
-Subject: [PATCH] Revert "serial: amba-pl011: fix incorrect integer size
- in pl011_fifo_to_tty()"
-In-Reply-To: <1445594400-29095-1-git-send-email-shijie.huang@arm.com>
-References: <1445594400-29095-1-git-send-email-shijie.huang@arm.com>
-Message-ID: <20151023103056.GI4801@e103592.cambridge.arm.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Fri, 23 Oct 2015 11:44:58 +0100
+Subject: [PATCH v2 4/5] drivers: firmware: psci: add extended stateid
+ power_state support
+In-Reply-To: <3982126.UybqODJKJo@wuerfel>
+References: <1436375811-10529-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1436375811-10529-5-git-send-email-lorenzo.pieralisi@arm.com>
+ <CAMAWPa9ZLGidg3r8RJY9MANdmjPdJ07S7mmixQBf_g3YPce1_g@mail.gmail.com>
+ <3982126.UybqODJKJo@wuerfel>
+Message-ID: <20151023104457.GA9309@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 23, 2015 at 06:00:00PM +0800, Huang Shijie wrote:
-> The commit 71a5cd8a4 makes the console hang for some times.
-> This reverts commit 71a5cd8a4a2602a6e9010b557a23af0a54df87b6.
-
-What hangs?  Input?  Output?  Both?
-
-Is CREAD set on the terminal?  If only input hangs, it's possible CREAD
-is not set and we were previously getting away with it, though I can't
-easily see why it should be unset...
-
-Cheers
----Dave
-
+On Fri, Oct 23, 2015 at 12:23:53PM +0200, Arnd Bergmann wrote:
+> On Thursday 22 October 2015 15:07:06 Kevin Hilman wrote:
+> > On Wed, Jul 8, 2015 at 10:16 AM, Lorenzo Pieralisi
+> > <lorenzo.pieralisi@arm.com> wrote:
+> > > PSCI v1.0 augmented the power_state parameter format specification
+> > > (extended stateid) and introduced a way to probe it through the
+> > > PSCI_FEATURES interface.
+> > >
+> > > This patch implements code that detects the power_state format at
+> > > run-time through the PSCI_FEATURES interface, so that the power_state
+> > > argument can be properly detected and validated in the kernel according
+> > > to the information provided through firmware.
+> > >
+> > > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> > > Cc: Mark Rutland <mark.rutland@arm.com>
+> > 
+> > kernelci.org started finding a new boot failures in the arm-soc tree
+> > on arm64 qemu[1] and it was bisected down to this patch, which is in
+> > arm-soc in the form of commit a5c00bb28da0 (drivers: firmware: psci:
+> > add extended stateid power_state support)
+> > 
+> > The patch doesn't revert cleanly, so I didn't dig much further, but
+> > this suggests that some more testing on qemu is needed (or does qemu
+> > need to be upgraded?)
+> > 
+> > Kevin
+> > 
+> > [1] http://kernelci.org/boot/all/job/arm-soc/kernel/v4.3-rc5-557-g159ca7e43189/
+> > 
 > 
-> Signed-off-by: Huang Shijie <shijie.huang@arm.com>
-> ---
->  drivers/tty/serial/amba-pl011.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
-> index 899a771..fd27e98 100644
-> --- a/drivers/tty/serial/amba-pl011.c
-> +++ b/drivers/tty/serial/amba-pl011.c
-> @@ -191,8 +191,8 @@ struct uart_amba_port {
->   */
->  static int pl011_fifo_to_tty(struct uart_amba_port *uap)
->  {
-> -	u16 status;
-> -	unsigned int ch, flag, max_count = 256;
-> +	u16 status, ch;
-> +	unsigned int flag, max_count = 256;
->  	int fifotaken = 0;
->  
->  	while (max_count--) {
-> -- 
-> 2.1.4
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> Could it be that qemu claims to support psci-1.0 but is actually not
+> compatible?
+
+Yes, the problem is, PSCI functions that are not implemented must return
+NOT_SUPPORTED according to the SMC calling convention and the PSCI
+spec. The KVM implementation was not compliant and we patched the
+kernel already:
+
+commit e2d997366dc5b ("ARM: kvm: psci: fix handling of unimplemented
+functions")
+
+So the KVM PSCI implementation is fine now.
+
+Problem with Qemu emulation is that it does not emulate the PSCI 1.0
+specs correctly (it does not even consider PSCI 1.0 functions proper PSCI
+calls), I tested it and I think we should update Qemu as we
+did with KVM kernel code instead of working around it by dodging the
+problem in the PSCI implementation by adding code that checks the
+PSCI version before issuing the PSCI calls through the respective
+conduit.
+
+Thoughts appreciated.
+
+Thanks,
+Lorenzo
