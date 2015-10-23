@@ -1,106 +1,58 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Fri, 23 Oct 2015 15:58:43 +0100
-Subject: [PATCH] drivers: psci: make PSCI 1.0 functions initialization
- version dependent
-In-Reply-To: <1445611610-12871-1-git-send-email-lorenzo.pieralisi@arm.com>
-References: <1445611610-12871-1-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <562A4B23.6020702@arm.com>
+From: julien.grall@citrix.com (Julien Grall)
+Date: Fri, 23 Oct 2015 15:58:23 +0100
+Subject: arm64: iomem_resource doesn't contain all the region used
+Message-ID: <562A4B0F.2020603@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi all,
 
+I've been working on trying to get balloon memory hotplug working for
+ARM64 guest on Xen.
 
-On 23/10/15 15:46, Lorenzo Pieralisi wrote:
-> The PSCI specifications [1] and the SMC calling convention mandate
-> that unimplemented functions ids must return NOT_SUPPORTED (0xffffffff)
-> if a function id is called but it is not implemented.
->
-> Consequently, PSCI 1.0 function ids that require the 1.0 PSCI_FEATURES
-> call to be initialized:
->
-> CPU_SUSPEND (psci_init_cpu_suspend())
-> SYSTEM_SUSPEND (psci_init_system_suspend())
->
-> call the PSCI_FEATURES function id independently of the detected
-> PSCI firmware version, since, if the PSCI_FEATURES function id is not
-> implemented, it must return NOT_SUPPORTED according to the PSCI
-> specifications, causing the initialization functions to fail as expected.
->
-> Some existing PSCI implementations (ie Qemu PSCI emulation), do not
-> comply with the SMC calling convention and fail if function ids that are
-> not implemented are called from the OS, causing boot failures.
->
-> To solve this issue, this patch adds code that checks the PSCI firmware
-> version before calling PSCI 1.0 initialization functions so that the
-> OS makes sure that it is calling 1.0 functions only if the firmware
-> version detected is 1.0 or greater, therefore avoiding PSCI calls
-> that are bound to fail and might cause system boot failures owing
-> to non-compliant PSCI firmware implementations.
->
-> [1] http://infocenter.arm.com/help/topic/com.arm.doc.den0022c/DEN0022C_Power_State_Coordination_Interface.pdf
->
-> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: Kevin Hilman <khilman@kernel.org>
-> Cc: Sudeep Holla <sudeep.holla@arm.com>
+In order to find a suitable region to hotplug the fake memory, we are
+trying to find a free region within iomem_resource.
 
-Looks good to me(however have alternate thought, see below)
-Acked-by: Sudeep Holla <sudeep.holla@arm.com>
+But on ARM64, only an handful number of regions are listed in it. For
+instance on X-Gene we have only:
 
-> Cc: Olof Johansson <olof@lixom.net>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> ---
-> Arnd, Kevin, Olof,
->
-> this applies to current arm-soc drivers/psci branch, and solves the
-> issue Kevin detected through kernelci with Qemu emulation:
->
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-October/380304.html
->
-> Tested on:
->
-> - Juno host
-> - AMD Seattle host
-> - kvmtool arm64 guest (on Juno arm64 defconfig host)
-> - Qemu x86 host (aarch64 emulation)
->
-> A run on kernelci and consequent tested-by tags would be much appreciated,
-> thanks for spotting this and for your help.
->
-> Thanks,
-> Lorenzo
->
->   drivers/firmware/psci.c | 7 ++++---
->   1 file changed, 4 insertions(+), 3 deletions(-)
->
-> diff --git a/drivers/firmware/psci.c b/drivers/firmware/psci.c
-> index 492db42..d24f35d 100644
-> --- a/drivers/firmware/psci.c
-> +++ b/drivers/firmware/psci.c
-> @@ -347,9 +347,10 @@ static int __init psci_probe(void)
->
->   	psci_init_migrate();
->
-> -	psci_init_cpu_suspend();
-> -
-> -	psci_init_system_suspend();
-> +	if (PSCI_VERSION_MAJOR(ver) >= 1) {
+42sh> cat /proc/iomem
 
-Alternatively we can just add this check in psci_features function and
-return PSCI_RET_NOT_SUPPORTED if PSCI_VERSION_MAJOR(ver) < 1. New
-callers of psci_features are also protected and need not add checks@
-call sites. Thoughts ?
+10510000-105103ff : /soc/rtc at 10510000
+1a400000-1a400fff : /soc/sata at 1a400000
+1a800000-1a800fff : /soc/sata at 1a800000
+1f220000-1f220fff : /soc/sata at 1a400000
+1f227000-1f227fff : /soc/sata at 1a400000
+1f22a000-1f22a0ff : /soc/phy at 1f22a000
+1f22d000-1f22dfff : /soc/sata at 1a400000
+1f22e000-1f22efff : /soc/sata at 1a400000
+1f230000-1f230fff : /soc/sata at 1a800000
+1f23a000-1f23a0ff : /soc/phy at 1f23a000
+1f23d000-1f23dfff : /soc/sata at 1a800000
+1f23e000-1f23efff : /soc/sata at 1a800000
+1f2b0000-1f2bffff : csr
+79000000-798fffff : /soc/msi at 79000000
+4100000000-41ffffffff : System RAM
+  4100080000-41008b58a3 : Kernel code
+  410093c000-41009e9fff : Kernel data
+e0d0000000-e0d003ffff : cfg
 
-I am fine with this patch as is and don't have a strong opinion.
+This is because most of the ARM drivers are using of_iomap which doesn't
+register the region.
 
-> +		psci_init_cpu_suspend();
-> +		psci_init_system_suspend();
-> +	}
->
->   	return 0;
->   }
->
+Looking to the code, I found a function of_io_request_and_map which
+register the resource and does the mapping. I'm wondering if there is
+any reason to have introduce a new function rather than doing the job in
+of_iomap?
+
+Although, that wouldn't fix all the drivers because some of them are
+directly using ioremap. I've got in mind the initialization of GICv2 for
+ACPI platform.
+
+Is there any way we could register the IO region used on ARM without
+having to enforce it in all the drivers?
+
+Regards,
 
 -- 
-Regards,
-Sudeep
+Julien Grall
