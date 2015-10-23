@@ -1,45 +1,20 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 23 Oct 2015 13:36:21 -0700
-Subject: MUSB peripheral DMA regression caused by driver core runtime PM
- change
-In-Reply-To: <Pine.LNX.4.44L0.1510231629430.1644-100000@iolanthe.rowland.org>
-References: <20151023192044.GX3078@atomide.com>
- <Pine.LNX.4.44L0.1510231629430.1644-100000@iolanthe.rowland.org>
-Message-ID: <20151023203620.GY3078@atomide.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 23 Oct 2015 22:39:15 +0200
+Subject: [PATCH v4 00/12] ARM64: Update support for FSL's LS2085A SoC
+In-Reply-To: <1445628721-10483-1-git-send-email-bhupesh.sharma@freescale.com>
+References: <1445628721-10483-1-git-send-email-bhupesh.sharma@freescale.com>
+Message-ID: <8597566.OLE6hhA6ha@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Alan Stern <stern@rowland.harvard.edu> [151023 13:34]:
-> On Fri, 23 Oct 2015, Tony Lindgren wrote:
+On Saturday 24 October 2015 01:01:49 Bhupesh Sharma wrote:
+> This is the v4 of the patchset which updates the support for FSL's LS2085A SoC
+> which is now being renamed to LS2080A (and is based on ARMv8 architecture).
 > 
-> > > Thus the sequence of events should be:
-> > > 
-> > > 	Allocate the musb device;
-> > > 	Runtime-enable the omap2430 (since it is now safe to do so);
-> > > 	Runtime-enable the musb and declare it irq_safe (this will
-> > > 		automatically runtime-resume the omap2430);
-> > > 	Register the musb.
-> > > 
-> > > If things are done this way, no special action needs to be taken.
-> > 
-> > Yes good point, that requires changing the init for the whole
-> > drivers/musb though.
+> Here is a description of what this patchset tries to achieve:
+> (v3 can be viewed here: http://www.spinics.net/lists/arm-kernel/msg452747.html)
 > 
-> This will have to be done anyway, since the way it is now (if I 
-> understand correctly), the musb is registered and made available to 
-> userspace before its parent is operational (i.e., at full power).
 
-Yes I agree.
+Applied all patches except for 5/12, as explained. Thanks,
 
-> > Also, we should reorganize the whole musb and make
-> > the platform glue and musb core drivers completely separate using a
-> > shared interrupt where needed.
-> > 
-> > For the regression for the -rc series? Do you see any better
-> > alternatives to what I posted?
-> 
-> No.
-
-OK thanks,
-
-Tony
+	Arnd
