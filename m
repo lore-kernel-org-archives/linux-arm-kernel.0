@@ -1,53 +1,92 @@
 From: anup.patel@broadcom.com (Anup Patel)
-Date: Fri, 23 Oct 2015 10:46:12 +0530
-Subject: [PATCH v3 1/2] mtd: brcmnand: Force 8bit mode before doing
- nand_scan_ident()
+Date: Fri, 23 Oct 2015 10:46:13 +0530
+Subject: [PATCH v3 2/2] arm64: dts: Add BRCM IPROC NAND DT node for NS2
 In-Reply-To: <1445577373-21252-1-git-send-email-anup.patel@broadcom.com>
 References: <1445577373-21252-1-git-send-email-anup.patel@broadcom.com>
-Message-ID: <1445577373-21252-2-git-send-email-anup.patel@broadcom.com>
+Message-ID: <1445577373-21252-3-git-send-email-anup.patel@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Just like other NAND controllers, the NAND READID command only works
-in 8bit mode for all versions of BRCMNAND controller.
+The NAND controller on NS2 SoC is compatible with existing
+BRCM IPROC NAND driver so let's enable it in NS2 DT and
+NS2 SVK DT.
 
-This patch forces 8bit mode for each NAND CS in brcmnand_init_cs()
-before doing nand_scan_ident() to ensure that BRCMNAND controller
-is in 8bit mode when NAND READID command is issued.
+This patch also fixes use of node labels in ns2-svk.dts.
 
 Signed-off-by: Anup Patel <anup.patel@broadcom.com>
 Reviewed-by: Ray Jui <rjui@broadcom.com>
 Reviewed-by: Scott Branden <sbranden@broadcom.com>
 ---
- drivers/mtd/nand/brcmnand/brcmnand.c | 9 +++++++++
- 1 file changed, 9 insertions(+)
+ arch/arm64/boot/dts/broadcom/ns2-svk.dts | 30 ++++++++++++++++++++----------
+ arch/arm64/boot/dts/broadcom/ns2.dtsi    | 14 ++++++++++++++
+ 2 files changed, 34 insertions(+), 10 deletions(-)
 
-diff --git a/drivers/mtd/nand/brcmnand/brcmnand.c b/drivers/mtd/nand/brcmnand/brcmnand.c
-index 4cba03d..0be8ef9 100644
---- a/drivers/mtd/nand/brcmnand/brcmnand.c
-+++ b/drivers/mtd/nand/brcmnand/brcmnand.c
-@@ -1888,6 +1888,7 @@ static int brcmnand_init_cs(struct brcmnand_host *host)
- 	struct mtd_info *mtd;
- 	struct nand_chip *chip;
- 	int ret;
-+	u16 cfg_offs;
- 	struct mtd_part_parser_data ppdata = { .of_node = dn };
+diff --git a/arch/arm64/boot/dts/broadcom/ns2-svk.dts b/arch/arm64/boot/dts/broadcom/ns2-svk.dts
+index e5950d5..6bb3d4d 100644
+--- a/arch/arm64/boot/dts/broadcom/ns2-svk.dts
++++ b/arch/arm64/boot/dts/broadcom/ns2-svk.dts
+@@ -50,18 +50,28 @@
+ 		device_type = "memory";
+ 		reg = <0x000000000 0x80000000 0x00000000 0x40000000>;
+ 	};
++};
  
- 	ret = of_property_read_u32(dn, "reg", &host->cs);
-@@ -1930,6 +1931,14 @@ static int brcmnand_init_cs(struct brcmnand_host *host)
+-	soc: soc {
+-		i2c0: i2c at 66080000 {
+-			status = "ok";
+-		};
++&i2c0 {
++	status = "ok";
++};
  
- 	chip->controller = &ctrl->controller;
- 
-+	/*
-+	 * The bootloader might have configured 16bit mode but
-+	 * NAND READID command only works in 8bit mode. We force
-+	 * 8bit mode here to ensure that NAND READID commands works.
-+	 */
-+	cfg_offs = brcmnand_cs_offset(ctrl, host->cs, BRCMNAND_CS_CFG);
-+	nand_writereg(ctrl, cfg_offs, nand_readreg(ctrl, cfg_offs) & ~BIT(23));
+-		i2c1: i2c at 660b0000 {
+-			status = "ok";
+-		};
++&i2c1 {
++	status = "ok";
++};
 +
- 	if (nand_scan_ident(mtd, 1, NULL))
- 		return -ENXIO;
++&uart3 {
++	status = "ok";
++};
  
+-		uart3: serial at 66130000 {
+-			status = "ok";
+-		};
++&nand {
++	nandcs at 0 {
++		compatible = "brcm,nandcs";
++		reg = <0>;
++		nand-ecc-mode = "hw";
++		nand-ecc-strength = <8>;
++		nand-ecc-step-size = <512>;
++		#address-cells = <1>;
++		#size-cells = <1>;
+ 	};
+ };
+diff --git a/arch/arm64/boot/dts/broadcom/ns2.dtsi b/arch/arm64/boot/dts/broadcom/ns2.dtsi
+index f603277..9610822 100644
+--- a/arch/arm64/boot/dts/broadcom/ns2.dtsi
++++ b/arch/arm64/boot/dts/broadcom/ns2.dtsi
+@@ -212,5 +212,19 @@
+ 			compatible = "brcm,iproc-rng200";
+ 			reg = <0x66220000 0x28>;
+ 		};
++
++		nand: nand at 66460000 {
++			compatible = "brcm,nand-iproc", "brcm,brcmnand-v6.1";
++			reg = <0x66460000 0x600>,
++			      <0x67015408 0x600>,
++			      <0x66460f00 0x20>;
++			reg-names = "nand", "iproc-idm", "iproc-ext";
++			interrupts = <GIC_SPI 420 IRQ_TYPE_LEVEL_HIGH>;
++
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			brcm,nand-has-wp;
++		};
+ 	};
+ };
 -- 
 1.9.1
