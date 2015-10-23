@@ -1,33 +1,32 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 23 Oct 2015 22:16:29 +0200
-Subject: [PATCH 2/4] ARM: dts: uniphier: delete i2c aliases
-In-Reply-To: <1445427390-22750-3-git-send-email-yamada.masahiro@socionext.com>
-References: <1445427390-22750-1-git-send-email-yamada.masahiro@socionext.com>
- <1445427390-22750-3-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <4000897.7Un1B3qMyp@wuerfel>
+Date: Fri, 23 Oct 2015 22:19:25 +0200
+Subject: [GIT PULL] omap dts changes for v4.4 merge window, part 2
+In-Reply-To: <20151020193501.GN3078@atomide.com>
+References: <20151020193501.GN3078@atomide.com>
+Message-ID: <4174355.uUodgcne1B@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 21 October 2015 20:36:28 Masahiro Yamada wrote:
-> The user space should not expect that a particular I2C channel is
-> always visible through the same character device.
-> No reason to fix the I2C indexes with aliases.
+On Tuesday 20 October 2015 12:35:02 Tony Lindgren wrote:
+> Few more omap dts changes for v4.4 merge window, mostly to fix and clean
+> up some omap5 issues to allow adding other omap5 boards. Also some other
+> fixes and clean-up:
 > 
-> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+> - Fix SDIO WLAN for omap5 that's been broken for a while. As further
+>   patches are still needed for wl18xx, no need for stable on this one.
+> 
+> - Move most of omap5 support into omap5-board-common.dtsi as most omap5
+>   boards seem to share the same basic set of devices.
+> 
+> - Add minimal IGEPv5 support using based on omap5-board-common.dtsi
+> 
+> - Remove now unneedes gpio hogging for dra72-evm
+> 
+> - Update Javier Martinez Canillas email address
+> 
+> - Change earlier IGEP boards to use IOPAD pinmux macros
 > 
 
-As I said in my reply to the earlier mail, I didn't really like the
-idea of having holes in the numbering for the i2c controllers, but
-this new approach also doesn't look ideal.
-
-We should have stable bus numbers on any given board, and the aliases
-work well for that. I just don't think the aliases need to be stable
-between different boards just because they are based on the same
-SoC.
-
-I'd suggest staying with the current slightly awkward approach though,
-to avoid regressions. Please send a follow-up patch to add the same
-aliases on the new boards and drop this patch, unless someone else
-can come up with a better idea.
+Pulled into next/dt, thanks!
 
 	Arnd
