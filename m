@@ -1,49 +1,43 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Fri, 23 Oct 2015 10:25:57 -0700
-Subject: [resend GIT PULL] ARM: mediatek: arm64 updates for v4.3
-In-Reply-To: <CABuKBeJbELoYh7fC_QNGgPxVHHhjioVn++z6Qj0W2X5Q-imL0g@mail.gmail.com>
-References: <CABuKBeJbELoYh7fC_QNGgPxVHHhjioVn++z6Qj0W2X5Q-imL0g@mail.gmail.com>
-Message-ID: <20151023172557.GK2224@localhost>
+From: peter@hurleysoftware.com (Peter Hurley)
+Date: Fri, 23 Oct 2015 13:49:06 -0400
+Subject: [PATCH] Revert "serial: amba-pl011: fix incorrect integer size in
+ pl011_fifo_to_tty()"
+In-Reply-To: <562A6296.3070600@codeaurora.org>
+References: <1445594400-29095-1-git-send-email-shijie.huang@arm.com>
+ <20151023103056.GI4801@e103592.cambridge.arm.com>
+ <562A297A.9030204@codeaurora.org>
+ <20151023133403.GI4796@e103592.cambridge.arm.com> <562A544D.7080506@tabi.org>
+ <20151023160246.GM4796@e103592.cambridge.arm.com>
+ <562A6296.3070600@codeaurora.org>
+Message-ID: <562A7312.5030501@hurleysoftware.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Oct 18, 2015 at 02:23:40PM +0200, Matthias Brugger wrote:
-> Hi Arnd and Olof,
+On 10/23/2015 12:38 PM, Timur Tabi wrote:
+> On 10/23/2015 11:02 AM, Dave P Martin wrote:
+>> I'm pretty sure CREAD should default to enabled[1], and that usually
+>> software won't modify it.
+>>
+>> Assuming that this is indeed the problem, it's possible that another bug
+>> in the pl011 driver is wrongly clearing this flag.  Sadly I don't have
+>> time to look at the code again just now ...:(
 > 
-> Please pull the following patches.
+> Perhaps, but !CREAD is definitely broken without this patch.  So if the driver really is clearing CREAD somewhere else, then that's where the real bug is.
 > 
-> I resend this pull request, because I forgot to add the arm mailing
-> list in the first place.
+>>
+>> Could be interesting to stick some BUG_ON(!CREAD) in the driver to
+>> try and track down where that's coming from.
 > 
-> Thanks,
-> Matthias
-> 
-> ---
-> 
-> The following changes since commit 1f93e4a96c9109378204c147b3eec0d0e8100fde:
-> 
->   Linux 4.3-rc2 (2015-09-20 14:32:34 -0700)
-> 
-> are available in the git repository at:
-> 
->   https://github.com/mbgg/linux-mediatek.git tags/v4.3-next-arm64
-> 
-> for you to fetch changes up to e34573c95a1416b4f26a5cc68b1de198e6b27ad7:
-> 
->   arm64: dts: mt8173: Add clocks for SCPSYS unit (2015-10-14 15:43:13 +0200)
-> 
-> ----------------------------------------------------------------
-> Correct i2c DTS node names in mt8173.dtsi.
-> 
-> Add spi DTS node to the mt8173 and mt8173-evb.
-> 
-> Add dts nodes for the subsystem clocks on mt8173.
-> This includes mmsys, imgsys, vdecsys, vencsys, vencltsys.
-> 
-> Add clock nodes to the scpsys binding, which are needed to
-> access the registers of venc and venc_lt power domains.
+> CREAD is disabled by default when opening the console.  You need to explicitly set it in the termios structure.
 
-Thanks, merged.
+No; the initial termios structure for all serial core-based drivers has
+CREAD set:
 
+pl011_probe
+   pl011_register_port
+      uart_register_driver
+         ...
+         normal->init_termios.c_cflag = .... | CREAD | ....;
 
--Olof
+Regards,
+Peter Hurley
