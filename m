@@ -1,33 +1,34 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 23 Oct 2015 22:22:14 +0200
-Subject: [GIT PULLv2] at91: dt for 4.4 #2
-In-Reply-To: <20151021205938.GA18600@piout.net>
-References: <20151021205938.GA18600@piout.net>
-Message-ID: <6283901.cB5kt79X9G@wuerfel>
+Date: Fri, 23 Oct 2015 22:28:27 +0200
+Subject: [PATCH v4 05/12] doc/bindings: Update Layerscape PCIe devicetree
+ bindings for LS2080A
+In-Reply-To: <1445628721-10483-6-git-send-email-bhupesh.sharma@freescale.com>
+References: <1445628721-10483-1-git-send-email-bhupesh.sharma@freescale.com>
+ <1445628721-10483-6-git-send-email-bhupesh.sharma@freescale.com>
+Message-ID: <4784400.64dhyokllJ@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 21 October 2015 22:59:38 Alexandre Belloni wrote:
+On Saturday 24 October 2015 01:01:54 Bhupesh Sharma wrote:
+> Update the definition of the Layerscape PCI compatible string to add
+> support for LS2080A, as the controller on LS2080A is different from
+> LS1021A SoC.
 > 
-> The following changes since commit a9b672a636a599cc052afcb6837e3177dc53c143:
+> While at it, move the clock related properties in the Designware PCIe
+> controller bindings to 'optional' set of properties.
 > 
->   ARM: at91/dt: sama5d2 Xplained: add device pin muxing (2015-09-23 16:26:47 +0200)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/abelloni/linux.git tags/at91-ab-dt2
-> 
-> for you to fetch changes up to 512fc048e4fdc39f43e78af7e2fed5047d651979:
-> 
->   ARM: at91/dt: sama5d2: add missing devices (2015-10-19 21:22:21 +0200)
-> 
-> ----------------------------------------------------------------
-> Second batch of DT changes for 4.4:
-> - some DT fixes: pullups, disabled property
-> - the PMC is now a syscon
-> - great improvement of sama5d2 support
+> Signed-off-by: Minghuan Lian <Minghuan.Lian@freescale.com>
+> Signed-off-by: Bhupesh Sharma <bhupesh.sharma@freescale.com>
+> ---
+>  .../devicetree/bindings/pci/designware-pcie.txt    |   10 +++++-----
+>  .../devicetree/bindings/pci/layerscape-pci.txt     |   14 ++++++++++++--
+>  2 files changed, 17 insertions(+), 7 deletions(-)
 > 
 
-Pulled into next/dt, thanks!
+This one depends on a patch that is in Bjorn's PCI tree but not
+yet in mainline.
+
+Please add my 'Acked-by: Arnd Bergmann <arnd@arndb.de>' and submit it to
+Bjorn so he can apply the patch on top of the other one.
 
 	Arnd
