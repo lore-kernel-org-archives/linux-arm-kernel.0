@@ -1,52 +1,60 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Fri, 23 Oct 2015 09:31:56 +0800
-Subject: [PATCH v3 0/2] simplefb: Add regulator handling support
-Message-ID: <1445563918-1050-1-git-send-email-wens@csie.org>
+Date: Fri, 23 Oct 2015 09:31:57 +0800
+Subject: [PATCH v3 1/2] dt-bindings: simplefb: Support regulator supply
+ properties
+In-Reply-To: <1445563918-1050-1-git-send-email-wens@csie.org>
+References: <1445563918-1050-1-git-send-email-wens@csie.org>
+Message-ID: <1445563918-1050-2-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi everyone,
+The physical display tied to the framebuffer may have regulators
+providing power to it, such as power for LCDs or interface conversion
+chips.
 
-This is v3 of the simplefb regulator support series. This series adds
-regulator claiming and enabling support for simplefb.
+The number of regulators in use may vary, but the regulator supply
+binding can not be a list. Instead just support any named regulator
+supply properties under the device node. These should be properly
+named to match the device schematics / design. The driver should
+take care to go through them all.
 
-Changes since v3:
-  - Dropped extra "if" which is always true, leftover from v1.
-  - Updated commit message of patch 1
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+Reviewed-by: Hans de Goede <hdegoede@redhat.com>
+Acked-by: Mark Brown <broonie@kernel.org>
+---
+ .../devicetree/bindings/video/simple-framebuffer.txt        | 13 +++++++++----
+ 1 file changed, 9 insertions(+), 4 deletions(-)
 
-Sometimes the simplefb display output path consits of external conversion
-chips and/or LCD drivers and backlights. These devices normally have
-GPIOs to turn them on and/or bring them out of reset, and regulators
-supplying power to them.
-
-While the kernel does not touch unclaimed GPIOs, the regulator core
-happily disables unused regulators. Thus we need simplefb to claim
-and enable the regulators used throughout the display pipeline.
-
-The binding supports any named regulator supplies under its device
-node. The driver will look through its properties, and claim any
-regulators by matching "*-supply", as Mark suggested.
-
-I've not done a generic helper in the regulator core yet, instead doing
-the regulator property handling in the simplefb code for now.
-
-
-Patch 1 adds the regulator properties to the DT binding.
-
-Patch 2 adds code to the simplefb driver to claim and enable regulators.
-
-
-Regards
-ChenYu
-
-
-Chen-Yu Tsai (2):
-  dt-bindings: simplefb: Support regulator supply properties
-  simplefb: Claim and enable regulators
-
- .../bindings/video/simple-framebuffer.txt          |  13 ++-
- drivers/video/fbdev/simplefb.c                     | 120 ++++++++++++++++++++-
- 2 files changed, 128 insertions(+), 5 deletions(-)
-
+diff --git a/Documentation/devicetree/bindings/video/simple-framebuffer.txt b/Documentation/devicetree/bindings/video/simple-framebuffer.txt
+index 4474ef6e0b95..8c9e9f515c87 100644
+--- a/Documentation/devicetree/bindings/video/simple-framebuffer.txt
++++ b/Documentation/devicetree/bindings/video/simple-framebuffer.txt
+@@ -47,10 +47,14 @@ Required properties:
+   - a8b8g8r8 (32-bit pixels, d[31:24]=a, d[23:16]=b, d[15:8]=g, d[7:0]=r).
+ 
+ Optional properties:
+-- clocks : List of clocks used by the framebuffer. Clocks listed here
+-           are expected to already be configured correctly. The OS must
+-           ensure these clocks are not modified or disabled while the
+-           simple framebuffer remains active.
++- clocks : List of clocks used by the framebuffer.
++- *-supply : Any number of regulators used by the framebuffer. These should
++	     be named according to the names in the device's design.
++
++  The above resources are expected to already be configured correctly.
++  The OS must ensure they are not modified or disabled while the simple
++  framebuffer remains active.
++
+ - display : phandle pointing to the primary display hardware node
+ 
+ Example:
+@@ -68,6 +72,7 @@ chosen {
+ 		stride = <(1600 * 2)>;
+ 		format = "r5g6b5";
+ 		clocks = <&ahb_gates 36>, <&ahb_gates 43>, <&ahb_gates 44>;
++		lcd-supply = <&reg_dc1sw>;
+ 		display = <&lcdc0>;
+ 	};
+ 	stdout-path = "display0";
 -- 
 2.6.1
