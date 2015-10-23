@@ -1,85 +1,92 @@
-From: mw@semihalf.com (Marcin Wojtas)
-Date: Fri, 23 Oct 2015 15:43:31 +0200
-Subject: [PATCH v3 2/5] mmc: sdhci-pxav3: enable usage of DAT3 pin as HW
- card detect
-In-Reply-To: <CAPDyKFqT6tGOKYM_tjnf7k70_1Uu70Vew8PpQW6g9KKzRKBX1g@mail.gmail.com>
-References: <1444926346-29763-1-git-send-email-mw@semihalf.com>
- <1444926346-29763-3-git-send-email-mw@semihalf.com>
- <CAPDyKFqT6tGOKYM_tjnf7k70_1Uu70Vew8PpQW6g9KKzRKBX1g@mail.gmail.com>
-Message-ID: <CAPv3WKcSohi5b0r_js50T1OPHRq608r9NFjscuXbXDzWQkwOgg@mail.gmail.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Fri, 23 Oct 2015 15:49:31 +0200
+Subject: [PATCH v4 0/4] simplefb: Add regulator handling support
+In-Reply-To: <1445572241-13259-1-git-send-email-wens@csie.org>
+References: <1445572241-13259-1-git-send-email-wens@csie.org>
+Message-ID: <562A3AEB.2080502@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ulf,
+Hi,
 
-2015-10-22 15:29 GMT+02:00 Ulf Hansson <ulf.hansson@linaro.org>:
-> On 15 October 2015 at 18:25, Marcin Wojtas <mw@semihalf.com> wrote:
->> Marvell Armada 38x SDHCI controller enable using DAT3 pin as a hardware
->> card detection. According to the SD sdandard this signal can be used for
->> this purpose combined with a pull-down resistor, implying inverted (active
->> high) polarization of a card detect. MMC standard does not support this
->> feature and does not operate with such connectivity of DAT3.
->>
->> When using DAT3-based detection Armada 38x SDIO IP expects its internal
->> clock to be always on, which had to be ensured by:
->> - Udating appropriate registers, each time controller is reset. On the
+Patches 1/2 look good and are:
+
+Reviewed-by: Hans de Goede <hdegoede@redhat.com>
+
+And the approach used for the regulators in them is also:
+
+Acked-by: Mark Brown <broonie@kernel.org>
+
+So patches 1/2 are ready for merging.
+
+Jean-Christophe or Tomi, can you pick up patch 1 &  2 please ?
+
+Regards,
+
+Hans
+
+
+
+On 10/23/2015 05:50 AM, Chen-Yu Tsai wrote:
+> Hi everyone,
 >
-> Isn't the reset sequence going to enable the clock again? I though
-> reset was used to recover from failures.
+> This is v4 of the simplefb regulator support series. This series adds
+> regulator claiming and enabling support for simplefb.
 >
-> To me, it seems odd that you need to deal with this, but of course
-> there are lots of odd things with sdhci. :-)
+> Changes since v4:
+>    - Fixed inverted logic when testing the property name.
+>    - Fixed regulator supply name string copy length off by 1.
+>    - Added real world user, MSI Primo 81 dts patches.
 >
-
-Setting clock enable in sdhci_control register is one thing, but this
-IP requires also setting other register, which is set to default after
-reset and does not get updated automatically.
-
->>   occasion of adding new register @0x104, register @0x100 name is modified
->>   in order to the be aligned with Armada 38x documentation.
->> - Leaving the clock enabled despite power-down. For this purpose a wrapper
->>   for sdhci_set_clock function is added.
->> - Disabling pm_runtime - during suspend both io_clock and controller's
->>   bus power is switched off, hence it would prevent proper card detection.
->>
->> In addition to the changes above this commit adds a new property to Armada
->> 38x SDHCI node ('dat3-cd') with an according binding documentation update.
->> 'sdhci_pxa' structure is also extended with dedicated flag for checking if
->> DAT3-based detection is in use.
+> Changes since v3:
+>    - Dropped extra "if" which is always true, leftover from v1.
+>    - Updated commit message of patch 1
 >
-> There is an easier way. Just check the new DT binding and if it set,
-> execute pm_runtime_forbid() during ->probe(). No more runtime PM
-> changes should be needed.
+> Sometimes the simplefb display output path consits of external conversion
+> chips and/or LCD drivers and backlights. These devices normally have
+> GPIOs to turn them on and/or bring them out of reset, and regulators
+> supplying power to them.
 >
-
-I will check it.
-
-> Actually, I wonder if we should make this a new mmc core feature. We
-> could via mmc_add_host() check if this DT property is set and then
-> invoke the pm_runtime_forbid(). What do you think?
+> While the kernel does not touch unclaimed GPIOs, the regulator core
+> happily disables unused regulators. Thus we need simplefb to claim
+> and enable the regulators used throughout the display pipeline.
 >
-
-I thought about it. dat3 detect is defined by SDIO standard
-(https://www.sdcard.org/developers/overview/sdio/sdio_spec/Simplified_SDIO_Card_Spec.pdf,
-section 4.6), so it can be enabled as a global feature. Each IP
-however would have to handle its own quirks related to it in the
-drivers. I don't know if clock_enable should be always set only for
-sdhci-pxav3 or for all hosts willing to use dat3 detection -
-intuitively it should be a common feature, but I cannot confirm it...
-
-On the other hand I will play with MMC_PM_KEEP_POWER capability, maybe
-with this flag mmc subsystem is already able to support dat3 cd and
-what has to be done is rather to satisfy sdhci-pxav3 quirks. Anyway, I
-cannot find any explicit reference to it.
-
-> One question, for clarity, you don't expect card detect IRQs to be
-> treated as wakeups while being system PM suspended, right?
-
-I'll check if enabling MMC_PM_KEEP_POWER is sufficient.
-
-> Please, don't involve "broken-cd" as that has its own rules and purpose.
-
-Indeed, this check is redundant.
-
-Best regards,
-Marcin
+> The binding supports any named regulator supplies under its device
+> node. The driver will look through its properties, and claim any
+> regulators by matching "*-supply", as Mark suggested.
+>
+> I've not done a generic helper in the regulator core yet, instead doing
+> the regulator property handling in the simplefb code for now.
+>
+>
+> Patch 1 adds the regulator properties to the DT binding.
+>
+> Patch 2 adds code to the simplefb driver to claim and enable regulators.
+> Hans, I dropped your Reviewed-by tag from this patch.
+>
+> Patch 3 adds labels to the simplefb device nodes in sun6i-a31.dtsi
+> so we can reference them in the board dts files, like in the next
+> patch.
+>
+> Patch 4 adds a dts file for MSI's Primo 81 tablet.
+>
+>
+> Regards
+> ChenYu
+>
+> Chen-Yu Tsai (3):
+>    dt-bindings: simplefb: Support regulator supply properties
+>    simplefb: Claim and enable regulators
+>    ARM: dts: sun6i: Add simplefb node labels to reference at board level
+>
+> Karsten Merker (1):
+>    ARM: dts: sun6i: Add dts file for MSI Primo81 tablet
+>
+>   .../bindings/video/simple-framebuffer.txt          |  13 +-
+>   arch/arm/boot/dts/Makefile                         |   1 +
+>   arch/arm/boot/dts/sun6i-a31.dtsi                   |   4 +-
+>   arch/arm/boot/dts/sun6i-a31s-primo81.dts           | 255 +++++++++++++++++++++
+>   drivers/video/fbdev/simplefb.c                     | 120 +++++++++-
+>   5 files changed, 386 insertions(+), 7 deletions(-)
+>   create mode 100644 arch/arm/boot/dts/sun6i-a31s-primo81.dts
+>
