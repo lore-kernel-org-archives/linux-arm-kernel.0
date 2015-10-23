@@ -1,23 +1,25 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 23 Oct 2015 12:04:48 +0200
-Subject: [PATCH] serial: amba-pl011: fix incorrect integer size in
- pl011_fifo_to_tty()
-In-Reply-To: <1444249636-25661-1-git-send-email-timur@codeaurora.org>
-References: <1444249636-25661-1-git-send-email-timur@codeaurora.org>
-Message-ID: <CACRpkdZNv-Q3-0KntE4k1dLWHn30H5POpmEaOWKiWCsuPMtjFw@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 23 Oct 2015 12:15:31 +0200
+Subject: [GIT PULL] ARM: SoC fixes for 4.3-rc
+In-Reply-To: <alpine.LFD.2.20.1510231834520.24002@vaio.linux-foundation.org>
+References: <6788509.osko4XNn1O@wuerfel>
+ <alpine.LFD.2.20.1510231834520.24002@vaio.linux-foundation.org>
+Message-ID: <11071677.x1l838PPrW@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 7, 2015 at 10:27 PM, Timur Tabi <timur@codeaurora.org> wrote:
-
-> The UART_DUMMY_DR_RX status bit is equal to (1 << 16), so a u16 is too small
-> to hold that value.  The result is that UART_DUMMY_DR_RX is never passed
-> to uart_insert_char().  This means that we're always accepting characters,
-> even when CREAD (in termios) is not set.
+On Friday 23 October 2015 18:41:32 Linus Torvalds wrote:
+> On Thu, 22 Oct 2015, Arnd Bergmann wrote:
+> > 
+> > are available in the git repository at:
+> > 
+> >   git+ssh://gitolite at ra.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/fixes-for-linus
 >
-> Signed-off-by: Timur Tabi <timur@codeaurora.org>
+> Anyway, I've pulled using the sane externally visible verion, so no need 
+> to resend, but check your scripting..
 
-Reviewed-by: Linus Walleij <linus.walleij@linaro.org>
+Found the problem, I was actually running 'git request-pull' from a
+different machine than I normally use, and that didn't have the
+URL set up right. Sorry about the mess.
 
-Yours,
-Linus Walleij
+	Arnd
