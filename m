@@ -1,50 +1,38 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Fri, 23 Oct 2015 13:19:17 +0900
-Subject: [PATCH] Documentation: ARM: EXYNOS: Update bootloader interface on
- Exynos542x
-Message-ID: <1445573957-28933-1-git-send-email-k.kozlowski@samsung.com>
+From: anup.patel@broadcom.com (Anup Patel)
+Date: Fri, 23 Oct 2015 10:46:11 +0530
+Subject: [PATCH v3 0/2] NAND support for Broadcom NS2 SoC
+Message-ID: <1445577373-21252-1-git-send-email-anup.patel@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Update the documentation about:
-1. Usage of PMU_SPARE2 register.
-   Bootloaders on Exynos542x-based boards often use the register
-   PMU_SPARE2 (0x908) in the same way as on Exynos3250: as a indicator
-   the secondary CPU was booted on. The bootloader will set this value
-   to non-zero, after sucessfull power up of secondary CPU. In the same
-   time this booted CPU will stuck (spin) waiting for software reset.
-2. Exynos542x entry address for secondary CPU boot up after system
-   suspend (with MCPM enabled and in non-secure mode).
+We enable NAND support for Broadcom NS2 SoC by reusing existing
+BRCMNAND driver.
 
-See arch/arm/mach-exynos/mcpm-exynos.c for source code.
+This patchset applies on-top of "arm64: Simple additions to
+NS2 DT" v1 patchset and is available in ns2_nand_v3 branch of
+https://github.com/Broadcom/arm64-linux.git.
 
-Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
----
- Documentation/arm/Samsung/Bootloader-interface.txt | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
+The patchset is tested on NS2 SVK.
 
-diff --git a/Documentation/arm/Samsung/Bootloader-interface.txt b/Documentation/arm/Samsung/Bootloader-interface.txt
-index df8d4fb85939..ed494ac0beb2 100644
---- a/Documentation/arm/Samsung/Bootloader-interface.txt
-+++ b/Documentation/arm/Samsung/Bootloader-interface.txt
-@@ -19,7 +19,7 @@ executing kernel.
- Address:      sysram_ns_base_addr
- Offset        Value                                        Purpose
- =============================================================================
--0x08          exynos_cpu_resume_ns                         System suspend
-+0x08          exynos_cpu_resume_ns, mcpm_entry_point       System suspend
- 0x0c          0x00000bad (Magic cookie)                    System suspend
- 0x1c          exynos4_secondary_startup                    Secondary CPU boot
- 0x1c + 4*cpu  exynos4_secondary_startup (Exynos4412)       Secondary CPU boot
-@@ -56,7 +56,8 @@ Offset        Value                                        Purpose
- Address:      pmu_base_addr
- Offset        Value                           Purpose
- =============================================================================
--0x0908        Non-zero (only Exynos3250)      Secondary CPU boot up indicator
-+0x0908        Non-zero                        Secondary CPU boot up indicator
-+                                              on Exynos3250 and Exynos542x
- 
- 
- 4. Glossary
+Changes since v2:
+ - Dropped patch1 and patch2 because these are already merged
+   by MTD maintainer.
+ - Avoid using absolute node paths in ns2-svk.dts.
+
+Changes since v1:
+ - Dropped patch3 and patch4 because we don't need to reset
+   BRCMNAND controller for NS2.
+ - Added patch to force 8bit mode before doing nand_scan_ident()
+   in brcmnand_init_cs().
+
+Anup Patel (2):
+  mtd: brcmnand: Force 8bit mode before doing nand_scan_ident()
+  arm64: dts: Add BRCM IPROC NAND DT node for NS2
+
+ arch/arm64/boot/dts/broadcom/ns2-svk.dts | 30 ++++++++++++++++++++----------
+ arch/arm64/boot/dts/broadcom/ns2.dtsi    | 14 ++++++++++++++
+ drivers/mtd/nand/brcmnand/brcmnand.c     |  9 +++++++++
+ 3 files changed, 43 insertions(+), 10 deletions(-)
+
 -- 
 1.9.1
