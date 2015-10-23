@@ -1,75 +1,48 @@
-From: stern@rowland.harvard.edu (Alan Stern)
-Date: Fri, 23 Oct 2015 14:27:05 -0400 (EDT)
-Subject: MUSB peripheral DMA regression caused by driver core runtime PM
- change
-In-Reply-To: <562A7549.3070400@ti.com>
-Message-ID: <Pine.LNX.4.44L0.1510231406200.1644-100000@iolanthe.rowland.org>
+From: dianders@chromium.org (Douglas Anderson)
+Date: Fri, 23 Oct 2015 11:28:10 -0700
+Subject: [PATCH 3/4] ARM: dts: rockchip: Enable the USB phys as reset
+ providers on rk3288
+In-Reply-To: <1445624891-31680-1-git-send-email-dianders@chromium.org>
+References: <1445624891-31680-1-git-send-email-dianders@chromium.org>
+Message-ID: <1445624891-31680-4-git-send-email-dianders@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 23 Oct 2015, Grygorii Strashko wrote:
+As per the change to the rk3288 USB phy driver, we can now enable the
+PHYs as reset providers.  Do so.
 
-> Reviewed-by: Grygorii Strashko <grygorii.strashko@ti.com>
-> 
-> It always fun when DD/PM core is updated to fix some driver/subsystem's
-> specific PM issue :(
-> 
-> > 
-> >> --- a/drivers/usb/musb/omap2430.c
-> >> +++ b/drivers/usb/musb/omap2430.c
-> >> @@ -391,9 +391,20 @@ static int omap2430_musb_init(struct musb *musb)
-> >>   	}
-> >>   	musb->isr = omap2430_musb_interrupt;
-> >>   
-> >> +	/*
-> >> +	 * Enable runtime PM for musb parent (this driver). We can't
-> >> +	 * do it earlier as struct musb is not yet allocated and we
-> >> +	 * need to touch the musb registers for runtime PM.
-> >> +	 */
-> >> +	pm_runtime_enable(glue->dev);
-> >> +	status = pm_runtime_get_sync(glue->dev);
-> >> +	if (status < 0)
-> >> +		goto err1;
-> >> +
-> >>   	status = pm_runtime_get_sync(dev);
-> 
-> Hm. My assumption was that *Parent* device (omap2430) will be enabled
-> here :( But as I can see this will not happen:
-> 
-> static int rpm_resume(struct device *dev, int rpmflags)
-> {...
-> 	if (!parent && dev->parent) {
-> 		/*
-> 		 * Increment the parent's usage counter and resume it if
-> 		 * necessary.  Not needed if dev is irq-safe; then the
-> 		 * parent is permanently resumed.
-> 		 */
-> 		parent = dev->parent;
-> 		if (dev->power.irq_safe)
-> 			goto skip_parent;
-> 
-> ^^^ and musb device is irq_safe :( 
+Signed-off-by: Douglas Anderson <dianders@chromium.org>
+---
+ arch/arm/boot/dts/rk3288.dtsi | 3 +++
+ 1 file changed, 3 insertions(+)
 
-This way of doing things looks very strange.
-
-If the omap2430 is the parent of the musb device, and
-pm_runtime_irq_safe() has been called for the musb device, then after
-that the omap2430 will never be runtime suspended.  Therefore it
-doesn't matter whether you enable it for runtime PM or not.
-
-It seems to me that the real problem must be that the musb device gets
-runtime-enabled and marked irq_safe too early.  These things should 
-happen before the musb device gets registered and exposed to userspace, 
-but not before the omap2430 parent is runtime-enabled.
-
-Thus the sequence of events should be:
-
-	Allocate the musb device;
-	Runtime-enable the omap2430 (since it is now safe to do so);
-	Runtime-enable the musb and declare it irq_safe (this will
-		automatically runtime-resume the omap2430);
-	Register the musb.
-
-If things are done this way, no special action needs to be taken.
-
-Alan Stern
+diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
+index 906e938..4f76805 100644
+--- a/arch/arm/boot/dts/rk3288.dtsi
++++ b/arch/arm/boot/dts/rk3288.dtsi
+@@ -778,6 +778,7 @@
+ 
+ 		usbphy0: usb-phy0 {
+ 			#phy-cells = <0>;
++			#reset-cells = <0>;
+ 			reg = <0x320>;
+ 			clocks = <&cru SCLK_OTGPHY0>;
+ 			clock-names = "phyclk";
+@@ -785,6 +786,7 @@
+ 
+ 		usbphy1: usb-phy1 {
+ 			#phy-cells = <0>;
++			#reset-cells = <0>;
+ 			reg = <0x334>;
+ 			clocks = <&cru SCLK_OTGPHY1>;
+ 			clock-names = "phyclk";
+@@ -792,6 +794,7 @@
+ 
+ 		usbphy2: usb-phy2 {
+ 			#phy-cells = <0>;
++			#reset-cells = <0>;
+ 			reg = <0x348>;
+ 			clocks = <&cru SCLK_OTGPHY2>;
+ 			clock-names = "phyclk";
+-- 
+2.6.0.rc2.230.g3dd15c0
