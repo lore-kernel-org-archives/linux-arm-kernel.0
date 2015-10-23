@@ -1,55 +1,70 @@
-From: kgene@kernel.org (Kukjin Kim)
-Date: Sat, 24 Oct 2015 04:39:32 +0900
-Subject: [PATCH] Documentation: ARM: EXYNOS: Update bootloader interface
- on Exynos542x
-In-Reply-To: <1445573957-28933-1-git-send-email-k.kozlowski@samsung.com>
-References: <1445573957-28933-1-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <562A8CF4.9040408@kernel.org>
+From: olof@lixom.net (Olof Johansson)
+Date: Fri, 23 Oct 2015 12:42:13 -0700
+Subject: [GIT PULL 1/2] Broadcom Device Tree changes for 4.4 (part 2)
+In-Reply-To: <562A8B32.5040906@gmail.com>
+References: <1445280190-8812-1-git-send-email-f.fainelli@gmail.com>
+ <1445280190-8812-2-git-send-email-f.fainelli@gmail.com>
+ <20151023182652.GE18961@localhost> <562A8B32.5040906@gmail.com>
+Message-ID: <CAOesGMh8p0pA2-ZsNyk=NmkeJrB3my4drHBT7rNY2tYSYdHQKQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/23/15 13:19, Krzysztof Kozlowski wrote:
-> Update the documentation about:
-> 1. Usage of PMU_SPARE2 register.
->    Bootloaders on Exynos542x-based boards often use the register
->    PMU_SPARE2 (0x908) in the same way as on Exynos3250: as a indicator
->    the secondary CPU was booted on. The bootloader will set this value
->    to non-zero, after sucessfull power up of secondary CPU. In the same
->    time this booted CPU will stuck (spin) waiting for software reset.
-> 2. Exynos542x entry address for secondary CPU boot up after system
->    suspend (with MCPM enabled and in non-secure mode).
-> 
-> See arch/arm/mach-exynos/mcpm-exynos.c for source code.
-> 
-> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> ---
->  Documentation/arm/Samsung/Bootloader-interface.txt | 5 +++--
->  1 file changed, 3 insertions(+), 2 deletions(-)
-> 
-> diff --git a/Documentation/arm/Samsung/Bootloader-interface.txt b/Documentation/arm/Samsung/Bootloader-interface.txt
-> index df8d4fb85939..ed494ac0beb2 100644
-> --- a/Documentation/arm/Samsung/Bootloader-interface.txt
-> +++ b/Documentation/arm/Samsung/Bootloader-interface.txt
-> @@ -19,7 +19,7 @@ executing kernel.
->  Address:      sysram_ns_base_addr
->  Offset        Value                                        Purpose
->  =============================================================================
-> -0x08          exynos_cpu_resume_ns                         System suspend
-> +0x08          exynos_cpu_resume_ns, mcpm_entry_point       System suspend
->  0x0c          0x00000bad (Magic cookie)                    System suspend
->  0x1c          exynos4_secondary_startup                    Secondary CPU boot
->  0x1c + 4*cpu  exynos4_secondary_startup (Exynos4412)       Secondary CPU boot
-> @@ -56,7 +56,8 @@ Offset        Value                                        Purpose
->  Address:      pmu_base_addr
->  Offset        Value                           Purpose
->  =============================================================================
-> -0x0908        Non-zero (only Exynos3250)      Secondary CPU boot up indicator
-> +0x0908        Non-zero                        Secondary CPU boot up indicator
-> +                                              on Exynos3250 and Exynos542x
->  
->  
->  4. Glossary
+On Fri, Oct 23, 2015 at 12:32 PM, Florian Fainelli <f.fainelli@gmail.com> wrote:
+> On 23/10/15 11:26, Olof Johansson wrote:
+>> Hi Florian,
+>>
+>> On Mon, Oct 19, 2015 at 11:43:10AM -0700, Florian Fainelli wrote:
+>>> The following changes since commit eef228e3191de0b62ef5913be216f25ba6b23a4c:
+>>>
+>>>   ARM: dts: move aliases back to .dts in Cygnus (2015-09-24 18:30:10 -0700)
+>>>
+>>> are available in the git repository at:
+>>>
+>>>   http://github.com/Broadcom/stblinux tags/arm-soc/for-4.4/devicetree-part2
+>>>
+>>> for you to fetch changes up to da6b53a6f7abc3d84260a9f0ff9849a88b44e11f:
+>>>
+>>>   ARM: bcm2835: Switch to using the new clock driver support. (2015-10-19 11:32:24 -0700)
+>>>
+>>> ----------------------------------------------------------------
+>>> This pull request contains the DT changes for BCM2835 in 4.4.  It
+>>> pulls in clk/clk-bcm2835 (which Stephen Boyd has said would be stable)
+>>> because the DT changes to enable the clock driver need the driver
+>>> itself to be present. These changes include the following:
+>>>
+>>> - Eric Anholt, moves the bcm2835 clock driver under bcm/ where it belongs with
+>>>   other Broadcom clock providers drivers, defines the binding for new clock
+>>>   driver, adds support for programming the BCM2835 audio domain, adds the DDC I2C
+>>>   controller to Device Tree, and finally migrates the Device Tree to use the new
+>>>   clock driver binding
+>>>
+>>> - Lubomir Rintel adds support for the Raspberry Pi Model A+ and B revision 2, and
+>>>   remove the I2S controller which is non-existent on Raspberry Pi Model B
+>>>
+>>> - Stefan Wahren adds an uart0 label for referencing the UART adapter
+>>>
+>>> ----------------------------------------------------------------
+>>> Eric Anholt (5):
+>>>       ARM: bcm2835: Add the DDC I2C controller to the device tree.
+>>>       clk: bcm2835: Move under bcm/ with other Broadcom SoC clk drivers.
+>>
+>> I see this patch in the branch, and it's signed off both by Stephen and you,
+>> which makes me suspect you cherry-picked it over from their tree?
+>>
+>> That means it'll exist in two copies and might cause pretty nasty conflicts at
+>> merge time if other changes have gone in on top of the separate commits.
+>> Instead, we ask that you share a branch with the same exact commits, since git
+>> will handle that appropriately and the patch will only be in the tree once.
+>
+> Just to clarify, are you okay with me merging a branch from Eric's tree,
+> or do you want to see individual commits, except for those that appear
+> in Stephen's tree (the clock changes basically)?
 
-Applied, thanks.
+I'm OK with you merging from Eric. I don't know how Stephen checked in
+the clock patches -- if they're just applied patches in the full
+history of his tree then it'll be really awkward to bring them in. If
+he applied them on a topic branch then you should base your work on
+top of that branch (without rebasing it).
 
-- Kukjin
+
+-Olof
