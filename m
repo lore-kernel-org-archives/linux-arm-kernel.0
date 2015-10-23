@@ -1,34 +1,49 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 23 Oct 2015 07:29:34 +0530
-Subject: [patch] cpufreq: scpi-cpufreq: signedness bug in
- scpi_get_dvfs_info()
-In-Reply-To: <20151022195208.GB24439@mwanda>
-References: <20151022195208.GB24439@mwanda>
-Message-ID: <20151023015934.GM3897@ubuntu>
+From: jh80.chung@samsung.com (Jaehoon Chung)
+Date: Fri, 23 Oct 2015 11:01:53 +0900
+Subject: [PATCHv2] ARM: dts: change the compatible from exynos5250 to
+ exynos5420 for mshc
+Message-ID: <1445565713-4000-1-git-send-email-jh80.chung@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22-10-15, 22:52, Dan Carpenter wrote:
-> The "domain" variable needs to be signed for the error handling to work.
-> 
-> Fixes: 8def31034d03 ('cpufreq: arm_big_little: add SCPI interface driver')
-> Signed-off-by: Dan Carpenter <dan.carpenter@oracle.com>
-> 
-> diff --git a/drivers/cpufreq/scpi-cpufreq.c b/drivers/cpufreq/scpi-cpufreq.c
-> index 2c3b16f..de5e89b 100644
-> --- a/drivers/cpufreq/scpi-cpufreq.c
-> +++ b/drivers/cpufreq/scpi-cpufreq.c
-> @@ -31,7 +31,7 @@ static struct scpi_ops *scpi_ops;
->  
->  static struct scpi_dvfs_info *scpi_get_dvfs_info(struct device *cpu_dev)
->  {
-> -	u8 domain = topology_physical_package_id(cpu_dev->id);
-> +	int domain = topology_physical_package_id(cpu_dev->id);
->  
->  	if (domain < 0)
->  		return ERR_PTR(-EINVAL);
+Exynos3250 and exnos5250 are some differences in Mobile Storage Host.
+(For example, exynos3250 support the HS400 mode, but exynos5250 doesn't
+support it.)
+Exynos3250 can perform the similar function with exynos5420 compatible.
+So this patch changes the compatible from exynos5250 to exynos5420
+for mshc.
 
-Acked-by: Viresh Kumar <viresh.kumar@linaro.org>
+Signed-off-by: Jaehoon Chung <jh80.chung@samsung.com>
+---
+Changelog v2:
+	- Drop "mmc: dw_mmc: exynos: Add the exynos3250 compatible" patch.
+	- Describe commit-message more detailedly than before.
+	- Change to exynos5420, not add new compatible (exynos3250).
 
+ arch/arm/boot/dts/exynos3250.dtsi | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/boot/dts/exynos3250.dtsi b/arch/arm/boot/dts/exynos3250.dtsi
+index 033def4..2f30d63 100644
+--- a/arch/arm/boot/dts/exynos3250.dtsi
++++ b/arch/arm/boot/dts/exynos3250.dtsi
+@@ -333,7 +333,7 @@
+ 		};
+ 
+ 		mshc_0: mshc at 12510000 {
+-			compatible = "samsung,exynos5250-dw-mshc";
++			compatible = "samsung,exynos5420-dw-mshc";
+ 			reg = <0x12510000 0x1000>;
+ 			interrupts = <0 142 0>;
+ 			clocks = <&cmu CLK_SDMMC0>, <&cmu CLK_SCLK_MMC0>;
+@@ -345,7 +345,7 @@
+ 		};
+ 
+ 		mshc_1: mshc at 12520000 {
+-			compatible = "samsung,exynos5250-dw-mshc";
++			compatible = "samsung,exynos5420-dw-mshc";
+ 			reg = <0x12520000 0x1000>;
+ 			interrupts = <0 143 0>;
+ 			clocks = <&cmu CLK_SDMMC1>, <&cmu CLK_SCLK_MMC1>;
 -- 
-viresh
+1.9.1
