@@ -1,60 +1,26 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Fri, 23 Oct 2015 09:31:57 +0800
-Subject: [PATCH v3 1/2] dt-bindings: simplefb: Support regulator supply
- properties
-In-Reply-To: <1445563918-1050-1-git-send-email-wens@csie.org>
-References: <1445563918-1050-1-git-send-email-wens@csie.org>
-Message-ID: <1445563918-1050-2-git-send-email-wens@csie.org>
+Date: Fri, 23 Oct 2015 09:37:45 +0800
+Subject: [PATCH v2 1/3] ARM: sunxi: Introduce Allwinner for A83T support
+In-Reply-To: <1445557577-27383-2-git-send-email-vishnupatekar0510@gmail.com>
+References: <1445557577-27383-1-git-send-email-vishnupatekar0510@gmail.com>
+ <1445557577-27383-2-git-send-email-vishnupatekar0510@gmail.com>
+Message-ID: <CAGb2v645Bwzdc1Uq0sR9SWqQH4htiO6qyPs28Hc5iOiJffXDHQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The physical display tied to the framebuffer may have regulators
-providing power to it, such as power for LCDs or interface conversion
-chips.
+On Fri, Oct 23, 2015 at 7:46 AM, Vishnu Patekar
+<vishnupatekar0510@gmail.com> wrote:
+> Allwinner A83T is octa-core cortex-a7 based SoC.
+> It's clock control unit and prcm, pinmux are different from previous sun8i
+> series.
+> Its processor cores are arragned in two clusters 4 cores each,
+> similar to A80.
+>
+> Signed-off-by: Vishnu Patekar <vishnupatekar0510@gmail.com>
 
-The number of regulators in use may vary, but the regulator supply
-binding can not be a list. Instead just support any named regulator
-supply properties under the device node. These should be properly
-named to match the device schematics / design. The driver should
-take care to go through them all.
+Could you also update Documentation/arm/sunxi/README, so it says A83T
+is supported?
 
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-Reviewed-by: Hans de Goede <hdegoede@redhat.com>
-Acked-by: Mark Brown <broonie@kernel.org>
----
- .../devicetree/bindings/video/simple-framebuffer.txt        | 13 +++++++++----
- 1 file changed, 9 insertions(+), 4 deletions(-)
+Otherwise,
 
-diff --git a/Documentation/devicetree/bindings/video/simple-framebuffer.txt b/Documentation/devicetree/bindings/video/simple-framebuffer.txt
-index 4474ef6e0b95..8c9e9f515c87 100644
---- a/Documentation/devicetree/bindings/video/simple-framebuffer.txt
-+++ b/Documentation/devicetree/bindings/video/simple-framebuffer.txt
-@@ -47,10 +47,14 @@ Required properties:
-   - a8b8g8r8 (32-bit pixels, d[31:24]=a, d[23:16]=b, d[15:8]=g, d[7:0]=r).
- 
- Optional properties:
--- clocks : List of clocks used by the framebuffer. Clocks listed here
--           are expected to already be configured correctly. The OS must
--           ensure these clocks are not modified or disabled while the
--           simple framebuffer remains active.
-+- clocks : List of clocks used by the framebuffer.
-+- *-supply : Any number of regulators used by the framebuffer. These should
-+	     be named according to the names in the device's design.
-+
-+  The above resources are expected to already be configured correctly.
-+  The OS must ensure they are not modified or disabled while the simple
-+  framebuffer remains active.
-+
- - display : phandle pointing to the primary display hardware node
- 
- Example:
-@@ -68,6 +72,7 @@ chosen {
- 		stride = <(1600 * 2)>;
- 		format = "r5g6b5";
- 		clocks = <&ahb_gates 36>, <&ahb_gates 43>, <&ahb_gates 44>;
-+		lcd-supply = <&reg_dc1sw>;
- 		display = <&lcdc0>;
- 	};
- 	stdout-path = "display0";
--- 
-2.6.1
+Acked-by: Chen-Yu Tsai <wens@csie.org>
