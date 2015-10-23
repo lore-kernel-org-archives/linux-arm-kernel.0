@@ -1,48 +1,46 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Fri, 23 Oct 2015 11:23:51 +0100
-Subject: [PATCH 06/19] input: tegra-kbc: enable support for the standard
- "wakeup-source" property
-In-Reply-To: <20151023063946.GA38047@dtor-ws>
-References: <1445422216-29375-1-git-send-email-sudeep.holla@arm.com>
- <1445422216-29375-7-git-send-email-sudeep.holla@arm.com>
- <20151023063946.GA38047@dtor-ws>
-Message-ID: <562A0AB7.3080607@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 23 Oct 2015 12:23:53 +0200
+Subject: [PATCH v2 4/5] drivers: firmware: psci: add extended stateid
+ power_state support
+In-Reply-To: <CAMAWPa9ZLGidg3r8RJY9MANdmjPdJ07S7mmixQBf_g3YPce1_g@mail.gmail.com>
+References: <1436375811-10529-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <1436375811-10529-5-git-send-email-lorenzo.pieralisi@arm.com>
+ <CAMAWPa9ZLGidg3r8RJY9MANdmjPdJ07S7mmixQBf_g3YPce1_g@mail.gmail.com>
+Message-ID: <3982126.UybqODJKJo@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thursday 22 October 2015 15:07:06 Kevin Hilman wrote:
+> Spam Status: Spamassassin    CRM114    
+> On Wed, Jul 8, 2015 at 10:16 AM, Lorenzo Pieralisi
+> <lorenzo.pieralisi@arm.com> wrote:
+> > PSCI v1.0 augmented the power_state parameter format specification
+> > (extended stateid) and introduced a way to probe it through the
+> > PSCI_FEATURES interface.
+> >
+> > This patch implements code that detects the power_state format at
+> > run-time through the PSCI_FEATURES interface, so that the power_state
+> > argument can be properly detected and validated in the kernel according
+> > to the information provided through firmware.
+> >
+> > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> > Cc: Mark Rutland <mark.rutland@arm.com>
+> 
+> kernelci.org started finding a new boot failures in the arm-soc tree
+> on arm64 qemu[1] and it was bisected down to this patch, which is in
+> arm-soc in the form of commit a5c00bb28da0 (drivers: firmware: psci:
+> add extended stateid power_state support)
+> 
+> The patch doesn't revert cleanly, so I didn't dig much further, but
+> this suggests that some more testing on qemu is needed (or does qemu
+> need to be upgraded?)
+> 
+> Kevin
+> 
+> [1] http://kernelci.org/boot/all/job/arm-soc/kernel/v4.3-rc5-557-g159ca7e43189/
+> 
 
+Could it be that qemu claims to support psci-1.0 but is actually not
+compatible?
 
-On 23/10/15 07:39, Dmitry Torokhov wrote:
-> On Wed, Oct 21, 2015 at 11:10:03AM +0100, Sudeep Holla wrote:
->> Though the mmc core driver should/will continue to support the legacy
->> "nvidia,wakeup-source" property to enable SDIO as the wakeup source, we
->> need to add support for the new standard property "wakeup-source".
->>
->> This patch adds support for "wakeup-source" property in addition to the
->> existing "nvidia,wakeup-source" property.
->>
->> Cc: Laxman Dewangan <ldewangan@nvidia.com>
->> Cc: Dmitry Torokhov <dmitry.torokhov@gmail.com>
->> Cc: Thierry Reding <thierry.reding@gmail.com>
->> Cc: linux-input at vger.kernel.org
->> Cc: linux-tegra at vger.kernel.org
->> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
->
-> Applied, thank you.
->
-
-Thanks, but I think I sent out a old copy which had unrelated commit
-message because of copy-paste. *Sorry for that*. Can you update it
-something like:
-
-"
-Though the tegra-kbc driver should/will continue to support the legacy
-"nvidia,wakeup-source" property to enable keyboard as the wakeup source,
-we need to add support for the new standard property "wakeup-source".
-
-This patch adds support for "wakeup-source" property in addition to the
-existing "nvidia,wakeup-source" property.
-"
--- 
-Regards,
-Sudeep
+	Arnd
