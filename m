@@ -1,36 +1,83 @@
-From: lftan@altera.com (Ley Foon Tan)
-Date: Fri, 23 Oct 2015 09:55:04 +0800
-Subject: [PATCH v11 2/6] pci: add Altera PCI vendor ID
-In-Reply-To: <20151022221355.GJ21237@localhost>
-References: <1445506051-21688-1-git-send-email-lftan@altera.com>
- <1445506051-21688-3-git-send-email-lftan@altera.com>
- <20151022221355.GJ21237@localhost>
-Message-ID: <CAFiDJ59j5KZej+PgiFVTO2ob5=w79yF=c6RAzrrWQHEi8AwOAA@mail.gmail.com>
+From: wxt@rock-chips.com (Caesar Wang)
+Date: Fri, 23 Oct 2015 09:54:53 +0800
+Subject: [PATCH v3 0/3] fix the TSHUT issue on rockchip thermal
+Message-ID: <1445565296-31517-1-git-send-email-wxt@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 23, 2015 at 6:13 AM, Bjorn Helgaas <helgaas@kernel.org> wrote:
-> On Thu, Oct 22, 2015 at 05:27:27PM +0800, Ley Foon Tan wrote:
->> Signed-off-by: Ley Foon Tan <lftan@altera.com>
->> ---
->>  include/linux/pci_ids.h | 2 ++
->>  1 file changed, 2 insertions(+)
->>
->> diff --git a/include/linux/pci_ids.h b/include/linux/pci_ids.h
->> index d9ba49c..08e4462 100644
->> --- a/include/linux/pci_ids.h
->> +++ b/include/linux/pci_ids.h
->> @@ -1550,6 +1550,8 @@
->>  #define PCI_DEVICE_ID_SERVERWORKS_CSB6LPC 0x0227
->>  #define PCI_DEVICE_ID_SERVERWORKS_HT1100LD 0x0408
->>
->> +#define PCI_VENDOR_ID_ALTERA         0x1172
->> +
->
-> This doesn't seem to be used anywhere, so I'll drop this patch.
-Okay.
+Thank you all for providing inputs and comments on previous versions of
+this patchset.
+Especially thanks to the (Doug, Rob....).
 
-Thanks.
+We need the OTP pin is gpio state before resetting the TSADC controller,
+since the tshut polarity will generate a high signal.
 
-Regards
-Ley Foon
+Says:
+The TSHUT temperature is setting more than 80 degree, the default
+tshut polarity is HIGH.
+
+If T > 80C, the OTP output the High Signal.
+If T < 80C, the OTP output the Low Signal.
+
+On the moment, the TSADC controller is reset, the tshut polarity will be
+Low in a short period of time.
+
+So:
+If T < 80C, the OTP output the High Signal.
+If T > 80C, the OTP output the Low Signal.
+
+In some cases, the OTP pin is connected to the PMIC, maybe the PMIC can
+accept the reset response time to avoid this issue.
+
+In other words, the system will be always reboot if we make the OTP pin
+is connected the others IC to control the power.
+
+This series patchs are depend on Doug's patch.(https://patchwork.kernel.org/patch/7454311/)
+
+This series patchs are based on the Linus master branch.
+
+518cd44 ARM: dts: rockchip: Add the OTP gpio pinctrl
+83e0bab dt-bindings: Add the "init" pinctrl in this document
+150426c drivers/pinctrl: Add the concept of an "init" state
+ce1fad2 Merge branch 'keys-fixes' of git://git.kernel.org/pub/scm/linux/kernel/git/dhowells/linux-fs
+1099f86 Merge git://git.kernel.org/pub/scm/linux/kernel/git/davem/net
+911b79c KEYS: Don't permit request_key() to construct a new keyring
+37850e3 net: bcmgenet: Fix early link interrupt enabling
+afc050d Merge tag 'wireless-drivers-for-davem-2015-10-17' of git://git.kernel.org/pub/scm/linux/kernel/git/kvalo/wireless-drivers
+e277de5 tunnels: Don't require remote endpoint or ID during creation.
+740dbc2 openvswitch: Scrub skb between namespaces
+....
+
+Tested on box board.
+
+
+Changes in v3:
+  - Add the pictrl states decription in document.
+  - Add the pinctrl state for in the suspend/resume.
+  - Add the "sleep" pinctrl as the gpio state in PATCH[3/3]
+
+Changes in v2:
+  - Add the 'init' pinctrl more decription in commit.
+  - Fix the subject to make more obvious in PATCH[1/2]
+  - Resend this patch v2 since fix the subject to be specific.
+  - Add some commits for more obvious in PATCH[2/2]
+
+Changes in v1:
+  - As the Doug comments, add the 'init' property to sync document.
+  - As the Doug comments, drop the thermal driver patchs since
+    we can with pinctrl changing to work.
+  - As the Doug's patch to add the 'init' property.
+
+Caesar Wang (3):
+  dt-bindings: rockchip-thermal: Add the pinctrl states in this document
+  thermal: rockchip: ensure the otp states before resetting the
+    controller
+  ARM: dts: rockchip: Add the OTP gpio pinctrl
+
+ .../devicetree/bindings/thermal/rockchip-thermal.txt          | 11 +++++++++--
+ arch/arm/boot/dts/rk3288.dtsi                                 | 10 ++++++++--
+ drivers/thermal/rockchip_thermal.c                            |  4 ++++
+ 3 files changed, 21 insertions(+), 4 deletions(-)
+
+-- 
+1.9.1
