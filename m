@@ -1,99 +1,128 @@
-From: dyoung@redhat.com (Dave Young)
-Date: Fri, 23 Oct 2015 17:50:59 +0800
-Subject: [PATCH 13/16] arm64: kdump: add kdump support
-In-Reply-To: <5628B2FA.80209@linaro.org>
-References: <cover.1445297709.git.geoff@infradead.org>
- <ef50b13d545f37a9fa95c5e6856e35f324798d00.1445297709.git.geoff@infradead.org>
- <20151022032534.GC11227@dhcp-129-115.nay.redhat.com>
- <5628662B.1020605@linaro.org>
- <20151022051548.GD11227@dhcp-129-115.nay.redhat.com>
- <5628B2FA.80209@linaro.org>
-Message-ID: <20151023095059.GH11227@dhcp-129-115.nay.redhat.com>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Fri, 23 Oct 2015 10:51:54 +0100
+Subject: [PATCH v2] EDAC: Add ARM64 EDAC
+In-Reply-To: <56299042.5090109@huawei.com>
+References: <1445460097-10260-1-git-send-email-brijeshkumar.singh@amd.com>
+ <56282550.4000201@arm.com> <5628F6B5.5080701@amd.com>
+ <56299042.5090109@huawei.com>
+Message-ID: <562A033A.5050105@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/22/15 at 06:57pm, AKASHI Takahiro wrote:
-> (added Ard to Cc.)
+On 23/10/15 02:41, Hanjun Guo wrote:
+> Hi Brijesh,
 > 
-> On 10/22/2015 02:15 PM, Dave Young wrote:
-> >On 10/22/15 at 01:29pm, AKASHI Takahiro wrote:
-> >>Hi Dave,
-> >>
-> >>Thank you for your comment.
-> >>
-> >>On 10/22/2015 12:25 PM, Dave Young wrote:
-> >>>Hi, AKASHI,
-> >>>
-> >>>On 10/19/15 at 11:38pm, Geoff Levand wrote:
-> >>>>From: AKASHI Takahiro <takahiro.akashi@linaro.org>
-> >>>>
-> >>>>On crash dump kernel, all the information about primary kernel's core
-> >>>>image is available in elf core header specified by "elfcorehdr=" boot
-> >>>>parameter. reserve_elfcorehdr() will set aside the region to avoid any
-> >>>>corruption by crash dump kernel.
-> >>>>
-> >>>>Crash dump kernel will access the system memory of primary kernel via
-> >>>>copy_oldmem_page(), which reads one page by ioremap'ing it since it does
-> >>>>not reside in linear mapping on crash dump kernel.
-> >>>>Please note that we should add "mem=X[MG]" boot parameter to limit the
-> >>>>memory size and avoid the following assertion at ioremap():
-> >>>>	if (WARN_ON(pfn_valid(__phys_to_pfn(phys_addr))))
-> >>>>		return NULL;
-> >>>>when accessing any pages beyond the usable memories of crash dump kernel.
-> >>>
-> >>>How does kexec-tools pass usable memory ranges to kernel? using dtb?
-> >>>Passing an extra mem=X sounds odd in the design. Kdump kernel should get
-> >>>usable ranges and hanle the limit better than depending on an extern kernel
-> >>>param.
-> >>
-> >>Well, regarding "depending on an external kernel param,"
-> >>- this limitation ("mem=") is compatible with arm(32) implementation although
-> >>   it is not clearly described in kernel's Documentation/kdump/kdump.txt.
-> >>- "elfcorehdr" kernel parameter is mandatory on x86 as well as on arm/arm64.
-> >>   The parameter is explicitly generated and added by kexec-tools.
-> >>
-> >>Do I miss your point?
-> >
-> >Arm previously use atag_mem tag for memory kernel uses, with dtb, Booting.txt
-> >says: The boot loader must pass at a minimum the size and location of the
-> >system memory
-> >
-> >In arm64 booting.txt, it does mentions about dtb but without above sentence.
-> >
-> >So if you are using dtb to pass memory I think the extra mem= should be not
-> >necessary unless there's other limitations dtb can not been used.
-> 
-> I would expect comments from arm64 maintainers here.
-> 
-> In my old implementation, I added "usablemem" attributes, along with "reg," to
-> "memory" nodes in dtb to specify the usable memory region on crash dump kernel.
-> 
-> But I removed this feature partly because, on uefi system, uefi might pass
-> no memory information in dtb.
+> On 2015/10/22 22:46, Brijesh Singh wrote:
+>> Hi Andre,
+>>
+>> On 10/21/2015 06:52 PM, Andre Przywara wrote:
+>>> On 21/10/15 21:41, Brijesh Singh wrote:
+>>>> Add support for Cortex A57 and A53 EDAC driver.
+>>> Hi Brijesh,
+>>>
+>>> thanks for the quick update! Some comments below.
+>>>
+>>>> Signed-off-by: Brijesh Singh <brijeshkumar.singh@amd.com>
+>>>> CC: robh+dt at kernel.org
+>>>> CC: pawel.moll at arm.com
+>>>> CC: mark.rutland at arm.com
+>>>> CC: ijc+devicetree at hellion.org.uk
+>>>> CC: galak at codeaurora.org
+>>>> CC: dougthompson at xmission.com
+>>>> CC: bp at alien8.de
+>>>> CC: mchehab at osg.samsung.com
+>>>> CC: devicetree at vger.kernel.org
+>>>> CC: guohanjun at huawei.com
+>>>> CC: andre.przywara at arm.com
+>>>> CC: arnd at arndb.de
+>>>> CC: linux-kernel at vger.kernel.org
+>>>> CC: linux-edac at vger.kernel.org
+>>>> ---
+>>>>
+>>>> v2:
+>>>> * convert into generic arm64 edac driver
+>>>> * remove AMD specific references from dt binding
+>>>> * remove poll_msec property from dt binding
+>>>> * add poll_msec as a module param, default is 100ms
+>>>> * update copyright text
+>>>> * define macro mnemonics for L1 and L2 RAMID
+>>>> * check L2 error per-cluster instead of per core
+>>>> * update function names
+>>>> * use get_online_cpus() and put_online_cpus() to make L1 and L2 register 
+>>>>   read hotplug-safe
+>>>> * add error check in probe routine
+>>>>
+>>>>  .../devicetree/bindings/edac/armv8-edac.txt        |  15 +
+>>>>  drivers/edac/Kconfig                               |   6 +
+>>>>  drivers/edac/Makefile                              |   1 +
+>>>>  drivers/edac/cortex_arm64_edac.c                   | 457 +++++++++++++++++++++
+>>>>  4 files changed, 479 insertions(+)
+>>>>  create mode 100644 Documentation/devicetree/bindings/edac/armv8-edac.txt
+>>>>  create mode 100644 drivers/edac/cortex_arm64_edac.c
+>>>>
+>>>> diff --git a/Documentation/devicetree/bindings/edac/armv8-edac.txt b/Documentation/devicetree/bindings/edac/armv8-edac.txt
+>>>> new file mode 100644
+>>>> index 0000000..dfd128f
+>>>> --- /dev/null
+>>>> +++ b/Documentation/devicetree/bindings/edac/armv8-edac.txt
+>>>> @@ -0,0 +1,15 @@
+>>>> +* ARMv8 L1/L2 cache error reporting
+>>>> +
+>>>> +On ARMv8, CPU Memory Error Syndrome Register and L2 Memory Error Syndrome
+>>>> +Register can be used for checking L1 and L2 memory errors.
+>>>> +
+>>>> +The following section describes the ARMv8 EDAC DT node binding.
+>>>> +
+>>>> +Required properties:
+>>>> +- compatible: Should be "arm,armv8-edac"
+>>>> +
+>>>> +Example:
+>>>> +	edac {
+>>>> +		compatible = "arm,armv8-edac";
+>>>> +	};
+>>>> +
+>>> So if there is nothing in here, why do we need the DT binding at all (I
+>>> think Mark hinted at that already)?
+>>> Can't we just use the MIDR as already suggested by others?
+>>> Secondly, armv8-edac is wrong here, as this feature is ARM-Cortex
+>>> specific and not architectural.
+>>>
+>> Yes, I was going with Mark suggestion to remove DT binding but then came across these cases which kind of hinted to keep DT binding:
+>>
+>> * Without DT binding, the driver will always be loaded on arm64 unless its blacklisted.
 
-If this is the case there must be somewhere else one can pass memory infomation
-to kernel, the booting.txt should be updated?
+So I checked the x86 code: the driver is always loaded as soon as the
+hardware is there (looking at PCI device IDs from the on-chip
+northbridge, for instance). The trick here is to have the Kconfig option
+defaulting to "=n", so a kernel builder would have to explicitly enable
+this. Android or embedded kernels wouldn't do this, for instance, while
+a server distribution would do.
+If a user doesn't want to be bothered with the driver, there is always
+the possibility of blacklisting the module.
+Setting a system policy is IMHO out of scope for a DT binding.
 
-kexec as a boot loader need use same method as the 1st kernel boot loader.
+>> * Its possible that other SoC's might handle single-bit and double-bit errors differently compare to 
+>>   Seattle platform. In Seattle platform both errors are handled by firmware but if other SoC 
+>>   wants OS to handle these errors then they might need DT binding to provide the irq numbers etc.
 
-> 
-> >One thing I'm confused is mem= only pass the memory size, where does you pass
-> >the start addresses?
-> 
-> In the current arm64 implementation, any regions below the start address will
-> be ignored as system ram.
-> 
-> >What if there's multiple sections such as some reserved
-> >ranges 2nd kernel also need?
-> 
-> My patch utilizes only a single contiguous region of memory as system ram.
-> One exception that I notice is uefi's runtime data. They will be ioremap'ed separately.
-> 
-> Please let me know if there is any other case that should be supported.
+What do you mean exactly with "firmware handles these errors"?
+What would the firmware do? I guess just logging the error and then
+possibly reset the register? How would this change the driver?
 
-For example the elf headers range, you reserved them in kdump kernel code,
-but kexec-tools can do that early if it can provides all memory info to 2nd
-kernel. Ditto for mark all the memory ranges 1st kernel used as reserved.
+> I totally agree with you here,  thanks for putting them together.
+> Different SoCs may handle the error in different ways, we need
+> bindings to specialize them, irq number is a good example :)
 
-Thanks
-Dave
+But how does this affect this very driver, polling just those two registers?
+Where would the interrupt come into the game here? Where is the proposed
+DT binding for that interrupt?
+
+AFAICT EL3 firmware handling errors would just hide this information
+from the driver, so if the f/w decides to "handle" uncorrectable ECC
+errors in a fatal way, there is nothing the driver could do anyway, right?
+
+Can you sketch a concrete example where we would actually need the
+driver to know about the firmware capabilities?
+
+Cheers,
+Andre.
