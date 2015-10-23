@@ -1,134 +1,71 @@
 From: eric.auger@linaro.org (Eric Auger)
-Date: Fri, 23 Oct 2015 17:47:19 +0200
-Subject: [PATCH v4 1/7] vfio: platform: introduce vfio-platform-base module
+Date: Fri, 23 Oct 2015 17:47:23 +0200
+Subject: [PATCH v4 5/7] vfio: platform: add compat in vfio_platform_device
 In-Reply-To: <1445615245-31124-1-git-send-email-eric.auger@linaro.org>
 References: <1445615245-31124-1-git-send-email-eric.auger@linaro.org>
-Message-ID: <1445615245-31124-2-git-send-email-eric.auger@linaro.org>
+Message-ID: <1445615245-31124-6-git-send-email-eric.auger@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To prepare for vfio platform reset rework let's build
-vfio_platform_common.c and vfio_platform_irq.c in a separate
-module from vfio-platform and vfio-amba. This makes possible
-to have separate module inits and works around a race between
-platform driver init and vfio reset module init: that way we
-make sure symbols exported by base are available when vfio-platform
-driver gets probed.
-
-The open/release being implemented in the base module, the ref
-count is applied to the parent module instead.
+Let's retrieve the compatibility string on probe and store it
+in the vfio_platform_device struct
 
 Signed-off-by: Eric Auger <eric.auger@linaro.org>
-Suggested-by: Arnd Bergmann <arnd@arndb.de>
-Reviewed-by: Arnd Bergmann <arnd@arndb.de>
 
 ---
-v3 -> v4:
-- add Arnd R-b
 
-v3: creation
+v2 -> v3:
+- populate compat after vdev check
 ---
- drivers/vfio/platform/Makefile                |  6 ++++--
- drivers/vfio/platform/vfio_amba.c             |  1 +
- drivers/vfio/platform/vfio_platform.c         |  1 +
- drivers/vfio/platform/vfio_platform_common.c  | 13 +++++++++++--
+ drivers/vfio/platform/vfio_platform_common.c  | 15 ++++++++-------
  drivers/vfio/platform/vfio_platform_private.h |  1 +
- 5 files changed, 18 insertions(+), 4 deletions(-)
+ 2 files changed, 9 insertions(+), 7 deletions(-)
 
-diff --git a/drivers/vfio/platform/Makefile b/drivers/vfio/platform/Makefile
-index 9ce8afe..41a6224 100644
---- a/drivers/vfio/platform/Makefile
-+++ b/drivers/vfio/platform/Makefile
-@@ -1,10 +1,12 @@
--
--vfio-platform-y := vfio_platform.o vfio_platform_common.o vfio_platform_irq.o
-+vfio-platform-base-y := vfio_platform_common.o vfio_platform_irq.o
-+vfio-platform-y := vfio_platform.o
- 
- obj-$(CONFIG_VFIO_PLATFORM) += vfio-platform.o
-+obj-$(CONFIG_VFIO_PLATFORM) += vfio-platform-base.o
- obj-$(CONFIG_VFIO_PLATFORM) += reset/
- 
- vfio-amba-y := vfio_amba.o
- 
- obj-$(CONFIG_VFIO_AMBA) += vfio-amba.o
-+obj-$(CONFIG_VFIO_AMBA) += vfio-platform-base.o
- obj-$(CONFIG_VFIO_AMBA) += reset/
-diff --git a/drivers/vfio/platform/vfio_amba.c b/drivers/vfio/platform/vfio_amba.c
-index ff0331f..a66479b 100644
---- a/drivers/vfio/platform/vfio_amba.c
-+++ b/drivers/vfio/platform/vfio_amba.c
-@@ -67,6 +67,7 @@ static int vfio_amba_probe(struct amba_device *adev, const struct amba_id *id)
- 	vdev->flags = VFIO_DEVICE_FLAGS_AMBA;
- 	vdev->get_resource = get_amba_resource;
- 	vdev->get_irq = get_amba_irq;
-+	vdev->parent_module = THIS_MODULE;
- 
- 	ret = vfio_platform_probe_common(vdev, &adev->dev);
- 	if (ret) {
-diff --git a/drivers/vfio/platform/vfio_platform.c b/drivers/vfio/platform/vfio_platform.c
-index cef645c..f1625dc 100644
---- a/drivers/vfio/platform/vfio_platform.c
-+++ b/drivers/vfio/platform/vfio_platform.c
-@@ -65,6 +65,7 @@ static int vfio_platform_probe(struct platform_device *pdev)
- 	vdev->flags = VFIO_DEVICE_FLAGS_PLATFORM;
- 	vdev->get_resource = get_platform_resource;
- 	vdev->get_irq = get_platform_irq;
-+	vdev->parent_module = THIS_MODULE;
- 
- 	ret = vfio_platform_probe_common(vdev, &pdev->dev);
- 	if (ret)
 diff --git a/drivers/vfio/platform/vfio_platform_common.c b/drivers/vfio/platform/vfio_platform_common.c
-index e43efb5..184e9d2 100644
+index 3b7e52c..f2d41a0 100644
 --- a/drivers/vfio/platform/vfio_platform_common.c
 +++ b/drivers/vfio/platform/vfio_platform_common.c
-@@ -23,6 +23,10 @@
+@@ -41,16 +41,11 @@ static const struct vfio_platform_reset_combo reset_lookup_table[] = {
+ static void vfio_platform_get_reset(struct vfio_platform_device *vdev,
+ 				    struct device *dev)
+ {
+-	const char *compat;
+ 	int (*reset)(struct vfio_platform_device *);
+-	int ret, i;
+-
+-	ret = device_property_read_string(dev, "compatible", &compat);
+-	if (ret)
+-		return;
++	int i;
  
- #include "vfio_platform_private.h"
+ 	for (i = 0 ; i < ARRAY_SIZE(reset_lookup_table); i++) {
+-		if (!strcmp(reset_lookup_table[i].compat, compat)) {
++		if (!strcmp(reset_lookup_table[i].compat, vdev->compat)) {
+ 			request_module(reset_lookup_table[i].module_name);
+ 			reset = __symbol_get(
+ 				reset_lookup_table[i].reset_function_name);
+@@ -544,6 +539,12 @@ int vfio_platform_probe_common(struct vfio_platform_device *vdev,
+ 	if (!vdev)
+ 		return -EINVAL;
  
-+#define DRIVER_VERSION  "0.10"
-+#define DRIVER_AUTHOR   "Antonios Motakis <a.motakis@virtualopensystems.com>"
-+#define DRIVER_DESC     "VFIO platform base module"
++	ret = device_property_read_string(dev, "compatible", &vdev->compat);
++	if (ret) {
++		pr_err("VFIO: cannot retrieve compat for %s\n", vdev->name);
++		return -EINVAL;
++	}
 +
- static DEFINE_MUTEX(driver_lock);
- 
- static const struct vfio_platform_reset_combo reset_lookup_table[] = {
-@@ -146,7 +150,7 @@ static void vfio_platform_release(void *device_data)
- 
- 	mutex_unlock(&driver_lock);
- 
--	module_put(THIS_MODULE);
-+	module_put(vdev->parent_module);
- }
- 
- static int vfio_platform_open(void *device_data)
-@@ -154,7 +158,7 @@ static int vfio_platform_open(void *device_data)
- 	struct vfio_platform_device *vdev = device_data;
- 	int ret;
- 
--	if (!try_module_get(THIS_MODULE))
-+	if (!try_module_get(vdev->parent_module))
- 		return -ENODEV;
- 
- 	mutex_lock(&driver_lock);
-@@ -573,3 +577,8 @@ struct vfio_platform_device *vfio_platform_remove_common(struct device *dev)
- 	return vdev;
- }
- EXPORT_SYMBOL_GPL(vfio_platform_remove_common);
-+
-+MODULE_VERSION(DRIVER_VERSION);
-+MODULE_LICENSE("GPL v2");
-+MODULE_AUTHOR(DRIVER_AUTHOR);
-+MODULE_DESCRIPTION(DRIVER_DESC);
+ 	group = iommu_group_get(dev);
+ 	if (!group) {
+ 		pr_err("VFIO: No IOMMU group for device %s\n", vdev->name);
 diff --git a/drivers/vfio/platform/vfio_platform_private.h b/drivers/vfio/platform/vfio_platform_private.h
-index 1c9b3d5..7128690 100644
+index fd262be..415310f 100644
 --- a/drivers/vfio/platform/vfio_platform_private.h
 +++ b/drivers/vfio/platform/vfio_platform_private.h
-@@ -56,6 +56,7 @@ struct vfio_platform_device {
- 	u32				num_irqs;
+@@ -57,6 +57,7 @@ struct vfio_platform_device {
  	int				refcnt;
  	struct mutex			igate;
-+	struct module			*parent_module;
+ 	struct module			*parent_module;
++	const char			*compat;
  
  	/*
  	 * These fields should be filled by the bus specific binder
