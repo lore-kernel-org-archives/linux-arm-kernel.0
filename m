@@ -1,34 +1,38 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 23 Oct 2015 22:28:27 +0200
-Subject: [PATCH v4 05/12] doc/bindings: Update Layerscape PCIe devicetree
- bindings for LS2080A
-In-Reply-To: <1445628721-10483-6-git-send-email-bhupesh.sharma@freescale.com>
-References: <1445628721-10483-1-git-send-email-bhupesh.sharma@freescale.com>
- <1445628721-10483-6-git-send-email-bhupesh.sharma@freescale.com>
-Message-ID: <4784400.64dhyokllJ@wuerfel>
+From: stern@rowland.harvard.edu (Alan Stern)
+Date: Fri, 23 Oct 2015 16:33:54 -0400 (EDT)
+Subject: MUSB peripheral DMA regression caused by driver core runtime PM
+ change
+In-Reply-To: <20151023192044.GX3078@atomide.com>
+Message-ID: <Pine.LNX.4.44L0.1510231629430.1644-100000@iolanthe.rowland.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 24 October 2015 01:01:54 Bhupesh Sharma wrote:
-> Update the definition of the Layerscape PCI compatible string to add
-> support for LS2080A, as the controller on LS2080A is different from
-> LS1021A SoC.
-> 
-> While at it, move the clock related properties in the Designware PCIe
-> controller bindings to 'optional' set of properties.
-> 
-> Signed-off-by: Minghuan Lian <Minghuan.Lian@freescale.com>
-> Signed-off-by: Bhupesh Sharma <bhupesh.sharma@freescale.com>
-> ---
->  .../devicetree/bindings/pci/designware-pcie.txt    |   10 +++++-----
->  .../devicetree/bindings/pci/layerscape-pci.txt     |   14 ++++++++++++--
->  2 files changed, 17 insertions(+), 7 deletions(-)
-> 
+On Fri, 23 Oct 2015, Tony Lindgren wrote:
 
-This one depends on a patch that is in Bjorn's PCI tree but not
-yet in mainline.
+> > Thus the sequence of events should be:
+> > 
+> > 	Allocate the musb device;
+> > 	Runtime-enable the omap2430 (since it is now safe to do so);
+> > 	Runtime-enable the musb and declare it irq_safe (this will
+> > 		automatically runtime-resume the omap2430);
+> > 	Register the musb.
+> > 
+> > If things are done this way, no special action needs to be taken.
+> 
+> Yes good point, that requires changing the init for the whole
+> drivers/musb though.
 
-Please add my 'Acked-by: Arnd Bergmann <arnd@arndb.de>' and submit it to
-Bjorn so he can apply the patch on top of the other one.
+This will have to be done anyway, since the way it is now (if I 
+understand correctly), the musb is registered and made available to 
+userspace before its parent is operational (i.e., at full power).
 
-	Arnd
+> Also, we should reorganize the whole musb and make
+> the platform glue and musb core drivers completely separate using a
+> shared interrupt where needed.
+> 
+> For the regression for the -rc series? Do you see any better
+> alternatives to what I posted?
+
+No.
+
+Alan Stern
