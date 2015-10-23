@@ -1,149 +1,67 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Fri, 23 Oct 2015 20:58:33 +0300
-Subject: MUSB peripheral DMA regression caused by driver core runtime PM
- change
-In-Reply-To: <877fmdcyzi.fsf@saruman.tx.rr.com>
-References: <20151021234134.GQ3078@atomide.com>
- <20151022180216.GT3078@atomide.com> <20151022230133.GV3078@atomide.com>
- <562A2D0D.3060104@ti.com> <20151023163957.GW3078@atomide.com>
- <877fmdcyzi.fsf@saruman.tx.rr.com>
-Message-ID: <562A7549.3070400@ti.com>
+From: brijeshkumar.singh@amd.com (Brijesh Singh)
+Date: Fri, 23 Oct 2015 12:58:29 -0500
+Subject: [PATCH v2] EDAC: Add ARM64 EDAC
+In-Reply-To: <562A033A.5050105@arm.com>
+References: <1445460097-10260-1-git-send-email-brijeshkumar.singh@amd.com>
+ <56282550.4000201@arm.com> <5628F6B5.5080701@amd.com>
+ <56299042.5090109@huawei.com> <562A033A.5050105@arm.com>
+Message-ID: <562A7545.2050306@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/23/2015 07:48 PM, Felipe Balbi wrote:
+
+> So I checked the x86 code: the driver is always loaded as soon as the
+> hardware is there (looking at PCI device IDs from the on-chip
+> northbridge, for instance). The trick here is to have the Kconfig option
+> defaulting to "=n", so a kernel builder would have to explicitly enable
+> this. Android or embedded kernels wouldn't do this, for instance, while
+> a server distribution would do.
+> If a user doesn't want to be bothered with the driver, there is always
+> the possibility of blacklisting the module.
+> Setting a system policy is IMHO out of scope for a DT binding.
 > 
-> Hi,
+Will update Kconfig to make it n by default.
+
+>>> * Its possible that other SoC's might handle single-bit and double-bit errors differently compare to 
+>>>   Seattle platform. In Seattle platform both errors are handled by firmware but if other SoC 
+>>>   wants OS to handle these errors then they might need DT binding to provide the irq numbers etc.
 > 
-> Tony Lindgren <tony@atomide.com> writes:
->> From: Tony Lindgren <tony@atomide.com>
->> Date: Fri, 23 Oct 2015 09:03:22 -0700
->> Subject: [PATCH] usb: musb: omap2430: Fix regression caused by driver core
->>   change
->>
->> Commit ddef08dd00f5 ("Driver core: wakeup the parent device before trying
->> probe") started automatically ensuring the parent device is enabled when
->> the child gets probed.
->>
->> This however caused a regression for MUSB omap2430 interface as the
->> runtime PM for the parent device needs the child initialized to access
->> the MUSB hardware registers.
->>
->> Let's delay the enabling of PM runtime for the parent until the child
->> has been properly initialized as suggested in an earlier patch by
->> Grygorii Strashko <grygorii.strashko@ti.com>.
->>
->> In addition to delaying pm_runtime_enable, we now also need to make sure
->> the parent is enabled during omap2430_musb_init. We also want to propagate
->> an error from omap2430_runtime_resume if struct musb is not initialized.
->>
->> Note that we use pm_runtime_put_noidle here for both the child and parent
->> to prevent an extra runtime_suspend/resume cycle.
->>
->> Let's also add some comments to avoid confusion between the
->> two different devices.
->>
->> Fixes: ddef08dd00f5 ("Driver core: wakeup the parent device before
->> trying probe")
->> Suggested-by: Grygorii Strashko <grygorii.strashko@ti.com>
->> Signed-off-by: Tony Lindgren <tony@atomide.com>
+> What do you mean exactly with "firmware handles these errors"?
+> What would the firmware do? I guess just logging the error and then
+> possibly reset the register? How would this change the driver?
 > 
-> I'm fine with this patch to fix this v4.3 regression. Greg, do you want
-> a pull request or can you take this in as a patch ? In any case:
+On Seattle platform SoC generates a interrupt on both single bit and double bit error
+and that interrupt is handled by firmware, so we don't need to do anything in the driver.
+Driver just need to poll registers to log correctable errors (because they do not generate interrupt).
+This very driver is doing exactly what we want. DT binding is not required.
+
+But Hanjun's comment on very first patch hinted me that there is possibility that
+SoC generate a interrupt on single bit and double bit but firmware does not handle it.
+In those cases driver will need be extended to handle interrupt.
+
+I will submit v3 for review with DT binding removed. We can revisit DT binding need in future.
+
+>> I totally agree with you here,  thanks for putting them together.
+>> Different SoCs may handle the error in different ways, we need
+>> bindings to specialize them, irq number is a good example :)
 > 
-> Acked-by: Felipe Balbi <balbi@ti.com>
-
-Reviewed-by: Grygorii Strashko <grygorii.strashko@ti.com>
-
-It always fun when DD/PM core is updated to fix some driver/subsystem's
-specific PM issue :(
-
+> But how does this affect this very driver, polling just those two registers?
+> Where would the interrupt come into the game here? Where is the proposed
+> DT binding for that interrupt?
 > 
->> --- a/drivers/usb/musb/omap2430.c
->> +++ b/drivers/usb/musb/omap2430.c
->> @@ -391,9 +391,20 @@ static int omap2430_musb_init(struct musb *musb)
->>   	}
->>   	musb->isr = omap2430_musb_interrupt;
->>   
->> +	/*
->> +	 * Enable runtime PM for musb parent (this driver). We can't
->> +	 * do it earlier as struct musb is not yet allocated and we
->> +	 * need to touch the musb registers for runtime PM.
->> +	 */
->> +	pm_runtime_enable(glue->dev);
->> +	status = pm_runtime_get_sync(glue->dev);
->> +	if (status < 0)
->> +		goto err1;
->> +
->>   	status = pm_runtime_get_sync(dev);
-
-Hm. My assumption was that *Parent* device (omap2430) will be enabled
-here :( But as I can see this will not happen:
-
-static int rpm_resume(struct device *dev, int rpmflags)
-{...
-	if (!parent && dev->parent) {
-		/*
-		 * Increment the parent's usage counter and resume it if
-		 * necessary.  Not needed if dev is irq-safe; then the
-		 * parent is permanently resumed.
-		 */
-		parent = dev->parent;
-		if (dev->power.irq_safe)
-			goto skip_parent;
-
-^^^ and musb device is irq_safe :( 
-
-
-
->>   	if (status < 0) {
->>   		dev_err(dev, "pm_runtime_get_sync FAILED %d\n", status);
->> +		pm_runtime_put_sync(glue->dev);
->>   		goto err1;
->>   	}
->>   
->> @@ -426,6 +437,7 @@ static int omap2430_musb_init(struct musb *musb)
->>   	phy_power_on(musb->phy);
->>   
->>   	pm_runtime_put_noidle(musb->controller);
->> +	pm_runtime_put_noidle(glue->dev);
->>   	return 0;
->>   
->>   err1:
->> @@ -626,7 +638,11 @@ static int omap2430_probe(struct platform_device *pdev)
->>   		goto err2;
->>   	}
->>   
->> -	pm_runtime_enable(&pdev->dev);
->> +	/*
->> +	 * Note that we cannot enable PM runtime yet for this
->> +	 * driver as we need struct musb initialized first.
->> +	 * See omap2430_musb_init above.
->> +	 */
->>   
->>   	ret = platform_device_add(musb);
->>   	if (ret) {
->> @@ -675,11 +691,12 @@ static int omap2430_runtime_resume(struct device *dev)
->>   	struct omap2430_glue		*glue = dev_get_drvdata(dev);
->>   	struct musb			*musb = glue_to_musb(glue);
->>   
->> -	if (musb) {
->> -		omap2430_low_level_init(musb);
->> -		musb_writel(musb->mregs, OTG_INTERFSEL,
->> -				musb->context.otg_interfsel);
->> -	}
->> +	if (!musb)
->> +		return -EPROBE_DEFER;
->> +
->> +	omap2430_low_level_init(musb);
->> +	musb_writel(musb->mregs, OTG_INTERFSEL,
->> +		    musb->context.otg_interfsel);
->>   
->>   	return 0;
->>   }
+> AFAICT EL3 firmware handling errors would just hide this information
+> from the driver, so if the f/w decides to "handle" uncorrectable ECC
+> errors in a fatal way, there is nothing the driver could do anyway, right?
 > 
-
-
--- 
-regards,
--grygorii
+> Can you sketch a concrete example where we would actually need the
+> driver to know about the firmware capabilities?
+> 
+> Cheers,
+> Andre.
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
+> 
