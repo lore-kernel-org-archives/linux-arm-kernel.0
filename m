@@ -1,21 +1,25 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Fri, 23 Oct 2015 09:19:46 +0900
-Subject: [PATCH 1/2] ARM: shmobile: r8a7790: fix "gpio-ranges" props
-In-Reply-To: <14605037.EZjgJcsdsk@wasted.cogentembedded.com>
+Date: Fri, 23 Oct 2015 09:20:11 +0900
+Subject: [PATCH 2/2] ARM: shmobile: r8a7791: fix "gpio-ranges" props
+In-Reply-To: <CAMuHMdVEBAJVezoj=Nm_upRSM_YjMrD8MmpX6EsT-4=vZTg+pQ@mail.gmail.com>
 References: <10037494.4LD4T2QGPX@wasted.cogentembedded.com>
- <14605037.EZjgJcsdsk@wasted.cogentembedded.com>
-Message-ID: <20151023001946.GB15844@verge.net.au>
+ <5904216.pOYUtEytKc@wasted.cogentembedded.com>
+ <CAMuHMdVEBAJVezoj=Nm_upRSM_YjMrD8MmpX6EsT-4=vZTg+pQ@mail.gmail.com>
+Message-ID: <20151023002010.GC15844@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 22, 2015 at 02:04:41AM +0300, Sergei Shtylyov wrote:
-> On R8A7790, GPIO banks 1 and 2 are missing  pins 30 and 31.  Correct the
-> "gpio-ranges" properties of the corresponding device nodes.
+On Thu, Oct 22, 2015 at 01:06:02PM +0200, Geert Uytterhoeven wrote:
+> On Thu, Oct 22, 2015 at 1:05 AM, Sergei Shtylyov
+> <sergei.shtylyov@cogentembedded.com> wrote:
+> > On R8A7791, GPIO banks 1 and 7  are missing  pins 26 to 31.  Correct the
+> > "gpio-ranges" properties of the GPIO1 node (GPIO7 is already correct).
+> >
+> > Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 > 
-> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+> LEDs and keys on r8a7791/koelsch (which are connected to a higher gpio)
+> still work fine.
 > 
-> ---
-> This patch is against the 'renesas-devel-20151019-v4.3-rc6' of Simon Horman's
-> 'renesas.git' repo.
+> Tested-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
 Thanks, I have queued this up.
