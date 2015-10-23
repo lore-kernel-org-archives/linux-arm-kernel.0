@@ -1,26 +1,24 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 23 Oct 2015 10:14:37 +0200
-Subject: [PATCH v2 2/2] pinctrl: sunxi: Add irq pinmuxing to sun6i "r"
- pincontroller
-In-Reply-To: <1444981572-17235-3-git-send-email-hdegoede@redhat.com>
-References: <1444981572-17235-1-git-send-email-hdegoede@redhat.com>
- <1444981572-17235-3-git-send-email-hdegoede@redhat.com>
-Message-ID: <CACRpkda2m06DPn1em2hnNx3-inbYt128geQHuTG3GuHypL-rfQ@mail.gmail.com>
+Date: Fri, 23 Oct 2015 10:21:01 +0200
+Subject: [PATCH 3/6] pinctrl: sunxi: Add H3 PIO controller support
+In-Reply-To: <5627BDB6.6020501@gmail.com>
+References: <5627BDB6.6020501@gmail.com>
+Message-ID: <CACRpkdbMq65VA8B9ZKB19Rh6dv2HxOG5VAV4VcMAGJs64L-W=Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 16, 2015 at 9:46 AM, Hans de Goede <hdegoede@redhat.com> wrote:
+On Wed, Oct 21, 2015 at 6:30 PM, Jens Kuske <jenskuske@gmail.com> wrote:
 
-> Add pinmuxing for external interrupt functionality through the
-> sun6i "r" pincontroller.
+> The H3 uses the same pin controller as previous SoC's from Allwinner.
+> Add support for the pins controlled by the main PIO controller.
 >
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
-> ---
-> Changes in v2:
-> -Fix compile error introduced by last minute changes before sending out
->  the patch (note to self: always do a recompile in such a case)
+> Signed-off-by: Jens Kuske <jenskuske@gmail.com>
 
-Patch applied with Chen-Yu's and Maxime's ACKs.
+This does not apply to my "devel" branch on the pinctrl tree.
+https://git.kernel.org/cgit/linux/kernel/git/linusw/linux-pinctrl.git/log/?h=devel
+
+Please rebase it on the devel branch, add Maxime's ACKs and
+resend so I can apply it.
 
 Yours,
 Linus Walleij
