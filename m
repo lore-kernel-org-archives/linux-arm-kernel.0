@@ -1,17 +1,16 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Fri, 23 Oct 2015 10:20:12 -0700
-Subject: [GIT PULL] Allwinner core changes for 4.4
-In-Reply-To: <20151017165114.GA15258@lukather>
-References: <20151017165114.GA15258@lukather>
-Message-ID: <20151023172012.GG2224@localhost>
+Date: Fri, 23 Oct 2015 10:21:18 -0700
+Subject: [GIT PULL] Allwinner defconfig changes for 4.4
+In-Reply-To: <20151017170541.GA17582@lukather>
+References: <20151017170541.GA17582@lukather>
+Message-ID: <20151023172118.GH2224@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 17, 2015 at 06:51:14PM +0200, Maxime Ripard wrote:
+On Sat, Oct 17, 2015 at 07:05:41PM +0200, Maxime Ripard wrote:
 > Hi Arnd, Kevin, Olof,
 > 
-> Please pull the following tag that adds the needed code to support the
-> R8 properly.
+> Please pull the following tag for the next merge window.
 > 
 > Thanks!
 > Maxime
@@ -22,30 +21,18 @@ On Sat, Oct 17, 2015 at 06:51:14PM +0200, Maxime Ripard wrote:
 > 
 > are available in the git repository at:
 > 
->   https://git.kernel.org/pub/scm/linux/kernel/git/mripard/linux.git tags/sunxi-core-for-4.4
+>   https://git.kernel.org/pub/scm/linux/kernel/git/mripard/linux.git tags/sunxi-defconfig-for-4.4
 > 
-> for you to fetch changes up to bef6229f36c1c2ddae186f4e328c2359c1dad18d:
+> for you to fetch changes up to 21e29d9afd1024b63a311172bf57c41223665299:
 > 
->   ARM: sunxi: Add R8 support (2015-10-17 18:47:28 +0200)
-> 
-> ----------------------------------------------------------------
-> Allwinner core changes for 4.4
-> 
-> Add support for the Allwinner R8 SoC used in the CHIP.
+>   ARM: sunxi_defconfig: enable MODULE_UNLOAD (2015-09-21 09:05:13 +0200)
 > 
 > ----------------------------------------------------------------
-> Maxime Ripard (1):
->       ARM: sunxi: Add R8 support
+> Allwinner defconfig changes for 4.4
 > 
->  Documentation/arm/sunxi/README                  | 2 +-
->  Documentation/devicetree/bindings/arm/sunxi.txt | 1 +
->  arch/arm/mach-sunxi/sunxi.c                     | 3 ++-
->  drivers/clk/sunxi/clk-sunxi.c                   | 1 +
->  4 files changed, 5 insertions(+), 2 deletions(-)
+> A bunch of defconfig changes to enable support for new drivers.
 
-5 lines to support a new SoC? Nice work.
-
-Merged.
+Merged, thanks.
 
 
 -Olof
