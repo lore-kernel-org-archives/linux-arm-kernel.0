@@ -1,43 +1,149 @@
-From: peter@hurleysoftware.com (Peter Hurley)
-Date: Fri, 23 Oct 2015 13:49:06 -0400
-Subject: [PATCH] Revert "serial: amba-pl011: fix incorrect integer size in
- pl011_fifo_to_tty()"
-In-Reply-To: <562A6296.3070600@codeaurora.org>
-References: <1445594400-29095-1-git-send-email-shijie.huang@arm.com>
- <20151023103056.GI4801@e103592.cambridge.arm.com>
- <562A297A.9030204@codeaurora.org>
- <20151023133403.GI4796@e103592.cambridge.arm.com> <562A544D.7080506@tabi.org>
- <20151023160246.GM4796@e103592.cambridge.arm.com>
- <562A6296.3070600@codeaurora.org>
-Message-ID: <562A7312.5030501@hurleysoftware.com>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Fri, 23 Oct 2015 20:58:33 +0300
+Subject: MUSB peripheral DMA regression caused by driver core runtime PM
+ change
+In-Reply-To: <877fmdcyzi.fsf@saruman.tx.rr.com>
+References: <20151021234134.GQ3078@atomide.com>
+ <20151022180216.GT3078@atomide.com> <20151022230133.GV3078@atomide.com>
+ <562A2D0D.3060104@ti.com> <20151023163957.GW3078@atomide.com>
+ <877fmdcyzi.fsf@saruman.tx.rr.com>
+Message-ID: <562A7549.3070400@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/23/2015 12:38 PM, Timur Tabi wrote:
-> On 10/23/2015 11:02 AM, Dave P Martin wrote:
->> I'm pretty sure CREAD should default to enabled[1], and that usually
->> software won't modify it.
+On 10/23/2015 07:48 PM, Felipe Balbi wrote:
+> 
+> Hi,
+> 
+> Tony Lindgren <tony@atomide.com> writes:
+>> From: Tony Lindgren <tony@atomide.com>
+>> Date: Fri, 23 Oct 2015 09:03:22 -0700
+>> Subject: [PATCH] usb: musb: omap2430: Fix regression caused by driver core
+>>   change
 >>
->> Assuming that this is indeed the problem, it's possible that another bug
->> in the pl011 driver is wrongly clearing this flag.  Sadly I don't have
->> time to look at the code again just now ...:(
-> 
-> Perhaps, but !CREAD is definitely broken without this patch.  So if the driver really is clearing CREAD somewhere else, then that's where the real bug is.
-> 
+>> Commit ddef08dd00f5 ("Driver core: wakeup the parent device before trying
+>> probe") started automatically ensuring the parent device is enabled when
+>> the child gets probed.
 >>
->> Could be interesting to stick some BUG_ON(!CREAD) in the driver to
->> try and track down where that's coming from.
+>> This however caused a regression for MUSB omap2430 interface as the
+>> runtime PM for the parent device needs the child initialized to access
+>> the MUSB hardware registers.
+>>
+>> Let's delay the enabling of PM runtime for the parent until the child
+>> has been properly initialized as suggested in an earlier patch by
+>> Grygorii Strashko <grygorii.strashko@ti.com>.
+>>
+>> In addition to delaying pm_runtime_enable, we now also need to make sure
+>> the parent is enabled during omap2430_musb_init. We also want to propagate
+>> an error from omap2430_runtime_resume if struct musb is not initialized.
+>>
+>> Note that we use pm_runtime_put_noidle here for both the child and parent
+>> to prevent an extra runtime_suspend/resume cycle.
+>>
+>> Let's also add some comments to avoid confusion between the
+>> two different devices.
+>>
+>> Fixes: ddef08dd00f5 ("Driver core: wakeup the parent device before
+>> trying probe")
+>> Suggested-by: Grygorii Strashko <grygorii.strashko@ti.com>
+>> Signed-off-by: Tony Lindgren <tony@atomide.com>
 > 
-> CREAD is disabled by default when opening the console.  You need to explicitly set it in the termios structure.
+> I'm fine with this patch to fix this v4.3 regression. Greg, do you want
+> a pull request or can you take this in as a patch ? In any case:
+> 
+> Acked-by: Felipe Balbi <balbi@ti.com>
 
-No; the initial termios structure for all serial core-based drivers has
-CREAD set:
+Reviewed-by: Grygorii Strashko <grygorii.strashko@ti.com>
 
-pl011_probe
-   pl011_register_port
-      uart_register_driver
-         ...
-         normal->init_termios.c_cflag = .... | CREAD | ....;
+It always fun when DD/PM core is updated to fix some driver/subsystem's
+specific PM issue :(
 
-Regards,
-Peter Hurley
+> 
+>> --- a/drivers/usb/musb/omap2430.c
+>> +++ b/drivers/usb/musb/omap2430.c
+>> @@ -391,9 +391,20 @@ static int omap2430_musb_init(struct musb *musb)
+>>   	}
+>>   	musb->isr = omap2430_musb_interrupt;
+>>   
+>> +	/*
+>> +	 * Enable runtime PM for musb parent (this driver). We can't
+>> +	 * do it earlier as struct musb is not yet allocated and we
+>> +	 * need to touch the musb registers for runtime PM.
+>> +	 */
+>> +	pm_runtime_enable(glue->dev);
+>> +	status = pm_runtime_get_sync(glue->dev);
+>> +	if (status < 0)
+>> +		goto err1;
+>> +
+>>   	status = pm_runtime_get_sync(dev);
+
+Hm. My assumption was that *Parent* device (omap2430) will be enabled
+here :( But as I can see this will not happen:
+
+static int rpm_resume(struct device *dev, int rpmflags)
+{...
+	if (!parent && dev->parent) {
+		/*
+		 * Increment the parent's usage counter and resume it if
+		 * necessary.  Not needed if dev is irq-safe; then the
+		 * parent is permanently resumed.
+		 */
+		parent = dev->parent;
+		if (dev->power.irq_safe)
+			goto skip_parent;
+
+^^^ and musb device is irq_safe :( 
+
+
+
+>>   	if (status < 0) {
+>>   		dev_err(dev, "pm_runtime_get_sync FAILED %d\n", status);
+>> +		pm_runtime_put_sync(glue->dev);
+>>   		goto err1;
+>>   	}
+>>   
+>> @@ -426,6 +437,7 @@ static int omap2430_musb_init(struct musb *musb)
+>>   	phy_power_on(musb->phy);
+>>   
+>>   	pm_runtime_put_noidle(musb->controller);
+>> +	pm_runtime_put_noidle(glue->dev);
+>>   	return 0;
+>>   
+>>   err1:
+>> @@ -626,7 +638,11 @@ static int omap2430_probe(struct platform_device *pdev)
+>>   		goto err2;
+>>   	}
+>>   
+>> -	pm_runtime_enable(&pdev->dev);
+>> +	/*
+>> +	 * Note that we cannot enable PM runtime yet for this
+>> +	 * driver as we need struct musb initialized first.
+>> +	 * See omap2430_musb_init above.
+>> +	 */
+>>   
+>>   	ret = platform_device_add(musb);
+>>   	if (ret) {
+>> @@ -675,11 +691,12 @@ static int omap2430_runtime_resume(struct device *dev)
+>>   	struct omap2430_glue		*glue = dev_get_drvdata(dev);
+>>   	struct musb			*musb = glue_to_musb(glue);
+>>   
+>> -	if (musb) {
+>> -		omap2430_low_level_init(musb);
+>> -		musb_writel(musb->mregs, OTG_INTERFSEL,
+>> -				musb->context.otg_interfsel);
+>> -	}
+>> +	if (!musb)
+>> +		return -EPROBE_DEFER;
+>> +
+>> +	omap2430_low_level_init(musb);
+>> +	musb_writel(musb->mregs, OTG_INTERFSEL,
+>> +		    musb->context.otg_interfsel);
+>>   
+>>   	return 0;
+>>   }
+> 
+
+
+-- 
+regards,
+-grygorii
