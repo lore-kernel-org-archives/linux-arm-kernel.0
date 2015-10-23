@@ -1,13 +1,13 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Fri, 23 Oct 2015 10:25:07 -0700
-Subject: [resend GIT PULL] ARM: mediatek: dts updates for v4.3
-In-Reply-To: <CABuKBeJA9rYZm4keLV8TVj_X4FT4YkOcmFJqnCBL=aaQWW4N1g@mail.gmail.com>
-References: <CABuKBeJA9rYZm4keLV8TVj_X4FT4YkOcmFJqnCBL=aaQWW4N1g@mail.gmail.com>
-Message-ID: <20151023172507.GJ2224@localhost>
+Date: Fri, 23 Oct 2015 10:25:57 -0700
+Subject: [resend GIT PULL] ARM: mediatek: arm64 updates for v4.3
+In-Reply-To: <CABuKBeJbELoYh7fC_QNGgPxVHHhjioVn++z6Qj0W2X5Q-imL0g@mail.gmail.com>
+References: <CABuKBeJbELoYh7fC_QNGgPxVHHhjioVn++z6Qj0W2X5Q-imL0g@mail.gmail.com>
+Message-ID: <20151023172557.GK2224@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Oct 18, 2015 at 02:21:54PM +0200, Matthias Brugger wrote:
+On Sun, Oct 18, 2015 at 02:23:40PM +0200, Matthias Brugger wrote:
 > Hi Arnd and Olof,
 > 
 > Please pull the following patches.
@@ -26,29 +26,24 @@ On Sun, Oct 18, 2015 at 02:21:54PM +0200, Matthias Brugger wrote:
 > 
 > are available in the git repository at:
 > 
->   https://github.com/mbgg/linux-mediatek.git tags/v4.3-next-dts
+>   https://github.com/mbgg/linux-mediatek.git tags/v4.3-next-arm64
 > 
-> for you to fetch changes up to 060646a218b357e758b3dc6bbce2865bd0aadd44:
+> for you to fetch changes up to e34573c95a1416b4f26a5cc68b1de198e6b27ad7:
 > 
->   ARM: dts: mt8127: enable basic SMP bringup for mt8127 (2015-10-12
-> 19:10:38 +0200)
+>   arm64: dts: mt8173: Add clocks for SCPSYS unit (2015-10-14 15:43:13 +0200)
 > 
 > ----------------------------------------------------------------
-> Delete regulator-compatible usage in mt8135-evbp1.dts.
-> The regualtor-compatible binding is deprecated, instead the node name
-> is used.
+> Correct i2c DTS node names in mt8173.dtsi.
 > 
-> Mediatek timer driver supports as well mt8127, mt8135 and mt8173. Add
-> these SOCs to the bindings list.
+> Add spi DTS node to the mt8173 and mt8173-evb.
 > 
-> Power domains venc and venc_lt need clocks two extra clocks to access
-> their registers. We update the bindings documentation about this.
+> Add dts nodes for the subsystem clocks on mt8173.
+> This includes mmsys, imgsys, vdecsys, vencsys, vencltsys.
 > 
-> Update SMP bindings documentation by adding support for mt6589 and mt81xx SOCs.
-> 
-> Update mt8127.dtsi and mt8135.dtsi to enable SMP support.
+> Add clock nodes to the scpsys binding, which are needed to
+> access the registers of venc and venc_lt power domains.
 
-Merged, thanks.
+Thanks, merged.
 
 
 -Olof
