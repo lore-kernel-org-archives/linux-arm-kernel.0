@@ -1,318 +1,108 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Fri, 23 Oct 2015 11:50:41 +0800
-Subject: [PATCH v4 4/4] ARM: dts: sun6i: Add dts file for MSI Primo81 tablet
-In-Reply-To: <1445572241-13259-1-git-send-email-wens@csie.org>
-References: <1445572241-13259-1-git-send-email-wens@csie.org>
-Message-ID: <1445572241-13259-5-git-send-email-wens@csie.org>
+From: dianders@chromium.org (Doug Anderson)
+Date: Fri, 23 Oct 2015 00:04:55 -0400
+Subject: [PATCH v3 2/3] thermal: rockchip: ensure the otp states before
+ resetting the controller
+In-Reply-To: <1445565296-31517-3-git-send-email-wxt@rock-chips.com>
+References: <1445565296-31517-1-git-send-email-wxt@rock-chips.com>
+ <1445565296-31517-3-git-send-email-wxt@rock-chips.com>
+Message-ID: <CAD=FV=WZqXRt4R_TTaz4LJxWo5B0fmrBjma52cVidpO=OkjcaQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Karsten Merker <merker@debian.org>
+Caesar,
 
-The MSI Primo81 is an A31s based tablet, with 1G RAM, 16G NAND,
-768x1024 IPS LCD display, mono speaker, 0.3 MP front camera, 2.0 MP
-rear camera, 3500 mAh battery, gt911 touchscreen, mma8452 accelerometer
-and rtl8188etv usb wifi. Has "power", "volume+" and "volume-" buttons
-(both volume buttons are also connected to the UBOOT_SEL pin). The
-external connectors are represented by MicroSD slot, MiniHDMI, MicroUSB
-OTG and 3.5mm headphone jack.
+On Thu, Oct 22, 2015 at 9:54 PM, Caesar Wang <wxt@rock-chips.com> wrote:
+> We need the OTP pin is gpio state before resetting the TSADC controller,
+> since the tshut polarity will generate a high signal.
+>
+> Says:
+> The TSHUT temperature is setting more than 80 degree, the
+> default tshut polarity is high.
+>
+> If T > 80C, the OTP output the high signal.
+> If T < 80C, the OTP output the low signal.
+>
+> On the moment, the tshut polarity will be low in a short period of time
+> if the TSADC controller is reset.
+>
+> So:
+> If T < 80C, the OTP output the High Signal.
+> If T > 80C, the OTP output the Low Signal.
+>
+> In some cases, the OTP pin is connected to the PMIC, maybe the PMIC can
+> accept the reset response time to avoid this issue.
+> In other words, the system will be always reboot if we
+> make the OTP pin is connected the others IC to control the power.
+>
+> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
+>
+> ---
+>
+> Changes in v3:
+>   - Add the pinctrl state for in the suspend/resume.
+>
+> Changes in v2: None
+> Changes in v1: None
+>
+>  drivers/thermal/rockchip_thermal.c | 4 ++++
+>  1 file changed, 4 insertions(+)
+>
+> diff --git a/drivers/thermal/rockchip_thermal.c b/drivers/thermal/rockchip_thermal.c
+> index c89ffb2..3b8fbda 100644
+> --- a/drivers/thermal/rockchip_thermal.c
+> +++ b/drivers/thermal/rockchip_thermal.c
+> @@ -642,6 +642,8 @@ static int __maybe_unused rockchip_thermal_suspend(struct device *dev)
+>         clk_disable(thermal->pclk);
+>         clk_disable(thermal->clk);
+>
+> +       pinctrl_pm_select_sleep_state(dev);
+> +
+>         return 0;
+>  }
+>
+> @@ -678,6 +680,8 @@ static int __maybe_unused rockchip_thermal_resume(struct device *dev)
+>         for (i = 0; i < ARRAY_SIZE(thermal->sensors); i++)
+>                 rockchip_thermal_toggle_sensor(&thermal->sensors[i], true);
+>
+> +       pinctrl_pm_select_default_state(dev);
+> +
+>         return 0;
+>  }
 
-USB OTG is enabled in host only mode. AXP221 USB power supply and
-GPIO support are required for full USB OTG support.
+The patch looks totally fine, but the description is a little
+confusing.  Reading this patch it's all about adding support for the
+"sleep" state in the tsadc driver, but nothing in the description
+talks about that.  I'd expect something like:
 
-Signed-off-by: Siarhei Siamashka <siarhei.siamashka@gmail.com>
-Signed-off-by: Karsten Merker <merker@debian.org>
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+thermal: rockchip: support the sleep pinctrl state to avoid glitches in s2r
+
+When we come out of system suspend state (S3) the tsadc will have been
+reset and back at its default state.  While reprogramming the tsadc
+it's possible that we'll glitch the output and unintentionally cause
+the "over temperature" GPIO to be asserted.  Since the over
+temperature GPIO is often hooked up to something that will cause a
+reboot or shutdown in hardware, this glitch can be catastrophic on
+some boards.
+
+We'll add support for selecting the "sleep" pinctrl state at suspend
+time.  Boards can use this to effectively disable the tsadc at suspend
+time and avoid glitches when the system is resumed.
+
 ---
 
-Changes since last submission (was part of Sinlinx SinA31s series)
+Note that although this pinctrl approach is fine IMHO, I am left
+wondering whether we could just change the tsadc init sequence to
+avoid the glitch.  I can't easily test myself, but if we can program
+the temperatures before re-enabling the tsadc would it avoid the
+problem too?  Like could we just swap things like:
 
-  - Update axp22x.dtsi file name
-  - Sort regulators
-  - Drop URL in commit message
-  - Drop comment for capacitive touch panel
-  - Add simplefb regulators
-  - Drop regulator-always-on for regulators that aren't critical
-  - Fix CPU and GPU regulator supply mix-up
+                thermal->chip->set_tshut_temp(id, thermal->regs,
+                                              thermal->hw_shut_temp);
+                thermal->chip->set_tshut_mode(id, thermal->regs,
+                                              thermal->tshut_mode);
 
----
- arch/arm/boot/dts/Makefile               |   1 +
- arch/arm/boot/dts/sun6i-a31s-primo81.dts | 255 +++++++++++++++++++++++++++++++
- 2 files changed, 256 insertions(+)
- create mode 100644 arch/arm/boot/dts/sun6i-a31s-primo81.dts
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index c00b72e750ab..78ade1a5e886 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -612,6 +612,7 @@ dtb-$(CONFIG_MACH_SUN6I) += \
- 	sun6i-a31-m9.dtb \
- 	sun6i-a31-mele-a1000g-quad.dtb \
- 	sun6i-a31s-cs908.dtb \
-+	sun6i-a31s-primo81.dtb \
- 	sun6i-a31s-sina31s.dtb \
- 	sun6i-a31s-sinovoip-bpi-m2.dtb \
- 	sun6i-a31s-yones-toptech-bs1078-v2.dtb
-diff --git a/arch/arm/boot/dts/sun6i-a31s-primo81.dts b/arch/arm/boot/dts/sun6i-a31s-primo81.dts
-new file mode 100644
-index 000000000000..2d4250b1faf8
---- /dev/null
-+++ b/arch/arm/boot/dts/sun6i-a31s-primo81.dts
-@@ -0,0 +1,255 @@
-+/*
-+ * Copyright 2014 Siarhei Siamashka <siarhei.siamashka@gmail.com>
-+ * Copyright 2015 Karsten Merker <merker@debian.org>
-+ * Copyright 2015 Chen-Yu Tsai <wens@csie.org>
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This file is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+/dts-v1/;
-+#include "sun6i-a31s.dtsi"
-+#include "sunxi-common-regulators.dtsi"
-+
-+#include <dt-bindings/gpio/gpio.h>
-+#include <dt-bindings/input/input.h>
-+#include <dt-bindings/pinctrl/sun4i-a10.h>
-+
-+/ {
-+	model = "MSI Primo81 tablet";
-+	compatible = "msi,primo81", "allwinner,sun6i-a31s";
-+};
-+
-+&cpu0 {
-+	cpu-supply = <&reg_dcdc3>;
-+};
-+
-+&ehci0 {
-+	/* rtl8188etv wifi is connected here */
-+	status = "okay";
-+};
-+
-+&i2c0 {
-+	/* pull-ups and device VDDIO use AXP221 DLDO3 */
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c0_pins_a>;
-+	status = "failed";
-+};
-+
-+&i2c1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c1_pins_a>;
-+	status = "okay";
-+
-+	ctp at 5d {
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&gt911_int_primo81>;
-+		compatible = "goodix,gt911";
-+		reg = <0x5d>;
-+		interrupt-parent = <&pio>;
-+		interrupts = <0 3 IRQ_TYPE_LEVEL_HIGH>; /* PA3 */
-+	};
-+};
-+
-+&i2c2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&i2c2_pins_a>;
-+	status = "okay";
-+
-+	accelerometer at 1c {
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&mma8452_int_primo81>;
-+		compatible = "fsl,mma8452";
-+		reg = <0x1c>;
-+		interrupt-parent = <&pio>;
-+		interrupts = <0 9 IRQ_TYPE_LEVEL_HIGH>; /* PA9 */
-+		#io-channel-cells = <1>;
-+	};
-+};
-+
-+&lradc {
-+	vref-supply = <&reg_aldo3>;
-+	status = "okay";
-+
-+	button at 158 {
-+		label = "Volume Up";
-+		linux,code = <KEY_VOLUMEUP>;
-+		channel = <0>;
-+		voltage = <158730>;
-+	};
-+
-+	button at 349 {
-+		label = "Volume Down";
-+		linux,code = <KEY_VOLUMEDOWN>;
-+		channel = <0>;
-+		voltage = <349206>;
-+	};
-+};
-+
-+&mmc0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_primo81>;
-+	vmmc-supply = <&reg_dcdc1>;
-+	bus-width = <4>;
-+	cd-gpios = <&pio 0 8 GPIO_ACTIVE_HIGH>; /* PA8 */
-+	cd-inverted;
-+	status = "okay";
-+};
-+
-+&pio {
-+	gt911_int_primo81: gt911_int_pin at 0 {
-+		allwinner,pins = "PA3";
-+		allwinner,function = "gpio_in";
-+		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+		allwinner,pull = <SUN4I_PINCTRL_NO_PULL>;
-+	};
-+
-+	mma8452_int_primo81: mma8452_int_pin at 0 {
-+		allwinner,pins = "PA9";
-+		allwinner,function = "gpio_in";
-+		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+		allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
-+	};
-+
-+	mmc0_cd_pin_primo81: mmc0_cd_pin at 0 {
-+		allwinner,pins = "PA8";
-+		allwinner,function = "gpio_in";
-+		allwinner,drive = <SUN4I_PINCTRL_10_MA>;
-+		allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
-+	};
-+};
-+
-+&p2wi {
-+	status = "okay";
-+
-+	axp22x: pmic at 68 {
-+		compatible = "x-powers,axp221";
-+		reg = <0x68>;
-+		interrupt-parent = <&nmi_intc>;
-+		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
-+	};
-+};
-+
-+#include "axp22x.dtsi"
-+
-+&reg_aldo3 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <2700000>;
-+	regulator-max-microvolt = <3300000>;
-+	regulator-name = "avcc";
-+};
-+
-+&reg_dc1sw {
-+	regulator-min-microvolt = <3000000>;
-+	regulator-max-microvolt = <3000000>;
-+	regulator-name = "vcc-lcd";
-+};
-+
-+&reg_dc5ldo {
-+	regulator-min-microvolt = <700000>;
-+	regulator-max-microvolt = <1320000>;
-+	regulator-name = "vdd-cpus"; /* This is an educated guess */
-+};
-+
-+&reg_dcdc1 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <3000000>;
-+	regulator-max-microvolt = <3000000>;
-+	regulator-name = "vcc-3v0";
-+};
-+
-+&reg_dcdc2 {
-+	regulator-min-microvolt = <700000>;
-+	regulator-max-microvolt = <1320000>;
-+	regulator-name = "vdd-gpu";
-+};
-+
-+&reg_dcdc3 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <700000>;
-+	regulator-max-microvolt = <1320000>;
-+	regulator-name = "vdd-cpu";
-+};
-+
-+&reg_dcdc4 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <700000>;
-+	regulator-max-microvolt = <1320000>;
-+	regulator-name = "vdd-sys-dll";
-+};
-+
-+&reg_dcdc5 {
-+	regulator-always-on;
-+	regulator-min-microvolt = <1500000>;
-+	regulator-max-microvolt = <1500000>;
-+	regulator-name = "vcc-dram";
-+};
-+
-+&reg_dldo1 {
-+	regulator-min-microvolt = <3300000>;
-+	regulator-max-microvolt = <3300000>;
-+	regulator-name = "vcc-wifi";
-+};
-+
-+&reg_dldo3 {
-+	regulator-min-microvolt = <2800000>;
-+	regulator-max-microvolt = <2800000>;
-+	regulator-name = "vddio-csi";
-+};
-+
-+&reg_eldo3 {
-+	regulator-min-microvolt = <1080000>;
-+	regulator-max-microvolt = <1320000>;
-+	regulator-name = "vdd-mipi-bridge";
-+};
-+
-+&simplefb_lcd {
-+	vcc-lcd-supply = <&reg_dc1sw>;
-+	vdd-mipi-bridge-supply = <&reg_eldo3>;
-+};
-+
-+&usb_otg {
-+	/* otg support requires support for AXP221 usb-power-supply and GPIO */
-+	dr_mode = "host";
-+	status = "okay";
-+};
-+
-+&usbphy {
-+	usb1_vbus-supply = <&reg_dldo1>;
-+	status = "okay";
-+};
--- 
-2.6.1
+Does that help?
+
+
+-Doug
