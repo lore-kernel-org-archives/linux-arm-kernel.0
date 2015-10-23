@@ -1,114 +1,90 @@
-From: moinejf@free.fr (Jean-Francois Moine)
-Date: Fri, 23 Oct 2015 21:20:13 +0200
-Subject: [PATCH 5/6] ARM: dts: sunxi: Add Allwinner H3 DTSI
-In-Reply-To: <20151023181406.GK10947@lukather>
-References: <1445444428-4652-1-git-send-email-jenskuske@gmail.com>
- <1445444428-4652-2-git-send-email-jenskuske@gmail.com>
- <20151023181406.GK10947@lukather>
-Message-ID: <20151023212013.50bcbe4a@OPI2>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 23 Oct 2015 12:20:44 -0700
+Subject: MUSB peripheral DMA regression caused by driver core runtime PM
+ change
+In-Reply-To: <Pine.LNX.4.44L0.1510231406200.1644-100000@iolanthe.rowland.org>
+References: <562A7549.3070400@ti.com>
+ <Pine.LNX.4.44L0.1510231406200.1644-100000@iolanthe.rowland.org>
+Message-ID: <20151023192044.GX3078@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 23 Oct 2015 20:14:06 +0200
-Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
-
-> On Wed, Oct 21, 2015 at 06:20:27PM +0200, Jens Kuske wrote:
-> > +		bus_gates: clk at 01c20060 {
-> > +			#clock-cells = <1>;
-> > +			compatible = "allwinner,sun8i-h3-bus-gates-clk";
-> > +			reg = <0x01c20060 0x14>;
-> > +			clock-indices = <5>, <6>, <8>,
-> > +					<9>, <10>, <13>,
-> > +					<14>, <17>, <18>,
-> > +					<19>, <20>,
-> > +					<21>, <23>,
-> > +					<24>, <25>,
-> > +					<26>, <27>,
-> > +					<28>, <29>,
-> > +					<30>, <31>, <32>,
-> > +					<35>, <36>, <37>,
-> > +					<40>, <41>, <43>,
-> > +					<44>, <52>, <53>,
-> > +					<54>, <64>,
-> > +					<65>, <69>, <72>,
-> > +					<76>, <77>, <78>,
-> > +					<96>, <97>, <98>,
-> > +					<112>, <113>,
-> > +					<114>, <115>, <116>,
-> > +					<128>, <135>;
-> > +			clocks = <&ahb1>, <&ahb1>, <&ahb1>,
-> > +				 <&ahb1>, <&ahb1>, <&ahb1>,
-> > +				 <&ahb1>, <&ahb2>, <&ahb1>,
-> > +				 <&ahb1>, <&ahb1>,
-> > +				 <&ahb1>, <&ahb1>,
-> > +				 <&ahb1>, <&ahb1>,
-> > +				 <&ahb1>, <&ahb1>,
-> > +				 <&ahb1>, <&ahb2>,
-> > +				 <&ahb2>, <&ahb2>, <&ahb1>,
-> > +				 <&ahb1>, <&ahb1>, <&ahb1>,
-> > +				 <&ahb1>, <&ahb1>, <&ahb1>,
-> > +				 <&ahb1>, <&ahb1>, <&ahb1>,
-> > +				 <&ahb1>, <&apb1>,
-> > +				 <&apb1>, <&apb1>, <&apb1>,
-> > +				 <&apb1>, <&apb1>, <&apb1>,
-> > +				 <&apb2>, <&apb2>, <&apb2>,
-> > +				 <&apb2>, <&apb2>,
-> > +				 <&apb2>, <&apb2>, <&apb2>,
-> > +				 <&ahb1>, <&ahb1>;  
+* Alan Stern <stern@rowland.harvard.edu> [151023 11:27]:
+> On Fri, 23 Oct 2015, Grygorii Strashko wrote:
 > 
-> This is not really what I had in mind...
+> > Reviewed-by: Grygorii Strashko <grygorii.strashko@ti.com>
+> > 
+> > It always fun when DD/PM core is updated to fix some driver/subsystem's
+> > specific PM issue :(
+> > 
+> > > 
+> > >> --- a/drivers/usb/musb/omap2430.c
+> > >> +++ b/drivers/usb/musb/omap2430.c
+> > >> @@ -391,9 +391,20 @@ static int omap2430_musb_init(struct musb *musb)
+> > >>   	}
+> > >>   	musb->isr = omap2430_musb_interrupt;
+> > >>   
+> > >> +	/*
+> > >> +	 * Enable runtime PM for musb parent (this driver). We can't
+> > >> +	 * do it earlier as struct musb is not yet allocated and we
+> > >> +	 * need to touch the musb registers for runtime PM.
+> > >> +	 */
+> > >> +	pm_runtime_enable(glue->dev);
+> > >> +	status = pm_runtime_get_sync(glue->dev);
+> > >> +	if (status < 0)
+> > >> +		goto err1;
+> > >> +
+> > >>   	status = pm_runtime_get_sync(dev);
+> > 
+> > Hm. My assumption was that *Parent* device (omap2430) will be enabled
+> > here :( But as I can see this will not happen:
+
+Yes the parent child stuff here is very confusing right now :)
+
+> > static int rpm_resume(struct device *dev, int rpmflags)
+> > {...
+> > 	if (!parent && dev->parent) {
+> > 		/*
+> > 		 * Increment the parent's usage counter and resume it if
+> > 		 * necessary.  Not needed if dev is irq-safe; then the
+> > 		 * parent is permanently resumed.
+> > 		 */
+> > 		parent = dev->parent;
+> > 		if (dev->power.irq_safe)
+> > 			goto skip_parent;
+> > 
+> > ^^^ and musb device is irq_safe :( 
 > 
-> This IP has 2 parents, and only two parents. The mapping between the
-> IPs should be done in the driver itself, not in the DT where it is
-> very error prone and barely readable.
+> This way of doing things looks very strange.
 > 
-> And note that I never have expected you to use clk-simple-gates
-> either. This is a complicated clock, unlike the other we've seen so
-> far, it definitely deserves a driver of its own.
+> If the omap2430 is the parent of the musb device, and
+> pm_runtime_irq_safe() has been called for the musb device, then after
+> that the omap2430 will never be runtime suspended.  Therefore it
+> doesn't matter whether you enable it for runtime PM or not.
+> 
+> It seems to me that the real problem must be that the musb device gets
+> runtime-enabled and marked irq_safe too early.  These things should 
+> happen before the musb device gets registered and exposed to userspace, 
+> but not before the omap2430 parent is runtime-enabled.
+> 
+> Thus the sequence of events should be:
+> 
+> 	Allocate the musb device;
+> 	Runtime-enable the omap2430 (since it is now safe to do so);
+> 	Runtime-enable the musb and declare it irq_safe (this will
+> 		automatically runtime-resume the omap2430);
+> 	Register the musb.
+> 
+> If things are done this way, no special action needs to be taken.
 
-It seems that Allwinner puts the gate definitions anywhere in the array
-of registers, so, I think that the H3 scheme will not be the last
-complicated one, and if the parent clocks are in the code instead of in
-the DT, we will have more and more code to develop.
+Yes good point, that requires changing the init for the whole
+drivers/musb though. Also, we should reorganize the whole musb and make
+the platform glue and musb core drivers completely separate using a
+shared interrupt where needed.
 
-An other way to describe the gates would be to add containers per parent
-(with still a small patch in the clk-simple-gates):
+For the regression for the -rc series? Do you see any better
+alternatives to what I posted?
 
-	bus_gates: clk at 01c20060 {
-		#clock-cells = <1>;
-		compatible = "allwinner,sun8i-h3-bus-gates-clk";
-		reg = <0x01c20060 0x14>;
-		ahb1_gates {
-			clocks = <&ahb1>;
-			clock-indices = <5>, <6>, <8>,
-					<9>, <10>, <13>,
-					<14>, <18>,
-					<19>, <20>,
-					...;
-			};
-			clock-output-names = "ahb1_ce", "ahb1_dma", "ahb1_mmc0",
-				"ahb1_mmc1", "ahb1_mmc2", "ahb1_nand",
-				"ahb1_sdram", "ahb1_ts",
-				"ahb1_hstimer", "ahb1_spi0",
-				...;
-		};
-		ahb2_gates {
-			clocks = <&ahb2>;
-			clock-indices = <17>, <29>,
-					<30>, <31>, <32>,
-					...;
-			clock-output-names = "ahb2_gmac", "ahb2_ohic1",
-					"ahb2_ohic2", "ahb2_ohic3", "ahb1_ve",
-					...;
-		};
-		apb1_gates {
-			...
-		};
-		apb2_gates {
-			...
-		};
-	};
+Regards,
 
--- 
-Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
-Jef		|		http://moinejf.free.fr/
+Tony
