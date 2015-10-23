@@ -1,22 +1,33 @@
-From: bjorn.andersson@sonymobile.com (Bjorn Andersson)
-Date: Fri, 23 Oct 2015 13:22:44 -0700
-Subject: [PATCH v3 3/4] soc: qcom: smd: Use __ioread32_copy() instead of
- open-coding it
-In-Reply-To: <1445630512-10888-4-git-send-email-sboyd@codeaurora.org>
-References: <1445630512-10888-1-git-send-email-sboyd@codeaurora.org>
- <1445630512-10888-4-git-send-email-sboyd@codeaurora.org>
-Message-ID: <20151023202244.GX24668@usrtlx11787.corpusers.net>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 23 Oct 2015 22:22:14 +0200
+Subject: [GIT PULLv2] at91: dt for 4.4 #2
+In-Reply-To: <20151021205938.GA18600@piout.net>
+References: <20151021205938.GA18600@piout.net>
+Message-ID: <6283901.cB5kt79X9G@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri 23 Oct 13:01 PDT 2015, Stephen Boyd wrote:
-
-> Now that we have a generic library function for this, replace the
-> open-coded instance.
+On Wednesday 21 October 2015 22:59:38 Alexandre Belloni wrote:
 > 
-> Cc: Bjorn Andersson <bjorn.andersson@sonymobile.com>
+> The following changes since commit a9b672a636a599cc052afcb6837e3177dc53c143:
+> 
+>   ARM: at91/dt: sama5d2 Xplained: add device pin muxing (2015-09-23 16:26:47 +0200)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/abelloni/linux.git tags/at91-ab-dt2
+> 
+> for you to fetch changes up to 512fc048e4fdc39f43e78af7e2fed5047d651979:
+> 
+>   ARM: at91/dt: sama5d2: add missing devices (2015-10-19 21:22:21 +0200)
+> 
+> ----------------------------------------------------------------
+> Second batch of DT changes for 4.4:
+> - some DT fixes: pullups, disabled property
+> - the PMC is now a syscon
+> - great improvement of sama5d2 support
+> 
 
-Reviewed-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
+Pulled into next/dt, thanks!
 
-Regards,
-Bjorn
+	Arnd
