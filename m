@@ -1,128 +1,33 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Fri, 23 Oct 2015 10:51:54 +0100
-Subject: [PATCH v2] EDAC: Add ARM64 EDAC
-In-Reply-To: <56299042.5090109@huawei.com>
-References: <1445460097-10260-1-git-send-email-brijeshkumar.singh@amd.com>
- <56282550.4000201@arm.com> <5628F6B5.5080701@amd.com>
- <56299042.5090109@huawei.com>
-Message-ID: <562A033A.5050105@arm.com>
+From: shijie.huang@arm.com (Huang Shijie)
+Date: Fri, 23 Oct 2015 18:00:00 +0800
+Subject: [PATCH] Revert "serial: amba-pl011: fix incorrect integer size in
+ pl011_fifo_to_tty()"
+Message-ID: <1445594400-29095-1-git-send-email-shijie.huang@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 23/10/15 02:41, Hanjun Guo wrote:
-> Hi Brijesh,
-> 
-> On 2015/10/22 22:46, Brijesh Singh wrote:
->> Hi Andre,
->>
->> On 10/21/2015 06:52 PM, Andre Przywara wrote:
->>> On 21/10/15 21:41, Brijesh Singh wrote:
->>>> Add support for Cortex A57 and A53 EDAC driver.
->>> Hi Brijesh,
->>>
->>> thanks for the quick update! Some comments below.
->>>
->>>> Signed-off-by: Brijesh Singh <brijeshkumar.singh@amd.com>
->>>> CC: robh+dt at kernel.org
->>>> CC: pawel.moll at arm.com
->>>> CC: mark.rutland at arm.com
->>>> CC: ijc+devicetree at hellion.org.uk
->>>> CC: galak at codeaurora.org
->>>> CC: dougthompson at xmission.com
->>>> CC: bp at alien8.de
->>>> CC: mchehab at osg.samsung.com
->>>> CC: devicetree at vger.kernel.org
->>>> CC: guohanjun at huawei.com
->>>> CC: andre.przywara at arm.com
->>>> CC: arnd at arndb.de
->>>> CC: linux-kernel at vger.kernel.org
->>>> CC: linux-edac at vger.kernel.org
->>>> ---
->>>>
->>>> v2:
->>>> * convert into generic arm64 edac driver
->>>> * remove AMD specific references from dt binding
->>>> * remove poll_msec property from dt binding
->>>> * add poll_msec as a module param, default is 100ms
->>>> * update copyright text
->>>> * define macro mnemonics for L1 and L2 RAMID
->>>> * check L2 error per-cluster instead of per core
->>>> * update function names
->>>> * use get_online_cpus() and put_online_cpus() to make L1 and L2 register 
->>>>   read hotplug-safe
->>>> * add error check in probe routine
->>>>
->>>>  .../devicetree/bindings/edac/armv8-edac.txt        |  15 +
->>>>  drivers/edac/Kconfig                               |   6 +
->>>>  drivers/edac/Makefile                              |   1 +
->>>>  drivers/edac/cortex_arm64_edac.c                   | 457 +++++++++++++++++++++
->>>>  4 files changed, 479 insertions(+)
->>>>  create mode 100644 Documentation/devicetree/bindings/edac/armv8-edac.txt
->>>>  create mode 100644 drivers/edac/cortex_arm64_edac.c
->>>>
->>>> diff --git a/Documentation/devicetree/bindings/edac/armv8-edac.txt b/Documentation/devicetree/bindings/edac/armv8-edac.txt
->>>> new file mode 100644
->>>> index 0000000..dfd128f
->>>> --- /dev/null
->>>> +++ b/Documentation/devicetree/bindings/edac/armv8-edac.txt
->>>> @@ -0,0 +1,15 @@
->>>> +* ARMv8 L1/L2 cache error reporting
->>>> +
->>>> +On ARMv8, CPU Memory Error Syndrome Register and L2 Memory Error Syndrome
->>>> +Register can be used for checking L1 and L2 memory errors.
->>>> +
->>>> +The following section describes the ARMv8 EDAC DT node binding.
->>>> +
->>>> +Required properties:
->>>> +- compatible: Should be "arm,armv8-edac"
->>>> +
->>>> +Example:
->>>> +	edac {
->>>> +		compatible = "arm,armv8-edac";
->>>> +	};
->>>> +
->>> So if there is nothing in here, why do we need the DT binding at all (I
->>> think Mark hinted at that already)?
->>> Can't we just use the MIDR as already suggested by others?
->>> Secondly, armv8-edac is wrong here, as this feature is ARM-Cortex
->>> specific and not architectural.
->>>
->> Yes, I was going with Mark suggestion to remove DT binding but then came across these cases which kind of hinted to keep DT binding:
->>
->> * Without DT binding, the driver will always be loaded on arm64 unless its blacklisted.
+The commit 71a5cd8a4 makes the console hang for some times.
+This reverts commit 71a5cd8a4a2602a6e9010b557a23af0a54df87b6.
 
-So I checked the x86 code: the driver is always loaded as soon as the
-hardware is there (looking at PCI device IDs from the on-chip
-northbridge, for instance). The trick here is to have the Kconfig option
-defaulting to "=n", so a kernel builder would have to explicitly enable
-this. Android or embedded kernels wouldn't do this, for instance, while
-a server distribution would do.
-If a user doesn't want to be bothered with the driver, there is always
-the possibility of blacklisting the module.
-Setting a system policy is IMHO out of scope for a DT binding.
+Signed-off-by: Huang Shijie <shijie.huang@arm.com>
+---
+ drivers/tty/serial/amba-pl011.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
->> * Its possible that other SoC's might handle single-bit and double-bit errors differently compare to 
->>   Seattle platform. In Seattle platform both errors are handled by firmware but if other SoC 
->>   wants OS to handle these errors then they might need DT binding to provide the irq numbers etc.
-
-What do you mean exactly with "firmware handles these errors"?
-What would the firmware do? I guess just logging the error and then
-possibly reset the register? How would this change the driver?
-
-> I totally agree with you here,  thanks for putting them together.
-> Different SoCs may handle the error in different ways, we need
-> bindings to specialize them, irq number is a good example :)
-
-But how does this affect this very driver, polling just those two registers?
-Where would the interrupt come into the game here? Where is the proposed
-DT binding for that interrupt?
-
-AFAICT EL3 firmware handling errors would just hide this information
-from the driver, so if the f/w decides to "handle" uncorrectable ECC
-errors in a fatal way, there is nothing the driver could do anyway, right?
-
-Can you sketch a concrete example where we would actually need the
-driver to know about the firmware capabilities?
-
-Cheers,
-Andre.
+diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
+index 899a771..fd27e98 100644
+--- a/drivers/tty/serial/amba-pl011.c
++++ b/drivers/tty/serial/amba-pl011.c
+@@ -191,8 +191,8 @@ struct uart_amba_port {
+  */
+ static int pl011_fifo_to_tty(struct uart_amba_port *uap)
+ {
+-	u16 status;
+-	unsigned int ch, flag, max_count = 256;
++	u16 status, ch;
++	unsigned int flag, max_count = 256;
+ 	int fifotaken = 0;
+ 
+ 	while (max_count--) {
+-- 
+2.1.4
