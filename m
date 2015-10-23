@@ -1,32 +1,22 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 23 Oct 2015 22:19:25 +0200
-Subject: [GIT PULL] omap dts changes for v4.4 merge window, part 2
-In-Reply-To: <20151020193501.GN3078@atomide.com>
-References: <20151020193501.GN3078@atomide.com>
-Message-ID: <4174355.uUodgcne1B@wuerfel>
+From: bjorn.andersson@sonymobile.com (Bjorn Andersson)
+Date: Fri, 23 Oct 2015 13:22:44 -0700
+Subject: [PATCH v3 3/4] soc: qcom: smd: Use __ioread32_copy() instead of
+ open-coding it
+In-Reply-To: <1445630512-10888-4-git-send-email-sboyd@codeaurora.org>
+References: <1445630512-10888-1-git-send-email-sboyd@codeaurora.org>
+ <1445630512-10888-4-git-send-email-sboyd@codeaurora.org>
+Message-ID: <20151023202244.GX24668@usrtlx11787.corpusers.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 20 October 2015 12:35:02 Tony Lindgren wrote:
-> Few more omap dts changes for v4.4 merge window, mostly to fix and clean
-> up some omap5 issues to allow adding other omap5 boards. Also some other
-> fixes and clean-up:
-> 
-> - Fix SDIO WLAN for omap5 that's been broken for a while. As further
->   patches are still needed for wl18xx, no need for stable on this one.
-> 
-> - Move most of omap5 support into omap5-board-common.dtsi as most omap5
->   boards seem to share the same basic set of devices.
-> 
-> - Add minimal IGEPv5 support using based on omap5-board-common.dtsi
-> 
-> - Remove now unneedes gpio hogging for dra72-evm
-> 
-> - Update Javier Martinez Canillas email address
-> 
-> - Change earlier IGEP boards to use IOPAD pinmux macros
-> 
+On Fri 23 Oct 13:01 PDT 2015, Stephen Boyd wrote:
 
-Pulled into next/dt, thanks!
+> Now that we have a generic library function for this, replace the
+> open-coded instance.
+> 
+> Cc: Bjorn Andersson <bjorn.andersson@sonymobile.com>
 
-	Arnd
+Reviewed-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
+
+Regards,
+Bjorn
