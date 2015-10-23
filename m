@@ -1,86 +1,126 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Fri, 23 Oct 2015 15:46:50 +0100
-Subject: [PATCH] drivers: psci: make PSCI 1.0 functions initialization version
- dependent
-Message-ID: <1445611610-12871-1-git-send-email-lorenzo.pieralisi@arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 23 Oct 2015 15:46:31 +0100
+Subject: [PATCH v3 0/2] Common SerDes driver for TI's Keystone Platforms
+In-Reply-To: <3702663.07h6YO0UjY@wuerfel>
+References: <1445432201-16007-1-git-send-email-w-kwok2@ti.com>
+ <56295B9E.9030201@ti.com>
+ <CAPw-ZTk1vJA3YSwLHBNMYP0t5k2tW0HTKse+37rL8izWN33y-w@mail.gmail.com>
+ <3702663.07h6YO0UjY@wuerfel>
+Message-ID: <20151023144631.GZ32532@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The PSCI specifications [1] and the SMC calling convention mandate
-that unimplemented functions ids must return NOT_SUPPORTED (0xffffffff)
-if a function id is called but it is not implemented.
+On Fri, Oct 23, 2015 at 11:17:06AM +0200, Arnd Bergmann wrote:
+> On Thursday 22 October 2015 15:27:05 Loc Ho wrote:
+> > >
+> > > phy-xgene.c
+> > > -----------
+> > >
+> > > Looking at other drivers under drivers/phy, I could find phy-xgene.c which
+> > > is close Keystone SerDes driver (. This is called APM X-Gene Multi-Purpose
+> > > PHY driver. It defines following mode per the driver code
+> > >
+> > >         MODE_SATA       = 0,    /* List them for simple reference */
+> > >         MODE_SGMII      = 1,
+> > >         MODE_PCIE       = 2,
+> > >         MODE_USB        = 3,
+> > >         MODE_XFI        = 4,
+> > >
+> > > But seems to support only MODE_SATA. From the code, it appears, this driver
+> > > is expected to be enhanced in the future to support additional modes. I have
+> > > copied the author to this email to participate in this discussion.
+> > 
+> > Let me comment on this APM X-Gene driver. This driver is dead and
+> > won't be supported in near or foreseeable future. And someday, it will
+> > be ripped out. Based on experience, this solution (having PHY driver
+> > in Linux) can't be supported across boards and etc as it is just too
+> > much maintenance. And therefore, we followed Arnd B guidance and move
+> > all this into the boot loader. From Linux or OS perspective, it only
+> > cares about the interface in which its interface with. This is just
+> > your reference and may be this will help you as well.
+> 
+> This depends a lot on the use case. If the chip is only used on server
+> parts that have a real firmware and you can deliver bug fixes for the
+> firmware if necessary, it's always best to do as much of the setup as
+> possible there, and let Linux see a simplified view of the hardware.
+> 
+> However, for embedded systems that tend to ship with a minimal binary
+> bootloader and no way to update that as an end-user, we rely on Linux
+> to know about all the hardware that requires some form of setup, which
+> is why we have all sorts of drivers and frameworks in the kernel that
+> a server can easily ignore.
+> 
+> While keystone can show up in servers that won't use this driver, my
+> impression is that its main market is actually in embedded space.
 
-Consequently, PSCI 1.0 function ids that require the 1.0 PSCI_FEATURES
-call to be initialized:
+That's an interesting point of view - especially as you can't make the
+argument that Marvell Armada chips would ever be anything but the
+embedded space, but we're so far getting away with having the serdes
+setup in u-boot - and even Marvell's BSP doesn't have it in the kernel.
 
-CPU_SUSPEND (psci_init_cpu_suspend())
-SYSTEM_SUSPEND (psci_init_system_suspend())
+The real question here is:
 
-call the PSCI_FEATURES function id independently of the detected
-PSCI firmware version, since, if the PSCI_FEATURES function id is not
-implemented, it must return NOT_SUPPORTED according to the PSCI
-specifications, causing the initialization functions to fail as expected.
+  Why would we want to statically setup serdes links in the kernel
+  according to the DTB, rather than having the boot loader set them up?
 
-Some existing PSCI implementations (ie Qemu PSCI emulation), do not
-comply with the SMC calling convention and fail if function ids that are
-not implemented are called from the OS, causing boot failures.
+For the most part, the choice between the serdes modes is fairly static,
+depending on the board wiring.  You wouldn't ever want to configure a
+mini-PCIe socket for gigabit ethernet.
 
-To solve this issue, this patch adds code that checks the PSCI firmware
-version before calling PSCI 1.0 initialization functions so that the
-OS makes sure that it is calling 1.0 functions only if the firmware
-version detected is 1.0 or greater, therefore avoiding PSCI calls
-that are bound to fail and might cause system boot failures owing
-to non-compliant PSCI firmware implementations.
+However, there are cases when you would want to change it, and I'm
+aware of these cases:
 
-[1] http://infocenter.arm.com/help/topic/com.arm.doc.den0022c/DEN0022C_Power_State_Coordination_Interface.pdf
+* Serdes routed to a mini-PCIe socket, which is compatible with mSATA.
+  There's an argument here to allow the serdes link to be switched at
+  runtime between PCIe and mSATA.  However, the card type can't be
+  detected at run time, so this would have to be a manual configuration
+  change by the user.
 
-Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: Kevin Hilman <khilman@kernel.org>
-Cc: Sudeep Holla <sudeep.holla@arm.com>
-Cc: Olof Johansson <olof@lixom.net>
-Cc: Mark Rutland <mark.rutland@arm.com>
----
-Arnd, Kevin, Olof,
+  Since mini-PCIe is not hot-pluggable, this configuration isn't
+  something that could be changed without powering the system down.
 
-this applies to current arm-soc drivers/psci branch, and solves the
-issue Kevin detected through kernelci with Qemu emulation:
+* Serdes routed to a SFP cage, where the serdes link is configured
+  for gigabit (or faster for SFP+) ethernet.  For gigabit only, serdes
+  is configured in either 1000base-X or Cisco SGMII mode (SGMII is a
+  non-802.3 modification to 1000base-X) depending on the type of
+  transceiver plugged in.
 
-http://lists.infradead.org/pipermail/linux-arm-kernel/2015-October/380304.html
+  Arguably, there's a third option here, which is SATA as well -  I'm
+  aware of one non-standard SFP module on the market which provides a
+  SATA connector, but this is highly non-standard, is not covered by
+  the SFP specifications, so such a switch to this mode would have to
+  be done manually.
 
-Tested on:
+The difference between 1000base-X vs SGMII is to do with the generation
+and interpretation of a 16-bit configuration word passed across the
+link.  Otherwise, the two are identical - and so far I've seen the
+configuration word mode is determined by the ethernet block rather than
+the serdes block.
 
-- Juno host
-- AMD Seattle host
-- kvmtool arm64 guest (on Juno arm64 defconfig host)
-- Qemu x86 host (aarch64 emulation)
+My argument would be that even in the case of the last paragraph,
+normal use for serdes reconfiguration would be a power cycle, even in
+the embedded environment.
 
-A run on kernelci and consequent tested-by tags would be much appreciated,
-thanks for spotting this and for your help.
+Now, that all said, it looks to me like TI's serdes implementation can't
+be switched between different modes - it's statically configured to
+whatever the DTB says it should be.
 
-Thanks,
-Lorenzo
+So, this brings up the obvious question: why do we need to support
+serdes configuration in the kernel rather than statically in the boot
+loader according to the board setup?
 
- drivers/firmware/psci.c | 7 ++++---
- 1 file changed, 4 insertions(+), 3 deletions(-)
+Specifically on this patch series, I think that if we're going to have
+code doing serdes configuration in the kernel, we need to come up with
+a common set of DT properties for it, rather than having everyone doing
+their own thing.  I'd also like to see the code shrink in size - it
+doesn't do anything beyond configuring the hardware for the settings
+that DTB tells it to, so why it has to be 2.5k lines I've no idea.
 
-diff --git a/drivers/firmware/psci.c b/drivers/firmware/psci.c
-index 492db42..d24f35d 100644
---- a/drivers/firmware/psci.c
-+++ b/drivers/firmware/psci.c
-@@ -347,9 +347,10 @@ static int __init psci_probe(void)
- 
- 	psci_init_migrate();
- 
--	psci_init_cpu_suspend();
--
--	psci_init_system_suspend();
-+	if (PSCI_VERSION_MAJOR(ver) >= 1) {
-+		psci_init_cpu_suspend();
-+		psci_init_system_suspend();
-+	}
- 
- 	return 0;
- }
+There's some specific comments I have about it using readl/writel, and
+its wrapping of those, which IMHO it shouldn't be doing, and the horrid
+for loops (what's wrong with the standard Linux way of defining a
+for_each_xxx() operator and leaving the body at the callsite?)
+
 -- 
-2.5.1
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
