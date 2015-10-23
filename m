@@ -1,68 +1,244 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Fri, 23 Oct 2015 11:44:58 +0100
-Subject: [PATCH v2 4/5] drivers: firmware: psci: add extended stateid
- power_state support
-In-Reply-To: <3982126.UybqODJKJo@wuerfel>
-References: <1436375811-10529-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1436375811-10529-5-git-send-email-lorenzo.pieralisi@arm.com>
- <CAMAWPa9ZLGidg3r8RJY9MANdmjPdJ07S7mmixQBf_g3YPce1_g@mail.gmail.com>
- <3982126.UybqODJKJo@wuerfel>
-Message-ID: <20151023104457.GA9309@red-moon>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Fri, 23 Oct 2015 12:48:16 +0200
+Subject: [PATCH v3 2/2] ARM: dts: mediatek: add MT2701 basic support
+In-Reply-To: <1445322871-14134-3-git-send-email-erin.lo@mediatek.com>
+References: <1445322871-14134-1-git-send-email-erin.lo@mediatek.com>
+ <1445322871-14134-3-git-send-email-erin.lo@mediatek.com>
+Message-ID: <562A1070.8070505@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 23, 2015 at 12:23:53PM +0200, Arnd Bergmann wrote:
-> On Thursday 22 October 2015 15:07:06 Kevin Hilman wrote:
-> > On Wed, Jul 8, 2015 at 10:16 AM, Lorenzo Pieralisi
-> > <lorenzo.pieralisi@arm.com> wrote:
-> > > PSCI v1.0 augmented the power_state parameter format specification
-> > > (extended stateid) and introduced a way to probe it through the
-> > > PSCI_FEATURES interface.
-> > >
-> > > This patch implements code that detects the power_state format at
-> > > run-time through the PSCI_FEATURES interface, so that the power_state
-> > > argument can be properly detected and validated in the kernel according
-> > > to the information provided through firmware.
-> > >
-> > > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> > > Cc: Mark Rutland <mark.rutland@arm.com>
-> > 
-> > kernelci.org started finding a new boot failures in the arm-soc tree
-> > on arm64 qemu[1] and it was bisected down to this patch, which is in
-> > arm-soc in the form of commit a5c00bb28da0 (drivers: firmware: psci:
-> > add extended stateid power_state support)
-> > 
-> > The patch doesn't revert cleanly, so I didn't dig much further, but
-> > this suggests that some more testing on qemu is needed (or does qemu
-> > need to be upgraded?)
-> > 
-> > Kevin
-> > 
-> > [1] http://kernelci.org/boot/all/job/arm-soc/kernel/v4.3-rc5-557-g159ca7e43189/
-> > 
-> 
-> Could it be that qemu claims to support psci-1.0 but is actually not
-> compatible?
 
-Yes, the problem is, PSCI functions that are not implemented must return
-NOT_SUPPORTED according to the SMC calling convention and the PSCI
-spec. The KVM implementation was not compliant and we patched the
-kernel already:
 
-commit e2d997366dc5b ("ARM: kvm: psci: fix handling of unimplemented
-functions")
+On 20/10/15 08:34, Erin Lo wrote:
+> This adds basic chip support for Mediatek 2701.
+>
+> Signed-off-by: Erin Lo <erin.lo@mediatek.com>
+> ---
+>   arch/arm/boot/dts/Makefile        |   1 +
+>   arch/arm/boot/dts/mt2701-evb.dts  |  29 ++++++++
+>   arch/arm/boot/dts/mt2701.dtsi     | 146 ++++++++++++++++++++++++++++++++++++++
+>   arch/arm/mach-mediatek/mediatek.c |   1 +
+>   4 files changed, 177 insertions(+)
+>   create mode 100644 arch/arm/boot/dts/mt2701-evb.dts
+>   create mode 100644 arch/arm/boot/dts/mt2701.dtsi
+>
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index 233159d..aec787e 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -732,6 +732,7 @@ dtb-$(CONFIG_MACH_DOVE) += \
+>   	dove-dove-db.dtb \
+>   	dove-sbc-a510.dtb
+>   dtb-$(CONFIG_ARCH_MEDIATEK) += \
+> +	mt2701-evb.dtb \
+>   	mt6580-evbp1.dtb \
+>   	mt6589-aquaris5.dtb \
+>   	mt6592-evb.dtb \
+> diff --git a/arch/arm/boot/dts/mt2701-evb.dts b/arch/arm/boot/dts/mt2701-evb.dts
+> new file mode 100644
+> index 0000000..082ca88
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/mt2701-evb.dts
+> @@ -0,0 +1,29 @@
+> +/*
+> + * Copyright (c) 2015 MediaTek Inc.
+> + * Author: Erin Lo <erin.lo@mediatek.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +
+> +/dts-v1/;
+> +#include "mt2701.dtsi"
+> +
+> +/ {
+> +	model = "MediaTek MT2701 evaluation board";
+> +	compatible = "mediatek,mt2701-evb", "mediatek,mt2701";
+> +
+> +	memory {
+> +		reg = <0 0x80000000 0 0x40000000>;
+> +	};
+> +};
+> +
+> +&uart0 {
+> +	status = "okay";
+> +};
+> diff --git a/arch/arm/boot/dts/mt2701.dtsi b/arch/arm/boot/dts/mt2701.dtsi
+> new file mode 100644
+> index 0000000..69f240f
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/mt2701.dtsi
+> @@ -0,0 +1,146 @@
+> +/*
+> + * Copyright (c) 2015 MediaTek Inc.
+> + * Author: Erin.Lo <erin.lo@mediatek.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +
+> +#include <dt-bindings/interrupt-controller/irq.h>
+> +#include <dt-bindings/interrupt-controller/arm-gic.h>
+> +#include "skeleton64.dtsi"
+> +
+> +/ {
+> +	compatible = "mediatek,mt2701";
+> +	interrupt-parent = <&sysirq>;
+> +
+> +	cpus {
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +
+> +		cpu at 0 {
+> +			device_type = "cpu";
+> +			compatible = "arm,cortex-a7";
+> +			reg = <0x0>;
+> +		};
+> +		cpu at 1 {
+> +			device_type = "cpu";
+> +			compatible = "arm,cortex-a7";
+> +			reg = <0x1>;
+> +		};
+> +		cpu at 2 {
+> +			device_type = "cpu";
+> +			compatible = "arm,cortex-a7";
+> +			reg = <0x2>;
+> +		};
+> +		cpu at 3 {
+> +			device_type = "cpu";
+> +			compatible = "arm,cortex-a7";
+> +			reg = <0x3>;
+> +		};
+> +	};
+> +
+> +	system_clk: dummy13m {
+> +		compatible = "fixed-clock";
+> +		clock-frequency = <13000000>;
+> +		#clock-cells = <0>;
+> +	};
+> +
+> +	rtc_clk: dummy32k {
+> +		compatible = "fixed-clock";
+> +		clock-frequency = <32000>;
+> +		#clock-cells = <0>;
+> +	};
+> +
+> +	uart_clk: dummy26m {
+> +		compatible = "fixed-clock";
+> +		clock-frequency = <26000000>;
+> +		#clock-cells = <0>;
+> +	};
+> +
+> +	timer {
+> +		compatible = "arm,armv7-timer";
+> +		interrupt-parent = <&gic>;
+> +		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>,
+> +			     <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>,
+> +			     <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>,
+> +			     <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
+> +	};
+> +
+> +	watchdog: watchdog at 10007000 {
+> +		compatible = "mediatek,mt2701-wdt",
+> +			     "mediatek,mt6589-wdt";
+> +		reg = <0 0x10007000 0 0x100>;
+> +	};
+> +
+> +	timer: timer at 10008000 {
+> +		compatible = "mediatek,mt2701-timer",
+> +			     "mediatek,mt6577-timer";
+> +		reg = <0x10008000 0x80>;
 
-So the KVM PSCI implementation is fine now.
+I suppose reg should look like this:
+reg = <0 0x10008000 0 0x80>;
 
-Problem with Qemu emulation is that it does not emulate the PSCI 1.0
-specs correctly (it does not even consider PSCI 1.0 functions proper PSCI
-calls), I tested it and I think we should update Qemu as we
-did with KVM kernel code instead of working around it by dodging the
-problem in the PSCI implementation by adding code that checks the
-PSCI version before issuing the PSCI calls through the respective
-conduit.
+I fixed it and pushed the patch to v4.4-next/dts
+Please let me know if this is not working, I have no hardware to test it.
 
-Thoughts appreciated.
-
-Thanks,
-Lorenzo
+> +		interrupts = <GIC_SPI 112 IRQ_TYPE_LEVEL_LOW>;
+> +		clocks = <&system_clk>, <&rtc_clk>;
+> +		clock-names = "system-clk", "rtc-clk";
+> +	};
+> +
+> +	sysirq: interrupt-controller at 10200100 {
+> +		compatible = "mediatek,mt2701-sysirq",
+> +			     "mediatek,mt6577-sysirq";
+> +		interrupt-controller;
+> +		#interrupt-cells = <3>;
+> +		interrupt-parent = <&gic>;
+> +		reg = <0 0x10200100 0 0x1c>;
+> +	};
+> +
+> +	gic: interrupt-controller at 10211000 {
+> +		compatible = "arm,cortex-a7-gic";
+> +		interrupt-controller;
+> +		#interrupt-cells = <3>;
+> +		interrupt-parent = <&gic>;
+> +		reg = <0 0x10211000 0 0x1000>,
+> +		      <0 0x10212000 0 0x1000>,
+> +		      <0 0x10214000 0 0x2000>,
+> +		      <0 0x10216000 0 0x2000>;
+> +	};
+> +
+> +	uart0: serial at 11002000 {
+> +		compatible = "mediatek,mt2701-uart",
+> +			     "mediatek,mt6577-uart";
+> +		reg = <0 0x11002000 0 0x400>;
+> +		interrupts = <GIC_SPI 51 IRQ_TYPE_LEVEL_LOW>;
+> +		clocks = <&uart_clk>;
+> +		status = "disabled";
+> +	};
+> +
+> +	uart1: serial at 11003000 {
+> +		compatible = "mediatek,mt2701-uart",
+> +			     "mediatek,mt6577-uart";
+> +		reg = <0 0x11003000 0 0x400>;
+> +		interrupts = <GIC_SPI 52 IRQ_TYPE_LEVEL_LOW>;
+> +		clocks = <&uart_clk>;
+> +		status = "disabled";
+> +	};
+> +
+> +	uart2: serial at 11004000 {
+> +		compatible = "mediatek,mt2701-uart",
+> +			     "mediatek,mt6577-uart";
+> +		reg = <0 0x11004000 0 0x400>;
+> +		interrupts = <GIC_SPI 53 IRQ_TYPE_LEVEL_LOW>;
+> +		clocks = <&uart_clk>;
+> +		status = "disabled";
+> +	};
+> +
+> +	uart3: serial at 11005000 {
+> +		compatible = "mediatek,mt2701-uart",
+> +			     "mediatek,mt6577-uart";
+> +		reg = <0 0x11005000 0 0x400>;
+> +		interrupts = <GIC_SPI 54 IRQ_TYPE_LEVEL_LOW>;
+> +		clocks = <&uart_clk>;
+> +		status = "disabled";
+> +	};
+> +};
+> diff --git a/arch/arm/mach-mediatek/mediatek.c b/arch/arm/mach-mediatek/mediatek.c
+> index a954900..1b98f7a 100644
+> --- a/arch/arm/mach-mediatek/mediatek.c
+> +++ b/arch/arm/mach-mediatek/mediatek.c
+> @@ -18,6 +18,7 @@
+>   #include <asm/mach/arch.h>
+>
+>   static const char * const mediatek_board_dt_compat[] = {
+> +	"mediatek,mt2701",
+>   	"mediatek,mt6589",
+>   	"mediatek,mt6592",
+>   	"mediatek,mt8127",
+>
