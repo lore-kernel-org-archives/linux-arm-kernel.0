@@ -1,51 +1,52 @@
-From: lftan@altera.com (Ley Foon Tan)
-Date: Fri, 23 Oct 2015 18:27:15 +0800
-Subject: [PATCH v12 6/6] MAINTAINERS: Add Altera PCIe and MSI drivers
- maintainer
-In-Reply-To: <1445596035-27733-1-git-send-email-lftan@altera.com>
-References: <1445596035-27733-1-git-send-email-lftan@altera.com>
-Message-ID: <1445596035-27733-7-git-send-email-lftan@altera.com>
+From: Dave.Martin@arm.com (Dave Martin)
+Date: Fri, 23 Oct 2015 11:31:00 +0100
+Subject: [PATCH] Revert "serial: amba-pl011: fix incorrect integer size
+ in pl011_fifo_to_tty()"
+In-Reply-To: <1445594400-29095-1-git-send-email-shijie.huang@arm.com>
+References: <1445594400-29095-1-git-send-email-shijie.huang@arm.com>
+Message-ID: <20151023103056.GI4801@e103592.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Ley Foon Tan <lftan@altera.com>
----
- MAINTAINERS | 16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
+On Fri, Oct 23, 2015 at 06:00:00PM +0800, Huang Shijie wrote:
+> The commit 71a5cd8a4 makes the console hang for some times.
+> This reverts commit 71a5cd8a4a2602a6e9010b557a23af0a54df87b6.
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index b8577ad9..96b9fac 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -7958,6 +7958,14 @@ F:	include/linux/pci*
- F:	arch/x86/pci/
- F:	arch/x86/kernel/quirks.c
- 
-+PCI DRIVER FOR ALTERA PCIE IP
-+M:	Ley Foon Tan <lftan@altera.com>
-+L:	rfi at lists.rocketboards.org (moderated for non-subscribers)
-+L:	linux-pci at vger.kernel.org
-+S:	Supported
-+F:	Documentation/devicetree/bindings/pci/altera-pcie.txt
-+F:	drivers/pci/host/pcie-altera.c
-+
- PCI DRIVER FOR ARM VERSATILE PLATFORM
- M:	Rob Herring <robh@kernel.org>
- L:	linux-pci at vger.kernel.org
-@@ -8059,6 +8067,14 @@ L:	linux-pci at vger.kernel.org
- S:	Maintained
- F:	drivers/pci/host/*spear*
- 
-+PCI MSI DRIVER FOR ALTERA MSI IP
-+M:	Ley Foon Tan <lftan@altera.com>
-+L:	rfi at lists.rocketboards.org (moderated for non-subscribers)
-+L:	linux-pci at vger.kernel.org
-+S:	Supported
-+F:	Documentation/devicetree/bindings/pci/altera-pcie-msi.txt
-+F:	drivers/pci/host/pcie-altera-msi.c
-+
- PCI MSI DRIVER FOR APPLIEDMICRO XGENE
- M:	Duc Dang <dhdang@apm.com>
- L:	linux-pci at vger.kernel.org
--- 
-1.8.2.1
+What hangs?  Input?  Output?  Both?
+
+Is CREAD set on the terminal?  If only input hangs, it's possible CREAD
+is not set and we were previously getting away with it, though I can't
+easily see why it should be unset...
+
+Cheers
+---Dave
+
+> 
+> Signed-off-by: Huang Shijie <shijie.huang@arm.com>
+> ---
+>  drivers/tty/serial/amba-pl011.c | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
+> index 899a771..fd27e98 100644
+> --- a/drivers/tty/serial/amba-pl011.c
+> +++ b/drivers/tty/serial/amba-pl011.c
+> @@ -191,8 +191,8 @@ struct uart_amba_port {
+>   */
+>  static int pl011_fifo_to_tty(struct uart_amba_port *uap)
+>  {
+> -	u16 status;
+> -	unsigned int ch, flag, max_count = 256;
+> +	u16 status, ch;
+> +	unsigned int flag, max_count = 256;
+>  	int fifotaken = 0;
+>  
+>  	while (max_count--) {
+> -- 
+> 2.1.4
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
