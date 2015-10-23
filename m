@@ -1,50 +1,23 @@
-From: Dave.Martin@arm.com (Dave P Martin)
-Date: Fri, 23 Oct 2015 17:02:46 +0100
-Subject: [PATCH] Revert "serial: amba-pl011: fix incorrect integer size
- in pl011_fifo_to_tty()"
-In-Reply-To: <562A544D.7080506@tabi.org>
-References: <1445594400-29095-1-git-send-email-shijie.huang@arm.com>
- <20151023103056.GI4801@e103592.cambridge.arm.com>
- <562A297A.9030204@codeaurora.org>
- <20151023133403.GI4796@e103592.cambridge.arm.com>
- <562A544D.7080506@tabi.org>
-Message-ID: <20151023160246.GM4796@e103592.cambridge.arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 23 Oct 2015 18:02:49 +0200
+Subject: [PATCH v4 2/7] vfio: platform: add capability to register a reset
+ function
+In-Reply-To: <1445615245-31124-3-git-send-email-eric.auger@linaro.org>
+References: <1445615245-31124-1-git-send-email-eric.auger@linaro.org>
+ <1445615245-31124-3-git-send-email-eric.auger@linaro.org>
+Message-ID: <4009334.qMnorDxQCK@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 23, 2015 at 10:37:49AM -0500, Timur Tabi wrote:
-> On 10/23/2015 08:34 AM, Dave P Martin wrote:
-> >Well, I'm not saying there's definitely no kernel bug, but I can't see
-> >how the patch should cause it.  It may be triggering a latent bug
-> >somewhere else in the driver than hasn't been biting us before, however.
+On Friday 23 October 2015 17:47:20 Eric Auger wrote:
+> In preparation for subsequent changes in reset function lookup,
+> lets introduce a dynamic list of reset combos (compat string,
+> reset module, reset function). The list can be populated/voided with
+> vfio_platform_register/unregister_reset. Those are not yet used in
+> this patch.
 > 
-> Fair enough.
+> Signed-off-by: Eric Auger <eric.auger@linaro.org>
 > 
-> >!CREAD is the most obvious cause, so that should definitely be ruled
-> >out first.  If CREAD is clear, we need to figure out why...
 > 
-> So I tested this by booting to my console, and then typing in:
-> 
-> 	stty -cread
-> 
-> and when I did that, the console ignored all input.
-> 
-> I do admit that since !CREAD has been ignored for so many reason, it
-> could be that a lot of userspaces will suddenly have broken
-> consoles.
 
-I'm pretty sure CREAD should default to enabled[1], and that usually
-software won't modify it.
-
-Assuming that this is indeed the problem, it's possible that another bug
-in the pl011 driver is wrongly clearing this flag.  Sadly I don't have
-time to look at the code again just now ... :(
-
-Could be interesting to stick some BUG_ON(!CREAD) in the driver to
-try and track down where that's coming from.
-
-Cheers
----Dave
-
-[1] See serial_core.c:uart_register_driver(),
-        serial_core.c:uart_set_options().
+Reviewed-by: Arnd Bergmann <arnd@arndb.de>
