@@ -1,45 +1,21 @@
-From: greg@kroah.com (Greg KH)
-Date: Thu, 22 Oct 2015 17:17:54 -0700
-Subject: [PATCH stable/v4.2.y] ARM: ux500: simplify secondary CPU boot
-In-Reply-To: <1445554568-4871-1-git-send-email-khilman@kernel.org>
-References: <1445554568-4871-1-git-send-email-khilman@kernel.org>
-Message-ID: <20151023001754.GB10983@kroah.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Fri, 23 Oct 2015 09:19:46 +0900
+Subject: [PATCH 1/2] ARM: shmobile: r8a7790: fix "gpio-ranges" props
+In-Reply-To: <14605037.EZjgJcsdsk@wasted.cogentembedded.com>
+References: <10037494.4LD4T2QGPX@wasted.cogentembedded.com>
+ <14605037.EZjgJcsdsk@wasted.cogentembedded.com>
+Message-ID: <20151023001946.GB15844@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 22, 2015 at 03:56:08PM -0700, Kevin Hilman wrote:
-> From: Linus Walleij <linus.walleij@linaro.org>
+On Thu, Oct 22, 2015 at 02:04:41AM +0300, Sergei Shtylyov wrote:
+> On R8A7790, GPIO banks 1 and 2 are missing  pins 30 and 31.  Correct the
+> "gpio-ranges" properties of the corresponding device nodes.
 > 
-> This removes a lot of ancient cruft from the Ux500 SMP boot.
-> Instead of the pen grab/release, just point the ROM to
-> secondary_boot() and start the second CPU there, then send
-> the IPI.
+> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 > 
-> Use our own SMP enable method. This enables us to remove the
-> last static mapping and get both CPUs booting properly.
-> 
-> Tested this and it just works.
-> 
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> Signed-off-by: Olof Johansson <olof@lixom.net>
-> (cherry picked from commit c00def71efd919e8ae835a25f4f4c80a4b2d36d3)
-> Cc: <stable@vger.kernel.org> # v4.2+
-> Signed-off-by: Kevin Hilman <khilman@linaro.org>
 > ---
-> This patch was the 2nd in a 2-patch series.  Only the 1st patch made it
-> into v4.2, but this one is also needed for booting on the ste-snowball.
-> 
->  arch/arm/mach-ux500/Makefile     |   2 +-
->  arch/arm/mach-ux500/cpu-db8500.c |   1 -
->  arch/arm/mach-ux500/headsmp.S    |  37 -----------
->  arch/arm/mach-ux500/platsmp.c    | 132 ++++++++++++---------------------------
->  arch/arm/mach-ux500/setup.h      |   1 -
->  5 files changed, 40 insertions(+), 133 deletions(-)
->  delete mode 100644 arch/arm/mach-ux500/headsmp.S
+> This patch is against the 'renesas-devel-20151019-v4.3-rc6' of Simon Horman's
+> 'renesas.git' repo.
 
-This looks to me like a "new feature", is it a regression from something
-that used to work in 4.1?
-
-thanks,
-
-greg k-h
+Thanks, I have queued this up.
