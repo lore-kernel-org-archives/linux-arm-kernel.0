@@ -1,36 +1,46 @@
 From: eric.auger@linaro.org (Eric Auger)
-Date: Fri, 23 Oct 2015 16:10:59 +0200
-Subject: [PATCH v3 3/7] vfio: platform: introduce
- module_vfio_reset_handler macro
-In-Reply-To: <3721718.lcvGuESNdi@wuerfel>
+Date: Fri, 23 Oct 2015 16:11:08 +0200
+Subject: [PATCH v3 6/7] vfio: platform: use list of registered reset
+ function
+In-Reply-To: <4934120.DeNtNjTIFs@wuerfel>
 References: <1445603835-14506-1-git-send-email-eric.auger@linaro.org>
- <1445603835-14506-4-git-send-email-eric.auger@linaro.org>
- <3721718.lcvGuESNdi@wuerfel>
-Message-ID: <562A3FF3.5040004@linaro.org>
+ <1445603835-14506-7-git-send-email-eric.auger@linaro.org>
+ <4934120.DeNtNjTIFs@wuerfel>
+Message-ID: <562A3FFC.4050504@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Arnd,
-On 10/23/2015 03:09 PM, Arnd Bergmann wrote:
-> On Friday 23 October 2015 14:37:11 Eric Auger wrote:
->> +static int __init reset ## _module_init(void)                  \
->> +{                                                              \
->> +       vfio_platform_register_reset(compat, reset);            \
->> +       return 0;                                               \
->> +};                                                             \
+On 10/23/2015 03:12 PM, Arnd Bergmann wrote:
+> On Friday 23 October 2015 14:37:14 Eric Auger wrote:
+>> Remove the static lookup table and use the dynamic list of registered
+>> reset functions instead. Also load the reset module through its alias.
+>> The reset struct module pointer is stored in vfio_platform_device.
 >>
+>> We also remove the useless struct device pointer parameter in
+>> vfio_platform_get_reset.
+>>
+>> This patch fixes the issue related to the usage of __symbol_get, which
+>> besides from being moot, prevented compilation with CONFIG_MODULES
+>> disabled.
+>>
+>> Also usage of MODULE_ALIAS makes possible to add a new reset module
+>> without needing to update the framework. This was suggested by Arnd.
+>>
+>> Signed-off-by: Eric Auger <eric.auger@linaro.org>
+>> Reported-by: Arnd Bergmann <arnd@arndb.de>
+>>
+>>
+> Reviewed-by: Arnd Bergmann <arnd@arndb.de>
 > 
-> I would make this 'return vfio_platform_register_reset(...)', so loading
-> the driver fails if the handler cannot get registered. Alternatively,
-> change the return type of vfio_platform_register_reset to 'void'
-> so it can never fail.
-I will turn __vfio_platform_register_reset to 'void' then since it has
-no reason to fail now.
-
-Thanks
+> but doesn't this need to come before patch 4/7?
+Well I don't think so. In [4] we introduce the dynamic registration
+method but until this patch we still use the old lookup method in the
+static table. I tested and the reset lookup still works in [4].
+If we put this one before the registration, the functionality will be
+lost here.
 
 Eric
 
-> 
 > 	Arnd
 > 
