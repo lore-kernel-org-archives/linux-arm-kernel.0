@@ -1,134 +1,62 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 23 Oct 2015 09:58:57 -0700
-Subject: [PATCH v2] EDAC: Add ARM64 EDAC
-In-Reply-To: <1445460097-10260-1-git-send-email-brijeshkumar.singh@amd.com>
-References: <1445460097-10260-1-git-send-email-brijeshkumar.singh@amd.com>
-Message-ID: <20151023165857.GD19782@codeaurora.org>
+From: olof@lixom.net (Olof Johansson)
+Date: Fri, 23 Oct 2015 09:59:02 -0700
+Subject: [PATCH] drivers: psci: make PSCI 1.0 functions initialization
+ version dependent
+In-Reply-To: <1445611610-12871-1-git-send-email-lorenzo.pieralisi@arm.com>
+References: <1445611610-12871-1-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <20151023165902.GA2224@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Drive by nitpicks
+On Fri, Oct 23, 2015 at 03:46:50PM +0100, Lorenzo Pieralisi wrote:
+> The PSCI specifications [1] and the SMC calling convention mandate
+> that unimplemented functions ids must return NOT_SUPPORTED (0xffffffff)
+> if a function id is called but it is not implemented.
+> 
+> Consequently, PSCI 1.0 function ids that require the 1.0 PSCI_FEATURES
+> call to be initialized:
+> 
+> CPU_SUSPEND (psci_init_cpu_suspend())
+> SYSTEM_SUSPEND (psci_init_system_suspend())
+> 
+> call the PSCI_FEATURES function id independently of the detected
+> PSCI firmware version, since, if the PSCI_FEATURES function id is not
+> implemented, it must return NOT_SUPPORTED according to the PSCI
+> specifications, causing the initialization functions to fail as expected.
+> 
+> Some existing PSCI implementations (ie Qemu PSCI emulation), do not
+> comply with the SMC calling convention and fail if function ids that are
+> not implemented are called from the OS, causing boot failures.
+> 
+> To solve this issue, this patch adds code that checks the PSCI firmware
+> version before calling PSCI 1.0 initialization functions so that the
+> OS makes sure that it is calling 1.0 functions only if the firmware
+> version detected is 1.0 or greater, therefore avoiding PSCI calls
+> that are bound to fail and might cause system boot failures owing
+> to non-compliant PSCI firmware implementations.
+> 
+> [1] http://infocenter.arm.com/help/topic/com.arm.doc.den0022c/DEN0022C_Power_State_Coordination_Interface.pdf
+> 
+> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: Kevin Hilman <khilman@kernel.org>
+> Cc: Sudeep Holla <sudeep.holla@arm.com>
+> Cc: Olof Johansson <olof@lixom.net>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> ---
+> Arnd, Kevin, Olof,
+> 
+> this applies to current arm-soc drivers/psci branch, and solves the
+> issue Kevin detected through kernelci with Qemu emulation:
+> 
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-October/380304.html
 
-On 10/21, Brijesh Singh wrote:
-> diff --git a/drivers/edac/cortex_arm64_edac.c b/drivers/edac/cortex_arm64_edac.c
-> new file mode 100644
-> index 0000000..c37bb94
-> --- /dev/null
-> +++ b/drivers/edac/cortex_arm64_edac.c
-> +
-> +#define L1_CACHE		     0
-> +#define L2_CACHE		     1
-> +
-> +int poll_msec = 100;
+Bummer. It'd been nice to catch this before merging, especially since
+the branch had been around a while.
 
-static?
+Anyway, I applied this to a drivers/psci2 branch that builds on top of the
+previous one. Please use psci2 as the base for other trees, so that mainline
+won't regress in case they get merged before our stuff.
 
-> +
-> +struct cortex_arm64_edac {
-> +	struct edac_device_ctl_info *edac_ctl;
-> +};
-[..]
-> +
-> +static int cortex_arm64_edac_probe(struct platform_device *pdev)
-> +{
-> +	int rc;
-> +	struct cortex_arm64_edac *drv;
-> +	struct device *dev = &pdev->dev;
-> +
-> +	drv = devm_kzalloc(dev, sizeof(*drv), GFP_KERNEL);
-> +	if (!drv)
-> +		return -ENOMEM;
-> +
-> +	drv->edac_ctl = edac_device_alloc_ctl_info(0, "cpu",
-> +						   num_possible_cpus(), "L", 2,
-> +						   1, NULL, 0,
-> +						   edac_device_alloc_index());
-> +	if (IS_ERR(drv->edac_ctl))
-> +		return -ENOMEM;
-> +
-> +	drv->edac_ctl->poll_msec = poll_msec;
-> +	drv->edac_ctl->edac_check = arm64_monitor_cache_errors;
-> +	drv->edac_ctl->dev = dev;
-> +	drv->edac_ctl->mod_name = dev_name(dev);
-> +	drv->edac_ctl->dev_name = dev_name(dev);
-> +	drv->edac_ctl->ctl_name = "cpu_err";
-> +	drv->edac_ctl->panic_on_ue = 1;
-> +	platform_set_drvdata(pdev, drv);
-> +
-> +	rc = edac_device_add_device(drv->edac_ctl);
-> +	if (rc)
-> +		goto edac_alloc_failed;
-> +
-> +	return 0;
-> +
-> +edac_alloc_failed:
-> +	edac_device_free_ctl_info(drv->edac_ctl);
-> +	return rc;
 
-Simplify to:
-
-	rc = edac_device_add_device(...
-	if (rc)
-		edac_device_free_ctl_info(..
-
-	return rc;
-
-> +}
-> +
-> +
-> +static const struct of_device_id cortex_arm64_edac_of_match[] = {
-> +	{ .compatible = "arm,armv8-edac" },
-> +	{},
-
-Dropping the comma here is good style because it forces us to add
-a comma if we were to add an element after the sentinel,
-hopefully causing us to question why we're doing that in the
-first place.
-
-> +};
-> +MODULE_DEVICE_TABLE(of, cortex_arm64_edac_of_match);
-> +
-> +static struct platform_driver cortex_arm64_edac_driver = {
-> +	.probe = cortex_arm64_edac_probe,
-> +	.remove = cortex_arm64_edac_remove,
-> +	.driver = {
-> +		.name = "arm64-edac",
-> +		.owner = THIS_MODULE,
-
-platform_driver_register() sets this so we can drop this
-assignment here.
-
-> +		.of_match_table = cortex_arm64_edac_of_match,
-> +	},
-> +};
-> +
-> +static int __init cortex_arm64_edac_init(void)
-> +{
-> +	int rc;
-> +
-> +	/* Only POLL mode is supported so far */
-> +	edac_op_state = EDAC_OPSTATE_POLL;
-> +
-> +	rc = platform_driver_register(&cortex_arm64_edac_driver);
-> +	if (rc) {
-> +		edac_printk(KERN_ERR, EDAC_MOD_STR, "failed to register\n");
-> +		return rc;
-> +	}
-> +
-> +	return 0;
-
-This could be simplified to
-
-	rc = ...
-	if (rc)
-		edac_printk(...
-
-	return rc;
-
-Or even just 'return platform_driver_register()' and not care
-about printing a message in that case because the end-user can't
-do anything with the message anyway.
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+-Olof
