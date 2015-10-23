@@ -1,172 +1,104 @@
-From: isubramanian@apm.com (Iyappan Subramanian)
-Date: Fri, 23 Oct 2015 11:02:19 -0700
-Subject: [PATCH net-next 1/2] drivers: net: xgene: Add support RGMII TX/RX
- delay configuration
-In-Reply-To: <56216DCE.6020800@gmail.com>
-References: <1445027752-16982-1-git-send-email-isubramanian@apm.com>
- <1445027752-16982-2-git-send-email-isubramanian@apm.com>
- <56216DCE.6020800@gmail.com>
-Message-ID: <CAKh23Fnv5t=y_EhuvjBwoeN3nwPmx8bBCCAF5aH-4kLfk7_TzA@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 23 Oct 2015 20:07:11 +0200
+Subject: [GIT PULL] Allwinner DT changes for 4.4, round 3
+Message-ID: <20151023180711.GA11749@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 16, 2015 at 2:36 PM, Florian Fainelli <f.fainelli@gmail.com> wrote:
-> On 16/10/15 13:35, Iyappan Subramanian wrote:
->> Add RGMII TX/RX delay configuration support. RGMII standard requires 2ns
->> delay to help the RGMII bridge receiver to sample data correctly. If the
->> default value does not provide proper centering of the data sample, the
->> TX/RX delay parameters can be used to adjust accordingly.
->
-> There is a standard 'phy-mode' property which can take multiple values
-> for RGMII: "rgmii" (no delay), "rgmii-txid" (transmit delay),
-> "rgmii-rxid" (receive delay) and "rgmii-id" (symetric delay). There does
-> not seem to be any verification of whether the rx or tx delay parameters
-> you introduce are going to be either sensible, or not conflicting with
-> the 'phy-mode' that should be configured.
+Hi Arnd, Kevin, Olof,
 
-X-Gene RGMII ethernet controller has a RGMII bridge that performs the
-task of converting the RGMII signal {RX_CLK,RX_CTL, RX_DATA[3:0]} from
-PHY to GMII signal {RX_DV,RX_ER,RX_DATA[7:0]} and vice versa.  This
-RGMII bridge has a provision to internally delay the input RX_CLK and
-the output TX_CLK using configuration registers. This will help in
-maintain the CLK-CTL delay relationship in various operating
-conditions.
+Please pull the following (late and last) pull request for the 4.4
+merge window.
 
-This is similar to the following patch that got accepted.
-https://lkml.org/lkml/2014/12/29/77
+Thanks!
+Maxime
 
-I will submit v2 with updated documentation.
+The following changes since commit c2aa565107fb539a84494fe8dac5fd5eb5678123:
 
->
->>
->> Signed-off-by: Iyappan Subramanian <isubramanian@apm.com>
->> ---
->>  drivers/net/ethernet/apm/xgene/xgene_enet_hw.c   |  8 +++-
->>  drivers/net/ethernet/apm/xgene/xgene_enet_hw.h   |  1 +
->>  drivers/net/ethernet/apm/xgene/xgene_enet_main.c | 49 ++++++++++++++++++++++++
->>  drivers/net/ethernet/apm/xgene/xgene_enet_main.h |  2 +
->>  4 files changed, 59 insertions(+), 1 deletion(-)
->>
->> diff --git a/drivers/net/ethernet/apm/xgene/xgene_enet_hw.c b/drivers/net/ethernet/apm/xgene/xgene_enet_hw.c
->> index 652f218..33850a0 100644
->> --- a/drivers/net/ethernet/apm/xgene/xgene_enet_hw.c
->> +++ b/drivers/net/ethernet/apm/xgene/xgene_enet_hw.c
->> @@ -461,6 +461,7 @@ static void xgene_gmac_reset(struct xgene_enet_pdata *pdata)
->>
->>  static void xgene_gmac_init(struct xgene_enet_pdata *pdata)
->>  {
->> +     struct device *dev = &pdata->pdev->dev;
->>       u32 value, mc2;
->>       u32 intf_ctl, rgmii;
->>       u32 icm0, icm2;
->> @@ -490,7 +491,12 @@ static void xgene_gmac_init(struct xgene_enet_pdata *pdata)
->>       default:
->>               ENET_INTERFACE_MODE2_SET(&mc2, 2);
->>               intf_ctl |= ENET_GHD_MODE;
->> -             CFG_TXCLK_MUXSEL0_SET(&rgmii, 4);
->> +
->> +             if (dev->of_node) {
->> +                     CFG_TXCLK_MUXSEL0_SET(&rgmii, pdata->tx_delay);
->> +                     CFG_RXCLK_MUXSEL0_SET(&rgmii, pdata->rx_delay);
->> +             }
->> +
->>               xgene_enet_rd_csr(pdata, DEBUG_REG_ADDR, &value);
->>               value |= CFG_BYPASS_UNISEC_TX | CFG_BYPASS_UNISEC_RX;
->>               xgene_enet_wr_csr(pdata, DEBUG_REG_ADDR, value);
->> diff --git a/drivers/net/ethernet/apm/xgene/xgene_enet_hw.h b/drivers/net/ethernet/apm/xgene/xgene_enet_hw.h
->> index ff05bbc..6dee73c 100644
->> --- a/drivers/net/ethernet/apm/xgene/xgene_enet_hw.h
->> +++ b/drivers/net/ethernet/apm/xgene/xgene_enet_hw.h
->> @@ -144,6 +144,7 @@ enum xgene_enet_rm {
->>  #define CFG_BYPASS_UNISEC_RX         BIT(1)
->>  #define CFG_CLE_BYPASS_EN0           BIT(31)
->>  #define CFG_TXCLK_MUXSEL0_SET(dst, val)      xgene_set_bits(dst, val, 29, 3)
->> +#define CFG_RXCLK_MUXSEL0_SET(dst, val)      xgene_set_bits(dst, val, 26, 3)
->>
->>  #define CFG_CLE_IP_PROTOCOL0_SET(dst, val)   xgene_set_bits(dst, val, 16, 2)
->>  #define CFG_CLE_DSTQID0_SET(dst, val)                xgene_set_bits(dst, val, 0, 12)
->> diff --git a/drivers/net/ethernet/apm/xgene/xgene_enet_main.c b/drivers/net/ethernet/apm/xgene/xgene_enet_main.c
->> index 6b1846d..ce10687 100644
->> --- a/drivers/net/ethernet/apm/xgene/xgene_enet_main.c
->> +++ b/drivers/net/ethernet/apm/xgene/xgene_enet_main.c
->> @@ -1118,6 +1118,47 @@ static int xgene_get_port_id_dt(struct device *dev, struct xgene_enet_pdata *pda
->>       return ret;
->>  }
->>
->> +static int xgene_get_tx_delay(struct xgene_enet_pdata *pdata)
->> +{
->> +     struct device *dev = &pdata->pdev->dev;
->> +     int delay, ret;
->> +
->> +     ret = of_property_read_u32(dev->of_node, "tx-delay", &delay);
->> +     if (ret) {
->> +             pdata->tx_delay = 4;
->> +             return 0;
->> +     }
->> +
->> +     if (delay < 0 || delay > 7) {
->> +             dev_err(dev, "Invalid tx-delay specified\n");
->> +             return -EINVAL;
->> +     }
->> +
->> +     pdata->tx_delay = delay;
->> +
->> +     return 0;
->> +}
->> +
->> +static int xgene_get_rx_delay(struct xgene_enet_pdata *pdata)
->> +{
->> +     struct device *dev = &pdata->pdev->dev;
->> +     int delay, ret;
->> +
->> +     ret = of_property_read_u32(dev->of_node, "rx-delay", &delay);
->> +     if (ret) {
->> +             pdata->rx_delay = 2;
->> +             return 0;
->> +     }
->> +
->> +     if (delay < 0 || delay > 7) {
->> +             dev_err(dev, "Invalid rx-delay specified\n");
->> +             return -EINVAL;
->> +     }
->> +
->> +     pdata->rx_delay = delay;
->> +
->> +     return 0;
->> +}
->>
->>  static int xgene_enet_get_resources(struct xgene_enet_pdata *pdata)
->>  {
->> @@ -1194,6 +1235,14 @@ static int xgene_enet_get_resources(struct xgene_enet_pdata *pdata)
->>               return -ENODEV;
->>       }
->>
->> +     ret = xgene_get_tx_delay(pdata);
->> +     if (ret)
->> +             return ret;
->> +
->> +     ret = xgene_get_rx_delay(pdata);
->> +     if (ret)
->> +             return ret;
->> +
->>       ret = platform_get_irq(pdev, 0);
->>       if (ret <= 0) {
->>               dev_err(dev, "Unable to get ENET Rx IRQ\n");
->> diff --git a/drivers/net/ethernet/apm/xgene/xgene_enet_main.h b/drivers/net/ethernet/apm/xgene/xgene_enet_main.h
->> index ff89a5d..a6e56b8 100644
->> --- a/drivers/net/ethernet/apm/xgene/xgene_enet_main.h
->> +++ b/drivers/net/ethernet/apm/xgene/xgene_enet_main.h
->> @@ -184,6 +184,8 @@ struct xgene_enet_pdata {
->>       u8 bp_bufnum;
->>       u16 ring_num;
->>       u32 mss;
->> +     u8 tx_delay;
->> +     u8 rx_delay;
->>  };
->>
->>  struct xgene_indirect_ctl {
->>
->
->
-> --
-> Florian
+  ARM: dts: sun6i: Add a dts file for the Sinovoip BPI-M2 board (2015-10-17 18:24:11 +0200)
+
+are available in the git repository at:
+
+  https://git.kernel.org/pub/scm/linux/kernel/git/mripard/linux.git tags/sunxi-dt-for-4.4-3
+
+for you to fetch changes up to a5ea06d0bc123cc7f49d042fab60ddd3964764c8:
+
+  ARM: dts: sun6i: Add dts file for MSI Primo81 tablet (2015-10-23 08:05:17 +0200)
+
+----------------------------------------------------------------
+Allwinner DT changes for 4.4, round 3
+
+A bunch of new boards, but mostly enable the support for the Audio Codec
+on the older SoCs (A10, A10s, A13, A20, R8) and enable it on various
+boards.
+
+----------------------------------------------------------------
+Adam Sampson (1):
+      ARM: dts: sun7i: Enable USB DRC on pcDuino v3 Nano
+
+Aleksei Mamlin (1):
+      ARM: dts: sun4i: Enable audio codec on Marsboard A10.
+
+Chen-Yu Tsai (3):
+      ARM: dts: sun6i: Add support for Sinlinx A31s SDK board
+      ARM: sun4i: Enable cubieboard audio codec
+      ARM: dts: sun6i: Add simplefb node labels to reference at board level
+
+Emilio L?pez (2):
+      ARM: sun7i: Add sunxi codec device node
+      ARM: sun7i: dt: enable audio codec on Cubietruck
+
+Hans de Goede (1):
+      ARM: dts: sun4i: Add dts file for the pov protab2-ips9 tablet
+
+Karsten Merker (1):
+      ARM: dts: sun6i: Add dts file for MSI Primo81 tablet
+
+Marcus Cooper (2):
+      ARM: sun4i: Add sunxi codec device node
+      ARM: sun4i: Enable audio-codec on Mele A1000
+
+Maxime Ripard (9):
+      ARM: sun4i: Add audio PLL
+      ARM: sun5i: Add audio PLL
+      ARM: sun7i: Add audio PLL
+      ARM: sun4i: Add audio codec clock
+      ARM: sun5i: Add audio codec clock
+      ARM: sun7i: Add audio codec clock
+      ARM: sun5i: Add the Audio codec DT node
+      ARM: sun7i: Enable cubieboard2 audio codec
+      ARM: sun5i: chip: Enable the audio codec
+
+ arch/arm/boot/dts/Makefile                       |   5 +-
+ arch/arm/boot/dts/sun4i-a10-a1000.dts            |   4 +
+ arch/arm/boot/dts/sun4i-a10-cubieboard.dts       |   4 +
+ arch/arm/boot/dts/sun4i-a10-marsboard.dts        |   4 +
+ arch/arm/boot/dts/sun4i-a10-pov-protab2-ips9.dts | 199 ++++++++++++++++++
+ arch/arm/boot/dts/sun4i-a10.dtsi                 |  31 +++
+ arch/arm/boot/dts/sun5i-r8-chip.dts              |   4 +
+ arch/arm/boot/dts/sun5i.dtsi                     |  31 +++
+ arch/arm/boot/dts/sun6i-a31.dtsi                 |   4 +-
+ arch/arm/boot/dts/sun6i-a31s-primo81.dts         | 255 +++++++++++++++++++++++
+ arch/arm/boot/dts/sun6i-a31s-sina31s-core.dtsi   | 140 +++++++++++++
+ arch/arm/boot/dts/sun6i-a31s-sina31s.dts         | 153 ++++++++++++++
+ arch/arm/boot/dts/sun7i-a20-cubieboard2.dts      |   4 +
+ arch/arm/boot/dts/sun7i-a20-cubietruck.dts       |   4 +
+ arch/arm/boot/dts/sun7i-a20-pcduino3-nano.dts    |  19 ++
+ arch/arm/boot/dts/sun7i-a20.dtsi                 |  31 +++
+ 16 files changed, 889 insertions(+), 3 deletions(-)
+ create mode 100644 arch/arm/boot/dts/sun4i-a10-pov-protab2-ips9.dts
+ create mode 100644 arch/arm/boot/dts/sun6i-a31s-primo81.dts
+ create mode 100644 arch/arm/boot/dts/sun6i-a31s-sina31s-core.dtsi
+ create mode 100644 arch/arm/boot/dts/sun6i-a31s-sina31s.dts
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151023/d4f51559/attachment.sig>
