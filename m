@@ -1,58 +1,38 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Fri, 23 Oct 2015 16:00:34 +0900
-Subject: [PATCH v11 6/8] arm64: renesas: add Salvator-X board support on
- DTS
-In-Reply-To: <20151015110139.GG8825@leverpostej>
-References: <1444890243-6978-1-git-send-email-horms+renesas@verge.net.au>
- <1444890243-6978-7-git-send-email-horms+renesas@verge.net.au>
- <20151015110139.GG8825@leverpostej>
-Message-ID: <20151023070032.GA4502@verge.net.au>
+From: panand@redhat.com (Pratyush Anand)
+Date: Fri, 23 Oct 2015 12:59:50 +0530
+Subject: [PATCH 08/16] arm64/kexec: Add core kexec support
+In-Reply-To: <1445361565.30908.68.camel@infradead.org>
+References: <cover.1445297709.git.geoff@infradead.org>
+ <a1c2a702f127d9dade1f9af8ab13decb2ef1c0da.1445297709.git.geoff@infradead.org>
+ <20151020085620.GC31893@dhcppc13.redhat.com>
+ <1445361565.30908.68.camel@infradead.org>
+Message-ID: <20151023072950.GC25029@dhcppc13.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 15, 2015 at 12:01:40PM +0100, Mark Rutland wrote:
-> > +/ {
-> > +	model = "Renesas Salvator-X board based on r8a7795";
-> > +	compatible = "renesas,salvator-x", "renesas,r8a7795";
-> > +
-> > +	aliases {
-> > +		serial0 = &scif2;
-> > +		serial1 = &scif1;
-> > +	};
-> > +
-> > +	chosen {
-> > +		bootargs = "ignore_loglevel";
+On 20/10/2015:10:19:25 AM, Geoff Levand wrote:
+> Hi,
 > 
-> Do we really need this kind of thing in the kernel DTs?
-
-I agree this looks a bit lonely by itself, and I'm not entirely
-opposed to removing it. However, I do seek consistency between
-the renesas ARM and ARM64 SoCs where possible.
-
-Further work[1] on this file outside of this series adds
-"rw root=/dev/nfs ip=dhcp" to bootargs, the result being consistent
-with Renesas ARM32 SoCs.
-
-[1] [PATCH v5 4/5] arm64: dts: r8a7795: enable nfs root on Salvator-X board
-    http://www.spinics.net/lists/arm-kernel/msg452743.html
-
-> > +		stdout-path = &scif2;
+> On Tue, 2015-10-20 at 14:26 +0530, Pratyush Anand wrote:
+> > On 19/10/2015:11:38:53 PM, Geoff Levand wrote:
+> > > +static void soft_restart(unsigned long addr)
+> > > +{
+> > > +> > 	> > setup_mm_for_reboot();
+> > > +> > 	> > cpu_soft_restart(virt_to_phys(cpu_reset), addr,
+> > > +> > 	> > 	> > is_hyp_mode_available());
+> > 
+> > So now we do not flush cache for any memory region. Shouldn't we still flush
+> > at least kernel and purgatory segments. 
 > 
-> No rate? It would be better to be explicit here; you should be able to
-> have:
+> Relevant pages of the kexec list are flushed in the code following the comment
+> 'Invalidate dest page to PoC' of the arm64_relocate_new_kernel routine:
 > 
-> 	stdout-path = "serial0:115200n8"
-> 
-> Where "115200n8" is replaced with whatever configuration this board
-> actually has.
+>  The dcache is turned off
+>  The page is invalidated to PoC
+>  The new page is written
 
-I think that we have had this discussion before in relation to
-a different board for a different Renesas SoC but I could be mistaken.
+Thanks for clarifying it.
 
-The r8a7795 uses the sh-sci serial driver for which the default rate is
-115200. It is hard for me to conceive of a situation where that would
-change without due consideration being given to the implications for DT
-files.
+I tested your kexec-v10.2 with mustang.
 
-Not specifying the baud here is consistent with what we have
-been doing for ARM32 Renesas SoCs for some time.
+Tested-by: Pratyush Anand <panand@redhat.com>
