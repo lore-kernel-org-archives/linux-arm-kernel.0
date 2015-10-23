@@ -1,40 +1,134 @@
-From: t-kristo@ti.com (Tero Kristo)
-Date: Fri, 23 Oct 2015 09:29:57 +0300
-Subject: [PATCH] rtc: ds1307: Fix alarm programming for mcp794xx
-Message-ID: <1445581797-19693-1-git-send-email-t-kristo@ti.com>
+From: caesar.upstream@gmail.com (Caesar Wang)
+Date: Fri, 23 Oct 2015 14:32:27 +0800
+Subject: [PATCH v3 2/3] thermal: rockchip: ensure the otp states before
+ resetting the controller
+In-Reply-To: <CAD=FV=WZqXRt4R_TTaz4LJxWo5B0fmrBjma52cVidpO=OkjcaQ@mail.gmail.com>
+References: <1445565296-31517-1-git-send-email-wxt@rock-chips.com>
+ <1445565296-31517-3-git-send-email-wxt@rock-chips.com>
+ <CAD=FV=WZqXRt4R_TTaz4LJxWo5B0fmrBjma52cVidpO=OkjcaQ@mail.gmail.com>
+Message-ID: <5629D47B.2030204@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-mcp794xx alarm registers must be written in BCD format. However, the
-alarm programming logic neglected this by adding one to the value
-after bin2bcd conversion has been already done, writing bad values
-to month register in case the alarm being set is in October. In this
-case, the alarm month value becomes 0x0a instead of the expected 0x10.
 
-Fix by moving the +1 addition within the bin2bcd call also.
 
-Fixes: 1d1945d261a2 ("drivers/rtc/rtc-ds1307.c: add alarm support for mcp7941x chips")
+? 2015?10?23? 12:04, Doug Anderson ??:
+> Caesar,
+>
+> On Thu, Oct 22, 2015 at 9:54 PM, Caesar Wang <wxt@rock-chips.com> wrote:
+>> We need the OTP pin is gpio state before resetting the TSADC controller,
+>> since the tshut polarity will generate a high signal.
+>>
+>> Says:
+>> The TSHUT temperature is setting more than 80 degree, the
+>> default tshut polarity is high.
+>>
+>> If T > 80C, the OTP output the high signal.
+>> If T < 80C, the OTP output the low signal.
+>>
+>> On the moment, the tshut polarity will be low in a short period of time
+>> if the TSADC controller is reset.
+>>
+>> So:
+>> If T < 80C, the OTP output the High Signal.
+>> If T > 80C, the OTP output the Low Signal.
+>>
+>> In some cases, the OTP pin is connected to the PMIC, maybe the PMIC can
+>> accept the reset response time to avoid this issue.
+>> In other words, the system will be always reboot if we
+>> make the OTP pin is connected the others IC to control the power.
+>>
+>> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
+>>
+>> ---
+>>
+>> Changes in v3:
+>>    - Add the pinctrl state for in the suspend/resume.
+>>
+>> Changes in v2: None
+>> Changes in v1: None
+>>
+>>   drivers/thermal/rockchip_thermal.c | 4 ++++
+>>   1 file changed, 4 insertions(+)
+>>
+>> diff --git a/drivers/thermal/rockchip_thermal.c b/drivers/thermal/rockchip_thermal.c
+>> index c89ffb2..3b8fbda 100644
+>> --- a/drivers/thermal/rockchip_thermal.c
+>> +++ b/drivers/thermal/rockchip_thermal.c
+>> @@ -642,6 +642,8 @@ static int __maybe_unused rockchip_thermal_suspend(struct device *dev)
+>>          clk_disable(thermal->pclk);
+>>          clk_disable(thermal->clk);
+>>
+>> +       pinctrl_pm_select_sleep_state(dev);
+>> +
+>>          return 0;
+>>   }
+>>
+>> @@ -678,6 +680,8 @@ static int __maybe_unused rockchip_thermal_resume(struct device *dev)
+>>          for (i = 0; i < ARRAY_SIZE(thermal->sensors); i++)
+>>                  rockchip_thermal_toggle_sensor(&thermal->sensors[i], true);
+>>
+>> +       pinctrl_pm_select_default_state(dev);
+>> +
+>>          return 0;
+>>   }
+> The patch looks totally fine, but the description is a little
+> confusing.  Reading this patch it's all about adding support for the
+> "sleep" state in the tsadc driver, but nothing in the description
+> talks about that.  I'd expect something like:
+>
+> thermal: rockchip: support the sleep pinctrl state to avoid glitches in s2r
+>
+> When we come out of system suspend state (S3) the tsadc will have been
+> reset and back at its default state.  While reprogramming the tsadc
+> it's possible that we'll glitch the output and unintentionally cause
+> the "over temperature" GPIO to be asserted.  Since the over
+> temperature GPIO is often hooked up to something that will cause a
+> reboot or shutdown in hardware, this glitch can be catastrophic on
+> some boards.
+>
+> We'll add support for selecting the "sleep" pinctrl state at suspend
+> time.  Boards can use this to effectively disable the tsadc at suspend
+> time and avoid glitches when the system is resumed.
 
-Signed-off-by: Tero Kristo <t-kristo@ti.com>
----
- drivers/rtc/rtc-ds1307.c |    4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+Thanks Doug to take your time reviewing this series patchs.
+The commit is very good for this patch.
 
-diff --git a/drivers/rtc/rtc-ds1307.c b/drivers/rtc/rtc-ds1307.c
-index a705e64..188006c 100644
---- a/drivers/rtc/rtc-ds1307.c
-+++ b/drivers/rtc/rtc-ds1307.c
-@@ -718,9 +718,9 @@ static int mcp794xx_set_alarm(struct device *dev, struct rtc_wkalrm *t)
- 	regs[3] = bin2bcd(t->time.tm_sec);
- 	regs[4] = bin2bcd(t->time.tm_min);
- 	regs[5] = bin2bcd(t->time.tm_hour);
--	regs[6] = bin2bcd(t->time.tm_wday) + 1;
-+	regs[6] = bin2bcd(t->time.tm_wday + 1);
- 	regs[7] = bin2bcd(t->time.tm_mday);
--	regs[8] = bin2bcd(t->time.tm_mon) + 1;
-+	regs[8] = bin2bcd(t->time.tm_mon + 1);
- 
- 	/* Clear the alarm 0 interrupt flag. */
- 	regs[6] &= ~MCP794XX_BIT_ALMX_IF;
+>
+> ---
+>
+> Note that although this pinctrl approach is fine IMHO, I am left
+> wondering whether we could just change the tsadc init sequence to
+> avoid the glitch.  I can't easily test myself, but if we can program
+> the temperatures before re-enabling the tsadc would it avoid the
+> problem too?
+
+It's the chip behaviour, the glitches is aways occured by reset controller.
+The best way need  change to the gpio state before reset the controller.
+
+
+>   Like could we just swap things like:
+>
+>                  thermal->chip->set_tshut_temp(id, thermal->regs,
+>                                                thermal->hw_shut_temp);
+>                  thermal->chip->set_tshut_mode(id, thermal->regs,
+>                                                thermal->tshut_mode);
+>
+>
+> Does that help?
+
+It didn't work on box board.
+
+>
+>
+> -Doug
+>
+> _______________________________________________
+> Linux-rockchip mailing list
+> Linux-rockchip at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-rockchip
+
+
 -- 
-1.7.9.5
+Thanks,
+Caesar
