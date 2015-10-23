@@ -1,47 +1,66 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 23 Oct 2015 16:23:06 +0200
-Subject: [PATCH v3 6/7] vfio: platform: use list of registered reset
- function
-In-Reply-To: <562A3FFC.4050504@linaro.org>
-References: <1445603835-14506-1-git-send-email-eric.auger@linaro.org>
- <4934120.DeNtNjTIFs@wuerfel> <562A3FFC.4050504@linaro.org>
-Message-ID: <5844194.uTAR9RVtmZ@wuerfel>
+From: m-karicheri2@ti.com (Murali Karicheri)
+Date: Fri, 23 Oct 2015 10:25:54 -0400
+Subject: [PATCH v3 0/2] Common SerDes driver for TI's Keystone Platforms
+In-Reply-To: <3702663.07h6YO0UjY@wuerfel>
+References: <1445432201-16007-1-git-send-email-w-kwok2@ti.com>
+ <56295B9E.9030201@ti.com>
+ <CAPw-ZTk1vJA3YSwLHBNMYP0t5k2tW0HTKse+37rL8izWN33y-w@mail.gmail.com>
+ <3702663.07h6YO0UjY@wuerfel>
+Message-ID: <562A4372.4040008@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 23 October 2015 16:11:08 Eric Auger wrote:
-> Hi Arnd,
-> On 10/23/2015 03:12 PM, Arnd Bergmann wrote:
-> > On Friday 23 October 2015 14:37:14 Eric Auger wrote:
-> >> Remove the static lookup table and use the dynamic list of registered
-> >> reset functions instead. Also load the reset module through its alias.
-> >> The reset struct module pointer is stored in vfio_platform_device.
-> >>
-> >> We also remove the useless struct device pointer parameter in
-> >> vfio_platform_get_reset.
-> >>
-> >> This patch fixes the issue related to the usage of __symbol_get, which
-> >> besides from being moot, prevented compilation with CONFIG_MODULES
-> >> disabled.
-> >>
-> >> Also usage of MODULE_ALIAS makes possible to add a new reset module
-> >> without needing to update the framework. This was suggested by Arnd.
-> >>
-> >> Signed-off-by: Eric Auger <eric.auger@linaro.org>
-> >> Reported-by: Arnd Bergmann <arnd@arndb.de>
-> >>
-> >>
-> > Reviewed-by: Arnd Bergmann <arnd@arndb.de>
-> > 
-> > but doesn't this need to come before patch 4/7?
-> Well I don't think so. In [4] we introduce the dynamic registration
-> method but until this patch we still use the old lookup method in the
-> static table. I tested and the reset lookup still works in [4].
-> If we put this one before the registration, the functionality will be
-> lost here.
-> 
+On 10/23/2015 05:17 AM, Arnd Bergmann wrote:
+> On Thursday 22 October 2015 15:27:05 Loc Ho wrote:
+>>>
+>>> phy-xgene.c
+>>> -----------
+>>>
+>>> Looking at other drivers under drivers/phy, I could find phy-xgene.c which
+>>> is close Keystone SerDes driver (. This is called APM X-Gene Multi-Purpose
+>>> PHY driver. It defines following mode per the driver code
+>>>
+>>>          MODE_SATA       = 0,    /* List them for simple reference */
+>>>          MODE_SGMII      = 1,
+>>>          MODE_PCIE       = 2,
+>>>          MODE_USB        = 3,
+>>>          MODE_XFI        = 4,
+>>>
+>>> But seems to support only MODE_SATA. From the code, it appears, this driver
+>>> is expected to be enhanced in the future to support additional modes. I have
+>>> copied the author to this email to participate in this discussion.
+>>
+>> Let me comment on this APM X-Gene driver. This driver is dead and
+>> won't be supported in near or foreseeable future. And someday, it will
+>> be ripped out. Based on experience, this solution (having PHY driver
+>> in Linux) can't be supported across boards and etc as it is just too
+>> much maintenance. And therefore, we followed Arnd B guidance and move
+>> all this into the boot loader. From Linux or OS perspective, it only
+>> cares about the interface in which its interface with. This is just
+>> your reference and may be this will help you as well.
+>
+> This depends a lot on the use case. If the chip is only used on server
+> parts that have a real firmware and you can deliver bug fixes for the
+> firmware if necessary, it's always best to do as much of the setup as
+> possible there, and let Linux see a simplified view of the hardware.
+>
+> However, for embedded systems that tend to ship with a minimal binary
+> bootloader and no way to update that as an end-user, we rely on Linux
+> to know about all the hardware that requires some form of setup, which
+> is why we have all sorts of drivers and frameworks in the kernel that
+> a server can easily ignore.
+>
+> While keystone can show up in servers that won't use this driver, my
+> impression is that its main market is actually in embedded space.
+It is in embedded space predominantly. From our experience, this has to 
+be a Linux driver and moving this to boot loader doesn't make sense.
 
-Ok, I see. I was getting confused by the removal of the EXPORT_SYMBOL
-statement there and thought it would break the __get_symbol call.
+Murali
+>
+> 	Arnd
+>
 
-	Arnd
+
+-- 
+Murali Karicheri
+Linux Kernel, Keystone
