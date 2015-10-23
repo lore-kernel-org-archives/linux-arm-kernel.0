@@ -1,46 +1,61 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 23 Oct 2015 12:23:53 +0200
-Subject: [PATCH v2 4/5] drivers: firmware: psci: add extended stateid
- power_state support
-In-Reply-To: <CAMAWPa9ZLGidg3r8RJY9MANdmjPdJ07S7mmixQBf_g3YPce1_g@mail.gmail.com>
-References: <1436375811-10529-1-git-send-email-lorenzo.pieralisi@arm.com>
- <1436375811-10529-5-git-send-email-lorenzo.pieralisi@arm.com>
- <CAMAWPa9ZLGidg3r8RJY9MANdmjPdJ07S7mmixQBf_g3YPce1_g@mail.gmail.com>
-Message-ID: <3982126.UybqODJKJo@wuerfel>
+From: lftan@altera.com (Ley Foon Tan)
+Date: Fri, 23 Oct 2015 18:27:09 +0800
+Subject: [PATCH v12 0/6] Altera PCIe host controller driver with MSI support
+Message-ID: <1445596035-27733-1-git-send-email-lftan@altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 22 October 2015 15:07:06 Kevin Hilman wrote:
-> Spam Status: Spamassassin    CRM114    
-> On Wed, Jul 8, 2015 at 10:16 AM, Lorenzo Pieralisi
-> <lorenzo.pieralisi@arm.com> wrote:
-> > PSCI v1.0 augmented the power_state parameter format specification
-> > (extended stateid) and introduced a way to probe it through the
-> > PSCI_FEATURES interface.
-> >
-> > This patch implements code that detects the power_state format at
-> > run-time through the PSCI_FEATURES interface, so that the power_state
-> > argument can be properly detected and validated in the kernel according
-> > to the information provided through firmware.
-> >
-> > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> > Cc: Mark Rutland <mark.rutland@arm.com>
-> 
-> kernelci.org started finding a new boot failures in the arm-soc tree
-> on arm64 qemu[1] and it was bisected down to this patch, which is in
-> arm-soc in the form of commit a5c00bb28da0 (drivers: firmware: psci:
-> add extended stateid power_state support)
-> 
-> The patch doesn't revert cleanly, so I didn't dig much further, but
-> this suggests that some more testing on qemu is needed (or does qemu
-> need to be upgraded?)
-> 
-> Kevin
-> 
-> [1] http://kernelci.org/boot/all/job/arm-soc/kernel/v4.3-rc5-557-g159ca7e43189/
-> 
+This is the 12th version of patch set to add support for Altera PCIe host
+controller with MSI feature on Altera FPGA device families. This patchset
+mainly resovle the comments from Bjorn.
 
-Could it be that qemu claims to support psci-1.0 but is actually not
-compatible?
 
-	Arnd
+This patchset is based on v4.3-rc6.
+
+v11->v12 changes:
+- pcie-altera: use DECLARE_PCI_FIXUP_EARLY for pcie retrain fixup
+- pcie-altera: move pcie_bus_configure_settings before pci_bus_add_devices
+- pcie-altera: add %d for irq bit in dev_err()
+- pcie-altera: prevent enumeration of root complex resources in config accessors
+- Documentation: add Acked-by from Rob Herring
+
+History:
+-------
+[v1]: https://lkml.org/lkml/2015/7/28/395
+[v2]: https://lkml.org/lkml/2015/7/31/267
+[v3]: http://www.kernelhub.org/?msg=811940&p=2
+[v4]: https://lkml.org/lkml/2015/8/17/141
+[v5]: https://lkml.org/lkml/2015/8/25/238
+[v6]: https://lkml.org/lkml/2015/9/1/177
+[v7]: https://lkml.org/lkml/2015/9/20/193
+[v8]: http://www.kernelhub.org/?msg=853553&p=2
+[v9]: https://lkml.org/lkml/2015/10/13/998
+[v10]: https://lkml.org/lkml/2015/10/19/139
+[v11]: https://lkml.org/lkml/2015/10/22/206
+
+
+Ley Foon Tan (6):
+  arm: add msi.h to Kbuild
+  pci: add Altera PCI vendor ID
+  pci:host: Add Altera PCIe host controller driver
+  pci: altera: Add Altera PCIe MSI driver
+  Documentation: dt-bindings: pci: altera pcie device tree binding
+  MAINTAINERS: Add Altera PCIe and MSI drivers maintainer
+
+ .../devicetree/bindings/pci/altera-pcie-msi.txt    |  28 +
+ .../devicetree/bindings/pci/altera-pcie.txt        |  49 ++
+ MAINTAINERS                                        |  16 +
+ arch/arm/include/asm/Kbuild                        |   1 +
+ drivers/pci/host/Kconfig                           |  16 +
+ drivers/pci/host/Makefile                          |   2 +
+ drivers/pci/host/pcie-altera-msi.c                 | 314 +++++++++++
+ drivers/pci/host/pcie-altera.c                     | 580 +++++++++++++++++++++
+ include/linux/pci_ids.h                            |   2 +
+ 9 files changed, 1008 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/pci/altera-pcie-msi.txt
+ create mode 100644 Documentation/devicetree/bindings/pci/altera-pcie.txt
+ create mode 100644 drivers/pci/host/pcie-altera-msi.c
+ create mode 100644 drivers/pci/host/pcie-altera.c
+
+-- 
+1.8.2.1
