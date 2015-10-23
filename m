@@ -1,37 +1,54 @@
-From: puck.chen@hisilicon.com (chenfeng)
-Date: Fri, 23 Oct 2015 17:10:31 +0800
-Subject: [PATCH V2 2/3] Add iommu driver for hi6220 SoC platform
-In-Reply-To: <56265783.5040406@arm.com>
-References: <1445330724-129401-1-git-send-email-puck.chen@hisilicon.com>
- <1445330724-129401-2-git-send-email-puck.chen@hisilicon.com>
- <56265783.5040406@arm.com>
-Message-ID: <5629F987.3060701@hisilicon.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 23 Oct 2015 11:17:06 +0200
+Subject: [PATCH v3 0/2] Common SerDes driver for TI's Keystone Platforms
+In-Reply-To: <CAPw-ZTk1vJA3YSwLHBNMYP0t5k2tW0HTKse+37rL8izWN33y-w@mail.gmail.com>
+References: <1445432201-16007-1-git-send-email-w-kwok2@ti.com>
+ <56295B9E.9030201@ti.com>
+ <CAPw-ZTk1vJA3YSwLHBNMYP0t5k2tW0HTKse+37rL8izWN33y-w@mail.gmail.com>
+Message-ID: <3702663.07h6YO0UjY@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Robin,
+On Thursday 22 October 2015 15:27:05 Loc Ho wrote:
+> >
+> > phy-xgene.c
+> > -----------
+> >
+> > Looking at other drivers under drivers/phy, I could find phy-xgene.c which
+> > is close Keystone SerDes driver (. This is called APM X-Gene Multi-Purpose
+> > PHY driver. It defines following mode per the driver code
+> >
+> >         MODE_SATA       = 0,    /* List them for simple reference */
+> >         MODE_SGMII      = 1,
+> >         MODE_PCIE       = 2,
+> >         MODE_USB        = 3,
+> >         MODE_XFI        = 4,
+> >
+> > But seems to support only MODE_SATA. From the code, it appears, this driver
+> > is expected to be enhanced in the future to support additional modes. I have
+> > copied the author to this email to participate in this discussion.
+> 
+> Let me comment on this APM X-Gene driver. This driver is dead and
+> won't be supported in near or foreseeable future. And someday, it will
+> be ripped out. Based on experience, this solution (having PHY driver
+> in Linux) can't be supported across boards and etc as it is just too
+> much maintenance. And therefore, we followed Arnd B guidance and move
+> all this into the boot loader. From Linux or OS perspective, it only
+> cares about the interface in which its interface with. This is just
+> your reference and may be this will help you as well.
 
-On 2015/10/20 23:02, Robin Murphy wrote:
-> On 20/10/15 09:45, Chen Feng wrote:
->> iommu/hisilicon: Add hi6220-SoC smmu driver
-> 
+This depends a lot on the use case. If the chip is only used on server
+parts that have a real firmware and you can deliver bug fixes for the
+firmware if necessary, it's always best to do as much of the setup as
+possible there, and let Linux see a simplified view of the hardware.
 
->> +
->> +static int hi6220_smmu_attach_dev(struct iommu_domain *domain,
->> +                  struct device *dev)
->> +{
->> +    dev->archdata.iommu = &iova_allocator;
-> 
-> If the hardware doesn't offer any kind of device isolation (i.e. multiple translation contexts), then you should probably have more logic here to ensure only a single domain can ever be active at once.
-> 
->> +    return 0;
->> +}
->> +
-I feel confused about your above comments. Could you help explain "ensure only a single domain can ever be active at once"?
+However, for embedded systems that tend to ship with a minimal binary
+bootloader and no way to update that as an end-user, we rely on Linux
+to know about all the hardware that requires some form of setup, which
+is why we have all sorts of drivers and frameworks in the kernel that
+a server can easily ignore.
 
+While keystone can show up in servers that won't use this driver, my
+impression is that its main market is actually in embedded space.
 
-> Robin.
-> 
-> 
-> .
-> 
+	Arnd
