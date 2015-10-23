@@ -1,59 +1,50 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Fri, 23 Oct 2015 09:18:51 +0900
-Subject: [PATCH 14/19] ARM: dts: shmobile/r8a7xxx: replace
- gpio-key,wakeup with wakeup-source property
-In-Reply-To: <5628AE72.3020809@arm.com>
-References: <1445422216-29375-1-git-send-email-sudeep.holla@arm.com>
- <1445422216-29375-15-git-send-email-sudeep.holla@arm.com>
- <CAMuHMdXpY7gSOPAGxh9Z_LurpL392y7Vx0pBe-FqfauXjVnMFQ@mail.gmail.com>
- <56276787.6090900@arm.com> <20151022005051.GD8879@verge.net.au>
- <5628AE72.3020809@arm.com>
-Message-ID: <20151023001851.GA15844@verge.net.au>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Thu, 22 Oct 2015 18:15:04 -0700
+Subject: [PATCH stable/v4.2.y] ARM: ux500: simplify secondary CPU boot
+In-Reply-To: <20151023001754.GB10983@kroah.com>
+References: <1445554568-4871-1-git-send-email-khilman@kernel.org>
+ <20151023001754.GB10983@kroah.com>
+Message-ID: <CAMAWPa9aJRa=7JQU4xjHG8mGhMsnC=7st0tLEPpe8TQKGztC9w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 22, 2015 at 10:37:54AM +0100, Sudeep Holla wrote:
-> 
-> 
-> On 22/10/15 01:50, Simon Horman wrote:
-> >On Wed, Oct 21, 2015 at 11:23:03AM +0100, Sudeep Holla wrote:
-> >>
-> >>
-> >>On 21/10/15 11:18, Geert Uytterhoeven wrote:
-> >>>On Wed, Oct 21, 2015 at 12:10 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
-> >>>>Though the keyboard driver for GPIO buttons(gpio-keys) will continue to
-> >>>>check for/support the legacy "gpio-key,wakeup" boolean property to
-> >>>>enable gpio buttons as wakeup source, "wakeup-source" is the new
-> >>>>standard binding.
-> >>>>
-> >>>>This patch replaces the legacy "gpio-key,wakeup" with the unified
-> >>>>"wakeup-source" property in order to avoid any futher copy-paste
-> >>>>duplication.
-> >>>
-> >>>Thanks!
-> >>>
-> >>>I made the same changes to my local tree a few weeks ago, but never found
-> >>>time to send them out...
-> >>>
-> >>
-> >>Ah OK, even I had these changes for long. I waited until I fixed all the
-> >>binding documents(which was boring ;))
-> >>
-> >>>>Cc: Simon Horman <horms@verge.net.au>
-> >>>>Cc: Magnus Damm <magnus.damm@gmail.com>
-> >>>>Cc: linux-sh at vger.kernel.org
-> >>>>Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
-> >>>
-> >>>Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> >
-> >Can I clarify that you would like me to pick up this patch?
-> >If so I'm happy to do so.
-> >
-> 
-> Yes you can pick up this patch as it has no dependency on driver changes.
+On Thu, Oct 22, 2015 at 5:17 PM, Greg KH <greg@kroah.com> wrote:
+> On Thu, Oct 22, 2015 at 03:56:08PM -0700, Kevin Hilman wrote:
+>> From: Linus Walleij <linus.walleij@linaro.org>
+>>
+>> This removes a lot of ancient cruft from the Ux500 SMP boot.
+>> Instead of the pen grab/release, just point the ROM to
+>> secondary_boot() and start the second CPU there, then send
+>> the IPI.
+>>
+>> Use our own SMP enable method. This enables us to remove the
+>> last static mapping and get both CPUs booting properly.
+>>
+>> Tested this and it just works.
+>>
+>> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+>> Signed-off-by: Olof Johansson <olof@lixom.net>
+>> (cherry picked from commit c00def71efd919e8ae835a25f4f4c80a4b2d36d3)
+>> Cc: <stable@vger.kernel.org> # v4.2+
+>> Signed-off-by: Kevin Hilman <khilman@linaro.org>
+>> ---
+>> This patch was the 2nd in a 2-patch series.  Only the 1st patch made it
+>> into v4.2, but this one is also needed for booting on the ste-snowball.
+>>
+>>  arch/arm/mach-ux500/Makefile     |   2 +-
+>>  arch/arm/mach-ux500/cpu-db8500.c |   1 -
+>>  arch/arm/mach-ux500/headsmp.S    |  37 -----------
+>>  arch/arm/mach-ux500/platsmp.c    | 132 ++++++++++++---------------------------
+>>  arch/arm/mach-ux500/setup.h      |   1 -
+>>  5 files changed, 40 insertions(+), 133 deletions(-)
+>>  delete mode 100644 arch/arm/mach-ux500/headsmp.S
+>
+> This looks to me like a "new feature", is it a regression from something
+> that used to work in 4.1?
 
-Thanks, I have queued this up for v4.5.
+I guess Linus W. will have to explain better, but I'll try...
 
-It should appear in the devel branch of the renesas tree some time today.
-I will include it in the next branch, which is included in the linux-next
-tree, once v4.4-rc1 has been released.
+it's the 2nd part of a 2-part fix that was submitted for v4.2, but
+only the 1st part made it in because it was late for the merge window.
+
+Kevin
