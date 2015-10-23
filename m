@@ -1,40 +1,25 @@
-From: robh+dt@kernel.org (Rob Herring)
-Date: Fri, 23 Oct 2015 16:33:11 -0500
-Subject: [PATCH v3 1/3] dt-bindings: Consolidate SRAM bindings from all
- vendors
-In-Reply-To: <562A9300.5060105@kernel.org>
-References: <1445564361-16974-1-git-send-email-k.kozlowski@samsung.com>
- <562A8ED8.6060904@kernel.org> <562A9300.5060105@kernel.org>
-Message-ID: <CAL_JsqKPd2vRZO-Y3aZKmS=RpKsg5+9+UHSQbb3yObB_VM0Dcw@mail.gmail.com>
+From: timur@codeaurora.org (Timur Tabi)
+Date: Fri, 23 Oct 2015 16:54:34 -0500
+Subject: [PATCH v13 5/5] uart: pl011: Add support to ZTE ZX296702 uart
+In-Reply-To: <CABymUCOA3oG7Hq83hDyQ_uisQHeipoHshcWONWTtjxKvikzjsQ@mail.gmail.com>
+References: <1438328959-16177-1-git-send-email-jun.nie@linaro.org>
+ <1438328959-16177-6-git-send-email-jun.nie@linaro.org>
+ <55FC16A2.5070207@arm.com>
+ <CABymUCOA3oG7Hq83hDyQ_uisQHeipoHshcWONWTtjxKvikzjsQ@mail.gmail.com>
+Message-ID: <CAOZdJXUjZLKkUYScD7oDTMuRUtAEJ6=DopmE4n6Vb9zyv+_viA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 23, 2015 at 3:05 PM, Kukjin Kim <kgene@kernel.org> wrote:
-> On 10/24/15 04:47, Kukjin Kim wrote:
->> On 10/23/15 10:39, Krzysztof Kozlowski wrote:
->>> SRAM bindings for various SoCs, using the mmio-sram genalloc
->>> API, are spread over different places - per SoC vendor. Since all of
->>> these are quite similar (they depend on mmio-sram) move them to a common
->>> place.
->>>
->>> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
->>> Cc: Heiko Stuebner <heiko@sntech.de>
->>> Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
->>> Cc: Chen-Yu Tsai <wens@csie.org>
->>> Cc: Kukjin Kim <kgene@kernel.org>
+On Sat, Sep 19, 2015 at 1:54 AM, Jun Nie <jun.nie@linaro.org> wrote:
 >
-> Acked-by: Kukjin Kim <kgene@kernel.org>
->
->>> Suggested-by: Rob Herring <robh+dt@kernel.org>
->>>
->> Applied with Heiko and Maxime's ack.
->>
-> + Sudeep
->
-> Oops, I can't because of ..bindings/arm/arm,scpi.txt, this series should
-> be handled with "DT binding for ARM System Control and Power
-> Interface(SCPI) protocol"
+> I am not sure the silicon designer's plan on the UART IP. Different
+> silicon team have different decision on the IP choice. So I guess
+> future ZTE SOC may reuse ZTE UART per people assignment.
 
-I'll take it after the merge window.
+I would rather see this as a separate driver.  I think this patch
+pollutes the amba-pl011.c driver too much.
 
-Rob
+-- 
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project.
