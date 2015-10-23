@@ -1,21 +1,81 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Fri, 23 Oct 2015 19:01:10 +0000 (UTC)
-Subject: [PATCH 2/2 v2] ARM: DRA7/335x/437x: hwmod: Remove gpmc address
- space from hwmod data
-In-Reply-To: <1444926461-16092-2-git-send-email-fcooper@ti.com>
-References: <1444926461-16092-1-git-send-email-fcooper@ti.com>
- <1444926461-16092-2-git-send-email-fcooper@ti.com>
-Message-ID: <alpine.DEB.2.02.1510231901020.9575@utopia.booyaka.com>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Fri, 23 Oct 2015 12:09:16 -0700
+Subject: [PATCH] drivers: psci: make PSCI 1.0 functions initialization
+ version dependent
+In-Reply-To: <7h611xr4on.fsf@deeprootsystems.com>
+References: <1445611610-12871-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <7h611xr4on.fsf@deeprootsystems.com>
+Message-ID: <CAMAWPa8VOZ7eTYhZTgY1W7SaEdFD0d90mrNyw2cDGn0MqNPL0g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 15 Oct 2015, Franklin S Cooper Jr wrote:
+On Fri, Oct 23, 2015 at 8:21 AM, Kevin Hilman <khilman@kernel.org> wrote:
+> Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> writes:
+>
+>> The PSCI specifications [1] and the SMC calling convention mandate
+>> that unimplemented functions ids must return NOT_SUPPORTED (0xffffffff)
+>> if a function id is called but it is not implemented.
+>>
+>> Consequently, PSCI 1.0 function ids that require the 1.0 PSCI_FEATURES
+>> call to be initialized:
+>>
+>> CPU_SUSPEND (psci_init_cpu_suspend())
+>> SYSTEM_SUSPEND (psci_init_system_suspend())
+>>
+>> call the PSCI_FEATURES function id independently of the detected
+>> PSCI firmware version, since, if the PSCI_FEATURES function id is not
+>> implemented, it must return NOT_SUPPORTED according to the PSCI
+>> specifications, causing the initialization functions to fail as expected.
+>>
+>> Some existing PSCI implementations (ie Qemu PSCI emulation), do not
+>> comply with the SMC calling convention and fail if function ids that are
+>> not implemented are called from the OS, causing boot failures.
+>>
+>> To solve this issue, this patch adds code that checks the PSCI firmware
+>> version before calling PSCI 1.0 initialization functions so that the
+>> OS makes sure that it is calling 1.0 functions only if the firmware
+>> version detected is 1.0 or greater, therefore avoiding PSCI calls
+>> that are bound to fail and might cause system boot failures owing
+>> to non-compliant PSCI firmware implementations.
+>>
+>> [1] http://infocenter.arm.com/help/topic/com.arm.doc.den0022c/DEN0022C_Power_State_Coordination_Interface.pdf
+>>
+>> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+>> Cc: Arnd Bergmann <arnd@arndb.de>
+>> Cc: Kevin Hilman <khilman@kernel.org>
+>> Cc: Sudeep Holla <sudeep.holla@arm.com>
+>> Cc: Olof Johansson <olof@lixom.net>
+>> Cc: Mark Rutland <mark.rutland@arm.com>
+>> ---
+>> Arnd, Kevin, Olof,
+>>
+>> this applies to current arm-soc drivers/psci branch, and solves the
+>> issue Kevin detected through kernelci with Qemu emulation:
+>>
+>> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-October/380304.html
+>>
+>> Tested on:
+>>
+>> - Juno host
+>> - AMD Seattle host
+>> - kvmtool arm64 guest (on Juno arm64 defconfig host)
+>> - Qemu x86 host (aarch64 emulation)
+>>
+>> A run on kernelci and consequent tested-by tags would be much appreciated,
+>> thanks for spotting this and for your help.
+>
+> I tested manually on my local qemu that was failing without this patch,
+> and it works:
+>
+> Tested-by: Kevin Hilman <khilman@linaro.org>
+>
+> We'll add this onto arm-soc drivers/psci and then it will have a spin through
+> kernelci.
 
-> GPMC address information is provided by device tree. No longer need
-> to include this information within hwmod.
-> 
-> Signed-off-by: Franklin S Cooper Jr <fcooper@ti.com>
+FYI... This has now been merged into arm-soc/for-next and had a spin
+through kernelci.org, and the arm64 qemu results are passing:
+http://kernelci.org/boot/all/job/arm-soc/kernel/v4.3-rc5-571-g9b588fdb667c/
 
-Thanks, queued.
+Thanks,
 
-- Paul
+Kevin
