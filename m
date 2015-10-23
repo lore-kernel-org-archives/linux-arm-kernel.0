@@ -1,90 +1,62 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 23 Oct 2015 12:20:44 -0700
-Subject: MUSB peripheral DMA regression caused by driver core runtime PM
- change
-In-Reply-To: <Pine.LNX.4.44L0.1510231406200.1644-100000@iolanthe.rowland.org>
-References: <562A7549.3070400@ti.com>
- <Pine.LNX.4.44L0.1510231406200.1644-100000@iolanthe.rowland.org>
-Message-ID: <20151023192044.GX3078@atomide.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Fri, 23 Oct 2015 12:32:02 -0700
+Subject: [GIT PULL 1/2] Broadcom Device Tree changes for 4.4 (part 2)
+In-Reply-To: <20151023182652.GE18961@localhost>
+References: <1445280190-8812-1-git-send-email-f.fainelli@gmail.com>
+ <1445280190-8812-2-git-send-email-f.fainelli@gmail.com>
+ <20151023182652.GE18961@localhost>
+Message-ID: <562A8B32.5040906@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Alan Stern <stern@rowland.harvard.edu> [151023 11:27]:
-> On Fri, 23 Oct 2015, Grygorii Strashko wrote:
+On 23/10/15 11:26, Olof Johansson wrote:
+> Hi Florian,
 > 
-> > Reviewed-by: Grygorii Strashko <grygorii.strashko@ti.com>
-> > 
-> > It always fun when DD/PM core is updated to fix some driver/subsystem's
-> > specific PM issue :(
-> > 
-> > > 
-> > >> --- a/drivers/usb/musb/omap2430.c
-> > >> +++ b/drivers/usb/musb/omap2430.c
-> > >> @@ -391,9 +391,20 @@ static int omap2430_musb_init(struct musb *musb)
-> > >>   	}
-> > >>   	musb->isr = omap2430_musb_interrupt;
-> > >>   
-> > >> +	/*
-> > >> +	 * Enable runtime PM for musb parent (this driver). We can't
-> > >> +	 * do it earlier as struct musb is not yet allocated and we
-> > >> +	 * need to touch the musb registers for runtime PM.
-> > >> +	 */
-> > >> +	pm_runtime_enable(glue->dev);
-> > >> +	status = pm_runtime_get_sync(glue->dev);
-> > >> +	if (status < 0)
-> > >> +		goto err1;
-> > >> +
-> > >>   	status = pm_runtime_get_sync(dev);
-> > 
-> > Hm. My assumption was that *Parent* device (omap2430) will be enabled
-> > here :( But as I can see this will not happen:
+> On Mon, Oct 19, 2015 at 11:43:10AM -0700, Florian Fainelli wrote:
+>> The following changes since commit eef228e3191de0b62ef5913be216f25ba6b23a4c:
+>>
+>>   ARM: dts: move aliases back to .dts in Cygnus (2015-09-24 18:30:10 -0700)
+>>
+>> are available in the git repository at:
+>>
+>>   http://github.com/Broadcom/stblinux tags/arm-soc/for-4.4/devicetree-part2
+>>
+>> for you to fetch changes up to da6b53a6f7abc3d84260a9f0ff9849a88b44e11f:
+>>
+>>   ARM: bcm2835: Switch to using the new clock driver support. (2015-10-19 11:32:24 -0700)
+>>
+>> ----------------------------------------------------------------
+>> This pull request contains the DT changes for BCM2835 in 4.4.  It
+>> pulls in clk/clk-bcm2835 (which Stephen Boyd has said would be stable)
+>> because the DT changes to enable the clock driver need the driver
+>> itself to be present. These changes include the following:
+>>
+>> - Eric Anholt, moves the bcm2835 clock driver under bcm/ where it belongs with
+>>   other Broadcom clock providers drivers, defines the binding for new clock
+>>   driver, adds support for programming the BCM2835 audio domain, adds the DDC I2C
+>>   controller to Device Tree, and finally migrates the Device Tree to use the new
+>>   clock driver binding
+>>
+>> - Lubomir Rintel adds support for the Raspberry Pi Model A+ and B revision 2, and
+>>   remove the I2S controller which is non-existent on Raspberry Pi Model B
+>>
+>> - Stefan Wahren adds an uart0 label for referencing the UART adapter
+>>
+>> ----------------------------------------------------------------
+>> Eric Anholt (5):
+>>       ARM: bcm2835: Add the DDC I2C controller to the device tree.
+>>       clk: bcm2835: Move under bcm/ with other Broadcom SoC clk drivers.
+> 
+> I see this patch in the branch, and it's signed off both by Stephen and you,
+> which makes me suspect you cherry-picked it over from their tree?
+> 
+> That means it'll exist in two copies and might cause pretty nasty conflicts at
+> merge time if other changes have gone in on top of the separate commits.
+> Instead, we ask that you share a branch with the same exact commits, since git
+> will handle that appropriately and the patch will only be in the tree once.
 
-Yes the parent child stuff here is very confusing right now :)
-
-> > static int rpm_resume(struct device *dev, int rpmflags)
-> > {...
-> > 	if (!parent && dev->parent) {
-> > 		/*
-> > 		 * Increment the parent's usage counter and resume it if
-> > 		 * necessary.  Not needed if dev is irq-safe; then the
-> > 		 * parent is permanently resumed.
-> > 		 */
-> > 		parent = dev->parent;
-> > 		if (dev->power.irq_safe)
-> > 			goto skip_parent;
-> > 
-> > ^^^ and musb device is irq_safe :( 
-> 
-> This way of doing things looks very strange.
-> 
-> If the omap2430 is the parent of the musb device, and
-> pm_runtime_irq_safe() has been called for the musb device, then after
-> that the omap2430 will never be runtime suspended.  Therefore it
-> doesn't matter whether you enable it for runtime PM or not.
-> 
-> It seems to me that the real problem must be that the musb device gets
-> runtime-enabled and marked irq_safe too early.  These things should 
-> happen before the musb device gets registered and exposed to userspace, 
-> but not before the omap2430 parent is runtime-enabled.
-> 
-> Thus the sequence of events should be:
-> 
-> 	Allocate the musb device;
-> 	Runtime-enable the omap2430 (since it is now safe to do so);
-> 	Runtime-enable the musb and declare it irq_safe (this will
-> 		automatically runtime-resume the omap2430);
-> 	Register the musb.
-> 
-> If things are done this way, no special action needs to be taken.
-
-Yes good point, that requires changing the init for the whole
-drivers/musb though. Also, we should reorganize the whole musb and make
-the platform glue and musb core drivers completely separate using a
-shared interrupt where needed.
-
-For the regression for the -rc series? Do you see any better
-alternatives to what I posted?
-
-Regards,
-
-Tony
+Just to clarify, are you okay with me merging a branch from Eric's tree,
+or do you want to see individual commits, except for those that appear
+in Stephen's tree (the clock changes basically)?
+-- 
+Florian
