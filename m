@@ -1,62 +1,67 @@
 From: wxt@rock-chips.com (Caesar Wang)
-Date: Fri, 23 Oct 2015 19:25:27 +0800
-Subject: [PATCH v4 2/3] thermal: rockchip: support the sleep pinctrl state to
- avoid glitches in s2r
+Date: Fri, 23 Oct 2015 19:25:28 +0800
+Subject: [PATCH v4 3/3] ARM: dts: rockchip: Add the OTP gpio pinctrl
 In-Reply-To: <1445599528-18825-1-git-send-email-wxt@rock-chips.com>
 References: <1445599528-18825-1-git-send-email-wxt@rock-chips.com>
-Message-ID: <1445599528-18825-3-git-send-email-wxt@rock-chips.com>
+Message-ID: <1445599528-18825-4-git-send-email-wxt@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When we come out of system suspend state (S3) the tsadc will have been
-reset and back at its default state.  While reprogramming the tsadc
-it's possible that we'll glitch the output and unintentionally cause
-the "over temperature" GPIO to be asserted.  Since the over
-temperature GPIO is often hooked up to something that will cause a
-reboot or shutdown in hardware, this glitch can be catastrophic on
-some boards.
+Add the "init" anf "sleep" pinctrl as the OTP gpio state.
+We need the OTP pin is gpio state before resetting the TSADC controller,
+since the tshut polarity will generate a high signal.
 
-We'll add support for selecting the "sleep" pinctrl state at suspend
-time.  Boards can use this to effectively disable the tsadc at suspend
-time and avoid glitches when the system is resumed.
+"init" pinctrl property is defined by Doug's Patch[0].
+
+Patch[0]:
+https://patchwork.kernel.org/patch/7454311/
 
 Signed-off-by: Caesar Wang <wxt@rock-chips.com>
-
+Reviewed-by: Douglas Anderson <dianders@chromium.org>
 ---
 
-Changes in v4:
-  - take the Doug's commit as correct decription.
-
+Changes in v4: None
 Changes in v3:
-  - Add the pinctrl state for in the suspend/resume.
+  - Add the "sleep" pinctrl as the gpio state in PATCH[3/3]
 
-Changes in v2: None
-Changes in v1: None
+Changes in v2:
+  - Add some commits for more obvious in PATCH[2/2]
 
- drivers/thermal/rockchip_thermal.c | 4 ++++
- 1 file changed, 4 insertions(+)
+Changes in v1:
+  - As the Doug comments, drop the thermal driver patchs since
+    we can with pinctrl changing to work.
+  - As the Doug's patch to add the 'init' property.
 
-diff --git a/drivers/thermal/rockchip_thermal.c b/drivers/thermal/rockchip_thermal.c
-index c89ffb2..3b8fbda 100644
---- a/drivers/thermal/rockchip_thermal.c
-+++ b/drivers/thermal/rockchip_thermal.c
-@@ -642,6 +642,8 @@ static int __maybe_unused rockchip_thermal_suspend(struct device *dev)
- 	clk_disable(thermal->pclk);
- 	clk_disable(thermal->clk);
+ arch/arm/boot/dts/rk3288.dtsi | 10 ++++++++--
+ 1 file changed, 8 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
+index 906e938..13ff09a 100644
+--- a/arch/arm/boot/dts/rk3288.dtsi
++++ b/arch/arm/boot/dts/rk3288.dtsi
+@@ -447,8 +447,10 @@
+ 		clock-names = "tsadc", "apb_pclk";
+ 		resets = <&cru SRST_TSADC>;
+ 		reset-names = "tsadc-apb";
+-		pinctrl-names = "default";
+-		pinctrl-0 = <&otp_out>;
++		pinctrl-names = "init", "default", "sleep";
++		pinctrl-0 = <&otp_gpio>;
++		pinctrl-1 = <&otp_out>;
++		pinctrl-2 = <&otp_gpio>;
+ 		#thermal-sensor-cells = <1>;
+ 		rockchip,hw-tshut-temp = <95000>;
+ 		status = "disabled";
+@@ -1273,6 +1275,10 @@
+ 		};
  
-+	pinctrl_pm_select_sleep_state(dev);
+ 		tsadc {
++			otp_gpio: otp-gpio {
++				rockchip,pins = <0 10 RK_FUNC_GPIO &pcfg_pull_none>;
++			};
 +
- 	return 0;
- }
- 
-@@ -678,6 +680,8 @@ static int __maybe_unused rockchip_thermal_resume(struct device *dev)
- 	for (i = 0; i < ARRAY_SIZE(thermal->sensors); i++)
- 		rockchip_thermal_toggle_sensor(&thermal->sensors[i], true);
- 
-+	pinctrl_pm_select_default_state(dev);
-+
- 	return 0;
- }
- 
+ 			otp_out: otp-out {
+ 				rockchip,pins = <0 10 RK_FUNC_1 &pcfg_pull_none>;
+ 			};
 -- 
 1.9.1
