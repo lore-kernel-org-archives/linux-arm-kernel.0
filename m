@@ -1,58 +1,48 @@
-From: julien.grall@citrix.com (Julien Grall)
-Date: Fri, 23 Oct 2015 15:58:23 +0100
-Subject: arm64: iomem_resource doesn't contain all the region used
-Message-ID: <562A4B0F.2020603@citrix.com>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Fri, 23 Oct 2015 08:10:30 -0700
+Subject: [PATCH v2 4/5] drivers: firmware: psci: add extended stateid
+ power_state support
+In-Reply-To: <20151023113618.GA29008@red-moon>
+References: <1436375811-10529-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <3982126.UybqODJKJo@wuerfel> <20151023104457.GA9309@red-moon>
+ <7012327.dvizHt4W5S@wuerfel> <20151023113618.GA29008@red-moon>
+Message-ID: <CAMAWPa-_H3ea65ZpkCjYHGXt5k76Li5b01eAhpRjVVJoYUXp_Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+On Fri, Oct 23, 2015 at 4:36 AM, Lorenzo Pieralisi
+<lorenzo.pieralisi@arm.com> wrote:
+> On Fri, Oct 23, 2015 at 12:55:34PM +0200, Arnd Bergmann wrote:
+>> On Friday 23 October 2015 11:44:58 Lorenzo Pieralisi wrote:
+>> >
+>> > Problem with Qemu emulation is that it does not emulate the PSCI 1.0
+>> > specs correctly (it does not even consider PSCI 1.0 functions proper PSCI
+>> > calls), I tested it and I think we should update Qemu as we
+>> > did with KVM kernel code instead of working around it by dodging the
+>> > problem in the PSCI implementation by adding code that checks the
+>> > PSCI version before issuing the PSCI calls through the respective
+>> > conduit.
+>> >
+>> > Thoughts appreciated.
+>>
+>> I think we really cannot break existing qemu installations, but need
+>> a way to detect whether we are dealing with a broken qemu (and warn
+>> about that) or with a working PSCI implementation.
+>>
+>> Fixing qemu is of course a good idea, but it's not sufficient.
+>
+> I will patch the PSCI back-end in the kernel to issue PSCI_FEATURES calls
+> only if the PSCI version detected is 1.0, therefore solving the issue, it
+> is not necessary according to the specs, but that's belt and braces
+> and sorts this niggle out.
+>
+> I will send a patch shortly to be applied on top of arm-soc drivers/psci.
 
-I've been working on trying to get balloon memory hotplug working for
-ARM64 guest on Xen.
+Thanks!
 
-In order to find a suitable region to hotplug the fake memory, we are
-trying to find a free region within iomem_resource.
+In parallel, since you understandn better what qemu is/isn't doing,
+can you ping the qemu folks about this bug?
 
-But on ARM64, only an handful number of regions are listed in it. For
-instance on X-Gene we have only:
+Thanks,
 
-42sh> cat /proc/iomem
-
-10510000-105103ff : /soc/rtc at 10510000
-1a400000-1a400fff : /soc/sata at 1a400000
-1a800000-1a800fff : /soc/sata at 1a800000
-1f220000-1f220fff : /soc/sata at 1a400000
-1f227000-1f227fff : /soc/sata at 1a400000
-1f22a000-1f22a0ff : /soc/phy at 1f22a000
-1f22d000-1f22dfff : /soc/sata at 1a400000
-1f22e000-1f22efff : /soc/sata at 1a400000
-1f230000-1f230fff : /soc/sata at 1a800000
-1f23a000-1f23a0ff : /soc/phy at 1f23a000
-1f23d000-1f23dfff : /soc/sata at 1a800000
-1f23e000-1f23efff : /soc/sata at 1a800000
-1f2b0000-1f2bffff : csr
-79000000-798fffff : /soc/msi at 79000000
-4100000000-41ffffffff : System RAM
-  4100080000-41008b58a3 : Kernel code
-  410093c000-41009e9fff : Kernel data
-e0d0000000-e0d003ffff : cfg
-
-This is because most of the ARM drivers are using of_iomap which doesn't
-register the region.
-
-Looking to the code, I found a function of_io_request_and_map which
-register the resource and does the mapping. I'm wondering if there is
-any reason to have introduce a new function rather than doing the job in
-of_iomap?
-
-Although, that wouldn't fix all the drivers because some of them are
-directly using ioremap. I've got in mind the initialization of GICv2 for
-ACPI platform.
-
-Is there any way we could register the IO region used on ARM without
-having to enforce it in all the drivers?
-
-Regards,
-
--- 
-Julien Grall
+Kevin
