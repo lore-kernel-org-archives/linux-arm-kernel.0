@@ -1,83 +1,106 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Fri, 23 Oct 2015 16:48:14 +0200
-Subject: [PATCH] arm64/efi: move arm64 specific stub C code to libstub
-Message-ID: <1445611694-31838-1-git-send-email-ard.biesheuvel@linaro.org>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Fri, 23 Oct 2015 15:58:43 +0100
+Subject: [PATCH] drivers: psci: make PSCI 1.0 functions initialization
+ version dependent
+In-Reply-To: <1445611610-12871-1-git-send-email-lorenzo.pieralisi@arm.com>
+References: <1445611610-12871-1-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <562A4B23.6020702@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we added special handling to the C files in libstub, move
-the one remaining arm64 specific EFI stub C file to libstub as
-well, so that it gets the same treatment. This should prevent future
-changes from resulting in binaries that may execute incorrectly in
-UEFI context.
 
-With efi-entry.S the only remaining EFI stub source file under
-arch/arm64, we can also simplify the Makefile logic somewhat.
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
+On 23/10/15 15:46, Lorenzo Pieralisi wrote:
+> The PSCI specifications [1] and the SMC calling convention mandate
+> that unimplemented functions ids must return NOT_SUPPORTED (0xffffffff)
+> if a function id is called but it is not implemented.
+>
+> Consequently, PSCI 1.0 function ids that require the 1.0 PSCI_FEATURES
+> call to be initialized:
+>
+> CPU_SUSPEND (psci_init_cpu_suspend())
+> SYSTEM_SUSPEND (psci_init_system_suspend())
+>
+> call the PSCI_FEATURES function id independently of the detected
+> PSCI firmware version, since, if the PSCI_FEATURES function id is not
+> implemented, it must return NOT_SUPPORTED according to the PSCI
+> specifications, causing the initialization functions to fail as expected.
+>
+> Some existing PSCI implementations (ie Qemu PSCI emulation), do not
+> comply with the SMC calling convention and fail if function ids that are
+> not implemented are called from the OS, causing boot failures.
+>
+> To solve this issue, this patch adds code that checks the PSCI firmware
+> version before calling PSCI 1.0 initialization functions so that the
+> OS makes sure that it is calling 1.0 functions only if the firmware
+> version detected is 1.0 or greater, therefore avoiding PSCI calls
+> that are bound to fail and might cause system boot failures owing
+> to non-compliant PSCI firmware implementations.
+>
+> [1] http://infocenter.arm.com/help/topic/com.arm.doc.den0022c/DEN0022C_Power_State_Coordination_Interface.pdf
+>
+> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: Kevin Hilman <khilman@kernel.org>
+> Cc: Sudeep Holla <sudeep.holla@arm.com>
 
-I would like to suggest that this be taken on top of the stuff that is
-queued for 4.4 at the moment (if it is not too late already).
+Looks good to me(however have alternate thought, see below)
+Acked-by: Sudeep Holla <sudeep.holla@arm.com>
 
- arch/arm64/kernel/Makefile                                                | 9 ++-------
- drivers/firmware/efi/libstub/Makefile                                     | 3 +++
- arch/arm64/kernel/efi-stub.c => drivers/firmware/efi/libstub/arm64-stub.c | 0
- 3 files changed, 5 insertions(+), 7 deletions(-)
+> Cc: Olof Johansson <olof@lixom.net>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> ---
+> Arnd, Kevin, Olof,
+>
+> this applies to current arm-soc drivers/psci branch, and solves the
+> issue Kevin detected through kernelci with Qemu emulation:
+>
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-October/380304.html
+>
+> Tested on:
+>
+> - Juno host
+> - AMD Seattle host
+> - kvmtool arm64 guest (on Juno arm64 defconfig host)
+> - Qemu x86 host (aarch64 emulation)
+>
+> A run on kernelci and consequent tested-by tags would be much appreciated,
+> thanks for spotting this and for your help.
+>
+> Thanks,
+> Lorenzo
+>
+>   drivers/firmware/psci.c | 7 ++++---
+>   1 file changed, 4 insertions(+), 3 deletions(-)
+>
+> diff --git a/drivers/firmware/psci.c b/drivers/firmware/psci.c
+> index 492db42..d24f35d 100644
+> --- a/drivers/firmware/psci.c
+> +++ b/drivers/firmware/psci.c
+> @@ -347,9 +347,10 @@ static int __init psci_probe(void)
+>
+>   	psci_init_migrate();
+>
+> -	psci_init_cpu_suspend();
+> -
+> -	psci_init_system_suspend();
+> +	if (PSCI_VERSION_MAJOR(ver) >= 1) {
 
-diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
-index 1b6bda2ff102..474691f8b13a 100644
---- a/arch/arm64/kernel/Makefile
-+++ b/arch/arm64/kernel/Makefile
-@@ -4,11 +4,8 @@
- 
- CPPFLAGS_vmlinux.lds	:= -DTEXT_OFFSET=$(TEXT_OFFSET)
- AFLAGS_head.o		:= -DTEXT_OFFSET=$(TEXT_OFFSET)
--CFLAGS_efi-stub.o 	:= -DTEXT_OFFSET=$(TEXT_OFFSET)
- CFLAGS_armv8_deprecated.o := -I$(src)
- 
--KASAN_SANITIZE_efi-stub.o	:= n
--
- CFLAGS_REMOVE_ftrace.o = -pg
- CFLAGS_REMOVE_insn.o = -pg
- CFLAGS_REMOVE_return_address.o = -pg
-@@ -22,9 +19,7 @@ arm64-obj-y		:= debug-monitors.o entry.o irq.o fpsimd.o		\
- 			   cpufeature.o alternative.o cacheinfo.o		\
- 			   smp.o smp_spin_table.o topology.o
- 
--stub-obj				:= efi-stub.o efi-entry.o
--extra-y					:= $(stub-obj)
--stub-obj				:= $(patsubst %.o,%.stub.o,$(stub-obj))
-+extra-$(CONFIG_EFI)			:= efi-entry.o
- 
- OBJCOPYFLAGS := --prefix-symbols=__efistub_
- $(obj)/%.stub.o: $(obj)/%.o FORCE
-@@ -42,7 +37,7 @@ arm64-obj-$(CONFIG_CPU_PM)		+= sleep.o suspend.o
- arm64-obj-$(CONFIG_CPU_IDLE)		+= cpuidle.o
- arm64-obj-$(CONFIG_JUMP_LABEL)		+= jump_label.o
- arm64-obj-$(CONFIG_KGDB)		+= kgdb.o
--arm64-obj-$(CONFIG_EFI)			+= efi.o $(stub-obj)
-+arm64-obj-$(CONFIG_EFI)			+= efi.o efi-entry.stub.o
- arm64-obj-$(CONFIG_PCI)			+= pci.o
- arm64-obj-$(CONFIG_ARMV8_DEPRECATED)	+= armv8_deprecated.o
- arm64-obj-$(CONFIG_ACPI)		+= acpi.o
-diff --git a/drivers/firmware/efi/libstub/Makefile b/drivers/firmware/efi/libstub/Makefile
-index bca9a76cbd33..92ae557abbbc 100644
---- a/drivers/firmware/efi/libstub/Makefile
-+++ b/drivers/firmware/efi/libstub/Makefile
-@@ -34,6 +34,9 @@ $(obj)/lib-%.o: $(srctree)/lib/%.c FORCE
- lib-$(CONFIG_EFI_ARMSTUB)	+= arm-stub.o fdt.o string.o \
- 				   $(patsubst %.c,lib-%.o,$(arm-deps))
- 
-+lib-$(CONFIG_ARM64)		+= arm64-stub.o
-+CFLAGS_arm64-stub.o 		:= -DTEXT_OFFSET=$(TEXT_OFFSET)
-+
- #
- # arm64 puts the stub in the kernel proper, which will unnecessarily retain all
- # code indefinitely unless it is annotated as __init/__initdata/__initconst etc.
-diff --git a/arch/arm64/kernel/efi-stub.c b/drivers/firmware/efi/libstub/arm64-stub.c
-similarity index 100%
-rename from arch/arm64/kernel/efi-stub.c
-rename to drivers/firmware/efi/libstub/arm64-stub.c
+Alternatively we can just add this check in psci_features function and
+return PSCI_RET_NOT_SUPPORTED if PSCI_VERSION_MAJOR(ver) < 1. New
+callers of psci_features are also protected and need not add checks@
+call sites. Thoughts ?
+
+I am fine with this patch as is and don't have a strong opinion.
+
+> +		psci_init_cpu_suspend();
+> +		psci_init_system_suspend();
+> +	}
+>
+>   	return 0;
+>   }
+>
+
 -- 
-2.1.4
+Regards,
+Sudeep
