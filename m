@@ -1,26 +1,66 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 23 Oct 2015 22:00:37 +0200
-Subject: [PATCH 0/5] ARM: dts: fix cpu compatible values
-In-Reply-To: <5625303C.6090902@mleia.com>
-References: <1443202506-13732-1-git-send-email-vz@mleia.com>
- <5625303C.6090902@mleia.com>
-Message-ID: <6261588.UmaTDKo2vv@wuerfel>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Fri, 23 Oct 2015 13:01:50 -0700
+Subject: [PATCH v3 2/4] lib: iomap_copy: Add __ioread32_copy()
+In-Reply-To: <1445630512-10888-1-git-send-email-sboyd@codeaurora.org>
+References: <1445630512-10888-1-git-send-email-sboyd@codeaurora.org>
+Message-ID: <1445630512-10888-3-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 19 October 2015 21:02:36 Vladimir Zapolskiy wrote:
-> On 25.09.2015 20:35, Vladimir Zapolskiy wrote:
-> > The changeset corrects severeal cpu compatible properties
-> > to defined ones in Documentation/devicetree/bindings/arm/cpus.txt
-> > 
-> > Vladimir Zapolskiy (5):
-> >   ARM: dts: i.MX31: fix cpu compatible value
-> >   ARM: dts: i.MX35: fix cpu compatible value
-> 
-> Ping. Two patches above are applied by Shawn, could ARM maintainers
-> apply the rest? Thank you in advance.
-> 
+Some drivers need to read data out of iomem areas 32-bits at a
+time. Add an API to do this.
 
-Applied the missing two as well now, thanks for the fixes!
+Cc: Bjorn Andersson <bjorn.andersson@sonymobile.com>
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+---
+ include/linux/io.h |  1 +
+ lib/iomap_copy.c   | 21 +++++++++++++++++++++
+ 2 files changed, 22 insertions(+)
 
-	Arnd
+diff --git a/include/linux/io.h b/include/linux/io.h
+index de64c1e53612..72c35e0a41d1 100644
+--- a/include/linux/io.h
++++ b/include/linux/io.h
+@@ -29,6 +29,7 @@ struct device;
+ struct resource;
+ 
+ __visible void __iowrite32_copy(void __iomem *to, const void *from, size_t count);
++void __ioread32_copy(void *to, const void __iomem *from, size_t count);
+ void __iowrite64_copy(void __iomem *to, const void *from, size_t count);
+ 
+ #ifdef CONFIG_MMU
+diff --git a/lib/iomap_copy.c b/lib/iomap_copy.c
+index 4527e751b5e0..b8f1d6cbb200 100644
+--- a/lib/iomap_copy.c
++++ b/lib/iomap_copy.c
+@@ -42,6 +42,27 @@ void __attribute__((weak)) __iowrite32_copy(void __iomem *to,
+ EXPORT_SYMBOL_GPL(__iowrite32_copy);
+ 
+ /**
++ * __ioread32_copy - copy data from MMIO space, in 32-bit units
++ * @to: destination (must be 32-bit aligned)
++ * @from: source, in MMIO space (must be 32-bit aligned)
++ * @count: number of 32-bit quantities to copy
++ *
++ * Copy data from MMIO space to kernel space, in units of 32 bits at a
++ * time.  Order of access is not guaranteed, nor is a memory barrier
++ * performed afterwards.
++ */
++void __ioread32_copy(void *to, const void __iomem *from, size_t count)
++{
++	u32 *dst = to;
++	const u32 __iomem *src = from;
++	const u32 __iomem *end = src + count;
++
++	while (src < end)
++		*dst++ = __raw_readl(src++);
++}
++EXPORT_SYMBOL_GPL(__ioread32_copy);
++
++/**
+  * __iowrite64_copy - copy data to MMIO space, in 64-bit or 32-bit units
+  * @to: destination, in MMIO space (must be 64-bit aligned)
+  * @from: source (must be 64-bit aligned)
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
