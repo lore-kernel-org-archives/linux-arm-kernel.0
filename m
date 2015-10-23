@@ -1,54 +1,36 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 23 Oct 2015 17:41:43 +0200
-Subject: [GIT PULL v2] ARM: mvebu: soc for v4.4 (#2)
-Message-ID: <877fmd383s.fsf@free-electrons.com>
+From: ian.campbell@citrix.com (Ian Campbell)
+Date: Fri, 23 Oct 2015 16:45:12 +0100
+Subject: arm64: iomem_resource doesn't contain all the region used
+In-Reply-To: <562A4B0F.2020603@citrix.com>
+References: <562A4B0F.2020603@citrix.com>
+Message-ID: <1445615112.2374.226.camel@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Fri, 2015-10-23 at 15:58 +0100, Julien Grall wrote:
+> Is there any way we could register the IO region used on ARM without
+> having to enforce it in all the drivers?
 
-Here is the second tentative of the second pull request for soc for
-mvebu for v4.4. :)
+This seems like an uphill battle to me.
 
-The difference with the previous one was the "ARM:
-mvebu: add broken-idle option" patch updated according Olof's remark.
+Why not do as I suggested IRL yesterday and expose the map of "potential
+RAM" addresses to the guest as well as the "actual RAM" addresses in the
+regular memory properties.
 
-Gregory
+i.e. explicitly expose the holes where RAM can be hotplugged later.
 
-The following changes since commit d492cccac28493f26bb70038385a9ef4df19bdee:
+This is even analogous to a native memory hotplug case, which AIUI
+similarly involves the provisioning of specific address space where RAM
+might plausibly appear in the future (I don't think physical memory hotplug
+involves searching for free PA space and hoping for the best, although
+strange things have happened I guess).
 
-  ARM: mvebu: add support to clear shared L2 bit on Armada XP (2015-09-29 15:31:51 +0200)
+With any luck you would be able to steal or define the bindings in terms of
+the native hotplug case rather than inventing some Xen specific thing.
 
-are available in the git repository at:
+In terms of dom0 the "potential" RAM is the host's actual RAM banks.
 
-  git://git.infradead.org/linux-mvebu.git tags/mvebu-soc-4.4-2
+In terms of domU the "potential" RAM is defined by the domain builder
+layout (currently the two banks mentioned in Xen's arch-arm.h).
 
-for you to fetch changes up to 9d2ea95a599a80b08cc802f044626ea2701aade9:
-
-  ARM: mvebu: add broken-idle option (2015-10-23 17:34:37 +0200)
-
-----------------------------------------------------------------
-mvebu soc for 4.4 (part 2)
-
-- Use mac_pton() helper in the oropn5x board instead of duplicating it
-- Add the broken-idle option allowing to boot boards with a mistake in
-  the hardware design
-
-----------------------------------------------------------------
-Andy Shevchenko (1):
-      ARM: orion5x: use mac_pton() helper
-
-Vincent Donnefort (1):
-      ARM: mvebu: add broken-idle option
-
- .../devicetree/bindings/arm/coherency-fabric.txt   |  5 ++
- arch/arm/mach-mvebu/pmsu.c                         | 29 ++++++++++--
- arch/arm/mach-orion5x/Kconfig                      |  3 ++
- arch/arm/mach-orion5x/dns323-setup.c               | 53 ++--------------------
- arch/arm/mach-orion5x/tsx09-common.c               | 49 ++------------------
- 5 files changed, 41 insertions(+), 98 deletions(-)
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Ian.
