@@ -1,63 +1,79 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Thu, 22 Oct 2015 22:48:42 -0700
-Subject: [PATCH] pinctrl-zynq: Initialize early
-In-Reply-To: <5629C8F3.2080004@topic.nl>
-References: <1445513420-23527-1-git-send-email-mike.looijmans@topic.nl>
- <20151022160733.GH5257@xsjsorenbubuntu> <5629C62D.8030804@topic.nl>
- <5629C8F3.2080004@topic.nl>
-Message-ID: <20151023054842.GV5257@xsjsorenbubuntu>
+From: Minghuan.Lian@freescale.com (Lian M.H.)
+Date: Fri, 23 Oct 2015 06:02:49 +0000
+Subject: [PATCH v4 5/6] PCI: layerscape: add PCIe support for LS1043a and
+ LS2080a
+In-Reply-To: <CADRPPNQoyzfr=bHOaVRrdxDmamUtTOfJOn=G9bQ=tGrB8b2Z4A@mail.gmail.com>
+References: <1444979960-24100-1-git-send-email-Minghuan.Lian@freescale.com>
+ <1444979960-24100-5-git-send-email-Minghuan.Lian@freescale.com>
+ <20151021213612.GK1583@localhost>
+ <CADRPPNSPP1m_7zNF6wEfw9+Bpe=Z_gUA81cSaV4SENVpR34YWQ@mail.gmail.com>
+ <20151022180813.GA25693@localhost>
+ <CADRPPNQoyzfr=bHOaVRrdxDmamUtTOfJOn=G9bQ=tGrB8b2Z4A@mail.gmail.com>
+Message-ID: <DM2PR0301MB064039AF2A51F940B9C7A025E2260@DM2PR0301MB0640.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2015-10-23 at 07:43AM +0200, Mike Looijmans wrote:
-> On 23-10-15 07:31, Mike Looijmans wrote:
-> >On 22-10-15 18:07, S?ren Brinkmann wrote:
-> >>Hi Mike,
-> >>
-> >>On Thu, 2015-10-22 at 01:30PM +0200, Mike Looijmans wrote:
-> >>>Supplying pinmux configuration for e.g. gpio pins leads to deferred
-> >>>probes because the pinctrl device is probed much later than gpio.
-> >>>Move the init call to a much earlier stage so it probes before the
-> >>>devices that may need it.
-> >>>
-> >>>Signed-off-by: Mike Looijmans <mike.looijmans@topic.nl>
-> >>
-> >>in general, the change should be OK, but neither on zc702 nor zc706 do I
-> >>see a difference in respect to deferred probes. With and without the
-> >>patch I see:
-> >>     root at zynq:~# dmesg | grep -i defer
-> >>     [    0.097021] zynq-gpio e000a000.gpio: could not find pctldev for node
-> >>/amba/slcr at f8000000/pinctrl at 700/gpio0-default, deferring probe
-> >>     root at zynq:~#
-> >>
-> >>If you have a case this patch improves things though, feel free to add my
-> >>Tested-by: S?ren Brinkmann <soren.brinkmann@xilinx.com>
-> >>
+Hi Bjorn and Leo,
+
+> -----Original Message-----
+> From: pku.leo at gmail.com [mailto:pku.leo at gmail.com] On Behalf Of Li Yang
+> Sent: Friday, October 23, 2015 3:18 AM
+> To: Bjorn Helgaas <helgaas@kernel.org>
+> Cc: Arnd Bergmann <arnd@arndb.de>; linux-pci at vger.kernel.org; Jingoo Han
+> <jg1.han@samsung.com>; Hu Mingkai-B21284 <Mingkai.Hu@freescale.com>;
+> Zang Roy-R61911 <tie-fei.zang@freescale.com>; Yoder Stuart-B08248
+> <stuart.yoder@freescale.com>; Lian Minghuan-B31939
+> <Minghuan.Lian@freescale.com>; Zhou Wang <wangzhou1@hisilicon.com>;
+> Bjorn Helgaas <bhelgaas@google.com>; linux-arm-kernel at lists.infradead.org
+> Subject: Re: [PATCH v4 5/6] PCI: layerscape: add PCIe support for LS1043a and
+> LS2080a
+> 
+> On Thu, Oct 22, 2015 at 1:08 PM, Bjorn Helgaas <helgaas@kernel.org> wrote:
+> > Hi Leo,
 > >
-> >On the Florida boards there are i2c controlled clocks, power supplies and
-> >reset signals. Replacing the Cadence I2C controller with a GPIO-bitbang
-> >controller solved the I2C problems but caused a storm of dozens of deferred
-> >probes because of the pinmux driver arriving even after the first probe
-> >attempt of the i2c bus driver. Moving the pinmux driver to an earlier stage
-> >solved that problem neatly, now the "zynq-pinctrl 700.pinctrl: zynq pinctrl
-> >initialized" message appears after the OCM driver.
-> >Judging from your comment the GPIO driver still probes earlier (I don't have
-> >any GPIO-only pinmuxes yet), so maybe we should amend the patch to probe even
-> >earlier. The pinmux driver doesn't depend on anything, so it can potentially
-> >probe very early. What do you think?
+> > On Thu, Oct 22, 2015 at 12:38:48PM -0500, Li Yang wrote:
+> >> On Wed, Oct 21, 2015 at 4:36 PM, Bjorn Helgaas <helgaas@kernel.org>
+> wrote:
+> >> > On Fri, Oct 16, 2015 at 03:19:19PM +0800, Minghuan Lian wrote:
+> >> >> Both LS1043a and LS2080a are based on ARMv8 64-bit architecture
+> >> >> and have similar PCIe implementation. LUT is added to controller.
+> >> >> The patch removes the necessary fields from struct ls_pcie.
+> >> >>
+> >> >> Signed-off-by: Minghuan Lian <Minghuan.Lian@freescale.com>
+> >> >> ---
+> >> >> This patch is based on v4.3-rc4 and [PATCH v10 3/6]
+> >> >> PCI: designware: Add ARM64 support.
+> >>
+> >> Hi Bjorn,
+> >>
+> >> Are you also applying this patch
+> >> https://patchwork.ozlabs.org/patch/531184/ in this merge windows?
+> >> Because the new hardware can only work with the generic ARM64 support
+> >> added in the designware pcie driver.
+> >
+> > I'm reviewing that patch right now, and I do hope to apply it for
+> > v4.4.
+> >
+> > There was no cover letter for this series (Minghuan's Layerscape v4
+> > series), and I didn't see any mention of dependencies, so I applied it
+> > on top of v4.3-rc1.  Is that the wrong thing to do?  If it depends on
+> > the Zhou's v11 series, I can hold the Layerscape branch until after
+> > that.
 > 
-> Minor addition:
-> The gpio-zynq driver probes at "postcore_initcall", so to beat that, the
-> zynq-pinmux driver should move to "core_initcall" (instead of
-> "arch_initcall"). That would make the gpio deferral go away.
+> I don't know if this patch will break anything without Zhou's patch.
+> But the new hardware mentioned in the description will not be working without
+> the dependent patch.  We should hold this patch until after the generic
+> change is merged.  Minghuan, are there any bug fixing patch in the series that
+> need to be merged earlier?
 > 
-> An alternative would be to move the gpio driver to "arch", then "postcore"
-> would be enough for the pinmux. If the gpio probe gets deferred, it
-> apparently has already been moved to below "subsys" already, with aparently
-> no ill effects.
+[Lian Minghuan-B31939] [PATCH v4 5/6] PCI: layerscape: add PCIe support for LS1043a and LS2080a] depended on Zhou's patch. I have described this in this patch. Actually, without zhou's patch, pci_layerscape.c can also be compiled and works well for LS1021A arm32 architecture, just do not support arm64 architecture. 
 
-Makes me wonder whether a single deferred probe is worth the risk of
-breaking something by moving these things around. But probably worth a
-try.
+Thank Bjorn very much, all the PCIe patches have been applied except MSI related patches.
 
-	S?ren
+Thanks,
+Minghuan
+ 
+
+
+> Regards,
+> Leo
