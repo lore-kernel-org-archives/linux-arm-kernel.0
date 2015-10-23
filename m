@@ -1,406 +1,71 @@
-From: bhupesh.sharma@freescale.com (Bhupesh Sharma)
-Date: Sat, 24 Oct 2015 01:02:00 +0530
-Subject: [PATCH v4 11/12] dts/ls2080a: Add DTS support for LS2080a QDS & RDB
- boards
-In-Reply-To: <1445628721-10483-1-git-send-email-bhupesh.sharma@freescale.com>
-References: <1445628721-10483-1-git-send-email-bhupesh.sharma@freescale.com>
-Message-ID: <1445628721-10483-12-git-send-email-bhupesh.sharma@freescale.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Fri, 23 Oct 2015 19:58:04 +0000 (UTC)
+Subject: [GIT PULL] ARM: OMAP2+: hwmod cleanup for v4.4
+Message-ID: <alpine.DEB.2.02.1510231957310.9575@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the LS2080a DTS files for QDS and RDB boards
-which support the LS2080a SoC.
+-----BEGIN PGP SIGNED MESSAGE-----
+Hash: SHA1
 
-Signed-off-by: Bhupesh Sharma <bhupesh.sharma@freescale.com>
-Signed-off-by: Scott Wood <scottwood@freescale.com>
----
- arch/arm64/boot/dts/freescale/fsl-ls2080a-qds.dts |  204 +++++++++++++++++++++
- arch/arm64/boot/dts/freescale/fsl-ls2080a-rdb.dts |  166 +++++++++++++++++
- 2 files changed, 370 insertions(+)
- create mode 100644 arch/arm64/boot/dts/freescale/fsl-ls2080a-qds.dts
- create mode 100644 arch/arm64/boot/dts/freescale/fsl-ls2080a-rdb.dts
+Hi Tony
 
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls2080a-qds.dts b/arch/arm64/boot/dts/freescale/fsl-ls2080a-qds.dts
-new file mode 100644
-index 0000000..4cb996d
---- /dev/null
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls2080a-qds.dts
-@@ -0,0 +1,204 @@
-+/*
-+ * Device Tree file for Freescale LS2080a QDS Board.
-+ *
-+ * Copyright (C) 2015, Freescale Semiconductor
-+ *
-+ * Bhupesh Sharma <bhupesh.sharma@freescale.com>
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPLv2 or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This library is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This library is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+/dts-v1/;
-+
-+/include/ "fsl-ls2080a.dtsi"
-+
-+/ {
-+	model = "Freescale Layerscape 2080a QDS Board";
-+	compatible = "fsl,ls2080a-qds", "fsl,ls2080a";
-+
-+	aliases {
-+		serial0 = &serial0;
-+		serial1 = &serial1;
-+	};
-+
-+};
-+
-+&esdhc {
-+	status = "okay";
-+};
-+
-+&ifc {
-+	status = "okay";
-+	#address-cells = <2>;
-+	#size-cells = <1>;
-+	ranges = <0x0 0x0 0x5 0x80000000 0x08000000
-+		  0x2 0x0 0x5 0x30000000 0x00010000
-+		  0x3 0x0 0x5 0x20000000 0x00010000>;
-+
-+	nor at 0,0 {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		compatible = "cfi-flash";
-+		reg = <0x0 0x0 0x8000000>;
-+		bank-width = <2>;
-+		device-width = <1>;
-+	};
-+
-+	nand at 2,0 {
-+	     compatible = "fsl,ifc-nand";
-+	     reg = <0x2 0x0 0x10000>;
-+	};
-+
-+	cpld at 3,0 {
-+	     reg = <0x3 0x0 0x10000>;
-+	     compatible = "fsl,ls2080aqds-fpga", "fsl,fpga-qixis";
-+	};
-+};
-+
-+&i2c0 {
-+	status = "okay";
-+	pca9547 at 77 {
-+		compatible = "nxp,pca9547";
-+		reg = <0x77>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		i2c at 0 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <0x00>;
-+			rtc at 68 {
-+				compatible = "dallas,ds3232";
-+				reg = <0x68>;
-+			};
-+		};
-+
-+		i2c at 2 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <0x02>;
-+
-+			ina220 at 40 {
-+				compatible = "ti,ina220";
-+				reg = <0x40>;
-+				shunt-resistor = <500>;
-+			};
-+
-+			ina220 at 41 {
-+				compatible = "ti,ina220";
-+				reg = <0x41>;
-+				shunt-resistor = <1000>;
-+			};
-+		};
-+
-+		i2c at 3 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <0x3>;
-+
-+			adt7481 at 4c {
-+				compatible = "adi,adt7461";
-+				reg = <0x4c>;
-+			};
-+		};
-+	};
-+};
-+
-+&i2c1 {
-+	status = "disabled";
-+};
-+
-+&i2c2 {
-+	status = "disabled";
-+};
-+
-+&i2c3 {
-+	status = "disabled";
-+};
-+
-+&dspi {
-+	status = "okay";
-+	dflash0: n25q128a {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		compatible = "st,m25p80";
-+		spi-max-frequency = <3000000>;
-+		reg = <0>;
-+	};
-+	dflash1: sst25wf040b {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		compatible = "st,m25p80";
-+		spi-max-frequency = <3000000>;
-+		reg = <1>;
-+	};
-+	dflash2: en25s64 {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		compatible = "st,m25p80";
-+		spi-max-frequency = <3000000>;
-+		reg = <2>;
-+	};
-+};
-+
-+&qspi {
-+	status = "okay";
-+	qflash0: s25fl008k {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		compatible = "st,m25p80";
-+		spi-max-frequency = <20000000>;
-+		reg = <0>;
-+	};
-+};
-+
-+&sata0 {
-+	status = "okay";
-+};
-+
-+&sata1 {
-+	status = "okay";
-+};
-+
-+&usb0 {
-+	status = "okay";
-+};
-+
-+&usb1 {
-+	status = "okay";
-+};
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls2080a-rdb.dts b/arch/arm64/boot/dts/freescale/fsl-ls2080a-rdb.dts
-new file mode 100644
-index 0000000..e127f0b
---- /dev/null
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls2080a-rdb.dts
-@@ -0,0 +1,166 @@
-+/*
-+ * Device Tree file for Freescale LS2080a RDB Board.
-+ *
-+ * Copyright (C) 2015, Freescale Semiconductor
-+ *
-+ * Bhupesh Sharma <bhupesh.sharma@freescale.com>
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPLv2 or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This library is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This library is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+/dts-v1/;
-+
-+/include/ "fsl-ls2080a.dtsi"
-+
-+/ {
-+	model = "Freescale Layerscape 2080a RDB Board";
-+	compatible = "fsl,ls2080a-rdb", "fsl,ls2080a";
-+
-+	aliases {
-+		serial0 = &serial0;
-+		serial1 = &serial1;
-+	};
-+};
-+
-+&esdhc {
-+	status = "okay";
-+};
-+
-+&ifc {
-+	status = "okay";
-+	#address-cells = <2>;
-+	#size-cells = <1>;
-+	ranges = <0x0 0x0 0x5 0x80000000 0x08000000
-+		  0x2 0x0 0x5 0x30000000 0x00010000
-+		  0x3 0x0 0x5 0x20000000 0x00010000>;
-+
-+	nor at 0,0 {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		compatible = "cfi-flash";
-+		reg = <0x0 0x0 0x8000000>;
-+		bank-width = <2>;
-+		device-width = <1>;
-+	};
-+
-+	nand at 2,0 {
-+	     compatible = "fsl,ifc-nand";
-+	     reg = <0x2 0x0 0x10000>;
-+	};
-+
-+	cpld at 3,0 {
-+	     reg = <0x3 0x0 0x10000>;
-+	     compatible = "fsl,ls2080aqds-fpga", "fsl,fpga-qixis";
-+	};
-+
-+};
-+
-+&i2c0 {
-+	status = "okay";
-+	pca9547 at 75 {
-+		compatible = "nxp,pca9547";
-+		reg = <0x75>;
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		status = "disabled";
-+		i2c at 1 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <0x01>;
-+			rtc at 68 {
-+				compatible = "dallas,ds3232";
-+				reg = <0x68>;
-+			};
-+		};
-+
-+		i2c at 3 {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			reg = <0x3>;
-+
-+			adt7481 at 4c {
-+				compatible = "adi,adt7461";
-+				reg = <0x4c>;
-+			};
-+		};
-+	};
-+};
-+
-+&i2c1 {
-+	status = "disabled";
-+};
-+
-+&i2c2 {
-+	status = "disabled";
-+};
-+
-+&i2c3 {
-+	status = "disabled";
-+};
-+
-+&dspi {
-+	status = "okay";
-+	dflash0: n25q512a {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		compatible = "st,m25p80";
-+		spi-max-frequency = <3000000>;
-+		reg = <0>;
-+	};
-+};
-+
-+&qspi {
-+	status = "disabled";
-+};
-+
-+&sata0 {
-+	status = "okay";
-+};
-+
-+&sata1 {
-+	status = "okay";
-+};
-+
-+&usb0 {
-+	status = "okay";
-+};
-+
-+&usb1 {
-+	status = "okay";
-+};
--- 
-1.7.9.5
+The following changes since commit 049e6dde7e57f0054fdc49102e7ef4830c698b46:
+
+  Linux 4.3-rc4 (2015-10-04 16:57:17 +0100)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending.git tags/for-v4.4/omap-hwmod-cleanup-a
+
+for you to fetch changes up to c4384a97af852121f66e52ba96e98d6f13ad19eb:
+
+  ARM: OMAP3: hwmod data: Remove legacy mailbox data and addrs (2015-10-23 13:01:25 -0600)
+
+- ----------------------------------------------------------------
+ARM: OMAP2+: hwmod cleanup for v4.4
+
+Remove some superfluous data from the OMAP2+ hwmod data files.  Mostly
+this is a result of data being moved to DT files.  Nothing too
+controversial, here.
+
+Basic build, boot, and PM test results are available here:
+
+http://www.pwsan.com/omap/testlogs/hwmod-cleanup-a-for-v4.4/20151023130140/
+
+- ----------------------------------------------------------------
+Franklin S Cooper Jr (2):
+      ARM: DRA7/AM335x/AM437x: hwmod: Remove elm address space from hwmod data
+      ARM: DRA7/AM335x/AM437x: hwmod: Remove gpmc address space from hwmod data
+
+Javier Martinez Canillas (1):
+      ARM: OMAP: Remove duplicated operand in OR operation
+
+Suman Anna (3):
+      ARM: OMAP4: hwmod data: Remove spinlock hwmod addrs
+      ARM: DRA7: hwmod data: Remove spinlock hwmod addrs
+      ARM: OMAP3: hwmod data: Remove legacy mailbox data and addrs
+
+ .../omap_hwmod_33xx_43xx_interconnect_data.c       | 20 ---------------
+ arch/arm/mach-omap2/omap_hwmod_3xxx_data.c         | 29 ---------------------
+ arch/arm/mach-omap2/omap_hwmod_44xx_data.c         | 10 --------
+ arch/arm/mach-omap2/omap_hwmod_54xx_data.c         |  3 +--
+ arch/arm/mach-omap2/omap_hwmod_7xx_data.c          | 30 ----------------------
+ 5 files changed, 1 insertion(+), 91 deletions(-)
+-----BEGIN PGP SIGNATURE-----
+Version: GnuPG v1
+
+iQIcBAEBAgAGBQJWKpEYAAoJEMePsQ0LvSpLYf0P/3TFvwtzWalFbYbNdvBZ67q2
+MLuA/cow3OXOsvVLwPKtfn60Z/wW4u/juUFpuL/1zTmcoFOiQe9Sx1FpI8W1YqXY
+zAbRLqbkHip/QUsAEEMjDqbQwWacNmpwChG1tCn7Ji9govi/oP3lYa+GzRXPyone
+NqhpwW7cV/OjgoKR8yxFEkdGdZT3I3EO2s0SyULJ+zYvrOSGHwX5SKNhh5Nd6iQV
+NbkiHuGospSoY9GHDHESaqabgto4l2XALN5N0fuWAmgeNjeQIwo5wLnGZFU2gHMH
++zZ8inQ+RTtIJfMRNwlr8BJVHKOf20dVEZsPGypxt/H+Sg2I68hoxojDPlrRClLn
+K5G4PCwnPBGj/f4UM4oiWBV+qbp26WlSed1CgeS1CJZ2wZM+uDhnYBy29JI3PGz1
+Mcov9FRKP06GcRTORC3q2uOuLTDWg+KAff9BidDO6oZR/UAwd+brKsfNWHYGlU8T
+n5r9LCkyF0Sk5aGcYizYMO7Nmh+LrDhm7SKbsI6vI8cZUbabuNp3tN4BEmtceh7h
+yzqj1Oe+MTmsNOwNSwApckkLAHrvMtDCB0dKEbjtwbFXvMftgd8RPESlxD1TJu2F
+H1gSWu+aVJx8J5GeFc9kLF4S8Nz6RdwbmYluqMWBaN8tGi75pEdjipI+f3Y6Iu/U
+/sm0vwOxTne0TkBbfhjK
+=PPb6
+-----END PGP SIGNATURE-----
