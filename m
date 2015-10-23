@@ -1,209 +1,132 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Fri, 23 Oct 2015 11:26:40 +0800
-Subject: [PATCH v3 2/2] simplefb: Claim and enable regulators
-In-Reply-To: <1445563918-1050-3-git-send-email-wens@csie.org>
-References: <1445563918-1050-1-git-send-email-wens@csie.org>
- <1445563918-1050-3-git-send-email-wens@csie.org>
-Message-ID: <CAGb2v64NvjqDtfQ22wfU6N33PBmCkdughcBBR1ew4fLJt19bjQ@mail.gmail.com>
+From: Minghuan.Lian@freescale.com (Lian M.H.)
+Date: Fri, 23 Oct 2015 03:39:54 +0000
+Subject: [PATCH v4 6/6] PCI: layerscape: add ls_pcie_msi_host_init
+In-Reply-To: <20151022162130.GA21237@localhost>
+References: <1444979960-24100-1-git-send-email-Minghuan.Lian@freescale.com>
+ <1444979960-24100-6-git-send-email-Minghuan.Lian@freescale.com>
+ <20151021213416.GJ1583@localhost> <20151022162130.GA21237@localhost>
+Message-ID: <DM2PR0301MB06403E78768B58BF62780AD4E2260@DM2PR0301MB0640.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 23, 2015 at 9:31 AM, Chen-Yu Tsai <wens@csie.org> wrote:
-> This claims and enables regulators listed in the simple framebuffer dt
-> node. This is needed so that regulators powering the display pipeline
-> and external hardware, described in the device node and known by the
-> kernel code, will remain properly enabled.
->
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> Reviewed-by: Hans de Goede <hdegoede@redhat.com>
-> Acked-by: Mark Brown <broonie@kernel.org>
-> ---
->  drivers/video/fbdev/simplefb.c | 120 ++++++++++++++++++++++++++++++++++++++++-
->  1 file changed, 119 insertions(+), 1 deletion(-)
->
-> diff --git a/drivers/video/fbdev/simplefb.c b/drivers/video/fbdev/simplefb.c
-> index 52c5c7e63b52..9de34ee15ac0 100644
-> --- a/drivers/video/fbdev/simplefb.c
-> +++ b/drivers/video/fbdev/simplefb.c
-> @@ -28,7 +28,10 @@
->  #include <linux/platform_device.h>
->  #include <linux/clk.h>
->  #include <linux/clk-provider.h>
-> +#include <linux/of.h>
->  #include <linux/of_platform.h>
-> +#include <linux/parser.h>
-> +#include <linux/regulator/consumer.h>
->
->  static struct fb_fix_screeninfo simplefb_fix = {
->         .id             = "simple",
-> @@ -174,6 +177,10 @@ struct simplefb_par {
->         int clk_count;
->         struct clk **clks;
->  #endif
-> +#if defined CONFIG_OF && defined CONFIG_REGULATOR
-> +       u32 regulator_count;
-> +       struct regulator **regulators;
-> +#endif
->  };
->
->  #if defined CONFIG_OF && defined CONFIG_COMMON_CLK
-> @@ -269,6 +276,110 @@ static int simplefb_clocks_init(struct simplefb_par *par,
->  static void simplefb_clocks_destroy(struct simplefb_par *par) { }
->  #endif
->
-> +#if defined CONFIG_OF && defined CONFIG_REGULATOR
-> +
-> +#define SUPPLY_SUFFIX "-supply"
-> +
-> +/*
-> + * Regulator handling code.
-> + *
-> + * Here we handle the num-supplies and vin*-supply properties of our
-> + * "simple-framebuffer" dt node. This is necessary so that we can make sure
-> + * that any regulators needed by the display hardware that the bootloader
-> + * set up for us (and for which it provided a simplefb dt node), stay up,
-> + * for the life of the simplefb driver.
-> + *
-> + * When the driver unloads, we cleanly disable, and then release the
-> + * regulators.
-> + *
-> + * We only complain about errors here, no action is taken as the most likely
-> + * error can only happen due to a mismatch between the bootloader which set
-> + * up simplefb, and the regulator definitions in the device tree. Chances are
-> + * that there are no adverse effects, and if there are, a clean teardown of
-> + * the fb probe will not help us much either. So just complain and carry on,
-> + * and hope that the user actually gets a working fb at the end of things.
-> + */
-> +static int simplefb_regulators_init(struct simplefb_par *par,
-> +       struct platform_device *pdev)
-> +{
-> +       struct device_node *np = pdev->dev.of_node;
-> +       struct property *prop;
-> +       struct regulator *regulator;
-> +       const char *p;
-> +       int count = 0, i = 0, ret;
-> +
-> +       if (dev_get_platdata(&pdev->dev) || !np)
-> +               return 0;
-> +
-> +       /* Count the number of regulator supplies */
-> +       for_each_property_of_node(np, prop) {
-> +               p = strstr(prop->name, SUPPLY_SUFFIX);
-> +               if (p && p != prop->name)
-> +                       count++;
-> +       }
-> +
-> +       if (!count)
-> +               return 0;
-> +
-> +       par->regulators = devm_kcalloc(&pdev->dev, count,
-> +                                      sizeof(struct regulator *), GFP_KERNEL);
-> +       if (!par->regulators)
-> +               return -ENOMEM;
-> +
-> +       /* Get all the regulators */
-> +       for_each_property_of_node(np, prop) {
-> +               char name[32]; /* 32 is max size of property name */
-> +
-> +               p = strstr(prop->name, SUPPLY_SUFFIX);
-> +               if (p && p != prop->name)
+Hi Bjorn,
 
-Sorry, the test is completely reversed here.
+I am sorry, I just change to outlook as email client instead of thunderbird.
+And I changed email type to plain text but forgot to check code type. Now, I have updated the options and hope it is ok.
 
-> +                       continue;
-> +
-> +               strlcpy(name, prop->name,
-> +                       strlen(prop->name) - sizeof(SUPPLY_SUFFIX) + 1);
 
-And string length is off by 1 due to using sizeof here.
+> -----Original Message-----
+> From: Bjorn Helgaas [mailto:helgaas at kernel.org]
+> Sent: Friday, October 23, 2015 12:22 AM
+> To: Lian Minghuan-B31939 <Minghuan.Lian@freescale.com>
+> Cc: linux-pci at vger.kernel.org; linux-arm-kernel at lists.infradead.org; Zang
+> Roy-R61911 <tie-fei.zang@freescale.com>; Hu Mingkai-B21284
+> <Mingkai.Hu@freescale.com>; Yoder Stuart-B08248
+> <stuart.yoder@freescale.com>; Li Yang-Leo-R58472 <LeoLi@freescale.com>;
+> Arnd Bergmann <arnd@arndb.de>; Bjorn Helgaas <bhelgaas@google.com>;
+> Jingoo Han <jg1.han@samsung.com>; Zhou Wang
+> <wangzhou1@hisilicon.com>; Thomas Gleixner <tglx@linutronix.de>
+> Subject: Re: [PATCH v4 6/6] PCI: layerscape: add ls_pcie_msi_host_init
+> 
+> [+cc Thomas for MSI driver file placement question + PCI MSI driver structure]
+> 
+> Hi Minghuan,
+> 
+> Your reply was base64-encoded and thus rejected by the vger mailing lists.
+> I mentioned this before
+> (http://lkml.kernel.org/r/20151011191027.GA29221 at localhost).   You might
+> want to fix your mail strategy, because it's really hard to carry on a
+> conversation if nobody can hear your side :)
+> 
+> But I'll include your response here again by hand.
+> 
+> Minghuan wrote:
+> > On Wed, Oct 21, 2015 at 04:34:16PM -0500, Bjorn Helgaas wrote:
+> > > Hi Minghuan,
+> > >
+> > > On Fri, Oct 16, 2015 at 03:19:20PM +0800, Minghuan Lian wrote:
+> > > > Layerscape PCIe has its own MSI implementation. The patch
+> > > > registers
+> > > > ls_pcie_msi_host_init() to avoid using Designware's MSI.
+> > > >
+> > > > Signed-off-by: Minghuan Lian <Minghuan.Lian@freescale.com>
+> > > > ---
+> > > > Change log
+> > > > v4: split from [PATCH v3] PCI: layerscape: Add PCIe support for
+> > > > LS1043a and LS2080a
+> > > >
+> > > >  drivers/pci/host/pci-layerscape.c | 17 +++++++++++++++++
+> > > >  1 file changed, 17 insertions(+)
+> > > >
+> > > > diff --git a/drivers/pci/host/pci-layerscape.c
+> > > > b/drivers/pci/host/pci-layerscape.c
+> > > > index c53692a..8fac6c8 100644
+> > > > --- a/drivers/pci/host/pci-layerscape.c
+> > > > +++ b/drivers/pci/host/pci-layerscape.c
+> > > > @@ -150,14 +150,31 @@ static void ls_pcie_host_init(struct pcie_port
+> *pp)
+> > > >  	iowrite32(0, pcie->dbi + PCIE_DBI_RO_WR_EN);  }
+> > > >
+> > > > +static int ls_pcie_msi_host_init(struct pcie_port *pp,
+> > > > +				 struct msi_controller *chip) {
+> > > > +	struct device_node *msi_node;
+> > > > +	struct device_node *np = pp->dev->of_node;
+> > > > +
+> > > > +	msi_node = of_parse_phandle(np, "msi-parent", 0);
+> > > > +	if (!msi_node) {
+> > > > +		dev_err(pp->dev, "failed to find msi-parent\n");
+> > > > +		return -EINVAL;
+> > > > +	}
+> > > > +
+> > > > +	return 0;
+> > >
+> > > I don't see how this can be right.  I think it's OK if you want to
+> > > enforce the presence of "msi-parent", but the other implementations
+> > > of .msi_host_init (ks_dw_pcie_msi_host_init() and the default
+> > > implementation in dw_pcie_host_init()) both set pp->irq_domain and
+> > > call irq_create_mapping().
+> > >
+> > > You don't do either of those, so I don't see how MSIs can work,
+> > > because I assume the generic DesignWare code will depend on
+> > > pp->irq_domain.  If you're planning to add more Layerscape-specific
+> > > MSI support later, I think you should wait and include this patch with that
+> work.
+> 
+> > Regarding MSI, both LS1021a and LS1043a use SCFG to implement it. I have
+> submitted patch:
+> > https://patchwork.kernel.org/patch/7411131/
+> > https://patchwork.kernel.org/patch/7411141/
+> 
+> > While ls2085a use ITS for it, we just re-use the ITS driver.
+> 
+> > I notice some platform MSI driver files were placed in pci/host folder
+> > not irqchip.  If it is ok, I would like to change driver folder and
+> > re-submitted the MSI patch.
+> 
+> I suppose you're referring to drivers/pci/host/pci-xgene-msi.c.
+> That file doesn't really have much PCI stuff in it.  It does call
+> pci_msi_create_irq_domain(), but that's really the only PCI interface or data
+> structure it uses.  So I don't know if drivers/pci/host or drivers/irqchip is the
+> best place for it and for your irq-ls-scfg-msi.c.
+> 
+> The connection between pci-xgene-msi.c and pci-xgene.c is not very clear to me,
+> and that's sort of what I'm complaining about here.
+> You're overriding a default MSI initialization method.  Usually that means you
+> do the same thing as the default method, but in a different way.  You aren't
+> doing the same thing at all, which makes the code hard to review.
+> 
+> Maybe a comment about how the MSI controller gets connected to devices
+> below this host bridge would be enough.
+> 
+[Lian Minghuan-B31939] 
+1. We need to define callback function msi_host_init() to avoid the running desginware MSI related code
+Because our PCIe controller do not enable this feature.
+2. we do not need to do anything such as bus->msi= ls_scfg_msi
+Because with the latest code, when PCIe controller device is created of_msi_configure() will be called and MSI domain pointed by 'msi-parent' will be bound  to the device. pci_msi_get_domain(struct pci_dev *dev) -> dev_get_msi_domain(&dev->dev) will return this MSI domain.
+3. I will add a comment in the next version.
 
-I'll send a new version. Sorry for the noise.
+Thanks,
+Minghuan
 
-ChenYu
 
-> +               regulator = devm_regulator_get_optional(&pdev->dev, name);
-> +               if (IS_ERR(regulator)) {
-> +                       if (PTR_ERR(regulator) == -EPROBE_DEFER)
-> +                               return -EPROBE_DEFER;
-> +                       dev_err(&pdev->dev, "regulator %s not found: %ld\n",
-> +                               name, PTR_ERR(regulator));
-> +                       continue;
-> +               }
-> +               par->regulators[i++] = regulator;
-> +       }
-> +       par->regulator_count = i;
-> +
-> +       /* Enable all the regulators */
-> +       for (i = 0; i < par->regulator_count; i++) {
-> +               ret = regulator_enable(par->regulators[i]);
-> +               if (ret) {
-> +                       dev_err(&pdev->dev,
-> +                               "failed to enable regulator %d: %d\n",
-> +                               i, ret);
-> +                       devm_regulator_put(par->regulators[i]);
-> +                       par->regulators[i] = NULL;
-> +               }
-> +       }
-> +
-> +       return 0;
-> +}
-> +
-> +static void simplefb_regulators_destroy(struct simplefb_par *par)
-> +{
-> +       int i;
-> +
-> +       if (!par->regulators)
-> +               return;
-> +
-> +       for (i = 0; i < par->regulator_count; i++)
-> +               if (par->regulators[i])
-> +                       regulator_disable(par->regulators[i]);
-> +}
-> +#else
-> +static int simplefb_regulators_init(struct simplefb_par *par,
-> +       struct platform_device *pdev) { return 0; }
-> +static void simplefb_regulators_destroy(struct simplefb_par *par) { }
-> +#endif
-> +
->  static int simplefb_probe(struct platform_device *pdev)
->  {
->         int ret;
-> @@ -340,6 +451,10 @@ static int simplefb_probe(struct platform_device *pdev)
->         if (ret < 0)
->                 goto error_unmap;
->
-> +       ret = simplefb_regulators_init(par, pdev);
-> +       if (ret < 0)
-> +               goto error_clocks;
-> +
->         dev_info(&pdev->dev, "framebuffer at 0x%lx, 0x%x bytes, mapped to 0x%p\n",
->                              info->fix.smem_start, info->fix.smem_len,
->                              info->screen_base);
-> @@ -351,13 +466,15 @@ static int simplefb_probe(struct platform_device *pdev)
->         ret = register_framebuffer(info);
->         if (ret < 0) {
->                 dev_err(&pdev->dev, "Unable to register simplefb: %d\n", ret);
-> -               goto error_clocks;
-> +               goto error_regulators;
->         }
->
->         dev_info(&pdev->dev, "fb%d: simplefb registered!\n", info->node);
->
->         return 0;
->
-> +error_regulators:
-> +       simplefb_regulators_destroy(par);
->  error_clocks:
->         simplefb_clocks_destroy(par);
->  error_unmap:
-> @@ -373,6 +490,7 @@ static int simplefb_remove(struct platform_device *pdev)
->         struct simplefb_par *par = info->par;
->
->         unregister_framebuffer(info);
-> +       simplefb_regulators_destroy(par);
->         simplefb_clocks_destroy(par);
->         framebuffer_release(info);
->
-> --
-> 2.6.1
->
+> Bjorn
