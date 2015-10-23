@@ -1,90 +1,53 @@
-From: hauke@hauke-m.de (Hauke Mehrtens)
-Date: Sat, 24 Oct 2015 00:38:08 +0200
-Subject: [RFC] ARM: BCM: Add SMP support for Broadcom 4708
-In-Reply-To: <20151015181409.GJ32089@broadcom.com>
-References: <1444844820-24290-1-git-send-email-kapilh@broadcom.com>
- <1444844820-24290-4-git-send-email-kapilh@broadcom.com>
- <561ED691.8080407@hauke-m.de> <20151014224003.GO15160@broadcom.com>
- <20151015154934.GD32089@broadcom.com> <20151015181409.GJ32089@broadcom.com>
-Message-ID: <562AB6D0.7060807@hauke-m.de>
+From: scottwood@freescale.com (Scott Wood)
+Date: Fri, 23 Oct 2015 17:39:35 -0500
+Subject: [PATCH v3 0/5] clk: qoriq: Move chip-specific knowledge into
+ driver
+In-Reply-To: <1442723397-26329-1-git-send-email-scottwood@freescale.com>
+References: <1442723397-26329-1-git-send-email-scottwood@freescale.com>
+Message-ID: <1445639975.701.257.camel@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/15/2015 08:14 PM, Jon Mason wrote:
-> ARM: BCM: Add SMP support for Broadcom 4708
+On Sat, 2015-09-19 at 23:29 -0500, Scott Wood wrote:
+> The existing device tree bindings are error-prone and inflexible. 
+> Correct the mistake by moving the knowledge into the driver, which has
+> more flexibility in describing the quirks of each chip.  This leaves the
+> device tree to its proper role of identifying a programming interface
+> rather than describing its individual registers.
 > 
-> Add SMP support for Broadcom's 4708 SoCs.
-
-I tested this and it works on my device, it is also in OpenWrt now:
-https://dev.openwrt.org/browser/trunk/target/linux/bcm53xx/patches-4.1/131-ARM-BCM-Add-SMP-support-for-Broadcom-4708.patch?rev=47247
-
+> For more detail, see the commit message of patch 2.
 > 
-> Signed-off-by: Jon Mason <jonmason@broadcom.com>
-> ---
->  arch/arm/boot/dts/bcm4708.dtsi | 2 ++
->  arch/arm/boot/dts/bcm94708.dts | 2 +-
->  arch/arm/mach-bcm/Kconfig      | 1 +
->  arch/arm/mach-bcm/Makefile     | 3 +++
->  4 files changed, 7 insertions(+), 1 deletion(-)
+> As there are both ARM and PPC patches that depend on this patchset, I'm
+> requesting ACKs from clk and cpufreq in order to put this into a topic
+> branch that both ARM and PPC can pull.
 > 
-> diff --git a/arch/arm/boot/dts/bcm4708.dtsi b/arch/arm/boot/dts/bcm4708.dtsi
-> index 31141e8..22a41df 100644
-> --- a/arch/arm/boot/dts/bcm4708.dtsi
-> +++ b/arch/arm/boot/dts/bcm4708.dtsi
-> @@ -15,6 +15,8 @@
->  	cpus {
->  		#address-cells = <1>;
->  		#size-cells = <0>;
-> +		enable-method = "brcm,bcm-nsp-smp";
-> +		secondary-boot-reg = <0xffff0400>;
->  
->  		cpu at 0 {
->  			device_type = "cpu";
-> diff --git a/arch/arm/boot/dts/bcm94708.dts b/arch/arm/boot/dts/bcm94708.dts
-> index f60bb1d..49682d6 100644
-> --- a/arch/arm/boot/dts/bcm94708.dts
-> +++ b/arch/arm/boot/dts/bcm94708.dts
-> @@ -32,7 +32,7 @@
->  
->  /dts-v1/;
->  
-> -#include "bcm5301x.dtsi"
-> +#include "bcm4708.dtsi"
+> Scott Wood (5):
+>   powerpc/fsl: Move fsl_guts.h out of arch/powerpc
+>   clk: qoriq: Move chip-specific knowledge into driver
+>   clk: qoriq: Add ls2080a support.
+>   clk: Add consumer APIs for discovering possible parent clocks
+>   cpufreq: qoriq: Don't look at clock implementation details
 
-This is already changed in the patch adding this file.
+I've applied the first three patches plus 
+http://patchwork.ozlabs.org/patch/534739/ to the clock branch of 
+scottwood/linux.git to be used as a basis for PPC and ARM device tree patches.
 
->  
->  / {
->  	model = "NorthStar SVK (BCM94708)";
-> diff --git a/arch/arm/mach-bcm/Kconfig b/arch/arm/mach-bcm/Kconfig
-> index 2e9dbb5..4fc8fa3 100644
-> --- a/arch/arm/mach-bcm/Kconfig
-> +++ b/arch/arm/mach-bcm/Kconfig
-> @@ -54,6 +54,7 @@ config ARCH_BCM_NSP
->  config ARCH_BCM_5301X
->  	bool "Broadcom BCM470X / BCM5301X ARM SoC" if ARCH_MULTI_V7
->  	select ARCH_BCM_IPROC
-> +	select HAVE_SMP
+Note that there is a trivial merge conflict with commit 
+4a7748c3d6419bb8178748 ("clk: Allow drivers to build if COMPILE_TEST is 
+enabled").  Another option is for these patches to go via the clk tree, and 
+the device tree patches will ust go separately.  This would result in 
+intermediate commits where the device tree contains clock information that 
+the clock driver can't handle, but it would be resolved by -rc1 -- and it 
+seems that one of the ARM device tree patches ("dts/ls2080a: Update DTSI to 
+add support of various peripherals") was already merged without waiting for 
+the clock driver patch.  I could still wait until next merge window to rip 
+out the legacy stuff from existing device trees, so it would only affect new 
+functionality.
 
-probably this is also needed:
-select ARM_ERRATA_764369 if SMP
-The CPU should be affected by this issue.
+Patch 4 is still waiting for an ack from Russell King, but it appears that 
+patch 5 (which depends on patch 4) can probably wait until the next merge 
+window.  Without those patches, qoriq-cpufreq should still mostly work, as 
+long as the old device trees are used.  Patches 4 and 5 will be needed to 
+make qoriq-cpufreq continue to work with device trees using the new binding.
 
->  	help
->  	  Support for Broadcom BCM470X and BCM5301X SoCs with ARM CPU cores.
->  
-> diff --git a/arch/arm/mach-bcm/Makefile b/arch/arm/mach-bcm/Makefile
-> index 36a4ca30..3ca1cf1 100644
-> --- a/arch/arm/mach-bcm/Makefile
-> +++ b/arch/arm/mach-bcm/Makefile
-> @@ -43,6 +43,9 @@ obj-$(CONFIG_ARCH_BCM2835)	+= board_bcm2835.o
->  
->  # BCM5301X
->  obj-$(CONFIG_ARCH_BCM_5301X)	+= bcm_5301x.o
-> +ifeq ($(CONFIG_ARCH_BCM_5301X),y)
-> +obj-$(CONFIG_SMP)		+= headsmp.o platsmp.o
-> +endif
->  
->  # BCM63XXx
->  ifeq ($(CONFIG_ARCH_BCM_63XX),y)
-> 
+-Scott
