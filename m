@@ -1,27 +1,26 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Fri, 23 Oct 2015 21:59:11 +0200
-Subject: [PATCH] i2c: mediatek: add i2c resume support
-In-Reply-To: <1444123376-24448-1-git-send-email-eddie.huang@mediatek.com>
-References: <1444123376-24448-1-git-send-email-eddie.huang@mediatek.com>
-Message-ID: <20151023195911.GB1520@katana>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 23 Oct 2015 22:00:37 +0200
+Subject: [PATCH 0/5] ARM: dts: fix cpu compatible values
+In-Reply-To: <5625303C.6090902@mleia.com>
+References: <1443202506-13732-1-git-send-email-vz@mleia.com>
+ <5625303C.6090902@mleia.com>
+Message-ID: <6261588.UmaTDKo2vv@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 06, 2015 at 05:22:56PM +0800, Eddie Huang wrote:
-> From: Liguo Zhang <liguo.zhang@mediatek.com>
+On Monday 19 October 2015 21:02:36 Vladimir Zapolskiy wrote:
+> On 25.09.2015 20:35, Vladimir Zapolskiy wrote:
+> > The changeset corrects severeal cpu compatible properties
+> > to defined ones in Documentation/devicetree/bindings/arm/cpus.txt
+> > 
+> > Vladimir Zapolskiy (5):
+> >   ARM: dts: i.MX31: fix cpu compatible value
+> >   ARM: dts: i.MX35: fix cpu compatible value
 > 
-> mt65xx i2c controller initial setting will be cleared after system suspend,
-> so we should init mt65xx i2c controller again when system resume.
+> Ping. Two patches above are applied by Shawn, could ARM maintainers
+> apply the rest? Thank you in advance.
 > 
-> Signed-off-by: Liguo Zhang <liguo.zhang@mediatek.com>
-> Signed-off-by: Eddie Huang <eddie.huang@mediatek.com>
 
-Applied to for-next, thanks!
+Applied the missing two as well now, thanks for the fixes!
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151023/e3cb883e/attachment-0001.sig>
+	Arnd
