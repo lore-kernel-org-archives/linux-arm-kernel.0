@@ -1,168 +1,86 @@
 From: eric.auger@linaro.org (Eric Auger)
-Date: Fri, 23 Oct 2015 17:47:24 +0200
-Subject: [PATCH v4 6/7] vfio: platform: use list of registered reset function
+Date: Fri, 23 Oct 2015 17:51:12 +0200
+Subject: [PATCH v4 0/7] VFIO platform reset module rework
 In-Reply-To: <1445615245-31124-1-git-send-email-eric.auger@linaro.org>
 References: <1445615245-31124-1-git-send-email-eric.auger@linaro.org>
-Message-ID: <1445615245-31124-7-git-send-email-eric.auger@linaro.org>
+Message-ID: <562A5770.5080903@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove the static lookup table and use the dynamic list of registered
-reset functions instead. Also load the reset module through its alias.
-The reset struct module pointer is stored in vfio_platform_device.
+On 10/23/2015 05:47 PM, Eric Auger wrote:
+> This series fixes the current implementation by getting rid of the
+> usage of __symbol_get which caused a compilation issue with
+> CONFIG_MODULES disabled. On top of this, the usage of MODULE_ALIAS makes
+> possible to add a new reset module without being obliged to update the
+> framework. The new implementation relies on the reset module registering
+> its reset function to the vfio-platform driver.
+> 
+> The series is available at
+> 
+> https://git.linaro.org/people/eric.auger/linux.git/shortlog/refs/heads/v4.3-rc6-rework-v3
+argh,
 
-We also remove the useless struct device pointer parameter in
-vfio_platform_get_reset.
+https://git.linaro.org/people/eric.auger/linux.git/shortlog/refs/heads/v4.3-rc6-rework-v4
 
-This patch fixes the issue related to the usage of __symbol_get, which
-besides from being moot, prevented compilation with CONFIG_MODULES
-disabled.
+But scatterbrained as I am, I am pretty sure I will do a new respin.
 
-Also usage of MODULE_ALIAS makes possible to add a new reset module
-without needing to update the framework. This was suggested by Arnd.
+Thanks for your patience :-(
 
-Signed-off-by: Eric Auger <eric.auger@linaro.org>
-Reported-by: Arnd Bergmann <arnd@arndb.de>
-Reviewed-by: Arnd Bergmann <arnd@arndb.de>
-
----
-
-v3 -> v4:
-- add Arnd R-b.
-- Remove the EXPORT_SYMBOL_GPL(vfio_platform_calxedaxgmac_reset) here
-
-v2 -> v3:
-- remove clear of vfio_platform_device reset_module and reset
-  in vfio_platform_put_reset
-- single unlock in vfio_platform_lookup_reset
-- use driver_lock instead of reset_lock
-
-v1 -> v2:
-- use reset_lock in vfio_platform_lookup_reset
-- remove vfio_platform_reset_combo declaration
-- remove struct device *dev parameter in vfio_platform_get_reset
-- set reset_module and reset to NULL in put function
----
- .../platform/reset/vfio_platform_calxedaxgmac.c    |  1 -
- drivers/vfio/platform/vfio_platform_common.c       | 52 ++++++++++++----------
- drivers/vfio/platform/vfio_platform_private.h      |  7 +--
- 3 files changed, 30 insertions(+), 30 deletions(-)
-
-diff --git a/drivers/vfio/platform/reset/vfio_platform_calxedaxgmac.c b/drivers/vfio/platform/reset/vfio_platform_calxedaxgmac.c
-index 80718f2..640f5d8 100644
---- a/drivers/vfio/platform/reset/vfio_platform_calxedaxgmac.c
-+++ b/drivers/vfio/platform/reset/vfio_platform_calxedaxgmac.c
-@@ -76,7 +76,6 @@ int vfio_platform_calxedaxgmac_reset(struct vfio_platform_device *vdev)
- 
- 	return 0;
- }
--EXPORT_SYMBOL_GPL(vfio_platform_calxedaxgmac_reset);
- 
- module_vfio_reset_handler("calxeda,hb-xgmac", vfio_platform_calxedaxgmac_reset);
- 
-diff --git a/drivers/vfio/platform/vfio_platform_common.c b/drivers/vfio/platform/vfio_platform_common.c
-index f2d41a0..f74836a 100644
---- a/drivers/vfio/platform/vfio_platform_common.c
-+++ b/drivers/vfio/platform/vfio_platform_common.c
-@@ -30,37 +30,43 @@
- static LIST_HEAD(reset_list);
- static DEFINE_MUTEX(driver_lock);
- 
--static const struct vfio_platform_reset_combo reset_lookup_table[] = {
--	{
--		.compat = "calxeda,hb-xgmac",
--		.reset_function_name = "vfio_platform_calxedaxgmac_reset",
--		.module_name = "vfio-platform-calxedaxgmac",
--	},
--};
--
--static void vfio_platform_get_reset(struct vfio_platform_device *vdev,
--				    struct device *dev)
-+static vfio_platform_reset_fn_t vfio_platform_lookup_reset(const char *compat,
-+					struct module **module)
- {
--	int (*reset)(struct vfio_platform_device *);
--	int i;
-+	struct vfio_platform_reset_node *iter;
-+	vfio_platform_reset_fn_t reset_fn = NULL;
- 
--	for (i = 0 ; i < ARRAY_SIZE(reset_lookup_table); i++) {
--		if (!strcmp(reset_lookup_table[i].compat, vdev->compat)) {
--			request_module(reset_lookup_table[i].module_name);
--			reset = __symbol_get(
--				reset_lookup_table[i].reset_function_name);
--			if (reset) {
--				vdev->reset = reset;
--				return;
--			}
-+	mutex_lock(&driver_lock);
-+	list_for_each_entry(iter, &reset_list, link) {
-+		if (!strcmp(iter->compat, compat) &&
-+			try_module_get(iter->owner)) {
-+			*module = iter->owner;
-+			reset_fn = iter->reset;
-+			break;
- 		}
- 	}
-+	mutex_unlock(&driver_lock);
-+	return reset_fn;
-+}
-+
-+static void vfio_platform_get_reset(struct vfio_platform_device *vdev)
-+{
-+	char modname[256];
-+
-+	vdev->reset = vfio_platform_lookup_reset(vdev->compat,
-+						&vdev->reset_module);
-+	if (!vdev->reset) {
-+		snprintf(modname, 256, "vfio-reset:%s", vdev->compat);
-+		request_module(modname);
-+		vdev->reset = vfio_platform_lookup_reset(vdev->compat,
-+							 &vdev->reset_module);
-+	}
- }
- 
- static void vfio_platform_put_reset(struct vfio_platform_device *vdev)
- {
- 	if (vdev->reset)
--		symbol_put_addr(vdev->reset);
-+		module_put(vdev->reset_module);
- }
- 
- static int vfio_platform_regions_init(struct vfio_platform_device *vdev)
-@@ -557,7 +563,7 @@ int vfio_platform_probe_common(struct vfio_platform_device *vdev,
- 		return ret;
- 	}
- 
--	vfio_platform_get_reset(vdev, dev);
-+	vfio_platform_get_reset(vdev);
- 
- 	mutex_init(&vdev->igate);
- 
-diff --git a/drivers/vfio/platform/vfio_platform_private.h b/drivers/vfio/platform/vfio_platform_private.h
-index 415310f..d1b0668 100644
---- a/drivers/vfio/platform/vfio_platform_private.h
-+++ b/drivers/vfio/platform/vfio_platform_private.h
-@@ -58,6 +58,7 @@ struct vfio_platform_device {
- 	struct mutex			igate;
- 	struct module			*parent_module;
- 	const char			*compat;
-+	struct module			*reset_module;
- 
- 	/*
- 	 * These fields should be filled by the bus specific binder
-@@ -81,12 +82,6 @@ struct vfio_platform_reset_node {
- 	vfio_platform_reset_fn_t reset;
- };
- 
--struct vfio_platform_reset_combo {
--	const char *compat;
--	const char *reset_function_name;
--	const char *module_name;
--};
--
- extern int vfio_platform_probe_common(struct vfio_platform_device *vdev,
- 				      struct device *dev);
- extern struct vfio_platform_device *vfio_platform_remove_common
--- 
-1.9.1
+Eric
+> 
+> Best Regards
+> 
+> Eric
+> 
+> v3 -> v4:
+> - Remove the EXPORT_SYMBOL_GPL(vfio_platform_calxedaxgmac_reset) later
+>   in [6/7], to keep the functionality working all along the series
+> - Add Arnd R-b (I dared to keep them despite the above change)
+> - vfio_platform_unregister_reset gets the reset function to do a double
+>   check on the compat and the function pointer too
+> - __vfio_platform_register_reset turned to 'void'
+> 
+> v2 -> v3:
+> - use driver_mutex instead of reset_mutex
+> - style fixes: single mutex_unlock
+> - use static nodes; vfio_platform_register_reset now is a macro
+> - vfio_platform_reset_private.h removed since reset_module_(un)register
+>   disappear. No use of symbol_get anymore.
+> - new patch introducing vfio-platform-base
+> - reset look-up moved back at vfio-platform probe time
+> - new patch featuring dev_info/dev_warn
+> 
+> v1 -> v2:
+> * in vfio_platform_common.c:
+>   - move reset lookup at load time and put reset at release: this is to
+>     prevent a race between the 2 load module loads
+>   - reset_list becomes static
+>   - vfio_platform_register/unregister_reset take a const char * as compat
+>   - fix node link
+>   - remove old combo struct and cleanup proto of vfio_platform_get_reset
+>   - add mutex to protect the reset list
+> * in calxeda xgmac reset module
+>   - introduce vfio_platform_reset_private.h
+>   - use module_vfio_reset_handler macro
+>   - do not export vfio_platform_calxedaxgmac_reset symbol anymore
+>   - add a pr_info to show the device is reset by vfio reset module
+> 
+> 
+> 
+> Eric Auger (7):
+>   vfio: platform: introduce vfio-platform-base module
+>   vfio: platform: add capability to register a reset function
+>   vfio: platform: introduce module_vfio_reset_handler macro
+>   vfio: platform: reset: calxedaxgmac: add reset function registration
+>   vfio: platform: add compat in vfio_platform_device
+>   vfio: platform: use list of registered reset function
+>   vfio: platform: add dev_info on device reset
+> 
+>  drivers/vfio/platform/Makefile                     |   6 +-
+>  .../platform/reset/vfio_platform_calxedaxgmac.c    |   5 +-
+>  drivers/vfio/platform/vfio_amba.c                  |   1 +
+>  drivers/vfio/platform/vfio_platform.c              |   1 +
+>  drivers/vfio/platform/vfio_platform_common.c       | 119 +++++++++++++++------
+>  drivers/vfio/platform/vfio_platform_private.h      |  40 ++++++-
+>  6 files changed, 130 insertions(+), 42 deletions(-)
+> 
