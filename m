@@ -1,140 +1,31 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Fri, 23 Oct 2015 17:37:30 +0200
-Subject: [PATCH] ARM: mvebu: add broken-idle option
-In-Reply-To: <1445597998-23751-2-git-send-email-vdonnefort@gmail.com> (Vincent
- Donnefort's message of "Fri, 23 Oct 2015 12:59:58 +0200")
-References: <87oafq2f0m.fsf@free-electrons.com>
- <1445597998-23751-1-git-send-email-vdonnefort@gmail.com>
- <1445597998-23751-2-git-send-email-vdonnefort@gmail.com>
-Message-ID: <87bnbp38at.fsf@free-electrons.com>
+From: timur@tabi.org (Timur Tabi)
+Date: Fri, 23 Oct 2015 10:37:49 -0500
+Subject: [PATCH] Revert "serial: amba-pl011: fix incorrect integer size in
+ pl011_fifo_to_tty()"
+In-Reply-To: <20151023133403.GI4796@e103592.cambridge.arm.com>
+References: <1445594400-29095-1-git-send-email-shijie.huang@arm.com>
+ <20151023103056.GI4801@e103592.cambridge.arm.com>
+ <562A297A.9030204@codeaurora.org>
+ <20151023133403.GI4796@e103592.cambridge.arm.com>
+Message-ID: <562A544D.7080506@tabi.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vincent,
- 
- On ven., oct. 23 2015, Vincent Donnefort <vdonnefort@gmail.com> wrote:
+On 10/23/2015 08:34 AM, Dave P Martin wrote:
+> Well, I'm not saying there's definitely no kernel bug, but I can't see
+> how the patch should cause it.  It may be triggering a latent bug
+> somewhere else in the driver than hasn't been biting us before, however.
 
-> The broken-idle option can be activated from the coherency-fabric DT
-> node. This property allows to disable the idle capability, when the
-> hardware doesn't support it, like the Seagate Personal Cloud boards.
+Fair enough.
 
-Applied on mvebu/soc
+> !CREAD is the most obvious cause, so that should definitely be ruled
+> out first.  If CREAD is clear, we need to figure out why...
 
-Thanks,
+So I tested this by booting to my console, and then typing in:
 
-Gregory
->
-> Signed-off-by: Vincent Donnefort <vdonnefort@gmail.com>
->
-> diff --git a/Documentation/devicetree/bindings/arm/coherency-fabric.txt b/Documentation/devicetree/bindings/arm/coherency-fabric.txt
-> index 8dd4661..9b5c3f6 100644
-> --- a/Documentation/devicetree/bindings/arm/coherency-fabric.txt
-> +++ b/Documentation/devicetree/bindings/arm/coherency-fabric.txt
-> @@ -27,6 +27,11 @@ Required properties:
->   * For "marvell,armada-380-coherency-fabric", only one pair is needed
->     for the per-CPU fabric registers.
->  
-> +Optional properties:
-> +
-> +- broken-idle: boolean to set when the Idle mode is not supported by the
-> +  hardware.
-> +
->  Examples:
->  
->  coherency-fabric at d0020200 {
-> diff --git a/arch/arm/mach-mvebu/pmsu.c b/arch/arm/mach-mvebu/pmsu.c
-> index 4f4e222..0e97b97 100644
-> --- a/arch/arm/mach-mvebu/pmsu.c
-> +++ b/arch/arm/mach-mvebu/pmsu.c
-> @@ -379,6 +379,16 @@ static struct notifier_block mvebu_v7_cpu_pm_notifier = {
->  
->  static struct platform_device mvebu_v7_cpuidle_device;
->  
-> +static int broken_idle(struct device_node *np)
-> +{
-> +	if (of_property_read_bool(np, "broken-idle")) {
-> +		pr_warn("CPU idle is currently broken: disabling\n");
-> +		return 1;
-> +	}
-> +
-> +	return 0;
-> +}
-> +
->  static __init int armada_370_cpuidle_init(void)
->  {
->  	struct device_node *np;
-> @@ -387,7 +397,9 @@ static __init int armada_370_cpuidle_init(void)
->  	np = of_find_compatible_node(NULL, NULL, "marvell,coherency-fabric");
->  	if (!np)
->  		return -ENODEV;
-> -	of_node_put(np);
-> +
-> +	if (broken_idle(np))
-> +		goto end;
->  
->  	/*
->  	 * On Armada 370, there is "a slow exit process from the deep
-> @@ -406,6 +418,8 @@ static __init int armada_370_cpuidle_init(void)
->  	mvebu_v7_cpuidle_device.dev.platform_data = armada_370_xp_cpu_suspend;
->  	mvebu_v7_cpuidle_device.name = "cpuidle-armada-370";
->  
-> +end:
-> +	of_node_put(np);
->  	return 0;
->  }
->  
-> @@ -422,6 +436,10 @@ static __init int armada_38x_cpuidle_init(void)
->  				     "marvell,armada-380-coherency-fabric");
->  	if (!np)
->  		return -ENODEV;
-> +
-> +	if (broken_idle(np))
-> +		goto end;
-> +
->  	of_node_put(np);
->  
->  	np = of_find_compatible_node(NULL, NULL,
-> @@ -430,7 +448,6 @@ static __init int armada_38x_cpuidle_init(void)
->  		return -ENODEV;
->  	mpsoc_base = of_iomap(np, 0);
->  	BUG_ON(!mpsoc_base);
-> -	of_node_put(np);
->  
->  	/* Set up reset mask when powering down the cpus */
->  	reg = readl(mpsoc_base + MPCORE_RESET_CTL);
-> @@ -450,6 +467,8 @@ static __init int armada_38x_cpuidle_init(void)
->  	mvebu_v7_cpuidle_device.dev.platform_data = armada_38x_cpu_suspend;
->  	mvebu_v7_cpuidle_device.name = "cpuidle-armada-38x";
->  
-> +end:
-> +	of_node_put(np);
->  	return 0;
->  }
->  
-> @@ -460,12 +479,16 @@ static __init int armada_xp_cpuidle_init(void)
->  	np = of_find_compatible_node(NULL, NULL, "marvell,coherency-fabric");
->  	if (!np)
->  		return -ENODEV;
-> -	of_node_put(np);
-> +
-> +	if (broken_idle(np))
-> +		goto end;
->  
->  	mvebu_cpu_resume = armada_370_xp_cpu_resume;
->  	mvebu_v7_cpuidle_device.dev.platform_data = armada_370_xp_cpu_suspend;
->  	mvebu_v7_cpuidle_device.name = "cpuidle-armada-xp";
->  
-> +end:
-> +	of_node_put(np);
->  	return 0;
->  }
->  
-> -- 
-> 2.1.4
->
+	stty -cread
 
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+and when I did that, the console ignored all input.
+
+I do admit that since !CREAD has been ignored for so many reason, it 
+could be that a lot of userspaces will suddenly have broken consoles.
