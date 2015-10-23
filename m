@@ -1,71 +1,47 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Fri, 23 Oct 2015 15:50:21 +0300
-Subject: MUSB peripheral DMA regression caused by driver core runtime PM
- change
-In-Reply-To: <20151022230133.GV3078@atomide.com>
-References: <20151021234134.GQ3078@atomide.com>
- <20151022180216.GT3078@atomide.com> <20151022230133.GV3078@atomide.com>
-Message-ID: <562A2D0D.3060104@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 23 Oct 2015 14:55:38 +0200
+Subject: [PATCH v2] VFIO: platform: reset: AMD xgbe reset module
+In-Reply-To: <1445604253-15384-1-git-send-email-eric.auger@linaro.org>
+References: <1445604253-15384-1-git-send-email-eric.auger@linaro.org>
+Message-ID: <4421151.hWFIfrRvFW@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/23/2015 02:01 AM, Tony Lindgren wrote:
-> * Tony Lindgren <tony@atomide.com> [151022 11:03]:
->> * Tony Lindgren <tony@atomide.com> [151021 16:44]:
->>> Hi all,
->>>
->>> I noticed a regresssino in v4.3-rc series to day with MUSB gadgets
->>> and DMA. Doing a git bisect between v4.2..v4.3-rc1 on it pointed to:
->>>
->>> ddef08dd00f5 ("Driver core: wakeup the parent device before trying probe")
->>>
->>> With the commit above reverted things work fine with DMA and USB gadgets.
->>>
->>> This is on omap3 with CONFIG_USB_INVENTRA_DMA selected. Selecting
->>> CONFIG_MUSB_PIO_ONLY still works even without reverting ddef08dd00f5.
->>>
->>> Anybody got ideas what might be wrong? Some wrong runtime PM usage
->>> under drivers/usb/musb?
->>
->> Here's some more debug info on where things are different initializing
->> the USB gadgets. I added some printks and diffed the dmesg output. The
->> added calls from commit ddef08dd00f5 start with dd:
->
-> Well turns out the problem actually happens earlier. We end up calling
-> omap2430_runtime_resume with NULL struct musb while EPROBE_DEFER
-> probing.
->
-> No ideas yet how it should be fixed though.
->
+On Friday 23 October 2015 14:44:13 Eric Auger wrote:
+> This patch introduces a module that registers and implements a low-level
+> reset function for the AMD XGBE device.
+> 
+> it performs the following actions:
+> - reset the PHY
+> - disable auto-negotiation
+> - disable & clear auto-negotiation IRQ
+> - soft-reset the MAC
+> 
+> Those tiny pieces of code are inherited from the native xgbe driver.
+> 
+> Signed-off-by: Eric Auger <eric.auger@linaro.org>
+> 
+> ---
 
-I'm not sure, but below diff might help
+The code looks ok to me, just two small style issues.
+>  
+>  	  If you don't know what to do here, say N.
+> +config VFIO_PLATFORM_AMDXGBE_RESET
+> +	tristate "VFIO support for AMD XGBE reset"
+> +	depends on VFIO_PLATFORM
+> +	help
+> +	  Enables the VFIO platform driver to handle reset for AMD XGBE
+> +
+> +	  If you don't know what to do here, say N.
 
-diff --git a/drivers/usb/musb/omap2430.c b/drivers/usb/musb/omap2430.c
-index 70f2b8a..aba8ca7 100644
---- a/drivers/usb/musb/omap2430.c
-+++ b/drivers/usb/musb/omap2430.c
-@@ -391,6 +391,8 @@ static int omap2430_musb_init(struct musb *musb)
-         }
-         musb->isr = omap2430_musb_interrupt;
+Please add an empty line before the newly introduced option.
 
-+       pm_runtime_enable(glue->dev);
-+
-         status = pm_runtime_get_sync(dev);
-         if (status < 0) {
-                 dev_err(dev, "pm_runtime_get_sync FAILED %d\n", status);
-@@ -626,8 +628,6 @@ static int omap2430_probe(struct platform_device *pdev)
-                 goto err2;
-         }
+> +MODULE_VERSION(DRIVER_VERSION);
+> +MODULE_LICENSE("GPL v2");
+> +MODULE_AUTHOR(DRIVER_AUTHOR);
+> +MODULE_DESCRIPTION(DRIVER_DESC);
 
--       pm_runtime_enable(&pdev->dev);
--
-         ret = platform_device_add(musb);
-         if (ret) {
-                 dev_err(&pdev->dev, "failed to register musb device\n");
+Best remove those macros and put the strings in here directly to
+make it easier to grep for.
 
-
-
-
--- 
-regards,
--grygorii
+	Arnd
