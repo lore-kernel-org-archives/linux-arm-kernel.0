@@ -1,55 +1,30 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 23 Oct 2015 20:09:27 +0200
-Subject: [PATCH 5/6] ARM: dts: sunxi: Add Allwinner H3 DTSI
-In-Reply-To: <5628C8E2.6040703@gmail.com>
-References: <1445444428-4652-1-git-send-email-jenskuske@gmail.com>
- <1445444428-4652-2-git-send-email-jenskuske@gmail.com>
- <20151022080508.GN10947@lukather> <20151022102959.09f0a1f4@OPI2>
- <20151022084735.GR10947@lukather> <20151022105745.2cc158a3@OPI2>
- <20151022091410.GW10947@lukather> <5628C8E2.6040703@gmail.com>
-Message-ID: <20151023180927.GJ10947@lukather>
+From: jeremy.linton@arm.com (Jeremy Linton)
+Date: Fri, 23 Oct 2015 13:13:12 -0500
+Subject: [PATCH] arm64: Align .text section to PAGE_SIZE
+In-Reply-To: <CAKv+Gu_QKpL2X3ZNn9QVZnBa00JrF1v0W1DtkyuGzm1cLREPWg@mail.gmail.com>
+References: <1445610134-20528-1-git-send-email-jeremy.linton@arm.com>
+ <CAKv+Gu_5YPiQOejsAUdVs7YbNJD4tFwuATYq6VNxuXbeRsoYkw@mail.gmail.com>
+ <562A610F.4090101@arm.com>
+ <CAKv+Gu_QKpL2X3ZNn9QVZnBa00JrF1v0W1DtkyuGzm1cLREPWg@mail.gmail.com>
+Message-ID: <562A78B8.3000503@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 22, 2015 at 01:30:42PM +0200, Jens Kuske wrote:
-> On 22/10/15 11:14, Maxime Ripard wrote:
-> > On Thu, Oct 22, 2015 at 10:57:45AM +0200, Jean-Francois Moine wrote:
-> >> On Thu, 22 Oct 2015 10:47:35 +0200
-> >> Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
-> >>
-> >>> Not really. The uart0 reset is the bit 16, in the reset register 4.
-> >>>
-> >>> 4 * 32 + 16 = 44.
-> >>>
-> >>> Not 112, but still not 208 either.
-> >>
-> >> The registers are numbered 1..5, then
-> >>
-> >> (4 - 1) * 32 + 16 = 112
-> > 
-> > Not on my version, and even then, UARTs are on the last reset
-> > register, which would still make 144.
-> > 
-> > Maxime
-> > 
-> 
-> There are holes between reg2 and reg3 and reg4 for some reason, but even
-> if we would correct that with some of_xlate() function they won't
-> completely line up with the gates.
+On 10/23/2015 11:49 AM, Ard Biesheuvel wrote:
+> On 23 October 2015 at 18:32, Jeremy Linton <jeremy.linton@arm.com> wrote:
+...
+>>          Maybe a clearer fix is an additional ifdef in the DEBUG_ALIGN_RODATA
+>> stanza which sets ALIGN_DEBUG_RO to align to pagesize if DEBUG_RODATA is
+>> set, that way it only takes affect for RODATA.
+>
+> I think the diff does what you mean here.
+...
 
-Indeed. Still, dealing with the holes and sticking to what the
-datasheet says seems like the right solution.
+This solves the problem I have. But, my comment about was trying to be a 
+little more creative and allow it to align at less than page size if 
+DEBUG_RODATA isn't set, as it does today. Sort of a packed kernel if you 
+will...
 
-Maxime
+But I will re-post shortly with just the ALIGN_DEBUG_RO change you suggest.
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151023/3952eb74/attachment.sig>
+Thanks,
