@@ -1,126 +1,83 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 23 Oct 2015 15:46:31 +0100
-Subject: [PATCH v3 0/2] Common SerDes driver for TI's Keystone Platforms
-In-Reply-To: <3702663.07h6YO0UjY@wuerfel>
-References: <1445432201-16007-1-git-send-email-w-kwok2@ti.com>
- <56295B9E.9030201@ti.com>
- <CAPw-ZTk1vJA3YSwLHBNMYP0t5k2tW0HTKse+37rL8izWN33y-w@mail.gmail.com>
- <3702663.07h6YO0UjY@wuerfel>
-Message-ID: <20151023144631.GZ32532@n2100.arm.linux.org.uk>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 23 Oct 2015 16:48:14 +0200
+Subject: [PATCH] arm64/efi: move arm64 specific stub C code to libstub
+Message-ID: <1445611694-31838-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 23, 2015 at 11:17:06AM +0200, Arnd Bergmann wrote:
-> On Thursday 22 October 2015 15:27:05 Loc Ho wrote:
-> > >
-> > > phy-xgene.c
-> > > -----------
-> > >
-> > > Looking at other drivers under drivers/phy, I could find phy-xgene.c which
-> > > is close Keystone SerDes driver (. This is called APM X-Gene Multi-Purpose
-> > > PHY driver. It defines following mode per the driver code
-> > >
-> > >         MODE_SATA       = 0,    /* List them for simple reference */
-> > >         MODE_SGMII      = 1,
-> > >         MODE_PCIE       = 2,
-> > >         MODE_USB        = 3,
-> > >         MODE_XFI        = 4,
-> > >
-> > > But seems to support only MODE_SATA. From the code, it appears, this driver
-> > > is expected to be enhanced in the future to support additional modes. I have
-> > > copied the author to this email to participate in this discussion.
-> > 
-> > Let me comment on this APM X-Gene driver. This driver is dead and
-> > won't be supported in near or foreseeable future. And someday, it will
-> > be ripped out. Based on experience, this solution (having PHY driver
-> > in Linux) can't be supported across boards and etc as it is just too
-> > much maintenance. And therefore, we followed Arnd B guidance and move
-> > all this into the boot loader. From Linux or OS perspective, it only
-> > cares about the interface in which its interface with. This is just
-> > your reference and may be this will help you as well.
-> 
-> This depends a lot on the use case. If the chip is only used on server
-> parts that have a real firmware and you can deliver bug fixes for the
-> firmware if necessary, it's always best to do as much of the setup as
-> possible there, and let Linux see a simplified view of the hardware.
-> 
-> However, for embedded systems that tend to ship with a minimal binary
-> bootloader and no way to update that as an end-user, we rely on Linux
-> to know about all the hardware that requires some form of setup, which
-> is why we have all sorts of drivers and frameworks in the kernel that
-> a server can easily ignore.
-> 
-> While keystone can show up in servers that won't use this driver, my
-> impression is that its main market is actually in embedded space.
+Now that we added special handling to the C files in libstub, move
+the one remaining arm64 specific EFI stub C file to libstub as
+well, so that it gets the same treatment. This should prevent future
+changes from resulting in binaries that may execute incorrectly in
+UEFI context.
 
-That's an interesting point of view - especially as you can't make the
-argument that Marvell Armada chips would ever be anything but the
-embedded space, but we're so far getting away with having the serdes
-setup in u-boot - and even Marvell's BSP doesn't have it in the kernel.
+With efi-entry.S the only remaining EFI stub source file under
+arch/arm64, we can also simplify the Makefile logic somewhat.
 
-The real question here is:
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
 
-  Why would we want to statically setup serdes links in the kernel
-  according to the DTB, rather than having the boot loader set them up?
+I would like to suggest that this be taken on top of the stuff that is
+queued for 4.4 at the moment (if it is not too late already).
 
-For the most part, the choice between the serdes modes is fairly static,
-depending on the board wiring.  You wouldn't ever want to configure a
-mini-PCIe socket for gigabit ethernet.
+ arch/arm64/kernel/Makefile                                                | 9 ++-------
+ drivers/firmware/efi/libstub/Makefile                                     | 3 +++
+ arch/arm64/kernel/efi-stub.c => drivers/firmware/efi/libstub/arm64-stub.c | 0
+ 3 files changed, 5 insertions(+), 7 deletions(-)
 
-However, there are cases when you would want to change it, and I'm
-aware of these cases:
-
-* Serdes routed to a mini-PCIe socket, which is compatible with mSATA.
-  There's an argument here to allow the serdes link to be switched at
-  runtime between PCIe and mSATA.  However, the card type can't be
-  detected at run time, so this would have to be a manual configuration
-  change by the user.
-
-  Since mini-PCIe is not hot-pluggable, this configuration isn't
-  something that could be changed without powering the system down.
-
-* Serdes routed to a SFP cage, where the serdes link is configured
-  for gigabit (or faster for SFP+) ethernet.  For gigabit only, serdes
-  is configured in either 1000base-X or Cisco SGMII mode (SGMII is a
-  non-802.3 modification to 1000base-X) depending on the type of
-  transceiver plugged in.
-
-  Arguably, there's a third option here, which is SATA as well -  I'm
-  aware of one non-standard SFP module on the market which provides a
-  SATA connector, but this is highly non-standard, is not covered by
-  the SFP specifications, so such a switch to this mode would have to
-  be done manually.
-
-The difference between 1000base-X vs SGMII is to do with the generation
-and interpretation of a 16-bit configuration word passed across the
-link.  Otherwise, the two are identical - and so far I've seen the
-configuration word mode is determined by the ethernet block rather than
-the serdes block.
-
-My argument would be that even in the case of the last paragraph,
-normal use for serdes reconfiguration would be a power cycle, even in
-the embedded environment.
-
-Now, that all said, it looks to me like TI's serdes implementation can't
-be switched between different modes - it's statically configured to
-whatever the DTB says it should be.
-
-So, this brings up the obvious question: why do we need to support
-serdes configuration in the kernel rather than statically in the boot
-loader according to the board setup?
-
-Specifically on this patch series, I think that if we're going to have
-code doing serdes configuration in the kernel, we need to come up with
-a common set of DT properties for it, rather than having everyone doing
-their own thing.  I'd also like to see the code shrink in size - it
-doesn't do anything beyond configuring the hardware for the settings
-that DTB tells it to, so why it has to be 2.5k lines I've no idea.
-
-There's some specific comments I have about it using readl/writel, and
-its wrapping of those, which IMHO it shouldn't be doing, and the horrid
-for loops (what's wrong with the standard Linux way of defining a
-for_each_xxx() operator and leaving the body at the callsite?)
-
+diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
+index 1b6bda2ff102..474691f8b13a 100644
+--- a/arch/arm64/kernel/Makefile
++++ b/arch/arm64/kernel/Makefile
+@@ -4,11 +4,8 @@
+ 
+ CPPFLAGS_vmlinux.lds	:= -DTEXT_OFFSET=$(TEXT_OFFSET)
+ AFLAGS_head.o		:= -DTEXT_OFFSET=$(TEXT_OFFSET)
+-CFLAGS_efi-stub.o 	:= -DTEXT_OFFSET=$(TEXT_OFFSET)
+ CFLAGS_armv8_deprecated.o := -I$(src)
+ 
+-KASAN_SANITIZE_efi-stub.o	:= n
+-
+ CFLAGS_REMOVE_ftrace.o = -pg
+ CFLAGS_REMOVE_insn.o = -pg
+ CFLAGS_REMOVE_return_address.o = -pg
+@@ -22,9 +19,7 @@ arm64-obj-y		:= debug-monitors.o entry.o irq.o fpsimd.o		\
+ 			   cpufeature.o alternative.o cacheinfo.o		\
+ 			   smp.o smp_spin_table.o topology.o
+ 
+-stub-obj				:= efi-stub.o efi-entry.o
+-extra-y					:= $(stub-obj)
+-stub-obj				:= $(patsubst %.o,%.stub.o,$(stub-obj))
++extra-$(CONFIG_EFI)			:= efi-entry.o
+ 
+ OBJCOPYFLAGS := --prefix-symbols=__efistub_
+ $(obj)/%.stub.o: $(obj)/%.o FORCE
+@@ -42,7 +37,7 @@ arm64-obj-$(CONFIG_CPU_PM)		+= sleep.o suspend.o
+ arm64-obj-$(CONFIG_CPU_IDLE)		+= cpuidle.o
+ arm64-obj-$(CONFIG_JUMP_LABEL)		+= jump_label.o
+ arm64-obj-$(CONFIG_KGDB)		+= kgdb.o
+-arm64-obj-$(CONFIG_EFI)			+= efi.o $(stub-obj)
++arm64-obj-$(CONFIG_EFI)			+= efi.o efi-entry.stub.o
+ arm64-obj-$(CONFIG_PCI)			+= pci.o
+ arm64-obj-$(CONFIG_ARMV8_DEPRECATED)	+= armv8_deprecated.o
+ arm64-obj-$(CONFIG_ACPI)		+= acpi.o
+diff --git a/drivers/firmware/efi/libstub/Makefile b/drivers/firmware/efi/libstub/Makefile
+index bca9a76cbd33..92ae557abbbc 100644
+--- a/drivers/firmware/efi/libstub/Makefile
++++ b/drivers/firmware/efi/libstub/Makefile
+@@ -34,6 +34,9 @@ $(obj)/lib-%.o: $(srctree)/lib/%.c FORCE
+ lib-$(CONFIG_EFI_ARMSTUB)	+= arm-stub.o fdt.o string.o \
+ 				   $(patsubst %.c,lib-%.o,$(arm-deps))
+ 
++lib-$(CONFIG_ARM64)		+= arm64-stub.o
++CFLAGS_arm64-stub.o 		:= -DTEXT_OFFSET=$(TEXT_OFFSET)
++
+ #
+ # arm64 puts the stub in the kernel proper, which will unnecessarily retain all
+ # code indefinitely unless it is annotated as __init/__initdata/__initconst etc.
+diff --git a/arch/arm64/kernel/efi-stub.c b/drivers/firmware/efi/libstub/arm64-stub.c
+similarity index 100%
+rename from arch/arm64/kernel/efi-stub.c
+rename to drivers/firmware/efi/libstub/arm64-stub.c
 -- 
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+2.1.4
