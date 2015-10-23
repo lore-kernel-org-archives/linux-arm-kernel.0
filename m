@@ -1,26 +1,57 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Fri, 23 Oct 2015 10:56:19 -0700
-Subject: [GIT PULL 3/3] ARM: imx: defconfig updates for 4.4
-In-Reply-To: <1445267937-2952-3-git-send-email-shawnguo@kernel.org>
-References: <1445267937-2952-1-git-send-email-shawnguo@kernel.org>
- <1445267937-2952-3-git-send-email-shawnguo@kernel.org>
-Message-ID: <20151023175619.GC18961@localhost>
+Date: Fri, 23 Oct 2015 11:26:52 -0700
+Subject: [GIT PULL 1/2] Broadcom Device Tree changes for 4.4 (part 2)
+In-Reply-To: <1445280190-8812-2-git-send-email-f.fainelli@gmail.com>
+References: <1445280190-8812-1-git-send-email-f.fainelli@gmail.com>
+ <1445280190-8812-2-git-send-email-f.fainelli@gmail.com>
+Message-ID: <20151023182652.GE18961@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 19, 2015 at 11:18:57PM +0800, Shawn Guo wrote:
-> The following changes since commit 6ff33f3902c3b1c5d0db6b1e2c70b6d76fba357f:
+Hi Florian,
+
+On Mon, Oct 19, 2015 at 11:43:10AM -0700, Florian Fainelli wrote:
+> The following changes since commit eef228e3191de0b62ef5913be216f25ba6b23a4c:
 > 
->   Linux 4.3-rc1 (2015-09-12 16:35:56 -0700)
+>   ARM: dts: move aliases back to .dts in Cygnus (2015-09-24 18:30:10 -0700)
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/shawnguo/linux.git tags/imx-defconfig-4.4
+>   http://github.com/Broadcom/stblinux tags/arm-soc/for-4.4/devicetree-part2
 > 
-> for you to fetch changes up to ed1098e4738d935cef12833b08916f6f5e700652:
+> for you to fetch changes up to da6b53a6f7abc3d84260a9f0ff9849a88b44e11f:
 > 
->   ARM: imx_v6_v7_defconfig: Remove CONFIG_VMSPLIT_2G (2015-09-23 05:19:37 -0700)
+>   ARM: bcm2835: Switch to using the new clock driver support. (2015-10-19 11:32:24 -0700)
+> 
+> ----------------------------------------------------------------
+> This pull request contains the DT changes for BCM2835 in 4.4.  It
+> pulls in clk/clk-bcm2835 (which Stephen Boyd has said would be stable)
+> because the DT changes to enable the clock driver need the driver
+> itself to be present. These changes include the following:
+> 
+> - Eric Anholt, moves the bcm2835 clock driver under bcm/ where it belongs with
+>   other Broadcom clock providers drivers, defines the binding for new clock
+>   driver, adds support for programming the BCM2835 audio domain, adds the DDC I2C
+>   controller to Device Tree, and finally migrates the Device Tree to use the new
+>   clock driver binding
+> 
+> - Lubomir Rintel adds support for the Raspberry Pi Model A+ and B revision 2, and
+>   remove the I2S controller which is non-existent on Raspberry Pi Model B
+> 
+> - Stefan Wahren adds an uart0 label for referencing the UART adapter
+> 
+> ----------------------------------------------------------------
+> Eric Anholt (5):
+>       ARM: bcm2835: Add the DDC I2C controller to the device tree.
+>       clk: bcm2835: Move under bcm/ with other Broadcom SoC clk drivers.
 
-Merged, thanks.
+I see this patch in the branch, and it's signed off both by Stephen and you,
+which makes me suspect you cherry-picked it over from their tree?
+
+That means it'll exist in two copies and might cause pretty nasty conflicts at
+merge time if other changes have gone in on top of the separate commits.
+Instead, we ask that you share a branch with the same exact commits, since git
+will handle that appropriately and the patch will only be in the tree once.
+
 
 -Olof
