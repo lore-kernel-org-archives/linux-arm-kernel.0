@@ -1,52 +1,58 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Thu, 22 Oct 2015 23:39:46 -0700
-Subject: [PATCH 06/19] input: tegra-kbc: enable support for the standard
- "wakeup-source" property
-In-Reply-To: <1445422216-29375-7-git-send-email-sudeep.holla@arm.com>
-References: <1445422216-29375-1-git-send-email-sudeep.holla@arm.com>
- <1445422216-29375-7-git-send-email-sudeep.holla@arm.com>
-Message-ID: <20151023063946.GA38047@dtor-ws>
+From: horms@verge.net.au (Simon Horman)
+Date: Fri, 23 Oct 2015 16:00:34 +0900
+Subject: [PATCH v11 6/8] arm64: renesas: add Salvator-X board support on
+ DTS
+In-Reply-To: <20151015110139.GG8825@leverpostej>
+References: <1444890243-6978-1-git-send-email-horms+renesas@verge.net.au>
+ <1444890243-6978-7-git-send-email-horms+renesas@verge.net.au>
+ <20151015110139.GG8825@leverpostej>
+Message-ID: <20151023070032.GA4502@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 21, 2015 at 11:10:03AM +0100, Sudeep Holla wrote:
-> Though the mmc core driver should/will continue to support the legacy
-> "nvidia,wakeup-source" property to enable SDIO as the wakeup source, we
-> need to add support for the new standard property "wakeup-source".
+On Thu, Oct 15, 2015 at 12:01:40PM +0100, Mark Rutland wrote:
+> > +/ {
+> > +	model = "Renesas Salvator-X board based on r8a7795";
+> > +	compatible = "renesas,salvator-x", "renesas,r8a7795";
+> > +
+> > +	aliases {
+> > +		serial0 = &scif2;
+> > +		serial1 = &scif1;
+> > +	};
+> > +
+> > +	chosen {
+> > +		bootargs = "ignore_loglevel";
 > 
-> This patch adds support for "wakeup-source" property in addition to the
-> existing "nvidia,wakeup-source" property.
-> 
-> Cc: Laxman Dewangan <ldewangan@nvidia.com>
-> Cc: Dmitry Torokhov <dmitry.torokhov@gmail.com>
-> Cc: Thierry Reding <thierry.reding@gmail.com>
-> Cc: linux-input at vger.kernel.org
-> Cc: linux-tegra at vger.kernel.org
-> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+> Do we really need this kind of thing in the kernel DTs?
 
-Applied, thank you.
+I agree this looks a bit lonely by itself, and I'm not entirely
+opposed to removing it. However, I do seek consistency between
+the renesas ARM and ARM64 SoCs where possible.
 
-> ---
->  drivers/input/keyboard/tegra-kbc.c | 3 ++-
->  1 file changed, 2 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/input/keyboard/tegra-kbc.c b/drivers/input/keyboard/tegra-kbc.c
-> index f97c73bd14f8..f80c72d4ac8f 100644
-> --- a/drivers/input/keyboard/tegra-kbc.c
-> +++ b/drivers/input/keyboard/tegra-kbc.c
-> @@ -517,7 +517,8 @@ static int tegra_kbc_parse_dt(struct tegra_kbc *kbc)
->  	if (of_find_property(np, "nvidia,needs-ghost-filter", NULL))
->  		kbc->use_ghost_filter = true;
->  
-> -	if (of_find_property(np, "nvidia,wakeup-source", NULL))
-> +	if (of_property_read_bool(np, "wakeup-source") ||
-> +	    of_property_read_bool(np, "nvidia,wakeup-source")) /* legacy */
->  		kbc->wakeup = true;
->  
->  	if (!of_get_property(np, "nvidia,kbc-row-pins", &proplen)) {
-> -- 
-> 1.9.1
-> 
+Further work[1] on this file outside of this series adds
+"rw root=/dev/nfs ip=dhcp" to bootargs, the result being consistent
+with Renesas ARM32 SoCs.
 
--- 
-Dmitry
+[1] [PATCH v5 4/5] arm64: dts: r8a7795: enable nfs root on Salvator-X board
+    http://www.spinics.net/lists/arm-kernel/msg452743.html
+
+> > +		stdout-path = &scif2;
+> 
+> No rate? It would be better to be explicit here; you should be able to
+> have:
+> 
+> 	stdout-path = "serial0:115200n8"
+> 
+> Where "115200n8" is replaced with whatever configuration this board
+> actually has.
+
+I think that we have had this discussion before in relation to
+a different board for a different Renesas SoC but I could be mistaken.
+
+The r8a7795 uses the sh-sci serial driver for which the default rate is
+115200. It is hard for me to conceive of a situation where that would
+change without due consideration being given to the implications for DT
+files.
+
+Not specifying the baud here is consistent with what we have
+been doing for ARM32 Renesas SoCs for some time.
