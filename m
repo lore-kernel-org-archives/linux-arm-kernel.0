@@ -1,9 +1,9 @@
 From: kgene@kernel.org (Kukjin Kim)
-Date: Sat, 24 Oct 2015 06:23:32 +0900
-Subject: [GIT PULL 3/5] Late Samsung SoC updates for v4.4
+Date: Sat, 24 Oct 2015 06:26:27 +0900
+Subject: [GIT PULL 4/5] Late Samsung driver updates for v4.4
 In-Reply-To: <562AA40E.4050407@kernel.org>
 References: <562AA40E.4050407@kernel.org>
-Message-ID: <562AA554.3040604@kernel.org>
+Message-ID: <562AA603.7040600@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -14,39 +14,64 @@ The following changes since commit 6ff33f3902c3b1c5d0db6b1e2c70b6d76fba357f:
 are available in the git repository at:
 
   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-tags/samsung-soc
+tags/samsung-driver
 
-for you to fetch changes up to 97d5c7a77e39ab96a2a6137de0e35dd6e3f38325:
+for you to fetch changes up to c612d5a7785b307df96938d590c3a1edfb624ccf:
 
-  Documentation: EXYNOS: Update bootloader interface on exynos542x
-(2015-10-24 04:43:31 +0900)
-
-----------------------------------------------------------------
-Samsung SoC updates for v4.4
-
-- use PWM lookup table with pwm_add_table() for the following boards
-  : s3c24xx h1940 and rx1950
-  : s3c64xx smdk6410, crag6410, hmt and smartq
-- document: update bootloader interface on exynos542x
+  cpufreq: s5pv210: remove superfluous CONFIG_PM ifdefs (2015-10-24
+04:34:50 +0900)
 
 ----------------------------------------------------------------
-Krzysztof Kozlowski (1):
-      Documentation: EXYNOS: Update bootloader interface on exynos542x
+Samsung driver udpates for v4.4
 
-Thierry Reding (6):
-      ARM: S3C24XX: Use PWM lookup table for mach-h1940
-      ARM: S3C24XX: Use PWM lookup table for mach-rx1950
-      ARM: S3C64XX: Use PWM lookup table for smdk6410
-      ARM: S3C64XX: Use PWM lookup table for mach-crag6410
-      ARM: S3C64XX: Use PWM lookup table for mach-hmt
-      ARM: S3C64XX: Use PWM lookup table for mach-smartq
+- add support for exynos SROM controller DT based driver
+  (drivers/soc/samsung/exynos-srom.c)
+  : Since the exynos SROM registers are used during Suspend to RAM
+    so the exynos SROM driver handles the S2R and then we can remove
+    static mapping for SROM registers.
+  : Pankaj tested boot and S2R functionality on Peach-Pi chromebook
+  : Pavel tested on SMDK5410 board
+  : Krzysztof tested on Trats2 (exynos4412) board
+- update Maintainer entry accordingly
+- remove superfluous CONFIG_PM ifdefs with Viresh's ack
 
- Documentation/arm/Samsung/Bootloader-interface.txt |  5 +++--
- arch/arm/mach-s3c24xx/mach-h1940.c                 | 10 +++++++---
- arch/arm/mach-s3c24xx/mach-rx1950.c                |  8 ++++++--
- arch/arm/mach-s3c64xx/dev-backlight.c              |  4 ----
- arch/arm/mach-s3c64xx/mach-crag6410.c              |  9 +++++++--
- arch/arm/mach-s3c64xx/mach-hmt.c                   |  9 +++++++--
- arch/arm/mach-s3c64xx/mach-smartq.c                |  9 +++++++--
- arch/arm/mach-s3c64xx/mach-smdk6410.c              |  8 +++++++-
- 8 files changed, 44 insertions(+), 18 deletions(-)
+----------------------------------------------------------------
+Bartlomiej Zolnierkiewicz (1):
+      cpufreq: s5pv210: remove superfluous CONFIG_PM ifdefs
+
+Pankaj Dubey (8):
+      ARM: EXYNOS: remove unused static mapping of CMU for exynos5
+      ARM: EXYNOS: code cleanup in map.h
+      dt-bindings: add exynos-srom device tree binding
+      ARM: dts: add SROM device node for exynos4
+      ARM: dts: add SROM device node for exynos5
+      drivers: soc: add support for exynos SROM driver
+      MAINTAINERS: add maintainers entry for drivers/soc/samsung
+      ARM: EXYNOS: Remove SROM related register settings from mach-exynos
+
+ .../bindings/arm/samsung/exynos-srom.txt           |  12 ++
+ MAINTAINERS                                        |   1 +
+ arch/arm/boot/dts/exynos4.dtsi                     |   5 +
+ arch/arm/boot/dts/exynos5.dtsi                     |   5 +
+ arch/arm/mach-exynos/Kconfig                       |   2 +
+ arch/arm/mach-exynos/exynos.c                      |  22 ---
+ arch/arm/mach-exynos/include/mach/map.h            |   8 -
+ arch/arm/mach-exynos/regs-srom.h                   |  53 -------
+ arch/arm/mach-exynos/suspend.c                     |  20 +--
+ arch/arm/plat-samsung/include/plat/map-s5p.h       |   1 -
+ drivers/cpufreq/s5pv210-cpufreq.c                  |   2 -
+ drivers/soc/Kconfig                                |   1 +
+ drivers/soc/Makefile                               |   1 +
+ drivers/soc/samsung/Kconfig                        |  13 ++
+ drivers/soc/samsung/Makefile                       |   1 +
+ drivers/soc/samsung/exynos-srom.c                  | 175
++++++++++++++++++++++
+ drivers/soc/samsung/exynos-srom.h                  |  51 ++++++
+ 17 files changed, 269 insertions(+), 104 deletions(-)
+ create mode 100644
+Documentation/devicetree/bindings/arm/samsung/exynos-srom.txt
+ delete mode 100644 arch/arm/mach-exynos/regs-srom.h
+ create mode 100644 drivers/soc/samsung/Kconfig
+ create mode 100644 drivers/soc/samsung/Makefile
+ create mode 100644 drivers/soc/samsung/exynos-srom.c
+ create mode 100644 drivers/soc/samsung/exynos-srom.h
