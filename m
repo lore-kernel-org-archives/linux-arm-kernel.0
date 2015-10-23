@@ -1,67 +1,133 @@
 From: eric.auger@linaro.org (Eric Auger)
-Date: Fri, 23 Oct 2015 14:37:08 +0200
-Subject: [PATCH v3 0/7] VFIO platform reset module rework
-Message-ID: <1445603835-14506-1-git-send-email-eric.auger@linaro.org>
+Date: Fri, 23 Oct 2015 14:37:09 +0200
+Subject: [PATCH v3 1/7] vfio: platform: introduce vfio-platform-base module
+In-Reply-To: <1445603835-14506-1-git-send-email-eric.auger@linaro.org>
+References: <1445603835-14506-1-git-send-email-eric.auger@linaro.org>
+Message-ID: <1445603835-14506-2-git-send-email-eric.auger@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series fixes the current implementation by getting rid of the
-usage of __symbol_get which caused a compilation issue with
-CONFIG_MODULES disabled. On top of this, the usage of MODULE_ALIAS makes
-possible to add a new reset module without being obliged to update the
-framework. The new implementation relies on the reset module registering
-its reset function to the vfio-platform driver.
+To prepare for vfio platform reset rework let's build
+vfio_platform_common.c and vfio_platform_irq.c in a separate
+module from vfio-platform and vfio-amba. This makes possible
+to have separate module inits and works around a race between
+platform driver init and vfio reset module init: that way we
+make sure symbols exported by base are available when vfio-platform
+driver gets probed.
 
-The series is available at
+The open/release being implemented in the base module, the ref
+count is applied to the parent module instead.
 
-https://git.linaro.org/people/eric.auger/linux.git/shortlog/refs/heads/v4.3-rc6-rework-v3
+Signed-off-by: Eric Auger <eric.auger@linaro.org>
+Suggested-by: Arnd Bergmann <arnd@arndb.de>
 
-Best Regards
+---
 
-Eric
+v3: creation
+---
+ drivers/vfio/platform/Makefile                |  6 ++++--
+ drivers/vfio/platform/vfio_amba.c             |  1 +
+ drivers/vfio/platform/vfio_platform.c         |  1 +
+ drivers/vfio/platform/vfio_platform_common.c  | 13 +++++++++++--
+ drivers/vfio/platform/vfio_platform_private.h |  1 +
+ 5 files changed, 18 insertions(+), 4 deletions(-)
 
-v2 -> v3:
-- use driver_mutex instead of reset_mutex
-- style fixes: single mutex_unlock
-- use static nodes; vfio_platform_register_reset now is a macro
-- vfio_platform_reset_private.h removed since reset_module_(un)register
-  disappear. No use of symbol_get anymore
-- new patch introducing vfio-platform-base
-- reset look-up moved back at vfio-platform probe time
-- new patch featuring dev_info/dev_warn
-
-v1 -> v2:
-* in vfio_platform_common.c:
-  - move reset lookup at load time and put reset at release: this is to
-    prevent a race between the 2 load module loads
-  - reset_list becomes static
-  - vfio_platform_register/unregister_reset take a const char * as compat
-  - fix node link
-  - remove old combo struct and cleanup proto of vfio_platform_get_reset
-  - add mutex to protect the reset list
-* in calxeda xgmac reset module
-  - introduce vfio_platform_reset_private.h
-  - use module_vfio_reset_handler macro
-  - do not export vfio_platform_calxedaxgmac_reset symbol anymore
-  - add a pr_info to show the device is reset by vfio reset module
-
-
-Eric Auger (7):
-  vfio: platform: introduce vfio-platform-base module
-  vfio: platform: add capability to register a reset function
-  vfio: platform: introduce module_vfio_reset_handler macro
-  vfio: platform: reset: calxedaxgmac: add reset function registration
-  vfio: platform: add compat in vfio_platform_device
-  vfio: platform: use list of registered reset function
-  vfio: platform: add dev_info on device reset
-
- drivers/vfio/platform/Makefile                     |   6 +-
- .../platform/reset/vfio_platform_calxedaxgmac.c    |   5 +-
- drivers/vfio/platform/vfio_amba.c                  |   1 +
- drivers/vfio/platform/vfio_platform.c              |   1 +
- drivers/vfio/platform/vfio_platform_common.c       | 118 +++++++++++++++------
- drivers/vfio/platform/vfio_platform_private.h      |  40 ++++++-
- 6 files changed, 129 insertions(+), 42 deletions(-)
-
+diff --git a/drivers/vfio/platform/Makefile b/drivers/vfio/platform/Makefile
+index 9ce8afe..41a6224 100644
+--- a/drivers/vfio/platform/Makefile
++++ b/drivers/vfio/platform/Makefile
+@@ -1,10 +1,12 @@
+-
+-vfio-platform-y := vfio_platform.o vfio_platform_common.o vfio_platform_irq.o
++vfio-platform-base-y := vfio_platform_common.o vfio_platform_irq.o
++vfio-platform-y := vfio_platform.o
+ 
+ obj-$(CONFIG_VFIO_PLATFORM) += vfio-platform.o
++obj-$(CONFIG_VFIO_PLATFORM) += vfio-platform-base.o
+ obj-$(CONFIG_VFIO_PLATFORM) += reset/
+ 
+ vfio-amba-y := vfio_amba.o
+ 
+ obj-$(CONFIG_VFIO_AMBA) += vfio-amba.o
++obj-$(CONFIG_VFIO_AMBA) += vfio-platform-base.o
+ obj-$(CONFIG_VFIO_AMBA) += reset/
+diff --git a/drivers/vfio/platform/vfio_amba.c b/drivers/vfio/platform/vfio_amba.c
+index ff0331f..a66479b 100644
+--- a/drivers/vfio/platform/vfio_amba.c
++++ b/drivers/vfio/platform/vfio_amba.c
+@@ -67,6 +67,7 @@ static int vfio_amba_probe(struct amba_device *adev, const struct amba_id *id)
+ 	vdev->flags = VFIO_DEVICE_FLAGS_AMBA;
+ 	vdev->get_resource = get_amba_resource;
+ 	vdev->get_irq = get_amba_irq;
++	vdev->parent_module = THIS_MODULE;
+ 
+ 	ret = vfio_platform_probe_common(vdev, &adev->dev);
+ 	if (ret) {
+diff --git a/drivers/vfio/platform/vfio_platform.c b/drivers/vfio/platform/vfio_platform.c
+index cef645c..f1625dc 100644
+--- a/drivers/vfio/platform/vfio_platform.c
++++ b/drivers/vfio/platform/vfio_platform.c
+@@ -65,6 +65,7 @@ static int vfio_platform_probe(struct platform_device *pdev)
+ 	vdev->flags = VFIO_DEVICE_FLAGS_PLATFORM;
+ 	vdev->get_resource = get_platform_resource;
+ 	vdev->get_irq = get_platform_irq;
++	vdev->parent_module = THIS_MODULE;
+ 
+ 	ret = vfio_platform_probe_common(vdev, &pdev->dev);
+ 	if (ret)
+diff --git a/drivers/vfio/platform/vfio_platform_common.c b/drivers/vfio/platform/vfio_platform_common.c
+index e43efb5..184e9d2 100644
+--- a/drivers/vfio/platform/vfio_platform_common.c
++++ b/drivers/vfio/platform/vfio_platform_common.c
+@@ -23,6 +23,10 @@
+ 
+ #include "vfio_platform_private.h"
+ 
++#define DRIVER_VERSION  "0.10"
++#define DRIVER_AUTHOR   "Antonios Motakis <a.motakis@virtualopensystems.com>"
++#define DRIVER_DESC     "VFIO platform base module"
++
+ static DEFINE_MUTEX(driver_lock);
+ 
+ static const struct vfio_platform_reset_combo reset_lookup_table[] = {
+@@ -146,7 +150,7 @@ static void vfio_platform_release(void *device_data)
+ 
+ 	mutex_unlock(&driver_lock);
+ 
+-	module_put(THIS_MODULE);
++	module_put(vdev->parent_module);
+ }
+ 
+ static int vfio_platform_open(void *device_data)
+@@ -154,7 +158,7 @@ static int vfio_platform_open(void *device_data)
+ 	struct vfio_platform_device *vdev = device_data;
+ 	int ret;
+ 
+-	if (!try_module_get(THIS_MODULE))
++	if (!try_module_get(vdev->parent_module))
+ 		return -ENODEV;
+ 
+ 	mutex_lock(&driver_lock);
+@@ -573,3 +577,8 @@ struct vfio_platform_device *vfio_platform_remove_common(struct device *dev)
+ 	return vdev;
+ }
+ EXPORT_SYMBOL_GPL(vfio_platform_remove_common);
++
++MODULE_VERSION(DRIVER_VERSION);
++MODULE_LICENSE("GPL v2");
++MODULE_AUTHOR(DRIVER_AUTHOR);
++MODULE_DESCRIPTION(DRIVER_DESC);
+diff --git a/drivers/vfio/platform/vfio_platform_private.h b/drivers/vfio/platform/vfio_platform_private.h
+index 1c9b3d5..7128690 100644
+--- a/drivers/vfio/platform/vfio_platform_private.h
++++ b/drivers/vfio/platform/vfio_platform_private.h
+@@ -56,6 +56,7 @@ struct vfio_platform_device {
+ 	u32				num_irqs;
+ 	int				refcnt;
+ 	struct mutex			igate;
++	struct module			*parent_module;
+ 
+ 	/*
+ 	 * These fields should be filled by the bus specific binder
 -- 
 1.9.1
