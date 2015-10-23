@@ -1,33 +1,30 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Fri, 23 Oct 2015 19:54:25 +0900
-Subject: [PATCH 3/3] i2c: uniphier: add bindings for UniPhier I2C
- controllers
-In-Reply-To: <20151022210039.GB1516@katana>
-References: <1438243942-26401-1-git-send-email-yamada.masahiro@socionext.com>
- <1438243942-26401-4-git-send-email-yamada.masahiro@socionext.com>
- <20151022210039.GB1516@katana>
-Message-ID: <CAK7LNARtLzE42t3XoiSXAjwgeL=7tcC6i+baQA9hZ2U-zAiqiw@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 23 Oct 2015 12:55:34 +0200
+Subject: [PATCH v2 4/5] drivers: firmware: psci: add extended stateid
+ power_state support
+In-Reply-To: <20151023104457.GA9309@red-moon>
+References: <1436375811-10529-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <3982126.UybqODJKJo@wuerfel> <20151023104457.GA9309@red-moon>
+Message-ID: <7012327.dvizHt4W5S@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-10-23 6:00 GMT+09:00 Wolfram Sang <wsa@the-dreams.de>:
-> On Thu, Jul 30, 2015 at 05:12:22PM +0900, Masahiro Yamada wrote:
->> Device Tree bindings for two I2C controllers embedded in
->> UniPhier SoCs.
->>
->> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
->
-> Please split this into two files with filenames matching those of the
-> drivers. I know they will be very similar but I'd like to keep
-> consistent.
->
+On Friday 23 October 2015 11:44:58 Lorenzo Pieralisi wrote:
+> 
+> Problem with Qemu emulation is that it does not emulate the PSCI 1.0
+> specs correctly (it does not even consider PSCI 1.0 functions proper PSCI
+> calls), I tested it and I think we should update Qemu as we
+> did with KVM kernel code instead of working around it by dodging the
+> problem in the PSCI implementation by adding code that checks the
+> PSCI version before issuing the PSCI calls through the respective
+> conduit.
+> 
+> Thoughts appreciated.
 
-OK, I splited it in v2.
+I think we really cannot break existing qemu installations, but need
+a way to detect whether we are dealing with a broken qemu (and warn
+about that) or with a working PSCI implementation.
 
-Each document was merged into the corresponding driver patch.
+Fixing qemu is of course a good idea, but it's not sufficient.
 
-
-
--- 
-Best Regards
-Masahiro Yamada
+	Arnd
