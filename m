@@ -1,59 +1,62 @@
 From: eric.auger@linaro.org (Eric Auger)
-Date: Fri, 23 Oct 2015 17:47:21 +0200
-Subject: [PATCH v4 3/7] vfio: platform: introduce module_vfio_reset_handler
- macro
+Date: Fri, 23 Oct 2015 17:47:22 +0200
+Subject: [PATCH v4 4/7] vfio: platform: reset: calxedaxgmac: add reset
+ function registration
 In-Reply-To: <1445615245-31124-1-git-send-email-eric.auger@linaro.org>
 References: <1445615245-31124-1-git-send-email-eric.auger@linaro.org>
-Message-ID: <1445615245-31124-4-git-send-email-eric.auger@linaro.org>
+Message-ID: <1445615245-31124-5-git-send-email-eric.auger@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The module_vfio_reset_handler macro
-- define a module alias
-- implement module init/exit function which respectively registers
-  and unregisters the reset function.
+This patch adds the reset function registration/unregistration.
+This is handled through the module_vfio_reset_handler macro. This
+latter also defines a MODULE_ALIAS which simplifies the load from
+vfio-platform.
 
 Signed-off-by: Eric Auger <eric.auger@linaro.org>
+Reviewed-by: Arnd Bergmann <arnd@arndb.de>
 
 ---
+
 v3 -> v4:
-- pass reset to vfio_platform_unregister_reset
+- I restored the EXPORT_SYMBOL which will be removed when switching the
+  lookup method
+- Add Arnd R-b.
 
 v2 -> v3:
-- use vfio_platform_register_reset macro
+- do not include vfio_platform_reset_private.h anymore (removed)
+- remove pr_info
+- rework commit message
 
 v1 -> v2:
-- remove vfio_platform_reset_private.h and move back the macro to
-  vfio_platform_private.h header: removed reset_module_register &
-  unregister (symbol_get)
-- defines the module_vfio_reset_handler macro as suggested by Arnd
-  (formerly in vfio_platform_reset_private.h)
+- uses the module_vfio_reset_handler macro
+- add pr_info on vfio reset
+- do not export vfio_platform_calxedaxgmac_reset symbol anymore
 ---
- drivers/vfio/platform/vfio_platform_private.h | 14 ++++++++++++++
- 1 file changed, 14 insertions(+)
+ drivers/vfio/platform/reset/vfio_platform_calxedaxgmac.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/vfio/platform/vfio_platform_private.h b/drivers/vfio/platform/vfio_platform_private.h
-index c563940..fd262be 100644
---- a/drivers/vfio/platform/vfio_platform_private.h
-+++ b/drivers/vfio/platform/vfio_platform_private.h
-@@ -110,4 +110,18 @@ static struct vfio_platform_reset_node __reset ## _node = {	\
- };								\
- __vfio_platform_register_reset(&__reset ## _node)
+diff --git a/drivers/vfio/platform/reset/vfio_platform_calxedaxgmac.c b/drivers/vfio/platform/reset/vfio_platform_calxedaxgmac.c
+index 619dc7d..80718f2 100644
+--- a/drivers/vfio/platform/reset/vfio_platform_calxedaxgmac.c
++++ b/drivers/vfio/platform/reset/vfio_platform_calxedaxgmac.c
+@@ -30,8 +30,6 @@
+ #define DRIVER_AUTHOR   "Eric Auger <eric.auger@linaro.org>"
+ #define DRIVER_DESC     "Reset support for Calxeda xgmac vfio platform device"
  
-+#define module_vfio_reset_handler(compat, reset)		\
-+MODULE_ALIAS("vfio-reset:" compat);				\
-+static int __init reset ## _module_init(void)			\
-+{								\
-+	vfio_platform_register_reset(compat, reset);		\
-+	return 0;						\
-+};								\
-+static void __exit reset ## _module_exit(void)			\
-+{								\
-+	vfio_platform_unregister_reset(compat, reset);		\
-+};								\
-+module_init(reset ## _module_init);				\
-+module_exit(reset ## _module_exit)
+-#define CALXEDAXGMAC_COMPAT "calxeda,hb-xgmac"
+-
+ /* XGMAC Register definitions */
+ #define XGMAC_CONTROL           0x00000000      /* MAC Configuration */
+ 
+@@ -80,6 +78,8 @@ int vfio_platform_calxedaxgmac_reset(struct vfio_platform_device *vdev)
+ }
+ EXPORT_SYMBOL_GPL(vfio_platform_calxedaxgmac_reset);
+ 
++module_vfio_reset_handler("calxeda,hb-xgmac", vfio_platform_calxedaxgmac_reset);
 +
- #endif /* VFIO_PLATFORM_PRIVATE_H */
+ MODULE_VERSION(DRIVER_VERSION);
+ MODULE_LICENSE("GPL v2");
+ MODULE_AUTHOR(DRIVER_AUTHOR);
 -- 
 1.9.1
