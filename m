@@ -1,44 +1,38 @@
 From: kgene@kernel.org (Kukjin Kim)
-Date: Sat, 24 Oct 2015 03:34:58 +0900
-Subject: [PATCH v5 8/8] ARM: EXYNOS: Remove SROM related register settings
- from mach-exynos
-In-Reply-To: <1445332540-12814-9-git-send-email-pankaj.dubey@samsung.com>
-References: <1445332540-12814-1-git-send-email-pankaj.dubey@samsung.com>
- <1445332540-12814-9-git-send-email-pankaj.dubey@samsung.com>
-Message-ID: <562A7DD2.2000000@kernel.org>
+Date: Sat, 24 Oct 2015 03:36:37 +0900
+Subject: [PATCHv2] ARM: dts: change the compatible from exynos5250 to
+ exynos5420 for mshc
+In-Reply-To: <562997F7.3060803@samsung.com>
+References: <1445565713-4000-1-git-send-email-jh80.chung@samsung.com>
+ <562997F7.3060803@samsung.com>
+Message-ID: <562A7E35.50909@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/20/15 18:15, Pankaj Dubey wrote:
-> As now we have dedicated driver for SROM controller, it will take care
-> of saving register banks during S2R so we can safely remove these
-> settings from mach-exynos.
+On 10/23/15 11:14, Krzysztof Kozlowski wrote:
+> On 23.10.2015 11:01, Jaehoon Chung wrote:
+>> Exynos3250 and exnos5250 are some differences in Mobile Storage Host.
+>> (For example, exynos3250 support the HS400 mode, but exynos5250 doesn't
+>> support it.)
+>> Exynos3250 can perform the similar function with exynos5420 compatible.
+>> So this patch changes the compatible from exynos5250 to exynos5420
+>> for mshc.
+>>
+>> Signed-off-by: Jaehoon Chung <jh80.chung@samsung.com>
+>> ---
+>> Changelog v2:
+>> 	- Drop "mmc: dw_mmc: exynos: Add the exynos3250 compatible" patch.
+>> 	- Describe commit-message more detailedly than before.
+>> 	- Change to exynos5420, not add new compatible (exynos3250).
+>>
+>>  arch/arm/boot/dts/exynos3250.dtsi | 4 ++--
+>>  1 file changed, 2 insertions(+), 2 deletions(-)
 > 
-> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+> 
+> Thanks! Looks good:
+> 
 > Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> ---
->  arch/arm/mach-exynos/Kconfig                 |  2 ++
->  arch/arm/mach-exynos/exynos.c                | 17 ---------
->  arch/arm/mach-exynos/include/mach/map.h      |  3 --
->  arch/arm/mach-exynos/regs-srom.h             | 53 ----------------------------
->  arch/arm/mach-exynos/suspend.c               | 20 ++---------
->  arch/arm/plat-samsung/include/plat/map-s5p.h |  1 -
->  6 files changed, 4 insertions(+), 92 deletions(-)
->  delete mode 100644 arch/arm/mach-exynos/regs-srom.h
 > 
-> diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
-> index 3a10f1a..62c3139 100644
-> --- a/arch/arm/mach-exynos/Kconfig
-> +++ b/arch/arm/mach-exynos/Kconfig
-> @@ -27,6 +27,8 @@ menuconfig ARCH_EXYNOS
->  	select SRAM
->  	select THERMAL
->  	select MFD_SYSCON
-> +	select SOC_SAMSUNG
-> +	select EXYNOS_SROM if PM
+Applied, thanks.
 
-Please add them in alphabetical next time...I've changed the order in
-this time.
-
-Thanks,
-Kukjin
+- Kukjin
