@@ -1,37 +1,25 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Fri, 23 Oct 2015 17:02:09 +0100
-Subject: [PATCH] drivers: psci: make PSCI 1.0 functions initialization
- version dependent
-In-Reply-To: <7h611xr4on.fsf@deeprootsystems.com>
-References: <1445611610-12871-1-git-send-email-lorenzo.pieralisi@arm.com>
- <7h611xr4on.fsf@deeprootsystems.com>
-Message-ID: <20151023160209.GB13029@red-moon>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 23 Oct 2015 18:02:15 +0200
+Subject: [PATCH v3] VFIO: platform: reset: AMD xgbe reset module
+In-Reply-To: <1445615913-31825-1-git-send-email-eric.auger@linaro.org>
+References: <1445615913-31825-1-git-send-email-eric.auger@linaro.org>
+Message-ID: <4674490.OAKeLluVeG@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 23, 2015 at 08:21:44AM -0700, Kevin Hilman wrote:
-> Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> writes:
-
-[...]
-
-> > Tested on:
-> >
-> > - Juno host
-> > - AMD Seattle host
-> > - kvmtool arm64 guest (on Juno arm64 defconfig host)
-> > - Qemu x86 host (aarch64 emulation)
-> >
-> > A run on kernelci and consequent tested-by tags would be much appreciated,
-> > thanks for spotting this and for your help.
+On Friday 23 October 2015 17:58:33 Eric Auger wrote:
+> This patch introduces a module that registers and implements a low-level
+> reset function for the AMD XGBE device.
 > 
-> I tested manually on my local qemu that was failing without this patch,
-> and it works:
+> it performs the following actions:
+> - reset the PHY
+> - disable auto-negotiation
+> - disable & clear auto-negotiation IRQ
+> - soft-reset the MAC
 > 
-> Tested-by: Kevin Hilman <khilman@linaro.org>
+> Those tiny pieces of code are inherited from the native xgbe driver.
 > 
-> We'll add this onto arm-soc drivers/psci and then it will have a spin through
-> kernelci.
+> Signed-off-by: Eric Auger <eric.auger@linaro.org>
+> 
 
-Thank you very much !
-
-Lorenzo
+Reviewed-by: Arnd Bergmann <arnd@arndb.de>
