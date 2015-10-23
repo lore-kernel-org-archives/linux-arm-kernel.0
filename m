@@ -1,35 +1,88 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 23 Oct 2015 15:12:16 +0200
-Subject: [PATCH v3 6/7] vfio: platform: use list of registered reset
- function
-In-Reply-To: <1445603835-14506-7-git-send-email-eric.auger@linaro.org>
-References: <1445603835-14506-1-git-send-email-eric.auger@linaro.org>
- <1445603835-14506-7-git-send-email-eric.auger@linaro.org>
-Message-ID: <4934120.DeNtNjTIFs@wuerfel>
+From: robh+dt@kernel.org (Rob Herring)
+Date: Fri, 23 Oct 2015 08:29:23 -0500
+Subject: [PATCH v4 1/3] dt-bindings: rockchip-thermal: Add the pinctrl
+ states in this document
+In-Reply-To: <1445599528-18825-2-git-send-email-wxt@rock-chips.com>
+References: <1445599528-18825-1-git-send-email-wxt@rock-chips.com>
+ <1445599528-18825-2-git-send-email-wxt@rock-chips.com>
+Message-ID: <CAL_JsqJasEvQKkT-ubyBwxR6GhLejCF=XiihgjmQ9nXeBPveOw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 23 October 2015 14:37:14 Eric Auger wrote:
-> Remove the static lookup table and use the dynamic list of registered
-> reset functions instead. Also load the reset module through its alias.
-> The reset struct module pointer is stored in vfio_platform_device.
-> 
-> We also remove the useless struct device pointer parameter in
-> vfio_platform_get_reset.
-> 
-> This patch fixes the issue related to the usage of __symbol_get, which
-> besides from being moot, prevented compilation with CONFIG_MODULES
-> disabled.
-> 
-> Also usage of MODULE_ALIAS makes possible to add a new reset module
-> without needing to update the framework. This was suggested by Arnd.
-> 
-> Signed-off-by: Eric Auger <eric.auger@linaro.org>
-> Reported-by: Arnd Bergmann <arnd@arndb.de>
-> 
-> 
-Reviewed-by: Arnd Bergmann <arnd@arndb.de>
+On Fri, Oct 23, 2015 at 6:25 AM, Caesar Wang <wxt@rock-chips.com> wrote:
+> The "init" pinctrl is defined we'll set
+> pinctrl to this state before probe and then "default" after probe.
+> Add the "init" and "sleep" pinctrl as the OTP gpio state, since we need
+> switch the pin to gpio state before the TSADC controller is reset.
+>
+> AFAIK, the TSADC controller is reset, the tshut polarity will be
+> a *low* signal in a short period of time for some devices.
+>
+> Says:
+> The TSADC get the temperature on rockchip thermal.
+>
+> If T(current temperature) < (setting temperature), the OTP output the
+> *high* signal.
+> If T(current temperature) > (setting temperature), the OTP output the
+> *low* Signal.
+>
+> In some cases, the OTP pin is connected to the PMIC, maybe the
+> PMIC can accept the reset response time to avoid this issue.
+>
+> In other words, the system will be always reboot if we make the
+> OTP pin is connected the others IC to control the power.
+>
+> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
+> Reviewed-by: Douglas Anderson <dianders@chromium.org>
 
-but doesn't this need to come before patch 4/7?
+Acked-by: Rob Herring <robh@kernel.org>
 
-	Arnd
+> ---
+>
+> Changes in v4: None
+> Changes in v3:
+>   - Add the pictrl states decription in document.
+>
+> Changes in v2:
+>   - Add the 'init' pinctrl more decription in commit.
+>   - Fix the subject to make more obvious in PATCH[1/2]
+>   - Resend this patch v2 since fix the subject to be specific.
+>
+> Changes in v1:
+>   - As the Doug comments, add the 'init' property to sync document.
+>
+>  .../devicetree/bindings/thermal/rockchip-thermal.txt          | 11 +++++++++--
+>  1 file changed, 9 insertions(+), 2 deletions(-)
+>
+> diff --git a/Documentation/devicetree/bindings/thermal/rockchip-thermal.txt b/Documentation/devicetree/bindings/thermal/rockchip-thermal.txt
+> index ef802de..b38200d 100644
+> --- a/Documentation/devicetree/bindings/thermal/rockchip-thermal.txt
+> +++ b/Documentation/devicetree/bindings/thermal/rockchip-thermal.txt
+> @@ -12,6 +12,11 @@ Required properties:
+>  - resets : Must contain an entry for each entry in reset-names.
+>            See ../reset/reset.txt for details.
+>  - reset-names : Must include the name "tsadc-apb".
+> +- pinctrl-names : The pin control state names;
+> +- pinctrl-0 : The "init" pinctrl state, it will be set before device probe.
+> +- pinctrl-1 : The "default" pinctrl state, it will be set after reset the
+> +             TSADC controller.
+> +- pinctrl-2 : The "sleep" pinctrl state, it will be in for suspend.
+>  - #thermal-sensor-cells : Should be 1. See ./thermal.txt for a description.
+>  - rockchip,hw-tshut-temp : The hardware-controlled shutdown temperature value.
+>  - rockchip,hw-tshut-mode : The hardware-controlled shutdown mode 0:CRU 1:GPIO.
+> @@ -27,8 +32,10 @@ tsadc: tsadc at ff280000 {
+>         clock-names = "tsadc", "apb_pclk";
+>         resets = <&cru SRST_TSADC>;
+>         reset-names = "tsadc-apb";
+> -       pinctrl-names = "default";
+> -       pinctrl-0 = <&otp_out>;
+> +       pinctrl-names = "init", "default", "sleep";
+> +       pinctrl-0 = <&otp_gpio>;
+> +       pinctrl-1 = <&otp_out>;
+> +       pinctrl-2 = <&otp_gpio>;
+>         #thermal-sensor-cells = <1>;
+>         rockchip,hw-tshut-temp = <95000>;
+>         rockchip,hw-tshut-mode = <0>;
+> --
+> 1.9.1
+>
