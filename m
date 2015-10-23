@@ -1,54 +1,85 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 23 Oct 2015 11:17:06 +0200
-Subject: [PATCH v3 0/2] Common SerDes driver for TI's Keystone Platforms
-In-Reply-To: <CAPw-ZTk1vJA3YSwLHBNMYP0t5k2tW0HTKse+37rL8izWN33y-w@mail.gmail.com>
-References: <1445432201-16007-1-git-send-email-w-kwok2@ti.com>
- <56295B9E.9030201@ti.com>
- <CAPw-ZTk1vJA3YSwLHBNMYP0t5k2tW0HTKse+37rL8izWN33y-w@mail.gmail.com>
-Message-ID: <3702663.07h6YO0UjY@wuerfel>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 23 Oct 2015 11:17:54 +0200
+Subject: [PATCH] mtd: document linux-specific partition parser DT binding
+In-Reply-To: <20151015162210.GA4545@localhost>
+References: <1444915191-28350-1-git-send-email-linus.walleij@linaro.org>
+ <20151015162210.GA4545@localhost>
+Message-ID: <CACRpkdYboyXQ7tz8gSTafVLJy26E3qLAbcKyjOsEhh8j=3S1bQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 22 October 2015 15:27:05 Loc Ho wrote:
-> >
-> > phy-xgene.c
-> > -----------
-> >
-> > Looking at other drivers under drivers/phy, I could find phy-xgene.c which
-> > is close Keystone SerDes driver (. This is called APM X-Gene Multi-Purpose
-> > PHY driver. It defines following mode per the driver code
-> >
-> >         MODE_SATA       = 0,    /* List them for simple reference */
-> >         MODE_SGMII      = 1,
-> >         MODE_PCIE       = 2,
-> >         MODE_USB        = 3,
-> >         MODE_XFI        = 4,
-> >
-> > But seems to support only MODE_SATA. From the code, it appears, this driver
-> > is expected to be enhanced in the future to support additional modes. I have
-> > copied the author to this email to participate in this discussion.
-> 
-> Let me comment on this APM X-Gene driver. This driver is dead and
-> won't be supported in near or foreseeable future. And someday, it will
-> be ripped out. Based on experience, this solution (having PHY driver
-> in Linux) can't be supported across boards and etc as it is just too
-> much maintenance. And therefore, we followed Arnd B guidance and move
-> all this into the boot loader. From Linux or OS perspective, it only
-> cares about the interface in which its interface with. This is just
-> your reference and may be this will help you as well.
+On Thu, Oct 15, 2015 at 6:22 PM, Brian Norris
+<computersforpeace@gmail.com> wrote:
 
-This depends a lot on the use case. If the chip is only used on server
-parts that have a real firmware and you can deliver bug fixes for the
-firmware if necessary, it's always best to do as much of the setup as
-possible there, and let Linux see a simplified view of the hardware.
+> Are you trying to use this binding, or is this just purely a mechanical
+> documentation issue? I ask, because it seems that binding never really
+> got reviewed at all, and others have recently tried to extend support
+> for it generically [1], but a few objections came up [2][3].
 
-However, for embedded systems that tend to ship with a minimal binary
-bootloader and no way to update that as an end-user, we rely on Linux
-to know about all the hardware that requires some form of setup, which
-is why we have all sorts of drivers and frameworks in the kernel that
-a server can easily ignore.
+I am using it in this devicetree patch:
+http://marc.info/?l=linux-arm-kernel&m=144492610417605&w=2
 
-While keystone can show up in servers that won't use this driver, my
-impression is that its main market is actually in embedded space.
+And this devicetree patch:
+http://marc.info/?l=linux-arm-kernel&m=144490455308758&w=2
 
-	Arnd
+Otherwise the AFS partition type will not be scanned.
+
+The other option is to add "afs" to this list in
+drivers/mtd/maps/physmap_of.c:
+
+diff --git a/drivers/mtd/maps/physmap_of.c b/drivers/mtd/maps/physmap_of.c
+index 3e614e9119d5..6233473a55d6 100644
+--- a/drivers/mtd/maps/physmap_of.c
++++ b/drivers/mtd/maps/physmap_of.c
+@@ -110,7 +110,7 @@ static struct mtd_info *obsolete_probe(struct
+platform_device *dev,
+    default is use. These take precedence over other device tree
+    information. */
+ static const char * const part_probe_types_def[] = {
+-       "cmdlinepart", "RedBoot", "ofpart", "ofoldpart", NULL };
++       "cmdlinepart", "RedBoot", "ofpart", "ofoldpart", "afs", NULL };
+
+I can send a patch like this if you prefer?
+
+> Unfortunately I/we dropped the ball a bit on that thread, but we'd
+> ideally like to address those concerns in a new binding that is
+> supported for all MTDs, and deprecate the old one. The new one would
+> probably not directly use the parser name as used by Linux, but define
+> some list of compatible strings that fit DT conventions better. Also, I
+> don't want people including things like "cmdlinepart" in DT, but it
+> should be available as an override if necessary. IOW, DT shouldn't
+> supersede the kernel command line.
+
+This is not for cmdlinepart, as AFS is an actual on-flash format.
+
+> That's not to say we can't document the old one, but I'm curious if
+> there are real users. I'd also like to encourage new users to avoid the
+> old one if we can make that feasible.
+
+I'm happy to do either patch, or define a new binding if you
+prefer, like simply:
+
+partition-type = <string>;
+
+and then we define this as "arm,arm-flash-structure" or something,
+and parse that to "afs" internally in physmap_of.c.
+
+>> + - linux,part-probe: a flash partition type to look for, using the
+>> +   Linux-internal partition naming scheme, e.g. "afs" for the ARM
+>> +   Flash footers.
+>
+> IIUC, this property actually supports a list of parsers, not just a
+> single partition type.
+
+Ah it does. If we wanna go with this patch I'll fix it.
+
+> Also, if we're really going to support this, we should list exactly what
+> strings we support. And that's one of the problems with the existing
+> binding; it supports any old string Linux supports, which doesn't match
+> how we typically want to add bindings (i.e., via proposal + review).
+
+OK that sounds like a case for "arm,arm-flash-structure" for this
+specific binding.
+
+Yours,
+Linus Walleij
