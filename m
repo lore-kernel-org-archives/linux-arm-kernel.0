@@ -1,63 +1,76 @@
-From: eric.auger@linaro.org (Eric Auger)
-Date: Fri, 23 Oct 2015 17:15:43 +0200
-Subject: [PATCH v3 6/7] vfio: platform: use list of registered reset
- function
-In-Reply-To: <5844194.uTAR9RVtmZ@wuerfel>
-References: <1445603835-14506-1-git-send-email-eric.auger@linaro.org>
- <4934120.DeNtNjTIFs@wuerfel> <562A3FFC.4050504@linaro.org>
- <5844194.uTAR9RVtmZ@wuerfel>
-Message-ID: <562A4F1F.1040209@linaro.org>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Fri, 23 Oct 2015 08:21:44 -0700
+Subject: [PATCH] drivers: psci: make PSCI 1.0 functions initialization
+ version dependent
+In-Reply-To: <1445611610-12871-1-git-send-email-lorenzo.pieralisi@arm.com>
+ (Lorenzo Pieralisi's message of "Fri, 23 Oct 2015 15:46:50 +0100")
+References: <1445611610-12871-1-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <7h611xr4on.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/23/2015 04:23 PM, Arnd Bergmann wrote:
-> On Friday 23 October 2015 16:11:08 Eric Auger wrote:
->> Hi Arnd,
->> On 10/23/2015 03:12 PM, Arnd Bergmann wrote:
->>> On Friday 23 October 2015 14:37:14 Eric Auger wrote:
->>>> Remove the static lookup table and use the dynamic list of registered
->>>> reset functions instead. Also load the reset module through its alias.
->>>> The reset struct module pointer is stored in vfio_platform_device.
->>>>
->>>> We also remove the useless struct device pointer parameter in
->>>> vfio_platform_get_reset.
->>>>
->>>> This patch fixes the issue related to the usage of __symbol_get, which
->>>> besides from being moot, prevented compilation with CONFIG_MODULES
->>>> disabled.
->>>>
->>>> Also usage of MODULE_ALIAS makes possible to add a new reset module
->>>> without needing to update the framework. This was suggested by Arnd.
->>>>
->>>> Signed-off-by: Eric Auger <eric.auger@linaro.org>
->>>> Reported-by: Arnd Bergmann <arnd@arndb.de>
->>>>
->>>>
->>> Reviewed-by: Arnd Bergmann <arnd@arndb.de>
->>>
->>> but doesn't this need to come before patch 4/7?
->> Well I don't think so. In [4] we introduce the dynamic registration
->> method but until this patch we still use the old lookup method in the
->> static table. I tested and the reset lookup still works in [4].
->> If we put this one before the registration, the functionality will be
->> lost here.
->>
-> 
-> Ok, I see. I was getting confused by the removal of the EXPORT_SYMBOL
-> statement there and thought it would break the __get_symbol call.
+Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> writes:
 
-Hum no actually you're right. I checked the reset module was loaded but
-effectly the _get_symbol fails. So if I want to keep the functionality
-all along the series I need to remove the EXPORT_SYMBOL when I swap the
-lookup method.
+> The PSCI specifications [1] and the SMC calling convention mandate
+> that unimplemented functions ids must return NOT_SUPPORTED (0xffffffff)
+> if a function id is called but it is not implemented.
+>
+> Consequently, PSCI 1.0 function ids that require the 1.0 PSCI_FEATURES
+> call to be initialized:
+>
+> CPU_SUSPEND (psci_init_cpu_suspend())
+> SYSTEM_SUSPEND (psci_init_system_suspend())
+>
+> call the PSCI_FEATURES function id independently of the detected
+> PSCI firmware version, since, if the PSCI_FEATURES function id is not
+> implemented, it must return NOT_SUPPORTED according to the PSCI
+> specifications, causing the initialization functions to fail as expected.
+>
+> Some existing PSCI implementations (ie Qemu PSCI emulation), do not
+> comply with the SMC calling convention and fail if function ids that are
+> not implemented are called from the OS, causing boot failures.
+>
+> To solve this issue, this patch adds code that checks the PSCI firmware
+> version before calling PSCI 1.0 initialization functions so that the
+> OS makes sure that it is calling 1.0 functions only if the firmware
+> version detected is 1.0 or greater, therefore avoiding PSCI calls
+> that are bound to fail and might cause system boot failures owing
+> to non-compliant PSCI firmware implementations.
+>
+> [1] http://infocenter.arm.com/help/topic/com.arm.doc.den0022c/DEN0022C_Power_State_Coordination_Interface.pdf
+>
+> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Cc: Arnd Bergmann <arnd@arndb.de>
+> Cc: Kevin Hilman <khilman@kernel.org>
+> Cc: Sudeep Holla <sudeep.holla@arm.com>
+> Cc: Olof Johansson <olof@lixom.net>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> ---
+> Arnd, Kevin, Olof,
+>
+> this applies to current arm-soc drivers/psci branch, and solves the
+> issue Kevin detected through kernelci with Qemu emulation:
+>
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-October/380304.html
+>
+> Tested on:
+>
+> - Juno host
+> - AMD Seattle host
+> - kvmtool arm64 guest (on Juno arm64 defconfig host)
+> - Qemu x86 host (aarch64 emulation)
+>
+> A run on kernelci and consequent tested-by tags would be much appreciated,
+> thanks for spotting this and for your help.
 
-Thanks
+I tested manually on my local qemu that was failing without this patch,
+and it works:
 
-Eric
-> 
-> 	Arnd
-> --
-> To unsubscribe from this list: send the line "unsubscribe kvm" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+Tested-by: Kevin Hilman <khilman@linaro.org>
+
+We'll add this onto arm-soc drivers/psci and then it will have a spin through
+kernelci.
+
+Thanks for the quick fix,
+
+Kevin
