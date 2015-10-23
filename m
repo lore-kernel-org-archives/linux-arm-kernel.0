@@ -1,24 +1,27 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 23 Oct 2015 10:21:01 +0200
-Subject: [PATCH 3/6] pinctrl: sunxi: Add H3 PIO controller support
-In-Reply-To: <5627BDB6.6020501@gmail.com>
-References: <5627BDB6.6020501@gmail.com>
-Message-ID: <CACRpkdbMq65VA8B9ZKB19Rh6dv2HxOG5VAV4VcMAGJs64L-W=Q@mail.gmail.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Fri, 23 Oct 2015 10:43:25 +0200
+Subject: [PATCH V6 1/6] i2c: Add i2c support to Freescale Layerscape
+ platforms
+In-Reply-To: <1445587282-29529-1-git-send-email-B48286@freescale.com>
+References: <1445587282-29529-1-git-send-email-B48286@freescale.com>
+Message-ID: <20151023084325.GA13380@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 21, 2015 at 6:30 PM, Jens Kuske <jenskuske@gmail.com> wrote:
+On Fri, Oct 23, 2015 at 04:01:17PM +0800, Zhiqiang Hou wrote:
+> From: Shaohui Xie <Shaohui.Xie@freescale.com>
+> 
+> Modify the I2C_IMX config to support to Layerscape platforms.
+> 
+> Signed-off-by: Shaohui Xie <Shaohui.Xie@freescale.com>
+> Signed-off-by: Hou Zhiqiang <B48286@freescale.com>
 
-> The H3 uses the same pin controller as previous SoC's from Allwinner.
-> Add support for the pins controlled by the main PIO controller.
->
-> Signed-off-by: Jens Kuske <jenskuske@gmail.com>
+Added COMPILE_TEST and applied to for-next, thanks!
 
-This does not apply to my "devel" branch on the pinctrl tree.
-https://git.kernel.org/cgit/linux/kernel/git/linusw/linux-pinctrl.git/log/?h=devel
-
-Please rebase it on the devel branch, add Maxime's ACKs and
-resend so I can apply it.
-
-Yours,
-Linus Walleij
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151023/ad8ce863/attachment.sig>
