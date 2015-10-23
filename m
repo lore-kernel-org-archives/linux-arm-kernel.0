@@ -1,34 +1,46 @@
-From: jeremy.linton@arm.com (Jeremy Linton)
-Date: Fri, 23 Oct 2015 11:32:15 -0500
-Subject: [PATCH] arm64: Align .text section to PAGE_SIZE
-In-Reply-To: <CAKv+Gu_5YPiQOejsAUdVs7YbNJD4tFwuATYq6VNxuXbeRsoYkw@mail.gmail.com>
-References: <1445610134-20528-1-git-send-email-jeremy.linton@arm.com>
- <CAKv+Gu_5YPiQOejsAUdVs7YbNJD4tFwuATYq6VNxuXbeRsoYkw@mail.gmail.com>
-Message-ID: <562A610F.4090101@arm.com>
+From: timur@codeaurora.org (Timur Tabi)
+Date: Fri, 23 Oct 2015 11:38:46 -0500
+Subject: [PATCH] Revert "serial: amba-pl011: fix incorrect integer size in
+ pl011_fifo_to_tty()"
+In-Reply-To: <20151023160246.GM4796@e103592.cambridge.arm.com>
+References: <1445594400-29095-1-git-send-email-shijie.huang@arm.com>
+ <20151023103056.GI4801@e103592.cambridge.arm.com>
+ <562A297A.9030204@codeaurora.org>
+ <20151023133403.GI4796@e103592.cambridge.arm.com> <562A544D.7080506@tabi.org>
+ <20151023160246.GM4796@e103592.cambridge.arm.com>
+Message-ID: <562A6296.3070600@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/23/2015 10:34 AM, Ard Biesheuvel wrote:
-> It looks like fixup_executable() [with DEBUG_RODATA enabled] is the
-> culprit here: it calls create mapping() with a size that gets rounded
-> up to a multiple of PAGE_SIZE, which means the region that ends up
-> getting its exec bits cleared is larger than it should. Perhaps it is
-> better to fix that instead?
+On 10/23/2015 11:02 AM, Dave P Martin wrote:
+> I'm pretty sure CREAD should default to enabled[1], and that usually
+> software won't modify it.
+>
+> Assuming that this is indeed the problem, it's possible that another bug
+> in the pl011 driver is wrongly clearing this flag.  Sadly I don't have
+> time to look at the code again just now ...:(
 
-Ard,
-	Thanks for taking a look at this!
+Perhaps, but !CREAD is definitely broken without this patch.  So if the 
+driver really is clearing CREAD somewhere else, then that's where the 
+real bug is.
 
-	Your probably right.
+>
+> Could be interesting to stick some BUG_ON(!CREAD) in the driver to
+> try and track down where that's coming from.
 
-	But AFAIK, with just that fix text/ro sections can be partially mapped 
-without ro. It seems to me that putting a little padding in so that they 
-are on separate pages is a good idea, especially since it seems the 
-remaining sections of interest are page aligned, either explicitly in 
-the linker script or via assembly directives in assorted places.
+CREAD is disabled by default when opening the console.  You need to 
+explicitly set it in the termios structure.  I can easily believe that 
+Huang's rootfs is just forgetting to set that bit because for the last 
+five years, it didn't matter.
 
-	Maybe a clearer fix is an additional ifdef in the DEBUG_ALIGN_RODATA 
-stanza which sets ALIGN_DEBUG_RO to align to pagesize if DEBUG_RODATA is 
-set, that way it only takes affect for RODATA.
+Huang,
 
-Thanks,
-	Jeremy
+In the beginning of pl011_set_termios() and sbsa_uart_set_termios(), 
+please add this code:
+
+	BUG_ON(!(termios->c_cflag & CREAD));		
+
+-- 
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the
+Code Aurora Forum, a Linux Foundation Collaborative Project.
