@@ -1,43 +1,27 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Fri, 23 Oct 2015 14:41:12 +0300
-Subject: [PATCH] drivers: net: cpsw: use module_platform_driver
-Message-ID: <1445600472-19242-1-git-send-email-grygorii.strashko@ti.com>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Fri, 23 Oct 2015 13:49:15 +0200
+Subject: [PATCH v2 2/2] i2c: uniphier_f: add UniPhier FIFO-builtin I2C
+ driver
+In-Reply-To: <1445597520-6299-3-git-send-email-yamada.masahiro@socionext.com>
+References: <1445597520-6299-1-git-send-email-yamada.masahiro@socionext.com>
+ <1445597520-6299-3-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <20151023114915.GJ13380@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is no reasons to probe cpsw from late_initcall level
-and it's not recommended. Hence, use module_platform_driver()
-to register and probe cpsw driver from module_init() level.
+On Fri, Oct 23, 2015 at 07:52:00PM +0900, Masahiro Yamada wrote:
+> Add support for on-chip I2C controller used on newer UniPhier SoCs
+> such as PH1-Pro4, PH1-Pro5, etc.  This adapter is equipped with
+> 8-depth TX/RX FIFOs.
+> 
+> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
 
-Cc: Tony Lindgren <tony@atomide.com>
-Acked-by: Mugunthan V N <mugunthanvnm@ti.com>
-Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
----
- drivers/net/ethernet/ti/cpsw.c | 12 +-----------
- 1 file changed, 1 insertion(+), 11 deletions(-)
+Applied to for-next, thanks!
 
-diff --git a/drivers/net/ethernet/ti/cpsw.c b/drivers/net/ethernet/ti/cpsw.c
-index 8fc90f1..e35a34d 100644
---- a/drivers/net/ethernet/ti/cpsw.c
-+++ b/drivers/net/ethernet/ti/cpsw.c
-@@ -2578,17 +2578,7 @@ static struct platform_driver cpsw_driver = {
- 	.remove = cpsw_remove,
- };
- 
--static int __init cpsw_init(void)
--{
--	return platform_driver_register(&cpsw_driver);
--}
--late_initcall(cpsw_init);
--
--static void __exit cpsw_exit(void)
--{
--	platform_driver_unregister(&cpsw_driver);
--}
--module_exit(cpsw_exit);
-+module_platform_driver(cpsw_driver);
- 
- MODULE_LICENSE("GPL");
- MODULE_AUTHOR("Cyril Chemparathy <cyril@ti.com>");
--- 
-2.6.2
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151023/48abc12c/attachment-0001.sig>
