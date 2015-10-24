@@ -1,41 +1,53 @@
-From: German.Rivera@freescale.com (J. German Rivera)
-Date: Fri, 23 Oct 2015 20:31:20 -0500
-Subject: [PATCH] arm64: dts: Added syscon-reboot node for FSL's LS2085A SoC
-Message-ID: <1445650280-9966-1-git-send-email-German.Rivera@freescale.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Sat, 24 Oct 2015 04:29:05 +0200
+Subject: [PATCH] arm64: Align .text section to PAGE_SIZE
+In-Reply-To: <562A78B8.3000503@arm.com>
+References: <1445610134-20528-1-git-send-email-jeremy.linton@arm.com>
+ <CAKv+Gu_5YPiQOejsAUdVs7YbNJD4tFwuATYq6VNxuXbeRsoYkw@mail.gmail.com>
+ <562A610F.4090101@arm.com>
+ <CAKv+Gu_QKpL2X3ZNn9QVZnBa00JrF1v0W1DtkyuGzm1cLREPWg@mail.gmail.com>
+ <562A78B8.3000503@arm.com>
+Message-ID: <CAKv+Gu-TJgMmFtM2zXWArfZZg=dGXR6Q797W_roogL+Hm+fV=Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Added sys-reboot node to the FSL's LS2085A SoC DT to leverage
-the ARM-generic reboot mechanism for this SoC. This mechanism
-is enabled through CONFIG_POWER_RESET_SYSCON.
+(+ Laura, correct email this time)
 
-Signed-off-by: J. German Rivera <German.Rivera@freescale.com>
----
- arch/arm64/boot/dts/freescale/fsl-ls2085a.dtsi | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+http://thread.gmane.org/gmane.linux.ports.arm.kernel/450513
 
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls2085a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls2085a.dtsi
-index e281ceb..6f82163 100644
---- a/arch/arm64/boot/dts/freescale/fsl-ls2085a.dtsi
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls2085a.dtsi
-@@ -131,6 +131,18 @@
- 		interrupts = <1 9 0x4>;
- 	};
- 
-+	rst_ccsr: rstccsr at 1E60000 {
-+	        compatible = "syscon";
-+		reg = <0x0 0x1E60000 0x0 0x10000>;
-+	};
-+
-+	reboot at 65024000 {
-+		compatible ="syscon-reboot";
-+		regmap = <&rst_ccsr>;
-+		offset = <0x0>;
-+		mask = <0x2>;
-+	};
-+
- 	timer {
- 		compatible = "arm,armv8-timer";
- 		interrupts = <1 13 0x8>, /* Physical Secure PPI, active-low */
+On 23 October 2015 at 20:13, Jeremy Linton <jeremy.linton@arm.com> wrote:
+> On 10/23/2015 11:49 AM, Ard Biesheuvel wrote:
+>>
+>> On 23 October 2015 at 18:32, Jeremy Linton <jeremy.linton@arm.com> wrote:
+>
+> ...
+>>>
+>>>          Maybe a clearer fix is an additional ifdef in the
+>>> DEBUG_ALIGN_RODATA
+>>> stanza which sets ALIGN_DEBUG_RO to align to pagesize if DEBUG_RODATA is
+>>> set, that way it only takes affect for RODATA.
+>>
+>>
+>> I think the diff does what you mean here.
+>
+> ...
+>
+> This solves the problem I have. But, my comment about was trying to be a
+> little more creative and allow it to align at less than page size if
+> DEBUG_RODATA isn't set, as it does today. Sort of a packed kernel if you
+> will...
+>
+
+OK, I didn't catch that. Not sure if the average waste of 32 KB is
+worth the trouble, though. Especially since, in my opinion,
+CONFIG_DEBUG_RODATA should be promoted to a non-debug 'default y'
+option.
+
 -- 
-2.3.3
+Ard.
+
+> But I will re-post shortly with just the ALIGN_DEBUG_RO change you suggest.
+>
+> Thanks,
+>
+>
