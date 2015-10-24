@@ -1,57 +1,36 @@
-From: tomasz.nowicki@linaro.org (Tomasz Nowicki)
-Date: Sat, 24 Oct 2015 15:58:17 +0200
-Subject: [PATCH V1 10/10] acpi, gicv3, its: Use MADT ITS subtable to do
- PCI/MSI domain initialization.
-In-Reply-To: <562B5B6E.2000305@huawei.com>
-References: <1444917919-21152-1-git-send-email-tn@semihalf.com>
- <1444917919-21152-11-git-send-email-tn@semihalf.com>
- <562B5B6E.2000305@huawei.com>
-Message-ID: <562B8E79.6010701@linaro.org>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Sat, 24 Oct 2015 16:28:28 +0200
+Subject: [PATCH v6 04/22] of: add function to allow probing a device from
+ a OF node
+In-Reply-To: <20151022235419.GF29919@sirena.org.uk>
+References: <1442844182-27787-1-git-send-email-tomeu.vizoso@collabora.com>
+ <CAAObsKCAX4DQGydQoYjJEYKTOEqpVozXdHnqXWdNYVkLsg7BVg@mail.gmail.com>
+ <20151022235419.GF29919@sirena.org.uk>
+Message-ID: <3439880.XMRknxAf8e@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/24/2015 12:20 PM, Hanjun Guo wrote:
-> On 2015/10/15 22:05, Tomasz Nowicki wrote:
->> After refactoring DT code, we let ACPI to build ITS PCI MSI domain
->> and do requester ID to device ID translation using IORT table.
->>
->> We have now full PCI MSI domain stack, thus we can enable ITS initialization
->> from GICv3 core driver for ACPI scenario.
->>
->> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
->> ---
->>   drivers/irqchip/irq-gic-v3-its-pci-msi.c | 48 ++++++++++++++++++++++++++++++--
->>   drivers/irqchip/irq-gic-v3.c             |  3 +-
->>   2 files changed, 47 insertions(+), 4 deletions(-)
->>
->> diff --git a/drivers/irqchip/irq-gic-v3-its-pci-msi.c b/drivers/irqchip/irq-gic-v3-its-pci-msi.c
->> index cfd35da..09ae2d8 100644
->> --- a/drivers/irqchip/irq-gic-v3-its-pci-msi.c
->> +++ b/drivers/irqchip/irq-gic-v3-its-pci-msi.c
->> @@ -15,6 +15,8 @@
->>    * along with this program.  If not, see <http://www.gnu.org/licenses/>.
->>    */
->>
->> +#include <linux/acpi.h>
->> +#include <linux/iort.h>
->>   #include <linux/msi.h>
->>   #include <linux/of.h>
->>   #include <linux/of_irq.h>
->> @@ -59,8 +61,10 @@ static int its_pci_msi_vec_count(struct pci_dev *pdev)
->>   static int its_get_pci_alias(struct pci_dev *pdev, u16 alias, void *data)
->>   {
->>   	struct its_pci_alias *dev_alias = data;
->> +	u32 dev_id;
->>
->> -	dev_alias->dev_id = alias;
->> +	dev_alias->dev_id = iort_find_pci_id(pdev, alias, &dev_id) == 0 ?
->> +								dev_id : alias;
->
-> Hi tomasz, I think we need to re work this patch on top of tip/irq/core
-> which has support for "msi-map" and "mai-parent" property support.
->
+On Friday, October 23, 2015 08:54:19 AM Mark Brown wrote:
+> 
+> --7cm2iqirTL37Ot+N
+> Content-Type: text/plain; charset=us-ascii
+> Content-Disposition: inline
+> 
+> On Thu, Oct 22, 2015 at 03:03:37PM +0200, Tomeu Vizoso wrote:
+> > On 22 October 2015 at 03:06, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
+> 
+> > > Same question as from Greg: How does a subsystem know whether or not to use
+> > > this function?
+> 
+> > Maybe I don't understand the comment, but as the commit message says,
+> > subsystems can use this when looking up resources for drivers. Or you
+> > mean that this information should be in the API docs?
+> 
+> I'm pretty sure what he's suggesting here is changing to "should always"
+> (ie, explain the situations when a subsystem would do this, including
+> decision criteria if it's optional).
 
-Indeed, I will rebase after some more comments related to other patches 
-in this series.
+Right.
 
-Tomasz
+Thanks,
+Rafael
