@@ -1,9 +1,9 @@
 From: Julia.Lawall@lip6.fr (Julia Lawall)
-Date: Sat, 24 Oct 2015 16:42:34 +0200
-Subject: [PATCH 8/9] soc: ti: knav_qmss_queue: add missing of_node_put
+Date: Sat, 24 Oct 2015 16:42:35 +0200
+Subject: [PATCH 9/9] pinctrl: at91: add missing of_node_put
 In-Reply-To: <1445697755-26341-1-git-send-email-Julia.Lawall@lip6.fr>
 References: <1445697755-26341-1-git-send-email-Julia.Lawall@lip6.fr>
-Message-ID: <1445697755-26341-9-git-send-email-Julia.Lawall@lip6.fr>
+Message-ID: <1445697755-26341-10-git-send-email-Julia.Lawall@lip6.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -35,34 +35,30 @@ local idexpression child;
 Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
 
 ---
- drivers/soc/ti/knav_qmss_queue.c |    3 +++
- 1 file changed, 3 insertions(+)
+ drivers/pinctrl/pinctrl-at91.c |    5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/soc/ti/knav_qmss_queue.c b/drivers/soc/ti/knav_qmss_queue.c
-index 89789e2..6f3d12b 100644
---- a/drivers/soc/ti/knav_qmss_queue.c
-+++ b/drivers/soc/ti/knav_qmss_queue.c
-@@ -1074,6 +1074,7 @@ static int knav_queue_setup_regions(struct knav_device *kdev,
- 		region = devm_kzalloc(dev, sizeof(*region), GFP_KERNEL);
- 		if (!region) {
- 			dev_err(dev, "out of memory allocating region\n");
+diff --git a/drivers/pinctrl/pinctrl-at91.c b/drivers/pinctrl/pinctrl-at91.c
+index ce6e589..0d2fc0c 100644
+--- a/drivers/pinctrl/pinctrl-at91.c
++++ b/drivers/pinctrl/pinctrl-at91.c
+@@ -1122,8 +1122,10 @@ static int at91_pinctrl_parse_functions(struct device_node *np,
+ 		func->groups[i] = child->name;
+ 		grp = &info->groups[grp_index++];
+ 		ret = at91_pinctrl_parse_groups(child, grp, info, i++);
+-		if (ret)
++		if (ret) {
 +			of_node_put(child);
- 			return -ENOMEM;
- 		}
+ 			return ret;
++		}
+ 	}
  
-@@ -1373,6 +1374,7 @@ static int knav_queue_init_qmgrs(struct knav_device *kdev,
- 		qmgr = devm_kzalloc(dev, sizeof(*qmgr), GFP_KERNEL);
- 		if (!qmgr) {
- 			dev_err(dev, "out of memory allocating qmgr\n");
+ 	return 0;
+@@ -1196,6 +1198,7 @@ static int at91_pinctrl_probe_dt(struct platform_device *pdev,
+ 		ret = at91_pinctrl_parse_functions(child, info, i++);
+ 		if (ret) {
+ 			dev_err(&pdev->dev, "failed to parse function\n");
 +			of_node_put(child);
- 			return -ENOMEM;
+ 			return ret;
  		}
- 
-@@ -1450,6 +1452,7 @@ static int knav_queue_init_pdsps(struct knav_device *kdev,
- 		pdsp = devm_kzalloc(dev, sizeof(*pdsp), GFP_KERNEL);
- 		if (!pdsp) {
- 			dev_err(dev, "out of memory allocating pdsp\n");
-+			of_node_put(child);
- 			return -ENOMEM;
- 		}
- 		pdsp->name = knav_queue_find_name(child);
+ 	}
