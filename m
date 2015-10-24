@@ -1,59 +1,116 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Sat, 24 Oct 2015 16:41:52 +0800
-Subject: [PATCH v3] VFIO: platform: reset: AMD xgbe reset module
-In-Reply-To: <1445615913-31825-1-git-send-email-eric.auger@linaro.org>
-Message-ID: <201510241614.F4vZ38k0%fengguang.wu@intel.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Sat, 24 Oct 2015 10:47:22 +0200
+Subject: [PATCH] arm64: kernel: fix tcr_el1.t0sz restore on systems with
+ extended idmap
+In-Reply-To: <1445441202-21484-1-git-send-email-lorenzo.pieralisi@arm.com>
+References: <1445441202-21484-1-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <CAKv+Gu_9_O4GQgm++BvC0i_cGT4pBmozqO5ddy7J2-8-shFRDA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Eric,
+Hi Lorenzo,
 
-[auto build test ERROR on asm-generic/master -- if it's inappropriate base, please suggest rules for selecting the more suitable base]
+Thanks for the fix. I'm a bit embarrassed since this is quite
+obviously broken, and I (nor anyone else, for that matter) spotted it
+through testing suspend/resume on Seattle (frankly, I don't even know
+if suspend/resume works currently on Seattle or if it did at the time)
 
-url:    https://github.com/0day-ci/linux/commits/Eric-Auger/VFIO-platform-reset-AMD-xgbe-reset-module/20151024-000245
-config: arm-allyesconfig (attached as .config)
-reproduce:
-        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm 
+On 21/10/2015, Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote:
+> Commit dd006da21646 ("arm64: mm: increase VA range of identity map")
+> introduced a mechanism to extend the virtual memory map range
+> to support arm64 systems with system RAM located at very high offset,
+> where the identity mapping used to enable/disable the MMU requires
+> additional translation levels to map the physical memory at an equal
+> virtual offset.
+>
+> The kernel detects at boot time the tcr_el1.t0sz value required by the
+> identity mapping and sets-up the tcr_el1.t0sz register field accordingly,
+> any time the identity map is required in the kernel (ie when enabling the
+> MMU).
+>
+> After enabling the MMU, in the cold boot path the kernel resets the
+> tcr_el1.t0sz to its default value (ie the actual configuration value for
+> the system virtual address space) so that after enabling the MMU the
+> memory space translated by ttbr0_el1 is restored as expected.
+>
 
-All errors (new ones prefixed by >>):
+'After enabling the MMU' is confusing, especially since you use it
+twice to describe two different points in time.
 
->> drivers/vfio/platform/reset/vfio_platform_amdxgbe.c:122:27: error: expected declaration specifiers or '...' before string constant
-    module_vfio_reset_handler("amd,xgbe-seattle-v1a", vfio_platform_amdxgbe_reset);
-                              ^
->> drivers/vfio/platform/reset/vfio_platform_amdxgbe.c:122:51: error: expected declaration specifiers or '...' before 'vfio_platform_amdxgbe_reset'
-    module_vfio_reset_handler("amd,xgbe-seattle-v1a", vfio_platform_amdxgbe_reset);
-                                                      ^
---
->> /kbuild/src/defs/drivers/vfio/platform/reset/vfio_platform_amdxgbe.c:122:27: error: expected declaration specifiers or '...' before string constant
-    module_vfio_reset_handler("amd,xgbe-seattle-v1a", vfio_platform_amdxgbe_reset);
-                              ^
->> /kbuild/src/defs/drivers/vfio/platform/reset/vfio_platform_amdxgbe.c:122:51: error: expected declaration specifiers or '...' before 'vfio_platform_amdxgbe_reset'
-    module_vfio_reset_handler("amd,xgbe-seattle-v1a", vfio_platform_amdxgbe_reset);
-                                                      ^
+> Commit dd006da21646 ("arm64: mm: increase VA range of identity map")
+> also added code to set-up the tcr_el1.t0sz value when the kernel resumes
+> from low-power states with the MMU off through cpu_resume() in order to
+> effectively use the identity mapping to enable the MMU but failed to add
+> the code required to restore the tcr_el1.t0sz to its default value, when
+> the core returns to the kernel with the MMU enabled, so that the kernel
+> might end up running with tcr_el1.t0sz value set-up for the identity
+> mapping which can be lower than the value required by the actual virtual
+> address space, resulting in an erroneous set-up.
+>
+> This patchs adds code in the resume path that restores the tcr_el1.t0sz
+> default value upon core resume, mirroring this way the cold boot path
+> behaviour therefore fixing the issue.
+>
 
-vim +122 drivers/vfio/platform/reset/vfio_platform_amdxgbe.c
+Of course, I agree with the patch, but could you condense the commit
+log, please?  I don't think we need five paragraphs to point out that
+the sequence to set T0SZ to its idmap value, enable the MMU, branch
+into the kernel virtual mapping and set T0SZ to its default value is
+missing the final step on the resume path, and it actually took me a
+while to figure out what the problem was from reading the text.
 
-   116		if (!count)
-   117			pr_warn("%s MAC SW reset failed\n", __func__);
-   118	
-   119		return 0;
-   120	}
-   121	
- > 122	module_vfio_reset_handler("amd,xgbe-seattle-v1a", vfio_platform_amdxgbe_reset);
-   123	
-   124	MODULE_VERSION("0.1");
-   125	MODULE_LICENSE("GPL v2");
+> Fixes: 95322526ef62 ("arm64: kernel: cpu_{suspend/resume} implementation")
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 53086 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151024/0ef36dd1/attachment-0001.obj>
+Wrong commit id
+
+> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+
+Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+
+> ---
+>  arch/arm64/kernel/suspend.c | 22 +++++++++++++---------
+>  1 file changed, 13 insertions(+), 9 deletions(-)
+>
+> diff --git a/arch/arm64/kernel/suspend.c b/arch/arm64/kernel/suspend.c
+> index 8297d50..44ca414 100644
+> --- a/arch/arm64/kernel/suspend.c
+> +++ b/arch/arm64/kernel/suspend.c
+> @@ -80,17 +80,21 @@ int cpu_suspend(unsigned long arg, int (*fn)(unsigned
+> long))
+>   if (ret == 0) {
+>   /*
+>   * We are resuming from reset with TTBR0_EL1 set to the
+> - * idmap to enable the MMU; restore the active_mm mappings in
+> - * TTBR0_EL1 unless the active_mm == &init_mm, in which case
+> - * the thread entered cpu_suspend with TTBR0_EL1 set to
+> - * reserved TTBR0 page tables and should be restored as such.
+> + * idmap to enable the MMU; set the TTBR0 to the reserved
+> + * page tables to prevent speculative TLB allocations, flush
+> + * the local tlb and set the default tcr_el1.t0sz so that
+> + * the TTBR0 address space set-up is properly restored.
+> + * If the current active_mm != &init_mm we entered cpu_suspend
+> + * with mappings in TTBR0 that must be restored, so we switch
+> + * them back to complete the address space configuration
+> + * restoration before returning.
+>   */
+> - if (mm == &init_mm)
+> - cpu_set_reserved_ttbr0();
+> - else
+> - cpu_switch_mm(mm->pgd, mm);
+> -
+> + cpu_set_reserved_ttbr0();
+>   flush_tlb_all();
+> + cpu_set_default_tcr_t0sz();
+> +
+> + if (mm != &init_mm)
+> + cpu_switch_mm(mm->pgd, mm);
+>
+>   /*
+>   * Restore per-cpu offset before any kernel
+> --
+> 2.5.1
+>
+>
