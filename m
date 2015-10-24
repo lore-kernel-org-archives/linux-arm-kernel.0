@@ -1,79 +1,37 @@
-From: ats@offog.org (Adam Sampson)
-Date: Sat, 24 Oct 2015 13:11:52 +0100
-Subject: [PATCH] ASoC: sun4i-codec: use consistent names for PA controls
-Message-ID: <1445688712-31951-1-git-send-email-ats@offog.org>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Sat, 24 Oct 2015 14:26:21 +0200
+Subject: [PATCH 0/4] Patches to fix remote wakeup on rk3288 dwc2 "host"
+ port
+In-Reply-To: <1445624891-31680-1-git-send-email-dianders@chromium.org>
+References: <1445624891-31680-1-git-send-email-dianders@chromium.org>
+Message-ID: <1633226.9pFzvpSks6@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The power amplifier for the headphone output is called "the PA" and "the
-headphone amplifier" in Allwinner's documentation for the A10 and A20.
-sun4i-codec calls it "PA" in some places and "Pre-Amplifier" (which
-isn't really accurate) in others, leading to user-visible controls with
-different names referring to the same device.
+Am Freitag, 23. Oktober 2015, 11:28:07 schrieb Douglas Anderson:
+> The "host1" port (AKA the dwc2 port that isn't the OTG port) on rk3288
+> has a hardware errata that causes everything to get confused when we get
+> a remote wakeup.  It appears that the "port reset" bit that's in the USB
+> phy (located in the rk3288 GRF) fixes things up and appears safe to do.
+> 
+> This series of patches exports the "port reset" from the PHY and then
+> hooks it up to dwc2 through a quirk.
+> 
+> I've tested this series atop a bit of a conglomeration of Heiko's github
+> "somewhat stable" branch (v4.3-rc3-876-g6509232) but with Greg KH's
+> usb-next merged in.
 
-When this driver implements audio input, it'll also need to expose
-controls for the line and mic input preamps, so just referring to "the
-Pre-Amplifier" will be ambiguous.
+I've been involved in the earlier revisions already, so this version already 
+implements the review-comments I had. I've also gave this a spin on 4.3-rc6 
+with usb-next merged in on a rk3288-firefly, so
 
-Change it to use "PA" consistently for the power amplifier.
+Reviewed-by: Heiko Stuebner <heiko@sntech.de>
+Tested-by: Heiko Stuebner <heiko@sntech.de>
 
-Signed-off-by: Adam Sampson <ats@offog.org>
----
- sound/soc/sunxi/sun4i-codec.c | 23 ++++++++++++-----------
- 1 file changed, 12 insertions(+), 11 deletions(-)
 
-diff --git a/sound/soc/sunxi/sun4i-codec.c b/sound/soc/sunxi/sun4i-codec.c
-index bcbf4da..ff3304d 100644
---- a/sound/soc/sunxi/sun4i-codec.c
-+++ b/sound/soc/sunxi/sun4i-codec.c
-@@ -2,6 +2,7 @@
-  * Copyright 2014 Emilio L?pez <emilio@elopez.com.ar>
-  * Copyright 2014 Jon Smirl <jonsmirl@gmail.com>
-  * Copyright 2015 Maxime Ripard <maxime.ripard@free-electrons.com>
-+ * Copyright 2015 Adam Sampson <ats@offog.org>
-  *
-  * Based on the Allwinner SDK driver, released under the GPL.
-  *
-@@ -452,12 +453,12 @@ static const struct snd_soc_dapm_widget sun4i_codec_dapm_widgets[] = {
- 	SND_SOC_DAPM_SUPPLY("Mixer Enable", SUN4I_CODEC_DAC_ACTL,
- 			    SUN4I_CODEC_DAC_ACTL_MIXEN, 0, NULL, 0),
- 
--	/* Pre-Amplifier */
--	SND_SOC_DAPM_MIXER("Pre-Amplifier", SUN4I_CODEC_ADC_ACTL,
-+	/* Headphone output power amplifier */
-+	SND_SOC_DAPM_MIXER("PA", SUN4I_CODEC_ADC_ACTL,
- 			   SUN4I_CODEC_ADC_ACTL_PA_EN, 0,
- 			   sun4i_codec_pa_mixer_controls,
- 			   ARRAY_SIZE(sun4i_codec_pa_mixer_controls)),
--	SND_SOC_DAPM_SWITCH("Pre-Amplifier Mute", SND_SOC_NOPM, 0, 0,
-+	SND_SOC_DAPM_SWITCH("PA Mute", SND_SOC_NOPM, 0, 0,
- 			    &sun4i_codec_pa_mute),
- 
- 	SND_SOC_DAPM_OUTPUT("HP Right"),
-@@ -480,16 +481,16 @@ static const struct snd_soc_dapm_route sun4i_codec_dapm_routes[] = {
- 	{ "Left Mixer", NULL, "Mixer Enable" },
- 	{ "Left Mixer", "Left DAC Playback Switch", "Left DAC" },
- 
--	/* Pre-Amplifier Mixer Routes */
--	{ "Pre-Amplifier", "Mixer Playback Switch", "Left Mixer" },
--	{ "Pre-Amplifier", "Mixer Playback Switch", "Right Mixer" },
--	{ "Pre-Amplifier", "DAC Playback Switch", "Left DAC" },
--	{ "Pre-Amplifier", "DAC Playback Switch", "Right DAC" },
-+	/* PA Mixer Routes */
-+	{ "PA", "Mixer Playback Switch", "Left Mixer" },
-+	{ "PA", "Mixer Playback Switch", "Right Mixer" },
-+	{ "PA", "DAC Playback Switch", "Left DAC" },
-+	{ "PA", "DAC Playback Switch", "Right DAC" },
- 
- 	/* PA -> HP path */
--	{ "Pre-Amplifier Mute", "Switch", "Pre-Amplifier" },
--	{ "HP Right", NULL, "Pre-Amplifier Mute" },
--	{ "HP Left", NULL, "Pre-Amplifier Mute" },
-+	{ "PA Mute", "Switch", "PA" },
-+	{ "HP Right", NULL, "PA Mute" },
-+	{ "HP Left", NULL, "PA Mute" },
- };
- 
- static struct snd_soc_codec_driver sun4i_codec_codec = {
--- 
-2.1.4
+If the first two patches get picked up, I'll pick the two dts patches 
+afterwards.
+
+
+Thanks
+Heiko
