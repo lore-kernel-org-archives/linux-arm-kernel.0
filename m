@@ -1,36 +1,62 @@
-From: jun.nie@linaro.org (Jun Nie)
-Date: Sat, 24 Oct 2015 11:23:04 +0800
-Subject: [PATCH v13 5/5] uart: pl011: Add support to ZTE ZX296702 uart
-In-Reply-To: <CAOZdJXUjZLKkUYScD7oDTMuRUtAEJ6=DopmE4n6Vb9zyv+_viA@mail.gmail.com>
-References: <1438328959-16177-1-git-send-email-jun.nie@linaro.org>
- <1438328959-16177-6-git-send-email-jun.nie@linaro.org>
- <55FC16A2.5070207@arm.com>
- <CABymUCOA3oG7Hq83hDyQ_uisQHeipoHshcWONWTtjxKvikzjsQ@mail.gmail.com>
- <CAOZdJXUjZLKkUYScD7oDTMuRUtAEJ6=DopmE4n6Vb9zyv+_viA@mail.gmail.com>
-Message-ID: <CABymUCORU9CDD64Rdw2VX0kLSe6E1zY9iZCap5xittoVFwbOtw@mail.gmail.com>
+From: ykk@rock-chips.com (Yakir Yang)
+Date: Sat, 24 Oct 2015 11:21:48 +0800
+Subject: [PATCH v7 16/17] drm: bridge: analogix/dp: move hpd detect to
+ connector detect function
+In-Reply-To: <1445599415-30856-1-git-send-email-ykk@rock-chips.com>
+References: <1445599415-30856-1-git-send-email-ykk@rock-chips.com>
+Message-ID: <1445656909-15477-1-git-send-email-ykk@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-10-24 5:54 GMT+08:00 Timur Tabi <timur@codeaurora.org>:
-> On Sat, Sep 19, 2015 at 1:54 AM, Jun Nie <jun.nie@linaro.org> wrote:
->>
->> I am not sure the silicon designer's plan on the UART IP. Different
->> silicon team have different decision on the IP choice. So I guess
->> future ZTE SOC may reuse ZTE UART per people assignment.
->
-> I would rather see this as a separate driver.  I think this patch
-> pollutes the amba-pl011.c driver too much.
+This change just make a little clean to make code more like
+drm core expect, move hdp detect code from bridge->enable(),
+and place them into connector->detect().
 
-I am OK to add a new driver for ZTE UART if no other's objection
-though I do not agree you. Without this last patch, other patches are
-just for minor refactor for register access.
+Tested-by: Javier Martinez Canillas <javier@osg.samsung.com>
+Signed-off-by: Yakir Yang <ykk@rock-chips.com>
+---
+Changes in v7: None
+Changes in v6: None
+Changes in v5: None
+Changes in v4:
+- Take Jingoo suggest, add commit messages.
 
-Comment from any other is welcome.
+Changes in v3:
+- move dp hpd detect to connector detect function.
 
-Jun
+Changes in v2: None
 
->
-> --
-> Qualcomm Innovation Center, Inc.
-> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-> a Linux Foundation Collaborative Project.
+ drivers/gpu/drm/bridge/analogix/analogix_dp_core.c | 11 +++++------
+ 1 file changed, 5 insertions(+), 6 deletions(-)
+
+diff --git a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
+index 3842dbd..216d33d 100644
+--- a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
++++ b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
+@@ -901,12 +901,6 @@ static void analogix_dp_commit(struct analogix_dp_device *dp)
+ 			DRM_ERROR("failed to disable the panel\n");
+ 	}
+ 
+-	ret = analogix_dp_detect_hpd(dp);
+-	if (ret) {
+-		/* Cable has been disconnected, we're done */
+-		return;
+-	}
+-
+ 	ret = analogix_dp_handle_edid(dp);
+ 	if (ret) {
+ 		dev_err(dp->dev, "unable to handle edid\n");
+@@ -941,6 +935,11 @@ static void analogix_dp_commit(struct analogix_dp_device *dp)
+ 
+ enum drm_connector_status analogix_dp_detect(struct device *dev, bool force)
+ {
++	struct analogix_dp_device *dp = dev_get_drvdata(dev);
++
++	if (analogix_dp_detect_hpd(dp))
++		return connector_status_disconnected;
++
+ 	return connector_status_connected;
+ }
+ EXPORT_SYMBOL_GPL(analogix_dp_detect);
+-- 
+2.1.2
