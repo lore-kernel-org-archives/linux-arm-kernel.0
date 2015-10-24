@@ -1,17 +1,13 @@
 From: zhengxing@rock-chips.com (Xing Zheng)
-Date: Sat, 24 Oct 2015 18:30:25 +0800
-Subject: [PATCH v4 4/8] clk: rockchip: add new pll-type for rk3036 and similar
- socs
+Date: Sat, 24 Oct 2015 18:40:06 +0800
+Subject: [PATCH v4 5/8] ARM: dts: rockchip: add core rk3036 dts
 In-Reply-To: <1445682629-21632-1-git-send-email-zhengxing@rock-chips.com>
 References: <1445682629-21632-1-git-send-email-zhengxing@rock-chips.com>
-Message-ID: <1445682629-21632-5-git-send-email-zhengxing@rock-chips.com>
+Message-ID: <1445683206-21776-1-git-send-email-zhengxing@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The rk3036's pll and clock are different with base on the rk3066(rk3188,
-rk3288, rk3368 use it), there are different adjust foctors and control
-registers, so these should be independent and separate from the series
-of rk3066s.
+Initial release for rk3036, node definitions rk3036 sdk board.
 
 Signed-off-by: Xing Zheng <zhengxing@rock-chips.com>
 Reviewed-by: Heiko Stuebner <heiko@sntech.de>
@@ -19,290 +15,636 @@ Reviewed-by: Heiko Stuebner <heiko@sntech.de>
 
 Changes in v4: None
 
- drivers/clk/rockchip/clk-pll.c |  243 +++++++++++++++++++++++++++++++++++++++-
- 1 file changed, 242 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/Makefile       |    1 +
+ arch/arm/boot/dts/rk3036-evb.dts |   64 +++++
+ arch/arm/boot/dts/rk3036.dtsi    |  536 ++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 601 insertions(+)
+ create mode 100644 arch/arm/boot/dts/rk3036-evb.dts
+ create mode 100644 arch/arm/boot/dts/rk3036.dtsi
 
-diff --git a/drivers/clk/rockchip/clk-pll.c b/drivers/clk/rockchip/clk-pll.c
-index 4881eb8..a435503 100644
---- a/drivers/clk/rockchip/clk-pll.c
-+++ b/drivers/clk/rockchip/clk-pll.c
-@@ -2,6 +2,9 @@
-  * Copyright (c) 2014 MundoReader S.L.
-  * Author: Heiko Stuebner <heiko@sntech.de>
-  *
-+ * Copyright (c) 2015 Rockchip Electronics Co. Ltd.
-+ * Author: Xing Zheng <zhengxing@rock-chips.com>
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 7d3e495..3e4e089 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -510,6 +510,7 @@ dtb-$(CONFIG_ARCH_QCOM) += \
+ dtb-$(CONFIG_ARCH_REALVIEW) += \
+ 	arm-realview-pb1176.dtb
+ dtb-$(CONFIG_ARCH_ROCKCHIP) += \
++	rk3036-evb.dtb \
+ 	rk3066a-bqcurie2.dtb \
+ 	rk3066a-marsboard.dtb \
+ 	rk3066a-rayeager.dtb \
+diff --git a/arch/arm/boot/dts/rk3036-evb.dts b/arch/arm/boot/dts/rk3036-evb.dts
+new file mode 100644
+index 0000000..28a0336
+--- /dev/null
++++ b/arch/arm/boot/dts/rk3036-evb.dts
+@@ -0,0 +1,64 @@
++/*
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
 + *
-  * This program is free software; you can redistribute it and/or modify
-  * it under the terms of the GNU General Public License as published by
-  * the Free Software Foundation; either version 2 of the License, or
-@@ -19,6 +22,7 @@
- #include <linux/delay.h>
- #include <linux/clk-provider.h>
- #include <linux/regmap.h>
-+#include <linux/clk.h>
- #include "clk.h"
- 
- #define PLL_MODE_MASK		0x3
-@@ -108,6 +112,237 @@ static int rockchip_pll_wait_lock(struct rockchip_clk_pll *pll)
- }
- 
- /**
-+ * PLL used in RK3036
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This file is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ *  Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
 + */
 +
-+#define RK3036_PLLCON(i)			(i * 0x4)
-+#define RK3036_PLLCON0_FBDIV_MASK		0xfff
-+#define RK3036_PLLCON0_FBDIV_SHIFT		0
-+#define RK3036_PLLCON0_POSTDIV1_MASK		0x7
-+#define RK3036_PLLCON0_POSTDIV1_SHIFT		12
-+#define RK3036_PLLCON1_REFDIV_MASK		0x3f
-+#define RK3036_PLLCON1_REFDIV_SHIFT		0
-+#define RK3036_PLLCON1_POSTDIV2_MASK		0x7
-+#define RK3036_PLLCON1_POSTDIV2_SHIFT		6
-+#define RK3036_PLLCON1_DSMPD_MASK		0x1
-+#define RK3036_PLLCON1_DSMPD_SHIFT		12
-+#define RK3036_PLLCON2_FRAC_MASK		0xffffff
-+#define RK3036_PLLCON2_FRAC_SHIFT		0
++/dts-v1/;
 +
-+#define RK3036_PLLCON1_PWRDOWN			(1 << 13)
++#include "rk3036.dtsi"
 +
-+static unsigned long rockchip_rk3036_pll_recalc_rate(struct clk_hw *hw,
-+						     unsigned long prate)
-+{
-+	struct rockchip_clk_pll *pll = to_rockchip_clk_pll(hw);
-+	unsigned int fbdiv, postdiv1, refdiv, postdiv2, dsmpd, frac;
-+	u64 rate64 = prate;
-+	u32 pllcon;
-+
-+	pllcon = readl_relaxed(pll->reg_base + RK3036_PLLCON(0));
-+	fbdiv = ((pllcon >> RK3036_PLLCON0_FBDIV_SHIFT) & RK3036_PLLCON0_FBDIV_MASK);
-+	postdiv1 = ((pllcon >> RK3036_PLLCON0_POSTDIV1_SHIFT) & RK3036_PLLCON0_POSTDIV1_MASK);
-+
-+	pllcon = readl_relaxed(pll->reg_base + RK3036_PLLCON(1));
-+	refdiv = ((pllcon >> RK3036_PLLCON1_REFDIV_SHIFT) & RK3036_PLLCON1_REFDIV_MASK);
-+	postdiv2 = ((pllcon >> RK3036_PLLCON1_POSTDIV2_SHIFT) & RK3036_PLLCON1_POSTDIV2_MASK);
-+	dsmpd = ((pllcon >> RK3036_PLLCON1_DSMPD_SHIFT) & RK3036_PLLCON1_DSMPD_MASK);
-+
-+	pllcon = readl_relaxed(pll->reg_base + RK3036_PLLCON(2));
-+	frac = ((pllcon >> RK3036_PLLCON2_FRAC_SHIFT) & RK3036_PLLCON2_FRAC_MASK);
-+
-+	rate64 *= fbdiv;
-+	do_div(rate64, refdiv);
-+
-+	if (dsmpd == 0) {
-+		/* fractional mode */
-+		u64 frac_rate64 = prate * frac;
-+
-+		do_div(frac_rate64, refdiv);
-+		rate64 += frac_rate64 >> 24;
-+	}
-+
-+	do_div(rate64, postdiv1);
-+	do_div(rate64, postdiv2);
-+
-+	return (unsigned long)rate64;
-+}
-+
-+static int rockchip_rk3036_pll_set_rate(struct clk_hw *hw, unsigned long drate,
-+					unsigned long prate)
-+{
-+	struct rockchip_clk_pll *pll = to_rockchip_clk_pll(hw);
-+	const struct rockchip_pll_rate_table *rate;
-+	unsigned long old_rate = rockchip_rk3036_pll_recalc_rate(hw, prate);
-+	struct regmap *grf = rockchip_clk_get_grf();
-+	struct clk_mux *pll_mux = &pll->pll_mux;
-+	const struct clk_ops *pll_mux_ops = pll->pll_mux_ops;
-+	u32 pllcon;
-+	int rate_change_remuxed = 0;
-+	int cur_parent;
-+	int ret;
-+
-+	if (IS_ERR(grf)) {
-+		pr_debug("%s: grf regmap not available, aborting rate change\n",
-+			 __func__);
-+		return PTR_ERR(grf);
-+	}
-+
-+	pr_debug("%s: changing %s from %lu to %lu with a parent rate of %lu\n",
-+		 __func__, __clk_get_name(hw->clk), old_rate, drate, prate);
-+
-+	/* Get required rate settings from table */
-+	rate = rockchip_get_pll_settings(pll, drate);
-+	if (!rate) {
-+		pr_err("%s: Invalid rate : %lu for pll clk %s\n", __func__,
-+			drate, __clk_get_name(hw->clk));
-+		return -EINVAL;
-+	}
-+
-+	pr_debug("%s: rate settings for %lu fbdiv: %d, postdiv1: %d, refdiv: %d, postdiv2: %d, dsmpd: %d, frac: %d\n",
-+		__func__, rate->rate,
-+		rate->fbdiv, rate->postdiv1, rate->refdiv, rate->postdiv2, rate->dsmpd, rate->frac);
-+
-+	cur_parent = pll_mux_ops->get_parent(&pll_mux->hw);
-+	if (cur_parent == PLL_MODE_NORM) {
-+		pll_mux_ops->set_parent(&pll_mux->hw, PLL_MODE_SLOW);
-+		rate_change_remuxed = 1;
-+	}
-+
-+	/* update pll values */
-+	writel_relaxed(HIWORD_UPDATE(rate->fbdiv, RK3036_PLLCON0_FBDIV_MASK,
-+					  RK3036_PLLCON0_FBDIV_SHIFT) |
-+		       HIWORD_UPDATE(rate->postdiv1, RK3036_PLLCON0_POSTDIV1_MASK,
-+					     RK3036_PLLCON0_POSTDIV1_SHIFT),
-+		       pll->reg_base + RK3036_PLLCON(0));
-+
-+	writel_relaxed(HIWORD_UPDATE(rate->refdiv, RK3036_PLLCON1_REFDIV_MASK,
-+						   RK3036_PLLCON1_REFDIV_SHIFT) |
-+		       HIWORD_UPDATE(rate->postdiv2, RK3036_PLLCON1_POSTDIV2_MASK,
-+						     RK3036_PLLCON1_POSTDIV2_SHIFT) |
-+		       HIWORD_UPDATE(rate->dsmpd, RK3036_PLLCON1_DSMPD_MASK,
-+						  RK3036_PLLCON1_DSMPD_SHIFT),
-+		       pll->reg_base + RK3036_PLLCON(1));
-+
-+	/* GPLL CON2 is not HIWORD_MASK */
-+	pllcon = readl_relaxed(pll->reg_base + RK3036_PLLCON(2));
-+	pllcon &= ~(RK3036_PLLCON2_FRAC_MASK << RK3036_PLLCON2_FRAC_SHIFT);
-+	pllcon |= rate->frac << RK3036_PLLCON2_FRAC_SHIFT;
-+	writel_relaxed(pllcon, pll->reg_base + RK3036_PLLCON(2));
-+
-+	/* wait for the pll to lock */
-+	ret = rockchip_pll_wait_lock(pll);
-+	if (ret) {
-+		pr_warn("%s: pll did not lock, trying to restore old rate %lu\n",
-+			__func__, old_rate);
-+		rockchip_rk3036_pll_set_rate(hw, old_rate, prate);
-+	}
-+
-+	if (rate_change_remuxed)
-+		pll_mux_ops->set_parent(&pll_mux->hw, PLL_MODE_NORM);
-+
-+	return ret;
-+}
-+
-+static int rockchip_rk3036_pll_enable(struct clk_hw *hw)
-+{
-+	struct rockchip_clk_pll *pll = to_rockchip_clk_pll(hw);
-+
-+	writel(HIWORD_UPDATE(0, RK3036_PLLCON1_PWRDOWN, 0),
-+	       pll->reg_base + RK3036_PLLCON(1));
-+
-+	return 0;
-+}
-+
-+static void rockchip_rk3036_pll_disable(struct clk_hw *hw)
-+{
-+	struct rockchip_clk_pll *pll = to_rockchip_clk_pll(hw);
-+
-+	writel(HIWORD_UPDATE(RK3036_PLLCON1_PWRDOWN,
-+			     RK3036_PLLCON1_PWRDOWN, 0),
-+	       pll->reg_base + RK3036_PLLCON(1));
-+}
-+
-+static int rockchip_rk3036_pll_is_enabled(struct clk_hw *hw)
-+{
-+	struct rockchip_clk_pll *pll = to_rockchip_clk_pll(hw);
-+	u32 pllcon = readl(pll->reg_base + RK3036_PLLCON(1));
-+
-+	return !(pllcon & RK3036_PLLCON1_PWRDOWN);
-+}
-+
-+static void rockchip_rk3036_pll_init(struct clk_hw *hw)
-+{
-+	struct rockchip_clk_pll *pll = to_rockchip_clk_pll(hw);
-+	const struct rockchip_pll_rate_table *rate;
-+	unsigned int fbdiv, postdiv1, refdiv, postdiv2, dsmpd, frac;
-+	unsigned long drate;
-+	u32 pllcon;
-+
-+	if (!(pll->flags & ROCKCHIP_PLL_SYNC_RATE))
-+		return;
-+
-+	drate = clk_hw_get_rate(hw);
-+	rate = rockchip_get_pll_settings(pll, drate);
-+
-+	/* when no rate setting for the current rate, rely on clk_set_rate */
-+	if (!rate)
-+		return;
-+
-+	pllcon = readl_relaxed(pll->reg_base + RK3036_PLLCON(0));
-+	fbdiv = ((pllcon >> RK3036_PLLCON0_FBDIV_SHIFT) & RK3036_PLLCON0_FBDIV_MASK);
-+	postdiv1 = ((pllcon >> RK3036_PLLCON0_POSTDIV1_SHIFT) & RK3036_PLLCON0_POSTDIV1_MASK);
-+
-+	pllcon = readl_relaxed(pll->reg_base + RK3036_PLLCON(1));
-+	refdiv = ((pllcon >> RK3036_PLLCON1_REFDIV_SHIFT) & RK3036_PLLCON1_REFDIV_MASK);
-+	postdiv2 = ((pllcon >> RK3036_PLLCON1_POSTDIV2_SHIFT) & RK3036_PLLCON1_POSTDIV2_MASK);
-+	dsmpd = ((pllcon >> RK3036_PLLCON1_DSMPD_SHIFT) & RK3036_PLLCON1_DSMPD_MASK);
-+
-+	pllcon = readl_relaxed(pll->reg_base + RK3036_PLLCON(2));
-+	frac = ((pllcon >> RK3036_PLLCON2_FRAC_SHIFT) & RK3036_PLLCON2_FRAC_MASK);
-+
-+	pr_debug("%s: pll %s@%lu: Hz\n", __func__, __clk_get_name(hw->clk), drate);
-+	pr_debug("old - fbdiv: %d, postdiv1: %d, refdiv: %d, postdiv2: %d, dsmpd: %d, frac: %d\n",
-+		fbdiv, postdiv1, refdiv, postdiv2, dsmpd, frac);
-+	pr_debug("new - fbdiv: %d, postdiv1: %d, refdiv: %d, postdiv2: %d, dsmpd: %d, frac: %d\n",
-+		rate->fbdiv, rate->postdiv1, rate->refdiv, rate->postdiv2, rate->dsmpd, rate->frac);
-+
-+	if (rate->fbdiv != fbdiv || rate->postdiv1 != postdiv1 || rate->refdiv != refdiv ||
-+		rate->postdiv2 != postdiv2 || rate->dsmpd != dsmpd || rate->frac != frac) {
-+		struct clk *parent = clk_get_parent(hw->clk);
-+		unsigned long prate;
-+
-+		if (!parent) {
-+			pr_warn("%s: parent of %s not available\n",
-+				__func__, __clk_get_name(hw->clk));
-+			return;
-+		}
-+
-+		pr_debug("%s: pll %s: rate params do not match rate table, adjusting\n",
-+			 __func__, __clk_get_name(hw->clk));
-+		prate = clk_get_rate(parent);
-+		rockchip_rk3036_pll_set_rate(hw, drate, prate);
-+	}
-+}
-+
-+static const struct clk_ops rockchip_rk3036_pll_clk_norate_ops = {
-+	.recalc_rate = rockchip_rk3036_pll_recalc_rate,
-+	.enable = rockchip_rk3036_pll_enable,
-+	.disable = rockchip_rk3036_pll_disable,
-+	.is_enabled = rockchip_rk3036_pll_is_enabled,
++/ {
++	model = "Rockchip RK3036 Evaluation board";
++	compatible = "rockchip,rk3036-evb", "rockchip,rk3036";
 +};
 +
-+static const struct clk_ops rockchip_rk3036_pll_clk_ops = {
-+	.recalc_rate = rockchip_rk3036_pll_recalc_rate,
-+	.round_rate = rockchip_pll_round_rate,
-+	.set_rate = rockchip_rk3036_pll_set_rate,
-+	.enable = rockchip_rk3036_pll_enable,
-+	.disable = rockchip_rk3036_pll_disable,
-+	.is_enabled = rockchip_rk3036_pll_is_enabled,
-+	.init = rockchip_rk3036_pll_init,
++&i2c1 {
++	status = "okay";
++
++	hym8563: hym8563 at 51 {
++		compatible = "haoyu,hym8563";
++		reg = <0x51>;
++		#clock-cells = <0>;
++		clock-frequency = <32768>;
++		clock-output-names = "xin32k";
++	};
 +};
 +
-+/**
-  * PLL used in RK3066, RK3188 and RK3288
-  */
- 
-@@ -376,7 +611,7 @@ struct clk *rockchip_clk_register_pll(enum rockchip_pll_type pll_type,
- 	pll_mux->lock = lock;
- 	pll_mux->hw.init = &init;
- 
--	if (pll_type == pll_rk3066)
-+	if (pll_type == pll_rk3036 || pll_type == pll_rk3066)
- 		pll_mux->flags |= CLK_MUX_HIWORD_MASK;
- 
- 	/* the actual muxing is xin24m, pll-output, xin32k */
-@@ -421,6 +656,12 @@ struct clk *rockchip_clk_register_pll(enum rockchip_pll_type pll_type,
- 	}
- 
- 	switch (pll_type) {
-+	case pll_rk3036:
-+		if (!pll->rate_table)
-+			init.ops = &rockchip_rk3036_pll_clk_norate_ops;
-+		else
-+			init.ops = &rockchip_rk3036_pll_clk_ops;
-+		break;
- 	case pll_rk3066:
- 		if (!pll->rate_table)
- 			init.ops = &rockchip_rk3066_pll_clk_norate_ops;
++&uart2 {
++	status = "okay";
++};
+diff --git a/arch/arm/boot/dts/rk3036.dtsi b/arch/arm/boot/dts/rk3036.dtsi
+new file mode 100644
+index 0000000..8f3a069
+--- /dev/null
++++ b/arch/arm/boot/dts/rk3036.dtsi
+@@ -0,0 +1,536 @@
++/*
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This file is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
++
++#include <dt-bindings/gpio/gpio.h>
++#include <dt-bindings/interrupt-controller/irq.h>
++#include <dt-bindings/interrupt-controller/arm-gic.h>
++#include <dt-bindings/pinctrl/rockchip.h>
++#include <dt-bindings/clock/rk3036-cru.h>
++#include "skeleton.dtsi"
++
++/ {
++	compatible = "rockchip,rk3036";
++
++	interrupt-parent = <&gic>;
++
++	aliases {
++		i2c1 = &i2c1;
++		serial0 = &uart0;
++		serial1 = &uart1;
++		serial2 = &uart2;
++	};
++
++	memory {
++		device_type = "memory";
++		reg = <0x60000000 0x40000000>;
++	};
++
++	arm-pmu {
++		compatible = "arm,cortex-a7-pmu";
++		interrupts = <GIC_SPI 76 IRQ_TYPE_LEVEL_HIGH>,
++		             <GIC_SPI 77 IRQ_TYPE_LEVEL_HIGH>;
++		interrupt-affinity = <&cpu0>, <&cpu1>;
++	};
++
++	cpus {
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		cpu0: cpu at f00 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a7";
++			reg = <0xf00>;
++			operating-points = <
++				/* KHz    uV */
++				 816000 1000000
++			>;
++			clock-latency = <40000>;
++			clocks = <&cru ARMCLK>;
++			resets = <&cru SRST_CORE0>;
++		};
++		cpu1: cpu at f01 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a7";
++			reg = <0xf01>;
++			resets = <&cru SRST_CORE1>;
++		};
++	};
++
++	amba {
++		compatible = "arm,amba-bus";
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges;
++
++		pdma: pdma at 20078000 {
++			compatible = "arm,pl330", "arm,primecell";
++			reg = <0x20078000 0x4000>;
++			interrupts = <GIC_SPI 0 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 1 IRQ_TYPE_LEVEL_HIGH>;
++			#dma-cells = <1>;
++			clocks = <&cru ACLK_DMAC2>;
++			clock-names = "apb_pclk";
++		};
++	};
++
++	xin24m: oscillator {
++		compatible = "fixed-clock";
++		clock-frequency = <24000000>;
++		clock-output-names = "xin24m";
++		#clock-cells = <0>;
++	};
++
++	timer {
++		compatible = "arm,armv7-timer";
++		arm,cpu-registers-not-fw-configured;
++		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>,
++			     <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>,
++			     <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>,
++			     <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
++		clock-frequency = <24000000>;
++	};
++
++	gic: interrupt-controller at 10139000 {
++		compatible = "arm,gic-400";
++		interrupt-controller;
++		#interrupt-cells = <3>;
++		#address-cells = <0>;
++
++		reg = <0x10139000 0x1000>,
++		      <0x1013a000 0x1000>,
++		      <0x1013c000 0x2000>,
++		      <0x1013e000 0x2000>;
++		interrupts = <GIC_PPI 9 0xf04>;
++	};
++
++	bus_intmem at 10080000 {
++		compatible = "mmio-sram";
++		reg = <0x10080000 0x2000>;
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges = <0 0x10080000 0x2000>;
++	};
++
++	cru: clock-controller at 20000000 {
++		compatible = "rockchip,rk3036-cru";
++		reg = <0x20000000 0x1000>;
++		rockchip,grf = <&grf>;
++		#clock-cells = <1>;
++		#reset-cells = <1>;
++		assigned-clocks = <&cru PLL_GPLL>;
++		assigned-clock-rates = <594000000>;
++	};
++
++	grf: syscon at 20008000 {
++		compatible = "rockchip,rk3036-grf", "syscon";
++		reg = <0x20008000 0x1000>;
++	};
++
++	pwm0: pwm at 20050000 {
++		compatible = "rockchip,rk3036-pwm", "rockchip,rk2928-pwm";
++		reg = <0x20050000 0x10>;
++		#pwm-cells = <3>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&pwm0_pin>;
++		clocks = <&cru PCLK_PWM>;
++		clock-names = "pwm";
++		status = "disabled";
++	};
++
++	pwm1: pwm at 20050010 {
++		compatible = "rockchip,rk3036-pwm", "rockchip,rk2928-pwm";
++		reg = <0x20050010 0x10>;
++		#pwm-cells = <3>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&pwm1_pin>;
++		clocks = <&cru PCLK_PWM>;
++		clock-names = "pwm";
++		status = "disabled";
++	};
++
++	pwm2: pwm at 20050020 {
++		compatible = "rockchip,rk3036-pwm", "rockchip,rk2928-pwm";
++		reg = <0x20050020 0x10>;
++		#pwm-cells = <3>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&pwm2_pin>;
++		clocks = <&cru PCLK_PWM>;
++		clock-names = "pwm";
++		status = "disabled";
++	};
++
++	pwm3: pwm at 20050030 {
++		compatible = "rockchip,rk3036-pwm", "rockchip,rk2928-pwm";
++		reg = <0x20050030 0x10>;
++		#pwm-cells = <2>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&pwm3_pin>;
++		clocks = <&cru PCLK_PWM>;
++		clock-names = "pwm";
++		status = "disabled";
++	};
++
++	acodec: acodec-ana at 20030000 {
++		compatible = "rk3036-codec";
++		reg = <0x20030000 0x4000>;
++		rockchip,grf = <&grf>;
++		clock-names = "acodec_pclk";
++		clocks = <&cru PCLK_ACODEC>;
++		status = "disabled";
++	};
++
++	emmc: dwmmc at 1021c000 {
++		compatible = "rockchip,rk3288-dw-mshc";
++		clock-frequency = <37500000>;
++		clock-freq-min-max = <400000 37500000>;
++		clocks = <&cru HCLK_EMMC>, <&cru SCLK_EMMC>,
++		<&cru SCLK_EMMC_DRV>, <&cru SCLK_EMMC_SAMPLE>;
++		clock-names = "biu", "ciu", "ciu_drv", "ciu_sample";
++		dmas = <&pdma 12>;
++		dma-names = "rx-tx";
++		fifo-depth = <0x100>;
++		interrupts = <GIC_SPI 16 IRQ_TYPE_LEVEL_HIGH>;
++		reg = <0x1021c000 0x4000>;
++		broken-cd;
++		bus-width = <8>;
++		cap-mmc-highspeed;
++		mmc-ddr-1_8v;
++		disable-wp;
++		non-removable;
++		num-slots = <1>;
++		default-sample-phase = <158>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&emmc_clk &emmc_cmd &emmc_bus8>;
++		status = "disabled";
++	};
++
++	i2c0: i2c at 20072000 {
++		compatible = "rockchip,rk3288-i2c";
++		reg = <0x20072000 0x1000>;
++		interrupts = <GIC_SPI 24 IRQ_TYPE_LEVEL_HIGH>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++		clock-names = "i2c";
++		clocks = <&cru PCLK_I2C0>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&i2c0_xfer>;
++		status = "disabled";
++	};
++
++	i2c1: i2c at 20056000 {
++		compatible = "rockchip,rk3288-i2c";
++		reg = <0x20056000 0x1000>;
++		interrupts = <GIC_SPI 25 IRQ_TYPE_LEVEL_HIGH>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++		clock-names = "i2c";
++		clocks = <&cru PCLK_I2C1>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&i2c1_xfer>;
++		status = "disabled";
++	};
++
++	i2c2: i2c at 2005a000 {
++		compatible = "rockchip,rk3288-i2c";
++		reg = <0x2005a000 0x1000>;
++		interrupts = <GIC_SPI 26 IRQ_TYPE_LEVEL_HIGH>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++		clock-names = "i2c";
++		clocks = <&cru PCLK_I2C2>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&i2c2_xfer>;
++		status = "disabled";
++	};
++
++	i2s: i2s at 10220000 {
++		compatible = "rockchip,rk3036-i2s", "rockchip,rk3066-i2s";
++		reg = <0x10220000 0x4000>;
++		interrupts = <GIC_SPI 51 IRQ_TYPE_LEVEL_HIGH>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++		dmas = <&pdma 0>, <&pdma 1>;
++		dma-names = "tx", "rx";
++		clock-names = "i2s_hclk", "i2s_clk";
++		clocks = <&cru HCLK_I2S>, <&cru SCLK_I2S>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&i2s_bus>;
++		status = "disabled";
++	};
++
++	uart0: serial at 20060000 {
++		compatible = "rockchip,rk3036-uart", "snps,dw-apb-uart";
++		reg = <0x20060000 0x100>;
++		interrupts = <GIC_SPI 20 IRQ_TYPE_LEVEL_HIGH>;
++		reg-shift = <2>;
++		reg-io-width = <4>;
++		clock-frequency = <24000000>;
++		clocks = <&cru SCLK_UART0>, <&cru PCLK_UART0>;
++		clock-names = "baudclk", "apb_pclk";
++		pinctrl-names = "default";
++		pinctrl-0 = <&uart0_xfer &uart0_cts &uart0_rts>;
++		status = "disabled";
++	};
++
++	uart1: serial at 20064000 {
++		compatible = "rockchip,rk3036-uart", "snps,dw-apb-uart";
++		reg = <0x20064000 0x100>;
++		interrupts = <GIC_SPI 21 IRQ_TYPE_LEVEL_HIGH>;
++		reg-shift = <2>;
++		reg-io-width = <4>;
++		clock-frequency = <24000000>;
++		clocks = <&cru SCLK_UART1>, <&cru PCLK_UART1>;
++		clock-names = "baudclk", "apb_pclk";
++		pinctrl-names = "default";
++		pinctrl-0 = <&uart1_xfer>;
++		status = "disabled";
++	};
++
++	uart2: serial at 20068000 {
++		compatible = "rockchip,rk3036-uart", "snps,dw-apb-uart";
++		reg = <0x20068000 0x100>;
++		interrupts = <GIC_SPI 22 IRQ_TYPE_LEVEL_HIGH>;
++		reg-shift = <2>;
++		reg-io-width = <4>;
++		clock-frequency = <24000000>;
++		clocks = <&cru SCLK_UART2>, <&cru PCLK_UART2>;
++		clock-names = "baudclk", "apb_pclk";
++		pinctrl-names = "default";
++		pinctrl-0 = <&uart2_xfer>;
++		status = "disabled";
++	};
++
++	usb_otg: usb at 10180000 {
++		compatible = "rockchip,rk3288-usb", "rockchip,rk3066-usb",
++				"snps,dwc2";
++		reg = <0x10180000 0x40000>;
++		interrupts = <GIC_SPI 10 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&cru HCLK_OTG0>;
++		clock-names = "otg";
++		dr_mode = "otg";
++		g-np-tx-fifo-size = <16>;
++		g-rx-fifo-size = <275>;
++		g-tx-fifo-size = <256 128 128 64 64 32>;
++		g-use-dma;
++		status = "disabled";
++	};
++
++	usb_host: usb at 101c0000 {
++		compatible = "rockchip,rk3288-usb", "rockchip,rk3066-usb",
++				"snps,dwc2";
++		reg = <0x101c0000 0x40000>;
++		interrupts = <GIC_SPI 11 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&cru HCLK_OTG1>;
++		clock-names = "otg";
++		dr_mode = "host";
++		status = "disabled";
++	};
++
++	pinctrl: pinctrl {
++		compatible = "rockchip,rk3036-pinctrl";
++		rockchip,grf = <&grf>;
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges;
++
++		gpio0: gpio0 at 2007c000 {
++			compatible = "rockchip,gpio-bank";
++			reg = <0x2007c000 0x100>;
++			interrupts = <GIC_SPI 36 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cru PCLK_GPIO0>;
++
++			gpio-controller;
++			#gpio-cells = <2>;
++
++			interrupt-controller;
++			#interrupt-cells = <2>;
++		};
++
++		gpio1: gpio1 at 20080000 {
++			compatible = "rockchip,gpio-bank";
++			reg = <0x20080000 0x100>;
++			interrupts = <GIC_SPI 37 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cru PCLK_GPIO1>;
++
++			gpio-controller;
++			#gpio-cells = <2>;
++
++			interrupt-controller;
++			#interrupt-cells = <2>;
++		};
++
++		gpio2: gpio2 at 20084000 {
++			compatible = "rockchip,gpio-bank";
++			reg = <0x20084000 0x100>;
++			interrupts = <GIC_SPI 38 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cru PCLK_GPIO2>;
++
++			gpio-controller;
++			#gpio-cells = <2>;
++
++			interrupt-controller;
++			#interrupt-cells = <2>;
++		};
++
++		pcfg_pull_up: pcfg-pull-up {
++			bias-pull-up;
++		};
++
++		pcfg_pull_down: pcfg-pull-down {
++			bias-pull-down;
++		};
++
++		pcfg_pull_none: pcfg-pull-none {
++			bias-disable;
++		};
++
++		pwm0 {
++			pwm0_pin: pwm0-pin {
++				rockchip,pins = <0 0 RK_FUNC_2 &pcfg_pull_none>;
++			};
++		};
++
++		pwm1 {
++			pwm1_pin: pwm1-pin {
++				rockchip,pins = <0 1 RK_FUNC_2 &pcfg_pull_none>;
++			};
++		};
++
++		pwm2 {
++			pwm2_pin: pwm2-pin {
++				rockchip,pins = <0 1 2 &pcfg_pull_none>;
++			};
++		};
++
++		pwm3 {
++			pwm3_pin: pwm3-pin {
++				rockchip,pins = <0 27 1 &pcfg_pull_none>;
++			};
++		};
++
++		emmc {
++			/*
++			 * We run eMMC at max speed; bump up drive strength.
++			 * We also have external pulls, so disable the internal ones.
++			 */
++			emmc_clk: emmc-clk {
++				rockchip,pins = <2 4 RK_FUNC_2 &pcfg_pull_none>;
++			};
++
++			emmc_cmd: emmc-cmd {
++				rockchip,pins = <2 1 RK_FUNC_2 &pcfg_pull_none>;
++			};
++
++			emmc_bus8: emmc-bus8 {
++				rockchip,pins = <1 24 RK_FUNC_2 &pcfg_pull_none>,
++						<1 25 RK_FUNC_2 &pcfg_pull_none>,
++						<1 26 RK_FUNC_2 &pcfg_pull_none>,
++						<1 27 RK_FUNC_2 &pcfg_pull_none>,
++						<1 28 RK_FUNC_2 &pcfg_pull_none>,
++						<1 29 RK_FUNC_2 &pcfg_pull_none>,
++						<1 30 RK_FUNC_2 &pcfg_pull_none>,
++						<1 31 RK_FUNC_2 &pcfg_pull_none>;
++			};
++		};
++
++		i2c0 {
++			i2c0_xfer: i2c0-xfer {
++				rockchip,pins = <0 0 RK_FUNC_1 &pcfg_pull_none>,
++						<0 1 RK_FUNC_1 &pcfg_pull_none>;
++			};
++		};
++
++		i2c1 {
++			i2c1_xfer: i2c1-xfer {
++				rockchip,pins = <0 2 RK_FUNC_1 &pcfg_pull_none>,
++						<0 3 RK_FUNC_1 &pcfg_pull_none>;
++			};
++		};
++
++		i2c2 {
++			i2c2_xfer: i2c2-xfer {
++				rockchip,pins = <2 20 RK_FUNC_1 &pcfg_pull_none>,
++						<2 21 RK_FUNC_1 &pcfg_pull_none>;
++			};
++		};
++
++		i2s {
++			i2s_bus: i2s-bus {
++				rockchip,pins = <1 0 RK_FUNC_1 &pcfg_pull_none>,
++						<1 1 RK_FUNC_1 &pcfg_pull_none>,
++						<1 2 RK_FUNC_1 &pcfg_pull_none>,
++						<1 3 RK_FUNC_1 &pcfg_pull_none>,
++						<1 4 RK_FUNC_1 &pcfg_pull_none>,
++						<1 5 RK_FUNC_1 &pcfg_pull_none>;
++			};
++		};
++
++		uart0 {
++			uart0_xfer: uart0-xfer {
++				rockchip,pins = <0 16 RK_FUNC_1 &pcfg_pull_up>,
++						<0 17 RK_FUNC_1 &pcfg_pull_none>;
++			};
++
++			uart0_cts: uart0-cts {
++				rockchip,pins = <0 18 RK_FUNC_1 &pcfg_pull_up>;
++			};
++
++			uart0_rts: uart0-rts {
++				rockchip,pins = <0 19 RK_FUNC_1 &pcfg_pull_none>;
++			};
++		};
++
++		uart1 {
++			uart1_xfer: uart1-xfer {
++				rockchip,pins = <2 22 RK_FUNC_1 &pcfg_pull_none>,
++						<2 23 RK_FUNC_1 &pcfg_pull_none>;
++			};
++			/* no rts / cts for uart1 */
++		};
++
++		uart2 {
++			uart2_xfer: uart2-xfer {
++				rockchip,pins = <1 18 RK_FUNC_2 &pcfg_pull_none>,
++						<1 19 RK_FUNC_2 &pcfg_pull_none>;
++			};
++			/* no rts / cts for uart2 */
++		};
++	};
++};
 -- 
 1.7.9.5
