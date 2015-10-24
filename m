@@ -1,36 +1,50 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Sat, 24 Oct 2015 16:28:28 +0200
-Subject: [PATCH v6 04/22] of: add function to allow probing a device from
- a OF node
-In-Reply-To: <20151022235419.GF29919@sirena.org.uk>
-References: <1442844182-27787-1-git-send-email-tomeu.vizoso@collabora.com>
- <CAAObsKCAX4DQGydQoYjJEYKTOEqpVozXdHnqXWdNYVkLsg7BVg@mail.gmail.com>
- <20151022235419.GF29919@sirena.org.uk>
-Message-ID: <3439880.XMRknxAf8e@vostro.rjw.lan>
+From: nm@ti.com (Nishanth Menon)
+Date: Sat, 24 Oct 2015 09:44:37 -0500
+Subject: [PATCH] rtc: ds1307: Fix alarm programming for mcp794xx
+In-Reply-To: <1445581797-19693-1-git-send-email-t-kristo@ti.com>
+References: <1445581797-19693-1-git-send-email-t-kristo@ti.com>
+Message-ID: <562B9955.40308@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, October 23, 2015 08:54:19 AM Mark Brown wrote:
+On 10/23/2015 01:29 AM, Tero Kristo wrote:
+> mcp794xx alarm registers must be written in BCD format. However, the
+> alarm programming logic neglected this by adding one to the value
+> after bin2bcd conversion has been already done, writing bad values
+> to month register in case the alarm being set is in October. In this
+> case, the alarm month value becomes 0x0a instead of the expected 0x10.
 > 
-> --7cm2iqirTL37Ot+N
-> Content-Type: text/plain; charset=us-ascii
-> Content-Disposition: inline
+> Fix by moving the +1 addition within the bin2bcd call also.
 > 
-> On Thu, Oct 22, 2015 at 03:03:37PM +0200, Tomeu Vizoso wrote:
-> > On 22 October 2015 at 03:06, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
+> Fixes: 1d1945d261a2 ("drivers/rtc/rtc-ds1307.c: add alarm support for mcp7941x chips")
 > 
-> > > Same question as from Greg: How does a subsystem know whether or not to use
-> > > this function?
-> 
-> > Maybe I don't understand the comment, but as the commit message says,
-> > subsystems can use this when looking up resources for drivers. Or you
-> > mean that this information should be in the API docs?
-> 
-> I'm pretty sure what he's suggesting here is changing to "should always"
-> (ie, explain the situations when a subsystem would do this, including
-> decision criteria if it's optional).
+> Signed-off-by: Tero Kristo <t-kristo@ti.com>
 
-Right.
+Nice catch.
+Acked-by: Nishanth Menon <nm@ti.com>
+> ---
+>  drivers/rtc/rtc-ds1307.c |    4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/rtc/rtc-ds1307.c b/drivers/rtc/rtc-ds1307.c
+> index a705e64..188006c 100644
+> --- a/drivers/rtc/rtc-ds1307.c
+> +++ b/drivers/rtc/rtc-ds1307.c
+> @@ -718,9 +718,9 @@ static int mcp794xx_set_alarm(struct device *dev, struct rtc_wkalrm *t)
+>  	regs[3] = bin2bcd(t->time.tm_sec);
+>  	regs[4] = bin2bcd(t->time.tm_min);
+>  	regs[5] = bin2bcd(t->time.tm_hour);
+> -	regs[6] = bin2bcd(t->time.tm_wday) + 1;
+> +	regs[6] = bin2bcd(t->time.tm_wday + 1);
+>  	regs[7] = bin2bcd(t->time.tm_mday);
+> -	regs[8] = bin2bcd(t->time.tm_mon) + 1;
+> +	regs[8] = bin2bcd(t->time.tm_mon + 1);
+>  
+>  	/* Clear the alarm 0 interrupt flag. */
+>  	regs[6] &= ~MCP794XX_BIT_ALMX_IF;
+> 
 
-Thanks,
-Rafael
+
+-- 
+Regards,
+Nishanth Menon
