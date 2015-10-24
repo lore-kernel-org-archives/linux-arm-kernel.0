@@ -1,64 +1,49 @@
-From: Julia.Lawall@lip6.fr (Julia Lawall)
-Date: Sat, 24 Oct 2015 16:42:35 +0200
-Subject: [PATCH 9/9] pinctrl: at91: add missing of_node_put
-In-Reply-To: <1445697755-26341-1-git-send-email-Julia.Lawall@lip6.fr>
-References: <1445697755-26341-1-git-send-email-Julia.Lawall@lip6.fr>
-Message-ID: <1445697755-26341-10-git-send-email-Julia.Lawall@lip6.fr>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Sat, 24 Oct 2015 11:57:53 +0200
+Subject: [PATCH v2 1/3] dmaengine: virt-dma: don't always free descriptor
+ upon completion
+References: <1444766070-26915-1-git-send-email-robert.jarzmik@free.fr>
+Message-ID: <87oafowahl.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-for_each_child_of_node performs an of_node_get on each iteration, so
-a break out of the loop requires an of_node_put.
+Robert Jarzmik <robert.jarzmik@free.fr> writes:
 
-A simplified version of the semantic patch that fixes this problem is as
-follows (http://coccinelle.lip6.fr):
+> This patch attempts to enhance the case of a transfer submitted multiple
+> times, and where the cost of creating the descriptors chain is not
+> negligible.
+>
+> This happens with big video buffers (several megabytes, ie. several
+> thousands of linked descriptors in one scatter-gather list). In these
+> cases, a video driver would want to do :
+>  - tx = dmaengine_prep_slave_sg()
+>  - dma_engine_submit(tx);
+>  - dma_async_issue_pending()
+>  - wait for video completion
+>  - read video data (or not, skipping a frame is also possible)
+>  - dma_engine_submit(tx)
+>    => here, the descriptors chain recalculation will take time
+>    => the dma coherent allocation over and over might create holes in
+>       the dma pool, which is counter-productive.
+>  - dma_async_issue_pending()
+>  - etc ...
+>
+> In order to cope with this case, virt-dma is modified to prevent freeing
+> the descriptors upon completion if DMA_CTRL_REUSE flag is set in the
+> transfer.
+>
+> This patch is a respin of the former DMA_CTRL_ACK approach, which was
+> reverted due to a regression in audio drivers.
+>
+> Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
+> ---
+> Since v1: added doxygen commit to vchan_tx_desc_free
 
-// <smpl>
-@@
-expression root,e;
-local idexpression child;
-@@
+Hi Vinod,
 
- for_each_child_of_node(root, child) {
-   ... when != of_node_put(child)
-       when != e = child
-(
-   return child;
-|
-+  of_node_put(child);
-?  return ...;
-)
-   ...
- }
-// </smpl>
+Is this serie good for you or do you have remaining comments to be addressed ?
 
-Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
+Cheers.
 
----
- drivers/pinctrl/pinctrl-at91.c |    5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
-
-diff --git a/drivers/pinctrl/pinctrl-at91.c b/drivers/pinctrl/pinctrl-at91.c
-index ce6e589..0d2fc0c 100644
---- a/drivers/pinctrl/pinctrl-at91.c
-+++ b/drivers/pinctrl/pinctrl-at91.c
-@@ -1122,8 +1122,10 @@ static int at91_pinctrl_parse_functions(struct device_node *np,
- 		func->groups[i] = child->name;
- 		grp = &info->groups[grp_index++];
- 		ret = at91_pinctrl_parse_groups(child, grp, info, i++);
--		if (ret)
-+		if (ret) {
-+			of_node_put(child);
- 			return ret;
-+		}
- 	}
- 
- 	return 0;
-@@ -1196,6 +1198,7 @@ static int at91_pinctrl_probe_dt(struct platform_device *pdev,
- 		ret = at91_pinctrl_parse_functions(child, info, i++);
- 		if (ret) {
- 			dev_err(&pdev->dev, "failed to parse function\n");
-+			of_node_put(child);
- 			return ret;
- 		}
- 	}
+--
+Robert
