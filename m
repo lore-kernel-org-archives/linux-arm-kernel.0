@@ -1,33 +1,36 @@
-From: zhengsq@rock-chips.com (Shunqian Zheng)
-Date: Sat, 24 Oct 2015 11:18:05 +0800
-Subject: [PATCH v1 3/4] ASoC: Add codec machine driver for RK3036
-In-Reply-To: <20151019191312.GQ32054@sirena.org.uk>
-References: <1444698070-4191-1-git-send-email-zhengsq@rock-chips.com>
- <1444698070-4191-4-git-send-email-zhengsq@rock-chips.com>
- <20151019191312.GQ32054@sirena.org.uk>
-Message-ID: <562AF86D.8050303@rock-chips.com>
+From: jun.nie@linaro.org (Jun Nie)
+Date: Sat, 24 Oct 2015 11:23:04 +0800
+Subject: [PATCH v13 5/5] uart: pl011: Add support to ZTE ZX296702 uart
+In-Reply-To: <CAOZdJXUjZLKkUYScD7oDTMuRUtAEJ6=DopmE4n6Vb9zyv+_viA@mail.gmail.com>
+References: <1438328959-16177-1-git-send-email-jun.nie@linaro.org>
+ <1438328959-16177-6-git-send-email-jun.nie@linaro.org>
+ <55FC16A2.5070207@arm.com>
+ <CABymUCOA3oG7Hq83hDyQ_uisQHeipoHshcWONWTtjxKvikzjsQ@mail.gmail.com>
+ <CAOZdJXUjZLKkUYScD7oDTMuRUtAEJ6=DopmE4n6Vb9zyv+_viA@mail.gmail.com>
+Message-ID: <CABymUCORU9CDD64Rdw2VX0kLSe6E1zY9iZCap5xittoVFwbOtw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mark & Sjoerd,
-
-On 2015?10?20? 03:13, Mark Brown wrote:
-> On Tue, Oct 13, 2015 at 09:01:08AM +0800, Shunqian Zheng wrote:
->> From: ZhengShunQian <zhengsq@rock-chips.com>
+2015-10-24 5:54 GMT+08:00 Timur Tabi <timur@codeaurora.org>:
+> On Sat, Sep 19, 2015 at 1:54 AM, Jun Nie <jun.nie@linaro.org> wrote:
 >>
->> This patch add the machine driver for rk3036.
-> Like Sjoerd said this looks like it migh be better just using
-> simple-card, if not...
-Yes, simple-card works fine, I think I need to learn more and resend 
-patches.
-
-Thank you very much,
-Shunqian
+>> I am not sure the silicon designer's plan on the UART IP. Different
+>> silicon team have different decision on the IP choice. So I guess
+>> future ZTE SOC may reuse ZTE UART per people assignment.
 >
->> +	ret = snd_soc_dai_set_fmt(codec_dai, dai_fmt);
->> +	if (ret < 0)
->> +		return ret;
->> +
->> +	/* set cpu DAI configuration */
->> +	ret = snd_soc_dai_set_fmt(cpu_dai, dai_fmt);
-> Set this in the dai_link struct.
+> I would rather see this as a separate driver.  I think this patch
+> pollutes the amba-pl011.c driver too much.
+
+I am OK to add a new driver for ZTE UART if no other's objection
+though I do not agree you. Without this last patch, other patches are
+just for minor refactor for register access.
+
+Comment from any other is welcome.
+
+Jun
+
+>
+> --
+> Qualcomm Innovation Center, Inc.
+> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+> a Linux Foundation Collaborative Project.
