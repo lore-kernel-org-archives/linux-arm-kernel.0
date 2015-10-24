@@ -1,49 +1,69 @@
 From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Sat, 24 Oct 2015 11:57:53 +0200
-Subject: [PATCH v2 1/3] dmaengine: virt-dma: don't always free descriptor
- upon completion
-References: <1444766070-26915-1-git-send-email-robert.jarzmik@free.fr>
-Message-ID: <87oafowahl.fsf@belgarion.home>
+Date: Sat, 24 Oct 2015 12:17:25 +0200
+Subject: [GIT PULL] pxa for v4.4
+References: <878u72zlif.fsf@belgarion.home> <20151023171539.GB2224@localhost>
+Message-ID: <87d1w4wagr.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Robert Jarzmik <robert.jarzmik@free.fr> writes:
+Olof Johansson <olof@lixom.net> writes:
 
-> This patch attempts to enhance the case of a transfer submitted multiple
-> times, and where the cost of creating the descriptors chain is not
-> negligible.
+> On Fri, Oct 16, 2015 at 09:00:40PM +0200, Robert Jarzmik wrote:
+>> Hi Arnd, Kevin and Olof,
+>> 
+>> This is the pxa pull request for 4.4 cycle. It is mainly magician enhancement
+>> and fixes. Could you please consider pulling ?
+>> 
+>> The following changes since commit 6ff33f3902c3b1c5d0db6b1e2c70b6d76fba357f:
+>> 
+>>   Linux 4.3-rc1 (2015-09-12 16:35:56 -0700)
+>> 
+>> are available in the git repository at:
+>> 
+>>   https://github.com/rjarzmik/linux.git pxa-for-4.4
 >
-> This happens with big video buffers (several megabytes, ie. several
-> thousands of linked descriptors in one scatter-gather list). In these
-> cases, a video driver would want to do :
->  - tx = dmaengine_prep_slave_sg()
->  - dma_engine_submit(tx);
->  - dma_async_issue_pending()
->  - wait for video completion
->  - read video data (or not, skipping a frame is also possible)
->  - dma_engine_submit(tx)
->    => here, the descriptors chain recalculation will take time
->    => the dma coherent allocation over and over might create holes in
->       the dma pool, which is counter-productive.
->  - dma_async_issue_pending()
->  - etc ...
+> Hi Robert,
 >
-> In order to cope with this case, virt-dma is modified to prevent freeing
-> the descriptors upon completion if DMA_CTRL_REUSE flag is set in the
-> transfer.
->
-> This patch is a respin of the former DMA_CTRL_ACK approach, which was
-> reverted due to a regression in audio drivers.
->
-> Signed-off-by: Robert Jarzmik <robert.jarzmik@free.fr>
-> ---
-> Since v1: added doxygen commit to vchan_tx_desc_free
+> I'm glad to see all this activity on PXA! You're reaching the amount of new
+> stuff that it's time to start splitting up in topics. I'll merge this branch
+> for this release, but I'm also going to go through below and show you how this
+> can/should be split up in the future.
+Ok, great !
 
-Hi Vinod,
+> First, take a look at our tree and how it's organized. Look at my presentation
+> from ELC 2014, or Arnd's from this year, to get an idea of the philosophy we
+> use and roughly how we categorize patches.
+Ok, just did.
+I must admit I've been a bit lazy in this cycle, as I already have my tree split
+into cleanup/fix/for-next/dt ...
 
-Is this serie good for you or do you have remaining comments to be addressed ?
+For cleanup, I understand it all.
+For the single fix, I wasn't aware I could make pull request before a merge
+window for fixes, I though I could only issue them for post -rc1 series.
+
+>> Petr Cvek (22):
+> Most of these are fixes/cleanups. With a burst of patches like this it can
+> sometimes be hard to rip them apart and put some in one bucked and others in
+> another. Feel free to keep them in a separate topic in that case
+> (magician-cleanup or similar)
+All right, understood, that translates into a separate pull request.
+
+> Board code, of which we tend to have almost none these days. :-)
+I know, I'm working on the ablation, it's just the patient is long to cure :)
+
+>> Thierry Reding (17):
+> This could also be a topic on its own. We'd merge it into the cleanup branch at
+> our end, but you can provide it as a separate branch if you want.
+Okay, understood.
+
+> Don't hesitate to ask if you have questions on how to handle this down the
+> road.
+Okay, thanks.
+I'll try to split better next time. If I see I have another heavy pull-request
+(at least heavy in a dying architecture context), I'll try to provide the pull
+requests earlier, at -rc4, to let you time to correct me if I messed it up.
 
 Cheers.
 
---
+-- 
 Robert
