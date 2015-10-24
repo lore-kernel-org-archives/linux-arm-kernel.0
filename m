@@ -1,118 +1,57 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Sat, 24 Oct 2015 15:57:24 +0200
-Subject: [PATCH v6 03/22] of/platform: Point to struct device from device
- node
-In-Reply-To: <CAAObsKA+ky+6XjqQYswdB4K41V0-_kM9bhLwY0RiCT0rm2qSgw@mail.gmail.com>
-References: <1442844182-27787-1-git-send-email-tomeu.vizoso@collabora.com>
- <1800338.r1NE3r6BDS@vostro.rjw.lan>
- <CAAObsKA+ky+6XjqQYswdB4K41V0-_kM9bhLwY0RiCT0rm2qSgw@mail.gmail.com>
-Message-ID: <1806288.pmhamH8mKQ@vostro.rjw.lan>
+From: tomasz.nowicki@linaro.org (Tomasz Nowicki)
+Date: Sat, 24 Oct 2015 15:58:17 +0200
+Subject: [PATCH V1 10/10] acpi, gicv3, its: Use MADT ITS subtable to do
+ PCI/MSI domain initialization.
+In-Reply-To: <562B5B6E.2000305@huawei.com>
+References: <1444917919-21152-1-git-send-email-tn@semihalf.com>
+ <1444917919-21152-11-git-send-email-tn@semihalf.com>
+ <562B5B6E.2000305@huawei.com>
+Message-ID: <562B8E79.6010701@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, October 22, 2015 03:01:45 PM Tomeu Vizoso wrote:
-> On 22 October 2015 at 03:02, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
-> > On Monday, September 21, 2015 04:02:43 PM Tomeu Vizoso wrote:
-> >> When adding platform and AMBA devices, set the device node's device
-> >> member to point to it.
-> >>
-> >> This speeds lookups considerably and is safe because we only create one
-> >> of these devices for any given device node.
-> >>
-> >> Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
-> >> ---
-> >>
-> >> Changes in v5:
-> >> - Set the pointer to struct device also for AMBA devices
-> >> - Unset the pointer to struct device when the platform device is about
-> >>   to be unregistered
-> >> - Increase the reference count of the device before returning from
-> >>   of_find_device_by_node()
-> >>
-> >>  drivers/of/platform.c | 19 ++++++++++---------
-> >>  include/linux/of.h    |  1 +
-> >>  2 files changed, 11 insertions(+), 9 deletions(-)
-> >>
-> >> diff --git a/drivers/of/platform.c b/drivers/of/platform.c
-> >> index 1001efaedcb8..408d89f1d124 100644
-> >> --- a/drivers/of/platform.c
-> >> +++ b/drivers/of/platform.c
-> >> @@ -32,11 +32,6 @@ const struct of_device_id of_default_bus_match_table[] = {
-> >>       {} /* Empty terminated list */
-> >>  };
-> >>
-> >> -static int of_dev_node_match(struct device *dev, void *data)
-> >> -{
-> >> -     return dev->of_node == data;
-> >> -}
-> >> -
-> >>  /**
-> >>   * of_find_device_by_node - Find the platform_device associated with a node
-> >>   * @np: Pointer to device tree node
-> >> @@ -45,10 +40,10 @@ static int of_dev_node_match(struct device *dev, void *data)
-> >>   */
-> >>  struct platform_device *of_find_device_by_node(struct device_node *np)
-> >>  {
-> >> -     struct device *dev;
-> >> -
-> >> -     dev = bus_find_device(&platform_bus_type, NULL, np, of_dev_node_match);
-> >> -     return dev ? to_platform_device(dev) : NULL;
-> >> +     if (np->device && np->device->bus == &platform_bus_type &&
-> >> +         get_device(np->device))
-> >> +             return to_platform_device(np->device);
-> >> +     return NULL;
-> >>  }
-> >>  EXPORT_SYMBOL(of_find_device_by_node);
-> >>
-> >> @@ -192,6 +187,8 @@ static struct platform_device *of_platform_device_create_pdata(
-> >>               goto err_clear_flag;
-> >>       }
-> >>
-> >> +     np->device = &dev->dev;
-> >> +
-> >>       return dev;
-> >>
-> >>  err_clear_flag:
-> >> @@ -272,6 +269,8 @@ static struct amba_device *of_amba_device_create(struct device_node *node,
-> >>               goto err_free;
-> >>       }
-> >>
-> >> +     node->device = &dev->dev;
-> >> +
-> >>       return dev;
-> >>
-> >>  err_free:
-> >> @@ -476,6 +475,8 @@ static int of_platform_device_destroy(struct device *dev, void *data)
-> >>       if (of_node_check_flag(dev->of_node, OF_POPULATED_BUS))
-> >>               device_for_each_child(dev, NULL, of_platform_device_destroy);
-> >>
-> >> +     dev->of_node->device = NULL;
-> >> +
-> >>       if (dev->bus == &platform_bus_type)
-> >>               platform_device_unregister(to_platform_device(dev));
-> >>  #ifdef CONFIG_ARM_AMBA
-> >> diff --git a/include/linux/of.h b/include/linux/of.h
-> >> index 2194b8ca41f9..eb091be0f8ee 100644
-> >> --- a/include/linux/of.h
-> >> +++ b/include/linux/of.h
-> >> @@ -52,6 +52,7 @@ struct device_node {
-> >>       phandle phandle;
-> >>       const char *full_name;
-> >>       struct fwnode_handle fwnode;
-> >> +     struct device *device;
-> >
-> > There are cases in which multiple device objects point to the same device_node,
-> > so is the single struct device pointer here really sufficient?
-> 
-> Only one struct device is registered for a given DT device node when
-> the DT is scanned (otherwise, of_find_device_by_node wouldn't be
-> safe).
-> 
-> If some driver makes a struct device to point to a device_node that
-> already has a struct device associated with it, that's fine.
+On 10/24/2015 12:20 PM, Hanjun Guo wrote:
+> On 2015/10/15 22:05, Tomasz Nowicki wrote:
+>> After refactoring DT code, we let ACPI to build ITS PCI MSI domain
+>> and do requester ID to device ID translation using IORT table.
+>>
+>> We have now full PCI MSI domain stack, thus we can enable ITS initialization
+>> from GICv3 core driver for ACPI scenario.
+>>
+>> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
+>> ---
+>>   drivers/irqchip/irq-gic-v3-its-pci-msi.c | 48 ++++++++++++++++++++++++++++++--
+>>   drivers/irqchip/irq-gic-v3.c             |  3 +-
+>>   2 files changed, 47 insertions(+), 4 deletions(-)
+>>
+>> diff --git a/drivers/irqchip/irq-gic-v3-its-pci-msi.c b/drivers/irqchip/irq-gic-v3-its-pci-msi.c
+>> index cfd35da..09ae2d8 100644
+>> --- a/drivers/irqchip/irq-gic-v3-its-pci-msi.c
+>> +++ b/drivers/irqchip/irq-gic-v3-its-pci-msi.c
+>> @@ -15,6 +15,8 @@
+>>    * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+>>    */
+>>
+>> +#include <linux/acpi.h>
+>> +#include <linux/iort.h>
+>>   #include <linux/msi.h>
+>>   #include <linux/of.h>
+>>   #include <linux/of_irq.h>
+>> @@ -59,8 +61,10 @@ static int its_pci_msi_vec_count(struct pci_dev *pdev)
+>>   static int its_get_pci_alias(struct pci_dev *pdev, u16 alias, void *data)
+>>   {
+>>   	struct its_pci_alias *dev_alias = data;
+>> +	u32 dev_id;
+>>
+>> -	dev_alias->dev_id = alias;
+>> +	dev_alias->dev_id = iort_find_pci_id(pdev, alias, &dev_id) == 0 ?
+>> +								dev_id : alias;
+>
+> Hi tomasz, I think we need to re work this patch on top of tip/irq/core
+> which has support for "msi-map" and "mai-parent" property support.
+>
 
-Well, once that has happened, your new device pointer in the given device_node
-becomes useless.  Why exactly is that fine?
+Indeed, I will rebase after some more comments related to other patches 
+in this series.
 
-Thanks,
-Rafael
+Tomasz
