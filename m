@@ -1,60 +1,27 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Sat, 24 Oct 2015 11:30:32 +0800
-Subject: [PATCH RESEND v6 0/2] ARM: sunxi: Add Reduced Serial Bus (RSB)
- controller support
-In-Reply-To: <1445625691-20289-1-git-send-email-maxime.ripard@free-electrons.com>
-References: <1445625691-20289-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <CAGb2v66utAE-Pzmn7dNuWOCGV-Y_=U9sfhGh=Cey-J-Y9BNHpg@mail.gmail.com>
+From: timur@codeaurora.org (Timur Tabi)
+Date: Fri, 23 Oct 2015 22:32:37 -0500
+Subject: [PATCH v13 5/5] uart: pl011: Add support to ZTE ZX296702 uart
+In-Reply-To: <CABymUCORU9CDD64Rdw2VX0kLSe6E1zY9iZCap5xittoVFwbOtw@mail.gmail.com>
+References: <1438328959-16177-1-git-send-email-jun.nie@linaro.org>
+ <1438328959-16177-6-git-send-email-jun.nie@linaro.org>
+ <55FC16A2.5070207@arm.com>
+ <CABymUCOA3oG7Hq83hDyQ_uisQHeipoHshcWONWTtjxKvikzjsQ@mail.gmail.com>
+ <CAOZdJXUjZLKkUYScD7oDTMuRUtAEJ6=DopmE4n6Vb9zyv+_viA@mail.gmail.com>
+ <CABymUCORU9CDD64Rdw2VX0kLSe6E1zY9iZCap5xittoVFwbOtw@mail.gmail.com>
+Message-ID: <562AFBD5.3050508@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd, Kevin, Olof,
+Jun Nie wrote:
+> I am OK to add a new driver for ZTE UART if no other's objection
+> though I do not agree you. Without this last patch, other patches are
+> just for minor refactor for register access.
 
-On Sat, Oct 24, 2015 at 2:41 AM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> Hi Arnd, Kevin, Olof,
->
-> As discussed on IRC, here is a resend of these RSB patches, to merge
-> for 4.4.
+In that case, my vote is to drop the whole patchset.  Just copy/paste 
+the amba-pl011 driver and make whatever changes you need.  That sort of 
+thing happens all the time.
 
-Please merge them on a topic branch, so we can try to merge other
-patches depending on them. If possible I'd like to get an actual
-user in 4.4, otherwise this driver won't get any usage until the
-next merge window.
-
-I'll try to send out a new version of the AXP223 patches later today.
-
-Thanks!
-
-Regards
-ChenYu
-
-> The original cover letter was:
->
-> This is v6 of the Allwinner Reduced Serial Bus driver. This version puts
-> the driver under drivers/bus instead of drivers/soc/sunxi. There are no
-> changes to the binding or the driver itself.
->
-> The series is based on v4.3-rc1.
->
-> Thanks!
-> Maxime
->
-> Chen-Yu Tsai (2):
->   bus: sunxi-rsb: Add Allwinner Reduced Serial Bus (RSB) controller
->     bindings
->   bus: sunxi-rsb: Add driver for Allwinner Reduced Serial Bus
->
->  .../devicetree/bindings/bus/sunxi-rsb.txt          |  47 ++
->  drivers/bus/Kconfig                                |  11 +
->  drivers/bus/Makefile                               |   1 +
->  drivers/bus/sunxi-rsb.c                            | 783 +++++++++++++++++++++
->  include/linux/sunxi-rsb.h                          | 105 +++
->  5 files changed, 947 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/bus/sunxi-rsb.txt
->  create mode 100644 drivers/bus/sunxi-rsb.c
->  create mode 100644 include/linux/sunxi-rsb.h
->
-> --
-> 2.6.2
->
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the
+Code Aurora Forum, hosted by The Linux Foundation.
