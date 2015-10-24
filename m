@@ -1,112 +1,63 @@
-From: ddaney.cavm@gmail.com (David Daney)
-Date: Fri, 23 Oct 2015 17:14:10 -0700
-Subject: [PATCH 4/4] net: thunderx: Incorporate pass2 silicon CPI index
- configuration changes
-In-Reply-To: <1445645650-17328-1-git-send-email-ddaney.cavm@gmail.com>
-References: <1445645650-17328-1-git-send-email-ddaney.cavm@gmail.com>
-Message-ID: <1445645650-17328-5-git-send-email-ddaney.cavm@gmail.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 23 Oct 2015 18:14:54 -0700
+Subject: [GIT PULL] ARM: OMAP2+: hwmod cleanup for v4.4
+In-Reply-To: <alpine.DEB.2.02.1510231957310.9575@utopia.booyaka.com>
+References: <alpine.DEB.2.02.1510231957310.9575@utopia.booyaka.com>
+Message-ID: <20151024011453.GZ3078@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Thanneeru Srinivasulu <tsrinivasulu@caviumnetworks.com>
+* Paul Walmsley <paul@pwsan.com> [151023 12:58]:
+> Hi Tony
+> 
+> The following changes since commit 049e6dde7e57f0054fdc49102e7ef4830c698b46:
+> 
+>   Linux 4.3-rc4 (2015-10-04 16:57:17 +0100)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending.git tags/for-v4.4/omap-hwmod-cleanup-a
+> 
+> for you to fetch changes up to c4384a97af852121f66e52ba96e98d6f13ad19eb:
+> 
+>   ARM: OMAP3: hwmod data: Remove legacy mailbox data and addrs (2015-10-23 13:01:25 -0600)
+> 
+> ----------------------------------------------------------------
+> ARM: OMAP2+: hwmod cleanup for v4.4
+> 
+> Remove some superfluous data from the OMAP2+ hwmod data files.  Mostly
+> this is a result of data being moved to DT files.  Nothing too
+> controversial, here.
+> 
+> Basic build, boot, and PM test results are available here:
+> 
+> http://www.pwsan.com/omap/testlogs/hwmod-cleanup-a-for-v4.4/20151023130140/
 
-Add support for ThunderX pass2 CPI and MPI configuration changes.
-MPI_ALG is not enabled i.e MCAM parsing is disabled.
+Thanks pulling into omap-for-v4.4/soc. FYI, that's most likely the last branch I'll
+do for the upcoming merge window as we're already late with all the regression
+fixes. Planning to send it off tomorrow.
 
-Signed-off-by: Thanneeru Srinivasulu <tsrinivasulu@caviumnetworks.com>
-Signed-off-by: Sunil Goutham <sgoutham@cavium.com>
-Signed-off-by: David Daney <david.daney@cavium.com>
----
- drivers/net/ethernet/cavium/thunder/nic_main.c | 29 ++++++++++++++++++++------
- drivers/net/ethernet/cavium/thunder/nic_reg.h  |  4 ++++
- 2 files changed, 27 insertions(+), 6 deletions(-)
+Regards,
 
-diff --git a/drivers/net/ethernet/cavium/thunder/nic_main.c b/drivers/net/ethernet/cavium/thunder/nic_main.c
-index 52e1acb..c561fdc 100644
---- a/drivers/net/ethernet/cavium/thunder/nic_main.c
-+++ b/drivers/net/ethernet/cavium/thunder/nic_main.c
-@@ -43,6 +43,7 @@ struct nicpf {
- 	u8			duplex[MAX_LMAC];
- 	u32			speed[MAX_LMAC];
- 	u16			cpi_base[MAX_NUM_VFS_SUPPORTED];
-+	u16			rssi_base[MAX_NUM_VFS_SUPPORTED];
- 	u16			rss_ind_tbl_size;
- 	bool			mbx_lock[MAX_NUM_VFS_SUPPORTED];
- 
-@@ -396,8 +397,18 @@ static void nic_config_cpi(struct nicpf *nic, struct cpi_cfg_msg *cfg)
- 			padd = cpi % 8; /* 3 bits CS out of 6bits DSCP */
- 
- 		/* Leave RSS_SIZE as '0' to disable RSS */
--		nic_reg_write(nic, NIC_PF_CPI_0_2047_CFG | (cpi << 3),
--			      (vnic << 24) | (padd << 16) | (rssi_base + rssi));
-+		if (pass1_silicon(nic)) {
-+			nic_reg_write(nic, NIC_PF_CPI_0_2047_CFG | (cpi << 3),
-+				      (vnic << 24) | (padd << 16) |
-+				      (rssi_base + rssi));
-+		} else {
-+			/* Set MPI_ALG to '0' to disable MCAM parsing */
-+			nic_reg_write(nic, NIC_PF_CPI_0_2047_CFG | (cpi << 3),
-+				      (padd << 16));
-+			/* MPI index is same as CPI if MPI_ALG is not enabled */
-+			nic_reg_write(nic, NIC_PF_MPI_0_2047_CFG | (cpi << 3),
-+				      (vnic << 24) | (rssi_base + rssi));
-+		}
- 
- 		if ((rssi + 1) >= cfg->rq_cnt)
- 			continue;
-@@ -410,6 +421,7 @@ static void nic_config_cpi(struct nicpf *nic, struct cpi_cfg_msg *cfg)
- 			rssi = ((cpi - cpi_base) & 0x38) >> 3;
- 	}
- 	nic->cpi_base[cfg->vf_id] = cpi_base;
-+	nic->rssi_base[cfg->vf_id] = rssi_base;
- }
- 
- /* Responsds to VF with its RSS indirection table size */
-@@ -435,10 +447,9 @@ static void nic_config_rss(struct nicpf *nic, struct rss_cfg_msg *cfg)
- {
- 	u8  qset, idx = 0;
- 	u64 cpi_cfg, cpi_base, rssi_base, rssi;
-+	u64 idx_addr;
- 
--	cpi_base = nic->cpi_base[cfg->vf_id];
--	cpi_cfg = nic_reg_read(nic, NIC_PF_CPI_0_2047_CFG | (cpi_base << 3));
--	rssi_base = (cpi_cfg & 0x0FFF) + cfg->tbl_offset;
-+	rssi_base = nic->rssi_base[cfg->vf_id] + cfg->tbl_offset;
- 
- 	rssi = rssi_base;
- 	qset = cfg->vf_id;
-@@ -455,9 +466,15 @@ static void nic_config_rss(struct nicpf *nic, struct rss_cfg_msg *cfg)
- 		idx++;
- 	}
- 
-+	cpi_base = nic->cpi_base[cfg->vf_id];
-+	if (pass1_silicon(nic))
-+		idx_addr = NIC_PF_CPI_0_2047_CFG;
-+	else
-+		idx_addr = NIC_PF_MPI_0_2047_CFG;
-+	cpi_cfg = nic_reg_read(nic, idx_addr | (cpi_base << 3));
- 	cpi_cfg &= ~(0xFULL << 20);
- 	cpi_cfg |= (cfg->hash_bits << 20);
--	nic_reg_write(nic, NIC_PF_CPI_0_2047_CFG | (cpi_base << 3), cpi_cfg);
-+	nic_reg_write(nic, idx_addr | (cpi_base << 3), cpi_cfg);
- }
- 
- /* 4 level transmit side scheduler configutation
-diff --git a/drivers/net/ethernet/cavium/thunder/nic_reg.h b/drivers/net/ethernet/cavium/thunder/nic_reg.h
-index 58197bb..dd536be 100644
---- a/drivers/net/ethernet/cavium/thunder/nic_reg.h
-+++ b/drivers/net/ethernet/cavium/thunder/nic_reg.h
-@@ -85,7 +85,11 @@
- #define   NIC_PF_ECC3_DBE_INT_W1S		(0x2708)
- #define   NIC_PF_ECC3_DBE_ENA_W1C		(0x2710)
- #define   NIC_PF_ECC3_DBE_ENA_W1S		(0x2718)
-+#define   NIC_PF_MCAM_0_191_ENA			(0x100000)
-+#define   NIC_PF_MCAM_0_191_M_0_5_DATA		(0x110000)
-+#define   NIC_PF_MCAM_CTRL			(0x120000)
- #define   NIC_PF_CPI_0_2047_CFG			(0x200000)
-+#define   NIC_PF_MPI_0_2047_CFG			(0x210000)
- #define   NIC_PF_RSSI_0_4097_RQ			(0x220000)
- #define   NIC_PF_LMAC_0_7_CFG			(0x240000)
- #define   NIC_PF_LMAC_0_7_SW_XOFF		(0x242000)
--- 
-1.8.3.1
+Tony
+
+> 
+> ----------------------------------------------------------------
+> Franklin S Cooper Jr (2):
+>       ARM: DRA7/AM335x/AM437x: hwmod: Remove elm address space from hwmod data
+>       ARM: DRA7/AM335x/AM437x: hwmod: Remove gpmc address space from hwmod data
+> 
+> Javier Martinez Canillas (1):
+>       ARM: OMAP: Remove duplicated operand in OR operation
+> 
+> Suman Anna (3):
+>       ARM: OMAP4: hwmod data: Remove spinlock hwmod addrs
+>       ARM: DRA7: hwmod data: Remove spinlock hwmod addrs
+>       ARM: OMAP3: hwmod data: Remove legacy mailbox data and addrs
+> 
+>  .../omap_hwmod_33xx_43xx_interconnect_data.c       | 20 ---------------
+>  arch/arm/mach-omap2/omap_hwmod_3xxx_data.c         | 29 ---------------------
+>  arch/arm/mach-omap2/omap_hwmod_44xx_data.c         | 10 --------
+>  arch/arm/mach-omap2/omap_hwmod_54xx_data.c         |  3 +--
+>  arch/arm/mach-omap2/omap_hwmod_7xx_data.c          | 30 ----------------------
+>  5 files changed, 1 insertion(+), 91 deletions(-)
