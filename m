@@ -1,87 +1,82 @@
 From: zhengxing@rock-chips.com (Xing Zheng)
-Date: Sat, 24 Oct 2015 18:30:22 +0800
-Subject: [PATCH v4 1/8] dt-bindings: add documentation of rk3036 clock
- controller
-In-Reply-To: <1445682629-21632-1-git-send-email-zhengxing@rock-chips.com>
-References: <1445682629-21632-1-git-send-email-zhengxing@rock-chips.com>
-Message-ID: <1445682629-21632-2-git-send-email-zhengxing@rock-chips.com>
+Date: Sat, 24 Oct 2015 18:30:21 +0800
+Subject: [PATCH v4 0/8] Build and support rk3036 SoC platform
+Message-ID: <1445682629-21632-1-git-send-email-zhengxing@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the devicetree binding for the cru on the rk3036 which quite similar
-structured as previous clock controllers.
 
+Hi,
+  We need to support rk3036 soc platform via upstream, there are
+3 primary parts for the initial release of minimum system: dts,
+pinctrl, and clock tree for rk3036, and additional, we can use
+these startup and run to init processs.
+
+Thanks.
+
+Changed in v4:
+- add some basic IP modules on rk3036.dtsi
+- optimized supporting smp codes
+
+Changed in v3:
+- optimized some codes based on v2
+- removed the patch "initial set time for rtc-hym8563" (useless)
+- removed the patch "pinctrl" (approved)
+
+Changed in v2:
+- based on v1, add clock controller documentation
+- enable timer5 startup
+- add smp for cpu1
+- initial set time for rtc-hym8563
+
+Changes in v1:
+- add dts, pinctrl and clock tree for rk3036 soc platform
+
+The patchset (8):
+8) rockchip: make sure timer5 is enabled on rk3036 platforms
+7) ARM: dts: enable smp for rk3036
+6) ARM: rockchip: add support smp for rk3036
+5) ARM: dts: rockchip: add core rk3036 dts
+4) clk: rockchip: add new pll-type for rk3036 and similar socs
+3) clk: rockchip: add clock controller for rk3036
+2) clk: rockchip: add dt-binding header for rk3036
+1) dt-bindings: add documentation of rk3036 clock controller
+
+
+Changes in v4:
 Signed-off-by: Xing Zheng <zhengxing@rock-chips.com>
 Reviewed-by: Heiko Stuebner <heiko@sntech.de>
----
 
-Changes in v4: None
+Heiko Stuebner (1):
+  ARM: rockchip: add support smp for rk3036
 
- .../bindings/clock/rockchip,rk3036-cru.txt         |   56 ++++++++++++++++++++
- 1 file changed, 56 insertions(+)
+Xing Zheng (7):
+  dt-bindings: add documentation of rk3036 clock controller
+  clk: rockchip: add dt-binding header for rk3036
+  clk: rockchip: add clock controller for rk3036
+  clk: rockchip: add new pll-type for rk3036 and similar socs
+  ARM: dts: rockchip: add core rk3036 dts
+  ARM: dts: enable smp for rk3036
+  rockchip: make sure timer5 is enabled on rk3036 platforms
+
+ Documentation/devicetree/bindings/arm/cpus.txt     |    1 +
+ .../bindings/clock/rockchip,rk3036-cru.txt         |   56 ++
+ arch/arm/boot/dts/Makefile                         |    1 +
+ arch/arm/boot/dts/rk3036-evb.dts                   |   64 +++
+ arch/arm/boot/dts/rk3036.dtsi                      |  541 ++++++++++++++++++++
+ arch/arm/mach-rockchip/platsmp.c                   |   45 +-
+ arch/arm/mach-rockchip/rockchip.c                  |   44 +-
+ drivers/clk/rockchip/Makefile                      |    1 +
+ drivers/clk/rockchip/clk-pll.c                     |  243 ++++++++-
+ drivers/clk/rockchip/clk-rk3036.c                  |  500 ++++++++++++++++++
+ drivers/clk/rockchip/clk.h                         |   30 ++
+ include/dt-bindings/clock/rk3036-cru.h             |  195 +++++++
+ 12 files changed, 1691 insertions(+), 30 deletions(-)
  create mode 100644 Documentation/devicetree/bindings/clock/rockchip,rk3036-cru.txt
+ create mode 100644 arch/arm/boot/dts/rk3036-evb.dts
+ create mode 100644 arch/arm/boot/dts/rk3036.dtsi
+ create mode 100644 drivers/clk/rockchip/clk-rk3036.c
+ create mode 100644 include/dt-bindings/clock/rk3036-cru.h
 
-diff --git a/Documentation/devicetree/bindings/clock/rockchip,rk3036-cru.txt b/Documentation/devicetree/bindings/clock/rockchip,rk3036-cru.txt
-new file mode 100644
-index 0000000..ace0599
---- /dev/null
-+++ b/Documentation/devicetree/bindings/clock/rockchip,rk3036-cru.txt
-@@ -0,0 +1,56 @@
-+* Rockchip RK3036 Clock and Reset Unit
-+
-+The RK3036 clock controller generates and supplies clock to various
-+controllers within the SoC and also implements a reset controller for SoC
-+peripherals.
-+
-+Required Properties:
-+
-+- compatible: should be "rockchip,rk3036-cru"
-+- reg: physical base address of the controller and length of memory mapped
-+  region.
-+- #clock-cells: should be 1.
-+- #reset-cells: should be 1.
-+
-+Optional Properties:
-+
-+- rockchip,grf: phandle to the syscon managing the "general register files"
-+  If missing pll rates are not changeable, due to the missing pll lock status.
-+
-+Each clock is assigned an identifier and client nodes can use this identifier
-+to specify the clock which they consume. All available clocks are defined as
-+preprocessor macros in the dt-bindings/clock/rk3036-cru.h headers and can be
-+used in device tree sources. Similar macros exist for the reset sources in
-+these files.
-+
-+External clocks:
-+
-+There are several clocks that are generated outside the SoC. It is expected
-+that they are defined using standard clock bindings with following
-+clock-output-names:
-+ - "xin24m" - crystal input - required,
-+ - "ext_i2s" - external I2S clock - optional,
-+ - "ext_gmac" - external GMAC clock - optional
-+
-+Example: Clock controller node:
-+
-+	cru: cru at 20000000 {
-+		compatible = "rockchip,rk3036-cru";
-+		reg = <0x20000000 0x1000>;
-+		rockchip,grf = <&grf>;
-+
-+		#clock-cells = <1>;
-+		#reset-cells = <1>;
-+	};
-+
-+Example: UART controller node that consumes the clock generated by the clock
-+  controller:
-+
-+	uart0: serial at 20060000 {
-+		compatible = "snps,dw-apb-uart";
-+		reg = <0x20060000 0x100>;
-+		interrupts = <GIC_SPI 20 IRQ_TYPE_LEVEL_HIGH>;
-+		reg-shift = <2>;
-+		reg-io-width = <4>;
-+		clocks = <&cru SCLK_UART0>;
-+	};
 -- 
 1.7.9.5
