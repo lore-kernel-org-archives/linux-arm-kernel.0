@@ -1,48 +1,60 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Sat, 24 Oct 2015 12:25:31 +0900
-Subject: [PATCH] ARM: dts: uniphier: add I2C aliases for ProXstream2 boards
-Message-ID: <1445657131-6351-1-git-send-email-yamada.masahiro@socionext.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Sat, 24 Oct 2015 11:30:32 +0800
+Subject: [PATCH RESEND v6 0/2] ARM: sunxi: Add Reduced Serial Bus (RSB)
+ controller support
+In-Reply-To: <1445625691-20289-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1445625691-20289-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <CAGb2v66utAE-Pzmn7dNuWOCGV-Y_=U9sfhGh=Cey-J-Y9BNHpg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add aliases to fix the I2C indexes like the other UniPhier boards.
+Hi Arnd, Kevin, Olof,
 
-Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
----
+On Sat, Oct 24, 2015 at 2:41 AM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> Hi Arnd, Kevin, Olof,
+>
+> As discussed on IRC, here is a resend of these RSB patches, to merge
+> for 4.4.
 
- arch/arm/boot/dts/uniphier-proxstream2-gentil.dts | 4 ++++
- arch/arm/boot/dts/uniphier-proxstream2-vodka.dts  | 4 ++++
- 2 files changed, 8 insertions(+)
+Please merge them on a topic branch, so we can try to merge other
+patches depending on them. If possible I'd like to get an actual
+user in 4.4, otherwise this driver won't get any usage until the
+next merge window.
 
-diff --git a/arch/arm/boot/dts/uniphier-proxstream2-gentil.dts b/arch/arm/boot/dts/uniphier-proxstream2-gentil.dts
-index 5cb58b6..9d7ec5c 100644
---- a/arch/arm/boot/dts/uniphier-proxstream2-gentil.dts
-+++ b/arch/arm/boot/dts/uniphier-proxstream2-gentil.dts
-@@ -62,6 +62,10 @@
- 		serial0 = &serial0;
- 		serial1 = &serial1;
- 		serial2 = &serial2;
-+		i2c0 = &i2c0;
-+		i2c4 = &i2c4;
-+		i2c5 = &i2c5;
-+		i2c6 = &i2c6;
- 	};
- };
- 
-diff --git a/arch/arm/boot/dts/uniphier-proxstream2-vodka.dts b/arch/arm/boot/dts/uniphier-proxstream2-vodka.dts
-index 76040bb..498acac 100644
---- a/arch/arm/boot/dts/uniphier-proxstream2-vodka.dts
-+++ b/arch/arm/boot/dts/uniphier-proxstream2-vodka.dts
-@@ -62,6 +62,10 @@
- 		serial0 = &serial0;
- 		serial1 = &serial1;
- 		serial2 = &serial2;
-+		i2c0 = &i2c0;
-+		i2c4 = &i2c4;
-+		i2c5 = &i2c5;
-+		i2c6 = &i2c6;
- 	};
- };
- 
--- 
-1.9.1
+I'll try to send out a new version of the AXP223 patches later today.
+
+Thanks!
+
+Regards
+ChenYu
+
+> The original cover letter was:
+>
+> This is v6 of the Allwinner Reduced Serial Bus driver. This version puts
+> the driver under drivers/bus instead of drivers/soc/sunxi. There are no
+> changes to the binding or the driver itself.
+>
+> The series is based on v4.3-rc1.
+>
+> Thanks!
+> Maxime
+>
+> Chen-Yu Tsai (2):
+>   bus: sunxi-rsb: Add Allwinner Reduced Serial Bus (RSB) controller
+>     bindings
+>   bus: sunxi-rsb: Add driver for Allwinner Reduced Serial Bus
+>
+>  .../devicetree/bindings/bus/sunxi-rsb.txt          |  47 ++
+>  drivers/bus/Kconfig                                |  11 +
+>  drivers/bus/Makefile                               |   1 +
+>  drivers/bus/sunxi-rsb.c                            | 783 +++++++++++++++++++++
+>  include/linux/sunxi-rsb.h                          | 105 +++
+>  5 files changed, 947 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/bus/sunxi-rsb.txt
+>  create mode 100644 drivers/bus/sunxi-rsb.c
+>  create mode 100644 include/linux/sunxi-rsb.h
+>
+> --
+> 2.6.2
+>
