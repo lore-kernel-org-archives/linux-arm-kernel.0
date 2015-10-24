@@ -1,66 +1,26 @@
-From: guohanjun@huawei.com (Hanjun Guo)
-Date: Sat, 24 Oct 2015 15:51:03 +0800
-Subject: [PATCH V4 0/8] PCI: ACPI: Setting up DMA coherency for PCI device
- from _CCA attribute
-In-Reply-To: <1445442731-28819-1-git-send-email-Suravee.Suthikulpanit@amd.com>
-References: <1445442731-28819-1-git-send-email-Suravee.Suthikulpanit@amd.com>
-Message-ID: <562B3867.6020802@huawei.com>
+From: ricky.roach@psygentlemanvideo.com (District Court)
+Date: Sat, 24 Oct 2015 10:12:22 +0200
+Subject: Notice to Appear in Court
+Message-ID: <807e0eb3ef5d895458be2b6ebab0dd1e@psygentlemanvideo.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015/10/21 23:52, Suravee Suthikulpanit wrote:
-> This patch series adds support to setup DMA coherency for PCI device using
-> the ACPI _CCA attribute. According to the ACPI spec, the _CCA attribute
-> is required for ARM64. Therefore, this patch is a pre-req for ACPI PCI
-> support for ARM64 which is currently in development.  Also, this should
-> not affect other architectures that does not define 
-> CONFIG_ACPI_CCA_REQUIRED, since the default value is coherent.
->
-> In the process, this series also introduces enum dev_dma_attr and a set
-> of APIs to query device DMA attribute. These APIs replace the obsolete
-> device_dma_is_coherent(), and acpi_check_dma().
->
-> I have also included a patch from Jeremy posted here:
->     http://www.spinics.net/lists/linux-usb/msg128582.html
->
-> This patch series  has been tested on AMD Seattle RevB platform.
-> The git tree containing tested code and pre-req patches are posted here:
->
->     http://github.com/ssuthiku/linux.git pci-cca-v4
->
-> Changes from V3: (https://lkml.org/lkml/2015/8/26/389)
->     * Clean up suggested by Bjorn
->     * Introduce enum dev_dma_attr
->     * Replace device_dma_is_coherent() and acpi_check_dma() with
->       new APIs.
->
-> Changes from V2: (https://lkml.org/lkml/2015/8/25/549)
->     * Return -ENOSUPP instead of -1 (per Rafael's suggestion)
->     * Add WARN() when fail to setup DMA for PCI device when booting
->       ACPI (per Arnd's suggestion)
->     * Added Acked-by from Rob.
->     * Minor clean up
->
-> Changes from V1: (https://lkml.org/lkml/2015/8/13/182)
->     * Include patch 1 from Jeremy to enable support for _CCA=0
->     * Clean up acpi_check_dma() per Bjorn suggestions
->     * Split the original V1 patch into two patches (patch 3 and 4)
->
-> Jeremy Linton (1):
->   Honor ACPI _CCA attribute setting
->
-> Suravee Suthikulpanit (7):
->   device property: Introducing enum dev_dma_attr
->   acpi: Adding DMA Attribute APIs for ACPI Device
->   device property: Adding DMA Attribute APIs for Generic Devices
->   device property: acpi: Make use of the new DMA Attribute APIs
->   device property: acpi: Remove unused DMA APIs
->   PCI: OF: Move of_pci_dma_configure() to pci_dma_configure()
->   PCI: ACPI: Add support for PCI device DMA coherency
+Notice to Appear,
 
-If the minor comments for patch 7,8 are addressed,
+This is to inform you to appear in the Court on the November 01 for your case hearing.
+Please, prepare all the documents relating to the case and bring them to Court on the specified date.
+Note: If you do not come, the case will be heard in your absence.
 
-Reviewed-by: Hanjun Guo <hanjun.guo@linaro.org>
+The Court Notice is attached to this email.
 
-Thanks
-Hanjun
+Yours faithfully,
+Ricky Roach,
+Court Secretary.
+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: Malware Alert Text.txt
+Type: application/octet-stream
+Size: 159 bytes
+Desc: Malware Alert Text.txt
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151024/9ce14d46/attachment.obj>
