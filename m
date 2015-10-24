@@ -1,50 +1,126 @@
-From: nm@ti.com (Nishanth Menon)
-Date: Sat, 24 Oct 2015 09:44:37 -0500
-Subject: [PATCH] rtc: ds1307: Fix alarm programming for mcp794xx
-In-Reply-To: <1445581797-19693-1-git-send-email-t-kristo@ti.com>
-References: <1445581797-19693-1-git-send-email-t-kristo@ti.com>
-Message-ID: <562B9955.40308@ti.com>
+From: Julia.Lawall@lip6.fr (Julia Lawall)
+Date: Sat, 24 Oct 2015 16:42:26 +0200
+Subject: [PATCH 0/9] add missing of_node_put
+Message-ID: <1445697755-26341-1-git-send-email-Julia.Lawall@lip6.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/23/2015 01:29 AM, Tero Kristo wrote:
-> mcp794xx alarm registers must be written in BCD format. However, the
-> alarm programming logic neglected this by adding one to the value
-> after bin2bcd conversion has been already done, writing bad values
-> to month register in case the alarm being set is in October. In this
-> case, the alarm month value becomes 0x0a instead of the expected 0x10.
-> 
-> Fix by moving the +1 addition within the bin2bcd call also.
-> 
-> Fixes: 1d1945d261a2 ("drivers/rtc/rtc-ds1307.c: add alarm support for mcp7941x chips")
-> 
-> Signed-off-by: Tero Kristo <t-kristo@ti.com>
+The various for_each device_node iterators performs an of_node_get on each
+iteration, so a break out of the loop requires an of_node_put.
 
-Nice catch.
-Acked-by: Nishanth Menon <nm@ti.com>
-> ---
->  drivers/rtc/rtc-ds1307.c |    4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/rtc/rtc-ds1307.c b/drivers/rtc/rtc-ds1307.c
-> index a705e64..188006c 100644
-> --- a/drivers/rtc/rtc-ds1307.c
-> +++ b/drivers/rtc/rtc-ds1307.c
-> @@ -718,9 +718,9 @@ static int mcp794xx_set_alarm(struct device *dev, struct rtc_wkalrm *t)
->  	regs[3] = bin2bcd(t->time.tm_sec);
->  	regs[4] = bin2bcd(t->time.tm_min);
->  	regs[5] = bin2bcd(t->time.tm_hour);
-> -	regs[6] = bin2bcd(t->time.tm_wday) + 1;
-> +	regs[6] = bin2bcd(t->time.tm_wday + 1);
->  	regs[7] = bin2bcd(t->time.tm_mday);
-> -	regs[8] = bin2bcd(t->time.tm_mon) + 1;
-> +	regs[8] = bin2bcd(t->time.tm_mon + 1);
->  
->  	/* Clear the alarm 0 interrupt flag. */
->  	regs[6] &= ~MCP794XX_BIT_ALMX_IF;
-> 
+The complete semantic patch that fixes this problem is
+(http://coccinelle.lip6.fr):
 
+// <smpl>
+@r@
+local idexpression n;
+expression e1,e2;
+iterator name for_each_node_by_name, for_each_node_by_type,
+for_each_compatible_node, for_each_matching_node,
+for_each_matching_node_and_match, for_each_child_of_node,
+for_each_available_child_of_node, for_each_node_with_property;
+iterator i;
+statement S;
+expression list [n1] es;
+@@
 
--- 
-Regards,
-Nishanth Menon
+(
+(
+for_each_node_by_name(n,e1) S
+|
+for_each_node_by_type(n,e1) S
+|
+for_each_compatible_node(n,e1,e2) S
+|
+for_each_matching_node(n,e1) S
+|
+for_each_matching_node_and_match(n,e1,e2) S
+|
+for_each_child_of_node(e1,n) S
+|
+for_each_available_child_of_node(e1,n) S
+|
+for_each_node_with_property(n,e1) S
+)
+&
+i(es,n,...) S
+)
+
+@@
+local idexpression r.n;
+iterator r.i;
+expression e;
+expression list [r.n1] es;
+@@
+
+ i(es,n,...) {
+   ...
+(
+   of_node_put(n);
+|
+   e = n
+|
+   return n;
+|
++  of_node_put(n);
+?  return ...;
+)
+   ...
+ }
+
+@@
+local idexpression r.n;
+iterator r.i;
+expression e;
+expression list [r.n1] es;
+@@
+
+ i(es,n,...) {
+   ...
+(
+   of_node_put(n);
+|
+   e = n
+|
++  of_node_put(n);
+?  break;
+)
+   ...
+ }
+... when != n
+
+@@
+local idexpression r.n;
+iterator r.i;
+expression e;
+identifier l;
+expression list [r.n1] es;
+@@
+
+ i(es,n,...) {
+   ...
+(
+   of_node_put(n);
+|
+   e = n
+|
++  of_node_put(n);
+?  goto l;
+)
+   ...
+ }
+...
+l: ... when != n// </smpl>
+
+---
+
+ drivers/bluetooth/btmrvl_main.c  |    5 ++++-
+ drivers/gpu/drm/tegra/dc.c       |    4 +++-
+ drivers/gpu/host1x/bus.c         |    4 +++-
+ drivers/leds/leds-88pm860x.c     |    1 +
+ drivers/leds/leds-bcm6328.c      |    4 +++-
+ drivers/leds/leds-bcm6358.c      |    4 +++-
+ drivers/leds/leds-powernv.c      |    8 ++++++--
+ drivers/pinctrl/pinctrl-at91.c   |    5 ++++-
+ drivers/soc/ti/knav_qmss_queue.c |    3 +++
+ 9 files changed, 30 insertions(+), 8 deletions(-)
