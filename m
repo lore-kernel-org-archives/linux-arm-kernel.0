@@ -1,86 +1,118 @@
 From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Sat, 24 Oct 2015 15:55:24 +0200
-Subject: [PATCH v6 04/22] of: add function to allow probing a device from
- a OF node
-In-Reply-To: <CAAObsKCAX4DQGydQoYjJEYKTOEqpVozXdHnqXWdNYVkLsg7BVg@mail.gmail.com>
+Date: Sat, 24 Oct 2015 15:57:24 +0200
+Subject: [PATCH v6 03/22] of/platform: Point to struct device from device
+ node
+In-Reply-To: <CAAObsKA+ky+6XjqQYswdB4K41V0-_kM9bhLwY0RiCT0rm2qSgw@mail.gmail.com>
 References: <1442844182-27787-1-git-send-email-tomeu.vizoso@collabora.com>
- <10119606.2TraDKGPVy@vostro.rjw.lan>
- <CAAObsKCAX4DQGydQoYjJEYKTOEqpVozXdHnqXWdNYVkLsg7BVg@mail.gmail.com>
-Message-ID: <8510008.IC14Fu2Aos@vostro.rjw.lan>
+ <1800338.r1NE3r6BDS@vostro.rjw.lan>
+ <CAAObsKA+ky+6XjqQYswdB4K41V0-_kM9bhLwY0RiCT0rm2qSgw@mail.gmail.com>
+Message-ID: <1806288.pmhamH8mKQ@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, October 22, 2015 03:03:37 PM Tomeu Vizoso wrote:
-> On 22 October 2015 at 03:06, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
-> > On Monday, September 21, 2015 04:02:44 PM Tomeu Vizoso wrote:
-> >> Walks the OF tree up and finds the closest ancestor that has a struct
-> >> device associated with it, probing it if isn't bound to a driver yet.
+On Thursday, October 22, 2015 03:01:45 PM Tomeu Vizoso wrote:
+> On 22 October 2015 at 03:02, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
+> > On Monday, September 21, 2015 04:02:43 PM Tomeu Vizoso wrote:
+> >> When adding platform and AMBA devices, set the device node's device
+> >> member to point to it.
 > >>
-> >> The above should ensure that the dependency represented by the passed OF
-> >> node is available, because probing a device should cause its descendants
-> >> to be probed as well (when they get registered).
-> >>
-> >> Subsystems can use this when looking up resources for drivers, to reduce
-> >> the chances of deferred probes because of the probing order of devices.
+> >> This speeds lookups considerably and is safe because we only create one
+> >> of these devices for any given device node.
 > >>
 > >> Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
 > >> ---
 > >>
 > >> Changes in v5:
-> >> - Move the assignment to device_node->device for AMBA devices to another
-> >>   commit.
-> >> - Hold a reference to the struct device while it's in use in
-> >>   of_device_probe().
+> >> - Set the pointer to struct device also for AMBA devices
+> >> - Unset the pointer to struct device when the platform device is about
+> >>   to be unregistered
+> >> - Increase the reference count of the device before returning from
+> >>   of_find_device_by_node()
 > >>
-> >> Changes in v4:
-> >> - Rename of_platform_probe to of_device_probe
-> >> - Use device_node.device instead of device_node.platform_dev
+> >>  drivers/of/platform.c | 19 ++++++++++---------
+> >>  include/linux/of.h    |  1 +
+> >>  2 files changed, 11 insertions(+), 9 deletions(-)
 > >>
-> >> Changes in v3:
-> >> - Set and use device_node.platform_dev instead of reversing the logic to
-> >>   find the platform device that encloses a device node.
-> >> - Drop the fwnode API to probe firmware nodes and add OF-only API for
-> >>   now. I think this same scheme could be used for machines with ACPI,
-> >>   but I haven't been able to find one that had to defer its probes because
-> >>   of the device probe order.
+> >> diff --git a/drivers/of/platform.c b/drivers/of/platform.c
+> >> index 1001efaedcb8..408d89f1d124 100644
+> >> --- a/drivers/of/platform.c
+> >> +++ b/drivers/of/platform.c
+> >> @@ -32,11 +32,6 @@ const struct of_device_id of_default_bus_match_table[] = {
+> >>       {} /* Empty terminated list */
+> >>  };
 > >>
-> >>  drivers/of/device.c       | 61 +++++++++++++++++++++++++++++++++++++++++++++++
-> >>  include/linux/of_device.h |  3 +++
-> >>  2 files changed, 64 insertions(+)
-> >>
-> >> diff --git a/drivers/of/device.c b/drivers/of/device.c
-> >> index 8b91ea241b10..836be71fc90e 100644
-> >> --- a/drivers/of/device.c
-> >> +++ b/drivers/of/device.c
-> >> @@ -286,3 +286,64 @@ int of_device_uevent_modalias(struct device *dev, struct kobj_uevent_env *env)
-> >>
-> >>       return 0;
+> >> -static int of_dev_node_match(struct device *dev, void *data)
+> >> -{
+> >> -     return dev->of_node == data;
+> >> -}
+> >> -
+> >>  /**
+> >>   * of_find_device_by_node - Find the platform_device associated with a node
+> >>   * @np: Pointer to device tree node
+> >> @@ -45,10 +40,10 @@ static int of_dev_node_match(struct device *dev, void *data)
+> >>   */
+> >>  struct platform_device *of_find_device_by_node(struct device_node *np)
+> >>  {
+> >> -     struct device *dev;
+> >> -
+> >> -     dev = bus_find_device(&platform_bus_type, NULL, np, of_dev_node_match);
+> >> -     return dev ? to_platform_device(dev) : NULL;
+> >> +     if (np->device && np->device->bus == &platform_bus_type &&
+> >> +         get_device(np->device))
+> >> +             return to_platform_device(np->device);
+> >> +     return NULL;
 > >>  }
+> >>  EXPORT_SYMBOL(of_find_device_by_node);
+> >>
+> >> @@ -192,6 +187,8 @@ static struct platform_device *of_platform_device_create_pdata(
+> >>               goto err_clear_flag;
+> >>       }
+> >>
+> >> +     np->device = &dev->dev;
 > >> +
-> >> +/**
-> >> + * of_device_probe() - Probe device associated with OF node
-> >> + * @np: node to probe
-> >> + *
-> >> + * Probe the device associated with the passed device node.
-> >> + */
-> >> +void of_device_probe(struct device_node *np)
+> >>       return dev;
+> >>
+> >>  err_clear_flag:
+> >> @@ -272,6 +269,8 @@ static struct amba_device *of_amba_device_create(struct device_node *node,
+> >>               goto err_free;
+> >>       }
+> >>
+> >> +     node->device = &dev->dev;
+> >> +
+> >>       return dev;
+> >>
+> >>  err_free:
+> >> @@ -476,6 +475,8 @@ static int of_platform_device_destroy(struct device *dev, void *data)
+> >>       if (of_node_check_flag(dev->of_node, OF_POPULATED_BUS))
+> >>               device_for_each_child(dev, NULL, of_platform_device_destroy);
+> >>
+> >> +     dev->of_node->device = NULL;
+> >> +
+> >>       if (dev->bus == &platform_bus_type)
+> >>               platform_device_unregister(to_platform_device(dev));
+> >>  #ifdef CONFIG_ARM_AMBA
+> >> diff --git a/include/linux/of.h b/include/linux/of.h
+> >> index 2194b8ca41f9..eb091be0f8ee 100644
+> >> --- a/include/linux/of.h
+> >> +++ b/include/linux/of.h
+> >> @@ -52,6 +52,7 @@ struct device_node {
+> >>       phandle phandle;
+> >>       const char *full_name;
+> >>       struct fwnode_handle fwnode;
+> >> +     struct device *device;
 > >
-> > Same question as from Greg: How does a subsystem know whether or not to use
-> > this function?
+> > There are cases in which multiple device objects point to the same device_node,
+> > so is the single struct device pointer here really sufficient?
 > 
-> Maybe I don't understand the comment, but as the commit message says,
-> subsystems can use this when looking up resources for drivers. Or you
-> mean that this information should be in the API docs?
+> Only one struct device is registered for a given DT device node when
+> the DT is scanned (otherwise, of_find_device_by_node wouldn't be
+> safe).
+> 
+> If some driver makes a struct device to point to a device_node that
+> already has a struct device associated with it, that's fine.
 
-I'm not really sure this is the only case.
-
-Most likely, you'd end up with that being called by every subsystem using DT
-just in case.
-
-And then each of those subsystems would need to call acpi_device_probe(), and
-then another_platform_firmware_interface_device_probe() and so on.
-
-Don't you see a problem here?
+Well, once that has happened, your new device pointer in the given device_node
+becomes useless.  Why exactly is that fine?
 
 Thanks,
 Rafael
