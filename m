@@ -1,40 +1,79 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Sat, 24 Oct 2015 13:10:05 +0200
-Subject: [PATCH v4 4/8] clk: rockchip: add new pll-type for rk3036 and
- similar socs
-In-Reply-To: <1445682629-21632-5-git-send-email-zhengxing@rock-chips.com>
-References: <1445682629-21632-1-git-send-email-zhengxing@rock-chips.com>
- <1445682629-21632-5-git-send-email-zhengxing@rock-chips.com>
-Message-ID: <1474048.ydSsx6D3zg@diego>
+From: ats@offog.org (Adam Sampson)
+Date: Sat, 24 Oct 2015 13:11:52 +0100
+Subject: [PATCH] ASoC: sun4i-codec: use consistent names for PA controls
+Message-ID: <1445688712-31951-1-git-send-email-ats@offog.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+The power amplifier for the headphone output is called "the PA" and "the
+headphone amplifier" in Allwinner's documentation for the A10 and A20.
+sun4i-codec calls it "PA" in some places and "Pre-Amplifier" (which
+isn't really accurate) in others, leading to user-visible controls with
+different names referring to the same device.
 
-Am Samstag, 24. Oktober 2015, 18:30:25 schrieb Xing Zheng:
-> The rk3036's pll and clock are different with base on the rk3066(rk3188,
-> rk3288, rk3368 use it), there are different adjust foctors and control
-> registers, so these should be independent and separate from the series
-> of rk3066s.
-> 
-> Signed-off-by: Xing Zheng <zhengxing@rock-chips.com>
-> Reviewed-by: Heiko Stuebner <heiko@sntech.de>
-> ---
-> 
+When this driver implements audio input, it'll also need to expose
+controls for the line and mic input preamps, so just referring to "the
+Pre-Amplifier" will be ambiguous.
 
-> +static void rockchip_rk3036_pll_init(struct clk_hw *hw)
-> +{
+Change it to use "PA" consistently for the power amplifier.
 
-In the previous version, Stephen requested that we don't use regular clock
-APIs in the init-callback. I did a modification for the already present pll-
-type in [0], which got already accepted. So you should probably also modify
-your pll-type in this fashion :-) .
+Signed-off-by: Adam Sampson <ats@offog.org>
+---
+ sound/soc/sunxi/sun4i-codec.c | 23 ++++++++++++-----------
+ 1 file changed, 12 insertions(+), 11 deletions(-)
 
-Oh and I guess patches 3 and 4 should switch places ... adding the pll-type
-before the code in the clock-controller using it.
-
-
-Heiko
-
-
-[0] https://git.kernel.org/cgit/linux/kernel/git/clk/linux.git/commit/?h=clk-next&id=8334c0e7b983fb27e0d8788901e9621d1946ba93
+diff --git a/sound/soc/sunxi/sun4i-codec.c b/sound/soc/sunxi/sun4i-codec.c
+index bcbf4da..ff3304d 100644
+--- a/sound/soc/sunxi/sun4i-codec.c
++++ b/sound/soc/sunxi/sun4i-codec.c
+@@ -2,6 +2,7 @@
+  * Copyright 2014 Emilio L?pez <emilio@elopez.com.ar>
+  * Copyright 2014 Jon Smirl <jonsmirl@gmail.com>
+  * Copyright 2015 Maxime Ripard <maxime.ripard@free-electrons.com>
++ * Copyright 2015 Adam Sampson <ats@offog.org>
+  *
+  * Based on the Allwinner SDK driver, released under the GPL.
+  *
+@@ -452,12 +453,12 @@ static const struct snd_soc_dapm_widget sun4i_codec_dapm_widgets[] = {
+ 	SND_SOC_DAPM_SUPPLY("Mixer Enable", SUN4I_CODEC_DAC_ACTL,
+ 			    SUN4I_CODEC_DAC_ACTL_MIXEN, 0, NULL, 0),
+ 
+-	/* Pre-Amplifier */
+-	SND_SOC_DAPM_MIXER("Pre-Amplifier", SUN4I_CODEC_ADC_ACTL,
++	/* Headphone output power amplifier */
++	SND_SOC_DAPM_MIXER("PA", SUN4I_CODEC_ADC_ACTL,
+ 			   SUN4I_CODEC_ADC_ACTL_PA_EN, 0,
+ 			   sun4i_codec_pa_mixer_controls,
+ 			   ARRAY_SIZE(sun4i_codec_pa_mixer_controls)),
+-	SND_SOC_DAPM_SWITCH("Pre-Amplifier Mute", SND_SOC_NOPM, 0, 0,
++	SND_SOC_DAPM_SWITCH("PA Mute", SND_SOC_NOPM, 0, 0,
+ 			    &sun4i_codec_pa_mute),
+ 
+ 	SND_SOC_DAPM_OUTPUT("HP Right"),
+@@ -480,16 +481,16 @@ static const struct snd_soc_dapm_route sun4i_codec_dapm_routes[] = {
+ 	{ "Left Mixer", NULL, "Mixer Enable" },
+ 	{ "Left Mixer", "Left DAC Playback Switch", "Left DAC" },
+ 
+-	/* Pre-Amplifier Mixer Routes */
+-	{ "Pre-Amplifier", "Mixer Playback Switch", "Left Mixer" },
+-	{ "Pre-Amplifier", "Mixer Playback Switch", "Right Mixer" },
+-	{ "Pre-Amplifier", "DAC Playback Switch", "Left DAC" },
+-	{ "Pre-Amplifier", "DAC Playback Switch", "Right DAC" },
++	/* PA Mixer Routes */
++	{ "PA", "Mixer Playback Switch", "Left Mixer" },
++	{ "PA", "Mixer Playback Switch", "Right Mixer" },
++	{ "PA", "DAC Playback Switch", "Left DAC" },
++	{ "PA", "DAC Playback Switch", "Right DAC" },
+ 
+ 	/* PA -> HP path */
+-	{ "Pre-Amplifier Mute", "Switch", "Pre-Amplifier" },
+-	{ "HP Right", NULL, "Pre-Amplifier Mute" },
+-	{ "HP Left", NULL, "Pre-Amplifier Mute" },
++	{ "PA Mute", "Switch", "PA" },
++	{ "HP Right", NULL, "PA Mute" },
++	{ "HP Left", NULL, "PA Mute" },
+ };
+ 
+ static struct snd_soc_codec_driver sun4i_codec_codec = {
+-- 
+2.1.4
