@@ -1,36 +1,69 @@
 From: ddaney.cavm@gmail.com (David Daney)
-Date: Fri, 23 Oct 2015 17:14:07 -0700
-Subject: [PATCH 1/4] net: thunderx: Remove PF soft reset.
+Date: Fri, 23 Oct 2015 17:14:09 -0700
+Subject: [PATCH 3/4] net: thunderx: Rewrite silicon revision tests.
 In-Reply-To: <1445645650-17328-1-git-send-email-ddaney.cavm@gmail.com>
 References: <1445645650-17328-1-git-send-email-ddaney.cavm@gmail.com>
-Message-ID: <1445645650-17328-2-git-send-email-ddaney.cavm@gmail.com>
+Message-ID: <1445645650-17328-4-git-send-email-ddaney.cavm@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Sunil Goutham <sgoutham@cavium.com>
+From: David Daney <david.daney@cavium.com>
 
-In some silicon revisions, the soft reset clobbers PCI config space,
-so quit doing the reset.
+The test for pass-1 silicon was incorrect, it should be for all
+revisions less than 8.  Also the revision is already present in the
+pci_dev, so there is no need to read and keep a private copy.
 
-Signed-off-by: Sunil Goutham <sgoutham@cavium.com>
+Remove rev_id and code to read it from struct nicpf.  Create new
+static inline function pass1_silicon() to be used to testing the
+silicon version.  Use pass1_silicon() for revision checks, this will
+be more widely used in follow on patches.
+
 Signed-off-by: David Daney <david.daney@cavium.com>
 ---
- drivers/net/ethernet/cavium/thunder/nic_main.c | 3 ---
- 1 file changed, 3 deletions(-)
+ drivers/net/ethernet/cavium/thunder/nic_main.c | 10 ++++++----
+ 1 file changed, 6 insertions(+), 4 deletions(-)
 
 diff --git a/drivers/net/ethernet/cavium/thunder/nic_main.c b/drivers/net/ethernet/cavium/thunder/nic_main.c
-index b3a5947..d6e3219 100644
+index d6e3219..52e1acb 100644
 --- a/drivers/net/ethernet/cavium/thunder/nic_main.c
 +++ b/drivers/net/ethernet/cavium/thunder/nic_main.c
-@@ -305,9 +305,6 @@ static void nic_init_hw(struct nicpf *nic)
- {
- 	int i;
+@@ -22,7 +22,6 @@
  
--	/* Reset NIC, in case the driver is repeatedly inserted and removed */
--	nic_reg_write(nic, NIC_PF_SOFT_RESET, 1);
+ struct nicpf {
+ 	struct pci_dev		*pdev;
+-	u8			rev_id;
+ 	u8			node;
+ 	unsigned int		flags;
+ 	u8			num_vf_en;      /* No of VF enabled */
+@@ -54,6 +53,11 @@ struct nicpf {
+ 	bool			irq_allocated[NIC_PF_MSIX_VECTORS];
+ };
+ 
++static inline bool pass1_silicon(struct nicpf *nic)
++{
++	return nic->pdev->revision < 8;
++}
++
+ /* Supported devices */
+ static const struct pci_device_id nic_id_table[] = {
+ 	{ PCI_DEVICE(PCI_VENDOR_ID_CAVIUM, PCI_DEVICE_ID_THUNDER_NIC_PF) },
+@@ -117,7 +121,7 @@ static void nic_send_msg_to_vf(struct nicpf *nic, int vf, union nic_mbx *mbx)
+ 	 * when PF writes to MBOX(1), in next revisions when
+ 	 * PF writes to MBOX(0)
+ 	 */
+-	if (nic->rev_id == 0) {
++	if (pass1_silicon(nic)) {
+ 		/* see the comment for nic_reg_write()/nic_reg_read()
+ 		 * functions above
+ 		 */
+@@ -998,8 +1002,6 @@ static int nic_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
+ 		goto err_release_regions;
+ 	}
+ 
+-	pci_read_config_byte(pdev, PCI_REVISION_ID, &nic->rev_id);
 -
- 	/* Enable NIC HW block */
- 	nic_reg_write(nic, NIC_PF_CFG, 0x3);
+ 	nic->node = nic_get_node_id(pdev);
  
+ 	nic_set_lmac_vf_mapping(nic);
 -- 
 1.8.3.1
