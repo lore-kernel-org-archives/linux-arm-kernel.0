@@ -1,56 +1,66 @@
 From: guohanjun@huawei.com (Hanjun Guo)
-Date: Sat, 24 Oct 2015 15:47:25 +0800
-Subject: [PATCH V4 8/8] PCI: ACPI: Add support for PCI device DMA coherency
-In-Reply-To: <1445442731-28819-9-git-send-email-Suravee.Suthikulpanit@amd.com>
+Date: Sat, 24 Oct 2015 15:51:03 +0800
+Subject: [PATCH V4 0/8] PCI: ACPI: Setting up DMA coherency for PCI device
+ from _CCA attribute
+In-Reply-To: <1445442731-28819-1-git-send-email-Suravee.Suthikulpanit@amd.com>
 References: <1445442731-28819-1-git-send-email-Suravee.Suthikulpanit@amd.com>
- <1445442731-28819-9-git-send-email-Suravee.Suthikulpanit@amd.com>
-Message-ID: <562B378D.10903@huawei.com>
+Message-ID: <562B3867.6020802@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 2015/10/21 23:52, Suravee Suthikulpanit wrote:
-> This patch adds support for setting up PCI device DMA coherency from
-> ACPI _CCA object that should normally be specified in the DSDT node
-> of its PCI host bridge.
+> This patch series adds support to setup DMA coherency for PCI device using
+> the ACPI _CCA attribute. According to the ACPI spec, the _CCA attribute
+> is required for ARM64. Therefore, this patch is a pre-req for ACPI PCI
+> support for ARM64 which is currently in development.  Also, this should
+> not affect other architectures that does not define 
+> CONFIG_ACPI_CCA_REQUIRED, since the default value is coherent.
 >
-> Signed-off-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
-> CC: Bjorn Helgaas <bhelgaas@google.com>
-> CC: Catalin Marinas <catalin.marinas@arm.com>
-> CC: Rob Herring <robh+dt@kernel.org>
-> CC: Will Deacon <will.deacon@arm.com>
-> CC: Rafael J. Wysocki <rjw@rjwysocki.net>
-> CC: Murali Karicheri <m-karicheri2@ti.com>
-> ---
->  drivers/pci/probe.c | 19 ++++++++++++++-----
->  1 file changed, 14 insertions(+), 5 deletions(-)
+> In the process, this series also introduces enum dev_dma_attr and a set
+> of APIs to query device DMA attribute. These APIs replace the obsolete
+> device_dma_is_coherent(), and acpi_check_dma().
 >
-> diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
-> index 09264f8..6e9f7e6 100644
-> --- a/drivers/pci/probe.c
-> +++ b/drivers/pci/probe.c
-> @@ -1642,17 +1642,26 @@ static void pci_set_msi_domain(struct pci_dev *dev)
->   * @dev: ptr to pci_dev struct of the PCI device
->   *
->   * Function to update PCI devices's DMA configuration using the same
-> - * info from the OF node of host bridge's parent (if any).
-> + * info from the OF node or ACPI node of host bridge's parent (if any).
->   */
->  static void pci_dma_configure(struct pci_dev *dev)
->  {
->  	struct device *bridge = pci_get_host_bridge_device(dev);
->  
->  	if (IS_ENABLED(CONFIG_OF) && dev->dev.of_node) {
-> -		if (!bridge->parent)
-> -			return;
-> -
-> -		of_dma_configure(&dev->dev, bridge->parent->of_node);
-> +		if (bridge->parent)
-> +			of_dma_configure(&dev->dev,
-> +					 bridge->parent->of_node);
-> +	} else if (has_acpi_companion(bridge)) {
-> +		struct acpi_device *adev = to_acpi_node(bridge->fwnode);
+> I have also included a patch from Jeremy posted here:
+>     http://www.spinics.net/lists/linux-usb/msg128582.html
+>
+> This patch series  has been tested on AMD Seattle RevB platform.
+> The git tree containing tested code and pre-req patches are posted here:
+>
+>     http://github.com/ssuthiku/linux.git pci-cca-v4
+>
+> Changes from V3: (https://lkml.org/lkml/2015/8/26/389)
+>     * Clean up suggested by Bjorn
+>     * Introduce enum dev_dma_attr
+>     * Replace device_dma_is_coherent() and acpi_check_dma() with
+>       new APIs.
+>
+> Changes from V2: (https://lkml.org/lkml/2015/8/25/549)
+>     * Return -ENOSUPP instead of -1 (per Rafael's suggestion)
+>     * Add WARN() when fail to setup DMA for PCI device when booting
+>       ACPI (per Arnd's suggestion)
+>     * Added Acked-by from Rob.
+>     * Minor clean up
+>
+> Changes from V1: (https://lkml.org/lkml/2015/8/13/182)
+>     * Include patch 1 from Jeremy to enable support for _CCA=0
+>     * Clean up acpi_check_dma() per Bjorn suggestions
+>     * Split the original V1 patch into two patches (patch 3 and 4)
+>
+> Jeremy Linton (1):
+>   Honor ACPI _CCA attribute setting
+>
+> Suravee Suthikulpanit (7):
+>   device property: Introducing enum dev_dma_attr
+>   acpi: Adding DMA Attribute APIs for ACPI Device
+>   device property: Adding DMA Attribute APIs for Generic Devices
+>   device property: acpi: Make use of the new DMA Attribute APIs
+>   device property: acpi: Remove unused DMA APIs
+>   PCI: OF: Move of_pci_dma_configure() to pci_dma_configure()
+>   PCI: ACPI: Add support for PCI device DMA coherency
 
-It's to_acpi_device_node() now in Rafael's tree.
+If the minor comments for patch 7,8 are addressed,
+
+Reviewed-by: Hanjun Guo <hanjun.guo@linaro.org>
 
 Thanks
 Hanjun
