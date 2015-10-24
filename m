@@ -1,39 +1,41 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 23 Oct 2015 18:21:49 -0700
-Subject: [PATCH 2/4] clk: ti816x: Add missing dmtimer clkdev entries
-In-Reply-To: <5628A9F7.9090105@baylibre.com>
-References: <5628A9F7.9090105@baylibre.com>
-Message-ID: <20151024012148.GB3078@atomide.com>
+From: German.Rivera@freescale.com (J. German Rivera)
+Date: Fri, 23 Oct 2015 20:31:20 -0500
+Subject: [PATCH] arm64: dts: Added syscon-reboot node for FSL's LS2085A SoC
+Message-ID: <1445650280-9966-1-git-send-email-German.Rivera@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Neil Armstrong <narmstrong@baylibre.com> [151022 02:19]:
-> Add missing clkdev dmtimer related entries for dm816x.
-> 32Khz and ext sources were missing.
-> 
-> Cc: Brian Hutchinson <b.hutchman@gmail.com>
-> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+Added sys-reboot node to the FSL's LS2085A SoC DT to leverage
+the ARM-generic reboot mechanism for this SoC. This mechanism
+is enabled through CONFIG_POWER_RESET_SYSCON.
 
-Tero should queue this one:
+Signed-off-by: J. German Rivera <German.Rivera@freescale.com>
+---
+ arch/arm64/boot/dts/freescale/fsl-ls2085a.dtsi | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
-Acked-by: Tony Lindgren <tony@atomide.com>
-
-> ---
->  drivers/clk/ti/clk-816x.c | 2 ++
->  1 file changed, 2 insertions(+)
-> 
-> diff --git a/drivers/clk/ti/clk-816x.c b/drivers/clk/ti/clk-816x.c
-> index 1dfad0c..2a5d84f 100644
-> --- a/drivers/clk/ti/clk-816x.c
-> +++ b/drivers/clk/ti/clk-816x.c
-> @@ -20,6 +20,8 @@ static struct ti_dt_clk dm816x_clks[] = {
->  	DT_CLK(NULL, "sys_clkin", "sys_clkin_ck"),
->  	DT_CLK(NULL, "timer_sys_ck", "sys_clkin_ck"),
->  	DT_CLK(NULL, "sys_32k_ck", "sys_32k_ck"),
-> +	DT_CLK(NULL, "timer_32k_ck", "sysclk18_ck"),
-> +	DT_CLK(NULL, "timer_ext_ck", "tclkin_ck"),
->  	DT_CLK(NULL, "mpu_ck", "mpu_ck"),
->  	DT_CLK(NULL, "timer1_fck", "timer1_fck"),
->  	DT_CLK(NULL, "timer2_fck", "timer2_fck"),
-> -- 
-> 1.9.1
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls2085a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls2085a.dtsi
+index e281ceb..6f82163 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls2085a.dtsi
++++ b/arch/arm64/boot/dts/freescale/fsl-ls2085a.dtsi
+@@ -131,6 +131,18 @@
+ 		interrupts = <1 9 0x4>;
+ 	};
+ 
++	rst_ccsr: rstccsr at 1E60000 {
++	        compatible = "syscon";
++		reg = <0x0 0x1E60000 0x0 0x10000>;
++	};
++
++	reboot at 65024000 {
++		compatible ="syscon-reboot";
++		regmap = <&rst_ccsr>;
++		offset = <0x0>;
++		mask = <0x2>;
++	};
++
+ 	timer {
+ 		compatible = "arm,armv8-timer";
+ 		interrupts = <1 13 0x8>, /* Physical Secure PPI, active-low */
+-- 
+2.3.3
