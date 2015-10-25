@@ -1,56 +1,57 @@
-From: Julia.Lawall@lip6.fr (Julia Lawall)
-Date: Sun, 25 Oct 2015 14:57:04 +0100
-Subject: [PATCH 5/8] [media] v4l: xilinx-vipp: add missing of_node_put
-In-Reply-To: <1445781427-7110-1-git-send-email-Julia.Lawall@lip6.fr>
-References: <1445781427-7110-1-git-send-email-Julia.Lawall@lip6.fr>
-Message-ID: <1445781427-7110-6-git-send-email-Julia.Lawall@lip6.fr>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sun, 25 Oct 2015 14:08:22 +0000
+Subject: Build regressions/improvements in v4.3-rc7
+In-Reply-To: <CAMuHMdUkNad7-zHSEfy__rPXKV2t0_7O+MtHiW1hUN=t30KWoA@mail.gmail.com>
+References: <1445767971-22415-1-git-send-email-geert@linux-m68k.org>
+ <CAMuHMdX9X8SRCA4K++LvRz1sK3Ewyj5wKbvrdAy06L6v2XTduA@mail.gmail.com>
+ <CAMuHMdUkNad7-zHSEfy__rPXKV2t0_7O+MtHiW1hUN=t30KWoA@mail.gmail.com>
+Message-ID: <20151025140822.GA32532@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-for_each_child_of_node performs an of_node_get on each iteration, so
-a break out of the loop requires an of_node_put.
+On Sun, Oct 25, 2015 at 11:39:15AM +0100, Geert Uytterhoeven wrote:
+> On Sun, Oct 25, 2015 at 11:18 AM, Geert Uytterhoeven
+> <geert@linux-m68k.org> wrote:
+> > On Sun, Oct 25, 2015 at 11:12 AM, Geert Uytterhoeven
+> > <geert@linux-m68k.org> wrote:
+> >> JFYI, when comparing v4.3-rc7[1] to v4.3-rc6[3], the summaries are:
+> >>   - build errors: +12/-4
+> 
+> >   + /home/kisskb/slave/src/arch/arm/kernel/patch.c: error: 'L_PTE_DIRTY' undeclared (first use in this function):  => 39:2
+> >   + /home/kisskb/slave/src/arch/arm/kernel/patch.c: error: 'L_PTE_MT_WRITEBACK' undeclared (first use in this function):  => 39:2
+> >   + /home/kisskb/slave/src/arch/arm/kernel/patch.c: error: 'L_PTE_PRESENT' undeclared (first use in this function):  => 39:2
+> >   + /home/kisskb/slave/src/arch/arm/kernel/patch.c: error: 'L_PTE_XN' undeclared (first use in this function):  => 39:2
+> >   + /home/kisskb/slave/src/arch/arm/kernel/patch.c: error: 'L_PTE_YOUNG' undeclared (first use in this function):  => 39:2
+> 
+> Caused by:
+> 
+> commit ab0615e2d6fb074764a3e4d05f1326fa2fdb4627
+> Author: Rabin Vincent <rabin@rab.in>
+> Date:   Thu Apr 24 23:28:57 2014 +0200
+> 
+>     arm: use fixmap for text patching when text is RO
+> 
+> Should the call to set_fixmap() in arch/arm/kernel/patch.c
+> just be protected by #ifdef CONFIG_MMU?
 
-A simplified version of the semantic patch that fixes this problem is as
-follows (http://coccinelle.lip6.fr):
+What this shows, time and time again, is that we need better testing for
+!MMU platforms - we need !MMU platforms in the mainline kernel which
+people actually have.
 
-// <smpl>
-@@
-expression root,e;
-local idexpression child;
-@@
+I have an OKI 67001 board (from Simtec), which is the older generation of
+!MMU system, and I have code for it, but arm-soc won't let me put it in
+the mainline kernel - even though it would give me a platform which I can
+add to the boot farm to build and boot a test kernel for.
 
- for_each_child_of_node(root, child) {
-   ... when != of_node_put(child)
-       when != e = child
-(
-   return child;
-|
-+  of_node_put(child);
-?  return ...;
-)
-   ...
- }
-// </smpl>
+Consequently, I've little motivation to catch !MMU regressions before
+they hit mainline.
 
-Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
+Should we accept old !MMU code into mainline for platforms which kernel
+developers have, in order to aid testing, even though it isn't modern
+platforms and doesn't conform to the latest way of doing stuff.
 
----
- drivers/media/platform/xilinx/xilinx-vipp.c |    4 +++-
- 1 file changed, 3 insertions(+), 1 deletion(-)
+Discuss.
 
-diff --git a/drivers/media/platform/xilinx/xilinx-vipp.c b/drivers/media/platform/xilinx/xilinx-vipp.c
-index 7b7cb9c..b9bf24f 100644
---- a/drivers/media/platform/xilinx/xilinx-vipp.c
-+++ b/drivers/media/platform/xilinx/xilinx-vipp.c
-@@ -476,8 +476,10 @@ static int xvip_graph_dma_init(struct xvip_composite_device *xdev)
- 
- 	for_each_child_of_node(ports, port) {
- 		ret = xvip_graph_dma_init_one(xdev, port);
--		if (ret < 0)
-+		if (ret < 0) {
-+			of_node_put(port);
- 			return ret;
-+		}
- 	}
- 
- 	return 0;
+-- 
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
