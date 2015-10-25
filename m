@@ -1,53 +1,61 @@
-From: sid@reserved-bit.com (Siddhesh Poyarekar)
-Date: Sun, 25 Oct 2015 13:36:00 +0530
-Subject: [PATCH v3 00/24] arm64: Consolidate CPU feature handling
-In-Reply-To: <1444756952-31145-1-git-send-email-suzuki.poulose@arm.com>
-References: <1444756952-31145-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <562C8D68.9040008@reserved-bit.com>
+From: info@lategoodbye.de (Stefan Wahren)
+Date: Sun, 25 Oct 2015 09:10:20 +0100
+Subject: [PATCH V2 RFT] ARM: bcm2835: enable all bcm2835-relevant in
+ defconfig
+In-Reply-To: <562C512A.2060805@wwwdotorg.org>
+References: <1444946250-23219-1-git-send-email-stefan.wahren@i2se.com>
+ <562C512A.2060805@wwwdotorg.org>
+Message-ID: <562C8E6C.7030205@lategoodbye.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 13 October 2015 10:52 PM, Suzuki K. Poulose wrote:
-> Apart from the selected feature registers, we expose MIDR_EL1 (Main
-> ID Register). The user should be aware that, reading MIDR_EL1 can be
-> tricky on a heterogeneous system (just like getcpu()). We export the
-> value of the current CPU where 'MRS' is executed. REVIDR is not exposed
-> via MRS, since we cannot guarantee atomic access to both MIDR and REVIDR
-> (task migration). So they both are exposed via sysfs under :
-> 
-> 	/sys/devices/system/cpu/cpu$ID/identification/
-> 							\- midr
-> 							\- revidr
-> 
-> The ABI useful for the toolchains (e.g, gcc, dynamic linker, JIT) to make
-> better runtime decisions based on what is available.
+Am 25.10.2015 um 04:48 schrieb Stephen Warren:
+> On 10/15/2015 03:57 PM, Stefan Wahren wrote:
+>> Rebuild bcm2835_defconfig using "make bcm2835_defconfig;
+>> make savedefconfig", and enable manually the following features:
+>>
+>> * all bcm2835-relevant drivers (MBOX, WDT, DMA, PWM, SND)
+>> * enable regular stackprotector because CONFIG_CC_STACKPROTECTOR
+>>    disappear
+>> * enable some new dependencies in order to keep LED heartbeat
+>>    ( CONFIG_NEW_LEDS, CONFIG_LEDS_CLASS, CONFIG_LEDS_TRIGGERS )
+>
+>> diff --git a/arch/arm/configs/bcm2835_defconfig b/arch/arm/configs/bcm2835_defconfig
+>
+>> -CONFIG_RESOURCE_COUNTERS=y
 
-Thank you for doing this.  I'm prototyping glibc support to select
-optimal functions by micro-architecture and I had a couple of concerns.
+This option becomes obsolete:
 
-The midr emulation may not be sufficient for glibc to select optimal
-routines because there could theoretically be sufficient variance
-between cpus with only different revidr that vendors may write different
-optimal routines.  Secondly, on a heterogeneous system, we won't be able
-to select a routine reliably using just the emulated instruction since
-we have no control where it runs and we would want to know what each of
-the cpus looks like.
+kernel: res_counter: remove the unused API
 
-The sysfs API solves this problem, but it doesn't seem like an optimal
-thing to do in an IFUNC resolver in glibc.  CPU information is scattered
-in 2*N+1 files for N processor cores.  This means for every process, one
-has to make 4*N+2 system calls to simply read in this information and
-cache it for later decision making.  On a 64 core system, this would
-mean making 258 additional system calls from within the IFUNC resolver,
-which seems quite excessive.
+5b1efc027c0b51ca3e76f4e00c83358f8349f543
 
-Would you be able to consolidate all cpu identification into a single
-file?  This would allow glibc to just map in the file and read in all of
-the information in one go, greatly reducing the number of syscalls.
+>> -CONFIG_RD_BZIP2=y
+>> -CONFIG_RD_LZMA=y
+>> -CONFIG_RD_XZ=y
+>> -CONFIG_RD_LZO=y
 
-The other alternative I was thinking of was to have an additional hwcap
-HWCAP_HETEROGENEOUS_CPU which is set if there are different kinds of
-processor cores in the system, but that will force us to stick to
-default routines for heterogeneous cores.
+These are enabled implicit.
 
-Siddhesh
+>> -CONFIG_SCSI_MULTI_LUN=y
+
+This option becomes obsolete:
+
+scsi: Remove CONFIG_SCSI_MULTI_LUN
+
+c309b35171ddb5384cc3f2f9dc82a96dccc6b7f6
+
+>> -CONFIG_USB_DWC2_HOST=y
+>> -CONFIG_EXT4_FS=y
+>> -CONFIG_EXT4_FS_POSIX_ACL=y
+
+These are enabled implicit.
+
+>
+> Do you know why all of those were removed?
+>
+> _______________________________________________
+> linux-rpi-kernel mailing list
+> linux-rpi-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-rpi-kernel
+>
