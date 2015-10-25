@@ -1,61 +1,30 @@
-From: info@lategoodbye.de (Stefan Wahren)
-Date: Sun, 25 Oct 2015 09:10:20 +0100
-Subject: [PATCH V2 RFT] ARM: bcm2835: enable all bcm2835-relevant in
- defconfig
-In-Reply-To: <562C512A.2060805@wwwdotorg.org>
-References: <1444946250-23219-1-git-send-email-stefan.wahren@i2se.com>
- <562C512A.2060805@wwwdotorg.org>
-Message-ID: <562C8E6C.7030205@lategoodbye.de>
+From: wsa@the-dreams.de (Wolfram Sang)
+Date: Sun, 25 Oct 2015 09:21:53 +0100
+Subject: [PATCH-v5 RESEND 2/5] i2c: pxa: enable/disable i2c module across
+ msg xfer
+In-Reply-To: <55F655FC.8070308@linaro.org>
+References: <1440395978-9065-1-git-send-email-vaibhav.hiremath@linaro.org>
+ <1440395978-9065-3-git-send-email-vaibhav.hiremath@linaro.org>
+ <20150911185312.GA1516@katana> <55F655FC.8070308@linaro.org>
+Message-ID: <20151025082152.GA2159@katana>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am 25.10.2015 um 04:48 schrieb Stephen Warren:
-> On 10/15/2015 03:57 PM, Stefan Wahren wrote:
->> Rebuild bcm2835_defconfig using "make bcm2835_defconfig;
->> make savedefconfig", and enable manually the following features:
->>
->> * all bcm2835-relevant drivers (MBOX, WDT, DMA, PWM, SND)
->> * enable regular stackprotector because CONFIG_CC_STACKPROTECTOR
->>    disappear
->> * enable some new dependencies in order to keep LED heartbeat
->>    ( CONFIG_NEW_LEDS, CONFIG_LEDS_CLASS, CONFIG_LEDS_TRIGGERS )
->
->> diff --git a/arch/arm/configs/bcm2835_defconfig b/arch/arm/configs/bcm2835_defconfig
->
->> -CONFIG_RESOURCE_COUNTERS=y
 
-This option becomes obsolete:
+> >>Enable i2c module/unit before transmission and disable when it
+> >>finishes.
+> 
+> >Can't you use Runtime PM for that?
+> >
+> 
+> I haven't tried it though, I can give a try and check.
 
-kernel: res_counter: remove the unused API
+It should work. Other I2C drivers are doing exactly that.
 
-5b1efc027c0b51ca3e76f4e00c83358f8349f543
-
->> -CONFIG_RD_BZIP2=y
->> -CONFIG_RD_LZMA=y
->> -CONFIG_RD_XZ=y
->> -CONFIG_RD_LZO=y
-
-These are enabled implicit.
-
->> -CONFIG_SCSI_MULTI_LUN=y
-
-This option becomes obsolete:
-
-scsi: Remove CONFIG_SCSI_MULTI_LUN
-
-c309b35171ddb5384cc3f2f9dc82a96dccc6b7f6
-
->> -CONFIG_USB_DWC2_HOST=y
->> -CONFIG_EXT4_FS=y
->> -CONFIG_EXT4_FS_POSIX_ACL=y
-
-These are enabled implicit.
-
->
-> Do you know why all of those were removed?
->
-> _______________________________________________
-> linux-rpi-kernel mailing list
-> linux-rpi-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-rpi-kernel
->
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151025/dad827ee/attachment-0001.sig>
