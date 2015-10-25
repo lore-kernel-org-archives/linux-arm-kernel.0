@@ -1,42 +1,36 @@
-From: mw@semihalf.com (Marcin Wojtas)
-Date: Sun, 25 Oct 2015 22:22:37 +0100
-Subject: [PATCH 3/5] irqchip: armada-370-xp: re-enable per-CPU interrupts
- at resume time
-In-Reply-To: <1445347435-2333-4-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1445347435-2333-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1445347435-2333-4-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <CAPv3WKdZeCo-0xFC6EJcCeVQd7ef+SQz=MocR1nE5YdZAx3AJQ@mail.gmail.com>
+From: robertcnelson@gmail.com (Robert Nelson)
+Date: Sun, 25 Oct 2015 16:33:51 -0500
+Subject: [PATCH V2 06/11] mmc: sdhci-esdhc-imx: fix cd regression for dt
+ platform
+In-Reply-To: <CAOMZO5D2LNS93XVx86fL7oLTgy4apU036v-ohhv-=kw5gFsCww@mail.gmail.com>
+References: <1437569590-5228-1-git-send-email-aisheng.dong@freescale.com>
+ <1437569590-5228-7-git-send-email-aisheng.dong@freescale.com>
+ <2333b5f060a8e45bd8adcdab55365fab@agner.ch>
+ <CAOMZO5BUKmqczyVgz_WgYmBMeuGugDS4uVjw+LXebxf-nPDTyw@mail.gmail.com>
+ <CAOMZO5Dz0KijjryoPihoXsP4b5Wy_5rock++oY=i-9gESThUbg@mail.gmail.com>
+ <CAOCHtYgayRZoHxJ2d8f1mO0QW_=N4Mx2_RSCrADKERHdP9TGYQ@mail.gmail.com>
+ <CAOMZO5D2LNS93XVx86fL7oLTgy4apU036v-ohhv-=kw5gFsCww@mail.gmail.com>
+Message-ID: <CAOCHtYj1QuEYLg4vbxshWkYXPe6r9b5OP7hh_O0WoE6xfL0mjw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thomas,
-
-
+On Sun, Oct 25, 2015 at 4:05 PM, Fabio Estevam <festevam@gmail.com> wrote:
+> On Sun, Oct 25, 2015 at 6:52 PM, Robert Nelson <robertcnelson@gmail.com> wrote:
 >
-> @@ -550,16 +572,27 @@ static void armada_370_xp_mpic_resume(void)
->                 if (virq == 0)
->                         continue;
+>> I need to finish a full bisect run, but one of these sdhci-esdhci-imx
+>> fixes broke the wandboard..
 >
-> -               if (irq != ARMADA_370_XP_TIMER0_PER_CPU_IRQ)
-> +               data = irq_get_irq_data(virq);
-> +
-> +               if (irq != ARMADA_370_XP_TIMER0_PER_CPU_IRQ) {
-> +                       /* Non per-CPU interrupts */
->                         writel(irq, per_cpu_int_base +
-
-For "Non per-CPU interrupts" per_cpu_int_base is used - is it
-intentional? In armada_370_xp_irq_mask/unmask the condition looks
-exactly opposite...
-
->                                ARMADA_370_XP_INT_CLEAR_MASK_OFFS);
-> -               else
-> +                       if (!irqd_irq_disabled(data))
-> +                               armada_370_xp_irq_unmask(data);
-> +               } else {
-> +                       /* Per-CPU interrupts */
->                         writel(irq, main_int_base +
->                                ARMADA_370_XP_INT_SET_ENABLE_OFFS);
+> Could you please try to apply the attached patch?
 >
+> Looks like this one was not applied.
 
-Best regards,
-Marcin
+Thanks Fabio, that fixes the regression on v4.1.11 on my wand's... Too
+bad it's also not in:
+
+https://lkml.org/lkml/2015/10/23/516
+
+Regards,
+
+-- 
+Robert Nelson
+https://rcn-ee.com/
