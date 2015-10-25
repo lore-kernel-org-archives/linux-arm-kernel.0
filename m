@@ -1,9 +1,9 @@
 From: Julia.Lawall@lip6.fr (Julia Lawall)
-Date: Sun, 25 Oct 2015 14:57:05 +0100
-Subject: [PATCH 6/8] [media] v4l: xilinx-tpg: add missing of_node_put
+Date: Sun, 25 Oct 2015 14:57:04 +0100
+Subject: [PATCH 5/8] [media] v4l: xilinx-vipp: add missing of_node_put
 In-Reply-To: <1445781427-7110-1-git-send-email-Julia.Lawall@lip6.fr>
 References: <1445781427-7110-1-git-send-email-Julia.Lawall@lip6.fr>
-Message-ID: <1445781427-7110-7-git-send-email-Julia.Lawall@lip6.fr>
+Message-ID: <1445781427-7110-6-git-send-email-Julia.Lawall@lip6.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -35,26 +35,22 @@ local idexpression child;
 Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
 
 ---
- drivers/media/platform/xilinx/xilinx-tpg.c |    2 ++
- 1 file changed, 2 insertions(+)
+ drivers/media/platform/xilinx/xilinx-vipp.c |    4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/media/platform/xilinx/xilinx-tpg.c b/drivers/media/platform/xilinx/xilinx-tpg.c
-index b5f7d5e..8bd7e37 100644
---- a/drivers/media/platform/xilinx/xilinx-tpg.c
-+++ b/drivers/media/platform/xilinx/xilinx-tpg.c
-@@ -731,6 +731,7 @@ static int xtpg_parse_of(struct xtpg_device *xtpg)
- 		format = xvip_of_get_format(port);
- 		if (IS_ERR(format)) {
- 			dev_err(dev, "invalid format in DT");
-+			of_node_put(port);
- 			return PTR_ERR(format);
- 		}
+diff --git a/drivers/media/platform/xilinx/xilinx-vipp.c b/drivers/media/platform/xilinx/xilinx-vipp.c
+index 7b7cb9c..b9bf24f 100644
+--- a/drivers/media/platform/xilinx/xilinx-vipp.c
++++ b/drivers/media/platform/xilinx/xilinx-vipp.c
+@@ -476,8 +476,10 @@ static int xvip_graph_dma_init(struct xvip_composite_device *xdev)
  
-@@ -739,6 +740,7 @@ static int xtpg_parse_of(struct xtpg_device *xtpg)
- 			xtpg->vip_format = format;
- 		} else if (xtpg->vip_format != format) {
- 			dev_err(dev, "in/out format mismatch in DT");
+ 	for_each_child_of_node(ports, port) {
+ 		ret = xvip_graph_dma_init_one(xdev, port);
+-		if (ret < 0)
++		if (ret < 0) {
 +			of_node_put(port);
- 			return -EINVAL;
- 		}
+ 			return ret;
++		}
+ 	}
  
+ 	return 0;
