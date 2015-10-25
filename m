@@ -1,33 +1,49 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Sat, 24 Oct 2015 21:48:58 -0600
-Subject: [PATCH V2 RFT] ARM: bcm2835: enable all bcm2835-relevant in
- defconfig
-In-Reply-To: <1444946250-23219-1-git-send-email-stefan.wahren@i2se.com>
-References: <1444946250-23219-1-git-send-email-stefan.wahren@i2se.com>
-Message-ID: <562C512A.2060805@wwwdotorg.org>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Sun, 25 Oct 2015 08:55:03 +0100
+Subject: [PATCH v4 3/3] ARM: dts: rockchip: Add the OTP gpio pinctrl
+In-Reply-To: <CAD=FV=WBCD8WsXV2mAGUD6y=BFScbFc9U3XA7jAB-rqOLp4qGA@mail.gmail.com>
+References: <1445599528-18825-1-git-send-email-wxt@rock-chips.com>
+ <1445599528-18825-4-git-send-email-wxt@rock-chips.com>
+ <CAD=FV=WBCD8WsXV2mAGUD6y=BFScbFc9U3XA7jAB-rqOLp4qGA@mail.gmail.com>
+Message-ID: <2741625.HAsG2fX6yg@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/15/2015 03:57 PM, Stefan Wahren wrote:
-> Rebuild bcm2835_defconfig using "make bcm2835_defconfig;
-> make savedefconfig", and enable manually the following features:
+Am Freitag, 23. Oktober 2015, 08:25:08 schrieb Doug Anderson:
+> On Fri, Oct 23, 2015 at 4:25 AM, Caesar Wang <wxt@rock-chips.com> wrote:
+> > Add the "init" anf "sleep" pinctrl as the OTP gpio state.
+> > We need the OTP pin is gpio state before resetting the TSADC controller,
+> > since the tshut polarity will generate a high signal.
+> > 
+> > "init" pinctrl property is defined by Doug's Patch[0].
+> > 
+> > Patch[0]:
+> > https://patchwork.kernel.org/patch/7454311/
+> > 
+> > Signed-off-by: Caesar Wang <wxt@rock-chips.com>
+> > Reviewed-by: Douglas Anderson <dianders@chromium.org>
+> > ---
+> > 
+> > Changes in v4: None
+> > 
+> > Changes in v3:
+> >   - Add the "sleep" pinctrl as the gpio state in PATCH[3/3]
+> > 
+> > Changes in v2:
+> >   - Add some commits for more obvious in PATCH[2/2]
+> > 
+> > Changes in v1:
+> >   - As the Doug comments, drop the thermal driver patchs since
+> >   
+> >     we can with pinctrl changing to work.
+> >   
+> >   - As the Doug's patch to add the 'init' property.
+> >  
+> >  arch/arm/boot/dts/rk3288.dtsi | 10 ++++++++--
+> >  1 file changed, 8 insertions(+), 2 deletions(-)
 > 
-> * all bcm2835-relevant drivers (MBOX, WDT, DMA, PWM, SND)
-> * enable regular stackprotector because CONFIG_CC_STACKPROTECTOR
->   disappear
-> * enable some new dependencies in order to keep LED heartbeat
->   ( CONFIG_NEW_LEDS, CONFIG_LEDS_CLASS, CONFIG_LEDS_TRIGGERS )
+> I realized that the subject of this patch should probably contain the
+> word rk3288, but I presume Heiko would rather add that himself than
+> for you to spin this again.  ;)
 
-> diff --git a/arch/arm/configs/bcm2835_defconfig b/arch/arm/configs/bcm2835_defconfig
-
-> -CONFIG_RESOURCE_COUNTERS=y
-> -CONFIG_RD_BZIP2=y
-> -CONFIG_RD_LZMA=y
-> -CONFIG_RD_XZ=y
-> -CONFIG_RD_LZO=y
-> -CONFIG_SCSI_MULTI_LUN=y
-> -CONFIG_USB_DWC2_HOST=y
-> -CONFIG_EXT4_FS=y
-> -CONFIG_EXT4_FS_POSIX_ACL=y
-
-Do you know why all of those were removed?
+yep :-) ... no need to respin for such an easy change.
