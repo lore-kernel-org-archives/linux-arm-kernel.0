@@ -1,67 +1,38 @@
-From: robertcnelson@gmail.com (Robert Nelson)
-Date: Sun, 25 Oct 2015 15:52:22 -0500
-Subject: [PATCH V2 06/11] mmc: sdhci-esdhc-imx: fix cd regression for dt
- platform
-In-Reply-To: <CAOMZO5Dz0KijjryoPihoXsP4b5Wy_5rock++oY=i-9gESThUbg@mail.gmail.com>
-References: <1437569590-5228-1-git-send-email-aisheng.dong@freescale.com>
- <1437569590-5228-7-git-send-email-aisheng.dong@freescale.com>
- <2333b5f060a8e45bd8adcdab55365fab@agner.ch>
- <CAOMZO5BUKmqczyVgz_WgYmBMeuGugDS4uVjw+LXebxf-nPDTyw@mail.gmail.com>
- <CAOMZO5Dz0KijjryoPihoXsP4b5Wy_5rock++oY=i-9gESThUbg@mail.gmail.com>
-Message-ID: <CAOCHtYgayRZoHxJ2d8f1mO0QW_=N4Mx2_RSCrADKERHdP9TGYQ@mail.gmail.com>
+From: robert.jarzmik@free.fr (Robert Jarzmik)
+Date: Sun, 25 Oct 2015 21:53:15 +0100
+Subject: [PATCH v4 0/5] mtd: pxa3xx_nand: rework the timing setup
+In-Reply-To: <1445416144-9194-1-git-send-email-antoine.tenart@free-electrons.com>
+ (Antoine Tenart's message of "Wed, 21 Oct 2015 10:28:59 +0200")
+References: <1445416144-9194-1-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <877fmallfo.fsf@belgarion.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 24, 2015 at 8:06 AM, Fabio Estevam <festevam@gmail.com> wrote:
-> On Tue, Oct 6, 2015 at 7:21 PM, Fabio Estevam <festevam@gmail.com> wrote:
->> Hi Stefan,
->>
->> On Tue, Oct 6, 2015 at 7:15 PM, Stefan Agner <stefan@agner.ch> wrote:
->>> Hi Dong,
->>>
->>> Just hit that issue in 4.1, could we add that patch also to stable?
->>
->> I sent the series to stable, but Greg has not applied it yet.
+Antoine Tenart <antoine.tenart@free-electrons.com> writes:
+
+> Hello,
 >
-> Greg applied the series and it appears now in 4.1.11.
+> Let's try one more time to get this merged.
+>
+> This series was part of a bigger one[1], which was split into smaller
+> ones as asked by Ezequiel[2]. When we take this into account this is
+> v9; with a v1 sent in January, 9 months ago.
+>
+> Another series, introducing the Berlin nand support, depends on this.
+>
+> The aim here is to use the nand framework to setup the timings,
+> while keeping the old in-driver way of configuration timings for
+> compatibility reasons.
+>
+> You can find the series at:
+> https://github.com/atenart/linux.git berlin/4.3/nand-timings
 
-I need to finish a full bisect run, but one of these sdhci-esdhci-imx
-fixes broke the wandboard..
+Hi Antoine,
 
-v4.1.10:
+I tested this serie once on my zylonite board, with both keep_config and no
+keep_config setups. Both do work fine.
 
-voodoo at a3-imx6q-wandboard-2gb:~$ dmesg | grep mmc2
-[    4.844563] mmc2: SDHCI controller on 2198000.usdhc [2198000.usdhc]
-using ADMA
-[    5.132859] mmc2: host does not support reading read-only switch,
-assuming write-enable
-[    5.147150] mmc2: new high speed SDHC card at address 0007
-[    5.153245] mmcblk0: mmc2:0007 SD8GB 7.42 GiB
-voodoo at a3-imx6q-wandboard-2gb:~$ dmesg | grep 2198000.usdhc
-[    4.779415] sdhci-esdhc-imx 2198000.usdhc: could not get ultra high
-speed state, work on normal mode
-[    4.788589] sdhci-esdhc-imx 2198000.usdhc: Got CD GPIO
-[    4.793910] sdhci-esdhc-imx 2198000.usdhc: No vmmc regulator found
-[    4.800133] sdhci-esdhc-imx 2198000.usdhc: No vqmmc regulator found
-[    4.844563] mmc2: SDHCI controller on 2198000.usdhc [2198000.usdhc]
-using ADMA
+Cheers.
 
-v4.1.11:
-
-root at a4-imx6q-wandboard-2gb:~# dmesg | grep mmc2
-[    4.854721] mmc2: SDHCI controller on 2198000.usdhc [2198000.usdhc]
-using ADMA
-root at a4-imx6q-wandboard-2gb:~# dmesg | grep 2198000.usdhc
-[    4.781491] sdhci-esdhc-imx 2198000.usdhc: Got CD GPIO
-[    4.786689] sdhci-esdhc-imx 2198000.usdhc: could not get ultra high
-speed state, work on normal mode
-[    4.796023] sdhci-esdhc-imx 2198000.usdhc: No vmmc regulator found
-[    4.802229] sdhci-esdhc-imx 2198000.usdhc: No vqmmc regulator found
-[    4.854721] mmc2: SDHCI controller on 2198000.usdhc [2198000.usdhc]
-using ADMA
-
-Regards,
-
--- 
-Robert Nelson
-https://rcn-ee.com/
+--
+Robert
