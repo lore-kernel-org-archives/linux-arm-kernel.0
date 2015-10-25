@@ -1,40 +1,29 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Sun, 25 Oct 2015 19:37:15 -0200
-Subject: [PATCH V2 06/11] mmc: sdhci-esdhc-imx: fix cd regression for dt
- platform
-In-Reply-To: <CAOCHtYj1QuEYLg4vbxshWkYXPe6r9b5OP7hh_O0WoE6xfL0mjw@mail.gmail.com>
-References: <1437569590-5228-1-git-send-email-aisheng.dong@freescale.com>
- <1437569590-5228-7-git-send-email-aisheng.dong@freescale.com>
- <2333b5f060a8e45bd8adcdab55365fab@agner.ch>
- <CAOMZO5BUKmqczyVgz_WgYmBMeuGugDS4uVjw+LXebxf-nPDTyw@mail.gmail.com>
- <CAOMZO5Dz0KijjryoPihoXsP4b5Wy_5rock++oY=i-9gESThUbg@mail.gmail.com>
- <CAOCHtYgayRZoHxJ2d8f1mO0QW_=N4Mx2_RSCrADKERHdP9TGYQ@mail.gmail.com>
- <CAOMZO5D2LNS93XVx86fL7oLTgy4apU036v-ohhv-=kw5gFsCww@mail.gmail.com>
- <CAOCHtYj1QuEYLg4vbxshWkYXPe6r9b5OP7hh_O0WoE6xfL0mjw@mail.gmail.com>
-Message-ID: <CAOMZO5Cuu2B=s8UPQP1+VLzgFL99FYiw=mgYX+Jfi3g7c-ABOQ@mail.gmail.com>
+From: rabin@rab.in (Rabin Vincent)
+Date: Sun, 25 Oct 2015 23:07:01 +0100
+Subject: Build regressions/improvements in v4.3-rc7
+In-Reply-To: <20151025190318.GA3320@afzalpc>
+References: <1445767971-22415-1-git-send-email-geert@linux-m68k.org>
+ <CAMuHMdX9X8SRCA4K++LvRz1sK3Ewyj5wKbvrdAy06L6v2XTduA@mail.gmail.com>
+ <CAMuHMdUkNad7-zHSEfy__rPXKV2t0_7O+MtHiW1hUN=t30KWoA@mail.gmail.com>
+ <20151025140822.GA32532@n2100.arm.linux.org.uk>
+ <CAMuHMdVdSa2899nEYq4dg_WghdCWgj4jZqnd_8FE7_221O0CFQ@mail.gmail.com>
+ <20151025190318.GA3320@afzalpc>
+Message-ID: <20151025220701.GA5635@debian>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Oct 25, 2015 at 7:33 PM, Robert Nelson <robertcnelson@gmail.com> wrote:
-> On Sun, Oct 25, 2015 at 4:05 PM, Fabio Estevam <festevam@gmail.com> wrote:
->> On Sun, Oct 25, 2015 at 6:52 PM, Robert Nelson <robertcnelson@gmail.com> wrote:
->>
->>> I need to finish a full bisect run, but one of these sdhci-esdhci-imx
->>> fixes broke the wandboard..
->>
->> Could you please try to apply the attached patch?
->>
->> Looks like this one was not applied.
->
-> Thanks Fabio, that fixes the regression on v4.1.11 on my wand's... Too
-> bad it's also not in:
->
-> https://lkml.org/lkml/2015/10/23/516
+On Mon, Oct 26, 2015 at 12:33:18AM +0530, Afzal Mohammed wrote:
+> On Sun, Oct 25, 2015 at 06:38:18PM +0100, Geert Uytterhoeven wrote:
+> > I think we should have at least one arm-nommu platform in the upstream kernel,
+> > with a suitable defconfig, so 0build will catch regressions.
+> 
+> afaik, there are 4 arm-nommu defconfig's. Has been recently playing
+> with Vybrid nommu platform, did not notice any build error w/ it's
+> defconfig (vf610m4) and able to boot too. Just now tried -rc7, it too
+> was success.
 
-This is strange. I have an automatic email from Greg in my Inbox
-saying that the mx6 patch has been applied to stable, but for some
-reason it was not applied.
+vf610m4 won't use patch.c since it has CONFIG_XIP_KERNEL=y.  The failing
+config is a randconfig[1], but the error can be triggered by, for
+example, enabling CONFIG_JUMP_LABEL=y on lpc18xx_defconfig.
 
-I will ask Greg if I need to resend it.
-
-Thanks for reporting it.
+[1] http://kisskb.ellerman.id.au/kisskb/buildresult/12531538/
