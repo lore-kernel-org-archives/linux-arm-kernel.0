@@ -1,44 +1,54 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Sun, 25 Oct 2015 11:39:15 +0100
-Subject: Build regressions/improvements in v4.3-rc7
-In-Reply-To: <CAMuHMdX9X8SRCA4K++LvRz1sK3Ewyj5wKbvrdAy06L6v2XTduA@mail.gmail.com>
-References: <1445767971-22415-1-git-send-email-geert@linux-m68k.org>
- <CAMuHMdX9X8SRCA4K++LvRz1sK3Ewyj5wKbvrdAy06L6v2XTduA@mail.gmail.com>
-Message-ID: <CAMuHMdUkNad7-zHSEfy__rPXKV2t0_7O+MtHiW1hUN=t30KWoA@mail.gmail.com>
+From: jic23@kernel.org (Jonathan Cameron)
+Date: Sun, 25 Oct 2015 12:16:32 +0000
+Subject: [PATCH] staging: iio: select IRQ_WORK for IIO_DUMMY_EVGEN
+In-Reply-To: <CAEnQRZDTP6Xut9hGLe4QpgdZJvumY0fESMc_aYWJ4TW3oHeUJw@mail.gmail.com>
+References: <22609671.lgCfBiaFIf@wuerfel>
+ <CAEnQRZDTP6Xut9hGLe4QpgdZJvumY0fESMc_aYWJ4TW3oHeUJw@mail.gmail.com>
+Message-ID: <562CC820.9060100@kernel.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Oct 25, 2015 at 11:18 AM, Geert Uytterhoeven
-<geert@linux-m68k.org> wrote:
-> On Sun, Oct 25, 2015 at 11:12 AM, Geert Uytterhoeven
-> <geert@linux-m68k.org> wrote:
->> JFYI, when comparing v4.3-rc7[1] to v4.3-rc6[3], the summaries are:
->>   - build errors: +12/-4
+On 19/10/15 09:16, Daniel Baluta wrote:
+> On Sat, Oct 17, 2015 at 1:29 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+>> The iio dummy code was recently changed to use irq_work_queue, but
+>> that code is compiled into the kernel only if IRQ_WORK is set, so
+>> we can get a link error here:
+>>
+>> drivers/built-in.o: In function `iio_evgen_poke':
+>> (.text+0x208a04): undefined reference to `irq_work_queue'
+>>
+>> This changes the Kconfig file to match what other drivers do.
+>>
+>> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+>> Fixes: fd2bb310ca3d ("Staging: iio: Move evgen interrupt generation to irq_work")
+> 
+> Acked-by: Daniel Baluta <daniel.baluta@intel.com>
+Applied to the fixes-togreg branch of iio.git.  I fear this won't get to Linus
+until just after the release occurs.  Unfortunate timing.
 
->   + /home/kisskb/slave/src/arch/arm/kernel/patch.c: error: 'L_PTE_DIRTY' undeclared (first use in this function):  => 39:2
->   + /home/kisskb/slave/src/arch/arm/kernel/patch.c: error: 'L_PTE_MT_WRITEBACK' undeclared (first use in this function):  => 39:2
->   + /home/kisskb/slave/src/arch/arm/kernel/patch.c: error: 'L_PTE_PRESENT' undeclared (first use in this function):  => 39:2
->   + /home/kisskb/slave/src/arch/arm/kernel/patch.c: error: 'L_PTE_XN' undeclared (first use in this function):  => 39:2
->   + /home/kisskb/slave/src/arch/arm/kernel/patch.c: error: 'L_PTE_YOUNG' undeclared (first use in this function):  => 39:2
-
-Caused by:
-
-commit ab0615e2d6fb074764a3e4d05f1326fa2fdb4627
-Author: Rabin Vincent <rabin@rab.in>
-Date:   Thu Apr 24 23:28:57 2014 +0200
-
-    arm: use fixmap for text patching when text is RO
-
-Should the call to set_fixmap() in arch/arm/kernel/patch.c
-just be protected by #ifdef CONFIG_MMU?
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Jonathan
+> 
+>> ---
+>> Found on ARM randconfig tests
+>>
+>> diff --git a/drivers/staging/iio/Kconfig b/drivers/staging/iio/Kconfig
+>> index 6d5b38d69578..9d7f0004d2d7 100644
+>> --- a/drivers/staging/iio/Kconfig
+>> +++ b/drivers/staging/iio/Kconfig
+>> @@ -18,7 +18,8 @@ source "drivers/staging/iio/resolver/Kconfig"
+>>  source "drivers/staging/iio/trigger/Kconfig"
+>>
+>>  config IIO_DUMMY_EVGEN
+>> -       tristate
+>> +       tristate
+>> +       select IRQ_WORK
+>>
+>>  config IIO_SIMPLE_DUMMY
+>>         tristate "An example driver with no hardware requirements"
+>>
+>> --
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-iio" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
