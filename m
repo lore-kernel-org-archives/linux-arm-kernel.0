@@ -1,128 +1,207 @@
-From: afzal.mohd.ma@gmail.com (Afzal Mohammed)
-Date: Sun, 25 Oct 2015 23:20:56 +0530
-Subject: [PATCH] ARM: dts: vf6xx: Cosmic+: M4(nommu) initial support
-Message-ID: <1445795456-6698-1-git-send-email-afzal.mohd.ma@gmail.com>
+From: bjorn.andersson@sonymobile.com (Bjorn Andersson)
+Date: Sun, 25 Oct 2015 11:09:44 -0700
+Subject: [PATCH 1/3] devicetree: mfd: Add binding for the TI LM3533
+Message-ID: <1445796586-28683-1-git-send-email-bjorn.andersson@sonymobile.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Minimal Cortex-M4 device tree to boot Linux to shell. M4 is booted via
-Cortex-A5 running Linux using Stefan Agner's <stefan@agner.ch> "m4boot"
-utility.
+Add the binding for the Texas Instruments LM3533 lighting power
+solution.
 
-Signed-off-by: Afzal Mohammed <afzal.mohd.ma@gmail.com>
+Signed-off-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
 ---
- arch/arm/boot/dts/Makefile           |  1 +
- arch/arm/boot/dts/vf610m4-cosmic.dts | 90 ++++++++++++++++++++++++++++++++++++
- 2 files changed, 91 insertions(+)
- create mode 100644 arch/arm/boot/dts/vf610m4-cosmic.dts
+ Documentation/devicetree/bindings/mfd/lm3533.txt | 183 +++++++++++++++++++++++
+ 1 file changed, 183 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/mfd/lm3533.txt
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index bb8fa023d574..06a1a7a1d104 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -347,6 +347,7 @@ dtb-$(CONFIG_SOC_VF610) += \
- 	vf610-colibri-eval-v3.dtb \
- 	vf610m4-colibri.dtb \
- 	vf610-cosmic.dtb \
-+	vf610m4-cosmic.dtb \
- 	vf610-twr.dtb
- dtb-$(CONFIG_ARCH_MXS) += \
- 	imx23-evk.dtb \
-diff --git a/arch/arm/boot/dts/vf610m4-cosmic.dts b/arch/arm/boot/dts/vf610m4-cosmic.dts
+diff --git a/Documentation/devicetree/bindings/mfd/lm3533.txt b/Documentation/devicetree/bindings/mfd/lm3533.txt
 new file mode 100644
-index 000000000000..8944a2d2054c
+index 000000000000..3cc41695a544
 --- /dev/null
-+++ b/arch/arm/boot/dts/vf610m4-cosmic.dts
-@@ -0,0 +1,90 @@
-+/*
-+ * Device tree for Cosmic+ VF6xx Cortex-M4 support
-+ *
-+ * Copyright (C) 2015
-+ *
-+ * Based on vf610m4 Colibri
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This file is distributed in the hope that it will be useful
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED , WITHOUT WARRANTY OF ANY KIND
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
++++ b/Documentation/devicetree/bindings/mfd/lm3533.txt
+@@ -0,0 +1,183 @@
++Texas Instruments LM3533 binding
 +
-+/dts-v1/;
-+#include "vf610m4.dtsi"
++This binding describes the Texas Instruments LM3533, a lighting power solution
++for smartphone handsets. The common properties are described directly in the
++node, while each individual component are described in an optional subnode.
 +
-+/ {
-+	model = "VF610 Cortex-M4";
-+	compatible = "fsl,vf610m4";
-+};
++- compatible:
++	Usage: required
++	Value type: <stringlist>
++	Definition: must be:
++		    "ti,lm3533"
 +
-+&gpio0 {
-+	status = "disabled";
-+};
++- reg:
++	Usage: required
++	Value type: <u32>
++	Definition: i2c address of the LM3533 chip
 +
-+&gpio1 {
-+	status = "disabled";
-+};
++- ti,hwen-gpios:
++	Usage: required
++	Value type: <prop-encoded-array>
++	Definition: reference to gpio pin connected to the HWEN input; as
++		    specified in "gpio/gpio.txt"
 +
-+&gpio2 {
-+	status = "disabled";
-+};
++- ti,als-supply:
++	Usage: optional
++	Value type: <prop-encoded-array>
++	Definition: reference to regulator powering the V_als input; as
++		    specified in "regulator/regulator.txt"
 +
-+&gpio3 {
-+	status = "disabled";
-+};
++- ti,boost-freq:
++	Usage: required
++	Value type: <u32>
++	Definition: switch-frequency of the boost converter, must be either:
++		    500000 or 1000000
 +
-+&gpio4 {
-+	status = "disabled";
-+};
++- ti,boost-ovp:
++	Usage: required
++	Value type: <u32>
++	Definition: over voltage protection limit, must be one of: 16, 24, 32
++		    or 40
 +
-+&uart3 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_uart3>;
-+	status = "okay";
-+};
++- #address-cells:
++	Usage: required
++	Value type: <u32>
++	Definition: must be 1
 +
-+&iomuxc {
-+	vf610-cosmic {
-+		pinctrl_uart3: uart3grp {
-+			fsl,pins = <
-+				VF610_PAD_PTA20__UART3_TX		0x21a2
-+				VF610_PAD_PTA21__UART3_RX		0x21a1
-+			>;
++- #size-cells:
++	Usage: required
++	Value type: <u32>
++	Definition: must be 0
++
++= ALS SUBNODE
++The als subnode must be named "als", it carries the als related properties.
++
++- ti,als-resistance:
++	Usage: required (unless ti,pwm-mode is specified)
++	Value type: <u32>
++	Definition: specifies the resistor value (R_als), in Ohm. Valid values
++		    ranges from 200kOhm to 1574Ohm.
++
++- ti,pwm-mode:
++	Usage: optional
++	Value type: <empty>
++	Definition: specifies, if present, that the als should operate in pwm
++		    mode - rather than analog mode
++
++= BACKLIGHT NODES
++Backlight subnodes must be named "backlight", they carry the backlight related
++properties.
++
++- reg:
++	Usage: required
++	Value type: <u32>
++	Definition: specifies which of the two backlights this node corresponds
++		    to
++
++- default-brightness:
++	Usage: optional
++	Value type: <32>
++	Definition: specifies the default brightness for the backlight, in
++		    units of brightness [0-255]
++
++- label:
++	Usage: required
++	Value type: <string>
++	Definition: specifies a name of this backlight
++
++- led-max-microamp:
++	Usage: required
++	Value type: <u32>
++	Definition: specifies the max current for this backlight, in uA, as
++		    described in "leds/common.txt"
++
++- ti,pwm-zones:
++	Usage: optional
++	Value type: <u32 list>
++	Definition: lists the ALS zones to be PWM controlled for this backlight,
++		    the values in the list are in the range [0 - 4]
++
++= LED NODES
++LED subnodes must be named "led", they carry the LED related properties.
++
++- reg:
++	Usage: required
++	Value type: <u32>
++	Definition: specifies which of the four LEDs this node corresponds to
++
++- linux,default-trigger:
++	Usage: optional
++	Value type: <string>
++	Definition: specifies the default trigger for the LED, as described in
++		    "leds/common.txt"
++
++- label:
++	Usage: required
++	Value type: <string>
++	Definition: specifies a name of this LED, as described in
++		    "leds/common.txt"
++
++- led-max-microamp:
++	Usage: required
++	Value type: <u32>
++	Definition: specifies the max current for this LED, in uA, as described
++		    in "leds/common.txt"
++
++- ti,pwm-zones:
++	Usage: optional
++	Value type: <u32 list>
++	Definition: lists the ALS zones to be PWM controlled for this LED, the
++		    values in the list are in the range [0 - 4]
++
++= EXAMPLE
++
++i2c at 12460000 {
++	compatible = "qcom,i2c-qup-v1.1.1";
++	...
++
++	lm3533 at 36 {
++		compatible = "ti,lm3533";
++		reg = <0x36>;
++
++		ti,hwen-gpios = <&pm8921_gpio 26 GPIO_ACTIVE_HIGH>;
++		ti,als-supply = <&pm8921_l11>;
++
++		ti,boost-freq = <500000>;
++		ti,boost-ovp = <24>;
++
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		als {
++			ti,als-resistance = <200000>;
++		};
++
++		backlight at 0 {
++			reg = <0>;
++			label = "backlight";
++
++			led-max-microamp = <20200>;
++		};
++
++		led at 0 {
++			reg = <0>;
++			label = "red";
++
++			led-max-microamp = <5000>;
++		};
++
++		led at 1 {
++			reg = <1>;
++			label = "green";
++
++			led-max-microamp = <5000>;
++		};
++
++		led at 2 {
++			reg = <2>;
++			label = "blue";
++
++			led-max-microamp = <5000>;
 +		};
 +	};
-+};
++
 -- 
-2.5.1
+2.4.2
