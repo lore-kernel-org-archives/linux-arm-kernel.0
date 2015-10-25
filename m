@@ -1,41 +1,38 @@
-From: oliver+list@schinagl.nl (Olliver Schinagl)
-Date: Sun, 25 Oct 2015 18:32:24 +0100
-Subject: [linux-sunxi] [PATCH] i2c: mv64xxx: The n clockdiv factor is
- 0 based on sunxi SoCs
-In-Reply-To: <20151020155821.GN5379@katana>
-References: <1443365828-8956-1-git-send-email-hdegoede@redhat.com>
- <560813CF.4000807@schinagl.nl> <20150929120943.GP7104@lukather>
- <560D80CF.6050500@schinagl.nl> <20151020155821.GN5379@katana>
-Message-ID: <562D1228.5030909@schinagl.nl>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Sun, 25 Oct 2015 18:34:04 +0100
+Subject: Build regressions/improvements in v4.3-rc7
+In-Reply-To: <CAMuHMdX9X8SRCA4K++LvRz1sK3Ewyj5wKbvrdAy06L6v2XTduA@mail.gmail.com>
+References: <1445767971-22415-1-git-send-email-geert@linux-m68k.org>
+ <CAMuHMdX9X8SRCA4K++LvRz1sK3Ewyj5wKbvrdAy06L6v2XTduA@mail.gmail.com>
+Message-ID: <CAMuHMdUeLdnxRKi7DT036uoZdH6uzBKipm-rv6Ch=0qCJsU_Og@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hey Wolfram,
+On Sun, Oct 25, 2015 at 11:18 AM, Geert Uytterhoeven
+<geert@linux-m68k.org> wrote:
+> On Sun, Oct 25, 2015 at 11:12 AM, Geert Uytterhoeven
+> <geert@linux-m68k.org> wrote:
+>> JFYI, when comparing v4.3-rc7[1] to v4.3-rc6[3], the summaries are:
+>>   - build errors: +12/-4
+>
+>   + /home/kisskb/slave/src/arch/arm/kernel/devtree.c: error: implicit declaration of function 'early_init_dt_scan_nodes' [-Werror=implicit-function-declaration]:  => 244:2
+>   + /home/kisskb/slave/src/arch/arm/kernel/devtree.c: error: implicit declaration of function 'early_init_dt_verify' [-Werror=implicit-function-declaration]:  => 215:2
+>   + /home/kisskb/slave/src/arch/arm/kernel/devtree.c: error: implicit declaration of function 'of_flat_dt_match_machine' [-Werror=implicit-function-declaration]:  => 218:2
+>   + /home/kisskb/slave/src/arch/arm/kernel/devtree.c: error: implicit declaration of function 'of_get_flat_dt_prop' [-Werror=implicit-function-declaration]:  => 229:3
+>   + /home/kisskb/slave/src/arch/arm/kernel/devtree.c: error: implicit declaration of function 'of_get_flat_dt_root' [-Werror=implicit-function-declaration]:  => 228:3
 
-On 20-10-15 17:58, Wolfram Sang wrote:
->> WIth Hans having figured it out and fixing it, I'll absolutly will take a
->> nother look and check with a scope if it all works out now.
-> Have you done this already? /me is always looking for Tested-by: tags :)
-And here you have it.
+> arm-randconfig (all seen and reported before)
 
-Tested-by: Olliver Schinagl <oliver@schinagl.nl>
+CONFIG_OF=y with CONFIG_USE_OF=n, which used to be an impossibe
+combination on ARM. Patch sent.
 
-I attached the scope traces for a 200.000 Hz i2c0 and a 400.000 Hz i2c1 
-(without anything connected to the bus) on a cubieboard2.
+Gr{oetje,eeting}s,
 
-Olliver
+                        Geert
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 200k.png
-Type: image/png
-Size: 6542 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151025/5d211822/attachment.png>
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 400k.png
-Type: image/png
-Size: 6200 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151025/5d211822/attachment-0001.png>
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
