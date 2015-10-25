@@ -1,27 +1,54 @@
-From: afzal.mohd.ma@gmail.com (Afzal Mohammed)
-Date: Mon, 26 Oct 2015 00:33:18 +0530
-Subject: Build regressions/improvements in v4.3-rc7
-In-Reply-To: <CAMuHMdVdSa2899nEYq4dg_WghdCWgj4jZqnd_8FE7_221O0CFQ@mail.gmail.com>
-References: <1445767971-22415-1-git-send-email-geert@linux-m68k.org>
- <CAMuHMdX9X8SRCA4K++LvRz1sK3Ewyj5wKbvrdAy06L6v2XTduA@mail.gmail.com>
- <CAMuHMdUkNad7-zHSEfy__rPXKV2t0_7O+MtHiW1hUN=t30KWoA@mail.gmail.com>
- <20151025140822.GA32532@n2100.arm.linux.org.uk>
- <CAMuHMdVdSa2899nEYq4dg_WghdCWgj4jZqnd_8FE7_221O0CFQ@mail.gmail.com>
-Message-ID: <20151025190318.GA3320@afzalpc>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Sun, 25 Oct 2015 21:13:08 +0100
+Subject: [GIT PULL] Allwinner DT changes for 4.4, round 3
+In-Reply-To: <9946613.K7Ehp1DEiL@wuerfel>
+References: <20151023180711.GA11749@lukather> <4745252.gLSrJNQ42D@wuerfel>
+ <9946613.K7Ehp1DEiL@wuerfel>
+Message-ID: <20151025201308.GS10947@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Fri, Oct 23, 2015 at 10:55:13PM +0200, Arnd Bergmann wrote:
+> On Friday 23 October 2015 22:41:04 Arnd Bergmann wrote:
+> > On Friday 23 October 2015 20:07:11 Maxime Ripard wrote:
+> > > Allwinner DT changes for 4.4, round 3
+> > > 
+> > > A bunch of new boards, but mostly enable the support for the Audio Codec
+> > > on the older SoCs (A10, A10s, A13, A20, R8) and enable it on various
+> > > boards.
+> > > 
+> > > 
+> > 
+> > Pulled into next/dt, thanks!
+> 
+> And dropped again:
+> 
+> In file included from /git/arm-soc/arch/arm/boot/dts/sun4i-a10-a1000.dts:46:0:
+> /git/arm-soc/arch/arm/boot/dts/sun4i-a10.dtsi:48:46: fatal error: dt-bindings/clock/sun4i-a10-pll2.h: No such file or directory
+> 
+> Please make sure branches you send actually work by themselves.
 
-On Sun, Oct 25, 2015 at 06:38:18PM +0100, Geert Uytterhoeven wrote:
+Damn, you're right... Sorry about that...
 
-> I think we should have at least one arm-nommu platform in the upstream kernel,
-> with a suitable defconfig, so 0build will catch regressions.
+You need to pull the tag sunxi-clk-for-4.4 that has been merged in the
+clk tree in 38ce30e29dc.
 
-afaik, there are 4 arm-nommu defconfig's. Has been recently playing
-with Vybrid nommu platform, did not notice any build error w/ it's
-defconfig (vf610m4) and able to boot too. Just now tried -rc7, it too
-was success.
+Mike, Stephen, will that tag be stable?
 
-Regards
-afzal
+Arnd, do you want me to merge it in my DT branch, or do you want to
+merge it yourself?
+
+Thanks, and sorry again,
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151025/2a467686/attachment.sig>
