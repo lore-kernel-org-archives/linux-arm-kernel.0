@@ -1,14 +1,14 @@
 From: jszhang@marvell.com (Jisheng Zhang)
-Date: Mon, 26 Oct 2015 19:02:12 +0800
-Subject: [RFC PATCH 1/3] PCI: iproc: generate proper configuration access
+Date: Mon, 26 Oct 2015 19:02:13 +0800
+Subject: [RFC PATCH 2/3] PCI: tegra: generate proper configuration access
  cycles
 In-Reply-To: <1445857334-6936-1-git-send-email-jszhang@marvell.com>
 References: <1445857334-6936-1-git-send-email-jszhang@marvell.com>
-Message-ID: <1445857334-6936-2-git-send-email-jszhang@marvell.com>
+Message-ID: <1445857334-6936-3-git-send-email-jszhang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Inspired by Russell King's patch[1], I found current iproc also has the
+Inspired by Russell King's patch[1], I found current tegra also has the
 same issue of "reading 32-bits from the command register, modifying the
 command register, and then writing it back has the effect of clearing
 any status bits that were indicating at that time" as pointed out by
@@ -18,21 +18,21 @@ Russell. This patch fix this issue by using the pci_generic_config_write.
 
 Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
 ---
- drivers/pci/host/pcie-iproc.c | 2 +-
+ drivers/pci/host/pci-tegra.c | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/pci/host/pcie-iproc.c b/drivers/pci/host/pcie-iproc.c
-index fe2efb1..0c423f2 100644
---- a/drivers/pci/host/pcie-iproc.c
-+++ b/drivers/pci/host/pcie-iproc.c
-@@ -111,7 +111,7 @@ static void __iomem *iproc_pcie_map_cfg_bus(struct pci_bus *bus,
- static struct pci_ops iproc_pcie_ops = {
- 	.map_bus = iproc_pcie_map_cfg_bus,
+diff --git a/drivers/pci/host/pci-tegra.c b/drivers/pci/host/pci-tegra.c
+index 81df0c1..d926e3e 100644
+--- a/drivers/pci/host/pci-tegra.c
++++ b/drivers/pci/host/pci-tegra.c
+@@ -483,7 +483,7 @@ static void __iomem *tegra_pcie_conf_address(struct pci_bus *bus,
+ static struct pci_ops tegra_pcie_ops = {
+ 	.map_bus = tegra_pcie_conf_address,
  	.read = pci_generic_config_read32,
 -	.write = pci_generic_config_write32,
 +	.write = pci_generic_config_write,
  };
  
- static void iproc_pcie_reset(struct iproc_pcie *pcie)
+ static unsigned long tegra_pcie_port_get_pex_ctrl(struct tegra_pcie_port *port)
 -- 
 2.6.2
