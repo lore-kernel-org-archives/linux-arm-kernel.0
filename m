@@ -1,42 +1,84 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 26 Oct 2015 09:16:48 +0100
-Subject: [PATCH v6 04/22] of: add function to allow probing a device from
- a OF node
-In-Reply-To: <1442844182-27787-5-git-send-email-tomeu.vizoso@collabora.com>
-References: <1442844182-27787-1-git-send-email-tomeu.vizoso@collabora.com>
- <1442844182-27787-5-git-send-email-tomeu.vizoso@collabora.com>
-Message-ID: <CAMuHMdW=sT9uLbZkwdYF9Yd3ENaAoQ0=qQLfr-Ow6pz11DiU0A@mail.gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 26 Oct 2015 09:17:46 +0100
+Subject: [PATCH 4/4] cpufreq: imx6q: check regulator_get_optional return
+ value
+In-Reply-To: <1445509395.3173.31.camel@pengutronix.de>
+References: <1445503652-777-1-git-send-email-s.hauer@pengutronix.de>
+ <1445503652-777-5-git-send-email-s.hauer@pengutronix.de>
+ <1445509395.3173.31.camel@pengutronix.de>
+Message-ID: <20151026081746.GX14476@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Sep 21, 2015 at 4:02 PM, Tomeu Vizoso
-<tomeu.vizoso@collabora.com> wrote:
-> Walks the OF tree up and finds the closest ancestor that has a struct
-> device associated with it, probing it if isn't bound to a driver yet.
->
-> The above should ensure that the dependency represented by the passed OF
-> node is available, because probing a device should cause its descendants
-> to be probed as well (when they get registered).
->
-> Subsystems can use this when looking up resources for drivers, to reduce
-> the chances of deferred probes because of the probing order of devices.
->
-> Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
+On Thu, Oct 22, 2015 at 12:23:15PM +0200, Lucas Stach wrote:
+> Am Donnerstag, den 22.10.2015, 10:47 +0200 schrieb Sascha Hauer:
+> > While pu_reg is an optional regulator we still have to check
+> > the return value for -EPROBE_DEFER to properly detect the
+> > case when we have a pu regulator but it is not yet present.
+> > 
+> > While at it, set pu_reg to NULL for an erroneous regulator
+> > so that we can check for the regulator with if (pu_reg)
+> > instead of the slightly less readable IS_ERR().
+> > 
+> > Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> > ---
+> >  drivers/cpufreq/imx6q-cpufreq.c | 11 ++++++++---
+> >  1 file changed, 8 insertions(+), 3 deletions(-)
+> > 
+> > diff --git a/drivers/cpufreq/imx6q-cpufreq.c b/drivers/cpufreq/imx6q-cpufreq.c
+> > index ce0c6bd..b643614 100644
+> > --- a/drivers/cpufreq/imx6q-cpufreq.c
+> > +++ b/drivers/cpufreq/imx6q-cpufreq.c
+> > @@ -71,7 +71,7 @@ static int imx6q_set_target(struct cpufreq_policy *policy, unsigned int index)
+> >  
+> >  	/* scaling up?  scale voltage before frequency */
+> >  	if (new_freq > old_freq) {
+> > -		if (!IS_ERR(pu_reg)) {
+> > +		if (pu_reg) {
+> >  			ret = regulator_set_voltage_tol(pu_reg, imx6_soc_volt[index], 0);
+> >  			if (ret) {
+> >  				dev_err(cpu_dev, "failed to scale vddpu up: %d\n", ret);
+> > @@ -148,7 +148,7 @@ static int imx6q_set_target(struct cpufreq_policy *policy, unsigned int index)
+> >  			dev_warn(cpu_dev, "failed to scale vddsoc down: %d\n", ret);
+> >  			ret = 0;
+> >  		}
+> > -		if (!IS_ERR(pu_reg)) {
+> > +		if (pu_reg) {
+> >  			ret = regulator_set_voltage_tol(pu_reg, imx6_soc_volt[index], 0);
+> >  			if (ret) {
+> >  				dev_warn(cpu_dev, "failed to scale vddpu down: %d\n", ret);
+> > @@ -217,6 +217,11 @@ static int imx6q_cpufreq_get_resources(struct platform_device *pdev)
+> >  		return PTR_ERR(arm_reg);
+> >  
+> >  	pu_reg = regulator_get_optional(cpu_dev, "pu");
+> > +	if (IS_ERR(pu_reg)) {
+> > +		if (PTR_ERR(pu_reg) == -EPROBE_DEFER)
+> > +			return -EPROBE_DEFER;
+> > +		pu_reg = NULL;
+> > +	}
+> 
+> The PU regulator isn't really optional for MX6 Q/DL (where it is present
+> in hardware) as the datasheet clearly specifies that it needs to be set
+> to the same voltage as SOC. Could you change this to request this
+> regulator as non-optional for those chip derivatives and skip the
+> request otherwise?
 
-Don't know to which response I should post this comment, so I'm responding
-to the original email.
+i.MX6SL also has the pu-reg, so this would become
 
-Some subsystems already do this.
-If you call e.g. syscon_regmap_lookup_by_phandle(), it will call
-of_syscon_register() if the syscon device pointed to hasn't been registered yet.
+	if (of_machine_is_compatible("fsl,imx6q") ||
+	    of_machine_is_compatible("fsl,imx6dl") ||
+	    of_machine_is_compatible("fsl,imx6sl))
 
-Gr{oetje,eeting}s,
+Not really nice. Also we already have a
+of_machine_is_compatible("fsl,imx6ul") in the driver. It seems the
+knowledge about (struct platform_device)->id_table is already lost
+nowadays. I think this should be used here to distinguish between the
+different devices.
 
-                        Geert
+Sascha
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
