@@ -1,34 +1,37 @@
-From: wsa@the-dreams.de (Wolfram Sang)
-Date: Mon, 26 Oct 2015 15:47:26 +0100
-Subject: [PATCH v3] i2c: at91: manage unexpected RXRDY flag when starting
- a transfer
-In-Reply-To: <1445852312-28389-1-git-send-email-ludovic.desroches@atmel.com>
-References: <20151022130847.GE1517@katana>
- <1445852312-28389-1-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <20151026144726.GB5588@katana>
+From: fcooper@ti.com (Franklin S Cooper Jr.)
+Date: Mon, 26 Oct 2015 09:50:16 -0500
+Subject: [PATCH 1/2 v2] ARM: DRA7/335x/437x/OMAP4: hwmod: Remove elm
+ address space from hwmod data
+In-Reply-To: <alpine.DEB.2.02.1510231858170.9575@utopia.booyaka.com>
+References: <1444926461-16092-1-git-send-email-fcooper@ti.com>
+ <alpine.DEB.2.02.1510231858170.9575@utopia.booyaka.com>
+Message-ID: <562E3DA8.4000006@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 26, 2015 at 10:38:27AM +0100, Ludovic Desroches wrote:
-> In some cases, we could start a new i2c transfer with the RXRDY flag
-> set. It is not a clean state and it leads to print annoying error
-> messages even if there no real issue. The cause is only having garbage
-> data in the Receive Holding Register because of a weird behavior of the
-> RXRDY flag.
-> 
-> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
-> Fixes: 93563a6a71bb ("i2c: at91: fix a race condition when using the DMA
-> controller")
-> Reported-by: Peter Rosin <peda@lysator.liu.se>
-> Tested-by: Peter Rosin <peda@lysator.liu.se>
-> Cc: stable at vger.kernel.org #4.1
 
-Applied to for-next, thanks!
 
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151026/4c8e17df/attachment.sig>
+On 10/23/2015 02:00 PM, Paul Walmsley wrote:
+> On Thu, 15 Oct 2015, Franklin S Cooper Jr wrote:
+>
+>> ELM address information is provided by device tree. No longer need
+>> to include this information within hwmod.
+>>
+>> Signed-off-by: Franklin S Cooper Jr <fcooper@ti.com>
+> The OMAP4 DTS files don't have the ELM address space declared.  I'm going 
+> to drop that portion of your patch.  Could you please send a two-patch 
+> series that first adds the ELM address space to the OMAP4 DTS file and 
+> then subsequently drops it from the OMAP4 hwmod data file?
+Hi Paul,
+
+Sorry about that. I can create the patches but I don't see any board omap4
+board that has nand support. So I'm not going to be able to test to insure if
+omap_elm.c will work as is.
+
+Should I just drop omap4 from this patchset or should I just add the elm node
+to omap4.dtsi and if people report an issue with omap_elm then we can fix it?
+
+
+>
+>
+> - Paul
