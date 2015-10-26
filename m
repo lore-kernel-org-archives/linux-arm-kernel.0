@@ -1,37 +1,45 @@
-From: sylvain.rochet@finsecur.com (Sylvain Rochet)
-Date: Mon, 26 Oct 2015 10:40:27 +0100
-Subject: Possible Regression due to c074fef5d36e ("of/platform: Defer
- probes of registered devices").
-In-Reply-To: <20151026032039.GA1950@verge.net.au>
-References: <20151026032039.GA1950@verge.net.au>
-Message-ID: <20151026094027.GA25225@gradator.net>
+From: jamesjj.liao@mediatek.com (James Liao)
+Date: Mon, 26 Oct 2015 17:46:37 +0800
+Subject: [PATCH] soc: mediatek: Init MT8173 scpsys driver earlier
+Message-ID: <1445852797-15549-1-git-send-email-jamesjj.liao@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Simon,
+Some power domain comsumers may init before module_init.
+So the power domain provider (scpsys) need to be initialized
+earlier too.
 
-On Mon, Oct 26, 2015 at 12:20:39PM +0900, Simon Horman wrote:
-> Hi,
-> 
-> I have observed a possible regression in next-20151022
-> due to c074fef5d36e ("of/platform: Defer probes of registered devices").
-> 
-> The problem manifests on the r8a7791 based koelsch board.
-> With the above patch present booting the board using the shmobile_defconfig
-> results in no console output. While after reverting the above patch
-> the boot proceeds all the way to user-space.
-> 
-> With DEBUG_LL and EARLY_PRINTK enabled I was able to capture some console
-> output. I have included both that boot log, and a log of boot all the way to
-> userspace with the patch in question reverted.
-> 
-> The problem does not seem to manifiest on other boards for other
-> Renesas ARM  SoCs that I have access too. In particular the
-> r8a7790 based lager board; the r8a7790 and r8a7791 are both members
-> of the R-Car Gen2 family of SoCs.
+This patch modify scpsys driver init level from module_init to
+subsys_initcall.
 
-Atmel SoC hit this regresssion too, discussion about this issue is in 
-the following thread:
- https://lkml.org/lkml/2015/10/16/733
+Signed-off-by: James Liao <jamesjj.liao@mediatek.com>
+---
 
-Sylvain
+This patch is based on v4.3-rc7.
+
+ drivers/soc/mediatek/mtk-scpsys.c | 13 ++++++++++++-
+ 1 file changed, 12 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/soc/mediatek/mtk-scpsys.c b/drivers/soc/mediatek/mtk-scpsys.c
+index 164a7d8..7d5d55d 100644
+--- a/drivers/soc/mediatek/mtk-scpsys.c
++++ b/drivers/soc/mediatek/mtk-scpsys.c
+@@ -485,4 +485,15 @@ static struct platform_driver scpsys_drv = {
+ 	},
+ };
+ 
+-module_platform_driver_probe(scpsys_drv, scpsys_probe);
++static int __init scpsys_drv_init(void)
++{
++	return platform_driver_probe(&scpsys_drv, scpsys_probe);
++}
++
++static void __exit scpsys_drv_exit(void)
++{
++	platform_driver_unregister(&scpsys_drv);
++}
++
++subsys_initcall(scpsys_drv_init);
++module_exit(scpsys_drv_exit);
+-- 
+1.9.1
