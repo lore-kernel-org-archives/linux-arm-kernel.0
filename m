@@ -1,67 +1,33 @@
-From: robh@kernel.org (Rob Herring)
-Date: Sun, 25 Oct 2015 19:45:08 -0500
-Subject: [PATCH] arm: Test for CONFIG_USE_OF to handle the USE_OF=n/OF=y
- case
-In-Reply-To: <1445786759-22005-1-git-send-email-geert@linux-m68k.org>
-References: <1445786759-22005-1-git-send-email-geert@linux-m68k.org>
-Message-ID: <CAL_JsqKHozy_fKHuTokQobKHjF6Vay_mzYvP1TCU_sBjTrewBA@mail.gmail.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Mon, 26 Oct 2015 09:44:27 +0900
+Subject: [GIT PULL] at91: defconfig for 4.4 #1
+In-Reply-To: <20151019202608.GA32225@piout.net>
+References: <20151019202608.GA32225@piout.net>
+Message-ID: <20151026004427.GB14238@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Oct 25, 2015 at 10:25 AM, Geert Uytterhoeven
-<geert@linux-m68k.org> wrote:
-> Until commit 0166dc11be911213 ("of: make CONFIG_OF user selectable"),
-> CONFIG_OF=y implied CONFIG_USE_OF=y on ARM, as the former could solely
-> be enabled by being selected by the latter.
+On Mon, Oct 19, 2015 at 10:26:08PM +0200, Alexandre Belloni wrote:
+> Arnd, Olof, Kevin,
+> 
+> A defconfig update, adding sama5d2 peripherals to sama5_defconfig and
+> multi_v7_defconfig
+> 
+> Thanks,
+> 
+> The following changes since commit 6ff33f3902c3b1c5d0db6b1e2c70b6d76fba357f:
+> 
+>   Linux 4.3-rc1 (2015-09-12 16:35:56 -0700)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/abelloni/linux.git tags/at91-ab-defconfig
+> 
+> for you to fetch changes up to 4af8540f0082812e2e092f2d31dbb4d114eee968:
+> 
+>   ARM: multi_v7_defconfig: Add Atmel SDHCI device (2015-10-19 21:52:21 +0200)
 
-Arnd sent a similar fix[1] which I prefer.
+Merged, thanks!
 
-> However, if the user now manually enables CONFIG_OF=y while
-> CONFIG_USE_OF=n:
->
->     arch/arm/kernel/devtree.c: In function 'setup_machine_fdt':
->     arch/arm/kernel/devtree.c:215:2: error: implicit declaration of function 'early_init_dt_verify' [-Werror=implicit-function-declaration]
->       if (!dt_phys || !early_init_dt_verify(phys_to_virt(dt_phys)))
->       ^
->     arch/arm/kernel/devtree.c:218:2: error: implicit declaration of function 'of_flat_dt_match_machine' [-Werror=implicit-function-declaration]
->       mdesc = of_flat_dt_match_machine(mdesc_best, arch_get_next_mach);
->       ^
->     arch/arm/kernel/devtree.c:218:8: warning: assignment makes pointer from integer without a cast
->       mdesc = of_flat_dt_match_machine(mdesc_best, arch_get_next_mach);
->             ^
->     arch/arm/kernel/devtree.c:228:3: error: implicit declaration of function 'of_get_flat_dt_root' [-Werror=implicit-function-declaration]
->        dt_root = of_get_flat_dt_root();
->        ^
->     arch/arm/kernel/devtree.c:229:3: error: implicit declaration of function 'of_get_flat_dt_prop' [-Werror=implicit-function-declaration]
->        prop = of_get_flat_dt_prop(dt_root, "compatible", &size);
->        ^
->     arch/arm/kernel/devtree.c:229:8: warning: assignment makes pointer from integer without a cast
->        prop = of_get_flat_dt_prop(dt_root, "compatible", &size);
->             ^
->     arch/arm/kernel/devtree.c:244:2: error: implicit declaration of function 'early_init_dt_scan_nodes' [-Werror=implicit-function-declaration]
->       early_init_dt_scan_nodes();
->       ^
->
-> and
->
->     arch/arm/kernel/built-in.o: In function `setup_arch':
->     arch/arm/kernel/setup.c:940: undefined reference to `setup_machine_fdt'
->     arch/arm/kernel/setup.c:979: undefined reference to `arm_dt_init_cpu_maps'
->
-> Replace tests for CONFIG_OF by tests for CONFIG_USE_OF where appropriate
-> to fix this.
->
-> Signed-off-by: Geert Uytterhoeven <geert@linux-m68k.org>
-> ---
-> Cfr. http://kisskb.ellerman.id.au/kisskb/buildresult/12531538/
->
-> I only fixed the particular issue with the randconfig from the build
-> above.  Are there more tests for CONFIG_OF that should be converted to
-> CONFIG_USE_OF?
 
-I'd rather move toward removing USE_OF and having arches select if
-they use EARLY_FLATTREE.
-
-Rob
-
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-October/376484.html
+-Olof
