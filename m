@@ -1,89 +1,47 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Mon, 26 Oct 2015 16:55:00 +0000
-Subject: [PATCH v6 1/3] iommu: Implement common IOMMU ops for DMA mapping
-In-Reply-To: <1445867094.30736.14.camel@mhfsdcap03>
-References: <cover.1443718557.git.robin.murphy@arm.com>
- <ab8e1caa40d6da1afa4a49f30242ef4e6e1f17df.1443718557.git.robin.murphy@arm.com>
- <1445867094.30736.14.camel@mhfsdcap03>
-Message-ID: <562E5AE4.9070001@arm.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Mon, 26 Oct 2015 17:06:45 +0000 (UTC)
+Subject: [PATCH 1/2 v2] ARM: DRA7/335x/437x/OMAP4: hwmod: Remove elm
+ address space from hwmod data
+In-Reply-To: <562E3DA8.4000006@ti.com>
+References: <1444926461-16092-1-git-send-email-fcooper@ti.com>
+ <alpine.DEB.2.02.1510231858170.9575@utopia.booyaka.com>
+ <562E3DA8.4000006@ti.com>
+Message-ID: <alpine.DEB.2.02.1510261700320.17863@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26/10/15 13:44, Yong Wu wrote:
-> On Thu, 2015-10-01 at 20:13 +0100, Robin Murphy wrote:
-> [...]
->> +/*
->> + * The DMA API client is passing in a scatterlist which could describe
->> + * any old buffer layout, but the IOMMU API requires everything to be
->> + * aligned to IOMMU pages. Hence the need for this complicated bit of
->> + * impedance-matching, to be able to hand off a suitably-aligned list,
->> + * but still preserve the original offsets and sizes for the caller.
->> + */
->> +int iommu_dma_map_sg(struct device *dev, struct scatterlist *sg,
->> +		int nents, int prot)
->> +{
->> +	struct iommu_domain *domain = iommu_get_domain_for_dev(dev);
->> +	struct iova_domain *iovad = domain->iova_cookie;
->> +	struct iova *iova;
->> +	struct scatterlist *s, *prev = NULL;
->> +	dma_addr_t dma_addr;
->> +	size_t iova_len = 0;
->> +	int i;
->> +
->> +	/*
->> +	 * Work out how much IOVA space we need, and align the segments to
->> +	 * IOVA granules for the IOMMU driver to handle. With some clever
->> +	 * trickery we can modify the list in-place, but reversibly, by
->> +	 * hiding the original data in the as-yet-unused DMA fields.
->> +	 */
->> +	for_each_sg(sg, s, nents, i) {
->> +		size_t s_offset = iova_offset(iovad, s->offset);
->> +		size_t s_length = s->length;
->> +
->> +		sg_dma_address(s) = s->offset;
->> +		sg_dma_len(s) = s_length;
->> +		s->offset -= s_offset;
->> +		s_length = iova_align(iovad, s_length + s_offset);
->> +		s->length = s_length;
->> +
->> +		/*
->> +		 * The simple way to avoid the rare case of a segment
->> +		 * crossing the boundary mask is to pad the previous one
->> +		 * to end at a naturally-aligned IOVA for this one's size,
->> +		 * at the cost of potentially over-allocating a little.
->> +		 */
->> +		if (prev) {
->> +			size_t pad_len = roundup_pow_of_two(s_length);
->> +
->> +			pad_len = (pad_len - iova_len) & (pad_len - 1);
->> +			prev->length += pad_len;
->
-> Hi Robin,
->        While our v4l2 testing, It seems that we met a problem here.
->        Here we update prev->length again, Do we need update
-> sg_dma_len(prev) again too?
->
->        Some function like vb2_dc_get_contiguous_size[1] always get
-> sg_dma_len(s) to compare instead of s->length. so it may break
-> unexpectedly while sg_dma_len(s) is not same with s->length.
+Hi Franklin,
 
-This is just tweaking the faked-up length that we hand off to 
-iommu_map_sg() (see also the iova_align() above), to trick it into 
-bumping this segment up to a suitable starting IOVA. The real length at 
-this point is stashed in sg_dma_len(s), and will be copied back into 
-s->length in __finalise_sg(), so both will hold the same true length 
-once we return to the caller.
+On Mon, 26 Oct 2015, Franklin S Cooper Jr. wrote:
 
-Yes, it does mean that if you have a list where the segment lengths are 
-page aligned but not monotonically decreasing, e.g. {64k, 16k, 64k}, 
-then you'll still end up with a gap between the second and third 
-segments, but that's fine because the DMA API offers no guarantees about 
-what the resulting DMA addresses will be (consider the no-IOMMU case 
-where they would each just be "mapped" to their physical address). If 
-that breaks v4l, then it's probably v4l's DMA API use that needs looking 
-at (again).
+> On 10/23/2015 02:00 PM, Paul Walmsley wrote:
+> > On Thu, 15 Oct 2015, Franklin S Cooper Jr wrote:
+> >
+> >> ELM address information is provided by device tree. No longer need
+> >> to include this information within hwmod.
+> >>
+> >> Signed-off-by: Franklin S Cooper Jr <fcooper@ti.com>
+> > The OMAP4 DTS files don't have the ELM address space declared.  I'm going 
+> > to drop that portion of your patch.  Could you please send a two-patch 
+> > series that first adds the ELM address space to the OMAP4 DTS file and 
+> > then subsequently drops it from the OMAP4 hwmod data file?
+> Hi Paul,
+> 
+> Sorry about that. I can create the patches but I don't see any board omap4
+> board that has nand support. So I'm not going to be able to test to insure if
+> omap_elm.c will work as is.
+> 
+> Should I just drop omap4 from this patchset or should I just add the elm node
+> to omap4.dtsi and if people report an issue with omap_elm then we can fix it?
 
-Robin.
+Please write the OMAP4 patches since we're trying to get the data cleaned 
+up.  You don't need to worry about the DRA7/335x/437x platforms; those 
+patches have already been merged.  The ELM hwmod should be initialized 
+even on boards without NAND, so that should be a reasonable test of the 
+register address space, at least.  Please note in the patch description 
+whether your patches are untested, tested just to initialize/boot, or 
+whether they've been tested on an active NAND flash workload.
 
-> [1]:
-> http://lxr.free-electrons.com/source/drivers/media/v4l2-core/videobuf2-dma-contig.c#L70
+thanks
+
+- Paul
