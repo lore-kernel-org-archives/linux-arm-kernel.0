@@ -1,60 +1,56 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Mon, 26 Oct 2015 16:02:18 +0800
-Subject: [linux-sunxi] [PATCH v4 1/1] dts: sun6i: yones toptech bs1078 v2:
- Add AXP221 support to dts
-In-Reply-To: <1445806172-25998-1-git-send-email-lyu@micile.com>
-References: <1445806172-25998-1-git-send-email-lyu@micile.com>
-Message-ID: <CAGb2v65vdA9Ug8td9zwq3eECm6moUcgSSQXGnAtE04tLp3KvhQ@mail.gmail.com>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Mon, 26 Oct 2015 09:05:37 +0100
+Subject: v7-M: Fixing XIP when the kernel is in ROM
+In-Reply-To: <20151026012710.GA17365@laptop>
+References: <20151026012710.GA17365@laptop>
+Message-ID: <20151026080537.GW4931@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hello,
 
-On Mon, Oct 26, 2015 at 4:49 AM, Lawrence Yu <lyu@micile.com> wrote:
-> Enable the axp221 PMIC chip in the dts file.
->
-> Allows board to power off correctly from the poweroff command
->
-> This board requires dc1sw to be enabled in order to provide a power source
-> for the 5V DCDC converter that powers USB2.
->
-> This board uses dldo1 for 3.3V wifi power
->
-> This board requires dldo3 to be enabled at 2.8V in order to provide voltage
-> to the pullup resistors for the i2c0 bus.
->
-> ---
-> Changes since v3
->
-> - Changed reg_dc1sw to be a node reference
-> - Moved regulator nodes to correct alphabetical position before uart0
->
-> Changes since v2
->
-> - Rename regulator vcc-dc1sw to vcc-lcd-usb2
-> - Rename regulator vcc-csi to vddio-csi
-> - Remove regulator-always-on from dldo3
-> - Remove comment about LCD backlight and USB2 from reg_dc1sw
-> - Remove comment about dc1sw providing power to LCD backlight in patch
->   description
->
-> Changes since v1
->
-> - Use axp22x.dtsi to standardize the register names
-> - Change wifi power regulator to dldo1 instead of incorrect aldo1
-> - Remove unnecessary gpio pin PH27 for wifi power, since this board uses
->   the axp221 chip to control power to the wifi chip.
->
-> Signed-off-by: Lawrence Yu <lyu@micile.com>
+On Sun, Oct 25, 2015 at 10:27:10PM -0300, Ezequiel Garcia wrote:
+> I've been trying to make my ARM v7-M LPC43xx board
+> boot a XIP kernel from flash. Currently, this seems
 
-Normally one puts this at the end of the commit message, then "---",
-then changelogs and any additional messages for the maintainer. :)
+I admit I didn't update my efm32 machine for quite some time, but this
+can only boot with XIP.
 
-Overall this version looks good.
+> to be broken in mainline due to this:
+> 
+> arch/arm/mm/proc-v7m.S
+> [..]
+>         @ SVC to run the kernel in this mode
+>         badr    r1, 1f
+>         ldr     r5, [r12, #11 * 4]      @ read the SVC vector entry
+>         str     r1, [r12, #11 * 4]      @ write the temporary SVC vector entry
+>         mov     r6, lr                  @ save LR
+>         mov     r7, sp                  @ save SP
+> 	ldr     sp, =__v7m_setup_stack_top @ <<< Breaks XIP!
+If you make the tab above 8 spaces the line will align in the git
+commit, too.
+Hmm, this line is there from the beginning (i.e. 55bdd6941165 ("ARM: Add
+base support for ARMv7-M")).
 
-Acked-by: Chen-Yu Tsai <wens@csie.org>
+>         cpsie   i
+>         svc     #0
+> 1:      cpsid   i
+>         str     r5, [r12, #11 * 4]      @ restore the original SVC vector entry
+>         mov     lr, r6                  @ restore LR
+>         mov     sp, r7                  @ restore SP
+> 
+> Here, a temporary stack is prepared before making a
+> supervisor call (SVC) to switch to handler mode.
+> 
+> The temporary stack is allocated in the .text.init section
+> and so this doesn't work when the kernel is executing from ROM.
 
-Please send additional patches for reordering stuff, simplefb regulators,
-and possibly cpu regulator (so you get full cpufreq support).
+If sp isn't used, how does it break you setup? Did you try to put a
+watchpoint to the location in question?
 
-P.S. Your patch is not showing up on LAKML patchwork. Not subscribed?
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
