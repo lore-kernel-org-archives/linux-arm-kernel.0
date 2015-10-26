@@ -1,49 +1,38 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 26 Oct 2015 13:31:53 +0000
-Subject: [PATCH 09/13] clk: versatile-icst: add device tree support
-In-Reply-To: <CACRpkdZUzTsMcFrudF6RRU5_1Njr=8L_XRUEmAWqvEnoJQ96Cw@mail.gmail.com>
-References: <1444916813-31024-1-git-send-email-linus.walleij@linaro.org>
- <1444916813-31024-10-git-send-email-linus.walleij@linaro.org>
- <20151015192626.GO4558@codeaurora.org>
- <CACRpkdZUzTsMcFrudF6RRU5_1Njr=8L_XRUEmAWqvEnoJQ96Cw@mail.gmail.com>
-Message-ID: <20151026133153.GG8644@n2100.arm.linux.org.uk>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 26 Oct 2015 14:35:42 +0100
+Subject: [PATCH 6/9] pinctrl: Add IRQ support to STM32 gpios
+In-Reply-To: <1445102638-11575-7-git-send-email-mcoquelin.stm32@gmail.com>
+References: <1445102638-11575-1-git-send-email-mcoquelin.stm32@gmail.com>
+ <1445102638-11575-7-git-send-email-mcoquelin.stm32@gmail.com>
+Message-ID: <CACRpkdbQcF8-hR7BP88i5GOrY8QNfxy21ANLgxuaHabzcvrKVA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 26, 2015 at 02:14:15PM +0100, Linus Walleij wrote:
-> On Thu, Oct 15, 2015 at 9:26 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
-> > On 10/15, Linus Walleij wrote:
-> >> +
-> >> +     if (of_device_is_compatible(np, "arm,syscon-icst525"))
-> >> +             icst_desc.params = &icst525_params;
-> >> +     else if (of_device_is_compatible(np, "arm,syscon-icst307"))
-> >> +             icst_desc.params = &icst307_params;
-> >
-> > I guess if we add anymore here we should use an of_device_id
-> > array instead.
-> 
-> As it happens those two are gonna be it.
-> 
-> ARM never created any more integrated ICST devices, and
-> they stopped using them since. Those two are the required
-> ones.
+On Sat, Oct 17, 2015 at 7:23 PM, Maxime Coquelin
+<mcoquelin.stm32@gmail.com> wrote:
 
-As ARM didn't create any ICST devices at all, that's hardly surprising.
-These devices are created by Integrated Circuit Systems, Inc.  The 525
-is a parallel-loaded clock generator, the 307 is a serial-loaded clock
-generator.
+> This patch adds IRQ support to STM32 gpios.
+>
+> The EXTI controller has 16 lines dedicated to GPIOs.
+> EXTI line n can be connected to only line n of one of the GPIO ports, for
+> example EXTI0 can be connected to either PA0, or PB0, or PC0...
+> This port selection is done by specifying the port number into System
+> Config registers.
+>
+> Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
 
-However, they have no "standard" software interface - indeed, the 525
-is marketed as a device that needs no processor or software to be used,
-so it doesn't have a "software" interface as such.
+(...)
+> +static int stm32_gpio_to_irq(struct gpio_chip *chip, unsigned offset)
+> +{
+> +       struct stm32_pinctrl *pctl = dev_get_drvdata(chip->dev);
+> +       struct stm32_gpio_bank *bank = gpio_chip_to_bank(chip);
+> +       unsigned int virq;
 
-ARM Ltd's hardware on these boards provides interfaces to these, however
-the underlying ICST support I wrote was factored to separate out the
-interface from the chip support - I haven't been tracking what's been
-going on with these, but I hope that separation has been kept as it's
-entirely logical, and describing these things in DT as an ARM Ltd device,
-combining the ICST device itself with its interface would be wrong.
+I don't like when these IRQs are called "virtual" (virq), becuase all
+Linux IRQs are equally virtual. It's just coincidence that sometimes
+the Linux IRQ and the hardware IRQ is the same.
 
--- 
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Just name it "irq".
+
+Yours,
+Linus Walleij
