@@ -1,44 +1,73 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 26 Oct 2015 20:26:09 +0000
-Subject: [PATCH v2] arm64: Align .text section to PAGE_SIZE
-In-Reply-To: <20151026201611.GI12277@leverpostej>
-References: <1445882989-10618-1-git-send-email-jeremy.linton@arm.com>
- <20151026201611.GI12277@leverpostej>
-Message-ID: <20151026202608.GJ12277@leverpostej>
+From: twarren@nvidia.com (Tom Warren)
+Date: Mon, 26 Oct 2015 13:34:36 -0700
+Subject: [PATCH v3] Tegra: DT: add device tree binding doc for QSPI
+Message-ID: <1445891676-3262-1-git-send-email-twarren@nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Perhaps it would be better to have something like the following (with
-> PAGE_SHIFT sorted out to be includable in a linker script), so any
-> ALIGN_DEBUG_RO* correctly aligns things to whatever boundary is
-> required, and we don't need to over-align things in the !DEBUG_RO_DATA
-> case.
+This patch adds the device tree binding doc for the Tegra
+QSPI controller on Tegra210.
 
-Ignore the bit about PAGE_SHIFT and linker script. I'd got confused as I
-had a local typo breaking the build.
+Signed-off-by: Tom Warren <twarren@nvidia.com>
+---
+Changes in v2:
+- based it more on kernel's nvidia,tegra114-spi.txt binding
+- changes based on prelim review by swarren at nvidia.com
+Changes in v3:
+- renamed to 'nvidia,tegra210-qspi.txt' to match kernel bindings
+- more changes based on review from swarren at nvidia.com
 
-With the below diff applied I can boot a defconfig +CONFIG_DEBUG_RODATA
-+CONFIG_ARM64_64K_PAGES v4.3-rc7 kernel on Juno
+ Documentation/devicetree/bindings/spi/nvidia,tegra210-qspi.txt | 42 ++++++++++++++++++++++++++++++
+ 1 file changed, 42 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/spi/nvidia,tegra210-qspi.txt
 
-Thanks,
-Mark.
-
-> ---->8----
-> diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
-> index 9807333..4d77757 100644
-> --- a/arch/arm64/kernel/vmlinux.lds.S
-> +++ b/arch/arm64/kernel/vmlinux.lds.S
-> @@ -60,9 +60,12 @@ PECOFF_FILE_ALIGNMENT = 0x200;
->  #define PECOFF_EDATA_PADDING
->  #endif
->  
-> -#ifdef CONFIG_DEBUG_ALIGN_RODATA
-> +#if defined(CONFIG_DEBUG_ALIGN_RODATA)
->  #define ALIGN_DEBUG_RO                 . = ALIGN(1<<SECTION_SHIFT);
->  #define ALIGN_DEBUG_RO_MIN(min)                ALIGN_DEBUG_RO
-> +#elif defined(CONFIG_DEBUG_RODATA)
-> +#define ALIGN_DEBUG_RO                 . = ALIGN(1<<PAGE_SHIFT);
-> +#define ALIGN_DEBUG_RO_MIN(min)                ALIGN_DEBUG_RO
->  #else
->  #define ALIGN_DEBUG_RO
->  #define ALIGN_DEBUG_RO_MIN(min)                . = ALIGN(min);
+diff --git a/Documentation/devicetree/bindings/spi/nvidia,tegra210-qspi.txt b/Documentation/devicetree/bindings/spi/nvidia,tegra210-qspi.txt
+new file mode 100644
+index 0000000..fe1558f
+--- /dev/null
++++ b/Documentation/devicetree/bindings/spi/nvidia,tegra210-qspi.txt
+@@ -0,0 +1,42 @@
++NVIDIA Tegra QSPI controller.
++
++Required properties:
++- compatible : for Tegra210, must contain "nvidia,tegra210-qspi".
++- reg: Should contain QSPI registers location and length.
++- interrupts: Should contain QSPI interrupt.
++- clock-names : Must include the following entries:
++  - qspi
++- resets : Must contain an entry for each entry in reset-names.
++  See ../reset/reset.txt for details.
++- reset-names : Must include the following entries:
++  - qspi
++- clocks : Must contain an entry for each entry in clock-names.
++  See ../clocks/clock-bindings.txt for details.
++
++Optional properties:
++- dmas : Must contain an entry for each entry in clock-names.
++  See ../dma/dma.txt for details.
++- dma-names : Must include the following entries:
++  - rx
++  - tx
++
++Recommended properties:
++- spi-max-frequency: Definition as per spi-bus.txt
++
++Example:
++
++spi at 70410000 {
++	compatible = "nvidia,tegra210-qspi";
++	reg = <0x0 0x70410000 0x0 0x1000>;
++	interrupts = <0 10 0x04>;
++	spi-max-frequency = <24000000>;
++	#address-cells = <1>;
++	#size-cells = <0>;
++	clocks = <&tegra_car 211>;
++	clock-names = "qspi";
++	resets = <&tegra_car 211>;
++	reset-names = "qspi";
++	dmas = <&apbdma 16>, <&apbdma 16>;
++	dma-names = "rx", "tx";
++	status = "disabled";
++};
+-- 
+1.8.2.1.610.g562af5b
