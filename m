@@ -1,56 +1,45 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 26 Oct 2015 09:05:37 +0100
-Subject: v7-M: Fixing XIP when the kernel is in ROM
-In-Reply-To: <20151026012710.GA17365@laptop>
-References: <20151026012710.GA17365@laptop>
-Message-ID: <20151026080537.GW4931@pengutronix.de>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Mon, 26 Oct 2015 17:06:20 +0900
+Subject: [PATCH v5 4/5] ARM: dts: mt8135: enable basic SMP bringup for
+ mt8135
+In-Reply-To: <1445843717.23888.1.camel@mtksdaap41>
+References: <1443799181-50409-1-git-send-email-yingjoe.chen@mediatek.com>
+ <1443799181-50409-5-git-send-email-yingjoe.chen@mediatek.com>
+ <CAMAWPa-Ed2FJY2pW67EHHKBH3_eBZx0+oWfMJwc_DhEjrf7aMg@mail.gmail.com>
+ <1445843717.23888.1.camel@mtksdaap41>
+Message-ID: <CAMAWPa_Gyq7H0qUJ32PAJh_ELdHeKWMPyHud4gaT8=Ootcu1+g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Mon, Oct 26, 2015 at 4:15 PM, Yingjoe Chen <yingjoe.chen@mediatek.com> wrote:
+> On Mon, 2015-10-26 at 09:56 +0900, Kevin Hilman wrote:
+>> Hello,
+>>
+>> On Sat, Oct 3, 2015 at 12:19 AM, Yingjoe Chen <yingjoe.chen@mediatek.com> wrote:
+>> > Add arch timer node to enable arch-timer support. MT8135 firmware
+>> > doesn't correctly setup arch-timer frequency and CNTVOFF, add
+>> > properties to workaround this.
+>> >
+>> > This also set cpu enable-method to enable SMP.
+>> >
+>> > Signed-off-by: Yingjoe Chen <yingjoe.chen@mediatek.com>
+>>
+>> kernelci.org started detecting new boot failures for the mt8135-evb in
+>> the arm-soc tree[1], and the boot failures were bisected down to this
+>> patch, which landed upstream in the form of commit d186a394bb98 (ARM:
+>> dts: mt8135: enable basic SMP bringup for mt8135)
+>>
+>> Maybe this new SMP support requires updating the firmware on the board
+>> as well?  If so, the changelog should've been a bit more explicit
+>> about firmware dependencies.
+>
+> Kevin,
+>
+> Thanks for testing.
+>
+> No, it doesn't need new firmware. Will test to see what's going wrong.
 
-On Sun, Oct 25, 2015 at 10:27:10PM -0300, Ezequiel Garcia wrote:
-> I've been trying to make my ARM v7-M LPC43xx board
-> boot a XIP kernel from flash. Currently, this seems
+Thanks for following up.  I'll be glad to test any patches if you have
+anything you'd like me to test.
 
-I admit I didn't update my efm32 machine for quite some time, but this
-can only boot with XIP.
-
-> to be broken in mainline due to this:
-> 
-> arch/arm/mm/proc-v7m.S
-> [..]
->         @ SVC to run the kernel in this mode
->         badr    r1, 1f
->         ldr     r5, [r12, #11 * 4]      @ read the SVC vector entry
->         str     r1, [r12, #11 * 4]      @ write the temporary SVC vector entry
->         mov     r6, lr                  @ save LR
->         mov     r7, sp                  @ save SP
-> 	ldr     sp, =__v7m_setup_stack_top @ <<< Breaks XIP!
-If you make the tab above 8 spaces the line will align in the git
-commit, too.
-Hmm, this line is there from the beginning (i.e. 55bdd6941165 ("ARM: Add
-base support for ARMv7-M")).
-
->         cpsie   i
->         svc     #0
-> 1:      cpsid   i
->         str     r5, [r12, #11 * 4]      @ restore the original SVC vector entry
->         mov     lr, r6                  @ restore LR
->         mov     sp, r7                  @ restore SP
-> 
-> Here, a temporary stack is prepared before making a
-> supervisor call (SVC) to switch to handler mode.
-> 
-> The temporary stack is allocated in the .text.init section
-> and so this doesn't work when the kernel is executing from ROM.
-
-If sp isn't used, how does it break you setup? Did you try to put a
-watchpoint to the location in question?
-
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Kevin
