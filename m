@@ -1,54 +1,93 @@
-From: laura@labbott.name (Laura Abbott)
-Date: Mon, 26 Oct 2015 14:09:58 -0700
-Subject: [PATCH v2] arm64: Align .text section to PAGE_SIZE
-In-Reply-To: <20151026202608.GJ12277@leverpostej>
-References: <1445882989-10618-1-git-send-email-jeremy.linton@arm.com>
- <20151026201611.GI12277@leverpostej> <20151026202608.GJ12277@leverpostej>
-Message-ID: <562E96A6.9090602@labbott.name>
+From: matt@codeblueprint.co.uk (Matt Fleming)
+Date: Mon, 26 Oct 2015 21:11:33 +0000
+Subject: [PATCH] arm64/efi: move arm64 specific stub C code to libstub
+In-Reply-To: <1445611694-31838-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1445611694-31838-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20151026211133.GB3526@codeblueprint.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/26/15 1:26 PM, Mark Rutland wrote:
->> Perhaps it would be better to have something like the following (with
->> PAGE_SHIFT sorted out to be includable in a linker script), so any
->> ALIGN_DEBUG_RO* correctly aligns things to whatever boundary is
->> required, and we don't need to over-align things in the !DEBUG_RO_DATA
->> case.
->
-> Ignore the bit about PAGE_SHIFT and linker script. I'd got confused as I
-> had a local typo breaking the build.
->
-> With the below diff applied I can boot a defconfig +CONFIG_DEBUG_RODATA
-> +CONFIG_ARM64_64K_PAGES v4.3-rc7 kernel on Juno
->
+On Fri, 23 Oct, at 04:48:14PM, Ard Biesheuvel wrote:
+> Now that we added special handling to the C files in libstub, move
+> the one remaining arm64 specific EFI stub C file to libstub as
+> well, so that it gets the same treatment. This should prevent future
+> changes from resulting in binaries that may execute incorrectly in
+> UEFI context.
+ 
+Sorry, I'm coming at this cache-cold: What special handling was added
+to libstub that you want to make use of here?
 
-Most of the alignment was found by trial and error so I suspect it was
-just getting lucky before. I think this should be covering all the
-cases. Hopefully the protections will make it more restrictive instead
-of less to catch any more corner cases. For whoever ends up submitting
-the patch,
+> With efi-entry.S the only remaining EFI stub source file under
+> arch/arm64, we can also simplify the Makefile logic somewhat.
+> 
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+> 
+> I would like to suggest that this be taken on top of the stuff that is
+> queued for 4.4 at the moment (if it is not too late already).
+ 
+That's upto the tip folks (Cc'd). Ingo, would you consider applying
+a minimal build cleanup patch like this for v4.4?
 
-Reviewed-by: Laura Abbott <laura@labbott.name>
-
-> Thanks,
-> Mark.
->
->> ---->8----
->> diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
->> index 9807333..4d77757 100644
->> --- a/arch/arm64/kernel/vmlinux.lds.S
->> +++ b/arch/arm64/kernel/vmlinux.lds.S
->> @@ -60,9 +60,12 @@ PECOFF_FILE_ALIGNMENT = 0x200;
->>   #define PECOFF_EDATA_PADDING
->>   #endif
->>
->> -#ifdef CONFIG_DEBUG_ALIGN_RODATA
->> +#if defined(CONFIG_DEBUG_ALIGN_RODATA)
->>   #define ALIGN_DEBUG_RO                 . = ALIGN(1<<SECTION_SHIFT);
->>   #define ALIGN_DEBUG_RO_MIN(min)                ALIGN_DEBUG_RO
->> +#elif defined(CONFIG_DEBUG_RODATA)
->> +#define ALIGN_DEBUG_RO                 . = ALIGN(1<<PAGE_SHIFT);
->> +#define ALIGN_DEBUG_RO_MIN(min)                ALIGN_DEBUG_RO
->>   #else
->>   #define ALIGN_DEBUG_RO
->>   #define ALIGN_DEBUG_RO_MIN(min)                . = ALIGN(min);
+>  arch/arm64/kernel/Makefile                                                | 9 ++-------
+>  drivers/firmware/efi/libstub/Makefile                                     | 3 +++
+>  arch/arm64/kernel/efi-stub.c => drivers/firmware/efi/libstub/arm64-stub.c | 0
+>  3 files changed, 5 insertions(+), 7 deletions(-)
+> 
+> diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
+> index 1b6bda2ff102..474691f8b13a 100644
+> --- a/arch/arm64/kernel/Makefile
+> +++ b/arch/arm64/kernel/Makefile
+> @@ -4,11 +4,8 @@
+>  
+>  CPPFLAGS_vmlinux.lds	:= -DTEXT_OFFSET=$(TEXT_OFFSET)
+>  AFLAGS_head.o		:= -DTEXT_OFFSET=$(TEXT_OFFSET)
+> -CFLAGS_efi-stub.o 	:= -DTEXT_OFFSET=$(TEXT_OFFSET)
+>  CFLAGS_armv8_deprecated.o := -I$(src)
+>  
+> -KASAN_SANITIZE_efi-stub.o	:= n
+> -
+>  CFLAGS_REMOVE_ftrace.o = -pg
+>  CFLAGS_REMOVE_insn.o = -pg
+>  CFLAGS_REMOVE_return_address.o = -pg
+> @@ -22,9 +19,7 @@ arm64-obj-y		:= debug-monitors.o entry.o irq.o fpsimd.o		\
+>  			   cpufeature.o alternative.o cacheinfo.o		\
+>  			   smp.o smp_spin_table.o topology.o
+>  
+> -stub-obj				:= efi-stub.o efi-entry.o
+> -extra-y					:= $(stub-obj)
+> -stub-obj				:= $(patsubst %.o,%.stub.o,$(stub-obj))
+> +extra-$(CONFIG_EFI)			:= efi-entry.o
+>  
+>  OBJCOPYFLAGS := --prefix-symbols=__efistub_
+>  $(obj)/%.stub.o: $(obj)/%.o FORCE
+> @@ -42,7 +37,7 @@ arm64-obj-$(CONFIG_CPU_PM)		+= sleep.o suspend.o
+>  arm64-obj-$(CONFIG_CPU_IDLE)		+= cpuidle.o
+>  arm64-obj-$(CONFIG_JUMP_LABEL)		+= jump_label.o
+>  arm64-obj-$(CONFIG_KGDB)		+= kgdb.o
+> -arm64-obj-$(CONFIG_EFI)			+= efi.o $(stub-obj)
+> +arm64-obj-$(CONFIG_EFI)			+= efi.o efi-entry.stub.o
+>  arm64-obj-$(CONFIG_PCI)			+= pci.o
+>  arm64-obj-$(CONFIG_ARMV8_DEPRECATED)	+= armv8_deprecated.o
+>  arm64-obj-$(CONFIG_ACPI)		+= acpi.o
+> diff --git a/drivers/firmware/efi/libstub/Makefile b/drivers/firmware/efi/libstub/Makefile
+> index bca9a76cbd33..92ae557abbbc 100644
+> --- a/drivers/firmware/efi/libstub/Makefile
+> +++ b/drivers/firmware/efi/libstub/Makefile
+> @@ -34,6 +34,9 @@ $(obj)/lib-%.o: $(srctree)/lib/%.c FORCE
+>  lib-$(CONFIG_EFI_ARMSTUB)	+= arm-stub.o fdt.o string.o \
+>  				   $(patsubst %.c,lib-%.o,$(arm-deps))
+>  
+> +lib-$(CONFIG_ARM64)		+= arm64-stub.o
+> +CFLAGS_arm64-stub.o 		:= -DTEXT_OFFSET=$(TEXT_OFFSET)
+> +
+>  #
+>  # arm64 puts the stub in the kernel proper, which will unnecessarily retain all
+>  # code indefinitely unless it is annotated as __init/__initdata/__initconst etc.
+> diff --git a/arch/arm64/kernel/efi-stub.c b/drivers/firmware/efi/libstub/arm64-stub.c
+> similarity index 100%
+> rename from arch/arm64/kernel/efi-stub.c
+> rename to drivers/firmware/efi/libstub/arm64-stub.c
+> -- 
+> 2.1.4
+> 
