@@ -1,40 +1,43 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Mon, 26 Oct 2015 09:27:11 +0100
-Subject: [PATCH 3/5] irqchip: armada-370-xp: re-enable per-CPU
- interrupts at resume time
-In-Reply-To: <CAPv3WKcrWqJ5Cw_kwO+JWk3iH0aprTexHTqzy-dSFmNHj4xJcg@mail.gmail.com>
-References: <1445347435-2333-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1445347435-2333-4-git-send-email-thomas.petazzoni@free-electrons.com>
- <CAPv3WKdZeCo-0xFC6EJcCeVQd7ef+SQz=MocR1nE5YdZAx3AJQ@mail.gmail.com>
- <20151026011036.2cb5b7a8@free-electrons.com>
- <CAPv3WKc8bzCadNN=SRxQuJBxMiHTVKnmqaSkTehu=j6V4nF6Gg@mail.gmail.com>
- <20151026060925.32ff2034@free-electrons.com>
- <CAPv3WKcrWqJ5Cw_kwO+JWk3iH0aprTexHTqzy-dSFmNHj4xJcg@mail.gmail.com>
-Message-ID: <20151026092711.04193834@free-electrons.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Mon, 26 Oct 2015 17:27:22 +0900
+Subject: [PATCH v2 0/2] i2c: uniphier: add two I2C controller drivers for
+ UniPhier SoC platform
+In-Reply-To: <20151026081746.GC597@x1>
+References: <1445597520-6299-1-git-send-email-yamada.masahiro@socionext.com>
+ <20151026081746.GC597@x1>
+Message-ID: <CAK7LNATVmVi=4ugv0MgoCUzusphNeAXTC_K-PsXDiTLoCkV4-Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Marcin Wojtas,
+Hi Lee,
 
-On Mon, 26 Oct 2015 08:06:18 +0100, Marcin Wojtas wrote:
 
-> > Good :-) Hopefully the explanation in PATCH 5/5 is also clear enough.
-> 
-> The Ascii-art is beutiful, indeed:)
+2015-10-26 17:17 GMT+09:00 Lee Jones <lee.jones@linaro.org>:
+>> This series adds two I2C controller drivers.
+>> (they are completely different IPs.)
+>>
+>> The first one is a very simple FIFO-less I2C controller,
+>> which is used on some older UniPhier SoCs.
+>>
+>> The other one is higher-performance I2C controller with TX/RX FIFO,
+>> used on newer UniPhier SoCs.
+>
+> And you have sent this to me because ... ?
 
-Glad to hear that my artistic skills are appreciated :)
 
-> Yes, you are right - without any pm_ops the driver works well after
-> suspend/resume in standby. However in the linux mem and standby is
-> treated exactly the same as pm sleep, so the same routines are
-> executed in both modes. Hence the s2ram support cannot spoil standby.
+No special reason.
 
-Absolutely. It would be nicer if we knew in the ->suspend() and
-->resume() hooks if we're doing a standby suspend, or a mem suspend,
-but IIRC, we don't have this information available.
 
-Thomas
+I sent this series to linux-i2c at vger.kernel.org.
+
+I guess you were automatically CC'ed by scripts/get_maintainer.pl.
+
+Using get_maintainer.pl is a normal process when sending patches, I think.
+
+
+
+
+
 -- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+Best Regards
+Masahiro Yamada
