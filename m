@@ -1,76 +1,85 @@
-From: ming.lei@canonical.com (Ming Lei)
-Date: Mon, 26 Oct 2015 15:20:34 +0800
-Subject: [PATCH v6 3/4] arm64/arm, numa, dt: adding numa dt binding
- implementation for arm64 platforms
-In-Reply-To: <CACVXFVPoZqjFeqK7=M7wK0JQ0iS9tYoN8BHsYMc25OL-4j=e1g@mail.gmail.com>
-References: <1445337931-11344-1-git-send-email-gkulkarni@caviumnetworks.com>
- <1445337931-11344-4-git-send-email-gkulkarni@caviumnetworks.com>
- <CACVXFVMiZs_g3qw99-PhxLiX5oLe8_z5cOAfJZ_4-09jN2koCQ@mail.gmail.com>
- <CAFpQJXX8VXX+gTBn-+7MepSAOzbOuc-yWJe4f=B7MH_Nj7FsKw@mail.gmail.com>
- <CACVXFVPoZqjFeqK7=M7wK0JQ0iS9tYoN8BHsYMc25OL-4j=e1g@mail.gmail.com>
-Message-ID: <CACVXFVO5QGu9z1C49Wos_A5MpPafABL+WDidiHp3S2v1xUsRZw@mail.gmail.com>
+From: bhupesh.sharma@freescale.com (Bhupesh Sharma)
+Date: Mon, 26 Oct 2015 13:01:21 +0530
+Subject: [PATCH 1/1] doc/bindings: Update Layerscape PCIe devicetree bindings
+ for LS2080A
+Message-ID: <1445844681-11488-1-git-send-email-bhupesh.sharma@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 26, 2015 at 12:53 PM, Ming Lei <ming.lei@canonical.com> wrote:
-> On Mon, Oct 26, 2015 at 11:50 AM, Ganapatrao Kulkarni
-> <gpkulkarni@gmail.com> wrote:
->> On Mon, Oct 26, 2015 at 7:14 AM, Ming Lei <ming.lei@canonical.com> wrote:
->>> On Tue, Oct 20, 2015 at 6:45 PM, Ganapatrao Kulkarni
->>> <gkulkarni@caviumnetworks.com> wrote:
->>>> Adding numa dt binding support for arm64 based platforms.
->>>> dt node parsing for numa topology is done using device property
->>>> proximity and device node distance-map.
->>>>
->>>> Reviewed-by: Robert Richter <rrichter@cavium.com>
->>>> Signed-off-by: Ganapatrao Kulkarni <gkulkarni@caviumnetworks.com>
->>>> ---
->>>>  arch/arm64/Kconfig            |  10 ++
->>>>  arch/arm64/include/asm/numa.h |  10 ++
->>>>  arch/arm64/kernel/Makefile    |   1 +
->>>>  arch/arm64/kernel/of_numa.c   | 221 ++++++++++++++++++++++++++++++++++++++++++
->>>>  arch/arm64/kernel/smp.c       |   1 +
->>>>  arch/arm64/mm/numa.c          |  10 +-
->>>>  6 files changed, 252 insertions(+), 1 deletion(-)
->>>>  create mode 100644 arch/arm64/kernel/of_numa.c
->>>>
->>>> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
->>>> index 0f9cdc7..6cf8d20 100644
->>>> --- a/arch/arm64/Kconfig
->>>> +++ b/arch/arm64/Kconfig
->>>> @@ -426,6 +426,16 @@ config NUMA
->>>>           local memory controller of the CPU and add some more
->>>>           NUMA awareness to the kernel.
->>>>
->>>> +config OF_NUMA
->>>> +       bool "Device Tree NUMA support"
->>>> +       depends on NUMA
->>>> +       depends on OF
->>>> +       default y
->>>> +       help
->>>> +         Enable Device Tree NUMA support.
->>>> +         This enables the numa mapping of cpu, memory, io and
->>>> +         inter node distances using dt bindings.
->>>
->>> Enabling the above config option can cause numa_init() warning in
->>> numa-less arm64 system, please see the following report:
->> this is taken care. which version are you using?
->
-> V5.
+Update the definition of the Layerscape PCI compatible string to add
+support for LS2080A, as the controller on LS2080A is different from
+LS1021A SoC.
 
-The issue persists on V6 too, so looks V7 is needed.
+While at it, move the clock related properties in the Designware PCIe
+controller bindings to 'optional' set of properties.
 
->
->>
->>>
->>>           https://bugs.launchpad.net/bugs/1509221
->>>
->>> Thanks,
->>
->> Thanks
->> Ganapat
->>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Signed-off-by: Minghuan Lian <Minghuan.Lian@freescale.com>
+Signed-off-by: Bhupesh Sharma <bhupesh.sharma@freescale.com>
+Acked-by: Arnd Bergmann <arnd@arndb.de>
+---
+Hi Bjorn,
+
+As discussed with Arnd (http://www.spinics.net/lists/linux-clk/msg04092.html),
+this patch depends on a patch that is in your PCI tree but not yet in mainline.
+
+So, sending this to you, so that you can apply the patch on top of the other
+one.
+
+ .../devicetree/bindings/pci/designware-pcie.txt    |   10 +++++-----
+ .../devicetree/bindings/pci/layerscape-pci.txt     |   14 ++++++++++++--
+ 2 files changed, 17 insertions(+), 7 deletions(-)
+
+diff --git a/Documentation/devicetree/bindings/pci/designware-pcie.txt b/Documentation/devicetree/bindings/pci/designware-pcie.txt
+index 0036ab3..576218a 100644
+--- a/Documentation/devicetree/bindings/pci/designware-pcie.txt
++++ b/Documentation/devicetree/bindings/pci/designware-pcie.txt
+@@ -14,11 +14,6 @@ Required properties:
+ - interrupt-map-mask and interrupt-map: standard PCI properties
+ 	to define the mapping of the PCIe interface to interrupt
+ 	numbers.
+-- clocks: Must contain an entry for each entry in clock-names.
+-	See ../clocks/clock-bindings.txt for details.
+-- clock-names: Must include the following entries:
+-	- "pcie"
+-	- "pcie_bus"
+ 
+ Optional properties:
+ - num-lanes: number of lanes to use (this property should be specified unless
+@@ -27,3 +22,8 @@ Optional properties:
+ - bus-range: PCI bus numbers covered (it is recommended for new devicetrees to
+   specify this property, to keep backwards compatibility a range of 0x00-0xff
+   is assumed if not present)
++- clocks: Must contain an entry for each entry in clock-names.
++	See ../clocks/clock-bindings.txt for details.
++- clock-names: Must include the following entries:
++	- "pcie"
++	- "pcie_bus"
+diff --git a/Documentation/devicetree/bindings/pci/layerscape-pci.txt b/Documentation/devicetree/bindings/pci/layerscape-pci.txt
+index 6286f04..ac7e07e 100644
+--- a/Documentation/devicetree/bindings/pci/layerscape-pci.txt
++++ b/Documentation/devicetree/bindings/pci/layerscape-pci.txt
+@@ -1,10 +1,20 @@
+ Freescale Layerscape PCIe controller
+ 
+-This PCIe host controller is based on the Synopsis Designware PCIe IP
++This PCIe host controller is based on the Synopsys Designware PCIe IP
+ and thus inherits all the common properties defined in designware-pcie.txt.
+ 
++This controller derives its clocks from the Reset Configuration Word (RCW)
++which is used to describe the PLL settings at the time of chip-reset.
++
++Also as per the available Reference Manuals, there is no specific 'version'
++register available in the Freescale PCIe controller register set,
++which can allow determining the underlying Designware PCIe controller version
++information.
++
+ Required properties:
+-- compatible: should contain the platform identifier such as "fsl,ls1021a-pcie"
++- compatible: should contain the platform identifier such as:
++        "fsl,ls1021a-pcie", "snps,dw-pcie"
++        "fsl,ls2080a-pcie", "snps,dw-pcie"
+ - reg: base addresses and lengths of the PCIe controller
+ - interrupts: A list of interrupt outputs of the controller. Must contain an
+   entry for each entry in the interrupt-names property.
+-- 
+1.7.9.5
