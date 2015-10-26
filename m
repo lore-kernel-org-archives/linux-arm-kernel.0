@@ -1,78 +1,27 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 26 Oct 2015 12:02:52 +0100
-Subject: Possible Regression due to c074fef5d36e ("of/platform: Defer
- probes of registered devices").
-In-Reply-To: <20151026104149.GB8644@n2100.arm.linux.org.uk>
-References: <20151026032039.GA1950@verge.net.au>
- <20151026094027.GA25225@gradator.net>
- <CAMuHMdWmw8TqyOOMSPkh_1V+9OJeqPts1t3528ZQrJjzE6tmRA@mail.gmail.com>
- <20151026104149.GB8644@n2100.arm.linux.org.uk>
-Message-ID: <CAMuHMdUriYkDazewJH1LhG3=pFMQxqOo0gz6MYDpVkM+2=1MPQ@mail.gmail.com>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Mon, 26 Oct 2015 19:02:11 +0800
+Subject: [RFC PATCH 0/3] PCI: generate proper configuration access cycles
+Message-ID: <1445857334-6936-1-git-send-email-jszhang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+Inspired by Russell King's patch[1], I found some pci hosts also have the
+same issue of "reading 32-bits from the command register, modifying the
+command register, and then writing it back has the effect of clearing
+any status bits that were indicating at that time" as pointed out by
+Russell. Fix them by using the pci_generic_config_write.
 
-On Mon, Oct 26, 2015 at 11:41 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Mon, Oct 26, 2015 at 10:56:03AM +0100, Geert Uytterhoeven wrote:
->> On Mon, Oct 26, 2015 at 10:40 AM, Sylvain Rochet
->> <sylvain.rochet@finsecur.com> wrote:
->> > On Mon, Oct 26, 2015 at 12:20:39PM +0900, Simon Horman wrote:
->> >> I have observed a possible regression in next-20151022
->> >> due to c074fef5d36e ("of/platform: Defer probes of registered devices").
->> >>
->> >> The problem manifests on the r8a7791 based koelsch board.
->> >> With the above patch present booting the board using the shmobile_defconfig
->> >> results in no console output. While after reverting the above patch
->> >> the boot proceeds all the way to user-space.
->> >>
->> >> With DEBUG_LL and EARLY_PRINTK enabled I was able to capture some console
->> >> output. I have included both that boot log, and a log of boot all the way to
->> >> userspace with the patch in question reverted.
->> >>
->> >> The problem does not seem to manifiest on other boards for other
->> >> Renesas ARM  SoCs that I have access too. In particular the
->> >> r8a7790 based lager board; the r8a7790 and r8a7791 are both members
->> >> of the R-Car Gen2 family of SoCs.
->> >
->> > Atmel SoC hit this regresssion too, discussion about this issue is in
->> > the following thread:
->> >  https://lkml.org/lkml/2015/10/16/733
->>
->> More reading material in "[GIT PULL] On-demand device probing"
->> (https://lkml.org/lkml/2015/10/14/126)
->
-> It's quite obvious from the thread that the on-demand device probing is
-> *not* going to be merged for 4.4, and so it should not be in linux-next
-> at all.  Having it in linux-next, it's disrupting people's testing of
-> the 4.4 merge window material.
->
-> Tomeu, please remove it so people can continue to test material
-> sheduled for the 4.4 merge window.  Thanks.
+Another problem is do we need to use proper readb/readw for config read?
 
-Unfortunately we'll be stuck with next-20151022 for a while, due to KS...
+Jisheng Zhang (3):
+  PCI: iproc: generate proper configuration access cycles
+  PCI: tegra: generate proper configuration access cycles
+  PCI: xgene: generate proper configuration access cycles
 
-So you're only option is manually reverting
-commit 138d8b73e6a32aeacd3417106fbf740865da309e
-Merge: 0f1cba62520b6119 c074fef5d36e1c27
-Author: Rob Herring <robh@kernel.org>
-Date:   Thu Oct 15 08:26:41 2015 -0500
+ drivers/pci/host/pci-tegra.c  | 2 +-
+ drivers/pci/host/pci-xgene.c  | 2 +-
+ drivers/pci/host/pcie-iproc.c | 2 +-
+ 3 files changed, 3 insertions(+), 3 deletions(-)
 
-    Merge branch 'on-demand-probes-for-next' of git://git.collabora.com/git/user
-
-    Pull on-demand probing series from Tomeu Vizoso.
-
-"git revert 138d8b73e6a32aeacd3417106fbf740865da309e -m 2" and fix
-the (many) conflicts :-(
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+-- 
+2.6.2
