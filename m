@@ -1,89 +1,51 @@
-From: wangzhou1@hisilicon.com (Zhou Wang)
-Date: Mon, 26 Oct 2015 15:27:14 +0800
-Subject: [PATCH v11 1/6] PCI: designware: move calculation of bus addresses
- to DRA7xx
-In-Reply-To: <20151022163534.GB21237@localhost>
-References: <1444991021-109306-1-git-send-email-wangzhou1@hisilicon.com>
- <1444991021-109306-2-git-send-email-wangzhou1@hisilicon.com>
- <20151021221524.GM1583@localhost>
- <EE11001F9E5DDD47B7634E2F8A612F2E16274DCC@lhreml503-mbs>
- <20151022163534.GB21237@localhost>
-Message-ID: <562DD5D2.9000705@hisilicon.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 26 Oct 2015 08:38:35 +0100
+Subject: [PATCH 3/4] cpufreq: imx6q: Fix regulator/clock error handling
+In-Reply-To: <20151022133315.GE3897@ubuntu>
+References: <1445503652-777-1-git-send-email-s.hauer@pengutronix.de>
+ <1445503652-777-4-git-send-email-s.hauer@pengutronix.de>
+ <20151022133315.GE3897@ubuntu>
+Message-ID: <20151026073835.GW14476@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015/10/23 0:35, Bjorn Helgaas wrote:
-> Hi Gabriele,
+On Thu, Oct 22, 2015 at 07:03:15PM +0530, Viresh Kumar wrote:
+> On 22-10-15, 10:47, Sascha Hauer wrote:
+> > +	arm_reg = regulator_get(cpu_dev, "arm");
+> > +	if (IS_ERR(arm_reg))
+> > +		return PTR_ERR(arm_reg);
+> > +
+> > +	pu_reg = regulator_get_optional(cpu_dev, "pu");
 > 
-> On Thu, Oct 22, 2015 at 07:21:41AM +0000, Gabriele Paoloni wrote:
->>> -----Original Message-----
->>> From: Bjorn Helgaas [mailto:helgaas at kernel.org]
-> 
->>>>  #define	PCIECTRL_DRA7XX_CONF_PHY_CS			0x010C
->>>>  #define	LINK_UP						BIT(16)
->>>> +#define	CPU_TO_BUS_ADDR					0x0FFFFFFF
->>>
->>> "CPU_TO_BUS_ADDR" is a very generic name.  Since you do have DRA7XX in
->>> other #defines and static symbols in this file, maybe it could be DRA7XX to
->>> make it obvious that it only applies here?
->>
->> Ok will change to DRA7XX_CPU_TO_BUS_ADRR in v12
->> ..
-> 
->>>> +	if (pp->io_mod_base)
->>>> +		pp->io_mod_base &= CPU_TO_BUS_ADDR;
->>>
->>> These are equivalent to
->>>
->>>   pp->io_mod_base &= CPU_TO_BUS_ADDR;
->>>
->>> (You don't need to test whether they're zero first.)
->>
->> Yes agreed, will change in v12
->> ...
-> 
->>>>  	cfg_res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "config");
->>>> @@ -415,8 +411,7 @@ int dw_pcie_host_init(struct pcie_port *pp)
->>>>  			pp->io_base = range.cpu_addr;
->>>>
->>>>  			/* Find the untranslated IO space address */
->>>> -			pp->io_mod_base = of_read_number(parser.range -
->>>> -							 parser.np + na, ns);
->>>> +			pp->io_mod_base = range.cpu_addr;
->>>
->>> So apparently
->>>
->>>   "of_read_number() == range.cpu_addr & CPU_TO_BUS_ADDR" on DRA7xx
->>>   "of_read_number() == range.cpu_addr" everywhere else?
->>
->> Yes correct
->>
->>> Is that right?  Is that a valid assumption, i.e., are we assuming
->>> anything about DTs in the field that we shouldn't?
->>
->> Before I wrote a patch that was generic to accommodate intermediate level
->> of translation between PCI_addr -> BUS_addr -> CPU_addr
->>
->> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-July/360922.html
->>
->> After discussion we agreed to solve it with a bitmask rather than adding
->> a field to of_pci_range to make it generic.
->> The bitmask only applies to DRA7xx
-> 
-> I haven't gotten all the way through this series yet, but don't bother with
-> a v12 just for these minor changes.  I can easily fix them up when applying
-> it.
-> 
-> Bjorn
->
+> Yes, current code doesn't care about if this failed, but if that's the
+> intention please add a comment for it now.
 
-Hi Gabriele and Bjorn,
+This is fixed right in the next patch.
 
-Sorry for late, I am preparing v12 patchset and I will fix above problems together
-with other patches.
-
-Many thanks,
-Zhou
-
-> .
 > 
+> > +	soc_reg = regulator_get(cpu_dev, "soc");
+> > +	if (IS_ERR(soc_reg))
+> > +		return PTR_ERR(soc_reg);
+> > +
+> > +	return 0;
+> > +}
+> > +
+> > +
+> > +static void imx6q_cpufreq_put_resources(void)
+> > +{
+> > +	if (!IS_ERR_OR_NULL(arm_reg))
+> > +		regulator_put(arm_reg);
+> > +	arm_reg = NULL;
+> 
+> Can you please clarify (maybe again) why this is required to be set to
+> NULL again?
+
+Ok.
+
+Sascha
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
