@@ -1,368 +1,73 @@
-From: o.schinagl@ultimaker.com (Olliver Schinagl)
-Date: Mon, 26 Oct 2015 22:32:38 +0100
-Subject: [PATCH 07/10] pwm: gpio: Add a generic gpio based PWM driver
-In-Reply-To: <1445895161-2317-1-git-send-email-o.schinagl@ultimaker.com>
-References: <1445895161-2317-1-git-send-email-o.schinagl@ultimaker.com>
-Message-ID: <1445895161-2317-8-git-send-email-o.schinagl@ultimaker.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 26 Oct 2015 21:35:18 +0000
+Subject: [PATCH v2] arm64: Align .text section to PAGE_SIZE
+In-Reply-To: <562E96A6.9090602@labbott.name>
+References: <1445882989-10618-1-git-send-email-jeremy.linton@arm.com>
+ <20151026201611.GI12277@leverpostej>
+ <20151026202608.GJ12277@leverpostej>
+ <562E96A6.9090602@labbott.name>
+Message-ID: <20151026213518.GM12277@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Olliver Schinagl <oliver@schinagl.nl>
+On Mon, Oct 26, 2015 at 02:09:58PM -0700, Laura Abbott wrote:
+> On 10/26/15 1:26 PM, Mark Rutland wrote:
+> >>Perhaps it would be better to have something like the following (with
+> >>PAGE_SHIFT sorted out to be includable in a linker script), so any
+> >>ALIGN_DEBUG_RO* correctly aligns things to whatever boundary is
+> >>required, and we don't need to over-align things in the !DEBUG_RO_DATA
+> >>case.
+> >
+> >Ignore the bit about PAGE_SHIFT and linker script. I'd got confused as I
+> >had a local typo breaking the build.
+> >
+> >With the below diff applied I can boot a defconfig +CONFIG_DEBUG_RODATA
+> >+CONFIG_ARM64_64K_PAGES v4.3-rc7 kernel on Juno
+> >
+> 
+> Most of the alignment was found by trial and error so I suspect it was
+> just getting lucky before. I think this should be covering all the
+> cases. Hopefully the protections will make it more restrictive instead
+> of less to catch any more corner cases.
 
-This patch adds a bit-banging gpio PWM driver. It makes use of hrtimers,
-to allow nano-second resolution, though it obviously strongly depends on
-the switching speed of the gpio pins, hrtimer and system load.
+Hopefully!
 
-Each pwm node can have 1 or more "pwm-gpio" entries, which will be
-treated as pwm's as part of a pwm chip.
+On a somewhat related note, we should probably move .rodata away from
+.text; currently we give everything between _stext and _etext
+PAGE_KERNEL_EXEC permissions (i.e. !PXN), and .rodata has no reason to
+be executable.
 
-Signed-off-by: Olliver Schinagl <oliver@schinagl.nl>
----
- Documentation/devicetree/bindings/pwm/pwm-gpio.txt |  18 ++
- MAINTAINERS                                        |   5 +
- drivers/pwm/Kconfig                                |  15 ++
- drivers/pwm/Makefile                               |   1 +
- drivers/pwm/pwm-gpio.c                             | 253 +++++++++++++++++++++
- 5 files changed, 292 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/pwm/pwm-gpio.txt
- create mode 100644 drivers/pwm/pwm-gpio.c
+Doing so would also make it simpler to add .rodata to the mem_init
+notice, which I've been meaning to do for a while.
 
-diff --git a/Documentation/devicetree/bindings/pwm/pwm-gpio.txt b/Documentation/devicetree/bindings/pwm/pwm-gpio.txt
-new file mode 100644
-index 0000000..336f61f
---- /dev/null
-+++ b/Documentation/devicetree/bindings/pwm/pwm-gpio.txt
-@@ -0,0 +1,18 @@
-+Generic GPIO bit-banged PWM driver
-+
-+Required properties:
-+  - compatible: should be "pwm-gpio"
-+  - #pwm-cells: should be 3, see pwm.txt in this directory for a general
-+    description of the cells format.
-+  - pwm-gpios: one or more gpios describing the used gpio, see the gpio
-+    bindings for the used gpio driver.
-+
-+Example:
-+#include <dt-bindings/gpio/gpio.h>
-+
-+	pwm: pwm at 0 {
-+		compatible = "pwm-gpio";
-+		#pwm-cells = 3;
-+		pwm-gpios = <&pio 7 1 GPIO_ACTIVE_LOW>;
-+		pwm-gpios = <&pio 7 2 GPIO_ACTIVE_LOW>;
-+	};
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 7ba7ab7..0ae7fbf 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -4555,6 +4555,11 @@ F:	drivers/i2c/muxes/i2c-mux-gpio.c
- F:	include/linux/i2c-mux-gpio.h
- F:	Documentation/i2c/muxes/i2c-mux-gpio
- 
-+GENERIC GPIO PWM DRIVER
-+M:	Olliver Schinagl <oliver@schinagl.nl>
-+S:	Maintained
-+F:	drivers/pwm/pwm-gpio.c
-+
- GENERIC HDLC (WAN) DRIVERS
- M:	Krzysztof Halasa <khc@pm.waw.pl>
- W:	http://www.kernel.org/pub/linux/utils/net/hdlc/
-diff --git a/drivers/pwm/Kconfig b/drivers/pwm/Kconfig
-index 0cfaf6b..c0bc296 100644
---- a/drivers/pwm/Kconfig
-+++ b/drivers/pwm/Kconfig
-@@ -170,6 +170,21 @@ config PWM_IMG
- 	  To compile this driver as a module, choose M here: the module
- 	  will be called pwm-img
- 
-+config PWM_GPIO
-+	tristate "Generic GPIO bit-banged PWM driver"
-+	depends on OF
-+	depends on GPIOLIB
-+	help
-+	  Some platforms do not offer any hardware PWM capabilities but do have
-+	  General Purpose Input Output (GPIO) pins available. Using the kernels
-+	  High-Resolution Timer API this driver tries to toggle GPIO using the
-+	  generic kernel PWM framework. The maximum frequency and/or accuracy
-+	  is dependent on several factors such as system load and the maximum
-+	  speed a pin can be toggled at the hardware.
-+
-+	  To compile this driver as a module, choose M here: the module
-+	  will be called pwm-gpio.
-+
- config PWM_IMX
- 	tristate "i.MX PWM support"
- 	depends on ARCH_MXC
-diff --git a/drivers/pwm/Makefile b/drivers/pwm/Makefile
-index 69b8275..96aa9aa 100644
---- a/drivers/pwm/Makefile
-+++ b/drivers/pwm/Makefile
-@@ -13,6 +13,7 @@ obj-$(CONFIG_PWM_CLPS711X)	+= pwm-clps711x.o
- obj-$(CONFIG_PWM_CRC)		+= pwm-crc.o
- obj-$(CONFIG_PWM_EP93XX)	+= pwm-ep93xx.o
- obj-$(CONFIG_PWM_FSL_FTM)	+= pwm-fsl-ftm.o
-+obj-$(CONFIG_PWM_GPIO)		+= pwm-gpio.o
- obj-$(CONFIG_PWM_IMG)		+= pwm-img.o
- obj-$(CONFIG_PWM_IMX)		+= pwm-imx.o
- obj-$(CONFIG_PWM_JZ4740)	+= pwm-jz4740.o
-diff --git a/drivers/pwm/pwm-gpio.c b/drivers/pwm/pwm-gpio.c
-new file mode 100644
-index 0000000..8b588fb
---- /dev/null
-+++ b/drivers/pwm/pwm-gpio.c
-@@ -0,0 +1,253 @@
-+/*
-+ * Copyright (c) 2015 Olliver Schinagl <oliver@schinagl.nl>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * This driver adds a high-resolution timer based PWM driver. Since this is a
-+ * bit-banged driver, accuracy will always depend on a lot of factors, such as
-+ * GPIO toggle speed and system load.
-+ */
-+
-+#include <linux/mod_devicetable.h>
-+#include <linux/module.h>
-+#include <linux/gpio/consumer.h>
-+#include <linux/of.h>
-+#include <linux/of_gpio.h>
-+#include <linux/property.h>
-+#include <linux/pwm.h>
-+#include <linux/errno.h>
-+#include <linux/err.h>
-+#include <linux/device.h>
-+#include <linux/hrtimer.h>
-+#include <linux/ktime.h>
-+#include <linux/kernel.h>
-+#include <linux/platform_device.h>
-+
-+#define DRV_NAME "pwm-gpio"
-+
-+struct gpio_pwm_data {
-+	struct hrtimer timer;
-+	struct gpio_desc *gpiod;
-+	bool polarity;
-+	bool pin_on;
-+	int on_time;
-+	int off_time;
-+	bool run;
-+};
-+
-+struct gpio_pwm_chip {
-+	struct pwm_chip chip;
-+};
-+
-+static void gpio_pwm_off(struct gpio_pwm_data *gpio_data)
-+{
-+	gpiod_set_value_cansleep(gpio_data->gpiod, gpio_data->polarity ? 0 : 1);
-+}
-+
-+static void gpio_pwm_on(struct gpio_pwm_data *gpio_data)
-+{
-+	gpiod_set_value_cansleep(gpio_data->gpiod, gpio_data->polarity ? 1 : 0);
-+}
-+
-+enum hrtimer_restart gpio_pwm_timer(struct hrtimer *timer)
-+{
-+	struct gpio_pwm_data *gpio_data = container_of(timer,
-+						      struct gpio_pwm_data,
-+						      timer);
-+	if (!gpio_data->run) {
-+		gpio_pwm_off(gpio_data);
-+		gpio_data->pin_on = false;
-+		return HRTIMER_NORESTART;
-+	}
-+
-+	if (!gpio_data->pin_on) {
-+		hrtimer_forward_now(&gpio_data->timer,
-+				    ns_to_ktime(gpio_data->on_time));
-+		gpio_pwm_on(gpio_data);
-+		gpio_data->pin_on = true;
-+	} else {
-+		hrtimer_forward_now(&gpio_data->timer,
-+				    ns_to_ktime(gpio_data->off_time));
-+		gpio_pwm_off(gpio_data);
-+		gpio_data->pin_on = false;
-+	}
-+
-+	return HRTIMER_RESTART;
-+}
-+
-+static int gpio_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
-+			    int duty_ns, int period_ns)
-+{
-+	struct gpio_pwm_data *gpio_data = pwm_get_chip_data(pwm);
-+
-+	gpio_data->on_time = duty_ns;
-+	gpio_data->off_time = period_ns - duty_ns;
-+
-+	return 0;
-+}
-+
-+static int gpio_pwm_set_polarity(struct pwm_chip *chip, struct pwm_device *pwm,
-+				 enum pwm_polarity polarity)
-+{
-+	struct gpio_pwm_data *gpio_data = pwm_get_chip_data(pwm);
-+
-+	gpio_data->polarity = (polarity != PWM_POLARITY_NORMAL) ? true : false;
-+
-+	return 0;
-+}
-+
-+static int gpio_pwm_enable(struct pwm_chip *chip, struct pwm_device *pwm)
-+{
-+	struct gpio_pwm_data *gpio_data = pwm_get_chip_data(pwm);
-+
-+	if (gpio_data->run)
-+		return -EBUSY;
-+
-+	gpio_data->run = true;
-+	if (gpio_data->off_time) {
-+		hrtimer_start(&gpio_data->timer, ktime_set(0, 0),
-+			      HRTIMER_MODE_REL);
-+	} else {
-+		if (gpio_data->on_time)
-+			gpio_pwm_on(gpio_data);
-+		else
-+			gpio_pwm_off(gpio_data);
-+	}
-+
-+	return 0;
-+}
-+
-+static void gpio_pwm_disable(struct pwm_chip *chip, struct pwm_device *pwm)
-+{
-+	struct gpio_pwm_data *gpio_data = pwm_get_chip_data(pwm);
-+
-+	gpio_data->run = false;
-+	if (!gpio_data->off_time)
-+		gpio_pwm_off(gpio_data);
-+}
-+
-+static const struct pwm_ops gpio_pwm_ops = {
-+	.config = gpio_pwm_config,
-+	.set_polarity = gpio_pwm_set_polarity,
-+	.enable = gpio_pwm_enable,
-+	.disable = gpio_pwm_disable,
-+	.owner = THIS_MODULE,
-+};
-+
-+static int gpio_pwm_probe(struct platform_device *pdev)
-+{
-+	int ret;
-+	struct gpio_pwm_chip *gpio_chip;
-+	int npwm, i;
-+	int hrtimer = 0;
-+
-+	npwm = of_gpio_named_count(pdev->dev.of_node, "pwm-gpios");
-+	if (npwm < 1)
-+		return -ENODEV;
-+
-+	gpio_chip = devm_kzalloc(&pdev->dev, sizeof(*gpio_chip), GFP_KERNEL);
-+	if (!gpio_chip)
-+		return -ENOMEM;
-+
-+	gpio_chip->chip.dev = &pdev->dev;
-+	gpio_chip->chip.ops = &gpio_pwm_ops;
-+	gpio_chip->chip.base = -1;
-+	gpio_chip->chip.npwm = npwm;
-+	gpio_chip->chip.of_xlate = of_pwm_xlate_with_flags;
-+	gpio_chip->chip.of_pwm_n_cells = 3;
-+	gpio_chip->chip.can_sleep = true;
-+
-+	ret = pwmchip_add(&gpio_chip->chip);
-+	if (ret < 0) {
-+		dev_err(&pdev->dev, "failed to add PWM chip: %d\n", ret);
-+		return ret;
-+	}
-+
-+	for (i = 0; i < npwm; i++) {
-+		struct gpio_desc *gpiod;
-+		struct gpio_pwm_data *gpio_data;
-+
-+		gpiod = devm_gpiod_get_index(&pdev->dev, "pwm", i,
-+					     GPIOD_OUT_LOW);
-+		if (IS_ERR(gpiod)) {
-+			int error;
-+
-+			error = PTR_ERR(gpiod);
-+			if (error != -EPROBE_DEFER)
-+				dev_err(&pdev->dev,
-+					"failed to get gpio flags, error: %d\n",
-+					error);
-+			return error;
-+		}
-+
-+		gpio_data = devm_kzalloc(&pdev->dev, sizeof(*gpio_data),
-+					 GFP_KERNEL);
-+
-+		hrtimer_init(&gpio_data->timer,
-+			     CLOCK_MONOTONIC, HRTIMER_MODE_REL);
-+		gpio_data->timer.function = &gpio_pwm_timer;
-+		gpio_data->gpiod = gpiod;
-+		gpio_data->pin_on = false;
-+		gpio_data->run = false;
-+
-+		if (hrtimer_is_hres_active(&gpio_data->timer))
-+			hrtimer++;
-+
-+		pwm_set_chip_data(&gpio_chip->chip.pwms[i], gpio_data);
-+	}
-+	if (!hrtimer)
-+		dev_warn(&pdev->dev, "unable to use High-Resolution timer,");
-+		dev_warn(&pdev->dev, "%s is restricted to low resolution.",
-+			 DRV_NAME);
-+
-+	platform_set_drvdata(pdev, gpio_chip);
-+
-+	dev_info(&pdev->dev, "%d gpio pwms loaded\n", npwm);
-+
-+	return 0;
-+}
-+
-+static int gpio_pwm_remove(struct platform_device *pdev)
-+{
-+	struct gpio_pwm_chip *gpio_chip;
-+	int i;
-+
-+	gpio_chip = platform_get_drvdata(pdev);
-+	for (i = 0; i < gpio_chip->chip.npwm; i++) {
-+		struct gpio_pwm_data *gpio_data;
-+
-+		gpio_data = pwm_get_chip_data(&gpio_chip->chip.pwms[i]);
-+
-+		hrtimer_cancel(&gpio_data->timer);
-+	}
-+
-+	return pwmchip_remove(&gpio_chip->chip);
-+}
-+
-+static const struct of_device_id gpio_pwm_of_match[] = {
-+	{ .compatible = DRV_NAME, },
-+	{/* sentinel */},
-+};
-+MODULE_DEVICE_TABLE(of, gpio_pwm_of_match);
-+
-+static struct platform_driver gpio_pwm_driver = {
-+	.probe = gpio_pwm_probe,
-+	.remove = gpio_pwm_remove,
-+	.driver = {
-+		.name = DRV_NAME,
-+		.of_match_table = of_match_ptr(gpio_pwm_of_match),
-+	},
-+};
-+module_platform_driver(gpio_pwm_driver);
-+
-+MODULE_AUTHOR("Olliver Schinagl <oliver@schinagl.nl>");
-+MODULE_DESCRIPTION("Generic GPIO bit-banged PWM driver");
-+MODULE_LICENSE("GPL");
--- 
-2.6.1
+I can take a look at shuffling sections for that tomorrow.
+
+> For whoever ends up submitting the patch,
+> 
+> Reviewed-by: Laura Abbott <laura@labbott.name>
+
+Cheers; I'll spin this as a full patch momentarily.
+
+Thanks,
+Mark.
+
+> >>---->8----
+> >>diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
+> >>index 9807333..4d77757 100644
+> >>--- a/arch/arm64/kernel/vmlinux.lds.S
+> >>+++ b/arch/arm64/kernel/vmlinux.lds.S
+> >>@@ -60,9 +60,12 @@ PECOFF_FILE_ALIGNMENT = 0x200;
+> >>  #define PECOFF_EDATA_PADDING
+> >>  #endif
+> >>
+> >>-#ifdef CONFIG_DEBUG_ALIGN_RODATA
+> >>+#if defined(CONFIG_DEBUG_ALIGN_RODATA)
+> >>  #define ALIGN_DEBUG_RO                 . = ALIGN(1<<SECTION_SHIFT);
+> >>  #define ALIGN_DEBUG_RO_MIN(min)                ALIGN_DEBUG_RO
+> >>+#elif defined(CONFIG_DEBUG_RODATA)
+> >>+#define ALIGN_DEBUG_RO                 . = ALIGN(1<<PAGE_SHIFT);
+> >>+#define ALIGN_DEBUG_RO_MIN(min)                ALIGN_DEBUG_RO
+> >>  #else
+> >>  #define ALIGN_DEBUG_RO
+> >>  #define ALIGN_DEBUG_RO_MIN(min)                . = ALIGN(min);
+> 
