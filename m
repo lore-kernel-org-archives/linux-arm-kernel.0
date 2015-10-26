@@ -1,36 +1,40 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Mon, 26 Oct 2015 11:27:27 -0700
-Subject: [PATCH soc/next] ARM: bcm2835: add mutual inclusion protection
-In-Reply-To: <1445539565-24955-1-git-send-email-alex.aring@gmail.com>
-References: <1445539565-24955-1-git-send-email-alex.aring@gmail.com>
-Message-ID: <87vb9t4h9s.fsf@eliezer.anholt.net>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Mon, 26 Oct 2015 11:34:07 -0700
+Subject: [PATCH v4 2/5] mtd: nand: allow compile test of MTD_NAND_PXA3xx
+In-Reply-To: <1445416144-9194-3-git-send-email-antoine.tenart@free-electrons.com>
+References: <1445416144-9194-1-git-send-email-antoine.tenart@free-electrons.com>
+ <1445416144-9194-3-git-send-email-antoine.tenart@free-electrons.com>
+Message-ID: <20151026183407.GB13239@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Alexander Aring <alex.aring@gmail.com> writes:
-
-> This patch adds mutual inclusion protection for the rpi firmware header.
->
-> Cc: Eric Anholt <eric@anholt.net>
-> Cc: Stephen Warren <swarren@wwwdotorg.org>
-> Signed-off-by: Alexander Aring <alex.aring@gmail.com>
+On Wed, Oct 21, 2015 at 10:29:01AM +0200, Antoine Tenart wrote:
+> Allow compile test of the MTD_NAND_PXA3xx nand driver.
+> 
+> Signed-off-by: Antoine Tenart <antoine.tenart@free-electrons.com>
 > ---
-> This patch is for "soc/next" and depends on Eric Anholt's patch ("ARM: bcm2835:
-> Add the Raspberry Pi firmware driver"), see:
->
-> http://lists.infradead.org/pipermail/linux-rpi-kernel/2015-October/002434.html
->
-> I think the patch is already applied but not pushed, so please fixup use this
-> as fixup or simple apply this patch after the patch to add the firmware driver.
+>  drivers/mtd/nand/Kconfig | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/mtd/nand/Kconfig b/drivers/mtd/nand/Kconfig
+> index 289664089cf3..554aff7b2f8b 100644
+> --- a/drivers/mtd/nand/Kconfig
+> +++ b/drivers/mtd/nand/Kconfig
+> @@ -329,7 +329,7 @@ config MTD_NAND_ATMEL
+>  
+>  config MTD_NAND_PXA3xx
+>  	tristate "NAND support on PXA3xx and Armada 370/XP"
+> -	depends on PXA3xx || ARCH_MMP || PLAT_ORION
+> +	depends on PXA3xx || ARCH_MMP || PLAT_ORION || COMPILE_TEST
 
-Looks like Florian pulled this in to his pull request and it's in the
-arm-soc tree.
+You need at least a dependency on HAS_IOMEM. I'll drop this patch for
+now, as it's unrelated. Feel free to send another revision.
 
-Thanks!
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 818 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151026/6d78cd2f/attachment.sig>
+Brian
+
+>  	help
+>  	  This enables the driver for the NAND flash device found on
+>  	  PXA3xx processors (NFCv1) and also on Armada 370/XP (NFCv2).
+> -- 
+> 2.6.2
+> 
