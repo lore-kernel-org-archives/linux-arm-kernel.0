@@ -1,30 +1,36 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Mon, 26 Oct 2015 09:48:03 +0900
-Subject: [GIT PULL 4/4] ARM: tegra: Default configuration updates for
- v4.4-rc1
-In-Reply-To: <1445347058-8834-4-git-send-email-thierry.reding@gmail.com>
-References: <1445347058-8834-1-git-send-email-thierry.reding@gmail.com>
- <1445347058-8834-4-git-send-email-thierry.reding@gmail.com>
-Message-ID: <20151026004803.GE14238@localhost>
+Date: Mon, 26 Oct 2015 09:59:34 +0900
+Subject: [GIT PULL v2] ARM: mvebu: soc for v4.4 (#2)
+In-Reply-To: <877fmd383s.fsf@free-electrons.com>
+References: <877fmd383s.fsf@free-electrons.com>
+Message-ID: <20151026005934.GF14238@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 20, 2015 at 03:17:38PM +0200, Thierry Reding wrote:
-> Hi ARM SoC maintainers,
+On Fri, Oct 23, 2015 at 05:41:43PM +0200, Gregory CLEMENT wrote:
+> Hi,
 > 
-> The following changes since commit 6ff33f3902c3b1c5d0db6b1e2c70b6d76fba357f:
+> Here is the second tentative of the second pull request for soc for
+> mvebu for v4.4. :)
 > 
->   Linux 4.3-rc1 (2015-09-12 16:35:56 -0700)
+> The difference with the previous one was the "ARM:
+> mvebu: add broken-idle option" patch updated according Olof's remark.
+> 
+> Gregory
+> 
+> The following changes since commit d492cccac28493f26bb70038385a9ef4df19bdee:
+> 
+>   ARM: mvebu: add support to clear shared L2 bit on Armada XP (2015-09-29 15:31:51 +0200)
 > 
 > are available in the git repository at:
 > 
->   git://git.kernel.org/pub/scm/linux/kernel/git/tegra/linux.git tags/tegra-for-4.4-defconfig
+>   git://git.infradead.org/linux-mvebu.git tags/mvebu-soc-4.4-2
 > 
-> for you to fetch changes up to 2fb43cecf5164fd99d0fd9fdd87f40e5148ecd91:
+> for you to fetch changes up to 9d2ea95a599a80b08cc802f044626ea2701aade9:
 > 
->   ARM: tegra: Update multi_v7_defconfig (2015-10-20 14:47:07 +0200)
+>   ARM: mvebu: add broken-idle option (2015-10-23 17:34:37 +0200)
 
-Merged, thanks!
+Thanks for respinning, merged now.
 
 
 -Olof
