@@ -1,13 +1,13 @@
 From: zhengxing@rock-chips.com (Xing Zheng)
-Date: Mon, 26 Oct 2015 12:25:34 +0800
-Subject: [PATCH v5 3/8] clk: rockchip: add clock controller for rk3036
+Date: Mon, 26 Oct 2015 12:31:43 +0800
+Subject: [PATCH v5 5/8] ARM: dts: rockchip: add core rk3036 dts
 In-Reply-To: <1445833539-6484-1-git-send-email-zhengxing@rock-chips.com>
 References: <1445833539-6484-1-git-send-email-zhengxing@rock-chips.com>
-Message-ID: <1445833539-6484-4-git-send-email-zhengxing@rock-chips.com>
+Message-ID: <1445833903-6596-1-git-send-email-zhengxing@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the clock tree definition for the new rk3036 SoC.
+Initial release for rk3036, node definitions rk3036 sdk board.
 
 Signed-off-by: Xing Zheng <zhengxing@rock-chips.com>
 Reviewed-by: Heiko Stuebner <heiko@sntech.de>
@@ -15,594 +15,636 @@ Reviewed-by: Heiko Stuebner <heiko@sntech.de>
 
 Changes in v5: None
 
- drivers/clk/rockchip/Makefile     |    1 +
- drivers/clk/rockchip/clk-rk3036.c |  500 +++++++++++++++++++++++++++++++++++++
- drivers/clk/rockchip/clk.h        |   30 +++
- 3 files changed, 531 insertions(+)
- create mode 100644 drivers/clk/rockchip/clk-rk3036.c
+ arch/arm/boot/dts/Makefile       |    1 +
+ arch/arm/boot/dts/rk3036-evb.dts |   64 +++++
+ arch/arm/boot/dts/rk3036.dtsi    |  536 ++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 601 insertions(+)
+ create mode 100644 arch/arm/boot/dts/rk3036-evb.dts
+ create mode 100644 arch/arm/boot/dts/rk3036.dtsi
 
-diff --git a/drivers/clk/rockchip/Makefile b/drivers/clk/rockchip/Makefile
-index b27edd6..d599829 100644
---- a/drivers/clk/rockchip/Makefile
-+++ b/drivers/clk/rockchip/Makefile
-@@ -10,6 +10,7 @@ obj-y	+= clk-inverter.o
- obj-y	+= clk-mmc-phase.o
- obj-$(CONFIG_RESET_CONTROLLER)	+= softrst.o
- 
-+obj-y	+= clk-rk3036.o
- obj-y	+= clk-rk3188.o
- obj-y	+= clk-rk3288.o
- obj-y	+= clk-rk3368.o
-diff --git a/drivers/clk/rockchip/clk-rk3036.c b/drivers/clk/rockchip/clk-rk3036.c
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 7d3e495..3e4e089 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -510,6 +510,7 @@ dtb-$(CONFIG_ARCH_QCOM) += \
+ dtb-$(CONFIG_ARCH_REALVIEW) += \
+ 	arm-realview-pb1176.dtb
+ dtb-$(CONFIG_ARCH_ROCKCHIP) += \
++	rk3036-evb.dtb \
+ 	rk3066a-bqcurie2.dtb \
+ 	rk3066a-marsboard.dtb \
+ 	rk3066a-rayeager.dtb \
+diff --git a/arch/arm/boot/dts/rk3036-evb.dts b/arch/arm/boot/dts/rk3036-evb.dts
 new file mode 100644
-index 0000000..6f49df3
+index 0000000..28a0336
 --- /dev/null
-+++ b/drivers/clk/rockchip/clk-rk3036.c
-@@ -0,0 +1,500 @@
++++ b/arch/arm/boot/dts/rk3036-evb.dts
+@@ -0,0 +1,64 @@
 +/*
-+ * Copyright (c) 2014 MundoReader S.L.
-+ * Author: Heiko Stuebner <heiko@sntech.de>
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
 + *
-+ * Copyright (c) 2015 Rockchip Electronics Co. Ltd.
-+ * Author: Xing Zheng <zhengxing@rock-chips.com>
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
 + *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
++ *     This file is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
 + *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
++ *  Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
 + */
 +
-+#include <linux/clk-provider.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
-+#include <linux/syscore_ops.h>
-+#include <dt-bindings/clock/rk3036-cru.h>
-+#include "clk.h"
++/dts-v1/;
 +
-+#define RK3036_GRF_SOC_STATUS0	0x14c
++#include "rk3036.dtsi"
 +
-+enum rk3036_plls {
-+	apll, dpll, gpll,
++/ {
++	model = "Rockchip RK3036 Evaluation board";
++	compatible = "rockchip,rk3036-evb", "rockchip,rk3036";
 +};
 +
-+static struct rockchip_pll_rate_table rk3036_pll_rates[] = {
-+	/* _mhz, _refdiv, _fbdiv, _postdiv1, _postdiv2, _dsmpd, _frac */
-+	RK3036_PLL_RATE(1608000000, 1, 67, 1, 1, 1, 0),
-+	RK3036_PLL_RATE(1584000000, 1, 66, 1, 1, 1, 0),
-+	RK3036_PLL_RATE(1560000000, 1, 65, 1, 1, 1, 0),
-+	RK3036_PLL_RATE(1536000000, 1, 64, 1, 1, 1, 0),
-+	RK3036_PLL_RATE(1512000000, 1, 63, 1, 1, 1, 0),
-+	RK3036_PLL_RATE(1488000000, 1, 62, 1, 1, 1, 0),
-+	RK3036_PLL_RATE(1464000000, 1, 61, 1, 1, 1, 0),
-+	RK3036_PLL_RATE(1440000000, 1, 60, 1, 1, 1, 0),
-+	RK3036_PLL_RATE(1416000000, 1, 59, 1, 1, 1, 0),
-+	RK3036_PLL_RATE(1392000000, 1, 58, 1, 1, 1, 0),
-+	RK3036_PLL_RATE(1368000000, 1, 57, 1, 1, 1, 0),
-+	RK3036_PLL_RATE(1344000000, 1, 56, 1, 1, 1, 0),
-+	RK3036_PLL_RATE(1320000000, 1, 55, 1, 1, 1, 0),
-+	RK3036_PLL_RATE(1296000000, 1, 54, 1, 1, 1, 0),
-+	RK3036_PLL_RATE(1272000000, 1, 53, 1, 1, 1, 0),
-+	RK3036_PLL_RATE(1248000000, 1, 52, 1, 1, 1, 0),
-+	RK3036_PLL_RATE(1200000000, 1, 50, 1, 1, 1, 0),
-+	RK3036_PLL_RATE(1188000000, 2, 99, 1, 1, 1, 0),
-+	RK3036_PLL_RATE(1104000000, 1, 46, 1, 1, 1, 0),
-+	RK3036_PLL_RATE(1100000000, 12, 550, 1, 1, 1, 0),
-+	RK3036_PLL_RATE(1008000000, 1, 84, 2, 1, 1, 0),
-+	RK3036_PLL_RATE(1000000000, 6, 500, 2, 1, 1, 0),
-+	RK3036_PLL_RATE( 984000000, 1, 82, 2, 1, 1, 0),
-+	RK3036_PLL_RATE( 960000000, 1, 80, 2, 1, 1, 0),
-+	RK3036_PLL_RATE( 936000000, 1, 78, 2, 1, 1, 0),
-+	RK3036_PLL_RATE( 912000000, 1, 76, 2, 1, 1, 0),
-+	RK3036_PLL_RATE( 900000000, 4, 300, 2, 1, 1, 0),
-+	RK3036_PLL_RATE( 888000000, 1, 74, 2, 1, 1, 0),
-+	RK3036_PLL_RATE( 864000000, 1, 72, 2, 1, 1, 0),
-+	RK3036_PLL_RATE( 840000000, 1, 70, 2, 1, 1, 0),
-+	RK3036_PLL_RATE( 816000000, 1, 68, 2, 1, 1, 0),
-+	RK3036_PLL_RATE( 800000000, 6, 400, 2, 1, 1, 0),
-+	RK3036_PLL_RATE( 700000000, 6, 350, 2, 1, 1, 0),
-+	RK3036_PLL_RATE( 696000000, 1, 58, 2, 1, 1, 0),
-+	RK3036_PLL_RATE( 600000000, 1, 75, 3, 1, 1, 0),
-+	RK3036_PLL_RATE( 594000000, 2, 99, 2, 1, 1, 0),
-+	RK3036_PLL_RATE( 504000000, 1, 63, 3, 1, 1, 0),
-+	RK3036_PLL_RATE( 500000000, 6, 250, 2, 1, 1, 0),
-+	RK3036_PLL_RATE( 408000000, 1, 68, 2, 2, 1, 0),
-+	RK3036_PLL_RATE( 312000000, 1, 52, 2, 2, 1, 0),
-+	RK3036_PLL_RATE( 216000000, 1, 72, 4, 2, 1, 0),
-+	RK3036_PLL_RATE(  96000000, 1, 64, 4, 4, 1, 0),
-+	{ /* sentinel */ },
++&i2c1 {
++	status = "okay";
++
++	hym8563: hym8563 at 51 {
++		compatible = "haoyu,hym8563";
++		reg = <0x51>;
++		#clock-cells = <0>;
++		clock-frequency = <32768>;
++		clock-output-names = "xin32k";
++	};
 +};
 +
-+#define RK3036_DIV_CPU_MASK		0x1f
-+#define RK3036_DIV_CPU_SHIFT		8
-+
-+#define RK3036_DIV_PERI_MASK		0xf
-+#define RK3036_DIV_PERI_SHIFT		0
-+#define RK3036_DIV_ACLK_MASK		0x7
-+#define RK3036_DIV_ACLK_SHIFT		4
-+#define RK3036_DIV_HCLK_MASK		0x3
-+#define RK3036_DIV_HCLK_SHIFT		8
-+#define RK3036_DIV_PCLK_MASK		0x7
-+#define RK3036_DIV_PCLK_SHIFT		12
-+
-+#define RK3036_CLKSEL1(_core_periph_div)					\
-+	{									\
-+		.reg = RK2928_CLKSEL_CON(1),					\
-+		.val = HIWORD_UPDATE(_core_periph_div, RK3036_DIV_PERI_MASK,	\
-+				RK3036_DIV_PERI_SHIFT)				\
-+	}
-+
-+#define RK3036_CPUCLK_RATE(_prate, _core_periph_div)			\
-+	{								\
-+		.prate = _prate,					\
-+		.divs = {						\
-+			RK3036_CLKSEL1(_core_periph_div),		\
-+		},							\
-+	}
-+
-+static struct rockchip_cpuclk_rate_table rk3036_cpuclk_rates[] __initdata = {
-+	RK3036_CPUCLK_RATE(816000000, 4),
-+	RK3036_CPUCLK_RATE(600000000, 4),
-+	RK3036_CPUCLK_RATE(312000000, 4),
++&uart2 {
++	status = "okay";
 +};
-+
-+static const struct rockchip_cpuclk_reg_data rk3036_cpuclk_data = {
-+	.core_reg = RK2928_CLKSEL_CON(0),
-+	.div_core_shift = 0,
-+	.div_core_mask = 0x1f,
-+	.mux_core_shift = 7,
-+};
-+
-+PNAME(mux_pll_p)		= { "xin24m", "xin24m" };
-+
-+PNAME(mux_armclk_p)		= { "apll", "gpll_armclk" };
-+PNAME(mux_busclk_p)		= { "apll", "dpll_cpu", "gpll_cpu" };
-+PNAME(mux_ddrphy_p)		= { "dpll_ddr", "gpll_ddr" };
-+PNAME(mux_pll_src_3plls_p)	= { "apll", "dpll", "gpll" };
-+PNAME(mux_timer_p)		= { "xin24m", "pclk_peri_src" };
-+
-+PNAME(mux_pll_src_apll_dpll_gpll_usb480m_p)	= { "apll", "dpll", "gpll" "usb480m" };
-+
-+PNAME(mux_mmc_src_p)	= { "apll", "dpll", "gpll", "xin24m" };
-+PNAME(mux_i2s_pre_p)	= { "i2s_src", "i2s_frac", "ext_i2s", "xin12m" };
-+PNAME(mux_i2s_clkout_p)	= { "i2s_pre", "xin12m" };
-+PNAME(mux_spdif_p)	= { "spdif_src", "spdif_frac", "xin12m" };
-+PNAME(mux_uart0_p)	= { "uart0_src", "uart0_frac", "xin24m" };
-+PNAME(mux_uart1_p)	= { "uart1_src", "uart1_frac", "xin24m" };
-+PNAME(mux_uart2_p)	= { "uart2_src", "uart2_frac", "xin24m" };
-+PNAME(mux_mac_p)	= { "mac_pll_src", "ext_gmac" };
-+PNAME(mux_dclk_p)	= { "dclk_lcdc", "dclk_hdmi_src" };
-+
-+static struct rockchip_pll_clock rk3036_pll_clks[] __initdata = {
-+	[apll] = PLL(pll_rk3036, PLL_APLL, "apll", mux_pll_p, 0, RK2928_PLL_CON(0),
-+		     RK2928_MODE_CON, 0, 5, 0, rk3036_pll_rates),
-+	[dpll] = PLL(pll_rk3036, PLL_DPLL, "dpll", mux_pll_p, 0, RK2928_PLL_CON(4),
-+		     RK2928_MODE_CON, 4, 4, 0, NULL),
-+	[gpll] = PLL(pll_rk3036, PLL_GPLL, "gpll", mux_pll_p, 0, RK2928_PLL_CON(12),
-+		     RK2928_MODE_CON, 12, 6, ROCKCHIP_PLL_SYNC_RATE, rk3036_pll_rates),
-+};
-+
-+#define MFLAGS CLK_MUX_HIWORD_MASK
-+#define DFLAGS CLK_DIVIDER_HIWORD_MASK
-+#define GFLAGS (CLK_GATE_HIWORD_MASK | CLK_GATE_SET_TO_DISABLE)
-+
-+static struct rockchip_clk_branch rk3036_clk_branches[] __initdata = {
-+	/*
-+	 * Clock-Architecture Diagram 1
-+	 */
-+
-+	/* PD_CORE */
-+	GATE(0, "gpll_armclk", "gpll", CLK_IGNORE_UNUSED,
-+			RK2928_CLKGATE_CON(0), 6, GFLAGS),
-+
-+	/*
-+	 * Clock-Architecture Diagram 2
-+	 */
-+
-+	/* PD_DDR */
-+	GATE(0, "dpll_ddr", "dpll", CLK_IGNORE_UNUSED,
-+			RK2928_CLKGATE_CON(0), 2, GFLAGS),
-+	GATE(0, "gpll_ddr", "gpll", CLK_IGNORE_UNUSED,
-+			RK2928_CLKGATE_CON(0), 8, GFLAGS),
-+	COMPOSITE_NOGATE(0, "ddrphy2x", mux_ddrphy_p, CLK_IGNORE_UNUSED,
-+			RK2928_CLKSEL_CON(26), 8, 1, MFLAGS, 0, 2, DFLAGS | CLK_DIVIDER_POWER_OF_TWO),
-+
-+	/* PD_CORE */
-+	COMPOSITE_NOMUX(0, "pclk_dbg", "armclk", CLK_IGNORE_UNUSED,
-+			RK2928_CLKSEL_CON(1), 0, 4, DFLAGS | CLK_DIVIDER_READ_ONLY,
-+			RK2928_CLKGATE_CON(0), 7, GFLAGS),
-+	COMPOSITE_NOMUX(0, "aclk_core_pre", "armclk", CLK_IGNORE_UNUSED,
-+			RK2928_CLKSEL_CON(1), 4, 3, DFLAGS | CLK_DIVIDER_READ_ONLY,
-+			RK2928_CLKGATE_CON(0), 7, GFLAGS),
-+
-+	/* PD_CPU (BUS) */
-+	GATE(0, "dpll_cpu", "dpll", 0, RK2928_CLKGATE_CON(10), 8, GFLAGS),
-+	GATE(0, "gpll_cpu", "gpll", 0, RK2928_CLKGATE_CON(0), 1, GFLAGS),
-+	COMPOSITE_NOGATE(0, "aclk_cpu_src", mux_busclk_p, 0,
-+			RK2928_CLKSEL_CON(0), 14, 2, MFLAGS, 8, 5, DFLAGS),
-+	GATE(ACLK_CPU, "aclk_cpu", "aclk_cpu_src", CLK_IGNORE_UNUSED,
-+			RK2928_CLKGATE_CON(0), 3, GFLAGS),
-+	COMPOSITE_NOMUX(PCLK_CPU, "pclk_cpu", "aclk_cpu_src", CLK_IGNORE_UNUSED,
-+			RK2928_CLKSEL_CON(1), 12, 3, DFLAGS | CLK_DIVIDER_READ_ONLY,
-+			RK2928_CLKGATE_CON(0), 5, GFLAGS),
-+	COMPOSITE_NOMUX(HCLK_CPU, "hclk_cpu", "aclk_cpu_src", CLK_IGNORE_UNUSED,
-+			RK2928_CLKSEL_CON(1), 8, 2, DFLAGS | CLK_DIVIDER_READ_ONLY,
-+			RK2928_CLKGATE_CON(0), 4, GFLAGS),
-+
-+	/* PD_PERI */
-+	COMPOSITE(0, "aclk_peri_src", mux_pll_src_3plls_p, 0,
-+			RK2928_CLKSEL_CON(10), 14, 2, MFLAGS, 0, 5, DFLAGS,
-+			RK2928_CLKGATE_CON(2), 0, GFLAGS),
-+
-+	GATE(ACLK_PERI, "aclk_peri", "aclk_peri_src", 0,
-+			RK2928_CLKGATE_CON(2), 1, GFLAGS),
-+	/* pclk_peri_src is soure for timers */
-+	DIV(0, "pclk_peri_src", "aclk_peri_src", CLK_IGNORE_UNUSED,
-+			RK2928_CLKSEL_CON(10), 12, 2, DFLAGS | CLK_DIVIDER_POWER_OF_TWO),
-+	GATE(PCLK_PERI, "pclk_peri", "pclk_peri_src", 0,
-+			RK2928_CLKGATE_CON(2), 3, GFLAGS),
-+	/* hclk_peri_src is soure for sclk_macref_out */
-+	DIV(0, "hclk_peri_src", "aclk_peri_src", CLK_IGNORE_UNUSED,
-+			RK2928_CLKSEL_CON(10), 8, 2, DFLAGS | CLK_DIVIDER_POWER_OF_TWO),
-+	GATE(HCLK_PERI, "hclk_peri", "hclk_peri_src", 0,
-+			RK2928_CLKGATE_CON(2), 2, GFLAGS),
-+
-+	/* PD_TIMER */
-+	COMPOSITE_NODIV(SCLK_TIMER0, "sclk_timer0", mux_timer_p, CLK_IGNORE_UNUSED,
-+			RK2928_CLKSEL_CON(2), 4, 1, DFLAGS,
-+			RK2928_CLKGATE_CON(1), 0, GFLAGS),
-+	COMPOSITE_NODIV(SCLK_TIMER1, "sclk_timer1", mux_timer_p, CLK_IGNORE_UNUSED,
-+			RK2928_CLKSEL_CON(2), 5, 1, DFLAGS,
-+			RK2928_CLKGATE_CON(1), 1, GFLAGS),
-+	COMPOSITE_NODIV(SCLK_TIMER2, "sclk_timer2", mux_timer_p, CLK_IGNORE_UNUSED,
-+			RK2928_CLKSEL_CON(2), 6, 1, DFLAGS,
-+			RK2928_CLKGATE_CON(2), 4, GFLAGS),
-+	COMPOSITE_NODIV(SCLK_TIMER3, "sclk_timer3", mux_timer_p, CLK_IGNORE_UNUSED,
-+			RK2928_CLKSEL_CON(2), 7, 1, DFLAGS,
-+			RK2928_CLKGATE_CON(2), 5, GFLAGS),
-+
-+	/* PD_UART */
-+	MUX(0, "uart_pll_clk", mux_pll_src_apll_dpll_gpll_usb480m_p, 0,
-+			RK2928_CLKSEL_CON(13), 10, 2, MFLAGS),
-+	COMPOSITE_NOMUX(0, "uart0_src", "uart_pll_clk", 0,
-+			RK2928_CLKSEL_CON(13), 0, 7, DFLAGS,
-+			RK2928_CLKGATE_CON(1), 8, GFLAGS),
-+	COMPOSITE_NOMUX(0, "uart1_src", "uart_pll_clk", 0,
-+			RK2928_CLKSEL_CON(13), 0, 7, DFLAGS,
-+			RK2928_CLKGATE_CON(1), 8, GFLAGS),
-+	COMPOSITE_NOMUX(0, "uart2_src", "uart_pll_clk", 0,
-+			RK2928_CLKSEL_CON(13), 0, 7, DFLAGS,
-+			RK2928_CLKGATE_CON(1), 8, GFLAGS),
-+	COMPOSITE_FRAC(0, "uart0_frac", "uart0_src", CLK_SET_RATE_PARENT,
-+			RK2928_CLKSEL_CON(17), 0,
-+			RK2928_CLKGATE_CON(1), 9, GFLAGS),
-+	COMPOSITE_FRAC(0, "uart1_frac", "uart1_src", CLK_SET_RATE_PARENT,
-+			RK2928_CLKSEL_CON(18), 0,
-+			RK2928_CLKGATE_CON(1), 11, GFLAGS),
-+	COMPOSITE_FRAC(0, "uart2_frac", "uart2_src", CLK_SET_RATE_PARENT,
-+			RK2928_CLKSEL_CON(19), 0,
-+			RK2928_CLKGATE_CON(1), 13, GFLAGS),
-+	MUX(SCLK_UART0, "sclk_uart0", mux_uart0_p, CLK_SET_RATE_PARENT,
-+			RK2928_CLKSEL_CON(13), 8, 2, MFLAGS),
-+	MUX(SCLK_UART1, "sclk_uart1", mux_uart1_p, CLK_SET_RATE_PARENT,
-+			RK2928_CLKSEL_CON(14), 8, 2, MFLAGS),
-+	MUX(SCLK_UART2, "sclk_uart2", mux_uart2_p, CLK_SET_RATE_PARENT,
-+			RK2928_CLKSEL_CON(15), 8, 2, MFLAGS),
-+
-+	/* PD_VIDEO */
-+	COMPOSITE(0, "aclk_vcodec", mux_pll_src_3plls_p, 0,
-+			RK2928_CLKSEL_CON(32), 14, 2, MFLAGS, 8, 5, DFLAGS,
-+			RK2928_CLKGATE_CON(3), 11, GFLAGS),
-+
-+	COMPOSITE(0, "aclk_hvec", mux_pll_src_3plls_p, 0,
-+			RK2928_CLKSEL_CON(20), 0, 2, MFLAGS, 2, 5, DFLAGS,
-+			RK2928_CLKGATE_CON(10), 6, GFLAGS),
-+
-+	/* PD_VIO */
-+	COMPOSITE(0, "aclk_disp1_pre", mux_pll_src_3plls_p, 0,
-+			RK2928_CLKSEL_CON(31), 14, 2, MFLAGS, 8, 5, DFLAGS,
-+			RK2928_CLKGATE_CON(1), 4, GFLAGS),
-+	COMPOSITE(0, "hclk_disp_pre", mux_pll_src_3plls_p, 0,
-+			RK2928_CLKSEL_CON(30), 14, 2, MFLAGS, 8, 5, DFLAGS,
-+			RK2928_CLKGATE_CON(0), 11, GFLAGS),
-+	COMPOSITE(DCLK_LCDC, "dclk_lcdc", mux_pll_src_3plls_p, 0,
-+			RK2928_CLKSEL_CON(28), 0, 2, MFLAGS, 8, 8, DFLAGS,
-+			RK2928_CLKGATE_CON(3), 2, GFLAGS),
-+
-+	/* MMC */
-+	COMPOSITE_NODIV(0, "sclk_sdmmc_src", mux_mmc_src_p, 0,
-+			RK2928_CLKSEL_CON(12), 8, 2, DFLAGS,
-+			RK2928_CLKGATE_CON(2), 11, GFLAGS),
-+	DIV(SCLK_SDMMC, "sclk_sdmmc", "sclk_sdmmc_src", 0,
-+			RK2928_CLKSEL_CON(11), 0, 7, DFLAGS),
-+
-+	COMPOSITE_NODIV(0, "sclk_sdio_src", mux_mmc_src_p, 0,
-+			RK2928_CLKSEL_CON(12), 10, 2, DFLAGS,
-+			RK2928_CLKGATE_CON(2), 13, GFLAGS),
-+	DIV(SCLK_SDIO, "sclk_sdio", "sclk_sdio_src", 0,
-+			RK2928_CLKSEL_CON(11), 8, 7, DFLAGS),
-+
-+	COMPOSITE(SCLK_EMMC, "sclk_emmc", mux_mmc_src_p, 0,
-+			RK2928_CLKSEL_CON(12), 12, 2, MFLAGS, 0, 7, DFLAGS,
-+			RK2928_CLKGATE_CON(2), 14, GFLAGS),
-+
-+	MMC(SCLK_SDMMC_DRV,    "sdmmc_drv",    "sclk_sdmmc", RK3036_SDMMC_CON0, 1),
-+	MMC(SCLK_SDMMC_SAMPLE, "sdmmc_sample", "sclk_sdmmc", RK3036_SDMMC_CON1, 0),
-+
-+	MMC(SCLK_SDIO_DRV,     "sdio_drv",     "sclk_sdio",  RK3036_SDIO_CON0, 1),
-+	MMC(SCLK_SDIO_SAMPLE,  "sdio_sample",  "sclk_sdio",  RK3036_SDIO_CON1, 0),
-+
-+	MMC(SCLK_EMMC_DRV,     "emmc_drv",     "sclk_emmc",  RK3036_EMMC_CON0,  1),
-+	MMC(SCLK_EMMC_SAMPLE,  "emmc_sample",  "sclk_emmc",  RK3036_EMMC_CON1,  0),
-+
-+	/* I2S */
-+	COMPOSITE(0, "i2s_src", mux_pll_src_3plls_p, 0,
-+			RK2928_CLKSEL_CON(3), 14, 2, MFLAGS, 0, 7, DFLAGS,
-+			RK2928_CLKGATE_CON(0), 9, GFLAGS),
-+	COMPOSITE_FRAC(0, "i2s_frac", "i2s_src", CLK_SET_RATE_PARENT,
-+			RK2928_CLKSEL_CON(7), 0,
-+			RK2928_CLKGATE_CON(0), 10, GFLAGS),
-+	MUX(0, "i2s_pre", mux_i2s_pre_p, CLK_SET_RATE_PARENT,
-+			RK2928_CLKSEL_CON(3), 8, 2, MFLAGS),
-+	COMPOSITE_NODIV(SCLK_I2S_OUT, "i2s_clkout", mux_i2s_clkout_p, 0,
-+			RK2928_CLKSEL_CON(3), 12, 1, MFLAGS,
-+			RK2928_CLKGATE_CON(0), 13, GFLAGS),
-+	GATE(SCLK_I2S, "sclk_i2s", "i2s_pre", CLK_SET_RATE_PARENT,
-+			RK2928_CLKGATE_CON(0), 14, GFLAGS),
-+
-+	/* SPDIF */
-+	COMPOSITE(0, "spdif_src", mux_pll_src_3plls_p, 0,
-+			RK2928_CLKSEL_CON(5), 10, 2, MFLAGS, 0, 7, DFLAGS,
-+			RK2928_CLKGATE_CON(2), 10, GFLAGS),
-+	COMPOSITE_FRAC(0, "spdif_frac", "spdif_src", 0,
-+			RK2928_CLKSEL_CON(9), 0,
-+			RK2928_CLKGATE_CON(2), 12, GFLAGS),
-+	MUX(SCLK_SPDIF, "sclk_spdif", mux_spdif_p, 0,
-+			RK2928_CLKSEL_CON(5), 8, 2, MFLAGS),
-+
-+	GATE(SCLK_OTGPHY0, "sclk_otgphy0", "xin12m", CLK_IGNORE_UNUSED,
-+			RK2928_CLKGATE_CON(1), 5, GFLAGS),
-+
-+	COMPOSITE(SCLK_GPU, "sclk_gpu", mux_pll_src_3plls_p, 0,
-+			RK2928_CLKSEL_CON(34), 8, 2, MFLAGS, 0, 5, DFLAGS,
-+			RK2928_CLKGATE_CON(3), 13, GFLAGS),
-+
-+	COMPOSITE(SCLK_SPI, "sclk_spi", mux_pll_src_3plls_p, 0,
-+			RK2928_CLKSEL_CON(25), 8, 2, MFLAGS, 0, 7, DFLAGS,
-+			RK2928_CLKGATE_CON(2), 9, GFLAGS),
-+
-+	COMPOSITE(SCLK_NANDC, "sclk_nandc", mux_pll_src_3plls_p, 0,
-+			RK2928_CLKSEL_CON(16), 8, 2, MFLAGS, 10, 5, DFLAGS,
-+			RK2928_CLKGATE_CON(10), 4, GFLAGS),
-+
-+	COMPOSITE(SCLK_SFC, "sclk_sfc", mux_pll_src_apll_dpll_gpll_usb480m_p, 0,
-+			RK2928_CLKSEL_CON(16), 0, 2, MFLAGS, 2, 5, DFLAGS,
-+			RK2928_CLKGATE_CON(10), 5, GFLAGS),
-+
-+	COMPOSITE_NOGATE(0, "mac_pll_src", mux_pll_src_3plls_p, 0,
-+			RK2928_CLKSEL_CON(21), 0, 2, MFLAGS, 4, 5, DFLAGS),
-+	/* for clk_mac_ref & clk_mac_refout */
-+	MUX(SCLK_MACREF, "mac_clk_ref", mux_mac_p, CLK_SET_RATE_PARENT,
-+			RK2928_CLKSEL_CON(21), 3, 1, MFLAGS),
-+
-+	COMPOSITE_NOMUX(SCLK_MAC, "mac_clk", "mac_clk_ref", 0,
-+			RK2928_CLKSEL_CON(21), 9, 5, DFLAGS,
-+			RK2928_CLKGATE_CON(2), 6, GFLAGS),
-+
-+	/* HDMI */
-+	/* total clks: pin_sys_clk / pin_sck / pin_mclk / pin_vclk / pin_vclk_pllref */
-+	/* the same with dclk_lcdc */
-+	COMPOSITE(0, "dclk_hdmi_src", mux_pll_src_3plls_p, 0,
-+			RK2928_CLKSEL_CON(28), 0, 2, MFLAGS, 8, 8, DFLAGS,
-+			RK2928_CLKGATE_CON(3), 2, GFLAGS),
-+	/* hdmi dclk from dclk_lcdc directly */
-+	MUX(SCLK_HDMI, "dclk_hdmi", mux_dclk_p, 0,
-+			RK2928_CLKSEL_CON(31), 0, 1, MFLAGS),
-+
-+	/*
-+	 * Clock-Architecture Diagram 3
-+	 */
-+
-+	/* aclk_cpu gates */
-+	GATE(0, "sclk_intmem", "aclk_cpu", CLK_IGNORE_UNUSED, RK2928_CLKGATE_CON(4), 12, GFLAGS),
-+	GATE(0, "aclk_strc_sys", "aclk_cpu", CLK_IGNORE_UNUSED, RK2928_CLKGATE_CON(4), 10, GFLAGS),
-+
-+	/* hclk_cpu gates */
-+	GATE(HCLK_ROM, "hclk_rom", "hclk_cpu", CLK_IGNORE_UNUSED, RK2928_CLKGATE_CON(5), 6, GFLAGS),
-+
-+	/* pclk_cpu gates */
-+	GATE(PCLK_GRF, "pclk_grf", "pclk_cpu", CLK_IGNORE_UNUSED, RK2928_CLKGATE_CON(5), 4, GFLAGS),
-+	GATE(PCLK_DDRUPCTL, "pclk_ddrupctl", "pclk_cpu", 0, RK2928_CLKGATE_CON(5), 7, GFLAGS),
-+	GATE(PCLK_ACODEC, "pclk_acodec", "pclk_cpu", 0, RK2928_CLKGATE_CON(5), 14, GFLAGS),
-+	GATE(PCLK_HDMI, "pclk_hdmi", "pclk_cpu", 0, RK2928_CLKGATE_CON(3), 8, GFLAGS),
-+
-+	/* aclk_vio gates */
-+	GATE(ACLK_VIO, "aclk_vio", "aclk_disp1_pre", 0, RK2928_CLKGATE_CON(6), 13, GFLAGS),
-+	GATE(ACLK_LCDC, "aclk_lcdc", "aclk_disp1_pre", 0, RK2928_CLKGATE_CON(9), 6, GFLAGS),
-+
-+	GATE(HCLK_VIO_BUS, "hclk_vio_bus", "hclk_disp_pre", 0, RK2928_CLKGATE_CON(6), 12, GFLAGS),
-+	GATE(HCLK_LCDC, "hclk_lcdc", "hclk_disp_pre", 0, RK2928_CLKGATE_CON(9), 5, GFLAGS),
-+
-+	/* aclk_video gates */
-+	GATE(HCLK_LCDC, "hclk_vcodec", "hclk_disp_pre", 0, RK2928_CLKGATE_CON(3), 12, GFLAGS),
-+
-+	/* xin24m gates */
-+	GATE(SCLK_PVTM_CORE, "sclk_pvtm_core", "xin24m", 0, RK2928_CLKGATE_CON(10), 0, GFLAGS),
-+	GATE(SCLK_PVTM_GPU, "sclk_pvtm_gpu", "xin24m", 0, RK2928_CLKGATE_CON(10), 1, GFLAGS),
-+
-+	/* aclk_peri gates */
-+	GATE(0, "aclk_peri_axi_matrix", "aclk_peri", CLK_IGNORE_UNUSED, RK2928_CLKGATE_CON(4), 3, GFLAGS),
-+	GATE(0, "aclk_cpu_peri", "aclk_peri", CLK_IGNORE_UNUSED, RK2928_CLKGATE_CON(4), 2, GFLAGS),
-+	GATE(ACLK_DMAC2, "aclk_dmac2", "aclk_peri", 0, RK2928_CLKGATE_CON(5), 1, GFLAGS),
-+	GATE(0, "aclk_peri_niu", "aclk_peri", CLK_IGNORE_UNUSED, RK2928_CLKGATE_CON(9), 15, GFLAGS),
-+
-+	/* hclk_peri gates */
-+	GATE(0, "hclk_peri_matrix", "hclk_peri", CLK_IGNORE_UNUSED, RK2928_CLKGATE_CON(4), 0, GFLAGS),
-+	GATE(0, "hclk_usb_peri", "hclk_peri", CLK_IGNORE_UNUSED, RK2928_CLKGATE_CON(9), 13, GFLAGS),
-+	GATE(0, "hclk_peri_arbi", "hclk_peri", CLK_IGNORE_UNUSED, RK2928_CLKGATE_CON(9), 14, GFLAGS),
-+	GATE(HCLK_NANDC, "hclk_nandc", "hclk_peri", 0, RK2928_CLKGATE_CON(5), 9, GFLAGS),
-+	GATE(HCLK_SDMMC, "hclk_sdmmc", "hclk_peri", 0, RK2928_CLKGATE_CON(5), 10, GFLAGS),
-+	GATE(HCLK_SDIO, "hclk_sdio", "hclk_peri", 0, RK2928_CLKGATE_CON(5), 11, GFLAGS),
-+	GATE(HCLK_EMMC, "hclk_emmc", "hclk_peri", 0, RK2928_CLKGATE_CON(7), 0, GFLAGS),
-+	GATE(HCLK_OTG0, "hclk_otg0", "hclk_peri", CLK_IGNORE_UNUSED, RK2928_CLKGATE_CON(5), 13, GFLAGS),
-+	GATE(HCLK_OTG1, "hclk_otg1", "hclk_peri", CLK_IGNORE_UNUSED, RK2928_CLKGATE_CON(7), 3, GFLAGS),
-+	GATE(HCLK_I2S, "hclk_i2s", "hclk_peri", 0, RK2928_CLKGATE_CON(7), 2, GFLAGS),
-+	GATE(0, "hclk_sfc", "hclk_peri", CLK_IGNORE_UNUSED, RK2928_CLKGATE_CON(3), 14, GFLAGS),
-+	GATE(0, "hclk_mac", "hclk_peri", CLK_IGNORE_UNUSED, RK2928_CLKGATE_CON(3), 15, GFLAGS),
-+
-+	/* pclk_peri gates */
-+	GATE(0, "pclk_peri_matrix", "pclk_peri", CLK_IGNORE_UNUSED, RK2928_CLKGATE_CON(4), 1, GFLAGS),
-+	GATE(0, "pclk_efuse", "pclk_peri", CLK_IGNORE_UNUSED, RK2928_CLKGATE_CON(5), 2, GFLAGS),
-+	GATE(PCLK_TIMER, "pclk_timer0", "pclk_peri", 0, RK2928_CLKGATE_CON(7), 7, GFLAGS),
-+	GATE(PCLK_PWM, "pclk_pwm", "pclk_peri", 0, RK2928_CLKGATE_CON(7), 10, GFLAGS),
-+	GATE(PCLK_SPI, "pclk_spi", "pclk_peri", 0, RK2928_CLKGATE_CON(7), 12, GFLAGS),
-+	GATE(PCLK_WDT, "pclk_wdt", "pclk_peri", 0, RK2928_CLKGATE_CON(7), 15, GFLAGS),
-+	GATE(PCLK_UART0, "pclk_uart0", "pclk_peri", 0, RK2928_CLKGATE_CON(8), 0, GFLAGS),
-+	GATE(PCLK_UART1, "pclk_uart1", "pclk_peri", 0, RK2928_CLKGATE_CON(8), 1, GFLAGS),
-+	GATE(PCLK_UART2, "pclk_uart2", "pclk_peri", 0, RK2928_CLKGATE_CON(8), 2, GFLAGS),
-+	GATE(PCLK_I2C0, "pclk_i2c0", "pclk_peri", 0, RK2928_CLKGATE_CON(8), 4, GFLAGS),
-+	GATE(PCLK_I2C1, "pclk_i2c1", "pclk_peri", 0, RK2928_CLKGATE_CON(8), 5, GFLAGS),
-+	GATE(PCLK_I2C2, "pclk_i2c2", "pclk_peri", 0, RK2928_CLKGATE_CON(8), 6, GFLAGS),
-+	GATE(PCLK_GPIO0, "pclk_gpio0", "pclk_peri", 0, RK2928_CLKGATE_CON(8), 9, GFLAGS),
-+	GATE(PCLK_GPIO1, "pclk_gpio1", "pclk_peri", 0, RK2928_CLKGATE_CON(8), 10, GFLAGS),
-+	GATE(PCLK_GPIO2, "pclk_gpio2", "pclk_peri", 0, RK2928_CLKGATE_CON(8), 11, GFLAGS),
-+};
-+
-+static const char *const rk3036_critical_clocks[] __initconst = {
-+	"aclk_cpu",
-+	"aclk_peri",
-+	"hclk_peri",
-+	"pclk_peri",
-+};
-+
-+static void __init rk3036_clk_init(struct device_node *np)
-+{
-+	void __iomem *reg_base;
-+	struct clk *clk;
-+
-+	reg_base = of_iomap(np, 0);
-+	if (!reg_base) {
-+		pr_err("%s: could not map cru region\n", __func__);
-+		return;
-+	}
-+
-+	rockchip_clk_init(np, reg_base, CLK_NR_CLKS);
-+
-+	/* xin12m is created by an cru-internal divider */
-+	clk = clk_register_fixed_factor(NULL, "xin12m", "xin24m", 0, 1, 2);
-+	if (IS_ERR(clk))
-+		pr_warn("%s: could not register clock xin12m: %ld\n",
-+			__func__, PTR_ERR(clk));
-+
-+	clk = clk_register_fixed_factor(NULL, "usb480m", "xin24m", 0, 20, 1);
-+	if (IS_ERR(clk))
-+		pr_warn("%s: could not register clock usb480m: %ld\n",
-+			__func__, PTR_ERR(clk));
-+
-+	clk = clk_register_fixed_factor(NULL, "ddrphy", "ddrphy2x", 0, 1, 2);
-+	if (IS_ERR(clk))
-+		pr_warn("%s: could not register clock ddrphy: %ld\n",
-+			__func__, PTR_ERR(clk));
-+
-+	clk = clk_register_fixed_factor(NULL, "hclk_vcodec_pre",
-+					"aclk_vcodec", 0, 1, 4);
-+	if (IS_ERR(clk))
-+		pr_warn("%s: could not register clock hclk_vcodec_pre: %ld\n",
-+			__func__, PTR_ERR(clk));
-+
-+	clk = clk_register_fixed_factor(NULL, "sclk_macref_out",
-+					"hclk_peri_src", 0, 1, 2);
-+	if (IS_ERR(clk))
-+		pr_warn("%s: could not register clock sclk_macref_out: %ld\n",
-+			__func__, PTR_ERR(clk));
-+
-+	rockchip_clk_register_plls(rk3036_pll_clks,
-+				   ARRAY_SIZE(rk3036_pll_clks),
-+				   RK3036_GRF_SOC_STATUS0);
-+	rockchip_clk_register_branches(rk3036_clk_branches,
-+				  ARRAY_SIZE(rk3036_clk_branches));
-+	rockchip_clk_protect_critical(rk3036_critical_clocks,
-+				      ARRAY_SIZE(rk3036_critical_clocks));
-+
-+	rockchip_clk_register_armclk(ARMCLK, "armclk",
-+			mux_armclk_p, ARRAY_SIZE(mux_armclk_p),
-+			&rk3036_cpuclk_data, rk3036_cpuclk_rates,
-+			ARRAY_SIZE(rk3036_cpuclk_rates));
-+
-+	rockchip_register_softrst(np, 9, reg_base + RK2928_SOFTRST_CON(0),
-+				  ROCKCHIP_SOFTRST_HIWORD_MASK);
-+
-+	rockchip_register_restart_notifier(RK2928_GLB_SRST_FST);
-+}
-+CLK_OF_DECLARE(rk3036_cru, "rockchip,rk3036-cru", rk3036_clk_init);
-diff --git a/drivers/clk/rockchip/clk.h b/drivers/clk/rockchip/clk.h
-index dc8ecb2..4b79f34 100644
---- a/drivers/clk/rockchip/clk.h
-+++ b/drivers/clk/rockchip/clk.h
-@@ -2,6 +2,9 @@
-  * Copyright (c) 2014 MundoReader S.L.
-  * Author: Heiko Stuebner <heiko@sntech.de>
-  *
-+ * Copyright (c) 2015 Rockchip Electronics Co. Ltd.
-+ * Author: Xing Zheng <zhengxing@rock-chips.com>
+diff --git a/arch/arm/boot/dts/rk3036.dtsi b/arch/arm/boot/dts/rk3036.dtsi
+new file mode 100644
+index 0000000..8f3a069
+--- /dev/null
++++ b/arch/arm/boot/dts/rk3036.dtsi
+@@ -0,0 +1,536 @@
++/*
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
 + *
-  * based on
-  *
-  * samsung/clk.h
-@@ -40,6 +43,13 @@ struct clk;
- #define RK2928_SOFTRST_CON(x)	((x) * 0x4 + 0x110)
- #define RK2928_MISC_CON		0x134
- 
-+#define RK3036_SDMMC_CON0		0x144
-+#define RK3036_SDMMC_CON1		0x148
-+#define RK3036_SDIO_CON0		0x14c
-+#define RK3036_SDIO_CON1		0x150
-+#define RK3036_EMMC_CON0		0x154
-+#define RK3036_EMMC_CON1		0x158
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This file is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
 +
- #define RK3288_PLL_CON(x)		RK2928_PLL_CON(x)
- #define RK3288_MODE_CON			0x50
- #define RK3288_CLKSEL_CON(x)		((x) * 0x4 + 0x60)
-@@ -74,9 +84,22 @@ struct clk;
- #define RK3368_EMMC_CON1		0x41c
- 
- enum rockchip_pll_type {
-+	pll_rk3036,
- 	pll_rk3066,
- };
- 
-+#define RK3036_PLL_RATE(_rate, _refdiv, _fbdiv, _postdiv1,	\
-+			_postdiv2, _dsmpd, _frac)		\
-+{								\
-+	.rate	= _rate##U,					\
-+	.fbdiv = _fbdiv,					\
-+	.postdiv1 = _postdiv1,					\
-+	.refdiv = _refdiv,					\
-+	.postdiv2 = _postdiv2,					\
-+	.dsmpd = _dsmpd,					\
-+	.frac = _frac,						\
-+}
++#include <dt-bindings/gpio/gpio.h>
++#include <dt-bindings/interrupt-controller/irq.h>
++#include <dt-bindings/interrupt-controller/arm-gic.h>
++#include <dt-bindings/pinctrl/rockchip.h>
++#include <dt-bindings/clock/rk3036-cru.h>
++#include "skeleton.dtsi"
 +
- #define RK3066_PLL_RATE(_rate, _nr, _nf, _no)	\
- {						\
- 	.rate	= _rate##U,			\
-@@ -101,6 +124,13 @@ struct rockchip_pll_rate_table {
- 	unsigned int nf;
- 	unsigned int no;
- 	unsigned int nb;
-+	/* for RK3036 */
-+	unsigned int fbdiv;
-+	unsigned int postdiv1;
-+	unsigned int refdiv;
-+	unsigned int postdiv2;
-+	unsigned int dsmpd;
-+	unsigned int frac;
- };
- 
- /**
++/ {
++	compatible = "rockchip,rk3036";
++
++	interrupt-parent = <&gic>;
++
++	aliases {
++		i2c1 = &i2c1;
++		serial0 = &uart0;
++		serial1 = &uart1;
++		serial2 = &uart2;
++	};
++
++	memory {
++		device_type = "memory";
++		reg = <0x60000000 0x40000000>;
++	};
++
++	arm-pmu {
++		compatible = "arm,cortex-a7-pmu";
++		interrupts = <GIC_SPI 76 IRQ_TYPE_LEVEL_HIGH>,
++		             <GIC_SPI 77 IRQ_TYPE_LEVEL_HIGH>;
++		interrupt-affinity = <&cpu0>, <&cpu1>;
++	};
++
++	cpus {
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		cpu0: cpu at f00 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a7";
++			reg = <0xf00>;
++			operating-points = <
++				/* KHz    uV */
++				 816000 1000000
++			>;
++			clock-latency = <40000>;
++			clocks = <&cru ARMCLK>;
++			resets = <&cru SRST_CORE0>;
++		};
++		cpu1: cpu at f01 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a7";
++			reg = <0xf01>;
++			resets = <&cru SRST_CORE1>;
++		};
++	};
++
++	amba {
++		compatible = "arm,amba-bus";
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges;
++
++		pdma: pdma at 20078000 {
++			compatible = "arm,pl330", "arm,primecell";
++			reg = <0x20078000 0x4000>;
++			interrupts = <GIC_SPI 0 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 1 IRQ_TYPE_LEVEL_HIGH>;
++			#dma-cells = <1>;
++			clocks = <&cru ACLK_DMAC2>;
++			clock-names = "apb_pclk";
++		};
++	};
++
++	xin24m: oscillator {
++		compatible = "fixed-clock";
++		clock-frequency = <24000000>;
++		clock-output-names = "xin24m";
++		#clock-cells = <0>;
++	};
++
++	timer {
++		compatible = "arm,armv7-timer";
++		arm,cpu-registers-not-fw-configured;
++		interrupts = <GIC_PPI 13 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>,
++			     <GIC_PPI 14 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>,
++			     <GIC_PPI 11 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>,
++			     <GIC_PPI 10 (GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
++		clock-frequency = <24000000>;
++	};
++
++	gic: interrupt-controller at 10139000 {
++		compatible = "arm,gic-400";
++		interrupt-controller;
++		#interrupt-cells = <3>;
++		#address-cells = <0>;
++
++		reg = <0x10139000 0x1000>,
++		      <0x1013a000 0x1000>,
++		      <0x1013c000 0x2000>,
++		      <0x1013e000 0x2000>;
++		interrupts = <GIC_PPI 9 0xf04>;
++	};
++
++	bus_intmem at 10080000 {
++		compatible = "mmio-sram";
++		reg = <0x10080000 0x2000>;
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges = <0 0x10080000 0x2000>;
++	};
++
++	cru: clock-controller at 20000000 {
++		compatible = "rockchip,rk3036-cru";
++		reg = <0x20000000 0x1000>;
++		rockchip,grf = <&grf>;
++		#clock-cells = <1>;
++		#reset-cells = <1>;
++		assigned-clocks = <&cru PLL_GPLL>;
++		assigned-clock-rates = <594000000>;
++	};
++
++	grf: syscon at 20008000 {
++		compatible = "rockchip,rk3036-grf", "syscon";
++		reg = <0x20008000 0x1000>;
++	};
++
++	pwm0: pwm at 20050000 {
++		compatible = "rockchip,rk3036-pwm", "rockchip,rk2928-pwm";
++		reg = <0x20050000 0x10>;
++		#pwm-cells = <3>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&pwm0_pin>;
++		clocks = <&cru PCLK_PWM>;
++		clock-names = "pwm";
++		status = "disabled";
++	};
++
++	pwm1: pwm at 20050010 {
++		compatible = "rockchip,rk3036-pwm", "rockchip,rk2928-pwm";
++		reg = <0x20050010 0x10>;
++		#pwm-cells = <3>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&pwm1_pin>;
++		clocks = <&cru PCLK_PWM>;
++		clock-names = "pwm";
++		status = "disabled";
++	};
++
++	pwm2: pwm at 20050020 {
++		compatible = "rockchip,rk3036-pwm", "rockchip,rk2928-pwm";
++		reg = <0x20050020 0x10>;
++		#pwm-cells = <3>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&pwm2_pin>;
++		clocks = <&cru PCLK_PWM>;
++		clock-names = "pwm";
++		status = "disabled";
++	};
++
++	pwm3: pwm at 20050030 {
++		compatible = "rockchip,rk3036-pwm", "rockchip,rk2928-pwm";
++		reg = <0x20050030 0x10>;
++		#pwm-cells = <2>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&pwm3_pin>;
++		clocks = <&cru PCLK_PWM>;
++		clock-names = "pwm";
++		status = "disabled";
++	};
++
++	acodec: acodec-ana at 20030000 {
++		compatible = "rk3036-codec";
++		reg = <0x20030000 0x4000>;
++		rockchip,grf = <&grf>;
++		clock-names = "acodec_pclk";
++		clocks = <&cru PCLK_ACODEC>;
++		status = "disabled";
++	};
++
++	emmc: dwmmc at 1021c000 {
++		compatible = "rockchip,rk3288-dw-mshc";
++		clock-frequency = <37500000>;
++		clock-freq-min-max = <400000 37500000>;
++		clocks = <&cru HCLK_EMMC>, <&cru SCLK_EMMC>,
++		<&cru SCLK_EMMC_DRV>, <&cru SCLK_EMMC_SAMPLE>;
++		clock-names = "biu", "ciu", "ciu_drv", "ciu_sample";
++		dmas = <&pdma 12>;
++		dma-names = "rx-tx";
++		fifo-depth = <0x100>;
++		interrupts = <GIC_SPI 16 IRQ_TYPE_LEVEL_HIGH>;
++		reg = <0x1021c000 0x4000>;
++		broken-cd;
++		bus-width = <8>;
++		cap-mmc-highspeed;
++		mmc-ddr-1_8v;
++		disable-wp;
++		non-removable;
++		num-slots = <1>;
++		default-sample-phase = <158>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&emmc_clk &emmc_cmd &emmc_bus8>;
++		status = "disabled";
++	};
++
++	i2c0: i2c at 20072000 {
++		compatible = "rockchip,rk3288-i2c";
++		reg = <0x20072000 0x1000>;
++		interrupts = <GIC_SPI 24 IRQ_TYPE_LEVEL_HIGH>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++		clock-names = "i2c";
++		clocks = <&cru PCLK_I2C0>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&i2c0_xfer>;
++		status = "disabled";
++	};
++
++	i2c1: i2c at 20056000 {
++		compatible = "rockchip,rk3288-i2c";
++		reg = <0x20056000 0x1000>;
++		interrupts = <GIC_SPI 25 IRQ_TYPE_LEVEL_HIGH>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++		clock-names = "i2c";
++		clocks = <&cru PCLK_I2C1>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&i2c1_xfer>;
++		status = "disabled";
++	};
++
++	i2c2: i2c at 2005a000 {
++		compatible = "rockchip,rk3288-i2c";
++		reg = <0x2005a000 0x1000>;
++		interrupts = <GIC_SPI 26 IRQ_TYPE_LEVEL_HIGH>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++		clock-names = "i2c";
++		clocks = <&cru PCLK_I2C2>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&i2c2_xfer>;
++		status = "disabled";
++	};
++
++	i2s: i2s at 10220000 {
++		compatible = "rockchip,rk3036-i2s", "rockchip,rk3066-i2s";
++		reg = <0x10220000 0x4000>;
++		interrupts = <GIC_SPI 51 IRQ_TYPE_LEVEL_HIGH>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++		dmas = <&pdma 0>, <&pdma 1>;
++		dma-names = "tx", "rx";
++		clock-names = "i2s_hclk", "i2s_clk";
++		clocks = <&cru HCLK_I2S>, <&cru SCLK_I2S>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&i2s_bus>;
++		status = "disabled";
++	};
++
++	uart0: serial at 20060000 {
++		compatible = "rockchip,rk3036-uart", "snps,dw-apb-uart";
++		reg = <0x20060000 0x100>;
++		interrupts = <GIC_SPI 20 IRQ_TYPE_LEVEL_HIGH>;
++		reg-shift = <2>;
++		reg-io-width = <4>;
++		clock-frequency = <24000000>;
++		clocks = <&cru SCLK_UART0>, <&cru PCLK_UART0>;
++		clock-names = "baudclk", "apb_pclk";
++		pinctrl-names = "default";
++		pinctrl-0 = <&uart0_xfer &uart0_cts &uart0_rts>;
++		status = "disabled";
++	};
++
++	uart1: serial at 20064000 {
++		compatible = "rockchip,rk3036-uart", "snps,dw-apb-uart";
++		reg = <0x20064000 0x100>;
++		interrupts = <GIC_SPI 21 IRQ_TYPE_LEVEL_HIGH>;
++		reg-shift = <2>;
++		reg-io-width = <4>;
++		clock-frequency = <24000000>;
++		clocks = <&cru SCLK_UART1>, <&cru PCLK_UART1>;
++		clock-names = "baudclk", "apb_pclk";
++		pinctrl-names = "default";
++		pinctrl-0 = <&uart1_xfer>;
++		status = "disabled";
++	};
++
++	uart2: serial at 20068000 {
++		compatible = "rockchip,rk3036-uart", "snps,dw-apb-uart";
++		reg = <0x20068000 0x100>;
++		interrupts = <GIC_SPI 22 IRQ_TYPE_LEVEL_HIGH>;
++		reg-shift = <2>;
++		reg-io-width = <4>;
++		clock-frequency = <24000000>;
++		clocks = <&cru SCLK_UART2>, <&cru PCLK_UART2>;
++		clock-names = "baudclk", "apb_pclk";
++		pinctrl-names = "default";
++		pinctrl-0 = <&uart2_xfer>;
++		status = "disabled";
++	};
++
++	usb_otg: usb at 10180000 {
++		compatible = "rockchip,rk3288-usb", "rockchip,rk3066-usb",
++				"snps,dwc2";
++		reg = <0x10180000 0x40000>;
++		interrupts = <GIC_SPI 10 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&cru HCLK_OTG0>;
++		clock-names = "otg";
++		dr_mode = "otg";
++		g-np-tx-fifo-size = <16>;
++		g-rx-fifo-size = <275>;
++		g-tx-fifo-size = <256 128 128 64 64 32>;
++		g-use-dma;
++		status = "disabled";
++	};
++
++	usb_host: usb at 101c0000 {
++		compatible = "rockchip,rk3288-usb", "rockchip,rk3066-usb",
++				"snps,dwc2";
++		reg = <0x101c0000 0x40000>;
++		interrupts = <GIC_SPI 11 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&cru HCLK_OTG1>;
++		clock-names = "otg";
++		dr_mode = "host";
++		status = "disabled";
++	};
++
++	pinctrl: pinctrl {
++		compatible = "rockchip,rk3036-pinctrl";
++		rockchip,grf = <&grf>;
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges;
++
++		gpio0: gpio0 at 2007c000 {
++			compatible = "rockchip,gpio-bank";
++			reg = <0x2007c000 0x100>;
++			interrupts = <GIC_SPI 36 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cru PCLK_GPIO0>;
++
++			gpio-controller;
++			#gpio-cells = <2>;
++
++			interrupt-controller;
++			#interrupt-cells = <2>;
++		};
++
++		gpio1: gpio1 at 20080000 {
++			compatible = "rockchip,gpio-bank";
++			reg = <0x20080000 0x100>;
++			interrupts = <GIC_SPI 37 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cru PCLK_GPIO1>;
++
++			gpio-controller;
++			#gpio-cells = <2>;
++
++			interrupt-controller;
++			#interrupt-cells = <2>;
++		};
++
++		gpio2: gpio2 at 20084000 {
++			compatible = "rockchip,gpio-bank";
++			reg = <0x20084000 0x100>;
++			interrupts = <GIC_SPI 38 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&cru PCLK_GPIO2>;
++
++			gpio-controller;
++			#gpio-cells = <2>;
++
++			interrupt-controller;
++			#interrupt-cells = <2>;
++		};
++
++		pcfg_pull_up: pcfg-pull-up {
++			bias-pull-up;
++		};
++
++		pcfg_pull_down: pcfg-pull-down {
++			bias-pull-down;
++		};
++
++		pcfg_pull_none: pcfg-pull-none {
++			bias-disable;
++		};
++
++		pwm0 {
++			pwm0_pin: pwm0-pin {
++				rockchip,pins = <0 0 RK_FUNC_2 &pcfg_pull_none>;
++			};
++		};
++
++		pwm1 {
++			pwm1_pin: pwm1-pin {
++				rockchip,pins = <0 1 RK_FUNC_2 &pcfg_pull_none>;
++			};
++		};
++
++		pwm2 {
++			pwm2_pin: pwm2-pin {
++				rockchip,pins = <0 1 2 &pcfg_pull_none>;
++			};
++		};
++
++		pwm3 {
++			pwm3_pin: pwm3-pin {
++				rockchip,pins = <0 27 1 &pcfg_pull_none>;
++			};
++		};
++
++		emmc {
++			/*
++			 * We run eMMC at max speed; bump up drive strength.
++			 * We also have external pulls, so disable the internal ones.
++			 */
++			emmc_clk: emmc-clk {
++				rockchip,pins = <2 4 RK_FUNC_2 &pcfg_pull_none>;
++			};
++
++			emmc_cmd: emmc-cmd {
++				rockchip,pins = <2 1 RK_FUNC_2 &pcfg_pull_none>;
++			};
++
++			emmc_bus8: emmc-bus8 {
++				rockchip,pins = <1 24 RK_FUNC_2 &pcfg_pull_none>,
++						<1 25 RK_FUNC_2 &pcfg_pull_none>,
++						<1 26 RK_FUNC_2 &pcfg_pull_none>,
++						<1 27 RK_FUNC_2 &pcfg_pull_none>,
++						<1 28 RK_FUNC_2 &pcfg_pull_none>,
++						<1 29 RK_FUNC_2 &pcfg_pull_none>,
++						<1 30 RK_FUNC_2 &pcfg_pull_none>,
++						<1 31 RK_FUNC_2 &pcfg_pull_none>;
++			};
++		};
++
++		i2c0 {
++			i2c0_xfer: i2c0-xfer {
++				rockchip,pins = <0 0 RK_FUNC_1 &pcfg_pull_none>,
++						<0 1 RK_FUNC_1 &pcfg_pull_none>;
++			};
++		};
++
++		i2c1 {
++			i2c1_xfer: i2c1-xfer {
++				rockchip,pins = <0 2 RK_FUNC_1 &pcfg_pull_none>,
++						<0 3 RK_FUNC_1 &pcfg_pull_none>;
++			};
++		};
++
++		i2c2 {
++			i2c2_xfer: i2c2-xfer {
++				rockchip,pins = <2 20 RK_FUNC_1 &pcfg_pull_none>,
++						<2 21 RK_FUNC_1 &pcfg_pull_none>;
++			};
++		};
++
++		i2s {
++			i2s_bus: i2s-bus {
++				rockchip,pins = <1 0 RK_FUNC_1 &pcfg_pull_none>,
++						<1 1 RK_FUNC_1 &pcfg_pull_none>,
++						<1 2 RK_FUNC_1 &pcfg_pull_none>,
++						<1 3 RK_FUNC_1 &pcfg_pull_none>,
++						<1 4 RK_FUNC_1 &pcfg_pull_none>,
++						<1 5 RK_FUNC_1 &pcfg_pull_none>;
++			};
++		};
++
++		uart0 {
++			uart0_xfer: uart0-xfer {
++				rockchip,pins = <0 16 RK_FUNC_1 &pcfg_pull_up>,
++						<0 17 RK_FUNC_1 &pcfg_pull_none>;
++			};
++
++			uart0_cts: uart0-cts {
++				rockchip,pins = <0 18 RK_FUNC_1 &pcfg_pull_up>;
++			};
++
++			uart0_rts: uart0-rts {
++				rockchip,pins = <0 19 RK_FUNC_1 &pcfg_pull_none>;
++			};
++		};
++
++		uart1 {
++			uart1_xfer: uart1-xfer {
++				rockchip,pins = <2 22 RK_FUNC_1 &pcfg_pull_none>,
++						<2 23 RK_FUNC_1 &pcfg_pull_none>;
++			};
++			/* no rts / cts for uart1 */
++		};
++
++		uart2 {
++			uart2_xfer: uart2-xfer {
++				rockchip,pins = <1 18 RK_FUNC_2 &pcfg_pull_none>,
++						<1 19 RK_FUNC_2 &pcfg_pull_none>;
++			};
++			/* no rts / cts for uart2 */
++		};
++	};
++};
 -- 
 1.7.9.5
