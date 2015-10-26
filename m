@@ -1,16 +1,16 @@
 From: jiada_wang@mentor.com (Jiada Wang)
-Date: Mon, 26 Oct 2015 12:21:55 +0900
-Subject: No subject
+Date: Mon, 26 Oct 2015 12:26:01 +0900
+Subject: [PATCH v2 4/8] spi: imx: add selection for iMX53 and iMX6
+ controller type
 In-Reply-To: <E1ZqY3A-0004Mt-KH@feisty.vs19.net>
 References: <E1ZqY3A-0004Mt-KH@feisty.vs19.net>
-Message-ID: <562D9C53.3050603@mentor.com>
+Message-ID: <562D9D49.50605@mentor.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hello
 
- > Subject: [PATCH v2 4/8] spi: imx: add selection for iMX53 and iMX6 
-controller type
+> Subject: [PATCH v2 4/8] spi: imx: add selection for iMX53 and iMX6 controller type
 >
 > ECSPI contorller for iMX53 and iMX6 has few hardware issues in slave
 > mode and (32*n+1) SPI word size handling comparing to iMX51.
