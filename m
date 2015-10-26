@@ -1,14 +1,14 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Mon, 26 Oct 2015 10:18:14 +0900
-Subject: [GIT PULL 2/5] Late Samsung DT64 update for v4.4
-In-Reply-To: <562AA4E3.1000001@kernel.org>
+Date: Mon, 26 Oct 2015 10:21:05 +0900
+Subject: [GIT PULL 5/5] Late Samsung defconfig updates for v4.4
+In-Reply-To: <562AA65C.7010702@kernel.org>
 References: <562AA40E.4050407@kernel.org>
- <562AA4E3.1000001@kernel.org>
-Message-ID: <20151026011814.GJ14238@localhost>
+ <562AA65C.7010702@kernel.org>
+Message-ID: <20151026012105.GL14238@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 24, 2015 at 06:21:39AM +0900, Kukjin Kim wrote:
+On Sat, Oct 24, 2015 at 06:27:56AM +0900, Kukjin Kim wrote:
 > The following changes since commit 6ff33f3902c3b1c5d0db6b1e2c70b6d76fba357f:
 > 
 >   Linux 4.3-rc1 (2015-09-12 16:35:56 -0700)
@@ -16,12 +16,12 @@ On Sat, Oct 24, 2015 at 06:21:39AM +0900, Kukjin Kim wrote:
 > are available in the git repository at:
 > 
 >   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
-> tags/samsung-dt64
+> tags/samsung-defconfig
 > 
-> for you to fetch changes up to c60ce7fe82c46d9480b85858828e3042dfe6c9bf:
+> for you to fetch changes up to f0864f843f0249f3e16e1a9af7152d7aa8070b10:
 > 
->   arm64: dts: Add BUS1 instance pinctrl support for exynos7 (2015-10-08
-> 07:18:33 +0900)
+>   ARM: multi_v7_defconfig: Enable rtl8152 ethernet driver for Odroid-XU4
+> (2015-10-24 04:13:12 +0900)
 
 Merged, thanks.
 
