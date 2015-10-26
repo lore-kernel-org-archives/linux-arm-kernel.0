@@ -1,205 +1,523 @@
-From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
-Date: Mon, 26 Oct 2015 10:11:56 +0100
-Subject: [PATCH v10 2/4] PM / Domains: add setter for dev.pm_domain
-In-Reply-To: <2258737.mym2G0FovV@vostro.rjw.lan>
-References: <1445441654-31778-1-git-send-email-tomeu.vizoso@collabora.com>
- <1445441654-31778-3-git-send-email-tomeu.vizoso@collabora.com>
- <2258737.mym2G0FovV@vostro.rjw.lan>
-Message-ID: <CAAObsKA9QJ9-H3=KvNLusy1GSmtsd_U9fhSqXXhzhp-GDhm84g@mail.gmail.com>
+From: hs@denx.de (Heiko Schocher)
+Date: Mon, 26 Oct 2015 10:13:55 +0100
+Subject: [PATCH] regulator: tps65217: remove tps65217.dtsi file
+Message-ID: <1445850836-17863-1-git-send-email-hs@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25 October 2015 at 16:18, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
-> On Wednesday, October 21, 2015 05:34:12 PM Tomeu Vizoso wrote:
->> Adds a function that sets the pointer to dev_pm_domain in struct device
->> and that warns if the device has already finished probing. The reason
->> why we want to enforce that is because in the general case that can
->> cause problems and also that we can simplify code quite a bit if we can
->> always assume that.
->>
->> This patch also changes all current code that directly sets the
->> dev.pm_domain pointer.
->>
->> Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
->> Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
->> ---
->>
->> Changes in v9:
->> - Add docs noting the need for the device lock to be held before calling
->>   dev_pm_domain_set()
->>
->> Changes in v8:
->> - Add dev_pm_domain_set() and update code to use it
->>
->>  arch/arm/mach-omap2/omap_device.c |  7 ++++---
->>  drivers/acpi/acpi_lpss.c          |  5 +++--
->>  drivers/acpi/device_pm.c          |  5 +++--
->>  drivers/base/power/clock_ops.c    |  5 +++--
->>  drivers/base/power/common.c       | 21 +++++++++++++++++++++
->>  drivers/base/power/domain.c       |  4 ++--
->>  drivers/gpu/vga/vga_switcheroo.c  | 10 +++++-----
->>  drivers/misc/mei/pci-me.c         |  5 +++--
->>  drivers/misc/mei/pci-txe.c        |  5 +++--
->>  include/linux/pm_domain.h         |  3 +++
->>  10 files changed, 50 insertions(+), 20 deletions(-)
->>
->> diff --git a/arch/arm/mach-omap2/omap_device.c b/arch/arm/mach-omap2/omap_device.c
->> index 4cb8fd9f741f..204101d11632 100644
->> --- a/arch/arm/mach-omap2/omap_device.c
->> +++ b/arch/arm/mach-omap2/omap_device.c
->> @@ -32,6 +32,7 @@
->>  #include <linux/io.h>
->>  #include <linux/clk.h>
->>  #include <linux/clkdev.h>
->> +#include <linux/pm_domain.h>
->>  #include <linux/pm_runtime.h>
->>  #include <linux/of.h>
->>  #include <linux/notifier.h>
->> @@ -168,7 +169,7 @@ static int omap_device_build_from_dt(struct platform_device *pdev)
->>                       r->name = dev_name(&pdev->dev);
->>       }
->>
->> -     pdev->dev.pm_domain = &omap_device_pm_domain;
->> +     dev_pm_domain_set(&pdev->dev, &omap_device_pm_domain);
->>
->>       if (device_active) {
->>               omap_device_enable(pdev);
->> @@ -180,7 +181,7 @@ odbfd_exit1:
->>  odbfd_exit:
->>       /* if data/we are at fault.. load up a fail handler */
->>       if (ret)
->> -             pdev->dev.pm_domain = &omap_device_fail_pm_domain;
->> +             dev_pm_domain_set(&pdev->dev, &omap_device_fail_pm_domain);
->>
->>       return ret;
->>  }
->> @@ -701,7 +702,7 @@ int omap_device_register(struct platform_device *pdev)
->>  {
->>       pr_debug("omap_device: %s: registering\n", pdev->name);
->>
->> -     pdev->dev.pm_domain = &omap_device_pm_domain;
->> +     dev_pm_domain_set(&pdev->dev, &omap_device_pm_domain);
->>       return platform_device_add(pdev);
->>  }
->>
->> diff --git a/drivers/acpi/acpi_lpss.c b/drivers/acpi/acpi_lpss.c
->> index f51bd0d0bc17..cc6e1abc69b3 100644
->> --- a/drivers/acpi/acpi_lpss.c
->> +++ b/drivers/acpi/acpi_lpss.c
->> @@ -17,6 +17,7 @@
->>  #include <linux/io.h>
->>  #include <linux/platform_device.h>
->>  #include <linux/platform_data/clk-lpss.h>
->> +#include <linux/pm_domain.h>
->>  #include <linux/pm_runtime.h>
->>  #include <linux/delay.h>
->>
->> @@ -706,7 +707,7 @@ static int acpi_lpss_platform_notify(struct notifier_block *nb,
->>
->>       switch (action) {
->>       case BUS_NOTIFY_ADD_DEVICE:
->> -             pdev->dev.pm_domain = &acpi_lpss_pm_domain;
->> +             dev_pm_domain_set(&pdev->dev, &acpi_lpss_pm_domain);
->>               if (pdata->dev_desc->flags & LPSS_LTR)
->>                       return sysfs_create_group(&pdev->dev.kobj,
->>                                                 &lpss_attr_group);
->> @@ -714,7 +715,7 @@ static int acpi_lpss_platform_notify(struct notifier_block *nb,
->>       case BUS_NOTIFY_DEL_DEVICE:
->>               if (pdata->dev_desc->flags & LPSS_LTR)
->>                       sysfs_remove_group(&pdev->dev.kobj, &lpss_attr_group);
->> -             pdev->dev.pm_domain = NULL;
->> +             dev_pm_domain_set(&pdev->dev, NULL);
->>               break;
->>       default:
->>               break;
->> diff --git a/drivers/acpi/device_pm.c b/drivers/acpi/device_pm.c
->> index 4806b7f856c4..8c5955bf9bbf 100644
->> --- a/drivers/acpi/device_pm.c
->> +++ b/drivers/acpi/device_pm.c
->> @@ -22,6 +22,7 @@
->>  #include <linux/export.h>
->>  #include <linux/mutex.h>
->>  #include <linux/pm_qos.h>
->> +#include <linux/pm_domain.h>
->>  #include <linux/pm_runtime.h>
->>
->>  #include "internal.h"
->> @@ -1076,7 +1077,7 @@ static void acpi_dev_pm_detach(struct device *dev, bool power_off)
->>       struct acpi_device *adev = ACPI_COMPANION(dev);
->>
->>       if (adev && dev->pm_domain == &acpi_general_pm_domain) {
->> -             dev->pm_domain = NULL;
->> +             dev_pm_domain_set(dev, NULL);
->>               acpi_remove_pm_notifier(adev);
->>               if (power_off) {
->>                       /*
->> @@ -1128,7 +1129,7 @@ int acpi_dev_pm_attach(struct device *dev, bool power_on)
->>               return -EBUSY;
->>
->>       acpi_add_pm_notifier(adev, dev, acpi_pm_notify_work_func);
->> -     dev->pm_domain = &acpi_general_pm_domain;
->> +     dev_pm_domain_set(dev, &acpi_general_pm_domain);
->>       if (power_on) {
->>               acpi_dev_pm_full_power(adev);
->>               acpi_device_wakeup(adev, ACPI_STATE_S0, false);
->> diff --git a/drivers/base/power/clock_ops.c b/drivers/base/power/clock_ops.c
->> index 652b5a367c1f..e80fda6c03a9 100644
->> --- a/drivers/base/power/clock_ops.c
->> +++ b/drivers/base/power/clock_ops.c
->> @@ -15,6 +15,7 @@
->>  #include <linux/clkdev.h>
->>  #include <linux/slab.h>
->>  #include <linux/err.h>
->> +#include <linux/pm_domain.h>
->>  #include <linux/pm_runtime.h>
->>
->>  #ifdef CONFIG_PM
->> @@ -346,7 +347,7 @@ static int pm_clk_notify(struct notifier_block *nb,
->>               if (error)
->>                       break;
->>
->> -             dev->pm_domain = clknb->pm_domain;
->> +             dev_pm_domain_set(dev, clknb->pm_domain);
->>               if (clknb->con_ids[0]) {
->>                       for (con_id = clknb->con_ids; *con_id; con_id++)
->>                               pm_clk_add(dev, *con_id);
->> @@ -359,7 +360,7 @@ static int pm_clk_notify(struct notifier_block *nb,
->>               if (dev->pm_domain != clknb->pm_domain)
->>                       break;
->>
->> -             dev->pm_domain = NULL;
->> +             dev_pm_domain_set(dev, NULL);
->>               pm_clk_destroy(dev);
->>               break;
->>       }
->> diff --git a/drivers/base/power/common.c b/drivers/base/power/common.c
->> index f32b802b98f4..a70f8a5cdfd7 100644
->> --- a/drivers/base/power/common.c
->> +++ b/drivers/base/power/common.c
->> @@ -128,3 +128,24 @@ void dev_pm_domain_detach(struct device *dev, bool power_off)
->>               dev->pm_domain->detach(dev, power_off);
->>  }
->>  EXPORT_SYMBOL_GPL(dev_pm_domain_detach);
->> +
->> +/**
->> + * dev_pm_domain_set - Set PM domain of a device.
->> + * @dev: Device whose PM domain is to be set.
->> + * @pd: PM domain to be set, or NULL.
->> + *
->> + * Sets the PM domain the device belongs to. The PM domain of a device needs
->> + * to be set before its probe finishes (it's bound to a driver).
->> + *
->> + * This function must be called with the device lock held.
->
-> So obviously every caller of this function that doesn't lock the device has to
-> be called with the device locked already.
->
-> Have you verified that this is the case?
+remove tps65217.dtsi and adapt all boards, which
+used it.
 
-Haven't checked that all the possible codepaths have the device lock,
-but as they were modifying dev->pm_domain already, I assumed they
-should.
+Signed-off-by: Heiko Schocher <hs@denx.de>
+---
+Suggested by Mark Brown, see:
+https://lkml.org/lkml/2015/10/21/581
 
-Regards,
+ .../devicetree/bindings/regulator/tps65217.txt     | 78 ----------------------
+ arch/arm/boot/dts/am335x-bone-common.dtsi          | 14 +++-
+ arch/arm/boot/dts/am335x-chilisom.dtsi             | 14 +++-
+ arch/arm/boot/dts/am335x-nano.dts                  | 14 +++-
+ arch/arm/boot/dts/am335x-pepper.dts                | 14 +++-
+ arch/arm/boot/dts/am335x-sl50.dts                  | 13 +++-
+ arch/arm/boot/dts/tps65217.dtsi                    | 56 ----------------
+ 7 files changed, 58 insertions(+), 145 deletions(-)
+ delete mode 100644 Documentation/devicetree/bindings/regulator/tps65217.txt
+ delete mode 100644 arch/arm/boot/dts/tps65217.dtsi
 
-Tomeu
+diff --git a/Documentation/devicetree/bindings/regulator/tps65217.txt b/Documentation/devicetree/bindings/regulator/tps65217.txt
+deleted file mode 100644
+index 4f05d20..0000000
+--- a/Documentation/devicetree/bindings/regulator/tps65217.txt
++++ /dev/null
+@@ -1,78 +0,0 @@
+-TPS65217 family of regulators
+-
+-Required properties:
+-- compatible: "ti,tps65217"
+-- reg: I2C slave address
+-- regulators: list of regulators provided by this controller, must be named
+-  after their hardware counterparts: dcdc[1-3] and ldo[1-4]
+-- regulators: This is the list of child nodes that specify the regulator
+-  initialization data for defined regulators. Not all regulators for the given
+-  device need to be present. The definition for each of these nodes is defined
+-  using the standard binding for regulators found at
+-  Documentation/devicetree/bindings/regulator/regulator.txt.
+-
+-Optional properties:
+-- ti,pmic-shutdown-controller: Telling the PMIC to shutdown on PWR_EN toggle.
+-
+-  The valid names for regulators are:
+-  tps65217: dcdc1, dcdc2, dcdc3, ldo1, ldo2, ldo3 and ldo4
+-
+-Each regulator is defined using the standard binding for regulators.
+-
+-Example:
+-
+-	tps: tps at 24 {
+-		compatible = "ti,tps65217";
+-		ti,pmic-shutdown-controller;
+-
+-		regulators {
+-			dcdc1_reg: dcdc1 {
+-				regulator-min-microvolt = <900000>;
+-				regulator-max-microvolt = <1800000>;
+-				regulator-boot-on;
+-				regulator-always-on;
+-			};
+-
+-			dcdc2_reg: dcdc2 {
+-				regulator-min-microvolt = <900000>;
+-				regulator-max-microvolt = <3300000>;
+-				regulator-boot-on;
+-				regulator-always-on;
+-			};
+-
+-			dcdc3_reg: dcc3 {
+-				regulator-min-microvolt = <900000>;
+-				regulator-max-microvolt = <1500000>;
+-				regulator-boot-on;
+-				regulator-always-on;
+-			};
+-
+-			ldo1_reg: ldo1 {
+-				regulator-min-microvolt = <1000000>;
+-				regulator-max-microvolt = <3300000>;
+-				regulator-boot-on;
+-				regulator-always-on;
+-			};
+-
+-			ldo2_reg: ldo2 {
+-				regulator-min-microvolt = <900000>;
+-				regulator-max-microvolt = <3300000>;
+-				regulator-boot-on;
+-				regulator-always-on;
+-			};
+-
+-			ldo3_reg: ldo3 {
+-				regulator-min-microvolt = <1800000>;
+-				regulator-max-microvolt = <3300000>;
+-				regulator-boot-on;
+-				regulator-always-on;
+-			};
+-
+-			ldo4_reg: ldo4 {
+-				regulator-min-microvolt = <1800000>;
+-				regulator-max-microvolt = <3300000>;
+-				regulator-boot-on;
+-				regulator-always-on;
+-			};
+-		};
+-	};
+diff --git a/arch/arm/boot/dts/am335x-bone-common.dtsi b/arch/arm/boot/dts/am335x-bone-common.dtsi
+index fec7834..0c4bde0 100644
+--- a/arch/arm/boot/dts/am335x-bone-common.dtsi
++++ b/arch/arm/boot/dts/am335x-bone-common.dtsi
+@@ -285,10 +285,8 @@
+ 	};
+ };
+ 
+-
+-/include/ "tps65217.dtsi"
+-
+ &tps {
++	compatible = "ti,tps65217";
+ 	/*
+ 	 * Configure pmic to enter OFF-state instead of SLEEP-state ("RTC-only
+ 	 * mode") at poweroff.  Most BeagleBone versions do not support RTC-only
+@@ -309,12 +307,17 @@
+ 	ti,pmic-shutdown-controller;
+ 
+ 	regulators {
++		#address-cells = <1>;
++		#size-cells = <0>;
++
+ 		dcdc1_reg: regulator at 0 {
++			reg = <0>;
+ 			regulator-name = "vdds_dpr";
+ 			regulator-always-on;
+ 		};
+ 
+ 		dcdc2_reg: regulator at 1 {
++			reg = <1>;
+ 			/* VDD_MPU voltage limits 0.95V - 1.26V with +/-4% tolerance */
+ 			regulator-name = "vdd_mpu";
+ 			regulator-min-microvolt = <925000>;
+@@ -324,6 +327,7 @@
+ 		};
+ 
+ 		dcdc3_reg: regulator at 2 {
++			reg = <2>;
+ 			/* VDD_CORE voltage limits 0.95V - 1.1V with +/-4% tolerance */
+ 			regulator-name = "vdd_core";
+ 			regulator-min-microvolt = <925000>;
+@@ -333,21 +337,25 @@
+ 		};
+ 
+ 		ldo1_reg: regulator at 3 {
++			reg = <3>;
+ 			regulator-name = "vio,vrtc,vdds";
+ 			regulator-always-on;
+ 		};
+ 
+ 		ldo2_reg: regulator at 4 {
++			reg = <4>;
+ 			regulator-name = "vdd_3v3aux";
+ 			regulator-always-on;
+ 		};
+ 
+ 		ldo3_reg: regulator at 5 {
++			reg = <5>;
+ 			regulator-name = "vdd_1v8";
+ 			regulator-always-on;
+ 		};
+ 
+ 		ldo4_reg: regulator at 6 {
++			reg = <6>;
+ 			regulator-name = "vdd_3v3a";
+ 			regulator-always-on;
+ 		};
+diff --git a/arch/arm/boot/dts/am335x-chilisom.dtsi b/arch/arm/boot/dts/am335x-chilisom.dtsi
+index 7e9a34d..9f5ee9a 100644
+--- a/arch/arm/boot/dts/am335x-chilisom.dtsi
++++ b/arch/arm/boot/dts/am335x-chilisom.dtsi
+@@ -128,16 +128,21 @@
+ 
+ };
+ 
+-/include/ "tps65217.dtsi"
+-
+ &tps {
++	compatible = "ti,tps65217";
++
+ 	regulators {
++		#address-cells = <1>;
++		#size-cells = <0>;
++
+ 		dcdc1_reg: regulator at 0 {
++			reg = <0>;
+ 			regulator-name = "vdds_dpr";
+ 			regulator-always-on;
+ 		};
+ 
+ 		dcdc2_reg: regulator at 1 {
++			reg = <1>;
+ 			/* VDD_MPU voltage limits 0.95V - 1.26V with +/-4% tolerance */
+ 			regulator-name = "vdd_mpu";
+ 			regulator-min-microvolt = <925000>;
+@@ -147,6 +152,7 @@
+ 		};
+ 
+ 		dcdc3_reg: regulator at 2 {
++			reg = <2>;
+ 			/* VDD_CORE voltage limits 0.95V - 1.1V with +/-4% tolerance */
+ 			regulator-name = "vdd_core";
+ 			regulator-min-microvolt = <925000>;
+@@ -156,24 +162,28 @@
+ 		};
+ 
+ 		ldo1_reg: regulator at 3 {
++			reg = <3>;
+ 			regulator-name = "vio,vrtc,vdds";
+ 			regulator-boot-on;
+ 			regulator-always-on;
+ 		};
+ 
+ 		ldo2_reg: regulator at 4 {
++			reg = <4>;
+ 			regulator-name = "vdd_3v3aux";
+ 			regulator-boot-on;
+ 			regulator-always-on;
+ 		};
+ 
+ 		ldo3_reg: regulator at 5 {
++			reg = <5>;
+ 			regulator-name = "vdd_1v8";
+ 			regulator-boot-on;
+ 			regulator-always-on;
+ 		};
+ 
+ 		ldo4_reg: regulator at 6 {
++			reg = <6>;
+ 			regulator-name = "vdd_3v3d";
+ 			regulator-boot-on;
+ 			regulator-always-on;
+diff --git a/arch/arm/boot/dts/am335x-nano.dts b/arch/arm/boot/dts/am335x-nano.dts
+index 5ed4ca6..041adb8 100644
+--- a/arch/arm/boot/dts/am335x-nano.dts
++++ b/arch/arm/boot/dts/am335x-nano.dts
+@@ -375,11 +375,15 @@
+ 	wp-gpios = <&gpio3 18 0>;
+ };
+ 
+-#include "tps65217.dtsi"
+-
+ &tps {
++	compatible = "ti,tps65217";
++
+ 	regulators {
++		#address-cells = <1>;
++		#size-cells = <0>;
++
+ 		dcdc1_reg: regulator at 0 {
++			reg = <0>;
+ 			/* +1.5V voltage with ?4% tolerance */
+ 			regulator-min-microvolt = <1450000>;
+ 			regulator-max-microvolt = <1550000>;
+@@ -388,6 +392,7 @@
+ 		};
+ 
+ 		dcdc2_reg: regulator at 1 {
++			reg = <1>;
+ 			/* VDD_MPU voltage limits 0.95V - 1.1V with ?4% tolerance */
+ 			regulator-name = "vdd_mpu";
+ 			regulator-min-microvolt = <915000>;
+@@ -397,6 +402,7 @@
+ 		};
+ 
+ 		dcdc3_reg: regulator at 2 {
++			reg = <2>;
+ 			/* VDD_CORE voltage limits 0.95V - 1.1V with ?4% tolerance */
+ 			regulator-name = "vdd_core";
+ 			regulator-min-microvolt = <915000>;
+@@ -406,6 +412,7 @@
+ 		};
+ 
+ 		ldo1_reg: regulator at 3 {
++			reg = <3>;
+ 			/* +1.8V voltage with ?4% tolerance */
+ 			regulator-min-microvolt = <1750000>;
+ 			regulator-max-microvolt = <1870000>;
+@@ -414,6 +421,7 @@
+ 		};
+ 
+ 		ldo2_reg: regulator at 4 {
++			reg = <4>;
+ 			/* +3.3V voltage with ?4% tolerance */
+ 			regulator-min-microvolt = <3175000>;
+ 			regulator-max-microvolt = <3430000>;
+@@ -422,6 +430,7 @@
+ 		};
+ 
+ 		ldo3_reg: regulator at 5 {
++			reg = <5>;
+ 			/* +1.8V voltage with ?4% tolerance */
+ 			regulator-min-microvolt = <1750000>;
+ 			regulator-max-microvolt = <1870000>;
+@@ -430,6 +439,7 @@
+ 		};
+ 
+ 		ldo4_reg: regulator at 6 {
++			reg = <6>;
+ 			/* +3.3V voltage with ?4% tolerance */
+ 			regulator-min-microvolt = <3175000>;
+ 			regulator-max-microvolt = <3430000>;
+diff --git a/arch/arm/boot/dts/am335x-pepper.dts b/arch/arm/boot/dts/am335x-pepper.dts
+index 7106114..32924a9 100644
+--- a/arch/arm/boot/dts/am335x-pepper.dts
++++ b/arch/arm/boot/dts/am335x-pepper.dts
+@@ -427,9 +427,9 @@
+ 	vin-supply = <&vbat>;
+ };
+ 
+-/include/ "tps65217.dtsi"
+-
+ &tps {
++	compatible = "ti,tps65217";
++
+ 	backlight {
+ 		isel = <1>; /* ISET1 */
+ 		fdim = <200>; /* TPS65217_BL_FDIM_200HZ */
+@@ -437,12 +437,17 @@
+ 	};
+ 
+ 	regulators {
++		#address-cells = <1>;
++		#size-cells = <0>;
++
+ 		dcdc1_reg: regulator at 0 {
++			reg = <0>;
+ 			/* VDD_1V8 system supply */
+ 			regulator-always-on;
+ 		};
+ 
+ 		dcdc2_reg: regulator at 1 {
++			reg = <1>;
+ 			/* VDD_CORE voltage limits 0.95V - 1.26V with +/-4% tolerance */
+ 			regulator-name = "vdd_core";
+ 			regulator-min-microvolt = <925000>;
+@@ -452,6 +457,7 @@
+ 		};
+ 
+ 		dcdc3_reg: regulator at 2 {
++			reg = <2>;
+ 			/* VDD_MPU voltage limits 0.95V - 1.1V with +/-4% tolerance */
+ 			regulator-name = "vdd_mpu";
+ 			regulator-min-microvolt = <925000>;
+@@ -461,18 +467,21 @@
+ 		};
+ 
+ 		ldo1_reg: regulator at 3 {
++			reg = <3>;
+ 			/* VRTC 1.8V always-on supply */
+ 			regulator-name = "vrtc,vdds";
+ 			regulator-always-on;
+ 		};
+ 
+ 		ldo2_reg: regulator at 4 {
++			reg = <4>;
+ 			/* 3.3V rail */
+ 			regulator-name = "vdd_3v3aux";
+ 			regulator-always-on;
+ 		};
+ 
+ 		ldo3_reg: regulator at 5 {
++			reg = <5>;
+ 			/* VDD_3V3A 3.3V rail */
+ 			regulator-name = "vdd_3v3a";
+ 			regulator-min-microvolt = <3300000>;
+@@ -480,6 +489,7 @@
+ 		};
+ 
+ 		ldo4_reg: regulator at 6 {
++			reg = <6>;
+ 			/* VDD_3V3B 3.3V rail */
+ 			regulator-name = "vdd_3v3b";
+ 			regulator-always-on;
+diff --git a/arch/arm/boot/dts/am335x-sl50.dts b/arch/arm/boot/dts/am335x-sl50.dts
+index 3303c28..d38edfa 100644
+--- a/arch/arm/boot/dts/am335x-sl50.dts
++++ b/arch/arm/boot/dts/am335x-sl50.dts
+@@ -375,16 +375,19 @@
+ 	pinctrl-0 = <&uart4_pins>;
+ };
+ 
+-#include "tps65217.dtsi"
+-
+ &tps {
++	compatible = "ti,tps65217";
+ 	ti,pmic-shutdown-controller;
+ 
+ 	interrupt-parent = <&intc>;
+ 	interrupts = <7>;	/* NNMI */
+ 
+ 	regulators {
++		#address-cells = <1>;
++		#size-cells = <0>;
++
+ 		dcdc1_reg: regulator at 0 {
++			reg = <0>;
+ 			/* VDDS_DDR */
+ 			regulator-min-microvolt = <1500000>;
+ 			regulator-max-microvolt = <1500000>;
+@@ -392,6 +395,7 @@
+ 		};
+ 
+ 		dcdc2_reg: regulator at 1 {
++			reg = <1>;
+ 			/* VDD_MPU voltage limits 0.95V - 1.26V with +/-4% tolerance */
+ 			regulator-name = "vdd_mpu";
+ 			regulator-min-microvolt = <925000>;
+@@ -401,6 +405,7 @@
+ 		};
+ 
+ 		dcdc3_reg: regulator at 2 {
++			reg = <2>;
+ 			/* VDD_CORE voltage limits 0.95V - 1.1V with +/-4% tolerance */
+ 			regulator-name = "vdd_core";
+ 			regulator-min-microvolt = <925000>;
+@@ -410,6 +415,7 @@
+ 		};
+ 
+ 		ldo1_reg: regulator at 3 {
++			reg = <3>;
+ 			/* VRTC / VIO / VDDS*/
+ 			regulator-always-on;
+ 			regulator-min-microvolt = <1800000>;
+@@ -417,6 +423,7 @@
+ 		};
+ 
+ 		ldo2_reg: regulator at 4 {
++			reg = <4>;
+ 			/* VDD_3V3AUX */
+ 			regulator-always-on;
+ 			regulator-min-microvolt = <3300000>;
+@@ -424,6 +431,7 @@
+ 		};
+ 
+ 		ldo3_reg: regulator at 5 {
++			reg = <5>;
+ 			/* VDD_1V8 */
+ 			regulator-min-microvolt = <1800000>;
+ 			regulator-max-microvolt = <1800000>;
+@@ -431,6 +439,7 @@
+ 		};
+ 
+ 		ldo4_reg: regulator at 6 {
++			reg = <6>;
+ 			/* VDD_3V3A */
+ 			regulator-min-microvolt = <3300000>;
+ 			regulator-max-microvolt = <3300000>;
+diff --git a/arch/arm/boot/dts/tps65217.dtsi b/arch/arm/boot/dts/tps65217.dtsi
+deleted file mode 100644
+index a632724..0000000
+--- a/arch/arm/boot/dts/tps65217.dtsi
++++ /dev/null
+@@ -1,56 +0,0 @@
+-/*
+- * Copyright (C) 2012 Texas Instruments Incorporated - http://www.ti.com/
+- *
+- * This program is free software; you can redistribute it and/or modify
+- * it under the terms of the GNU General Public License version 2 as
+- * published by the Free Software Foundation.
+- */
+-
+-/*
+- * Integrated Power Management Chip
+- * http://www.ti.com/lit/ds/symlink/tps65217.pdf
+- */
+-
+-&tps {
+-	compatible = "ti,tps65217";
+-
+-	regulators {
+-		#address-cells = <1>;
+-		#size-cells = <0>;
+-
+-		dcdc1_reg: regulator at 0 {
+-			reg = <0>;
+-			regulator-compatible = "dcdc1";
+-		};
+-
+-		dcdc2_reg: regulator at 1 {
+-			reg = <1>;
+-			regulator-compatible = "dcdc2";
+-		};
+-
+-		dcdc3_reg: regulator at 2 {
+-			reg = <2>;
+-			regulator-compatible = "dcdc3";
+-		};
+-
+-		ldo1_reg: regulator at 3 {
+-			reg = <3>;
+-			regulator-compatible = "ldo1";
+-		};
+-
+-		ldo2_reg: regulator at 4 {
+-			reg = <4>;
+-			regulator-compatible = "ldo2";
+-		};
+-
+-		ldo3_reg: regulator at 5 {
+-			reg = <5>;
+-			regulator-compatible = "ldo3";
+-		};
+-
+-		ldo4_reg: regulator at 6 {
+-			reg = <6>;
+-			regulator-compatible = "ldo4";
+-		};
+-	};
+-};
+-- 
+2.1.0
