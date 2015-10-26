@@ -1,60 +1,73 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Mon, 26 Oct 2015 15:32:45 +0100
-Subject: [PATCH v2 1/2] add hooks for armv8 fp/simd lazy switch
-In-Reply-To: <1444098794-19244-2-git-send-email-m.smarduch@samsung.com>
-References: <1444098794-19244-1-git-send-email-m.smarduch@samsung.com>
- <1444098794-19244-2-git-send-email-m.smarduch@samsung.com>
-Message-ID: <20151026143245.GC20298@cbox>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Mon, 26 Oct 2015 14:42:23 +0000
+Subject: [PATCH v13 5/5] uart: pl011: Add support to ZTE ZX296702 uart
+In-Reply-To: <562E33AE.2020608@codeaurora.org>
+References: <1438328959-16177-1-git-send-email-jun.nie@linaro.org>
+ <1438328959-16177-6-git-send-email-jun.nie@linaro.org>
+ <55FC16A2.5070207@arm.com>
+ <CABymUCOA3oG7Hq83hDyQ_uisQHeipoHshcWONWTtjxKvikzjsQ@mail.gmail.com>
+ <CAOZdJXUjZLKkUYScD7oDTMuRUtAEJ6=DopmE4n6Vb9zyv+_viA@mail.gmail.com>
+ <CABymUCORU9CDD64Rdw2VX0kLSe6E1zY9iZCap5xittoVFwbOtw@mail.gmail.com>
+ <562AFBD5.3050508@codeaurora.org> <562DF96D.6020307@arm.com>
+ <562E20B2.4050805@codeaurora.org> <562E3213.8070602@arm.com>
+ <562E33AE.2020608@codeaurora.org>
+Message-ID: <562E3BCF.7010000@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 05, 2015 at 07:33:13PM -0700, Mario Smarduch wrote:
-> This patch adds hooks to support fp/simd lazy switch. A vcpu flag to track
-> fp/simd state, and flag offset in vcpu structure.
+Hi,
+
+On 26/10/15 14:07, Timur Tabi wrote:
+> Andre Przywara wrote:
 > 
-> Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
-> ---
->  arch/arm64/include/asm/kvm_host.h | 3 +++
->  arch/arm64/kernel/asm-offsets.c   | 1 +
->  2 files changed, 4 insertions(+)
+>> Yeah, I was interested in that scenario too, because the SBSA spec
+>> actually speaks of 32-bit registers and vendors may implement it
+>> strictly as that. Still waiting for actual failure reports on this
+>> before I wanted to push a fix, though.
 > 
-> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-> index 4562459..03f25d0 100644
-> --- a/arch/arm64/include/asm/kvm_host.h
-> +++ b/arch/arm64/include/asm/kvm_host.h
-> @@ -157,6 +157,9 @@ struct kvm_vcpu_arch {
->  	/* Interrupt related fields */
->  	u64 irq_lines;		/* IRQ and FIQ levels */
->  
-> +	/* Track fp/simd lazy switch */
-> +	u32 vfp_lazy;
-> +
+> What do you mean by failure reports?  Our hardware generates an SError
+> if you try to access the PL011 registers with 8-bit or 16-bit reads or
+> writes.
 
+I meant that if some hardware does not work with an upstream kernel, I'd
+expect some kind of failure report or a patch on the public mailing
+list. I may have missed it, but I couldn't find anything on the list so far.
 
-like for the 32-bit patch set I think this could have a more meaningful
-name with more clearly defined semantics, e.g. vfp_host_dirty.  You
-could also call it vfp_flags like the debug flags and define a specific
-flag for your use...
+As mentioned earlier, I didn't want to change code without good reasons,
+that's why I was waiting for people to scream.
 
-Thanks,
--Christoffer
+So I just take this as a scream, then ;-)
 
+Can you elaborate on that? Is your UART a PL011 one (using the arm,pl011
+DT binding or AMBA ID registers) or are you using the SBSA subset only?
+Is there some means to identify this particular UART?
 
->  	/* Cache some mmu pages needed inside spinlock regions */
->  	struct kvm_mmu_memory_cache mmu_page_cache;
->  
-> diff --git a/arch/arm64/kernel/asm-offsets.c b/arch/arm64/kernel/asm-offsets.c
-> index 8d89cf8..8311da4 100644
-> --- a/arch/arm64/kernel/asm-offsets.c
-> +++ b/arch/arm64/kernel/asm-offsets.c
-> @@ -124,6 +124,7 @@ int main(void)
->    DEFINE(VCPU_HCR_EL2,		offsetof(struct kvm_vcpu, arch.hcr_el2));
->    DEFINE(VCPU_MDCR_EL2,	offsetof(struct kvm_vcpu, arch.mdcr_el2));
->    DEFINE(VCPU_IRQ_LINES,	offsetof(struct kvm_vcpu, arch.irq_lines));
-> +  DEFINE(VCPU_VFP_LAZY,         offsetof(struct kvm_vcpu, arch.vfp_lazy));
->    DEFINE(VCPU_HOST_CONTEXT,	offsetof(struct kvm_vcpu, arch.host_cpu_context));
->    DEFINE(VCPU_HOST_DEBUG_STATE, offsetof(struct kvm_vcpu, arch.host_debug_state));
->    DEFINE(VCPU_TIMER_CNTV_CTL,	offsetof(struct kvm_vcpu, arch.timer_cpu.cntv_ctl));
-> -- 
-> 1.9.1
+>>> We have an internal patch
+>>> that replaces all of the read/write routines with vendor function calls.
+>>>   I would need to refactor our patch on top of yours.
+>>
+>> But wouldn't Jun's patch address this more easily, because it wraps
+>> every call already? TBH I found this change the most interesting.
 > 
+> Yes, but I think it changes a lot of things unnecessarily, like the
+> register names.
+
+Which is unfortunate, but cannot be changed anymore. And as much as I
+dislike this myself, I guess we cannot ignore this hardware just because
+it doesn't go easily with our driver code. So instead of having just
+another driver which is strikingly similar, I'd rather have this in the
+one-and-only PL011 driver which is much less subject to bit-rot.
+
+So my idea here was to split Jun's series into introducing the
+readl/writel wrappers first, and adding the register address mangling on
+top of that. Given that those changed register addresses seem to be a
+mishap to me, we could just get away with a ZTE specific translate
+function, which takes a PL011 register number and returns the actual
+register offset to use. That isn't very generic, but would hide this
+ugliness without spoiling the whole driver.
+
+So both you and me could benefit from the wrapper functions already,
+while Jun has some patches less to care about.
+
+Cheers,
+Andre.
