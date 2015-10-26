@@ -1,45 +1,39 @@
-From: bayi.cheng@mediatek.com (Bayi Cheng)
-Date: Mon, 26 Oct 2015 21:40:39 +0800
-Subject: [PATCH v5 3/3] arm64: dts: mt8173: Add nor flash node
-In-Reply-To: <1445866839-31063-1-git-send-email-bayi.cheng@mediatek.com>
-References: <1445866839-31063-1-git-send-email-bayi.cheng@mediatek.com>
-Message-ID: <1445866839-31063-4-git-send-email-bayi.cheng@mediatek.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 26 Oct 2015 14:41:38 +0100
+Subject: [PATCH v2 8/9] ARM: dts: Add leds support to STM32F429 Discovery
+ board
+In-Reply-To: <1445102604-11502-9-git-send-email-mcoquelin.stm32@gmail.com>
+References: <1445102604-11502-1-git-send-email-mcoquelin.stm32@gmail.com>
+ <1445102604-11502-9-git-send-email-mcoquelin.stm32@gmail.com>
+Message-ID: <CACRpkdYjq9XqKM4imYsaa_HBopS7uFnbb6gf=hRZHGC4baafAg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add Mediatek nor flash node
+On Sat, Oct 17, 2015 at 7:23 PM, Maxime Coquelin
+<mcoquelin.stm32@gmail.com> wrote:
 
-Signed-off-by: Bayi Cheng <bayi.cheng@mediatek.com>
----
- arch/arm64/boot/dts/mediatek/mt8173.dtsi | 16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
+> Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
+(...)
+> +       leds {
+> +               compatible = "gpio-leds";
+> +               red {
+> +                       gpios = <&gpiog 14 0>;
+> +               };
+> +               green {
+> +                       gpios = <&gpiog 13 0>;
+> +               };
 
-diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-index d18ee42..f5f08eb 100644
---- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-+++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-@@ -365,6 +365,22 @@
- 			status = "disabled";
- 		};
- 
-+		nor_flash: spi at 1100d000 {
-+			compatible = "mediatek,mt8173-nor";
-+			reg = <0 0x1100d000 0 0xe0>;
-+			clocks = <&pericfg CLK_PERI_SPI>,
-+				 <&topckgen CLK_TOP_SPINFI_IFR_SEL>;
-+			clock-names = "spi", "sf";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			status = "disabled";
-+
-+			flash at 0 {
-+				compatible = "jedec,spi-nor";
-+				reg = <0>;
-+			};
-+		};
-+
- 		i2c3: i2c3 at 11010000 {
- 			compatible = "mediatek,mt8173-i2c";
- 			reg = <0 0x11010000 0 0x70>,
--- 
-1.8.1.1.dirty
+I suggest you add labels to these LEDs.
+
+label = "red-LED"
+label = "green-LED"
+
+This make things so much easier in sysfs.
+
+Usually people also want to add a default linux,trigger to these,
+like linux,default-trigger = "heartbeat"; but whatever you prefer.
+
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
+
+Yours,
+Linus Walleij
