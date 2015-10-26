@@ -1,67 +1,79 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Mon, 26 Oct 2015 14:48:28 +0900
-Subject: [GIT PULL] Allwinner DT changes for 4.4, round 3
-In-Reply-To: <CAGb2v671MmpRHkWKpOd8kmEbvfTKTU9k7AU_bP+AgRuguodWkQ@mail.gmail.com>
-References: <20151023180711.GA11749@lukather> <4745252.gLSrJNQ42D@wuerfel>
- <9946613.K7Ehp1DEiL@wuerfel> <20151025201308.GS10947@lukather>
- <20151026010752.GG14238@localhost>
- <CAGb2v671MmpRHkWKpOd8kmEbvfTKTU9k7AU_bP+AgRuguodWkQ@mail.gmail.com>
-Message-ID: <20151026054828.GD4216@localhost>
+Date: Mon, 26 Oct 2015 14:55:57 +0900
+Subject: [GIT PULL] pxa for v4.4
+In-Reply-To: <87d1w4wagr.fsf@belgarion.home>
+References: <878u72zlif.fsf@belgarion.home> <20151023171539.GB2224@localhost>
+ <87d1w4wagr.fsf@belgarion.home>
+Message-ID: <20151026055557.GE4216@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 26, 2015 at 09:46:24AM +0800, Chen-Yu Tsai wrote:
-> Hi Olof,
+On Sat, Oct 24, 2015 at 12:17:25PM +0200, Robert Jarzmik wrote:
+> Olof Johansson <olof@lixom.net> writes:
 > 
-> On Mon, Oct 26, 2015 at 9:07 AM, Olof Johansson <olof@lixom.net> wrote:
-> > On Sun, Oct 25, 2015 at 09:13:08PM +0100, Maxime Ripard wrote:
-> >> On Fri, Oct 23, 2015 at 10:55:13PM +0200, Arnd Bergmann wrote:
-> >> > On Friday 23 October 2015 22:41:04 Arnd Bergmann wrote:
-> >> > > On Friday 23 October 2015 20:07:11 Maxime Ripard wrote:
-> >> > > > Allwinner DT changes for 4.4, round 3
-> >> > > >
-> >> > > > A bunch of new boards, but mostly enable the support for the Audio Codec
-> >> > > > on the older SoCs (A10, A10s, A13, A20, R8) and enable it on various
-> >> > > > boards.
-> >> > > >
-> >> > > >
-> >> > >
-> >> > > Pulled into next/dt, thanks!
-> >> >
-> >> > And dropped again:
-> >> >
-> >> > In file included from /git/arm-soc/arch/arm/boot/dts/sun4i-a10-a1000.dts:46:0:
-> >> > /git/arm-soc/arch/arm/boot/dts/sun4i-a10.dtsi:48:46: fatal error: dt-bindings/clock/sun4i-a10-pll2.h: No such file or directory
-> >> >
-> >> > Please make sure branches you send actually work by themselves.
-> >>
-> >> Damn, you're right... Sorry about that...
-> >>
-> >> You need to pull the tag sunxi-clk-for-4.4 that has been merged in the
-> >> clk tree in 38ce30e29dc.
-> >>
-> >> Mike, Stephen, will that tag be stable?
+> > On Fri, Oct 16, 2015 at 09:00:40PM +0200, Robert Jarzmik wrote:
+> >> Hi Arnd, Kevin and Olof,
+> >> 
+> >> This is the pxa pull request for 4.4 cycle. It is mainly magician enhancement
+> >> and fixes. Could you please consider pulling ?
+> >> 
+> >> The following changes since commit 6ff33f3902c3b1c5d0db6b1e2c70b6d76fba357f:
+> >> 
+> >>   Linux 4.3-rc1 (2015-09-12 16:35:56 -0700)
+> >> 
+> >> are available in the git repository at:
+> >> 
+> >>   https://github.com/rjarzmik/linux.git pxa-for-4.4
 > >
-> > I don't see that tag in your tree, Maxime? I also don't see 38ce30e29dc in
-> > the clk tree on kernel.org.
+> > Hi Robert,
 > >
-> > I'm a little confused right now...
+> > I'm glad to see all this activity on PXA! You're reaching the amount of new
+> > stuff that it's time to start splitting up in topics. I'll merge this branch
+> > for this release, but I'm also going to go through below and show you how this
+> > can/should be split up in the future.
+> Ok, great !
 > 
-> The tag is "sunxi-clocks-for-4.4":
->     https://git.kernel.org/cgit/linux/kernel/git/mripard/linux.git/tag/?h=sunxi-clocks-for-4.4
+> > First, take a look at our tree and how it's organized. Look at my presentation
+> > from ELC 2014, or Arnd's from this year, to get an idea of the philosophy we
+> > use and roughly how we categorize patches.
+> Ok, just did.
+> I must admit I've been a bit lazy in this cycle, as I already have my tree split
+> into cleanup/fix/for-next/dt ...
 > 
-> The merge commit in the clk tree is 938ce30e29dc:
->     https://git.kernel.org/cgit/linux/kernel/git/clk/linux.git/commit/?h=clk-next&id=938ce30e29dc
+> For cleanup, I understand it all.
+> For the single fix, I wasn't aware I could make pull request before a merge
+> window for fixes, I though I could only issue them for post -rc1 series.
 
-Thanks, so both the tag and the hash were missing a few characters. :-)
+You can, but it's usually tricky to find a good base for them since we normally
+ask for an -rc as the base for your branch.
 
-I've merged this in now. Note that this has resulted in a tree that won't
-misect cleanly, since having the clk contents merged instead of used as a base
-for the dt branch means that you could end up in a bisect state that has the DT
-branch but not the clk branch.
+For simple single fixes, you can always send them as patches as well. Or send
+them after -rc1. :)
 
-These are some of the reasons why I'm not overly excited about these header
-file dependencies. :(
+> >> Petr Cvek (22):
+> > Most of these are fixes/cleanups. With a burst of patches like this it can
+> > sometimes be hard to rip them apart and put some in one bucked and others in
+> > another. Feel free to keep them in a separate topic in that case
+> > (magician-cleanup or similar)
+> All right, understood, that translates into a separate pull request.
+> 
+> > Board code, of which we tend to have almost none these days. :-)
+> I know, I'm working on the ablation, it's just the patient is long to cure :)
+> 
+> >> Thierry Reding (17):
+> > This could also be a topic on its own. We'd merge it into the cleanup branch at
+> > our end, but you can provide it as a separate branch if you want.
+> Okay, understood.
+> 
+> > Don't hesitate to ask if you have questions on how to handle this down the
+> > road.
+> Okay, thanks.
+> I'll try to split better next time. If I see I have another heavy pull-request
+> (at least heavy in a dying architecture context), I'll try to provide the pull
+> requests earlier, at -rc4, to let you time to correct me if I messed it up.
+
+No worries at all -- as I said, it's fine as it is and I was just taking the
+opportunity to show how you could be thinking about it going forward.
 
 
 -Olof
