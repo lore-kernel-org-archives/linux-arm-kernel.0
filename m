@@ -1,207 +1,67 @@
-From: m-karicheri2@ti.com (Murali Karicheri)
-Date: Mon, 26 Oct 2015 18:09:08 -0400
-Subject: [PATCH v3 0/2] Common SerDes driver for TI's Keystone Platforms
-In-Reply-To: <562A81F8.1060608@ti.com>
-References: <1445432201-16007-1-git-send-email-w-kwok2@ti.com>
- <56295B9E.9030201@ti.com>
- <CAPw-ZTk1vJA3YSwLHBNMYP0t5k2tW0HTKse+37rL8izWN33y-w@mail.gmail.com>
- <3702663.07h6YO0UjY@wuerfel> <20151023144631.GZ32532@n2100.arm.linux.org.uk>
- <562A81F8.1060608@ti.com>
-Message-ID: <562EA484.7050509@ti.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Tue, 27 Oct 2015 06:10:29 +0800
+Subject: [PATCH 08/10] pwm: core: add pulse feature to the PWM framework
+In-Reply-To: <1445895161-2317-9-git-send-email-o.schinagl@ultimaker.com>
+Message-ID: <201510270600.lCMWUXoI%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell,
+Hi Olliver,
 
-On 10/23/2015 02:52 PM, Kishon Vijay Abraham I wrote:
-> Hi,
->
-> On Friday 23 October 2015 08:16 PM, Russell King - ARM Linux wrote:
->> On Fri, Oct 23, 2015 at 11:17:06AM +0200, Arnd Bergmann wrote:
->>> On Thursday 22 October 2015 15:27:05 Loc Ho wrote:
->>>>>
->>>>> phy-xgene.c
->>>>> -----------
->>>>>
----CUT-------------------------------------------------------------------
->>>>
->>>> Let me comment on this APM X-Gene driver. This driver is dead and
->>>> won't be supported in near or foreseeable future. And someday, it will
->>>> be ripped out. Based on experience, this solution (having PHY driver
->>>> in Linux) can't be supported across boards and etc as it is just too
->>>> much maintenance. And therefore, we followed Arnd B guidance and move
->>>> all this into the boot loader. From Linux or OS perspective, it only
->>>> cares about the interface in which its interface with. This is just
->>>> your reference and may be this will help you as well.
->>>
->>> This depends a lot on the use case. If the chip is only used on server
->>> parts that have a real firmware and you can deliver bug fixes for the
->>> firmware if necessary, it's always best to do as much of the setup as
->>> possible there, and let Linux see a simplified view of the hardware.
->>>
->>> However, for embedded systems that tend to ship with a minimal binary
->>> bootloader and no way to update that as an end-user, we rely on Linux
->>> to know about all the hardware that requires some form of setup, which
->>> is why we have all sorts of drivers and frameworks in the kernel that
->>> a server can easily ignore.
->>>
->>> While keystone can show up in servers that won't use this driver, my
->>> impression is that its main market is actually in embedded space.
->>
->> That's an interesting point of view - especially as you can't make the
->> argument that Marvell Armada chips would ever be anything but the
->> embedded space, but we're so far getting away with having the serdes
->> setup in u-boot - and even Marvell's BSP doesn't have it in the kernel.
->>
->> The real question here is:
->>
->>    Why would we want to statically setup serdes links in the kernel
->>    according to the DTB, rather than having the boot loader set them up?
->
-> Lot of PHYs have HW configure the parameters with default values so the
-> driver really doesn't have to touch them (like programming the equalizer
-> and the various digital mode configuration and analog mode
-> configuration). Then the SW just has to take care of clock programming
-> and powering on/off the PHY.
->
-> Some platforms require the controller core be in reset before powering
-> on the PHY, so we can't have all the configurations done in bootloader
-> for all the platforms.
->
-> The problem w.r.t code size starts when the drivers starts to configure
-> the analog and digital components inside the PHY (like equalizer,
-> attenuation etc..).
->
+[auto build test ERROR on pwm/for-next -- if it's inappropriate base, please suggest rules for selecting the more suitable base]
 
-Agree. There are also calibration required on the receive side for 10G 
-and SRIO that adds to the code size. SRIO is currently not supported, 
-but expected to be supported in the future. For 10G, and SRIO, it is 
-expected that user may need to tune the coefficients on a per board 
-basis and hence we can't afford to have the driver in the boot loader.
+url:    https://github.com/0day-ci/linux/commits/Olliver-Schinagl/pwm-lpc18xx_pwm-use-pwm_set_chip_data/20151027-053853
+config: i386-randconfig-s1-201543 (attached as .config)
+reproduce:
+        # save the attached .config to linux build tree
+        make ARCH=i386 
 
-> While performing all these configurations in bootloader will help reduce
-> the code size, as Arnd pointed out, it'll cause problems if the PHY
-> loses the contents after a suspend/resume cycle.
->>
+All errors (new ones prefixed by >>):
 
-Agree.
+   drivers/input/misc/max77693-haptic.c: In function 'max77693_haptic_set_duty_cycle':
+>> drivers/input/misc/max77693-haptic.c:76:10: error: too few arguments to function 'pwm_config'
+     error = pwm_config(haptic->pwm_dev, delta, haptic->pwm_dev->period);
+             ^
+   In file included from drivers/input/misc/max77693-haptic.c:23:0:
+   include/linux/pwm.h:25:5: note: declared here
+    int pwm_config(struct pwm_device *pwm, int duty_ns,
+        ^
+--
+   drivers/input/misc/max8997_haptic.c: In function 'max8997_haptic_set_duty_cycle':
+>> drivers/input/misc/max8997_haptic.c:76:9: error: too few arguments to function 'pwm_config'
+      ret = pwm_config(chip->pwm, duty, chip->pwm_period);
+            ^
+   In file included from drivers/input/misc/max8997_haptic.c:29:0:
+   include/linux/pwm.h:25:5: note: declared here
+    int pwm_config(struct pwm_device *pwm, int duty_ns,
+        ^
 
->> For the most part, the choice between the serdes modes is fairly static,
->> depending on the board wiring.  You wouldn't ever want to configure a
->> mini-PCIe socket for gigabit ethernet.
->>
-This is true for most of the serdes except 10G. 10G would require 
-reconfiguration of the SerDes if it has to work in 1G mode. You wouldn't 
-want to power cycle the board in case user wants to plug in a 1G link. 
-We plan to add 10G support based on this serdes patch and also need to 
-handle 1G mode on 10G as well in the future.
+vim +/pwm_config +76 drivers/input/misc/max77693-haptic.c
 
-10G also has another mode to use a firmware that handles auto 
-negotiation. User may use different firmware as well and has to be taken 
-care of in the driver. How do we support this if this has to be in boot 
-loader?
+a3b3ca75 Jaewon Kim 2014-09-11  70  
+a3b3ca75 Jaewon Kim 2014-09-11  71  static int max77693_haptic_set_duty_cycle(struct max77693_haptic *haptic)
+a3b3ca75 Jaewon Kim 2014-09-11  72  {
+a3b3ca75 Jaewon Kim 2014-09-11  73  	int delta = (haptic->pwm_dev->period + haptic->pwm_duty) / 2;
+a3b3ca75 Jaewon Kim 2014-09-11  74  	int error;
+a3b3ca75 Jaewon Kim 2014-09-11  75  
+a3b3ca75 Jaewon Kim 2014-09-11 @76  	error = pwm_config(haptic->pwm_dev, delta, haptic->pwm_dev->period);
+a3b3ca75 Jaewon Kim 2014-09-11  77  	if (error) {
+a3b3ca75 Jaewon Kim 2014-09-11  78  		dev_err(haptic->dev, "failed to configure pwm: %d\n", error);
+a3b3ca75 Jaewon Kim 2014-09-11  79  		return error;
 
->> However, there are cases when you would want to change it, and I'm
->> aware of these cases:
->>
->> * Serdes routed to a mini-PCIe socket, which is compatible with mSATA.
->>    There's an argument here to allow the serdes link to be switched at
->>    runtime between PCIe and mSATA.  However, the card type can't be
->>    detected at run time, so this would have to be a manual configuration
->>    change by the user.
->>
->>    Since mini-PCIe is not hot-pluggable, this configuration isn't
->>    something that could be changed without powering the system down.
->>
->> * Serdes routed to a SFP cage, where the serdes link is configured
->>    for gigabit (or faster for SFP+) ethernet.  For gigabit only, serdes
->>    is configured in either 1000base-X or Cisco SGMII mode (SGMII is a
->>    non-802.3 modification to 1000base-X) depending on the type of
->>    transceiver plugged in.
->>
->>    Arguably, there's a third option here, which is SATA as well -  I'm
->>    aware of one non-standard SFP module on the market which provides a
->>    SATA connector, but this is highly non-standard, is not covered by
->>    the SFP specifications, so such a switch to this mode would have to
->>    be done manually.
->>
->> The difference between 1000base-X vs SGMII is to do with the generation
->> and interpretation of a 16-bit configuration word passed across the
->> link.  Otherwise, the two are identical - and so far I've seen the
->> configuration word mode is determined by the ethernet block rather than
->> the serdes block.
->>
->> My argument would be that even in the case of the last paragraph,
->> normal use for serdes reconfiguration would be a power cycle, even in
->> the embedded environment.
->>
->> Now, that all said, it looks to me like TI's serdes implementation can't
->> be switched between different modes - it's statically configured to
->> whatever the DTB says it should be.
->>
+:::::: The code at line 76 was first introduced by commit
+:::::: a3b3ca753cdc92c7d5f57404afed3115b3b79cc6 Input: add haptic driver on max77693
 
-For 10G and SRIO, there are coefficients (tx-coeff in DTS) that needs to 
-be tuned on a per board basis. How would you do that if this has to be 
-added to boot loader? Not scalable as boot loader has to be different 
-for different boards
+:::::: TO: Jaewon Kim <jaewon02.kim@samsung.com>
+:::::: CC: Dmitry Torokhov <dmitry.torokhov@gmail.com>
 
->> So, this brings up the obvious question: why do we need to support
->> serdes configuration in the kernel rather than statically in the boot
->> loader according to the board setup?
->>
-
-The cases described above makes it clear we need a Linux driver for 
-these SerDes.
-
->> Specifically on this patch series, I think that if we're going to have
->> code doing serdes configuration in the kernel, we need to come up with
->> a common set of DT properties for it, rather than having everyone doing
->> their own thing.
-
-Not sure if there are standard configuration across various SERDES 
-hardware provided by different vendors that we can identify. Some of the 
-common are probably num-lanes, phy-mode etc. Do you know who can help us 
-find these?
-
-I'd also like to see the code shrink in size - it
->> doesn't do anything beyond configuring the hardware for the settings
->> that DTB tells it to, so why it has to be 2.5k lines I've no idea.
->>
-
-Kishon has described the reason above.
-
->> There's some specific comments I have about it using readl/writel, and
->> its wrapping of those, which IMHO it shouldn't be doing,
-
-Are you referring to below code?
-
-+static inline u32 kserdes_readl(void __iomem *base, u32 offset)
-+{
-+	return readl(base + offset);
-+}
-+
-+static inline void kserdes_writel(void __iomem *base, u32 offset, u32 
-value)
-+{
-+	writel(value, base + offset);
-+}
-
-Any reason why you don't like these in the driver code?
-
-  and the horrid
->> for loops (what's wrong with the standard Linux way of defining a
->> for_each_xxx() operator and leaving the body at the callsite?)
->
-
-Will add for_each_xxx() in the next version.
-
-Thanks
-
-Murali & Wingman
-
-> +1
->
-> Thanks
-> Kishon
->
->
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 24764 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151027/7b41532a/attachment-0001.obj>
