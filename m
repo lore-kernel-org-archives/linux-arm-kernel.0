@@ -1,128 +1,22 @@
-From: yong.wu@mediatek.com (Yong Wu)
-Date: Mon, 26 Oct 2015 13:23:41 +0800
-Subject: [PATCH v5 5/6] iommu/mediatek: Add mt8173 IOMMU driver
-In-Reply-To: <20151014125309.GO27420@8bytes.org>
-References: <1444357388-30257-1-git-send-email-yong.wu@mediatek.com>
- <1444357388-30257-6-git-send-email-yong.wu@mediatek.com>
- <20151014125309.GO27420@8bytes.org>
-Message-ID: <1445837021.24436.8.camel@mhfsdcap03>
+From: leilk.liu@mediatek.com (lei liu)
+Date: Mon, 26 Oct 2015 13:35:36 +0800
+Subject: [PATCH 0/5] mt8173 spi multiple devices support
+In-Reply-To: <20151019192713.GR32054@sirena.org.uk>
+References: <1444793015-30359-1-git-send-email-leilk.liu@mediatek.com>
+ <20151019192713.GR32054@sirena.org.uk>
+Message-ID: <1445837736.24921.0.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2015-10-14 at 14:53 +0200, Joerg Roedel wrote:
-> On Fri, Oct 09, 2015 at 10:23:07AM +0800, Yong Wu wrote:
-> > +	/*
-> > +	 * There is a domain for each a iommu device in normal case.
-> > +	 * But MTK only has one iommu domain called the m4u domain which all
-> > +	 * the multimedia HW share. Here we reserve one as the m4u domain and
-> > +	 * free the others.
-> > +	 *
-> > +	 * And the attach_device that from __iommu_setup_dma_ops
-> > +	 * will be called earlier than probe.
-> > +	 */
+Hi Mark,
+
+On Mon, 2015-10-19 at 20:27 +0100, Mark Brown wrote:
+> On Wed, Oct 14, 2015 at 11:23:30AM +0800, Leilk Liu wrote:
+> > This series are based on 4.3-rc1 and provide 5 patches to support
+> > mt8173 spi multiple devices.
 > 
-> Okay, with this being the case, you need to put all devices behind one
-> IOMMU into the same iommu-group, because the IOMMU can't really isolate
-> the devices from each other.
-> 
-> > +static int mtk_iommu_add_device(struct device *dev)
-> > +{
-> > +	struct iommu_group *group;
-> > +	struct mtk_iommu_client_priv *priv;
-> > +	struct mtk_iommu_domain *m4udom;
-> > +	struct iommu_domain *domain;
-> > +	int ret;
-> > +
-> > +	if (!dev->archdata.iommu) /* Not a iommu client device */
-> > +		return -ENODEV;
-> > +
-> > +	group = iommu_group_get(dev);
-> > +	if (!group) {
-> > +		group = iommu_group_alloc();
-> > +		if (IS_ERR(group)) {
-> > +			dev_err(dev, "Failed to allocate IOMMU group\n");
-> > +			return PTR_ERR(group);
-> > +		}
-> > +	}
-> > +
-> > +	ret = iommu_group_add_device(group, dev);
-> > +	if (ret) {
-> > +		dev_err(dev, "Failed to add IOMMU group\n");
-> > +		goto err_group_put;
-> > +	}
-> > +
-> > +	domain = iommu_get_domain_for_dev(dev);
-> > +	if (!domain) {
-> > +		/*
-> > +		 * Get the m4u iommu domain from the m4u device.
-> > +		 * Attach all the client devices into the m4u domain.
-> > +		 */
-> > +		priv = dev->archdata.iommu;
-> > +		m4udom = dev_get_drvdata(priv->m4udev);
-> > +		ret = iommu_attach_group(&m4udom->domain, group);
-> > +		if (ret)
-> > +			dev_err(dev, "Failed to attach IOMMU group\n");
-> > +	}
-> > +
-> > +err_group_put:
-> > +	iommu_group_put(group);
-> > +	return ret;
-> > +}
-> 
-> Here it looks like you are allocating one group for each device. As I
-> said, all devices need to be in one group.
-> 
-> 	Joerg
-> 
+> This doesn't apply against current code, please check and resend.  Also
+> note that it looks like you've got the execute bit set on some of the
+> files.  The code itself looks fine.
 
-Thanks for this suggestion. I have put all the iommu client devices into
-the same iommu group, the code looks like below.
-And I will send this in the next version after the Short descriptor is
-reviewed.
-
-
-static int mtk_iommu_add_device(struct device *dev)
-{
-	struct iommu_group *group;
-	struct mtk_iommu_client_priv *priv;
-	struct mtk_iommu_domain *m4udom;
-	struct iommu_domain *domain;
-	int ret;
-
-	priv = dev->archdata.iommu;
-	if (!priv) /* Not a iommu client device */
-		return -ENODEV;
-	m4udom = dev_get_drvdata(priv->m4udev);
-
-	group = iommu_group_get(dev);
-	if (!group) {
-		/*
-		 * All the iommu client devices are in the m4u domain,
-		 * they all are in the same m4u iommu-group too here.
-		 */
-		if (!m4udom->m4u_group) {
-			group = iommu_group_alloc();
-			if (IS_ERR(group)) {
-				dev_err(dev, "Failed to allocate IOMMU group\n");
-				return PTR_ERR(group);
-			}
-			m4udom->m4u_group = group;
-		} else {
-			group = m4udom->m4u_group;
-		}
-	}
-
-	ret = iommu_group_add_device(group, dev);
-	if (ret) {
-		dev_err(dev, "Failed to add IOMMU group\n");
-		goto err_group_put;
-	}
-
-	domain = iommu_get_domain_for_dev(dev);
-	if (!domain)
-		ret = iommu_attach_group(&m4udom->domain, group);
-
-err_group_put:
-	iommu_group_put(group);
-	return ret;
-}
+OK, I will fix it.
