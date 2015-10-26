@@ -1,32 +1,48 @@
-From: bjorn.andersson@sonymobile.com (Bjorn Andersson)
-Date: Mon, 26 Oct 2015 14:46:56 -0700
-Subject: [PATCH 04/14] devicetree: Add hardware rng entry to
- qcom-apq8064.dtsi
-In-Reply-To: <1442579472-20102-1-git-send-email-srinivas.kandagatla@linaro.org>
-References: <1442579371-19822-1-git-send-email-srinivas.kandagatla@linaro.org>
- <1442579472-20102-1-git-send-email-srinivas.kandagatla@linaro.org>
-Message-ID: <20151026214656.GZ24668@usrtlx11787.corpusers.net>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 26 Oct 2015 15:49:30 -0600
+Subject: [PATCH v3] Tegra: DT: add device tree binding doc for QSPI
+In-Reply-To: <731fc53aa2d24edc93c2af43a7711657@HQMAIL104.nvidia.com>
+References: <1445891676-3262-1-git-send-email-twarren@nvidia.com>
+ <562E954B.5070604@wwwdotorg.org>
+ <731fc53aa2d24edc93c2af43a7711657@HQMAIL104.nvidia.com>
+Message-ID: <562E9FEA.1080705@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri 18 Sep 05:31 PDT 2015, Srinivas Kandagatla wrote:
+On 10/26/2015 03:36 PM, Tom Warren wrote:
+> Stephen Warren wrote at Monday, October 26, 2015 2:04 PM:
+>> On 10/26/2015 02:34 PM, Tom Warren wrote:
+>>> This patch adds the device tree binding doc for the Tegra QSPI
+>>> controller on Tegra210.
+>>
+>>> diff --git
+>>> a/Documentation/devicetree/bindings/spi/nvidia,tegra210-qspi.txt
+>>> b/Documentation/devicetree/bindings/spi/nvidia,tegra210-qspi.txt
+>>
+>>> +- clock-names : Must include the following entries:
+>>> +  - qspi
+>>> +- resets : Must contain an entry for each entry in reset-names.
+>>> +  See ../reset/reset.txt for details.
+>>> +- reset-names : Must include the following entries:
+>>> +  - qspi
+>>> +- clocks : Must contain an entry for each entry in clock-names.
+>>> +  See ../clocks/clock-bindings.txt for details.
+>>
+>> Let's keep clocks and clock-names next to each-other in the doc. I don't know
+>> why they aren't in the eixsting Tegra SPI doc.
+ >
+> OK. I assume 'clock-names', then 'clocks' since 'clocks' references clock-names.
 
-> From: John Stultz <john.stultz@linaro.org>
-> 
-> Add devicetree data to add support for hw_rng support
-> to the apq8064 dts.
-> 
-> Tested on the Nexus7 (2013).
-> 
-> Cc: Kumar Gala <galak@codeaurora.org>
-> Cc: Stephen Boyd <sboyd@codeaurora.org>
-> Cc: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
-> Cc: devicetree at vger.kernel.org
+That sounds correct.
 
-Reviewed-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
+>> With this issue fixed, this patch looks good to me.
+>>
+>> Note: I don't see the devicetree mailing list in the CC list. You should probably
+>> replace the U-Boot mailing list with it.
+ >
+> I thought I had it, but may have dropped it. What exactly is the URL of the devicetree mailing list? devicetree-discuss at lists.ozlabs.org? or devicetree at vger.kernel.org?
 
-> Reviewed-by: Stephen Boyd <sboyd@codeaurora.org>
-> Signed-off-by: John Stultz <john.stultz@linaro.org>
+devicetree at vger.kernel.org
 
-Regards,
-Bjorn
+(See the "OPEN FIRMWARE AND FLATTENED DEVICE TREE BINDINGS" in 
+"MAINTAINERS", or the output of ./scripts/get_maintainers.pl)
