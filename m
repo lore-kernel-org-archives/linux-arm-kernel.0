@@ -1,48 +1,77 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 26 Oct 2015 10:56:03 +0100
-Subject: Possible Regression due to c074fef5d36e ("of/platform: Defer
- probes of registered devices").
-In-Reply-To: <20151026094027.GA25225@gradator.net>
-References: <20151026032039.GA1950@verge.net.au>
- <20151026094027.GA25225@gradator.net>
-Message-ID: <CAMuHMdWmw8TqyOOMSPkh_1V+9OJeqPts1t3528ZQrJjzE6tmRA@mail.gmail.com>
+From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
+Date: Mon, 26 Oct 2015 09:56:14 +0000
+Subject: [PATCH 1/3] dt-bindings: add document of mediatek efuse driver
+In-Reply-To: <1444984751-4572-2-git-send-email-andrew-ct.chen@mediatek.com>
+References: <1444984751-4572-1-git-send-email-andrew-ct.chen@mediatek.com>
+ <1444984751-4572-2-git-send-email-andrew-ct.chen@mediatek.com>
+Message-ID: <562DF8BE.4060205@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 26, 2015 at 10:40 AM, Sylvain Rochet
-<sylvain.rochet@finsecur.com> wrote:
-> On Mon, Oct 26, 2015 at 12:20:39PM +0900, Simon Horman wrote:
->> I have observed a possible regression in next-20151022
->> due to c074fef5d36e ("of/platform: Defer probes of registered devices").
->>
->> The problem manifests on the r8a7791 based koelsch board.
->> With the above patch present booting the board using the shmobile_defconfig
->> results in no console output. While after reverting the above patch
->> the boot proceeds all the way to user-space.
->>
->> With DEBUG_LL and EARLY_PRINTK enabled I was able to capture some console
->> output. I have included both that boot log, and a log of boot all the way to
->> userspace with the patch in question reverted.
->>
->> The problem does not seem to manifiest on other boards for other
->> Renesas ARM  SoCs that I have access too. In particular the
->> r8a7790 based lager board; the r8a7790 and r8a7791 are both members
->> of the R-Car Gen2 family of SoCs.
+
+
+On 16/10/15 09:39, andrew-ct.chen at mediatek.com wrote:
+> From: Andrew-CT Chen <andrew-ct.chen@mediatek.com>
 >
-> Atmel SoC hit this regresssion too, discussion about this issue is in
-> the following thread:
->  https://lkml.org/lkml/2015/10/16/733
+> Add Mediatek MT8173 EFUSE Devicetree binding file
+>
+> Signed-off-by: Andrew-CT Chen <andrew-ct.chen@mediatek.com>
 
-More reading material in "[GIT PULL] On-demand device probing"
-(https://lkml.org/lkml/2015/10/14/126)
+Looks good to me, minor comment below.
 
-Gr{oetje,eeting}s,
+Will queue this for v4.5 once v4.4-rc1 is released.
 
-                        Geert
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+> ---
+>   .../devicetree/bindings/nvmem/mtk-efuse.txt        | 36 ++++++++++++++++++++++
+>   1 file changed, 36 insertions(+)
+>   create mode 100644 Documentation/devicetree/bindings/nvmem/mtk-efuse.txt
+>
+> diff --git a/Documentation/devicetree/bindings/nvmem/mtk-efuse.txt b/Documentation/devicetree/bindings/nvmem/mtk-efuse.txt
+> new file mode 100644
+> index 0000000..92edc3d
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/nvmem/mtk-efuse.txt
+> @@ -0,0 +1,36 @@
+> += Mediatek MTK-EFUSE device tree bindings =
+> +
+> +This binding is intended to represent MTK-EFUSE which is found in most Mediatek SOCs.
+> +
+> +Required properties:
+> +- compatible: should be "mediatek,mt8173-efuse" or "mediatek,mt8135-efuse"
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Can we make the compatible more generic for mediatek socs? Like 
+"mediatek,efuse"  Or are they different in each SOC?
+
+--srini
+> +- reg: Should contain registers location and length
+> +
+> += Data cells =
+> +Are child nodes of MTK-EFUSE, bindings of which as described in
+> +bindings/nvmem/nvmem.txt
+> +
+> +Example:
+> +
+> +	efuse: efuse at 10206000 {
+> +		compatible = "mediatek,mt8173-efuse";
+> +		reg	   = <0 0x10206000 0 0x1000>;
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +
+> +		/* Data cells */
+> +		thermal_calibration: calib at 528 {
+> +			reg = <0x528 0xc>;
+> +		};
+> +	};
+> +
+> += Data consumers =
+> +Are device nodes which consume nvmem data cells.
+> +
+> +For example:
+> +
+> +	thermal {
+> +		...
+> +		nvmem-cells = <&thermal_calibration>;
+> +		nvmem-cell-names = "calibration";
+> +	};
+>
