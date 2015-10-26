@@ -1,53 +1,55 @@
-From: ming.lei@canonical.com (Ming Lei)
-Date: Mon, 26 Oct 2015 09:44:31 +0800
-Subject: [PATCH v6 3/4] arm64/arm, numa, dt: adding numa dt binding
- implementation for arm64 platforms
-In-Reply-To: <1445337931-11344-4-git-send-email-gkulkarni@caviumnetworks.com>
-References: <1445337931-11344-1-git-send-email-gkulkarni@caviumnetworks.com>
- <1445337931-11344-4-git-send-email-gkulkarni@caviumnetworks.com>
-Message-ID: <CACVXFVMiZs_g3qw99-PhxLiX5oLe8_z5cOAfJZ_4-09jN2koCQ@mail.gmail.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Mon, 26 Oct 2015 09:46:24 +0800
+Subject: [GIT PULL] Allwinner DT changes for 4.4, round 3
+In-Reply-To: <20151026010752.GG14238@localhost>
+References: <20151023180711.GA11749@lukather> <4745252.gLSrJNQ42D@wuerfel>
+ <9946613.K7Ehp1DEiL@wuerfel> <20151025201308.GS10947@lukather>
+ <20151026010752.GG14238@localhost>
+Message-ID: <CAGb2v671MmpRHkWKpOd8kmEbvfTKTU9k7AU_bP+AgRuguodWkQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 20, 2015 at 6:45 PM, Ganapatrao Kulkarni
-<gkulkarni@caviumnetworks.com> wrote:
-> Adding numa dt binding support for arm64 based platforms.
-> dt node parsing for numa topology is done using device property
-> proximity and device node distance-map.
->
-> Reviewed-by: Robert Richter <rrichter@cavium.com>
-> Signed-off-by: Ganapatrao Kulkarni <gkulkarni@caviumnetworks.com>
-> ---
->  arch/arm64/Kconfig            |  10 ++
->  arch/arm64/include/asm/numa.h |  10 ++
->  arch/arm64/kernel/Makefile    |   1 +
->  arch/arm64/kernel/of_numa.c   | 221 ++++++++++++++++++++++++++++++++++++++++++
->  arch/arm64/kernel/smp.c       |   1 +
->  arch/arm64/mm/numa.c          |  10 +-
->  6 files changed, 252 insertions(+), 1 deletion(-)
->  create mode 100644 arch/arm64/kernel/of_numa.c
->
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index 0f9cdc7..6cf8d20 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -426,6 +426,16 @@ config NUMA
->           local memory controller of the CPU and add some more
->           NUMA awareness to the kernel.
->
-> +config OF_NUMA
-> +       bool "Device Tree NUMA support"
-> +       depends on NUMA
-> +       depends on OF
-> +       default y
-> +       help
-> +         Enable Device Tree NUMA support.
-> +         This enables the numa mapping of cpu, memory, io and
-> +         inter node distances using dt bindings.
+Hi Olof,
 
-Enabling the above config option can cause numa_init() warning in
-numa-less arm64 system, please see the following report:
+On Mon, Oct 26, 2015 at 9:07 AM, Olof Johansson <olof@lixom.net> wrote:
+> On Sun, Oct 25, 2015 at 09:13:08PM +0100, Maxime Ripard wrote:
+>> On Fri, Oct 23, 2015 at 10:55:13PM +0200, Arnd Bergmann wrote:
+>> > On Friday 23 October 2015 22:41:04 Arnd Bergmann wrote:
+>> > > On Friday 23 October 2015 20:07:11 Maxime Ripard wrote:
+>> > > > Allwinner DT changes for 4.4, round 3
+>> > > >
+>> > > > A bunch of new boards, but mostly enable the support for the Audio Codec
+>> > > > on the older SoCs (A10, A10s, A13, A20, R8) and enable it on various
+>> > > > boards.
+>> > > >
+>> > > >
+>> > >
+>> > > Pulled into next/dt, thanks!
+>> >
+>> > And dropped again:
+>> >
+>> > In file included from /git/arm-soc/arch/arm/boot/dts/sun4i-a10-a1000.dts:46:0:
+>> > /git/arm-soc/arch/arm/boot/dts/sun4i-a10.dtsi:48:46: fatal error: dt-bindings/clock/sun4i-a10-pll2.h: No such file or directory
+>> >
+>> > Please make sure branches you send actually work by themselves.
+>>
+>> Damn, you're right... Sorry about that...
+>>
+>> You need to pull the tag sunxi-clk-for-4.4 that has been merged in the
+>> clk tree in 38ce30e29dc.
+>>
+>> Mike, Stephen, will that tag be stable?
+>
+> I don't see that tag in your tree, Maxime? I also don't see 38ce30e29dc in
+> the clk tree on kernel.org.
+>
+> I'm a little confused right now...
 
-          https://bugs.launchpad.net/bugs/1509221
+The tag is "sunxi-clocks-for-4.4":
+    https://git.kernel.org/cgit/linux/kernel/git/mripard/linux.git/tag/?h=sunxi-clocks-for-4.4
 
-Thanks,
+The merge commit in the clk tree is 938ce30e29dc:
+    https://git.kernel.org/cgit/linux/kernel/git/clk/linux.git/commit/?h=clk-next&id=938ce30e29dc
+
+Regards
+ChenYu
