@@ -1,107 +1,65 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Mon, 26 Oct 2015 10:55:37 +0000
-Subject: [PATCH] arm64: kernel: fix tcr_el1.t0sz restore on systems with
- extended idmap
-In-Reply-To: <CAKv+Gu_9_O4GQgm++BvC0i_cGT4pBmozqO5ddy7J2-8-shFRDA@mail.gmail.com>
-References: <1445441202-21484-1-git-send-email-lorenzo.pieralisi@arm.com>
- <CAKv+Gu_9_O4GQgm++BvC0i_cGT4pBmozqO5ddy7J2-8-shFRDA@mail.gmail.com>
-Message-ID: <20151026105537.GC8299@red-moon>
+From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
+Date: Mon, 26 Oct 2015 10:55:20 +0000
+Subject: [PATCH 1/3] dt-bindings: add document of mediatek efuse driver
+In-Reply-To: <20151026102344.GD25308@pengutronix.de>
+References: <1444984751-4572-1-git-send-email-andrew-ct.chen@mediatek.com>
+ <1444984751-4572-2-git-send-email-andrew-ct.chen@mediatek.com>
+ <562DF8BE.4060205@linaro.org> <20151026102344.GD25308@pengutronix.de>
+Message-ID: <562E0698.1000503@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ard,
 
-On Sat, Oct 24, 2015 at 10:47:22AM +0200, Ard Biesheuvel wrote:
-> Hi Lorenzo,
-> 
-> Thanks for the fix. I'm a bit embarrassed since this is quite
-> obviously broken, and I (nor anyone else, for that matter) spotted it
-> through testing suspend/resume on Seattle (frankly, I don't even know
-> if suspend/resume works currently on Seattle or if it did at the time)
 
-You could not spot it by testing on Seattle, it does not implement PM yet,
-I spotted it by code inspection while reviewing James' suspend-to-disk
-patches, there is nothing to be embarassed about, you paved the way
-to fix it.
+On 26/10/15 10:23, Sascha Hauer wrote:
+> On Mon, Oct 26, 2015 at 09:56:14AM +0000, Srinivas Kandagatla wrote:
+>>
+>>
+>> On 16/10/15 09:39, andrew-ct.chen at mediatek.com wrote:
+>>> From: Andrew-CT Chen <andrew-ct.chen@mediatek.com>
+>>>
+>>> Add Mediatek MT8173 EFUSE Devicetree binding file
+>>>
+>>> Signed-off-by: Andrew-CT Chen <andrew-ct.chen@mediatek.com>
+>>
+>> Looks good to me, minor comment below.
+>>
+>> Will queue this for v4.5 once v4.4-rc1 is released.
+>>
+>>
+>>> ---
+>>>   .../devicetree/bindings/nvmem/mtk-efuse.txt        | 36 ++++++++++++++++++++++
+>>>   1 file changed, 36 insertions(+)
+>>>   create mode 100644 Documentation/devicetree/bindings/nvmem/mtk-efuse.txt
+>>>
+>>> diff --git a/Documentation/devicetree/bindings/nvmem/mtk-efuse.txt b/Documentation/devicetree/bindings/nvmem/mtk-efuse.txt
+>>> new file mode 100644
+>>> index 0000000..92edc3d
+>>> --- /dev/null
+>>> +++ b/Documentation/devicetree/bindings/nvmem/mtk-efuse.txt
+>>> @@ -0,0 +1,36 @@
+>>> += Mediatek MTK-EFUSE device tree bindings =
+>>> +
+>>> +This binding is intended to represent MTK-EFUSE which is found in most Mediatek SOCs.
+>>> +
+>>> +Required properties:
+>>> +- compatible: should be "mediatek,mt8173-efuse" or "mediatek,mt8135-efuse"
+>>
+>> Can we make the compatible more generic for mediatek socs? Like
+>> "mediatek,efuse"  Or are they different in each SOC?
+>
+> While we can add an additional "mediatek,efuse" compatible we should
+> always add the most specific compatible first. Otherwise we cannot
+> differentiate between SoCs later without changing the device tree.
+Yes, that?s correct.
 
-> On 21/10/2015, Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote:
-> > Commit dd006da21646 ("arm64: mm: increase VA range of identity map")
-> > introduced a mechanism to extend the virtual memory map range
-> > to support arm64 systems with system RAM located at very high offset,
-> > where the identity mapping used to enable/disable the MMU requires
-> > additional translation levels to map the physical memory at an equal
-> > virtual offset.
-> >
-> > The kernel detects at boot time the tcr_el1.t0sz value required by the
-> > identity mapping and sets-up the tcr_el1.t0sz register field accordingly,
-> > any time the identity map is required in the kernel (ie when enabling the
-> > MMU).
-> >
-> > After enabling the MMU, in the cold boot path the kernel resets the
-> > tcr_el1.t0sz to its default value (ie the actual configuration value for
-> > the system virtual address space) so that after enabling the MMU the
-> > memory space translated by ttbr0_el1 is restored as expected.
-> >
-> 
-> 'After enabling the MMU' is confusing, especially since you use it
-> twice to describe two different points in time.
+AFAIK, Ideally the driver should have more generic compatible string 
+unless there is any SOC specific thing, and DT can still use the order 
+of specific, generic compatible strings. If not we would end up adding 
+compatible strings into the driver for every new SOC.
 
-I will sum up this commit log, it is ways too long and not clear
-at times.
+--srini
 
-> > Commit dd006da21646 ("arm64: mm: increase VA range of identity map")
-> > also added code to set-up the tcr_el1.t0sz value when the kernel resumes
-> > from low-power states with the MMU off through cpu_resume() in order to
-> > effectively use the identity mapping to enable the MMU but failed to add
-> > the code required to restore the tcr_el1.t0sz to its default value, when
-> > the core returns to the kernel with the MMU enabled, so that the kernel
-> > might end up running with tcr_el1.t0sz value set-up for the identity
-> > mapping which can be lower than the value required by the actual virtual
-> > address space, resulting in an erroneous set-up.
-> >
-> > This patchs adds code in the resume path that restores the tcr_el1.t0sz
-> > default value upon core resume, mirroring this way the cold boot path
-> > behaviour therefore fixing the issue.
-> >
-> 
-> Of course, I agree with the patch, but could you condense the commit
-> log, please?  I don't think we need five paragraphs to point out that
-> the sequence to set T0SZ to its idmap value, enable the MMU, branch
-> into the kernel virtual mapping and set T0SZ to its default value is
-> missing the final step on the resume path, and it actually took me a
-> while to figure out what the problem was from reading the text.
-
-Agreed.
-
-> > Fixes: 95322526ef62 ("arm64: kernel: cpu_{suspend/resume} implementation")
-> 
-> Wrong commit id
-
-Technically speaking I am not fixing
-
-Commit dd006da21646 ("arm64: mm: increase VA range of identity map")
-
-I am fixing the commit I reported, because it never worked on platforms
-requiring extended idmap, if anything, your commit dd006da21646 gave
-CPUidle states and suspend2RAM a chance to work on those platforms,
-and this patch completes the implementation.
-
-To make things simpler I can report:
-
-Fixes: dd006da21646 ("arm64: mm: increase VA range of identity map")
-
-as long as we all agree on the above.
-
-> > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> > Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> > Cc: Will Deacon <will.deacon@arm.com>
-> > Cc: Catalin Marinas <catalin.marinas@arm.com>
-> 
-> Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-
-Thanks, I will prepare a v2 and ask Catalin to merge it at -rc1, it
-conflicts with patches currently on arm64 for-next/core we can wait till
--rc1.
-
-Thanks,
-Lorenzo
+>
+> Sascha
+>
