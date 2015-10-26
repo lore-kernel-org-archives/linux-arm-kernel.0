@@ -1,38 +1,34 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Mon, 26 Oct 2015 19:02:14 +0800
-Subject: [RFC PATCH 3/3] PCI: xgene: generate proper configuration access
- cycles
-In-Reply-To: <1445857334-6936-1-git-send-email-jszhang@marvell.com>
-References: <1445857334-6936-1-git-send-email-jszhang@marvell.com>
-Message-ID: <1445857334-6936-4-git-send-email-jszhang@marvell.com>
+From: wangzhou1@hisilicon.com (Zhou Wang)
+Date: Mon, 26 Oct 2015 19:35:50 +0800
+Subject: [PATCH v12 8/8] MAINTAINERS: Add pcie-hisi maintainer
+In-Reply-To: <1445859350-26375-1-git-send-email-wangzhou1@hisilicon.com>
+References: <1445859350-26375-1-git-send-email-wangzhou1@hisilicon.com>
+Message-ID: <1445859350-26375-9-git-send-email-wangzhou1@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Inspired by Russell King's patch[1], I found current tegra also has the
-same issue of "reading 32-bits from the command register, modifying the
-command register, and then writing it back has the effect of clearing
-any status bits that were indicating at that time" as pointed out by
-Russell. This patch fix this issue by using the pci_generic_config_write.
-
-[1]http://www.spinics.net/lists/linux-pci/msg44869.html
-
-Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+Signed-off-by: Zhou Wang <wangzhou1@hisilicon.com>
 ---
- drivers/pci/host/pci-xgene.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ MAINTAINERS | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-diff --git a/drivers/pci/host/pci-xgene.c b/drivers/pci/host/pci-xgene.c
-index 0236ab9..8946a6c 100644
---- a/drivers/pci/host/pci-xgene.c
-+++ b/drivers/pci/host/pci-xgene.c
-@@ -176,7 +176,7 @@ static int xgene_pcie_config_read32(struct pci_bus *bus, unsigned int devfn,
- static struct pci_ops xgene_pcie_ops = {
- 	.map_bus = xgene_pcie_map_bus,
- 	.read = xgene_pcie_config_read32,
--	.write = pci_generic_config_write32,
-+	.write = pci_generic_config_write,
- };
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 7ba7ab7..944a229 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -8047,6 +8047,13 @@ S:	Maintained
+ F:	Documentation/devicetree/bindings/pci/xgene-pci-msi.txt
+ F:	drivers/pci/host/pci-xgene-msi.c
  
- static u64 xgene_pcie_set_ib_mask(void __iomem *csr_base, u32 addr,
++PCIE DRIVER FOR HISILICON
++M:	Zhou Wang <wangzhou1@hisilicon.com>
++L:	linux-pci at vger.kernel.org
++S:	Maintained
++F:	Documentation/devicetree/bindings/pci/hisilicon-pcie.txt
++F:	drivers/pci/host/pcie-hisi.c
++
+ PCMCIA SUBSYSTEM
+ P:	Linux PCMCIA Team
+ L:	linux-pcmcia at lists.infradead.org
 -- 
-2.6.2
+1.9.1
