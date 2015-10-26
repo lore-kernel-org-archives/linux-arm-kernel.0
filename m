@@ -1,36 +1,47 @@
 From: leilk.liu@mediatek.com (Leilk Liu)
-Date: Mon, 26 Oct 2015 16:09:40 +0800
-Subject: [PATCH v2 0/5] mt8173 spi multiple devices support 
-Message-ID: <1445846985-26229-1-git-send-email-leilk.liu@mediatek.com>
+Date: Mon, 26 Oct 2015 16:09:41 +0800
+Subject: [PATCH v2 1/5] dt-binding: spi: Mediatek: Update document devicetree
+ bindings to support multiple devices
+In-Reply-To: <1445846985-26229-1-git-send-email-leilk.liu@mediatek.com>
+References: <1445846985-26229-1-git-send-email-leilk.liu@mediatek.com>
+Message-ID: <1445846985-26229-2-git-send-email-leilk.liu@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series are based on 4.3-rc1 and provide 5 patches to support
-mt8173 spi multiple devices.
+This patch updates document devicetree bindings
+to support multiple devices.
 
-Change in v2:
-1. add mt8173 board name on patch 5/5 subject.
-2. fix this series merge conflict.
+Signed-off-by: Leilk Liu <leilk.liu@mediatek.com>
+---
+ Documentation/devicetree/bindings/spi/spi-mt65xx.txt | 9 ++++++---
+ 1 file changed, 6 insertions(+), 3 deletions(-)
 
-Change in v1:
-1. update document to add cs-gpio;
-2. remove mtk_spi_config function;
-3. move controller_data to master->setup;
-4. add mt8173 spi multiple devices support;
-5. update dts to add cs-gpio and modify cs pin to gpio function.
-
-Leilk Liu (5):
-  dt-binding: spi: Mediatek: Update document devicetree bindings to
-    support multiple devices
-  spi: mediatek: remove mtk_spi_config
-  spi: mediatek: handle controller_data in mtk_spi_setup
-  spi: mediatek: mt8173 spi multiple devices support
-  arm64: dts: mt8173: spi bus dts support multiple devices
-
- .../devicetree/bindings/spi/spi-mt65xx.txt         |   9 +-
- arch/arm64/boot/dts/mediatek/mt8173-evb.dts        |   3 +-
- drivers/spi/spi-mt65xx.c                           | 129 +++++++++++++--------
- 3 files changed, 91 insertions(+), 50 deletions(-)
-
---
+diff --git a/Documentation/devicetree/bindings/spi/spi-mt65xx.txt b/Documentation/devicetree/bindings/spi/spi-mt65xx.txt
+index 6160ffb..ce363c923f 100644
+--- a/Documentation/devicetree/bindings/spi/spi-mt65xx.txt
++++ b/Documentation/devicetree/bindings/spi/spi-mt65xx.txt
+@@ -29,8 +29,11 @@ Required properties:
+   muxes clock, and "spi-clk" for the clock gate.
+ 
+ Optional properties:
++-cs-gpios: see spi-bus.txt, only required for MT8173.
++
+ - mediatek,pad-select: specify which pins group(ck/mi/mo/cs) spi
+-  controller used, this value should be 0~3, only required for MT8173.
++  controller used. This is a array, the element value should be 0~3,
++  only required for MT8173.
+     0: specify GPIO69,70,71,72 for spi pins.
+     1: specify GPIO102,103,104,105 for spi pins.
+     2: specify GPIO128,129,130,131 for spi pins.
+@@ -49,7 +52,7 @@ spi: spi at 1100a000 {
+ 		 <&topckgen CLK_TOP_SPI_SEL>,
+ 		 <&pericfg CLK_PERI_SPI0>;
+ 	clock-names = "parent-clk", "sel-clk", "spi-clk";
+-
+-	mediatek,pad-select = <0>;
++	cs-gpios = <&pio 105 GPIO_ACTIVE_LOW>, <&pio 72 GPIO_ACTIVE_LOW>;
++	mediatek,pad-select = <1>, <0>;
+ 	status = "disabled";
+ };
+-- 
 1.8.1.1.dirty
