@@ -1,48 +1,74 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon, 26 Oct 2015 15:01:52 +0900
-Subject: [PATCH v12 7/7] MAINTAINERS: Add entry Renesas arm64 architecture
-In-Reply-To: <1445839312-8874-1-git-send-email-horms+renesas@verge.net.au>
-References: <1445839312-8874-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1445839312-8874-8-git-send-email-horms+renesas@verge.net.au>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Mon, 26 Oct 2015 07:10:48 +0100
+Subject: [PATCH v2] clk: imx25: Remove osc clock from driver
+Message-ID: <1445839848-28323-1-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Initial Renesas arm64 architecture support will be for the R-Car H3,
-r8a7795, SoC and its Salvator-X board.
+The 'osc' clock is already initialized by the fixed clock defined in
+imx25.dtsi. The imx25 clock driver tries to add this clock for a second
+time and fails with -EEXIST:
+	i.MX clk 1: register failed with -17
 
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+As the clock is already properly setup in DT with a different driver, we
+can completely remove the handling in the imx25 clock driver.
 
+Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+Reviewed-by: Lucas Stach <l.stach@pengutronix.de>
 ---
 
-Changes since v11:
-- As suggested by Khiem Nguyen:
-  + Removed reference to http://oss.renesas.com as that web site is closed
+Thanks for your review Lucas. I just removed the NULL assignment from the patch
+you mentioned. That's the only change for v2.
 
-Changes since v10:
-- New Patch
----
- MAINTAINERS | 9 +++++++++
- 1 file changed, 9 insertions(+)
+Best Regards,
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 7ba7ab749c85..e35134f7d128 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -1392,6 +1392,15 @@ M:	Lennert Buytenhek <kernel@wantstofly.org>
- L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
- S:	Maintained
+Markus
+
+ drivers/clk/imx/clk-imx25.c | 18 ++----------------
+ 1 file changed, 2 insertions(+), 16 deletions(-)
+
+diff --git a/drivers/clk/imx/clk-imx25.c b/drivers/clk/imx/clk-imx25.c
+index ec1a4c1dacf1..4df652cd912c 100644
+--- a/drivers/clk/imx/clk-imx25.c
++++ b/drivers/clk/imx/clk-imx25.c
+@@ -86,13 +86,11 @@ enum mx25_clks {
  
-+ARM/RENESAS ARM64 ARCHITECTURE
-+M:	Simon Horman <horms@verge.net.au>
-+M:	Magnus Damm <magnus.damm@gmail.com>
-+L:	linux-sh at vger.kernel.org
-+Q:	http://patchwork.kernel.org/project/linux-sh/list/
-+T:	git git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git next
-+S:	Supported
-+F:	arch/arm64/boot/dts/renesas/
-+
- ARM/RISCPC ARCHITECTURE
- M:	Russell King <linux@arm.linux.org.uk>
- L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+ static struct clk *clk[clk_max];
+ 
+-static int __init __mx25_clocks_init(unsigned long osc_rate,
+-				     void __iomem *ccm_base)
++static int __init __mx25_clocks_init(void __iomem *ccm_base)
+ {
+ 	BUG_ON(!ccm_base);
+ 
+ 	clk[dummy] = imx_clk_fixed("dummy", 0);
+-	clk[osc] = imx_clk_fixed("osc", osc_rate);
+ 	clk[mpll] = imx_clk_pllv1(IMX_PLLV1_IMX25, "mpll", "osc", ccm(CCM_MPCTL));
+ 	clk[upll] = imx_clk_pllv1(IMX_PLLV1_IMX25, "upll", "osc", ccm(CCM_UPCTL));
+ 	clk[mpll_cpu_3_4] = imx_clk_fixed_factor("mpll_cpu_3_4", "mpll", 3, 4);
+@@ -238,22 +236,10 @@ static int __init __mx25_clocks_init(unsigned long osc_rate,
+ 
+ static void __init mx25_clocks_init_dt(struct device_node *np)
+ {
+-	struct device_node *refnp;
+-	unsigned long osc_rate = 24000000;
+ 	void __iomem *ccm;
+ 
+-	/* retrieve the freqency of fixed clocks from device tree */
+-	for_each_compatible_node(refnp, NULL, "fixed-clock") {
+-		u32 rate;
+-		if (of_property_read_u32(refnp, "clock-frequency", &rate))
+-			continue;
+-
+-		if (of_device_is_compatible(refnp, "fsl,imx-osc"))
+-			osc_rate = rate;
+-	}
+-
+ 	ccm = of_iomap(np, 0);
+-	__mx25_clocks_init(osc_rate, ccm);
++	__mx25_clocks_init(ccm);
+ 
+ 	clk_data.clks = clk;
+ 	clk_data.clk_num = ARRAY_SIZE(clk);
 -- 
-2.1.4
+2.6.1
