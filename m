@@ -1,38 +1,33 @@
-From: aaro.koskinen@iki.fi (Aaro Koskinen)
-Date: Mon, 26 Oct 2015 20:41:43 +0200
-Subject: [PATCH] ARM: OMAP1: fix incorrect INT_DMA_LCD
-In-Reply-To: <20151020144707.GA3078@atomide.com>
-References: <20151020144707.GA3078@atomide.com>
-Message-ID: <1445884903-12224-1-git-send-email-aaro.koskinen@iki.fi>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Mon, 26 Oct 2015 12:07:58 -0700
+Subject: [PATCH soc/next] ARM: bcm2835: add mutual inclusion protection
+In-Reply-To: <87vb9t4h9s.fsf@eliezer.anholt.net>
+References: <1445539565-24955-1-git-send-email-alex.aring@gmail.com>
+ <87vb9t4h9s.fsf@eliezer.anholt.net>
+Message-ID: <562E7A0E.1090905@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 685e2d08c54b ("ARM: OMAP1: Change interrupt numbering for
-sparse IRQ") turned on SPARSE_IRQ on OMAP1, but forgot to change
-the number of INT_DMA_LCD. This broke the boot at least on Nokia 770,
-where the device hangs during framebuffer initialization.
+On 26/10/15 11:27, Eric Anholt wrote:
+> Alexander Aring <alex.aring@gmail.com> writes:
+> 
+>> This patch adds mutual inclusion protection for the rpi firmware header.
+>>
+>> Cc: Eric Anholt <eric@anholt.net>
+>> Cc: Stephen Warren <swarren@wwwdotorg.org>
+>> Signed-off-by: Alexander Aring <alex.aring@gmail.com>
+>> ---
+>> This patch is for "soc/next" and depends on Eric Anholt's patch ("ARM: bcm2835:
+>> Add the Raspberry Pi firmware driver"), see:
+>>
+>> http://lists.infradead.org/pipermail/linux-rpi-kernel/2015-October/002434.html
+>>
+>> I think the patch is already applied but not pushed, so please fixup use this
+>> as fixup or simple apply this patch after the patch to add the firmware driver.
+> 
+> Looks like Florian pulled this in to his pull request and it's in the
+> arm-soc tree.
 
-Fix by defining INT_DMA_LCD like the other interrupts.
-
-Cc: stable at vger.kernel.org
-Fixes: 685e2d08c54b ("ARM: OMAP1: Change interrupt numbering for sparse IRQ")
-Signed-off-by: Aaro Koskinen <aaro.koskinen@iki.fi>
----
- include/linux/omap-dma.h | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/include/linux/omap-dma.h b/include/linux/omap-dma.h
-index e5a7013..88fa8af 100644
---- a/include/linux/omap-dma.h
-+++ b/include/linux/omap-dma.h
-@@ -17,7 +17,7 @@
- 
- #include <linux/platform_device.h>
- 
--#define INT_DMA_LCD			25
-+#define INT_DMA_LCD			(NR_IRQS_LEGACY + 25)
- 
- #define OMAP1_DMA_TOUT_IRQ		(1 << 0)
- #define OMAP_DMA_DROP_IRQ		(1 << 1)
+Yes I did apply this, sorry for not mentioning that (I usually do).
 -- 
-2.4.0
+Florian
