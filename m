@@ -1,36 +1,45 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Mon, 26 Oct 2015 09:59:34 +0900
-Subject: [GIT PULL v2] ARM: mvebu: soc for v4.4 (#2)
-In-Reply-To: <877fmd383s.fsf@free-electrons.com>
-References: <877fmd383s.fsf@free-electrons.com>
-Message-ID: <20151026005934.GF14238@localhost>
+Date: Mon, 26 Oct 2015 10:07:52 +0900
+Subject: [GIT PULL] Allwinner DT changes for 4.4, round 3
+In-Reply-To: <20151025201308.GS10947@lukather>
+References: <20151023180711.GA11749@lukather> <4745252.gLSrJNQ42D@wuerfel>
+ <9946613.K7Ehp1DEiL@wuerfel> <20151025201308.GS10947@lukather>
+Message-ID: <20151026010752.GG14238@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 23, 2015 at 05:41:43PM +0200, Gregory CLEMENT wrote:
-> Hi,
+On Sun, Oct 25, 2015 at 09:13:08PM +0100, Maxime Ripard wrote:
+> On Fri, Oct 23, 2015 at 10:55:13PM +0200, Arnd Bergmann wrote:
+> > On Friday 23 October 2015 22:41:04 Arnd Bergmann wrote:
+> > > On Friday 23 October 2015 20:07:11 Maxime Ripard wrote:
+> > > > Allwinner DT changes for 4.4, round 3
+> > > > 
+> > > > A bunch of new boards, but mostly enable the support for the Audio Codec
+> > > > on the older SoCs (A10, A10s, A13, A20, R8) and enable it on various
+> > > > boards.
+> > > > 
+> > > > 
+> > > 
+> > > Pulled into next/dt, thanks!
+> > 
+> > And dropped again:
+> > 
+> > In file included from /git/arm-soc/arch/arm/boot/dts/sun4i-a10-a1000.dts:46:0:
+> > /git/arm-soc/arch/arm/boot/dts/sun4i-a10.dtsi:48:46: fatal error: dt-bindings/clock/sun4i-a10-pll2.h: No such file or directory
+> > 
+> > Please make sure branches you send actually work by themselves.
 > 
-> Here is the second tentative of the second pull request for soc for
-> mvebu for v4.4. :)
+> Damn, you're right... Sorry about that...
 > 
-> The difference with the previous one was the "ARM:
-> mvebu: add broken-idle option" patch updated according Olof's remark.
+> You need to pull the tag sunxi-clk-for-4.4 that has been merged in the
+> clk tree in 38ce30e29dc.
 > 
-> Gregory
-> 
-> The following changes since commit d492cccac28493f26bb70038385a9ef4df19bdee:
-> 
->   ARM: mvebu: add support to clear shared L2 bit on Armada XP (2015-09-29 15:31:51 +0200)
-> 
-> are available in the git repository at:
-> 
->   git://git.infradead.org/linux-mvebu.git tags/mvebu-soc-4.4-2
-> 
-> for you to fetch changes up to 9d2ea95a599a80b08cc802f044626ea2701aade9:
-> 
->   ARM: mvebu: add broken-idle option (2015-10-23 17:34:37 +0200)
+> Mike, Stephen, will that tag be stable?
 
-Thanks for respinning, merged now.
+I don't see that tag in your tree, Maxime? I also don't see 38ce30e29dc in
+the clk tree on kernel.org.
+
+I'm a little confused right now...
 
 
 -Olof
