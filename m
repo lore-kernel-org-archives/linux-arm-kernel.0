@@ -1,72 +1,207 @@
-From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Mon, 26 Oct 2015 10:12:57 +0000
-Subject: [GIT PULL] arm64: Juno: Add support for PCIe or R1 board
-In-Reply-To: <4136958.Qhq5GfeeVa@wuerfel>
-References: <20151021113629.GF3394@e106497-lin.cambridge.arm.com>
- <4136958.Qhq5GfeeVa@wuerfel>
-Message-ID: <20151026101256.GF963@e106497-lin.cambridge.arm.com>
+From: amittomer25@gmail.com (Amit)
+Date: Mon, 26 Oct 2015 15:45:58 +0530
+Subject: [PATCH v1] Ftrace: arm/arm64: Define a new arm/arm64 trace clock
+ source based on CNTPCT/CNTPCT_EL0 register.
+Message-ID: <1445854558-16253-1-git-send-email-amittomer25@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 23, 2015 at 10:42:53PM +0200, Arnd Bergmann wrote:
-> On Wednesday 21 October 2015 12:36:29 Liviu Dudau wrote:
-> > The following changes since commit 25cb62b76430a91cc6195f902e61c2cb84ade622:
-> > 
-> >   Linux 4.3-rc5 (2015-10-11 11:09:45 -0700)
-> > 
-> > are available in the git repository at:
-> > 
-> > 
-> 
-> Not pulled.
-> 
-> All our branches are based on -rc4 or earlier, and we'd like to avoid
-> backmerges from mainline if at all possible.
-> 
-> Can you rebase this to -rc4 and send again?
-> 
-> 	Arnd
+From: Amit Singh Tomar <amittomer25@gmail.com>
 
-Sure, I've rebased the branch on top of -rc4 now, so here is the new request.
+Define new arm/arm64 specific trace clock using CNTPCT/CNTPCT_EL0 register,
+similar to x86-tsc. It can be used to correlate trace events across
+hosts and guest that can be useful for debugging purpose.
 
-Many thanks,
-Liviu
+Signed-off-by: Amit Singh Tomar <amittomer25@gmail.com>
+---
+Changes since RFC:
+	* Replaced define with static inline
+	* Revert few changes done in ftrace.txt
+	* Made it common between ARM and ARM64.
+---
+ Documentation/trace/ftrace.txt       | 12 ++++++++++++
+ arch/arm/include/asm/Kbuild          |  1 -
+ arch/arm/include/asm/trace_clock.h   | 21 +++++++++++++++++++++
+ arch/arm/kernel/Makefile             |  2 ++
+ arch/arm/kernel/trace_clock.c        | 33 +++++++++++++++++++++++++++++++++
+ arch/arm64/include/asm/Kbuild        |  1 -
+ arch/arm64/include/asm/trace_clock.h | 21 +++++++++++++++++++++
+ arch/arm64/kernel/Makefile           |  2 ++
+ 8 files changed, 91 insertions(+), 2 deletions(-)
+ create mode 100644 arch/arm/include/asm/trace_clock.h
+ create mode 100644 arch/arm/kernel/trace_clock.c
+ create mode 100644 arch/arm64/include/asm/trace_clock.h
 
-The following changes since commit 049e6dde7e57f0054fdc49102e7ef4830c698b46:
-
-  Linux 4.3-rc4 (2015-10-04 16:57:17 +0100)
-
-are available in the git repository at:
-
-  git://linux-arm.org/linux-ld for-upstream/juno-pcie
-
-for you to fetch changes up to 324e84cb9265120b49c4835ae850e4b83228aa73:
-
-  arm64: defconfig: Enable PCI generic host bridge by default (2015-10-26 10:02:52 +0000)
-
-----------------------------------------------------------------
-Liviu Dudau (3):
-      Documentation: of: Document the bindings used by Juno R1 PCIe host bridge
-      arm64: Juno: Add support for the PCIe host bridge on Juno R1
-      arm64: defconfig: Enable PCI generic host bridge by default
-
- .../devicetree/bindings/pci/arm,juno-r1-pcie.txt     | 10 ++++++++++
- .../devicetree/bindings/pci/plda,xpressrich3-axi.txt | 12 ++++++++++++
- .../devicetree/bindings/vendor-prefixes.txt          |  1 +
- arch/arm64/boot/dts/arm/juno-r1.dts                  | 20 ++++++++++++++++++++
- arch/arm64/configs/defconfig                         |  1 +
- 5 files changed, 44 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/pci/arm,juno-r1-pcie.txt
- create mode 100644 Documentation/devicetree/bindings/pci/plda,xpressrich3-axi.txt
-
-
-
+diff --git a/Documentation/trace/ftrace.txt b/Documentation/trace/ftrace.txt
+index ef621d3..13f3737 100644
+--- a/Documentation/trace/ftrace.txt
++++ b/Documentation/trace/ftrace.txt
+@@ -351,6 +351,18 @@ of ftrace. Here is a list of some of the key files:
+ 		  to correlate events across hypervisor/guest if
+ 		  tb_offset is known.
+ 
++	 arm-pct: This uses ARM Physical Count register value.This
++	 	  is different from default "local" clock which
++		  usese Virtual Count register.This is consistent
++		  across processors and can be used to correlate
++		  events across host/guest.
++
++	 arm64-pct: This uses ARM64 Physical Timer Count register
++                   value. This is different from default "local"
++                   clock which usese Virtual Timer Count register.
++                   This is consistent across processors and can be
++                   used to correlate events across host/guest.
++
+ 	To set a clock, simply echo the clock name into this file.
+ 
+ 	  echo global > trace_clock
+diff --git a/arch/arm/include/asm/Kbuild b/arch/arm/include/asm/Kbuild
+index be648eb..bc3964b 100644
+--- a/arch/arm/include/asm/Kbuild
++++ b/arch/arm/include/asm/Kbuild
+@@ -34,5 +34,4 @@ generic-y += sockios.h
+ generic-y += termbits.h
+ generic-y += termios.h
+ generic-y += timex.h
+-generic-y += trace_clock.h
+ generic-y += unaligned.h
+diff --git a/arch/arm/include/asm/trace_clock.h b/arch/arm/include/asm/trace_clock.h
+new file mode 100644
+index 0000000..dc41f75
+--- /dev/null
++++ b/arch/arm/include/asm/trace_clock.h
+@@ -0,0 +1,21 @@
++/*
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License, version 2, as
++ * published by the Free Software Foundation.
++ *
++ * Copyright (C) 2015 Amit Singh Tomar, amittomer25 at gmail.com
++*/
++
++#ifndef _ASM_ARM_TRACE_CLOCK_H
++#define _ASM_ARM_TRACE_CLOCK_H
++
++#include <linux/compiler.h>
++#include <linux/types.h>
++
++extern u64 notrace trace_clock_arm_pct(void);
++
++# define ARCH_TRACE_CLOCKS \
++	{ trace_clock_arm_pct,  "arm-pct",  0},
++
++#endif  /* _ASM_ARM_TRACE_CLOCK_H */
++
+diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
+index af9e59b..c3abf7c 100644
+--- a/arch/arm/kernel/Makefile
++++ b/arch/arm/kernel/Makefile
+@@ -92,4 +92,6 @@ obj-y				+= psci-call.o
+ obj-$(CONFIG_SMP)		+= psci_smp.o
+ endif
+ 
++obj-$(CONFIG_TRACING)           += trace_clock.o
++
+ extra-y := $(head-y) vmlinux.lds
+diff --git a/arch/arm/kernel/trace_clock.c b/arch/arm/kernel/trace_clock.c
+new file mode 100644
+index 0000000..3bf040d
+--- /dev/null
++++ b/arch/arm/kernel/trace_clock.c
+@@ -0,0 +1,33 @@
++/*
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License, version 2, as
++ * published by the Free Software Foundation.
++ *
++ * Copyright (C) 2015 Amit Singh Tomar, amittomer25 at gmail.com
++ *
++ * Thanks to Steven Rostedt and Andre Przywara!
++*/
++
++#include <asm/trace_clock.h>
++#include <asm/barrier.h>
++#include <asm/arch_timer.h>
++
++static inline u64 get_cntpct(void)
++{
++	u64 cycles;
++
++	isb();
++	asm volatile("mrs %0, cntpct_el0" : "=r" (cycles));
++
++	return cycles;
++}
++
++u64 notrace trace_clock_arm_pct(void)
++{
++	return arch_counter_get_cntpct();
++}
++
++#ifdef CONFIG_ARM64
++u64 notrace trace_clock_arm64_pct(void)
++{
++	return get_cntpct();
++}
++#endif
+diff --git a/arch/arm64/include/asm/Kbuild b/arch/arm64/include/asm/Kbuild
+index 70fd9ff..8608f9e 100644
+--- a/arch/arm64/include/asm/Kbuild
++++ b/arch/arm64/include/asm/Kbuild
+@@ -50,7 +50,6 @@ generic-y += switch_to.h
+ generic-y += termbits.h
+ generic-y += termios.h
+ generic-y += topology.h
+-generic-y += trace_clock.h
+ generic-y += types.h
+ generic-y += unaligned.h
+ generic-y += user.h
+diff --git a/arch/arm64/include/asm/trace_clock.h b/arch/arm64/include/asm/trace_clock.h
+new file mode 100644
+index 0000000..aef4ccd
+--- /dev/null
++++ b/arch/arm64/include/asm/trace_clock.h
+@@ -0,0 +1,21 @@
++/*
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License, version 2, as
++ * published by the Free Software Foundation.
++ *
++ * Copyright (C) 2015 Amit Singh Tomar, amittomer25 at gmail.com
++*/
++
++#ifndef _ASM_ARM_TRACE_CLOCK_H
++#define _ASM_ARM_TRACE_CLOCK_H
++
++#include <linux/compiler.h>
++#include <linux/types.h>
++
++extern u64 notrace trace_clock_arm64_pct(void);
++
++# define ARCH_TRACE_CLOCKS \
++	{ trace_clock_arm64_pct,  "arm64-pct",  0},
++
++#endif  /* _ASM_ARM_TRACE_CLOCK_H */
++
+diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
+index 22dc9bc..b23a149 100644
+--- a/arch/arm64/kernel/Makefile
++++ b/arch/arm64/kernel/Makefile
+@@ -10,6 +10,7 @@ CFLAGS_armv8_deprecated.o := -I$(src)
+ CFLAGS_REMOVE_ftrace.o = -pg
+ CFLAGS_REMOVE_insn.o = -pg
+ CFLAGS_REMOVE_return_address.o = -pg
++ARM=../../../arch/arm/kernel
+ 
+ # Object file lists.
+ arm64-obj-y		:= debug-monitors.o entry.o irq.o fpsimd.o		\
+@@ -36,6 +37,7 @@ arm64-obj-$(CONFIG_EFI)			+= efi.o efi-stub.o efi-entry.o
+ arm64-obj-$(CONFIG_PCI)			+= pci.o
+ arm64-obj-$(CONFIG_ARMV8_DEPRECATED)	+= armv8_deprecated.o
+ arm64-obj-$(CONFIG_ACPI)		+= acpi.o
++arm64-obj-$(CONFIG_TRACING)             += $(ARM)/trace_clock.o
+ 
+ obj-y					+= $(arm64-obj-y) vdso/
+ obj-m					+= $(arm64-obj-m)
 -- 
-====================
-| I would like to |
-| fix the world,  |
-| but they're not |
-| giving me the   |
- \ source code!  /
-  ---------------
-    ?\_(?)_/?
+1.9.1
