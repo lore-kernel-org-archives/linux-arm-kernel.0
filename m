@@ -1,68 +1,76 @@
-From: TWarren@nvidia.com (Tom Warren)
-Date: Mon, 26 Oct 2015 21:36:33 +0000
-Subject: [PATCH v3] Tegra: DT: add device tree binding doc for QSPI
-In-Reply-To: <562E954B.5070604@wwwdotorg.org>
-References: <1445891676-3262-1-git-send-email-twarren@nvidia.com>
- <562E954B.5070604@wwwdotorg.org>
-Message-ID: <731fc53aa2d24edc93c2af43a7711657@HQMAIL104.nvidia.com>
+From: o.schinagl@ultimaker.com (Olliver Schinagl)
+Date: Mon, 26 Oct 2015 22:32:31 +0100
+Subject: [PATCH 00/10] 
+Message-ID: <1445895161-2317-1-git-send-email-o.schinagl@ultimaker.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Stephen,
+Hey Thierry,
 
-> -----Original Message-----
-> From: Stephen Warren [mailto:swarren at wwwdotorg.org]
-> Sent: Monday, October 26, 2015 2:04 PM
-> To: Tom Warren <TWarren@nvidia.com>
-> Cc: u-boot at lists.denx.de; Stephen Warren <swarren@nvidia.com>;
-> tomcwarren3959 at gmail.com; jteki at openedev.com; robh+dt at kernel.org;
-> pawel.moll at arm.com; mark.rutland at arm.com; ijc+devicetree at hellion.org.uk;
-> galak at codeaurora.org; Thierry Reding <treding@nvidia.com>; linux-
-> tegra at vger.kernel.org; Alex Courbot <acourbot@nvidia.com>; linux-arm-
-> kernel at lists.infradead.org
-> Subject: Re: [PATCH v3] Tegra: DT: add device tree binding doc for QSPI
-> 
-> On 10/26/2015 02:34 PM, Tom Warren wrote:
-> > This patch adds the device tree binding doc for the Tegra QSPI
-> > controller on Tegra210.
-> 
-> > diff --git
-> > a/Documentation/devicetree/bindings/spi/nvidia,tegra210-qspi.txt
-> > b/Documentation/devicetree/bindings/spi/nvidia,tegra210-qspi.txt
-> 
-> > +- clock-names : Must include the following entries:
-> > +  - qspi
-> > +- resets : Must contain an entry for each entry in reset-names.
-> > +  See ../reset/reset.txt for details.
-> > +- reset-names : Must include the following entries:
-> > +  - qspi
-> > +- clocks : Must contain an entry for each entry in clock-names.
-> > +  See ../clocks/clock-bindings.txt for details.
-> 
-> Let's keep clocks and clock-names next to each-other in the doc. I don't know
-> why they aren't in the eixsting Tegra SPI doc.
-OK. I assume 'clock-names', then 'clocks' since 'clocks' references clock-names.
+With this patch set I wanted to add some new features to the PWM framework,
+while doing so, I ran into 2 minor things with the lpc18xx and sunxi driver.
 
-> 
-> With this issue fixed, this patch looks good to me.
-> 
-> Note: I don't see the devicetree mailing list in the CC list. You should probably
-> replace the U-Boot mailing list with it.
-I thought I had it, but may have dropped it. What exactly is the URL of the devicetree mailing list? devicetree-discuss at lists.ozlabs.org? or devicetree at vger.kernel.org?
+The lpc18xx I bumped into because I was trying to learn from existing drivers.
+Here I only added the setter to set the chip_data, since I think it is bad
+practice to set data directly in the struct, I'll be happy to stand corrected
+however and that patch not applied.
 
-> 
-> > +Optional properties:
-> > +- dmas : Must contain an entry for each entry in clock-names.
-> > +  See ../dma/dma.txt for details.
-> > +- dma-names : Must include the following entries:
-> > +  - rx
-> > +  - tx
-> 
-> Eventually, we should have a property that describes the SPI bus width (x1, x2,
-> x4 I assume). However, we can assume that unless otherwise specified, the
-> width is x1, and add a property to specify the width later as/when we need it if
-> you want.
+Since I use the sunxi platform a lot, I used this platform to test things with
+and to also ran into some issues with the hardware PWM as can be seen in its
+commit log.
 
-Tom
---
-nvpublic
+The major feature of this patch-set however is the introduction of the Generic
+GPIO based PWM driver based on the high-resolution timers. On an Olimex Lime2
+featuring an Allwinner A20 SoC, I can toggle quite reliably at 100 kHz. At 150
+kHz the SoC started to show signs of being to slow and the scope traces started
+to become inconsistent.
+Naturally of course, a GPIO based PWM is heavily dependent on system load and
+on the SoC. For some use cases a bit-banged PWM might not be ideal, audio for
+example does not sound 'pitch-perfect' but does work pretty alright. It really
+is up to the users what one might one to use a bit-banged GPIO driver for.
+
+Finally, I've started to add a 'pulse' option to the PWM framework and
+added it to the sunxi and gpio variants. It currently does not work and I
+did not wanted to submit it until Boris's PWM patches where in, but I also
+felt an early review on the intention would be a good idea.
+The idea is using this new feature, we can start emitting a fixed number of
+pulses, using the PWM 'hardware' guaranteeing properly timed output.
+Not all hardware may support this at all (might be emulated however) and the
+sunxi hardware for example is limited to 1 pulse max (but may emulate more with
+timers for example). The GPIO driver is able to produce a lot of timed pulses
+however.
+
+Thanks,
+
+Olliver
+
+Signed-off-by: Olliver Schinagl <oliver@schinagl.nL>
+
+Olliver Schinagl (10):
+  pwm: lpc18xx_pwm: use pwm_set_chip_data
+  pwm: sunxi: fix whitespace issue
+  pwm: sunxi: Yield some time to the pwm-block to become ready
+  pwm: core: use bitops
+  pwm: sysfs: do not unnecessarily store result in var
+  pwm: sysfs: make use of the DEVICE_ATTR_[RW][WO] macro's
+  pwm: gpio: Add a generic gpio based PWM driver
+  pwm: core: add pulse feature to the PWM framework
+  pwm: pwm_gpio: add pulse option
+  pwm: sunxi: Add possibility to pulse the sunxi pwm output
+
+ Documentation/devicetree/bindings/pwm/pwm-gpio.txt |  18 ++
+ MAINTAINERS                                        |   5 +
+ drivers/pwm/Kconfig                                |  15 ++
+ drivers/pwm/Makefile                               |   1 +
+ drivers/pwm/core.c                                 |  30 ++-
+ drivers/pwm/pwm-gpio.c                             | 276 +++++++++++++++++++++
+ drivers/pwm/pwm-lpc18xx-sct.c                      |  11 +-
+ drivers/pwm/pwm-sun4i.c                            |  73 ++++--
+ drivers/pwm/sysfs.c                                | 133 +++++++---
+ include/linux/pwm.h                                |  71 +++++-
+ 10 files changed, 556 insertions(+), 77 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/pwm/pwm-gpio.txt
+ create mode 100644 drivers/pwm/pwm-gpio.c
+
+-- 
+2.6.1
