@@ -1,116 +1,35 @@
-From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Mon, 26 Oct 2015 18:25:43 +0530
-Subject: [PATCH v3 7/7] drivers: soc: Add support for Exynos PMU driver
-In-Reply-To: <1445864143-25695-1-git-send-email-pankaj.dubey@samsung.com>
-References: <1445864143-25695-1-git-send-email-pankaj.dubey@samsung.com>
-Message-ID: <1445864143-25695-8-git-send-email-pankaj.dubey@samsung.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 26 Oct 2015 14:10:17 +0100
+Subject: [PATCH 00/10] ARM MTD AFS v2 partition support
+In-Reply-To: <1444914533-27782-1-git-send-email-linus.walleij@linaro.org>
+References: <1444914533-27782-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <CACRpkdbH3yP3jbeeGxrAJXoJeXJQtnPfZpQ1dtx7DpP9_uaZhQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch moves Exynos PMU driver implementation from "arm/mach-exynos"
-to "drivers/soc/samsung". This driver is mainly used for setting misc
-bits of register from PMU IP of Exynos SoC which will be required to
-configure before Suspend/Resume. Currently all these settings are done
-in "arch/arm/mach-exynos/pmu.c" but moving ahead for ARM64 based SoC
-support, there is a need of this PMU driver in driver/* folder.
+On Thu, Oct 15, 2015 at 3:08 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
 
-This driver uses existing DT binding information and there should
-be no functionality change in the supported platforms.
+> Years ago, the ARM reference platforms moved away from the footer
+> format parsed by the current AFS code in MTD. As far as I can
+> tell this begun with the RealView reference designs (mach-realview)
+> and the new format has been used in RealView, Versatile Express
+> and recently the Juno Development platform (64bit).
+>
+> The code has not been working for newer designs for a long time.
+> Proper parsing of the flash image partitions is very helpful when
+> you want to replace firmware when running full Linux and none of
+> the boot monitors or boot loaders.
+>
+> After this, AFS parsing will work on all ARM reference designs,
+> or well, all I could test. I tested the Integrator/AP, RealView
+> PB11MPCore and Juno Development Platform.
+>
+> The first 9 patches basically refactors the current code to
+> make the old partition format more encapsulated, while the last
+> patch adds the new v2 format.
 
-Signed-off-by: Amit Daniel Kachhap <amitdanielk@gmail.com>
-Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
----
- arch/arm/mach-exynos/Kconfig                                   | 1 +
- arch/arm/mach-exynos/Makefile                                  | 4 +---
- drivers/soc/samsung/Kconfig                                    | 4 ++++
- drivers/soc/samsung/Makefile                                   | 4 ++++
- arch/arm/mach-exynos/pmu.c => drivers/soc/samsung/exynos-pmu.c | 0
- {arch/arm/mach-exynos => drivers/soc/samsung}/exynos-pmu.h     | 0
- {arch/arm/mach-exynos => drivers/soc/samsung}/exynos3250-pmu.c | 0
- {arch/arm/mach-exynos => drivers/soc/samsung}/exynos4-pmu.c    | 0
- {arch/arm/mach-exynos => drivers/soc/samsung}/exynos5250-pmu.c | 0
- {arch/arm/mach-exynos => drivers/soc/samsung}/exynos5420-pmu.c | 0
- 10 files changed, 10 insertions(+), 3 deletions(-)
- rename arch/arm/mach-exynos/pmu.c => drivers/soc/samsung/exynos-pmu.c (100%)
- rename {arch/arm/mach-exynos => drivers/soc/samsung}/exynos-pmu.h (100%)
- rename {arch/arm/mach-exynos => drivers/soc/samsung}/exynos3250-pmu.c (100%)
- rename {arch/arm/mach-exynos => drivers/soc/samsung}/exynos4-pmu.c (100%)
- rename {arch/arm/mach-exynos => drivers/soc/samsung}/exynos5250-pmu.c (100%)
- rename {arch/arm/mach-exynos => drivers/soc/samsung}/exynos5420-pmu.c (100%)
+If there are no comments on this series, then can it be
+applied for v4.4?
 
-diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
-index 83c85f5..874cb38 100644
---- a/arch/arm/mach-exynos/Kconfig
-+++ b/arch/arm/mach-exynos/Kconfig
-@@ -16,6 +16,7 @@ menuconfig ARCH_EXYNOS
- 	select ARM_GIC
- 	select COMMON_CLK_SAMSUNG
- 	select EXYNOS_THERMAL
-+	select EXYNOS_PMU
- 	select EXYNOS_SROM if PM
- 	select HAVE_ARM_SCU if SMP
- 	select HAVE_S3C2410_I2C if I2C
-diff --git a/arch/arm/mach-exynos/Makefile b/arch/arm/mach-exynos/Makefile
-index 2d58063..34d29df 100644
---- a/arch/arm/mach-exynos/Makefile
-+++ b/arch/arm/mach-exynos/Makefile
-@@ -9,9 +9,7 @@ ccflags-$(CONFIG_ARCH_MULTIPLATFORM) += -I$(srctree)/$(src)/include -I$(srctree)
- 
- # Core
- 
--obj-$(CONFIG_ARCH_EXYNOS)	+= exynos.o pmu.o exynos-smc.o firmware.o \
--					exynos3250-pmu.o exynos4-pmu.o \
--					exynos5250-pmu.o exynos5420-pmu.o
-+obj-$(CONFIG_ARCH_EXYNOS)	+= exynos.o exynos-smc.o firmware.o
- 
- obj-$(CONFIG_EXYNOS_CPU_SUSPEND) += pm.o sleep.o
- obj-$(CONFIG_PM_SLEEP)		+= suspend.o
-diff --git a/drivers/soc/samsung/Kconfig b/drivers/soc/samsung/Kconfig
-index 2833b5b..f545d6c 100644
---- a/drivers/soc/samsung/Kconfig
-+++ b/drivers/soc/samsung/Kconfig
-@@ -10,4 +10,8 @@ config EXYNOS_SROM
- 	bool
- 	depends on ARM && ARCH_EXYNOS && PM
- 
-+config EXYNOS_PMU
-+	bool
-+	depends on ARCH_EXYNOS
-+
- endmenu
-diff --git a/drivers/soc/samsung/Makefile b/drivers/soc/samsung/Makefile
-index 9c554d5..26fb489 100644
---- a/drivers/soc/samsung/Makefile
-+++ b/drivers/soc/samsung/Makefile
-@@ -1 +1,5 @@
- obj-$(CONFIG_EXYNOS_SROM)	+= exynos-srom.o
-+ifdef CONFIG_ARM
-+obj-$(CONFIG_EXYNOS_PMU)	+= exynos-pmu.o exynos3250-pmu.o exynos4-pmu.o \
-+					exynos5250-pmu.o exynos5420-pmu.o
-+endif
-diff --git a/arch/arm/mach-exynos/pmu.c b/drivers/soc/samsung/exynos-pmu.c
-similarity index 100%
-rename from arch/arm/mach-exynos/pmu.c
-rename to drivers/soc/samsung/exynos-pmu.c
-diff --git a/arch/arm/mach-exynos/exynos-pmu.h b/drivers/soc/samsung/exynos-pmu.h
-similarity index 100%
-rename from arch/arm/mach-exynos/exynos-pmu.h
-rename to drivers/soc/samsung/exynos-pmu.h
-diff --git a/arch/arm/mach-exynos/exynos3250-pmu.c b/drivers/soc/samsung/exynos3250-pmu.c
-similarity index 100%
-rename from arch/arm/mach-exynos/exynos3250-pmu.c
-rename to drivers/soc/samsung/exynos3250-pmu.c
-diff --git a/arch/arm/mach-exynos/exynos4-pmu.c b/drivers/soc/samsung/exynos4-pmu.c
-similarity index 100%
-rename from arch/arm/mach-exynos/exynos4-pmu.c
-rename to drivers/soc/samsung/exynos4-pmu.c
-diff --git a/arch/arm/mach-exynos/exynos5250-pmu.c b/drivers/soc/samsung/exynos5250-pmu.c
-similarity index 100%
-rename from arch/arm/mach-exynos/exynos5250-pmu.c
-rename to drivers/soc/samsung/exynos5250-pmu.c
-diff --git a/arch/arm/mach-exynos/exynos5420-pmu.c b/drivers/soc/samsung/exynos5420-pmu.c
-similarity index 100%
-rename from arch/arm/mach-exynos/exynos5420-pmu.c
-rename to drivers/soc/samsung/exynos5420-pmu.c
--- 
-2.4.5
+Yours,
+Linus Walleij
