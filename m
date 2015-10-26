@@ -1,99 +1,127 @@
-From: yong.wu@mediatek.com (Yong Wu)
-Date: Mon, 26 Oct 2015 21:44:54 +0800
-Subject: [PATCH v6 1/3] iommu: Implement common IOMMU ops for DMA mapping
-In-Reply-To: <ab8e1caa40d6da1afa4a49f30242ef4e6e1f17df.1443718557.git.robin.murphy@arm.com>
-References: <cover.1443718557.git.robin.murphy@arm.com>
- <ab8e1caa40d6da1afa4a49f30242ef4e6e1f17df.1443718557.git.robin.murphy@arm.com>
-Message-ID: <1445867094.30736.14.camel@mhfsdcap03>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 26 Oct 2015 22:45:11 +0900
+Subject: [PATCH] arm64: kernel: fix tcr_el1.t0sz restore on systems with
+ extended idmap
+In-Reply-To: <20151026105537.GC8299@red-moon>
+References: <1445441202-21484-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <CAKv+Gu_9_O4GQgm++BvC0i_cGT4pBmozqO5ddy7J2-8-shFRDA@mail.gmail.com>
+ <20151026105537.GC8299@red-moon>
+Message-ID: <CAKv+Gu-s3Qh-sx2MU+WEj1rc=nfEwEWrd5eo+LXoVpBmAtbR=A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2015-10-01 at 20:13 +0100, Robin Murphy wrote:
-[...]
-> +/*
-> + * The DMA API client is passing in a scatterlist which could describe
-> + * any old buffer layout, but the IOMMU API requires everything to be
-> + * aligned to IOMMU pages. Hence the need for this complicated bit of
-> + * impedance-matching, to be able to hand off a suitably-aligned list,
-> + * but still preserve the original offsets and sizes for the caller.
-> + */
-> +int iommu_dma_map_sg(struct device *dev, struct scatterlist *sg,
-> +		int nents, int prot)
-> +{
-> +	struct iommu_domain *domain = iommu_get_domain_for_dev(dev);
-> +	struct iova_domain *iovad = domain->iova_cookie;
-> +	struct iova *iova;
-> +	struct scatterlist *s, *prev = NULL;
-> +	dma_addr_t dma_addr;
-> +	size_t iova_len = 0;
-> +	int i;
-> +
-> +	/*
-> +	 * Work out how much IOVA space we need, and align the segments to
-> +	 * IOVA granules for the IOMMU driver to handle. With some clever
-> +	 * trickery we can modify the list in-place, but reversibly, by
-> +	 * hiding the original data in the as-yet-unused DMA fields.
-> +	 */
-> +	for_each_sg(sg, s, nents, i) {
-> +		size_t s_offset = iova_offset(iovad, s->offset);
-> +		size_t s_length = s->length;
-> +
-> +		sg_dma_address(s) = s->offset;
-> +		sg_dma_len(s) = s_length;
-> +		s->offset -= s_offset;
-> +		s_length = iova_align(iovad, s_length + s_offset);
-> +		s->length = s_length;
-> +
-> +		/*
-> +		 * The simple way to avoid the rare case of a segment
-> +		 * crossing the boundary mask is to pad the previous one
-> +		 * to end at a naturally-aligned IOVA for this one's size,
-> +		 * at the cost of potentially over-allocating a little.
-> +		 */
-> +		if (prev) {
-> +			size_t pad_len = roundup_pow_of_two(s_length);
-> +
-> +			pad_len = (pad_len - iova_len) & (pad_len - 1);
-> +			prev->length += pad_len;
+On 26 October 2015 at 19:55, Lorenzo Pieralisi
+<lorenzo.pieralisi@arm.com> wrote:
+> Hi Ard,
+>
+> On Sat, Oct 24, 2015 at 10:47:22AM +0200, Ard Biesheuvel wrote:
+>> Hi Lorenzo,
+>>
+>> Thanks for the fix. I'm a bit embarrassed since this is quite
+>> obviously broken, and I (nor anyone else, for that matter) spotted it
+>> through testing suspend/resume on Seattle (frankly, I don't even know
+>> if suspend/resume works currently on Seattle or if it did at the time)
+>
+> You could not spot it by testing on Seattle, it does not implement PM yet,
+> I spotted it by code inspection while reviewing James' suspend-to-disk
+> patches, there is nothing to be embarassed about, you paved the way
+> to fix it.
+>
 
-Hi Robin,
-      While our v4l2 testing, It seems that we met a problem here.
-      Here we update prev->length again, Do we need update
-sg_dma_len(prev) again too?
+Ah ok, that is good to hear.
 
-      Some function like vb2_dc_get_contiguous_size[1] always get
-sg_dma_len(s) to compare instead of s->length. so it may break
-unexpectedly while sg_dma_len(s) is not same with s->length.
+>> On 21/10/2015, Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote:
+>> > Commit dd006da21646 ("arm64: mm: increase VA range of identity map")
+>> > introduced a mechanism to extend the virtual memory map range
+>> > to support arm64 systems with system RAM located at very high offset,
+>> > where the identity mapping used to enable/disable the MMU requires
+>> > additional translation levels to map the physical memory at an equal
+>> > virtual offset.
+>> >
+>> > The kernel detects at boot time the tcr_el1.t0sz value required by the
+>> > identity mapping and sets-up the tcr_el1.t0sz register field accordingly,
+>> > any time the identity map is required in the kernel (ie when enabling the
+>> > MMU).
+>> >
+>> > After enabling the MMU, in the cold boot path the kernel resets the
+>> > tcr_el1.t0sz to its default value (ie the actual configuration value for
+>> > the system virtual address space) so that after enabling the MMU the
+>> > memory space translated by ttbr0_el1 is restored as expected.
+>> >
+>>
+>> 'After enabling the MMU' is confusing, especially since you use it
+>> twice to describe two different points in time.
+>
+> I will sum up this commit log, it is ways too long and not clear
+> at times.
+>
 
-[1]:
-http://lxr.free-electrons.com/source/drivers/media/v4l2-core/videobuf2-dma-contig.c#L70
+OK
 
+>> > Commit dd006da21646 ("arm64: mm: increase VA range of identity map")
+>> > also added code to set-up the tcr_el1.t0sz value when the kernel resumes
+>> > from low-power states with the MMU off through cpu_resume() in order to
+>> > effectively use the identity mapping to enable the MMU but failed to add
+>> > the code required to restore the tcr_el1.t0sz to its default value, when
+>> > the core returns to the kernel with the MMU enabled, so that the kernel
+>> > might end up running with tcr_el1.t0sz value set-up for the identity
+>> > mapping which can be lower than the value required by the actual virtual
+>> > address space, resulting in an erroneous set-up.
+>> >
+>> > This patchs adds code in the resume path that restores the tcr_el1.t0sz
+>> > default value upon core resume, mirroring this way the cold boot path
+>> > behaviour therefore fixing the issue.
+>> >
+>>
+>> Of course, I agree with the patch, but could you condense the commit
+>> log, please?  I don't think we need five paragraphs to point out that
+>> the sequence to set T0SZ to its idmap value, enable the MMU, branch
+>> into the kernel virtual mapping and set T0SZ to its default value is
+>> missing the final step on the resume path, and it actually took me a
+>> while to figure out what the problem was from reading the text.
+>
+> Agreed.
+>
+>> > Fixes: 95322526ef62 ("arm64: kernel: cpu_{suspend/resume} implementation")
+>>
+>> Wrong commit id
+>
+> Technically speaking I am not fixing
+>
+> Commit dd006da21646 ("arm64: mm: increase VA range of identity map")
+>
+> I am fixing the commit I reported, because it never worked on platforms
+> requiring extended idmap, if anything, your commit dd006da21646 gave
+> CPUidle states and suspend2RAM a chance to work on those platforms,
+> and this patch completes the implementation.
+>
+> To make things simpler I can report:
+>
+> Fixes: dd006da21646 ("arm64: mm: increase VA range of identity map")
+>
+> as long as we all agree on the above.
+>
 
-> +			iova_len += pad_len;
-> +		}
-> +
-> +		iova_len += s_length;
-> +		prev = s;
-> +	}
-> +
-> +	iova = __alloc_iova(iovad, iova_len, dma_get_mask(dev));
-> +	if (!iova)
-> +		goto out_restore_sg;
-> +
-> +	/*
-> +	 * We'll leave any physical concatenation to the IOMMU driver's
-> +	 * implementation - it knows better than we do.
-> +	 */
-> +	dma_addr = iova_dma_addr(iovad, iova);
-> +	if (iommu_map_sg(domain, dma_addr, sg, nents, prot) < iova_len)
-> +		goto out_free_iova;
-> +
-> +	return __finalise_sg(dev, sg, nents, dma_addr);
-> +
-> +out_free_iova:
-> +	__free_iova(iovad, iova);
-> +out_restore_sg:
-> +	__invalidate_sg(sg, nents);
-> +	return 0;
-> +}
-> +
+This patch cannot be applied to any stable tree that does not have
+dd006da21646, since that commit introduces cpu_set_default_tcr_t0sz(),
+and your patch introduces a call to that function. However, the
+context does not reflect that, and the patch may apply cleanly to
+older kernels only to break at build time. So to make the lives of
+stable kernel maintainers easier, it is better to use the latter IMO.
+
+>> > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+>> > Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>> > Cc: Will Deacon <will.deacon@arm.com>
+>> > Cc: Catalin Marinas <catalin.marinas@arm.com>
+>>
+>> Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>
+> Thanks, I will prepare a v2 and ask Catalin to merge it at -rc1, it
+> conflicts with patches currently on arm64 for-next/core we can wait till
+> -rc1.
+>
+
+OK.
+
+-- 
+Ard.
