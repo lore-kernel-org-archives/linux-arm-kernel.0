@@ -1,68 +1,60 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 26 Oct 2015 08:56:00 +0100
-Subject: Build regressions/improvements in v4.3-rc7
-In-Reply-To: <20151025223252.GB5635@debian>
-References: <1445767971-22415-1-git-send-email-geert@linux-m68k.org>
- <CAMuHMdX9X8SRCA4K++LvRz1sK3Ewyj5wKbvrdAy06L6v2XTduA@mail.gmail.com>
- <CAMuHMdUkNad7-zHSEfy__rPXKV2t0_7O+MtHiW1hUN=t30KWoA@mail.gmail.com>
- <20151025223252.GB5635@debian>
-Message-ID: <CAMuHMdV7ycSa2G07a0c0Vw=ikWqnFt3sOFyG4WdLo15av5q_wQ@mail.gmail.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Mon, 26 Oct 2015 16:02:18 +0800
+Subject: [linux-sunxi] [PATCH v4 1/1] dts: sun6i: yones toptech bs1078 v2:
+ Add AXP221 support to dts
+In-Reply-To: <1445806172-25998-1-git-send-email-lyu@micile.com>
+References: <1445806172-25998-1-git-send-email-lyu@micile.com>
+Message-ID: <CAGb2v65vdA9Ug8td9zwq3eECm6moUcgSSQXGnAtE04tLp3KvhQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rabin,
+Hi,
 
-On Sun, Oct 25, 2015 at 11:32 PM, Rabin Vincent <rabin@rab.in> wrote:
-> On Sun, Oct 25, 2015 at 11:39:15AM +0100, Geert Uytterhoeven wrote:
->> On Sun, Oct 25, 2015 at 11:18 AM, Geert Uytterhoeven
->> <geert@linux-m68k.org> wrote:
->> > On Sun, Oct 25, 2015 at 11:12 AM, Geert Uytterhoeven
->> > <geert@linux-m68k.org> wrote:
->> >> JFYI, when comparing v4.3-rc7[1] to v4.3-rc6[3], the summaries are:
->> >>   - build errors: +12/-4
+On Mon, Oct 26, 2015 at 4:49 AM, Lawrence Yu <lyu@micile.com> wrote:
+> Enable the axp221 PMIC chip in the dts file.
 >
-> From the quoted lines above one I got the impression that this was a
-> regression from v4.3-rc6 to 4.3-rc7, but that's not the case.  The
-
-randconfig regression reports are never accurate, as each run is different.
-
-> failing config also fails with v4.3-rc6.  It is however a regression
-> from v4.2 to v4.3-rc1, and started failing after the changes in
-> a5f4c561b3b19a ("ARM: 8415/1: early fixmap support for earlycon").
+> Allows board to power off correctly from the poweroff command
 >
->> >   + /home/kisskb/slave/src/arch/arm/kernel/patch.c: error: 'L_PTE_DIRTY' undeclared (first use in this function):  => 39:2
->> >   + /home/kisskb/slave/src/arch/arm/kernel/patch.c: error: 'L_PTE_MT_WRITEBACK' undeclared (first use in this function):  => 39:2
->> >   + /home/kisskb/slave/src/arch/arm/kernel/patch.c: error: 'L_PTE_PRESENT' undeclared (first use in this function):  => 39:2
->> >   + /home/kisskb/slave/src/arch/arm/kernel/patch.c: error: 'L_PTE_XN' undeclared (first use in this function):  => 39:2
->> >   + /home/kisskb/slave/src/arch/arm/kernel/patch.c: error: 'L_PTE_YOUNG' undeclared (first use in this function):  => 39:2
->>
->> Caused by:
->>
->> commit ab0615e2d6fb074764a3e4d05f1326fa2fdb4627
->> Author: Rabin Vincent <rabin@rab.in>
->> Date:   Thu Apr 24 23:28:57 2014 +0200
->>
->>     arm: use fixmap for text patching when text is RO
->>
->> Should the call to set_fixmap() in arch/arm/kernel/patch.c
->> just be protected by #ifdef CONFIG_MMU?
+> This board requires dc1sw to be enabled in order to provide a power source
+> for the 5V DCDC converter that powers USB2.
 >
-> Yes, and the call to clear_fixmap() too.  This part of the code will
+> This board uses dldo1 for 3.3V wifi power
+>
+> This board requires dldo3 to be enabled at 2.8V in order to provide voltage
+> to the pullup resistors for the i2c0 bus.
+>
+> ---
+> Changes since v3
+>
+> - Changed reg_dc1sw to be a node reference
+> - Moved regulator nodes to correct alphabetical position before uart0
+>
+> Changes since v2
+>
+> - Rename regulator vcc-dc1sw to vcc-lcd-usb2
+> - Rename regulator vcc-csi to vddio-csi
+> - Remove regulator-always-on from dldo3
+> - Remove comment about LCD backlight and USB2 from reg_dc1sw
+> - Remove comment about dc1sw providing power to LCD backlight in patch
+>   description
+>
+> Changes since v1
+>
+> - Use axp22x.dtsi to standardize the register names
+> - Change wifi power regulator to dldo1 instead of incorrect aldo1
+> - Remove unnecessary gpio pin PH27 for wifi power, since this board uses
+>   the axp221 chip to control power to the wifi chip.
+>
+> Signed-off-by: Lawrence Yu <lyu@micile.com>
 
-OK.
+Normally one puts this at the end of the commit message, then "---",
+then changelogs and any additional messages for the maintainer. :)
 
-> never actually be called on !MMU because patch_map() will always exit
-> early with nothing to remap.  Will you send a patch?
+Overall this version looks good.
 
-Thanks, sent.
+Acked-by: Chen-Yu Tsai <wens@csie.org>
 
-Gr{oetje,eeting}s,
+Please send additional patches for reordering stuff, simplefb regulators,
+and possibly cpu regulator (so you get full cpufreq support).
 
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+P.S. Your patch is not showing up on LAKML patchwork. Not subscribed?
