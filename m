@@ -1,43 +1,74 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Mon, 26 Oct 2015 15:04:11 -0600
-Subject: [PATCH v3] Tegra: DT: add device tree binding doc for QSPI
-In-Reply-To: <1445891676-3262-1-git-send-email-twarren@nvidia.com>
-References: <1445891676-3262-1-git-send-email-twarren@nvidia.com>
-Message-ID: <562E954B.5070604@wwwdotorg.org>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Mon, 26 Oct 2015 22:06:23 +0100
+Subject: [PATCH 5/6] ARM: dts: sunxi: Add Allwinner H3 DTSI
+In-Reply-To: <20151024104749.179dab64@OPI2>
+References: <1445444428-4652-1-git-send-email-jenskuske@gmail.com>
+ <1445444428-4652-2-git-send-email-jenskuske@gmail.com>
+ <20151023181406.GK10947@lukather> <20151023212013.50bcbe4a@OPI2>
+ <20151024071328.GQ10947@lukather> <20151024104749.179dab64@OPI2>
+Message-ID: <20151026210623.GB10947@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/26/2015 02:34 PM, Tom Warren wrote:
-> This patch adds the device tree binding doc for the Tegra
-> QSPI controller on Tegra210.
+On Sat, Oct 24, 2015 at 10:47:49AM +0200, Jean-Francois Moine wrote:
+> On Sat, 24 Oct 2015 09:13:28 +0200
+> Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
+> 
+> > Or simply
+> > 
+> > bus_gates {
+> > 	clocks = <&ahb1>, <&ahb2>;
+> > 	clock-indices = <5>, <6>, <8>, ...
+> > 	clock-output-names = "bus_ce", "bus_dma", "bus_mmc0"
+> > };
+> 
+> I don't understand: the apb1, apb2, ahb1 and ahb2 clocks may be
+> programmed independently to different frequencies
 
-> diff --git a/Documentation/devicetree/bindings/spi/nvidia,tegra210-qspi.txt b/Documentation/devicetree/bindings/spi/nvidia,tegra210-qspi.txt
+I don't understand why you're talking about frequencies here.
 
-> +- clock-names : Must include the following entries:
-> +  - qspi
-> +- resets : Must contain an entry for each entry in reset-names.
-> +  See ../reset/reset.txt for details.
-> +- reset-names : Must include the following entries:
-> +  - qspi
-> +- clocks : Must contain an entry for each entry in clock-names.
-> +  See ../clocks/clock-bindings.txt for details.
+> and you have to know which of them is the parent of each leaf clock.
 
-Let's keep clocks and clock-names next to each-other in the doc. I don't 
-know why they aren't in the eixsting Tegra SPI doc.
+Indeed, but that's also doable here. Just not in the DT.
 
-With this issue fixed, this patch looks good to me.
+> So, either you hard-code the parents as Jens did in a first proposal,
+> or you define the full list of parents in the DT as in the last
+> proposal, or you use a container per parent in the DT as I proposed.
+> 
+> There could be an other solution using the output clock name to define
+> the parent clock:
+> 
+> bus_gates {
+> 	clocks = <&ahb1>, <&ahb2>, <&apb1>, <&apb2>;
+> 	clock-indices = <5>, <6>, <8>, ...
+> 	clock-output-names = "ahb1_ce", "ahb1_dma", "ahb1_mmc0"
+> };
+> 
+> with the documentation:
+> 
+> 	"the clocks MUST be defined in order: ahb1, ahb2, apb1, apb2."
+> 
+> and the code
+> 
+> 	if (strncmp(clock_name, "ahb1", 4) == 0)
+> 		clk_parent = of_clk_get_parent_name(node, 0);
+> 	else if (..)
+> 
+> but it seems a bit hacky.
 
-Note: I don't see the devicetree mailing list in the CC list. You should 
-probably replace the U-Boot mailing list with it.
+It's exactly what I suggested, without the string comparison, but
+relying on the ID instead.
 
-> +Optional properties:
-> +- dmas : Must contain an entry for each entry in clock-names.
-> +  See ../dma/dma.txt for details.
-> +- dma-names : Must include the following entries:
-> +  - rx
-> +  - tx
+Maxime
 
-Eventually, we should have a property that describes the SPI bus width 
-(x1, x2, x4 I assume). However, we can assume that unless otherwise 
-specified, the width is x1, and add a property to specify the width 
-later as/when we need it if you want.
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151026/ee281511/attachment.sig>
