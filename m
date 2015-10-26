@@ -1,166 +1,50 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Mon, 26 Oct 2015 09:56:24 +0000
-Subject: [PATCH 2/3] nvmem: mediatek: Add Mediatek EFUSE driver
-In-Reply-To: <1444984751-4572-3-git-send-email-andrew-ct.chen@mediatek.com>
-References: <1444984751-4572-1-git-send-email-andrew-ct.chen@mediatek.com>
- <1444984751-4572-3-git-send-email-andrew-ct.chen@mediatek.com>
-Message-ID: <562DF8C8.8060600@linaro.org>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Mon, 26 Oct 2015 09:59:09 +0000
+Subject: [PATCH v13 5/5] uart: pl011: Add support to ZTE ZX296702 uart
+In-Reply-To: <562AFBD5.3050508@codeaurora.org>
+References: <1438328959-16177-1-git-send-email-jun.nie@linaro.org>
+ <1438328959-16177-6-git-send-email-jun.nie@linaro.org>
+ <55FC16A2.5070207@arm.com>
+ <CABymUCOA3oG7Hq83hDyQ_uisQHeipoHshcWONWTtjxKvikzjsQ@mail.gmail.com>
+ <CAOZdJXUjZLKkUYScD7oDTMuRUtAEJ6=DopmE4n6Vb9zyv+_viA@mail.gmail.com>
+ <CABymUCORU9CDD64Rdw2VX0kLSe6E1zY9iZCap5xittoVFwbOtw@mail.gmail.com>
+ <562AFBD5.3050508@codeaurora.org>
+Message-ID: <562DF96D.6020307@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
 
-On 16/10/15 09:39, andrew-ct.chen at mediatek.com wrote:
-> From: Andrew-CT Chen <andrew-ct.chen@mediatek.com>
->
-> Add Mediatek EFUSE driver to access hardware data like
-> thermal sensor calibration or HDMI impedance.
->
-> Signed-off-by: Andrew-CT Chen <andrew-ct.chen@mediatek.com>
+On 24/10/15 04:32, Timur Tabi wrote:
+> Jun Nie wrote:
+>> I am OK to add a new driver for ZTE UART if no other's objection
+>> though I do not agree you. Without this last patch, other patches are
+>> just for minor refactor for register access.
+> 
+> In that case, my vote is to drop the whole patchset.  Just copy/paste
+> the amba-pl011 driver and make whatever changes you need.  That sort of
+> thing happens all the time.
 
-Dirver looks pretty simple, below are few minor nits.
+I don't agree here. The driver _is_ very similar (all the semantics and
+behaviour), it's just the register addresses that are different.
+In so far I'd go with that approach of supporting it within the PL011
+driver - whether this has to be in this very same file is another
+question. I think by using register accessors (avoiding direct calls to
+writel/readl in the code) we can hide a lot of these differences in just
+two functions.
+Also, as I said earlier, I guess we don't need all those #ifdefs.
+So in the end the driver wouldn't be too different, it's just that those
+diffs that look a bit scary (because they touch every readl/writel).
 
-Please rebase this patch on top of v4.4-rc1 once its released in few 
-weeks, so that I can queue this driver for v4.5.
+I tried to refactor the driver lately to split up SBSA and PL011 support
+and got something that compiles, though I wasn't fully satisfied and I
+ran out of time. The refactor idea was to split driver runtime from
+initialization, so the different probe and init functions can be moved
+into separate files. There would be one stub file with all the core
+driver logic (DMA, IRQ handling, buffer handling, communication
+parameters setup) and one file for each subtype (PL011, SBSA, ZTE, you
+name it).
+If people are interested, I can try to clean this up and post it as an RFC.
 
-> ---
->   drivers/nvmem/Kconfig     | 11 ++++++
->   drivers/nvmem/Makefile    |  1 +
->   drivers/nvmem/mtk-efuse.c | 89 +++++++++++++++++++++++++++++++++++++++++++++++
->   3 files changed, 101 insertions(+)
->   create mode 100644 drivers/nvmem/mtk-efuse.c
->
-> diff --git a/drivers/nvmem/Kconfig b/drivers/nvmem/Kconfig
-> index 8db2978..1bd5badc 100644
-> --- a/drivers/nvmem/Kconfig
-> +++ b/drivers/nvmem/Kconfig
-> @@ -14,6 +14,17 @@ menuconfig NVMEM
->
->   if NVMEM
->
-> +config MTK_EFUSE
-> +	tristate "Mediatek SoCs EFUSE support"
-> +	depends on ARCH_MEDIATEK || COMPILE_TEST
-> +	select REGMAP_MMIO
-> +	help
-> +	  This is a driver to access hardware related data like sensor
-> +	  calibration, HDMI impedance etc.
-> +
-> +	  This driver can also be built as a module. If so, the module
-> +	  will be called efuse-mtk.
-> +
->   config QCOM_QFPROM
->   	tristate "QCOM QFPROM Support"
->   	depends on ARCH_QCOM || COMPILE_TEST
-> diff --git a/drivers/nvmem/Makefile b/drivers/nvmem/Makefile
-> index 4328b93..916b727 100644
-> --- a/drivers/nvmem/Makefile
-> +++ b/drivers/nvmem/Makefile
-> @@ -6,6 +6,7 @@ obj-$(CONFIG_NVMEM)		+= nvmem_core.o
->   nvmem_core-y			:= core.o
->
->   # Devices
-> +obj-$(CONFIG_MTK_EFUSE)		+= mtk-efuse.o
-
-For consistency reasons, could you do this similar to other drivers.
-
->   obj-$(CONFIG_QCOM_QFPROM)	+= nvmem_qfprom.o
->   nvmem_qfprom-y			:= qfprom.o
->   obj-$(CONFIG_NVMEM_SUNXI_SID)	+= nvmem_sunxi_sid.o
-> diff --git a/drivers/nvmem/mtk-efuse.c b/drivers/nvmem/mtk-efuse.c
-> new file mode 100644
-> index 0000000..9021c0b
-> --- /dev/null
-> +++ b/drivers/nvmem/mtk-efuse.c
-> @@ -0,0 +1,89 @@
-> +/*
-> + * Copyright (c) 2015 MediaTek Inc.
-> + * Author: Andrew-CT Chen <andrew-ct.chen@mediatek.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + */
-> +
-> +#include <linux/device.h>
-> +#include <linux/module.h>
-> +#include <linux/nvmem-provider.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/regmap.h>
-> +
-> +static struct regmap_config mtk_regmap_config = {
-> +	.reg_bits = 32,
-> +	.val_bits = 32,
-> +	.reg_stride = 4,
-> +};
-> +
-> +static int mtk_efuse_probe(struct platform_device *pdev)
-> +{
-> +	struct device *dev = &pdev->dev;
-> +	struct resource *res;
-> +	struct nvmem_device *nvmem;
-> +	struct nvmem_config *econfig;
-> +	struct regmap *regmap;
-> +	void __iomem *base;
-> +
-> +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> +	base = devm_ioremap_resource(dev, res);
-> +	if (IS_ERR(base))
-> +		return PTR_ERR(base);
-> +
-> +	econfig = devm_kzalloc(dev, sizeof(*econfig), GFP_KERNEL);
-> +	if (!econfig)
-> +		return -ENOMEM;
-Why not use static econfig variable?
-
-> +
-> +	mtk_regmap_config.max_register = resource_size(res) - 1;
-> +
-> +	regmap = devm_regmap_init_mmio(dev, base, &mtk_regmap_config);
-> +	if (IS_ERR(regmap)) {
-> +		dev_err(dev, "regmap init failed\n");
-> +		return PTR_ERR(regmap);
-> +	}
-> +
-> +	econfig->dev = dev;
-> +	econfig->owner = THIS_MODULE;
-> +	nvmem = nvmem_register(econfig);
-> +	if (IS_ERR(nvmem))
-> +		return PTR_ERR(nvmem);
-> +
-> +	platform_set_drvdata(pdev, nvmem);
-> +
-> +	return 0;
-> +}
-> +
-> +static int mtk_efuse_remove(struct platform_device *pdev)
-> +{
-> +	struct nvmem_device *nvmem = platform_get_drvdata(pdev);
-> +
-> +	return nvmem_unregister(nvmem);
-> +}
-> +
-> +static const struct of_device_id mtk_efuse_of_match[] = {
-> +	{ .compatible = "mediatek,mt8135-efuse",},
-> +	{ .compatible = "mediatek,mt8173-efuse",},
-> +	{/* sentinel */},
-> +};
-> +MODULE_DEVICE_TABLE(of, mtk_efuse_of_match);
-> +
-> +static struct platform_driver mtk_efuse_driver = {
-> +	.probe = mtk_efuse_probe,
-> +	.remove = mtk_efuse_remove,
-> +	.driver = {
-> +		.name = "mediatek,efuse",
-> +		.of_match_table = mtk_efuse_of_match,
-> +	},
-> +};
-> +module_platform_driver(mtk_efuse_driver);
-> +MODULE_AUTHOR("Andrew-CT Chen <andrew-ct.chen@mediatek.com>");
-> +MODULE_DESCRIPTION("Mediatek EFUSE driver");
-> +MODULE_LICENSE("GPL v2");
->
+Cheers,
+Andre.
