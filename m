@@ -1,54 +1,52 @@
-From: mturquette@baylibre.com (Michael Turquette)
-Date: Mon, 26 Oct 2015 03:26:31 -0700
-Subject: [GIT PULL] Allwinner DT changes for 4.4, round 3
-In-Reply-To: <20151025201308.GS10947@lukather>
-References: <20151023180711.GA11749@lukather> <4745252.gLSrJNQ42D@wuerfel>
- <9946613.K7Ehp1DEiL@wuerfel> <20151025201308.GS10947@lukather>
-Message-ID: <20151026102631.20687.88931@quantum>
+From: bharat.kumar.gogada@xilinx.com (Bharat Kumar Gogada)
+Date: Mon, 26 Oct 2015 10:26:38 +0000
+Subject: [PATCH v4] PCI: Xilinx-NWL-PCIe: Added support for Xilinx NWL
+ PCIe Host Controller
+In-Reply-To: <5705956.6YyKSO4LdH@wuerfel>
+References: <1445066538-24638-1-git-send-email-bharatku@xilinx.com>
+ <5705956.6YyKSO4LdH@wuerfel>
+Message-ID: <8520D5D51A55D047800579B09414719801692D8E@XAP-PVEXMBX01.xlnx.xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Quoting Maxime Ripard (2015-10-25 13:13:08)
-> On Fri, Oct 23, 2015 at 10:55:13PM +0200, Arnd Bergmann wrote:
-> > On Friday 23 October 2015 22:41:04 Arnd Bergmann wrote:
-> > > On Friday 23 October 2015 20:07:11 Maxime Ripard wrote:
-> > > > Allwinner DT changes for 4.4, round 3
-> > > > 
-> > > > A bunch of new boards, but mostly enable the support for the Audio Codec
-> > > > on the older SoCs (A10, A10s, A13, A20, R8) and enable it on various
-> > > > boards.
-> > > > 
-> > > > 
-> > > 
-> > > Pulled into next/dt, thanks!
-> > 
-> > And dropped again:
-> > 
-> > In file included from /git/arm-soc/arch/arm/boot/dts/sun4i-a10-a1000.dts:46:0:
-> > /git/arm-soc/arch/arm/boot/dts/sun4i-a10.dtsi:48:46: fatal error: dt-bindings/clock/sun4i-a10-pll2.h: No such file or directory
-> > 
-> > Please make sure branches you send actually work by themselves.
+> > +       device_type = "pci";
+> > +       interrupt-parent = <&gic>;
+> > +       interrupts = < 0 118 4
+> > +                      0 116 4
+> > +                      0 115 4          // MSI_1 [63...32]
+> > +                      0 114 4 >;       // MSI_0 [31...0]
 > 
-> Damn, you're right... Sorry about that...
+> Better write these as tuples:
 > 
-> You need to pull the tag sunxi-clk-for-4.4 that has been merged in the
-> clk tree in 38ce30e29dc.
+> 	interrupts = <0 118 4>, <0 116 4>, <0 115 4>, <0 114 4>;
 > 
-> Mike, Stephen, will that tag be stable?
+> And maybe reverse the order? It looks that might be what the soc
+> integration person had in mind.
+> 
+> Also, what is interrupt <0 117 4>? Is that connected here as well?
+> Better list it as well then, even if you don't use it.
+> 
+We have it but not using it, we will list it.
 
-Yes.
+> > +       interrupt-map-mask = <0x0 0x0 0x0 0x7>;
+> > +       interrupt-map = <0x0 0x0 0x0 0x1 &pcie_intc 0x1
+> > +                        0x0 0x0 0x0 0x2 &pcie_intc 0x2
+> > +                        0x0 0x0 0x0 0x3 &pcie_intc 0x3
+> > +                        0x0 0x0 0x0 0x4 &pcie_intc 0x4>;
+> 
+> > +       msi-parent = <&nwl_pcie>;
+> > +       reg = <0x0 0xfd0e0000 0x1000
+> > +              0x0 0xfd480000 0x1000
+> > +              0x0 0xE0000000 0x1000000>;
+> 
+> Same grouping for reg and interrupt-map as above for interrupts.
 
-Regards,
-Mike
-
+Grouping reg and interrupt-map as tuples will make lengthy line and reduces readability, is it compulsory ?
 > 
-> Arnd, do you want me to merge it in my DT branch, or do you want to
-> merge it yourself?
+> > +       reg-names = "breg", "pcireg", "cfg";
+> > +       ranges = <0x02000000 0x00000000 0xE1000000 0x00000000
+> > + 0xE1000000 0 0x0F000000>;
 > 
-> Thanks, and sorry again,
-> Maxime
+> No I/O space or prefetcheable memory?
 > 
-> -- 
-> Maxime Ripard, Free Electrons
-> Embedded Linux, Kernel and Android engineering
-> http://free-electrons.com
+> 	Arnd
