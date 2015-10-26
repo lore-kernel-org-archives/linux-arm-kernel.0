@@ -1,49 +1,64 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Mon, 26 Oct 2015 08:50:59 +0100
-Subject: [PATCH] ARM: v7-M: Use ret_to_user_from_irq in PendSV handler
-In-Reply-To: <1445818252-13175-1-git-send-email-ezequiel@vanguardiasur.com.ar>
-References: <1445818252-13175-1-git-send-email-ezequiel@vanguardiasur.com.ar>
-Message-ID: <20151026075059.GV4931@pengutronix.de>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 26 Oct 2015 08:54:52 +0100
+Subject: [PATCH] arm: Omit fixmap calls in text patching code if CONFIG_MMU=n
+Message-ID: <1445846092-1979-1-git-send-email-geert@linux-m68k.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Oct 25, 2015 at 09:10:52PM -0300, Ezequiel Garcia wrote:
-> The PendSV handler calls v7m_exception_entry which
-> disables IRQs. Therefore, since IRQs are already disabled,
-> the PendSV handler can return using ret_to_user_from_irq.
-> 
-> Signed-off-by: Ezequiel Garcia <ezequiel@vanguardiasur.com.ar>
-Looks right. How did you notice this?
+If CONFIG_JUMP_LABEL=y and CONFIG_MMU=n:
 
-Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+    arch/arm/kernel/patch.c: In function 'patch_map':
+    arch/arm/kernel/patch.c:39:129: error: 'L_PTE_YOUNG' undeclared (first use in this function)
+      set_fixmap(fixmap, page_to_phys(page));
+																     ^
+    arch/arm/kernel/patch.c:39:129: note: each undeclared identifier is reported only once for each function it appears in
+    arch/arm/kernel/patch.c:39:143: error: 'L_PTE_PRESENT' undeclared (first use in this function)
+      set_fixmap(fixmap, page_to_phys(page));
+																		   ^
+    arch/arm/kernel/patch.c:39:159: error: 'L_PTE_XN' undeclared (first use in this function)
+      set_fixmap(fixmap, page_to_phys(page));
+																				   ^
+    arch/arm/kernel/patch.c:39:170: error: 'L_PTE_DIRTY' undeclared (first use in this function)
+      set_fixmap(fixmap, page_to_phys(page));
+																					      ^
+    arch/arm/kernel/patch.c:39:185: error: 'L_PTE_MT_WRITEBACK' undeclared (first use in this function)
+      set_fixmap(fixmap, page_to_phys(page));
+																							     ^
 
-Best regards
-Uwe
+Protect the calls to set_fixmap() and clear_fixmap() by #ifdef
+CONFIG_MMU to fix this.
 
-> ---
-> Tested on a NXP LPC43xx platform.
-> 
->  arch/arm/kernel/entry-v7m.S | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/kernel/entry-v7m.S b/arch/arm/kernel/entry-v7m.S
-> index b6c8bb9315e7..907534f97053 100644
-> --- a/arch/arm/kernel/entry-v7m.S
-> +++ b/arch/arm/kernel/entry-v7m.S
-> @@ -88,7 +88,7 @@ __pendsv_entry:
->  	@ execute the pending work, including reschedule
->  	get_thread_info tsk
->  	mov	why, #0
-> -	b	ret_to_user
-> +	b	ret_to_user_from_irq
->  ENDPROC(__pendsv_entry)
->  
->  /*
-> -- 
-> 2.5.2
-> 
-> 
+Fixes: commit ab0615e2d6fb0747 ("arm: use fixmap for text patching when text is RO")
+Signed-off-by: Geert Uytterhoeven <geert@linux-m68k.org>
+---
+http://kisskb.ellerman.id.au/kisskb/buildresult/12531538/
 
+ arch/arm/kernel/patch.c | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/arch/arm/kernel/patch.c b/arch/arm/kernel/patch.c
+index 69bda1a5707ee826..447b53a68be5bd6f 100644
+--- a/arch/arm/kernel/patch.c
++++ b/arch/arm/kernel/patch.c
+@@ -36,7 +36,9 @@ static void __kprobes *patch_map(void *addr, int fixmap, unsigned long *flags)
+ 	else
+ 		__acquire(&patch_lock);
+ 
++#ifdef CONFIG_MMU
+ 	set_fixmap(fixmap, page_to_phys(page));
++#endif
+ 
+ 	return (void *) (__fix_to_virt(fixmap) + (uintaddr & ~PAGE_MASK));
+ }
+@@ -44,7 +46,9 @@ static void __kprobes *patch_map(void *addr, int fixmap, unsigned long *flags)
+ static void __kprobes patch_unmap(int fixmap, unsigned long *flags)
+ 	__releases(&patch_lock)
+ {
++#ifdef CONFIG_MMU
+ 	clear_fixmap(fixmap);
++#endif
+ 
+ 	if (flags)
+ 		spin_unlock_irqrestore(&patch_lock, *flags);
 -- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+1.9.1
