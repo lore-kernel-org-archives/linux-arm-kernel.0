@@ -1,63 +1,40 @@
-From: wangzhou1@hisilicon.com (Zhou Wang)
-Date: Mon, 26 Oct 2015 16:24:34 +0800
-Subject: [PATCH v11 4/6] PCI: hisi: Add PCIe host support for HiSilicon
- SoC Hip05
-In-Reply-To: <20151022184622.GD21237@localhost>
-References: <1444991021-109306-1-git-send-email-wangzhou1@hisilicon.com>
- <1444991021-109306-5-git-send-email-wangzhou1@hisilicon.com>
- <20151022184622.GD21237@localhost>
-Message-ID: <562DE342.2000104@hisilicon.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Mon, 26 Oct 2015 09:27:11 +0100
+Subject: [PATCH 3/5] irqchip: armada-370-xp: re-enable per-CPU
+ interrupts at resume time
+In-Reply-To: <CAPv3WKcrWqJ5Cw_kwO+JWk3iH0aprTexHTqzy-dSFmNHj4xJcg@mail.gmail.com>
+References: <1445347435-2333-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1445347435-2333-4-git-send-email-thomas.petazzoni@free-electrons.com>
+ <CAPv3WKdZeCo-0xFC6EJcCeVQd7ef+SQz=MocR1nE5YdZAx3AJQ@mail.gmail.com>
+ <20151026011036.2cb5b7a8@free-electrons.com>
+ <CAPv3WKc8bzCadNN=SRxQuJBxMiHTVKnmqaSkTehu=j6V4nF6Gg@mail.gmail.com>
+ <20151026060925.32ff2034@free-electrons.com>
+ <CAPv3WKcrWqJ5Cw_kwO+JWk3iH0aprTexHTqzy-dSFmNHj4xJcg@mail.gmail.com>
+Message-ID: <20151026092711.04193834@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015/10/23 2:46, Bjorn Helgaas wrote:
-> Hi Zhou,
-> 
-> This looks pretty good to me; just a mask question and add a printk.
-> 
-> On Fri, Oct 16, 2015 at 06:23:39PM +0800, Zhou Wang wrote:
->> This patch adds PCIe host support for HiSilicon SoC Hip05.
->> ...
-> 
->> +#define PCIE_SUBCTRL_SYS_STATE4_REG                     0x6818
->> +#define PCIE_LTSSM_LINKUP_STATE                         0x11
->> +#define PCIE_LTSSM_STATE_MASK                           0x3F
-> 
-> Fabio unified some of this; see
->   https://git.kernel.org/cgit/linux/kernel/git/helgaas/pci.git/commit/?h=pci/host-designware&id=4788fe6ebf4594c9a95b620cbff05147c8504823
->   https://git.kernel.org/cgit/linux/kernel/git/helgaas/pci.git/commit/?h=pci/host-designware&id=b09464f77dd252a782da1f4e9925c1dbce4540ac
-> 
-> So the question is, why do you use a 6-bit (0x3f) LTSSM_STATE_MASK?
-> We think we can use a 5-bit mask (0x1f) for all the other
-> DesignWare-based systems.
+Dear Marcin Wojtas,
 
-Hi Bjorn,
+On Mon, 26 Oct 2015 08:06:18 +0100, Marcin Wojtas wrote:
 
-LTSSM_STATE_MASK indicates the status of LTSSM, it should be 6-bit
-in Hip05 PCIe host. I checked Designware hardware manual, its
-LTSSM current state is 6-bit too(smlh_ltssm_state).
+> > Good :-) Hopefully the explanation in PATCH 5/5 is also clear enough.
+> 
+> The Ascii-art is beutiful, indeed:)
 
-> 
->> +/* Hip05 PCIe host only supports 32-bit config access */
-> 
-> Thanks for the comment asserting that Hip05 only supports 32-bit
-> config access.  I assume you confirmed that with the hardware
-> designers.  As far as I can tell, this *is* a hardware defect, and at
-> the minimum, I want a printk at driver probe-time so a dmesg log will
-> have a clue that read/modify/write on config space might do the wrong
-> thing.
->
+Glad to hear that my artistic skills are appreciated :)
 
-Yes, I had checked this with hardware guys. Will add a print during probe-time.
+> Yes, you are right - without any pm_ops the driver works well after
+> suspend/resume in standby. However in the linux mem and standby is
+> treated exactly the same as pm sleep, so the same routines are
+> executed in both modes. Hence the s2ram support cannot spoil standby.
 
-Many thanks,
-Zhou
+Absolutely. It would be nicer if we knew in the ->suspend() and
+->resume() hooks if we're doing a standby suspend, or a mem suspend,
+but IIRC, we don't have this information available.
 
->> +static int hisi_pcie_cfg_read(struct pcie_port *pp, int where, int size,
->> +			      u32 *val)
->> ...
-> 
-> Bjorn
-> 
-> .
-> 
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
