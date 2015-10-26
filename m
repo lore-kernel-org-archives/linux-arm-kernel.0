@@ -1,46 +1,52 @@
-From: yvo@apm.com (Y Vo)
-Date: Mon, 26 Oct 2015 13:49:35 +0700
-Subject: [PATCH v2 3/3] arm64: dts: Update APM X-Gene standby GPIO controller
- DTS entries
-In-Reply-To: <1445842175-11446-1-git-send-email-yvo@apm.com>
-References: <1445842175-11446-1-git-send-email-yvo@apm.com>
-Message-ID: <1445842175-11446-4-git-send-email-yvo@apm.com>
+From: dongsheng.wang@freescale.com (Dongsheng Wang)
+Date: Mon, 26 Oct 2015 14:53:12 +0800
+Subject: [PATCH] arm/layerscape: add RCPM device tree support for ls1021a.
+Message-ID: <1445842392-7129-1-git-send-email-dongsheng.wang@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Update APM X-Gene standby GPIO controller DTS entries to support GPIO
-line configuration as input, output or external IRQ pin.
+From: Wang Dongsheng <dongsheng.wang@freescale.com>
 
-Signed-off-by: Y Vo <yvo@apm.com>
+Signed-off-by: Wang Dongsheng <dongsheng.wang@freescale.com>
 ---
- arch/arm64/boot/dts/apm/apm-storm.dtsi |   15 +++++++++------
- 1 files changed, 9 insertions(+), 6 deletions(-)
+*v4*:
+-Separate this patch from RCPM binding patchset.
+-Change "rcpm-wakeup" to "fsl,rcpm-wakeup". 
+*v3*: Add "fsl,#rcpm-wakeup-cells" for rcpm node.
+*v2*: No change.
 
-diff --git a/arch/arm64/boot/dts/apm/apm-storm.dtsi b/arch/arm64/boot/dts/apm/apm-storm.dtsi
-index 6c5ed11..40a79fb 100644
---- a/arch/arm64/boot/dts/apm/apm-storm.dtsi
-+++ b/arch/arm64/boot/dts/apm/apm-storm.dtsi
-@@ -765,12 +765,15 @@
- 			reg = <0x0 0x17001000 0x0 0x400>;
- 			#gpio-cells = <2>;
- 			gpio-controller;
--			interrupts = 	<0x0 0x28 0x1>,
--					<0x0 0x29 0x1>,
--					<0x0 0x2a 0x1>,
--					<0x0 0x2b 0x1>,
--					<0x0 0x2c 0x1>,
--					<0x0 0x2d 0x1>;
-+			interrupt-parent = <&gic>;
-+			interrupts = 	<0x0 0x28 0x4>,
-+					<0x0 0x29 0x4>,
-+					<0x0 0x2a 0x4>,
-+					<0x0 0x2b 0x4>,
-+					<0x0 0x2c 0x4>,
-+					<0x0 0x2d 0x4>;
-+			#interrupt-cells = <2>;
-+			interrupt-controller;
+diff --git a/arch/arm/boot/dts/ls1021a.dtsi b/arch/arm/boot/dts/ls1021a.dtsi
+index 973a496..b713cfc 100644
+--- a/arch/arm/boot/dts/ls1021a.dtsi
++++ b/arch/arm/boot/dts/ls1021a.dtsi
+@@ -139,6 +139,7 @@
+ 			sdhci,auto-cmd12;
+ 			big-endian;
+ 			bus-width = <4>;
++			fsl,rcpm-wakeup = <&rcpm 0x00000080 0x0>;
+ 			status = "disabled";
  		};
  
- 		rtc: rtc at 10510000 {
+@@ -186,6 +187,12 @@
+ 			};
+ 		};
+ 
++		rcpm: rcpm at 1ee2000 {
++			compatible = "fsl,ls1021a-rcpm", "fsl,qoriq-rcpm-2.1";
++			reg = <0x0 0x1ee2000 0x0 0x10000>;
++			fsl,#rcpm-wakeup-cells = <2>;
++		};
++
+ 		dspi0: dspi at 2100000 {
+ 			compatible = "fsl,ls1021a-v1.0-dspi";
+ 			#address-cells = <1>;
+@@ -287,6 +294,7 @@
+ 			interrupts = <GIC_SPI 80 IRQ_TYPE_LEVEL_HIGH>;
+ 			clocks = <&sysclk>;
+ 			clock-names = "ipg";
++			fsl,rcpm-wakeup = <&rcpm 0x0 0x40000000>;
+ 			status = "disabled";
+ 		};
+ 
 -- 
-1.7.1
+2.1.0.27.g96db324
