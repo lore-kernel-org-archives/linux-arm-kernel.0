@@ -1,43 +1,67 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 26 Oct 2015 09:40:34 +0900
-Subject: [GIT PULL] Allwinner DT changes for 4.4, round 3
-In-Reply-To: <9946613.K7Ehp1DEiL@wuerfel>
-References: <20151023180711.GA11749@lukather> <4745252.gLSrJNQ42D@wuerfel>
- <9946613.K7Ehp1DEiL@wuerfel>
-Message-ID: <20151026004034.GA14238@localhost>
+From: robh@kernel.org (Rob Herring)
+Date: Sun, 25 Oct 2015 19:45:08 -0500
+Subject: [PATCH] arm: Test for CONFIG_USE_OF to handle the USE_OF=n/OF=y
+ case
+In-Reply-To: <1445786759-22005-1-git-send-email-geert@linux-m68k.org>
+References: <1445786759-22005-1-git-send-email-geert@linux-m68k.org>
+Message-ID: <CAL_JsqKHozy_fKHuTokQobKHjF6Vay_mzYvP1TCU_sBjTrewBA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 23, 2015 at 10:55:13PM +0200, Arnd Bergmann wrote:
-> On Friday 23 October 2015 22:41:04 Arnd Bergmann wrote:
-> > On Friday 23 October 2015 20:07:11 Maxime Ripard wrote:
-> > > Allwinner DT changes for 4.4, round 3
-> > > 
-> > > A bunch of new boards, but mostly enable the support for the Audio Codec
-> > > on the older SoCs (A10, A10s, A13, A20, R8) and enable it on various
-> > > boards.
-> > > 
-> > > 
-> > 
-> > Pulled into next/dt, thanks!
-> 
-> And dropped again:
-> 
-> In file included from /git/arm-soc/arch/arm/boot/dts/sun4i-a10-a1000.dts:46:0:
-> /git/arm-soc/arch/arm/boot/dts/sun4i-a10.dtsi:48:46: fatal error: dt-bindings/clock/sun4i-a10-pll2.h: No such file or directory
+On Sun, Oct 25, 2015 at 10:25 AM, Geert Uytterhoeven
+<geert@linux-m68k.org> wrote:
+> Until commit 0166dc11be911213 ("of: make CONFIG_OF user selectable"),
+> CONFIG_OF=y implied CONFIG_USE_OF=y on ARM, as the former could solely
+> be enabled by being selected by the latter.
 
-I'm starting to find these header files somewhat tedious to deal with,
-and I wish we could do it better. We're creating a lot of cross-tree
-dependencies with these, usually jsut for one or two added lines in one
-of these headers.
+Arnd sent a similar fix[1] which I prefer.
 
-For those cases, I wonder if we should just take the DT change without using
-the symbol for the first release, and then next release a cleanup patch that
-moves over to include the header file and use that flag from there.
+> However, if the user now manually enables CONFIG_OF=y while
+> CONFIG_USE_OF=n:
+>
+>     arch/arm/kernel/devtree.c: In function 'setup_machine_fdt':
+>     arch/arm/kernel/devtree.c:215:2: error: implicit declaration of function 'early_init_dt_verify' [-Werror=implicit-function-declaration]
+>       if (!dt_phys || !early_init_dt_verify(phys_to_virt(dt_phys)))
+>       ^
+>     arch/arm/kernel/devtree.c:218:2: error: implicit declaration of function 'of_flat_dt_match_machine' [-Werror=implicit-function-declaration]
+>       mdesc = of_flat_dt_match_machine(mdesc_best, arch_get_next_mach);
+>       ^
+>     arch/arm/kernel/devtree.c:218:8: warning: assignment makes pointer from integer without a cast
+>       mdesc = of_flat_dt_match_machine(mdesc_best, arch_get_next_mach);
+>             ^
+>     arch/arm/kernel/devtree.c:228:3: error: implicit declaration of function 'of_get_flat_dt_root' [-Werror=implicit-function-declaration]
+>        dt_root = of_get_flat_dt_root();
+>        ^
+>     arch/arm/kernel/devtree.c:229:3: error: implicit declaration of function 'of_get_flat_dt_prop' [-Werror=implicit-function-declaration]
+>        prop = of_get_flat_dt_prop(dt_root, "compatible", &size);
+>        ^
+>     arch/arm/kernel/devtree.c:229:8: warning: assignment makes pointer from integer without a cast
+>        prop = of_get_flat_dt_prop(dt_root, "compatible", &size);
+>             ^
+>     arch/arm/kernel/devtree.c:244:2: error: implicit declaration of function 'early_init_dt_scan_nodes' [-Werror=implicit-function-declaration]
+>       early_init_dt_scan_nodes();
+>       ^
+>
+> and
+>
+>     arch/arm/kernel/built-in.o: In function `setup_arch':
+>     arch/arm/kernel/setup.c:940: undefined reference to `setup_machine_fdt'
+>     arch/arm/kernel/setup.c:979: undefined reference to `arm_dt_init_cpu_maps'
+>
+> Replace tests for CONFIG_OF by tests for CONFIG_USE_OF where appropriate
+> to fix this.
+>
+> Signed-off-by: Geert Uytterhoeven <geert@linux-m68k.org>
+> ---
+> Cfr. http://kisskb.ellerman.id.au/kisskb/buildresult/12531538/
+>
+> I only fixed the particular issue with the randconfig from the build
+> above.  Are there more tests for CONFIG_OF that should be converted to
+> CONFIG_USE_OF?
 
-But I'm all ears looking for better suggestions too. I wish to move away from
-the current model where we usually have to merge in a clk or pinctrl branch to
-get this though.
+I'd rather move toward removing USE_OF and having arches select if
+they use EARLY_FLATTREE.
 
+Rob
 
--Olof
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-October/376484.html
