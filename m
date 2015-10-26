@@ -1,50 +1,71 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Mon, 26 Oct 2015 09:59:09 +0000
-Subject: [PATCH v13 5/5] uart: pl011: Add support to ZTE ZX296702 uart
-In-Reply-To: <562AFBD5.3050508@codeaurora.org>
-References: <1438328959-16177-1-git-send-email-jun.nie@linaro.org>
- <1438328959-16177-6-git-send-email-jun.nie@linaro.org>
- <55FC16A2.5070207@arm.com>
- <CABymUCOA3oG7Hq83hDyQ_uisQHeipoHshcWONWTtjxKvikzjsQ@mail.gmail.com>
- <CAOZdJXUjZLKkUYScD7oDTMuRUtAEJ6=DopmE4n6Vb9zyv+_viA@mail.gmail.com>
- <CABymUCORU9CDD64Rdw2VX0kLSe6E1zY9iZCap5xittoVFwbOtw@mail.gmail.com>
- <562AFBD5.3050508@codeaurora.org>
-Message-ID: <562DF96D.6020307@arm.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Mon, 26 Oct 2015 10:02:31 +0000
+Subject: [PATCH] drivers: psci: make PSCI 1.0 functions initialization
+ version dependent
+In-Reply-To: <20151023165902.GA2224@localhost>
+References: <1445611610-12871-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <20151023165902.GA2224@localhost>
+Message-ID: <20151026100231.GB8263@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On 24/10/15 04:32, Timur Tabi wrote:
-> Jun Nie wrote:
->> I am OK to add a new driver for ZTE UART if no other's objection
->> though I do not agree you. Without this last patch, other patches are
->> just for minor refactor for register access.
+On Fri, Oct 23, 2015 at 09:59:02AM -0700, Olof Johansson wrote:
+> On Fri, Oct 23, 2015 at 03:46:50PM +0100, Lorenzo Pieralisi wrote:
+> > The PSCI specifications [1] and the SMC calling convention mandate
+> > that unimplemented functions ids must return NOT_SUPPORTED (0xffffffff)
+> > if a function id is called but it is not implemented.
+> > 
+> > Consequently, PSCI 1.0 function ids that require the 1.0 PSCI_FEATURES
+> > call to be initialized:
+> > 
+> > CPU_SUSPEND (psci_init_cpu_suspend())
+> > SYSTEM_SUSPEND (psci_init_system_suspend())
+> > 
+> > call the PSCI_FEATURES function id independently of the detected
+> > PSCI firmware version, since, if the PSCI_FEATURES function id is not
+> > implemented, it must return NOT_SUPPORTED according to the PSCI
+> > specifications, causing the initialization functions to fail as expected.
+> > 
+> > Some existing PSCI implementations (ie Qemu PSCI emulation), do not
+> > comply with the SMC calling convention and fail if function ids that are
+> > not implemented are called from the OS, causing boot failures.
+> > 
+> > To solve this issue, this patch adds code that checks the PSCI firmware
+> > version before calling PSCI 1.0 initialization functions so that the
+> > OS makes sure that it is calling 1.0 functions only if the firmware
+> > version detected is 1.0 or greater, therefore avoiding PSCI calls
+> > that are bound to fail and might cause system boot failures owing
+> > to non-compliant PSCI firmware implementations.
+> > 
+> > [1] http://infocenter.arm.com/help/topic/com.arm.doc.den0022c/DEN0022C_Power_State_Coordination_Interface.pdf
+> > 
+> > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> > Cc: Arnd Bergmann <arnd@arndb.de>
+> > Cc: Kevin Hilman <khilman@kernel.org>
+> > Cc: Sudeep Holla <sudeep.holla@arm.com>
+> > Cc: Olof Johansson <olof@lixom.net>
+> > Cc: Mark Rutland <mark.rutland@arm.com>
+> > ---
+> > Arnd, Kevin, Olof,
+> > 
+> > this applies to current arm-soc drivers/psci branch, and solves the
+> > issue Kevin detected through kernelci with Qemu emulation:
+> > 
+> > http://lists.infradead.org/pipermail/linux-arm-kernel/2015-October/380304.html
 > 
-> In that case, my vote is to drop the whole patchset.  Just copy/paste
-> the amba-pl011 driver and make whatever changes you need.  That sort of
-> thing happens all the time.
+> Bummer. It'd been nice to catch this before merging, especially since
+> the branch had been around a while.
 
-I don't agree here. The driver _is_ very similar (all the semantics and
-behaviour), it's just the register addresses that are different.
-In so far I'd go with that approach of supporting it within the PL011
-driver - whether this has to be in this very same file is another
-question. I think by using register accessors (avoiding direct calls to
-writel/readl in the code) we can hide a lot of these differences in just
-two functions.
-Also, as I said earlier, I guess we don't need all those #ifdefs.
-So in the end the driver wouldn't be too different, it's just that those
-diffs that look a bit scary (because they touch every readl/writel).
+Agreed, sorry about that, I will talk to Kevin to make sure I am able
+to run kernelci tests on branches aimed at upstreaming from now onwards.
 
-I tried to refactor the driver lately to split up SBSA and PL011 support
-and got something that compiles, though I wasn't fully satisfied and I
-ran out of time. The refactor idea was to split driver runtime from
-initialization, so the different probe and init functions can be moved
-into separate files. There would be one stub file with all the core
-driver logic (DMA, IRQ handling, buffer handling, communication
-parameters setup) and one file for each subtype (PL011, SBSA, ZTE, you
-name it).
-If people are interested, I can try to clean this up and post it as an RFC.
+> Anyway, I applied this to a drivers/psci2 branch that builds on top of the
+> previous one. Please use psci2 as the base for other trees, so that mainline
+> won't regress in case they get merged before our stuff.
 
-Cheers,
-Andre.
+Thanks, I will talk to Daniel for the PSCI CPUidle patches, but I think
+they will have to wait, let's merge this drivers/psci2 branch and I will
+rebase the patches going via other trees at -rc1 for the next merge window.
+
+Thanks a lot,
+Lorenzo
