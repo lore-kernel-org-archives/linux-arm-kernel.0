@@ -1,73 +1,68 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 26 Oct 2015 21:35:18 +0000
-Subject: [PATCH v2] arm64: Align .text section to PAGE_SIZE
-In-Reply-To: <562E96A6.9090602@labbott.name>
-References: <1445882989-10618-1-git-send-email-jeremy.linton@arm.com>
- <20151026201611.GI12277@leverpostej>
- <20151026202608.GJ12277@leverpostej>
- <562E96A6.9090602@labbott.name>
-Message-ID: <20151026213518.GM12277@leverpostej>
+From: TWarren@nvidia.com (Tom Warren)
+Date: Mon, 26 Oct 2015 21:36:33 +0000
+Subject: [PATCH v3] Tegra: DT: add device tree binding doc for QSPI
+In-Reply-To: <562E954B.5070604@wwwdotorg.org>
+References: <1445891676-3262-1-git-send-email-twarren@nvidia.com>
+ <562E954B.5070604@wwwdotorg.org>
+Message-ID: <731fc53aa2d24edc93c2af43a7711657@HQMAIL104.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 26, 2015 at 02:09:58PM -0700, Laura Abbott wrote:
-> On 10/26/15 1:26 PM, Mark Rutland wrote:
-> >>Perhaps it would be better to have something like the following (with
-> >>PAGE_SHIFT sorted out to be includable in a linker script), so any
-> >>ALIGN_DEBUG_RO* correctly aligns things to whatever boundary is
-> >>required, and we don't need to over-align things in the !DEBUG_RO_DATA
-> >>case.
-> >
-> >Ignore the bit about PAGE_SHIFT and linker script. I'd got confused as I
-> >had a local typo breaking the build.
-> >
-> >With the below diff applied I can boot a defconfig +CONFIG_DEBUG_RODATA
-> >+CONFIG_ARM64_64K_PAGES v4.3-rc7 kernel on Juno
-> >
+Stephen,
+
+> -----Original Message-----
+> From: Stephen Warren [mailto:swarren at wwwdotorg.org]
+> Sent: Monday, October 26, 2015 2:04 PM
+> To: Tom Warren <TWarren@nvidia.com>
+> Cc: u-boot at lists.denx.de; Stephen Warren <swarren@nvidia.com>;
+> tomcwarren3959 at gmail.com; jteki at openedev.com; robh+dt at kernel.org;
+> pawel.moll at arm.com; mark.rutland at arm.com; ijc+devicetree at hellion.org.uk;
+> galak at codeaurora.org; Thierry Reding <treding@nvidia.com>; linux-
+> tegra at vger.kernel.org; Alex Courbot <acourbot@nvidia.com>; linux-arm-
+> kernel at lists.infradead.org
+> Subject: Re: [PATCH v3] Tegra: DT: add device tree binding doc for QSPI
 > 
-> Most of the alignment was found by trial and error so I suspect it was
-> just getting lucky before. I think this should be covering all the
-> cases. Hopefully the protections will make it more restrictive instead
-> of less to catch any more corner cases.
-
-Hopefully!
-
-On a somewhat related note, we should probably move .rodata away from
-.text; currently we give everything between _stext and _etext
-PAGE_KERNEL_EXEC permissions (i.e. !PXN), and .rodata has no reason to
-be executable.
-
-Doing so would also make it simpler to add .rodata to the mem_init
-notice, which I've been meaning to do for a while.
-
-I can take a look at shuffling sections for that tomorrow.
-
-> For whoever ends up submitting the patch,
+> On 10/26/2015 02:34 PM, Tom Warren wrote:
+> > This patch adds the device tree binding doc for the Tegra QSPI
+> > controller on Tegra210.
 > 
-> Reviewed-by: Laura Abbott <laura@labbott.name>
-
-Cheers; I'll spin this as a full patch momentarily.
-
-Thanks,
-Mark.
-
-> >>---->8----
-> >>diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
-> >>index 9807333..4d77757 100644
-> >>--- a/arch/arm64/kernel/vmlinux.lds.S
-> >>+++ b/arch/arm64/kernel/vmlinux.lds.S
-> >>@@ -60,9 +60,12 @@ PECOFF_FILE_ALIGNMENT = 0x200;
-> >>  #define PECOFF_EDATA_PADDING
-> >>  #endif
-> >>
-> >>-#ifdef CONFIG_DEBUG_ALIGN_RODATA
-> >>+#if defined(CONFIG_DEBUG_ALIGN_RODATA)
-> >>  #define ALIGN_DEBUG_RO                 . = ALIGN(1<<SECTION_SHIFT);
-> >>  #define ALIGN_DEBUG_RO_MIN(min)                ALIGN_DEBUG_RO
-> >>+#elif defined(CONFIG_DEBUG_RODATA)
-> >>+#define ALIGN_DEBUG_RO                 . = ALIGN(1<<PAGE_SHIFT);
-> >>+#define ALIGN_DEBUG_RO_MIN(min)                ALIGN_DEBUG_RO
-> >>  #else
-> >>  #define ALIGN_DEBUG_RO
-> >>  #define ALIGN_DEBUG_RO_MIN(min)                . = ALIGN(min);
+> > diff --git
+> > a/Documentation/devicetree/bindings/spi/nvidia,tegra210-qspi.txt
+> > b/Documentation/devicetree/bindings/spi/nvidia,tegra210-qspi.txt
 > 
+> > +- clock-names : Must include the following entries:
+> > +  - qspi
+> > +- resets : Must contain an entry for each entry in reset-names.
+> > +  See ../reset/reset.txt for details.
+> > +- reset-names : Must include the following entries:
+> > +  - qspi
+> > +- clocks : Must contain an entry for each entry in clock-names.
+> > +  See ../clocks/clock-bindings.txt for details.
+> 
+> Let's keep clocks and clock-names next to each-other in the doc. I don't know
+> why they aren't in the eixsting Tegra SPI doc.
+OK. I assume 'clock-names', then 'clocks' since 'clocks' references clock-names.
+
+> 
+> With this issue fixed, this patch looks good to me.
+> 
+> Note: I don't see the devicetree mailing list in the CC list. You should probably
+> replace the U-Boot mailing list with it.
+I thought I had it, but may have dropped it. What exactly is the URL of the devicetree mailing list? devicetree-discuss at lists.ozlabs.org? or devicetree at vger.kernel.org?
+
+> 
+> > +Optional properties:
+> > +- dmas : Must contain an entry for each entry in clock-names.
+> > +  See ../dma/dma.txt for details.
+> > +- dma-names : Must include the following entries:
+> > +  - rx
+> > +  - tx
+> 
+> Eventually, we should have a property that describes the SPI bus width (x1, x2,
+> x4 I assume). However, we can assume that unless otherwise specified, the
+> width is x1, and add a property to specify the width later as/when we need it if
+> you want.
+
+Tom
+--
+nvpublic
