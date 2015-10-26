@@ -1,45 +1,72 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 26 Oct 2015 10:07:52 +0900
-Subject: [GIT PULL] Allwinner DT changes for 4.4, round 3
-In-Reply-To: <20151025201308.GS10947@lukather>
-References: <20151023180711.GA11749@lukather> <4745252.gLSrJNQ42D@wuerfel>
- <9946613.K7Ehp1DEiL@wuerfel> <20151025201308.GS10947@lukather>
-Message-ID: <20151026010752.GG14238@localhost>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Mon, 26 Oct 2015 03:19:42 +0200
+Subject: [PATCH 6/8] [media] v4l: xilinx-tpg: add missing of_node_put
+In-Reply-To: <1445781427-7110-7-git-send-email-Julia.Lawall@lip6.fr>
+References: <1445781427-7110-1-git-send-email-Julia.Lawall@lip6.fr>
+ <1445781427-7110-7-git-send-email-Julia.Lawall@lip6.fr>
+Message-ID: <1798308.03Tu29vvmA@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Oct 25, 2015 at 09:13:08PM +0100, Maxime Ripard wrote:
-> On Fri, Oct 23, 2015 at 10:55:13PM +0200, Arnd Bergmann wrote:
-> > On Friday 23 October 2015 22:41:04 Arnd Bergmann wrote:
-> > > On Friday 23 October 2015 20:07:11 Maxime Ripard wrote:
-> > > > Allwinner DT changes for 4.4, round 3
-> > > > 
-> > > > A bunch of new boards, but mostly enable the support for the Audio Codec
-> > > > on the older SoCs (A10, A10s, A13, A20, R8) and enable it on various
-> > > > boards.
-> > > > 
-> > > > 
-> > > 
-> > > Pulled into next/dt, thanks!
-> > 
-> > And dropped again:
-> > 
-> > In file included from /git/arm-soc/arch/arm/boot/dts/sun4i-a10-a1000.dts:46:0:
-> > /git/arm-soc/arch/arm/boot/dts/sun4i-a10.dtsi:48:46: fatal error: dt-bindings/clock/sun4i-a10-pll2.h: No such file or directory
-> > 
-> > Please make sure branches you send actually work by themselves.
+Hi Julia,
+
+Thank you for the patch.
+
+On Sunday 25 October 2015 14:57:05 Julia Lawall wrote:
+> for_each_child_of_node performs an of_node_get on each iteration, so
+> a break out of the loop requires an of_node_put.
 > 
-> Damn, you're right... Sorry about that...
+> A simplified version of the semantic patch that fixes this problem is as
+> follows (http://coccinelle.lip6.fr):
 > 
-> You need to pull the tag sunxi-clk-for-4.4 that has been merged in the
-> clk tree in 38ce30e29dc.
+> // <smpl>
+> @@
+> expression root,e;
+> local idexpression child;
+> @@
 > 
-> Mike, Stephen, will that tag be stable?
+>  for_each_child_of_node(root, child) {
+>    ... when != of_node_put(child)
+>        when != e = child
+> (
+>    return child;
+> 
+> +  of_node_put(child);
+> ?  return ...;
+> )
+>    ...
+>  }
+> // </smpl>
+> 
+> Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
 
-I don't see that tag in your tree, Maxime? I also don't see 38ce30e29dc in
-the clk tree on kernel.org.
+Reviewed-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 
-I'm a little confused right now...
+> ---
+>  drivers/media/platform/xilinx/xilinx-tpg.c |    2 ++
+>  1 file changed, 2 insertions(+)
+> 
+> diff --git a/drivers/media/platform/xilinx/xilinx-tpg.c
+> b/drivers/media/platform/xilinx/xilinx-tpg.c index b5f7d5e..8bd7e37 100644
+> --- a/drivers/media/platform/xilinx/xilinx-tpg.c
+> +++ b/drivers/media/platform/xilinx/xilinx-tpg.c
+> @@ -731,6 +731,7 @@ static int xtpg_parse_of(struct xtpg_device *xtpg)
+>  		format = xvip_of_get_format(port);
+>  		if (IS_ERR(format)) {
+>  			dev_err(dev, "invalid format in DT");
+> +			of_node_put(port);
+>  			return PTR_ERR(format);
+>  		}
+> 
+> @@ -739,6 +740,7 @@ static int xtpg_parse_of(struct xtpg_device *xtpg)
+>  			xtpg->vip_format = format;
+>  		} else if (xtpg->vip_format != format) {
+>  			dev_err(dev, "in/out format mismatch in DT");
+> +			of_node_put(port);
+>  			return -EINVAL;
+>  		}
 
+-- 
+Regards,
 
--Olof
+Laurent Pinchart
