@@ -1,55 +1,32 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 26 Oct 2015 21:42:33 +0000
-Subject: [PATCH] arm64: page-align sections for DEBUG_RODATA
-Message-ID: <1445895753-2095-1-git-send-email-mark.rutland@arm.com>
+From: bjorn.andersson@sonymobile.com (Bjorn Andersson)
+Date: Mon, 26 Oct 2015 14:46:56 -0700
+Subject: [PATCH 04/14] devicetree: Add hardware rng entry to
+ qcom-apq8064.dtsi
+In-Reply-To: <1442579472-20102-1-git-send-email-srinivas.kandagatla@linaro.org>
+References: <1442579371-19822-1-git-send-email-srinivas.kandagatla@linaro.org>
+ <1442579472-20102-1-git-send-email-srinivas.kandagatla@linaro.org>
+Message-ID: <20151026214656.GZ24668@usrtlx11787.corpusers.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A kernel built with DEBUG_RO_DATA && !CONFIG_DEBUG_ALIGN_RODATA doesn't
-have .text aligned to a page boundary, though fixup_executable works at
-page-granularity thanks to its use of create_mapping. If .text is not
-page-aligned, the first page it exists in may be marked non-executable,
-leading to failures when an attempt is made to execute code in said
-page.
+On Fri 18 Sep 05:31 PDT 2015, Srinivas Kandagatla wrote:
 
-This patch upgrades ALIGN_DEBUG_RO and ALIGN_DEBUG_RO_MIN to force page
-alignment for DEBUG_RO_DATA && !CONFIG_DEBUG_ALIGN_RODATA kernels,
-ensuring that all sections with specific RWX permission requirements are
-mapped with the correct permissions.
+> From: John Stultz <john.stultz@linaro.org>
+> 
+> Add devicetree data to add support for hw_rng support
+> to the apq8064 dts.
+> 
+> Tested on the Nexus7 (2013).
+> 
+> Cc: Kumar Gala <galak@codeaurora.org>
+> Cc: Stephen Boyd <sboyd@codeaurora.org>
+> Cc: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+> Cc: devicetree at vger.kernel.org
 
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Reported-by: Jeremy Linton <jeremy.linton@arm.com>
-Reviewed-by: Laura Abbott <laura@labbott.name>
-Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Suzuki Poulose <suzuki.poulose@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
----
- arch/arm64/kernel/vmlinux.lds.S | 5 ++++-
- 1 file changed, 4 insertions(+), 1 deletion(-)
+Reviewed-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
 
-Note: this is intended to supercede [1,2].
+> Reviewed-by: Stephen Boyd <sboyd@codeaurora.org>
+> Signed-off-by: John Stultz <john.stultz@linaro.org>
 
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-October/380486.html
-[2] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-October/380999.html
-
-diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
-index 9807333..4d77757 100644
---- a/arch/arm64/kernel/vmlinux.lds.S
-+++ b/arch/arm64/kernel/vmlinux.lds.S
-@@ -60,9 +60,12 @@ PECOFF_FILE_ALIGNMENT = 0x200;
- #define PECOFF_EDATA_PADDING
- #endif
- 
--#ifdef CONFIG_DEBUG_ALIGN_RODATA
-+#if defined(CONFIG_DEBUG_ALIGN_RODATA)
- #define ALIGN_DEBUG_RO			. = ALIGN(1<<SECTION_SHIFT);
- #define ALIGN_DEBUG_RO_MIN(min)		ALIGN_DEBUG_RO
-+#elif defined(CONFIG_DEBUG_RODATA)
-+#define ALIGN_DEBUG_RO			. = ALIGN(1<<PAGE_SHIFT);
-+#define ALIGN_DEBUG_RO_MIN(min)		ALIGN_DEBUG_RO
- #else
- #define ALIGN_DEBUG_RO
- #define ALIGN_DEBUG_RO_MIN(min)		. = ALIGN(min);
--- 
-1.9.1
+Regards,
+Bjorn
