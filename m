@@ -1,36 +1,40 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Mon, 26 Oct 2015 10:11:52 +0900
-Subject: [PATCH RESEND v6 0/2] ARM: sunxi: Add Reduced Serial Bus (RSB)
- controller support
-In-Reply-To: <CAGb2v66utAE-Pzmn7dNuWOCGV-Y_=U9sfhGh=Cey-J-Y9BNHpg@mail.gmail.com>
-References: <1445625691-20289-1-git-send-email-maxime.ripard@free-electrons.com>
- <CAGb2v66utAE-Pzmn7dNuWOCGV-Y_=U9sfhGh=Cey-J-Y9BNHpg@mail.gmail.com>
-Message-ID: <20151026011152.GH14238@localhost>
+Date: Mon, 26 Oct 2015 10:17:05 +0900
+Subject: [GIT PULL 1/5] Late Samsung DT updates for v4.4
+In-Reply-To: <562AA40E.4050407@kernel.org>
+References: <562AA40E.4050407@kernel.org>
+Message-ID: <20151026011705.GI14238@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 24, 2015 at 11:30:32AM +0800, Chen-Yu Tsai wrote:
-> Hi Arnd, Kevin, Olof,
+On Sat, Oct 24, 2015 at 06:18:06AM +0900, Kukjin Kim wrote:
+> Hi Arnd, Olof, Kevin
 > 
-> On Sat, Oct 24, 2015 at 2:41 AM, Maxime Ripard
-> <maxime.ripard@free-electrons.com> wrote:
-> > Hi Arnd, Kevin, Olof,
-> >
-> > As discussed on IRC, here is a resend of these RSB patches, to merge
-> > for 4.4.
+> Here is late pull-request for v4.4, please pull.
 > 
-> Please merge them on a topic branch, so we can try to merge other
-> patches depending on them. If possible I'd like to get an actual
-> user in 4.4, otherwise this driver won't get any usage until the
-> next merge window.
+> If any problems, please kindly let me know.
+> See you in Seoul next week ;-)
 > 
-> I'll try to send out a new version of the AXP223 patches later today.
+> Thanks,
+> Kukjin
+> 
+> 
+> The following changes since commit df829b06f0079165d9dc7719af8f8a7da852fe51:
+> 
+>   ARM: dts: Use GPIO constants for flags cells in exynos5440 boards
+> (2015-10-08 07:39:58 +0900)
+> 
+> are available in the git repository at:
+> 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/kgene/linux-samsung.git
+> tags/samsung-dt-2
+> 
+> for you to fetch changes up to d6b9aea67f40e138e972b17c7c658bc3c8ac2459:
+> 
+>   MAINTAINERS: Add documentation and dt-bindings for exynos stuff
+> (2015-10-24 05:07:26 +0900)
 
-It's too late to make 4.4, rc7 is upon us. But the good news is that for 4.4
-there's no need to add cross-tree dependencies to get the shared base, which
-is a good thing.
-
-So, given timing I'll apply these directly without a topic branch.
+Merged, thanks.
 
 
 -Olof
