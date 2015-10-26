@@ -1,75 +1,34 @@
-From: twarren@nvidia.com (Tom Warren)
-Date: Mon, 26 Oct 2015 15:22:20 -0700
-Subject: [PATCH v4] Tegra: DT: add device tree binding doc for QSPI
-Message-ID: <1445898140-3561-1-git-send-email-twarren@nvidia.com>
+From: isubramanian@apm.com (Iyappan Subramanian)
+Date: Mon, 26 Oct 2015 15:25:14 -0700
+Subject: [PATCH net-next v2 0/2] drivers: xgene: Add support RGMII TX/RX delay
+ configuration
+Message-ID: <1445898316-21372-1-git-send-email-isubramanian@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the device tree binding doc for the Tegra
-QSPI controller on Tegra210.
+X-Gene RGMII ethernet controller has a RGMII bridge that performs the
+task of converting the RGMII signal {RX_CLK,RX_CTL, RX_DATA[3:0]} from
+PHY to GMII signal {RX_DV,RX_ER,RX_DATA[7:0]} and vice versa.  This
+RGMII bridge has a provision to internally delay the input RX_CLK and
+the output TX_CLK using configuration registers. This will help in
+maintain the CLK-CTL delay relationship in various operating
+conditions.
 
-Signed-off-by: Tom Warren <twarren@nvidia.com>
+This patch adds support RGMII TX/RX delay configuration.
+
+Signed-off-by: Iyappan Subramanian <isubramanian@apm.com>
 ---
-Changes in v2:
-- based it more on kernel's nvidia,tegra114-spi.txt binding
-- changes based on prelim review by swarren at nvidia.com
-Changes in v3:
-- renamed to 'nvidia,tegra210-qspi.txt' to match kernel bindings
-- more changes based on review from swarren at nvidia.com
-Changes in v4:
-- move 'clock' up under 'clock-names' entry
 
- Documentation/devicetree/bindings/spi/nvidia,tegra210-qspi.txt | 42 ++++++++++++++++++++++++++++++
- 1 file changed, 42 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/spi/nvidia,tegra210-qspi.txt
+Iyappan Subramanian (2):
+  drivers: net: xgene: Add support RGMII TX/RX delay configuration
+  Documentation: dts: xgene: Add TX/RX delay field
 
-diff --git a/Documentation/devicetree/bindings/spi/nvidia,tegra210-qspi.txt b/Documentation/devicetree/bindings/spi/nvidia,tegra210-qspi.txt
-new file mode 100644
-index 0000000..fe1558f
---- /dev/null
-+++ b/Documentation/devicetree/bindings/spi/nvidia,tegra210-qspi.txt
-@@ -0,0 +1,42 @@
-+NVIDIA Tegra QSPI controller.
-+
-+Required properties:
-+- compatible : for Tegra210, must contain "nvidia,tegra210-qspi".
-+- reg: Should contain QSPI registers location and length.
-+- interrupts: Should contain QSPI interrupt.
-+- clock-names : Must include the following entries:
-+  - qspi
-+- clocks : Must contain an entry for each entry in clock-names.
-+  See ../clocks/clock-bindings.txt for details.
-+- resets : Must contain an entry for each entry in reset-names.
-+  See ../reset/reset.txt for details.
-+- reset-names : Must include the following entries:
-+  - qspi
-+
-+Optional properties:
-+- dmas : Must contain an entry for each entry in clock-names.
-+  See ../dma/dma.txt for details.
-+- dma-names : Must include the following entries:
-+  - rx
-+  - tx
-+
-+Recommended properties:
-+- spi-max-frequency: Definition as per spi-bus.txt
-+
-+Example:
-+
-+spi at 70410000 {
-+	compatible = "nvidia,tegra210-qspi";
-+	reg = <0x0 0x70410000 0x0 0x1000>;
-+	interrupts = <0 10 0x04>;
-+	spi-max-frequency = <24000000>;
-+	#address-cells = <1>;
-+	#size-cells = <0>;
-+	clocks = <&tegra_car 211>;
-+	clock-names = "qspi";
-+	resets = <&tegra_car 211>;
-+	reset-names = "qspi";
-+	dmas = <&apbdma 16>, <&apbdma 16>;
-+	dma-names = "rx", "tx";
-+	status = "disabled";
-+};
+ .../devicetree/bindings/net/apm-xgene-enet.txt     | 10 +++++
+ drivers/net/ethernet/apm/xgene/xgene_enet_hw.c     |  8 +++-
+ drivers/net/ethernet/apm/xgene/xgene_enet_hw.h     |  1 +
+ drivers/net/ethernet/apm/xgene/xgene_enet_main.c   | 49 ++++++++++++++++++++++
+ drivers/net/ethernet/apm/xgene/xgene_enet_main.h   |  2 +
+ 5 files changed, 69 insertions(+), 1 deletion(-)
+
 -- 
-1.8.2.1.610.g562af5b
+1.9.1
