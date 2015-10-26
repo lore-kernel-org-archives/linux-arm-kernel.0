@@ -1,56 +1,39 @@
-From: eddie.huang@mediatek.com (Eddie Huang)
-Date: Mon, 26 Oct 2015 19:40:10 +0800
-Subject: [PATCH v5 4/5] ARM: dts: mt8135: enable basic SMP bringup for
- mt8135
-In-Reply-To: <CAMAWPa_Gyq7H0qUJ32PAJh_ELdHeKWMPyHud4gaT8=Ootcu1+g@mail.gmail.com>
-References: <1443799181-50409-1-git-send-email-yingjoe.chen@mediatek.com>
- <1443799181-50409-5-git-send-email-yingjoe.chen@mediatek.com>
- <CAMAWPa-Ed2FJY2pW67EHHKBH3_eBZx0+oWfMJwc_DhEjrf7aMg@mail.gmail.com>
- <1445843717.23888.1.camel@mtksdaap41>
- <CAMAWPa_Gyq7H0qUJ32PAJh_ELdHeKWMPyHud4gaT8=Ootcu1+g@mail.gmail.com>
-Message-ID: <1445859610.26723.4.camel@mtksdaap41>
+From: p.fedin@samsung.com (Pavel Fedin)
+Date: Mon, 26 Oct 2015 14:47:40 +0300
+Subject: [PATCH 0/4] Exynos SROMc configuration and Ethernet support for
+ SMDK5410
+Message-ID: <cover.1445859834.git.p.fedin@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kevin,
+This patch extends Exynos SROM controller driver with ability to configure
+controller outputs and enables SMSC9115 Ethernet chip on SMDK5410 board,
+which is connected via SROMc bank #3.
 
-On Mon, 2015-10-26 at 17:06 +0900, Kevin Hilman wrote:
-> On Mon, Oct 26, 2015 at 4:15 PM, Yingjoe Chen <yingjoe.chen@mediatek.com> wrote:
-> > On Mon, 2015-10-26 at 09:56 +0900, Kevin Hilman wrote:
-> >> Hello,
-> >>
-> >> On Sat, Oct 3, 2015 at 12:19 AM, Yingjoe Chen <yingjoe.chen@mediatek.com> wrote:
-> >> > Add arch timer node to enable arch-timer support. MT8135 firmware
-> >> > doesn't correctly setup arch-timer frequency and CNTVOFF, add
-> >> > properties to workaround this.
-> >> >
-> >> > This also set cpu enable-method to enable SMP.
-> >> >
-> >> > Signed-off-by: Yingjoe Chen <yingjoe.chen@mediatek.com>
-> >>
-> >> kernelci.org started detecting new boot failures for the mt8135-evb in
-> >> the arm-soc tree[1], and the boot failures were bisected down to this
-> >> patch, which landed upstream in the form of commit d186a394bb98 (ARM:
-> >> dts: mt8135: enable basic SMP bringup for mt8135)
-> >>
-> >> Maybe this new SMP support requires updating the firmware on the board
-> >> as well?  If so, the changelog should've been a bit more explicit
-> >> about firmware dependencies.
-> >
-> > Kevin,
-> >
-> > Thanks for testing.
-> >
-> > No, it doesn't need new firmware. Will test to see what's going wrong.
-> 
-> Thanks for following up.  I'll be glad to test any patches if you have
-> anything you'd like me to test.
+With this patch, support for the whole existing SMDK range can be added.
+Actually, only bank number is different.
 
-You need "clockevents/drivers/mtk: Fix spurious interrupt leading to
-crash" (https://lkml.org/lkml/2015/8/24/803)
+This patchset also depends on Exynos 5410 pinctrl support, introduced by
+patches 0003 and 0004 from this set:
+[PATCH v4 0/5] ARM: EXYNOS: ODROID-XU DT and LEDs
+http://lists.infradead.org/pipermail/linux-arm-kernel/2015-March/330862.html
 
-Daniel Lezcano already applied this patch in his tree for 4.4.
-(https://git.linaro.org/people/daniel.lezcano/linux.git)
+Pinctrl support is necessary in order to correctly configure
+multifunctional pins of the Exynos chip.
 
-Eddie
-Thanks
+Pavel Fedin (4):
+  ARM: dts: Add SROMc to Exynos 5410
+  drivers: exynos-srom: Add support for bank configuration
+  ARM: dts: Add Ethernet chip to SMDK5410
+  Documentation: dt-bindings: Describe SROMc configuration
+
+ .../bindings/arm/samsung/exynos-srom.txt           | 19 +++++++++-
+ arch/arm/boot/dts/exynos5410-smdk5410.dts          | 42 ++++++++++++++++++++++
+ arch/arm/boot/dts/exynos5410.dtsi                  |  5 +++
+ arch/arm/mach-exynos/Kconfig                       |  2 +-
+ drivers/soc/samsung/Kconfig                        |  2 +-
+ drivers/soc/samsung/exynos-srom.c                  | 42 +++++++++++++++++++++-
+ 6 files changed, 108 insertions(+), 4 deletions(-)
+
+-- 
+2.4.4
