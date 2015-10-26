@@ -1,364 +1,203 @@
-From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
-Date: Mon, 26 Oct 2015 14:23:54 +0000
-Subject: [PATCH v2 2/4] nvmem: NXP LPC18xx EEPROM memory NVMEM driver
-In-Reply-To: <1445275946-32653-3-git-send-email-ariel@vanguardiasur.com.ar>
-References: <1445275946-32653-1-git-send-email-ariel@vanguardiasur.com.ar>
- <1445275946-32653-3-git-send-email-ariel@vanguardiasur.com.ar>
-Message-ID: <562E377A.3040604@linaro.org>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Mon, 26 Oct 2015 15:32:38 +0100
+Subject: [PATCH v2 2/2] enable armv8 fp/simd lazy switch
+In-Reply-To: <1444098794-19244-3-git-send-email-m.smarduch@samsung.com>
+References: <1444098794-19244-1-git-send-email-m.smarduch@samsung.com>
+ <1444098794-19244-3-git-send-email-m.smarduch@samsung.com>
+Message-ID: <20151026143238.GB20298@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 19/10/15 18:32, Ariel D'Alessandro wrote:
-> This commit adds support for NXP LPC18xx EEPROM memory found in NXP
-s/commit/patch
-
-> LPC185x/3x and LPC435x/3x/2x/1x devices.
->
-> EEPROM size is 16384 bytes and it can be entirely read and
-> written/erased with 1 word (4 bytes) granularity. The last page
-> (128 bytes) contains the EEPROM initialization data and is not writable.
->
-> Erase/program time is less than 3ms. The EEPROM device requires a
-> ~1500 kHz clock (min 800 kHz, max 1600 kHz) that is generated dividing
-> the system bus clock by the division factor, contained in the divider
-> register (minus 1 encoded).
->
-> Signed-off-by: Ariel D'Alessandro <ariel@vanguardiasur.com.ar>
+On Mon, Oct 05, 2015 at 07:33:14PM -0700, Mario Smarduch wrote:
+> This patch enables arm64 lazy fp/simd switch. Removes the ARM constraint,
+> and follows the same approach as armv7 version - found here.
+> 
+> https://lists.cs.columbia.edu/pipermail/kvmarm/2015-September/016567.html
+> 
+> To summarize - provided the guest accesses fp/simd unit we limit number
+> of fp/simd context switches to two per vCPU execution schedule.
+> 
+> Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
 > ---
->   drivers/nvmem/Kconfig          |   9 ++
->   drivers/nvmem/Makefile         |   2 +
->   drivers/nvmem/lpc18xx_eeprom.c | 266 +++++++++++++++++++++++++++++++++++++++++
->   3 files changed, 277 insertions(+)
->   create mode 100644 drivers/nvmem/lpc18xx_eeprom.c
->
-> diff --git a/drivers/nvmem/Kconfig b/drivers/nvmem/Kconfig
-> index bc4ea58..6ff1b50 100644
-> --- a/drivers/nvmem/Kconfig
-> +++ b/drivers/nvmem/Kconfig
-> @@ -25,6 +25,15 @@ config NVMEM_IMX_OCOTP
->   	  This driver can also be built as a module. If so, the module
->   	  will be called nvmem-imx-ocotp.
->
-> +config NVMEM_LPC18XX_EEPROM
-> +	tristate "NXP LPC18XX EEPROM Memory Support"
-> +	depends on ARCH_LPC18XX || COMPILE_TEST
-> +	help
-> +	  Say Y here to include support for NXP LPC18xx EEPROM memory found in
-> +	  NXP LPC185x/3x and LPC435x/3x/2x/1x devices.
-> +	  To compile this driver as a module, choose M here: the module
-> +	  will be called nvmem_lpc18xx_eeprom.
+>  arch/arm/kvm/arm.c               |  2 --
+>  arch/arm64/include/asm/kvm_asm.h |  1 +
+>  arch/arm64/kvm/hyp.S             | 59 +++++++++++++++++++++++++++-------------
+>  3 files changed, 41 insertions(+), 21 deletions(-)
+> 
+> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+> index 1b1f9e9..fe609f1 100644
+> --- a/arch/arm/kvm/arm.c
+> +++ b/arch/arm/kvm/arm.c
+> @@ -112,12 +112,10 @@ void kvm_arch_check_processor_compat(void *rtn)
+>   */
+>  static void kvm_switch_fp_regs(struct kvm_vcpu *vcpu)
+>  {
+> -#ifdef CONFIG_ARM
+>  	if (vcpu->arch.vfp_lazy == 1) {
+>  		kvm_call_hyp(__kvm_restore_host_vfp_state, vcpu);
+>  		vcpu->arch.vfp_lazy = 0;
+>  	}
+> -#endif
+
+I'm assuming you'll rework this like for the 32-bit series to just do
+this in EL1, yes?
+
+>  }
+>  
+>  /**
+> diff --git a/arch/arm64/include/asm/kvm_asm.h b/arch/arm64/include/asm/kvm_asm.h
+> index 5e37710..83dcac5 100644
+> --- a/arch/arm64/include/asm/kvm_asm.h
+> +++ b/arch/arm64/include/asm/kvm_asm.h
+> @@ -117,6 +117,7 @@ extern char __kvm_hyp_vector[];
+>  extern void __kvm_flush_vm_context(void);
+>  extern void __kvm_tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa);
+>  extern void __kvm_tlb_flush_vmid(struct kvm *kvm);
+> +extern void __kvm_restore_host_vfp_state(struct kvm_vcpu *vcpu);
+>  
+>  extern int __kvm_vcpu_run(struct kvm_vcpu *vcpu);
+>  
+> diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
+> index e583613..ea99f66 100644
+> --- a/arch/arm64/kvm/hyp.S
+> +++ b/arch/arm64/kvm/hyp.S
+> @@ -385,14 +385,6 @@
+>  	tbz	\tmp, #KVM_ARM64_DEBUG_DIRTY_SHIFT, \target
+>  .endm
+>  
+> -/*
+> - * Branch to target if CPTR_EL2.TFP bit is set (VFP/SIMD trapping enabled)
+> - */
+> -.macro skip_fpsimd_state tmp, target
+> -	mrs	\tmp, cptr_el2
+> -	tbnz	\tmp, #CPTR_EL2_TFP_SHIFT, \target
+> -.endm
+> -
+>  .macro compute_debug_state target
+>  	// Compute debug state: If any of KDE, MDE or KVM_ARM64_DEBUG_DIRTY
+>  	// is set, we do a full save/restore cycle and disable trapping.
+> @@ -433,10 +425,6 @@
+>  	mrs	x5, ifsr32_el2
+>  	stp	x4, x5, [x3]
+>  
+> -	skip_fpsimd_state x8, 2f
+> -	mrs	x6, fpexc32_el2
+> -	str	x6, [x3, #16]
+> -2:
+>  	skip_debug_state x8, 1f
+>  	mrs	x7, dbgvcr32_el2
+>  	str	x7, [x3, #24]
+> @@ -481,8 +469,15 @@
+>  	isb
+>  99:
+>  	msr     hcr_el2, x2
+> -	mov	x2, #CPTR_EL2_TTA
 > +
->   config NVMEM_MXS_OCOTP
->   	tristate "Freescale MXS On-Chip OTP Memory Support"
->   	depends on ARCH_MXS || COMPILE_TEST
-> diff --git a/drivers/nvmem/Makefile b/drivers/nvmem/Makefile
-> index 95dde3f..c14a556 100644
-> --- a/drivers/nvmem/Makefile
-> +++ b/drivers/nvmem/Makefile
-> @@ -8,6 +8,8 @@ nvmem_core-y			:= core.o
->   # Devices
->   obj-$(CONFIG_NVMEM_IMX_OCOTP)	+= nvmem-imx-ocotp.o
->   nvmem-imx-ocotp-y		:= imx-ocotp.o
-> +obj-$(CONFIG_NVMEM_LPC18XX_EEPROM)	+= nvmem_lpc18xx_eeprom.o
-> +nvmem_lpc18xx_eeprom-y	:= lpc18xx_eeprom.o
->   obj-$(CONFIG_NVMEM_MXS_OCOTP)	+= nvmem-mxs-ocotp.o
->   nvmem-mxs-ocotp-y		:= mxs-ocotp.o
->   obj-$(CONFIG_QCOM_QFPROM)	+= nvmem_qfprom.o
-> diff --git a/drivers/nvmem/lpc18xx_eeprom.c b/drivers/nvmem/lpc18xx_eeprom.c
-> new file mode 100644
-> index 0000000..ccdda66
-> --- /dev/null
-> +++ b/drivers/nvmem/lpc18xx_eeprom.c
-> @@ -0,0 +1,266 @@
-> +/*
-> + * NXP LPC18xx/LPC43xx EEPROM memory NVMEM driver
+> +	mov     x2, #0
+> +	ldr     w3, [x0, #VCPU_VFP_LAZY]
+> +	tbnz    w3, #0, 98f
+> +
+>  	orr     x2, x2, #CPTR_EL2_TFP
+> +98:
+> +	orr     x2, x2, #CPTR_EL2_TTA
+> +
+
+this can be reworked more simply by using an extra register and leaving
+the initial mov x2, #CPTR_EL2_TTA alone and just skip setting the TFP
+bit if we've already switched the state.
+
+>  	msr	cptr_el2, x2
+>  
+>  	mov	x2, #(1 << 15)	// Trap CP15 Cr=15
+> @@ -669,14 +664,12 @@ __restore_debug:
+>  	ret
+>  
+>  __save_fpsimd:
+> -	skip_fpsimd_state x3, 1f
+>  	save_fpsimd
+> -1:	ret
+> +	ret
+>  
+>  __restore_fpsimd:
+> -	skip_fpsimd_state x3, 1f
+>  	restore_fpsimd
+> -1:	ret
+> +	ret
+>  
+>  switch_to_guest_fpsimd:
+>  	push	x4, lr
+> @@ -688,6 +681,9 @@ switch_to_guest_fpsimd:
+>  
+>  	mrs	x0, tpidr_el2
+>  
+> +	mov     w2, #1
+> +	str     w2, [x0, #VCPU_VFP_LAZY]
+> +
+>  	ldr	x2, [x0, #VCPU_HOST_CONTEXT]
+>  	kern_hyp_va x2
+>  	bl __save_fpsimd
+> @@ -763,7 +759,6 @@ __kvm_vcpu_return:
+>  	add	x2, x0, #VCPU_CONTEXT
+>  
+>  	save_guest_regs
+> -	bl __save_fpsimd
+>  	bl __save_sysregs
+>  
+>  	skip_debug_state x3, 1f
+> @@ -784,7 +779,6 @@ __kvm_vcpu_return:
+>  	kern_hyp_va x2
+>  
+>  	bl __restore_sysregs
+> -	bl __restore_fpsimd
+>  	/* Clear FPSIMD and Trace trapping */
+>  	msr     cptr_el2, xzr
+>  
+> @@ -863,6 +857,33 @@ ENTRY(__kvm_flush_vm_context)
+>  	ret
+>  ENDPROC(__kvm_flush_vm_context)
+>  
+> +/**
+> + * kvm_switch_fp_regs() - switch guest/host VFP/SIMD registers
+> + * @vcpu:      pointer to vcpu structure.
 > + *
-> + * Copyright (c) 2015 Ariel D'Alessandro <ariel@vanguardiasur.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify it
-> + * under the terms of the GNU General Public License version 2 as published by
-> + * the Free Software Foundation.
 > + */
-> +
-> +#include <linux/clk.h>
-> +#include <linux/device.h>
-> +#include <linux/delay.h>
-> +#include <linux/err.h>
-> +#include <linux/io.h>
-> +#include <linux/module.h>
-> +#include <linux/nvmem-provider.h>
-> +#include <linux/of_device.h>
-Why do you need above?
+> +ENTRY(__kvm_restore_host_vfp_state)
+> +	push    x4, lr
 
-Also you should probably include
-
-  #include <linux/platform_device.h>
-
-
-> +#include <linux/regmap.h>
-> +#include <linux/reset.h>
-> +
-> +/* Registers */
-> +#define LPC18XX_EEPROM_AUTOPROG		0x00c
-> +#define LPC18XX_EEPROM_AUTOPROG_WORD	0x1
-> +
-> +#define LPC18XX_EEPROM_CLKDIV		0x014
-> +
-> +#define LPC18XX_EEPROM_PWRDWN		0x018
-> +#define LPC18XX_EEPROM_PWRDWN_NO	0x0
-> +#define LPC18XX_EEPROM_PWRDWN_YES	0x1
-> +
-> +/* Fixed page size (bytes) */
-> +#define LPC18XX_EEPROM_PAGE_SIZE	0x80
-> +
-> +/* EEPROM device requires a ~1500 kHz clock (min 800 kHz, max 1600 kHz) */
-> +#define LPC18XX_EEPROM_CLOCK_HZ		1500000
-> +
-> +struct lpc18xx_eeprom_dev {
-> +	struct clk *clk;
-> +	void __iomem *reg_base;
-> +	void __iomem *mem_base;
-> +	struct nvmem_device *nvmem;
-> +	unsigned reg_bytes;
-> +	unsigned val_bytes;
-> +};
-> +
-> +static inline void lpc18xx_eeprom_writel(struct lpc18xx_eeprom_dev *eeprom,
-> +					 u32 reg, u32 val)
-> +{
-> +	writel(val, eeprom->reg_base + reg);
-> +}
-I don't have a strong feeling but, I see no point to have a wrapper for 
-writel which is only used in probe function.
+even when you move this to el1, I don't think you need to do the
+additional store of the registers as this is going to be called from
+C-code and you should have plenty of caller-save registers, if I read
+the aarch64 PCS correctly.
 
 > +
-> +static int lpc18xx_eeprom_gather_write(void *context, const void *reg,
-> +				       size_t reg_size, const void *val,
-> +				       size_t val_size)
-> +{
-> +	struct lpc18xx_eeprom_dev *eeprom = context;
-> +	unsigned int offset = *(u32 *)reg;
+> +	kern_hyp_va x0
+> +	add     x2, x0, #VCPU_CONTEXT
 > +
-> +	/* 3 ms of erase/program time between each writing */
-> +	while (val_size) {
-> +		writel(*(u32 *)val, eeprom->mem_base + offset);
-> +		usleep_range(3000, 4000);
-> +		val_size -= eeprom->val_bytes;
-> +		val += eeprom->val_bytes;
-> +		offset += eeprom->val_bytes;
-> +	}
+> +	// Load Guest HCR, determine if guest is 32 or 64 bit
+> +	ldr     x3, [x0, #VCPU_HCR_EL2]
+> +	tbnz    x3, #HCR_RW_SHIFT, 1f
+> +	mrs     x4, fpexc32_el2
+> +	str     x4, [x2, #CPU_SYSREG_OFFSET(FPEXC32_EL2)]
+> +1:
+> +	bl __save_fpsimd
 > +
-> +	return 0;
-> +}
+> +	ldr     x2, [x0, #VCPU_HOST_CONTEXT]
+> +	kern_hyp_va x2
+> +	bl __restore_fpsimd
 > +
-> +static int lpc18xx_eeprom_write(void *context, const void *data, size_t count)
-> +{
-> +	struct lpc18xx_eeprom_dev *eeprom = context;
-> +	unsigned int offset = eeprom->reg_bytes;
+> +	pop     x4, lr
+> +	ret
+> +ENDPROC(__kvm_restore_host_vfp_state)
 > +
-> +	if (count <= offset)
-> +		return -EINVAL;
-> +
-> +
-unnecessary new line.
+>  __kvm_hyp_panic:
+>  	// Guess the context by looking at VTTBR:
+>  	// If zero, then we're already a host.
+> -- 
+> 1.9.1
+> 
 
-> +	return lpc18xx_eeprom_gather_write(context, data, eeprom->reg_bytes,
-> +					   data + offset, count - offset);
-> +}
-> +
-> +static int lpc18xx_eeprom_read(void *context, const void *reg, size_t reg_size,
-> +			       void *val, size_t val_size)
-> +{
-> +	struct lpc18xx_eeprom_dev *eeprom = context;
-> +	unsigned int offset = *(u32 *)reg;
-> +
-> +	while (val_size) {
-> +		*(u32 *)val = readl(eeprom->mem_base + offset);
-> +		val_size -= eeprom->val_bytes;
-> +		val += eeprom->val_bytes;
-> +		offset += eeprom->val_bytes;
-> +	}
-> +
-> +	return 0;
-> +}
-> +
-> +static struct regmap_bus lpc18xx_eeprom_bus = {
-> +	.write = lpc18xx_eeprom_write,
-> +	.gather_write = lpc18xx_eeprom_gather_write,
-> +	.read = lpc18xx_eeprom_read,
-> +	.reg_format_endian_default = REGMAP_ENDIAN_NATIVE,
-> +	.val_format_endian_default = REGMAP_ENDIAN_NATIVE,
-> +};
-> +
-> +static struct regmap_config lpc18xx_regmap_config = {
-> +	.reg_bits = 32,
-> +	.reg_stride = 4,
-> +	.val_bits = 32,
-> +};
-> +
-> +static bool lpc18xx_eeprom_writeable_reg(struct device *dev, unsigned int reg)
-> +{
-> +	/*
-> +	 * The last page contains the EEPROM initialization data and is not
-> +	 * writable.
-> +	 */
-> +	return reg <= lpc18xx_regmap_config.max_register -
-> +						LPC18XX_EEPROM_PAGE_SIZE;
-> +}
-> +
-> +static bool lpc18xx_eeprom_readable_reg(struct device *dev, unsigned int reg)
-> +{
-> +	return reg <= lpc18xx_regmap_config.max_register;
-> +}
-> +
-> +static struct nvmem_config lpc18xx_nvmem_config = {
-> +	.name = "lpc18xx-eeprom",
-> +	.owner = THIS_MODULE,
-> +};
-> +
-> +static const struct of_device_id lpc18xx_eeprom_of_match[] = {
-> +	{ .compatible = "nxp,lpc1857-eeprom" },
-> +	{ },
-> +};
-> +MODULE_DEVICE_TABLE(of, lpc18xx_eeprom_of_match);
-> +
-> +static int lpc18xx_eeprom_probe(struct platform_device *pdev)
-> +{
-> +	struct lpc18xx_eeprom_dev *eeprom;
-> +	struct device *dev = &pdev->dev;
-> +	struct reset_control *rst;
-> +	unsigned long clk_rate;
-> +	struct regmap *regmap;
-> +	struct resource *res;
-> +	int ret;
-> +
-> +	eeprom = devm_kzalloc(dev, sizeof(*eeprom), GFP_KERNEL);
-> +	if (!eeprom)
-> +		return -ENOMEM;
-> +
-> +	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "reg");
-> +	eeprom->reg_base = devm_ioremap_resource(dev, res);
-> +	if (IS_ERR(eeprom->reg_base))
-> +		return PTR_ERR(eeprom->reg_base);
-> +
-> +	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "mem");
-> +	eeprom->mem_base = devm_ioremap_resource(dev, res);
-> +	if (IS_ERR(eeprom->mem_base))
-> +		return PTR_ERR(eeprom->mem_base);
-> +
-> +	eeprom->clk = devm_clk_get(&pdev->dev, "eeprom");
-> +	if (IS_ERR(eeprom->clk)) {
-> +		dev_err(&pdev->dev, "failed to get eeprom clock\n");
-> +		return PTR_ERR(eeprom->clk);
-> +	}
-> +
-> +	ret = clk_prepare_enable(eeprom->clk);
-> +	if (ret < 0) {
-> +		dev_err(dev, "failed to prepare/enable eeprom clk: %d\n", ret);
-> +		return ret;
-> +	}
-> +
-> +	rst = devm_reset_control_get(dev, NULL);
-> +	if (IS_ERR(rst)) {
-> +		dev_err(dev, "failed to get reset: %ld\n", PTR_ERR(rst));
-> +		ret = PTR_ERR(rst);
-> +		goto err_clk;
-> +	}
-> +
-> +	ret = reset_control_deassert(rst);
-> +	if (ret < 0) {
-> +		dev_err(dev, "failed to deassert reset: %d\n", ret);
-> +		goto err_clk;
-> +	}
-> +
-> +	eeprom->val_bytes = lpc18xx_regmap_config.val_bits / 8;
-> +	eeprom->reg_bytes = lpc18xx_regmap_config.reg_bits / 8;
-> +
-> +	/*
-> +	 * Clock rate is generated by dividing the system bus clock by the
-> +	 * division factor, contained in the divider register (minus 1 encoded).
-> +	 */
-> +	clk_rate = clk_get_rate(eeprom->clk);
-> +	clk_rate = DIV_ROUND_UP(clk_rate, LPC18XX_EEPROM_CLOCK_HZ) - 1;
-> +	lpc18xx_eeprom_writel(eeprom, LPC18XX_EEPROM_CLKDIV, clk_rate);
-> +
-> +	/*
-> +	 * Writing a single word to the page will start the erase/program cycle
-> +	 * automatically
-> +	 */
-> +	lpc18xx_eeprom_writel(eeprom, LPC18XX_EEPROM_AUTOPROG,
-> +			      LPC18XX_EEPROM_AUTOPROG_WORD);
-> +
-> +	lpc18xx_eeprom_writel(eeprom, LPC18XX_EEPROM_PWRDWN,
-> +			      LPC18XX_EEPROM_PWRDWN_NO);
+Otherwise this looks reasonably good.
 
-Any reason not power up/dowm dynamically in 
-lpc18xx_eeprom_write()/lpc18xx_eeprom_read().
 
-This can potentially save some power.
-
-> +
-> +	lpc18xx_regmap_config.max_register = resource_size(res) - 1;
-> +	lpc18xx_regmap_config.writeable_reg = lpc18xx_eeprom_writeable_reg;
-> +	lpc18xx_regmap_config.readable_reg = lpc18xx_eeprom_readable_reg;
-> +
-> +	regmap = devm_regmap_init(dev, &lpc18xx_eeprom_bus, eeprom,
-> +				  &lpc18xx_regmap_config);
-> +	if (IS_ERR(regmap)) {
-> +		dev_err(dev, "regmap init failed: %ld\n", PTR_ERR(regmap));
-> +		ret = PTR_ERR(regmap);
-> +		goto err_clk;
-> +	}
-> +
-> +	lpc18xx_nvmem_config.dev = dev;
-> +
-> +	eeprom->nvmem = nvmem_register(&lpc18xx_nvmem_config);
-> +	if (IS_ERR(eeprom->nvmem)) {
-> +		ret = PTR_ERR(eeprom->nvmem);
-> +		goto err_clk;
-> +	}
-> +
-> +	platform_set_drvdata(pdev, eeprom);
-> +
-> +	return 0;
-> +
-> +err_clk:
-
-Should this error path also include power down/reset assert the eeprom?
-
-> +	clk_disable_unprepare(eeprom->clk);
-> +
-> +	return ret;
-> +}
-> +
-> +static int lpc18xx_eeprom_remove(struct platform_device *pdev)
-> +{
-> +	struct lpc18xx_eeprom_dev *eeprom = platform_get_drvdata(pdev);
-> +
-> +	lpc18xx_eeprom_writel(eeprom, LPC18XX_EEPROM_PWRDWN,
-> +			      LPC18XX_EEPROM_PWRDWN_YES);
-> +
-> +	clk_disable_unprepare(eeprom->clk);
-> +
-> +	return nvmem_unregister(eeprom->nvmem);
-
-Same comment as Joachim, should the reset be asserted too?
-> +}
-> +
-> +static struct platform_driver lpc18xx_eeprom_driver = {
-> +	.probe = lpc18xx_eeprom_probe,
-> +	.remove = lpc18xx_eeprom_remove,
-> +	.driver = {
-> +		.name = "lpc18xx-eeprom",
-> +		.of_match_table = lpc18xx_eeprom_of_match,
-> +	},
-> +};
-> +
-> +module_platform_driver(lpc18xx_eeprom_driver);
-> +
-> +MODULE_AUTHOR("Ariel D'Alessandro <ariel@vanguardiasur.com.ar>");
-> +MODULE_DESCRIPTION("NXP LPC18xx EEPROM memory Driver");
-> +MODULE_LICENSE("GPL v2");
->
+Thanks,
+-Christoffer
