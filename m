@@ -1,53 +1,51 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 26 Oct 2015 09:31:15 +0100
-Subject: [PATCH v2 0/2] i2c: uniphier: add two I2C controller drivers for
- UniPhier SoC platform
-In-Reply-To: <CAK7LNATVmVi=4ugv0MgoCUzusphNeAXTC_K-PsXDiTLoCkV4-Q@mail.gmail.com>
-References: <1445597520-6299-1-git-send-email-yamada.masahiro@socionext.com>
- <20151026081746.GC597@x1>
- <CAK7LNATVmVi=4ugv0MgoCUzusphNeAXTC_K-PsXDiTLoCkV4-Q@mail.gmail.com>
-Message-ID: <CAMuHMdXLMRji80Ma9hbUJg_PChS1s2JaGy00L3M3rmyOnYKqHQ@mail.gmail.com>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Mon, 26 Oct 2015 01:33:54 -0700
+Subject: [PATCH 06/19] input: tegra-kbc: enable support for the standard
+ "wakeup-source" property
+In-Reply-To: <562A0AB7.3080607@arm.com>
+References: <1445422216-29375-1-git-send-email-sudeep.holla@arm.com>
+ <1445422216-29375-7-git-send-email-sudeep.holla@arm.com>
+ <20151023063946.GA38047@dtor-ws> <562A0AB7.3080607@arm.com>
+Message-ID: <20151026083354.GA13056@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 26, 2015 at 9:27 AM, Masahiro Yamada
-<yamada.masahiro@socionext.com> wrote:
-> 2015-10-26 17:17 GMT+09:00 Lee Jones <lee.jones@linaro.org>:
->>> This series adds two I2C controller drivers.
->>> (they are completely different IPs.)
->>>
->>> The first one is a very simple FIFO-less I2C controller,
->>> which is used on some older UniPhier SoCs.
->>>
->>> The other one is higher-performance I2C controller with TX/RX FIFO,
->>> used on newer UniPhier SoCs.
->>
->> And you have sent this to me because ... ?
->
->
-> No special reason.
->
->
-> I sent this series to linux-i2c at vger.kernel.org.
->
-> I guess you were automatically CC'ed by scripts/get_maintainer.pl.
->
-> Using get_maintainer.pl is a normal process when sending patches, I think.
+On Fri, Oct 23, 2015 at 11:23:51AM +0100, Sudeep Holla wrote:
+> 
+> 
+> On 23/10/15 07:39, Dmitry Torokhov wrote:
+> >On Wed, Oct 21, 2015 at 11:10:03AM +0100, Sudeep Holla wrote:
+> >>Though the mmc core driver should/will continue to support the legacy
+> >>"nvidia,wakeup-source" property to enable SDIO as the wakeup source, we
+> >>need to add support for the new standard property "wakeup-source".
+> >>
+> >>This patch adds support for "wakeup-source" property in addition to the
+> >>existing "nvidia,wakeup-source" property.
+> >>
+> >>Cc: Laxman Dewangan <ldewangan@nvidia.com>
+> >>Cc: Dmitry Torokhov <dmitry.torokhov@gmail.com>
+> >>Cc: Thierry Reding <thierry.reding@gmail.com>
+> >>Cc: linux-input at vger.kernel.org
+> >>Cc: linux-tegra at vger.kernel.org
+> >>Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+> >
+> >Applied, thank you.
+> >
+> 
+> Thanks, but I think I sent out a old copy which had unrelated commit
+> message because of copy-paste. *Sorry for that*. Can you update it
+> something like:
+> 
+> "
+> Though the tegra-kbc driver should/will continue to support the legacy
+> "nvidia,wakeup-source" property to enable keyboard as the wakeup source,
+> we need to add support for the new standard property "wakeup-source".
+> 
+> This patch adds support for "wakeup-source" property in addition to the
+> existing "nvidia,wakeup-source" property.
+> "
 
-Please use common sense. It doesn't make much sense to CC everybody who
-ever made a minor edit to an affected file.
+Thanks, I replaced the description with what you supplied.
 
-If checkpatch comes up with more than 5 names, this should ring a bell.
-
-Thanks!
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+-- 
+Dmitry
