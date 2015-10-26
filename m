@@ -1,52 +1,49 @@
-From: dongsheng.wang@freescale.com (Dongsheng Wang)
-Date: Mon, 26 Oct 2015 14:53:12 +0800
-Subject: [PATCH] arm/layerscape: add RCPM device tree support for ls1021a.
-Message-ID: <1445842392-7129-1-git-send-email-dongsheng.wang@freescale.com>
+From: mw@semihalf.com (Marcin Wojtas)
+Date: Mon, 26 Oct 2015 08:06:18 +0100
+Subject: [PATCH 3/5] irqchip: armada-370-xp: re-enable per-CPU interrupts
+ at resume time
+In-Reply-To: <20151026060925.32ff2034@free-electrons.com>
+References: <1445347435-2333-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1445347435-2333-4-git-send-email-thomas.petazzoni@free-electrons.com>
+ <CAPv3WKdZeCo-0xFC6EJcCeVQd7ef+SQz=MocR1nE5YdZAx3AJQ@mail.gmail.com>
+ <20151026011036.2cb5b7a8@free-electrons.com>
+ <CAPv3WKc8bzCadNN=SRxQuJBxMiHTVKnmqaSkTehu=j6V4nF6Gg@mail.gmail.com>
+ <20151026060925.32ff2034@free-electrons.com>
+Message-ID: <CAPv3WKcrWqJ5Cw_kwO+JWk3iH0aprTexHTqzy-dSFmNHj4xJcg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Wang Dongsheng <dongsheng.wang@freescale.com>
+Thomas,
 
-Signed-off-by: Wang Dongsheng <dongsheng.wang@freescale.com>
----
-*v4*:
--Separate this patch from RCPM binding patchset.
--Change "rcpm-wakeup" to "fsl,rcpm-wakeup". 
-*v3*: Add "fsl,#rcpm-wakeup-cells" for rcpm node.
-*v2*: No change.
+2015-10-26 6:09 GMT+01:00 Thomas Petazzoni
+<thomas.petazzoni@free-electrons.com>:
+> Marcin,
+>
+> On Mon, 26 Oct 2015 05:35:46 +0100, Marcin Wojtas wrote:
+>
+>> Thanks for the explanation - now it's clear.
+>
+> Good :-) Hopefully the explanation in PATCH 5/5 is also clear enough.
 
-diff --git a/arch/arm/boot/dts/ls1021a.dtsi b/arch/arm/boot/dts/ls1021a.dtsi
-index 973a496..b713cfc 100644
---- a/arch/arm/boot/dts/ls1021a.dtsi
-+++ b/arch/arm/boot/dts/ls1021a.dtsi
-@@ -139,6 +139,7 @@
- 			sdhci,auto-cmd12;
- 			big-endian;
- 			bus-width = <4>;
-+			fsl,rcpm-wakeup = <&rcpm 0x00000080 0x0>;
- 			status = "disabled";
- 		};
- 
-@@ -186,6 +187,12 @@
- 			};
- 		};
- 
-+		rcpm: rcpm at 1ee2000 {
-+			compatible = "fsl,ls1021a-rcpm", "fsl,qoriq-rcpm-2.1";
-+			reg = <0x0 0x1ee2000 0x0 0x10000>;
-+			fsl,#rcpm-wakeup-cells = <2>;
-+		};
-+
- 		dspi0: dspi at 2100000 {
- 			compatible = "fsl,ls1021a-v1.0-dspi";
- 			#address-cells = <1>;
-@@ -287,6 +294,7 @@
- 			interrupts = <GIC_SPI 80 IRQ_TYPE_LEVEL_HIGH>;
- 			clocks = <&sysclk>;
- 			clock-names = "ipg";
-+			fsl,rcpm-wakeup = <&rcpm 0x0 0x40000000>;
- 			status = "disabled";
- 		};
- 
--- 
-2.1.0.27.g96db324
+The Ascii-art is beutiful, indeed:)
+
+>
+>> Btw, I checked the patches with mvneta in both 'standby' and 'mem'
+>> modes on A38x (with not-yet-submitted support for PM in mvneta and
+>> pinctrl) and everything works properly. Hence:
+>
+> Thanks for the testing. However, I wonder why you think those changes
+> are need to get mvneta to work fine with the 'standby' mode ? While I
+> do agree that they are need for the 'mem' mode, they shouldn't be
+> needed for the 'standby' mode. For now, the standby mode only puts the
+> CPU into deep-idle, and that's all: all devices remain powered on, and
+> they don't lose their state.
+>
+
+Yes, you are right - without any pm_ops the driver works well after
+suspend/resume in standby. However in the linux mem and standby is
+treated exactly the same as pm sleep, so the same routines are
+executed in both modes. Hence the s2ram support cannot spoil standby.
+
+Best regards,
+Marcin
