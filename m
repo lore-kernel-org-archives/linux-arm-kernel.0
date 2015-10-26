@@ -1,54 +1,78 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 26 Oct 2015 10:56:09 +0000
-Subject: [PATCH 3/3] reset: sti: Provide ops .status() call-back
-In-Reply-To: <1445856969-19424-1-git-send-email-lee.jones@linaro.org>
-References: <1445856969-19424-1-git-send-email-lee.jones@linaro.org>
-Message-ID: <1445856969-19424-3-git-send-email-lee.jones@linaro.org>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 26 Oct 2015 12:02:52 +0100
+Subject: Possible Regression due to c074fef5d36e ("of/platform: Defer
+ probes of registered devices").
+In-Reply-To: <20151026104149.GB8644@n2100.arm.linux.org.uk>
+References: <20151026032039.GA1950@verge.net.au>
+ <20151026094027.GA25225@gradator.net>
+ <CAMuHMdWmw8TqyOOMSPkh_1V+9OJeqPts1t3528ZQrJjzE6tmRA@mail.gmail.com>
+ <20151026104149.GB8644@n2100.arm.linux.org.uk>
+Message-ID: <CAMuHMdUriYkDazewJH1LhG3=pFMQxqOo0gz6MYDpVkM+2=1MPQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Lee Jones <lee.jones@linaro.org>
----
- drivers/reset/sti/reset-syscfg.c | 23 +++++++++++++++++++++++
- 1 file changed, 23 insertions(+)
+Hi Russell,
 
-diff --git a/drivers/reset/sti/reset-syscfg.c b/drivers/reset/sti/reset-syscfg.c
-index a145cc0..4453412 100644
---- a/drivers/reset/sti/reset-syscfg.c
-+++ b/drivers/reset/sti/reset-syscfg.c
-@@ -110,10 +110,33 @@ static int syscfg_reset_dev(struct reset_controller_dev *rcdev,
- 	return syscfg_reset_deassert(rcdev, idx);
- }
- 
-+static int syscfg_reset_status(struct reset_controller_dev *rcdev,
-+			      unsigned long idx)
-+{
-+       struct syscfg_reset_controller *rst = to_syscfg_reset_controller(rcdev);
-+       const struct syscfg_reset_channel *ch;
-+       u32 ret_val = 0;
-+       int err;
-+
-+       if (idx >= rcdev->nr_resets)
-+	       return -EINVAL;
-+
-+       ch = &rst->channels[idx];
-+       if (ch->ack)
-+	       err = regmap_field_read(ch->ack, &ret_val);
-+       else
-+	       err = regmap_field_read(ch->reset, &ret_val);
-+       if (err)
-+	       return err;
-+
-+       return rst->active_low ? !ret_val : !!ret_val;
-+}
-+
- static struct reset_control_ops syscfg_reset_ops = {
- 	.reset    = syscfg_reset_dev,
- 	.assert   = syscfg_reset_assert,
- 	.deassert = syscfg_reset_deassert,
-+	.status   = syscfg_reset_status,
- };
- 
- static int syscfg_reset_controller_register(struct device *dev,
--- 
-1.9.1
+On Mon, Oct 26, 2015 at 11:41 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Mon, Oct 26, 2015 at 10:56:03AM +0100, Geert Uytterhoeven wrote:
+>> On Mon, Oct 26, 2015 at 10:40 AM, Sylvain Rochet
+>> <sylvain.rochet@finsecur.com> wrote:
+>> > On Mon, Oct 26, 2015 at 12:20:39PM +0900, Simon Horman wrote:
+>> >> I have observed a possible regression in next-20151022
+>> >> due to c074fef5d36e ("of/platform: Defer probes of registered devices").
+>> >>
+>> >> The problem manifests on the r8a7791 based koelsch board.
+>> >> With the above patch present booting the board using the shmobile_defconfig
+>> >> results in no console output. While after reverting the above patch
+>> >> the boot proceeds all the way to user-space.
+>> >>
+>> >> With DEBUG_LL and EARLY_PRINTK enabled I was able to capture some console
+>> >> output. I have included both that boot log, and a log of boot all the way to
+>> >> userspace with the patch in question reverted.
+>> >>
+>> >> The problem does not seem to manifiest on other boards for other
+>> >> Renesas ARM  SoCs that I have access too. In particular the
+>> >> r8a7790 based lager board; the r8a7790 and r8a7791 are both members
+>> >> of the R-Car Gen2 family of SoCs.
+>> >
+>> > Atmel SoC hit this regresssion too, discussion about this issue is in
+>> > the following thread:
+>> >  https://lkml.org/lkml/2015/10/16/733
+>>
+>> More reading material in "[GIT PULL] On-demand device probing"
+>> (https://lkml.org/lkml/2015/10/14/126)
+>
+> It's quite obvious from the thread that the on-demand device probing is
+> *not* going to be merged for 4.4, and so it should not be in linux-next
+> at all.  Having it in linux-next, it's disrupting people's testing of
+> the 4.4 merge window material.
+>
+> Tomeu, please remove it so people can continue to test material
+> sheduled for the 4.4 merge window.  Thanks.
+
+Unfortunately we'll be stuck with next-20151022 for a while, due to KS...
+
+So you're only option is manually reverting
+commit 138d8b73e6a32aeacd3417106fbf740865da309e
+Merge: 0f1cba62520b6119 c074fef5d36e1c27
+Author: Rob Herring <robh@kernel.org>
+Date:   Thu Oct 15 08:26:41 2015 -0500
+
+    Merge branch 'on-demand-probes-for-next' of git://git.collabora.com/git/user
+
+    Pull on-demand probing series from Tomeu Vizoso.
+
+"git revert 138d8b73e6a32aeacd3417106fbf740865da309e -m 2" and fix
+the (many) conflicts :-(
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
