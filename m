@@ -1,74 +1,54 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Mon, 26 Oct 2015 22:06:23 +0100
-Subject: [PATCH 5/6] ARM: dts: sunxi: Add Allwinner H3 DTSI
-In-Reply-To: <20151024104749.179dab64@OPI2>
-References: <1445444428-4652-1-git-send-email-jenskuske@gmail.com>
- <1445444428-4652-2-git-send-email-jenskuske@gmail.com>
- <20151023181406.GK10947@lukather> <20151023212013.50bcbe4a@OPI2>
- <20151024071328.GQ10947@lukather> <20151024104749.179dab64@OPI2>
-Message-ID: <20151026210623.GB10947@lukather>
+From: laura@labbott.name (Laura Abbott)
+Date: Mon, 26 Oct 2015 14:09:58 -0700
+Subject: [PATCH v2] arm64: Align .text section to PAGE_SIZE
+In-Reply-To: <20151026202608.GJ12277@leverpostej>
+References: <1445882989-10618-1-git-send-email-jeremy.linton@arm.com>
+ <20151026201611.GI12277@leverpostej> <20151026202608.GJ12277@leverpostej>
+Message-ID: <562E96A6.9090602@labbott.name>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 24, 2015 at 10:47:49AM +0200, Jean-Francois Moine wrote:
-> On Sat, 24 Oct 2015 09:13:28 +0200
-> Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
-> 
-> > Or simply
-> > 
-> > bus_gates {
-> > 	clocks = <&ahb1>, <&ahb2>;
-> > 	clock-indices = <5>, <6>, <8>, ...
-> > 	clock-output-names = "bus_ce", "bus_dma", "bus_mmc0"
-> > };
-> 
-> I don't understand: the apb1, apb2, ahb1 and ahb2 clocks may be
-> programmed independently to different frequencies
+On 10/26/15 1:26 PM, Mark Rutland wrote:
+>> Perhaps it would be better to have something like the following (with
+>> PAGE_SHIFT sorted out to be includable in a linker script), so any
+>> ALIGN_DEBUG_RO* correctly aligns things to whatever boundary is
+>> required, and we don't need to over-align things in the !DEBUG_RO_DATA
+>> case.
+>
+> Ignore the bit about PAGE_SHIFT and linker script. I'd got confused as I
+> had a local typo breaking the build.
+>
+> With the below diff applied I can boot a defconfig +CONFIG_DEBUG_RODATA
+> +CONFIG_ARM64_64K_PAGES v4.3-rc7 kernel on Juno
+>
 
-I don't understand why you're talking about frequencies here.
+Most of the alignment was found by trial and error so I suspect it was
+just getting lucky before. I think this should be covering all the
+cases. Hopefully the protections will make it more restrictive instead
+of less to catch any more corner cases. For whoever ends up submitting
+the patch,
 
-> and you have to know which of them is the parent of each leaf clock.
+Reviewed-by: Laura Abbott <laura@labbott.name>
 
-Indeed, but that's also doable here. Just not in the DT.
-
-> So, either you hard-code the parents as Jens did in a first proposal,
-> or you define the full list of parents in the DT as in the last
-> proposal, or you use a container per parent in the DT as I proposed.
-> 
-> There could be an other solution using the output clock name to define
-> the parent clock:
-> 
-> bus_gates {
-> 	clocks = <&ahb1>, <&ahb2>, <&apb1>, <&apb2>;
-> 	clock-indices = <5>, <6>, <8>, ...
-> 	clock-output-names = "ahb1_ce", "ahb1_dma", "ahb1_mmc0"
-> };
-> 
-> with the documentation:
-> 
-> 	"the clocks MUST be defined in order: ahb1, ahb2, apb1, apb2."
-> 
-> and the code
-> 
-> 	if (strncmp(clock_name, "ahb1", 4) == 0)
-> 		clk_parent = of_clk_get_parent_name(node, 0);
-> 	else if (..)
-> 
-> but it seems a bit hacky.
-
-It's exactly what I suggested, without the string comparison, but
-relying on the ID instead.
-
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151026/ee281511/attachment.sig>
+> Thanks,
+> Mark.
+>
+>> ---->8----
+>> diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
+>> index 9807333..4d77757 100644
+>> --- a/arch/arm64/kernel/vmlinux.lds.S
+>> +++ b/arch/arm64/kernel/vmlinux.lds.S
+>> @@ -60,9 +60,12 @@ PECOFF_FILE_ALIGNMENT = 0x200;
+>>   #define PECOFF_EDATA_PADDING
+>>   #endif
+>>
+>> -#ifdef CONFIG_DEBUG_ALIGN_RODATA
+>> +#if defined(CONFIG_DEBUG_ALIGN_RODATA)
+>>   #define ALIGN_DEBUG_RO                 . = ALIGN(1<<SECTION_SHIFT);
+>>   #define ALIGN_DEBUG_RO_MIN(min)                ALIGN_DEBUG_RO
+>> +#elif defined(CONFIG_DEBUG_RODATA)
+>> +#define ALIGN_DEBUG_RO                 . = ALIGN(1<<PAGE_SHIFT);
+>> +#define ALIGN_DEBUG_RO_MIN(min)                ALIGN_DEBUG_RO
+>>   #else
+>>   #define ALIGN_DEBUG_RO
+>>   #define ALIGN_DEBUG_RO_MIN(min)                . = ALIGN(min);
