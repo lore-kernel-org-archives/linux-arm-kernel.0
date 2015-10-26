@@ -1,71 +1,157 @@
-From: TWarren@nvidia.com (Tom Warren)
-Date: Mon, 26 Oct 2015 18:04:34 +0000
-Subject: [PATCH v2] spi: Tegra: add device tree binding doc for SPI/QSPI
-In-Reply-To: <562E55BD.7070000@wwwdotorg.org>
-References: <1445643042-5764-1-git-send-email-twarren@nvidia.com>
- <562E55BD.7070000@wwwdotorg.org>
-Message-ID: <77b185ab23764f1e8cde0a41189bb490@HQMAIL104.nvidia.com>
+From: pramodku@broadcom.com (Pramod Kumar)
+Date: Mon, 26 Oct 2015 18:06:24 +0000
+Subject: [PATCH 05/11] dt-binding: Add ngpios property to GPIO
+ controller node
+In-Reply-To: <562E5F00.1010403@broadcom.com>
+References: <1445233398-27129-1-git-send-email-pramodku@broadcom.com>
+ <3735458.2h6HCQhAOs@avalon>
+ <CAL_Jsq+Va0ZnvNoqKWocFYE4_DD-A+2sQaLswy5_eO2ZHn+3Kw@mail.gmail.com>
+ <2123166.E4KEJx3AQ2@avalon> <562A5B75.7010804@broadcom.com>
+ <0C803592FC378B4E83922050AB46442A2AD728F0@SJEXCHMB10.corp.ad.broadcom.com>
+ <562E5F00.1010403@broadcom.com>
+Message-ID: <0C803592FC378B4E83922050AB46442A2AD729D4@SJEXCHMB10.corp.ad.broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Stephen,
+Hi Ray,
 
 > -----Original Message-----
-> From: Stephen Warren [mailto:swarren at wwwdotorg.org]
-> Sent: Monday, October 26, 2015 9:33 AM
-> To: Tom Warren <TWarren@nvidia.com>; u-boot at lists.denx.de
-> Cc: Stephen Warren <swarren@nvidia.com>; tomcwarren3959 at gmail.com;
-> jteki at openedev.com; robh+dt at kernel.org; pawel.moll at arm.com;
-> mark.rutland at arm.com; ijc+devicetree at hellion.org.uk;
-> galak at codeaurora.org; Thierry Reding <treding@nvidia.com>; linux-
-> tegra at vger.kernel.org; Alex Courbot <acourbot@nvidia.com>; linux-arm-
-> kernel at lists.infradead.org
-> Subject: Re: [PATCH v2] spi: Tegra: add device tree binding doc for SPI/QSPI
+> From: Ray Jui [mailto:rjui at broadcom.com]
+> Sent: 26 October 2015 22:43
+> To: Pramod Kumar; Laurent Pinchart; Rob Herring
+> Cc: Pawel Moll; Mark Rutland; Ian Campbell; Kumar Gala; Scott Branden; Russell
+> King; Linus Walleij; linux-gpio at vger.kernel.org; bcm-kernel-feedback-list; Jason
+> Uy; Masahiro Yamada; Thomas Gleixner; devicetree at vger.kernel.org; linux-
+> arm-kernel at lists.infradead.org; linux-kernel at vger.kernel.org; Jonas Gorski
+> Subject: Re: [PATCH 05/11] dt-binding: Add ngpios property to GPIO controller
+> node
 > 
-> On 10/23/2015 05:30 PM, Tom Warren wrote:
-> > This patch adds the device tree binding doc for the Tegra SPI/QSPI
-> > controllers on Tegra114 and Tegra210.
+> Hi Pramod,
 > 
-> > diff --git a/doc/device-tree-bindings/spi/spi-tegra.txt
-> > b/doc/device-tree-bindings/spi/spi-tegra.txt
+> On 10/26/2015 10:08 AM, Pramod Kumar wrote:
+> >
+> >
+> >> -----Original Message-----
+> >> From: Ray Jui [mailto:rjui at broadcom.com]
+> >> Sent: 23 October 2015 21:38
+> >> To: Laurent Pinchart; Rob Herring
+> >> Cc: Pramod Kumar; Pawel Moll; Mark Rutland; Ian Campbell; Kumar Gala;
+> >> Scott Branden; Russell King; Linus Walleij;
+> >> linux-gpio at vger.kernel.org; bcm-kernel- feedback-list; Jason Uy;
+> >> Masahiro Yamada; Thomas Gleixner; devicetree at vger.kernel.org;
+> >> linux-arm-kernel at lists.infradead.org; linux- kernel at vger.kernel.org;
+> >> Jonas Gorski
+> >> Subject: Re: [PATCH 05/11] dt-binding: Add ngpios property to GPIO
+> >> controller node
+> >>
+> >>
+> >>
+> >> On 10/23/2015 6:02 AM, Laurent Pinchart wrote:
+> >>> Hi Rob,
+> >>>
+> >>> On Friday 23 October 2015 06:51:28 Rob Herring wrote:
+> >>>> On Fri, Oct 23, 2015 at 4:08 AM, Laurent Pinchart wrote:
+> >>>>> On Thursday 22 October 2015 18:41:05 Rob Herring wrote:
+> >>>>>> On Thu, Oct 22, 2015 at 1:52 PM, Ray Jui wrote:
+> >>>>>>> On 10/22/2015 11:43 AM, Rob Herring wrote:
+> >>>>>>>> On Mon, Oct 19, 2015 at 12:43 AM, Pramod Kumar wrote:
+> >>>>>>>>> Add ngpios property to the gpio controller's DT node so that
+> >>>>>>>>> controller driver extracts total number of gpio lines present
+> >>>>>>>>> in controller from DT and removes dependency on driver.
+> >>>>>>>>>
+> >>>>>>>>> Signed-off-by: Pramod Kumar <pramodku@broadcom.com>
+> >>>>>>>>> Reviewed-by: Ray Jui <rjui@broadcom.com>
+> >>>>>>>>> Reviewed-by: Scott Branden <sbranden@broadcom.com>
+> >>>>>>>>> ---
+> >>>>>>>>>
+> >>>>>>>>>    Documentation/devicetree/bindings/pinctrl/brcm,cygnus-gpio.txt
+> | 5
+> >>>>>>>>>    +++
+> >>>>>>>>>    1 file changed, 5 insertions(+)
+> >>>>>>>>>
+> >>>>>>>>> diff --git
+> >>>>>>>>> a/Documentation/devicetree/bindings/pinctrl/brcm,cygnus-gpio.t
+> >>>>>>>>> xt
+> >>>>>>>>> b/Documentation/devicetree/bindings/pinctrl/brcm,cygnus-gpio.t
+> >>>>>>>>> xt
+> >>>>>>>>> index f92b833..655a8d7 100644
+> >>>>>>>>> ---
+> >>>>>>>>> a/Documentation/devicetree/bindings/pinctrl/brcm,cygnus-gpio.t
+> >>>>>>>>> xt
+> >>>>>>>>> +++ b/Documentation/devicetree/bindings/pinctrl/brcm,cygnus-gp
+> >>>>>>>>> +++ io
+> >>>>>>>>> +++ .txt
+> >>>>>>>>>
+> >>>>>>>>> @@ -10,6 +10,9 @@ Required properties:
+> >>>>>>>>>         Define the base and range of the I/O address space that
+> >>>>>>>>>         contains
+> >>>>>>>>>
+> >>>>>>>>> the Cygnus
+> >>>>>>>>>
+> >>>>>>>>>     GPIO/PINCONF controller registers
+> >>>>>>>>>
+> >>>>>>>>> +- ngpios:
+> >>>>>>>> +    Total number of GPIOs the controller provides
+> >>>>>>>>
+> >>>>>>>> This must be optional for compatibility and the driver needs to
+> >>>>>>>> handle it not present.
+> >>>>>>>
+> >>>>>>> You meant to be compatible with existing Cygnus devices, correct?
+> >>>>>>>
+> >>>>>>> Just to clarify, here you suggest we still leave the existing
+> >>>>>>> hard coded ngpios in the driver, in order to be compatible with
+> >>>>>>> all existing Cygnus devices (while the Cygnus device tree
+> >>>>>>> changes to use ngpio is still being merged and through different
+> >>>>>>> maintainer), and have all new iProc SoCs switch to use ngpios from
+> device tree, right?
+> >>>>>>
+> >>>>>> Yes, an existing dtb should continue to work with a new kernel.
+> >>>>>> You can add the DT property to the older devices too and then
+> >>>>>> eventually remove the hard coded values some time in the future.
+> >>>>>> That could be immediately (don't care about compatibility at
+> >>>>>> all), a couple of kernel cycles, never... It all depends on users
+> >>>>>> of the impacted platforms.
+> >>>>>
+> >>>>> But shouldn't the property still be documented as required to
+> >>>>> ensure that new DTs always include it ?
+> >>>>
+> >>>> Good point. If the intent is to eventually remove it from the
+> >>>> driver, then yes. We probably need "required for new designs" as a
+> >>>> category or maybe "recommended"? The wording is not so important
+> >>>> here, but I'm thinking about as we try to standardize the naming.
+> >>>
+> >>> Required for new designs sounds better than recommended. Or maybe
+> >>> something like "Required (optional for backward compatibility)".
+> >>>
+> >>
+> >> Yes, it should be phrased as "required for new designs" because all
+> >> new iProc SoCs using this GPIO driver need to have this in DT.
+> >>
+> >> Thanks,
+> >>
+> >> Ray
+> >
+> > Thanks for providing feedback. I'll make sure to use this property under phrase
+> " required for new designs " in next patch set.
+> >
+> > Regards,
+> > Pramod
+> >
 > 
-> Since this is a patch to the Linux kernel, it should use the path and file names
-> from the Linux kernel, so that should be:
+> To confirm, is your plan:
 > 
-> Documentation/devicetree/bindings/spi/nvidia,tegra210-qspi.txt
-I thought I was adding a binding doc to U-Boot, so the QSPI driver for T210 can go in. I wasn't aware that I had to submit a changelist against the kernel's binding first. I'll redo the file path.
+> 1) Continue to support hardcoded ngpios in the driver for the current SoC Cygnus
+> 2) Proceed with Cygnus DTS changes to switch to DT based ngpios configuration
+> 3) Modify the document to make DT ngpios a required property for all new SoCs
+> including NSP, NS2, and etc.
+> 
+> ?
+> 
+> Thanks,
+> 
+> Ray
 
-> 
-> (or perhaps an earlier SoC number if this HW block first appeared before
-> Tegra210)
-AFAICT, QSPI first appeared in Tegra210/X1.
+Ok. This patch-set is to make this driver more generic so that all future SoCs , as you mentioned like NS2, NSP, Stingray, could use it.  Since This Cygnus is in very very early stage and No customer is using it so we can afford it to address ngpio from DT and remove Cygnus hard coded values immediately from this patch. Otherwise we will see the same issue with "gpios-ranges" property and this will be highly inter-dependent as well.   
 
-> 
-> > +NVIDIA Tegra SPI/QSPI controller.
-> 
-> There's already a binding document for the regular SPI controller. The plain SPI
-> entries should be removed from this file, leaving it covering the QSPI controller
-> only.
-There is no spi binding for Tegra114 in U-Boot at present, hence my duplication. I'll remove the SPI entries from this file, and perhaps copy over the kernel's tegra114 spi binding for U-Boot at a later date.
-
-> 
-> Can you confirm that there physically is a separate QSPI controller in HW and
-> that it has different registers to the regular SPI controller?
-> Or, is QSPI simply a new mode of operation for the existing HW?
-QSPI is its own controller, separate from the traditional 4 Tegra SPI controllers. It has its own address space, and some differences in bits in some registers, and adds misc and timing registers that don't exist in the SPI controller. It supports Master mode only (no slave mode), and adds Dual (x2)  and Quad mode (x4) transfer options. It's basically a superset of the Tegra SPI controller.
-
-> 
-> > +Required properties:
-> > +- compatible : should be one of the following:
-> > +  "nvidia,tegra114-spi" (for Tegra114)
-> > +  "nvidia,tegra210-qspi" (for Tegra210)
-> > +- reg: Should contain SPI registers location and length.
-> > +- interrupts: Should contain SPI interrupts.
-> 
-> Are there multiple interrupts or just one? I imagine just one, in which case just
-> "interrupt" at the end of that description.
-Only 1 interrupt for QSPI. Note that this was copied verbatim from the kernel's current nvidia,tegra114-spi.txt binding, so if it's wrong, it's wrong there, too.
-
-Tom
---
-nvpublic
+Regards,
+Pramod
