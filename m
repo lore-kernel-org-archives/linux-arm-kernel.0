@@ -1,56 +1,84 @@
-From: rjui@broadcom.com (Ray Jui)
-Date: Mon, 26 Oct 2015 10:18:14 -0700
-Subject: [RFC PATCH 1/3] PCI: iproc: generate proper configuration access
- cycles
-In-Reply-To: <1445857334-6936-2-git-send-email-jszhang@marvell.com>
-References: <1445857334-6936-1-git-send-email-jszhang@marvell.com>
- <1445857334-6936-2-git-send-email-jszhang@marvell.com>
-Message-ID: <562E6056.3040203@broadcom.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 26 Oct 2015 18:26:06 +0100
+Subject: [PATCH] arm: Test for CONFIG_USE_OF to handle the USE_OF=n/OF=y
+ case
+In-Reply-To: <CAL_JsqKHozy_fKHuTokQobKHjF6Vay_mzYvP1TCU_sBjTrewBA@mail.gmail.com>
+References: <1445786759-22005-1-git-send-email-geert@linux-m68k.org>
+ <CAL_JsqKHozy_fKHuTokQobKHjF6Vay_mzYvP1TCU_sBjTrewBA@mail.gmail.com>
+Message-ID: <CAMuHMdVjM7na7za==QZ+8EObxsNqL0n+PXSedwjQVzw2D1Y1zw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jisheng,
+Hi Rob,
 
-On 10/26/2015 4:02 AM, Jisheng Zhang wrote:
-> Inspired by Russell King's patch[1], I found current iproc also has the
-> same issue of "reading 32-bits from the command register, modifying the
-> command register, and then writing it back has the effect of clearing
-> any status bits that were indicating at that time" as pointed out by
-> Russell. This patch fix this issue by using the pci_generic_config_write.
+On Mon, Oct 26, 2015 at 1:45 AM, Rob Herring <robh@kernel.org> wrote:
+> On Sun, Oct 25, 2015 at 10:25 AM, Geert Uytterhoeven
+> <geert@linux-m68k.org> wrote:
+>> Until commit 0166dc11be911213 ("of: make CONFIG_OF user selectable"),
+>> CONFIG_OF=y implied CONFIG_USE_OF=y on ARM, as the former could solely
+>> be enabled by being selected by the latter.
 >
-> [1]http://www.spinics.net/lists/linux-pci/msg44869.html
+> Arnd sent a similar fix[1] which I prefer.
+
+Fine for me.
+
+>> However, if the user now manually enables CONFIG_OF=y while
+>> CONFIG_USE_OF=n:
+>>
+>>     arch/arm/kernel/devtree.c: In function 'setup_machine_fdt':
+>>     arch/arm/kernel/devtree.c:215:2: error: implicit declaration of function 'early_init_dt_verify' [-Werror=implicit-function-declaration]
+>>       if (!dt_phys || !early_init_dt_verify(phys_to_virt(dt_phys)))
+>>       ^
+>>     arch/arm/kernel/devtree.c:218:2: error: implicit declaration of function 'of_flat_dt_match_machine' [-Werror=implicit-function-declaration]
+>>       mdesc = of_flat_dt_match_machine(mdesc_best, arch_get_next_mach);
+>>       ^
+>>     arch/arm/kernel/devtree.c:218:8: warning: assignment makes pointer from integer without a cast
+>>       mdesc = of_flat_dt_match_machine(mdesc_best, arch_get_next_mach);
+>>             ^
+>>     arch/arm/kernel/devtree.c:228:3: error: implicit declaration of function 'of_get_flat_dt_root' [-Werror=implicit-function-declaration]
+>>        dt_root = of_get_flat_dt_root();
+>>        ^
+>>     arch/arm/kernel/devtree.c:229:3: error: implicit declaration of function 'of_get_flat_dt_prop' [-Werror=implicit-function-declaration]
+>>        prop = of_get_flat_dt_prop(dt_root, "compatible", &size);
+>>        ^
+>>     arch/arm/kernel/devtree.c:229:8: warning: assignment makes pointer from integer without a cast
+>>        prop = of_get_flat_dt_prop(dt_root, "compatible", &size);
+>>             ^
+>>     arch/arm/kernel/devtree.c:244:2: error: implicit declaration of function 'early_init_dt_scan_nodes' [-Werror=implicit-function-declaration]
+>>       early_init_dt_scan_nodes();
+>>       ^
+>>
+>> and
+>>
+>>     arch/arm/kernel/built-in.o: In function `setup_arch':
+>>     arch/arm/kernel/setup.c:940: undefined reference to `setup_machine_fdt'
+>>     arch/arm/kernel/setup.c:979: undefined reference to `arm_dt_init_cpu_maps'
+>>
+>> Replace tests for CONFIG_OF by tests for CONFIG_USE_OF where appropriate
+>> to fix this.
+>>
+>> Signed-off-by: Geert Uytterhoeven <geert@linux-m68k.org>
+>> ---
+>> Cfr. http://kisskb.ellerman.id.au/kisskb/buildresult/12531538/
+>>
+>> I only fixed the particular issue with the randconfig from the build
+>> above.  Are there more tests for CONFIG_OF that should be converted to
+>> CONFIG_USE_OF?
 >
-> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
-> ---
->   drivers/pci/host/pcie-iproc.c | 2 +-
->   1 file changed, 1 insertion(+), 1 deletion(-)
+> I'd rather move toward removing USE_OF and having arches select if
+> they use EARLY_FLATTREE.
 >
-> diff --git a/drivers/pci/host/pcie-iproc.c b/drivers/pci/host/pcie-iproc.c
-> index fe2efb1..0c423f2 100644
-> --- a/drivers/pci/host/pcie-iproc.c
-> +++ b/drivers/pci/host/pcie-iproc.c
-> @@ -111,7 +111,7 @@ static void __iomem *iproc_pcie_map_cfg_bus(struct pci_bus *bus,
->   static struct pci_ops iproc_pcie_ops = {
->   	.map_bus = iproc_pcie_map_cfg_bus,
->   	.read = pci_generic_config_read32,
-> -	.write = pci_generic_config_write32,
-> +	.write = pci_generic_config_write,
->   };
+> Rob
 >
->   static void iproc_pcie_reset(struct iproc_pcie *pcie)
->
+> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-October/376484.html
 
-I have already confirmed with the ASIC team that the current iProc PCIe 
-controller requires 32-bit aligned access into the configuration space 
-due to the way how it was integrated into various iProc SoCs including 
-NSP, Cygnus, and NS2.
+Gr{oetje,eeting}s,
 
-This change will prevent the driver from working properly.
+                        Geert
 
-I've informed our ASIC team about this issue and all future iProc based 
-SoCs should be able to support 8-bit, 16-bit access and therefore 
-pci_generic_config_write/read can be used for those SoCs.
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
 
-Thanks,
-
-Ray
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
