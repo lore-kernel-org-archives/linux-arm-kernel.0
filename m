@@ -1,35 +1,60 @@
-From: wangkefeng.wang@huawei.com (Kefeng Wang)
-Date: Mon, 26 Oct 2015 11:48:16 +0800
-Subject: [RFC PATCH] arm64: make Timer Interrupt Frequency selectable
-Message-ID: <1445831296-7020-1-git-send-email-wangkefeng.wang@huawei.com>
+From: gpkulkarni@gmail.com (Ganapatrao Kulkarni)
+Date: Mon, 26 Oct 2015 09:20:24 +0530
+Subject: [PATCH v6 3/4] arm64/arm, numa, dt: adding numa dt binding
+ implementation for arm64 platforms
+In-Reply-To: <CACVXFVMiZs_g3qw99-PhxLiX5oLe8_z5cOAfJZ_4-09jN2koCQ@mail.gmail.com>
+References: <1445337931-11344-1-git-send-email-gkulkarni@caviumnetworks.com>
+ <1445337931-11344-4-git-send-email-gkulkarni@caviumnetworks.com>
+ <CACVXFVMiZs_g3qw99-PhxLiX5oLe8_z5cOAfJZ_4-09jN2koCQ@mail.gmail.com>
+Message-ID: <CAFpQJXX8VXX+gTBn-+7MepSAOzbOuc-yWJe4f=B7MH_Nj7FsKw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It allows a selectable timer interrupt frequency of 100, 250, 300 and 1000 HZ.
-We will get better performance when choose a suitable frequency in some scene.
+On Mon, Oct 26, 2015 at 7:14 AM, Ming Lei <ming.lei@canonical.com> wrote:
+> On Tue, Oct 20, 2015 at 6:45 PM, Ganapatrao Kulkarni
+> <gkulkarni@caviumnetworks.com> wrote:
+>> Adding numa dt binding support for arm64 based platforms.
+>> dt node parsing for numa topology is done using device property
+>> proximity and device node distance-map.
+>>
+>> Reviewed-by: Robert Richter <rrichter@cavium.com>
+>> Signed-off-by: Ganapatrao Kulkarni <gkulkarni@caviumnetworks.com>
+>> ---
+>>  arch/arm64/Kconfig            |  10 ++
+>>  arch/arm64/include/asm/numa.h |  10 ++
+>>  arch/arm64/kernel/Makefile    |   1 +
+>>  arch/arm64/kernel/of_numa.c   | 221 ++++++++++++++++++++++++++++++++++++++++++
+>>  arch/arm64/kernel/smp.c       |   1 +
+>>  arch/arm64/mm/numa.c          |  10 +-
+>>  6 files changed, 252 insertions(+), 1 deletion(-)
+>>  create mode 100644 arch/arm64/kernel/of_numa.c
+>>
+>> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+>> index 0f9cdc7..6cf8d20 100644
+>> --- a/arch/arm64/Kconfig
+>> +++ b/arch/arm64/Kconfig
+>> @@ -426,6 +426,16 @@ config NUMA
+>>           local memory controller of the CPU and add some more
+>>           NUMA awareness to the kernel.
+>>
+>> +config OF_NUMA
+>> +       bool "Device Tree NUMA support"
+>> +       depends on NUMA
+>> +       depends on OF
+>> +       default y
+>> +       help
+>> +         Enable Device Tree NUMA support.
+>> +         This enables the numa mapping of cpu, memory, io and
+>> +         inter node distances using dt bindings.
+>
+> Enabling the above config option can cause numa_init() warning in
+> numa-less arm64 system, please see the following report:
+this is taken care. which version are you using?
 
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Will Deacon <will.deacon@arm.com>
-Signed-off-by: Kefeng Wang <wangkefeng.wang@huawei.com>
----
- arch/arm64/Kconfig | 5 +----
- 1 file changed, 1 insertion(+), 4 deletions(-)
+>
+>           https://bugs.launchpad.net/bugs/1509221
+>
+> Thanks,
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 07d1811..4a07d89 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -432,10 +432,7 @@ config HOTPLUG_CPU
- 	  can be controlled through /sys/devices/system/cpu.
- 
- source kernel/Kconfig.preempt
--
--config HZ
--	int
--	default 100
-+source kernel/Kconfig.hz
- 
- config ARCH_HAS_HOLES_MEMORYMODEL
- 	def_bool y if SPARSEMEM
--- 
-1.7.12.4
+Thanks
+Ganapat
