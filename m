@@ -1,93 +1,167 @@
-From: wangzhou1@hisilicon.com (Zhou Wang)
-Date: Mon, 26 Oct 2015 19:35:44 +0800
-Subject: [PATCH v12 2/8] ARM/PCI: remove align_resource in pci_sys_data
-In-Reply-To: <1445859350-26375-1-git-send-email-wangzhou1@hisilicon.com>
-References: <1445859350-26375-1-git-send-email-wangzhou1@hisilicon.com>
-Message-ID: <1445859350-26375-3-git-send-email-wangzhou1@hisilicon.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Mon, 26 Oct 2015 12:33:49 +0100
+Subject: [PATCH v3 00/20] KVM: ARM64: Add guest PMU support
+In-Reply-To: <1443133885-3366-1-git-send-email-shannon.zhao@linaro.org>
+References: <1443133885-3366-1-git-send-email-shannon.zhao@linaro.org>
+Message-ID: <20151026113349.GA20298@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: gabriele paoloni <gabriele.paoloni@huawei.com>
+On Thu, Sep 24, 2015 at 03:31:05PM -0700, Shannon Zhao wrote:
+> This patchset adds guest PMU support for KVM on ARM64. It takes
+> trap-and-emulate approach. When guest wants to monitor one event, it
+> will be trapped by KVM and KVM will call perf_event API to create a perf
+> event and call relevant perf_event APIs to get the count value of event.
+> 
+> Use perf to test this patchset in guest. When using "perf list", it
+> shows the list of the hardware events and hardware cache events perf
+> supports. Then use "perf stat -e EVENT" to monitor some event. For
+> example, use "perf stat -e cycles" to count cpu cycles and
+> "perf stat -e cache-misses" to count cache misses.
+> 
+> Below are the outputs of "perf stat -r 5 sleep 5" when running in host
+> and guest.
+> 
+> Host:
+>  Performance counter stats for 'sleep 5' (5 runs):
+> 
+>           0.551428      task-clock (msec)         #    0.000 CPUs utilized            ( +-  0.91% )
+>                  1      context-switches          #    0.002 M/sec
+>                  0      cpu-migrations            #    0.000 K/sec
+>                 48      page-faults               #    0.088 M/sec                    ( +-  1.05% )
+>            1150265      cycles                    #    2.086 GHz                      ( +-  0.92% )
+>    <not supported>      stalled-cycles-frontend
+>    <not supported>      stalled-cycles-backend
+>             526398      instructions              #    0.46  insns per cycle          ( +-  0.89% )
+>    <not supported>      branches
+>               9485      branch-misses             #   17.201 M/sec                    ( +-  2.35% )
+> 
+>        5.000831616 seconds time elapsed                                          ( +-  0.00% )
+> 
+> Guest:
+>  Performance counter stats for 'sleep 5' (5 runs):
+> 
+>           0.730868      task-clock (msec)         #    0.000 CPUs utilized            ( +-  1.13% )
+>                  1      context-switches          #    0.001 M/sec
+>                  0      cpu-migrations            #    0.000 K/sec
+>                 48      page-faults               #    0.065 M/sec                    ( +-  0.42% )
+>            1642982      cycles                    #    2.248 GHz                      ( +-  1.04% )
+>    <not supported>      stalled-cycles-frontend
+>    <not supported>      stalled-cycles-backend
+>             637964      instructions              #    0.39  insns per cycle          ( +-  0.65% )
+>    <not supported>      branches
+>              10377      branch-misses             #   14.198 M/sec                    ( +-  1.09% )
+> 
+>        5.001289068 seconds time elapsed                                          ( +-  0.00% )
 
-This patch is needed in order to unify the PCIe designware framework for ARM and
-ARM64 architectures. In the PCIe designware unification process we are calling
-pci_create_root_bus() passing a "sysdata" parameter that is the same for both
-ARM and ARM64 and is of type "struct pcie_port*". In the ARM case this will
-cause a problem with the function pcibios_align_resource(); in fact this will
-cast "dev->sysdata" to "struct pci_sys_data*", whereas designware had passed a
-"struct pcie_port*" pointer.
+This looks pretty cool!
 
-This patch solves the issue by removing "align_resource" from "pci_sys_data"
-struct and defining a static global function pointer in "bios32.c"
+I'll review your next patch set version in more detail.
 
-Signed-off-by: Gabriele Paoloni <gabriele.paoloni@huawei.com>
-Signed-off-by: Zhou Wang <wangzhou1@hisilicon.com>
-Acked-by: Pratyush Anand <pratyush.anand@gmail.com>
----
- arch/arm/include/asm/mach/pci.h |  6 ------
- arch/arm/kernel/bios32.c        | 12 ++++++++----
- 2 files changed, 8 insertions(+), 10 deletions(-)
+Have you tried runnig a no-op cycle counter read test in the guest and
+in the host?
 
-diff --git a/arch/arm/include/asm/mach/pci.h b/arch/arm/include/asm/mach/pci.h
-index 8857d28..0070e85 100644
---- a/arch/arm/include/asm/mach/pci.h
-+++ b/arch/arm/include/asm/mach/pci.h
-@@ -52,12 +52,6 @@ struct pci_sys_data {
- 	u8		(*swizzle)(struct pci_dev *, u8 *);
- 					/* IRQ mapping				*/
- 	int		(*map_irq)(const struct pci_dev *, u8, u8);
--					/* Resource alignement requirements	*/
--	resource_size_t (*align_resource)(struct pci_dev *dev,
--					  const struct resource *res,
--					  resource_size_t start,
--					  resource_size_t size,
--					  resource_size_t align);
- 	void		*private_data;	/* platform controller private data	*/
- };
- 
-diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
-index 874e182..6551d28 100644
---- a/arch/arm/kernel/bios32.c
-+++ b/arch/arm/kernel/bios32.c
-@@ -17,6 +17,11 @@
- #include <asm/mach/pci.h>
- 
- static int debug_pci;
-+static resource_size_t (*align_resource)(struct pci_dev *dev,
-+		  const struct resource *res,
-+		  resource_size_t start,
-+		  resource_size_t size,
-+		  resource_size_t align) = NULL;
- 
- /*
-  * We can't use pci_get_device() here since we are
-@@ -456,7 +461,7 @@ static void pcibios_init_hw(struct device *parent, struct hw_pci *hw,
- 		sys->busnr   = busnr;
- 		sys->swizzle = hw->swizzle;
- 		sys->map_irq = hw->map_irq;
--		sys->align_resource = hw->align_resource;
-+		align_resource = hw->align_resource;
- 		INIT_LIST_HEAD(&sys->resources);
- 
- 		if (hw->private_data)
-@@ -572,7 +577,6 @@ resource_size_t pcibios_align_resource(void *data, const struct resource *res,
- 				resource_size_t size, resource_size_t align)
- {
- 	struct pci_dev *dev = data;
--	struct pci_sys_data *sys = dev->sysdata;
- 	resource_size_t start = res->start;
- 
- 	if (res->flags & IORESOURCE_IO && start & 0x300)
-@@ -580,8 +584,8 @@ resource_size_t pcibios_align_resource(void *data, const struct resource *res,
- 
- 	start = (start + align - 1) & ~(align - 1);
- 
--	if (sys->align_resource)
--		return sys->align_resource(dev, res, start, size, align);
-+	if (align_resource)
-+		return align_resource(dev, res, start, size, align);
- 
- 	return start;
- }
--- 
-1.9.1
+Basically something like:
+
+static void nop(void *junk)
+{
+}
+
+static void test_nop(void)
+{
+	unsigned long before,after;
+	before = read_cycles();
+	isb();
+	nop(NULL);
+	isb();
+	after = read_cycles();
+}
+
+I would be very curious to see if we get a ~6000 cycles overhead in the
+guest compared to bare-metal, which I expect.
+
+If we do, we should consider a hot-path in the the EL2 assembly code to
+read the cycle counter to reduce the overhead to something more precise.
+
+
+Thanks,
+-Christoffer
+
+
+> 
+> This patchset can be fetched from [1] and the relevant QEMU version for
+> test can be fetched from [2].
+> 
+> Thanks,
+> Shannon
+> 
+> [1] https://git.linaro.org/people/shannon.zhao/linux-mainline.git  KVM_ARM64_PMU_v3
+> [2] https://git.linaro.org/people/shannon.zhao/qemu.git  PMU_v2
+> 
+> Changes since v2->v3:
+> * Directly use perf raw event type to create perf_event in KVM
+> * Add a helper vcpu_sysreg_write
+> * remove unrelated header file
+> 
+> Changes since v1->v2:
+> * Use switch...case for registers access handler instead of adding
+>   alone handler for each register
+> * Try to use the sys_regs to store the register value instead of adding
+>   new variables in struct kvm_pmc
+> * Fix the handle of cp15 regs
+> * Create a new kvm device vPMU, then userspace could choose whether to
+>   create PMU
+> * Fix the handle of PMU overflow interrupt
+> 
+> Shannon Zhao (20):
+>   ARM64: Move PMU register related defines to asm/pmu.h
+>   KVM: ARM64: Define PMU data structure for each vcpu
+>   KVM: ARM64: Add offset defines for PMU registers
+>   KVM: ARM64: Add reset and access handlers for PMCR_EL0 register
+>   KVM: ARM64: Add reset and access handlers for PMSELR register
+>   KVM: ARM64: Add reset and access handlers for PMCEID0 and PMCEID1
+>     register
+>   KVM: ARM64: PMU: Add perf event map and introduce perf event creating
+>     function
+>   KVM: ARM64: Add reset and access handlers for PMXEVTYPER register
+>   KVM: ARM64: Add reset and access handlers for PMXEVCNTR register
+>   KVM: ARM64: Add reset and access handlers for PMCCNTR register
+>   KVM: ARM64: Add reset and access handlers for PMCNTENSET and
+>     PMCNTENCLR register
+>   KVM: ARM64: Add reset and access handlers for PMINTENSET and
+>     PMINTENCLR register
+>   KVM: ARM64: Add reset and access handlers for PMOVSSET and PMOVSCLR
+>     register
+>   KVM: ARM64: Add reset and access handlers for PMUSERENR register
+>   KVM: ARM64: Add reset and access handlers for PMSWINC register
+>   KVM: ARM64: Add access handlers for PMEVCNTRn and PMEVTYPERn register
+>   KVM: ARM64: Add PMU overflow interrupt routing
+>   KVM: ARM64: Reset PMU state when resetting vcpu
+>   KVM: ARM64: Free perf event of PMU when destroying vcpu
+>   KVM: ARM64: Add a new kvm ARM PMU device
+> 
+>  Documentation/virtual/kvm/devices/arm-pmu.txt |  15 +
+>  arch/arm/kvm/arm.c                            |   5 +
+>  arch/arm64/include/asm/kvm_asm.h              |  59 +++-
+>  arch/arm64/include/asm/kvm_host.h             |   2 +
+>  arch/arm64/include/asm/pmu.h                  |  47 +++
+>  arch/arm64/include/uapi/asm/kvm.h             |   3 +
+>  arch/arm64/kernel/perf_event.c                |  35 --
+>  arch/arm64/kvm/Kconfig                        |   8 +
+>  arch/arm64/kvm/Makefile                       |   1 +
+>  arch/arm64/kvm/reset.c                        |   3 +
+>  arch/arm64/kvm/sys_regs.c                     | 488 ++++++++++++++++++++++++--
+>  arch/arm64/kvm/sys_regs.h                     |  16 +
+>  include/kvm/arm_pmu.h                         |  65 ++++
+>  include/linux/kvm_host.h                      |   1 +
+>  include/uapi/linux/kvm.h                      |   2 +
+>  virt/kvm/arm/pmu.c                            | 414 ++++++++++++++++++++++
+>  virt/kvm/kvm_main.c                           |   4 +
+>  17 files changed, 1098 insertions(+), 70 deletions(-)
+>  create mode 100644 Documentation/virtual/kvm/devices/arm-pmu.txt
+>  create mode 100644 include/kvm/arm_pmu.h
+>  create mode 100644 virt/kvm/arm/pmu.c
+> 
+> -- 
+> 2.1.4
+> 
