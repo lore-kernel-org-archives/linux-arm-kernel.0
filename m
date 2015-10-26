@@ -1,68 +1,71 @@
-From: mw@semihalf.com (Marcin Wojtas)
-Date: Mon, 26 Oct 2015 05:35:46 +0100
-Subject: [PATCH 3/5] irqchip: armada-370-xp: re-enable per-CPU interrupts
- at resume time
-In-Reply-To: <20151026011036.2cb5b7a8@free-electrons.com>
-References: <1445347435-2333-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <1445347435-2333-4-git-send-email-thomas.petazzoni@free-electrons.com>
- <CAPv3WKdZeCo-0xFC6EJcCeVQd7ef+SQz=MocR1nE5YdZAx3AJQ@mail.gmail.com>
- <20151026011036.2cb5b7a8@free-electrons.com>
-Message-ID: <CAPv3WKc8bzCadNN=SRxQuJBxMiHTVKnmqaSkTehu=j6V4nF6Gg@mail.gmail.com>
+From: ming.lei@canonical.com (Ming Lei)
+Date: Mon, 26 Oct 2015 12:53:10 +0800
+Subject: [PATCH v6 3/4] arm64/arm, numa, dt: adding numa dt binding
+ implementation for arm64 platforms
+In-Reply-To: <CAFpQJXX8VXX+gTBn-+7MepSAOzbOuc-yWJe4f=B7MH_Nj7FsKw@mail.gmail.com>
+References: <1445337931-11344-1-git-send-email-gkulkarni@caviumnetworks.com>
+ <1445337931-11344-4-git-send-email-gkulkarni@caviumnetworks.com>
+ <CACVXFVMiZs_g3qw99-PhxLiX5oLe8_z5cOAfJZ_4-09jN2koCQ@mail.gmail.com>
+ <CAFpQJXX8VXX+gTBn-+7MepSAOzbOuc-yWJe4f=B7MH_Nj7FsKw@mail.gmail.com>
+Message-ID: <CACVXFVPoZqjFeqK7=M7wK0JQ0iS9tYoN8BHsYMc25OL-4j=e1g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thomas,
-
-2015-10-26 1:10 GMT+01:00 Thomas Petazzoni
-<thomas.petazzoni@free-electrons.com>:
-> Marcin,
->
-> On Sun, 25 Oct 2015 22:22:37 +0100, Marcin Wojtas wrote:
->
->> > @@ -550,16 +572,27 @@ static void armada_370_xp_mpic_resume(void)
->> >                 if (virq == 0)
->> >                         continue;
->> >
->> > -               if (irq != ARMADA_370_XP_TIMER0_PER_CPU_IRQ)
->> > +               data = irq_get_irq_data(virq);
->> > +
->> > +               if (irq != ARMADA_370_XP_TIMER0_PER_CPU_IRQ) {
->> > +                       /* Non per-CPU interrupts */
->> >                         writel(irq, per_cpu_int_base +
+On Mon, Oct 26, 2015 at 11:50 AM, Ganapatrao Kulkarni
+<gpkulkarni@gmail.com> wrote:
+> On Mon, Oct 26, 2015 at 7:14 AM, Ming Lei <ming.lei@canonical.com> wrote:
+>> On Tue, Oct 20, 2015 at 6:45 PM, Ganapatrao Kulkarni
+>> <gkulkarni@caviumnetworks.com> wrote:
+>>> Adding numa dt binding support for arm64 based platforms.
+>>> dt node parsing for numa topology is done using device property
+>>> proximity and device node distance-map.
+>>>
+>>> Reviewed-by: Robert Richter <rrichter@cavium.com>
+>>> Signed-off-by: Ganapatrao Kulkarni <gkulkarni@caviumnetworks.com>
+>>> ---
+>>>  arch/arm64/Kconfig            |  10 ++
+>>>  arch/arm64/include/asm/numa.h |  10 ++
+>>>  arch/arm64/kernel/Makefile    |   1 +
+>>>  arch/arm64/kernel/of_numa.c   | 221 ++++++++++++++++++++++++++++++++++++++++++
+>>>  arch/arm64/kernel/smp.c       |   1 +
+>>>  arch/arm64/mm/numa.c          |  10 +-
+>>>  6 files changed, 252 insertions(+), 1 deletion(-)
+>>>  create mode 100644 arch/arm64/kernel/of_numa.c
+>>>
+>>> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+>>> index 0f9cdc7..6cf8d20 100644
+>>> --- a/arch/arm64/Kconfig
+>>> +++ b/arch/arm64/Kconfig
+>>> @@ -426,6 +426,16 @@ config NUMA
+>>>           local memory controller of the CPU and add some more
+>>>           NUMA awareness to the kernel.
+>>>
+>>> +config OF_NUMA
+>>> +       bool "Device Tree NUMA support"
+>>> +       depends on NUMA
+>>> +       depends on OF
+>>> +       default y
+>>> +       help
+>>> +         Enable Device Tree NUMA support.
+>>> +         This enables the numa mapping of cpu, memory, io and
+>>> +         inter node distances using dt bindings.
 >>
->> For "Non per-CPU interrupts" per_cpu_int_base is used - is it
->> intentional? In armada_370_xp_irq_mask/unmask the condition looks
->> exactly opposite...
->
-> Yes, this is normal. Carefully read PATCH 5/5, which adds a big
-> comment, which explains the logic of the HW and how the
-> irq-armada-370-xp driver copes with it.
->
-> Each interrupt can be masked at two levels. One level is enabled when
-> the interrupted is mapped, the other upon ->mask()/->unmask(). So
-> when we're resuming, we need to re-enable the interrupt at the level it
-> was enabled in ->map(), and have ->mask()/->unmask() continue to
-> mask/unmask the interrupt at the other level.
->
-> For per-CPU interrupts, ->map() and ->resume() enable the interrupt at
-> the global level, and leave ->mask()/->unmask() enable/disable at the
-> per-CPU level.
->
-> For global interrupts, ->map() and ->resume() enable the interrupt at
-> the per-CPU level, and leave ->mask()/->unmask() enable/disable at the
-> global level.
->
-> Again, see PATCH 5/5, and let me know if there are still some unclear
-> aspects.
->
+>> Enabling the above config option can cause numa_init() warning in
+>> numa-less arm64 system, please see the following report:
+> this is taken care. which version are you using?
 
-Thanks for the explanation - now it's clear.
+V5.
 
-Btw, I checked the patches with mvneta in both 'standby' and 'mem'
-modes on A38x (with not-yet-submitted support for PM in mvneta and
-pinctrl) and everything works properly. Hence:
-
-Tested-by: Marcin Wojtas <mw@semihalf.com>
-
-Best regards,
-Marcin
+>
+>>
+>>           https://bugs.launchpad.net/bugs/1509221
+>>
+>> Thanks,
+>
+> Thanks
+> Ganapat
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
