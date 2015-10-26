@@ -1,33 +1,65 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 26 Oct 2015 12:53:17 +0900
-Subject: [PATCH] arm64: remove bogus TASK_SIZE_64 check
-Message-ID: <1445831597-5680-1-git-send-email-ard.biesheuvel@linaro.org>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Mon, 26 Oct 2015 13:16:50 +0900
+Subject: [PATCH v3 0/3] ARM: uniphier: add outer cache support and rework
+ SMP operations
+In-Reply-To: <CAK7LNATgK0OQbu_9J7DjUfDA_dKSCkCS4Kqw6vXD+=5oxkw4ig@mail.gmail.com>
+References: <1442551054-2116-1-git-send-email-yamada.masahiro@socionext.com>
+ <6239461.UGe6XP3dfB@wuerfel> <5275814.I392BfIEUH@wuerfel>
+ <CAK7LNATgK0OQbu_9J7DjUfDA_dKSCkCS4Kqw6vXD+=5oxkw4ig@mail.gmail.com>
+Message-ID: <CAK7LNASA-fmS943We9ncXUNQTa17s85OPmnWEdcY0yxTpW9hTA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The comparison between TASK_SIZE_64 and MODULES_VADDR does not
-make any sense on arm64, it is simply something that has been
-carried over from the ARM port which arm64 is based on. So drop it.
+Hi Arnd,
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- arch/arm64/include/asm/memory.h | 4 ----
- 1 file changed, 4 deletions(-)
 
-diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
-index 11ccf6c09533..37f3538a2924 100644
---- a/arch/arm64/include/asm/memory.h
-+++ b/arch/arm64/include/asm/memory.h
-@@ -70,10 +70,6 @@
- 
- #define TASK_UNMAPPED_BASE	(PAGE_ALIGN(TASK_SIZE / 4))
- 
--#if TASK_SIZE_64 > MODULES_VADDR
--#error Top of 64-bit user space clashes with start of module space
--#endif
--
- /*
-  * Physical vs virtual RAM address space conversion.  These are
-  * private definitions which should NOT be used outside memory.h
+2015-10-10 15:59 GMT+09:00 Masahiro Yamada <yamada.masahiro@socionext.com>:
+> Hi Arnd,
+>
+>
+> 2015-10-06 15:22 GMT+01:00 Arnd Bergmann <arnd@arndb.de>:
+>> On Tuesday 06 October 2015 16:20:23 Arnd Bergmann wrote:
+>>> On Friday 18 September 2015 13:37:31 Masahiro Yamada wrote:
+>>> > Hi Olof,
+>>> >
+>>> > Now Linux 4.3-rc1 is out, so I am back to this.
+>>> >
+>>> > 1/3: add outer cache support
+>>> > 2/3: rework SMP operations
+>>> > 3/3: add device tree nodes
+>>> >
+>>> > Because 2/3 highly depends on 1/3, I hope whole of this series
+>>> > is applied through ARM-SOC tree.
+>>>
+>>> Sorry for the long delay here. Is this the latest version of these
+>>> patches?
+>>>
+>>> Did Russell King review the first patch?
+>>> Is he ok with merging this through arm-soc?
+>>>
+>>
+>> I found an answer to the first question, as I see you posted
+>> v5 of the patchset in the meantime.
+>
+>
+> Yes, v5 is my latest version.
+>
+>
+> For the second question, Russell gave me some comments on the 1/3
+> and I answered.
+>
+> He mentioned nothing about merging the whole series thru arm-soc.
+> (At least, he was not opposed to it, I guess)
+>
+
+Is it difficult to apply this series for the next merge window?
+V5 is the latest.
+No comment, but not applied.
+
+Is there anything I can do but wait?
+
+
+
 -- 
-2.1.4
+Best Regards
+Masahiro Yamada
