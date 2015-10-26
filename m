@@ -1,35 +1,89 @@
 From: o.schinagl@ultimaker.com (Olliver Schinagl)
-Date: Mon, 26 Oct 2015 22:32:36 +0100
-Subject: [PATCH 05/10] pwm: sysfs: do not unnecessarily store result in var
+Date: Mon, 26 Oct 2015 22:32:40 +0100
+Subject: [PATCH 09/10] pwm: pwm_gpio: add pulse option
 In-Reply-To: <1445895161-2317-1-git-send-email-o.schinagl@ultimaker.com>
 References: <1445895161-2317-1-git-send-email-o.schinagl@ultimaker.com>
-Message-ID: <1445895161-2317-6-git-send-email-o.schinagl@ultimaker.com>
+Message-ID: <1445895161-2317-10-git-send-email-o.schinagl@ultimaker.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Olliver Schinagl <oliver@schinagl.nl>
 
-Use the result of pwm_is_enabled directly instead of storing it first.
+With the newly added pwm_pulse option added to the PWM framework, this
+patch adds the pulse functionality to the gpio_pwm driver.
 
 Signed-off-by: Olliver Schinagl <oliver@schinagl.nl>
 ---
- drivers/pwm/sysfs.c | 3 +--
- 1 file changed, 1 insertion(+), 2 deletions(-)
+ drivers/pwm/pwm-gpio.c | 22 ++++++++++++++++++++++
+ 1 file changed, 22 insertions(+)
 
-diff --git a/drivers/pwm/sysfs.c b/drivers/pwm/sysfs.c
-index c472772..ba67845 100644
---- a/drivers/pwm/sysfs.c
-+++ b/drivers/pwm/sysfs.c
-@@ -97,9 +97,8 @@ static ssize_t pwm_enable_show(struct device *child,
- 			       char *buf)
- {
- 	const struct pwm_device *pwm = child_to_pwm_device(child);
--	int enabled = pwm_is_enabled(pwm);
+diff --git a/drivers/pwm/pwm-gpio.c b/drivers/pwm/pwm-gpio.c
+index cf4b170..24c27b1 100644
+--- a/drivers/pwm/pwm-gpio.c
++++ b/drivers/pwm/pwm-gpio.c
+@@ -40,6 +40,8 @@ struct gpio_pwm_data {
+ 	bool pin_on;
+ 	int on_time;
+ 	int off_time;
++	unsigned int count;
++	bool pulse;
+ 	bool run;
+ };
  
--	return sprintf(buf, "%d\n", enabled);
-+	return sprintf(buf, "%d\n", pwm_is_enabled(pwm));
+@@ -80,6 +82,16 @@ enum hrtimer_restart gpio_pwm_timer(struct hrtimer *timer)
+ 		gpio_data->pin_on = false;
+ 	}
+ 
++	if (gpio_data->count > 0)
++		gpio_data->count--;
++	if (!gpio_data->count && gpio_data->pulse) {
++		struct pwm_device *pwm = container_of((void *)gpio_data,
++						      struct pwm_device,
++						      chip_data);
++		pwm_pulse_done(pwm);
++		return HRTIMER_NORESTART;
++	}
++
+ 	return HRTIMER_RESTART;
  }
  
- static ssize_t pwm_enable_store(struct device *child,
+@@ -88,6 +100,10 @@ static int gpio_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
+ {
+ 	struct gpio_pwm_data *gpio_data = pwm_get_chip_data(pwm);
+ 
++	/* A full pulse is both the on and off time, and since counting each
++	 * iteration of the timer is easy and clean, we need double the count.
++	 */
++	gpio_data->count = count * 2;
+ 	gpio_data->on_time = duty_ns;
+ 	gpio_data->off_time = period_ns - duty_ns;
+ 
+@@ -111,6 +127,9 @@ static int gpio_pwm_enable(struct pwm_chip *chip, struct pwm_device *pwm)
+ 	if (gpio_data->run)
+ 		return -EBUSY;
+ 
++	if (pwm->pulse_count)
++		gpio_data->pulse = true;
++	gpio_data->count = pwm->pulse_count;
+ 	gpio_data->run = true;
+ 	if (gpio_data->off_time) {
+ 		hrtimer_start(&gpio_data->timer, ktime_set(0, 0),
+@@ -130,6 +149,7 @@ static void gpio_pwm_disable(struct pwm_chip *chip, struct pwm_device *pwm)
+ 	struct gpio_pwm_data *gpio_data = pwm_get_chip_data(pwm);
+ 
+ 	gpio_data->run = false;
++	gpio_data->pulse = false;
+ 	if (!gpio_data->off_time)
+ 		gpio_pwm_off(gpio_data);
+ }
+@@ -196,6 +216,8 @@ static int gpio_pwm_probe(struct platform_device *pdev)
+ 		gpio_data->timer.function = &gpio_pwm_timer;
+ 		gpio_data->gpiod = gpiod;
+ 		gpio_data->pin_on = false;
++		gpio_data->count = 0;
++		gpio_data->pulse = false;
+ 		gpio_data->run = false;
+ 
+ 		if (hrtimer_is_hres_active(&gpio_data->timer))
 -- 
 2.6.1
