@@ -1,32 +1,34 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 26 Oct 2015 09:45:07 +0900
-Subject: [GIT PULL] at91: soc for 4.4 #2
-In-Reply-To: <20151019212105.GA6134@piout.net>
-References: <20151019212105.GA6134@piout.net>
-Message-ID: <20151026004507.GC14238@localhost>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Mon, 26 Oct 2015 09:56:50 +0900
+Subject: [PATCH v5 4/5] ARM: dts: mt8135: enable basic SMP bringup for
+ mt8135
+In-Reply-To: <1443799181-50409-5-git-send-email-yingjoe.chen@mediatek.com>
+References: <1443799181-50409-1-git-send-email-yingjoe.chen@mediatek.com>
+ <1443799181-50409-5-git-send-email-yingjoe.chen@mediatek.com>
+Message-ID: <CAMAWPa-Ed2FJY2pW67EHHKBH3_eBZx0+oWfMJwc_DhEjrf7aMg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 19, 2015 at 11:21:05PM +0200, Alexandre Belloni wrote:
-> Arnd, Olof, Kevin,
-> 
-> This is a great fix for PM and suspend/resume for 4.4
-> 
-> Thanks,
-> 
-> The following changes since commit 6f112a08c1ed717a015dae190e289d53085c1bc4:
-> 
->   ARM: at91: debug: use DEBUG_UART_PHYS (2015-09-21 16:31:15 +0200)
-> 
-> are available in the git repository at:
-> 
->   git://git.kernel.org/pub/scm/linux/kernel/git/abelloni/linux.git tags/at91-ab-soc2
-> 
-> for you to fetch changes up to 5fcf8d1a0e84792b2bc44922c5d833dab96a9c1e:
-> 
->   ARM: at91: pm: at91_pm_suspend_in_sram() must be 8-byte aligned (2015-10-19 22:58:44 +0200)
+Hello,
 
-Merged, thanks.
+On Sat, Oct 3, 2015 at 12:19 AM, Yingjoe Chen <yingjoe.chen@mediatek.com> wrote:
+> Add arch timer node to enable arch-timer support. MT8135 firmware
+> doesn't correctly setup arch-timer frequency and CNTVOFF, add
+> properties to workaround this.
+>
+> This also set cpu enable-method to enable SMP.
+>
+> Signed-off-by: Yingjoe Chen <yingjoe.chen@mediatek.com>
 
+kernelci.org started detecting new boot failures for the mt8135-evb in
+the arm-soc tree[1], and the boot failures were bisected down to this
+patch, which landed upstream in the form of commit d186a394bb98 (ARM:
+dts: mt8135: enable basic SMP bringup for mt8135)
 
--Olof
+Maybe this new SMP support requires updating the firmware on the board
+as well?  If so, the changelog should've been a bit more explicit
+about firmware dependencies.
+
+Kevin
+
+[1] http://kernelci.org/boot/mt8135-evbp1/job/arm-soc/kernel/v4.3-rc5-795-ga4b616012d2e/defconfig/multi_v7_defconfig/lab/lab-khilman/?_id=562b1cf959b5149e07111471
