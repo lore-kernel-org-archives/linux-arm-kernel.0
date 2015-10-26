@@ -1,41 +1,45 @@
-From: timur@codeaurora.org (Timur Tabi)
-Date: Mon, 26 Oct 2015 09:07:42 -0500
-Subject: [PATCH v13 5/5] uart: pl011: Add support to ZTE ZX296702 uart
-In-Reply-To: <562E3213.8070602@arm.com>
-References: <1438328959-16177-1-git-send-email-jun.nie@linaro.org>
- <1438328959-16177-6-git-send-email-jun.nie@linaro.org>
- <55FC16A2.5070207@arm.com>
- <CABymUCOA3oG7Hq83hDyQ_uisQHeipoHshcWONWTtjxKvikzjsQ@mail.gmail.com>
- <CAOZdJXUjZLKkUYScD7oDTMuRUtAEJ6=DopmE4n6Vb9zyv+_viA@mail.gmail.com>
- <CABymUCORU9CDD64Rdw2VX0kLSe6E1zY9iZCap5xittoVFwbOtw@mail.gmail.com>
- <562AFBD5.3050508@codeaurora.org> <562DF96D.6020307@arm.com>
- <562E20B2.4050805@codeaurora.org> <562E3213.8070602@arm.com>
-Message-ID: <562E33AE.2020608@codeaurora.org>
+From: tixy@linaro.org (Jon Medhurst (Tixy))
+Date: Mon, 26 Oct 2015 14:12:31 +0000
+Subject: [PATCH] arm64: dts: Add idle-states for Juno
+In-Reply-To: <9hheggnca1y.fsf@e105922-lin.cambridge.arm.com>
+References: <1430402268.2868.20.camel@linaro.org>
+ <9hheggnca1y.fsf@e105922-lin.cambridge.arm.com>
+Message-ID: <1445868751.2807.21.camel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Andre Przywara wrote:
+On Thu, 2015-10-22 at 14:22 +0100, Punit Agrawal wrote:
+> "Jon Medhurst (Tixy)" <tixy@linaro.org> writes:
+> 
+> > From: Jon Medhurst <tixy@linaro.org>
+> >
+> > Signed-off-by: Jon Medhurst <tixy@linaro.org>
+> 
+> Apologies for resurrecting an old thread.
+> 
+> Following the discussion on this thread, even though certain concerns
+> were raised, there wasn't any objection to $SUBJECT being merged.
+> 
+> I don't see this patch in any tree; perhaps it's slipped through the
+> cracks.
 
-> Yeah, I was interested in that scenario too, because the SBSA spec
-> actually speaks of 32-bit registers and vendors may implement it
-> strictly as that. Still waiting for actual failure reports on this
-> before I wanted to push a fix, though.
+It did slip through the cracks. Lorenzo's last comment was "I am fine
+with enabling the idle states, I need to review and test the idle states
+DT data in the patch first though." and I didn't chase things up.
 
-What do you mean by failure reports?  Our hardware generates an SError 
-if you try to access the PL011 registers with 8-bit or 16-bit reads or 
-writes.
+The patch will need refreshing to add idle for Juno r1. Which will then
+probably resurrect the discussion about where the numbers come from for
+residency times, and are the same ones for r0 valid on r1 (and r2?).
 
->> We have an internal patch
->> that replaces all of the read/write routines with vendor function calls.
->>   I would need to refactor our patch on top of yours.
->
-> But wouldn't Jun's patch address this more easily, because it wraps
-> every call already? TBH I found this change the most interesting.
+In an effort to forestall that I would say: does anyone actually care if
+the values are optimal? Juno is a reference platform and powered off
+mains, so tuning for the optimum power consumption is pretty pointless.
+But because it _is_ used as a reference by people it should at least
+have these features enabled, to serve as an example, and for test
+coverage.
 
-Yes, but I think it changes a lot of things unnecessarily, like the 
-register names.
+(And we can all pretend to ignore the elephant in the room
+http://lwn.net/Articles/659347/)
 
 -- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the
-Code Aurora Forum, hosted by The Linux Foundation.
+Tixy
