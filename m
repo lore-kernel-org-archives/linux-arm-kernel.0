@@ -1,54 +1,28 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Mon, 26 Oct 2015 10:21:40 +0800
-Subject: [PATCH v2 2/3] ARM: dts: sun8i: Add Allwinner A83T dtsi
-In-Reply-To: <1445557577-27383-3-git-send-email-vishnupatekar0510@gmail.com>
-References: <1445557577-27383-1-git-send-email-vishnupatekar0510@gmail.com>
- <1445557577-27383-3-git-send-email-vishnupatekar0510@gmail.com>
-Message-ID: <CAGb2v65J-meF6AGR9Btjvr5DZtKoeYMi3Hj_e0-N95Z=O1vKHg@mail.gmail.com>
+From: rafael@kernel.org (Rafael J. Wysocki)
+Date: Mon, 26 Oct 2015 03:48:44 +0100
+Subject: [PATCH v6 04/22] of: add function to allow probing a device from
+ a OF node
+In-Reply-To: <20151026001301.GT29919@sirena.org.uk>
+References: <1442844182-27787-1-git-send-email-tomeu.vizoso@collabora.com>
+ <10119606.2TraDKGPVy@vostro.rjw.lan>
+ <CAAObsKCAX4DQGydQoYjJEYKTOEqpVozXdHnqXWdNYVkLsg7BVg@mail.gmail.com>
+ <8510008.IC14Fu2Aos@vostro.rjw.lan> <562BE562.8090704@kernel.org>
+ <20151026001301.GT29919@sirena.org.uk>
+Message-ID: <CAJZ5v0hdO-Qd+yMsv6fvc5+kLBPV9fiy77WC_aRjF=qmb2tQJQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 23, 2015 at 7:46 AM, Vishnu Patekar
-<vishnupatekar0510@gmail.com> wrote:
-> Allwinner A83T is new octa-core cortex-a7 SOC.
-> This adds the basic dtsi, the clocks differs from
-> earlier sun8i SOCs.
+On Mon, Oct 26, 2015 at 1:13 AM, Mark Brown <broonie@kernel.org> wrote:
+> On Sat, Oct 24, 2015 at 03:09:06PM -0500, Rob Herring wrote:
 >
-> Signed-off-by: Vishnu Patekar <vishnupatekar0510@gmail.com>
-> ---
->  arch/arm/boot/dts/sun8i-a83t.dtsi | 247 ++++++++++++++++++++++++++++++++++++++
->  1 file changed, 247 insertions(+)
->  create mode 100644 arch/arm/boot/dts/sun8i-a83t.dtsi
+>> Let's get agreement on the flow and structure and how to address other
+>> issues like suspend, then we can worry about whether this needs to be
+>> abstracted from subsystems. We can discuss more this week at KS.
 >
-> diff --git a/arch/arm/boot/dts/sun8i-a83t.dtsi b/arch/arm/boot/dts/sun8i-a83t.dtsi
-> new file mode 100644
-> index 0000000..e85995f
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/sun8i-a83t.dtsi
-> @@ -0,0 +1,247 @@
-> +               cpu at 100 {
-> +                       compatible = "arm,cortex-a7";
-> +                       device_type = "cpu";
-> +                       reg = <4>;
-> +               };
-> +
-> +               cpu at 101 {
-> +                       compatible = "arm,cortex-a7";
-> +                       device_type = "cpu";
-> +                       reg = <5>;
-> +               };
-> +               cpu at 102 {
-> +                       compatible = "arm,cortex-a7";
-> +                       device_type = "cpu";
-> +                       reg = <6>;
-> +               };
-> +
-> +               cpu at 103 {
-> +                       compatible = "arm,cortex-a7";
-> +                       device_type = "cpu";
-> +                       reg = <7>;
-> +               };
+> Should we try to schedule an ad-hoc session today (Monday) for those of
+> us who are here to talk this over?
 
-The reg values are still wrong for the second cluster.
+I won't mind doing that, what about after the Linus+Dirk session?
 
-ChenYu
+Thanks,
+Rafael
