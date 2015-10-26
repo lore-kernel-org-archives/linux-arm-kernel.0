@@ -1,71 +1,38 @@
-From: ming.lei@canonical.com (Ming Lei)
-Date: Mon, 26 Oct 2015 12:53:10 +0800
-Subject: [PATCH v6 3/4] arm64/arm, numa, dt: adding numa dt binding
- implementation for arm64 platforms
-In-Reply-To: <CAFpQJXX8VXX+gTBn-+7MepSAOzbOuc-yWJe4f=B7MH_Nj7FsKw@mail.gmail.com>
-References: <1445337931-11344-1-git-send-email-gkulkarni@caviumnetworks.com>
- <1445337931-11344-4-git-send-email-gkulkarni@caviumnetworks.com>
- <CACVXFVMiZs_g3qw99-PhxLiX5oLe8_z5cOAfJZ_4-09jN2koCQ@mail.gmail.com>
- <CAFpQJXX8VXX+gTBn-+7MepSAOzbOuc-yWJe4f=B7MH_Nj7FsKw@mail.gmail.com>
-Message-ID: <CACVXFVPoZqjFeqK7=M7wK0JQ0iS9tYoN8BHsYMc25OL-4j=e1g@mail.gmail.com>
+From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
+Date: Mon, 26 Oct 2015 06:09:25 +0100
+Subject: [PATCH 3/5] irqchip: armada-370-xp: re-enable per-CPU
+ interrupts at resume time
+In-Reply-To: <CAPv3WKc8bzCadNN=SRxQuJBxMiHTVKnmqaSkTehu=j6V4nF6Gg@mail.gmail.com>
+References: <1445347435-2333-1-git-send-email-thomas.petazzoni@free-electrons.com>
+ <1445347435-2333-4-git-send-email-thomas.petazzoni@free-electrons.com>
+ <CAPv3WKdZeCo-0xFC6EJcCeVQd7ef+SQz=MocR1nE5YdZAx3AJQ@mail.gmail.com>
+ <20151026011036.2cb5b7a8@free-electrons.com>
+ <CAPv3WKc8bzCadNN=SRxQuJBxMiHTVKnmqaSkTehu=j6V4nF6Gg@mail.gmail.com>
+Message-ID: <20151026060925.32ff2034@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 26, 2015 at 11:50 AM, Ganapatrao Kulkarni
-<gpkulkarni@gmail.com> wrote:
-> On Mon, Oct 26, 2015 at 7:14 AM, Ming Lei <ming.lei@canonical.com> wrote:
->> On Tue, Oct 20, 2015 at 6:45 PM, Ganapatrao Kulkarni
->> <gkulkarni@caviumnetworks.com> wrote:
->>> Adding numa dt binding support for arm64 based platforms.
->>> dt node parsing for numa topology is done using device property
->>> proximity and device node distance-map.
->>>
->>> Reviewed-by: Robert Richter <rrichter@cavium.com>
->>> Signed-off-by: Ganapatrao Kulkarni <gkulkarni@caviumnetworks.com>
->>> ---
->>>  arch/arm64/Kconfig            |  10 ++
->>>  arch/arm64/include/asm/numa.h |  10 ++
->>>  arch/arm64/kernel/Makefile    |   1 +
->>>  arch/arm64/kernel/of_numa.c   | 221 ++++++++++++++++++++++++++++++++++++++++++
->>>  arch/arm64/kernel/smp.c       |   1 +
->>>  arch/arm64/mm/numa.c          |  10 +-
->>>  6 files changed, 252 insertions(+), 1 deletion(-)
->>>  create mode 100644 arch/arm64/kernel/of_numa.c
->>>
->>> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
->>> index 0f9cdc7..6cf8d20 100644
->>> --- a/arch/arm64/Kconfig
->>> +++ b/arch/arm64/Kconfig
->>> @@ -426,6 +426,16 @@ config NUMA
->>>           local memory controller of the CPU and add some more
->>>           NUMA awareness to the kernel.
->>>
->>> +config OF_NUMA
->>> +       bool "Device Tree NUMA support"
->>> +       depends on NUMA
->>> +       depends on OF
->>> +       default y
->>> +       help
->>> +         Enable Device Tree NUMA support.
->>> +         This enables the numa mapping of cpu, memory, io and
->>> +         inter node distances using dt bindings.
->>
->> Enabling the above config option can cause numa_init() warning in
->> numa-less arm64 system, please see the following report:
-> this is taken care. which version are you using?
+Marcin,
 
-V5.
+On Mon, 26 Oct 2015 05:35:46 +0100, Marcin Wojtas wrote:
 
->
->>
->>           https://bugs.launchpad.net/bugs/1509221
->>
->> Thanks,
->
-> Thanks
-> Ganapat
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> Thanks for the explanation - now it's clear.
+
+Good :-) Hopefully the explanation in PATCH 5/5 is also clear enough.
+
+> Btw, I checked the patches with mvneta in both 'standby' and 'mem'
+> modes on A38x (with not-yet-submitted support for PM in mvneta and
+> pinctrl) and everything works properly. Hence:
+
+Thanks for the testing. However, I wonder why you think those changes
+are need to get mvneta to work fine with the 'standby' mode ? While I
+do agree that they are need for the 'mem' mode, they shouldn't be
+needed for the 'standby' mode. For now, the standby mode only puts the
+CPU into deep-idle, and that's all: all devices remain powered on, and
+they don't lose their state.
+
+Thomas
+-- 
+Thomas Petazzoni, CTO, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
