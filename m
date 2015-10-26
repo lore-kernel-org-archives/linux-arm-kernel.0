@@ -1,74 +1,50 @@
-From: ezequiel@vanguardiasur.com.ar (Ezequiel Garcia)
-Date: Mon, 26 Oct 2015 10:50:33 -0300
-Subject: [PATCH v4 0/5] mtd: pxa3xx_nand: rework the timing setup
-In-Reply-To: <1445416144-9194-1-git-send-email-antoine.tenart@free-electrons.com>
-References: <1445416144-9194-1-git-send-email-antoine.tenart@free-electrons.com>
-Message-ID: <20151026135033.GA1820@laptop>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Mon, 26 Oct 2015 14:00:51 +0000
+Subject: [PATCH v13 5/5] uart: pl011: Add support to ZTE ZX296702 uart
+In-Reply-To: <562E20B2.4050805@codeaurora.org>
+References: <1438328959-16177-1-git-send-email-jun.nie@linaro.org>
+ <1438328959-16177-6-git-send-email-jun.nie@linaro.org>
+ <55FC16A2.5070207@arm.com>
+ <CABymUCOA3oG7Hq83hDyQ_uisQHeipoHshcWONWTtjxKvikzjsQ@mail.gmail.com>
+ <CAOZdJXUjZLKkUYScD7oDTMuRUtAEJ6=DopmE4n6Vb9zyv+_viA@mail.gmail.com>
+ <CABymUCORU9CDD64Rdw2VX0kLSe6E1zY9iZCap5xittoVFwbOtw@mail.gmail.com>
+ <562AFBD5.3050508@codeaurora.org> <562DF96D.6020307@arm.com>
+ <562E20B2.4050805@codeaurora.org>
+Message-ID: <562E3213.8070602@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21 Oct 10:28 AM, Antoine Tenart wrote:
-> Hello,
-> 
-> Let's try one more time to get this merged.
-> 
-> This series was part of a bigger one[1], which was split into smaller
-> ones as asked by Ezequiel[2]. When we take this into account this is
-> v9; with a v1 sent in January, 9 months ago.
-> 
-> Another series, introducing the Berlin nand support, depends on this.
-> 
-> The aim here is to use the nand framework to setup the timings,
-> while keeping the old in-driver way of configuration timings for
-> compatibility reasons.
-> 
-> You can find the series at:
-> https://github.com/atenart/linux.git berlin/4.3/nand-timings
-> 
-> Antoine
-> 
-> Since v3:
->         - Moved back a chunk into the right patch.
->         - Called pxa3xx_nand_config_flash() before KEEP_CONFIG.
->         - Rebased on top of l2-mtd.git master.
-> 
-> Since v2:
->         - Added back the support for keep-config 16 bits devices
->         - Fixed wrong unit in a calculation
->         - Reworked the pxa3xx_nand_init_timings() logic
->         - Allowed compile test the pxa3xx driver
-> 
-> Since v1:
->         - Rebased on top of v4.2-rc1
-> 
-> Since the series was split up:
->         - Reworked the ndcr setup
->         - Removed the read_id_bytes update after device detection
-> 
-> Antoine Tenart (5):
->   mtd: pxa3xx: prepare allowing compile test
+Hi Timur,
 
-Nit: This commit subject sounds a bit off.
-
->   mtd: nand: allow compile test of MTD_NAND_PXA3xx
->   mtd: pxa3xx_nand: add helpers to setup the timings
->   mtd: pxa3xx_nand: rework flash detection and timing setup
->   mtd: pxa3xx_nand: clean up the pxa3xx timings
+On 26/10/15 12:46, Timur Tabi wrote:
+> Andre Przywara wrote:
+>> I tried to refactor the driver lately to split up SBSA and PL011 support
+>> and got something that compiles, though I wasn't fully satisfied and I
+>> ran out of time. The refactor idea was to split driver runtime from
+>> initialization, so the different probe and init functions can be moved
+>> into separate files. There would be one stub file with all the core
+>> driver logic (DMA, IRQ handling, buffer handling, communication
+>> parameters setup) and one file for each subtype (PL011, SBSA, ZTE, you
+>> name it).
+>> If people are interested, I can try to clean this up and post it as an
+>> RFC.
 > 
->  drivers/mtd/nand/Kconfig       |   2 +-
->  drivers/mtd/nand/pxa3xx_nand.c | 274 +++++++++++++++++++++++++----------------
->  2 files changed, 168 insertions(+), 108 deletions(-)
-> 
+> I am interested.  We need support for subtype 13, because our hardware
+> only supports 32-bit access to all registers. 
 
-The series look good and it's certainly a great improvement.
-Thomas and Robert tested it, so we should be good to go:
+Yeah, I was interested in that scenario too, because the SBSA spec
+actually speaks of 32-bit registers and vendors may implement it
+strictly as that. Still waiting for actual failure reports on this
+before I wanted to push a fix, though.
 
-Acked-by: Ezequiel Garcia <ezequiel@vanguardiasur.com.ar>
+> We have an internal patch
+> that replaces all of the read/write routines with vendor function calls.
+>  I would need to refactor our patch on top of yours.
 
-We can take a look at the timeout reported by Thomas afterwards.
+But wouldn't Jun's patch address this more easily, because it wraps
+every call already? TBH I found this change the most interesting.
 
-BTW, it would be great if you could post a patch using Boris'
-timings helpers: https://patchwork.ozlabs.org/patch/534919/ ?
--- 
-Ezequiel Garcia, VanguardiaSur
-www.vanguardiasur.com.ar
+I will prepare something this week.
+
+Cheers,
+Andre.
