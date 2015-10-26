@@ -1,93 +1,110 @@
-From: matt@codeblueprint.co.uk (Matt Fleming)
-Date: Mon, 26 Oct 2015 21:11:33 +0000
-Subject: [PATCH] arm64/efi: move arm64 specific stub C code to libstub
-In-Reply-To: <1445611694-31838-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1445611694-31838-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20151026211133.GB3526@codeblueprint.co.uk>
+From: kamal@canonical.com (Kamal Mostafa)
+Date: Mon, 26 Oct 2015 14:14:34 -0700
+Subject: [3.16.y-ckt stable] Patch "irqchip/atmel-aic5: Use per chip mask
+ caches in mask/unmask()" has been added to staging queue
+Message-ID: <1445894074-1191-1-git-send-email-kamal@canonical.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 23 Oct, at 04:48:14PM, Ard Biesheuvel wrote:
-> Now that we added special handling to the C files in libstub, move
-> the one remaining arm64 specific EFI stub C file to libstub as
-> well, so that it gets the same treatment. This should prevent future
-> changes from resulting in binaries that may execute incorrectly in
-> UEFI context.
- 
-Sorry, I'm coming at this cache-cold: What special handling was added
-to libstub that you want to make use of here?
+This is a note to let you know that I have just added a patch titled
 
-> With efi-entry.S the only remaining EFI stub source file under
-> arch/arm64, we can also simplify the Makefile logic somewhat.
-> 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
-> 
-> I would like to suggest that this be taken on top of the stuff that is
-> queued for 4.4 at the moment (if it is not too late already).
- 
-That's upto the tip folks (Cc'd). Ingo, would you consider applying
-a minimal build cleanup patch like this for v4.4?
+    irqchip/atmel-aic5: Use per chip mask caches in mask/unmask()
 
->  arch/arm64/kernel/Makefile                                                | 9 ++-------
->  drivers/firmware/efi/libstub/Makefile                                     | 3 +++
->  arch/arm64/kernel/efi-stub.c => drivers/firmware/efi/libstub/arm64-stub.c | 0
->  3 files changed, 5 insertions(+), 7 deletions(-)
-> 
-> diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
-> index 1b6bda2ff102..474691f8b13a 100644
-> --- a/arch/arm64/kernel/Makefile
-> +++ b/arch/arm64/kernel/Makefile
-> @@ -4,11 +4,8 @@
->  
->  CPPFLAGS_vmlinux.lds	:= -DTEXT_OFFSET=$(TEXT_OFFSET)
->  AFLAGS_head.o		:= -DTEXT_OFFSET=$(TEXT_OFFSET)
-> -CFLAGS_efi-stub.o 	:= -DTEXT_OFFSET=$(TEXT_OFFSET)
->  CFLAGS_armv8_deprecated.o := -I$(src)
->  
-> -KASAN_SANITIZE_efi-stub.o	:= n
-> -
->  CFLAGS_REMOVE_ftrace.o = -pg
->  CFLAGS_REMOVE_insn.o = -pg
->  CFLAGS_REMOVE_return_address.o = -pg
-> @@ -22,9 +19,7 @@ arm64-obj-y		:= debug-monitors.o entry.o irq.o fpsimd.o		\
->  			   cpufeature.o alternative.o cacheinfo.o		\
->  			   smp.o smp_spin_table.o topology.o
->  
-> -stub-obj				:= efi-stub.o efi-entry.o
-> -extra-y					:= $(stub-obj)
-> -stub-obj				:= $(patsubst %.o,%.stub.o,$(stub-obj))
-> +extra-$(CONFIG_EFI)			:= efi-entry.o
->  
->  OBJCOPYFLAGS := --prefix-symbols=__efistub_
->  $(obj)/%.stub.o: $(obj)/%.o FORCE
-> @@ -42,7 +37,7 @@ arm64-obj-$(CONFIG_CPU_PM)		+= sleep.o suspend.o
->  arm64-obj-$(CONFIG_CPU_IDLE)		+= cpuidle.o
->  arm64-obj-$(CONFIG_JUMP_LABEL)		+= jump_label.o
->  arm64-obj-$(CONFIG_KGDB)		+= kgdb.o
-> -arm64-obj-$(CONFIG_EFI)			+= efi.o $(stub-obj)
-> +arm64-obj-$(CONFIG_EFI)			+= efi.o efi-entry.stub.o
->  arm64-obj-$(CONFIG_PCI)			+= pci.o
->  arm64-obj-$(CONFIG_ARMV8_DEPRECATED)	+= armv8_deprecated.o
->  arm64-obj-$(CONFIG_ACPI)		+= acpi.o
-> diff --git a/drivers/firmware/efi/libstub/Makefile b/drivers/firmware/efi/libstub/Makefile
-> index bca9a76cbd33..92ae557abbbc 100644
-> --- a/drivers/firmware/efi/libstub/Makefile
-> +++ b/drivers/firmware/efi/libstub/Makefile
-> @@ -34,6 +34,9 @@ $(obj)/lib-%.o: $(srctree)/lib/%.c FORCE
->  lib-$(CONFIG_EFI_ARMSTUB)	+= arm-stub.o fdt.o string.o \
->  				   $(patsubst %.c,lib-%.o,$(arm-deps))
->  
-> +lib-$(CONFIG_ARM64)		+= arm64-stub.o
-> +CFLAGS_arm64-stub.o 		:= -DTEXT_OFFSET=$(TEXT_OFFSET)
-> +
->  #
->  # arm64 puts the stub in the kernel proper, which will unnecessarily retain all
->  # code indefinitely unless it is annotated as __init/__initdata/__initconst etc.
-> diff --git a/arch/arm64/kernel/efi-stub.c b/drivers/firmware/efi/libstub/arm64-stub.c
-> similarity index 100%
-> rename from arch/arm64/kernel/efi-stub.c
-> rename to drivers/firmware/efi/libstub/arm64-stub.c
-> -- 
-> 2.1.4
-> 
+to the linux-3.16.y-queue branch of the 3.16.y-ckt extended stable tree 
+which can be found at:
+
+    http://kernel.ubuntu.com/git/ubuntu/linux.git/log/?h=linux-3.16.y-queue
+
+This patch is scheduled to be released in version 3.19.8-ckt9.
+
+If you, or anyone else, feels it should not be added to this tree, please 
+reply to this email.
+
+For more information about the 3.16.y-ckt tree, see
+https://wiki.ubuntu.com/Kernel/Dev/ExtendedStable
+
+Thanks.
+-Kamal
+
+------
+
+>From 91631f5d71ee5f728703349d96d09080e46cae0a Mon Sep 17 00:00:00 2001
+From: Ludovic Desroches <ludovic.desroches@atmel.com>
+Date: Mon, 21 Sep 2015 15:46:04 +0200
+Subject: irqchip/atmel-aic5: Use per chip mask caches in mask/unmask()
+
+commit d32dc9aa10c739363c775baf4499416b2e0dc11f upstream.
+
+When masking/unmasking interrupts, mask_cache is updated and used later
+for suspend/resume. Unfortunately, it always was the mask_cache
+associated with the first irq chip which was updated. So when performing
+resume, only irqs 0-31 could be enabled.
+
+Fixes: b1479ebb7720 ("irqchip: atmel-aic: Add atmel AIC/AIC5 drivers")
+Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+Cc: <sasha.levin@oracle.com>
+Cc: <linux-arm-kernel@lists.infradead.org>
+Cc: <nicolas.ferre@atmel.com>
+Cc: <alexandre.belloni@free-electrons.com>
+Cc: <boris.brezillon@free-electrons.com>
+Cc: <Wenyou.Yang@atmel.com>
+Cc: <jason@lakedaemon.net>
+Cc: <marc.zyngier@arm.com>
+Link: http://lkml.kernel.org/r/1442843173-2390-1-git-send-email-ludovic.desroches at atmel.com
+Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
+Signed-off-by: Kamal Mostafa <kamal@canonical.com>
+---
+ drivers/irqchip/irq-atmel-aic5.c | 24 ++++++++++++++++--------
+ 1 file changed, 16 insertions(+), 8 deletions(-)
+
+diff --git a/drivers/irqchip/irq-atmel-aic5.c b/drivers/irqchip/irq-atmel-aic5.c
+index a2e8c3f..c2c578f 100644
+--- a/drivers/irqchip/irq-atmel-aic5.c
++++ b/drivers/irqchip/irq-atmel-aic5.c
+@@ -88,28 +88,36 @@ static void aic5_mask(struct irq_data *d)
+ {
+ 	struct irq_domain *domain = d->domain;
+ 	struct irq_domain_chip_generic *dgc = domain->gc;
+-	struct irq_chip_generic *gc = dgc->gc[0];
++	struct irq_chip_generic *bgc = dgc->gc[0];
++	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
+
+-	/* Disable interrupt on AIC5 */
+-	irq_gc_lock(gc);
++	/*
++	 * Disable interrupt on AIC5. We always take the lock of the
++	 * first irq chip as all chips share the same registers.
++	 */
++	irq_gc_lock(bgc);
+ 	irq_reg_writel(gc, d->hwirq, AT91_AIC5_SSR);
+ 	irq_reg_writel(gc, 1, AT91_AIC5_IDCR);
+ 	gc->mask_cache &= ~d->mask;
+-	irq_gc_unlock(gc);
++	irq_gc_unlock(bgc);
+ }
+
+ static void aic5_unmask(struct irq_data *d)
+ {
+ 	struct irq_domain *domain = d->domain;
+ 	struct irq_domain_chip_generic *dgc = domain->gc;
+-	struct irq_chip_generic *gc = dgc->gc[0];
++	struct irq_chip_generic *bgc = dgc->gc[0];
++	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
+
+-	/* Enable interrupt on AIC5 */
+-	irq_gc_lock(gc);
++	/*
++	 * Enable interrupt on AIC5. We always take the lock of the
++	 * first irq chip as all chips share the same registers.
++	 */
++	irq_gc_lock(bgc);
+ 	irq_reg_writel(gc, d->hwirq, AT91_AIC5_SSR);
+ 	irq_reg_writel(gc, 1, AT91_AIC5_IECR);
+ 	gc->mask_cache |= d->mask;
+-	irq_gc_unlock(gc);
++	irq_gc_unlock(bgc);
+ }
+
+ static int aic5_retrigger(struct irq_data *d)
+--
+1.9.1
