@@ -1,76 +1,55 @@
-From: o.schinagl@ultimaker.com (Olliver Schinagl)
-Date: Mon, 26 Oct 2015 22:32:31 +0100
-Subject: [PATCH 00/10] 
-Message-ID: <1445895161-2317-1-git-send-email-o.schinagl@ultimaker.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 26 Oct 2015 21:42:33 +0000
+Subject: [PATCH] arm64: page-align sections for DEBUG_RODATA
+Message-ID: <1445895753-2095-1-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hey Thierry,
+A kernel built with DEBUG_RO_DATA && !CONFIG_DEBUG_ALIGN_RODATA doesn't
+have .text aligned to a page boundary, though fixup_executable works at
+page-granularity thanks to its use of create_mapping. If .text is not
+page-aligned, the first page it exists in may be marked non-executable,
+leading to failures when an attempt is made to execute code in said
+page.
 
-With this patch set I wanted to add some new features to the PWM framework,
-while doing so, I ran into 2 minor things with the lpc18xx and sunxi driver.
+This patch upgrades ALIGN_DEBUG_RO and ALIGN_DEBUG_RO_MIN to force page
+alignment for DEBUG_RO_DATA && !CONFIG_DEBUG_ALIGN_RODATA kernels,
+ensuring that all sections with specific RWX permission requirements are
+mapped with the correct permissions.
 
-The lpc18xx I bumped into because I was trying to learn from existing drivers.
-Here I only added the setter to set the chip_data, since I think it is bad
-practice to set data directly in the struct, I'll be happy to stand corrected
-however and that patch not applied.
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Reported-by: Jeremy Linton <jeremy.linton@arm.com>
+Reviewed-by: Laura Abbott <laura@labbott.name>
+Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Suzuki Poulose <suzuki.poulose@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm64/kernel/vmlinux.lds.S | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
 
-Since I use the sunxi platform a lot, I used this platform to test things with
-and to also ran into some issues with the hardware PWM as can be seen in its
-commit log.
+Note: this is intended to supercede [1,2].
 
-The major feature of this patch-set however is the introduction of the Generic
-GPIO based PWM driver based on the high-resolution timers. On an Olimex Lime2
-featuring an Allwinner A20 SoC, I can toggle quite reliably at 100 kHz. At 150
-kHz the SoC started to show signs of being to slow and the scope traces started
-to become inconsistent.
-Naturally of course, a GPIO based PWM is heavily dependent on system load and
-on the SoC. For some use cases a bit-banged PWM might not be ideal, audio for
-example does not sound 'pitch-perfect' but does work pretty alright. It really
-is up to the users what one might one to use a bit-banged GPIO driver for.
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-October/380486.html
+[2] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-October/380999.html
 
-Finally, I've started to add a 'pulse' option to the PWM framework and
-added it to the sunxi and gpio variants. It currently does not work and I
-did not wanted to submit it until Boris's PWM patches where in, but I also
-felt an early review on the intention would be a good idea.
-The idea is using this new feature, we can start emitting a fixed number of
-pulses, using the PWM 'hardware' guaranteeing properly timed output.
-Not all hardware may support this at all (might be emulated however) and the
-sunxi hardware for example is limited to 1 pulse max (but may emulate more with
-timers for example). The GPIO driver is able to produce a lot of timed pulses
-however.
-
-Thanks,
-
-Olliver
-
-Signed-off-by: Olliver Schinagl <oliver@schinagl.nL>
-
-Olliver Schinagl (10):
-  pwm: lpc18xx_pwm: use pwm_set_chip_data
-  pwm: sunxi: fix whitespace issue
-  pwm: sunxi: Yield some time to the pwm-block to become ready
-  pwm: core: use bitops
-  pwm: sysfs: do not unnecessarily store result in var
-  pwm: sysfs: make use of the DEVICE_ATTR_[RW][WO] macro's
-  pwm: gpio: Add a generic gpio based PWM driver
-  pwm: core: add pulse feature to the PWM framework
-  pwm: pwm_gpio: add pulse option
-  pwm: sunxi: Add possibility to pulse the sunxi pwm output
-
- Documentation/devicetree/bindings/pwm/pwm-gpio.txt |  18 ++
- MAINTAINERS                                        |   5 +
- drivers/pwm/Kconfig                                |  15 ++
- drivers/pwm/Makefile                               |   1 +
- drivers/pwm/core.c                                 |  30 ++-
- drivers/pwm/pwm-gpio.c                             | 276 +++++++++++++++++++++
- drivers/pwm/pwm-lpc18xx-sct.c                      |  11 +-
- drivers/pwm/pwm-sun4i.c                            |  73 ++++--
- drivers/pwm/sysfs.c                                | 133 +++++++---
- include/linux/pwm.h                                |  71 +++++-
- 10 files changed, 556 insertions(+), 77 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/pwm/pwm-gpio.txt
- create mode 100644 drivers/pwm/pwm-gpio.c
-
+diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
+index 9807333..4d77757 100644
+--- a/arch/arm64/kernel/vmlinux.lds.S
++++ b/arch/arm64/kernel/vmlinux.lds.S
+@@ -60,9 +60,12 @@ PECOFF_FILE_ALIGNMENT = 0x200;
+ #define PECOFF_EDATA_PADDING
+ #endif
+ 
+-#ifdef CONFIG_DEBUG_ALIGN_RODATA
++#if defined(CONFIG_DEBUG_ALIGN_RODATA)
+ #define ALIGN_DEBUG_RO			. = ALIGN(1<<SECTION_SHIFT);
+ #define ALIGN_DEBUG_RO_MIN(min)		ALIGN_DEBUG_RO
++#elif defined(CONFIG_DEBUG_RODATA)
++#define ALIGN_DEBUG_RO			. = ALIGN(1<<PAGE_SHIFT);
++#define ALIGN_DEBUG_RO_MIN(min)		ALIGN_DEBUG_RO
+ #else
+ #define ALIGN_DEBUG_RO
+ #define ALIGN_DEBUG_RO_MIN(min)		. = ALIGN(min);
 -- 
-2.6.1
+1.9.1
