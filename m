@@ -1,102 +1,53 @@
-From: ezequiel@vanguardiasur.com.ar (Ezequiel Garcia)
-Date: Sun, 25 Oct 2015 22:27:10 -0300
-Subject: v7-M: Fixing XIP when the kernel is in ROM
-Message-ID: <20151026012710.GA17365@laptop>
+From: ming.lei@canonical.com (Ming Lei)
+Date: Mon, 26 Oct 2015 09:44:31 +0800
+Subject: [PATCH v6 3/4] arm64/arm, numa, dt: adding numa dt binding
+ implementation for arm64 platforms
+In-Reply-To: <1445337931-11344-4-git-send-email-gkulkarni@caviumnetworks.com>
+References: <1445337931-11344-1-git-send-email-gkulkarni@caviumnetworks.com>
+ <1445337931-11344-4-git-send-email-gkulkarni@caviumnetworks.com>
+Message-ID: <CACVXFVMiZs_g3qw99-PhxLiX5oLe8_z5cOAfJZ_4-09jN2koCQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I've been trying to make my ARM v7-M LPC43xx board
-boot a XIP kernel from flash. Currently, this seems
-to be broken in mainline due to this:
+On Tue, Oct 20, 2015 at 6:45 PM, Ganapatrao Kulkarni
+<gkulkarni@caviumnetworks.com> wrote:
+> Adding numa dt binding support for arm64 based platforms.
+> dt node parsing for numa topology is done using device property
+> proximity and device node distance-map.
+>
+> Reviewed-by: Robert Richter <rrichter@cavium.com>
+> Signed-off-by: Ganapatrao Kulkarni <gkulkarni@caviumnetworks.com>
+> ---
+>  arch/arm64/Kconfig            |  10 ++
+>  arch/arm64/include/asm/numa.h |  10 ++
+>  arch/arm64/kernel/Makefile    |   1 +
+>  arch/arm64/kernel/of_numa.c   | 221 ++++++++++++++++++++++++++++++++++++++++++
+>  arch/arm64/kernel/smp.c       |   1 +
+>  arch/arm64/mm/numa.c          |  10 +-
+>  6 files changed, 252 insertions(+), 1 deletion(-)
+>  create mode 100644 arch/arm64/kernel/of_numa.c
+>
+> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> index 0f9cdc7..6cf8d20 100644
+> --- a/arch/arm64/Kconfig
+> +++ b/arch/arm64/Kconfig
+> @@ -426,6 +426,16 @@ config NUMA
+>           local memory controller of the CPU and add some more
+>           NUMA awareness to the kernel.
+>
+> +config OF_NUMA
+> +       bool "Device Tree NUMA support"
+> +       depends on NUMA
+> +       depends on OF
+> +       default y
+> +       help
+> +         Enable Device Tree NUMA support.
+> +         This enables the numa mapping of cpu, memory, io and
+> +         inter node distances using dt bindings.
 
-arch/arm/mm/proc-v7m.S
-[..]
-        @ SVC to run the kernel in this mode
-        badr    r1, 1f
-        ldr     r5, [r12, #11 * 4]      @ read the SVC vector entry
-        str     r1, [r12, #11 * 4]      @ write the temporary SVC vector entry
-        mov     r6, lr                  @ save LR
-        mov     r7, sp                  @ save SP
-	ldr     sp, =__v7m_setup_stack_top @ <<< Breaks XIP!
-        cpsie   i
-        svc     #0
-1:      cpsid   i
-        str     r5, [r12, #11 * 4]      @ restore the original SVC vector entry
-        mov     lr, r6                  @ restore LR
-        mov     sp, r7                  @ restore SP
+Enabling the above config option can cause numa_init() warning in
+numa-less arm64 system, please see the following report:
 
-Here, a temporary stack is prepared before making a
-supervisor call (SVC) to switch to handler mode.
+          https://bugs.launchpad.net/bugs/1509221
 
-The temporary stack is allocated in the .text.init section
-and so this doesn't work when the kernel is executing from ROM.
-
-A similar problem has been reported for v7:
-
-http://lists.infradead.org/pipermail/linux-arm-kernel/2015-July/357106.html
-
-While trying to come up with a proper fix, I've noticed how
-the stack doesn't seem to be used.
-
-So, I've been trying to understand why the need for the temporary
-stack@all, but I still can't get it. 
-
-The below patch seems to work just fine, and allows to boot a
-LPC43xx kernel either as XIP from ROM or non-XIP from RAM.
-
-However, I'm still wondering if the stack is really unused or not,
-so any lights that can be shed here will be appreciated.
-
-Thanks!
-
->From a7c880c73b8ad2e4c4b07f4d11809ea541a65e1d Mon Sep 17 00:00:00 2001
-From: Ezequiel Garcia <ezequiel@vanguardiasur.com.ar>
-Date: Sat, 24 Oct 2015 13:27:27 -0300
-Subject: [PATCH] ARM: Don't prepare any temporary stack in __v7m_setup
-
-Since __v7m_setup() is implemented as the PROCINFO_INITFUNC
-called in head-nommu.S it's called at the very beggining to
-do some very basic setup.
-
-The function prepares a temporary stack in the .text.init
-section before calling SVC. However, this stack seems to
-be completely unused and hence is not needed.
-
-Moreover, this breaks on XIP kernels, when the text is in ROM.
-Hence, this commit simply removes the temporary stack setup.
-
-Signed-off-by: Ezequiel Garcia <ezequiel@vanguardiasur.com.ar>
----
- arch/arm/mm/proc-v7m.S | 6 ------
- 1 file changed, 6 deletions(-)
-
-diff --git a/arch/arm/mm/proc-v7m.S b/arch/arm/mm/proc-v7m.S
-index 67d9209077c6..6a383e619a0c 100644
---- a/arch/arm/mm/proc-v7m.S
-+++ b/arch/arm/mm/proc-v7m.S
-@@ -103,7 +103,6 @@ __v7m_setup:
- 	str	r1, [r12, #11 * 4]	@ write the temporary SVC vector entry
- 	mov	r6, lr			@ save LR
- 	mov	r7, sp			@ save SP
--	ldr	sp, =__v7m_setup_stack_top
- 	cpsie	i
- 	svc	#0
- 1:	cpsid	i
-@@ -123,11 +122,6 @@ __v7m_setup:
- 	ret	lr
- ENDPROC(__v7m_setup)
- 
--	.align 2
--__v7m_setup_stack:
--	.space	4 * 8				@ 8 registers
--__v7m_setup_stack_top:
--
- 	define_processor_functions v7m, dabort=nommu_early_abort, pabort=legacy_pabort, nommu=1
- 
- 	.section ".rodata"
--- 
-2.5.2
-
--- 
-Ezequiel Garcia, VanguardiaSur
-www.vanguardiasur.com.ar
+Thanks,
