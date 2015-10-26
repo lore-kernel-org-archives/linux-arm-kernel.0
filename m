@@ -1,18 +1,22 @@
-From: raghumag@gmail.com (raghu MG)
-Date: Mon, 26 Oct 2015 12:19:31 +0530
-Subject: How is jiffies upation while holding spinlock in Uniprocessor or SMP
- environment?
-Message-ID: <CAG1O52Wq9uCXkOgttQ7gYECQsbFufug2LCBJQfNU309i5QNH6A@mail.gmail.com>
+From: yvo@apm.com (Y Vo)
+Date: Mon, 26 Oct 2015 13:49:32 +0700
+Subject: [PATCH v2 0/3] gpio: xgene: add support to configure GPIO line as
+ input, output or external IRQ pin
+Message-ID: <1445842175-11446-1-git-send-email-yvo@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-I have couple of questions.
-1) In case of UP how is jiffies(timer) get updated while holding spin
-lock using spinlock_irq_save?
+V2 Changes:
+	- support X-Gene standby GPIO as an interrupt controller.
 
-2)My understanding is in smp environment jiffies updation cannot be
-done on processor holding spinlock irrespective of spinlock API.So
-timer interrupt should be enabled across all cores in SoC. Imagine a
-scenario in quad core processor where 4 cores are holding 4 different
-spinlocks & how is the timer interrupt for jiffies handled?
+Y Vo (3):
+  gpio: xgene: add support to configure GPIO line as input, output or  
+      external IRQ pin
+  Documentation: gpio: Update description for X-Gene standby GPIO    
+    controller DTS binding
+  arm64: dts: Update APM X-Gene standby GPIO controller DTS entries
+
+ .../devicetree/bindings/gpio/gpio-xgene-sb.txt     |   23 ++-
+ arch/arm64/boot/dts/apm/apm-storm.dtsi             |   15 +-
+ drivers/gpio/gpio-xgene-sb.c                       |  234 +++++++++++++++++---
+ 3 files changed, 223 insertions(+), 49 deletions(-)
