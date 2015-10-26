@@ -1,47 +1,99 @@
 From: leilk.liu@mediatek.com (Leilk Liu)
-Date: Mon, 26 Oct 2015 16:09:41 +0800
-Subject: [PATCH v2 1/5] dt-binding: spi: Mediatek: Update document devicetree
- bindings to support multiple devices
+Date: Mon, 26 Oct 2015 16:09:42 +0800
+Subject: [PATCH v2 2/5] spi: mediatek: remove mtk_spi_config
 In-Reply-To: <1445846985-26229-1-git-send-email-leilk.liu@mediatek.com>
 References: <1445846985-26229-1-git-send-email-leilk.liu@mediatek.com>
-Message-ID: <1445846985-26229-2-git-send-email-leilk.liu@mediatek.com>
+Message-ID: <1445846985-26229-3-git-send-email-leilk.liu@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch updates document devicetree bindings
-to support multiple devices.
+mtk_spi_config() and mtk_spi_prepare_message() both initialize
+spi register, so remove mtk_spi_config() and init all register
+in mtk_spi_prepare_message().
 
 Signed-off-by: Leilk Liu <leilk.liu@mediatek.com>
 ---
- Documentation/devicetree/bindings/spi/spi-mt65xx.txt | 9 ++++++---
- 1 file changed, 6 insertions(+), 3 deletions(-)
+ drivers/spi/spi-mt65xx.c | 59 +++++++++++++++++++++---------------------------
+ 1 file changed, 26 insertions(+), 33 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/spi/spi-mt65xx.txt b/Documentation/devicetree/bindings/spi/spi-mt65xx.txt
-index 6160ffb..ce363c923f 100644
---- a/Documentation/devicetree/bindings/spi/spi-mt65xx.txt
-+++ b/Documentation/devicetree/bindings/spi/spi-mt65xx.txt
-@@ -29,8 +29,11 @@ Required properties:
-   muxes clock, and "spi-clk" for the clock gate.
+diff --git a/drivers/spi/spi-mt65xx.c b/drivers/spi/spi-mt65xx.c
+index ecb6c58..7bd84c8 100644
+--- a/drivers/spi/spi-mt65xx.c
++++ b/drivers/spi/spi-mt65xx.c
+@@ -131,10 +131,34 @@ static void mtk_spi_reset(struct mtk_spi *mdata)
+ 	writel(reg_val, mdata->base + SPI_CMD_REG);
+ }
  
- Optional properties:
-+-cs-gpios: see spi-bus.txt, only required for MT8173.
+-static void mtk_spi_config(struct mtk_spi *mdata,
+-			   struct mtk_chip_config *chip_config)
++static int mtk_spi_prepare_message(struct spi_master *master,
++				   struct spi_message *msg)
+ {
++	u16 cpha, cpol;
+ 	u32 reg_val;
++	struct mtk_chip_config *chip_config;
++	struct spi_device *spi = msg->spi;
++	struct mtk_spi *mdata = spi_master_get_devdata(master);
 +
- - mediatek,pad-select: specify which pins group(ck/mi/mo/cs) spi
--  controller used, this value should be 0~3, only required for MT8173.
-+  controller used. This is a array, the element value should be 0~3,
-+  only required for MT8173.
-     0: specify GPIO69,70,71,72 for spi pins.
-     1: specify GPIO102,103,104,105 for spi pins.
-     2: specify GPIO128,129,130,131 for spi pins.
-@@ -49,7 +52,7 @@ spi: spi at 1100a000 {
- 		 <&topckgen CLK_TOP_SPI_SEL>,
- 		 <&pericfg CLK_PERI_SPI0>;
- 	clock-names = "parent-clk", "sel-clk", "spi-clk";
++	cpha = spi->mode & SPI_CPHA ? 1 : 0;
++	cpol = spi->mode & SPI_CPOL ? 1 : 0;
++
++	chip_config = spi->controller_data;
++	if (!chip_config) {
++		chip_config = (void *)&mtk_default_chip_info;
++		spi->controller_data = chip_config;
++	}
++
++	reg_val = readl(mdata->base + SPI_CMD_REG);
++	if (cpha)
++		reg_val |= SPI_CMD_CPHA;
++	else
++		reg_val &= ~SPI_CMD_CPHA;
++	if (cpol)
++		reg_val |= SPI_CMD_CPOL;
++	else
++		reg_val &= ~SPI_CMD_CPOL;
++	writel(reg_val, mdata->base + SPI_CMD_REG);
+ 
+ 	reg_val = readl(mdata->base + SPI_CMD_REG);
+ 
+@@ -171,37 +195,6 @@ static void mtk_spi_config(struct mtk_spi *mdata,
+ 	/* pad select */
+ 	if (mdata->dev_comp->need_pad_sel)
+ 		writel(mdata->pad_sel, mdata->base + SPI_PAD_SEL_REG);
+-}
 -
--	mediatek,pad-select = <0>;
-+	cs-gpios = <&pio 105 GPIO_ACTIVE_LOW>, <&pio 72 GPIO_ACTIVE_LOW>;
-+	mediatek,pad-select = <1>, <0>;
- 	status = "disabled";
- };
+-static int mtk_spi_prepare_message(struct spi_master *master,
+-				   struct spi_message *msg)
+-{
+-	u32 reg_val;
+-	u8 cpha, cpol;
+-	struct mtk_chip_config *chip_config;
+-	struct spi_device *spi = msg->spi;
+-	struct mtk_spi *mdata = spi_master_get_devdata(master);
+-
+-	cpha = spi->mode & SPI_CPHA ? 1 : 0;
+-	cpol = spi->mode & SPI_CPOL ? 1 : 0;
+-
+-	reg_val = readl(mdata->base + SPI_CMD_REG);
+-	if (cpha)
+-		reg_val |= SPI_CMD_CPHA;
+-	else
+-		reg_val &= ~SPI_CMD_CPHA;
+-	if (cpol)
+-		reg_val |= SPI_CMD_CPOL;
+-	else
+-		reg_val &= ~SPI_CMD_CPOL;
+-	writel(reg_val, mdata->base + SPI_CMD_REG);
+-
+-	chip_config = spi->controller_data;
+-	if (!chip_config) {
+-		chip_config = (void *)&mtk_default_chip_info;
+-		spi->controller_data = chip_config;
+-	}
+-	mtk_spi_config(mdata, chip_config);
+ 
+ 	return 0;
+ }
 -- 
 1.8.1.1.dirty
