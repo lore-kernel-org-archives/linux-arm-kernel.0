@@ -1,41 +1,76 @@
-From: yingjoe.chen@mediatek.com (Yingjoe Chen)
-Date: Mon, 26 Oct 2015 15:15:17 +0800
-Subject: [PATCH v5 4/5] ARM: dts: mt8135: enable basic SMP bringup for
- mt8135
-In-Reply-To: <CAMAWPa-Ed2FJY2pW67EHHKBH3_eBZx0+oWfMJwc_DhEjrf7aMg@mail.gmail.com>
-References: <1443799181-50409-1-git-send-email-yingjoe.chen@mediatek.com>
- <1443799181-50409-5-git-send-email-yingjoe.chen@mediatek.com>
- <CAMAWPa-Ed2FJY2pW67EHHKBH3_eBZx0+oWfMJwc_DhEjrf7aMg@mail.gmail.com>
-Message-ID: <1445843717.23888.1.camel@mtksdaap41>
+From: ming.lei@canonical.com (Ming Lei)
+Date: Mon, 26 Oct 2015 15:20:34 +0800
+Subject: [PATCH v6 3/4] arm64/arm, numa, dt: adding numa dt binding
+ implementation for arm64 platforms
+In-Reply-To: <CACVXFVPoZqjFeqK7=M7wK0JQ0iS9tYoN8BHsYMc25OL-4j=e1g@mail.gmail.com>
+References: <1445337931-11344-1-git-send-email-gkulkarni@caviumnetworks.com>
+ <1445337931-11344-4-git-send-email-gkulkarni@caviumnetworks.com>
+ <CACVXFVMiZs_g3qw99-PhxLiX5oLe8_z5cOAfJZ_4-09jN2koCQ@mail.gmail.com>
+ <CAFpQJXX8VXX+gTBn-+7MepSAOzbOuc-yWJe4f=B7MH_Nj7FsKw@mail.gmail.com>
+ <CACVXFVPoZqjFeqK7=M7wK0JQ0iS9tYoN8BHsYMc25OL-4j=e1g@mail.gmail.com>
+Message-ID: <CACVXFVO5QGu9z1C49Wos_A5MpPafABL+WDidiHp3S2v1xUsRZw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2015-10-26 at 09:56 +0900, Kevin Hilman wrote:
-> Hello,
-> 
-> On Sat, Oct 3, 2015 at 12:19 AM, Yingjoe Chen <yingjoe.chen@mediatek.com> wrote:
-> > Add arch timer node to enable arch-timer support. MT8135 firmware
-> > doesn't correctly setup arch-timer frequency and CNTVOFF, add
-> > properties to workaround this.
-> >
-> > This also set cpu enable-method to enable SMP.
-> >
-> > Signed-off-by: Yingjoe Chen <yingjoe.chen@mediatek.com>
-> 
-> kernelci.org started detecting new boot failures for the mt8135-evb in
-> the arm-soc tree[1], and the boot failures were bisected down to this
-> patch, which landed upstream in the form of commit d186a394bb98 (ARM:
-> dts: mt8135: enable basic SMP bringup for mt8135)
-> 
-> Maybe this new SMP support requires updating the firmware on the board
-> as well?  If so, the changelog should've been a bit more explicit
-> about firmware dependencies.
+On Mon, Oct 26, 2015 at 12:53 PM, Ming Lei <ming.lei@canonical.com> wrote:
+> On Mon, Oct 26, 2015 at 11:50 AM, Ganapatrao Kulkarni
+> <gpkulkarni@gmail.com> wrote:
+>> On Mon, Oct 26, 2015 at 7:14 AM, Ming Lei <ming.lei@canonical.com> wrote:
+>>> On Tue, Oct 20, 2015 at 6:45 PM, Ganapatrao Kulkarni
+>>> <gkulkarni@caviumnetworks.com> wrote:
+>>>> Adding numa dt binding support for arm64 based platforms.
+>>>> dt node parsing for numa topology is done using device property
+>>>> proximity and device node distance-map.
+>>>>
+>>>> Reviewed-by: Robert Richter <rrichter@cavium.com>
+>>>> Signed-off-by: Ganapatrao Kulkarni <gkulkarni@caviumnetworks.com>
+>>>> ---
+>>>>  arch/arm64/Kconfig            |  10 ++
+>>>>  arch/arm64/include/asm/numa.h |  10 ++
+>>>>  arch/arm64/kernel/Makefile    |   1 +
+>>>>  arch/arm64/kernel/of_numa.c   | 221 ++++++++++++++++++++++++++++++++++++++++++
+>>>>  arch/arm64/kernel/smp.c       |   1 +
+>>>>  arch/arm64/mm/numa.c          |  10 +-
+>>>>  6 files changed, 252 insertions(+), 1 deletion(-)
+>>>>  create mode 100644 arch/arm64/kernel/of_numa.c
+>>>>
+>>>> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+>>>> index 0f9cdc7..6cf8d20 100644
+>>>> --- a/arch/arm64/Kconfig
+>>>> +++ b/arch/arm64/Kconfig
+>>>> @@ -426,6 +426,16 @@ config NUMA
+>>>>           local memory controller of the CPU and add some more
+>>>>           NUMA awareness to the kernel.
+>>>>
+>>>> +config OF_NUMA
+>>>> +       bool "Device Tree NUMA support"
+>>>> +       depends on NUMA
+>>>> +       depends on OF
+>>>> +       default y
+>>>> +       help
+>>>> +         Enable Device Tree NUMA support.
+>>>> +         This enables the numa mapping of cpu, memory, io and
+>>>> +         inter node distances using dt bindings.
+>>>
+>>> Enabling the above config option can cause numa_init() warning in
+>>> numa-less arm64 system, please see the following report:
+>> this is taken care. which version are you using?
+>
+> V5.
 
-Kevin,
+The issue persists on V6 too, so looks V7 is needed.
 
-Thanks for testing.
-
-No, it doesn't need new firmware. Will test to see what's going wrong.
-
-
-Joe.C
+>
+>>
+>>>
+>>>           https://bugs.launchpad.net/bugs/1509221
+>>>
+>>> Thanks,
+>>
+>> Thanks
+>> Ganapat
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
