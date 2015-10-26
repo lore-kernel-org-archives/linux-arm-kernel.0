@@ -1,25 +1,55 @@
-From: agross@codeaurora.org (Andy Gross)
-Date: Sun, 25 Oct 2015 21:00:14 -0500
-Subject: [PATCH v3 3/4] soc: qcom: smd: Use __ioread32_copy() instead of
- open-coding it
-In-Reply-To: <1445630512-10888-4-git-send-email-sboyd@codeaurora.org>
-References: <1445630512-10888-1-git-send-email-sboyd@codeaurora.org>
- <1445630512-10888-4-git-send-email-sboyd@codeaurora.org>
-Message-ID: <20151026020014.GA5705@qualcomm.com>
+From: shijie.huang@arm.com (Huang Shijie)
+Date: Mon, 26 Oct 2015 10:13:07 +0800
+Subject: [PATCH] Revert "serial: amba-pl011: fix incorrect integer size
+ in pl011_fifo_to_tty()"
+In-Reply-To: <562A6296.3070600@codeaurora.org>
+References: <1445594400-29095-1-git-send-email-shijie.huang@arm.com>
+ <20151023103056.GI4801@e103592.cambridge.arm.com>
+ <562A297A.9030204@codeaurora.org>
+ <20151023133403.GI4796@e103592.cambridge.arm.com>
+ <562A544D.7080506@tabi.org>
+ <20151023160246.GM4796@e103592.cambridge.arm.com>
+ <562A6296.3070600@codeaurora.org>
+Message-ID: <20151026021306.GB7305@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 23, 2015 at 01:01:51PM -0700, Stephen Boyd wrote:
-> Now that we have a generic library function for this, replace the
-> open-coded instance.
-> 
-> Cc: Bjorn Andersson <bjorn.andersson@sonymobile.com>
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
-> ---
+The 10/23/2015 11:38, Timur Tabi wrote:
+> On 10/23/2015 11:02 AM, Dave P Martin wrote:
+> >I'm pretty sure CREAD should default to enabled[1], and that usually
+> >software won't modify it.
+> >
+> >Assuming that this is indeed the problem, it's possible that another bug
+> >in the pl011 driver is wrongly clearing this flag.  Sadly I don't have
+> >time to look at the code again just now ...:(
+>
+> Perhaps, but !CREAD is definitely broken without this patch.  So if the
+> driver really is clearing CREAD somewhere else, then that's where the real
+> bug is.
+>
+> >
+> >Could be interesting to stick some BUG_ON(!CREAD) in the driver to
+> >try and track down where that's coming from.
+>
+> CREAD is disabled by default when opening the console.  You need to
+> explicitly set it in the termios structure.  I can easily believe that
+> Huang's rootfs is just forgetting to set that bit because for the last five
+> years, it didn't matter.
+>
+> Huang,
+>
+> In the beginning of pl011_set_termios() and sbsa_uart_set_termios(), please
+> add this code:
+>
+>       BUG_ON(!(termios->c_cflag & CREAD));
+>
+I find after I reverted this patch, the console also can hang sometimes!
 
-Acked-by: Andy Gross <agross@codeaurora.org>
+So the hang issue maybe caused by other patches.
 
--- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+thanks
+Huang Shijie
+
+________________________________
+
+-- IMPORTANT NOTICE: The contents of this email and any attachments are confidential and may also be privileged. If you are not the intended recipient, please notify the sender immediately and do not disclose the contents to any other person, use it for any purpose, or store or copy the information in any medium. Thank you.
