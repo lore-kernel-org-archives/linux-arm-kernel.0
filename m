@@ -1,27 +1,41 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Mon, 26 Oct 2015 14:28:55 +0900
-Subject: [GIT PULL 1/2] Broadcom Device Tree changes for 4.4 (Part 2, try2)
-In-Reply-To: <1445718981-13552-2-git-send-email-f.fainelli@gmail.com>
-References: <1445718981-13552-1-git-send-email-f.fainelli@gmail.com>
- <1445718981-13552-2-git-send-email-f.fainelli@gmail.com>
-Message-ID: <20151026052855.GB4216@localhost>
+Date: Mon, 26 Oct 2015 14:36:59 +0900
+Subject: [GIT PULL] omap soc clean-up for v4.4 merge window
+In-Reply-To: <20151024204209.GB892@atomide.com>
+References: <20151024204209.GB892@atomide.com>
+Message-ID: <20151026053659.GC4216@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 24, 2015 at 01:36:21PM -0700, Florian Fainelli wrote:
-> The following changes since commit 6ff33f3902c3b1c5d0db6b1e2c70b6d76fba357f:
+On Sat, Oct 24, 2015 at 01:42:10PM -0700, Tony Lindgren wrote:
+> The following changes since commit 049e6dde7e57f0054fdc49102e7ef4830c698b46:
 > 
->   Linux 4.3-rc1 (2015-09-12 16:35:56 -0700)
+>   Linux 4.3-rc4 (2015-10-04 16:57:17 +0100)
 > 
 > are available in the git repository at:
 > 
->   https://github.com/Broadcom/stblinux tags/arm/soc/for-4.4/rpi-dt-v2
+>   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.4/soc-clean-up
 > 
-> for you to fetch changes up to 121432c7a02f3818eefcad88c9ec428b7139b84a:
+> for you to fetch changes up to ef4da0c1c8f3ca3e9dcf6936bf687a32cd62f293:
 > 
->   ARM: bcm2835: Add the DDC I2C controller to the device tree. (2015-10-23 10:04:02 +0100)
+>   Merge tag 'for-v4.4/omap-hwmod-cleanup-a' of git://git.kernel.org/pub/scm/linux/kernel/git/pjw/omap-pending into omap-for-v4.4/soc (2015-10-23 18:13:38 -0700)
+> 
+> ----------------------------------------------------------------
+> Minimal omap SoC changes for v4.4 merge window. As we've spent quite a
+> bit of time sorting out regressions for v4.3 and are very late with
+> these, I've kept the changes down to minimum:
+> 
+> - A series of timer changes from Felipe Balbi to get us closer to
+>   moving the remaining timer code into drivers
+> 
+> - A series of hwmod clean-up changes queued by Paul Walmsley
+> 
+> - SoC detection clean-up to use soc_is instead of cpu_is as CPU is
+>   within the SoC and is confusing naming. The rest we can now change
+>   along with the other clean-up
 
-Thanks, merged!
+This is arriving a bit late, but I've merged it anyway since it's cleanup.
+Hopefully we won't see much regressions from it during the -rc cycle.
 
 
 -Olof
