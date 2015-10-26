@@ -1,52 +1,47 @@
-From: bharat.kumar.gogada@xilinx.com (Bharat Kumar Gogada)
-Date: Mon, 26 Oct 2015 10:26:38 +0000
-Subject: [PATCH v4] PCI: Xilinx-NWL-PCIe: Added support for Xilinx NWL
- PCIe Host Controller
-In-Reply-To: <5705956.6YyKSO4LdH@wuerfel>
-References: <1445066538-24638-1-git-send-email-bharatku@xilinx.com>
- <5705956.6YyKSO4LdH@wuerfel>
-Message-ID: <8520D5D51A55D047800579B09414719801692D8E@XAP-PVEXMBX01.xlnx.xilinx.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon, 26 Oct 2015 11:28:34 +0100
+Subject: [PATCH 2/3] nvmem: mediatek: Add Mediatek EFUSE driver
+In-Reply-To: <562DF8C8.8060600@linaro.org>
+References: <1444984751-4572-1-git-send-email-andrew-ct.chen@mediatek.com>
+ <1444984751-4572-3-git-send-email-andrew-ct.chen@mediatek.com>
+ <562DF8C8.8060600@linaro.org>
+Message-ID: <20151026102834.GE25308@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > +       device_type = "pci";
-> > +       interrupt-parent = <&gic>;
-> > +       interrupts = < 0 118 4
-> > +                      0 116 4
-> > +                      0 115 4          // MSI_1 [63...32]
-> > +                      0 114 4 >;       // MSI_0 [31...0]
-> 
-> Better write these as tuples:
-> 
-> 	interrupts = <0 118 4>, <0 116 4>, <0 115 4>, <0 114 4>;
-> 
-> And maybe reverse the order? It looks that might be what the soc
-> integration person had in mind.
-> 
-> Also, what is interrupt <0 117 4>? Is that connected here as well?
-> Better list it as well then, even if you don't use it.
-> 
-We have it but not using it, we will list it.
+On Mon, Oct 26, 2015 at 09:56:24AM +0000, Srinivas Kandagatla wrote:
+> >+	.val_bits = 32,
+> >+	.reg_stride = 4,
+> >+};
+> >+
+> >+static int mtk_efuse_probe(struct platform_device *pdev)
+> >+{
+> >+	struct device *dev = &pdev->dev;
+> >+	struct resource *res;
+> >+	struct nvmem_device *nvmem;
+> >+	struct nvmem_config *econfig;
+> >+	struct regmap *regmap;
+> >+	void __iomem *base;
+> >+
+> >+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> >+	base = devm_ioremap_resource(dev, res);
+> >+	if (IS_ERR(base))
+> >+		return PTR_ERR(base);
+> >+
+> >+	econfig = devm_kzalloc(dev, sizeof(*econfig), GFP_KERNEL);
+> >+	if (!econfig)
+> >+		return -ENOMEM;
+> Why not use static econfig variable?
 
-> > +       interrupt-map-mask = <0x0 0x0 0x0 0x7>;
-> > +       interrupt-map = <0x0 0x0 0x0 0x1 &pcie_intc 0x1
-> > +                        0x0 0x0 0x0 0x2 &pcie_intc 0x2
-> > +                        0x0 0x0 0x0 0x3 &pcie_intc 0x3
-> > +                        0x0 0x0 0x0 0x4 &pcie_intc 0x4>;
-> 
-> > +       msi-parent = <&nwl_pcie>;
-> > +       reg = <0x0 0xfd0e0000 0x1000
-> > +              0x0 0xfd480000 0x1000
-> > +              0x0 0xE0000000 0x1000000>;
-> 
-> Same grouping for reg and interrupt-map as above for interrupts.
+Because drivers should not assume there is only one instance of them in
+the system. The qfprom driver does this and it's only a matter of
+putting a second qcom,qfprom node into the device tree to break the
+driver.
 
-Grouping reg and interrupt-map as tuples will make lengthy line and reduces readability, is it compulsory ?
-> 
-> > +       reg-names = "breg", "pcireg", "cfg";
-> > +       ranges = <0x02000000 0x00000000 0xE1000000 0x00000000
-> > + 0xE1000000 0 0x0F000000>;
-> 
-> No I/O space or prefetcheable memory?
-> 
-> 	Arnd
+Sascha
+
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
