@@ -1,54 +1,45 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 26 Oct 2015 08:17:46 +0000
-Subject: [PATCH v2 0/2] i2c: uniphier: add two I2C controller drivers for
- UniPhier SoC platform
-In-Reply-To: <1445597520-6299-1-git-send-email-yamada.masahiro@socionext.com>
-References: <1445597520-6299-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <20151026081746.GC597@x1>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 26 Oct 2015 09:18:57 +0100
+Subject: Possible Regression due to c074fef5d36e ("of/platform: Defer
+ probes of registered devices").
+In-Reply-To: <20151026032039.GA1950@verge.net.au>
+References: <20151026032039.GA1950@verge.net.au>
+Message-ID: <CAMuHMdVGQ5w+Rr=wcWhgkpSVWLG_1U6sw2BXYyw9AA=SOzz+ZQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> This series adds two I2C controller drivers.
-> (they are completely different IPs.)
-> 
-> The first one is a very simple FIFO-less I2C controller,
-> which is used on some older UniPhier SoCs.
-> 
-> The other one is higher-performance I2C controller with TX/RX FIFO,
-> used on newer UniPhier SoCs.
+Hi Simon,
 
-And you have sent this to me because ... ?
+On Mon, Oct 26, 2015 at 4:20 AM, Simon Horman <horms@verge.net.au> wrote:
+> I have observed a possible regression in next-20151022
+> due to c074fef5d36e ("of/platform: Defer probes of registered devices").
+>
+> The problem manifests on the r8a7791 based koelsch board.
+> With the above patch present booting the board using the shmobile_defconfig
+> results in no console output. While after reverting the above patch
+> the boot proceeds all the way to user-space.
+>
+> With DEBUG_LL and EARLY_PRINTK enabled I was able to capture some console
+> output. I have included both that boot log, and a log of boot all the way to
+> userspace with the patch in question reverted.
+>
+> The problem does not seem to manifiest on other boards for other
+> Renesas ARM  SoCs that I have access too. In particular the
+> r8a7790 based lager board; the r8a7790 and r8a7791 are both members
+> of the R-Car Gen2 family of SoCs.
 
-> Changes in v2:
->   - Delete if-block after platform_get_resource()
->   - Add I2C_FUNC_SMBUS_EMUL to functionality
->   - Add bindings document
->   - Add entry to MAINTAINERS
->   - Delete if-block after platform_get_resource()
->   - Add I2C_FUNC_SMBUS_EMUL to functionality
->   - Add bindings document
->   - Fix a typo in a comment block
-> 
-> Masahiro Yamada (2):
->   i2c: uniphier: add UniPhier FIFO-less I2C driver
->   i2c: uniphier_f: add UniPhier FIFO-builtin I2C driver
-> 
->  .../devicetree/bindings/i2c/i2c-uniphier-f.txt     |  25 +
->  .../devicetree/bindings/i2c/i2c-uniphier.txt       |  25 +
->  MAINTAINERS                                        |   1 +
->  drivers/i2c/busses/Kconfig                         |  16 +
->  drivers/i2c/busses/Makefile                        |   2 +
->  drivers/i2c/busses/i2c-uniphier-f.c                | 584 +++++++++++++++++++++
->  drivers/i2c/busses/i2c-uniphier.c                  | 441 ++++++++++++++++
->  7 files changed, 1094 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/i2c/i2c-uniphier-f.txt
->  create mode 100644 Documentation/devicetree/bindings/i2c/i2c-uniphier.txt
->  create mode 100644 drivers/i2c/busses/i2c-uniphier-f.c
->  create mode 100644 drivers/i2c/busses/i2c-uniphier.c
-> 
+> bootconsole [earlycon0] disabled
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Please append "keep_bootcon" to the kernel command line, so you get to
+see the rest of the boot up logs, too.
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
