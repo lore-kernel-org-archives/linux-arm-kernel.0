@@ -1,46 +1,35 @@
 From: o.schinagl@ultimaker.com (Olliver Schinagl)
-Date: Mon, 26 Oct 2015 22:32:35 +0100
-Subject: [PATCH 04/10] pwm: core: use bitops
+Date: Mon, 26 Oct 2015 22:32:36 +0100
+Subject: [PATCH 05/10] pwm: sysfs: do not unnecessarily store result in var
 In-Reply-To: <1445895161-2317-1-git-send-email-o.schinagl@ultimaker.com>
 References: <1445895161-2317-1-git-send-email-o.schinagl@ultimaker.com>
-Message-ID: <1445895161-2317-5-git-send-email-o.schinagl@ultimaker.com>
+Message-ID: <1445895161-2317-6-git-send-email-o.schinagl@ultimaker.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Olliver Schinagl <oliver@schinagl.nl>
 
-The pwm header defines bits manually while there is a nice bitops.h with
-a BIT() macro. Use the BIT() macro to set bits in pwm.h
+Use the result of pwm_is_enabled directly instead of storing it first.
 
 Signed-off-by: Olliver Schinagl <oliver@schinagl.nl>
 ---
- include/linux/pwm.h | 7 ++++---
- 1 file changed, 4 insertions(+), 3 deletions(-)
+ drivers/pwm/sysfs.c | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
 
-diff --git a/include/linux/pwm.h b/include/linux/pwm.h
-index d681f68..29315ad 100644
---- a/include/linux/pwm.h
-+++ b/include/linux/pwm.h
-@@ -1,6 +1,7 @@
- #ifndef __LINUX_PWM_H
- #define __LINUX_PWM_H
+diff --git a/drivers/pwm/sysfs.c b/drivers/pwm/sysfs.c
+index c472772..ba67845 100644
+--- a/drivers/pwm/sysfs.c
++++ b/drivers/pwm/sysfs.c
+@@ -97,9 +97,8 @@ static ssize_t pwm_enable_show(struct device *child,
+ 			       char *buf)
+ {
+ 	const struct pwm_device *pwm = child_to_pwm_device(child);
+-	int enabled = pwm_is_enabled(pwm);
  
-+#include <linux/bitops.h>
- #include <linux/err.h>
- #include <linux/of.h>
+-	return sprintf(buf, "%d\n", enabled);
++	return sprintf(buf, "%d\n", pwm_is_enabled(pwm));
+ }
  
-@@ -74,9 +75,9 @@ enum pwm_polarity {
- };
- 
- enum {
--	PWMF_REQUESTED = 1 << 0,
--	PWMF_ENABLED = 1 << 1,
--	PWMF_EXPORTED = 1 << 2,
-+	PWMF_REQUESTED = BIT(0),
-+	PWMF_ENABLED = BIT(1),
-+	PWMF_EXPORTED = BIT(2),
- };
- 
- /**
+ static ssize_t pwm_enable_store(struct device *child,
 -- 
 2.6.1
