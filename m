@@ -1,36 +1,59 @@
-From: jeremy.linton@arm.com (Jeremy Linton)
-Date: Mon, 26 Oct 2015 17:33:06 -0500
-Subject: [PATCH v4 3/3] arm64/efi: isolate EFI stub from the kernel proper
-In-Reply-To: <562EA894.8070505@arm.com>
-References: <1444330924-17830-1-git-send-email-ard.biesheuvel@linaro.org>
- <1444330924-17830-4-git-send-email-ard.biesheuvel@linaro.org>
- <562EA894.8070505@arm.com>
-Message-ID: <562EAA22.3010905@arm.com>
+From: leoli@freescale.com (Li Yang)
+Date: Mon, 26 Oct 2015 17:45:22 -0500
+Subject: [PATCH V6 4/6] arm64/ls1043a: add DTS for Freescale LS1043A SoC
+In-Reply-To: <1445587282-29529-4-git-send-email-B48286@freescale.com>
+References: <1445587282-29529-1-git-send-email-B48286@freescale.com>
+ <1445587282-29529-4-git-send-email-B48286@freescale.com>
+Message-ID: <CADRPPNSdZS0DrxauhA8AmWQrZMLUs06fxLyp4kXonooESVRiXw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/26/2015 05:26 PM, Jeremy Linton wrote:
-> On 10/08/2015 02:02 PM, Ard Biesheuvel wrote:
->> Since arm64 does not use a builtin decompressor, the EFI stub is built
->> into the kernel proper. So far, this has been working fine, but actually,
->> since the stub is in fact a PE/COFF relocatable binary that is executed
->> at an unknown offset in the 1:1 mapping provided by the UEFI firmware, we
->> should not be seamlessly sharing code with the kernel proper, which is a
->> position dependent executable linked at a high virtual offset.
+On Fri, Oct 23, 2015 at 3:01 AM, Zhiqiang Hou <B48286@freescale.com> wrote:
+> From: Mingkai Hu <Mingkai.Hu@freescale.com>
 >
-> This patch appears to be causing a build break
+> LS1043a is an SoC with 4 ARMv8 A53 cores and most other IP blocks
+> similar to LS1021a which complies to Chassis 2.1 spec.
 >
->   STUBCPY drivers/firmware/efi/libstub/lib-sort.stub.o
-> 0000000000000000 R_AARCH64_ABS64   __efistub___crc_sort
-> drivers/firmware/efi/libstub/lib-sort.stub.o: absolute symbol references
-> not allowed in the EFI stub
+> Following levels of DTSI/DTS files have been created for the
+> LS1043A SoC family:
 >
-> __kcrctab_sort:
->      .xword    __crc_sort
->      .weak    __crc_sort
->      .text
+> - fsl-ls1043a.dtsi:
+>   DTS-Include file for FSL LS1043A SoC.
 >
->
-> Which is the EXPORT_SYMBOL() in sort.c combined with !CONFIG_MODVERSIONS.
+> Signed-off-by: Li Yang <leoli@freescale.com>
+> Signed-off-by: Hou Zhiqiang <B48286@freescale.com>
+> Signed-off-by: Mingkai Hu <Mingkai.Hu@freescale.com>
+> Signed-off-by: Wenbin Song <Wenbin.Song@freescale.com>
 
-	Sorry, I that should be CONFIG_MODVERSIONS..
+Hi Arnd,
+
+Can you also review and merge the LS1043 device tree related patches
+in the series(3/6,4/6,6/6)?
+
+Regards,
+Leo
+
+> ---
+> V6:
+>  - No change.
+>
+> V5:
+>  - Move gic, timer and pmu nodes out of SoC node.
+>
+> V4:
+>  - Add soc node with simple-bus compatible.
+>  - Add property interrupt-affinity for armv8 pmuv3 node.
+>
+> V3:
+>  - Add device tree node for SATA.
+>  - Remove properity enable-method for all cpu node.
+>    Remove reserved memory region for spin-table.
+>
+> V2:
+>  - Add secondary core boot method.
+>  - Move out the sysclk node from the clockgen node.
+>  - Correct the reg size of GICC.
+>
+>  arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi | 525 +++++++++++++++++++++++++
+>  1 file changed, 525 insertions(+)
+>  create mode 100644 arch/arm64/boot/dts/freescale/fsl-ls1043a.dtsi
