@@ -1,37 +1,99 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 26 Oct 2015 14:42:41 +0100
-Subject: [PATCH v2 9/9] ARM: config: Enable GPIO Led driver in
- stm32_defconfig
-In-Reply-To: <1445102604-11502-10-git-send-email-mcoquelin.stm32@gmail.com>
-References: <1445102604-11502-1-git-send-email-mcoquelin.stm32@gmail.com>
- <1445102604-11502-10-git-send-email-mcoquelin.stm32@gmail.com>
-Message-ID: <CACRpkdZZ_T24+Zx5Auv1cs0wUF=UycVxo7mLFosDrfz2Quw9uw@mail.gmail.com>
+From: yong.wu@mediatek.com (Yong Wu)
+Date: Mon, 26 Oct 2015 21:44:54 +0800
+Subject: [PATCH v6 1/3] iommu: Implement common IOMMU ops for DMA mapping
+In-Reply-To: <ab8e1caa40d6da1afa4a49f30242ef4e6e1f17df.1443718557.git.robin.murphy@arm.com>
+References: <cover.1443718557.git.robin.murphy@arm.com>
+ <ab8e1caa40d6da1afa4a49f30242ef4e6e1f17df.1443718557.git.robin.murphy@arm.com>
+Message-ID: <1445867094.30736.14.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 17, 2015 at 7:23 PM, Maxime Coquelin
-<mcoquelin.stm32@gmail.com> wrote:
+On Thu, 2015-10-01 at 20:13 +0100, Robin Murphy wrote:
+[...]
+> +/*
+> + * The DMA API client is passing in a scatterlist which could describe
+> + * any old buffer layout, but the IOMMU API requires everything to be
+> + * aligned to IOMMU pages. Hence the need for this complicated bit of
+> + * impedance-matching, to be able to hand off a suitably-aligned list,
+> + * but still preserve the original offsets and sizes for the caller.
+> + */
+> +int iommu_dma_map_sg(struct device *dev, struct scatterlist *sg,
+> +		int nents, int prot)
+> +{
+> +	struct iommu_domain *domain = iommu_get_domain_for_dev(dev);
+> +	struct iova_domain *iovad = domain->iova_cookie;
+> +	struct iova *iova;
+> +	struct scatterlist *s, *prev = NULL;
+> +	dma_addr_t dma_addr;
+> +	size_t iova_len = 0;
+> +	int i;
+> +
+> +	/*
+> +	 * Work out how much IOVA space we need, and align the segments to
+> +	 * IOVA granules for the IOMMU driver to handle. With some clever
+> +	 * trickery we can modify the list in-place, but reversibly, by
+> +	 * hiding the original data in the as-yet-unused DMA fields.
+> +	 */
+> +	for_each_sg(sg, s, nents, i) {
+> +		size_t s_offset = iova_offset(iovad, s->offset);
+> +		size_t s_length = s->length;
+> +
+> +		sg_dma_address(s) = s->offset;
+> +		sg_dma_len(s) = s_length;
+> +		s->offset -= s_offset;
+> +		s_length = iova_align(iovad, s_length + s_offset);
+> +		s->length = s_length;
+> +
+> +		/*
+> +		 * The simple way to avoid the rare case of a segment
+> +		 * crossing the boundary mask is to pad the previous one
+> +		 * to end at a naturally-aligned IOVA for this one's size,
+> +		 * at the cost of potentially over-allocating a little.
+> +		 */
+> +		if (prev) {
+> +			size_t pad_len = roundup_pow_of_two(s_length);
+> +
+> +			pad_len = (pad_len - iova_len) & (pad_len - 1);
+> +			prev->length += pad_len;
 
-> Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
-> ---
->  arch/arm/configs/stm32_defconfig | 1 +
->  1 file changed, 1 insertion(+)
->
-> diff --git a/arch/arm/configs/stm32_defconfig b/arch/arm/configs/stm32_defconfig
-> index 4725fab..92ade2e 100644
-> --- a/arch/arm/configs/stm32_defconfig
-> +++ b/arch/arm/configs/stm32_defconfig
-> @@ -52,6 +52,7 @@ CONFIG_SERIAL_STM32_CONSOLE=y
->  # CONFIG_USB_SUPPORT is not set
->  CONFIG_NEW_LEDS=y
->  CONFIG_LEDS_CLASS=y
-> +CONFIG_LEDS_GPIO=y
->  CONFIG_LEDS_TRIGGERS=y
->  CONFIG_LEDS_TRIGGER_HEARTBEAT=y
+Hi Robin,
+      While our v4l2 testing, It seems that we met a problem here.
+      Here we update prev->length again, Do we need update
+sg_dma_len(prev) again too?
 
-You even have triggers and heartbeat in your defconfig, even
-more reason to set it up as default trigger in the DT.
-Acked-by: Linus Walleij <linus.walleij@linaro.org>
+      Some function like vb2_dc_get_contiguous_size[1] always get
+sg_dma_len(s) to compare instead of s->length. so it may break
+unexpectedly while sg_dma_len(s) is not same with s->length.
 
-Yours,
-Linus Walleij
+[1]:
+http://lxr.free-electrons.com/source/drivers/media/v4l2-core/videobuf2-dma-contig.c#L70
+
+
+> +			iova_len += pad_len;
+> +		}
+> +
+> +		iova_len += s_length;
+> +		prev = s;
+> +	}
+> +
+> +	iova = __alloc_iova(iovad, iova_len, dma_get_mask(dev));
+> +	if (!iova)
+> +		goto out_restore_sg;
+> +
+> +	/*
+> +	 * We'll leave any physical concatenation to the IOMMU driver's
+> +	 * implementation - it knows better than we do.
+> +	 */
+> +	dma_addr = iova_dma_addr(iovad, iova);
+> +	if (iommu_map_sg(domain, dma_addr, sg, nents, prot) < iova_len)
+> +		goto out_free_iova;
+> +
+> +	return __finalise_sg(dev, sg, nents, dma_addr);
+> +
+> +out_free_iova:
+> +	__free_iova(iovad, iova);
+> +out_restore_sg:
+> +	__invalidate_sg(sg, nents);
+> +	return 0;
+> +}
+> +
