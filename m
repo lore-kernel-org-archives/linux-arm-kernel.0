@@ -1,31 +1,43 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Wed, 28 Oct 2015 01:56:53 +0300
-Subject: [PATCH] ARM: shmobile: porter: add CAN0 DT support
-In-Reply-To: <20151027224142.GB21745@verge.net.au>
-References: <1674850.BZpGW9kEud@wasted.cogentembedded.com>
- <5706086.RKBCVZugI4@wasted.cogentembedded.com>
- <20151027224142.GB21745@verge.net.au>
-Message-ID: <56300135.703@cogentembedded.com>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Wed, 28 Oct 2015 08:05:26 +0900
+Subject: [PATCH v4 0/3] arm64: renesas: r8a7795: add I2C support
+Message-ID: <1445987129-13496-1-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/28/2015 01:41 AM, Simon Horman wrote:
+Hi,
 
->> Define the Porter board dependent part of the CAN0 device node.
->>
->> This patch is  analogous to the commit 457acc4a6ce8 (ARM: shmobile:
->> henninger: add CAN0 DT support) as there are no differences between the
->> boards in this respect.
->>
->> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
->
-> Thanks, I have queued this up for v4.5 after updating the changelog
-> as per checkpatch.pl's insight:
->
-> ERROR: Please use git commit description style 'commit <12+ chars of sha1> ("<title line>")' - ie: 'commit 457acc4a6ce8 ("ARM: shmobile: henninger: add CAN0 DT support")'
-> #8:
-> This patch is  analogous to the commit 457acc4a6ce8 (ARM: shmobile:
+these patches add i2c support to the r8a7795/Salvator-X.
 
-    Oops, sorry, forgot to update the patch description.
+These patches are an update of work by Kuninori Morimoto,
+broken out of a larger patchset posted by him.
 
-MBR, Sergei
+The main change to the patches themselves since Morimoto-san's v3
+posting is to update to new CPG/MSSR bindings via Geert Uytterhoeven.
+
+Morimoto-san, I would be most grateful if you could look over this and repost
+if there are problems.
+
+Base:
+
+* "[PATCH v12 0/7] arm64: renesas: Add Renesas R8A7795 SoC support".
+  This can be found in the topic/arm64-rcar-gen3-v12 branch of
+  my renesas tree on kernel.org.
+
+Availability:
+* This patchset is available in the  topic/r8a7795-i2c-v4 branch of my
+  renesas tree on kernel.org
+
+
+Kuninori Morimoto (3):
+  arm64: renesas: r8a7795: add I2C support
+  arm64: renesas: salvator-x: enable I2C
+  arm64: defconfig: Enable Renesas R-Car I2C Controller
+
+ arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts | 12 +++
+ arch/arm64/boot/dts/renesas/r8a7795.dtsi           | 87 ++++++++++++++++++++++
+ arch/arm64/configs/defconfig                       |  2 +
+ 3 files changed, 101 insertions(+)
+
+-- 
+2.1.4
