@@ -1,60 +1,52 @@
-From: timur@codeaurora.org (Timur Tabi)
-Date: Tue, 27 Oct 2015 16:24:01 -0500
-Subject: [PATCH] arm64: efi: make sure vmlinux load address aligned on 2MBytes
-Message-ID: <1445981041-8774-1-git-send-email-timur@codeaurora.org>
+From: robh+dt@kernel.org (Rob Herring)
+Date: Tue, 27 Oct 2015 16:24:48 -0500
+Subject: [PATCH v6 03/22] of/platform: Point to struct device from device
+ node
+In-Reply-To: <3956941.s3nuWak5tq@vostro.rjw.lan>
+References: <1442844182-27787-1-git-send-email-tomeu.vizoso@collabora.com>
+ <1806288.pmhamH8mKQ@vostro.rjw.lan>
+ <CAAObsKBjNZMhKn2bUMmQO8Lvrqfucnf9dXqmbfQ2DbAc6_GvcQ@mail.gmail.com>
+ <3956941.s3nuWak5tq@vostro.rjw.lan>
+Message-ID: <CAL_JsqJxqJc=0tDDCxx-2rGLLUVE50u+P3CrvptBCkskHdV2tg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Shanker Donthineni <shankerd@codeaurora.org>
+On Tue, Oct 27, 2015 at 10:43 AM, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
+> On Tuesday, October 27, 2015 03:48:40 PM Tomeu Vizoso wrote:
+>> On 24 October 2015 at 15:57, Rafael J. Wysocki <rjw@rjwysocki.net> wrote:
+>
+> [...]
+>
+>> >
+>> > Well, once that has happened, your new device pointer in the given device_node
+>> > becomes useless.  Why exactly is that fine?
+>>
+>> Why do you think it's useless? It's the device that was registered
+>> from that device_node. The other one just happens to want to point to
+>> the same device_node for whatever other reason, but I don't see how is
+>> that relevant.
+>
+> It is useless as a reverse mapping from OF nodes to devices.  It tells us
+> which device pointing to the given device node has been found first, but
+> that's just it.
+>
+> You can't say whether or not it is special in any way with respect to the
+> other devices hanging out of the same OF node unless you have some additional
+> information on how those devices are related to each other.
 
-The vmlinux image load address must be aligned to 2MB, as documented
-in Documentation/arm64/booting.txt. Otherwise, __create_page_tables
-in head.S will create incorrect page table entries.
+As Tomeu says this struct device is the one created from scanning the
+DT. There should never be more than one. Now some drivers create sub
+devices and maybe they set the DT node on the child devices, but that
+is wrong. Doing that would also break the current code:
 
-Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
-Signed-off-by: Timur Tabi <timur@codeaurora.org>
----
- arch/arm64/kernel/efi-stub.c | 15 +++++++++------
- 1 file changed, 9 insertions(+), 6 deletions(-)
+struct platform_device *of_find_device_by_node(struct device_node *np)
+{
+        struct device *dev;
 
-diff --git a/arch/arm64/kernel/efi-stub.c b/arch/arm64/kernel/efi-stub.c
-index 816120e..df1433d 100644
---- a/arch/arm64/kernel/efi-stub.c
-+++ b/arch/arm64/kernel/efi-stub.c
-@@ -21,7 +21,7 @@ efi_status_t __init handle_kernel_image(efi_system_table_t *sys_table_arg,
- 					unsigned long dram_base,
- 					efi_loaded_image_t *image)
- {
--	efi_status_t status;
-+	efi_status_t status = EFI_LOAD_ERROR;
- 	unsigned long kernel_size, kernel_memsize = 0;
- 	unsigned long nr_pages;
- 	void *old_image_addr = (void *)*image_addr;
-@@ -39,15 +39,18 @@ efi_status_t __init handle_kernel_image(efi_system_table_t *sys_table_arg,
- 		 * value or a NULL pointer). It will also ensure that, on
- 		 * platforms where the [dram_base, dram_base + TEXT_OFFSET)
- 		 * interval is partially occupied by the firmware (like on APM
--		 * Mustang), we can still place the kernel at the address
--		 * 'dram_base + TEXT_OFFSET'.
-+		 * Mustang) and dram_base is aligned on 2Mbytes, we can still
-+		 * place the kernel at the address 'dram_base + TEXT_OFFSET'.
- 		 */
--		*image_addr = *reserve_addr = dram_base + TEXT_OFFSET;
--		nr_pages = round_up(kernel_memsize, EFI_ALLOC_ALIGN) /
-+		if (IS_ALIGNED(dram_base, SZ_2M)) {
-+			*image_addr = *reserve_addr = dram_base + TEXT_OFFSET;
-+			nr_pages = round_up(kernel_memsize, EFI_ALLOC_ALIGN) /
- 			   EFI_PAGE_SIZE;
--		status = efi_call_early(allocate_pages, EFI_ALLOCATE_ADDRESS,
-+			status = efi_call_early(allocate_pages,
-+					EFI_ALLOCATE_ADDRESS,
- 					EFI_LOADER_DATA, nr_pages,
- 					(efi_physical_addr_t *)reserve_addr);
-+		}
- 		if (status != EFI_SUCCESS) {
- 			kernel_memsize += TEXT_OFFSET;
- 			status = efi_low_alloc(sys_table_arg, kernel_memsize,
--- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project.
+        dev = bus_find_device(&platform_bus_type, NULL, np, of_dev_node_match);
+        return dev ? to_platform_device(dev) : NULL;
+}
+
+I can't think of any other possible cases.
+
+Rob
