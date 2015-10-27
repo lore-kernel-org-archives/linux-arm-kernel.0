@@ -1,73 +1,66 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 27 Oct 2015 10:56:33 +0000
-Subject: [PATCH] arm64: page-align sections for DEBUG_RODATA
-In-Reply-To: <CAKv+Gu-jCxeQt1DffTnYiMLT-jB75GiQCOUR7GqNH7hAeB84LA@mail.gmail.com>
-References: <1445895753-2095-1-git-send-email-mark.rutland@arm.com>
- <CAKv+Gu-jCxeQt1DffTnYiMLT-jB75GiQCOUR7GqNH7hAeB84LA@mail.gmail.com>
-Message-ID: <20151027105632.GA3091@leverpostej>
+From: huangdaode@hisilicon.com (huangdaode)
+Date: Tue, 27 Oct 2015 19:16:34 +0800
+Subject: [PATCH RESEND v2 net-next] net: hisilicon: updates HNS config and
+ documents
+Message-ID: <1445944594-244149-1-git-send-email-huangdaode@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 27, 2015 at 11:37:04AM +0900, Ard Biesheuvel wrote:
-> On 27 October 2015 at 06:42, Mark Rutland <mark.rutland@arm.com> wrote:
-> > A kernel built with DEBUG_RO_DATA && !CONFIG_DEBUG_ALIGN_RODATA doesn't
-> > have .text aligned to a page boundary, though fixup_executable works at
-> > page-granularity thanks to its use of create_mapping. If .text is not
-> > page-aligned, the first page it exists in may be marked non-executable,
-> > leading to failures when an attempt is made to execute code in said
-> > page.
-> >
-> > This patch upgrades ALIGN_DEBUG_RO and ALIGN_DEBUG_RO_MIN to force page
-> > alignment for DEBUG_RO_DATA && !CONFIG_DEBUG_ALIGN_RODATA kernels,
-> > ensuring that all sections with specific RWX permission requirements are
-> > mapped with the correct permissions.
-> >
-> > Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> > Reported-by: Jeremy Linton <jeremy.linton@arm.com>
-> > Reviewed-by: Laura Abbott <laura@labbott.name>
-> > Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> > Cc: Catalin Marinas <catalin.marinas@arm.com>
-> > Cc: Suzuki Poulose <suzuki.poulose@arm.com>
-> > Cc: Will Deacon <will.deacon@arm.com>
-> > ---
-> >  arch/arm64/kernel/vmlinux.lds.S | 5 ++++-
-> >  1 file changed, 4 insertions(+), 1 deletion(-)
-> >
-> > Note: this is intended to supercede [1,2].
-> >
-> > [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-October/380486.html
-> > [2] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-October/380999.html
-> >
-> > diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
-> > index 9807333..4d77757 100644
-> > --- a/arch/arm64/kernel/vmlinux.lds.S
-> > +++ b/arch/arm64/kernel/vmlinux.lds.S
-> > @@ -60,9 +60,12 @@ PECOFF_FILE_ALIGNMENT = 0x200;
-> >  #define PECOFF_EDATA_PADDING
-> >  #endif
-> >
-> > -#ifdef CONFIG_DEBUG_ALIGN_RODATA
-> > +#if defined(CONFIG_DEBUG_ALIGN_RODATA)
-> >  #define ALIGN_DEBUG_RO                 . = ALIGN(1<<SECTION_SHIFT);
-> >  #define ALIGN_DEBUG_RO_MIN(min)                ALIGN_DEBUG_RO
-> > +#elif defined(CONFIG_DEBUG_RODATA)
-> > +#define ALIGN_DEBUG_RO                 . = ALIGN(1<<PAGE_SHIFT);
-> > +#define ALIGN_DEBUG_RO_MIN(min)                ALIGN_DEBUG_RO
-> >  #else
-> >  #define ALIGN_DEBUG_RO
-> >  #define ALIGN_DEBUG_RO_MIN(min)                . = ALIGN(min);
-> 
-> Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+From: yankejian <yankejian@huawei.com>
 
-Cheers, Ard.
+updates the bindings documents and dtsi file according to the review
+comments[https://lkml.org/lkml/2015/9/21/670] from Rob Herring <robh@kernel.org>
 
-Jeremy, does this work for you?
+Acked-by: Rob Herring <robh@kernel.org>
+Signed-off-by: yankejian <yankejian@huawei.com>
+Signed-off-by: huangdaode <huangdaode@hisilicon.com>
+---
+ Documentation/devicetree/bindings/net/hisilicon-hns-mdio.txt | 2 +-
+ arch/arm64/boot/dts/hisilicon/hip05_hns.dtsi                 | 8 +++-----
+ 2 files changed, 4 insertions(+), 6 deletions(-)
 
-If so, I expect Catalin will take this for 4.4, with the addition of any
-Acks and:
-
-Fixes: da141706aea52c1a ("arm64: add better page protections to arm64")
-Cc: <stable@vger.kernel.org>
-
-Thanks,
-Mark.
+diff --git a/Documentation/devicetree/bindings/net/hisilicon-hns-mdio.txt b/Documentation/devicetree/bindings/net/hisilicon-hns-mdio.txt
+index 9940aa0..9c23fdf 100644
+--- a/Documentation/devicetree/bindings/net/hisilicon-hns-mdio.txt
++++ b/Documentation/devicetree/bindings/net/hisilicon-hns-mdio.txt
+@@ -12,7 +12,7 @@ Example:
+          mdio at 803c0000 {
+                    #address-cells = <1>;
+                    #size-cells = <0>;
+-                   compatible = "hisilicon,mdio","hisilicon,hns-mdio";
++                   compatible = "hisilicon,hns-mdio","hisilicon,mdio";
+                    reg = <0x0 0x803c0000 0x0 0x10000>;
+ 
+                    ethernet-phy at 0 {
+diff --git a/arch/arm64/boot/dts/hisilicon/hip05_hns.dtsi b/arch/arm64/boot/dts/hisilicon/hip05_hns.dtsi
+index 3500586..606dd5a 100644
+--- a/arch/arm64/boot/dts/hisilicon/hip05_hns.dtsi
++++ b/arch/arm64/boot/dts/hisilicon/hip05_hns.dtsi
+@@ -13,14 +13,12 @@ soc0: soc at 000000000 {
+ 		reg = <0x0 0x803c0000 0x0 0x10000
+ 		       0x0 0x80000000 0x0 0x10000>;
+ 
+-		soc0_phy4: ethernet-phy at 4 {
++		soc0_phy0: ethernet-phy at 0 {
+ 			reg = <0x0>;
+-			device_type = "ethernet-phy";
+ 			compatible = "ethernet-phy-ieee802.3-c22";
+ 		};
+-		soc0_phy5: ethernet-phy at 5 {
++		soc0_phy1: ethernet-phy at 1 {
+ 			reg = <0x1>;
+-			device_type = "ethernet-phy";
+ 			compatible = "ethernet-phy-ieee802.3-c22";
+ 		};
+ 	};
+@@ -37,7 +35,7 @@ soc0: soc at 000000000 {
+ 		       0x0 0xc7000000 0x0 0x60000
+ 		       >;
+ 
+-		phy-handle = <0 0 0 0 &soc0_phy4 &soc0_phy5 0 0>;
++		phy-handle = <0 0 0 0 &soc0_phy0 &soc0_phy1 0 0>;
+ 		interrupts = <
+ 			/* [14] ge fifo err 8 / xge 6**/
+ 			149 0x4 150 0x4 151 0x4 152 0x4
+-- 
+1.9.1
