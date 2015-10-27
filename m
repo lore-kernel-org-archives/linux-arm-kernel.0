@@ -1,62 +1,34 @@
-From: lee@kernel.org (Lee Jones)
-Date: Tue, 27 Oct 2015 17:00:03 +0000
-Subject: [PATCH soc/next] ARM: bcm2835: add mutual inclusion protection
-In-Reply-To: <1445539565-24955-1-git-send-email-alex.aring@gmail.com>
-References: <1445539565-24955-1-git-send-email-alex.aring@gmail.com>
-Message-ID: <20151027170003.GB5828@x1>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 27 Oct 2015 17:11:03 +0000
+Subject: [PATCH v2 10/10] ARM: software-based priviledged-no-access support
+In-Reply-To: <20151023084639.GY32532@n2100.arm.linux.org.uk>
+References: <20150825154026.GT7557@n2100.arm.linux.org.uk>
+ <E1ZUGMS-0000BG-8B@rmk-PC.arm.linux.org.uk>
+ <CACRpkdZhJfsH0wU0VBotT=yomDqBkKWrz3MNFOin=CCz62v_nw@mail.gmail.com>
+ <20151009105309.GM26278@arm.com>
+ <20151009112418.GN32532@n2100.arm.linux.org.uk>
+ <CACRpkdb0KavGAQ4XVb1n3P0tZ2Tf9K4EvEtoYCiZ47hKi5MjFA@mail.gmail.com>
+ <20151023084639.GY32532@n2100.arm.linux.org.uk>
+Message-ID: <20151027171102.GD22049@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 22 Oct 2015, Alexander Aring wrote:
-
-> This patch adds mutual inclusion protection for the rpi firmware header.
+On Fri, Oct 23, 2015 at 09:46:40AM +0100, Russell King - ARM Linux wrote:
+> On Fri, Oct 23, 2015 at 10:05:06AM +0200, Linus Walleij wrote:
+> > Do we have a solution for this?
+> > 
+> > I'm carrying the patch and v4.3-rc6 is broken on upstream
+> > RealView PB11MPCore, at least for me. :(
 > 
-> Cc: Eric Anholt <eric@anholt.net>
-> Cc: Stephen Warren <swarren@wwwdotorg.org>
+> Will was going to do some research and get back to me, but what he was
+> going to look at has been archived off-site.  Will said he wanted to
+> reproduce it on the latest silicon, but I haven't heard anything
+> further and he hasn't been around this week.
 
-Looks like these didn't work.  You might want to look into that.
+I'm afraid my digging didn't prove to be very enlightening. One thing I'd
+like to try, is to see if we can reproduce the problem on an 11MPCore
+platform with a CPU > r0p0. However, I don't have access to such a platform
+that can run mainline, so without that I think we have to go with Russell's
+workaround predicated on a check for 11MPCore.
 
-You either have --no-signed-off-by-cc set, or you're not using `git
-send-email`.
-
->From the man page:
-
---[no-]signed-off-by-cc
-    If this is set, add emails found in Signed-off-by: or Cc: lines to
-    the cc list. Default is the value of sendemail.signedoffbycc
-    configuration value; if that is unspecified, default to
-    --signed-off-by-cc.
-
-> Signed-off-by: Alexander Aring <alex.aring@gmail.com>
-> ---
-> This patch is for "soc/next" and depends on Eric Anholt's patch ("ARM: bcm2835:
-> Add the Raspberry Pi firmware driver"), see:
-> 
-> http://lists.infradead.org/pipermail/linux-rpi-kernel/2015-October/002434.html
-> 
-> I think the patch is already applied but not pushed, so please fixup use this
-> as fixup or simple apply this patch after the patch to add the firmware driver.
-> 
->  include/soc/bcm2835/raspberrypi-firmware.h | 5 +++++
->  1 file changed, 5 insertions(+)
-> 
-> diff --git a/include/soc/bcm2835/raspberrypi-firmware.h b/include/soc/bcm2835/raspberrypi-firmware.h
-> index 9d9efb7..c07d74a 100644
-> --- a/include/soc/bcm2835/raspberrypi-firmware.h
-> +++ b/include/soc/bcm2835/raspberrypi-firmware.h
-> @@ -6,6 +6,9 @@
->   * published by the Free Software Foundation.
->   */
->  
-> +#ifndef __SOC_RASPBERRY_FIRMWARE_H__
-> +#define __SOC_RASPBERRY_FIRMWARE_H__
-> +
->  #include <linux/types.h>
->  #include <linux/of_device.h>
->  
-> @@ -113,3 +116,5 @@ int rpi_firmware_property(struct rpi_firmware *fw,
->  int rpi_firmware_property_list(struct rpi_firmware *fw,
->  			       void *data, size_t tag_size);
->  struct rpi_firmware *rpi_firmware_get(struct device_node *firmware_node);
-> +
-> +#endif /* __SOC_RASPBERRY_FIRMWARE_H__ */
+Will
