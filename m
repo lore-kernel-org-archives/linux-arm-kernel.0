@@ -1,187 +1,119 @@
-From: nicola@corna.info (Nicola Corna)
-Date: Tue, 27 Oct 2015 21:11:58 +0100
-Subject: [PATCH v3 4/4] iio: humidity: si7020: added No Hold read mode
-In-Reply-To: <1445976718-7449-1-git-send-email-nicola@corna.info>
-References: <1445976718-7449-1-git-send-email-nicola@corna.info>
-Message-ID: <1445976718-7449-4-git-send-email-nicola@corna.info>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Tue, 27 Oct 2015 21:21:24 +0100
+Subject: v7-M: Fixing XIP when the kernel is in ROM
+In-Reply-To: <20151026012710.GA17365@laptop>
+References: <20151026012710.GA17365@laptop>
+Message-ID: <20151027202124.GK4931@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Si7013/20/21 modules support 2 read modes:
- * Hold mode (blocking), where the device stretches the clock until the end
-of the measurement
- * No Hold mode (non-blocking), where the device replies NACK for every I2C
-call during the measurement
-Here the No Hold mode is implemented, selectable with the blocking_io
-variable within si7020_platform_data. The default mode is Hold, unless the
-adapter does not support clock stretching, in which case the No Hold mode
-is used.
+Hello Ezequiel,
 
-Signed-off-by: Nicola Corna <nicola@corna.info>
----
-This patch depends on patch "[PATCH v4 1/2] iio: humidity: si7020: replaced
-bitmask on humidity values with range check"
- drivers/iio/humidity/si7020.c        | 78 ++++++++++++++++++++++++++++++++----
- include/linux/platform_data/si7020.h | 21 ++++++++++
- 2 files changed, 92 insertions(+), 7 deletions(-)
- create mode 100644 include/linux/platform_data/si7020.h
+On Sun, Oct 25, 2015 at 10:27:10PM -0300, Ezequiel Garcia wrote:
+> I've been trying to make my ARM v7-M LPC43xx board
+> boot a XIP kernel from flash. Currently, this seems
+> to be broken in mainline due to this:
+> 
+> arch/arm/mm/proc-v7m.S
+> [..]
+>         @ SVC to run the kernel in this mode
+>         badr    r1, 1f
+>         ldr     r5, [r12, #11 * 4]      @ read the SVC vector entry
+>         str     r1, [r12, #11 * 4]      @ write the temporary SVC vector entry
+>         mov     r6, lr                  @ save LR
+>         mov     r7, sp                  @ save SP
+> 	ldr     sp, =__v7m_setup_stack_top @ <<< Breaks XIP!
 
-diff --git a/drivers/iio/humidity/si7020.c b/drivers/iio/humidity/si7020.c
-index 12128d1..cb65f34 100644
---- a/drivers/iio/humidity/si7020.c
-+++ b/drivers/iio/humidity/si7020.c
-@@ -2,6 +2,7 @@
-  * si7020.c - Silicon Labs Si7013/20/21 Relative Humidity and Temp Sensors
-  * Copyright (c) 2013,2014  Uplogix, Inc.
-  * David Barksdale <dbarksdale@uplogix.com>
-+ * Copyright (c) 2015 Nicola Corna <nicola@corna.info>
-  *
-  * This program is free software; you can redistribute it and/or modify it
-  * under the terms and conditions of the GNU General Public License,
-@@ -30,33 +31,79 @@
- #include <linux/module.h>
- #include <linux/slab.h>
- #include <linux/sysfs.h>
-+#include <linux/jiffies.h>
- 
- #include <linux/iio/iio.h>
- #include <linux/iio/sysfs.h>
-+#include <linux/platform_data/si7020.h>
- 
- /* Measure Relative Humidity, Hold Master Mode */
- #define SI7020CMD_RH_HOLD	0xE5
-+/* Measure Relative Humidity, No Hold Master Mode */
-+#define SI7020CMD_RH_NO_HOLD	0xF5
- /* Measure Temperature, Hold Master Mode */
- #define SI7020CMD_TEMP_HOLD	0xE3
-+/* Measure Temperature, No Hold Master Mode */
-+#define SI7020CMD_TEMP_NO_HOLD	0xF3
- /* Software Reset */
- #define SI7020CMD_RESET		0xFE
-+/* Relative humidity measurement timeout (us) */
-+#define SI7020_RH_TIMEOUT	22800
-+/* Temperature measurement timeout (us) */
-+#define SI7020_TEMP_TIMEOUT	10800
-+/* Minimum delay between retries (No Hold Mode) in us */
-+#define SI7020_NOHOLD_SLEEP_MIN	2000
-+/* Maximum delay between retries (No Hold Mode) in us */
-+#define SI7020_NOHOLD_SLEEP_MAX	6000
- 
- static int si7020_read_raw(struct iio_dev *indio_dev,
- 			   struct iio_chan_spec const *chan, int *val,
- 			   int *val2, long mask)
- {
- 	struct i2c_client **client = iio_priv(indio_dev);
-+	struct si7020_platform_data *pdata;
- 	int ret;
-+	bool holdmode;
-+	unsigned char buf[2];
-+	unsigned long start;
- 
- 	switch (mask) {
- 	case IIO_CHAN_INFO_RAW:
--		ret = i2c_smbus_read_word_data(*client,
--					       chan->type == IIO_TEMP ?
--					       SI7020CMD_TEMP_HOLD :
--					       SI7020CMD_RH_HOLD);
--		if (ret < 0)
--			return ret;
--		*val = ret >> 2;
-+		pdata = dev_get_platdata(&(*client)->dev);
-+		if (pdata)
-+			holdmode = pdata->blocking_io;
-+		else
-+			holdmode = !((*client)->adapter->quirks &&
-+					(*client)->adapter->quirks->flags |
-+					I2C_AQ_NO_CLK_STRETCH);
-+		if (holdmode) {
-+			ret = i2c_smbus_read_word_data(*client,
-+						       chan->type == IIO_TEMP ?
-+						       SI7020CMD_TEMP_HOLD :
-+						       SI7020CMD_RH_HOLD);
-+			if (ret < 0)
-+				return ret;
-+			*val = ret >> 2;
-+		} else {
-+			ret = i2c_smbus_write_byte(*client,
-+						   chan->type == IIO_TEMP ?
-+						   SI7020CMD_TEMP_NO_HOLD :
-+						   SI7020CMD_RH_NO_HOLD);
-+			if (ret < 0)
-+				return ret;
-+			start = jiffies;
-+			while ((ret = i2c_master_recv(*client, buf, 2)) < 0) {
-+				if (time_after(jiffies, start +
-+					       usecs_to_jiffies(
-+							chan->type == IIO_TEMP ?
-+							SI7020_TEMP_TIMEOUT :
-+							SI7020_RH_TIMEOUT)))
-+					return ret;
-+				usleep_range(SI7020_NOHOLD_SLEEP_MIN,
-+					     SI7020_NOHOLD_SLEEP_MAX);
-+			}
-+			*val = ((buf[0] << 8) | buf[1]) >> 2;
-+		}
- 		/*
- 		 * Humidity values can slightly exceed the 0-100%RH
- 		 * range and should be corrected by software
-@@ -116,6 +163,7 @@ static int si7020_probe(struct i2c_client *client,
- {
- 	struct iio_dev *indio_dev;
- 	struct i2c_client **data;
-+	struct si7020_platform_data *pdata;
- 	int ret;
- 
- 	if (!i2c_check_functionality(client->adapter,
-@@ -123,6 +171,22 @@ static int si7020_probe(struct i2c_client *client,
- 				     I2C_FUNC_SMBUS_READ_WORD_DATA))
- 		return -ENODEV;
- 
-+	pdata = dev_get_platdata(&client->dev);
-+	if (pdata) {
-+		if (pdata->blocking_io) {
-+			if (client->adapter->quirks &&
-+			   client->adapter->quirks->flags |
-+			   I2C_AQ_NO_CLK_STRETCH)
-+				return -ENODEV;
-+		} else if (!i2c_check_functionality(client->adapter,
-+			  I2C_FUNC_I2C))
-+			return -ENODEV;
-+	} else
-+		if (!i2c_check_functionality(client->adapter, I2C_FUNC_I2C) &&
-+		   client->adapter->quirks &&
-+		   client->adapter->quirks->flags | I2C_AQ_NO_CLK_STRETCH)
-+			return -ENODEV;
-+
- 	/* Reset device, loads default settings. */
- 	ret = i2c_smbus_write_byte(client, SI7020CMD_RESET);
- 	if (ret < 0)
-diff --git a/include/linux/platform_data/si7020.h b/include/linux/platform_data/si7020.h
-new file mode 100644
-index 0000000..8bb5848
---- /dev/null
-+++ b/include/linux/platform_data/si7020.h
-@@ -0,0 +1,21 @@
-+/*
-+ * Copyright (C) 2015 Nicola Corna <nicola@corna.info>
-+ *
-+ * This software is licensed under the terms of the GNU General Public
-+ * License version 2, as published by the Free Software Foundation, and
-+ * may be copied, distributed, and modified under those terms.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ */
-+
-+#ifndef __SI7020_H_
-+#define __SI7020_H_
-+
-+struct si7020_platform_data {
-+	bool blocking_io;
-+};
-+#endif /* __SI7020_H_ */
+How does this fail for you?
+
+>         cpsie   i
+>         svc     #0
+> 1:      cpsid   i
+>         str     r5, [r12, #11 * 4]      @ restore the original SVC vector entry
+>         mov     lr, r6                  @ restore LR
+>         mov     sp, r7                  @ restore SP
+> 
+> Here, a temporary stack is prepared before making a
+> supervisor call (SVC) to switch to handler mode.
+
+OK, the effect of svc is that something is written to where sp points
+to. On my efm32 nothing obvious happens when something random is written
+there. I guess if that results in some CFI commands I have a problem
+though. What about your machine?
+
+> The temporary stack is allocated in the .text.init section
+> and so this doesn't work when the kernel is executing from ROM.
+> 
+> A similar problem has been reported for v7:
+> 
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-July/357106.html
+> 
+> While trying to come up with a proper fix, I've noticed how
+> the stack doesn't seem to be used.
+> 
+> So, I've been trying to understand why the need for the temporary
+> stack at all, but I still can't get it. 
+> 
+> The below patch seems to work just fine, and allows to boot a
+> LPC43xx kernel either as XIP from ROM or non-XIP from RAM.
+> 
+> However, I'm still wondering if the stack is really unused or not,
+> so any lights that can be shed here will be appreciated.
+> 
+> Thanks!
+> 
+> From a7c880c73b8ad2e4c4b07f4d11809ea541a65e1d Mon Sep 17 00:00:00 2001
+> From: Ezequiel Garcia <ezequiel@vanguardiasur.com.ar>
+> Date: Sat, 24 Oct 2015 13:27:27 -0300
+> Subject: [PATCH] ARM: Don't prepare any temporary stack in __v7m_setup
+> 
+> Since __v7m_setup() is implemented as the PROCINFO_INITFUNC
+> called in head-nommu.S it's called at the very beggining to
+> do some very basic setup.
+> 
+> The function prepares a temporary stack in the .text.init
+> section before calling SVC. However, this stack seems to
+> be completely unused and hence is not needed.
+> 
+> Moreover, this breaks on XIP kernels, when the text is in ROM.
+> Hence, this commit simply removes the temporary stack setup.
+> 
+> Signed-off-by: Ezequiel Garcia <ezequiel@vanguardiasur.com.ar>
+> ---
+>  arch/arm/mm/proc-v7m.S | 6 ------
+>  1 file changed, 6 deletions(-)
+> 
+> diff --git a/arch/arm/mm/proc-v7m.S b/arch/arm/mm/proc-v7m.S
+> index 67d9209077c6..6a383e619a0c 100644
+> --- a/arch/arm/mm/proc-v7m.S
+> +++ b/arch/arm/mm/proc-v7m.S
+> @@ -103,7 +103,6 @@ __v7m_setup:
+>  	str	r1, [r12, #11 * 4]	@ write the temporary SVC vector entry
+>  	mov	r6, lr			@ save LR
+>  	mov	r7, sp			@ save SP
+> -	ldr	sp, =__v7m_setup_stack_top
+>  	cpsie	i
+>  	svc	#0
+>  1:	cpsid	i
+> @@ -123,11 +122,6 @@ __v7m_setup:
+>  	ret	lr
+>  ENDPROC(__v7m_setup)
+>  
+> -	.align 2
+> -__v7m_setup_stack:
+> -	.space	4 * 8				@ 8 registers
+> -__v7m_setup_stack_top:
+> -
+
+The effect of your patch is that the value of sp as it is when
+__v7m_setup is entered is used. I didn't check, but I wouldn't be
+surprised if that's the value of sp when the boot loader gave control to
+Linux. This might or might not work. Something more robust would be
+better of course.
+
+Best regards
+Uwe
+
 -- 
-2.6.1
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
