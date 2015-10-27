@@ -1,83 +1,121 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 27 Oct 2015 15:44:24 +0000
-Subject: [PATCH] ARM: SWP emulation: Restore original *data when failed
-In-Reply-To: <20151016103729.GA6613@e104818-lin.cambridge.arm.com>
-References: <1444791077-26020-1-git-send-email-shengjiu.wang@freescale.com>
- <20151015082417.GX32532@n2100.arm.linux.org.uk>
- <20151015083629.GA32630@shlinux2>
- <20151015085700.GY32532@n2100.arm.linux.org.uk>
- <561F6F3B.6030607@arm.com> <20151015130247.GB29301@arm.com>
- <561FA948.5080505@arm.com> <5620ACB8.20908@arm.com>
- <20151016103729.GA6613@e104818-lin.cambridge.arm.com>
-Message-ID: <20151027154424.GG1689@arm.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 27 Oct 2015 15:42:37 +0000
+Subject: [PATCH] MAINTAINERS: Start using the 'reviewer' (R) tag
+Message-ID: <1445960557-24328-1-git-send-email-lee.jones@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 16, 2015 at 11:37:29AM +0100, Catalin Marinas wrote:
-> On Fri, Oct 16, 2015 at 08:52:24AM +0100, Vladimir Murzin wrote:
-> > > On 15/10/15 14:02, Will Deacon wrote:
-> > >> diff --git a/arch/arm64/kernel/armv8_deprecated.c b/arch/arm64/kernel/armv8_deprecated.c
-> > >> index bcee7abac68e..6039d1eb5912 100644
-> > >> --- a/arch/arm64/kernel/armv8_deprecated.c
-> > >> +++ b/arch/arm64/kernel/armv8_deprecated.c
-> > >> @@ -284,12 +284,12 @@ static void register_insn_emulation_sysctl(struct ctl_table *table)
-> > >>  	__asm__ __volatile__(					\
-> > >>  	ALTERNATIVE("nop", SET_PSTATE_PAN(0), ARM64_HAS_PAN,	\
-> > >>  		    CONFIG_ARM64_PAN)				\
-> > >> -	"	mov		%w2, %w1\n"			\
-> > >> -	"0:	ldxr"B"		%w1, [%3]\n"			\
-> > >> -	"1:	stxr"B"		%w0, %w2, [%3]\n"		\
-> > >> +	"0:	ldxr"B"		%w2, [%3]\n"			\
-> > >> +	"1:	stxr"B"		%w0, %w1, [%3]\n"		\
-> > >>  	"	cbz		%w0, 2f\n"			\
-> > >>  	"	mov		%w0, %w4\n"			\
-> > >>  	"2:\n"							\
-> > >> +	"	mov		%w1, %w2\n"			\
-> > >>  	"	.pushsection	 .fixup,\"ax\"\n"		\
-> > >>  	"	.align		2\n"				\
-> > >>  	"3:	mov		%w0, %w5\n"			\
-> > 
-> > On the second thought looks like we still update *data in case stxr
-> > fails (or I need more coffee).
-> 
-> I'm on the second cup and I see the same problem. Even if stxr fails, we
-> fall back through "mov %w1, %w2", so *data is always updated with the
-> loaded value. Maybe something like below on top of Will's patch:
+Since eafbaac ("MAINTAINERS: Add "R:" designated-reviewers tag") we
+have been able to tag specific people as Reviewers.  These are key
+individuals who are tasked with or volunteer to review code submitted
+to a subsystem or specific file.  However, according to MAINTAINERS
+we have 1046 Maintainers and only a mere 22 Reviewers.  I believe
+these numbers to be incorrect, as many of these Maintainers are in
+fact Reviewers.
 
-Yeah, sorry, my original patch was an untested mess. I think we can avoid
-the "cc" clobber by adding a branch to the slow-path, as below.
+I have taken the time to identify some of the Reviewers who pertain
+to subsystems which I look after, and have changed their status from
+Maintainer (collector of patches) to Reviewer (reviewer of code).
 
-Still needs testing, mind.
+Signed-off-by: Lee Jones <lee.jones@linaro.org>
+---
 
-Will
+ MAINTAINERS | 22 +++++++++++-----------
+ 1 file changed, 11 insertions(+), 11 deletions(-)
 
---->8
-
-diff --git a/arch/arm64/kernel/armv8_deprecated.c b/arch/arm64/kernel/armv8_deprecated.c
-index 6039d1eb5912..937f5e58a4d3 100644
---- a/arch/arm64/kernel/armv8_deprecated.c
-+++ b/arch/arm64/kernel/armv8_deprecated.c
-@@ -288,17 +288,19 @@ static void register_insn_emulation_sysctl(struct ctl_table *table)
- 	"1:	stxr"B"		%w0, %w1, [%3]\n"		\
- 	"	cbz		%w0, 2f\n"			\
- 	"	mov		%w0, %w4\n"			\
-+	"	b		3f\n"				\
- 	"2:\n"							\
- 	"	mov		%w1, %w2\n"			\
-+	"3:\n"							\
- 	"	.pushsection	 .fixup,\"ax\"\n"		\
- 	"	.align		2\n"				\
--	"3:	mov		%w0, %w5\n"			\
--	"	b		2b\n"				\
-+	"4:	mov		%w0, %w5\n"			\
-+	"	b		3b\n"				\
- 	"	.popsection"					\
- 	"	.pushsection	 __ex_table,\"a\"\n"		\
- 	"	.align		3\n"				\
--	"	.quad		0b, 3b\n"			\
--	"	.quad		1b, 3b\n"			\
-+	"	.quad		0b, 4b\n"			\
-+	"	.quad		1b, 4b\n"			\
- 	"	.popsection\n"					\
- 	ALTERNATIVE("nop", SET_PSTATE_PAN(1), ARM64_HAS_PAN,	\
- 		CONFIG_ARM64_PAN)				\
+diff --git a/MAINTAINERS b/MAINTAINERS
+index 9de185d..07bc92f 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -392,7 +392,7 @@ F:	drivers/media/i2c/adp1653.c
+ F:	include/media/adp1653.h
+ 
+ ADP5520 BACKLIGHT DRIVER WITH IO EXPANDER (ADP5520/ADP5501)
+-M:	Michael Hennerich <michael.hennerich@analog.com>
++R:	Michael Hennerich <michael.hennerich@analog.com>
+ W:	http://wiki.analog.com/ADP5520
+ W:	http://ez.analog.com/community/linux-device-drivers
+ S:	Supported
+@@ -411,7 +411,7 @@ F:	drivers/input/keyboard/adp5588-keys.c
+ F:	drivers/gpio/gpio-adp5588.c
+ 
+ ADP8860 BACKLIGHT DRIVER (ADP8860/ADP8861/ADP8863)
+-M:	Michael Hennerich <michael.hennerich@analog.com>
++R:	Michael Hennerich <michael.hennerich@analog.com>
+ W:	http://wiki.analog.com/ADP8860
+ W:	http://ez.analog.com/community/linux-device-drivers
+ S:	Supported
+@@ -2049,8 +2049,8 @@ S:	Maintained
+ F:	drivers/net/wireless/b43legacy/
+ 
+ BACKLIGHT CLASS/SUBSYSTEM
+-M:	Jingoo Han <jingoohan1@gmail.com>
+ M:	Lee Jones <lee.jones@linaro.org>
++R:	Jingoo Han <jingoohan1@gmail.com>
+ S:	Maintained
+ F:	drivers/video/backlight/
+ F:	include/linux/backlight.h
+@@ -3364,7 +3364,7 @@ F:	include/linux/dm-*.h
+ F:	include/uapi/linux/dm-*.h
+ 
+ DIALOG SEMICONDUCTOR DRIVERS
+-M:	Support Opensource <support.opensource@diasemi.com>
++R:	Support Opensource <support.opensource@diasemi.com>
+ W:	http://www.dialog-semiconductor.com/products
+ S:	Supported
+ F:	Documentation/hwmon/da90??
+@@ -5212,7 +5212,7 @@ S:	Orphan
+ F:	drivers/scsi/ips.*
+ 
+ ICH LPC AND GPIO DRIVER
+-M:	Peter Tyser <ptyser@xes-inc.com>
++R:	Peter Tyser <ptyser@xes-inc.com>
+ S:	Maintained
+ F:	drivers/mfd/lpc_ich.c
+ F:	drivers/gpio/gpio-ich.c
+@@ -6855,7 +6855,7 @@ F:	include/linux/mcb.h
+ F:	Documentation/men-chameleon-bus.txt
+ 
+ MEN F21BMC (Board Management Controller)
+-M:	Andreas Werner <andreas.werner@men.de>
++R:	Andreas Werner <andreas.werner@men.de>
+ S:	Supported
+ F:	drivers/mfd/menf21bmc.c
+ F:	drivers/watchdog/menf21bmc_wdt.c
+@@ -9009,8 +9009,8 @@ S:	Maintained
+ F:	drivers/video/fbdev/s3c-fb.c
+ 
+ SAMSUNG MULTIFUNCTION PMIC DEVICE DRIVERS
+-M:	Sangbeom Kim <sbkim73@samsung.com>
+-M:	Krzysztof Kozlowski <k.kozlowski@samsung.com>
++R:	Sangbeom Kim <sbkim73@samsung.com>
++R:	Krzysztof Kozlowski <k.kozlowski@samsung.com>
+ L:	linux-kernel at vger.kernel.org
+ L:	linux-samsung-soc at vger.kernel.org
+ S:	Supported
+@@ -10434,20 +10434,20 @@ F:	sound/soc/codecs/lm49453*
+ F:	sound/soc/codecs/isabelle*
+ 
+ TI LP855x BACKLIGHT DRIVER
+-M:	Milo Kim <milo.kim@ti.com>
++R:	Milo Kim <milo.kim@ti.com>
+ S:	Maintained
+ F:	Documentation/backlight/lp855x-driver.txt
+ F:	drivers/video/backlight/lp855x_bl.c
+ F:	include/linux/platform_data/lp855x.h
+ 
+ TI LP8727 CHARGER DRIVER
+-M:	Milo Kim <milo.kim@ti.com>
++R:	Milo Kim <milo.kim@ti.com>
+ S:	Maintained
+ F:	drivers/power/lp8727_charger.c
+ F:	include/linux/platform_data/lp8727.h
+ 
+ TI LP8788 MFD DRIVER
+-M:	Milo Kim <milo.kim@ti.com>
++R:	Milo Kim <milo.kim@ti.com>
+ S:	Maintained
+ F:	drivers/iio/adc/lp8788_adc.c
+ F:	drivers/leds/leds-lp8788.c
+-- 
+1.9.1
