@@ -1,35 +1,42 @@
-From: scottwood@freescale.com (Scott Wood)
-Date: Mon, 26 Oct 2015 20:34:26 -0500
-Subject: [PATCH V6 5/6] clk: qoriq: Add ls1043a support.
-In-Reply-To: <CADRPPNSS62G3D8ghNjd1kJMSjXkQJ9bfqeTP_ZqMk2ehRN5iyw@mail.gmail.com>
-References: <1445587282-29529-1-git-send-email-B48286@freescale.com>
- <1445587282-29529-5-git-send-email-B48286@freescale.com>
- <CADRPPNSS62G3D8ghNjd1kJMSjXkQJ9bfqeTP_ZqMk2ehRN5iyw@mail.gmail.com>
-Message-ID: <1445909666.701.289.camel@freescale.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Tue, 27 Oct 2015 10:38:08 +0900
+Subject: [PATCH v12 0/7] arm64: renesas: Add Renesas R8A7795 SoC support
+In-Reply-To: <1445839312-8874-1-git-send-email-horms+renesas@verge.net.au>
+References: <1445839312-8874-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <20151027013808.GA12057@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2015-10-26 at 17:20 -0500, Leo Li wrote:
-> On Fri, Oct 23, 2015 at 3:01 AM, Zhiqiang Hou <B48286@freescale.com> wrote:
-> > From: Hou Zhiqiang <B48286@freescale.com>
-> > 
-> > Signed-off-by: Hou Zhiqiang <B48286@freescale.com>
-> > Acked-by: Stephen Boyd <sboyd@codeaurora.org>
-> > ---
-> > V6: V5 V4 V3 V2
-> >  - No change.
+On ?, 10? 26, 2015 at 03:01:45?? +0900, Simon Horman wrote:
+> Hi,
 > 
-> I know you mentioned the dependency in the summary of the patch
-> series.  But it's not likely these dependencies will be merged through
-> the ARM sub-maintainers tree and be resolved in this merge window.  So
-> it will be better to mention these dependencies here so that this
-> patch will go through the same tree as these dependency patches.
+> this patchset adds basic support for the Renesas R-Car H3 (R8A7795) SoC
+> and its Saovator-X board.
 > 
-> Scott,
 > 
-> What is your plan to merge the clock patches?  This patch need to go
-> together with it.
+> Based on a merge of:
+> * v4.3-rc1
+> * clk-shmobile-for-v4.4 branch of 
+>   git://git.kernel.org/pub/scm/linux/kernel/git/geert/renesas-drivers
+>   This provides the bindings and includes for the new CPG driver.
+>   These are queued up by the subsystem maintainer, Mike Turquette,
+>   for v4.4.
+> 
+> Run-time dependencies:
+> * The base
+> * The new GPG driver
+>   "[PATCH/RFC v4 0/5] clk: shmobile: Add new Renesas CPG/MSSR DT bindings"
+>   and its dependencies. This may be found in the
+>   topic/cpg-mssr-v4 branch of
+>   git://git.kernel.org/pub/scm/linux/kernel/git/geert/renesas-drivers
+> 
+> 
+> For changes see per-patch changelogs.
 
-See https://lists.ozlabs.org/pipermail/linuxppc-dev/2015-October/135565.html
+The key change was to update to new CPG/MSSR bindings via Geert
+Uytterhoeven.
 
--Scott
+Availability:
+
+* This patchset is available in the topic/r8a7795-gpio-v2 branch of my
+  renesas tree on kernel.org.
