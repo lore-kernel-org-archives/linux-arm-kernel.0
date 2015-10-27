@@ -1,70 +1,59 @@
 From: tn@semihalf.com (Tomasz Nowicki)
-Date: Tue, 27 Oct 2015 17:38:40 +0100
-Subject: [PATCH V1 09/11] x86,
- pci: Use previously added ECAM hot_added flag to remove ECAM regions.
+Date: Tue, 27 Oct 2015 17:38:39 +0100
+Subject: [PATCH V1 08/11] pci, acpi,
+ ecam: Add flag to indicate whether ECAM region was hot added or not.
 In-Reply-To: <1445963922-22711-1-git-send-email-tn@semihalf.com>
 References: <1445963922-22711-1-git-send-email-tn@semihalf.com>
-Message-ID: <1445963922-22711-10-git-send-email-tn@semihalf.com>
+Message-ID: <1445963922-22711-9-git-send-email-tn@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we have hot_added flag we can get rid of arch specific mcfg_added.
+There are two ways we can get ECAM (aka MCFG) regions using ACPI,
+from MCFG static table and from _CBA method. We cannot remove static
+regions, however regions coming from _CBA should be removed while removing
+bridge device.
+
+In the light of above we need flag to mark hot added ECAM entries
+so that user should use pci_mmconfig_inject while adding regions from
+_CBA method.
 
 Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
 ---
- arch/x86/pci/acpi.c | 16 ++++++++--------
- 1 file changed, 8 insertions(+), 8 deletions(-)
+ drivers/pci/ecam.c   | 2 ++
+ include/linux/ecam.h | 1 +
+ 2 files changed, 3 insertions(+)
 
-diff --git a/arch/x86/pci/acpi.c b/arch/x86/pci/acpi.c
-index 28c9cd6..b4ef761 100644
---- a/arch/x86/pci/acpi.c
-+++ b/arch/x86/pci/acpi.c
-@@ -13,7 +13,6 @@ struct pci_root_info {
- 	struct acpi_pci_root_info common;
- 	struct pci_sysdata sd;
- #ifdef	CONFIG_PCI_MMCONFIG
--	bool mcfg_added;
+diff --git a/drivers/pci/ecam.c b/drivers/pci/ecam.c
+index 8a5eef7..da35b4c 100644
+--- a/drivers/pci/ecam.c
++++ b/drivers/pci/ecam.c
+@@ -131,6 +131,7 @@ struct pci_mmcfg_region *pci_mmconfig_alloc(int segment, int start,
+ 	new->segment = segment;
+ 	new->start_bus = start;
+ 	new->end_bus = end;
++	new->hot_added = false;
+ 
+ 	res = &new->res;
+ 	res->start = addr + PCI_MMCFG_BUS_OFFSET(start);
+@@ -221,6 +222,7 @@ int pci_mmconfig_inject(struct pci_mmcfg_region *cfg)
+ 		err = -ENOMEM;
+ 		goto out;
+ 	} else {
++		cfg->hot_added = true;
+ 		list_add_sorted(cfg);
+ 		pr_info("MMCONFIG at %pR (base %#lx)\n",
+ 			&cfg->res, (unsigned long)cfg->address);
+diff --git a/include/linux/ecam.h b/include/linux/ecam.h
+index 813acd1..e0f322e 100644
+--- a/include/linux/ecam.h
++++ b/include/linux/ecam.h
+@@ -17,6 +17,7 @@ struct pci_mmcfg_region {
  	u8 start_bus;
  	u8 end_bus;
- #endif
-@@ -188,7 +187,6 @@ static int setup_mcfg_map(struct acpi_pci_root_info *ci)
- 	info = container_of(ci, struct pci_root_info, common);
- 	info->start_bus = (u8)root->secondary.start;
- 	info->end_bus = (u8)root->secondary.end;
--	info->mcfg_added = false;
- 	seg = info->sd.domain;
+ 	char name[PCI_MMCFG_RESOURCE_NAME_LEN];
++	bool hot_added;
+ };
  
- 	/* return success if MMCFG is not in use */
-@@ -204,7 +202,6 @@ static int setup_mcfg_map(struct acpi_pci_root_info *ci)
- 		/* enable MMCFG if it hasn't been enabled yet */
- 		if (raw_pci_ext_ops == NULL)
- 			raw_pci_ext_ops = &pci_mmcfg;
--		info->mcfg_added = true;
- 	} else if (result != -EEXIST)
- 		return check_segment(seg, dev,
- 			 "fail to add MMCONFIG information,");
-@@ -214,14 +211,17 @@ static int setup_mcfg_map(struct acpi_pci_root_info *ci)
- 
- static void teardown_mcfg_map(struct acpi_pci_root_info *ci)
- {
-+	struct pci_mmcfg_region *cfg;
- 	struct pci_root_info *info;
- 
- 	info = container_of(ci, struct pci_root_info, common);
--	if (info->mcfg_added) {
--		pci_mmconfig_delete(info->sd.domain,
--				    info->start_bus, info->end_bus);
--		info->mcfg_added = false;
--	}
-+	cfg = pci_mmconfig_lookup(info->sd.domain, info->start_bus);
-+	if (!cfg)
-+		return;
-+
-+	if (cfg->hot_added)
-+		pci_mmconfig_delete(info->sd.domain, info->start_bus,
-+				    info->end_bus);
- }
- #else
- static int setup_mcfg_map(struct acpi_pci_root_info *ci)
+ struct pci_mmcfg_region *pci_mmconfig_lookup(int segment, int bus);
 -- 
 1.9.1
