@@ -1,74 +1,49 @@
-From: Suzuki.Poulose@arm.com (Suzuki K. Poulose)
-Date: Tue, 27 Oct 2015 18:09:24 +0000
-Subject: [PATCH v3 00/24] arm64: Consolidate CPU feature handling
-In-Reply-To: <562C8D68.9040008@reserved-bit.com>
-References: <1444756952-31145-1-git-send-email-suzuki.poulose@arm.com>
- <562C8D68.9040008@reserved-bit.com>
-Message-ID: <562FBDD4.5030309@arm.com>
+From: mingo@kernel.org (Ingo Molnar)
+Date: Tue, 27 Oct 2015 19:13:51 +0100
+Subject: [PATCH] mutex: make mutex_lock_nested an inline function
+In-Reply-To: <20151022174400.GW32532@n2100.arm.linux.org.uk>
+References: <11282238.AHmyWliPRj@wuerfel>
+ <20151013203812.GM17308@twins.programming.kicks-ass.net>
+ <11817958.z9KtmeKzV7@wuerfel> <57854232.vMTrn4EgZx@wuerfel>
+ <20151022150959.GU17308@twins.programming.kicks-ass.net>
+ <20151022174400.GW32532@n2100.arm.linux.org.uk>
+Message-ID: <20151027181351.GA15015@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25/10/15 08:06, Siddhesh Poyarekar wrote:
-> On Tuesday 13 October 2015 10:52 PM, Suzuki K. Poulose wrote:
->> Apart from the selected feature registers, we expose MIDR_EL1 (Main
->> ID Register). The user should be aware that, reading MIDR_EL1 can be
->> tricky on a heterogeneous system (just like getcpu()). We export the
->> value of the current CPU where 'MRS' is executed. REVIDR is not exposed
->> via MRS, since we cannot guarantee atomic access to both MIDR and REVIDR
->> (task migration). So they both are exposed via sysfs under :
->>
->> 	/sys/devices/system/cpu/cpu$ID/identification/
->> 							\- midr
->> 							\- revidr
->>
->> The ABI useful for the toolchains (e.g, gcc, dynamic linker, JIT) to make
->> better runtime decisions based on what is available.
->
-> Thank you for doing this.  I'm prototyping glibc support to select
-> optimal functions by micro-architecture and I had a couple of concerns.
->
-> The midr emulation may not be sufficient for glibc to select optimal
-> routines because there could theoretically be sufficient variance
-> between cpus with only different revidr that vendors may write different
-> optimal routines.
 
-But then there is no way we can provide the midr/revidr pair reliably.
-So I guess we can't do much about it.
+* Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
 
->  Secondly, on a heterogeneous system, we won't be able
-> to select a routine reliably using just the emulated instruction since
-> we have no control where it runs and we would want to know what each of
-> the cpus looks like.
+> On Thu, Oct 22, 2015 at 05:09:59PM +0200, Peter Zijlstra wrote:
+> > Hmm, I was sure I send a reply, but I cannot even find it in my own sent
+> > folder so who knows.
+> > 
+> > My current preference is to keep the thing a macro and work around it in
+> > the usage site because while these warns are annoying, they're at least
+> > visible. Whereas, with an inline, code bloat is entirely silent. Even if
+> > the sites you found are harmless, there's no saying what the future will
+> > bring etc..
+> 
+> I agree - we've got way too many inline functions already.  My biggest annoyance 
+> in that respect is the asm-generic dma_map_single() implementation that we're 
+> now forced to use on ARM, which results in quite a large chunk of code at every 
+> callsite.
+> 
+> The problem there is that when you have drivers which do something like:
+> 
+> 	dma = dma_map_single(dev, page_address(page), size, dir);
+> 
+> you end up with code which converts the struct page to a virtual address, and 
+> then you end up with code in the dma_map_single() inline function which then 
+> converts it back to a struct page + offset - none of which, with modern ARM 
+> kernels, the compiler has a hope in hell of optimising.
+> 
+> So we end up with all that junk at every single dma_map_single() callsite. If 
+> dma_map_single() were a library function, it would be a lot smaller since we'd 
+> only have one copy of the complex virt->struct page conversion.
 
-On a heterogeneous system, we can't do much, as you will anyway need to know
-which CPU you are running on to select the version, which itself is not
-reliable (unless you are pinned to the CPU).
+Should be pretty easy to fix, once you know which inline functions hurt.
 
->
-> The sysfs API solves this problem, but it doesn't seem like an optimal
-> thing to do in an IFUNC resolver in glibc.  CPU information is scattered
+Thanks,
 
-I agree, the sysfs API is not suitable for low-level users like IFUNC, but
-for tools like JIT to determine the CPUs present on the system.
-
->
-> Would you be able to consolidate all cpu identification into a single
-> file?  This would allow glibc to just map in the file and read in all of
-> the information in one go, greatly reducing the number of syscalls.
-
-I am afraid that would impose a new ABI with complications on how we
-handle information about the CPUs in different states (online, offline,
-etc). I am open to suggestions here.
-
->
-> The other alternative I was thinking of was to have an additional hwcap
-> HWCAP_HETEROGENEOUS_CPU which is set if there are different kinds of
-> processor cores in the system, but that will force us to stick to
-> default routines for heterogeneous cores.
-
-See [1] for previous discussion on this topic.
-
-[1] https://lkml.org/lkml/2015/9/1/391
-
-Thanks
-Suzuki
+	Ingo
