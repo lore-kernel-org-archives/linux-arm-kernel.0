@@ -1,35 +1,43 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Tue, 27 Oct 2015 11:47:13 +0900
-Subject: [PATCH] ARM: multi_v7_defconfig: enable UniPhier I2C drivers
-Message-ID: <1445914033-4598-1-git-send-email-yamada.masahiro@socionext.com>
+From: pankaj.dubey@samsung.com (Pankaj Dubey)
+Date: Tue, 27 Oct 2015 08:27:05 +0530
+Subject: [PATCH 1/4] ARM: dts: Add SROMc to Exynos 5410
+In-Reply-To: <185cfa03e31cee4187492e0b9b0050e4b6f1a8f9.1445859834.git.p.fedin@samsung.com>
+References: <cover.1445859834.git.p.fedin@samsung.com>
+ <185cfa03e31cee4187492e0b9b0050e4b6f1a8f9.1445859834.git.p.fedin@samsung.com>
+Message-ID: <562EE801.4000906@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These two drivers were merged into the I2C sub-system by
-commit dd6fd4a32793 ("i2c: uniphier: add UniPhier FIFO-less I2C driver")
-and commit 6a62974b667f ("i2c: uniphier_f: add UniPhier FIFO-builtin I2C
-driver").
+Hi Pavel,
 
-Enable them from arch/arm/configs/multi_v7_defconfig.
+On Monday 26 October 2015 05:17 PM, Pavel Fedin wrote:
+> This machine uses own SoC device tree file, add missing part.
+>
+> Signed-off-by: Pavel Fedin <p.fedin@samsung.com>
+> ---
+>   arch/arm/boot/dts/exynos5410.dtsi | 5 +++++
+>   1 file changed, 5 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/exynos5410.dtsi b/arch/arm/boot/dts/exynos5410.dtsi
+> index 4603356..91dd302 100644
+> --- a/arch/arm/boot/dts/exynos5410.dtsi
+> +++ b/arch/arm/boot/dts/exynos5410.dtsi
+> @@ -101,6 +101,11 @@
+>   			reg = <0x10000000 0x100>;
+>   		};
+>
+> +		sromc_0: sromc at 12250000 {
 
-Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
----
+Why sromc_0? Does this SoC have more than one srom controllers?
 
- arch/arm/configs/multi_v7_defconfig | 2 ++
- 1 file changed, 2 insertions(+)
+> +			compatible = "samsung,exynos-srom";
+> +			reg = <0x12250000 0x10>;
+> +		};
+> +
+>   		pmu_system_controller: system-controller at 10040000 {
+>   			compatible = "samsung,exynos5410-pmu", "syscon";
+>   			reg = <0x10040000 0x5000>;
+>
 
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index bfd74fe..90e2b68 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -308,6 +308,8 @@ CONFIG_I2C_SIRF=y
- CONFIG_I2C_ST=y
- CONFIG_I2C_SUN6I_P2WI=y
- CONFIG_I2C_TEGRA=y
-+CONFIG_I2C_UNIPHIER=y
-+CONFIG_I2C_UNIPHIER_F=y
- CONFIG_I2C_XILINX=y
- CONFIG_I2C_RCAR=y
- CONFIG_I2C_CROS_EC_TUNNEL=m
--- 
-1.9.1
+Thanks,
+Pankaj Dubey
