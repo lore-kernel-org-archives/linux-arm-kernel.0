@@ -1,83 +1,59 @@
 From: robh+dt@kernel.org (Rob Herring)
-Date: Tue, 27 Oct 2015 02:42:48 -0500
-Subject: [PATCH 07/10] pwm: gpio: Add a generic gpio based PWM driver
-In-Reply-To: <1445895161-2317-8-git-send-email-o.schinagl@ultimaker.com>
-References: <1445895161-2317-1-git-send-email-o.schinagl@ultimaker.com>
- <1445895161-2317-8-git-send-email-o.schinagl@ultimaker.com>
-Message-ID: <CAL_Jsq+98bBt5-+Of-u6jCdGBiZfMvL=P=mMpvWT26qnPFMz5A@mail.gmail.com>
+Date: Tue, 27 Oct 2015 02:49:00 -0500
+Subject: [PATCH v2 1/4] DT: nvmem: Add NXP LPC18xx EEPROM memory binding
+ documentation
+In-Reply-To: <1445275946-32653-2-git-send-email-ariel@vanguardiasur.com.ar>
+References: <1445275946-32653-1-git-send-email-ariel@vanguardiasur.com.ar>
+ <1445275946-32653-2-git-send-email-ariel@vanguardiasur.com.ar>
+Message-ID: <CAL_Jsq+_2qDbp8v7yGsAOFGVxpKSisomnFyLwYkD3oMz2go0Hw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 26, 2015 at 4:32 PM, Olliver Schinagl
-<o.schinagl@ultimaker.com> wrote:
-> From: Olliver Schinagl <oliver@schinagl.nl>
+On Mon, Oct 19, 2015 at 12:32 PM, Ariel D'Alessandro
+<ariel@vanguardiasur.com.ar> wrote:
+> Add the devicetree binding document for NXP LPC18xx EEPROM memory.
 >
-> This patch adds a bit-banging gpio PWM driver. It makes use of hrtimers,
-> to allow nano-second resolution, though it obviously strongly depends on
-> the switching speed of the gpio pins, hrtimer and system load.
->
-> Each pwm node can have 1 or more "pwm-gpio" entries, which will be
-> treated as pwm's as part of a pwm chip.
->
-> Signed-off-by: Olliver Schinagl <oliver@schinagl.nl>
+> Signed-off-by: Ariel D'Alessandro <ariel@vanguardiasur.com.ar>
+
+Acked-by: Rob Herring <robh@kernel.org>
+
 > ---
->  Documentation/devicetree/bindings/pwm/pwm-gpio.txt |  18 ++
->  MAINTAINERS                                        |   5 +
->  drivers/pwm/Kconfig                                |  15 ++
->  drivers/pwm/Makefile                               |   1 +
->  drivers/pwm/pwm-gpio.c                             | 253 +++++++++++++++++++++
->  5 files changed, 292 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/pwm/pwm-gpio.txt
->  create mode 100644 drivers/pwm/pwm-gpio.c
+>  .../devicetree/bindings/nvmem/lpc1857-eeprom.txt   | 26 ++++++++++++++++++++++
+>  1 file changed, 26 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/nvmem/lpc1857-eeprom.txt
 >
-> diff --git a/Documentation/devicetree/bindings/pwm/pwm-gpio.txt b/Documentation/devicetree/bindings/pwm/pwm-gpio.txt
+> diff --git a/Documentation/devicetree/bindings/nvmem/lpc1857-eeprom.txt b/Documentation/devicetree/bindings/nvmem/lpc1857-eeprom.txt
 > new file mode 100644
-> index 0000000..336f61f
+> index 0000000..01cde0d
 > --- /dev/null
-> +++ b/Documentation/devicetree/bindings/pwm/pwm-gpio.txt
-> @@ -0,0 +1,18 @@
-> +Generic GPIO bit-banged PWM driver
+> +++ b/Documentation/devicetree/bindings/nvmem/lpc1857-eeprom.txt
+> @@ -0,0 +1,26 @@
+> +* NXP LPC18xx EEPROM memory NVMEM driver
 > +
 > +Required properties:
-> +  - compatible: should be "pwm-gpio"
-> +  - #pwm-cells: should be 3, see pwm.txt in this directory for a general
-> +    description of the cells format.
-> +  - pwm-gpios: one or more gpios describing the used gpio, see the gpio
-> +    bindings for the used gpio driver.
-
-I'm not sure there is really much advantage to having multiple gpios
-per node. It would simplify the driver a bit not to, but I don't feel
-strongly either way.
-
+> +  - compatible: Should be "nxp,lpc1857-eeprom"
+> +  - reg: Must contain an entry with the physical base address and length
+> +    for each entry in reg-names.
+> +  - reg-names: Must include the following entries.
+> +    - reg: EEPROM registers.
+> +    - mem: EEPROM address space.
+> +  - clocks: Must contain an entry for each entry in clock-names.
+> +  - clock-names: Must include the following entries.
+> +    - eeprom: EEPROM operating clock.
+> +  - interrupts: Should contain EEPROM interrupt.
 > +
 > +Example:
-> +#include <dt-bindings/gpio/gpio.h>
 > +
-> +       pwm: pwm at 0 {
-
-Unit address should be associated with a reg property, so drop it.
-
-> +               compatible = "pwm-gpio";
-> +               #pwm-cells = 3;
-> +               pwm-gpios = <&pio 7 1 GPIO_ACTIVE_LOW>;
-> +               pwm-gpios = <&pio 7 2 GPIO_ACTIVE_LOW>;
-
-This would not actually compile. You can't have 2 properties of the same name.
-
-> +       };
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index 7ba7ab7..0ae7fbf 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -4555,6 +4555,11 @@ F:       drivers/i2c/muxes/i2c-mux-gpio.c
->  F:     include/linux/i2c-mux-gpio.h
->  F:     Documentation/i2c/muxes/i2c-mux-gpio
+> +  eeprom: eeprom at 4000e000 {
+> +    compatible = "nxp,lpc1857-eeprom";
+> +    reg = <0x4000e000 0x1000>,
+> +          <0x20040000 0x4000>;
+> +    reg-names = "reg", "mem";
+> +    clocks = <&ccu1 CLK_CPU_EEPROM>;
+> +    clock-names = "eeprom";
+> +    resets = <&rgu 27>;
+> +    interrupts = <4>;
+> +  };
+> --
+> 2.6.1
 >
-> +GENERIC GPIO PWM DRIVER
-> +M:     Olliver Schinagl <oliver@schinagl.nl>
-> +S:     Maintained
-> +F:     drivers/pwm/pwm-gpio.c
-
-Can you add the binding doc too.
-
-Rob
