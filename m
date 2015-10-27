@@ -1,82 +1,28 @@
-From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Tue, 27 Oct 2015 10:12:18 +0000
-Subject: [GIT PULL] arm64: Juno: Add support for PCIe or R1 board
-In-Reply-To: <20151026235505.GA13221@localhost>
-References: <20151021113629.GF3394@e106497-lin.cambridge.arm.com>
- <4136958.Qhq5GfeeVa@wuerfel>
- <20151026101256.GF963@e106497-lin.cambridge.arm.com>
- <20151026235505.GA13221@localhost>
-Message-ID: <20151027101218.GI963@e106497-lin.cambridge.arm.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 27 Oct 2015 11:23:22 +0100
+Subject: [PATCH 2/4] thermal: rockchip: ensure the otp state before
+ resetting the controller
+In-Reply-To: <5626ED35.3010403@gmail.com>
+References: <1445332264-6054-1-git-send-email-wxt@rock-chips.com>
+ <1445332264-6054-3-git-send-email-wxt@rock-chips.com>
+ <CAD=FV=WHvwNGdRZ4Yjwk0zB00o2gFHXLfbAYHai1kM_oBAR4_g@mail.gmail.com>
+ <5626ED35.3010403@gmail.com>
+Message-ID: <CACRpkdaRhpmgZLUAOrHN99GwYDbXhF0Mmi7WuQPAtC4aEsZDJQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 27, 2015 at 08:55:05AM +0900, Olof Johansson wrote:
-> Hi,
-> 
-> On Mon, Oct 26, 2015 at 10:12:57AM +0000, Liviu Dudau wrote:
-> > On Fri, Oct 23, 2015 at 10:42:53PM +0200, Arnd Bergmann wrote:
-> > > On Wednesday 21 October 2015 12:36:29 Liviu Dudau wrote:
-> > > > The following changes since commit 25cb62b76430a91cc6195f902e61c2cb84ade622:
-> > > > 
-> > > >   Linux 4.3-rc5 (2015-10-11 11:09:45 -0700)
-> > > > 
-> > > > are available in the git repository at:
-> > > > 
-> > > > 
-> > > 
-> > > Not pulled.
-> > > 
-> > > All our branches are based on -rc4 or earlier, and we'd like to avoid
-> > > backmerges from mainline if at all possible.
-> > > 
-> > > Can you rebase this to -rc4 and send again?
-> > > 
-> > > 	Arnd
-> > 
-> > Sure, I've rebased the branch on top of -rc4 now, so here is the new request.
-> > 
-> > Many thanks,
-> > Liviu
-> > 
-> > The following changes since commit 049e6dde7e57f0054fdc49102e7ef4830c698b46:
-> > 
-> >   Linux 4.3-rc4 (2015-10-04 16:57:17 +0100)
-> > 
-> > are available in the git repository at:
-> > 
-> >   git://linux-arm.org/linux-ld for-upstream/juno-pcie
-> 
-> This is showing up late by now, but Juno also isn't a high-volume platform
-> so exposure to regressions are limited.
-> 
-> That being said, I really hope we won't have to pick up any fixes for
-> this due to lack of exposure to -next after the merge window.
-> 
-> 
-> Merged into next/arm64.
+On Wed, Oct 21, 2015 at 3:41 AM, Caesar Wang <caesar.upstream@gmail.com> wrote:
+>> On Tue, Oct 20, 2015 at 2:11 AM, Caesar Wang <wxt@rock-chips.com> wrote:
 
-Thanks,
+>> You'd still want to have a bindings change to describe "init", but at
+>> least you shouldn't need any code changes.
+>
+> Okay, https://patchwork.kernel.org/patch/5055741/ that's working for me.
+> Fell free add my  test tag if you resend the patch. (Tested-by: Caesar Wang
+> <wxt@rock-chips.com>)
 
-The PCIe setup has been tested pretty thoroughly (famous last words) inside ARM.
-The only surprises can come from various combinations of bootloaders and the
-kernel, and I'm happy to handle those.
+Doug, can you resend this rebased version with Caesar's Test tag?
+I kinda like this more than any alternatives.
 
-Best regards,
-Liviu
-
-> 
-> 
-> Thanks,
-> 
-> -Olof
-> 
-
--- 
-====================
-| I would like to |
-| fix the world,  |
-| but they're not |
-| giving me the   |
- \ source code!  /
-  ---------------
-    ?\_(?)_/?
+Yours,
+Linus Walleij
