@@ -1,357 +1,458 @@
-From: james.morse@arm.com (James Morse)
-Date: Tue, 27 Oct 2015 17:29:16 +0000
-Subject: [PATCH v2 07/11] arm64: Change cpu_resume() to enable mmu early then
- access sleep_sp by va
-In-Reply-To: <1445966960-31724-1-git-send-email-james.morse@arm.com>
-References: <1445966960-31724-1-git-send-email-james.morse@arm.com>
-Message-ID: <1445966960-31724-8-git-send-email-james.morse@arm.com>
+From: brijeshkumar.singh@amd.com (Brijesh Singh)
+Date: Tue, 27 Oct 2015 12:29:45 -0500
+Subject: [PATCH v3] EDAC: Add ARM64 EDAC
+Message-ID: <1445966985-5777-1-git-send-email-brijeshkumar.singh@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-By enabling the MMU early in cpu_resume(), the sleep_save_sp and stack can
-be accessed by VA, which avoids the need to convert-addresses and clean to
-PoC on the suspend path.
+Add support for Cortex A57 and A53 EDAC driver.
 
-MMU setup is shared with the boot path, meaning the swapper_pg_dir is
-restored directly: ttbr1_el1 is no longer saved/restored.
-
-struct sleep_save_sp is removed, replacing it with a single array of
-pointers.
-
-cpu_do_{suspend,resume} could be further reduced to not restore: cpacr_el1,
-mdscr_el1, tcr_el1, vbar_el1 and sctlr_el1, all of which are set by
-__cpu_setup(). However these values all contain res0 bits that may be used
-to enable future features.
-
-Signed-off-by: James Morse <james.morse@arm.com>
+Signed-off-by: Brijesh Singh <brijeshkumar.singh@amd.com>
+CC: robh+dt at kernel.org
+CC: pawel.moll at arm.com
+CC: mark.rutland at arm.com
+CC: ijc+devicetree at hellion.org.uk
+CC: galak at codeaurora.org
+CC: dougthompson at xmission.com
+CC: bp at alien8.de
+CC: mchehab at osg.samsung.com
+CC: devicetree at vger.kernel.org
+CC: guohanjun at huawei.com
+CC: andre.przywara at arm.com
+CC: arnd at arndb.de
+CC: sboyd at codeaurora.org
+CC: linux-kernel at vger.kernel.org
+CC: linux-edac at vger.kernel.org
 ---
- arch/arm64/include/asm/suspend.h |  7 +----
- arch/arm64/kernel/asm-offsets.c  |  3 ---
- arch/arm64/kernel/head.S         |  2 +-
- arch/arm64/kernel/setup.c        |  1 -
- arch/arm64/kernel/sleep.S        | 57 ++++++++++++++--------------------------
- arch/arm64/kernel/suspend.c      | 52 +++---------------------------------
- arch/arm64/mm/proc.S             | 27 +++++--------------
- 7 files changed, 33 insertions(+), 116 deletions(-)
+v3:
+* change DT binding compatibilty string to 'cortex-a57-edac'
+* remove A57/A53 prefix from register bit definition
+* unify A57 and A53 L1/L2 error parsing functions
+* use mc trace event function to report the error
+* update Kconfig default to 'n'
 
-diff --git a/arch/arm64/include/asm/suspend.h b/arch/arm64/include/asm/suspend.h
-index ccd26da93d03..5faa3ce1fa3a 100644
---- a/arch/arm64/include/asm/suspend.h
-+++ b/arch/arm64/include/asm/suspend.h
-@@ -1,7 +1,7 @@
- #ifndef __ASM_SUSPEND_H
- #define __ASM_SUSPEND_H
- 
--#define NR_CTX_REGS 11
-+#define NR_CTX_REGS 10
- #define NR_CALLEE_SAVED_REGS 12
- 
- /*
-@@ -17,11 +17,6 @@ struct cpu_suspend_ctx {
- 	u64 sp;
- } __aligned(16);
- 
--struct sleep_save_sp {
--	phys_addr_t *save_ptr_stash;
--	phys_addr_t save_ptr_stash_phys;
--};
--
- /*
-  * Memory to save the cpu state is allocated on the stack by
-  * __cpu_suspend_enter()'s caller, and populated by __cpu_suspend_enter().
-diff --git a/arch/arm64/kernel/asm-offsets.c b/arch/arm64/kernel/asm-offsets.c
-index 5daa4e692932..3cb1383d3deb 100644
---- a/arch/arm64/kernel/asm-offsets.c
-+++ b/arch/arm64/kernel/asm-offsets.c
-@@ -157,9 +157,6 @@ int main(void)
-   DEFINE(CPU_CTX_SP,		offsetof(struct cpu_suspend_ctx, sp));
-   DEFINE(MPIDR_HASH_MASK,	offsetof(struct mpidr_hash, mask));
-   DEFINE(MPIDR_HASH_SHIFTS,	offsetof(struct mpidr_hash, shift_aff));
--  DEFINE(SLEEP_SAVE_SP_SZ,	sizeof(struct sleep_save_sp));
--  DEFINE(SLEEP_SAVE_SP_PHYS,	offsetof(struct sleep_save_sp, save_ptr_stash_phys));
--  DEFINE(SLEEP_SAVE_SP_VIRT,	offsetof(struct sleep_save_sp, save_ptr_stash));
-   DEFINE(SLEEP_STACK_DATA_SYSTEM_REGS,	offsetof(struct sleep_stack_data, system_regs));
-   DEFINE(SLEEP_STACK_DATA_CALLEE_REGS,	offsetof(struct sleep_stack_data, callee_saved_regs));
- #endif
-diff --git a/arch/arm64/kernel/head.S b/arch/arm64/kernel/head.S
-index 9ad8b1f15b19..cf4e0bdf6533 100644
---- a/arch/arm64/kernel/head.S
-+++ b/arch/arm64/kernel/head.S
-@@ -630,7 +630,7 @@ ENDPROC(__secondary_switched)
-  * other registers depend on the function called upon completion
-  */
- 	.section	".idmap.text", "ax"
--__enable_mmu:
-+ENTRY(__enable_mmu)
- 	ldr	x5, =vectors
- 	msr	vbar_el1, x5
- 	msr	ttbr0_el1, x25			// load TTBR0
-diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
-index 232247945b1c..5a338235ba1a 100644
---- a/arch/arm64/kernel/setup.c
-+++ b/arch/arm64/kernel/setup.c
-@@ -192,7 +192,6 @@ static void __init smp_build_mpidr_hash(void)
- 	 */
- 	if (mpidr_hash_size() > 4 * num_possible_cpus())
- 		pr_warn("Large number of MPIDR hash buckets detected\n");
--	__flush_dcache_area(&mpidr_hash, sizeof(struct mpidr_hash));
- }
- 
- static void __init setup_processor(void)
-diff --git a/arch/arm64/kernel/sleep.S b/arch/arm64/kernel/sleep.S
-index 1fa40573db13..07e005d756b0 100644
---- a/arch/arm64/kernel/sleep.S
-+++ b/arch/arm64/kernel/sleep.S
-@@ -73,8 +73,8 @@ ENTRY(__cpu_suspend_enter)
- 	str	x2, [x0, #SLEEP_STACK_DATA_SYSTEM_REGS + CPU_CTX_SP]
- 
- 	/* find the mpidr_hash */
--	ldr	x1, =sleep_save_sp
--	ldr	x1, [x1, #SLEEP_SAVE_SP_VIRT]
-+	ldr	x1, =sleep_save_stash
-+	ldr	x1, [x1]
- 	mrs	x7, mpidr_el1
- 	ldr	x9, =mpidr_hash
- 	ldr	x10, [x9, #MPIDR_HASH_MASK]
-@@ -87,40 +87,26 @@ ENTRY(__cpu_suspend_enter)
- 	compute_mpidr_hash x8, x3, x4, x5, x6, x7, x10
- 	add	x1, x1, x8, lsl #3
- 
-+	str	x0, [x1]
-+	add	x0, x0, #SLEEP_STACK_DATA_SYSTEM_REGS
- 	push	x29, lr
--	bl	__cpu_suspend_save
-+	bl	cpu_do_suspend
- 	pop	x29, lr
- 	mov	x0, #1
- 	ret
- ENDPROC(__cpu_suspend_enter)
- 	.ltorg
- 
--/*
-- * x0 must contain the sctlr value retrieved from restored context
-- */
--	.pushsection	".idmap.text", "ax"
--ENTRY(cpu_resume_mmu)
--	ldr	x3, =cpu_resume_after_mmu
--	msr	sctlr_el1, x0		// restore sctlr_el1
--	isb
--	/*
--	 * Invalidate the local I-cache so that any instructions fetched
--	 * speculatively from the PoC are discarded, since they may have
--	 * been dynamically patched at the PoU.
--	 */
--	ic	iallu
--	dsb	nsh
--	isb
--	br	x3			// global jump to virtual address
--ENDPROC(cpu_resume_mmu)
--	.popsection
--cpu_resume_after_mmu:
--	mov	x0, #0			// return zero on success
--	ret
--ENDPROC(cpu_resume_after_mmu)
--
- ENTRY(cpu_resume)
- 	bl	el2_setup		// if in EL2 drop to EL1 cleanly
-+	/* enable the MMU early - so we can access sleep_save_stash by va */
-+	adr_l	lr, __enable_mmu	/* __cpu_setup will return here */
-+	ldr	x27, =_cpu_resume	/* __enable_mmu will branch here */
-+	adrp	x25, idmap_pg_dir
-+	adrp	x26, swapper_pg_dir
-+	b	__cpu_setup
+v2:
+* convert into generic arm64 edac driver
+* remove AMD specific references from dt binding
+* remove poll_msec property from dt binding
+* add poll_msec as a module param, default is 100ms
+* update copyright text
+* define macro mnemonics for L1 and L2 RAMID
+* check L2 error per-cluster instead of per core
+* update function names
+* use get_online_cpus() and put_online_cpus() to make L1 and L2 register 
+  read hotplug-safe
+* add error check in probe routine
+
+ .../devicetree/bindings/edac/cortex-arm64-edac.txt |  15 +
+ drivers/edac/Kconfig                               |   8 +
+ drivers/edac/Makefile                              |   1 +
+ drivers/edac/cortex_arm64_edac.c                   | 349 +++++++++++++++++++++
+ 4 files changed, 373 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/edac/cortex-arm64-edac.txt
+ create mode 100644 drivers/edac/cortex_arm64_edac.c
+
+diff --git a/Documentation/devicetree/bindings/edac/cortex-arm64-edac.txt b/Documentation/devicetree/bindings/edac/cortex-arm64-edac.txt
+new file mode 100644
+index 0000000..552f0c7
+--- /dev/null
++++ b/Documentation/devicetree/bindings/edac/cortex-arm64-edac.txt
+@@ -0,0 +1,15 @@
++* ARM Cortex A57 and A53 L1/L2 cache error reporting
 +
-+ENTRY(_cpu_resume)
- 	mrs	x1, mpidr_el1
- 	adrp	x8, mpidr_hash
- 	add x8, x8, #:lo12:mpidr_hash // x8 = struct mpidr_hash phys address
-@@ -130,26 +116,23 @@ ENTRY(cpu_resume)
- 	ldp	w5, w6, [x8, #(MPIDR_HASH_SHIFTS + 8)]
- 	compute_mpidr_hash x7, x3, x4, x5, x6, x1, x2
-         /* x7 contains hash index, let's use it to grab context pointer */
--	ldr_l	x0, sleep_save_sp + SLEEP_SAVE_SP_PHYS
-+	ldr_l	x0, sleep_save_stash
- 	ldr	x0, [x0, x7, lsl #3]
- 	add	x29, x0, #SLEEP_STACK_DATA_CALLEE_REGS
- 	add	x0, x0, #SLEEP_STACK_DATA_SYSTEM_REGS
- 	/* load sp from context */
- 	ldr	x2, [x0, #CPU_CTX_SP]
--	/* load physical address of identity map page table in x1 */
--	adrp	x1, idmap_pg_dir
- 	mov	sp, x2
--	/*
--	 * cpu_do_resume expects x0 to contain context physical address
--	 * pointer and x1 to contain physical address of 1:1 page tables
--	 */
--	bl	cpu_do_resume		// PC relative jump, MMU off
--	/* Can't access these by physical address once the MMU is on */
-+	bl	cpu_do_resume
-+	msr	sctlr_el1, x0
-+	isb
++CPU Memory Error Syndrome and L2 Memory Error Syndrome registers can be used
++for checking L1 and L2 memory errors.
 +
- 	ldp	x19, x20, [x29, #16]
- 	ldp	x21, x22, [x29, #32]
- 	ldp	x23, x24, [x29, #48]
- 	ldp	x25, x26, [x29, #64]
- 	ldp	x27, x28, [x29, #80]
- 	ldp	x29, lr, [x29]
--	b	cpu_resume_mmu		// Resume MMU, never returns
-+	mov	x0, #0
-+	ret
- ENDPROC(cpu_resume)
-diff --git a/arch/arm64/kernel/suspend.c b/arch/arm64/kernel/suspend.c
-index eeb088d15bcb..03ef74c02939 100644
---- a/arch/arm64/kernel/suspend.c
-+++ b/arch/arm64/kernel/suspend.c
-@@ -11,30 +11,6 @@
++The following section describes the Cortex A57/A53 EDAC DT node binding.
++
++Required properties:
++- compatible: Should be "arm,cortex-a57-edac" or "arm,cortex-a53-edac"
++
++Example:
++	edac {
++		compatible = "arm,cortex-a57-edac";
++	};
++
+diff --git a/drivers/edac/Kconfig b/drivers/edac/Kconfig
+index ef25000..84507b5 100644
+--- a/drivers/edac/Kconfig
++++ b/drivers/edac/Kconfig
+@@ -390,4 +390,12 @@ config EDAC_XGENE
+ 	  Support for error detection and correction on the
+ 	  APM X-Gene family of SOCs.
  
- 
- /*
-- * This is called by __cpu_suspend_enter() to save the state, and do whatever
-- * flushing is required to ensure that when the CPU goes to sleep we have
-- * the necessary data available when the caches are not searched.
-- *
-- * ptr: sleep_stack_data containing cpu state virtual address.
-- * save_ptr: address of the location where the context physical address
-- *           must be saved
-- */
--void notrace __cpu_suspend_save(struct sleep_stack_data *ptr,
--				phys_addr_t *save_ptr)
--{
--	*save_ptr = virt_to_phys(ptr);
--
--	cpu_do_suspend(&ptr->system_regs);
--	/*
--	 * Only flush the context that must be retrieved with the MMU
--	 * off. VA primitives ensure the flush is applied to all
--	 * cache levels so context is pushed to DRAM.
--	 */
--	__flush_dcache_area(ptr, sizeof(*ptr));
--	__flush_dcache_area(save_ptr, sizeof(*save_ptr));
--}
--
--/*
-  * This hook is provided so that cpu_suspend code can restore HW
-  * breakpoints as early as possible in the resume path, before reenabling
-  * debug exceptions. Code cannot be run from a CPU PM notifier since by the
-@@ -52,21 +28,6 @@ void __init cpu_suspend_set_dbg_restorer(void (*hw_bp_restore)(void *))
- 
- void notrace __cpu_suspend_exit(struct mm_struct *mm)
- {
--	/*
--	 * We are resuming from reset with TTBR0_EL1 set to the
--	 * idmap to enable the MMU; set the TTBR0 to the reserved
--	 * page tables to prevent speculative TLB allocations, flush
--	 * the local tlb and set the default tcr_el1.t0sz so that
--	 * the TTBR0 address space set-up is properly restored.
--	 * If the current active_mm != &init_mm we entered cpu_suspend
--	 * with mappings in TTBR0 that must be restored, so we switch
--	 * them back to complete the address space configuration
--	 * restoration before returning.
--	 */
--	cpu_set_reserved_ttbr0();
--	flush_tlb_all();
--	cpu_set_default_tcr_t0sz();
--
- 	if (mm != &init_mm)
- 		cpu_switch_mm(mm->pgd, mm);
- 
-@@ -138,22 +99,17 @@ int cpu_suspend(unsigned long arg, int (*fn)(unsigned long))
- 	return ret;
- }
- 
--struct sleep_save_sp sleep_save_sp;
-+unsigned long *sleep_save_stash;
- 
- static int __init cpu_suspend_init(void)
- {
--	void *ctx_ptr;
--
- 	/* ctx_ptr is an array of physical addresses */
--	ctx_ptr = kcalloc(mpidr_hash_size(), sizeof(phys_addr_t), GFP_KERNEL);
-+	sleep_save_stash = kcalloc(mpidr_hash_size(), sizeof(*sleep_save_stash),
-+				   GFP_KERNEL);
- 
--	if (WARN_ON(!ctx_ptr))
-+	if (WARN_ON(!sleep_save_stash))
- 		return -ENOMEM;
- 
--	sleep_save_sp.save_ptr_stash = ctx_ptr;
--	sleep_save_sp.save_ptr_stash_phys = virt_to_phys(ctx_ptr);
--	__flush_dcache_area(&sleep_save_sp, sizeof(struct sleep_save_sp));
--
- 	return 0;
- }
- early_initcall(cpu_suspend_init);
-diff --git a/arch/arm64/mm/proc.S b/arch/arm64/mm/proc.S
-index 456c1c5f8ecd..b3afb6123c81 100644
---- a/arch/arm64/mm/proc.S
-+++ b/arch/arm64/mm/proc.S
-@@ -59,20 +59,17 @@ ENTRY(cpu_do_suspend)
- 	mrs	x2, tpidr_el0
- 	mrs	x3, tpidrro_el0
- 	mrs	x4, contextidr_el1
--	mrs	x5, mair_el1
- 	mrs	x6, cpacr_el1
--	mrs	x7, ttbr1_el1
- 	mrs	x8, tcr_el1
- 	mrs	x9, vbar_el1
- 	mrs	x10, mdscr_el1
- 	mrs	x11, oslsr_el1
- 	mrs	x12, sctlr_el1
- 	stp	x2, x3, [x0]
--	stp	x4, x5, [x0, #16]
--	stp	x6, x7, [x0, #32]
--	stp	x8, x9, [x0, #48]
--	stp	x10, x11, [x0, #64]
--	str	x12, [x0, #80]
-+	stp	x4, xzr, [x0, #16]
-+	stp	x6, x8, [x0, #32]
-+	stp	x9, x10, [x0, #48]
-+	stp	x11, x12, [x0, #64]
- 	ret
- ENDPROC(cpu_do_suspend)
- 
-@@ -80,29 +77,20 @@ ENDPROC(cpu_do_suspend)
-  * cpu_do_resume - restore CPU register context
-  *
-  * x0: Physical address of context pointer
-- * x1: ttbr0_el1 to be restored
-  *
-  * Returns:
-  *	sctlr_el1 value in x0
-  */
- ENTRY(cpu_do_resume)
--	/*
--	 * Invalidate local tlb entries before turning on MMU
--	 */
--	tlbi	vmalle1
- 	ldp	x2, x3, [x0]
- 	ldp	x4, x5, [x0, #16]
--	ldp	x6, x7, [x0, #32]
--	ldp	x8, x9, [x0, #48]
--	ldp	x10, x11, [x0, #64]
--	ldr	x12, [x0, #80]
-+	ldp	x6, x8, [x0, #32]
-+	ldp	x9, x10, [x0, #48]
-+	ldp	x11, x12, [x0, #64]
- 	msr	tpidr_el0, x2
- 	msr	tpidrro_el0, x3
- 	msr	contextidr_el1, x4
--	msr	mair_el1, x5
- 	msr	cpacr_el1, x6
--	msr	ttbr0_el1, x1
--	msr	ttbr1_el1, x7
- 	tcr_set_idmap_t0sz x8, x7
- 	msr	tcr_el1, x8
- 	msr	vbar_el1, x9
-@@ -113,7 +101,6 @@ ENTRY(cpu_do_resume)
- 	ubfx	x11, x11, #1, #1
- 	msr	oslar_el1, x11
- 	mov	x0, x12
--	dsb	nsh		// Make sure local tlb invalidation completed
- 	isb
- 	ret
- ENDPROC(cpu_do_resume)
++config EDAC_CORTEX_ARM64
++	tristate "ARM Cortex A57/A53"
++	depends on EDAC_MM_EDAC && ARM64
++	default n
++	help
++	  Support for error detection and correction on the
++	  ARM Cortex A57 and A53.
++
+ endif # EDAC
+diff --git a/drivers/edac/Makefile b/drivers/edac/Makefile
+index ae3c5f3..ac01660 100644
+--- a/drivers/edac/Makefile
++++ b/drivers/edac/Makefile
+@@ -68,3 +68,4 @@ obj-$(CONFIG_EDAC_OCTEON_PCI)		+= octeon_edac-pci.o
+ obj-$(CONFIG_EDAC_ALTERA_MC)		+= altera_edac.o
+ obj-$(CONFIG_EDAC_SYNOPSYS)		+= synopsys_edac.o
+ obj-$(CONFIG_EDAC_XGENE)		+= xgene_edac.o
++obj-$(CONFIG_EDAC_CORTEX_ARM64)		+= cortex_arm64_edac.o
+diff --git a/drivers/edac/cortex_arm64_edac.c b/drivers/edac/cortex_arm64_edac.c
+new file mode 100644
+index 0000000..7c936b66
+--- /dev/null
++++ b/drivers/edac/cortex_arm64_edac.c
+@@ -0,0 +1,349 @@
++/*
++ * Cortex A57 and A53 EDAC
++ *
++ * Copyright (c) 2015, Advanced Micro Devices
++ * Author: Brijesh Singh <brijeshkumar.singh@amd.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#include <linux/module.h>
++#include <linux/of_device.h>
++#include <linux/platform_device.h>
++#include <ras/ras_event.h>
++
++#include "edac_core.h"
++
++#define DRV_NAME			"cortex_edac"
++
++#define CPUMERRSR_EL1_INDEX(x, y)	((x) & (y))
++#define CPUMERRSR_EL1_BANK_WAY(x, y)	(((x) >> 18) & (y))
++#define CPUMERRSR_EL1_RAMID(x)		(((x) >> 24) & 0x7f)
++#define CPUMERRSR_EL1_VALID(x)		((x) & (1 << 31))
++#define CPUMERRSR_EL1_REPEAT(x)		(((x) >> 32) & 0x7f)
++#define CPUMERRSR_EL1_OTHER(x)		(((x) >> 40) & 0xff)
++#define CPUMERRSR_EL1_FATAL(x)		((x) & (1UL << 63))
++#define L1_I_TAG_RAM			0x00
++#define L1_I_DATA_RAM			0x01
++#define L1_D_TAG_RAM			0x08
++#define L1_D_DATA_RAM			0x09
++#define L1_D_DIRTY_RAM			0x14
++#define TLB_RAM				0x18
++
++#define L2MERRSR_EL1_CPUID_WAY(x)	(((x) >> 18) & 0xf)
++#define L2MERRSR_EL1_RAMID(x)		(((x) >> 24) & 0x7f)
++#define L2MERRSR_EL1_VALID(x)		((x) & (1 << 31))
++#define L2MERRSR_EL1_REPEAT(x)		(((x) >> 32) & 0xff)
++#define L2MERRSR_EL1_OTHER(x)		(((x) >> 40) & 0xff)
++#define L2MERRSR_EL1_FATAL(x)		((x) & (1UL << 63))
++#define L2_TAG_RAM			0x10
++#define L2_DATA_RAM			0x11
++#define L2_SNOOP_RAM			0x12
++#define L2_DIRTY_RAM			0x14
++#define L2_INCLUSION_PF_RAM		0x18
++
++#define L1_CACHE			0
++#define L2_CACHE			1
++
++#define EDAC_MOD_STR			DRV_NAME
++
++static int poll_msec = 100;
++
++struct cortex_arm64_edac {
++	struct edac_device_ctl_info *edac_ctl;
++};
++
++static inline u64 read_cpumerrsr_el1(void)
++{
++	u64 val;
++
++	asm volatile("mrs %0, s3_1_c15_c2_2" : "=r" (val));
++	return val;
++}
++
++static inline void write_cpumerrsr_el1(u64 val)
++{
++	asm volatile("msr s3_1_c15_c2_2, %0" :: "r" (val));
++}
++
++static inline u64 read_l2merrsr_el1(void)
++{
++	u64 val;
++
++	asm volatile("mrs %0, s3_1_c15_c2_3" : "=r" (val));
++	return val;
++}
++
++static inline void write_l2merrsr_el1(u64 val)
++{
++	asm volatile("msr s3_1_c15_c2_3, %0" :: "r" (val));
++}
++
++static void parse_cpumerrsr(void *arg)
++{
++	int cpu, partnum, way;
++	unsigned int index = 0;
++	u64 val = read_cpumerrsr_el1();
++	int repeat_err, other_err;
++
++	/* we do not support fatal error handling so far */
++	if (CPUMERRSR_EL1_FATAL(val))
++		return;
++
++	/* check if we have valid error before continuing */
++	if (!CPUMERRSR_EL1_VALID(val))
++		return;
++
++	cpu = smp_processor_id();
++	partnum = read_cpuid_part_number();
++	repeat_err = CPUMERRSR_EL1_REPEAT(val);
++	other_err = CPUMERRSR_EL1_OTHER(val);
++
++	/* way/bank and index address bit ranges are different between
++	 * A57 and A53 */
++	if (partnum == ARM_CPU_PART_CORTEX_A57) {
++		index = CPUMERRSR_EL1_INDEX(val, 0x1ffff);
++		way = CPUMERRSR_EL1_BANK_WAY(val, 0x1f);
++	} else {
++		index = CPUMERRSR_EL1_INDEX(val, 0xfff);
++		way = CPUMERRSR_EL1_BANK_WAY(val, 0x7);
++	}
++
++	edac_printk(KERN_CRIT, EDAC_MOD_STR, "CPU%d L1 error detected!\n", cpu);
++	edac_printk(KERN_CRIT, EDAC_MOD_STR, "index=%#x, RAMID=", index);
++
++	switch (CPUMERRSR_EL1_RAMID(val)) {
++	case L1_I_TAG_RAM:
++		pr_cont("'L1-I Tag RAM' (way %d)", way);
++		break;
++	case L1_I_DATA_RAM:
++		pr_cont("'L1-I Data RAM' (bank %d)", way);
++		break;
++	case L1_D_TAG_RAM:
++		pr_cont("'L1-D Tag RAM' (way %d)", way);
++		break;
++	case L1_D_DATA_RAM:
++		pr_cont("'L1-D Data RAM' (bank %d)", way);
++		break;
++	case L1_D_DIRTY_RAM:
++		pr_cont("'L1 Dirty RAM'");
++		break;
++	case TLB_RAM:
++		pr_cont("'TLB RAM'");
++		break;
++	default:
++		pr_cont("'unknown'");
++		break;
++	}
++
++	pr_cont(", repeat=%d, other=%d (CPUMERRSR_EL1=%#llx)\n", repeat_err,
++		other_err, val);
++
++	trace_mc_event(HW_EVENT_ERR_CORRECTED, "L1 non-fatal error",
++		       "", repeat_err, 0, 0, 0, -1, index, 0, 0, DRV_NAME);
++	write_cpumerrsr_el1(0);
++}
++
++static void a57_parse_l2merrsr_way(u8 ramid, u8 val)
++{
++	switch (ramid) {
++	case L2_TAG_RAM:
++	case L2_DATA_RAM:
++	case L2_DIRTY_RAM:
++		pr_cont("(cpu%d tag, way %d)", val / 2, val % 2);
++		break;
++	case L2_SNOOP_RAM:
++		pr_cont("(cpu%d tag, way %d)", (val & 0x6) >> 1,
++			(val & 0x1));
++		break;
++	}
++}
++
++static void a53_parse_l2merrsr_way(u8 ramid, u8 val)
++{
++	switch (ramid) {
++	case L2_TAG_RAM:
++		pr_cont("(way %d)", val);
++	case L2_DATA_RAM:
++		pr_cont("(bank %d)", val);
++		break;
++	case L2_SNOOP_RAM:
++		pr_cont("(cpu%d tag, way %d)", val / 2, val % 4);
++		break;
++	}
++}
++
++static void parse_l2merrsr(void *arg)
++{
++	int cpu, partnum;
++	unsigned int index;
++	int repeat_err, other_err;
++	u64 val = read_l2merrsr_el1();
++
++	/* we do not support fatal error handling so far */
++	if (L2MERRSR_EL1_FATAL(val))
++		return;
++
++	/* check if we have valid error before continuing */
++	if (!L2MERRSR_EL1_VALID(val))
++		return;
++
++	cpu = smp_processor_id();
++	partnum = read_cpuid_part_number();
++	repeat_err = L2MERRSR_EL1_REPEAT(val);
++	other_err = L2MERRSR_EL1_OTHER(val);
++
++	/* index address range is different between A57 and A53 */
++	if (partnum == ARM_CPU_PART_CORTEX_A57)
++		index = val & 0x1ffff;
++	else
++		index = (val >> 3) & 0x3fff;
++
++	edac_printk(KERN_CRIT, EDAC_MOD_STR, "CPU%d L2 error detected!\n", cpu);
++	edac_printk(KERN_CRIT, EDAC_MOD_STR, "index=%#x RAMID=", index);
++
++	switch (L2MERRSR_EL1_RAMID(val)) {
++	case L2_TAG_RAM:
++		pr_cont("'L2 Tag RAM'");
++		break;
++	case L2_DATA_RAM:
++		pr_cont("'L2 Data RAM'");
++		break;
++	case L2_SNOOP_RAM:
++		pr_cont("'L2 Snoop tag RAM'");
++		break;
++	case L2_DIRTY_RAM:
++		pr_cont("'L2 Dirty RAM'");
++		break;
++	case L2_INCLUSION_PF_RAM:
++		pr_cont("'L2 inclusion PF RAM'");
++		break;
++	default:
++		pr_cont("unknown");
++		break;
++	}
++
++	/* cpuid/way bit description is different between A57 and A53 */
++	if (partnum == ARM_CPU_PART_CORTEX_A57)
++		a57_parse_l2merrsr_way(L2MERRSR_EL1_RAMID(val),
++				       L2MERRSR_EL1_CPUID_WAY(val));
++	else
++		a53_parse_l2merrsr_way(L2MERRSR_EL1_RAMID(val),
++				       L2MERRSR_EL1_CPUID_WAY(val));
++
++	pr_cont(", repeat=%d, other=%d (L2MERRSR_EL1=%#llx)\n", repeat_err,
++		other_err, val);
++	trace_mc_event(HW_EVENT_ERR_CORRECTED, "L2 non-fatal error",
++		       "", repeat_err, 0, 0, 0, -1, index, 0, 0, DRV_NAME);
++	write_l2merrsr_el1(0);
++}
++
++static void cortex_arm64_edac_check(struct edac_device_ctl_info *edac_ctl)
++{
++	int cpu;
++	struct cpumask cluster_mask, old_mask;
++
++	cpumask_clear(&cluster_mask);
++	cpumask_clear(&old_mask);
++
++	get_online_cpus();
++	for_each_online_cpu(cpu) {
++		/* Check CPU L1 error */
++		smp_call_function_single(cpu, parse_cpumerrsr, NULL, 0);
++		cpumask_copy(&cluster_mask, topology_core_cpumask(cpu));
++		if (cpumask_equal(&cluster_mask, &old_mask))
++			continue;
++		cpumask_copy(&old_mask, &cluster_mask);
++		/* Check CPU L2 error */
++		smp_call_function_any(&cluster_mask, parse_l2merrsr, NULL, 0);
++	}
++	put_online_cpus();
++}
++
++static int cortex_arm64_edac_probe(struct platform_device *pdev)
++{
++	int rc;
++	struct cortex_arm64_edac *drv;
++	struct device *dev = &pdev->dev;
++
++	drv = devm_kzalloc(dev, sizeof(*drv), GFP_KERNEL);
++	if (!drv)
++		return -ENOMEM;
++
++	/* Only POLL mode is supported */
++	edac_op_state = EDAC_OPSTATE_POLL;
++
++	drv->edac_ctl = edac_device_alloc_ctl_info(0, "cpu",
++						   num_possible_cpus(), "L", 2,
++						   1, NULL, 0,
++						   edac_device_alloc_index());
++	if (IS_ERR(drv->edac_ctl))
++		return -ENOMEM;
++
++	drv->edac_ctl->poll_msec = poll_msec;
++	drv->edac_ctl->edac_check = cortex_arm64_edac_check;
++	drv->edac_ctl->dev = dev;
++	drv->edac_ctl->mod_name = dev_name(dev);
++	drv->edac_ctl->dev_name = dev_name(dev);
++	drv->edac_ctl->ctl_name = "cache";
++	platform_set_drvdata(pdev, drv);
++
++	rc = edac_device_add_device(drv->edac_ctl);
++	if (rc)
++		edac_device_free_ctl_info(drv->edac_ctl);
++
++	return rc;
++}
++
++static int cortex_arm64_edac_remove(struct platform_device *pdev)
++{
++	struct cortex_arm64_edac *drv = dev_get_drvdata(&pdev->dev);
++	struct edac_device_ctl_info *edac_ctl = drv->edac_ctl;
++
++	edac_device_del_device(edac_ctl->dev);
++	edac_device_free_ctl_info(edac_ctl);
++
++	return 0;
++}
++
++static const struct of_device_id cortex_arm64_edac_of_match[] = {
++	{ .compatible = "arm,cortex-a57-edac" },
++	{ .compatible = "arm,cortex-a53-edac" },
++	{}
++};
++MODULE_DEVICE_TABLE(of, cortex_arm64_edac_of_match);
++
++static struct platform_driver cortex_arm64_edac_driver = {
++	.probe = cortex_arm64_edac_probe,
++	.remove = cortex_arm64_edac_remove,
++	.driver = {
++		.name = DRV_NAME,
++		.owner = THIS_MODULE,
++		.of_match_table = cortex_arm64_edac_of_match,
++	},
++};
++
++static int __init cortex_arm64_edac_init(void)
++{
++	return platform_driver_register(&cortex_arm64_edac_driver);
++}
++module_init(cortex_arm64_edac_init);
++
++static void __exit cortex_arm64_edac_exit(void)
++{
++	platform_driver_unregister(&cortex_arm64_edac_driver);
++}
++module_exit(cortex_arm64_edac_exit);
++
++MODULE_LICENSE("GPL");
++MODULE_AUTHOR("Brijesh Singh <brijeshkumar.singh@amd.com>");
++MODULE_DESCRIPTION("Cortex A57 and A53 EDAC driver");
++module_param(poll_msec, int, 0444);
++MODULE_PARM_DESC(poll_msec, "EDAC monitor poll interval in msec");
 -- 
-2.1.4
+1.9.1
