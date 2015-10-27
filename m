@@ -1,51 +1,42 @@
-From: cov@codeaurora.org (Christopher Covington)
-Date: Tue, 27 Oct 2015 11:46:12 -0400
-Subject: [PATCH] arm: perf: Add event descriptions
-In-Reply-To: <20151007112011.GH16065@arm.com>
-References: <20150804001522.GA13214@dreric01-gentoo.localdomain>
- <20150817205809.GA16506@dreric01-gentoo.localdomain>
- <20150826165148.GF30466@arm.com>
- <20150817214035.GA25775@dreric01-gentoo.localdomain>
- <20150924175257.GH7356@arm.com> <20151007112011.GH16065@arm.com>
-Message-ID: <562F9C44.50702@codeaurora.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 27 Oct 2015 16:53:23 +0100
+Subject: [PATCH] gpio: zynq: Implement irq_(request|release)_resources
+In-Reply-To: <1445607381-7794-1-git-send-email-soren.brinkmann@xilinx.com>
+References: <1445607381-7794-1-git-send-email-soren.brinkmann@xilinx.com>
+Message-ID: <CACRpkda4QKEJvwkwGLS7OLTP8Nxu5W05tzbcFXA_FPnBsFtKhw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/07/2015 07:20 AM, Will Deacon wrote:
-> Hi again, Drew,
-> 
-> On Thu, Sep 24, 2015 at 06:52:57PM +0100, Will Deacon wrote:
->> On Mon, Aug 17, 2015 at 10:40:36PM +0100, Drew Richardson wrote:
->>> So my suggestion to solve the problem is that the kernel can have the
->>> list of events as proposed in the patch.
->>
->> Sorry, but I just don't buy this argument. Your problem is that the user
->> needs to be running an up-to-date perf tool, but with your proposed
->> solution, you're asking them to update the *kernel* instead, which is
->> (unfortunately) one of the hardest pieces of software to upgrade on a
->> typical ARM platform.
-> 
-> I've spent some time thinking about this and, actually, it makes sense
-> to do this for the architected events. These event numbers are guaranteed
-> to be portable between CPUs, so if we expose those through sysfs then
-> we don't have this dependency on updating the kernel for newer cores
-> (well, once the initial period without your patch has expired). It's the
-> noon-portable, micro-architectural events that I object to.
-> 
-> So how about you roll a new version of this patch just exposing the
-> architected events and making use of the macros in perf_event.h to make
-> it a bit tidier (PMU_EVENT_ATTR, PMU_EVENT_ATTR_STRING etc)?
-> 
-> Be aware that there's a fair amount of arm64 perf patches queue for 4.4,
-> since we're moving over to the code in drivers/perf/. Hopefully these
-> will appear on the arm64 for-next/core branch shortly.
+On Fri, Oct 23, 2015 at 3:36 PM, Soren Brinkmann
+<soren.brinkmann@xilinx.com> wrote:
 
-Have you considered using OF/ACPI to describe this aspect of the hardware?
+> The driver uses runtime PM to leverage low power techniques. For
+> use-cases using GPIO as interrupt the device needs to be in an
+> appropriate state.
+>
+> Reported-by: John Linn <linnj@xilinx.com>
+> Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
+> Tested-by: John Linn <linnj@xilinx.com>
 
-Thanks,
-Christopher Covington
+As pointed out by Grygorii in
+commit aca82d1cbb49af34b69ecd4571a0fe48ad9247c1:
 
--- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+    The PM runtime API can't be used in atomic contex on -RT even if
+    it's configured as irqsafe. As result, below error report can
+    be seen when PM runtime API called from IRQ chip's callbacks
+    irq_startup/irq_shutdown/irq_set_type, because they are
+    protected by RAW spinlock:
+(...)
+    The IRQ chip interface defines only two callbacks which are executed in
+    non-atomic contex - irq_bus_lock/irq_bus_sync_unlock, so lets move
+    PM runtime calls there.
+
+I.e. these calls are atomic context and it's just luck that it works
+and this is fragile.
+
+Can you please check if you can move it to
+irq_bus_lock()/irq_sync_unlock()
+like Grygorii does?
+
+Yours,
+Linus Walleij
