@@ -1,218 +1,72 @@
 From: robh+dt@kernel.org (Rob Herring)
-Date: Tue, 27 Oct 2015 02:57:20 -0500
-Subject: [PATCH 1/3] devicetree: mfd: Add binding for the TI LM3533
-In-Reply-To: <1445796586-28683-1-git-send-email-bjorn.andersson@sonymobile.com>
-References: <1445796586-28683-1-git-send-email-bjorn.andersson@sonymobile.com>
-Message-ID: <CAL_JsqLcmCeAmRCSUhpfYKrzkcU4uu3uYrgtqUto-aEEQ-O+6g@mail.gmail.com>
+Date: Tue, 27 Oct 2015 03:10:59 -0500
+Subject: [PATCH v1 1/3] dt-bindings: rockchip-mailbox: Add mailbox
+ controller document on Rockchip SoCs
+In-Reply-To: <1445931106-683-2-git-send-email-wxt@rock-chips.com>
+References: <1445931106-683-1-git-send-email-wxt@rock-chips.com>
+ <1445931106-683-2-git-send-email-wxt@rock-chips.com>
+Message-ID: <CAL_JsqLhLsJCAVqFnnjDG1SGyU6Wd2SvXZUoocF4tLcLrVSX0w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Oct 25, 2015 at 1:09 PM, Bjorn Andersson
-<bjorn.andersson@sonymobile.com> wrote:
-> Add the binding for the Texas Instruments LM3533 lighting power
-> solution.
+On Tue, Oct 27, 2015 at 2:31 AM, Caesar Wang <wxt@rock-chips.com> wrote:
+> This add the necessary binding documentation for mailbox
+> found on RK3368 SoC.
 >
-> Signed-off-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
+> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
 > ---
->  Documentation/devicetree/bindings/mfd/lm3533.txt | 183 +++++++++++++++++++++++
->  1 file changed, 183 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/mfd/lm3533.txt
 >
-> diff --git a/Documentation/devicetree/bindings/mfd/lm3533.txt b/Documentation/devicetree/bindings/mfd/lm3533.txt
+> Changes in v1:
+> - PATCH[1/3] doc:
+> - As the Rob Herring comments, s/share/shared/ and specify the value of #mbox-cells.
+> - Move the shared memory in mailbox, let's move the property the client
+>   driver in the future.
+
+Acked-by: Rob Herring <robh@kernel.org>
+
+>
+>  .../bindings/mailbox/rockchip-mailbox.txt          | 32 ++++++++++++++++++++++
+>  1 file changed, 32 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/mailbox/rockchip-mailbox.txt
+>
+> diff --git a/Documentation/devicetree/bindings/mailbox/rockchip-mailbox.txt b/Documentation/devicetree/bindings/mailbox/rockchip-mailbox.txt
 > new file mode 100644
-> index 000000000000..3cc41695a544
+> index 0000000..b6bb84a
 > --- /dev/null
-> +++ b/Documentation/devicetree/bindings/mfd/lm3533.txt
-> @@ -0,0 +1,183 @@
-> +Texas Instruments LM3533 binding
+> +++ b/Documentation/devicetree/bindings/mailbox/rockchip-mailbox.txt
+> @@ -0,0 +1,32 @@
+> +Rockchip mailbox
 > +
-> +This binding describes the Texas Instruments LM3533, a lighting power solution
-> +for smartphone handsets. The common properties are described directly in the
-> +node, while each individual component are described in an optional subnode.
+> +The Rockchip mailbox is used by the Rockchip CPU cores to communicate
+> +requests to MCU processor.
 > +
-> +- compatible:
-> +       Usage: required
-> +       Value type: <stringlist>
-> +       Definition: must be:
-> +                   "ti,lm3533"
+> +Refer to ./mailbox.txt for generic information about mailbox device-tree
+> +bindings.
 > +
-> +- reg:
-> +       Usage: required
-> +       Value type: <u32>
-> +       Definition: i2c address of the LM3533 chip
+> +Required properties:
 > +
-> +- ti,hwen-gpios:
-> +       Usage: required
-> +       Value type: <prop-encoded-array>
-> +       Definition: reference to gpio pin connected to the HWEN input; as
-> +                   specified in "gpio/gpio.txt"
+> + - compatible: should be one of the following.
+> +   - "rockchip,rk3368-mbox" for rk3368
+> + - reg: physical base address of the controller and length of memory mapped
+> +       region.
+> + - interrupts: The interrupt number to the cpu. The interrupt specifier format
+> +       depends on the interrupt controller.
+> + - #mbox-cells: Common mailbox binding property to identify the number
+> +       of cells required for the mailbox specifier. Should be 1
 > +
-> +- ti,als-supply:
-> +       Usage: optional
-> +       Value type: <prop-encoded-array>
-> +       Definition: reference to regulator powering the V_als input; as
-> +                   specified in "regulator/regulator.txt"
+> +Example:
+> +--------
 > +
-> +- ti,boost-freq:
-
-Append "-hz".
-
-> +       Usage: required
-> +       Value type: <u32>
-> +       Definition: switch-frequency of the boost converter, must be either:
-> +                   500000 or 1000000
-> +
-> +- ti,boost-ovp:
-> +       Usage: required
-> +       Value type: <u32>
-> +       Definition: over voltage protection limit, must be one of: 16, 24, 32
-> +                   or 40
-> +
-> +- #address-cells:
-> +       Usage: required
-> +       Value type: <u32>
-> +       Definition: must be 1
-> +
-> +- #size-cells:
-> +       Usage: required
-> +       Value type: <u32>
-> +       Definition: must be 0
-> +
-> += ALS SUBNODE
-> +The als subnode must be named "als", it carries the als related properties.
-> +
-> +- ti,als-resistance:
-> +       Usage: required (unless ti,pwm-mode is specified)
-> +       Value type: <u32>
-> +       Definition: specifies the resistor value (R_als), in Ohm. Valid values
-> +                   ranges from 200kOhm to 1574Ohm.
-
-So append "-kohm"?
-
-> +
-> +- ti,pwm-mode:
-> +       Usage: optional
-> +       Value type: <empty>
-> +       Definition: specifies, if present, that the als should operate in pwm
-> +                   mode - rather than analog mode
-> +
-> += BACKLIGHT NODES
-> +Backlight subnodes must be named "backlight", they carry the backlight related
-> +properties.
-> +
-> +- reg:
-> +       Usage: required
-> +       Value type: <u32>
-> +       Definition: specifies which of the two backlights this node corresponds
-> +                   to
-> +
-> +- default-brightness:
-> +       Usage: optional
-> +       Value type: <32>
-> +       Definition: specifies the default brightness for the backlight, in
-> +                   units of brightness [0-255]
-> +
-> +- label:
-> +       Usage: required
-> +       Value type: <string>
-> +       Definition: specifies a name of this backlight
-> +
-> +- led-max-microamp:
-> +       Usage: required
-> +       Value type: <u32>
-> +       Definition: specifies the max current for this backlight, in uA, as
-> +                   described in "leds/common.txt"
-> +
-> +- ti,pwm-zones:
-> +       Usage: optional
-> +       Value type: <u32 list>
-> +       Definition: lists the ALS zones to be PWM controlled for this backlight,
-> +                   the values in the list are in the range [0 - 4]
-> +
-> += LED NODES
-> +LED subnodes must be named "led", they carry the LED related properties.
-> +
-> +- reg:
-> +       Usage: required
-> +       Value type: <u32>
-> +       Definition: specifies which of the four LEDs this node corresponds to
-> +
-> +- linux,default-trigger:
-> +       Usage: optional
-> +       Value type: <string>
-> +       Definition: specifies the default trigger for the LED, as described in
-> +                   "leds/common.txt"
-> +
-> +- label:
-> +       Usage: required
-> +       Value type: <string>
-> +       Definition: specifies a name of this LED, as described in
-> +                   "leds/common.txt"
-> +
-> +- led-max-microamp:
-> +       Usage: required
-> +       Value type: <u32>
-> +       Definition: specifies the max current for this LED, in uA, as described
-> +                   in "leds/common.txt"
-> +
-> +- ti,pwm-zones:
-> +       Usage: optional
-> +       Value type: <u32 list>
-> +       Definition: lists the ALS zones to be PWM controlled for this LED, the
-> +                   values in the list are in the range [0 - 4]
-> +
-> += EXAMPLE
-> +
-> +i2c at 12460000 {
-> +       compatible = "qcom,i2c-qup-v1.1.1";
-> +       ...
-> +
-> +       lm3533 at 36 {
-> +               compatible = "ti,lm3533";
-> +               reg = <0x36>;
-> +
-> +               ti,hwen-gpios = <&pm8921_gpio 26 GPIO_ACTIVE_HIGH>;
-> +               ti,als-supply = <&pm8921_l11>;
-> +
-> +               ti,boost-freq = <500000>;
-> +               ti,boost-ovp = <24>;
-> +
-> +               #address-cells = <1>;
-> +               #size-cells = <0>;
-> +
-> +               als {
-> +                       ti,als-resistance = <200000>;
-> +               };
-> +
-> +               backlight at 0 {
-> +                       reg = <0>;
-> +                       label = "backlight";
-> +
-> +                       led-max-microamp = <20200>;
-> +               };
-> +
-> +               led at 0 {
-> +                       reg = <0>;
-> +                       label = "red";
-> +
-> +                       led-max-microamp = <5000>;
-> +               };
-> +
-> +               led at 1 {
-> +                       reg = <1>;
-> +                       label = "green";
-> +
-> +                       led-max-microamp = <5000>;
-> +               };
-> +
-> +               led at 2 {
-> +                       reg = <2>;
-> +                       label = "blue";
-> +
-> +                       led-max-microamp = <5000>;
-> +               };
-> +       };
-> +
+> +/* RK3368 */
+> +mbox: mbox at ff6b0000 {
+> +       compatible = "rockchip,rk3368-mailbox";
+> +       reg = <0x0 0xff6b0000 0x0 0x1000>,
+> +       interrupts = <GIC_SPI 146 IRQ_TYPE_LEVEL_HIGH>,
+> +                    <GIC_SPI 147 IRQ_TYPE_LEVEL_HIGH>,
+> +                    <GIC_SPI 148 IRQ_TYPE_LEVEL_HIGH>,
+> +                    <GIC_SPI 149 IRQ_TYPE_LEVEL_HIGH>;
+> +       #mbox-cells = <1>;
+> +};
 > --
-> 2.4.2
+> 1.9.1
 >
