@@ -1,26 +1,53 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Tue, 27 Oct 2015 10:24:53 +0900
-Subject: [PATCH v2 00/14] dmaenigne: edma/ti-crossbar: fixes, new bindings
-In-Reply-To: <1444979892-31626-1-git-send-email-peter.ujfalusi@ti.com>
-References: <1444979892-31626-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <20151027012452.GB11691@vkoul-mobl.iind.intel.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon, 26 Oct 2015 18:26:53 -0700
+Subject: [PATCH] arm: dts: qcom: Add board clocks
+Message-ID: <1445909213-32496-1-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 16, 2015 at 10:17:58AM +0300, Peter Ujfalusi wrote:
-> Hi,
-> 
-> Changes since v1:
-> - Comments in the memcpy optimization patch extended
-> - The crossbar patch has been improved:
->  - debug prints changed
->  - fallback xbar parameters now type specific as the fallback values for DRA7
->    are not valid for AM33xx crossbar.
-> - New patch for Kconfig to select the crossbar in case the eDMA is used on OMAP
->   platforms
-> 
-I am applying this series and Please note that this has ARM patches which i
-have not heard any objections so applying :)
+These clocks are fixed rate board sources that should be in DT.
+Add them.
 
+Cc: Georgi Djakov <georgi.djakov@linaro.org>
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+---
+ arch/arm/boot/dts/qcom-msm8960.dtsi | 23 +++++++++++++++++++++++
+ 1 file changed, 23 insertions(+)
+
+diff --git a/arch/arm/boot/dts/qcom-msm8960.dtsi b/arch/arm/boot/dts/qcom-msm8960.dtsi
+index 134cd91d68ec..51a40d84145c 100644
+--- a/arch/arm/boot/dts/qcom-msm8960.dtsi
++++ b/arch/arm/boot/dts/qcom-msm8960.dtsi
+@@ -49,6 +49,29 @@
+ 		qcom,no-pc-write;
+ 	};
+ 
++	clocks {
++		cxo_board {
++			compatible = "fixed-clock";
++			#clock-cells = <0>;
++			clock-frequency = <19200000>;
++			clock-output-names = "cxo_board";
++		};
++
++		pxo_board {
++			compatible = "fixed-clock";
++			#clock-cells = <0>;
++			clock-frequency = <27000000>;
++			clock-output-names = "pxo_board";
++		};
++
++		sleep_clk {
++			compatible = "fixed-clock";
++			#clock-cells = <0>;
++			clock-frequency = <32768>;
++			clock-output-names = "sleep_clk";
++		};
++	};
++
+ 	soc: soc {
+ 		#address-cells = <1>;
+ 		#size-cells = <1>;
 -- 
-~Vinod
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
