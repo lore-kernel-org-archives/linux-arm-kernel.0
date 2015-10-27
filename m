@@ -1,34 +1,43 @@
 From: p.fedin@samsung.com (Pavel Fedin)
-Date: Tue, 27 Oct 2015 11:43:52 +0300
-Subject: [PATCH v2 1/4] ARM: dts: Add SROMc to Exynos 5410
-In-Reply-To: <cover.1445935215.git.p.fedin@samsung.com>
-References: <cover.1445935215.git.p.fedin@samsung.com>
-Message-ID: <91ae80f172192fa4dbc8bf8ee5a9068661592de6.1445935215.git.p.fedin@samsung.com>
+Date: Tue, 27 Oct 2015 11:43:51 +0300
+Subject: [PATCH v2 0/4] Exynos SROMc configuration and Ethernet support for
+ SMDK5410
+Message-ID: <cover.1445935215.git.p.fedin@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This machine uses own SoC device tree file, add missing part.
+This patch extends Exynos SROM controller driver with ability to configure
+controller outputs and enables SMSC9115 Ethernet chip on SMDK5410 board,
+which is connected via SROMc bank #3.
 
-Signed-off-by: Pavel Fedin <p.fedin@samsung.com>
----
- arch/arm/boot/dts/exynos5410.dtsi | 5 +++++
- 1 file changed, 5 insertions(+)
+With this patchset, support for the whole existing SMDK range can be added.
+Actually, only bank number is different.
 
-diff --git a/arch/arm/boot/dts/exynos5410.dtsi b/arch/arm/boot/dts/exynos5410.dtsi
-index 4603356..af85aad 100644
---- a/arch/arm/boot/dts/exynos5410.dtsi
-+++ b/arch/arm/boot/dts/exynos5410.dtsi
-@@ -101,6 +101,11 @@
- 			reg = <0x10000000 0x100>;
- 		};
- 
-+		sromc: sromc at 12250000 {
-+			compatible = "samsung,exynos-srom";
-+			reg = <0x12250000 0x10>;
-+		};
-+
- 		pmu_system_controller: system-controller at 10040000 {
- 			compatible = "samsung,exynos5410-pmu", "syscon";
- 			reg = <0x10040000 0x5000>;
+This patchset also depends on Exynos 5410 pinctrl support, introduced by
+patches 0003 and 0004 from this set:
+[PATCH v4 0/5] ARM: EXYNOS: ODROID-XU DT and LEDs
+http://lists.infradead.org/pipermail/linux-arm-kernel/2015-March/330862.html
+
+Pinctrl support is necessary in order to correctly configure
+multifunctional pins of the Exynos chip.
+
+v1 => v2:
+- Fixed some typos and bad labels in device tree
+- Improved documentation
+
+Pavel Fedin (4):
+  ARM: dts: Add SROMc to Exynos 5410
+  drivers: exynos-srom: Add support for bank configuration
+  ARM: dts: Add Ethernet chip to SMDK5410
+  Documentation: dt-bindings: Describe SROMc configuration
+
+ .../bindings/arm/samsung/exynos-srom.txt           | 24 ++++++++++++-
+ arch/arm/boot/dts/exynos5410-smdk5410.dts          | 42 ++++++++++++++++++++++
+ arch/arm/boot/dts/exynos5410.dtsi                  |  5 +++
+ arch/arm/mach-exynos/Kconfig                       |  2 +-
+ drivers/soc/samsung/Kconfig                        |  2 +-
+ drivers/soc/samsung/exynos-srom.c                  | 42 +++++++++++++++++++++-
+ 6 files changed, 113 insertions(+), 4 deletions(-)
+
 -- 
 2.4.4
