@@ -1,50 +1,47 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 27 Oct 2015 08:18:35 +0000
-Subject: [PATCH] arm: kernel: utilize hrtimer based broadcast
-In-Reply-To: <1437124312-44700-1-git-send-email-b18965@freescale.com>
-References: <1437124312-44700-1-git-send-email-b18965@freescale.com>
-Message-ID: <20151027081834.GB1425@svinekod>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Tue, 27 Oct 2015 10:37:37 +0200
+Subject: [PATCH v2 0/2] ARM: OMAP2+ McASP(3) support for DRA7xx family
+In-Reply-To: <1444814608-20908-1-git-send-email-peter.ujfalusi@ti.com>
+References: <1444814608-20908-1-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <562F37D1.8030105@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Jul 17, 2015 at 10:11:52AM +0100, Alison Wang wrote:
-> Hrtimer based broadcast is used on ARM platform. It can be
-> registered as the tick broadcast device in the absence of
-> a real external clock device.
+Hi Paul,
+
+On 10/14/2015 12:23 PM, Peter Ujfalusi wrote:
+> Hi Paul,
 > 
-> Signed-off-by: Alison Wang <alison.wang@freescale.com>
+> This is the followup series for the hwmod changes needed to get audio working
+> on DRA7xx family based boards.
+> The DTS patches has been applied by Tony from the original series:
+> http://www.spinics.net/lists/linux-omap/msg121473.html
+> 
+> I have addressed your comments in the hwmod data and did some research also
+> regarding to the use of ahclkx as fclk in the original submission.
+> It turned out that McASP _needs_ all clocks to be enabled (fclk, iclk and
+> ahclkx/r) to be able to access registers. The original patch where we handled
+> the ahclkx as fclk worked, because the fclk clock got enabled in the HW w/o
+> any SW interaction.
+> All in all, the McASP found in DRA7 needs all clocks to be enabled.
+> To satisfy this I have introduced a new flag to hwmod, which means that the
+> listed optional clocks need to be handled alongside with the fclk clock.
 
-This looks sensible to me. FWIW:
+Can you, please look at this patch?
 
-Acked-by: Mark Rutland <mark.rutland@arm.com>
+Thank you,
+P?ter
 
-Thanks,
-Mark.
-
+> 
+> Regards,
+> Peter
 > ---
->  arch/arm/kernel/time.c | 3 +++
->  1 file changed, 3 insertions(+)
+> Peter Ujfalusi (2):
+>   ARM: OMAP2+: hwmod: Add hwmod flag for HWMOD_OPT_CLKS_NEEDED
+>   ARM: OMAP: DRA7: hwmod: Add data for McASP3
 > 
-> diff --git a/arch/arm/kernel/time.c b/arch/arm/kernel/time.c
-> index a66e37e..a9bc73c 100644
-> --- a/arch/arm/kernel/time.c
-> +++ b/arch/arm/kernel/time.c
-> @@ -12,6 +12,7 @@
->   *  reading the RTC at bootup, etc...
->   */
->  #include <linux/clk-provider.h>
-> +#include <linux/clockchips.h>
->  #include <linux/clocksource.h>
->  #include <linux/errno.h>
->  #include <linux/export.h>
-> @@ -121,5 +122,7 @@ void __init time_init(void)
->  		of_clk_init(NULL);
->  #endif
->  		clocksource_of_init();
-> +
-> +		tick_setup_hrtimer_broadcast();
->  	}
->  }
-> -- 
-> 2.1.0.27.g96db324
+>  arch/arm/mach-omap2/omap_hwmod.c          | 66 +++++++++++++++++--------------
+>  arch/arm/mach-omap2/omap_hwmod.h          |  3 ++
+>  arch/arm/mach-omap2/omap_hwmod_7xx_data.c | 56 ++++++++++++++++++++++++++
+>  3 files changed, 95 insertions(+), 30 deletions(-)
 > 
