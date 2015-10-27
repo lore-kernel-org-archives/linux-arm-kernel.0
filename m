@@ -1,46 +1,82 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 27 Oct 2015 11:09:11 +0100
-Subject: [PATCH] pinctrl: uniphier: set input-enable before pin-muxing
-In-Reply-To: <1445329509-6252-1-git-send-email-yamada.masahiro@socionext.com>
-References: <1445329509-6252-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <CACRpkdZwnrpJkv+70UsWjOVMb3uUNnxG8TxK235=OaeHafDk+Q@mail.gmail.com>
+From: Liviu.Dudau@arm.com (Liviu Dudau)
+Date: Tue, 27 Oct 2015 10:12:18 +0000
+Subject: [GIT PULL] arm64: Juno: Add support for PCIe or R1 board
+In-Reply-To: <20151026235505.GA13221@localhost>
+References: <20151021113629.GF3394@e106497-lin.cambridge.arm.com>
+ <4136958.Qhq5GfeeVa@wuerfel>
+ <20151026101256.GF963@e106497-lin.cambridge.arm.com>
+ <20151026235505.GA13221@localhost>
+Message-ID: <20151027101218.GI963@e106497-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 20, 2015 at 10:25 AM, Masahiro Yamada
-<yamada.masahiro@socionext.com> wrote:
+On Tue, Oct 27, 2015 at 08:55:05AM +0900, Olof Johansson wrote:
+> Hi,
+> 
+> On Mon, Oct 26, 2015 at 10:12:57AM +0000, Liviu Dudau wrote:
+> > On Fri, Oct 23, 2015 at 10:42:53PM +0200, Arnd Bergmann wrote:
+> > > On Wednesday 21 October 2015 12:36:29 Liviu Dudau wrote:
+> > > > The following changes since commit 25cb62b76430a91cc6195f902e61c2cb84ade622:
+> > > > 
+> > > >   Linux 4.3-rc5 (2015-10-11 11:09:45 -0700)
+> > > > 
+> > > > are available in the git repository at:
+> > > > 
+> > > > 
+> > > 
+> > > Not pulled.
+> > > 
+> > > All our branches are based on -rc4 or earlier, and we'd like to avoid
+> > > backmerges from mainline if at all possible.
+> > > 
+> > > Can you rebase this to -rc4 and send again?
+> > > 
+> > > 	Arnd
+> > 
+> > Sure, I've rebased the branch on top of -rc4 now, so here is the new request.
+> > 
+> > Many thanks,
+> > Liviu
+> > 
+> > The following changes since commit 049e6dde7e57f0054fdc49102e7ef4830c698b46:
+> > 
+> >   Linux 4.3-rc4 (2015-10-04 16:57:17 +0100)
+> > 
+> > are available in the git repository at:
+> > 
+> >   git://linux-arm.org/linux-ld for-upstream/juno-pcie
+> 
+> This is showing up late by now, but Juno also isn't a high-volume platform
+> so exposure to regressions are limited.
+> 
+> That being said, I really hope we won't have to pick up any fixes for
+> this due to lack of exposure to -next after the merge window.
+> 
+> 
+> Merged into next/arm64.
 
-> While IECTRL is disabled, input signals are pulled-down internally.
-> If pin-muxing is set up first, glitch signals (Low to High transition)
-> might be input to hardware blocks.
->
-> Bad case scenario:
-> [1] The hardware block is already running before pinctrl is handled.
->    (the reset is de-asserted by default or by a firmware, for example)
-> [2] The pin-muxing is set up.  The input signals to hardware block
->     are pulled-down by the chip-internal biasing.
-> [3] The pins are input-enabled.  The signals from the board reach the
->     hardware block.
->
-> Actually, one invalid character is input to the UART blocks for such
-> SoCs as PH1-LD4, PH1-sLD8, where UART devices start to run at the
-> power on reset.
->
-> To avoid such problems, pins should be input-enabled before muxing.
->
-> Fixes: 6e9088920258 ("pinctrl: UniPhier: add UniPhier pinctrl core support")
-> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
-> Reported-by: Dai Okamura <okamura.dai@socionext.com>
-> ---
->
-> Hi Linus,
->
-> If it is not too late, please apply this fix for Linux 4.3.
+Thanks,
 
-It's too late at this point.
+The PCIe setup has been tested pretty thoroughly (famous last words) inside ARM.
+The only surprises can come from various combinations of bootloaders and the
+kernel, and I'm happy to handle those.
 
-Patch is applied for devel and will come into v4.4 and from there
-to -stable.
+Best regards,
+Liviu
 
-Yours,
-Linus Walleij
+> 
+> 
+> Thanks,
+> 
+> -Olof
+> 
+
+-- 
+====================
+| I would like to |
+| fix the world,  |
+| but they're not |
+| giving me the   |
+ \ source code!  /
+  ---------------
+    ?\_(?)_/?
