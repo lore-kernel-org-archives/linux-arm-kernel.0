@@ -1,91 +1,50 @@
-From: kamal@canonical.com (Kamal Mostafa)
-Date: Tue, 27 Oct 2015 14:29:54 -0700
-Subject: [PATCH 3.19.y-ckt 54/86] irqchip/atmel-aic5: Use per chip mask caches
- in mask/unmask()
-In-Reply-To: <1445981426-19727-1-git-send-email-kamal@canonical.com>
-References: <1445981426-19727-1-git-send-email-kamal@canonical.com>
-Message-ID: <1445981426-19727-55-git-send-email-kamal@canonical.com>
+From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
+Date: Tue, 27 Oct 2015 22:33:01 +0100
+Subject: v7-M: Fixing XIP when the kernel is in ROM
+In-Reply-To: <85aea33b93066d0959d98b56f8787ba3@agner.ch>
+References: <20151026012710.GA17365@laptop>
+ <20151026080537.GW4931@pengutronix.de>
+ <CAAEAJfB0yywtQ2MrYf2ih5+a3fZJXAy0hFSXWA038wQMQswa7g@mail.gmail.com>
+ <CAAEAJfD29_PSTw+srx7d2YrF+Akx-_94Wv9ifKzT+8HTfH5tGA@mail.gmail.com>
+ <562FA053.6010208@st.com>
+ <CALszF6C4B-S-o3E1OHK3+bKpDQ8a64Ly-ABNQwfSfj95y7qFyA@mail.gmail.com>
+ <85aea33b93066d0959d98b56f8787ba3@agner.ch>
+Message-ID: <CALszF6Di3LWLu_W67Zdn2LyKKRF_5U241eKFKMmJ-0s+0boFag@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-3.19.8-ckt9 -stable review patch.  If anyone has any objections, please let me know.
+2015-10-27 21:33 GMT+01:00 Stefan Agner <stefan@agner.ch>:
+> On 2015-10-27 13:25, Maxime Coquelin wrote:
+>> 2015-10-27 17:03 GMT+01:00 Maxime Coquelin <maxime.coquelin@st.com>:
+>>> Hi Ezequiel,
+>>>
+>>> On 10/27/2015 04:35 PM, Ezequiel Garcia wrote:
+>>>>>
+>>>>> >>>The temporary stack is allocated in the .text.init section
+>>>>> >>>and so this doesn't work when the kernel is executing from ROM.
+>>>>
+>>>> >>
+>>>> >>If sp isn't used, how does it break you setup?
+>>>
+>>> STM32 machine works fine with XIP from internal flash memory, so as Uwe, I'm
+>>> surprised it solves your problem.
+>>>
+>>> I will have a try with your patch later today.
+>>
+>> Just tested, and confirm it works with (and without) your patch in XIP on STM32.
+>
+> It probably depends what exactly happens when the CPU core tries to use
+> the stack. I mean, the CPU core will issue a write to the flash, and how
+> that behaves is probably implementation specific. However, I would
+> expect that it should lead to some kind of fault... Do we have fault
+> handlers at that time?
 
-------------------
+Yes we have fault handlers at that time.
+I agree the behaviour is probably implementation specific.
 
-From: Ludovic Desroches <ludovic.desroches@atmel.com>
+>
+> Anyway, I guess Ezequiel's fix is the right thing to do...
+Or, maybe we should put the stack in RAM as Uwe suggest?
 
-commit d32dc9aa10c739363c775baf4499416b2e0dc11f upstream.
-
-When masking/unmasking interrupts, mask_cache is updated and used later
-for suspend/resume. Unfortunately, it always was the mask_cache
-associated with the first irq chip which was updated. So when performing
-resume, only irqs 0-31 could be enabled.
-
-Fixes: b1479ebb7720 ("irqchip: atmel-aic: Add atmel AIC/AIC5 drivers")
-Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
-Cc: <sasha.levin@oracle.com>
-Cc: <linux-arm-kernel@lists.infradead.org>
-Cc: <nicolas.ferre@atmel.com>
-Cc: <alexandre.belloni@free-electrons.com>
-Cc: <boris.brezillon@free-electrons.com>
-Cc: <Wenyou.Yang@atmel.com>
-Cc: <jason@lakedaemon.net>
-Cc: <marc.zyngier@arm.com>
-Link: http://lkml.kernel.org/r/1442843173-2390-1-git-send-email-ludovic.desroches at atmel.com
-Signed-off-by: Thomas Gleixner <tglx@linutronix.de>
-Signed-off-by: Kamal Mostafa <kamal@canonical.com>
----
- drivers/irqchip/irq-atmel-aic5.c | 24 ++++++++++++++++--------
- 1 file changed, 16 insertions(+), 8 deletions(-)
-
-diff --git a/drivers/irqchip/irq-atmel-aic5.c b/drivers/irqchip/irq-atmel-aic5.c
-index a2e8c3f..c2c578f 100644
---- a/drivers/irqchip/irq-atmel-aic5.c
-+++ b/drivers/irqchip/irq-atmel-aic5.c
-@@ -88,28 +88,36 @@ static void aic5_mask(struct irq_data *d)
- {
- 	struct irq_domain *domain = d->domain;
- 	struct irq_domain_chip_generic *dgc = domain->gc;
--	struct irq_chip_generic *gc = dgc->gc[0];
-+	struct irq_chip_generic *bgc = dgc->gc[0];
-+	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
- 
--	/* Disable interrupt on AIC5 */
--	irq_gc_lock(gc);
-+	/*
-+	 * Disable interrupt on AIC5. We always take the lock of the
-+	 * first irq chip as all chips share the same registers.
-+	 */
-+	irq_gc_lock(bgc);
- 	irq_reg_writel(gc, d->hwirq, AT91_AIC5_SSR);
- 	irq_reg_writel(gc, 1, AT91_AIC5_IDCR);
- 	gc->mask_cache &= ~d->mask;
--	irq_gc_unlock(gc);
-+	irq_gc_unlock(bgc);
- }
- 
- static void aic5_unmask(struct irq_data *d)
- {
- 	struct irq_domain *domain = d->domain;
- 	struct irq_domain_chip_generic *dgc = domain->gc;
--	struct irq_chip_generic *gc = dgc->gc[0];
-+	struct irq_chip_generic *bgc = dgc->gc[0];
-+	struct irq_chip_generic *gc = irq_data_get_irq_chip_data(d);
- 
--	/* Enable interrupt on AIC5 */
--	irq_gc_lock(gc);
-+	/*
-+	 * Enable interrupt on AIC5. We always take the lock of the
-+	 * first irq chip as all chips share the same registers.
-+	 */
-+	irq_gc_lock(bgc);
- 	irq_reg_writel(gc, d->hwirq, AT91_AIC5_SSR);
- 	irq_reg_writel(gc, 1, AT91_AIC5_IECR);
- 	gc->mask_cache |= d->mask;
--	irq_gc_unlock(gc);
-+	irq_gc_unlock(bgc);
- }
- 
- static int aic5_retrigger(struct irq_data *d)
--- 
-1.9.1
+Regards,
+Maxime
