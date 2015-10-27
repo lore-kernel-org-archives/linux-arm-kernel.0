@@ -1,57 +1,60 @@
 From: chaotian.jing@mediatek.com (Chaotian Jing)
-Date: Tue, 27 Oct 2015 14:24:20 +0800
-Subject: [PATCH v3 00/10] Add tune support of Mediatek MMC driver
-Message-ID: <1445927070-5102-1-git-send-email-chaotian.jing@mediatek.com>
+Date: Tue, 27 Oct 2015 14:24:25 +0800
+Subject: [PATCH v3 05/10] mmc: mediatek: fix got GPD checksum error interrupt
+ when data transfer
+In-Reply-To: <1445927070-5102-1-git-send-email-chaotian.jing@mediatek.com>
+References: <1445927070-5102-1-git-send-email-chaotian.jing@mediatek.com>
+Message-ID: <1445927070-5102-6-git-send-email-chaotian.jing@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Change in v3:
-Fix checkpatch errors and warnings for patch 8
-Split patch 9, make DT parts enabling hw reset separately
+Even if we only use one gpd, we need alloc 2 gpd and make
+the gpd->next pointer to the second gpd, or may get gpd checksum
+error, this was checked by hardware
 
-Change in v2:
-Drop the 400mhz and use assigned-clock-parents to instead
-Split the original tune patch to several independent patches
-Re-write the mmc_send_tuning()
-Fix GPD checksum error
-Move the HS400 setting to ops->prepare_hs400_tuning()	
-Modify SD driving settings
+Signed-off-by: Chaotian Jing <chaotian.jing@mediatek.com>
+---
+ drivers/mmc/host/mtk-sd.c | 11 +++++++----
+ 1 file changed, 7 insertions(+), 4 deletions(-)
 
-Change in v1:
-Add DT bindings for eMMC hardware reset
-Add pinctrl of data strobe pin for HS400 mode
-Modify eMMC driving settings
-Add 400mhz source clock for HS400 mode
-Add eMMC HS200/HS400 mode support
-Add SD SDR50/SDR104 mode support
-Add implement of tune function with CMD19/CMD21
-
-Chaotian Jing (10):
-  mmc: core: Add DT bindings for eMMC hardware reset support
-  mmc: dt-bindings: update Mediatek MMC bindings
-  mmc: mediatek: make cmd_ints_mask to const
-  mmc: mediatek: change the argument "ddr" to "timing"
-  mmc: mediatek: fix got GPD checksum error interrupt when data transfer
-  mmc: mediatek: add implement of ops->hw_reset()
-  arm64: dts: mediatek: add eMMC hw reset support
-  mmc: mmc: extend the mmc_send_tuning()
-  mmc: mediatek: add HS400 support
-  arm64: dts: mediatek: add HS200/HS400/SDR50/SDR104 support
-
- Documentation/devicetree/bindings/mmc/mmc.txt    |   1 +
- Documentation/devicetree/bindings/mmc/mtk-sd.txt |  11 +-
- arch/arm64/boot/dts/mediatek/mt8173-evb.dts      |  27 +-
- drivers/mmc/core/host.c                          |   2 +
- drivers/mmc/core/mmc_ops.c                       |   8 +-
- drivers/mmc/host/dw_mmc-exynos.c                 |   4 +-
- drivers/mmc/host/dw_mmc.c                        |   2 +-
- drivers/mmc/host/dw_mmc.h                        |   2 +-
- drivers/mmc/host/mtk-sd.c                        | 304 ++++++++++++++++++++---
- drivers/mmc/host/sdhci-esdhc-imx.c               |   6 +-
- drivers/mmc/host/sdhci-msm.c                     |   2 +-
- drivers/mmc/host/sdhci-sirf.c                    |   2 +-
- include/linux/mmc/core.h                         |   2 +-
- 13 files changed, 322 insertions(+), 51 deletions(-)
-
+diff --git a/drivers/mmc/host/mtk-sd.c b/drivers/mmc/host/mtk-sd.c
+index c877ded..3858163 100644
+--- a/drivers/mmc/host/mtk-sd.c
++++ b/drivers/mmc/host/mtk-sd.c
+@@ -1145,11 +1145,14 @@ static void msdc_init_gpd_bd(struct msdc_host *host, struct msdc_dma *dma)
+ 	struct mt_bdma_desc *bd = dma->bd;
+ 	int i;
+ 
+-	memset(gpd, 0, sizeof(struct mt_gpdma_desc));
++	memset(gpd, 0, sizeof(struct mt_gpdma_desc) * 2);
+ 
+ 	gpd->gpd_info = GPDMA_DESC_BDP; /* hwo, cs, bd pointer */
+ 	gpd->ptr = (u32)dma->bd_addr; /* physical address */
+-
++	/* gpd->next is must set for desc DMA
++	 * That's why must alloc 2 gpd structure.
++	 */
++	gpd->next = (u32)dma->gpd_addr + sizeof(struct mt_gpdma_desc);
+ 	memset(bd, 0, sizeof(struct mt_bdma_desc) * MAX_BD_NUM);
+ 	for (i = 0; i < (MAX_BD_NUM - 1); i++)
+ 		bd[i].next = (u32)dma->bd_addr + sizeof(*bd) * (i + 1);
+@@ -1306,7 +1309,7 @@ static int msdc_drv_probe(struct platform_device *pdev)
+ 
+ 	host->timeout_clks = 3 * 1048576;
+ 	host->dma.gpd = dma_alloc_coherent(&pdev->dev,
+-				sizeof(struct mt_gpdma_desc),
++				2 * sizeof(struct mt_gpdma_desc),
+ 				&host->dma.gpd_addr, GFP_KERNEL);
+ 	host->dma.bd = dma_alloc_coherent(&pdev->dev,
+ 				MAX_BD_NUM * sizeof(struct mt_bdma_desc),
+@@ -1347,7 +1350,7 @@ release:
+ release_mem:
+ 	if (host->dma.gpd)
+ 		dma_free_coherent(&pdev->dev,
+-			sizeof(struct mt_gpdma_desc),
++			2 * sizeof(struct mt_gpdma_desc),
+ 			host->dma.gpd, host->dma.gpd_addr);
+ 	if (host->dma.bd)
+ 		dma_free_coherent(&pdev->dev,
 -- 
 1.8.1.1.dirty
