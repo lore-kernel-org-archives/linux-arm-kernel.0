@@ -1,223 +1,101 @@
 From: jenskuske@gmail.com (Jens Kuske)
-Date: Tue, 27 Oct 2015 17:50:22 +0100
-Subject: [PATCH v4 2/6] clk: sunxi: Add H3 clocks support
+Date: Tue, 27 Oct 2015 17:50:24 +0100
+Subject: [PATCH v4 4/6] reset: sunxi: Add Allwinner H3 bus resets
 In-Reply-To: <1445964626-6484-1-git-send-email-jenskuske@gmail.com>
 References: <1445964626-6484-1-git-send-email-jenskuske@gmail.com>
-Message-ID: <1445964626-6484-3-git-send-email-jenskuske@gmail.com>
+Message-ID: <1445964626-6484-5-git-send-email-jenskuske@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The H3 clock control unit is similar to the those of other sun8i family
-members like the A23.
-
-It adds a new bus gates clock similar to the simple gates, but with a
-different parent clock for each single gate.
-Some of the gates use the new AHB2 clock as parent, whose clock source
-is muxable between AHB1 and PLL6/2. The documentation isn't totally clear
-about which devices belong to AHB2 now, especially USB EHIC/OHIC, so it
-is mostly based on Allwinner kernel source code.
+The H3 bus resets have some holes between the registers, so we add
+an of_xlate() function to skip them according to the datasheet.
 
 Signed-off-by: Jens Kuske <jenskuske@gmail.com>
 ---
- Documentation/devicetree/bindings/clock/sunxi.txt |   2 +
- drivers/clk/sunxi/Makefile                        |   1 +
- drivers/clk/sunxi/clk-sun8i-bus-gates.c           | 111 ++++++++++++++++++++++
- drivers/clk/sunxi/clk-sunxi.c                     |   9 +-
- 4 files changed, 122 insertions(+), 1 deletion(-)
- create mode 100644 drivers/clk/sunxi/clk-sun8i-bus-gates.c
+ .../bindings/reset/allwinner,sunxi-clock-reset.txt |  1 +
+ drivers/reset/reset-sunxi.c                        | 30 +++++++++++++++++++---
+ 2 files changed, 28 insertions(+), 3 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/clock/sunxi.txt b/Documentation/devicetree/bindings/clock/sunxi.txt
-index 8a47b77..d303dec 100644
---- a/Documentation/devicetree/bindings/clock/sunxi.txt
-+++ b/Documentation/devicetree/bindings/clock/sunxi.txt
-@@ -28,6 +28,7 @@ Required properties:
- 	"allwinner,sun7i-a20-ahb-gates-clk" - for the AHB gates on A20
- 	"allwinner,sun6i-a31-ar100-clk" - for the AR100 on A31
- 	"allwinner,sun6i-a31-ahb1-clk" - for the AHB1 clock on A31
-+	"allwinner,sun8i-h3-ahb2-clk" - for the AHB2 clock on H3
- 	"allwinner,sun6i-a31-ahb1-gates-clk" - for the AHB1 gates on A31
- 	"allwinner,sun8i-a23-ahb1-gates-clk" - for the AHB1 gates on A23
- 	"allwinner,sun9i-a80-ahb0-gates-clk" - for the AHB0 gates on A80
-@@ -55,6 +56,7 @@ Required properties:
- 	"allwinner,sun9i-a80-apb1-gates-clk" - for the APB1 gates on A80
- 	"allwinner,sun6i-a31-apb2-gates-clk" - for the APB2 gates on A31
- 	"allwinner,sun8i-a23-apb2-gates-clk" - for the APB2 gates on A23
-+	"allwinner,sun8i-h3-bus-gates-clk" - for the bus gates on H3
- 	"allwinner,sun5i-a13-mbus-clk" - for the MBUS clock on A13
- 	"allwinner,sun4i-a10-mmc-clk" - for the MMC clock
- 	"allwinner,sun9i-a80-mmc-clk" - for mmc module clocks on A80
-diff --git a/drivers/clk/sunxi/Makefile b/drivers/clk/sunxi/Makefile
-index cb4c299..f520af6 100644
---- a/drivers/clk/sunxi/Makefile
-+++ b/drivers/clk/sunxi/Makefile
-@@ -10,6 +10,7 @@ obj-y += clk-a10-pll2.o
- obj-y += clk-a20-gmac.o
- obj-y += clk-mod0.o
- obj-y += clk-simple-gates.o
-+obj-y += clk-sun8i-bus-gates.o
- obj-y += clk-sun8i-mbus.o
- obj-y += clk-sun9i-core.o
- obj-y += clk-sun9i-mmc.o
-diff --git a/drivers/clk/sunxi/clk-sun8i-bus-gates.c b/drivers/clk/sunxi/clk-sun8i-bus-gates.c
-new file mode 100644
-index 0000000..ad605fa
---- /dev/null
-+++ b/drivers/clk/sunxi/clk-sun8i-bus-gates.c
-@@ -0,0 +1,111 @@
-+/*
-+ * Copyright (C) 2015 Jens Kuske <jenskuske@gmail.com>
-+ *
-+ * Based on clk-simple-gates.c, which is:
-+ * Copyright 2015 Maxime Ripard
-+ *
-+ * Maxime Ripard <maxime.ripard@free-electrons.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License as published by
-+ * the Free Software Foundation; either version 2 of the License, or
-+ * (at your option) any later version.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ */
-+
-+#include <linux/clk.h>
-+#include <linux/clk-provider.h>
-+#include <linux/of.h>
-+#include <linux/of_address.h>
-+#include <linux/slab.h>
-+#include <linux/spinlock.h>
-+
-+static DEFINE_SPINLOCK(gates_lock);
-+
-+static void __init sun8i_h3_bus_gates_init(struct device_node *node)
+diff --git a/Documentation/devicetree/bindings/reset/allwinner,sunxi-clock-reset.txt b/Documentation/devicetree/bindings/reset/allwinner,sunxi-clock-reset.txt
+index c8f7757..e11f023 100644
+--- a/Documentation/devicetree/bindings/reset/allwinner,sunxi-clock-reset.txt
++++ b/Documentation/devicetree/bindings/reset/allwinner,sunxi-clock-reset.txt
+@@ -8,6 +8,7 @@ Required properties:
+ - compatible: Should be one of the following:
+   "allwinner,sun6i-a31-ahb1-reset"
+   "allwinner,sun6i-a31-clock-reset"
++  "allwinner,sun8i-h3-bus-reset"
+ - reg: should be register base and length as documented in the
+   datasheet
+ - #reset-cells: 1, see below
+diff --git a/drivers/reset/reset-sunxi.c b/drivers/reset/reset-sunxi.c
+index 3d95c87..c91e146 100644
+--- a/drivers/reset/reset-sunxi.c
++++ b/drivers/reset/reset-sunxi.c
+@@ -75,7 +75,9 @@ static struct reset_control_ops sunxi_reset_ops = {
+ 	.deassert	= sunxi_reset_deassert,
+ };
+ 
+-static int sunxi_reset_init(struct device_node *np)
++static int sunxi_reset_init(struct device_node *np,
++			    int (*of_xlate)(struct reset_controller_dev *rcdev,
++				    const struct of_phandle_args *reset_spec))
+ {
+ 	struct sunxi_reset_data *data;
+ 	struct resource res;
+@@ -108,6 +110,7 @@ static int sunxi_reset_init(struct device_node *np)
+ 	data->rcdev.nr_resets = size * 32;
+ 	data->rcdev.ops = &sunxi_reset_ops;
+ 	data->rcdev.of_node = np;
++	data->rcdev.of_xlate = of_xlate;
+ 	reset_controller_register(&data->rcdev);
+ 
+ 	return 0;
+@@ -117,6 +120,21 @@ err_alloc:
+ 	return ret;
+ };
+ 
++static int sun8i_h3_bus_reset_xlate(struct reset_controller_dev *rcdev,
++				    const struct of_phandle_args *reset_spec)
 +{
-+	const char *clocks[] = { "ahb1", "ahb2", "apb1", "apb2" };
-+	enum { AHB1, AHB2, APB1, APB2 } clk_parent;
-+	struct clk_onecell_data *clk_data;
-+	const char *clk_name;
-+	struct property *prop;
-+	struct resource res;
-+	void __iomem *clk_reg;
-+	void __iomem *reg;
-+	const __be32 *p;
-+	int number, i;
-+	u8 clk_bit;
-+	u32 index;
++	unsigned int index = reset_spec->args[0];
 +
-+	reg = of_io_request_and_map(node, 0, of_node_full_name(node));
-+	if (IS_ERR(reg))
-+		return;
-+
-+	for (i = 0; i < ARRAY_SIZE(clocks); i++) {
-+		index = of_property_match_string(node, "clock-names", clocks[i]);
-+		if (index < 0)
-+			return;
-+
-+		clocks[i] = of_clk_get_parent_name(node, index);
-+	}
-+
-+	clk_data = kmalloc(sizeof(struct clk_onecell_data), GFP_KERNEL);
-+	if (!clk_data)
-+		goto err_unmap;
-+
-+	number = of_property_count_u32_elems(node, "clock-indices");
-+	of_property_read_u32_index(node, "clock-indices", number - 1, &number);
-+
-+	clk_data->clks = kcalloc(number + 1, sizeof(struct clk *), GFP_KERNEL);
-+	if (!clk_data->clks)
-+		goto err_free_data;
-+
-+	i = 0;
-+	of_property_for_each_u32(node, "clock-indices", prop, p, index) {
-+		of_property_read_string_index(node, "clock-output-names",
-+					      i, &clk_name);
-+
-+		if (index == 17 || (index >= 29 && index <= 31))
-+			clk_parent = AHB2;
-+		else if (index <= 63 || index >= 128)
-+			clk_parent = AHB1;
-+		else if (index >= 64 && index <= 95)
-+			clk_parent = APB1;
-+		else if (index >= 96 && index <= 127)
-+			clk_parent = APB2;
-+
-+		clk_reg = reg + 4 * (index / 32);
-+		clk_bit = index % 32;
-+
-+		clk_data->clks[index] = clk_register_gate(NULL, clk_name,
-+							  clocks[clk_parent], 0,
-+							  clk_reg,
-+							  clk_bit,
-+							  0, &gates_lock);
-+		i++;
-+
-+		if (IS_ERR(clk_data->clks[index])) {
-+			WARN_ON(true);
-+			continue;
-+		}
-+	}
-+
-+	clk_data->clk_num = number + 1;
-+	of_clk_add_provider(node, of_clk_src_onecell_get, clk_data);
-+
-+	return;
-+
-+err_free_data:
-+	kfree(clk_data);
-+err_unmap:
-+	iounmap(reg);
-+	of_address_to_resource(node, 0, &res);
-+	release_mem_region(res.start, resource_size(&res));
++	if (index < 96)
++		return index;
++	else if (index < 128)
++		return index + 32;
++	else if (index < 160)
++		return index + 64;
++	else
++		return -EINVAL;
 +}
 +
-+CLK_OF_DECLARE(sun8i_h3_bus_gates, "allwinner,sun8i-h3-bus-gates-clk",
-+	       sun8i_h3_bus_gates_init);
-diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
-index 270de42..6293c65 100644
---- a/drivers/clk/sunxi/clk-sunxi.c
-+++ b/drivers/clk/sunxi/clk-sunxi.c
-@@ -769,6 +769,10 @@ static const struct mux_data sun6i_a31_ahb1_mux_data __initconst = {
- 	.shift = 12,
+ /*
+  * These are the reset controller we need to initialize early on in
+  * our system, before we can even think of using a regular device
+@@ -124,15 +142,21 @@ err_alloc:
+  */
+ static const struct of_device_id sunxi_early_reset_dt_ids[] __initdata = {
+ 	{ .compatible = "allwinner,sun6i-a31-ahb1-reset", },
++	{ .compatible = "allwinner,sun8i-h3-bus-reset", .data = sun8i_h3_bus_reset_xlate, },
+ 	{ /* sentinel */ },
  };
  
-+static const struct mux_data sun8i_h3_ahb2_mux_data __initconst = {
-+	.shift = 0,
-+};
-+
- static void __init sunxi_mux_clk_setup(struct device_node *node,
- 				       struct mux_data *data)
+ void __init sun6i_reset_init(void)
  {
-@@ -945,10 +949,11 @@ static const struct divs_data pll6_divs_data __initconst = {
+ 	struct device_node *np;
++	const struct of_device_id *match;
++	int (*of_xlate)(struct reset_controller_dev *rcdev,
++			const struct of_phandle_args *reset_spec);
  
- static const struct divs_data sun6i_a31_pll6_divs_data __initconst = {
- 	.factors = &sun6i_a31_pll6_data,
--	.ndivs = 2,
-+	.ndivs = 3,
- 	.div = {
- 		{ .fixed = 2 }, /* normal output */
- 		{ .self = 1 }, /* base factor clock, 2x */
-+		{ .fixed = 4 }, /* divided output, /2 */
- 	}
- };
+-	for_each_matching_node(np, sunxi_early_reset_dt_ids)
+-		sunxi_reset_init(np);
++	for_each_matching_node_and_match(np, sunxi_early_reset_dt_ids, &match) {
++		of_xlate = match->data;
++		sunxi_reset_init(np, of_xlate);
++	}
+ }
  
-@@ -1146,6 +1151,7 @@ static const struct of_device_id clk_divs_match[] __initconst = {
- static const struct of_device_id clk_mux_match[] __initconst = {
- 	{.compatible = "allwinner,sun4i-a10-cpu-clk", .data = &sun4i_cpu_mux_data,},
- 	{.compatible = "allwinner,sun6i-a31-ahb1-mux-clk", .data = &sun6i_a31_ahb1_mux_data,},
-+	{.compatible = "allwinner,sun8i-h3-ahb2-clk", .data = &sun8i_h3_ahb2_mux_data,},
- 	{}
- };
- 
-@@ -1228,6 +1234,7 @@ CLK_OF_DECLARE(sun6i_a31_clk_init, "allwinner,sun6i-a31", sun6i_init_clocks);
- CLK_OF_DECLARE(sun6i_a31s_clk_init, "allwinner,sun6i-a31s", sun6i_init_clocks);
- CLK_OF_DECLARE(sun8i_a23_clk_init, "allwinner,sun8i-a23", sun6i_init_clocks);
- CLK_OF_DECLARE(sun8i_a33_clk_init, "allwinner,sun8i-a33", sun6i_init_clocks);
-+CLK_OF_DECLARE(sun8i_h3_clk_init, "allwinner,sun8i-h3", sun6i_init_clocks);
- 
- static void __init sun9i_init_clocks(struct device_node *node)
- {
+ /*
 -- 
 2.6.2
