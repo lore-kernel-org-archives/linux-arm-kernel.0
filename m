@@ -1,33 +1,43 @@
-From: james.morse@arm.com (James Morse)
-Date: Tue, 27 Oct 2015 17:29:17 +0000
-Subject: [PATCH v2 08/11] arm64: kernel: Include _AC definition in page.h
-In-Reply-To: <1445966960-31724-1-git-send-email-james.morse@arm.com>
-References: <1445966960-31724-1-git-send-email-james.morse@arm.com>
-Message-ID: <1445966960-31724-9-git-send-email-james.morse@arm.com>
+From: alex.aring@gmail.com (Alexander Aring)
+Date: Tue, 27 Oct 2015 18:42:35 +0100
+Subject: [PATCH soc/next] ARM: bcm2835: add mutual inclusion protection
+In-Reply-To: <20151027170003.GB5828@x1>
+References: <1445539565-24955-1-git-send-email-alex.aring@gmail.com>
+ <20151027170003.GB5828@x1>
+Message-ID: <20151027174230.GA9495@omega>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-page.h uses '_AC' in the definition of PAGE_SIZE, but doesn't include
-linux/const.h where this is defined. This produces build warnings when only
-asm/page.h is included by asm code.
+Hi,
 
-Signed-off-by: James Morse <james.morse@arm.com>
----
- arch/arm64/include/asm/page.h | 2 ++
- 1 file changed, 2 insertions(+)
+On Tue, Oct 27, 2015 at 05:00:03PM +0000, Lee Jones wrote:
+> On Thu, 22 Oct 2015, Alexander Aring wrote:
+> 
+> > This patch adds mutual inclusion protection for the rpi firmware header.
+> > 
+> > Cc: Eric Anholt <eric@anholt.net>
+> > Cc: Stephen Warren <swarren@wwwdotorg.org>
+> 
+> Looks like these didn't work.  You might want to look into that.
+> 
+> You either have --no-signed-off-by-cc set, or you're not using `git
+> send-email`.
+> 
 
-diff --git a/arch/arm64/include/asm/page.h b/arch/arm64/include/asm/page.h
-index 7d9c7e4a424b..74f67d049a63 100644
---- a/arch/arm64/include/asm/page.h
-+++ b/arch/arm64/include/asm/page.h
-@@ -19,6 +19,8 @@
- #ifndef __ASM_PAGE_H
- #define __ASM_PAGE_H
- 
-+#include <linux/const.h>
-+
- /* PAGE_SHIFT determines the page size */
- #ifdef CONFIG_ARM64_64K_PAGES
- #define PAGE_SHIFT		16
--- 
-2.1.4
+I am using git send-email without "--no-signed-off-by-cc".
+
+> From the man page:
+> 
+> --[no-]signed-off-by-cc
+>     If this is set, add emails found in Signed-off-by: or Cc: lines to
+>     the cc list. Default is the value of sendemail.signedoffbycc
+>     configuration value; if that is unspecified, default to
+>     --signed-off-by-cc.
+> 
+
+I wonder if this is really not working.
+
+Stephen Warren, Eric Anholt did you receive my mail? I saw everybody
+(except you) has these two in cc when they replied.
+
+- Alex
