@@ -1,32 +1,80 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Mon, 26 Oct 2015 18:43:00 -0700
-Subject: [PATCH 0/4] Patches to fix remote wakeup on rk3288 dwc2 "host"
- port
-In-Reply-To: <CAD=FV=UfdEN4MzAwZLWDTQ4qMakhchpr063U1e3uk6R96wScJw@mail.gmail.com>
-References: <1445624891-31680-1-git-send-email-dianders@chromium.org>
- <562B9F5F.1080800@kernel.org>
- <CAD=FV=VgYU8sZfSkbNbbOFpb-nt=Yy9NjybxADBnAiQXfasDpw@mail.gmail.com>
- <CAL_JsqLtYrzvreV68V5S0wFJNAR6JusnqZrLjsJwT6yXgrQKHg@mail.gmail.com>
- <CAD=FV=UfdEN4MzAwZLWDTQ4qMakhchpr063U1e3uk6R96wScJw@mail.gmail.com>
-Message-ID: <CAD=FV=VKhBheVVBFT9DRDgd32o54RV8Er8sKqCHUvZm3ChnBRA@mail.gmail.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Tue, 27 Oct 2015 11:00:36 +0900
+Subject: [PATCH v3] dmaengine: fsl-edma: add PM suspend/resume support
+In-Reply-To: <1445243465-7727-1-git-send-email-yao.yuan@freescale.com>
+References: <1445243465-7727-1-git-send-email-yao.yuan@freescale.com>
+Message-ID: <20151027020035.GC11691@vkoul-mobl.iind.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Mon, Oct 19, 2015 at 04:31:05PM +0800, Yuan Yao wrote:
 
-On Mon, Oct 26, 2015 at 4:49 PM, Doug Anderson <dianders@chromium.org> wrote:
-> One note: the "full" PHY reset is actually not in the register map of
-> the PHY.  It is amazingly enough in the CRU (clock reset unit).  So if
-> we actually exposed the "full" reset through the PHY framework, the
-> PHY would then turn around and pass it off to the reset framework,
-> which is how the full PHY reset is exposed from the CRU.
+The patch overall looks fine, but
+>  
+> +static int fsl_edma_suspend_late(struct device *dev)
 
-Interestingly enough, it looks like there's a reasonable chance that
-we won't be able to use the PHY port reset.  We might have to go back
-to the full PHY reset (though it causes de-enumeration and
-re-enumeration) for safety, since there might be some side effects of
-the "phy port reset".
+This needs protection and will have build failure when CONFIG_PM is not
+defined
 
-Probably shouldn't land this series until we can figure that out.
-...but in that case we still have the question of how we should export
-it.  It would certainly be easy to keep using the reset framework...
+> +{
+> +	struct fsl_edma_engine *fsl_edma = dev_get_drvdata(dev);
+> +	struct fsl_edma_chan *fsl_chan;
+> +	unsigned long flags;
+> +	int i;
+> +
+> +	for (i = 0; i < fsl_edma->n_chans; i++) {
+> +		fsl_chan = &fsl_edma->chans[i];
+> +		spin_lock_irqsave(&fsl_chan->vchan.lock, flags);
+> +		/* Make sure chan is idle or will force disable. */
+> +		if (unlikely(!fsl_chan->idle)) {
+> +			dev_warn(dev, "WARN: There is non-idle channel.");
+> +			fsl_edma_disable_request(fsl_chan);
+> +			fsl_edma_chan_mux(fsl_chan, 0, false);
+> +		}
+> +
+> +		fsl_chan->pm_state = SUSPENDED;
+> +		spin_unlock_irqrestore(&fsl_chan->vchan.lock, flags);
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+> +static int fsl_edma_resume_early(struct device *dev)
+> +{
+> +	struct fsl_edma_engine *fsl_edma = dev_get_drvdata(dev);
+> +	struct fsl_edma_chan *fsl_chan;
+> +	int i;
+> +
+> +	for (i = 0; i < fsl_edma->n_chans; i++) {
+> +		fsl_chan = &fsl_edma->chans[i];
+> +		fsl_chan->pm_state = RUNNING;
+> +		edma_writew(fsl_edma, 0x0, fsl_edma->membase + EDMA_TCD_CSR(i));
+> +		if (fsl_chan->slave_id != 0)
+> +			fsl_edma_chan_mux(fsl_chan, fsl_chan->slave_id, true);
+> +	}
+> +
+> +	edma_writel(fsl_edma, EDMA_CR_ERGA | EDMA_CR_ERCA,
+> +			fsl_edma->membase + EDMA_CR);
+> +
+> +	return 0;
+> +}
+> +
+> +static const struct dev_pm_ops fsl_edma_pm_ops = {
+> +	.suspend_late   = fsl_edma_suspend_late,
+> +	.resume_early   = fsl_edma_resume_early,
+> +};
+
+This one too, also why use late and early, pls add the note here
+
+>  static const struct of_device_id fsl_edma_dt_ids[] = {
+>  	{ .compatible = "fsl,vf610-edma", },
+>  	{ /* sentinel */ }
+> @@ -969,6 +1042,7 @@ static struct platform_driver fsl_edma_driver = {
+>  	.driver		= {
+>  		.name	= "fsl-edma",
+>  		.of_match_table = fsl_edma_dt_ids,
+> +		.pm     = &fsl_edma_pm_ops,
+This will fail too if CONFIG_PM is not defined
+
+-- 
+~Vinod
