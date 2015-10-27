@@ -1,29 +1,49 @@
-From: kgene@kernel.org (Kukjin Kim)
-Date: Tue, 27 Oct 2015 11:15:17 +0900
-Subject: [PATCH v5 0/8] Add support for Exynos SROM Controller driver
-In-Reply-To: <00f401d10fb9$e92e7f40$bb8b7dc0$@samsung.com>
-References: <1445332540-12814-1-git-send-email-pankaj.dubey@samsung.com>
- <5626DD9A.9030603@samsung.com> <00ba01d10d78$177c1720$46744560$@samsung.com>
- <562A7A03.8040704@kernel.org> <00f401d10fb9$e92e7f40$bb8b7dc0$@samsung.com>
-Message-ID: <562EDE35.2090409@kernel.org>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Tue, 27 Oct 2015 10:16:48 +0800
+Subject: [PATCH 0/7] clocksource: add missing notrace attribute
+In-Reply-To: <562E67D2.3020401@linaro.org>
+References: <1445328160-402-1-git-send-email-jszhang@marvell.com>
+ <562E67D2.3020401@linaro.org>
+Message-ID: <20151027101648.535ffdc7@xhacker>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/26/15 15:45, Pavel Fedin wrote:
->  Hello!
-> 
-Hi,
+Dear Daniel,
 
->> Applied, this whole series.
-> 
->  Where can i find the recent code to base my series on? I looked at linux-samsung.git but was unable to find it there.
-> 
-You may need to fetch again?
-Anyway the branch is v4.4-next/driver-samsung or tags/samsung-driver...
-Or just for-next should be fine I think.
+On Mon, 26 Oct 2015 18:50:10 +0100
+Daniel Lezcano <daniel.lezcano@linaro.org> wrote:
 
-See below:
-https://git.kernel.org/cgit/linux/kernel/git/kgene/linux-samsung.git/log/?h=v4.4-next/driver-samsung
+> On 10/20/2015 10:02 AM, Jisheng Zhang wrote:
+> > Some clocksource drivers sched_clock implementation either miss notrace
+> > attribute or call wasn't notrace function. This series try to fix them.
+> >
+> > Jisheng Zhang (7):
+> >    clocksource: arm_global_timer: fix ftrace
+> >    clocksource: samsung_pwm_timer: fix ftrace
+> >    clocksource: pistachio: fix ftrace
+> >    clocksource: prima2: fix ftrace
+> >    clocksource: vf_pit_timer: don't trace pit_read_sched_clock()
+> >    clocksource: digicolor: don't trace digicolor_timer_sched_read()
+> >    clocksource: fsl_ftm_timer: don't trace ftm_read_sched_clock
+> >
+> >   drivers/clocksource/arm_global_timer.c  | 9 +++++++--
+> >   drivers/clocksource/fsl_ftm_timer.c     | 2 +-
+> >   drivers/clocksource/samsung_pwm_timer.c | 2 +-
+> >   drivers/clocksource/time-pistachio.c    | 3 ++-
+> >   drivers/clocksource/timer-digicolor.c   | 2 +-
+> >   drivers/clocksource/timer-prima2.c      | 2 +-
+> >   drivers/clocksource/vf_pit_timer.c      | 2 +-
+> >   7 files changed, 14 insertions(+), 8 deletions(-)  
+> 
+> Hi Jisheng,
+> 
+> I will apply this series as 4.3 fixes.
+> 
+> In the future, could you fix the subject by:
+> 
+> clocksource/drivers/<driver>: [first letter uppercase]...;
 
-Thanks,
-Kukjin
+Got it. Will take care in the future.
+
+Thanks a lot for kind reminding,
+Jisheng
