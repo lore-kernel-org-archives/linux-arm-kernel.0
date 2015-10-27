@@ -1,102 +1,92 @@
-From: yao.yuan@freescale.com (Yao Yuan)
-Date: Tue, 27 Oct 2015 03:58:31 +0000
-Subject: [PATCH v3] dmaengine: fsl-edma: add PM suspend/resume support
-In-Reply-To: <20151027020035.GC11691@vkoul-mobl.iind.intel.com>
-References: <1445243465-7727-1-git-send-email-yao.yuan@freescale.com>
- <20151027020035.GC11691@vkoul-mobl.iind.intel.com>
-Message-ID: <BLUPR03MB134DA9E483023953813E03783220@BLUPR03MB134.namprd03.prod.outlook.com>
+From: pankaj.dubey@samsung.com (Pankaj Dubey)
+Date: Tue, 27 Oct 2015 09:45:14 +0530
+Subject: [PATCH 3/4] ARM: dts: Add Ethernet chip to SMDK5410
+In-Reply-To: <e98a08b6576931ee935dbfd539839fb857c01e4f.1445859834.git.p.fedin@samsung.com>
+References: <cover.1445859834.git.p.fedin@samsung.com>
+ <e98a08b6576931ee935dbfd539839fb857c01e4f.1445859834.git.p.fedin@samsung.com>
+Message-ID: <562EFA52.1060202@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vinod,
+Hi Pavel,
 
-Thanks for your review.
-I did the test and it seems that it should be ok when CONFIG_PM is not defined.
-So I removed the protection code to make it more readable.
-Do you think is it ok?
+On Monday 26 October 2015 05:17 PM, Pavel Fedin wrote:
+> The chip is smsc9115, connected via SROMc bank 3. Additionally, some GPIO
+> initialization is required.
+>
+> Signed-off-by: Pavel Fedin <p.fedin@samsung.com>
+> ---
+>   arch/arm/boot/dts/exynos5410-smdk5410.dts | 42 +++++++++++++++++++++++++++++++
+>   1 file changed, 42 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/exynos5410-smdk5410.dts b/arch/arm/boot/dts/exynos5410-smdk5410.dts
+> index cebeaab..154e37b 100644
+> --- a/arch/arm/boot/dts/exynos5410-smdk5410.dts
+> +++ b/arch/arm/boot/dts/exynos5410-smdk5410.dts
+> @@ -35,6 +35,17 @@
+>   		reg = <0x02037000 0x1000>;
+>   	};
+>
+> +	etherhet at 07000000 {
 
-Best Regards,
-Yuan Yao
+%s/etherhet/ethernet/
 
-> -----Original Message-----
-> From: Vinod Koul [mailto:vinod.koul at intel.com]
-> Sent: Tuesday, October 27, 2015 10:01 AM
-> To: Yuan Yao-B46683 <yao.yuan@freescale.com>
-> Cc: stefan at agner.ch; arnd at arndb.de; dan.j.williams at intel.com;
-> dmaengine at vger.kernel.org; linux-kernel at vger.kernel.org; linux-arm-
-> kernel at lists.infradead.org
-> Subject: Re: [PATCH v3] dmaengine: fsl-edma: add PM suspend/resume
-> support
-> 
-> On Mon, Oct 19, 2015 at 04:31:05PM +0800, Yuan Yao wrote:
-> 
-> The patch overall looks fine, but
-> >
-> > +static int fsl_edma_suspend_late(struct device *dev)
-> 
-> This needs protection and will have build failure when CONFIG_PM is not
-> defined
-> 
-> > +{
-> > +	struct fsl_edma_engine *fsl_edma = dev_get_drvdata(dev);
-> > +	struct fsl_edma_chan *fsl_chan;
-> > +	unsigned long flags;
-> > +	int i;
-> > +
-> > +	for (i = 0; i < fsl_edma->n_chans; i++) {
-> > +		fsl_chan = &fsl_edma->chans[i];
-> > +		spin_lock_irqsave(&fsl_chan->vchan.lock, flags);
-> > +		/* Make sure chan is idle or will force disable. */
-> > +		if (unlikely(!fsl_chan->idle)) {
-> > +			dev_warn(dev, "WARN: There is non-idle channel.");
-> > +			fsl_edma_disable_request(fsl_chan);
-> > +			fsl_edma_chan_mux(fsl_chan, 0, false);
-> > +		}
-> > +
-> > +		fsl_chan->pm_state = SUSPENDED;
-> > +		spin_unlock_irqrestore(&fsl_chan->vchan.lock, flags);
-> > +	}
-> > +
-> > +	return 0;
-> > +}
-> > +
-> > +static int fsl_edma_resume_early(struct device *dev) {
-> > +	struct fsl_edma_engine *fsl_edma = dev_get_drvdata(dev);
-> > +	struct fsl_edma_chan *fsl_chan;
-> > +	int i;
-> > +
-> > +	for (i = 0; i < fsl_edma->n_chans; i++) {
-> > +		fsl_chan = &fsl_edma->chans[i];
-> > +		fsl_chan->pm_state = RUNNING;
-> > +		edma_writew(fsl_edma, 0x0, fsl_edma->membase +
-> EDMA_TCD_CSR(i));
-> > +		if (fsl_chan->slave_id != 0)
-> > +			fsl_edma_chan_mux(fsl_chan, fsl_chan->slave_id,
-> true);
-> > +	}
-> > +
-> > +	edma_writel(fsl_edma, EDMA_CR_ERGA | EDMA_CR_ERCA,
-> > +			fsl_edma->membase + EDMA_CR);
-> > +
-> > +	return 0;
-> > +}
-> > +
-> > +static const struct dev_pm_ops fsl_edma_pm_ops = {
-> > +	.suspend_late   = fsl_edma_suspend_late,
-> > +	.resume_early   = fsl_edma_resume_early,
-> > +};
-> 
-> This one too, also why use late and early, pls add the note here
-> 
-> >  static const struct of_device_id fsl_edma_dt_ids[] = {
-> >  	{ .compatible = "fsl,vf610-edma", },
-> >  	{ /* sentinel */ }
-> > @@ -969,6 +1042,7 @@ static struct platform_driver fsl_edma_driver = {
-> >  	.driver		= {
-> >  		.name	= "fsl-edma",
-> >  		.of_match_table = fsl_edma_dt_ids,
-> > +		.pm     = &fsl_edma_pm_ops,
-> This will fail too if CONFIG_PM is not defined
-> 
-> --
-> ~Vinod
+> +		compatible = "smsc,lan9115";
+> +		reg = <0x07000000 0x10000>;
+> +		phy-mode = "mii";
+> +		interrupt-parent = <&gpx0>;
+> +		interrupts = <5 8>;
+> +		reg-io-width = <2>;
+> +		smsc,irq-push-pull;
+> +		smsc,force-internal-phy;
+> +	};
+> +
+>   };
+>
+>   &mmc_0 {
+> @@ -61,6 +72,27 @@
+>   	disable-wp;
+>   };
+>
+> +&pinctrl_0 {
+> +	srom_ctl: srom-ctl {
+> +		samsung,pins = "gpy0-3", "gpy0-4", "gpy0-5",
+> +			       "gpy1-0", "gpy1-1", "gpy1-2", "gpy1-3";
+> +		samsung,pin-function = <2>;
+> +		samsung,pin-drv = <0>;
+> +	};
+> +
+> +	srom_ebi: srom-ebi {
+> +		samsung,pins = "gpy3-0", "gpy3-1", "gpy3-2", "gpy3-3",
+> +			       "gpy3-4", "gpy3-5", "gpy3-6", "gpy3-7",
+> +			       "gpy5-0", "gpy5-1", "gpy5-2", "gpy5-3",
+> +			       "gpy5-4", "gpy5-5", "gpy5-6", "gpy5-7",
+> +			       "gpy6-0", "gpy6-1", "gpy6-2", "gpy6-3",
+> +			       "gpy6-4", "gpy6-5", "gpy6-6", "gpy6-7";
+> +		samsung,pin-function = <2>;
+> +		samsung,pin-pud = <3>;
+> +		samsung,pin-drv = <0>;
+> +	};
+> +};
+> +
+>   &uart0 {
+>   	status = "okay";
+>   };
+> @@ -72,3 +104,13 @@
+>   &uart2 {
+>   	status = "okay";
+>   };
+> +
+> +&sromc_0 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&srom_ctl>, <&srom_ebi>;
+> +	bank at 3 {
+> +		bank = <3>;
+> +		width = <2>;
+> +		srom-timing = <1 9 12 1 9 1 1>;
+> +	};
+> +};
+>
+
+Thanks,
+Pankaj Dubey
