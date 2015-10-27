@@ -1,101 +1,121 @@
 From: jenskuske@gmail.com (Jens Kuske)
-Date: Tue, 27 Oct 2015 17:50:24 +0100
-Subject: [PATCH v4 4/6] reset: sunxi: Add Allwinner H3 bus resets
+Date: Tue, 27 Oct 2015 17:50:26 +0100
+Subject: [PATCH v4 6/6] ARM: dts: sun8i: Add Orange Pi Plus support
 In-Reply-To: <1445964626-6484-1-git-send-email-jenskuske@gmail.com>
 References: <1445964626-6484-1-git-send-email-jenskuske@gmail.com>
-Message-ID: <1445964626-6484-5-git-send-email-jenskuske@gmail.com>
+Message-ID: <1445964626-6484-7-git-send-email-jenskuske@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The H3 bus resets have some holes between the registers, so we add
-an of_xlate() function to skip them according to the datasheet.
+The Orange Pi Plus is a SBC based on the Allwinner H3 SoC
+with 8GB eMMC, multiple USB ports through a USB hub chip, SATA through
+a USB-SATA bridge, one uSD slot, a 10/100/1000M ethernet port,
+WiFi, HDMI, headphone jack, IR receiver, a microphone, a CSI connector
+and a 40-pin GPIO header.
 
 Signed-off-by: Jens Kuske <jenskuske@gmail.com>
 ---
- .../bindings/reset/allwinner,sunxi-clock-reset.txt |  1 +
- drivers/reset/reset-sunxi.c                        | 30 +++++++++++++++++++---
- 2 files changed, 28 insertions(+), 3 deletions(-)
+ arch/arm/boot/dts/Makefile                   |  3 +-
+ arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts | 77 ++++++++++++++++++++++++++++
+ 2 files changed, 79 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts
 
-diff --git a/Documentation/devicetree/bindings/reset/allwinner,sunxi-clock-reset.txt b/Documentation/devicetree/bindings/reset/allwinner,sunxi-clock-reset.txt
-index c8f7757..e11f023 100644
---- a/Documentation/devicetree/bindings/reset/allwinner,sunxi-clock-reset.txt
-+++ b/Documentation/devicetree/bindings/reset/allwinner,sunxi-clock-reset.txt
-@@ -8,6 +8,7 @@ Required properties:
- - compatible: Should be one of the following:
-   "allwinner,sun6i-a31-ahb1-reset"
-   "allwinner,sun6i-a31-clock-reset"
-+  "allwinner,sun8i-h3-bus-reset"
- - reg: should be register base and length as documented in the
-   datasheet
- - #reset-cells: 1, see below
-diff --git a/drivers/reset/reset-sunxi.c b/drivers/reset/reset-sunxi.c
-index 3d95c87..c91e146 100644
---- a/drivers/reset/reset-sunxi.c
-+++ b/drivers/reset/reset-sunxi.c
-@@ -75,7 +75,9 @@ static struct reset_control_ops sunxi_reset_ops = {
- 	.deassert	= sunxi_reset_deassert,
- };
- 
--static int sunxi_reset_init(struct device_node *np)
-+static int sunxi_reset_init(struct device_node *np,
-+			    int (*of_xlate)(struct reset_controller_dev *rcdev,
-+				    const struct of_phandle_args *reset_spec))
- {
- 	struct sunxi_reset_data *data;
- 	struct resource res;
-@@ -108,6 +110,7 @@ static int sunxi_reset_init(struct device_node *np)
- 	data->rcdev.nr_resets = size * 32;
- 	data->rcdev.ops = &sunxi_reset_ops;
- 	data->rcdev.of_node = np;
-+	data->rcdev.of_xlate = of_xlate;
- 	reset_controller_register(&data->rcdev);
- 
- 	return 0;
-@@ -117,6 +120,21 @@ err_alloc:
- 	return ret;
- };
- 
-+static int sun8i_h3_bus_reset_xlate(struct reset_controller_dev *rcdev,
-+				    const struct of_phandle_args *reset_spec)
-+{
-+	unsigned int index = reset_spec->args[0];
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 78ade1a..476658d 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -645,7 +645,8 @@ dtb-$(CONFIG_MACH_SUN8I) += \
+ 	sun8i-a33-ga10h-v1.1.dtb \
+ 	sun8i-a33-ippo-q8h-v1.2.dtb \
+ 	sun8i-a33-q8-tablet.dtb \
+-	sun8i-a33-sinlinx-sina33.dtb
++	sun8i-a33-sinlinx-sina33.dtb \
++	sun8i-h3-orangepi-plus.dtb
+ dtb-$(CONFIG_MACH_SUN9I) += \
+ 	sun9i-a80-optimus.dtb \
+ 	sun9i-a80-cubieboard4.dtb
+diff --git a/arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts b/arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts
+new file mode 100644
+index 0000000..e67df59
+--- /dev/null
++++ b/arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts
+@@ -0,0 +1,77 @@
++/*
++ * Copyright (C) 2015 Jens Kuske <jenskuske@gmail.com>
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This file is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
 +
-+	if (index < 96)
-+		return index;
-+	else if (index < 128)
-+		return index + 32;
-+	else if (index < 160)
-+		return index + 64;
-+	else
-+		return -EINVAL;
-+}
++/dts-v1/;
++#include "sun8i-h3.dtsi"
++#include "sunxi-common-regulators.dtsi"
 +
- /*
-  * These are the reset controller we need to initialize early on in
-  * our system, before we can even think of using a regular device
-@@ -124,15 +142,21 @@ err_alloc:
-  */
- static const struct of_device_id sunxi_early_reset_dt_ids[] __initdata = {
- 	{ .compatible = "allwinner,sun6i-a31-ahb1-reset", },
-+	{ .compatible = "allwinner,sun8i-h3-bus-reset", .data = sun8i_h3_bus_reset_xlate, },
- 	{ /* sentinel */ },
- };
- 
- void __init sun6i_reset_init(void)
- {
- 	struct device_node *np;
-+	const struct of_device_id *match;
-+	int (*of_xlate)(struct reset_controller_dev *rcdev,
-+			const struct of_phandle_args *reset_spec);
- 
--	for_each_matching_node(np, sunxi_early_reset_dt_ids)
--		sunxi_reset_init(np);
-+	for_each_matching_node_and_match(np, sunxi_early_reset_dt_ids, &match) {
-+		of_xlate = match->data;
-+		sunxi_reset_init(np, of_xlate);
-+	}
- }
- 
- /*
++#include <dt-bindings/gpio/gpio.h>
++#include <dt-bindings/pinctrl/sun4i-a10.h>
++
++/ {
++	model = "Xunlong Orange Pi Plus";
++	compatible = "xunlong,orangepi-plus", "allwinner,sun8i-h3";
++
++	aliases {
++		serial0 = &uart0;
++	};
++
++	chosen {
++		stdout-path = "serial0:115200n8";
++	};
++};
++
++&mmc0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin>;
++	vmmc-supply = <&reg_vcc3v3>;
++	bus-width = <4>;
++	cd-gpios = <&pio 5 6 GPIO_ACTIVE_HIGH>; /* PF6 */
++	cd-inverted;
++	status = "okay";
++};
++
++&uart0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&uart0_pins_a>;
++	status = "okay";
++};
 -- 
 2.6.2
