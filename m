@@ -1,55 +1,73 @@
-From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Tue, 27 Oct 2015 11:52:27 +0100
-Subject: [PATCH] arm64: dts: mediatek: mt8173 PSCI-1.0 support
-In-Reply-To: <1440727919-34719-1-git-send-email-fan.chen@mediatek.com>
-References: <1440727919-34719-1-git-send-email-fan.chen@mediatek.com>
-Message-ID: <562F576B.2050108@gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 27 Oct 2015 10:56:33 +0000
+Subject: [PATCH] arm64: page-align sections for DEBUG_RODATA
+In-Reply-To: <CAKv+Gu-jCxeQt1DffTnYiMLT-jB75GiQCOUR7GqNH7hAeB84LA@mail.gmail.com>
+References: <1445895753-2095-1-git-send-email-mark.rutland@arm.com>
+ <CAKv+Gu-jCxeQt1DffTnYiMLT-jB75GiQCOUR7GqNH7hAeB84LA@mail.gmail.com>
+Message-ID: <20151027105632.GA3091@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Oct 27, 2015 at 11:37:04AM +0900, Ard Biesheuvel wrote:
+> On 27 October 2015 at 06:42, Mark Rutland <mark.rutland@arm.com> wrote:
+> > A kernel built with DEBUG_RO_DATA && !CONFIG_DEBUG_ALIGN_RODATA doesn't
+> > have .text aligned to a page boundary, though fixup_executable works at
+> > page-granularity thanks to its use of create_mapping. If .text is not
+> > page-aligned, the first page it exists in may be marked non-executable,
+> > leading to failures when an attempt is made to execute code in said
+> > page.
+> >
+> > This patch upgrades ALIGN_DEBUG_RO and ALIGN_DEBUG_RO_MIN to force page
+> > alignment for DEBUG_RO_DATA && !CONFIG_DEBUG_ALIGN_RODATA kernels,
+> > ensuring that all sections with specific RWX permission requirements are
+> > mapped with the correct permissions.
+> >
+> > Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> > Reported-by: Jeremy Linton <jeremy.linton@arm.com>
+> > Reviewed-by: Laura Abbott <laura@labbott.name>
+> > Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> > Cc: Catalin Marinas <catalin.marinas@arm.com>
+> > Cc: Suzuki Poulose <suzuki.poulose@arm.com>
+> > Cc: Will Deacon <will.deacon@arm.com>
+> > ---
+> >  arch/arm64/kernel/vmlinux.lds.S | 5 ++++-
+> >  1 file changed, 4 insertions(+), 1 deletion(-)
+> >
+> > Note: this is intended to supercede [1,2].
+> >
+> > [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-October/380486.html
+> > [2] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-October/380999.html
+> >
+> > diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
+> > index 9807333..4d77757 100644
+> > --- a/arch/arm64/kernel/vmlinux.lds.S
+> > +++ b/arch/arm64/kernel/vmlinux.lds.S
+> > @@ -60,9 +60,12 @@ PECOFF_FILE_ALIGNMENT = 0x200;
+> >  #define PECOFF_EDATA_PADDING
+> >  #endif
+> >
+> > -#ifdef CONFIG_DEBUG_ALIGN_RODATA
+> > +#if defined(CONFIG_DEBUG_ALIGN_RODATA)
+> >  #define ALIGN_DEBUG_RO                 . = ALIGN(1<<SECTION_SHIFT);
+> >  #define ALIGN_DEBUG_RO_MIN(min)                ALIGN_DEBUG_RO
+> > +#elif defined(CONFIG_DEBUG_RODATA)
+> > +#define ALIGN_DEBUG_RO                 . = ALIGN(1<<PAGE_SHIFT);
+> > +#define ALIGN_DEBUG_RO_MIN(min)                ALIGN_DEBUG_RO
+> >  #else
+> >  #define ALIGN_DEBUG_RO
+> >  #define ALIGN_DEBUG_RO_MIN(min)                . = ALIGN(min);
+> 
+> Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
+Cheers, Ard.
 
-On 28/08/15 04:11, fan.chen at mediatek.com wrote:
-> From: Fan Chen <fan.chen@mediatek.com>
->
-> This patch adds psci comatible properties to support all mandatory
-> functions of PSCI-1.0, PSCI-0.2 and PSCI-0.1, and system suspend
-> can be supported in PSCI-1.0.
->
-> Signed-off-by: Fan Chen <fan.chen@mediatek.com>
-> ---
+Jeremy, does this work for you?
 
-Applied to v4.4-next/arm64
+If so, I expect Catalin will take this for 4.4, with the addition of any
+Acks and:
+
+Fixes: da141706aea52c1a ("arm64: add better page protections to arm64")
+Cc: <stable@vger.kernel.org>
 
 Thanks,
-Matthias
-
-> Because PSCI-1.0 patches hadn't landed on mainline, this patch is
-> based on three patch sets below:
-> [0] http://www.spinics.net/lists/arm-kernel/msg425793.html
->      PSCI: system suspend support
-> [1] git://git.kernel.org/pub/scm/linux/kernel/git/mark/linux.git
->      psci/unification
-> [2] http://www.spinics.net/lists/devicetree/msg82017.html
->      [PATCH 0/6] drivers: firmware: psci: add basic v1.0 support
->
-> Before they are merged in, this patch still works fine with psci-0.2
-> support in current mainline.
-> ---
->   arch/arm64/boot/dts/mediatek/mt8173.dtsi |    2 +-
->   1 file changed, 1 insertion(+), 1 deletion(-)
->
-> diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-> index d18ee42..b9b4205 100644
-> --- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-> +++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-> @@ -95,7 +95,7 @@
->   	};
->
->   	psci {
-> -		compatible = "arm,psci";
-> +		compatible = "arm,psci-1.0", "arm,psci-0.2", "arm,psci";
->   		method = "smc";
->   		cpu_suspend   = <0x84000001>;
->   		cpu_off	      = <0x84000002>;
->
+Mark.
