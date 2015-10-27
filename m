@@ -1,50 +1,35 @@
-From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
-Date: Tue, 27 Oct 2015 21:31:52 +0100
-Subject: [PATCH v2 8/9] ARM: dts: Add leds support to STM32F429 Discovery
- board
-In-Reply-To: <CACRpkdYjq9XqKM4imYsaa_HBopS7uFnbb6gf=hRZHGC4baafAg@mail.gmail.com>
-References: <1445102604-11502-1-git-send-email-mcoquelin.stm32@gmail.com>
- <1445102604-11502-9-git-send-email-mcoquelin.stm32@gmail.com>
- <CACRpkdYjq9XqKM4imYsaa_HBopS7uFnbb6gf=hRZHGC4baafAg@mail.gmail.com>
-Message-ID: <CALszF6Bo3x4jWnvDc=28s=517YJrv2=3BuuYmxjqP4ciF17fcQ@mail.gmail.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Wed, 28 Oct 2015 04:33:23 +0800
+Subject: [PATCH v1 3/3] ARM64: dts: rk3368: Add mailbox device nodes
+In-Reply-To: <1445931106-683-4-git-send-email-wxt@rock-chips.com>
+Message-ID: <201510280433.KeMm1w9H%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-10-26 14:41 GMT+01:00 Linus Walleij <linus.walleij@linaro.org>:
-> On Sat, Oct 17, 2015 at 7:23 PM, Maxime Coquelin
-> <mcoquelin.stm32@gmail.com> wrote:
->
->> Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
-> (...)
->> +       leds {
->> +               compatible = "gpio-leds";
->> +               red {
->> +                       gpios = <&gpiog 14 0>;
->> +               };
->> +               green {
->> +                       gpios = <&gpiog 13 0>;
->> +               };
->
-> I suggest you add labels to these LEDs.
->
-> label = "red-LED"
-> label = "green-LED"
->
-> This make things so much easier in sysfs.
+Hi Caesar,
 
-I'm not sure to understand where it makes things easier in sysfs.
-This is the sysfs path for the red led:
-/sys/class/leds/red/
+[auto build test ERROR on rockchip/for-next -- if it's inappropriate base, please suggest rules for selecting the more suitable base]
 
-Indeed, if label is not present, it gets the node name.
+url:    https://github.com/0day-ci/linux/commits/Caesar-Wang/mailbox-rockchip-Add-mailbox-driver-for-Rockchip-platform/20151027-153608
+config: arm64-allyesconfig (attached as .config)
+reproduce:
+        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm64 
 
->
-> Usually people also want to add a default linux,trigger to these,
-> like linux,default-trigger = "heartbeat"; but whatever you prefer.
+All errors (new ones prefixed by >>):
 
-Makes sense, I will add default trigger in next version.
+>> Error: arch/arm64/boot/dts/rockchip/rk3368.dtsi:490.3-4 syntax error
+   FATAL ERROR: Unable to parse input tree
 
-> Acked-by: Linus Walleij <linus.walleij@linaro.org>
-
-Thanks!
-Maxime
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 45779 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151028/fbf01d30/attachment-0001.obj>
