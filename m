@@ -1,50 +1,62 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Wed, 28 Oct 2015 00:53:28 +0800
-Subject: [PATCH v2 3/3] mfd: lm3533: Support initialization from Device
- Tree
-In-Reply-To: <1445963373-27790-3-git-send-email-bjorn.andersson@sonymobile.com>
-Message-ID: <201510280023.PwmPMF0y%fengguang.wu@intel.com>
+From: lee@kernel.org (Lee Jones)
+Date: Tue, 27 Oct 2015 17:00:03 +0000
+Subject: [PATCH soc/next] ARM: bcm2835: add mutual inclusion protection
+In-Reply-To: <1445539565-24955-1-git-send-email-alex.aring@gmail.com>
+References: <1445539565-24955-1-git-send-email-alex.aring@gmail.com>
+Message-ID: <20151027170003.GB5828@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bjorn,
+On Thu, 22 Oct 2015, Alexander Aring wrote:
 
-[auto build test ERROR on ljones-mfd/for-mfd-next -- if it's inappropriate base, please suggest rules for selecting the more suitable base]
+> This patch adds mutual inclusion protection for the rpi firmware header.
+> 
+> Cc: Eric Anholt <eric@anholt.net>
+> Cc: Stephen Warren <swarren@wwwdotorg.org>
 
-url:    https://github.com/0day-ci/linux/commits/Bjorn-Andersson/devicetree-mfd-Add-binding-for-the-TI-LM3533/20151028-003248
-config: x86_64-randconfig-x019-201543 (attached as .config)
-reproduce:
-        # save the attached .config to linux build tree
-        make ARCH=x86_64 
+Looks like these didn't work.  You might want to look into that.
 
-All errors (new ones prefixed by >>):
+You either have --no-signed-off-by-cc set, or you're not using `git
+send-email`.
 
-   drivers/mfd/lm3533-core.c: In function 'lm3533_pdata_from_of_node':
->> drivers/mfd/lm3533-core.c:830:8: error: implicit declaration of function 'of_node_cmp' [-Werror=implicit-function-declaration]
-      if (!of_node_cmp(node->name, "als"))
-           ^
-   cc1: some warnings being treated as errors
+>From the man page:
 
-vim +/of_node_cmp +830 drivers/mfd/lm3533-core.c
+--[no-]signed-off-by-cc
+    If this is set, add emails found in Signed-off-by: or Cc: lines to
+    the cc list. Default is the value of sendemail.signedoffbycc
+    configuration value; if that is unspecified, default to
+    --signed-off-by-cc.
 
-   824			dev_err(dev, "failed to parse ti,boost-ovp\n");
-   825			return ret;
-   826		}
-   827		pdata->boost_ovp = ret;
-   828	
-   829		for_each_child_of_node(dev->of_node, node) {
- > 830			if (!of_node_cmp(node->name, "als"))
-   831				ret = lm3533_of_parse_als_node(dev, node, pdata);
-   832			else if (!of_node_cmp(node->name, "backlight"))
-   833				ret = lm3533_of_parse_bl_node(dev, node, pdata);
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 25708 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151028/30190180/attachment-0001.obj>
+> Signed-off-by: Alexander Aring <alex.aring@gmail.com>
+> ---
+> This patch is for "soc/next" and depends on Eric Anholt's patch ("ARM: bcm2835:
+> Add the Raspberry Pi firmware driver"), see:
+> 
+> http://lists.infradead.org/pipermail/linux-rpi-kernel/2015-October/002434.html
+> 
+> I think the patch is already applied but not pushed, so please fixup use this
+> as fixup or simple apply this patch after the patch to add the firmware driver.
+> 
+>  include/soc/bcm2835/raspberrypi-firmware.h | 5 +++++
+>  1 file changed, 5 insertions(+)
+> 
+> diff --git a/include/soc/bcm2835/raspberrypi-firmware.h b/include/soc/bcm2835/raspberrypi-firmware.h
+> index 9d9efb7..c07d74a 100644
+> --- a/include/soc/bcm2835/raspberrypi-firmware.h
+> +++ b/include/soc/bcm2835/raspberrypi-firmware.h
+> @@ -6,6 +6,9 @@
+>   * published by the Free Software Foundation.
+>   */
+>  
+> +#ifndef __SOC_RASPBERRY_FIRMWARE_H__
+> +#define __SOC_RASPBERRY_FIRMWARE_H__
+> +
+>  #include <linux/types.h>
+>  #include <linux/of_device.h>
+>  
+> @@ -113,3 +116,5 @@ int rpi_firmware_property(struct rpi_firmware *fw,
+>  int rpi_firmware_property_list(struct rpi_firmware *fw,
+>  			       void *data, size_t tag_size);
+>  struct rpi_firmware *rpi_firmware_get(struct device_node *firmware_node);
+> +
+> +#endif /* __SOC_RASPBERRY_FIRMWARE_H__ */
