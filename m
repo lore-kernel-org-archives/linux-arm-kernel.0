@@ -1,113 +1,81 @@
-From: dinguyen@opensource.altera.com (dinguyen at opensource.altera.com)
-Date: Tue, 27 Oct 2015 15:58:03 -0500
-Subject: [PATCHv7 1/3] ARM: dts: Add Altera L2 Cache and OCRAM EDAC entries
-Message-ID: <1445979483-8035-1-git-send-email-dinguyen@opensource.altera.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Tue, 27 Oct 2015 22:04:50 +0100
+Subject: [PATCH v7 06/17] Documentation: drm/bridge: add document for
+ analogix_dp
+In-Reply-To: <1445655964-15237-1-git-send-email-ykk@rock-chips.com>
+References: <1445599415-30856-1-git-send-email-ykk@rock-chips.com>
+ <1445655964-15237-1-git-send-email-ykk@rock-chips.com>
+Message-ID: <4132920.kfrKzY5nYN@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Thor Thayer <tthayer@opensource.altera.com>
+Hi Yakir,
 
-Adding the device tree entries and bindings needed to support
-the Altera L2 cache and On-Chip RAM EDAC. This patch relies upon
-an earlier patch to declare and setup On-chip RAM properly.
-http://www.spinics.net/lists/devicetree/msg51117.html
+Am Samstag, 24. Oktober 2015, 11:06:00 schrieb Yakir Yang:
+> Analogix dp driver is split from exynos dp driver, so we just
+> make an copy of exynos_dp.txt, and then simplify exynos_dp.txt
+> 
+> Beside update some exynos dtsi file with the latest change
+> according to the devicetree binding documents.
+> 
+> Tested-by: Javier Martinez Canillas <javier@osg.samsung.com>
+> Signed-off-by: Yakir Yang <ykk@rock-chips.com>
+> ---
+> diff --git a/Documentation/devicetree/bindings/display/exynos/exynos_dp.txt b/Documentation/devicetree/bindings/display/exynos/exynos_dp.txt
+> index 7a3a9cd..9e47357 100644
+> --- a/Documentation/devicetree/bindings/display/exynos/exynos_dp.txt
+> +++ b/Documentation/devicetree/bindings/display/exynos/exynos_dp.txt
+> @@ -31,45 +31,31 @@ Required properties for dp-controller:
+>  		from general PHY binding: the phandle for the PHY device.
+>  	-phy-names:
+>  		from general PHY binding: Should be "dp".
+> -	-samsung,color-space:
+> -		input video data format.
+> -			COLOR_RGB = 0, COLOR_YCBCR422 = 1, COLOR_YCBCR444 = 2
+> -	-samsung,dynamic-range:
+> -		dynamic range for input video data.
+> -			VESA = 0, CEA = 1
+> -	-samsung,ycbcr-coeff:
+> -		YCbCr co-efficients for input video.
+> -			COLOR_YCBCR601 = 0, COLOR_YCBCR709 = 1
+> -	-samsung,color-depth:
+> -		number of bits per colour component.
+> -			COLOR_6 = 0, COLOR_8 = 1, COLOR_10 = 2, COLOR_12 = 3
+> -	-samsung,link-rate:
+> -		link rate supported by the panel.
+> -			LINK_RATE_1_62GBPS = 0x6, LINK_RATE_2_70GBPS = 0x0A
+> -	-samsung,lane-count:
+> -		number of lanes supported by the panel.
+> -			LANE_COUNT1 = 1, LANE_COUNT2 = 2, LANE_COUNT4 = 4
+> +
+> +Optional properties for dp-controller:
+>  	- display-timings: timings for the connected panel as described by
+>  		Documentation/devicetree/bindings/video/display-timing.txt
+											^^
 
-Signed-off-by: Thor Thayer <tthayer@opensource.altera.com>
-Signed-off-by: Dinh Nguyen <dinguyen@opensource.altera.com>
----
-v7: No Change
-v6: Change to nested EDAC device nodes based on community
-    feedback. Remove L2 syscon. Use consolidated binding.
-v3-5: No Change
-v2: Remove OCRAM declaration and reference prior patch.
----
- .../bindings/arm/altera/socfpga-edac.txt           | 46 ++++++++++++++++++++++
- arch/arm/boot/dts/socfpga.dtsi                     | 20 ++++++++++
- 2 files changed, 66 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/arm/altera/socfpga-edac.txt
+bindings/display/display-timing.txt ... that actually made the patch not apply cleanly
 
-diff --git a/Documentation/devicetree/bindings/arm/altera/socfpga-edac.txt b/Documentation/devicetree/bindings/arm/altera/socfpga-edac.txt
-new file mode 100644
-index 0000000..4bf32e1
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/altera/socfpga-edac.txt
-@@ -0,0 +1,46 @@
-+Altera SoCFPGA Error Detection and Correction [EDAC]
-+
-+Required Properties:
-+- compatible : Should be "altr,edac"
-+- #address-cells: must be 1
-+- #size-cells: must be 1
-+- ranges : standard definition, should translate from local addresses
-+
-+Subcomponents:
-+
-+L2 Cache ECC
-+Required Properties:
-+- compatible : Should be "altr,l2-edac"
-+- reg : Address and size for ECC error interrupt clear registers.
-+- interrupts : Should be single bit error interrupt, then double bit error
-+	interrupt. Note the rising edge type.
-+
-+On Chip RAM ECC
-+Required Properties:
-+- compatible : Should be "altr,ocram-edac"
-+- reg : Address and size for ECC error interrupt clear registers.
-+- iram : phandle to On-Chip RAM definition.
-+- interrupts : Should be single bit error interrupt, then double bit error
-+	interrupt. Note the rising edge type.
-+
-+Example:
-+
-+	soc_ecc {
-+		compatible = "altr,edac";
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges;
-+
-+		l2edac at ffd08140 {
-+			compatible = "altr,l2-edac";
-+			reg = <0xffd08140 0x4>;
-+			interrupts = <0 36 1>, <0 37 1>;
-+		};
-+
-+		ocramedac at ffd08144 {
-+			compatible = "altr,ocram-edac";
-+			reg = <0xffd08144 0x4>;
-+			iram = <&ocram>;
-+			interrupts = <0 178 1>, <0 179 1>;
-+		};
-+	};
-diff --git a/arch/arm/boot/dts/socfpga.dtsi b/arch/arm/boot/dts/socfpga.dtsi
-index 314e589..7cfec22 100644
---- a/arch/arm/boot/dts/socfpga.dtsi
-+++ b/arch/arm/boot/dts/socfpga.dtsi
-@@ -660,6 +660,26 @@
- 			interrupts = <0 39 4>;
- 		};
- 
-+		soc_ecc {
-+			compatible = "altr,edac";
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			ranges;
-+
-+			l2edac at ffd08140 {
-+				compatible = "altr,l2-edac";
-+				reg = <0xffd08140 0x4>;
-+				interrupts = <0 36 1>, <0 37 1>;
-+			};
-+
-+			ocramedac at ffd08144 {
-+				compatible = "altr,ocram-edac";
-+				reg = <0xffd08144 0x4>;
-+				iram = <&ocram>;
-+				interrupts = <0 178 1>, <0 179 1>;
-+			};
-+		};
-+
- 		L2: l2-cache at fffef000 {
- 			compatible = "arm,pl310-cache";
- 			reg = <0xfffef000 0x1000>;
--- 
-2.4.5
+
+[...]
+
+> -[1]: Documentation/devicetree/bindings/media/video-interfaces.txt
+> +Deprecated properties for DisplayPort:
+> +-interlaced:            deprecated prop that can parsed frm drm_display_mode.
+> +-vsync-active-high:     deprecated prop that can parsed frm drm_display_mode.
+> +-hsync-active-high:     deprecated prop that can parsed frm drm_display_mode.
+> +-samsung,ycbcr-coeff:   deprecated prop that can parsed frm drm_display_mode.
+> +-samsung,dynamic-range: deprecated prop that can parsed frm drm_display_mode.
+
+the "frm" above need some more "o"s to be "from"s :-)
+
+> +-samsung,color-space:   deprecated prop that can parsed from drm_display_info.
+> +-samsung,color-depth:   deprecated prop that can parsed from drm_display_info.
+> +-samsung,link-rate:     deprecated prop that can reading from monitor by dpcd method.
+> +-samsung,lane-count:    deprecated prop that can reading from monitor by dpcd method.
+> +-samsung,hpd-gpio:      deprecated name for hpd-gpios.
+> +
+> +-------------------------------------------------------------------------------
+
+
+Cheers,
+Heiko
