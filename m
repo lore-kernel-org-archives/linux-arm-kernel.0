@@ -1,136 +1,92 @@
 From: liguo.zhang@mediatek.com (Liguo Zhang)
-Date: Tue, 27 Oct 2015 16:59:26 +0800
-Subject: [PATCH 1/2] i2c: mediatek: add i2c first write then read optimization
+Date: Tue, 27 Oct 2015 16:59:27 +0800
+Subject: [PATCH 2/2] i2c: mediatek: fix i2c multi transfer issue in high speed
+ mode
 In-Reply-To: <1445936367-30141-1-git-send-email-liguo.zhang@mediatek.com>
 References: <1445936367-30141-1-git-send-email-liguo.zhang@mediatek.com>
-Message-ID: <1445936367-30141-2-git-send-email-liguo.zhang@mediatek.com>
+Message-ID: <1445936367-30141-3-git-send-email-liguo.zhang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For platform with auto restart support, between every transfer,
-i2c controller will trigger an interrupt and SW need to handle
-it to start new transfer. When doing write-then-read transfer,
-instead of restart mechanism, using WRRD mode to have controller
-send both transfer in one request to reduce latency.
+For platform with auto restart support, when doing i2c multi transfer
+in high speed, for example, doing write-then-read transfer, the master
+code will occupy the first transfer, and the second transfer will be
+the read transfer, the write transfer will be discarded. So we should
+first send the master code, and then start i2c multi transfer.
 
 Signed-off-by: Liguo Zhang <liguo.zhang@mediatek.com>
 ---
- drivers/i2c/busses/i2c-mt65xx.c | 33 +++++++++++++++++++++++++++------
- 1 file changed, 27 insertions(+), 6 deletions(-)
+ drivers/i2c/busses/i2c-mt65xx.c | 44 +++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 44 insertions(+)
 
 diff --git a/drivers/i2c/busses/i2c-mt65xx.c b/drivers/i2c/busses/i2c-mt65xx.c
-index 9b86716..dc4aac6 100644
+index dc4aac6..0b9e9f5 100644
 --- a/drivers/i2c/busses/i2c-mt65xx.c
 +++ b/drivers/i2c/busses/i2c-mt65xx.c
-@@ -132,6 +132,7 @@ struct mtk_i2c_compatible {
- 	unsigned char pmic_i2c: 1;
- 	unsigned char dcm: 1;
- 	unsigned char auto_restart: 1;
-+	unsigned char aux_len_reg: 1;
- };
+@@ -53,6 +53,8 @@
+ #define I2C_FS_TIME_INIT_VALUE		0x1303
+ #define I2C_WRRD_TRANAC_VALUE		0x0002
+ #define I2C_RD_TRANAC_VALUE		0x0001
++#define I2C_TRAN_DEFAULT_VALUE		0x0001
++#define I2C_TRANAC_DEFAULT_VALUE	0x0001
  
- struct mtk_i2c {
-@@ -153,6 +154,7 @@ struct mtk_i2c {
- 	enum mtk_trans_op op;
- 	u16 timing_reg;
- 	u16 high_speed_reg;
-+	unsigned char auto_restart;
- 	const struct mtk_i2c_compatible *dev_comp;
- };
+ #define I2C_DMA_CON_TX			0x0000
+ #define I2C_DMA_CON_RX			0x0001
+@@ -365,6 +367,42 @@ static int mtk_i2c_set_speed(struct mtk_i2c *i2c, unsigned int parent_clk,
+ 	return 0;
+ }
  
-@@ -178,6 +180,7 @@ static const struct mtk_i2c_compatible mt6577_compat = {
- 	.pmic_i2c = 0,
- 	.dcm = 1,
- 	.auto_restart = 0,
-+	.aux_len_reg = 0,
- };
- 
- static const struct mtk_i2c_compatible mt6589_compat = {
-@@ -185,6 +188,7 @@ static const struct mtk_i2c_compatible mt6589_compat = {
- 	.pmic_i2c = 1,
- 	.dcm = 0,
- 	.auto_restart = 0,
-+	.aux_len_reg = 0,
- };
- 
- static const struct mtk_i2c_compatible mt8173_compat = {
-@@ -192,6 +196,7 @@ static const struct mtk_i2c_compatible mt8173_compat = {
- 	.pmic_i2c = 0,
- 	.dcm = 1,
- 	.auto_restart = 1,
-+	.aux_len_reg = 1,
- };
- 
- static const struct of_device_id mtk_i2c_of_match[] = {
-@@ -373,7 +378,7 @@ static int mtk_i2c_do_transfer(struct mtk_i2c *i2c, struct i2c_msg *msgs,
- 
- 	i2c->irq_stat = 0;
- 
--	if (i2c->dev_comp->auto_restart)
-+	if (i2c->auto_restart)
- 		restart_flag = I2C_RS_TRANSFER;
- 
- 	reinit_completion(&i2c->msg_complete);
-@@ -411,8 +416,14 @@ static int mtk_i2c_do_transfer(struct mtk_i2c *i2c, struct i2c_msg *msgs,
- 
- 	/* Set transfer and transaction len */
- 	if (i2c->op == I2C_MASTER_WRRD) {
--		writew(msgs->len | ((msgs + 1)->len) << 8,
--		       i2c->base + OFFSET_TRANSFER_LEN);
-+		if (i2c->dev_comp->aux_len_reg) {
-+			writew(msgs->len, i2c->base + OFFSET_TRANSFER_LEN);
-+			writew((msgs + 1)->len, i2c->base +
-+			       OFFSET_TRANSFER_LEN_AUX);
-+		} else {
-+			writew(msgs->len | ((msgs + 1)->len) << 8,
-+			       i2c->base + OFFSET_TRANSFER_LEN);
-+		}
- 		writew(I2C_WRRD_TRANAC_VALUE, i2c->base + OFFSET_TRANSAC_LEN);
- 	} else {
- 		writew(msgs->len, i2c->base + OFFSET_TRANSFER_LEN);
-@@ -461,7 +472,7 @@ static int mtk_i2c_do_transfer(struct mtk_i2c *i2c, struct i2c_msg *msgs,
- 
- 	writel(I2C_DMA_START_EN, i2c->pdmabase + OFFSET_EN);
- 
--	if (!i2c->dev_comp->auto_restart) {
-+	if (!i2c->auto_restart) {
- 		start_reg = I2C_TRANSAC_START;
- 	} else {
- 		start_reg = I2C_TRANSAC_START | I2C_RS_MUL_TRIG;
-@@ -518,6 +529,16 @@ static int mtk_i2c_transfer(struct i2c_adapter *adap,
- 	if (ret)
- 		return ret;
- 
-+	i2c->auto_restart = i2c->dev_comp->auto_restart;
++static int mtk_i2c_send_master_code(struct mtk_i2c *i2c)
++{
++	int ret = 0;
 +
-+	/* checking if we can skip restart and optimize using WRRD mode */
-+	if (i2c->auto_restart && num == 2) {
-+		if (!(msgs[0].flags & I2C_M_RD) && (msgs[1].flags & I2C_M_RD) &&
-+		    msgs[0].addr == msgs[1].addr) {
-+			i2c->auto_restart = 0;
-+		}
++	reinit_completion(&i2c->msg_complete);
++
++	writew(I2C_CONTROL_RS | I2C_CONTROL_ACKERR_DET_EN |
++	       I2C_CONTROL_CLK_EXT_EN | I2C_CONTROL_DMA_EN,
++	       i2c->base + OFFSET_CONTROL);
++
++	/* Clear interrupt status */
++	writew(I2C_RS_TRANSFER | I2C_TRANSAC_COMP | I2C_HS_NACKERR | I2C_ACKERR,
++	       i2c->base + OFFSET_INTR_STAT);
++
++	/* Enable interrupt */
++	writew(I2C_RS_TRANSFER | I2C_TRANSAC_COMP, i2c->base + OFFSET_INTR_MASK);
++
++	writew(I2C_TRAN_DEFAULT_VALUE, i2c->base + OFFSET_TRANSFER_LEN);
++	writew(I2C_TRANAC_DEFAULT_VALUE, i2c->base + OFFSET_TRANSAC_LEN);
++
++	writew(I2C_TRANSAC_START | I2C_RS_MUL_CNFG, i2c->base + OFFSET_START);
++
++	ret = wait_for_completion_timeout(&i2c->msg_complete,
++					  i2c->adap.timeout);
++
++	completion_done(&i2c->msg_complete);
++
++	if (ret == 0) {
++		dev_dbg(i2c->dev, "send master code timeout.\n");
++		mtk_i2c_init_hw(i2c);
++		return -ETIMEDOUT;
++	}
++
++	return 0;
++}
++
+ static int mtk_i2c_do_transfer(struct mtk_i2c *i2c, struct i2c_msg *msgs,
+ 			       int num, int left_num)
+ {
+@@ -539,6 +577,12 @@ static int mtk_i2c_transfer(struct i2c_adapter *adap,
+ 		}
+ 	}
+ 
++	if (i2c->auto_restart && i2c->speed_hz > 400000) {
++		ret = mtk_i2c_send_master_code(i2c);
++		if (ret)
++			return ret;
 +	}
 +
  	while (left_num--) {
  		if (!msgs->buf) {
  			dev_dbg(i2c->dev, "data buffer is NULL.\n");
-@@ -530,7 +551,7 @@ static int mtk_i2c_transfer(struct i2c_adapter *adap,
- 		else
- 			i2c->op = I2C_MASTER_WR;
- 
--		if (!i2c->dev_comp->auto_restart) {
-+		if (!i2c->auto_restart) {
- 			if (num > 1) {
- 				/* combined two messages into one transaction */
- 				i2c->op = I2C_MASTER_WRRD;
-@@ -559,7 +580,7 @@ static irqreturn_t mtk_i2c_irq(int irqno, void *dev_id)
- 	u16 restart_flag = 0;
- 	u16 intr_stat;
- 
--	if (i2c->dev_comp->auto_restart)
-+	if (i2c->auto_restart)
- 		restart_flag = I2C_RS_TRANSFER;
- 
- 	intr_stat = readw(i2c->base + OFFSET_INTR_STAT);
 -- 
 1.8.1.1.dirty
