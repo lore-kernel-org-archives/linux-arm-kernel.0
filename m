@@ -1,151 +1,93 @@
-From: ezequiel@vanguardiasur.com.ar (Ezequiel Garcia)
-Date: Tue, 27 Oct 2015 17:57:46 -0300
-Subject: v7-M: Fixing XIP when the kernel is in ROM
-In-Reply-To: <20151027202124.GK4931@pengutronix.de>
-References: <20151026012710.GA17365@laptop>
- <20151027202124.GK4931@pengutronix.de>
-Message-ID: <CAAEAJfBOcxwq=L2aq5=KYedN=gs=gM6rupUWS9bPceEDCZniSg@mail.gmail.com>
+From: ats@offog.org (Adam Sampson)
+Date: Tue, 27 Oct 2015 21:00:45 +0000
+Subject: [PATCH v2] ASoC: sun4i-codec: use consistent names for PA controls
+Message-ID: <1445979645-1664-1-git-send-email-ats@offog.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27 October 2015 at 17:21, Uwe Kleine-K?nig
-<u.kleine-koenig@pengutronix.de> wrote:
-> Hello Ezequiel,
->
-> On Sun, Oct 25, 2015 at 10:27:10PM -0300, Ezequiel Garcia wrote:
->> I've been trying to make my ARM v7-M LPC43xx board
->> boot a XIP kernel from flash. Currently, this seems
->> to be broken in mainline due to this:
->>
->> arch/arm/mm/proc-v7m.S
->> [..]
->>         @ SVC to run the kernel in this mode
->>         badr    r1, 1f
->>         ldr     r5, [r12, #11 * 4]      @ read the SVC vector entry
->>         str     r1, [r12, #11 * 4]      @ write the temporary SVC vector entry
->>         mov     r6, lr                  @ save LR
->>         mov     r7, sp                  @ save SP
->>       ldr     sp, =__v7m_setup_stack_top @ <<< Breaks XIP!
->
-> How does this fail for you?
->
+The power amplifier for the headphone output is called "the PA" and "the
+headphone amplifier" in Allwinner's documentation for the A10 and A20.
+sun4i-codec calls it "PA" in some places and "Pre-Amplifier" (which
+isn't really accurate) in others, leading to user-visible controls with
+different names referring to the same device.
 
-My CPU just seems to stall.
-I've added calls to the printch in arch/arm/kernel/debug.S
-and can't get past the SVC call.
+When this driver implements audio input, it'll also need to expose
+controls for the line and mic input preamps, so just referring to "the
+Pre-Amplifier" will be ambiguous.
 
-As Stefan suggested, maybe a fault handler is called,
-but I'm not getting any fault message printed.
+Change it to use "Power Amplifier" consistently for the power
+amplifier's controls.
 
->>         cpsie   i
->>         svc     #0
->> 1:      cpsid   i
->>         str     r5, [r12, #11 * 4]      @ restore the original SVC vector entry
->>         mov     lr, r6                  @ restore LR
->>         mov     sp, r7                  @ restore SP
->>
->> Here, a temporary stack is prepared before making a
->> supervisor call (SVC) to switch to handler mode.
->
-> OK, the effect of svc is that something is written to where sp points
-> to. On my efm32 nothing obvious happens when something random is written
-> there. I guess if that results in some CFI commands I have a problem
-> though. What about your machine?
->
+Signed-off-by: Adam Sampson <ats@offog.org>
+---
+Changes in v2:
+- use "Power Amplifier" rather than "PA"
+---
+ sound/soc/sunxi/sun4i-codec.c | 27 ++++++++++++++-------------
+ 1 file changed, 14 insertions(+), 13 deletions(-)
 
-Good, I was under the same impression. My only explanation for the fact
-that Maxime and you seem to have no problem was that a store
-to the internal flash doesn't stall the MCU.
-
-On my side, I have U-Boot and the DTB on the internal flash,
-and the kernel is on SPIFI, which can be configured to allow
-code execution.
-
-Haven't checked what the effect is if you try to write there.
-In any case, it seems wrong to have the stack point to flash.
-
->> The temporary stack is allocated in the .text.init section
->> and so this doesn't work when the kernel is executing from ROM.
->>
->> A similar problem has been reported for v7:
->>
->> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-July/357106.html
->>
->> While trying to come up with a proper fix, I've noticed how
->> the stack doesn't seem to be used.
->>
->> So, I've been trying to understand why the need for the temporary
->> stack at all, but I still can't get it.
->>
->> The below patch seems to work just fine, and allows to boot a
->> LPC43xx kernel either as XIP from ROM or non-XIP from RAM.
->>
->> However, I'm still wondering if the stack is really unused or not,
->> so any lights that can be shed here will be appreciated.
->>
->> Thanks!
->>
->> From a7c880c73b8ad2e4c4b07f4d11809ea541a65e1d Mon Sep 17 00:00:00 2001
->> From: Ezequiel Garcia <ezequiel@vanguardiasur.com.ar>
->> Date: Sat, 24 Oct 2015 13:27:27 -0300
->> Subject: [PATCH] ARM: Don't prepare any temporary stack in __v7m_setup
->>
->> Since __v7m_setup() is implemented as the PROCINFO_INITFUNC
->> called in head-nommu.S it's called at the very beggining to
->> do some very basic setup.
->>
->> The function prepares a temporary stack in the .text.init
->> section before calling SVC. However, this stack seems to
->> be completely unused and hence is not needed.
->>
->> Moreover, this breaks on XIP kernels, when the text is in ROM.
->> Hence, this commit simply removes the temporary stack setup.
->>
->> Signed-off-by: Ezequiel Garcia <ezequiel@vanguardiasur.com.ar>
->> ---
->>  arch/arm/mm/proc-v7m.S | 6 ------
->>  1 file changed, 6 deletions(-)
->>
->> diff --git a/arch/arm/mm/proc-v7m.S b/arch/arm/mm/proc-v7m.S
->> index 67d9209077c6..6a383e619a0c 100644
->> --- a/arch/arm/mm/proc-v7m.S
->> +++ b/arch/arm/mm/proc-v7m.S
->> @@ -103,7 +103,6 @@ __v7m_setup:
->>       str     r1, [r12, #11 * 4]      @ write the temporary SVC vector entry
->>       mov     r6, lr                  @ save LR
->>       mov     r7, sp                  @ save SP
->> -     ldr     sp, =__v7m_setup_stack_top
->>       cpsie   i
->>       svc     #0
->>  1:   cpsid   i
->> @@ -123,11 +122,6 @@ __v7m_setup:
->>       ret     lr
->>  ENDPROC(__v7m_setup)
->>
->> -     .align 2
->> -__v7m_setup_stack:
->> -     .space  4 * 8                           @ 8 registers
->> -__v7m_setup_stack_top:
->> -
->
-> The effect of your patch is that the value of sp as it is when
-> __v7m_setup is entered is used. I didn't check, but I wouldn't be
-> surprised if that's the value of sp when the boot loader gave control to
-> Linux. This might or might not work. Something more robust would be
-> better of course.
->
-
-Well, this is where I'm a bit lost, as I was unable to find where
-the stack is setup in Linux.
-
-But on the other side, the current code, just sets a *temporary*
-stack to fit the 8 registers needed for the SVC call. The stack
-pointer is restored right after that.
-
-So in reality, the effect of the patch above is to require some
-additional space for the already in-use stack.
-
-I can't see why it wouldn't be robust.
+diff --git a/sound/soc/sunxi/sun4i-codec.c b/sound/soc/sunxi/sun4i-codec.c
+index bcbf4da..1bb896d 100644
+--- a/sound/soc/sunxi/sun4i-codec.c
++++ b/sound/soc/sunxi/sun4i-codec.c
+@@ -2,6 +2,7 @@
+  * Copyright 2014 Emilio L?pez <emilio@elopez.com.ar>
+  * Copyright 2014 Jon Smirl <jonsmirl@gmail.com>
+  * Copyright 2015 Maxime Ripard <maxime.ripard@free-electrons.com>
++ * Copyright 2015 Adam Sampson <ats@offog.org>
+  *
+  * Based on the Allwinner SDK driver, released under the GPL.
+  *
+@@ -404,7 +405,7 @@ static const struct snd_kcontrol_new sun4i_codec_pa_mute =
+ static DECLARE_TLV_DB_SCALE(sun4i_codec_pa_volume_scale, -6300, 100, 1);
+ 
+ static const struct snd_kcontrol_new sun4i_codec_widgets[] = {
+-	SOC_SINGLE_TLV("PA Volume", SUN4I_CODEC_DAC_ACTL,
++	SOC_SINGLE_TLV("Power Amplifier Volume", SUN4I_CODEC_DAC_ACTL,
+ 		       SUN4I_CODEC_DAC_ACTL_PA_VOL, 0x3F, 0,
+ 		       sun4i_codec_pa_volume_scale),
+ };
+@@ -452,12 +453,12 @@ static const struct snd_soc_dapm_widget sun4i_codec_dapm_widgets[] = {
+ 	SND_SOC_DAPM_SUPPLY("Mixer Enable", SUN4I_CODEC_DAC_ACTL,
+ 			    SUN4I_CODEC_DAC_ACTL_MIXEN, 0, NULL, 0),
+ 
+-	/* Pre-Amplifier */
+-	SND_SOC_DAPM_MIXER("Pre-Amplifier", SUN4I_CODEC_ADC_ACTL,
++	/* Power Amplifier */
++	SND_SOC_DAPM_MIXER("Power Amplifier", SUN4I_CODEC_ADC_ACTL,
+ 			   SUN4I_CODEC_ADC_ACTL_PA_EN, 0,
+ 			   sun4i_codec_pa_mixer_controls,
+ 			   ARRAY_SIZE(sun4i_codec_pa_mixer_controls)),
+-	SND_SOC_DAPM_SWITCH("Pre-Amplifier Mute", SND_SOC_NOPM, 0, 0,
++	SND_SOC_DAPM_SWITCH("Power Amplifier Mute", SND_SOC_NOPM, 0, 0,
+ 			    &sun4i_codec_pa_mute),
+ 
+ 	SND_SOC_DAPM_OUTPUT("HP Right"),
+@@ -480,16 +481,16 @@ static const struct snd_soc_dapm_route sun4i_codec_dapm_routes[] = {
+ 	{ "Left Mixer", NULL, "Mixer Enable" },
+ 	{ "Left Mixer", "Left DAC Playback Switch", "Left DAC" },
+ 
+-	/* Pre-Amplifier Mixer Routes */
+-	{ "Pre-Amplifier", "Mixer Playback Switch", "Left Mixer" },
+-	{ "Pre-Amplifier", "Mixer Playback Switch", "Right Mixer" },
+-	{ "Pre-Amplifier", "DAC Playback Switch", "Left DAC" },
+-	{ "Pre-Amplifier", "DAC Playback Switch", "Right DAC" },
++	/* Power Amplifier Routes */
++	{ "Power Amplifier", "Mixer Playback Switch", "Left Mixer" },
++	{ "Power Amplifier", "Mixer Playback Switch", "Right Mixer" },
++	{ "Power Amplifier", "DAC Playback Switch", "Left DAC" },
++	{ "Power Amplifier", "DAC Playback Switch", "Right DAC" },
+ 
+-	/* PA -> HP path */
+-	{ "Pre-Amplifier Mute", "Switch", "Pre-Amplifier" },
+-	{ "HP Right", NULL, "Pre-Amplifier Mute" },
+-	{ "HP Left", NULL, "Pre-Amplifier Mute" },
++	/* Headphone Output Routes */
++	{ "Power Amplifier Mute", "Switch", "Power Amplifier" },
++	{ "HP Right", NULL, "Power Amplifier Mute" },
++	{ "HP Left", NULL, "Power Amplifier Mute" },
+ };
+ 
+ static struct snd_soc_codec_driver sun4i_codec_codec = {
 -- 
-Ezequiel Garc?a, VanguardiaSur
-www.vanguardiasur.com.ar
+2.1.4
