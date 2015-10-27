@@ -1,41 +1,60 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Tue, 27 Oct 2015 12:46:18 +0000
-Subject: [PATCH 18/19] ARM: dts: ste: replace legacy *,wakeup property
- with wakeup-source
-In-Reply-To: <CACRpkdYNFa-R8-u8JXijsCDyY+RHo4ANp+Voz3PEn6b9hcCrzQ@mail.gmail.com>
-References: <1445422216-29375-1-git-send-email-sudeep.holla@arm.com>
- <1445422216-29375-19-git-send-email-sudeep.holla@arm.com>
- <CACRpkdYNFa-R8-u8JXijsCDyY+RHo4ANp+Voz3PEn6b9hcCrzQ@mail.gmail.com>
-Message-ID: <562F7219.9010705@arm.com>
+From: mans@mansr.com (Mans Rullgard)
+Date: Tue, 27 Oct 2015 12:57:57 +0000
+Subject: [RESEND][PATCH] ARM: debug: add support for Palmchip 16550-like UART
+Message-ID: <1445950678-16097-1-git-send-email-mans@mansr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Some SoCs have a Palmchip UART with a non-standard register layout.
+This allows the debug console to work with these.
 
+Signed-off-by: Mans Rullgard <mans@mansr.com>
+---
+ arch/arm/Kconfig.debug        |  8 ++++++++
+ arch/arm/include/debug/8250.S | 12 ++++++++++++
+ 2 files changed, 20 insertions(+)
 
-On 27/10/15 12:34, Linus Walleij wrote:
-> On Wed, Oct 21, 2015 at 12:10 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
->
->> Though the keyboard and other driver will continue to support the legacy
->> "gpio-key,wakeup", "linux,wakeup" boolean property to enable the wakeup
->> source, "wakeup-source" is the new standard binding.
->>
->> This patch replaces all the legacy wakeup properties with the unified
->> "wakeup-source" property in order to avoid any futher copy-paste
->> duplication.
->>
->> Cc: Linus Walleij <linus.walleij@linaro.org>
->> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
->
-> Acked-by: Linus Walleij <linus.walleij@linaro.org>
->
-> Are you sending this to ARM SoC or do I need to handle the
-> patch?
->
-
-Many platform maintainers preferred to pick up via their tree, so if you
-want to pick up with other STE patches, I am fine as there's no
-dependency on the driver changes.
-
+diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+index 0cfd7f9..9039fff 100644
+--- a/arch/arm/Kconfig.debug
++++ b/arch/arm/Kconfig.debug
+@@ -1597,6 +1597,14 @@ config DEBUG_UART_8250_WORD
+ 		DEBUG_BCM_KONA_UART || DEBUG_RK32_UART2 || \
+ 		DEBUG_BRCMSTB_UART
+ 
++config DEBUG_UART_8250_PALMCHIP
++	bool "8250 UART is Palmchip variant"
++	depends on DEBUG_LL_UART_8250 || DEBUG_UART_8250
++	help
++	  Palmchip provides a UART implementation compatible with 16550
++	  except for having a different register layout.  Say Y here if
++	  the debug UART is of this type.
++
+ config DEBUG_UART_8250_FLOW_CONTROL
+ 	bool "Enable flow control for 8250 UART"
+ 	depends on DEBUG_LL_UART_8250 || DEBUG_UART_8250
+diff --git a/arch/arm/include/debug/8250.S b/arch/arm/include/debug/8250.S
+index 7f7446f..2332f40 100644
+--- a/arch/arm/include/debug/8250.S
++++ b/arch/arm/include/debug/8250.S
+@@ -9,6 +9,18 @@
+  */
+ #include <linux/serial_reg.h>
+ 
++#ifdef CONFIG_DEBUG_UART_8250_PALMCHIP
++
++#undef UART_TX
++#undef UART_LSR
++#undef UART_MSR
++
++#define UART_TX 1
++#define UART_LSR 7
++#define UART_MSR 8
++
++#endif
++
+ 		.macro	addruart, rp, rv, tmp
+ 		ldr	\rp, =CONFIG_DEBUG_UART_PHYS
+ 		ldr	\rv, =CONFIG_DEBUG_UART_VIRT
 -- 
-Regards,
-Sudeep
+2.6.2
