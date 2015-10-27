@@ -1,133 +1,102 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Tue, 27 Oct 2015 12:21:05 +0900
-Subject: [PATCH] ARM: dts: uniphier: add system-bus-controller nodes
-Message-ID: <1445916065-13118-1-git-send-email-yamada.masahiro@socionext.com>
+From: yao.yuan@freescale.com (Yao Yuan)
+Date: Tue, 27 Oct 2015 03:58:31 +0000
+Subject: [PATCH v3] dmaengine: fsl-edma: add PM suspend/resume support
+In-Reply-To: <20151027020035.GC11691@vkoul-mobl.iind.intel.com>
+References: <1445243465-7727-1-git-send-email-yao.yuan@freescale.com>
+ <20151027020035.GC11691@vkoul-mobl.iind.intel.com>
+Message-ID: <BLUPR03MB134DA9E483023953813E03783220@BLUPR03MB134.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The System Bus Controller block has two register regions,
-but having only the second one in a separate node was not nice.
+Hi Vinod,
 
-Replace it with a new node with two register regions in it.
+Thanks for your review.
+I did the test and it seems that it should be ok when CONFIG_PM is not defined.
+So I removed the protection code to make it more readable.
+Do you think is it ok?
 
-Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
----
+Best Regards,
+Yuan Yao
 
- arch/arm/boot/dts/uniphier-ph1-ld4.dtsi     | 7 +++----
- arch/arm/boot/dts/uniphier-ph1-pro4.dtsi    | 7 +++----
- arch/arm/boot/dts/uniphier-ph1-pro5.dtsi    | 7 +++----
- arch/arm/boot/dts/uniphier-ph1-sld3.dtsi    | 7 +++----
- arch/arm/boot/dts/uniphier-ph1-sld8.dtsi    | 7 +++----
- arch/arm/boot/dts/uniphier-proxstream2.dtsi | 7 +++----
- 6 files changed, 18 insertions(+), 24 deletions(-)
-
-diff --git a/arch/arm/boot/dts/uniphier-ph1-ld4.dtsi b/arch/arm/boot/dts/uniphier-ph1-ld4.dtsi
-index ae13469..af49381 100644
---- a/arch/arm/boot/dts/uniphier-ph1-ld4.dtsi
-+++ b/arch/arm/boot/dts/uniphier-ph1-ld4.dtsi
-@@ -200,10 +200,9 @@
- 			clock-frequency = <100000>;
- 		};
- 
--		system-bus-controller-misc at 59800000 {
--			compatible = "socionext,uniphier-system-bus-controller-misc",
--				     "syscon";
--			reg = <0x59800000 0x2000>;
-+		system-bus-controller at 58c00000 {
-+			compatible = "socionext,uniphier-system-bus-controller";
-+			reg = <0x58c00000 0x400>, <0x59800000 0x2000>;
- 		};
- 
- 		usb0: usb at 5a800100 {
-diff --git a/arch/arm/boot/dts/uniphier-ph1-pro4.dtsi b/arch/arm/boot/dts/uniphier-ph1-pro4.dtsi
-index 85377b2..254642f 100644
---- a/arch/arm/boot/dts/uniphier-ph1-pro4.dtsi
-+++ b/arch/arm/boot/dts/uniphier-ph1-pro4.dtsi
-@@ -232,10 +232,9 @@
- 			clock-frequency = <400000>;
- 		};
- 
--		system-bus-controller-misc at 59800000 {
--			compatible = "socionext,uniphier-system-bus-controller-misc",
--				     "syscon";
--			reg = <0x59800000 0x2000>;
-+		system-bus-controller at 58c00000 {
-+			compatible = "socionext,uniphier-system-bus-controller";
-+			reg = <0x58c00000 0x400>, <0x59800000 0x2000>;
- 		};
- 
- 		usb2: usb at 5a800100 {
-diff --git a/arch/arm/boot/dts/uniphier-ph1-pro5.dtsi b/arch/arm/boot/dts/uniphier-ph1-pro5.dtsi
-index 96da01e..11eb762 100644
---- a/arch/arm/boot/dts/uniphier-ph1-pro5.dtsi
-+++ b/arch/arm/boot/dts/uniphier-ph1-pro5.dtsi
-@@ -241,10 +241,9 @@
- 			clock-frequency = <400000>;
- 		};
- 
--		system-bus-controller-misc at 59800000 {
--			compatible = "socionext,uniphier-system-bus-controller-misc",
--				     "syscon";
--			reg = <0x59800000 0x2000>;
-+		system-bus-controller at 58c00000 {
-+			compatible = "socionext,uniphier-system-bus-controller";
-+			reg = <0x58c00000 0x400>, <0x59800000 0x2000>;
- 		};
- 
- 		pinctrl: pinctrl at 5f801000 {
-diff --git a/arch/arm/boot/dts/uniphier-ph1-sld3.dtsi b/arch/arm/boot/dts/uniphier-ph1-sld3.dtsi
-index 945b37f..691a17d 100644
---- a/arch/arm/boot/dts/uniphier-ph1-sld3.dtsi
-+++ b/arch/arm/boot/dts/uniphier-ph1-sld3.dtsi
-@@ -216,10 +216,9 @@
- 			clock-frequency = <400000>;
- 		};
- 
--		system-bus-controller-misc at 59800000 {
--			compatible = "socionext,uniphier-system-bus-controller-misc",
--				     "syscon";
--			reg = <0x59800000 0x2000>;
-+		system-bus-controller at 58c00000 {
-+			compatible = "socionext,uniphier-system-bus-controller";
-+			reg = <0x58c00000 0x400>, <0x59800000 0x2000>;
- 		};
- 
- 		usb0: usb at 5a800100 {
-diff --git a/arch/arm/boot/dts/uniphier-ph1-sld8.dtsi b/arch/arm/boot/dts/uniphier-ph1-sld8.dtsi
-index c98428c..e88559b 100644
---- a/arch/arm/boot/dts/uniphier-ph1-sld8.dtsi
-+++ b/arch/arm/boot/dts/uniphier-ph1-sld8.dtsi
-@@ -200,10 +200,9 @@
- 			clock-frequency = <100000>;
- 		};
- 
--		system-bus-controller-misc at 59800000 {
--			compatible = "socionext,uniphier-system-bus-controller-misc",
--				     "syscon";
--			reg = <0x59800000 0x2000>;
-+		system-bus-controller at 58c00000 {
-+			compatible = "socionext,uniphier-system-bus-controller";
-+			reg = <0x58c00000 0x400>, <0x59800000 0x2000>;
- 		};
- 
- 		usb0: usb at 5a800100 {
-diff --git a/arch/arm/boot/dts/uniphier-proxstream2.dtsi b/arch/arm/boot/dts/uniphier-proxstream2.dtsi
-index ad5fb39..259f1a9 100644
---- a/arch/arm/boot/dts/uniphier-proxstream2.dtsi
-+++ b/arch/arm/boot/dts/uniphier-proxstream2.dtsi
-@@ -251,10 +251,9 @@
- 			clock-frequency = <400000>;
- 		};
- 
--		system-bus-controller-misc at 59800000 {
--			compatible = "socionext,uniphier-system-bus-controller-misc",
--				     "syscon";
--			reg = <0x59800000 0x2000>;
-+		system-bus-controller at 58c00000 {
-+			compatible = "socionext,uniphier-system-bus-controller";
-+			reg = <0x58c00000 0x400>, <0x59800000 0x2000>;
- 		};
- 
- 		pinctrl: pinctrl at 5f801000 {
--- 
-1.9.1
+> -----Original Message-----
+> From: Vinod Koul [mailto:vinod.koul at intel.com]
+> Sent: Tuesday, October 27, 2015 10:01 AM
+> To: Yuan Yao-B46683 <yao.yuan@freescale.com>
+> Cc: stefan at agner.ch; arnd at arndb.de; dan.j.williams at intel.com;
+> dmaengine at vger.kernel.org; linux-kernel at vger.kernel.org; linux-arm-
+> kernel at lists.infradead.org
+> Subject: Re: [PATCH v3] dmaengine: fsl-edma: add PM suspend/resume
+> support
+> 
+> On Mon, Oct 19, 2015 at 04:31:05PM +0800, Yuan Yao wrote:
+> 
+> The patch overall looks fine, but
+> >
+> > +static int fsl_edma_suspend_late(struct device *dev)
+> 
+> This needs protection and will have build failure when CONFIG_PM is not
+> defined
+> 
+> > +{
+> > +	struct fsl_edma_engine *fsl_edma = dev_get_drvdata(dev);
+> > +	struct fsl_edma_chan *fsl_chan;
+> > +	unsigned long flags;
+> > +	int i;
+> > +
+> > +	for (i = 0; i < fsl_edma->n_chans; i++) {
+> > +		fsl_chan = &fsl_edma->chans[i];
+> > +		spin_lock_irqsave(&fsl_chan->vchan.lock, flags);
+> > +		/* Make sure chan is idle or will force disable. */
+> > +		if (unlikely(!fsl_chan->idle)) {
+> > +			dev_warn(dev, "WARN: There is non-idle channel.");
+> > +			fsl_edma_disable_request(fsl_chan);
+> > +			fsl_edma_chan_mux(fsl_chan, 0, false);
+> > +		}
+> > +
+> > +		fsl_chan->pm_state = SUSPENDED;
+> > +		spin_unlock_irqrestore(&fsl_chan->vchan.lock, flags);
+> > +	}
+> > +
+> > +	return 0;
+> > +}
+> > +
+> > +static int fsl_edma_resume_early(struct device *dev) {
+> > +	struct fsl_edma_engine *fsl_edma = dev_get_drvdata(dev);
+> > +	struct fsl_edma_chan *fsl_chan;
+> > +	int i;
+> > +
+> > +	for (i = 0; i < fsl_edma->n_chans; i++) {
+> > +		fsl_chan = &fsl_edma->chans[i];
+> > +		fsl_chan->pm_state = RUNNING;
+> > +		edma_writew(fsl_edma, 0x0, fsl_edma->membase +
+> EDMA_TCD_CSR(i));
+> > +		if (fsl_chan->slave_id != 0)
+> > +			fsl_edma_chan_mux(fsl_chan, fsl_chan->slave_id,
+> true);
+> > +	}
+> > +
+> > +	edma_writel(fsl_edma, EDMA_CR_ERGA | EDMA_CR_ERCA,
+> > +			fsl_edma->membase + EDMA_CR);
+> > +
+> > +	return 0;
+> > +}
+> > +
+> > +static const struct dev_pm_ops fsl_edma_pm_ops = {
+> > +	.suspend_late   = fsl_edma_suspend_late,
+> > +	.resume_early   = fsl_edma_resume_early,
+> > +};
+> 
+> This one too, also why use late and early, pls add the note here
+> 
+> >  static const struct of_device_id fsl_edma_dt_ids[] = {
+> >  	{ .compatible = "fsl,vf610-edma", },
+> >  	{ /* sentinel */ }
+> > @@ -969,6 +1042,7 @@ static struct platform_driver fsl_edma_driver = {
+> >  	.driver		= {
+> >  		.name	= "fsl-edma",
+> >  		.of_match_table = fsl_edma_dt_ids,
+> > +		.pm     = &fsl_edma_pm_ops,
+> This will fail too if CONFIG_PM is not defined
+> 
+> --
+> ~Vinod
