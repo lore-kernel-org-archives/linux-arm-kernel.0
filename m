@@ -1,70 +1,48 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 27 Oct 2015 14:37:06 +0000
-Subject: Trustzone: DSB before/after SMC
-In-Reply-To: <562F84BA.5060203@free.fr>
-References: <562F7CBA.7060806@free.fr> <20151027134318.GD3091@leverpostej>
- <562F84BA.5060203@free.fr>
-Message-ID: <20151027143706.GF3091@leverpostej>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Tue, 27 Oct 2015 09:38:12 -0500
+Subject: [PATCH V4 7/8] PCI: OF: Move of_pci_dma_configure() to
+ pci_dma_configure()
+In-Reply-To: <1445442731-28819-8-git-send-email-Suravee.Suthikulpanit@amd.com>
+References: <1445442731-28819-1-git-send-email-Suravee.Suthikulpanit@amd.com>
+ <1445442731-28819-8-git-send-email-Suravee.Suthikulpanit@amd.com>
+Message-ID: <20151027143812.GB8660@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 27, 2015 at 03:05:46PM +0100, Mason wrote:
-> On 27/10/2015 14:43, Mark Rutland wrote:
-> 
-> > On Tue, Oct 27, 2015 at 02:31:38PM +0100, Mason wrote:
-> > 
-> >> I have a few questions about SMC. (I'm using Cortex-A9)
-> >>
-> >> Platforms that use SMC often/always execute DSB beforehand.
-> > 
-> > Please give an example. We don't do this for PSCI, for instance.
-> 
-> arch/arm/mach-exynos/exynos-smc.S
-> arch/arm/mach-highbank/smc.S
-> arch/arm/mach-omap2/omap-smc.S
+Hi Suravee,
 
->From a quick look, it's not obvious to me why those DSBs are present. It
-would be best to ask the original authors; it may simply be that this
-was never necessary and has simply been copied.
+On Wed, Oct 21, 2015 at 08:52:10AM -0700, Suravee Suthikulpanit wrote:
+> This patch move of_pci_dma_configure() to a more generic
+> pci_dma_configure(), which can be extended by non-OF code (e.g. ACPI).
 
-In particular, the DSB; DMB; SMC sequence in omap_smc2 makes no sense to
-me, given that a DSB provides a superset of the guarantees of a DMB. If
-the DSB is necessary I don't see that the DMB would also be necessary.
+> -void of_pci_dma_configure(struct pci_dev *pci_dev)
+> -{
+> -	struct device *dev = &pci_dev->dev;
+> -	struct device *bridge = pci_get_host_bridge_device(pci_dev);
+> -
+> -	if (!bridge->parent)
+> -		return;
+> -
+> -	of_dma_configure(dev, bridge->parent->of_node);
+> -	pci_put_host_bridge_device(bridge);
+> -}
 
-> A few that don't execute DSB before SMC:
-> arch/arm/mach-bcm/bcm_kona_smc.c
-> arch/arm/mach-keystone/smc.S
-> 
-> >> 1a) Is DSB required before SMC?
-> >> 1b) Is DSB required  after SMC?
-> >> 2a) Is DSB required before returning to non-secure OS?
-> >> 2b) Is DSB required  after returning to non-secure OS?
-> > 
-> > It depends on what you're trying to achieve, and the design of both the
-> > secure and non-secure OS code.
-> 
-> In my case, I just want to write the L2_CONTROL register.
+> +static void pci_dma_configure(struct pci_dev *dev)
+> +{
+> +	struct device *bridge = pci_get_host_bridge_device(dev);
+> +
+> +	if (IS_ENABLED(CONFIG_OF) && dev->dev.of_node) {
+> +		if (!bridge->parent)
+> +			return;
 
-Is that a register in the L2, or in the CPU? Which L2/CPU?
+Don't we leak a bridge reference here?  This looks like it was a problem in
+the original code, not something you added.  Ideally I guess I would add a
+new patch that only fixes the leak in the original code, followed by this
+patch that moves it from of_pci_dma_configure() to pci_dma_configure().
 
-There may be a constraint that the memory system needs to be quiescent
-or something to that effect. Without more information I cannot say what
-specifically you need to do.
-
-> > A DSB is certainly not always required before nor after an SMC.
-> 
-> That makes sense. But a colleague mentioned that the secure OS may
-> be using different MMU mappings. In that case, it might be required
-> to wait for all in-flight accesses to resolve?
-
-Are you referring to differing VAs or differing attributes?
-
-For ARMv6 and above the former does not matter; the caches behaves as if
-they are PIPT.
-
-The latter may require the use of barriers and/or cache maintenance if
-the secure and non-secure OSs are communicating through shared memory.
-That's somewhat independent of the SMC itself.
-
-Thanks,
-Mark.
+> +
+> +		of_dma_configure(&dev->dev, bridge->parent->of_node);
+> +	}
+> +
+> +	pci_put_host_bridge_device(bridge);
+> +}
