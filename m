@@ -1,38 +1,24 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Tue, 27 Oct 2015 18:56:18 +0100
-Subject: [PATCH] ARM: sun7i: dt: Enable audio codec on pcDuino V3 Nano
-In-Reply-To: <1445639787-23715-1-git-send-email-ats@offog.org>
-References: <1445639787-23715-1-git-send-email-ats@offog.org>
-Message-ID: <20151027175618.GD6114@lukather>
+From: moinejf@free.fr (Jean-Francois Moine)
+Date: Tue, 27 Oct 2015 19:04:05 +0100
+Subject: [PATCH v4 0/6] ARM: sunxi: Introduce Allwinner H3 support
+In-Reply-To: <1445964626-6484-1-git-send-email-jenskuske@gmail.com>
+References: <1445964626-6484-1-git-send-email-jenskuske@gmail.com>
+Message-ID: <20151027190405.ce1dd36f952269e0c23e4b52@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Tue, 27 Oct 2015 17:50:20 +0100
+Jens Kuske <jenskuske@gmail.com> wrote:
 
-On Fri, Oct 23, 2015 at 11:36:27PM +0100, Adam Sampson wrote:
-> The pcDuino V3 Nano has a 3.5mm TRRS jack socket for audio, using the
-> CTIA standard pinout, connected to HPOUTL, HPOUTR, HPCOM/HPCOMFB and
-> MICIN1/VMIC (via appropriate RC networks) on the A20. The PH00 GPIO is
-> wired for headphone plug detection: it reads 0 when nothing's plugged
-> in, and 1 when a plug is inserted.
-> 
-> LINEINL/R and FMINL/R are not connected.
+> Changes since v3:
+> - add a clock driver specific to the bus gates instead of listing parents in
+>   the DTSI
+> - skip the holes in the reset controller with of_xlate()
 
-Ah, so there's a design out there with headphone detect. Cool :)
-
-Do you feel like writing the headphone detection code?
-
-Anyway, queued for 4.5, thanks!
-Maxime
+Hi, Maxime, there we are :(. The H3 description is hardcoded and the
+next SoCs will ask for more and more code. I wonder what is the use of
+a DT...
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151027/2bba340d/attachment.sig>
+Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
+Jef		|		http://moinejf.free.fr/
