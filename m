@@ -1,48 +1,93 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Tue, 27 Oct 2015 09:38:12 -0500
-Subject: [PATCH V4 7/8] PCI: OF: Move of_pci_dma_configure() to
- pci_dma_configure()
-In-Reply-To: <1445442731-28819-8-git-send-email-Suravee.Suthikulpanit@amd.com>
-References: <1445442731-28819-1-git-send-email-Suravee.Suthikulpanit@amd.com>
- <1445442731-28819-8-git-send-email-Suravee.Suthikulpanit@amd.com>
-Message-ID: <20151027143812.GB8660@localhost>
+From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
+Date: Tue, 27 Oct 2015 15:38:47 +0100
+Subject: [PATCH v11 0/4] Allow USB devices to remain runtime-suspended when
+ sleeping
+Message-ID: <1445956731-6304-1-git-send-email-tomeu.vizoso@collabora.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Suravee,
+Hi,
 
-On Wed, Oct 21, 2015 at 08:52:10AM -0700, Suravee Suthikulpanit wrote:
-> This patch move of_pci_dma_configure() to a more generic
-> pci_dma_configure(), which can be extended by non-OF code (e.g. ACPI).
+this is v11 of an attempt to make it easier for devices to remain in
+runtime PM when the system goes to sleep, mainly to reduce the time
+spent resuming devices.
 
-> -void of_pci_dma_configure(struct pci_dev *pci_dev)
-> -{
-> -	struct device *dev = &pci_dev->dev;
-> -	struct device *bridge = pci_get_host_bridge_device(pci_dev);
-> -
-> -	if (!bridge->parent)
-> -		return;
-> -
-> -	of_dma_configure(dev, bridge->parent->of_node);
-> -	pci_put_host_bridge_device(bridge);
-> -}
+For this, we interpret the absence of all PM callback implementations as
+it being safe to do direct_complete, so their ancestors aren't prevented
+from remaining runtime-suspended.
 
-> +static void pci_dma_configure(struct pci_dev *dev)
-> +{
-> +	struct device *bridge = pci_get_host_bridge_device(dev);
-> +
-> +	if (IS_ENABLED(CONFIG_OF) && dev->dev.of_node) {
-> +		if (!bridge->parent)
-> +			return;
+Additionally, the prepare() callback of USB devices will return 1 if
+runtime PM is enabled and the current wakeup settings are correct.
 
-Don't we leak a bridge reference here?  This looks like it was a problem in
-the original code, not something you added.  Ideally I guess I would add a
-new patch that only fixes the leak in the original code, followed by this
-patch that moves it from of_pci_dma_configure() to pci_dma_configure().
+With these changes, a uvcvideo device (for example) stays in runtime
+suspend when the system goes to sleep and is left in that state when the
+system resumes, not delaying it unnecessarily.
 
-> +
-> +		of_dma_configure(&dev->dev, bridge->parent->of_node);
-> +	}
-> +
-> +	pci_put_host_bridge_device(bridge);
-> +}
+Thanks,
+
+Tomeu
+
+Changes in v11:
+- Move calls to dev_pm_domain_set() out from &dev->power.lock as that
+  isn't needed for dev->pm_domain.
+
+Changes in v10:
+- Remove superfluous call to pm_runtime_enabled() as suggested by Alan
+
+Changes in v9:
+- Add docs noting the need for the device lock to be held before calling
+  device_is_bound()
+- Add docs noting the need for the device lock to be held before calling
+  dev_pm_domain_set()
+- Move to CONFIG_PM_SLEEP as suggested by Rafael and Ulf.
+- Rename from device_check_pm_callbacks to device_pm_check_callbacks to
+  follow with the naming convention of existing API.
+- Re-add calling to device_pm_check_callbacks from device registration
+  and when updating the PM domain of a device.
+
+Changes in v8:
+- Add device_is_bound()
+- Add dev_pm_domain_set() and update code to use it
+- Move no_pm_callbacks field into CONFIG_PM_SLEEP
+- Call device_check_pm_callbacks only after a device is bound or unbound
+
+Changes in v7:
+- Reduce indentation by adding a label in device_prepare()
+
+Changes in v6:
+- Add stub for !CONFIG_PM.
+- Move implementation of device_check_pm_callbacks to power/main.c as it
+  doesn't belong to CONFIG_PM_SLEEP.
+- Take dev->power.lock before modifying flag.
+
+Changes in v5:
+- Check for all dev_pm_ops instances associated to a device, updating a
+  no_pm_callbacks flag at the times when that could change.
+
+Tomeu Vizoso (4):
+  device core: add device_is_bound()
+  PM / Domains: add setter for dev.pm_domain
+  PM / sleep: Go direct_complete if driver has no callbacks
+  USB / PM: Allow USB devices to remain runtime-suspended when sleeping
+
+ arch/arm/mach-omap2/omap_device.c |  7 ++++---
+ drivers/acpi/acpi_lpss.c          |  5 +++--
+ drivers/acpi/device_pm.c          |  5 +++--
+ drivers/base/dd.c                 | 21 +++++++++++++++++++--
+ drivers/base/power/clock_ops.c    |  5 +++--
+ drivers/base/power/common.c       | 24 ++++++++++++++++++++++++
+ drivers/base/power/domain.c       |  8 ++++++--
+ drivers/base/power/main.c         | 35 +++++++++++++++++++++++++++++++++++
+ drivers/base/power/power.h        |  3 +++
+ drivers/gpu/vga/vga_switcheroo.c  | 10 +++++-----
+ drivers/misc/mei/pci-me.c         |  5 +++--
+ drivers/misc/mei/pci-txe.c        |  5 +++--
+ drivers/usb/core/port.c           |  6 ++++++
+ drivers/usb/core/usb.c            |  8 +++++++-
+ include/linux/device.h            |  2 ++
+ include/linux/pm.h                |  1 +
+ include/linux/pm_domain.h         |  3 +++
+ 17 files changed, 130 insertions(+), 23 deletions(-)
+
+-- 
+2.5.0
