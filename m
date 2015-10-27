@@ -1,97 +1,60 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Tue, 27 Oct 2015 22:23:22 +0100
-Subject: [PATCH v7 10/17] phy: Add driver for rockchip Display Port PHY
-In-Reply-To: <1445655964-15237-5-git-send-email-ykk@rock-chips.com>
-References: <1445599415-30856-1-git-send-email-ykk@rock-chips.com>
- <1445655964-15237-1-git-send-email-ykk@rock-chips.com>
- <1445655964-15237-5-git-send-email-ykk@rock-chips.com>
-Message-ID: <2304066.jCpsGbPbCP@phil>
+From: timur@codeaurora.org (Timur Tabi)
+Date: Tue, 27 Oct 2015 16:24:01 -0500
+Subject: [PATCH] arm64: efi: make sure vmlinux load address aligned on 2MBytes
+Message-ID: <1445981041-8774-1-git-send-email-timur@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Samstag, 24. Oktober 2015, 11:06:04 schrieb Yakir Yang:
-> Add phy driver for the Rockchip DisplayPort PHY module. This
-> is required to get DisplayPort working in Rockchip SoCs.
-> 
-> Tested-by: Javier Martinez Canillas <javier@osg.samsung.com>
-> Signed-off-by: Yakir Yang <ykk@rock-chips.com>
-> ---
+From: Shanker Donthineni <shankerd@codeaurora.org>
 
-> diff --git a/drivers/phy/phy-rockchip-dp.c b/drivers/phy/phy-rockchip-dp.c
-> new file mode 100644
-> index 0000000..4af19af
-> --- /dev/null
-> +++ b/drivers/phy/phy-rockchip-dp.c
-> @@ -0,0 +1,153 @@
-> +/*
-> + * Rockchip DP PHY driver
-> + *
-> + * Copyright (C) 2015 FuZhou Rockchip Co., Ltd.
-> + * Author: Yakir Yang <ykk@@rock-chips.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; either version 2 of the License.
-> + */
-> +
-> +#include <linux/io.h>
-> +#include <linux/kernel.h>
-> +#include <linux/module.h>
-> +#include <linux/of.h>
-> +#include <linux/of_address.h>
-> +#include <linux/clk.h>
-> +#include <linux/phy/phy.h>
-> +#include <linux/regmap.h>
-> +#include <linux/mfd/syscon.h>
-> +#include <linux/platform_device.h>
-> +
-> +#define GRF_SOC_CON12                   0x0274
-> +#define GRF_EDP_REF_CLK_SEL_INTER	BIT(4)
-> +#define GRF_EDP_PHY_SIDDQ_WRITE_EN      BIT(21)
-> +#define GRF_EDP_PHY_SIDDQ_ON            0
-> +#define GRF_EDP_PHY_SIDDQ_OFF           BIT(5)
+The vmlinux image load address must be aligned to 2MB, as documented
+in Documentation/arm64/booting.txt. Otherwise, __create_page_tables
+in head.S will create incorrect page table entries.
 
-mixed spacers (tabs and spaces), please use either tabs if you want to
-align stuff or a single space.
+Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
+Signed-off-by: Timur Tabi <timur@codeaurora.org>
+---
+ arch/arm64/kernel/efi-stub.c | 15 +++++++++------
+ 1 file changed, 9 insertions(+), 6 deletions(-)
 
-Also you're mixing the handling here, for SIDDQ you're defining both the
-actual bit as well as the write-enable bit, but for CLK_SEL_INTR you're
-hard-coding the 16-bit shift down in the code.
-
-You could also just use/copy the HIWORD_MASK macro we use for example
-in the clock controller.
-
-
-> +
-> +struct rockchip_dp_phy {
-> +	struct device  *dev;
-> +	struct regmap  *grf;
-> +	struct clk     *phy_24m;
-> +};
-> +
-> +static int rockchip_set_phy_state(struct phy *phy, bool enable)
-> +{
-> +	struct rockchip_dp_phy *dp = phy_get_drvdata(phy);
-> +	int ret;
-> +
-> +	if (enable) {
-> +		ret = regmap_write(dp->grf, GRF_SOC_CON12,
-> +				   GRF_EDP_PHY_SIDDQ_WRITE_EN |
-> +				   GRF_EDP_PHY_SIDDQ_ON);
-> +		if (ret < 0) {
-> +			dev_err(dp->dev, "Can't enable PHY power %d\n", ret);
-> +			return ret;
-> +		}
-> +
-> +		ret = clk_prepare_enable(dp->phy_24m);
-> +
-
-unnecessary empty line after clk_prepare_enable
-
-
-with these things fixed,
-Reviewed-by: Heiko Stuebner <heiko@sntech.de>
-
-
-Cheers,
-Heiko
+diff --git a/arch/arm64/kernel/efi-stub.c b/arch/arm64/kernel/efi-stub.c
+index 816120e..df1433d 100644
+--- a/arch/arm64/kernel/efi-stub.c
++++ b/arch/arm64/kernel/efi-stub.c
+@@ -21,7 +21,7 @@ efi_status_t __init handle_kernel_image(efi_system_table_t *sys_table_arg,
+ 					unsigned long dram_base,
+ 					efi_loaded_image_t *image)
+ {
+-	efi_status_t status;
++	efi_status_t status = EFI_LOAD_ERROR;
+ 	unsigned long kernel_size, kernel_memsize = 0;
+ 	unsigned long nr_pages;
+ 	void *old_image_addr = (void *)*image_addr;
+@@ -39,15 +39,18 @@ efi_status_t __init handle_kernel_image(efi_system_table_t *sys_table_arg,
+ 		 * value or a NULL pointer). It will also ensure that, on
+ 		 * platforms where the [dram_base, dram_base + TEXT_OFFSET)
+ 		 * interval is partially occupied by the firmware (like on APM
+-		 * Mustang), we can still place the kernel at the address
+-		 * 'dram_base + TEXT_OFFSET'.
++		 * Mustang) and dram_base is aligned on 2Mbytes, we can still
++		 * place the kernel at the address 'dram_base + TEXT_OFFSET'.
+ 		 */
+-		*image_addr = *reserve_addr = dram_base + TEXT_OFFSET;
+-		nr_pages = round_up(kernel_memsize, EFI_ALLOC_ALIGN) /
++		if (IS_ALIGNED(dram_base, SZ_2M)) {
++			*image_addr = *reserve_addr = dram_base + TEXT_OFFSET;
++			nr_pages = round_up(kernel_memsize, EFI_ALLOC_ALIGN) /
+ 			   EFI_PAGE_SIZE;
+-		status = efi_call_early(allocate_pages, EFI_ALLOCATE_ADDRESS,
++			status = efi_call_early(allocate_pages,
++					EFI_ALLOCATE_ADDRESS,
+ 					EFI_LOADER_DATA, nr_pages,
+ 					(efi_physical_addr_t *)reserve_addr);
++		}
+ 		if (status != EFI_SUCCESS) {
+ 			kernel_memsize += TEXT_OFFSET;
+ 			status = efi_low_alloc(sys_table_arg, kernel_memsize,
+-- 
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project.
