@@ -1,50 +1,83 @@
-From: wxt@rock-chips.com (Caesar Wang)
-Date: Tue, 27 Oct 2015 15:31:46 +0800
-Subject: [PATCH v1 3/3] ARM64: dts: rk3368: Add mailbox device nodes
-In-Reply-To: <1445931106-683-1-git-send-email-wxt@rock-chips.com>
-References: <1445931106-683-1-git-send-email-wxt@rock-chips.com>
-Message-ID: <1445931106-683-4-git-send-email-wxt@rock-chips.com>
+From: robh+dt@kernel.org (Rob Herring)
+Date: Tue, 27 Oct 2015 02:42:48 -0500
+Subject: [PATCH 07/10] pwm: gpio: Add a generic gpio based PWM driver
+In-Reply-To: <1445895161-2317-8-git-send-email-o.schinagl@ultimaker.com>
+References: <1445895161-2317-1-git-send-email-o.schinagl@ultimaker.com>
+ <1445895161-2317-8-git-send-email-o.schinagl@ultimaker.com>
+Message-ID: <CAL_Jsq+98bBt5-+Of-u6jCdGBiZfMvL=P=mMpvWT26qnPFMz5A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This adds mailbox device nodes in dts.
+On Mon, Oct 26, 2015 at 4:32 PM, Olliver Schinagl
+<o.schinagl@ultimaker.com> wrote:
+> From: Olliver Schinagl <oliver@schinagl.nl>
+>
+> This patch adds a bit-banging gpio PWM driver. It makes use of hrtimers,
+> to allow nano-second resolution, though it obviously strongly depends on
+> the switching speed of the gpio pins, hrtimer and system load.
+>
+> Each pwm node can have 1 or more "pwm-gpio" entries, which will be
+> treated as pwm's as part of a pwm chip.
+>
+> Signed-off-by: Olliver Schinagl <oliver@schinagl.nl>
+> ---
+>  Documentation/devicetree/bindings/pwm/pwm-gpio.txt |  18 ++
+>  MAINTAINERS                                        |   5 +
+>  drivers/pwm/Kconfig                                |  15 ++
+>  drivers/pwm/Makefile                               |   1 +
+>  drivers/pwm/pwm-gpio.c                             | 253 +++++++++++++++++++++
+>  5 files changed, 292 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/pwm/pwm-gpio.txt
+>  create mode 100644 drivers/pwm/pwm-gpio.c
+>
+> diff --git a/Documentation/devicetree/bindings/pwm/pwm-gpio.txt b/Documentation/devicetree/bindings/pwm/pwm-gpio.txt
+> new file mode 100644
+> index 0000000..336f61f
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/pwm/pwm-gpio.txt
+> @@ -0,0 +1,18 @@
+> +Generic GPIO bit-banged PWM driver
+> +
+> +Required properties:
+> +  - compatible: should be "pwm-gpio"
+> +  - #pwm-cells: should be 3, see pwm.txt in this directory for a general
+> +    description of the cells format.
+> +  - pwm-gpios: one or more gpios describing the used gpio, see the gpio
+> +    bindings for the used gpio driver.
 
-Mailbox is used by the Rockchip CPU cores to communicate
-requests to MCU processor.
+I'm not sure there is really much advantage to having multiple gpios
+per node. It would simplify the driver a bit not to, but I don't feel
+strongly either way.
 
-Signed-off-by: Caesar Wang <wxt@rock-chips.com>
----
+> +
+> +Example:
+> +#include <dt-bindings/gpio/gpio.h>
+> +
+> +       pwm: pwm at 0 {
 
-Changes in v1:
-- PATCH[3/3] dts:
-- fix "processormZ"--> "processor",the miss-fingerboard.
-- Remove the shared memory in mailbox controller dtsi.
+Unit address should be associated with a reg property, so drop it.
 
- arch/arm64/boot/dts/rockchip/rk3368.dtsi | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+> +               compatible = "pwm-gpio";
+> +               #pwm-cells = 3;
+> +               pwm-gpios = <&pio 7 1 GPIO_ACTIVE_LOW>;
+> +               pwm-gpios = <&pio 7 2 GPIO_ACTIVE_LOW>;
 
-diff --git a/arch/arm64/boot/dts/rockchip/rk3368.dtsi b/arch/arm64/boot/dts/rockchip/rk3368.dtsi
-index cc093a4..cefdad3 100644
---- a/arch/arm64/boot/dts/rockchip/rk3368.dtsi
-+++ b/arch/arm64/boot/dts/rockchip/rk3368.dtsi
-@@ -484,6 +484,18 @@
- 		status = "disabled";
- 	};
- 
-+	mbox: mbox at ff6b0000 {
-+		compatible = "rockchip,rk3368-mailbox";
-+		reg = <0x0 0xff6b0000 0x0 0x1000>,
-+		interrupts = <GIC_SPI 146 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 147 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 148 IRQ_TYPE_LEVEL_HIGH>,
-+			     <GIC_SPI 149 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&cru PCLK_MAILBOX>;
-+		clock-names = "pclk_mailbox";
-+		#mbox-cells = <1>;
-+	};
-+
- 	pmugrf: syscon at ff738000 {
- 		compatible = "rockchip,rk3368-pmugrf", "syscon";
- 		reg = <0x0 0xff738000 0x0 0x1000>;
--- 
-1.9.1
+This would not actually compile. You can't have 2 properties of the same name.
+
+> +       };
+> diff --git a/MAINTAINERS b/MAINTAINERS
+> index 7ba7ab7..0ae7fbf 100644
+> --- a/MAINTAINERS
+> +++ b/MAINTAINERS
+> @@ -4555,6 +4555,11 @@ F:       drivers/i2c/muxes/i2c-mux-gpio.c
+>  F:     include/linux/i2c-mux-gpio.h
+>  F:     Documentation/i2c/muxes/i2c-mux-gpio
+>
+> +GENERIC GPIO PWM DRIVER
+> +M:     Olliver Schinagl <oliver@schinagl.nl>
+> +S:     Maintained
+> +F:     drivers/pwm/pwm-gpio.c
+
+Can you add the binding doc too.
+
+Rob
