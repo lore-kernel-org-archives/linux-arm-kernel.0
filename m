@@ -1,53 +1,35 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 26 Oct 2015 18:26:53 -0700
-Subject: [PATCH] arm: dts: qcom: Add board clocks
-Message-ID: <1445909213-32496-1-git-send-email-sboyd@codeaurora.org>
+From: scottwood@freescale.com (Scott Wood)
+Date: Mon, 26 Oct 2015 20:34:26 -0500
+Subject: [PATCH V6 5/6] clk: qoriq: Add ls1043a support.
+In-Reply-To: <CADRPPNSS62G3D8ghNjd1kJMSjXkQJ9bfqeTP_ZqMk2ehRN5iyw@mail.gmail.com>
+References: <1445587282-29529-1-git-send-email-B48286@freescale.com>
+ <1445587282-29529-5-git-send-email-B48286@freescale.com>
+ <CADRPPNSS62G3D8ghNjd1kJMSjXkQJ9bfqeTP_ZqMk2ehRN5iyw@mail.gmail.com>
+Message-ID: <1445909666.701.289.camel@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-These clocks are fixed rate board sources that should be in DT.
-Add them.
+On Mon, 2015-10-26 at 17:20 -0500, Leo Li wrote:
+> On Fri, Oct 23, 2015 at 3:01 AM, Zhiqiang Hou <B48286@freescale.com> wrote:
+> > From: Hou Zhiqiang <B48286@freescale.com>
+> > 
+> > Signed-off-by: Hou Zhiqiang <B48286@freescale.com>
+> > Acked-by: Stephen Boyd <sboyd@codeaurora.org>
+> > ---
+> > V6: V5 V4 V3 V2
+> >  - No change.
+> 
+> I know you mentioned the dependency in the summary of the patch
+> series.  But it's not likely these dependencies will be merged through
+> the ARM sub-maintainers tree and be resolved in this merge window.  So
+> it will be better to mention these dependencies here so that this
+> patch will go through the same tree as these dependency patches.
+> 
+> Scott,
+> 
+> What is your plan to merge the clock patches?  This patch need to go
+> together with it.
 
-Cc: Georgi Djakov <georgi.djakov@linaro.org>
-Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
----
- arch/arm/boot/dts/qcom-msm8960.dtsi | 23 +++++++++++++++++++++++
- 1 file changed, 23 insertions(+)
+See https://lists.ozlabs.org/pipermail/linuxppc-dev/2015-October/135565.html
 
-diff --git a/arch/arm/boot/dts/qcom-msm8960.dtsi b/arch/arm/boot/dts/qcom-msm8960.dtsi
-index 134cd91d68ec..51a40d84145c 100644
---- a/arch/arm/boot/dts/qcom-msm8960.dtsi
-+++ b/arch/arm/boot/dts/qcom-msm8960.dtsi
-@@ -49,6 +49,29 @@
- 		qcom,no-pc-write;
- 	};
- 
-+	clocks {
-+		cxo_board {
-+			compatible = "fixed-clock";
-+			#clock-cells = <0>;
-+			clock-frequency = <19200000>;
-+			clock-output-names = "cxo_board";
-+		};
-+
-+		pxo_board {
-+			compatible = "fixed-clock";
-+			#clock-cells = <0>;
-+			clock-frequency = <27000000>;
-+			clock-output-names = "pxo_board";
-+		};
-+
-+		sleep_clk {
-+			compatible = "fixed-clock";
-+			#clock-cells = <0>;
-+			clock-frequency = <32768>;
-+			clock-output-names = "sleep_clk";
-+		};
-+	};
-+
- 	soc: soc {
- 		#address-cells = <1>;
- 		#size-cells = <1>;
--- 
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+-Scott
