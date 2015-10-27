@@ -1,213 +1,323 @@
 From: bjorn.andersson@sonymobile.com (Bjorn Andersson)
-Date: Tue, 27 Oct 2015 09:29:31 -0700
-Subject: [PATCH v2 1/3] devicetree: mfd: Add binding for the TI LM3533
-In-Reply-To: <1445796586-28683-1-git-send-email-bjorn.andersson@sonymobile.com>
-Message-ID: <1445963373-27790-1-git-send-email-bjorn.andersson@sonymobile.com>
+Date: Tue, 27 Oct 2015 09:29:33 -0700
+Subject: [PATCH v2 3/3] mfd: lm3533: Support initialization from Device Tree
+In-Reply-To: <1445963373-27790-1-git-send-email-bjorn.andersson@sonymobile.com>
+References: <1445963373-27790-1-git-send-email-bjorn.andersson@sonymobile.com>
+Message-ID: <1445963373-27790-3-git-send-email-bjorn.andersson@sonymobile.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the binding for the Texas Instruments LM3533 lighting power
-solution.
+Implement Device Tree parsing functions to support initialization of the
+lm3533 drivers.
 
 Signed-off-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
 ---
 
 Changes since v1:
-- Added unit to boost-freq and als-resistance (as the frequency now comes with
-  a unit specifier I changed it to be expressed in kHz)
+- Added units to bost-freq and als resistance
 
- Documentation/devicetree/bindings/mfd/lm3533.txt | 183 +++++++++++++++++++++++
- 1 file changed, 183 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/mfd/lm3533.txt
+ drivers/mfd/lm3533-core.c | 264 ++++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 264 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/mfd/lm3533.txt b/Documentation/devicetree/bindings/mfd/lm3533.txt
-new file mode 100644
-index 000000000000..399df39ec7e7
---- /dev/null
-+++ b/Documentation/devicetree/bindings/mfd/lm3533.txt
-@@ -0,0 +1,183 @@
-+Texas Instruments LM3533 binding
+diff --git a/drivers/mfd/lm3533-core.c b/drivers/mfd/lm3533-core.c
+index 5abcbb2e8849..9f0fb362ee76 100644
+--- a/drivers/mfd/lm3533-core.c
++++ b/drivers/mfd/lm3533-core.c
+@@ -18,6 +18,7 @@
+ #include <linux/gpio.h>
+ #include <linux/i2c.h>
+ #include <linux/mfd/core.h>
++#include <linux/of_gpio.h>
+ #include <linux/regmap.h>
+ #include <linux/seq_file.h>
+ #include <linux/slab.h>
+@@ -25,6 +26,7 @@
+ 
+ #include <linux/mfd/lm3533.h>
+ 
++#define LM3533_DEFAULT_BRIGHTNESS	200
+ 
+ #define LM3533_BOOST_OVP_MASK		0x06
+ #define LM3533_BOOST_OVP_SHIFT		1
+@@ -588,10 +590,266 @@ static const struct regmap_config regmap_config = {
+ 	.precious_reg	= lm3533_precious_register,
+ };
+ 
++static int lm3533_of_parse_enum(struct device_node *node,
++				const char *propname,
++				const unsigned *match, size_t num_matches)
++{
++	size_t i;
++	int ret;
++	u32 val;
 +
-+This binding describes the Texas Instruments LM3533, a lighting power solution
-+for smartphone handsets. The common properties are described directly in the
-+node, while each individual component are described in an optional subnode.
++	ret = of_property_read_u32(node, propname, &val);
++	if (ret < 0)
++		return ret;
 +
-+- compatible:
-+	Usage: required
-+	Value type: <stringlist>
-+	Definition: must be:
-+		    "ti,lm3533"
++	for (i = 0; i < num_matches; i++) {
++		if (val == match[i])
++			return i;
++	}
 +
-+- reg:
-+	Usage: required
-+	Value type: <u32>
-+	Definition: i2c address of the LM3533 chip
++	return -EINVAL;
++}
 +
-+- ti,hwen-gpios:
-+	Usage: required
-+	Value type: <prop-encoded-array>
-+	Definition: reference to gpio pin connected to the HWEN input; as
-+		    specified in "gpio/gpio.txt"
++static int lm3533_of_parse_pwm_zones(struct device_node *node)
++{
++	const char *propname = "ti,pwm-zones";
++	u32 zones[5];
++	int count;
++	int ret;
++	int i;
 +
-+- ti,als-supply:
-+	Usage: optional
-+	Value type: <prop-encoded-array>
-+	Definition: reference to regulator powering the V_als input; as
-+		    specified in "regulator/regulator.txt"
++	count = of_property_count_u32_elems(node, propname);
++	if (count == -EINVAL)
++		return 0;
++	if (count <= 0)
++		return count;
++	if (count >= ARRAY_SIZE(zones))
++		return -EINVAL;
 +
-+- ti,boost-freq-khz:
-+	Usage: required
-+	Value type: <u32>
-+	Definition: switch-frequency of the boost converter, must be either:
-+		    500 or 1000
++	ret = of_property_read_u32_array(node, propname, zones, count);
++	if (ret < 0)
++		return ret;
 +
-+- ti,boost-ovp:
-+	Usage: required
-+	Value type: <u32>
-+	Definition: over voltage protection limit, must be one of: 16, 24, 32
-+		    or 40
++	/* Enable pwm input, and enable the selected zones */
++	ret = BIT(0);
++	for (i = 0; i < count; i++)
++		ret |= BIT(zones[i] + 1);
 +
-+- #address-cells:
-+	Usage: required
-+	Value type: <u32>
-+	Definition: must be 1
++	return ret;
++}
 +
-+- #size-cells:
-+	Usage: required
-+	Value type: <u32>
-+	Definition: must be 0
++static int lm3533_of_parse_als_node(struct device *dev,
++				    struct device_node *node,
++				    struct lm3533_platform_data *pdata)
++{
++	struct lm3533_als_platform_data *als_pdata;
++	int ret;
++	u32 val;
 +
-+= ALS SUBNODE
-+The als subnode must be named "als", it carries the als related properties.
++	als_pdata = devm_kzalloc(dev,
++				 sizeof(struct lm3533_als_platform_data),
++				 GFP_KERNEL);
++	if (!als_pdata)
++		return -ENOMEM;
 +
-+- ti,als-resistance-ohm:
-+	Usage: required (unless ti,pwm-mode is specified)
-+	Value type: <u32>
-+	Definition: specifies the resistor value (R_als), in Ohm. Valid values
-+		    ranges from 200kOhm to 1574Ohm.
++	als_pdata->pwm_mode = of_property_read_bool(node, "ti,pwm-mode");
 +
-+- ti,pwm-mode:
-+	Usage: optional
-+	Value type: <empty>
-+	Definition: specifies, if present, that the als should operate in pwm
-+		    mode - rather than analog mode
++	ret = of_property_read_u32(node, "ti,als-resistance-ohm", &val);
++	if (ret < 0 && ret != -EINVAL) {
++		dev_err(dev, "unable to read ti,als-resistance-ohm");
++		return ret;
++	}
 +
-+= BACKLIGHT NODES
-+Backlight subnodes must be named "backlight", they carry the backlight related
-+properties.
++	/* Leave@high-Z, if the property was omitted or specified as 0 */
++	if (!ret && val != 0)
++		als_pdata->r_select = 200000 / val;
 +
-+- reg:
-+	Usage: required
-+	Value type: <u32>
-+	Definition: specifies which of the two backlights this node corresponds
-+		    to
++	pdata->als = als_pdata;
 +
-+- default-brightness:
-+	Usage: optional
-+	Value type: <32>
-+	Definition: specifies the default brightness for the backlight, in
-+		    units of brightness [0-255]
++	return 0;
++}
 +
-+- label:
-+	Usage: required
-+	Value type: <string>
-+	Definition: specifies a name of this backlight
++static int lm3533_of_parse_bl_node(struct device *dev,
++				   struct device_node *node,
++				   struct lm3533_platform_data *pdata)
++{
++	struct lm3533_bl_platform_data *bl_pdata;
++	int ret;
++	u32 reg;
++	u32 val;
 +
-+- led-max-microamp:
-+	Usage: required
-+	Value type: <u32>
-+	Definition: specifies the max current for this backlight, in uA, as
-+		    described in "leds/common.txt"
++	ret = of_property_read_u32(node, "reg", &reg);
++	if (ret < 0 || reg >= ARRAY_SIZE(lm3533_bl_devs)) {
++		dev_err(dev, "invalid reg property\n");
++		return ret;
++	}
 +
-+- ti,pwm-zones:
-+	Usage: optional
-+	Value type: <u32 list>
-+	Definition: lists the ALS zones to be PWM controlled for this backlight,
-+		    the values in the list are in the range [0 - 4]
++	bl_pdata = &pdata->backlights[reg];
 +
-+= LED NODES
-+LED subnodes must be named "led", they carry the LED related properties.
++	/* Increment num_backlights if we're filling a new space */
++	if (reg + 1 > pdata->num_backlights)
++		pdata->num_backlights = reg + 1;
 +
-+- reg:
-+	Usage: required
-+	Value type: <u32>
-+	Definition: specifies which of the four LEDs this node corresponds to
++	ret = of_property_read_string(node, "label",
++				      (const char **)&bl_pdata->name);
++	if (ret < 0) {
++		dev_err(dev, "unable to parse label\n");
++		return ret;
++	}
 +
-+- linux,default-trigger:
-+	Usage: optional
-+	Value type: <string>
-+	Definition: specifies the default trigger for the LED, as described in
-+		    "leds/common.txt"
++	ret = of_property_read_u32(node, "led-max-microamp", &val);
++	if (ret < 0) {
++		dev_err(dev, "unable to parse led-max-microamp\n");
++		return ret;
++	}
++	bl_pdata->max_current = val;
 +
-+- label:
-+	Usage: required
-+	Value type: <string>
-+	Definition: specifies a name of this LED, as described in
-+		    "leds/common.txt"
++	val = LM3533_DEFAULT_BRIGHTNESS;
++	ret = of_property_read_u32(node, "default-brightness", &val);
++	if (ret < 0 && ret != -EINVAL) {
++		dev_err(dev, "unable to parse default-brightness\n");
++		return ret;
++	}
++	bl_pdata->default_brightness = val;
 +
-+- led-max-microamp:
-+	Usage: required
-+	Value type: <u32>
-+	Definition: specifies the max current for this LED, in uA, as described
-+		    in "leds/common.txt"
++	ret = lm3533_of_parse_pwm_zones(node);
++	if (ret < 0) {
++		dev_err(dev, "failed to parse ti,pwm-zones\n");
++		return ret;
++	}
++	bl_pdata->pwm = ret;
 +
-+- ti,pwm-zones:
-+	Usage: optional
-+	Value type: <u32 list>
-+	Definition: lists the ALS zones to be PWM controlled for this LED, the
-+		    values in the list are in the range [0 - 4]
++	return 0;
++}
 +
-+= EXAMPLE
++static int lm3533_of_parse_led_node(struct device *dev,
++				    struct device_node *node,
++				    struct lm3533_platform_data *pdata)
++{
++	struct lm3533_led_platform_data *led_pdata;
++	int ret;
++	u32 reg;
++	u32 val;
 +
-+i2c at 12460000 {
-+	compatible = "qcom,i2c-qup-v1.1.1";
-+	...
++	ret = of_property_read_u32(node, "reg", &reg);
++	if (ret < 0 || reg >= ARRAY_SIZE(lm3533_led_devs)) {
++		dev_err(dev, "invalid reg property\n");
++		return ret;
++	}
 +
-+	lm3533 at 36 {
-+		compatible = "ti,lm3533";
-+		reg = <0x36>;
++	led_pdata = &pdata->leds[reg];
 +
-+		ti,hwen-gpios = <&pm8921_gpio 26 GPIO_ACTIVE_HIGH>;
-+		ti,als-supply = <&pm8921_l11>;
++	/* Increment num_leds if we're filling a new space */
++	if (reg + 1 > pdata->num_leds)
++		pdata->num_leds = reg + 1;
 +
-+		ti,boost-freq = <500000>;
-+		ti,boost-ovp = <24>;
++	ret = of_property_read_string(node, "label",
++				      (const char **)&led_pdata->name);
++	if (ret < 0) {
++		dev_err(dev, "unable to parse label\n");
++		return ret;
++	}
 +
-+		#address-cells = <1>;
-+		#size-cells = <0>;
++	ret = of_property_read_u32(node, "led-max-microamp", &val);
++	if (ret < 0) {
++		dev_err(dev, "unable to parse led-max-microamp\n");
++		return ret;
++	}
++	led_pdata->max_current = val;
 +
-+		als {
-+			ti,als-resistance = <200000>;
-+		};
++	ret = of_property_read_string(node, "linux,default-trigger",
++				      &led_pdata->default_trigger);
++	if (ret < 0 && ret != -EINVAL) {
++		dev_err(dev, "unable to parse default-trigger\n");
++		return ret;
++	}
 +
-+		backlight at 0 {
-+			reg = <0>;
-+			label = "backlight";
++	ret = lm3533_of_parse_pwm_zones(node);
++	if (ret < 0) {
++		dev_err(dev, "failed to parse ti,pwm-zones\n");
++		return ret;
++	}
++	led_pdata->pwm = ret;
 +
-+			led-max-microamp = <20200>;
-+		};
++	return 0;
++}
 +
-+		led at 0 {
-+			reg = <0>;
-+			label = "red";
-+
-+			led-max-microamp = <5000>;
-+		};
-+
-+		led at 1 {
-+			reg = <1>;
-+			label = "green";
-+
-+			led-max-microamp = <5000>;
-+		};
-+
-+		led at 2 {
-+			reg = <2>;
-+			label = "blue";
-+
-+			led-max-microamp = <5000>;
-+		};
++static int lm3533_pdata_from_of_node(struct device *dev)
++{
++	struct lm3533_platform_data *pdata;
++	struct device_node *node;
++	int ret;
++	const unsigned freqs[] = {
++		[LM3533_BOOST_FREQ_500KHZ] = 500,
++		[LM3533_BOOST_FREQ_1000KHZ] = 1000,
++	};
++	const unsigned ovps[] = {
++		[LM3533_BOOST_OVP_16V] = 16,
++		[LM3533_BOOST_OVP_24V] = 24,
++		[LM3533_BOOST_OVP_32V] = 32,
++		[LM3533_BOOST_OVP_40V] = 40,
 +	};
 +
++	pdata = devm_kzalloc(dev, sizeof(*pdata), GFP_KERNEL);
++	if (!pdata)
++		return -ENOMEM;
++
++	pdata->backlights = devm_kcalloc(dev,
++					 ARRAY_SIZE(lm3533_bl_devs),
++					 sizeof(struct lm3533_bl_platform_data),
++					 GFP_KERNEL);
++	if (!pdata->backlights)
++		return -ENOMEM;
++
++	pdata->leds = devm_kcalloc(dev,
++				   ARRAY_SIZE(lm3533_led_devs),
++				   sizeof(struct lm3533_led_platform_data),
++				   GFP_KERNEL);
++	if (!pdata->leds)
++		return -ENOMEM;
++
++	pdata->gpio_hwen = of_get_named_gpio(dev->of_node, "ti,hwen-gpios", 0);
++	if (pdata->gpio_hwen < 0)
++		return pdata->gpio_hwen;
++
++	ret = lm3533_of_parse_enum(dev->of_node, "ti,boost-freq-khz", freqs, 2);
++	if (ret < 0) {
++		dev_err(dev, "failed to parse ti,boost-freq-khz\n");
++		return ret;
++	}
++	pdata->boost_freq = ret;
++
++	ret = lm3533_of_parse_enum(dev->of_node, "ti,boost-ovp", ovps, 4);
++	if (ret < 0) {
++		dev_err(dev, "failed to parse ti,boost-ovp\n");
++		return ret;
++	}
++	pdata->boost_ovp = ret;
++
++	for_each_child_of_node(dev->of_node, node) {
++		if (!of_node_cmp(node->name, "als"))
++			ret = lm3533_of_parse_als_node(dev, node, pdata);
++		else if (!of_node_cmp(node->name, "backlight"))
++			ret = lm3533_of_parse_bl_node(dev, node, pdata);
++		else if (!of_node_cmp(node->name, "led"))
++			ret = lm3533_of_parse_led_node(dev, node, pdata);
++
++		if (ret < 0) {
++			of_node_put(node);
++			return ret;
++		}
++	}
++
++	dev->platform_data = pdata;
++
++	return 0;
++}
++
+ static int lm3533_i2c_probe(struct i2c_client *i2c,
+ 					const struct i2c_device_id *id)
+ {
+ 	struct lm3533 *lm3533;
++	int ret;
+ 
+ 	dev_dbg(&i2c->dev, "%s\n", __func__);
+ 
+@@ -608,6 +866,12 @@ static int lm3533_i2c_probe(struct i2c_client *i2c,
+ 	lm3533->dev = &i2c->dev;
+ 	lm3533->irq = i2c->irq;
+ 
++	if (i2c->dev.of_node) {
++		ret = lm3533_pdata_from_of_node(lm3533->dev);
++		if (ret < 0)
++			return ret;
++	}
++
+ 	return lm3533_device_init(lm3533);
+ }
+ 
 -- 
 2.4.2
