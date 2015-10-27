@@ -1,33 +1,50 @@
 From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
-Date: Tue, 27 Oct 2015 21:25:11 +0100
-Subject: v7-M: Fixing XIP when the kernel is in ROM
-In-Reply-To: <562FA053.6010208@st.com>
-References: <20151026012710.GA17365@laptop>
- <20151026080537.GW4931@pengutronix.de>
- <CAAEAJfB0yywtQ2MrYf2ih5+a3fZJXAy0hFSXWA038wQMQswa7g@mail.gmail.com>
- <CAAEAJfD29_PSTw+srx7d2YrF+Akx-_94Wv9ifKzT+8HTfH5tGA@mail.gmail.com>
- <562FA053.6010208@st.com>
-Message-ID: <CALszF6C4B-S-o3E1OHK3+bKpDQ8a64Ly-ABNQwfSfj95y7qFyA@mail.gmail.com>
+Date: Tue, 27 Oct 2015 21:31:52 +0100
+Subject: [PATCH v2 8/9] ARM: dts: Add leds support to STM32F429 Discovery
+ board
+In-Reply-To: <CACRpkdYjq9XqKM4imYsaa_HBopS7uFnbb6gf=hRZHGC4baafAg@mail.gmail.com>
+References: <1445102604-11502-1-git-send-email-mcoquelin.stm32@gmail.com>
+ <1445102604-11502-9-git-send-email-mcoquelin.stm32@gmail.com>
+ <CACRpkdYjq9XqKM4imYsaa_HBopS7uFnbb6gf=hRZHGC4baafAg@mail.gmail.com>
+Message-ID: <CALszF6Bo3x4jWnvDc=28s=517YJrv2=3BuuYmxjqP4ciF17fcQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-10-27 17:03 GMT+01:00 Maxime Coquelin <maxime.coquelin@st.com>:
-> Hi Ezequiel,
+2015-10-26 14:41 GMT+01:00 Linus Walleij <linus.walleij@linaro.org>:
+> On Sat, Oct 17, 2015 at 7:23 PM, Maxime Coquelin
+> <mcoquelin.stm32@gmail.com> wrote:
 >
-> On 10/27/2015 04:35 PM, Ezequiel Garcia wrote:
->>>
->>> >>>The temporary stack is allocated in the .text.init section
->>> >>>and so this doesn't work when the kernel is executing from ROM.
->>
->> >>
->> >>If sp isn't used, how does it break you setup?
+>> Signed-off-by: Maxime Coquelin <mcoquelin.stm32@gmail.com>
+> (...)
+>> +       leds {
+>> +               compatible = "gpio-leds";
+>> +               red {
+>> +                       gpios = <&gpiog 14 0>;
+>> +               };
+>> +               green {
+>> +                       gpios = <&gpiog 13 0>;
+>> +               };
 >
-> STM32 machine works fine with XIP from internal flash memory, so as Uwe, I'm
-> surprised it solves your problem.
+> I suggest you add labels to these LEDs.
 >
-> I will have a try with your patch later today.
+> label = "red-LED"
+> label = "green-LED"
+>
+> This make things so much easier in sysfs.
 
-Just tested, and confirm it works with (and without) your patch in XIP on STM32.
+I'm not sure to understand where it makes things easier in sysfs.
+This is the sysfs path for the red led:
+/sys/class/leds/red/
 
-Regards,
+Indeed, if label is not present, it gets the node name.
+
+>
+> Usually people also want to add a default linux,trigger to these,
+> like linux,default-trigger = "heartbeat"; but whatever you prefer.
+
+Makes sense, I will add default trigger in next version.
+
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+
+Thanks!
 Maxime
