@@ -1,53 +1,66 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 27 Oct 2015 16:42:13 +0000
-Subject: [PATCH 2/2] arm64: cachetype: fix definitions of ICACHEF_* flags
-In-Reply-To: <1445947555-2109-2-git-send-email-will.deacon@arm.com>
-References: <1445947555-2109-1-git-send-email-will.deacon@arm.com>
- <1445947555-2109-2-git-send-email-will.deacon@arm.com>
-Message-ID: <20151027164213.GL3091@leverpostej>
+From: tomasz.nowicki@linaro.org (Tomasz Nowicki)
+Date: Tue, 27 Oct 2015 17:47:04 +0100
+Subject: [Linaro-acpi] [PATCH V1 07/11] XEN / PCI: Remove the dependence
+ on arch x86 when PCI_MMCONFIG=y
+In-Reply-To: <1445963922-22711-8-git-send-email-tn@semihalf.com>
+References: <1445963922-22711-1-git-send-email-tn@semihalf.com>
+ <1445963922-22711-8-git-send-email-tn@semihalf.com>
+Message-ID: <562FAA88.3020609@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 27, 2015 at 12:05:55PM +0000, Will Deacon wrote:
-> test_bit and set_bit take the bit number to operate on, rather than a
-> mask. This patch fixes the ICACHEF_* definitions so that they represent
-> the bit index in __icache_flags as opposed to the mask returned by the
-> BIT macro.
-> 
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
++ Stefano
 
-At least they were used consistently, so this is a cleanup rather than a
-fix.
-
-Reviewed-by: Mark Rutland <mark.rutland@arm.com>
-
-Mark.
-
+On 27.10.2015 17:38, Tomasz Nowicki wrote:
+> From: Hanjun Guo <hanjun.guo@linaro.org>
+>
+> In drivers/xen/pci.c, there are arch x86 dependent codes when
+> CONFIG_PCI_MMCONFIG is enabled, since CONFIG_PCI_MMCONFIG
+> depends on ACPI, so this will prevent XEN PCI running on other
+> architectures using ACPI with PCI_MMCONFIG enabled (such as ARM64).
+>
+> Fortunatly, it can be sloved in a simple way. In drivers/xen/pci.c,
+> the only x86 dependent code is if ((pci_probe & PCI_PROBE_MMCONF) == 0),
+> and it's defined in asm/pci_x86.h, the code means that
+> if the PCI resource is not probed in PCI_PROBE_MMCONF way, just
+> ingnore the xen mcfg init. Actually this is duplicate, because
+> if PCI resource is not probed in PCI_PROBE_MMCONF way, the
+> pci_mmconfig_list will be empty, and the if (list_empty())
+> after it will do the same job.
+>
+> So just remove the arch related code and the head file, this
+> will be no functional change for x86, and also makes xen/pci.c
+> usable for other architectures.
+>
+> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+> CC: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
+> CC: Boris Ostrovsky <boris.ostrovsky@oracle.com>
 > ---
->  arch/arm64/include/asm/cachetype.h | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/arch/arm64/include/asm/cachetype.h b/arch/arm64/include/asm/cachetype.h
-> index da2fc9e3cedd..f5588692f1d4 100644
-> --- a/arch/arm64/include/asm/cachetype.h
-> +++ b/arch/arm64/include/asm/cachetype.h
-> @@ -34,8 +34,8 @@
->  
->  #define CTR_L1IP(ctr)	(((ctr) >> CTR_L1IP_SHIFT) & CTR_L1IP_MASK)
->  
-> -#define ICACHEF_ALIASING	BIT(0)
-> -#define ICACHEF_AIVIVT		BIT(1)
-> +#define ICACHEF_ALIASING	0
-> +#define ICACHEF_AIVIVT		1
->  
->  extern unsigned long __icache_flags;
->  
-> -- 
-> 2.1.4
-> 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
+>   drivers/xen/pci.c | 6 ------
+>   1 file changed, 6 deletions(-)
+>
+> diff --git a/drivers/xen/pci.c b/drivers/xen/pci.c
+> index 6785ebb..9a8dbe3 100644
+> --- a/drivers/xen/pci.c
+> +++ b/drivers/xen/pci.c
+> @@ -28,9 +28,6 @@
+>   #include <asm/xen/hypervisor.h>
+>   #include <asm/xen/hypercall.h>
+>   #include "../pci/pci.h"
+> -#ifdef CONFIG_PCI_MMCONFIG
+> -#include <asm/pci_x86.h>
+> -#endif
+>
+>   static bool __read_mostly pci_seg_supported = true;
+>
+> @@ -222,9 +219,6 @@ static int __init xen_mcfg_late(void)
+>   	if (!xen_initial_domain())
+>   		return 0;
+>
+> -	if ((pci_probe & PCI_PROBE_MMCONF) == 0)
+> -		return 0;
+> -
+>   	if (list_empty(&pci_mmcfg_list))
+>   		return 0;
+>
+>
