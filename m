@@ -1,99 +1,58 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Tue, 27 Oct 2015 11:28:31 +0900
-Subject: [PATCH 2/2] pinctrl: uniphier: guard uniphier directory with
- CONFIG_PINCTRL_UNIPHIER
-In-Reply-To: <1445912911-1292-1-git-send-email-yamada.masahiro@socionext.com>
-References: <1445912911-1292-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <1445912911-1292-2-git-send-email-yamada.masahiro@socionext.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 27 Oct 2015 11:37:04 +0900
+Subject: [PATCH] arm64: page-align sections for DEBUG_RODATA
+In-Reply-To: <1445895753-2095-1-git-send-email-mark.rutland@arm.com>
+References: <1445895753-2095-1-git-send-email-mark.rutland@arm.com>
+Message-ID: <CAKv+Gu-jCxeQt1DffTnYiMLT-jB75GiQCOUR7GqNH7hAeB84LA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-CONFIG_PINCTRL_UNIPHIER is more suitable than CONFIG_ARCH_UNIPHIER
-to guard the drivers/pinctrl/uniphier directory.
+On 27 October 2015 at 06:42, Mark Rutland <mark.rutland@arm.com> wrote:
+> A kernel built with DEBUG_RO_DATA && !CONFIG_DEBUG_ALIGN_RODATA doesn't
+> have .text aligned to a page boundary, though fixup_executable works at
+> page-granularity thanks to its use of create_mapping. If .text is not
+> page-aligned, the first page it exists in may be marked non-executable,
+> leading to failures when an attempt is made to execute code in said
+> page.
+>
+> This patch upgrades ALIGN_DEBUG_RO and ALIGN_DEBUG_RO_MIN to force page
+> alignment for DEBUG_RO_DATA && !CONFIG_DEBUG_ALIGN_RODATA kernels,
+> ensuring that all sections with specific RWX permission requirements are
+> mapped with the correct permissions.
+>
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> Reported-by: Jeremy Linton <jeremy.linton@arm.com>
+> Reviewed-by: Laura Abbott <laura@labbott.name>
+> Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Suzuki Poulose <suzuki.poulose@arm.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> ---
+>  arch/arm64/kernel/vmlinux.lds.S | 5 ++++-
+>  1 file changed, 4 insertions(+), 1 deletion(-)
+>
+> Note: this is intended to supercede [1,2].
+>
+> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-October/380486.html
+> [2] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-October/380999.html
+>
+> diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
+> index 9807333..4d77757 100644
+> --- a/arch/arm64/kernel/vmlinux.lds.S
+> +++ b/arch/arm64/kernel/vmlinux.lds.S
+> @@ -60,9 +60,12 @@ PECOFF_FILE_ALIGNMENT = 0x200;
+>  #define PECOFF_EDATA_PADDING
+>  #endif
+>
+> -#ifdef CONFIG_DEBUG_ALIGN_RODATA
+> +#if defined(CONFIG_DEBUG_ALIGN_RODATA)
+>  #define ALIGN_DEBUG_RO                 . = ALIGN(1<<SECTION_SHIFT);
+>  #define ALIGN_DEBUG_RO_MIN(min)                ALIGN_DEBUG_RO
+> +#elif defined(CONFIG_DEBUG_RODATA)
+> +#define ALIGN_DEBUG_RO                 . = ALIGN(1<<PAGE_SHIFT);
+> +#define ALIGN_DEBUG_RO_MIN(min)                ALIGN_DEBUG_RO
+>  #else
+>  #define ALIGN_DEBUG_RO
+>  #define ALIGN_DEBUG_RO_MIN(min)                . = ALIGN(min);
 
-The current CONFIG_PINCTRL_UNIPHIER_CORE is a bit long
-(it would break the indentation in drivers/pinctrl/Makefile),
-so rename it into CONFIG_PINCTRL_UNIPHIER.
-
-Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
----
-
- drivers/pinctrl/Makefile          |  2 +-
- drivers/pinctrl/uniphier/Kconfig  | 14 +++++++-------
- drivers/pinctrl/uniphier/Makefile |  2 +-
- 3 files changed, 9 insertions(+), 9 deletions(-)
-
-diff --git a/drivers/pinctrl/Makefile b/drivers/pinctrl/Makefile
-index cad077c..367af9b 100644
---- a/drivers/pinctrl/Makefile
-+++ b/drivers/pinctrl/Makefile
-@@ -50,6 +50,6 @@ obj-$(CONFIG_PINCTRL_SAMSUNG)	+= samsung/
- obj-$(CONFIG_PINCTRL_SH_PFC)	+= sh-pfc/
- obj-$(CONFIG_PLAT_SPEAR)	+= spear/
- obj-$(CONFIG_ARCH_SUNXI)	+= sunxi/
--obj-$(CONFIG_ARCH_UNIPHIER)	+= uniphier/
-+obj-$(CONFIG_PINCTRL_UNIPHIER)	+= uniphier/
- obj-$(CONFIG_ARCH_VT8500)	+= vt8500/
- obj-$(CONFIG_ARCH_MEDIATEK)	+= mediatek/
-diff --git a/drivers/pinctrl/uniphier/Kconfig b/drivers/pinctrl/uniphier/Kconfig
-index b1d2f941..7ca72bc 100644
---- a/drivers/pinctrl/uniphier/Kconfig
-+++ b/drivers/pinctrl/uniphier/Kconfig
-@@ -1,6 +1,6 @@
- if ARCH_UNIPHIER
- 
--config PINCTRL_UNIPHIER_CORE
-+config PINCTRL_UNIPHIER
- 	bool
- 	select PINMUX
- 	select GENERIC_PINCONF
-@@ -8,31 +8,31 @@ config PINCTRL_UNIPHIER_CORE
- config PINCTRL_UNIPHIER_PH1_LD4
- 	tristate "UniPhier PH1-LD4 SoC pinctrl driver"
- 	default y
--	select PINCTRL_UNIPHIER_CORE
-+	select PINCTRL_UNIPHIER
- 
- config PINCTRL_UNIPHIER_PH1_PRO4
- 	tristate "UniPhier PH1-Pro4 SoC pinctrl driver"
- 	default y
--	select PINCTRL_UNIPHIER_CORE
-+	select PINCTRL_UNIPHIER
- 
- config PINCTRL_UNIPHIER_PH1_SLD8
- 	tristate "UniPhier PH1-sLD8 SoC pinctrl driver"
- 	default y
--	select PINCTRL_UNIPHIER_CORE
-+	select PINCTRL_UNIPHIER
- 
- config PINCTRL_UNIPHIER_PH1_PRO5
- 	tristate "UniPhier PH1-Pro5 SoC pinctrl driver"
- 	default y
--	select PINCTRL_UNIPHIER_CORE
-+	select PINCTRL_UNIPHIER
- 
- config PINCTRL_UNIPHIER_PROXSTREAM2
- 	tristate "UniPhier ProXstream2 SoC pinctrl driver"
- 	default y
--	select PINCTRL_UNIPHIER_CORE
-+	select PINCTRL_UNIPHIER
- 
- config PINCTRL_UNIPHIER_PH1_LD6B
- 	tristate "UniPhier PH1-LD6b SoC pinctrl driver"
- 	default y
--	select PINCTRL_UNIPHIER_CORE
-+	select PINCTRL_UNIPHIER
- 
- endif
-diff --git a/drivers/pinctrl/uniphier/Makefile b/drivers/pinctrl/uniphier/Makefile
-index e215b10..e7ce967 100644
---- a/drivers/pinctrl/uniphier/Makefile
-+++ b/drivers/pinctrl/uniphier/Makefile
-@@ -1,4 +1,4 @@
--obj-$(CONFIG_PINCTRL_UNIPHIER_CORE)		+= pinctrl-uniphier-core.o
-+obj-y						+= pinctrl-uniphier-core.o
- 
- obj-$(CONFIG_PINCTRL_UNIPHIER_PH1_LD4)		+= pinctrl-ph1-ld4.o
- obj-$(CONFIG_PINCTRL_UNIPHIER_PH1_PRO4)		+= pinctrl-ph1-pro4.o
--- 
-1.9.1
+Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
