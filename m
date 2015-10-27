@@ -1,29 +1,38 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Tue, 27 Oct 2015 22:14:13 +0100
-Subject: [PATCH v7 09/17] Documentation: drm/bridge: add document for
- analogix_dp
-In-Reply-To: <1445655964-15237-4-git-send-email-ykk@rock-chips.com>
-References: <1445599415-30856-1-git-send-email-ykk@rock-chips.com>
- <1445655964-15237-1-git-send-email-ykk@rock-chips.com>
- <1445655964-15237-4-git-send-email-ykk@rock-chips.com>
-Message-ID: <7020871.rDEeBYHTDp@phil>
+From: timur@codeaurora.org (Timur Tabi)
+Date: Tue, 27 Oct 2015 16:15:45 -0500
+Subject: [PATCH v2] arm64/efi: prefer AllocatePages() over efi_low_alloc()
+ for vmlinux
+In-Reply-To: <1437737907-10477-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1437737907-10477-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <CAOZdJXWgJKb7S0_3AJ4oT-gbgzMRYXydOoByh7chuervwJN1sw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Patch subject should probably be something like:
+On Fri, Jul 24, 2015 at 6:38 AM, Ard Biesheuvel
+<ard.biesheuvel@linaro.org> wrote:
+>
+> +               /*
+> +                * First, try a straight allocation at the preferred offset.
+> +                * This will work around the issue where, if dram_base == 0x0,
+> +                * efi_low_alloc() refuses to allocate at 0x0 (to prevent the
+> +                * address of the allocation to be mistaken for a FAIL return
+> +                * value or a NULL pointer). It will also ensure that, on
+> +                * platforms where the [dram_base, dram_base + TEXT_OFFSET)
+> +                * interval is partially occupied by the firmware (like on APM
+> +                * Mustang), we can still place the kernel at the address
+> +                * 'dram_base + TEXT_OFFSET'.
+> +                */
+> +               *image_addr = *reserve_addr = dram_base + TEXT_OFFSET;
+> +               nr_pages = round_up(kernel_memsize, EFI_ALLOC_ALIGN) /
+> +                          EFI_PAGE_SIZE;
+> +               status = efi_call_early(allocate_pages, EFI_ALLOCATE_ADDRESS,
+> +                                       EFI_LOADER_DATA, nr_pages,
+> +                                       (efi_physical_addr_t *)reserve_addr);
 
-dt-bindings: add document for rockchip variant of analogix_dp
+This causes our kernel to crash, because on our system, dram_base is
+not 2MB aligned.  I'll be posting a patch soon that fixes this.
 
-or similar, but definitly should mention that it's the Rockchip variant.
-
-
-Am Samstag, 24. Oktober 2015, 11:06:03 schrieb Yakir Yang:
-> Rockchip DP driver is a helper driver of analogix_dp coder driver,
-> so most of the DT property should be descriped in analogix_dp document.
-> 
-> Tested-by: Javier Martinez Canillas <javier@osg.samsung.com>
-> Signed-off-by: Yakir Yang <ykk@rock-chips.com>
-
-everything else looks nice, so with a better subject
-
-Reviewed-by: Heiko Stuebner <heiko@sntech.de>
+-- 
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project.
