@@ -1,25 +1,33 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 27 Oct 2015 13:08:42 +0100
-Subject: [PATCH] arm64/efi: register UEFI runtime mmio regions as iomem
- resources
-In-Reply-To: <1445848860-9547-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <CAD0U-h+cr0xpAAcCD1P8k2hUcJJL2Ga+-Grrb8WaZrgm08G2nA@mail.gmail.com>
- <1445848860-9547-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <CACRpkdact=Jh5WpghnyPU1Oaiu8pgvb=kwva-nEkJUX9NKL6xw@mail.gmail.com>
+From: uri.mashiach@compulab.co.il (Uri Mashiach)
+Date: Tue, 27 Oct 2015 14:14:54 +0200
+Subject: [PATCH 0/6] ARM: OMAP2+: dts: cm-t335: initial support
+Message-ID: <1445948100-16446-1-git-send-email-uri.mashiach@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 26, 2015 at 9:41 AM, Ard Biesheuvel
-<ard.biesheuvel@linaro.org> wrote:
+Add basic support for CompuLab cm-t335 module based on AM335X SoC.
 
-> In order to prevent kernel drivers from attaching to MMIO regions
-> that are owned by the firmware, register them as iomem resources.
->
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+CM-T335 is a tiny computer-on-module (CoM) / system-on-module (SoM)
+The module is built around the Texas Instruments Sitara AM3352/4
+system-on-chip.
 
-Is this related to the flash memory discussion so that NOR flash
-will be part of what is considered "I/O memory" and flash
-protection achieved this way?
+The CPU is supplemented with up-to 512MB DDR3 and up-to 1GB of on-board
+NAND storage, WiFi connected to SPI, Bluetooth, Analog audio, Gigabit
+Ethernet, CAN bus.
 
-Yours,
-Linus Walleij
+Ilya Ledvich (6):
+  ARM: OMAP2+: dts: cm-t335: add initial support
+  ARM: OMAP2+: dts: cm-t335: add basic support for I2C
+  ARM: OMAP2+: dts: cm-t335: add support for NAND flash
+  ARM: OMAP2+: dts: cm-t335: add support for MMC
+  ARM: OMAP2+: dts: cm-t335: add support for network device
+  ARM: OMAP2+: dts: cm-t335: add support for PWM backlight
+
+ .../devicetree/bindings/arm/omap/omap.txt          |   3 +
+ arch/arm/boot/dts/Makefile                         |   7 +-
+ arch/arm/boot/dts/am335x-cm-t335.dts               | 347 +++++++++++++++++++++
+ 3 files changed, 354 insertions(+), 3 deletions(-)
+ create mode 100644 arch/arm/boot/dts/am335x-cm-t335.dts
+
+-- 
+2.6.0
