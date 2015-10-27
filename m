@@ -1,44 +1,78 @@
-From: slash.tmp@free.fr (Mason)
-Date: Tue, 27 Oct 2015 15:05:46 +0100
-Subject: Trustzone: DSB before/after SMC
-In-Reply-To: <20151027134318.GD3091@leverpostej>
-References: <562F7CBA.7060806@free.fr> <20151027134318.GD3091@leverpostej>
-Message-ID: <562F84BA.5060203@free.fr>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Tue, 27 Oct 2015 09:26:44 -0500
+Subject: [PATCH v12 0/6] Altera PCIe host controller driver with MSI
+ support
+In-Reply-To: <1445596035-27733-1-git-send-email-lftan@altera.com>
+References: <1445596035-27733-1-git-send-email-lftan@altera.com>
+Message-ID: <20151027142644.GA8660@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27/10/2015 14:43, Mark Rutland wrote:
+Hi Ley,
 
-> On Tue, Oct 27, 2015 at 02:31:38PM +0100, Mason wrote:
+On Fri, Oct 23, 2015 at 06:27:09PM +0800, Ley Foon Tan wrote:
+> This is the 12th version of patch set to add support for Altera PCIe host
+> controller with MSI feature on Altera FPGA device families. This patchset
+> mainly resovle the comments from Bjorn.
 > 
->> I have a few questions about SMC. (I'm using Cortex-A9)
->>
->> Platforms that use SMC often/always execute DSB beforehand.
 > 
-> Please give an example. We don't do this for PSCI, for instance.
-
-arch/arm/mach-exynos/exynos-smc.S
-arch/arm/mach-highbank/smc.S
-arch/arm/mach-omap2/omap-smc.S
-
-A few that don't execute DSB before SMC:
-arch/arm/mach-bcm/bcm_kona_smc.c
-arch/arm/mach-keystone/smc.S
-
->> 1a) Is DSB required before SMC?
->> 1b) Is DSB required  after SMC?
->> 2a) Is DSB required before returning to non-secure OS?
->> 2b) Is DSB required  after returning to non-secure OS?
+> This patchset is based on v4.3-rc6.
 > 
-> It depends on what you're trying to achieve, and the design of both the
-> secure and non-secure OS code.
+> v11->v12 changes:
+> - pcie-altera: use DECLARE_PCI_FIXUP_EARLY for pcie retrain fixup
+> - pcie-altera: move pcie_bus_configure_settings before pci_bus_add_devices
+> - pcie-altera: add %d for irq bit in dev_err()
+> - pcie-altera: prevent enumeration of root complex resources in config accessors
+> - Documentation: add Acked-by from Rob Herring
+> 
+> History:
+> -------
+> [v1]: https://lkml.org/lkml/2015/7/28/395
+> [v2]: https://lkml.org/lkml/2015/7/31/267
+> [v3]: http://www.kernelhub.org/?msg=811940&p=2
+> [v4]: https://lkml.org/lkml/2015/8/17/141
+> [v5]: https://lkml.org/lkml/2015/8/25/238
+> [v6]: https://lkml.org/lkml/2015/9/1/177
+> [v7]: https://lkml.org/lkml/2015/9/20/193
+> [v8]: http://www.kernelhub.org/?msg=853553&p=2
+> [v9]: https://lkml.org/lkml/2015/10/13/998
+> [v10]: https://lkml.org/lkml/2015/10/19/139
+> [v11]: https://lkml.org/lkml/2015/10/22/206
+> 
+> 
+> Ley Foon Tan (6):
+>   arm: add msi.h to Kbuild
+>   pci: add Altera PCI vendor ID
+>   pci:host: Add Altera PCIe host controller driver
+>   pci: altera: Add Altera PCIe MSI driver
+>   Documentation: dt-bindings: pci: altera pcie device tree binding
+>   MAINTAINERS: Add Altera PCIe and MSI drivers maintainer
+> 
+>  .../devicetree/bindings/pci/altera-pcie-msi.txt    |  28 +
+>  .../devicetree/bindings/pci/altera-pcie.txt        |  49 ++
+>  MAINTAINERS                                        |  16 +
+>  arch/arm/include/asm/Kbuild                        |   1 +
+>  drivers/pci/host/Kconfig                           |  16 +
+>  drivers/pci/host/Makefile                          |   2 +
+>  drivers/pci/host/pcie-altera-msi.c                 | 314 +++++++++++
+>  drivers/pci/host/pcie-altera.c                     | 580 +++++++++++++++++++++
+>  include/linux/pci_ids.h                            |   2 +
+>  9 files changed, 1008 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/pci/altera-pcie-msi.txt
+>  create mode 100644 Documentation/devicetree/bindings/pci/altera-pcie.txt
+>  create mode 100644 drivers/pci/host/pcie-altera-msi.c
+>  create mode 100644 drivers/pci/host/pcie-altera.c
 
-In my case, I just want to write the L2_CONTROL register.
+I applied these to pci/host-altera for v4.4, thanks!
 
-> A DSB is certainly not always required before nor after an SMC.
+I squashed these into three patches:
 
-That makes sense. But a colleague mentioned that the secure OS may
-be using different MMU mappings. In that case, it might be required
-to wait for all in-flight accesses to resolve?
+  - add msi.h to Kbuild
+  - add Altera host driver (including DT binding and MAINTAINERS update)
+  - add Altera MSI driver (including DT binding and MAINTAINERS update)
 
-Regards.
+Since the convention is to add PCI ID #defines only when they are used in
+multiple places, I replaced PCI_VENDOR_ID_ALTERA with 0x1172 in the single
+place it is used.
+
+Bjorn
