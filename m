@@ -1,25 +1,33 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 27 Oct 2015 17:32:38 +0000
-Subject: [PATCHv2] arm: perf: Add event descriptions
-In-Reply-To: <20151022140557.GA2154@dreric01-gentoo.localdomain>
-References: <20151007182735.GA18706@dreric01-gentoo.localdomain>
- <20151009101338.GH26278@arm.com>
- <20151022140557.GA2154@dreric01-gentoo.localdomain>
-Message-ID: <20151027173238.GE22049@arm.com>
+From: james.morse@arm.com (James Morse)
+Date: Tue, 27 Oct 2015 17:29:17 +0000
+Subject: [PATCH v2 08/11] arm64: kernel: Include _AC definition in page.h
+In-Reply-To: <1445966960-31724-1-git-send-email-james.morse@arm.com>
+References: <1445966960-31724-1-git-send-email-james.morse@arm.com>
+Message-ID: <1445966960-31724-9-git-send-email-james.morse@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 22, 2015 at 07:05:58AM -0700, Drew Richardson wrote:
-> On Fri, Oct 09, 2015 at 03:13:38AM -0700, Will Deacon wrote:
-> > Also, would you be able to do something similar for AArch64 too, please?
-> > (take a look at our for-next/core branch for the latest perf changes).
-> 
-> Here are some almost identical patches for AArch64 based on arm64
-> tree's for-next/core branch. Please note that this is dependent on
-> some change to drivers/perf/arm_pmu.c so that pmu.attr_groups is
-> preserved.
+page.h uses '_AC' in the definition of PAGE_SIZE, but doesn't include
+linux/const.h where this is defined. This produces build warnings when only
+asm/page.h is included by asm code.
 
-Has a revised version of that prerequisite patch been posted anywhere? I
-can't seem to find it in my inbox...
+Signed-off-by: James Morse <james.morse@arm.com>
+---
+ arch/arm64/include/asm/page.h | 2 ++
+ 1 file changed, 2 insertions(+)
 
-Will
+diff --git a/arch/arm64/include/asm/page.h b/arch/arm64/include/asm/page.h
+index 7d9c7e4a424b..74f67d049a63 100644
+--- a/arch/arm64/include/asm/page.h
++++ b/arch/arm64/include/asm/page.h
+@@ -19,6 +19,8 @@
+ #ifndef __ASM_PAGE_H
+ #define __ASM_PAGE_H
+ 
++#include <linux/const.h>
++
+ /* PAGE_SHIFT determines the page size */
+ #ifdef CONFIG_ARM64_64K_PAGES
+ #define PAGE_SHIFT		16
+-- 
+2.1.4
