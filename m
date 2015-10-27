@@ -1,137 +1,74 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Tue, 27 Oct 2015 19:08:58 +0100
-Subject: [PATCH V3 RFT] ARM: bcm2835: enable all bcm2835-relevant in defconfig
-Message-ID: <1445969338-23977-1-git-send-email-stefan.wahren@i2se.com>
+From: Suzuki.Poulose@arm.com (Suzuki K. Poulose)
+Date: Tue, 27 Oct 2015 18:09:24 +0000
+Subject: [PATCH v3 00/24] arm64: Consolidate CPU feature handling
+In-Reply-To: <562C8D68.9040008@reserved-bit.com>
+References: <1444756952-31145-1-git-send-email-suzuki.poulose@arm.com>
+ <562C8D68.9040008@reserved-bit.com>
+Message-ID: <562FBDD4.5030309@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rebuild bcm2835_defconfig using "make bcm2835_defconfig;
-make savedefconfig", and enable manually the following features:
+On 25/10/15 08:06, Siddhesh Poyarekar wrote:
+> On Tuesday 13 October 2015 10:52 PM, Suzuki K. Poulose wrote:
+>> Apart from the selected feature registers, we expose MIDR_EL1 (Main
+>> ID Register). The user should be aware that, reading MIDR_EL1 can be
+>> tricky on a heterogeneous system (just like getcpu()). We export the
+>> value of the current CPU where 'MRS' is executed. REVIDR is not exposed
+>> via MRS, since we cannot guarantee atomic access to both MIDR and REVIDR
+>> (task migration). So they both are exposed via sysfs under :
+>>
+>> 	/sys/devices/system/cpu/cpu$ID/identification/
+>> 							\- midr
+>> 							\- revidr
+>>
+>> The ABI useful for the toolchains (e.g, gcc, dynamic linker, JIT) to make
+>> better runtime decisions based on what is available.
+>
+> Thank you for doing this.  I'm prototyping glibc support to select
+> optimal functions by micro-architecture and I had a couple of concerns.
+>
+> The midr emulation may not be sufficient for glibc to select optimal
+> routines because there could theoretically be sufficient variance
+> between cpus with only different revidr that vendors may write different
+> optimal routines.
 
-* all bcm2835-relevant drivers (MBOX, WDT, DMA, PWM, SND)
-* enable regular stackprotector because CONFIG_CC_STACKPROTECTOR
-  disappear
-* enable some new dependencies in order to keep LED heartbeat
-  ( CONFIG_NEW_LEDS, CONFIG_LEDS_CLASS, CONFIG_LEDS_TRIGGERS )
+But then there is no way we can provide the midr/revidr pair reliably.
+So I guess we can't do much about it.
 
-The following options were removed, because they are enabled implicit:
+>  Secondly, on a heterogeneous system, we won't be able
+> to select a routine reliably using just the emulated instruction since
+> we have no control where it runs and we would want to know what each of
+> the cpus looks like.
 
-CONFIG_RD_BZIP2, CONFIG_RD_LZMA, CONFIG_RD_XZ, CONFIG_RD_LZO,
-CONFIG_USB_DWC2_HOST, CONFIG_EXT4_FS, CONFIG_EXT4_FS_POSIX_ACL
+On a heterogeneous system, we can't do much, as you will anyway need to know
+which CPU you are running on to select the version, which itself is not
+reliable (unless you are pinned to the CPU).
 
-These options became obsolete:
+>
+> The sysfs API solves this problem, but it doesn't seem like an optimal
+> thing to do in an IFUNC resolver in glibc.  CPU information is scattered
 
-CONFIG_RESOURCE_COUNTERS, CONFIG_SCSI_MULTI_LUN
+I agree, the sysfs API is not suitable for low-level users like IFUNC, but
+for tools like JIT to determine the CPUs present on the system.
 
-Signed-off-by: Stefan Wahren <stefan.wahren@i2se.com>
----
- arch/arm/configs/bcm2835_defconfig |   28 +++++++++++++++++-----------
- 1 file changed, 17 insertions(+), 11 deletions(-)
+>
+> Would you be able to consolidate all cpu identification into a single
+> file?  This would allow glibc to just map in the file and read in all of
+> the information in one go, greatly reducing the number of syscalls.
 
-This patch is only compile-tested.
+I am afraid that would impose a new ABI with complications on how we
+handle information about the CPUs in different states (online, offline,
+etc). I am open to suggestions here.
 
-Changes in V3: add explanation about removed options
+>
+> The other alternative I was thinking of was to have an additional hwcap
+> HWCAP_HETEROGENEOUS_CPU which is set if there are different kinds of
+> processor cores in the system, but that will force us to stick to
+> default routines for heterogeneous cores.
 
-Changes in V2: clarify patch description
+See [1] for previous discussion on this topic.
 
-diff --git a/arch/arm/configs/bcm2835_defconfig b/arch/arm/configs/bcm2835_defconfig
-index 31cb073..0fda844 100644
---- a/arch/arm/configs/bcm2835_defconfig
-+++ b/arch/arm/configs/bcm2835_defconfig
-@@ -10,7 +10,6 @@ CONFIG_CGROUP_FREEZER=y
- CONFIG_CGROUP_DEVICE=y
- CONFIG_CPUSETS=y
- CONFIG_CGROUP_CPUACCT=y
--CONFIG_RESOURCE_COUNTERS=y
- CONFIG_CGROUP_PERF=y
- CONFIG_CFS_BANDWIDTH=y
- CONFIG_RT_GROUP_SCHED=y
-@@ -18,10 +17,6 @@ CONFIG_NAMESPACES=y
- CONFIG_SCHED_AUTOGROUP=y
- CONFIG_RELAY=y
- CONFIG_BLK_DEV_INITRD=y
--CONFIG_RD_BZIP2=y
--CONFIG_RD_LZMA=y
--CONFIG_RD_XZ=y
--CONFIG_RD_LZO=y
- CONFIG_CC_OPTIMIZE_FOR_SIZE=y
- CONFIG_KALLSYMS_ALL=y
- CONFIG_EMBEDDED=y
-@@ -29,6 +24,7 @@ CONFIG_EMBEDDED=y
- CONFIG_PROFILING=y
- CONFIG_OPROFILE=y
- CONFIG_JUMP_LABEL=y
-+CONFIG_CC_STACKPROTECTOR_REGULAR=y
- CONFIG_ARCH_MULTI_V6=y
- # CONFIG_ARCH_MULTI_V7 is not set
- CONFIG_ARCH_BCM=y
-@@ -38,7 +34,6 @@ CONFIG_AEABI=y
- CONFIG_KSM=y
- CONFIG_CLEANCACHE=y
- CONFIG_SECCOMP=y
--CONFIG_CC_STACKPROTECTOR=y
- CONFIG_KEXEC=y
- CONFIG_CRASH_DUMP=y
- CONFIG_VFP=y
-@@ -57,7 +52,6 @@ CONFIG_DEVTMPFS_MOUNT=y
- # CONFIG_STANDALONE is not set
- CONFIG_SCSI=y
- CONFIG_BLK_DEV_SD=y
--CONFIG_SCSI_MULTI_LUN=y
- CONFIG_SCSI_CONSTANTS=y
- CONFIG_SCSI_SCAN_ASYNC=y
- CONFIG_NETDEVICES=y
-@@ -77,17 +71,27 @@ CONFIG_SPI=y
- CONFIG_SPI_BCM2835=y
- CONFIG_GPIO_SYSFS=y
- # CONFIG_HWMON is not set
-+CONFIG_WATCHDOG=y
-+CONFIG_BCM2835_WDT=y
- CONFIG_FB=y
- CONFIG_FB_SIMPLE=y
- CONFIG_FRAMEBUFFER_CONSOLE=y
- CONFIG_FRAMEBUFFER_CONSOLE_DETECT_PRIMARY=y
-+CONFIG_SOUND=y
-+CONFIG_SND=y
-+CONFIG_SND_SOC=y
-+CONFIG_SND_BCM2835_SOC_I2S=y
- CONFIG_USB=y
- CONFIG_USB_STORAGE=y
-+CONFIG_USB_DWC2=y
- CONFIG_MMC=y
- CONFIG_MMC_SDHCI=y
- CONFIG_MMC_SDHCI_PLTFM=y
- CONFIG_MMC_SDHCI_BCM2835=y
-+CONFIG_NEW_LEDS=y
-+CONFIG_LEDS_CLASS=y
- CONFIG_LEDS_GPIO=y
-+CONFIG_LEDS_TRIGGERS=y
- CONFIG_LEDS_TRIGGER_TIMER=y
- CONFIG_LEDS_TRIGGER_ONESHOT=y
- CONFIG_LEDS_TRIGGER_HEARTBEAT=y
-@@ -96,17 +100,19 @@ CONFIG_LEDS_TRIGGER_GPIO=y
- CONFIG_LEDS_TRIGGER_DEFAULT_ON=y
- CONFIG_LEDS_TRIGGER_TRANSIENT=y
- CONFIG_LEDS_TRIGGER_CAMERA=y
-+CONFIG_DMADEVICES=y
-+CONFIG_DMA_BCM2835=y
- CONFIG_STAGING=y
--CONFIG_USB_DWC2=y
--CONFIG_USB_DWC2_HOST=y
-+CONFIG_MAILBOX=y
-+CONFIG_BCM2835_MBOX=y
- # CONFIG_IOMMU_SUPPORT is not set
-+CONFIG_PWM=y
-+CONFIG_PWM_BCM2835=y
- CONFIG_EXT2_FS=y
- CONFIG_EXT2_FS_XATTR=y
- CONFIG_EXT2_FS_POSIX_ACL=y
- CONFIG_EXT3_FS=y
- CONFIG_EXT3_FS_POSIX_ACL=y
--CONFIG_EXT4_FS=y
--CONFIG_EXT4_FS_POSIX_ACL=y
- CONFIG_FANOTIFY=y
- CONFIG_MSDOS_FS=y
- CONFIG_VFAT_FS=y
--- 
-1.7.10.4
+[1] https://lkml.org/lkml/2015/9/1/391
+
+Thanks
+Suzuki
