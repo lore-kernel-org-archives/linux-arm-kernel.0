@@ -1,60 +1,42 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 27 Oct 2015 17:23:33 +0100
-Subject: [PATCH] gpio: zynq: Implement irq_(request|release)_resources
-In-Reply-To: <562FA3EE.5040408@ti.com>
-References: <1445607381-7794-1-git-send-email-soren.brinkmann@xilinx.com>
- <CACRpkda4QKEJvwkwGLS7OLTP8Nxu5W05tzbcFXA_FPnBsFtKhw@mail.gmail.com>
- <562FA3EE.5040408@ti.com>
-Message-ID: <CACRpkdYjNWiEdM8kthMXhGXBPYE74hy_xa7bBB6XQrAOaBnehA@mail.gmail.com>
+From: bjorn.andersson@sonymobile.com (Bjorn Andersson)
+Date: Tue, 27 Oct 2015 09:29:32 -0700
+Subject: [PATCH v2 2/3] iio: light: lm3533-als: Print error message on invalid
+ resistance
+In-Reply-To: <1445963373-27790-1-git-send-email-bjorn.andersson@sonymobile.com>
+References: <1445963373-27790-1-git-send-email-bjorn.andersson@sonymobile.com>
+Message-ID: <1445963373-27790-2-git-send-email-bjorn.andersson@sonymobile.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 27, 2015 at 5:18 PM, Grygorii Strashko
-<grygorii.strashko@ti.com> wrote:
-> On 10/27/2015 05:53 PM, Linus Walleij wrote:
->>
->> On Fri, Oct 23, 2015 at 3:36 PM, Soren Brinkmann
->> <soren.brinkmann@xilinx.com> wrote:
->>
->>> The driver uses runtime PM to leverage low power techniques. For
->>> use-cases using GPIO as interrupt the device needs to be in an
->>> appropriate state.
->>>
->>> Reported-by: John Linn <linnj@xilinx.com>
->>> Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
->>> Tested-by: John Linn <linnj@xilinx.com>
->>
->>
->> As pointed out by Grygorii in
->> commit aca82d1cbb49af34b69ecd4571a0fe48ad9247c1:
->>
->>      The PM runtime API can't be used in atomic contex on -RT even if
->>      it's configured as irqsafe. As result, below error report can
->>      be seen when PM runtime API called from IRQ chip's callbacks
->>      irq_startup/irq_shutdown/irq_set_type, because they are
->>      protected by RAW spinlock:
->> (...)
->>      The IRQ chip interface defines only two callbacks which are executed
->> in
->>      non-atomic contex - irq_bus_lock/irq_bus_sync_unlock, so lets move
->>      PM runtime calls there.
->>
->> I.e. these calls are atomic context and it's just luck that it works
->> and this is fragile.
->>
->> Can you please check if you can move it to
->> irq_bus_lock()/irq_sync_unlock()
->> like Grygorii does?
->>
->
-> This patch rises the question not only about PM runtime, but also
-> about gpiochip_irq_reqres()/gpiochip_irq_relres().
+Print an error message to indicate that invalid configuration data was
+provided in the platform_data, rather than just aborting initialization.
 
-Do you mean that these functions contain calls to non-atomic
-functions?
+Signed-off-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
+---
 
-I mainly reacted to this because it was pm_* calls, that you
-mentioned explicitly in your patch.
+This patch can be picked independently of the other 2, but included in the
+series for "completeness".
 
-Yours,
-Linus Walleij
+No changes since v1 in this patch.
+
+ drivers/iio/light/lm3533-als.c | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/iio/light/lm3533-als.c b/drivers/iio/light/lm3533-als.c
+index 076bc46fad03..e56937c40a18 100644
+--- a/drivers/iio/light/lm3533-als.c
++++ b/drivers/iio/light/lm3533-als.c
+@@ -743,8 +743,10 @@ static int lm3533_als_set_resistor(struct lm3533_als *als, u8 val)
+ {
+ 	int ret;
+ 
+-	if (val < LM3533_ALS_RESISTOR_MIN || val > LM3533_ALS_RESISTOR_MAX)
++	if (val < LM3533_ALS_RESISTOR_MIN || val > LM3533_ALS_RESISTOR_MAX) {
++		dev_err(&als->pdev->dev, "invalid resistor value\n");
+ 		return -EINVAL;
++	};
+ 
+ 	ret = lm3533_write(als->lm3533, LM3533_REG_ALS_RESISTOR_SELECT, val);
+ 	if (ret) {
+-- 
+2.4.2
