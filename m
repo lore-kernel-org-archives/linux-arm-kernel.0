@@ -1,89 +1,83 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Tue, 27 Oct 2015 16:27:26 +0100
-Subject: [PATCH V4 0/8] PCI: ACPI: Setting up DMA coherency for PCI device
- from _CCA attribute
-In-Reply-To: <20151027145249.GE8660@localhost>
-References: <1445442731-28819-1-git-send-email-Suravee.Suthikulpanit@amd.com>
- <20151027145249.GE8660@localhost>
-Message-ID: <24127028.eJSjD1i70u@vostro.rjw.lan>
+From: slash.tmp@free.fr (Mason)
+Date: Tue, 27 Oct 2015 16:01:41 +0100
+Subject: Trustzone: DSB before/after SMC
+In-Reply-To: <20151027143706.GF3091@leverpostej>
+References: <562F7CBA.7060806@free.fr> <20151027134318.GD3091@leverpostej>
+ <562F84BA.5060203@free.fr> <20151027143706.GF3091@leverpostej>
+Message-ID: <562F91D5.2020708@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, October 27, 2015 09:52:50 AM Bjorn Helgaas wrote:
-> Hi Suravee,
+On 27/10/2015 15:37, Mark Rutland wrote:
+> On Tue, Oct 27, 2015 at 03:05:46PM +0100, Mason wrote:
+>> On 27/10/2015 14:43, Mark Rutland wrote:
+>>
+>>> On Tue, Oct 27, 2015 at 02:31:38PM +0100, Mason wrote:
+>>>
+>>>> I have a few questions about SMC. (I'm using Cortex-A9)
+>>>>
+>>>> Platforms that use SMC often/always execute DSB beforehand.
+>>>
+>>> Please give an example. We don't do this for PSCI, for instance.
+>>
+>> arch/arm/mach-exynos/exynos-smc.S
+>> arch/arm/mach-highbank/smc.S
+>> arch/arm/mach-omap2/omap-smc.S
 > 
-> On Wed, Oct 21, 2015 at 08:52:03AM -0700, Suravee Suthikulpanit wrote:
-> > This patch series adds support to setup DMA coherency for PCI device using
-> > the ACPI _CCA attribute. According to the ACPI spec, the _CCA attribute
-> > is required for ARM64. Therefore, this patch is a pre-req for ACPI PCI
-> > support for ARM64 which is currently in development.  Also, this should
-> > not affect other architectures that does not define 
-> > CONFIG_ACPI_CCA_REQUIRED, since the default value is coherent.
-> > 
-> > In the process, this series also introduces enum dev_dma_attr and a set
-> > of APIs to query device DMA attribute. These APIs replace the obsolete
-> > device_dma_is_coherent(), and acpi_check_dma().
-> > 
-> > I have also included a patch from Jeremy posted here:
-> >     http://www.spinics.net/lists/linux-usb/msg128582.html
-> > 
-> > This patch series  has been tested on AMD Seattle RevB platform.
-> > The git tree containing tested code and pre-req patches are posted here:
-> > 
-> >     http://github.com/ssuthiku/linux.git pci-cca-v4
-> > 
-> > Changes from V3: (https://lkml.org/lkml/2015/8/26/389)
-> >     * Clean up suggested by Bjorn
-> >     * Introduce enum dev_dma_attr
-> >     * Replace device_dma_is_coherent() and acpi_check_dma() with
-> >       new APIs.
-> > 
-> > Changes from V2: (https://lkml.org/lkml/2015/8/25/549)
-> >     * Return -ENOSUPP instead of -1 (per Rafael's suggestion)
-> >     * Add WARN() when fail to setup DMA for PCI device when booting
-> >       ACPI (per Arnd's suggestion)
-> >     * Added Acked-by from Rob.
-> >     * Minor clean up
-> > 
-> > Changes from V1: (https://lkml.org/lkml/2015/8/13/182)
-> >     * Include patch 1 from Jeremy to enable support for _CCA=0
-> >     * Clean up acpi_check_dma() per Bjorn suggestions
-> >     * Split the original V1 patch into two patches (patch 3 and 4)
-> > 
-> > Jeremy Linton (1):
-> >   Honor ACPI _CCA attribute setting
-> > 
-> > Suravee Suthikulpanit (7):
-> >   device property: Introducing enum dev_dma_attr
-> >   acpi: Adding DMA Attribute APIs for ACPI Device
-> >   device property: Adding DMA Attribute APIs for Generic Devices
-> >   device property: acpi: Make use of the new DMA Attribute APIs
-> >   device property: acpi: Remove unused DMA APIs
-> >   PCI: OF: Move of_pci_dma_configure() to pci_dma_configure()
-> >   PCI: ACPI: Add support for PCI device DMA coherency
-> > 
-> >  drivers/acpi/acpi_platform.c              |  7 +++++-
-> >  drivers/acpi/glue.c                       |  8 +++---
-> >  drivers/acpi/scan.c                       | 42 +++++++++++++++++++++++++++++++
-> >  drivers/base/property.c                   | 32 +++++++++++++++++------
-> >  drivers/crypto/ccp/ccp-platform.c         |  9 ++++++-
-> >  drivers/net/ethernet/amd/xgbe/xgbe-main.c |  9 ++++++-
-> >  drivers/of/of_pci.c                       | 20 ---------------
-> >  drivers/pci/probe.c                       | 36 ++++++++++++++++++++++++--
-> >  include/acpi/acpi_bus.h                   | 36 +++-----------------------
-> >  include/linux/acpi.h                      |  7 +++++-
-> >  include/linux/of_pci.h                    |  3 ---
-> >  include/linux/property.h                  | 10 +++++++-
-> >  12 files changed, 145 insertions(+), 74 deletions(-)
+> From a quick look, it's not obvious to me why those DSBs are present. It
+> would be best to ask the original authors; it may simply be that this
+> was never necessary and has simply been copied.
 > 
-> I had a couple minor comments.  It's sort of a toss-up, but this feels
-> more ACPI-flavored than PCI, so I assume Rafael will take this whole
-> series unless I hear otherwise.
+> In particular, the DSB; DMB; SMC sequence in omap_smc2 makes no sense to
+> me, given that a DSB provides a superset of the guarantees of a DMB. If
+> the DSB is necessary I don't see that the DMB would also be necessary.
 
-I'll do that.
+I agree the DSB; DMB; SMC sequence looks fishy.
 
-> Acked-by: Bjorn Helgaas <bhelgaas@google.com>
+It also shows up there:
+http://genode.org/documentation/articles/trustzone
 
-Thanks for the help with reviewing this!
+>> A few that don't execute DSB before SMC:
+>> arch/arm/mach-bcm/bcm_kona_smc.c
+>> arch/arm/mach-keystone/smc.S
+>>
+>>>> 1a) Is DSB required before SMC?
+>>>> 1b) Is DSB required  after SMC?
+>>>> 2a) Is DSB required before returning to non-secure OS?
+>>>> 2b) Is DSB required  after returning to non-secure OS?
+>>>
+>>> It depends on what you're trying to achieve, and the design of both the
+>>> secure and non-secure OS code.
+>>
+>> In my case, I just want to write the L2_CONTROL register.
+> 
+> Is that a register in the L2, or in the CPU? Which L2/CPU?
 
-Rafael
+Sorry for being so sloppy.
+L2C-310 reg1_control (offset 0x100) connected to Cortex-A9 MPCore.
+
+> There may be a constraint that the memory system needs to be quiescent
+> or something to that effect. Without more information I cannot say what
+> specifically you need to do.
+> 
+>>> A DSB is certainly not always required before nor after an SMC.
+>>
+>> That makes sense. But a colleague mentioned that the secure OS may
+>> be using different MMU mappings. In that case, it might be required
+>> to wait for all in-flight accesses to resolve?
+> 
+> Are you referring to differing VAs or differing attributes?
+> 
+> For ARMv6 and above the former does not matter; the caches behaves as if
+> they are PIPT.
+> 
+> The latter may require the use of barriers and/or cache maintenance if
+> the secure and non-secure OSs are communicating through shared memory.
+> That's somewhat independent of the SMC itself.
+
+AFAICT, the two OSes only communicate through registers.
+
+I think DSB is unnecessary. But I'm not confident enough to remove it.
+(It might not matter, since that function is called very rarely.)
+
+Regards.
