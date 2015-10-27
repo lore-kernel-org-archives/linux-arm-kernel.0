@@ -1,30 +1,27 @@
 From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Tue, 27 Oct 2015 23:53:15 +0100
-Subject: [PATCH 04/19] rtc: isl12057: enable support for the standard
- "wakeup-source" property
-In-Reply-To: <1445422216-29375-5-git-send-email-sudeep.holla@arm.com>
-References: <1445422216-29375-1-git-send-email-sudeep.holla@arm.com>
- <1445422216-29375-5-git-send-email-sudeep.holla@arm.com>
-Message-ID: <20151027225315.GJ22331@piout.net>
+Date: Tue, 27 Oct 2015 23:53:29 +0100
+Subject: [PATCH] rtc: ds1307: Fix alarm programming for mcp794xx
+In-Reply-To: <1445581797-19693-1-git-send-email-t-kristo@ti.com>
+References: <1445581797-19693-1-git-send-email-t-kristo@ti.com>
+Message-ID: <20151027225329.GK22331@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 21/10/2015 at 11:10:01 +0100, Sudeep Holla wrote :
-> Though the isl12057 rtc driver should and will continue to support the
-> legacy "isil,irq2-can-wakeup-machine" property to enable RTC as the
-> wakeup source, we need to add support for the new standard property
-> "wakeup-source".
+On 23/10/2015 at 09:29:57 +0300, Tero Kristo wrote :
+> mcp794xx alarm registers must be written in BCD format. However, the
+> alarm programming logic neglected this by adding one to the value
+> after bin2bcd conversion has been already done, writing bad values
+> to month register in case the alarm being set is in October. In this
+> case, the alarm month value becomes 0x0a instead of the expected 0x10.
 > 
-> This patch adds support for "wakeup-source" property in addition to the
-> existing "isil,irq2-can-wakeup-machine" property.
+> Fix by moving the +1 addition within the bin2bcd call also.
 > 
-> Cc: Alessandro Zummo <a.zummo@towertech.it>
-> Cc: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> Cc: rtc-linux at googlegroups.com
-> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+> Fixes: 1d1945d261a2 ("drivers/rtc/rtc-ds1307.c: add alarm support for mcp7941x chips")
+> 
+> Signed-off-by: Tero Kristo <t-kristo@ti.com>
 > ---
->  drivers/rtc/rtc-isl12057.c | 10 +++++-----
->  1 file changed, 5 insertions(+), 5 deletions(-)
+>  drivers/rtc/rtc-ds1307.c |    4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
 > 
 Applied, thanks.
 
