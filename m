@@ -1,93 +1,51 @@
-From: ats@offog.org (Adam Sampson)
-Date: Tue, 27 Oct 2015 21:00:45 +0000
-Subject: [PATCH v2] ASoC: sun4i-codec: use consistent names for PA controls
-Message-ID: <1445979645-1664-1-git-send-email-ats@offog.org>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Wed, 28 Oct 2015 00:03:22 +0300
+Subject: [PATCH] ARM: shmobile: porter: add CAN0 DT support
+In-Reply-To: <1674850.BZpGW9kEud@wasted.cogentembedded.com>
+References: <1674850.BZpGW9kEud@wasted.cogentembedded.com>
+Message-ID: <5706086.RKBCVZugI4@wasted.cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The power amplifier for the headphone output is called "the PA" and "the
-headphone amplifier" in Allwinner's documentation for the A10 and A20.
-sun4i-codec calls it "PA" in some places and "Pre-Amplifier" (which
-isn't really accurate) in others, leading to user-visible controls with
-different names referring to the same device.
+Define the Porter board dependent part of the CAN0 device node.
 
-When this driver implements audio input, it'll also need to expose
-controls for the line and mic input preamps, so just referring to "the
-Pre-Amplifier" will be ambiguous.
+This patch is  analogous to the commit 457acc4a6ce8 (ARM: shmobile:
+henninger: add CAN0 DT support) as there are no differences between the
+boards in this respect.
 
-Change it to use "Power Amplifier" consistently for the power
-amplifier's controls.
+Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-Signed-off-by: Adam Sampson <ats@offog.org>
 ---
-Changes in v2:
-- use "Power Amplifier" rather than "PA"
----
- sound/soc/sunxi/sun4i-codec.c | 27 ++++++++++++++-------------
- 1 file changed, 14 insertions(+), 13 deletions(-)
+This patch is against 'renesas-devel-20151026-v4.3-rc7' tag of Simon Horman's
+'renesas.git' repo.
 
-diff --git a/sound/soc/sunxi/sun4i-codec.c b/sound/soc/sunxi/sun4i-codec.c
-index bcbf4da..1bb896d 100644
---- a/sound/soc/sunxi/sun4i-codec.c
-+++ b/sound/soc/sunxi/sun4i-codec.c
-@@ -2,6 +2,7 @@
-  * Copyright 2014 Emilio L?pez <emilio@elopez.com.ar>
-  * Copyright 2014 Jon Smirl <jonsmirl@gmail.com>
-  * Copyright 2015 Maxime Ripard <maxime.ripard@free-electrons.com>
-+ * Copyright 2015 Adam Sampson <ats@offog.org>
-  *
-  * Based on the Allwinner SDK driver, released under the GPL.
-  *
-@@ -404,7 +405,7 @@ static const struct snd_kcontrol_new sun4i_codec_pa_mute =
- static DECLARE_TLV_DB_SCALE(sun4i_codec_pa_volume_scale, -6300, 100, 1);
- 
- static const struct snd_kcontrol_new sun4i_codec_widgets[] = {
--	SOC_SINGLE_TLV("PA Volume", SUN4I_CODEC_DAC_ACTL,
-+	SOC_SINGLE_TLV("Power Amplifier Volume", SUN4I_CODEC_DAC_ACTL,
- 		       SUN4I_CODEC_DAC_ACTL_PA_VOL, 0x3F, 0,
- 		       sun4i_codec_pa_volume_scale),
- };
-@@ -452,12 +453,12 @@ static const struct snd_soc_dapm_widget sun4i_codec_dapm_widgets[] = {
- 	SND_SOC_DAPM_SUPPLY("Mixer Enable", SUN4I_CODEC_DAC_ACTL,
- 			    SUN4I_CODEC_DAC_ACTL_MIXEN, 0, NULL, 0),
- 
--	/* Pre-Amplifier */
--	SND_SOC_DAPM_MIXER("Pre-Amplifier", SUN4I_CODEC_ADC_ACTL,
-+	/* Power Amplifier */
-+	SND_SOC_DAPM_MIXER("Power Amplifier", SUN4I_CODEC_ADC_ACTL,
- 			   SUN4I_CODEC_ADC_ACTL_PA_EN, 0,
- 			   sun4i_codec_pa_mixer_controls,
- 			   ARRAY_SIZE(sun4i_codec_pa_mixer_controls)),
--	SND_SOC_DAPM_SWITCH("Pre-Amplifier Mute", SND_SOC_NOPM, 0, 0,
-+	SND_SOC_DAPM_SWITCH("Power Amplifier Mute", SND_SOC_NOPM, 0, 0,
- 			    &sun4i_codec_pa_mute),
- 
- 	SND_SOC_DAPM_OUTPUT("HP Right"),
-@@ -480,16 +481,16 @@ static const struct snd_soc_dapm_route sun4i_codec_dapm_routes[] = {
- 	{ "Left Mixer", NULL, "Mixer Enable" },
- 	{ "Left Mixer", "Left DAC Playback Switch", "Left DAC" },
- 
--	/* Pre-Amplifier Mixer Routes */
--	{ "Pre-Amplifier", "Mixer Playback Switch", "Left Mixer" },
--	{ "Pre-Amplifier", "Mixer Playback Switch", "Right Mixer" },
--	{ "Pre-Amplifier", "DAC Playback Switch", "Left DAC" },
--	{ "Pre-Amplifier", "DAC Playback Switch", "Right DAC" },
-+	/* Power Amplifier Routes */
-+	{ "Power Amplifier", "Mixer Playback Switch", "Left Mixer" },
-+	{ "Power Amplifier", "Mixer Playback Switch", "Right Mixer" },
-+	{ "Power Amplifier", "DAC Playback Switch", "Left DAC" },
-+	{ "Power Amplifier", "DAC Playback Switch", "Right DAC" },
- 
--	/* PA -> HP path */
--	{ "Pre-Amplifier Mute", "Switch", "Pre-Amplifier" },
--	{ "HP Right", NULL, "Pre-Amplifier Mute" },
--	{ "HP Left", NULL, "Pre-Amplifier Mute" },
-+	/* Headphone Output Routes */
-+	{ "Power Amplifier Mute", "Switch", "Power Amplifier" },
-+	{ "HP Right", NULL, "Power Amplifier Mute" },
-+	{ "HP Left", NULL, "Power Amplifier Mute" },
+ arch/arm/boot/dts/r8a7791-porter.dts |   12 ++++++++++++
+ 1 file changed, 12 insertions(+)
+
+Index: renesas/arch/arm/boot/dts/r8a7791-porter.dts
+===================================================================
+--- renesas.orig/arch/arm/boot/dts/r8a7791-porter.dts
++++ renesas/arch/arm/boot/dts/r8a7791-porter.dts
+@@ -134,6 +134,11 @@
+ 		renesas,groups = "vin0_data8", "vin0_clk";
+ 		renesas,function = "vin0";
+ 	};
++
++	can0_pins: can0 {
++		renesas,groups = "can0_data";
++		renesas,function = "can0";
++	};
  };
  
- static struct snd_soc_codec_driver sun4i_codec_codec = {
--- 
-2.1.4
+ &scif0 {
+@@ -288,3 +293,10 @@
+ &pciec {
+ 	status = "okay";
+ };
++
++&can0 {
++	pinctrl-0 = <&can0_pins>;
++	pinctrl-names = "default";
++
++	status = "okay";
++};
