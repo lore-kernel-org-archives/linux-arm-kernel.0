@@ -1,40 +1,73 @@
-From: kernel@tekno-soft.it (Roberto Fichera)
-Date: Tue, 27 Oct 2015 18:45:55 +0100
-Subject: iMX6 SSI in TDM master mode and SDMA
-In-Reply-To: <CAOMZO5CzEbXAmWpfd-JrpoP5OJ6HAioTPWF7nvKcX=BRf1Dngg@mail.gmail.com>
-References: <562F8DF7.2000704@tekno-soft.it> <3531856.xGOeYJXuNb@adelgunde>
- <CAOMZO5CzEbXAmWpfd-JrpoP5OJ6HAioTPWF7nvKcX=BRf1Dngg@mail.gmail.com>
-Message-ID: <562FB853.9040406@tekno-soft.it>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Tue, 27 Oct 2015 19:54:40 +0200
+Subject: [PATCH] gpio: zynq: Implement irq_(request|release)_resources
+In-Reply-To: <CACRpkdYjNWiEdM8kthMXhGXBPYE74hy_xa7bBB6XQrAOaBnehA@mail.gmail.com>
+References: <1445607381-7794-1-git-send-email-soren.brinkmann@xilinx.com>
+ <CACRpkda4QKEJvwkwGLS7OLTP8Nxu5W05tzbcFXA_FPnBsFtKhw@mail.gmail.com>
+ <562FA3EE.5040408@ti.com>
+ <CACRpkdYjNWiEdM8kthMXhGXBPYE74hy_xa7bBB6XQrAOaBnehA@mail.gmail.com>
+Message-ID: <562FBA60.70002@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/27/2015 05:53 PM, Fabio Estevam wrote:
-> Hi Roberto,
-
-Hi Fabio,
-
-> On Tue, Oct 27, 2015 at 1:20 PM, Markus Pargmann <mpa@pengutronix.de> wrote:
->> Hi,
->>
->> On Tuesday 27 October 2015 15:45:11 Roberto Fichera wrote:
->>> Hi There,
+On 10/27/2015 06:23 PM, Linus Walleij wrote:
+> On Tue, Oct 27, 2015 at 5:18 PM, Grygorii Strashko
+> <grygorii.strashko@ti.com> wrote:
+>> On 10/27/2015 05:53 PM, Linus Walleij wrote:
 >>>
->>> I'm having an SDMA freeze when putting the SSI in TDM master mode while
->>> developing a DAHDI kernel driver. Kernel is the official freescale v3.14.28.
->> Please use the mainline kernel. fsl-ssi has really good mainline support. I
->> don't think anyone can help you with such an old kernel.
-> Also, this one could be better discussed in the alsa-devel mailing list.
->
-> Caleb is also trying to use SSI in TDM mode (See his post in
-> alsa-devel archive), so maybe you two could work together on this
-> task.
+>>> On Fri, Oct 23, 2015 at 3:36 PM, Soren Brinkmann
+>>> <soren.brinkmann@xilinx.com> wrote:
+>>>
+>>>> The driver uses runtime PM to leverage low power techniques. For
+>>>> use-cases using GPIO as interrupt the device needs to be in an
+>>>> appropriate state.
+>>>>
+>>>> Reported-by: John Linn <linnj@xilinx.com>
+>>>> Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
+>>>> Tested-by: John Linn <linnj@xilinx.com>
+>>>
+>>>
+>>> As pointed out by Grygorii in
+>>> commit aca82d1cbb49af34b69ecd4571a0fe48ad9247c1:
+>>>
+>>>       The PM runtime API can't be used in atomic contex on -RT even if
+>>>       it's configured as irqsafe. As result, below error report can
+>>>       be seen when PM runtime API called from IRQ chip's callbacks
+>>>       irq_startup/irq_shutdown/irq_set_type, because they are
+>>>       protected by RAW spinlock:
+>>> (...)
+>>>       The IRQ chip interface defines only two callbacks which are executed
+>>> in
+>>>       non-atomic contex - irq_bus_lock/irq_bus_sync_unlock, so lets move
+>>>       PM runtime calls there.
+>>>
+>>> I.e. these calls are atomic context and it's just luck that it works
+>>> and this is fragile.
+>>>
+>>> Can you please check if you can move it to
+>>> irq_bus_lock()/irq_sync_unlock()
+>>> like Grygorii does?
+>>>
+>>
+>> This patch rises the question not only about PM runtime, but also
+>> about gpiochip_irq_reqres()/gpiochip_irq_relres().
+> 
+> Do you mean that these functions contain calls to non-atomic
+> functions?
+> 
 
-Interesting to know!
+Oh. No, I have to be more specific :(
+if GPIOx driver defines custom .irq_(request|release)_resources() callbacks
+they will *overwrite* standard GPIOirqchip callbacks.
+(commit: 8b67a1f "gpio: don't override irq_*_resources() callbacks")
 
-Can you please add me in cc because I'm not subscribed to the alsa-devel mailing list?
+As result, such GPIOx driver should *re-implement* the same functionality in
+its .irq_(request|release)_resources() callbacks as implemented in
+gpiochip_irq_reqres()/gpiochip_irq_relres().
 
->
-> Regards,
->
-> Fabio Estevam
->
+> I mainly reacted to this because it was pm_* calls, that you
+> mentioned explicitly in your patch.
+> 
+-- 
+regards,
+-grygorii
