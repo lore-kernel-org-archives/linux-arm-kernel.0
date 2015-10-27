@@ -1,24 +1,63 @@
-From: jeremy.linton@arm.com (Jeremy Linton)
-Date: Tue, 27 Oct 2015 09:44:30 -0500
-Subject: [PATCH v4 3/3] arm64/efi: isolate EFI stub from the kernel proper
-In-Reply-To: <CAKv+Gu-G1YS9Ha=-rtnPKJTOxBTrdSq6=Tqwq_GPW742JUE+2Q@mail.gmail.com>
-References: <1444330924-17830-1-git-send-email-ard.biesheuvel@linaro.org>
- <1444330924-17830-4-git-send-email-ard.biesheuvel@linaro.org>
- <562EA894.8070505@arm.com> <562EAA22.3010905@arm.com>
- <CAKv+Gu-G1YS9Ha=-rtnPKJTOxBTrdSq6=Tqwq_GPW742JUE+2Q@mail.gmail.com>
-Message-ID: <562F8DCE.4010308@arm.com>
+From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
+Date: Tue, 27 Oct 2015 15:46:07 +0100
+Subject: [PATCH v6 04/22] of: add function to allow probing a device from
+ a OF node
+In-Reply-To: <CAMuHMdW=sT9uLbZkwdYF9Yd3ENaAoQ0=qQLfr-Ow6pz11DiU0A@mail.gmail.com>
+References: <1442844182-27787-1-git-send-email-tomeu.vizoso@collabora.com>
+ <1442844182-27787-5-git-send-email-tomeu.vizoso@collabora.com>
+ <CAMuHMdW=sT9uLbZkwdYF9Yd3ENaAoQ0=qQLfr-Ow6pz11DiU0A@mail.gmail.com>
+Message-ID: <CAAObsKCSzBNESu5WGAWPz5Uh41NYaPXkWtBPtL7SVu4NAs6ebw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/26/2015 09:20 PM, Ard Biesheuvel wrote:
-> Thanks for the report. The following patch should fix it
+On 26 October 2015 at 09:16, Geert Uytterhoeven <geert@linux-m68k.org> wrote:
+> On Mon, Sep 21, 2015 at 4:02 PM, Tomeu Vizoso
+> <tomeu.vizoso@collabora.com> wrote:
+>> Walks the OF tree up and finds the closest ancestor that has a struct
+>> device associated with it, probing it if isn't bound to a driver yet.
+>>
+>> The above should ensure that the dependency represented by the passed OF
+>> node is available, because probing a device should cause its descendants
+>> to be probed as well (when they get registered).
+>>
+>> Subsystems can use this when looking up resources for drivers, to reduce
+>> the chances of deferred probes because of the probing order of devices.
+>>
+>> Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
+>
+> Don't know to which response I should post this comment, so I'm responding
+> to the original email.
+>
+> Some subsystems already do this.
+> If you call e.g. syscon_regmap_lookup_by_phandle(), it will call
+> of_syscon_register() if the syscon device pointed to hasn't been registered yet.
 
-Ard,
-	
-Thanks, it does fix the build problem...
+Hi Geert,
 
-Now to get the darn thing to boot (not related to this AFAIK).
+I think I prefer if devices are registered as early as possible and
+then only probed on-demand, as registration is very much
+device-specific but probing is the same for all devices.
 
+But I think in general we should be doing more things on demand and
+depending less on the order in which we mass initialize stuff
+(devices, classes, drivers, etc).
 
+Regards,
 
-	
+Tomeu
+
+> Gr{oetje,eeting}s,
+>
+>                         Geert
+>
+> --
+> Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+>
+> In personal conversations with technical people, I call myself a hacker. But
+> when I'm talking to journalists I just say "programmer" or something like that.
+>                                 -- Linus Torvalds
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
