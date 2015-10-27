@@ -1,34 +1,43 @@
-From: yangyingliang@huawei.com (Yang Yingliang)
-Date: Tue, 27 Oct 2015 21:21:12 +0800
-Subject: [PATCH 1/2] clocksource: replace cycle_last validation with an equal
- way
-In-Reply-To: <1445952073-7260-1-git-send-email-yangyingliang@huawei.com>
-References: <1445952073-7260-1-git-send-email-yangyingliang@huawei.com>
-Message-ID: <1445952073-7260-2-git-send-email-yangyingliang@huawei.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Tue, 27 Oct 2015 13:24:34 +0000
+Subject: [PATCH v5 4/6] memory: mediatek: Add SMI driver
+In-Reply-To: <1444357388-30257-5-git-send-email-yong.wu@mediatek.com>
+References: <1444357388-30257-1-git-send-email-yong.wu@mediatek.com>
+ <1444357388-30257-5-git-send-email-yong.wu@mediatek.com>
+Message-ID: <562F7B12.7030201@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mask the cycle values before subtraction. So we can use this
-validation while the clocksource mask is not 64-bits.
+On 09/10/15 03:23, Yong Wu wrote:
+[...]
+> +static int mtk_smi_probe(struct platform_device *pdev)
+> +{
+> +	struct device *dev = &pdev->dev;
+> +	struct mtk_smi_data *smidata;
+> +	int ret;
+> +
+> +	if (!dev->pm_domain)
+> +		return -EPROBE_DEFER;
+> +
+> +	smidata = devm_kzalloc(dev, sizeof(*smidata), GFP_KERNEL);
+> +	if (!smidata)
+> +		return -ENOMEM;
+> +
+> +	smidata->clk_apb = devm_clk_get(dev, "apb");
+> +	if (IS_ERR(smidata->clk_apb))
+> +		return PTR_ERR(smidata->clk_apb);
+> +
+> +	smidata->clk_smi = devm_clk_get(dev, "smi");
+> +	if (IS_ERR(smidata->clk_smi))
+> +		return PTR_ERR(smidata->clk_smi);
+> +
+> +	pm_runtime_enable(dev);
+> +	dev_set_drvdata(dev, smidata);
+> +	return ret;
 
-Signed-off-by: Yang Yingliang <yangyingliang@huawei.com>
-Cc: Thomas Gleixner <tglx@linutronix.de>
----
- kernel/time/timekeeping_internal.h | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ret is used uninitialised here, but you might as well just "return 0;" 
+and get rid of the variable entirely.
 
-diff --git a/kernel/time/timekeeping_internal.h b/kernel/time/timekeeping_internal.h
-index 4ea005a..984f02e 100644
---- a/kernel/time/timekeeping_internal.h
-+++ b/kernel/time/timekeeping_internal.h
-@@ -15,7 +15,7 @@ extern void tk_debug_account_sleep_time(struct timespec64 *t);
- #ifdef CONFIG_CLOCKSOURCE_VALIDATE_LAST_CYCLE
- static inline cycle_t clocksource_delta(cycle_t now, cycle_t last, cycle_t mask)
- {
--	cycle_t ret = (now - last) & mask;
-+	cycle_t ret = (now & mask) - (last & mask);
- 
- 	return (s64) ret > 0 ? ret : 0;
- }
--- 
-2.5.0
+> +}
+
+Robin.
