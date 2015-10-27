@@ -1,54 +1,58 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 27 Oct 2015 16:34:41 +0000
-Subject: [PATCH] arm64: dts: Added syscon-reboot node for FSL's LS2085A SoC
-In-Reply-To: <1445650280-9966-1-git-send-email-German.Rivera@freescale.com>
-References: <1445650280-9966-1-git-send-email-German.Rivera@freescale.com>
-Message-ID: <20151027163441.GK3091@leverpostej>
+From: lars@metafoo.de (Lars-Peter Clausen)
+Date: Tue, 27 Oct 2015 17:37:29 +0100
+Subject: [PATCH] gpio: zynq: Implement irq_(request|release)_resources
+In-Reply-To: <CACRpkda4QKEJvwkwGLS7OLTP8Nxu5W05tzbcFXA_FPnBsFtKhw@mail.gmail.com>
+References: <1445607381-7794-1-git-send-email-soren.brinkmann@xilinx.com>
+ <CACRpkda4QKEJvwkwGLS7OLTP8Nxu5W05tzbcFXA_FPnBsFtKhw@mail.gmail.com>
+Message-ID: <562FA849.2070306@metafoo.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 23, 2015 at 08:31:20PM -0500, J. German Rivera wrote:
-> Added sys-reboot node to the FSL's LS2085A SoC DT to leverage
-> the ARM-generic reboot mechanism for this SoC. This mechanism
-> is enabled through CONFIG_POWER_RESET_SYSCON.
-
-Per the comments in arch/arm64/boot/dts/freescale/fsl-ls2085a.dtsi, the
-platform has PSCI 0.2+, and therefore already has system reset
-functionality.
-
-Given that, why is this necessary?
-
-Thanks,
-Mark.
-
-> Signed-off-by: J. German Rivera <German.Rivera@freescale.com>
-> ---
->  arch/arm64/boot/dts/freescale/fsl-ls2085a.dtsi | 12 ++++++++++++
->  1 file changed, 12 insertions(+)
+On 10/27/2015 04:53 PM, Linus Walleij wrote:
+> On Fri, Oct 23, 2015 at 3:36 PM, Soren Brinkmann
+> <soren.brinkmann@xilinx.com> wrote:
 > 
-> diff --git a/arch/arm64/boot/dts/freescale/fsl-ls2085a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls2085a.dtsi
-> index e281ceb..6f82163 100644
-> --- a/arch/arm64/boot/dts/freescale/fsl-ls2085a.dtsi
-> +++ b/arch/arm64/boot/dts/freescale/fsl-ls2085a.dtsi
-> @@ -131,6 +131,18 @@
->  		interrupts = <1 9 0x4>;
->  	};
->  
-> +	rst_ccsr: rstccsr at 1E60000 {
-> +	        compatible = "syscon";
-> +		reg = <0x0 0x1E60000 0x0 0x10000>;
-> +	};
-> +
-> +	reboot at 65024000 {
-> +		compatible ="syscon-reboot";
-> +		regmap = <&rst_ccsr>;
-> +		offset = <0x0>;
-> +		mask = <0x2>;
-> +	};
-> +
->  	timer {
->  		compatible = "arm,armv8-timer";
->  		interrupts = <1 13 0x8>, /* Physical Secure PPI, active-low */
-> -- 
-> 2.3.3
+>> The driver uses runtime PM to leverage low power techniques. For
+>> use-cases using GPIO as interrupt the device needs to be in an
+>> appropriate state.
+>>
+>> Reported-by: John Linn <linnj@xilinx.com>
+>> Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
+>> Tested-by: John Linn <linnj@xilinx.com>
 > 
+> As pointed out by Grygorii in
+> commit aca82d1cbb49af34b69ecd4571a0fe48ad9247c1:
+> 
+>     The PM runtime API can't be used in atomic contex on -RT even if
+>     it's configured as irqsafe. As result, below error report can
+>     be seen when PM runtime API called from IRQ chip's callbacks
+>     irq_startup/irq_shutdown/irq_set_type, because they are
+>     protected by RAW spinlock:
+> (...)
+>     The IRQ chip interface defines only two callbacks which are executed in
+>     non-atomic contex - irq_bus_lock/irq_bus_sync_unlock, so lets move
+>     PM runtime calls there.
+> 
+> I.e. these calls are atomic context and it's just luck that it works
+> and this is fragile.
+> 
+> Can you please check if you can move it to
+> irq_bus_lock()/irq_sync_unlock()
+> like Grygorii does?
+
+That only powers up the chip when the chip is accessed. For proper IRQ
+operation the chip needs to be powered up though as long as the IRQ is
+enabled. request_irq() and free_irq() must always be called from sleepable
+context. The thing is just that request_resource/release_resource are called
+from within a raw spinlock, which is necessary since otherwise you can't
+guarantee that they are only called once for shared interrupts.
+
+It might make sense to add a separate set of callbacks to the irq_chip
+struct that are called from the sleepable sections of
+request_irq()/free_irq() which are meant for power management purposes and
+which wont have the guarantee that they are only called once for shared IRQs
+(but are still balanced).
+
+Thomas, do you have any thoughts on this?
+
+- Lars
