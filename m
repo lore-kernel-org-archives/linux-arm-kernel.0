@@ -1,166 +1,70 @@
 From: tn@semihalf.com (Tomasz Nowicki)
-Date: Tue, 27 Oct 2015 17:38:32 +0100
-Subject: [PATCH V1 01/11] x86,
- pci: Reorder logic of pci_mmconfig_insert() function
-In-Reply-To: <1445963922-22711-1-git-send-email-tn@semihalf.com>
-References: <1445963922-22711-1-git-send-email-tn@semihalf.com>
-Message-ID: <1445963922-22711-2-git-send-email-tn@semihalf.com>
+Date: Tue, 27 Oct 2015 17:38:31 +0100
+Subject: [PATCH V1 00/11] MMCONFIG refactoring and ARM64 PCI hostbridge init
+ based on ACPI
+Message-ID: <1445963922-22711-1-git-send-email-tn@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch is the first step for MMCONFIG refactoring process.
+>From the functionality point of view this series might be split into two logic parts:
+1. Making MMCONFIG code arch-agnostic which allows all architectures to collect
+   PCI config regions and used when necessary.
+2. Using generic MMCONFIG code and introducing ACPI based PCI hostbridge
+   initialization for ARM64
 
-Code that uses pci_mmcfg_lock will be moved to common file and become
-accessible for all architectures. pci_mmconfig_insert() cannot be moved
-so easily since it is mixing generic mmconfig code with x86 specific logic
-inside of mutual exclusive block guarded by pci_mmcfg_lock.
+Patches has been built on top of:
+[Patch v7 0/7] Consolidate ACPI PCI root common code into ACPI core
+https://lkml.org/lkml/2015/10/14/31
+Git branch can be found here:
+https://git.linaro.org/leg/acpi/acpi.git/shortlog/refs/heads/pci-acpi-upstream
 
-To get rid of that constraint, we reorder actions as follow:
-1. sanity check for mmconfig region presence, if we already have such
-region it doesn't make snese to alloc new mmconfig list entry
-2. mmconfig entry allocation, no need to lock
-3. insertion to iomem_resource has its own lock, no need to wrap it into mutex
-4. insertion to mmconfig list can be done as the final step in separate
-function (candidate for further refactoring) and needs another mmconfig
-lookup to avoid race condition.
+This has been tested on Cavium ThunderX 1 socket server.
+Any help in reviewing and testing is very appreciated.
 
-Signed-off-by: Tomasz Nowicki <tomasz.nowicki@linaro.org>
----
- arch/x86/pci/mmconfig-shared.c | 101 +++++++++++++++++++++++------------------
- 1 file changed, 58 insertions(+), 43 deletions(-)
+Hanjun Guo (1):
+  XEN / PCI: Remove the dependence on arch x86 when PCI_MMCONFIG=y
 
-diff --git a/arch/x86/pci/mmconfig-shared.c b/arch/x86/pci/mmconfig-shared.c
-index dd30b7e..c8bb9b0 100644
---- a/arch/x86/pci/mmconfig-shared.c
-+++ b/arch/x86/pci/mmconfig-shared.c
-@@ -720,6 +720,38 @@ static int __init pci_mmcfg_late_insert_resources(void)
-  */
- late_initcall(pci_mmcfg_late_insert_resources);
- 
-+static int pci_mmconfig_inject(struct pci_mmcfg_region *cfg)
-+{
-+	struct pci_mmcfg_region *cfg_conflict;
-+	int err = 0;
-+
-+	mutex_lock(&pci_mmcfg_lock);
-+	cfg_conflict = pci_mmconfig_lookup(cfg->segment, cfg->start_bus);
-+	if (cfg_conflict) {
-+		if (cfg_conflict->end_bus < cfg->end_bus)
-+			pr_info(FW_INFO "MMCONFIG for "
-+				"domain %04x [bus %02x-%02x] "
-+				"only partially covers this bridge\n",
-+				cfg_conflict->segment, cfg_conflict->start_bus,
-+				cfg_conflict->end_bus);
-+		err = -EEXIST;
-+		goto out;
-+	}
-+
-+	if (pci_mmcfg_arch_map(cfg)) {
-+		pr_warn("fail to map MMCONFIG %pR.\n", &cfg->res);
-+		err = -ENOMEM;
-+		goto out;
-+	} else {
-+		list_add_sorted(cfg);
-+		pr_info("MMCONFIG at %pR (base %#lx)\n",
-+			&cfg->res, (unsigned long)cfg->address);
-+	}
-+out:
-+	mutex_unlock(&pci_mmcfg_lock);
-+	return err;
-+}
-+
- /* Add MMCFG information for host bridges */
- int pci_mmconfig_insert(struct device *dev, u16 seg, u8 start, u8 end,
- 			phys_addr_t addr)
-@@ -734,63 +766,46 @@ int pci_mmconfig_insert(struct device *dev, u16 seg, u8 start, u8 end,
- 	if (start > end)
- 		return -EINVAL;
- 
--	mutex_lock(&pci_mmcfg_lock);
-+	rcu_read_lock();
- 	cfg = pci_mmconfig_lookup(seg, start);
--	if (cfg) {
--		if (cfg->end_bus < end)
--			dev_info(dev, FW_INFO
--				 "MMCONFIG for "
--				 "domain %04x [bus %02x-%02x] "
--				 "only partially covers this bridge\n",
--				  cfg->segment, cfg->start_bus, cfg->end_bus);
--		mutex_unlock(&pci_mmcfg_lock);
-+	rcu_read_unlock();
-+	if (cfg)
- 		return -EEXIST;
--	}
- 
--	if (!addr) {
--		mutex_unlock(&pci_mmcfg_lock);
-+	if (!addr)
- 		return -EINVAL;
--	}
- 
--	rc = -EBUSY;
- 	cfg = pci_mmconfig_alloc(seg, start, end, addr);
--	if (cfg == NULL) {
-+	if (!cfg) {
- 		dev_warn(dev, "fail to add MMCONFIG (out of memory)\n");
--		rc = -ENOMEM;
--	} else if (!pci_mmcfg_check_reserved(dev, cfg, 0)) {
-+		return -ENOMEM;
-+	}
-+
-+	rc = -EBUSY;
-+	if (!pci_mmcfg_check_reserved(dev, cfg, 0)) {
- 		dev_warn(dev, FW_BUG "MMCONFIG %pR isn't reserved\n",
- 			 &cfg->res);
--	} else {
--		/* Insert resource if it's not in boot stage */
--		if (pci_mmcfg_running_state)
--			tmp = insert_resource_conflict(&iomem_resource,
--						       &cfg->res);
--
--		if (tmp) {
--			dev_warn(dev,
--				 "MMCONFIG %pR conflicts with "
--				 "%s %pR\n",
--				 &cfg->res, tmp->name, tmp);
--		} else if (pci_mmcfg_arch_map(cfg)) {
--			dev_warn(dev, "fail to map MMCONFIG %pR.\n",
--				 &cfg->res);
--		} else {
--			list_add_sorted(cfg);
--			dev_info(dev, "MMCONFIG at %pR (base %#lx)\n",
--				 &cfg->res, (unsigned long)addr);
--			cfg = NULL;
--			rc = 0;
--		}
-+		goto error;
- 	}
- 
--	if (cfg) {
--		if (cfg->res.parent)
--			release_resource(&cfg->res);
--		kfree(cfg);
-+	/* Insert resource if it's not in boot stage */
-+	if (pci_mmcfg_running_state)
-+		tmp = insert_resource_conflict(&iomem_resource, &cfg->res);
-+
-+	if (tmp) {
-+		dev_warn(dev, "MMCONFIG %pR conflicts with %s %pR\n",
-+			 &cfg->res, tmp->name, tmp);
-+		goto error;
- 	}
- 
--	mutex_unlock(&pci_mmcfg_lock);
-+	rc = pci_mmconfig_inject(cfg);
-+	if (!rc)
-+		return 0;
- 
-+error:
-+	if (cfg->res.parent)
-+		release_resource(&cfg->res);
-+	kfree(cfg);
- 	return rc;
- }
- 
+Tomasz Nowicki (10):
+  x86, pci: Reorder logic of pci_mmconfig_insert() function
+  x86, pci, acpi: Move arch-agnostic MMCONFIG (aka ECAM) and ACPI code
+    out of arch/x86/ directory
+  pci, acpi, mcfg: Provide generic implementation of MCFG code
+    initialization.
+  x86, pci: mmconfig_{32,64}.c code refactoring - remove code
+    duplication.
+  x86, pci, ecam: mmconfig_64.c becomes default implementation for ECAM
+    driver.
+  pci, acpi, mcfg: Provide default RAW ACPI PCI config space accessors.
+  pci, acpi, ecam: Add flag to indicate whether ECAM region was hot
+    added or not.
+  x86, pci: Use previously added ECAM hot_added flag to remove ECAM
+    regions.
+  pci, acpi: Provide generic way to assign bus domain number.
+  arm64, pci, acpi: Support for ACPI based PCI hostbridge init
+
+ arch/arm64/Kconfig             |   6 +
+ arch/arm64/kernel/pci.c        | 208 ++++++++++++++++++++++++++++++++--
+ arch/x86/Kconfig               |   4 +
+ arch/x86/include/asm/pci_x86.h |  28 +----
+ arch/x86/pci/acpi.c            |  17 +--
+ arch/x86/pci/mmconfig-shared.c | 250 +++++++----------------------------------
+ arch/x86/pci/mmconfig_32.c     |  11 +-
+ arch/x86/pci/mmconfig_64.c     |  67 +----------
+ arch/x86/pci/numachip.c        |   1 +
+ drivers/acpi/Makefile          |   1 +
+ drivers/acpi/mcfg.c            | 104 +++++++++++++++++
+ drivers/acpi/pci_root.c        |   2 +-
+ drivers/pci/Kconfig            |  10 ++
+ drivers/pci/Makefile           |   5 +
+ drivers/pci/ecam.c             | 234 ++++++++++++++++++++++++++++++++++++++
+ drivers/pci/pci.c              |  30 ++++-
+ drivers/xen/pci.c              |   7 +-
+ include/linux/acpi.h           |   2 +
+ include/linux/ecam.h           |  44 ++++++++
+ 19 files changed, 691 insertions(+), 340 deletions(-)
+ create mode 100644 drivers/acpi/mcfg.c
+ create mode 100644 drivers/pci/ecam.c
+ create mode 100644 include/linux/ecam.h
+
 -- 
 1.9.1
