@@ -1,66 +1,109 @@
-From: tomasz.nowicki@linaro.org (Tomasz Nowicki)
-Date: Tue, 27 Oct 2015 17:47:04 +0100
-Subject: [Linaro-acpi] [PATCH V1 07/11] XEN / PCI: Remove the dependence
- on arch x86 when PCI_MMCONFIG=y
-In-Reply-To: <1445963922-22711-8-git-send-email-tn@semihalf.com>
-References: <1445963922-22711-1-git-send-email-tn@semihalf.com>
- <1445963922-22711-8-git-send-email-tn@semihalf.com>
-Message-ID: <562FAA88.3020609@linaro.org>
+From: jenskuske@gmail.com (Jens Kuske)
+Date: Tue, 27 Oct 2015 17:50:21 +0100
+Subject: [PATCH v4 1/6] clk: sunxi: Let divs clocks read the base factor clock
+ name from devicetree
+In-Reply-To: <1445964626-6484-1-git-send-email-jenskuske@gmail.com>
+References: <1445964626-6484-1-git-send-email-jenskuske@gmail.com>
+Message-ID: <1445964626-6484-2-git-send-email-jenskuske@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+ Stefano
+Currently, the sunxi clock driver gets the name for the base factor clock
+of divs clocks from the name field in factors_data. This prevents reusing
+of the factor clock for clocks with same properties, but different name.
 
-On 27.10.2015 17:38, Tomasz Nowicki wrote:
-> From: Hanjun Guo <hanjun.guo@linaro.org>
->
-> In drivers/xen/pci.c, there are arch x86 dependent codes when
-> CONFIG_PCI_MMCONFIG is enabled, since CONFIG_PCI_MMCONFIG
-> depends on ACPI, so this will prevent XEN PCI running on other
-> architectures using ACPI with PCI_MMCONFIG enabled (such as ARM64).
->
-> Fortunatly, it can be sloved in a simple way. In drivers/xen/pci.c,
-> the only x86 dependent code is if ((pci_probe & PCI_PROBE_MMCONF) == 0),
-> and it's defined in asm/pci_x86.h, the code means that
-> if the PCI resource is not probed in PCI_PROBE_MMCONF way, just
-> ingnore the xen mcfg init. Actually this is duplicate, because
-> if PCI resource is not probed in PCI_PROBE_MMCONF way, the
-> pci_mmconfig_list will be empty, and the if (list_empty())
-> after it will do the same job.
->
-> So just remove the arch related code and the head file, this
-> will be no functional change for x86, and also makes xen/pci.c
-> usable for other architectures.
->
-> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-> CC: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
-> CC: Boris Ostrovsky <boris.ostrovsky@oracle.com>
-> ---
->   drivers/xen/pci.c | 6 ------
->   1 file changed, 6 deletions(-)
->
-> diff --git a/drivers/xen/pci.c b/drivers/xen/pci.c
-> index 6785ebb..9a8dbe3 100644
-> --- a/drivers/xen/pci.c
-> +++ b/drivers/xen/pci.c
-> @@ -28,9 +28,6 @@
->   #include <asm/xen/hypervisor.h>
->   #include <asm/xen/hypercall.h>
->   #include "../pci/pci.h"
-> -#ifdef CONFIG_PCI_MMCONFIG
-> -#include <asm/pci_x86.h>
-> -#endif
->
->   static bool __read_mostly pci_seg_supported = true;
->
-> @@ -222,9 +219,6 @@ static int __init xen_mcfg_late(void)
->   	if (!xen_initial_domain())
->   		return 0;
->
-> -	if ((pci_probe & PCI_PROBE_MMCONF) == 0)
-> -		return 0;
-> -
->   	if (list_empty(&pci_mmcfg_list))
->   		return 0;
->
->
+This commit makes the divs setup function try to get a name from
+clock-output-names in the devicetree. It also removes the name field where
+possible and merges the sun4i PLL5 and PLL6 clocks.
+
+Signed-off-by: Jens Kuske <jenskuske@gmail.com>
+---
+ drivers/clk/sunxi/clk-sunxi.c | 38 +++++++++++++++++++++++++++-----------
+ 1 file changed, 27 insertions(+), 11 deletions(-)
+
+diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
+index 9c79af0c..270de42 100644
+--- a/drivers/clk/sunxi/clk-sunxi.c
++++ b/drivers/clk/sunxi/clk-sunxi.c
+@@ -704,21 +704,12 @@ static const struct factors_data sun4i_pll5_data __initconst = {
+ 	.enable = 31,
+ 	.table = &sun4i_pll5_config,
+ 	.getter = sun4i_get_pll5_factors,
+-	.name = "pll5",
+-};
+-
+-static const struct factors_data sun4i_pll6_data __initconst = {
+-	.enable = 31,
+-	.table = &sun4i_pll5_config,
+-	.getter = sun4i_get_pll5_factors,
+-	.name = "pll6",
+ };
+ 
+ static const struct factors_data sun6i_a31_pll6_data __initconst = {
+ 	.enable = 31,
+ 	.table = &sun6i_a31_pll6_config,
+ 	.getter = sun6i_a31_get_pll6_factors,
+-	.name = "pll6x2",
+ };
+ 
+ static const struct factors_data sun5i_a13_ahb_data __initconst = {
+@@ -902,6 +893,7 @@ struct gates_data {
+ 
+ #define SUNXI_DIVS_MAX_QTY	4
+ #define SUNXI_DIVISOR_WIDTH	2
++#define SUNXI_DIVS_BASE_NAME_MAX_LEN	8
+ 
+ struct divs_data {
+ 	const struct factors_data *factors; /* data for the factor clock */
+@@ -941,7 +933,7 @@ static const struct divs_data pll5_divs_data __initconst = {
+ };
+ 
+ static const struct divs_data pll6_divs_data __initconst = {
+-	.factors = &sun4i_pll6_data,
++	.factors = &sun4i_pll5_data,
+ 	.ndivs = 4,
+ 	.div = {
+ 		{ .shift = 0, .table = pll6_sata_tbl, .gate = 14 }, /* M, SATA */
+@@ -983,6 +975,8 @@ static void __init sunxi_divs_clk_setup(struct device_node *node,
+ 	struct clk_gate *gate = NULL;
+ 	struct clk_fixed_factor *fix_factor;
+ 	struct clk_divider *divider;
++	struct factors_data factors = *data->factors;
++	char base_name[SUNXI_DIVS_BASE_NAME_MAX_LEN];
+ 	void __iomem *reg;
+ 	int ndivs = SUNXI_DIVS_MAX_QTY, i = 0;
+ 	int flags, clkflags;
+@@ -991,8 +985,30 @@ static void __init sunxi_divs_clk_setup(struct device_node *node,
+ 	if (data->ndivs)
+ 		ndivs = data->ndivs;
+ 
++	/* Try to find a name for base factor clock */
++	for (i = 0; i < ndivs; i++) {
++		if (data->div[i].self) {
++			of_property_read_string_index(node, "clock-output-names",
++						      i, &factors.name);
++			break;
++		}
++	}
++	/* If we don't have a .self clk use the first output-name up to '_' */
++	if (factors.name == NULL) {
++		of_property_read_string_index(node, "clock-output-names",
++						      0, &clk_name);
++
++		for (i = 0; i < SUNXI_DIVS_BASE_NAME_MAX_LEN - 1 &&
++						clk_name[i] != '_' &&
++						clk_name[i] != '\0'; i++)
++			base_name[i] = clk_name[i];
++
++		base_name[i] = '\0';
++		factors.name = base_name;
++	}
++
+ 	/* Set up factor clock that we will be dividing */
+-	pclk = sunxi_factors_clk_setup(node, data->factors);
++	pclk = sunxi_factors_clk_setup(node, &factors);
+ 	parent = __clk_get_name(pclk);
+ 
+ 	reg = of_iomap(node, 0);
+-- 
+2.6.2
