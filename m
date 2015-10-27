@@ -1,53 +1,80 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 27 Oct 2015 21:31:06 +0900
-Subject: [PATCH] arm64/efi: register UEFI runtime mmio regions as iomem
- resources
-In-Reply-To: <CACRpkdact=Jh5WpghnyPU1Oaiu8pgvb=kwva-nEkJUX9NKL6xw@mail.gmail.com>
-References: <CAD0U-h+cr0xpAAcCD1P8k2hUcJJL2Ga+-Grrb8WaZrgm08G2nA@mail.gmail.com>
- <1445848860-9547-1-git-send-email-ard.biesheuvel@linaro.org>
- <CACRpkdact=Jh5WpghnyPU1Oaiu8pgvb=kwva-nEkJUX9NKL6xw@mail.gmail.com>
-Message-ID: <CAKv+Gu-12azUSe_V9Cx58fd5YyO8RMO4qSOs1afQ8iAc71cC9g@mail.gmail.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Tue, 27 Oct 2015 12:33:03 +0000
+Subject: [PATCH] ARM64: juno: add NOR flash to device tree
+In-Reply-To: <CACRpkdbpD+Kr01hDc7QnL4x_4=A_rnAO+G0CaMce8+5ns+bx2Q@mail.gmail.com>
+References: <1444904415-19597-1-git-send-email-linus.walleij@linaro.org>
+ <561FC681.2040809@arm.com>
+ <CACRpkdaSox9WKb5-dkD_zAwO9WxP6+b010p3bdxsm1LRy=WvKg@mail.gmail.com>
+ <5624C31D.3070906@arm.com> <20151019102932.GB10678@leverpostej>
+ <CACRpkdaGscb_ccbGuwccsRj_b1d6xoveiiZpw1a5eXon3PxAUA@mail.gmail.com>
+ <20151019113904.GE10678@leverpostej>
+ <CACRpkdb1XRSq3EERbiMwCnuV7Dtit2xGYRDBtQ9+odyXq6kM7A@mail.gmail.com>
+ <20151020112026.GF10728@bivouac.eciton.net>
+ <CAD0U-hKZM-A2N_Lpnzwkt0WmAi+kRR=UOEE4Vr2M-iTo9ikkOg@mail.gmail.com>
+ <CACRpkdZ2Ydyzf9rHOgjZ_KhhxqFi_cK1-Jh47Fh+SP4YGjg_EA@mail.gmail.com>
+ <562F6799.1060301@arm.com>
+ <CACRpkdbpD+Kr01hDc7QnL4x_4=A_rnAO+G0CaMce8+5ns+bx2Q@mail.gmail.com>
+Message-ID: <562F6EFF.2030404@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27 October 2015 at 21:08, Linus Walleij <linus.walleij@linaro.org> wrote:
-> On Mon, Oct 26, 2015 at 9:41 AM, Ard Biesheuvel
-> <ard.biesheuvel@linaro.org> wrote:
->
->> In order to prevent kernel drivers from attaching to MMIO regions
->> that are owned by the firmware, register them as iomem resources.
+
+
+On 27/10/15 12:22, Linus Walleij wrote:
+> On Tue, Oct 27, 2015 at 1:01 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
+>> On 27/10/15 11:55, Linus Walleij wrote:
+
+[...]
+
+>>> Then it is safe to enable NOR flash and AFS in the kernel.
 >>
->> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>> *No*, not on Juno. If we need to enable them for other platforms, then
+>> we should either disable NOR flash in DT(or even remove it completely
+>> whichever is appropriate).
+>>
+>> Since idle is enable in defconfig and if DT has idle states, then it
+>> can't boot for the reason I previously mentioned.
 >
-> Is this related to the flash memory discussion so that NOR flash
-> will be part of what is considered "I/O memory"
-
-Yes
-
-> and flash
-> protection achieved this way?
+> Yeah right I remember that now. Let's say it is safe to enable
+> for the tamper-security reason. There may be other reasons
+> not to...
+>
+> If this is about different idle functionalities blocking flash
+> access, what we should do is to in Kconfig make it impossible
+> to compile in both deep idle states and flash support at the
+> same time, as that is how the system really behaves.
+>
+> I.e do you mean something like this, or am I getting it wrong?
 >
 
-... and no, not entirely. Note that this is not about 'protecting' the
-flash in a security sense. It is simply to reserve the resources that
-should be considered occupied by the UEFI firmware drivers. This may
-be NOR flash, but it may just as well be the RTC or potentially a
-syscon register block to do reset and/or poweroff.
+But with this you will never enable idle on all VEXPRESS platforms, what
+if the issue on Juno is resolved in future silicon. So I prefer DT way
+if we have to enable NOR flash in defconfig.
 
-My QEMU mach-virt /proc/iomem looks like this with the patch applied:
+> index 21340e0be73e..07d91776bcfe 100644
+> --- a/drivers/cpuidle/Kconfig.arm
+> +++ b/drivers/cpuidle/Kconfig.arm
+> @@ -4,6 +4,7 @@
+>   config ARM_CPUIDLE
+>           bool "Generic ARM/ARM64 CPU idle Driver"
+>           select DT_IDLE_STATES
+> +       depends on !(ARCH_VEXPRESS && MTD)
+>           help
+>             Select this to enable generic cpuidle driver for ARM.
+>             It provides a generic idle driver whose idle states are configured
+>
+> Hiding hardware from the devicetree seems over the top to me,
 
-04000000-07ffffff : UEFI Runtime MMIO
-09000000-09000fff : /pl011 at 9000000
-  09000000-09000fff : /pl011 at 9000000
-09010000-0901ffff : UEFI Runtime MMIO
-40000000-7fffffff : System RAM
-  40080000-408a27d3 : Kernel code
-  40970000-40adffff : Kernel data
+OK, I agree with you on not hiding. But disabling it seems OK for me as
+it's a hardware errata(SROM can't be used and hence NOR is used in warm
+reset path)
 
-where the first UEFI mmio region is the second bank of NOR flash (the
-first one holds the firmware image itself, so that is not claimed
-since the variable store driver never accesses it) and the second UEFI
-mmio region is the PL031 RTC.
+> it is better to keep the device trees describing the actual hardware
+
+Agreed, but we need a way to specify that it used as alternative for
+SROM to workaround the hardware issue and hence not available for Linux.
+One way I believe is setting the status as disabled.
 
 -- 
-Ard.
+Regards,
+Sudeep
