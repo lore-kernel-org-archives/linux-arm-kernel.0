@@ -1,31 +1,25 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 27 Oct 2015 12:05:54 +0000
-Subject: [PATCH 1/2] arm64: cpufeature: declare enable_cpu_capabilities as
- static
-Message-ID: <1445947555-2109-1-git-send-email-will.deacon@arm.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 27 Oct 2015 13:08:42 +0100
+Subject: [PATCH] arm64/efi: register UEFI runtime mmio regions as iomem
+ resources
+In-Reply-To: <1445848860-9547-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <CAD0U-h+cr0xpAAcCD1P8k2hUcJJL2Ga+-Grrb8WaZrgm08G2nA@mail.gmail.com>
+ <1445848860-9547-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <CACRpkdact=Jh5WpghnyPU1Oaiu8pgvb=kwva-nEkJUX9NKL6xw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-enable_cpu_capabilities is only called from within cpufeature.c, so it
-can be declared static.
+On Mon, Oct 26, 2015 at 9:41 AM, Ard Biesheuvel
+<ard.biesheuvel@linaro.org> wrote:
 
-Signed-off-by: Will Deacon <will.deacon@arm.com>
----
- arch/arm64/kernel/cpufeature.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+> In order to prevent kernel drivers from attaching to MMIO regions
+> that are owned by the firmware, register them as iomem resources.
+>
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
-diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-index d0d607452e1d..504526fa8129 100644
---- a/arch/arm64/kernel/cpufeature.c
-+++ b/arch/arm64/kernel/cpufeature.c
-@@ -732,7 +732,7 @@ void update_cpu_capabilities(const struct arm64_cpu_capabilities *caps,
-  * Run through the enabled capabilities and enable() it on all active
-  * CPUs
-  */
--void enable_cpu_capabilities(const struct arm64_cpu_capabilities *caps)
-+static void enable_cpu_capabilities(const struct arm64_cpu_capabilities *caps)
- {
- 	int i;
- 
--- 
-2.1.4
+Is this related to the flash memory discussion so that NOR flash
+will be part of what is considered "I/O memory" and flash
+protection achieved this way?
+
+Yours,
+Linus Walleij
