@@ -1,38 +1,31 @@
-From: hs@denx.de (Heiko Schocher)
-Date: Tue, 27 Oct 2015 13:33:42 +0100
-Subject: [PATCH] regulator: tps65217: remove tps65217.dtsi file
-In-Reply-To: <20151027122148.GA819@earth>
-References: <1445850836-17863-1-git-send-email-hs@denx.de>
- <20151027122148.GA819@earth>
-Message-ID: <562F6F26.4060005@denx.de>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 27 Oct 2015 13:34:44 +0100
+Subject: [PATCH 18/19] ARM: dts: ste: replace legacy *,wakeup property
+ with wakeup-source
+In-Reply-To: <1445422216-29375-19-git-send-email-sudeep.holla@arm.com>
+References: <1445422216-29375-1-git-send-email-sudeep.holla@arm.com>
+ <1445422216-29375-19-git-send-email-sudeep.holla@arm.com>
+Message-ID: <CACRpkdYNFa-R8-u8JXijsCDyY+RHo4ANp+Voz3PEn6b9hcCrzQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Sebastian,
+On Wed, Oct 21, 2015 at 12:10 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
 
-Am 27.10.2015 um 13:21 schrieb Sebastian Reichel:
-> Hi,
+> Though the keyboard and other driver will continue to support the legacy
+> "gpio-key,wakeup", "linux,wakeup" boolean property to enable the wakeup
+> source, "wakeup-source" is the new standard binding.
 >
-> On Mon, Oct 26, 2015 at 10:13:55AM +0100, Heiko Schocher wrote:
->> remove tps65217.dtsi and adapt all boards, which
->> used it.
->>
->> Signed-off-by: Heiko Schocher <hs@denx.de>
->> ---
->> Suggested by Mark Brown, see:
->> https://lkml.org/lkml/2015/10/21/581
->>
->>   .../devicetree/bindings/regulator/tps65217.txt     | 78 ----------------------
+> This patch replaces all the legacy wakeup properties with the unified
+> "wakeup-source" property in order to avoid any futher copy-paste
+> duplication.
 >
-> why did you delete the binding description?
+> Cc: Linus Walleij <linus.walleij@linaro.org>
+> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
 
-Didn;t I sent a v2? I realized this after sending the v1 patch, and
-prepared a v2, which does not remove this file ... Uh, yes, seems
-I missed sending it ... Sorry. Send a v2 ASAP, thanks!
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
-bye,
-Heiko
--- 
--- 
-DENX Software Engineering GmbH,      Managing Director: Wolfgang Denk
-HRB 165235 Munich, Office: Kirchenstr.5, D-82194 Groebenzell, Germany
+Are you sending this to ARM SoC or do I need to handle the
+patch?
+
+Yours,
+Linus Walleij
