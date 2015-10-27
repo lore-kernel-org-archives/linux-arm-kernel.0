@@ -1,83 +1,104 @@
-From: p.fedin@samsung.com (Pavel Fedin)
-Date: Tue, 27 Oct 2015 11:43:54 +0300
-Subject: [PATCH v2 3/4] ARM: dts: Add Ethernet chip to SMDK5410
-In-Reply-To: <cover.1445935215.git.p.fedin@samsung.com>
-References: <cover.1445935215.git.p.fedin@samsung.com>
-Message-ID: <17645207bc6822bfe6b8e2e1f90053e2d9c00c7b.1445935215.git.p.fedin@samsung.com>
+From: o.schinagl@ultimaker.com (Olliver Schinagl)
+Date: Tue, 27 Oct 2015 09:50:37 +0100
+Subject: [PATCH 07/10] pwm: gpio: Add a generic gpio based PWM driver
+In-Reply-To: <CAL_Jsq+98bBt5-+Of-u6jCdGBiZfMvL=P=mMpvWT26qnPFMz5A@mail.gmail.com>
+References: <1445895161-2317-1-git-send-email-o.schinagl@ultimaker.com>
+ <1445895161-2317-8-git-send-email-o.schinagl@ultimaker.com>
+ <CAL_Jsq+98bBt5-+Of-u6jCdGBiZfMvL=P=mMpvWT26qnPFMz5A@mail.gmail.com>
+Message-ID: <551D0470-9D4A-446D-9030-027A3E054E06@ultimaker.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The chip is smsc9115, connected via SROMc bank 3. Additionally, some GPIO
-initialization is required.
+Hey Rob,
 
-Signed-off-by: Pavel Fedin <p.fedin@samsung.com>
----
- arch/arm/boot/dts/exynos5410-smdk5410.dts | 42 +++++++++++++++++++++++++++++++
- 1 file changed, 42 insertions(+)
+On October 27, 2015 8:42:48 AM CET, Rob Herring <robh+dt@kernel.org> wrote:
+>On Mon, Oct 26, 2015 at 4:32 PM, Olliver Schinagl
+><o.schinagl@ultimaker.com> wrote:
+>> From: Olliver Schinagl <oliver@schinagl.nl>
+>>
+>> This patch adds a bit-banging gpio PWM driver. It makes use of
+>hrtimers,
+>> to allow nano-second resolution, though it obviously strongly depends
+>on
+>> the switching speed of the gpio pins, hrtimer and system load.
+>>
+>> Each pwm node can have 1 or more "pwm-gpio" entries, which will be
+>> treated as pwm's as part of a pwm chip.
+>>
+>> Signed-off-by: Olliver Schinagl <oliver@schinagl.nl>
+>> ---
+>>  Documentation/devicetree/bindings/pwm/pwm-gpio.txt |  18 ++
+>>  MAINTAINERS                                        |   5 +
+>>  drivers/pwm/Kconfig                                |  15 ++
+>>  drivers/pwm/Makefile                               |   1 +
+>>  drivers/pwm/pwm-gpio.c                             | 253
+>+++++++++++++++++++++
+>>  5 files changed, 292 insertions(+)
+>>  create mode 100644
+>Documentation/devicetree/bindings/pwm/pwm-gpio.txt
+>>  create mode 100644 drivers/pwm/pwm-gpio.c
+>>
+>> diff --git a/Documentation/devicetree/bindings/pwm/pwm-gpio.txt
+>b/Documentation/devicetree/bindings/pwm/pwm-gpio.txt
+>> new file mode 100644
+>> index 0000000..336f61f
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/pwm/pwm-gpio.txt
+>> @@ -0,0 +1,18 @@
+>> +Generic GPIO bit-banged PWM driver
+>> +
+>> +Required properties:
+>> +  - compatible: should be "pwm-gpio"
+>> +  - #pwm-cells: should be 3, see pwm.txt in this directory for a
+>general
+>> +    description of the cells format.
+>> +  - pwm-gpios: one or more gpios describing the used gpio, see the
+>gpio
+>> +    bindings for the used gpio driver.
+>
+>I'm not sure there is really much advantage to having multiple gpios
+>per node. It would simplify the driver a bit not to, but I don't feel
+>strongly either way.
+I figured this way you have one (or more) gpio 'chips' and then per chip 1 or more outputs. I actually thing pne would use several gpios rather then several 'chips'. Most hardware oprates the same way i thought.
+>
+>> +
+>> +Example:
+>> +#include <dt-bindings/gpio/gpio.h>
+>> +
+>> +       pwm: pwm at 0 {
+>
+>Unit address should be associated with a reg property, so drop it.
+Done
 
-diff --git a/arch/arm/boot/dts/exynos5410-smdk5410.dts b/arch/arm/boot/dts/exynos5410-smdk5410.dts
-index cebeaab..2a6a5ac 100644
---- a/arch/arm/boot/dts/exynos5410-smdk5410.dts
-+++ b/arch/arm/boot/dts/exynos5410-smdk5410.dts
-@@ -35,6 +35,17 @@
- 		reg = <0x02037000 0x1000>;
- 	};
- 
-+	ethernet at 07000000 {
-+		compatible = "smsc,lan9115";
-+		reg = <0x07000000 0x10000>;
-+		phy-mode = "mii";
-+		interrupt-parent = <&gpx0>;
-+		interrupts = <5 8>;
-+		reg-io-width = <2>;
-+		smsc,irq-push-pull;
-+		smsc,force-internal-phy;
-+	};
-+
- };
- 
- &mmc_0 {
-@@ -61,6 +72,27 @@
- 	disable-wp;
- };
- 
-+&pinctrl_0 {
-+	srom_ctl: srom-ctl {
-+		samsung,pins = "gpy0-3", "gpy0-4", "gpy0-5",
-+			       "gpy1-0", "gpy1-1", "gpy1-2", "gpy1-3";
-+		samsung,pin-function = <2>;
-+		samsung,pin-drv = <0>;
-+	};
-+
-+	srom_ebi: srom-ebi {
-+		samsung,pins = "gpy3-0", "gpy3-1", "gpy3-2", "gpy3-3",
-+			       "gpy3-4", "gpy3-5", "gpy3-6", "gpy3-7",
-+			       "gpy5-0", "gpy5-1", "gpy5-2", "gpy5-3",
-+			       "gpy5-4", "gpy5-5", "gpy5-6", "gpy5-7",
-+			       "gpy6-0", "gpy6-1", "gpy6-2", "gpy6-3",
-+			       "gpy6-4", "gpy6-5", "gpy6-6", "gpy6-7";
-+		samsung,pin-function = <2>;
-+		samsung,pin-pud = <3>;
-+		samsung,pin-drv = <0>;
-+	};
-+};
-+
- &uart0 {
- 	status = "okay";
- };
-@@ -72,3 +104,13 @@
- &uart2 {
- 	status = "okay";
- };
-+
-+&sromc {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&srom_ctl>, <&srom_ebi>;
-+	bank at 3 {
-+		bank = <3>;
-+		width = <2>;
-+		srom-timing = <1 9 12 1 9 1 1>;
-+	};
-+};
+>
+>> +               compatible = "pwm-gpio";
+>> +               #pwm-cells = 3;
+>> +               pwm-gpios = <&pio 7 1 GPIO_ACTIVE_LOW>;
+>> +               pwm-gpios = <&pio 7 2 GPIO_ACTIVE_LOW>;
+>
+>This would not actually compile. You can't have 2 properties of the
+>same name.
+A bad example is still a bug. Fixed.
+>
+>> +       };
+>> diff --git a/MAINTAINERS b/MAINTAINERS
+>> index 7ba7ab7..0ae7fbf 100644
+>> --- a/MAINTAINERS
+>> +++ b/MAINTAINERS
+>> @@ -4555,6 +4555,11 @@ F:       drivers/i2c/muxes/i2c-mux-gpio.c
+>>  F:     include/linux/i2c-mux-gpio.h
+>>  F:     Documentation/i2c/muxes/i2c-mux-gpio
+>>
+>> +GENERIC GPIO PWM DRIVER
+>> +M:     Olliver Schinagl <oliver@schinagl.nl>
+>> +S:     Maintained
+>> +F:     drivers/pwm/pwm-gpio.c
+>
+>Can you add the binding doc too.
+Sure, done.
+
+>
+>Rob
+
 -- 
-2.4.4
+Sent from my Android device with K-9 Mail. Please excuse my brevity.
