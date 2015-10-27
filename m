@@ -1,29 +1,31 @@
-From: timur@tabi.org (Timur Tabi)
-Date: Tue, 27 Oct 2015 17:54:38 -0500
-Subject: [PATCH v13 5/5] uart: pl011: Add support to ZTE ZX296702 uart
-In-Reply-To: <562E447E.6070703@arm.com>
-References: <1438328959-16177-1-git-send-email-jun.nie@linaro.org>
- <1438328959-16177-6-git-send-email-jun.nie@linaro.org>
- <55FC16A2.5070207@arm.com>
- <CABymUCOA3oG7Hq83hDyQ_uisQHeipoHshcWONWTtjxKvikzjsQ@mail.gmail.com>
- <CAOZdJXUjZLKkUYScD7oDTMuRUtAEJ6=DopmE4n6Vb9zyv+_viA@mail.gmail.com>
- <CABymUCORU9CDD64Rdw2VX0kLSe6E1zY9iZCap5xittoVFwbOtw@mail.gmail.com>
- <562AFBD5.3050508@codeaurora.org> <562DF96D.6020307@arm.com>
- <562E20B2.4050805@codeaurora.org> <562E3213.8070602@arm.com>
- <562E33AE.2020608@codeaurora.org> <562E3BCF.7010000@arm.com>
- <562E3D02.2040108@codeaurora.org> <562E447E.6070703@arm.com>
-Message-ID: <563000AE.4070107@tabi.org>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Wed, 28 Oct 2015 01:56:53 +0300
+Subject: [PATCH] ARM: shmobile: porter: add CAN0 DT support
+In-Reply-To: <20151027224142.GB21745@verge.net.au>
+References: <1674850.BZpGW9kEud@wasted.cogentembedded.com>
+ <5706086.RKBCVZugI4@wasted.cogentembedded.com>
+ <20151027224142.GB21745@verge.net.au>
+Message-ID: <56300135.703@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/26/2015 10:19 AM, Andre Przywara wrote:
->> >We have an internal patch that I'm trying to upstream, but I need the
->> >amba-pl011 driver to stabilize first.
+On 10/28/2015 01:41 AM, Simon Horman wrote:
 
-> As mentioned earlier, this looks like the perfect opportunity now to get
-> the change in (since I see it as a subset of Jun's series). "Waiting for
-> stabilization" sounds a bit optimistic to me in a general Linux context;-)
+>> Define the Porter board dependent part of the CAN0 device node.
+>>
+>> This patch is  analogous to the commit 457acc4a6ce8 (ARM: shmobile:
+>> henninger: add CAN0 DT support) as there are no differences between the
+>> boards in this respect.
+>>
+>> Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
+>
+> Thanks, I have queued this up for v4.5 after updating the changelog
+> as per checkpatch.pl's insight:
+>
+> ERROR: Please use git commit description style 'commit <12+ chars of sha1> ("<title line>")' - ie: 'commit 457acc4a6ce8 ("ARM: shmobile: henninger: add CAN0 DT support")'
+> #8:
+> This patch is  analogous to the commit 457acc4a6ce8 (ARM: shmobile:
 
-Unfortunately, I must depend on Leif Lindholm's SPCR patches.  He's 
-working on a new version, but until then I can't do much.  They should 
-be out soon, though.
+    Oops, sorry, forgot to update the patch description.
+
+MBR, Sergei
