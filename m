@@ -1,32 +1,26 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 27 Oct 2015 17:03:29 +0100
-Subject: [PATCH 1/3] DT binding: gpio-zynq: Document interrupt-controller
-In-Reply-To: <1445617532-10228-1-git-send-email-soren.brinkmann@xilinx.com>
-References: <1445617532-10228-1-git-send-email-soren.brinkmann@xilinx.com>
-Message-ID: <CACRpkdan7oFcTWSF-fE-BiOsk4Pji7DgimfMji_eb3RGjdA4RQ@mail.gmail.com>
+From: maxime.coquelin@st.com (Maxime Coquelin)
+Date: Tue, 27 Oct 2015 17:03:31 +0100
+Subject: v7-M: Fixing XIP when the kernel is in ROM
+In-Reply-To: <CAAEAJfD29_PSTw+srx7d2YrF+Akx-_94Wv9ifKzT+8HTfH5tGA@mail.gmail.com>
+References: <20151026012710.GA17365@laptop>
+ <20151026080537.GW4931@pengutronix.de>
+ <CAAEAJfB0yywtQ2MrYf2ih5+a3fZJXAy0hFSXWA038wQMQswa7g@mail.gmail.com>
+ <CAAEAJfD29_PSTw+srx7d2YrF+Akx-_94Wv9ifKzT+8HTfH5tGA@mail.gmail.com>
+Message-ID: <562FA053.6010208@st.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 23, 2015 at 6:25 PM, Soren Brinkmann
-<soren.brinkmann@xilinx.com> wrote:
+Hi Ezequiel,
 
-> HW and driver support the GPIO as interrupt-controller. Document that in
-> the DT binding.
->
-> Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
+On 10/27/2015 04:35 PM, Ezequiel Garcia wrote:
+>> >>>The temporary stack is allocated in the .text.init section
+>> >>>and so this doesn't work when the kernel is executing from ROM.
+> >>
+> >>If sp isn't used, how does it break you setup?
+STM32 machine works fine with XIP from internal flash memory, so as Uwe, 
+I'm surprised it solves your problem.
 
-Patch subject augmented and applied.
+I will have a try with your patch later today.
 
-> +- interrupt-controller : Marks the device node as an interrupt controller.
-> +- #interrupt-cells     : Should be 2.  The first cell is the GPIO number.
-> +                         The second cell bits[3:0] is used to specify trigger type and level flags:
-> +                             1 = low-to-high edge triggered.
-> +                             2 = high-to-low edge triggered.
-> +                             4 = active high level-sensitive.
-> +                             8 = active low level-sensitive.
-
-If these can be or:ed together, e.g 3 = both edges, that needs to be
-documented. If they can't the current patch is fine I guess.
-
-Yours,
-Linus Walleij
+Regards,
+Maxime
