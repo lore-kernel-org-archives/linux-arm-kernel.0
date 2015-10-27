@@ -1,80 +1,60 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Tue, 27 Oct 2015 11:00:36 +0900
-Subject: [PATCH v3] dmaengine: fsl-edma: add PM suspend/resume support
-In-Reply-To: <1445243465-7727-1-git-send-email-yao.yuan@freescale.com>
-References: <1445243465-7727-1-git-send-email-yao.yuan@freescale.com>
-Message-ID: <20151027020035.GC11691@vkoul-mobl.iind.intel.com>
+From: swarren@wwwdotorg.org (Stephen Warren)
+Date: Mon, 26 Oct 2015 20:03:04 -0600
+Subject: [PATCH V2 RFT] ARM: bcm2835: enable all bcm2835-relevant in
+ defconfig
+In-Reply-To: <562C8E6C.7030205@lategoodbye.de>
+References: <1444946250-23219-1-git-send-email-stefan.wahren@i2se.com>
+ <562C512A.2060805@wwwdotorg.org> <562C8E6C.7030205@lategoodbye.de>
+Message-ID: <562EDB58.4000001@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 19, 2015 at 04:31:05PM +0800, Yuan Yao wrote:
+On 10/25/2015 02:10 AM, Stefan Wahren wrote:
+> Am 25.10.2015 um 04:48 schrieb Stephen Warren:
+>> On 10/15/2015 03:57 PM, Stefan Wahren wrote:
+>>> Rebuild bcm2835_defconfig using "make bcm2835_defconfig;
+>>> make savedefconfig", and enable manually the following features:
+>>>
+>>> * all bcm2835-relevant drivers (MBOX, WDT, DMA, PWM, SND)
+>>> * enable regular stackprotector because CONFIG_CC_STACKPROTECTOR
+>>>    disappear
+>>> * enable some new dependencies in order to keep LED heartbeat
+>>>    ( CONFIG_NEW_LEDS, CONFIG_LEDS_CLASS, CONFIG_LEDS_TRIGGERS )
+>>
+>>> diff --git a/arch/arm/configs/bcm2835_defconfig
+>>> b/arch/arm/configs/bcm2835_defconfig
+>>
+>>> -CONFIG_RESOURCE_COUNTERS=y
+> 
+> This option becomes obsolete:
+> 
+> kernel: res_counter: remove the unused API
+> 
+> 5b1efc027c0b51ca3e76f4e00c83358f8349f543
+> 
+>>> -CONFIG_RD_BZIP2=y
+>>> -CONFIG_RD_LZMA=y
+>>> -CONFIG_RD_XZ=y
+>>> -CONFIG_RD_LZO=y
+> 
+> These are enabled implicit.
+> 
+>>> -CONFIG_SCSI_MULTI_LUN=y
+> 
+> This option becomes obsolete:
+> 
+> scsi: Remove CONFIG_SCSI_MULTI_LUN
+> 
+> c309b35171ddb5384cc3f2f9dc82a96dccc6b7f6
+> 
+>>> -CONFIG_USB_DWC2_HOST=y
+>>> -CONFIG_EXT4_FS=y
+>>> -CONFIG_EXT4_FS_POSIX_ACL=y
+> 
+> These are enabled implicit.
+> 
+>>
+>> Do you know why all of those were removed?
 
-The patch overall looks fine, but
->  
-> +static int fsl_edma_suspend_late(struct device *dev)
-
-This needs protection and will have build failure when CONFIG_PM is not
-defined
-
-> +{
-> +	struct fsl_edma_engine *fsl_edma = dev_get_drvdata(dev);
-> +	struct fsl_edma_chan *fsl_chan;
-> +	unsigned long flags;
-> +	int i;
-> +
-> +	for (i = 0; i < fsl_edma->n_chans; i++) {
-> +		fsl_chan = &fsl_edma->chans[i];
-> +		spin_lock_irqsave(&fsl_chan->vchan.lock, flags);
-> +		/* Make sure chan is idle or will force disable. */
-> +		if (unlikely(!fsl_chan->idle)) {
-> +			dev_warn(dev, "WARN: There is non-idle channel.");
-> +			fsl_edma_disable_request(fsl_chan);
-> +			fsl_edma_chan_mux(fsl_chan, 0, false);
-> +		}
-> +
-> +		fsl_chan->pm_state = SUSPENDED;
-> +		spin_unlock_irqrestore(&fsl_chan->vchan.lock, flags);
-> +	}
-> +
-> +	return 0;
-> +}
-> +
-> +static int fsl_edma_resume_early(struct device *dev)
-> +{
-> +	struct fsl_edma_engine *fsl_edma = dev_get_drvdata(dev);
-> +	struct fsl_edma_chan *fsl_chan;
-> +	int i;
-> +
-> +	for (i = 0; i < fsl_edma->n_chans; i++) {
-> +		fsl_chan = &fsl_edma->chans[i];
-> +		fsl_chan->pm_state = RUNNING;
-> +		edma_writew(fsl_edma, 0x0, fsl_edma->membase + EDMA_TCD_CSR(i));
-> +		if (fsl_chan->slave_id != 0)
-> +			fsl_edma_chan_mux(fsl_chan, fsl_chan->slave_id, true);
-> +	}
-> +
-> +	edma_writel(fsl_edma, EDMA_CR_ERGA | EDMA_CR_ERCA,
-> +			fsl_edma->membase + EDMA_CR);
-> +
-> +	return 0;
-> +}
-> +
-> +static const struct dev_pm_ops fsl_edma_pm_ops = {
-> +	.suspend_late   = fsl_edma_suspend_late,
-> +	.resume_early   = fsl_edma_resume_early,
-> +};
-
-This one too, also why use late and early, pls add the note here
-
->  static const struct of_device_id fsl_edma_dt_ids[] = {
->  	{ .compatible = "fsl,vf610-edma", },
->  	{ /* sentinel */ }
-> @@ -969,6 +1042,7 @@ static struct platform_driver fsl_edma_driver = {
->  	.driver		= {
->  		.name	= "fsl-edma",
->  		.of_match_table = fsl_edma_dt_ids,
-> +		.pm     = &fsl_edma_pm_ops,
-This will fail too if CONFIG_PM is not defined
-
--- 
-~Vinod
+The explanations sound good. It'd be useful to have that kind of thing
+explained in the commit message for any future patches.
