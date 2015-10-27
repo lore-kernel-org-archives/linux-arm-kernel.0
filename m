@@ -1,81 +1,58 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Tue, 27 Oct 2015 09:52:50 -0500
-Subject: [PATCH V4 0/8] PCI: ACPI: Setting up DMA coherency for PCI
- device from _CCA attribute
-In-Reply-To: <1445442731-28819-1-git-send-email-Suravee.Suthikulpanit@amd.com>
-References: <1445442731-28819-1-git-send-email-Suravee.Suthikulpanit@amd.com>
-Message-ID: <20151027145249.GE8660@localhost>
+From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
+Date: Tue, 27 Oct 2015 14:54:40 +0000
+Subject: Trustzone: DSB before/after SMC
+In-Reply-To: <20151027143706.GF3091@leverpostej> (Mark Rutland's message of
+ "Tue, 27 Oct 2015 14:37:06 +0000")
+References: <562F7CBA.7060806@free.fr> <20151027134318.GD3091@leverpostej>
+ <562F84BA.5060203@free.fr> <20151027143706.GF3091@leverpostej>
+Message-ID: <yw1x4mhce4zz.fsf@unicorn.mansr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Suravee,
+Mark Rutland <mark.rutland@arm.com> writes:
 
-On Wed, Oct 21, 2015 at 08:52:03AM -0700, Suravee Suthikulpanit wrote:
-> This patch series adds support to setup DMA coherency for PCI device using
-> the ACPI _CCA attribute. According to the ACPI spec, the _CCA attribute
-> is required for ARM64. Therefore, this patch is a pre-req for ACPI PCI
-> support for ARM64 which is currently in development.  Also, this should
-> not affect other architectures that does not define 
-> CONFIG_ACPI_CCA_REQUIRED, since the default value is coherent.
-> 
-> In the process, this series also introduces enum dev_dma_attr and a set
-> of APIs to query device DMA attribute. These APIs replace the obsolete
-> device_dma_is_coherent(), and acpi_check_dma().
-> 
-> I have also included a patch from Jeremy posted here:
->     http://www.spinics.net/lists/linux-usb/msg128582.html
-> 
-> This patch series  has been tested on AMD Seattle RevB platform.
-> The git tree containing tested code and pre-req patches are posted here:
-> 
->     http://github.com/ssuthiku/linux.git pci-cca-v4
-> 
-> Changes from V3: (https://lkml.org/lkml/2015/8/26/389)
->     * Clean up suggested by Bjorn
->     * Introduce enum dev_dma_attr
->     * Replace device_dma_is_coherent() and acpi_check_dma() with
->       new APIs.
-> 
-> Changes from V2: (https://lkml.org/lkml/2015/8/25/549)
->     * Return -ENOSUPP instead of -1 (per Rafael's suggestion)
->     * Add WARN() when fail to setup DMA for PCI device when booting
->       ACPI (per Arnd's suggestion)
->     * Added Acked-by from Rob.
->     * Minor clean up
-> 
-> Changes from V1: (https://lkml.org/lkml/2015/8/13/182)
->     * Include patch 1 from Jeremy to enable support for _CCA=0
->     * Clean up acpi_check_dma() per Bjorn suggestions
->     * Split the original V1 patch into two patches (patch 3 and 4)
-> 
-> Jeremy Linton (1):
->   Honor ACPI _CCA attribute setting
-> 
-> Suravee Suthikulpanit (7):
->   device property: Introducing enum dev_dma_attr
->   acpi: Adding DMA Attribute APIs for ACPI Device
->   device property: Adding DMA Attribute APIs for Generic Devices
->   device property: acpi: Make use of the new DMA Attribute APIs
->   device property: acpi: Remove unused DMA APIs
->   PCI: OF: Move of_pci_dma_configure() to pci_dma_configure()
->   PCI: ACPI: Add support for PCI device DMA coherency
-> 
->  drivers/acpi/acpi_platform.c              |  7 +++++-
->  drivers/acpi/glue.c                       |  8 +++---
->  drivers/acpi/scan.c                       | 42 +++++++++++++++++++++++++++++++
->  drivers/base/property.c                   | 32 +++++++++++++++++------
->  drivers/crypto/ccp/ccp-platform.c         |  9 ++++++-
->  drivers/net/ethernet/amd/xgbe/xgbe-main.c |  9 ++++++-
->  drivers/of/of_pci.c                       | 20 ---------------
->  drivers/pci/probe.c                       | 36 ++++++++++++++++++++++++--
->  include/acpi/acpi_bus.h                   | 36 +++-----------------------
->  include/linux/acpi.h                      |  7 +++++-
->  include/linux/of_pci.h                    |  3 ---
->  include/linux/property.h                  | 10 +++++++-
->  12 files changed, 145 insertions(+), 74 deletions(-)
+> On Tue, Oct 27, 2015 at 03:05:46PM +0100, Mason wrote:
+>> On 27/10/2015 14:43, Mark Rutland wrote:
+>> 
+>> > On Tue, Oct 27, 2015 at 02:31:38PM +0100, Mason wrote:
+>> > 
+>> >> I have a few questions about SMC. (I'm using Cortex-A9)
+>> >>
+>> >> Platforms that use SMC often/always execute DSB beforehand.
+>> > 
+>> > Please give an example. We don't do this for PSCI, for instance.
+>> 
+>> arch/arm/mach-exynos/exynos-smc.S
+>> arch/arm/mach-highbank/smc.S
+>> arch/arm/mach-omap2/omap-smc.S
+>
+> From a quick look, it's not obvious to me why those DSBs are present. It
+> would be best to ask the original authors; it may simply be that this
+> was never necessary and has simply been copied.
 
-I had a couple minor comments.  It's sort of a toss-up, but this feels
-more ACPI-flavored than PCI, so I assume Rafael will take this whole
-series unless I hear otherwise.
+It could be required due to secure firmware bugs or CPU errata.
 
-Acked-by: Bjorn Helgaas <bhelgaas@google.com>
+>> In my case, I just want to write the L2_CONTROL register.
+>
+> Is that a register in the L2, or in the CPU? Which L2/CPU?
+
+Cortex-A9, he said.  I believe it's the usual PL310 L2 controller.
+
+> There may be a constraint that the memory system needs to be quiescent
+> or something to that effect. Without more information I cannot say what
+> specifically you need to do.
+>
+>> > A DSB is certainly not always required before nor after an SMC.
+>> 
+>> That makes sense. But a colleague mentioned that the secure OS may
+>> be using different MMU mappings. In that case, it might be required
+>> to wait for all in-flight accesses to resolve?
+
+It's normally a design error for a more secure domain to require things
+of a less secure one.  If the secure monitor code requires a DMB for
+proper operation, it had better do it itself, or else hostile non-secure
+code might be able to exploit it.
+
+-- 
+M?ns Rullg?rd
+mans at mansr.com
