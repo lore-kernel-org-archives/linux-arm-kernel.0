@@ -1,28 +1,37 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 27 Oct 2015 11:23:22 +0100
-Subject: [PATCH 2/4] thermal: rockchip: ensure the otp state before
- resetting the controller
-In-Reply-To: <5626ED35.3010403@gmail.com>
-References: <1445332264-6054-1-git-send-email-wxt@rock-chips.com>
- <1445332264-6054-3-git-send-email-wxt@rock-chips.com>
- <CAD=FV=WHvwNGdRZ4Yjwk0zB00o2gFHXLfbAYHai1kM_oBAR4_g@mail.gmail.com>
- <5626ED35.3010403@gmail.com>
-Message-ID: <CACRpkdaRhpmgZLUAOrHN99GwYDbXhF0Mmi7WuQPAtC4aEsZDJQ@mail.gmail.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Tue, 27 Oct 2015 11:41:05 +0100
+Subject: [PATCH v5 0/5] arm64: dts: r8a7795: enable EthernetAVB on
+ Salvator-X
+In-Reply-To: <1444891698-8780-1-git-send-email-horms+renesas@verge.net.au>
+References: <1444891698-8780-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <CAMuHMdWUwMk0U176rq1ax+j=mrnWkPrw9eWPVHnzHHLAJY86pw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 21, 2015 at 3:41 AM, Caesar Wang <caesar.upstream@gmail.com> wrote:
->> On Tue, Oct 20, 2015 at 2:11 AM, Caesar Wang <wxt@rock-chips.com> wrote:
-
->> You'd still want to have a bindings change to describe "init", but at
->> least you shouldn't need any code changes.
+On Thu, Oct 15, 2015 at 8:48 AM, Simon Horman
+<horms+renesas@verge.net.au> wrote:
+> This patchset enables the EthernetAVB on the Salvator-X board.
+> With it and its dependencies in place I have have successfully
+> booted to an nfsroot user-space (arm64 Debian Jessie).
 >
-> Okay, https://patchwork.kernel.org/patch/5055741/ that's working for me.
-> Fell free add my  test tag if you resend the patch. (Tested-by: Caesar Wang
-> <wxt@rock-chips.com>)
+> In order to achieve that I used the following command line set from u-boot.
 
-Doug, can you resend this rebased version with Caesar's Test tag?
-I kinda like this more than any alternatives.
+> root=/dev/nfs ip=dhcp nfsroot=10.3.3.135:/srv/nfs/salvator-x-arm64
 
-Yours,
-Linus Walleij
+For people who want to try this: you probably want to add a line specifying
+the MAC address
+
+        local-mac-address = [ XX XX XX XX XX XX ];
+
+to the avb node in arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts.
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
