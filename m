@@ -1,32 +1,195 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Tue, 27 Oct 2015 09:41:24 -0500
-Subject: [PATCH V4 1/8] acpi: Honor ACPI _CCA attribute setting
-In-Reply-To: <1445442731-28819-2-git-send-email-Suravee.Suthikulpanit@amd.com>
-References: <1445442731-28819-1-git-send-email-Suravee.Suthikulpanit@amd.com>
- <1445442731-28819-2-git-send-email-Suravee.Suthikulpanit@amd.com>
-Message-ID: <20151027144123.GC8660@localhost>
+From: b18965@freescale.com (Alison Wang)
+Date: Tue, 27 Oct 2015 22:35:07 +0800
+Subject: [PATCH] ARM: add v7 LPAE multi-platform defconfig
+Message-ID: <1445956507-34026-1-git-send-email-b18965@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->From "git log --oneline include/acpi/acpi_bus.h", I see the convention is
-to capitalize "ACPI:" in the summary (also applies to other patches in this
-series).
+v7 LPAE multi-platform defconfig is based on v7 multi-platform
+defconfig and adds LPAE support.
 
-On Wed, Oct 21, 2015 at 08:52:04AM -0700, Suravee Suthikulpanit wrote:
-> From: Jeremy Linton <jeremy.linton@arm.com>
-> 
-> ACPI configurations can now mark devices as noncoherent,
-> support that choice.
-> 
-> NOTE: This is required to support USB on ARM Juno Development Board.
-> 
-> Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
-> Signed-off-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
-> CC: Bjorn Helgaas <bhelgaas@google.com>
-> CC: Catalin Marinas <catalin.marinas@arm.com>
-> CC: Rob Herring <robh+dt@kernel.org>
-> CC: Will Deacon <will.deacon@arm.com>
-> CC: Rafael J. Wysocki <rjw@rjwysocki.net>
-> ---
->  include/acpi/acpi_bus.h | 5 +++--
->  1 file changed, 3 insertions(+), 2 deletions(-)
+This defconfig is verified on LS1021A which enables GIANFAR,
+I2C, WATCHDOG, AUDIO, EDMA and DSPI drivers, etc.
+
+Signed-off-by: Alison Wang <alison.wang@freescale.com>
+---
+ arch/arm/configs/multi_v7_lpae_defconfig | 168 +++++++++++++++++++++++++++++++
+ 1 file changed, 168 insertions(+)
+ create mode 100644 arch/arm/configs/multi_v7_lpae_defconfig
+
+diff --git a/arch/arm/configs/multi_v7_lpae_defconfig b/arch/arm/configs/multi_v7_lpae_defconfig
+new file mode 100644
+index 0000000..65876d0
+--- /dev/null
++++ b/arch/arm/configs/multi_v7_lpae_defconfig
+@@ -0,0 +1,168 @@
++CONFIG_SYSVIPC=y
++CONFIG_FHANDLE=y
++CONFIG_IRQ_DOMAIN_DEBUG=y
++CONFIG_NO_HZ=y
++CONFIG_HIGH_RES_TIMERS=y
++CONFIG_CGROUPS=y
++CONFIG_BLK_DEV_INITRD=y
++CONFIG_EMBEDDED=y
++CONFIG_PERF_EVENTS=y
++CONFIG_MODULES=y
++CONFIG_MODULE_UNLOAD=y
++CONFIG_PARTITION_ADVANCED=y
++CONFIG_CMDLINE_PARTITION=y
++CONFIG_ARCH_MXC=y
++CONFIG_SOC_LS1021A=y
++CONFIG_ARM_LPAE=y
++CONFIG_PCI=y
++CONFIG_PCI_MSI=y
++CONFIG_PCI_HOST_GENERIC=y
++CONFIG_PCI_LAYERSCAPE=y
++CONFIG_PCIEPORTBUS=y
++CONFIG_SMP=y
++CONFIG_NR_CPUS=16
++CONFIG_ARM_PSCI=y
++CONFIG_AEABI=y
++CONFIG_HIGHMEM=y
++CONFIG_CMA=y
++CONFIG_ARM_APPENDED_DTB=y
++CONFIG_ARM_ATAG_DTB_COMPAT=y
++CONFIG_KEXEC=y
++CONFIG_CPU_FREQ=y
++CONFIG_CPU_FREQ_STAT_DETAILS=y
++CONFIG_CPU_FREQ_DEFAULT_GOV_ONDEMAND=y
++CONFIG_CPUFREQ_DT=y
++CONFIG_CPU_IDLE=y
++CONFIG_ARM_CPUIDLE=y
++CONFIG_VFP=y
++CONFIG_NEON=y
++CONFIG_KERNEL_MODE_NEON=y
++CONFIG_NET=y
++CONFIG_PACKET=y
++CONFIG_UNIX=y
++CONFIG_INET=y
++CONFIG_IP_PNP=y
++CONFIG_IP_PNP_DHCP=y
++CONFIG_IP_PNP_BOOTP=y
++CONFIG_IP_PNP_RARP=y
++CONFIG_IPV6_ROUTER_PREF=y
++CONFIG_IPV6_OPTIMISTIC_DAD=y
++CONFIG_INET6_AH=m
++CONFIG_INET6_ESP=m
++CONFIG_INET6_IPCOMP=m
++CONFIG_IPV6_MIP6=m
++CONFIG_IPV6_TUNNEL=m
++CONFIG_IPV6_MULTIPLE_TABLES=y
++CONFIG_CAN=y
++CONFIG_CAN_FLEXCAN=y
++CONFIG_DEVTMPFS=y
++CONFIG_DEVTMPFS_MOUNT=y
++CONFIG_MTD=y
++CONFIG_MTD_CMDLINE_PARTS=y
++CONFIG_MTD_BLOCK=y
++CONFIG_MTD_CFI=y
++CONFIG_MTD_CFI_ADV_OPTIONS=y
++CONFIG_MTD_CFI_BE_BYTE_SWAP=y
++CONFIG_MTD_CFI_GEOMETRY=y
++CONFIG_MTD_CFI_INTELEXT=y
++CONFIG_MTD_CFI_AMDSTD=y
++CONFIG_MTD_CFI_STAA=y
++CONFIG_MTD_PHYSMAP_OF=y
++CONFIG_MTD_DATAFLASH=y
++CONFIG_MTD_M25P80=y
++CONFIG_MTD_SST25L=y
++CONFIG_MTD_NAND=y
++CONFIG_MTD_SPI_NOR=y
++CONFIG_SPI_FSL_QUADSPI=y
++CONFIG_BLK_DEV_LOOP=y
++CONFIG_BLK_DEV_RAM=y
++CONFIG_BLK_DEV_RAM_SIZE=256000
++CONFIG_BLK_DEV_SD=y
++CONFIG_BLK_DEV_SR=y
++CONFIG_ATA=y
++CONFIG_SATA_AHCI=y
++CONFIG_SATA_AHCI_PLATFORM=y
++CONFIG_SATA_SIL24=y
++CONFIG_NETDEVICES=y
++CONFIG_MACB=y
++CONFIG_GIANFAR=y
++CONFIG_E1000E=y
++CONFIG_AT803X_PHY=y
++CONFIG_MARVELL_PHY=y
++CONFIG_VITESSE_PHY=y
++CONFIG_SMSC_PHY=y
++CONFIG_BROADCOM_PHY=y
++CONFIG_REALTEK_PHY=y
++CONFIG_NATIONAL_PHY=y
++CONFIG_MICREL_PHY=y
++CONFIG_FIXED_PHY=y
++CONFIG_SERIAL_8250=y
++CONFIG_SERIAL_8250_CONSOLE=y
++CONFIG_SERIAL_OF_PLATFORM=y
++CONFIG_SERIAL_FSL_LPUART=y
++CONFIG_SERIAL_FSL_LPUART_CONSOLE=y
++CONFIG_I2C_IMX=y
++CONFIG_SPI=y
++CONFIG_SPI_FSL_DSPI=y
++CONFIG_WATCHDOG=y
++CONFIG_IMX2_WDT=y
++CONFIG_REGULATOR=y
++CONFIG_REGULATOR_FIXED_VOLTAGE=y
++CONFIG_DRM=y
++CONFIG_DRM_FSL_DCU=y
++CONFIG_DRM_PANEL_SIMPLE=y
++CONFIG_FRAMEBUFFER_CONSOLE=y
++CONFIG_FRAMEBUFFER_CONSOLE_ROTATION=y
++CONFIG_LOGO=y
++CONFIG_SOUND=y
++CONFIG_SND=y
++CONFIG_SND_DYNAMIC_MINORS=y
++CONFIG_SND_SOC=y
++CONFIG_SND_SOC_FSL_SAI=y
++CONFIG_SND_SOC_SGTL5000=y
++CONFIG_SND_SIMPLE_CARD=y
++CONFIG_USB=y
++CONFIG_USB_XHCI_HCD=y
++CONFIG_USB_STORAGE=y
++CONFIG_USB_DWC3=y
++CONFIG_MMC=y
++CONFIG_MMC_SDHCI=y
++CONFIG_MMC_SDHCI_PLTFM=y
++CONFIG_MMC_SDHCI_OF_ESDHC=y
++CONFIG_RTC_CLASS=y
++CONFIG_DMADEVICES=y
++CONFIG_FSL_EDMA=y
++CONFIG_CLK_QORIQ=y
++CONFIG_MEMORY=y
++CONFIG_PWM=y
++CONFIG_PWM_FSL_FTM=y
++CONFIG_GENERIC_PHY=y
++CONFIG_EXT4_FS=y
++CONFIG_AUTOFS4_FS=y
++CONFIG_MSDOS_FS=y
++CONFIG_VFAT_FS=y
++CONFIG_NTFS_FS=y
++CONFIG_TMPFS=y
++CONFIG_TMPFS_POSIX_ACL=y
++CONFIG_SQUASHFS=y
++CONFIG_SQUASHFS_LZO=y
++CONFIG_SQUASHFS_XZ=y
++CONFIG_NFS_FS=y
++CONFIG_NFS_V3_ACL=y
++CONFIG_NFS_V4=y
++CONFIG_ROOT_NFS=y
++CONFIG_NLS_CODEPAGE_437=y
++CONFIG_NLS_ISO8859_1=y
++CONFIG_NLS_UTF8=y
++CONFIG_PRINTK_TIME=y
++CONFIG_DEBUG_FS=y
++CONFIG_MAGIC_SYSRQ=y
++CONFIG_LOCKUP_DETECTOR=y
++CONFIG_ARM_CRYPTO=y
++CONFIG_CRYPTO_SHA1_ARM_NEON=m
++CONFIG_CRYPTO_SHA1_ARM_CE=m
++CONFIG_CRYPTO_SHA2_ARM_CE=m
++CONFIG_CRYPTO_SHA512_ARM=m
++CONFIG_CRYPTO_AES_ARM_BS=m
++CONFIG_CRYPTO_AES_ARM_CE=m
++CONFIG_CRYPTO_GHASH_ARM_CE=m
+-- 
+2.1.0.27.g96db324
