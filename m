@@ -1,352 +1,73 @@
-From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
-Date: Tue, 27 Oct 2015 15:38:49 +0100
-Subject: [PATCH v11 2/4] PM / Domains: add setter for dev.pm_domain
-In-Reply-To: <1445956731-6304-1-git-send-email-tomeu.vizoso@collabora.com>
-References: <1445956731-6304-1-git-send-email-tomeu.vizoso@collabora.com>
-Message-ID: <1445956731-6304-3-git-send-email-tomeu.vizoso@collabora.com>
+From: alison.wang@freescale.com (Huan Wang)
+Date: Tue, 27 Oct 2015 14:40:21 +0000
+Subject: [PATCH v4] ARM: configs: Add Freescale LS1021A defconfig
+In-Reply-To: <5073362.oArWDzYkxD@wuerfel>
+References: <1442480614-32345-1-git-send-email-b18965@freescale.com>
+ <5232654.e6dagm53H4@wuerfel>
+ <BN3PR0301MB0867A87B64E1206B773F05EEFE3E0@BN3PR0301MB0867.namprd03.prod.outlook.com>
+ <5073362.oArWDzYkxD@wuerfel>
+Message-ID: <BN3PR0301MB0867C51A52319367F981C630FE230@BN3PR0301MB0867.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adds a function that sets the pointer to dev_pm_domain in struct device
-and that warns if the device has already finished probing. The reason
-why we want to enforce that is because in the general case that can
-cause problems and also that we can simplify code quite a bit if we can
-always assume that.
+> On Thursday 15 October 2015 02:11:57 Huan Wang wrote:
+> > > On Wednesday 14 October 2015 10:18:47 Huan Wang wrote:
+> > > > > On Thursday 24 September 2015 07:27:10 Huan Wang wrote:
+> > > > > > > On Fri, Sep 18, 2015 at 4:38 AM, Huan Wang
+> <alison.wang@freescale.com> wrote:
+> > > > > > Any suggestion? Thanks.
+> > > > >
+> > > > > Try enabling DEBUG_LL for your platform to get some debug
+> > > > > output, if you still don't get any helpful messages, try also
+> > > > > inserting
+> > > > >
+> > > > >       printascii(__func__);
+> > > > >
+> > > > > statements in the early boot process to see how far you get
+> before the hang.
+> > > > >
+> > >
+> > [Alison Wang] ls1021a uses duart as the default serial port, not
+> > lpuart. So
+> > 8250/16550 serial driver is used. Let me explain my debug process in
+> detail.
+> 
+> Ah, I see.
+> 
+> > When CONFIG_VMSPLIT_2G is used, I could boot up the whole kernel and
+> > get the print message " Booting Linux on physical CPU 0xf00" after
+> "Starting kernel"
+> > as below.
+> >
+> > Starting kernel ...
+> > [    0.000000] Booting Linux on physical CPU 0xf00
+> > .....
+> >
+> > But when CONFIG_VMSPLIT_3G is used, I couldn't get print message "
+> > Booting Linux on physical CPU 0xf00". It only hangs at  "Starting
+> kernel ...".
+> >
+> > Moreover, I add some asm code in __turn_mmu_on to print some simple
+> > characters, and I could get the print characters when
+> > CONFIG_VMSPLIT_3G is used. So I guess there is something wrong with
+> the page tables.
+> 
+> Ok. What I was suggesting above though was to try to pinpoint exactly
+> where it goes wrong. You have verified that it does not crash before the
+> page tables are enabled, but that is very early. You have also shown
+> that the kernel crashes before the point at which the 'Booting Linux on
+> physical CPU 0xf00' message is printed to the kernel, but that is *much*
+> later: setup_arch() calls parse_early_param(), which in turn sets up
+> early_console_write(). This means the 'Booting Linux on physical CPU
+> 0xf00'
+> is still stuck in the log buffer and you may have crashed someone
+> inbetween.
+> 
+> If you can call printascii(), you can try to do that just after enabling
+> the page tables to see if that was the problem like you suspect, or
+> otherwise add more printascii() statements between __turn_mmu_on and
+> parse_early_param() to pinpoint the exact code that breaks.
+[Alison Wang] Thank you very much for your help. The issue is fixed.
 
-This patch also changes all current code that directly sets the
-dev.pm_domain pointer.
-
-Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
-Reviewed-by: Ulf Hansson <ulf.hansson@linaro.org>
----
-
-Changes in v11:
-- Move calls to dev_pm_domain_set() out from &dev->power.lock as that
-  isn't needed for dev->pm_domain.
-
-Changes in v9:
-- Add docs noting the need for the device lock to be held before calling
-  dev_pm_domain_set()
-
-Changes in v8:
-- Add dev_pm_domain_set() and update code to use it
-
- arch/arm/mach-omap2/omap_device.c |  7 ++++---
- drivers/acpi/acpi_lpss.c          |  5 +++--
- drivers/acpi/device_pm.c          |  5 +++--
- drivers/base/power/clock_ops.c    |  5 +++--
- drivers/base/power/common.c       | 21 +++++++++++++++++++++
- drivers/base/power/domain.c       |  6 ++++--
- drivers/gpu/vga/vga_switcheroo.c  | 10 +++++-----
- drivers/misc/mei/pci-me.c         |  5 +++--
- drivers/misc/mei/pci-txe.c        |  5 +++--
- include/linux/pm_domain.h         |  3 +++
- 10 files changed, 52 insertions(+), 20 deletions(-)
-
-diff --git a/arch/arm/mach-omap2/omap_device.c b/arch/arm/mach-omap2/omap_device.c
-index 4cb8fd9f741f..204101d11632 100644
---- a/arch/arm/mach-omap2/omap_device.c
-+++ b/arch/arm/mach-omap2/omap_device.c
-@@ -32,6 +32,7 @@
- #include <linux/io.h>
- #include <linux/clk.h>
- #include <linux/clkdev.h>
-+#include <linux/pm_domain.h>
- #include <linux/pm_runtime.h>
- #include <linux/of.h>
- #include <linux/notifier.h>
-@@ -168,7 +169,7 @@ static int omap_device_build_from_dt(struct platform_device *pdev)
- 			r->name = dev_name(&pdev->dev);
- 	}
- 
--	pdev->dev.pm_domain = &omap_device_pm_domain;
-+	dev_pm_domain_set(&pdev->dev, &omap_device_pm_domain);
- 
- 	if (device_active) {
- 		omap_device_enable(pdev);
-@@ -180,7 +181,7 @@ odbfd_exit1:
- odbfd_exit:
- 	/* if data/we are at fault.. load up a fail handler */
- 	if (ret)
--		pdev->dev.pm_domain = &omap_device_fail_pm_domain;
-+		dev_pm_domain_set(&pdev->dev, &omap_device_fail_pm_domain);
- 
- 	return ret;
- }
-@@ -701,7 +702,7 @@ int omap_device_register(struct platform_device *pdev)
- {
- 	pr_debug("omap_device: %s: registering\n", pdev->name);
- 
--	pdev->dev.pm_domain = &omap_device_pm_domain;
-+	dev_pm_domain_set(&pdev->dev, &omap_device_pm_domain);
- 	return platform_device_add(pdev);
- }
- 
-diff --git a/drivers/acpi/acpi_lpss.c b/drivers/acpi/acpi_lpss.c
-index f51bd0d0bc17..cc6e1abc69b3 100644
---- a/drivers/acpi/acpi_lpss.c
-+++ b/drivers/acpi/acpi_lpss.c
-@@ -17,6 +17,7 @@
- #include <linux/io.h>
- #include <linux/platform_device.h>
- #include <linux/platform_data/clk-lpss.h>
-+#include <linux/pm_domain.h>
- #include <linux/pm_runtime.h>
- #include <linux/delay.h>
- 
-@@ -706,7 +707,7 @@ static int acpi_lpss_platform_notify(struct notifier_block *nb,
- 
- 	switch (action) {
- 	case BUS_NOTIFY_ADD_DEVICE:
--		pdev->dev.pm_domain = &acpi_lpss_pm_domain;
-+		dev_pm_domain_set(&pdev->dev, &acpi_lpss_pm_domain);
- 		if (pdata->dev_desc->flags & LPSS_LTR)
- 			return sysfs_create_group(&pdev->dev.kobj,
- 						  &lpss_attr_group);
-@@ -714,7 +715,7 @@ static int acpi_lpss_platform_notify(struct notifier_block *nb,
- 	case BUS_NOTIFY_DEL_DEVICE:
- 		if (pdata->dev_desc->flags & LPSS_LTR)
- 			sysfs_remove_group(&pdev->dev.kobj, &lpss_attr_group);
--		pdev->dev.pm_domain = NULL;
-+		dev_pm_domain_set(&pdev->dev, NULL);
- 		break;
- 	default:
- 		break;
-diff --git a/drivers/acpi/device_pm.c b/drivers/acpi/device_pm.c
-index 4806b7f856c4..8c5955bf9bbf 100644
---- a/drivers/acpi/device_pm.c
-+++ b/drivers/acpi/device_pm.c
-@@ -22,6 +22,7 @@
- #include <linux/export.h>
- #include <linux/mutex.h>
- #include <linux/pm_qos.h>
-+#include <linux/pm_domain.h>
- #include <linux/pm_runtime.h>
- 
- #include "internal.h"
-@@ -1076,7 +1077,7 @@ static void acpi_dev_pm_detach(struct device *dev, bool power_off)
- 	struct acpi_device *adev = ACPI_COMPANION(dev);
- 
- 	if (adev && dev->pm_domain == &acpi_general_pm_domain) {
--		dev->pm_domain = NULL;
-+		dev_pm_domain_set(dev, NULL);
- 		acpi_remove_pm_notifier(adev);
- 		if (power_off) {
- 			/*
-@@ -1128,7 +1129,7 @@ int acpi_dev_pm_attach(struct device *dev, bool power_on)
- 		return -EBUSY;
- 
- 	acpi_add_pm_notifier(adev, dev, acpi_pm_notify_work_func);
--	dev->pm_domain = &acpi_general_pm_domain;
-+	dev_pm_domain_set(dev, &acpi_general_pm_domain);
- 	if (power_on) {
- 		acpi_dev_pm_full_power(adev);
- 		acpi_device_wakeup(adev, ACPI_STATE_S0, false);
-diff --git a/drivers/base/power/clock_ops.c b/drivers/base/power/clock_ops.c
-index 652b5a367c1f..e80fda6c03a9 100644
---- a/drivers/base/power/clock_ops.c
-+++ b/drivers/base/power/clock_ops.c
-@@ -15,6 +15,7 @@
- #include <linux/clkdev.h>
- #include <linux/slab.h>
- #include <linux/err.h>
-+#include <linux/pm_domain.h>
- #include <linux/pm_runtime.h>
- 
- #ifdef CONFIG_PM
-@@ -346,7 +347,7 @@ static int pm_clk_notify(struct notifier_block *nb,
- 		if (error)
- 			break;
- 
--		dev->pm_domain = clknb->pm_domain;
-+		dev_pm_domain_set(dev, clknb->pm_domain);
- 		if (clknb->con_ids[0]) {
- 			for (con_id = clknb->con_ids; *con_id; con_id++)
- 				pm_clk_add(dev, *con_id);
-@@ -359,7 +360,7 @@ static int pm_clk_notify(struct notifier_block *nb,
- 		if (dev->pm_domain != clknb->pm_domain)
- 			break;
- 
--		dev->pm_domain = NULL;
-+		dev_pm_domain_set(dev, NULL);
- 		pm_clk_destroy(dev);
- 		break;
- 	}
-diff --git a/drivers/base/power/common.c b/drivers/base/power/common.c
-index f32b802b98f4..a70f8a5cdfd7 100644
---- a/drivers/base/power/common.c
-+++ b/drivers/base/power/common.c
-@@ -128,3 +128,24 @@ void dev_pm_domain_detach(struct device *dev, bool power_off)
- 		dev->pm_domain->detach(dev, power_off);
- }
- EXPORT_SYMBOL_GPL(dev_pm_domain_detach);
-+
-+/**
-+ * dev_pm_domain_set - Set PM domain of a device.
-+ * @dev: Device whose PM domain is to be set.
-+ * @pd: PM domain to be set, or NULL.
-+ *
-+ * Sets the PM domain the device belongs to. The PM domain of a device needs
-+ * to be set before its probe finishes (it's bound to a driver).
-+ *
-+ * This function must be called with the device lock held.
-+ */
-+void dev_pm_domain_set(struct device *dev, struct dev_pm_domain *pd)
-+{
-+	if (dev->pm_domain == pd)
-+		return;
-+
-+	WARN(device_is_bound(dev),
-+	     "PM domains can only be changed for unbound devices\n");
-+	dev->pm_domain = pd;
-+}
-+EXPORT_SYMBOL_GPL(dev_pm_domain_set);
-diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
-index 16550c63d611..95b1a5c06592 100644
---- a/drivers/base/power/domain.c
-+++ b/drivers/base/power/domain.c
-@@ -1240,10 +1240,11 @@ static struct generic_pm_domain_data *genpd_alloc_dev_data(struct device *dev,
- 	}
- 
- 	dev->power.subsys_data->domain_data = &gpd_data->base;
--	dev->pm_domain = &genpd->domain;
- 
- 	spin_unlock_irq(&dev->power.lock);
- 
-+	dev_pm_domain_set(dev, &genpd->domain);
-+
- 	return gpd_data;
- 
-  err_free:
-@@ -1257,9 +1258,10 @@ static struct generic_pm_domain_data *genpd_alloc_dev_data(struct device *dev,
- static void genpd_free_dev_data(struct device *dev,
- 				struct generic_pm_domain_data *gpd_data)
- {
-+	dev_pm_domain_set(dev, NULL);
-+
- 	spin_lock_irq(&dev->power.lock);
- 
--	dev->pm_domain = NULL;
- 	dev->power.subsys_data->domain_data = NULL;
- 
- 	spin_unlock_irq(&dev->power.lock);
-diff --git a/drivers/gpu/vga/vga_switcheroo.c b/drivers/gpu/vga/vga_switcheroo.c
-index 21060668fd25..2c3208ea6de4 100644
---- a/drivers/gpu/vga/vga_switcheroo.c
-+++ b/drivers/gpu/vga/vga_switcheroo.c
-@@ -665,17 +665,17 @@ int vga_switcheroo_init_domain_pm_ops(struct device *dev,
- 		domain->ops.runtime_suspend = vga_switcheroo_runtime_suspend;
- 		domain->ops.runtime_resume = vga_switcheroo_runtime_resume;
- 
--		dev->pm_domain = domain;
-+		dev_pm_domain_set(dev, domain);
- 		return 0;
- 	}
--	dev->pm_domain = NULL;
-+	dev_pm_domain_set(dev, NULL);
- 	return -EINVAL;
- }
- EXPORT_SYMBOL(vga_switcheroo_init_domain_pm_ops);
- 
- void vga_switcheroo_fini_domain_pm_ops(struct device *dev)
- {
--	dev->pm_domain = NULL;
-+	dev_pm_domain_set(dev, NULL);
- }
- EXPORT_SYMBOL(vga_switcheroo_fini_domain_pm_ops);
- 
-@@ -719,10 +719,10 @@ vga_switcheroo_init_domain_pm_optimus_hdmi_audio(struct device *dev,
- 		domain->ops.runtime_resume =
- 			vga_switcheroo_runtime_resume_hdmi_audio;
- 
--		dev->pm_domain = domain;
-+		dev_pm_domain_set(dev, domain);
- 		return 0;
- 	}
--	dev->pm_domain = NULL;
-+	dev_pm_domain_set(dev, NULL);
- 	return -EINVAL;
- }
- EXPORT_SYMBOL(vga_switcheroo_init_domain_pm_optimus_hdmi_audio);
-diff --git a/drivers/misc/mei/pci-me.c b/drivers/misc/mei/pci-me.c
-index 27678d8154e0..75fc9c688df8 100644
---- a/drivers/misc/mei/pci-me.c
-+++ b/drivers/misc/mei/pci-me.c
-@@ -31,6 +31,7 @@
- #include <linux/jiffies.h>
- #include <linux/interrupt.h>
- 
-+#include <linux/pm_domain.h>
- #include <linux/pm_runtime.h>
- 
- #include <linux/mei.h>
-@@ -436,7 +437,7 @@ static inline void mei_me_set_pm_domain(struct mei_device *dev)
- 		dev->pg_domain.ops.runtime_resume = mei_me_pm_runtime_resume;
- 		dev->pg_domain.ops.runtime_idle = mei_me_pm_runtime_idle;
- 
--		pdev->dev.pm_domain = &dev->pg_domain;
-+		dev_pm_domain_set(&pdev->dev, &dev->pg_domain);
- 	}
- }
- 
-@@ -448,7 +449,7 @@ static inline void mei_me_set_pm_domain(struct mei_device *dev)
- static inline void mei_me_unset_pm_domain(struct mei_device *dev)
- {
- 	/* stop using pm callbacks if any */
--	dev->dev->pm_domain = NULL;
-+	dev_pm_domain_set(dev->dev, NULL);
- }
- 
- static const struct dev_pm_ops mei_me_pm_ops = {
-diff --git a/drivers/misc/mei/pci-txe.c b/drivers/misc/mei/pci-txe.c
-index 0882c0201907..71f8a7475717 100644
---- a/drivers/misc/mei/pci-txe.c
-+++ b/drivers/misc/mei/pci-txe.c
-@@ -27,6 +27,7 @@
- #include <linux/jiffies.h>
- #include <linux/interrupt.h>
- #include <linux/workqueue.h>
-+#include <linux/pm_domain.h>
- #include <linux/pm_runtime.h>
- 
- #include <linux/mei.h>
-@@ -388,7 +389,7 @@ static inline void mei_txe_set_pm_domain(struct mei_device *dev)
- 		dev->pg_domain.ops.runtime_resume = mei_txe_pm_runtime_resume;
- 		dev->pg_domain.ops.runtime_idle = mei_txe_pm_runtime_idle;
- 
--		pdev->dev.pm_domain = &dev->pg_domain;
-+		dev_pm_domain_set(&pdev->dev, &dev->pg_domain);
- 	}
- }
- 
-@@ -400,7 +401,7 @@ static inline void mei_txe_set_pm_domain(struct mei_device *dev)
- static inline void mei_txe_unset_pm_domain(struct mei_device *dev)
- {
- 	/* stop using pm callbacks if any */
--	dev->dev->pm_domain = NULL;
-+	dev_pm_domain_set(dev->dev, NULL);
- }
- 
- static const struct dev_pm_ops mei_txe_pm_ops = {
-diff --git a/include/linux/pm_domain.h b/include/linux/pm_domain.h
-index b1cf7e797892..4ae4b14fb7b4 100644
---- a/include/linux/pm_domain.h
-+++ b/include/linux/pm_domain.h
-@@ -306,12 +306,15 @@ static inline int of_genpd_add_provider_onecell(struct device_node *np,
- #ifdef CONFIG_PM
- extern int dev_pm_domain_attach(struct device *dev, bool power_on);
- extern void dev_pm_domain_detach(struct device *dev, bool power_off);
-+extern void dev_pm_domain_set(struct device *dev, struct dev_pm_domain *pd);
- #else
- static inline int dev_pm_domain_attach(struct device *dev, bool power_on)
- {
- 	return -ENODEV;
- }
- static inline void dev_pm_domain_detach(struct device *dev, bool power_off) {}
-+static inline void dev_pm_domain_set(struct device *dev,
-+				     struct dev_pm_domain *pd) {}
- #endif
- 
- #endif /* _LINUX_PM_DOMAIN_H */
--- 
-2.5.0
+Best Regards,
+Alison Wang
