@@ -1,141 +1,97 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Tue, 27 Oct 2015 22:20:20 +0100
-Subject: v7-M: Fixing XIP when the kernel is in ROM
-In-Reply-To: <CAAEAJfBOcxwq=L2aq5=KYedN=gs=gM6rupUWS9bPceEDCZniSg@mail.gmail.com>
-References: <20151026012710.GA17365@laptop>
- <20151027202124.GK4931@pengutronix.de>
- <CAAEAJfBOcxwq=L2aq5=KYedN=gs=gM6rupUWS9bPceEDCZniSg@mail.gmail.com>
-Message-ID: <20151027212020.GL4931@pengutronix.de>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Tue, 27 Oct 2015 22:23:22 +0100
+Subject: [PATCH v7 10/17] phy: Add driver for rockchip Display Port PHY
+In-Reply-To: <1445655964-15237-5-git-send-email-ykk@rock-chips.com>
+References: <1445599415-30856-1-git-send-email-ykk@rock-chips.com>
+ <1445655964-15237-1-git-send-email-ykk@rock-chips.com>
+ <1445655964-15237-5-git-send-email-ykk@rock-chips.com>
+Message-ID: <2304066.jCpsGbPbCP@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Ezequiel,
-
-On Tue, Oct 27, 2015 at 05:57:46PM -0300, Ezequiel Garcia wrote:
-> On 27 October 2015 at 17:21, Uwe Kleine-K?nig
-> <u.kleine-koenig@pengutronix.de> wrote:
-> > Hello Ezequiel,
-> >
-> > On Sun, Oct 25, 2015 at 10:27:10PM -0300, Ezequiel Garcia wrote:
-> >> I've been trying to make my ARM v7-M LPC43xx board
-> >> boot a XIP kernel from flash. Currently, this seems
-> >> to be broken in mainline due to this:
-> >>
-> >> arch/arm/mm/proc-v7m.S
-> >> [..]
-> >>         @ SVC to run the kernel in this mode
-> >>         badr    r1, 1f
-> >>         ldr     r5, [r12, #11 * 4]      @ read the SVC vector entry
-> >>         str     r1, [r12, #11 * 4]      @ write the temporary SVC vector entry
-> >>         mov     r6, lr                  @ save LR
-> >>         mov     r7, sp                  @ save SP
-> >>       ldr     sp, =__v7m_setup_stack_top @ <<< Breaks XIP!
-> >
-> > How does this fail for you?
-> >
+Am Samstag, 24. Oktober 2015, 11:06:04 schrieb Yakir Yang:
+> Add phy driver for the Rockchip DisplayPort PHY module. This
+> is required to get DisplayPort working in Rockchip SoCs.
 > 
-> My CPU just seems to stall.
-> I've added calls to the printch in arch/arm/kernel/debug.S
-> and can't get past the SVC call.
-Can you try to add something like:
+> Tested-by: Javier Martinez Canillas <javier@osg.samsung.com>
+> Signed-off-by: Yakir Yang <ykk@rock-chips.com>
+> ---
 
-	stmdb	sp!, {r0-r4}
+> diff --git a/drivers/phy/phy-rockchip-dp.c b/drivers/phy/phy-rockchip-dp.c
+> new file mode 100644
+> index 0000000..4af19af
+> --- /dev/null
+> +++ b/drivers/phy/phy-rockchip-dp.c
+> @@ -0,0 +1,153 @@
+> +/*
+> + * Rockchip DP PHY driver
+> + *
+> + * Copyright (C) 2015 FuZhou Rockchip Co., Ltd.
+> + * Author: Yakir Yang <ykk@@rock-chips.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License.
+> + */
+> +
+> +#include <linux/io.h>
+> +#include <linux/kernel.h>
+> +#include <linux/module.h>
+> +#include <linux/of.h>
+> +#include <linux/of_address.h>
+> +#include <linux/clk.h>
+> +#include <linux/phy/phy.h>
+> +#include <linux/regmap.h>
+> +#include <linux/mfd/syscon.h>
+> +#include <linux/platform_device.h>
+> +
+> +#define GRF_SOC_CON12                   0x0274
+> +#define GRF_EDP_REF_CLK_SEL_INTER	BIT(4)
+> +#define GRF_EDP_PHY_SIDDQ_WRITE_EN      BIT(21)
+> +#define GRF_EDP_PHY_SIDDQ_ON            0
+> +#define GRF_EDP_PHY_SIDDQ_OFF           BIT(5)
 
-after setting sp as above and check if that makes the machine hang, too?
+mixed spacers (tabs and spaces), please use either tabs if you want to
+align stuff or a single space.
 
-> As Stefan suggested, maybe a fault handler is called,
-> but I'm not getting any fault message printed.
+Also you're mixing the handling here, for SIDDQ you're defining both the
+actual bit as well as the write-enable bit, but for CLK_SEL_INTR you're
+hard-coding the 16-bit shift down in the code.
 
-Hmm, the fault handler should be up, didn't verify though.
+You could also just use/copy the HIWORD_MASK macro we use for example
+in the clock controller.
 
-> >>         cpsie   i
-> >>         svc     #0
-> >> 1:      cpsid   i
-> >>         str     r5, [r12, #11 * 4]      @ restore the original SVC vector entry
-> >>         mov     lr, r6                  @ restore LR
-> >>         mov     sp, r7                  @ restore SP
-> >>
-> >> Here, a temporary stack is prepared before making a
-> >> supervisor call (SVC) to switch to handler mode.
-> >
-> > OK, the effect of svc is that something is written to where sp points
-> > to. On my efm32 nothing obvious happens when something random is written
-> > there. I guess if that results in some CFI commands I have a problem
-> > though. What about your machine?
-> >
-> 
-> Good, I was under the same impression. My only explanation for the fact
-> that Maxime and you seem to have no problem was that a store
-> to the internal flash doesn't stall the MCU.
-> 
-> On my side, I have U-Boot and the DTB on the internal flash,
-> and the kernel is on SPIFI, which can be configured to allow
-> code execution.
-> 
-> Haven't checked what the effect is if you try to write there.
-> In any case, it seems wrong to have the stack point to flash.
 
-That's right, so we need some writeable memory there. Where should we
-take that from?
+> +
+> +struct rockchip_dp_phy {
+> +	struct device  *dev;
+> +	struct regmap  *grf;
+> +	struct clk     *phy_24m;
+> +};
+> +
+> +static int rockchip_set_phy_state(struct phy *phy, bool enable)
+> +{
+> +	struct rockchip_dp_phy *dp = phy_get_drvdata(phy);
+> +	int ret;
+> +
+> +	if (enable) {
+> +		ret = regmap_write(dp->grf, GRF_SOC_CON12,
+> +				   GRF_EDP_PHY_SIDDQ_WRITE_EN |
+> +				   GRF_EDP_PHY_SIDDQ_ON);
+> +		if (ret < 0) {
+> +			dev_err(dp->dev, "Can't enable PHY power %d\n", ret);
+> +			return ret;
+> +		}
+> +
+> +		ret = clk_prepare_enable(dp->phy_24m);
+> +
 
-> >> The temporary stack is allocated in the .text.init section
-> >> and so this doesn't work when the kernel is executing from ROM.
-> >> diff --git a/arch/arm/mm/proc-v7m.S b/arch/arm/mm/proc-v7m.S
-> >> index 67d9209077c6..6a383e619a0c 100644
-> >> --- a/arch/arm/mm/proc-v7m.S
-> >> +++ b/arch/arm/mm/proc-v7m.S
-> >> @@ -103,7 +103,6 @@ __v7m_setup:
-> >>       str     r1, [r12, #11 * 4]      @ write the temporary SVC vector entry
-> >>       mov     r6, lr                  @ save LR
-> >>       mov     r7, sp                  @ save SP
-> >> -     ldr     sp, =__v7m_setup_stack_top
-> >>       cpsie   i
-> >>       svc     #0
-> >>  1:   cpsid   i
-> >> @@ -123,11 +122,6 @@ __v7m_setup:
-> >>       ret     lr
-> >>  ENDPROC(__v7m_setup)
-> >>
-> >> -     .align 2
-> >> -__v7m_setup_stack:
-> >> -     .space  4 * 8                           @ 8 registers
-> >> -__v7m_setup_stack_top:
-> >> -
-> >
-> > The effect of your patch is that the value of sp as it is when
-> > __v7m_setup is entered is used. I didn't check, but I wouldn't be
-> > surprised if that's the value of sp when the boot loader gave control to
-> > Linux. This might or might not work. Something more robust would be
-> > better of course.
-> >
-> 
-> Well, this is where I'm a bit lost, as I was unable to find where
-> the stack is setup in Linux.
+unnecessary empty line after clk_prepare_enable
 
-Hmm, that's long time ago that I worked on that code. Didn't find it but
-only looked a few minutes. Looking at arch/arm/kernel/head-nommu.S it
-seems __lookup_processor_type is called without explicitly initializing
-sp first. Hmm.
 
-> But on the other side, the current code, just sets a *temporary*
-> stack to fit the 8 registers needed for the SVC call. The stack
-> pointer is restored right after that.
-> 
-> So in reality, the effect of the patch above is to require some
-> additional space for the already in-use stack.
+with these things fixed,
+Reviewed-by: Heiko Stuebner <heiko@sntech.de>
 
-With your patch and on top of arch/arm/kernel/head-nommu.S adding
 
-	ldr	sp, =(some_address_in_ROM)
-
-crashes your kernel, right? This means we either have to find a save
-location to put the stack to, or need to document that the sp register
-needs to be setup to have some stack available when the kernel image is
-jumped into. I don't like the latter.
-
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Cheers,
+Heiko
