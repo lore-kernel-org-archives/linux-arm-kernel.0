@@ -1,73 +1,91 @@
-From: boris.ostrovsky@oracle.com (Boris Ostrovsky)
-Date: Tue, 27 Oct 2015 13:25:57 -0400
-Subject: [Linaro-acpi] [PATCH V1 07/11] XEN / PCI: Remove the dependence
- on arch x86 when PCI_MMCONFIG=y
-In-Reply-To: <562FAA88.3020609@linaro.org>
-References: <1445963922-22711-1-git-send-email-tn@semihalf.com>
- <1445963922-22711-8-git-send-email-tn@semihalf.com>
- <562FAA88.3020609@linaro.org>
-Message-ID: <562FB3A5.3050500@oracle.com>
+From: james.morse@arm.com (James Morse)
+Date: Tue, 27 Oct 2015 17:29:09 +0000
+Subject: [PATCH v2 00/11] arm64: kernel: Add support for
+ hibernate/suspend-to-disk
+Message-ID: <1445966960-31724-1-git-send-email-james.morse@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/27/2015 12:47 PM, Tomasz Nowicki wrote:
-> + Stefano
->
-> On 27.10.2015 17:38, Tomasz Nowicki wrote:
->> From: Hanjun Guo <hanjun.guo@linaro.org>
->>
->> In drivers/xen/pci.c, there are arch x86 dependent codes when
->> CONFIG_PCI_MMCONFIG is enabled, since CONFIG_PCI_MMCONFIG
->> depends on ACPI, so this will prevent XEN PCI running on other
->> architectures using ACPI with PCI_MMCONFIG enabled (such as ARM64).
->>
->> Fortunatly, it can be sloved in a simple way. In drivers/xen/pci.c,
->> the only x86 dependent code is if ((pci_probe & PCI_PROBE_MMCONF) == 0),
->> and it's defined in asm/pci_x86.h, the code means that
->> if the PCI resource is not probed in PCI_PROBE_MMCONF way, just
->> ingnore the xen mcfg init. Actually this is duplicate, because
->> if PCI resource is not probed in PCI_PROBE_MMCONF way, the
->> pci_mmconfig_list will be empty, and the if (list_empty())
->> after it will do the same job.
->>
->> So just remove the arch related code and the head file, this
->> will be no functional change for x86, and also makes xen/pci.c
->> usable for other architectures.
->>
->> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
->> CC: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
->> CC: Boris Ostrovsky <boris.ostrovsky@oracle.com>
->> ---
->>   drivers/xen/pci.c | 6 ------
->>   1 file changed, 6 deletions(-)
->>
->> diff --git a/drivers/xen/pci.c b/drivers/xen/pci.c
->> index 6785ebb..9a8dbe3 100644
->> --- a/drivers/xen/pci.c
->> +++ b/drivers/xen/pci.c
->> @@ -28,9 +28,6 @@
->>   #include <asm/xen/hypervisor.h>
->>   #include <asm/xen/hypercall.h>
->>   #include "../pci/pci.h"
->> -#ifdef CONFIG_PCI_MMCONFIG
->> -#include <asm/pci_x86.h>
->> -#endif
+Hi all,
 
-Assuming this still compiles on x86 now that this include file is removed
+This version of the series follows Lorenzo's option one, described at [0],
+when cleaning executable code that may be held in data caches after
+hibernate/resume. Patch ten adds the necessary hook to kernel/power/snapshot.c.
 
-Reviewed-by: Boris Ostrovsky <boris.ostrovsky@oracle.com>
+This allows the architecture's hibernate assembly code to clean all the
+pages that it copies, meaning the for_each_process(); for_each_vma(); version
+of this can be removed.
 
->>
->>   static bool __read_mostly pci_seg_supported = true;
->>
->> @@ -222,9 +219,6 @@ static int __init xen_mcfg_late(void)
->>       if (!xen_initial_domain())
->>           return 0;
->>
->> -    if ((pci_probe & PCI_PROBE_MMCONF) == 0)
->> -        return 0;
->> -
->>       if (list_empty(&pci_mmcfg_list))
->>           return 0;
->>
->>
+The other changes were fixes so that this code works both before and after
+Ard Biesheuvel's 'relax Image placement rules' series [1] that moves the
+kernel text out of the linear map.
+
+Finally the series has picked up Lorenzo's t0sz fix [2], as it refactors
+all of those changes out, and the first four patches of kexec v10, [3].
+
+(Version one here: [4])
+
+
+James
+
+[0] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-October/380153.html
+[1] http://www.spinics.net/lists/arm-kernel/msg446929.html
+[2] http://www.spinics.net/lists/arm-kernel/msg454862.html
+[3] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-October/379268.html
+[4] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-October/376450.html
+
+AKASHI Takahiro (1):
+  arm64: kvm: allows kvm cpu hotplug
+
+Geoff Levand (3):
+  arm64: Fold proc-macros.S into assembler.h
+  arm64: Convert hcalls to use HVC immediate value
+  arm64: Add new hcall HVC_CALL_FUNC
+
+James Morse (6):
+  arm64: kernel: Rework finisher callback out of __cpu_suspend_enter().
+  arm64: Change cpu_resume() to enable mmu early then access sleep_sp by
+    va
+  arm64: kernel: Include _AC definition in page.h
+  arm64: Promote KERNEL_START/KERNEL_END definitions to a header file
+  PM / Hibernate: clean cached pages on architectures that require it
+  arm64: kernel: Add support for hibernate/suspend-to-disk.
+
+Lorenzo Pieralisi (1):
+  arm64: kernel: fix tcr_el1.t0sz restore on systems with extended idmap
+
+ arch/arm/include/asm/kvm_host.h    |  10 +-
+ arch/arm/include/asm/kvm_mmu.h     |   1 +
+ arch/arm/kvm/arm.c                 |  79 ++++----
+ arch/arm/kvm/mmu.c                 |   5 +
+ arch/arm64/Kconfig                 |   3 +
+ arch/arm64/include/asm/assembler.h |  48 ++++-
+ arch/arm64/include/asm/kvm_host.h  |  16 +-
+ arch/arm64/include/asm/kvm_mmu.h   |   1 +
+ arch/arm64/include/asm/memory.h    |   3 +
+ arch/arm64/include/asm/page.h      |   2 +
+ arch/arm64/include/asm/suspend.h   |  31 +++-
+ arch/arm64/include/asm/virt.h      |  49 +++++
+ arch/arm64/kernel/Makefile         |   1 +
+ arch/arm64/kernel/asm-offsets.c    |   9 +-
+ arch/arm64/kernel/head.S           |   6 +-
+ arch/arm64/kernel/hibernate-asm.S  | 118 ++++++++++++
+ arch/arm64/kernel/hibernate.c      | 359 +++++++++++++++++++++++++++++++++++++
+ arch/arm64/kernel/hyp-stub.S       |  43 +++--
+ arch/arm64/kernel/setup.c          |   1 -
+ arch/arm64/kernel/sleep.S          | 148 ++++++---------
+ arch/arm64/kernel/suspend.c        |  99 ++++------
+ arch/arm64/kernel/vmlinux.lds.S    |  15 ++
+ arch/arm64/kvm/hyp-init.S          |  34 +++-
+ arch/arm64/kvm/hyp.S               |  44 ++++-
+ arch/arm64/mm/cache.S              |   2 -
+ arch/arm64/mm/proc-macros.S        |  64 -------
+ arch/arm64/mm/proc.S               |  30 +---
+ kernel/power/snapshot.c            |   4 +
+ 28 files changed, 900 insertions(+), 325 deletions(-)
+ create mode 100644 arch/arm64/kernel/hibernate-asm.S
+ create mode 100644 arch/arm64/kernel/hibernate.c
+ delete mode 100644 arch/arm64/mm/proc-macros.S
+
+-- 
+2.1.4
