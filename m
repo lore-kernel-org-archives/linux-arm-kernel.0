@@ -1,81 +1,110 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Tue, 27 Oct 2015 22:04:50 +0100
-Subject: [PATCH v7 06/17] Documentation: drm/bridge: add document for
- analogix_dp
-In-Reply-To: <1445655964-15237-1-git-send-email-ykk@rock-chips.com>
-References: <1445599415-30856-1-git-send-email-ykk@rock-chips.com>
- <1445655964-15237-1-git-send-email-ykk@rock-chips.com>
-Message-ID: <4132920.kfrKzY5nYN@phil>
+From: dinguyen@opensource.altera.com (dinguyen at opensource.altera.com)
+Date: Tue, 27 Oct 2015 15:59:40 -0500
+Subject: [PATCHv7 1/2] ARM: socfpga: enable L2 cache ECC on startup
+Message-ID: <1445979581-8080-1-git-send-email-dinguyen@opensource.altera.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Yakir,
+From: Dinh Nguyen <dinguyen@opensource.altera.com>
 
-Am Samstag, 24. Oktober 2015, 11:06:00 schrieb Yakir Yang:
-> Analogix dp driver is split from exynos dp driver, so we just
-> make an copy of exynos_dp.txt, and then simplify exynos_dp.txt
-> 
-> Beside update some exynos dtsi file with the latest change
-> according to the devicetree binding documents.
-> 
-> Tested-by: Javier Martinez Canillas <javier@osg.samsung.com>
-> Signed-off-by: Yakir Yang <ykk@rock-chips.com>
-> ---
-> diff --git a/Documentation/devicetree/bindings/display/exynos/exynos_dp.txt b/Documentation/devicetree/bindings/display/exynos/exynos_dp.txt
-> index 7a3a9cd..9e47357 100644
-> --- a/Documentation/devicetree/bindings/display/exynos/exynos_dp.txt
-> +++ b/Documentation/devicetree/bindings/display/exynos/exynos_dp.txt
-> @@ -31,45 +31,31 @@ Required properties for dp-controller:
->  		from general PHY binding: the phandle for the PHY device.
->  	-phy-names:
->  		from general PHY binding: Should be "dp".
-> -	-samsung,color-space:
-> -		input video data format.
-> -			COLOR_RGB = 0, COLOR_YCBCR422 = 1, COLOR_YCBCR444 = 2
-> -	-samsung,dynamic-range:
-> -		dynamic range for input video data.
-> -			VESA = 0, CEA = 1
-> -	-samsung,ycbcr-coeff:
-> -		YCbCr co-efficients for input video.
-> -			COLOR_YCBCR601 = 0, COLOR_YCBCR709 = 1
-> -	-samsung,color-depth:
-> -		number of bits per colour component.
-> -			COLOR_6 = 0, COLOR_8 = 1, COLOR_10 = 2, COLOR_12 = 3
-> -	-samsung,link-rate:
-> -		link rate supported by the panel.
-> -			LINK_RATE_1_62GBPS = 0x6, LINK_RATE_2_70GBPS = 0x0A
-> -	-samsung,lane-count:
-> -		number of lanes supported by the panel.
-> -			LANE_COUNT1 = 1, LANE_COUNT2 = 2, LANE_COUNT4 = 4
-> +
-> +Optional properties for dp-controller:
->  	- display-timings: timings for the connected panel as described by
->  		Documentation/devicetree/bindings/video/display-timing.txt
-											^^
+This patch enables the ECC for L2 cache on machine startup. The ECC has to
+be enabled before data is stored in memory otherwise the ECC will fail on
+reads.
 
-bindings/display/display-timing.txt ... that actually made the patch not apply cleanly
+Signed-off-by: Thor Thayer <tthayer@opensource.altera.com>
+Signed-off-by: Dinh Nguyen <dinguyen@opensource.altera.com>
+---
+v7: unmap locally scoped mapped_l2_edac_addr and add of_node_put(np)
+v6: Remove pr_debug() & update year in header.
+---
+ arch/arm/mach-socfpga/Makefile   |  1 +
+ arch/arm/mach-socfpga/core.h     |  1 +
+ arch/arm/mach-socfpga/l2_cache.c | 42 ++++++++++++++++++++++++++++++++++++++++
+ arch/arm/mach-socfpga/socfpga.c  |  2 ++
+ 4 files changed, 46 insertions(+)
+ create mode 100644 arch/arm/mach-socfpga/l2_cache.c
 
-
-[...]
-
-> -[1]: Documentation/devicetree/bindings/media/video-interfaces.txt
-> +Deprecated properties for DisplayPort:
-> +-interlaced:            deprecated prop that can parsed frm drm_display_mode.
-> +-vsync-active-high:     deprecated prop that can parsed frm drm_display_mode.
-> +-hsync-active-high:     deprecated prop that can parsed frm drm_display_mode.
-> +-samsung,ycbcr-coeff:   deprecated prop that can parsed frm drm_display_mode.
-> +-samsung,dynamic-range: deprecated prop that can parsed frm drm_display_mode.
-
-the "frm" above need some more "o"s to be "from"s :-)
-
-> +-samsung,color-space:   deprecated prop that can parsed from drm_display_info.
-> +-samsung,color-depth:   deprecated prop that can parsed from drm_display_info.
-> +-samsung,link-rate:     deprecated prop that can reading from monitor by dpcd method.
-> +-samsung,lane-count:    deprecated prop that can reading from monitor by dpcd method.
-> +-samsung,hpd-gpio:      deprecated name for hpd-gpios.
-> +
-> +-------------------------------------------------------------------------------
-
-
-Cheers,
-Heiko
+diff --git a/arch/arm/mach-socfpga/Makefile b/arch/arm/mach-socfpga/Makefile
+index b8f9e23..e9ab7c9 100644
+--- a/arch/arm/mach-socfpga/Makefile
++++ b/arch/arm/mach-socfpga/Makefile
+@@ -5,3 +5,4 @@
+ obj-y					:= socfpga.o
+ obj-$(CONFIG_SMP)	+= headsmp.o platsmp.o
+ obj-$(CONFIG_SOCFPGA_SUSPEND)	+= pm.o self-refresh.o
++obj-$(CONFIG_EDAC_ALTERA_L2C)	+= l2_cache.o
+diff --git a/arch/arm/mach-socfpga/core.h b/arch/arm/mach-socfpga/core.h
+index 5bc6ea8..eb55d66 100644
+--- a/arch/arm/mach-socfpga/core.h
++++ b/arch/arm/mach-socfpga/core.h
+@@ -36,6 +36,7 @@
+ 
+ extern void socfpga_init_clocks(void);
+ extern void socfpga_sysmgr_init(void);
++void socfpga_init_l2_ecc(void);
+ 
+ extern void __iomem *sys_manager_base_addr;
+ extern void __iomem *rst_manager_base_addr;
+diff --git a/arch/arm/mach-socfpga/l2_cache.c b/arch/arm/mach-socfpga/l2_cache.c
+new file mode 100644
+index 0000000..7712e162
+--- /dev/null
++++ b/arch/arm/mach-socfpga/l2_cache.c
+@@ -0,0 +1,42 @@
++/*
++ * Copyright Altera Corporation (C) 2015. All rights reserved.
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms and conditions of the GNU General Public License,
++ * version 2, as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
++ * more details.
++ *
++ * You should have received a copy of the GNU General Public License along with
++ * this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++#include <linux/io.h>
++#include <linux/of_platform.h>
++#include <linux/of_address.h>
++
++void socfpga_init_l2_ecc(void)
++{
++	struct device_node *np;
++	void __iomem *mapped_l2_edac_addr;
++
++	np = of_find_compatible_node(NULL, NULL, "altr,l2-edac");
++	if (!np) {
++		pr_err("SOCFPGA: Unable to find altr,l2-edac in dtb\n");
++		return;
++	}
++
++	mapped_l2_edac_addr = of_iomap(np, 0);
++	if (!mapped_l2_edac_addr) {
++		pr_err("SOCFPGA: Unable to find L2 ECC mapping in dtb\n");
++		return;
++	}
++
++	/* Enable ECC */
++	writel(0x01, mapped_l2_edac_addr);
++	iounmap(mapped_l2_edac_addr);
++
++	of_node_put(np);
++}
+diff --git a/arch/arm/mach-socfpga/socfpga.c b/arch/arm/mach-socfpga/socfpga.c
+index a1c0efa..dd1ff07 100644
+--- a/arch/arm/mach-socfpga/socfpga.c
++++ b/arch/arm/mach-socfpga/socfpga.c
+@@ -59,6 +59,8 @@ static void __init socfpga_init_irq(void)
+ {
+ 	irqchip_init();
+ 	socfpga_sysmgr_init();
++	if (IS_ENABLED(CONFIG_EDAC_ALTERA_L2C))
++		socfpga_init_l2_ecc();
+ }
+ 
+ static void socfpga_cyclone5_restart(enum reboot_mode mode, const char *cmd)
+-- 
+2.4.5
