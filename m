@@ -1,55 +1,39 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Tue, 27 Oct 2015 12:47:03 +0100
-Subject: [PATCH V2] clockevents/drivers/mtk: Fix spurious interrupt
- leading to crash
-In-Reply-To: <562F5EA8.2070507@linaro.org>
-References: <1440426924.17418.11.camel@mtksdaap41>
- <1440453450-21203-1-git-send-email-daniel.lezcano@linaro.org>
- <1440508871.29634.1.camel@mtksdaap41> <55DDCC4B.7010203@linaro.org>
- <562F5BE9.30200@gmail.com> <562F5EA8.2070507@linaro.org>
-Message-ID: <562F6437.1000507@linaro.org>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 27 Oct 2015 12:55:11 +0100
+Subject: [PATCH] ARM64: juno: add NOR flash to device tree
+In-Reply-To: <CAD0U-hKZM-A2N_Lpnzwkt0WmAi+kRR=UOEE4Vr2M-iTo9ikkOg@mail.gmail.com>
+References: <1444904415-19597-1-git-send-email-linus.walleij@linaro.org>
+ <561FC681.2040809@arm.com>
+ <CACRpkdaSox9WKb5-dkD_zAwO9WxP6+b010p3bdxsm1LRy=WvKg@mail.gmail.com>
+ <5624C31D.3070906@arm.com> <20151019102932.GB10678@leverpostej>
+ <CACRpkdaGscb_ccbGuwccsRj_b1d6xoveiiZpw1a5eXon3PxAUA@mail.gmail.com>
+ <20151019113904.GE10678@leverpostej>
+ <CACRpkdb1XRSq3EERbiMwCnuV7Dtit2xGYRDBtQ9+odyXq6kM7A@mail.gmail.com>
+ <20151020112026.GF10728@bivouac.eciton.net>
+ <CAD0U-hKZM-A2N_Lpnzwkt0WmAi+kRR=UOEE4Vr2M-iTo9ikkOg@mail.gmail.com>
+Message-ID: <CACRpkdZ2Ydyzf9rHOgjZ_KhhxqFi_cK1-Jh47Fh+SP4YGjg_EA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/27/2015 12:23 PM, Daniel Lezcano wrote:
-> On 10/27/2015 12:11 PM, Matthias Brugger wrote:
->> Hi Daniel,
->>
->> On 26/08/15 16:25, Daniel Lezcano wrote:
->>> On 08/25/2015 03:21 PM, Yingjoe Chen wrote:
->>>> Tested-by: Yingjoe Chen<yingjoe.chen@mediatek.com>
->>>
->>> Applied to my tree for 4.4.
->>>
->>>    -- Daniel
->>>
->>
->> Kevin found a regression in v4.3 which will need this patch to fix it
->> [1]. Can you apply it to your clockevents/4.3-fixes branch please.
->>
->> Thanks,
->> Matthias
->>
->> [1] https://lkml.org/lkml/2015/10/26/211
+On Wed, Oct 21, 2015 at 12:07 PM, Ryan Harkin <ryan.harkin@linaro.org> wrote:
+
+> FYI, in the latest Juno motherboard firmware [1], I have a file called
+> "blank.img" in the NOR flash at address 0x0BFC0000 that represents the UEFI
+> (and now u-boot) config area at the end of the NOR flash.
 >
-> Hmm, I thought it wasn't impacting 4.3, so it went to 4.4.
->
-> Let me look how to backport this fix without introducing a conflict when
-> tip/timers/urgent will be merged to tip/timers/core.
+> I mostly put this there so that you can "touch blank.img" to erase the
+> config, but also to show that the region is reserved to anyone who might
+> think about putting something there.
 
-Thomas,
+Then it is safe to enable NOR flash and AFS in the kernel.
+The AFS "partition" should probably have a better name than
+"blank.img" (if this is the name it gets in the flash), rather
+"BOOTENV" or something.
 
-do you think I can cherry-pick from tip/timers/core or clockevents/4.4 
-directly the fix to be pulled into clockevents/4.3-fixes ? That will 
-certainly raise a conflict when tip/timers/urgent will be merged to 
-tip/timers/core (a trivial conflict actually).
+I can augment the code in the recently cleaned-up AFS driver
+to make that partition read-only by setting the MTD_WRITABLE
+flag in the mask_flags field if we agree on some good name
+like that.
 
-   -- Daniel
-
-
--- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Yours,
+Linus Walleij
