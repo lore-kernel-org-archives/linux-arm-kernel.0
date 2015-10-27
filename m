@@ -1,22 +1,24 @@
-From: bharatku@xilinx.com (bharat kumar gogada)
-Date: Tue, 27 Oct 2015 09:08:42 +0000 (UTC)
-Subject: need clarity on irq domain in
- =?utf-8?b?cGNpX21zaV9jcmVhdGVfaXJxX2RvbWFpbg==?=
-Message-ID: <loom.20151027T094750-928@post.gmane.org>
+From: ulrich.hecht+renesas@gmail.com (Ulrich Hecht)
+Date: Tue, 27 Oct 2015 10:21:36 +0100
+Subject: [PATCH v2 0/2] Basic GPIO support for r8a7795
+In-Reply-To: <1445910126-14097-1-git-send-email-horms+renesas@verge.net.au>
+References: <1445910126-14097-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <CAO3366wD=0Q+qhtgNCKE1i31wsVQG4xN_QoVWEJkiDN5DQgsEQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For MSI when we have IRQ domain, we use following API's
-irq_domain_add_linear (parent domain), pci_msi_create_irq_domain (child domain).
+On Tue, Oct 27, 2015 at 2:42 AM, Simon Horman
+<horms+renesas@verge.net.au> wrote:
+> this is an update of work by Takeshi Kihara, posted by me, then Ulrich
+> Hecht and now me again. The main change since Ulrich's v1 posting is to
+> update to new CPG/MSSR bindings via Geert Uytterhoeven. This includes
+> dropping "arm64: dts: r8a7795: add GPIO clocks" from the series as the new
+> approach does not require those nodes.
+>
+> Ulrich, I would be most grateful if you could look over this and repost
+> if there are problems.
 
-The domain_ops in irq_domain_add_linear is used to map hwirq and virq
-through alloc function of domain_ops. 
+Thank you for the patches.  Looks all correct to me.
 
-Another irq domain is being created in pci_msi_create_irq_domain, so what is
-the purpose of this irq domain being created here, i see that here domain is
-created with following API, __irq_domain_add(of_node, 0, ~0, 0, ops,
-host_data); which means hwirq_max is maximum number, so what is the purpose
-having hwirq_max as maximum.
-
-Regards,
-Bharat
+CU
+Uli
