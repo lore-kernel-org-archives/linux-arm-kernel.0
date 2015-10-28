@@ -1,88 +1,65 @@
-From: boris.ostrovsky@oracle.com (Boris Ostrovsky)
-Date: Wed, 28 Oct 2015 10:07:54 -0400
-Subject: [Linaro-acpi] [PATCH V1 07/11] XEN / PCI: Remove the dependence
- on arch x86 when PCI_MMCONFIG=y
-In-Reply-To: <5630D179.9050403@linaro.org>
-References: <1445963922-22711-1-git-send-email-tn@semihalf.com>
- <1445963922-22711-8-git-send-email-tn@semihalf.com>
- <562FAA88.3020609@linaro.org> <562FB3A5.3050500@oracle.com>
- <alpine.DEB.2.02.1510281047460.15801@kaball.uk.xensource.com>
- <5630A9D3.1030607@linaro.org> <5630D179.9050403@linaro.org>
-Message-ID: <5630D6BA.1080701@oracle.com>
+From: cov@codeaurora.org (Christopher Covington)
+Date: Wed, 28 Oct 2015 10:14:24 -0400
+Subject: [PATCH] arm: perf: Add event descriptions
+In-Reply-To: <20151027160412.GI3091@leverpostej>
+References: <20150804001522.GA13214@dreric01-gentoo.localdomain>
+ <20150817205809.GA16506@dreric01-gentoo.localdomain>
+ <20150826165148.GF30466@arm.com>
+ <20150817214035.GA25775@dreric01-gentoo.localdomain>
+ <20150924175257.GH7356@arm.com> <20151007112011.GH16065@arm.com>
+ <562F9C44.50702@codeaurora.org> <20151027160412.GI3091@leverpostej>
+Message-ID: <5630D840.6050706@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/28/2015 09:45 AM, Hanjun Guo wrote:
-> On 10/28/2015 06:56 PM, Tomasz Nowicki wrote:
->> On 28.10.2015 11:49, Stefano Stabellini wrote:
->>> On Tue, 27 Oct 2015, Boris Ostrovsky wrote:
->>>> On 10/27/2015 12:47 PM, Tomasz Nowicki wrote:
->>>>> + Stefano
->>>>>
->>>>> On 27.10.2015 17:38, Tomasz Nowicki wrote:
->>>>>> From: Hanjun Guo <hanjun.guo@linaro.org>
->>>>>>
->>>>>> In drivers/xen/pci.c, there are arch x86 dependent codes when
->>>>>> CONFIG_PCI_MMCONFIG is enabled, since CONFIG_PCI_MMCONFIG
->>>>>> depends on ACPI, so this will prevent XEN PCI running on other
->>>>>> architectures using ACPI with PCI_MMCONFIG enabled (such as ARM64).
->>>>>>
->>>>>> Fortunatly, it can be sloved in a simple way. In drivers/xen/pci.c,
->>>>>> the only x86 dependent code is if ((pci_probe & PCI_PROBE_MMCONF)
->>>>>> == 0),
->>>>>> and it's defined in asm/pci_x86.h, the code means that
->>>>>> if the PCI resource is not probed in PCI_PROBE_MMCONF way, just
->>>>>> ingnore the xen mcfg init. Actually this is duplicate, because
->>>>>> if PCI resource is not probed in PCI_PROBE_MMCONF way, the
->>>>>> pci_mmconfig_list will be empty, and the if (list_empty())
->>>>>> after it will do the same job.
->>>>>>
->>>>>> So just remove the arch related code and the head file, this
->>>>>> will be no functional change for x86, and also makes xen/pci.c
->>>>>> usable for other architectures.
->>>>>>
->>>>>> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
->>>>>> CC: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
->>>>>> CC: Boris Ostrovsky <boris.ostrovsky@oracle.com>
->>>>>> ---
->>>>>>    drivers/xen/pci.c | 6 ------
->>>>>>    1 file changed, 6 deletions(-)
->>>>>>
->>>>>> diff --git a/drivers/xen/pci.c b/drivers/xen/pci.c
->>>>>> index 6785ebb..9a8dbe3 100644
->>>>>> --- a/drivers/xen/pci.c
->>>>>> +++ b/drivers/xen/pci.c
->>>>>> @@ -28,9 +28,6 @@
->>>>>>    #include <asm/xen/hypervisor.h>
->>>>>>    #include <asm/xen/hypercall.h>
->>>>>>    #include "../pci/pci.h"
->>>>>> -#ifdef CONFIG_PCI_MMCONFIG
->>>>>> -#include <asm/pci_x86.h>
->>>>>> -#endif
->>>>
->>>> Assuming this still compiles on x86 now that this include file is
->>>> removed
->>>>
->>>> Reviewed-by: Boris Ostrovsky <boris.ostrovsky@oracle.com>
+On 10/27/2015 12:04 PM, Mark Rutland wrote:
+> On Tue, Oct 27, 2015 at 11:46:12AM -0400, Christopher Covington wrote:
+>> On 10/07/2015 07:20 AM, Will Deacon wrote:
+>>> Hi again, Drew,
 >>>
->>> I think it does not:
+>>> On Thu, Sep 24, 2015 at 06:52:57PM +0100, Will Deacon wrote:
+>>>> On Mon, Aug 17, 2015 at 10:40:36PM +0100, Drew Richardson wrote:
+>>>>> So my suggestion to solve the problem is that the kernel can have the
+>>>>> list of events as proposed in the patch.
+>>>>
+>>>> Sorry, but I just don't buy this argument. Your problem is that the user
+>>>> needs to be running an up-to-date perf tool, but with your proposed
+>>>> solution, you're asking them to update the *kernel* instead, which is
+>>>> (unfortunately) one of the hardest pieces of software to upgrade on a
+>>>> typical ARM platform.
 >>>
->>> drivers/xen/pci.c: In function ?xen_mcfg_late?:
->>> drivers/xen/pci.c:221:18: error: ?pci_mmcfg_list? undeclared (first
->>> use in this function)
->>> drivers/xen/pci.c:221:18: note: each undeclared identifier is reported
->>> only once for each f
+>>> I've spent some time thinking about this and, actually, it makes sense
+>>> to do this for the architected events. These event numbers are guaranteed
+>>> to be portable between CPUs, so if we expose those through sysfs then
+>>> we don't have this dependency on updating the kernel for newer cores
+>>> (well, once the initial period without your patch has expired). It's the
+>>> noon-portable, micro-architectural events that I object to.
+>>>
+>>> So how about you roll a new version of this patch just exposing the
+>>> architected events and making use of the macros in perf_event.h to make
+>>> it a bit tidier (PMU_EVENT_ATTR, PMU_EVENT_ATTR_STRING etc)?
+>>>
+>>> Be aware that there's a fair amount of arm64 perf patches queue for 4.4,
+>>> since we're moving over to the code in drivers/perf/. Hopefully these
+>>> will appear on the arm64 for-next/core branch shortly.
 >>
->> Right, we need:
->> +#include <linux/ecam.h>
->>
->> Will fix this in next version, thanks!
->
-> Hmm, I think we just missed the head file, but the logic
-> of this patch is still right.
->
+>> Have you considered using OF/ACPI to describe this aspect of the hardware?
+> 
+> FW-provided data structures are going to be harder to upgrade than the
+> kernel, so the same argument applies as with placing this data in the
+> kernel (if anything, more strongly).
 
+A convenient place for workarounds is great, when necessary, but I don't see
+why Plan A for hardware description should be anything other than standardized
+hardware description mechanisms.
 
-Yes, removing the test should be safe.
+Why are you eager to inflate the expectations of firmware when it comes to
+power state coordination but reluctant to rely on firmware for describing
+performance monitor events?
 
--boris
+Christopher Covington
+
+-- 
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
