@@ -1,10 +1,10 @@
 From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 28 Oct 2015 10:33:30 +0100
-Subject: [PATCH v4 1/3] arm64: renesas: r8a7795: add I2C support
-In-Reply-To: <1445987129-13496-2-git-send-email-horms+renesas@verge.net.au>
+Date: Wed, 28 Oct 2015 10:36:04 +0100
+Subject: [PATCH v4 2/3] arm64: renesas: salvator-x: enable I2C
+In-Reply-To: <1445987129-13496-3-git-send-email-horms+renesas@verge.net.au>
 References: <1445987129-13496-1-git-send-email-horms+renesas@verge.net.au>
- <1445987129-13496-2-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <CAMuHMdWKrr=s5BZb=5VsHunAeOVo8xc-jDicW+XaWF3=Mmvz3w@mail.gmail.com>
+ <1445987129-13496-3-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <CAMuHMdX6nJFUcPij7hmcRGFvc=1c3eK+4DzFiGbfZofUSgE9nQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,15 +13,9 @@ On Wed, Oct 28, 2015 at 12:05 AM, Simon Horman
 > From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 >
 > Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-> [geert: aAdd clock-output-names properties]
-> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-
-As the clock-output-names are no longer valid, please replace the
-above two lines by
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 
 Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
-
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 
 Gr{oetje,eeting}s,
 
