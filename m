@@ -1,104 +1,41 @@
-From: ykk@rock-chips.com (Yakir Yang)
-Date: Wed, 28 Oct 2015 09:49:58 +0800
-Subject: [PATCH v7 10/17] phy: Add driver for rockchip Display Port PHY
-In-Reply-To: <2304066.jCpsGbPbCP@phil>
-References: <1445599415-30856-1-git-send-email-ykk@rock-chips.com>
- <1445655964-15237-1-git-send-email-ykk@rock-chips.com>
- <1445655964-15237-5-git-send-email-ykk@rock-chips.com>
- <2304066.jCpsGbPbCP@phil>
-Message-ID: <563029C6.5000807@rock-chips.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Wed, 28 Oct 2015 10:52:58 +0900
+Subject: [PATCH v2 0/4] Exynos SROMc configuration and Ethernet support for
+ SMDK5410
+In-Reply-To: <cover.1445935215.git.p.fedin@samsung.com>
+References: <cover.1445935215.git.p.fedin@samsung.com>
+Message-ID: <56302A7A.1070105@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 27.10.2015 17:43, Pavel Fedin wrote:
+> This patch extends Exynos SROM controller driver with ability to configure
+> controller outputs and enables SMSC9115 Ethernet chip on SMDK5410 board,
+> which is connected via SROMc bank #3.
+> 
+> With this patchset, support for the whole existing SMDK range can be added.
+> Actually, only bank number is different.
+> 
+> This patchset also depends on Exynos 5410 pinctrl support, introduced by
+> patches 0003 and 0004 from this set:
+> [PATCH v4 0/5] ARM: EXYNOS: ODROID-XU DT and LEDs
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-March/330862.html
+> 
+> Pinctrl support is necessary in order to correctly configure
+> multifunctional pins of the Exynos chip.
+> 
+> v1 => v2:
+> - Fixed some typos and bad labels in device tree
+> - Improved documentation
+> 
+> Pavel Fedin (4):
+>   ARM: dts: Add SROMc to Exynos 5410
+>   drivers: exynos-srom: Add support for bank configuration
+>   ARM: dts: Add Ethernet chip to SMDK5410
+>   Documentation: dt-bindings: Describe SROMc configuration
+> 
 
-On 10/28/2015 05:23 AM, Heiko Stuebner wrote:
-> Am Samstag, 24. Oktober 2015, 11:06:04 schrieb Yakir Yang:
->> Add phy driver for the Rockchip DisplayPort PHY module. This
->> is required to get DisplayPort working in Rockchip SoCs.
->>
->> Tested-by: Javier Martinez Canillas <javier@osg.samsung.com>
->> Signed-off-by: Yakir Yang <ykk@rock-chips.com>
->> ---
->> diff --git a/drivers/phy/phy-rockchip-dp.c b/drivers/phy/phy-rockchip-dp.c
->> new file mode 100644
->> index 0000000..4af19af
->> --- /dev/null
->> +++ b/drivers/phy/phy-rockchip-dp.c
->> @@ -0,0 +1,153 @@
->> +/*
->> + * Rockchip DP PHY driver
->> + *
->> + * Copyright (C) 2015 FuZhou Rockchip Co., Ltd.
->> + * Author: Yakir Yang <ykk@@rock-chips.com>
->> + *
->> + * This program is free software; you can redistribute it and/or modify
->> + * it under the terms of the GNU General Public License as published by
->> + * the Free Software Foundation; either version 2 of the License.
->> + */
->> +
->> +#include <linux/io.h>
->> +#include <linux/kernel.h>
->> +#include <linux/module.h>
->> +#include <linux/of.h>
->> +#include <linux/of_address.h>
->> +#include <linux/clk.h>
->> +#include <linux/phy/phy.h>
->> +#include <linux/regmap.h>
->> +#include <linux/mfd/syscon.h>
->> +#include <linux/platform_device.h>
->> +
->> +#define GRF_SOC_CON12                   0x0274
->> +#define GRF_EDP_REF_CLK_SEL_INTER	BIT(4)
->> +#define GRF_EDP_PHY_SIDDQ_WRITE_EN      BIT(21)
->> +#define GRF_EDP_PHY_SIDDQ_ON            0
->> +#define GRF_EDP_PHY_SIDDQ_OFF           BIT(5)
-> mixed spacers (tabs and spaces), please use either tabs if you want to
-> align stuff or a single space.
->
-> Also you're mixing the handling here, for SIDDQ you're defining both the
-> actual bit as well as the write-enable bit, but for CLK_SEL_INTR you're
-> hard-coding the 16-bit shift down in the code.
->
-> You could also just use/copy the HIWORD_MASK macro we use for example
-> in the clock controller.
->
->
->> +
->> +struct rockchip_dp_phy {
->> +	struct device  *dev;
->> +	struct regmap  *grf;
->> +	struct clk     *phy_24m;
->> +};
->> +
->> +static int rockchip_set_phy_state(struct phy *phy, bool enable)
->> +{
->> +	struct rockchip_dp_phy *dp = phy_get_drvdata(phy);
->> +	int ret;
->> +
->> +	if (enable) {
->> +		ret = regmap_write(dp->grf, GRF_SOC_CON12,
->> +				   GRF_EDP_PHY_SIDDQ_WRITE_EN |
->> +				   GRF_EDP_PHY_SIDDQ_ON);
->> +		if (ret < 0) {
->> +			dev_err(dp->dev, "Can't enable PHY power %d\n", ret);
->> +			return ret;
->> +		}
->> +
->> +		ret = clk_prepare_enable(dp->phy_24m);
->> +
-> unnecessary empty line after clk_prepare_enable
->
->
-> with these things fixed,
-> Reviewed-by: Heiko Stuebner <heiko@sntech.de>
+The bindings documentation goes first.
 
-Oops, thanks
-
-- Yakir
-
->
-> Cheers,
-> Heiko
->
->
->
+Best regards,
+Krzysztof
