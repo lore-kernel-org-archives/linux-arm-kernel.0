@@ -1,24 +1,36 @@
-From: lars@metafoo.de (Lars-Peter Clausen)
-Date: Wed, 28 Oct 2015 10:38:05 +0100
-Subject: [PATCH v4 4/4] iio: humidity: si7020: added No Hold read mode
-In-Reply-To: <1446015506-21371-1-git-send-email-nicola@corna.info>
-References: <f113de76b2369d404909cfc5158feca4@rainloop.corna.info>
- <1446015506-21371-1-git-send-email-nicola@corna.info>
-Message-ID: <5630977D.2020102@metafoo.de>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Wed, 28 Oct 2015 10:39:07 +0100
+Subject: [PATCH] MAINTAINERS: Start using the 'reviewer' (R) tag
+In-Reply-To: <56309419.4060908@samsung.com>
+References: <1445960557-24328-1-git-send-email-lee.jones@linaro.org>
+ <20151027172428.GB21070@earth> <20151027181555.GE5828@x1>
+ <1445971482.2757.27.camel@perches.com>
+ <CAJKOXPc_w2Dc8LvkCu_d+kjZZmYScXboQrpNWdicT2yfL_5D7Q@mail.gmail.com>
+ <20151028082446.GF5828@x1> <56309419.4060908@samsung.com>
+Message-ID: <20151028093907.GP4931@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/28/2015 07:58 AM, Nicola Corna wrote:
-[...]
-> +			holdmode = !((*client)->adapter->quirks &&
-> +					(*client)->adapter->quirks->flags &
-[...]
-> +		   client->adapter->quirks &&
-> +		   client->adapter->quirks->flags & I2C_AQ_NO_CLK_STRETCH)
+Hello,
 
-This is rather ugly, can we get a helper in the I2C core something along the
-lines of
+On Wed, Oct 28, 2015 at 06:23:37PM +0900, Krzysztof Kozlowski wrote:
+> On 28.10.2015 17:24, Lee Jones wrote:
+> > You guys are pushing back like this is some kind of demotion.
+> > That's not the case at all.  All it does is better describe the (very
+> > worthy) function you *actually* provide.
+> 
+> It is getting into dispute about entire change of yours... which is not
+> what I want. I agree with your general idea but I was referring only to
+> that particular case - the Samsung PMICs (and Maxim PMICs/MUICs which
+> would fall into same category).
 
-i2c_check_quirks(client->adapter, I2C_AQ_NO_CLK_STRETCH)
+Not being affected by this change, I wonder what the technical
+difference is if someone is listed as reviewer instead of maintainer.
+Does get_maintainer.pl behave differently?
 
-- Lars
+Best regards
+Uwe
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
