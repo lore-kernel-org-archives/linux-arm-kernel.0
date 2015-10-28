@@ -1,47 +1,24 @@
-From: p.fedin@samsung.com (Pavel Fedin)
-Date: Wed, 28 Oct 2015 12:36:05 +0300
-Subject: [PATCH] ARM: exynos: Bring back reboot on Exynos5410
-Message-ID: <1446024965-8508-1-git-send-email-p.fedin@samsung.com>
+From: lars@metafoo.de (Lars-Peter Clausen)
+Date: Wed, 28 Oct 2015 10:38:05 +0100
+Subject: [PATCH v4 4/4] iio: humidity: si7020: added No Hold read mode
+In-Reply-To: <1446015506-21371-1-git-send-email-nicola@corna.info>
+References: <f113de76b2369d404909cfc5158feca4@rainloop.corna.info>
+ <1446015506-21371-1-git-send-email-nicola@corna.info>
+Message-ID: <5630977D.2020102@metafoo.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since 8cfc7fdd33080e30b86d21b1a8c9ad0686427ddc ("ARM: EXYNOS: move restart
-code into pmu driver") PMU support is required in order for the reboot to
-work. Unfortunately, there is currently no PMU support for 5410.
+On 10/28/2015 07:58 AM, Nicola Corna wrote:
+[...]
+> +			holdmode = !((*client)->adapter->quirks &&
+> +					(*client)->adapter->quirks->flags &
+[...]
+> +		   client->adapter->quirks &&
+> +		   client->adapter->quirks->flags & I2C_AQ_NO_CLK_STRETCH)
 
-This patch adds exynos5410-pmu to the list of recognized devices. It is
-okay for the code to have empty struct exynos_pmu_data, in this case only
-minimal support is enabled. This is enough for SWRESET to work.
+This is rather ugly, can we get a helper in the I2C core something along the
+lines of
 
-Signed-off-by: Pavel Fedin <p.fedin@samsung.com>
----
- arch/arm/mach-exynos/pmu.c | 7 +++++++
- 1 file changed, 7 insertions(+)
+i2c_check_quirks(client->adapter, I2C_AQ_NO_CLK_STRETCH)
 
-diff --git a/arch/arm/mach-exynos/pmu.c b/arch/arm/mach-exynos/pmu.c
-index de68938..7b9e33c 100644
---- a/arch/arm/mach-exynos/pmu.c
-+++ b/arch/arm/mach-exynos/pmu.c
-@@ -908,6 +908,10 @@ static const struct exynos_pmu_data exynos5250_pmu_data = {
- 	.powerdown_conf	= exynos5_powerdown_conf,
- };
- 
-+static struct exynos_pmu_data exynos5410_pmu_data = {
-+	/* Only SWRESET is currently supported on 5410 */
-+};
-+
- static struct exynos_pmu_data exynos5420_pmu_data = {
- 	.pmu_config	= exynos5420_pmu_config,
- 	.pmu_init	= exynos5420_pmu_init,
-@@ -934,6 +938,9 @@ static const struct of_device_id exynos_pmu_of_device_ids[] = {
- 		.compatible = "samsung,exynos5250-pmu",
- 		.data = &exynos5250_pmu_data,
- 	}, {
-+		.compatible = "samsung,exynos5410-pmu",
-+		.data = &exynos5410_pmu_data,
-+	}, {
- 		.compatible = "samsung,exynos5420-pmu",
- 		.data = &exynos5420_pmu_data,
- 	},
--- 
-2.4.4
+- Lars
