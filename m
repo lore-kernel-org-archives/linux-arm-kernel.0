@@ -1,49 +1,110 @@
-From: timur@codeaurora.org (Timur Tabi)
-Date: Wed, 28 Oct 2015 12:11:57 -0500
-Subject: [PATCH] arm64: efi: make sure vmlinux load address aligned on
- 2MBytes
-In-Reply-To: <CAKv+Gu_ivkemFva-Fu0E24mQqE-m0jPWBzo5OZAr7cyM08hqug@mail.gmail.com>
-References: <1445981041-8774-1-git-send-email-timur@codeaurora.org>
- <CAKv+Gu_ivkemFva-Fu0E24mQqE-m0jPWBzo5OZAr7cyM08hqug@mail.gmail.com>
-Message-ID: <563101DD.8080508@codeaurora.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 28 Oct 2015 17:14:11 +0000
+Subject: [RFC] vfio/type1: handle case where IOMMU does not support
+ PAGE_SIZE size
+In-Reply-To: <1446049648.8018.397.camel@redhat.com>
+References: <1446037965-2341-1-git-send-email-eric.auger@linaro.org>
+ <1446049648.8018.397.camel@redhat.com>
+Message-ID: <20151028171410.GK18966@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/27/2015 09:06 PM, Ard Biesheuvel wrote:
->
-> diff --git a/arch/arm64/kernel/efi-stub.c b/arch/arm64/kernel/efi-stub.c
-> index 816120ece6bc..a60ce249cfc0 100644
-> --- a/arch/arm64/kernel/efi-stub.c
-> +++ b/arch/arm64/kernel/efi-stub.c
-> @@ -42,7 +42,8 @@
->                   * Mustang), we can still place the kernel at the address
->                   * 'dram_base + TEXT_OFFSET'.
->                   */
-> -               *image_addr = *reserve_addr = dram_base + TEXT_OFFSET;
-> +               *image_addr = *reserve_addr = round_up(dram_base, SZ_2M) +
-> +                                                      TEXT_OFFSET);
->                  nr_pages = round_up(kernel_memsize, EFI_ALLOC_ALIGN) /
->                             EFI_PAGE_SIZE;
->                  status = efi_call_early(allocate_pages, EFI_ALLOCATE_ADDRESS,
+On Wed, Oct 28, 2015 at 10:27:28AM -0600, Alex Williamson wrote:
+> On Wed, 2015-10-28 at 13:12 +0000, Eric Auger wrote:
+> > diff --git a/drivers/vfio/vfio_iommu_type1.c b/drivers/vfio/vfio_iommu_type1.c
+> > index 57d8c37..13fb974 100644
+> > --- a/drivers/vfio/vfio_iommu_type1.c
+> > +++ b/drivers/vfio/vfio_iommu_type1.c
+> > @@ -403,7 +403,7 @@ static void vfio_remove_dma(struct vfio_iommu *iommu, struct vfio_dma *dma)
+> >  static unsigned long vfio_pgsize_bitmap(struct vfio_iommu *iommu)
+> >  {
+> >  	struct vfio_domain *domain;
+> > -	unsigned long bitmap = PAGE_MASK;
+> > +	unsigned long bitmap = ULONG_MAX;
+> 
+> Isn't this and removing the WARN_ON()s the only real change in this
+> patch?  The rest looks like conversion to use IS_ALIGNED and the
+> following test, that I don't really understand...
+> 
+> >  
+> >  	mutex_lock(&iommu->lock);
+> >  	list_for_each_entry(domain, &iommu->domain_list, next)
+> > @@ -416,20 +416,18 @@ static unsigned long vfio_pgsize_bitmap(struct vfio_iommu *iommu)
+> >  static int vfio_dma_do_unmap(struct vfio_iommu *iommu,
+> >  			     struct vfio_iommu_type1_dma_unmap *unmap)
+> >  {
+> > -	uint64_t mask;
+> >  	struct vfio_dma *dma;
+> >  	size_t unmapped = 0;
+> >  	int ret = 0;
+> > +	unsigned int min_pagesz = __ffs(vfio_pgsize_bitmap(iommu));
+> > +	unsigned int requested_alignment = (min_pagesz < PAGE_SIZE) ?
+> > +						PAGE_SIZE : min_pagesz;
+> 
+> This one.  If we're going to support sub-PAGE_SIZE mappings, why do we
+> care to cap alignment at PAGE_SIZE?
 
-Tested-by: Timur Tabi <timur@codeaurora.org>
-Tested-by: Shanker Donthineni <shankerd@codeaurora.org>
+Eric can clarify, but I think the intention here is to have VFIO continue
+doing things in PAGE_SIZE chunks precisely so that we don't have to rework
+all of the pinning code etc. The IOMMU API can then deal with the smaller
+page size.
 
-However, I think this formatting is easier to read:
+> > -	mask = ((uint64_t)1 << __ffs(vfio_pgsize_bitmap(iommu))) - 1;
+> > -
+> > -	if (unmap->iova & mask)
+> > +	if (!IS_ALIGNED(unmap->iova, requested_alignment))
+> >  		return -EINVAL;
+> > -	if (!unmap->size || unmap->size & mask)
+> > +	if (!unmap->size || !IS_ALIGNED(unmap->size, requested_alignment))
+> >  		return -EINVAL;
+> >  
+> > -	WARN_ON(mask & PAGE_MASK);
+> > -
+> >  	mutex_lock(&iommu->lock);
+> >  
+> >  	/*
+> > @@ -553,25 +551,24 @@ static int vfio_dma_do_map(struct vfio_iommu *iommu,
+> >  	size_t size = map->size;
+> >  	long npage;
+> >  	int ret = 0, prot = 0;
+> > -	uint64_t mask;
+> >  	struct vfio_dma *dma;
+> >  	unsigned long pfn;
+> > +	unsigned int min_pagesz = __ffs(vfio_pgsize_bitmap(iommu));
+> > +	unsigned int requested_alignment = (min_pagesz < PAGE_SIZE) ?
+> > +						PAGE_SIZE : min_pagesz;
+> >  
+> >  	/* Verify that none of our __u64 fields overflow */
+> >  	if (map->size != size || map->vaddr != vaddr || map->iova != iova)
+> >  		return -EINVAL;
+> >  
+> > -	mask = ((uint64_t)1 << __ffs(vfio_pgsize_bitmap(iommu))) - 1;
+> > -
+> > -	WARN_ON(mask & PAGE_MASK);
+> > -
+> >  	/* READ/WRITE from device perspective */
+> >  	if (map->flags & VFIO_DMA_MAP_FLAG_WRITE)
+> >  		prot |= IOMMU_WRITE;
+> >  	if (map->flags & VFIO_DMA_MAP_FLAG_READ)
+> >  		prot |= IOMMU_READ;
+> >  
+> > -	if (!prot || !size || (size | iova | vaddr) & mask)
+> > +	if (!prot || !size ||
+> > +		!IS_ALIGNED(size | iova | vaddr, requested_alignment))
+> >  		return -EINVAL;
+> >  
+> >  	/* Don't allow IOVA or virtual address wrap */
+> 
+> This is mostly ignoring the problems with sub-PAGE_SIZE mappings.  For
+> instance, we can only pin on PAGE_SIZE and therefore we only do
+> accounting on PAGE_SIZE, so if the user does 4K mappings across your 64K
+> page, that page gets pinned and accounted 16 times.  Are we going to
+> tell users that their locked memory limit needs to be 16x now?  The rest
+> of the code would need an audit as well to see what other sub-page bugs
+> might be hiding.  Thanks,
 
-		*image_addr = *reserve_addr =
-			round_up(dram_base, SZ_2M) + TEXT_OFFSET;
+I don't see that. The pinning all happens the same in VFIO, which can
+then happily pass a 64k region to iommu_map. iommu_map will then call
+->map in 4k chunks on the IOMMU driver ops.
 
-This does make the kernel boot, but we suspect that there may be another 
-problem.  We need to investigate it, but we have a suspicion that the 
-EFI stub is trying to allocate from the Runtime Data block, and the 
-alignment adjustment "fixes" the problem by moving the pointer to 
-Conventional Memory.
-
-Anyway, is there any chance we can get this fix into 4.3?  I'd hate to 
-have 4.3 released knowing that it's broken on our hardware.
-
--- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the
-Code Aurora Forum, a Linux Foundation Collaborative Project.
+Will
