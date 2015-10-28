@@ -1,86 +1,359 @@
-From: dcashman@android.com (Daniel Cashman)
-Date: Wed, 28 Oct 2015 14:25:20 -0700
-Subject: [PATCH 2/2] arm: mm: support ARCH_MMAP_RND_BITS.
-In-Reply-To: <1446067520-31806-1-git-send-email-dcashman@android.com>
-References: <1446067520-31806-1-git-send-email-dcashman@android.com>
-Message-ID: <1446067520-31806-2-git-send-email-dcashman@android.com>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Thu, 29 Oct 2015 00:34:29 +0300
+Subject: [PATCH] ARM: shmobile: henninger: remove board DT
+Message-ID: <2890345.M5sT48V28r@wasted.cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: dcashman <dcashman@google.com>
+The Henninger low cost board was never sold and so  had  no  users outside
+Renesas (and Cogent Embedded). Instead Renesas  has made the Porter  board
+which has mostly similar hardware. Now that the Porter board support is on
+par with Henninger, we can remove  the Henninger's device tree file.
 
-arm: arch_mmap_rnd() uses a hard-code value of 8 to generate the
-random offset for the mmap base address.  This value represents a
-compromise between increased ASLR effectiveness and avoiding
-address-space fragmentation. Replace it with a Kconfig option, which
-is sensibly bounded, so that platform developers may choose where to
-place this compromise. Keep 8 as the minimum acceptable value.
+Signed-off-by: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
 
-Signed-off-by: Daniel Cashman <dcashman@google.com>
 ---
- arch/arm/Kconfig   | 24 ++++++++++++++++++++++++
- arch/arm/mm/mmap.c |  7 +++++--
- 2 files changed, 29 insertions(+), 2 deletions(-)
+This patch is against 'renesas-devel-20151028-v4.3-rc7' tag of Simon Horman's
+'renesas.git' repo.
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 639411f..d61e7e2 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -306,6 +306,30 @@ config MMU
- 	  Select if you want MMU-based virtualised addressing space
- 	  support by paged memory management. If unsure, say 'Y'.
- 
-+config ARCH_MMAP_RND_BITS_MIN
-+	int
-+	default 8
-+
-+config ARCH_MMAP_RND_BITS_MAX
-+	int
-+	default 14 if MMU && PAGE_OFFSET=0x40000000
-+	default 15 if MMU && PAGE_OFFSET=0x80000000
-+	default 16 if MMU
-+	default 8
-+
-+config ARCH_MMAP_RND_BITS
-+	int "Number of bits to use for ASLR of mmap base address" if EXPERT
-+	range ARCH_MMAP_RND_BITS_MIN ARCH_MMAP_RND_BITS_MAX
-+	default ARCH_MMAP_RND_BITS_MIN
-+	help
-+	  This value can be used to select the number of bits to use to
-+	  determine the random offset to the base address of vma regions
-+	  resulting from mmap allocations. This value will be bounded
-+	  by the architecture's minimum and maximum supported values.
-+
-+	  This value can be changed after boot using the
-+	  /proc/sys/kernel/mmap_rnd_bits tunable
-+
- #
- # The "ARM system type" choice list is ordered alphabetically by option
- # text.  Please add new entries in the option alphabetic order.
-diff --git a/arch/arm/mm/mmap.c b/arch/arm/mm/mmap.c
-index 407dc78..73ca3a7 100644
---- a/arch/arm/mm/mmap.c
-+++ b/arch/arm/mm/mmap.c
-@@ -11,6 +11,10 @@
- #include <linux/random.h>
- #include <asm/cachetype.h>
- 
-+int mmap_rnd_bits_min = CONFIG_ARCH_MMAP_RND_BITS_MIN;
-+int mmap_rnd_bits_max = CONFIG_ARCH_MMAP_RND_BITS_MAX;
-+int mmap_rnd_bits = CONFIG_ARCH_MMAP_RND_BITS;
-+
- #define COLOUR_ALIGN(addr,pgoff)		\
- 	((((addr)+SHMLBA-1)&~(SHMLBA-1)) +	\
- 	 (((pgoff)<<PAGE_SHIFT) & (SHMLBA-1)))
-@@ -173,8 +177,7 @@ unsigned long arch_mmap_rnd(void)
- {
- 	unsigned long rnd;
- 
--	/* 8 bits of randomness in 20 address space bits */
--	rnd = (unsigned long)get_random_int() % (1 << 8);
-+	rnd = (unsigned long)get_random_int() % (1 << mmap_rnd_bits);
- 
- 	return rnd << PAGE_SHIFT;
- }
--- 
-2.6.0.rc2.230.g3dd15c0
+ arch/arm/boot/dts/Makefile              |    1 
+ arch/arm/boot/dts/r8a7791-henninger.dts |  320 --------------------------------
+ 2 files changed, 321 deletions(-)
+
+Index: renesas/arch/arm/boot/dts/Makefile
+===================================================================
+--- renesas.orig/arch/arm/boot/dts/Makefile
++++ renesas/arch/arm/boot/dts/Makefile
+@@ -530,7 +530,6 @@ dtb-$(CONFIG_ARCH_SHMOBILE_MULTI) += \
+ 	r8a7778-bockw.dtb \
+ 	r8a7779-marzen.dtb \
+ 	r8a7790-lager.dtb \
+-	r8a7791-henninger.dtb \
+ 	r8a7791-koelsch.dtb \
+ 	r8a7791-porter.dtb \
+ 	r8a7793-gose.dtb \
+Index: renesas/arch/arm/boot/dts/r8a7791-henninger.dts
+===================================================================
+--- renesas.orig/arch/arm/boot/dts/r8a7791-henninger.dts
++++ /dev/null
+@@ -1,320 +0,0 @@
+-/*
+- * Device Tree Source for the Henninger board
+- *
+- * Copyright (C) 2014 Renesas Solutions Corp.
+- * Copyright (C) 2014 Cogent Embedded, Inc.
+- *
+- * This file is licensed under the terms of the GNU General Public License
+- * version 2.  This program is licensed "as is" without any warranty of any
+- * kind, whether express or implied.
+- */
+-
+-/dts-v1/;
+-#include "r8a7791.dtsi"
+-#include <dt-bindings/gpio/gpio.h>
+-
+-/ {
+-	model = "Henninger";
+-	compatible = "renesas,henninger", "renesas,r8a7791";
+-
+-	aliases {
+-		serial0 = &scif0;
+-	};
+-
+-	chosen {
+-		bootargs = "console=ttySC0,38400 ignore_loglevel rw root=/dev/nfs ip=dhcp";
+-		stdout-path = &scif0;
+-	};
+-
+-	memory at 40000000 {
+-		device_type = "memory";
+-		reg = <0 0x40000000 0 0x40000000>;
+-	};
+-
+-	memory at 200000000 {
+-		device_type = "memory";
+-		reg = <2 0x00000000 0 0x40000000>;
+-	};
+-
+-	vcc_sdhi0: regulator at 0 {
+-		compatible = "regulator-fixed";
+-
+-		regulator-name = "SDHI0 Vcc";
+-		regulator-min-microvolt = <3300000>;
+-		regulator-max-microvolt = <3300000>;
+-		regulator-always-on;
+-	};
+-
+-	vccq_sdhi0: regulator at 1 {
+-		compatible = "regulator-gpio";
+-
+-		regulator-name = "SDHI0 VccQ";
+-		regulator-min-microvolt = <1800000>;
+-		regulator-max-microvolt = <3300000>;
+-
+-		gpios = <&gpio2 12 GPIO_ACTIVE_HIGH>;
+-		gpios-states = <1>;
+-		states = <3300000 1
+-			  1800000 0>;
+-	};
+-
+-	vcc_sdhi2: regulator at 2 {
+-		compatible = "regulator-fixed";
+-
+-		regulator-name = "SDHI2 Vcc";
+-		regulator-min-microvolt = <3300000>;
+-		regulator-max-microvolt = <3300000>;
+-		regulator-always-on;
+-	};
+-
+-	vccq_sdhi2: regulator at 3 {
+-		compatible = "regulator-gpio";
+-
+-		regulator-name = "SDHI2 VccQ";
+-		regulator-min-microvolt = <1800000>;
+-		regulator-max-microvolt = <3300000>;
+-
+-		gpios = <&gpio2 26 GPIO_ACTIVE_HIGH>;
+-		gpios-states = <1>;
+-		states = <3300000 1
+-			  1800000 0>;
+-	};
+-};
+-
+-&extal_clk {
+-	clock-frequency = <20000000>;
+-};
+-
+-&pfc {
+-	scif0_pins: serial0 {
+-		renesas,groups = "scif0_data_d";
+-		renesas,function = "scif0";
+-	};
+-
+-	ether_pins: ether {
+-		renesas,groups = "eth_link", "eth_mdio", "eth_rmii";
+-		renesas,function = "eth";
+-	};
+-
+-	phy1_pins: phy1 {
+-		renesas,groups = "intc_irq0";
+-		renesas,function = "intc";
+-	};
+-
+-	sdhi0_pins: sd0 {
+-		renesas,groups = "sdhi0_data4", "sdhi0_ctrl";
+-		renesas,function = "sdhi0";
+-	};
+-
+-	sdhi2_pins: sd2 {
+-		renesas,groups = "sdhi2_data4", "sdhi2_ctrl";
+-		renesas,function = "sdhi2";
+-	};
+-
+-	i2c2_pins: i2c2 {
+-		renesas,groups = "i2c2";
+-		renesas,function = "i2c2";
+-	};
+-
+-	qspi_pins: spi0 {
+-		renesas,groups = "qspi_ctrl", "qspi_data4";
+-		renesas,function = "qspi";
+-	};
+-
+-	msiof0_pins: spi1 {
+-		renesas,groups = "msiof0_clk", "msiof0_sync", "msiof0_rx",
+-				 "msiof0_tx";
+-		renesas,function = "msiof0";
+-	};
+-
+-	usb0_pins: usb0 {
+-		renesas,groups = "usb0";
+-		renesas,function = "usb0";
+-	};
+-
+-	usb1_pins: usb1 {
+-		renesas,groups = "usb1";
+-		renesas,function = "usb1";
+-	};
+-
+-	vin0_pins: vin0 {
+-		renesas,groups = "vin0_data8", "vin0_clk";
+-		renesas,function = "vin0";
+-	};
+-
+-	can0_pins: can0 {
+-		renesas,groups = "can0_data";
+-		renesas,function = "can0";
+-	};
+-};
+-
+-&scif0 {
+-	pinctrl-0 = <&scif0_pins>;
+-	pinctrl-names = "default";
+-
+-	status = "okay";
+-};
+-
+-&ether {
+-	pinctrl-0 = <&ether_pins &phy1_pins>;
+-	pinctrl-names = "default";
+-
+-	phy-handle = <&phy1>;
+-	renesas,ether-link-active-low;
+-	status = "okay";
+-
+-	phy1: ethernet-phy at 1 {
+-		reg = <1>;
+-		interrupt-parent = <&irqc0>;
+-		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
+-		micrel,led-mode = <1>;
+-	};
+-};
+-
+-&sata0 {
+-	status = "okay";
+-};
+-
+-&sdhi0 {
+-	pinctrl-0 = <&sdhi0_pins>;
+-	pinctrl-names = "default";
+-
+-	vmmc-supply = <&vcc_sdhi0>;
+-	vqmmc-supply = <&vccq_sdhi0>;
+-	cd-gpios = <&gpio6 6 GPIO_ACTIVE_LOW>;
+-	wp-gpios = <&gpio6 7 GPIO_ACTIVE_HIGH>;
+-	status = "okay";
+-};
+-
+-&sdhi2 {
+-	pinctrl-0 = <&sdhi2_pins>;
+-	pinctrl-names = "default";
+-
+-	vmmc-supply = <&vcc_sdhi2>;
+-	vqmmc-supply = <&vccq_sdhi2>;
+-	cd-gpios = <&gpio6 22 GPIO_ACTIVE_LOW>;
+-	status = "okay";
+-};
+-
+-&i2c2 {
+-	pinctrl-0 = <&i2c2_pins>;
+-	pinctrl-names = "default";
+-
+-	status = "okay";
+-	clock-frequency = <400000>;
+-
+-	composite-in at 20 {
+-		compatible = "adi,adv7180";
+-		reg = <0x20>;
+-		remote = <&vin0>;
+-
+-		port {
+-			adv7180: endpoint {
+-				bus-width = <8>;
+-				remote-endpoint = <&vin0ep>;
+-			};
+-		};
+-	};
+-};
+-
+-&qspi {
+-	pinctrl-0 = <&qspi_pins>;
+-	pinctrl-names = "default";
+-
+-	status = "okay";
+-
+-	flash at 0 {
+-		#address-cells = <1>;
+-		#size-cells = <1>;
+-		compatible = "spansion,s25fl512s", "jedec,spi-nor";
+-		reg = <0>;
+-		spi-max-frequency = <30000000>;
+-		spi-tx-bus-width = <4>;
+-		spi-rx-bus-width = <4>;
+-		m25p,fast-read;
+-
+-		partition at 0 {
+-			label = "loader_prg";
+-			reg = <0x00000000 0x00040000>;
+-			read-only;
+-		};
+-		partition at 40000 {
+-			label = "user_prg";
+-			reg = <0x00040000 0x00400000>;
+-			read-only;
+-		};
+-		partition at 440000 {
+-			label = "flash_fs";
+-			reg = <0x00440000 0x03bc0000>;
+-		};
+-	};
+-};
+-
+-&msiof0 {
+-	pinctrl-0 = <&msiof0_pins>;
+-	pinctrl-names = "default";
+-
+-	status = "okay";
+-
+-	pmic at 0 {
+-		compatible = "renesas,r2a11302ft";
+-		reg = <0>;
+-		spi-max-frequency = <6000000>;
+-		spi-cpol;
+-		spi-cpha;
+-	};
+-};
+-
+-&pci0 {
+-	status = "okay";
+-	pinctrl-0 = <&usb0_pins>;
+-	pinctrl-names = "default";
+-};
+-
+-&pci1 {
+-	status = "okay";
+-	pinctrl-0 = <&usb1_pins>;
+-	pinctrl-names = "default";
+-};
+-
+-&hsusb {
+-	status = "okay";
+-	pinctrl-0 = <&usb0_pins>;
+-	pinctrl-names = "default";
+-	renesas,enable-gpio = <&gpio5 31 GPIO_ACTIVE_HIGH>;
+-};
+-
+-&usbphy {
+-	status = "okay";
+-};
+-
+-&pcie_bus_clk {
+-	status = "okay";
+-};
+-
+-&pciec {
+-	status = "okay";
+-};
+-
+-/* composite video input */
+-&vin0 {
+-	status = "okay";
+-	pinctrl-0 = <&vin0_pins>;
+-	pinctrl-names = "default";
+-
+-	port {
+-		#address-cells = <1>;
+-		#size-cells = <0>;
+-
+-		vin0ep: endpoint {
+-			remote-endpoint = <&adv7180>;
+-			bus-width = <8>;
+-		};
+-	};
+-};
+-
+-&can0 {
+-	pinctrl-0 = <&can0_pins>;
+-	pinctrl-names = "default";
+-	status = "okay";
+-};
