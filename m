@@ -1,37 +1,48 @@
-From: timur@codeaurora.org (Timur Tabi)
-Date: Wed, 28 Oct 2015 16:02:23 -0500
-Subject: [PATCH] arm64: efi: make sure vmlinux load address aligned on
- 2MBytes
-In-Reply-To: <20151028172619.GA26777@leverpostej>
-References: <1445981041-8774-1-git-send-email-timur@codeaurora.org>
- <CAKv+Gu_ivkemFva-Fu0E24mQqE-m0jPWBzo5OZAr7cyM08hqug@mail.gmail.com>
- <563101DD.8080508@codeaurora.org> <20151028172619.GA26777@leverpostej>
-Message-ID: <563137DF.1040908@codeaurora.org>
+From: fcooper@ti.com (Franklin S Cooper Jr)
+Date: Wed, 28 Oct 2015 16:02:17 -0500
+Subject: [PATCH 2/2] ARM: omap4: hwmod: Remove elm address space from hwmod
+ data
+In-Reply-To: <1446066137-11527-1-git-send-email-fcooper@ti.com>
+References: <1446066137-11527-1-git-send-email-fcooper@ti.com>
+Message-ID: <1446066137-11527-3-git-send-email-fcooper@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/28/2015 12:26 PM, Mark Rutland wrote:
->> >This does make the kernel boot, but we suspect that there may be
->> >another problem.  We need to investigate it, but we have a suspicion
->> >that the EFI stub is trying to allocate from the Runtime Data block,
->> >and the alignment adjustment "fixes" the problem by moving the
->> >pointer to Conventional Memory.
-> I don't follow. EFI_BOOT_SERVICES.AllocatePages() should only give us
-> pages which are available, so it shouldn't ever return pages which are
-> runtime data -- it would fail and we'd fall back to efi_low_alloc().
->
-> Could you elaborate?
+ELM address information is provided by device tree. No longer need
+to include this information within hwmod.
 
-So we're still debugging this internally, but it turns out that 
-dram_base is equal to 0x4000820000, which also happens to be the start 
-of a Runtime Data block:
+This patch has only been boot tested.
 
-   0x004000820000-0x00400085ffff [Runtime Data       |RUN|XP|  |  | 
-|WB|WT|WC|UC]
+Signed-off-by: Franklin S Cooper Jr <fcooper@ti.com>
+---
+ arch/arm/mach-omap2/omap_hwmod_44xx_data.c | 10 ----------
+ 1 file changed, 10 deletions(-)
 
-I think this is not supposed to happen.
-
+diff --git a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+index 43eebf2..8f13f4a 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_44xx_data.c
+@@ -3915,21 +3915,11 @@ static struct omap_hwmod_ocp_if omap44xx_l4_per__dss_venc = {
+ 	.user		= OCP_USER_MPU,
+ };
+ 
+-static struct omap_hwmod_addr_space omap44xx_elm_addrs[] = {
+-	{
+-		.pa_start	= 0x48078000,
+-		.pa_end		= 0x48078fff,
+-		.flags		= ADDR_TYPE_RT
+-	},
+-	{ }
+-};
+-
+ /* l4_per -> elm */
+ static struct omap_hwmod_ocp_if omap44xx_l4_per__elm = {
+ 	.master		= &omap44xx_l4_per_hwmod,
+ 	.slave		= &omap44xx_elm_hwmod,
+ 	.clk		= "l4_div_ck",
+-	.addr		= omap44xx_elm_addrs,
+ 	.user		= OCP_USER_MPU | OCP_USER_SDMA,
+ };
+ 
 -- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the
-Code Aurora Forum, a Linux Foundation Collaborative Project.
+2.6.1
