@@ -1,25 +1,41 @@
-From: timur@codeaurora.org (Timur Tabi)
-Date: Tue, 27 Oct 2015 21:13:22 -0500
-Subject: [PATCH] arm64: efi: make sure vmlinux load address aligned on
- 2MBytes
-In-Reply-To: <CAKv+Gu9t=dGoaVem+h11cXfimpEzmte36_j4tKW_h8rA8c1jBg@mail.gmail.com>
-References: <1445981041-8774-1-git-send-email-timur@codeaurora.org>
- <CAKv+Gu_ivkemFva-Fu0E24mQqE-m0jPWBzo5OZAr7cyM08hqug@mail.gmail.com>
- <56302E7C.7000605@codeaurora.org>
- <CAKv+Gu9t=dGoaVem+h11cXfimpEzmte36_j4tKW_h8rA8c1jBg@mail.gmail.com>
-Message-ID: <56302F42.4040408@codeaurora.org>
+From: koro.chen@mediatek.com (Koro Chen)
+Date: Wed, 28 Oct 2015 10:15:34 +0800
+Subject: [PATCH] ASoC: dpcm: Make BE prepare possible in suspend state
+Message-ID: <1445998534-38246-1-git-send-email-koro.chen@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Ard Biesheuvel wrote:
-> No. I screwed up the patch since the trailing ) should not be there,
-> but we do need to round first, and only then add the offset.
+During suspend/resume, there is a flow that if a driver does not support
+SNDRV_PCM_INFO_RESUME, it will fail at snd_pcm_resume(), and user space
+can then issue SNDRV_PCM_IOCTL_PREPARE to let audio continue to play.
 
-But if the offset is not a multiple of 2MB, won't the address passed to 
-allocate_pages be unaligned?  I'll test your patch on our system, but I 
-thought the problem was that the allocated address must be aligned.
+However, in dpcm_be_dai_prepare() it only allows BEs to be prepared
+in state SND_SOC_DPCM_STATE_HW_PARAMS or SND_SOC_DPCM_STATE_STOP.
+The BE state will then stay in SND_SOC_DPCM_STATE_SUSPEND, consequently
+dpcm_be_dai_shutdown() is skipped in the end of playback and
+be_substream->runtime is not cleared while this runtime is actually freed
+by snd_pcm_detach_substream(). If another suspend comes, a NULL pointer
+dereference will happen in snd_pcm_suspend() when accessing
+BE substream's runtime.
 
+Signed-off-by: Koro Chen <koro.chen@mediatek.com>
+---
+ sound/soc/soc-pcm.c |    3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
+
+diff --git a/sound/soc/soc-pcm.c b/sound/soc/soc-pcm.c
+index 3173958..5c41a58 100644
+--- a/sound/soc/soc-pcm.c
++++ b/sound/soc/soc-pcm.c
+@@ -2117,7 +2117,8 @@ int dpcm_be_dai_prepare(struct snd_soc_pcm_runtime *fe, int stream)
+ 			continue;
+ 
+ 		if ((be->dpcm[stream].state != SND_SOC_DPCM_STATE_HW_PARAMS) &&
+-		    (be->dpcm[stream].state != SND_SOC_DPCM_STATE_STOP))
++		    (be->dpcm[stream].state != SND_SOC_DPCM_STATE_STOP) &&
++		    (be->dpcm[stream].state != SND_SOC_DPCM_STATE_SUSPEND))
+ 			continue;
+ 
+ 		dev_dbg(be->dev, "ASoC: prepare BE %s\n",
 -- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the
-Code Aurora Forum, hosted by The Linux Foundation.
+1.7.9.5
