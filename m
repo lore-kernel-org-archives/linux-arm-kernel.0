@@ -1,35 +1,93 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Wed, 28 Oct 2015 16:20:42 +0100
-Subject: [PATCH] gpio: zynq: Implement irq_(request|release)_resources
-In-Reply-To: <562FBA60.70002@ti.com>
-References: <1445607381-7794-1-git-send-email-soren.brinkmann@xilinx.com>
- <CACRpkda4QKEJvwkwGLS7OLTP8Nxu5W05tzbcFXA_FPnBsFtKhw@mail.gmail.com>
- <562FA3EE.5040408@ti.com>
- <CACRpkdYjNWiEdM8kthMXhGXBPYE74hy_xa7bBB6XQrAOaBnehA@mail.gmail.com>
- <562FBA60.70002@ti.com>
-Message-ID: <CACRpkdZpEh=Z89M3SPxNzstUYqB8BpzL_PMgRiPQN2C+WFq5KA@mail.gmail.com>
+From: peter@hurleysoftware.com (Peter Hurley)
+Date: Wed, 28 Oct 2015 11:21:00 -0400
+Subject: [PATCH] serial: 8250_uniphier: add earlycon support
+In-Reply-To: <1445503154-14340-1-git-send-email-yamada.masahiro@socionext.com>
+References: <1445503154-14340-1-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <5630E7DC.3050506@hurleysoftware.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 27, 2015 at 6:54 PM, Grygorii Strashko
-<grygorii.strashko@ti.com> wrote:
-> [Me]
->> Do you mean that these functions contain calls to non-atomic
->> functions?
->>
->
-> Oh. No, I have to be more specific :(
-> if GPIOx driver defines custom .irq_(request|release)_resources() callbacks
-> they will *overwrite* standard GPIOirqchip callbacks.
-> (commit: 8b67a1f "gpio: don't override irq_*_resources() callbacks")
->
-> As result, such GPIOx driver should *re-implement* the same functionality in
-> its .irq_(request|release)_resources() callbacks as implemented in
-> gpiochip_irq_reqres()/gpiochip_irq_relres().
+Hi Masahiro,
 
-Yes that goes for all drivers not using gpiochip_add_irqchip().
-Not everyone uses that ... and for those supplying their own
-implementations of these functions.
+On 10/22/2015 04:39 AM, Masahiro Yamada wrote:
+> This reuses the code of drivers/tty/serial/8250/8250_early.c except
+> 
+>   - Overwrite device->port.iotype and device->port.regshift for
+>     UPIO_MEM32 because of_setup_earlycon() has set them for UPIO_MEM.
+> 
+>   - Set device->baud to zero to prevent early8250_setup() from
+>     initializing the divisor register because port->uartclk does not
+>     match the frequency expected by this hardware.
+> 
+> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+> ---
+> 
+>  drivers/tty/serial/8250/8250_uniphier.c | 24 ++++++++++++++++++++++++
+>  1 file changed, 24 insertions(+)
+> 
+> diff --git a/drivers/tty/serial/8250/8250_uniphier.c b/drivers/tty/serial/8250/8250_uniphier.c
+> index 245edbb..c1075c5 100644
+> --- a/drivers/tty/serial/8250/8250_uniphier.c
+> +++ b/drivers/tty/serial/8250/8250_uniphier.c
+> @@ -13,6 +13,7 @@
+>   */
+>  
+>  #include <linux/clk.h>
+> +#include <linux/console.h>
+>  #include <linux/io.h>
+>  #include <linux/module.h>
+>  #include <linux/of.h>
+> @@ -34,6 +35,29 @@ struct uniphier8250_priv {
+>  	spinlock_t atomic_write_lock;
+>  };
+>  
+> +#if IS_ENABLED(CONFIG_SERIAL_8250_CONSOLE)
 
-Yours,
-Linus Walleij
+#ifdef CONFIG_SERIAL_8250_CONSOLE
+
+
+Customarily, IS_ENABLED() is only used in-function with control flow
+statements; eg.,
+
+	if (IS_ENABLED() && .... )
+		....
+
+> +static int __init uniphier_early_console_setup(struct earlycon_device *device,
+> +					       const char *options)
+> +{
+> +	if (!device->port.membase)
+> +		return -ENODEV;
+> +
+> +	/* This hardware always expects MMIO32 register interface. */
+> +	device->port.iotype = UPIO_MEM32;
+> +	device->port.regshift = 2;
+> +
+> +	/*
+> +	 * Do not touch the divisor register in early_serial8250_setup();
+> +	 * we assume it has been initialized by a boot loader.
+> +	 */
+> +	device->baud = 0;
+> +
+> +	return early_serial8250_setup(device, options);
+> +}
+> +OF_EARLYCON_DECLARE(uniphier_uart, "socionext,uniphier-uart",
+> +		    uniphier_early_console_setup);
+
+Please change the earlycon name to just "uniphier" or "uniphier8250"; eg.,
+
+OF_EARLYCON_DECLARE(uniphier, "socionext,uniphier-uart",
+		    uniphier_early_console_setup);
+
+
+My earlycon series merges OF_EARLYCON_DECLARE() => EARLYCON_DECLARE()
+and "uniphier" is simpler on the command line.
+
+Regards,
+Peter Hurley
+
+> +#endif
+> +
+>  /*
+>   * The register map is slightly different from that of 8250.
+>   * IO callbacks must be overridden for correct access to FCR, LCR, and MCR.
+> 
