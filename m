@@ -1,105 +1,67 @@
-From: eric.auger@linaro.org (Eric Auger)
-Date: Wed, 28 Oct 2015 13:12:45 +0000
-Subject: [RFC] vfio/type1: handle case where IOMMU does not support PAGE_SIZE
- size
-Message-ID: <1446037965-2341-1-git-send-email-eric.auger@linaro.org>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Wed, 28 Oct 2015 22:13:42 +0900
+Subject: [PATCH] MAINTAINERS: Start using the 'reviewer' (R) tag
+In-Reply-To: <20151028095524.GP5828@x1>
+References: <1445960557-24328-1-git-send-email-lee.jones@linaro.org>
+ <20151027172428.GB21070@earth> <20151027181555.GE5828@x1>
+ <1445971482.2757.27.camel@perches.com>
+ <CAJKOXPc_w2Dc8LvkCu_d+kjZZmYScXboQrpNWdicT2yfL_5D7Q@mail.gmail.com>
+ <20151028082446.GF5828@x1> <56309419.4060908@samsung.com>
+ <20151028093907.GP4931@pengutronix.de> <20151028095524.GP5828@x1>
+Message-ID: <5630CA06.7050503@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Current vfio_pgsize_bitmap code hides the supported IOMMU page
-sizes smaller than PAGE_SIZE. As a result, in case the IOMMU
-does not support PAGE_SIZE page, the alignment check on map/unmap
-is done with larger page sizes, if any. This can fail although
-mapping could be done with pages smaller than PAGE_SIZE.
+W dniu 28.10.2015 o 18:55, Lee Jones pisze:
+> On Wed, 28 Oct 2015, Uwe Kleine-K?nig wrote:
+> 
+>> Hello,
+>>
+>> On Wed, Oct 28, 2015 at 06:23:37PM +0900, Krzysztof Kozlowski wrote:
+>>> On 28.10.2015 17:24, Lee Jones wrote:
+>>>> You guys are pushing back like this is some kind of demotion.
+>>>> That's not the case at all.  All it does is better describe the (very
+>>>> worthy) function you *actually* provide.
+>>>
+>>> It is getting into dispute about entire change of yours... which is not
+>>> what I want. I agree with your general idea but I was referring only to
+>>> that particular case - the Samsung PMICs (and Maxim PMICs/MUICs which
+>>> would fall into same category).
+>>
+>> Not being affected by this change, I wonder what the technical
+>> difference is if someone is listed as reviewer instead of maintainer.
+>> Does get_maintainer.pl behave differently?
+> 
+> Reviewers are people who should be Cc'ed on all patches, as are
+> Maintainers, so no, fundamentally they are treated the same by a
+> Submitter.
+> 
+> Here is some output for Maintainers/Reviews from get_maintainer.pl.
+> 
+>  $ ./scripts/get_maintainer.pl -f arch/arm/boot/dts/vf500.dtsi
+>  Shawn Guo <shawnguo@kernel.org> (maintainer:ARM/FREESCALE VYBRID ARM ARCHITECTURE)
+>  Sascha Hauer <kernel@pengutronix.de> (maintainer:ARM/FREESCALE VYBRID ARM ARCHITECTURE)
+>  Stefan Agner <stefan@agner.ch> (reviewer)
+>  Russell King <linux@arm.linux.org.uk> (maintainer:ARM PORT)
+>  linux-arm-kernel at lists.infradead.org (moderated list:ARM/FREESCALE VYBRID ARM ARCHITECTURE)
+>  devicetree at vger.kernel.org (open list:OPEN FIRMWARE AND FLATTENED DEVICE TREE BINDINGS)
+>  linux-kernel at vger.kernel.org (open list)
+> 
+> I'm sure we can make the output even more similar by listing the
+> MAINTAINERS tag after "reviewer" too.
 
-vfio_pgsize_bitmap is modified to expose the IOMMU page sizes,
-supported by all domains, even those smaller than PAGE_SIZE. The
-alignment check on map is performed against PAGE_SIZE if the minimum
-IOMMU size is less than PAGE_SIZE or against the min page size greater
-than PAGE_SIZE.
+And here is the output of drivers/mfd/sec-core.c *before*:
+Sangbeom Kim <sbkim73@samsung.com> (supporter:SAMSUNG MULTIFUNCTION PMIC DEVICE DRIVERS)
+Krzysztof Kozlowski <k.kozlowski@samsung.com> (supporter:SAMSUNG MULTIFUNCTION PMIC DEVICE DRIVERS)
+Lee Jones <lee.jones@linaro.org> (supporter:MULTIFUNCTION DEVICES (MFD))
 
-Signed-off-by: Eric Auger <eric.auger@linaro.org>
 
----
+and after (where I am listed as reviewer):
+Sangbeom Kim <sbkim73@samsung.com> (reviewer)
+Krzysztof Kozlowski <k.kozlowski@samsung.com> (reviewer)
+Lee Jones <lee.jones@linaro.org> (supporter:MULTIFUNCTION DEVICES (MFD))
 
-This was tested on AMD Seattle with 64kB page host. ARM MMU 401
-currently expose 4kB, 2MB and 1GB page support. With a 64kB page host,
-the map/unmap check is done against 2MB. Some alignment check fail
-so VFIO_IOMMU_MAP_DMA fail while we could map using 4kB IOMMU page
-size.
----
- drivers/vfio/vfio_iommu_type1.c | 25 +++++++++++--------------
- 1 file changed, 11 insertions(+), 14 deletions(-)
+Maybe it should be "supporter reviewer"?
 
-diff --git a/drivers/vfio/vfio_iommu_type1.c b/drivers/vfio/vfio_iommu_type1.c
-index 57d8c37..13fb974 100644
---- a/drivers/vfio/vfio_iommu_type1.c
-+++ b/drivers/vfio/vfio_iommu_type1.c
-@@ -403,7 +403,7 @@ static void vfio_remove_dma(struct vfio_iommu *iommu, struct vfio_dma *dma)
- static unsigned long vfio_pgsize_bitmap(struct vfio_iommu *iommu)
- {
- 	struct vfio_domain *domain;
--	unsigned long bitmap = PAGE_MASK;
-+	unsigned long bitmap = ULONG_MAX;
- 
- 	mutex_lock(&iommu->lock);
- 	list_for_each_entry(domain, &iommu->domain_list, next)
-@@ -416,20 +416,18 @@ static unsigned long vfio_pgsize_bitmap(struct vfio_iommu *iommu)
- static int vfio_dma_do_unmap(struct vfio_iommu *iommu,
- 			     struct vfio_iommu_type1_dma_unmap *unmap)
- {
--	uint64_t mask;
- 	struct vfio_dma *dma;
- 	size_t unmapped = 0;
- 	int ret = 0;
-+	unsigned int min_pagesz = __ffs(vfio_pgsize_bitmap(iommu));
-+	unsigned int requested_alignment = (min_pagesz < PAGE_SIZE) ?
-+						PAGE_SIZE : min_pagesz;
- 
--	mask = ((uint64_t)1 << __ffs(vfio_pgsize_bitmap(iommu))) - 1;
--
--	if (unmap->iova & mask)
-+	if (!IS_ALIGNED(unmap->iova, requested_alignment))
- 		return -EINVAL;
--	if (!unmap->size || unmap->size & mask)
-+	if (!unmap->size || !IS_ALIGNED(unmap->size, requested_alignment))
- 		return -EINVAL;
- 
--	WARN_ON(mask & PAGE_MASK);
--
- 	mutex_lock(&iommu->lock);
- 
- 	/*
-@@ -553,25 +551,24 @@ static int vfio_dma_do_map(struct vfio_iommu *iommu,
- 	size_t size = map->size;
- 	long npage;
- 	int ret = 0, prot = 0;
--	uint64_t mask;
- 	struct vfio_dma *dma;
- 	unsigned long pfn;
-+	unsigned int min_pagesz = __ffs(vfio_pgsize_bitmap(iommu));
-+	unsigned int requested_alignment = (min_pagesz < PAGE_SIZE) ?
-+						PAGE_SIZE : min_pagesz;
- 
- 	/* Verify that none of our __u64 fields overflow */
- 	if (map->size != size || map->vaddr != vaddr || map->iova != iova)
- 		return -EINVAL;
- 
--	mask = ((uint64_t)1 << __ffs(vfio_pgsize_bitmap(iommu))) - 1;
--
--	WARN_ON(mask & PAGE_MASK);
--
- 	/* READ/WRITE from device perspective */
- 	if (map->flags & VFIO_DMA_MAP_FLAG_WRITE)
- 		prot |= IOMMU_WRITE;
- 	if (map->flags & VFIO_DMA_MAP_FLAG_READ)
- 		prot |= IOMMU_READ;
- 
--	if (!prot || !size || (size | iova | vaddr) & mask)
-+	if (!prot || !size ||
-+		!IS_ALIGNED(size | iova | vaddr, requested_alignment))
- 		return -EINVAL;
- 
- 	/* Don't allow IOVA or virtual address wrap */
--- 
-1.9.1
+Best regards,
+Krzysztof
