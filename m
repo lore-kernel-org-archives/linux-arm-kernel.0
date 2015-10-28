@@ -1,247 +1,55 @@
-From: drew.richardson@arm.com (Drew Richardson)
-Date: Wed, 28 Oct 2015 08:08:49 -0700
-Subject: [PATCH 1/2] arm: perf: Convert event enums to #defines
-In-Reply-To: <20151028150758.GA12239@dreric01-gentoo.localdomain>
-References: <20151028150758.GA12239@dreric01-gentoo.localdomain>
-Message-ID: <20151028150848.GB12239@dreric01-gentoo.localdomain>
+From: peter@hurleysoftware.com (Peter Hurley)
+Date: Wed, 28 Oct 2015 11:08:49 -0400
+Subject: [PATCH v13 2/5] uart: pl011: Introduce register accessor
+In-Reply-To: <5630E0F7.9080705@codeaurora.org>
+References: <1438328959-16177-1-git-send-email-jun.nie@linaro.org>
+ <1438328959-16177-3-git-send-email-jun.nie@linaro.org>
+ <55FBECCD.2080906@arm.com>
+ <CAOZdJXUZDTzEn4f4FGhmKfq7HeEFKPKp4BAbR6_=wXGVw5_0GQ@mail.gmail.com>
+ <5630DA2A.4050803@hurleysoftware.com> <5630E0F7.9080705@codeaurora.org>
+Message-ID: <5630E501.7070506@hurleysoftware.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->From 7a5ccb14449d6ccdf34c38c2c32e739da3552c5f Mon Sep 17 00:00:00 2001
-From: Drew Richardson <drew.richardson@arm.com>
-Date: Tue, 13 Oct 2015 07:55:16 -0700
-Subject: [PATCH 1/2] arm: perf: Convert event enums to #defines
+On 10/28/2015 10:51 AM, Timur Tabi wrote:
+> On 10/28/2015 09:22 AM, Peter Hurley wrote:
+>> EARLYCON_DECLARE(zte, zte_early_console_setup);
+>> OF_EARLYCON_DECLARE(zte, ".......", zte_early_console_setup);
+>> EARLYCON_DECLARE(sbsa32, sbsa32_early_console_setup);
+>> OF_EARLYCON_DECLARE(sbsa32, "arm,sbsa-uart", sbsa32_early_console_setup);
+>>
+>> The above assumes that the sbsa32 maintains the equivalence of
+>> earlycon and console; ie., that
+>>
+>> / {
+>>     chosen {
+>>         stdout-path = &uart0;
+>>     };
+>>
+>>     soc {
+>>         uart0: serial at xxxxxx {
+>>             compatible = "arm,sbsa-uart";
+>>         };
+>>     };
+>> };
+>>
+>>
+>> will start a sbsa32 earlycon and later replace that with
+>> sbsa console.
+> 
+> I never really understood the device tree support for SBSA. The "S" stands for Server, and ARM Server systems are supposed to use ACPI. It's easy to add special cases via device tree, because of its flexibility.
 
-The enums are not necessary and this allows the event values to be
-used to construct static strings at compile time.
+Agreed.
 
-Signed-off-by: Drew Richardson <drew.richardson@arm.com>
----
- arch/arm/kernel/perf_event_v7.c | 186 ++++++++++++++++++----------------------
- 1 file changed, 85 insertions(+), 101 deletions(-)
+> ACPI is much more difficult, and that's why I used the command-line approach.
 
-diff --git a/arch/arm/kernel/perf_event_v7.c b/arch/arm/kernel/perf_event_v7.c
-index 126dc679b230..dc979724e3bb 100644
---- a/arch/arm/kernel/perf_event_v7.c
-+++ b/arch/arm/kernel/perf_event_v7.c
-@@ -35,133 +35,117 @@
-  * but the encodings are considered to be `reserved' in the case that
-  * they are not available.
-  */
--enum armv7_perf_types {
--	ARMV7_PERFCTR_PMNC_SW_INCR			= 0x00,
--	ARMV7_PERFCTR_L1_ICACHE_REFILL			= 0x01,
--	ARMV7_PERFCTR_ITLB_REFILL			= 0x02,
--	ARMV7_PERFCTR_L1_DCACHE_REFILL			= 0x03,
--	ARMV7_PERFCTR_L1_DCACHE_ACCESS			= 0x04,
--	ARMV7_PERFCTR_DTLB_REFILL			= 0x05,
--	ARMV7_PERFCTR_MEM_READ				= 0x06,
--	ARMV7_PERFCTR_MEM_WRITE				= 0x07,
--	ARMV7_PERFCTR_INSTR_EXECUTED			= 0x08,
--	ARMV7_PERFCTR_EXC_TAKEN				= 0x09,
--	ARMV7_PERFCTR_EXC_EXECUTED			= 0x0A,
--	ARMV7_PERFCTR_CID_WRITE				= 0x0B,
-+#define ARMV7_PERFCTR_PMNC_SW_INCR			0x00
-+#define ARMV7_PERFCTR_L1_ICACHE_REFILL			0x01
-+#define ARMV7_PERFCTR_ITLB_REFILL			0x02
-+#define ARMV7_PERFCTR_L1_DCACHE_REFILL			0x03
-+#define ARMV7_PERFCTR_L1_DCACHE_ACCESS			0x04
-+#define ARMV7_PERFCTR_DTLB_REFILL			0x05
-+#define ARMV7_PERFCTR_MEM_READ				0x06
-+#define ARMV7_PERFCTR_MEM_WRITE				0x07
-+#define ARMV7_PERFCTR_INSTR_EXECUTED			0x08
-+#define ARMV7_PERFCTR_EXC_TAKEN				0x09
-+#define ARMV7_PERFCTR_EXC_EXECUTED			0x0A
-+#define ARMV7_PERFCTR_CID_WRITE				0x0B
- 
--	/*
--	 * ARMV7_PERFCTR_PC_WRITE is equivalent to HW_BRANCH_INSTRUCTIONS.
--	 * It counts:
--	 *  - all (taken) branch instructions,
--	 *  - instructions that explicitly write the PC,
--	 *  - exception generating instructions.
--	 */
--	ARMV7_PERFCTR_PC_WRITE				= 0x0C,
--	ARMV7_PERFCTR_PC_IMM_BRANCH			= 0x0D,
--	ARMV7_PERFCTR_PC_PROC_RETURN			= 0x0E,
--	ARMV7_PERFCTR_MEM_UNALIGNED_ACCESS		= 0x0F,
--	ARMV7_PERFCTR_PC_BRANCH_MIS_PRED		= 0x10,
--	ARMV7_PERFCTR_CLOCK_CYCLES			= 0x11,
--	ARMV7_PERFCTR_PC_BRANCH_PRED			= 0x12,
--
--	/* These events are defined by the PMUv2 supplement (ARM DDI 0457A). */
--	ARMV7_PERFCTR_MEM_ACCESS			= 0x13,
--	ARMV7_PERFCTR_L1_ICACHE_ACCESS			= 0x14,
--	ARMV7_PERFCTR_L1_DCACHE_WB			= 0x15,
--	ARMV7_PERFCTR_L2_CACHE_ACCESS			= 0x16,
--	ARMV7_PERFCTR_L2_CACHE_REFILL			= 0x17,
--	ARMV7_PERFCTR_L2_CACHE_WB			= 0x18,
--	ARMV7_PERFCTR_BUS_ACCESS			= 0x19,
--	ARMV7_PERFCTR_MEM_ERROR				= 0x1A,
--	ARMV7_PERFCTR_INSTR_SPEC			= 0x1B,
--	ARMV7_PERFCTR_TTBR_WRITE			= 0x1C,
--	ARMV7_PERFCTR_BUS_CYCLES			= 0x1D,
--
--	ARMV7_PERFCTR_CPU_CYCLES			= 0xFF
--};
-+/*
-+ * ARMV7_PERFCTR_PC_WRITE is equivalent to HW_BRANCH_INSTRUCTIONS.
-+ * It counts:
-+ *  - all (taken) branch instructions,
-+ *  - instructions that explicitly write the PC,
-+ *  - exception generating instructions.
-+ */
-+#define ARMV7_PERFCTR_PC_WRITE				0x0C
-+#define ARMV7_PERFCTR_PC_IMM_BRANCH			0x0D
-+#define ARMV7_PERFCTR_PC_PROC_RETURN			0x0E
-+#define ARMV7_PERFCTR_MEM_UNALIGNED_ACCESS		0x0F
-+#define ARMV7_PERFCTR_PC_BRANCH_MIS_PRED		0x10
-+#define ARMV7_PERFCTR_CLOCK_CYCLES			0x11
-+#define ARMV7_PERFCTR_PC_BRANCH_PRED			0x12
-+
-+/* These events are defined by the PMUv2 supplement (ARM DDI 0457A). */
-+#define ARMV7_PERFCTR_MEM_ACCESS			0x13
-+#define ARMV7_PERFCTR_L1_ICACHE_ACCESS			0x14
-+#define ARMV7_PERFCTR_L1_DCACHE_WB			0x15
-+#define ARMV7_PERFCTR_L2_CACHE_ACCESS			0x16
-+#define ARMV7_PERFCTR_L2_CACHE_REFILL			0x17
-+#define ARMV7_PERFCTR_L2_CACHE_WB			0x18
-+#define ARMV7_PERFCTR_BUS_ACCESS			0x19
-+#define ARMV7_PERFCTR_MEM_ERROR				0x1A
-+#define ARMV7_PERFCTR_INSTR_SPEC			0x1B
-+#define ARMV7_PERFCTR_TTBR_WRITE			0x1C
-+#define ARMV7_PERFCTR_BUS_CYCLES			0x1D
-+
-+#define ARMV7_PERFCTR_CPU_CYCLES			0xFF
- 
- /* ARMv7 Cortex-A8 specific event types */
--enum armv7_a8_perf_types {
--	ARMV7_A8_PERFCTR_L2_CACHE_ACCESS		= 0x43,
--	ARMV7_A8_PERFCTR_L2_CACHE_REFILL		= 0x44,
--	ARMV7_A8_PERFCTR_L1_ICACHE_ACCESS		= 0x50,
--	ARMV7_A8_PERFCTR_STALL_ISIDE			= 0x56,
--};
-+#define ARMV7_A8_PERFCTR_L2_CACHE_ACCESS		0x43
-+#define ARMV7_A8_PERFCTR_L2_CACHE_REFILL		0x44
-+#define ARMV7_A8_PERFCTR_L1_ICACHE_ACCESS		0x50
-+#define ARMV7_A8_PERFCTR_STALL_ISIDE			0x56
- 
- /* ARMv7 Cortex-A9 specific event types */
--enum armv7_a9_perf_types {
--	ARMV7_A9_PERFCTR_INSTR_CORE_RENAME		= 0x68,
--	ARMV7_A9_PERFCTR_STALL_ICACHE			= 0x60,
--	ARMV7_A9_PERFCTR_STALL_DISPATCH			= 0x66,
--};
-+#define ARMV7_A9_PERFCTR_INSTR_CORE_RENAME		0x68
-+#define ARMV7_A9_PERFCTR_STALL_ICACHE			0x60
-+#define ARMV7_A9_PERFCTR_STALL_DISPATCH			0x66
- 
- /* ARMv7 Cortex-A5 specific event types */
--enum armv7_a5_perf_types {
--	ARMV7_A5_PERFCTR_PREFETCH_LINEFILL		= 0xc2,
--	ARMV7_A5_PERFCTR_PREFETCH_LINEFILL_DROP		= 0xc3,
--};
-+#define ARMV7_A5_PERFCTR_PREFETCH_LINEFILL		0xc2
-+#define ARMV7_A5_PERFCTR_PREFETCH_LINEFILL_DROP		0xc3
- 
- /* ARMv7 Cortex-A15 specific event types */
--enum armv7_a15_perf_types {
--	ARMV7_A15_PERFCTR_L1_DCACHE_ACCESS_READ		= 0x40,
--	ARMV7_A15_PERFCTR_L1_DCACHE_ACCESS_WRITE	= 0x41,
--	ARMV7_A15_PERFCTR_L1_DCACHE_REFILL_READ		= 0x42,
--	ARMV7_A15_PERFCTR_L1_DCACHE_REFILL_WRITE	= 0x43,
-+#define ARMV7_A15_PERFCTR_L1_DCACHE_ACCESS_READ		0x40
-+#define ARMV7_A15_PERFCTR_L1_DCACHE_ACCESS_WRITE	0x41
-+#define ARMV7_A15_PERFCTR_L1_DCACHE_REFILL_READ		0x42
-+#define ARMV7_A15_PERFCTR_L1_DCACHE_REFILL_WRITE	0x43
- 
--	ARMV7_A15_PERFCTR_DTLB_REFILL_L1_READ		= 0x4C,
--	ARMV7_A15_PERFCTR_DTLB_REFILL_L1_WRITE		= 0x4D,
-+#define ARMV7_A15_PERFCTR_DTLB_REFILL_L1_READ		0x4C
-+#define ARMV7_A15_PERFCTR_DTLB_REFILL_L1_WRITE		0x4D
- 
--	ARMV7_A15_PERFCTR_L2_CACHE_ACCESS_READ		= 0x50,
--	ARMV7_A15_PERFCTR_L2_CACHE_ACCESS_WRITE		= 0x51,
--	ARMV7_A15_PERFCTR_L2_CACHE_REFILL_READ		= 0x52,
--	ARMV7_A15_PERFCTR_L2_CACHE_REFILL_WRITE		= 0x53,
-+#define ARMV7_A15_PERFCTR_L2_CACHE_ACCESS_READ		0x50
-+#define ARMV7_A15_PERFCTR_L2_CACHE_ACCESS_WRITE		0x51
-+#define ARMV7_A15_PERFCTR_L2_CACHE_REFILL_READ		0x52
-+#define ARMV7_A15_PERFCTR_L2_CACHE_REFILL_WRITE		0x53
- 
--	ARMV7_A15_PERFCTR_PC_WRITE_SPEC			= 0x76,
--};
-+#define ARMV7_A15_PERFCTR_PC_WRITE_SPEC			0x76
- 
- /* ARMv7 Cortex-A12 specific event types */
--enum armv7_a12_perf_types {
--	ARMV7_A12_PERFCTR_L1_DCACHE_ACCESS_READ		= 0x40,
--	ARMV7_A12_PERFCTR_L1_DCACHE_ACCESS_WRITE	= 0x41,
-+#define ARMV7_A12_PERFCTR_L1_DCACHE_ACCESS_READ		0x40
-+#define ARMV7_A12_PERFCTR_L1_DCACHE_ACCESS_WRITE	0x41
- 
--	ARMV7_A12_PERFCTR_L2_CACHE_ACCESS_READ		= 0x50,
--	ARMV7_A12_PERFCTR_L2_CACHE_ACCESS_WRITE		= 0x51,
-+#define ARMV7_A12_PERFCTR_L2_CACHE_ACCESS_READ		0x50
-+#define ARMV7_A12_PERFCTR_L2_CACHE_ACCESS_WRITE		0x51
- 
--	ARMV7_A12_PERFCTR_PC_WRITE_SPEC			= 0x76,
-+#define ARMV7_A12_PERFCTR_PC_WRITE_SPEC			0x76
- 
--	ARMV7_A12_PERFCTR_PF_TLB_REFILL			= 0xe7,
--};
-+#define ARMV7_A12_PERFCTR_PF_TLB_REFILL			0xe7
- 
- /* ARMv7 Krait specific event types */
--enum krait_perf_types {
--	KRAIT_PMRESR0_GROUP0				= 0xcc,
--	KRAIT_PMRESR1_GROUP0				= 0xd0,
--	KRAIT_PMRESR2_GROUP0				= 0xd4,
--	KRAIT_VPMRESR0_GROUP0				= 0xd8,
-+#define KRAIT_PMRESR0_GROUP0				0xcc
-+#define KRAIT_PMRESR1_GROUP0				0xd0
-+#define KRAIT_PMRESR2_GROUP0				0xd4
-+#define KRAIT_VPMRESR0_GROUP0				0xd8
- 
--	KRAIT_PERFCTR_L1_ICACHE_ACCESS			= 0x10011,
--	KRAIT_PERFCTR_L1_ICACHE_MISS			= 0x10010,
-+#define KRAIT_PERFCTR_L1_ICACHE_ACCESS			0x10011
-+#define KRAIT_PERFCTR_L1_ICACHE_MISS			0x10010
- 
--	KRAIT_PERFCTR_L1_ITLB_ACCESS			= 0x12222,
--	KRAIT_PERFCTR_L1_DTLB_ACCESS			= 0x12210,
--};
-+#define KRAIT_PERFCTR_L1_ITLB_ACCESS			0x12222
-+#define KRAIT_PERFCTR_L1_DTLB_ACCESS			0x12210
- 
- /* ARMv7 Scorpion specific event types */
--enum scorpion_perf_types {
--	SCORPION_LPM0_GROUP0				= 0x4c,
--	SCORPION_LPM1_GROUP0				= 0x50,
--	SCORPION_LPM2_GROUP0				= 0x54,
--	SCORPION_L2LPM_GROUP0				= 0x58,
--	SCORPION_VLPM_GROUP0				= 0x5c,
-+#define SCORPION_LPM0_GROUP0				0x4c
-+#define SCORPION_LPM1_GROUP0				0x50
-+#define SCORPION_LPM2_GROUP0				0x54
-+#define SCORPION_L2LPM_GROUP0				0x58
-+#define SCORPION_VLPM_GROUP0				0x5c
- 
--	SCORPION_ICACHE_ACCESS				= 0x10053,
--	SCORPION_ICACHE_MISS				= 0x10052,
-+#define SCORPION_ICACHE_ACCESS				0x10053
-+#define SCORPION_ICACHE_MISS				0x10052
- 
--	SCORPION_DTLB_ACCESS				= 0x12013,
--	SCORPION_DTLB_MISS				= 0x12012,
-+#define SCORPION_DTLB_ACCESS				0x12013
-+#define SCORPION_DTLB_MISS				0x12012
- 
--	SCORPION_ITLB_MISS				= 0x12021,
--};
-+#define SCORPION_ITLB_MISS				0x12021
- 
- /*
-  * Cortex-A8 HW events mapping
--- 
-2.5.0
+Understood.
+
+> Anyway, I found this alternate patch from Lief Lindholm that implements this idea better, although it needs work:
+> 
+> https://patches.linaro.org/53265/
+
+Yeah, I saw those, but I'm waiting for v2 to review.
+
+Regards,
+Peter Hurley
