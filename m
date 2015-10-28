@@ -1,83 +1,37 @@
-From: p.fedin@samsung.com (Pavel Fedin)
-Date: Wed, 28 Oct 2015 10:57:38 +0300
-Subject: [PATCH v3 4/4] ARM: dts: Add Ethernet chip to SMDK5410
-In-Reply-To: <cover.1446018918.git.p.fedin@samsung.com>
-References: <cover.1446018918.git.p.fedin@samsung.com>
-Message-ID: <e5eba0f655e9df234891ef26f2c55219a50e98a0.1446018918.git.p.fedin@samsung.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 28 Oct 2015 08:59:09 +0100
+Subject: [PATCH v2] cpufreq: i.MX6: -EPROBE_DEFER fixes
+Message-ID: <1446019154-16384-1-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The chip is smsc9115, connected via SROMc bank 3. Additionally, some GPIO
-initialization is required.
+The i.MX6 cpufreq driver can't cope with -EPROBE_DEFER returned from
+regulator_get/clk_get. This series fix that and some other small issues.
 
-Signed-off-by: Pavel Fedin <p.fedin@samsung.com>
----
- arch/arm/boot/dts/exynos5410-smdk5410.dts | 42 +++++++++++++++++++++++++++++++
- 1 file changed, 42 insertions(+)
+Shawn, Could you give me your ack for patch 4/5?
 
-diff --git a/arch/arm/boot/dts/exynos5410-smdk5410.dts b/arch/arm/boot/dts/exynos5410-smdk5410.dts
-index cebeaab..2a6a5ac 100644
---- a/arch/arm/boot/dts/exynos5410-smdk5410.dts
-+++ b/arch/arm/boot/dts/exynos5410-smdk5410.dts
-@@ -35,6 +35,17 @@
- 		reg = <0x02037000 0x1000>;
- 	};
- 
-+	ethernet at 07000000 {
-+		compatible = "smsc,lan9115";
-+		reg = <0x07000000 0x10000>;
-+		phy-mode = "mii";
-+		interrupt-parent = <&gpx0>;
-+		interrupts = <5 8>;
-+		reg-io-width = <2>;
-+		smsc,irq-push-pull;
-+		smsc,force-internal-phy;
-+	};
-+
- };
- 
- &mmc_0 {
-@@ -61,6 +72,27 @@
- 	disable-wp;
- };
- 
-+&pinctrl_0 {
-+	srom_ctl: srom-ctl {
-+		samsung,pins = "gpy0-3", "gpy0-4", "gpy0-5",
-+			       "gpy1-0", "gpy1-1", "gpy1-2", "gpy1-3";
-+		samsung,pin-function = <2>;
-+		samsung,pin-drv = <0>;
-+	};
-+
-+	srom_ebi: srom-ebi {
-+		samsung,pins = "gpy3-0", "gpy3-1", "gpy3-2", "gpy3-3",
-+			       "gpy3-4", "gpy3-5", "gpy3-6", "gpy3-7",
-+			       "gpy5-0", "gpy5-1", "gpy5-2", "gpy5-3",
-+			       "gpy5-4", "gpy5-5", "gpy5-6", "gpy5-7",
-+			       "gpy6-0", "gpy6-1", "gpy6-2", "gpy6-3",
-+			       "gpy6-4", "gpy6-5", "gpy6-6", "gpy6-7";
-+		samsung,pin-function = <2>;
-+		samsung,pin-pud = <3>;
-+		samsung,pin-drv = <0>;
-+	};
-+};
-+
- &uart0 {
- 	status = "okay";
- };
-@@ -72,3 +104,13 @@
- &uart2 {
- 	status = "okay";
- };
-+
-+&sromc {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&srom_ctl>, <&srom_ebi>;
-+	bank at 3 {
-+		bank = <3>;
-+		width = <2>;
-+		srom-timing = <1 9 12 1 9 1 1>;
-+	};
-+};
--- 
-2.4.4
+Sascha
+
+Changes since v1:
+
+- Fix Coding style nitpicks
+- drop unnecessary platform_device argument from
+  imx6q_cpufreq_get_resources
+- Add more comments
+- Use id_table to distinguish between SoCs
+- make PU regulator non optional on SoCs that need it and don't request
+  it on SoCs that don't need it
+
+----------------------------------------------------------------
+Sascha Hauer (5):
+      cpufreq: imx6q: Fix goto wrong error label
+      cpufreq: imx6q: Fix wrong device in devm_kzalloc
+      cpufreq: imx6q: Fix regulator/clock error handling
+      cpufreq: imx6q: Use id_table to distinguish between SoCs
+      cpufreq: imx6q: pu regulator is not optional
+
+ arch/arm/mach-imx/mach-imx6sl.c |   2 +-
+ arch/arm/mach-imx/mach-imx6sx.c |   2 +-
+ arch/arm/mach-imx/mach-imx6ul.c |   2 +-
+ drivers/cpufreq/imx6q-cpufreq.c | 213 ++++++++++++++++++++++++++--------------
+ 4 files changed, 145 insertions(+), 74 deletions(-)
