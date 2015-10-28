@@ -1,134 +1,81 @@
-From: Liviu.Dudau@arm.com (Liviu.Dudau at arm.com)
-Date: Wed, 28 Oct 2015 11:38:37 +0000
-Subject: [PATCH V1 10/11] pci, acpi: Provide generic way to assign bus
- domain number.
-In-Reply-To: <1445963922-22711-11-git-send-email-tn@semihalf.com>
-References: <1445963922-22711-1-git-send-email-tn@semihalf.com>
- <1445963922-22711-11-git-send-email-tn@semihalf.com>
-Message-ID: <20151028113837.GK963@e106497-lin.cambridge.arm.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 28 Oct 2015 11:39:32 +0000
+Subject: [PATCH] MAINTAINERS: Start using the 'reviewer' (R) tag
+In-Reply-To: <CABxcv=m+aMgtKPA-WBX9rTW8c3pnMmZgNG=NvnbaeOchdZ87hg@mail.gmail.com>
+References: <20151027172428.GB21070@earth> <20151027181555.GE5828@x1>
+ <1445971482.2757.27.camel@perches.com>
+ <CAJKOXPc_w2Dc8LvkCu_d+kjZZmYScXboQrpNWdicT2yfL_5D7Q@mail.gmail.com>
+ <20151028082446.GF5828@x1>
+ <CABxcv=mGZstqyrkB95hjDCYCvhDJDVD=ga-Fg_5yPtXETuWe=g@mail.gmail.com>
+ <20151028102832.GR5828@x1>
+ <CABxcv=mzzcx3o0m3hYzcn0DyM2pEFDZ-ZgVCjChWGf+y4Xy78A@mail.gmail.com>
+ <1446030399.2757.83.camel@perches.com>
+ <CABxcv=m+aMgtKPA-WBX9rTW8c3pnMmZgNG=NvnbaeOchdZ87hg@mail.gmail.com>
+Message-ID: <20151028113932.GS5828@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 27, 2015 at 05:38:41PM +0100, Tomasz Nowicki wrote:
-> Architectures which support PCI_DOMAINS_GENERIC (like ARM64)
-> cannot call pci_bus_assign_domain_nr along ACPI PCI host bridge
-> initialization since this function needs valid parent device reference
-> to be able to retrieve domain number (aka segment).
+On Wed, 28 Oct 2015, Javier Martinez Canillas wrote:
+
+> Hello Joe,
 > 
-> We can omit that blocker and pass down host bridge device via
-> pci_create_root_bus parameter and then be able to evaluate _SEG method
-> being in pci_bus_assign_domain_nr.
+> On Wed, Oct 28, 2015 at 12:06 PM, Joe Perches <joe@perches.com> wrote:
+> > On Wed, 2015-10-28 at 11:53 +0100, Javier Martinez Canillas wrote:
+> >> (Lee) think(s) that the difference between a maintainer and
+> >> a reviewer is if a branch with fixes / new features are kept and pull
+> >> requests sent while I think that the difference is the level of
+> >> involvement someone has with a driver regardless of how patches ends
+> >> in the subsystem tree (picked directly by subsystem maintainers or
+> >> sent through pull requests).
+> >>
+> >> Is the first time I heard your definition but maybe I'm the one that
+> >> is wrong so it would be great to get a consensus on that and get it
+> >> documented somewhere.
+> >
+> > I think Lee is over-analyzing.
+> >
+> > From MAINTAINERS:
+> >         M: Mail patches to: FullName <address@domain>
+> >         R: Designated reviewer: FullName <address@domain>
+> >            These reviewers should be CCed on patches.
+> >         S: Status, one of the following:
+> >            Supported:   Someone is actually paid to look after this.
+> >            Maintained:  Someone actually looks after it.
+> >
+> > "looking after" doesn't mean upstreaming.
+> >
 > 
-> Note that _SEG method is optional, therefore _SEG absence means
-> that all PCI buses belong to domain 0.
+> Agreed and upstreaming doesn't mean sending pull request, you can for
+> example upstream the downstream changes for a driver you maintain by
+> posting patches or ack patches others post and let the subsystem
+> maintainer to pick those (even if you are listed as the driver
+> maintainer in MAINTAINERS).
 > 
-> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
-> ---
->  drivers/acpi/pci_root.c |  2 +-
->  drivers/pci/pci.c       | 32 +++++++++++++++++++++++++++-----
->  2 files changed, 28 insertions(+), 6 deletions(-)
-> 
-> diff --git a/drivers/acpi/pci_root.c b/drivers/acpi/pci_root.c
-> index 850d7bf..e682dc6 100644
-> --- a/drivers/acpi/pci_root.c
-> +++ b/drivers/acpi/pci_root.c
-> @@ -839,7 +839,7 @@ struct pci_bus *acpi_pci_root_create(struct acpi_pci_root *root,
->  
->  	pci_acpi_root_add_resources(info);
->  	pci_add_resource(&info->resources, &root->secondary);
-> -	bus = pci_create_root_bus(NULL, busnum, ops->pci_ops,
-> +	bus = pci_create_root_bus(&device->dev, busnum, ops->pci_ops,
->  				  sysdata, &info->resources);
+> So by following Lee's definition, then most drivers' maintainers
+> should not be called maintainers since keeping a tree with patches for
+> both fixes and new features, sending pull requests, etc is only
+> justified for drivers that have a lot of changes per release. Is not
+> worth it for drivers that are in "maintenance mode" where only bugs
+> are fixed every once in a while or features are seldom added.
 
-Not sure this change should be in this patch, I don't see the relation.
+Exactly right.
 
-To put it differently: I think the patch should introduce the retrieval of the
-domain number from _SEG method and leave the passing of a valid host bridge device
-to a more appropriate patch.
+Although, it looks like M: doesn't even mean Maintainer.  If it did, I
+would have made these points over and over until death (or until I got
+bored).  However, as M: actually means "Mail patches to", there seems
+to be very little difference between that and "Designated reviewer"
+and makes me wonder why the R: tag was ever even introduced.  I guess
+all of the other guys in the threads below also thought M: meant
+Maintainer, or else they would have just added poor old Josh as a
+"Mail patches to" recipient and been done with it.
 
-
->  	if (!bus)
->  		goto out_release_info;
-> diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
-> index 6a9a111..17d1857 100644
-> --- a/drivers/pci/pci.c
-> +++ b/drivers/pci/pci.c
-> @@ -25,6 +25,7 @@
->  #include <linux/device.h>
->  #include <linux/pm_runtime.h>
->  #include <linux/pci_hotplug.h>
-> +#include <linux/acpi.h>
->  #include <asm-generic/pci-bridge.h>
->  #include <asm/setup.h>
->  #include "pci.h"
-> @@ -4501,7 +4502,7 @@ int pci_get_new_domain_nr(void)
->  void pci_bus_assign_domain_nr(struct pci_bus *bus, struct device *parent)
->  {
->  	static int use_dt_domains = -1;
-> -	int domain = of_get_pci_domain_nr(parent->of_node);
-> +	int domain;
->  
->  	/*
->  	 * Check DT domain and use_dt_domains values.
-> @@ -4523,14 +4524,35 @@ void pci_bus_assign_domain_nr(struct pci_bus *bus, struct device *parent)
->  	 * API and update the use_dt_domains value to keep track of method we
->  	 * are using to assign domain numbers (use_dt_domains = 0).
->  	 *
-> +	 * IF ACPI, we expect non-DT method (use_dt_domains == -1)
-> +	 * and call _SEG method for corresponding host bridge device.
-> +	 * If _SEG method does not exist, following ACPI spec (6.5.6)
-> +	 * all PCI buses belong to domain 0.
-> +	 *
->  	 * All other combinations imply we have a platform that is trying
-> -	 * to mix domain numbers obtained from DT and pci_get_new_domain_nr(),
-> -	 * which is a recipe for domain mishandling and it is prevented by
-> -	 * invalidating the domain value (domain = -1) and printing a
-> -	 * corresponding error.
-> +	 * to mix domain numbers obtained from DT, ACPI and
-> +	 * pci_get_new_domain_nr(), which is a recipe for domain mishandling and
-> +	 * it is prevented by invalidating the domain value (domain = -1) and
-> +	 * printing a corresponding error.
->  	 */
-> +
-> +	domain = of_get_pci_domain_nr(parent->of_node);
-
-Not sure what you've got here by splitting the original line into two other than an increase
-in the change count.
-
-Otherwise, it looks sensible.
-
-Reviewed-by: Liviu Dudau <Liviu.Dudau@arm.com>
-
-
->  	if (domain >= 0 && use_dt_domains) {
->  		use_dt_domains = 1;
-> +#ifdef CONFIG_ACPI
-> +	} else if (!acpi_disabled && use_dt_domains == -1) {
-> +		struct acpi_device *acpi_dev = to_acpi_device(parent);
-> +		unsigned long long segment = 0;
-> +		acpi_status status;
-> +
-> +		status = acpi_evaluate_integer(acpi_dev->handle,
-> +					       METHOD_NAME__SEG, NULL,
-> +					       &segment);
-> +		if (ACPI_FAILURE(status) && status != AE_NOT_FOUND)
-> +			dev_err(&acpi_dev->dev,  "can't evaluate _SEG\n");
-> +
-> +		domain = segment;
-> +#endif
->  	} else if (domain < 0 && use_dt_domains != 1) {
->  		use_dt_domains = 0;
->  		domain = pci_get_new_domain_nr();
-> -- 
-> 1.9.1
-> 
+> > The original threads for this were:
+> >
+> > http://lists.linuxfoundation.org/pipermail/ksummit-discuss/2014-May/000830.html
+> > https://lkml.org/lkml/2014/6/2/446
 
 -- 
-====================
-| I would like to |
-| fix the world,  |
-| but they're not |
-| giving me the   |
- \ source code!  /
-  ---------------
-    ?\_(?)_/?
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
