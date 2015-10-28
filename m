@@ -1,94 +1,63 @@
-From: amittomer25@gmail.com (Amit Tomer)
-Date: Thu, 29 Oct 2015 00:32:51 +0530
-Subject: [PATCH v1] Ftrace: arm/arm64: Define a new arm/arm64 trace clock
- source based on CNTPCT/CNTPCT_EL0 register.
-In-Reply-To: <20151028124726.GD25451@leverpostej>
-References: <1445854558-16253-1-git-send-email-amittomer25@gmail.com>
- <20151028124726.GD25451@leverpostej>
-Message-ID: <CABHD4K-KugtaLvc98wEMWm0iN_3v=d2UYkSmpSMCX91s-EAnhg@mail.gmail.com>
+From: dhdang@apm.com (Duc Dang)
+Date: Wed, 28 Oct 2015 12:08:58 -0700
+Subject: [GIT PULL] arm64: Second batch of DTS changes for X-Gene platforms
+ queued for v4.4
+Message-ID: <CADaLND=otWJX5vqzGdf0Y_pwiYHafWB5TwE9GXWnHG3M2r7fOw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 28, 2015 at 6:17 PM, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Mon, Oct 26, 2015 at 03:45:58PM +0530, Amit wrote:
->> From: Amit Singh Tomar <amittomer25@gmail.com>
->>
->> Define new arm/arm64 specific trace clock using CNTPCT/CNTPCT_EL0 register,
->> similar to x86-tsc. It can be used to correlate trace events across
->> hosts and guest that can be useful for debugging purpose.
->>
->> Signed-off-by: Amit Singh Tomar <amittomer25@gmail.com>
->> ---
->> Changes since RFC:
->>       * Replaced define with static inline
->>       * Revert few changes done in ftrace.txt
->>       * Made it common between ARM and ARM64.
->> ---
->>  Documentation/trace/ftrace.txt       | 12 ++++++++++++
->>  arch/arm/include/asm/Kbuild          |  1 -
->>  arch/arm/include/asm/trace_clock.h   | 21 +++++++++++++++++++++
->>  arch/arm/kernel/Makefile             |  2 ++
->>  arch/arm/kernel/trace_clock.c        | 33 +++++++++++++++++++++++++++++++++
->>  arch/arm64/include/asm/Kbuild        |  1 -
->>  arch/arm64/include/asm/trace_clock.h | 21 +++++++++++++++++++++
->>  arch/arm64/kernel/Makefile           |  2 ++
->>  8 files changed, 91 insertions(+), 2 deletions(-)
->>  create mode 100644 arch/arm/include/asm/trace_clock.h
->>  create mode 100644 arch/arm/kernel/trace_clock.c
->>  create mode 100644 arch/arm64/include/asm/trace_clock.h
->>
->> diff --git a/Documentation/trace/ftrace.txt b/Documentation/trace/ftrace.txt
->> index ef621d3..13f3737 100644
->> --- a/Documentation/trace/ftrace.txt
->> +++ b/Documentation/trace/ftrace.txt
->> @@ -351,6 +351,18 @@ of ftrace. Here is a list of some of the key files:
->>                 to correlate events across hypervisor/guest if
->>                 tb_offset is known.
->>
->> +      arm-pct: This uses ARM Physical Count register value.This
->> +               is different from default "local" clock which
->> +               usese Virtual Count register.This is consistent
->> +               across processors and can be used to correlate
->> +               events across host/guest.
->> +
->> +      arm64-pct: This uses ARM64 Physical Timer Count register
->> +                   value. This is different from default "local"
->> +                   clock which usese Virtual Timer Count register.
->> +                   This is consistent across processors and can be
->> +                   used to correlate events across host/guest.
->
-> The above is wrong. Both the physical and virtual counters have the same
-> guarantees w.r.t. consistency across CPUs for the same VM image. Neither
-> is more local than the other.
+Hi Arnd, Olof,
 
-I never said virtual counters are not consistent across CPU's but pointed out
-that Values of Virtual counter seen by host and guest are
-different(but even in Host context
-I have seen VCT is not exactly equal to PCT).
+The following changes since commit d2d0a722df735de52015f0c8a01f27a9ec28622e:
 
-> In the host you will have access to CNTVOFF, so you can use that to
-> correlate the virtual counter.
+  arm64: dts: Add poweroff device nodes for APM X-Gene 2 platform
+(2015-10-12 14:18:38 -0700)
 
-I don't think CNTVOFF can be accessible from normal el1 host code and
-do you think reading it from el2 and then feed it to virtual counter
-is good idea?
+are available in the git repository at:
 
-> Additionally, it's not safe to read the physical counter register unless
-> you know that access has not been denied by the hypervisor; so any Linux
-> image not booted at hyp cannot use this. If the hypervisor emulates the
-> access, it will also be horrifically slow.
->
+  https://github.com/AppliedMicro/xgene-next.git tags/xgene-dts-for-v4.4-2
 
-Sorry but are you saying if kernel doesn't boot in HYP mode , I have no way to
-read Physical counter in Guest?
+for you to fetch changes up to fa535e2632f275f0d5d4080d60c8e1331ac37549:
 
+  arm64: dts: Add L2 cache topology for APM X-Gene SoC (2015-10-26
+02:31:43 -0700)
 
->
-> This is arch/arm. This cannot build for 32-bit.
->
+----------------------------------------------------------------
+Second batch of DTS changes for X-Gene platforms queued for v4.4
 
-I did build it on ARM(32 bit) and for the same made a check using
-"#ifdef CONFIG_ARM64", so would you  relook at it again.
+This patch set adds DTS entries to support various IPs
+for X-Gene v1 and X-Gene v2 SoC:
+- X-Gene v1: Enable support for MMC, USB, GPIO controllers,
+  I2C controller, L2 Cache topology
+- X-Gene v2: Enable support for MMC, USB, GPIO controller,
+  I2C controller (with RTC), PCIe controller with GICv2m MSI,
+  EDAC, L2 Cache topology, TRNG
 
-Thanks
-Amit.
+----------------------------------------------------------------
+Duc Dang (16):
+      arm64: dts: Add the arasan mmc DTS entries for APm X-Gene v2 SoC
+      arm64: dts: X-Gene: Do not reset or enable/disable clock for AHB block
+      arm64: dts: Add RNG device tree nodes for APM X-Gene v2 platform
+      arm64: dts: Add v2m MSI frame nodes for APM X-Gene v2 platforms
+      arm64: dts: Add PCIe node for APM X-Gene v2 platforms
+      arm64: dts: Add USB nodes for APM X-Gene v1 platforms
+      arm64: dts: Add USB nodes for APM X-Gene v2 platforms
+      arm64: dts: Add APM X-Gene v1 SoC GFC GPIO controller DTS entries
+      arm64: dts: Add APM X-Gene v2 SoC GFC GPIO controller DTS entry
+      arm64: dts: Add Designware GPIO dts binding for APM X-Gene v1 platform
+      arm64: dts: Add APM X-Gene v2 SoC Designware GPIO controller DTS entry
+      arm64: dts: Add APM X-Gene v2 SoC EDAC DTS entries
+      arm64: dts: Add Designware I2C controller DTS entries for X-Gene v1 SoC
+      arm64: dts: Add Designware I2C controller DTS entries for X-Gene
+v2 SoC platform
+      arm64: dts: Add RTC DTS entry for X-Gene v2 SoC platform
+      arm64: dts: Add L2 cache topology for APM X-Gene SoC
+
+Suman Tripathi (1):
+      arm64: dts: Add the arasan mmc DTS entries for APM X-Gene v1 SoC
+
+ arch/arm64/boot/dts/apm/apm-merlin.dts     |  12 +
+ arch/arm64/boot/dts/apm/apm-mustang.dts    |   4 +
+ arch/arm64/boot/dts/apm/apm-shadowcat.dtsi | 401 +++++++++++++++++++++++++++++
+ arch/arm64/boot/dts/apm/apm-storm.dtsi     | 126 +++++++++
+ 4 files changed, 543 insertions(+)
