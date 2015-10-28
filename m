@@ -1,30 +1,47 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Wed, 28 Oct 2015 10:36:33 +0100
-Subject: [PATCH v4 3/3] arm64: defconfig: Enable Renesas R-Car I2C
- Controller
-In-Reply-To: <1445987129-13496-4-git-send-email-horms+renesas@verge.net.au>
-References: <1445987129-13496-1-git-send-email-horms+renesas@verge.net.au>
- <1445987129-13496-4-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <CAMuHMdVmYw7Sx1L5SuPoDz_Grruz=CjWQxsLb5O7qtkre3502Q@mail.gmail.com>
+From: p.fedin@samsung.com (Pavel Fedin)
+Date: Wed, 28 Oct 2015 12:36:05 +0300
+Subject: [PATCH] ARM: exynos: Bring back reboot on Exynos5410
+Message-ID: <1446024965-8508-1-git-send-email-p.fedin@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 28, 2015 at 12:05 AM, Simon Horman
-<horms+renesas@verge.net.au> wrote:
-> From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
->
-> Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+Since 8cfc7fdd33080e30b86d21b1a8c9ad0686427ddc ("ARM: EXYNOS: move restart
+code into pmu driver") PMU support is required in order for the reboot to
+work. Unfortunately, there is currently no PMU support for 5410.
 
-Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
+This patch adds exynos5410-pmu to the list of recognized devices. It is
+okay for the code to have empty struct exynos_pmu_data, in this case only
+minimal support is enabled. This is enough for SWRESET to work.
 
-Gr{oetje,eeting}s,
+Signed-off-by: Pavel Fedin <p.fedin@samsung.com>
+---
+ arch/arm/mach-exynos/pmu.c | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+diff --git a/arch/arm/mach-exynos/pmu.c b/arch/arm/mach-exynos/pmu.c
+index de68938..7b9e33c 100644
+--- a/arch/arm/mach-exynos/pmu.c
++++ b/arch/arm/mach-exynos/pmu.c
+@@ -908,6 +908,10 @@ static const struct exynos_pmu_data exynos5250_pmu_data = {
+ 	.powerdown_conf	= exynos5_powerdown_conf,
+ };
+ 
++static struct exynos_pmu_data exynos5410_pmu_data = {
++	/* Only SWRESET is currently supported on 5410 */
++};
++
+ static struct exynos_pmu_data exynos5420_pmu_data = {
+ 	.pmu_config	= exynos5420_pmu_config,
+ 	.pmu_init	= exynos5420_pmu_init,
+@@ -934,6 +938,9 @@ static const struct of_device_id exynos_pmu_of_device_ids[] = {
+ 		.compatible = "samsung,exynos5250-pmu",
+ 		.data = &exynos5250_pmu_data,
+ 	}, {
++		.compatible = "samsung,exynos5410-pmu",
++		.data = &exynos5410_pmu_data,
++	}, {
+ 		.compatible = "samsung,exynos5420-pmu",
+ 		.data = &exynos5420_pmu_data,
+ 	},
+-- 
+2.4.4
