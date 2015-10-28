@@ -1,52 +1,38 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 28 Oct 2015 15:21:31 +0000
-Subject: [PATCH] arm64: ftrace: function_graph: dump real return addr in
- call trace
-In-Reply-To: <5628340F.5080902@huawei.com>
-References: <1444911155-17480-1-git-send-email-huawei.libin@huawei.com>
- <6277407.jveniKQDxt@wuerfel> <20151015125133.GA29301@arm.com>
- <20151015101812.7cb6e917@gandalf.local.home>
- <20151020153227.GL11226@e104818-lin.cambridge.arm.com>
- <5628340F.5080902@huawei.com>
-Message-ID: <20151028152130.GF18966@arm.com>
+Date: Wed, 28 Oct 2015 15:23:45 +0000
+Subject: [PATCH v3 0/7] arm64: ftrace: fix incorrect output from stack
+ tracer
+In-Reply-To: <1444298504-10392-1-git-send-email-takahiro.akashi@linaro.org>
+References: <1444298504-10392-1-git-send-email-takahiro.akashi@linaro.org>
+Message-ID: <20151028152344.GG18966@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 22, 2015 at 08:55:43AM +0800, libin wrote:
-> ? 2015/10/20 23:32, Catalin Marinas ??:
-> >On Thu, Oct 15, 2015 at 10:18:12AM -0400, Steven Rostedt wrote:
-> >>On Thu, 15 Oct 2015 13:51:33 +0100
-> >>Will Deacon <will.deacon@arm.com> wrote:
-> >>
-> >>>Is this the same old problem caused by e306dfd06fcb ("ARM64: unwind: Fix
-> >>>PC calculation")? I've said previously that I'm happy to revert that if
-> >>>we're the only architecture with this behaviour, but Akashi resisted
-> >>>because there are other issues with ftrace that he was hoping to address
-> >>>and they would resolve this too.
-> >>
-> >>Just a reference, but this patch is pretty much exactly what x86
-> >>currently has. I wonder if I should make that function generic for all
-> >>archs to use.
-> >>
-> >>If you accept this patch, I can look at what archs do and pull out the
-> >>common code and place it into the core code and have the archs call
-> >>that instead.
-> >
-> >The difference I see from the sh and x86 version is that we have this -4
-> >on arm64, introduced by e306dfd06fcb as Will mentioned above (it seemed
-> >to have caused more problems that it solved). I think we should revert
-> >that commit first just to be in line with other architectures and then
-> >apply additional fixes as needed.
-> >
-> >Question for Li Bin: is your patch still needed if we revert commit
-> >e306dfd06fcb?
-> >
+On Thu, Oct 08, 2015 at 07:01:37PM +0900, AKASHI Takahiro wrote:
+> This is the third patch series for fixing stack tracer on arm64.
+> The original issue was reported by Jungseok[1], and then I found more
+> issues[2].
+> (Steven, Jungseok, sorry for not replying to your comments directly.)
 > 
-> It still be needed, but it can be implemented in generic for all archs
-> as Steve suggested.
+> I address here all the issues and implement fixes described in [2] except
+> for interrupt-triggered problems, ie. II-3). Recent discussions[3] about
+> introducing a dedicated interrupt stack suggests that we may avoid walking
+> through from an interrupt stack to a process stack.
+> (So interrupt-stack patch is a prerequisite.)
+> 
+> Basically,
+> patch1 corresponds to the original issue.
+> patch2 is a proactive improvement of function_graph tracer. 
+> patch3 corresponds to II-4(functions under function_graph tracer).
+> patch4 corresponds to II-5(leaf function).
+> patch5, 6 and 7 correspond to II-1(slurping stack) and II-2(differences
+> between x86 and arm64).
+> 
+> Each fix can be applied independently, but if patch5, 6 and 7 are
+> acceptable, patch1 is not necessary because patch7 replaces a default
+> stack tracer.
 
-Well, there's still an argument for reverting e306dfd06fcb because it
-makes us behave differently to other architectures (in particular,
-arch/arm).
+Given the comments and kbuild robot build errors, do you plan to post a
+new version of this series?
 
 Will
