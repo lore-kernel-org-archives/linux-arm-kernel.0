@@ -1,90 +1,31 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Wed, 28 Oct 2015 07:32:28 -0500
-Subject: [PATCH v5] PCI: Xilinx-NWL-PCIe: Added support for Xilinx NWL
- PCIe Host Controller
-In-Reply-To: <8520D5D51A55D047800579B0941471980169316D@XAP-PVEXMBX01.xlnx.xilinx.com>
-References: <1445871386-2377-1-git-send-email-bharatku@xilinx.com>
- <20151027234032.GA7238@localhost>
- <8520D5D51A55D047800579B0941471980169316D@XAP-PVEXMBX01.xlnx.xilinx.com>
-Message-ID: <20151028123228.GA30510@localhost>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 28 Oct 2015 12:33:58 +0000
+Subject: [PATCHv2] arm: perf: Add event descriptions
+In-Reply-To: <20151027173238.GE22049@arm.com>
+References: <20151007182735.GA18706@dreric01-gentoo.localdomain>
+ <20151009101338.GH26278@arm.com>
+ <20151022140557.GA2154@dreric01-gentoo.localdomain>
+ <20151027173238.GE22049@arm.com>
+Message-ID: <20151028123358.GC25451@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 28, 2015 at 10:17:22AM +0000, Bharat Kumar Gogada wrote:
-> > On Mon, Oct 26, 2015 at 08:26:26PM +0530, Bharat Kumar Gogada wrote:
-> > > Adding PCIe Root Port driver for Xilinx PCIe NWL bridge IP.
+On Tue, Oct 27, 2015 at 05:32:38PM +0000, Will Deacon wrote:
+> On Thu, Oct 22, 2015 at 07:05:58AM -0700, Drew Richardson wrote:
+> > On Fri, Oct 09, 2015 at 03:13:38AM -0700, Will Deacon wrote:
+> > > Also, would you be able to do something similar for AArch64 too, please?
+> > > (take a look at our for-next/core branch for the latest perf changes).
+> > 
+> > Here are some almost identical patches for AArch64 based on arm64
+> > tree's for-next/core branch. Please note that this is dependent on
+> > some change to drivers/perf/arm_pmu.c so that pmu.attr_groups is
+> > preserved.
 > 
-> > > +
-> > > +	while ((status = nwl_bridge_readl(pcie, MSGF_MSI_STATUS_LO)) !=
-> > 0) {
-> > > +		for_each_set_bit(bit, &status, 32) {
-> > > +			nwl_bridge_writel(pcie, 1 << bit,
-> > MSGF_MSI_STATUS_LO);
-> > > +			virq = irq_find_mapping(msi->dev_domain, bit);
-> > > +			if (virq)
-> > > +				generic_handle_irq(virq);
-> > > +		}
-> > > +	}
-> > > +
-> > > +	chained_irq_exit(chip, desc);
-> > > +}
-> > 
-> > These are basically identical.  Can you factor them out somehow to avoid
-> > repeating the code?
-> 
-> Is it okay if irq_set_chained_handler_and_data being invoked with two different interrupt numbers, but pointing to 
-> same interrupt handler?
+> Has a revised version of that prerequisite patch been posted anywhere? I
+> can't seem to find it in my inbox...
 
-Yes, that should be fine.
+I've just posted it [1], having had the chance to test it.
 
-> > > +
-> > > +	pcie->legacy_irq_domain =
-> > irq_domain_add_linear(legacy_intc_node, 4,
-> > > +
-> > 	&legacy_domain_ops,
-> > > +							pcie);
-> > > +
-> > > +	if (!pcie->legacy_irq_domain) {
-> > > +		dev_err(pcie->dev, "failed to create IRQ domain\n");
-> > > +		return -ENOMEM;
-> > > +	}
-> > > +
-> > > +#ifdef CONFIG_PCI_MSI
-> > > +	msi->dev_domain = irq_domain_add_linear(NULL,
-> > INT_PCI_MSI_NR,
-> > > +					&dev_msi_domain_ops, pcie);
-> > > +	if (!msi->dev_domain) {
-> > > +		dev_err(pcie->dev, "failed to create dev IRQ domain\n");
-> > > +		return -ENOMEM;
-> > > +	}
-> > > +	msi->msi_chip.domain = pci_msi_create_irq_domain(node,
-> > > +
-> > 	&nwl_msi_domain_info,
-> > > +							msi->dev_domain);
-> > > +	if (!msi->msi_chip.domain) {
-> > > +		dev_err(pcie->dev, "failed to create msi IRQ domain\n");
-> > > +		irq_domain_remove(msi->dev_domain);
-> > > +		return -ENOMEM;
-> > > +	}
-> > > +#endif
-> > > +	return 0;
-> > > +}
-> > > +
-> > > +static int nwl_pcie_enable_msi(struct nwl_pcie *pcie, struct pci_bus
-> > > +*bus) {
-> > 
-> > It looks strange to have all the "#ifdef CONFIG_PCI_MSI" above, and here
-> > we have this long MSI-related function without any ifdefs around it.  Seems
-> > like this should be ifdef'ed also?  What about nwl_pcie_msi_handler_high(),
-> > nwl_pcie_msi_handler_low(), nwl_compose_msi_msg(),
-> > nwl_msi_set_affinity(), etc.?
-> > 
-> In probe I'm invoking "nwl_pcie_enable_msi" using "if (IS_ENABLED(CONFIG_PCI_MSI)) " check, since this is at run time 
-> I haven't kept above mentioned functions under #ifdef CONFIG_PCI_MSI.
-> The above MSI domain allocation was under ifdef, since if driver was compiled for legacy some of the MSI hierarchy API's and structures aren't available.
+Mark.
 
-OK.  It *looks* strange, but maybe it's the best we can do.  I'm not
-enamored of IS_ENABLED() thing yet; I guess I just haven't
-internalized the combination compile-time and run-time behavior.
-
-Bjorn
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-October/381480.html
