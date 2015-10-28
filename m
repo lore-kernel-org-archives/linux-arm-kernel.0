@@ -1,38 +1,51 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Wed, 28 Oct 2015 18:23:57 +0000
-Subject: [PATCH 02/19] Documentation: devicetree: fix reference to legacy
- wakeup properties
-In-Reply-To: <CAL_JsqJ+5RNCehN9izgChf1fXhctzf+ShevjdAGnW5jF1GsAXw@mail.gmail.com>
-References: <1445422216-29375-1-git-send-email-sudeep.holla@arm.com>
- <1445422216-29375-3-git-send-email-sudeep.holla@arm.com>
- <CAL_JsqJ+5RNCehN9izgChf1fXhctzf+ShevjdAGnW5jF1GsAXw@mail.gmail.com>
-Message-ID: <563112BD.2050700@arm.com>
+From: nicola@corna.info (Nicola Corna)
+Date: Wed, 28 Oct 2015 18:35:17 +0000
+Subject: [PATCH v4 4/4] iio: humidity: si7020: added No Hold read mode
+In-Reply-To: <5630977D.2020102@metafoo.de>
+References: <5630977D.2020102@metafoo.de>
+ <f113de76b2369d404909cfc5158feca4@rainloop.corna.info>
+ <1446015506-21371-1-git-send-email-nicola@corna.info>
+Message-ID: <aa9c6c7ffdd5083c110cb35723081dbf@rainloop.corna.info>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+October 28 2015 10:38 AM, "Lars-Peter Clausen" <lars@metafoo.de> wrote:
 
+> On 10/28/2015 07:58 AM, Nicola Corna wrote:
+> [...]
+> 
+>> + holdmode = !((*client)->adapter->quirks &&
+>> + (*client)->adapter->quirks->flags &
+> 
+> [...]
+> 
+>> + client->adapter->quirks &&
+>> + client->adapter->quirks->flags & I2C_AQ_NO_CLK_STRETCH)
+> 
+> This is rather ugly, can we get a helper in the I2C core something along the
+> lines of
+> 
+> i2c_check_quirks(client->adapter, I2C_AQ_NO_CLK_STRETCH)
+> 
+> - Lars
 
-On 21/10/15 23:04, Rob Herring wrote:
-> On Wed, Oct 21, 2015 at 5:09 AM, Sudeep Holla <sudeep.holla@arm.com> wrote:
->> This patch marks all the reference to the legacy wakeup bindings
->> and replaces them with the standard "wakeup-source" property.
->>
->> All these legacy property are also listed under a separate section in
->> the generic wakeup-source binding document.
->>
->> Cc: Rob Herring <robh+dt@kernel.org>
->> Cc: Pawel Moll <pawel.moll@arm.com>
->> Cc: Mark Rutland <mark.rutland@arm.com>
->> Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
->> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
->
-> Acked-by: Rob Herring <robh@kernel.org>
->
+Something like this?
 
-Thanks Rob, can you take these couple(first two) of DT binding patches
-via devicetree. I can then push remaining patches via respective trees
-later.
+---
+diff --git a/include/linux/i2c.h b/include/linux/i2c.h
+index a69a9a0..a06ffc0 100644
+--- a/include/linux/i2c.h
++++ b/include/linux/i2c.h
+@@ -613,6 +613,12 @@ static inline int i2c_check_functionality(struct i2c_adapter *adap, u32 func)
+return (func & i2c_get_functionality(adap)) == func;
+}
 
--- 
-Regards,
-Sudeep
++/* Return 1 if adapter has the specified quirks, 0 if not. */
++static inline int i2c_check_quirks(struct i2c_adapter *adap, u64 quirks)
++{
++ return (quirks & (adap->quirks ? adap->quirks->flags : 0)) == quirks;
++}
++
+/* Return the adapter number for a specific adapter */
+static inline int i2c_adapter_id(struct i2c_adapter *adap)
+{
