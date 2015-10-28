@@ -1,98 +1,56 @@
-From: drew.richardson@arm.com (Drew Richardson)
-Date: Wed, 28 Oct 2015 07:45:54 -0700
-Subject: [PATCHv2] drivers/perf: kill armpmu_register
-In-Reply-To: <1446035537-12854-1-git-send-email-mark.rutland@arm.com>
-References: <1446035537-12854-1-git-send-email-mark.rutland@arm.com>
-Message-ID: <20151028144553.GA12173@dreric01-gentoo.localdomain>
+From: timur@codeaurora.org (Timur Tabi)
+Date: Wed, 28 Oct 2015 09:51:35 -0500
+Subject: [PATCH v13 2/5] uart: pl011: Introduce register accessor
+In-Reply-To: <5630DA2A.4050803@hurleysoftware.com>
+References: <1438328959-16177-1-git-send-email-jun.nie@linaro.org>
+ <1438328959-16177-3-git-send-email-jun.nie@linaro.org>
+ <55FBECCD.2080906@arm.com>
+ <CAOZdJXUZDTzEn4f4FGhmKfq7HeEFKPKp4BAbR6_=wXGVw5_0GQ@mail.gmail.com>
+ <5630DA2A.4050803@hurleysoftware.com>
+Message-ID: <5630E0F7.9080705@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 28, 2015 at 12:32:17PM +0000, Mark Rutland wrote:
-> Nothing outside of drivers/perf/arm_pmu.c should call armpmu_register
-> any more, so it no longer needs to be in include/linux/perf/arm_pmu.h.
-> Additionally, by folding it in to arm_pmu_device_probe we can allow
-> drivers to override struct pmu fields without getting blatted by the
-> armpmu code.
-> 
-> This patch folds armpmu_register into arm_pmu_device_probe. The logging
-> to the console is moved to after the PMU is successfully registered with
-> the core perf code.
-> 
-> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-> Suggested-by: Will Deacon <will.deacon@arm.com>
-> Cc: Drew Richardson <drew.richardson@arm.com>
-> Cc: Pawel Moll <pawel.moll@arm.com>
-> ---
->  drivers/perf/arm_pmu.c       | 15 ++++++---------
->  include/linux/perf/arm_pmu.h |  2 --
->  2 files changed, 6 insertions(+), 11 deletions(-)
-> 
-> Since v1 [1]
-> * Call armpmu_init before the PMU init_fn
-> 
-> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-October/378064.html
-> 
-> diff --git a/drivers/perf/arm_pmu.c b/drivers/perf/arm_pmu.c
-> index f346960..6186882 100644
-> --- a/drivers/perf/arm_pmu.c
-> +++ b/drivers/perf/arm_pmu.c
-> @@ -583,14 +583,6 @@ static void armpmu_init(struct arm_pmu *armpmu)
->  	};
->  }
->  
-> -int armpmu_register(struct arm_pmu *armpmu, int type)
-> -{
-> -	armpmu_init(armpmu);
-> -	pr_info("enabled with %s PMU driver, %d counters available\n",
-> -			armpmu->name, armpmu->num_events);
-> -	return perf_pmu_register(&armpmu->pmu, armpmu->name, type);
-> -}
-> -
->  /* Set at runtime when we know what CPU type we are. */
->  static struct arm_pmu *__oprofile_cpu_pmu;
->  
-> @@ -913,6 +905,8 @@ int arm_pmu_device_probe(struct platform_device *pdev,
->  		return -ENOMEM;
->  	}
->  
-> +	armpmu_init(pmu);
-> +
->  	if (!__oprofile_cpu_pmu)
->  		__oprofile_cpu_pmu = pmu;
->  
-> @@ -938,10 +932,13 @@ int arm_pmu_device_probe(struct platform_device *pdev,
->  	if (ret)
->  		goto out_free;
->  
-> -	ret = armpmu_register(pmu, -1);
-> +	ret = perf_pmu_register(&pmu->pmu, pmu->name, -1);
->  	if (ret)
->  		goto out_destroy;
->  
-> +	pr_info("enabled with %s PMU driver, %d counters available\n",
-> +			pmu->name, pmu->num_events);
-> +
->  	return 0;
->  
->  out_destroy:
-> diff --git a/include/linux/perf/arm_pmu.h b/include/linux/perf/arm_pmu.h
-> index bfa673b..83b5e34 100644
-> --- a/include/linux/perf/arm_pmu.h
-> +++ b/include/linux/perf/arm_pmu.h
-> @@ -111,8 +111,6 @@ struct arm_pmu {
->  
->  #define to_arm_pmu(p) (container_of(p, struct arm_pmu, pmu))
->  
-> -int armpmu_register(struct arm_pmu *armpmu, int type);
-> -
->  u64 armpmu_event_update(struct perf_event *event);
->  
->  int armpmu_event_set_period(struct perf_event *event);
-> -- 
-> 1.9.1
-> 
+On 10/28/2015 09:22 AM, Peter Hurley wrote:
+> EARLYCON_DECLARE(zte, zte_early_console_setup);
+> OF_EARLYCON_DECLARE(zte, ".......", zte_early_console_setup);
+> EARLYCON_DECLARE(sbsa32, sbsa32_early_console_setup);
+> OF_EARLYCON_DECLARE(sbsa32, "arm,sbsa-uart", sbsa32_early_console_setup);
+>
+> The above assumes that the sbsa32 maintains the equivalence of
+> earlycon and console; ie., that
+>
+> / {
+> 	chosen {
+> 		stdout-path = &uart0;
+> 	};
+>
+> 	soc {
+> 		uart0: serial at xxxxxx {
+> 			compatible = "arm,sbsa-uart";
+> 		};
+> 	};
+> };
+>
+>
+> will start a sbsa32 earlycon and later replace that with
+> sbsa console.
 
-This works great and I no longer need to copy attr_groups in
-armpmu_init. Thank you Mark.
+I never really understood the device tree support for SBSA.  The "S" 
+stands for Server, and ARM Server systems are supposed to use ACPI. 
+It's easy to add special cases via device tree, because of its 
+flexibility.  ACPI is much more difficult, and that's why I used the 
+command-line approach.
 
-Drew
+Anyway, I found this alternate patch from Lief Lindholm that implements 
+this idea better, although it needs work:
+
+https://patches.linaro.org/53265/
+
+
+
+
+-- 
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the
+Code Aurora Forum, a Linux Foundation Collaborative Project.
