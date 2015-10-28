@@ -1,39 +1,79 @@
-From: Nathan_Lynch@mentor.com (Nathan Lynch)
-Date: Wed, 28 Oct 2015 07:51:05 -0500
-Subject: typo in recent linux commit?
-In-Reply-To: <30294E2E-4011-4B50-BD26-787977A3F3BB@goldelico.com>
-References: <CAPKXbB6Y9esdQm-VevEfhTggA30vmFY424mwiTK9wZR=wORRHg@mail.gmail.com>
- <30294E2E-4011-4B50-BD26-787977A3F3BB@goldelico.com>
-Message-ID: <5630C4B9.7080404@mentor.com>
+From: eric.auger@linaro.org (Eric Auger)
+Date: Wed, 28 Oct 2015 13:02:31 +0000
+Subject: [PATCH v5 0/7] VFIO platform reset module rework
+Message-ID: <1446037358-2079-1-git-send-email-eric.auger@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/28/2015 03:41 AM, H.Nikolaus Schaller wrote:
-> Hi,
-> 
-> Am 28.10.2015 um 09:19 schrieb Efraim Yawitz <efraim.yawitz@gmail.com>:
-> 
->> Hi,
->>
->> I was just browsing recent commits to the linux kernel tree, and I saw this in a change to arch/arm/vdso/vdsomunge.c:
->>
->> +#define swab32(x) \
->>    + ((((x) & 0x000000ff) << 24) | \
->>    + (((x) & 0x0000ff00) << 8) | \
->>    + (((x) & 0x00ff0000) >> 8) | \
->>    + (((x) & 0xff000000) << 24))
->>
->>
->> Shouldn't that last '<<' be a '>>'?
->>
->> Ephraim Yawitz
-> 
-> Yes, you are right! Thanks for spotting this.
-> It appears that it was introduced during code simplification.
-> 
-> @maintainers: should I write another patch or can you more easily replace the original one?
+This series fixes the current implementation by getting rid of the
+usage of __symbol_get which caused a compilation issue with
+CONFIG_MODULES disabled. On top of this, the usage of MODULE_ALIAS makes
+possible to add a new reset module without being obliged to update the
+framework. The new implementation relies on the reset module registering
+its reset function to the vfio-platform driver.
 
-As the regression is already in Linus' tree, it needs an incremental
-patch.  Please also credit Ephraim with a Reported-by: .
+The series is available at
 
-Thanks.
+https://git.linaro.org/people/eric.auger/linux.git/shortlog/refs/heads/v4.3-rc7-rework-v5
+
+Best Regards
+
+Eric
+
+v4 -> v5:
+- no code change
+- only added Arnd's new R-b
+
+v3 -> v4:
+- Remove the EXPORT_SYMBOL_GPL(vfio_platform_calxedaxgmac_reset) later
+  in [6/7], to keep the functionality working all along the series
+- Add Arnd R-b (I dared to keep them despite the above change)
+- vfio_platform_unregister_reset gets the reset function to do a double
+  check on the compat and the function pointer too
+- __vfio_platform_register_reset turned to 'void'
+
+v2 -> v3:
+- use driver_mutex instead of reset_mutex
+- style fixes: single mutex_unlock
+- use static nodes; vfio_platform_register_reset now is a macro
+- vfio_platform_reset_private.h removed since reset_module_(un)register
+  disappear. No use of symbol_get anymore.
+- new patch introducing vfio-platform-base
+- reset look-up moved back at vfio-platform probe time
+- new patch featuring dev_info/dev_warn
+
+v1 -> v2:
+* in vfio_platform_common.c:
+  - move reset lookup at load time and put reset at release: this is to
+    prevent a race between the 2 load module loads
+  - reset_list becomes static
+  - vfio_platform_register/unregister_reset take a const char * as compat
+  - fix node link
+  - remove old combo struct and cleanup proto of vfio_platform_get_reset
+  - add mutex to protect the reset list
+* in calxeda xgmac reset module
+  - introduce vfio_platform_reset_private.h
+  - use module_vfio_reset_handler macro
+  - do not export vfio_platform_calxedaxgmac_reset symbol anymore
+  - add a pr_info to show the device is reset by vfio reset module
+
+
+Eric Auger (7):
+  vfio: platform: introduce vfio-platform-base module
+  vfio: platform: add capability to register a reset function
+  vfio: platform: introduce module_vfio_reset_handler macro
+  vfio: platform: reset: calxedaxgmac: add reset function registration
+  vfio: platform: add compat in vfio_platform_device
+  vfio: platform: use list of registered reset function
+  vfio: platform: add dev_info on device reset
+
+ drivers/vfio/platform/Makefile                     |   6 +-
+ .../platform/reset/vfio_platform_calxedaxgmac.c    |   5 +-
+ drivers/vfio/platform/vfio_amba.c                  |   1 +
+ drivers/vfio/platform/vfio_platform.c              |   1 +
+ drivers/vfio/platform/vfio_platform_common.c       | 119 +++++++++++++++------
+ drivers/vfio/platform/vfio_platform_private.h      |  40 ++++++-
+ 6 files changed, 130 insertions(+), 42 deletions(-)
+
+-- 
+1.9.1
