@@ -1,35 +1,42 @@
-From: hns@goldelico.com (H. Nikolaus Schaller)
-Date: Wed, 28 Oct 2015 09:41:20 +0100
-Subject: typo in recent linux commit?
-In-Reply-To: <CAPKXbB6Y9esdQm-VevEfhTggA30vmFY424mwiTK9wZR=wORRHg@mail.gmail.com>
-References: <CAPKXbB6Y9esdQm-VevEfhTggA30vmFY424mwiTK9wZR=wORRHg@mail.gmail.com>
-Message-ID: <30294E2E-4011-4B50-BD26-787977A3F3BB@goldelico.com>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Wed, 28 Oct 2015 09:49:09 +0100
+Subject: [PATCH 2/5] cpufreq: imx6q: Fix wrong device in devm_kzalloc
+In-Reply-To: <1446019154-16384-3-git-send-email-s.hauer@pengutronix.de>
+References: <1446019154-16384-1-git-send-email-s.hauer@pengutronix.de>
+ <1446019154-16384-3-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1446022149.3138.5.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-Am 28.10.2015 um 09:19 schrieb Efraim Yawitz <efraim.yawitz@gmail.com>:
-
-> Hi,
+Am Mittwoch, den 28.10.2015, 08:59 +0100 schrieb Sascha Hauer:
+> devm_kzalloc must be called with the device that is actually probed,
+> not with cpu_dev which resources are not freed when probe fails.
 > 
-> I was just browsing recent commits to the linux kernel tree, and I saw this in a change to arch/arm/vdso/vdsomunge.c:
-> 
-> +#define swab32(x) \
->    + ((((x) & 0x000000ff) << 24) | \
->    + (((x) & 0x0000ff00) << 8) | \
->    + (((x) & 0x00ff0000) >> 8) | \
->    + (((x) & 0xff000000) << 24))
-> 
-> 
-> Shouldn't that last '<<' be a '>>'?
-> 
-> Ephraim Yawitz
+> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
 
-Yes, you are right! Thanks for spotting this.
-It appears that it was introduced during code simplification.
+I think I've said this already on the last round,
 
-@maintainers: should I write another patch or can you more easily replace the original one?
+Reviewed-by: Lucas Stach <l.stach@pengutronix.de>
 
-BR,
-Nikolaus Schaller
+> ---
+>  drivers/cpufreq/imx6q-cpufreq.c | 3 ++-
+>  1 file changed, 2 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/cpufreq/imx6q-cpufreq.c b/drivers/cpufreq/imx6q-cpufreq.c
+> index fabd144..6fefd19 100644
+> --- a/drivers/cpufreq/imx6q-cpufreq.c
+> +++ b/drivers/cpufreq/imx6q-cpufreq.c
+> @@ -260,7 +260,8 @@ static int imx6q_cpufreq_probe(struct platform_device *pdev)
+>  	}
+>  
+>  	/* Make imx6_soc_volt array's size same as arm opp number */
+> -	imx6_soc_volt = devm_kzalloc(cpu_dev, sizeof(*imx6_soc_volt) * num, GFP_KERNEL);
+> +	imx6_soc_volt = devm_kzalloc(&pdev->dev,
+> +				     sizeof(*imx6_soc_volt) * num, GFP_KERNEL);
+>  	if (imx6_soc_volt == NULL) {
+>  		ret = -ENOMEM;
+>  		goto free_freq_table;
+
+-- 
+Pengutronix e.K.             | Lucas Stach                 |
+Industrial Linux Solutions   | http://www.pengutronix.de/  |
