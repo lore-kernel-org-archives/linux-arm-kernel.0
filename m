@@ -1,64 +1,26 @@
-From: ykk@rock-chips.com (Yakir Yang)
-Date: Wed, 28 Oct 2015 16:31:08 +0800
-Subject: [PATCH v8 11/17] dt-bindings: add document for rockchip dp phy
-In-Reply-To: <1446020143-32645-1-git-send-email-ykk@rock-chips.com>
-References: <1446020143-32645-1-git-send-email-ykk@rock-chips.com>
-Message-ID: <1446021068-11655-1-git-send-email-ykk@rock-chips.com>
+From: liam.r.girdwood@linux.intel.com (Liam Girdwood)
+Date: Wed, 28 Oct 2015 08:34:25 +0000
+Subject: [PATCH] ASoC: dpcm: Make BE prepare possible in suspend state
+In-Reply-To: <1445998534-38246-1-git-send-email-koro.chen@mediatek.com>
+References: <1445998534-38246-1-git-send-email-koro.chen@mediatek.com>
+Message-ID: <1446021265.2443.3.camel@loki>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add dt binding documentation for rockchip display port PHY.
+On Wed, 2015-10-28 at 10:15 +0800, Koro Chen wrote:
+> During suspend/resume, there is a flow that if a driver does not support
+> SNDRV_PCM_INFO_RESUME, it will fail at snd_pcm_resume(), and user space
+> can then issue SNDRV_PCM_IOCTL_PREPARE to let audio continue to play.
+> 
+> However, in dpcm_be_dai_prepare() it only allows BEs to be prepared
+> in state SND_SOC_DPCM_STATE_HW_PARAMS or SND_SOC_DPCM_STATE_STOP.
+> The BE state will then stay in SND_SOC_DPCM_STATE_SUSPEND, consequently
+> dpcm_be_dai_shutdown() is skipped in the end of playback and
+> be_substream->runtime is not cleared while this runtime is actually freed
+> by snd_pcm_detach_substream(). If another suspend comes, a NULL pointer
+> dereference will happen in snd_pcm_suspend() when accessing
+> BE substream's runtime.
+> 
+> Signed-off-by: Koro Chen <koro.chen@mediatek.com>
 
-Reviewed-by: Heiko Stuebner <heiko@sntech.de>
-Signed-off-by: Yakir Yang <ykk@rock-chips.com>
----
-Changes in v8:
-- Remove the specific address in the example node name. (Heiko)
-
-Changes in v7:
-- Simplify the commit message. (Kishon)
-
-Changes in v6: None
-Changes in v5:
-- Split binding doc's from driver changes. (Rob)
-- Update the rockchip,grf explain in document, and correct the clock required
-  elemets in document. (Rob & Heiko)
-
-Changes in v4: None
-Changes in v3: None
-Changes in v2: None
-
- .../devicetree/bindings/phy/rockchip-dp-phy.txt    | 22 ++++++++++++++++++++++
- 1 file changed, 22 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/phy/rockchip-dp-phy.txt
-
-diff --git a/Documentation/devicetree/bindings/phy/rockchip-dp-phy.txt b/Documentation/devicetree/bindings/phy/rockchip-dp-phy.txt
-new file mode 100644
-index 0000000..00902cb
---- /dev/null
-+++ b/Documentation/devicetree/bindings/phy/rockchip-dp-phy.txt
-@@ -0,0 +1,22 @@
-+Rockchip Soc Seroes Display Port PHY
-+------------------------------------
-+
-+Required properties:
-+- compatible : should be one of the following supported values:
-+	 - "rockchip.rk3288-dp-phy"
-+- clocks: from common clock binding: handle to dp clock.
-+	of memory mapped region.
-+- clock-names: from common clock binding:
-+	Required elements: "24m"
-+- rockchip,grf: phandle to the syscon managing the "general register files"
-+- #phy-cells : from the generic PHY bindings, must be 0;
-+
-+Example:
-+
-+edp_phy: edp-phy {
-+	compatible = "rockchip,rk3288-dp-phy";
-+	rockchip,grf = <&grf>;
-+	clocks = <&cru SCLK_EDP_24M>;
-+	clock-names = "24m";
-+	#phy-cells = <0>;
-+};
--- 
-1.9.1
+Acked-by: Liam Girdwood <liam.r.girdwood@linux.intel.com>
