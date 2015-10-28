@@ -1,62 +1,66 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 28 Oct 2015 17:22:08 +0000
-Subject: [PATCH] get_maintainer: Add subsystem to reviewer output
-In-Reply-To: <1446052121.2757.120.camel@perches.com>
-References: <1445971482.2757.27.camel@perches.com>
- <CAJKOXPc_w2Dc8LvkCu_d+kjZZmYScXboQrpNWdicT2yfL_5D7Q@mail.gmail.com>
- <20151028082446.GF5828@x1> <56309419.4060908@samsung.com>
- <20151028093907.GP4931@pengutronix.de> <20151028095524.GP5828@x1>
- <5630CA06.7050503@samsung.com>
- <1446050506.2757.109.camel@perches.com> <20151028170116.GI4058@x1>
- <1446052121.2757.120.camel@perches.com>
-Message-ID: <20151028172208.GJ4058@x1>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 28 Oct 2015 17:26:19 +0000
+Subject: [PATCH] arm64: efi: make sure vmlinux load address aligned on
+ 2MBytes
+In-Reply-To: <563101DD.8080508@codeaurora.org>
+References: <1445981041-8774-1-git-send-email-timur@codeaurora.org>
+ <CAKv+Gu_ivkemFva-Fu0E24mQqE-m0jPWBzo5OZAr7cyM08hqug@mail.gmail.com>
+ <563101DD.8080508@codeaurora.org>
+Message-ID: <20151028172619.GA26777@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 28 Oct 2015, Joe Perches wrote:
-
-> On Wed, 2015-10-28 at 17:01 +0000, Lee Jones wrote:
-> > On Wed, 28 Oct 2015, Joe Perches wrote:
-> > 
-> > > Reviewer output currently does not include the subsystem
-> > > that matched.  Add it.
-> > > 
-> > > Miscellanea:
-> > > 
-> > > o Add a get_subsystem_name routine to centralize this
-> > > 
-> > > Signed-off-by: Joe Perches <joe@perches.com>
-> > > ---
-> > >  scripts/get_maintainer.pl | 31 ++++++++++++++++---------------
-> > >  1 file changed, 16 insertions(+), 15 deletions(-)
-> > 
-> > It looks like I'm going to have to drop the patch where we actually
-> > start using the R: tag properly due to some social, emotional issues.
+On Wed, Oct 28, 2015 at 12:11:57PM -0500, Timur Tabi wrote:
+> On 10/27/2015 09:06 PM, Ard Biesheuvel wrote:
+> >
+> >diff --git a/arch/arm64/kernel/efi-stub.c b/arch/arm64/kernel/efi-stub.c
+> >index 816120ece6bc..a60ce249cfc0 100644
+> >--- a/arch/arm64/kernel/efi-stub.c
+> >+++ b/arch/arm64/kernel/efi-stub.c
+> >@@ -42,7 +42,8 @@
+> >                  * Mustang), we can still place the kernel at the address
+> >                  * 'dram_base + TEXT_OFFSET'.
+> >                  */
+> >-               *image_addr = *reserve_addr = dram_base + TEXT_OFFSET;
+> >+               *image_addr = *reserve_addr = round_up(dram_base, SZ_2M) +
+> >+                                                      TEXT_OFFSET);
+> >                 nr_pages = round_up(kernel_memsize, EFI_ALLOC_ALIGN) /
+> >                            EFI_PAGE_SIZE;
+> >                 status = efi_call_early(allocate_pages, EFI_ALLOCATE_ADDRESS,
 > 
-> Not to mention logical.
+> Tested-by: Timur Tabi <timur@codeaurora.org>
+> Tested-by: Shanker Donthineni <shankerd@codeaurora.org>
 
-Hmm... we continue to disagree on that one.
+I assume with the trailing ')' removed. ;)
 
-> > Despite that and not knowing Perl, I believe get_maintainer.pl should
-> > be printing out the subsystem next to 'reviewer' as it does for
-> > 'maintainer'.
-> > 
-> > So with that in mind:
-> >   Acked-by: Lee Jones <lee.jones@linaro.org>
+With that:
+
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+
+> However, I think this formatting is easier to read:
 > 
-> It'd be better if you could add a "tested-by:" instead.
+> 		*image_addr = *reserve_addr =
+> 			round_up(dram_base, SZ_2M) + TEXT_OFFSET;
 
-Patch works as expected:
-  Tested-by: Lee Jones <lee.jones@linaro.org>
+I have no strong feeling on this either way.
 
-Feel free to add my Suggested-by too, based on my belief that this
-patch was born out of this comment:
+> This does make the kernel boot, but we suspect that there may be
+> another problem.  We need to investigate it, but we have a suspicion
+> that the EFI stub is trying to allocate from the Runtime Data block,
+> and the alignment adjustment "fixes" the problem by moving the
+> pointer to Conventional Memory.
 
-      "I'm sure we can make the output even more similar by listing
-      the MAINTAINERS tag after "reviewer" too."
+I don't follow. EFI_BOOT_SERVICES.AllocatePages() should only give us
+pages which are available, so it shouldn't ever return pages which are
+runtime data -- it would fail and we'd fall back to efi_low_alloc().
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Could you elaborate?
+
+> Anyway, is there any chance we can get this fix into 4.3?  I'd hate
+> to have 4.3 released knowing that it's broken on our hardware.
+
+It's probably too late now, but it should certainly be Cc'd stable and
+get backported.
+
+Thanks,
+Mark.
