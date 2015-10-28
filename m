@@ -1,99 +1,37 @@
-From: ykk@rock-chips.com (Yakir Yang)
-Date: Wed, 28 Oct 2015 16:56:01 +0800
-Subject: [PATCH v8 14/17] drm: bridge: analogix/dp: add max link rate and lane
- count limit for RK3288
-In-Reply-To: <1446020143-32645-1-git-send-email-ykk@rock-chips.com>
-References: <1446020143-32645-1-git-send-email-ykk@rock-chips.com>
-Message-ID: <1446022561-16870-1-git-send-email-ykk@rock-chips.com>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Wed, 28 Oct 2015 17:57:05 +0900
+Subject: [PATCH] MAINTAINERS: Start using the 'reviewer' (R) tag
+In-Reply-To: <1445960557-24328-1-git-send-email-lee.jones@linaro.org>
+References: <1445960557-24328-1-git-send-email-lee.jones@linaro.org>
+Message-ID: <56308DE1.9030303@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There are some IP limit on rk3288 that only support 4 physical lanes
-of 2.7/1.6 Gbps/lane, so seprate them out by device_type flag.
+Hi Lee,
 
-Tested-by: Javier Martinez Canillas <javier@osg.samsung.com>
-Signed-off-by: Yakir Yang <ykk@rock-chips.com>
----
-Changes in v8: None
-Changes in v7: None
-Changes in v6: None
-Changes in v5: None
-Changes in v4:
-- Seprate the link-rate and lane-count limit out with the device_type
-  flag. (Thierry)
+On 2015? 10? 28? 00:42, Lee Jones wrote:
+> Since eafbaac ("MAINTAINERS: Add "R:" designated-reviewers tag") we
+> have been able to tag specific people as Reviewers.  These are key
+> individuals who are tasked with or volunteer to review code submitted
+> to a subsystem or specific file.  However, according to MAINTAINERS
+> we have 1046 Maintainers and only a mere 22 Reviewers.  I believe
+> these numbers to be incorrect, as many of these Maintainers are in
+> fact Reviewers.
+> 
+> I have taken the time to identify some of the Reviewers who pertain
+> to subsystems which I look after, and have changed their status from
+> Maintainer (collector of patches) to Reviewer (reviewer of code).
+> 
+> Signed-off-by: Lee Jones <lee.jones@linaro.org>
+> ---
+> 
+>  MAINTAINERS | 22 +++++++++++-----------
+>  1 file changed, 11 insertions(+), 11 deletions(-)
 
-Changes in v3: None
-Changes in v2: None
+Although this patch don't include the entry of drivers/extcon,
+I agree your opinion to add 'R' for Reviewer.
 
- drivers/gpu/drm/bridge/analogix/analogix_dp_core.c | 33 ++++++++++++++--------
- drivers/gpu/drm/bridge/analogix/analogix_dp_core.h |  4 +--
- 2 files changed, 23 insertions(+), 14 deletions(-)
+Acked-by: Chanwoo Choi <cw00.choi@samsung.com>
 
-diff --git a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
-index 6307060..563ffb1d 100644
---- a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
-+++ b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
-@@ -890,8 +890,8 @@ static void analogix_dp_commit(struct analogix_dp_device *dp)
- 		return;
- 	}
- 
--	ret = analogix_dp_set_link_train(dp, dp->video_info.lane_count,
--					 dp->video_info.link_rate);
-+	ret = analogix_dp_set_link_train(dp, dp->video_info.max_lane_count,
-+					 dp->video_info.max_link_rate);
- 	if (ret) {
- 		dev_err(dp->dev, "unable to do link train\n");
- 		return;
-@@ -1156,16 +1156,25 @@ static int analogix_dp_dt_parse_pdata(struct analogix_dp_device *dp)
- 	struct device_node *dp_node = dp->dev->of_node;
- 	struct video_info *video_info = &dp->video_info;
- 
--	if (of_property_read_u32(dp_node, "samsung,link-rate",
--				 &video_info->link_rate)) {
--		dev_err(dp->dev, "failed to get link-rate\n");
--		return -EINVAL;
--	}
--
--	if (of_property_read_u32(dp_node, "samsung,lane-count",
--				 &video_info->lane_count)) {
--		dev_err(dp->dev, "failed to get lane-count\n");
--		return -EINVAL;
-+	switch (dp->plat_data && dp->plat_data->dev_type) {
-+	case RK3288_DP:
-+		/*
-+		 * Like Rk3288 DisplayPort TRM indicate that "Main link
-+		 * containing 4 physical lanes of 2.7/1.62 Gbps/lane".
-+		 */
-+		video_info->max_link_rate = 0x0A;
-+		video_info->max_lane_count = 0x04;
-+		break;
-+	case EXYNOS_DP:
-+		/*
-+		 * NOTE: those property parseing code is used for
-+		 * providing backward compatibility for samsung platform.
-+		 */
-+		of_property_read_u32(dp_node, "samsung,link-rate",
-+				     &video_info->max_link_rate);
-+		of_property_read_u32(dp_node, "samsung,lane-count",
-+				     &video_info->max_lane_count);
-+		break;
- 	}
- 
- 	return 0;
-diff --git a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.h b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.h
-index e37cef6..e6f8243 100644
---- a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.h
-+++ b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.h
-@@ -129,8 +129,8 @@ struct video_info {
- 	enum color_coefficient ycbcr_coeff;
- 	enum color_depth color_depth;
- 
--	enum link_rate_type link_rate;
--	enum link_lane_count_type lane_count;
-+	enum link_rate_type max_link_rate;
-+	enum link_lane_count_type max_lane_count;
- };
- 
- struct link_train {
--- 
-1.9.1
+Thanks,
+Chanwoo Choi
