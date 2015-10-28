@@ -1,110 +1,129 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 28 Oct 2015 17:14:11 +0000
-Subject: [RFC] vfio/type1: handle case where IOMMU does not support
- PAGE_SIZE size
-In-Reply-To: <1446049648.8018.397.camel@redhat.com>
-References: <1446037965-2341-1-git-send-email-eric.auger@linaro.org>
- <1446049648.8018.397.camel@redhat.com>
-Message-ID: <20151028171410.GK18966@arm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 28 Oct 2015 10:14:41 -0700
+Subject: MUSB peripheral DMA regression caused by driver core runtime PM
+ change
+In-Reply-To: <877fmdcyzi.fsf@saruman.tx.rr.com>
+References: <20151021234134.GQ3078@atomide.com>
+ <20151022180216.GT3078@atomide.com>
+ <20151022230133.GV3078@atomide.com> <562A2D0D.3060104@ti.com>
+ <20151023163957.GW3078@atomide.com>
+ <877fmdcyzi.fsf@saruman.tx.rr.com>
+Message-ID: <20151028171441.GE3078@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 28, 2015 at 10:27:28AM -0600, Alex Williamson wrote:
-> On Wed, 2015-10-28 at 13:12 +0000, Eric Auger wrote:
-> > diff --git a/drivers/vfio/vfio_iommu_type1.c b/drivers/vfio/vfio_iommu_type1.c
-> > index 57d8c37..13fb974 100644
-> > --- a/drivers/vfio/vfio_iommu_type1.c
-> > +++ b/drivers/vfio/vfio_iommu_type1.c
-> > @@ -403,7 +403,7 @@ static void vfio_remove_dma(struct vfio_iommu *iommu, struct vfio_dma *dma)
-> >  static unsigned long vfio_pgsize_bitmap(struct vfio_iommu *iommu)
-> >  {
-> >  	struct vfio_domain *domain;
-> > -	unsigned long bitmap = PAGE_MASK;
-> > +	unsigned long bitmap = ULONG_MAX;
+* Felipe Balbi <balbi@ti.com> [151023 09:48]:
 > 
-> Isn't this and removing the WARN_ON()s the only real change in this
-> patch?  The rest looks like conversion to use IS_ALIGNED and the
-> following test, that I don't really understand...
+> Hi,
 > 
-> >  
-> >  	mutex_lock(&iommu->lock);
-> >  	list_for_each_entry(domain, &iommu->domain_list, next)
-> > @@ -416,20 +416,18 @@ static unsigned long vfio_pgsize_bitmap(struct vfio_iommu *iommu)
-> >  static int vfio_dma_do_unmap(struct vfio_iommu *iommu,
-> >  			     struct vfio_iommu_type1_dma_unmap *unmap)
-> >  {
-> > -	uint64_t mask;
-> >  	struct vfio_dma *dma;
-> >  	size_t unmapped = 0;
-> >  	int ret = 0;
-> > +	unsigned int min_pagesz = __ffs(vfio_pgsize_bitmap(iommu));
-> > +	unsigned int requested_alignment = (min_pagesz < PAGE_SIZE) ?
-> > +						PAGE_SIZE : min_pagesz;
+> Tony Lindgren <tony@atomide.com> writes:
+> > From: Tony Lindgren <tony@atomide.com>
+> > Date: Fri, 23 Oct 2015 09:03:22 -0700
+> > Subject: [PATCH] usb: musb: omap2430: Fix regression caused by driver core
+> >  change
+> >
+> > Commit ddef08dd00f5 ("Driver core: wakeup the parent device before trying
+> > probe") started automatically ensuring the parent device is enabled when
+> > the child gets probed.
+> >
+> > This however caused a regression for MUSB omap2430 interface as the
+> > runtime PM for the parent device needs the child initialized to access
+> > the MUSB hardware registers.
+> >
+> > Let's delay the enabling of PM runtime for the parent until the child
+> > has been properly initialized as suggested in an earlier patch by
+> > Grygorii Strashko <grygorii.strashko@ti.com>.
+> >
+> > In addition to delaying pm_runtime_enable, we now also need to make sure
+> > the parent is enabled during omap2430_musb_init. We also want to propagate
+> > an error from omap2430_runtime_resume if struct musb is not initialized.
+> >
+> > Note that we use pm_runtime_put_noidle here for both the child and parent
+> > to prevent an extra runtime_suspend/resume cycle.
+> >
+> > Let's also add some comments to avoid confusion between the
+> > two different devices.
+> >
+> > Fixes: ddef08dd00f5 ("Driver core: wakeup the parent device before
+> > trying probe")
+> > Suggested-by: Grygorii Strashko <grygorii.strashko@ti.com>
+> > Signed-off-by: Tony Lindgren <tony@atomide.com>
 > 
-> This one.  If we're going to support sub-PAGE_SIZE mappings, why do we
-> care to cap alignment at PAGE_SIZE?
-
-Eric can clarify, but I think the intention here is to have VFIO continue
-doing things in PAGE_SIZE chunks precisely so that we don't have to rework
-all of the pinning code etc. The IOMMU API can then deal with the smaller
-page size.
-
-> > -	mask = ((uint64_t)1 << __ffs(vfio_pgsize_bitmap(iommu))) - 1;
-> > -
-> > -	if (unmap->iova & mask)
-> > +	if (!IS_ALIGNED(unmap->iova, requested_alignment))
-> >  		return -EINVAL;
-> > -	if (!unmap->size || unmap->size & mask)
-> > +	if (!unmap->size || !IS_ALIGNED(unmap->size, requested_alignment))
-> >  		return -EINVAL;
-> >  
-> > -	WARN_ON(mask & PAGE_MASK);
-> > -
-> >  	mutex_lock(&iommu->lock);
-> >  
-> >  	/*
-> > @@ -553,25 +551,24 @@ static int vfio_dma_do_map(struct vfio_iommu *iommu,
-> >  	size_t size = map->size;
-> >  	long npage;
-> >  	int ret = 0, prot = 0;
-> > -	uint64_t mask;
-> >  	struct vfio_dma *dma;
-> >  	unsigned long pfn;
-> > +	unsigned int min_pagesz = __ffs(vfio_pgsize_bitmap(iommu));
-> > +	unsigned int requested_alignment = (min_pagesz < PAGE_SIZE) ?
-> > +						PAGE_SIZE : min_pagesz;
-> >  
-> >  	/* Verify that none of our __u64 fields overflow */
-> >  	if (map->size != size || map->vaddr != vaddr || map->iova != iova)
-> >  		return -EINVAL;
-> >  
-> > -	mask = ((uint64_t)1 << __ffs(vfio_pgsize_bitmap(iommu))) - 1;
-> > -
-> > -	WARN_ON(mask & PAGE_MASK);
-> > -
-> >  	/* READ/WRITE from device perspective */
-> >  	if (map->flags & VFIO_DMA_MAP_FLAG_WRITE)
-> >  		prot |= IOMMU_WRITE;
-> >  	if (map->flags & VFIO_DMA_MAP_FLAG_READ)
-> >  		prot |= IOMMU_READ;
-> >  
-> > -	if (!prot || !size || (size | iova | vaddr) & mask)
-> > +	if (!prot || !size ||
-> > +		!IS_ALIGNED(size | iova | vaddr, requested_alignment))
-> >  		return -EINVAL;
-> >  
-> >  	/* Don't allow IOVA or virtual address wrap */
+> I'm fine with this patch to fix this v4.3 regression. Greg, do you want
+> a pull request or can you take this in as a patch ? In any case:
 > 
-> This is mostly ignoring the problems with sub-PAGE_SIZE mappings.  For
-> instance, we can only pin on PAGE_SIZE and therefore we only do
-> accounting on PAGE_SIZE, so if the user does 4K mappings across your 64K
-> page, that page gets pinned and accounted 16 times.  Are we going to
-> tell users that their locked memory limit needs to be 16x now?  The rest
-> of the code would need an audit as well to see what other sub-page bugs
-> might be hiding.  Thanks,
+> Acked-by: Felipe Balbi <balbi@ti.com>
 
-I don't see that. The pinning all happens the same in VFIO, which can
-then happily pass a 64k region to iommu_map. iommu_map will then call
-->map in 4k chunks on the IOMMU driver ops.
+OK no response for a few days, so I'll pick this up into omap-for-v4.3/fixes
+as I have another fix there too.
 
-Will
+Regards,
+
+Tony
+
+
+> > --- a/drivers/usb/musb/omap2430.c
+> > +++ b/drivers/usb/musb/omap2430.c
+> > @@ -391,9 +391,20 @@ static int omap2430_musb_init(struct musb *musb)
+> >  	}
+> >  	musb->isr = omap2430_musb_interrupt;
+> >  
+> > +	/*
+> > +	 * Enable runtime PM for musb parent (this driver). We can't
+> > +	 * do it earlier as struct musb is not yet allocated and we
+> > +	 * need to touch the musb registers for runtime PM.
+> > +	 */
+> > +	pm_runtime_enable(glue->dev);
+> > +	status = pm_runtime_get_sync(glue->dev);
+> > +	if (status < 0)
+> > +		goto err1;
+> > +
+> >  	status = pm_runtime_get_sync(dev);
+> >  	if (status < 0) {
+> >  		dev_err(dev, "pm_runtime_get_sync FAILED %d\n", status);
+> > +		pm_runtime_put_sync(glue->dev);
+> >  		goto err1;
+> >  	}
+> >  
+> > @@ -426,6 +437,7 @@ static int omap2430_musb_init(struct musb *musb)
+> >  	phy_power_on(musb->phy);
+> >  
+> >  	pm_runtime_put_noidle(musb->controller);
+> > +	pm_runtime_put_noidle(glue->dev);
+> >  	return 0;
+> >  
+> >  err1:
+> > @@ -626,7 +638,11 @@ static int omap2430_probe(struct platform_device *pdev)
+> >  		goto err2;
+> >  	}
+> >  
+> > -	pm_runtime_enable(&pdev->dev);
+> > +	/*
+> > +	 * Note that we cannot enable PM runtime yet for this
+> > +	 * driver as we need struct musb initialized first.
+> > +	 * See omap2430_musb_init above.
+> > +	 */
+> >  
+> >  	ret = platform_device_add(musb);
+> >  	if (ret) {
+> > @@ -675,11 +691,12 @@ static int omap2430_runtime_resume(struct device *dev)
+> >  	struct omap2430_glue		*glue = dev_get_drvdata(dev);
+> >  	struct musb			*musb = glue_to_musb(glue);
+> >  
+> > -	if (musb) {
+> > -		omap2430_low_level_init(musb);
+> > -		musb_writel(musb->mregs, OTG_INTERFSEL,
+> > -				musb->context.otg_interfsel);
+> > -	}
+> > +	if (!musb)
+> > +		return -EPROBE_DEFER;
+> > +
+> > +	omap2430_low_level_init(musb);
+> > +	musb_writel(musb->mregs, OTG_INTERFSEL,
+> > +		    musb->context.otg_interfsel);
+> >  
+> >  	return 0;
+> >  }
+> 
+> -- 
+> balbi
