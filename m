@@ -1,73 +1,135 @@
-From: eric.auger@linaro.org (Eric Auger)
-Date: Wed, 28 Oct 2015 13:02:36 +0000
-Subject: [PATCH v5 5/7] vfio: platform: add compat in vfio_platform_device
-In-Reply-To: <1446037358-2079-1-git-send-email-eric.auger@linaro.org>
-References: <1446037358-2079-1-git-send-email-eric.auger@linaro.org>
-Message-ID: <1446037358-2079-6-git-send-email-eric.auger@linaro.org>
+From: javier@dowhile0.org (Javier Martinez Canillas)
+Date: Wed, 28 Oct 2015 14:06:20 +0100
+Subject: [PATCH] MAINTAINERS: Start using the 'reviewer' (R) tag
+In-Reply-To: <20151028121454.GA4058@x1>
+References: <20151027181555.GE5828@x1> <1445971482.2757.27.camel@perches.com>
+ <CAJKOXPc_w2Dc8LvkCu_d+kjZZmYScXboQrpNWdicT2yfL_5D7Q@mail.gmail.com>
+ <20151028082446.GF5828@x1>
+ <CABxcv=mGZstqyrkB95hjDCYCvhDJDVD=ga-Fg_5yPtXETuWe=g@mail.gmail.com>
+ <20151028102832.GR5828@x1>
+ <CABxcv=mzzcx3o0m3hYzcn0DyM2pEFDZ-ZgVCjChWGf+y4Xy78A@mail.gmail.com>
+ <1446030399.2757.83.camel@perches.com>
+ <CABxcv=m+aMgtKPA-WBX9rTW8c3pnMmZgNG=NvnbaeOchdZ87hg@mail.gmail.com>
+ <20151028113932.GS5828@x1> <20151028121454.GA4058@x1>
+Message-ID: <CABxcv=kCuYaYWgnvEUuTGv1RXdS6_3DR=6fnzHhAh7V-KFfCrQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Let's retrieve the compatibility string on probe and store it
-in the vfio_platform_device struct
+Hello Lee,
 
-Signed-off-by: Eric Auger <eric.auger@linaro.org>
+On Wed, Oct 28, 2015 at 1:14 PM, Lee Jones <lee.jones@linaro.org> wrote:
+> On Wed, 28 Oct 2015, Lee Jones wrote:
+>
+>> On Wed, 28 Oct 2015, Javier Martinez Canillas wrote:
+>>
+>> > Hello Joe,
+>> >
+>> > On Wed, Oct 28, 2015 at 12:06 PM, Joe Perches <joe@perches.com> wrote:
+>> > > On Wed, 2015-10-28 at 11:53 +0100, Javier Martinez Canillas wrote:
+>> > >> (Lee) think(s) that the difference between a maintainer and
+>> > >> a reviewer is if a branch with fixes / new features are kept and pull
+>> > >> requests sent while I think that the difference is the level of
+>> > >> involvement someone has with a driver regardless of how patches ends
+>> > >> in the subsystem tree (picked directly by subsystem maintainers or
+>> > >> sent through pull requests).
+>> > >>
+>> > >> Is the first time I heard your definition but maybe I'm the one that
+>> > >> is wrong so it would be great to get a consensus on that and get it
+>> > >> documented somewhere.
+>> > >
+>> > > I think Lee is over-analyzing.
+>> > >
+>> > > From MAINTAINERS:
+>> > >         M: Mail patches to: FullName <address@domain>
+>> > >         R: Designated reviewer: FullName <address@domain>
+>> > >            These reviewers should be CCed on patches.
+>> > >         S: Status, one of the following:
+>> > >            Supported:   Someone is actually paid to look after this.
+>> > >            Maintained:  Someone actually looks after it.
+>> > >
+>> > > "looking after" doesn't mean upstreaming.
+>> > >
+>> >
+>> > Agreed and upstreaming doesn't mean sending pull request, you can for
+>> > example upstream the downstream changes for a driver you maintain by
+>> > posting patches or ack patches others post and let the subsystem
+>> > maintainer to pick those (even if you are listed as the driver
+>> > maintainer in MAINTAINERS).
+>> >
+>> > So by following Lee's definition, then most drivers' maintainers
+>> > should not be called maintainers since keeping a tree with patches for
+>> > both fixes and new features, sending pull requests, etc is only
+>> > justified for drivers that have a lot of changes per release. Is not
+>> > worth it for drivers that are in "maintenance mode" where only bugs
+>> > are fixed every once in a while or features are seldom added.
+>>
+>> Exactly right.
+>>
+>> Although, it looks like M: doesn't even mean Maintainer.  If it did, I
+>> would have made these points over and over until death (or until I got
+>> bored).  However, as M: actually means "Mail patches to", there seems
+>> to be very little difference between that and "Designated reviewer"
+>> and makes me wonder why the R: tag was ever even introduced.  I guess
+>> all of the other guys in the threads below also thought M: meant
+>> Maintainer, or else they would have just added poor old Josh as a
+>> "Mail patches to" recipient and been done with it.
+>
+> Ah, but wait.  get_maintainer.pl *does* assume M means Maintainer
+> doesn't it?  Which is why this came about.  So if we have a "Mail
+> patches to" entry, get_maintainer.pl tells the user that this is a
 
----
+Joe already answered but I'll elaborate a little bit:
 
-v2 -> v3:
-- populate compat after vdev check
----
- drivers/vfio/platform/vfio_platform_common.c  | 15 ++++++++-------
- drivers/vfio/platform/vfio_platform_private.h |  1 +
- 2 files changed, 9 insertions(+), 7 deletions(-)
+"M:" means "Mail patches to" and "S:" means "Status" so what
+get_maintainers.pl is reports the person in "M:" printing the status
+of the file(s).
 
-diff --git a/drivers/vfio/platform/vfio_platform_common.c b/drivers/vfio/platform/vfio_platform_common.c
-index 3b7e52c..f2d41a0 100644
---- a/drivers/vfio/platform/vfio_platform_common.c
-+++ b/drivers/vfio/platform/vfio_platform_common.c
-@@ -41,16 +41,11 @@ static const struct vfio_platform_reset_combo reset_lookup_table[] = {
- static void vfio_platform_get_reset(struct vfio_platform_device *vdev,
- 				    struct device *dev)
- {
--	const char *compat;
- 	int (*reset)(struct vfio_platform_device *);
--	int ret, i;
--
--	ret = device_property_read_string(dev, "compatible", &compat);
--	if (ret)
--		return;
-+	int i;
- 
- 	for (i = 0 ; i < ARRAY_SIZE(reset_lookup_table); i++) {
--		if (!strcmp(reset_lookup_table[i].compat, compat)) {
-+		if (!strcmp(reset_lookup_table[i].compat, vdev->compat)) {
- 			request_module(reset_lookup_table[i].module_name);
- 			reset = __symbol_get(
- 				reset_lookup_table[i].reset_function_name);
-@@ -544,6 +539,12 @@ int vfio_platform_probe_common(struct vfio_platform_device *vdev,
- 	if (!vdev)
- 		return -EINVAL;
- 
-+	ret = device_property_read_string(dev, "compatible", &vdev->compat);
-+	if (ret) {
-+		pr_err("VFIO: cannot retrieve compat for %s\n", vdev->name);
-+		return -EINVAL;
-+	}
-+
- 	group = iommu_group_get(dev);
- 	if (!group) {
- 		pr_err("VFIO: No IOMMU group for device %s\n", vdev->name);
-diff --git a/drivers/vfio/platform/vfio_platform_private.h b/drivers/vfio/platform/vfio_platform_private.h
-index fd262be..415310f 100644
---- a/drivers/vfio/platform/vfio_platform_private.h
-+++ b/drivers/vfio/platform/vfio_platform_private.h
-@@ -57,6 +57,7 @@ struct vfio_platform_device {
- 	int				refcnt;
- 	struct mutex			igate;
- 	struct module			*parent_module;
-+	const char			*compat;
- 
- 	/*
- 	 * These fields should be filled by the bus specific binder
--- 
-1.9.1
+So for example if the file has "S: Supported" then the person listed
+in "M:" is shown as "supporter" while if the status is "S:
+Maintained", the person is listed as "maintainer".
+
+There isn't a "Reviewed" status to specify files that are looked by
+"Designated reviewers", it can be added but I don't see the reason of
+it.
+
+> Maintainer, which (given that there are over 1000 unique M: entries
+> and I know that there are no where near that many actual Maintainers)
+> means that it's printing out incorrect information most of the time.
+>
+
+Well, that's correct according to your definition of maintainer
+(people with a tree that sends pull requests) but I can believe that
+there are 1K unique maintainers for different small components
+(without taking into account what components may be obsolete / not
+used anymore) even if these maintainers don't send pull request
+because the patch load is low and rely on subsystem maintainers to
+pick directly from the list with their Acks.
+
+For me the maintainer is that a) cares about the file and makes sure
+that things remain working, fix issues, reviews patches from others,
+etc b) is someone that actually understand the code in the files. A
+subsystem maintainer has the last word of what gets merged into the
+subsystem but may not be familiar with code under the subsystem and
+relies on the file / driver maintainer to Ack the patch as correct
+since that person is the one that knows the code.
+
+> So back to my original thought then, what can we do to rectify this
+> situation and make the information printed more meaningful.  Again,
+> I'm back to using the R: tag appropriately.
+>
+> Any (technical, which aren't based on "but I really want to be listed
+> as a Maintainer") thoughts?
+>
+
+I haven't read a "but I really want to be listed as a maintainer"
+thought in this thread.
+
+I think the problem is the definition of what a maintainer in Linux
+really means. For you is someone that keeps a tree and sends pull
+request (for me that is what I call a subsystem maintainer) while for
+others it seems that maintainer means someone who care about a set of
+files, knows the code, makes sure that things keep working and Ack
+patches to those files when posted.
+
+Best regards,
+Javier
