@@ -1,47 +1,34 @@
 From: p.fedin@samsung.com (Pavel Fedin)
-Date: Wed, 28 Oct 2015 10:57:34 +0300
-Subject: [PATCH v3 0/4] Exynos SROMc configuration and Ethernet support for
- SMDK5410
-Message-ID: <cover.1446018918.git.p.fedin@samsung.com>
+Date: Wed, 28 Oct 2015 10:57:36 +0300
+Subject: [PATCH v3 2/4] ARM: dts: Add SROMc to Exynos 5410
+In-Reply-To: <cover.1446018918.git.p.fedin@samsung.com>
+References: <cover.1446018918.git.p.fedin@samsung.com>
+Message-ID: <40d3e02ee082e994e155f662407552a96319e6b4.1446018918.git.p.fedin@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch extends Exynos SROM controller driver with ability to configure
-controller outputs and enables SMSC9115 Ethernet chip on SMDK5410 board,
-which is connected via SROMc bank #3.
+This machine uses own SoC device tree file, add missing part.
 
-With this patchset, support for the whole existing SMDK range can be added.
-Actually, only bank number is different.
+Signed-off-by: Pavel Fedin <p.fedin@samsung.com>
+---
+ arch/arm/boot/dts/exynos5410.dtsi | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-This patchset also depends on Exynos 5410 pinctrl support, introduced by
-patches 0003 and 0004 from this set:
-[PATCH v4 0/5] ARM: EXYNOS: ODROID-XU DT and LEDs
-http://lists.infradead.org/pipermail/linux-arm-kernel/2015-March/330862.html
-
-Pinctrl support is necessary in order to correctly configure
-multifunctional pins of the Exynos chip.
-
-v2 => v3:
-- Fixed up SROMc region size in the device tree
-- Reordered patches, documentation goes first now
-
-v1 => v2:
-- Fixed some typos and bad labels in device tree
-- Improved documentation
-
-Pavel Fedin (4):
-  Documentation: dt-bindings: Describe SROMc configuration
-  ARM: dts: Add SROMc to Exynos 5410
-  drivers: exynos-srom: Add support for bank configuration
-  ARM: dts: Add Ethernet chip to SMDK5410
-
- .../bindings/arm/samsung/exynos-srom.txt           | 24 ++++++++++++-
- arch/arm/boot/dts/exynos5410-smdk5410.dts          | 42 ++++++++++++++++++++++
- arch/arm/boot/dts/exynos5410.dtsi                  |  5 +++
- arch/arm/mach-exynos/Kconfig                       |  2 +-
- drivers/soc/samsung/Kconfig                        |  2 +-
- drivers/soc/samsung/exynos-srom.c                  | 42 +++++++++++++++++++++-
- 6 files changed, 113 insertions(+), 4 deletions(-)
-
+diff --git a/arch/arm/boot/dts/exynos5410.dtsi b/arch/arm/boot/dts/exynos5410.dtsi
+index 4603356..e2b58f8 100644
+--- a/arch/arm/boot/dts/exynos5410.dtsi
++++ b/arch/arm/boot/dts/exynos5410.dtsi
+@@ -101,6 +101,11 @@
+ 			reg = <0x10000000 0x100>;
+ 		};
+ 
++		sromc: sromc at 12250000 {
++			compatible = "samsung,exynos-srom";
++			reg = <0x12250000 0x14>;
++		};
++
+ 		pmu_system_controller: system-controller at 10040000 {
+ 			compatible = "samsung,exynos5410-pmu", "syscon";
+ 			reg = <0x10040000 0x5000>;
 -- 
 2.4.4
