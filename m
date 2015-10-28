@@ -1,136 +1,451 @@
-From: rjui@broadcom.com (Ray Jui)
-Date: Wed, 28 Oct 2015 09:08:02 -0700
-Subject: [PATCH v3 2/2] arm64: dts: Add BRCM IPROC NAND DT node for NS2
-In-Reply-To: <39063E8F96E11742B35A201CC5D095B7AFFB81@SJEXCHMB10.corp.ad.broadcom.com>
-References: <1445577373-21252-1-git-send-email-anup.patel@broadcom.com>
- <1445577373-21252-3-git-send-email-anup.patel@broadcom.com>
- <20151028001920.GY13239@google.com> <563015FC.9040006@broadcom.com>
- <20151028003935.GZ13239@google.com> <56301B00.1020301@broadcom.com>
- <39063E8F96E11742B35A201CC5D095B7AFFB81@SJEXCHMB10.corp.ad.broadcom.com>
-Message-ID: <5630F2E2.8060508@broadcom.com>
+From: brijeshkumar.singh@amd.com (Brijesh Singh)
+Date: Wed, 28 Oct 2015 11:13:49 -0500
+Subject: [PATCH v4] EDAC: Add ARM64 EDAC
+Message-ID: <1446048829-3359-1-git-send-email-brijeshkumar.singh@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Add support for Cortex A57 and A53 EDAC driver.
 
+Signed-off-by: Brijesh Singh <brijeshkumar.singh@amd.com>
+CC: robh+dt at kernel.org
+CC: pawel.moll at arm.com
+CC: mark.rutland at arm.com
+CC: ijc+devicetree at hellion.org.uk
+CC: galak at codeaurora.org
+CC: dougthompson at xmission.com
+CC: bp at alien8.de
+CC: mchehab at osg.samsung.com
+CC: devicetree at vger.kernel.org
+CC: guohanjun at huawei.com
+CC: andre.przywara at arm.com
+CC: arnd at arndb.de
+CC: sboyd at codeaurora.org
+CC: linux-kernel at vger.kernel.org
+CC: linux-edac at vger.kernel.org
+---
+Tested error reporting via rasdeamon on AMD seattle platform.
 
-On 10/28/2015 2:06 AM, Anup Patel wrote:
->
->
->> -----Original Message-----
->> From: Ray Jui [mailto:rjui at broadcom.com]
->> Sent: 28 October 2015 06:17
->> To: Brian Norris
->> Cc: Anup Patel; David Woodhouse; Linux MTD; Rob Herring; Pawel Moll; Mark
->> Rutland; Catalin Marinas; Will Deacon; Sudeep Holla; Ian Campbell; Kumar Gala;
->> Scott Branden; Florian Fainelli; Pramod Kumar; Vikram Prakash; Sandeep
->> Tripathy; Linux ARM Kernel; Device Tree; Linux Kernel; bcm-kernel-feedback-list
->> Subject: Re: [PATCH v3 2/2] arm64: dts: Add BRCM IPROC NAND DT node for
->> NS2
->>
->>
->>
->> On 10/27/2015 5:39 PM, Brian Norris wrote:
->>> On Tue, Oct 27, 2015 at 05:25:32PM -0700, Ray Jui wrote:
->>>> On 10/27/2015 5:19 PM, Brian Norris wrote:
->>>>> On Fri, Oct 23, 2015 at 10:46:13AM +0530, Anup Patel wrote:
->>>>>> diff --git a/arch/arm64/boot/dts/broadcom/ns2.dtsi
->>>>>> b/arch/arm64/boot/dts/broadcom/ns2.dtsi
->>>>>> index f603277..9610822 100644
->>>>>> --- a/arch/arm64/boot/dts/broadcom/ns2.dtsi
->>>>>> +++ b/arch/arm64/boot/dts/broadcom/ns2.dtsi
->>>>>> @@ -212,5 +212,19 @@
->>>>>>    			compatible = "brcm,iproc-rng200";
->>>>>>    			reg = <0x66220000 0x28>;
->>>>>>    		};
->>>>>> +
->>>>>> +		nand: nand at 66460000 {
->>>>>> +			compatible = "brcm,nand-iproc", "brcm,brcmnand-
->> v6.1";
->>>>>
->>>>> Technically, the binding says you should also have "brcm,brcmnand"
->>>>> as a last resort. Otherwise (for the NAND parts):
->>>>>
->>>>
->>>> I believe Anup was seeing issues when both "brcm,nand-iproc" and
->>>> "brcm,brcmnand" are present.
->>>>
->>>> Note "brcm,nand-iproc" invokes 'iproc_nand_probe', which calls
->>>> 'brcmnand_probe' in the end.
->>>>
->>>> "brcm,brcmnand" invokes 'brcmstb_nand_probe', which also calls
->>>> 'brcmstb_probe', but without all the prep configuration required for
->>>> "brcm,nand-iproc".
->>>
->>> Ah, I forgot about that problem. That seems like an OF infrastructure
->>> issue that could be fixed. We could lump these drivers back together,
->>> and make sure that "brcm,nand-iproc" gets the priority in the
->>> of_device_id list.
->>>
->>> Or we could just relax the DT binding.
->>>
->>> But wait, wouldn't cygnus already have that problem? You're using the
->>> binding I suggested in arch/arm/boot/dts/bcm-cygnus.dtsi.
->>
->> Interestingly, we do not see this problem with Cygnus or NSP, but only on NS2
->> (arm64 based). There may be a difference between how OF devices are
->> instantiated between arm and arm64?
->
-> Alternately, it could be also about order in-which platform drivers are matched
-> for newly created OF device.
->
->>
->>>
->>> Oh, and I see we hacked this one in drivers/mtd/nand/brcmnand/Makefile:
->>>
->>>     # link order matters; don't link the more generic brcmstb_nand.o before the
->>>     # more specific iproc_nand.o, for instance
->>
->> Yes, I see that too (after sending out my previous email, :)). Maybe
->> Anup can help to elaborate on the problem. I'm now getting a bit
->> confused on how the problem can surface on NS2.
->
-> I think for a newly created OF devices the Linux device driver framework will
-> match the platform drivers in the order in which they are registered by module
-> init functions. Now the order of module init function calls will be based how
-> the .initcall section is formed by linker and order in which objects are linked.
->
+v4:
+* remove THIS_MODULE assignment from platform_driver
+* use module_platform_driver(), remove module_init() and module_exit()
+* remove default n from Kconfig
 
-Yes, what you said is my understanding as well, but then here is the 
-mystery. This is the link order in brcmnand/Makefile:
+v3:
+* change DT binding compatibilty string to 'cortex-a57-edac'
+* remove A57/A53 prefix from register bit definition
+* unify A57 and A53 L1/L2 error parsing functions
+* use mc trace event function to report the error
+* update Kconfig default to 'n'
 
-1 # link order matters; don't link the more generic brcmstb_nand.o 
-before the
-2 # more specific iproc_nand.o, for instance
-3 obj-$(CONFIG_MTD_NAND_BRCMNAND) += iproc_nand.o
-4 obj-$(CONFIG_MTD_NAND_BRCMNAND) += bcm63138_nand.o
-5 obj-$(CONFIG_MTD_NAND_BRCMNAND) += brcmstb_nand.o
-6 obj-$(CONFIG_MTD_NAND_BRCMNAND) += brcmnand.o
+v2:
+* convert into generic arm64 edac driver
+* remove AMD specific references from dt binding
+* remove poll_msec property from dt binding
+* add poll_msec as a module param, default is 100ms
+* update copyright text
+* define macro mnemonics for L1 and L2 RAMID
+* check L2 error per-cluster instead of per core
+* update function names
+* use get_online_cpus() and put_online_cpus() to make L1 and L2 register 
+  read hotplug-safe
+* add error check in probe routine
 
-Based on the order above, probe from iproc_nand should always be called 
-first if a matching compatible string is found. If so, then why having 
-both compatible strings "brcm,brcmnand" and "brcm,nand-iproc" causes 
-issues for NS2 (I remember it broke smoketest in the past when you 
-submitted the change)? I'm not saying we should have "brcm,brcmnand" for 
-iProc devices, but I don't get why it would cause any issue.
+ .../devicetree/bindings/edac/cortex-arm64-edac.txt |  15 +
+ drivers/edac/Kconfig                               |   7 +
+ drivers/edac/Makefile                              |   1 +
+ drivers/edac/cortex_arm64_edac.c                   | 336 +++++++++++++++++++++
+ 4 files changed, 359 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/edac/cortex-arm64-edac.txt
+ create mode 100644 drivers/edac/cortex_arm64_edac.c
 
-Does the order of the compatible string matter when they are assigned to 
-the same 'compatible' property like this?
-
-compatible = "brcm,nand-iproc", "brcm,brcmnand-v6.1",    "brcm,brcmnand";
-
-
-> IMHO, if multiple platform drivers match given OF device then platform driver
-> with longest matching compatible string should only be probed. I don't know
-> how big change this would be for OF framework.
->
->>
->> But in general, I think it's a good idea to relax the requirement in the
->> DT binding document to not require "brcm,brcmnand", in the case when
->> "brcm,nand-iproc" and "brcm,nand-bcm63138" are present.
->
-> Even I think, it will be good to relax the DT bindings requirement for
-> BRCM NAND driver.
->
-> Regards,
-> Anup
->
+diff --git a/Documentation/devicetree/bindings/edac/cortex-arm64-edac.txt b/Documentation/devicetree/bindings/edac/cortex-arm64-edac.txt
+new file mode 100644
+index 0000000..552f0c7
+--- /dev/null
++++ b/Documentation/devicetree/bindings/edac/cortex-arm64-edac.txt
+@@ -0,0 +1,15 @@
++* ARM Cortex A57 and A53 L1/L2 cache error reporting
++
++CPU Memory Error Syndrome and L2 Memory Error Syndrome registers can be used
++for checking L1 and L2 memory errors.
++
++The following section describes the Cortex A57/A53 EDAC DT node binding.
++
++Required properties:
++- compatible: Should be "arm,cortex-a57-edac" or "arm,cortex-a53-edac"
++
++Example:
++	edac {
++		compatible = "arm,cortex-a57-edac";
++	};
++
+diff --git a/drivers/edac/Kconfig b/drivers/edac/Kconfig
+index ef25000..e8f5306 100644
+--- a/drivers/edac/Kconfig
++++ b/drivers/edac/Kconfig
+@@ -390,4 +390,11 @@ config EDAC_XGENE
+ 	  Support for error detection and correction on the
+ 	  APM X-Gene family of SOCs.
+ 
++config EDAC_CORTEX_ARM64
++	tristate "ARM Cortex A57/A53"
++	depends on EDAC_MM_EDAC && ARM64
++	help
++	  Support for error detection and correction on the
++	  ARM Cortex A57 and A53.
++
+ endif # EDAC
+diff --git a/drivers/edac/Makefile b/drivers/edac/Makefile
+index ae3c5f3..ac01660 100644
+--- a/drivers/edac/Makefile
++++ b/drivers/edac/Makefile
+@@ -68,3 +68,4 @@ obj-$(CONFIG_EDAC_OCTEON_PCI)		+= octeon_edac-pci.o
+ obj-$(CONFIG_EDAC_ALTERA_MC)		+= altera_edac.o
+ obj-$(CONFIG_EDAC_SYNOPSYS)		+= synopsys_edac.o
+ obj-$(CONFIG_EDAC_XGENE)		+= xgene_edac.o
++obj-$(CONFIG_EDAC_CORTEX_ARM64)		+= cortex_arm64_edac.o
+diff --git a/drivers/edac/cortex_arm64_edac.c b/drivers/edac/cortex_arm64_edac.c
+new file mode 100644
+index 0000000..b2a8723
+--- /dev/null
++++ b/drivers/edac/cortex_arm64_edac.c
+@@ -0,0 +1,336 @@
++/*
++ * Cortex A57 and A53 EDAC
++ *
++ * Copyright (c) 2015, Advanced Micro Devices
++ * Author: Brijesh Singh <brijeshkumar.singh@amd.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#include <linux/module.h>
++#include <linux/of_device.h>
++#include <linux/platform_device.h>
++#include <ras/ras_event.h>
++
++#include "edac_core.h"
++
++#define DRV_NAME			"cortex_edac"
++
++#define CPUMERRSR_EL1_INDEX(x, y)	((x) & (y))
++#define CPUMERRSR_EL1_BANK_WAY(x, y)	(((x) >> 18) & (y))
++#define CPUMERRSR_EL1_RAMID(x)		(((x) >> 24) & 0x7f)
++#define CPUMERRSR_EL1_VALID(x)		((x) & (1 << 31))
++#define CPUMERRSR_EL1_REPEAT(x)		(((x) >> 32) & 0x7f)
++#define CPUMERRSR_EL1_OTHER(x)		(((x) >> 40) & 0xff)
++#define CPUMERRSR_EL1_FATAL(x)		((x) & (1UL << 63))
++#define L1_I_TAG_RAM			0x00
++#define L1_I_DATA_RAM			0x01
++#define L1_D_TAG_RAM			0x08
++#define L1_D_DATA_RAM			0x09
++#define L1_D_DIRTY_RAM			0x14
++#define TLB_RAM				0x18
++
++#define L2MERRSR_EL1_CPUID_WAY(x)	(((x) >> 18) & 0xf)
++#define L2MERRSR_EL1_RAMID(x)		(((x) >> 24) & 0x7f)
++#define L2MERRSR_EL1_VALID(x)		((x) & (1 << 31))
++#define L2MERRSR_EL1_REPEAT(x)		(((x) >> 32) & 0xff)
++#define L2MERRSR_EL1_OTHER(x)		(((x) >> 40) & 0xff)
++#define L2MERRSR_EL1_FATAL(x)		((x) & (1UL << 63))
++#define L2_TAG_RAM			0x10
++#define L2_DATA_RAM			0x11
++#define L2_SNOOP_RAM			0x12
++#define L2_DIRTY_RAM			0x14
++#define L2_INCLUSION_PF_RAM		0x18
++
++#define L1_CACHE			0
++#define L2_CACHE			1
++
++#define EDAC_MOD_STR			DRV_NAME
++
++static int poll_msec = 100;
++
++struct cortex_arm64_edac {
++	struct edac_device_ctl_info *edac_ctl;
++};
++
++static inline u64 read_cpumerrsr_el1(void)
++{
++	u64 val;
++
++	asm volatile("mrs %0, s3_1_c15_c2_2" : "=r" (val));
++	return val;
++}
++
++static inline void write_cpumerrsr_el1(u64 val)
++{
++	asm volatile("msr s3_1_c15_c2_2, %0" :: "r" (val));
++}
++
++static inline u64 read_l2merrsr_el1(void)
++{
++	u64 val;
++
++	asm volatile("mrs %0, s3_1_c15_c2_3" : "=r" (val));
++	return val;
++}
++
++static inline void write_l2merrsr_el1(u64 val)
++{
++	asm volatile("msr s3_1_c15_c2_3, %0" :: "r" (val));
++}
++
++static void parse_cpumerrsr(void *arg)
++{
++	int cpu, partnum, way;
++	unsigned int index = 0;
++	u64 val = read_cpumerrsr_el1();
++	int repeat_err, other_err;
++
++	/* we do not support fatal error handling so far */
++	if (CPUMERRSR_EL1_FATAL(val))
++		return;
++
++	/* check if we have valid error before continuing */
++	if (!CPUMERRSR_EL1_VALID(val))
++		return;
++
++	cpu = smp_processor_id();
++	partnum = read_cpuid_part_number();
++	repeat_err = CPUMERRSR_EL1_REPEAT(val);
++	other_err = CPUMERRSR_EL1_OTHER(val);
++
++	/* way/bank and index address bit ranges are different between
++	 * A57 and A53 */
++	if (partnum == ARM_CPU_PART_CORTEX_A57) {
++		index = CPUMERRSR_EL1_INDEX(val, 0x1ffff);
++		way = CPUMERRSR_EL1_BANK_WAY(val, 0x1f);
++	} else {
++		index = CPUMERRSR_EL1_INDEX(val, 0xfff);
++		way = CPUMERRSR_EL1_BANK_WAY(val, 0x7);
++	}
++
++	edac_printk(KERN_CRIT, EDAC_MOD_STR, "CPU%d L1 error detected!\n", cpu);
++	edac_printk(KERN_CRIT, EDAC_MOD_STR, "index=%#x, RAMID=", index);
++
++	switch (CPUMERRSR_EL1_RAMID(val)) {
++	case L1_I_TAG_RAM:
++		pr_cont("'L1-I Tag RAM' (way %d)", way);
++		break;
++	case L1_I_DATA_RAM:
++		pr_cont("'L1-I Data RAM' (bank %d)", way);
++		break;
++	case L1_D_TAG_RAM:
++		pr_cont("'L1-D Tag RAM' (way %d)", way);
++		break;
++	case L1_D_DATA_RAM:
++		pr_cont("'L1-D Data RAM' (bank %d)", way);
++		break;
++	case L1_D_DIRTY_RAM:
++		pr_cont("'L1 Dirty RAM'");
++		break;
++	case TLB_RAM:
++		pr_cont("'TLB RAM'");
++		break;
++	default:
++		pr_cont("'unknown'");
++		break;
++	}
++
++	pr_cont(", repeat=%d, other=%d (CPUMERRSR_EL1=%#llx)\n", repeat_err,
++		other_err, val);
++
++	trace_mc_event(HW_EVENT_ERR_CORRECTED, "L1 non-fatal error",
++		       "", repeat_err, 0, 0, 0, -1, index, 0, 0, DRV_NAME);
++	write_cpumerrsr_el1(0);
++}
++
++static void a57_parse_l2merrsr_way(u8 ramid, u8 val)
++{
++	switch (ramid) {
++	case L2_TAG_RAM:
++	case L2_DATA_RAM:
++	case L2_DIRTY_RAM:
++		pr_cont("(cpu%d tag, way %d)", val / 2, val % 2);
++		break;
++	case L2_SNOOP_RAM:
++		pr_cont("(cpu%d tag, way %d)", (val & 0x6) >> 1,
++			(val & 0x1));
++		break;
++	}
++}
++
++static void a53_parse_l2merrsr_way(u8 ramid, u8 val)
++{
++	switch (ramid) {
++	case L2_TAG_RAM:
++		pr_cont("(way %d)", val);
++	case L2_DATA_RAM:
++		pr_cont("(bank %d)", val);
++		break;
++	case L2_SNOOP_RAM:
++		pr_cont("(cpu%d tag, way %d)", val / 2, val % 4);
++		break;
++	}
++}
++
++static void parse_l2merrsr(void *arg)
++{
++	int cpu, partnum;
++	unsigned int index;
++	int repeat_err, other_err;
++	u64 val = read_l2merrsr_el1();
++
++	/* we do not support fatal error handling so far */
++	if (L2MERRSR_EL1_FATAL(val))
++		return;
++
++	/* check if we have valid error before continuing */
++	if (!L2MERRSR_EL1_VALID(val))
++		return;
++
++	cpu = smp_processor_id();
++	partnum = read_cpuid_part_number();
++	repeat_err = L2MERRSR_EL1_REPEAT(val);
++	other_err = L2MERRSR_EL1_OTHER(val);
++
++	/* index address range is different between A57 and A53 */
++	if (partnum == ARM_CPU_PART_CORTEX_A57)
++		index = val & 0x1ffff;
++	else
++		index = (val >> 3) & 0x3fff;
++
++	edac_printk(KERN_CRIT, EDAC_MOD_STR, "CPU%d L2 error detected!\n", cpu);
++	edac_printk(KERN_CRIT, EDAC_MOD_STR, "index=%#x RAMID=", index);
++
++	switch (L2MERRSR_EL1_RAMID(val)) {
++	case L2_TAG_RAM:
++		pr_cont("'L2 Tag RAM'");
++		break;
++	case L2_DATA_RAM:
++		pr_cont("'L2 Data RAM'");
++		break;
++	case L2_SNOOP_RAM:
++		pr_cont("'L2 Snoop tag RAM'");
++		break;
++	case L2_DIRTY_RAM:
++		pr_cont("'L2 Dirty RAM'");
++		break;
++	case L2_INCLUSION_PF_RAM:
++		pr_cont("'L2 inclusion PF RAM'");
++		break;
++	default:
++		pr_cont("unknown");
++		break;
++	}
++
++	/* cpuid/way bit description is different between A57 and A53 */
++	if (partnum == ARM_CPU_PART_CORTEX_A57)
++		a57_parse_l2merrsr_way(L2MERRSR_EL1_RAMID(val),
++				       L2MERRSR_EL1_CPUID_WAY(val));
++	else
++		a53_parse_l2merrsr_way(L2MERRSR_EL1_RAMID(val),
++				       L2MERRSR_EL1_CPUID_WAY(val));
++
++	pr_cont(", repeat=%d, other=%d (L2MERRSR_EL1=%#llx)\n", repeat_err,
++		other_err, val);
++	trace_mc_event(HW_EVENT_ERR_CORRECTED, "L2 non-fatal error",
++		       "", repeat_err, 0, 0, 0, -1, index, 0, 0, DRV_NAME);
++	write_l2merrsr_el1(0);
++}
++
++static void cortex_arm64_edac_check(struct edac_device_ctl_info *edac_ctl)
++{
++	int cpu;
++	struct cpumask cluster_mask, old_mask;
++
++	cpumask_clear(&cluster_mask);
++	cpumask_clear(&old_mask);
++
++	get_online_cpus();
++	for_each_online_cpu(cpu) {
++		/* Check CPU L1 error */
++		smp_call_function_single(cpu, parse_cpumerrsr, NULL, 0);
++		cpumask_copy(&cluster_mask, topology_core_cpumask(cpu));
++		if (cpumask_equal(&cluster_mask, &old_mask))
++			continue;
++		cpumask_copy(&old_mask, &cluster_mask);
++		/* Check CPU L2 error */
++		smp_call_function_any(&cluster_mask, parse_l2merrsr, NULL, 0);
++	}
++	put_online_cpus();
++}
++
++static int cortex_arm64_edac_probe(struct platform_device *pdev)
++{
++	int rc;
++	struct cortex_arm64_edac *drv;
++	struct device *dev = &pdev->dev;
++
++	drv = devm_kzalloc(dev, sizeof(*drv), GFP_KERNEL);
++	if (!drv)
++		return -ENOMEM;
++
++	/* Only POLL mode is supported */
++	edac_op_state = EDAC_OPSTATE_POLL;
++
++	drv->edac_ctl = edac_device_alloc_ctl_info(0, "cpu_cache", 1, "L", 2,
++						   0, NULL, 0,
++						   edac_device_alloc_index());
++	if (IS_ERR(drv->edac_ctl))
++		return -ENOMEM;
++
++	drv->edac_ctl->poll_msec = poll_msec;
++	drv->edac_ctl->edac_check = cortex_arm64_edac_check;
++	drv->edac_ctl->dev = dev;
++	drv->edac_ctl->mod_name = dev_name(dev);
++	drv->edac_ctl->dev_name = dev_name(dev);
++	drv->edac_ctl->ctl_name = "cache_err";
++	platform_set_drvdata(pdev, drv);
++
++	rc = edac_device_add_device(drv->edac_ctl);
++	if (rc)
++		edac_device_free_ctl_info(drv->edac_ctl);
++
++	return rc;
++}
++
++static int cortex_arm64_edac_remove(struct platform_device *pdev)
++{
++	struct cortex_arm64_edac *drv = dev_get_drvdata(&pdev->dev);
++	struct edac_device_ctl_info *edac_ctl = drv->edac_ctl;
++
++	edac_device_del_device(edac_ctl->dev);
++	edac_device_free_ctl_info(edac_ctl);
++
++	return 0;
++}
++
++static const struct of_device_id cortex_arm64_edac_of_match[] = {
++	{ .compatible = "arm,cortex-a57-edac" },
++	{ .compatible = "arm,cortex-a53-edac" },
++	{}
++};
++MODULE_DEVICE_TABLE(of, cortex_arm64_edac_of_match);
++
++static struct platform_driver cortex_arm64_edac_driver = {
++	.probe = cortex_arm64_edac_probe,
++	.remove = cortex_arm64_edac_remove,
++	.driver = {
++		.name = DRV_NAME,
++		.of_match_table = cortex_arm64_edac_of_match,
++	},
++};
++module_platform_driver(cortex_arm64_edac_driver);
++
++MODULE_LICENSE("GPL");
++MODULE_AUTHOR("Brijesh Singh <brijeshkumar.singh@amd.com>");
++MODULE_DESCRIPTION("Cortex A57 and A53 EDAC driver");
++module_param(poll_msec, int, 0444);
++MODULE_PARM_DESC(poll_msec, "EDAC monitor poll interval in msec");
+-- 
+1.9.1
