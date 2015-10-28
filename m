@@ -1,161 +1,169 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 28 Oct 2015 22:27:23 +0900
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 28 Oct 2015 13:34:38 +0000
 Subject: [PATCH] MAINTAINERS: Start using the 'reviewer' (R) tag
-In-Reply-To: <20151028101455.GQ5828@x1>
-References: <1445960557-24328-1-git-send-email-lee.jones@linaro.org>
- <20151027172428.GB21070@earth> <20151027181555.GE5828@x1>
- <1445971482.2757.27.camel@perches.com>
- <CAJKOXPc_w2Dc8LvkCu_d+kjZZmYScXboQrpNWdicT2yfL_5D7Q@mail.gmail.com>
- <20151028082446.GF5828@x1> <56309419.4060908@samsung.com>
- <20151028101455.GQ5828@x1>
-Message-ID: <5630CD3B.7030202@samsung.com>
+In-Reply-To: <CABxcv=kCuYaYWgnvEUuTGv1RXdS6_3DR=6fnzHhAh7V-KFfCrQ@mail.gmail.com>
+References: <CAJKOXPc_w2Dc8LvkCu_d+kjZZmYScXboQrpNWdicT2yfL_5D7Q@mail.gmail.com>
+ <20151028082446.GF5828@x1>
+ <CABxcv=mGZstqyrkB95hjDCYCvhDJDVD=ga-Fg_5yPtXETuWe=g@mail.gmail.com>
+ <20151028102832.GR5828@x1>
+ <CABxcv=mzzcx3o0m3hYzcn0DyM2pEFDZ-ZgVCjChWGf+y4Xy78A@mail.gmail.com>
+ <1446030399.2757.83.camel@perches.com>
+ <CABxcv=m+aMgtKPA-WBX9rTW8c3pnMmZgNG=NvnbaeOchdZ87hg@mail.gmail.com>
+ <20151028113932.GS5828@x1> <20151028121454.GA4058@x1>
+ <CABxcv=kCuYaYWgnvEUuTGv1RXdS6_3DR=6fnzHhAh7V-KFfCrQ@mail.gmail.com>
+Message-ID: <20151028133438.GC4058@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-W dniu 28.10.2015 o 19:14, Lee Jones pisze:
-> On Wed, 28 Oct 2015, Krzysztof Kozlowski wrote:
->> On 28.10.2015 17:24, Lee Jones wrote:
->>> On Wed, 28 Oct 2015, Krzysztof Kozlowski wrote:
->>>> 2015-10-28 3:44 GMT+09:00 Joe Perches <joe@perches.com>:
->>>>> On Tue, 2015-10-27 at 18:15 +0000, Lee Jones wrote:
->>>>>> On Tue, 27 Oct 2015, Sebastian Reichel wrote:> >
->>>>>>> I think you should CC the people, which are changed from "M:"
->>>>>>> to "R:", though.
->>>>>>
->>>>>> Yes, makes sense.
->>>>>>
->>>>>> I'd like to collect some Maintainer Acks first though.
->>>>>
->>>>> I think people from organizations like Samsung are actual 
->>>>> maintainers not reviewers.
->>>
->>> So this all hinges on how we are describing Maintainers and
->>> Reviewers.
->>>
->>> My personal definition (until convinced otherwise) is that Reviewers 
->>> care about their particular subsystem and/or files.  They conduct
->>> code reviews to ensure nothing gets broken and the code base stays in
->>> best possible state of worthiness.  On the other hand Maintainers
->>> usually conduct themselves as Reviewers but also have
->>> 'maintainership' duties as well; such as applying patches,
->>> *maintaining*, testing, rebasing, etc, an upstream branch and
->>> ultimately sending pull-requests to higher level Maintainers i.e.
->>> Linus.  Maintainers also have the ultimate say (unless over-ruled by
->>> Linus etc) over what gets applied.
->>
->> Okay, sounds reasonable... so if a person performs reviews plus he does
->> some of the other activities (not all) then who is he?
+On Wed, 28 Oct 2015, Javier Martinez Canillas wrote:
+> On Wed, Oct 28, 2015 at 1:14 PM, Lee Jones <lee.jones@linaro.org> wrote:
+> > On Wed, 28 Oct 2015, Lee Jones wrote:
+> >
+> >> On Wed, 28 Oct 2015, Javier Martinez Canillas wrote:
+> >>
+> >> > Hello Joe,
+> >> >
+> >> > On Wed, Oct 28, 2015 at 12:06 PM, Joe Perches <joe@perches.com> wrote:
+> >> > > On Wed, 2015-10-28 at 11:53 +0100, Javier Martinez Canillas wrote:
+> >> > >> (Lee) think(s) that the difference between a maintainer and
+> >> > >> a reviewer is if a branch with fixes / new features are kept and pull
+> >> > >> requests sent while I think that the difference is the level of
+> >> > >> involvement someone has with a driver regardless of how patches ends
+> >> > >> in the subsystem tree (picked directly by subsystem maintainers or
+> >> > >> sent through pull requests).
+> >> > >>
+> >> > >> Is the first time I heard your definition but maybe I'm the one that
+> >> > >> is wrong so it would be great to get a consensus on that and get it
+> >> > >> documented somewhere.
+> >> > >
+> >> > > I think Lee is over-analyzing.
+> >> > >
+> >> > > From MAINTAINERS:
+> >> > >         M: Mail patches to: FullName <address@domain>
+> >> > >         R: Designated reviewer: FullName <address@domain>
+> >> > >            These reviewers should be CCed on patches.
+> >> > >         S: Status, one of the following:
+> >> > >            Supported:   Someone is actually paid to look after this.
+> >> > >            Maintained:  Someone actually looks after it.
+> >> > >
+> >> > > "looking after" doesn't mean upstreaming.
+> >> > >
+> >> >
+> >> > Agreed and upstreaming doesn't mean sending pull request, you can for
+> >> > example upstream the downstream changes for a driver you maintain by
+> >> > posting patches or ack patches others post and let the subsystem
+> >> > maintainer to pick those (even if you are listed as the driver
+> >> > maintainer in MAINTAINERS).
+> >> >
+> >> > So by following Lee's definition, then most drivers' maintainers
+> >> > should not be called maintainers since keeping a tree with patches for
+> >> > both fixes and new features, sending pull requests, etc is only
+> >> > justified for drivers that have a lot of changes per release. Is not
+> >> > worth it for drivers that are in "maintenance mode" where only bugs
+> >> > are fixed every once in a while or features are seldom added.
+> >>
+> >> Exactly right.
+> >>
+> >> Although, it looks like M: doesn't even mean Maintainer.  If it did, I
+> >> would have made these points over and over until death (or until I got
+> >> bored).  However, as M: actually means "Mail patches to", there seems
+> >> to be very little difference between that and "Designated reviewer"
+> >> and makes me wonder why the R: tag was ever even introduced.  I guess
+> >> all of the other guys in the threads below also thought M: meant
+> >> Maintainer, or else they would have just added poor old Josh as a
+> >> "Mail patches to" recipient and been done with it.
+> >
+> > Ah, but wait.  get_maintainer.pl *does* assume M means Maintainer
+> > doesn't it?  Which is why this came about.  So if we have a "Mail
+> > patches to" entry, get_maintainer.pl tells the user that this is a
 > 
-> LT;DR: If someone doesn't *maintain* an upstream branch, they are not
-> an upstream Maintainer.
+> Joe already answered but I'll elaborate a little bit:
+> 
+> "M:" means "Mail patches to" and "S:" means "Status" so what
+> get_maintainers.pl is reports the person in "M:" printing the status
+> of the file(s).
+> 
+> So for example if the file has "S: Supported" then the person listed
+> in "M:" is shown as "supporter" while if the status is "S:
+> Maintained", the person is listed as "maintainer".
+> 
+> There isn't a "Reviewed" status to specify files that are looked by
+> "Designated reviewers", it can be added but I don't see the reason of
+> it.
 
-If I understand your point correctly: The maintainer and supporter
-should be mentioned if and only if he maintains an upstream branch?
+Not sure why you wrote all of this.  We know *why* get_maintainer.pl
+does what it does.  What I'm saying is, that I personally believe this
+is the wrong behaviour in what I'm *guessing* is the majority of the
+time.
 
+> > Maintainer, which (given that there are over 1000 unique M: entries
+> > and I know that there are no where near that many actual Maintainers)
+> > means that it's printing out incorrect information most of the time.
 > 
->> For example reviewing
-> 
-> Depends on the type of engagement.  Anyone can review any patch
-> submitted to anywhere on the code-base.  This does not make them an
-> accepted Reviewer.  Here I'm saying that a Reviewer is a competent
-> engineer who has made a promise to dedicate time to review incoming
-> patches in order to ensure quality.
-> 
-> To emphasise a tagged Reviewer isn't just someone who reviews code
-> every now and again.  It's someone who cares and has a vested interest
-> in either a subsystem as a whole, or perhaps individual or a group of
-> drivers.  However, this person does not conduct upstream branch
-> *maintenance*.
-> 
->> testing + fixing bugs + cleaning up (sending
->> patches from time to time)?
-> 
-> This is a Submitter/Contributor.
-> 
-> When I said testing before, I meant the branch being maintained, not
-> the driver on it's own.  That should be tested by Submitters/
-> Contributors or Testers (who get to provide their Tested-by).
-> 
->> Would that be sufficient requirement to call him maintainer of a driver?
->> Or maybe all of these requirements must be met (including handling of
->> patches and sending pull reqs)?
-> 
-> It's only really the handing of patches and the maintenance of an
-> upstream branch which differentiates a Reviewer from a Maintainer. 
-> 
->>>>> Their drivers are not thrown over a wall and forgotten.
->>>>
->>>> At least for Samsung Multifunction PMIC drivers (and some of Maxim 
->>>> MUICs and PMICs) these are actively used by us in existing and new 
->>>> products. They are also continuously extended and actually
->>>> maintained. This means that it is not only about review of new
->>>> patches but also about caring that nothing will become broken.
->>>
->>> Exactly.  This what I expect of any good code Reviewer.
->>>
->>>> I would prefer to leave the "SAMSUNG MULTIFUNCTION PMIC DEVICE 
->>>> DRIVERS" entry as is - maintainers.
->>>
->>> But you aren't maintaining the driver i.e. you don't collect patches 
->>> and *maintain* them on an upstream branch.
->>
->> Indeed, we don't. However are other non-reviewing activities sufficient?
-> 
-> The other non-reviewing activities you mentioned are that of the
-> Submitter/Contributor/Tester.  They still don't make someone a
-> Maintainer.
+> Well, that's correct according to your definition of maintainer
+> (people with a tree that sends pull requests) but I can believe that
+> there are 1K unique maintainers for different small components
+> (without taking into account what components may be obsolete / not
+> used anymore) even if these maintainers don't send pull request
+> because the patch load is low and rely on subsystem maintainers to
+> pick directly from the list with their Acks.
 
-I think I got your point of view. I don't see it that way, especially
-that I pointed the fact of combining these activities.
-Submitter/Reviewer/Tester in one person.
+Then they are not Maintainers.  They are Reviewers who rely on
+Maintainers.  In your example above it's the Maintainers that are
+Maintainers and the people who review the code are Reviewers.  The
+clues are in the words. ;)
 
-> 
->>> Granted some of you guys 
->>> are doing a great job of maintaining branches on your downstream or 
->>> BSP kernels, but conduct a Reviewer type role for upstream.
->>
->> You mentioned also the "ultimate say over what gets applied" - which in
->> this particular case is interesting to us because we have direct
->> interest in these drivers being in a good shape and doing things we
->> expect them to do. Like representing the interest of users.
-> 
-> Any Reviewers opinion will matter to someone who ultimately applies
-> the patches.  For instance, if you were to say to me "this change to
-> our MFD doesn't suit us because of X", I almost certainly won't apply
-> the patch.
-> 
->> Of course one could say that every upstreaming person has such
->> expectations... but some of the upstreamers just send a driver for one
->> device. Or extend driver for one device. In this case this is a family
->> of devices used on all of our Exynos SoC products and we care about all
->> of them.
-> 
-> And being a nominated Reviewer mentioned in MAINTAINERS, that's
-> exactly what I'd expect.  If people fail to mean these requirement
-> they should be removed completely.
+> For me the maintainer is that a) cares about the file and makes sure
+> that things remain working, fix issues, reviews patches from others,
+> etc b) is someone that actually understand the code in the files. A
+> subsystem maintainer has the last word of what gets merged into the
+> subsystem but may not be familiar with code under the subsystem and
+> relies on the file / driver maintainer to Ack the patch as correct
+> since that person is the one that knows the code.
 
-Both of the points above make sense. The person mentioned as reviewer
-should review.
+Then what is a Reviewer?
 
+> > So back to my original thought then, what can we do to rectify this
+> > situation and make the information printed more meaningful.  Again,
+> > I'm back to using the R: tag appropriately.
+> >
+> > Any (technical, which aren't based on "but I really want to be listed
+> > as a Maintainer") thoughts?
+> >
 > 
->>> You guys are pushing back like this is some kind of demotion.
->>> That's not the case at all.  All it does is better describe the (very
->>> worthy) function you *actually* provide.
->>
->> It is getting into dispute about entire change of yours... which is not
->> what I want. I agree with your general idea but I was referring only to
->> that particular case - the Samsung PMICs (and Maxim PMICs/MUICs which
->> would fall into same category).
-> 
-> I hope that I've explained my view adequately above.  My view is also
-> carried out over the Samsung drivers.
+> I haven't read a "but I really want to be listed as a maintainer"
+> thought in this thread.
 
-Yes, you explained your point of view... and we can agree to disagree.
-:) In the same time I actually accept the fact that I am not the person
-with any kind of knowledge about kernel development process.
+If you had no vested interest in this, you would be able to see the
+logic in what I'm saying.  Again I'm *guess*, but I think there is
+some emotional reasons for you pushing back so hard.  I could always
+be wrong though.
 
-I think I also described what I am doing with the Samsung drivers so if
-that falls under "Reviewing" then I am entirely fine with it.
+> I think the problem is the definition of what a maintainer in Linux
+> really means. For you is someone that keeps a tree and sends pull
+> request (for me that is what I call a subsystem maintainer)
 
-Best regards,
-Krzysztof
+Right.  A Level 3 Maintainer sends pull-requests to a Level 2
+Maintainer, who sends pull-requests to a Level 1 Maintainer, who sends
+pull-requests to Linus.  Maintainers at *all* levels collect patches
+and Maintain them before sending on.
+
+reiterate:
+
+Reviewers care about particular driver(s)/domain(s) that they know
+well.  They provide solid reviews and possible testing (because they
+are likely to have the h/w).  They then provide Acked-by:s so that a
+Maintainer can collect the patch. 
+
+> while for
+> others it seems that maintainer means someone who care about a set of
+> files, knows the code, makes sure that things keep working and Ack
+> patches to those files when posted.
+
+        goto reiterate;   ;)
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
