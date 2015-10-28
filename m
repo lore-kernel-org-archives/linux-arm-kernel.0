@@ -1,5 +1,5 @@
-From: javier@dowhile0.org (Javier Martinez Canillas)
-Date: Wed, 28 Oct 2015 10:25:00 +0100
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Wed, 28 Oct 2015 18:31:13 +0900
 Subject: [PATCH] MAINTAINERS: Start using the 'reviewer' (R) tag
 In-Reply-To: <CABxcv=mGZstqyrkB95hjDCYCvhDJDVD=ga-Fg_5yPtXETuWe=g@mail.gmail.com>
 References: <1445960557-24328-1-git-send-email-lee.jones@linaro.org>
@@ -8,21 +8,48 @@ References: <1445960557-24328-1-git-send-email-lee.jones@linaro.org>
  <CAJKOXPc_w2Dc8LvkCu_d+kjZZmYScXboQrpNWdicT2yfL_5D7Q@mail.gmail.com>
  <20151028082446.GF5828@x1>
  <CABxcv=mGZstqyrkB95hjDCYCvhDJDVD=ga-Fg_5yPtXETuWe=g@mail.gmail.com>
-Message-ID: <CABxcv=k+a_u8mS1QM0=A65jg5D-UZgq4J7d8oxX+DxKtR2ETdQ@mail.gmail.com>
+Message-ID: <563095E1.9010406@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 28, 2015 at 10:21 AM, Javier Martinez Canillas
-<javier@dowhile0.org> wrote:
->
-> We do have in fact different tags for each type of involvement so I
-> usually answer with a Reviewed-by tag if I review code for a subsystem
-> I care but I don't maintainer or answer with an Acked-by tag if I
-> review *and agree* with a patch for a component I maintain (so the
-> maintainer knows that is good to apply differently from the list if
+On 28.10.2015 18:21, Javier Martinez Canillas wrote:
+> Hello Lee,
+> 
 
-I wanted to write directly instead of differently. Sorry about the
-typo, I'm still with jetlag after a long trip.
+(...)
+Let me only add something to certain part of your email...
+
+>> But you aren't maintaining the driver i.e. you don't collect patches
+>> and *maintain* them on an upstream branch.  Granted some of you guys
+>> are doing a great job of maintaining branches on your downstream or
+>> BSP kernels, but conduct a Reviewer type role for upstream.
+>>
+>> You guys are pushing back like this is some kind of demotion.  That's
+>> not the case at all.  All it does is better describe the (very worthy)
+>> function you *actually* provide.
+>>
+> 
+> But I think it makes description less accurate in fact, since without
+> $SUBJECT get_maintainers.pl reports for example:
+> 
+> Krzysztof Kozlowski <k.kozlowski@samsung.com> (supporter:MAXIM PMIC
+> AND MUIC DRIVERS FOR EXYNOS BASED BO...)
+> Lee Jones <lee.jones@linaro.org> (supporter:MULTIFUNCTION DEVICES (MFD))
+> 
+> and after the change:
+> 
+> Krzysztof Kozlowski <k.kozlowski@samsung.com> (reviewer)
+> Lee Jones <lee.jones@linaro.org> (supporter:MULTIFUNCTION DEVICES (MFD))
+> 
+> He also works for Samsung so the driver is not only maintained but
+> supported since he can actually take care of it as a part of his day
+> job (if I understood correctly).
+
+Oh, that's interesting semantic change. Yes, in that particular case, I
+added the "supported" tag on purpose - it's part of my job. It is
+connected with what I said in other reply - we have deep interest in
+these drivers. Not only "I will review the code if I have the time". No.
+I will devote my time to ensure that the code is working on our products.
 
 Best regards,
-Javier
+Krzysztof
