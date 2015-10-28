@@ -1,96 +1,62 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 28 Oct 2015 15:37:51 +0000
-Subject: [RFC] vfio/type1: handle case where IOMMU does not support
- PAGE_SIZE size
-In-Reply-To: <1446037965-2341-1-git-send-email-eric.auger@linaro.org>
-References: <1446037965-2341-1-git-send-email-eric.auger@linaro.org>
-Message-ID: <20151028153750.GH18966@arm.com>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Wed, 28 Oct 2015 21:09:44 +0530
+Subject: [PATCH v3 2/2] arm64: dts: mt8173: Add thermal zone node for
+ mt8173.
+In-Reply-To: <1445515359-8587-3-git-send-email-dawei.chien@mediatek.com>
+References: <1445515359-8587-1-git-send-email-dawei.chien@mediatek.com>
+ <1445515359-8587-3-git-send-email-dawei.chien@mediatek.com>
+Message-ID: <20151028153944.GG3716@ubuntu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 28, 2015 at 01:12:45PM +0000, Eric Auger wrote:
-> Current vfio_pgsize_bitmap code hides the supported IOMMU page
-> sizes smaller than PAGE_SIZE. As a result, in case the IOMMU
-> does not support PAGE_SIZE page, the alignment check on map/unmap
-> is done with larger page sizes, if any. This can fail although
-> mapping could be done with pages smaller than PAGE_SIZE.
+On 22-10-15, 20:02, Dawei Chien wrote:
+> Add thermal zone node to mt8173.dtsi.
 > 
-> vfio_pgsize_bitmap is modified to expose the IOMMU page sizes,
-> supported by all domains, even those smaller than PAGE_SIZE. The
-> alignment check on map is performed against PAGE_SIZE if the minimum
-> IOMMU size is less than PAGE_SIZE or against the min page size greater
-> than PAGE_SIZE.
-> 
-> Signed-off-by: Eric Auger <eric.auger@linaro.org>
-> 
+> Signed-off-by: Dawei Chien <dawei.chien@mediatek.com>
 > ---
-> 
-> This was tested on AMD Seattle with 64kB page host. ARM MMU 401
-> currently expose 4kB, 2MB and 1GB page support. With a 64kB page host,
-> the map/unmap check is done against 2MB. Some alignment check fail
-> so VFIO_IOMMU_MAP_DMA fail while we could map using 4kB IOMMU page
-> size.
+> This patch is base on
+> https://patchwork.kernel.org/patch/7249821/
+> https://patchwork.kernel.org/patch/7249861/
+> https://patchwork.kernel.org/patch/7249891/
 > ---
->  drivers/vfio/vfio_iommu_type1.c | 25 +++++++++++--------------
->  1 file changed, 11 insertions(+), 14 deletions(-)
+>  arch/arm64/boot/dts/mediatek/mt8173.dtsi |   90 ++++++++++++++++++++++++++++++
+>  1 file changed, 90 insertions(+)
 > 
-> diff --git a/drivers/vfio/vfio_iommu_type1.c b/drivers/vfio/vfio_iommu_type1.c
-> index 57d8c37..13fb974 100644
-> --- a/drivers/vfio/vfio_iommu_type1.c
-> +++ b/drivers/vfio/vfio_iommu_type1.c
-> @@ -403,7 +403,7 @@ static void vfio_remove_dma(struct vfio_iommu *iommu, struct vfio_dma *dma)
->  static unsigned long vfio_pgsize_bitmap(struct vfio_iommu *iommu)
->  {
->  	struct vfio_domain *domain;
-> -	unsigned long bitmap = PAGE_MASK;
-> +	unsigned long bitmap = ULONG_MAX;
+> diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+> index 3b18f37..eaf12bf 100644
+> --- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+> +++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+> @@ -16,6 +16,7 @@
+>  #include <dt-bindings/interrupt-controller/arm-gic.h>
+>  #include <dt-bindings/power/mt8173-power.h>
+>  #include <dt-bindings/reset-controller/mt8173-resets.h>
+> +#include <dt-bindings/thermal/mt8173.h>
+>  #include "mt8173-pinfunc.h"
 >  
->  	mutex_lock(&iommu->lock);
->  	list_for_each_entry(domain, &iommu->domain_list, next)
-> @@ -416,20 +416,18 @@ static unsigned long vfio_pgsize_bitmap(struct vfio_iommu *iommu)
->  static int vfio_dma_do_unmap(struct vfio_iommu *iommu,
->  			     struct vfio_iommu_type1_dma_unmap *unmap)
->  {
-> -	uint64_t mask;
->  	struct vfio_dma *dma;
->  	size_t unmapped = 0;
->  	int ret = 0;
-> +	unsigned int min_pagesz = __ffs(vfio_pgsize_bitmap(iommu));
-> +	unsigned int requested_alignment = (min_pagesz < PAGE_SIZE) ?
-> +						PAGE_SIZE : min_pagesz;
+>  / {
+> @@ -54,6 +55,18 @@
+>  			reg = <0x000>;
+>  			enable-method = "psci";
+>  			cpu-idle-states = <&CPU_SLEEP_0>;
+> +			static-power-points = <
+> +				859000  43
+> +				908000  52
+> +				983000  86
+> +				1009000 123
+> +				1028000 138
+> +				1083000 172
+> +				1110900 180
+> +				1125000 192
 
-max_t ?
+What's the unit of power here? Is this power accurate? Or just a
+number representing the power ?
 
->  
-> -	mask = ((uint64_t)1 << __ffs(vfio_pgsize_bitmap(iommu))) - 1;
-> -
-> -	if (unmap->iova & mask)
-> +	if (!IS_ALIGNED(unmap->iova, requested_alignment))
->  		return -EINVAL;
-> -	if (!unmap->size || unmap->size & mask)
-> +	if (!unmap->size || !IS_ALIGNED(unmap->size, requested_alignment))
->  		return -EINVAL;
->  
-> -	WARN_ON(mask & PAGE_MASK);
-> -
->  	mutex_lock(&iommu->lock);
->  
->  	/*
-> @@ -553,25 +551,24 @@ static int vfio_dma_do_map(struct vfio_iommu *iommu,
->  	size_t size = map->size;
->  	long npage;
->  	int ret = 0, prot = 0;
-> -	uint64_t mask;
->  	struct vfio_dma *dma;
->  	unsigned long pfn;
-> +	unsigned int min_pagesz = __ffs(vfio_pgsize_bitmap(iommu));
-> +	unsigned int requested_alignment = (min_pagesz < PAGE_SIZE) ?
-> +						PAGE_SIZE : min_pagesz;
+> +			>;
+> +			dynamic-power-coefficient = <263>;
+> +			#cooling-cells = <2>;
+>  		};
 
-Same code here. Perhaps you need another function to get the alignment?
+@Rob: Looks like another good candidate for the OPP-v2 table? Power.
 
-Otherwise, this looks pretty straightforward to me; iommu_map will take
-care of splitting up the requests to the IOMMU driver so they are in the
-right chunks.
-
-Will
+-- 
+viresh
