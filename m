@@ -1,36 +1,44 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Wed, 28 Oct 2015 11:01:05 +0000
-Subject: [PATCH 1/2] arm64: Workaround renaming of __GFP_WAIT
-In-Reply-To: <20151028005333.GH27420@8bytes.org>
-References: <ecbbf6550654071f13d1bdc04b86dc4d69ad09b4.1445008695.git.robin.murphy@arm.com>
- <20151028005333.GH27420@8bytes.org>
-Message-ID: <5630AAF1.1050500@arm.com>
+From: joe@perches.com (Joe Perches)
+Date: Wed, 28 Oct 2015 04:06:39 -0700
+Subject: [PATCH] MAINTAINERS: Start using the 'reviewer' (R) tag
+In-Reply-To: <CABxcv=mzzcx3o0m3hYzcn0DyM2pEFDZ-ZgVCjChWGf+y4Xy78A@mail.gmail.com>
+References: <1445960557-24328-1-git-send-email-lee.jones@linaro.org>
+ <20151027172428.GB21070@earth> <20151027181555.GE5828@x1>
+ <1445971482.2757.27.camel@perches.com>
+ <CAJKOXPc_w2Dc8LvkCu_d+kjZZmYScXboQrpNWdicT2yfL_5D7Q@mail.gmail.com>
+ <20151028082446.GF5828@x1>
+ <CABxcv=mGZstqyrkB95hjDCYCvhDJDVD=ga-Fg_5yPtXETuWe=g@mail.gmail.com>
+ <20151028102832.GR5828@x1>
+ <CABxcv=mzzcx3o0m3hYzcn0DyM2pEFDZ-ZgVCjChWGf+y4Xy78A@mail.gmail.com>
+Message-ID: <1446030399.2757.83.camel@perches.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Joerg,
+On Wed, 2015-10-28 at 11:53 +0100, Javier Martinez Canillas wrote:
+> (Lee) think(s) that the difference between a maintainer and
+> a reviewer is if a branch with fixes / new features are kept and pull
+> requests sent while I think that the difference is the level of
+> involvement someone has with a driver regardless of how patches ends
+> in the subsystem tree (picked directly by subsystem maintainers or
+> sent through pull requests).
+> 
+> Is the first time I heard your definition but maybe I'm the one that
+> is wrong so it would be great to get a consensus on that and get it
+> documented somewhere.
 
-On 28/10/15 00:53, Joerg Roedel wrote:
-> Hi Robin,
->
-> On Fri, Oct 16, 2015 at 04:33:41PM +0100, Robin Murphy wrote:
->> The imminent renaming of __GFP_WAIT in the mm tree conflicts with its
->> use in the new IOMMU DMA ops; introduce a temporary local version of
->> its replacement to smooth over the transition.
->>
->> This patch should be reverted at 4.4-rc1.
->
-> I lost track here, are these two patches required in the iommu tree for
-> the next merge window?
+I think Lee is over-analyzing.
 
-Andrew has the equivalent of patch 2 as a fixup on top of Mel's series, 
-which Stephen is currently carrying as a merge resolution in -next. I'm 
-assuming this will go into the final merge as well, so as long as Linus 
-takes the IOMMU tree first we should be OK as-is.
+>From MAINTAINERS:
+	M: Mail patches to: FullName <address@domain>
+	R: Designated reviewer: FullName <address@domain>
+	   These reviewers should be CCed on patches.
+	S: Status, one of the following:
+	   Supported:	Someone is actually paid to look after this.
+	   Maintained:	Someone actually looks after it.
 
-Robin.
+"looking after" doesn't mean upstreaming.
 
->
->
-> 	Joerg
->
+The original threads for this were:
+
+http://lists.linuxfoundation.org/pipermail/ksummit-discuss/2014-May/000830.html
+https://lkml.org/lkml/2014/6/2/446
