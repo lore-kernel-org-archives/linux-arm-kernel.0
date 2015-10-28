@@ -1,61 +1,137 @@
-From: pramodku@broadcom.com (Pramod Kumar)
-Date: Wed, 28 Oct 2015 11:52:49 +0000
-Subject: [PATCH 07/11] pinctrl: use ngpios propety from DT
-In-Reply-To: <CACRpkdY1GDs6ypqCiY3iiv3DkfnHchnY+bWPoCqU=_sgn9f5vQ@mail.gmail.com>
-References: <1445233398-27129-1-git-send-email-pramodku@broadcom.com>
- <1445233398-27129-8-git-send-email-pramodku@broadcom.com>
- <CACRpkdY1GDs6ypqCiY3iiv3DkfnHchnY+bWPoCqU=_sgn9f5vQ@mail.gmail.com>
-Message-ID: <0C803592FC378B4E83922050AB46442A2AD742F0@SJEXCHMB10.corp.ad.broadcom.com>
+From: subbaraya.sundeep.bhatta@xilinx.com (Subbaraya Sundeep Bhatta)
+Date: Wed, 28 Oct 2015 11:55:07 +0000
+Subject: [RFC PATCH 1/2] usb: doc: Add bindings for ULPI platform driver
+In-Reply-To: <561A74E6.9050406@ti.com>
+References: <1443012841-13673-1-git-send-email-sbhatta@xilinx.com>
+ <20150924091034.GB27847@shlinux2>
+ <F1B223389110CE49B4CF055ABA2E5D3D78C9BCBF@XAP-PVEXMBX02.xlnx.xilinx.com>
+ <CAL_JsqK-aAY+DAwt0YH-mbBo+a9c7WPrBwJJoy3=FkT6ZX2A5w@mail.gmail.com>
+ <20150930161803.GI32625@saruman.tx.rr.com>
+ <CAGnW=Bb0pdv7i1N=WqZoQLDUpuGw=Xq=cM5ir2Ow25pUDYtvEA@mail.gmail.com>
+ <561A74E6.9050406@ti.com>
+Message-ID: <F1B223389110CE49B4CF055ABA2E5D3D78CA6D47@XAP-PVEXMBX02.xlnx.xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+Hi Kishon,
 
 > -----Original Message-----
-> From: Linus Walleij [mailto:linus.walleij at linaro.org]
-> Sent: 27 October 2015 15:22
-> To: Pramod Kumar
-> Cc: Rob Herring; Pawel Moll; Mark Rutland; Ian Campbell; Kumar Gala; Ray Jui;
-> Scott Branden; Russell King; linux-gpio at vger.kernel.org; bcm-kernel-feedback-
-> list; Jason Uy; Masahiro Yamada; Thomas Gleixner; Laurent Pinchart;
-> devicetree at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux-
-> kernel at vger.kernel.org; Jonas Gorski
-> Subject: Re: [PATCH 07/11] pinctrl: use ngpios propety from DT
+> From: Kishon Vijay Abraham I [mailto:kishon at ti.com]
+> Sent: Sunday, October 11, 2015 8:11 PM
+> To: Punnaiah Choudary Kalluri; balbi at ti.com
+> Cc: Rob Herring; Subbaraya Sundeep Bhatta; Peter Chen;
+> devicetree at vger.kernel.org; gregkh at linuxfoundation.org; linux-
+> usb at vger.kernel.org; linux-kernel at vger.kernel.org; linux-arm-
+> kernel at lists.infradead.org
+> Subject: Re: [RFC PATCH 1/2] usb: doc: Add bindings for ULPI platform driver
 > 
-> On Mon, Oct 19, 2015 at 7:43 AM, Pramod Kumar <pramodku@broadcom.com>
-> wrote:
+> Hi,
 > 
-> > Since identical hardware is used in several instances and all pins are
-> > not routed to pinctrl hence getting total number of gpios from DT make
-> > more sense hence stop using total number of gpios pins from drivers
-> > and extract it from DT.
+> On Sunday 11 October 2015 04:45 PM, punnaiah choudary kalluri wrote:
+> > On Wed, Sep 30, 2015 at 9:48 PM, Felipe Balbi <balbi@ti.com> wrote:
+> >> On Thu, Sep 24, 2015 at 11:18:01AM -0500, Rob Herring wrote:
+> >>> On Thu, Sep 24, 2015 at 4:26 AM, Subbaraya Sundeep Bhatta
+> >>> <subbaraya.sundeep.bhatta@xilinx.com> wrote:
+> >>>> Hi Peter,
+> >>>>
+> >>>>> -----Original Message-----
+> >>>>> From: Peter Chen [mailto:peter.chen at freescale.com]
+> >>>>> Sent: Thursday, September 24, 2015 2:41 PM
+> >>>>> To: Subbaraya Sundeep Bhatta
+> >>>>> Cc: balbi at ti.com; devicetree at vger.kernel.org; kishon at ti.com;
+> >>>>> gregkh at linuxfoundation.org; linux-usb at vger.kernel.org; linux-
+> >>>>> kernel at vger.kernel.org; Punnaiah Choudary Kalluri; Subbaraya
+> >>>>> Sundeep Bhatta; linux-arm-kernel at lists.infradead.org
+> >>>>> Subject: Re: [RFC PATCH 1/2] usb: doc: Add bindings for ULPI
+> >>>>> platform driver
+> >>>>>
+> >>>>> On Wed, Sep 23, 2015 at 06:24:01PM +0530, Subbaraya Sundeep
+> Bhatta
+> >>>>> wrote:
+> >>>>>> This patch adds binding doc info for generic ULPI PHYs platform
+> >>>>>> driver.
+> >>>>>>
+> >>>>>> Signed-off-by: Subbaraya Sundeep Bhatta <sbhatta@xilinx.com>
+> >>>>>> ---
+> >>>>>>  .../devicetree/bindings/usb/ulpi-platform-phy.txt  |   34
+> >>>>> ++++++++++++++++++++
+> >>>>>>  1 files changed, 34 insertions(+), 0 deletions(-)  create mode
+> >>>>>> 100644
+> >>>>>> Documentation/devicetree/bindings/usb/ulpi-platform-phy.txt
+> >>>>>>
+> >>>>>> diff --git
+> >>>>>> a/Documentation/devicetree/bindings/usb/ulpi-platform-phy.txt
+> >>>>>> b/Documentation/devicetree/bindings/usb/ulpi-platform-phy.txt
+> >>>>>> new file mode 100644
+> >>>>>> index 0000000..7b8cbb4
+> >>>>>> --- /dev/null
+> >>>>>> +++ b/Documentation/devicetree/bindings/usb/ulpi-platform-phy.txt
+> >>>>>> @@ -0,0 +1,34 @@
+> >>>>>> +Platform driver for generic ULPI PHYs
+> >>>>>> +
+> >>>>>> +Required properties:
+> >>>>>> +- compatible               : Should be "ulpi-phy"
+> >>>>>> +- reg                      : Physical base address and size of the USB
+> >>>>>> +                     controller registers map to which this PHY
+> >>>>>> +                     is connected.
+> >>>>>> +- view-port                : Should contain viewport register offset of the
+> >>>>>> +                     USB controller to which this PHY is
+> >>>>>> +connected Optional
+> >>>>>> +properties:
+> >>>>>> +- drv-vbus         : required if turning VBUS on/off has to be driven
+> >>>>>> +                     by writing to PHY. This feature depends on board
+> >>>>>> +                     design.
+> >>>>>> +
+> >>>>>> +Example:
+> >>>>>> +Below example shows the PHY binding for Chipidea USB controller
+> >>>>>> +which has ulpi viewport register at 0x0170
+> >>>>>> +
+> >>>>>> +           usb_phy0: phy0 {
+> >>>>>> +                   compatible = "ulpi-phy";
+> >>>>>> +                   reg = <0xe0002000 0x1000>;
+> >>>>>> +                   view-port = <0x0170>;
+> >>>>>> +                   drv-vbus;
+> >>>>>> +           };
+> >>>>>> +
+> >>>>>> +           usb0: usb at e0002000 {
+> >>>>>> +                        compatible = "chipidea,usb2";
+> >>>>>> +                        interrupt-parent = <&intc>;
+> >>>>>> +                        interrupts = <0 21 4>;
+> >>>>>> +                        reg = <0xe0002000 0x1000>;
+> >>>>>
+> >>>>> Although just call devm_ioremap twice for the same register region
+> >>>>> does not cause any errors, I am not sure if it will has other
+> >>>>> potential problems. Cc: arm list.
+> >>>>
+> >>>> Yes Peter I was also in doubt to call devm_ioremap twice for same register
+> region.
+> >>>> devm_ioremap_resource complained hence modified to devm_ioremap.
+> >>>> Thanks for adding arm-list.
+> >>>
+> >>> Don't put overlapping resources in the DT. Having 2 drivers
+> >>> accessing the same registers is not a clean or safe design.
+> >>
+> >> thanks, saves me the trouble of saying the same thing.
+> >>
+> >> Bottom line, if devm_ioremap_resource() fails, you're wrong. Just fix
+> >> your driver and move on.
 > >
-> > Signed-off-by: Pramod Kumar <pramodku@broadcom.com>
-> > Reviewed-by: Ray Jui <rjui@broadcom.com>
-> > Reviewed-by: Scott Branden <sbranden@broadcom.com>
+> > Any suggestions on how to move further?
+> > Chipidea controller provides ulpi view port register for accessing the
+> > usb phy registers. Now we want to add new driver for ulpi phy
+> > configuration and that obviously it need of ulpi view port register
+> > access. So, sharing the register space between these two drivers is necessary
+> here.
 > 
-> This patch is wrong.
-> 
-> Keep this per-compatible code, and only overrid the ngpios if and only if:
-> 
-> - The ngpios is set in the DT node
-> - The ngpios in the DT node is *smaller* than the hardware
->   defined number of GPIOs.
-> 
-> ngpios is for restricting the number of available lines due to routing etc, not to
-> define what the hardware has, because the hardware most certainly have all the
-> lines, it's just that you're not using all of them.
-> 
-> Yours,
-> Linus Walleij
+> Why not program ULPI the same way as DWC3 does?
 
-I discussed with ASIC team regarding this iProc GPIO block. They use a library to create the GPIOs block where "total number of GPIO pins( let say N) in GPIO block" is used as an parameter. 
-Library uses a construct for *a* GPIO pin. This gets instantiated N times to create a complete GPIO block with N pins.
+Sorry for delay in response, back from long vacation.
+Can we call generic PHY phy->power_on and power_off functions to do similar function as usb2_phy->set_vbus?
+I assume it is to power on whole PHY chip but not to enable 5V on VBUS line.
 
-All iProc based SoCs uses this library. So I'm not sure whether attaching "total number of GPIOs pins" to compatible-string make sense in this case. 
-I personally feel that passing this number from the DT makes more sense here. Any iProc based future as well as current SoCs would be able to use this driver without any change.
 
-Please advise us in this case.
-
-Regards,
-Pramod
+Thanks,
+Sundeep
+> 
+> Thanks
+> Kishon
