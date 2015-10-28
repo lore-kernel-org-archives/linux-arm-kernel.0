@@ -1,102 +1,204 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 28 Oct 2015 16:33:55 +0000
-Subject: [PATCH] MAINTAINERS: Start using the 'reviewer' (R) tag
-In-Reply-To: <3533886.bbrHZIjT1f@amdc1976>
-References: <1445960557-24328-1-git-send-email-lee.jones@linaro.org>
- <CAJKOXPc_w2Dc8LvkCu_d+kjZZmYScXboQrpNWdicT2yfL_5D7Q@mail.gmail.com>
- <20151028082446.GF5828@x1> <3533886.bbrHZIjT1f@amdc1976>
-Message-ID: <20151028163355.GH4058@x1>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 28 Oct 2015 16:40:53 +0000
+Subject: [PATCH v4] EDAC: Add ARM64 EDAC
+In-Reply-To: <1446048829-3359-1-git-send-email-brijeshkumar.singh@amd.com>
+References: <1446048829-3359-1-git-send-email-brijeshkumar.singh@amd.com>
+Message-ID: <20151028164053.GG25451@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 28 Oct 2015, Bartlomiej Zolnierkiewicz wrote:
-> On Wednesday, October 28, 2015 08:24:46 AM Lee Jones wrote:
-> > On Tue, 2015-10-27 at 18:15 +0000, Lee Jones wrote:
-> > > On Tue, 27 Oct 2015, Sebastian Reichel wrote:
-> > > > On Tue, Oct 27, 2015 at 03:42:37PM +0000, Lee Jones wrote:
-> > > > > Since eafbaac ("MAINTAINERS: Add "R:" designated-reviewers tag") we
-> > > > > have been able to tag specific people as Reviewers.  These are key
-> > > > > individuals who are tasked with or volunteer to review code submitted
-> > > > > to a subsystem or specific file.  However, according to MAINTAINERS
-> > > > > we have 1046 Maintainers and only a mere 22 Reviewers.  I believe
-> > > > > these numbers to be incorrect, as many of these Maintainers are in
-> > > > > fact Reviewers.
-> > 
-> > Most entries in MAINTAINERS seem to be vanity entries than actual
-> > active participants.  A person typically writes a driver, adds a
-> > MAINTAINER entry, then forgets about it and/or the hardware becomes
-> > outdated.
-> > 
-> > This I agree with.
-> > 
-> > On Wed, 28 Oct 2015, Krzysztof Kozlowski wrote:
-> > > 2015-10-28 3:44 GMT+09:00 Joe Perches <joe@perches.com>:
-> > > > On Tue, 2015-10-27 at 18:15 +0000, Lee Jones wrote:
-> > > > > On Tue, 27 Oct 2015, Sebastian Reichel wrote:> >
-> > > > > > I think you should CC the people, which are changed from "M:" to
-> > > > > > "R:", though.
-> > > > >
-> > > > > Yes, makes sense.
-> > > > >
-> > > > > I'd like to collect some Maintainer Acks first though.
-> > > >
-> > > > I think people from organizations like Samsung are actual
-> > > > maintainers not reviewers.
-> > 
-> > So this all hinges on how we are describing Maintainers and Reviewers.
-> > 
-> > My personal definition (until convinced otherwise) is that Reviewers
-> > care about their particular subsystem and/or files.  They conduct code
-> > reviews to ensure nothing gets broken and the code base stays in best
-> > possible state of worthiness.  On the other hand Maintainers usually
-> > conduct themselves as Reviewers but also have 'maintainership' duties
-> > as well; such as applying patches, *maintaining*, testing, rebasing,
-> > etc, an upstream branch and ultimately sending pull-requests to higher
-> > level Maintainers i.e. Linus.  Maintainers also have the ultimate say
-> > (unless over-ruled by Linus etc) over what gets applied.
-> > 
-> > > > Their drivers are not thrown over a wall and forgotten.
-> > > 
-> > > At least for Samsung Multifunction PMIC drivers (and some of Maxim
-> > > MUICs and PMICs) these are actively used by us in existing and new
-> > > products. They are also continuously extended and actually maintained.
-> > > This means that it is not only about review of new patches but also
-> > > about caring that nothing will become broken.
-> > 
-> > Exactly.  This what I expect of any good code Reviewer.
-> > 
-> > > I would prefer to leave the "SAMSUNG MULTIFUNCTION PMIC DEVICE
-> > > DRIVERS" entry as is - maintainers.
-> > 
-> > But you aren't maintaining the driver i.e. you don't collect patches
-> > and *maintain* them on an upstream branch.  Granted some of you guys
-> > are doing a great job of maintaining branches on your downstream or
-> > BSP kernels, but conduct a Reviewer type role for upstream.
-> > 
-> > You guys are pushing back like this is some kind of demotion.  That's
-> > not the case at all.  All it does is better describe the (very worthy)
-> > function you *actually* provide.
+Hi,
+
+On Wed, Oct 28, 2015 at 11:13:49AM -0500, Brijesh Singh wrote:
+> Add support for Cortex A57 and A53 EDAC driver.
 > 
-> It is actually a demotion from my POV:
+> Signed-off-by: Brijesh Singh <brijeshkumar.singh@amd.com>
+> CC: robh+dt at kernel.org
+> CC: pawel.moll at arm.com
+> CC: mark.rutland at arm.com
+> CC: ijc+devicetree at hellion.org.uk
+> CC: galak at codeaurora.org
+> CC: dougthompson at xmission.com
+> CC: bp at alien8.de
+> CC: mchehab at osg.samsung.com
+> CC: devicetree at vger.kernel.org
+> CC: guohanjun at huawei.com
+> CC: andre.przywara at arm.com
+> CC: arnd at arndb.de
+> CC: sboyd at codeaurora.org
+> CC: linux-kernel at vger.kernel.org
+> CC: linux-edac at vger.kernel.org
+> ---
+> Tested error reporting via rasdeamon on AMD seattle platform.
 > 
-> * "Reviewer" doesn't accurately describe the job of doing all the needed
->   testing, bug-fixing and additional contributions that is often done by
->   people without their own branches.
+> v4:
+> * remove THIS_MODULE assignment from platform_driver
+> * use module_platform_driver(), remove module_init() and module_exit()
+> * remove default n from Kconfig
 > 
-> * You don't know internal policies of all companies involved in Linux
->   Kernel development.  "Maintainer" is a well known term and sometimes
->   person's job status or "key performance indicators" may depend on it.
+> v3:
+> * change DT binding compatibilty string to 'cortex-a57-edac'
+> * remove A57/A53 prefix from register bit definition
+> * unify A57 and A53 L1/L2 error parsing functions
+> * use mc trace event function to report the error
+> * update Kconfig default to 'n'
+> 
+> v2:
+> * convert into generic arm64 edac driver
+> * remove AMD specific references from dt binding
+> * remove poll_msec property from dt binding
+> * add poll_msec as a module param, default is 100ms
+> * update copyright text
+> * define macro mnemonics for L1 and L2 RAMID
+> * check L2 error per-cluster instead of per core
+> * update function names
+> * use get_online_cpus() and put_online_cpus() to make L1 and L2 register 
+>   read hotplug-safe
+> * add error check in probe routine
+> 
+>  .../devicetree/bindings/edac/cortex-arm64-edac.txt |  15 +
+>  drivers/edac/Kconfig                               |   7 +
+>  drivers/edac/Makefile                              |   1 +
+>  drivers/edac/cortex_arm64_edac.c                   | 336 +++++++++++++++++++++
+>  4 files changed, 359 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/edac/cortex-arm64-edac.txt
+>  create mode 100644 drivers/edac/cortex_arm64_edac.c
+> 
+> diff --git a/Documentation/devicetree/bindings/edac/cortex-arm64-edac.txt b/Documentation/devicetree/bindings/edac/cortex-arm64-edac.txt
+> new file mode 100644
+> index 0000000..552f0c7
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/edac/cortex-arm64-edac.txt
+> @@ -0,0 +1,15 @@
+> +* ARM Cortex A57 and A53 L1/L2 cache error reporting
+> +
+> +CPU Memory Error Syndrome and L2 Memory Error Syndrome registers can be used
+> +for checking L1 and L2 memory errors.
+> +
+> +The following section describes the Cortex A57/A53 EDAC DT node binding.
+> +
+> +Required properties:
+> +- compatible: Should be "arm,cortex-a57-edac" or "arm,cortex-a53-edac"
+> +
+> +Example:
+> +	edac {
+> +		compatible = "arm,cortex-a57-edac";
+> +	};
+> +
 
-I'm going to drop the patch I think.
+This is insufficient for big.LITTLE, no interrupt is possible, and we
+haven't defined the rules for accessing the registers (e.g. whether
+write backs are permitted).
 
-Despite it being the correct thing to do from a logical perspective, I
-see it having too many personal, emotional and social issues/
-repercussions.
+Please see my prior comments [1] on those points.
 
-Let's let sleeping dogs lie.
+If we're going to use this feature directly within the kernel, we need
+to consider the envelope of possible implementations rather than your
+use-case alone.
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+> +static void parse_cpumerrsr(void *arg)
+> +{
+> +	int cpu, partnum, way;
+> +	unsigned int index = 0;
+> +	u64 val = read_cpumerrsr_el1();
+> +	int repeat_err, other_err;
+> +
+> +	/* we do not support fatal error handling so far */
+> +	if (CPUMERRSR_EL1_FATAL(val))
+> +		return;
+
+Silently ignoring fatal errors doesn't seem good.
+
+Shouldn't this be checked after the valid bit?
+
+> +	/* check if we have valid error before continuing */
+> +	if (!CPUMERRSR_EL1_VALID(val))
+> +		return;
+> +
+> +	cpu = smp_processor_id();
+> +	partnum = read_cpuid_part_number();
+> +	repeat_err = CPUMERRSR_EL1_REPEAT(val);
+> +	other_err = CPUMERRSR_EL1_OTHER(val);
+> +
+> +	/* way/bank and index address bit ranges are different between
+> +	 * A57 and A53 */
+> +	if (partnum == ARM_CPU_PART_CORTEX_A57) {
+> +		index = CPUMERRSR_EL1_INDEX(val, 0x1ffff);
+> +		way = CPUMERRSR_EL1_BANK_WAY(val, 0x1f);
+> +	} else {
+> +		index = CPUMERRSR_EL1_INDEX(val, 0xfff);
+> +		way = CPUMERRSR_EL1_BANK_WAY(val, 0x7);
+> +	}
+
+Can the bit ranges not be determined at probe time rather than reading
+the MIDR repeatedly?
+
+> +	edac_printk(KERN_CRIT, EDAC_MOD_STR, "CPU%d L1 error detected!\n", cpu);
+> +	edac_printk(KERN_CRIT, EDAC_MOD_STR, "index=%#x, RAMID=", index);
+> +
+> +	switch (CPUMERRSR_EL1_RAMID(val)) {
+> +	case L1_I_TAG_RAM:
+> +		pr_cont("'L1-I Tag RAM' (way %d)", way);
+> +		break;
+> +	case L1_I_DATA_RAM:
+> +		pr_cont("'L1-I Data RAM' (bank %d)", way);
+> +		break;
+> +	case L1_D_TAG_RAM:
+> +		pr_cont("'L1-D Tag RAM' (way %d)", way);
+> +		break;
+> +	case L1_D_DATA_RAM:
+> +		pr_cont("'L1-D Data RAM' (bank %d)", way);
+> +		break;
+> +	case L1_D_DIRTY_RAM:
+> +		pr_cont("'L1 Dirty RAM'");
+> +		break;
+> +	case TLB_RAM:
+> +		pr_cont("'TLB RAM'");
+> +		break;
+> +	default:
+> +		pr_cont("'unknown'");
+> +		break;
+> +	}
+> +
+> +	pr_cont(", repeat=%d, other=%d (CPUMERRSR_EL1=%#llx)\n", repeat_err,
+> +		other_err, val);
+> +
+> +	trace_mc_event(HW_EVENT_ERR_CORRECTED, "L1 non-fatal error",
+> +		       "", repeat_err, 0, 0, 0, -1, index, 0, 0, DRV_NAME);
+> +	write_cpumerrsr_el1(0);
+> +}
+
+The comments above also apply to parse_l2merrsr.
+
+> +static void cortex_arm64_edac_check(struct edac_device_ctl_info *edac_ctl)
+> +{
+> +	int cpu;
+> +	struct cpumask cluster_mask, old_mask;
+> +
+> +	cpumask_clear(&cluster_mask);
+> +	cpumask_clear(&old_mask);
+> +
+> +	get_online_cpus();
+> +	for_each_online_cpu(cpu) {
+> +		/* Check CPU L1 error */
+> +		smp_call_function_single(cpu, parse_cpumerrsr, NULL, 0);
+> +		cpumask_copy(&cluster_mask, topology_core_cpumask(cpu));
+> +		if (cpumask_equal(&cluster_mask, &old_mask))
+> +			continue;
+> +		cpumask_copy(&old_mask, &cluster_mask);
+> +		/* Check CPU L2 error */
+> +		smp_call_function_any(&cluster_mask, parse_l2merrsr, NULL, 0);
+> +	}
+
+I don't think the use of old_mask is sufficient here, given the mapping
+of logical to physical ID is arbitrary. For example, we could have CPUs
+0,5,6,7 in one cluster, and CPUs 1,2,3,4 in another, and in that case
+we'd check the first cluster twice.
+
+This also is wrong for big.LITTLE; we can't necessarily check on every
+CPU.
+
+Thanks,
+Mark.
+
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-October/380942.html
