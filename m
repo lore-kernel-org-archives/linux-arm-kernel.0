@@ -1,34 +1,34 @@
-From: david@protonic.nl (David Jander)
-Date: Wed, 28 Oct 2015 13:36:02 +0100
-Subject: BUG: fsl FEC ethernet tx checksum offloading doesn't work with
- RMII interface
-In-Reply-To: <CAOMZO5D=7Okx-Lju5uzMCXC+_8ETDVmEOfWU7ZD0byZszDSV3A@mail.gmail.com>
-References: <20151028104854.025430ce@archvile>
- <20151028111414.GJ8644@n2100.arm.linux.org.uk>
- <20151028121918.4884b42e@archvile>
- <CAOMZO5D=7Okx-Lju5uzMCXC+_8ETDVmEOfWU7ZD0byZszDSV3A@mail.gmail.com>
-Message-ID: <20151028133602.0f48dac9@archvile>
+From: slash.tmp@free.fr (Mason)
+Date: Wed, 28 Oct 2015 13:36:19 +0100
+Subject: CPU_METHOD_OF_DECLARE() with Linux as non-secure OS
+Message-ID: <5630C143.5080103@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 28 Oct 2015 10:31:17 -0200
-Fabio Estevam <festevam@gmail.com> wrote:
+Hello,
 
-> On Wed, Oct 28, 2015 at 9:19 AM, David Jander <david@protonic.nl> wrote:
-> 
-> > Sorry, I somehow assumed it was obvious I'd report against latest
-> > mainline... I'm on 4.3-rc7.
-> 
-> Are you able to find out a previous kernel version that does not
-> exhibit this failure?
+I'm working on a dual-core SoC (Cortex-A9 MPCore) with Linux running
+as the non-secure OS. The secure OS implements some of the APIs used
+in OMAP2 via SMC.
 
-I can search further down, but 4.1 is also broken.
-Are there specific changes or versions you are suspicious of?
-Russel mentioned something similar being fixed in the past... any pointers to
-this fix, so I can investigate whether this has any relation?
+To start the second core, I used to define .smp in my DT_MACHINE_START
+definition, but Arnd wrote: "There are other ways to do [.smp and .restart]
+too, see CPU_METHOD_OF_DECLARE() and register_restart_handler()."
 
-Best regards,
+Is CPU_METHOD_OF_DECLARE() the way to go?
+Is it "compatible" with executing smc to ask the secure OS to do whatever
+is needed to start the second core? (I don't understand why starting cores
+is secure OS responsibility.)
 
--- 
-David Jander
-Protonic Holland.
+I've located three relevant secure OS services:
+get_aux_core_boot
+set_aux_core_boot0
+set_aux_core_boot_addr
+
+I'm looking for guidance. What mach-* should I take as a reference to
+implement "second core startup from non-secure OS"?
+
+An ARM engineer suggested PSCI a while back, but I can't change the
+secure OS API at this time.
+
+Regards.
