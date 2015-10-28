@@ -1,34 +1,91 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Wed, 28 Oct 2015 10:54:58 +0000
-Subject: [PATCH] ARM64: juno: disable NOR flash node by default
-In-Reply-To: <1446025195-9264-1-git-send-email-linus.walleij@linaro.org>
-References: <1446025195-9264-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <5630A982.5080505@arm.com>
+From: tomasz.nowicki@linaro.org (Tomasz Nowicki)
+Date: Wed, 28 Oct 2015 11:56:19 +0100
+Subject: [Linaro-acpi] [PATCH V1 07/11] XEN / PCI: Remove the dependence
+ on arch x86 when PCI_MMCONFIG=y
+In-Reply-To: <alpine.DEB.2.02.1510281047460.15801@kaball.uk.xensource.com>
+References: <1445963922-22711-1-git-send-email-tn@semihalf.com>
+ <1445963922-22711-8-git-send-email-tn@semihalf.com>
+ <562FAA88.3020609@linaro.org> <562FB3A5.3050500@oracle.com>
+ <alpine.DEB.2.02.1510281047460.15801@kaball.uk.xensource.com>
+Message-ID: <5630A9D3.1030607@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 28/10/15 09:39, Linus Walleij wrote:
-> After discussing on the mailing list it turns out that
-> accessing the flash memory from the kernel can disrupt CPU
-> sleep states and CPU hotplugging, so let's disable this
-> DT node by default. Setups that want to access the flash
-> can modify this entry to enable the flash again.
+On 28.10.2015 11:49, Stefano Stabellini wrote:
+> On Tue, 27 Oct 2015, Boris Ostrovsky wrote:
+>> On 10/27/2015 12:47 PM, Tomasz Nowicki wrote:
+>>> + Stefano
+>>>
+>>> On 27.10.2015 17:38, Tomasz Nowicki wrote:
+>>>> From: Hanjun Guo <hanjun.guo@linaro.org>
+>>>>
+>>>> In drivers/xen/pci.c, there are arch x86 dependent codes when
+>>>> CONFIG_PCI_MMCONFIG is enabled, since CONFIG_PCI_MMCONFIG
+>>>> depends on ACPI, so this will prevent XEN PCI running on other
+>>>> architectures using ACPI with PCI_MMCONFIG enabled (such as ARM64).
+>>>>
+>>>> Fortunatly, it can be sloved in a simple way. In drivers/xen/pci.c,
+>>>> the only x86 dependent code is if ((pci_probe & PCI_PROBE_MMCONF) == 0),
+>>>> and it's defined in asm/pci_x86.h, the code means that
+>>>> if the PCI resource is not probed in PCI_PROBE_MMCONF way, just
+>>>> ingnore the xen mcfg init. Actually this is duplicate, because
+>>>> if PCI resource is not probed in PCI_PROBE_MMCONF way, the
+>>>> pci_mmconfig_list will be empty, and the if (list_empty())
+>>>> after it will do the same job.
+>>>>
+>>>> So just remove the arch related code and the head file, this
+>>>> will be no functional change for x86, and also makes xen/pci.c
+>>>> usable for other architectures.
+>>>>
+>>>> Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+>>>> CC: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
+>>>> CC: Boris Ostrovsky <boris.ostrovsky@oracle.com>
+>>>> ---
+>>>>    drivers/xen/pci.c | 6 ------
+>>>>    1 file changed, 6 deletions(-)
+>>>>
+>>>> diff --git a/drivers/xen/pci.c b/drivers/xen/pci.c
+>>>> index 6785ebb..9a8dbe3 100644
+>>>> --- a/drivers/xen/pci.c
+>>>> +++ b/drivers/xen/pci.c
+>>>> @@ -28,9 +28,6 @@
+>>>>    #include <asm/xen/hypervisor.h>
+>>>>    #include <asm/xen/hypercall.h>
+>>>>    #include "../pci/pci.h"
+>>>> -#ifdef CONFIG_PCI_MMCONFIG
+>>>> -#include <asm/pci_x86.h>
+>>>> -#endif
+>>
+>> Assuming this still compiles on x86 now that this include file is removed
+>>
+>> Reviewed-by: Boris Ostrovsky <boris.ostrovsky@oracle.com>
 >
-> Quoting Sudeep Holla: "the firmware assumes the flash is
-> always in read mode while Linux leaves NOR flash in
-> "read id" mode after initialization."
+> I think it does not:
 >
-> Reported-by: Sudeep Holla <sudeep.holla@arm.com>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Sudeep Holla <sudeep.holla@arm.com>
+> drivers/xen/pci.c: In function ?xen_mcfg_late?:
+> drivers/xen/pci.c:221:18: error: ?pci_mmcfg_list? undeclared (first use in this function)
+> drivers/xen/pci.c:221:18: note: each undeclared identifier is reported only once for each f
 
-Thanks for the patch. I too wrote one last night after I found
-NOR flash was added in arm-soc -next.
+Right, we need:
++#include <linux/ecam.h>
 
-Acked-by: Sudeep Holla <sudeep.holla@arm.com>
+Will fix this in next version, thanks!
 
--- 
-Regards,
-Sudeep
+Tomasz
+
+>
+>
+>>>>
+>>>>    static bool __read_mostly pci_seg_supported = true;
+>>>>
+>>>> @@ -222,9 +219,6 @@ static int __init xen_mcfg_late(void)
+>>>>        if (!xen_initial_domain())
+>>>>            return 0;
+>>>>
+>>>> -    if ((pci_probe & PCI_PROBE_MMCONF) == 0)
+>>>> -        return 0;
+>>>> -
+>>>>        if (list_empty(&pci_mmcfg_list))
+>>>>            return 0;
+>>>>
+>>>>
