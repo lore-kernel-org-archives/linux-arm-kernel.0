@@ -1,65 +1,134 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 28 Oct 2015 11:29:34 +0000
-Subject: [PATCH] ARM64: juno: disable NOR flash node by default
-In-Reply-To: <1446025195-9264-1-git-send-email-linus.walleij@linaro.org>
-References: <1446025195-9264-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <20151028112933.GB24930@leverpostej>
+From: Liviu.Dudau@arm.com (Liviu.Dudau at arm.com)
+Date: Wed, 28 Oct 2015 11:38:37 +0000
+Subject: [PATCH V1 10/11] pci, acpi: Provide generic way to assign bus
+ domain number.
+In-Reply-To: <1445963922-22711-11-git-send-email-tn@semihalf.com>
+References: <1445963922-22711-1-git-send-email-tn@semihalf.com>
+ <1445963922-22711-11-git-send-email-tn@semihalf.com>
+Message-ID: <20151028113837.GK963@e106497-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 28, 2015 at 10:39:55AM +0100, Linus Walleij wrote:
-> After discussing on the mailing list it turns out that
-> accessing the flash memory from the kernel can disrupt CPU
-> sleep states and CPU hotplugging, so let's disable this
-> DT node by default. Setups that want to access the flash
-> can modify this entry to enable the flash again.
+On Tue, Oct 27, 2015 at 05:38:41PM +0100, Tomasz Nowicki wrote:
+> Architectures which support PCI_DOMAINS_GENERIC (like ARM64)
+> cannot call pci_bus_assign_domain_nr along ACPI PCI host bridge
+> initialization since this function needs valid parent device reference
+> to be able to retrieve domain number (aka segment).
 > 
-> Quoting Sudeep Holla: "the firmware assumes the flash is
-> always in read mode while Linux leaves NOR flash in
-> "read id" mode after initialization."
+> We can omit that blocker and pass down host bridge device via
+> pci_create_root_bus parameter and then be able to evaluate _SEG method
+> being in pci_bus_assign_domain_nr.
 > 
-> Reported-by: Sudeep Holla <sudeep.holla@arm.com>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Sudeep Holla <sudeep.holla@arm.com>
-> Cc: Liviu Dudau <Liviu.Dudau@arm.com>
-> Cc: Lorenzo Pieralisi <Lorenzo.Pieralisi@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Leif Lindholm <leif.lindholm@arm.com>
-> Cc: Ryan Harkin <ryan.harkin@linaro.org>
-> Fixes: 5078f77e1443 "ARM64: juno: add NOR flash to device tree"
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-
-Acked-by: Mark Rutland <mark.rutland@arm.com>
-
-Mark.
-
+> Note that _SEG method is optional, therefore _SEG absence means
+> that all PCI buses belong to domain 0.
+> 
+> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
 > ---
-> ARM SoC folks: please apply this as a fix for the upcoming v4.4
-> merge window, directly to the branch where the original commit
-> resides (appears to be directly on the for-next branch or
-> something).
-> ---
->  arch/arm64/boot/dts/arm/juno-motherboard.dtsi | 7 +++++++
->  1 file changed, 7 insertions(+)
+>  drivers/acpi/pci_root.c |  2 +-
+>  drivers/pci/pci.c       | 32 +++++++++++++++++++++++++++-----
+>  2 files changed, 28 insertions(+), 6 deletions(-)
 > 
-> diff --git a/arch/arm64/boot/dts/arm/juno-motherboard.dtsi b/arch/arm64/boot/dts/arm/juno-motherboard.dtsi
-> index c7c99a42e2e9..8c029ee2a5b5 100644
-> --- a/arch/arm64/boot/dts/arm/juno-motherboard.dtsi
-> +++ b/arch/arm64/boot/dts/arm/juno-motherboard.dtsi
-> @@ -109,6 +109,13 @@
->  				linux,part-probe = "afs";
->  				reg = <0 0x00000000 0x04000000>;
->  				bank-width = <4>;
-> +				/*
-> +				 * Unfortunately, accessing the flash disturbs
-> +				 * the CPU idle states (suspend) and CPU
-> +				 * hotplug of the platform. For this reason,
-> +				 * flash hardware access is disabled by default.
-> +				 */
-> +				status = "disabled";
->  			};
+> diff --git a/drivers/acpi/pci_root.c b/drivers/acpi/pci_root.c
+> index 850d7bf..e682dc6 100644
+> --- a/drivers/acpi/pci_root.c
+> +++ b/drivers/acpi/pci_root.c
+> @@ -839,7 +839,7 @@ struct pci_bus *acpi_pci_root_create(struct acpi_pci_root *root,
 >  
->  			ethernet at 2,00000000 {
+>  	pci_acpi_root_add_resources(info);
+>  	pci_add_resource(&info->resources, &root->secondary);
+> -	bus = pci_create_root_bus(NULL, busnum, ops->pci_ops,
+> +	bus = pci_create_root_bus(&device->dev, busnum, ops->pci_ops,
+>  				  sysdata, &info->resources);
+
+Not sure this change should be in this patch, I don't see the relation.
+
+To put it differently: I think the patch should introduce the retrieval of the
+domain number from _SEG method and leave the passing of a valid host bridge device
+to a more appropriate patch.
+
+
+>  	if (!bus)
+>  		goto out_release_info;
+> diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
+> index 6a9a111..17d1857 100644
+> --- a/drivers/pci/pci.c
+> +++ b/drivers/pci/pci.c
+> @@ -25,6 +25,7 @@
+>  #include <linux/device.h>
+>  #include <linux/pm_runtime.h>
+>  #include <linux/pci_hotplug.h>
+> +#include <linux/acpi.h>
+>  #include <asm-generic/pci-bridge.h>
+>  #include <asm/setup.h>
+>  #include "pci.h"
+> @@ -4501,7 +4502,7 @@ int pci_get_new_domain_nr(void)
+>  void pci_bus_assign_domain_nr(struct pci_bus *bus, struct device *parent)
+>  {
+>  	static int use_dt_domains = -1;
+> -	int domain = of_get_pci_domain_nr(parent->of_node);
+> +	int domain;
+>  
+>  	/*
+>  	 * Check DT domain and use_dt_domains values.
+> @@ -4523,14 +4524,35 @@ void pci_bus_assign_domain_nr(struct pci_bus *bus, struct device *parent)
+>  	 * API and update the use_dt_domains value to keep track of method we
+>  	 * are using to assign domain numbers (use_dt_domains = 0).
+>  	 *
+> +	 * IF ACPI, we expect non-DT method (use_dt_domains == -1)
+> +	 * and call _SEG method for corresponding host bridge device.
+> +	 * If _SEG method does not exist, following ACPI spec (6.5.6)
+> +	 * all PCI buses belong to domain 0.
+> +	 *
+>  	 * All other combinations imply we have a platform that is trying
+> -	 * to mix domain numbers obtained from DT and pci_get_new_domain_nr(),
+> -	 * which is a recipe for domain mishandling and it is prevented by
+> -	 * invalidating the domain value (domain = -1) and printing a
+> -	 * corresponding error.
+> +	 * to mix domain numbers obtained from DT, ACPI and
+> +	 * pci_get_new_domain_nr(), which is a recipe for domain mishandling and
+> +	 * it is prevented by invalidating the domain value (domain = -1) and
+> +	 * printing a corresponding error.
+>  	 */
+> +
+> +	domain = of_get_pci_domain_nr(parent->of_node);
+
+Not sure what you've got here by splitting the original line into two other than an increase
+in the change count.
+
+Otherwise, it looks sensible.
+
+Reviewed-by: Liviu Dudau <Liviu.Dudau@arm.com>
+
+
+>  	if (domain >= 0 && use_dt_domains) {
+>  		use_dt_domains = 1;
+> +#ifdef CONFIG_ACPI
+> +	} else if (!acpi_disabled && use_dt_domains == -1) {
+> +		struct acpi_device *acpi_dev = to_acpi_device(parent);
+> +		unsigned long long segment = 0;
+> +		acpi_status status;
+> +
+> +		status = acpi_evaluate_integer(acpi_dev->handle,
+> +					       METHOD_NAME__SEG, NULL,
+> +					       &segment);
+> +		if (ACPI_FAILURE(status) && status != AE_NOT_FOUND)
+> +			dev_err(&acpi_dev->dev,  "can't evaluate _SEG\n");
+> +
+> +		domain = segment;
+> +#endif
+>  	} else if (domain < 0 && use_dt_domains != 1) {
+>  		use_dt_domains = 0;
+>  		domain = pci_get_new_domain_nr();
 > -- 
-> 2.4.3
+> 1.9.1
 > 
+
+-- 
+====================
+| I would like to |
+| fix the world,  |
+| but they're not |
+| giving me the   |
+ \ source code!  /
+  ---------------
+    ?\_(?)_/?
