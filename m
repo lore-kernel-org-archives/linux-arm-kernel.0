@@ -1,36 +1,24 @@
-From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
-Date: Wed, 28 Oct 2015 10:39:07 +0100
-Subject: [PATCH] MAINTAINERS: Start using the 'reviewer' (R) tag
-In-Reply-To: <56309419.4060908@samsung.com>
-References: <1445960557-24328-1-git-send-email-lee.jones@linaro.org>
- <20151027172428.GB21070@earth> <20151027181555.GE5828@x1>
- <1445971482.2757.27.camel@perches.com>
- <CAJKOXPc_w2Dc8LvkCu_d+kjZZmYScXboQrpNWdicT2yfL_5D7Q@mail.gmail.com>
- <20151028082446.GF5828@x1> <56309419.4060908@samsung.com>
-Message-ID: <20151028093907.GP4931@pengutronix.de>
+From: p.fedin@samsung.com (Pavel Fedin)
+Date: Wed, 28 Oct 2015 12:39:43 +0300
+Subject: [PATCH v2 1/4] ARM: dts: Add SROMc to Exynos 5410
+In-Reply-To: <563095BE.9050106@samsung.com>
+References: <cover.1445935215.git.p.fedin@samsung.com>
+ <91ae80f172192fa4dbc8bf8ee5a9068661592de6.1445935215.git.p.fedin@samsung.com>
+ <56302F1F.5090206@samsung.com> <009001d1114f$3c7a1f60$b56e5e20$@samsung.com>
+ <56307824.1050302@samsung.com> <563095BE.9050106@samsung.com>
+Message-ID: <003101d11164$93c83b70$bb58b250$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+ Hello!
 
-On Wed, Oct 28, 2015 at 06:23:37PM +0900, Krzysztof Kozlowski wrote:
-> On 28.10.2015 17:24, Lee Jones wrote:
-> > You guys are pushing back like this is some kind of demotion.
-> > That's not the case at all.  All it does is better describe the (very
-> > worthy) function you *actually* provide.
-> 
-> It is getting into dispute about entire change of yours... which is not
-> what I want. I agree with your general idea but I was referring only to
-> that particular case - the Samsung PMICs (and Maxim PMICs/MUICs which
-> would fall into same category).
+> There is no offset such as SROM_BC{4,5} at least in these SoC
+> manuals. Accordingly I modified size from 0x100 to 0x10.
 
-Not being affected by this change, I wonder what the technical
-difference is if someone is listed as reviewer instead of maintainer.
-Does get_maintainer.pl behave differently?
+ 0x10 is indeed an offset for SROM_BC3. But, it occupies 4 bytes by itself, and you have to include it, because you are describing
+*SIZE* of the region. :)
 
-Best regards
-Uwe
-
--- 
-Pengutronix e.K.                           | Uwe Kleine-K?nig            |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Kind regards,
+Pavel Fedin
+Expert Engineer
+Samsung Electronics Research center Russia
