@@ -1,12 +1,12 @@
 From: ykk@rock-chips.com (Yakir Yang)
-Date: Wed, 28 Oct 2015 09:46:35 +0800
+Date: Wed, 28 Oct 2015 09:49:58 +0800
 Subject: [PATCH v7 10/17] phy: Add driver for rockchip Display Port PHY
 In-Reply-To: <2304066.jCpsGbPbCP@phil>
 References: <1445599415-30856-1-git-send-email-ykk@rock-chips.com>
  <1445655964-15237-1-git-send-email-ykk@rock-chips.com>
  <1445655964-15237-5-git-send-email-ykk@rock-chips.com>
  <2304066.jCpsGbPbCP@phil>
-Message-ID: <563028FB.8030501@rock-chips.com>
+Message-ID: <563029C6.5000807@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -61,11 +61,7 @@ On 10/28/2015 05:23 AM, Heiko Stuebner wrote:
 >
 > You could also just use/copy the HIWORD_MASK macro we use for example
 > in the clock controller.
-
-Great, thanks.
-
-- Yakir
-
+>
 >
 >> +
 >> +struct rockchip_dp_phy {
@@ -95,7 +91,11 @@ Great, thanks.
 >
 > with these things fixed,
 > Reviewed-by: Heiko Stuebner <heiko@sntech.de>
->
+
+Oops, thanks
+
+- Yakir
+
 >
 > Cheers,
 > Heiko
