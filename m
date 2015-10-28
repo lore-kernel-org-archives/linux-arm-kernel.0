@@ -1,65 +1,231 @@
-From: cov@codeaurora.org (Christopher Covington)
-Date: Wed, 28 Oct 2015 10:14:24 -0400
-Subject: [PATCH] arm: perf: Add event descriptions
-In-Reply-To: <20151027160412.GI3091@leverpostej>
-References: <20150804001522.GA13214@dreric01-gentoo.localdomain>
- <20150817205809.GA16506@dreric01-gentoo.localdomain>
- <20150826165148.GF30466@arm.com>
- <20150817214035.GA25775@dreric01-gentoo.localdomain>
- <20150924175257.GH7356@arm.com> <20151007112011.GH16065@arm.com>
- <562F9C44.50702@codeaurora.org> <20151027160412.GI3091@leverpostej>
-Message-ID: <5630D840.6050706@codeaurora.org>
+From: javier@dowhile0.org (Javier Martinez Canillas)
+Date: Wed, 28 Oct 2015 15:09:13 +0100
+Subject: [PATCH] MAINTAINERS: Start using the 'reviewer' (R) tag
+In-Reply-To: <20151028133438.GC4058@x1>
+References: <CAJKOXPc_w2Dc8LvkCu_d+kjZZmYScXboQrpNWdicT2yfL_5D7Q@mail.gmail.com>
+ <20151028082446.GF5828@x1>
+ <CABxcv=mGZstqyrkB95hjDCYCvhDJDVD=ga-Fg_5yPtXETuWe=g@mail.gmail.com>
+ <20151028102832.GR5828@x1>
+ <CABxcv=mzzcx3o0m3hYzcn0DyM2pEFDZ-ZgVCjChWGf+y4Xy78A@mail.gmail.com>
+ <1446030399.2757.83.camel@perches.com>
+ <CABxcv=m+aMgtKPA-WBX9rTW8c3pnMmZgNG=NvnbaeOchdZ87hg@mail.gmail.com>
+ <20151028113932.GS5828@x1> <20151028121454.GA4058@x1>
+ <CABxcv=kCuYaYWgnvEUuTGv1RXdS6_3DR=6fnzHhAh7V-KFfCrQ@mail.gmail.com>
+ <20151028133438.GC4058@x1>
+Message-ID: <CABxcv==Ag3ARUtQYZdfqBELAJ_CwU3to9YxmgG1yBbUJ-h9xrw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/27/2015 12:04 PM, Mark Rutland wrote:
-> On Tue, Oct 27, 2015 at 11:46:12AM -0400, Christopher Covington wrote:
->> On 10/07/2015 07:20 AM, Will Deacon wrote:
->>> Hi again, Drew,
->>>
->>> On Thu, Sep 24, 2015 at 06:52:57PM +0100, Will Deacon wrote:
->>>> On Mon, Aug 17, 2015 at 10:40:36PM +0100, Drew Richardson wrote:
->>>>> So my suggestion to solve the problem is that the kernel can have the
->>>>> list of events as proposed in the patch.
->>>>
->>>> Sorry, but I just don't buy this argument. Your problem is that the user
->>>> needs to be running an up-to-date perf tool, but with your proposed
->>>> solution, you're asking them to update the *kernel* instead, which is
->>>> (unfortunately) one of the hardest pieces of software to upgrade on a
->>>> typical ARM platform.
->>>
->>> I've spent some time thinking about this and, actually, it makes sense
->>> to do this for the architected events. These event numbers are guaranteed
->>> to be portable between CPUs, so if we expose those through sysfs then
->>> we don't have this dependency on updating the kernel for newer cores
->>> (well, once the initial period without your patch has expired). It's the
->>> noon-portable, micro-architectural events that I object to.
->>>
->>> So how about you roll a new version of this patch just exposing the
->>> architected events and making use of the macros in perf_event.h to make
->>> it a bit tidier (PMU_EVENT_ATTR, PMU_EVENT_ATTR_STRING etc)?
->>>
->>> Be aware that there's a fair amount of arm64 perf patches queue for 4.4,
->>> since we're moving over to the code in drivers/perf/. Hopefully these
->>> will appear on the arm64 for-next/core branch shortly.
+Hello Lee,
+
+On Wed, Oct 28, 2015 at 2:34 PM, Lee Jones <lee.jones@linaro.org> wrote:
+> On Wed, 28 Oct 2015, Javier Martinez Canillas wrote:
+>> On Wed, Oct 28, 2015 at 1:14 PM, Lee Jones <lee.jones@linaro.org> wrote:
+>> > On Wed, 28 Oct 2015, Lee Jones wrote:
+>> >
+>> >> On Wed, 28 Oct 2015, Javier Martinez Canillas wrote:
+>> >>
+>> >> > Hello Joe,
+>> >> >
+>> >> > On Wed, Oct 28, 2015 at 12:06 PM, Joe Perches <joe@perches.com> wrote:
+>> >> > > On Wed, 2015-10-28 at 11:53 +0100, Javier Martinez Canillas wrote:
+>> >> > >> (Lee) think(s) that the difference between a maintainer and
+>> >> > >> a reviewer is if a branch with fixes / new features are kept and pull
+>> >> > >> requests sent while I think that the difference is the level of
+>> >> > >> involvement someone has with a driver regardless of how patches ends
+>> >> > >> in the subsystem tree (picked directly by subsystem maintainers or
+>> >> > >> sent through pull requests).
+>> >> > >>
+>> >> > >> Is the first time I heard your definition but maybe I'm the one that
+>> >> > >> is wrong so it would be great to get a consensus on that and get it
+>> >> > >> documented somewhere.
+>> >> > >
+>> >> > > I think Lee is over-analyzing.
+>> >> > >
+>> >> > > From MAINTAINERS:
+>> >> > >         M: Mail patches to: FullName <address@domain>
+>> >> > >         R: Designated reviewer: FullName <address@domain>
+>> >> > >            These reviewers should be CCed on patches.
+>> >> > >         S: Status, one of the following:
+>> >> > >            Supported:   Someone is actually paid to look after this.
+>> >> > >            Maintained:  Someone actually looks after it.
+>> >> > >
+>> >> > > "looking after" doesn't mean upstreaming.
+>> >> > >
+>> >> >
+>> >> > Agreed and upstreaming doesn't mean sending pull request, you can for
+>> >> > example upstream the downstream changes for a driver you maintain by
+>> >> > posting patches or ack patches others post and let the subsystem
+>> >> > maintainer to pick those (even if you are listed as the driver
+>> >> > maintainer in MAINTAINERS).
+>> >> >
+>> >> > So by following Lee's definition, then most drivers' maintainers
+>> >> > should not be called maintainers since keeping a tree with patches for
+>> >> > both fixes and new features, sending pull requests, etc is only
+>> >> > justified for drivers that have a lot of changes per release. Is not
+>> >> > worth it for drivers that are in "maintenance mode" where only bugs
+>> >> > are fixed every once in a while or features are seldom added.
+>> >>
+>> >> Exactly right.
+>> >>
+>> >> Although, it looks like M: doesn't even mean Maintainer.  If it did, I
+>> >> would have made these points over and over until death (or until I got
+>> >> bored).  However, as M: actually means "Mail patches to", there seems
+>> >> to be very little difference between that and "Designated reviewer"
+>> >> and makes me wonder why the R: tag was ever even introduced.  I guess
+>> >> all of the other guys in the threads below also thought M: meant
+>> >> Maintainer, or else they would have just added poor old Josh as a
+>> >> "Mail patches to" recipient and been done with it.
+>> >
+>> > Ah, but wait.  get_maintainer.pl *does* assume M means Maintainer
+>> > doesn't it?  Which is why this came about.  So if we have a "Mail
+>> > patches to" entry, get_maintainer.pl tells the user that this is a
 >>
->> Have you considered using OF/ACPI to describe this aspect of the hardware?
-> 
-> FW-provided data structures are going to be harder to upgrade than the
-> kernel, so the same argument applies as with placing this data in the
-> kernel (if anything, more strongly).
+>> Joe already answered but I'll elaborate a little bit:
+>>
+>> "M:" means "Mail patches to" and "S:" means "Status" so what
+>> get_maintainers.pl is reports the person in "M:" printing the status
+>> of the file(s).
+>>
+>> So for example if the file has "S: Supported" then the person listed
+>> in "M:" is shown as "supporter" while if the status is "S:
+>> Maintained", the person is listed as "maintainer".
+>>
+>> There isn't a "Reviewed" status to specify files that are looked by
+>> "Designated reviewers", it can be added but I don't see the reason of
+>> it.
+>
+> Not sure why you wrote all of this.  We know *why* get_maintainer.pl
+> does what it does.  What I'm saying is, that I personally believe this
+> is the wrong behaviour in what I'm *guessing* is the majority of the
+> time.
+>
 
-A convenient place for workarounds is great, when necessary, but I don't see
-why Plan A for hardware description should be anything other than standardized
-hardware description mechanisms.
+Ok sorry if it was clear to you already.
 
-Why are you eager to inflate the expectations of firmware when it comes to
-power state coordination but reluctant to rely on firmware for describing
-performance monitor events?
+>> > Maintainer, which (given that there are over 1000 unique M: entries
+>> > and I know that there are no where near that many actual Maintainers)
+>> > means that it's printing out incorrect information most of the time.
+>>
+>> Well, that's correct according to your definition of maintainer
+>> (people with a tree that sends pull requests) but I can believe that
+>> there are 1K unique maintainers for different small components
+>> (without taking into account what components may be obsolete / not
+>> used anymore) even if these maintainers don't send pull request
+>> because the patch load is low and rely on subsystem maintainers to
+>> pick directly from the list with their Acks.
+>
+> Then they are not Maintainers.  They are Reviewers who rely on
+> Maintainers.  In your example above it's the Maintainers that are
+> Maintainers and the people who review the code are Reviewers.  The
+> clues are in the words. ;)
+>
 
-Christopher Covington
+They are not maintainers according to your definition of maintainer
+that doesn't seem what most people agree with.
 
--- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+>> For me the maintainer is that a) cares about the file and makes sure
+>> that things remain working, fix issues, reviews patches from others,
+>> etc b) is someone that actually understand the code in the files. A
+>> subsystem maintainer has the last word of what gets merged into the
+>> subsystem but may not be familiar with code under the subsystem and
+>> relies on the file / driver maintainer to Ack the patch as correct
+>> since that person is the one that knows the code.
+>
+> Then what is a Reviewer?
+>
+
+As I mentioned before, I think a reviewer is someone who is interested
+in a given file / driver / subsystem and reviews patches to the list
+but does not have an authoritative answer on that file. I gave as an
+example that I review patches posted for Exynos SoC support although
+I'm not mentioned in MAINTAINERS and I don't plan it to be. People
+don't know that I'm interested in that and don't cc me, I just review
+what is posted to the linux-samsung-soc ML.
+
+A designated reviewer is someone that is mentioned in the MAINTAINERS
+file so people know that this person is interested and will add
+him/her as cc. So designated reviewers are expected to review more
+patches, be more available, etc and it seems the idea is that they can
+become maintainers in the future if there is some need for it.
+
+>> > So back to my original thought then, what can we do to rectify this
+>> > situation and make the information printed more meaningful.  Again,
+>> > I'm back to using the R: tag appropriately.
+>> >
+>> > Any (technical, which aren't based on "but I really want to be listed
+>> > as a Maintainer") thoughts?
+>> >
+>>
+>> I haven't read a "but I really want to be listed as a maintainer"
+>> thought in this thread.
+>
+> If you had no vested interest in this, you would be able to see the
+> logic in what I'm saying.  Again I'm *guess*, but I think there is
+> some emotional reasons for you pushing back so hard.  I could always
+> be wrong though.
+>
+
+Oh, I have no personal interest. I'm not even listed as a maintainer /
+reviewer for anything that is MFD related and I do understand your
+point is just that I don't agree. The fact that we disagree doesn't
+mean that you are right and I'm wrong.
+
+So if anything I think this thread is more about "but I really don't
+want people without a tree to be listed as a Maintainer".
+
+What I do care is about consistency across different subystems since
+the kernel development process is already complicated and there are
+already differences in the workflow of the maintainers so people
+contributing to many subsystems have to first do some research to
+learn all the unwritten rules and conventions of a given susbystem and
+subsystem maintainer before posting patches.
+
+That's why adding the semantics of maintainers and reviewers to the
+mix of things to keep in mind is not something that thrills me.
+
+>> I think the problem is the definition of what a maintainer in Linux
+>> really means. For you is someone that keeps a tree and sends pull
+>> request (for me that is what I call a subsystem maintainer)
+>
+> Right.  A Level 3 Maintainer sends pull-requests to a Level 2
+> Maintainer, who sends pull-requests to a Level 1 Maintainer, who sends
+> pull-requests to Linus.  Maintainers at *all* levels collect patches
+> and Maintain them before sending on.
+>
+
+Here is where we disagree (and it seems is not only me), someone who
+acks patches posted to some files even if those are later picked for
+someone higher in the maintenance hierarchy could be named maintainers
+as well since they "own" those files and their answer should be
+authoritative (no matter how the patches end into mainline).
+
+At the end of the day is to make easier for developers to understand
+who are the interested parties for a given change. It is much easier
+to think in terms of different levels of maintainers that should be
+copied so they can review and possibly people outside of that group if
+they are subscribed to the mailing lists. Naming the first levels
+reviewers makes no sense for me since it will only confuse new comers
+IMHO.
+
+> reiterate:
+>
+> Reviewers care about particular driver(s)/domain(s) that they know
+> well.  They provide solid reviews and possible testing (because they
+> are likely to have the h/w).  They then provide Acked-by:s so that a
+> Maintainer can collect the patch.
+>
+>> while for
+>> others it seems that maintainer means someone who care about a set of
+>> files, knows the code, makes sure that things keep working and Ack
+>> patches to those files when posted.
+>
+>         goto reiterate;   ;)
+>
+
+No need for that, I already explained my point of view several times
+and you just think I'm wrong because I don't agree with you. So let's
+just agree on disagree ;-)
+
+Best regards,
+Javier
