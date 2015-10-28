@@ -1,77 +1,95 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 28 Oct 2015 11:06:46 +0900
-Subject: [PATCH] arm64: efi: make sure vmlinux load address aligned on
- 2MBytes
-In-Reply-To: <1445981041-8774-1-git-send-email-timur@codeaurora.org>
-References: <1445981041-8774-1-git-send-email-timur@codeaurora.org>
-Message-ID: <CAKv+Gu_ivkemFva-Fu0E24mQqE-m0jPWBzo5OZAr7cyM08hqug@mail.gmail.com>
+From: ykk@rock-chips.com (Yakir Yang)
+Date: Wed, 28 Oct 2015 10:08:21 +0800
+Subject: [PATCH v7 06/17] Documentation: drm/bridge: add document for
+ analogix_dp
+In-Reply-To: <4132920.kfrKzY5nYN@phil>
+References: <1445599415-30856-1-git-send-email-ykk@rock-chips.com>
+ <1445655964-15237-1-git-send-email-ykk@rock-chips.com>
+ <4132920.kfrKzY5nYN@phil>
+Message-ID: <56302E15.1060408@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28 October 2015 at 06:24, Timur Tabi <timur@codeaurora.org> wrote:
-> From: Shanker Donthineni <shankerd@codeaurora.org>
->
-> The vmlinux image load address must be aligned to 2MB, as documented
-> in Documentation/arm64/booting.txt. Otherwise, __create_page_tables
-> in head.S will create incorrect page table entries.
->
-> Signed-off-by: Shanker Donthineni <shankerd@codeaurora.org>
-> Signed-off-by: Timur Tabi <timur@codeaurora.org>
-> ---
->  arch/arm64/kernel/efi-stub.c | 15 +++++++++------
->  1 file changed, 9 insertions(+), 6 deletions(-)
->
-> diff --git a/arch/arm64/kernel/efi-stub.c b/arch/arm64/kernel/efi-stub.c
-> index 816120e..df1433d 100644
-> --- a/arch/arm64/kernel/efi-stub.c
-> +++ b/arch/arm64/kernel/efi-stub.c
-> @@ -21,7 +21,7 @@ efi_status_t __init handle_kernel_image(efi_system_table_t *sys_table_arg,
->                                         unsigned long dram_base,
->                                         efi_loaded_image_t *image)
->  {
-> -       efi_status_t status;
-> +       efi_status_t status = EFI_LOAD_ERROR;
->         unsigned long kernel_size, kernel_memsize = 0;
->         unsigned long nr_pages;
->         void *old_image_addr = (void *)*image_addr;
-> @@ -39,15 +39,18 @@ efi_status_t __init handle_kernel_image(efi_system_table_t *sys_table_arg,
->                  * value or a NULL pointer). It will also ensure that, on
->                  * platforms where the [dram_base, dram_base + TEXT_OFFSET)
->                  * interval is partially occupied by the firmware (like on APM
-> -                * Mustang), we can still place the kernel at the address
-> -                * 'dram_base + TEXT_OFFSET'.
-> +                * Mustang) and dram_base is aligned on 2Mbytes, we can still
-> +                * place the kernel at the address 'dram_base + TEXT_OFFSET'.
->                  */
-> -               *image_addr = *reserve_addr = dram_base + TEXT_OFFSET;
-> -               nr_pages = round_up(kernel_memsize, EFI_ALLOC_ALIGN) /
-> +               if (IS_ALIGNED(dram_base, SZ_2M)) {
-> +                       *image_addr = *reserve_addr = dram_base + TEXT_OFFSET;
-> +                       nr_pages = round_up(kernel_memsize, EFI_ALLOC_ALIGN) /
->                            EFI_PAGE_SIZE;
-> -               status = efi_call_early(allocate_pages, EFI_ALLOCATE_ADDRESS,
-> +                       status = efi_call_early(allocate_pages,
-> +                                       EFI_ALLOCATE_ADDRESS,
->                                         EFI_LOADER_DATA, nr_pages,
->                                         (efi_physical_addr_t *)reserve_addr);
-> +               }
->                 if (status != EFI_SUCCESS) {
->                         kernel_memsize += TEXT_OFFSET;
->                         status = efi_low_alloc(sys_table_arg, kernel_memsize,
+Hi Heiko,
 
-I agree we should fix this, but I would prefer a oneliner such as
+On 10/28/2015 05:04 AM, Heiko Stuebner wrote:
+> Hi Yakir,
+>
+> Am Samstag, 24. Oktober 2015, 11:06:00 schrieb Yakir Yang:
+>> Analogix dp driver is split from exynos dp driver, so we just
+>> make an copy of exynos_dp.txt, and then simplify exynos_dp.txt
+>>
+>> Beside update some exynos dtsi file with the latest change
+>> according to the devicetree binding documents.
+>>
+>> Tested-by: Javier Martinez Canillas <javier@osg.samsung.com>
+>> Signed-off-by: Yakir Yang <ykk@rock-chips.com>
+>> ---
+>> diff --git a/Documentation/devicetree/bindings/display/exynos/exynos_dp.txt b/Documentation/devicetree/bindings/display/exynos/exynos_dp.txt
+>> index 7a3a9cd..9e47357 100644
+>> --- a/Documentation/devicetree/bindings/display/exynos/exynos_dp.txt
+>> +++ b/Documentation/devicetree/bindings/display/exynos/exynos_dp.txt
+>> @@ -31,45 +31,31 @@ Required properties for dp-controller:
+>>   		from general PHY binding: the phandle for the PHY device.
+>>   	-phy-names:
+>>   		from general PHY binding: Should be "dp".
+>> -	-samsung,color-space:
+>> -		input video data format.
+>> -			COLOR_RGB = 0, COLOR_YCBCR422 = 1, COLOR_YCBCR444 = 2
+>> -	-samsung,dynamic-range:
+>> -		dynamic range for input video data.
+>> -			VESA = 0, CEA = 1
+>> -	-samsung,ycbcr-coeff:
+>> -		YCbCr co-efficients for input video.
+>> -			COLOR_YCBCR601 = 0, COLOR_YCBCR709 = 1
+>> -	-samsung,color-depth:
+>> -		number of bits per colour component.
+>> -			COLOR_6 = 0, COLOR_8 = 1, COLOR_10 = 2, COLOR_12 = 3
+>> -	-samsung,link-rate:
+>> -		link rate supported by the panel.
+>> -			LINK_RATE_1_62GBPS = 0x6, LINK_RATE_2_70GBPS = 0x0A
+>> -	-samsung,lane-count:
+>> -		number of lanes supported by the panel.
+>> -			LANE_COUNT1 = 1, LANE_COUNT2 = 2, LANE_COUNT4 = 4
+>> +
+>> +Optional properties for dp-controller:
+>>   	- display-timings: timings for the connected panel as described by
+>>   		Documentation/devicetree/bindings/video/display-timing.txt
+> 											^^
+>
+> bindings/display/display-timing.txt ... that actually made the patch not apply cleanly
 
-diff --git a/arch/arm64/kernel/efi-stub.c b/arch/arm64/kernel/efi-stub.c
-index 816120ece6bc..a60ce249cfc0 100644
---- a/arch/arm64/kernel/efi-stub.c
-+++ b/arch/arm64/kernel/efi-stub.c
-@@ -42,7 +42,8 @@
-                 * Mustang), we can still place the kernel at the address
-                 * 'dram_base + TEXT_OFFSET'.
-                 */
--               *image_addr = *reserve_addr = dram_base + TEXT_OFFSET;
-+               *image_addr = *reserve_addr = round_up(dram_base, SZ_2M) +
-+                                                      TEXT_OFFSET);
-                nr_pages = round_up(kernel_memsize, EFI_ALLOC_ALIGN) /
-                           EFI_PAGE_SIZE;
-                status = efi_call_early(allocate_pages, EFI_ALLOCATE_ADDRESS,
+Thanks, the right path should be:
+Documentation/devicetree/bindings/display/panel/display-timing.txt
+
+
+>
+> [...]
+>
+>> -[1]: Documentation/devicetree/bindings/media/video-interfaces.txt
+>> +Deprecated properties for DisplayPort:
+>> +-interlaced:            deprecated prop that can parsed frm drm_display_mode.
+>> +-vsync-active-high:     deprecated prop that can parsed frm drm_display_mode.
+>> +-hsync-active-high:     deprecated prop that can parsed frm drm_display_mode.
+>> +-samsung,ycbcr-coeff:   deprecated prop that can parsed frm drm_display_mode.
+>> +-samsung,dynamic-range: deprecated prop that can parsed frm drm_display_mode.
+> the "frm" above need some more "o"s to be "from"s :-)
+
+Ah,  :-P
+
+Thanks,
+- Yakir
+>
+>> +-samsung,color-space:   deprecated prop that can parsed from drm_display_info.
+>> +-samsung,color-depth:   deprecated prop that can parsed from drm_display_info.
+>> +-samsung,link-rate:     deprecated prop that can reading from monitor by dpcd method.
+>> +-samsung,lane-count:    deprecated prop that can reading from monitor by dpcd method.
+>> +-samsung,hpd-gpio:      deprecated name for hpd-gpios.
+>> +
+>> +-------------------------------------------------------------------------------
+>
+> Cheers,
+> Heiko
+>
+>
+>
