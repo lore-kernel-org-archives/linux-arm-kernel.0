@@ -1,98 +1,124 @@
-From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
-Date: Wed, 28 Oct 2015 17:26:10 +0100
-Subject: [PATCH] MAINTAINERS: Start using the 'reviewer' (R) tag
-In-Reply-To: <20151028082446.GF5828@x1>
-References: <1445960557-24328-1-git-send-email-lee.jones@linaro.org>
- <CAJKOXPc_w2Dc8LvkCu_d+kjZZmYScXboQrpNWdicT2yfL_5D7Q@mail.gmail.com>
- <20151028082446.GF5828@x1>
-Message-ID: <3533886.bbrHZIjT1f@amdc1976>
+From: alex.williamson@redhat.com (Alex Williamson)
+Date: Wed, 28 Oct 2015 10:27:28 -0600
+Subject: [RFC] vfio/type1: handle case where IOMMU does not support
+ PAGE_SIZE size
+In-Reply-To: <1446037965-2341-1-git-send-email-eric.auger@linaro.org>
+References: <1446037965-2341-1-git-send-email-eric.auger@linaro.org>
+Message-ID: <1446049648.8018.397.camel@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, 2015-10-28 at 13:12 +0000, Eric Auger wrote:
+> Current vfio_pgsize_bitmap code hides the supported IOMMU page
+> sizes smaller than PAGE_SIZE. As a result, in case the IOMMU
+> does not support PAGE_SIZE page, the alignment check on map/unmap
+> is done with larger page sizes, if any. This can fail although
+> mapping could be done with pages smaller than PAGE_SIZE.
+> 
+> vfio_pgsize_bitmap is modified to expose the IOMMU page sizes,
+> supported by all domains, even those smaller than PAGE_SIZE. The
+> alignment check on map is performed against PAGE_SIZE if the minimum
+> IOMMU size is less than PAGE_SIZE or against the min page size greater
+> than PAGE_SIZE.
+> 
+> Signed-off-by: Eric Auger <eric.auger@linaro.org>
+> 
+> ---
+> 
+> This was tested on AMD Seattle with 64kB page host. ARM MMU 401
+> currently expose 4kB, 2MB and 1GB page support. With a 64kB page host,
+> the map/unmap check is done against 2MB. Some alignment check fail
+> so VFIO_IOMMU_MAP_DMA fail while we could map using 4kB IOMMU page
+> size.
+> ---
+>  drivers/vfio/vfio_iommu_type1.c | 25 +++++++++++--------------
+>  1 file changed, 11 insertions(+), 14 deletions(-)
+> 
+> diff --git a/drivers/vfio/vfio_iommu_type1.c b/drivers/vfio/vfio_iommu_type1.c
+> index 57d8c37..13fb974 100644
+> --- a/drivers/vfio/vfio_iommu_type1.c
+> +++ b/drivers/vfio/vfio_iommu_type1.c
+> @@ -403,7 +403,7 @@ static void vfio_remove_dma(struct vfio_iommu *iommu, struct vfio_dma *dma)
+>  static unsigned long vfio_pgsize_bitmap(struct vfio_iommu *iommu)
+>  {
+>  	struct vfio_domain *domain;
+> -	unsigned long bitmap = PAGE_MASK;
+> +	unsigned long bitmap = ULONG_MAX;
 
-[ this time with full Cc: & context preserved ]
+Isn't this and removing the WARN_ON()s the only real change in this
+patch?  The rest looks like conversion to use IS_ALIGNED and the
+following test, that I don't really understand...
 
-Hi,
+>  
+>  	mutex_lock(&iommu->lock);
+>  	list_for_each_entry(domain, &iommu->domain_list, next)
+> @@ -416,20 +416,18 @@ static unsigned long vfio_pgsize_bitmap(struct vfio_iommu *iommu)
+>  static int vfio_dma_do_unmap(struct vfio_iommu *iommu,
+>  			     struct vfio_iommu_type1_dma_unmap *unmap)
+>  {
+> -	uint64_t mask;
+>  	struct vfio_dma *dma;
+>  	size_t unmapped = 0;
+>  	int ret = 0;
+> +	unsigned int min_pagesz = __ffs(vfio_pgsize_bitmap(iommu));
+> +	unsigned int requested_alignment = (min_pagesz < PAGE_SIZE) ?
+> +						PAGE_SIZE : min_pagesz;
 
-On Wednesday, October 28, 2015 08:24:46 AM Lee Jones wrote:
-> On Tue, 2015-10-27 at 18:15 +0000, Lee Jones wrote:
-> > On Tue, 27 Oct 2015, Sebastian Reichel wrote:
-> > > On Tue, Oct 27, 2015 at 03:42:37PM +0000, Lee Jones wrote:
-> > > > Since eafbaac ("MAINTAINERS: Add "R:" designated-reviewers tag") we
-> > > > have been able to tag specific people as Reviewers.  These are key
-> > > > individuals who are tasked with or volunteer to review code submitted
-> > > > to a subsystem or specific file.  However, according to MAINTAINERS
-> > > > we have 1046 Maintainers and only a mere 22 Reviewers.  I believe
-> > > > these numbers to be incorrect, as many of these Maintainers are in
-> > > > fact Reviewers.
-> 
-> Most entries in MAINTAINERS seem to be vanity entries than actual
-> active participants.  A person typically writes a driver, adds a
-> MAINTAINER entry, then forgets about it and/or the hardware becomes
-> outdated.
-> 
-> This I agree with.
-> 
-> On Wed, 28 Oct 2015, Krzysztof Kozlowski wrote:
-> > 2015-10-28 3:44 GMT+09:00 Joe Perches <joe@perches.com>:
-> > > On Tue, 2015-10-27 at 18:15 +0000, Lee Jones wrote:
-> > > > On Tue, 27 Oct 2015, Sebastian Reichel wrote:> >
-> > > > > I think you should CC the people, which are changed from "M:" to
-> > > > > "R:", though.
-> > > >
-> > > > Yes, makes sense.
-> > > >
-> > > > I'd like to collect some Maintainer Acks first though.
-> > >
-> > > I think people from organizations like Samsung are actual
-> > > maintainers not reviewers.
-> 
-> So this all hinges on how we are describing Maintainers and Reviewers.
-> 
-> My personal definition (until convinced otherwise) is that Reviewers
-> care about their particular subsystem and/or files.  They conduct code
-> reviews to ensure nothing gets broken and the code base stays in best
-> possible state of worthiness.  On the other hand Maintainers usually
-> conduct themselves as Reviewers but also have 'maintainership' duties
-> as well; such as applying patches, *maintaining*, testing, rebasing,
-> etc, an upstream branch and ultimately sending pull-requests to higher
-> level Maintainers i.e. Linus.  Maintainers also have the ultimate say
-> (unless over-ruled by Linus etc) over what gets applied.
-> 
-> > > Their drivers are not thrown over a wall and forgotten.
-> > 
-> > At least for Samsung Multifunction PMIC drivers (and some of Maxim
-> > MUICs and PMICs) these are actively used by us in existing and new
-> > products. They are also continuously extended and actually maintained.
-> > This means that it is not only about review of new patches but also
-> > about caring that nothing will become broken.
-> 
-> Exactly.  This what I expect of any good code Reviewer.
-> 
-> > I would prefer to leave the "SAMSUNG MULTIFUNCTION PMIC DEVICE
-> > DRIVERS" entry as is - maintainers.
-> 
-> But you aren't maintaining the driver i.e. you don't collect patches
-> and *maintain* them on an upstream branch.  Granted some of you guys
-> are doing a great job of maintaining branches on your downstream or
-> BSP kernels, but conduct a Reviewer type role for upstream.
-> 
-> You guys are pushing back like this is some kind of demotion.  That's
-> not the case at all.  All it does is better describe the (very worthy)
-> function you *actually* provide.
+This one.  If we're going to support sub-PAGE_SIZE mappings, why do we
+care to cap alignment at PAGE_SIZE?
 
-It is actually a demotion from my POV:
+> -	mask = ((uint64_t)1 << __ffs(vfio_pgsize_bitmap(iommu))) - 1;
+> -
+> -	if (unmap->iova & mask)
+> +	if (!IS_ALIGNED(unmap->iova, requested_alignment))
+>  		return -EINVAL;
+> -	if (!unmap->size || unmap->size & mask)
+> +	if (!unmap->size || !IS_ALIGNED(unmap->size, requested_alignment))
+>  		return -EINVAL;
+>  
+> -	WARN_ON(mask & PAGE_MASK);
+> -
+>  	mutex_lock(&iommu->lock);
+>  
+>  	/*
+> @@ -553,25 +551,24 @@ static int vfio_dma_do_map(struct vfio_iommu *iommu,
+>  	size_t size = map->size;
+>  	long npage;
+>  	int ret = 0, prot = 0;
+> -	uint64_t mask;
+>  	struct vfio_dma *dma;
+>  	unsigned long pfn;
+> +	unsigned int min_pagesz = __ffs(vfio_pgsize_bitmap(iommu));
+> +	unsigned int requested_alignment = (min_pagesz < PAGE_SIZE) ?
+> +						PAGE_SIZE : min_pagesz;
+>  
+>  	/* Verify that none of our __u64 fields overflow */
+>  	if (map->size != size || map->vaddr != vaddr || map->iova != iova)
+>  		return -EINVAL;
+>  
+> -	mask = ((uint64_t)1 << __ffs(vfio_pgsize_bitmap(iommu))) - 1;
+> -
+> -	WARN_ON(mask & PAGE_MASK);
+> -
+>  	/* READ/WRITE from device perspective */
+>  	if (map->flags & VFIO_DMA_MAP_FLAG_WRITE)
+>  		prot |= IOMMU_WRITE;
+>  	if (map->flags & VFIO_DMA_MAP_FLAG_READ)
+>  		prot |= IOMMU_READ;
+>  
+> -	if (!prot || !size || (size | iova | vaddr) & mask)
+> +	if (!prot || !size ||
+> +		!IS_ALIGNED(size | iova | vaddr, requested_alignment))
+>  		return -EINVAL;
+>  
+>  	/* Don't allow IOVA or virtual address wrap */
 
-* "Reviewer" doesn't accurately describe the job of doing all the needed
-  testing, bug-fixing and additional contributions that is often done by
-  people without their own branches.
+This is mostly ignoring the problems with sub-PAGE_SIZE mappings.  For
+instance, we can only pin on PAGE_SIZE and therefore we only do
+accounting on PAGE_SIZE, so if the user does 4K mappings across your 64K
+page, that page gets pinned and accounted 16 times.  Are we going to
+tell users that their locked memory limit needs to be 16x now?  The rest
+of the code would need an audit as well to see what other sub-page bugs
+might be hiding.  Thanks,
 
-* You don't know internal policies of all companies involved in Linux
-  Kernel development.  "Maintainer" is a well known term and sometimes
-  person's job status or "key performance indicators" may depend on it.
-
-Best regards,
---
-Bartlomiej Zolnierkiewicz
-Samsung R&D Institute Poland
-Samsung Electronics
+Alex
