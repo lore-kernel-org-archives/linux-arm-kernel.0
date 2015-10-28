@@ -1,19 +1,20 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 28 Oct 2015 18:36:57 +0000
-Subject: [PATCH] arm64/mm: use PAGE_ALIGNED instead of IS_ALIGNED
-In-Reply-To: <1445858817-7056-1-git-send-email-kuleshovmail@gmail.com>
-References: <1445858817-7056-1-git-send-email-kuleshovmail@gmail.com>
-Message-ID: <20151028183656.GE8899@e104818-lin.cambridge.arm.com>
+Date: Wed, 28 Oct 2015 18:37:48 +0000
+Subject: [PATCH 1/2] arm64: cpufeature: declare enable_cpu_capabilities
+ as static
+In-Reply-To: <1445947555-2109-1-git-send-email-will.deacon@arm.com>
+References: <1445947555-2109-1-git-send-email-will.deacon@arm.com>
+Message-ID: <20151028183748.GF8899@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 26, 2015 at 05:26:57PM +0600, Alexander Kuleshov wrote:
-> The <linux/mm.h> already provides the PAGE_ALIGNED macro. Let's
-> use this macro instead of IS_ALIGNED and passing PAGE_SIZE directly.
+On Tue, Oct 27, 2015 at 12:05:54PM +0000, Will Deacon wrote:
+> enable_cpu_capabilities is only called from within cpufeature.c, so it
+> can be declared static.
 > 
-> Signed-off-by: Alexander Kuleshov <kuleshovmail@gmail.com>
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
 
-Queued for 4.4. Thanks.
+Both patches queued for 4.4. Thanks.
 
 -- 
 Catalin
