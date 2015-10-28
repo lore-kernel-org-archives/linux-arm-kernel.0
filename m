@@ -1,51 +1,45 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 29 Oct 2015 08:09:17 +0900
-Subject: [PATCH v3 0/2] Basic GPIO support for r8a7795
-Message-ID: <1446073759-10569-1-git-send-email-horms+renesas@verge.net.au>
+Date: Thu, 29 Oct 2015 08:09:19 +0900
+Subject: [PATCH v3 2/2] arm64: defconfig: Enable GPIO of Renesas R-Car Gen3 SoC
+In-Reply-To: <1446073759-10569-1-git-send-email-horms+renesas@verge.net.au>
+References: <1446073759-10569-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1446073759-10569-3-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: Takeshi Kihara <takeshi.kihara.df@renesas.com>
 
-this is an update of work by Takeshi Kihara, posted by me, then Ulrich
-Hecht and now me again.  Ulrich, I would be most grateful if you could look
-over this and repost if there are problems.
+Enable GPIO for  Renesas R-Car Gen3 SoC.
 
-Changes:
+Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-* v3
-  - Correction to gpio-ranges as suggested by Geert Uytterhoeven
-* v2
-  - Update to new CPG/MSSR bindings via Geert Uytterhoeven
+---
 
-Base:
+v3 [Simon Horman]
+* Added Ack from Geert Uytterhoeven
 
-* "[PATCH v12 0/7] arm64: renesas: Add Renesas R8A7795 SoC support".
-  This can be found in the topic/arm64-rcar-gen3-v12 branch of
-  my renesas tree on kernel.org.
+v2
+* No change
 
-Run-time dependencies:
+v0 [Simon Horman]
+* Only enable GPIO_RCAR
+---
+ arch/arm64/configs/defconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-* The base
-* The new GPG driver
-  "[PATCH/RFC v4 0/5] clk: shmobile: Add new Renesas CPG/MSSR DT bindings"
-  and its dependencies. This may be found in the
-  topic/cpg-mssr-v4 branch of
-  git://git.kernel.org/pub/scm/linux/kernel/git/geert/renesas-drivers
-  along with an earlier version of this patchset which updates applied.
-
-Availability:
-* This patchset is available in the topic/r8a7795-gpio-v3 branch of my
-  renesas tree on kernel.org
-
-
-Takeshi Kihara (2):
-  arm64: dts: r8a7795: add GPIO nodes
-  arm64: defconfig: Enable GPIO of Renesas R-Car Gen3 SoC
-
- arch/arm64/boot/dts/renesas/r8a7795.dtsi | 112 +++++++++++++++++++++++++++++++
- arch/arm64/configs/defconfig             |   1 +
- 2 files changed, 113 insertions(+)
-
+diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+index dccc685b58ae..d9946384f102 100644
+--- a/arch/arm64/configs/defconfig
++++ b/arch/arm64/configs/defconfig
+@@ -125,6 +125,7 @@ CONFIG_SPI=y
+ CONFIG_SPI_PL022=y
+ CONFIG_PINCTRL_MSM8916=y
+ CONFIG_GPIO_PL061=y
++CONFIG_GPIO_RCAR=y
+ CONFIG_GPIO_XGENE=y
+ CONFIG_POWER_RESET_XGENE=y
+ CONFIG_POWER_RESET_SYSCON=y
 -- 
 2.1.4
