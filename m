@@ -1,39 +1,43 @@
-From: bjorn.andersson@sonymobile.com (Bjorn Andersson)
-Date: Wed, 28 Oct 2015 11:41:04 -0700
-Subject: [PATCH v2 3/3] mfd: lm3533: Support initialization from Device
- Tree
-In-Reply-To: <20151028114057.GT5828@x1>
-References: <1445963373-27790-1-git-send-email-bjorn.andersson@sonymobile.com>
- <1445963373-27790-3-git-send-email-bjorn.andersson@sonymobile.com>
- <20151028114057.GT5828@x1>
-Message-ID: <20151028184104.GC24668@usrtlx11787.corpusers.net>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 28 Oct 2015 18:45:04 +0000
+Subject: [PATCH v12 1/7] arm64: renesas: r8a7795: Add Renesas R8A7795 SoC
+ support
+In-Reply-To: <1445839312-8874-2-git-send-email-horms+renesas@verge.net.au>
+References: <1445839312-8874-1-git-send-email-horms+renesas@verge.net.au>
+ <1445839312-8874-2-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <20151028184504.GG8899@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed 28 Oct 04:40 PDT 2015, Lee Jones wrote:
+On Mon, Oct 26, 2015 at 03:01:46PM +0900, Simon Horman wrote:
+> --- a/arch/arm64/Kconfig.platforms
+> +++ b/arch/arm64/Kconfig.platforms
+> @@ -66,6 +66,23 @@ config ARCH_SEATTLE
+>  	help
+>  	  This enables support for AMD Seattle SOC Family
+>  
+> +config ARCH_SHMOBILE
+> +	bool
+> +
+> +config ARCH_RENESAS
+> +	bool "Renesas SoC Platforms"
+> +	select ARCH_SHMOBILE
+> +	select PINCTRL
+> +	select PM_GENERIC_DOMAINS if PM
+> +	help
+> +	  This enables support for the ARMv8 based Renesas SoCs.
+> +
+> +config ARCH_R8A7795
+> +	bool "Renesas R-Car H3 SoC Platform"
+> +	depends on ARCH_RENESAS
+> +	help
+> +	  This enables support for the Renesas R-Car H3 SoC.
 
-> On Tue, 27 Oct 2015, Bjorn Andersson wrote:
-> 
-> > Implement Device Tree parsing functions to support initialization of the
-> > lm3533 drivers.
-> > 
-> > Signed-off-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
-> > ---
-> > 
-> > Changes since v1:
-> > - Added units to bost-freq and als resistance
-> > 
-> >  drivers/mfd/lm3533-core.c | 264 ++++++++++++++++++++++++++++++++++++++++++++++
-> >  1 file changed, 264 insertions(+)
-> 
-> I assume you plan on fixing the build robot's complains? 
-> 
+Do you need such fine-grained configuration? I'd really like to avoid
+individual SoC Kconfig entries and only include SoC families (like
+ARCH_RENESAS). There are some which I didn't spot at the time
+(ARCH_FSL_LS2085A and ARCH_TEGRA_132_SOC) but we shouldn't continue this
+trend any further.
 
-I do, unfortunately I didn't get those on v1 :/
-
-
-Just trying to conclude if I should move the logic from patch 2 into
-this patch before resending.
-
-Regards,
-Bjorn
+-- 
+Catalin
