@@ -1,51 +1,124 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Wed, 28 Oct 2015 21:14:49 +0530
-Subject: [PATCH v3 0/2] thermal: mediatek: Add cpu power cooling model
-In-Reply-To: <1445515359-8587-1-git-send-email-dawei.chien@mediatek.com>
-References: <1445515359-8587-1-git-send-email-dawei.chien@mediatek.com>
-Message-ID: <20151028154449.GH3716@ubuntu>
+From: peter@hurleysoftware.com (Peter Hurley)
+Date: Wed, 28 Oct 2015 12:00:01 -0400
+Subject: Which is better to specify console, "console= " or "stdout-path" ?
+In-Reply-To: <CAK7LNASqjd_Xf53WKa=Ogesf80HQzEoKEyVtw-BMh7JF=jq+xQ@mail.gmail.com>
+References: <CAK7LNAS9uBJ1cVmGBKae3W0tk8Siu1yeXOaeN6Kz11cksMqtsg@mail.gmail.com>
+ <562753A6.3070107@arm.com> <56278911.9050704@hurleysoftware.com>
+ <CAK7LNAQ_+_9K-y7bmpdGwcH2u4uqJhJhON1Ew4OvzSSa-amyvw@mail.gmail.com>
+ <5627BCBC.5040701@hurleysoftware.com>
+ <CAK7LNASqjd_Xf53WKa=Ogesf80HQzEoKEyVtw-BMh7JF=jq+xQ@mail.gmail.com>
+Message-ID: <5630F101.1080803@hurleysoftware.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22-10-15, 20:02, Dawei Chien wrote:
-> Use Intelligent Power Allocation (IPA) technical to add static/dynamic power model for binding CPU thermal zone.
-> The power allocator governor allocates power budget to control CPU temperature.
-> 
-> Power Allocator governor is able to keep SOC temperature within a defined temperature range to avoid SOC overheat and keep it's performance. mt8173-cpufreq.c need to register its' own power model with power allocator thermal governor, so that power allocator governor can allocates suitable power budget to control CPU temperature.
-> 
-> PATCH1 is base on
-> https://patchwork.kernel.org/patch/7034601/
-> 
-> PATCH2 is base on Sascha's thermal driver V9
-> https://patchwork.kernel.org/patch/7249821/
-> https://patchwork.kernel.org/patch/7249861/
-> https://patchwork.kernel.org/patch/7249891/
-> 
-> Change since V1:
-> include mt8171.h and sort header file for mt8173.dtsi
-> 
-> Change since V2:
-> Move dynamic/static power model in device tree
-> 
-> Dawei.Chien (2):
->   thermal: mediatek: Add cpu power cooling model.
->   arm64: dts: mt8173: Add thermal zone node for mt8173.
+Hi Masahiro,
 
-Sorry for being extremely late in reviewing this stuff. You are
-already on v3 and I haven't reviewed it once. Mostly due to bad timing
-of my holidays and other work pressure.
+On 10/22/2015 12:20 AM, Masahiro Yamada wrote:
+> 2015-10-22 1:26 GMT+09:00 Peter Hurley <peter@hurleysoftware.com>:
+>> On 10/21/2015 11:38 AM, Masahiro Yamada wrote:
+>>> 2015-10-21 21:46 GMT+09:00 Peter Hurley <peter@hurleysoftware.com>:
+>>>> On 10/21/2015 04:58 AM, Sudeep Holla wrote:
+>>>>> On 21/10/15 06:09, Masahiro Yamada wrote:
+>>>>>> I think there exist two ways to specify the console port and baudrate.
+>>>>>>
+>>>>>>
+>>>>>> [1] Specify console in bootargs
+>>>>>>
+>>>>>>    chosen {
+>>>>>>          bootargs = "console=ttyS0,115200";
+>>>>>>    };
+>>>>>>
+>>>>>>
+>>>>>> [2] Specify stdout-path
+>>>>>>
+>>>>>>     chosen {
+>>>>>>           stdout-path = "serial0:115200n8";
+>>>>>
+>>>>> This will work for even early/boot console, so this is better than
+>>>>> option [1]
+>>>>
+>>>> Be aware that options specified via /chosen/stdout-path are
+>>>> currently ignored by earlycon. There were some hiccups getting the
+>>>> initial support upstream; when 4.4 hits mainline, I'll resubmit
+>>>> my series that implements the of_serial i/o properties and
+>>>> options passthrough to earlycon setup.
+>>>
+>>>
+>>> As I said in another thread ("serial: earlycon: allow to specify
+>>> uartclk in earlycon kernel-parameter"),
+>>> stdout-path can pass dev->baud, but not port->uartclk.
+>>
+>> That's true but I'm not seeing in that thread where you wrote that?
+> 
+> Sorry, I made you confused.  I was talking about the kernel parameter (console=)
+> in the thread.
+> 
+>> My replies there were specific to uartclk on the kernel command line,
+>> which isn't necessary if the bootloader has already initialized the
+>> uart.
+>>
+>>> It is usually specified "clocks" phandle, but
+>>> clk is not ready at the point of earlycon.
+>>>
+>>> It seems impossible to set up the baudrate even if the options are passed.
+>>
+>> It's difficult to understand what you're trying to do when I can't
+>> see the code you're referring to.  For example, I only recently
+>> understood that you're talking about a earlycon implementation
+>> that you're working on and not the 8250 earlycon itself.
+> 
+> Sorry again for making you confused.
+> 
+> I was talking both.
+> 
+> Now I am tackling on some ARM board porting.
+> 
+> 
+> The board has a pure 8250 family device (compatible = "ns16550a") on it.
+> 
+> In addition, there exist 8250-variant IPs inside the SoC.
+> (this is similar to 8250, but slightly different.
+> drivers/tty/serial/8250/8250_uniphier.c)
+> 
+> 
+> What I want to do is:
+>   [1] To use  drivers/tty/serial/8250/8250_early.c  for the on-board ns16550a.
+>   [2] To implement my own EARLYCON_DECLARE() in
+> drivers/tty/serial/8250/8250_uniphier.c
+> 
+> 
+> 
+>> If you look at other non-8250 earlycons, you'll see they all ignore
+>> the baud rate, on the assumption the bootloader already set it up.
+> 
+> OK, I will do so for [2].
+> 
+> 
+>> The 8250 earlycon is a little different because legacy platforms
+>> do not initialize the uart.
+> 
+> 
+> Make sense.
+> 
+> For legacy platforms, earlycon initializes the uart,
+> assuming the hard-coded "port->uartclk = BASE_BAUD * 16"
+> is the value.
+> 
+> 
+> For embedded boards such as ARM, the boot-loader should initialize the UART
+> and the earlycon should preserve it because port->uartclk varies from
+> board to board.
+> (For example, the ns16550a on my board expects   BASE_BAUD is 1228000,
+> but it does not match the one in include/asm-generic/serial.h )
 
-Now, there are few things that I feel are not properly addressed here,
-and I may be wrong:
-- Where are the bindings for static-power-points and
-  dynamic-power-coefficient. Sorry I failed to see them in this or
-  other series you mentioned.
-- Even then, why should we be adding another table into DT for
-  voltage/power ? And not reuse and extend the opp-v2 stuff which is
-  already mainlined now.
-- There are few issues with the code as well, but I want to see where
-  the bindings should go first. And then only discuss the code
-  further.
+I want to clarify one point: if you have a configuration for which the
+earlycon uart is not initialized by the bootloader (or boot prom), then
+we can add a way for the ASoC init to set BASE_BAUD. This was done for
+the ARC arch, but I would like to use this as a last resort for the ARM
+arch.
 
--- 
-viresh
+An example configuration I can envision that would require this solution
+is u-boot's so-called 'falcon mode' without devicetree (or boot prom).
+
+Regards,
+Peter Hurley
