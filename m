@@ -1,38 +1,104 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 28 Oct 2015 10:46:06 +0900
-Subject: [PATCH] MAINTAINERS: Start using the 'reviewer' (R) tag
-In-Reply-To: <1445971482.2757.27.camel@perches.com>
-References: <1445960557-24328-1-git-send-email-lee.jones@linaro.org>
- <20151027172428.GB21070@earth> <20151027181555.GE5828@x1>
- <1445971482.2757.27.camel@perches.com>
-Message-ID: <CAJKOXPc_w2Dc8LvkCu_d+kjZZmYScXboQrpNWdicT2yfL_5D7Q@mail.gmail.com>
+From: ykk@rock-chips.com (Yakir Yang)
+Date: Wed, 28 Oct 2015 09:46:35 +0800
+Subject: [PATCH v7 10/17] phy: Add driver for rockchip Display Port PHY
+In-Reply-To: <2304066.jCpsGbPbCP@phil>
+References: <1445599415-30856-1-git-send-email-ykk@rock-chips.com>
+ <1445655964-15237-1-git-send-email-ykk@rock-chips.com>
+ <1445655964-15237-5-git-send-email-ykk@rock-chips.com>
+ <2304066.jCpsGbPbCP@phil>
+Message-ID: <563028FB.8030501@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-10-28 3:44 GMT+09:00 Joe Perches <joe@perches.com>:
->
-> On Tue, 2015-10-27 at 18:15 +0000, Lee Jones wrote:
-> > On Tue, 27 Oct 2015, Sebastian Reichel wrote:> >
-> > > I think you should CC the people, which are changed from "M:" to
-> > > "R:", though.
-> >
-> > Yes, makes sense.
-> >
-> > I'd like to collect some Maintainer Acks first though.
->
-> I think people from organizations like Samsung are actual
-> maintainers not reviewers.
->
-> Their drivers are not thrown over a wall and forgotten.
 
-At least for Samsung Multifunction PMIC drivers (and some of Maxim
-MUICs and PMICs) these are actively used by us in existing and new
-products. They are also continuously extended and actually maintained.
-This means that it is not only about review of new patches but also
-about caring that nothing will become broken.
+On 10/28/2015 05:23 AM, Heiko Stuebner wrote:
+> Am Samstag, 24. Oktober 2015, 11:06:04 schrieb Yakir Yang:
+>> Add phy driver for the Rockchip DisplayPort PHY module. This
+>> is required to get DisplayPort working in Rockchip SoCs.
+>>
+>> Tested-by: Javier Martinez Canillas <javier@osg.samsung.com>
+>> Signed-off-by: Yakir Yang <ykk@rock-chips.com>
+>> ---
+>> diff --git a/drivers/phy/phy-rockchip-dp.c b/drivers/phy/phy-rockchip-dp.c
+>> new file mode 100644
+>> index 0000000..4af19af
+>> --- /dev/null
+>> +++ b/drivers/phy/phy-rockchip-dp.c
+>> @@ -0,0 +1,153 @@
+>> +/*
+>> + * Rockchip DP PHY driver
+>> + *
+>> + * Copyright (C) 2015 FuZhou Rockchip Co., Ltd.
+>> + * Author: Yakir Yang <ykk@@rock-chips.com>
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License as published by
+>> + * the Free Software Foundation; either version 2 of the License.
+>> + */
+>> +
+>> +#include <linux/io.h>
+>> +#include <linux/kernel.h>
+>> +#include <linux/module.h>
+>> +#include <linux/of.h>
+>> +#include <linux/of_address.h>
+>> +#include <linux/clk.h>
+>> +#include <linux/phy/phy.h>
+>> +#include <linux/regmap.h>
+>> +#include <linux/mfd/syscon.h>
+>> +#include <linux/platform_device.h>
+>> +
+>> +#define GRF_SOC_CON12                   0x0274
+>> +#define GRF_EDP_REF_CLK_SEL_INTER	BIT(4)
+>> +#define GRF_EDP_PHY_SIDDQ_WRITE_EN      BIT(21)
+>> +#define GRF_EDP_PHY_SIDDQ_ON            0
+>> +#define GRF_EDP_PHY_SIDDQ_OFF           BIT(5)
+> mixed spacers (tabs and spaces), please use either tabs if you want to
+> align stuff or a single space.
+>
+> Also you're mixing the handling here, for SIDDQ you're defining both the
+> actual bit as well as the write-enable bit, but for CLK_SEL_INTR you're
+> hard-coding the 16-bit shift down in the code.
+>
+> You could also just use/copy the HIWORD_MASK macro we use for example
+> in the clock controller.
 
-I would prefer to leave the "SAMSUNG MULTIFUNCTION PMIC DEVICE
-DRIVERS" entry as is - maintainers.
+Great, thanks.
 
-Best regards,
-Krzysztof
+- Yakir
+
+>
+>> +
+>> +struct rockchip_dp_phy {
+>> +	struct device  *dev;
+>> +	struct regmap  *grf;
+>> +	struct clk     *phy_24m;
+>> +};
+>> +
+>> +static int rockchip_set_phy_state(struct phy *phy, bool enable)
+>> +{
+>> +	struct rockchip_dp_phy *dp = phy_get_drvdata(phy);
+>> +	int ret;
+>> +
+>> +	if (enable) {
+>> +		ret = regmap_write(dp->grf, GRF_SOC_CON12,
+>> +				   GRF_EDP_PHY_SIDDQ_WRITE_EN |
+>> +				   GRF_EDP_PHY_SIDDQ_ON);
+>> +		if (ret < 0) {
+>> +			dev_err(dp->dev, "Can't enable PHY power %d\n", ret);
+>> +			return ret;
+>> +		}
+>> +
+>> +		ret = clk_prepare_enable(dp->phy_24m);
+>> +
+> unnecessary empty line after clk_prepare_enable
+>
+>
+> with these things fixed,
+> Reviewed-by: Heiko Stuebner <heiko@sntech.de>
+>
+>
+> Cheers,
+> Heiko
+>
+>
+>
