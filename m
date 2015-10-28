@@ -1,47 +1,66 @@
-From: timur@codeaurora.org (Timur Tabi)
-Date: Wed, 28 Oct 2015 13:12:36 -0500
-Subject: [PATCH] [v2] arm64: efi: make sure vmlinux load address aligned
- on 2MB
-In-Reply-To: <20151028180836.GB26777@leverpostej>
-References: <1446053844-27281-1-git-send-email-timur@codeaurora.org>
- <20151028180836.GB26777@leverpostej>
-Message-ID: <56311014.9020400@codeaurora.org>
+From: alex.williamson@redhat.com (Alex Williamson)
+Date: Wed, 28 Oct 2015 12:15:13 -0600
+Subject: [RFC] vfio/type1: handle case where IOMMU does not support
+ PAGE_SIZE size
+In-Reply-To: <56310D39.6090500@linaro.org>
+References: <1446037965-2341-1-git-send-email-eric.auger@linaro.org>
+ <1446049648.8018.397.camel@redhat.com> <563101A0.7020404@linaro.org>
+ <1446053858.8018.406.camel@redhat.com> <56310A79.4020309@linaro.org>
+ <20151028175533.GM18966@arm.com> <56310D39.6090500@linaro.org>
+Message-ID: <1446056113.8018.419.camel@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/28/2015 01:08 PM, Mark Rutland wrote:
+On Wed, 2015-10-28 at 19:00 +0100, Eric Auger wrote:
+> On 10/28/2015 06:55 PM, Will Deacon wrote:
+> > On Wed, Oct 28, 2015 at 06:48:41PM +0100, Eric Auger wrote:
+> >> On 10/28/2015 06:37 PM, Alex Williamson wrote:
+> >>> Ok, so with hopefully correcting my understand of what this does, isn't
+> >>> this effectively the same:
+> >>>
+> >>> diff --git a/drivers/vfio/vfio_iommu_type1.c b/drivers/vfio/vfio_iommu_type1.c
+> >>> index 57d8c37..7db4f5a 100644
+> >>> --- a/drivers/vfio/vfio_iommu_type1.c
+> >>> +++ b/drivers/vfio/vfio_iommu_type1.c
+> >>> @@ -403,13 +403,19 @@ static void vfio_remove_dma(struct vfio_iommu *iommu, stru
+> >>>  static unsigned long vfio_pgsize_bitmap(struct vfio_iommu *iommu)
+> >>>  {
+> >>>         struct vfio_domain *domain;
+> >>> -       unsigned long bitmap = PAGE_MASK;
+> >>> +       unsigned long bitmap = ULONG_MAX;
+> >>>  
+> >>>         mutex_lock(&iommu->lock);
+> >>>         list_for_each_entry(domain, &iommu->domain_list, next)
+> >>>                 bitmap &= domain->domain->ops->pgsize_bitmap;
+> >>>         mutex_unlock(&iommu->lock);
+> >>>  
+> >>> +       /* Some comment about how the IOMMU API splits requests */
+> >>> +       if (bitmap & ~PAGE_MASK) {
+> >>> +               bitmap &= PAGE_MASK;
+> >>> +               bitmap |= PAGE_SIZE;
+> >>> +       }
+> >>> +
+> >>>         return bitmap;
+> >>>  }
+> >> Yes, to me it is indeed the same
+> >>>  
+> >>> This would also expose to the user that we're accepting PAGE_SIZE, which
+> >>> we weren't before, so it was not quite right to just let them do it
+> >>> anyway.  I don't think we even need to get rid of the WARN_ONs, do we?
+> >>> Thanks,
+> >>
+> >> The end-user might be afraid of those latter. Personally I would get rid
+> >> of them but that's definitively up to you.
+> > 
+> > I think Alex's point is that the WARN_ON's won't trigger with this patch,
+> > because he clears those lower bits in the bitmap.
+> ah yes sure!
 
-> arm64: efi: ensure kernel is loaded at correct address
->
-> The kernel image needs to be loaded text_offset_bytes from a 2M-aligned
-> base, per Documentation/arm64/booting.txt. If loaded at the wrong offset
-> modulo 2M, __create_page_tables will create incorrect page tables.
->
-> The EFI stub implicitly assumes that dram_base (i.e. the lowest address
-> with a EFI_MEMORY_WB attribute) is 2M-aligned, and tries to load the
-> kernel at dram_base + TEXT_OFFSET. If dram_base is not 2M-aligned, the
-> kernel will be loaded at the wrong offset from 2M.
+The WARN_ON triggers when the IOMMU mask is greater than PAGE_SIZE,
+which means we can't operate on the IOMMU with PAGE_SIZE granularity,
+which we do in a couple places.  So I think the WARN_ON is actually
+valid for the code and won't trigger for you now that the IOMMU mask is
+always at least ~PAGE_MASK if we can use the IOMMU at anything less than
+PAGE_SIZE granularity.  Thanks,
 
-Thanks, I'll use that.  I messed up a couple other things, so I need to 
-send out a v3 anyway.
-
->> -		*image_addr = *reserve_addr = dram_base + TEXT_OFFSET;
->> +		*image_addr = *reserve_addr =
->> +			round_up(dram_base, SZ_2M) + TEXT_OFFSET;
->
-> We also need to fix the test for whether we need to relocate the kernel:
-> (*image_addr != (dram_base + TEXT_OFFSET)).
->
-> When dram_base is not 2M aligned, that is broken, and it's been broken
-> since it was introduced in commit 3c7f255039a2ad6e ("arm64: efi: add EFI
-> stub") in v3.16.
->
-> It's a bit hideous to fix the general case, though, it seems.
-
-Um, so I should I do something more in my v3 patch, or is this a change 
-for a different patch?
-
--- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the
-Code Aurora Forum, a Linux Foundation Collaborative Project.
+Alex
