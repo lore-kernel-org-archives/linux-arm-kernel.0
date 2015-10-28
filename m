@@ -1,56 +1,64 @@
-From: timur@codeaurora.org (Timur Tabi)
-Date: Wed, 28 Oct 2015 09:51:35 -0500
-Subject: [PATCH v13 2/5] uart: pl011: Introduce register accessor
-In-Reply-To: <5630DA2A.4050803@hurleysoftware.com>
-References: <1438328959-16177-1-git-send-email-jun.nie@linaro.org>
- <1438328959-16177-3-git-send-email-jun.nie@linaro.org>
- <55FBECCD.2080906@arm.com>
- <CAOZdJXUZDTzEn4f4FGhmKfq7HeEFKPKp4BAbR6_=wXGVw5_0GQ@mail.gmail.com>
- <5630DA2A.4050803@hurleysoftware.com>
-Message-ID: <5630E0F7.9080705@codeaurora.org>
+From: javier@dowhile0.org (Javier Martinez Canillas)
+Date: Wed, 28 Oct 2015 15:54:30 +0100
+Subject: [PATCH] MAINTAINERS: Start using the 'reviewer' (R) tag
+In-Reply-To: <20151028143838.GG4058@x1>
+References: <CABxcv=mGZstqyrkB95hjDCYCvhDJDVD=ga-Fg_5yPtXETuWe=g@mail.gmail.com>
+ <20151028102832.GR5828@x1>
+ <CABxcv=mzzcx3o0m3hYzcn0DyM2pEFDZ-ZgVCjChWGf+y4Xy78A@mail.gmail.com>
+ <1446030399.2757.83.camel@perches.com>
+ <CABxcv=m+aMgtKPA-WBX9rTW8c3pnMmZgNG=NvnbaeOchdZ87hg@mail.gmail.com>
+ <20151028113932.GS5828@x1> <20151028121454.GA4058@x1>
+ <CABxcv=kCuYaYWgnvEUuTGv1RXdS6_3DR=6fnzHhAh7V-KFfCrQ@mail.gmail.com>
+ <20151028133438.GC4058@x1>
+ <CABxcv==Ag3ARUtQYZdfqBELAJ_CwU3to9YxmgG1yBbUJ-h9xrw@mail.gmail.com>
+ <20151028143838.GG4058@x1>
+Message-ID: <CABxcv=mL5jxS45EH7g=uYR2-xk3azW_QXPqK27FkkxAHy=nyGw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/28/2015 09:22 AM, Peter Hurley wrote:
-> EARLYCON_DECLARE(zte, zte_early_console_setup);
-> OF_EARLYCON_DECLARE(zte, ".......", zte_early_console_setup);
-> EARLYCON_DECLARE(sbsa32, sbsa32_early_console_setup);
-> OF_EARLYCON_DECLARE(sbsa32, "arm,sbsa-uart", sbsa32_early_console_setup);
+Hello Lee,
+
+[removed since we have been discussing the same back and forth]
+
+On Wed, Oct 28, 2015 at 3:38 PM, Lee Jones <lee.jones@linaro.org> wrote:
+>>
+>> No need for that, I already explained my point of view several times
+>> and you just think I'm wrong because I don't agree with you. So let's
+>> just agree on disagree ;-)
 >
-> The above assumes that the sbsa32 maintains the equivalence of
-> earlycon and console; ie., that
+> I do think you're wrong.  And you think I am wrong.  My reasoning is
+> based on logic, common sense and words, and yours is based on, well, I
+> really don't know. ;)
 >
-> / {
-> 	chosen {
-> 		stdout-path = &uart0;
-> 	};
+
+My reasoning is based on two things basically:
+
+1) Simplicity: it is easier to think in terms of developers (that post
+patches) and maintainers (that reviews / acks patches) instead of
+developers (that post patches), reviewers (that review patches) and
+maintainers (that collect patches and push them upstream).
+
+Individual developers posting patches should not even care what is the
+flow of a patch into mainline IMHO, just who should be in copy (which
+should be both the "own" of the file whatever is called and the
+subsystem maintainer).
+
+2) Consistency: I think that the developer / maintainer split is what
+more people are familiar with than the developer / reviewer /
+maintainer split.
+
+I don't really have a strong opinion and I'm completely OK if all the
+people that don't keep a tree are renamed to Reviewer, Author,
+Whatever instead of Maintainer. The only thing that I ask is if this
+could be made consistently across all subsystems and have an agreement
+in consensus so developers knows what the semantics are regardless of
+what subsystems they need to contribute.
+
+> So yes, we'll have to agree to disagree or neither of us will get any
+> real work done today.
 >
-> 	soc {
-> 		uart0: serial at xxxxxx {
-> 			compatible = "arm,sbsa-uart";
-> 		};
-> 	};
-> };
->
->
-> will start a sbsa32 earlycon and later replace that with
-> sbsa console.
 
-I never really understood the device tree support for SBSA.  The "S" 
-stands for Server, and ARM Server systems are supposed to use ACPI. 
-It's easy to add special cases via device tree, because of its 
-flexibility.  ACPI is much more difficult, and that's why I used the 
-command-line approach.
+Agreed, I spent most of my morning on this thread ;)
 
-Anyway, I found this alternate patch from Lief Lindholm that implements 
-this idea better, although it needs work:
-
-https://patches.linaro.org/53265/
-
-
-
-
--- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the
-Code Aurora Forum, a Linux Foundation Collaborative Project.
+Best regards,
+Javier
