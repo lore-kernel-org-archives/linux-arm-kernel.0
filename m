@@ -1,34 +1,59 @@
-From: slash.tmp@free.fr (Mason)
-Date: Wed, 28 Oct 2015 13:36:19 +0100
-Subject: CPU_METHOD_OF_DECLARE() with Linux as non-secure OS
-Message-ID: <5630C143.5080103@free.fr>
+From: joe@perches.com (Joe Perches)
+Date: Wed, 28 Oct 2015 05:46:10 -0700
+Subject: [PATCH] MAINTAINERS: Start using the 'reviewer' (R) tag
+In-Reply-To: <20151028122417.GB4058@x1>
+References: <CAJKOXPc_w2Dc8LvkCu_d+kjZZmYScXboQrpNWdicT2yfL_5D7Q@mail.gmail.com>
+ <20151028082446.GF5828@x1>
+ <CABxcv=mGZstqyrkB95hjDCYCvhDJDVD=ga-Fg_5yPtXETuWe=g@mail.gmail.com>
+ <20151028102832.GR5828@x1>
+ <CABxcv=mzzcx3o0m3hYzcn0DyM2pEFDZ-ZgVCjChWGf+y4Xy78A@mail.gmail.com>
+ <1446030399.2757.83.camel@perches.com>
+ <CABxcv=m+aMgtKPA-WBX9rTW8c3pnMmZgNG=NvnbaeOchdZ87hg@mail.gmail.com>
+ <20151028113932.GS5828@x1> <20151028121454.GA4058@x1>
+ <1446034810.2757.87.camel@perches.com> <20151028122417.GB4058@x1>
+Message-ID: <1446036370.2757.104.camel@perches.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Wed, 2015-10-28 at 12:24 +0000, Lee Jones wrote:
+> On Wed, 28 Oct 2015, Joe Perches wrote:
+> > On Wed, 2015-10-28 at 12:14 +0000, Lee Jones wrote:
+> > > Ah, but wait.  get_maintainer.pl *does* assume M means Maintainer
+> > > doesn't it?
+> > 
+> > No, it looks at the "S:" line.
+> 
+> Right.  Then assumes because the driver is 'supported' or 'maintained'
+> that the person(s) listed in M: must be the Supporter(s) or the
+> Maintainer(s).
 
-I'm working on a dual-core SoC (Cortex-A9 MPCore) with Linux running
-as the non-secure OS. The secure OS implements some of the APIs used
-in OMAP2 via SMC.
+Yup, except "assumes" isn't correct.
 
-To start the second core, I used to define .smp in my DT_MACHINE_START
-definition, but Arnd wrote: "There are other ways to do [.smp and .restart]
-too, see CPU_METHOD_OF_DECLARE() and register_restart_handler()."
+It's your definition of maintainer that seems to be at odds
+with what's otherwise apparently commonly accepted.
 
-Is CPU_METHOD_OF_DECLARE() the way to go?
-Is it "compatible" with executing smc to ask the secure OS to do whatever
-is needed to start the second core? (I don't understand why starting cores
-is secure OS responsibility.)
+Any "M:" entry in a section where the "S:" line is maintained
+or supported is generally classified as a maintainer too.
 
-I've located three relevant secure OS services:
-get_aux_core_boot
-set_aux_core_boot0
-set_aux_core_boot_addr
+For instance: I think most accept that I am a maintainer of
+get_maintainer.pl.
 
-I'm looking for guidance. What mach-* should I take as a reference to
-implement "second core startup from non-secure OS"?
+I wrote most of get_maintainer and I accept most but not all
+patches to it by acking some and nacking or otherwise requesting
+changes in others.  I do not upstream it.
 
-An ARM engineer suggested PSCI a while back, but I can't change the
-secure OS API at this time.
+I don't have a git tree at kernel.org and don't really need one.
+I rarely send pull requests.  I generally upstream through
+Andrew Morton and he uses quilt.  It's working well enough.
 
-Regards.
+The kernel summit thread from last year that initiated the "R:"
+line in MAINTAINERS was primarily focused on encouraging new
+patch review and honoring those that already take time to review.
+
+http://lists.linuxfoundation.org/pipermail/ksummit-discuss/2014-May/000764.html
+
+Knock your self out about clarifying how process should work.
+Generate consensus where necessary but don't try too hard.
+
+It's working reasonably well right now.  Most people are able
+to maintain sanity by ignoring what's unimportant to them.
