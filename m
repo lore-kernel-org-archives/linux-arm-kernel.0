@@ -1,252 +1,151 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Wed, 28 Oct 2015 09:51:28 +0100
-Subject: [PATCH 3/5] cpufreq: imx6q: Fix regulator/clock error handling
-In-Reply-To: <1446019154-16384-4-git-send-email-s.hauer@pengutronix.de>
-References: <1446019154-16384-1-git-send-email-s.hauer@pengutronix.de>
- <1446019154-16384-4-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1446022288.3138.6.camel@pengutronix.de>
+From: ykk@rock-chips.com (Yakir Yang)
+Date: Wed, 28 Oct 2015 16:52:46 +0800
+Subject: [PATCH v8 12/17] drm: rockchip: vop: add bpc and color mode setting
+In-Reply-To: <1446020143-32645-1-git-send-email-ykk@rock-chips.com>
+References: <1446020143-32645-1-git-send-email-ykk@rock-chips.com>
+Message-ID: <1446022366-20093-1-git-send-email-ykk@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Mittwoch, den 28.10.2015, 08:59 +0100 schrieb Sascha Hauer:
-> When one of the regulator_get/clk_get calls fails the driver just
-> returns -ENOENT. To properly handle the -EPROBE_DEFER case we have
-> to forward the actual error value instead. This patch fixes that.
-> 
-> Since all clocks/regulators are global static variables the IS_ERR()
-> check in the error path in probe() may erroneously work on the values
-> assigned in the previous probe run. This means we have to reinitialize
-> the variables between two probe runs().
-> 
-> The probe function already is quite overloaded, so this patch moves
-> the regulator and clock allocation into a separate function and the
-> dropping of these resourced into a corresponding cleanup function.
-> This is easier to review for correctness than the current mix of
-> reverse-cleanup and !IS_ERR checks at the end of probe().
-> 
-> While at it leave a comment that these resource allocations can't use
-> devm_* to prevent people from trying to convert it.
-> 
-> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+From: Mark Yao <yzq@rock-chips.com>
 
-Looks good to me now,
+Add bpc and color mode setting in rockchip_drm_vop driver, so
+connector could try to use the edid drm_display_info to config
+vop output mode.
 
-Reviewed-by: Lucas Stach <l.stach@pengutronix.de>
+Signed-off-by: Mark Yao <yzq@rock-chips.com>
+Signed-off-by: Yakir Yang <ykk@rock-chips.com>
+---
+Changes in v8: None
+Changes in v7: None
+Changes in v6: None
+Changes in v5:
+- Fix compiled error (Heiko)
+- Using the connector display info message to configure eDP driver input
+  video mode, but hard code CRTC video output mode to RGBaaa.
 
-> ---
->  drivers/cpufreq/imx6q-cpufreq.c | 170 +++++++++++++++++++++++++---------------
->  1 file changed, 106 insertions(+), 64 deletions(-)
-> 
-> diff --git a/drivers/cpufreq/imx6q-cpufreq.c b/drivers/cpufreq/imx6q-cpufreq.c
-> index 6fefd19..f81cf8e 100644
-> --- a/drivers/cpufreq/imx6q-cpufreq.c
-> +++ b/drivers/cpufreq/imx6q-cpufreq.c
-> @@ -176,6 +176,103 @@ static struct cpufreq_driver imx6q_cpufreq_driver = {
->  	.attr = cpufreq_generic_attr,
->  };
->  
-> +static int imx6q_cpufreq_get_resources(void)
-> +{
-> +	/*
-> +	 * Do not use devm_* here. The resources are bound to the
-> +	 * cpu_dev and not to this drivers platform_device.
-> +	 */
-> +	arm_clk = clk_get(cpu_dev, "arm");
-> +	if (IS_ERR(arm_clk))
-> +		return PTR_ERR(arm_clk);
-> +
-> +	pll1_sys_clk = clk_get(cpu_dev, "pll1_sys");
-> +	if (IS_ERR(pll1_sys_clk))
-> +		return PTR_ERR(pll1_sys_clk);
-> +
-> +	pll1_sw_clk = clk_get(cpu_dev, "pll1_sw");
-> +	if (IS_ERR(pll1_sw_clk))
-> +		return PTR_ERR(pll1_sw_clk);
-> +
-> +	step_clk = clk_get(cpu_dev, "step");
-> +	if (IS_ERR(step_clk))
-> +		return PTR_ERR(step_clk);
-> +
-> +	pll2_pfd2_396m_clk = clk_get(cpu_dev, "pll2_pfd2_396m");
-> +	if (IS_ERR(pll2_pfd2_396m_clk))
-> +		return PTR_ERR(pll2_pfd2_396m_clk);
-> +
-> +	if (of_machine_is_compatible("fsl,imx6ul")) {
-> +		pll2_bus_clk = clk_get(cpu_dev, "pll2_bus");
-> +		if (IS_ERR(pll2_bus_clk))
-> +			return PTR_ERR(pll2_bus_clk);
-> +
-> +		secondary_sel_clk = clk_get(cpu_dev, "secondary_sel");
-> +		if (IS_ERR(secondary_sel_clk))
-> +			return PTR_ERR(secondary_sel_clk);
-> +	}
-> +
-> +	arm_reg = regulator_get(cpu_dev, "arm");
-> +	if (IS_ERR(arm_reg))
-> +		return PTR_ERR(arm_reg);
-> +
-> +	pu_reg = regulator_get_optional(cpu_dev, "pu");
-> +
-> +	soc_reg = regulator_get(cpu_dev, "soc");
-> +	if (IS_ERR(soc_reg))
-> +		return PTR_ERR(soc_reg);
-> +
-> +	return 0;
-> +}
-> +
-> +
-> +static void imx6q_cpufreq_put_resources(void)
-> +{
-> +	/*
-> +	 * Set all resources to NULL here so that they are correctly
-> +	 * initialized next time we enter probe()
-> +	 */
-> +	if (!IS_ERR_OR_NULL(arm_reg))
-> +		regulator_put(arm_reg);
-> +	arm_reg = NULL;
-> +
-> +	if (!IS_ERR_OR_NULL(pu_reg))
-> +		regulator_put(pu_reg);
-> +	pu_reg = NULL;
-> +
-> +	if (!IS_ERR_OR_NULL(soc_reg))
-> +		regulator_put(soc_reg);
-> +	soc_reg = NULL;
-> +
-> +	if (!IS_ERR_OR_NULL(arm_clk))
-> +		clk_put(arm_clk);
-> +	arm_clk = NULL;
-> +
-> +	if (!IS_ERR_OR_NULL(pll1_sys_clk))
-> +		clk_put(pll1_sys_clk);
-> +	pll1_sys_clk = NULL;
-> +
-> +	if (!IS_ERR_OR_NULL(pll1_sw_clk))
-> +		clk_put(pll1_sw_clk);
-> +	pll1_sw_clk = NULL;
-> +
-> +	if (!IS_ERR_OR_NULL(step_clk))
-> +		clk_put(step_clk);
-> +	step_clk = NULL;
-> +
-> +	if (!IS_ERR_OR_NULL(pll2_pfd2_396m_clk))
-> +		clk_put(pll2_pfd2_396m_clk);
-> +	pll2_pfd2_396m_clk = NULL;
-> +
-> +	if (!IS_ERR_OR_NULL(pll2_bus_clk))
-> +		clk_put(pll2_bus_clk);
-> +	pll2_bus_clk = NULL;
-> +
-> +	if (!IS_ERR_OR_NULL(secondary_sel_clk))
-> +		clk_put(secondary_sel_clk);
-> +	secondary_sel_clk = NULL;
-> +}
-> +
->  static int imx6q_cpufreq_probe(struct platform_device *pdev)
->  {
->  	struct device_node *np;
-> @@ -198,36 +295,9 @@ static int imx6q_cpufreq_probe(struct platform_device *pdev)
->  		return -ENOENT;
->  	}
->  
-> -	arm_clk = clk_get(cpu_dev, "arm");
-> -	pll1_sys_clk = clk_get(cpu_dev, "pll1_sys");
-> -	pll1_sw_clk = clk_get(cpu_dev, "pll1_sw");
-> -	step_clk = clk_get(cpu_dev, "step");
-> -	pll2_pfd2_396m_clk = clk_get(cpu_dev, "pll2_pfd2_396m");
-> -	if (IS_ERR(arm_clk) || IS_ERR(pll1_sys_clk) || IS_ERR(pll1_sw_clk) ||
-> -	    IS_ERR(step_clk) || IS_ERR(pll2_pfd2_396m_clk)) {
-> -		dev_err(cpu_dev, "failed to get clocks\n");
-> -		ret = -ENOENT;
-> -		goto put_clk;
-> -	}
-> -
-> -	if (of_machine_is_compatible("fsl,imx6ul")) {
-> -		pll2_bus_clk = clk_get(cpu_dev, "pll2_bus");
-> -		secondary_sel_clk = clk_get(cpu_dev, "secondary_sel");
-> -		if (IS_ERR(pll2_bus_clk) || IS_ERR(secondary_sel_clk)) {
-> -			dev_err(cpu_dev, "failed to get clocks specific to imx6ul\n");
-> -			ret = -ENOENT;
-> -			goto put_clk;
-> -		}
-> -	}
-> -
-> -	arm_reg = regulator_get(cpu_dev, "arm");
-> -	pu_reg = regulator_get_optional(cpu_dev, "pu");
-> -	soc_reg = regulator_get(cpu_dev, "soc");
-> -	if (IS_ERR(arm_reg) || IS_ERR(soc_reg)) {
-> -		dev_err(cpu_dev, "failed to get regulators\n");
-> -		ret = -ENOENT;
-> -		goto put_reg;
-> -	}
-> +	ret = imx6q_cpufreq_get_resources();
-> +	if (ret)
-> +		goto drop_resources;
->  
->  	/*
->  	 * We expect an OPP table supplied by platform.
-> @@ -239,7 +309,7 @@ static int imx6q_cpufreq_probe(struct platform_device *pdev)
->  		ret = dev_pm_opp_of_add_table(cpu_dev);
->  		if (ret < 0) {
->  			dev_err(cpu_dev, "failed to init OPP table: %d\n", ret);
-> -			goto put_reg;
-> +			goto drop_resources;
->  		}
->  
->  		/* Because we have added the OPPs here, we must free them */
-> @@ -348,28 +418,9 @@ free_freq_table:
->  out_free_opp:
->  	if (free_opp)
->  		dev_pm_opp_of_remove_table(cpu_dev);
-> -put_reg:
-> -	if (!IS_ERR(arm_reg))
-> -		regulator_put(arm_reg);
-> -	if (!IS_ERR(pu_reg))
-> -		regulator_put(pu_reg);
-> -	if (!IS_ERR(soc_reg))
-> -		regulator_put(soc_reg);
-> -put_clk:
-> -	if (!IS_ERR(arm_clk))
-> -		clk_put(arm_clk);
-> -	if (!IS_ERR(pll1_sys_clk))
-> -		clk_put(pll1_sys_clk);
-> -	if (!IS_ERR(pll1_sw_clk))
-> -		clk_put(pll1_sw_clk);
-> -	if (!IS_ERR(step_clk))
-> -		clk_put(step_clk);
-> -	if (!IS_ERR(pll2_pfd2_396m_clk))
-> -		clk_put(pll2_pfd2_396m_clk);
-> -	if (!IS_ERR(pll2_bus_clk))
-> -		clk_put(pll2_bus_clk);
-> -	if (!IS_ERR(secondary_sel_clk))
-> -		clk_put(secondary_sel_clk);
-> +drop_resources:
-> +	imx6q_cpufreq_put_resources();
-> +
->  	of_node_put(np);
->  	return ret;
->  }
-> @@ -380,17 +431,8 @@ static int imx6q_cpufreq_remove(struct platform_device *pdev)
->  	dev_pm_opp_free_cpufreq_table(cpu_dev, &freq_table);
->  	if (free_opp)
->  		dev_pm_opp_of_remove_table(cpu_dev);
-> -	regulator_put(arm_reg);
-> -	if (!IS_ERR(pu_reg))
-> -		regulator_put(pu_reg);
-> -	regulator_put(soc_reg);
-> -	clk_put(arm_clk);
-> -	clk_put(pll1_sys_clk);
-> -	clk_put(pll1_sw_clk);
-> -	clk_put(step_clk);
-> -	clk_put(pll2_pfd2_396m_clk);
-> -	clk_put(pll2_bus_clk);
-> -	clk_put(secondary_sel_clk);
-> +
-> +	imx6q_cpufreq_put_resources();
->  
->  	return 0;
->  }
+Changes in v4: None
+Changes in v3: None
+Changes in v2: None
 
+ drivers/gpu/drm/rockchip/analogix_dp-rockchip.c | 25 +++++++++++++++----
+ drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c     |  2 +-
+ drivers/gpu/drm/rockchip/rockchip_drm_drv.h     |  2 +-
+ drivers/gpu/drm/rockchip/rockchip_drm_vop.c     | 32 ++++++++++++++++++++++---
+ 4 files changed, 51 insertions(+), 10 deletions(-)
+
+diff --git a/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c b/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
+index 2c82a9a..3990951 100644
+--- a/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
++++ b/drivers/gpu/drm/rockchip/analogix_dp-rockchip.c
+@@ -180,14 +180,29 @@ static void rockchip_dp_drm_encoder_mode_set(struct drm_encoder *encoder,
+ static void rockchip_dp_drm_encoder_prepare(struct drm_encoder *encoder)
+ {
+ 	struct rockchip_dp_device *dp = to_dp(encoder);
++	struct drm_connector *cn = &dp->connector;
++	int ret = -1;
+ 	u32 val;
+-	int ret;
+ 
+-	ret = rockchip_drm_crtc_mode_config(encoder->crtc,
+-					    DRM_MODE_CONNECTOR_eDP,
+-					    ROCKCHIP_OUT_MODE_AAAA);
++	/*
++	 * FIXME(Yakir): driver should configure the CRTC output video
++	 * mode with the display information which indicated the monitor
++	 * support colorimetry.
++	 *
++	 * But don't know why the CRTC driver seems could only output the
++	 * RGBaaa rightly. For example, if connect the "innolux,n116bge"
++	 * eDP screen, EDID would indicated that screen only accepted the
++	 * 6bpc mode. But if I configure CRTC to RGB666 output, then eDP
++	 * screen would show a blue picture (RGB888 show a green picture).
++	 * But if I configure CTRC to RGBaaa, and eDP driver still keep
++	 * RGB666 input video mode, then screen would works prefect.
++	 */
++	if (cn->display_info.color_formats & DRM_COLOR_FORMAT_RGB444)
++		ret = rockchip_drm_crtc_mode_config(encoder->crtc,
++					DRM_MODE_CONNECTOR_eDP,
++					10, DRM_COLOR_FORMAT_RGB444);
+ 	if (ret < 0) {
+-		dev_err(dp->dev, "Could not set crtc mode config: %d.\n", ret);
++		dev_err(dp->dev, "Could not set crtc mode config (%d)\n", ret);
+ 		return;
+ 	}
+ 
+diff --git a/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c b/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
+index 80d6fc8..428a3c1 100644
+--- a/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
++++ b/drivers/gpu/drm/rockchip/dw_hdmi-rockchip.c
+@@ -215,7 +215,7 @@ static void dw_hdmi_rockchip_encoder_commit(struct drm_encoder *encoder)
+ static void dw_hdmi_rockchip_encoder_prepare(struct drm_encoder *encoder)
+ {
+ 	rockchip_drm_crtc_mode_config(encoder->crtc, DRM_MODE_CONNECTOR_HDMIA,
+-				      ROCKCHIP_OUT_MODE_AAAA);
++				      10, DRM_COLOR_FORMAT_RGB444);
+ }
+ 
+ static struct drm_encoder_helper_funcs dw_hdmi_rockchip_encoder_helper_funcs = {
+diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_drv.h b/drivers/gpu/drm/rockchip/rockchip_drm_drv.h
+index dc4e5f0..ef1d7fb 100644
+--- a/drivers/gpu/drm/rockchip/rockchip_drm_drv.h
++++ b/drivers/gpu/drm/rockchip/rockchip_drm_drv.h
+@@ -59,7 +59,7 @@ void rockchip_unregister_crtc_funcs(struct drm_device *dev, int pipe);
+ int rockchip_drm_encoder_get_mux_id(struct device_node *node,
+ 				    struct drm_encoder *encoder);
+ int rockchip_drm_crtc_mode_config(struct drm_crtc *crtc, int connector_type,
+-				  int out_mode);
++				  int bpc, int color);
+ int rockchip_drm_dma_attach_device(struct drm_device *drm_dev,
+ 				   struct device *dev);
+ void rockchip_drm_dma_detach_device(struct drm_device *drm_dev,
+diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+index 5d8ae5e..9ef4a1f 100644
+--- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
++++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+@@ -1062,14 +1062,40 @@ static const struct drm_plane_funcs vop_plane_funcs = {
+ 
+ int rockchip_drm_crtc_mode_config(struct drm_crtc *crtc,
+ 				  int connector_type,
+-				  int out_mode)
++				  int bpc, int color)
+ {
+ 	struct vop *vop = to_vop(crtc);
+ 
++	/*
++	 * RK3288 vop only support RGB Color output.
++	 */
++	if (color != DRM_COLOR_FORMAT_RGB444) {
++		DRM_ERROR("Only support output RGB444, not support%d\n",
++			  color);
++		return -EINVAL;
++	}
++
+ 	vop->connector_type = connector_type;
+-	vop->connector_out_mode = out_mode;
+ 
+-	return 0;
++	/*
++	 * Fixme: I don't know how to describe the ROCKCHIP_OUT_MODE_P565's
++	 * bpc, 5 or 6?
++	 */
++	if (bpc >= 10) {
++		bpc = 10;
++		vop->connector_out_mode = ROCKCHIP_OUT_MODE_AAAA;
++	} else if (bpc >= 8) {
++		bpc = 8;
++		vop->connector_out_mode = ROCKCHIP_OUT_MODE_P888;
++	} else if (bpc >= 6) {
++		bpc = 6;
++		vop->connector_out_mode = ROCKCHIP_OUT_MODE_P666;
++	} else {
++		DRM_ERROR("unsupport bpc %d\n", bpc);
++		return -EINVAL;
++	}
++
++	return bpc;
+ }
+ EXPORT_SYMBOL_GPL(rockchip_drm_crtc_mode_config);
+ 
 -- 
-Pengutronix e.K.             | Lucas Stach                 |
-Industrial Linux Solutions   | http://www.pengutronix.de/  |
+1.9.1
