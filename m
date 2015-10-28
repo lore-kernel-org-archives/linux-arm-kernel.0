@@ -1,32 +1,42 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 28 Oct 2015 17:05:50 +0900
-Subject: [GIT PULL 4/5] Late Samsung driver updates for v4.4
-In-Reply-To: <000801d11156$c0e0c270$42a24750$@samsung.com>
-References: <562AA40E.4050407@kernel.org> <562AA603.7040600@kernel.org>
- <56307B33.90608@samsung.com> <000101d11155$1f8d6eb0$5ea84c10$@samsung.com>
- <56307FEA.6090207@samsung.com> <000801d11156$c0e0c270$42a24750$@samsung.com>
-Message-ID: <563081DE.9010500@samsung.com>
+From: daniel.thompson@linaro.org (Daniel Thompson)
+Date: Wed, 28 Oct 2015 08:09:23 +0000
+Subject: [PATCH v2 8/9] ARM: dts: Add leds support to STM32F429 Discovery
+ board
+In-Reply-To: <562FF234.9010403@suse.de>
+References: <1445102604-11502-1-git-send-email-mcoquelin.stm32@gmail.com>
+ <1445102604-11502-9-git-send-email-mcoquelin.stm32@gmail.com>
+ <CACRpkdYjq9XqKM4imYsaa_HBopS7uFnbb6gf=hRZHGC4baafAg@mail.gmail.com>
+ <CALszF6Bo3x4jWnvDc=28s=517YJrv2=3BuuYmxjqP4ciF17fcQ@mail.gmail.com>
+ <562FEE85.3010204@suse.de>
+ <CACRpkdaQWm7Jz7Zj-amqx3EHVYi_-GvNxyQs9c8ht2WjGjAphg@mail.gmail.com>
+ <562FF234.9010403@suse.de>
+Message-ID: <563082B3.8040301@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28.10.2015 17:00, Pavel Fedin wrote:
->  Hello!
-> 
->> The Exynos5410 in current form does not have suspend capability. During
->> boot you should see in dmesg:
->> 	Failed to find PMU node
->> coming from mach-exynos/suspend.c.
-> 
->  Indeed. By the way, can this be a reason why reboot stopped working? It worked in v4.1. Isn't this a regression?
->  Ok, nevertheless, here is v3 of my patchset.
+On 27/10/15 21:52, Andreas F?rber wrote:
+> Am 27.10.2015 um 22:46 schrieb Linus Walleij:
+>> Heartbeat is awesome.
+>
+> Yes, it's awesome for testing, but not for a .dts file that ends up in a
+> distro (not the case here, of course) and keeps blinking on the desk.
+>
+> If someone wants LEDs to blink, they can set that via sysfs or by
+> modifying their .dts locally.
+>
+> sunxi chose to keep LEDs off my default. For qcom we had a similar
+> discussion some weeks ago. I don't regularly read Linux patches, so feel
+> free to skim the archives yourself.
 
-The noticeable change between v4.1 and v4.2 was for example:
-c4241a582d22 ("ARM: EXYNOS: use PS_HOLD based poweroff for all supported
-SoCs")
+Among the existing DTS files there is pretty significant use of 
+heartbeat although its not absolute.
 
-Can you try whether reverting it fixes the issue?
+There are 119 files that set a default-trigger, of these 91 (~75%) 
+include a line to configure a heartbeat.
 
-I don't recall any other changes which could affect Exynos5410.
+Personally I'd be very happy with heartbeat by default on STM32... I've 
+seldom worked on a board without a default-enabled heartbeat so they 
+make me feel comfortable. ;-)
 
-Best regards,
-Krzysztof
+
+Daniel.
