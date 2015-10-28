@@ -1,68 +1,63 @@
-From: hauke@hauke-m.de (Hauke Mehrtens)
-Date: Wed, 28 Oct 2015 20:10:47 +0100
-Subject: [PATCH 3/3] ARM: BCM: Add SMP support for Broadcom NSP
-In-Reply-To: <5630DA81.4030301@broadcom.com>
-References: <1444844820-24290-1-git-send-email-kapilh@broadcom.com>
- <1444844820-24290-4-git-send-email-kapilh@broadcom.com>
- <561ED691.8080407@hauke-m.de> <561FD005.3040900@broadcom.com>
- <562016A9.7050208@hauke-m.de> <20151015211703.GQ32089@broadcom.com>
- <5630DA81.4030301@broadcom.com>
-Message-ID: <56311DB7.5000905@hauke-m.de>
+From: eric@anholt.net (Eric Anholt)
+Date: Wed, 28 Oct 2015 12:16:51 -0700
+Subject: [PATCH 3/4] i2c: added I2C_AQ_NO_CLK_STRETCH to i2c-bcm2835.c
+In-Reply-To: <1445976718-7449-3-git-send-email-nicola@corna.info>
+References: <1445976718-7449-1-git-send-email-nicola@corna.info>
+ <1445976718-7449-3-git-send-email-nicola@corna.info>
+Message-ID: <8737wu9524.fsf@eliezer.anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/28/2015 03:24 PM, Kapil Hali wrote:
-> 
-> 
-> On 10/16/2015 2:47 AM, Jon Mason wrote:
->> On Thu, Oct 15, 2015 at 11:12:09PM +0200, Hauke Mehrtens wrote:
->>> On 10/15/2015 06:10 PM, Kapil Hali wrote:
->>>>
->>>>
->>>> On 10/15/2015 3:56 AM, Hauke Mehrtens wrote:
->>>>> On 10/14/2015 07:47 PM, Kapil Hali wrote:
->>>>>> Add SMP support for Broadcom's Northstar Plus SoC,
->>>>>> cpu enable method and pen_release procedures. This
->>>>>> changes also consolidates iProc family's - BCM NSP
->>>>>> and BCM Kona, SMP handling in a common file.
->>>>>
->>>>> This will probably also work on normal Northstar CPUs without changes.
->>>>>
->>>> I think, it should work for most of the variants of Northstar family, 
->>>> except for those which have a BOOTROM bug.
->>>
->>> Which SoC are affected by this BOOTROM bug?
->>
->> 53012 is the one I am seeing.  Not seeing it on 4708 (and assuming it is
->> not present on 4709).  Internally, we do the ugly bug workaround on
->> all Northstar SoCs.  The workaround is not acceptable upstream, so I
->> am not pushing it. :)
->>
->> Thanks,
->> Jon
->>
-> 
-> Hi Hauke,
-> 
-> Now that you have tested Jon's patch which is based on my changes for
-> SMP, shall I take his changes and add it on top of my changes and resend?
-> Also, do I consider your Acked-by and Tested-by for the change?
-> 
-> Thanks,
-> Kapil
-> 
+Nicola Corna <nicola@corna.info> writes:
+> As reported here
+> http://www.advamation.com/knowhow/raspberrypi/rpi-i2c-bug.html
+> the BCM2835 has a bug in its i2c implementation which prevents a correct
+> clock stretching.
+>
+> Signed-off-by: Nicola Corna <nicola@corna.info>
+> ---
+>  drivers/i2c/busses/i2c-bcm2835.c | 5 +++++
+>  1 file changed, 5 insertions(+)
+>
+> diff --git a/drivers/i2c/busses/i2c-bcm2835.c b/drivers/i2c/busses/i2c-bcm2835.c
+> index 3032b89..38d7102 100644
+> --- a/drivers/i2c/busses/i2c-bcm2835.c
+> +++ b/drivers/i2c/busses/i2c-bcm2835.c
+> @@ -222,6 +222,10 @@ static const struct i2c_algorithm bcm2835_i2c_algo = {
+>  	.functionality	= bcm2835_i2c_func,
+>  };
+>  
+> +static const struct i2c_adapter_quirks bcm2835_i2c_quirks = {
+> +	.flags = I2C_AQ_NO_CLK_STRETCH,
+> +};
+> +
+>  static int bcm2835_i2c_probe(struct platform_device *pdev)
+>  {
+>  	struct bcm2835_i2c_dev *i2c_dev;
+> @@ -293,6 +297,7 @@ static int bcm2835_i2c_probe(struct platform_device *pdev)
+>  	adap->algo = &bcm2835_i2c_algo;
+>  	adap->dev.parent = &pdev->dev;
+>  	adap->dev.of_node = pdev->dev.of_node;
+> +	adap->quirks = &bcm2835_i2c_quirks;
+>  
+>  	bcm2835_i2c_writel(i2c_dev, BCM2835_I2C_C, 0);
 
-Hi Kapil,
+Looking at the driver, we're not setting the REDL/FEDL fields, which are
+involved in the delays following clock stretching.  Looks like I2C_DEL's
+low 16 bits (rising edge delay) should be I2C_DIV / 4 (wait half the
+period for the slave to update its data before we sample it), and the
+high 16 bits (falling edge delay) should be I2C_DIV / 16 (put our data
+out before we expet the slave to sample the value).
 
-I tested this on Northstar 1.
+Note: this is not a detailed analysis, nor am I asserting that this is
+the bug, just something that we seem to be missing in the Linux driver.
 
-Acked-by: Hauke Mehrtens <hauke@hauke-m.de>
-Tested-by: Hauke Mehrtens <hauke@hauke-m.de>
-
-I think Florian has to take the patches and you should hurry up because
-the merge window probably opens on Monday.
-
-You can send all patches again with the bcm501x patch or just that one,
-I assume there are no changes needed for the other patches?
-
-Hauke
+(Added cc to linux-rpi-kernel, in case anyone on that list is interested
+in I2C issues on the platform)
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 818 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151028/675f82b2/attachment.sig>
