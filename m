@@ -1,23 +1,23 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Wed, 28 Oct 2015 04:27 +0100
-Subject: cpufreq: i.MX6: -EPROBE_DEFER fixes
-In-Reply-To: <1445503652-777-1-git-send-email-s.hauer@pengutronix.de>
-References: <1445503652-777-1-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <1625342.QihRV1d1Kl@vostro.rjw.lan>
+From: davem@davemloft.net (David Miller)
+Date: Tue, 27 Oct 2015 20:20:41 -0700 (PDT)
+Subject: [PATCH RESEND v2 net-next] net: hisilicon: updates HNS config
+ and documents
+In-Reply-To: <1445944594-244149-1-git-send-email-huangdaode@hisilicon.com>
+References: <1445944594-244149-1-git-send-email-huangdaode@hisilicon.com>
+Message-ID: <20151027.202041.613033307041357854.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, October 22, 2015 10:47:28 AM Sascha Hauer wrote:
-> The i.MX6 cpufreq driver can't cope with -EPROBE_DEFER returned from
-> regulator_get/clk_get. This series fix that and some other small issues.
+From: huangdaode <huangdaode@hisilicon.com>
+Date: Tue, 27 Oct 2015 19:16:34 +0800
+
+> From: yankejian <yankejian@huawei.com>
 > 
-> This series supersedes
-> [PATCH 1/2] cpufreq: imx: fix regulator_get error handling
-> [PATCH 2/2] cpufreq: imx: fix regulator_get_optional error handling
-> from Heiner Kallweit.
+> updates the bindings documents and dtsi file according to the review
+> comments[https://lkml.org/lkml/2015/9/21/670] from Rob Herring <robh@kernel.org>
+> 
+> Acked-by: Rob Herring <robh@kernel.org>
+> Signed-off-by: yankejian <yankejian@huawei.com>
+> Signed-off-by: huangdaode <huangdaode@hisilicon.com>
 
-I'm expecting a new version of this addressing the review comments to be
-submitted.
-
-Thanks,
-Rafael
+Applied, thanks.
