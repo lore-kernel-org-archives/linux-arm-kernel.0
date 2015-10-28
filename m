@@ -1,107 +1,120 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 28 Oct 2015 12:47:26 +0000
-Subject: [PATCH v1] Ftrace: arm/arm64: Define a new arm/arm64 trace clock
- source based on CNTPCT/CNTPCT_EL0 register.
-In-Reply-To: <1445854558-16253-1-git-send-email-amittomer25@gmail.com>
-References: <1445854558-16253-1-git-send-email-amittomer25@gmail.com>
-Message-ID: <20151028124726.GD25451@leverpostej>
+From: tomasz.nowicki@linaro.org (Tomasz Nowicki)
+Date: Wed, 28 Oct 2015 13:47:51 +0100
+Subject: [Linaro-acpi] [PATCH V1 10/11] pci, acpi: Provide generic way to
+ assign bus domain number.
+In-Reply-To: <20151028113837.GK963@e106497-lin.cambridge.arm.com>
+References: <1445963922-22711-1-git-send-email-tn@semihalf.com>
+ <1445963922-22711-11-git-send-email-tn@semihalf.com>
+ <20151028113837.GK963@e106497-lin.cambridge.arm.com>
+Message-ID: <5630C3F7.2040104@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 26, 2015 at 03:45:58PM +0530, Amit wrote:
-> From: Amit Singh Tomar <amittomer25@gmail.com>
-> 
-> Define new arm/arm64 specific trace clock using CNTPCT/CNTPCT_EL0 register,
-> similar to x86-tsc. It can be used to correlate trace events across
-> hosts and guest that can be useful for debugging purpose.
-> 
-> Signed-off-by: Amit Singh Tomar <amittomer25@gmail.com>
-> ---
-> Changes since RFC:
-> 	* Replaced define with static inline
-> 	* Revert few changes done in ftrace.txt
-> 	* Made it common between ARM and ARM64.
-> ---
->  Documentation/trace/ftrace.txt       | 12 ++++++++++++
->  arch/arm/include/asm/Kbuild          |  1 -
->  arch/arm/include/asm/trace_clock.h   | 21 +++++++++++++++++++++
->  arch/arm/kernel/Makefile             |  2 ++
->  arch/arm/kernel/trace_clock.c        | 33 +++++++++++++++++++++++++++++++++
->  arch/arm64/include/asm/Kbuild        |  1 -
->  arch/arm64/include/asm/trace_clock.h | 21 +++++++++++++++++++++
->  arch/arm64/kernel/Makefile           |  2 ++
->  8 files changed, 91 insertions(+), 2 deletions(-)
->  create mode 100644 arch/arm/include/asm/trace_clock.h
->  create mode 100644 arch/arm/kernel/trace_clock.c
->  create mode 100644 arch/arm64/include/asm/trace_clock.h
-> 
-> diff --git a/Documentation/trace/ftrace.txt b/Documentation/trace/ftrace.txt
-> index ef621d3..13f3737 100644
-> --- a/Documentation/trace/ftrace.txt
-> +++ b/Documentation/trace/ftrace.txt
-> @@ -351,6 +351,18 @@ of ftrace. Here is a list of some of the key files:
->  		  to correlate events across hypervisor/guest if
->  		  tb_offset is known.
->  
-> +	 arm-pct: This uses ARM Physical Count register value.This
-> +	 	  is different from default "local" clock which
-> +		  usese Virtual Count register.This is consistent
-> +		  across processors and can be used to correlate
-> +		  events across host/guest.
-> +
-> +	 arm64-pct: This uses ARM64 Physical Timer Count register
-> +                   value. This is different from default "local"
-> +                   clock which usese Virtual Timer Count register.
-> +                   This is consistent across processors and can be
-> +                   used to correlate events across host/guest.
+Hi Liviu,
 
-The above is wrong. Both the physical and virtual counters have the same
-guarantees w.r.t. consistency across CPUs for the same VM image. Neither
-is more local than the other.
+On 28.10.2015 12:38, Liviu.Dudau at arm.com wrote:
+> On Tue, Oct 27, 2015 at 05:38:41PM +0100, Tomasz Nowicki wrote:
+>> Architectures which support PCI_DOMAINS_GENERIC (like ARM64)
+>> cannot call pci_bus_assign_domain_nr along ACPI PCI host bridge
+>> initialization since this function needs valid parent device reference
+>> to be able to retrieve domain number (aka segment).
+>>
+>> We can omit that blocker and pass down host bridge device via
+>> pci_create_root_bus parameter and then be able to evaluate _SEG method
+>> being in pci_bus_assign_domain_nr.
+>>
+>> Note that _SEG method is optional, therefore _SEG absence means
+>> that all PCI buses belong to domain 0.
+>>
+>> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
+>> ---
+>>   drivers/acpi/pci_root.c |  2 +-
+>>   drivers/pci/pci.c       | 32 +++++++++++++++++++++++++++-----
+>>   2 files changed, 28 insertions(+), 6 deletions(-)
+>>
+>> diff --git a/drivers/acpi/pci_root.c b/drivers/acpi/pci_root.c
+>> index 850d7bf..e682dc6 100644
+>> --- a/drivers/acpi/pci_root.c
+>> +++ b/drivers/acpi/pci_root.c
+>> @@ -839,7 +839,7 @@ struct pci_bus *acpi_pci_root_create(struct acpi_pci_root *root,
+>>
+>>   	pci_acpi_root_add_resources(info);
+>>   	pci_add_resource(&info->resources, &root->secondary);
+>> -	bus = pci_create_root_bus(NULL, busnum, ops->pci_ops,
+>> +	bus = pci_create_root_bus(&device->dev, busnum, ops->pci_ops,
+>>   				  sysdata, &info->resources);
+>
+> Not sure this change should be in this patch, I don't see the relation.
+>
+> To put it differently: I think the patch should introduce the retrieval of the
+> domain number from _SEG method and leave the passing of a valid host bridge device
+> to a more appropriate patch.
 
-In the host you will have access to CNTVOFF, so you can use that to
-correlate the virtual counter.
+I wanted to highlight that ACPI kernel using PCI_DOMAINS_GENERIC needs 
+to have both in place:
+1. Obtaining domain from _SEG method
+2. And host bridge device reference for which we can call _SEG.
+But you are right, it will be more clear if I split up patch and 
+describe it in separate changelog.
 
-Additionally, it's not safe to read the physical counter register unless
-you know that access has not been denied by the hypervisor; so any Linux
-image not booted at hyp cannot use this. If the hypervisor emulates the
-access, it will also be horrifically slow.
+>
+>
+>>   	if (!bus)
+>>   		goto out_release_info;
+>> diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
+>> index 6a9a111..17d1857 100644
+>> --- a/drivers/pci/pci.c
+>> +++ b/drivers/pci/pci.c
+>> @@ -25,6 +25,7 @@
+>>   #include <linux/device.h>
+>>   #include <linux/pm_runtime.h>
+>>   #include <linux/pci_hotplug.h>
+>> +#include <linux/acpi.h>
+>>   #include <asm-generic/pci-bridge.h>
+>>   #include <asm/setup.h>
+>>   #include "pci.h"
+>> @@ -4501,7 +4502,7 @@ int pci_get_new_domain_nr(void)
+>>   void pci_bus_assign_domain_nr(struct pci_bus *bus, struct device *parent)
+>>   {
+>>   	static int use_dt_domains = -1;
+>> -	int domain = of_get_pci_domain_nr(parent->of_node);
+>> +	int domain;
+>>
+>>   	/*
+>>   	 * Check DT domain and use_dt_domains values.
+>> @@ -4523,14 +4524,35 @@ void pci_bus_assign_domain_nr(struct pci_bus *bus, struct device *parent)
+>>   	 * API and update the use_dt_domains value to keep track of method we
+>>   	 * are using to assign domain numbers (use_dt_domains = 0).
+>>   	 *
+>> +	 * IF ACPI, we expect non-DT method (use_dt_domains == -1)
+>> +	 * and call _SEG method for corresponding host bridge device.
+>> +	 * If _SEG method does not exist, following ACPI spec (6.5.6)
+>> +	 * all PCI buses belong to domain 0.
+>> +	 *
+>>   	 * All other combinations imply we have a platform that is trying
+>> -	 * to mix domain numbers obtained from DT and pci_get_new_domain_nr(),
+>> -	 * which is a recipe for domain mishandling and it is prevented by
+>> -	 * invalidating the domain value (domain = -1) and printing a
+>> -	 * corresponding error.
+>> +	 * to mix domain numbers obtained from DT, ACPI and
+>> +	 * pci_get_new_domain_nr(), which is a recipe for domain mishandling and
+>> +	 * it is prevented by invalidating the domain value (domain = -1) and
+>> +	 * printing a corresponding error.
+>>   	 */
+>> +
+>> +	domain = of_get_pci_domain_nr(parent->of_node);
+>
+> Not sure what you've got here by splitting the original line into two other than an increase
+> in the change count.
 
-I don't think this makes sense.
+Yes, it does not make sense to split the original line. I will fix that.
 
-> diff --git a/arch/arm/kernel/trace_clock.c b/arch/arm/kernel/trace_clock.c
-> new file mode 100644
-> index 0000000..3bf040d
-> --- /dev/null
-> +++ b/arch/arm/kernel/trace_clock.c
-> @@ -0,0 +1,33 @@
-> +/*
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License, version 2, as
-> + * published by the Free Software Foundation.
-> + *
-> + * Copyright (C) 2015 Amit Singh Tomar, amittomer25 at gmail.com
-> + *
-> + * Thanks to Steven Rostedt and Andre Przywara!
-> +*/
-> +
-> +#include <asm/trace_clock.h>
-> +#include <asm/barrier.h>
-> +#include <asm/arch_timer.h>
-> +
-> +static inline u64 get_cntpct(void)
-> +{
-> +	u64 cycles;
-> +
-> +	isb();
-> +	asm volatile("mrs %0, cntpct_el0" : "=r" (cycles));
-> +
-> +	return cycles;
-> +}
+>
+> Otherwise, it looks sensible.
+>
+> Reviewed-by: Liviu Dudau <Liviu.Dudau@arm.com>
 
-This is arch/arm. This cannot build for 32-bit.
+Thanks Liviu!
 
-Regardless, this doesn't belong here.
-
-Thanks,
-Mark.
+Regards,
+Tomasz
