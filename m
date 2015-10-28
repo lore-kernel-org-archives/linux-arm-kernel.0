@@ -1,82 +1,210 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Wed, 28 Oct 2015 10:49:15 +0000
-Subject: [Linaro-acpi] [PATCH V1 07/11] XEN / PCI: Remove the dependence
- on arch x86 when PCI_MMCONFIG=y
-In-Reply-To: <562FB3A5.3050500@oracle.com>
-References: <1445963922-22711-1-git-send-email-tn@semihalf.com>
- <1445963922-22711-8-git-send-email-tn@semihalf.com>
- <562FAA88.3020609@linaro.org> <562FB3A5.3050500@oracle.com>
-Message-ID: <alpine.DEB.2.02.1510281047460.15801@kaball.uk.xensource.com>
+From: javier@dowhile0.org (Javier Martinez Canillas)
+Date: Wed, 28 Oct 2015 11:53:42 +0100
+Subject: [PATCH] MAINTAINERS: Start using the 'reviewer' (R) tag
+In-Reply-To: <20151028102832.GR5828@x1>
+References: <1445960557-24328-1-git-send-email-lee.jones@linaro.org>
+ <20151027172428.GB21070@earth> <20151027181555.GE5828@x1>
+ <1445971482.2757.27.camel@perches.com>
+ <CAJKOXPc_w2Dc8LvkCu_d+kjZZmYScXboQrpNWdicT2yfL_5D7Q@mail.gmail.com>
+ <20151028082446.GF5828@x1>
+ <CABxcv=mGZstqyrkB95hjDCYCvhDJDVD=ga-Fg_5yPtXETuWe=g@mail.gmail.com>
+ <20151028102832.GR5828@x1>
+Message-ID: <CABxcv=mzzcx3o0m3hYzcn0DyM2pEFDZ-ZgVCjChWGf+y4Xy78A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 27 Oct 2015, Boris Ostrovsky wrote:
-> On 10/27/2015 12:47 PM, Tomasz Nowicki wrote:
-> > + Stefano
-> > 
-> > On 27.10.2015 17:38, Tomasz Nowicki wrote:
-> > > From: Hanjun Guo <hanjun.guo@linaro.org>
-> > > 
-> > > In drivers/xen/pci.c, there are arch x86 dependent codes when
-> > > CONFIG_PCI_MMCONFIG is enabled, since CONFIG_PCI_MMCONFIG
-> > > depends on ACPI, so this will prevent XEN PCI running on other
-> > > architectures using ACPI with PCI_MMCONFIG enabled (such as ARM64).
-> > > 
-> > > Fortunatly, it can be sloved in a simple way. In drivers/xen/pci.c,
-> > > the only x86 dependent code is if ((pci_probe & PCI_PROBE_MMCONF) == 0),
-> > > and it's defined in asm/pci_x86.h, the code means that
-> > > if the PCI resource is not probed in PCI_PROBE_MMCONF way, just
-> > > ingnore the xen mcfg init. Actually this is duplicate, because
-> > > if PCI resource is not probed in PCI_PROBE_MMCONF way, the
-> > > pci_mmconfig_list will be empty, and the if (list_empty())
-> > > after it will do the same job.
-> > > 
-> > > So just remove the arch related code and the head file, this
-> > > will be no functional change for x86, and also makes xen/pci.c
-> > > usable for other architectures.
-> > > 
-> > > Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-> > > CC: Konrad Rzeszutek Wilk <konrad.wilk@oracle.com>
-> > > CC: Boris Ostrovsky <boris.ostrovsky@oracle.com>
-> > > ---
-> > >   drivers/xen/pci.c | 6 ------
-> > >   1 file changed, 6 deletions(-)
-> > > 
-> > > diff --git a/drivers/xen/pci.c b/drivers/xen/pci.c
-> > > index 6785ebb..9a8dbe3 100644
-> > > --- a/drivers/xen/pci.c
-> > > +++ b/drivers/xen/pci.c
-> > > @@ -28,9 +28,6 @@
-> > >   #include <asm/xen/hypervisor.h>
-> > >   #include <asm/xen/hypercall.h>
-> > >   #include "../pci/pci.h"
-> > > -#ifdef CONFIG_PCI_MMCONFIG
-> > > -#include <asm/pci_x86.h>
-> > > -#endif
-> 
-> Assuming this still compiles on x86 now that this include file is removed
-> 
-> Reviewed-by: Boris Ostrovsky <boris.ostrovsky@oracle.com>
+Hello Lee,
 
-I think it does not:
+On Wed, Oct 28, 2015 at 11:28 AM, Lee Jones <lee.jones@linaro.org> wrote:
+> On Wed, 28 Oct 2015, Javier Martinez Canillas wrote:
+>> On Wed, Oct 28, 2015 at 9:24 AM, Lee Jones <lee.jones@linaro.org> wrote:
+>> > On Tue, 2015-10-27 at 18:15 +0000, Lee Jones wrote:
+>> >> On Tue, 27 Oct 2015, Sebastian Reichel wrote:
+>> >> > On Tue, Oct 27, 2015 at 03:42:37PM +0000, Lee Jones wrote:
+>> >> > > Since eafbaac ("MAINTAINERS: Add "R:" designated-reviewers tag") we
+>> >> > > have been able to tag specific people as Reviewers.  These are key
+>> >> > > individuals who are tasked with or volunteer to review code submitted
+>> >> > > to a subsystem or specific file.  However, according to MAINTAINERS
+>> >> > > we have 1046 Maintainers and only a mere 22 Reviewers.  I believe
+>> >> > > these numbers to be incorrect, as many of these Maintainers are in
+>> >> > > fact Reviewers.
+>> >
+>> > Most entries in MAINTAINERS seem to be vanity entries than actual
+>> > active participants.  A person typically writes a driver, adds a
+>> > MAINTAINER entry, then forgets about it and/or the hardware becomes
+>> > outdated.
+>> >
+>> > This I agree with.
+>> >
+>> > On Wed, 28 Oct 2015, Krzysztof Kozlowski wrote:
+>> >> 2015-10-28 3:44 GMT+09:00 Joe Perches <joe@perches.com>:
+>> >> > On Tue, 2015-10-27 at 18:15 +0000, Lee Jones wrote:
+>> >> > > On Tue, 27 Oct 2015, Sebastian Reichel wrote:> >
+>> >> > > > I think you should CC the people, which are changed from "M:" to
+>> >> > > > "R:", though.
+>> >> > >
+>> >> > > Yes, makes sense.
+>> >> > >
+>> >> > > I'd like to collect some Maintainer Acks first though.
+>> >> >
+>> >> > I think people from organizations like Samsung are actual
+>> >> > maintainers not reviewers.
+>> >
+>> > So this all hinges on how we are describing Maintainers and Reviewers.
+>> >
+>> > My personal definition (until convinced otherwise) is that Reviewers
+>> > care about their particular subsystem and/or files.  They conduct code
+>> > reviews to ensure nothing gets broken and the code base stays in best
+>> > possible state of worthiness.  On the other hand Maintainers usually
+>> > conduct themselves as Reviewers but also have 'maintainership' duties
+>> > as well; such as applying patches, *maintaining*, testing, rebasing,
+>> > etc, an upstream branch and ultimately sending pull-requests to higher
+>> > level Maintainers i.e. Linus.  Maintainers also have the ultimate say
+>> > (unless over-ruled by Linus etc) over what gets applied.
+>> >
+>> >> > Their drivers are not thrown over a wall and forgotten.
+>> >>
+>>
+>> I've a different definition. For me it depends on much do you care
+>> about the component. For example I maintain a couple of drivers in the
+>> kernel and Device Tree files for some boards that are important to me
+>> but I also care about some other subsystems (i.e: Exynos SoC support)
+>> and I act as a reviewer (although I'm not officially listed as
+>> reviewer in the MAINTAINERS file).
+>
+> I wish to make this clear from the out-set.  If you have no obligation
+> to review patches but do so occasionally anyway, that does not make
+> you the type of Reviewer that we're speaking about here.  Anyone can
+> review any patch on the list that they wish to, which is lovely, but
+> it won't carry the same authority (for want of a better expression) as
+> if you were tagged as an official Reviewer in MAINTAINERS.
+>
 
-drivers/xen/pci.c: In function ?xen_mcfg_late?:
-drivers/xen/pci.c:221:18: error: ?pci_mmcfg_list? undeclared (first use in this function)
-drivers/xen/pci.c:221:18: note: each undeclared identifier is reported only once for each f
+We agree on that.
 
+>> We do have in fact different tags for each type of involvement so I
+>> usually answer with a Reviewed-by tag if I review code for a subsystem
+>> I care but I don't maintainer or answer with an Acked-by tag if I
+>> review *and agree* with a patch for a component I maintain (so the
+>> maintainer knows that is good to apply differently from the list if
+>> needed).
+>
+> I think you need to re-read what those tags mean.
+>
+>   Documentation/SubmittingPatches
+>
 
-> > > 
-> > >   static bool __read_mostly pci_seg_supported = true;
-> > > 
-> > > @@ -222,9 +219,6 @@ static int __init xen_mcfg_late(void)
-> > >       if (!xen_initial_domain())
-> > >           return 0;
-> > > 
-> > > -    if ((pci_probe & PCI_PROBE_MMCONF) == 0)
-> > > -        return 0;
-> > > -
-> > >       if (list_empty(&pci_mmcfg_list))
-> > >           return 0;
-> > > 
-> > > 
-> 
+I know that document of course but I went and read the tags
+description again and I don't see how that document supports your
+arguments. Can you please share the paragraphs you are referring to?
+
+>> Now, that doesn't mean that I provide a pull request for the drivers
+>> or boards I maintain on every release since that will depend on the
+>> number of patches posted for that component per release. So if there
+>> are only a couple of patches, I think is easier for the subsystem
+>> maintainer to pick those directly from the list but if there are a lot
+>> of them, then the maintainer may ask me to prepare a branch to pull
+>> and I've done in the past for drivers I maintain to be sure that the
+>> patches in the list are applied in the right order, no needed patches
+>> were missed, etc.
+>
+> I have also submitted patches via a pull-request as a Submitter to
+> different subsystems.  That does not mean I should automatically be
+> classed as a Maintainer.
+>
+
+Yes I agree that preparing pull requests doesn't make you a maintainer
+but you are the one using maintain a branch / sending pull requests as
+classification method. My point is that this is orthogonal to being a
+maintainer or reviewer.
+
+>> Another difference is that when I'm listed as a maintainer, I feel an
+>> obligation to answer to the patches touching that component but that's
+>> not the case for components I usually act as a reviewer, I may review
+>> it if I have time but if I don't, I let other people to review it.
+>
+> Then, in the latter case you shouldn't be listed as a Reviewer in my
+> example.  Anyone listed as a Reviewer in MAINTAINERS *does* have that
+> obligation.  That's what it means.  If Reviewers don't review, they
+> should be removed from MAINTAINERS.
+>
+
+Again we agree on that, that's why I said that I'm *not* officially
+listed as a reviewer for Exynos SoC patches since even when I'm
+interested on that, I don't have time to review every single patch.
+
+>> >> At least for Samsung Multifunction PMIC drivers (and some of Maxim
+>> >> MUICs and PMICs) these are actively used by us in existing and new
+>> >> products. They are also continuously extended and actually maintained.
+>> >> This means that it is not only about review of new patches but also
+>> >> about caring that nothing will become broken.
+>> >
+>> > Exactly.  This what I expect of any good code Reviewer.
+>> >
+>> >> I would prefer to leave the "SAMSUNG MULTIFUNCTION PMIC DEVICE
+>> >> DRIVERS" entry as is - maintainers.
+>>
+>> I agree with Krzysztof here, I would prefer to keep them as
+>> maintainers if they are maintaining the drivers.
+>
+> But they're not.  They're reviewing and caring like a good Reviewer
+> should.
+>
+
+That's your opinion, as I said my opinion is that they are maintaining
+it because they care that the drivers are in good shape, testing that
+no regressions are introduced, fixing bugs, etc.
+
+>> > But you aren't maintaining the driver i.e. you don't collect patches
+>> > and *maintain* them on an upstream branch.  Granted some of you guys
+>> > are doing a great job of maintaining branches on your downstream or
+>> > BSP kernels, but conduct a Reviewer type role for upstream.
+>> >
+>> > You guys are pushing back like this is some kind of demotion.  That's
+>> > not the case at all.  All it does is better describe the (very worthy)
+>> > function you *actually* provide.
+>> >
+>>
+>> But I think it makes description less accurate in fact, since without
+>> $SUBJECT get_maintainers.pl reports for example:
+>>
+>> Krzysztof Kozlowski <k.kozlowski@samsung.com> (supporter:MAXIM PMIC
+>> AND MUIC DRIVERS FOR EXYNOS BASED BO...)
+>> Lee Jones <lee.jones@linaro.org> (supporter:MULTIFUNCTION DEVICES (MFD))
+>>
+>> and after the change:
+>>
+>> Krzysztof Kozlowski <k.kozlowski@samsung.com> (reviewer)
+>> Lee Jones <lee.jones@linaro.org> (supporter:MULTIFUNCTION DEVICES (MFD))
+>>
+>> He also works for Samsung so the driver is not only maintained but
+>> supported since he can actually take care of it as a part of his day
+>> job (if I understood correctly).
+>
+> It's not the person that's supported, it's the driver.  The driver
+> doesn't need to change state.
+>
+
+Yes, is the driver that is supported but by whom? In my opinion the
+supporter should be the maintainer of the driver and that is what
+get_maintainer.pl thinks as well.
+
+So in summary, you think that the difference between a maintainer and
+a reviewer is if a branch with fixes / new features are kept and pull
+requests sent while I think that the difference is the level of
+involvement someone has with a driver regardless of how patches ends
+in the subsystem tree (picked directly by subsystem maintainers or
+sent through pull requests).
+
+Is the first time I heard your definition but maybe I'm the one that
+is wrong so it would be great to get a consensus on that and get it
+documented somewhere.
+
+> --
+> Lee Jones
+> Linaro STMicroelectronics Landing Team Lead
+> Linaro.org ? Open source software for ARM SoCs
+> Follow Linaro: Facebook | Twitter | Blog
+
+Best regards,
+Javier
