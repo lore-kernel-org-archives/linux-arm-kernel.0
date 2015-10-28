@@ -1,78 +1,71 @@
 From: eric.auger@linaro.org (Eric Auger)
-Date: Wed, 28 Oct 2015 13:02:38 +0000
-Subject: [PATCH v5 7/7] vfio: platform: add dev_info on device reset
+Date: Wed, 28 Oct 2015 13:02:36 +0000
+Subject: [PATCH v5 5/7] vfio: platform: add compat in vfio_platform_device
 In-Reply-To: <1446037358-2079-1-git-send-email-eric.auger@linaro.org>
 References: <1446037358-2079-1-git-send-email-eric.auger@linaro.org>
-Message-ID: <1446037358-2079-8-git-send-email-eric.auger@linaro.org>
+Message-ID: <1446037358-2079-6-git-send-email-eric.auger@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It might be helpful for the end-user to check the device reset
-function was found by the vfio platform reset framework.
-
-Lets store a pointer to the struct device in vfio_platform_device
-and trace when the reset function is called or not found.
+Let's retrieve the compatibility string on probe and store it
+in the vfio_platform_device struct
 
 Signed-off-by: Eric Auger <eric.auger@linaro.org>
 
 ---
 
-v3: creation
+v2 -> v3:
+- populate compat after vdev check
 ---
- drivers/vfio/platform/vfio_platform_common.c  | 14 ++++++++++++--
+ drivers/vfio/platform/vfio_platform_common.c  | 15 ++++++++-------
  drivers/vfio/platform/vfio_platform_private.h |  1 +
- 2 files changed, 13 insertions(+), 2 deletions(-)
+ 2 files changed, 9 insertions(+), 7 deletions(-)
 
 diff --git a/drivers/vfio/platform/vfio_platform_common.c b/drivers/vfio/platform/vfio_platform_common.c
-index f74836a..376d289 100644
+index 3b7e52c..f2d41a0 100644
 --- a/drivers/vfio/platform/vfio_platform_common.c
 +++ b/drivers/vfio/platform/vfio_platform_common.c
-@@ -144,8 +144,12 @@ static void vfio_platform_release(void *device_data)
- 	mutex_lock(&driver_lock);
+@@ -41,16 +41,11 @@ static const struct vfio_platform_reset_combo reset_lookup_table[] = {
+ static void vfio_platform_get_reset(struct vfio_platform_device *vdev,
+ 				    struct device *dev)
+ {
+-	const char *compat;
+ 	int (*reset)(struct vfio_platform_device *);
+-	int ret, i;
+-
+-	ret = device_property_read_string(dev, "compatible", &compat);
+-	if (ret)
+-		return;
++	int i;
  
- 	if (!(--vdev->refcnt)) {
--		if (vdev->reset)
-+		if (vdev->reset) {
-+			dev_info(vdev->device, "reset\n");
- 			vdev->reset(vdev);
-+		} else {
-+			dev_warn(vdev->device, "no reset function found!\n");
-+		}
- 		vfio_platform_regions_cleanup(vdev);
- 		vfio_platform_irq_cleanup(vdev);
- 	}
-@@ -174,8 +178,12 @@ static int vfio_platform_open(void *device_data)
- 		if (ret)
- 			goto err_irq;
- 
--		if (vdev->reset)
-+		if (vdev->reset) {
-+			dev_info(vdev->device, "reset\n");
- 			vdev->reset(vdev);
-+		} else {
-+			dev_warn(vdev->device, "no reset function found!\n");
-+		}
- 	}
- 
- 	vdev->refcnt++;
-@@ -551,6 +559,8 @@ int vfio_platform_probe_common(struct vfio_platform_device *vdev,
+ 	for (i = 0 ; i < ARRAY_SIZE(reset_lookup_table); i++) {
+-		if (!strcmp(reset_lookup_table[i].compat, compat)) {
++		if (!strcmp(reset_lookup_table[i].compat, vdev->compat)) {
+ 			request_module(reset_lookup_table[i].module_name);
+ 			reset = __symbol_get(
+ 				reset_lookup_table[i].reset_function_name);
+@@ -544,6 +539,12 @@ int vfio_platform_probe_common(struct vfio_platform_device *vdev,
+ 	if (!vdev)
  		return -EINVAL;
- 	}
  
-+	vdev->device = dev;
++	ret = device_property_read_string(dev, "compatible", &vdev->compat);
++	if (ret) {
++		pr_err("VFIO: cannot retrieve compat for %s\n", vdev->name);
++		return -EINVAL;
++	}
 +
  	group = iommu_group_get(dev);
  	if (!group) {
  		pr_err("VFIO: No IOMMU group for device %s\n", vdev->name);
 diff --git a/drivers/vfio/platform/vfio_platform_private.h b/drivers/vfio/platform/vfio_platform_private.h
-index d1b0668..42816dd 100644
+index fd262be..415310f 100644
 --- a/drivers/vfio/platform/vfio_platform_private.h
 +++ b/drivers/vfio/platform/vfio_platform_private.h
-@@ -59,6 +59,7 @@ struct vfio_platform_device {
+@@ -57,6 +57,7 @@ struct vfio_platform_device {
+ 	int				refcnt;
+ 	struct mutex			igate;
  	struct module			*parent_module;
- 	const char			*compat;
- 	struct module			*reset_module;
-+	struct device			*device;
++	const char			*compat;
  
  	/*
  	 * These fields should be filled by the bus specific binder
