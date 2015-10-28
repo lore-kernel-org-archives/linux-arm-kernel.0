@@ -1,56 +1,47 @@
-From: Suravee.Suthikulpanit@amd.com (Suravee Suthikulpanit)
-Date: Wed, 28 Oct 2015 13:12:20 -0500
-Subject: [PATCH V4 7/8] PCI: OF: Move of_pci_dma_configure() to
- pci_dma_configure()
-In-Reply-To: <562B36EC.3040406@huawei.com>
-References: <1445442731-28819-1-git-send-email-Suravee.Suthikulpanit@amd.com>
- <1445442731-28819-8-git-send-email-Suravee.Suthikulpanit@amd.com>
- <562B36EC.3040406@huawei.com>
-Message-ID: <56311004.6090809@amd.com>
+From: timur@codeaurora.org (Timur Tabi)
+Date: Wed, 28 Oct 2015 13:12:36 -0500
+Subject: [PATCH] [v2] arm64: efi: make sure vmlinux load address aligned
+ on 2MB
+In-Reply-To: <20151028180836.GB26777@leverpostej>
+References: <1446053844-27281-1-git-send-email-timur@codeaurora.org>
+ <20151028180836.GB26777@leverpostej>
+Message-ID: <56311014.9020400@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Hanjun,
+On 10/28/2015 01:08 PM, Mark Rutland wrote:
 
-On 10/24/15 02:44, Hanjun Guo wrote:
-> Hi Suravee,
+> arm64: efi: ensure kernel is loaded at correct address
 >
-> Some minor comments  below:
+> The kernel image needs to be loaded text_offset_bytes from a 2M-aligned
+> base, per Documentation/arm64/booting.txt. If loaded at the wrong offset
+> modulo 2M, __create_page_tables will create incorrect page tables.
 >
-> On 2015/10/21 23:52, Suravee Suthikulpanit wrote:
-> [...]
->> diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
->> index eea8b42..09264f8 100644
->> --- a/drivers/pci/probe.c
->> +++ b/drivers/pci/probe.c
->> @@ -6,12 +6,14 @@
->>   #include <linux/delay.h>
->>   #include <linux/init.h>
->>   #include <linux/pci.h>
->> -#include <linux/of_pci.h>
->> +#include <linux/of_device.h>
->
-> Seems it's needed for GICv2m patch but not this one?
-This one is needed since we are making use of the new of_dma_configure 
-instead of the of_pci_dma_configure.
+> The EFI stub implicitly assumes that dram_base (i.e. the lowest address
+> with a EFI_MEMORY_WB attribute) is 2M-aligned, and tries to load the
+> kernel at dram_base + TEXT_OFFSET. If dram_base is not 2M-aligned, the
+> kernel will be loaded at the wrong offset from 2M.
 
->
->>   #include <linux/pci_hotplug.h>
->>   #include <linux/slab.h>
->>   #include <linux/module.h>
->>   #include <linux/cpumask.h>
->>   #include <linux/pci-aspm.h>
->> +#include <linux/acpi.h>
->
-> I think acpi.h should be introduced by the next patch.
-You are right. I'll update this one.
+Thanks, I'll use that.  I messed up a couple other things, so I need to 
+send out a v3 anyway.
 
+>> -		*image_addr = *reserve_addr = dram_base + TEXT_OFFSET;
+>> +		*image_addr = *reserve_addr =
+>> +			round_up(dram_base, SZ_2M) + TEXT_OFFSET;
 >
->> +#include <linux/property.h>
+> We also need to fix the test for whether we need to relocate the kernel:
+> (*image_addr != (dram_base + TEXT_OFFSET)).
 >
-> And property.h is also not needed for this patch set.
+> When dram_base is not 2M aligned, that is broken, and it's been broken
+> since it was introduced in commit 3c7f255039a2ad6e ("arm64: efi: add EFI
+> stub") in v3.16.
+>
+> It's a bit hideous to fix the general case, though, it seems.
 
-You are right. I'll remove this
+Um, so I should I do something more in my v3 patch, or is this a change 
+for a different patch?
 
-Thanks,
-Suravee
+-- 
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the
+Code Aurora Forum, a Linux Foundation Collaborative Project.
