@@ -1,82 +1,98 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Wed, 28 Oct 2015 09:18:10 -0700
-Subject: [PATCH v2] i2c: cadence: Move to sensible power management
-In-Reply-To: <1446017200-30373-1-git-send-email-shubhraj@xilinx.com>
-References: <1446017200-30373-1-git-send-email-shubhraj@xilinx.com>
-Message-ID: <20151028161810.GB6436@xsjsorenbubuntu>
+From: b.zolnierkie@samsung.com (Bartlomiej Zolnierkiewicz)
+Date: Wed, 28 Oct 2015 17:26:10 +0100
+Subject: [PATCH] MAINTAINERS: Start using the 'reviewer' (R) tag
+In-Reply-To: <20151028082446.GF5828@x1>
+References: <1445960557-24328-1-git-send-email-lee.jones@linaro.org>
+ <CAJKOXPc_w2Dc8LvkCu_d+kjZZmYScXboQrpNWdicT2yfL_5D7Q@mail.gmail.com>
+ <20151028082446.GF5828@x1>
+Message-ID: <3533886.bbrHZIjT1f@amdc1976>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shubhrajyoti,
 
+[ this time with full Cc: & context preserved ]
 
-On Wed, 2015-10-28 at 12:56PM +0530, Shubhrajyoti Datta wrote:
-> Currently the clocks are enabled at probe and disabled at remove.
-> Which keeps the clocks enabled even if no transaction is going on.
-> This patch enables the clocks at the start of transfer and disables
-> after it.
+Hi,
+
+On Wednesday, October 28, 2015 08:24:46 AM Lee Jones wrote:
+> On Tue, 2015-10-27 at 18:15 +0000, Lee Jones wrote:
+> > On Tue, 27 Oct 2015, Sebastian Reichel wrote:
+> > > On Tue, Oct 27, 2015 at 03:42:37PM +0000, Lee Jones wrote:
+> > > > Since eafbaac ("MAINTAINERS: Add "R:" designated-reviewers tag") we
+> > > > have been able to tag specific people as Reviewers.  These are key
+> > > > individuals who are tasked with or volunteer to review code submitted
+> > > > to a subsystem or specific file.  However, according to MAINTAINERS
+> > > > we have 1046 Maintainers and only a mere 22 Reviewers.  I believe
+> > > > these numbers to be incorrect, as many of these Maintainers are in
+> > > > fact Reviewers.
 > 
-> Also adapts to runtime pm.
-> Remove xi2c->suspended and use pm runtime status instead.
+> Most entries in MAINTAINERS seem to be vanity entries than actual
+> active participants.  A person typically writes a driver, adds a
+> MAINTAINER entry, then forgets about it and/or the hardware becomes
+> outdated.
 > 
-> converts dev pm to const to silence a checkpatch warning.
+> This I agree with.
 > 
-> Signed-off-by: Shubhrajyoti Datta <shubhraj@xilinx.com>
-
-To me, this looks all good. Just one small concern below.
-
-> ---
-> changes since v2
-> update the cc list
+> On Wed, 28 Oct 2015, Krzysztof Kozlowski wrote:
+> > 2015-10-28 3:44 GMT+09:00 Joe Perches <joe@perches.com>:
+> > > On Tue, 2015-10-27 at 18:15 +0000, Lee Jones wrote:
+> > > > On Tue, 27 Oct 2015, Sebastian Reichel wrote:> >
+> > > > > I think you should CC the people, which are changed from "M:" to
+> > > > > "R:", though.
+> > > >
+> > > > Yes, makes sense.
+> > > >
+> > > > I'd like to collect some Maintainer Acks first though.
+> > >
+> > > I think people from organizations like Samsung are actual
+> > > maintainers not reviewers.
 > 
->  drivers/i2c/busses/i2c-cadence.c |   73 ++++++++++++++++++++++++--------------
->  1 files changed, 46 insertions(+), 27 deletions(-)
+> So this all hinges on how we are describing Maintainers and Reviewers.
 > 
-> diff --git a/drivers/i2c/busses/i2c-cadence.c b/drivers/i2c/busses/i2c-cadence.c
-> index 84deed6..6b08d16 100644
-> --- a/drivers/i2c/busses/i2c-cadence.c
-> +++ b/drivers/i2c/busses/i2c-cadence.c
-> @@ -18,6 +18,7 @@
->  #include <linux/module.h>
->  #include <linux/platform_device.h>
->  #include <linux/of.h>
-> +#include <linux/pm_runtime.h>
->  
->  /* Register offsets for the I2C device. */
->  #define CDNS_I2C_CR_OFFSET		0x00 /* Control Register, RW */
-> @@ -96,6 +97,8 @@
->  					 CDNS_I2C_IXR_COMP)
->  
->  #define CDNS_I2C_TIMEOUT		msecs_to_jiffies(1000)
-> +/* timeout for pm runtime autosuspend */
-> +#define CNDS_I2C_PM_TIMEOUT		1000	/* ms */
->  
->  #define CDNS_I2C_FIFO_DEPTH		16
->  /* FIFO depth at which the DATA interrupt occurs */
-> @@ -128,7 +131,6 @@
->   * @xfer_done:		Transfer complete status
->   * @p_send_buf:		Pointer to transmit buffer
->   * @p_recv_buf:		Pointer to receive buffer
-> - * @suspended:		Flag holding the device's PM status
->   * @send_count:		Number of bytes still expected to send
->   * @recv_count:		Number of bytes still expected to receive
->   * @curr_recv_count:	Number of bytes to be received in current transfer
-> @@ -141,6 +143,7 @@
->   * @quirks:		flag for broken hold bit usage in r1p10
->   */
->  struct cdns_i2c {
-> +	struct device		*dev;
->  	void __iomem *membase;
->  	struct i2c_adapter adap;
->  	struct i2c_msg *p_msg;
-> @@ -148,7 +151,6 @@ struct cdns_i2c {
->  	struct completion xfer_done;
->  	unsigned char *p_send_buf;
->  	unsigned char *p_recv_buf;
-> -	u8 suspended;
+> My personal definition (until convinced otherwise) is that Reviewers
+> care about their particular subsystem and/or files.  They conduct code
+> reviews to ensure nothing gets broken and the code base stays in best
+> possible state of worthiness.  On the other hand Maintainers usually
+> conduct themselves as Reviewers but also have 'maintainership' duties
+> as well; such as applying patches, *maintaining*, testing, rebasing,
+> etc, an upstream branch and ultimately sending pull-requests to higher
+> level Maintainers i.e. Linus.  Maintainers also have the ultimate say
+> (unless over-ruled by Linus etc) over what gets applied.
+> 
+> > > Their drivers are not thrown over a wall and forgotten.
+> > 
+> > At least for Samsung Multifunction PMIC drivers (and some of Maxim
+> > MUICs and PMICs) these are actively used by us in existing and new
+> > products. They are also continuously extended and actually maintained.
+> > This means that it is not only about review of new patches but also
+> > about caring that nothing will become broken.
+> 
+> Exactly.  This what I expect of any good code Reviewer.
+> 
+> > I would prefer to leave the "SAMSUNG MULTIFUNCTION PMIC DEVICE
+> > DRIVERS" entry as is - maintainers.
+> 
+> But you aren't maintaining the driver i.e. you don't collect patches
+> and *maintain* them on an upstream branch.  Granted some of you guys
+> are doing a great job of maintaining branches on your downstream or
+> BSP kernels, but conduct a Reviewer type role for upstream.
+> 
+> You guys are pushing back like this is some kind of demotion.  That's
+> not the case at all.  All it does is better describe the (very worthy)
+> function you *actually* provide.
 
-There might have been a reason to store this flag here. Did you test
-this with lockdep and CONFIG_DEBUG_ATOMIC_SLEEP? Just to make sure that
-nothing that can sleep is called from atomic context.
+It is actually a demotion from my POV:
 
-	S?ren
+* "Reviewer" doesn't accurately describe the job of doing all the needed
+  testing, bug-fixing and additional contributions that is often done by
+  people without their own branches.
+
+* You don't know internal policies of all companies involved in Linux
+  Kernel development.  "Maintainer" is a well known term and sometimes
+  person's job status or "key performance indicators" may depend on it.
+
+Best regards,
+--
+Bartlomiej Zolnierkiewicz
+Samsung R&D Institute Poland
+Samsung Electronics
