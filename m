@@ -1,54 +1,35 @@
-From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Wed, 28 Oct 2015 15:00:38 +0530
-Subject: [PATCH v2 1/4] ARM: dts: Add SROMc to Exynos 5410
-In-Reply-To: <56307824.1050302@samsung.com>
-References: <cover.1445935215.git.p.fedin@samsung.com>
- <91ae80f172192fa4dbc8bf8ee5a9068661592de6.1445935215.git.p.fedin@samsung.com>
- <56302F1F.5090206@samsung.com> <009001d1114f$3c7a1f60$b56e5e20$@samsung.com>
- <56307824.1050302@samsung.com>
-Message-ID: <563095BE.9050106@samsung.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Wed, 28 Oct 2015 10:33:30 +0100
+Subject: [PATCH v4 1/3] arm64: renesas: r8a7795: add I2C support
+In-Reply-To: <1445987129-13496-2-git-send-email-horms+renesas@verge.net.au>
+References: <1445987129-13496-1-git-send-email-horms+renesas@verge.net.au>
+ <1445987129-13496-2-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <CAMuHMdWKrr=s5BZb=5VsHunAeOVo8xc-jDicW+XaWF3=Mmvz3w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
-
-On Wednesday 28 October 2015 12:54 PM, Krzysztof Kozlowski wrote:
-> On 28.10.2015 16:06, Pavel Fedin wrote:
->>   Hello!
->>
->>>> +		sromc: sromc at 12250000 {
->>>> +			compatible = "samsung,exynos-srom";
->>>> +			reg = <0x12250000 0x10>;
->>>
->>> Isn't 0x10 too small (SROM_BC3 won't be mapped)?
->>
->>   Muhaha, indeed, thanks for noticing this.
->>   By the way, i've just checked exynos4.dtsi and exynos5.dtsi, they specify the same size. Did reviewers overlook this small thing?
+On Wed, Oct 28, 2015 at 12:05 AM, Simon Horman
+<horms+renesas@verge.net.au> wrote:
+> From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 >
-> Yep, I pointed that 0x100 (from first version of patchset) is too big...
-> but did not exactly check the length of new value.
->
+> Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+> [geert: aAdd clock-output-names properties]
+> Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Yes, once you pointed out I checked UM for Exynos4415, Exynos5250, 
-Exynos5420 and Exynos5410 and all these manuals talks about SROM_BC{0-3} 
-only. There is no offset such as SROM_BC{4,5} at least in these SoC 
-manuals. Accordingly I modified size from 0x100 to 0x10. But looks like 
-I missed to remove SROM_BC{{4,5} from exynos-srom.h. I checked only 
-these registers are used in the driver, so as such it should not cause 
-any issue in driver as of now, only we have some redundant entry in 
-exynos-srom.h which can be removed if it's not applicable for any of 
-Exynos SoC, after confirmation from Kukjin.
+As the clock-output-names are no longer valid, please replace the
+above two lines by
 
+Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
->> Shouldn't it be fixed then?
->
-> Yes. It hasn't been pulled yet by arm-soc... Let's wait Kukjin's opinion
-> how to deal with exynos[45].dtsi.
->
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 
-> Best regards,
-> Krzysztof
->
+Gr{oetje,eeting}s,
 
-Thanks,
-Pankaj Dubey
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
