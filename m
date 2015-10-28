@@ -1,93 +1,52 @@
-From: peter@hurleysoftware.com (Peter Hurley)
-Date: Wed, 28 Oct 2015 11:21:00 -0400
-Subject: [PATCH] serial: 8250_uniphier: add earlycon support
-In-Reply-To: <1445503154-14340-1-git-send-email-yamada.masahiro@socionext.com>
-References: <1445503154-14340-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <5630E7DC.3050506@hurleysoftware.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 28 Oct 2015 15:21:31 +0000
+Subject: [PATCH] arm64: ftrace: function_graph: dump real return addr in
+ call trace
+In-Reply-To: <5628340F.5080902@huawei.com>
+References: <1444911155-17480-1-git-send-email-huawei.libin@huawei.com>
+ <6277407.jveniKQDxt@wuerfel> <20151015125133.GA29301@arm.com>
+ <20151015101812.7cb6e917@gandalf.local.home>
+ <20151020153227.GL11226@e104818-lin.cambridge.arm.com>
+ <5628340F.5080902@huawei.com>
+Message-ID: <20151028152130.GF18966@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Masahiro,
-
-On 10/22/2015 04:39 AM, Masahiro Yamada wrote:
-> This reuses the code of drivers/tty/serial/8250/8250_early.c except
+On Thu, Oct 22, 2015 at 08:55:43AM +0800, libin wrote:
+> ? 2015/10/20 23:32, Catalin Marinas ??:
+> >On Thu, Oct 15, 2015 at 10:18:12AM -0400, Steven Rostedt wrote:
+> >>On Thu, 15 Oct 2015 13:51:33 +0100
+> >>Will Deacon <will.deacon@arm.com> wrote:
+> >>
+> >>>Is this the same old problem caused by e306dfd06fcb ("ARM64: unwind: Fix
+> >>>PC calculation")? I've said previously that I'm happy to revert that if
+> >>>we're the only architecture with this behaviour, but Akashi resisted
+> >>>because there are other issues with ftrace that he was hoping to address
+> >>>and they would resolve this too.
+> >>
+> >>Just a reference, but this patch is pretty much exactly what x86
+> >>currently has. I wonder if I should make that function generic for all
+> >>archs to use.
+> >>
+> >>If you accept this patch, I can look at what archs do and pull out the
+> >>common code and place it into the core code and have the archs call
+> >>that instead.
+> >
+> >The difference I see from the sh and x86 version is that we have this -4
+> >on arm64, introduced by e306dfd06fcb as Will mentioned above (it seemed
+> >to have caused more problems that it solved). I think we should revert
+> >that commit first just to be in line with other architectures and then
+> >apply additional fixes as needed.
+> >
+> >Question for Li Bin: is your patch still needed if we revert commit
+> >e306dfd06fcb?
+> >
 > 
->   - Overwrite device->port.iotype and device->port.regshift for
->     UPIO_MEM32 because of_setup_earlycon() has set them for UPIO_MEM.
-> 
->   - Set device->baud to zero to prevent early8250_setup() from
->     initializing the divisor register because port->uartclk does not
->     match the frequency expected by this hardware.
-> 
-> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
-> ---
-> 
->  drivers/tty/serial/8250/8250_uniphier.c | 24 ++++++++++++++++++++++++
->  1 file changed, 24 insertions(+)
-> 
-> diff --git a/drivers/tty/serial/8250/8250_uniphier.c b/drivers/tty/serial/8250/8250_uniphier.c
-> index 245edbb..c1075c5 100644
-> --- a/drivers/tty/serial/8250/8250_uniphier.c
-> +++ b/drivers/tty/serial/8250/8250_uniphier.c
-> @@ -13,6 +13,7 @@
->   */
->  
->  #include <linux/clk.h>
-> +#include <linux/console.h>
->  #include <linux/io.h>
->  #include <linux/module.h>
->  #include <linux/of.h>
-> @@ -34,6 +35,29 @@ struct uniphier8250_priv {
->  	spinlock_t atomic_write_lock;
->  };
->  
-> +#if IS_ENABLED(CONFIG_SERIAL_8250_CONSOLE)
+> It still be needed, but it can be implemented in generic for all archs
+> as Steve suggested.
 
-#ifdef CONFIG_SERIAL_8250_CONSOLE
+Well, there's still an argument for reverting e306dfd06fcb because it
+makes us behave differently to other architectures (in particular,
+arch/arm).
 
-
-Customarily, IS_ENABLED() is only used in-function with control flow
-statements; eg.,
-
-	if (IS_ENABLED() && .... )
-		....
-
-> +static int __init uniphier_early_console_setup(struct earlycon_device *device,
-> +					       const char *options)
-> +{
-> +	if (!device->port.membase)
-> +		return -ENODEV;
-> +
-> +	/* This hardware always expects MMIO32 register interface. */
-> +	device->port.iotype = UPIO_MEM32;
-> +	device->port.regshift = 2;
-> +
-> +	/*
-> +	 * Do not touch the divisor register in early_serial8250_setup();
-> +	 * we assume it has been initialized by a boot loader.
-> +	 */
-> +	device->baud = 0;
-> +
-> +	return early_serial8250_setup(device, options);
-> +}
-> +OF_EARLYCON_DECLARE(uniphier_uart, "socionext,uniphier-uart",
-> +		    uniphier_early_console_setup);
-
-Please change the earlycon name to just "uniphier" or "uniphier8250"; eg.,
-
-OF_EARLYCON_DECLARE(uniphier, "socionext,uniphier-uart",
-		    uniphier_early_console_setup);
-
-
-My earlycon series merges OF_EARLYCON_DECLARE() => EARLYCON_DECLARE()
-and "uniphier" is simpler on the command line.
-
-Regards,
-Peter Hurley
-
-> +#endif
-> +
->  /*
->   * The register map is slightly different from that of 8250.
->   * IO callbacks must be overridden for correct access to FCR, LCR, and MCR.
-> 
+Will
