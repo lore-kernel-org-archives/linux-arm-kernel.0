@@ -1,55 +1,54 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 28 Oct 2015 18:31:13 +0900
-Subject: [PATCH] MAINTAINERS: Start using the 'reviewer' (R) tag
-In-Reply-To: <CABxcv=mGZstqyrkB95hjDCYCvhDJDVD=ga-Fg_5yPtXETuWe=g@mail.gmail.com>
-References: <1445960557-24328-1-git-send-email-lee.jones@linaro.org>
- <20151027172428.GB21070@earth> <20151027181555.GE5828@x1>
- <1445971482.2757.27.camel@perches.com>
- <CAJKOXPc_w2Dc8LvkCu_d+kjZZmYScXboQrpNWdicT2yfL_5D7Q@mail.gmail.com>
- <20151028082446.GF5828@x1>
- <CABxcv=mGZstqyrkB95hjDCYCvhDJDVD=ga-Fg_5yPtXETuWe=g@mail.gmail.com>
-Message-ID: <563095E1.9010406@samsung.com>
+From: pankaj.dubey@samsung.com (Pankaj Dubey)
+Date: Wed, 28 Oct 2015 15:00:38 +0530
+Subject: [PATCH v2 1/4] ARM: dts: Add SROMc to Exynos 5410
+In-Reply-To: <56307824.1050302@samsung.com>
+References: <cover.1445935215.git.p.fedin@samsung.com>
+ <91ae80f172192fa4dbc8bf8ee5a9068661592de6.1445935215.git.p.fedin@samsung.com>
+ <56302F1F.5090206@samsung.com> <009001d1114f$3c7a1f60$b56e5e20$@samsung.com>
+ <56307824.1050302@samsung.com>
+Message-ID: <563095BE.9050106@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 28.10.2015 18:21, Javier Martinez Canillas wrote:
-> Hello Lee,
-> 
+Hi
 
-(...)
-Let me only add something to certain part of your email...
-
->> But you aren't maintaining the driver i.e. you don't collect patches
->> and *maintain* them on an upstream branch.  Granted some of you guys
->> are doing a great job of maintaining branches on your downstream or
->> BSP kernels, but conduct a Reviewer type role for upstream.
+On Wednesday 28 October 2015 12:54 PM, Krzysztof Kozlowski wrote:
+> On 28.10.2015 16:06, Pavel Fedin wrote:
+>>   Hello!
 >>
->> You guys are pushing back like this is some kind of demotion.  That's
->> not the case at all.  All it does is better describe the (very worthy)
->> function you *actually* provide.
+>>>> +		sromc: sromc at 12250000 {
+>>>> +			compatible = "samsung,exynos-srom";
+>>>> +			reg = <0x12250000 0x10>;
+>>>
+>>> Isn't 0x10 too small (SROM_BC3 won't be mapped)?
 >>
-> 
-> But I think it makes description less accurate in fact, since without
-> $SUBJECT get_maintainers.pl reports for example:
-> 
-> Krzysztof Kozlowski <k.kozlowski@samsung.com> (supporter:MAXIM PMIC
-> AND MUIC DRIVERS FOR EXYNOS BASED BO...)
-> Lee Jones <lee.jones@linaro.org> (supporter:MULTIFUNCTION DEVICES (MFD))
-> 
-> and after the change:
-> 
-> Krzysztof Kozlowski <k.kozlowski@samsung.com> (reviewer)
-> Lee Jones <lee.jones@linaro.org> (supporter:MULTIFUNCTION DEVICES (MFD))
-> 
-> He also works for Samsung so the driver is not only maintained but
-> supported since he can actually take care of it as a part of his day
-> job (if I understood correctly).
+>>   Muhaha, indeed, thanks for noticing this.
+>>   By the way, i've just checked exynos4.dtsi and exynos5.dtsi, they specify the same size. Did reviewers overlook this small thing?
+>
+> Yep, I pointed that 0x100 (from first version of patchset) is too big...
+> but did not exactly check the length of new value.
+>
 
-Oh, that's interesting semantic change. Yes, in that particular case, I
-added the "supported" tag on purpose - it's part of my job. It is
-connected with what I said in other reply - we have deep interest in
-these drivers. Not only "I will review the code if I have the time". No.
-I will devote my time to ensure that the code is working on our products.
+Yes, once you pointed out I checked UM for Exynos4415, Exynos5250, 
+Exynos5420 and Exynos5410 and all these manuals talks about SROM_BC{0-3} 
+only. There is no offset such as SROM_BC{4,5} at least in these SoC 
+manuals. Accordingly I modified size from 0x100 to 0x10. But looks like 
+I missed to remove SROM_BC{{4,5} from exynos-srom.h. I checked only 
+these registers are used in the driver, so as such it should not cause 
+any issue in driver as of now, only we have some redundant entry in 
+exynos-srom.h which can be removed if it's not applicable for any of 
+Exynos SoC, after confirmation from Kukjin.
 
-Best regards,
-Krzysztof
+
+>> Shouldn't it be fixed then?
+>
+> Yes. It hasn't been pulled yet by arm-soc... Let's wait Kukjin's opinion
+> how to deal with exynos[45].dtsi.
+>
+
+> Best regards,
+> Krzysztof
+>
+
+Thanks,
+Pankaj Dubey
