@@ -1,137 +1,33 @@
-From: subbaraya.sundeep.bhatta@xilinx.com (Subbaraya Sundeep Bhatta)
-Date: Wed, 28 Oct 2015 11:55:07 +0000
-Subject: [RFC PATCH 1/2] usb: doc: Add bindings for ULPI platform driver
-In-Reply-To: <561A74E6.9050406@ti.com>
-References: <1443012841-13673-1-git-send-email-sbhatta@xilinx.com>
- <20150924091034.GB27847@shlinux2>
- <F1B223389110CE49B4CF055ABA2E5D3D78C9BCBF@XAP-PVEXMBX02.xlnx.xilinx.com>
- <CAL_JsqK-aAY+DAwt0YH-mbBo+a9c7WPrBwJJoy3=FkT6ZX2A5w@mail.gmail.com>
- <20150930161803.GI32625@saruman.tx.rr.com>
- <CAGnW=Bb0pdv7i1N=WqZoQLDUpuGw=Xq=cM5ir2Ow25pUDYtvEA@mail.gmail.com>
- <561A74E6.9050406@ti.com>
-Message-ID: <F1B223389110CE49B4CF055ABA2E5D3D78CA6D47@XAP-PVEXMBX02.xlnx.xilinx.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 28 Oct 2015 11:58:25 +0000
+Subject: [PATCH] recordmcount: arm64: replace the ignored mcount call
+ into nop
+In-Reply-To: <20151028041619.4e44491a@grimm.local.home>
+References: <1446019445-14421-1-git-send-email-huawei.libin@huawei.com>
+ <20151028041619.4e44491a@grimm.local.home>
+Message-ID: <20151028115825.GB29512@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kishon,
-
-> -----Original Message-----
-> From: Kishon Vijay Abraham I [mailto:kishon at ti.com]
-> Sent: Sunday, October 11, 2015 8:11 PM
-> To: Punnaiah Choudary Kalluri; balbi at ti.com
-> Cc: Rob Herring; Subbaraya Sundeep Bhatta; Peter Chen;
-> devicetree at vger.kernel.org; gregkh at linuxfoundation.org; linux-
-> usb at vger.kernel.org; linux-kernel at vger.kernel.org; linux-arm-
-> kernel at lists.infradead.org
-> Subject: Re: [RFC PATCH 1/2] usb: doc: Add bindings for ULPI platform driver
+On Wed, Oct 28, 2015 at 04:16:19AM -0400, Steven Rostedt wrote:
+> On Wed, 28 Oct 2015 16:04:05 +0800
+> Li Bin <huawei.libin@huawei.com> wrote:
 > 
-> Hi,
+> > By now, the recordmcount only records the function that in
+> > following sections:
+> > .text/.ref.text/.sched.text/.spinlock.text/.irqentry.text/
+> > .kprobes.text/.text.unlikely
+> > 
+> > For the function that not in these sections, the call mcount
+> > will be in place and not be replaced when kernel boot up. And
+> > it will bring performance overhead, such as do_mem_abort (in
+> > .exception.text section). This patch make the call mcount to
+> > nop for this case in recordmcount.
 > 
-> On Sunday 11 October 2015 04:45 PM, punnaiah choudary kalluri wrote:
-> > On Wed, Sep 30, 2015 at 9:48 PM, Felipe Balbi <balbi@ti.com> wrote:
-> >> On Thu, Sep 24, 2015 at 11:18:01AM -0500, Rob Herring wrote:
-> >>> On Thu, Sep 24, 2015 at 4:26 AM, Subbaraya Sundeep Bhatta
-> >>> <subbaraya.sundeep.bhatta@xilinx.com> wrote:
-> >>>> Hi Peter,
-> >>>>
-> >>>>> -----Original Message-----
-> >>>>> From: Peter Chen [mailto:peter.chen at freescale.com]
-> >>>>> Sent: Thursday, September 24, 2015 2:41 PM
-> >>>>> To: Subbaraya Sundeep Bhatta
-> >>>>> Cc: balbi at ti.com; devicetree at vger.kernel.org; kishon at ti.com;
-> >>>>> gregkh at linuxfoundation.org; linux-usb at vger.kernel.org; linux-
-> >>>>> kernel at vger.kernel.org; Punnaiah Choudary Kalluri; Subbaraya
-> >>>>> Sundeep Bhatta; linux-arm-kernel at lists.infradead.org
-> >>>>> Subject: Re: [RFC PATCH 1/2] usb: doc: Add bindings for ULPI
-> >>>>> platform driver
-> >>>>>
-> >>>>> On Wed, Sep 23, 2015 at 06:24:01PM +0530, Subbaraya Sundeep
-> Bhatta
-> >>>>> wrote:
-> >>>>>> This patch adds binding doc info for generic ULPI PHYs platform
-> >>>>>> driver.
-> >>>>>>
-> >>>>>> Signed-off-by: Subbaraya Sundeep Bhatta <sbhatta@xilinx.com>
-> >>>>>> ---
-> >>>>>>  .../devicetree/bindings/usb/ulpi-platform-phy.txt  |   34
-> >>>>> ++++++++++++++++++++
-> >>>>>>  1 files changed, 34 insertions(+), 0 deletions(-)  create mode
-> >>>>>> 100644
-> >>>>>> Documentation/devicetree/bindings/usb/ulpi-platform-phy.txt
-> >>>>>>
-> >>>>>> diff --git
-> >>>>>> a/Documentation/devicetree/bindings/usb/ulpi-platform-phy.txt
-> >>>>>> b/Documentation/devicetree/bindings/usb/ulpi-platform-phy.txt
-> >>>>>> new file mode 100644
-> >>>>>> index 0000000..7b8cbb4
-> >>>>>> --- /dev/null
-> >>>>>> +++ b/Documentation/devicetree/bindings/usb/ulpi-platform-phy.txt
-> >>>>>> @@ -0,0 +1,34 @@
-> >>>>>> +Platform driver for generic ULPI PHYs
-> >>>>>> +
-> >>>>>> +Required properties:
-> >>>>>> +- compatible               : Should be "ulpi-phy"
-> >>>>>> +- reg                      : Physical base address and size of the USB
-> >>>>>> +                     controller registers map to which this PHY
-> >>>>>> +                     is connected.
-> >>>>>> +- view-port                : Should contain viewport register offset of the
-> >>>>>> +                     USB controller to which this PHY is
-> >>>>>> +connected Optional
-> >>>>>> +properties:
-> >>>>>> +- drv-vbus         : required if turning VBUS on/off has to be driven
-> >>>>>> +                     by writing to PHY. This feature depends on board
-> >>>>>> +                     design.
-> >>>>>> +
-> >>>>>> +Example:
-> >>>>>> +Below example shows the PHY binding for Chipidea USB controller
-> >>>>>> +which has ulpi viewport register at 0x0170
-> >>>>>> +
-> >>>>>> +           usb_phy0: phy0 {
-> >>>>>> +                   compatible = "ulpi-phy";
-> >>>>>> +                   reg = <0xe0002000 0x1000>;
-> >>>>>> +                   view-port = <0x0170>;
-> >>>>>> +                   drv-vbus;
-> >>>>>> +           };
-> >>>>>> +
-> >>>>>> +           usb0: usb at e0002000 {
-> >>>>>> +                        compatible = "chipidea,usb2";
-> >>>>>> +                        interrupt-parent = <&intc>;
-> >>>>>> +                        interrupts = <0 21 4>;
-> >>>>>> +                        reg = <0xe0002000 0x1000>;
-> >>>>>
-> >>>>> Although just call devm_ioremap twice for the same register region
-> >>>>> does not cause any errors, I am not sure if it will has other
-> >>>>> potential problems. Cc: arm list.
-> >>>>
-> >>>> Yes Peter I was also in doubt to call devm_ioremap twice for same register
-> region.
-> >>>> devm_ioremap_resource complained hence modified to devm_ioremap.
-> >>>> Thanks for adding arm-list.
-> >>>
-> >>> Don't put overlapping resources in the DT. Having 2 drivers
-> >>> accessing the same registers is not a clean or safe design.
-> >>
-> >> thanks, saves me the trouble of saying the same thing.
-> >>
-> >> Bottom line, if devm_ioremap_resource() fails, you're wrong. Just fix
-> >> your driver and move on.
-> >
-> > Any suggestions on how to move further?
-> > Chipidea controller provides ulpi view port register for accessing the
-> > usb phy registers. Now we want to add new driver for ulpi phy
-> > configuration and that obviously it need of ulpi view port register
-> > access. So, sharing the register space between these two drivers is necessary
-> here.
-> 
-> Why not program ULPI the same way as DWC3 does?
+> I can take this in my tree with an Ack from the ARM64 maintainers.
 
-Sorry for delay in response, back from long vacation.
-Can we call generic PHY phy->power_on and power_off functions to do similar function as usb2_phy->set_vbus?
-I assume it is to power on whole PHY chip but not to enable 5V on VBUS line.
+Looks like it does what it says on the tin:
 
+  Acked-by: Will Deacon <will.deacon@arm.com>
 
-Thanks,
-Sundeep
-> 
-> Thanks
-> Kishon
+Will
