@@ -1,416 +1,137 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Tue, 27 Oct 2015 18:40:32 -0500
-Subject: [PATCH v5] PCI: Xilinx-NWL-PCIe: Added support for Xilinx NWL
- PCIe Host Controller
-In-Reply-To: <1445871386-2377-1-git-send-email-bharatku@xilinx.com>
-References: <1445871386-2377-1-git-send-email-bharatku@xilinx.com>
-Message-ID: <20151027234032.GA7238@localhost>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Tue, 27 Oct 2015 17:14:43 -0700
+Subject: [PATCH v3 1/2] mtd: brcmnand: Force 8bit mode before doing
+ nand_scan_ident()
+In-Reply-To: <1445577373-21252-2-git-send-email-anup.patel@broadcom.com>
+References: <1445577373-21252-1-git-send-email-anup.patel@broadcom.com>
+ <1445577373-21252-2-git-send-email-anup.patel@broadcom.com>
+Message-ID: <20151028001443.GX13239@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bharat,
-
-On Mon, Oct 26, 2015 at 08:26:26PM +0530, Bharat Kumar Gogada wrote:
-> Adding PCIe Root Port driver for Xilinx PCIe NWL bridge IP.
+On Fri, Oct 23, 2015 at 10:46:12AM +0530, Anup Patel wrote:
+> Just like other NAND controllers, the NAND READID command only works
+> in 8bit mode for all versions of BRCMNAND controller.
 > 
-> Signed-off-by: Bharat Kumar Gogada <bharatku@xilinx.com>
-> Signed-off-by: Ravi Kiran Gummaluri <rgummal@xilinx.com>
+> This patch forces 8bit mode for each NAND CS in brcmnand_init_cs()
+> before doing nand_scan_ident() to ensure that BRCMNAND controller
+> is in 8bit mode when NAND READID command is issued.
+> 
+> Signed-off-by: Anup Patel <anup.patel@broadcom.com>
+> Reviewed-by: Ray Jui <rjui@broadcom.com>
+> Reviewed-by: Scott Branden <sbranden@broadcom.com>
 > ---
-> Corrected device tree node name.
-> Made tuples for interrupts, interrupt-map, reg properties.
-> Added mutex lock in nwl_irq_domain_free function.
-> Removed unneccessary casts.
-> ---
->  .../devicetree/bindings/pci/xilinx-nwl-pcie.txt    |   68 ++
->  drivers/pci/host/Kconfig                           |    9 +
->  drivers/pci/host/Makefile                          |    1 +
->  drivers/pci/host/pcie-xilinx-nwl.c                 | 1057 ++++++++++++++++++++
+>  drivers/mtd/nand/brcmnand/brcmnand.c | 9 +++++++++
+>  1 file changed, 9 insertions(+)
+> 
+> diff --git a/drivers/mtd/nand/brcmnand/brcmnand.c b/drivers/mtd/nand/brcmnand/brcmnand.c
+> index 4cba03d..0be8ef9 100644
+> --- a/drivers/mtd/nand/brcmnand/brcmnand.c
+> +++ b/drivers/mtd/nand/brcmnand/brcmnand.c
+> @@ -1888,6 +1888,7 @@ static int brcmnand_init_cs(struct brcmnand_host *host)
+>  	struct mtd_info *mtd;
+>  	struct nand_chip *chip;
+>  	int ret;
+> +	u16 cfg_offs;
+>  	struct mtd_part_parser_data ppdata = { .of_node = dn };
+>  
+>  	ret = of_property_read_u32(dn, "reg", &host->cs);
+> @@ -1930,6 +1931,14 @@ static int brcmnand_init_cs(struct brcmnand_host *host)
+>  
+>  	chip->controller = &ctrl->controller;
+>  
+> +	/*
+> +	 * The bootloader might have configured 16bit mode but
+> +	 * NAND READID command only works in 8bit mode. We force
+> +	 * 8bit mode here to ensure that NAND READID commands works.
+> +	 */
+> +	cfg_offs = brcmnand_cs_offset(ctrl, host->cs, BRCMNAND_CS_CFG);
+> +	nand_writereg(ctrl, cfg_offs, nand_readreg(ctrl, cfg_offs) & ~BIT(23));
 
-Please update MAINTAINERS, too.
-
-> +struct nwl_msi {			/* struct nwl_msi - MSI information */
-> +	struct msi_controller msi_chip;	/* msi_chip: MSI domain */
-> +	DECLARE_BITMAP(used, INT_PCI_MSI_NR);	/* used: Declare Bitmap
-> +						for MSI	*/
-> +	struct irq_domain *dev_domain;	/* domain: IRQ domain pointer */
-> +	unsigned long pages;		/* pages: MSI pages */
-> +	struct mutex lock;		/* lock: mutex lock */
-> +	int irq_msi0;			/* irq_msi0: msi0 interrupt number */
-> +	int irq_msi1;			/* irq_msi1: msi1 interrupt number */
-
-You don't need to repeat the struct or member name in the comment.
-
-> + * struct nwl_pcie - PCIe port information
-> + *
-> + * @dev: Device pointer
-> + * @breg_base: IO Mapped Bridge Register Base
-> + * @pcireg_base: IO Mapped PCIe controller attributes
-> + * @ecam_base: IO Mapped configuration space
-> + * @phys_breg_base: Physical Bridge Register Base
-> + * @phys_pcie_reg_base: Physical PCIe Controller Attributes
-> + * @phys_ecam_base: Physical Configuration Base
-> + * @breg_size: Bridge Register space
-> + * @pcie_reg_size: PCIe controller attributes space
-> + * @ecam_size: PCIe Configuration space
-> + * @irq_intx: Legacy interrupt number
-> + * @irq_misc: Misc interrupt number
-> + * @ecam_value: ECAM value
-> + * @last_busno: Last Bus number configured
-> + * @link_up: Link status flag
-> + * @bus: PCI bus
-> + * @msi: MSI domain
-> + * @legacy_irq_domain: IRQ domain pointer
-> + */
-> +struct nwl_pcie {
-> +	struct device *dev;
-> +	void __iomem *breg_base;
-> +	void __iomem *pcireg_base;
-> +	void __iomem *ecam_base;
-> +	u32 phys_breg_base;
-> +	u32 phys_pcie_reg_base;
-> +	u32 phys_ecam_base;
-> +	u32 breg_size;
-> +	u32 pcie_reg_size;
-> +	u32 ecam_size;
-> +	int irq_intx;
-> +	int irq_misc;
-> +	u32 ecam_value;
-> +	u8 last_busno;
-> +	u8 link_up;
-> +	struct pci_bus *bus;
-> +	struct nwl_msi msi;
-> +	struct irq_domain *legacy_irq_domain;
-
-Please put the comments on the same line as the member declaration.
-You might not even need some of the comments, e.g., "Device pointer"
-merely restates what we already know from the code without adding
-anything useful.
-
-> +static int nwl_setup_sspl(struct nwl_pcie *pcie)
-> +{
-> +	unsigned int status;
-> +	int retval = 0;
-> +
-> +	do {
-> +		status = nwl_bridge_readl(pcie, TX_PCIE_MSG) & MSG_BUSY_BIT;
-> +		if (!status) {
-> +			/*
-> +			 * Generate the TLP message for a single EP
-> +			 * [TODO] Add a multi-endpoint code
-> +			 */
-> +			nwl_bridge_writel(pcie, 0x0,
-> +					  TX_PCIE_MSG + TX_PCIE_MSG_CNTL);
-> +			nwl_bridge_writel(pcie, 0x0,
-> +					  TX_PCIE_MSG + TX_PCIE_MSG_SPEC_LO);
-> +			nwl_bridge_writel(pcie, 0x0,
-> +					  TX_PCIE_MSG + TX_PCIE_MSG_SPEC_HI);
-> +			nwl_bridge_writel(pcie, 0x0,
-> +					  TX_PCIE_MSG + TX_PCIE_MSG_DATA);
-> +			/* Pattern to generate SSLP TLP */
-> +			nwl_bridge_writel(pcie, PATTRN_SSLP_TLP,
-> +					  TX_PCIE_MSG + TX_PCIE_MSG_CNTL);
-> +			nwl_bridge_writel(pcie, RANDOM_DIGIT,
-> +					  TX_PCIE_MSG + TX_PCIE_MSG_DATA);
-> +			nwl_bridge_writel(pcie, nwl_bridge_readl(pcie,
-> +					  TX_PCIE_MSG) | 0x1, TX_PCIE_MSG);
-> +			mdelay(2);
-> +			status = nwl_bridge_readl(pcie, TX_PCIE_MSG)
-> +						  & MSG_DONE_BIT;
-> +			if (status) {
-> +				status = nwl_bridge_readl(pcie, TX_PCIE_MSG)
-> +						  & MSG_DONE_STATUS_BIT;
-> +				if (status == SLVERR) {
-> +					dev_err(pcie->dev, "AXI slave error");
-> +					retval = SLVERR;
-> +				} else if (status == DECERR) {
-> +					dev_err(pcie->dev, "AXI Decode error");
-> +					retval = DECERR;
-> +				}
-> +			} else {
-> +				retval = 1;
-> +			}
-> +		}
-> +	} while (status);
-> +
-> +	return retval;
-
-This still seems confusing to me.  What about if you made a helper
-function or two?  Having the main body of a function indented two tabs
-is a good hint that something should be factored out of it.
-
-> +static void nwl_pcie_leg_handler(int irq, struct irq_desc *desc)
-> +{
-> +	struct irq_chip *chip = irq_desc_get_chip(desc);
-> +	struct nwl_pcie *pcie;
-> +	unsigned long status;
-> +	u32 bit;
-> +	u32 virq;
-> +
-> +	chained_irq_enter(chip, desc);
-> +	pcie = irq_desc_get_handler_data(desc);
-> +
-> +	while ((status = nwl_bridge_readl(pcie, MSGF_LEG_STATUS) &
-> +				MSGF_LEG_SR_MASKALL) != 0) {
-> +		for_each_set_bit(bit, &status, 4) {
-> +
-> +			virq = irq_find_mapping(pcie->legacy_irq_domain,
-> +						bit + 1);
-> +			if (virq)
-> +				generic_handle_irq(virq);
-> +		}
-> +	}
-> +
-> +	chained_irq_exit(chip, desc);
-> +
-
-Unnecessary newline.
-
-> +}
+Can we get a new enum for cfg bits? Unfortunately, I never managed that
+in brcmnand_set_cfg(); just magic numbers :( But I'd like to stop that
+if we're going to have to touch these bits outside of
+brcmnand_set_cfg().
 
 > +
-> +static void nwl_pcie_msi_handler_high(unsigned int irq, struct irq_desc *desc)
-> +{
-> +	struct irq_chip *chip = irq_desc_get_chip(desc);
-> +	struct nwl_pcie *pcie;
-> +	struct nwl_msi *msi;
-> +	unsigned long status;
-> +	u32 bit;
-> +	u32 virq;
-> +
-> +	chained_irq_enter(chip, desc);
-> +	pcie = irq_desc_get_handler_data(desc);
-> +	msi = &pcie->msi;
-> +
-> +	while ((status = nwl_bridge_readl(pcie, MSGF_MSI_STATUS_HI)) != 0) {
-> +		for_each_set_bit(bit, &status, 32) {
-> +			nwl_bridge_writel(pcie, 1 << bit, MSGF_MSI_STATUS_HI);
-> +			virq = irq_find_mapping(msi->dev_domain, bit);
-> +			if (virq)
-> +				generic_handle_irq(virq);
-> +		}
-> +	}
-> +
-> +	chained_irq_exit(chip, desc);
-> +}
-> +
-> +
-> +static void nwl_pcie_msi_handler_low(unsigned int irq, struct irq_desc *desc)
-> +{
-> +	struct irq_chip *chip = irq_desc_get_chip(desc);
-> +	struct nwl_pcie *pcie;
-> +	struct nwl_msi *msi;
-> +	unsigned long status;
-> +	u32 bit;
-> +	u32 virq;
-> +
-> +	chained_irq_enter(chip, desc);
-> +	pcie = irq_desc_get_handler_data(desc);
-> +	msi = &pcie->msi;
-> +
-> +	while ((status = nwl_bridge_readl(pcie, MSGF_MSI_STATUS_LO)) != 0) {
-> +		for_each_set_bit(bit, &status, 32) {
-> +			nwl_bridge_writel(pcie, 1 << bit, MSGF_MSI_STATUS_LO);
-> +			virq = irq_find_mapping(msi->dev_domain, bit);
-> +			if (virq)
-> +				generic_handle_irq(virq);
-> +		}
-> +	}
-> +
-> +	chained_irq_exit(chip, desc);
-> +}
+>  	if (nand_scan_ident(mtd, 1, NULL))
+>  		return -ENXIO;
+>  
 
-These are basically identical.  Can you factor them out somehow to
-avoid repeating the code?
+How about the following, as a preparatory patch? Only compile tested.
 
-> +static void nwl_pcie_free_irq_domain(struct nwl_pcie *pcie)
-> +{
-> +	int i;
-> +	u32 irq;
-> +
-> +#ifdef CONFIG_PCI_MSI
-> +	struct nwl_msi *msi = &pcie->msi;
-> +#endif
-> +
-> +	for (i = 0; i < 4; i++) {
-> +		irq = irq_find_mapping(pcie->legacy_irq_domain, i + 1);
-> +		if (irq > 0)
-> +			irq_dispose_mapping(irq);
-> +	}
-> +
-> +	irq_domain_remove(pcie->legacy_irq_domain);
-> +
-> +#ifdef CONFIG_PCI_MSI
-> +	irq_set_chained_handler_and_data(msi->irq_msi0, NULL, NULL);
-> +	irq_set_chained_handler_and_data(msi->irq_msi1, NULL, NULL);
-> +
-> +	irq_domain_remove(msi->msi_chip.domain);
-> +	irq_domain_remove(msi->dev_domain);
-> +#endif
-> +
-> +}
-> +
-> +static int nwl_pcie_init_irq_domain(struct nwl_pcie *pcie)
-> +{
-> +	struct device_node *node = pcie->dev->of_node;
-> +	struct device_node *legacy_intc_node;
-> +
-> +#ifdef CONFIG_PCI_MSI
-> +	struct nwl_msi *msi = &pcie->msi;
-> +#endif
-> +
-> +	legacy_intc_node = of_get_next_child(node, NULL);
-> +	if (!legacy_intc_node) {
-> +		dev_err(pcie->dev, "No legacy intc node found\n");
-> +		return PTR_ERR(legacy_intc_node);
-> +	}
-> +
-> +	pcie->legacy_irq_domain = irq_domain_add_linear(legacy_intc_node, 4,
-> +							&legacy_domain_ops,
-> +							pcie);
-> +
-> +	if (!pcie->legacy_irq_domain) {
-> +		dev_err(pcie->dev, "failed to create IRQ domain\n");
-> +		return -ENOMEM;
-> +	}
-> +
-> +#ifdef CONFIG_PCI_MSI
-> +	msi->dev_domain = irq_domain_add_linear(NULL, INT_PCI_MSI_NR,
-> +					&dev_msi_domain_ops, pcie);
-> +	if (!msi->dev_domain) {
-> +		dev_err(pcie->dev, "failed to create dev IRQ domain\n");
-> +		return -ENOMEM;
-> +	}
-> +	msi->msi_chip.domain = pci_msi_create_irq_domain(node,
-> +							&nwl_msi_domain_info,
-> +							msi->dev_domain);
-> +	if (!msi->msi_chip.domain) {
-> +		dev_err(pcie->dev, "failed to create msi IRQ domain\n");
-> +		irq_domain_remove(msi->dev_domain);
-> +		return -ENOMEM;
-> +	}
-> +#endif
-> +	return 0;
-> +}
-> +
-> +static int nwl_pcie_enable_msi(struct nwl_pcie *pcie, struct pci_bus *bus)
-> +{
+>From c5423a86dbfa33b550d2b170bda3c12ecf4d5313 Mon Sep 17 00:00:00 2001
+From: Brian Norris <computersforpeace@gmail.com>
+Date: Tue, 27 Oct 2015 17:12:13 -0700
+Subject: [PATCH] mtd: brcmnand: factor out CFG and CFG_EXT bitfields
 
-It looks strange to have all the "#ifdef CONFIG_PCI_MSI" above, and
-here we have this long MSI-related function without any ifdefs around
-it.  Seems like this should be ifdef'ed also?  What about
-nwl_pcie_msi_handler_high(), nwl_pcie_msi_handler_low(),
-nwl_compose_msi_msg(), nwl_msi_set_affinity(), etc.?
+These used magic numbers. Shame on me.
 
-> +	struct platform_device *pdev = to_platform_device(pcie->dev);
-> +	struct nwl_msi *msi = &pcie->msi;
-> +	unsigned long base;
-> +	int ret;
-> +
-> +	mutex_init(&msi->lock);
-> +
-> +	msi->msi_chip.dev = pcie->dev;
-> +	bus->msi = &msi->msi_chip;
-> +
-> +	/* Check for msii_present bit */
-> +	ret = nwl_bridge_readl(pcie, I_MSII_CAPABILITIES) & MSII_PRESENT;
-> +	if (!ret) {
-> +		dev_err(pcie->dev, "MSI not present\n");
-> +		ret = -EIO;
-> +		goto err;
-> +	}
-> +
-> +	/* Enable MSII */
-> +	nwl_bridge_writel(pcie, nwl_bridge_readl(pcie, I_MSII_CONTROL) |
-> +			  MSII_ENABLE, I_MSII_CONTROL);
-> +
-> +	/* Enable MSII status */
-> +	nwl_bridge_writel(pcie, nwl_bridge_readl(pcie, I_MSII_CONTROL) |
-> +			  MSII_STATUS_ENABLE, I_MSII_CONTROL);
-> +
-> +	/* setup AFI/FPCI range */
-> +	msi->pages = __get_free_pages(GFP_KERNEL, 0);
-> +	base = virt_to_phys((void *)msi->pages);
-> +	nwl_bridge_writel(pcie, base, I_MSII_BASE_LO);
-> +	nwl_bridge_writel(pcie, 0x0, I_MSII_BASE_HI);
-> +
-> +	/* Disable high range msi interrupts */
-> +	nwl_bridge_writel(pcie, (u32)~MSGF_MSI_SR_HI_MASK, MSGF_MSI_MASK_HI);
-> +
-> +	/* Clear pending high range msi interrupts */
-> +	nwl_bridge_writel(pcie, nwl_bridge_readl(pcie,  MSGF_MSI_STATUS_HI) &
-> +			  MSGF_MSI_SR_HI_MASK, MSGF_MSI_STATUS_HI);
-> +	/* Get msi_1 IRQ number */
-> +	msi->irq_msi1 = platform_get_irq_byname(pdev, "msi1");
-> +	if (msi->irq_msi1 < 0) {
-> +		dev_err(&pdev->dev, "failed to get IRQ#%d\n", msi->irq_msi1);
-> +		goto err;
-> +	}
-> +	/* Register msi handler */
-> +	irq_set_chained_handler_and_data(msi->irq_msi1,
-> +					 nwl_pcie_msi_handler_high, pcie);
-> +
-> +	/* Enable all high range msi interrupts */
-> +	nwl_bridge_writel(pcie, MSGF_MSI_SR_HI_MASK, MSGF_MSI_MASK_HI);
-> +
-> +	/* Disable low range msi interrupts */
-> +	nwl_bridge_writel(pcie, (u32)~MSGF_MSI_SR_LO_MASK, MSGF_MSI_MASK_LO);
-> +
-> +	/* Clear pending low range msi interrupts */
-> +	nwl_bridge_writel(pcie, nwl_bridge_readl(pcie, MSGF_MSI_STATUS_LO) &
-> +			  MSGF_MSI_SR_LO_MASK, MSGF_MSI_STATUS_LO);
-> +	/* Get msi_0 IRQ number */
-> +	msi->irq_msi0 = platform_get_irq_byname(pdev, "msi0");
-> +	if (msi->irq_msi0 < 0) {
-> +		dev_err(&pdev->dev, "failed to get IRQ#%d\n", msi->irq_msi0);
-> +		goto err;
-> +	}
-> +
-> +	/* Register msi handler */
-> +	irq_set_chained_handler_and_data(msi->irq_msi0,
-> +					 nwl_pcie_msi_handler_low, pcie);
-> +
-> +	/* Enable all low range msi interrupts */
-> +	nwl_bridge_writel(pcie, MSGF_MSI_SR_LO_MASK, MSGF_MSI_MASK_LO);
-> +
-> +	return 0;
-> +err:
-> +	return ret;
-> +}
+Signed-off-by: Brian Norris <computersforpeace@gmail.com>
+Cc: Anup Patel <anup.patel@broadcom.com>
+---
+ drivers/mtd/nand/brcmnand/brcmnand.c | 38 +++++++++++++++++++++++++++++-------
+ 1 file changed, 31 insertions(+), 7 deletions(-)
 
-> ...
-> +	bus = pci_create_root_bus(&pdev->dev, 0,
-> +				  &nwl_pcie_ops, pcie, &res);
-> +	if (!bus)
-> +		return -ENOMEM;
-> +
-> +	/* Enable MSI */
-> +	if (IS_ENABLED(CONFIG_PCI_MSI)) {
-> +		err = nwl_pcie_enable_msi(pcie, bus);
-> +		if (err < 0) {
-> +			dev_err(&pdev->dev,
-> +				"failed to enable MSI support: %d\n", err);
-> +			return err;
-> +		}
-> +	}
-> +	pci_scan_child_bus(bus);
-> +	pci_assign_unassigned_bus_resources(bus);
-
-You should call pcie_bus_configure_settings() here.  The fact that the
-PCI core doesn't do that for you automatically is a deficiency in the
-core, but we have to do it by hand for now.
-
-> +	pci_bus_add_devices(bus);
-> +	platform_set_drvdata(pdev, pcie);
-> +
-> +	return 0;
-> +}
-
-> +MODULE_LICENSE("GPL");
-
-"GPL" is perfectly fine if that's what you want.  Most people use
-"GPL v2" to specify that particular version.  Using "GPL" means people
-can use this code under GPL v1, v2, v3, or possibly other versions.
-I'm not a lawyer and not offering advice; I'm just checking to make
-sure this is correct.
-
-Bjorn
+diff --git a/drivers/mtd/nand/brcmnand/brcmnand.c b/drivers/mtd/nand/brcmnand/brcmnand.c
+index d694d876631e..c93fbc3869ee 100644
+--- a/drivers/mtd/nand/brcmnand/brcmnand.c
++++ b/drivers/mtd/nand/brcmnand/brcmnand.c
+@@ -344,6 +344,28 @@ static const u8 brcmnand_cs_offsets_cs0[] = {
+ 	[BRCMNAND_CS_TIMING2]		= 0x14,
+ };
+ 
++/*
++ * Bitfields for the CFG and CFG_EXT registers. Pre-v7.1 controllers only had
++ * one config register, but once the bitfields overflowed, newer controllers
++ * (v7.1 and newer) added a CFG_EXT register and shuffled a few fields around.
++ */
++enum {
++	CFG_BLK_ADR_BYTES_SHIFT		= 8,
++	CFG_COL_ADR_BYTES_SHIFT		= 12,
++	CFG_FUL_ADR_BYTES_SHIFT		= 16,
++	CFG_BUS_WIDTH_SHIFT		= 23,
++	CFG_BUS_WIDTH			= BIT(CFG_BUS_WIDTH_SHIFT),
++	CFG_DEVICE_SIZE_SHIFT		= 24,
++
++	/* Only for pre-v7.1 (with no CFG_EXT register) */
++	CFG_PAGE_SIZE_SHIFT		= 20,
++	CFG_BLK_SIZE_SHIFT		= 28,
++
++	/* Only for v7.1+ (with CFG_EXT register) */
++	CFG_EXT_PAGE_SIZE_SHIFT		= 0,
++	CFG_EXT_BLK_SIZE_SHIFT		= 4,
++};
++
+ /* BRCMNAND_INTFC_STATUS */
+ enum {
+ 	INTFC_FLASH_STATUS		= GENMASK(7, 0),
+@@ -1710,17 +1732,19 @@ static int brcmnand_set_cfg(struct brcmnand_host *host,
+ 	}
+ 	device_size = fls64(cfg->device_size) - fls64(BRCMNAND_MIN_DEVSIZE);
+ 
+-	tmp = (cfg->blk_adr_bytes << 8) |
+-		(cfg->col_adr_bytes << 12) |
+-		(cfg->ful_adr_bytes << 16) |
+-		(!!(cfg->device_width == 16) << 23) |
+-		(device_size << 24);
++	tmp = (cfg->blk_adr_bytes << CFG_BLK_ADR_BYTES_SHIFT) |
++		(cfg->col_adr_bytes << CFG_BLK_ADR_BYTES_SHIFT) |
++		(cfg->ful_adr_bytes << CFG_FUL_ADR_BYTES_SHIFT) |
++		(!!(cfg->device_width == 16) << CFG_BUS_WIDTH_SHIFT) |
++		(device_size << CFG_DEVICE_SIZE_SHIFT);
+ 	if (cfg_offs == cfg_ext_offs) {
+-		tmp |= (page_size << 20) | (block_size << 28);
++		tmp |= (page_size << CFG_PAGE_SIZE_SHIFT) |
++		       (block_size << CFG_BLK_SIZE_SHIFT);
+ 		nand_writereg(ctrl, cfg_offs, tmp);
+ 	} else {
+ 		nand_writereg(ctrl, cfg_offs, tmp);
+-		tmp = page_size | (block_size << 4);
++		tmp = (page_size << CFG_EXT_PAGE_SIZE_SHIFT) |
++		      (block_size << CFG_EXT_BLK_SIZE_SHIFT);
+ 		nand_writereg(ctrl, cfg_ext_offs, tmp);
+ 	}
+ 
+-- 
+2.6.0.rc2.230.g3dd15c0
