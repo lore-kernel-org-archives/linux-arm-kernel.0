@@ -1,109 +1,98 @@
-From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
-Date: Wed, 28 Oct 2015 15:40:31 +0100
-Subject: [PATCH v6 22/22] of/platform: Defer probes of registered devices
-In-Reply-To: <1445549230.701.116.camel@freescale.com>
-References: <1442844182-27787-1-git-send-email-tomeu.vizoso@collabora.com>
- <1442844182-27787-23-git-send-email-tomeu.vizoso@collabora.com>
- <1445406845.701.55.camel@freescale.com>
- <CAL_JsqLhZmc8cEC+tFJ25KLe0bQZsWmrRWGBMQake9VN6OjvdQ@mail.gmail.com>
- <1445467912.701.90.camel@freescale.com>
- <CAAObsKAfufBe_SycibUN3ZsE3fOkBfUjZRx1SWEMwVtM6t7inQ@mail.gmail.com>
- <1445549230.701.116.camel@freescale.com>
-Message-ID: <CAAObsKDR6pTEDK-G+jw+cr9MD-XoZqU8niqvDFHqFM0ve-+Smw@mail.gmail.com>
+From: drew.richardson@arm.com (Drew Richardson)
+Date: Wed, 28 Oct 2015 07:45:54 -0700
+Subject: [PATCHv2] drivers/perf: kill armpmu_register
+In-Reply-To: <1446035537-12854-1-git-send-email-mark.rutland@arm.com>
+References: <1446035537-12854-1-git-send-email-mark.rutland@arm.com>
+Message-ID: <20151028144553.GA12173@dreric01-gentoo.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 22 October 2015 at 23:27, Scott Wood <scottwood@freescale.com> wrote:
-> On Thu, 2015-10-22 at 15:04 +0200, Tomeu Vizoso wrote:
->> On 22 October 2015 at 00:51, Scott Wood <scottwood@freescale.com> wrote:
->> > On Wed, 2015-10-21 at 08:44 -0500, Rob Herring wrote:
->> > > On Wed, Oct 21, 2015 at 12:54 AM, Scott Wood <scottwood@freescale.com>
->> > > wrote:
->> > > > On Mon, 2015-09-21 at 16:03 +0200, Tomeu Vizoso wrote:
->> > > > > Instead of trying to match and probe platform and AMBA devices right
->> > > > > after each is registered, delay their probes until
->> > > > > device_initcall_sync.
->> > > > >
->> > > > > This means that devices will start probing once all built-in drivers
->> > > > > have registered, and after all platform and AMBA devices from the DT
->> > > > > have been registered already.
->> > > > >
->> > > > > This allows us to prevent deferred probes by probing dependencies on
->> > > > > demand.
->> > > > >
->> > > > > Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
->> > > > > ---
->> > > > >
->> > > > > Changes in v4:
->> > > > > - Also defer probes of AMBA devices registered from the DT as they
->> > > > > can
->> > > > >   also request resources.
->> > > > >
->> > > > >  drivers/of/platform.c | 11 ++++++++---
->> > > > >  1 file changed, 8 insertions(+), 3 deletions(-)
->> > > >
->> > > > This breaks arch/powerpc/sysdev/fsl_pci.c.  The PCI bus is an OF
->> > > > platform
->> > > > device, and it must be probed before pcibios_init() which is a
->> > > > subsys_initcall(), or else the PCI bus never gets scanned.
->> > >
->> > > Thanks for the report. This is probably getting dropped, but it could
->> > > be disabled for PPC.
->> >
->> > I don't think that adding another arbitrary arch difference would be the
->> > right solution.
->>
->> I think Rob meant temporarily disable it while things get fixed. At
->> least,
->
-> So, what is the permanent fix for the swiotlb issue (or more generally, the
-> inability to have a late_initcall that runs after non-module, non-hotplug
-> platform devices have been probed)?
+On Wed, Oct 28, 2015 at 12:32:17PM +0000, Mark Rutland wrote:
+> Nothing outside of drivers/perf/arm_pmu.c should call armpmu_register
+> any more, so it no longer needs to be in include/linux/perf/arm_pmu.h.
+> Additionally, by folding it in to arm_pmu_device_probe we can allow
+> drivers to override struct pmu fields without getting blatted by the
+> armpmu code.
+> 
+> This patch folds armpmu_register into arm_pmu_device_probe. The logging
+> to the console is moved to after the PMU is successfully registered with
+> the core perf code.
+> 
+> Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+> Suggested-by: Will Deacon <will.deacon@arm.com>
+> Cc: Drew Richardson <drew.richardson@arm.com>
+> Cc: Pawel Moll <pawel.moll@arm.com>
+> ---
+>  drivers/perf/arm_pmu.c       | 15 ++++++---------
+>  include/linux/perf/arm_pmu.h |  2 --
+>  2 files changed, 6 insertions(+), 11 deletions(-)
+> 
+> Since v1 [1]
+> * Call armpmu_init before the PMU init_fn
+> 
+> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-October/378064.html
+> 
+> diff --git a/drivers/perf/arm_pmu.c b/drivers/perf/arm_pmu.c
+> index f346960..6186882 100644
+> --- a/drivers/perf/arm_pmu.c
+> +++ b/drivers/perf/arm_pmu.c
+> @@ -583,14 +583,6 @@ static void armpmu_init(struct arm_pmu *armpmu)
+>  	};
+>  }
+>  
+> -int armpmu_register(struct arm_pmu *armpmu, int type)
+> -{
+> -	armpmu_init(armpmu);
+> -	pr_info("enabled with %s PMU driver, %d counters available\n",
+> -			armpmu->name, armpmu->num_events);
+> -	return perf_pmu_register(&armpmu->pmu, armpmu->name, type);
+> -}
+> -
+>  /* Set at runtime when we know what CPU type we are. */
+>  static struct arm_pmu *__oprofile_cpu_pmu;
+>  
+> @@ -913,6 +905,8 @@ int arm_pmu_device_probe(struct platform_device *pdev,
+>  		return -ENOMEM;
+>  	}
+>  
+> +	armpmu_init(pmu);
+> +
+>  	if (!__oprofile_cpu_pmu)
+>  		__oprofile_cpu_pmu = pmu;
+>  
+> @@ -938,10 +932,13 @@ int arm_pmu_device_probe(struct platform_device *pdev,
+>  	if (ret)
+>  		goto out_free;
+>  
+> -	ret = armpmu_register(pmu, -1);
+> +	ret = perf_pmu_register(&pmu->pmu, pmu->name, -1);
+>  	if (ret)
+>  		goto out_destroy;
+>  
+> +	pr_info("enabled with %s PMU driver, %d counters available\n",
+> +			pmu->name, pmu->num_events);
+> +
+>  	return 0;
+>  
+>  out_destroy:
+> diff --git a/include/linux/perf/arm_pmu.h b/include/linux/perf/arm_pmu.h
+> index bfa673b..83b5e34 100644
+> --- a/include/linux/perf/arm_pmu.h
+> +++ b/include/linux/perf/arm_pmu.h
+> @@ -111,8 +111,6 @@ struct arm_pmu {
+>  
+>  #define to_arm_pmu(p) (container_of(p, struct arm_pmu, pmu))
+>  
+> -int armpmu_register(struct arm_pmu *armpmu, int type);
+> -
+>  u64 armpmu_event_update(struct perf_event *event);
+>  
+>  int armpmu_event_set_period(struct perf_event *event);
+> -- 
+> 1.9.1
+> 
 
-If the code in pcibios_init() depends on the PCI bus device having
-probed, then I would recommend making that dependency explicit by
-calling of_device_probe() on the OF node of the PCI controller when
-looking it up.
+This works great and I no longer need to copy attr_groups in
+armpmu_init. Thank you Mark.
 
->> I don't see any reason why PPC wouldn't benefit from this
->> series.
->
-> It's not clear to me what the benefit of this is at all, much less for PPC.
-> What is the fundamental problem with deferred probes?  In the cover letter
-> you say this change saves 2.3 seconds, but where is that time being consumed?
->  Are the drivers taking too long in their probe function trying to initialize
-> and then deferring, rather than checking for dependencies up front?  Or are
-> there really so many devices and such a pessimal ordering that most of the
-> time is spent iterating through and reordering the list, with each defer
-> happening quickly?
-
-The problem is that a device that defers its probe is currently sent
-to the back of the queue, and that's undesired in some use cases in
-which there's a device that should be up as soon as possible during
-boot (and boot takes a long time). So the goal is to change the order
-in which devices with dependencies end up probing.
-
-> Even if something different does need to be done at this level, forcing all
-> OF platform devices to be probed at the late_initcall level seems quite
-> intrusive.  You limited it to OF because people complained that other things
-> will break.  Things still broke.  Surely there's a better way to address the
-> problem.  Can't the delay be requested by drivers that might otherwise need
-> to defer (which could be done incrementally, focusing on the worst
-> performance problems), rather than enabling it for everything?
-
-Yes, given the amount of breakage that's a sensible option. But in any
-case and even if this series is most likely to be dropped, I recommend
-to make explicit as many implicit dependencies as possible.
-
-Regards,
-
-Tomeu
-
-> -Scott
->
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+Drew
