@@ -1,286 +1,109 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 28 Oct 2015 14:38:38 +0000
-Subject: [PATCH] MAINTAINERS: Start using the 'reviewer' (R) tag
-In-Reply-To: <CABxcv==Ag3ARUtQYZdfqBELAJ_CwU3to9YxmgG1yBbUJ-h9xrw@mail.gmail.com>
-References: <CABxcv=mGZstqyrkB95hjDCYCvhDJDVD=ga-Fg_5yPtXETuWe=g@mail.gmail.com>
- <20151028102832.GR5828@x1>
- <CABxcv=mzzcx3o0m3hYzcn0DyM2pEFDZ-ZgVCjChWGf+y4Xy78A@mail.gmail.com>
- <1446030399.2757.83.camel@perches.com>
- <CABxcv=m+aMgtKPA-WBX9rTW8c3pnMmZgNG=NvnbaeOchdZ87hg@mail.gmail.com>
- <20151028113932.GS5828@x1> <20151028121454.GA4058@x1>
- <CABxcv=kCuYaYWgnvEUuTGv1RXdS6_3DR=6fnzHhAh7V-KFfCrQ@mail.gmail.com>
- <20151028133438.GC4058@x1>
- <CABxcv==Ag3ARUtQYZdfqBELAJ_CwU3to9YxmgG1yBbUJ-h9xrw@mail.gmail.com>
-Message-ID: <20151028143838.GG4058@x1>
+From: tomeu.vizoso@collabora.com (Tomeu Vizoso)
+Date: Wed, 28 Oct 2015 15:40:31 +0100
+Subject: [PATCH v6 22/22] of/platform: Defer probes of registered devices
+In-Reply-To: <1445549230.701.116.camel@freescale.com>
+References: <1442844182-27787-1-git-send-email-tomeu.vizoso@collabora.com>
+ <1442844182-27787-23-git-send-email-tomeu.vizoso@collabora.com>
+ <1445406845.701.55.camel@freescale.com>
+ <CAL_JsqLhZmc8cEC+tFJ25KLe0bQZsWmrRWGBMQake9VN6OjvdQ@mail.gmail.com>
+ <1445467912.701.90.camel@freescale.com>
+ <CAAObsKAfufBe_SycibUN3ZsE3fOkBfUjZRx1SWEMwVtM6t7inQ@mail.gmail.com>
+ <1445549230.701.116.camel@freescale.com>
+Message-ID: <CAAObsKDR6pTEDK-G+jw+cr9MD-XoZqU8niqvDFHqFM0ve-+Smw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 28 Oct 2015, Javier Martinez Canillas wrote:
-> On Wed, Oct 28, 2015 at 2:34 PM, Lee Jones <lee.jones@linaro.org> wrote:
-> > On Wed, 28 Oct 2015, Javier Martinez Canillas wrote:
-> >> On Wed, Oct 28, 2015 at 1:14 PM, Lee Jones <lee.jones@linaro.org> wrote:
-> >> > On Wed, 28 Oct 2015, Lee Jones wrote:
-> >> >
-> >> >> On Wed, 28 Oct 2015, Javier Martinez Canillas wrote:
-> >> >>
-> >> >> > Hello Joe,
-> >> >> >
-> >> >> > On Wed, Oct 28, 2015 at 12:06 PM, Joe Perches <joe@perches.com> wrote:
-> >> >> > > On Wed, 2015-10-28 at 11:53 +0100, Javier Martinez Canillas wrote:
-> >> >> > >> (Lee) think(s) that the difference between a maintainer and
-> >> >> > >> a reviewer is if a branch with fixes / new features are kept and pull
-> >> >> > >> requests sent while I think that the difference is the level of
-> >> >> > >> involvement someone has with a driver regardless of how patches ends
-> >> >> > >> in the subsystem tree (picked directly by subsystem maintainers or
-> >> >> > >> sent through pull requests).
-> >> >> > >>
-> >> >> > >> Is the first time I heard your definition but maybe I'm the one that
-> >> >> > >> is wrong so it would be great to get a consensus on that and get it
-> >> >> > >> documented somewhere.
-> >> >> > >
-> >> >> > > I think Lee is over-analyzing.
-> >> >> > >
-> >> >> > > From MAINTAINERS:
-> >> >> > >         M: Mail patches to: FullName <address@domain>
-> >> >> > >         R: Designated reviewer: FullName <address@domain>
-> >> >> > >            These reviewers should be CCed on patches.
-> >> >> > >         S: Status, one of the following:
-> >> >> > >            Supported:   Someone is actually paid to look after this.
-> >> >> > >            Maintained:  Someone actually looks after it.
-> >> >> > >
-> >> >> > > "looking after" doesn't mean upstreaming.
-> >> >> > >
-> >> >> >
-> >> >> > Agreed and upstreaming doesn't mean sending pull request, you can for
-> >> >> > example upstream the downstream changes for a driver you maintain by
-> >> >> > posting patches or ack patches others post and let the subsystem
-> >> >> > maintainer to pick those (even if you are listed as the driver
-> >> >> > maintainer in MAINTAINERS).
-> >> >> >
-> >> >> > So by following Lee's definition, then most drivers' maintainers
-> >> >> > should not be called maintainers since keeping a tree with patches for
-> >> >> > both fixes and new features, sending pull requests, etc is only
-> >> >> > justified for drivers that have a lot of changes per release. Is not
-> >> >> > worth it for drivers that are in "maintenance mode" where only bugs
-> >> >> > are fixed every once in a while or features are seldom added.
-> >> >>
-> >> >> Exactly right.
-> >> >>
-> >> >> Although, it looks like M: doesn't even mean Maintainer.  If it did, I
-> >> >> would have made these points over and over until death (or until I got
-> >> >> bored).  However, as M: actually means "Mail patches to", there seems
-> >> >> to be very little difference between that and "Designated reviewer"
-> >> >> and makes me wonder why the R: tag was ever even introduced.  I guess
-> >> >> all of the other guys in the threads below also thought M: meant
-> >> >> Maintainer, or else they would have just added poor old Josh as a
-> >> >> "Mail patches to" recipient and been done with it.
-> >> >
-> >> > Ah, but wait.  get_maintainer.pl *does* assume M means Maintainer
-> >> > doesn't it?  Which is why this came about.  So if we have a "Mail
-> >> > patches to" entry, get_maintainer.pl tells the user that this is a
-> >>
-> >> Joe already answered but I'll elaborate a little bit:
-> >>
-> >> "M:" means "Mail patches to" and "S:" means "Status" so what
-> >> get_maintainers.pl is reports the person in "M:" printing the status
-> >> of the file(s).
-> >>
-> >> So for example if the file has "S: Supported" then the person listed
-> >> in "M:" is shown as "supporter" while if the status is "S:
-> >> Maintained", the person is listed as "maintainer".
-> >>
-> >> There isn't a "Reviewed" status to specify files that are looked by
-> >> "Designated reviewers", it can be added but I don't see the reason of
-> >> it.
-> >
-> > Not sure why you wrote all of this.  We know *why* get_maintainer.pl
-> > does what it does.  What I'm saying is, that I personally believe this
-> > is the wrong behaviour in what I'm *guessing* is the majority of the
-> > time.
-> 
-> Ok sorry if it was clear to you already.
+On 22 October 2015 at 23:27, Scott Wood <scottwood@freescale.com> wrote:
+> On Thu, 2015-10-22 at 15:04 +0200, Tomeu Vizoso wrote:
+>> On 22 October 2015 at 00:51, Scott Wood <scottwood@freescale.com> wrote:
+>> > On Wed, 2015-10-21 at 08:44 -0500, Rob Herring wrote:
+>> > > On Wed, Oct 21, 2015 at 12:54 AM, Scott Wood <scottwood@freescale.com>
+>> > > wrote:
+>> > > > On Mon, 2015-09-21 at 16:03 +0200, Tomeu Vizoso wrote:
+>> > > > > Instead of trying to match and probe platform and AMBA devices right
+>> > > > > after each is registered, delay their probes until
+>> > > > > device_initcall_sync.
+>> > > > >
+>> > > > > This means that devices will start probing once all built-in drivers
+>> > > > > have registered, and after all platform and AMBA devices from the DT
+>> > > > > have been registered already.
+>> > > > >
+>> > > > > This allows us to prevent deferred probes by probing dependencies on
+>> > > > > demand.
+>> > > > >
+>> > > > > Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
+>> > > > > ---
+>> > > > >
+>> > > > > Changes in v4:
+>> > > > > - Also defer probes of AMBA devices registered from the DT as they
+>> > > > > can
+>> > > > >   also request resources.
+>> > > > >
+>> > > > >  drivers/of/platform.c | 11 ++++++++---
+>> > > > >  1 file changed, 8 insertions(+), 3 deletions(-)
+>> > > >
+>> > > > This breaks arch/powerpc/sysdev/fsl_pci.c.  The PCI bus is an OF
+>> > > > platform
+>> > > > device, and it must be probed before pcibios_init() which is a
+>> > > > subsys_initcall(), or else the PCI bus never gets scanned.
+>> > >
+>> > > Thanks for the report. This is probably getting dropped, but it could
+>> > > be disabled for PPC.
+>> >
+>> > I don't think that adding another arbitrary arch difference would be the
+>> > right solution.
+>>
+>> I think Rob meant temporarily disable it while things get fixed. At
+>> least,
+>
+> So, what is the permanent fix for the swiotlb issue (or more generally, the
+> inability to have a late_initcall that runs after non-module, non-hotplug
+> platform devices have been probed)?
 
-NP.
+If the code in pcibios_init() depends on the PCI bus device having
+probed, then I would recommend making that dependency explicit by
+calling of_device_probe() on the OF node of the PCI controller when
+looking it up.
 
-> >> > Maintainer, which (given that there are over 1000 unique M: entries
-> >> > and I know that there are no where near that many actual Maintainers)
-> >> > means that it's printing out incorrect information most of the time.
-> >>
-> >> Well, that's correct according to your definition of maintainer
-> >> (people with a tree that sends pull requests) but I can believe that
-> >> there are 1K unique maintainers for different small components
-> >> (without taking into account what components may be obsolete / not
-> >> used anymore) even if these maintainers don't send pull request
-> >> because the patch load is low and rely on subsystem maintainers to
-> >> pick directly from the list with their Acks.
-> >
-> > Then they are not Maintainers.  They are Reviewers who rely on
-> > Maintainers.  In your example above it's the Maintainers that are
-> > Maintainers and the people who review the code are Reviewers.  The
-> > clues are in the words. ;)
-> 
-> They are not maintainers according to your definition of maintainer
-> that doesn't seem what most people agree with.
+>> I don't see any reason why PPC wouldn't benefit from this
+>> series.
+>
+> It's not clear to me what the benefit of this is at all, much less for PPC.
+> What is the fundamental problem with deferred probes?  In the cover letter
+> you say this change saves 2.3 seconds, but where is that time being consumed?
+>  Are the drivers taking too long in their probe function trying to initialize
+> and then deferring, rather than checking for dependencies up front?  Or are
+> there really so many devices and such a pessimal ordering that most of the
+> time is spent iterating through and reordering the list, with each defer
+> happening quickly?
 
-"most people" so far are 3 people that I assume still want to be
-Maintainers despite not actually conducting Maintainer duties, but
-are rather Reviewers.  I also have 2 Acks for this patch, so thus far
-that's 3 that agree and 3 that do not.  Unsurprisingly the ones that
-agree are Maintainers and the ones who are not are (by my definition)
-Reviewers -- go figure.
+The problem is that a device that defers its probe is currently sent
+to the back of the queue, and that's undesired in some use cases in
+which there's a device that should be up as soon as possible during
+boot (and boot takes a long time). So the goal is to change the order
+in which devices with dependencies end up probing.
 
-> >> For me the maintainer is that a) cares about the file and makes sure
-> >> that things remain working, fix issues, reviews patches from others,
-> >> etc b) is someone that actually understand the code in the files. A
-> >> subsystem maintainer has the last word of what gets merged into the
-> >> subsystem but may not be familiar with code under the subsystem and
-> >> relies on the file / driver maintainer to Ack the patch as correct
-> >> since that person is the one that knows the code.
-> >
-> > Then what is a Reviewer?
-> 
-> As I mentioned before, I think a reviewer is someone who is interested
-> in a given file / driver / subsystem and reviews patches to the list
-> but does not have an authoritative answer on that file. I gave as an
-> example that I review patches posted for Exynos SoC support although
-> I'm not mentioned in MAINTAINERS and I don't plan it to be. People
-> don't know that I'm interested in that and don't cc me, I just review
-> what is posted to the linux-samsung-soc ML.
+> Even if something different does need to be done at this level, forcing all
+> OF platform devices to be probed at the late_initcall level seems quite
+> intrusive.  You limited it to OF because people complained that other things
+> will break.  Things still broke.  Surely there's a better way to address the
+> problem.  Can't the delay be requested by drivers that might otherwise need
+> to defer (which could be done incrementally, focusing on the worst
+> performance problems), rather than enabling it for everything?
 
-*sigh* I've explained this (to you directly) before.  What you explain
-here is just someone that occasionally reviews code.  Anyone can do
-that, it doesn't make them a "Designated reviewer" and doesn't warrant
-listing in MAINTAINERS.  A Reviewer (note the capitalisation whenever
-I use the term like this) is someone who has volunteered or has been
-identified as someone to conduct all of the duties you've mentioned
-before.
+Yes, given the amount of breakage that's a sensible option. But in any
+case and even if this series is most likely to be dropped, I recommend
+to make explicit as many implicit dependencies as possible.
 
-So my question still stands.  What is a Reviewer in the context of the
-MAINTAINERS file.  I'm suggesting that this is the title you give
-someone when they; know the code, care about the code, review changes
-to the code and possibly test the code (if they have the h/w).  I also
-suggest they to not apply patches, maintain an upstream branch and
-submit pull-requests to Linus or another senior Maintainer.
+Regards,
 
-> A designated reviewer is someone that is mentioned in the MAINTAINERS
-> file so people know that this person is interested and will add
-> him/her as cc. So designated reviewers are expected to review more
-> patches, be more available, etc
+Tomeu
 
-Right.  So how is this any different to what you're proposing is
-actually a Maintainer?  I suggest the traits are the same.
-
-> and it seems the idea is that they can
-> become maintainers in the future if there is some need for it.
-
-You just made that bit up. ;)
-
-> >> > So back to my original thought then, what can we do to rectify this
-> >> > situation and make the information printed more meaningful.  Again,
-> >> > I'm back to using the R: tag appropriately.
-> >> >
-> >> > Any (technical, which aren't based on "but I really want to be listed
-> >> > as a Maintainer") thoughts?
-> >> >
-> >>
-> >> I haven't read a "but I really want to be listed as a maintainer"
-> >> thought in this thread.
-> >
-> > If you had no vested interest in this, you would be able to see the
-> > logic in what I'm saying.  Again I'm *guess*, but I think there is
-> > some emotional reasons for you pushing back so hard.  I could always
-> > be wrong though.
-> >
-> 
-> Oh, I have no personal interest. I'm not even listed as a maintainer /
-> reviewer for anything that is MFD related and I do understand your
-> point is just that I don't agree. The fact that we disagree doesn't
-> mean that you are right and I'm wrong.
-
-Nor visa versa. ;)
-
-> So if anything I think this thread is more about "but I really don't
-> want people without a tree to be listed as a Maintainer".
-
-This is 'really' about Maintainers being listed as Maintainers and
-Reviewers being listed as Reviewers.  It doesn't get any simple or
-logical than that.  I have no emotional attachment to either my
-reasoning nor the patch.  It just makes sense.
-
-> What I do care is about consistency across different subystems since
-> the kernel development process is already complicated and there are
-> already differences in the workflow of the maintainers so people
-> contributing to many subsystems have to first do some research to
-> learn all the unwritten rules and conventions of a given susbystem and
-> subsystem maintainer before posting patches.
-
-Amen to that.  And wouldn't life be simpler if submitters knew who
-is likely to review their code and who is likely to apply it?
-
-> That's why adding the semantics of maintainers and reviewers to the
-> mix of things to keep in mind is not something that thrills me.
-
-The semantics are already there.  They've been accepted by some pretty
-senior Maintainers already.  What we're doing here is just using those
-accepted semantics.
-
-> >> I think the problem is the definition of what a maintainer in Linux
-> >> really means. For you is someone that keeps a tree and sends pull
-> >> request (for me that is what I call a subsystem maintainer)
-> >
-> > Right.  A Level 3 Maintainer sends pull-requests to a Level 2
-> > Maintainer, who sends pull-requests to a Level 1 Maintainer, who sends
-> > pull-requests to Linus.  Maintainers at *all* levels collect patches
-> > and Maintain them before sending on.
-> >
-> 
-> Here is where we disagree (and it seems is not only me), someone who
-> acks patches posted to some files even if those are later picked for
-> someone higher in the maintenance hierarchy could be named maintainers
-> as well since they "own" those files and their answer should be
-> authoritative (no matter how the patches end into mainline).
-> 
-> At the end of the day is to make easier for developers to understand
-> who are the interested parties for a given change. It is much easier
-> to think in terms of different levels of maintainers that should be
-> copied so they can review and possibly people outside of that group if
-> they are subscribed to the mailing lists. Naming the first levels
-> reviewers makes no sense for me since it will only confuse new comers
-> IMHO.
-
-There's no level of Reviewer.  They are not under the Maintainers in
-any way.  They do a different role and serve a different purpose.  I
-believe it's clearer to submitters if they know who the Reviewers are
-compared with who will actually take the patch into the 'system'.
-
-> > reiterate:
-> >
-> > Reviewers care about particular driver(s)/domain(s) that they know
-> > well.  They provide solid reviews and possible testing (because they
-> > are likely to have the h/w).  They then provide Acked-by:s so that a
-> > Maintainer can collect the patch.
-> >
-> >> while for
-> >> others it seems that maintainer means someone who care about a set of
-> >> files, knows the code, makes sure that things keep working and Ack
-> >> patches to those files when posted.
-> >
-> >         goto reiterate;   ;)
-> >
-> 
-> No need for that, I already explained my point of view several times
-> and you just think I'm wrong because I don't agree with you. So let's
-> just agree on disagree ;-)
-
-I do think you're wrong.  And you think I am wrong.  My reasoning is
-based on logic, common sense and words, and yours is based on, well, I
-really don't know. ;)
-
-So yes, we'll have to agree to disagree or neither of us will get any
-real work done today.
-
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+> -Scott
+>
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
