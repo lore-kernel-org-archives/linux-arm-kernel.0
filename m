@@ -1,135 +1,205 @@
-From: javier@dowhile0.org (Javier Martinez Canillas)
-Date: Wed, 28 Oct 2015 14:06:20 +0100
-Subject: [PATCH] MAINTAINERS: Start using the 'reviewer' (R) tag
-In-Reply-To: <20151028121454.GA4058@x1>
-References: <20151027181555.GE5828@x1> <1445971482.2757.27.camel@perches.com>
- <CAJKOXPc_w2Dc8LvkCu_d+kjZZmYScXboQrpNWdicT2yfL_5D7Q@mail.gmail.com>
- <20151028082446.GF5828@x1>
- <CABxcv=mGZstqyrkB95hjDCYCvhDJDVD=ga-Fg_5yPtXETuWe=g@mail.gmail.com>
- <20151028102832.GR5828@x1>
- <CABxcv=mzzcx3o0m3hYzcn0DyM2pEFDZ-ZgVCjChWGf+y4Xy78A@mail.gmail.com>
- <1446030399.2757.83.camel@perches.com>
- <CABxcv=m+aMgtKPA-WBX9rTW8c3pnMmZgNG=NvnbaeOchdZ87hg@mail.gmail.com>
- <20151028113932.GS5828@x1> <20151028121454.GA4058@x1>
-Message-ID: <CABxcv=kCuYaYWgnvEUuTGv1RXdS6_3DR=6fnzHhAh7V-KFfCrQ@mail.gmail.com>
+From: eric.auger@linaro.org (Eric Auger)
+Date: Wed, 28 Oct 2015 13:06:35 +0000
+Subject: [PATCH v4] VFIO: platform: reset: AMD xgbe reset module
+Message-ID: <1446037595-2173-1-git-send-email-eric.auger@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Lee,
+This patch introduces a module that registers and implements a low-level
+reset function for the AMD XGBE device.
 
-On Wed, Oct 28, 2015 at 1:14 PM, Lee Jones <lee.jones@linaro.org> wrote:
-> On Wed, 28 Oct 2015, Lee Jones wrote:
->
->> On Wed, 28 Oct 2015, Javier Martinez Canillas wrote:
->>
->> > Hello Joe,
->> >
->> > On Wed, Oct 28, 2015 at 12:06 PM, Joe Perches <joe@perches.com> wrote:
->> > > On Wed, 2015-10-28 at 11:53 +0100, Javier Martinez Canillas wrote:
->> > >> (Lee) think(s) that the difference between a maintainer and
->> > >> a reviewer is if a branch with fixes / new features are kept and pull
->> > >> requests sent while I think that the difference is the level of
->> > >> involvement someone has with a driver regardless of how patches ends
->> > >> in the subsystem tree (picked directly by subsystem maintainers or
->> > >> sent through pull requests).
->> > >>
->> > >> Is the first time I heard your definition but maybe I'm the one that
->> > >> is wrong so it would be great to get a consensus on that and get it
->> > >> documented somewhere.
->> > >
->> > > I think Lee is over-analyzing.
->> > >
->> > > From MAINTAINERS:
->> > >         M: Mail patches to: FullName <address@domain>
->> > >         R: Designated reviewer: FullName <address@domain>
->> > >            These reviewers should be CCed on patches.
->> > >         S: Status, one of the following:
->> > >            Supported:   Someone is actually paid to look after this.
->> > >            Maintained:  Someone actually looks after it.
->> > >
->> > > "looking after" doesn't mean upstreaming.
->> > >
->> >
->> > Agreed and upstreaming doesn't mean sending pull request, you can for
->> > example upstream the downstream changes for a driver you maintain by
->> > posting patches or ack patches others post and let the subsystem
->> > maintainer to pick those (even if you are listed as the driver
->> > maintainer in MAINTAINERS).
->> >
->> > So by following Lee's definition, then most drivers' maintainers
->> > should not be called maintainers since keeping a tree with patches for
->> > both fixes and new features, sending pull requests, etc is only
->> > justified for drivers that have a lot of changes per release. Is not
->> > worth it for drivers that are in "maintenance mode" where only bugs
->> > are fixed every once in a while or features are seldom added.
->>
->> Exactly right.
->>
->> Although, it looks like M: doesn't even mean Maintainer.  If it did, I
->> would have made these points over and over until death (or until I got
->> bored).  However, as M: actually means "Mail patches to", there seems
->> to be very little difference between that and "Designated reviewer"
->> and makes me wonder why the R: tag was ever even introduced.  I guess
->> all of the other guys in the threads below also thought M: meant
->> Maintainer, or else they would have just added poor old Josh as a
->> "Mail patches to" recipient and been done with it.
->
-> Ah, but wait.  get_maintainer.pl *does* assume M means Maintainer
-> doesn't it?  Which is why this came about.  So if we have a "Mail
-> patches to" entry, get_maintainer.pl tells the user that this is a
+it performs the following actions:
+- reset the PHY
+- disable auto-negotiation
+- disable & clear auto-negotiation IRQ
+- soft-reset the MAC
 
-Joe already answered but I'll elaborate a little bit:
+Those tiny pieces of code are inherited from the native xgbe driver.
 
-"M:" means "Mail patches to" and "S:" means "Status" so what
-get_maintainers.pl is reports the person in "M:" printing the status
-of the file(s).
+Signed-off-by: Eric Auger <eric.auger@linaro.org>
+Reviewed-by: Arnd Bergmann <arnd@arndb.de>
 
-So for example if the file has "S: Supported" then the person listed
-in "M:" is shown as "supporter" while if the status is "S:
-Maintained", the person is listed as "maintainer".
+---
 
-There isn't a "Reviewed" status to specify files that are looked by
-"Designated reviewers", it can be added but I don't see the reason of
-it.
+Applies on top of [PATCH v5 0/7] VFIO platform reset module rework
 
-> Maintainer, which (given that there are over 1000 unique M: entries
-> and I know that there are no where near that many actual Maintainers)
-> means that it's printing out incorrect information most of the time.
->
+v3 -> v4:
+- add Arnd's R-b
 
-Well, that's correct according to your definition of maintainer
-(people with a tree that sends pull requests) but I can believe that
-there are 1K unique maintainers for different small components
-(without taking into account what components may be obsolete / not
-used anymore) even if these maintainers don't send pull request
-because the patch load is low and rely on subsystem maintainers to
-pick directly from the list with their Acks.
+v2 -> v3:
+- in Kconfig, add empty line between the 2 options
+- remove DRIVER_VERSION, DRIVER_AUTHOR and DRIVER_DESC and put
+  strings directly in MODULE macros
 
-For me the maintainer is that a) cares about the file and makes sure
-that things remain working, fix issues, reviews patches from others,
-etc b) is someone that actually understand the code in the files. A
-subsystem maintainer has the last word of what gets merged into the
-subsystem but may not be familiar with code under the subsystem and
-relies on the file / driver maintainer to Ack the patch as correct
-since that person is the one that knows the code.
+v1 -> v2:
+- uses module_vfio_reset_handler macro
+---
+ drivers/vfio/platform/reset/Kconfig                |   8 ++
+ drivers/vfio/platform/reset/Makefile               |   2 +
+ .../vfio/platform/reset/vfio_platform_amdxgbe.c    | 127 +++++++++++++++++++++
+ 3 files changed, 137 insertions(+)
+ create mode 100644 drivers/vfio/platform/reset/vfio_platform_amdxgbe.c
 
-> So back to my original thought then, what can we do to rectify this
-> situation and make the information printed more meaningful.  Again,
-> I'm back to using the R: tag appropriately.
->
-> Any (technical, which aren't based on "but I really want to be listed
-> as a Maintainer") thoughts?
->
-
-I haven't read a "but I really want to be listed as a maintainer"
-thought in this thread.
-
-I think the problem is the definition of what a maintainer in Linux
-really means. For you is someone that keeps a tree and sends pull
-request (for me that is what I call a subsystem maintainer) while for
-others it seems that maintainer means someone who care about a set of
-files, knows the code, makes sure that things keep working and Ack
-patches to those files when posted.
-
-Best regards,
-Javier
+diff --git a/drivers/vfio/platform/reset/Kconfig b/drivers/vfio/platform/reset/Kconfig
+index 746b96b..70cccc5 100644
+--- a/drivers/vfio/platform/reset/Kconfig
++++ b/drivers/vfio/platform/reset/Kconfig
+@@ -5,3 +5,11 @@ config VFIO_PLATFORM_CALXEDAXGMAC_RESET
+ 	  Enables the VFIO platform driver to handle reset for Calxeda xgmac
+ 
+ 	  If you don't know what to do here, say N.
++
++config VFIO_PLATFORM_AMDXGBE_RESET
++	tristate "VFIO support for AMD XGBE reset"
++	depends on VFIO_PLATFORM
++	help
++	  Enables the VFIO platform driver to handle reset for AMD XGBE
++
++	  If you don't know what to do here, say N.
+diff --git a/drivers/vfio/platform/reset/Makefile b/drivers/vfio/platform/reset/Makefile
+index 2a486af..93f4e23 100644
+--- a/drivers/vfio/platform/reset/Makefile
++++ b/drivers/vfio/platform/reset/Makefile
+@@ -1,5 +1,7 @@
+ vfio-platform-calxedaxgmac-y := vfio_platform_calxedaxgmac.o
++vfio-platform-amdxgbe-y := vfio_platform_amdxgbe.o
+ 
+ ccflags-y += -Idrivers/vfio/platform
+ 
+ obj-$(CONFIG_VFIO_PLATFORM_CALXEDAXGMAC_RESET) += vfio-platform-calxedaxgmac.o
++obj-$(CONFIG_VFIO_PLATFORM_AMDXGBE_RESET) += vfio-platform-amdxgbe.o
+diff --git a/drivers/vfio/platform/reset/vfio_platform_amdxgbe.c b/drivers/vfio/platform/reset/vfio_platform_amdxgbe.c
+new file mode 100644
+index 0000000..1636e22
+--- /dev/null
++++ b/drivers/vfio/platform/reset/vfio_platform_amdxgbe.c
+@@ -0,0 +1,127 @@
++/*
++ * VFIO platform driver specialized for AMD xgbe reset
++ * reset code is inherited from AMD xgbe native driver
++ *
++ * Copyright (c) 2015 Linaro Ltd.
++ *              www.linaro.org
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms and conditions of the GNU General Public License,
++ * version 2, as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
++ * more details.
++ *
++ * You should have received a copy of the GNU General Public License along with
++ * this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++
++#include <linux/module.h>
++#include <linux/kernel.h>
++#include <linux/init.h>
++#include <linux/io.h>
++#include <uapi/linux/mdio.h>
++#include <linux/delay.h>
++
++#include "vfio_platform_private.h"
++
++#define DMA_MR			0x3000
++#define MAC_VR			0x0110
++#define DMA_ISR			0x3008
++#define MAC_ISR			0x00b0
++#define PCS_MMD_SELECT		0xff
++#define MDIO_AN_INT		0x8002
++#define MDIO_AN_INTMASK		0x8001
++
++static unsigned int xmdio_read(void *ioaddr, unsigned int mmd,
++			       unsigned int reg)
++{
++	unsigned int mmd_address, value;
++
++	mmd_address = (mmd << 16) | ((reg) & 0xffff);
++	iowrite32(mmd_address >> 8, ioaddr + (PCS_MMD_SELECT << 2));
++	value = ioread32(ioaddr + ((mmd_address & 0xff) << 2));
++	return value;
++}
++
++static void xmdio_write(void *ioaddr, unsigned int mmd,
++			unsigned int reg, unsigned int value)
++{
++	unsigned int mmd_address;
++
++	mmd_address = (mmd << 16) | ((reg) & 0xffff);
++	iowrite32(mmd_address >> 8, ioaddr + (PCS_MMD_SELECT << 2));
++	iowrite32(value, ioaddr + ((mmd_address & 0xff) << 2));
++}
++
++int vfio_platform_amdxgbe_reset(struct vfio_platform_device *vdev)
++{
++	struct vfio_platform_region xgmac_regs = vdev->regions[0];
++	struct vfio_platform_region xpcs_regs = vdev->regions[1];
++	u32 dma_mr_value, pcs_value, value;
++	unsigned int count;
++
++	if (!xgmac_regs.ioaddr) {
++		xgmac_regs.ioaddr =
++			ioremap_nocache(xgmac_regs.addr, xgmac_regs.size);
++		if (!xgmac_regs.ioaddr)
++			return -ENOMEM;
++	}
++	if (!xpcs_regs.ioaddr) {
++		xpcs_regs.ioaddr =
++			ioremap_nocache(xpcs_regs.addr, xpcs_regs.size);
++		if (!xpcs_regs.ioaddr)
++			return -ENOMEM;
++	}
++
++	/* reset the PHY through MDIO*/
++	pcs_value = xmdio_read(xpcs_regs.ioaddr, MDIO_MMD_PCS, MDIO_CTRL1);
++	pcs_value |= MDIO_CTRL1_RESET;
++	xmdio_write(xpcs_regs.ioaddr, MDIO_MMD_PCS, MDIO_CTRL1, pcs_value);
++
++	count = 50;
++	do {
++		msleep(20);
++		pcs_value = xmdio_read(xpcs_regs.ioaddr, MDIO_MMD_PCS,
++					MDIO_CTRL1);
++	} while ((pcs_value & MDIO_CTRL1_RESET) && --count);
++
++	if (pcs_value & MDIO_CTRL1_RESET)
++		pr_warn("%s XGBE PHY reset timeout\n", __func__);
++
++	/* disable auto-negotiation */
++	value = xmdio_read(xpcs_regs.ioaddr, MDIO_MMD_AN, MDIO_CTRL1);
++	value &= ~MDIO_AN_CTRL1_ENABLE;
++	xmdio_write(xpcs_regs.ioaddr, MDIO_MMD_AN, MDIO_CTRL1, value);
++
++	/* disable AN IRQ */
++	xmdio_write(xpcs_regs.ioaddr, MDIO_MMD_AN, MDIO_AN_INTMASK, 0);
++
++	/* clear AN IRQ */
++	xmdio_write(xpcs_regs.ioaddr, MDIO_MMD_AN, MDIO_AN_INT, 0);
++
++	/* MAC software reset */
++	dma_mr_value = ioread32(xgmac_regs.ioaddr + DMA_MR);
++	dma_mr_value |= 0x1;
++	iowrite32(dma_mr_value, xgmac_regs.ioaddr + DMA_MR);
++
++	usleep_range(10, 15);
++
++	count = 2000;
++	while (count-- && (ioread32(xgmac_regs.ioaddr + DMA_MR) & 1))
++		usleep_range(500, 600);
++
++	if (!count)
++		pr_warn("%s MAC SW reset failed\n", __func__);
++
++	return 0;
++}
++
++module_vfio_reset_handler("amd,xgbe-seattle-v1a", vfio_platform_amdxgbe_reset);
++
++MODULE_VERSION("0.1");
++MODULE_LICENSE("GPL v2");
++MODULE_AUTHOR("Eric Auger <eric.auger@linaro.org>");
++MODULE_DESCRIPTION("Reset support for AMD xgbe vfio platform device");
+-- 
+1.9.1
