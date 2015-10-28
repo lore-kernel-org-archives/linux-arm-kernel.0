@@ -1,50 +1,56 @@
-From: fengguang.wu@intel.com (kbuild test robot)
-Date: Wed, 28 Oct 2015 17:50:40 +0800
-Subject: [arm-platforms:kvm-arm64/vhe-wsinc 27/31] arch/arm/kvm/mmu.c:597:2:
- error: implicit declaration of function 'is_kernel_in_hyp_mode'
-Message-ID: <201510281738.XuP5AVMf%fengguang.wu@intel.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Wed, 28 Oct 2015 09:55:24 +0000
+Subject: [PATCH] MAINTAINERS: Start using the 'reviewer' (R) tag
+In-Reply-To: <20151028093907.GP4931@pengutronix.de>
+References: <1445960557-24328-1-git-send-email-lee.jones@linaro.org>
+ <20151027172428.GB21070@earth> <20151027181555.GE5828@x1>
+ <1445971482.2757.27.camel@perches.com>
+ <CAJKOXPc_w2Dc8LvkCu_d+kjZZmYScXboQrpNWdicT2yfL_5D7Q@mail.gmail.com>
+ <20151028082446.GF5828@x1> <56309419.4060908@samsung.com>
+ <20151028093907.GP4931@pengutronix.de>
+Message-ID: <20151028095524.GP5828@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-tree:   https://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git kvm-arm64/vhe-wsinc
-head:   de3f90e8d3e0751d8bfb2ed946eb4fdbf880d549
-commit: 6df2cc7cc0972deb9f639ab14a68c11f0a55e2e7 [27/31] arm64: KVM: skip HYP setup when already running in HYP
-config: arm-axm55xx_defconfig (attached as .config)
-reproduce:
-        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        git checkout 6df2cc7cc0972deb9f639ab14a68c11f0a55e2e7
-        # save the attached .config to linux build tree
-        make.cross ARCH=arm 
+On Wed, 28 Oct 2015, Uwe Kleine-K?nig wrote:
 
-All errors (new ones prefixed by >>):
+> Hello,
+> 
+> On Wed, Oct 28, 2015 at 06:23:37PM +0900, Krzysztof Kozlowski wrote:
+> > On 28.10.2015 17:24, Lee Jones wrote:
+> > > You guys are pushing back like this is some kind of demotion.
+> > > That's not the case at all.  All it does is better describe the (very
+> > > worthy) function you *actually* provide.
+> > 
+> > It is getting into dispute about entire change of yours... which is not
+> > what I want. I agree with your general idea but I was referring only to
+> > that particular case - the Samsung PMICs (and Maxim PMICs/MUICs which
+> > would fall into same category).
+> 
+> Not being affected by this change, I wonder what the technical
+> difference is if someone is listed as reviewer instead of maintainer.
+> Does get_maintainer.pl behave differently?
 
-   arch/arm/kvm/mmu.c: In function 'create_hyp_mappings':
->> arch/arm/kvm/mmu.c:597:2: error: implicit declaration of function 'is_kernel_in_hyp_mode' [-Werror=implicit-function-declaration]
-     if (is_kernel_in_hyp_mode())
-     ^
-   cc1: some warnings being treated as errors
+Reviewers are people who should be Cc'ed on all patches, as are
+Maintainers, so no, fundamentally they are treated the same by a
+Submitter.
 
-vim +/is_kernel_in_hyp_mode +597 arch/arm/kvm/mmu.c
+Here is some output for Maintainers/Reviews from get_maintainer.pl.
 
-   591	{
-   592		phys_addr_t phys_addr;
-   593		unsigned long virt_addr;
-   594		unsigned long start = KERN_TO_HYP((unsigned long)from);
-   595		unsigned long end = KERN_TO_HYP((unsigned long)to);
-   596	
- > 597		if (is_kernel_in_hyp_mode())
-   598			return 0;
-   599	
-   600		start = start & PAGE_MASK;
+ $ ./scripts/get_maintainer.pl -f arch/arm/boot/dts/vf500.dtsi
+ Shawn Guo <shawnguo@kernel.org> (maintainer:ARM/FREESCALE VYBRID ARM ARCHITECTURE)
+ Sascha Hauer <kernel@pengutronix.de> (maintainer:ARM/FREESCALE VYBRID ARM ARCHITECTURE)
+ Stefan Agner <stefan@agner.ch> (reviewer)
+ Russell King <linux@arm.linux.org.uk> (maintainer:ARM PORT)
+ linux-arm-kernel at lists.infradead.org (moderated list:ARM/FREESCALE VYBRID ARM ARCHITECTURE)
+ devicetree at vger.kernel.org (open list:OPEN FIRMWARE AND FLATTENED DEVICE TREE BINDINGS)
+ linux-kernel at vger.kernel.org (open list)
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 18300 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151028/384a3c2e/attachment-0001.obj>
+I'm sure we can make the output even more similar by listing the
+MAINTAINERS tag after "reviewer" too.
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
