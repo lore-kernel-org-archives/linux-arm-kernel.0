@@ -1,38 +1,50 @@
-From: david@protonic.nl (David Jander)
-Date: Wed, 28 Oct 2015 10:48:54 +0100
-Subject: BUG: fsl FEC ethernet tx checksum offloading doesn't work with RMII
- interface
-Message-ID: <20151028104854.025430ce@archvile>
+From: fengguang.wu@intel.com (kbuild test robot)
+Date: Wed, 28 Oct 2015 17:50:40 +0800
+Subject: [arm-platforms:kvm-arm64/vhe-wsinc 27/31] arch/arm/kvm/mmu.c:597:2:
+ error: implicit declaration of function 'is_kernel_in_hyp_mode'
+Message-ID: <201510281738.XuP5AVMf%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+tree:   https://git.kernel.org/pub/scm/linux/kernel/git/maz/arm-platforms.git kvm-arm64/vhe-wsinc
+head:   de3f90e8d3e0751d8bfb2ed946eb4fdbf880d549
+commit: 6df2cc7cc0972deb9f639ab14a68c11f0a55e2e7 [27/31] arm64: KVM: skip HYP setup when already running in HYP
+config: arm-axm55xx_defconfig (attached as .config)
+reproduce:
+        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        git checkout 6df2cc7cc0972deb9f639ab14a68c11f0a55e2e7
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm 
 
-Hi all,
+All errors (new ones prefixed by >>):
 
-I was unable to figure out who's maintaining
-drivers/net/ethernet/freescale/fec_main.c, so I hope someone can help out on
-this list...
+   arch/arm/kvm/mmu.c: In function 'create_hyp_mappings':
+>> arch/arm/kvm/mmu.c:597:2: error: implicit declaration of function 'is_kernel_in_hyp_mode' [-Werror=implicit-function-declaration]
+     if (is_kernel_in_hyp_mode())
+     ^
+   cc1: some warnings being treated as errors
 
-We have a board with a RMII phy connected to an i.MX6S. The hardware seems to
-be ok, since I can receive and transmit ethernet frames without drops or
-errors. However only simple things like ping and dhcp seemed to work. TCP/IP
-connections could not be made. When looking at both ends with tcpdump, I
-realized that all transmitted packages arrived at the other end with the TCP
-and IP header checksums zeroed-out.
+vim +/is_kernel_in_hyp_mode +597 arch/arm/kvm/mmu.c
 
-After issuing the following command, TCP/IP started working correctly:
+   591	{
+   592		phys_addr_t phys_addr;
+   593		unsigned long virt_addr;
+   594		unsigned long start = KERN_TO_HYP((unsigned long)from);
+   595		unsigned long end = KERN_TO_HYP((unsigned long)to);
+   596	
+ > 597		if (is_kernel_in_hyp_mode())
+   598			return 0;
+   599	
+   600		start = start & PAGE_MASK;
 
-$ ethtool --offload eth0 tx off
-
-This works around the issue. For some reason, when the FEC is in RMII mode, it
-isn't filling in the checksums.
-
-On another board with an RGMII phy the same kernel works fine without the need
-to disable offloading. What can possibly relate this functionality to the
-choice of MAC interface?
-
-Best regards,
-
--- 
-David Jander
-Protonic Holland.
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 18300 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151028/384a3c2e/attachment-0001.obj>
