@@ -1,83 +1,91 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 28 Oct 2015 08:24:46 +0000
-Subject: [PATCH] MAINTAINERS: Start using the 'reviewer' (R) tag
-In-Reply-To: <CAJKOXPc_w2Dc8LvkCu_d+kjZZmYScXboQrpNWdicT2yfL_5D7Q@mail.gmail.com>
-References: <1445960557-24328-1-git-send-email-lee.jones@linaro.org>
- <20151027172428.GB21070@earth> <20151027181555.GE5828@x1>
- <1445971482.2757.27.camel@perches.com>
- <CAJKOXPc_w2Dc8LvkCu_d+kjZZmYScXboQrpNWdicT2yfL_5D7Q@mail.gmail.com>
-Message-ID: <20151028082446.GF5828@x1>
+From: ykk@rock-chips.com (Yakir Yang)
+Date: Wed, 28 Oct 2015 16:24:19 +0800
+Subject: [PATCH v8 04/17] drm: bridge: analogix/dp: remove duplicate
+ configuration of link rate and link count
+In-Reply-To: <1446020143-32645-1-git-send-email-ykk@rock-chips.com>
+References: <1446020143-32645-1-git-send-email-ykk@rock-chips.com>
+Message-ID: <1446020659-21747-1-git-send-email-ykk@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2015-10-27 at 18:15 +0000, Lee Jones wrote:
-> On Tue, 27 Oct 2015, Sebastian Reichel wrote:
-> > On Tue, Oct 27, 2015 at 03:42:37PM +0000, Lee Jones wrote:
-> > > Since eafbaac ("MAINTAINERS: Add "R:" designated-reviewers tag") we
-> > > have been able to tag specific people as Reviewers.  These are key
-> > > individuals who are tasked with or volunteer to review code submitted
-> > > to a subsystem or specific file.  However, according to MAINTAINERS
-> > > we have 1046 Maintainers and only a mere 22 Reviewers.  I believe
-> > > these numbers to be incorrect, as many of these Maintainers are in
-> > > fact Reviewers.
+link_rate and lane_count already configured in analogix_dp_set_link_train(),
+so we don't need to config those repeatly after training finished, just
+remove them out.
 
-Most entries in MAINTAINERS seem to be vanity entries than actual
-active participants.  A person typically writes a driver, adds a
-MAINTAINER entry, then forgets about it and/or the hardware becomes
-outdated.
+Beside Display Port 1.2 already support 5.4Gbps link rate, the maximum sets
+would change from {1.62Gbps, 2.7Gbps} to {1.62Gbps, 2.7Gbps, 5.4Gbps}.
 
-This I agree with.
+Tested-by: Javier Martinez Canillas <javier@osg.samsung.com>
+Signed-off-by: Yakir Yang <ykk@rock-chips.com>
+---
+Changes in v8: None
+Changes in v7: None
+Changes in v6: None
+Changes in v5: None
+Changes in v4:
+- Update commit message more readable. (Jingoo)
+- Adjust the order from 05 to 04
 
-On Wed, 28 Oct 2015, Krzysztof Kozlowski wrote:
-> 2015-10-28 3:44 GMT+09:00 Joe Perches <joe@perches.com>:
-> > On Tue, 2015-10-27 at 18:15 +0000, Lee Jones wrote:
-> > > On Tue, 27 Oct 2015, Sebastian Reichel wrote:> >
-> > > > I think you should CC the people, which are changed from "M:" to
-> > > > "R:", though.
-> > >
-> > > Yes, makes sense.
-> > >
-> > > I'd like to collect some Maintainer Acks first though.
-> >
-> > I think people from organizations like Samsung are actual
-> > maintainers not reviewers.
+Changes in v3:
+- The link_rate and lane_count shouldn't config to the DT property value
+  directly, but we can take those as hardware limite. For example, RK3288
+  only support 4 physical lanes of 2.7/1.62 Gbps/lane, so DT property would
+  like "link-rate = 0x0a" "lane-count = 4". (Thierry)
 
-So this all hinges on how we are describing Maintainers and Reviewers.
+Changes in v2: None
 
-My personal definition (until convinced otherwise) is that Reviewers
-care about their particular subsystem and/or files.  They conduct code
-reviews to ensure nothing gets broken and the code base stays in best
-possible state of worthiness.  On the other hand Maintainers usually
-conduct themselves as Reviewers but also have 'maintainership' duties
-as well; such as applying patches, *maintaining*, testing, rebasing,
-etc, an upstream branch and ultimately sending pull-requests to higher
-level Maintainers i.e. Linus.  Maintainers also have the ultimate say
-(unless over-ruled by Linus etc) over what gets applied.
+ drivers/gpu/drm/bridge/analogix/analogix_dp_core.c | 8 ++++----
+ drivers/gpu/drm/bridge/analogix/analogix_dp_core.h | 5 +++--
+ 2 files changed, 7 insertions(+), 6 deletions(-)
 
-> > Their drivers are not thrown over a wall and forgotten.
-> 
-> At least for Samsung Multifunction PMIC drivers (and some of Maxim
-> MUICs and PMICs) these are actively used by us in existing and new
-> products. They are also continuously extended and actually maintained.
-> This means that it is not only about review of new patches but also
-> about caring that nothing will become broken.
-
-Exactly.  This what I expect of any good code Reviewer.
-
-> I would prefer to leave the "SAMSUNG MULTIFUNCTION PMIC DEVICE
-> DRIVERS" entry as is - maintainers.
-
-But you aren't maintaining the driver i.e. you don't collect patches
-and *maintain* them on an upstream branch.  Granted some of you guys
-are doing a great job of maintaining branches on your downstream or
-BSP kernels, but conduct a Reviewer type role for upstream.
-
-You guys are pushing back like this is some kind of demotion.  That's
-not the case at all.  All it does is better describe the (very worthy)
-function you *actually* provide.
-
+diff --git a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
+index 334181c..96afb67 100644
+--- a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
++++ b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
+@@ -624,6 +624,8 @@ static void analogix_dp_get_max_rx_bandwidth(struct analogix_dp_device *dp,
+ 	/*
+ 	 * For DP rev.1.1, Maximum link rate of Main Link lanes
+ 	 * 0x06 = 1.62 Gbps, 0x0a = 2.7 Gbps
++	 * For DP rev.1.2, Maximum link rate of Main Link lanes
++	 * 0x06 = 1.62 Gbps, 0x0a = 2.7 Gbps, 0x14 = 5.4Gbps
+ 	 */
+ 	analogix_dp_read_byte_from_dpcd(dp, DP_MAX_LINK_RATE, &data);
+ 	*bandwidth = data;
+@@ -657,7 +659,8 @@ static void analogix_dp_init_training(struct analogix_dp_device *dp,
+ 	analogix_dp_get_max_rx_lane_count(dp, &dp->link_train.lane_count);
+ 
+ 	if ((dp->link_train.link_rate != LINK_RATE_1_62GBPS) &&
+-	    (dp->link_train.link_rate != LINK_RATE_2_70GBPS)) {
++	    (dp->link_train.link_rate != LINK_RATE_2_70GBPS) &&
++	    (dp->link_train.link_rate != LINK_RATE_5_40GBPS)) {
+ 		dev_err(dp->dev, "Rx Max Link Rate is abnormal :%x !\n",
+ 			dp->link_train.link_rate);
+ 		dp->link_train.link_rate = LINK_RATE_1_62GBPS;
+@@ -898,9 +901,6 @@ static void analogix_dp_commit(struct analogix_dp_device *dp)
+ 	analogix_dp_enable_rx_to_enhanced_mode(dp, 1);
+ 	analogix_dp_enable_enhanced_mode(dp, 1);
+ 
+-	analogix_dp_set_lane_count(dp, dp->video_info->lane_count);
+-	analogix_dp_set_link_bandwidth(dp, dp->video_info->link_rate);
+-
+ 	analogix_dp_init_video(dp);
+ 	ret = analogix_dp_config_video(dp);
+ 	if (ret)
+diff --git a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.h b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.h
+index 14d20be..9a90a18 100644
+--- a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.h
++++ b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.h
+@@ -21,8 +21,9 @@
+ #define MAX_EQ_LOOP 5
+ 
+ enum link_rate_type {
+-	LINK_RATE_1_62GBPS = 0x06,
+-	LINK_RATE_2_70GBPS = 0x0a
++	LINK_RATE_1_62GBPS = DP_LINK_BW_1_62,
++	LINK_RATE_2_70GBPS = DP_LINK_BW_2_7,
++	LINK_RATE_5_40GBPS = DP_LINK_BW_5_4,
+ };
+ 
+ enum link_lane_count_type {
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+1.9.1
