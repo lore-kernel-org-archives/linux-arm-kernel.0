@@ -1,19 +1,89 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 28 Oct 2015 10:31:17 -0200
-Subject: BUG: fsl FEC ethernet tx checksum offloading doesn't work with
- RMII interface
-In-Reply-To: <20151028121918.4884b42e@archvile>
-References: <20151028104854.025430ce@archvile>
- <20151028111414.GJ8644@n2100.arm.linux.org.uk>
- <20151028121918.4884b42e@archvile>
-Message-ID: <CAOMZO5D=7Okx-Lju5uzMCXC+_8ETDVmEOfWU7ZD0byZszDSV3A@mail.gmail.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 28 Oct 2015 12:32:17 +0000
+Subject: [PATCHv2] drivers/perf: kill armpmu_register
+Message-ID: <1446035537-12854-1-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 28, 2015 at 9:19 AM, David Jander <david@protonic.nl> wrote:
+Nothing outside of drivers/perf/arm_pmu.c should call armpmu_register
+any more, so it no longer needs to be in include/linux/perf/arm_pmu.h.
+Additionally, by folding it in to arm_pmu_device_probe we can allow
+drivers to override struct pmu fields without getting blatted by the
+armpmu code.
 
-> Sorry, I somehow assumed it was obvious I'd report against latest mainline...
-> I'm on 4.3-rc7.
+This patch folds armpmu_register into arm_pmu_device_probe. The logging
+to the console is moved to after the PMU is successfully registered with
+the core perf code.
 
-Are you able to find out a previous kernel version that does not
-exhibit this failure?
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Suggested-by: Will Deacon <will.deacon@arm.com>
+Cc: Drew Richardson <drew.richardson@arm.com>
+Cc: Pawel Moll <pawel.moll@arm.com>
+---
+ drivers/perf/arm_pmu.c       | 15 ++++++---------
+ include/linux/perf/arm_pmu.h |  2 --
+ 2 files changed, 6 insertions(+), 11 deletions(-)
+
+Since v1 [1]
+* Call armpmu_init before the PMU init_fn
+
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-October/378064.html
+
+diff --git a/drivers/perf/arm_pmu.c b/drivers/perf/arm_pmu.c
+index f346960..6186882 100644
+--- a/drivers/perf/arm_pmu.c
++++ b/drivers/perf/arm_pmu.c
+@@ -583,14 +583,6 @@ static void armpmu_init(struct arm_pmu *armpmu)
+ 	};
+ }
+ 
+-int armpmu_register(struct arm_pmu *armpmu, int type)
+-{
+-	armpmu_init(armpmu);
+-	pr_info("enabled with %s PMU driver, %d counters available\n",
+-			armpmu->name, armpmu->num_events);
+-	return perf_pmu_register(&armpmu->pmu, armpmu->name, type);
+-}
+-
+ /* Set at runtime when we know what CPU type we are. */
+ static struct arm_pmu *__oprofile_cpu_pmu;
+ 
+@@ -913,6 +905,8 @@ int arm_pmu_device_probe(struct platform_device *pdev,
+ 		return -ENOMEM;
+ 	}
+ 
++	armpmu_init(pmu);
++
+ 	if (!__oprofile_cpu_pmu)
+ 		__oprofile_cpu_pmu = pmu;
+ 
+@@ -938,10 +932,13 @@ int arm_pmu_device_probe(struct platform_device *pdev,
+ 	if (ret)
+ 		goto out_free;
+ 
+-	ret = armpmu_register(pmu, -1);
++	ret = perf_pmu_register(&pmu->pmu, pmu->name, -1);
+ 	if (ret)
+ 		goto out_destroy;
+ 
++	pr_info("enabled with %s PMU driver, %d counters available\n",
++			pmu->name, pmu->num_events);
++
+ 	return 0;
+ 
+ out_destroy:
+diff --git a/include/linux/perf/arm_pmu.h b/include/linux/perf/arm_pmu.h
+index bfa673b..83b5e34 100644
+--- a/include/linux/perf/arm_pmu.h
++++ b/include/linux/perf/arm_pmu.h
+@@ -111,8 +111,6 @@ struct arm_pmu {
+ 
+ #define to_arm_pmu(p) (container_of(p, struct arm_pmu, pmu))
+ 
+-int armpmu_register(struct arm_pmu *armpmu, int type);
+-
+ u64 armpmu_event_update(struct perf_event *event);
+ 
+ int armpmu_event_set_period(struct perf_event *event);
+-- 
+1.9.1
