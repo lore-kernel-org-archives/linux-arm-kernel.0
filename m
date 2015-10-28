@@ -1,138 +1,121 @@
 From: Suravee.Suthikulpanit@amd.com (Suravee Suthikulpanit)
-Date: Wed, 28 Oct 2015 15:50:50 -0700
-Subject: [PATCH V5 5/9] device property: ACPI: Make use of the new DMA
- Attribute APIs
+Date: Wed, 28 Oct 2015 15:50:51 -0700
+Subject: [PATCH V5 6/9] device property: ACPI: Remove unused DMA APIs
 In-Reply-To: <1446072654-5608-1-git-send-email-Suravee.Suthikulpanit@amd.com>
 References: <1446072654-5608-1-git-send-email-Suravee.Suthikulpanit@amd.com>
-Message-ID: <1446072654-5608-6-git-send-email-Suravee.Suthikulpanit@amd.com>
+Message-ID: <1446072654-5608-7-git-send-email-Suravee.Suthikulpanit@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we have the new DMA attribute APIs, we can replace the older
-acpi_check_dma() and device_dma_is_coherent().
+These DMA APIs are replaced with the newer versions, which return
+the enum dev_dma_attr. So, we can safely remove them.
 
 Signed-off-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
 CC: Rafael J. Wysocki <rjw@rjwysocki.net>
-CC: Tom Lendacky <thomas.lendacky@amd.com>
-CC: Herbert Xu <herbert@gondor.apana.org.au>
-CC: David S. Miller <davem@davemloft.net>
 ---
- drivers/acpi/acpi_platform.c              |  7 ++++++-
- drivers/acpi/glue.c                       |  8 +++++---
- drivers/crypto/ccp/ccp-platform.c         | 15 +++++++++++----
- drivers/net/ethernet/amd/xgbe/xgbe-main.c |  8 +++++++-
- 4 files changed, 29 insertions(+), 9 deletions(-)
+ drivers/base/property.c  | 13 -------------
+ include/acpi/acpi_bus.h  | 34 ----------------------------------
+ include/linux/acpi.h     |  5 -----
+ include/linux/property.h |  2 --
+ 4 files changed, 54 deletions(-)
 
-diff --git a/drivers/acpi/acpi_platform.c b/drivers/acpi/acpi_platform.c
-index 06a67d5..296b7a1 100644
---- a/drivers/acpi/acpi_platform.c
-+++ b/drivers/acpi/acpi_platform.c
-@@ -103,7 +103,12 @@ struct platform_device *acpi_create_platform_device(struct acpi_device *adev)
- 	pdevinfo.res = resources;
- 	pdevinfo.num_res = count;
- 	pdevinfo.fwnode = acpi_fwnode_handle(adev);
--	pdevinfo.dma_mask = acpi_check_dma(adev, NULL) ? DMA_BIT_MASK(32) : 0;
-+
-+	if (acpi_dma_supported(adev))
-+		pdevinfo.dma_mask = DMA_BIT_MASK(32);
-+	else
-+		pdevinfo.dma_mask = 0;
-+
- 	pdev = platform_device_register_full(&pdevinfo);
- 	if (IS_ERR(pdev))
- 		dev_err(&adev->dev, "platform device creation failed: %ld\n",
-diff --git a/drivers/acpi/glue.c b/drivers/acpi/glue.c
-index 1470ae4..5ea5dc2 100644
---- a/drivers/acpi/glue.c
-+++ b/drivers/acpi/glue.c
-@@ -168,7 +168,7 @@ int acpi_bind_one(struct device *dev, struct acpi_device *acpi_dev)
- 	struct list_head *physnode_list;
- 	unsigned int node_id;
- 	int retval = -EINVAL;
--	bool coherent;
-+	enum dev_dma_attr attr;
+diff --git a/drivers/base/property.c b/drivers/base/property.c
+index 05d57a2..1325ff2 100644
+--- a/drivers/base/property.c
++++ b/drivers/base/property.c
+@@ -598,19 +598,6 @@ unsigned int device_get_child_node_count(struct device *dev)
+ }
+ EXPORT_SYMBOL_GPL(device_get_child_node_count);
  
- 	if (has_acpi_companion(dev)) {
- 		if (acpi_dev) {
-@@ -225,8 +225,10 @@ int acpi_bind_one(struct device *dev, struct acpi_device *acpi_dev)
- 	if (!has_acpi_companion(dev))
- 		ACPI_COMPANION_SET(dev, acpi_dev);
+-bool device_dma_is_coherent(struct device *dev)
+-{
+-	bool coherent = false;
+-
+-	if (IS_ENABLED(CONFIG_OF) && dev->of_node)
+-		coherent = of_dma_is_coherent(dev->of_node);
+-	else
+-		acpi_check_dma(ACPI_COMPANION(dev), &coherent);
+-
+-	return coherent;
+-}
+-EXPORT_SYMBOL_GPL(device_dma_is_coherent);
+-
+ bool device_dma_supported(struct device *dev)
+ {
+ 	/* For DT, this is always supported.
+diff --git a/include/acpi/acpi_bus.h b/include/acpi/acpi_bus.h
+index 920b774..ad0a5ff 100644
+--- a/include/acpi/acpi_bus.h
++++ b/include/acpi/acpi_bus.h
+@@ -390,40 +390,6 @@ struct acpi_data_node {
+ 	struct completion kobj_done;
+ };
  
--	if (acpi_check_dma(acpi_dev, &coherent))
--		arch_setup_dma_ops(dev, 0, 0, NULL, coherent);
-+	attr = acpi_get_dma_attr(acpi_dev);
-+	if (attr != DEV_DMA_NOT_SUPPORTED)
-+		arch_setup_dma_ops(dev, 0, 0, NULL,
-+				   attr == DEV_DMA_COHERENT);
+-static inline bool acpi_check_dma(struct acpi_device *adev, bool *coherent)
+-{
+-	bool ret = false;
+-
+-	if (!adev)
+-		return ret;
+-
+-	/**
+-	 * Currently, we only support _CCA=1 (i.e. coherent_dma=1)
+-	 * This should be equivalent to specifyig dma-coherent for
+-	 * a device in OF.
+-	 *
+-	 * For the case when _CCA=0 (i.e. coherent_dma=0 && cca_seen=1),
+-	 * There are two cases:
+-	 * case 1. Do not support and disable DMA.
+-	 * case 2. Support but rely on arch-specific cache maintenance for
+-	 *         non-coherence DMA operations.
+-	 * Currently, we implement case 2 above.
+-	 *
+-	 * For the case when _CCA is missing (i.e. cca_seen=0) and
+-	 * platform specifies ACPI_CCA_REQUIRED, we do not support DMA,
+-	 * and fallback to arch-specific default handling.
+-	 *
+-	 * See acpi_init_coherency() for more info.
+-	 */
+-	if (adev->flags.coherent_dma ||
+-	    (adev->flags.cca_seen && IS_ENABLED(CONFIG_ARM64))) {
+-		ret = true;
+-		if (coherent)
+-			*coherent = adev->flags.coherent_dma;
+-	}
+-	return ret;
+-}
+-
+ static inline bool is_acpi_node(struct fwnode_handle *fwnode)
+ {
+ 	return fwnode && (fwnode->type == FWNODE_ACPI
+diff --git a/include/linux/acpi.h b/include/linux/acpi.h
+index 6527920..fa2bbc0 100644
+--- a/include/linux/acpi.h
++++ b/include/linux/acpi.h
+@@ -593,11 +593,6 @@ static inline int acpi_device_modalias(struct device *dev,
+ 	return -ENODEV;
+ }
  
- 	acpi_physnode_link_name(physical_node_name, node_id);
- 	retval = sysfs_create_link(&acpi_dev->dev.kobj, &dev->kobj,
-diff --git a/drivers/crypto/ccp/ccp-platform.c b/drivers/crypto/ccp/ccp-platform.c
-index bb241c3..844118c 100644
---- a/drivers/crypto/ccp/ccp-platform.c
-+++ b/drivers/crypto/ccp/ccp-platform.c
-@@ -96,6 +96,7 @@ static int ccp_platform_probe(struct platform_device *pdev)
- 	struct ccp_platform *ccp_platform;
- 	struct device *dev = &pdev->dev;
- 	struct acpi_device *adev = ACPI_COMPANION(dev);
-+	enum dev_dma_attr attr;
- 	struct resource *ior;
- 	int ret;
+-static inline bool acpi_check_dma(struct acpi_device *adev, bool *coherent)
+-{
+-	return false;
+-}
+-
+ static inline bool acpi_dma_supported(struct acpi_device *adev)
+ {
+ 	return false;
+diff --git a/include/linux/property.h b/include/linux/property.h
+index 7200490..0a3705a 100644
+--- a/include/linux/property.h
++++ b/include/linux/property.h
+@@ -174,8 +174,6 @@ struct property_set {
  
-@@ -122,18 +123,24 @@ static int ccp_platform_probe(struct platform_device *pdev)
- 	}
- 	ccp->io_regs = ccp->io_map;
+ void device_add_property_set(struct device *dev, struct property_set *pset);
  
--	ret = dma_set_mask_and_coherent(dev, DMA_BIT_MASK(48));
--	if (ret) {
--		dev_err(dev, "dma_set_mask_and_coherent failed (%d)\n", ret);
-+	attr = device_get_dma_attr(dev);
-+	if (attr == DEV_DMA_NOT_SUPPORTED) {
-+		dev_err(dev, "DMA is not supported");
- 		goto e_err;
- 	}
+-bool device_dma_is_coherent(struct device *dev);
+-
+ bool device_dma_supported(struct device *dev);
  
--	ccp_platform->coherent = device_dma_is_coherent(ccp->dev);
-+	ccp_platform->coherent = (attr == DEV_DMA_COHERENT);
- 	if (ccp_platform->coherent)
- 		ccp->axcache = CACHE_WB_NO_ALLOC;
- 	else
- 		ccp->axcache = CACHE_NONE;
- 
-+	ret = dma_set_mask_and_coherent(dev, DMA_BIT_MASK(48));
-+	if (ret) {
-+		dev_err(dev, "dma_set_mask_and_coherent failed (%d)\n", ret);
-+		goto e_err;
-+	}
-+
- 	dev_set_drvdata(dev, ccp);
- 
- 	ret = ccp_init(ccp);
-diff --git a/drivers/net/ethernet/amd/xgbe/xgbe-main.c b/drivers/net/ethernet/amd/xgbe/xgbe-main.c
-index e83bd76..c607b3f 100644
---- a/drivers/net/ethernet/amd/xgbe/xgbe-main.c
-+++ b/drivers/net/ethernet/amd/xgbe/xgbe-main.c
-@@ -342,6 +342,7 @@ static int xgbe_probe(struct platform_device *pdev)
- 	struct resource *res;
- 	const char *phy_mode;
- 	unsigned int i, phy_memnum, phy_irqnum;
-+	enum dev_dma_attr attr;
- 	int ret;
- 
- 	DBGPR("--> xgbe_probe\n");
-@@ -609,7 +610,12 @@ static int xgbe_probe(struct platform_device *pdev)
- 		goto err_io;
- 
- 	/* Set the DMA coherency values */
--	pdata->coherent = device_dma_is_coherent(pdata->dev);
-+	attr = device_get_dma_attr(dev);
-+	if (attr == DEV_DMA_NOT_SUPPORTED) {
-+		dev_err(dev, "DMA is not supported");
-+		goto err_io;
-+	}
-+	pdata->coherent = (attr == DEV_DMA_COHERENT);
- 	if (pdata->coherent) {
- 		pdata->axdomain = XGBE_DMA_OS_AXDOMAIN;
- 		pdata->arcache = XGBE_DMA_OS_ARCACHE;
+ enum dev_dma_attr device_get_dma_attr(struct device *dev);
 -- 
 2.1.0
