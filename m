@@ -1,24 +1,27 @@
-From: nicola@corna.info (Nicola Corna)
-Date: Wed, 28 Oct 2015 06:46:28 +0000
-Subject: [PATCH v3 4/4] iio: humidity: si7020: added No Hold read mode
-In-Reply-To: <20151027233000.GB1572@katana>
-References: <20151027233000.GB1572@katana>
- <1445976718-7449-1-git-send-email-nicola@corna.info>
- <1445976718-7449-4-git-send-email-nicola@corna.info>
-Message-ID: <f113de76b2369d404909cfc5158feca4@rainloop.corna.info>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Wed, 28 Oct 2015 15:49:17 +0900
+Subject: [PATCH v3] dmaengine: fsl-edma: add PM suspend/resume support
+In-Reply-To: <BLUPR03MB134DA9E483023953813E03783220@BLUPR03MB134.namprd03.prod.outlook.com>
+References: <1445243465-7727-1-git-send-email-yao.yuan@freescale.com>
+ <20151027020035.GC11691@vkoul-mobl.iind.intel.com>
+ <BLUPR03MB134DA9E483023953813E03783220@BLUPR03MB134.namprd03.prod.outlook.com>
+Message-ID: <20151028064915.GD3041@vkoul-mobl.iind.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-October 28 2015 12:30 AM, "Wolfram Sang" <wsa@the-dreams.de> wrote:
-> Not a complete review, I just stumbled over this one:
+On Tue, Oct 27, 2015 at 03:58:31AM +0000, Yao Yuan wrote:
+> Hi Vinod,
 > 
->> + if (client->adapter->quirks &&
->> + client->adapter->quirks->flags |
-> 
-> '|' should be '&', or?
-> 
-Yes, sorry. I'll update the patch.
 
-Nicola Corna
->> + I2C_AQ_NO_CLK_STRETCH)
->> + return -ENODEV;
+Please do not top post
+
+> Thanks for your review.
+> I did the test and it seems that it should be ok when CONFIG_PM is not defined.
+> So I removed the protection code to make it more readable.
+> Do you think is it ok?
+
+Yes I did check, this seems okay, pls ignore this comment. You still need to
+explain why you use late/early calls
+
+-- 
+~Vinod
