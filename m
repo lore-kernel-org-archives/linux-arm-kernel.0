@@ -1,60 +1,51 @@
-From: Suravee.Suthikulpanit@amd.com (Suravee Suthikulpanit)
-Date: Wed, 28 Oct 2015 15:50:54 -0700
-Subject: [PATCH V5 9/9] PCI: ACPI: Add support for PCI device DMA coherency
-In-Reply-To: <1446072654-5608-1-git-send-email-Suravee.Suthikulpanit@amd.com>
-References: <1446072654-5608-1-git-send-email-Suravee.Suthikulpanit@amd.com>
-Message-ID: <1446072654-5608-10-git-send-email-Suravee.Suthikulpanit@amd.com>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Thu, 29 Oct 2015 08:09:17 +0900
+Subject: [PATCH v3 0/2] Basic GPIO support for r8a7795
+Message-ID: <1446073759-10569-1-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds support for setting up PCI device DMA coherency from
-ACPI _CCA object that should normally be specified in the DSDT node
-of its PCI host bridge.
+Hi,
 
-Signed-off-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
-Acked-by: Bjorn Helgaas <bhelgaas@google.com>
-Reviewed-by: Hanjun Guo <hanjun.guo@linaro.org>
-CC: Rafael J. Wysocki <rjw@rjwysocki.net>
----
- drivers/pci/probe.c | 12 +++++++++++-
- 1 file changed, 11 insertions(+), 1 deletion(-)
+this is an update of work by Takeshi Kihara, posted by me, then Ulrich
+Hecht and now me again.  Ulrich, I would be most grateful if you could look
+over this and repost if there are problems.
 
-diff --git a/drivers/pci/probe.c b/drivers/pci/probe.c
-index 31e3eef..40eed54 100644
---- a/drivers/pci/probe.c
-+++ b/drivers/pci/probe.c
-@@ -12,6 +12,7 @@
- #include <linux/module.h>
- #include <linux/cpumask.h>
- #include <linux/pci-aspm.h>
-+#include <linux/acpi.h>
- #include <asm-generic/pci-bridge.h>
- #include "pci.h"
- 
-@@ -1638,7 +1639,7 @@ static void pci_set_msi_domain(struct pci_dev *dev)
-  * @dev: ptr to pci_dev struct of the PCI device
-  *
-  * Function to update PCI devices's DMA configuration using the same
-- * info from the OF node of host bridge's parent (if any).
-+ * info from the OF node or ACPI node of host bridge's parent (if any).
-  */
- static void pci_dma_configure(struct pci_dev *dev)
- {
-@@ -1647,6 +1648,15 @@ static void pci_dma_configure(struct pci_dev *dev)
- 	if (IS_ENABLED(CONFIG_OF) && dev->dev.of_node) {
- 		if (bridge->parent)
- 			of_dma_configure(&dev->dev, bridge->parent->of_node);
-+	} else if (has_acpi_companion(bridge)) {
-+		struct acpi_device *adev = to_acpi_device_node(bridge->fwnode);
-+		enum dev_dma_attr attr = acpi_get_dma_attr(adev);
-+
-+		if (attr == DEV_DMA_NOT_SUPPORTED)
-+			dev_warn(&dev->dev, "DMA not supported.\n");
-+		else
-+			arch_setup_dma_ops(&dev->dev, 0, 0, NULL,
-+					   attr == DEV_DMA_COHERENT);
- 	}
- 
- 	pci_put_host_bridge_device(bridge);
+Changes:
+
+* v3
+  - Correction to gpio-ranges as suggested by Geert Uytterhoeven
+* v2
+  - Update to new CPG/MSSR bindings via Geert Uytterhoeven
+
+Base:
+
+* "[PATCH v12 0/7] arm64: renesas: Add Renesas R8A7795 SoC support".
+  This can be found in the topic/arm64-rcar-gen3-v12 branch of
+  my renesas tree on kernel.org.
+
+Run-time dependencies:
+
+* The base
+* The new GPG driver
+  "[PATCH/RFC v4 0/5] clk: shmobile: Add new Renesas CPG/MSSR DT bindings"
+  and its dependencies. This may be found in the
+  topic/cpg-mssr-v4 branch of
+  git://git.kernel.org/pub/scm/linux/kernel/git/geert/renesas-drivers
+  along with an earlier version of this patchset which updates applied.
+
+Availability:
+* This patchset is available in the topic/r8a7795-gpio-v3 branch of my
+  renesas tree on kernel.org
+
+
+Takeshi Kihara (2):
+  arm64: dts: r8a7795: add GPIO nodes
+  arm64: defconfig: Enable GPIO of Renesas R-Car Gen3 SoC
+
+ arch/arm64/boot/dts/renesas/r8a7795.dtsi | 112 +++++++++++++++++++++++++++++++
+ arch/arm64/configs/defconfig             |   1 +
+ 2 files changed, 113 insertions(+)
+
 -- 
-2.1.0
+2.1.4
