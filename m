@@ -1,231 +1,143 @@
-From: javier@dowhile0.org (Javier Martinez Canillas)
-Date: Wed, 28 Oct 2015 15:09:13 +0100
-Subject: [PATCH] MAINTAINERS: Start using the 'reviewer' (R) tag
-In-Reply-To: <20151028133438.GC4058@x1>
-References: <CAJKOXPc_w2Dc8LvkCu_d+kjZZmYScXboQrpNWdicT2yfL_5D7Q@mail.gmail.com>
- <20151028082446.GF5828@x1>
- <CABxcv=mGZstqyrkB95hjDCYCvhDJDVD=ga-Fg_5yPtXETuWe=g@mail.gmail.com>
- <20151028102832.GR5828@x1>
- <CABxcv=mzzcx3o0m3hYzcn0DyM2pEFDZ-ZgVCjChWGf+y4Xy78A@mail.gmail.com>
- <1446030399.2757.83.camel@perches.com>
- <CABxcv=m+aMgtKPA-WBX9rTW8c3pnMmZgNG=NvnbaeOchdZ87hg@mail.gmail.com>
- <20151028113932.GS5828@x1> <20151028121454.GA4058@x1>
- <CABxcv=kCuYaYWgnvEUuTGv1RXdS6_3DR=6fnzHhAh7V-KFfCrQ@mail.gmail.com>
- <20151028133438.GC4058@x1>
-Message-ID: <CABxcv==Ag3ARUtQYZdfqBELAJ_CwU3to9YxmgG1yBbUJ-h9xrw@mail.gmail.com>
+From: peter@hurleysoftware.com (Peter Hurley)
+Date: Wed, 28 Oct 2015 10:22:34 -0400
+Subject: [PATCH v13 2/5] uart: pl011: Introduce register accessor
+In-Reply-To: <CAOZdJXUZDTzEn4f4FGhmKfq7HeEFKPKp4BAbR6_=wXGVw5_0GQ@mail.gmail.com>
+References: <1438328959-16177-1-git-send-email-jun.nie@linaro.org>
+ <1438328959-16177-3-git-send-email-jun.nie@linaro.org>
+ <55FBECCD.2080906@arm.com>
+ <CAOZdJXUZDTzEn4f4FGhmKfq7HeEFKPKp4BAbR6_=wXGVw5_0GQ@mail.gmail.com>
+Message-ID: <5630DA2A.4050803@hurleysoftware.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Lee,
-
-On Wed, Oct 28, 2015 at 2:34 PM, Lee Jones <lee.jones@linaro.org> wrote:
-> On Wed, 28 Oct 2015, Javier Martinez Canillas wrote:
->> On Wed, Oct 28, 2015 at 1:14 PM, Lee Jones <lee.jones@linaro.org> wrote:
->> > On Wed, 28 Oct 2015, Lee Jones wrote:
->> >
->> >> On Wed, 28 Oct 2015, Javier Martinez Canillas wrote:
->> >>
->> >> > Hello Joe,
->> >> >
->> >> > On Wed, Oct 28, 2015 at 12:06 PM, Joe Perches <joe@perches.com> wrote:
->> >> > > On Wed, 2015-10-28 at 11:53 +0100, Javier Martinez Canillas wrote:
->> >> > >> (Lee) think(s) that the difference between a maintainer and
->> >> > >> a reviewer is if a branch with fixes / new features are kept and pull
->> >> > >> requests sent while I think that the difference is the level of
->> >> > >> involvement someone has with a driver regardless of how patches ends
->> >> > >> in the subsystem tree (picked directly by subsystem maintainers or
->> >> > >> sent through pull requests).
->> >> > >>
->> >> > >> Is the first time I heard your definition but maybe I'm the one that
->> >> > >> is wrong so it would be great to get a consensus on that and get it
->> >> > >> documented somewhere.
->> >> > >
->> >> > > I think Lee is over-analyzing.
->> >> > >
->> >> > > From MAINTAINERS:
->> >> > >         M: Mail patches to: FullName <address@domain>
->> >> > >         R: Designated reviewer: FullName <address@domain>
->> >> > >            These reviewers should be CCed on patches.
->> >> > >         S: Status, one of the following:
->> >> > >            Supported:   Someone is actually paid to look after this.
->> >> > >            Maintained:  Someone actually looks after it.
->> >> > >
->> >> > > "looking after" doesn't mean upstreaming.
->> >> > >
->> >> >
->> >> > Agreed and upstreaming doesn't mean sending pull request, you can for
->> >> > example upstream the downstream changes for a driver you maintain by
->> >> > posting patches or ack patches others post and let the subsystem
->> >> > maintainer to pick those (even if you are listed as the driver
->> >> > maintainer in MAINTAINERS).
->> >> >
->> >> > So by following Lee's definition, then most drivers' maintainers
->> >> > should not be called maintainers since keeping a tree with patches for
->> >> > both fixes and new features, sending pull requests, etc is only
->> >> > justified for drivers that have a lot of changes per release. Is not
->> >> > worth it for drivers that are in "maintenance mode" where only bugs
->> >> > are fixed every once in a while or features are seldom added.
->> >>
->> >> Exactly right.
->> >>
->> >> Although, it looks like M: doesn't even mean Maintainer.  If it did, I
->> >> would have made these points over and over until death (or until I got
->> >> bored).  However, as M: actually means "Mail patches to", there seems
->> >> to be very little difference between that and "Designated reviewer"
->> >> and makes me wonder why the R: tag was ever even introduced.  I guess
->> >> all of the other guys in the threads below also thought M: meant
->> >> Maintainer, or else they would have just added poor old Josh as a
->> >> "Mail patches to" recipient and been done with it.
->> >
->> > Ah, but wait.  get_maintainer.pl *does* assume M means Maintainer
->> > doesn't it?  Which is why this came about.  So if we have a "Mail
->> > patches to" entry, get_maintainer.pl tells the user that this is a
+On 10/22/2015 07:36 PM, Timur Tabi wrote:
+> On Fri, Sep 18, 2015 at 5:51 AM, Andre Przywara <andre.przywara@arm.com> wrote:
 >>
->> Joe already answered but I'll elaborate a little bit:
+>>>  static void pl011_putc(struct uart_port *port, int c)
+>>>  {
+>>> -       while (readl(port->membase + REG_FR) & UART01x_FR_TXFF)
+>>> +       struct uart_amba_port *uap =
+>>> +           container_of(port, struct uart_amba_port, port);
+>>> +
+>>> +       while (pl011_readw(uap, REG_FR) & UART01x_FR_TXFF)
+>>>                 ;
+>>> -       writeb(c, port->membase + REG_DR);
+>>> -       while (readl(port->membase + REG_FR) & UART01x_FR_BUSY)
+>>> +       pl011_writeb(uap, c, REG_DR);
+>>> +       while (pl011_readw(uap, REG_FR) & UART01x_FR_BUSY)
+>>>                 ;
+>>>  }
 >>
->> "M:" means "Mail patches to" and "S:" means "Status" so what
->> get_maintainers.pl is reports the person in "M:" printing the status
->> of the file(s).
+>> Just for the records, as this has been discussed before: pl011_putc() is
+>> called by the earlycon code, before the uart_port is actually
+>> initialized. So we cannot rely on the accessors, but have to use the
+>> old-fashioned director accessors for this.
 >>
->> So for example if the file has "S: Supported" then the person listed
->> in "M:" is shown as "supporter" while if the status is "S:
->> Maintained", the person is listed as "maintainer".
->>
->> There isn't a "Reviewed" status to specify files that are looked by
->> "Designated reviewers", it can be added but I don't see the reason of
->> it.
->
-> Not sure why you wrote all of this.  We know *why* get_maintainer.pl
-> does what it does.  What I'm saying is, that I personally believe this
-> is the wrong behaviour in what I'm *guessing* is the majority of the
-> time.
->
+>> Which means you cannot use that approach to get earlycon support for the
+>> ZTE UART, if I get this correctly. It shouldn't be to hard to introduce
+>> another earlycon type specificly for that one, copying pl011_early_write
+>> and pl011_early_console_setup and changing pl011_putc into
+>> zte_uart_putc. But of course this belongs into the final patch (or a
+>> separate one), not in this. So I guess you just leave that function
+>> unchanged in this patch.
+> 
+> How about something like this?  It adds the "sbsa32" option to the
+> earlycon command-line parameter.
+> 
+> static void pl011_putc(struct uart_port *port, int c)
+> {
+>     while (readl(port->membase + UART01x_FR) & UART01x_FR_TXFF)
+>         cpu_relax();
+>     writeb(c, port->membase + UART01x_DR);
+>     while (readl(port->membase + UART01x_FR) & UART01x_FR_BUSY)
+>         cpu_relax();
+> }
+> 
+> static void pl011_early_write(struct console *con, const char *s, unsigned n)
+> {
+>     struct earlycon_device *dev = con->data;
+> 
+>     uart_console_write(&dev->port, s, n, pl011_putc);
+> }
+> 
+> static void pl011_putc_sbsa32(struct uart_port *port, int c)
+> {
+>     while (readl(port->membase + UART01x_FR) & UART01x_FR_TXFF)
+>         cpu_relax();
+>     writel(c, port->membase + UART01x_DR);
+>     while (readl(port->membase + UART01x_FR) & UART01x_FR_BUSY)
+>         cpu_relax();
+> }
+> 
+> static void pl011_early_write_sbsa32(struct console *con, const char
+> *s, unsigned n)
+> {
+>     struct earlycon_device *dev = con->data;
+> 
+>     uart_console_write(&dev->port, s, n, pl011_putc_sbsa32);
+> }
+> 
+> static int __init pl011_early_console_setup(struct earlycon_device *device,
+>                         const char *opt)
+> {
+>     if (!device->port.membase)
+>         return -ENODEV;
+> 
+>     if (strcmp(device->options, "sbsa32"))
+>         device->con->write = pl011_early_write_sbsa32;
+>     else
+>         device->con->write = pl011_early_write;
+> 
+>     return 0;
+> }
 
-Ok sorry if it was clear to you already.
 
->> > Maintainer, which (given that there are over 1000 unique M: entries
->> > and I know that there are no where near that many actual Maintainers)
->> > means that it's printing out incorrect information most of the time.
->>
->> Well, that's correct according to your definition of maintainer
->> (people with a tree that sends pull requests) but I can believe that
->> there are 1K unique maintainers for different small components
->> (without taking into account what components may be obsolete / not
->> used anymore) even if these maintainers don't send pull request
->> because the patch load is low and rely on subsystem maintainers to
->> pick directly from the list with their Acks.
->
-> Then they are not Maintainers.  They are Reviewers who rely on
-> Maintainers.  In your example above it's the Maintainers that are
-> Maintainers and the people who review the code are Reviewers.  The
-> clues are in the words. ;)
->
+For earlycon support, I'd prefer to see different OF_EARLYCON_DECLARE()
+(and EARLYCON_DECLARE()) declarations with alternate setup() functions
+for zte and sbsa32. For example:
 
-They are not maintainers according to your definition of maintainer
-that doesn't seem what most people agree with.
+static int __init zte_early_console_setup(struct earlycon_device *device,
+	const char *opt)
+{
+	if (!device->port.membase)
+		return -ENODEV;
+	device->con->write = zte_early_write;
+	return 0;
+}
 
->> For me the maintainer is that a) cares about the file and makes sure
->> that things remain working, fix issues, reviews patches from others,
->> etc b) is someone that actually understand the code in the files. A
->> subsystem maintainer has the last word of what gets merged into the
->> subsystem but may not be familiar with code under the subsystem and
->> relies on the file / driver maintainer to Ack the patch as correct
->> since that person is the one that knows the code.
->
-> Then what is a Reviewer?
->
+static int __init sbsa32_early_console_setup(struct earlycon_device *device,
+	const char *opt)
+{
+	if (!device->port.membase)
+		return -ENODEV;
+	device->con->write = sbsa32_early_write;
+	return 0;
+}
 
-As I mentioned before, I think a reviewer is someone who is interested
-in a given file / driver / subsystem and reviews patches to the list
-but does not have an authoritative answer on that file. I gave as an
-example that I review patches posted for Exynos SoC support although
-I'm not mentioned in MAINTAINERS and I don't plan it to be. People
-don't know that I'm interested in that and don't cc me, I just review
-what is posted to the linux-samsung-soc ML.
+EARLYCON_DECLARE(zte, zte_early_console_setup);
+OF_EARLYCON_DECLARE(zte, ".......", zte_early_console_setup);
+EARLYCON_DECLARE(sbsa32, sbsa32_early_console_setup);
+OF_EARLYCON_DECLARE(sbsa32, "arm,sbsa-uart", sbsa32_early_console_setup);
 
-A designated reviewer is someone that is mentioned in the MAINTAINERS
-file so people know that this person is interested and will add
-him/her as cc. So designated reviewers are expected to review more
-patches, be more available, etc and it seems the idea is that they can
-become maintainers in the future if there is some need for it.
+The above assumes that the sbsa32 maintains the equivalence of
+earlycon and console; ie., that 
 
->> > So back to my original thought then, what can we do to rectify this
->> > situation and make the information printed more meaningful.  Again,
->> > I'm back to using the R: tag appropriately.
->> >
->> > Any (technical, which aren't based on "but I really want to be listed
->> > as a Maintainer") thoughts?
->> >
->>
->> I haven't read a "but I really want to be listed as a maintainer"
->> thought in this thread.
->
-> If you had no vested interest in this, you would be able to see the
-> logic in what I'm saying.  Again I'm *guess*, but I think there is
-> some emotional reasons for you pushing back so hard.  I could always
-> be wrong though.
->
+/ {
+	chosen {
+		stdout-path = &uart0;
+	};
 
-Oh, I have no personal interest. I'm not even listed as a maintainer /
-reviewer for anything that is MFD related and I do understand your
-point is just that I don't agree. The fact that we disagree doesn't
-mean that you are right and I'm wrong.
+	soc {
+		uart0: serial at xxxxxx {
+			compatible = "arm,sbsa-uart";
+		};
+	};
+};
 
-So if anything I think this thread is more about "but I really don't
-want people without a tree to be listed as a Maintainer".
 
-What I do care is about consistency across different subystems since
-the kernel development process is already complicated and there are
-already differences in the workflow of the maintainers so people
-contributing to many subsystems have to first do some research to
-learn all the unwritten rules and conventions of a given susbystem and
-subsystem maintainer before posting patches.
+will start a sbsa32 earlycon and later replace that with
+sbsa console.
 
-That's why adding the semantics of maintainers and reviewers to the
-mix of things to keep in mind is not something that thrills me.
 
->> I think the problem is the definition of what a maintainer in Linux
->> really means. For you is someone that keeps a tree and sends pull
->> request (for me that is what I call a subsystem maintainer)
->
-> Right.  A Level 3 Maintainer sends pull-requests to a Level 2
-> Maintainer, who sends pull-requests to a Level 1 Maintainer, who sends
-> pull-requests to Linus.  Maintainers at *all* levels collect patches
-> and Maintain them before sending on.
->
-
-Here is where we disagree (and it seems is not only me), someone who
-acks patches posted to some files even if those are later picked for
-someone higher in the maintenance hierarchy could be named maintainers
-as well since they "own" those files and their answer should be
-authoritative (no matter how the patches end into mainline).
-
-At the end of the day is to make easier for developers to understand
-who are the interested parties for a given change. It is much easier
-to think in terms of different levels of maintainers that should be
-copied so they can review and possibly people outside of that group if
-they are subscribed to the mailing lists. Naming the first levels
-reviewers makes no sense for me since it will only confuse new comers
-IMHO.
-
-> reiterate:
->
-> Reviewers care about particular driver(s)/domain(s) that they know
-> well.  They provide solid reviews and possible testing (because they
-> are likely to have the h/w).  They then provide Acked-by:s so that a
-> Maintainer can collect the patch.
->
->> while for
->> others it seems that maintainer means someone who care about a set of
->> files, knows the code, makes sure that things keep working and Ack
->> patches to those files when posted.
->
->         goto reiterate;   ;)
->
-
-No need for that, I already explained my point of view several times
-and you just think I'm wrong because I don't agree with you. So let's
-just agree on disagree ;-)
-
-Best regards,
-Javier
+Regards,
+Peter Hurley
