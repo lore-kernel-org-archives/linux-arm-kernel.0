@@ -1,31 +1,68 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 28 Oct 2015 19:09:49 +0000
-Subject: [PATCH] arm64: Increase the max granular size
-In-Reply-To: <1442944788-17254-1-git-send-email-rric@kernel.org>
-References: <1442944788-17254-1-git-send-email-rric@kernel.org>
-Message-ID: <20151028190948.GJ8899@e104818-lin.cambridge.arm.com>
+From: hauke@hauke-m.de (Hauke Mehrtens)
+Date: Wed, 28 Oct 2015 20:10:47 +0100
+Subject: [PATCH 3/3] ARM: BCM: Add SMP support for Broadcom NSP
+In-Reply-To: <5630DA81.4030301@broadcom.com>
+References: <1444844820-24290-1-git-send-email-kapilh@broadcom.com>
+ <1444844820-24290-4-git-send-email-kapilh@broadcom.com>
+ <561ED691.8080407@hauke-m.de> <561FD005.3040900@broadcom.com>
+ <562016A9.7050208@hauke-m.de> <20151015211703.GQ32089@broadcom.com>
+ <5630DA81.4030301@broadcom.com>
+Message-ID: <56311DB7.5000905@hauke-m.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 22, 2015 at 07:59:48PM +0200, Robert Richter wrote:
-> From: Tirumalesh Chalamarla <tchalamarla@cavium.com>
+On 10/28/2015 03:24 PM, Kapil Hali wrote:
 > 
-> Increase the standard cacheline size to avoid having locks in the same
-> cacheline.
 > 
-> Cavium's ThunderX core implements cache lines of 128 byte size. With
-> current granulare size of 64 bytes (L1_CACHE_SHIFT=6) two locks could
-> share the same cache line leading a performance degradation.
-> Increasing the size fixes that.
+> On 10/16/2015 2:47 AM, Jon Mason wrote:
+>> On Thu, Oct 15, 2015 at 11:12:09PM +0200, Hauke Mehrtens wrote:
+>>> On 10/15/2015 06:10 PM, Kapil Hali wrote:
+>>>>
+>>>>
+>>>> On 10/15/2015 3:56 AM, Hauke Mehrtens wrote:
+>>>>> On 10/14/2015 07:47 PM, Kapil Hali wrote:
+>>>>>> Add SMP support for Broadcom's Northstar Plus SoC,
+>>>>>> cpu enable method and pen_release procedures. This
+>>>>>> changes also consolidates iProc family's - BCM NSP
+>>>>>> and BCM Kona, SMP handling in a common file.
+>>>>>
+>>>>> This will probably also work on normal Northstar CPUs without changes.
+>>>>>
+>>>> I think, it should work for most of the variants of Northstar family, 
+>>>> except for those which have a BOOTROM bug.
+>>>
+>>> Which SoC are affected by this BOOTROM bug?
+>>
+>> 53012 is the one I am seeing.  Not seeing it on 4708 (and assuming it is
+>> not present on 4709).  Internally, we do the ugly bug workaround on
+>> all Northstar SoCs.  The workaround is not acceptable upstream, so I
+>> am not pushing it. :)
+>>
+>> Thanks,
+>> Jon
+>>
 > 
-> Increasing the size has no negative impact to cache invalidation on
-> systems with a smaller cache line. There is an impact on memory usage,
-> but that's not too important for arm64 use cases.
+> Hi Hauke,
 > 
-> Signed-off-by: Tirumalesh Chalamarla <tchalamarla@cavium.com>
-> Signed-off-by: Robert Richter <rrichter@cavium.com>
+> Now that you have tested Jon's patch which is based on my changes for
+> SMP, shall I take his changes and add it on top of my changes and resend?
+> Also, do I consider your Acked-by and Tested-by for the change?
+> 
+> Thanks,
+> Kapil
+> 
 
-Applied. Thanks.
+Hi Kapil,
 
--- 
-Catalin
+I tested this on Northstar 1.
+
+Acked-by: Hauke Mehrtens <hauke@hauke-m.de>
+Tested-by: Hauke Mehrtens <hauke@hauke-m.de>
+
+I think Florian has to take the patches and you should hurry up because
+the merge window probably opens on Monday.
+
+You can send all patches again with the bcm501x patch or just that one,
+I assume there are no changes needed for the other patches?
+
+Hauke
