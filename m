@@ -1,55 +1,202 @@
-From: peter@hurleysoftware.com (Peter Hurley)
-Date: Wed, 28 Oct 2015 11:08:49 -0400
-Subject: [PATCH v13 2/5] uart: pl011: Introduce register accessor
-In-Reply-To: <5630E0F7.9080705@codeaurora.org>
-References: <1438328959-16177-1-git-send-email-jun.nie@linaro.org>
- <1438328959-16177-3-git-send-email-jun.nie@linaro.org>
- <55FBECCD.2080906@arm.com>
- <CAOZdJXUZDTzEn4f4FGhmKfq7HeEFKPKp4BAbR6_=wXGVw5_0GQ@mail.gmail.com>
- <5630DA2A.4050803@hurleysoftware.com> <5630E0F7.9080705@codeaurora.org>
-Message-ID: <5630E501.7070506@hurleysoftware.com>
+From: drew.richardson@arm.com (Drew Richardson)
+Date: Wed, 28 Oct 2015 08:10:15 -0700
+Subject: [PATCH 1/2] arm: perf: Convert event enums to #defines
+In-Reply-To: <20151028150758.GA12239@dreric01-gentoo.localdomain>
+References: <20151028150758.GA12239@dreric01-gentoo.localdomain>
+Message-ID: <20151028151014.GC12239@dreric01-gentoo.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/28/2015 10:51 AM, Timur Tabi wrote:
-> On 10/28/2015 09:22 AM, Peter Hurley wrote:
->> EARLYCON_DECLARE(zte, zte_early_console_setup);
->> OF_EARLYCON_DECLARE(zte, ".......", zte_early_console_setup);
->> EARLYCON_DECLARE(sbsa32, sbsa32_early_console_setup);
->> OF_EARLYCON_DECLARE(sbsa32, "arm,sbsa-uart", sbsa32_early_console_setup);
->>
->> The above assumes that the sbsa32 maintains the equivalence of
->> earlycon and console; ie., that
->>
->> / {
->>     chosen {
->>         stdout-path = &uart0;
->>     };
->>
->>     soc {
->>         uart0: serial at xxxxxx {
->>             compatible = "arm,sbsa-uart";
->>         };
->>     };
->> };
->>
->>
->> will start a sbsa32 earlycon and later replace that with
->> sbsa console.
-> 
-> I never really understood the device tree support for SBSA. The "S" stands for Server, and ARM Server systems are supposed to use ACPI. It's easy to add special cases via device tree, because of its flexibility.
+Add additional information about the ARM architected hardware events
+to make counters self describing. This makes the hardware PMUs easier
+to use as perf list contains possible events instead of users having
+to refer to documentation like the ARM TRMs.
 
-Agreed.
+Signed-off-by: Drew Richardson <drew.richardson@arm.com>
+---
+ arch/arm/kernel/perf_event_v7.c | 121 ++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 121 insertions(+)
 
-> ACPI is much more difficult, and that's why I used the command-line approach.
-
-Understood.
-
-> Anyway, I found this alternate patch from Lief Lindholm that implements this idea better, although it needs work:
-> 
-> https://patches.linaro.org/53265/
-
-Yeah, I saw those, but I'm waiting for v2 to review.
-
-Regards,
-Peter Hurley
+diff --git a/arch/arm/kernel/perf_event_v7.c b/arch/arm/kernel/perf_event_v7.c
+index dc979724e3bb..970e1364e484 100644
+--- a/arch/arm/kernel/perf_event_v7.c
++++ b/arch/arm/kernel/perf_event_v7.c
+@@ -531,6 +531,120 @@ static const unsigned scorpion_perf_cache_map[PERF_COUNT_HW_CACHE_MAX]
+ 	[C(BPU)][C(OP_WRITE)][C(RESULT_MISS)] = ARMV7_PERFCTR_PC_BRANCH_MIS_PRED,
+ };
+ 
++#define ARMV7_EVENT_ATTR_RESOLVE(m) #m
++#define ARMV7_EVENT_ATTR(name, config) \
++	PMU_EVENT_ATTR_STRING(name, armv7_event_attr_##name, \
++			      "event=" ARMV7_EVENT_ATTR_RESOLVE(config))
++
++ARMV7_EVENT_ATTR(sw_incr, ARMV7_PERFCTR_PMNC_SW_INCR);
++ARMV7_EVENT_ATTR(l1i_cache_refill, ARMV7_PERFCTR_L1_ICACHE_REFILL);
++ARMV7_EVENT_ATTR(l1i_tlb_refill, ARMV7_PERFCTR_ITLB_REFILL);
++ARMV7_EVENT_ATTR(l1d_cache_refill, ARMV7_PERFCTR_L1_DCACHE_REFILL);
++ARMV7_EVENT_ATTR(l1d_cache, ARMV7_PERFCTR_L1_DCACHE_ACCESS);
++ARMV7_EVENT_ATTR(l1d_tlb_refill, ARMV7_PERFCTR_DTLB_REFILL);
++ARMV7_EVENT_ATTR(ld_retired, ARMV7_PERFCTR_MEM_READ);
++ARMV7_EVENT_ATTR(st_retired, ARMV7_PERFCTR_MEM_WRITE);
++ARMV7_EVENT_ATTR(inst_retired, ARMV7_PERFCTR_INSTR_EXECUTED);
++ARMV7_EVENT_ATTR(exc_taken, ARMV7_PERFCTR_EXC_TAKEN);
++ARMV7_EVENT_ATTR(exc_return, ARMV7_PERFCTR_EXC_EXECUTED);
++ARMV7_EVENT_ATTR(cid_write_retired, ARMV7_PERFCTR_CID_WRITE);
++ARMV7_EVENT_ATTR(pc_write_retired, ARMV7_PERFCTR_PC_WRITE);
++ARMV7_EVENT_ATTR(br_immed_retired, ARMV7_PERFCTR_PC_IMM_BRANCH);
++ARMV7_EVENT_ATTR(br_return_retired, ARMV7_PERFCTR_PC_PROC_RETURN);
++ARMV7_EVENT_ATTR(unaligned_ldst_retired, ARMV7_PERFCTR_MEM_UNALIGNED_ACCESS);
++ARMV7_EVENT_ATTR(br_mis_pred, ARMV7_PERFCTR_PC_BRANCH_MIS_PRED);
++ARMV7_EVENT_ATTR(cpu_cycles, ARMV7_PERFCTR_CLOCK_CYCLES);
++ARMV7_EVENT_ATTR(br_pred, ARMV7_PERFCTR_PC_BRANCH_PRED);
++
++static struct attribute *armv7_pmuv1_event_attrs[] = {
++	&armv7_event_attr_sw_incr.attr.attr,
++	&armv7_event_attr_l1i_cache_refill.attr.attr,
++	&armv7_event_attr_l1i_tlb_refill.attr.attr,
++	&armv7_event_attr_l1d_cache_refill.attr.attr,
++	&armv7_event_attr_l1d_cache.attr.attr,
++	&armv7_event_attr_l1d_tlb_refill.attr.attr,
++	&armv7_event_attr_ld_retired.attr.attr,
++	&armv7_event_attr_st_retired.attr.attr,
++	&armv7_event_attr_inst_retired.attr.attr,
++	&armv7_event_attr_exc_taken.attr.attr,
++	&armv7_event_attr_exc_return.attr.attr,
++	&armv7_event_attr_cid_write_retired.attr.attr,
++	&armv7_event_attr_pc_write_retired.attr.attr,
++	&armv7_event_attr_br_immed_retired.attr.attr,
++	&armv7_event_attr_br_return_retired.attr.attr,
++	&armv7_event_attr_unaligned_ldst_retired.attr.attr,
++	&armv7_event_attr_br_mis_pred.attr.attr,
++	&armv7_event_attr_cpu_cycles.attr.attr,
++	&armv7_event_attr_br_pred.attr.attr,
++	NULL
++};
++
++static struct attribute_group armv7_pmuv1_events_attr_group = {
++	.name = "events",
++	.attrs = armv7_pmuv1_event_attrs,
++};
++
++static const struct attribute_group *armv7_pmuv1_attr_groups[] = {
++	&armv7_pmuv1_events_attr_group,
++	NULL
++};
++
++ARMV7_EVENT_ATTR(mem_access, ARMV7_PERFCTR_MEM_ACCESS);
++ARMV7_EVENT_ATTR(l1i_cache, ARMV7_PERFCTR_L1_ICACHE_ACCESS);
++ARMV7_EVENT_ATTR(l1d_cache_wb, ARMV7_PERFCTR_L1_DCACHE_WB);
++ARMV7_EVENT_ATTR(l2d_cache, ARMV7_PERFCTR_L2_CACHE_ACCESS);
++ARMV7_EVENT_ATTR(l2d_cache_refill, ARMV7_PERFCTR_L2_CACHE_REFILL);
++ARMV7_EVENT_ATTR(l2d_cache_wb, ARMV7_PERFCTR_L2_CACHE_WB);
++ARMV7_EVENT_ATTR(bus_access, ARMV7_PERFCTR_BUS_ACCESS);
++ARMV7_EVENT_ATTR(memory_error, ARMV7_PERFCTR_MEM_ERROR);
++ARMV7_EVENT_ATTR(inst_spec, ARMV7_PERFCTR_INSTR_SPEC);
++ARMV7_EVENT_ATTR(ttbr_write_retired, ARMV7_PERFCTR_TTBR_WRITE);
++ARMV7_EVENT_ATTR(bus_cycles, ARMV7_PERFCTR_BUS_CYCLES);
++
++static struct attribute *armv7_pmuv2_event_attrs[] = {
++	&armv7_event_attr_sw_incr.attr.attr,
++	&armv7_event_attr_l1i_cache_refill.attr.attr,
++	&armv7_event_attr_l1i_tlb_refill.attr.attr,
++	&armv7_event_attr_l1d_cache_refill.attr.attr,
++	&armv7_event_attr_l1d_cache.attr.attr,
++	&armv7_event_attr_l1d_tlb_refill.attr.attr,
++	&armv7_event_attr_ld_retired.attr.attr,
++	&armv7_event_attr_st_retired.attr.attr,
++	&armv7_event_attr_inst_retired.attr.attr,
++	&armv7_event_attr_exc_taken.attr.attr,
++	&armv7_event_attr_exc_return.attr.attr,
++	&armv7_event_attr_cid_write_retired.attr.attr,
++	&armv7_event_attr_pc_write_retired.attr.attr,
++	&armv7_event_attr_br_immed_retired.attr.attr,
++	&armv7_event_attr_br_return_retired.attr.attr,
++	&armv7_event_attr_unaligned_ldst_retired.attr.attr,
++	&armv7_event_attr_br_mis_pred.attr.attr,
++	&armv7_event_attr_cpu_cycles.attr.attr,
++	&armv7_event_attr_br_pred.attr.attr,
++	&armv7_event_attr_mem_access.attr.attr,
++	&armv7_event_attr_l1i_cache.attr.attr,
++	&armv7_event_attr_l1d_cache_wb.attr.attr,
++	&armv7_event_attr_l2d_cache.attr.attr,
++	&armv7_event_attr_l2d_cache_refill.attr.attr,
++	&armv7_event_attr_l2d_cache_wb.attr.attr,
++	&armv7_event_attr_bus_access.attr.attr,
++	&armv7_event_attr_memory_error.attr.attr,
++	&armv7_event_attr_inst_spec.attr.attr,
++	&armv7_event_attr_ttbr_write_retired.attr.attr,
++	&armv7_event_attr_bus_cycles.attr.attr,
++	NULL
++};
++
++static struct attribute_group armv7_pmuv2_events_attr_group = {
++	.name = "events",
++	.attrs = armv7_pmuv2_event_attrs,
++};
++
++static const struct attribute_group *armv7_pmuv2_attr_groups[] = {
++	&armv7_pmuv2_events_attr_group,
++	NULL
++};
++
+ /*
+  * Perf Events' indices
+  */
+@@ -1069,6 +1183,7 @@ static int armv7_a8_pmu_init(struct arm_pmu *cpu_pmu)
+ 	armv7pmu_init(cpu_pmu);
+ 	cpu_pmu->name		= "armv7_cortex_a8";
+ 	cpu_pmu->map_event	= armv7_a8_map_event;
++	cpu_pmu->pmu.attr_groups = armv7_pmuv1_attr_groups;
+ 	return armv7_probe_num_events(cpu_pmu);
+ }
+ 
+@@ -1077,6 +1192,7 @@ static int armv7_a9_pmu_init(struct arm_pmu *cpu_pmu)
+ 	armv7pmu_init(cpu_pmu);
+ 	cpu_pmu->name		= "armv7_cortex_a9";
+ 	cpu_pmu->map_event	= armv7_a9_map_event;
++	cpu_pmu->pmu.attr_groups = armv7_pmuv1_attr_groups;
+ 	return armv7_probe_num_events(cpu_pmu);
+ }
+ 
+@@ -1085,6 +1201,7 @@ static int armv7_a5_pmu_init(struct arm_pmu *cpu_pmu)
+ 	armv7pmu_init(cpu_pmu);
+ 	cpu_pmu->name		= "armv7_cortex_a5";
+ 	cpu_pmu->map_event	= armv7_a5_map_event;
++	cpu_pmu->pmu.attr_groups = armv7_pmuv1_attr_groups;
+ 	return armv7_probe_num_events(cpu_pmu);
+ }
+ 
+@@ -1094,6 +1211,7 @@ static int armv7_a15_pmu_init(struct arm_pmu *cpu_pmu)
+ 	cpu_pmu->name		= "armv7_cortex_a15";
+ 	cpu_pmu->map_event	= armv7_a15_map_event;
+ 	cpu_pmu->set_event_filter = armv7pmu_set_event_filter;
++	cpu_pmu->pmu.attr_groups = armv7_pmuv2_attr_groups;
+ 	return armv7_probe_num_events(cpu_pmu);
+ }
+ 
+@@ -1103,6 +1221,7 @@ static int armv7_a7_pmu_init(struct arm_pmu *cpu_pmu)
+ 	cpu_pmu->name		= "armv7_cortex_a7";
+ 	cpu_pmu->map_event	= armv7_a7_map_event;
+ 	cpu_pmu->set_event_filter = armv7pmu_set_event_filter;
++	cpu_pmu->pmu.attr_groups = armv7_pmuv2_attr_groups;
+ 	return armv7_probe_num_events(cpu_pmu);
+ }
+ 
+@@ -1112,6 +1231,7 @@ static int armv7_a12_pmu_init(struct arm_pmu *cpu_pmu)
+ 	cpu_pmu->name		= "armv7_cortex_a12";
+ 	cpu_pmu->map_event	= armv7_a12_map_event;
+ 	cpu_pmu->set_event_filter = armv7pmu_set_event_filter;
++	cpu_pmu->pmu.attr_groups = armv7_pmuv2_attr_groups;
+ 	return armv7_probe_num_events(cpu_pmu);
+ }
+ 
+@@ -1119,6 +1239,7 @@ static int armv7_a17_pmu_init(struct arm_pmu *cpu_pmu)
+ {
+ 	int ret = armv7_a12_pmu_init(cpu_pmu);
+ 	cpu_pmu->name = "armv7_cortex_a17";
++	cpu_pmu->pmu.attr_groups = armv7_pmuv2_attr_groups;
+ 	return ret;
+ }
+ 
+-- 
+2.5.0
