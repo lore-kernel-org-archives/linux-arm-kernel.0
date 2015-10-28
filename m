@@ -1,41 +1,25 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 28 Oct 2015 11:12:47 +0900
-Subject: [PATCH v2 1/4] ARM: dts: Add SROMc to Exynos 5410
-In-Reply-To: <91ae80f172192fa4dbc8bf8ee5a9068661592de6.1445935215.git.p.fedin@samsung.com>
-References: <cover.1445935215.git.p.fedin@samsung.com>
- <91ae80f172192fa4dbc8bf8ee5a9068661592de6.1445935215.git.p.fedin@samsung.com>
-Message-ID: <56302F1F.5090206@samsung.com>
+From: timur@codeaurora.org (Timur Tabi)
+Date: Tue, 27 Oct 2015 21:13:22 -0500
+Subject: [PATCH] arm64: efi: make sure vmlinux load address aligned on
+ 2MBytes
+In-Reply-To: <CAKv+Gu9t=dGoaVem+h11cXfimpEzmte36_j4tKW_h8rA8c1jBg@mail.gmail.com>
+References: <1445981041-8774-1-git-send-email-timur@codeaurora.org>
+ <CAKv+Gu_ivkemFva-Fu0E24mQqE-m0jPWBzo5OZAr7cyM08hqug@mail.gmail.com>
+ <56302E7C.7000605@codeaurora.org>
+ <CAKv+Gu9t=dGoaVem+h11cXfimpEzmte36_j4tKW_h8rA8c1jBg@mail.gmail.com>
+Message-ID: <56302F42.4040408@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27.10.2015 17:43, Pavel Fedin wrote:
-> This machine uses own SoC device tree file, add missing part.
-> 
-> Signed-off-by: Pavel Fedin <p.fedin@samsung.com>
-> ---
->  arch/arm/boot/dts/exynos5410.dtsi | 5 +++++
->  1 file changed, 5 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/exynos5410.dtsi b/arch/arm/boot/dts/exynos5410.dtsi
-> index 4603356..af85aad 100644
-> --- a/arch/arm/boot/dts/exynos5410.dtsi
-> +++ b/arch/arm/boot/dts/exynos5410.dtsi
-> @@ -101,6 +101,11 @@
->  			reg = <0x10000000 0x100>;
->  		};
->  
-> +		sromc: sromc at 12250000 {
-> +			compatible = "samsung,exynos-srom";
-> +			reg = <0x12250000 0x10>;
+Ard Biesheuvel wrote:
+> No. I screwed up the patch since the trailing ) should not be there,
+> but we do need to round first, and only then add the offset.
 
-Isn't 0x10 too small (SROM_BC3 won't be mapped)?
+But if the offset is not a multiple of 2MB, won't the address passed to 
+allocate_pages be unaligned?  I'll test your patch on our system, but I 
+thought the problem was that the allocated address must be aligned.
 
-Best regards,
-Krzysztof
-
-> +		};
-> +
->  		pmu_system_controller: system-controller at 10040000 {
->  			compatible = "samsung,exynos5410-pmu", "syscon";
->  			reg = <0x10040000 0x5000>;
-> 
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the
+Code Aurora Forum, hosted by The Linux Foundation.
