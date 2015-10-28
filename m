@@ -1,94 +1,56 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Tue, 27 Oct 2015 17:34:42 -0700
-Subject: [PATCH] clk: iproc: Make clocks visible options
-In-Reply-To: <1445541913-25066-1-git-send-email-jonmason@broadcom.com>
-References: <1445541913-25066-1-git-send-email-jonmason@broadcom.com>
-Message-ID: <20151028003442.GU19782@codeaurora.org>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Tue, 27 Oct 2015 17:39:35 -0700
+Subject: [PATCH v3 2/2] arm64: dts: Add BRCM IPROC NAND DT node for NS2
+In-Reply-To: <563015FC.9040006@broadcom.com>
+References: <1445577373-21252-1-git-send-email-anup.patel@broadcom.com>
+ <1445577373-21252-3-git-send-email-anup.patel@broadcom.com>
+ <20151028001920.GY13239@google.com> <563015FC.9040006@broadcom.com>
+Message-ID: <20151028003935.GZ13239@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The thread didn't seem to finish, so here's some review.
+On Tue, Oct 27, 2015 at 05:25:32PM -0700, Ray Jui wrote:
+> On 10/27/2015 5:19 PM, Brian Norris wrote:
+> >On Fri, Oct 23, 2015 at 10:46:13AM +0530, Anup Patel wrote:
+> >>diff --git a/arch/arm64/boot/dts/broadcom/ns2.dtsi b/arch/arm64/boot/dts/broadcom/ns2.dtsi
+> >>index f603277..9610822 100644
+> >>--- a/arch/arm64/boot/dts/broadcom/ns2.dtsi
+> >>+++ b/arch/arm64/boot/dts/broadcom/ns2.dtsi
+> >>@@ -212,5 +212,19 @@
+> >>  			compatible = "brcm,iproc-rng200";
+> >>  			reg = <0x66220000 0x28>;
+> >>  		};
+> >>+
+> >>+		nand: nand at 66460000 {
+> >>+			compatible = "brcm,nand-iproc", "brcm,brcmnand-v6.1";
+> >
+> >Technically, the binding says you should also have "brcm,brcmnand" as a
+> >last resort. Otherwise (for the NAND parts):
+> >
+> 
+> I believe Anup was seeing issues when both "brcm,nand-iproc" and
+> "brcm,brcmnand" are present.
+> 
+> Note "brcm,nand-iproc" invokes 'iproc_nand_probe', which calls
+> 'brcmnand_probe' in the end.
+> 
+> "brcm,brcmnand" invokes 'brcmstb_nand_probe', which also calls
+> 'brcmstb_probe', but without all the prep configuration required for
+> "brcm,nand-iproc".
 
-On 10/22, Jon Mason wrote:
-> diff --git a/drivers/clk/bcm/Kconfig b/drivers/clk/bcm/Kconfig
-> index 46ee475..0352ccf 100644
-> --- a/drivers/clk/bcm/Kconfig
-> +++ b/drivers/clk/bcm/Kconfig
-> @@ -9,8 +9,41 @@ config CLK_BCM_KONA
->  	  in the BCM281xx and BCM21664 families.
->  
->  config COMMON_CLK_IPROC
-> -	bool
-> +	bool "Broadcom iProc clock support"
-> +	depends on ARCH_BCM_IPROC
+Ah, I forgot about that problem. That seems like an OF infrastructure
+issue that could be fixed. We could lump these drivers back together,
+and make sure that "brcm,nand-iproc" gets the priority in the
+of_device_id list.
 
-Plus || COMPILE_TEST?
+Or we could just relax the DT binding.
 
->  	depends on COMMON_CLK
-> +	default ARCH_BCM_IPROC
->  	help
->  	  Enable common clock framework support for Broadcom SoCs
->  	  based on the iProc architecture
+But wait, wouldn't cygnus already have that problem? You're using the
+binding I suggested in arch/arm/boot/dts/bcm-cygnus.dtsi.
 
-It's nice that we're grouping the different platforms under one
-umbrella config for the iProc architecture. That way we don't
-have to see it unless we're targeting the platform. We should
-probably do something similar for kona too in case anyone cares
-about code bloat there.
+Oh, and I see we hacked this one in drivers/mtd/nand/brcmnand/Makefile:
 
-> +
-> +if COMMON_CLK_IPROC
-> +
-> +comment "Broadcom iProc clocks"
+  # link order matters; don't link the more generic brcmstb_nand.o before the
+  # more specific iproc_nand.o, for instance
 
-Please remove this comment block and drop the depends on
-COMMON_CLK_IPROC in the configs below. The if section will keep
-things properly indented and avoid duplicating that depends on
-statement. Plus the comment pretty much duplicates what is
-already in the help for COMMON_CLK_IPROC.
-
-We can make COMMON_CLK_IPROC into a hidden option and introduce a
-new grouping config if we really care about that case where the
-base support is built but there aren't any users. I'd rather not
-care though to simplify things.
-
-> +
-> +config CLK_BCM_CYGNUS
-> +	bool "Broadcom Cygnus clock support"
-> +	depends on COMMON_CLK_IPROC
-> +	depends on ARCH_BCM_CYGNUS
-
-Plus || COMPILE_TEST?
-
-> +	default ARCH_BCM_CYGNUS
-> +	help
-> +	  Enable common clock framework support for the Broadcom Cygnus SoC
-> +
-> +config CLK_BCM_NSP
-> +	bool "Broadcom Northstar/Northstar Plus clock support"
-> +	depends on COMMON_CLK_IPROC
-> +	depends on ARCH_BCM_5301X || ARCH_BCM_NSP
-
-Plus || COMPILE_TEST?
-
-> +	default ARCH_BCM_5301X || ARCH_BCM_NSP
-> +	help
-> +	  Enable common clock framework support for the Broadcom Northstar and
-> +	  Northstar Plus SoCs
-> +
-> +config CLK_BCM_NS2
-> +	bool "Broadcom Northstar 2 clock support"
-> +	depends on ARM64
-
-Plus || COMPILE_TEST?
-
-> +	depends on COMMON_CLK_IPROC
-> +	default ARCH_BCM_IPROC
-> +	help
-> +	  Enable common clock framework support for the Broadcom Northstar 2 SoC
-> +
-> +endif
-
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Brian
