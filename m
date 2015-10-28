@@ -1,193 +1,29 @@
-From: ykk@rock-chips.com (Yakir Yang)
-Date: Wed, 28 Oct 2015 16:26:33 +0800
-Subject: [PATCH v8 06/17] dt-bindings: add document for analogix display port
- driver
-In-Reply-To: <1446020143-32645-1-git-send-email-ykk@rock-chips.com>
-References: <1446020143-32645-1-git-send-email-ykk@rock-chips.com>
-Message-ID: <1446020793-10532-1-git-send-email-ykk@rock-chips.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Wed, 28 Oct 2015 09:27:45 +0100
+Subject: [PATCH v12 7/7] MAINTAINERS: Add entry Renesas arm64 architecture
+In-Reply-To: <1445839312-8874-8-git-send-email-horms+renesas@verge.net.au>
+References: <1445839312-8874-1-git-send-email-horms+renesas@verge.net.au>
+ <1445839312-8874-8-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <CAMuHMdUe_HvBXH_7Rp9CDNGYeu3NSvR44kZrTh6MtfubUOBsYA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Analogix dp driver is split from exynos dp driver, so we just
-make an copy of exynos_dp.txt, and then simplify exynos_dp.txt
+On Mon, Oct 26, 2015 at 7:01 AM, Simon Horman
+<horms+renesas@verge.net.au> wrote:
+> Initial Renesas arm64 architecture support will be for the R-Car H3,
+> r8a7795, SoC and its Salvator-X board.
+>
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 
-Beside update some exynos dtsi file with the latest change
-according to the devicetree binding documents.
+Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Tested-by: Javier Martinez Canillas <javier@osg.samsung.com>
-Signed-off-by: Yakir Yang <ykk@rock-chips.com>
----
-Changes in v8:
-- Correct the right document path of display-timing.txt (Heiko)
-- Correct the misspell of 'from' to 'frm'. (Heiko)
+Gr{oetje,eeting}s,
 
-Changes in v7: None
-Changes in v6: None
-Changes in v5: None
-Changes in v4:
-- Split all DTS changes, and provide backward compatibility. Mark old
-  properties as deprecated but still support them. (Krzysztof)
-- Update "analogix,hpd-gpio" to "hpd-gpios" prop name. (Rob)
-- Deprecated some properties which could parsed from Edid/Mode/DPCD. (Thierry)
-    "analogix,color-space" & "analogix,color-depth"   &
-    "analogix,link-rate"   & "analogix,lane-count"    &
-    "analogix,ycbcr-coeff" & "analogix,dynamic-range" &
-    "vsync-active-high"    & "hsync-active-high"      & "interlaces"
+                        Geert
 
-Changes in v3:
-- Add devicetree binding documents. (Heiko)
-- Remove sync pol & colorimetry properies from the new analogix dp driver
-  devicetree binding. (Thierry)
-- Update the exist exynos dtsi file with the latest DP DT properies.
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
 
-Changes in v2: None
-
- .../bindings/display/bridge/analogix_dp.txt        | 50 +++++++++++++++++
- .../bindings/display/exynos/exynos_dp.txt          | 65 ++++++++--------------
- 2 files changed, 72 insertions(+), 43 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/display/bridge/analogix_dp.txt
-
-diff --git a/Documentation/devicetree/bindings/display/bridge/analogix_dp.txt b/Documentation/devicetree/bindings/display/bridge/analogix_dp.txt
-new file mode 100644
-index 0000000..7659a7a
---- /dev/null
-+++ b/Documentation/devicetree/bindings/display/bridge/analogix_dp.txt
-@@ -0,0 +1,50 @@
-+Analogix Display Port bridge bindings
-+
-+Required properties for dp-controller:
-+	-compatible:
-+		platform specific such as:
-+		 * "samsung,exynos5-dp"
-+		 * "rockchip,rk3288-dp"
-+	-reg:
-+		physical base address of the controller and length
-+		of memory mapped region.
-+	-interrupts:
-+		interrupt combiner values.
-+	-clocks:
-+		from common clock binding: handle to dp clock.
-+	-clock-names:
-+		from common clock binding: Shall be "dp".
-+	-interrupt-parent:
-+		phandle to Interrupt combiner node.
-+	-phys:
-+		from general PHY binding: the phandle for the PHY device.
-+	-phy-names:
-+		from general PHY binding: Should be "dp".
-+
-+Optional properties for dp-controller:
-+	-hpd-gpios:
-+		Hotplug detect GPIO.
-+		Indicates which GPIO should be used for hotplug detection
-+	-port@[X]: SoC specific port nodes with endpoint definitions as defined
-+		in Documentation/devicetree/bindings/media/video-interfaces.txt,
-+		please refer to the SoC specific binding document:
-+		* Documentation/devicetree/bindings/display/exynos/exynos_dp.txt
-+		* Documentation/devicetree/bindings/video/analogix_dp-rockchip.txt
-+
-+
-+[1]: Documentation/devicetree/bindings/media/video-interfaces.txt
-+-------------------------------------------------------------------------------
-+
-+Example:
-+
-+	dp-controller {
-+		compatible = "samsung,exynos5-dp";
-+		reg = <0x145b0000 0x10000>;
-+		interrupts = <10 3>;
-+		interrupt-parent = <&combiner>;
-+		clocks = <&clock 342>;
-+		clock-names = "dp";
-+
-+		phys = <&dp_phy>;
-+		phy-names = "dp";
-+	};
-diff --git a/Documentation/devicetree/bindings/display/exynos/exynos_dp.txt b/Documentation/devicetree/bindings/display/exynos/exynos_dp.txt
-index 7a3a9cd..9905081 100644
---- a/Documentation/devicetree/bindings/display/exynos/exynos_dp.txt
-+++ b/Documentation/devicetree/bindings/display/exynos/exynos_dp.txt
-@@ -31,45 +31,31 @@ Required properties for dp-controller:
- 		from general PHY binding: the phandle for the PHY device.
- 	-phy-names:
- 		from general PHY binding: Should be "dp".
--	-samsung,color-space:
--		input video data format.
--			COLOR_RGB = 0, COLOR_YCBCR422 = 1, COLOR_YCBCR444 = 2
--	-samsung,dynamic-range:
--		dynamic range for input video data.
--			VESA = 0, CEA = 1
--	-samsung,ycbcr-coeff:
--		YCbCr co-efficients for input video.
--			COLOR_YCBCR601 = 0, COLOR_YCBCR709 = 1
--	-samsung,color-depth:
--		number of bits per colour component.
--			COLOR_6 = 0, COLOR_8 = 1, COLOR_10 = 2, COLOR_12 = 3
--	-samsung,link-rate:
--		link rate supported by the panel.
--			LINK_RATE_1_62GBPS = 0x6, LINK_RATE_2_70GBPS = 0x0A
--	-samsung,lane-count:
--		number of lanes supported by the panel.
--			LANE_COUNT1 = 1, LANE_COUNT2 = 2, LANE_COUNT4 = 4
--	- display-timings: timings for the connected panel as described by
--		Documentation/devicetree/bindings/video/display-timing.txt
- 
- Optional properties for dp-controller:
--	-interlaced:
--		interlace scan mode.
--			Progressive if defined, Interlaced if not defined
--	-vsync-active-high:
--		VSYNC polarity configuration.
--			High if defined, Low if not defined
--	-hsync-active-high:
--		HSYNC polarity configuration.
--			High if defined, Low if not defined
--	-samsung,hpd-gpio:
--		Hotplug detect GPIO.
--			Indicates which GPIO should be used for hotplug
--			detection
--	-video interfaces: Device node can contain video interface port
--			    nodes according to [1].
-+	- display-timings: timings for the connected panel as described by
-+		Documentation/devicetree/bindings/display/panel/display-timing.txt
-+
-+For the below properties, please refer to Analogix DP binding document:
-+ * Documentation/devicetree/bindings/display/bridge/analogix_dp.txt
-+	-phys (required)
-+	-phy-names (required)
-+	-hpd-gpios (optional)
-+	-video interfaces (optional)
- 
--[1]: Documentation/devicetree/bindings/media/video-interfaces.txt
-+Deprecated properties for DisplayPort:
-+-interlaced:            deprecated prop that can parsed from drm_display_mode.
-+-vsync-active-high:     deprecated prop that can parsed from drm_display_mode.
-+-hsync-active-high:     deprecated prop that can parsed from drm_display_mode.
-+-samsung,ycbcr-coeff:   deprecated prop that can parsed from drm_display_mode.
-+-samsung,dynamic-range: deprecated prop that can parsed from drm_display_mode.
-+-samsung,color-space:   deprecated prop that can parsed from drm_display_info.
-+-samsung,color-depth:   deprecated prop that can parsed from drm_display_info.
-+-samsung,link-rate:     deprecated prop that can reading from monitor by dpcd method.
-+-samsung,lane-count:    deprecated prop that can reading from monitor by dpcd method.
-+-samsung,hpd-gpio:      deprecated name for hpd-gpios.
-+
-+-------------------------------------------------------------------------------
- 
- Example:
- 
-@@ -88,13 +74,6 @@ SOC specific portion:
- 
- Board Specific portion:
- 	dp-controller {
--		samsung,color-space = <0>;
--		samsung,dynamic-range = <0>;
--		samsung,ycbcr-coeff = <0>;
--		samsung,color-depth = <1>;
--		samsung,link-rate = <0x0a>;
--		samsung,lane-count = <4>;
--
- 		display-timings {
- 			native-mode = <&lcd_timing>;
- 			lcd_timing: 1366x768 {
--- 
-1.9.1
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
