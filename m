@@ -1,41 +1,32 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 28 Oct 2015 10:52:58 +0900
-Subject: [PATCH v2 0/4] Exynos SROMc configuration and Ethernet support for
- SMDK5410
-In-Reply-To: <cover.1445935215.git.p.fedin@samsung.com>
-References: <cover.1445935215.git.p.fedin@samsung.com>
-Message-ID: <56302A7A.1070105@samsung.com>
+From: dan.j.williams@intel.com (Dan Williams)
+Date: Wed, 28 Oct 2015 11:06:41 +0900
+Subject: [for 4.4 PATCH] memremap: fix highmem support
+In-Reply-To: <20151028013557.31764.66161.stgit@dwillia2-desk3.amr.corp.intel.com>
+References: <20151028013557.31764.66161.stgit@dwillia2-desk3.amr.corp.intel.com>
+Message-ID: <CAPcyv4ggrX0QGELcBt-Vu_xh6mtFvxMTiMsKYfKf4z72O73JVg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27.10.2015 17:43, Pavel Fedin wrote:
-> This patch extends Exynos SROM controller driver with ability to configure
-> controller outputs and enables SMSC9115 Ethernet chip on SMDK5410 board,
-> which is connected via SROMc bank #3.
-> 
-> With this patchset, support for the whole existing SMDK range can be added.
-> Actually, only bank number is different.
-> 
-> This patchset also depends on Exynos 5410 pinctrl support, introduced by
-> patches 0003 and 0004 from this set:
-> [PATCH v4 0/5] ARM: EXYNOS: ODROID-XU DT and LEDs
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-March/330862.html
-> 
-> Pinctrl support is necessary in order to correctly configure
-> multifunctional pins of the Exynos chip.
-> 
-> v1 => v2:
-> - Fixed some typos and bad labels in device tree
-> - Improved documentation
-> 
-> Pavel Fedin (4):
->   ARM: dts: Add SROMc to Exynos 5410
->   drivers: exynos-srom: Add support for bank configuration
->   ARM: dts: Add Ethernet chip to SMDK5410
->   Documentation: dt-bindings: Describe SROMc configuration
-> 
+On Wed, Oct 28, 2015 at 10:39 AM, Dan Williams <dan.j.williams@intel.com> wrote:
+> Currently memremap checks if the range is "System RAM" and returns the
+> kernel linear address.  This is broken for highmem platforms where a
+> range may be "System RAM", but is not part of the kernel linear mapping.
+> Similar to acpi_map(), use kmap() for PAGE_SIZE memremap() requests for
+> highmem, and fall back to ioremap_cache() otherwise.
+>
+> The impact of this bug is low for now since the pmem driver is the only
+> user of memremap(), but this is important to fix before more conversions
+> to memremap arrive in 4.4.
+>
+> Cc: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
+> Cc: Russell King <rmk+kernel@arm.linux.org.uk>
+> Reported-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> Signed-off-by: Dan Williams <dan.j.williams@intel.com>
+> ---
+> Russell,
+>
+> I question whether the kmap fallback is needed.  This is borrowed from
+> the current implementation of acpi_map(), and I added it since arm
+> ioremap warns if passed pfn_valid() addresses.
 
-The bindings documentation goes first.
-
-Best regards,
-Krzysztof
+I flubbed the subject line... this is for 4.3-final.
