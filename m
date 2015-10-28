@@ -1,34 +1,56 @@
-From: pratyush.anand@gmail.com (Pratyush Anand)
-Date: Wed, 28 Oct 2015 09:27:48 +0530
-Subject: [PATCH v3 05/12] doc/bindings: Update Layerscape PCIe devicetree
- binding to be more flexible
-In-Reply-To: <BY1PR0301MB13039481CB958A3323FB03B2823E0@BY1PR0301MB1303.namprd03.prod.outlook.com>
-References: <1444891672-32117-1-git-send-email-bhupesh.sharma@freescale.com>
- <1444891672-32117-6-git-send-email-bhupesh.sharma@freescale.com>
- <5383901.aC2HYopUNW@wuerfel>
- <BY1PR0301MB13039481CB958A3323FB03B2823E0@BY1PR0301MB1303.namprd03.prod.outlook.com>
-Message-ID: <CAHM4w1=-qF_JL-PbyNerzRrAVfapswmaZkcqQWeoMxWbV=ghKQ@mail.gmail.com>
+From: pramodku@broadcom.com (Pramod Kumar)
+Date: Wed, 28 Oct 2015 05:14:34 +0000
+Subject: [PATCH 05/11] dt-binding: Add ngpios property to GPIO
+ controller node
+In-Reply-To: <CACRpkdZRmJTF9_yzVJx_vPKH6M6PivcrPiLD7xMEs5HDvsLw7g@mail.gmail.com>
+References: <1445233398-27129-1-git-send-email-pramodku@broadcom.com>
+ <1445233398-27129-6-git-send-email-pramodku@broadcom.com>
+ <CACRpkdZRmJTF9_yzVJx_vPKH6M6PivcrPiLD7xMEs5HDvsLw7g@mail.gmail.com>
+Message-ID: <0C803592FC378B4E83922050AB46442A2AD73E7A@SJEXCHMB10.corp.ad.broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bhupesh,
+Hi Linus,
 
+> -----Original Message-----
+> From: Linus Walleij [mailto:linus.walleij at linaro.org]
+> Sent: 27 October 2015 15:11
+> To: Pramod Kumar
+> Cc: Rob Herring; Pawel Moll; Mark Rutland; Ian Campbell; Kumar Gala; Ray Jui;
+> Scott Branden; Russell King; linux-gpio at vger.kernel.org; bcm-kernel-feedback-
+> list; Jason Uy; Masahiro Yamada; Thomas Gleixner; Laurent Pinchart;
+> devicetree at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux-
+> kernel at vger.kernel.org; Jonas Gorski
+> Subject: Re: [PATCH 05/11] dt-binding: Add ngpios property to GPIO controller
+> node
+> 
+> On Mon, Oct 19, 2015 at 7:43 AM, Pramod Kumar <pramodku@broadcom.com>
+> wrote:
+> 
+> > Add ngpios property to the gpio controller's DT node so that
+> > controller driver extracts total number of gpio lines present in
+> > controller from DT and removes dependency on driver.
+> >
+> > Signed-off-by: Pramod Kumar <pramodku@broadcom.com>
+> > Reviewed-by: Ray Jui <rjui@broadcom.com>
+> > Reviewed-by: Scott Branden <sbranden@broadcom.com>
+> (...)
+> > +- ngpios:
+> > +    Total number of GPIOs the controller provides
+> 
+> This description is wrong. The number of GPIOs the controller *provides* is to
+> be determined by the compatible-string.
+> 
+> ngpios is used to restrict the number of lines *used* or *routed* from the
+> number *available*. (I hope that is what the code does as well.) Such as if 12
+> GPIOs are used of the 32 available on 32bits in a register.
+> 
+> Update this description to say what it really means.
+> 
+> Yours,
+> Linus Walleij
 
-On Fri, Oct 16, 2015 at 1:41 AM, Sharma Bhupesh
-<bhupesh.sharma@freescale.com> wrote:
-> I think this can be moved to the generic bindings for DWC3 PCIe driver. However
-> I cannot vouch if the same is true for usage of this IP in other SoCs and it
-> will not break existing drivers if this property is not defined in their SoC DTSI.
->
-> So adding a few old ST colleagues (Pratyush, Gabriel, Fabrice), who I am sure have used this IP in ST SoCs
-> for their comments as well.
+Thanks for reviewing . Will update the description.
 
-Sorry for delayed response. Was on leave and away from internet.
-
->
-> So the question would be - do you think it will be ok to make the clock related
-> properties optional in 'designware-pcie.txt' rather than required.
-
-I think they should have been optional.
-
-~Pratyush
+Regards,
+Pramod
