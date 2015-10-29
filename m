@@ -1,123 +1,50 @@
-From: wangzhou1@hisilicon.com (Zhou Wang)
-Date: Thu, 29 Oct 2015 10:27:05 +0800
-Subject: [PATCH v12 7/8] Documentation: DT: Add HiSilicon PCIe host binding
-In-Reply-To: <CAL_JsqKamKx8vVVv7qVZ8oyjXLem93B9dnJAxvvoRWd3XEc=7Q@mail.gmail.com>
-References: <1445859350-26375-1-git-send-email-wangzhou1@hisilicon.com>
- <1445859350-26375-8-git-send-email-wangzhou1@hisilicon.com>
- <CAL_JsqKamKx8vVVv7qVZ8oyjXLem93B9dnJAxvvoRWd3XEc=7Q@mail.gmail.com>
-Message-ID: <563183F9.1010809@hisilicon.com>
+From: jh80.chung@samsung.com (Jaehoon Chung)
+Date: Thu, 29 Oct 2015 11:32:22 +0900
+Subject: [RFC PATCH v8 09/10] arm: multi_v7_defconfig: remove
+ CONFIG_MMC_DW_IDMAC
+In-Reply-To: <1442385795-1389-1-git-send-email-shawn.lin@rock-chips.com>
+References: <1442385625-26775-1-git-send-email-shawn.lin@rock-chips.com>
+ <1442385795-1389-1-git-send-email-shawn.lin@rock-chips.com>
+Message-ID: <56318536.1010408@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015/10/28 3:19, Rob Herring wrote:
-> On Mon, Oct 26, 2015 at 6:35 AM, Zhou Wang <wangzhou1@hisilicon.com> wrote:
->> This patch adds related DTS binding document for HiSilicon PCIe host driver.
->>
->> Signed-off-by: Zhou Wang <wangzhou1@hisilicon.com>
-> 
-> Acked-by: Rob Herring <robh@kernel.org>
->
+Hi, All.
 
-Thanks for your review.
-Zhou
+Is there any other opinion about this patch?
 
->> ---
->>  .../bindings/arm/hisilicon/hisilicon.txt           | 17 +++++++++
->>  .../devicetree/bindings/pci/hisilicon-pcie.txt     | 44 ++++++++++++++++++++++
->>  2 files changed, 61 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/pci/hisilicon-pcie.txt
->>
->> diff --git a/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt b/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
->> index 3504dca..6ac7c00 100644
->> --- a/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
->> +++ b/Documentation/devicetree/bindings/arm/hisilicon/hisilicon.txt
->> @@ -171,6 +171,23 @@ Example:
->>         };
->>
->>  -----------------------------------------------------------------------
->> +Hisilicon HiP05 PCIe-SAS system controller
->> +
->> +Required properties:
->> +- compatible : "hisilicon,pcie-sas-subctrl", "syscon";
->> +- reg : Register address and size
->> +
->> +The HiP05 PCIe-SAS system controller is shared by PCIe and SAS controllers in
->> +HiP05 Soc to implement some basic configurations.
->> +
->> +Example:
->> +       /* for HiP05 PCIe-SAS system */
->> +       pcie_sas: system_controller at 0xb0000000 {
->> +               compatible = "hisilicon,pcie-sas-subctrl", "syscon";
->> +               reg = <0xb0000000 0x10000>;
->> +       };
->> +
->> +-----------------------------------------------------------------------
->>  Hisilicon CPU controller
->>
->>  Required properties:
->> diff --git a/Documentation/devicetree/bindings/pci/hisilicon-pcie.txt b/Documentation/devicetree/bindings/pci/hisilicon-pcie.txt
->> new file mode 100644
->> index 0000000..17c6ed9
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/pci/hisilicon-pcie.txt
->> @@ -0,0 +1,44 @@
->> +HiSilicon PCIe host bridge DT description
->> +
->> +HiSilicon PCIe host controller is based on Designware PCI core.
->> +It shares common functions with PCIe Designware core driver and inherits
->> +common properties defined in
->> +Documentation/devicetree/bindings/pci/designware-pci.txt.
->> +
->> +Additional properties are described here:
->> +
->> +Required properties:
->> +- compatible: Should contain "hisilicon,hip05-pcie".
->> +- reg: Should contain rc_dbi, config registers location and length.
->> +- reg-names: Must include the following entries:
->> +  "rc_dbi": controller configuration registers;
->> +  "config": PCIe configuration space registers.
->> +- msi-parent: Should be its_pcie which is an ITS receiving MSI interrupts.
->> +- port-id: Should be 0, 1, 2 or 3.
+Best Regards,
+Jaehoon Chung
+
+On 09/16/2015 03:43 PM, Shawn Lin wrote:
+> DesignWare MMC Controller's transfer mode should be decided
+> at runtime instead of compile-time. So we remove this config
+> option and read dw_mmc's register to select DMA master.
 > 
+> Signed-off-by: Shawn Lin <shawn.lin@rock-chips.com>
+> ---
 > 
->> +
->> +Optional properties:
->> +- status: Either "ok" or "disabled".
->> +- dma-coherent: Present if DMA operations are coherent.
->> +
->> +Example:
->> +       pcie at 0xb0080000 {
->> +               compatible = "hisilicon,hip05-pcie", "snps,dw-pcie";
->> +               reg = <0 0xb0080000 0 0x10000>, <0x220 0x00000000 0 0x2000>;
->> +               reg-names = "rc_dbi", "config";
->> +               bus-range = <0  15>;
->> +               msi-parent = <&its_pcie>;
->> +               #address-cells = <3>;
->> +               #size-cells = <2>;
->> +               device_type = "pci";
->> +               dma-coherent;
->> +               ranges = <0x82000000 0 0x00000000 0x220 0x00000000 0 0x10000000>;
->> +               num-lanes = <8>;
->> +               port-id = <1>;
->> +               #interrupts-cells = <1>;
->> +               interrupts-map-mask = <0xf800 0 0 7>;
->> +               interrupts-map = <0x0 0 0 1 &mbigen_pcie 1 10
->> +                                 0x0 0 0 2 &mbigen_pcie 2 11
->> +                                 0x0 0 0 3 &mbigen_pcie 3 12
->> +                                 0x0 0 0 4 &mbigen_pcie 4 13>;
->> +               status = "ok";
->> +       };
->> --
->> 1.9.1
->>
->> --
->> To unsubscribe from this list: send the line "unsubscribe devicetree" in
->> the body of a message to majordomo at vger.kernel.org
->> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Changes in v8: None
+> Changes in v7: None
+> Changes in v6: None
+> Changes in v5: None
+> Changes in v4: None
+> Changes in v3: None
+> Changes in v2: None
 > 
-> .
+>  arch/arm/configs/multi_v7_defconfig | 1 -
+>  1 file changed, 1 deletion(-)
+> 
+> diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+> index 03deb7f..ad929ea 100644
+> --- a/arch/arm/configs/multi_v7_defconfig
+> +++ b/arch/arm/configs/multi_v7_defconfig
+> @@ -539,7 +539,6 @@ CONFIG_MMC_ATMELMCI=y
+>  CONFIG_MMC_MVSDIO=y
+>  CONFIG_MMC_SDHI=y
+>  CONFIG_MMC_DW=y
+> -CONFIG_MMC_DW_IDMAC=y
+>  CONFIG_MMC_DW_PLTFM=y
+>  CONFIG_MMC_DW_EXYNOS=y
+>  CONFIG_MMC_DW_ROCKCHIP=y
 > 
