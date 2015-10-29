@@ -1,63 +1,121 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 29 Oct 2015 17:28:19 +0100
-Subject: [PATCH 0/3] Revert arm64 cache geometry
-In-Reply-To: <20151029154346.GL8644@n2100.arm.linux.org.uk>
-References: <1446068637-11509-1-git-send-email-avanbrunt@nvidia.com>
- <CAKv+Gu-CgXU4O8SymcjmCYZqyAa0PZbJXwNqXfuCamxYY9C8GA@mail.gmail.com>
- <20151029154346.GL8644@n2100.arm.linux.org.uk>
-Message-ID: <5A68E2B9-2254-42CA-8781-E2FA737C366C@linaro.org>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Thu, 29 Oct 2015 09:29:08 -0700
+Subject: [PATCH 1/3] mtd: create a partition type device tree binding
+In-Reply-To: <1446123152-22666-1-git-send-email-linus.walleij@linaro.org>
+References: <1446123152-22666-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <20151029162908.GA13275@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
++ devicetree-spec and others, since other non-driver-specific MTD
+partitioning stuff has gotten directed there [1], and this binding
+should probably get promoted in short order to the core mtdpart.c
+partitioning
 
-> On 29 okt. 2015, at 16:43, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
+On Thu, Oct 29, 2015 at 01:52:30PM +0100, Linus Walleij wrote:
+> The Linux code in drivers/mtd/maps/physmap_of.c will optionally
+> look for the linux,part-probe binding for hints on a partition type to
+> look for in the MTD. It was added in commit 9d5da3a9b849
+> "mtd: extend physmap_of to let the device tree specify the parition probe"
 > 
->> On Thu, Oct 29, 2015 at 12:22:51PM +0900, Ard Biesheuvel wrote:
->> Fair enough. It is a bit disappointing that we cannot trust these
->> values, but if the architecture does not mandate their accuracy, we
->> obviously should not be using them in the way that we are.
->> 
->> I think we have similar code in the ARM tree, so we should probably
->> make some changes there as well.
+> This solution is too Linux-specific and depend on some
+> Linux kernel-internal naming conventions. We need a proper
+> way of describing partition types that follow the pattern set by
+> other device tree bindings.
 > 
-> I've opposed exporting the cache dimensions to userspace for several
-> reasons:
-> 
+> Create a "partition-type" binding for this, and add "my" bindings
+> for "arm,arm-flash-structure" as a starter for others to follow.
+> A follow-on patch adds support to the Linux kernel to handle this
+> binding, with some infrastructure for others to use it too.
 
-I agree with the arguments below. However, what I refer to here is kernel code that infers whether a certain VIPT cache is non-aliasing based on the way size, which is calculated from values that are exposed to software for the sole purpose of enumerating cachelines by set/way.
+Overall, I like this. And thanks for expanding the explanation of DT
+partitions vs. parsers. It'd be good if we make parsers like this easier
+to integrate, so we see less hard-coded partitions in device tree.
 
+> Cc: devicetree at vger.kernel.org
+> Cc: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
+> Cc: Liviu Dudau <Liviu.Dudau@arm.com>
+> Reported-by: Liviu Dudau <Liviu.Dudau@arm.com>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+>  .../devicetree/bindings/mtd/mtd-physmap.txt        |  2 ++
+>  .../devicetree/bindings/mtd/partition.txt          | 35 +++++++++++++++++++---
+>  2 files changed, 33 insertions(+), 4 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/mtd/mtd-physmap.txt b/Documentation/devicetree/bindings/mtd/mtd-physmap.txt
+> index 4a0a48bf4ecb..863560bdbb19 100644
+> --- a/Documentation/devicetree/bindings/mtd/mtd-physmap.txt
+> +++ b/Documentation/devicetree/bindings/mtd/mtd-physmap.txt
+> @@ -23,6 +23,8 @@ file systems on embedded devices.
+>     unaligned accesses as implemented in the JFFS2 code via memcpy().
+>     By defining "no-unaligned-direct-access", the flash will not be
+>     exposed directly to the MTD users (e.g. JFFS2) any more.
+> + - partition-type : a flash partition type to expect and probe for
+> +   on this device. See "partition.txt" for available partition types.
+>   - linux,mtd-name: allow to specify the mtd name for retro capability with
+>     physmap-flash drivers as boot loader pass the mtd partition via the old
+>     device name physmap-flash.
+> diff --git a/Documentation/devicetree/bindings/mtd/partition.txt b/Documentation/devicetree/bindings/mtd/partition.txt
+> index 8e5557da1955..85d45764a4b3 100644
+> --- a/Documentation/devicetree/bindings/mtd/partition.txt
+> +++ b/Documentation/devicetree/bindings/mtd/partition.txt
+> @@ -1,9 +1,36 @@
+>  Representing flash partitions in devicetree
+>  
+> -Partitions can be represented by sub-nodes of an mtd device. This can be used
+> -on platforms which have strong conventions about which portions of a flash are
+> -used for what purposes, but which don't use an on-flash partition table such
+> -as RedBoot.
+> +On-device partition types:
+> +
+> +It is possible for some drivers to indicate an on-device partition type, i.e.
+> +partition tables, footers or other binary pattern in the flash used to
+> +define how the flash is partitioned. This can be done in the device tree node
+> +of an MTD device by specifying partition-type = "foo"; This tells the operating
+> +system to look for the partition type indicated.
+> +
+> +Required properties:
+> +- partition-type : the type of partition. Only one type can be specified.
 
-> * it will become a nightmare with the various different register formats
->  to properly decode these values
-> * older CPUs don't have the cache ID registers, so we'd need to augment
->  any export with additional static configuration somehow
-> * I don't trust userland with this information to make the right choices,
->  especially when faced with further levels of caches.
-> 
-> The main reason for people wanting the cache dimensions has been "so we
-> can select the optimal code for the CPU".  Given all the combinations
-> of caches out there, I've always said selecting code based on one level
-> of cache is totally insane, and userspace is better off doing some
-> performance measurement of its implementations and selecting the most
-> appropriate version.
-> 
-> There's many things that affect the performance of code paths with CPUs.
-> It's not just about cache line size, but instruction latencies, write
-> delays, branch prediction and so forth.  You can't _say_ "because this
-> CPU has a 32K L1 cache, if I optimise my code as X it'll perform
-> better everywhere with a 32K L1 cache than optimised Y."
-> 
-> Selecting code based on cache parameters is just wrong.
-> 
-> There may be cases where userspace would like to know the cache line
-> size, so it can appropriately align data structures - but that again
-> depends on what you're trying to achieve, and what if the L1 cache
-> line size is different from the L2 cache line size...
-> 
-> It's a minefield, one which IMHO userspace shouldn't be trusted with.
-> Userspace should assume the worst case cache line size seen in ARM
-> CPUs and be done with it.
-> 
+You're supporting this as a list property (for future expansion,
+presumably), so I can only assume the "only one type" is referring to
+the number of different parsers available currently, not the behavior of
+the property itself? This should probably be worded differently if
+that's the intention. Like, "a list of partition types ... ordered by
+priority .... We currently support the following: (list only the AFS
+type)" (fill in the blanks how you'd like).
+
+Also, this patch will conflict with [1]. I'll probably take [1] soon, so
+one of us will have to rebase this.
+
+Brian
+
+[1] http://thread.gmane.org/gmane.comp.devicetree.spec/191
+
+> +  Valid types are:
+> +  "arm,arm-flash-structure" (also called AFS)
+> +
+> +Example:
+> +
+> +flash0 at 40000000 {
+> +	/* 2 * 32MiB NOR Flash memory */
+> +	compatible = "arm,vexpress-flash", "cfi-flash";
+> +	partition-type = "arm,arm-flash-structure";
+> +	reg = <0x40000000 0x04000000>;
+> +	bank-width = <4>;
+> +};
+> +
+> +
+> +Device Tree specified partitions:
+> +
+> +If there is no specified on-device binary format, partitions can be
+> +represented by sub-nodes of an mtd device. This can be used on platforms which
+> +have strong conventions about which portions of a flash are used for what
+> +purposes.
+> +
+>  NOTE: if the sub-node has a compatible string, then it is not a partition.
+>  
+>  #address-cells & #size-cells must both be present in the mtd device. There are
 > -- 
-> FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-> according to speedtest.net.
+> 2.4.3
+> 
