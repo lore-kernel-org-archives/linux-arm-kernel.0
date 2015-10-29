@@ -1,75 +1,87 @@
-From: eric.auger@linaro.org (Eric Auger)
-Date: Thu, 29 Oct 2015 13:59:45 +0000
-Subject: [PATCH] vfio/type1: handle case where IOMMU does not support
- PAGE_SIZE size
-Message-ID: <1446127185-2096-1-git-send-email-eric.auger@linaro.org>
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Thu, 29 Oct 2015 14:01:43 +0000
+Subject: [PATCH] Documentation: dt: Add bindings for Secure-only devices
+Message-ID: <1446127303-5082-1-git-send-email-peter.maydell@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Current vfio_pgsize_bitmap code hides the supported IOMMU page
-sizes smaller than PAGE_SIZE. As a result, in case the IOMMU
-does not support PAGE_SIZE page, the alignment check on map/unmap
-is done with larger page sizes, if any. This can fail although
-mapping could be done with pages smaller than PAGE_SIZE.
+The existing device tree bindings assume that we are only trying to
+describe a single address space with a device tree (for ARM, either
+the Normal or the Secure world). Some uses for device tree need to
+describe both Normal and Secure worlds in a single device tree. Add
+documentation of how to do this, by adding extra properties which
+describe when a device appears differently in the two worlds or when
+it only appears in one of them.
 
-This patch modifies vfio_pgsize_bitmap implementation so that,
-in case the IOMMU supports page sizes smaller than PAGE_HOST
-we pretend PAGE_HOST is supported and hide sub-PAGE_HOST sizes.
-That way the user will be able to map/unmap buffers whose size/
-start address is aligned with PAGE_HOST. Pinning code uses that
-granularity while iommu driver can use the sub-PAGE_HOST size
-to map the buffer.
+The binding describes the general principles for adding new
+properties describing the secure world, but for now we only need a
+single new property, "secure-status", which can be used to annotate
+devices to indicate that they are only visible in one of the two
+worlds.
 
-Signed-off-by: Eric Auger <eric.auger@linaro.org>
-Signed-off-by: Alex Williamson <alex.williamson@redhat.com>
+The primary expected use of this binding is for a virtual machine
+like QEMU to describe the VM layout to a TrustZone aware firmware
+(which would then use the secure-only devices itself, and pass the DT
+on to a kernel running in the non-secure world, which ignores the
+secure-only devices and uses the rest).
 
+Signed-off-by: Peter Maydell <peter.maydell@linaro.org>
 ---
+This binding doesn't affect the kernel itself, but the kernel
+Documentation/ tree is the de-facto current place where all DT
+bindings are documented, so Grant suggested this was the right
+place to send a doc patch.
 
-This was tested on AMD Seattle with 64kB page host. ARM MMU 401
-currently expose 4kB, 2MB and 1GB page support. With a 64kB page host,
-the map/unmap check is done against 2MB. Some alignment check fail
-so VFIO_IOMMU_MAP_DMA fail while we could map using 4kB IOMMU page
-size.
+ Documentation/devicetree/bindings/arm/secure.txt | 41 ++++++++++++++++++++++++
+ 1 file changed, 41 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/secure.txt
 
-RFC -> PATCH v1:
-- move all modifications in vfio_pgsize_bitmap following Alex'
-  suggestion to expose a fake PAGE_HOST support
-- restore WARN_ON's
----
- drivers/vfio/vfio_iommu_type1.c | 15 ++++++++++++++-
- 1 file changed, 14 insertions(+), 1 deletion(-)
-
-diff --git a/drivers/vfio/vfio_iommu_type1.c b/drivers/vfio/vfio_iommu_type1.c
-index 57d8c37..cee504a 100644
---- a/drivers/vfio/vfio_iommu_type1.c
-+++ b/drivers/vfio/vfio_iommu_type1.c
-@@ -403,13 +403,26 @@ static void vfio_remove_dma(struct vfio_iommu *iommu, struct vfio_dma *dma)
- static unsigned long vfio_pgsize_bitmap(struct vfio_iommu *iommu)
- {
- 	struct vfio_domain *domain;
--	unsigned long bitmap = PAGE_MASK;
-+	unsigned long bitmap = ULONG_MAX;
- 
- 	mutex_lock(&iommu->lock);
- 	list_for_each_entry(domain, &iommu->domain_list, next)
- 		bitmap &= domain->domain->ops->pgsize_bitmap;
- 	mutex_unlock(&iommu->lock);
- 
-+	/*
-+	 * In case the IOMMU supports page sizes smaller than PAGE_HOST
-+	 * we pretend PAGE_HOST is supported and hide sub-PAGE_HOST sizes.
-+	 * That way the user will be able to map/unmap buffers whose size/
-+	 * start address is aligned with PAGE_HOST. Pinning code uses that
-+	 * granularity while iommu driver can use the sub-PAGE_HOST size
-+	 * to map the buffer.
-+	 */
-+	if (bitmap & ~PAGE_MASK) {
-+		bitmap &= PAGE_MASK;
-+		bitmap |= PAGE_SIZE;
-+	}
+diff --git a/Documentation/devicetree/bindings/arm/secure.txt b/Documentation/devicetree/bindings/arm/secure.txt
+new file mode 100644
+index 0000000..4129fba
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/secure.txt
+@@ -0,0 +1,41 @@
++* ARM Secure world bindings
 +
- 	return bitmap;
- }
- 
++ARM CPUs with TrustZone support have two distinct address spaces,
++"Normal" and "Secure". Most devicetree consumers (including the Linux
++kernel) are not TrustZone aware and run entirely in either the Normal
++world or the Secure world. However some devicetree consumers are
++TrustZone aware and need to be able to determine whether devices are
++visible only in the Secure address space, only in the Normal address
++space, or visible in both. (One example of that situation would be a
++virtual machine which boots Secure firmware and wants to tell the
++firmware about the layout of the machine via devicetree.)
++
++The general principle of the naming scheme for Secure world bindings
++is that any property that needs a different value in the Secure world
++can be supported by prefixing the property name with "secure-". So for
++instance "secure-reg" would override "reg". If there is no "secure-"
++property then the Secure world value is the same as specified for the
++Normal world by the non-prefixed property. However, only the
++properties listed below may validly have "secure-" versions; this list
++will be enlarged on a case-by-case basis.
++
++Defining the bindings in this way means that a device tree which has
++been annotated to indicate the presence of Secure-only devices can
++still be processed unmodified by existing Non-secure software (and in
++particular by the kernel).
++
++Note that it is still valid for bindings intended for purely Secure
++world consumers (like kernels that run entirely in Secure) to simply
++describe the view of Secure world using the standard bindings. These
++secure- bindings only need to be used where both the Secure and Normal
++world views need to be described in a single device tree.
++
++Valid Secure world properties:
++
++- secure-status : specifies whether the device is present and usable
++  in the secure world. The combination of this with "status" allows
++  the various possible combinations of device visibility to be
++  specified:
++   status = "okay";                             // visible in S and NS
++   status = "disabled"; secure-status = "okay"; // S-only
++   status = "okay"; secure-status = "disabled"; // NS-only
 -- 
 1.9.1
