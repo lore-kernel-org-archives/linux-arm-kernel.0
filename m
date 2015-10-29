@@ -1,97 +1,121 @@
-From: guohanjun@huawei.com (Hanjun Guo)
-Date: Thu, 29 Oct 2015 14:37:01 +0800
-Subject: [PATCH V4 0/8] PCI: ACPI: Setting up DMA coherency for PCI device
- from _CCA attribute
-In-Reply-To: <1545680.eQNYNjjaSj@vostro.rjw.lan>
-References: <1445442731-28819-1-git-send-email-Suravee.Suthikulpanit@amd.com>
- <24127028.eJSjD1i70u@vostro.rjw.lan> <5630D38F.804@linaro.org>
- <1545680.eQNYNjjaSj@vostro.rjw.lan>
-Message-ID: <5631BE8D.10604@huawei.com>
+From: dyoung@redhat.com (Dave Young)
+Date: Thu, 29 Oct 2015 14:40:11 +0800
+Subject: [PATCH 13/16] arm64: kdump: add kdump support
+In-Reply-To: <5631B4BA.6030903@linaro.org>
+References: <cover.1445297709.git.geoff@infradead.org>
+ <ef50b13d545f37a9fa95c5e6856e35f324798d00.1445297709.git.geoff@infradead.org>
+ <20151022032534.GC11227@dhcp-129-115.nay.redhat.com>
+ <5628662B.1020605@linaro.org>
+ <20151022051548.GD11227@dhcp-129-115.nay.redhat.com>
+ <5628B2FA.80209@linaro.org>
+ <20151023095059.GH11227@dhcp-129-115.nay.redhat.com>
+ <5631B4BA.6030903@linaro.org>
+Message-ID: <20151029064011.GF21927@dhcp-129-115.nay.redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015/10/29 0:00, Rafael J. Wysocki wrote:
-> On Wednesday, October 28, 2015 09:54:23 PM Hanjun Guo wrote:
->> Hi Rafael,
->>
->> On 10/27/2015 11:27 PM, Rafael J. Wysocki wrote:
->>> On Tuesday, October 27, 2015 09:52:50 AM Bjorn Helgaas wrote:
->>>> Hi Suravee,
->>>>
->>>> On Wed, Oct 21, 2015 at 08:52:03AM -0700, Suravee Suthikulpanit wrote:
->>>>> This patch series adds support to setup DMA coherency for PCI device using
->>>>> the ACPI _CCA attribute. According to the ACPI spec, the _CCA attribute
->>>>> is required for ARM64. Therefore, this patch is a pre-req for ACPI PCI
->>>>> support for ARM64 which is currently in development.  Also, this should
->>>>> not affect other architectures that does not define
->>>>> CONFIG_ACPI_CCA_REQUIRED, since the default value is coherent.
->>>>>
->>>>> In the process, this series also introduces enum dev_dma_attr and a set
->>>>> of APIs to query device DMA attribute. These APIs replace the obsolete
->>>>> device_dma_is_coherent(), and acpi_check_dma().
->>>>>
->>>>> I have also included a patch from Jeremy posted here:
->>>>>      http://www.spinics.net/lists/linux-usb/msg128582.html
->>>>>
->>>>> This patch series  has been tested on AMD Seattle RevB platform.
->>>>> The git tree containing tested code and pre-req patches are posted here:
->>>>>
->>>>>      http://github.com/ssuthiku/linux.git pci-cca-v4
->>>>>
->>>>> Changes from V3: (https://lkml.org/lkml/2015/8/26/389)
->>>>>      * Clean up suggested by Bjorn
->>>>>      * Introduce enum dev_dma_attr
->>>>>      * Replace device_dma_is_coherent() and acpi_check_dma() with
->>>>>        new APIs.
->>>>>
->>>>> Changes from V2: (https://lkml.org/lkml/2015/8/25/549)
->>>>>      * Return -ENOSUPP instead of -1 (per Rafael's suggestion)
->>>>>      * Add WARN() when fail to setup DMA for PCI device when booting
->>>>>        ACPI (per Arnd's suggestion)
->>>>>      * Added Acked-by from Rob.
->>>>>      * Minor clean up
->>>>>
->>>>> Changes from V1: (https://lkml.org/lkml/2015/8/13/182)
->>>>>      * Include patch 1 from Jeremy to enable support for _CCA=0
->>>>>      * Clean up acpi_check_dma() per Bjorn suggestions
->>>>>      * Split the original V1 patch into two patches (patch 3 and 4)
->>>>>
->>>>> Jeremy Linton (1):
->>>>>    Honor ACPI _CCA attribute setting
->>>>>
->>>>> Suravee Suthikulpanit (7):
->>>>>    device property: Introducing enum dev_dma_attr
->>>>>    acpi: Adding DMA Attribute APIs for ACPI Device
->>>>>    device property: Adding DMA Attribute APIs for Generic Devices
->>>>>    device property: acpi: Make use of the new DMA Attribute APIs
->>>>>    device property: acpi: Remove unused DMA APIs
->>>>>    PCI: OF: Move of_pci_dma_configure() to pci_dma_configure()
->>>>>    PCI: ACPI: Add support for PCI device DMA coherency
->>>>>
->>>>>   drivers/acpi/acpi_platform.c              |  7 +++++-
->>>>>   drivers/acpi/glue.c                       |  8 +++---
->>>>>   drivers/acpi/scan.c                       | 42 +++++++++++++++++++++++++++++++
->>>>>   drivers/base/property.c                   | 32 +++++++++++++++++------
->>>>>   drivers/crypto/ccp/ccp-platform.c         |  9 ++++++-
->>>>>   drivers/net/ethernet/amd/xgbe/xgbe-main.c |  9 ++++++-
->>>>>   drivers/of/of_pci.c                       | 20 ---------------
->>>>>   drivers/pci/probe.c                       | 36 ++++++++++++++++++++++++--
->>>>>   include/acpi/acpi_bus.h                   | 36 +++-----------------------
->>>>>   include/linux/acpi.h                      |  7 +++++-
->>>>>   include/linux/of_pci.h                    |  3 ---
->>>>>   include/linux/property.h                  | 10 +++++++-
->>>>>   12 files changed, 145 insertions(+), 74 deletions(-)
->>>> I had a couple minor comments.  It's sort of a toss-up, but this feels
->>>> more ACPI-flavored than PCI, so I assume Rafael will take this whole
->>>> series unless I hear otherwise.
->>> I'll do that.
->> If Suravee address the comments and send another version,
->> an it be merged into 4.4?
-> Well, it is likely, but not guaranteed.
->
-> We're only a few days from the beginning of the merge window and I'm still
-> in Seoul.
+Hi, AKASHI
 
-No problem, it's up to you :), thanks for the quick response.
+On 10/29/15 at 02:55pm, AKASHI Takahiro wrote:
+> Dave,
+> 
+> On 10/23/2015 06:50 PM, Dave Young wrote:
+> >On 10/22/15 at 06:57pm, AKASHI Takahiro wrote:
+> >>(added Ard to Cc.)
+> >>
+> >>On 10/22/2015 02:15 PM, Dave Young wrote:
+> >>>On 10/22/15 at 01:29pm, AKASHI Takahiro wrote:
+> >>>>Hi Dave,
+> >>>>
+> >>>>Thank you for your comment.
+> >>>>
+> >>>>On 10/22/2015 12:25 PM, Dave Young wrote:
+> >>>>>Hi, AKASHI,
+> >>>>>
+> >>>>>On 10/19/15 at 11:38pm, Geoff Levand wrote:
+> >>>>>>From: AKASHI Takahiro <takahiro.akashi@linaro.org>
+> >>>>>>
+> >>>>>>On crash dump kernel, all the information about primary kernel's core
+> >>>>>>image is available in elf core header specified by "elfcorehdr=" boot
+> >>>>>>parameter. reserve_elfcorehdr() will set aside the region to avoid any
+> >>>>>>corruption by crash dump kernel.
+> >>>>>>
+> >>>>>>Crash dump kernel will access the system memory of primary kernel via
+> >>>>>>copy_oldmem_page(), which reads one page by ioremap'ing it since it does
+> >>>>>>not reside in linear mapping on crash dump kernel.
+> >>>>>>Please note that we should add "mem=X[MG]" boot parameter to limit the
+> >>>>>>memory size and avoid the following assertion at ioremap():
+> >>>>>>	if (WARN_ON(pfn_valid(__phys_to_pfn(phys_addr))))
+> >>>>>>		return NULL;
+> >>>>>>when accessing any pages beyond the usable memories of crash dump kernel.
+> >>>>>
+> >>>>>How does kexec-tools pass usable memory ranges to kernel? using dtb?
+> >>>>>Passing an extra mem=X sounds odd in the design. Kdump kernel should get
+> >>>>>usable ranges and hanle the limit better than depending on an extern kernel
+> >>>>>param.
+> >>>>
+> >>>>Well, regarding "depending on an external kernel param,"
+> >>>>- this limitation ("mem=") is compatible with arm(32) implementation although
+> >>>>   it is not clearly described in kernel's Documentation/kdump/kdump.txt.
+> >>>>- "elfcorehdr" kernel parameter is mandatory on x86 as well as on arm/arm64.
+> >>>>   The parameter is explicitly generated and added by kexec-tools.
+> >>>>
+> >>>>Do I miss your point?
+> >>>
+> >>>Arm previously use atag_mem tag for memory kernel uses, with dtb, Booting.txt
+> >>>says: The boot loader must pass at a minimum the size and location of the
+> >>>system memory
+> >>>
+> >>>In arm64 booting.txt, it does mentions about dtb but without above sentence.
+> >>>
+> >>>So if you are using dtb to pass memory I think the extra mem= should be not
+> >>>necessary unless there's other limitations dtb can not been used.
+> >>
+> >>I would expect comments from arm64 maintainers here.
+> >>
+> >>In my old implementation, I added "usablemem" attributes, along with "reg," to
+> >>"memory" nodes in dtb to specify the usable memory region on crash dump kernel.
+> >>
+> >>But I removed this feature partly because, on uefi system, uefi might pass
+> >>no memory information in dtb.
+> >
+> >If this is the case there must be somewhere else one can pass memory infomation
+> >to kernel, the booting.txt should be updated?
+> >
+> >kexec as a boot loader need use same method as the 1st kernel boot loader.
+> >
+> >>
+> >>>One thing I'm confused is mem= only pass the memory size, where does you pass
+> >>>the start addresses?
+> >>
+> >>In the current arm64 implementation, any regions below the start address will
+> >>be ignored as system ram.
+> >>
+> >>>What if there's multiple sections such as some reserved
+> >>>ranges 2nd kernel also need?
+> >>
+> >>My patch utilizes only a single contiguous region of memory as system ram.
+> >>One exception that I notice is uefi's runtime data. They will be ioremap'ed separately.
+> >>
+> >>Please let me know if there is any other case that should be supported.
+> >
+> >For example the elf headers range, you reserved them in kdump kernel code,
+> >but kexec-tools can do that early if it can provides all memory info to 2nd
+> >kernel. Ditto for mark all the memory ranges 1st kernel used as reserved.
+> 
+> It seems to me that the issue you mentioned here is totally independent
+> from "mem=" issue, isn't it?
+> (and "elfcorehdr=" is a common way for crash dump kernel to know the region.)
 
-Hanjun
+Hmm, I did not talked about the eflcorehdr=, I means the code to reserve the
+memory ranges elfcorehdr is using.
+
+Thanks
+Dave
+
+> 
+> -Takahiro AKASHI
+> 
+> >Thanks
+> >Dave
+> >
