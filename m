@@ -1,45 +1,23 @@
 From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 28 Oct 2015 21:59:54 -0600
-Subject: [PATCH soc/next] ARM: bcm2835: add mutual inclusion protection
-In-Reply-To: <20151027174230.GA9495@omega>
-References: <1445539565-24955-1-git-send-email-alex.aring@gmail.com>
- <20151027170003.GB5828@x1> <20151027174230.GA9495@omega>
-Message-ID: <563199BA.3080605@wwwdotorg.org>
+Date: Wed, 28 Oct 2015 22:10:53 -0600
+Subject: [PATCH 3/4] i2c: added I2C_AQ_NO_CLK_STRETCH to i2c-bcm2835.c
+In-Reply-To: <1445976718-7449-3-git-send-email-nicola@corna.info>
+References: <1445976718-7449-1-git-send-email-nicola@corna.info>
+ <1445976718-7449-3-git-send-email-nicola@corna.info>
+Message-ID: <56319C4D.9020807@wwwdotorg.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/27/2015 11:42 AM, Alexander Aring wrote:
-> Hi,
-> 
-> On Tue, Oct 27, 2015 at 05:00:03PM +0000, Lee Jones wrote:
->> On Thu, 22 Oct 2015, Alexander Aring wrote:
->>
->>> This patch adds mutual inclusion protection for the rpi firmware header.
->>>
->>> Cc: Eric Anholt <eric@anholt.net>
->>> Cc: Stephen Warren <swarren@wwwdotorg.org>
->>
->> Looks like these didn't work.  You might want to look into that.
->>
->> You either have --no-signed-off-by-cc set, or you're not using `git
->> send-email`.
->>
-> 
-> I am using git send-email without "--no-signed-off-by-cc".
-> 
->> From the man page:
->>
->> --[no-]signed-off-by-cc
->>     If this is set, add emails found in Signed-off-by: or Cc: lines to
->>     the cc list. Default is the value of sendemail.signedoffbycc
->>     configuration value; if that is unspecified, default to
->>     --signed-off-by-cc.
->>
-> 
-> I wonder if this is really not working.
-> 
-> Stephen Warren, Eric Anholt did you receive my mail? I saw everybody
-> (except you) has these two in cc when they replied.
+On 10/27/2015 02:11 PM, Nicola Corna wrote:
+> As reported here
+> http://www.advamation.com/knowhow/raspberrypi/rpi-i2c-bug.html
+> the BCM2835 has a bug in its i2c implementation which prevents a correct
+> clock stretching.
 
-I received two copies of the original email; one directly and one via
-the ARM kernel mailing list. Both have both Eric and myself in CC.
+I was going to ask for some more official confirmation of this bug (e.g.
+update to BCM2835_Peripherals.pdf), but it looks like it's already been
+confirmed; check Gert van Loo's responses at:
+
+https://www.raspberrypi.org/forums/viewtopic.php?p=146272
+
+It might be useful to add this link into the patch description.
