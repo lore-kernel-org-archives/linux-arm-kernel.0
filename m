@@ -1,58 +1,50 @@
-From: magnus.damm@gmail.com (Magnus Damm)
-Date: Thu, 29 Oct 2015 14:15:19 +0900
-Subject: [PATCH v12 1/7] arm64: renesas: r8a7795: Add Renesas R8A7795 SoC
- support
-In-Reply-To: <20151028184504.GG8899@e104818-lin.cambridge.arm.com>
-References: <1445839312-8874-1-git-send-email-horms+renesas@verge.net.au>
- <1445839312-8874-2-git-send-email-horms+renesas@verge.net.au>
- <20151028184504.GG8899@e104818-lin.cambridge.arm.com>
-Message-ID: <CANqRtoT-7hhAN907KQFYwrP7+B7tVZdDEpp0SPrnXG3YrDbKoQ@mail.gmail.com>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Thu, 29 Oct 2015 14:24:36 +0900
+Subject: [PATCH v3 0/7] arm64: ftrace: fix incorrect output from stack
+ tracer
+In-Reply-To: <20151028152344.GG18966@arm.com>
+References: <1444298504-10392-1-git-send-email-takahiro.akashi@linaro.org>
+ <20151028152344.GG18966@arm.com>
+Message-ID: <5631AD94.4010304@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 29, 2015 at 3:45 AM, Catalin Marinas
-<catalin.marinas@arm.com> wrote:
-> On Mon, Oct 26, 2015 at 03:01:46PM +0900, Simon Horman wrote:
->> --- a/arch/arm64/Kconfig.platforms
->> +++ b/arch/arm64/Kconfig.platforms
->> @@ -66,6 +66,23 @@ config ARCH_SEATTLE
->>       help
->>         This enables support for AMD Seattle SOC Family
+On 10/29/2015 12:23 AM, Will Deacon wrote:
+> On Thu, Oct 08, 2015 at 07:01:37PM +0900, AKASHI Takahiro wrote:
+>> This is the third patch series for fixing stack tracer on arm64.
+>> The original issue was reported by Jungseok[1], and then I found more
+>> issues[2].
+>> (Steven, Jungseok, sorry for not replying to your comments directly.)
 >>
->> +config ARCH_SHMOBILE
->> +     bool
->> +
->> +config ARCH_RENESAS
->> +     bool "Renesas SoC Platforms"
->> +     select ARCH_SHMOBILE
->> +     select PINCTRL
->> +     select PM_GENERIC_DOMAINS if PM
->> +     help
->> +       This enables support for the ARMv8 based Renesas SoCs.
->> +
->> +config ARCH_R8A7795
->> +     bool "Renesas R-Car H3 SoC Platform"
->> +     depends on ARCH_RENESAS
->> +     help
->> +       This enables support for the Renesas R-Car H3 SoC.
+>> I address here all the issues and implement fixes described in [2] except
+>> for interrupt-triggered problems, ie. II-3). Recent discussions[3] about
+>> introducing a dedicated interrupt stack suggests that we may avoid walking
+>> through from an interrupt stack to a process stack.
+>> (So interrupt-stack patch is a prerequisite.)
+>>
+>> Basically,
+>> patch1 corresponds to the original issue.
+>> patch2 is a proactive improvement of function_graph tracer.
+>> patch3 corresponds to II-4(functions under function_graph tracer).
+>> patch4 corresponds to II-5(leaf function).
+>> patch5, 6 and 7 correspond to II-1(slurping stack) and II-2(differences
+>> between x86 and arm64).
+>>
+>> Each fix can be applied independently, but if patch5, 6 and 7 are
+>> acceptable, patch1 is not necessary because patch7 replaces a default
+>> stack tracer.
 >
-> Do you need such fine-grained configuration? I'd really like to avoid
-> individual SoC Kconfig entries and only include SoC families (like
-> ARCH_RENESAS). There are some which I didn't spot at the time
-> (ARCH_FSL_LS2085A and ARCH_TEGRA_132_SOC) but we shouldn't continue this
-> trend any further.
+> Given the comments and kbuild robot build errors, do you plan to post a
+> new version of this series?
 
-I agree with you about coarse grained configuration in general. I am
-also wondering how to handle cases where IP varies with SoC version.
-=)
-
-The two most common cases with SoC-specific IP for Renesas SoCs tend
-to be Pinctrl which is using rather large tables to support the PFC
-hardware and also the clocks (CCF) that drives the SoC specific CPG
-hardware. For the PFC and CPG I think it makes sense to enable build
-based on SoC model like we do already, but for the Kconfig bits in
-arch/arm64 perhaps ARCH_RENESAS can simply select ARCH_R8A7795?
+Yes, I do.
+Do you have any comments that I should address before submitting a new version?
+Apart from build errors, I admit that I should drop patch #4 ("arm64: ftrace:
+allow for tracing leaf functions") just because I was somewhat confused.
+I confirmed that "-pg" option actually disables omit-leaf-stack-frame.
 
 Thanks,
+-Takahiro AKASHI
 
-/ magnus
+> Will
+>
