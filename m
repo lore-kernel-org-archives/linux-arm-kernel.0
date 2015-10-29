@@ -1,65 +1,110 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Thu, 29 Oct 2015 19:29:40 +0900
-Subject: [PATCH v3 1/4] Documentation: dt-bindings: Describe SROMc
- configuration
-In-Reply-To: <008001d1121d$c0fef160$42fcd420$@samsung.com>
-References: <cover.1446018918.git.p.fedin@samsung.com>
- <046d990092dc85cf50db9082fc894d93a3ece7c0.1446018918.git.p.fedin@samsung.com>
- <563183F9.6020806@samsung.com>
- <008001d1121d$c0fef160$42fcd420$@samsung.com>
-Message-ID: <CAJKOXPcSehXRYDpYiybzdagPS76QKGpeMb7DxkpwJq8GTfuPOw@mail.gmail.com>
+From: bhupesh.sharma@freescale.com (Sharma Bhupesh)
+Date: Thu, 29 Oct 2015 11:07:41 +0000
+Subject: [PATCH 1/1] doc/bindings: Update Layerscape PCIe devicetree
+ bindings for LS2080A
+In-Reply-To: <1445844681-11488-1-git-send-email-bhupesh.sharma@freescale.com>
+References: <1445844681-11488-1-git-send-email-bhupesh.sharma@freescale.com>
+Message-ID: <BY1PR0301MB130322BA83723F641964E25482200@BY1PR0301MB1303.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-10-29 16:45 GMT+09:00 Pavel Fedin <p.fedin@samsung.com>:
->  Hello!
->
->> You missed here a lot of potential Cc. Please use get_maintainer.pl
->> script. It *must* be sent to devicetree list.
->>
->> Please send it also to DeviceTree maintainers because you are adding
->> quite generic names for bindings so they may have interesting thoughts
->> on this.
->>
->> LKML list is also missing.
->
->  Ok. Next version will go there too.
->
->> Any vendor prefix here? How generic is this?
->
->  I just don't know... Does *everything* really need a vendor prefix? How readable would that be? "compatible" property already says
-> that it's samsung-exynos-specific. And IMHO it's quite obvious that properties of vendor-specific device are automatically
-> vendor-specific.
->  Ok, i am currently fixing up the rest and will post v4 soon, and will Cc: it to devicetree ML.
+Hi Bjorn,
 
-Which my reply you are referring to? You stripped part of some
-sentence and put it without *any context*. Just random sentence.
-I asked for vendor prefix in few places... srom-timing? width? And I
-do not remember where I used exactly these words. This is why
-*context* is needed.
+> From: Bhupesh Sharma [mailto:bhupesh.sharma at freescale.com]
+> Sent: Monday, October 26, 2015 1:01 PM
+> 
+> Update the definition of the Layerscape PCI compatible string to add
+> support for LS2080A, as the controller on LS2080A is different from
+> LS1021A SoC.
+> 
+> While at it, move the clock related properties in the Designware PCIe
+> controller bindings to 'optional' set of properties.
+> 
+> Signed-off-by: Minghuan Lian <Minghuan.Lian@freescale.com>
+> Signed-off-by: Bhupesh Sharma <bhupesh.sharma@freescale.com>
+> Acked-by: Arnd Bergmann <arnd@arndb.de>
+> ---
+> Hi Bjorn,
+> 
+> As discussed with Arnd (http://www.spinics.net/lists/linux-
+> clk/msg04092.html),
+> this patch depends on a patch that is in your PCI tree but not yet in
+> mainline.
+> 
+> So, sending this to you, so that you can apply the patch on top of the
+> other one.
 
->
->  P.S. I intentionally omit the rest of the text in order to avoid overquoting, since we are already focused on some specific things.
-> If someone wants to get the whole picture, he/she could just browse back to the start of the thread. Or is it considered wrong
-> approach in this particular ML?
+Ping..
 
-Yep, selecting some sentences and replying only to them, leaving the
-context away, is highly confusing. I reply in different places,
-sometimes asking for similar things. Removing context messes this up.
-In the same time all of my other questions are being removed without
-any acknowledgment so I do not know if they were ignored or just
-silently acked.
+> 
+>  .../devicetree/bindings/pci/designware-pcie.txt    |   10 +++++-----
+>  .../devicetree/bindings/pci/layerscape-pci.txt     |   14 ++++++++++++--
+>  2 files changed, 17 insertions(+), 7 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/pci/designware-pcie.txt
+> b/Documentation/devicetree/bindings/pci/designware-pcie.txt
+> index 0036ab3..576218a 100644
+> --- a/Documentation/devicetree/bindings/pci/designware-pcie.txt
+> +++ b/Documentation/devicetree/bindings/pci/designware-pcie.txt
+> @@ -14,11 +14,6 @@ Required properties:
+>  - interrupt-map-mask and interrupt-map: standard PCI properties
+>  	to define the mapping of the PCIe interface to interrupt
+>  	numbers.
+> -- clocks: Must contain an entry for each entry in clock-names.
+> -	See ../clocks/clock-bindings.txt for details.
+> -- clock-names: Must include the following entries:
+> -	- "pcie"
+> -	- "pcie_bus"
+> 
+>  Optional properties:
+>  - num-lanes: number of lanes to use (this property should be specified
+> unless @@ -27,3 +22,8 @@ Optional properties:
+>  - bus-range: PCI bus numbers covered (it is recommended for new
+> devicetrees to
+>    specify this property, to keep backwards compatibility a range of
+> 0x00-0xff
+>    is assumed if not present)
+> +- clocks: Must contain an entry for each entry in clock-names.
+> +	See ../clocks/clock-bindings.txt for details.
+> +- clock-names: Must include the following entries:
+> +	- "pcie"
+> +	- "pcie_bus"
+> diff --git a/Documentation/devicetree/bindings/pci/layerscape-pci.txt
+> b/Documentation/devicetree/bindings/pci/layerscape-pci.txt
+> index 6286f04..ac7e07e 100644
+> --- a/Documentation/devicetree/bindings/pci/layerscape-pci.txt
+> +++ b/Documentation/devicetree/bindings/pci/layerscape-pci.txt
+> @@ -1,10 +1,20 @@
+>  Freescale Layerscape PCIe controller
+> 
+> -This PCIe host controller is based on the Synopsis Designware PCIe IP
+> +This PCIe host controller is based on the Synopsys Designware PCIe IP
+>  and thus inherits all the common properties defined in designware-
+> pcie.txt.
+> 
+> +This controller derives its clocks from the Reset Configuration Word
+> +(RCW) which is used to describe the PLL settings at the time of chip-
+> reset.
+> +
+> +Also as per the available Reference Manuals, there is no specific
+> 'version'
+> +register available in the Freescale PCIe controller register set, which
+> +can allow determining the underlying Designware PCIe controller version
+> +information.
+> +
+>  Required properties:
+> -- compatible: should contain the platform identifier such as
+> "fsl,ls1021a-pcie"
+> +- compatible: should contain the platform identifier such as:
+> +        "fsl,ls1021a-pcie", "snps,dw-pcie"
+> +        "fsl,ls2080a-pcie", "snps,dw-pcie"
+>  - reg: base addresses and lengths of the PCIe controller
+>  - interrupts: A list of interrupt outputs of the controller. Must
+> contain an
+>    entry for each entry in the interrupt-names property.
+> --
+> 1.7.9.5
+> 
 
-I show you example:
-
->  I just don't know...
-I don't know neither.
-
-> If someone wants to get the whole picture, he/she could just browse back to the start of the thread.
-Yes, I would just scroll up and see the context. No, wait. There is no
-context. I have to find mine original email and compare which part was
-ignored, which was applied and which quoted sentence you are referring
-to.
-
-Best regards,
-Krzysztof
+Regards,
+Bhupesh
