@@ -1,58 +1,31 @@
-From: ykk@rock-chips.com (Yakir Yang)
-Date: Thu, 29 Oct 2015 09:14:44 +0800
-Subject: [PATCH v8 10/17] phy: Add driver for rockchip Display Port PHY
-In-Reply-To: <1657250.2TWeX0dr1C@phil>
-References: <1446020143-32645-1-git-send-email-ykk@rock-chips.com>
- <1446021033-11537-1-git-send-email-ykk@rock-chips.com>
- <1657250.2TWeX0dr1C@phil>
-Message-ID: <56317304.5070506@rock-chips.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Thu, 29 Oct 2015 10:40:45 +0900
+Subject: [PATCH] ARM: EXYNOS: Constify local exynos_pmu_data structure
+Message-ID: <1446082845-4974-1-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Heiko,
+The Exynos5420 instance of exynos_pmu_data structure is not modified and
+can be made const.
 
-On 10/29/2015 04:36 AM, Heiko Stuebner wrote:
-> Hi Yakir,
->
-> Am Mittwoch, 28. Oktober 2015, 16:30:33 schrieb Yakir Yang:
->> +static int rockchip_dp_phy_probe(struct platform_device *pdev)
->> +{
->> +	struct device *dev = &pdev->dev;
->> +	struct device_node *np = dev->of_node;
->> +	struct phy_provider *phy_provider;
->> +	struct rockchip_dp_phy *dp;
->> +	struct resource *res;
-> drivers/phy/phy-rockchip-dp.c: In function 'rockchip_dp_phy_probe':
-> drivers/phy/phy-rockchip-dp.c:86:19: warning: unused variable 'res' [-Wunused-variable]
+Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Suggested-by: Pavel Fedin <p.fedin@samsung.com>
+---
+ arch/arm/mach-exynos/pmu.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Oh, thanks, would send v9 of this one alone.
-
-- Yakir
-
->> +	struct phy *phy;
->> +	int ret;
->> +
->> +	if (!np)
->> +		return -ENODEV;
->> +
->> +	dp = devm_kzalloc(dev, sizeof(*dp), GFP_KERNEL);
->> +	if (IS_ERR(dp))
->> +		return -ENOMEM;
->> +
->> +	dp->dev = dev;
->> +
->> +	dp->phy_24m = devm_clk_get(dev, "24m");
->> +	if (IS_ERR(dp->phy_24m)) {
->> +		dev_err(dev, "cannot get clock 24m\n");
->> +		return PTR_ERR(dp->phy_24m);
->> +	}
->> +
->> +	ret = clk_set_rate(dp->phy_24m, 24000000);
->> +	if (ret < 0) {
->> +		dev_err(dp->dev, "cannot set clock phy_24m %d\n", ret);
->> +		return ret;
->> +	}
->> +
->
->
->
+diff --git a/arch/arm/mach-exynos/pmu.c b/arch/arm/mach-exynos/pmu.c
+index de68938ee6aa..5775154501d8 100644
+--- a/arch/arm/mach-exynos/pmu.c
++++ b/arch/arm/mach-exynos/pmu.c
+@@ -908,7 +908,7 @@ static const struct exynos_pmu_data exynos5250_pmu_data = {
+ 	.powerdown_conf	= exynos5_powerdown_conf,
+ };
+ 
+-static struct exynos_pmu_data exynos5420_pmu_data = {
++static const struct exynos_pmu_data exynos5420_pmu_data = {
+ 	.pmu_config	= exynos5420_pmu_config,
+ 	.pmu_init	= exynos5420_pmu_init,
+ 	.powerdown_conf	= exynos5420_powerdown_conf,
+-- 
+1.9.1
