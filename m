@@ -1,116 +1,36 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Thu, 29 Oct 2015 10:57:50 -0400
-Subject: [PATCH V1 11/11] arm64, pci, acpi: Support for ACPI based PCI
- hostbridge init
-In-Reply-To: <563131B0.9060305@codeaurora.org>
-References: <1445963922-22711-1-git-send-email-tn@semihalf.com>
- <1445963922-22711-12-git-send-email-tn@semihalf.com>
- <5631180D.2000902@codeaurora.org> <563131B0.9060305@codeaurora.org>
-Message-ID: <563233EE.1090907@codeaurora.org>
+From: timur@codeaurora.org (Timur Tabi)
+Date: Thu, 29 Oct 2015 10:00:14 -0500
+Subject: [PATCH] arm64/efi: do not assume DRAM base is aligned to 2 MB
+In-Reply-To: <20151029145754.GD3440@arm.com>
+References: <1446127645-4115-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20151029145754.GD3440@arm.com>
+Message-ID: <5632347E.2070303@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 10/29/2015 09:57 AM, Will Deacon wrote:
+> So is this fixing a regression introduced in 4.3? If so, can I have a
+> Fixes: tag too, please? (I was under the impression that this was a
+> longstanding issue, but the thread hasn't been easy to follow).
 
+It fixes a bug introduced by:
 
-On 10/28/2015 4:36 PM, Sinan Kaya wrote:
-> 2. The second problem is about the PCIe resources.
->
-> pci_0000:01:00.0:_can't_enable_device:_BAR_0_[mem_0x80100100000-0x80100101fff_64bit]_not_claimed
->
-> pci 0000:01:00.0: Can't enable PCI device, BIOS handoff failed.
-> pci 0000:00:00.0: BAR 14: assigned [mem 0x80100100000-0x801003fffff]
-> pci 0000:00:00.0: BAR 13: no space for [io  size 0x1000]
-> pci 0000:00:00.0: BAR 13: failed to assign [io  size 0x1000]
-> pci 0000:00:00.0: BAR 13: no space for [io  size 0x1000]
-> pci 0000:00:00.0: BAR 13: failed to assign [io  size 0x1000]
-> pci 0000:01:00.0: BAR 0: assigned [mem 0x80100100000-0x80100101fff 64bit]
->
-> For some reason, the kernel is unable to assign resources.
->
-> I appreciate any pointers you might give.
+Author: Ard Biesheuvel <ard.biesheuvel@linaro.org>  2015-07-24 06:38:27
+Committer: Will Deacon <will.deacon@arm.com>  2015-07-27 05:08:41
+Parent: ddeeefe2dfbe1fa6b116b9362b1bec465b64c873 (arm64/efi: efistub: 
+Apply __init annotation)
+Child:  739fa11938bec53a849b77b2042237a0e17c70ae (arm64/efi: do not 
+assume DRAM base is aligned to 2 MB)
+Branches: dcc, master, qserver, qserver2, remotes/origin/master, tty
+Follows: v4.2-rc4
+Precedes: v4.3-rc1
 
-Tomasz,
-I debugged this part of the problem yesterday night.
-
-I have one set up with 4.2 kernel and Mark Salter's original ACPI PCIE 
-patch. His patchwork works fine with our ACPI table.
-
-This is what IO resource looks like in our table. PCI IO is supported 
-using the ACPI translation attribute on ARM systems.
-
-QWORDIO(			// produced resource
-	ResourceProducer,	// bit 0 of general flags is 0
-	MinFixed,		// Range is fixed
-	MaxFixed,		// Range is fixed
-	PosDecode,
-	EntireRange,
-	0x0000,			// Granularity
-	0x1000,			// Min,
-	0xFFFF,			// Max
-	0x8FFFFFEF000,		// Translation
-	0xF000,			// Range Length
-	,, PI00
-  )
-
-It looks like you are missing the translation support for the IO 
-aperture and Mark Salter's patch has this support.
-
-Yours is missing in pci_acpi_root_prepare_resources function here. 
-Mark's patch uses the offset argument to reorganize the resource.
-
-
-+            resource_size_t length = res->end - res->start;
-+
-+            err = pci_register_io_range(res->start, length);
-+            if (err) {
-+                resource_list_destroy_entry(entry);
-+                continue;
-+            }
-+
-+            port = pci_address_to_pio(res->start);
-+            if (port == (unsigned long)-1) {
-+                resource_list_destroy_entry(entry);
-+                continue;
-+            }
-+
-+            res->start = port;
-+            res->end = res->start + length - 1;
-+
-+            if (pci_remap_iospace(res, res->start) < 0)
-+                resource_list_destroy_entry(entry);
-
-
-
- > 
-pci_0000:01:00.0:_can't_enable_device:_BAR_0_[mem_0x80100100000-0x80100101fff_64bit]_not_claimed 
-
- >
- > pci 0000:01:00.0: Can't enable PCI device, BIOS handoff failed.
-
-I also found out this problem. This is a resource reclaim order problem 
-with respect to quirks. The card I'm testing is a PCIe USB card. It has 
-a quirk associated with it and it tries to enable and then disable the 
-device here.
-
-DECLARE_PCI_FIXUP_CLASS_FINAL(PCI_ANY_ID, PCI_ANY_ID,
-PCI_CLASS_SERIAL_USB, 8, quirk_usb_early_handoff);
-
-The resources get assigned after this quirk. That's why I see these 
-can't enable messages. I looked at 4.2 kernel. The execution order is 
-reversed.
-
- > pci 0000:00:00.0: BAR 14: assigned [mem 0x80100100000-0x801003fffff]
- > pci 0000:00:00.0: BAR 13: no space for [io  size 0x1000]
- > pci 0000:00:00.0: BAR 13: failed to assign [io  size 0x1000]
- > pci 0000:00:00.0: BAR 13: no space for [io  size 0x1000]
- > pci 0000:00:00.0: BAR 13: failed to assign [io  size 0x1000]
- > pci 0000:01:00.0: BAR 0: assigned [mem 0x80100100000-0x80100101fff 64bit]
+     arm64: efi: prefer AllocatePages() over efi_low_alloc() for vmlinux
 
 
 
 
 -- 
-Sinan Kaya
-Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a 
-Linux Foundation Collaborative Project
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the
+Code Aurora Forum, a Linux Foundation Collaborative Project.
