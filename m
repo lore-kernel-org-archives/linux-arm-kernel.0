@@ -1,91 +1,129 @@
-From: ezequiel@vanguardiasur.com.ar (Ezequiel Garcia)
-Date: Thu, 29 Oct 2015 15:54:22 -0300
-Subject: [PATCH] ARM: v7-M: Fix the stack set by __v7m_setup
-In-Reply-To: <20151029184127.GG4931@pengutronix.de>
-References: <1446139880-17311-1-git-send-email-ezequiel@vanguardiasur.com.ar>
- <20151029184127.GG4931@pengutronix.de>
-Message-ID: <CAAEAJfD6aTRcRDXiz=6kBFE=1x_9=3b33JX2cUEwuDqOas8HBQ@mail.gmail.com>
+From: eric@anholt.net (Eric Anholt)
+Date: Thu, 29 Oct 2015 12:02:24 -0700
+Subject: [RFC] rpi: add support to enable usb power domain
+In-Reply-To: <1446064810-5064-1-git-send-email-alex.aring@gmail.com>
+References: <1446064810-5064-1-git-send-email-alex.aring@gmail.com>
+Message-ID: <87a8r1pkfz.fsf@eliezer.anholt.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29 October 2015 at 15:41, Uwe Kleine-K?nig
-<u.kleine-koenig@pengutronix.de> wrote:
-> Hello,
->
-> On Thu, Oct 29, 2015 at 02:31:20PM -0300, Ezequiel Garcia wrote:
->> On ARM v7-M, when PROCINFO_INITFUNC (__v7m_setup) is called,
->> a stack is needed before calling the supervisor call (SVC),
->> which is used by the supervisor call to save the context.
->>
->> Currently, __v7m_setup() prepares a temporary stack in the .text.init
->> section, which is is broken if the kernel is executing directly from
->> read-only memory.
->>
->> This commit fixes this by seting an early stack to its usual location.
->>
->> Also, __v7m_setup() is currently saving and restoring the previous
->> stack. That was bogus, because there's no stack previously set,
->> so this commit removes it.
->
-> Maybe add something like:
->
->         This fixes booting on my $somedetails machine which throws an
->         exception when a write to ROM is done.
->
->> Signed-off-by: Ezequiel Garcia <ezequiel@vanguardiasur.com.ar>
->> ---
->> As suggested by Uwe, this commit tries to set a proper stack
->> before calling the SVC in __v7m_setup.
->>
->> Instead of putting that in a .data section, I'm just using
->> the usual stack location.
->>
->> The stack will be reset to the same place in __mmap_switched.
->> This means the stack is set twice in the v7-M case, but
->> for simplicity I figure we can just leave this that way.
->
-> That's ok I think, yes.
->
->>  arch/arm/mm/proc-v7m.S | 14 +++++---------
->>  1 file changed, 5 insertions(+), 9 deletions(-)
->>
->> diff --git a/arch/arm/mm/proc-v7m.S b/arch/arm/mm/proc-v7m.S
->> index 67d9209077c6..f42d4e2774c7 100644
->> --- a/arch/arm/mm/proc-v7m.S
->> +++ b/arch/arm/mm/proc-v7m.S
->> @@ -12,6 +12,7 @@
->>   */
->>  #include <linux/linkage.h>
->>  #include <asm/assembler.h>
->> +#include <asm/memory.h>
->>  #include <asm/v7m.h>
->>  #include "proc-macros.S"
->>
->> @@ -97,19 +98,19 @@ __v7m_setup:
->>       mov     r5, #0x00800000
->>       str     r5, [r0, V7M_SCB_SHPR3] @ set PendSV priority
->>
->> -     @ SVC to run the kernel in this mode
->> +     @ SVC to run the kernel in this mode,
-> Do you consider this understandable? What is "this"? I suggest to change
-> it to
->
->         @ SVC to switch to handler mode, notice that this requires sp to
->         @ point to writeable memory because the processor saves
->         @ some registers to the stack.
->
+Alexander Aring <alex.aring@gmail.com> writes:
 
-OK, sounds good.
+> This patch adds support for RPi several Power Domains and enable support
+> to enable the USB Power Domain when it's not enabled before.
+>
+> This patch based on Eric Anholt's patch to support Power Domains. He had
+> an issue about -EPROBE_DEFER inside the power domain subsystem, this
+> issue was solved by commit <311fa6a> ("PM / Domains: Return -EPROBE_DEFER
+> if we fail to init or turn-on domain").
+>
+> It was tested with barebox and the following scripts before booting
+> linux:
+>
+> /env/a_off:
+>
+>  # cat /env/a_off
+>  #turn off which are enabled by default
+>  regulator -n bcm2835_mci0 -s disable
+>  regulator -n uart0-pl0110 -s disable
+>
+> /env/a_on:
+>
+>  # cat /env/a_on
+>  #turn off which are enabled by default
+>  regulator -n bcm2835_mci0 -s disable
+>  regulator -n uart0-pl0110 -s disable
+>
+>  regulator -n bcm2835_mci0 -s enable
+>  regulator -n uart0-pl0110 -s enable
+>  regulator -n uart0-pl0111 -s enable
+>  regulator -n bcm2835_usb -s enable
+>  regulator -n bcm2835_i2c0 -s enable
+>  regulator -n bcm2835_i2c1 -s enable
+>  regulator -n bcm2835_i2c2 -s enable
+>  regulator -n bcm2835_spi -s enable
+>  regulator -n bcm2835_ccp2tx -s enable
+>  regulator -n bcm2835_dsi -s enable
+>
+> /env/b:
+>
+>  # cat /env/b
+>  sh /env/a_on
+>
+>  regulator -n bcm2835_mci0 -s disable
+>  regulator -n uart0-pl0110 -s disable
+>  regulator -n uart0-pl0111 -s disable
+>  regulator -n bcm2835_usb -s disable
+>  regulator -n bcm2835_i2c0 -s disable
+>  regulator -n bcm2835_i2c1 -s disable
+>  regulator -n bcm2835_i2c2 -s disable
+>  regulator -n bcm2835_spi -s disable
+>  regulator -n bcm2835_ccp2tx -s disable
+>  regulator -n bcm2835_dsi -s disable
+>
+> /env/c:
+>
+>  # cat /env/c
+>  sh ./env/b
+>
+>  regulator -n bcm2835_mci0 -s enable
+>  regulator -n uart0-pl0110 -s enable
+>  regulator -n uart0-pl0111 -s enable
+>  regulator -n bcm2835_usb -s enable
+>  regulator -n bcm2835_i2c0 -s enable
+>  regulator -n bcm2835_i2c1 -s enable
+>  regulator -n bcm2835_i2c2 -s enable
+>  regulator -n bcm2835_spi -s enable
+>  regulator -n bcm2835_ccp2tx -s enable
+>  regulator -n bcm2835_dsi -s enable
+>
+> These scripts enables/disable all regulators inside the bootloader. It
+> was running with a "hard" and "soft" reset without any issues. These
+> testcases should fit to Stephen Warren suggestions:
+>
+> "(a) before having explicitly turned the power domain on or off at all (b)
+> after having turned it on (c) after having turned it off, and for all
+> power domains."
+>
+> Cc: Stephen Warren <swarren@wwwdotorg.org>
+> Cc: Lee Jones <lee@kernel.org>
+> Cc: Eric Anholt <eric@anholt.net>
+> Cc: Andy Whitcroft <apw@canonical.com>
+> Cc: Joe Perches <joe@perches.com>
+> Signed-off-by: Alexander Aring <alex.aring@gmail.com>
+> ---
+> First:
+> I cc'ed Andy Whitcroft and Joe Perches here, because this patch will
+> generate a false positive for checkpatch and checkpatch told me to
+> cc checkpatch maintainers if this occurs:
+>
+> ERROR: Macros with complex values should be enclosed in parentheses
+> #191: FILE: drivers/firmware/raspberrypi.c:26:
+> +#define RPI_POWER_DOMAIN(_domain, _name)			\
+> +	[_domain] =						\
+> +	{							\
+> ...
+>
+> Second:
+> This patch based on linus/master and requires the rpi-firmware patch.
+>
+> Third:
+> The barebox regulator doesn't support right now to enable/disable
+> regulators at runtime but I want to bring this mainline in the next
+> days. So you can't check yourself if the above scripts working right
+> now. I describe it here to show you what exactly I tested.
+>
+> changes since Eric Anholts "power domain" patch:
+>  - add for me all known power domains of the RPi, it contains the domains
+>    0 - 9.
 
->> +     @ notice that we need to set a stack for SVC to save
->> +     @ the context.
->
-> Other than that:
->
-> Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
->
-
-Cool, thanks!
--- 
-Ezequiel Garc?a, VanguardiaSur
-www.vanguardiasur.com.ar
+Note: None of the power domain enums other than the ones I'd had in my
+patch are actually connected to anything in the firmware.  I don't think
+we should be adding them, given that.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 818 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151029/433f6e15/attachment.sig>
