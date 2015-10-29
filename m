@@ -1,154 +1,249 @@
 From: wangzhou1@hisilicon.com (Zhou Wang)
-Date: Thu, 29 Oct 2015 17:40:32 +0800
-Subject: [PATCH v13 0/6] PCI: hisi: Add PCIe host support for HiSilicon SoC
- Hip05
-Message-ID: <1446111638-197070-1-git-send-email-wangzhou1@hisilicon.com>
+Date: Thu, 29 Oct 2015 17:40:37 +0800
+Subject: [PATCH v13 5/6] PCI: designware: Add ARM64 support
+In-Reply-To: <1446111638-197070-1-git-send-email-wangzhou1@hisilicon.com>
+References: <1446111638-197070-1-git-send-email-wangzhou1@hisilicon.com>
+Message-ID: <1446111638-197070-6-git-send-email-wangzhou1@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset adds PCIe host support for HiSilicon SoC Hip05. The PCIe hosts
-use PCIe IP core from Synopsys, So this driver is based on designware PCIe driver.
+This patch tries to unify ARM32 and ARM64 PCIe in designware driver. Delete
+function dw_pcie_setup, dw_pcie_scan_bus, dw_pcie_map_irq and struct hw_pci,
+move related operations to dw_pcie_host_init.
 
-Hip05 is an ARMv8 architecture SoC. It should be able to use ARM64 PCIe API in
-designware PCIe driver. So this patch also adds ARM64 support for designware
-pcie.
+As dw_pcie_setup is removed, we also remove io_base_tmp which was introduced
+in "PCI: designware: Remove *_mod_base".
 
-This patchset is based on v4.3-rc1.
+Signed-off-by: Zhou Wang <wangzhou1@hisilicon.com>
+Signed-off-by: Gabriele Paoloni <gabriele.paoloni@huawei.com>
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Tested-by: James Morse <james.morse@arm.com>
+Tested-by: Gabriel Fernandez <gabriel.fernandez@st.com>
+Tested-by: Minghuan Lian <Minghuan.Lian@freescale.com>
+Acked-by: Pratyush Anand <pratyush.anand@gmail.com>
+---
+ drivers/pci/host/pcie-designware.c | 128 +++++++++++--------------------------
+ drivers/pci/host/pcie-designware.h |   1 -
+ 2 files changed, 38 insertions(+), 91 deletions(-)
 
-Change from v12:
-- Reorder patchset as suggestion by Bjorn.
-- Add Rob's Acked-by for DT binding.
-- Merge HiSilicon PCIe driver, DT binding document and maintainer update into
-  one patch.
-
-Change from v11:
-- Split 3/6 in v11 to 3/8, 4/8, 5/8 in v12.
-- Add print in pcie-hisi.c to indicate read/write hardware defect.
-- Modify macro in 1/8 pointed by Bjorn.
-
-Change from v10:
-- Remove MSI related setting and VMID/ASID table setting, they will be
-  implemented in BIOS.
-- Use module_platform_driver to init pcie-hisi.c
-- Add necessary comments.
-
-Change from v9:
-- Use syscon to get subctrl base address.
-- 5/6 is based on [PATCH v3 0/2] arm64: Support Hisilicon Hip05-D02 board
-  from Ding Tianhong
-- Add hisi_pcie_cfg_read in pcie-hisi.c to match
-  [PATCH v6 0/3] PCI: designware: change dw_pcie_cfg_write() and dw_pcie_cfg_read()
-  from Gabriele.
-
-Change from v8:
-- Rebase on v4.3-rc1.
-- Add Tested-by from Gabriel and Minghuan.
-- Remove ITS domain parsing in msi_host_init in pcie-hisi.c, no need this as PCI
-  core does related job. Add ITS base address parsing in msi_host_init.
-- Change vmid/asid table configuration, previous configuration was wrong.
-- Add wr_own_conf callback in pcie-hisi.c.
-- Use subsys_initcall to init hisi PCIe.
-
-Change from v7:
-- Remove pp->root_bus_nr = 0 in dra7xx, exynos, imx6, keystone, layerscape,
-  spear13xx. Pass pp->busn->start to pci_create_root_bus as root bus number.
-- Remove bus-range parsing in pcie-hisi.c.
-
-Change from v6:
-- Add Pratyush's Acked-by for 1/6 and 2/6.
-- Add James' Tested-by for 3/6.
-
-Change from v5:
-- Merge 1/6 in this series, discussion about this can be found in [1]
-
-Change from v4:
-- Change the author of 1/5 to Gabriele.
-- Modify problems in 3/5 pointed by Bjorn.
-- Modify spelling problems in 4/5.
-
-Change from v3:
-- Change 1/5 to what Gabriele suggested.
-- Use win->__res.start to get *_mod_base in 2/5, this fix a bug in v3 series.
-
-Change from v2:
-- Move struct pci_dev *dev and struct pci_sys_data *sys in
-  pcibios_align_resource in 1/5.
-- Add Gabriele's codes in 2/5 which delete unnecessary information parse and
-  use of_pci_get_host_bridge_resources for both ARM32 and ARM64.
-- Add maintainer patch 5/5.
-
-Change from RFC v1:
-- Add 1/4 patch by Arnd which removes align_resource callback in ARM
-  pcibios_align_resource.
-- Change head file in pcie-designware from asm/hardirq.h to linux/hardirq.h.
-- Set pp->root_bus_nr = 0 in dra7xx, exynos, imx6, keystone, layerscape,
-  spear13xx.
-- Remove unnecessary parentheses of some macros in pcie-hisi.
-- Use macro to replace some magic values.
-- Merge two loops together and add some comments about it in context_config
-  function in pcie-hisi.
-- Modify some value of items in pcie node example in binding document. 
-
-Change from RFC:
-- delete dw_pcie_setup, dw_pcie_scan_bus, dw_pcie_map_irq and struct hw_pci,
-  merge related operations into dw_pcie_host_init.
-
-Link of v12:
-- https://lkml.org/lkml/2015/10/26/196
-Link of v11:
-- https://lkml.org/lkml/2015/10/16/228
-Link of v10:
-- http://www.spinics.net/lists/linux-pci/msg45490.html
-Link of v9:
-- http://www.spinics.net/lists/linux-pci/msg44545.html
-Link of v8:
-- http://www.spinics.net/lists/linux-pci/msg44192.html
-Link of v7:
-- http://www.spinics.net/lists/devicetree/msg90690.html
-Link of v6:
-- http://www.spinics.net/lists/linux-pci/msg43669.html
-Link of v5:
-- http://www.spinics.net/lists/devicetree/msg87959.html
-Link of v4:
-- http://www.spinics.net/lists/arm-kernel/msg433050.html
-Link of v3:
-- http://www.spinics.net/lists/linux-pci/msg42539.html
-Link of v2:
-- http://www.spinics.net/lists/linux-pci/msg41844.html
-Link of RFC v1:
-- http://www.spinics.net/lists/linux-pci/msg41305.html
-Link of RFC:
-- http://www.spinics.net/lists/linux-pci/msg40434.html
-
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-July/359741.html
-
-Zhou Wang (4):
-  PCI: designware: Remove *_mod_base
-  PCI: designware: Replace DT PCI ranges parse with
-    of_pci_get_host_bridge_resources
-  PCI: designware: Add ARM64 support
-  PCI: hisi: Add PCIe host support for HiSilicon SoC Hip05
-
-gabriele paoloni (2):
-  PCI: designware: Move calculation of bus addresses to DRA7xx
-  ARM/PCI: Replace pci_sys_data->align_resource with global function
-    pointer
-
- .../bindings/arm/hisilicon/hisilicon.txt           |  17 ++
- .../devicetree/bindings/pci/hisilicon-pcie.txt     |  44 ++++
- MAINTAINERS                                        |   7 +
- arch/arm/include/asm/mach/pci.h                    |   6 -
- arch/arm/kernel/bios32.c                           |  12 +-
- drivers/pci/host/Kconfig                           |   8 +
- drivers/pci/host/Makefile                          |   1 +
- drivers/pci/host/pci-dra7xx.c                      |   7 +
- drivers/pci/host/pci-keystone-dw.c                 |   2 +-
- drivers/pci/host/pcie-designware.c                 | 249 +++++++--------------
- drivers/pci/host/pcie-designware.h                 |  14 +-
- drivers/pci/host/pcie-hisi.c                       | 198 ++++++++++++++++
- 12 files changed, 378 insertions(+), 187 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/pci/hisilicon-pcie.txt
- create mode 100644 drivers/pci/host/pcie-hisi.c
-
+diff --git a/drivers/pci/host/pcie-designware.c b/drivers/pci/host/pcie-designware.c
+index 089b6cf..1a6d3e1 100644
+--- a/drivers/pci/host/pcie-designware.c
++++ b/drivers/pci/host/pcie-designware.c
+@@ -69,16 +69,7 @@
+ #define PCIE_ATU_FUNC(x)		(((x) & 0x7) << 16)
+ #define PCIE_ATU_UPPER_TARGET		0x91C
+ 
+-static struct hw_pci dw_pci;
+-
+-static unsigned long global_io_offset;
+-
+-static inline struct pcie_port *sys_to_pcie(struct pci_sys_data *sys)
+-{
+-	BUG_ON(!sys->private_data);
+-
+-	return sys->private_data;
+-}
++static struct pci_ops dw_pcie_ops;
+ 
+ int dw_pcie_cfg_read(void __iomem *addr, int where, int size, u32 *val)
+ {
+@@ -255,7 +246,7 @@ static void dw_pcie_msi_set_irq(struct pcie_port *pp, int irq)
+ static int assign_irq(int no_irqs, struct msi_desc *desc, int *pos)
+ {
+ 	int irq, pos0, i;
+-	struct pcie_port *pp = sys_to_pcie(msi_desc_to_pci_sysdata(desc));
++	struct pcie_port *pp = (struct pcie_port *) msi_desc_to_pci_sysdata(desc);
+ 
+ 	pos0 = bitmap_find_free_region(pp->msi_irq_in_use, MAX_MSI_IRQS,
+ 				       order_base_2(no_irqs));
+@@ -298,7 +289,7 @@ static int dw_msi_setup_irq(struct msi_controller *chip, struct pci_dev *pdev,
+ {
+ 	int irq, pos;
+ 	struct msi_msg msg;
+-	struct pcie_port *pp = sys_to_pcie(pdev->bus->sysdata);
++	struct pcie_port *pp = pdev->bus->sysdata;
+ 
+ 	if (desc->msi_attrib.is_msix)
+ 		return -EINVAL;
+@@ -327,7 +318,7 @@ static void dw_msi_teardown_irq(struct msi_controller *chip, unsigned int irq)
+ {
+ 	struct irq_data *data = irq_get_irq_data(irq);
+ 	struct msi_desc *msi = irq_data_get_msi_desc(data);
+-	struct pcie_port *pp = sys_to_pcie(msi_desc_to_pci_sysdata(msi));
++	struct pcie_port *pp = (struct pcie_port *) msi_desc_to_pci_sysdata(msi);
+ 
+ 	clear_irq_range(pp, irq, 1, data->hwirq);
+ }
+@@ -362,6 +353,7 @@ int dw_pcie_host_init(struct pcie_port *pp)
+ {
+ 	struct device_node *np = pp->dev->of_node;
+ 	struct platform_device *pdev = to_platform_device(pp->dev);
++	struct pci_bus *bus, *child;
+ 	struct resource *cfg_res;
+ 	u32 val;
+ 	int i, ret;
+@@ -390,14 +382,13 @@ int dw_pcie_host_init(struct pcie_port *pp)
+ 			pp->io->name = "I/O";
+ 			pp->io_size = resource_size(pp->io);
+ 			pp->io_bus_addr = pp->io->start - win->offset;
+-			pp->io->start = max_t(resource_size_t, PCIBIOS_MIN_IO,
+-					      pp->io_bus_addr +
+-					      global_io_offset);
+-			pp->io->end = min_t(resource_size_t, IO_SPACE_LIMIT,
+-					    pp->io_bus_addr + pp->io_size +
+-					    global_io_offset - 1);
++			ret = pci_remap_iospace(pp->io, pp->io_base);
++			if (ret) {
++				dev_warn(pp->dev, "error %d: failed to map resource %pR\n",
++					 ret, pp->io);
++				continue;
++			}
+ 			pp->io_base = pp->io->start;
+-			pp->io_base_tmp = pp->io->start;
+ 			break;
+ 		case IORESOURCE_MEM:
+ 			pp->mem = win->res;
+@@ -490,15 +481,35 @@ int dw_pcie_host_init(struct pcie_port *pp)
+ 	val |= PORT_LOGIC_SPEED_CHANGE;
+ 	dw_pcie_wr_own_conf(pp, PCIE_LINK_WIDTH_SPEED_CONTROL, 4, val);
+ 
+-#ifdef CONFIG_PCI_MSI
+-	dw_pcie_msi_chip.dev = pp->dev;
++	pp->root_bus_nr = pp->busn->start;
++	if (IS_ENABLED(CONFIG_PCI_MSI)) {
++		bus = pci_scan_root_bus_msi(pp->dev, pp->root_bus_nr,
++					    &dw_pcie_ops, pp, &res,
++					    &dw_pcie_msi_chip);
++		dw_pcie_msi_chip.dev = pp->dev;
++	} else
++		bus = pci_scan_root_bus(pp->dev, pp->root_bus_nr, &dw_pcie_ops,
++					pp, &res);
++	if (!bus)
++		return -ENOMEM;
++
++	if (pp->ops->scan_bus)
++		pp->ops->scan_bus(pp);
++
++#ifdef CONFIG_ARM
++	/* support old dtbs that incorrectly describe IRQs */
++	pci_fixup_irqs(pci_common_swizzle, of_irq_parse_and_map_pci);
+ #endif
+ 
+-	dw_pci.nr_controllers = 1;
+-	dw_pci.private_data = (void **)&pp;
++	if (!pci_has_flag(PCI_PROBE_ONLY)) {
++		pci_bus_size_bridges(bus);
++		pci_bus_assign_resources(bus);
+ 
+-	pci_common_init_dev(pp->dev, &dw_pci);
++		list_for_each_entry(child, &bus->children, node)
++			pcie_bus_configure_settings(child);
++	}
+ 
++	pci_bus_add_devices(bus);
+ 	return 0;
+ }
+ 
+@@ -598,7 +609,7 @@ static int dw_pcie_valid_config(struct pcie_port *pp,
+ static int dw_pcie_rd_conf(struct pci_bus *bus, u32 devfn, int where,
+ 			int size, u32 *val)
+ {
+-	struct pcie_port *pp = sys_to_pcie(bus->sysdata);
++	struct pcie_port *pp = bus->sysdata;
+ 	int ret;
+ 
+ 	if (dw_pcie_valid_config(pp, bus, PCI_SLOT(devfn)) == 0) {
+@@ -622,7 +633,7 @@ static int dw_pcie_rd_conf(struct pci_bus *bus, u32 devfn, int where,
+ static int dw_pcie_wr_conf(struct pci_bus *bus, u32 devfn,
+ 			int where, int size, u32 val)
+ {
+-	struct pcie_port *pp = sys_to_pcie(bus->sysdata);
++	struct pcie_port *pp = bus->sysdata;
+ 	int ret;
+ 
+ 	if (dw_pcie_valid_config(pp, bus, PCI_SLOT(devfn)) == 0)
+@@ -646,69 +657,6 @@ static struct pci_ops dw_pcie_ops = {
+ 	.write = dw_pcie_wr_conf,
+ };
+ 
+-static int dw_pcie_setup(int nr, struct pci_sys_data *sys)
+-{
+-	struct pcie_port *pp;
+-
+-	pp = sys_to_pcie(sys);
+-
+-	if (global_io_offset < SZ_1M && pp->io_size > 0) {
+-		sys->io_offset = global_io_offset - pp->io_bus_addr;
+-		pci_ioremap_io(global_io_offset, pp->io_base_tmp);
+-		global_io_offset += SZ_64K;
+-		pci_add_resource_offset(&sys->resources, pp->io,
+-					sys->io_offset);
+-	}
+-
+-	sys->mem_offset = pp->mem->start - pp->mem_bus_addr;
+-	pci_add_resource_offset(&sys->resources, pp->mem, sys->mem_offset);
+-	pci_add_resource(&sys->resources, pp->busn);
+-
+-	return 1;
+-}
+-
+-static struct pci_bus *dw_pcie_scan_bus(int nr, struct pci_sys_data *sys)
+-{
+-	struct pci_bus *bus;
+-	struct pcie_port *pp = sys_to_pcie(sys);
+-
+-	pp->root_bus_nr = sys->busnr;
+-
+-	if (IS_ENABLED(CONFIG_PCI_MSI))
+-		bus = pci_scan_root_bus_msi(pp->dev, sys->busnr, &dw_pcie_ops,
+-					    sys, &sys->resources,
+-					    &dw_pcie_msi_chip);
+-	else
+-		bus = pci_scan_root_bus(pp->dev, sys->busnr, &dw_pcie_ops,
+-					sys, &sys->resources);
+-
+-	if (!bus)
+-		return NULL;
+-
+-	if (bus && pp->ops->scan_bus)
+-		pp->ops->scan_bus(pp);
+-
+-	return bus;
+-}
+-
+-static int dw_pcie_map_irq(const struct pci_dev *dev, u8 slot, u8 pin)
+-{
+-	struct pcie_port *pp = sys_to_pcie(dev->bus->sysdata);
+-	int irq;
+-
+-	irq = of_irq_parse_and_map_pci(dev, slot, pin);
+-	if (!irq)
+-		irq = pp->irq;
+-
+-	return irq;
+-}
+-
+-static struct hw_pci dw_pci = {
+-	.setup		= dw_pcie_setup,
+-	.scan		= dw_pcie_scan_bus,
+-	.map_irq	= dw_pcie_map_irq,
+-};
+-
+ void dw_pcie_setup_rc(struct pcie_port *pp)
+ {
+ 	u32 val;
+diff --git a/drivers/pci/host/pcie-designware.h b/drivers/pci/host/pcie-designware.h
+index 91a36f6..264c969 100644
+--- a/drivers/pci/host/pcie-designware.h
++++ b/drivers/pci/host/pcie-designware.h
+@@ -33,7 +33,6 @@ struct pcie_port {
+ 	void __iomem		*va_cfg1_base;
+ 	u32			cfg1_size;
+ 	resource_size_t		io_base;
+-	resource_size_t		io_base_tmp;
+ 	phys_addr_t		io_bus_addr;
+ 	u32			io_size;
+ 	u64			mem_base;
 -- 
 1.9.1
