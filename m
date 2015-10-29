@@ -1,73 +1,138 @@
 From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Thu, 29 Oct 2015 11:11:41 +0900
-Subject: [PATCH] ARM: exynos: Bring back reboot on Exynos5410
-In-Reply-To: <CAGcde9H4WVt34rn6_9H+sVu2Bp2xq4awMiwV1zgv1D6posPWSg@mail.gmail.com>
-References: <1446024965-8508-1-git-send-email-p.fedin@samsung.com>
- <56317960.9070608@samsung.com>
- <CAGcde9H4WVt34rn6_9H+sVu2Bp2xq4awMiwV1zgv1D6posPWSg@mail.gmail.com>
-Message-ID: <5631805D.9070007@samsung.com>
+Date: Thu, 29 Oct 2015 11:16:21 +0900
+Subject: [PATCH v3 3/4] drivers: exynos-srom: Add support for bank
+ configuration
+In-Reply-To: <048021141f295b0e70c852134d4ac9cc6f7f1da4.1446018918.git.p.fedin@samsung.com>
+References: <cover.1446018918.git.p.fedin@samsung.com>
+ <048021141f295b0e70c852134d4ac9cc6f7f1da4.1446018918.git.p.fedin@samsung.com>
+Message-ID: <56318175.6000006@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29.10.2015 11:06, Pankaj Dubey wrote:
-> Hi Pavel,
+On 28.10.2015 16:57, Pavel Fedin wrote:
+> Bindings are based on u-boot implementation, however they are stored in
+> subnodes, providing support for more than one bank.
 > 
-> On 29 October 2015 at 07:11, Krzysztof Kozlowski
-> <k.kozlowski@samsung.com> wrote:
->> On 28.10.2015 18:36, Pavel Fedin wrote:
->>> Since 8cfc7fdd33080e30b86d21b1a8c9ad0686427ddc ("ARM: EXYNOS: move restart
->>
->> This should be sufficient (although full is okay as well):
->> $ git config core.abbrev 12
->>
->>> code into pmu driver") PMU support is required in order for the reboot to
->>> work. Unfortunately, there is currently no PMU support for 5410.
->>>
->>> This patch adds exynos5410-pmu to the list of recognized devices. It is
->>> okay for the code to have empty struct exynos_pmu_data, in this case only
->>> minimal support is enabled. This is enough for SWRESET to work.
->>>
->>> Signed-off-by: Pavel Fedin <p.fedin@samsung.com>
->>
->> This definitely looks like a fix for a regression, so:
->> Cc: <stable@vger.kernel.org>
->> Fixes: 8cfc7fdd3308 ("ARM: EXYNOS: move restart code into pmu driver")
->>
->>> ---
->>>  arch/arm/mach-exynos/pmu.c | 7 +++++++
->>>  1 file changed, 7 insertions(+)
->>>
->>> diff --git a/arch/arm/mach-exynos/pmu.c b/arch/arm/mach-exynos/pmu.c
->>> index de68938..7b9e33c 100644
->>> --- a/arch/arm/mach-exynos/pmu.c
->>> +++ b/arch/arm/mach-exynos/pmu.c
->>> @@ -908,6 +908,10 @@ static const struct exynos_pmu_data exynos5250_pmu_data = {
->>>       .powerdown_conf = exynos5_powerdown_conf,
->>>  };
->>>
->>> +static struct exynos_pmu_data exynos5410_pmu_data = {
->>> +     /* Only SWRESET is currently supported on 5410 */
->>> +};
->>
->> static const struct
->>
->> With these changes:
->> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
->>
->>
+> Since the driver now does more than suspend-resume support, dependency on
+> CONFIG_PM is removed.
 > 
-> Patch looks ok, but after Alim's patch series [1] to handle poweroff
-> and reboot via generic syscon based driver gets merged, this will
-> become redundant entry into PMU driver in the absence of any PMU  data
-> for Exynos5410. Alim has taken care of adding power-off and reboot
-> device node in exynos5410.dtsi [2].
+> Signed-off-by: Pavel Fedin <p.fedin@samsung.com>
+> ---
+>  arch/arm/mach-exynos/Kconfig      |  2 +-
+>  drivers/soc/samsung/Kconfig       |  2 +-
+>  drivers/soc/samsung/exynos-srom.c | 42 ++++++++++++++++++++++++++++++++++++++-
+>  3 files changed, 43 insertions(+), 3 deletions(-)
 > 
-> [1]: http://www.spinics.net/lists/devicetree/msg98858.html
-> [2]: http://www.spinics.net/lists/devicetree/msg98862.html
-> 
+> diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
+> index 83c85f5..c22dc42 100644
+> --- a/arch/arm/mach-exynos/Kconfig
+> +++ b/arch/arm/mach-exynos/Kconfig
+> @@ -16,7 +16,7 @@ menuconfig ARCH_EXYNOS
+>  	select ARM_GIC
+>  	select COMMON_CLK_SAMSUNG
+>  	select EXYNOS_THERMAL
+> -	select EXYNOS_SROM if PM
+> +	select EXYNOS_SROM
+>  	select HAVE_ARM_SCU if SMP
+>  	select HAVE_S3C2410_I2C if I2C
+>  	select HAVE_S3C2410_WATCHDOG if WATCHDOG
+> diff --git a/drivers/soc/samsung/Kconfig b/drivers/soc/samsung/Kconfig
+> index 2833b5b..ea4bc2a 100644
+> --- a/drivers/soc/samsung/Kconfig
+> +++ b/drivers/soc/samsung/Kconfig
+> @@ -8,6 +8,6 @@ config SOC_SAMSUNG
+>  
+>  config EXYNOS_SROM
+>  	bool
+> -	depends on ARM && ARCH_EXYNOS && PM
+> +	depends on ARM && ARCH_EXYNOS
+>  
+>  endmenu
+> diff --git a/drivers/soc/samsung/exynos-srom.c b/drivers/soc/samsung/exynos-srom.c
+> index 57a232d..6c8c56a 100644
+> --- a/drivers/soc/samsung/exynos-srom.c
+> +++ b/drivers/soc/samsung/exynos-srom.c
+> @@ -67,9 +67,46 @@ static struct exynos_srom_reg_dump *exynos_srom_alloc_reg_dump(
+>  	return rd;
+>  }
+>  
+> +static int decode_sromc(struct exynos_srom *srom, struct device_node *np)
+> +{
+> +	u32 bank, width;
+> +	u32 timing[7];
+> +	u32 bw;
+> +
+> +	if (of_property_read_u32(np, "bank", &bank))
+> +		return -ENXIO;
 
-Yes, current patch makes sense only if it gets into fixes for current RC
-and then backported to stable kernels. Alim's patchset won't be backported.
+This is an invalid value in DTB, not missing device or address, so -EINVAL.
+
+> +	if (of_property_read_u32(np, "width", &width))
+> +		width = 1;
+> +	if (of_property_read_u32_array(np, "srom-timing", timing, 7)) {
+
+s/7/ARRAY_SIZE/
+
+> +		pr_err("Could not decode SROMC configuration\n");
+
+dev_err()
+
+> +		return -ENXIO;
+
+Here also I would prefer -EINVAL
+
+> +	}
+> +
+> +	bank *= 4; /* Convert bank into shift/offset */
+> +
+> +	bw = 1 << EXYNOS_SROM_BW__BYTEENABLE__SHIFT;
+> +	if (width == 2)
+> +		bw |= 1 << EXYNOS_SROM_BW__DATAWIDTH__SHIFT;
+> +	bw <<= bank;
+> +	bw |= __raw_readl(srom->reg_base + EXYNOS_SROM_BW) &
+> +	      ~(EXYNOS_SROM_BW__CS_MASK << bank);
+
+This is reversed pattern. First read, then set or clear bits and finally
+write. It makes easier to understand what is the intention.
+
+> +	__raw_writel(bw, srom->reg_base + EXYNOS_SROM_BW);
+> +
+> +	__raw_writel((timing[0] << EXYNOS_SROM_BCX__PMC__SHIFT) |
+> +		    (timing[1] << EXYNOS_SROM_BCX__TACP__SHIFT) |
+> +		    (timing[2] << EXYNOS_SROM_BCX__TCAH__SHIFT) |
+> +		    (timing[3] << EXYNOS_SROM_BCX__TCOH__SHIFT) |
+> +		    (timing[4] << EXYNOS_SROM_BCX__TACC__SHIFT) |
+> +		    (timing[5] << EXYNOS_SROM_BCX__TCOS__SHIFT) |
+> +		    (timing[6] << EXYNOS_SROM_BCX__TACS__SHIFT),
+> +		    srom->reg_base + EXYNOS_SROM_BC0 + bank);
+> +
+> +	return 0;
+> +}
+> +
+>  static int exynos_srom_probe(struct platform_device *pdev)
+>  {
+> -	struct device_node *np;
+> +	struct device_node *np, *child;
+>  	struct exynos_srom *srom;
+>  	struct device *dev = &pdev->dev;
+>  
+> @@ -100,6 +137,9 @@ static int exynos_srom_probe(struct platform_device *pdev)
+>  		return -ENOMEM;
+>  	}
+>  
+> +	for_each_child_of_node(np, child)
+> +		decode_sromc(srom, child);
+
+You ignore the return value here so bank may be not configured but
+device probe will return 0.
+
+Maybe clean up and fail the probe?
 
 Best regards,
 Krzysztof
+
+> +
+>  	return 0;
+>  }
+>  
+> 
