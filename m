@@ -1,74 +1,106 @@
-From: khilman@kernel.org (Kevin Hilman)
-Date: Thu, 29 Oct 2015 02:21:30 -0700
-Subject: [GIT PULL] arm64: Juno: Add support for PCIe or R1 board
-In-Reply-To: <20151027101218.GI963@e106497-lin.cambridge.arm.com> (Liviu
- Dudau's message of "Tue, 27 Oct 2015 10:12:18 +0000")
-References: <20151021113629.GF3394@e106497-lin.cambridge.arm.com>
- <4136958.Qhq5GfeeVa@wuerfel>
- <20151026101256.GF963@e106497-lin.cambridge.arm.com>
- <20151026235505.GA13221@localhost>
- <20151027101218.GI963@e106497-lin.cambridge.arm.com>
-Message-ID: <7hh9lajahx.fsf@deeprootsystems.com>
+From: wangzhou1@hisilicon.com (Zhou Wang)
+Date: Thu, 29 Oct 2015 17:40:33 +0800
+Subject: [PATCH v13 1/6] PCI: designware: Move calculation of bus addresses to
+ DRA7xx
+In-Reply-To: <1446111638-197070-1-git-send-email-wangzhou1@hisilicon.com>
+References: <1446111638-197070-1-git-send-email-wangzhou1@hisilicon.com>
+Message-ID: <1446111638-197070-2-git-send-email-wangzhou1@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Liviu Dudau <Liviu.Dudau@arm.com> writes:
+From: gabriele paoloni <gabriele.paoloni@huawei.com>
 
-> On Tue, Oct 27, 2015 at 08:55:05AM +0900, Olof Johansson wrote:
->> Hi,
->> 
->> On Mon, Oct 26, 2015 at 10:12:57AM +0000, Liviu Dudau wrote:
->> > On Fri, Oct 23, 2015 at 10:42:53PM +0200, Arnd Bergmann wrote:
->> > > On Wednesday 21 October 2015 12:36:29 Liviu Dudau wrote:
->> > > > The following changes since commit 25cb62b76430a91cc6195f902e61c2cb84ade622:
->> > > > 
->> > > >   Linux 4.3-rc5 (2015-10-11 11:09:45 -0700)
->> > > > 
->> > > > are available in the git repository at:
->> > > > 
->> > > > 
->> > > 
->> > > Not pulled.
->> > > 
->> > > All our branches are based on -rc4 or earlier, and we'd like to avoid
->> > > backmerges from mainline if at all possible.
->> > > 
->> > > Can you rebase this to -rc4 and send again?
->> > > 
->> > > 	Arnd
->> > 
->> > Sure, I've rebased the branch on top of -rc4 now, so here is the new request.
->> > 
->> > Many thanks,
->> > Liviu
->> > 
->> > The following changes since commit 049e6dde7e57f0054fdc49102e7ef4830c698b46:
->> > 
->> >   Linux 4.3-rc4 (2015-10-04 16:57:17 +0100)
->> > 
->> > are available in the git repository at:
->> > 
->> >   git://linux-arm.org/linux-ld for-upstream/juno-pcie
->> 
->> This is showing up late by now, but Juno also isn't a high-volume platform
->> so exposure to regressions are limited.
->> 
->> That being said, I really hope we won't have to pick up any fixes for
->> this due to lack of exposure to -next after the merge window.
->> 
->> 
->> Merged into next/arm64.
->
-> Thanks,
->
-> The PCIe setup has been tested pretty thoroughly (famous last words) inside ARM.
-> The only surprises can come from various combinations of bootloaders and the
-> kernel, and I'm happy to handle those.
->
+Commit f4c55c5a3f7f ("PCI: designware: Program ATU with untranslated
+address") added the calculation of PCI BUS addresses in designware,
+storing them in new fields added in "struct pcie_port". This
+calculation is done for every designware user even if is only
+applicable to DRA7xx.
+This patch moves the calculation of the bus addresses to the DRA7xx
+driver and is needed to allow the rework of designware to use
+the new DT parsing API.
 
-FWIW, I've also been testing PCIe on juno-r1.  Unfortunately, it
-currently only works with the UEFI loader, but I understand PCIe init is
-on it's way upstream in mainline u-boo also, but I haven't been able to
-test that yet.
+Signed-off-by: Gabriele Paoloni <gabriele.paoloni@huawei.com>
+Signed-off-by: Zhou Wang <wangzhou1@hisilicon.com>
+Acked-by: Pratyush Anand <pratyush.anand@gmail.com>
+---
+ drivers/pci/host/pci-dra7xx.c      |  7 +++++++
+ drivers/pci/host/pcie-designware.c | 15 ++++-----------
+ 2 files changed, 11 insertions(+), 11 deletions(-)
 
-Kevin
+diff --git a/drivers/pci/host/pci-dra7xx.c b/drivers/pci/host/pci-dra7xx.c
+index 199e29a..0b4847a 100644
+--- a/drivers/pci/host/pci-dra7xx.c
++++ b/drivers/pci/host/pci-dra7xx.c
+@@ -62,6 +62,7 @@
+ 
+ #define	PCIECTRL_DRA7XX_CONF_PHY_CS			0x010C
+ #define	LINK_UP						BIT(16)
++#define	DRA7XX_CPU_TO_BUS_ADDR				0x0FFFFFFF
+ 
+ struct dra7xx_pcie {
+ 	void __iomem		*base;
+@@ -151,6 +152,12 @@ static void dra7xx_pcie_enable_interrupts(struct pcie_port *pp)
+ static void dra7xx_pcie_host_init(struct pcie_port *pp)
+ {
+ 	dw_pcie_setup_rc(pp);
++
++	pp->io_mod_base &= DRA7XX_CPU_TO_BUS_ADDR;
++	pp->mem_mod_base &= DRA7XX_CPU_TO_BUS_ADDR;
++	pp->cfg0_mod_base &= DRA7XX_CPU_TO_BUS_ADDR;
++	pp->cfg1_mod_base &= DRA7XX_CPU_TO_BUS_ADDR;
++
+ 	dra7xx_pcie_establish_link(pp);
+ 	if (IS_ENABLED(CONFIG_PCI_MSI))
+ 		dw_pcie_msi_init(pp);
+diff --git a/drivers/pci/host/pcie-designware.c b/drivers/pci/host/pcie-designware.c
+index 52aa6e3..75338a6 100644
+--- a/drivers/pci/host/pcie-designware.c
++++ b/drivers/pci/host/pcie-designware.c
+@@ -365,14 +365,10 @@ int dw_pcie_host_init(struct pcie_port *pp)
+ 	struct of_pci_range range;
+ 	struct of_pci_range_parser parser;
+ 	struct resource *cfg_res;
+-	u32 val, na, ns;
++	u32 val, ns;
+ 	const __be32 *addrp;
+ 	int i, index, ret;
+ 
+-	/* Find the address cell size and the number of cells in order to get
+-	 * the untranslated address.
+-	 */
+-	of_property_read_u32(np, "#address-cells", &na);
+ 	ns = of_n_size_cells(np);
+ 
+ 	cfg_res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "config");
+@@ -415,8 +411,7 @@ int dw_pcie_host_init(struct pcie_port *pp)
+ 			pp->io_base = range.cpu_addr;
+ 
+ 			/* Find the untranslated IO space address */
+-			pp->io_mod_base = of_read_number(parser.range -
+-							 parser.np + na, ns);
++			pp->io_mod_base = range.cpu_addr;
+ 		}
+ 		if (restype == IORESOURCE_MEM) {
+ 			of_pci_range_to_resource(&range, np, &pp->mem);
+@@ -425,8 +420,7 @@ int dw_pcie_host_init(struct pcie_port *pp)
+ 			pp->mem_bus_addr = range.pci_addr;
+ 
+ 			/* Find the untranslated MEM space address */
+-			pp->mem_mod_base = of_read_number(parser.range -
+-							  parser.np + na, ns);
++			pp->mem_mod_base = range.cpu_addr;
+ 		}
+ 		if (restype == 0) {
+ 			of_pci_range_to_resource(&range, np, &pp->cfg);
+@@ -436,8 +430,7 @@ int dw_pcie_host_init(struct pcie_port *pp)
+ 			pp->cfg1_base = pp->cfg.start + pp->cfg0_size;
+ 
+ 			/* Find the untranslated configuration space address */
+-			pp->cfg0_mod_base = of_read_number(parser.range -
+-							   parser.np + na, ns);
++			pp->cfg0_mod_base = range.cpu_addr;
+ 			pp->cfg1_mod_base = pp->cfg0_mod_base +
+ 					    pp->cfg0_size;
+ 		}
+-- 
+1.9.1
