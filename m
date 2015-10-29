@@ -1,42 +1,30 @@
-From: wxt@rock-chips.com (Caesar Wang)
-Date: Thu, 29 Oct 2015 15:14:18 +0800
-Subject: [PATCH v1 6/6] arm64: dts: Enable the Thermal on R88 board
-In-Reply-To: <1446102858-10116-1-git-send-email-wxt@rock-chips.com>
-References: <1446102858-10116-1-git-send-email-wxt@rock-chips.com>
-Message-ID: <1446102858-10116-7-git-send-email-wxt@rock-chips.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Thu, 29 Oct 2015 08:20:49 +0100
+Subject: [PATCH v3 1/2] arm64: dts: r8a7795: add GPIO nodes
+In-Reply-To: <1446073759-10569-2-git-send-email-horms+renesas@verge.net.au>
+References: <1446073759-10569-1-git-send-email-horms+renesas@verge.net.au>
+ <1446073759-10569-2-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <CAMuHMdXE6982DpOGjw3oijrCzzuytif1LPPUEG8Wh58A7wY5gQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch enable the TS-ADC.
+On Thu, Oct 29, 2015 at 12:09 AM, Simon Horman
+<horms+renesas@verge.net.au> wrote:
+> From: Takeshi Kihara <takeshi.kihara.df@renesas.com>
+>
+> Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
+> Signed-off-by: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 
-When a thermal temperature is invoked use the CRU to reset the chip
-on R88 board. TSHUT is low active on this board.
+Acked-by: by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-Signed-off-by: Caesar Wang <wxt@rock-chips.com>
+Gr{oetje,eeting}s,
 
----
+                        Geert
 
-Changes in v1: None
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
 
- arch/arm64/boot/dts/rockchip/rk3368-r88.dts | 6 ++++++
- 1 file changed, 6 insertions(+)
-
-diff --git a/arch/arm64/boot/dts/rockchip/rk3368-r88.dts b/arch/arm64/boot/dts/rockchip/rk3368-r88.dts
-index 401a812..7684426a 100644
---- a/arch/arm64/boot/dts/rockchip/rk3368-r88.dts
-+++ b/arch/arm64/boot/dts/rockchip/rk3368-r88.dts
-@@ -336,6 +336,12 @@
- 	status = "okay";
- };
- 
-+&tsadc {
-+	rockchip,hw-tshut-mode = <0>; /* tshut mode 0:CRU 1:GPIO */
-+	rockchip,hw-tshut-polarity = <0>; /* tshut polarity 0:LOW 1:HIGH */
-+	status = "okay";
-+}
-+
- &uart2 {
- 	status = "okay";
- };
--- 
-1.9.1
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
