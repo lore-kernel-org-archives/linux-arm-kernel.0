@@ -1,35 +1,28 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 29 Oct 2015 14:33:34 +0100
-Subject: [PATCH 1/2] pinctrl: uniphier: enable UniPhier SoCs pinctrl
- drivers by default
-In-Reply-To: <1445912911-1292-1-git-send-email-yamada.masahiro@socionext.com>
+Date: Thu, 29 Oct 2015 14:34:29 +0100
+Subject: [PATCH 2/2] pinctrl: uniphier: guard uniphier directory with
+ CONFIG_PINCTRL_UNIPHIER
+In-Reply-To: <1445912911-1292-2-git-send-email-yamada.masahiro@socionext.com>
 References: <1445912911-1292-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <CACRpkdY4hs_7dE2KicDeUj7hvbKmHu3pcwQO3eshTtSmzH2PGA@mail.gmail.com>
+ <1445912911-1292-2-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <CACRpkdZ286dBTvd3EO_GTixnS=Cz-ch-H+AzNOJhZwoB63K6jw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Tue, Oct 27, 2015 at 3:28 AM, Masahiro Yamada
 <yamada.masahiro@socionext.com> wrote:
 
-> Add "default y" to the Kconfig rather than adding entries into
-> arch/arm/configs/multi_v7_defconfig.
+> CONFIG_PINCTRL_UNIPHIER is more suitable than CONFIG_ARCH_UNIPHIER
+> to guard the drivers/pinctrl/uniphier directory.
+>
+> The current CONFIG_PINCTRL_UNIPHIER_CORE is a bit long
+> (it would break the indentation in drivers/pinctrl/Makefile),
+> so rename it into CONFIG_PINCTRL_UNIPHIER.
 >
 > Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
 
-(...)
-> config PINCTRL_UNIPHIER_PH1_LD4
->         tristate "UniPhier PH1-LD4 SoC pinctrl driver"
-> +       default y
->         select PINCTRL_UNIPHIER_CORE
-
-Why is it not default y if <PH1_LD4_SOC_THING>?
-
-So it is only turned on if the corresponding SoC is selected?
-
-Or don't you have symbols like that?
-
-ARM SoC folks: can you ACK this patch indicating that this is the way
-you wanna handle this?
+Holding this back until we know what to do with the first patch
+but it looks OK.
 
 Yours,
 Linus Walleij
