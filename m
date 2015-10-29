@@ -1,71 +1,107 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Thu, 29 Oct 2015 09:03:31 -0700
-Subject: [PATCH v4 2/3] mtd: mtk-nor: mtk serial flash controller driver
-In-Reply-To: <1446126991.25711.23.camel@mhfsdcap03>
-References: <1444729160-26433-1-git-send-email-bayi.cheng@mediatek.com>
- <1444729160-26433-3-git-send-email-bayi.cheng@mediatek.com>
- <20151016073959.GB28158@localhost>
- <1445178035.4832.23.camel@mhfsdcap03>
- <20151029015237.GE13239@google.com>
- <1446089334.25711.10.camel@mhfsdcap03>
- <1446126991.25711.23.camel@mhfsdcap03>
-Message-ID: <20151029160331.GA12954@localhost>
+From: scottwood@freescale.com (Scott Wood)
+Date: Thu, 29 Oct 2015 11:06:18 -0500
+Subject: [PATCH v6 22/22] of/platform: Defer probes of registered devices
+In-Reply-To: <CAAObsKDR6pTEDK-G+jw+cr9MD-XoZqU8niqvDFHqFM0ve-+Smw@mail.gmail.com>
+References: <1442844182-27787-1-git-send-email-tomeu.vizoso@collabora.com>
+ <1442844182-27787-23-git-send-email-tomeu.vizoso@collabora.com>
+ <1445406845.701.55.camel@freescale.com>
+ <CAL_JsqLhZmc8cEC+tFJ25KLe0bQZsWmrRWGBMQake9VN6OjvdQ@mail.gmail.com>
+ <1445467912.701.90.camel@freescale.com>
+ <CAAObsKAfufBe_SycibUN3ZsE3fOkBfUjZRx1SWEMwVtM6t7inQ@mail.gmail.com>
+ <1445549230.701.116.camel@freescale.com>
+ <CAAObsKDR6pTEDK-G+jw+cr9MD-XoZqU8niqvDFHqFM0ve-+Smw@mail.gmail.com>
+Message-ID: <1446134778.701.374.camel@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 29, 2015 at 09:56:31PM +0800, bayi.cheng wrote:
-> On Thu, 2015-10-29 at 11:28 +0800, bayi.cheng wrote:
-> > On Wed, 2015-10-28 at 18:52 -0700, Brian Norris wrote:
-> > > On Sun, Oct 18, 2015 at 10:20:35PM +0800, bayi.cheng wrote:
-> > > > On Fri, 2015-10-16 at 00:39 -0700, Brian Norris wrote:
-> > > > > On Tue, Oct 13, 2015 at 05:39:19PM +0800, Bayi Cheng wrote:
-
-> > > > > > +	/* mtk nor controller doesn't supoort SPINOR_OP_RDCR */
-> > > > > > +	switch (opcode) {
-> > > > > > +	case SPINOR_OP_RDID:
-> > > > > > +		/* read JEDEC ID need 4 bytes commands */
-> > > > > > +		ret = mt8173_nor_set_cmd(mt8173_nor, 0, 32, SPINOR_OP_RDID);
-> > > > > > +		if (ret < 0)
-> > > > > > +			return ret;
-> > > > > > +
-> > > > > > +		/* mtk nor flash controller only support 3 bytes IDs */
+On Wed, 2015-10-28 at 15:40 +0100, Tomeu Vizoso wrote:
+> On 22 October 2015 at 23:27, Scott Wood <scottwood@freescale.com> wrote:
+> > On Thu, 2015-10-22 at 15:04 +0200, Tomeu Vizoso wrote:
+> > > On 22 October 2015 at 00:51, Scott Wood <scottwood@freescale.com> wrote:
+> > > > On Wed, 2015-10-21 at 08:44 -0500, Rob Herring wrote:
+> > > > > On Wed, Oct 21, 2015 at 12:54 AM, Scott Wood <
+> > > > > scottwood at freescale.com>
+> > > > > wrote:
+> > > > > > On Mon, 2015-09-21 at 16:03 +0200, Tomeu Vizoso wrote:
+> > > > > > > Instead of trying to match and probe platform and AMBA devices 
+> > > > > > > right
+> > > > > > > after each is registered, delay their probes until
+> > > > > > > device_initcall_sync.
+> > > > > > > 
+> > > > > > > This means that devices will start probing once all built-in 
+> > > > > > > drivers
+> > > > > > > have registered, and after all platform and AMBA devices from 
+> > > > > > > the DT
+> > > > > > > have been registered already.
+> > > > > > > 
+> > > > > > > This allows us to prevent deferred probes by probing 
+> > > > > > > dependencies on
+> > > > > > > demand.
+> > > > > > > 
+> > > > > > > Signed-off-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
+> > > > > > > ---
+> > > > > > > 
+> > > > > > > Changes in v4:
+> > > > > > > - Also defer probes of AMBA devices registered from the DT as 
+> > > > > > > they
+> > > > > > > can
+> > > > > > >   also request resources.
+> > > > > > > 
+> > > > > > >  drivers/of/platform.c | 11 ++++++++---
+> > > > > > >  1 file changed, 8 insertions(+), 3 deletions(-)
+> > > > > > 
+> > > > > > This breaks arch/powerpc/sysdev/fsl_pci.c.  The PCI bus is an OF
+> > > > > > platform
+> > > > > > device, and it must be probed before pcibios_init() which is a
+> > > > > > subsys_initcall(), or else the PCI bus never gets scanned.
 > > > > > 
-> > > > > Are you absolutely sure of this? That would be highly unfortunate, but
-> > > > > I also don't believe it's true.
-> > > > > 
-> > > > Yes, for this issue I have asked our designer of nor flash controller,
-> > > > unfortunately, it is true, and I have tried to read more IDs, but our
-> > > > controller just accept 3 IDs from nor flash, and our next generation IC
-> > > > may solve this problem.
+> > > > > Thanks for the report. This is probably getting dropped, but it 
+> > > > > could
+> > > > > be disabled for PPC.
+> > > > 
+> > > > I don't think that adding another arbitrary arch difference would be 
+> > > > the
+> > > > right solution.
 > > > 
-> > > How exactly did you try? Did you do what I suggested above? Are the
-> > > "shift registers" not all actually functional?
-> > > 
-> > Hi Brian, For this problem, I have asked our nor controller designer to
-> > double confirm again, and he promise to do some simulation testes, On
-> > the other hand, I have got some Spansion nor flash which has 5 IDs, and
-> > after our designer make sure our controller can support 5 or 6 IDs, then
-> > I will rework a special platform with S25FL256SA. If we have any
-> > progress, I will inform you immediately!  Thanks!!
+> > > I think Rob meant temporarily disable it while things get fixed. At
+> > > least,
 > > 
-> Hi Brian, Thanks very much for your perseverance!!
-> Actually, You idea is correct, and our designer has completed some
-> simulation test on spansion nor flash witch has more than 3 IDs, and the
-> results has prove that we can support to read 5 IDs. I also double
+> > So, what is the permanent fix for the swiotlb issue (or more generally, 
+> > the
+> > inability to have a late_initcall that runs after non-module, non-hotplug
+> > platform devices have been probed)?
+> 
+> If the code in pcibios_init() depends on the PCI bus device having
+> probed, then I would recommend making that dependency explicit by
+> calling of_device_probe() on the OF node of the PCI controller when
+> looking it up.
 
-Awesome!
+"when looking it up"?  pcibios_init() doesn't do anything with the OF node or 
+know any details about the particular PCI bus host implementation.
 
-> confirmed with spansion nor flash. The only pity is that our nor
-> controller can't support 6 IDs, we just support 5 IDs.
+> > > I don't see any reason why PPC wouldn't benefit from this
+> > > series.
+> > 
+> > It's not clear to me what the benefit of this is at all, much less for 
+> > PPC.
+> > What is the fundamental problem with deferred probes?  In the cover letter
+> > you say this change saves 2.3 seconds, but where is that time being 
+> > consumed?
+> >  Are the drivers taking too long in their probe function trying to 
+> > initialize
+> > and then deferring, rather than checking for dependencies up front?  Or 
+> > are
+> > there really so many devices and such a pessimal ordering that most of the
+> > time is spent iterating through and reordering the list, with each defer
+> > happening quickly?
+> 
+> The problem is that a device that defers its probe is currently sent
+> to the back of the queue, and that's undesired in some use cases in
+> which there's a device that should be up as soon as possible during
+> boot (and boot takes a long time). So the goal is to change the order
+> in which devices with dependencies end up probing.
 
-That's not quite as awesome. But that's still much more workable than
-only 3 bytes. Perhaps we'll want a way to communicate that to the
-spi-nor layer, so it doesn't think it can match a full 6 bytes?
+That doesn't answer my question about where the time is being spent.  Did you 
+profile?
 
-> I will submit my changes to V6 version. Thanks again!!
-
-OK, but let me take another look at v5 and send you comments on that one
-first.
-
-Regards,
-Brian
+-Scott
