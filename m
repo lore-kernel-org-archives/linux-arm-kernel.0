@@ -1,81 +1,81 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 29 Oct 2015 21:26:44 +0900
-Subject: [PATCH 0/3] Revert arm64 cache geometry
-In-Reply-To: <20151029112008.GA28221@leverpostej>
-References: <1446068637-11509-1-git-send-email-avanbrunt@nvidia.com>
- <CAKv+Gu-CgXU4O8SymcjmCYZqyAa0PZbJXwNqXfuCamxYY9C8GA@mail.gmail.com>
- <20151029112008.GA28221@leverpostej>
-Message-ID: <CAKv+Gu-gBKdQneC_3yX3sQtQsL8244S1qGkXYZ5PhrPov1aRhA@mail.gmail.com>
+From: p.fedin@samsung.com (Pavel Fedin)
+Date: Thu, 29 Oct 2015 15:42:17 +0300
+Subject: [PATCH v4 1/4] Documentation: dt-bindings: Describe SROMc
+ configuration
+In-Reply-To: <cover.1446122247.git.p.fedin@samsung.com>
+References: <cover.1446122247.git.p.fedin@samsung.com>
+Message-ID: <f1fbd1a7877090f4318705f0fccbf4d96c0ebc9c.1446122247.git.p.fedin@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29 October 2015 at 20:20, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Thu, Oct 29, 2015 at 12:22:51PM +0900, Ard Biesheuvel wrote:
->> On 29 October 2015 at 06:43, Alex Van Brunt <avanbrunt@nvidia.com> wrote:
->> > This patchset reverts three patches that attempt to query the CPU for cache
->> > geometry and then make use of that information. Those patches rely on the
->> > NumSets and LineSize fields of CCSIDR to determine the cache geometry. However,
->> > the architectural documentation for these registers forbids such use:
->> >
->> >         The parameters NumSets, Associativity, and LineSize in these registers
->> >         define the architecturally visible parameters that are required for the
->> >         cache maintenance by Set/Way instructions. They are not guaranteed to
->> >         represent the actual microarchitectural features of a design. You cannot
->> >         make any inference about the actual sizes of caches based on these
->> >         parameters.
->> >
->> > It is not just theoretical. For example, the Denver CPU will report one set and
->> > one way in CCSIDR even though the actual microarchitectural implementation has
->> > many sets and many ways.
->> >
->>
->> Fair enough. It is a bit disappointing that we cannot trust these
->> values, but if the architecture does not mandate their accuracy, we
->> obviously should not be using them in the way that we are.
->
-> Indeed.
->
->> > The only place that the cache geometry is used is to determine if there can be
->> > aliasing for a VIPT (virtually-indexed, physically-tagged) instruction cache.
->> > The code assumes that there is no need to flush the entire instruction cache
->> > if the size of a cache set is less than or equal to a page size. However, the
->> > architectural definition of VIPT says "The only architecturally-guaranteed way
->> > to invalidate all aliases of a physical address from a VIPT instruction cache
->> > is to invalidate the entire instruction cache." Not only are the parameters not
->> > guaranteed to be correct, it is explicitly not legal to ignore aliasing even if
->> > the parameters were correct.
->> >
->>
->> I understand that this is subject to interpretation, but I would argue
->> that this does not apply to the case where you can prove that no
->> aliases could ever exist (which is the point of comparing the way size
->> to the page size)
->
-> Given NumSets and LineSize aren't guaranteed to match the physical
-> values, I don't see that way have sufficient information to derive the
-> physical way size in order to do so.
->
+Add documentation for new subnode properties, allowing bank configuration.
+Based on u-boot implementation, but heavily reworked.
 
-I know, but the argument being made is that if we did have this
-information, we would still violate the spec if we used it to decide
-whether a VIPT I-cache could alias or not.
+Signed-off-by: Pavel Fedin <p.fedin@samsung.com>
+---
+ .../bindings/arm/samsung/exynos-srom.txt           | 50 +++++++++++++++++++++-
+ 1 file changed, 48 insertions(+), 2 deletions(-)
 
->> > Alex Van Brunt (3):
->> >   Revert "arm64: kernel: add support for cpu cache information"
->> >   Revert "arm64: don't flag non-aliasing VIPT I-caches as aliasing"
->> >   Revert "arm64: add helper functions to read I-cache attributes"
->> >
->>
->> None of the clarifications you offer here are in the commit logs of
->> the patches. Since the cover letter does not make it into the
->> repository, someone looking at the commit log will not have a clue why
->> these patches were reverted all of a sudden. Could you please update
->> that? At the same time, could you get rid of the Change-Ids as well?
->> They are meaningless in the kernel tree.
->
-> It would be good to include the quote from the cover letter in each
-> patch; it makes the situation abundantly clear and avoids having to
-> trawl through the ARM ARM again in future.
->
-
-Indeed.
+diff --git a/Documentation/devicetree/bindings/arm/samsung/exynos-srom.txt b/Documentation/devicetree/bindings/arm/samsung/exynos-srom.txt
+index 33886d5..02ecc7f 100644
+--- a/Documentation/devicetree/bindings/arm/samsung/exynos-srom.txt
++++ b/Documentation/devicetree/bindings/arm/samsung/exynos-srom.txt
+@@ -5,8 +5,54 @@ Required properties:
+ 
+ - reg: offset and length of the register set
+ 
+-Example:
++- #address-cells, #size-cells : should be '1' if the device has sub-nodes
++				with 'reg' property.
++- ranges: allows valid 1:1 translation between child's address space and
++	  parent's address space
++
++Sub-nodes:
++The SROM controller can be used to attach external peripherials. In this case
++device nodes should be added as subnodes to the SROMc node. These subnodes,
++except regular device specification, should contain the following properties,
++describing configuration of the relevant SROM bank:
++
++Required properties:
++- samsung,srom-bank : bank number (0 - 3)
++
++- samsung,srom-timing : array of 7 integers: PMC, Tacp, Tcah, Tcoh, Tacc, Tcos,
++			Tacs
++
++Optional properties:
++- samsung,srom-data-width : data width in bytes (1 or 2). If omitted, default
++			    of 1 is used.
++
++Example: basic definition, no banks are configured
+ 	sromc at 12570000 {
+ 		compatible = "samsung,exynos-srom";
+-		reg = <0x12570000 0x10>;
++		reg = <0x12570000 0x14>;
++	};
++
++Example: SROMc with smsc 911x ethernet chip on bank 3
++	sromc at 12570000 {
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges;
++
++		compatible = "samsung,exynos-srom";
++		reg = <0x12570000 0x14>;
++
++		ethernet at 07000000 {
++			compatible = "smsc,lan9115";
++			reg = <0x07000000 0x10000>;
++			phy-mode = "mii";
++			interrupt-parent = <&gpx0>;
++			interrupts = <5 8>;
++			reg-io-width = <2>;
++			smsc,irq-push-pull;
++			smsc,force-internal-phy;
++
++			samsung,srom-bank = <3>;
++			samsung,srom-data-width = <2>;
++			samsung,srom-timing = <1 9 12 1 9 1 1>;
++		};
+ 	};
+-- 
+2.4.4
