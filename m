@@ -1,207 +1,147 @@
-From: yangyingliang@huawei.com (Yang Yingliang)
-Date: Thu, 29 Oct 2015 16:31:51 +0800
-Subject: [PATCH 2/2] arm64: validate the delta of cycle_now and cycle_last
-In-Reply-To: <5631CC8F.6050201@huawei.com>
-References: <1445952073-7260-1-git-send-email-yangyingliang@huawei.com>
- <1445952073-7260-3-git-send-email-yangyingliang@huawei.com>
- <20151027140302.GE3091@leverpostej> <5631CC8F.6050201@huawei.com>
-Message-ID: <5631D977.10105@huawei.com>
+From: leo.yan@linaro.org (Leo Yan)
+Date: Thu, 29 Oct 2015 16:33:01 +0800
+Subject: [PATCH 1/4] arm64: dts: Reserve memory regions for hi6220
+In-Reply-To: <CAL_JsqLhu03B_ADYvCYdduH2d38kajOyc=9eX_FHy4QYYhZGxQ@mail.gmail.com>
+References: <1444365376-10728-1-git-send-email-leo.yan@linaro.org>
+ <1444365376-10728-2-git-send-email-leo.yan@linaro.org>
+ <CAL_JsqJapPM6CpaG+AYDAUQajZ4V5jREdCwA5F4vkD5jqC3bzg@mail.gmail.com>
+ <20151009133028.GB21629@leverpostej>
+ <CAL_Jsq+TrsS39L4nsRgqszTxKHyc00fLUf+BmftHnn=EV0PxhA@mail.gmail.com>
+ <20151009142034.GB528@leoy-linaro>
+ <CAL_JsqLhu03B_ADYvCYdduH2d38kajOyc=9eX_FHy4QYYhZGxQ@mail.gmail.com>
+Message-ID: <20151029083301.GB16063@leoy-linaro>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wed, Oct 28, 2015 at 11:32:29PM -0500, Rob Herring wrote:
+> On Fri, Oct 9, 2015 at 9:20 AM, Leo Yan <leo.yan@linaro.org> wrote:
+> > On Fri, Oct 09, 2015 at 08:50:13AM -0500, Rob Herring wrote:
+> >> On Fri, Oct 9, 2015 at 8:30 AM, Mark Rutland <mark.rutland@arm.com> wrote:
+> >> > On Fri, Oct 09, 2015 at 08:17:16AM -0500, Rob Herring wrote:
+> >> >> On Thu, Oct 8, 2015 at 11:36 PM, Leo Yan <leo.yan@linaro.org> wrote:
+> >> >> > On Hi6220, below memory regions in DDR have specific purpose:
+> >> >> >
+> >> >> >   0x05e0,0000 - 0x05ef,ffff: For MCU firmware using at runtime;
+> >> >> >   0x06df,f000 - 0x06df,ffff: For mailbox message data;
+> >> >> >   0x0740,f000 - 0x0740,ffff: For MCU firmware's section;
+> >> >> >   0x3e00,0000 - 0x3fff,ffff: For OP-TEE.
+> >> >> >
+> >> >> > This patch reserves these memory regions in DT.
+> >> >> >
+> >> >> > Signed-off-by: Leo Yan <leo.yan@linaro.org>
+> >> >> > ---
+> >> >> >  arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts | 16 ++++++++++++----
+> >> >> >  1 file changed, 12 insertions(+), 4 deletions(-)
+> >> >> >
+> >> >> > diff --git a/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts b/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
+> >> >> > index e36a539..e3f4cb3 100644
+> >> >> > --- a/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
+> >> >> > +++ b/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
+> >> >> > @@ -7,9 +7,6 @@
+> >> >> >
+> >> >> >  /dts-v1/;
+> >> >> >
+> >> >> > -/*Reserved 1MB memory for MCU*/
+> >> >> > -/memreserve/ 0x05e00000 0x00100000;
+> >> >> > -
+> >> >>
+> >> >> Why does memreserve not work for you? You can have multiple entries.
+> >> >>
+> >> >> >  #include "hi6220.dtsi"
+> >> >> >
+> >> >> >  / {
+> >> >> > @@ -24,8 +21,19 @@
+> >> >> >                 stdout-path = "serial0:115200n8";
+> >> >> >         };
+> >> >> >
+> >> >> > +       /*
+> >> >> > +        * Reserve below regions from memory node:
+> >> >> > +        *
+> >> >> > +        *  - 0x05e0,0000 - 0x05ef,ffff: MCU firmware runtime using
+> >> >> > +        *  - 0x06df,f000 - 0x06df,ffff: Mailbox message data
+> >> >> > +        *  - 0x0740,f000 - 0x0740,ffff: MCU firmware section
+> >> >> > +        *  - 0x3e00,0000 - 0x3fff,ffff: OP-TEE
+> >> >> > +        */
+> >> >> >         memory at 0 {
+> >> >> >                 device_type = "memory";
+> >> >> > -               reg = <0x0 0x0 0x0 0x40000000>;
+> >> >> > +               reg = <0x00000000 0x00000000 0x00000000 0x05e00000>,
+> >> >> > +                     <0x00000000 0x05f00000 0x00000000 0x00eff000>,
+> >> >> > +                     <0x00000000 0x06e00000 0x00000000 0x0060f000>,
+> >> >> > +                     <0x00000000 0x07410000 0x00000000 0x36bf0000>;
+> >> >>
+> >> >> No, don't do this. Please use memreserve or reserved-memory binding[1]
+> >> >> or combination of both. Probably reserved-memory if you need the
+> >> >> kernel to access some of these regions.
+> >> >
+> >> > I disagree at least for those portions owned by the secure world. The
+> >> > kernel shouldn't map those at all, so memreserve isn't appropriate. That
+> >> > covers OP-TEE and the MCU firmware regions, and I'd expec the EFI memory
+> >> > map to not list those as available to the kernel.
+> >>
+> >> I'm fine carving out the beginning or end, but otherwise think memory
+> >> should correspond to the physical memory. We have a way to describe
+> >> holes to keep out, so we should use them. If secure world uses the DT,
+> >> then it would either want to know its region in memory or add the DT
+> >> data to say what it is using. We need that to be easy to find or easy
+> >> to set, respectively. The size secure world needs could vary as well.
+> >>
+> >> The fact that the kernel maps the memory is the kernel's problem, not
+> >> a DT problem.
+> >>
+> >
+> > Just give more input here. In previous time, we have long discussion [1];
+> > So actually your suggestion is exactly same what my old patch.
+> >
+> > From previous discussion, i think here have an assumtion: Use UEFI as
+> > bootloader, the kernel will ignore (or remove) memreserve and reserved-memory
+> > nodes, so just like Mark said "the EFI memory map to not list those
+> > as available to the kernel". My new patch is just to follow this and
+> > also make sure they have same behavior for different bootloader
+> > (between UEFI and uboot).
+> 
+> I've read thru the thread and see 2 main conclusions. Using
+> reserved-memory is problematic since things like grub don't support
+> that. That is fine and we should stick with /mem-reserve/ for now.
 
-On 2015/10/29 15:36, Yang Yingliang wrote:
->
-> On 2015/10/27 22:03, Mark Rutland wrote:
->> On Tue, Oct 27, 2015 at 09:21:13PM +0800, Yang Yingliang wrote:
->>> In multi-core system, if the clock is not sync perfectly, it
->>> will make cycle_last that recorded by CPU-A is a little more
->>> than cycle_now that read by CPU-B.
->>
->> If that is happening, that sounds like a hardware and/or firmware bug.
->>
->> The ARM ARM states the following (where a CPU is a device):
->>
->>     The system counter must provide a uniform view of system time. More
->>     precisely, it must be impossible for the following sequence of events
->>     to show system time going backwards:
->>
->>     1. Device A reads the time from the system counter.
->>
->>     2. Device A communicates with another agent in the system, Device B.
->>
->>     3. After recognizing the communication from Device A, Device B reads
->>        the time from the system counter.
->>
->> Per [1] it seems like the TSC is not architected to provide this
->> guarantee for
->> x86.
->>
->> Are you certain that the CPUs have clocks which are not in sync?
->>
->>> With the negative result,
->>> hrtimer_update_base() return a huge and wrong time. It leads
->>> to the cpu can not finish the while loop in hrtimer_interrupt()
->>> until the real nowtime which is returned from ktime_get() catch
->>> up with the wrong time on clock monotonic base.
->>>
->>> I was able to reproudce the problem with calling clock_settime
->>> and clock_adjtime repeatedly on each cpu. The params of the calls
->>> is random.
->>
->> Could you share your reproducer?
->
-> https://github.com/kernelslacker/trinity
->
-> I use this testsuite and I make it call clock_settime and
-> clock_adjtime alternately with random params on each core.
->
->>
->> How long does it take to trigger the issue?
->
-> It's not certain. It would take half an hour or several hours or more
-> longer.
->
->>
->>> Here is the calltrace:
->>>
->>> Jan 01 00:02:29 Linux kernel: INFO: rcu_sched detected stalls on
->>> CPUs/tasks:
->>> Jan 01 00:02:29 Linux kernel:         0: (2 GPs behind) idle=913/1/0
->>> softirq=59289/59291 fqs=488
->>> Jan 01 00:02:29 Linux kernel:         (detected by 20, t=5252
->>> jiffies, g=35769, c=35768, q=567)
->>> Jan 01 00:02:29 Linux kernel: Task dump for CPU 0:
->>> Jan 01 00:02:29 Linux kernel: swapper/0       R  running task
->>> 0   0      0 0x00000002
->>> Jan 01 00:02:29 Linux kernel: Call trace:
->>> Jan 01 00:02:29 Linux kernel: [<ffffffc000086c5c>] __switch_to+0x74/0x8c
->>> Jan 01 00:02:29 Linux kernel: rcu_sched kthread starved for 4764
->>> jiffies!
->>> Jan 01 00:03:32 Linux kernel: NMI watchdog: BUG: soft lockup - CPU#0
->>> stuck for 23s! [swapper/0:0]
->>> Jan 01 00:03:32 Linux kernel: CPU: 0 PID: 0 Comm: swapper/0 Not
->>> tainted 4.1.6+ #184
->>> Jan 01 00:03:32 Linux kernel: task: ffffffc00091cdf0 ti:
->>> ffffffc000910000 task.ti: ffffffc000910000
->>> Jan 01 00:03:32 Linux kernel: PC is at arch_cpu_idle+0x10/0x18
->>> Jan 01 00:03:32 Linux kernel: LR is at arch_cpu_idle+0xc/0x18
->>> Jan 01 00:03:32 Linux kernel: pc : [<ffffffc00008686c>] lr :
->>> [<ffffffc000086868>] pstate: 60000145
->>> Jan 01 00:03:32 Linux kernel: sp : ffffffc000913f20
->>> Jan 01 00:03:32 Linux kernel: x29: ffffffc000913f20 x28:
->>> 000000003f4bbab0
->>> Jan 01 00:03:32 Linux kernel: x27: ffffffc00091669c x26:
->>> ffffffc00096e000
->>> Jan 01 00:03:32 Linux kernel: x25: ffffffc000804000 x24:
->>> ffffffc000913f30
->>> Jan 01 00:03:32 Linux kernel: x23: 0000000000000001 x22:
->>> ffffffc0006817f8
->>> Jan 01 00:03:32 Linux kernel: x21: ffffffc0008fdb00 x20:
->>> ffffffc000916618
->>> Jan 01 00:03:32 Linux kernel: x19: ffffffc000910000 x18:
->>> 00000000ffffffff
->>> Jan 01 00:03:32 Linux kernel: x17: 0000007f9d6f682c x16:
->>> ffffffc0001e19d0
->>> Jan 01 00:03:32 Linux kernel: x15: 0000000000000061 x14:
->>> 0000000000000072
->>> Jan 01 00:03:32 Linux kernel: x13: 0000000000000067 x12:
->>> ffffffc000682528
->>> Jan 01 00:03:32 Linux kernel: x11: 0000000000000005 x10:
->>> 00000001000faf9a
->>> Jan 01 00:03:32 Linux kernel: x9 : ffffffc000913e60 x8 :
->>> ffffffc00091d350
->>> Jan 01 00:03:32 Linux kernel: x7 : 0000000000000000 x6 :
->>> 002b24c4f00026aa
->>> Jan 01 00:03:32 Linux kernel: x5 : 0000001ffd5c6000 x4 :
->>> ffffffc000913ea0
->>> Jan 01 00:03:32 Linux kernel: x3 : ffffffdffdec3b44 x2 :
->>> ffffffdffdec3b44
->>> Jan 01 00:03:32 Linux kernel: x1 : 0000000000000000 x0 :
->>> 0000000000000000
->>
->> In this case was CNTVOFF uniform on all CPUs?
->>
->> Was the kernel booted at EL2 or EL1N? Was it booted under a hypervisor?
->
-> At EL1N without a hypervisor.
+Thanks for reviewing, Rob.
 
-I was wrong, It booted at EL2 without hypervisor.
+One thing should note: after booting with UEFI, /memreserve/ nodes
+will be deleted by UEFI stub; and _ONLY_ can use /reserved-memory/
+node to reserve memory regions.
 
->
->>
->>> CPU-A updates the cycle_last in do_settimeofday64() under lock and CPU-B
->>> reads the current cycles which is slightly behind CPU-A to substract the
->>> cycle_last after unlock, then we get a negative result, after masking it
->>> comes to a extremely huge value and lead to "hang" in
->>> hrtimer_interrupt().
->>
->> It's possible that we have missing ISBs or DSBs somewhere, and we're
->> encountering a re-ordering that we did not expect.
->>
->> It would be very helpful to be able to analyse with your reproducer. I
->> have a kernel test in a local branch which I've never managed to trigger
->> a failure with otehr than on systems with a horrifically skewed CNTVOFF.
->>
->>> And multi-core system on X86 had already met such problem and Thomas
->>> introduce
->>> a fix which is commit 47001d603375 ("x86: tsc prevent time going
->>> backwards").
->>> And then Thomas moved the fix code into the core code file of time in
->>> commit 09ec54429c6d ("clocksource: Move cycle_last validation to core
->>> code").
->>> Now the validation can be enabled by config
->>> CLOCKSOURCE_VALIDATE_LAST_CYCLE.
->>> I think we can fix the problem on arm64 by selecting the config. This
->>> is no
->>> side effect for systems with counters running properly.
->>
->> As above, per [1], I'm not sure that the same rationale applies, and
->> it's somewhat worrying to mask the issue in this manner.
->>
->> Thanks,
->> Mark.
->>
->> [1] https://lkml.org/lkml/2007/8/23/96
->>
->>>
->>> Signed-off-by: Yang Yingliang <yangyingliang@huawei.com>
->>> Cc: Thomas Gleixner <tglx@linutronix.de>
->>> ---
->>>   arch/arm64/Kconfig | 1 +
->>>   1 file changed, 1 insertion(+)
->>>
->>> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
->>> index 07d1811..6a53926 100644
->>> --- a/arch/arm64/Kconfig
->>> +++ b/arch/arm64/Kconfig
->>> @@ -30,6 +30,7 @@ config ARM64
->>>       select GENERIC_ALLOCATOR
->>>       select GENERIC_CLOCKEVENTS
->>>       select GENERIC_CLOCKEVENTS_BROADCAST
->>> +    select CLOCKSOURCE_VALIDATE_LAST_CYCLE
->>>       select GENERIC_CPU_AUTOPROBE
->>>       select GENERIC_EARLY_IOREMAP
->>>       select GENERIC_IDLE_POLL_SETUP
->>> --
->>> 2.5.0
->>>
->>>
->>>
->>> _______________________________________________
->>> linux-arm-kernel mailing list
->>> linux-arm-kernel at lists.infradead.org
->>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->>>
->>
->> .
->>
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
-> .
->
+Ard have another patch [1], after applied this patch, then all
+/memreserve/ nodes and /reserved-memory/ nodes nodes will be ignored
+to scan after booting with UEFI stub.
+
+This is make sense, that means UEFI need provide exactly correct memory
+map info by self and totally not depend on DT structures.
+
+Another minor difference between /memreserve/ node and /reserved-memory/
+node is: we can add property "no-map" for /reserved-memory/; so that
+means it will totally remove region from memory block. it's more safe
+for the memory region will NOT be mapped twice with different mapping
+attribution.
+
+[1] http://archive.arm.linux.org.uk/lurker/message/20150922.002128.46757034.en.html
+
+> The other thing is the desire to have the memory presented to the kernel
+> be the same whether it comes from UEFI or DT structures. I can see why
+> there is some desire to have that alignment, but that doesn't really
+> buy us anything. We can't eliminate some code path in the kernel doing
+> so. So I still think that the memory node should reflect all of memory
+> as defined by the h/w and mem-reserve should be used for any software
+> defined reserved regions.
+
+i think before we engaged much thinking for UEFI, that's meaningful for
+we found what's correct implementation for UEFI. We need make sure UEFI
+will do correct thing for itself.
+
+If only consider purly from DT's usage, i have no strong opinion to
+stick to use memory node to carve memory regions out. It's okay for me to
+go back to use /reserved-memory/ to reserved regions.
+
+Mark, do you agree with this?
+
+Thanks,
+Leo Yan
