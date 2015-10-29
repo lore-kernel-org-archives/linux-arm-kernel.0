@@ -1,185 +1,81 @@
-From: nicola@corna.info (Nicola Corna)
-Date: Thu, 29 Oct 2015 12:34:27 +0100
-Subject: [PATCH v5 5/5] iio: humidity: si7020: add No Hold read mode
-In-Reply-To: <1446118467-26453-1-git-send-email-nicola@corna.info>
-References: <1445976718-7449-1-git-send-email-nicola@corna.info>
- <1446118467-26453-1-git-send-email-nicola@corna.info>
-Message-ID: <1446118467-26453-5-git-send-email-nicola@corna.info>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 29 Oct 2015 21:26:44 +0900
+Subject: [PATCH 0/3] Revert arm64 cache geometry
+In-Reply-To: <20151029112008.GA28221@leverpostej>
+References: <1446068637-11509-1-git-send-email-avanbrunt@nvidia.com>
+ <CAKv+Gu-CgXU4O8SymcjmCYZqyAa0PZbJXwNqXfuCamxYY9C8GA@mail.gmail.com>
+ <20151029112008.GA28221@leverpostej>
+Message-ID: <CAKv+Gu-gBKdQneC_3yX3sQtQsL8244S1qGkXYZ5PhrPov1aRhA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Si7013/20/21 modules support 2 read modes:
- * Hold mode (blocking), where the device stretches the clock until the end
-of the measurement
- * No Hold mode (non-blocking), where the device replies NACK for every I2C
-call during the measurement
-Here the No Hold mode is implemented, selectable with the blocking_io
-variable within si7020_platform_data. The default mode is Hold, unless the
-adapter does not support clock stretching, in which case the No Hold mode
-is used.
+On 29 October 2015 at 20:20, Mark Rutland <mark.rutland@arm.com> wrote:
+> On Thu, Oct 29, 2015 at 12:22:51PM +0900, Ard Biesheuvel wrote:
+>> On 29 October 2015 at 06:43, Alex Van Brunt <avanbrunt@nvidia.com> wrote:
+>> > This patchset reverts three patches that attempt to query the CPU for cache
+>> > geometry and then make use of that information. Those patches rely on the
+>> > NumSets and LineSize fields of CCSIDR to determine the cache geometry. However,
+>> > the architectural documentation for these registers forbids such use:
+>> >
+>> >         The parameters NumSets, Associativity, and LineSize in these registers
+>> >         define the architecturally visible parameters that are required for the
+>> >         cache maintenance by Set/Way instructions. They are not guaranteed to
+>> >         represent the actual microarchitectural features of a design. You cannot
+>> >         make any inference about the actual sizes of caches based on these
+>> >         parameters.
+>> >
+>> > It is not just theoretical. For example, the Denver CPU will report one set and
+>> > one way in CCSIDR even though the actual microarchitectural implementation has
+>> > many sets and many ways.
+>> >
+>>
+>> Fair enough. It is a bit disappointing that we cannot trust these
+>> values, but if the architecture does not mandate their accuracy, we
+>> obviously should not be using them in the way that we are.
+>
+> Indeed.
+>
+>> > The only place that the cache geometry is used is to determine if there can be
+>> > aliasing for a VIPT (virtually-indexed, physically-tagged) instruction cache.
+>> > The code assumes that there is no need to flush the entire instruction cache
+>> > if the size of a cache set is less than or equal to a page size. However, the
+>> > architectural definition of VIPT says "The only architecturally-guaranteed way
+>> > to invalidate all aliases of a physical address from a VIPT instruction cache
+>> > is to invalidate the entire instruction cache." Not only are the parameters not
+>> > guaranteed to be correct, it is explicitly not legal to ignore aliasing even if
+>> > the parameters were correct.
+>> >
+>>
+>> I understand that this is subject to interpretation, but I would argue
+>> that this does not apply to the case where you can prove that no
+>> aliases could ever exist (which is the point of comparing the way size
+>> to the page size)
+>
+> Given NumSets and LineSize aren't guaranteed to match the physical
+> values, I don't see that way have sufficient information to derive the
+> physical way size in order to do so.
+>
 
-Signed-off-by: Nicola Corna <nicola@corna.info>
----
-This patch depends on patch "[PATCH v4 1/2] iio: humidity: si7020: replaced
-bitmask on humidity values with range check"
- drivers/iio/humidity/si7020.c        | 75 ++++++++++++++++++++++++++++++++----
- include/linux/platform_data/si7020.h | 21 ++++++++++
- 2 files changed, 89 insertions(+), 7 deletions(-)
- create mode 100644 include/linux/platform_data/si7020.h
+I know, but the argument being made is that if we did have this
+information, we would still violate the spec if we used it to decide
+whether a VIPT I-cache could alias or not.
 
-diff --git a/drivers/iio/humidity/si7020.c b/drivers/iio/humidity/si7020.c
-index 12128d1..674a61a 100644
---- a/drivers/iio/humidity/si7020.c
-+++ b/drivers/iio/humidity/si7020.c
-@@ -2,6 +2,7 @@
-  * si7020.c - Silicon Labs Si7013/20/21 Relative Humidity and Temp Sensors
-  * Copyright (c) 2013,2014  Uplogix, Inc.
-  * David Barksdale <dbarksdale@uplogix.com>
-+ * Copyright (c) 2015 Nicola Corna <nicola@corna.info>
-  *
-  * This program is free software; you can redistribute it and/or modify it
-  * under the terms and conditions of the GNU General Public License,
-@@ -30,33 +31,78 @@
- #include <linux/module.h>
- #include <linux/slab.h>
- #include <linux/sysfs.h>
-+#include <linux/jiffies.h>
- 
- #include <linux/iio/iio.h>
- #include <linux/iio/sysfs.h>
-+#include <linux/platform_data/si7020.h>
- 
- /* Measure Relative Humidity, Hold Master Mode */
- #define SI7020CMD_RH_HOLD	0xE5
-+/* Measure Relative Humidity, No Hold Master Mode */
-+#define SI7020CMD_RH_NO_HOLD	0xF5
- /* Measure Temperature, Hold Master Mode */
- #define SI7020CMD_TEMP_HOLD	0xE3
-+/* Measure Temperature, No Hold Master Mode */
-+#define SI7020CMD_TEMP_NO_HOLD	0xF3
- /* Software Reset */
- #define SI7020CMD_RESET		0xFE
-+/* Relative humidity measurement timeout (us) */
-+#define SI7020_RH_TIMEOUT	22800
-+/* Temperature measurement timeout (us) */
-+#define SI7020_TEMP_TIMEOUT	10800
-+/* Minimum delay between retries (No Hold Mode) in us */
-+#define SI7020_NOHOLD_SLEEP_MIN	2000
-+/* Maximum delay between retries (No Hold Mode) in us */
-+#define SI7020_NOHOLD_SLEEP_MAX	6000
- 
- static int si7020_read_raw(struct iio_dev *indio_dev,
- 			   struct iio_chan_spec const *chan, int *val,
- 			   int *val2, long mask)
- {
- 	struct i2c_client **client = iio_priv(indio_dev);
-+	struct si7020_platform_data *pdata;
- 	int ret;
-+	bool holdmode;
-+	unsigned char buf[2];
-+	unsigned long start;
- 
- 	switch (mask) {
- 	case IIO_CHAN_INFO_RAW:
--		ret = i2c_smbus_read_word_data(*client,
--					       chan->type == IIO_TEMP ?
--					       SI7020CMD_TEMP_HOLD :
--					       SI7020CMD_RH_HOLD);
--		if (ret < 0)
--			return ret;
--		*val = ret >> 2;
-+		pdata = dev_get_platdata(&(*client)->dev);
-+		if (pdata)
-+			holdmode = pdata->blocking_io;
-+		else
-+			holdmode = !i2c_check_quirks((*client)->adapter,
-+				   I2C_AQ_NO_CLK_STRETCH);
-+		if (holdmode) {
-+			ret = i2c_smbus_read_word_data(*client,
-+						       chan->type == IIO_TEMP ?
-+						       SI7020CMD_TEMP_HOLD :
-+						       SI7020CMD_RH_HOLD);
-+			if (ret < 0)
-+				return ret;
-+			*val = ret >> 2;
-+		} else {
-+			ret = i2c_smbus_write_byte(*client,
-+						   chan->type == IIO_TEMP ?
-+						   SI7020CMD_TEMP_NO_HOLD :
-+						   SI7020CMD_RH_NO_HOLD);
-+			if (ret < 0)
-+				return ret;
-+			start = jiffies;
-+			while ((ret = i2c_master_recv(*client, buf, 2)) < 0) {
-+				if (time_after(jiffies, start +
-+					       usecs_to_jiffies(
-+							chan->type == IIO_TEMP ?
-+							SI7020_TEMP_TIMEOUT :
-+							SI7020_RH_TIMEOUT)))
-+					return ret;
-+				usleep_range(SI7020_NOHOLD_SLEEP_MIN,
-+					     SI7020_NOHOLD_SLEEP_MAX);
-+			}
-+			*val = ((buf[0] << 8) | buf[1]) >> 2;
-+		}
- 		/*
- 		 * Humidity values can slightly exceed the 0-100%RH
- 		 * range and should be corrected by software
-@@ -116,6 +162,7 @@ static int si7020_probe(struct i2c_client *client,
- {
- 	struct iio_dev *indio_dev;
- 	struct i2c_client **data;
-+	struct si7020_platform_data *pdata;
- 	int ret;
- 
- 	if (!i2c_check_functionality(client->adapter,
-@@ -123,6 +170,20 @@ static int si7020_probe(struct i2c_client *client,
- 				     I2C_FUNC_SMBUS_READ_WORD_DATA))
- 		return -ENODEV;
- 
-+	pdata = dev_get_platdata(&client->dev);
-+	if (pdata) {
-+		if (pdata->blocking_io) {
-+			if (i2c_check_quirks(client->adapter,
-+			   I2C_AQ_NO_CLK_STRETCH))
-+				return -ENODEV;
-+		} else if (!i2c_check_functionality(client->adapter,
-+			  I2C_FUNC_I2C))
-+			return -ENODEV;
-+	} else
-+		if (!i2c_check_functionality(client->adapter, I2C_FUNC_I2C) &&
-+		   i2c_check_quirks(client->adapter, I2C_AQ_NO_CLK_STRETCH))
-+			return -ENODEV;
-+
- 	/* Reset device, loads default settings. */
- 	ret = i2c_smbus_write_byte(client, SI7020CMD_RESET);
- 	if (ret < 0)
-diff --git a/include/linux/platform_data/si7020.h b/include/linux/platform_data/si7020.h
-new file mode 100644
-index 0000000..8bb5848
---- /dev/null
-+++ b/include/linux/platform_data/si7020.h
-@@ -0,0 +1,21 @@
-+/*
-+ * Copyright (C) 2015 Nicola Corna <nicola@corna.info>
-+ *
-+ * This software is licensed under the terms of the GNU General Public
-+ * License version 2, as published by the Free Software Foundation, and
-+ * may be copied, distributed, and modified under those terms.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ */
-+
-+#ifndef __SI7020_H_
-+#define __SI7020_H_
-+
-+struct si7020_platform_data {
-+	bool blocking_io;
-+};
-+#endif /* __SI7020_H_ */
--- 
-2.6.1
+>> > Alex Van Brunt (3):
+>> >   Revert "arm64: kernel: add support for cpu cache information"
+>> >   Revert "arm64: don't flag non-aliasing VIPT I-caches as aliasing"
+>> >   Revert "arm64: add helper functions to read I-cache attributes"
+>> >
+>>
+>> None of the clarifications you offer here are in the commit logs of
+>> the patches. Since the cover letter does not make it into the
+>> repository, someone looking at the commit log will not have a clue why
+>> these patches were reverted all of a sudden. Could you please update
+>> that? At the same time, could you get rid of the Change-Ids as well?
+>> They are meaningless in the kernel tree.
+>
+> It would be good to include the quote from the cover letter in each
+> patch; it makes the situation abundantly clear and avoids having to
+> trawl through the ARM ARM again in future.
+>
+
+Indeed.
