@@ -1,21 +1,37 @@
 From: leoli@freescale.com (Li Yang)
-Date: Thu, 29 Oct 2015 16:12:03 -0500
-Subject: [PATCH v7 0/3] Add Freescale LS1043a device tree
-Message-ID: <1446153126-6219-1-git-send-email-leoli@freescale.com>
+Date: Thu, 29 Oct 2015 16:12:04 -0500
+Subject: [PATCH V7 1/3] Documentation: DT: Add entry for Freescale LS1043a-RDB
+ board
+In-Reply-To: <1446153126-6219-1-git-send-email-leoli@freescale.com>
+References: <1446153126-6219-1-git-send-email-leoli@freescale.com>
+Message-ID: <1446153126-6219-2-git-send-email-leoli@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi ARM SoC maintainers,
+From: Mingkai Hu <Mingkai.Hu@freescale.com>
 
-After several rounds of review I think the patch series is generally in
-good shape.  Can someone from the ARM maintainers group help to pick
-these patches up?
+Signed-off-by: Mingkai Hu <Mingkai.Hu@freescale.com>
+Signed-off-by: Hou Zhiqiang <B48286@freescale.com>
+---
+v2-v7: no change
 
-Some small updates to v7:
-- Re-grouped the series to only include device tree related patches for
-arm-soc subsystem.
-- Rebased the patches on latest LS2080 patches from Bhupesh to apply
-cleanly.
+ Documentation/devicetree/bindings/arm/fsl.txt | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-Regards,
-Leo
+diff --git a/Documentation/devicetree/bindings/arm/fsl.txt b/Documentation/devicetree/bindings/arm/fsl.txt
+index 34c88b0..752a685 100644
+--- a/Documentation/devicetree/bindings/arm/fsl.txt
++++ b/Documentation/devicetree/bindings/arm/fsl.txt
+@@ -131,6 +131,10 @@ Example:
+ Freescale ARMv8 based Layerscape SoC family Device Tree Bindings
+ ----------------------------------------------------------------
+ 
++LS1043A ARMv8 based RDB Board
++Required root node properties:
++    - compatible = "fsl,ls1043a-rdb", "fsl,ls1043a";
++
+ LS2080A ARMv8 based Simulator model
+ Required root node properties:
+     - compatible = "fsl,ls2080a-simu", "fsl,ls2080a";
+-- 
+2.3.3
