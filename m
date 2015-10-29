@@ -1,44 +1,44 @@
-From: dcashman@android.com (Dan Cashman)
-Date: Wed, 28 Oct 2015 17:39:49 -0700
-Subject: [PATCH 1/2] mm: mmap: Add new /proc tunable for mmap_base ASLR.
-In-Reply-To: <CABXk95DOSKv70p+=DQvHck5LCvRDc0WDORpoobSStWhrcrCiyg@mail.gmail.com>
-References: <1446067520-31806-1-git-send-email-dcashman@android.com>
- <871tcewoso.fsf@x220.int.ebiederm.org>
- <CABXk95DOSKv70p+=DQvHck5LCvRDc0WDORpoobSStWhrcrCiyg@mail.gmail.com>
-Message-ID: <CAEP4de2GsEwn0eeO126GEtFb-FSJoU3fgOWTAr1yPFAmyXTi0Q@mail.gmail.com>
+From: icoolidge@google.com (Ian Coolidge)
+Date: Wed, 28 Oct 2015 17:47:45 -0700
+Subject: [PATCH] arm64: spinlock: const qualify read-only functions
+In-Reply-To: <1446079665-25366-1-git-send-email-icoolidge@google.com>
+References: <1446079665-25366-1-git-send-email-icoolidge@google.com>
+Message-ID: <1446079665-25366-2-git-send-email-icoolidge@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > This all would be much cleaner if the arm architecture code were just to
-> > register the sysctl itself.
-> >
-> > As it sits this looks like a patchset that does not meaninfully bisect,
-> > and would result in code that is hard to trace and understand.
->
-> I believe the intent is to follow up with more architecture specific
-> patches to allow each architecture to define the number of bits to use
+This allows assert_spin_locked() to be used against
+spinlocks that are const qualified.
 
-Yes.  I included these patches together because they provide mutual
-context, but each has a different outcome and they could be taken
-separately.  The arm architecture-specific portion allows the changing
-of the number of bits used for mmap ASLR, useful even without the
-sysctl.  The sysctl patch (patch 1) provides another way of setting
-this value, and the hope is that this will be adopted across multiple
-architectures, with the arm changes (patch 2) providing an example.  I
-hope to follow this with changes to arm64 and x86, for example.
+Signed-off-by: Ian Coolidge <icoolidge@google.com>
+---
+ arch/arm64/include/asm/spinlock.h | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-On Wed, Oct 28, 2015 at 5:01 PM, Jeffrey Vander Stoep <jeffv@google.com> wrote:
-> plain text this time...
->
->> This all would be much cleaner if the arm architecture code were just to
->> register the sysctl itself.
->>
->> As it sits this looks like a patchset that does not meaninfully bisect,
->> and would result in code that is hard to trace and understand.
->
-> I believe the intent is to follow up with more architecture specific
-> patches to allow each architecture to define the number of bits to use
-> (min, max, and default) since these values are architecture dependent.
-> Arm64 patch should be forthcoming, and others after that. With that in
-> mind, would you still prefer to have the sysctl code in the
-> arm-specific patch?
+diff --git a/arch/arm64/include/asm/spinlock.h b/arch/arm64/include/asm/spinlock.h
+index c85e96d..72a7f33 100644
+--- a/arch/arm64/include/asm/spinlock.h
++++ b/arch/arm64/include/asm/spinlock.h
+@@ -122,17 +122,17 @@ static inline void arch_spin_unlock(arch_spinlock_t *lock)
+ 	: "memory");
+ }
+ 
+-static inline int arch_spin_value_unlocked(arch_spinlock_t lock)
++static inline int arch_spin_value_unlocked(const arch_spinlock_t lock)
+ {
+ 	return lock.owner == lock.next;
+ }
+ 
+-static inline int arch_spin_is_locked(arch_spinlock_t *lock)
++static inline int arch_spin_is_locked(const arch_spinlock_t *lock)
+ {
+ 	return !arch_spin_value_unlocked(READ_ONCE(*lock));
+ }
+ 
+-static inline int arch_spin_is_contended(arch_spinlock_t *lock)
++static inline int arch_spin_is_contended(const arch_spinlock_t *lock)
+ {
+ 	arch_spinlock_t lockval = READ_ONCE(*lock);
+ 	return (lockval.next - lockval.owner) > 1;
+-- 
+2.6.0.rc2.230.g3dd15c0
