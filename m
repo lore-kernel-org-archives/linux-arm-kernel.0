@@ -1,46 +1,134 @@
-From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Thu, 29 Oct 2015 13:59:25 +0530
-Subject: [PATCH] ARM: exynos: Bring back reboot on Exynos5410
-In-Reply-To: <006c01d11218$d6e2d500$84a87f00$@samsung.com>
-References: <1446024965-8508-1-git-send-email-p.fedin@samsung.com>
- <56317960.9070608@samsung.com>
- <CAGcde9H4WVt34rn6_9H+sVu2Bp2xq4awMiwV1zgv1D6posPWSg@mail.gmail.com>
- <006c01d11218$d6e2d500$84a87f00$@samsung.com>
-Message-ID: <5631D8E5.6090506@samsung.com>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Thu, 29 Oct 2015 10:28:50 +0200
+Subject: [PATCH 2/3] dmaengine: ti-dma-crossbar: dra7: Support for reserving
+ DMA event ranges
+In-Reply-To: <1446107331-30041-1-git-send-email-peter.ujfalusi@ti.com>
+References: <1446107331-30041-1-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <1446107331-30041-3-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Pavel,
+In eDMA the events are directly mapped to a DMA channel (for example DMA
+event 14 can only be handled by DMA channel 14). If the memcpy is enabled
+on the eDMA, there is a possibility that the crossbar driver would assign
+DMA event number already allocated in eDMA for memcpy. Furthermore the
+eDMA can be shared with DSP in which case the crossbar driver should also
+avoid mapping xbar events to DSP used event numbers (or channels).
 
-On Thursday 29 October 2015 12:40 PM, Pavel Fedin wrote:
->   Hello!
->
->> Patch looks ok, but after Alim's patch series [1] to handle poweroff
->> and reboot via generic syscon based driver gets merged, this will
->> become redundant entry into PMU driver in the absence of any PMU  data
->> for Exynos5410. Alim has taken care of adding power-off and reboot
->> device node in exynos5410.dtsi [2].
->>
->> [1]: http://www.spinics.net/lists/devicetree/msg98858.html
->> [2]: http://www.spinics.net/lists/devicetree/msg98862.html
->
->   I looked at those patches, IMHO they are too large for doing too small thing. What they do is basically describing two registers one-by-one and adding a separate per-register driver. Isn't it too much just for pushing a reset pin?
->   May be we should just invent some generic "compatible" string, like "samsung,exynos-pmu" (or "Samsung,exynos-pmu-generic", if you want to be more specific), which would do the same as my patch currently does? This would be only several lines of code, achieving the same result.
->
+Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+---
+ .../devicetree/bindings/dma/ti-dma-crossbar.txt    |  6 +++
+ drivers/dma/ti-dma-crossbar.c                      | 47 ++++++++++++++++++++--
+ 2 files changed, 49 insertions(+), 4 deletions(-)
 
-These patches are not adding any new code, except DT entry. Infact 
-restart handler will be removed from PMU driver and we will be using 
-generic syscon based implementation for reboot, which is already present 
-in Linux kernel. Thus effectively reducing LoC. Only we need to add 
-device node entries in respective DT files, and this is being done for 
-all Exynos SoCs including exynos5410.
-
-Thanks,
-Pankaj Dubey
-> Kind regards,
-> Pavel Fedin
-> Expert Engineer
-> Samsung Electronics Research center Russia
->
->
->
+diff --git a/Documentation/devicetree/bindings/dma/ti-dma-crossbar.txt b/Documentation/devicetree/bindings/dma/ti-dma-crossbar.txt
+index b152a75dceae..aead5869a28d 100644
+--- a/Documentation/devicetree/bindings/dma/ti-dma-crossbar.txt
++++ b/Documentation/devicetree/bindings/dma/ti-dma-crossbar.txt
+@@ -14,6 +14,10 @@ The DMA controller node need to have the following poroperties:
+ 
+ Optional properties:
+ - ti,dma-safe-map: Safe routing value for unused request lines
++- ti,reserved-dma-request-ranges: DMA request ranges which should not be used
++		when mapping xbar input to DMA request, they are either
++		allocated to be used by for example the DSP or they are used as
++		memcpy channels in eDMA.
+ 
+ Notes:
+ When requesting channel via ti,dra7-dma-crossbar, the DMA clinet must request
+@@ -46,6 +50,8 @@ sdma_xbar: dma-router at 4a002b78 {
+ 	#dma-cells = <1>;
+ 	dma-requests = <205>;
+ 	ti,dma-safe-map = <0>;
++	/* Protect the sDMA request ranges: 10-14 and 100-126 */
++	ti,reserved-dma-request-ranges = <10 5>, <100 27>;
+ 	dma-masters = <&sdma>;
+ };
+ 
+diff --git a/drivers/dma/ti-dma-crossbar.c b/drivers/dma/ti-dma-crossbar.c
+index 5fe1909d4ec4..1a41f75a4d1f 100644
+--- a/drivers/dma/ti-dma-crossbar.c
++++ b/drivers/dma/ti-dma-crossbar.c
+@@ -292,14 +292,22 @@ static const struct of_device_id ti_dra7_master_match[] = {
+ 	{},
+ };
+ 
++static inline void ti_dra7_xbar_reserve(int offset, int len, unsigned long *p)
++{
++	for (; len > 0; len--)
++		clear_bit(offset + (len - 1), p);
++}
++
+ static int ti_dra7_xbar_probe(struct platform_device *pdev)
+ {
+ 	struct device_node *node = pdev->dev.of_node;
+ 	const struct of_device_id *match;
+ 	struct device_node *dma_node;
+ 	struct ti_dra7_xbar_data *xbar;
++	struct property *prop;
+ 	struct resource *res;
+ 	u32 safe_val;
++	size_t sz;
+ 	void __iomem *iomem;
+ 	int i, ret;
+ 
+@@ -347,6 +355,33 @@ static int ti_dra7_xbar_probe(struct platform_device *pdev)
+ 	if (!of_property_read_u32(node, "ti,dma-safe-map", &safe_val))
+ 		xbar->safe_val = (u16)safe_val;
+ 
++
++	prop = of_find_property(node, "ti,reserved-dma-request-ranges", &sz);
++	if (prop) {
++		const char pname[] = "ti,reserved-dma-request-ranges";
++		u32 (*rsv_events)[2];
++		size_t nelm = sz / sizeof(*rsv_events);
++		int i;
++
++		if (!nelm)
++			return -EINVAL;
++
++		rsv_events = kcalloc(nelm, sizeof(*rsv_events), GFP_KERNEL);
++		if (!rsv_events)
++			return -ENOMEM;
++
++		ret = of_property_read_u32_array(node, pname, (u32 *)rsv_events,
++						 nelm * 2);
++		if (ret)
++			return ret;
++
++		for (i = 0; i < nelm; i++) {
++			ti_dra7_xbar_reserve(rsv_events[i][0], rsv_events[i][1],
++					     xbar->dma_inuse);
++		}
++		kfree(rsv_events);
++	}
++
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	iomem = devm_ioremap_resource(&pdev->dev, res);
+ 	if (IS_ERR(iomem))
+@@ -362,15 +397,19 @@ static int ti_dra7_xbar_probe(struct platform_device *pdev)
+ 	platform_set_drvdata(pdev, xbar);
+ 
+ 	/* Reset the crossbar */
+-	for (i = 0; i < xbar->dma_requests; i++)
+-		ti_dra7_xbar_write(xbar->iomem, i, xbar->safe_val);
++	for (i = 0; i < xbar->dma_requests; i++) {
++		if (!test_bit(i, xbar->dma_inuse))
++			ti_dra7_xbar_write(xbar->iomem, i, xbar->safe_val);
++	}
+ 
+ 	ret = of_dma_router_register(node, ti_dra7_xbar_route_allocate,
+ 				     &xbar->dmarouter);
+ 	if (ret) {
+ 		/* Restore the defaults for the crossbar */
+-		for (i = 0; i < xbar->dma_requests; i++)
+-			ti_dra7_xbar_write(xbar->iomem, i, i);
++		for (i = 0; i < xbar->dma_requests; i++) {
++			if (!test_bit(i, xbar->dma_inuse))
++				ti_dra7_xbar_write(xbar->iomem, i, i);
++		}
+ 	}
+ 
+ 	return ret;
+-- 
+2.6.1
