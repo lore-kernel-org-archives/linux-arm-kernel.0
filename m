@@ -1,88 +1,121 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Thu, 29 Oct 2015 16:51:46 +0100
-Subject: [PATCH] pwm-backlight: Avoid backlight flicker when probed from DT
-Message-ID: <1446133906-3076-1-git-send-email-p.zabel@pengutronix.de>
+From: tn@semihalf.com (Tomasz Nowicki)
+Date: Thu, 29 Oct 2015 16:53:26 +0100
+Subject: [PATCH V1 11/11] arm64, pci, acpi: Support for ACPI based PCI
+ hostbridge init
+In-Reply-To: <563234E6.4050109@codeaurora.org>
+References: <1445963922-22711-1-git-send-email-tn@semihalf.com>
+ <1445963922-22711-12-git-send-email-tn@semihalf.com>
+ <5631180D.2000902@codeaurora.org> <563131B0.9060305@codeaurora.org>
+ <56320538.6000905@semihalf.com> <563234E6.4050109@codeaurora.org>
+Message-ID: <563240F6.2060209@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If the driver is probed from the device tree, and there is a phandle
-property set on it, and the enable GPIO is already configured as output,
-and the backlight is currently disabled, keep it disabled.
-If all these conditions are met, assume there will be some other driver
-that can enable the backlight at the appropriate time.
+On 29.10.2015 16:01, Sinan Kaya wrote:
+>
+>
+> On 10/29/2015 7:38 AM, Tomasz Nowicki wrote:
+>> On 28.10.2015 21:36, Sinan Kaya wrote:
+>>> 1. ACPI code is unable to discover the interrupt numbers when objects
+>>> are ordered as follows in the ACPI file
+>>>
+>>> PNP0A08 object
+>>> PNP0C0F INTA object
+>>> PNP0C0F INTB object
+>>> PNP0C0F INTC object
+>>> PNP0C0F INTD object
+>>>
+>>> This gives me invalid link context error.
+>>>
+>>> pci 0000:00:00.0: PCI INT A: no GSI
+>>> pci 0000:01:00.0: Derived GSI for 0000:01:00.0 INT A from 0000:00:00.0
+>>> acpi PNP0C0F:00: Invalid link context
+>>>
+>>> If I order it like this in the ACPI file,
+>>>
+>>> PNP0C0F INTA object
+>>> PNP0C0F INTB object
+>>> PNP0C0F INTC object
+>>> PNP0C0F INTD object
+>>> PNP0A08 object
+>>>
+>>> then, the legacy interrupt numbers can be discovered properly.
+>>
+>> Can you show full content of your PNP0C0F and PNP0A08 objects?
+>>
+>
+> ACPI table is considered proprietary. I don't think I can get the legal
+> approval in time. I can give you pieces though.
+>
+> Here is the _PRT
+> Device (PCI0) { // PCIe port 0
+>      Name(_HID, EISAID("PNP0A08"))    // PCI express
+>      Name(_CID, EISAID("PNP0A03"))    // Compatible PCI Root Bridge
+> {
+>      ....
+>      Name(_PRT, Package(){
+>          Package(){0x0FFFF, 0, \_SB.LN0A, 0},  // Slot 0, INTA
+>          Package(){0x0FFFF, 1, \_SB.LN0B, 0},  // Slot 0, INTB
+>          Package(){0x0FFFF, 2, \_SB.LN0C, 0},  // Slot 0, INTC
+>          Package(){0x0FFFF, 3, \_SB.LN0D, 0}   // Slot 0, INTD
+>      })
+> }
+>
+> Here is the PNP0C0F
+>
+> Device(LN0A){
+>      Name(_HID, EISAID("PNP0C0F")) // PCI interrupt link
+>      Name(_UID, 1)
+>      Name(_PRS, ResourceTemplate(){
+>      Interrupt(ResourceProducer, Level, ActiveHigh, Exclusive, , ,) {0xE8}
+>      })
+>      Method(_DIS) {}
+>      Method(_CRS) { Return (_PRS) }
+>      Method(_SRS, 1) {}
+> }
+>
 
-Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
-Reviewed-by: Christian Gmeiner <christian.gmeiner@gmail.com>
----
-Changes since v2:
- - Leave GPIO configuration as is (GPIOD_ASIS) when requesting,
-   so we can actually check the initial state.
----
- drivers/video/backlight/pwm_bl.c | 25 ++++++++++++++++++++++++-
- 1 file changed, 24 insertions(+), 1 deletion(-)
+Can you please apply patch below:
 
-diff --git a/drivers/video/backlight/pwm_bl.c b/drivers/video/backlight/pwm_bl.c
-index ae3c6b6..8e9c261 100644
---- a/drivers/video/backlight/pwm_bl.c
-+++ b/drivers/video/backlight/pwm_bl.c
-@@ -199,6 +199,8 @@ static int pwm_backlight_probe(struct platform_device *pdev)
- 	struct backlight_properties props;
- 	struct backlight_device *bl;
- 	struct pwm_bl_data *pb;
-+	int initial_blank = FB_BLANK_UNBLANK;
-+	bool phandle;
- 	int ret;
- 
- 	if (!data) {
-@@ -242,7 +244,7 @@ static int pwm_backlight_probe(struct platform_device *pdev)
- 	pb->enabled = false;
- 
- 	pb->enable_gpio = devm_gpiod_get_optional(&pdev->dev, "enable",
--						  GPIOD_OUT_HIGH);
-+						  GPIOD_ASIS);
- 	if (IS_ERR(pb->enable_gpio)) {
- 		ret = PTR_ERR(pb->enable_gpio);
- 		goto err_alloc;
-@@ -264,12 +266,32 @@ static int pwm_backlight_probe(struct platform_device *pdev)
- 		pb->enable_gpio = gpio_to_desc(data->enable_gpio);
- 	}
- 
-+	phandle = of_find_property(pdev->dev.of_node, "phandle", NULL) != NULL;
+diff --git a/arch/arm64/kernel/pci.c b/arch/arm64/kernel/pci.c
+index fec1c91..fe34415 100644
+--- a/arch/arm64/kernel/pci.c
++++ b/arch/arm64/kernel/pci.c
+@@ -48,10 +48,19 @@ resource_size_t pcibios_align_resource(void *data, 
+const struct resource *res,
+   */
+  int pcibios_enable_device(struct pci_dev *dev, int mask)
+  {
++       int ret;
 +
-+	if (pb->enable_gpio) {
-+		/*
-+		 * If the driver is probed from the device tree and there is a
-+		 * phandle link pointing to the backlight node, it is safe to
-+		 * assume that another driver will enable the backlight at the
-+		 * appropriate time. Therefore, if it is disabled, keep it so.
-+		 */
-+		if (phandle &&
-+		    gpiod_get_direction(pb->enable_gpio) == GPIOF_DIR_OUT &&
-+		    gpiod_get_value(pb->enable_gpio) == 0)
-+			initial_blank = FB_BLANK_POWERDOWN;
-+		else
-+			gpiod_direction_output(pb->enable_gpio, 1);
-+	}
-+
- 	pb->power_supply = devm_regulator_get(&pdev->dev, "power");
- 	if (IS_ERR(pb->power_supply)) {
- 		ret = PTR_ERR(pb->power_supply);
- 		goto err_alloc;
- 	}
- 
-+	if (phandle && !regulator_is_enabled(pb->power_supply))
-+		initial_blank = FB_BLANK_POWERDOWN;
-+
- 	pb->pwm = devm_pwm_get(&pdev->dev, NULL);
- 	if (IS_ERR(pb->pwm) && PTR_ERR(pb->pwm) != -EPROBE_DEFER
- 	    && !pdev->dev.of_node) {
-@@ -320,6 +342,7 @@ static int pwm_backlight_probe(struct platform_device *pdev)
- 	}
- 
- 	bl->props.brightness = data->dft_brightness;
-+	bl->props.power = initial_blank;
- 	backlight_update_status(bl);
- 
- 	platform_set_drvdata(pdev, bl);
--- 
-2.6.1
+         if (pci_has_flag(PCI_PROBE_ONLY))
+                 return 0;
+
+-       return pci_enable_resources(dev, mask);
++       ret = pci_enable_resources(dev, mask);
++       if (ret < 0)
++               return ret;
++#ifdef CONFIG_ACPI
++       if (!dev->msi_enabled)
++               return acpi_pci_irq_enable(dev);
++#endif
++       return 0;
+  }
+
+  /*
+@@ -61,10 +70,6 @@ int pcibios_add_device(struct pci_dev *dev)
+  {
+         if (acpi_disabled)
+                 dev->irq = of_irq_parse_and_map_pci(dev, 0, 0);
+-#ifdef CONFIG_ACPI
+-       else
+-               acpi_pci_irq_enable(dev);
+-#endif
+
+         return 0;
+  }
+
+and let me know if the order still matter?
+
+Regards,
+Tomasz
