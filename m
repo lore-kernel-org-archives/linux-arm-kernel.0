@@ -1,29 +1,114 @@
-From: p.fedin@samsung.com (Pavel Fedin)
-Date: Thu, 29 Oct 2015 10:10:05 +0300
-Subject: [PATCH] ARM: exynos: Bring back reboot on Exynos5410
-In-Reply-To: <CAGcde9H4WVt34rn6_9H+sVu2Bp2xq4awMiwV1zgv1D6posPWSg@mail.gmail.com>
-References: <1446024965-8508-1-git-send-email-p.fedin@samsung.com>
- <56317960.9070608@samsung.com>
- <CAGcde9H4WVt34rn6_9H+sVu2Bp2xq4awMiwV1zgv1D6posPWSg@mail.gmail.com>
-Message-ID: <006c01d11218$d6e2d500$84a87f00$@samsung.com>
+From: wxt@rock-chips.com (Caesar Wang)
+Date: Thu, 29 Oct 2015 15:14:12 +0800
+Subject: [PATCH v1 0/6] Support the thermal for RK3368 SoCs
+Message-ID: <1446102858-10116-1-git-send-email-wxt@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- Hello!
+This series patchs are working for RK3368 on Rockchip platform.
 
-> Patch looks ok, but after Alim's patch series [1] to handle poweroff
-> and reboot via generic syscon based driver gets merged, this will
-> become redundant entry into PMU driver in the absence of any PMU  data
-> for Exynos5410. Alim has taken care of adding power-off and reboot
-> device node in exynos5410.dtsi [2].
-> 
-> [1]: http://www.spinics.net/lists/devicetree/msg98858.html
-> [2]: http://www.spinics.net/lists/devicetree/msg98862.html
+@Heiko,
+    The PATCH [5/6] is working based on big/littel cluster cpufreq
+    added. Anyway, the PATCH [5/6] also work for next kernel.
 
- I looked at those patches, IMHO they are too large for doing too small thing. What they do is basically describing two registers one-by-one and adding a separate per-register driver. Isn't it too much just for pushing a reset pin?
- May be we should just invent some generic "compatible" string, like "samsung,exynos-pmu" (or "Samsung,exynos-pmu-generic", if you want to be more specific), which would do the same as my patch currently does? This would be only several lines of code, achieving the same result.
+@Eduardo,
+This patchset are based on linus master branch.
+Note: Need add the following thermal patchs for thermal driver before apply
+this series patchs.
 
-Kind regards,
-Pavel Fedin
-Expert Engineer
-Samsung Electronics Research center Russia
+1) thermal: rockchip: fix handling of invalid readings
+(https://patchwork.kernel.org/patch/6973101/)
+
+2) thermal: rockhip: fix setting thermal shutdown polarity
+(https://patchwork.kernel.org/patch/6973131/)
+
+3) dt-bindings: rockchip-thermal: Add the pinctrl states in this document
+(https://patchwork.kernel.org/patch/7472021/)
+
+4) thermal: rockchip: support the sleep pinctrl state to avoid glitches in s2r
+(https://patchwork.kernel.org/patch/7472051/)
+
+the git log oneline my local branch as follows:
+
+8132956 arm64: dts: Enable the Thermal on R88 board
+ba3fd05 arm64: dts: Add main Thermal info to rk3368.dtsi
+66adecc arm64: dts: Add the thermal data found on RK3368
+acc9cb6 thermal: rockchip: Support the RK3368 SoCs in thermal driver
+8c65003 thermal: rockchip: better to compatible the driver for different SoCs
+ea9f28a dt-bindings: rockchip-thermal: Support the RK3368 SoCs compatible
+29eb0c7 thermal: rockchip: support the sleep pinctrl state to avoid glitches in s2r
+cf2100b dt-bindings: rockchip-thermal: Add the pinctrl states in this document
+38e287b0 thermal: rockhip: fix setting thermal shutdown polarity
+ddee4a2 thermal: rockchip: fix handling of invalid readings
+8a28d67 Merge tag 'powerpc-4.3-6' of
+git://git.kernel.org/pub/scm/linux/kernel/git/powerpc/linux
+977bf06 powerpc/dma: dma_set_coherent_mask() should not be GPL only
+a22c4d7 block: re-add discard_granularity and alignment checks
+23d8827 Merge branch 'fixes' of git://ftp.arm.linux.org.uk/~rmk/linux-arm
+3d0aa36 Merge branch 'for-linus' of git://git.kernel.dk/linux-block
+dc5bc3f Merge branch 'linus' of git://git.kernel.org/pub/scm/linux/kernel/git/herbert/crypto-2.6
+9e17f90 Merge tag 'fixes-for-linus' of git://git.kernel.org/pub/scm/linux/kernel/git/rusty/linux
+174fd8d blkcg: fix incorrect read/write sync/async stat accounting
+858e904 Merge tag 'iommu-fixes-v4.3-rc7' of
+......
+
+----
+This series are tested on RK3368 board.
+
+while true;do ls >/dev/null; done&
+
+while true; do grep "" /sys/class/thermal/thermal_zone[0-1]/temp; sleep .5; done &
+
+You can get the temperature form sensors.
+/sys/class/thermal/thermal_zone0/temp:27500
+/sys/class/thermal/thermal_zone1/temp:30000
+/sys/class/thermal/thermal_zone0/temp:30000
+/sys/class/thermal/thermal_zone1/temp:30000
+/sys/class/thermal/thermal_zone0/temp:27500
+/sys/class/thermal/thermal_zone1/temp:30000
+/sys/class/thermal/thermal_zone0/temp:30000
+/sys/class/thermal/thermal_zone1/temp:30000
+/sys/class/thermal/thermal_zone0/temp:25000
+/sys/class/thermal/thermal_zone1/temp:30000
+/sys/class/thermal/thermal_zone0/temp:32500
+/sys/class/thermal/thermal_zone1/temp:30000
+/sys/class/thermal/thermal_zone0/temp:30000
+/sys/class/thermal/thermal_zone1/temp:30000
+/sys/class/thermal/thermal_zone0/temp:22500
+/sys/class/thermal/thermal_zone1/temp:32500
+/sys/class/thermal/thermal_zone0/temp:25000
+/sys/class/thermal/thermal_zone1/temp:30000
+/sys/class/thermal/thermal_zone0/temp:25000
+/sys/class/thermal/thermal_zone1/temp:30000
+/sys/class/thermal/thermal_zone0/temp:22500
+/sys/class/thermal/thermal_zone1/temp:30000
+/sys/class/thermal/thermal_zone0/temp:30000
+/sys/class/thermal/thermal_zone1/temp:32500
+/sys/class/thermal/thermal_zone1/temp:32500
+/sys/class/thermal/thermal_zone0/temp:32500
+
+
+Changes in v1:
+- %s/thermal/rockchip-thermal in subject.
+- add a new patch for thermal driver to support more SoCs.
+- As Dmitry comment, make the conversion table in as a parameter.
+- support the opt gpio pinctrl state
+
+Caesar Wang (6):
+  dt-bindings: rockchip-thermal: Support the RK3368 SoCs compatible
+  thermal: rockchip: better to compatible the driver for different SoCs
+  thermal: rockchip: Support the RK3368 SoCs in thermal driver
+  arm64: dts: Add the thermal data found on RK3368
+  arm64: dts: Add main Thermal info to rk3368.dtsi
+  arm64: dts: Enable the Thermal on R88 board
+
+ .../bindings/thermal/rockchip-thermal.txt          |   4 +-
+ arch/arm64/boot/dts/rockchip/rk3368-r88.dts        |   6 +
+ arch/arm64/boot/dts/rockchip/rk3368-thermal.dtsi   | 112 +++++++++
+ arch/arm64/boot/dts/rockchip/rk3368.dtsi           |  36 +++
+ drivers/thermal/rockchip_thermal.c                 | 267 ++++++++++++++++-----
+ 5 files changed, 362 insertions(+), 63 deletions(-)
+ create mode 100644 arch/arm64/boot/dts/rockchip/rk3368-thermal.dtsi
+
+-- 
+1.9.1
