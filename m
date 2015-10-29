@@ -1,70 +1,112 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Thu, 29 Oct 2015 09:40:37 +0100
-Subject: [PATCH v8 06/17] dt-bindings: add document for analogix display
- port driver
-In-Reply-To: <56317275.90508@rock-chips.com>
-References: <1446020143-32645-1-git-send-email-ykk@rock-chips.com>
- <103292898.nCEg51kmfI@phil> <56317275.90508@rock-chips.com>
-Message-ID: <1689999.2MgYqJktlx@phil>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Thu, 29 Oct 2015 17:42:43 +0900
+Subject: [PATCH v5 2/5] arm64: dts: r8a7795: add EthernetAVB device node
+In-Reply-To: <1444891698-8780-3-git-send-email-horms+renesas@verge.net.au>
+References: <1444891698-8780-1-git-send-email-horms+renesas@verge.net.au>
+ <1444891698-8780-3-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <CANqRtoQLXQENVxvpMB_pymu7B+F6MhL0CBqPC4EscFTxOYt07Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag, 29. Oktober 2015, 09:12:21 schrieb Yakir Yang:
-> Hi Heiko,
-> 
-> On 10/29/2015 04:02 AM, Heiko Stuebner wrote:
-> > Hi Yakir,
-> >
-> > Am Mittwoch, 28. Oktober 2015, 16:26:33 schrieb Yakir Yang:
-> >> diff --git a/Documentation/devicetree/bindings/display/exynos/exynos_dp.txt b/Documentation/devicetree/bindings/display/exynos/exynos_dp.txt
-> >> index 7a3a9cd..9905081 100644
-> >> --- a/Documentation/devicetree/bindings/display/exynos/exynos_dp.txt
-> >> +++ b/Documentation/devicetree/bindings/display/exynos/exynos_dp.txt
-> >> @@ -31,45 +31,31 @@ Required properties for dp-controller:
-> >>   		from general PHY binding: the phandle for the PHY device.
-> >>   	-phy-names:
-> >>   		from general PHY binding: Should be "dp".
-> >> -	-samsung,color-space:
-> >> -		input video data format.
-> >> -			COLOR_RGB = 0, COLOR_YCBCR422 = 1, COLOR_YCBCR444 = 2
-> >> -	-samsung,dynamic-range:
-> >> -		dynamic range for input video data.
-> >> -			VESA = 0, CEA = 1
-> >> -	-samsung,ycbcr-coeff:
-> >> -		YCbCr co-efficients for input video.
-> >> -			COLOR_YCBCR601 = 0, COLOR_YCBCR709 = 1
-> >> -	-samsung,color-depth:
-> >> -		number of bits per colour component.
-> >> -			COLOR_6 = 0, COLOR_8 = 1, COLOR_10 = 2, COLOR_12 = 3
-> >> -	-samsung,link-rate:
-> >> -		link rate supported by the panel.
-> >> -			LINK_RATE_1_62GBPS = 0x6, LINK_RATE_2_70GBPS = 0x0A
-> >> -	-samsung,lane-count:
-> >> -		number of lanes supported by the panel.
-> >> -			LANE_COUNT1 = 1, LANE_COUNT2 = 2, LANE_COUNT4 = 4
-> >> -	- display-timings: timings for the connected panel as described by
-> >> -		Documentation/devicetree/bindings/video/display-timing.txt
-> > 											^^ display/display-timings.txt
-> > otherwise this patch does not apply.
-> 
-> I thought I have deleted this old path of "display-timing.txt", and 
-> changed it to
-> 
-> -		Documentation/devicetree/bindings/video/display-timing.txt
+On Thu, Oct 15, 2015 at 3:48 PM, Simon Horman
+<horms+renesas@verge.net.au> wrote:
+> From: Kazuya Mizuguchi <kazuya.mizuguchi.ks@renesas.com>
+>
+> Signed-off-by: Kazuya Mizuguchi <kazuya.mizuguchi.ks@renesas.com>
+> [horms: minor updates]
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
+>
+> ---
+> v0 [Kazuya Mizuguchi]
+>
+> v1 [Simon Horman]
+> * moved to soc node
+> * updated patch subject
+>
+> v2 [Simon Horman]
+> * Specify all interrupts
+> * Use named interrupts
+> * Rebase
+> * Remove spurious whitespace change introduce in v1
+>
+> v3 [Simon Horman]
+> * As suggested by Geert Uytterhoeven
+>   - Add power-domains property
+> * Added Ack
+>
+> v4, v5
+> * No change
+> ---
+>  arch/arm64/boot/dts/renesas/r8a7795.dtsi | 42 ++++++++++++++++++++++++++++++++
+>  1 file changed, 42 insertions(+)
+>
+> diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+> index 6efa49f97e07..63bc74e89fa4 100644
+> --- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+> +++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+> @@ -312,6 +312,48 @@
+>                         /* Empty node for now */
+>                 };
+>
+> +               avb: ethernet at e6800000 {
+> +                       compatible = "renesas,etheravb-r8a7795";
+> +                       reg = <0 0xe6800000 0 0x800>, <0 0xe6a00000 0 0x10000>;
+> +                       interrupts = <GIC_SPI 39 IRQ_TYPE_LEVEL_HIGH>,
+> +                                    <GIC_SPI 40 IRQ_TYPE_LEVEL_HIGH>,
+> +                                    <GIC_SPI 41 IRQ_TYPE_LEVEL_HIGH>,
+> +                                    <GIC_SPI 42 IRQ_TYPE_LEVEL_HIGH>,
+> +                                    <GIC_SPI 43 IRQ_TYPE_LEVEL_HIGH>,
+> +                                    <GIC_SPI 44 IRQ_TYPE_LEVEL_HIGH>,
+> +                                    <GIC_SPI 45 IRQ_TYPE_LEVEL_HIGH>,
+> +                                    <GIC_SPI 46 IRQ_TYPE_LEVEL_HIGH>,
+> +                                    <GIC_SPI 47 IRQ_TYPE_LEVEL_HIGH>,
+> +                                    <GIC_SPI 48 IRQ_TYPE_LEVEL_HIGH>,
+> +                                    <GIC_SPI 49 IRQ_TYPE_LEVEL_HIGH>,
+> +                                    <GIC_SPI 50 IRQ_TYPE_LEVEL_HIGH>,
+> +                                    <GIC_SPI 51 IRQ_TYPE_LEVEL_HIGH>,
+> +                                    <GIC_SPI 52 IRQ_TYPE_LEVEL_HIGH>,
+> +                                    <GIC_SPI 53 IRQ_TYPE_LEVEL_HIGH>,
+> +                                    <GIC_SPI 54 IRQ_TYPE_LEVEL_HIGH>,
+> +                                    <GIC_SPI 55 IRQ_TYPE_LEVEL_HIGH>,
+> +                                    <GIC_SPI 56 IRQ_TYPE_LEVEL_HIGH>,
+> +                                    <GIC_SPI 57 IRQ_TYPE_LEVEL_HIGH>,
+> +                                    <GIC_SPI 58 IRQ_TYPE_LEVEL_HIGH>,
+> +                                    <GIC_SPI 59 IRQ_TYPE_LEVEL_HIGH>,
+> +                                    <GIC_SPI 60 IRQ_TYPE_LEVEL_HIGH>,
+> +                                    <GIC_SPI 61 IRQ_TYPE_LEVEL_HIGH>,
+> +                                    <GIC_SPI 62 IRQ_TYPE_LEVEL_HIGH>,
+> +                                    <GIC_SPI 63 IRQ_TYPE_LEVEL_HIGH>;
+> +                       interrupt-names = "ch0", "ch1", "ch2", "ch3",
+> +                                         "ch4", "ch5", "ch6", "ch7",
+> +                                         "ch8", "ch9", "ch10", "ch11",
+> +                                         "ch12", "ch13", "ch14", "ch15",
+> +                                         "ch16", "ch17", "ch18", "ch19",
+> +                                         "ch20", "ch21", "ch22", "ch23",
+> +                                         "ch24";
+> +                       clocks = <&mstp8_clks R8A7795_CLK_ETHERAVB>;
+> +                       power-domains = <&cpg_clocks>;
+> +                       phy-mode = "rgmii-id";
+> +                       #address-cells = <1>;
+> +                       #size-cells = <0>;
+> +               };
+> +
+>                 dmac1: dma-controller at e7300000 {
+>                         /* Empty node for now */
+>                 };
+> --
+> 2.1.4
+>
 
-in the changes I got from Rob Hering's dt-branch [0] the path in the file
-is already display/display-timing.txt so applying a change with video/...
-in it fails. Anyway, as this will probably only make it in after the merge-
-window, we can see how this ends up before anyway :-) .
+Hi Simon,
 
-> 
-> +		Documentation/devicetree/bindings/display/panel/display-timing.txt
-> 
-> And the real path of "display-timing.txt" in linux-next [tag 20151022] 
-> do under
-> the "display/panel/", those change should be right.
+Thanks for your efforts with the ethernet controller. In general all
+seems good to me, but this I came across the contents of this patch
+when I was browsing the SoC DTSI file. What is the reason to put this
+node in between dmac0 and dmac1? I don't know where is the best
+location, but it would be good to keep the dmac nodes together I
+think.
 
+Cheers,
 
-Heiko
-
-[0] https://git.kernel.org/cgit/linux/kernel/git/robh/linux.git/commit/?h=dt/next&id=efdbd7345f8836f7495f3ac6ee237d86cb3bb6b0
+/ magnus
