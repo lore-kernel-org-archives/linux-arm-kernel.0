@@ -1,41 +1,41 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 29 Oct 2015 16:08:55 +0100
-Subject: [PATCH] [v2] arm64: efi: make sure vmlinux load address aligned
- on 2MB
-In-Reply-To: <56323311.8050708@codeaurora.org>
-References: <1446053844-27281-1-git-send-email-timur@codeaurora.org>
- <20151028180836.GB26777@leverpostej> <56311014.9020400@codeaurora.org>
- <20151028182139.GC26777@leverpostej>
- <CAKv+Gu-76knWJ+ffAemeR7sBBtVB68pmZNPGQZRZKhmnd21F9A@mail.gmail.com>
- <20151029134333.GE28221@leverpostej>
- <CAKv+Gu8yFYv7GNvsOzUD1UQaXZ0AeXByahq3XjodrCtOGRGfgQ@mail.gmail.com>
- <56323311.8050708@codeaurora.org>
-Message-ID: <B00905D7-EF6A-42F7-86AB-7C2FA60E3B51@linaro.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 29 Oct 2015 15:09:22 +0000
+Subject: [PATCH] recordmcount: arm64: replace the ignored mcount call
+ into nop
+In-Reply-To: <201510292118.ZYBYzBGa%fengguang.wu@intel.com>
+References: <1446019445-14421-1-git-send-email-huawei.libin@huawei.com>
+ <201510292118.ZYBYzBGa%fengguang.wu@intel.com>
+Message-ID: <20151029150922.GE3440@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-> On 29 okt. 2015, at 15:54, Timur Tabi <timur@codeaurora.org> wrote:
+On Thu, Oct 29, 2015 at 09:35:42PM +0800, kbuild test robot wrote:
+> [auto build test ERROR on arm64/for-next/core -- if it's inappropriate base, please suggest rules for selecting the more suitable base]
 > 
-> On 10/29/2015 08:48 AM, Ard Biesheuvel wrote:
->>> >There is another (existing) problem I spotted, in that we'll sometimes
->>> >move the kernel to a worse address. If the kernel was loaded at a valid
->>> >address (i.e. image_addr % SZ_2MB == TEXT_OFFSET), but not at the
->>> >preferred offset, we try to relocate it, even if it's already at the
->>> >lowest possible address.
->>> >
+> url:    https://github.com/0day-ci/linux/commits/Li-Bin/recordmcount-arm64-replace-the-ignored-mcount-call-into-nop/20151028-160846
+> config: arm64-allmodconfig (attached as .config)
+> reproduce:
+>         wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+>         chmod +x ~/bin/make.cross
+>         # save the attached .config to linux build tree
+>         make.cross ARCH=arm64 
 > 
->> Indeed. Unlikely to occur in practice, since UEFI mostly allocates top
->> down, but it would indeed be better to drop the new allocation and
->> simply use the existing one if it is not an improvement.
+> All errors (new ones prefixed by >>):
 > 
-> So you're saying that if we modify our UEFI so that it always loads the kernel at dram_base + TEXT_OFFSET, then one day in the future the kernel will skip the relocation?
-> 
+> >> /bin/bash: line 1: 117734 Segmentation fault      ./scripts/recordmcount "arch/arm64/kernel/traps.o"
+> --
+> >> /bin/bash: line 1: 113824 Segmentation fault      ./scripts/recordmcount "arch/arm64/mm/fault.o"
 
-In fact, it does that already. The case Mark describes is when the Image is correctly aligned, but not at the base of DRAM, and the allocation produced by the firmware turns out to be even higher up in memory than the existing Image. In that particular case, the Image should simply be kept at the original offset, but currently we will prefer the suboptimal reallocation.
+I can reproduce this locally with an allmodconfig build. The offset
+parameter to make_nop_arm64 is nuts:
 
-> -- 
-> Qualcomm Innovation Center, Inc.
-> The Qualcomm Innovation Center, Inc. is a member of the
-> Code Aurora Forum, a Linux Foundation Collaborative Project.
+  Program received signal SIGSEGV, Segmentation fault.
+  make_nop_arm64 (map=0x7ffff7fef000, offset=2600547309829750784) at scripts/recordmcount.c:170
+  170		if (*ptr != 0x94000000)
+
+Both shdr->sh_offset (0x17000000000000) and relp->r_offset (0x2400000000000000)
+look dodgy in the caller.
+
+Li, can you take a look please?
+
+Will
