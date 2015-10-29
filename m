@@ -1,66 +1,27 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 29 Oct 2015 08:52:12 +0100
-Subject: [PATCH v11 6/8] arm64: renesas: add Salvator-X board support on
- DTS
-In-Reply-To: <20151023070032.GA4502@verge.net.au>
-References: <1444890243-6978-1-git-send-email-horms+renesas@verge.net.au>
- <1444890243-6978-7-git-send-email-horms+renesas@verge.net.au>
- <20151015110139.GG8825@leverpostej>
- <20151023070032.GA4502@verge.net.au>
-Message-ID: <CAMuHMdVzUPyhkfPy3s+jBK1gQ-kZqYfrQZ8Bww-iFxGOPVZn2w@mail.gmail.com>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Thu, 29 Oct 2015 08:53:42 +0100
+Subject: [PATCH 2/3] ARM: zynq: DT: Add interrupt-controller property to
+ GPIO
+In-Reply-To: <CACRpkdY-PR1Pd+=tm49cAjayC6LQbTUH7FDqmTN-1D8aYCw5Ng@mail.gmail.com>
+References: <1445617532-10228-1-git-send-email-soren.brinkmann@xilinx.com>
+ <1445617532-10228-2-git-send-email-soren.brinkmann@xilinx.com>
+ <CACRpkdY-PR1Pd+=tm49cAjayC6LQbTUH7FDqmTN-1D8aYCw5Ng@mail.gmail.com>
+Message-ID: <5631D086.9080603@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
-
-On Fri, Oct 23, 2015 at 9:00 AM, Simon Horman <horms@verge.net.au> wrote:
-> On Thu, Oct 15, 2015 at 12:01:40PM +0100, Mark Rutland wrote:
->> > +           stdout-path = &scif2;
+On 10/27/2015 05:04 PM, Linus Walleij wrote:
+> On Fri, Oct 23, 2015 at 6:25 PM, Soren Brinkmann
+> <soren.brinkmann@xilinx.com> wrote:
+> 
+>> GPIO can be used as interrupt-controller. Add the missing properties to
+>> the GPIO node.
 >>
->> No rate? It would be better to be explicit here; you should be able to
->> have:
->>
->>       stdout-path = "serial0:115200n8"
->>
->> Where "115200n8" is replaced with whatever configuration this board
->> actually has.
->
-> I think that we have had this discussion before in relation to
-> a different board for a different Renesas SoC but I could be mistaken.
+>> Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
+> 
+> Acked-by: Linus Walleij <linus.walleij@linaro.org>
 
-IIRC, at that time the code to parse the options wasn't upstream yet, so
-adding the options would have broken the serial console.
+Applied to zynq/dt.
 
-I can confirm it works fine on Salvator-X with
-
-        stdout-path = "serial0:115200n8";
-
-> The r8a7795 uses the sh-sci serial driver for which the default rate is
-> 115200. It is hard for me to conceive of a situation where that would
-> change without due consideration being given to the implications for DT
-> files.
->
-> Not specifying the baud here is consistent with what we have
-> been doing for ARM32 Renesas SoCs for some time.
-
-FWIW, I have updated all ARM32 Renesas DTSes locally:
-  1. Use alias in and add serial options to stdout-path,
-  2. Drop superfluous console= from bootargs (shmobile-legacy is gone,
-     and it works fine on boards with both fbdev and serial consoles).
-
-And everything looks fine on the boards I could try it on (sh73a0/kzm9g,
-r8a73a4/ape6evm, r8a7740/armadillo, r8a7791/koelsch).
-
-Hence if you're open for this change, I can submit patches (or a single patch,
-up to your preference).
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Thanks,
+Michal
