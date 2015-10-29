@@ -1,68 +1,80 @@
-From: dubepankaj1980@gmail.com (Pankaj Dubey)
-Date: Thu, 29 Oct 2015 23:16:44 +0530
-Subject: [PATCH v4 0/4] [PATCH v4 0/4] Exynos SROMc configuration and
- Ethernet support for SMDK5410
-In-Reply-To: <cover.1446122247.git.p.fedin@samsung.com>
-References: <cover.1446122247.git.p.fedin@samsung.com>
-Message-ID: <CAGcde9GtepdzFLCfW+ughAdyU_sKXUhgK35z434FPOFXpmRX9Q@mail.gmail.com>
+From: eric.auger@linaro.org (Eric Auger)
+Date: Thu, 29 Oct 2015 17:49:42 +0000
+Subject: [PATCH v2] vfio/type1: handle case where IOMMU does not support
+ PAGE_SIZE size
+Message-ID: <1446140982-4059-1-git-send-email-eric.auger@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29 October 2015 at 18:12, Pavel Fedin <p.fedin@samsung.com> wrote:
-> This patch extends Exynos SROM controller driver with ability to configure
-> controller outputs and enables SMSC9115 Ethernet chip on SMDK5410 board,
-> which is connected via SROMc bank #3.
->
-> With this patchset, support for the whole existing SMDK range can be added.
-> Actually, only bank number is different.
->
-> This patchset also depends on Exynos 5410 pinctrl support, introduced by
-> patches 0003 and 0004 from this set:
-> [PATCH v4 0/5] ARM: EXYNOS: ODROID-XU DT and LEDs
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-March/330862.html
->
-> Pinctrl support is necessary in order to correctly configure
-> multifunctional pins of the Exynos chip.
->
-> v3 => v4:
-> - Devices are now added as subnodes, with additional properties. This allows
->   to cleary specify dependency. If configuration fails, error will be reported
->   and child devices will not be probed.
-> - These additional properties now have "samsung,srom-XXX" format
-> - Fixed code style, now better understood.
->
-> v2 => v3:
-> - Fixed up SROMc region size in the device tree
-> - Reordered patches, documentation goes first now
->
-> v1 => v2:
-> - Fixed some typos and bad labels in device tree
-> - Improved documentation
->
-> Pavel Fedin (4):
->   Documentation: dt-bindings: Describe SROMc configuration
->   ARM: dts: Add SROMc to Exynos 5410
->   drivers: exynos-srom: Add support for bank configuration
->   ARM: dts: Add Ethernet chip to SMDK5410
->
->  .../bindings/arm/samsung/exynos-srom.txt           | 50 ++++++++++++++++++-
->  arch/arm/boot/dts/exynos5410-smdk5410.dts          | 41 +++++++++++++++
->  arch/arm/boot/dts/exynos5410.dtsi                  | 15 ++++++
->  arch/arm/mach-exynos/Kconfig                       |  2 +-
->  drivers/soc/samsung/Kconfig                        |  2 +-
->  drivers/soc/samsung/exynos-srom.c                  | 58 +++++++++++++++++++++-
->  6 files changed, 162 insertions(+), 6 deletions(-)
->
+Current vfio_pgsize_bitmap code hides the supported IOMMU page
+sizes smaller than PAGE_SIZE. As a result, in case the IOMMU
+does not support PAGE_SIZE page, the alignment check on map/unmap
+is done with larger page sizes, if any. This can fail although
+mapping could be done with pages smaller than PAGE_SIZE.
 
-Something wrong here, I am not able to find V4 1/4 and 3/4 in this mailing list.
+This patch modifies vfio_pgsize_bitmap implementation so that,
+in case the IOMMU supports page sizes smaller than PAGE_SIZE
+we pretend PAGE_SIZE is supported and hide sub-PAGE_SIZE sizes.
+That way the user will be able to map/unmap buffers whose size/
+start address is aligned with PAGE_SIZE. Pinning code uses that
+granularity while iommu driver can use the sub-PAGE_SIZE size
+to map the buffer.
 
-Thanks,
-Pankaj Dubey
-> --
-> 2.4.4
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+Signed-off-by: Eric Auger <eric.auger@linaro.org>
+Signed-off-by: Alex Williamson <alex.williamson@redhat.com>
+Acked-by: Will Deacon <will.deacon@arm.com>
+
+---
+
+This was tested on AMD Seattle with 64kB page host. ARM MMU 401
+currently expose 4kB, 2MB and 1GB page support. With a 64kB page host,
+the map/unmap check is done against 2MB. Some alignment check fail
+so VFIO_IOMMU_MAP_DMA fail while we could map using 4kB IOMMU page
+size.
+
+v1 -> v2:
+- correct PAGE_HOST type in comment and commit msg
+- Add Will's R-b
+
+RFC -> PATCH v1:
+- move all modifications in vfio_pgsize_bitmap following Alex'
+  suggestion to expose a fake PAGE_SIZE support
+- restore WARN_ON's
+---
+ drivers/vfio/vfio_iommu_type1.c | 15 ++++++++++++++-
+ 1 file changed, 14 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/vfio/vfio_iommu_type1.c b/drivers/vfio/vfio_iommu_type1.c
+index 57d8c37..59d47cb 100644
+--- a/drivers/vfio/vfio_iommu_type1.c
++++ b/drivers/vfio/vfio_iommu_type1.c
+@@ -403,13 +403,26 @@ static void vfio_remove_dma(struct vfio_iommu *iommu, struct vfio_dma *dma)
+ static unsigned long vfio_pgsize_bitmap(struct vfio_iommu *iommu)
+ {
+ 	struct vfio_domain *domain;
+-	unsigned long bitmap = PAGE_MASK;
++	unsigned long bitmap = ULONG_MAX;
+ 
+ 	mutex_lock(&iommu->lock);
+ 	list_for_each_entry(domain, &iommu->domain_list, next)
+ 		bitmap &= domain->domain->ops->pgsize_bitmap;
+ 	mutex_unlock(&iommu->lock);
+ 
++	/*
++	 * In case the IOMMU supports page sizes smaller than PAGE_SIZE
++	 * we pretend PAGE_SIZE is supported and hide sub-PAGE_SIZE sizes.
++	 * That way the user will be able to map/unmap buffers whose size/
++	 * start address is aligned with PAGE_SIZE. Pinning code uses that
++	 * granularity while iommu driver can use the sub-PAGE_SIZE size
++	 * to map the buffer.
++	 */
++	if (bitmap & ~PAGE_MASK) {
++		bitmap &= PAGE_MASK;
++		bitmap |= PAGE_SIZE;
++	}
++
+ 	return bitmap;
+ }
+ 
+-- 
+1.9.1
