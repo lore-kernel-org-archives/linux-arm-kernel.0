@@ -1,138 +1,84 @@
 From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Thu, 29 Oct 2015 11:16:21 +0900
-Subject: [PATCH v3 3/4] drivers: exynos-srom: Add support for bank
+Date: Thu, 29 Oct 2015 11:27:05 +0900
+Subject: [PATCH v3 1/4] Documentation: dt-bindings: Describe SROMc
  configuration
-In-Reply-To: <048021141f295b0e70c852134d4ac9cc6f7f1da4.1446018918.git.p.fedin@samsung.com>
+In-Reply-To: <046d990092dc85cf50db9082fc894d93a3ece7c0.1446018918.git.p.fedin@samsung.com>
 References: <cover.1446018918.git.p.fedin@samsung.com>
- <048021141f295b0e70c852134d4ac9cc6f7f1da4.1446018918.git.p.fedin@samsung.com>
-Message-ID: <56318175.6000006@samsung.com>
+ <046d990092dc85cf50db9082fc894d93a3ece7c0.1446018918.git.p.fedin@samsung.com>
+Message-ID: <563183F9.6020806@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 28.10.2015 16:57, Pavel Fedin wrote:
-> Bindings are based on u-boot implementation, however they are stored in
-> subnodes, providing support for more than one bank.
-> 
-> Since the driver now does more than suspend-resume support, dependency on
-> CONFIG_PM is removed.
+> Add documentation for new properties, allowing bank configuration.
 > 
 > Signed-off-by: Pavel Fedin <p.fedin@samsung.com>
 > ---
->  arch/arm/mach-exynos/Kconfig      |  2 +-
->  drivers/soc/samsung/Kconfig       |  2 +-
->  drivers/soc/samsung/exynos-srom.c | 42 ++++++++++++++++++++++++++++++++++++++-
->  3 files changed, 43 insertions(+), 3 deletions(-)
+>  .../bindings/arm/samsung/exynos-srom.txt           | 24 +++++++++++++++++++++-
+>  1 file changed, 23 insertions(+), 1 deletion(-)
+
+You missed here a lot of potential Cc. Please use get_maintainer.pl
+script. It *must* be sent to devicetree list.
+
+Please send it also to DeviceTree maintainers because you are adding
+quite generic names for bindings so they may have interesting thoughts
+on this.
+
+LKML list is also missing.
+
 > 
-> diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
-> index 83c85f5..c22dc42 100644
-> --- a/arch/arm/mach-exynos/Kconfig
-> +++ b/arch/arm/mach-exynos/Kconfig
-> @@ -16,7 +16,7 @@ menuconfig ARCH_EXYNOS
->  	select ARM_GIC
->  	select COMMON_CLK_SAMSUNG
->  	select EXYNOS_THERMAL
-> -	select EXYNOS_SROM if PM
-> +	select EXYNOS_SROM
->  	select HAVE_ARM_SCU if SMP
->  	select HAVE_S3C2410_I2C if I2C
->  	select HAVE_S3C2410_WATCHDOG if WATCHDOG
-> diff --git a/drivers/soc/samsung/Kconfig b/drivers/soc/samsung/Kconfig
-> index 2833b5b..ea4bc2a 100644
-> --- a/drivers/soc/samsung/Kconfig
-> +++ b/drivers/soc/samsung/Kconfig
-> @@ -8,6 +8,6 @@ config SOC_SAMSUNG
+> diff --git a/Documentation/devicetree/bindings/arm/samsung/exynos-srom.txt b/Documentation/devicetree/bindings/arm/samsung/exynos-srom.txt
+> index 33886d5..9e4a40b 100644
+> --- a/Documentation/devicetree/bindings/arm/samsung/exynos-srom.txt
+> +++ b/Documentation/devicetree/bindings/arm/samsung/exynos-srom.txt
+> @@ -5,8 +5,30 @@ Required properties:
 >  
->  config EXYNOS_SROM
->  	bool
-> -	depends on ARM && ARCH_EXYNOS && PM
-> +	depends on ARM && ARCH_EXYNOS
+>  - reg: offset and length of the register set
 >  
->  endmenu
-> diff --git a/drivers/soc/samsung/exynos-srom.c b/drivers/soc/samsung/exynos-srom.c
-> index 57a232d..6c8c56a 100644
-> --- a/drivers/soc/samsung/exynos-srom.c
-> +++ b/drivers/soc/samsung/exynos-srom.c
-> @@ -67,9 +67,46 @@ static struct exynos_srom_reg_dump *exynos_srom_alloc_reg_dump(
->  	return rd;
->  }
->  
-> +static int decode_sromc(struct exynos_srom *srom, struct device_node *np)
-> +{
-> +	u32 bank, width;
-> +	u32 timing[7];
-> +	u32 bw;
+> -Example:
+> +Bank configurations can be defined in optional subnodes. Each subnode
+> +describes one bank and contains the following:
 > +
-> +	if (of_property_read_u32(np, "bank", &bank))
-> +		return -ENXIO;
+> +Required properties:
+> +- bank : bank number (0 - 3)
 
-This is an invalid value in DTB, not missing device or address, so -EINVAL.
+I wonder whether this should be maybe "reg"?
 
-> +	if (of_property_read_u32(np, "width", &width))
-> +		width = 1;
-> +	if (of_property_read_u32_array(np, "srom-timing", timing, 7)) {
-
-s/7/ARRAY_SIZE/
-
-> +		pr_err("Could not decode SROMC configuration\n");
-
-dev_err()
-
-> +		return -ENXIO;
-
-Here also I would prefer -EINVAL
-
-> +	}
 > +
-> +	bank *= 4; /* Convert bank into shift/offset */
-> +
-> +	bw = 1 << EXYNOS_SROM_BW__BYTEENABLE__SHIFT;
-> +	if (width == 2)
-> +		bw |= 1 << EXYNOS_SROM_BW__DATAWIDTH__SHIFT;
-> +	bw <<= bank;
-> +	bw |= __raw_readl(srom->reg_base + EXYNOS_SROM_BW) &
-> +	      ~(EXYNOS_SROM_BW__CS_MASK << bank);
+> +- srom-timing : array of 7 integers: Tacp, Tcah, Tcoh, Tacc, Tcos, Tacs
 
-This is reversed pattern. First read, then set or clear bits and finally
-write. It makes easier to understand what is the intention.
+Missing "pmc"? Where is the seventh?
 
-> +	__raw_writel(bw, srom->reg_base + EXYNOS_SROM_BW);
-> +
-> +	__raw_writel((timing[0] << EXYNOS_SROM_BCX__PMC__SHIFT) |
-> +		    (timing[1] << EXYNOS_SROM_BCX__TACP__SHIFT) |
-> +		    (timing[2] << EXYNOS_SROM_BCX__TCAH__SHIFT) |
-> +		    (timing[3] << EXYNOS_SROM_BCX__TCOH__SHIFT) |
-> +		    (timing[4] << EXYNOS_SROM_BCX__TACC__SHIFT) |
-> +		    (timing[5] << EXYNOS_SROM_BCX__TCOS__SHIFT) |
-> +		    (timing[6] << EXYNOS_SROM_BCX__TACS__SHIFT),
-> +		    srom->reg_base + EXYNOS_SROM_BC0 + bank);
-> +
-> +	return 0;
-> +}
-> +
->  static int exynos_srom_probe(struct platform_device *pdev)
->  {
-> -	struct device_node *np;
-> +	struct device_node *np, *child;
->  	struct exynos_srom *srom;
->  	struct device *dev = &pdev->dev;
->  
-> @@ -100,6 +137,9 @@ static int exynos_srom_probe(struct platform_device *pdev)
->  		return -ENOMEM;
->  	}
->  
-> +	for_each_child_of_node(np, child)
-> +		decode_sromc(srom, child);
+This looks vendor specific, so prefix with "samsung,exynos-".
 
-You ignore the return value here so bank may be not configured but
-device probe will return 0.
+> +
+> +Optional properties:
+> +- width : data width in bytes (1 or 2). If omitted, default of 1 is used.
 
-Maybe clean up and fail the probe?
+This is not bank-width? So data-width? Any vendor prefix here? How
+generic is this?
+
+These are first things which came to my mind. Maybe DT maintainers will
+come with something more...
 
 Best regards,
 Krzysztof
 
 > +
->  	return 0;
->  }
->  
+> +Example: basic definition, no banks are configured
+> +	sromc at 12570000 {
+> +		compatible = "samsung,exynos-srom";
+> +		reg = <0x12570000 0x10>;
+> +	};
+> +
+> +Example: SROMc with bank3 configuration
+>  	sromc at 12570000 {
+>  		compatible = "samsung,exynos-srom";
+>  		reg = <0x12570000 0x10>;
+> +		bank at 3 {
+> +			bank = <3>;
+> +			width = <2>;
+> +			srom-timing = <1 9 12 1 9 1 1>;
+> +		};
+>  	};
 > 
