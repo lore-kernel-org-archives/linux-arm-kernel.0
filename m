@@ -1,83 +1,113 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 29 Oct 2015 14:40:59 +0100
-Subject: [PATCH 3/3] arm64/efi: memblock_remove() rather than _reserve UEFI
- reserved memory
-In-Reply-To: <1446126059-25336-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1446126059-25336-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1446126059-25336-4-git-send-email-ard.biesheuvel@linaro.org>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 29 Oct 2015 13:43:33 +0000
+Subject: [PATCH] [v2] arm64: efi: make sure vmlinux load address aligned
+ on 2MB
+In-Reply-To: <CAKv+Gu-76knWJ+ffAemeR7sBBtVB68pmZNPGQZRZKhmnd21F9A@mail.gmail.com>
+References: <1446053844-27281-1-git-send-email-timur@codeaurora.org>
+ <20151028180836.GB26777@leverpostej>
+ <56311014.9020400@codeaurora.org>
+ <20151028182139.GC26777@leverpostej>
+ <CAKv+Gu-76knWJ+ffAemeR7sBBtVB68pmZNPGQZRZKhmnd21F9A@mail.gmail.com>
+Message-ID: <20151029134333.GE28221@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Memory regions that are not advertised as being available for general use
-to the kernel should either never be mapped at all (EfiReservedMemory),
-since it should not even be accessed speculatively, or they are mapped
-and unmapped explicitly when used (UEFI runtime services regions), so
-the linear mapping is never used anyway.
+On Thu, Oct 29, 2015 at 11:59:46AM +0900, Ard Biesheuvel wrote:
+> On 29 October 2015 at 03:21, Mark Rutland <mark.rutland@arm.com> wrote:
+> > On Wed, Oct 28, 2015 at 01:12:36PM -0500, Timur Tabi wrote:
+> >> On 10/28/2015 01:08 PM, Mark Rutland wrote:
+> >>
+> >> >arm64: efi: ensure kernel is loaded at correct address
+> >> >
+> >> >The kernel image needs to be loaded text_offset_bytes from a 2M-aligned
+> >> >base, per Documentation/arm64/booting.txt. If loaded at the wrong offset
+> >> >modulo 2M, __create_page_tables will create incorrect page tables.
+> >> >
+> >> >The EFI stub implicitly assumes that dram_base (i.e. the lowest address
+> >> >with a EFI_MEMORY_WB attribute) is 2M-aligned, and tries to load the
+> >> >kernel at dram_base + TEXT_OFFSET. If dram_base is not 2M-aligned, the
+> >> >kernel will be loaded at the wrong offset from 2M.
+> >>
+> >> Thanks, I'll use that.  I messed up a couple other things, so I need
+> >> to send out a v3 anyway.
+> >>
+> >> >>-           *image_addr = *reserve_addr = dram_base + TEXT_OFFSET;
+> >> >>+           *image_addr = *reserve_addr =
+> >> >>+                   round_up(dram_base, SZ_2M) + TEXT_OFFSET;
+> >> >
+> >> >We also need to fix the test for whether we need to relocate the kernel:
+> >> >(*image_addr != (dram_base + TEXT_OFFSET)).
+> >> >
+> >> >When dram_base is not 2M aligned, that is broken, and it's been broken
+> >> >since it was introduced in commit 3c7f255039a2ad6e ("arm64: efi: add EFI
+> >> >stub") in v3.16.
+> >> >
+> >> >It's a bit hideous to fix the general case, though, it seems.
+> >>
+> >> Um, so I should I do something more in my v3 patch, or is this a
+> >> change for a different patch?
+> >
+> > I think there should be a single patch, but please hold off v3 for a day
+> > or so. I think there a few more edge cases here, and I'm currently
+> > investigating.
+> >
+> 
+> Apologies for the drive-by nature of my contributions to this thread.
+> I am currently travelling.
+> 
+> I think the below should address both issues (and I even tried to
+> compile it this time)
+> 
+> -----------------8<-----------------
+> diff --git a/arch/arm64/kernel/efi-stub.c b/arch/arm64/kernel/efi-stub.c
+> index 816120ece6bc..78dfbd34b6bf 100644
+> --- a/arch/arm64/kernel/efi-stub.c
+> +++ b/arch/arm64/kernel/efi-stub.c
+> @@ -25,10 +25,20 @@
+>         unsigned long kernel_size, kernel_memsize = 0;
+>         unsigned long nr_pages;
+>         void *old_image_addr = (void *)*image_addr;
+> +       unsigned long preferred_offset;
+> +
+> +       /*
+> +        * The preferred offset of the kernel Image is TEXT_OFFSET bytes beyond
+> +        * a 2 MB aligned base, which itself may be lower than dram_base, as
+> +        * long as the resulting offset equals or exceeds it.
+> +        */
+> +       preferred_offset = round_down(dram_base, SZ_2M) + TEXT_OFFSET;
+> +       if (preferred_offset < dram_base)
+> +               preferred_offset += SZ_2M;
+> 
+>         /* Relocate the image, if required. */
+>         kernel_size = _edata - _text;
+> -       if (*image_addr != (dram_base + TEXT_OFFSET)) {
+> +       if (*image_addr != preferred_offset) {
+>                 kernel_memsize = kernel_size + (_end - _edata);
+> 
+>                 /*
+> @@ -42,7 +52,7 @@
+>                  * Mustang), we can still place the kernel at the address
+>                  * 'dram_base + TEXT_OFFSET'.
+>                  */
+> -               *image_addr = *reserve_addr = dram_base + TEXT_OFFSET;
+> +               *image_addr = *reserve_addr = preferred_offset;
+>                 nr_pages = round_up(kernel_memsize, EFI_ALLOC_ALIGN) /
+>                            EFI_PAGE_SIZE;
+>                 status = efi_call_early(allocate_pages, EFI_ALLOCATE_ADDRESS,
+> 
 
-This means we are better off removing these regions from the linear
-mapping entirely, so memblock_remove() rather than memblock_reserve()
-them.
+This looks good to me, and I've given it a spin on Juno (though I
+haven't fiddled with dram_base). I trust that you will respin this as a
+patch when you get the chance.
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- arch/arm64/kernel/efi.c | 22 +++++++++++---------
- 1 file changed, 12 insertions(+), 10 deletions(-)
+There is another (existing) problem I spotted, in that we'll sometimes
+move the kernel to a worse address. If the kernel was loaded at a valid
+address (i.e. image_addr % SZ_2MB == TEXT_OFFSET), but not at the
+preferred offset, we try to relocate it, even if it's already at the
+lowest possible address.
 
-diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
-index 11b59e9a5954..daafa40d1c19 100644
---- a/arch/arm64/kernel/efi.c
-+++ b/arch/arm64/kernel/efi.c
-@@ -171,7 +171,7 @@ static __init void reserve_regions(void)
- 		if (efi_enabled(EFI_DBG)) {
- 			char buf[64];
- 
--			pr_info("  0x%012llx-0x%012llx %s",
-+			pr_info("  0x%012llx-0x%012llx %s\n",
- 				paddr, paddr + (npages << EFI_PAGE_SHIFT) - 1,
- 				efi_md_typeattr_format(buf, sizeof(buf), md));
- 		}
-@@ -181,15 +181,17 @@ static __init void reserve_regions(void)
- 
- 		if (is_normal_ram(md))
- 			early_init_dt_add_memory_arch(paddr, size);
-+	}
- 
--		if (is_reserve_region(md)) {
--			memblock_reserve(paddr, size);
--			if (efi_enabled(EFI_DBG))
--				pr_cont("*");
--		}
-+	for_each_efi_memory_desc(&memmap, md) {
-+		paddr = md->phys_addr;
-+		npages = md->num_pages;
-+
-+		memrange_efi_to_native(&paddr, &npages);
-+		size = npages << PAGE_SHIFT;
- 
--		if (efi_enabled(EFI_DBG))
--			pr_cont("\n");
-+		if (is_reserve_region(md))
-+			memblock_remove(paddr, size);
- 	}
- }
- 
-@@ -203,8 +205,6 @@ void __init efi_init(void)
- 
- 	efi_system_table = params.system_table;
- 
--	memblock_reserve(params.mmap & PAGE_MASK,
--			 PAGE_ALIGN(params.mmap_size + (params.mmap & ~PAGE_MASK)));
- 	memmap.phys_map = (void *)params.mmap;
- 	memmap.map = early_memremap(params.mmap, params.mmap_size);
- 	memmap.map_end = memmap.map + params.mmap_size;
-@@ -216,6 +216,8 @@ void __init efi_init(void)
- 
- 	reserve_regions();
- 	early_memunmap(memmap.map, params.mmap_size);
-+	memblock_remove(params.mmap & PAGE_MASK,
-+			PAGE_ALIGN(params.mmap_size + (params.mmap & ~PAGE_MASK)));
- }
- 
- static void __init efi_reserve_iomem_resource(efi_memory_desc_t *md)
--- 
-2.1.4
+That doesn't break boot, so it's not as big a problem, and it's probably
+better sovled with the split VA stuff.
+
+Thanks,
+Mark.
