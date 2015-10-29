@@ -1,32 +1,55 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Thu, 29 Oct 2015 16:40:59 +0100
-Subject: [PATCH v2] pwm-backlight: fix the panel power sequence
-In-Reply-To: <1445526750.27586.8.camel@mtksdaap41>
-References: <1444987060-48202-1-git-send-email-yh.huang@mediatek.com>
- <1444988219.3541.3.camel@pengutronix.de>
- <1445526750.27586.8.camel@mtksdaap41>
-Message-ID: <1446133259.3274.52.camel@pengutronix.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 29 Oct 2015 15:43:46 +0000
+Subject: [PATCH 0/3] Revert arm64 cache geometry
+In-Reply-To: <CAKv+Gu-CgXU4O8SymcjmCYZqyAa0PZbJXwNqXfuCamxYY9C8GA@mail.gmail.com>
+References: <1446068637-11509-1-git-send-email-avanbrunt@nvidia.com>
+ <CAKv+Gu-CgXU4O8SymcjmCYZqyAa0PZbJXwNqXfuCamxYY9C8GA@mail.gmail.com>
+Message-ID: <20151029154346.GL8644@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi YH,
+On Thu, Oct 29, 2015 at 12:22:51PM +0900, Ard Biesheuvel wrote:
+> Fair enough. It is a bit disappointing that we cannot trust these
+> values, but if the architecture does not mandate their accuracy, we
+> obviously should not be using them in the way that we are.
+> 
+> I think we have similar code in the ARM tree, so we should probably
+> make some changes there as well.
 
-Am Donnerstag, den 22.10.2015, 23:12 +0800 schrieb YH Huang:
-> In the case of the panel disabled by the bootloader,
-> your patch still has the following code and always enables the backlight
-> in the probe function.
-> pb->enable_gpio = devm_gpiod_get_optional(&pdev->dev, "enable",
-> -						  GPIOD_OUT_HIGH);
+I've opposed exporting the cache dimensions to userspace for several
+reasons:
 
-You are right.
+* it will become a nightmare with the various different register formats
+  to properly decode these values
+* older CPUs don't have the cache ID registers, so we'd need to augment
+  any export with additional static configuration somehow
+* I don't trust userland with this information to make the right choices,
+  especially when faced with further levels of caches.
 
-> What do you think if I remove these two lines in my patch?
-> if (pb->enable_gpio)
-> 	gpiod_direction_output(pb->enable_gpio, 0);
+The main reason for people wanting the cache dimensions has been "so we
+can select the optimal code for the CPU".  Given all the combinations
+of caches out there, I've always said selecting code based on one level
+of cache is totally insane, and userspace is better off doing some
+performance measurement of its implementations and selecting the most
+appropriate version.
 
-That won't work if the gpio is still configured as input. How about I
-add the GPIOD_ASIS change to my patch you remove that and the above from
-yours?
+There's many things that affect the performance of code paths with CPUs.
+It's not just about cache line size, but instruction latencies, write
+delays, branch prediction and so forth.  You can't _say_ "because this
+CPU has a 32K L1 cache, if I optimise my code as X it'll perform
+better everywhere with a 32K L1 cache than optimised Y."
 
-best regards
-Philipp
+Selecting code based on cache parameters is just wrong.
+
+There may be cases where userspace would like to know the cache line
+size, so it can appropriately align data structures - but that again
+depends on what you're trying to achieve, and what if the L1 cache
+line size is different from the L2 cache line size...
+
+It's a minefield, one which IMHO userspace shouldn't be trusted with.
+Userspace should assume the worst case cache line size seen in ARM
+CPUs and be done with it.
+
+-- 
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
