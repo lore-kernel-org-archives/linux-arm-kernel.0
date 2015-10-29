@@ -1,40 +1,50 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Thu, 29 Oct 2015 18:49:44 +0100
-Subject: [PATCH v8 0/17] Add Analogix Core Display Port Driver
-In-Reply-To: <1446020143-32645-1-git-send-email-ykk@rock-chips.com>
-References: <1446020143-32645-1-git-send-email-ykk@rock-chips.com>
-Message-ID: <1972811.93U5ryFMyR@phil>
+From: slash.tmp@free.fr (Mason)
+Date: Thu, 29 Oct 2015 18:50:31 +0100
+Subject: CPU_METHOD_OF_DECLARE() with Linux as non-secure OS
+In-Reply-To: <yw1xio5pd5mf.fsf@unicorn.mansr.com>
+References: <5630C143.5080103@free.fr> <yw1xio5pd5mf.fsf@unicorn.mansr.com>
+Message-ID: <56325C67.8000007@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Mittwoch, 28. Oktober 2015, 16:15:43 schrieb Yakir Yang:
-> Hi all,
-> 
->    The Samsung Exynos eDP controller and Rockchip RK3288 eDP controller
-> share the same IP, so a lot of parts can be re-used. I split the common
-> code into bridge directory, then rk3288 and exynos only need to keep
-> some platform code. Cause I can't find the exact IP name of exynos dp
-> controller, so I decide to name dp core driver with "analogix" which I
-> find in rk3288 eDP TRM
-> 
-> But  there are still three light registers setting differents bewteen
-> exynos and rk3288.
-> 1. RK3288 have five special pll resigters which not indicata in exynos
->    dp controller.
-> 2. The address of DP_PHY_PD(dp phy power manager register) are different
->    between rk3288 and exynos.
-> 3. Rk3288 and exynos have different setting with AUX_HW_RETRY_CTL(dp debug
->    register).
-> 
-> This series have been well tested on Rockchip platform with eDP panel on
-> Jerry Chromebook and Display Port Monitor on RK3288 board. Also I have
-> tested on Samsung Snow and Peach Pit Chromebooks, and thanks to Javier at Samsung
-> help to retest the whole series on Samsung Exynos5800 Peach Pi Chromebook,
-> glad to say that things works rightlly.
+On 29/10/2015 17:03, M?ns Rullg?rd wrote:
 
-Patch 15/17 looks like it didn't make it? I haven't found it in neither my
-inbox nor in the linux-rockchip list archive? So I've used the v7 version
-for my tests.
+> Mason writes:
+> 
+>> I'm working on a dual-core SoC (Cortex-A9 MPCore) with Linux running
+>> as the non-secure OS. The secure OS implements some of the APIs used
+>> in OMAP2 via SMC.
+>>
+>> To start the second core, I used to define .smp in my DT_MACHINE_START
+>> definition, but Arnd wrote: "There are other ways to do [.smp and .restart]
+>> too, see CPU_METHOD_OF_DECLARE() and register_restart_handler()."
+>>
+>> Is CPU_METHOD_OF_DECLARE() the way to go?
+>> Is it "compatible" with executing smc to ask the secure OS to do whatever
+>> is needed to start the second core? (I don't understand why starting cores
+>> is secure OS responsibility.)
+>>
+>> I've located three relevant secure OS services:
+>> get_aux_core_boot
+>> set_aux_core_boot0
+>> set_aux_core_boot_addr
+>>
+>> I'm looking for guidance. What mach-* should I take as a reference to
+>> implement "second core startup from non-secure OS"?
+> 
+> See https://github.com/mansr/linux-tangox/commit/717dd5fab87aa90255460ba409970331cb577247
 
-This series on a rk3288-veyron-pinky and rk3288-veyron-jerry
-Tested-by: Heiko Stuebner <heiko@sntech.de>
+I discussed cpu1 startup with the firmware author; he said the
+secure OS does all the heavy lifting, Linux is only expected to
+provide secondary_startup. AFAICT, we don't need to jump hoops
+like mach-vexpress did.
+
+I don't think you can define the cpus node in your smp87xx.dtsi
+because smp8756 is single-core.
+
+BTW, I see that you've tried to enable L2C. I would expect your
+board would panic?
+
+http://thread.gmane.org/gmane.linux.ports.arm.kernel/447493
+
+Regards.
