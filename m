@@ -1,37 +1,42 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 29 Oct 2015 11:29:14 +0000
-Subject: [PATCH 0/3] Revert arm64 cache geometry
-In-Reply-To: <1446068637-11509-1-git-send-email-avanbrunt@nvidia.com>
-References: <1446068637-11509-1-git-send-email-avanbrunt@nvidia.com>
-Message-ID: <20151029112914.GB28221@leverpostej>
+From: tn@semihalf.com (Tomasz Nowicki)
+Date: Thu, 29 Oct 2015 12:38:32 +0100
+Subject: [PATCH V1 11/11] arm64, pci, acpi: Support for ACPI based PCI
+ hostbridge init
+In-Reply-To: <563131B0.9060305@codeaurora.org>
+References: <1445963922-22711-1-git-send-email-tn@semihalf.com>
+ <1445963922-22711-12-git-send-email-tn@semihalf.com>
+ <5631180D.2000902@codeaurora.org> <563131B0.9060305@codeaurora.org>
+Message-ID: <56320538.6000905@semihalf.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 28, 2015 at 02:43:54PM -0700, Alex Van Brunt wrote:
-> This patchset reverts three patches that attempt to query the CPU for cache
-> geometry and then make use of that information. Those patches rely on the
-> NumSets and LineSize fields of CCSIDR to determine the cache geometry. However,
-> the architectural documentation for these registers forbids such use:
-> 
-> 	The parameters NumSets, Associativity, and LineSize in these registers
-> 	define the architecturally visible parameters that are required for the
-> 	cache maintenance by Set/Way instructions. They are not guaranteed to
-> 	represent the actual microarchitectural features of a design. You cannot
-> 	make any inference about the actual sizes of caches based on these
-> 	parameters.
-> 
-> It is not just theoretical. For example, the Denver CPU will report one set and
-> one way in CCSIDR even though the actual microarchitectural implementation has
-> many sets and many ways.
-> 
-> I have two suggestions for how to get the cache geometry on an ARMv8 processor:
->   1. Specify the information in the device tree. The purpose of the deivce tree
->      is to specify information that software cannot query at run-time. Becuase
->      the architecture does not have an architectural way to query the cache
->      geometry this may be a good fit.
+On 28.10.2015 21:36, Sinan Kaya wrote:
+> 1. ACPI code is unable to discover the interrupt numbers when objects
+> are ordered as follows in the ACPI file
+>
+> PNP0A08 object
+> PNP0C0F INTA object
+> PNP0C0F INTB object
+> PNP0C0F INTC object
+> PNP0C0F INTD object
+>
+> This gives me invalid link context error.
+>
+> pci 0000:00:00.0: PCI INT A: no GSI
+> pci 0000:01:00.0: Derived GSI for 0000:01:00.0 INT A from 0000:00:00.0
+> acpi PNP0C0F:00: Invalid link context
+>
+> If I order it like this in the ACPI file,
+>
+> PNP0C0F INTA object
+> PNP0C0F INTB object
+> PNP0C0F INTC object
+> PNP0C0F INTD object
+> PNP0A08 object
+>
+> then, the legacy interrupt numbers can be discovered properly.
 
-We already have to detect the unification of caches via DT, so the geomtery
-should probably live there too.
+Can you show full content of your PNP0C0F and PNP0A08 objects?
 
-Thanks,
-Mark.
+Regards,
+Tomasz
