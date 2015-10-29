@@ -1,36 +1,89 @@
-From: timur@codeaurora.org (Timur Tabi)
-Date: Thu, 29 Oct 2015 10:00:14 -0500
-Subject: [PATCH] arm64/efi: do not assume DRAM base is aligned to 2 MB
-In-Reply-To: <20151029145754.GD3440@arm.com>
-References: <1446127645-4115-1-git-send-email-ard.biesheuvel@linaro.org>
- <20151029145754.GD3440@arm.com>
-Message-ID: <5632347E.2070303@codeaurora.org>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Thu, 29 Oct 2015 11:01:58 -0400
+Subject: [PATCH V1 11/11] arm64, pci, acpi: Support for ACPI based PCI
+ hostbridge init
+In-Reply-To: <56320538.6000905@semihalf.com>
+References: <1445963922-22711-1-git-send-email-tn@semihalf.com>
+ <1445963922-22711-12-git-send-email-tn@semihalf.com>
+ <5631180D.2000902@codeaurora.org> <563131B0.9060305@codeaurora.org>
+ <56320538.6000905@semihalf.com>
+Message-ID: <563234E6.4050109@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/29/2015 09:57 AM, Will Deacon wrote:
-> So is this fixing a regression introduced in 4.3? If so, can I have a
-> Fixes: tag too, please? (I was under the impression that this was a
-> longstanding issue, but the thread hasn't been easy to follow).
-
-It fixes a bug introduced by:
-
-Author: Ard Biesheuvel <ard.biesheuvel@linaro.org>  2015-07-24 06:38:27
-Committer: Will Deacon <will.deacon@arm.com>  2015-07-27 05:08:41
-Parent: ddeeefe2dfbe1fa6b116b9362b1bec465b64c873 (arm64/efi: efistub: 
-Apply __init annotation)
-Child:  739fa11938bec53a849b77b2042237a0e17c70ae (arm64/efi: do not 
-assume DRAM base is aligned to 2 MB)
-Branches: dcc, master, qserver, qserver2, remotes/origin/master, tty
-Follows: v4.2-rc4
-Precedes: v4.3-rc1
-
-     arm64: efi: prefer AllocatePages() over efi_low_alloc() for vmlinux
 
 
+On 10/29/2015 7:38 AM, Tomasz Nowicki wrote:
+> On 28.10.2015 21:36, Sinan Kaya wrote:
+>> 1. ACPI code is unable to discover the interrupt numbers when objects
+>> are ordered as follows in the ACPI file
+>>
+>> PNP0A08 object
+>> PNP0C0F INTA object
+>> PNP0C0F INTB object
+>> PNP0C0F INTC object
+>> PNP0C0F INTD object
+>>
+>> This gives me invalid link context error.
+>>
+>> pci 0000:00:00.0: PCI INT A: no GSI
+>> pci 0000:01:00.0: Derived GSI for 0000:01:00.0 INT A from 0000:00:00.0
+>> acpi PNP0C0F:00: Invalid link context
+>>
+>> If I order it like this in the ACPI file,
+>>
+>> PNP0C0F INTA object
+>> PNP0C0F INTB object
+>> PNP0C0F INTC object
+>> PNP0C0F INTD object
+>> PNP0A08 object
+>>
+>> then, the legacy interrupt numbers can be discovered properly.
+>
+> Can you show full content of your PNP0C0F and PNP0A08 objects?
+>
 
+ACPI table is considered proprietary. I don't think I can get the legal 
+approval in time. I can give you pieces though.
+
+Here is the _PRT
+Device (PCI0) { // PCIe port 0
+	Name(_HID, EISAID("PNP0A08"))	// PCI express
+	Name(_CID, EISAID("PNP0A03"))	// Compatible PCI Root Bridge
+{
+	....
+	Name(_PRT, Package(){
+		Package(){0x0FFFF, 0, \_SB.LN0A, 0},  // Slot 0, INTA
+		Package(){0x0FFFF, 1, \_SB.LN0B, 0},  // Slot 0, INTB
+		Package(){0x0FFFF, 2, \_SB.LN0C, 0},  // Slot 0, INTC
+		Package(){0x0FFFF, 3, \_SB.LN0D, 0}   // Slot 0, INTD
+	})
+}
+
+Here is the PNP0C0F
+
+Device(LN0A){
+	Name(_HID, EISAID("PNP0C0F")) // PCI interrupt link
+	Name(_UID, 1)
+	Name(_PRS, ResourceTemplate(){
+	Interrupt(ResourceProducer, Level, ActiveHigh, Exclusive, , ,) {0xE8}
+	})
+	Method(_DIS) {}
+	Method(_CRS) { Return (_PRS) }
+	Method(_SRS, 1) {}
+}
+
+
+
+> Regards,
+> Tomasz
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 
 -- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the
-Code Aurora Forum, a Linux Foundation Collaborative Project.
+Sinan Kaya
+Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a 
+Linux Foundation Collaborative Project
