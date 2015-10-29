@@ -1,146 +1,99 @@
 From: wxt@rock-chips.com (Caesar Wang)
-Date: Thu, 29 Oct 2015 15:14:16 +0800
-Subject: [PATCH v1 4/6] arm64: dts: Add the thermal data found on RK3368
+Date: Thu, 29 Oct 2015 15:14:17 +0800
+Subject: [PATCH v1 5/6] arm64: dts: Add main Thermal info to rk3368.dtsi
 In-Reply-To: <1446102858-10116-1-git-send-email-wxt@rock-chips.com>
 References: <1446102858-10116-1-git-send-email-wxt@rock-chips.com>
-Message-ID: <1446102858-10116-5-git-send-email-wxt@rock-chips.com>
+Message-ID: <1446102858-10116-6-git-send-email-wxt@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patchset add the thermal for RK3368 dts,
-Since the two CPU clusters, with four CPU core for each cluster,
-One cluster is optimized for high-performance(big cluster) and the othe
-is optimized for low power(little cluster).
-
-This patch adds the second order for thermal throttle, and the critical
-temperature for thermal over-tempeature protection on Software.
+This patch add the thermal needed info on RK3368.
+Meanwhile, support the trips to throttle for thermal.
 
 Signed-off-by: Caesar Wang <wxt@rock-chips.com>
+
 ---
 
-Changes in v1: None
+Changes in v1:
+- support the opt gpio pinctrl state
 
- arch/arm64/boot/dts/rockchip/rk3368-thermal.dtsi | 112 +++++++++++++++++++++++
- 1 file changed, 112 insertions(+)
- create mode 100644 arch/arm64/boot/dts/rockchip/rk3368-thermal.dtsi
+ arch/arm64/boot/dts/rockchip/rk3368.dtsi | 36 ++++++++++++++++++++++++++++++++
+ 1 file changed, 36 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/rockchip/rk3368-thermal.dtsi b/arch/arm64/boot/dts/rockchip/rk3368-thermal.dtsi
-new file mode 100644
-index 0000000..a10010f
---- /dev/null
-+++ b/arch/arm64/boot/dts/rockchip/rk3368-thermal.dtsi
-@@ -0,0 +1,112 @@
-+/*
-+ * Device Tree Source for RK3368 SoC thermal
-+ *
-+ * Copyright (c) 2015, Fuzhou Rockchip Electronics Co., Ltd
-+ * Caesar Wang <wxt@rock-chips.com>
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This file is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
+diff --git a/arch/arm64/boot/dts/rockchip/rk3368.dtsi b/arch/arm64/boot/dts/rockchip/rk3368.dtsi
+index cc093a4..7207293 100644
+--- a/arch/arm64/boot/dts/rockchip/rk3368.dtsi
++++ b/arch/arm64/boot/dts/rockchip/rk3368.dtsi
+@@ -45,6 +45,7 @@
+ #include <dt-bindings/interrupt-controller/irq.h>
+ #include <dt-bindings/interrupt-controller/arm-gic.h>
+ #include <dt-bindings/pinctrl/rockchip.h>
 +#include <dt-bindings/thermal/thermal.h>
+ 
+ / {
+ 	compatible = "rockchip,rk3368";
+@@ -123,6 +124,8 @@
+ 			reg = <0x0 0x0>;
+ 			cpu-idle-states = <&cpu_sleep>;
+ 			enable-method = "psci";
 +
-+cpu_thermal: cpu_thermal {
-+	polling-delay-passive = <100>; /* milliseconds */
-+	polling-delay = <5000>; /* milliseconds */
++			#cooling-cells = <2>; /* min followed by max */
+ 		};
+ 
+ 		cpu_l1: cpu at 1 {
+@@ -155,6 +158,8 @@
+ 			reg = <0x0 0x100>;
+ 			cpu-idle-states = <&cpu_sleep>;
+ 			enable-method = "psci";
 +
-+	thermal-sensors = <&tsadc 0>;
-+
-+	trips {
-+		cpu_alert0: cpu_alert0 {
-+			temperature = <75000>; /* millicelsius */
-+			hysteresis = <2000>; /* millicelsius */
-+			type = "passive";
-+		};
-+		cpu_alert1: cpu_alert1 {
-+			temperature = <80000>; /* millicelsius */
-+			hysteresis = <2000>; /* millicelsius */
-+			type = "passive";
-+		};
-+		cpu_crit: cpu_crit {
-+			temperature = <95000>; /* millicelsius */
-+			hysteresis = <2000>; /* millicelsius */
-+			type = "critical";
-+		};
++			#cooling-cells = <2>; /* min followed by max */
+ 		};
+ 
+ 		cpu_b1: cpu at 101 {
+@@ -404,6 +409,27 @@
+ 		status = "disabled";
+ 	};
+ 
++	thermal-zones {
++		#include "rk3368-thermal.dtsi"
 +	};
 +
-+	cooling-maps {
-+		map0 {
-+			trip = <&cpu_alert0>;
-+			cooling-device =
-+				<&cpu_b0 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
-+		};
-+		map1 {
-+			trip = <&cpu_alert1>;
-+			cooling-device =
-+				<&cpu_l0 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
-+		};
-+	};
-+};
-+
-+gpu_thermal: gpu_thermal {
-+	polling-delay-passive = <100>; /* milliseconds */
-+	polling-delay = <5000>; /* milliseconds */
-+
-+	thermal-sensors = <&tsadc 1>;
-+
-+	trips {
-+		gpu_alert0: gpu_alert0 {
-+			temperature = <80000>; /* millicelsius */
-+			hysteresis = <2000>; /* millicelsius */
-+			type = "passive";
-+		};
-+		gpu_crit: gpu_crit {
-+			temperature = <1150000>; /* millicelsius */
-+			hysteresis = <2000>; /* millicelsius */
-+			type = "critical";
-+		};
++	tsadc: tsadc at ff280000 {
++		compatible = "rockchip,rk3368-tsadc";
++		reg = <0x0 0xff280000 0x0 0x100>;
++		interrupts = <GIC_SPI 37 IRQ_TYPE_LEVEL_HIGH>;
++		clocks = <&cru SCLK_TSADC>, <&cru PCLK_TSADC>;
++		clock-names = "tsadc", "apb_pclk";
++		resets = <&cru SRST_TSADC>;
++		reset-names = "tsadc-apb";
++		pinctrl-names = "init", "default", "sleep";
++		pinctrl-0 = <&otp_gpio>;
++		pinctrl-1 = <&otp_out>;
++		pinctrl-2 = <&otp_gpio>;
++		#thermal-sensor-cells = <1>;
++		rockchip,hw-tshut-temp = <95000>;
++		status = "disabled";
 +	};
 +
-+	cooling-maps {
-+		map0 {
-+			trip = <&gpu_alert0>;
-+			cooling-device =
-+				<&cpu_b0 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
+ 	gmac: ethernet at ff290000 {
+ 		compatible = "rockchip,rk3368-gmac";
+ 		reg = <0x0 0xff290000 0x0 0x10000>;
+@@ -829,6 +855,16 @@
+ 			};
+ 		};
+ 
++		tsadc {
++			otp_out: otp-gpio {
++				rockchip,pins = <0 10 RK_FUNC_GPIO &pcfg_pull_none>;
++			};
++
++			otp_out: otp-out {
++				rockchip,pins = <0 10 RK_FUNC_1 &pcfg_pull_none>;
++			};
 +		};
-+	};
-+};
++
+ 		uart0 {
+ 			uart0_xfer: uart0-xfer {
+ 				rockchip,pins = <2 24 RK_FUNC_1 &pcfg_pull_up>,
 -- 
 1.9.1
