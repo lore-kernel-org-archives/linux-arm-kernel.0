@@ -1,35 +1,28 @@
 From: damien.riegel@savoirfairelinux.com (Damien Riegel)
-Date: Thu, 29 Oct 2015 16:27:29 -0400
-Subject: [PATCH v2 4/5] ARM: imx_v6_v7_defconfig: add TS-4800 watchdog and
- syscon
+Date: Thu, 29 Oct 2015 16:27:26 -0400
+Subject: [PATCH v2 1/5] of: add vendor prefix for Technologic Systems
 In-Reply-To: <1446150450-22093-1-git-send-email-damien.riegel@savoirfairelinux.com>
 References: <1446150450-22093-1-git-send-email-damien.riegel@savoirfairelinux.com>
-Message-ID: <1446150450-22093-5-git-send-email-damien.riegel@savoirfairelinux.com>
+Message-ID: <1446150450-22093-2-git-send-email-damien.riegel@savoirfairelinux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Damien Riegel <damien.riegel@savoirfairelinux.com>
 ---
- arch/arm/configs/imx_v6_v7_defconfig | 2 ++
- 1 file changed, 2 insertions(+)
+ Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
-index b47863d..7adc8b7 100644
---- a/arch/arm/configs/imx_v6_v7_defconfig
-+++ b/arch/arm/configs/imx_v6_v7_defconfig
-@@ -190,11 +190,13 @@ CONFIG_THERMAL=y
- CONFIG_CPU_THERMAL=y
- CONFIG_IMX_THERMAL=y
- CONFIG_WATCHDOG=y
-+CONFIG_TS4800_WATCHDOG=y
- CONFIG_IMX2_WDT=y
- CONFIG_MFD_DA9052_I2C=y
- CONFIG_MFD_MC13XXX_SPI=y
- CONFIG_MFD_MC13XXX_I2C=y
- CONFIG_MFD_STMPE=y
-+CONFIG_MFD_TS4800_SYSCON=y
- CONFIG_REGULATOR=y
- CONFIG_REGULATOR_FIXED_VOLTAGE=y
- CONFIG_REGULATOR_ANATOP=y
+diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+index d444757..68aad78a 100644
+--- a/Documentation/devicetree/bindings/vendor-prefixes.txt
++++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+@@ -211,6 +211,7 @@ toshiba	Toshiba Corporation
+ toumaz	Toumaz
+ tplink	TP-LINK Technologies Co., Ltd.
+ truly	Truly Semiconductors Limited
++ts	Technologic Systems
+ usi	Universal Scientific Industrial Co., Ltd.
+ v3	V3 Semiconductor
+ variscite	Variscite Ltd.
 -- 
 2.5.0
