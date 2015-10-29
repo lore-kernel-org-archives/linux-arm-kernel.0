@@ -1,110 +1,74 @@
-From: bhupesh.sharma@freescale.com (Sharma Bhupesh)
-Date: Thu, 29 Oct 2015 11:07:41 +0000
-Subject: [PATCH 1/1] doc/bindings: Update Layerscape PCIe devicetree
- bindings for LS2080A
-In-Reply-To: <1445844681-11488-1-git-send-email-bhupesh.sharma@freescale.com>
-References: <1445844681-11488-1-git-send-email-bhupesh.sharma@freescale.com>
-Message-ID: <BY1PR0301MB130322BA83723F641964E25482200@BY1PR0301MB1303.namprd03.prod.outlook.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 29 Oct 2015 11:20:08 +0000
+Subject: [PATCH 0/3] Revert arm64 cache geometry
+In-Reply-To: <CAKv+Gu-CgXU4O8SymcjmCYZqyAa0PZbJXwNqXfuCamxYY9C8GA@mail.gmail.com>
+References: <1446068637-11509-1-git-send-email-avanbrunt@nvidia.com>
+ <CAKv+Gu-CgXU4O8SymcjmCYZqyAa0PZbJXwNqXfuCamxYY9C8GA@mail.gmail.com>
+Message-ID: <20151029112008.GA28221@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bjorn,
+On Thu, Oct 29, 2015 at 12:22:51PM +0900, Ard Biesheuvel wrote:
+> On 29 October 2015 at 06:43, Alex Van Brunt <avanbrunt@nvidia.com> wrote:
+> > This patchset reverts three patches that attempt to query the CPU for cache
+> > geometry and then make use of that information. Those patches rely on the
+> > NumSets and LineSize fields of CCSIDR to determine the cache geometry. However,
+> > the architectural documentation for these registers forbids such use:
+> >
+> >         The parameters NumSets, Associativity, and LineSize in these registers
+> >         define the architecturally visible parameters that are required for the
+> >         cache maintenance by Set/Way instructions. They are not guaranteed to
+> >         represent the actual microarchitectural features of a design. You cannot
+> >         make any inference about the actual sizes of caches based on these
+> >         parameters.
+> >
+> > It is not just theoretical. For example, the Denver CPU will report one set and
+> > one way in CCSIDR even though the actual microarchitectural implementation has
+> > many sets and many ways.
+> >
+> 
+> Fair enough. It is a bit disappointing that we cannot trust these
+> values, but if the architecture does not mandate their accuracy, we
+> obviously should not be using them in the way that we are.
 
-> From: Bhupesh Sharma [mailto:bhupesh.sharma at freescale.com]
-> Sent: Monday, October 26, 2015 1:01 PM
-> 
-> Update the definition of the Layerscape PCI compatible string to add
-> support for LS2080A, as the controller on LS2080A is different from
-> LS1021A SoC.
-> 
-> While at it, move the clock related properties in the Designware PCIe
-> controller bindings to 'optional' set of properties.
-> 
-> Signed-off-by: Minghuan Lian <Minghuan.Lian@freescale.com>
-> Signed-off-by: Bhupesh Sharma <bhupesh.sharma@freescale.com>
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
-> ---
-> Hi Bjorn,
-> 
-> As discussed with Arnd (http://www.spinics.net/lists/linux-
-> clk/msg04092.html),
-> this patch depends on a patch that is in your PCI tree but not yet in
-> mainline.
-> 
-> So, sending this to you, so that you can apply the patch on top of the
-> other one.
+Indeed.
 
-Ping..
+> > The only place that the cache geometry is used is to determine if there can be
+> > aliasing for a VIPT (virtually-indexed, physically-tagged) instruction cache.
+> > The code assumes that there is no need to flush the entire instruction cache
+> > if the size of a cache set is less than or equal to a page size. However, the
+> > architectural definition of VIPT says "The only architecturally-guaranteed way
+> > to invalidate all aliases of a physical address from a VIPT instruction cache
+> > is to invalidate the entire instruction cache." Not only are the parameters not
+> > guaranteed to be correct, it is explicitly not legal to ignore aliasing even if
+> > the parameters were correct.
+> >
+> 
+> I understand that this is subject to interpretation, but I would argue
+> that this does not apply to the case where you can prove that no
+> aliases could ever exist (which is the point of comparing the way size
+> to the page size)
 
-> 
->  .../devicetree/bindings/pci/designware-pcie.txt    |   10 +++++-----
->  .../devicetree/bindings/pci/layerscape-pci.txt     |   14 ++++++++++++--
->  2 files changed, 17 insertions(+), 7 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/pci/designware-pcie.txt
-> b/Documentation/devicetree/bindings/pci/designware-pcie.txt
-> index 0036ab3..576218a 100644
-> --- a/Documentation/devicetree/bindings/pci/designware-pcie.txt
-> +++ b/Documentation/devicetree/bindings/pci/designware-pcie.txt
-> @@ -14,11 +14,6 @@ Required properties:
->  - interrupt-map-mask and interrupt-map: standard PCI properties
->  	to define the mapping of the PCIe interface to interrupt
->  	numbers.
-> -- clocks: Must contain an entry for each entry in clock-names.
-> -	See ../clocks/clock-bindings.txt for details.
-> -- clock-names: Must include the following entries:
-> -	- "pcie"
-> -	- "pcie_bus"
-> 
->  Optional properties:
->  - num-lanes: number of lanes to use (this property should be specified
-> unless @@ -27,3 +22,8 @@ Optional properties:
->  - bus-range: PCI bus numbers covered (it is recommended for new
-> devicetrees to
->    specify this property, to keep backwards compatibility a range of
-> 0x00-0xff
->    is assumed if not present)
-> +- clocks: Must contain an entry for each entry in clock-names.
-> +	See ../clocks/clock-bindings.txt for details.
-> +- clock-names: Must include the following entries:
-> +	- "pcie"
-> +	- "pcie_bus"
-> diff --git a/Documentation/devicetree/bindings/pci/layerscape-pci.txt
-> b/Documentation/devicetree/bindings/pci/layerscape-pci.txt
-> index 6286f04..ac7e07e 100644
-> --- a/Documentation/devicetree/bindings/pci/layerscape-pci.txt
-> +++ b/Documentation/devicetree/bindings/pci/layerscape-pci.txt
-> @@ -1,10 +1,20 @@
->  Freescale Layerscape PCIe controller
-> 
-> -This PCIe host controller is based on the Synopsis Designware PCIe IP
-> +This PCIe host controller is based on the Synopsys Designware PCIe IP
->  and thus inherits all the common properties defined in designware-
-> pcie.txt.
-> 
-> +This controller derives its clocks from the Reset Configuration Word
-> +(RCW) which is used to describe the PLL settings at the time of chip-
-> reset.
-> +
-> +Also as per the available Reference Manuals, there is no specific
-> 'version'
-> +register available in the Freescale PCIe controller register set, which
-> +can allow determining the underlying Designware PCIe controller version
-> +information.
-> +
->  Required properties:
-> -- compatible: should contain the platform identifier such as
-> "fsl,ls1021a-pcie"
-> +- compatible: should contain the platform identifier such as:
-> +        "fsl,ls1021a-pcie", "snps,dw-pcie"
-> +        "fsl,ls2080a-pcie", "snps,dw-pcie"
->  - reg: base addresses and lengths of the PCIe controller
->  - interrupts: A list of interrupt outputs of the controller. Must
-> contain an
->    entry for each entry in the interrupt-names property.
-> --
-> 1.7.9.5
-> 
+Given NumSets and LineSize aren't guaranteed to match the physical
+values, I don't see that way have sufficient information to derive the
+physical way size in order to do so.
 
-Regards,
-Bhupesh
+> > Alex Van Brunt (3):
+> >   Revert "arm64: kernel: add support for cpu cache information"
+> >   Revert "arm64: don't flag non-aliasing VIPT I-caches as aliasing"
+> >   Revert "arm64: add helper functions to read I-cache attributes"
+> >
+> 
+> None of the clarifications you offer here are in the commit logs of
+> the patches. Since the cover letter does not make it into the
+> repository, someone looking at the commit log will not have a clue why
+> these patches were reverted all of a sudden. Could you please update
+> that? At the same time, could you get rid of the Change-Ids as well?
+> They are meaningless in the kernel tree.
+
+It would be good to include the quote from the cover letter in each
+patch; it makes the situation abundantly clear and avoids having to
+trawl through the ARM ARM again in future.
+
+Thanks,
+Mark.
