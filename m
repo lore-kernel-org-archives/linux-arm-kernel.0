@@ -1,93 +1,65 @@
-From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Thu, 29 Oct 2015 09:44:59 +0000
-Subject: [GIT PULL] arm64: Juno: Add support for PCIe or R1 board
-In-Reply-To: <7hh9lajahx.fsf@deeprootsystems.com>
-References: <20151021113629.GF3394@e106497-lin.cambridge.arm.com>
- <4136958.Qhq5GfeeVa@wuerfel>
- <20151026101256.GF963@e106497-lin.cambridge.arm.com>
- <20151026235505.GA13221@localhost>
- <20151027101218.GI963@e106497-lin.cambridge.arm.com>
- <7hh9lajahx.fsf@deeprootsystems.com>
-Message-ID: <20151029094459.GN963@e106497-lin.cambridge.arm.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Thu, 29 Oct 2015 19:29:40 +0900
+Subject: [PATCH v3 1/4] Documentation: dt-bindings: Describe SROMc
+ configuration
+In-Reply-To: <008001d1121d$c0fef160$42fcd420$@samsung.com>
+References: <cover.1446018918.git.p.fedin@samsung.com>
+ <046d990092dc85cf50db9082fc894d93a3ece7c0.1446018918.git.p.fedin@samsung.com>
+ <563183F9.6020806@samsung.com>
+ <008001d1121d$c0fef160$42fcd420$@samsung.com>
+Message-ID: <CAJKOXPcSehXRYDpYiybzdagPS76QKGpeMb7DxkpwJq8GTfuPOw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 29, 2015 at 02:21:30AM -0700, Kevin Hilman wrote:
-> Liviu Dudau <Liviu.Dudau@arm.com> writes:
-> 
-> > On Tue, Oct 27, 2015 at 08:55:05AM +0900, Olof Johansson wrote:
-> >> Hi,
-> >> 
-> >> On Mon, Oct 26, 2015 at 10:12:57AM +0000, Liviu Dudau wrote:
-> >> > On Fri, Oct 23, 2015 at 10:42:53PM +0200, Arnd Bergmann wrote:
-> >> > > On Wednesday 21 October 2015 12:36:29 Liviu Dudau wrote:
-> >> > > > The following changes since commit 25cb62b76430a91cc6195f902e61c2cb84ade622:
-> >> > > > 
-> >> > > >   Linux 4.3-rc5 (2015-10-11 11:09:45 -0700)
-> >> > > > 
-> >> > > > are available in the git repository at:
-> >> > > > 
-> >> > > > 
-> >> > > 
-> >> > > Not pulled.
-> >> > > 
-> >> > > All our branches are based on -rc4 or earlier, and we'd like to avoid
-> >> > > backmerges from mainline if at all possible.
-> >> > > 
-> >> > > Can you rebase this to -rc4 and send again?
-> >> > > 
-> >> > > 	Arnd
-> >> > 
-> >> > Sure, I've rebased the branch on top of -rc4 now, so here is the new request.
-> >> > 
-> >> > Many thanks,
-> >> > Liviu
-> >> > 
-> >> > The following changes since commit 049e6dde7e57f0054fdc49102e7ef4830c698b46:
-> >> > 
-> >> >   Linux 4.3-rc4 (2015-10-04 16:57:17 +0100)
-> >> > 
-> >> > are available in the git repository at:
-> >> > 
-> >> >   git://linux-arm.org/linux-ld for-upstream/juno-pcie
-> >> 
-> >> This is showing up late by now, but Juno also isn't a high-volume platform
-> >> so exposure to regressions are limited.
-> >> 
-> >> That being said, I really hope we won't have to pick up any fixes for
-> >> this due to lack of exposure to -next after the merge window.
-> >> 
-> >> 
-> >> Merged into next/arm64.
-> >
-> > Thanks,
-> >
-> > The PCIe setup has been tested pretty thoroughly (famous last words) inside ARM.
-> > The only surprises can come from various combinations of bootloaders and the
-> > kernel, and I'm happy to handle those.
-> >
-> 
-> FWIW, I've also been testing PCIe on juno-r1.  Unfortunately, it
-> currently only works with the UEFI loader, but I understand PCIe init is
-> on it's way upstream in mainline u-boo also, but I haven't been able to
-> test that yet.
+2015-10-29 16:45 GMT+09:00 Pavel Fedin <p.fedin@samsung.com>:
+>  Hello!
+>
+>> You missed here a lot of potential Cc. Please use get_maintainer.pl
+>> script. It *must* be sent to devicetree list.
+>>
+>> Please send it also to DeviceTree maintainers because you are adding
+>> quite generic names for bindings so they may have interesting thoughts
+>> on this.
+>>
+>> LKML list is also missing.
+>
+>  Ok. Next version will go there too.
+>
+>> Any vendor prefix here? How generic is this?
+>
+>  I just don't know... Does *everything* really need a vendor prefix? How readable would that be? "compatible" property already says
+> that it's samsung-exynos-specific. And IMHO it's quite obvious that properties of vendor-specific device are automatically
+> vendor-specific.
+>  Ok, i am currently fixing up the rest and will post v4 soon, and will Cc: it to devicetree ML.
 
-Tom Rini was kind enough to pull the changes before 2015.10 was cut out, so mainline
-U-Boot works fine, that is what I'm using at the moment.
+Which my reply you are referring to? You stripped part of some
+sentence and put it without *any context*. Just random sentence.
+I asked for vendor prefix in few places... srom-timing? width? And I
+do not remember where I used exactly these words. This is why
+*context* is needed.
+
+>
+>  P.S. I intentionally omit the rest of the text in order to avoid overquoting, since we are already focused on some specific things.
+> If someone wants to get the whole picture, he/she could just browse back to the start of the thread. Or is it considered wrong
+> approach in this particular ML?
+
+Yep, selecting some sentences and replying only to them, leaving the
+context away, is highly confusing. I reply in different places,
+sometimes asking for similar things. Removing context messes this up.
+In the same time all of my other questions are being removed without
+any acknowledgment so I do not know if they were ignored or just
+silently acked.
+
+I show you example:
+
+>  I just don't know...
+I don't know neither.
+
+> If someone wants to get the whole picture, he/she could just browse back to the start of the thread.
+Yes, I would just scroll up and see the context. No, wait. There is no
+context. I have to find mine original email and compare which part was
+ignored, which was applied and which quoted sentence you are referring
+to.
 
 Best regards,
-Liviu
-
-> 
-> Kevin
-> 
-
--- 
-====================
-| I would like to |
-| fix the world,  |
-| but they're not |
-| giving me the   |
- \ source code!  /
-  ---------------
-    ?\_(?)_/?
+Krzysztof
