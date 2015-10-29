@@ -1,121 +1,94 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Thu, 29 Oct 2015 09:29:08 -0700
-Subject: [PATCH 1/3] mtd: create a partition type device tree binding
-In-Reply-To: <1446123152-22666-1-git-send-email-linus.walleij@linaro.org>
-References: <1446123152-22666-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <20151029162908.GA13275@localhost>
+From: daniel.kiper@oracle.com (Daniel Kiper)
+Date: Thu, 29 Oct 2015 17:36:55 +0100
+Subject: arm64: iomem_resource doesn't contain all the region used
+In-Reply-To: <563106C6.8000603@citrix.com>
+References: <562A4B0F.2020603@citrix.com>
+ <1445615112.2374.226.camel@citrix.com>
+ <563106C6.8000603@citrix.com>
+Message-ID: <20151029163655.GJ3489@olila.local.net-space.pl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-+ devicetree-spec and others, since other non-driver-specific MTD
-partitioning stuff has gotten directed there [1], and this binding
-should probably get promoted in short order to the core mtdpart.c
-partitioning
+On Wed, Oct 28, 2015 at 05:32:54PM +0000, Julien Grall wrote:
+> (Adding David and Daniel)
+>
+> On 23/10/15 16:45, Ian Campbell wrote:
+> > On Fri, 2015-10-23 at 15:58 +0100, Julien Grall wrote:
+> >> Is there any way we could register the IO region used on ARM without
+> >> having to enforce it in all the drivers?
+> >
+> > This seems like an uphill battle to me.
+>
+> I agree about it. However this is how x86 handle memory hotplug for xen
+> ballooning. I'm wondering how this is cannot an problem for x86?
+>
+> Note that the problem is the same if a module is insert after hand.
 
-On Thu, Oct 29, 2015 at 01:52:30PM +0100, Linus Walleij wrote:
-> The Linux code in drivers/mtd/maps/physmap_of.c will optionally
-> look for the linux,part-probe binding for hints on a partition type to
-> look for in the MTD. It was added in commit 9d5da3a9b849
-> "mtd: extend physmap_of to let the device tree specify the parition probe"
-> 
-> This solution is too Linux-specific and depend on some
-> Linux kernel-internal naming conventions. We need a proper
-> way of describing partition types that follow the pattern set by
-> other device tree bindings.
-> 
-> Create a "partition-type" binding for this, and add "my" bindings
-> for "arm,arm-flash-structure" as a starter for others to follow.
-> A follow-on patch adds support to the Linux kernel to handle this
-> binding, with some infrastructure for others to use it too.
+Does ARM64 support memory hotplug on bare metal? If yes then check relevant
+code and do what should be done as close as possible to bare metal case
+on Xen guest.
 
-Overall, I like this. And thanks for expanding the explanation of DT
-partitions vs. parsers. It'd be good if we make parsers like this easier
-to integrate, so we see less hard-coded partitions in device tree.
+> > Why not do as I suggested IRL yesterday and expose the map of "potential
+> > RAM" addresses to the guest as well as the "actual RAM" addresses in the
+> > regular memory properties.
+> >
+> > i.e. explicitly expose the holes where RAM can be hotplugged later.
+>
+> I was trying to find another solution because I find your suggestion
+> fragile.
+>
+> Currently the device tree for a guest is set in stone after the creation
+> of the domain. I.e it's not possible to modify the device tree later
+> (I'm not speaking about hardcode value...).
+>
+> This means that the region for "balloon hotplug" and "PCI hotplug" must
+> be static and can't overlapped. We may end up to run out of "PCI
+> hotplug" address space while there is plenty of free space in the
+> "balloon hotplug". However it's not possible to move from one to another.
+>
+> How do you define the size of those regions? In one side, we can't
+> "hardcode" them because the user may not want to use either "balloon
+> hotplug" or "PCI hoplug". On another side, we could expose them to the
+> user but it's not nice.
+>
+> > This is even analogous to a native memory hotplug case, which AIUI
+> > similarly involves the provisioning of specific address space where RAM
+> > might plausibly appear in the future (I don't think physical memory hotplug
+> > involves searching for free PA space and hoping for the best, although
+> > strange things have happened I guess).
+>
+> I've looked at how Power PC handle native hotplug. From my
+> understanding, when a new memory bank is added, the device tree will be
+> updated by someone (firmware?) and an event will be sent to the Linux.
+>
+> Linux will then read the new DT node (see
+> ibm,dynamic_reconfiguration-memory) and add the new memory region to Linux.
 
-> Cc: devicetree at vger.kernel.org
-> Cc: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
-> Cc: Liviu Dudau <Liviu.Dudau@arm.com>
-> Reported-by: Liviu Dudau <Liviu.Dudau@arm.com>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
->  .../devicetree/bindings/mtd/mtd-physmap.txt        |  2 ++
->  .../devicetree/bindings/mtd/partition.txt          | 35 +++++++++++++++++++---
->  2 files changed, 33 insertions(+), 4 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/mtd/mtd-physmap.txt b/Documentation/devicetree/bindings/mtd/mtd-physmap.txt
-> index 4a0a48bf4ecb..863560bdbb19 100644
-> --- a/Documentation/devicetree/bindings/mtd/mtd-physmap.txt
-> +++ b/Documentation/devicetree/bindings/mtd/mtd-physmap.txt
-> @@ -23,6 +23,8 @@ file systems on embedded devices.
->     unaligned accesses as implemented in the JFFS2 code via memcpy().
->     By defining "no-unaligned-direct-access", the flash will not be
->     exposed directly to the MTD users (e.g. JFFS2) any more.
-> + - partition-type : a flash partition type to expect and probe for
-> +   on this device. See "partition.txt" for available partition types.
->   - linux,mtd-name: allow to specify the mtd name for retro capability with
->     physmap-flash drivers as boot loader pass the mtd partition via the old
->     device name physmap-flash.
-> diff --git a/Documentation/devicetree/bindings/mtd/partition.txt b/Documentation/devicetree/bindings/mtd/partition.txt
-> index 8e5557da1955..85d45764a4b3 100644
-> --- a/Documentation/devicetree/bindings/mtd/partition.txt
-> +++ b/Documentation/devicetree/bindings/mtd/partition.txt
-> @@ -1,9 +1,36 @@
->  Representing flash partitions in devicetree
->  
-> -Partitions can be represented by sub-nodes of an mtd device. This can be used
-> -on platforms which have strong conventions about which portions of a flash are
-> -used for what purposes, but which don't use an on-flash partition table such
-> -as RedBoot.
-> +On-device partition types:
-> +
-> +It is possible for some drivers to indicate an on-device partition type, i.e.
-> +partition tables, footers or other binary pattern in the flash used to
-> +define how the flash is partitioned. This can be done in the device tree node
-> +of an MTD device by specifying partition-type = "foo"; This tells the operating
-> +system to look for the partition type indicated.
-> +
-> +Required properties:
-> +- partition-type : the type of partition. Only one type can be specified.
+Make sense for me. It works more or less in the same way on bare metal x86.
+Of course it uses ACPI instead of FDT.
 
-You're supporting this as a list property (for future expansion,
-presumably), so I can only assume the "only one type" is referring to
-the number of different parsers available currently, not the behavior of
-the property itself? This should probably be worded differently if
-that's the intention. Like, "a list of partition types ... ordered by
-priority .... We currently support the following: (list only the AFS
-type)" (fill in the blanks how you'd like).
+> > With any luck you would be able to steal or define the bindings in terms of
+> > the native hotplug case rather than inventing some Xen specific thing.
+>
+> I wasn't able to find the binding for ibm,dynamic-reconfiguration-memory
+> in Linux.
+>
+> >
+> > In terms of dom0 the "potential" RAM is the host's actual RAM banks.
+>
+> Your solution works for DOM0, but ...
+>
+> > In terms of domU the "potential" RAM is defined by the domain builder
+> > layout (currently the two banks mentioned in Xen's arch-arm.h).
+>
+> ... the DOMU one is more complex (see above). Today the guest layout is
+> static, I wouldn't be surprised to see it becoming dynamic very soon (I
+> have in mind PCI hotplug) and therefore defining static hotplug region
+> would not possible.
 
-Also, this patch will conflict with [1]. I'll probably take [1] soon, so
-one of us will have to rebase this.
+Please do not do that. I think that memory hotplug should not be limited
+by anything but just a given platform limitations. By the way, could you
+explain in details why linux/mm/memory_hotplug.c:register_memory_resource()
+will not work on ARM64 guest?
 
-Brian
-
-[1] http://thread.gmane.org/gmane.comp.devicetree.spec/191
-
-> +  Valid types are:
-> +  "arm,arm-flash-structure" (also called AFS)
-> +
-> +Example:
-> +
-> +flash0 at 40000000 {
-> +	/* 2 * 32MiB NOR Flash memory */
-> +	compatible = "arm,vexpress-flash", "cfi-flash";
-> +	partition-type = "arm,arm-flash-structure";
-> +	reg = <0x40000000 0x04000000>;
-> +	bank-width = <4>;
-> +};
-> +
-> +
-> +Device Tree specified partitions:
-> +
-> +If there is no specified on-device binary format, partitions can be
-> +represented by sub-nodes of an mtd device. This can be used on platforms which
-> +have strong conventions about which portions of a flash are used for what
-> +purposes.
-> +
->  NOTE: if the sub-node has a compatible string, then it is not a partition.
->  
->  #address-cells & #size-cells must both be present in the mtd device. There are
-> -- 
-> 2.4.3
-> 
+Daniel
