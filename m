@@ -1,69 +1,61 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 29 Oct 2015 13:52:31 +0100
-Subject: [PATCH 2/3] mtd: physmap_of: break out array clone code
+Date: Thu, 29 Oct 2015 13:52:32 +0100
+Subject: [PATCH 3/3] mtd: physmap_of: handle the new "partition-type"
 In-Reply-To: <1446123152-22666-1-git-send-email-linus.walleij@linaro.org>
 References: <1446123152-22666-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <1446123152-22666-2-git-send-email-linus.walleij@linaro.org>
+Message-ID: <1446123152-22666-3-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is a piece of code cloning a string array in the end of
-the of_get_probes() function. Break it out, so we can reuse it.
+We defined a new device tree binding for partitions, and if they
+are found these need to be translated into a string array of
+Linux partitions. Reuse the string-to-array split function and
+support "arm,arm-flash-structure" by splitting "afs" into
+{"afs", NULL} and passing that along.
 
 Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- drivers/mtd/maps/physmap_of.c | 29 +++++++++++++++++++++--------
- 1 file changed, 21 insertions(+), 8 deletions(-)
+ drivers/mtd/maps/physmap_of.c | 18 +++++++++++++++++-
+ 1 file changed, 17 insertions(+), 1 deletion(-)
 
 diff --git a/drivers/mtd/maps/physmap_of.c b/drivers/mtd/maps/physmap_of.c
-index 3e614e9119d5..1b66ca66206b 100644
+index 1b66ca66206b..8c09d7e23b6e 100644
 --- a/drivers/mtd/maps/physmap_of.c
 +++ b/drivers/mtd/maps/physmap_of.c
-@@ -112,17 +112,18 @@ static struct mtd_info *obsolete_probe(struct platform_device *dev,
- static const char * const part_probe_types_def[] = {
- 	"cmdlinepart", "RedBoot", "ofpart", "ofoldpart", NULL };
- 
--static const char * const *of_get_probes(struct device_node *dp)
-+/**
-+ * string_to_array() - split a string into an array
-+ *
-+ * This takes "a\0string\0array" and splits it into { "a", "string", "array" }
-+ * with a newly allocated array of pointers returned. A NULL terminator
-+ * is also added at the end of the array.
-+ */
-+static const char * const *string_to_array(const char *cp, int cplen)
- {
--	const char *cp;
--	int cplen;
-+	const char **res;
- 	unsigned int l;
- 	unsigned int count;
--	const char **res;
--
--	cp = of_get_property(dp, "linux,part-probe", &cplen);
--	if (cp == NULL)
--		return part_probe_types_def;
- 
- 	count = 0;
- 	for (l = 0; l != cplen; l++)
-@@ -143,6 +144,18 @@ static const char * const *of_get_probes(struct device_node *dp)
- 	return res;
+@@ -105,7 +105,7 @@ static struct mtd_info *obsolete_probe(struct platform_device *dev,
+ 	}
  }
  
-+static const char * const *of_get_probes(struct device_node *dp)
-+{
-+	const char *cp;
-+	int cplen;
-+	int ret;
+-/* When partitions are set we look for a linux,part-probe property which
++/* When partitions are set we look for a partition-type property which
+    specifies the list of partition probers to use. If none is given then the
+    default is use. These take precedence over other device tree
+    information. */
+@@ -150,9 +150,25 @@ static const char * const *of_get_probes(struct device_node *dp)
+ 	int cplen;
+ 	int ret;
+ 
++	/*
++	 * The proper device tree bindings take precedence.
++	 */
++	ret = of_property_read_string(dp, "partition-type", &cp);
++	if (!ret) {
++		pr_info("check for partition type \"%s\"\n", cp);
++		if (!strcmp(cp, "arm,arm-flash-structure"))
++			return string_to_array("afs", 1);
++	}
 +
-+	cp = of_get_property(dp, "linux,part-probe", &cplen);
-+	if (cp == NULL)
-+		return part_probe_types_def;
-+	return string_to_array(cp, cplen);
-+}
-+
- static void of_free_probes(const char * const *probes)
- {
- 	if (probes != part_probe_types_def)
++	/*
++	 * Else look for the deprecated binding, or fall back to
++	 * defaults.
++	 */
+ 	cp = of_get_property(dp, "linux,part-probe", &cplen);
+ 	if (cp == NULL)
+ 		return part_probe_types_def;
++	pr_info("DT is using the deprecated \"linux,part-probe\" binding\n");
++	pr_info("please move to the standard \"partition-type\" binding\n");
+ 	return string_to_array(cp, cplen);
+ }
+ 
 -- 
 2.4.3
