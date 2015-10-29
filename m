@@ -1,56 +1,74 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 29 Oct 2015 09:20:07 +0000
-Subject: [PATCH] get_maintainer: Add subsystem to reviewer output
-In-Reply-To: <1446054996.2757.139.camel@perches.com>
-References: <20151028093907.GP4931@pengutronix.de> <20151028095524.GP5828@x1>
- <5630CA06.7050503@samsung.com>
- <1446050506.2757.109.camel@perches.com> <20151028170116.GI4058@x1>
- <1446052121.2757.120.camel@perches.com> <20151028172208.GJ4058@x1>
- <1446053411.2757.131.camel@perches.com> <20151028174932.GK4058@x1>
- <1446054996.2757.139.camel@perches.com>
-Message-ID: <20151029092007.GN4058@x1>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Thu, 29 Oct 2015 02:21:30 -0700
+Subject: [GIT PULL] arm64: Juno: Add support for PCIe or R1 board
+In-Reply-To: <20151027101218.GI963@e106497-lin.cambridge.arm.com> (Liviu
+ Dudau's message of "Tue, 27 Oct 2015 10:12:18 +0000")
+References: <20151021113629.GF3394@e106497-lin.cambridge.arm.com>
+ <4136958.Qhq5GfeeVa@wuerfel>
+ <20151026101256.GF963@e106497-lin.cambridge.arm.com>
+ <20151026235505.GA13221@localhost>
+ <20151027101218.GI963@e106497-lin.cambridge.arm.com>
+Message-ID: <7hh9lajahx.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 28 Oct 2015, Joe Perches wrote:
-> On Wed, 2015-10-28 at 17:49 +0000, Lee Jones wrote:
-> > On Wed, 28 Oct 2015, Joe Perches wrote:
-> > > On Wed, 2015-10-28 at 17:22 +0000, Lee Jones wrote:
-> > > > On Wed, 28 Oct 2015, Joe Perches wrote:
-> > > > > >   Acked-by: Lee Jones <lee.jones@linaro.org>
-> > > > > It'd be better if you could add a "tested-by:" instead.
-> > > > 
-> > > > Patch works as expected:
-> > > >   Tested-by: Lee Jones <lee.jones@linaro.org>
-> > > []
-> > > >       "I'm sure we can make the output even more similar by listing
-> > > >       the MAINTAINERS tag after "reviewer" too."
-> > > 
-> > > I guess we'll disagree on that one too.
-> > 
-> > You just happened to think of it a few hours after I mentioned it.
-> 
-> Nope, it seems a maintainers tag is what Krzysztof was suggesting
-> with his "supported reviewer" bit.
+Liviu Dudau <Liviu.Dudau@arm.com> writes:
 
-Which was in reply to the bit above.
+> On Tue, Oct 27, 2015 at 08:55:05AM +0900, Olof Johansson wrote:
+>> Hi,
+>> 
+>> On Mon, Oct 26, 2015 at 10:12:57AM +0000, Liviu Dudau wrote:
+>> > On Fri, Oct 23, 2015 at 10:42:53PM +0200, Arnd Bergmann wrote:
+>> > > On Wednesday 21 October 2015 12:36:29 Liviu Dudau wrote:
+>> > > > The following changes since commit 25cb62b76430a91cc6195f902e61c2cb84ade622:
+>> > > > 
+>> > > >   Linux 4.3-rc5 (2015-10-11 11:09:45 -0700)
+>> > > > 
+>> > > > are available in the git repository at:
+>> > > > 
+>> > > > 
+>> > > 
+>> > > Not pulled.
+>> > > 
+>> > > All our branches are based on -rc4 or earlier, and we'd like to avoid
+>> > > backmerges from mainline if at all possible.
+>> > > 
+>> > > Can you rebase this to -rc4 and send again?
+>> > > 
+>> > > 	Arnd
+>> > 
+>> > Sure, I've rebased the branch on top of -rc4 now, so here is the new request.
+>> > 
+>> > Many thanks,
+>> > Liviu
+>> > 
+>> > The following changes since commit 049e6dde7e57f0054fdc49102e7ef4830c698b46:
+>> > 
+>> >   Linux 4.3-rc4 (2015-10-04 16:57:17 +0100)
+>> > 
+>> > are available in the git repository at:
+>> > 
+>> >   git://linux-arm.org/linux-ld for-upstream/juno-pcie
+>> 
+>> This is showing up late by now, but Juno also isn't a high-volume platform
+>> so exposure to regressions are limited.
+>> 
+>> That being said, I really hope we won't have to pick up any fixes for
+>> this due to lack of exposure to -next after the merge window.
+>> 
+>> 
+>> Merged into next/arm64.
+>
+> Thanks,
+>
+> The PCIe setup has been tested pretty thoroughly (famous last words) inside ARM.
+> The only surprises can come from various combinations of bootloaders and the
+> kernel, and I'm happy to handle those.
+>
 
-> I added the subsystem name.
+FWIW, I've also been testing PCIe on juno-r1.  Unfortunately, it
+currently only works with the UEFI loader, but I understand PCIe init is
+on it's way upstream in mainline u-boo also, but I haven't been able to
+test that yet.
 
-(subsystem name == MAINTAINERS tag) in my comment above.
-
-> An issue for that will be how multiple subsystem section matching
-> affects the output for reviewers who are also maintainers.
-
-I think that's okay, becuase the 'MAINTAINERS tag' will be different.
-
-As an example:
-
-  Lee Jones <lee.jones@linaro.org> (supporter:DRIVER SUBSYSTEM)
-  Lee Jones <lee.jones@linaro.org> (reviewer:VENDOR DRIVER NAME)
-
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Kevin
