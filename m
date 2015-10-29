@@ -1,48 +1,45 @@
 From: nicola@corna.info (Nicola Corna)
-Date: Thu, 29 Oct 2015 12:34:25 +0100
-Subject: [PATCH v2 3/5] i2c: add I2C_AQ_NO_CLK_STRETCH to i2c-bcm2835.c
+Date: Thu, 29 Oct 2015 12:34:26 +0100
+Subject: [PATCH 4/5] i2c: add i2c_check_quirks helper function
 In-Reply-To: <1446118467-26453-1-git-send-email-nicola@corna.info>
 References: <1445976718-7449-1-git-send-email-nicola@corna.info>
  <1446118467-26453-1-git-send-email-nicola@corna.info>
-Message-ID: <1446118467-26453-3-git-send-email-nicola@corna.info>
+Message-ID: <1446118467-26453-4-git-send-email-nicola@corna.info>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As reported here
-http://www.advamation.com/knowhow/raspberrypi/rpi-i2c-bug.html
-and confirmed here
-https://www.raspberrypi.org/forums/viewtopic.php?p=146272
-the BCM2835 has a hardware bug in its i2c module which prevents a correct
-clock stretching. This patch adds the I2C_AQ_NO_CLK_STRETCH quirk flag
-to i2c-bcm2835.
+This patch adds a i2c_check_quirks helper function to check the quirk flags
+of an i2c adapter, in a similar way to i2c_check_functionality.
 
 Signed-off-by: Nicola Corna <nicola@corna.info>
 ---
- drivers/i2c/busses/i2c-bcm2835.c | 5 +++++
- 1 file changed, 5 insertions(+)
+ include/linux/i2c.h | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
 
-diff --git a/drivers/i2c/busses/i2c-bcm2835.c b/drivers/i2c/busses/i2c-bcm2835.c
-index 3032b89..38d7102 100644
---- a/drivers/i2c/busses/i2c-bcm2835.c
-+++ b/drivers/i2c/busses/i2c-bcm2835.c
-@@ -222,6 +222,10 @@ static const struct i2c_algorithm bcm2835_i2c_algo = {
- 	.functionality	= bcm2835_i2c_func,
- };
+diff --git a/include/linux/i2c.h b/include/linux/i2c.h
+index 9697002..51028f3 100644
+--- a/include/linux/i2c.h
++++ b/include/linux/i2c.h
+@@ -617,6 +617,20 @@ static inline int i2c_check_functionality(struct i2c_adapter *adap, u32 func)
+ 	return (func & i2c_get_functionality(adap)) == func;
+ }
  
-+static const struct i2c_adapter_quirks bcm2835_i2c_quirks = {
-+	.flags = I2C_AQ_NO_CLK_STRETCH,
-+};
++/**
++ * i2c_check_quirks() - Function for checking the quirk flags in an i2c adapter
++ * @adap: i2c adapter
++ * @quirks: quirk flags
++ *
++ * Return: true if the adapter has all the specified quirk flags, false if not
++ */
++static inline bool i2c_check_quirks(struct i2c_adapter *adap, u64 quirks)
++{
++	if (!adap->quirks)
++		return false;
++	return (adap->quirks->flags & quirks) == quirks;
++}
 +
- static int bcm2835_i2c_probe(struct platform_device *pdev)
+ /* Return the adapter number for a specific adapter */
+ static inline int i2c_adapter_id(struct i2c_adapter *adap)
  {
- 	struct bcm2835_i2c_dev *i2c_dev;
-@@ -293,6 +297,7 @@ static int bcm2835_i2c_probe(struct platform_device *pdev)
- 	adap->algo = &bcm2835_i2c_algo;
- 	adap->dev.parent = &pdev->dev;
- 	adap->dev.of_node = pdev->dev.of_node;
-+	adap->quirks = &bcm2835_i2c_quirks;
- 
- 	bcm2835_i2c_writel(i2c_dev, BCM2835_I2C_C, 0);
- 
 -- 
 2.6.1
