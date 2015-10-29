@@ -1,35 +1,100 @@
-From: timur@codeaurora.org (Timur Tabi)
-Date: Thu, 29 Oct 2015 09:54:09 -0500
-Subject: [PATCH] [v2] arm64: efi: make sure vmlinux load address aligned
- on 2MB
-In-Reply-To: <CAKv+Gu8yFYv7GNvsOzUD1UQaXZ0AeXByahq3XjodrCtOGRGfgQ@mail.gmail.com>
-References: <1446053844-27281-1-git-send-email-timur@codeaurora.org>
- <20151028180836.GB26777@leverpostej> <56311014.9020400@codeaurora.org>
- <20151028182139.GC26777@leverpostej>
- <CAKv+Gu-76knWJ+ffAemeR7sBBtVB68pmZNPGQZRZKhmnd21F9A@mail.gmail.com>
- <20151029134333.GE28221@leverpostej>
- <CAKv+Gu8yFYv7GNvsOzUD1UQaXZ0AeXByahq3XjodrCtOGRGfgQ@mail.gmail.com>
-Message-ID: <56323311.8050708@codeaurora.org>
+From: shubhrajyoti.datta@gmail.com (Shubhrajyoti Datta)
+Date: Thu, 29 Oct 2015 20:27:43 +0530
+Subject: [PATCH v2] i2c: cadence: Move to sensible power management
+In-Reply-To: <20151028161810.GB6436@xsjsorenbubuntu>
+References: <1446017200-30373-1-git-send-email-shubhraj@xilinx.com>
+ <20151028161810.GB6436@xsjsorenbubuntu>
+Message-ID: <CAKfKVtHbKrYK-JkQRWO3hEyOkGEW8q9zc6r90PNP8uEm3VXc4Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/29/2015 08:48 AM, Ard Biesheuvel wrote:
->> >There is another (existing) problem I spotted, in that we'll sometimes
->> >move the kernel to a worse address. If the kernel was loaded at a valid
->> >address (i.e. image_addr % SZ_2MB == TEXT_OFFSET), but not at the
->> >preferred offset, we try to relocate it, even if it's already at the
->> >lowest possible address.
->> >
+On Wed, Oct 28, 2015 at 9:48 PM, S?ren Brinkmann
+<soren.brinkmann@xilinx.com> wrote:
+> Hi Shubhrajyoti,
+>
+>
+> On Wed, 2015-10-28 at 12:56PM +0530, Shubhrajyoti Datta wrote:
+>> Currently the clocks are enabled at probe and disabled at remove.
+>> Which keeps the clocks enabled even if no transaction is going on.
+>> This patch enables the clocks at the start of transfer and disables
+>> after it.
+>>
+>> Also adapts to runtime pm.
+>> Remove xi2c->suspended and use pm runtime status instead.
+>>
+>> converts dev pm to const to silence a checkpatch warning.
+>>
+>> Signed-off-by: Shubhrajyoti Datta <shubhraj@xilinx.com>
+>
+> To me, this looks all good. Just one small concern below.
 
-> Indeed. Unlikely to occur in practice, since UEFI mostly allocates top
-> down, but it would indeed be better to drop the new allocation and
-> simply use the existing one if it is not an improvement.
+Thanks for the review.
 
-So you're saying that if we modify our UEFI so that it always loads the 
-kernel at dram_base + TEXT_OFFSET, then one day in the future the kernel 
-will skip the relocation?
+>
+>> ---
+>> changes since v2
+>> update the cc list
+>>
+>>  drivers/i2c/busses/i2c-cadence.c |   73 ++++++++++++++++++++++++--------------
+>>  1 files changed, 46 insertions(+), 27 deletions(-)
+>>
+>> diff --git a/drivers/i2c/busses/i2c-cadence.c b/drivers/i2c/busses/i2c-cadence.c
+>> index 84deed6..6b08d16 100644
+>> --- a/drivers/i2c/busses/i2c-cadence.c
+>> +++ b/drivers/i2c/busses/i2c-cadence.c
+>> @@ -18,6 +18,7 @@
+>>  #include <linux/module.h>
+>>  #include <linux/platform_device.h>
+>>  #include <linux/of.h>
+>> +#include <linux/pm_runtime.h>
+>>
+>>  /* Register offsets for the I2C device. */
+>>  #define CDNS_I2C_CR_OFFSET           0x00 /* Control Register, RW */
+>> @@ -96,6 +97,8 @@
+>>                                        CDNS_I2C_IXR_COMP)
+>>
+>>  #define CDNS_I2C_TIMEOUT             msecs_to_jiffies(1000)
+>> +/* timeout for pm runtime autosuspend */
+>> +#define CNDS_I2C_PM_TIMEOUT          1000    /* ms */
+>>
+>>  #define CDNS_I2C_FIFO_DEPTH          16
+>>  /* FIFO depth at which the DATA interrupt occurs */
+>> @@ -128,7 +131,6 @@
+>>   * @xfer_done:               Transfer complete status
+>>   * @p_send_buf:              Pointer to transmit buffer
+>>   * @p_recv_buf:              Pointer to receive buffer
+>> - * @suspended:               Flag holding the device's PM status
+>>   * @send_count:              Number of bytes still expected to send
+>>   * @recv_count:              Number of bytes still expected to receive
+>>   * @curr_recv_count: Number of bytes to be received in current transfer
+>> @@ -141,6 +143,7 @@
+>>   * @quirks:          flag for broken hold bit usage in r1p10
+>>   */
+>>  struct cdns_i2c {
+>> +     struct device           *dev;
+>>       void __iomem *membase;
+>>       struct i2c_adapter adap;
+>>       struct i2c_msg *p_msg;
+>> @@ -148,7 +151,6 @@ struct cdns_i2c {
+>>       struct completion xfer_done;
+>>       unsigned char *p_send_buf;
+>>       unsigned char *p_recv_buf;
+>> -     u8 suspended;
+>
+> There might have been a reason to store this flag here. Did you test
+> this with lockdep and CONFIG_DEBUG_ATOMIC_SLEEP? Just to make sure that
+> nothing that can sleep is called from atomic context.
+Done now.
 
--- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the
-Code Aurora Forum, a Linux Foundation Collaborative Project.
+
+Essentially this is a flag is set in suspend routine. and checked in
+the isr I use
+pm_runtime_suspended(id->dev) instead.
+
+>
+>         S?ren
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
