@@ -1,121 +1,40 @@
-From: tn@semihalf.com (Tomasz Nowicki)
-Date: Thu, 29 Oct 2015 16:53:26 +0100
-Subject: [PATCH V1 11/11] arm64, pci, acpi: Support for ACPI based PCI
- hostbridge init
-In-Reply-To: <563234E6.4050109@codeaurora.org>
-References: <1445963922-22711-1-git-send-email-tn@semihalf.com>
- <1445963922-22711-12-git-send-email-tn@semihalf.com>
- <5631180D.2000902@codeaurora.org> <563131B0.9060305@codeaurora.org>
- <56320538.6000905@semihalf.com> <563234E6.4050109@codeaurora.org>
-Message-ID: <563240F6.2060209@semihalf.com>
+From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
+Date: Thu, 29 Oct 2015 16:03:20 +0000
+Subject: CPU_METHOD_OF_DECLARE() with Linux as non-secure OS
+In-Reply-To: <5630C143.5080103@free.fr> (Mason's message of "Wed, 28 Oct 2015
+ 13:36:19 +0100")
+References: <5630C143.5080103@free.fr>
+Message-ID: <yw1xio5pd5mf.fsf@unicorn.mansr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29.10.2015 16:01, Sinan Kaya wrote:
->
->
-> On 10/29/2015 7:38 AM, Tomasz Nowicki wrote:
->> On 28.10.2015 21:36, Sinan Kaya wrote:
->>> 1. ACPI code is unable to discover the interrupt numbers when objects
->>> are ordered as follows in the ACPI file
->>>
->>> PNP0A08 object
->>> PNP0C0F INTA object
->>> PNP0C0F INTB object
->>> PNP0C0F INTC object
->>> PNP0C0F INTD object
->>>
->>> This gives me invalid link context error.
->>>
->>> pci 0000:00:00.0: PCI INT A: no GSI
->>> pci 0000:01:00.0: Derived GSI for 0000:01:00.0 INT A from 0000:00:00.0
->>> acpi PNP0C0F:00: Invalid link context
->>>
->>> If I order it like this in the ACPI file,
->>>
->>> PNP0C0F INTA object
->>> PNP0C0F INTB object
->>> PNP0C0F INTC object
->>> PNP0C0F INTD object
->>> PNP0A08 object
->>>
->>> then, the legacy interrupt numbers can be discovered properly.
->>
->> Can you show full content of your PNP0C0F and PNP0A08 objects?
->>
->
-> ACPI table is considered proprietary. I don't think I can get the legal
-> approval in time. I can give you pieces though.
->
-> Here is the _PRT
-> Device (PCI0) { // PCIe port 0
->      Name(_HID, EISAID("PNP0A08"))    // PCI express
->      Name(_CID, EISAID("PNP0A03"))    // Compatible PCI Root Bridge
-> {
->      ....
->      Name(_PRT, Package(){
->          Package(){0x0FFFF, 0, \_SB.LN0A, 0},  // Slot 0, INTA
->          Package(){0x0FFFF, 1, \_SB.LN0B, 0},  // Slot 0, INTB
->          Package(){0x0FFFF, 2, \_SB.LN0C, 0},  // Slot 0, INTC
->          Package(){0x0FFFF, 3, \_SB.LN0D, 0}   // Slot 0, INTD
->      })
-> }
->
-> Here is the PNP0C0F
->
-> Device(LN0A){
->      Name(_HID, EISAID("PNP0C0F")) // PCI interrupt link
->      Name(_UID, 1)
->      Name(_PRS, ResourceTemplate(){
->      Interrupt(ResourceProducer, Level, ActiveHigh, Exclusive, , ,) {0xE8}
->      })
->      Method(_DIS) {}
->      Method(_CRS) { Return (_PRS) }
->      Method(_SRS, 1) {}
-> }
->
+Mason <slash.tmp@free.fr> writes:
 
-Can you please apply patch below:
+> Hello,
+>
+> I'm working on a dual-core SoC (Cortex-A9 MPCore) with Linux running
+> as the non-secure OS. The secure OS implements some of the APIs used
+> in OMAP2 via SMC.
+>
+> To start the second core, I used to define .smp in my DT_MACHINE_START
+> definition, but Arnd wrote: "There are other ways to do [.smp and .restart]
+> too, see CPU_METHOD_OF_DECLARE() and register_restart_handler()."
+>
+> Is CPU_METHOD_OF_DECLARE() the way to go?
+> Is it "compatible" with executing smc to ask the secure OS to do whatever
+> is needed to start the second core? (I don't understand why starting cores
+> is secure OS responsibility.)
+>
+> I've located three relevant secure OS services:
+> get_aux_core_boot
+> set_aux_core_boot0
+> set_aux_core_boot_addr
+>
+> I'm looking for guidance. What mach-* should I take as a reference to
+> implement "second core startup from non-secure OS"?
 
-diff --git a/arch/arm64/kernel/pci.c b/arch/arm64/kernel/pci.c
-index fec1c91..fe34415 100644
---- a/arch/arm64/kernel/pci.c
-+++ b/arch/arm64/kernel/pci.c
-@@ -48,10 +48,19 @@ resource_size_t pcibios_align_resource(void *data, 
-const struct resource *res,
-   */
-  int pcibios_enable_device(struct pci_dev *dev, int mask)
-  {
-+       int ret;
-+
-         if (pci_has_flag(PCI_PROBE_ONLY))
-                 return 0;
+See https://github.com/mansr/linux-tangox/commit/717dd5fab87aa90255460ba409970331cb577247
 
--       return pci_enable_resources(dev, mask);
-+       ret = pci_enable_resources(dev, mask);
-+       if (ret < 0)
-+               return ret;
-+#ifdef CONFIG_ACPI
-+       if (!dev->msi_enabled)
-+               return acpi_pci_irq_enable(dev);
-+#endif
-+       return 0;
-  }
-
-  /*
-@@ -61,10 +70,6 @@ int pcibios_add_device(struct pci_dev *dev)
-  {
-         if (acpi_disabled)
-                 dev->irq = of_irq_parse_and_map_pci(dev, 0, 0);
--#ifdef CONFIG_ACPI
--       else
--               acpi_pci_irq_enable(dev);
--#endif
-
-         return 0;
-  }
-
-and let me know if the order still matter?
-
-Regards,
-Tomasz
+-- 
+M?ns Rullg?rd
+mans at mansr.com
