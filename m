@@ -1,51 +1,62 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Thu, 29 Oct 2015 15:24:54 +0900
-Subject: [PATCH 0/3] ARM: dts: Enable Exynos RNG module
-In-Reply-To: <562C1B17.3080303@math.uni-bielefeld.de>
-References: <1445230834-32689-1-git-send-email-k.kozlowski@samsung.com>
- <56251627.4050908@math.uni-bielefeld.de> <562581BD.3070609@samsung.com>
- <562C1B17.3080303@math.uni-bielefeld.de>
-Message-ID: <5631BBB6.9080204@samsung.com>
+From: Yuantian.Tang@freescale.com (Tang Yuantian)
+Date: Thu, 29 Oct 2015 14:22:15 +0800
+Subject: [PATCH 1/3] ahci: qoriq: Rename LS2085A SoC support code to LS2080A
+Message-ID: <1446099737-41854-1-git-send-email-Yuantian.Tang@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 25.10.2015 08:58, Tobias Jakobi wrote:
-> Hello Krzysztof,
-> 
-> 
-> Krzysztof Kozlowski wrote:
->> On 20.10.2015 01:11, Tobias Jakobi wrote:
->>> Hello Krzysztof,
->>>
->>> I can confirm that this also works on a Odroid-X2, so I guess it's safe
->>> to enable the PRNG for all Exynos4412-based Odroid devices.
->>
->> Sure, I can send a patch for that. I can test it later also on Odroid-U3.
-> Thanks already!
-> 
-> 
-> 
->>> Any chance that you might also take a look at the other hwcrypto stuff
->>> on the SoC ('samsung,exynos4210-secss' compatible)?
->>
->> What do you mean? The s5p-sss driver already supports Device Tree.
-> The driver supports DT, but it doesn't really work.
-> 
-> I'm using the following DT entry to let the driver probe correctly:
-> https://github.com/tobiasjakobi/linux-odroid/commit/82c00cddb5cbf89fad994784c28c8125beae8e13
-> 
-> But the crypto self-test fails on boot:
-> alg: skcipher: encryption failed on test 1 for ecb-aes-s5p: ret=22
-> 
-> 
-> Another problems is that SSS and PRNG can't be used at the same time,
-> since they both use common hardware resources (I think it was IO).
-> 
+Freescale is renaming the LS2085A SoC to LS2080A.
+This patch addresses the same.
 
-Thanks for explaining this. I added the issue to the long TODO list but
-I don't know when I will be able to dig into this.
+Signed-off-by: Tang Yuantian <Yuantian.Tang@freescale.com>
+---
+ Documentation/devicetree/bindings/ata/ahci-fsl-qoriq.txt | 2 +-
+ drivers/ata/ahci_qoriq.c                                 | 6 +++---
+ 2 files changed, 4 insertions(+), 4 deletions(-)
 
-If anyone wants to look into this, please go ahead...
-
-Best regards,
-Krzysztof
+diff --git a/Documentation/devicetree/bindings/ata/ahci-fsl-qoriq.txt b/Documentation/devicetree/bindings/ata/ahci-fsl-qoriq.txt
+index b614e3b..3aafe27 100644
+--- a/Documentation/devicetree/bindings/ata/ahci-fsl-qoriq.txt
++++ b/Documentation/devicetree/bindings/ata/ahci-fsl-qoriq.txt
+@@ -3,7 +3,7 @@ Binding for Freescale QorIQ AHCI SATA Controller
+ Required properties:
+   - reg: Physical base address and size of the controller's register area.
+   - compatible: Compatibility string. Must be 'fsl,<chip>-ahci', where
+-    chip could be ls1021a, ls2085a, ls1043a etc.
++    chip could be ls1021a, ls2080a, ls1043a etc.
+   - clocks: Input clock specifier. Refer to common clock bindings.
+   - interrupts: Interrupt specifier. Refer to interrupt binding.
+ 
+diff --git a/drivers/ata/ahci_qoriq.c b/drivers/ata/ahci_qoriq.c
+index 58c1a94..b9b691e 100644
+--- a/drivers/ata/ahci_qoriq.c
++++ b/drivers/ata/ahci_qoriq.c
+@@ -45,7 +45,7 @@
+ enum ahci_qoriq_type {
+ 	AHCI_LS1021A,
+ 	AHCI_LS1043A,
+-	AHCI_LS2085A,
++	AHCI_LS2080A,
+ };
+ 
+ struct ahci_qoriq_priv {
+@@ -57,7 +57,7 @@ struct ahci_qoriq_priv {
+ static const struct of_device_id ahci_qoriq_of_match[] = {
+ 	{ .compatible = "fsl,ls1021a-ahci", .data = (void *)AHCI_LS1021A},
+ 	{ .compatible = "fsl,ls1043a-ahci", .data = (void *)AHCI_LS1043A},
+-	{ .compatible = "fsl,ls2085a-ahci", .data = (void *)AHCI_LS2085A},
++	{ .compatible = "fsl,ls2080a-ahci", .data = (void *)AHCI_LS2080A},
+ 	{},
+ };
+ MODULE_DEVICE_TABLE(of, ahci_qoriq_of_match);
+@@ -159,7 +159,7 @@ static int ahci_qoriq_phy_init(struct ahci_host_priv *hpriv)
+ 		break;
+ 
+ 	case AHCI_LS1043A:
+-	case AHCI_LS2085A:
++	case AHCI_LS2080A:
+ 		writel(AHCI_PORT_PHY_1_CFG, reg_base + PORT_PHY1);
+ 		break;
+ 	}
+-- 
+2.1.0.27.g96db324
