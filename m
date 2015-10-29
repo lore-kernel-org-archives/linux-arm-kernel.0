@@ -1,38 +1,31 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 29 Oct 2015 15:36:24 +0100
-Subject: [PATCH 07/11] pinctrl: use ngpios propety from DT
-In-Reply-To: <0C803592FC378B4E83922050AB46442A2AD742F0@SJEXCHMB10.corp.ad.broadcom.com>
-References: <1445233398-27129-1-git-send-email-pramodku@broadcom.com>
- <1445233398-27129-8-git-send-email-pramodku@broadcom.com>
- <CACRpkdY1GDs6ypqCiY3iiv3DkfnHchnY+bWPoCqU=_sgn9f5vQ@mail.gmail.com>
- <0C803592FC378B4E83922050AB46442A2AD742F0@SJEXCHMB10.corp.ad.broadcom.com>
-Message-ID: <CACRpkdb3FT0K+atNOTXL_e8Fs7Nm0VDLe0RPiiBKK=8o=MHqKQ@mail.gmail.com>
+From: fabio.estevam@freescale.com (Fabio Estevam)
+Date: Thu, 29 Oct 2015 12:37:05 -0200
+Subject: [PATCH] ARM: multi_v7_defconfig: Remove CONFIG_SOC_LS1021A
+Message-ID: <1446129425-11899-1-git-send-email-fabio.estevam@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 28, 2015 at 12:52 PM, Pramod Kumar <pramodku@broadcom.com> wrote:
+imx_v6_v7_defconfig is not suitable for booting LS1021 as it needs
+LPAE.
 
-> I discussed with ASIC team regarding this iProc GPIO block. They use a library to create the GPIOs block where "total number of GPIO pins( let say N) in GPIO block" is used as an parameter.
-> Library uses a construct for *a* GPIO pin. This gets instantiated N times to create a complete GPIO block with N pins.
->
-> All iProc based SoCs uses this library. So I'm not sure whether attaching "total number of GPIOs pins" to compatible-string make sense in this case.
-> I personally feel that passing this number from the DT makes more sense here. Any iProc based future as well as current SoCs would be able to use this driver without any change.
->
-> Please advise us in this case.
+Remove this option.
 
-Hm! You make a good case.
+Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ arch/arm/configs/multi_v7_defconfig | 1 -
+ 1 file changed, 1 deletion(-)
 
-But this contradicts the traditional use of ngpios.
-
-But on the other hand:
-git grep ngpio Documentation/devicetree/bindings/gpio/
-
-Gives at hand that the use of ngpio[s] is a complete mess.
-
-:(
-
-I will think about patching the standard bindings to fix this mess
-and include your case. Give me some time.
-
-Yours,
-Linus Walleij
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index cb0f35d..ed0f631 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -53,7 +53,6 @@ CONFIG_SOC_IMX6SX=y
+ CONFIG_SOC_IMX6UL=y
+ CONFIG_SOC_IMX7D=y
+ CONFIG_SOC_VF610=y
+-CONFIG_SOC_LS1021A=y
+ CONFIG_ARCH_OMAP3=y
+ CONFIG_ARCH_OMAP4=y
+ CONFIG_SOC_OMAP5=y
+-- 
+1.9.1
