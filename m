@@ -1,41 +1,39 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 29 Oct 2015 15:09:22 +0000
-Subject: [PATCH] recordmcount: arm64: replace the ignored mcount call
- into nop
-In-Reply-To: <201510292118.ZYBYzBGa%fengguang.wu@intel.com>
-References: <1446019445-14421-1-git-send-email-huawei.libin@huawei.com>
- <201510292118.ZYBYzBGa%fengguang.wu@intel.com>
-Message-ID: <20151029150922.GE3440@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 29 Oct 2015 15:21:42 +0000
+Subject: [PATCH] arm64/efi: do not assume DRAM base is aligned to 2 MB
+In-Reply-To: <5632347E.2070303@codeaurora.org>
+References: <1446127645-4115-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20151029145754.GD3440@arm.com> <5632347E.2070303@codeaurora.org>
+Message-ID: <20151029152141.GH28221@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 29, 2015 at 09:35:42PM +0800, kbuild test robot wrote:
-> [auto build test ERROR on arm64/for-next/core -- if it's inappropriate base, please suggest rules for selecting the more suitable base]
+On Thu, Oct 29, 2015 at 10:00:14AM -0500, Timur Tabi wrote:
+> On 10/29/2015 09:57 AM, Will Deacon wrote:
+> >So is this fixing a regression introduced in 4.3? If so, can I have a
+> >Fixes: tag too, please? (I was under the impression that this was a
+> >longstanding issue, but the thread hasn't been easy to follow).
 > 
-> url:    https://github.com/0day-ci/linux/commits/Li-Bin/recordmcount-arm64-replace-the-ignored-mcount-call-into-nop/20151028-160846
-> config: arm64-allmodconfig (attached as .config)
-> reproduce:
->         wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
->         chmod +x ~/bin/make.cross
->         # save the attached .config to linux build tree
->         make.cross ARCH=arm64 
+> It fixes a bug introduced by:
 > 
-> All errors (new ones prefixed by >>):
+> Author: Ard Biesheuvel <ard.biesheuvel@linaro.org>  2015-07-24 06:38:27
+> Committer: Will Deacon <will.deacon@arm.com>  2015-07-27 05:08:41
+> Parent: ddeeefe2dfbe1fa6b116b9362b1bec465b64c873 (arm64/efi:
+> efistub: Apply __init annotation)
+> Child:  739fa11938bec53a849b77b2042237a0e17c70ae (arm64/efi: do not
+> assume DRAM base is aligned to 2 MB)
+> Branches: dcc, master, qserver, qserver2, remotes/origin/master, tty
+> Follows: v4.2-rc4
+> Precedes: v4.3-rc1
 > 
-> >> /bin/bash: line 1: 117734 Segmentation fault      ./scripts/recordmcount "arch/arm64/kernel/traps.o"
-> --
-> >> /bin/bash: line 1: 113824 Segmentation fault      ./scripts/recordmcount "arch/arm64/mm/fault.o"
+>     arm64: efi: prefer AllocatePages() over efi_low_alloc() for vmlinux
 
-I can reproduce this locally with an allmodconfig build. The offset
-parameter to make_nop_arm64 is nuts:
+As it wasn't in the context, that's commit ID e38457c361b30c5a, which
+was introduced in v4.3-rc1.
 
-  Program received signal SIGSEGV, Segmentation fault.
-  make_nop_arm64 (map=0x7ffff7fef000, offset=2600547309829750784) at scripts/recordmcount.c:170
-  170		if (*ptr != 0x94000000)
+However, the check on the base address was always buggy since its
+introduction in v3.16 in commit 3c7f255039a2ad6e ("arm64: efi: add EFI
+stub"), so that portion needs to be backported further.
 
-Both shdr->sh_offset (0x17000000000000) and relp->r_offset (0x2400000000000000)
-look dodgy in the caller.
-
-Li, can you take a look please?
-
-Will
+Thanks,
+Mark.
