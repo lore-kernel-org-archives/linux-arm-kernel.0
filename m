@@ -1,181 +1,66 @@
-From: leoli@freescale.com (Li Yang)
-Date: Thu, 29 Oct 2015 16:12:06 -0500
-Subject: [PATCH V7 3/3] ARM64: dts: add LS1043a-RDB board support
-In-Reply-To: <1446153126-6219-1-git-send-email-leoli@freescale.com>
-References: <1446153126-6219-1-git-send-email-leoli@freescale.com>
-Message-ID: <1446153126-6219-4-git-send-email-leoli@freescale.com>
+From: sjoerd.simons@collabora.co.uk (Sjoerd Simons)
+Date: Thu, 29 Oct 2015 22:39:24 +0100
+Subject: [PATCH] ARM: dts: rockchip: Setup ethernet0 alias for u-boot
+In-Reply-To: <1895461.b5NitQ7UFH@phil>
+References: <1446151497-29833-1-git-send-email-sjoerd.simons@collabora.co.uk>
+ <1895461.b5NitQ7UFH@phil>
+Message-ID: <1446154764.4092.273.camel@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Shaohui Xie <Shaohui.Xie@freescale.com>
+On Thu, 2015-10-29 at 21:52 +0100, Heiko Stuebner wrote:
+> Hi Sjoerd,
+> 
+> Am Donnerstag, 29. Oktober 2015, 21:44:57 schrieb Sjoerd Simons:
+> > Add an ethernet0 alias for the wired network card and an all 0
+> > default
+> > mac address so that u-boot can find the device-node and fill in the
+> > mac address.
+> > 
+> > Signed-off-by: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
+> > ---
+> > 
+> > ?arch/arm/boot/dts/rk3288-rock2-square.dts | 6 ++++++
+> > ?1 file changed, 6 insertions(+)
+> > 
+> > diff --git a/arch/arm/boot/dts/rk3288-rock2-square.dts
+> > b/arch/arm/boot/dts/rk3288-rock2-square.dts
+> > index 0ef065d..a029ebf 100644
+> > --- a/arch/arm/boot/dts/rk3288-rock2-square.dts
+> > +++ b/arch/arm/boot/dts/rk3288-rock2-square.dts
+> > @@ -45,6 +45,10 @@
+> > ?	model = "Radxa Rock 2 Square";
+> > ?	compatible = "radxa,rock2-square", "rockchip,rk3288";
+> > ?
+> > +	aliases {
+> > +		ethernet0 = &gmac;
+> > +	};
+> > +
+> 
+> wouldn't it make more sense to have this in the rk3288.dtsi, so to
+> keep
+> every board from having to add this alias?
 
-Signed-off-by: Shaohui Xie <Shaohui.Xie@freescale.com>
-Signed-off-by: Mingkai Hu <Mingkai.Hu@freescale.com>
-Signed-off-by: Wenbin Song <Wenbin.Song@freescale.com>
-Signed-off-by: Hou Zhiqiang <B48286@freescale.com>
-Signed-off-by: Li Yang <leoli@freescale.com>
----
-V7:
- - Rebased on latest LS2080 patches.
+Hmm, that would work. Thought it would add an alias point to a disabled
+node for boards that don't have a wired interface. If that isn't an
+issue it can indeed be moved there.
+> 
+> > ?	chosen {
+> > ?		stdout-path = "serial2:115200n8";
+> > ?	};
+> > @@ -130,6 +134,8 @@
+> > ?};
+> > ?
+> > ?&gmac {
+> > +	/* To be filled in by U-Boot */
+> > +	mac-address = [00 00 00 00 00 00];
+> > ?	status = "ok";
+> > ?};
+> 
+> I guess the same applies for the mac placeholder.
 
-V6:
- - No change.
+In any case they should be in the same dts{i}.
 
-V5:
- - Move gic, timer and pmu nodes out of SoC node.
-
-V4:
- - Add soc node with simple-bus compatible.
- - Add property interrupt-affinity for armv8 pmuv3 node.
-
-V3:
- - Add device tree node for SATA.
- - Remove properity enable-method for all cpu node.
-   Remove reserved memory region for spin-table.
-
-V2:
- - Add secondary core boot method.
- - Move out the sysclk node from the clockgen node.
- - Correct the reg size of GICC.
-
- arch/arm64/boot/dts/freescale/Makefile            |   1 +
- arch/arm64/boot/dts/freescale/fsl-ls1043a-rdb.dts | 116 ++++++++++++++++++++++
- 2 files changed, 117 insertions(+)
- create mode 100644 arch/arm64/boot/dts/freescale/fsl-ls1043a-rdb.dts
-
-diff --git a/arch/arm64/boot/dts/freescale/Makefile b/arch/arm64/boot/dts/freescale/Makefile
-index c4957a4..f3c2516 100644
---- a/arch/arm64/boot/dts/freescale/Makefile
-+++ b/arch/arm64/boot/dts/freescale/Makefile
-@@ -1,6 +1,7 @@
- dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls2080a-qds.dtb
- dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls2080a-rdb.dtb
- dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls2080a-simu.dtb
-+dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls1043a-rdb.dtb
-  
- always		:= $(dtb-y)
- subdir-y	:= $(dts-dirs)
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1043a-rdb.dts b/arch/arm64/boot/dts/freescale/fsl-ls1043a-rdb.dts
-new file mode 100644
-index 0000000..7a351e2
---- /dev/null
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls1043a-rdb.dts
-@@ -0,0 +1,116 @@
-+/*
-+ * Device Tree Include file for Freescale Layerscape-1043A family SoC.
-+ *
-+ * Copyright 2014-2015, Freescale Semiconductor
-+ *
-+ * Mingkai Hu <Mingkai.hu@freescale.com>
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPLv2 or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This library is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This library is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+/dts-v1/;
-+#include "fsl-ls1043a.dtsi"
-+
-+/ {
-+	model = "LS1043A RDB Board";
-+};
-+
-+&i2c0 {
-+	status = "okay";
-+	ina220 at 40 {
-+		compatible = "ti,ina220";
-+		reg = <0x40>;
-+		shunt-resistor = <1000>;
-+	};
-+	adt7461a at 4c {
-+		compatible = "adi,adt7461";
-+		reg = <0x4c>;
-+	};
-+	eeprom at 56 {
-+		compatible = "at24,24c512";
-+		reg = <0x52>;
-+	};
-+	eeprom at 57 {
-+		compatible = "at24,24c512";
-+		reg = <0x53>;
-+	};
-+	rtc at 68 {
-+		compatible = "pericom,pt7c4338";
-+		reg = <0x68>;
-+	};
-+};
-+
-+&ifc {
-+	status = "okay";
-+	#address-cells = <2>;
-+	#size-cells = <1>;
-+	/* NOR, NAND Flashes and FPGA on board */
-+	ranges = <0x0 0x0 0x0 0x60000000 0x08000000
-+		  0x1 0x0 0x0 0x7e800000 0x00010000
-+		  0x2 0x0 0x0 0x7fb00000 0x00000100>;
-+
-+		nor at 0,0 {
-+			compatible = "cfi-flash";
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			reg = <0x0 0x0 0x8000000>;
-+			bank-width = <2>;
-+			device-width = <1>;
-+		};
-+
-+		nand at 1,0 {
-+			compatible = "fsl,ifc-nand";
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+			reg = <0x1 0x0 0x10000>;
-+		};
-+
-+		cpld: board-control at 2,0 {
-+			compatible = "fsl,ls1043ardb-cpld";
-+			reg = <0x2 0x0 0x0000100>;
-+		};
-+};
-+
-+&duart0 {
-+	status = "okay";
-+};
-+
-+&duart1 {
-+	status = "okay";
-+};
--- 
-2.3.3
+--?
+Sjoerd Simons
+Collabora Ltd.
