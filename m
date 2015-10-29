@@ -1,25 +1,55 @@
-From: p.fedin@samsung.com (Pavel Fedin)
-Date: Thu, 29 Oct 2015 11:43:22 +0300
-Subject: [PATCH] ARM: exynos: Bring back reboot on Exynos5410
-In-Reply-To: <5631D8E5.6090506@samsung.com>
-References: <1446024965-8508-1-git-send-email-p.fedin@samsung.com>
- <56317960.9070608@samsung.com>
- <CAGcde9H4WVt34rn6_9H+sVu2Bp2xq4awMiwV1zgv1D6posPWSg@mail.gmail.com>
- <006c01d11218$d6e2d500$84a87f00$@samsung.com> <5631D8E5.6090506@samsung.com>
-Message-ID: <002801d11225$dedab4a0$9c901de0$@samsung.com>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Thu, 29 Oct 2015 09:56:59 +0100
+Subject: [PATCH 19/19] ARM: dts: zynq: replace gpio-key,wakeup with
+ wakeup-source property
+In-Reply-To: <1445422216-29375-20-git-send-email-sudeep.holla@arm.com>
+References: <1445422216-29375-1-git-send-email-sudeep.holla@arm.com>
+ <1445422216-29375-20-git-send-email-sudeep.holla@arm.com>
+Message-ID: <5631DF5B.5040208@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- Hello!
+On 10/21/2015 12:10 PM, Sudeep Holla wrote:
+> Though the keyboard driver for GPIO buttons(gpio-keys) will continue to
+> check for/support the legacy "gpio-key,wakeup" boolean property to
+> enable gpio buttons as wakeup source, "wakeup-source" is the new
+> standard binding.
+> 
+> This patch replaces the legacy "gpio-key,wakeup" with the unified
+> "wakeup-source" property in order to avoid any futher copy-paste
+> duplication.
+> 
+> Cc: Michal Simek <michal.simek@xilinx.com>
+> Cc: "S?ren Brinkmann" <soren.brinkmann@xilinx.com>
+> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+> ---
+>  arch/arm/boot/dts/zynq-zc702.dts | 4 ++--
+>  1 file changed, 2 insertions(+), 2 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/zynq-zc702.dts b/arch/arm/boot/dts/zynq-zc702.dts
+> index 5df8f81f4217..cb64209bca08 100644
+> --- a/arch/arm/boot/dts/zynq-zc702.dts
+> +++ b/arch/arm/boot/dts/zynq-zc702.dts
+> @@ -43,14 +43,14 @@
+>  			label = "sw14";
+>  			gpios = <&gpio0 12 0>;
+>  			linux,code = <108>; /* down */
+> -			gpio-key,wakeup;
+> +			wakeup-source;
+>  			autorepeat;
+>  		};
+>  		sw13 {
+>  			label = "sw13";
+>  			gpios = <&gpio0 14 0>;
+>  			linux,code = <103>; /* up */
+> -			gpio-key,wakeup;
+> +			wakeup-source;
+>  			autorepeat;
+>  		};
+>  	};
+> 
 
-> These patches are not adding any new code, except DT entry. Infact
-> restart handler will be removed from PMU driver and we will be using
-> generic syscon based implementation for reboot, which is already present
-> in Linux kernel.
+Applied to zynq/dt.
 
- Ah, got it. So syscon is a very generic thing, allowing to describe whatever reset register for whatever board, since we are specifying both address and value to write there. Is my understanding correct? If so, then, OK, you can do this too.
-
-Kind regards,
-Pavel Fedin
-Expert Engineer
-Samsung Electronics Research center Russia
+Thanks,
+Michal
