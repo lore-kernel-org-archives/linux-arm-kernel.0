@@ -1,73 +1,42 @@
-From: soren.brinkmann@xilinx.com (=?utf-8?B?U8O2cmVu?= Brinkmann)
-Date: Thu, 29 Oct 2015 09:47:06 -0700
-Subject: [PATCH] gpio: zynq: Implement irq_(request|release)_resources
-In-Reply-To: <562FA849.2070306@metafoo.de>
-References: <1445607381-7794-1-git-send-email-soren.brinkmann@xilinx.com>
- <CACRpkda4QKEJvwkwGLS7OLTP8Nxu5W05tzbcFXA_FPnBsFtKhw@mail.gmail.com>
- <562FA849.2070306@metafoo.de>
-Message-ID: <20151029164706.GQ6436@xsjsorenbubuntu>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 29 Oct 2015 17:09:50 +0000
+Subject: [GIT PULL] memremap fix for 4.3
+In-Reply-To: <1446105610.23766.17.camel@intel.com>
+References: <1446105610.23766.17.camel@intel.com>
+Message-ID: <20151029170950.GP8644@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2015-10-27 at 05:37PM +0100, Lars-Peter Clausen wrote:
-> On 10/27/2015 04:53 PM, Linus Walleij wrote:
-> > On Fri, Oct 23, 2015 at 3:36 PM, Soren Brinkmann
-> > <soren.brinkmann@xilinx.com> wrote:
-> > 
-> >> The driver uses runtime PM to leverage low power techniques. For
-> >> use-cases using GPIO as interrupt the device needs to be in an
-> >> appropriate state.
-> >>
-> >> Reported-by: John Linn <linnj@xilinx.com>
-> >> Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
-> >> Tested-by: John Linn <linnj@xilinx.com>
-> > 
-> > As pointed out by Grygorii in
-> > commit aca82d1cbb49af34b69ecd4571a0fe48ad9247c1:
-> > 
-> >     The PM runtime API can't be used in atomic contex on -RT even if
-> >     it's configured as irqsafe. As result, below error report can
-> >     be seen when PM runtime API called from IRQ chip's callbacks
-> >     irq_startup/irq_shutdown/irq_set_type, because they are
-> >     protected by RAW spinlock:
-> > (...)
-> >     The IRQ chip interface defines only two callbacks which are executed in
-> >     non-atomic contex - irq_bus_lock/irq_bus_sync_unlock, so lets move
-> >     PM runtime calls there.
-> > 
-> > I.e. these calls are atomic context and it's just luck that it works
-> > and this is fragile.
-> > 
-> > Can you please check if you can move it to
-> > irq_bus_lock()/irq_sync_unlock()
-> > like Grygorii does?
+On Thu, Oct 29, 2015 at 08:00:13AM +0000, Williams, Dan J wrote:
+> Hi Linus, please pull from:
 > 
-> That only powers up the chip when the chip is accessed. For proper IRQ
-> operation the chip needs to be powered up though as long as the IRQ is
-> enabled. request_irq() and free_irq() must always be called from sleepable
-> context. The thing is just that request_resource/release_resource are called
-> from within a raw spinlock, which is necessary since otherwise you can't
-> guarantee that they are only called once for shared interrupts.
+>   git://git.kernel.org/pub/scm/linux/kernel/git/nvdimm/nvdimm libnvdimm-fixes
 > 
-> It might make sense to add a separate set of callbacks to the irq_chip
-> struct that are called from the sleepable sections of
-> request_irq()/free_irq() which are meant for power management purposes and
-> which wont have the guarantee that they are only called once for shared IRQs
-> (but are still balanced).
+> ...to receive a small fixlet for 4.3.
+> 
+> The new memremap() api introduced in the 4.3 cycle to unify/replace
+> ioremap_cache() and ioremap_wt() is mishandling the highmem case.  This
+> patch has received a build success notification from a 0day-kbuild-robot
+> run and has been out for a review for a day.  Russell has not had a
+> chance to weigh in on it yet.
 
-Let me try to summarize what I've heard so far:
- - reqres/relres are called from atomic context, hence must not sleep
- - pm_runtime API must not be used from atomic context, even when the
-   implementation of the callbacks does not sleep
- - when overriding regres/relres, a driver must re-implement the default
-   behavior the core provides
- - bus lock/unlock is not sufficient for this case because it doesn't
-   keep the device on as long as an IRQ is expected
- - a new pair of gpiochip ops might be helpful
+Oh, was this merged for 4.3-rc1?  I haven't noticed any problems if it
+has.
 
-Does that summarize the current situation correctly? If so, I'd tend to
-agree with Lars that we might need another pair of callbacks in the
-gpiochip struct.
+> I do not think the usage of kmap is strictly necessary as we should be
+> able to fall back to ioremap_cache(), but I include it for two reasons:
+> 
+> 1/ ARM ioremap() will WARN if passed a pfn_valid() address.
 
-	Thanks,
-	S?ren
+We don't support ioremap() on system RAM on ARM, period.  That's because
+ioremap() sets up page tables with incompatible attributes compared to
+those which are/will be setup by the lowmem/kmap* mappings, which leads
+to "unpredictable" behaviour.
+
+The only time RAM is mappable with ioremap() is if it's stolen from the
+kernel at boot time, which prevents the kernel from managing it and
+setting up memory-like mappings.
+
+-- 
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
