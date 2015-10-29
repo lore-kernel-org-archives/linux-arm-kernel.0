@@ -1,40 +1,63 @@
-From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Thu, 29 Oct 2015 14:28:13 +0530
-Subject: [PATCH] ARM: exynos: Bring back reboot on Exynos5410
-In-Reply-To: <002801d11225$dedab4a0$9c901de0$@samsung.com>
-References: <1446024965-8508-1-git-send-email-p.fedin@samsung.com>
- <56317960.9070608@samsung.com>
- <CAGcde9H4WVt34rn6_9H+sVu2Bp2xq4awMiwV1zgv1D6posPWSg@mail.gmail.com>
- <006c01d11218$d6e2d500$84a87f00$@samsung.com> <5631D8E5.6090506@samsung.com>
- <002801d11225$dedab4a0$9c901de0$@samsung.com>
-Message-ID: <5631DFA5.8040208@samsung.com>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Thu, 29 Oct 2015 10:00:09 +0100
+Subject: [PATCH] pinctrl-zynq: Initialize early
+In-Reply-To: <20151023054455.GU5257@xsjsorenbubuntu>
+References: <1445513420-23527-1-git-send-email-mike.looijmans@topic.nl>
+ <20151022160733.GH5257@xsjsorenbubuntu> <5629C62D.8030804@topic.nl>
+ <20151023054455.GU5257@xsjsorenbubuntu>
+Message-ID: <5631E019.5040906@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Linus,
 
+On 10/23/2015 07:44 AM, S?ren Brinkmann wrote:
+> On Fri, 2015-10-23 at 07:31AM +0200, Mike Looijmans wrote:
+>> On 22-10-15 18:07, S?ren Brinkmann wrote:
+>>> Hi Mike,
+>>>
+>>> On Thu, 2015-10-22 at 01:30PM +0200, Mike Looijmans wrote:
+>>>> Supplying pinmux configuration for e.g. gpio pins leads to deferred
+>>>> probes because the pinctrl device is probed much later than gpio.
+>>>> Move the init call to a much earlier stage so it probes before the
+>>>> devices that may need it.
+>>>>
+>>>> Signed-off-by: Mike Looijmans <mike.looijmans@topic.nl>
+>>>
+>>> in general, the change should be OK, but neither on zc702 nor zc706 do I
+>>> see a difference in respect to deferred probes. With and without the
+>>> patch I see:
+>>>     root at zynq:~# dmesg | grep -i defer
+>>>     [    0.097021] zynq-gpio e000a000.gpio: could not find pctldev for node /amba/slcr at f8000000/pinctrl at 700/gpio0-default, deferring probe
+>>>     root at zynq:~#
+>>>
+>>> If you have a case this patch improves things though, feel free to add my
+>>> Tested-by: S?ren Brinkmann <soren.brinkmann@xilinx.com>
+>>>
+>>
+>> On the Florida boards there are i2c controlled clocks, power supplies and
+>> reset signals. Replacing the Cadence I2C controller with a GPIO-bitbang
+>> controller solved the I2C problems but caused a storm of dozens of deferred
+>> probes because of the pinmux driver arriving even after the first probe
+>> attempt of the i2c bus driver. Moving the pinmux driver to an earlier stage
+>> solved that problem neatly, now the "zynq-pinctrl 700.pinctrl: zynq pinctrl
+>> initialized" message appears after the OCM driver.
+> 
+> OK, makes sense. Thanks for the background.
+> 
+>> Judging from your comment the GPIO driver still probes earlier (I don't have
+>> any GPIO-only pinmuxes yet), so maybe we should amend the patch to probe
+>> even earlier. The pinmux driver doesn't depend on anything, so it can
+>> potentially probe very early. What do you think?
+> 
+> I'm pretty neutral on this one :) Hasn't the probe deferral mechanism
+> been introduced to avoid having to create ordering through the initcall
+> stages? But I agree, having the probe deferral notices is not particularly
+> pretty. So, I'd definitely not oppose changing this.
+> Though, there is one dependency on the SLCR regmap, but that is initialized
+> fairly early.
 
-On Thursday 29 October 2015 02:13 PM, Pavel Fedin wrote:
->   Hello!
->
->> These patches are not adding any new code, except DT entry. Infact
->> restart handler will be removed from PMU driver and we will be using
->> generic syscon based implementation for reboot, which is already present
->> in Linux kernel.
->
->   Ah, got it. So syscon is a very generic thing, allowing to describe whatever reset register for whatever board, since we are specifying both address and value to write there. Is my understanding correct? If so, then, OK, you can do this too.
->
-
-Yes, syscon-reboot does exactly same. We just need to provide 
-"syscon-provider" in our case it's PMU device node, register/offset and 
-value to be written, and syscon-reboot driver will take care from 
-registered restart-handler.
+Any comment on this one?
 
 Thanks,
-Pankaj Dubey
-> Kind regards,
-> Pavel Fedin
-> Expert Engineer
-> Samsung Electronics Research center Russia
->
->
->
+Michal
