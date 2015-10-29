@@ -1,54 +1,94 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Thu, 29 Oct 2015 21:52:50 +0100
-Subject: [PATCH] ARM: dts: rockchip: Setup ethernet0 alias for u-boot
-In-Reply-To: <1446151497-29833-1-git-send-email-sjoerd.simons@collabora.co.uk>
-References: <1446151497-29833-1-git-send-email-sjoerd.simons@collabora.co.uk>
-Message-ID: <1895461.b5NitQ7UFH@phil>
+From: jonmason@broadcom.com (Jon Mason)
+Date: Thu, 29 Oct 2015 16:44:10 -0400
+Subject: [PATCH v2] clk: iproc: Make clocks visible options
+Message-ID: <1446151450-23563-1-git-send-email-jonmason@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sjoerd,
+Make the clocks visible options that can be selected by anyone.  This
+avoids the problems of:
+ 1) Select is a reverse dependency and is hard for people to understand
+    and can sometimes be a pain to track down
+ 2) Build coverage goes down because configs are hidden
+ 3) Code bloat
 
-Am Donnerstag, 29. Oktober 2015, 21:44:57 schrieb Sjoerd Simons:
-> Add an ethernet0 alias for the wired network card and an all 0 default
-> mac address so that u-boot can find the device-node and fill in the
-> mac address.
-> 
-> Signed-off-by: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
-> ---
-> 
->  arch/arm/boot/dts/rk3288-rock2-square.dts | 6 ++++++
->  1 file changed, 6 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/rk3288-rock2-square.dts b/arch/arm/boot/dts/rk3288-rock2-square.dts
-> index 0ef065d..a029ebf 100644
-> --- a/arch/arm/boot/dts/rk3288-rock2-square.dts
-> +++ b/arch/arm/boot/dts/rk3288-rock2-square.dts
-> @@ -45,6 +45,10 @@
->  	model = "Radxa Rock 2 Square";
->  	compatible = "radxa,rock2-square", "rockchip,rk3288";
->  
-> +	aliases {
-> +		ethernet0 = &gmac;
-> +	};
-> +
+Patch suggested by Stephen Boyd
 
-wouldn't it make more sense to have this in the rk3288.dtsi, so to keep
-every board from having to add this alias?
+Signed-off-by: Jon Mason <jonmason@broadcom.com>
+---
+ arch/arm/mach-bcm/Kconfig |  1 -
+ drivers/clk/bcm/Kconfig   | 30 +++++++++++++++++++++++++++++-
+ drivers/clk/bcm/Makefile  |  7 +++----
+ 3 files changed, 32 insertions(+), 6 deletions(-)
 
-
->  	chosen {
->  		stdout-path = "serial2:115200n8";
->  	};
-> @@ -130,6 +134,8 @@
->  };
->  
->  &gmac {
-> +	/* To be filled in by U-Boot */
-> +	mac-address = [00 00 00 00 00 00];
->  	status = "ok";
->  };
-
-I guess the same applies for the mac placeholder.
-
-Heiko
+diff --git a/arch/arm/mach-bcm/Kconfig b/arch/arm/mach-bcm/Kconfig
+index 679798b..cacaaec 100644
+--- a/arch/arm/mach-bcm/Kconfig
++++ b/arch/arm/mach-bcm/Kconfig
+@@ -14,7 +14,6 @@ config ARCH_BCM_IPROC
+ 	select HAVE_ARM_SCU if SMP
+ 	select HAVE_ARM_TWD if SMP
+ 	select ARM_GLOBAL_TIMER
+-	select COMMON_CLK_IPROC
+ 	select CLKSRC_MMIO
+ 	select ARCH_REQUIRE_GPIOLIB
+ 	select ARM_AMBA
+diff --git a/drivers/clk/bcm/Kconfig b/drivers/clk/bcm/Kconfig
+index 46ee475..ad815a5 100644
+--- a/drivers/clk/bcm/Kconfig
++++ b/drivers/clk/bcm/Kconfig
+@@ -9,8 +9,36 @@ config CLK_BCM_KONA
+ 	  in the BCM281xx and BCM21664 families.
+ 
+ config COMMON_CLK_IPROC
+-	bool
++	bool "Broadcom iProc clock support"
++	depends on ARCH_BCM_IPROC || COMPILE_TEST
+ 	depends on COMMON_CLK
++	default ARCH_BCM_IPROC
+ 	help
+ 	  Enable common clock framework support for Broadcom SoCs
+ 	  based on the iProc architecture
++
++if COMMON_CLK_IPROC
++
++config CLK_BCM_CYGNUS
++	bool "Broadcom Cygnus clock support"
++	depends on ARCH_BCM_CYGNUS || COMPILE_TEST
++	default ARCH_BCM_CYGNUS
++	help
++	  Enable common clock framework support for the Broadcom Cygnus SoC
++
++config CLK_BCM_NSP
++	bool "Broadcom Northstar/Northstar Plus clock support"
++	depends on ARCH_BCM_5301X || ARCH_BCM_NSP || COMPILE_TEST
++	default ARCH_BCM_5301X || ARCH_BCM_NSP
++	help
++	  Enable common clock framework support for the Broadcom Northstar and
++	  Northstar Plus SoCs
++
++config CLK_BCM_NS2
++	bool "Broadcom Northstar 2 clock support"
++	depends on ARM64 || COMPILE_TEST
++	default ARCH_BCM_IPROC
++	help
++	  Enable common clock framework support for the Broadcom Northstar 2 SoC
++
++endif
+diff --git a/drivers/clk/bcm/Makefile b/drivers/clk/bcm/Makefile
+index 2d1cbc5..05d5830 100644
+--- a/drivers/clk/bcm/Makefile
++++ b/drivers/clk/bcm/Makefile
+@@ -3,7 +3,6 @@ obj-$(CONFIG_CLK_BCM_KONA)	+= clk-kona-setup.o
+ obj-$(CONFIG_CLK_BCM_KONA)	+= clk-bcm281xx.o
+ obj-$(CONFIG_CLK_BCM_KONA)	+= clk-bcm21664.o
+ obj-$(CONFIG_COMMON_CLK_IPROC)	+= clk-iproc-armpll.o clk-iproc-pll.o clk-iproc-asiu.o
+-obj-$(CONFIG_COMMON_CLK_IPROC)	+= clk-ns2.o
+-obj-$(CONFIG_ARCH_BCM_CYGNUS)	+= clk-cygnus.o
+-obj-$(CONFIG_ARCH_BCM_NSP)	+= clk-nsp.o
+-obj-$(CONFIG_ARCH_BCM_5301X)	+= clk-nsp.o
++obj-$(CONFIG_CLK_BCM_CYGNUS)	+= clk-cygnus.o
++obj-$(CONFIG_CLK_BCM_NSP)	+= clk-nsp.o
++obj-$(CONFIG_CLK_BCM_NS2)	+= clk-ns2.o
+-- 
+1.9.1
