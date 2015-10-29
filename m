@@ -1,94 +1,76 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 29 Oct 2015 11:59:46 +0900
-Subject: [PATCH] [v2] arm64: efi: make sure vmlinux load address aligned
- on 2MB
-In-Reply-To: <20151028182139.GC26777@leverpostej>
-References: <1446053844-27281-1-git-send-email-timur@codeaurora.org>
- <20151028180836.GB26777@leverpostej>
- <56311014.9020400@codeaurora.org>
- <20151028182139.GC26777@leverpostej>
-Message-ID: <CAKv+Gu-76knWJ+ffAemeR7sBBtVB68pmZNPGQZRZKhmnd21F9A@mail.gmail.com>
+Date: Thu, 29 Oct 2015 12:22:51 +0900
+Subject: [PATCH 0/3] Revert arm64 cache geometry
+In-Reply-To: <1446068637-11509-1-git-send-email-avanbrunt@nvidia.com>
+References: <1446068637-11509-1-git-send-email-avanbrunt@nvidia.com>
+Message-ID: <CAKv+Gu-CgXU4O8SymcjmCYZqyAa0PZbJXwNqXfuCamxYY9C8GA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29 October 2015 at 03:21, Mark Rutland <mark.rutland@arm.com> wrote:
-> On Wed, Oct 28, 2015 at 01:12:36PM -0500, Timur Tabi wrote:
->> On 10/28/2015 01:08 PM, Mark Rutland wrote:
->>
->> >arm64: efi: ensure kernel is loaded at correct address
->> >
->> >The kernel image needs to be loaded text_offset_bytes from a 2M-aligned
->> >base, per Documentation/arm64/booting.txt. If loaded at the wrong offset
->> >modulo 2M, __create_page_tables will create incorrect page tables.
->> >
->> >The EFI stub implicitly assumes that dram_base (i.e. the lowest address
->> >with a EFI_MEMORY_WB attribute) is 2M-aligned, and tries to load the
->> >kernel at dram_base + TEXT_OFFSET. If dram_base is not 2M-aligned, the
->> >kernel will be loaded at the wrong offset from 2M.
->>
->> Thanks, I'll use that.  I messed up a couple other things, so I need
->> to send out a v3 anyway.
->>
->> >>-           *image_addr = *reserve_addr = dram_base + TEXT_OFFSET;
->> >>+           *image_addr = *reserve_addr =
->> >>+                   round_up(dram_base, SZ_2M) + TEXT_OFFSET;
->> >
->> >We also need to fix the test for whether we need to relocate the kernel:
->> >(*image_addr != (dram_base + TEXT_OFFSET)).
->> >
->> >When dram_base is not 2M aligned, that is broken, and it's been broken
->> >since it was introduced in commit 3c7f255039a2ad6e ("arm64: efi: add EFI
->> >stub") in v3.16.
->> >
->> >It's a bit hideous to fix the general case, though, it seems.
->>
->> Um, so I should I do something more in my v3 patch, or is this a
->> change for a different patch?
+On 29 October 2015 at 06:43, Alex Van Brunt <avanbrunt@nvidia.com> wrote:
+> This patchset reverts three patches that attempt to query the CPU for cache
+> geometry and then make use of that information. Those patches rely on the
+> NumSets and LineSize fields of CCSIDR to determine the cache geometry. However,
+> the architectural documentation for these registers forbids such use:
 >
-> I think there should be a single patch, but please hold off v3 for a day
-> or so. I think there a few more edge cases here, and I'm currently
-> investigating.
+>         The parameters NumSets, Associativity, and LineSize in these registers
+>         define the architecturally visible parameters that are required for the
+>         cache maintenance by Set/Way instructions. They are not guaranteed to
+>         represent the actual microarchitectural features of a design. You cannot
+>         make any inference about the actual sizes of caches based on these
+>         parameters.
+>
+> It is not just theoretical. For example, the Denver CPU will report one set and
+> one way in CCSIDR even though the actual microarchitectural implementation has
+> many sets and many ways.
 >
 
-Apologies for the drive-by nature of my contributions to this thread.
-I am currently travelling.
+Fair enough. It is a bit disappointing that we cannot trust these
+values, but if the architecture does not mandate their accuracy, we
+obviously should not be using them in the way that we are.
 
-I think the below should address both issues (and I even tried to
-compile it this time)
+I think we have similar code in the ARM tree, so we should probably
+make some changes there as well.
 
------------------8<-----------------
-diff --git a/arch/arm64/kernel/efi-stub.c b/arch/arm64/kernel/efi-stub.c
-index 816120ece6bc..78dfbd34b6bf 100644
---- a/arch/arm64/kernel/efi-stub.c
-+++ b/arch/arm64/kernel/efi-stub.c
-@@ -25,10 +25,20 @@
-        unsigned long kernel_size, kernel_memsize = 0;
-        unsigned long nr_pages;
-        void *old_image_addr = (void *)*image_addr;
-+       unsigned long preferred_offset;
-+
-+       /*
-+        * The preferred offset of the kernel Image is TEXT_OFFSET bytes beyond
-+        * a 2 MB aligned base, which itself may be lower than dram_base, as
-+        * long as the resulting offset equals or exceeds it.
-+        */
-+       preferred_offset = round_down(dram_base, SZ_2M) + TEXT_OFFSET;
-+       if (preferred_offset < dram_base)
-+               preferred_offset += SZ_2M;
+> I have two suggestions for how to get the cache geometry on an ARMv8 processor:
+>   1. Specify the information in the device tree. The purpose of the deivce tree
+>      is to specify information that software cannot query at run-time. Becuase
+>      the architecture does not have an architectural way to query the cache
+>      geometry this may be a good fit.
+>   2. Add a function pointer to cpu_table that gives a implementation specific
+>      way to query the cache geometry. For an A57, for example, the function
+>      could read the CCSIDR register because it happens to report the
+>      microarchitectural geometry. The Denver CPU has implementation defined
+>      registers that can be used to determine the microarchitectural geometry.
+>      However, the implementation for the default "AArch64 Processor", must
+>      return an error.
+>
+> The only place that the cache geometry is used is to determine if there can be
+> aliasing for a VIPT (virtually-indexed, physically-tagged) instruction cache.
+> The code assumes that there is no need to flush the entire instruction cache
+> if the size of a cache set is less than or equal to a page size. However, the
+> architectural definition of VIPT says "The only architecturally-guaranteed way
+> to invalidate all aliases of a physical address from a VIPT instruction cache
+> is to invalidate the entire instruction cache." Not only are the parameters not
+> guaranteed to be correct, it is explicitly not legal to ignore aliasing even if
+> the parameters were correct.
+>
 
-        /* Relocate the image, if required. */
-        kernel_size = _edata - _text;
--       if (*image_addr != (dram_base + TEXT_OFFSET)) {
-+       if (*image_addr != preferred_offset) {
-                kernel_memsize = kernel_size + (_end - _edata);
+I understand that this is subject to interpretation, but I would argue
+that this does not apply to the case where you can prove that no
+aliases could ever exist (which is the point of comparing the way size
+to the page size)
 
-                /*
-@@ -42,7 +52,7 @@
-                 * Mustang), we can still place the kernel@the address
-                 * 'dram_base + TEXT_OFFSET'.
-                 */
--               *image_addr = *reserve_addr = dram_base + TEXT_OFFSET;
-+               *image_addr = *reserve_addr = preferred_offset;
-                nr_pages = round_up(kernel_memsize, EFI_ALLOC_ALIGN) /
-                           EFI_PAGE_SIZE;
-                status = efi_call_early(allocate_pages, EFI_ALLOCATE_ADDRESS,
+
+> Alex Van Brunt (3):
+>   Revert "arm64: kernel: add support for cpu cache information"
+>   Revert "arm64: don't flag non-aliasing VIPT I-caches as aliasing"
+>   Revert "arm64: add helper functions to read I-cache attributes"
+>
+
+None of the clarifications you offer here are in the commit logs of
+the patches. Since the cover letter does not make it into the
+repository, someone looking at the commit log will not have a clue why
+these patches were reverted all of a sudden. Could you please update
+that? At the same time, could you get rid of the Change-Ids as well?
+They are meaningless in the kernel tree.
