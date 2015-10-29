@@ -1,94 +1,79 @@
-From: jonmason@broadcom.com (Jon Mason)
-Date: Thu, 29 Oct 2015 16:44:10 -0400
-Subject: [PATCH v2] clk: iproc: Make clocks visible options
-Message-ID: <1446151450-23563-1-git-send-email-jonmason@broadcom.com>
+From: dhdang@apm.com (Duc Dang)
+Date: Thu, 29 Oct 2015 14:25:32 -0700
+Subject: [PATCH V3 0/6] gicv2m: acpi: Add ACPI support for GICv2m MSI
+In-Reply-To: <1445453249-32557-1-git-send-email-Suravee.Suthikulpanit@amd.com>
+References: <1445453249-32557-1-git-send-email-Suravee.Suthikulpanit@amd.com>
+Message-ID: <CADaLNDnhn+Lax6aMseA4kPsAfKHG=L0buO6Tf-U8sxfUzn38BA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Make the clocks visible options that can be selected by anyone.  This
-avoids the problems of:
- 1) Select is a reverse dependency and is hard for people to understand
-    and can sometimes be a pain to track down
- 2) Build coverage goes down because configs are hidden
- 3) Code bloat
+Hi Suravee,
+On Wed, Oct 21, 2015 at 11:47 AM, Suravee Suthikulpanit
+<Suravee.Suthikulpanit@amd.com> wrote:
+> This patch series has been forked from the following patch series since
+> it no longer depends on the rest of the patches.
+>
+>   [PATCH v4 00/10] ACPI GIC Self-probing, GICv2m and GICv3 support
+>   https://lkml.org/lkml/2015/7/29/234
+>
+> It has been ported to use the newly introduced device fwnode_handle
+> for ACPI irqdmain introduced by Marc in the following patch series:
+>
+>   [PATCH v2 00/17] Divorcing irqdomain and device_node
+>   http://git.kernel.org/cgit/linux/kernel/git/maz/arm-platforms.git irq/irq-domain-fwnode-v2
+>
+> The following git branch contains the submitted patches along with
+> the pre-requsite patches (mainly for ARM64 PCI support for ACPI).
+>
+>   https://github.com/ssuthiku/linux.git v2m-multiframe-v3
 
-Patch suggested by Stephen Boyd
+I tried to clone your tree to test on my X-Gene platform but I didn't
+see branch v2m-multiframe-v3.
+I see similar patch set in origin/irq-domain-fwnode-v2-v2m-multiframe.
+Can you please check?
 
-Signed-off-by: Jon Mason <jonmason@broadcom.com>
----
- arch/arm/mach-bcm/Kconfig |  1 -
- drivers/clk/bcm/Kconfig   | 30 +++++++++++++++++++++++++++++-
- drivers/clk/bcm/Makefile  |  7 +++----
- 3 files changed, 32 insertions(+), 6 deletions(-)
+>
+> This has been tested on AMD Seattle (Overdrive) RevB system.
+>
+> NOTE: I have not tested ACPI GICv2m multiframe support since
+> I don't have access to such system. Any helps are appreciated.
+>
+> Thanks,
+> Suravee
+>
+> Changes from V2: (https://lkml.org/lkml/2015/10/14/1010)
+>   - Minor clean up from Tomasz review comment in patch 6/6.
+>
+> Changes from V1: (https://lkml.org/lkml/2015/10/13/859)
+>   - Rebase on top of Marc's patch to addng support for multiple MSI frames
+>     (https://lkml.org/lkml/2015/10/14/271)
+>   - Adding fwnode convenient functions (patch 3 and 4)
+>
+>
+> Suravee Suthikulpanit (6):
+>   pci: msi: Add support to query MSI domain for pci device
+>   acpi: pci: Setup MSI domain for ACPI based pci devices
+>   irqdomain: introduce is_fwnode_irqchip helper
+>   irqdomain: Introduce irq_domain_get_irqchip_fwnode_name helper
+>     function
+>   gicv2m: Refactor to prepare for ACPI support
+>   gicv2m: acpi: Introducing GICv2m ACPI support
+>
+>  drivers/irqchip/irq-gic-v2m.c   | 152 ++++++++++++++++++++++++++++++++++------
+>  drivers/irqchip/irq-gic.c       |   5 +-
+>  drivers/pci/msi.c               |  30 ++++++++
+>  drivers/pci/pci-acpi.c          |  13 ++++
+>  drivers/pci/probe.c             |   2 +
+>  include/linux/irqchip/arm-gic.h |   4 ++
+>  include/linux/irqdomain.h       |   6 ++
+>  include/linux/msi.h             |   7 ++
+>  include/linux/pci.h             |   7 ++
+>  kernel/irq/irqdomain.c          |  20 +++++-
+>  10 files changed, 223 insertions(+), 23 deletions(-)
+>
+> --
+> 2.1.0
+>
 
-diff --git a/arch/arm/mach-bcm/Kconfig b/arch/arm/mach-bcm/Kconfig
-index 679798b..cacaaec 100644
---- a/arch/arm/mach-bcm/Kconfig
-+++ b/arch/arm/mach-bcm/Kconfig
-@@ -14,7 +14,6 @@ config ARCH_BCM_IPROC
- 	select HAVE_ARM_SCU if SMP
- 	select HAVE_ARM_TWD if SMP
- 	select ARM_GLOBAL_TIMER
--	select COMMON_CLK_IPROC
- 	select CLKSRC_MMIO
- 	select ARCH_REQUIRE_GPIOLIB
- 	select ARM_AMBA
-diff --git a/drivers/clk/bcm/Kconfig b/drivers/clk/bcm/Kconfig
-index 46ee475..ad815a5 100644
---- a/drivers/clk/bcm/Kconfig
-+++ b/drivers/clk/bcm/Kconfig
-@@ -9,8 +9,36 @@ config CLK_BCM_KONA
- 	  in the BCM281xx and BCM21664 families.
- 
- config COMMON_CLK_IPROC
--	bool
-+	bool "Broadcom iProc clock support"
-+	depends on ARCH_BCM_IPROC || COMPILE_TEST
- 	depends on COMMON_CLK
-+	default ARCH_BCM_IPROC
- 	help
- 	  Enable common clock framework support for Broadcom SoCs
- 	  based on the iProc architecture
-+
-+if COMMON_CLK_IPROC
-+
-+config CLK_BCM_CYGNUS
-+	bool "Broadcom Cygnus clock support"
-+	depends on ARCH_BCM_CYGNUS || COMPILE_TEST
-+	default ARCH_BCM_CYGNUS
-+	help
-+	  Enable common clock framework support for the Broadcom Cygnus SoC
-+
-+config CLK_BCM_NSP
-+	bool "Broadcom Northstar/Northstar Plus clock support"
-+	depends on ARCH_BCM_5301X || ARCH_BCM_NSP || COMPILE_TEST
-+	default ARCH_BCM_5301X || ARCH_BCM_NSP
-+	help
-+	  Enable common clock framework support for the Broadcom Northstar and
-+	  Northstar Plus SoCs
-+
-+config CLK_BCM_NS2
-+	bool "Broadcom Northstar 2 clock support"
-+	depends on ARM64 || COMPILE_TEST
-+	default ARCH_BCM_IPROC
-+	help
-+	  Enable common clock framework support for the Broadcom Northstar 2 SoC
-+
-+endif
-diff --git a/drivers/clk/bcm/Makefile b/drivers/clk/bcm/Makefile
-index 2d1cbc5..05d5830 100644
---- a/drivers/clk/bcm/Makefile
-+++ b/drivers/clk/bcm/Makefile
-@@ -3,7 +3,6 @@ obj-$(CONFIG_CLK_BCM_KONA)	+= clk-kona-setup.o
- obj-$(CONFIG_CLK_BCM_KONA)	+= clk-bcm281xx.o
- obj-$(CONFIG_CLK_BCM_KONA)	+= clk-bcm21664.o
- obj-$(CONFIG_COMMON_CLK_IPROC)	+= clk-iproc-armpll.o clk-iproc-pll.o clk-iproc-asiu.o
--obj-$(CONFIG_COMMON_CLK_IPROC)	+= clk-ns2.o
--obj-$(CONFIG_ARCH_BCM_CYGNUS)	+= clk-cygnus.o
--obj-$(CONFIG_ARCH_BCM_NSP)	+= clk-nsp.o
--obj-$(CONFIG_ARCH_BCM_5301X)	+= clk-nsp.o
-+obj-$(CONFIG_CLK_BCM_CYGNUS)	+= clk-cygnus.o
-+obj-$(CONFIG_CLK_BCM_NSP)	+= clk-nsp.o
-+obj-$(CONFIG_CLK_BCM_NS2)	+= clk-ns2.o
--- 
-1.9.1
+Regards,
+Duc Dang.
