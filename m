@@ -1,147 +1,70 @@
-From: leo.yan@linaro.org (Leo Yan)
-Date: Thu, 29 Oct 2015 16:33:01 +0800
-Subject: [PATCH 1/4] arm64: dts: Reserve memory regions for hi6220
-In-Reply-To: <CAL_JsqLhu03B_ADYvCYdduH2d38kajOyc=9eX_FHy4QYYhZGxQ@mail.gmail.com>
-References: <1444365376-10728-1-git-send-email-leo.yan@linaro.org>
- <1444365376-10728-2-git-send-email-leo.yan@linaro.org>
- <CAL_JsqJapPM6CpaG+AYDAUQajZ4V5jREdCwA5F4vkD5jqC3bzg@mail.gmail.com>
- <20151009133028.GB21629@leverpostej>
- <CAL_Jsq+TrsS39L4nsRgqszTxKHyc00fLUf+BmftHnn=EV0PxhA@mail.gmail.com>
- <20151009142034.GB528@leoy-linaro>
- <CAL_JsqLhu03B_ADYvCYdduH2d38kajOyc=9eX_FHy4QYYhZGxQ@mail.gmail.com>
-Message-ID: <20151029083301.GB16063@leoy-linaro>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Thu, 29 Oct 2015 09:40:37 +0100
+Subject: [PATCH v8 06/17] dt-bindings: add document for analogix display
+ port driver
+In-Reply-To: <56317275.90508@rock-chips.com>
+References: <1446020143-32645-1-git-send-email-ykk@rock-chips.com>
+ <103292898.nCEg51kmfI@phil> <56317275.90508@rock-chips.com>
+Message-ID: <1689999.2MgYqJktlx@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 28, 2015 at 11:32:29PM -0500, Rob Herring wrote:
-> On Fri, Oct 9, 2015 at 9:20 AM, Leo Yan <leo.yan@linaro.org> wrote:
-> > On Fri, Oct 09, 2015 at 08:50:13AM -0500, Rob Herring wrote:
-> >> On Fri, Oct 9, 2015 at 8:30 AM, Mark Rutland <mark.rutland@arm.com> wrote:
-> >> > On Fri, Oct 09, 2015 at 08:17:16AM -0500, Rob Herring wrote:
-> >> >> On Thu, Oct 8, 2015 at 11:36 PM, Leo Yan <leo.yan@linaro.org> wrote:
-> >> >> > On Hi6220, below memory regions in DDR have specific purpose:
-> >> >> >
-> >> >> >   0x05e0,0000 - 0x05ef,ffff: For MCU firmware using at runtime;
-> >> >> >   0x06df,f000 - 0x06df,ffff: For mailbox message data;
-> >> >> >   0x0740,f000 - 0x0740,ffff: For MCU firmware's section;
-> >> >> >   0x3e00,0000 - 0x3fff,ffff: For OP-TEE.
-> >> >> >
-> >> >> > This patch reserves these memory regions in DT.
-> >> >> >
-> >> >> > Signed-off-by: Leo Yan <leo.yan@linaro.org>
-> >> >> > ---
-> >> >> >  arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts | 16 ++++++++++++----
-> >> >> >  1 file changed, 12 insertions(+), 4 deletions(-)
-> >> >> >
-> >> >> > diff --git a/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts b/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
-> >> >> > index e36a539..e3f4cb3 100644
-> >> >> > --- a/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
-> >> >> > +++ b/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
-> >> >> > @@ -7,9 +7,6 @@
-> >> >> >
-> >> >> >  /dts-v1/;
-> >> >> >
-> >> >> > -/*Reserved 1MB memory for MCU*/
-> >> >> > -/memreserve/ 0x05e00000 0x00100000;
-> >> >> > -
-> >> >>
-> >> >> Why does memreserve not work for you? You can have multiple entries.
-> >> >>
-> >> >> >  #include "hi6220.dtsi"
-> >> >> >
-> >> >> >  / {
-> >> >> > @@ -24,8 +21,19 @@
-> >> >> >                 stdout-path = "serial0:115200n8";
-> >> >> >         };
-> >> >> >
-> >> >> > +       /*
-> >> >> > +        * Reserve below regions from memory node:
-> >> >> > +        *
-> >> >> > +        *  - 0x05e0,0000 - 0x05ef,ffff: MCU firmware runtime using
-> >> >> > +        *  - 0x06df,f000 - 0x06df,ffff: Mailbox message data
-> >> >> > +        *  - 0x0740,f000 - 0x0740,ffff: MCU firmware section
-> >> >> > +        *  - 0x3e00,0000 - 0x3fff,ffff: OP-TEE
-> >> >> > +        */
-> >> >> >         memory at 0 {
-> >> >> >                 device_type = "memory";
-> >> >> > -               reg = <0x0 0x0 0x0 0x40000000>;
-> >> >> > +               reg = <0x00000000 0x00000000 0x00000000 0x05e00000>,
-> >> >> > +                     <0x00000000 0x05f00000 0x00000000 0x00eff000>,
-> >> >> > +                     <0x00000000 0x06e00000 0x00000000 0x0060f000>,
-> >> >> > +                     <0x00000000 0x07410000 0x00000000 0x36bf0000>;
-> >> >>
-> >> >> No, don't do this. Please use memreserve or reserved-memory binding[1]
-> >> >> or combination of both. Probably reserved-memory if you need the
-> >> >> kernel to access some of these regions.
-> >> >
-> >> > I disagree at least for those portions owned by the secure world. The
-> >> > kernel shouldn't map those at all, so memreserve isn't appropriate. That
-> >> > covers OP-TEE and the MCU firmware regions, and I'd expec the EFI memory
-> >> > map to not list those as available to the kernel.
-> >>
-> >> I'm fine carving out the beginning or end, but otherwise think memory
-> >> should correspond to the physical memory. We have a way to describe
-> >> holes to keep out, so we should use them. If secure world uses the DT,
-> >> then it would either want to know its region in memory or add the DT
-> >> data to say what it is using. We need that to be easy to find or easy
-> >> to set, respectively. The size secure world needs could vary as well.
-> >>
-> >> The fact that the kernel maps the memory is the kernel's problem, not
-> >> a DT problem.
-> >>
-> >
-> > Just give more input here. In previous time, we have long discussion [1];
-> > So actually your suggestion is exactly same what my old patch.
-> >
-> > From previous discussion, i think here have an assumtion: Use UEFI as
-> > bootloader, the kernel will ignore (or remove) memreserve and reserved-memory
-> > nodes, so just like Mark said "the EFI memory map to not list those
-> > as available to the kernel". My new patch is just to follow this and
-> > also make sure they have same behavior for different bootloader
-> > (between UEFI and uboot).
+Am Donnerstag, 29. Oktober 2015, 09:12:21 schrieb Yakir Yang:
+> Hi Heiko,
 > 
-> I've read thru the thread and see 2 main conclusions. Using
-> reserved-memory is problematic since things like grub don't support
-> that. That is fine and we should stick with /mem-reserve/ for now.
+> On 10/29/2015 04:02 AM, Heiko Stuebner wrote:
+> > Hi Yakir,
+> >
+> > Am Mittwoch, 28. Oktober 2015, 16:26:33 schrieb Yakir Yang:
+> >> diff --git a/Documentation/devicetree/bindings/display/exynos/exynos_dp.txt b/Documentation/devicetree/bindings/display/exynos/exynos_dp.txt
+> >> index 7a3a9cd..9905081 100644
+> >> --- a/Documentation/devicetree/bindings/display/exynos/exynos_dp.txt
+> >> +++ b/Documentation/devicetree/bindings/display/exynos/exynos_dp.txt
+> >> @@ -31,45 +31,31 @@ Required properties for dp-controller:
+> >>   		from general PHY binding: the phandle for the PHY device.
+> >>   	-phy-names:
+> >>   		from general PHY binding: Should be "dp".
+> >> -	-samsung,color-space:
+> >> -		input video data format.
+> >> -			COLOR_RGB = 0, COLOR_YCBCR422 = 1, COLOR_YCBCR444 = 2
+> >> -	-samsung,dynamic-range:
+> >> -		dynamic range for input video data.
+> >> -			VESA = 0, CEA = 1
+> >> -	-samsung,ycbcr-coeff:
+> >> -		YCbCr co-efficients for input video.
+> >> -			COLOR_YCBCR601 = 0, COLOR_YCBCR709 = 1
+> >> -	-samsung,color-depth:
+> >> -		number of bits per colour component.
+> >> -			COLOR_6 = 0, COLOR_8 = 1, COLOR_10 = 2, COLOR_12 = 3
+> >> -	-samsung,link-rate:
+> >> -		link rate supported by the panel.
+> >> -			LINK_RATE_1_62GBPS = 0x6, LINK_RATE_2_70GBPS = 0x0A
+> >> -	-samsung,lane-count:
+> >> -		number of lanes supported by the panel.
+> >> -			LANE_COUNT1 = 1, LANE_COUNT2 = 2, LANE_COUNT4 = 4
+> >> -	- display-timings: timings for the connected panel as described by
+> >> -		Documentation/devicetree/bindings/video/display-timing.txt
+> > 											^^ display/display-timings.txt
+> > otherwise this patch does not apply.
+> 
+> I thought I have deleted this old path of "display-timing.txt", and 
+> changed it to
+> 
+> -		Documentation/devicetree/bindings/video/display-timing.txt
 
-Thanks for reviewing, Rob.
+in the changes I got from Rob Hering's dt-branch [0] the path in the file
+is already display/display-timing.txt so applying a change with video/...
+in it fails. Anyway, as this will probably only make it in after the merge-
+window, we can see how this ends up before anyway :-) .
 
-One thing should note: after booting with UEFI, /memreserve/ nodes
-will be deleted by UEFI stub; and _ONLY_ can use /reserved-memory/
-node to reserve memory regions.
+> 
+> +		Documentation/devicetree/bindings/display/panel/display-timing.txt
+> 
+> And the real path of "display-timing.txt" in linux-next [tag 20151022] 
+> do under
+> the "display/panel/", those change should be right.
 
-Ard have another patch [1], after applied this patch, then all
-/memreserve/ nodes and /reserved-memory/ nodes nodes will be ignored
-to scan after booting with UEFI stub.
 
-This is make sense, that means UEFI need provide exactly correct memory
-map info by self and totally not depend on DT structures.
+Heiko
 
-Another minor difference between /memreserve/ node and /reserved-memory/
-node is: we can add property "no-map" for /reserved-memory/; so that
-means it will totally remove region from memory block. it's more safe
-for the memory region will NOT be mapped twice with different mapping
-attribution.
-
-[1] http://archive.arm.linux.org.uk/lurker/message/20150922.002128.46757034.en.html
-
-> The other thing is the desire to have the memory presented to the kernel
-> be the same whether it comes from UEFI or DT structures. I can see why
-> there is some desire to have that alignment, but that doesn't really
-> buy us anything. We can't eliminate some code path in the kernel doing
-> so. So I still think that the memory node should reflect all of memory
-> as defined by the h/w and mem-reserve should be used for any software
-> defined reserved regions.
-
-i think before we engaged much thinking for UEFI, that's meaningful for
-we found what's correct implementation for UEFI. We need make sure UEFI
-will do correct thing for itself.
-
-If only consider purly from DT's usage, i have no strong opinion to
-stick to use memory node to carve memory regions out. It's okay for me to
-go back to use /reserved-memory/ to reserved regions.
-
-Mark, do you agree with this?
-
-Thanks,
-Leo Yan
+[0] https://git.kernel.org/cgit/linux/kernel/git/robh/linux.git/commit/?h=dt/next&id=efdbd7345f8836f7495f3ac6ee237d86cb3bb6b0
