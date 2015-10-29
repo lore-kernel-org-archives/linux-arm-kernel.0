@@ -1,129 +1,47 @@
-From: eric@anholt.net (Eric Anholt)
-Date: Thu, 29 Oct 2015 12:02:24 -0700
-Subject: [RFC] rpi: add support to enable usb power domain
-In-Reply-To: <1446064810-5064-1-git-send-email-alex.aring@gmail.com>
-References: <1446064810-5064-1-git-send-email-alex.aring@gmail.com>
-Message-ID: <87a8r1pkfz.fsf@eliezer.anholt.net>
+From: dan.j.williams@intel.com (Dan Williams)
+Date: Thu, 29 Oct 2015 13:08:51 -0700
+Subject: [GIT PULL] memremap fix for 4.3
+In-Reply-To: <20151029170950.GP8644@n2100.arm.linux.org.uk>
+References: <1446105610.23766.17.camel@intel.com>
+ <20151029170950.GP8644@n2100.arm.linux.org.uk>
+Message-ID: <CAPcyv4izsS-qj2eeMB1cpJmFMwbtPXBG_QeGVB-O44vEHnptOg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Alexander Aring <alex.aring@gmail.com> writes:
+On Thu, Oct 29, 2015 at 10:09 AM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Thu, Oct 29, 2015 at 08:00:13AM +0000, Williams, Dan J wrote:
+>> Hi Linus, please pull from:
+>>
+>>   git://git.kernel.org/pub/scm/linux/kernel/git/nvdimm/nvdimm libnvdimm-fixes
+>>
+>> ...to receive a small fixlet for 4.3.
+>>
+>> The new memremap() api introduced in the 4.3 cycle to unify/replace
+>> ioremap_cache() and ioremap_wt() is mishandling the highmem case.  This
+>> patch has received a build success notification from a 0day-kbuild-robot
+>> run and has been out for a review for a day.  Russell has not had a
+>> chance to weigh in on it yet.
+>
+> Oh, was this merged for 4.3-rc1?  I haven't noticed any problems if it
+> has.
+>
+>> I do not think the usage of kmap is strictly necessary as we should be
+>> able to fall back to ioremap_cache(), but I include it for two reasons:
+>>
+>> 1/ ARM ioremap() will WARN if passed a pfn_valid() address.
+>
+> We don't support ioremap() on system RAM on ARM, period.  That's because
+> ioremap() sets up page tables with incompatible attributes compared to
+> those which are/will be setup by the lowmem/kmap* mappings, which leads
+> to "unpredictable" behaviour.
+>
+> The only time RAM is mappable with ioremap() is if it's stolen from the
+> kernel at boot time, which prevents the kernel from managing it and
+> setting up memory-like mappings.
+>
 
-> This patch adds support for RPi several Power Domains and enable support
-> to enable the USB Power Domain when it's not enabled before.
->
-> This patch based on Eric Anholt's patch to support Power Domains. He had
-> an issue about -EPROBE_DEFER inside the power domain subsystem, this
-> issue was solved by commit <311fa6a> ("PM / Domains: Return -EPROBE_DEFER
-> if we fail to init or turn-on domain").
->
-> It was tested with barebox and the following scripts before booting
-> linux:
->
-> /env/a_off:
->
->  # cat /env/a_off
->  #turn off which are enabled by default
->  regulator -n bcm2835_mci0 -s disable
->  regulator -n uart0-pl0110 -s disable
->
-> /env/a_on:
->
->  # cat /env/a_on
->  #turn off which are enabled by default
->  regulator -n bcm2835_mci0 -s disable
->  regulator -n uart0-pl0110 -s disable
->
->  regulator -n bcm2835_mci0 -s enable
->  regulator -n uart0-pl0110 -s enable
->  regulator -n uart0-pl0111 -s enable
->  regulator -n bcm2835_usb -s enable
->  regulator -n bcm2835_i2c0 -s enable
->  regulator -n bcm2835_i2c1 -s enable
->  regulator -n bcm2835_i2c2 -s enable
->  regulator -n bcm2835_spi -s enable
->  regulator -n bcm2835_ccp2tx -s enable
->  regulator -n bcm2835_dsi -s enable
->
-> /env/b:
->
->  # cat /env/b
->  sh /env/a_on
->
->  regulator -n bcm2835_mci0 -s disable
->  regulator -n uart0-pl0110 -s disable
->  regulator -n uart0-pl0111 -s disable
->  regulator -n bcm2835_usb -s disable
->  regulator -n bcm2835_i2c0 -s disable
->  regulator -n bcm2835_i2c1 -s disable
->  regulator -n bcm2835_i2c2 -s disable
->  regulator -n bcm2835_spi -s disable
->  regulator -n bcm2835_ccp2tx -s disable
->  regulator -n bcm2835_dsi -s disable
->
-> /env/c:
->
->  # cat /env/c
->  sh ./env/b
->
->  regulator -n bcm2835_mci0 -s enable
->  regulator -n uart0-pl0110 -s enable
->  regulator -n uart0-pl0111 -s enable
->  regulator -n bcm2835_usb -s enable
->  regulator -n bcm2835_i2c0 -s enable
->  regulator -n bcm2835_i2c1 -s enable
->  regulator -n bcm2835_i2c2 -s enable
->  regulator -n bcm2835_spi -s enable
->  regulator -n bcm2835_ccp2tx -s enable
->  regulator -n bcm2835_dsi -s enable
->
-> These scripts enables/disable all regulators inside the bootloader. It
-> was running with a "hard" and "soft" reset without any issues. These
-> testcases should fit to Stephen Warren suggestions:
->
-> "(a) before having explicitly turned the power domain on or off at all (b)
-> after having turned it on (c) after having turned it off, and for all
-> power domains."
->
-> Cc: Stephen Warren <swarren@wwwdotorg.org>
-> Cc: Lee Jones <lee@kernel.org>
-> Cc: Eric Anholt <eric@anholt.net>
-> Cc: Andy Whitcroft <apw@canonical.com>
-> Cc: Joe Perches <joe@perches.com>
-> Signed-off-by: Alexander Aring <alex.aring@gmail.com>
-> ---
-> First:
-> I cc'ed Andy Whitcroft and Joe Perches here, because this patch will
-> generate a false positive for checkpatch and checkpatch told me to
-> cc checkpatch maintainers if this occurs:
->
-> ERROR: Macros with complex values should be enclosed in parentheses
-> #191: FILE: drivers/firmware/raspberrypi.c:26:
-> +#define RPI_POWER_DOMAIN(_domain, _name)			\
-> +	[_domain] =						\
-> +	{							\
-> ...
->
-> Second:
-> This patch based on linus/master and requires the rpi-firmware patch.
->
-> Third:
-> The barebox regulator doesn't support right now to enable/disable
-> regulators at runtime but I want to bring this mainline in the next
-> days. So you can't check yourself if the above scripts working right
-> now. I describe it here to show you what exactly I tested.
->
-> changes since Eric Anholts "power domain" patch:
->  - add for me all known power domains of the RPi, it contains the domains
->    0 - 9.
-
-Note: None of the power domain enums other than the ones I'd had in my
-patch are actually connected to anything in the firmware.  I don't think
-we should be adding them, given that.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 818 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151029/433f6e15/attachment.sig>
+Ok, I read that as: "if someone calls memremap() on a 'System RAM'
+address on ARM and we can't find the kernel linear address then just
+pass it through to arch level remap code where it should rightly
+WARN."  I'll reflow the patch with that change.
