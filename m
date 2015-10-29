@@ -1,46 +1,139 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Thu, 29 Oct 2015 16:17:20 +0000
-Subject: [PATCH] get_maintainer: Add subsystem to reviewer output
-In-Reply-To: <1446128049.2757.165.camel@perches.com>
-References: <20151028093907.GP4931@pengutronix.de> <20151028095524.GP5828@x1>
- <5630CA06.7050503@samsung.com>
- <1446050506.2757.109.camel@perches.com> <20151028170116.GI4058@x1>
- <1446052121.2757.120.camel@perches.com> <20151028172208.GJ4058@x1>
- <1446053411.2757.131.camel@perches.com> <20151028174932.GK4058@x1>
- <1446054996.2757.139.camel@perches.com> <20151029092007.GN4058@x1>
- <1446128049.2757.165.camel@perches.com>
-Message-ID: <CAF2Aj3hFTE6x4NLoSt08WF4w3d8rLHyG-47c45-y95+pKhBhLQ@mail.gmail.com>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Thu, 29 Oct 2015 12:20:45 -0400
+Subject: [PATCH V1 11/11] arm64, pci, acpi: Support for ACPI based PCI
+ hostbridge init
+In-Reply-To: <563240F6.2060209@semihalf.com>
+References: <1445963922-22711-1-git-send-email-tn@semihalf.com>
+ <1445963922-22711-12-git-send-email-tn@semihalf.com>
+ <5631180D.2000902@codeaurora.org> <563131B0.9060305@codeaurora.org>
+ <56320538.6000905@semihalf.com> <563234E6.4050109@codeaurora.org>
+ <563240F6.2060209@semihalf.com>
+Message-ID: <5632475D.8020900@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 29 October 2015 at 14:14, Joe Perches <joe@perches.com> wrote:
-> On Thu, 2015-10-29 at 09:20 +0000, Lee Jones wrote:
->> On Wed, 28 Oct 2015, Joe Perches wrote:
->
->> > An issue for that will be how multiple subsystem section matching
->> > affects the output for reviewers who are also maintainers.
->>
->> I think that's okay, becuase the 'MAINTAINERS tag' will be different.
->>
->> As an example:
->>
->>   Lee Jones <lee.jones@linaro.org> (supporter:DRIVER SUBSYSTEM)
->>   Lee Jones <lee.jones@linaro.org> (reviewer:VENDOR DRIVER NAME)
->
-> I'm pretty sure I know a little more about the
-> behavior of the get_maintainers script than you do.
 
-Instead of this childishness, I'm guessing what you meant to say was;
-unfortunately the current behaviour of the script is such that, if a
-person is marked as a Reviewer and a Maintainer, the final one
-mentioned in MAINTAINERS will take precedence over each of the others.
-In other words, only one (the final) reference will be printed.
 
-If so, thanks Joe that's informative, and yes, I can see how that
-might cause issues in some cases.
+On 10/29/2015 11:53 AM, Tomasz Nowicki wrote:
+> On 29.10.2015 16:01, Sinan Kaya wrote:
+>>
+>>
+>> On 10/29/2015 7:38 AM, Tomasz Nowicki wrote:
+>>> On 28.10.2015 21:36, Sinan Kaya wrote:
+>>>> 1. ACPI code is unable to discover the interrupt numbers when objects
+>>>> are ordered as follows in the ACPI file
+>>>>
+>>>> PNP0A08 object
+>>>> PNP0C0F INTA object
+>>>> PNP0C0F INTB object
+>>>> PNP0C0F INTC object
+>>>> PNP0C0F INTD object
+>>>>
+>>>> This gives me invalid link context error.
+>>>>
+>>>> pci 0000:00:00.0: PCI INT A: no GSI
+>>>> pci 0000:01:00.0: Derived GSI for 0000:01:00.0 INT A from 0000:00:00.0
+>>>> acpi PNP0C0F:00: Invalid link context
+>>>>
+>>>> If I order it like this in the ACPI file,
+>>>>
+>>>> PNP0C0F INTA object
+>>>> PNP0C0F INTB object
+>>>> PNP0C0F INTC object
+>>>> PNP0C0F INTD object
+>>>> PNP0A08 object
+>>>>
+>>>> then, the legacy interrupt numbers can be discovered properly.
+>>>
+>>> Can you show full content of your PNP0C0F and PNP0A08 objects?
+>>>
+>>
+>> ACPI table is considered proprietary. I don't think I can get the legal
+>> approval in time. I can give you pieces though.
+>>
+>> Here is the _PRT
+>> Device (PCI0) { // PCIe port 0
+>>      Name(_HID, EISAID("PNP0A08"))    // PCI express
+>>      Name(_CID, EISAID("PNP0A03"))    // Compatible PCI Root Bridge
+>> {
+>>      ....
+>>      Name(_PRT, Package(){
+>>          Package(){0x0FFFF, 0, \_SB.LN0A, 0},  // Slot 0, INTA
+>>          Package(){0x0FFFF, 1, \_SB.LN0B, 0},  // Slot 0, INTB
+>>          Package(){0x0FFFF, 2, \_SB.LN0C, 0},  // Slot 0, INTC
+>>          Package(){0x0FFFF, 3, \_SB.LN0D, 0}   // Slot 0, INTD
+>>      })
+>> }
+>>
+>> Here is the PNP0C0F
+>>
+>> Device(LN0A){
+>>      Name(_HID, EISAID("PNP0C0F")) // PCI interrupt link
+>>      Name(_UID, 1)
+>>      Name(_PRS, ResourceTemplate(){
+>>      Interrupt(ResourceProducer, Level, ActiveHigh, Exclusive, , ,)
+>> {0xE8}
+>>      })
+>>      Method(_DIS) {}
+>>      Method(_CRS) { Return (_PRS) }
+>>      Method(_SRS, 1) {}
+>> }
+>>
+>
+> Can you please apply patch below:
+>
+> diff --git a/arch/arm64/kernel/pci.c b/arch/arm64/kernel/pci.c
+> index fec1c91..fe34415 100644
+> --- a/arch/arm64/kernel/pci.c
+> +++ b/arch/arm64/kernel/pci.c
+> @@ -48,10 +48,19 @@ resource_size_t pcibios_align_resource(void *data,
+> const struct resource *res,
+>    */
+>   int pcibios_enable_device(struct pci_dev *dev, int mask)
+>   {
+> +       int ret;
+> +
+>          if (pci_has_flag(PCI_PROBE_ONLY))
+>                  return 0;
+>
+> -       return pci_enable_resources(dev, mask);
+> +       ret = pci_enable_resources(dev, mask);
+> +       if (ret < 0)
+> +               return ret;
+> +#ifdef CONFIG_ACPI
+> +       if (!dev->msi_enabled)
+> +               return acpi_pci_irq_enable(dev);
+> +#endif
+> +       return 0;
+>   }
+>
+>   /*
+> @@ -61,10 +70,6 @@ int pcibios_add_device(struct pci_dev *dev)
+>   {
+>          if (acpi_disabled)
+>                  dev->irq = of_irq_parse_and_map_pci(dev, 0, 0);
+> -#ifdef CONFIG_ACPI
+> -       else
+> -               acpi_pci_irq_enable(dev);
+> -#endif
+>
+>          return 0;
+>   }
+>
+> and let me know if the order still matter?
+>
+> Regards,
+> Tomasz
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+
+Thanks,
+This seems to have fixed the ACPI table order problem.
 
 -- 
-Lee Jones
-Linaro ST Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Sinan Kaya
+Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a 
+Linux Foundation Collaborative Project
