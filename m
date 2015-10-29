@@ -1,110 +1,78 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 29 Oct 2015 11:38:50 +0000
-Subject: [PATCH v1] Ftrace: arm/arm64: Define a new arm/arm64 trace clock
- source based on CNTPCT/CNTPCT_EL0 register.
-In-Reply-To: <CABHD4K-KugtaLvc98wEMWm0iN_3v=d2UYkSmpSMCX91s-EAnhg@mail.gmail.com>
-References: <1445854558-16253-1-git-send-email-amittomer25@gmail.com>
- <20151028124726.GD25451@leverpostej>
- <CABHD4K-KugtaLvc98wEMWm0iN_3v=d2UYkSmpSMCX91s-EAnhg@mail.gmail.com>
-Message-ID: <20151029113849.GC28221@leverpostej>
+From: will.deacon@arm.com (Will Deacon)
+Date: Thu, 29 Oct 2015 11:40:05 +0000
+Subject: [PATCH 0/3] Revert arm64 cache geometry
+In-Reply-To: <1446068637-11509-1-git-send-email-avanbrunt@nvidia.com>
+References: <1446068637-11509-1-git-send-email-avanbrunt@nvidia.com>
+Message-ID: <20151029114005.GB389@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[adding Marc and Christoffer]
+Hi Alex,
 
-On Thu, Oct 29, 2015 at 12:32:51AM +0530, Amit Tomer wrote:
-> On Wed, Oct 28, 2015 at 6:17 PM, Mark Rutland <mark.rutland@arm.com> wrote:
-> > On Mon, Oct 26, 2015 at 03:45:58PM +0530, Amit wrote:
-> >> From: Amit Singh Tomar <amittomer25@gmail.com>
-> >>
-> >> Define new arm/arm64 specific trace clock using CNTPCT/CNTPCT_EL0 register,
-> >> similar to x86-tsc. It can be used to correlate trace events across
-> >> hosts and guest that can be useful for debugging purpose.
-> >>
-> >> Signed-off-by: Amit Singh Tomar <amittomer25@gmail.com>
-> >> ---
-> >> Changes since RFC:
-> >>       * Replaced define with static inline
-> >>       * Revert few changes done in ftrace.txt
-> >>       * Made it common between ARM and ARM64.
-> >> ---
-> >>  Documentation/trace/ftrace.txt       | 12 ++++++++++++
-> >>  arch/arm/include/asm/Kbuild          |  1 -
-> >>  arch/arm/include/asm/trace_clock.h   | 21 +++++++++++++++++++++
-> >>  arch/arm/kernel/Makefile             |  2 ++
-> >>  arch/arm/kernel/trace_clock.c        | 33 +++++++++++++++++++++++++++++++++
-> >>  arch/arm64/include/asm/Kbuild        |  1 -
-> >>  arch/arm64/include/asm/trace_clock.h | 21 +++++++++++++++++++++
-> >>  arch/arm64/kernel/Makefile           |  2 ++
-> >>  8 files changed, 91 insertions(+), 2 deletions(-)
-> >>  create mode 100644 arch/arm/include/asm/trace_clock.h
-> >>  create mode 100644 arch/arm/kernel/trace_clock.c
-> >>  create mode 100644 arch/arm64/include/asm/trace_clock.h
-> >>
-> >> diff --git a/Documentation/trace/ftrace.txt b/Documentation/trace/ftrace.txt
-> >> index ef621d3..13f3737 100644
-> >> --- a/Documentation/trace/ftrace.txt
-> >> +++ b/Documentation/trace/ftrace.txt
-> >> @@ -351,6 +351,18 @@ of ftrace. Here is a list of some of the key files:
-> >>                 to correlate events across hypervisor/guest if
-> >>                 tb_offset is known.
-> >>
-> >> +      arm-pct: This uses ARM Physical Count register value.This
-> >> +               is different from default "local" clock which
-> >> +               usese Virtual Count register.This is consistent
-> >> +               across processors and can be used to correlate
-> >> +               events across host/guest.
-> >> +
-> >> +      arm64-pct: This uses ARM64 Physical Timer Count register
-> >> +                   value. This is different from default "local"
-> >> +                   clock which usese Virtual Timer Count register.
-> >> +                   This is consistent across processors and can be
-> >> +                   used to correlate events across host/guest.
-> >
-> > The above is wrong. Both the physical and virtual counters have the same
-> > guarantees w.r.t. consistency across CPUs for the same VM image. Neither
-> > is more local than the other.
+Thanks for describing the problem in depth here. I'm not at all happy
+about the conclusion, but you're right and thanks for the report.
+Minor comments below.
+
+On Wed, Oct 28, 2015 at 02:43:54PM -0700, Alex Van Brunt wrote:
+> This patchset reverts three patches that attempt to query the CPU for cache
+> geometry and then make use of that information. Those patches rely on the
+> NumSets and LineSize fields of CCSIDR to determine the cache geometry. However,
+> the architectural documentation for these registers forbids such use:
 > 
-> I never said virtual counters are not consistent across CPU's but pointed out
-> that Values of Virtual counter seen by host and guest are
-> different(but even in Host context
-
-Ok.
-
-> I have seen VCT is not exactly equal to PCT).
-
-That should only be the case when running a guest (or running at hyp).
-
-Accross CPUS, CNTVCT should be consistent for the same OS image (i.e.
-those CPUs in the same VM will have the same value at the same point in
-time).
-
-> > In the host you will have access to CNTVOFF, so you can use that to
-> > correlate the virtual counter.
+> 	The parameters NumSets, Associativity, and LineSize in these registers
+> 	define the architecturally visible parameters that are required for the
+> 	cache maintenance by Set/Way instructions. They are not guaranteed to
+> 	represent the actual microarchitectural features of a design. You cannot
+> 	make any inference about the actual sizes of caches based on these
+> 	parameters.
 > 
-> I don't think CNTVOFF can be accessible from normal el1 host code and
-> do you think reading it from el2 and then feed it to virtual counter
-> is good idea?
-
-There are KVM APIs for acquring and configuring CNTVOFF for the guest.
-The host kernel knows what the virtual offset is.
-
-You could even configure the offset to be zero if you wanted, which
-would make the guest and host virtual counters uniform.
-
-> > Additionally, it's not safe to read the physical counter register unless
-> > you know that access has not been denied by the hypervisor; so any Linux
-> > image not booted at hyp cannot use this. If the hypervisor emulates the
-> > access, it will also be horrifically slow.
+> It is not just theoretical. For example, the Denver CPU will report one set and
+> one way in CCSIDR even though the actual microarchitectural implementation has
+> many sets and many ways.
 > 
-> Sorry but are you saying if kernel doesn't boot in HYP mode , I have no way to
-> read Physical counter in Guest?
+> I have two suggestions for how to get the cache geometry on an ARMv8 processor:
+>   1. Specify the information in the device tree. The purpose of the deivce tree
+>      is to specify information that software cannot query at run-time. Becuase
+>      the architecture does not have an architectural way to query the cache
+>      geometry this may be a good fit.
+>   2. Add a function pointer to cpu_table that gives a implementation specific
+>      way to query the cache geometry. For an A57, for example, the function
+>      could read the CCSIDR register because it happens to report the
+>      microarchitectural geometry. The Denver CPU has implementation defined
+>      registers that can be used to determine the microarchitectural geometry.
+>      However, the implementation for the default "AArch64 Processor", must
+>      return an error.
+> 
+> The only place that the cache geometry is used is to determine if there can be
+> aliasing for a VIPT (virtually-indexed, physically-tagged) instruction cache.
+> The code assumes that there is no need to flush the entire instruction cache
+> if the size of a cache set is less than or equal to a page size. However, the
+> architectural definition of VIPT says "The only architecturally-guaranteed way
+> to invalidate all aliases of a physical address from a VIPT instruction cache
+> is to invalidate the entire instruction cache." Not only are the parameters not
+> guaranteed to be correct, it is explicitly not legal to ignore aliasing even if
+> the parameters were correct.
 
-Regardless of the host, you cannot know whether it is safe to access
-in a guest. It could bring down the system.
+This is useful detail -- can you include it in the relevant commit messages
+too, please? You can also drop the ChangeId tags and probably add Cc:
+<stable@vger.kernel.org> tags as well.
 
-The host kernel could safely access the physical counter were it booted
-at EL2, because it could grant itself access.
+We should also add a comment to the I-cache aliasing code to state why
+we always nuke the entire I-cache, so that we don't "optimise" it again
+in the future!
 
-Thanks,
-Mark.
+My final concern is how this impacts userspace parsing
+/sys/devices/system/cpu/cpuX/cache/*. Do we need to stub that out with
+dummy values and extend the device-tree properties to allow inner-cache
+geometry to be described? I worry that simply removing the files under
+there could break more than it solves.
+
+Perhaps the right solution is to leave the cacheinfo code as-is and extend
+it so that it prefers to use DT, falling back to the registers if the
+properties are absent? That matches up with our treatment of MPIDR for
+topology too and reduces the risk of breaking any existing software.
+
+Patch 2 and 3 look fine as straight reverts, though (module my previous
+comments about commit messages).
+
+Will
