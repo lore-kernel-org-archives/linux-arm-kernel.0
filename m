@@ -1,33 +1,44 @@
 From: nicola@corna.info (Nicola Corna)
-Date: Thu, 29 Oct 2015 12:34:23 +0100
-Subject: [PATCH v2 1/5] i2c: add i2c quirk flag for unsupported clock
- stretching
-In-Reply-To: <1445976718-7449-1-git-send-email-nicola@corna.info>
+Date: Thu, 29 Oct 2015 12:34:24 +0100
+Subject: [PATCH v2 2/5] i2c: add I2C_AQ_NO_CLK_STRETCH to i2c-algo-bit.c
+In-Reply-To: <1446118467-26453-1-git-send-email-nicola@corna.info>
 References: <1445976718-7449-1-git-send-email-nicola@corna.info>
-Message-ID: <1446118467-26453-1-git-send-email-nicola@corna.info>
+ <1446118467-26453-1-git-send-email-nicola@corna.info>
+Message-ID: <1446118467-26453-2-git-send-email-nicola@corna.info>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add I2C_AQ_NO_CLK_STRETCH quirk flag, to be used when clock stretching is
-not supported.
+Add I2C_AQ_NO_CLK_STRETCH to drivers/i2c/algos/i2c-algo-bit.c when getscl
+is not available.
 
 Signed-off-by: Nicola Corna <nicola@corna.info>
 ---
- include/linux/i2c.h | 2 ++
- 1 file changed, 2 insertions(+)
+ drivers/i2c/algos/i2c-algo-bit.c | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
-diff --git a/include/linux/i2c.h b/include/linux/i2c.h
-index 768063b..9697002 100644
---- a/include/linux/i2c.h
-+++ b/include/linux/i2c.h
-@@ -493,6 +493,8 @@ struct i2c_adapter_quirks {
- /* convenience macro for typical write-then read case */
- #define I2C_AQ_COMB_WRITE_THEN_READ	(I2C_AQ_COMB | I2C_AQ_COMB_WRITE_FIRST | \
- 					 I2C_AQ_COMB_READ_SECOND | I2C_AQ_COMB_SAME_ADDR)
-+/* clock stretching is not supported */
-+#define I2C_AQ_NO_CLK_STRETCH		BIT(4)
+diff --git a/drivers/i2c/algos/i2c-algo-bit.c b/drivers/i2c/algos/i2c-algo-bit.c
+index 899bede..9d233bb 100644
+--- a/drivers/i2c/algos/i2c-algo-bit.c
++++ b/drivers/i2c/algos/i2c-algo-bit.c
+@@ -617,6 +617,10 @@ const struct i2c_algorithm i2c_bit_algo = {
+ };
+ EXPORT_SYMBOL(i2c_bit_algo);
  
++const struct i2c_adapter_quirks i2c_bit_quirk_no_clk_stretch = {
++	.flags = I2C_AQ_NO_CLK_STRETCH,
++};
++
  /*
-  * i2c_adapter is the structure used to identify a physical i2c bus along
+  * registering functions to load algorithms at runtime
+  */
+@@ -635,6 +639,8 @@ static int __i2c_bit_add_bus(struct i2c_adapter *adap,
+ 	/* register new adapter to i2c module... */
+ 	adap->algo = &i2c_bit_algo;
+ 	adap->retries = 3;
++	if (bit_adap->getscl == NULL)
++		adap->quirks = &i2c_bit_quirk_no_clk_stretch;
+ 
+ 	ret = add_adapter(adap);
+ 	if (ret < 0)
 -- 
 2.6.1
