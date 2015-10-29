@@ -1,136 +1,119 @@
 From: jens.wiklander@linaro.org (Jens Wiklander)
-Date: Thu, 29 Oct 2015 09:21:26 +0100
-Subject: [PATCH v6 4/6] tee: generic TEE subsystem
+Date: Thu, 29 Oct 2015 09:21:27 +0100
+Subject: [PATCH v6 5/6] tee: add OP-TEE driver
 In-Reply-To: <1446106888-8983-1-git-send-email-jens.wiklander@linaro.org>
 References: <1446106888-8983-1-git-send-email-jens.wiklander@linaro.org>
-Message-ID: <1446106888-8983-5-git-send-email-jens.wiklander@linaro.org>
+Message-ID: <1446106888-8983-6-git-send-email-jens.wiklander@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Initial patch for generic TEE subsystem.
-This subsystem provides:
-* Registration/un-registration of TEE drivers.
-* Shared memory between normal world and secure world.
-* Ioctl interface for interaction with user space.
-* Sysfs implementation_id of TEE driver
+Adds a OP-TEE driver which also can be compiled as a loadable module.
 
-A TEE (Trusted Execution Environment) driver is a driver that interfaces
-with a trusted OS running in some secure environment, for example,
-TrustZone on ARM cpus, or a separate secure co-processor etc.
-
-The TEE subsystem can serve a TEE driver for a Global Platform compliant
-TEE, but it's not limited to only Global Platform TEEs.
-
-This patch builds on other similar implementations trying to solve
-the same problem:
-* "optee_linuxdriver" by among others
-  Jean-michel DELORME<jean-michel.delorme@st.com> and
-  Emmanuel MICHEL <emmanuel.michel@st.com>
-* "Generic TrustZone Driver" by Javier Gonz?lez <javier@javigon.com>
+* Targets ARM and ARM64
+* Supports using reserved memory from OP-TEE as shared memory
+* Probes OP-TEE version using SMCs
+* Accepts requests on privileged and unprivileged device
+* Uses OPTEE message protocol version 2 to communicate with secure world
 
 Signed-off-by: Jens Wiklander <jens.wiklander@linaro.org>
 ---
- Documentation/ioctl/ioctl-number.txt |   1 +
- MAINTAINERS                          |   7 +
- drivers/Kconfig                      |   2 +
- drivers/Makefile                     |   1 +
- drivers/tee/Kconfig                  |   8 +
- drivers/tee/Makefile                 |   3 +
- drivers/tee/tee.c                    | 873 +++++++++++++++++++++++++++++++++++
- drivers/tee/tee_private.h            |  80 ++++
- drivers/tee/tee_shm.c                | 324 +++++++++++++
- drivers/tee/tee_shm_pool.c           | 133 ++++++
- include/linux/tee_drv.h              | 300 ++++++++++++
- include/uapi/linux/tee.h             | 383 +++++++++++++++
- 12 files changed, 2115 insertions(+)
- create mode 100644 drivers/tee/Kconfig
- create mode 100644 drivers/tee/Makefile
- create mode 100644 drivers/tee/tee.c
- create mode 100644 drivers/tee/tee_private.h
- create mode 100644 drivers/tee/tee_shm.c
- create mode 100644 drivers/tee/tee_shm_pool.c
- create mode 100644 include/linux/tee_drv.h
- create mode 100644 include/uapi/linux/tee.h
+ MAINTAINERS                       |   5 +
+ drivers/tee/Kconfig               |  10 +
+ drivers/tee/Makefile              |   1 +
+ drivers/tee/optee/Kconfig         |   8 +
+ drivers/tee/optee/Makefile        |   5 +
+ drivers/tee/optee/call.c          | 400 ++++++++++++++++++++++++++++++
+ drivers/tee/optee/core.c          | 502 ++++++++++++++++++++++++++++++++++++++
+ drivers/tee/optee/optee_msg.h     | 423 ++++++++++++++++++++++++++++++++
+ drivers/tee/optee/optee_private.h | 146 +++++++++++
+ drivers/tee/optee/optee_smc.h     | 418 +++++++++++++++++++++++++++++++
+ drivers/tee/optee/rpc.c           | 322 ++++++++++++++++++++++++
+ drivers/tee/optee/supp.c          | 212 ++++++++++++++++
+ 12 files changed, 2452 insertions(+)
+ create mode 100644 drivers/tee/optee/Kconfig
+ create mode 100644 drivers/tee/optee/Makefile
+ create mode 100644 drivers/tee/optee/call.c
+ create mode 100644 drivers/tee/optee/core.c
+ create mode 100644 drivers/tee/optee/optee_msg.h
+ create mode 100644 drivers/tee/optee/optee_private.h
+ create mode 100644 drivers/tee/optee/optee_smc.h
+ create mode 100644 drivers/tee/optee/rpc.c
+ create mode 100644 drivers/tee/optee/supp.c
 
-diff --git a/Documentation/ioctl/ioctl-number.txt b/Documentation/ioctl/ioctl-number.txt
-index df1b25e..8e4b7ac 100644
---- a/Documentation/ioctl/ioctl-number.txt
-+++ b/Documentation/ioctl/ioctl-number.txt
-@@ -303,6 +303,7 @@ Code  Seq#(hex)	Include File		Comments
- 0xA3	80-8F	Port ACL		in development:
- 					<mailto:tlewis@mindspring.com>
- 0xA3	90-9F	linux/dtlk.h
-+0xA4	00-1F	uapi/linux/tee.h	Generic TEE subsystem
- 0xAA	00-3F	linux/uapi/linux/userfaultfd.h
- 0xAB	00-1F	linux/nbd.h
- 0xAC	00-1F	linux/raw.h
 diff --git a/MAINTAINERS b/MAINTAINERS
-index 9de185d..93b1dd8 100644
+index 93b1dd8..e9be205 100644
 --- a/MAINTAINERS
 +++ b/MAINTAINERS
-@@ -9133,6 +9133,13 @@ S:	Maintained
- F:	include/linux/mmc/dw_mmc.h
- F:	drivers/mmc/host/dw_mmc*
+@@ -7777,6 +7777,11 @@ F:	arch/*/oprofile/
+ F:	drivers/oprofile/
+ F:	include/linux/oprofile.h
  
-+TEE SUBSYSTEM
++OP-TEE DRIVER
 +M:	Jens Wiklander <jens.wiklander@linaro.org>
 +S:	Maintained
-+F:	include/linux/tee_drv.h
-+F:	include/uapi/linux/tee.h
-+F:	drivers/tee/
++F:	drivers/tee/optee/
 +
- THUNDERBOLT DRIVER
- M:	Andreas Noever <andreas.noever@gmail.com>
- S:	Maintained
-diff --git a/drivers/Kconfig b/drivers/Kconfig
-index 46b4a8e..fdd2e96 100644
---- a/drivers/Kconfig
-+++ b/drivers/Kconfig
-@@ -188,4 +188,6 @@ source "drivers/nvdimm/Kconfig"
- 
- source "drivers/nvmem/Kconfig"
- 
-+source "drivers/tee/Kconfig"
-+
- endmenu
-diff --git a/drivers/Makefile b/drivers/Makefile
-index b250b36..91c0411 100644
---- a/drivers/Makefile
-+++ b/drivers/Makefile
-@@ -167,3 +167,4 @@ obj-$(CONFIG_THUNDERBOLT)	+= thunderbolt/
- obj-$(CONFIG_CORESIGHT)		+= hwtracing/coresight/
- obj-$(CONFIG_ANDROID)		+= android/
- obj-$(CONFIG_NVMEM)		+= nvmem/
-+obj-$(CONFIG_TEE)		+= tee/
+ ORACLE CLUSTER FILESYSTEM 2 (OCFS2)
+ M:	Mark Fasheh <mfasheh@suse.com>
+ M:	Joel Becker <jlbec@evilplan.org>
 diff --git a/drivers/tee/Kconfig b/drivers/tee/Kconfig
-new file mode 100644
-index 0000000..64a8cd7
---- /dev/null
+index 64a8cd7..b269276 100644
+--- a/drivers/tee/Kconfig
 +++ b/drivers/tee/Kconfig
-@@ -0,0 +1,8 @@
-+# Generic Trusted Execution Environment Configuration
-+config TEE
-+	bool "Trusted Execution Environment support"
-+	default n
-+	select DMA_SHARED_BUFFER
-+	help
-+	  This implements a generic interface towards a Trusted Execution
-+	  Environment (TEE).
+@@ -6,3 +6,13 @@ config TEE
+ 	help
+ 	  This implements a generic interface towards a Trusted Execution
+ 	  Environment (TEE).
++
++if TEE
++
++menu "TEE drivers"
++
++source "drivers/tee/optee/Kconfig"
++
++endmenu
++
++endif
 diff --git a/drivers/tee/Makefile b/drivers/tee/Makefile
-new file mode 100644
-index 0000000..60d2dab
---- /dev/null
+index 60d2dab..53f3c76 100644
+--- a/drivers/tee/Makefile
 +++ b/drivers/tee/Makefile
-@@ -0,0 +1,3 @@
-+obj-y += tee.o
-+obj-y += tee_shm.o
-+obj-y += tee_shm_pool.o
-diff --git a/drivers/tee/tee.c b/drivers/tee/tee.c
+@@ -1,3 +1,4 @@
+ obj-y += tee.o
+ obj-y += tee_shm.o
+ obj-y += tee_shm_pool.o
++obj-$(CONFIG_OPTEE) += optee/
+diff --git a/drivers/tee/optee/Kconfig b/drivers/tee/optee/Kconfig
 new file mode 100644
-index 0000000..b8a1c76
+index 0000000..b550b18
 --- /dev/null
-+++ b/drivers/tee/tee.c
-@@ -0,0 +1,873 @@
++++ b/drivers/tee/optee/Kconfig
+@@ -0,0 +1,8 @@
++# OP-TEE Trusted Execution Environment Configuration
++config OPTEE
++	tristate "OP-TEE"
++	default n
++	depends on HAVE_SMCCC
++	help
++	  This implements the OP-TEE Trusted Execution Environment (TEE)
++	  driver.
+diff --git a/drivers/tee/optee/Makefile b/drivers/tee/optee/Makefile
+new file mode 100644
+index 0000000..92fe578
+--- /dev/null
++++ b/drivers/tee/optee/Makefile
+@@ -0,0 +1,5 @@
++obj-$(CONFIG_OPTEE) += optee.o
++optee-objs += core.o
++optee-objs += call.o
++optee-objs += rpc.o
++optee-objs += supp.o
+diff --git a/drivers/tee/optee/call.c b/drivers/tee/optee/call.c
+new file mode 100644
+index 0000000..fa15748
+--- /dev/null
++++ b/drivers/tee/optee/call.c
+@@ -0,0 +1,400 @@
 +/*
 + * Copyright (c) 2015, Linaro Limited
 + *
@@ -144,2115 +127,2451 @@ index 0000000..b8a1c76
 + * GNU General Public License for more details.
 + *
 + */
-+#include <linux/device.h>
-+#include <linux/cdev.h>
-+#include <linux/fs.h>
++#include <linux/types.h>
++#include <linux/err.h>
++#include <linux/errno.h>
 +#include <linux/slab.h>
 +#include <linux/uaccess.h>
++#include <linux/device.h>
 +#include <linux/tee_drv.h>
-+#include "tee_private.h"
++#include <linux/arm-smccc.h>
++#include "optee_private.h"
++#include "optee_smc.h"
 +
-+#define TEE_NUM_DEVICES	32
++struct optee_call_waiter {
++	struct list_head list_node;
++	struct completion c;
++	bool completed;
++};
 +
-+#define TEE_IOCTL_PARAM_SIZE(x) (sizeof(struct tee_param) * (x))
++static void optee_cq_wait_init(struct optee_call_queue *cq,
++			struct optee_call_waiter *w)
++{
++	mutex_lock(&cq->mutex);
++	/*
++	 * We add ourselves to the queue, but we don't wait. This
++	 * guarentees that we don't lose a completion if secure world
++	 * returns busy and another thread just exited and try to complete
++	 * someone.
++	 */
++	w->completed = false;
++	init_completion(&w->c);
++	list_add_tail(&w->list_node, &cq->waiters);
++	mutex_unlock(&cq->mutex);
++}
 +
-+/*
-+ * Unprivileged devices in the in the lower half range and privileged
-+ * devices in the upper half range.
-+ */
-+static DECLARE_BITMAP(dev_mask, TEE_NUM_DEVICES);
-+static DEFINE_SPINLOCK(driver_lock);
++static void optee_cq_wait_for_completion(struct optee_call_queue *cq,
++			struct optee_call_waiter *w)
++{
++	wait_for_completion(&w->c);
 +
-+static struct class *tee_class;
-+static dev_t tee_devt;
++	mutex_lock(&cq->mutex);
 +
-+static int tee_open(struct inode *inode, struct file *filp)
++	/* Move to end of list to get out of the way for other waiters */
++	list_del(&w->list_node);
++	w->completed = false;
++	reinit_completion(&w->c);
++	list_add_tail(&w->list_node, &cq->waiters);
++
++	mutex_unlock(&cq->mutex);
++}
++
++static void optee_cq_complete_one(struct optee_call_queue *cq)
++{
++	struct optee_call_waiter *w;
++
++	list_for_each_entry(w, &cq->waiters, list_node) {
++		if (!w->completed) {
++			complete(&w->c);
++			w->completed = true;
++			break;
++		}
++	}
++}
++
++static void optee_cq_wait_final(struct optee_call_queue *cq,
++			struct optee_call_waiter *w)
++{
++	mutex_lock(&cq->mutex);
++
++	/* Get out of the list */
++	list_del(&w->list_node);
++
++	optee_cq_complete_one(cq);
++	/*
++	 * If we're completed we've got a completion that some other task
++	 * could have used instead.
++	 */
++	if (w->completed)
++		optee_cq_complete_one(cq);
++
++	mutex_unlock(&cq->mutex);
++}
++
++/* Requires the filpstate mutex to be held */
++static struct optee_session *find_session(struct optee_context_data *ctxdata,
++			u32 session_id)
++{
++	struct optee_session *sess;
++
++	list_for_each_entry(sess, &ctxdata->sess_list, list_node)
++		if (sess->session_id == session_id)
++			return sess;
++	return NULL;
++}
++
++u32 optee_do_call_with_arg(struct tee_context *ctx, phys_addr_t parg)
++{
++	struct optee *optee = tee_get_drvdata(ctx->teedev);
++	struct optee_call_waiter w;
++	struct optee_rpc_param param = { };
++	u32 ret;
++
++	param.a0 = OPTEE_SMC_CALL_WITH_ARG;
++	reg_pair_from_64(&param.a1, &param.a2, parg);
++	/* Initialize waiter */
++	optee_cq_wait_init(&optee->call_queue, &w);
++	while (true) {
++		struct smccc_res res;
++
++		optee->invoke_fn(param.a0, param.a1, param.a2, param.a3,
++				 param.a4, param.a5, param.a6, param.a7,
++				 &res);
++
++		if (res.a0 == OPTEE_SMC_RETURN_ETHREAD_LIMIT) {
++			/*
++			 * Out of threads in secure world, wait for a thread
++			 * become available.
++			 */
++			optee_cq_wait_for_completion(&optee->call_queue, &w);
++		} else if (OPTEE_SMC_RETURN_IS_RPC(res.a0)) {
++			param.a0 = res.a0;
++			param.a1 = res.a1;
++			param.a2 = res.a2;
++			param.a3 = res.a3;
++			optee_handle_rpc(ctx, &param);
++		} else {
++			ret = res.a0;
++			break;
++		}
++	}
++	/*
++	 * We're done with our thread in secure world, if there's any
++	 * thread waiters wake up one.
++	 */
++	optee_cq_wait_final(&optee->call_queue, &w);
++	return ret;
++}
++
++static struct tee_shm *get_msg_arg(struct tee_context *ctx, size_t num_params,
++			struct optee_msg_arg **msg_arg, phys_addr_t *msg_parg)
 +{
 +	int rc;
-+	struct tee_device *teedev;
-+	struct tee_context *ctx;
++	struct tee_shm *shm;
++	struct optee_msg_arg *ma;
 +
-+	teedev = container_of(inode->i_cdev, struct tee_device, cdev);
-+	if (!tee_device_get(teedev))
++	shm = tee_shm_alloc(ctx->teedev, OPTEE_MSG_GET_ARG_SIZE(num_params),
++			    TEE_SHM_MAPPED);
++	if (IS_ERR(shm))
++		return shm;
++	ma = tee_shm_get_va(shm, 0);
++	if (IS_ERR(ma)) {
++		rc = PTR_ERR(ma);
++		goto out;
++	}
++	rc = tee_shm_get_pa(shm, 0, msg_parg);
++	if (rc)
++		goto out;
++
++	memset(ma, 0, OPTEE_MSG_GET_ARG_SIZE(num_params));
++	ma->num_params = num_params;
++	*msg_arg = ma;
++out:
++	if (rc) {
++		tee_shm_free(shm);
++		return ERR_PTR(rc);
++	}
++	return shm;
++}
++
++int optee_open_session(struct tee_context *ctx,
++			struct tee_ioctl_open_session_arg *arg,
++			struct tee_param *param)
++{
++	struct optee_context_data *ctxdata = ctx->data;
++	int rc;
++	struct tee_shm *shm;
++	struct optee_msg_arg *msg_arg;
++	phys_addr_t msg_parg;
++	struct optee_msg_param *msg_param;
++	struct optee_session *sess = NULL;
++
++	/* +2 for the meta parameters added below */
++	shm = get_msg_arg(ctx, arg->num_params + 2, &msg_arg, &msg_parg);
++	if (IS_ERR(shm))
++		return PTR_ERR(shm);
++
++	msg_arg->cmd = OPTEE_MSG_CMD_OPEN_SESSION;
++	msg_arg->cancel_id = arg->cancel_id;
++	msg_param = OPTEE_MSG_GET_PARAMS(msg_arg);
++
++	/*
++	 * Initialize and add the meta parameters needed when opening a
++	 * session.
++	 */
++	msg_param[0].attr = OPTEE_MSG_ATTR_TYPE_VALUE_INPUT |
++			    OPTEE_MSG_ATTR_META;
++	msg_param[1].attr = OPTEE_MSG_ATTR_TYPE_VALUE_INPUT |
++			    OPTEE_MSG_ATTR_META;
++	memcpy(&msg_param[0].u.value, arg->uuid, sizeof(arg->uuid));
++	memcpy(&msg_param[1].u.value, arg->uuid, sizeof(arg->clnt_uuid));
++	msg_param[1].u.value.c = arg->clnt_login;
++
++	rc = optee_to_msg_param(msg_param + 2, arg->num_params, param);
++	if (rc)
++		goto out;
++
++	sess = kzalloc(sizeof(struct optee_session), GFP_KERNEL);
++	if (!sess) {
++		rc = -ENOMEM;
++		goto out;
++	}
++
++	if (optee_do_call_with_arg(ctx, msg_parg)) {
++		msg_arg->ret = TEEC_ERROR_COMMUNICATION;
++		msg_arg->ret_origin = TEEC_ORIGIN_COMMS;
++	}
++
++	if (msg_arg->ret == TEEC_SUCCESS) {
++		/* A new session has been created, add it to the list. */
++		sess->session_id = msg_arg->session;
++		mutex_lock(&ctxdata->mutex);
++		list_add(&sess->list_node, &ctxdata->sess_list);
++		mutex_unlock(&ctxdata->mutex);
++		sess = NULL;
++	}
++
++	if (optee_from_msg_param(param, arg->num_params, msg_param + 2)) {
++		arg->ret = TEEC_ERROR_COMMUNICATION;
++		arg->ret_origin = TEEC_ORIGIN_COMMS;
++		/* Close session again to avoid leakage */
++		optee_close_session(ctx, msg_arg->session);
++	} else {
++		arg->session = msg_arg->session;
++		arg->ret = msg_arg->ret;
++		arg->ret_origin = msg_arg->ret_origin;
++	}
++out:
++	kfree(sess);
++	tee_shm_free(shm);
++	return rc;
++}
++
++int optee_close_session(struct tee_context *ctx, u32 session)
++{
++	struct optee_context_data *ctxdata = ctx->data;
++	struct tee_shm *shm;
++	struct optee_msg_arg *msg_arg;
++	phys_addr_t msg_parg;
++	struct optee_session *sess;
++
++	/* Check that the session is valid and remove it from the list */
++	mutex_lock(&ctxdata->mutex);
++	sess = find_session(ctxdata, session);
++	if (sess)
++		list_del(&sess->list_node);
++	mutex_unlock(&ctxdata->mutex);
++	if (!sess)
++		return -EINVAL;
++	kfree(sess);
++
++	shm = get_msg_arg(ctx, 0, &msg_arg, &msg_parg);
++	if (IS_ERR(shm))
++		return PTR_ERR(shm);
++
++	msg_arg->cmd = OPTEE_MSG_CMD_CLOSE_SESSION;
++	msg_arg->session = session;
++	optee_do_call_with_arg(ctx, msg_parg);
++
++	tee_shm_free(shm);
++	return 0;
++}
++
++int optee_invoke_func(struct tee_context *ctx, struct tee_ioctl_invoke_arg *arg,
++			struct tee_param *param)
++{
++	struct optee_context_data *ctxdata = ctx->data;
++	struct tee_shm *shm;
++	struct optee_msg_arg *msg_arg;
++	phys_addr_t msg_parg;
++	struct optee_msg_param *msg_param;
++	struct optee_session *sess;
++	int rc;
++
++	/* Check that the session is valid */
++	mutex_lock(&ctxdata->mutex);
++	sess = find_session(ctxdata, arg->session);
++	mutex_unlock(&ctxdata->mutex);
++	if (!sess)
 +		return -EINVAL;
 +
-+	ctx = kzalloc(sizeof(*ctx), GFP_KERNEL);
-+	if (!ctx) {
++	shm = get_msg_arg(ctx, arg->num_params, &msg_arg, &msg_parg);
++	if (IS_ERR(shm))
++		return PTR_ERR(shm);
++	msg_arg->cmd = OPTEE_MSG_CMD_INVOKE_COMMAND;
++	msg_arg->func = arg->func;
++	msg_arg->session = arg->session;
++	msg_arg->cancel_id = arg->cancel_id;
++	msg_param = OPTEE_MSG_GET_PARAMS(msg_arg);
++
++	rc = optee_to_msg_param(msg_param, arg->num_params, param);
++	if (rc)
++		goto out;
++
++	if (optee_do_call_with_arg(ctx, msg_parg)) {
++		msg_arg->ret = TEEC_ERROR_COMMUNICATION;
++		msg_arg->ret_origin = TEEC_ORIGIN_COMMS;
++	}
++
++	if (optee_from_msg_param(param, arg->num_params, msg_param)) {
++		msg_arg->ret = TEEC_ERROR_COMMUNICATION;
++		msg_arg->ret_origin = TEEC_ORIGIN_COMMS;
++	}
++
++	arg->ret = msg_arg->ret;
++	arg->ret_origin = msg_arg->ret_origin;
++out:
++	tee_shm_free(shm);
++	return rc;
++}
++
++int optee_cancel_req(struct tee_context *ctx, u32 cancel_id, u32 session)
++{
++	struct optee_context_data *ctxdata = ctx->data;
++	struct tee_shm *shm;
++	struct optee_msg_arg *msg_arg;
++	phys_addr_t msg_parg;
++	struct optee_session *sess;
++
++	/* Check that the session is valid */
++	mutex_lock(&ctxdata->mutex);
++	sess = find_session(ctxdata, session);
++	mutex_unlock(&ctxdata->mutex);
++	if (!sess)
++		return -EINVAL;
++
++	shm = get_msg_arg(ctx, 0, &msg_arg, &msg_parg);
++	if (IS_ERR(shm))
++		return PTR_ERR(shm);
++
++	msg_arg->cmd = OPTEE_MSG_CMD_CANCEL;
++	msg_arg->session = session;
++	msg_arg->cancel_id = cancel_id;
++	optee_do_call_with_arg(ctx, msg_parg);
++
++	tee_shm_free(shm);
++	return 0;
++}
++
++void optee_enable_shm_cache(struct optee *optee)
++{
++	struct optee_call_waiter w;
++
++	/* We need to retry until secure world isn't busy. */
++	optee_cq_wait_init(&optee->call_queue, &w);
++	while (true) {
++		struct smccc_res res;
++
++		optee->invoke_fn(OPTEE_SMC_ENABLE_SHM_CACHE, 0, 0, 0, 0, 0, 0,
++				 0, &res);
++		if (res.a0 == OPTEE_SMC_RETURN_OK)
++			break;
++		optee_cq_wait_for_completion(&optee->call_queue, &w);
++	}
++	optee_cq_wait_final(&optee->call_queue, &w);
++}
++
++void optee_disable_shm_cache(struct optee *optee)
++{
++	struct optee_call_waiter w;
++
++	/* We need to retry until secure world isn't busy. */
++	optee_cq_wait_init(&optee->call_queue, &w);
++	while (true) {
++		struct smccc_res res;
++
++		optee->invoke_fn(OPTEE_SMC_DISABLE_SHM_CACHE, 0, 0, 0, 0, 0, 0,
++				 0, &res);
++		if (res.a0 == OPTEE_SMC_RETURN_ENOTAVAIL)
++			break; /* All shm's freed */
++		if (res.a0 == OPTEE_SMC_RETURN_OK) {
++			struct tee_shm *shm;
++
++			shm = reg_pair_to_ptr(res.a1, res.a2);
++			tee_shm_free(shm);
++		} else
++			optee_cq_wait_for_completion(&optee->call_queue, &w);
++	}
++	optee_cq_wait_final(&optee->call_queue, &w);
++}
+diff --git a/drivers/tee/optee/core.c b/drivers/tee/optee/core.c
+new file mode 100644
+index 0000000..c7dd7ee
+--- /dev/null
++++ b/drivers/tee/optee/core.c
+@@ -0,0 +1,502 @@
++/*
++ * Copyright (c) 2015, Linaro Limited
++ *
++ * This software is licensed under the terms of the GNU General Public
++ * License version 2, as published by the Free Software Foundation, and
++ * may be copied, distributed, and modified under those terms.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ */
++#include <linux/types.h>
++#include <linux/string.h>
++#include <linux/errno.h>
++#include <linux/module.h>
++#include <linux/platform_device.h>
++#include <linux/slab.h>
++#include <linux/uaccess.h>
++#include <linux/io.h>
++#include <linux/of.h>
++#include <linux/tee_drv.h>
++#include "optee_private.h"
++#include "optee_smc.h"
++
++#define DRIVER_NAME "optee"
++
++#define OPTEE_SHM_NUM_PRIV_PAGES	1
++
++int optee_from_msg_param(struct tee_param *params, size_t num_params,
++			const struct optee_msg_param *msg_params)
++{
++	int rc;
++	size_t n;
++	struct tee_shm *shm;
++	phys_addr_t pa;
++
++	for (n = 0; n < num_params; n++) {
++		struct tee_param *p = params + n;
++		const struct optee_msg_param *mp = msg_params + n;
++		u32 attr = mp->attr & OPTEE_MSG_ATTR_TYPE_MASK;
++
++		switch (attr) {
++		case OPTEE_MSG_ATTR_TYPE_NONE:
++			p->attr = TEE_IOCTL_PARAM_ATTR_TYPE_NONE;
++			memset(&p->u, 0, sizeof(p->u));
++			break;
++		case OPTEE_MSG_ATTR_TYPE_VALUE_INPUT:
++		case OPTEE_MSG_ATTR_TYPE_VALUE_OUTPUT:
++		case OPTEE_MSG_ATTR_TYPE_VALUE_INOUT:
++			p->attr = TEE_IOCTL_PARAM_ATTR_TYPE_VALUE_INPUT +
++				  attr - OPTEE_MSG_ATTR_TYPE_VALUE_INPUT;
++			p->u.value.a = mp->u.value.a;
++			p->u.value.b = mp->u.value.b;
++			p->u.value.c = mp->u.value.c;
++			break;
++		case OPTEE_MSG_ATTR_TYPE_TMEM_INPUT:
++		case OPTEE_MSG_ATTR_TYPE_TMEM_OUTPUT:
++		case OPTEE_MSG_ATTR_TYPE_TMEM_INOUT:
++			p->attr = TEE_IOCTL_PARAM_ATTR_TYPE_MEMREF_INPUT +
++				  attr - OPTEE_MSG_ATTR_TYPE_TMEM_INPUT;
++			p->u.memref.size = mp->u.tmem.size;
++			shm = (struct tee_shm *)(unsigned long)
++				mp->u.tmem.shm_ref;
++			if (!shm) {
++				p->u.memref.shm_offs = 0;
++				p->u.memref.shm = NULL;
++				break;
++			}
++			rc = tee_shm_get_pa(shm, 0, &pa);
++			if (rc)
++				return rc;
++			p->u.memref.shm_offs = pa - mp->u.tmem.buf_ptr;
++			p->u.memref.shm = shm;
++
++			/* Check that the memref is covered by the shm object */
++			if (p->u.memref.size) {
++				size_t o = p->u.memref.shm_offs +
++					   p->u.memref.size - 1;
++
++				rc = tee_shm_get_pa(shm, o, NULL);
++				if (rc)
++					return rc;
++			}
++			break;
++		default:
++			return -EINVAL;
++		}
++	}
++	return 0;
++}
++
++int optee_to_msg_param(struct optee_msg_param *msg_params, size_t num_params,
++			const struct tee_param *params)
++{
++	int rc;
++	size_t n;
++	phys_addr_t pa;
++
++	for (n = 0; n < num_params; n++) {
++		const struct tee_param *p = params + n;
++		struct optee_msg_param *mp = msg_params + n;
++
++		switch (p->attr) {
++		case TEE_IOCTL_PARAM_ATTR_TYPE_NONE:
++			mp->attr = TEE_IOCTL_PARAM_ATTR_TYPE_NONE;
++			memset(&mp->u, 0, sizeof(mp->u));
++			break;
++		case TEE_IOCTL_PARAM_ATTR_TYPE_VALUE_INPUT:
++		case TEE_IOCTL_PARAM_ATTR_TYPE_VALUE_OUTPUT:
++		case TEE_IOCTL_PARAM_ATTR_TYPE_VALUE_INOUT:
++			mp->attr = OPTEE_MSG_ATTR_TYPE_VALUE_INPUT + p->attr -
++				   TEE_IOCTL_PARAM_ATTR_TYPE_VALUE_INPUT;
++			mp->u.value.a = p->u.value.a;
++			mp->u.value.b = p->u.value.b;
++			mp->u.value.c = p->u.value.c;
++			break;
++		case TEE_IOCTL_PARAM_ATTR_TYPE_MEMREF_INPUT:
++		case TEE_IOCTL_PARAM_ATTR_TYPE_MEMREF_OUTPUT:
++		case TEE_IOCTL_PARAM_ATTR_TYPE_MEMREF_INOUT:
++			mp->attr = OPTEE_MSG_ATTR_TYPE_TMEM_INPUT +
++				   p->attr -
++				   TEE_IOCTL_PARAM_ATTR_TYPE_MEMREF_INPUT;
++			mp->u.tmem.shm_ref = (unsigned long)p->u.memref.shm;
++			mp->u.tmem.size = p->u.memref.size;
++			if (!p->u.memref.shm) {
++				mp->u.tmem.buf_ptr = 0;
++				break;
++			}
++			rc = tee_shm_get_pa(p->u.memref.shm,
++					    p->u.memref.shm_offs, &pa);
++			if (rc)
++				return rc;
++			mp->u.tmem.buf_ptr = pa;
++			mp->attr |= OPTEE_MSG_ATTR_CACHE_PREDEFINED <<
++					OPTEE_MSG_ATTR_CACHE_SHIFT;
++			break;
++		default:
++			return -EINVAL;
++		}
++	}
++	return 0;
++}
++
++static void optee_get_version(struct tee_device *teedev,
++			struct tee_ioctl_version_data *vers)
++{
++	struct tee_ioctl_version_data v = {
++		.impl_id = TEE_IMPL_ID_OPTEE,
++		.impl_caps = TEE_OPTEE_CAP_TZ,
++		.gen_caps = TEE_GEN_CAP_GP,
++	};
++	*vers = v;
++}
++
++static int optee_open(struct tee_context *ctx)
++{
++	struct optee_context_data *ctxdata;
++
++	ctxdata = kzalloc(sizeof(*ctxdata), GFP_KERNEL);
++	if (!ctxdata)
++		return -ENOMEM;
++
++	mutex_init(&ctxdata->mutex);
++	INIT_LIST_HEAD(&ctxdata->sess_list);
++
++	ctx->data = ctxdata;
++	return 0;
++}
++
++static void optee_release(struct tee_context *ctx)
++{
++	struct optee_context_data *ctxdata = ctx->data;
++	struct tee_shm *shm;
++	struct optee_msg_arg *arg = NULL;
++	phys_addr_t parg;
++
++	if (!ctxdata)
++		return;
++
++	shm = tee_shm_alloc(ctx->teedev, sizeof(struct optee_msg_arg),
++			    TEE_SHM_MAPPED);
++	if (!IS_ERR(shm)) {
++		arg = tee_shm_get_va(shm, 0);
++		/*
++		 * If va2pa fails for some reason, we can't call
++		 * optee_close_session(), only free the memory. Secure OS
++		 * will leak sessions and finally refuse more session, but
++		 * we will at least let normal world reclaim its memory.
++		 */
++		if (!IS_ERR(arg))
++			tee_shm_va2pa(shm, arg, &parg);
++	}
++
++	while (true) {
++		struct optee_session *sess;
++
++		sess = list_first_entry_or_null(&ctxdata->sess_list,
++						struct optee_session,
++						list_node);
++		if (!sess)
++			break;
++		list_del(&sess->list_node);
++		if (!IS_ERR_OR_NULL(arg)) {
++			memset(arg, 0, sizeof(*arg));
++			arg->cmd = OPTEE_MSG_CMD_CLOSE_SESSION;
++			arg->session = sess->session_id;
++			optee_do_call_with_arg(ctx, parg);
++		}
++		kfree(sess);
++	}
++	kfree(ctxdata);
++
++	if (!IS_ERR(shm))
++		tee_shm_free(shm);
++
++	ctx->data = NULL;
++}
++
++static struct tee_driver_ops optee_ops = {
++	.get_version = optee_get_version,
++	.open = optee_open,
++	.release = optee_release,
++	.open_session = optee_open_session,
++	.close_session = optee_close_session,
++	.invoke_func = optee_invoke_func,
++	.cancel_req = optee_cancel_req,
++};
++
++static struct tee_desc optee_desc = {
++	.name = DRIVER_NAME "-clnt",
++	.ops = &optee_ops,
++	.owner = THIS_MODULE,
++};
++
++static struct tee_driver_ops optee_supp_ops = {
++	.get_version = optee_get_version,
++	.open = optee_open,
++	.release = optee_release,
++	.supp_recv = optee_supp_recv,
++	.supp_send = optee_supp_send,
++};
++
++static struct tee_desc optee_supp_desc = {
++	.name = DRIVER_NAME "-supp",
++	.ops = &optee_supp_ops,
++	.owner = THIS_MODULE,
++	.flags = TEE_DESC_PRIVILEGED,
++};
++
++static bool optee_msg_api_uid_is_optee_api(optee_invoke_fn *invoke_fn)
++{
++	struct smccc_res res;
++
++	invoke_fn(OPTEE_SMC_CALLS_UID, 0, 0, 0, 0, 0, 0, 0, &res);
++
++	if (res.a0 == OPTEE_MSG_UID_0 && res.a1 == OPTEE_MSG_UID_1 &&
++	    res.a2 == OPTEE_MSG_UID_2 && res.a3 == OPTEE_MSG_UID_3)
++		return true;
++	return false;
++}
++
++static bool optee_msg_api_revision_is_compatible(optee_invoke_fn *invoke_fn)
++{
++	struct smccc_res res;
++
++	invoke_fn(OPTEE_SMC_CALLS_REVISION, 0, 0, 0, 0, 0, 0, 0, &res);
++
++	if (res.a0 == OPTEE_MSG_REVISION_MAJOR &&
++	    (int)res.a1 >= OPTEE_MSG_REVISION_MINOR)
++		return true;
++	return false;
++}
++
++static bool optee_msg_exchange_capabilities(optee_invoke_fn *invoke_fn,
++			u32 *sec_caps)
++{
++	struct smccc_res res;
++	u32 a1 = 0;
++
++	/*
++	 * TODO This isn't enough to tell if it's UP system (from kernel
++	 * point of view) or not, is_smp() returns the the information
++	 * needed, but can't be called directly from here.
++	 */
++#ifndef CONFIG_SMP
++	a1 |= OPTEE_SMC_NSEC_CAP_UNIPROCESSOR;
++#endif
++
++	invoke_fn(OPTEE_SMC_EXCHANGE_CAPABILITIES, a1, 0, 0, 0, 0, 0, 0, &res);
++
++	if (res.a0 != OPTEE_SMC_RETURN_OK)
++		return false;
++
++	*sec_caps = res.a1;
++	return true;
++}
++
++static struct tee_shm_pool *optee_config_shm_ioremap(struct device *dev,
++			optee_invoke_fn *invoke_fn,
++			void __iomem **ioremaped_shm)
++{
++	struct smccc_res res;
++	struct tee_shm_pool *pool;
++	unsigned long vaddr;
++	phys_addr_t paddr;
++	size_t size;
++	phys_addr_t begin;
++	phys_addr_t end;
++	void __iomem *va;
++	struct tee_shm_pool_mem_info priv_info;
++	struct tee_shm_pool_mem_info dmabuf_info;
++
++	invoke_fn(OPTEE_SMC_GET_SHM_CONFIG, 0, 0, 0, 0, 0, 0, 0, &res);
++	if (res.a0 != OPTEE_SMC_RETURN_OK) {
++		dev_info(dev, "shm service not available\n");
++		return ERR_PTR(-ENOENT);
++	}
++
++	if (res.a3 != OPTEE_SMC_SHM_CACHED) {
++		dev_err(dev, "only normal cached shared memory supported\n");
++		return ERR_PTR(-EINVAL);
++	}
++
++	begin = roundup(res.a1, PAGE_SIZE);
++	end = rounddown(res.a1 + res.a2, PAGE_SIZE);
++	paddr = begin;
++	size = end - begin;
++
++	if (size < 2 * OPTEE_SHM_NUM_PRIV_PAGES * PAGE_SIZE) {
++		dev_err(dev, "too small shared memory area\n");
++		return ERR_PTR(-EINVAL);
++	}
++
++	va = ioremap_cache(paddr, size);
++	if (!va) {
++		dev_err(dev, "shared memory ioremap failed\n");
++		return ERR_PTR(-EINVAL);
++	}
++	vaddr = (unsigned long)va;
++
++	priv_info.vaddr = vaddr;
++	priv_info.paddr = paddr;
++	priv_info.size = OPTEE_SHM_NUM_PRIV_PAGES * PAGE_SIZE;
++	dmabuf_info.vaddr = vaddr + OPTEE_SHM_NUM_PRIV_PAGES * PAGE_SIZE;
++	dmabuf_info.paddr = paddr + OPTEE_SHM_NUM_PRIV_PAGES * PAGE_SIZE;
++	dmabuf_info.size = size - OPTEE_SHM_NUM_PRIV_PAGES * PAGE_SIZE;
++
++	pool = tee_shm_pool_alloc_res_mem(dev, &priv_info, &dmabuf_info);
++	if (IS_ERR(pool))
++		iounmap(va);
++	else
++		*ioremaped_shm = va;
++	return pool;
++}
++
++static int get_invoke_func(struct device *dev, optee_invoke_fn **invoke_fn)
++{
++	struct device_node *np = dev->of_node;
++	const char *method;
++
++	dev_info(dev, "probing for conduit method from DT.\n");
++
++	if (of_property_read_string(np, "method", &method)) {
++		dev_warn(dev, "missing \"method\" property\n");
++		return -ENXIO;
++	}
++
++	if (!strcmp("hvc", method)) {
++		*invoke_fn = smccc_hvc;
++	} else if (!strcmp("smc", method)) {
++		*invoke_fn = smccc_smc;
++	} else {
++		dev_warn(dev, "invalid \"method\" property: %s\n", method);
++		return -EINVAL;
++	}
++	return 0;
++}
++
++static int optee_probe(struct platform_device *pdev)
++{
++	optee_invoke_fn *invoke_fn;
++	struct tee_shm_pool *pool;
++	struct optee *optee = NULL;
++	void __iomem *ioremaped_shm = NULL;
++	struct tee_device *teedev;
++	u32 sec_caps;
++	int rc;
++
++	rc = get_invoke_func(&pdev->dev, &invoke_fn);
++	if (rc)
++		return rc;
++
++	if (!optee_msg_api_uid_is_optee_api(invoke_fn) ||
++	    !optee_msg_api_revision_is_compatible(invoke_fn) ||
++	    !optee_msg_exchange_capabilities(invoke_fn, &sec_caps))
++		return -EINVAL;
++
++	/*
++	 * We have no other option for shared memory, if secure world
++	 * doesn't have any reserved memory we can use we can't continue.
++	 */
++	if (!(sec_caps & OPTEE_SMC_SEC_CAP_HAVE_RESERVERED_SHM))
++		return -EINVAL;
++
++	pool = optee_config_shm_ioremap(&pdev->dev, invoke_fn, &ioremaped_shm);
++	if (IS_ERR(pool))
++		return PTR_ERR(pool);
++
++	optee = devm_kzalloc(&pdev->dev, sizeof(*optee), GFP_KERNEL);
++	if (!optee) {
 +		rc = -ENOMEM;
 +		goto err;
 +	}
 +
-+	ctx->teedev = teedev;
-+	filp->private_data = ctx;
-+	rc = teedev->desc->ops->open(ctx);
++	optee->dev = &pdev->dev;
++	optee->invoke_fn = invoke_fn;
++
++	teedev = tee_device_alloc(&optee_desc, &pdev->dev, pool, optee);
++	if (IS_ERR(teedev)) {
++		rc = PTR_ERR(teedev);
++		goto err;
++	}
++	optee->teedev = teedev;
++
++	teedev = tee_device_alloc(&optee_supp_desc, &pdev->dev, pool, optee);
++	if (IS_ERR(teedev)) {
++		rc = PTR_ERR(teedev);
++		goto err;
++	}
++	optee->supp_teedev = teedev;
++
++	rc = tee_device_register(optee->teedev);
 +	if (rc)
 +		goto err;
 +
++	rc = tee_device_register(optee->supp_teedev);
++	if (rc)
++		goto err;
++
++	mutex_init(&optee->call_queue.mutex);
++	INIT_LIST_HEAD(&optee->call_queue.waiters);
++	optee_wait_queue_init(&optee->wait_queue);
++	optee_supp_init(&optee->supp);
++	optee->ioremaped_shm = ioremaped_shm;
++	optee->pool = pool;
++
++	platform_set_drvdata(pdev, optee);
++
++	optee_enable_shm_cache(optee);
++
++	dev_info(&pdev->dev, "initialized driver\n");
 +	return 0;
 +err:
-+	kfree(ctx);
-+	tee_device_put(teedev);
++	tee_device_unregister(optee->teedev);
++	tee_device_unregister(optee->supp_teedev);
++	if (pool)
++		tee_shm_pool_free(pool);
++	if (ioremaped_shm)
++		iounmap(optee->ioremaped_shm);
 +	return rc;
 +}
 +
-+static int tee_release(struct inode *inode, struct file *filp)
++static int optee_remove(struct platform_device *pdev)
 +{
-+	struct tee_context *ctx = filp->private_data;
-+	struct tee_device *teedev = ctx->teedev;
++	struct optee *optee = platform_get_drvdata(pdev);
 +
-+	ctx->teedev->desc->ops->release(ctx);
-+	kfree(ctx);
-+	tee_device_put(teedev);
++	optee_disable_shm_cache(optee);
++
++	tee_device_unregister(optee->teedev);
++	tee_device_unregister(optee->supp_teedev);
++	tee_shm_pool_free(optee->pool);
++	if (optee->ioremaped_shm)
++		iounmap(optee->ioremaped_shm);
++	optee_wait_queue_exit(&optee->wait_queue);
++	optee_supp_uninit(&optee->supp);
++	mutex_destroy(&optee->call_queue.mutex);
 +	return 0;
 +}
 +
-+static int tee_ioctl_version(struct tee_context *ctx,
-+		struct tee_ioctl_version_data __user *uvers)
-+{
-+	struct tee_ioctl_version_data vers;
-+
-+	ctx->teedev->desc->ops->get_version(ctx->teedev, &vers);
-+	if (copy_to_user(uvers, &vers, sizeof(vers)))
-+		return -EFAULT;
-+	return 0;
-+}
-+
-+static int tee_ioctl_shm_alloc(struct tee_context *ctx,
-+		struct tee_ioctl_shm_alloc_data __user *udata)
-+{
-+	long ret;
-+	struct tee_ioctl_shm_alloc_data data;
-+	struct tee_shm *shm;
-+
-+	if (copy_from_user(&data, udata, sizeof(data)))
-+		return -EFAULT;
-+
-+	/* Currently no input flags are supported */
-+	if (data.flags)
-+		return -EINVAL;
-+
-+	data.fd = -1;
-+
-+	shm = tee_shm_alloc(ctx->teedev, data.size,
-+			    TEE_SHM_MAPPED | TEE_SHM_DMA_BUF);
-+	if (IS_ERR(shm))
-+		return PTR_ERR(shm);
-+
-+	data.flags = shm->flags;
-+	data.size = shm->size;
-+	data.fd = tee_shm_get_fd(shm);
-+	if (data.fd < 0) {
-+		ret = data.fd;
-+		goto err;
-+	}
-+
-+	if (copy_to_user(udata, &data, sizeof(data))) {
-+		ret = -EFAULT;
-+		goto err;
-+	}
-+	/*
-+	 * When user space closes the file descriptor the shared memory
-+	 * should be freed
-+	 */
-+	tee_shm_put(shm);
-+	return 0;
-+err:
-+	if (data.fd >= 0)
-+		tee_shm_put_fd(data.fd);
-+	tee_shm_free(shm);
-+	return ret;
-+}
-+
-+static int params_from_user(struct tee_param *params, size_t num_params,
-+		struct tee_ioctl_param __user *uparams)
-+{
-+	size_t n;
-+
-+	for (n = 0; n < num_params; n++) {
-+		struct tee_shm *shm;
-+		struct tee_ioctl_param ip;
-+
-+		if (copy_from_user(&ip, uparams + n, sizeof(ip)))
-+			return -EFAULT;
-+
-+		/* All unused attribute bits has to be zero */
-+		if (ip.attr & ~TEE_IOCTL_PARAM_ATTR_TYPE_MASK)
-+			return -EINVAL;
-+
-+		params[n].attr = ip.attr;
-+		switch (ip.attr) {
-+		case TEE_IOCTL_PARAM_ATTR_TYPE_NONE:
-+		case TEE_IOCTL_PARAM_ATTR_TYPE_VALUE_OUTPUT:
-+			break;
-+		case TEE_IOCTL_PARAM_ATTR_TYPE_VALUE_INPUT:
-+		case TEE_IOCTL_PARAM_ATTR_TYPE_VALUE_INOUT:
-+			params[n].u.value.a = ip.u.value.a;
-+			params[n].u.value.b = ip.u.value.b;
-+			params[n].u.value.c = ip.u.value.c;
-+			break;
-+		case TEE_IOCTL_PARAM_ATTR_TYPE_MEMREF_INPUT:
-+		case TEE_IOCTL_PARAM_ATTR_TYPE_MEMREF_OUTPUT:
-+		case TEE_IOCTL_PARAM_ATTR_TYPE_MEMREF_INOUT:
-+			/*
-+			 * If we fail to get a pointer to a shared memory
-+			 * object (and increase the ref count) from a file
-+			 * descriptor we return an error. All pointers that
-+			 * has been added in params have an increased ref
-+			 * count. It's the callers responibility to do
-+			 * tee_shm_put() on all resolved pointers.
-+			 */
-+			shm = tee_shm_get_from_fd(ip.u.memref.shm_fd);
-+			if (IS_ERR(shm))
-+				return PTR_ERR(shm);
-+
-+			params[n].u.memref.shm_offs = ip.u.memref.shm_offs;
-+			params[n].u.memref.size = ip.u.memref.size;
-+			params[n].u.memref.shm = shm;
-+			break;
-+		default:
-+			/* Unknown attribute */
-+			return -EINVAL;
-+		}
-+	}
-+	return 0;
-+}
-+
-+static int params_to_user(struct tee_ioctl_param __user *uparams,
-+		size_t num_params, struct tee_param *params)
-+{
-+	size_t n;
-+
-+	for (n = 0; n < num_params; n++) {
-+		struct tee_ioctl_param __user *up = uparams + n;
-+		struct tee_param *p = params + n;
-+
-+		switch (p->attr) {
-+		case TEE_IOCTL_PARAM_ATTR_TYPE_VALUE_OUTPUT:
-+		case TEE_IOCTL_PARAM_ATTR_TYPE_VALUE_INOUT:
-+			if (put_user(p->u.value.a, &up->u.value.a) ||
-+			    put_user(p->u.value.b, &up->u.value.b) ||
-+			    put_user(p->u.value.c, &up->u.value.c))
-+				return -EFAULT;
-+			break;
-+		case TEE_IOCTL_PARAM_ATTR_TYPE_MEMREF_OUTPUT:
-+		case TEE_IOCTL_PARAM_ATTR_TYPE_MEMREF_INOUT:
-+			if (put_user((u64)p->u.memref.size, &up->u.memref.size))
-+				return -EFAULT;
-+		default:
-+			break;
-+		}
-+	}
-+	return 0;
-+}
-+
-+static bool param_is_memref(struct tee_param *param)
-+{
-+	switch (param->attr & TEE_IOCTL_PARAM_ATTR_TYPE_MASK) {
-+	case TEE_IOCTL_PARAM_ATTR_TYPE_MEMREF_INPUT:
-+	case TEE_IOCTL_PARAM_ATTR_TYPE_MEMREF_OUTPUT:
-+	case TEE_IOCTL_PARAM_ATTR_TYPE_MEMREF_INOUT:
-+		return true;
-+	default:
-+		return false;
-+	}
-+}
-+
-+static int tee_ioctl_open_session(struct tee_context *ctx,
-+		struct tee_ioctl_buf_data __user *ubuf)
-+{
-+	int rc;
-+	size_t n;
-+	struct tee_ioctl_buf_data buf;
-+	struct tee_ioctl_open_session_arg __user *uarg;
-+	struct tee_ioctl_open_session_arg arg;
-+	struct tee_ioctl_param __user *uparams = NULL;
-+	struct tee_param *params = NULL;
-+	bool have_session = false;
-+
-+	if (!ctx->teedev->desc->ops->open_session)
-+		return -EINVAL;
-+
-+	if (copy_from_user(&buf, ubuf, sizeof(buf)))
-+		return -EFAULT;
-+
-+	if (buf.buf_len > TEE_MAX_ARG_SIZE ||
-+	    buf.buf_len < sizeof(struct tee_ioctl_open_session_arg))
-+		return -EINVAL;
-+
-+	uarg = (struct tee_ioctl_open_session_arg __user *)(unsigned long)
-+		buf.buf_ptr;
-+	rc = copy_from_user(&arg, uarg, sizeof(arg));
-+	if (rc)
-+		return rc;
-+
-+	if (sizeof(arg) + TEE_IOCTL_PARAM_SIZE(arg.num_params) != buf.buf_len)
-+		return -EINVAL;
-+
-+	if (arg.num_params) {
-+		params = kcalloc(arg.num_params, sizeof(struct tee_param),
-+				GFP_KERNEL);
-+		if (!params)
-+			return -ENOMEM;
-+		uparams = (struct tee_ioctl_param __user *)(uarg + 1);
-+		rc = params_from_user(params, arg.num_params, uparams);
-+		if (rc)
-+			goto out;
-+	}
-+
-+	rc = ctx->teedev->desc->ops->open_session(ctx, &arg, params);
-+	if (rc)
-+		goto out;
-+	have_session = true;
-+
-+	if (put_user(arg.session, &uarg->session) ||
-+	    put_user(arg.ret, &uarg->ret) ||
-+	    put_user(arg.ret_origin, &uarg->ret_origin)) {
-+		rc = -EFAULT;
-+		goto out;
-+	}
-+	rc = params_to_user(uparams, arg.num_params, params);
-+out:
-+	/*
-+	 * If we've succeeded to open the session but failed to communicate
-+	 * it back to user space, close the session again to avoid leakage.
-+	 */
-+	if (rc && have_session && ctx->teedev->desc->ops->close_session)
-+		ctx->teedev->desc->ops->close_session(ctx, arg.session);
-+
-+	if (params) {
-+		/* Decrease ref count for all valid shared memory pointers */
-+		for (n = 0; n < arg.num_params; n++)
-+			if (param_is_memref(params + n) &&
-+			    params[n].u.memref.shm)
-+				tee_shm_put(params[n].u.memref.shm);
-+		kfree(params);
-+	}
-+
-+	return rc;
-+}
-+
-+static int tee_ioctl_invoke(struct tee_context *ctx,
-+		struct tee_ioctl_buf_data __user *ubuf)
-+{
-+	int rc;
-+	size_t n;
-+	struct tee_ioctl_buf_data buf;
-+	struct tee_ioctl_invoke_arg __user *uarg;
-+	struct tee_ioctl_invoke_arg arg;
-+	struct tee_ioctl_param __user *uparams = NULL;
-+	struct tee_param *params = NULL;
-+
-+	if (!ctx->teedev->desc->ops->invoke_func)
-+		return -EINVAL;
-+
-+	rc = copy_from_user(&buf, ubuf, sizeof(buf));
-+	if (rc)
-+		return rc;
-+
-+	if (buf.buf_len > TEE_MAX_ARG_SIZE ||
-+	    buf.buf_len < sizeof(struct tee_ioctl_invoke_arg))
-+		return -EINVAL;
-+
-+	uarg = (struct tee_ioctl_invoke_arg __user *)(unsigned long)buf.buf_ptr;
-+	if (copy_from_user(&arg, uarg, sizeof(arg)))
-+		return -EFAULT;
-+
-+	if (sizeof(arg) + TEE_IOCTL_PARAM_SIZE(arg.num_params) != buf.buf_len)
-+		return -EINVAL;
-+
-+	if (arg.num_params) {
-+		params = kcalloc(arg.num_params, sizeof(struct tee_param),
-+				GFP_KERNEL);
-+		if (!params)
-+			return -ENOMEM;
-+		uparams = (struct tee_ioctl_param __user *)(uarg + 1);
-+		rc = params_from_user(params, arg.num_params, uparams);
-+		if (rc)
-+			goto out;
-+	}
-+
-+	rc = ctx->teedev->desc->ops->invoke_func(ctx, &arg, params);
-+	if (rc)
-+		goto out;
-+
-+	if (put_user(arg.ret, &uarg->ret) ||
-+	    put_user(arg.ret_origin, &uarg->ret_origin)) {
-+		rc = -EFAULT;
-+		goto out;
-+	}
-+	rc = params_to_user(uparams, arg.num_params, params);
-+out:
-+	if (params) {
-+		/* Decrease ref count for all valid shared memory pointers */
-+		for (n = 0; n < arg.num_params; n++)
-+			if (param_is_memref(params + n) &&
-+			    params[n].u.memref.shm)
-+				tee_shm_put(params[n].u.memref.shm);
-+		kfree(params);
-+	}
-+	return rc;
-+}
-+
-+
-+static int tee_ioctl_cancel(struct tee_context *ctx,
-+		struct tee_ioctl_cancel_arg __user *uarg)
-+{
-+	struct tee_ioctl_cancel_arg arg;
-+
-+	if (!ctx->teedev->desc->ops->cancel_req)
-+		return -EINVAL;
-+
-+	if (copy_from_user(&arg, uarg, sizeof(arg)))
-+		return -EFAULT;
-+
-+	return ctx->teedev->desc->ops->cancel_req(ctx, arg.cancel_id,
-+						  arg.session);
-+}
-+
-+static int tee_ioctl_close_session(struct tee_context *ctx,
-+		struct tee_ioctl_close_session_arg __user *uarg)
-+{
-+	struct tee_ioctl_close_session_arg arg;
-+
-+	if (!ctx->teedev->desc->ops->close_session)
-+		return -EINVAL;
-+
-+	if (copy_from_user(&arg, uarg, sizeof(arg)))
-+		return -EFAULT;
-+
-+	return ctx->teedev->desc->ops->close_session(ctx, arg.session);
-+}
-+
-+static int params_to_supp(struct tee_ioctl_param __user *uparams,
-+		size_t num_params, struct tee_param *params)
-+{
-+	int rc = 0;
-+	size_t n;
-+	int *fds = kmalloc_array(num_params, sizeof(int), GFP_KERNEL);
-+
-+	if (!fds)
-+		return -ENOMEM;
-+	for (n = 0; n < num_params; n++)
-+		fds[n] = -1;
-+
-+	for (n = 0; n < num_params; n++) {
-+		struct tee_ioctl_param ip;
-+		struct tee_param *p = params + n;
-+
-+		ip.attr = p->attr & TEE_IOCTL_PARAM_ATTR_TYPE_MASK;
-+		switch (p->attr) {
-+		case TEE_IOCTL_PARAM_ATTR_TYPE_VALUE_INPUT:
-+		case TEE_IOCTL_PARAM_ATTR_TYPE_VALUE_INOUT:
-+			ip.u.value.a = p->u.value.a;
-+			ip.u.value.b = p->u.value.b;
-+			ip.u.value.c = p->u.value.c;
-+			break;
-+		case TEE_IOCTL_PARAM_ATTR_TYPE_MEMREF_INPUT:
-+		case TEE_IOCTL_PARAM_ATTR_TYPE_MEMREF_OUTPUT:
-+		case TEE_IOCTL_PARAM_ATTR_TYPE_MEMREF_INOUT:
-+			ip.u.memref.size = p->u.memref.size;
-+			if (!p->u.memref.shm) {
-+				ip.u.memref.shm_offs = 0;
-+				ip.u.memref.shm_fd = -1;
-+				break;
-+			}
-+			ip.u.memref.shm_offs = p->u.memref.shm_offs;
-+			/*
-+			 * This tee_shm_get_fd() is supposed to be matched
-+			 * by a close(2) from tee-supplicant.
-+			 */
-+			fds[n] = tee_shm_get_fd(p->u.memref.shm);
-+			if (fds[n] < 0) {
-+				rc = fds[n];
-+				goto out;
-+			}
-+			ip.u.memref.shm_fd = fds[n];
-+			break;
-+		default:
-+			memset(&ip.u, 0, sizeof(ip.u));
-+			break;
-+		}
-+
-+		if (copy_to_user(uparams + n, &ip, sizeof(ip))) {
-+			rc = -EFAULT;
-+			goto out;
-+		}
-+	}
-+out:
-+	if (rc) {
-+		for (n = 0; n < num_params; n++)
-+			if (fds[n] >= 0)
-+				tee_shm_put_fd(fds[n]);
-+	}
-+	kfree(fds);
-+	return rc;
-+}
-+
-+static int tee_ioctl_supp_recv(struct tee_context *ctx,
-+		struct tee_ioctl_buf_data __user *ubuf)
-+{
-+	int rc;
-+	struct tee_ioctl_buf_data buf;
-+	struct tee_iocl_supp_recv_arg __user *uarg;
-+	struct tee_param *params;
-+	struct tee_ioctl_param __user *uparams;
-+	u32 num_params;
-+	u32 func;
-+
-+	if (!ctx->teedev->desc->ops->supp_recv)
-+		return -EINVAL;
-+
-+	if (copy_from_user(&buf, ubuf, sizeof(buf)))
-+		return -EFAULT;
-+
-+	if (buf.buf_len > TEE_MAX_ARG_SIZE ||
-+	    buf.buf_len < sizeof(struct tee_iocl_supp_recv_arg))
-+		return -EINVAL;
-+
-+	uarg = (struct tee_iocl_supp_recv_arg __user *)(unsigned long)
-+		buf.buf_ptr;
-+	if (get_user(num_params, &uarg->num_params))
-+		return -EFAULT;
-+
-+	if (sizeof(*uarg) + TEE_IOCTL_PARAM_SIZE(num_params) != buf.buf_len)
-+		return -EINVAL;
-+
-+	params = kcalloc(num_params, sizeof(struct tee_param), GFP_KERNEL);
-+	if (!params)
-+		return -ENOMEM;
-+
-+	rc = ctx->teedev->desc->ops->supp_recv(ctx, &func, &num_params, params);
-+	if (rc)
-+		goto out;
-+
-+	if (put_user(func, &uarg->func) ||
-+	    put_user(num_params, &uarg->num_params)) {
-+		rc = -EFAULT;
-+		goto out;
-+	}
-+
-+	uparams = (struct tee_ioctl_param __user *)(uarg + 1);
-+	rc = params_to_supp(uparams, num_params, params);
-+out:
-+	kfree(params);
-+	return rc;
-+}
-+
-+static int params_from_supp(struct tee_param *params,
-+		size_t num_params, struct tee_ioctl_param __user *uparams)
-+{
-+	size_t n;
-+
-+	for (n = 0; n < num_params; n++) {
-+		struct tee_param *p = params + n;
-+		struct tee_ioctl_param ip;
-+
-+		if (copy_from_user(&ip, uparams + n, sizeof(ip)))
-+			return -EFAULT;
-+
-+		/* All unused attribute bits has to be zero */
-+		if (ip.attr & ~TEE_IOCTL_PARAM_ATTR_TYPE_MASK)
-+			return -EINVAL;
-+
-+		p->attr = ip.attr;
-+		switch (ip.attr) {
-+		case TEE_IOCTL_PARAM_ATTR_TYPE_VALUE_OUTPUT:
-+		case TEE_IOCTL_PARAM_ATTR_TYPE_VALUE_INOUT:
-+			/* Only out and in/out values can be updated */
-+			p->u.value.a = ip.u.value.a;
-+			p->u.value.b = ip.u.value.b;
-+			p->u.value.c = ip.u.value.c;
-+			break;
-+		case TEE_IOCTL_PARAM_ATTR_TYPE_MEMREF_OUTPUT:
-+		case TEE_IOCTL_PARAM_ATTR_TYPE_MEMREF_INOUT:
-+			/*
-+			 * Only the size of the memref can be updated.
-+			 * Since we don't have access to the original
-+			 * parameters here, only store the supplied size.
-+			 * The driver will copy the updated size into the
-+			 * original parameters.
-+			 */
-+			p->u.memref.shm = NULL;
-+			p->u.memref.shm_offs = 0;
-+			p->u.memref.size = ip.u.memref.size;
-+			break;
-+		default:
-+			memset(&p->u, 0, sizeof(p->u));
-+			break;
-+		}
-+	}
-+	return 0;
-+}
-+
-+static int tee_ioctl_supp_send(struct tee_context *ctx,
-+		struct tee_ioctl_buf_data __user *ubuf)
-+{
-+	long rc;
-+	struct tee_ioctl_buf_data buf;
-+	struct tee_iocl_supp_send_arg __user *uarg;
-+	struct tee_param *params;
-+	struct tee_ioctl_param __user *uparams;
-+	u32 num_params;
-+	u32 ret;
-+
-+	/* Not valid for this driver */
-+	if (!ctx->teedev->desc->ops->supp_send)
-+		return -EINVAL;
-+
-+	if (copy_from_user(&buf, ubuf, sizeof(buf)))
-+		return -EFAULT;
-+
-+	if (buf.buf_len > TEE_MAX_ARG_SIZE ||
-+	    buf.buf_len < sizeof(struct tee_iocl_supp_send_arg))
-+		return -EINVAL;
-+
-+	uarg = (struct tee_iocl_supp_send_arg __user *)(unsigned long)
-+		buf.buf_ptr;
-+	if (get_user(ret, &uarg->ret) ||
-+	    get_user(num_params, &uarg->num_params))
-+		return -EFAULT;
-+
-+	if (sizeof(*uarg) + TEE_IOCTL_PARAM_SIZE(num_params) > buf.buf_len)
-+		return -EINVAL;
-+
-+	params = kcalloc(num_params, sizeof(struct tee_param), GFP_KERNEL);
-+	if (!params)
-+		return -ENOMEM;
-+
-+	uparams = (struct tee_ioctl_param __user *)(uarg + 1);
-+	rc = params_from_supp(params, num_params, uparams);
-+	if (rc)
-+		goto out;
-+
-+	rc = ctx->teedev->desc->ops->supp_send(ctx, ret, num_params, params);
-+out:
-+	kfree(params);
-+	return rc;
-+}
-+
-+
-+static long tee_ioctl(struct file *filp, unsigned int cmd, unsigned long arg)
-+{
-+	struct tee_context *ctx = filp->private_data;
-+	void __user *uarg = (void __user *)arg;
-+
-+	switch (cmd) {
-+	case TEE_IOC_VERSION:
-+		return tee_ioctl_version(ctx, uarg);
-+	case TEE_IOC_SHM_ALLOC:
-+		return tee_ioctl_shm_alloc(ctx, uarg);
-+	case TEE_IOC_OPEN_SESSION:
-+		return tee_ioctl_open_session(ctx, uarg);
-+	case TEE_IOC_INVOKE:
-+		return tee_ioctl_invoke(ctx, uarg);
-+	case TEE_IOC_CANCEL:
-+		return tee_ioctl_cancel(ctx, uarg);
-+	case TEE_IOC_CLOSE_SESSION:
-+		return tee_ioctl_close_session(ctx, uarg);
-+	case TEE_IOC_SUPPL_RECV:
-+		return tee_ioctl_supp_recv(ctx, uarg);
-+	case TEE_IOC_SUPPL_SEND:
-+		return tee_ioctl_supp_send(ctx, uarg);
-+	default:
-+		return -EINVAL;
-+	}
-+}
-+
-+static const struct file_operations tee_fops = {
-+	.open = tee_open,
-+	.release = tee_release,
-+	.unlocked_ioctl = tee_ioctl,
-+	.compat_ioctl = tee_ioctl,
++static const struct of_device_id optee_match[] = {
++	{ .compatible = "optee,optee-tz" },
++	{},
 +};
 +
-+static void tee_release_device(struct device *dev)
-+{
-+	struct tee_device *teedev = container_of(dev, struct tee_device, dev);
-+
-+	spin_lock(&driver_lock);
-+	clear_bit(teedev->id, dev_mask);
-+	spin_unlock(&driver_lock);
-+	mutex_destroy(&teedev->mutex);
-+	kfree(teedev);
-+}
-+
-+struct tee_device *tee_device_alloc(const struct tee_desc *teedesc,
-+			struct device *dev, struct tee_shm_pool *pool,
-+			void *driver_data)
-+{
-+	struct tee_device *teedev;
-+	void *ret;
-+	int rc;
-+	int offs = 0;
-+
-+	if (!teedesc || !teedesc->name || !teedesc->ops ||
-+	    !teedesc->ops->get_version || !teedesc->ops->open ||
-+	    !teedesc->ops->release || !dev || !pool)
-+		return ERR_PTR(-EINVAL);
-+
-+	teedev = kzalloc(sizeof(*teedev), GFP_KERNEL);
-+	if (!teedev) {
-+		ret = ERR_PTR(-ENOMEM);
-+		goto err;
-+	}
-+
-+	if (teedesc->flags & TEE_DESC_PRIVILEGED)
-+		offs = TEE_NUM_DEVICES / 2;
-+
-+	spin_lock(&driver_lock);
-+	teedev->id = find_next_zero_bit(dev_mask, TEE_NUM_DEVICES, offs);
-+	if (teedev->id < TEE_NUM_DEVICES)
-+		set_bit(teedev->id, dev_mask);
-+	spin_unlock(&driver_lock);
-+
-+	if (teedev->id >= TEE_NUM_DEVICES) {
-+		ret = ERR_PTR(-ENOMEM);
-+		goto err;
-+	}
-+
-+	snprintf(teedev->name, sizeof(teedev->name), "tee%s%d",
-+		 teedesc->flags & TEE_DESC_PRIVILEGED ? "priv" : "",
-+		 teedev->id - offs);
-+
-+	teedev->dev.class = tee_class;
-+	teedev->dev.release = tee_release_device;
-+	teedev->dev.parent = dev;
-+	teedev->dev.devt = MKDEV(MAJOR(tee_devt), teedev->id);
-+
-+	rc = dev_set_name(&teedev->dev, "%s", teedev->name);
-+	if (rc) {
-+		ret = ERR_PTR(rc);
-+		goto err;
-+	}
-+
-+	cdev_init(&teedev->cdev, &tee_fops);
-+	teedev->cdev.owner = teedesc->owner;
-+	teedev->cdev.kobj.parent = &teedev->dev.kobj;
-+
-+	dev_set_drvdata(&teedev->dev, driver_data);
-+	device_initialize(&teedev->dev);
-+
-+	/* 1 as tee_device_unregister() does one final tee_device_put() */
-+	teedev->num_users = 1;
-+	init_completion(&teedev->c_no_users);
-+	mutex_init(&teedev->mutex);
-+
-+	teedev->desc = teedesc;
-+	teedev->pool = pool;
-+	INIT_LIST_HEAD(&teedev->list_shm);
-+
-+	return teedev;
-+err:
-+	dev_err(dev, "could not register %s driver\n",
-+		teedesc->flags & TEE_DESC_PRIVILEGED ? "privileged" : "client");
-+	if (teedev && teedev->id < TEE_NUM_DEVICES) {
-+		spin_lock(&driver_lock);
-+		clear_bit(teedev->id, dev_mask);
-+		spin_unlock(&driver_lock);
-+	}
-+	kfree(teedev);
-+	return ret;
-+}
-+EXPORT_SYMBOL_GPL(tee_device_alloc);
-+
-+static ssize_t implementation_id_show(struct device *dev,
-+			struct device_attribute *attr, char *buf)
-+{
-+	struct tee_device *teedev = container_of(dev, struct tee_device, dev);
-+	struct tee_ioctl_version_data vers;
-+
-+	teedev->desc->ops->get_version(teedev, &vers);
-+	return scnprintf(buf, PAGE_SIZE, "%d\n", vers.impl_id);
-+}
-+static DEVICE_ATTR_RO(implementation_id);
-+
-+static struct attribute *tee_dev_attrs[] = {
-+	&dev_attr_implementation_id.attr,
-+	NULL
++static struct platform_driver optee_driver = {
++	.driver = {
++		.name = DRIVER_NAME,
++		.of_match_table = optee_match,
++	},
++	.probe = optee_probe,
++	.remove = optee_remove,
 +};
 +
-+static const struct attribute_group tee_dev_group = {
-+	.attrs = tee_dev_attrs,
-+};
++module_platform_driver(optee_driver);
 +
-+int tee_device_register(struct tee_device *teedev)
-+{
-+	int rc;
-+
-+	/*
-+	 * If the teedev already is registered, don't do it again. It's
-+	 * obviously an error to try to register twice, but if we return
-+	 * an error we'll force the driver to remove the teedev.
-+	 */
-+	if (teedev->flags & TEE_DEVICE_FLAG_REGISTERED) {
-+		dev_err(&teedev->dev, "attempt to register twice\n");
-+		return 0;
-+	}
-+
-+	rc = cdev_add(&teedev->cdev, teedev->dev.devt, 1);
-+	if (rc) {
-+		dev_err(&teedev->dev,
-+			"unable to cdev_add() %s, major %d, minor %d, err=%d\n",
-+			teedev->name, MAJOR(teedev->dev.devt),
-+			MINOR(teedev->dev.devt), rc);
-+		return rc;
-+	}
-+
-+	rc = device_add(&teedev->dev);
-+	if (rc) {
-+		dev_err(&teedev->dev,
-+			"unable to device_add() %s, major %d, minor %d, err=%d\n",
-+			teedev->name, MAJOR(teedev->dev.devt),
-+			MINOR(teedev->dev.devt), rc);
-+		goto err_device_add;
-+	}
-+
-+	rc = sysfs_create_group(&teedev->dev.kobj, &tee_dev_group);
-+	if (rc) {
-+		dev_err(&teedev->dev,
-+			"failed to create sysfs attributes, err=%d\n", rc);
-+		goto err_sysfs_create_group;
-+	}
-+
-+	teedev->flags |= TEE_DEVICE_FLAG_REGISTERED;
-+	return 0;
-+
-+err_sysfs_create_group:
-+	device_del(&teedev->dev);
-+err_device_add:
-+	cdev_del(&teedev->cdev);
-+	return rc;
-+
-+}
-+EXPORT_SYMBOL_GPL(tee_device_register);
-+
-+void tee_device_put(struct tee_device *teedev)
-+{
-+	mutex_lock(&teedev->mutex);
-+	/* Shouldn't put in this state */
-+	if (!WARN_ON(!teedev->desc)) {
-+		teedev->num_users--;
-+		if (!teedev->num_users) {
-+			teedev->desc = NULL;
-+			complete(&teedev->c_no_users);
-+		}
-+	}
-+	mutex_unlock(&teedev->mutex);
-+}
-+
-+bool tee_device_get(struct tee_device *teedev)
-+{
-+	mutex_lock(&teedev->mutex);
-+	if (!teedev->desc) {
-+		mutex_unlock(&teedev->mutex);
-+		return false;
-+	}
-+	teedev->num_users++;
-+	mutex_unlock(&teedev->mutex);
-+	return true;
-+}
-+
-+void tee_device_unregister(struct tee_device *teedev)
-+{
-+	if (!teedev)
-+		return;
-+
-+	if (teedev->flags & TEE_DEVICE_FLAG_REGISTERED) {
-+		sysfs_remove_group(&teedev->dev.kobj, &tee_dev_group);
-+		cdev_del(&teedev->cdev);
-+		device_del(&teedev->dev);
-+	}
-+
-+	tee_device_put(teedev);
-+	wait_for_completion(&teedev->c_no_users);
-+
-+	/*
-+	 * No need to take a mutex any longer now since teedev->desc was
-+	 * set to NULL before teedev->c_no_users was completed.
-+	 */
-+
-+	teedev->pool = NULL;
-+
-+	put_device(&teedev->dev);
-+}
-+EXPORT_SYMBOL_GPL(tee_device_unregister);
-+
-+void *tee_get_drvdata(struct tee_device *teedev)
-+{
-+	return dev_get_drvdata(&teedev->dev);
-+}
-+EXPORT_SYMBOL_GPL(tee_get_drvdata);
-+
-+static int __init tee_init(void)
-+{
-+	int rc;
-+
-+	tee_class = class_create(THIS_MODULE, "tee");
-+	if (IS_ERR(tee_class)) {
-+		pr_err("couldn't create class\n");
-+		return PTR_ERR(tee_class);
-+	}
-+
-+	rc = alloc_chrdev_region(&tee_devt, 0, TEE_NUM_DEVICES, "tee");
-+	if (rc < 0) {
-+		pr_err("failed to allocate char dev region\n");
-+		class_destroy(tee_class);
-+		tee_class = NULL;
-+	}
-+
-+	return rc;
-+}
-+
-+subsys_initcall(tee_init);
-diff --git a/drivers/tee/tee_private.h b/drivers/tee/tee_private.h
++MODULE_AUTHOR("Linaro");
++MODULE_DESCRIPTION("OP-TEE driver");
++MODULE_SUPPORTED_DEVICE("");
++MODULE_VERSION("1.0");
++MODULE_LICENSE("GPL v2");
+diff --git a/drivers/tee/optee/optee_msg.h b/drivers/tee/optee/optee_msg.h
 new file mode 100644
-index 0000000..d32ac54
+index 0000000..58db178
 --- /dev/null
-+++ b/drivers/tee/tee_private.h
-@@ -0,0 +1,80 @@
++++ b/drivers/tee/optee/optee_msg.h
+@@ -0,0 +1,423 @@
 +/*
 + * Copyright (c) 2015, Linaro Limited
++ * All rights reserved.
 + *
-+ * This software is licensed under the terms of the GNU General Public
-+ * License version 2, as published by the Free Software Foundation, and
-+ * may be copied, distributed, and modified under those terms.
++ * Redistribution and use in source and binary forms, with or without
++ * modification, are permitted provided that the following conditions are met:
 + *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
++ * 1. Redistributions of source code must retain the above copyright notice,
++ * this list of conditions and the following disclaimer.
 + *
++ * 2. Redistributions in binary form must reproduce the above copyright notice,
++ * this list of conditions and the following disclaimer in the documentation
++ * and/or other materials provided with the distribution.
++ *
++ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
++ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
++ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
++ * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
++ * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
++ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
++ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
++ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
++ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
++ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
++ * POSSIBILITY OF SUCH DAMAGE.
 + */
-+#ifndef TEE_PRIVATE_H
-+#define TEE_PRIVATE_H
++#ifndef _OPTEE_MSG_H
++#define _OPTEE_MSG_H
 +
 +#include <linux/types.h>
-+#include <linux/device.h>
-+#include <linux/cdev.h>
-+#include <linux/completion.h>
-+#include <linux/mutex.h>
-+#include <linux/kref.h>
-+
-+struct tee_device;
-+
-+struct tee_shm {
-+	struct list_head list_node;
-+	struct tee_device *teedev;
-+	phys_addr_t paddr;
-+	void *kaddr;
-+	size_t size;
-+	struct dma_buf *dmabuf;
-+	u32 flags;
-+};
-+
-+struct tee_shm_pool_mgr;
-+struct tee_shm_pool_mgr_ops {
-+	int (*alloc)(struct tee_shm_pool_mgr *poolmgr, struct tee_shm *shm,
-+		     size_t size);
-+	void (*free)(struct tee_shm_pool_mgr *poolmgr, struct tee_shm *shm);
-+};
-+
-+struct tee_shm_pool_mgr {
-+	const struct tee_shm_pool_mgr_ops *ops;
-+	void *private_data;
-+};
-+
-+struct tee_shm_pool {
-+	struct tee_shm_pool_mgr private_mgr;
-+	struct tee_shm_pool_mgr dma_buf_mgr;
-+	void (*destroy)(struct tee_shm_pool *pool);
-+	void *private_data;
-+};
-+
-+#define TEE_DEVICE_FLAG_REGISTERED	0x1
-+#define TEE_MAX_DEV_NAME_LEN		32
-+
-+struct tee_device {
-+	char name[TEE_MAX_DEV_NAME_LEN];
-+	const struct tee_desc *desc;
-+	int id;
-+	unsigned flags;
-+
-+	struct device dev;
-+	struct cdev cdev;
-+
-+	size_t num_users;
-+	struct completion c_no_users;
-+	struct mutex mutex;
-+
-+	struct list_head list_shm;
-+	struct tee_shm_pool *pool;
-+};
-+
-+int tee_shm_init(void);
-+
-+bool tee_device_get(struct tee_device *teedev);
-+void tee_device_put(struct tee_device *teedev);
-+
-+#endif /*TEE_PRIVATE_H*/
-diff --git a/drivers/tee/tee_shm.c b/drivers/tee/tee_shm.c
-new file mode 100644
-index 0000000..6732e77
---- /dev/null
-+++ b/drivers/tee/tee_shm.c
-@@ -0,0 +1,324 @@
-+/*
-+ * Copyright (c) 2015, Linaro Limited
-+ *
-+ * This software is licensed under the terms of the GNU General Public
-+ * License version 2, as published by the Free Software Foundation, and
-+ * may be copied, distributed, and modified under those terms.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ */
-+#include <linux/device.h>
-+#include <linux/fdtable.h>
-+#include <linux/sched.h>
-+#include <linux/dma-buf.h>
-+#include <linux/slab.h>
-+#include <linux/tee_drv.h>
-+#include "tee_private.h"
-+
-+static void tee_shm_release(struct tee_shm *shm)
-+{
-+	struct tee_device *teedev = shm->teedev;
-+	struct tee_shm_pool_mgr *poolm;
-+
-+	mutex_lock(&teedev->mutex);
-+	list_del(&shm->list_node);
-+	mutex_unlock(&teedev->mutex);
-+
-+	if (shm->flags & TEE_SHM_DMA_BUF)
-+		poolm = &teedev->pool->dma_buf_mgr;
-+	else
-+		poolm = &teedev->pool->private_mgr;
-+
-+	poolm->ops->free(poolm, shm);
-+	kfree(shm);
-+
-+	tee_device_put(teedev);
-+}
-+
-+static struct sg_table *tee_shm_op_map_dma_buf(struct dma_buf_attachment
-+			*attach, enum dma_data_direction dir)
-+{
-+	return NULL;
-+}
-+
-+static void tee_shm_op_unmap_dma_buf(struct dma_buf_attachment *attach,
-+			struct sg_table *table, enum dma_data_direction dir)
-+{
-+}
-+
-+static void tee_shm_op_release(struct dma_buf *dmabuf)
-+{
-+	struct tee_shm *shm = dmabuf->priv;
-+
-+	tee_shm_release(shm);
-+}
-+
-+static void *tee_shm_op_kmap_atomic(struct dma_buf *dmabuf,
-+			unsigned long pgnum)
-+{
-+	return NULL;
-+}
-+
-+static void *tee_shm_op_kmap(struct dma_buf *dmabuf, unsigned long pgnum)
-+{
-+	return NULL;
-+}
-+
-+static int tee_shm_op_mmap(struct dma_buf *dmabuf,
-+			struct vm_area_struct *vma)
-+{
-+	struct tee_shm *shm = dmabuf->priv;
-+	size_t size = vma->vm_end - vma->vm_start;
-+
-+	return remap_pfn_range(vma, vma->vm_start, shm->paddr >> PAGE_SHIFT,
-+			       size, vma->vm_page_prot);
-+}
-+
-+static struct dma_buf_ops tee_shm_dma_buf_ops = {
-+	.map_dma_buf = tee_shm_op_map_dma_buf,
-+	.unmap_dma_buf = tee_shm_op_unmap_dma_buf,
-+	.release = tee_shm_op_release,
-+	.kmap_atomic = tee_shm_op_kmap_atomic,
-+	.kmap = tee_shm_op_kmap,
-+	.mmap = tee_shm_op_mmap,
-+};
-+
-+struct tee_shm *tee_shm_alloc(struct tee_device *teedev, size_t size,
-+			u32 flags)
-+{
-+	struct tee_shm_pool_mgr *poolm = NULL;
-+	struct tee_shm *shm;
-+	void *ret;
-+	int rc;
-+
-+	if (!(flags & TEE_SHM_MAPPED)) {
-+		dev_err(teedev->dev.parent,
-+			"only mapped allocations supported\n");
-+		return ERR_PTR(-EINVAL);
-+	}
-+
-+	if ((flags & ~(TEE_SHM_MAPPED|TEE_SHM_DMA_BUF))) {
-+		dev_err(teedev->dev.parent, "invalid shm flags 0x%x", flags);
-+		return ERR_PTR(-EINVAL);
-+	}
-+
-+	if (!tee_device_get(teedev))
-+		return ERR_PTR(-EINVAL);
-+
-+	if (!teedev->pool) {
-+		/* teedev has been detached from driver */
-+		ret = ERR_PTR(-EINVAL);
-+		goto err;
-+	}
-+
-+	shm = kzalloc(sizeof(struct tee_shm), GFP_KERNEL);
-+	if (!shm) {
-+		ret = ERR_PTR(-ENOMEM);
-+		goto err;
-+	}
-+
-+	shm->flags = flags;
-+	shm->teedev = teedev;
-+	if (flags & TEE_SHM_DMA_BUF)
-+		poolm = &teedev->pool->dma_buf_mgr;
-+	else
-+		poolm = &teedev->pool->private_mgr;
-+
-+	rc = poolm->ops->alloc(poolm, shm, size);
-+	if (rc) {
-+		ret = ERR_PTR(rc);
-+		goto err;
-+	}
-+
-+	mutex_lock(&teedev->mutex);
-+	list_add_tail(&shm->list_node, &teedev->list_shm);
-+	mutex_unlock(&teedev->mutex);
-+
-+	if (flags & TEE_SHM_DMA_BUF) {
-+		DEFINE_DMA_BUF_EXPORT_INFO(exp_info);
-+
-+		exp_info.ops = &tee_shm_dma_buf_ops;
-+		exp_info.size = shm->size;
-+		exp_info.flags = O_RDWR;
-+		exp_info.priv = shm;
-+
-+		shm->dmabuf = dma_buf_export(&exp_info);
-+		if (IS_ERR(shm->dmabuf)) {
-+			ret = ERR_CAST(shm->dmabuf);
-+			goto err;
-+		}
-+	}
-+
-+	return shm;
-+err:
-+	if (poolm && shm && shm->kaddr)
-+		poolm->ops->free(poolm, shm);
-+	kfree(shm);
-+	tee_device_put(teedev);
-+	return ret;
-+}
-+EXPORT_SYMBOL_GPL(tee_shm_alloc);
-+
-+int tee_shm_get_fd(struct tee_shm *shm)
-+{
-+	u32 req_flags = TEE_SHM_MAPPED | TEE_SHM_DMA_BUF;
-+	int fd;
-+
-+	if ((shm->flags & req_flags) != req_flags)
-+		return -EINVAL;
-+
-+	fd = dma_buf_fd(shm->dmabuf, O_CLOEXEC);
-+	if (fd >= 0)
-+		get_dma_buf(shm->dmabuf);
-+	return fd;
-+}
-+EXPORT_SYMBOL_GPL(tee_shm_get_fd);
-+
-+int tee_shm_put_fd(int fd)
-+{
-+	return __close_fd(current->files, fd);
-+}
-+EXPORT_SYMBOL_GPL(tee_shm_put_fd);
-+
-+void tee_shm_free(struct tee_shm *shm)
-+{
-+
-+	/*
-+	 * dma_buf_put() decreases the dmabuf reference counter and will
-+	 * call tee_shm_release() when the last reference is gone.
-+	 *
-+	 * In the case of driver private memory we call tee_shm_release
-+	 * directly instead as it doesn't have a reference counter.
-+	 */
-+	if (shm->flags & TEE_SHM_DMA_BUF)
-+		dma_buf_put(shm->dmabuf);
-+	else
-+		tee_shm_release(shm);
-+}
-+EXPORT_SYMBOL_GPL(tee_shm_free);
-+
-+static bool cmp_key_va(struct tee_shm *shm, uintptr_t va)
-+{
-+	uintptr_t shm_va = (uintptr_t)shm->kaddr;
-+
-+	return (va >= shm_va) && (va < (shm_va + shm->size));
-+}
-+
-+static bool cmp_key_pa(struct tee_shm *shm, uintptr_t pa)
-+{
-+	return (pa >= shm->paddr) && (pa < (shm->paddr + shm->size));
-+}
-+
-+static struct tee_shm *tee_shm_find_by_key(struct tee_device *teedev, u32 flags,
-+			bool (*cmp)(struct tee_shm *shm, uintptr_t key),
-+			uintptr_t key)
-+{
-+	struct tee_shm *ret = NULL;
-+	struct tee_shm *shm;
-+
-+	mutex_lock(&teedev->mutex);
-+	list_for_each_entry(shm, &teedev->list_shm, list_node) {
-+		if (cmp(shm, key)) {
-+			ret = shm;
-+			break;
-+		}
-+	}
-+	mutex_unlock(&teedev->mutex);
-+
-+	return ret;
-+}
-+
-+struct tee_shm *tee_shm_find_by_va(struct tee_device *teedev, u32 flags,
-+			void *va)
-+{
-+	return tee_shm_find_by_key(teedev, flags, cmp_key_va, (uintptr_t)va);
-+}
-+EXPORT_SYMBOL_GPL(tee_shm_find_by_va);
-+
-+struct tee_shm *tee_shm_find_by_pa(struct tee_device *teedev, u32 flags,
-+			phys_addr_t pa)
-+{
-+	return tee_shm_find_by_key(teedev, flags, cmp_key_pa, pa);
-+}
-+EXPORT_SYMBOL_GPL(tee_shm_find_by_pa);
-+
-+int tee_shm_va2pa(struct tee_shm *shm, void *va, phys_addr_t *pa)
-+{
-+	/* Check that we're in the range of the shm */
-+	if ((char *)va < (char *)shm->kaddr)
-+		return -EINVAL;
-+	if ((char *)va >= ((char *)shm->kaddr + shm->size))
-+		return -EINVAL;
-+
-+	return tee_shm_get_pa(
-+			shm, (unsigned long)va - (unsigned long)shm->kaddr, pa);
-+}
-+EXPORT_SYMBOL_GPL(tee_shm_va2pa);
-+
-+int tee_shm_pa2va(struct tee_shm *shm, phys_addr_t pa, void **va)
-+{
-+	/* Check that we're in the range of the shm */
-+	if (pa < shm->paddr)
-+		return -EINVAL;
-+	if (pa >= (shm->paddr + shm->size))
-+		return -EINVAL;
-+
-+	if (va) {
-+		void *v = tee_shm_get_va(shm, pa - shm->paddr);
-+
-+		if (IS_ERR(v))
-+			return PTR_ERR(v);
-+		*va = v;
-+	}
-+	return 0;
-+}
-+EXPORT_SYMBOL_GPL(tee_shm_pa2va);
-+
-+void *tee_shm_get_va(struct tee_shm *shm, size_t offs)
-+{
-+	if (offs >= shm->size)
-+		return ERR_PTR(-EINVAL);
-+	return (char *)shm->kaddr + offs;
-+}
-+EXPORT_SYMBOL_GPL(tee_shm_get_va);
-+
-+int tee_shm_get_pa(struct tee_shm *shm, size_t offs, phys_addr_t *pa)
-+{
-+	if (offs >= shm->size)
-+		return -EINVAL;
-+	if (pa)
-+		*pa = shm->paddr + offs;
-+	return 0;
-+}
-+EXPORT_SYMBOL_GPL(tee_shm_get_pa);
-+
-+static bool is_shm_dma_buf(struct dma_buf *dmabuf)
-+{
-+	return dmabuf->ops == &tee_shm_dma_buf_ops;
-+}
-+
-+struct tee_shm *tee_shm_get_from_fd(int fd)
-+{
-+	struct dma_buf *dmabuf = dma_buf_get(fd);
-+
-+	if (IS_ERR(dmabuf))
-+		return ERR_CAST(dmabuf);
-+
-+	if (!is_shm_dma_buf(dmabuf)) {
-+		dma_buf_put(dmabuf);
-+		return ERR_PTR(-EINVAL);
-+	}
-+	return dmabuf->priv;
-+}
-+EXPORT_SYMBOL_GPL(tee_shm_get_from_fd);
-+
-+void tee_shm_put(struct tee_shm *shm)
-+{
-+	if (shm->flags & TEE_SHM_DMA_BUF)
-+		dma_buf_put(shm->dmabuf);
-+}
-+EXPORT_SYMBOL_GPL(tee_shm_put);
-diff --git a/drivers/tee/tee_shm_pool.c b/drivers/tee/tee_shm_pool.c
-new file mode 100644
-index 0000000..2ef22bc
---- /dev/null
-+++ b/drivers/tee/tee_shm_pool.c
-@@ -0,0 +1,133 @@
-+/*
-+ * Copyright (c) 2015, Linaro Limited
-+ *
-+ * This software is licensed under the terms of the GNU General Public
-+ * License version 2, as published by the Free Software Foundation, and
-+ * may be copied, distributed, and modified under those terms.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ */
-+#include <linux/device.h>
-+#include <linux/dma-buf.h>
-+#include <linux/slab.h>
-+#include <linux/genalloc.h>
-+#include <linux/tee_drv.h>
-+#include "tee_private.h"
-+
-+static int pool_op_gen_alloc(struct tee_shm_pool_mgr *poolm,
-+			struct tee_shm *shm, size_t size)
-+{
-+	unsigned long va;
-+	struct gen_pool *genpool = poolm->private_data;
-+	size_t s = roundup(size, 1 << genpool->min_alloc_order);
-+
-+	va = gen_pool_alloc(genpool, s);
-+	if (!va)
-+		return -ENOMEM;
-+	shm->kaddr = (void *)va;
-+	shm->paddr = gen_pool_virt_to_phys(genpool, va);
-+	shm->size = s;
-+	return 0;
-+}
-+
-+static void pool_op_gen_free(struct tee_shm_pool_mgr *poolm,
-+			struct tee_shm *shm)
-+{
-+	gen_pool_free(poolm->private_data, (unsigned long)shm->kaddr,
-+		      shm->size);
-+	shm->kaddr = NULL;
-+}
-+
-+static const struct tee_shm_pool_mgr_ops pool_ops_generic = {
-+	.alloc = pool_op_gen_alloc,
-+	.free = pool_op_gen_free,
-+};
-+
-+static void pool_res_mem_destroy(struct tee_shm_pool *pool)
-+{
-+	gen_pool_destroy(pool->private_mgr.private_data);
-+	gen_pool_destroy(pool->dma_buf_mgr.private_data);
-+}
-+
-+static int pool_res_mem_mgr_init(struct tee_shm_pool_mgr *mgr,
-+			struct tee_shm_pool_mem_info *info, int min_alloc_order)
-+{
-+	size_t page_mask = PAGE_SIZE - 1;
-+	struct gen_pool *genpool = NULL;
-+	int rc;
-+
-+	/*
-+	 * Start and end must be page aligned
-+	 */
-+	if ((info->vaddr & page_mask) || (info->paddr & page_mask) ||
-+	    (info->size & page_mask))
-+		return -EINVAL;
-+
-+	genpool = gen_pool_create(min_alloc_order, -1);
-+	if (!genpool)
-+		return -ENOMEM;
-+
-+	gen_pool_set_algo(genpool, gen_pool_best_fit, NULL);
-+	rc = gen_pool_add_virt(genpool, info->vaddr, info->paddr, info->size,
-+			       -1);
-+	if (rc) {
-+		gen_pool_destroy(genpool);
-+		return rc;
-+	}
-+
-+	mgr->private_data = genpool;
-+	mgr->ops = &pool_ops_generic;
-+	return 0;
-+}
-+
-+struct tee_shm_pool *tee_shm_pool_alloc_res_mem(struct device *dev,
-+			struct tee_shm_pool_mem_info *priv_info,
-+			struct tee_shm_pool_mem_info *dmabuf_info)
-+{
-+	struct tee_shm_pool *pool = NULL;
-+	int ret;
-+
-+	pool = kzalloc(sizeof(*pool), GFP_KERNEL);
-+	if (!pool) {
-+		ret = -ENOMEM;
-+		goto err;
-+	}
-+
-+	/*
-+	 * Create the pool for driver private shared memory
-+	 */
-+	ret = pool_res_mem_mgr_init(&pool->private_mgr, priv_info,
-+				    3 /* 8 byte aligned */);
-+	if (ret)
-+		goto err;
-+
-+	/*
-+	 * Create the pool for dma_buf shared memory
-+	 */
-+	ret = pool_res_mem_mgr_init(&pool->dma_buf_mgr, dmabuf_info,
-+				    PAGE_SHIFT);
-+	if (ret)
-+		goto err;
-+
-+	pool->destroy = pool_res_mem_destroy;
-+	return pool;
-+err:
-+	if (ret == -ENOMEM)
-+		dev_err(dev, "can't allocate memory for res_mem shared memory pool\n");
-+	if (pool && pool->private_mgr.private_data)
-+		gen_pool_destroy(pool->private_mgr.private_data);
-+	kfree(pool);
-+	return ERR_PTR(ret);
-+}
-+EXPORT_SYMBOL_GPL(tee_shm_pool_alloc_res_mem);
-+
-+void tee_shm_pool_free(struct tee_shm_pool *pool)
-+{
-+	pool->destroy(pool);
-+	kfree(pool);
-+}
-+EXPORT_SYMBOL_GPL(tee_shm_pool_free);
-diff --git a/include/linux/tee_drv.h b/include/linux/tee_drv.h
-new file mode 100644
-index 0000000..bbfe8c2
---- /dev/null
-+++ b/include/linux/tee_drv.h
-@@ -0,0 +1,300 @@
-+/*
-+ * Copyright (c) 2015, Linaro Limited
-+ *
-+ * This software is licensed under the terms of the GNU General Public
-+ * License version 2, as published by the Free Software Foundation, and
-+ * may be copied, distributed, and modified under those terms.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ */
-+
-+#ifndef __TEE_DRV_H
-+#define __TEE_DRV_H
-+
-+#include <linux/types.h>
-+#include <linux/list.h>
-+#include <linux/miscdevice.h>
-+#include <linux/tee.h>
 +
 +/*
-+ * The file describes the API provided by the generic TEE driver to the
-+ * specific TEE driver.
++ * This file defines the OP-TEE message protocol used to communicate
++ * with an instance of OP-TEE running in secure world.
++ *
++ * This file is divided into three sections.
++ * 1. Formatting of messages.
++ * 2. Requests from normal world
++ * 3. Requests from secure world, Remote Procedure Call (RPC), handled by
++ *    tee-supplicant.
 + */
 +
-+#define TEE_SHM_MAPPED		0x1	/* Memory mapped by the kernel */
-+#define TEE_SHM_DMA_BUF		0x2	/* Memory with dma-buf handle */
++/*****************************************************************************
++ * Part 1 - formatting of messages
++ *****************************************************************************/
 +
-+struct tee_device;
-+struct tee_shm;
-+struct tee_shm_pool;
++#define OPTEE_MSG_ATTR_TYPE_NONE		0x0
++#define OPTEE_MSG_ATTR_TYPE_VALUE_INPUT		0x1
++#define OPTEE_MSG_ATTR_TYPE_VALUE_OUTPUT	0x2
++#define OPTEE_MSG_ATTR_TYPE_VALUE_INOUT		0x3
++#define OPTEE_MSG_ATTR_TYPE_RMEM_INPUT		0x5
++#define OPTEE_MSG_ATTR_TYPE_RMEM_OUTPUT		0x6
++#define OPTEE_MSG_ATTR_TYPE_RMEM_INOUT		0x7
++#define OPTEE_MSG_ATTR_TYPE_TMEM_INPUT		0x9
++#define OPTEE_MSG_ATTR_TYPE_TMEM_OUTPUT		0xa
++#define OPTEE_MSG_ATTR_TYPE_TMEM_INOUT		0xb
++
++#define OPTEE_MSG_ATTR_TYPE_MASK		0xff
++
++/*
++ * Meta parameter to be absorbed by the Secure OS and not passed
++ * to the Trusted Application.
++ *
++ * Currently only used with OPTEE_MSG_CMD_OPEN_SESSION.
++ */
++#define OPTEE_MSG_ATTR_META			(1 << 8)
++
++/*
++ * The temporary shared memory object is not physically contigous and this
++ * temp memref is followed by another fragment until the last temp memref
++ * that doesn't have this bit set.
++ */
++#define OPTEE_MSG_ATTR_FRAGMENT			(1 << 9)
++
++/*
++ * Memory attributes for caching passed with temp memrefs. The actual value
++ * used is defined outside the message protocol with the exception of
++ * OPTEE_MSG_ATTR_CACHE_PREDEFINED which means the attributes already
++ * defined for the memory range should be used. If optee_smc.h is used as
++ * bearer of this protocol OPTEE_SMC_SHM_* is used for values.
++ */
++#define OPTEE_MSG_ATTR_CACHE_SHIFT		16
++#define OPTEE_MSG_ATTR_CACHE_MASK		0x7
++#define OPTEE_MSG_ATTR_CACHE_PREDEFINED		0
++
++/*
++ * Same values as TEE_LOGIN_* from TEE Internal API
++ */
++#define OPTEE_MSG_LOGIN_PUBLIC			0x00000000
++#define OPTEE_MSG_LOGIN_USER			0x00000001
++#define OPTEE_MSG_LOGIN_GROUP			0x00000002
++#define OPTEE_MSG_LOGIN_APPLICATION		0x00000004
++#define OPTEE_MSG_LOGIN_APPLICATION_USER	0x00000005
++#define OPTEE_MSG_LOGIN_APPLICATION_GROUP	0x00000006
 +
 +/**
-+ * struct tee_context - driver specific context on file pointer data
-+ * @teedev:	pointer to this drivers struct tee_device
-+ * @data:	driver specific context data, managed by the driver
++ * struct optee_msg_param_tmem - temporary memory reference
++ * @buf_ptr:	Address of the buffer
++ * @size:	Size of the buffer
++ * @shm_ref:	Temporary shared memory reference, pointer to a struct tee_shm
++ *
++ * Secure and normal world communicates pointers as physical address
++ * instead of the virtual address. This is because secure and normal world
++ * have completely independent memory mapping. Normal world can even have a
++ * hypervisor which need to translate the guest physical address (AKA IPA
++ * in ARM documentation) to a real physical address before passing the
++ * structure to secure world.
 + */
-+struct tee_context {
-+	struct tee_device *teedev;
-+	void *data;
++struct optee_msg_param_tmem {
++	u64 buf_ptr;
++	u64 size;
++	u64 shm_ref;
 +};
 +
-+struct tee_param_memref {
-+	size_t shm_offs;
-+	size_t size;
-+	struct tee_shm *shm;
++/**
++ * struct optee_msg_param_rmem - registered memory reference
++ * @offs:	Offset into shared memory reference
++ * @size:	Size of the buffer
++ * @shm_ref:	Shared memory reference, pointer to a struct tee_shm
++ */
++struct optee_msg_param_rmem {
++	u64 offs;
++	u64 size;
++	u64 shm_ref;
 +};
 +
-+struct tee_param_value {
++/**
++ * struct optee_msg_param_value - values
++ * @a: first value
++ * @b: second value
++ * @c: third value
++ */
++struct optee_msg_param_value {
 +	u64 a;
 +	u64 b;
 +	u64 c;
 +};
 +
-+struct tee_param {
-+	u64 attr;
-+	union {
-+		struct tee_param_memref memref;
-+		struct tee_param_value value;
-+	} u;
-+};
-+
 +/**
-+ * struct tee_driver_ops - driver operations vtable
-+ * @get_version:	returns version of driver
-+ * @open:		called when the device file is opened
-+ * @release:		release this open file
-+ */
-+struct tee_driver_ops {
-+	void (*get_version)(struct tee_device *teedev,
-+			struct tee_ioctl_version_data *vers);
-+	int (*open)(struct tee_context *ctx);
-+	void (*release)(struct tee_context *ctx);
-+	int (*open_session)(struct tee_context *ctx,
-+			struct tee_ioctl_open_session_arg *arg,
-+			struct tee_param *param);
-+	int (*close_session)(struct tee_context *ctx, u32 session);
-+	int (*invoke_func)(struct tee_context *ctx,
-+			struct tee_ioctl_invoke_arg *arg,
-+			struct tee_param *param);
-+	int (*cancel_req)(struct tee_context *ctx, u32 cancel_id, u32 session);
-+	int (*supp_recv)(struct tee_context *ctx, u32 *func, u32 *num_params,
-+			struct tee_param *param);
-+	int (*supp_send)(struct tee_context *ctx, u32 ret, u32 num_params,
-+			struct tee_param *param);
-+};
-+
-+/**
-+ * struct tee_desc - Describes the TEE driver to the subsystem
-+ * @name:	name of driver
-+ * @ops:	driver operations vtable
-+ * @owner:	module providing the driver
-+ * @flags:	Extra properties of driver, defined by TEE_DESC_* below
-+ */
-+#define TEE_DESC_PRIVILEGED	0x1
-+struct tee_desc {
-+	const char *name;
-+	const struct tee_driver_ops *ops;
-+	struct module *owner;
-+	u32 flags;
-+};
-+
-+
-+/**
-+ * tee_device_alloc() - Allocate a new struct tee_device instance
-+ * @teedesc:	Descriptor for this driver
-+ * @dev:	Parent device for this device
-+ * @pool:	Shared memory pool, NULL if not used
-+ * @driver_data: Private driver data for this device
-+ *
-+ * Allocates a new struct tee_device instance. The device is
-+ * removed by tee_device_unregister().
-+ *
-+ * @returns a pointer to a 'struct tee_device' or an ERR_PTR on failure
-+ */
-+struct tee_device *tee_device_alloc(const struct tee_desc *teedesc,
-+			struct device *dev, struct tee_shm_pool *pool,
-+			void *driver_data);
-+
-+/**
-+ * tee_device_register() - Registers a TEE device
-+ * @teedev:	Device to register
-+ *
-+ * tee_device_unregister() need to be called to remove the @teedev if
-+ * this function fails.
-+ *
-+ * @returns < 0 on failure
-+ */
-+int tee_device_register(struct tee_device *teedev);
-+
-+/**
-+ * tee_device_unregister() - Removes a TEE device
-+ * @teedev:	Device to unregister
-+ *
-+ * This function should be called to remove the @teedev even if
-+ * tee_device_register() hasn't been called yet. Does nothing if
-+ * @teedev is NULL.
-+ */
-+void tee_device_unregister(struct tee_device *teedev);
-+
-+/**
-+ * struct tee_shm_pool_mem_info - holds information needed to create a shared memory pool
-+ * @vaddr:	Virtual address of start of pool
-+ * @paddr:	Physical address of start of pool
-+ * @size:	Size in bytes of the pool
-+ */
-+struct tee_shm_pool_mem_info {
-+	unsigned long vaddr;
-+	unsigned long paddr;
-+	size_t size;
-+};
-+
-+/**
-+ * tee_shm_pool_alloc_res_mem() - Create a shared memory pool from reserved memory range
-+ * @dev:	Device allocating the pool
-+ * @priv_info:	Information for driver private shared memory pool
-+ * @dmabuf_info: Information for dma-buf shared memory pool
-+ *
-+ * Start and end of pools will must be page aligned.
-+ *
-+ * Allocation with the flag TEE_SHM_DMA_BUF set will use the range supplied
-+ * in @dmabuf, others will use the range provided by @priv.
-+ *
-+ * @returns pointer to a 'struct tee_shm_pool' or an ERR_PTR on failure.
-+ */
-+struct tee_shm_pool *tee_shm_pool_alloc_res_mem(struct device *dev,
-+			struct tee_shm_pool_mem_info *priv_info,
-+			struct tee_shm_pool_mem_info *dmabuf_info);
-+
-+/**
-+ * tee_shm_pool_free() - Free a shared memory pool
-+ * @pool:	The shared memory pool to free
-+ *
-+ * The must be no remaining shared memory allocated from this pool when
-+ * this function is called.
-+ */
-+void tee_shm_pool_free(struct tee_shm_pool *pool);
-+
-+/**
-+ * tee_get_drvdata() - Return driver_data pointer
-+ * @returns the driver_data pointer supplied to tee_register().
-+ */
-+void *tee_get_drvdata(struct tee_device *teedev);
-+
-+/**
-+ * tee_shm_alloc() - Allocate shared memory
-+ * @teedev:	Driver that allocates the shared memory
-+ * @size:	Requested size of shared memory
-+ * @flags:	Flags setting properties for the requested shared memory.
-+ *
-+ * Memory allocated as global shared memory is automatically freed when the
-+ * TEE file pointer is closed. The @flags field uses the bits defined by
-+ * TEE_SHM_* above. TEE_SHM_MAPPED must currently always be set. If
-+ * TEE_SHM_DMA_BUF global shared memory will be allocated and associated
-+ * with a dma-buf handle, else driver private memory.
-+ *
-+ * @returns a pointer to 'struct tee_shm'
-+ */
-+struct tee_shm *tee_shm_alloc(struct tee_device *teedev, size_t size,
-+			u32 flags);
-+
-+/**
-+ * tee_shm_free() - Free shared memory
-+ * @shm:	Handle to shared memory to free
-+ */
-+void tee_shm_free(struct tee_shm *shm);
-+
-+/**
-+ * tee_shm_find_by_va() - Find a shared memory handle by a virtual address
-+ * @teedev:	The device that owns the shared memory
-+ * @flags:	Select which type of shared memory to locate, if
-+ *		TEE_SHM_DMA_BUF global shared memory else driver private
-+ *		shared memory.
-+ * @va:		Virtual address covered by the shared memory
-+ * @returns a Handle to shared memory
-+ */
-+struct tee_shm *tee_shm_find_by_va(struct tee_device *teedev, u32 flags,
-+			void *va);
-+/**
-+ * tee_shm_find_by_pa() - Find a shared memory handle by a physical address
-+ * @teedev:	The device that owns the shared memory
-+ * @flags:	Select which type of shared memory to locate, if
-+ *		TEE_SHM_DMA_BUF global shared memory else driver private
-+ *		shared memory.
-+ * @pa:		Physical address covered by the shared memory
-+ * @returns a Handle to shared memory
-+ */
-+struct tee_shm *tee_shm_find_by_pa(struct tee_device *teedev, u32 flags,
-+			phys_addr_t pa);
-+
-+/**
-+ * tee_shm_va2pa() - Get physical address of a virtual address
-+ * @shm:	Shared memory handle
-+ * @va:		Virtual address to tranlsate
-+ * @pa:		Returned physical address
-+ * @returns 0 on success and < 0 on failure
-+ */
-+int tee_shm_va2pa(struct tee_shm *shm, void *va, phys_addr_t *pa);
-+
-+/**
-+ * tee_shm_pa2va() - Get virtual address of a physical address
-+ * @shm:	Shared memory handle
-+ * @pa:		Physical address to tranlsate
-+ * @va:		Returned virtual address
-+ * @returns 0 on success and < 0 on failure
-+ */
-+int tee_shm_pa2va(struct tee_shm *shm, phys_addr_t pa, void **va);
-+
-+/**
-+ * tee_shm_get_va() - Get virtual address of a shared memory plus an offset
-+ * @shm:	Shared memory handle
-+ * @offs:	Offset from start of this shared memory
-+ * @returns virtual address of the shared memory + offs if offs is within
-+ *	the bounds of this shared memory, else an ERR_PTR
-+ */
-+void *tee_shm_get_va(struct tee_shm *shm, size_t offs);
-+
-+/**
-+ * tee_shm_get_pa() - Get physical address of a shared memory plus an offset
-+ * @shm:	Shared memory handle
-+ * @offs:	Offset from start of this shared memory
-+ * @pa:		Physical address to return
-+ * @returns 0 if offs is within the bounds of this shared memory, else an
-+ *	error code.
-+ */
-+int tee_shm_get_pa(struct tee_shm *shm, size_t offs, phys_addr_t *pa);
-+
-+/**
-+ * tee_shm_get_from_fd() - Get a shared memory handle from a file descriptor
-+ * @fd:		A user space file descriptor
-+ *
-+ * This function increases the reference counter on the shared memory and
-+ * returns a handle.
-+ * @returns handle to shared memory
-+ */
-+struct tee_shm *tee_shm_get_from_fd(int fd);
-+
-+/**
-+ * tee_shm_put() - Decrease reference count on a shared memory handle
-+ * @shm:	Shared memory handle
-+ */
-+void tee_shm_put(struct tee_shm *shm);
-+
-+/**
-+ * tee_shm_get_fd() - Increase reference count and return file descriptor
-+ * @shm:	Shared memory handle
-+ * @returns user space file descriptor to shared memory
-+ */
-+int tee_shm_get_fd(struct tee_shm *shm);
-+
-+/**
-+ * tee_shm_put_fd() - Decrease reference count and close file descriptor
-+ * @fd:		File descriptor to close
-+ * @returns < 0 on failure
-+ */
-+int tee_shm_put_fd(int fd);
-+
-+#endif /*__TEE_DRV_H*/
-diff --git a/include/uapi/linux/tee.h b/include/uapi/linux/tee.h
-new file mode 100644
-index 0000000..319cc61
---- /dev/null
-+++ b/include/uapi/linux/tee.h
-@@ -0,0 +1,383 @@
-+/*
-+ * Copyright (c) 2015, Linaro Limited
-+ *
-+ * This software is licensed under the terms of the GNU General Public
-+ * License version 2, as published by the Free Software Foundation, and
-+ * may be copied, distributed, and modified under those terms.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ */
-+
-+#ifndef __TEE_H
-+#define __TEE_H
-+
-+#include <linux/ioctl.h>
-+#include <linux/types.h>
-+
-+/*
-+ * This file describes the API provided by a TEE driver to user space.
-+ *
-+ * Each TEE driver defines a TEE specific protocol which is used for the
-+ * data passed back and forth using TEE_IOC_CMD.
-+ */
-+
-+
-+/* Helpers to make the ioctl defines */
-+#define TEE_IOC_MAGIC	0xa4
-+#define TEE_IOC_BASE	0
-+
-+/* Flags relating to shared memory */
-+#define TEE_IOCTL_SHM_MAPPED	0x1	/* memory mapped in normal world */
-+#define TEE_IOCTL_SHM_DMA_BUF	0x2	/* dma-buf handle on shared memory */
-+
-+#define TEE_MAX_ARG_SIZE	1024
-+
-+#define TEE_GEN_CAP_GP		(1 << 0)/* Global Platform compliant TEE */
-+
-+/*
-+ * TEE Implementation ID
-+ */
-+#define TEE_IMPL_ID_OPTEE	1
-+
-+/*
-+ * OP-TEE specific capabilities
-+ */
-+#define TEE_OPTEE_CAP_TZ	(1 << 0)
-+
-+/**
-+ * struct tee_ioctl_version_data - TEE version
-+ * @impl_id:	[out] TEE implementation id
-+ * @impl_caps:	[out] Implementation specific capabilities
-+ * @gen_caps:	[out] Generic capabilities, defined by TEE_GEN_CAPS_* above
-+ *
-+ * Identifies the TEE implementaion, @impl_id is one of TEE_IMPL_ID_* above.
-+ * @impl_caps is implementation specific, for example TEE_OPTEE_CAP_*
-+ * is valid when @impl_id == TEE_IMPL_ID_OPTEE.
-+ */
-+struct tee_ioctl_version_data {
-+	__u32 impl_id;
-+	__u32 impl_caps;
-+	__u32 gen_caps;
-+};
-+/**
-+ * TEE_IOC_VERSION - query version of TEE
-+ *
-+ * Takes a tee_version struct and returns with the TEE version data filled
-+ * in.
-+ */
-+#define TEE_IOC_VERSION		_IOR(TEE_IOC_MAGIC, TEE_IOC_BASE + 0, \
-+				     struct tee_ioctl_version_data)
-+
-+/**
-+ * struct tee_ioctl_shm_alloc_data - Shared memory allocate argument
-+ * @size:	[in/out] Size of shared memory to allocate
-+ * @flags:	[in/out] Flags to/from allocation.
-+ * @fd:		[out] dma_buf file descriptor of the shared memory
-+ *
-+ * The flags field should currently be zero as input. Updated by the call
-+ * with actual flags as defined by TEE_IOCTL_SHM_* above.
-+ * This structure is used as argument for TEE_IOC_SHM_ALLOC below.
-+ */
-+struct tee_ioctl_shm_alloc_data {
-+	__u64 size;
-+	__u32 flags;
-+	__s32 fd;
-+};
-+/**
-+ * TEE_IOC_SHM_ALLOC - allocate shared memory
-+ *
-+ * Allocates shared memory between the user space process and secure OS.
-+ * The returned file descriptor is used to map the shared memory into user
-+ * space. The shared memory is freed when the descriptor is closed and the
-+ * memory is unmapped.
-+ */
-+#define TEE_IOC_SHM_ALLOC	_IOWR(TEE_IOC_MAGIC, TEE_IOC_BASE + 1, \
-+				     struct tee_ioctl_shm_alloc_data)
-+
-+/**
-+ * struct tee_ioctl_buf_data - Variable sized buffer
-+ * @buf_ptr:	[in] A __user pointer to a buffer
-+ * @buf_len:	[in] Length of the buffer above
-+ *
-+ * Used as argument for TEE_IOC_OPEN_SESSION, TEE_IOC_INVOKE,
-+ * TEE_IOC_SUPPL_RECV, and TEE_IOC_SUPPL_SEND below.
-+ */
-+struct tee_ioctl_buf_data {
-+	__u64 buf_ptr;
-+	__u64 buf_len;
-+};
-+
-+
-+/*
-+ * Attributes for struct tee_ioctl_param, selects field in the union
-+ */
-+#define TEE_IOCTL_PARAM_ATTR_TYPE_NONE		0	/* parameter not used */
-+
-+/*
-+ * These defines value parameters (struct tee_ioctl_param_value)
-+ */
-+#define TEE_IOCTL_PARAM_ATTR_TYPE_VALUE_INPUT	1
-+#define TEE_IOCTL_PARAM_ATTR_TYPE_VALUE_OUTPUT	2
-+#define TEE_IOCTL_PARAM_ATTR_TYPE_VALUE_INOUT	3	/* input and output */
-+
-+/*
-+ * These defines shared memory reference parameters (struct
-+ * tee_ioctl_param_memref)
-+ */
-+#define TEE_IOCTL_PARAM_ATTR_TYPE_MEMREF_INPUT	5
-+#define TEE_IOCTL_PARAM_ATTR_TYPE_MEMREF_OUTPUT	6
-+#define TEE_IOCTL_PARAM_ATTR_TYPE_MEMREF_INOUT	7	/* input and output */
-+
-+/*
-+ * Mask for the type part of the attribute, leaves room for more types
-+ */
-+#define TEE_IOCTL_PARAM_ATTR_TYPE_MASK		0xff
-+
-+/*
-+ * Matches TEEC_LOGIN_* in GP TEE Client API
-+ * Is only defined for GP compliant TEEs
-+ */
-+#define TEE_IOCTL_LOGIN_PUBLIC			0
-+#define TEE_IOCTL_LOGIN_USER			1
-+#define TEE_IOCTL_LOGIN_GROUP			2
-+#define TEE_IOCTL_LOGIN_APPLICATION		4
-+#define TEE_IOCTL_LOGIN_USER_APPLICATION	5
-+#define TEE_IOCTL_LOGIN_GROUP_APPLICATION	6
-+
-+/**
-+ * struct tee_ioctl_param_memref - memory reference
-+ * @shm_offs:	Offset into the shared memory object
-+ * @size:	Size of the buffer
-+ * @shm_fd:	Shared memory file descriptor
-+ *
-+ * Shared memory is allocated with TEE_IOC_SHM_ALLOC which returns a file
-+ * descriptor connected to the shared memory object. A memref can reference
-+ * a part of a shared memory by specifying an offset (@shm_offs) and @size
-+ * of the object. To supply the entire shared memory object set @shm_offs to 0
-+ * and @size to the previously returned size of the object.
-+ */
-+struct tee_ioctl_param_memref {
-+	__u64 shm_offs;
-+	__u64 size;
-+	__s64 shm_fd;
-+};
-+
-+/**
-+ * struct tee_ioctl_param_value - values
-+ * @a: first value
-+ * @b: second value
-+ * @c: third value
-+ */
-+struct tee_ioctl_param_value {
-+	__u64 a;
-+	__u64 b;
-+	__u64 c;
-+};
-+
-+/**
-+ * struct tee_ioctl_param - parameter
++ * struct optee_msg_param - parameter
 + * @attr: attributes
 + * @memref: a memory reference
 + * @value: a value
 + *
-+ * @attr & TEE_PARAM_ATTR_TYPE_MASK indicates if memref or value is used in
-+ * the union. TEE_PARAM_ATTR_TYPE_VALUE_* indicates value and
-+ * TEE_PARAM_ATTR_TYPE_MEMREF_* indicates memref. TEE_PARAM_ATTR_TYPE_NONE
-+ * indicates that none of the members are used.
++ * @attr & OPTEE_MSG_ATTR_TYPE_MASK indicates if tmem, rmem or value is used in
++ * the union. OPTEE_MSG_ATTR_TYPE_VALUE_* indicates value,
++ * OPTEE_MSG_ATTR_TYPE_TMEM_* indicates tmem and
++ * OPTEE_MSG_ATTR_TYPE_RMEM_* indicates rmem.
++ * OPTEE_MSG_ATTR_TYPE_NONE indicates that none of the members are used.
 + */
-+struct tee_ioctl_param {
-+	__u64 attr;
++struct optee_msg_param {
++	u64 attr;
 +	union {
-+		struct tee_ioctl_param_memref memref;
-+		struct tee_ioctl_param_value value;
++		struct optee_msg_param_tmem tmem;
++		struct optee_msg_param_rmem rmem;
++		struct optee_msg_param_value value;
 +	} u;
 +};
 +
-+#define TEE_IOCTL_UUID_LEN		16
-+
 +/**
-+ * struct tee_ioctl_open_session_arg - Open session argument
-+ * @uuid:	[in] UUID of the Trusted Application
-+ * @clnt_uuid:	[in] UUID of client
-+ * @clnt_login:	[in] Login class of client, TEE_LOGIN_* above
-+ * @cancel_id:	[in] Cancellation id, a unique value to identify this request
-+ * @session:	[out] Session id
-+ * @ret:	[out] return value
-+ * @ret_origin	[out] origin of the return value
-+ * @num_params	[in] number of parameters following this struct
-+ */
-+struct tee_ioctl_open_session_arg {
-+	__u8 uuid[TEE_IOCTL_UUID_LEN];
-+	__u8 clnt_uuid[TEE_IOCTL_UUID_LEN];
-+	__u32 clnt_login;
-+	__u32 cancel_id;
-+	__u32 session;
-+	__u32 ret;
-+	__u32 ret_origin;
-+	__u32 num_params;
-+	/*
-+	 * this struct is 8 byte aligned since the 'struct tee_ioctl_param'
-+	 * which follows requires 8 byte alignment.
-+	 *
-+	 * Commented out element used to visualize the layout dynamic part
-+	 * of the struct. This field is not available at all if
-+	 * num_params == 0.
-+	 *
-+	 * struct tee_ioctl_param params[num_params];
-+	 */
-+} __aligned(8);
-+
-+/**
-+ * TEE_IOC_OPEN_SESSION - opens a session to a Trusted Application
++ * struct optee_msg_arg - call argument
++ * @cmd: Command, one of OPTEE_MSG_CMD_* or OPTEE_MSG_RPC_CMD_*
++ * @func: Trusted Application function, specific to the Trusted Application,
++ *	     used if cmd == OPTEE_MSG_CMD_INVOKE_COMMAND
++ * @session: In parameter for all OPTEE_MSG_CMD_* except
++ *	     OPTEE_MSG_CMD_OPEN_SESSION where it's an output parameter instead
++ * @cancel_id: Cancellation id, a unique value to identify this request
++ * @ret: return value
++ * @ret_origin: origin of the return value
++ * @num_params: number of parameters supplied to the OS Command
++ * @params: the parameters supplied to the OS Command
 + *
-+ * Takes a struct tee_ioctl_buf_data which contains a struct
-+ * tee_ioctl_open_session_arg followed by any array of struct
-+ * tee_ioctl_param
-+ */
-+#define TEE_IOC_OPEN_SESSION	_IOR(TEE_IOC_MAGIC, TEE_IOC_BASE + 2, \
-+				     struct tee_ioctl_buf_data)
-+
-+/**
-+ * struct tee_ioctl_invoke_func_arg - Invokes a function in a Trusted Application
-+ * @func:	[in] Trusted Application function, specific to the TA
-+ * @session:	[in] Session id
-+ * @cancel_id:	[in] Cancellation id, a unique value to identify this request
-+ * @ret:	[out] return value
-+ * @ret_origin	[out] origin of the return value
-+ * @num_params	[in] number of parameters following this struct
-+ */
-+struct tee_ioctl_invoke_arg {
-+	__u32 func;
-+	__u32 session;
-+	__u32 cancel_id;
-+	__u32 ret;
-+	__u32 ret_origin;
-+	__u32 num_params;
-+	/*
-+	 * this struct is 8 byte aligned since the 'struct tee_ioctl_param'
-+	 * which follows requires 8 byte alignment.
-+	 *
-+	 * Commented out element used to visualize the layout dynamic part
-+	 * of the struct. This field is not available at all if
-+	 * num_params == 0.
-+	 *
-+	 * struct tee_ioctl_param params[num_params];
-+	 */
-+} __aligned(8);
-+
-+/**
-+ * TEE_IOC_INVOKE - Invokes a function in a Trusted Application
++ * All normal calls to Trusted OS uses this struct. If cmd requires further
++ * information than what these field holds it can be passed as a parameter
++ * tagged as meta (setting the OPTEE_MSG_ATTR_META bit in corresponding
++ * attrs field). All parameters tagged as meta has to come first.
 + *
-+ * Takes a struct tee_ioctl_buf_data which contains a struct
-+ * tee_invoke_func_arg followed by any array of struct tee_param
++ * Temp memref parameters can be fragmented if supported by the Trusted OS
++ * (when optee_smc.h is bearer of this protocol this is indicated with
++ * OPTEE_SMC_SEC_CAP_UNREGISTERED_SHM). If a logical memref parameter is
++ * fragmented then has all but the last fragment the
++ * OPTEE_MSG_ATTR_FRAGMENT bit set in attrs. Even if a memref is fragmented
++ * it will still be presented as a single logical memref to the Trusted
++ * Application.
 + */
-+#define TEE_IOC_INVOKE		_IOR(TEE_IOC_MAGIC, TEE_IOC_BASE + 3, \
-+				     struct tee_ioctl_buf_data)
++struct optee_msg_arg {
++	u32 cmd;
++	u32 func;
++	u32 session;
++	u32 cancel_id;
++	u32 pad;
++	u32 ret;
++	u32 ret_origin;
++	u32 num_params;
 +
-+/**
-+ * struct tee_ioctl_cancel_arg - Cancels an open session or invoke ioctl
-+ * @cancel_id:	[in] Cancellation id, a unique value to identify this request
-+ * @session:	[in] Session id, if the session is opened, else set to 0
-+ */
-+struct tee_ioctl_cancel_arg {
-+	__u32 cancel_id;
-+	__u32 session;
-+};
-+/**
-+ * TEE_IOC_CANCEL - Cancels an open session or invoke
-+ */
-+#define TEE_IOC_CANCEL		_IOR(TEE_IOC_MAGIC, TEE_IOC_BASE + 4, \
-+				     struct tee_ioctl_cancel_arg)
-+
-+/**
-+ * struct tee_ioctl_close_session_arg - Closes an open session
-+ * @session:	[in] Session id
-+ */
-+struct tee_ioctl_close_session_arg {
-+	__u32 session;
-+};
-+/**
-+ * TEE_IOC_CLOSE_SESSION - Closes a session
-+ */
-+#define TEE_IOC_CLOSE_SESSION	_IOR(TEE_IOC_MAGIC, TEE_IOC_BASE + 5, \
-+				     struct tee_ioctl_close_session_arg)
-+
-+/**
-+ * struct tee_iocl_supp_recv_arg - Receive a request for a supplicant function
-+ * @func:	[in] supplicant function
-+ * @num_params	[in/out] number of parameters following this struct
-+ *
-+ * @num_params is the number of params that tee-supplicant has room to
-+ * receive when input, @num_params is the number of actual params
-+ * tee-supplicant receives when output.
-+ */
-+struct tee_iocl_supp_recv_arg {
-+	__u32 func;
-+	__u32 num_params;
 +	/*
-+	 * this struct is 8 byte aligned since the 'struct tee_ioctl_param'
-+	 * which follows requires 8 byte alignment.
-+	 *
-+	 * Commented out element used to visualize the layout dynamic part
-+	 * of the struct. This field is not available at all if
-+	 * num_params == 0.
-+	 *
-+	 * struct tee_ioctl_param params[num_params];
-+	 */
-+} __aligned(8);
-+/**
-+ * TEE_IOC_SUPPL_RECV - Receive a request for a supplicant function
-+ *
-+ * Takes a struct tee_ioctl_buf_data which contains a struct
-+ * tee_iocl_supp_recv_arg followed by any array of struct tee_param
-+ */
-+#define TEE_IOC_SUPPL_RECV	_IOR(TEE_IOC_MAGIC, TEE_IOC_BASE + 6, \
-+				     struct tee_ioctl_buf_data)
-+
-+
-+/**
-+ * struct tee_iocl_supp_send_arg - Send a response to a received request
-+ * @ret:	[out] return value
-+ * @num_params	[in] number of parameters following this struct
-+ */
-+struct tee_iocl_supp_send_arg {
-+	__u32 ret;
-+	__u32 num_params;
-+	/*
-+	 * this struct is 8 byte aligned since the 'struct tee_ioctl_param'
++	 * this struct is 8 byte aligned since the 'struct optee_msg_param'
 +	 * which follows requires 8 byte alignment.
 +	 *
 +	 * Commented out element used to visualize the layout dynamic part
 +	 * of the struct. This field is not available@all if
 +	 * num_params == 0.
 +	 *
-+	 * struct tee_ioctl_param params[num_params];
++	 * params is accessed through the macro OPTEE_MSG_GET_PARAMS
++	 *
++	 * struct optee_msg_param params[num_params];
 +	 */
 +} __aligned(8);
++
 +/**
-+ * TEE_IOC_SUPPL_SEND - Receive a request for a supplicant function
++ * OPTEE_MSG_GET_PARAMS - return pointer to struct optee_msg_param *
 + *
-+ * Takes a struct tee_ioctl_buf_data which contains a struct
-+ * tee_iocl_supp_send_arg followed by any array of struct tee_param
++ * @x: Pointer to a struct optee_msg_arg
++ *
++ * Returns a pointer to the params[] inside a struct optee_msg_arg.
 + */
-+#define TEE_IOC_SUPPL_SEND	_IOR(TEE_IOC_MAGIC, TEE_IOC_BASE + 7, \
-+				     struct tee_ioctl_buf_data)
++#define OPTEE_MSG_GET_PARAMS(x) \
++	(struct optee_msg_param *)(((struct optee_msg_arg *)(x)) + 1)
++
++/**
++ * OPTEE_MSG_GET_ARG_SIZE - return size of struct optee_msg_arg
++ *
++ * @num_params: Number of parameters embedded in the struct optee_msg_arg
++ *
++ * Returns the size of the struct optee_msg_arg together with the number
++ * of embedded parameters.
++ */
++#define OPTEE_MSG_GET_ARG_SIZE(num_params) \
++	(sizeof(struct optee_msg_arg) + \
++	 sizeof(struct optee_msg_param) * (num_params))
++
++/*****************************************************************************
++ * Part 2 - requests from normal world
++ *****************************************************************************/
++
++/*
++ * Return the following UID if using API specified in this file without
++ * further extentions:
++ * 384fb3e0-e7f8-11e3-af63-0002a5d5c51b.
++ * Represented in 4 32-bit words in OPTEE_MSG_UID_0, OPTEE_MSG_UID_1,
++ * OPTEE_MSG_UID_2, OPTEE_MSG_UID_3.
++ */
++#define OPTEE_MSG_UID_0			0x384fb3e0
++#define OPTEE_MSG_UID_1			0xe7f811e3
++#define OPTEE_MSG_UID_2			0xaf630002
++#define OPTEE_MSG_UID_3			0xa5d5c51b
++#define OPTEE_MSG_FUNCID_CALLS_UID	0xFF01
++
++/*
++ * Returns 2.0 if using API specified in this file without further
++ * extentions. Represented in 2 32-bit words in OPTEE_MSG_REVISION_MAJOR
++ * and OPTEE_MSG_REVISION_MINOR
++ */
++#define OPTEE_MSG_REVISION_MAJOR	2
++#define OPTEE_MSG_REVISION_MINOR	0
++#define OPTEE_MSG_FUNCID_CALLS_REVISION	0xFF03
++
++/*
++ * Get UUID of Trusted OS.
++ *
++ * Used by non-secure world to figure out which Trusted OS is installed.
++ * Note that returned UUID is the UUID of the Trusted OS, not of the API.
++ *
++ * Returns UUID in 4 32-bit words in the same way as
++ * OPTEE_MSG_FUNCID_CALLS_UID described above.
++ */
++#define OPTEE_MSG_OS_OPTEE_UUID_0	0x486178e0
++#define OPTEE_MSG_OS_OPTEE_UUID_1	0xe7f811e3
++#define OPTEE_MSG_OS_OPTEE_UUID_2	0xbc5e0002
++#define OPTEE_MSG_OS_OPTEE_UUID_3	0xa5d5c51b
++#define OPTEE_MSG_FUNCID_GET_OS_UUID	0x0000
++
++/*
++ * Get revision of Trusted OS.
++ *
++ * Used by non-secure world to figure out which version of the Trusted OS
++ * is installed. Note that the returned revision is the revision of the
++ * Trusted OS, not of the API.
++ *
++ * Returns revision in 2 32-bit words in the same way as
++ * OPTEE_MSG_CALLS_REVISION described above.
++ */
++#define OPTEE_MSG_OS_OPTEE_REVISION_MAJOR	1
++#define OPTEE_MSG_OS_OPTEE_REVISION_MINOR	0
++#define OPTEE_MSG_FUNCID_GET_OS_REVISION	0x0001
++
++/*
++ * Do a secure call with struct optee_msg_arg as argument
++ * The OPTEE_MSG_CMD_* below defines what goes in struct optee_msg_arg::cmd
++ *
++ * OPTEE_MSG_CMD_OPEN_SESSION opens a session to a Trusted Application.
++ * The first two parameters are tagged as meta, holding two value
++ * parameters to pass the following information:
++ * param[0].u.value.a-b uuid of Trusted Application
++ * param[1].u.value.a-b uuid of Client
++ * param[1].u.value.c Login class of client OPTEE_MSG_LOGIN_*
++ *
++ * OPTEE_MSG_CMD_INVOKE_COMMAND invokes a command a previously opened
++ * session to a Trusted Application.  struct optee_msg_arg::func is Trusted
++ * Application function, specific to the Trusted Application.
++ *
++ * OPTEE_MSG_CMD_CLOSE_SESSION closes a previously opened session to
++ * Trusted Application.
++ *
++ * OPTEE_MSG_CMD_CANCEL cancels a currently invoked command.
++ *
++ * OPTEE_MSG_CMD_REGISTER_SHM registers a shared memory reference. The
++ * information is passed as:
++ * [in] param[0].attr			OPTEE_MSG_ATTR_TYPE_TMEM_INPUT
++ *					[| OPTEE_MSG_ATTR_FRAGMENT]
++ * [in] param[0].u.tmem.buf_ptr		physical address (of first fragment)
++ * [in] param[0].u.tmem.size		size (of first fragment)
++ * [in] param[0].u.tmem.shm_ref		holds shared memory reference
++ * ...
++ * The shared memory can optionally be fragmented, temp memrefs can follow
++ * each other with all but the last with the OPTEE_MSG_ATTR_FRAGMENT bit set.
++ *
++ * OPTEE_MSG_CMD_UNREGISTER_SHM unregisteres a previously registered shared
++ * memory reference. The information is passed as:
++ * [in] param[0].attr			OPTEE_MSG_ATTR_TYPE_RMEM_INPUT
++ * [in] param[0].u.rmem.shm_ref		holds shared memory reference
++ * [in] param[0].u.rmem.offs		0
++ * [in] param[0].u.rmem.size		0
++ */
++#define OPTEE_MSG_CMD_OPEN_SESSION	0
++#define OPTEE_MSG_CMD_INVOKE_COMMAND	1
++#define OPTEE_MSG_CMD_CLOSE_SESSION	2
++#define OPTEE_MSG_CMD_CANCEL		3
++#define OPTEE_MSG_CMD_REGISTER_SHM	4
++#define OPTEE_MSG_CMD_UNREGISTER_SHM	5
++#define OPTEE_MSG_FUNCID_CALL_WITH_ARG	0x0004
++
++/*****************************************************************************
++ * Part 3 - Requests from secure world, RPC
++ *****************************************************************************/
++
++/*
++ * All RPC is done with a struct optee_msg_arg as bearer of information,
++ * struct optee_msg_arg::arg holds values defined by OPTEE_MSG_RPC_CMD_* below
++ *
++ * RPC communication with tee-supplicant is reversed compared to normal
++ * client communication desribed above. The supplicant receives requests
++ * and sends responses.
++ */
++
++/*
++ * Load a TA into memory, defined in tee-supplicant
++ */
++#define OPTEE_MSG_RPC_CMD_LOAD_TA	0
++
++/*
++ * Reserved
++ */
++#define OPTEE_MSG_RPC_CMD_RPMB		1
++
++/*
++ * File system access, defined in tee-supplicant
++ */
++#define OPTEE_MSG_RPC_CMD_FS		2
++
++/*
++ * Get time
++ *
++ * Returns number of seconds and nano seconds since the Epoch,
++ * 1970-01-01 00:00:00 +0000 (UTC).
++ *
++ * [out] param[0].u.value.a	Number of seconds
++ * [out] param[0].u.value.b	Number of nano seconds.
++ */
++#define OPTEE_MSG_RPC_CMD_GET_TIME	3
++
++/*
++ * Wait queue primitive, helper for secure world to implement a wait queue
++ *
++ * Waiting on a key
++ * [in] param[0].u.value.a OPTEE_MSG_RPC_WAIT_QUEUE_SLEEP
++ * [in] param[0].u.value.b wait key
++ *
++ * Waking up a key
++ * [in] param[0].u.value.a OPTEE_MSG_RPC_WAIT_QUEUE_WAKEUP
++ * [in] param[0].u.value.b wakeup key
++ */
++#define OPTEE_MSG_RPC_CMD_WAIT_QUEUE	4
++#define OPTEE_MSG_RPC_WAIT_QUEUE_SLEEP	0
++#define OPTEE_MSG_RPC_WAIT_QUEUE_WAKEUP	1
++
++/*
++ * Suspend execution
++ *
++ * [in] param[0].value	.a number of milliseconds to suspend
++ */
++#define OPTEE_MSG_RPC_CMD_SUSPEND	5
++
++/*
++ * Allocate a piece of shared memory
++ *
++ * Shared memory can optionally be fragmented, to support that additional
++ * spare param entries are allocated to make room for eventual fragments.
++ * The spare param entries has .attr = OPTEE_MSG_ATTR_TYPE_NONE when
++ * unused. All returned temp memrefs except the last should have the
++ * OPTEE_MSG_ATTR_FRAGMENT bit set in the attr field.
++ *
++ * [in]  param[0].u.value.a		type of memory one of
++ *					OPTEE_MSG_RPC_SHM_TYPE_* below
++ * [in]  param[0].u.value.b		requested size
++ * [in]  param[0].u.value.c		required alignment
++ *
++ * [out] param[0].u.tmem.buf_ptr	physical address (of first fragment)
++ * [out] param[0].u.tmem.size		size (of first fragment)
++ * [out] param[0].u.tmem.shm_ref	shared memory reference
++ * ...
++ * [out] param[n].u.tmem.buf_ptr	physical address
++ * [out] param[n].u.tmem.size		size
++ * [out] param[n].u.tmem.shm_ref	shared memory reference (same value
++ *					as in param[n-1].u.tmem.shm_ref)
++ */
++#define OPTEE_MSG_RPC_CMD_SHM_ALLOC	6
++/* Memory that can be shared with a non-secure user space application */
++#define OPTEE_MSG_RPC_SHM_TYPE_APPL	0
++/* Memory only shared with non-secure kernel */
++#define OPTEE_MSG_RPC_SHM_TYPE_KERNEL	1
++
++#endif /* _OPTEE_MSG_H */
+diff --git a/drivers/tee/optee/optee_private.h b/drivers/tee/optee/optee_private.h
+new file mode 100644
+index 0000000..50488e5
+--- /dev/null
++++ b/drivers/tee/optee/optee_private.h
+@@ -0,0 +1,146 @@
++/*
++ * Copyright (c) 2015, Linaro Limited
++ *
++ * This software is licensed under the terms of the GNU General Public
++ * License version 2, as published by the Free Software Foundation, and
++ * may be copied, distributed, and modified under those terms.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ */
++
++#ifndef OPTEE_PRIVATE_H
++#define OPTEE_PRIVATE_H
++
++#include <linux/types.h>
++#include <linux/semaphore.h>
++#include <linux/tee_drv.h>
++#include "optee_msg.h"
++#include <linux/arm-smccc.h>
++
++#define OPTEE_MAX_ARG_SIZE	1024
++
++/* Some Global Platform error codes used in this driver */
++#define TEEC_SUCCESS			0x00000000
++#define TEEC_ERROR_BAD_PARAMETERS	0xFFFF0006
++#define TEEC_ERROR_COMMUNICATION	0xFFFF000E
++#define TEEC_ERROR_OUT_OF_MEMORY	0xFFFF000C
++
++#define TEEC_ORIGIN_COMMS		0x00000002
++
++typedef void (optee_invoke_fn)(unsigned long, unsigned long, unsigned long,
++				unsigned long, unsigned long, unsigned long,
++				unsigned long, unsigned long,
++				struct smccc_res *);
++
++struct optee_call_queue {
++	struct mutex mutex;
++	struct list_head waiters;
++};
++
++struct optee_wait_queue {
++	struct mutex mu;
++	struct list_head db;
++};
++
++struct optee_supp {
++	u32 func;
++	u32 ret;
++	size_t num_params;
++	struct tee_param *param;
++
++	bool req_posted;
++	bool supp_next_send;
++	struct mutex thrd_mutex;
++	struct mutex supp_mutex;
++	struct completion data_to_supp;
++	struct completion data_from_supp;
++};
++
++struct optee {
++	struct tee_device *supp_teedev;
++	struct tee_device *teedev;
++	struct device *dev;
++	optee_invoke_fn *invoke_fn;
++	struct optee_call_queue call_queue;
++	struct optee_wait_queue wait_queue;
++	struct optee_supp supp;
++	struct tee_shm_pool *pool;
++	void __iomem *ioremaped_shm;
++};
++
++struct optee_session {
++	struct list_head list_node;
++	u32 session_id;
++};
++
++struct optee_context_data {
++	struct mutex mutex;
++	struct list_head sess_list;
++};
++
++struct optee_rpc_param {
++	u32	a0;
++	u32	a1;
++	u32	a2;
++	u32	a3;
++	u32	a4;
++	u32	a5;
++	u32	a6;
++	u32	a7;
++};
++
++void optee_handle_rpc(struct tee_context *ctx, struct optee_rpc_param *param);
++
++void optee_wait_queue_init(struct optee_wait_queue *wq);
++void optee_wait_queue_exit(struct optee_wait_queue *wq);
++
++u32 optee_supp_thrd_req(struct tee_context *ctx, u32 func, size_t num_params,
++			struct tee_param *param);
++
++int optee_supp_read(struct tee_context *ctx, void __user *buf, size_t len);
++int optee_supp_write(struct tee_context *ctx, void __user *buf, size_t len);
++void optee_supp_init(struct optee_supp *supp);
++void optee_supp_uninit(struct optee_supp *supp);
++
++int optee_supp_recv(struct tee_context *ctx, u32 *func, u32 *num_params,
++			struct tee_param *param);
++int optee_supp_send(struct tee_context *ctx, u32 ret, u32 num_params,
++			struct tee_param *param);
++
++u32 optee_do_call_with_arg(struct tee_context *ctx, phys_addr_t parg);
++int optee_open_session(struct tee_context *ctx,
++			struct tee_ioctl_open_session_arg *arg,
++			struct tee_param *param);
++int optee_close_session(struct tee_context *ctx, u32 session);
++int optee_invoke_func(struct tee_context *ctx, struct tee_ioctl_invoke_arg *arg,
++			struct tee_param *param);
++int optee_cancel_req(struct tee_context *ctx, u32 cancel_id, u32 session);
++
++void optee_enable_shm_cache(struct optee *optee);
++void optee_disable_shm_cache(struct optee *optee);
++
++int optee_from_msg_param(struct tee_param *params, size_t num_params,
++			const struct optee_msg_param *msg_params);
++int optee_to_msg_param(struct optee_msg_param *msg_params, size_t num_params,
++			const struct tee_param *params);
++
++/*
++ * Small helpers
++ */
++
++static inline void *reg_pair_to_ptr(u32 reg0, u32 reg1)
++{
++	return (void *)(unsigned long)(((u64)reg0 << 32) | reg1);
++}
++
++static inline void reg_pair_from_64(u32 *reg0, u32 *reg1, u64 val)
++{
++	*reg0 = val >> 32;
++	*reg1 = val;
++}
++
++#endif /*OPTEE_PRIVATE_H*/
+diff --git a/drivers/tee/optee/optee_smc.h b/drivers/tee/optee/optee_smc.h
+new file mode 100644
+index 0000000..bad2d8e
+--- /dev/null
++++ b/drivers/tee/optee/optee_smc.h
+@@ -0,0 +1,418 @@
++/*
++ * Copyright (c) 2015, Linaro Limited
++ * All rights reserved.
++ *
++ * Redistribution and use in source and binary forms, with or without
++ * modification, are permitted provided that the following conditions are met:
++ *
++ * 1. Redistributions of source code must retain the above copyright notice,
++ * this list of conditions and the following disclaimer.
++ *
++ * 2. Redistributions in binary form must reproduce the above copyright notice,
++ * this list of conditions and the following disclaimer in the documentation
++ * and/or other materials provided with the distribution.
++ *
++ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
++ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
++ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
++ * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
++ * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
++ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
++ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
++ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
++ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
++ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
++ * POSSIBILITY OF SUCH DAMAGE.
++ */
++#ifndef OPTEE_SMC_H
++#define OPTEE_SMC_H
++
++#include <linux/arm-smccc.h>
++
++#define OPTEE_SMC_STD_CALL_VAL(func_num) \
++	SMCCC_CALL_VAL(SMCCC_SMC_32, SMCCC_STD_CALL, \
++			   SMCCC_OWNER_TRUSTED_OS, (func_num))
++#define OPTEE_SMC_FAST_CALL_VAL(func_num) \
++	SMCCC_CALL_VAL(SMCCC_SMC_32, SMCCC_FAST_CALL, \
++			   SMCCC_OWNER_TRUSTED_OS, (func_num))
++
++/*
++ * Function specified by SMC Calling convention.
++ */
++#define OPTEE_SMC_FUNCID_CALLS_COUNT	0xFF00
++#define OPTEE_SMC_CALLS_COUNT \
++	SMCCC_CALL_VAL(SMCCC_SMC_32, OPTEE_SMC_FAST_CALL, \
++			   SMCCC_OWNER_TRUSTED_OS_END, \
++			   OPTEE_SMC_FUNCID_CALLS_COUNT)
++
++/*
++ * Normal cached memory (write-back), shareable for SMP systems and not
++ * shareable for UP systems.
++ */
++#define OPTEE_SMC_SHM_CACHED		1
++
++/*
++ * a0..a7 is used as register names in the descriptions below, on arm32
++ * that translates to r0..r7 and on arm64 to w0..w7. In both cases it's
++ * 32-bit registers.
++ */
++
++/*
++ * Function specified by SMC Calling convention
++ *
++ * Return one of the following UIDs if using API specified in this file
++ * without further extentions:
++ * 65cb6b93-af0c-4617-8ed6-644a8d1140f8
++ * see also OPTEE_SMC_UID_* in optee_msg.h
++ */
++#define OPTEE_SMC_FUNCID_CALLS_UID OPTEE_MSG_FUNCID_CALLS_UID
++#define OPTEE_SMC_CALLS_UID \
++	SMCCC_CALL_VAL(SMCCC_SMC_32, SMCCC_FAST_CALL, \
++		       SMCCC_OWNER_TRUSTED_OS_END, \
++		       OPTEE_SMC_FUNCID_CALLS_UID)
++
++/*
++ * Function specified by SMC Calling convention
++ *
++ * Returns 2.0 if using API specified in this file without further extentions.
++ * see also OPTEE_MSG_REVISION_* in optee_msg.h
++ */
++#define OPTEE_SMC_FUNCID_CALLS_REVISION OPTEE_MSG_FUNCID_CALLS_REVISION
++#define OPTEE_SMC_CALLS_REVISION \
++	SMCCC_CALL_VAL(SMCCC_SMC_32, SMCCC_FAST_CALL, \
++		       SMCCC_OWNER_TRUSTED_OS_END, \
++		       OPTEE_SMC_FUNCID_CALLS_REVISION)
++
++/*
++ * Get UUID of Trusted OS.
++ *
++ * Used by non-secure world to figure out which Trusted OS is installed.
++ * Note that returned UUID is the UUID of the Trusted OS, not of the API.
++ *
++ * Returns UUID in a0-4 in the same way as OPTEE_SMC_CALLS_UID
++ * described above.
++ */
++#define OPTEE_SMC_FUNCID_GET_OS_UUID OPTEE_MSG_FUNCID_GET_OS_UUID
++#define OPTEE_SMC_CALL_GET_OS_UUID \
++	OPTEE_SMC_FAST_CALL_VAL(OPTEE_SMC_FUNCID_GET_OS_UUID)
++
++/*
++ * Get revision of Trusted OS.
++ *
++ * Used by non-secure world to figure out which version of the Trusted OS
++ * is installed. Note that the returned revision is the revision of the
++ * Trusted OS, not of the API.
++ *
++ * Returns revision in a0-1 in the same way as OPTEE_SMC_CALLS_REVISION
++ * described above.
++ */
++#define OPTEE_SMC_FUNCID_GET_OS_REVISION OPTEE_MSG_FUNCID_GET_OS_REVISION
++#define OPTEE_SMC_CALL_GET_OS_REVISION \
++	OPTEE_SMC_FAST_CALL_VAL(OPTEE_SMC_FUNCID_GET_OS_REVISION)
++
++/*
++ * Call with struct optee_msg_arg as argument
++ *
++ * Call register usage:
++ * a0	SMC Function ID, OPTEE_SMC*CALL_WITH_ARG
++ * a1	Upper 32bit of a 64bit physical pointer to a struct optee_msg_arg
++ * a2	Lower 32bit of a 64bit physical pointer to a struct optee_msg_arg
++ * a3	Cache settings, not used if physical pointer is in a predefined shared
++ *	memory area else per OPTEE_SMC_SHM_*
++ * a4-6	Not used
++ * a7	Hypervisor Client ID register
++ *
++ * Normal return register usage:
++ * a0	Return value, OPTEE_SMC_RETURN_*
++ * a1-3	Not used
++ * a4-7	Preserved
++ *
++ * OPTEE_SMC_RETURN_ETHREAD_LIMIT return register usage:
++ * a0	Return value, OPTEE_SMC_RETURN_ETHREAD_LIMIT
++ * a1-3	Preserved
++ * a4-7	Preserved
++ *
++ * RPC return register usage:
++ * a0	Return value, OPTEE_SMC_RETURN_IS_RPC(val)
++ * a1-2	RPC parameters
++ * a3-7	Resume information, must be preserved
++ *
++ * Possible return values:
++ * OPTEE_SMC_RETURN_UNKNOWN_FUNCTION	Trusted OS does not recognize this
++ *					function.
++ * OPTEE_SMC_RETURN_OK			Call completed, result updated in
++ *					the previously supplied struct
++ *					optee_msg_arg.
++ * OPTEE_SMC_RETURN_ETHREAD_LIMIT	Number of Trusted OS threads exceeded,
++ *					try again later.
++ * OPTEE_SMC_RETURN_EBADADDR		Bad physcial pointer to struct
++ *					optee_msg_arg.
++ * OPTEE_SMC_RETURN_EBADCMD		Bad/unknown cmd in struct optee_msg_arg
++ * OPTEE_SMC_RETURN_IS_RPC()		Call suspended by RPC call to normal
++ *					world.
++ */
++#define OPTEE_SMC_FUNCID_CALL_WITH_ARG OPTEE_MSG_FUNCID_CALL_WITH_ARG
++#define OPTEE_SMC_CALL_WITH_ARG \
++	OPTEE_SMC_STD_CALL_VAL(OPTEE_SMC_FUNCID_CALL_WITH_ARG)
++
++/*
++ * Get Shared Memory Config
++ *
++ * Returns the Secure/Non-secure shared memory config.
++ *
++ * Call register usage:
++ * a0	SMC Function ID, OPTEE_SMC_GET_SHM_CONFIG
++ * a1-6	Not used
++ * a7	Hypervisor Client ID register
++ *
++ * Have config return register usage:
++ * a0	OPTEE_SMC_RETURN_OK
++ * a1	Physical address of start of SHM
++ * a2	Size of of SHM
++ * a3	Cache settings of memory, as defined by the
++ *	OPTEE_SMC_SHM_* values above
++ * a4-7	Preserved
++ *
++ * Not available register usage:
++ * a0	OPTEE_SMC_RETURN_ENOTAVAIL
++ * a1-3 Not used
++ * a4-7	Preserved
++ */
++#define OPTEE_SMC_FUNCID_GET_SHM_CONFIG	7
++#define OPTEE_SMC_GET_SHM_CONFIG \
++	OPTEE_SMC_FAST_CALL_VAL(OPTEE_SMC_FUNCID_GET_SHM_CONFIG)
++
++/*
++ * Exchanges capabilities between normal world and secure world
++ *
++ * Call register usage:
++ * a0	SMC Function ID, OPTEE_SMC_EXCHANGE_CAPABILITIES
++ * a1	bitfield of normal world capabilities OPTEE_SMC_NSEC_CAP_*
++ * a2-6	Not used
++ * a7	Hypervisor Client ID register
++ *
++ * Normal return register usage:
++ * a0	OPTEE_SMC_RETURN_OK
++ * a1	bitfield of secure world capabilities OPTEE_SMC_SEC_CAP_*
++ * a2-7	Preserved
++ *
++ * Error return register usage:
++ * a0	OPTEE_SMC_RETURN_ENOTAVAIL, can't use the capabilities from normal world
++ * a1	bitfield of secure world capabilities OPTEE_SMC_SEC_CAP_*
++ * a2-7 Preserved
++ */
++/* Normal world works as a uniprocessor system */
++#define OPTEE_SMC_NSEC_CAP_UNIPROCESSOR		(1 << 0)
++/* Secure world has reserved shared memory for normal world to use */
++#define OPTEE_SMC_SEC_CAP_HAVE_RESERVERED_SHM	(1 << 0)
++/* Secure world can communicate via previously unregistered shared memory */
++#define OPTEE_SMC_SEC_CAP_UNREGISTERED_SHM	(1 << 1)
++#define OPTEE_SMC_FUNCID_EXCHANGE_CAPABILITIES	9
++#define OPTEE_SMC_EXCHANGE_CAPABILITIES \
++	OPTEE_SMC_FAST_CALL_VAL(OPTEE_SMC_FUNCID_EXCHANGE_CAPABILITIES)
++
++/*
++ * Disable and empties cache of shared memory objects
++ *
++ * Secure world can cache frequently used shared memory objects, for
++ * example objects used as RPC arguments. When secure world is idle this
++ * function returns one shared memory reference to free. To disable the
++ * cache and free all cached objects this function has to be called until
++ * it returns OPTEE_SMC_RETURN_ENOTAVAIL.
++ *
++ * Call register usage:
++ * a0	SMC Function ID, OPTEE_SMC_DISABLE_SHM_CACHE
++ * a1-6	Not used
++ * a7	Hypervisor Client ID register
++ *
++ * Normal return register usage:
++ * a0	OPTEE_SMC_RETURN_OK
++ * a1	Upper 32bit of a 64bit Shared memory cookie
++ * a2	Lower 32bit of a 64bit Shared memory cookie
++ * a3-7	Preserved
++ *
++ * Cache empty return register usage:
++ * a0	OPTEE_SMC_RETURN_ENOTAVAIL
++ * a1-7	Preserved
++ *
++ * Not idle return register usage:
++ * a0	OPTEE_SMC_RETURN_EBUSY
++ * a1-7	Preserved
++ */
++#define OPTEE_SMC_FUNCID_DISABLE_SHM_CACHE	10
++#define OPTEE_SMC_DISABLE_SHM_CACHE \
++	OPTEE_SMC_FAST_CALL_VAL(OPTEE_SMC_FUNCID_DISABLE_SHM_CACHE)
 +
 +
 +/*
-+ * Five syscalls are used when communicating with the TEE driver.
-+ * open(): opens the device associated with the driver
-+ * ioctl(): as described above operating on the file descriptor from open()
-+ * close(): two cases
-+ *   - closes the device file descriptor
-+ *   - closes a file descriptor connected to allocated shared memory
-+ * mmap(): maps shared memory into user space using information from struct
-+ *	   tee_ioctl_shm_alloc_data
-+ * munmap(): unmaps previously shared memory
++ * Enable cache of shared memory objects
++ *
++ * Secure world can cache frequently used shared memory objects, for
++ * example objects used as RPC arguments. When secure world is idle this
++ * function returns OPTEE_SMC_RETURN_OK and the cache is enabled. If
++ * secure world isn't idle OPTEE_SMC_RETURN_EBUSY is returned.
++ *
++ * Call register usage:
++ * a0	SMC Function ID, OPTEE_SMC_ENABLE_SHM_CACHE
++ * a1-6	Not used
++ * a7	Hypervisor Client ID register
++ *
++ * Normal return register usage:
++ * a0	OPTEE_SMC_RETURN_OK
++ * a1-7	Preserved
++ *
++ * Not idle return register usage:
++ * a0	OPTEE_SMC_RETURN_EBUSY
++ * a1-7	Preserved
 + */
++#define OPTEE_SMC_FUNCID_ENABLE_SHM_CACHE	11
++#define OPTEE_SMC_ENABLE_SHM_CACHE \
++	OPTEE_SMC_FAST_CALL_VAL(OPTEE_SMC_FUNCID_ENABLE_SHM_CACHE)
 +
-+#endif /*__TEE_H*/
++/*
++ * Resume from RPC (for example after processing an IRQ)
++ *
++ * Call register usage:
++ * a0	SMC Function ID, OPTEE_SMC_CALL_RETURN_FROM_RPC
++ * a1-3	Value of a1-3 when OPTEE_SMC_CALL_WITH_ARG returned
++ *	OPTEE_SMC_RETURN_RPC in a0
++ *
++ * Return register usage is the same as for OPTEE_SMC_*CALL_WITH_ARG above.
++ *
++ * Possible return values
++ * OPTEE_SMC_RETURN_UNKNOWN_FUNCTION	Trusted OS does not recognize this
++ *					function.
++ * OPTEE_SMC_RETURN_OK			Original call completed, result
++ *					updated in the previously supplied.
++ *					struct optee_msg_arg
++ * OPTEE_SMC_RETURN_RPC			Call suspended by RPC call to normal
++ *					world.
++ * OPTEE_SMC_RETURN_ERESUME		Resume failed, the opaque resume
++ *					information was corrupt.
++ */
++#define OPTEE_SMC_FUNCID_RETURN_FROM_RPC	3
++#define OPTEE_SMC_CALL_RETURN_FROM_RPC \
++	OPTEE_SMC_STD_CALL_VAL(OPTEE_SMC_FUNCID_RETURN_FROM_RPC)
++
++#define OPTEE_SMC_RETURN_RPC_PREFIX_MASK	0xFFFF0000
++#define OPTEE_SMC_RETURN_RPC_PREFIX		0xFFFF0000
++#define OPTEE_SMC_RETURN_RPC_FUNC_MASK		0x0000FFFF
++
++#define OPTEE_SMC_RETURN_GET_RPC_FUNC(ret) \
++	((ret) & OPTEE_SMC_RETURN_RPC_FUNC_MASK)
++
++#define OPTEE_SMC_RPC_VAL(func)		((func) | OPTEE_SMC_RETURN_RPC_PREFIX)
++
++/*
++ * Allocate memory for RPC parameter passing. The memory is used to hold a
++ * struct optee_msg_arg.
++ *
++ * "Call" register usage:
++ * a0	This value, OPTEE_SMC_RETURN_RPC_ALLOC
++ * a1	Size in bytes of required argument memory
++ * a2	Not used
++ * a3	Resume information, must be preserved
++ * a4-5	Not used
++ * a6-7	Resume information, must be preserved
++ *
++ * "Return" register usage:
++ * a0	SMC Function ID, OPTEE_SMC_CALL_RETURN_FROM_RPC.
++ * a1	Upper 32bits of 64bit physical pointer to allocated
++ *	memory, (a1 == 0 && a2 == 0) if size was 0 or if memory can't
++ *	be allocated.
++ * a2	Lower 32bits of 64bit physical pointer to allocated
++ *	memory, (a1 == 0 && a2 == 0) if size was 0 or if memory can't
++ *	be allocated
++ * a3	Preserved
++ * a4	Upper 32bits of 64bit Shared memory cookie used when freeing
++ *	the memory or doing an RPC
++ * a5	Lower 32bits of 64bit Shared memory cookie used when freeing
++ *	the memory or doing an RPC
++ * a6-7	Preserved
++ */
++#define OPTEE_SMC_RPC_FUNC_ALLOC	0
++#define OPTEE_SMC_RETURN_RPC_ALLOC \
++	OPTEE_SMC_RPC_VAL(OPTEE_SMC_RPC_FUNC_ALLOC)
++
++/*
++ * Free memory previously allocated by OPTEE_SMC_RETURN_RPC_ALLOC
++ *
++ * "Call" register usage:
++ * a0	This value, OPTEE_SMC_RETURN_RPC_FREE_ARG
++ * a1	Upper 32bits of 64bit shared memory cookie belonging to this
++ *	argument memory
++ * a2	Lower 32bits of 64bit shared memory cookie belonging to this
++ *	argument memory
++ * a3-7	Resume information, must be preserved
++ *
++ * "Return" register usage:
++ * a0	SMC Function ID, OPTEE_SMC_CALL_RETURN_FROM_RPC.
++ * a1-2	Not used
++ * a3-7	Preserved
++ */
++#define OPTEE_SMC_RPC_FUNC_FREE		2
++#define OPTEE_SMC_RETURN_RPC_FREE \
++	OPTEE_SMC_RPC_VAL(OPTEE_SMC_RPC_FUNC_FREE)
++
++/*
++ * Deliver an IRQ in normal world.
++ *
++ * "Call" register usage:
++ * a0	OPTEE_SMC_RETURN_RPC_IRQ
++ * a1-7	Resume information, must be preserved
++ *
++ * "Return" register usage:
++ * a0	SMC Function ID, OPTEE_SMC_CALL_RETURN_FROM_RPC.
++ * a1-7	Preserved
++ */
++#define OPTEE_SMC_RPC_FUNC_IRQ		4
++#define OPTEE_SMC_RETURN_RPC_IRQ \
++	OPTEE_SMC_RPC_VAL(OPTEE_SMC_RPC_FUNC_IRQ)
++
++/*
++ * Do an RPC request. The supplied struct optee_msg_arg tells which
++ * request to do and the parameters for the request. The following fields
++ * are used (the rest are unused):
++ * - cmd		the Request ID
++ * - ret		return value of the request, filled in by normal world
++ * - num_params		number of parameters for the request
++ * - params		the parameters
++ * - param_attrs	attributes of the parameters
++ *
++ * "Call" register usage:
++ * a0	OPTEE_SMC_RETURN_RPC_CMD
++ * a1	Upper 32bit of a 64bit Shared memory cookie holding a
++ *	struct optee_msg_arg, must be preserved, only the data should
++ *	be updated
++ * a2	Lower 32bit of a 64bit Shared memory cookie holding a
++ *	struct optee_msg_arg, must be preserved, only the data should
++ *	be updated
++ * a3-7	Resume information, must be preserved
++ *
++ * "Return" register usage:
++ * a0	SMC Function ID, OPTEE_SMC_CALL_RETURN_FROM_RPC.
++ * a1-2	Not used
++ * a3-7	Preserved
++ */
++#define OPTEE_SMC_RPC_FUNC_CMD		5
++#define OPTEE_SMC_RETURN_RPC_CMD \
++	OPTEE_SMC_RPC_VAL(OPTEE_SMC_RPC_FUNC_CMD)
++
++/* Returned in a0 */
++#define OPTEE_SMC_RETURN_UNKNOWN_FUNCTION 0xFFFFFFFF
++
++/* Returned in a0 only from Trusted OS functions */
++#define OPTEE_SMC_RETURN_OK		0x0
++#define OPTEE_SMC_RETURN_ETHREAD_LIMIT	0x1
++#define OPTEE_SMC_RETURN_EBUSY		0x2
++#define OPTEE_SMC_RETURN_ERESUME	0x3
++#define OPTEE_SMC_RETURN_EBADADDR	0x4
++#define OPTEE_SMC_RETURN_EBADCMD	0x5
++#define OPTEE_SMC_RETURN_ENOMEM		0x6
++#define OPTEE_SMC_RETURN_ENOTAVAIL	0x7
++#define OPTEE_SMC_RETURN_IS_RPC(ret) \
++	(((ret) != OPTEE_SMC_RETURN_UNKNOWN_FUNCTION) && \
++	((((ret) & OPTEE_SMC_RETURN_RPC_PREFIX_MASK) == \
++		OPTEE_SMC_RETURN_RPC_PREFIX)))
++
++#endif /* OPTEE_SMC_H */
+diff --git a/drivers/tee/optee/rpc.c b/drivers/tee/optee/rpc.c
+new file mode 100644
+index 0000000..05716e9
+--- /dev/null
++++ b/drivers/tee/optee/rpc.c
+@@ -0,0 +1,322 @@
++
++/*
++ * Copyright (c) 2015, Linaro Limited
++ *
++ * This software is licensed under the terms of the GNU General Public
++ * License version 2, as published by the Free Software Foundation, and
++ * may be copied, distributed, and modified under those terms.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ */
++#include <linux/device.h>
++#include <linux/slab.h>
++#include <linux/sched.h>
++#include <linux/tee_drv.h>
++#include "optee_private.h"
++#include "optee_smc.h"
++
++struct wq_entry {
++	struct list_head link;
++	struct completion c;
++	u32 key;
++};
++
++void optee_wait_queue_init(struct optee_wait_queue *priv)
++{
++	mutex_init(&priv->mu);
++	INIT_LIST_HEAD(&priv->db);
++}
++
++void optee_wait_queue_exit(struct optee_wait_queue *priv)
++{
++	mutex_destroy(&priv->mu);
++}
++
++static void handle_rpc_func_cmd_get_time(struct optee_msg_arg *arg)
++{
++	struct optee_msg_param *params;
++	struct timespec64 ts;
++
++	if (arg->num_params != 1)
++		goto bad;
++	params = OPTEE_MSG_GET_PARAMS(arg);
++	if ((params->attr & OPTEE_MSG_ATTR_TYPE_MASK) !=
++			OPTEE_MSG_ATTR_TYPE_VALUE_OUTPUT)
++		goto bad;
++
++	getnstimeofday64(&ts);
++	params->u.value.a = ts.tv_sec;
++	params->u.value.b = ts.tv_nsec;
++
++	arg->ret = TEEC_SUCCESS;
++	return;
++bad:
++	arg->ret = TEEC_ERROR_BAD_PARAMETERS;
++}
++
++static struct wq_entry *wq_entry_get(struct optee_wait_queue *wq, u32 key)
++{
++	struct wq_entry *w;
++
++	mutex_lock(&wq->mu);
++
++	list_for_each_entry(w, &wq->db, link)
++		if (w->key == key)
++			goto out;
++
++	w = kmalloc(sizeof(struct wq_entry), GFP_KERNEL);
++	if (w) {
++		init_completion(&w->c);
++		w->key = key;
++		list_add_tail(&w->link, &wq->db);
++	}
++out:
++	mutex_unlock(&wq->mu);
++	return w;
++}
++
++static void wq_sleep(struct optee_wait_queue *wq, u32 key)
++{
++	struct wq_entry *w = wq_entry_get(wq, key);
++
++	if (w) {
++		wait_for_completion(&w->c);
++		mutex_lock(&wq->mu);
++		list_del(&w->link);
++		mutex_unlock(&wq->mu);
++		kfree(w);
++	}
++}
++
++static void wq_wakeup(struct optee_wait_queue *wq, u32 key)
++{
++	struct wq_entry *w = wq_entry_get(wq, key);
++
++	if (w)
++		complete(&w->c);
++}
++
++static void handle_rpc_func_cmd_wq(struct optee *optee,
++			struct optee_msg_arg *arg)
++{
++	struct optee_msg_param *params;
++
++	if (arg->num_params != 1)
++		goto bad;
++
++	params = OPTEE_MSG_GET_PARAMS(arg);
++	if ((params->attr & OPTEE_MSG_ATTR_TYPE_MASK) !=
++			OPTEE_MSG_ATTR_TYPE_VALUE_INPUT)
++		goto bad;
++
++	switch (params->u.value.a) {
++	case OPTEE_MSG_RPC_WAIT_QUEUE_SLEEP:
++		wq_sleep(&optee->wait_queue, params->u.value.b);
++		break;
++	case OPTEE_MSG_RPC_WAIT_QUEUE_WAKEUP:
++		wq_wakeup(&optee->wait_queue, params->u.value.b);
++		break;
++	default:
++		goto bad;
++	}
++
++	arg->ret = TEEC_SUCCESS;
++	return;
++bad:
++	arg->ret = TEEC_ERROR_BAD_PARAMETERS;
++}
++
++static void handle_rpc_func_cmd_wait(struct optee_msg_arg *arg)
++{
++	struct optee_msg_param *params;
++	u32 msec_to_wait;
++
++	if (arg->num_params != 1)
++		goto bad;
++
++	params = OPTEE_MSG_GET_PARAMS(arg);
++	if ((params->attr & OPTEE_MSG_ATTR_TYPE_MASK) !=
++			OPTEE_MSG_ATTR_TYPE_VALUE_INPUT)
++		goto bad;
++
++	msec_to_wait = params->u.value.a;
++
++	/* set task's state to interruptible sleep */
++	set_current_state(TASK_INTERRUPTIBLE);
++
++	/* take a nap */
++	schedule_timeout(msecs_to_jiffies(msec_to_wait));
++
++	arg->ret = TEEC_SUCCESS;
++	return;
++bad:
++	arg->ret = TEEC_ERROR_BAD_PARAMETERS;
++}
++
++static void handle_rpc_supp_cmd(struct tee_context *ctx,
++			struct optee_msg_arg *arg)
++{
++	struct tee_param *params;
++	struct optee_msg_param *msg_params = OPTEE_MSG_GET_PARAMS(arg);
++
++	arg->ret_origin = TEEC_ORIGIN_COMMS;
++
++	params = kmalloc_array(arg->num_params, sizeof(struct tee_param),
++			       GFP_KERNEL);
++	if (!params) {
++		arg->ret = TEEC_ERROR_OUT_OF_MEMORY;
++		return;
++	}
++
++	if (optee_from_msg_param(params, arg->num_params, msg_params)) {
++		arg->ret = TEEC_ERROR_BAD_PARAMETERS;
++		goto out;
++	}
++
++	arg->ret = optee_supp_thrd_req(ctx, arg->cmd, arg->num_params, params);
++
++	if (optee_to_msg_param(msg_params, arg->num_params, params))
++		arg->ret = TEEC_ERROR_BAD_PARAMETERS;
++out:
++	kfree(params);
++}
++
++static void handle_rpc_func_cmd_shm_alloc(struct tee_context *ctx,
++			struct optee_msg_arg *arg)
++{
++	struct tee_device *teedev = ctx->teedev;
++	struct optee_msg_param *params = OPTEE_MSG_GET_PARAMS(arg);
++	phys_addr_t pa;
++	struct tee_shm *shm;
++	u32 flags;
++	size_t sz;
++	size_t n;
++
++	arg->ret_origin = TEEC_ORIGIN_COMMS;
++
++	if (!arg->num_params ||
++	    params->attr != OPTEE_MSG_ATTR_TYPE_VALUE_INPUT) {
++		arg->ret = TEEC_ERROR_BAD_PARAMETERS;
++		return;
++	}
++
++	for (n = 1; n < arg->num_params; n++) {
++		if (params[n].attr != OPTEE_MSG_ATTR_TYPE_NONE) {
++			arg->ret = TEEC_ERROR_BAD_PARAMETERS;
++			return;
++		}
++	}
++
++	flags = TEE_SHM_MAPPED;
++	switch (params->u.value.a) {
++	case OPTEE_MSG_RPC_SHM_TYPE_APPL:
++		flags |= TEE_SHM_DMA_BUF;
++		break;
++	case OPTEE_MSG_RPC_SHM_TYPE_KERNEL:
++		break;
++	default:
++		arg->ret = TEEC_ERROR_BAD_PARAMETERS;
++		return;
++	}
++	sz = params->u.value.b;
++	/* TODO pass alignment */
++	shm = tee_shm_alloc(teedev, params->u.value.b, flags);
++	if (IS_ERR(shm)) {
++		arg->ret = TEEC_ERROR_OUT_OF_MEMORY;
++		return;
++	}
++
++	if (tee_shm_get_pa(shm, 0, &pa)) {
++		arg->ret = TEEC_ERROR_BAD_PARAMETERS;
++		goto bad;
++	}
++
++	params[0].attr = OPTEE_MSG_ATTR_TYPE_TMEM_OUTPUT;
++	params[0].u.tmem.buf_ptr = pa;
++	params[0].u.tmem.size = sz;
++	params[0].u.tmem.shm_ref = (unsigned long)shm;
++	arg->ret = TEEC_SUCCESS;
++	return;
++bad:
++	tee_shm_free(shm);
++}
++
++static void handle_rpc_func_cmd(struct tee_context *ctx, struct optee *optee,
++			struct tee_shm *shm)
++{
++	struct optee_msg_arg *arg;
++
++	arg = tee_shm_get_va(shm, 0);
++	if (IS_ERR(arg)) {
++		dev_err(optee->dev, "%s: tee_shm_get_va %p failed\n",
++			__func__, shm);
++		return;
++	}
++
++	switch (arg->cmd) {
++	case OPTEE_MSG_RPC_CMD_GET_TIME:
++		handle_rpc_func_cmd_get_time(arg);
++		break;
++	case OPTEE_MSG_RPC_CMD_WAIT_QUEUE:
++		handle_rpc_func_cmd_wq(optee, arg);
++		break;
++	case OPTEE_MSG_RPC_CMD_SUSPEND:
++		handle_rpc_func_cmd_wait(arg);
++		break;
++	case OPTEE_MSG_RPC_CMD_SHM_ALLOC:
++		handle_rpc_func_cmd_shm_alloc(ctx, arg);
++		break;
++	default:
++		handle_rpc_supp_cmd(ctx, arg);
++	}
++}
++
++void optee_handle_rpc(struct tee_context *ctx, struct optee_rpc_param *param)
++{
++	struct tee_device *teedev = ctx->teedev;
++	struct optee *optee = tee_get_drvdata(teedev);
++	struct tee_shm *shm;
++	phys_addr_t pa;
++
++	switch (OPTEE_SMC_RETURN_GET_RPC_FUNC(param->a0)) {
++	case OPTEE_SMC_RPC_FUNC_ALLOC:
++		shm = tee_shm_alloc(teedev, param->a1, TEE_SHM_MAPPED);
++		if (!IS_ERR(shm) && !tee_shm_get_pa(shm, 0, &pa)) {
++			reg_pair_from_64(&param->a1, &param->a2, pa);
++			reg_pair_from_64(&param->a4, &param->a5,
++					 (unsigned long)shm);
++		} else {
++			param->a1 = 0;
++			param->a2 = 0;
++			param->a4 = 0;
++			param->a5 = 0;
++		}
++		break;
++	case OPTEE_SMC_RPC_FUNC_FREE:
++		shm = reg_pair_to_ptr(param->a1, param->a2);
++		tee_shm_free(shm);
++		break;
++	case OPTEE_SMC_RPC_FUNC_IRQ:
++		/*
++		 * An IRQ was raised while secure world was executing,
++		 * since all IRQs a handled in Linux a dummy RPC is
++		 * performed to let Linux take the IRQ through the normal
++		 * vector.
++		 */
++		break;
++	case OPTEE_SMC_RPC_FUNC_CMD:
++		shm = reg_pair_to_ptr(param->a1, param->a2);
++		handle_rpc_func_cmd(ctx, optee, shm);
++		break;
++	default:
++		dev_warn(optee->dev, "Unknown RPC func 0x%x\n",
++			 (u32)OPTEE_SMC_RETURN_GET_RPC_FUNC(param->a0));
++		break;
++	}
++
++	param->a0 = OPTEE_SMC_CALL_RETURN_FROM_RPC;
++}
+diff --git a/drivers/tee/optee/supp.c b/drivers/tee/optee/supp.c
+new file mode 100644
+index 0000000..b6478b6
+--- /dev/null
++++ b/drivers/tee/optee/supp.c
+@@ -0,0 +1,212 @@
++/*
++ * Copyright (c) 2015, Linaro Limited
++ *
++ * This software is licensed under the terms of the GNU General Public
++ * License version 2, as published by the Free Software Foundation, and
++ * may be copied, distributed, and modified under those terms.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ */
++#include <linux/device.h>
++#include <linux/slab.h>
++#include <linux/uaccess.h>
++#include "optee_private.h"
++
++void optee_supp_init(struct optee_supp *supp)
++{
++	memset(supp, 0, sizeof(*supp));
++	mutex_init(&supp->thrd_mutex);
++	mutex_init(&supp->supp_mutex);
++	init_completion(&supp->data_to_supp);
++	init_completion(&supp->data_from_supp);
++}
++
++void optee_supp_uninit(struct optee_supp *supp)
++{
++	mutex_destroy(&supp->thrd_mutex);
++	mutex_destroy(&supp->supp_mutex);
++}
++
++u32 optee_supp_thrd_req(struct tee_context *ctx, u32 func, size_t num_params,
++			struct tee_param *param)
++{
++	struct optee *optee = tee_get_drvdata(ctx->teedev);
++	struct optee_supp *supp = &optee->supp;
++	u32 ret;
++
++	/*
++	 * Other threads blocks here until we've copied our answer from
++	 * supplicant.
++	 */
++	mutex_lock(&supp->thrd_mutex);
++
++	/*
++	 * We have exclusive access now since the supplicant at this
++	 * point is either doing a
++	 * wait_for_completion_interruptible(data_to_supp) or is in
++	 * userspace still about to do the ioctl() to enter
++	 * optee_supp_read() below.
++	 */
++
++	supp->func = func;
++	supp->num_params = num_params;
++	supp->param = param;
++	supp->req_posted = true;
++
++	/* Let supplicant get the data */
++	complete(&supp->data_to_supp);
++
++	/*
++	 * Wait for supplicant to process and return result, once we've
++	 * returned from wait_for_completion(data_from_supp) we have
++	 * exclusive access again.
++	 */
++	wait_for_completion(&supp->data_from_supp);
++
++	ret = supp->ret;
++	supp->param = NULL;
++	supp->req_posted = false;
++
++	/* We're done, let someone else talk to the supplicant now. */
++	mutex_unlock(&supp->thrd_mutex);
++
++	return ret;
++}
++
++int optee_supp_recv(struct tee_context *ctx, u32 *func, u32 *num_params,
++		struct tee_param *param)
++{
++	struct tee_device *teedev = ctx->teedev;
++	struct optee *optee = tee_get_drvdata(teedev);
++	struct optee_supp *supp = &optee->supp;
++	int rc;
++
++	/*
++	 * In case two supplicants or two threads in one supplicant is
++	 * calling this function simultaneously we need to protect the
++	 * data with a mutex which we'll release before returning.
++	 */
++	mutex_lock(&supp->supp_mutex);
++
++	if (supp->supp_next_send) {
++		/*
++		 * optee_supp_recv() has been called again without
++		 * a optee_supp_send() in between. Supplicant has
++		 * probably been restarted before it was able to
++		 * write back last result. Abort last request and
++		 * wait for a new.
++		 */
++		if (supp->req_posted) {
++			supp->ret = TEEC_ERROR_COMMUNICATION;
++			supp->supp_next_send = false;
++			complete(&supp->data_from_supp);
++		}
++	}
++
++	/*
++	 * This is where supplicant will be hanging most of the
++	 * time, let's make this interruptable so we can easily
++	 * restart supplicant if needed.
++	 */
++	if (wait_for_completion_interruptible(&supp->data_to_supp)) {
++		rc = -ERESTARTSYS;
++		goto out;
++	}
++
++	/* We have exlusive access to the data */
++
++	if (*num_params < supp->num_params) {
++		/*
++		 * Not enough room for parameters, tell supplicant
++		 * it failed and abort last request.
++		 */
++		supp->ret = TEEC_ERROR_COMMUNICATION;
++		rc = -EINVAL;
++		complete(&supp->data_from_supp);
++		goto out;
++	}
++
++	*func = supp->func;
++	*num_params = supp->num_params;
++	memcpy(param, supp->param,
++	       sizeof(struct tee_param) * supp->num_params);
++
++	/* Allow optee_supp_send() below to do its work */
++	supp->supp_next_send = true;
++
++	rc = 0;
++out:
++	mutex_unlock(&supp->supp_mutex);
++	return rc;
++}
++
++int optee_supp_send(struct tee_context *ctx, u32 ret, u32 num_params,
++			struct tee_param *param)
++{
++	struct tee_device *teedev = ctx->teedev;
++	struct optee *optee = tee_get_drvdata(teedev);
++	struct optee_supp *supp = &optee->supp;
++	size_t n;
++	int rc = 0;
++
++	/*
++	 * We still have exclusive access to the data since that's how we
++	 * left it when returning from optee_supp_read().
++	 */
++
++	/* See comment on mutex in optee_supp_read() above */
++	mutex_lock(&supp->supp_mutex);
++
++	if (!supp->supp_next_send) {
++		/*
++		 * Something strange is going on, supplicant shouldn't
++		 * enter optee_supp_send() in this state
++		 */
++		rc = -ENOENT;
++		goto out;
++	}
++
++	if (num_params != supp->num_params) {
++		/*
++		 * Something is wrong, let supplicant restart. Next call to
++		 * optee_supp_recv() will give an error to the requesting
++		 * thread and release it.
++		 */
++		rc = -EINVAL;
++		goto out;
++	}
++
++	/* Update out and in/out parameters */
++	for (n = 0; n < num_params; n++) {
++		struct tee_param *p = supp->param + n;
++
++		switch (p->attr) {
++		case TEE_IOCTL_PARAM_ATTR_TYPE_VALUE_OUTPUT:
++		case TEE_IOCTL_PARAM_ATTR_TYPE_VALUE_INOUT:
++			p->u.value.a = param[n].u.value.a;
++			p->u.value.b = param[n].u.value.b;
++			p->u.value.c = param[n].u.value.c;
++			break;
++		case TEE_IOCTL_PARAM_ATTR_TYPE_MEMREF_OUTPUT:
++		case TEE_IOCTL_PARAM_ATTR_TYPE_MEMREF_INOUT:
++			p->u.memref.size = param[n].u.memref.size;
++			break;
++		default:
++			break;
++		}
++	}
++	supp->ret = ret;
++
++	/* Allow optee_supp_recv() above to do its work */
++	supp->supp_next_send = false;
++
++	/* Let the requesting thread continue */
++	complete(&supp->data_from_supp);
++out:
++	mutex_unlock(&supp->supp_mutex);
++	return rc;
++}
 -- 
 1.9.1
