@@ -1,44 +1,124 @@
-From: amittomer25@gmail.com (Amit Tomer)
-Date: Thu, 29 Oct 2015 19:17:31 +0530
-Subject: [PATCH v1] Ftrace: arm/arm64: Define a new arm/arm64 trace clock
- source based on CNTPCT/CNTPCT_EL0 register.
-In-Reply-To: <20151029113849.GC28221@leverpostej>
-References: <1445854558-16253-1-git-send-email-amittomer25@gmail.com>
- <20151028124726.GD25451@leverpostej>
- <CABHD4K-KugtaLvc98wEMWm0iN_3v=d2UYkSmpSMCX91s-EAnhg@mail.gmail.com>
- <20151029113849.GC28221@leverpostej>
-Message-ID: <CABHD4K_DXCNpOS9esA9yEANaYocNMG3fcQ4_uRTKQHF-8JiQvw@mail.gmail.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 29 Oct 2015 14:48:24 +0100
+Subject: [PATCH] [v2] arm64: efi: make sure vmlinux load address aligned
+ on 2MB
+In-Reply-To: <20151029134333.GE28221@leverpostej>
+References: <1446053844-27281-1-git-send-email-timur@codeaurora.org>
+ <20151028180836.GB26777@leverpostej>
+ <56311014.9020400@codeaurora.org>
+ <20151028182139.GC26777@leverpostej>
+ <CAKv+Gu-76knWJ+ffAemeR7sBBtVB68pmZNPGQZRZKhmnd21F9A@mail.gmail.com>
+ <20151029134333.GE28221@leverpostej>
+Message-ID: <CAKv+Gu8yFYv7GNvsOzUD1UQaXZ0AeXByahq3XjodrCtOGRGfgQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Regardless of the host, you cannot know whether it is safe to access
-> in a guest. It could bring down the system.
+On 29 October 2015 at 14:43, Mark Rutland <mark.rutland@arm.com> wrote:
+> On Thu, Oct 29, 2015 at 11:59:46AM +0900, Ard Biesheuvel wrote:
+>> On 29 October 2015 at 03:21, Mark Rutland <mark.rutland@arm.com> wrote:
+>> > On Wed, Oct 28, 2015 at 01:12:36PM -0500, Timur Tabi wrote:
+>> >> On 10/28/2015 01:08 PM, Mark Rutland wrote:
+>> >>
+>> >> >arm64: efi: ensure kernel is loaded at correct address
+>> >> >
+>> >> >The kernel image needs to be loaded text_offset_bytes from a 2M-aligned
+>> >> >base, per Documentation/arm64/booting.txt. If loaded at the wrong offset
+>> >> >modulo 2M, __create_page_tables will create incorrect page tables.
+>> >> >
+>> >> >The EFI stub implicitly assumes that dram_base (i.e. the lowest address
+>> >> >with a EFI_MEMORY_WB attribute) is 2M-aligned, and tries to load the
+>> >> >kernel at dram_base + TEXT_OFFSET. If dram_base is not 2M-aligned, the
+>> >> >kernel will be loaded at the wrong offset from 2M.
+>> >>
+>> >> Thanks, I'll use that.  I messed up a couple other things, so I need
+>> >> to send out a v3 anyway.
+>> >>
+>> >> >>-           *image_addr = *reserve_addr = dram_base + TEXT_OFFSET;
+>> >> >>+           *image_addr = *reserve_addr =
+>> >> >>+                   round_up(dram_base, SZ_2M) + TEXT_OFFSET;
+>> >> >
+>> >> >We also need to fix the test for whether we need to relocate the kernel:
+>> >> >(*image_addr != (dram_base + TEXT_OFFSET)).
+>> >> >
+>> >> >When dram_base is not 2M aligned, that is broken, and it's been broken
+>> >> >since it was introduced in commit 3c7f255039a2ad6e ("arm64: efi: add EFI
+>> >> >stub") in v3.16.
+>> >> >
+>> >> >It's a bit hideous to fix the general case, though, it seems.
+>> >>
+>> >> Um, so I should I do something more in my v3 patch, or is this a
+>> >> change for a different patch?
+>> >
+>> > I think there should be a single patch, but please hold off v3 for a day
+>> > or so. I think there a few more edge cases here, and I'm currently
+>> > investigating.
+>> >
+>>
+>> Apologies for the drive-by nature of my contributions to this thread.
+>> I am currently travelling.
+>>
+>> I think the below should address both issues (and I even tried to
+>> compile it this time)
+>>
+>> -----------------8<-----------------
+>> diff --git a/arch/arm64/kernel/efi-stub.c b/arch/arm64/kernel/efi-stub.c
+>> index 816120ece6bc..78dfbd34b6bf 100644
+>> --- a/arch/arm64/kernel/efi-stub.c
+>> +++ b/arch/arm64/kernel/efi-stub.c
+>> @@ -25,10 +25,20 @@
+>>         unsigned long kernel_size, kernel_memsize = 0;
+>>         unsigned long nr_pages;
+>>         void *old_image_addr = (void *)*image_addr;
+>> +       unsigned long preferred_offset;
+>> +
+>> +       /*
+>> +        * The preferred offset of the kernel Image is TEXT_OFFSET bytes beyond
+>> +        * a 2 MB aligned base, which itself may be lower than dram_base, as
+>> +        * long as the resulting offset equals or exceeds it.
+>> +        */
+>> +       preferred_offset = round_down(dram_base, SZ_2M) + TEXT_OFFSET;
+>> +       if (preferred_offset < dram_base)
+>> +               preferred_offset += SZ_2M;
+>>
+>>         /* Relocate the image, if required. */
+>>         kernel_size = _edata - _text;
+>> -       if (*image_addr != (dram_base + TEXT_OFFSET)) {
+>> +       if (*image_addr != preferred_offset) {
+>>                 kernel_memsize = kernel_size + (_end - _edata);
+>>
+>>                 /*
+>> @@ -42,7 +52,7 @@
+>>                  * Mustang), we can still place the kernel at the address
+>>                  * 'dram_base + TEXT_OFFSET'.
+>>                  */
+>> -               *image_addr = *reserve_addr = dram_base + TEXT_OFFSET;
+>> +               *image_addr = *reserve_addr = preferred_offset;
+>>                 nr_pages = round_up(kernel_memsize, EFI_ALLOC_ALIGN) /
+>>                            EFI_PAGE_SIZE;
+>>                 status = efi_call_early(allocate_pages, EFI_ALLOCATE_ADDRESS,
+>>
 >
-> The host kernel could safely access the physical counter were it booted
-> at EL2, because it could grant itself access.
+> This looks good to me, and I've given it a spin on Juno (though I
+> haven't fiddled with dram_base). I trust that you will respin this as a
+> patch when you get the chance.
+>
+> There is another (existing) problem I spotted, in that we'll sometimes
+> move the kernel to a worse address. If the kernel was loaded at a valid
+> address (i.e. image_addr % SZ_2MB == TEXT_OFFSET), but not at the
+> preferred offset, we try to relocate it, even if it's already at the
+> lowest possible address.
+>
 
-May be I am totally wrong here but it doesn't look to be good . if
-Linux image does not boot at hyp mode,
-there is no way to use arch timers, Not true?
+Indeed. Unlikely to occur in practice, since UEFI mostly allocates top
+down, but it would indeed be better to drop the new allocation and
+simply use the existing one if it is not an improvement.
 
-But I could see even if Linux image booted in EL1 has the access to
-Physical timer/counters that is
-been allowed by firmware it self.
+> That doesn't break boot, so it's not as big a problem, and it's probably
+> better sovled with the split VA stuff.
+>
 
-ENTRY(armv8_switch_to_el1)
-        switch_el x0, 0f, 1f, 0f
-0:      ret
-1:
-        /* Initialize Generic Timers */
-        mrs     x0, cnthctl_el2
-        orr     x0, x0, #0x3            /* Enable EL1 access to timers */
-        msr     cnthctl_el2, x0
-        msr     cntvoff_el2, x0
-        mrs     x0, cntkctl_el1
-        orr     x0, x0, #0x3            /* Enable EL0 access to timers */
-        msr     cntkctl_el1, x0
+Once we have that, we should revisit this logic anyway, since loading
+at the lowest possible address may waste precious <4 GB RAM.
 
-Sorry, if it's just all stupid.
-
-Thanks,
-Amit.
+-- 
+Ard.
