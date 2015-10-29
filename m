@@ -1,37 +1,54 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 29 Oct 2015 13:18:30 -0700
-Subject: [GIT PULL] two omap regression fixes for v4.3-rc cycle
-Message-ID: <20151029201829.GF3078@atomide.com>
+From: damien.riegel@savoirfairelinux.com (Damien Riegel)
+Date: Thu, 29 Oct 2015 16:27:25 -0400
+Subject: [PATCH v2 0/5] Add board support for TS-4800
+Message-ID: <1446150450-22093-1-git-send-email-damien.riegel@savoirfairelinux.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The following changes since commit 57df5380853460bc66b59a46273ce113c923d39c:
+This patch serie adds support for TS-4800 board. This board,
+manufactured by Technologic Systems, is based on an IMX515.
 
-  ARM: OMAP2+: Fix imprecise external abort caused by bogus SRAM init (2015-10-19 08:55:46 -0700)
+The first stage bootloader, called TS-BOOTROM, enables the watchdog,
+so a watchdog driver is required to prevent board from rebooting.
 
-are available in the git repository at:
+The current device tree is minimal but it allows to get a shell on the
+board.
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.3/fixes-rc7
+Changes in v2:
+ - Added a mfd driver to handle syscon registers
+ - The watchdog driver now uses the regmap (created by the mfd driver)
+   to access the feed register
+ - Remove watchdog's dependency on SOC_IMX51
 
-for you to fetch changes up to 8f2279d5d908119a08e906be1c6b69c744d0c379:
+Damien Riegel (5):
+  of: add vendor prefix for Technologic Systems
+  mfd: ts4800-syscon: add driver for TS-4800 syscon
+  watchdog: ts4800: add driver for TS-4800 watchdog
+  ARM: imx_v6_v7_defconfig: add TS-4800 watchdog and syscon
+  ARM: dts: TS-4800: add basic device tree
 
-  usb: musb: omap2430: Fix regression caused by driver core change (2015-10-28 10:16:04 -0700)
+ Documentation/devicetree/bindings/arm/ts.txt       |   6 +
+ .../devicetree/bindings/mfd/ts4800-syscon.txt      |  20 ++
+ .../devicetree/bindings/vendor-prefixes.txt        |   1 +
+ .../devicetree/bindings/watchdog/ts4800-wdt.txt    |  12 ++
+ arch/arm/boot/dts/Makefile                         |   3 +-
+ arch/arm/boot/dts/imx51-ts4800.dts                 | 192 ++++++++++++++++++
+ arch/arm/configs/imx_v6_v7_defconfig               |   2 +
+ drivers/mfd/Kconfig                                |   8 +
+ drivers/mfd/Makefile                               |   1 +
+ drivers/mfd/ts4800-syscon.c                        |  95 +++++++++
+ drivers/watchdog/Kconfig                           |  10 +
+ drivers/watchdog/Makefile                          |   1 +
+ drivers/watchdog/ts4800_wdt.c                      | 216 +++++++++++++++++++++
+ include/linux/mfd/ts4800-syscon.h                  |  24 +++
+ 14 files changed, 590 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/ts.txt
+ create mode 100644 Documentation/devicetree/bindings/mfd/ts4800-syscon.txt
+ create mode 100644 Documentation/devicetree/bindings/watchdog/ts4800-wdt.txt
+ create mode 100644 arch/arm/boot/dts/imx51-ts4800.dts
+ create mode 100644 drivers/mfd/ts4800-syscon.c
+ create mode 100644 drivers/watchdog/ts4800_wdt.c
+ create mode 100644 include/linux/mfd/ts4800-syscon.h
 
-----------------------------------------------------------------
-Two omap regression fixes:
-
-- Fix omap3 MUSB with DMA caused by driver core changes
-
-- Fix LCD DMA interrupt number for omap1 that did not
-  get changed for sparse IRQ changes
-
-----------------------------------------------------------------
-Aaro Koskinen (1):
-      ARM: OMAP1: fix incorrect INT_DMA_LCD
-
-Tony Lindgren (1):
-      usb: musb: omap2430: Fix regression caused by driver core change
-
- drivers/usb/musb/omap2430.c | 29 +++++++++++++++++++++++------
- include/linux/omap-dma.h    |  2 +-
- 2 files changed, 24 insertions(+), 7 deletions(-)
+-- 
+2.5.0
