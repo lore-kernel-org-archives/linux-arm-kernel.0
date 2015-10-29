@@ -1,75 +1,92 @@
-From: p.fedin@samsung.com (Pavel Fedin)
-Date: Thu, 29 Oct 2015 15:42:20 +0300
-Subject: [PATCH v4 4/4] ARM: dts: Add Ethernet chip to SMDK5410
-In-Reply-To: <cover.1446122247.git.p.fedin@samsung.com>
-References: <cover.1446122247.git.p.fedin@samsung.com>
-Message-ID: <6fed900bf831d8bc23ef56c95417887c3d9a2d07.1446122247.git.p.fedin@samsung.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 29 Oct 2015 13:52:30 +0100
+Subject: [PATCH 1/3] mtd: create a partition type device tree binding
+Message-ID: <1446123152-22666-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The chip is smsc9115, connected via SROMc bank 3. Additionally, some GPIO
-initialization is required.
+The Linux code in drivers/mtd/maps/physmap_of.c will optionally
+look for the linux,part-probe binding for hints on a partition type to
+look for in the MTD. It was added in commit 9d5da3a9b849
+"mtd: extend physmap_of to let the device tree specify the parition probe"
 
-Signed-off-by: Pavel Fedin <p.fedin@samsung.com>
+This solution is too Linux-specific and depend on some
+Linux kernel-internal naming conventions. We need a proper
+way of describing partition types that follow the pattern set by
+other device tree bindings.
+
+Create a "partition-type" binding for this, and add "my" bindings
+for "arm,arm-flash-structure" as a starter for others to follow.
+A follow-on patch adds support to the Linux kernel to handle this
+binding, with some infrastructure for others to use it too.
+
+Cc: devicetree at vger.kernel.org
+Cc: Jason Gunthorpe <jgunthorpe@obsidianresearch.com>
+Cc: Liviu Dudau <Liviu.Dudau@arm.com>
+Reported-by: Liviu Dudau <Liviu.Dudau@arm.com>
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- arch/arm/boot/dts/exynos5410-smdk5410.dts | 41 +++++++++++++++++++++++++++++++
- 1 file changed, 41 insertions(+)
+ .../devicetree/bindings/mtd/mtd-physmap.txt        |  2 ++
+ .../devicetree/bindings/mtd/partition.txt          | 35 +++++++++++++++++++---
+ 2 files changed, 33 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/boot/dts/exynos5410-smdk5410.dts b/arch/arm/boot/dts/exynos5410-smdk5410.dts
-index cebeaab..311e7be 100644
---- a/arch/arm/boot/dts/exynos5410-smdk5410.dts
-+++ b/arch/arm/boot/dts/exynos5410-smdk5410.dts
-@@ -61,6 +61,27 @@
- 	disable-wp;
- };
+diff --git a/Documentation/devicetree/bindings/mtd/mtd-physmap.txt b/Documentation/devicetree/bindings/mtd/mtd-physmap.txt
+index 4a0a48bf4ecb..863560bdbb19 100644
+--- a/Documentation/devicetree/bindings/mtd/mtd-physmap.txt
++++ b/Documentation/devicetree/bindings/mtd/mtd-physmap.txt
+@@ -23,6 +23,8 @@ file systems on embedded devices.
+    unaligned accesses as implemented in the JFFS2 code via memcpy().
+    By defining "no-unaligned-direct-access", the flash will not be
+    exposed directly to the MTD users (e.g. JFFS2) any more.
++ - partition-type : a flash partition type to expect and probe for
++   on this device. See "partition.txt" for available partition types.
+  - linux,mtd-name: allow to specify the mtd name for retro capability with
+    physmap-flash drivers as boot loader pass the mtd partition via the old
+    device name physmap-flash.
+diff --git a/Documentation/devicetree/bindings/mtd/partition.txt b/Documentation/devicetree/bindings/mtd/partition.txt
+index 8e5557da1955..85d45764a4b3 100644
+--- a/Documentation/devicetree/bindings/mtd/partition.txt
++++ b/Documentation/devicetree/bindings/mtd/partition.txt
+@@ -1,9 +1,36 @@
+ Representing flash partitions in devicetree
  
-+&pinctrl_0 {
-+	srom_ctl: srom-ctl {
-+		samsung,pins = "gpy0-3", "gpy0-4", "gpy0-5",
-+			       "gpy1-0", "gpy1-1", "gpy1-2", "gpy1-3";
-+		samsung,pin-function = <2>;
-+		samsung,pin-drv = <0>;
-+	};
+-Partitions can be represented by sub-nodes of an mtd device. This can be used
+-on platforms which have strong conventions about which portions of a flash are
+-used for what purposes, but which don't use an on-flash partition table such
+-as RedBoot.
++On-device partition types:
 +
-+	srom_ebi: srom-ebi {
-+		samsung,pins = "gpy3-0", "gpy3-1", "gpy3-2", "gpy3-3",
-+			       "gpy3-4", "gpy3-5", "gpy3-6", "gpy3-7",
-+			       "gpy5-0", "gpy5-1", "gpy5-2", "gpy5-3",
-+			       "gpy5-4", "gpy5-5", "gpy5-6", "gpy5-7",
-+			       "gpy6-0", "gpy6-1", "gpy6-2", "gpy6-3",
-+			       "gpy6-4", "gpy6-5", "gpy6-6", "gpy6-7";
-+		samsung,pin-function = <2>;
-+		samsung,pin-pud = <3>;
-+		samsung,pin-drv = <0>;
-+	};
++It is possible for some drivers to indicate an on-device partition type, i.e.
++partition tables, footers or other binary pattern in the flash used to
++define how the flash is partitioned. This can be done in the device tree node
++of an MTD device by specifying partition-type = "foo"; This tells the operating
++system to look for the partition type indicated.
++
++Required properties:
++- partition-type : the type of partition. Only one type can be specified.
++  Valid types are:
++  "arm,arm-flash-structure" (also called AFS)
++
++Example:
++
++flash0 at 40000000 {
++	/* 2 * 32MiB NOR Flash memory */
++	compatible = "arm,vexpress-flash", "cfi-flash";
++	partition-type = "arm,arm-flash-structure";
++	reg = <0x40000000 0x04000000>;
++	bank-width = <4>;
 +};
 +
- &uart0 {
- 	status = "okay";
- };
-@@ -72,3 +93,23 @@
- &uart2 {
- 	status = "okay";
- };
 +
-+&sromc {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&srom_ctl>, <&srom_ebi>;
++Device Tree specified partitions:
 +
-+	ethernet at 07000000 {
-+		compatible = "smsc,lan9115";
-+		reg = <0x07000000 0x10000>;
-+		phy-mode = "mii";
-+		interrupt-parent = <&gpx0>;
-+		interrupts = <5 8>;
-+		reg-io-width = <2>;
-+		smsc,irq-push-pull;
-+		smsc,force-internal-phy;
++If there is no specified on-device binary format, partitions can be
++represented by sub-nodes of an mtd device. This can be used on platforms which
++have strong conventions about which portions of a flash are used for what
++purposes.
 +
-+		samsung,srom-bank = <3>;
-+		samsung,srom-data-width = <2>;
-+		samsung,srom-timing = <1 9 12 1 9 1 1>;
-+	};
-+};
+ NOTE: if the sub-node has a compatible string, then it is not a partition.
+ 
+ #address-cells & #size-cells must both be present in the mtd device. There are
 -- 
-2.4.4
+2.4.3
