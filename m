@@ -1,63 +1,83 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 29 Oct 2015 14:40:57 +0100
-Subject: [PATCH 1/3] arm64/efi: set EFI_MEMMAP bit only after mapping the
- memory map
+Date: Thu, 29 Oct 2015 14:40:59 +0100
+Subject: [PATCH 3/3] arm64/efi: memblock_remove() rather than _reserve UEFI
+ reserved memory
 In-Reply-To: <1446126059-25336-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1446126059-25336-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1446126059-25336-2-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1446126059-25336-4-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In an upcoming patch, we will wire up page_is_ram() to the UEFI memory
-map, so make sure the EFI_MEMMAP bit accurately reflects whether the
-UEFI memory map is available via its permanent mapping.
+Memory regions that are not advertised as being available for general use
+to the kernel should either never be mapped at all (EfiReservedMemory),
+since it should not even be accessed speculatively, or they are mapped
+and unmapped explicitly when used (UEFI runtime services regions), so
+the linear mapping is never used anyway.
+
+This means we are better off removing these regions from the linear
+mapping entirely, so memblock_remove() rather than memblock_reserve()
+them.
 
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm64/kernel/efi.c | 17 ++++++++---------
- 1 file changed, 8 insertions(+), 9 deletions(-)
+ arch/arm64/kernel/efi.c | 22 +++++++++++---------
+ 1 file changed, 12 insertions(+), 10 deletions(-)
 
 diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
-index 852eb927ea85..11b59e9a5954 100644
+index 11b59e9a5954..daafa40d1c19 100644
 --- a/arch/arm64/kernel/efi.c
 +++ b/arch/arm64/kernel/efi.c
-@@ -191,8 +191,6 @@ static __init void reserve_regions(void)
- 		if (efi_enabled(EFI_DBG))
- 			pr_cont("\n");
+@@ -171,7 +171,7 @@ static __init void reserve_regions(void)
+ 		if (efi_enabled(EFI_DBG)) {
+ 			char buf[64];
+ 
+-			pr_info("  0x%012llx-0x%012llx %s",
++			pr_info("  0x%012llx-0x%012llx %s\n",
+ 				paddr, paddr + (npages << EFI_PAGE_SHIFT) - 1,
+ 				efi_md_typeattr_format(buf, sizeof(buf), md));
+ 		}
+@@ -181,15 +181,17 @@ static __init void reserve_regions(void)
+ 
+ 		if (is_normal_ram(md))
+ 			early_init_dt_add_memory_arch(paddr, size);
++	}
+ 
+-		if (is_reserve_region(md)) {
+-			memblock_reserve(paddr, size);
+-			if (efi_enabled(EFI_DBG))
+-				pr_cont("*");
+-		}
++	for_each_efi_memory_desc(&memmap, md) {
++		paddr = md->phys_addr;
++		npages = md->num_pages;
++
++		memrange_efi_to_native(&paddr, &npages);
++		size = npages << PAGE_SHIFT;
+ 
+-		if (efi_enabled(EFI_DBG))
+-			pr_cont("\n");
++		if (is_reserve_region(md))
++			memblock_remove(paddr, size);
  	}
--
--	set_bit(EFI_MEMMAP, &efi.flags);
  }
  
- void __init efi_init(void)
-@@ -291,13 +289,6 @@ static int __init arm64_enable_runtime_services(void)
- 		return -1;
- 	}
+@@ -203,8 +205,6 @@ void __init efi_init(void)
  
--	if (efi_runtime_disabled()) {
--		pr_info("EFI runtime services will be disabled.\n");
--		return -1;
--	}
--
--	pr_info("Remapping and enabling EFI services.\n");
--
- 	mapsize = memmap.map_end - memmap.map;
- 	memmap.map = (__force void *)ioremap_cache((phys_addr_t)memmap.phys_map,
- 						   mapsize);
-@@ -307,6 +298,14 @@ static int __init arm64_enable_runtime_services(void)
- 	}
- 	memmap.map_end = memmap.map + mapsize;
- 	efi.memmap = &memmap;
-+	set_bit(EFI_MEMMAP, &efi.flags);
-+
-+	if (efi_runtime_disabled()) {
-+		pr_info("EFI runtime services will be disabled.\n");
-+		return -1;
-+	}
-+
-+	pr_info("Remapping and enabling EFI services.\n");
+ 	efi_system_table = params.system_table;
  
- 	efi.systab = (__force void *)ioremap_cache(efi_system_table,
- 						   sizeof(efi_system_table_t));
+-	memblock_reserve(params.mmap & PAGE_MASK,
+-			 PAGE_ALIGN(params.mmap_size + (params.mmap & ~PAGE_MASK)));
+ 	memmap.phys_map = (void *)params.mmap;
+ 	memmap.map = early_memremap(params.mmap, params.mmap_size);
+ 	memmap.map_end = memmap.map + params.mmap_size;
+@@ -216,6 +216,8 @@ void __init efi_init(void)
+ 
+ 	reserve_regions();
+ 	early_memunmap(memmap.map, params.mmap_size);
++	memblock_remove(params.mmap & PAGE_MASK,
++			PAGE_ALIGN(params.mmap_size + (params.mmap & ~PAGE_MASK)));
+ }
+ 
+ static void __init efi_reserve_iomem_resource(efi_memory_desc_t *md)
 -- 
 2.1.4
