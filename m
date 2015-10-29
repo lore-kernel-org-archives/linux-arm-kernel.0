@@ -1,78 +1,37 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 29 Oct 2015 11:40:05 +0000
-Subject: [PATCH 0/3] Revert arm64 cache geometry
-In-Reply-To: <1446068637-11509-1-git-send-email-avanbrunt@nvidia.com>
-References: <1446068637-11509-1-git-send-email-avanbrunt@nvidia.com>
-Message-ID: <20151029114005.GB389@arm.com>
+From: p.fedin@samsung.com (Pavel Fedin)
+Date: Thu, 29 Oct 2015 14:43:15 +0300
+Subject: [PATCH v3 1/4] Documentation: dt-bindings: Describe SROMc
+ configuration
+In-Reply-To: <CAJKOXPcSehXRYDpYiybzdagPS76QKGpeMb7DxkpwJq8GTfuPOw@mail.gmail.com>
+References: <cover.1446018918.git.p.fedin@samsung.com>
+ <046d990092dc85cf50db9082fc894d93a3ece7c0.1446018918.git.p.fedin@samsung.com>
+ <563183F9.6020806@samsung.com> <008001d1121d$c0fef160$42fcd420$@samsung.com>
+ <CAJKOXPcSehXRYDpYiybzdagPS76QKGpeMb7DxkpwJq8GTfuPOw@mail.gmail.com>
+Message-ID: <003c01d1123f$002a3220$007e9660$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alex,
+ Hello!
 
-Thanks for describing the problem in depth here. I'm not at all happy
-about the conclusion, but you're right and thanks for the report.
-Minor comments below.
-
-On Wed, Oct 28, 2015 at 02:43:54PM -0700, Alex Van Brunt wrote:
-> This patchset reverts three patches that attempt to query the CPU for cache
-> geometry and then make use of that information. Those patches rely on the
-> NumSets and LineSize fields of CCSIDR to determine the cache geometry. However,
-> the architectural documentation for these registers forbids such use:
+> >> Any vendor prefix here? How generic is this?
+> >
+> >  I just don't know... Does *everything* really need a vendor prefix? How readable would that
+> be? "compatible" property already says
+> > that it's samsung-exynos-specific. And IMHO it's quite obvious that properties of vendor-
+> specific device are automatically
+> > vendor-specific.
+> >  Ok, i am currently fixing up the rest and will post v4 soon, and will Cc: it to devicetree
+> ML.
 > 
-> 	The parameters NumSets, Associativity, and LineSize in these registers
-> 	define the architecturally visible parameters that are required for the
-> 	cache maintenance by Set/Way instructions. They are not guaranteed to
-> 	represent the actual microarchitectural features of a design. You cannot
-> 	make any inference about the actual sizes of caches based on these
-> 	parameters.
-> 
-> It is not just theoretical. For example, the Denver CPU will report one set and
-> one way in CCSIDR even though the actual microarchitectural implementation has
-> many sets and many ways.
-> 
-> I have two suggestions for how to get the cache geometry on an ARMv8 processor:
->   1. Specify the information in the device tree. The purpose of the deivce tree
->      is to specify information that software cannot query at run-time. Becuase
->      the architecture does not have an architectural way to query the cache
->      geometry this may be a good fit.
->   2. Add a function pointer to cpu_table that gives a implementation specific
->      way to query the cache geometry. For an A57, for example, the function
->      could read the CCSIDR register because it happens to report the
->      microarchitectural geometry. The Denver CPU has implementation defined
->      registers that can be used to determine the microarchitectural geometry.
->      However, the implementation for the default "AArch64 Processor", must
->      return an error.
-> 
-> The only place that the cache geometry is used is to determine if there can be
-> aliasing for a VIPT (virtually-indexed, physically-tagged) instruction cache.
-> The code assumes that there is no need to flush the entire instruction cache
-> if the size of a cache set is less than or equal to a page size. However, the
-> architectural definition of VIPT says "The only architecturally-guaranteed way
-> to invalidate all aliases of a physical address from a VIPT instruction cache
-> is to invalidate the entire instruction cache." Not only are the parameters not
-> guaranteed to be correct, it is explicitly not legal to ignore aliasing even if
-> the parameters were correct.
+> Which my reply you are referring to? You stripped part of some
+> sentence and put it without *any context*. Just random sentence.
+> I asked for vendor prefix in few places... srom-timing? width? And I
+> do not remember where I used exactly these words.
 
-This is useful detail -- can you include it in the relevant commit messages
-too, please? You can also drop the ChangeId tags and probably add Cc:
-<stable@vger.kernel.org> tags as well.
+ Ok, sorry, i promise to improve. :)
+ Anyway, i have figured out how to add sub-devices, and heavily modified the whole thing. And indeed, vendor prefix is now very useful, so i added it to all three properties. Making v4...
 
-We should also add a comment to the I-cache aliasing code to state why
-we always nuke the entire I-cache, so that we don't "optimise" it again
-in the future!
-
-My final concern is how this impacts userspace parsing
-/sys/devices/system/cpu/cpuX/cache/*. Do we need to stub that out with
-dummy values and extend the device-tree properties to allow inner-cache
-geometry to be described? I worry that simply removing the files under
-there could break more than it solves.
-
-Perhaps the right solution is to leave the cacheinfo code as-is and extend
-it so that it prefers to use DT, falling back to the registers if the
-properties are absent? That matches up with our treatment of MPIDR for
-topology too and reduces the risk of breaking any existing software.
-
-Patch 2 and 3 look fine as straight reverts, though (module my previous
-comments about commit messages).
-
-Will
+Kind regards,
+Pavel Fedin
+Expert Engineer
+Samsung Electronics Research center Russia
