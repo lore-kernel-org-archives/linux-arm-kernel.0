@@ -1,89 +1,41 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Thu, 29 Oct 2015 11:01:58 -0400
-Subject: [PATCH V1 11/11] arm64, pci, acpi: Support for ACPI based PCI
- hostbridge init
-In-Reply-To: <56320538.6000905@semihalf.com>
-References: <1445963922-22711-1-git-send-email-tn@semihalf.com>
- <1445963922-22711-12-git-send-email-tn@semihalf.com>
- <5631180D.2000902@codeaurora.org> <563131B0.9060305@codeaurora.org>
- <56320538.6000905@semihalf.com>
-Message-ID: <563234E6.4050109@codeaurora.org>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 29 Oct 2015 16:08:55 +0100
+Subject: [PATCH] [v2] arm64: efi: make sure vmlinux load address aligned
+ on 2MB
+In-Reply-To: <56323311.8050708@codeaurora.org>
+References: <1446053844-27281-1-git-send-email-timur@codeaurora.org>
+ <20151028180836.GB26777@leverpostej> <56311014.9020400@codeaurora.org>
+ <20151028182139.GC26777@leverpostej>
+ <CAKv+Gu-76knWJ+ffAemeR7sBBtVB68pmZNPGQZRZKhmnd21F9A@mail.gmail.com>
+ <20151029134333.GE28221@leverpostej>
+ <CAKv+Gu8yFYv7GNvsOzUD1UQaXZ0AeXByahq3XjodrCtOGRGfgQ@mail.gmail.com>
+ <56323311.8050708@codeaurora.org>
+Message-ID: <B00905D7-EF6A-42F7-86AB-7C2FA60E3B51@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-On 10/29/2015 7:38 AM, Tomasz Nowicki wrote:
-> On 28.10.2015 21:36, Sinan Kaya wrote:
->> 1. ACPI code is unable to discover the interrupt numbers when objects
->> are ordered as follows in the ACPI file
->>
->> PNP0A08 object
->> PNP0C0F INTA object
->> PNP0C0F INTB object
->> PNP0C0F INTC object
->> PNP0C0F INTD object
->>
->> This gives me invalid link context error.
->>
->> pci 0000:00:00.0: PCI INT A: no GSI
->> pci 0000:01:00.0: Derived GSI for 0000:01:00.0 INT A from 0000:00:00.0
->> acpi PNP0C0F:00: Invalid link context
->>
->> If I order it like this in the ACPI file,
->>
->> PNP0C0F INTA object
->> PNP0C0F INTB object
->> PNP0C0F INTC object
->> PNP0C0F INTD object
->> PNP0A08 object
->>
->> then, the legacy interrupt numbers can be discovered properly.
->
-> Can you show full content of your PNP0C0F and PNP0A08 objects?
->
+> On 29 okt. 2015, at 15:54, Timur Tabi <timur@codeaurora.org> wrote:
+> 
+> On 10/29/2015 08:48 AM, Ard Biesheuvel wrote:
+>>> >There is another (existing) problem I spotted, in that we'll sometimes
+>>> >move the kernel to a worse address. If the kernel was loaded at a valid
+>>> >address (i.e. image_addr % SZ_2MB == TEXT_OFFSET), but not at the
+>>> >preferred offset, we try to relocate it, even if it's already at the
+>>> >lowest possible address.
+>>> >
+> 
+>> Indeed. Unlikely to occur in practice, since UEFI mostly allocates top
+>> down, but it would indeed be better to drop the new allocation and
+>> simply use the existing one if it is not an improvement.
+> 
+> So you're saying that if we modify our UEFI so that it always loads the kernel at dram_base + TEXT_OFFSET, then one day in the future the kernel will skip the relocation?
+> 
 
-ACPI table is considered proprietary. I don't think I can get the legal 
-approval in time. I can give you pieces though.
+In fact, it does that already. The case Mark describes is when the Image is correctly aligned, but not at the base of DRAM, and the allocation produced by the firmware turns out to be even higher up in memory than the existing Image. In that particular case, the Image should simply be kept at the original offset, but currently we will prefer the suboptimal reallocation.
 
-Here is the _PRT
-Device (PCI0) { // PCIe port 0
-	Name(_HID, EISAID("PNP0A08"))	// PCI express
-	Name(_CID, EISAID("PNP0A03"))	// Compatible PCI Root Bridge
-{
-	....
-	Name(_PRT, Package(){
-		Package(){0x0FFFF, 0, \_SB.LN0A, 0},  // Slot 0, INTA
-		Package(){0x0FFFF, 1, \_SB.LN0B, 0},  // Slot 0, INTB
-		Package(){0x0FFFF, 2, \_SB.LN0C, 0},  // Slot 0, INTC
-		Package(){0x0FFFF, 3, \_SB.LN0D, 0}   // Slot 0, INTD
-	})
-}
-
-Here is the PNP0C0F
-
-Device(LN0A){
-	Name(_HID, EISAID("PNP0C0F")) // PCI interrupt link
-	Name(_UID, 1)
-	Name(_PRS, ResourceTemplate(){
-	Interrupt(ResourceProducer, Level, ActiveHigh, Exclusive, , ,) {0xE8}
-	})
-	Method(_DIS) {}
-	Method(_CRS) { Return (_PRS) }
-	Method(_SRS, 1) {}
-}
-
-
-
-> Regards,
-> Tomasz
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-
--- 
-Sinan Kaya
-Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a 
-Linux Foundation Collaborative Project
+> -- 
+> Qualcomm Innovation Center, Inc.
+> The Qualcomm Innovation Center, Inc. is a member of the
+> Code Aurora Forum, a Linux Foundation Collaborative Project.
