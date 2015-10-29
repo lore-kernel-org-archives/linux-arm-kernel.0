@@ -1,28 +1,37 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 29 Oct 2015 14:34:29 +0100
-Subject: [PATCH 2/2] pinctrl: uniphier: guard uniphier directory with
- CONFIG_PINCTRL_UNIPHIER
-In-Reply-To: <1445912911-1292-2-git-send-email-yamada.masahiro@socionext.com>
-References: <1445912911-1292-1-git-send-email-yamada.masahiro@socionext.com>
- <1445912911-1292-2-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <CACRpkdZ286dBTvd3EO_GTixnS=Cz-ch-H+AzNOJhZwoB63K6jw@mail.gmail.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Thu, 29 Oct 2015 21:35:42 +0800
+Subject: [PATCH] recordmcount: arm64: replace the ignored mcount call
+ into nop
+In-Reply-To: <1446019445-14421-1-git-send-email-huawei.libin@huawei.com>
+Message-ID: <201510292118.ZYBYzBGa%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 27, 2015 at 3:28 AM, Masahiro Yamada
-<yamada.masahiro@socionext.com> wrote:
+Hi Li,
 
-> CONFIG_PINCTRL_UNIPHIER is more suitable than CONFIG_ARCH_UNIPHIER
-> to guard the drivers/pinctrl/uniphier directory.
->
-> The current CONFIG_PINCTRL_UNIPHIER_CORE is a bit long
-> (it would break the indentation in drivers/pinctrl/Makefile),
-> so rename it into CONFIG_PINCTRL_UNIPHIER.
->
-> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+[auto build test ERROR on arm64/for-next/core -- if it's inappropriate base, please suggest rules for selecting the more suitable base]
 
-Holding this back until we know what to do with the first patch
-but it looks OK.
+url:    https://github.com/0day-ci/linux/commits/Li-Bin/recordmcount-arm64-replace-the-ignored-mcount-call-into-nop/20151028-160846
+config: arm64-allmodconfig (attached as .config)
+reproduce:
+        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm64 
 
-Yours,
-Linus Walleij
+All errors (new ones prefixed by >>):
+
+>> /bin/bash: line 1: 117734 Segmentation fault      ./scripts/recordmcount "arch/arm64/kernel/traps.o"
+--
+>> /bin/bash: line 1: 113824 Segmentation fault      ./scripts/recordmcount "arch/arm64/mm/fault.o"
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 45574 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151029/469c95e2/attachment-0001.obj>
