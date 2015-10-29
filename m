@@ -1,66 +1,26 @@
-From: khilman@kernel.org (Kevin Hilman)
-Date: Thu, 29 Oct 2015 02:12:45 -0700
-Subject: [PATCH v5 4/5] ARM: dts: mt8135: enable basic SMP bringup for
- mt8135
-In-Reply-To: <1445859610.26723.4.camel@mtksdaap41> (Eddie Huang's message of
- "Mon, 26 Oct 2015 19:40:10 +0800")
-References: <1443799181-50409-1-git-send-email-yingjoe.chen@mediatek.com>
- <1443799181-50409-5-git-send-email-yingjoe.chen@mediatek.com>
- <CAMAWPa-Ed2FJY2pW67EHHKBH3_eBZx0+oWfMJwc_DhEjrf7aMg@mail.gmail.com>
- <1445843717.23888.1.camel@mtksdaap41>
- <CAMAWPa_Gyq7H0qUJ32PAJh_ELdHeKWMPyHud4gaT8=Ootcu1+g@mail.gmail.com>
- <1445859610.26723.4.camel@mtksdaap41>
-Message-ID: <7hlhamjawi.fsf@deeprootsystems.com>
+From: lars@metafoo.de (Lars-Peter Clausen)
+Date: Thu, 29 Oct 2015 10:17:53 +0100
+Subject: [PATCH v4 4/4] iio: humidity: si7020: added No Hold read mode
+In-Reply-To: <ba63445a2f9af32bcbad698039041cbf@rainloop.corna.info>
+References: <563117FB.5030506@metafoo.de> <5630977D.2020102@metafoo.de>
+ <f113de76b2369d404909cfc5158feca4@rainloop.corna.info>
+ <1446015506-21371-1-git-send-email-nicola@corna.info>
+ <aa9c6c7ffdd5083c110cb35723081dbf@rainloop.corna.info>
+ <ba63445a2f9af32bcbad698039041cbf@rainloop.corna.info>
+Message-ID: <5631E441.6030600@metafoo.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Eddie Huang <eddie.huang@mediatek.com> writes:
+>> So maybe more like this:
+>>
+>> static inline bool i2c_check_quirks(struct i2c_adapter *adap, u64 quirks)
+>> {
+>> if (!adap->quirks)
+>> return false;
+>> return (adap->quirks->flags & quirks) == quirks;
+>> }
+> 
+> Should I use bool (like in your snippet) or int (like i2c_check_functionality) as return type?
 
-> Hi Kevin,
->
-> On Mon, 2015-10-26 at 17:06 +0900, Kevin Hilman wrote:
->> On Mon, Oct 26, 2015 at 4:15 PM, Yingjoe Chen <yingjoe.chen@mediatek.com> wrote:
->> > On Mon, 2015-10-26 at 09:56 +0900, Kevin Hilman wrote:
->> >> Hello,
->> >>
->> >> On Sat, Oct 3, 2015 at 12:19 AM, Yingjoe Chen <yingjoe.chen@mediatek.com> wrote:
->> >> > Add arch timer node to enable arch-timer support. MT8135 firmware
->> >> > doesn't correctly setup arch-timer frequency and CNTVOFF, add
->> >> > properties to workaround this.
->> >> >
->> >> > This also set cpu enable-method to enable SMP.
->> >> >
->> >> > Signed-off-by: Yingjoe Chen <yingjoe.chen@mediatek.com>
->> >>
->> >> kernelci.org started detecting new boot failures for the mt8135-evb in
->> >> the arm-soc tree[1], and the boot failures were bisected down to this
->> >> patch, which landed upstream in the form of commit d186a394bb98 (ARM:
->> >> dts: mt8135: enable basic SMP bringup for mt8135)
->> >>
->> >> Maybe this new SMP support requires updating the firmware on the board
->> >> as well?  If so, the changelog should've been a bit more explicit
->> >> about firmware dependencies.
->> >
->> > Kevin,
->> >
->> > Thanks for testing.
->> >
->> > No, it doesn't need new firmware. Will test to see what's going wrong.
->> 
->> Thanks for following up.  I'll be glad to test any patches if you have
->> anything you'd like me to test.
->
-> You need "clockevents/drivers/mtk: Fix spurious interrupt leading to
-> crash" (https://lkml.org/lkml/2015/8/24/803)
->
-> Daniel Lezcano already applied this patch in his tree for 4.4.
-> (https://git.linaro.org/people/daniel.lezcano/linux.git)
->
-
-Thanks for letting us know.
-
-In the future, these kinds of cross-tree dependencies are important to
-mention in the cover letter of  the pull request so we can setup
-dependency branches and keep arm-soc/for-next building and booting.
-
-Kevin
+I'd use bool, given that the result is a boolean value. It's semantically
+more clear this way.
