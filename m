@@ -1,98 +1,114 @@
-From: swarren@wwwdotorg.org (Stephen Warren)
-Date: Wed, 28 Oct 2015 22:32:37 -0600
-Subject: [RFC] rpi: add support to enable usb power domain
-In-Reply-To: <1446064810-5064-1-git-send-email-alex.aring@gmail.com>
-References: <1446064810-5064-1-git-send-email-alex.aring@gmail.com>
-Message-ID: <5631A165.3050304@wwwdotorg.org>
+From: robherring2@gmail.com (Rob Herring)
+Date: Wed, 28 Oct 2015 23:32:29 -0500
+Subject: [PATCH 1/4] arm64: dts: Reserve memory regions for hi6220
+In-Reply-To: <20151009142034.GB528@leoy-linaro>
+References: <1444365376-10728-1-git-send-email-leo.yan@linaro.org>
+ <1444365376-10728-2-git-send-email-leo.yan@linaro.org>
+ <CAL_JsqJapPM6CpaG+AYDAUQajZ4V5jREdCwA5F4vkD5jqC3bzg@mail.gmail.com>
+ <20151009133028.GB21629@leverpostej>
+ <CAL_Jsq+TrsS39L4nsRgqszTxKHyc00fLUf+BmftHnn=EV0PxhA@mail.gmail.com>
+ <20151009142034.GB528@leoy-linaro>
+Message-ID: <CAL_JsqLhu03B_ADYvCYdduH2d38kajOyc=9eX_FHy4QYYhZGxQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/28/2015 02:40 PM, Alexander Aring wrote:
-> This patch adds support for RPi several Power Domains and enable support
-> to enable the USB Power Domain when it's not enabled before.
-> 
-> This patch based on Eric Anholt's patch to support Power Domains. He had
-> an issue about -EPROBE_DEFER inside the power domain subsystem, this
-> issue was solved by commit <311fa6a> ("PM / Domains: Return -EPROBE_DEFER
-> if we fail to init or turn-on domain").
+On Fri, Oct 9, 2015 at 9:20 AM, Leo Yan <leo.yan@linaro.org> wrote:
+> Hi Rob,
+>
+> On Fri, Oct 09, 2015 at 08:50:13AM -0500, Rob Herring wrote:
+>> On Fri, Oct 9, 2015 at 8:30 AM, Mark Rutland <mark.rutland@arm.com> wrote:
+>> > On Fri, Oct 09, 2015 at 08:17:16AM -0500, Rob Herring wrote:
+>> >> On Thu, Oct 8, 2015 at 11:36 PM, Leo Yan <leo.yan@linaro.org> wrote:
+>> >> > On Hi6220, below memory regions in DDR have specific purpose:
+>> >> >
+>> >> >   0x05e0,0000 - 0x05ef,ffff: For MCU firmware using at runtime;
+>> >> >   0x06df,f000 - 0x06df,ffff: For mailbox message data;
+>> >> >   0x0740,f000 - 0x0740,ffff: For MCU firmware's section;
+>> >> >   0x3e00,0000 - 0x3fff,ffff: For OP-TEE.
+>> >> >
+>> >> > This patch reserves these memory regions in DT.
+>> >> >
+>> >> > Signed-off-by: Leo Yan <leo.yan@linaro.org>
+>> >> > ---
+>> >> >  arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts | 16 ++++++++++++----
+>> >> >  1 file changed, 12 insertions(+), 4 deletions(-)
+>> >> >
+>> >> > diff --git a/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts b/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
+>> >> > index e36a539..e3f4cb3 100644
+>> >> > --- a/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
+>> >> > +++ b/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
+>> >> > @@ -7,9 +7,6 @@
+>> >> >
+>> >> >  /dts-v1/;
+>> >> >
+>> >> > -/*Reserved 1MB memory for MCU*/
+>> >> > -/memreserve/ 0x05e00000 0x00100000;
+>> >> > -
+>> >>
+>> >> Why does memreserve not work for you? You can have multiple entries.
+>> >>
+>> >> >  #include "hi6220.dtsi"
+>> >> >
+>> >> >  / {
+>> >> > @@ -24,8 +21,19 @@
+>> >> >                 stdout-path = "serial0:115200n8";
+>> >> >         };
+>> >> >
+>> >> > +       /*
+>> >> > +        * Reserve below regions from memory node:
+>> >> > +        *
+>> >> > +        *  - 0x05e0,0000 - 0x05ef,ffff: MCU firmware runtime using
+>> >> > +        *  - 0x06df,f000 - 0x06df,ffff: Mailbox message data
+>> >> > +        *  - 0x0740,f000 - 0x0740,ffff: MCU firmware section
+>> >> > +        *  - 0x3e00,0000 - 0x3fff,ffff: OP-TEE
+>> >> > +        */
+>> >> >         memory at 0 {
+>> >> >                 device_type = "memory";
+>> >> > -               reg = <0x0 0x0 0x0 0x40000000>;
+>> >> > +               reg = <0x00000000 0x00000000 0x00000000 0x05e00000>,
+>> >> > +                     <0x00000000 0x05f00000 0x00000000 0x00eff000>,
+>> >> > +                     <0x00000000 0x06e00000 0x00000000 0x0060f000>,
+>> >> > +                     <0x00000000 0x07410000 0x00000000 0x36bf0000>;
+>> >>
+>> >> No, don't do this. Please use memreserve or reserved-memory binding[1]
+>> >> or combination of both. Probably reserved-memory if you need the
+>> >> kernel to access some of these regions.
+>> >
+>> > I disagree at least for those portions owned by the secure world. The
+>> > kernel shouldn't map those at all, so memreserve isn't appropriate. That
+>> > covers OP-TEE and the MCU firmware regions, and I'd expec the EFI memory
+>> > map to not list those as available to the kernel.
+>>
+>> I'm fine carving out the beginning or end, but otherwise think memory
+>> should correspond to the physical memory. We have a way to describe
+>> holes to keep out, so we should use them. If secure world uses the DT,
+>> then it would either want to know its region in memory or add the DT
+>> data to say what it is using. We need that to be easy to find or easy
+>> to set, respectively. The size secure world needs could vary as well.
+>>
+>> The fact that the kernel maps the memory is the kernel's problem, not
+>> a DT problem.
+>>
+>
+> Just give more input here. In previous time, we have long discussion [1];
+> So actually your suggestion is exactly same what my old patch.
+>
+> From previous discussion, i think here have an assumtion: Use UEFI as
+> bootloader, the kernel will ignore (or remove) memreserve and reserved-memory
+> nodes, so just like Mark said "the EFI memory map to not list those
+> as available to the kernel". My new patch is just to follow this and
+> also make sure they have same behavior for different bootloader
+> (between UEFI and uboot).
 
-> diff --git a/Documentation/devicetree/bindings/arm/bcm/raspberrypi,bcm2835-firmware.txt b/Documentation/devicetree/bindings/arm/bcm/raspberrypi,bcm2835-firmware.txt
+I've read thru the thread and see 2 main conclusions. Using
+reserved-memory is problematic since things like grub don't support
+that. That is fine and we should stick with /mem-reserve/ for now. The
+other thing is the desire to have the memory presented to the kernel
+be the same whether it comes from UEFI or DT structures. I can see why
+there is some desire to have that alignment, but that doesn't really
+buy us anything. We can't eliminate some code path in the kernel doing
+so. So I still think that the memory node should reflect all of memory
+as defined by the h/w and mem-reserve should be used for any software
+defined reserved regions.
 
->  firmware {
->  	compatible = "raspberrypi,bcm2835-firmware";
->  	mboxes = <&mailbox>;
-> +	#power-domain-cells = <1>;
-> +};
-
-I would have expected a separate DT node for the power domains driver
-that referenced the firmware node by phandle. I believe that's why the
-firmware node exports mailboxes to other drivers. If the firmware driver
-was going to implement all the features directly, it wouldn't need to
-act as a mailbox provider, since all the mailbox programming would be
-internal.
-
-> diff --git a/drivers/firmware/raspberrypi.c b/drivers/firmware/raspberrypi.c
-
-> +#define RPI_POWER_DOMAIN(_domain, _name)			\
-> +	[_domain] =						\
-> +	{							\
-
-I'd expect { wrapped onto the previous line.
-
-> +static int raspberrypi_firmware_set_power(struct rpi_firmware *fw,
-> +					  u32 domain, bool on)
-
-> +	packet.on = on;
-> +	ret = rpi_firmware_property(fw, RPI_FIRMWARE_SET_POWER_STATE, &packet,
-> +				    sizeof(packet));
-> +	if (!ret && !packet.on)
-> +		ret = -EINVAL;
-
-The error is only reported for power off requests?
-
-> +/* Asks the firmware to if power is on for a specific power domain. */
-> +static int raspberrypi_firmware_power_is_on(struct rpi_firmware *fw,
-> +					    u32 domain)
-
-> +	packet.domain = domain;
-> +	ret = rpi_firmware_property(fw, RPI_FIRMWARE_GET_POWER_STATE, &packet,
-> +				    sizeof(packet));
-> +	if (ret < 0)
-> +		return ret;
-
-Hmm. If rpi_firmware_property() returns <0 on error, I'm confused what
-the test I commented on above is intended to do.
-
-> +/*
-> + * IMPORTANT: be sure this array has no entries which are not specified
-> + * between others by RPI_POWER_DOMAIN, otherwise mapping between
-> + * generic_pm_domain array doesn't work anymore.
-> + */
-
-"has no entries which are not specified between others by
-RPI_POWER_DOMAIN" might be better phrased as "is contiguous" or
-"contains only contiguous entries".
-
-> @@ -208,15 +312,44 @@ static int rpi_firmware_probe(struct platform_device *pdev)
-
-> +	for (i = 0; i < num_domains; i++) {
-> +		bool is_off;
-> +
-> +		rpi_power_domains[i].fw = fw;
-> +		power_domains[i] = &rpi_power_domains[i].base;
-> +
-> +		/* get the initial state */
-> +		ret = raspberrypi_firmware_power_is_on(fw, i);
-> +		if (ret < 0)
-> +			goto mbox;
-
-The label name "mbox" doesn't give a clue that it's an error handler.
-"free_mbox" might be better.
-
-> +mbox:
-> +	mbox_free_channel(fw->chan);
-> +	return ret;
->  }
-
-Does the pm_genpd_init() call for all the power domains need to be
-undone at all?
+Rob
