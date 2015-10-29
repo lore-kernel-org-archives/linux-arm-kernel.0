@@ -1,108 +1,108 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Thu, 29 Oct 2015 10:49:27 +0900
-Subject: [PATCH] serial: 8250_uniphier: add earlycon support
-In-Reply-To: <5630E7DC.3050506@hurleysoftware.com>
-References: <1445503154-14340-1-git-send-email-yamada.masahiro@socionext.com>
- <5630E7DC.3050506@hurleysoftware.com>
-Message-ID: <CAK7LNATGWRwitQVNsiFiiojE3JLYdO6DPY74LSbJ3jw4mg6HdQ@mail.gmail.com>
+From: wenyou.yang@atmel.com (Yang, Wenyou)
+Date: Thu, 29 Oct 2015 09:50:15 +0800
+Subject: [PATCH v2 10/14] ARM: at91: pm: find and remap the pmc
+In-Reply-To: <1444660131-14954-11-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1444660131-14954-1-git-send-email-alexandre.belloni@free-electrons.com>
+ <1444660131-14954-11-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <56317B57.5040703@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Peter,
+Hi Alexandre,
 
+Trivial comments.
 
-
->>
->> +#if IS_ENABLED(CONFIG_SERIAL_8250_CONSOLE)
+On 2015/10/12 22:28, Alexandre Belloni wrote:
+> To avoid relying on at91_pmc_read(), find the pmc node and remap it
+> locally.
 >
-> #ifdef CONFIG_SERIAL_8250_CONSOLE
-
-I am OK with this change because this CONFIG is boolean.
-
-
-I still believe
-
-#if IS_ENABLED(CONFIG_FOO)
-
-is a nice shorthand for
-
-#if defined(CONFIG_FOO) || defined(CONFIG_FOO_MODULE)
-
-when CONFIG_FOO is tristate.
-
-
-
-
-
->> +static int __init uniphier_early_console_setup(struct earlycon_device *device,
->> +                                            const char *options)
->> +{
->> +     if (!device->port.membase)
->> +             return -ENODEV;
->> +
->> +     /* This hardware always expects MMIO32 register interface. */
->> +     device->port.iotype = UPIO_MEM32;
->> +     device->port.regshift = 2;
->> +
->> +     /*
->> +      * Do not touch the divisor register in early_serial8250_setup();
->> +      * we assume it has been initialized by a boot loader.
->> +      */
->> +     device->baud = 0;
->> +
->> +     return early_serial8250_setup(device, options);
->> +}
->> +OF_EARLYCON_DECLARE(uniphier_uart, "socionext,uniphier-uart",
->> +                 uniphier_early_console_setup);
+> Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+> ---
+>   arch/arm/mach-at91/pm.c | 32 ++++++++++++++++++++++++++------
+>   1 file changed, 26 insertions(+), 6 deletions(-)
 >
-> Please change the earlycon name to just "uniphier" or "uniphier8250"; eg.,
->
-> OF_EARLYCON_DECLARE(uniphier, "socionext,uniphier-uart",
->                     uniphier_early_console_setup);
->
->
-> My earlycon series merges OF_EARLYCON_DECLARE() => EARLYCON_DECLARE()
-> and "uniphier" is simpler on the command line.
->
+> diff --git a/arch/arm/mach-at91/pm.c b/arch/arm/mach-at91/pm.c
+> index 5c2b60c5a2a1..1dee29b33ff9 100644
+> --- a/arch/arm/mach-at91/pm.c
+> +++ b/arch/arm/mach-at91/pm.c
+> @@ -35,6 +35,8 @@
+>   #include "generic.h"
+>   #include "pm.h"
+>   
+> +void __iomem *pmc;
+> +
+>   /*
+>    * FIXME: this is needed to communicate between the pinctrl driver and
+>    * the PM implementation in the machine. Possibly part of the PM
+> @@ -85,7 +87,7 @@ static int at91_pm_verify_clocks(void)
+>   	unsigned long scsr;
+>   	int i;
+>   
+> -	scsr = at91_pmc_read(AT91_PMC_SCSR);
+> +	scsr = readl(pmc + AT91_PMC_SCSR);
+>   
+>   	/* USB must not be using PLLB */
+>   	if ((scsr & at91_pm_data.uhp_udp_mask) != 0) {
+> @@ -99,8 +101,7 @@ static int at91_pm_verify_clocks(void)
+>   
+>   		if ((scsr & (AT91_PMC_PCK0 << i)) == 0)
+>   			continue;
+> -
+> -		css = at91_pmc_read(AT91_PMC_PCKR(i)) & AT91_PMC_CSS;
+> +		css = readl(pmc + AT91_PMC_PCKR(i)) & AT91_PMC_CSS;
+>   		if (css != AT91_PMC_CSS_SLOW) {
+>   			pr_err("AT91: PM - Suspend-to-RAM with PCK%d src %d\n", i, css);
+>   			return 0;
+> @@ -143,8 +144,8 @@ static void at91_pm_suspend(suspend_state_t state)
+>   	flush_cache_all();
+>   	outer_disable();
+>   
+> -	at91_suspend_sram_fn(at91_pmc_base, at91_ramc_base[0],
+> -				at91_ramc_base[1], pm_data);
+> +	at91_suspend_sram_fn(pmc, at91_ramc_base[0],
+> +			     at91_ramc_base[1], pm_data);
+>   
+>   	outer_resume();
+>   }
+> @@ -394,13 +395,32 @@ static void __init at91_pm_sram_init(void)
+>   			&at91_pm_suspend_in_sram, at91_pm_suspend_in_sram_sz);
+>   }
+>   
+> +static const struct of_device_id atmel_pmc_ids[] = {
+> +	{ .compatible = "atmel,at91rm9200-pmc"  },
+> +	{ .compatible = "atmel,at91sam9260-pmc" },
+> +	{ .compatible = "atmel,at91sam9g45-pmc" },
+> +	{ .compatible = "atmel,at91sam9n12-pmc" },
+> +	{ .compatible = "atmel,at91sam9x5-pmc" },
+> +	{ .compatible = "atmel,sama5d3-pmc" },
+> +	{ /* sentinel */ },
+Do we need  compatible for sama5d2 pmc used in sama5d2.dtsi?
+{ .compatible = "atmel,sama5d2-pmc" },
 
-I am also OK with this change, too.
+> +};
+> +
+>   static void __init at91_pm_init(void)
+>   {
+> -	at91_pm_sram_init();
+> +	struct device_node *pmc_np;
+>   
+>   	if (at91_cpuidle_device.dev.platform_data)
+>   		platform_device_register(&at91_cpuidle_device);
+>   
+> +	pmc_np = of_find_matching_node(NULL, atmel_pmc_ids);
+> +	pmc = of_iomap(pmc_np, 0);
+> +	if (!pmc) {
+> +		pr_info("AT91: PM not supported, PMC not found");
+Should need "\n" before end of printout.
 
-But I still see  some *_serial and *_uart are used
-in EARLYCON_DECLARE.
+> +		return;
+> +	}
+> +
+> +	at91_pm_sram_init();
+> +
+>   	if (at91_suspend_sram_fn)
+>   		suspend_set_ops(&at91_pm_ops);
+>   	else
 
-yamada at beagle:~/workspace/linux/drivers/tty$ git grep -e
-'EARLYCON_DECLARE(.*_uart'
-serial/8250/8250_ingenic.c:EARLYCON_DECLARE(jz4740_uart,
-ingenic_early_console_setup);
-serial/8250/8250_ingenic.c:OF_EARLYCON_DECLARE(jz4740_uart,
-"ingenic,jz4740-uart",
-serial/8250/8250_ingenic.c:EARLYCON_DECLARE(jz4775_uart,
-ingenic_early_console_setup);
-serial/8250/8250_ingenic.c:OF_EARLYCON_DECLARE(jz4775_uart,
-"ingenic,jz4775-uart",
-serial/8250/8250_ingenic.c:EARLYCON_DECLARE(jz4780_uart,
-ingenic_early_console_setup);
-serial/8250/8250_ingenic.c:OF_EARLYCON_DECLARE(jz4780_uart,
-"ingenic,jz4780-uart",
-serial/arc_uart.c:EARLYCON_DECLARE(arc_uart, arc_early_console_setup);
-serial/arc_uart.c:OF_EARLYCON_DECLARE(arc_uart, "snps,arc-uart",
-arc_early_console_setup);
-serial/bcm63xx_uart.c:OF_EARLYCON_DECLARE(bcm63xx_uart,
-"brcm,bcm6345-uart", bcm_early_console_setup);
-yamada at beagle:~/workspace/linux/drivers/tty$ git grep -e
-'EARLYCON_DECLARE(.*_serial'
-serial/8250/8250_early.c:EARLYCON_DECLARE(uart8250, early_serial8250_setup);
-serial/8250/8250_early.c:EARLYCON_DECLARE(uart, early_serial8250_setup);
-serial/msm_serial.c:EARLYCON_DECLARE(msm_serial,
-msm_serial_early_console_setup);
-serial/msm_serial.c:OF_EARLYCON_DECLARE(msm_serial, "qcom,msm-uart",
-serial/msm_serial.c:EARLYCON_DECLARE(msm_serial_dm,
-msm_serial_early_console_setup_dm);
-serial/msm_serial.c:OF_EARLYCON_DECLARE(msm_serial_dm, "qcom,msm-uartdm",
-serial/sprd_serial.c:EARLYCON_DECLARE(sprd_serial, sprd_early_console_setup);
-serial/sprd_serial.c:OF_EARLYCON_DECLARE(sprd_serial, "sprd,sc9836-uart",
-
-
--- 
-Best Regards
-Masahiro Yamada
+Best Regards,
+Wenyou Yang
