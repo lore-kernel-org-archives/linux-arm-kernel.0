@@ -1,24 +1,20 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 29 Oct 2015 22:49:12 +0100
-Subject: [PATCH v2] arm64: dts: Added syscon-reboot node for FSL's LS2085A
- SoC
-In-Reply-To: <1446066584-3738-1-git-send-email-German.Rivera@freescale.com>
-References: <1446066584-3738-1-git-send-email-German.Rivera@freescale.com>
-Message-ID: <3919319.0f6zV1T7g0@wuerfel>
+Date: Thu, 29 Oct 2015 22:51 +0100
+Subject: [PATCH] arm: spinlock: const qualify read-only functions
+In-Reply-To: <1446061495-38554-1-git-send-email-icoolidge@google.com>
+References: <1446061495-38554-1-git-send-email-icoolidge@google.com>
+Message-ID: <4229998.loM0Ug13ZK@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 28 October 2015 16:09:44 J. German Rivera wrote:
-> +       rst_ccsr: rstccsr at 1E60000 {
-> +               compatible = "syscon";
-> +               reg = <0x0 0x1E60000 0x0 0x10000>;
-> +       };
-> +
+On Wednesday 28 October 2015 12:44:54 Ian Coolidge wrote:
+> This allows assert_spin_locked() to be used against
+> spinlocks that are const qualified.
+> 
+> Signed-off-by: Ian Coolidge <icoolidge@google.com>
 > 
 
-What does 'rstccsr' stand for? Is this by chance a reset controller?
-
-If so, we probably want a real driver for it rather than just a
-syscon.
+Can you give an example in the changelog where this might
+be useful? Constant spinlocks seem counterintuitive.
 
 	Arnd
