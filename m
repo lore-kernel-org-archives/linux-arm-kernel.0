@@ -1,70 +1,26 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Fri, 30 Oct 2015 11:46:16 +0900
-Subject: [PATCH v2] serial: 8250_uniphier: add earlycon support
-Message-ID: <1446173176-6966-1-git-send-email-yamada.masahiro@socionext.com>
+From: davem@davemloft.net (David Miller)
+Date: Fri, 30 Oct 2015 12:22:20 +0900 (KST)
+Subject: [PATCH net-next v2 0/2] drivers: xgene: Add support RGMII
+ TX/RX delay configuration
+In-Reply-To: <1445898316-21372-1-git-send-email-isubramanian@apm.com>
+References: <1445898316-21372-1-git-send-email-isubramanian@apm.com>
+Message-ID: <20151030.122220.1215954538392198950.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This reuses the code of drivers/tty/serial/8250/8250_early.c except
+From: Iyappan Subramanian <isubramanian@apm.com>
+Date: Mon, 26 Oct 2015 15:25:14 -0700
 
-  - Overwrite device->port.iotype and device->port.regshift for
-    UPIO_MEM32 because of_setup_earlycon() has set them for UPIO_MEM.
+> X-Gene RGMII ethernet controller has a RGMII bridge that performs the
+> task of converting the RGMII signal {RX_CLK,RX_CTL, RX_DATA[3:0]} from
+> PHY to GMII signal {RX_DV,RX_ER,RX_DATA[7:0]} and vice versa.  This
+> RGMII bridge has a provision to internally delay the input RX_CLK and
+> the output TX_CLK using configuration registers. This will help in
+> maintain the CLK-CTL delay relationship in various operating
+> conditions.
+> 
+> This patch adds support RGMII TX/RX delay configuration.
+> 
+> Signed-off-by: Iyappan Subramanian <isubramanian@apm.com>
 
-  - Set device->baud to zero to prevent early8250_setup() from
-    initializing the divisor register because port->uartclk does not
-    match the frequency expected by this hardware.
-
-Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
----
-
-Changes in v2:
-  - #if IS_ENABLED(...)  -> #ifdef ...
-  - Change earlycon name from uniphier_uart to uniphier
-
- drivers/tty/serial/8250/8250_uniphier.c | 24 ++++++++++++++++++++++++
- 1 file changed, 24 insertions(+)
-
-diff --git a/drivers/tty/serial/8250/8250_uniphier.c b/drivers/tty/serial/8250/8250_uniphier.c
-index 245edbb..bab6b3a 100644
---- a/drivers/tty/serial/8250/8250_uniphier.c
-+++ b/drivers/tty/serial/8250/8250_uniphier.c
-@@ -13,6 +13,7 @@
-  */
- 
- #include <linux/clk.h>
-+#include <linux/console.h>
- #include <linux/io.h>
- #include <linux/module.h>
- #include <linux/of.h>
-@@ -34,6 +35,29 @@ struct uniphier8250_priv {
- 	spinlock_t atomic_write_lock;
- };
- 
-+#ifdef CONFIG_SERIAL_8250_CONSOLE
-+static int __init uniphier_early_console_setup(struct earlycon_device *device,
-+					       const char *options)
-+{
-+	if (!device->port.membase)
-+		return -ENODEV;
-+
-+	/* This hardware always expects MMIO32 register interface. */
-+	device->port.iotype = UPIO_MEM32;
-+	device->port.regshift = 2;
-+
-+	/*
-+	 * Do not touch the divisor register in early_serial8250_setup();
-+	 * we assume it has been initialized by a boot loader.
-+	 */
-+	device->baud = 0;
-+
-+	return early_serial8250_setup(device, options);
-+}
-+OF_EARLYCON_DECLARE(uniphier, "socionext,uniphier-uart",
-+		    uniphier_early_console_setup);
-+#endif
-+
- /*
-  * The register map is slightly different from that of 8250.
-  * IO callbacks must be overridden for correct access to FCR, LCR, and MCR.
--- 
-1.9.1
+Series applied, thanks.
