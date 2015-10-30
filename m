@@ -1,58 +1,84 @@
-From: tharvey@gateworks.com (Tim Harvey)
-Date: Fri, 30 Oct 2015 10:31:24 -0700
-Subject: [PATCH v3 0/2] imx6: Implement external watchdog reset
-In-Reply-To: <5633A21B.2040300@timesys.com>
-References: <1433448960-9257-2-git-send-email-tharvey@gateworks.com>
- <1438097230-2653-1-git-send-email-tharvey@gateworks.com>
- <5633A21B.2040300@timesys.com>
-Message-ID: <CAJ+vNU0wKrTyY_2YYyYWPsW8kvHtj-8-U8TeQZfm_ne9v2mZ1w@mail.gmail.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Fri, 30 Oct 2015 18:32:30 +0100
+Subject: [PATCH 07/19] drm/panel: simple: Add timings for the Olimex
+ LCD-OLinuXino-4.3TS
+In-Reply-To: <1446214865-3972-8-git-send-email-maxime.ripard@free-electrons.com>
+References: <1446214865-3972-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1446214865-3972-8-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <20151030173230.GC17183@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 30, 2015 at 10:00 AM, Akshay Bhat <akshay.bhat@timesys.com> wrote:
->
->
-> On 07/28/2015 11:27 AM, Tim Harvey wrote:
->>
->> The IMX6 watchdog supports assertion of a signal (WDOG_B) which
->> can be pinmux'd to an external pin. This is typically used for boards that
->> have PMIC's in control of the IMX6 power rails. In fact, failure to use
->> such an external reset on boards with external PMIC's can result in
->> various
->> hangs due to the IMX6 not being fully reset [1] as well as the board
->> failing
->> to reset because its PMIC has not been reset to provide adequate voltate
->> for
->> the CPU when comming out of reset at 800Mhz when it was at 400Mhz prior to
->> reset.
->>
->> This adds a new device-tree property 'ext-reset-output' to fsl-imx-wdt in
->> order to indicate the board has such a reset and to cause the watchdog to
->> be
->> configured to assert WDOG_B instead of an internal reset both on a
->> watchdog timeout and in system_restart.
->>
->
-> Hi, was there a reason why this patch did not make it to the upstream
-> kernel? We would like to use this feature on a Advantech/GE board and I can
-> rebase the first patch onto the latest linux-next, resubmit if needed.
->
-> Thanks, Akshay
->
+On Fri, Oct 30, 2015 at 03:20:53PM +0100, Maxime Ripard wrote:
+> Add support for the Olimex LCD-OLinuXino-4.3TS panel to the DRM simple
+> panel driver.
+> 
+> It is a 480x272 panel connected through a 24-bits RGB interface.
+> 
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> ---
+>  drivers/gpu/drm/panel/panel-simple.c | 26 ++++++++++++++++++++++++++
+>  1 file changed, 26 insertions(+)
 
-Akshay,
+I don't see a patch adding the DT binding documentation for this panel.
 
-I have no idea why it hasn't made it upstream yet. I realized a couple
-of weeks ago that I never sent it to Wim who is listed as the
-maintainer of watchdog device drivers or the linux-watchdog maillist
-so I did so at that time and haven't heard anything yet.
+Also, the olimex vendor prefix isn't defined.
 
-The original patch was:
-http://lists.infradead.org/pipermail/linux-arm-kernel/2015-May/347168.html
-The 2nd version was:
-http://lists.infradead.org/pipermail/linux-arm-kernel/2015-June/348761.html
+> diff --git a/drivers/gpu/drm/panel/panel-simple.c b/drivers/gpu/drm/panel/panel-simple.c
+> index f97b73ec4713..3a9ecb64d1e6 100644
+> --- a/drivers/gpu/drm/panel/panel-simple.c
+> +++ b/drivers/gpu/drm/panel/panel-simple.c
+> @@ -1096,6 +1096,29 @@ static const struct panel_desc shelly_sca07010_bfn_lnn = {
+>  	.bus_format = MEDIA_BUS_FMT_RGB666_1X18,
+>  };
+>  
+> +static const struct drm_display_mode olimex_lcd_olinuxino_43ts_mode = {
+> +	.clock = 9000,
+> +	.hdisplay = 480,
+> +	.hsync_start = 480 + 5,
+> +	.hsync_end = 480 + 5 + 30,
+> +	.htotal = 480 + 5 + 30 + 10,
+> +	.vdisplay = 272,
+> +	.vsync_start = 272 + 8,
+> +	.vsync_end = 272 + 8 + 5,
+> +	.vtotal = 272 + 8 + 5 + 3,
+> +	.vrefresh = 60,
+> +};
+> +
+> +static const struct panel_desc olimex_lcd_olinuxino_43ts = {
+> +	.modes = &olimex_lcd_olinuxino_43ts_mode,
+> +	.num_modes = 1,
+> +	.size = {
+> +		.width = 105,
+> +		.height = 67,
+> +	},
+> +	.bus_format = MEDIA_BUS_FMT_RGB666_1X18,
+> +};
+> +
 
-It's likely that a rebase/resubmit (including the proper list) may
-result in a better outcome.
+These mode and panel descriptors are all sorted alphabetically (by
+vendor, by model), please keep it so.
 
-Tim
+>  static const struct of_device_id platform_of_match[] = {
+>  	{
+>  		.compatible = "ampire,am800480r3tmqwa1h",
+> @@ -1191,6 +1214,9 @@ static const struct of_device_id platform_of_match[] = {
+>  		.compatible = "shelly,sca07010-bfn-lnn",
+>  		.data = &shelly_sca07010_bfn_lnn,
+>  	}, {
+> +		.compatible = "olimex,lcd-olinuxino-43-ts",
+> +		.data = &olimex_lcd_olinuxino_43ts,
+> +	}, {
+>  		/* sentinel */
+>  	}
+
+Here as well.
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151030/b35e6456/attachment.sig>
