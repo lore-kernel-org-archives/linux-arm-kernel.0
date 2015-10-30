@@ -1,190 +1,71 @@
-From: robh@kernel.org (Rob Herring)
-Date: Fri, 30 Oct 2015 11:40:03 -0500
-Subject: [PATCH 09/19] drm: sun4i: Add DT bindings documentation
-In-Reply-To: <1446214865-3972-10-git-send-email-maxime.ripard@free-electrons.com>
-References: <1446214865-3972-1-git-send-email-maxime.ripard@free-electrons.com>
- <1446214865-3972-10-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <CAL_JsqLuUUApGAgdw7U8EJ7p5yrYJg8AKFB32AE9Ufrf47=WpQ@mail.gmail.com>
+From: robh+dt@kernel.org (Rob Herring)
+Date: Fri, 30 Oct 2015 11:42:09 -0500
+Subject: [PATCH v8 11/17] dt-bindings: add document for rockchip dp phy
+In-Reply-To: <1446021068-11655-1-git-send-email-ykk@rock-chips.com>
+References: <1446020143-32645-1-git-send-email-ykk@rock-chips.com>
+ <1446021068-11655-1-git-send-email-ykk@rock-chips.com>
+Message-ID: <CAL_JsqL=pL8SXLEzhbJHS_djFSh+Ctky0igzagZ6E0M9Q_TFuA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 30, 2015 at 9:20 AM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> The display pipeline of the Allwinner A10 is involving several loosely
-> coupled components.
+On Wed, Oct 28, 2015 at 3:31 AM, Yakir Yang <ykk@rock-chips.com> wrote:
+> Add dt binding documentation for rockchip display port PHY.
 >
-> Add a documentation for the bindings.
->
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> Reviewed-by: Heiko Stuebner <heiko@sntech.de>
+> Signed-off-by: Yakir Yang <ykk@rock-chips.com>
+
+Acked-by: Rob Herring <robh@kernel.org>
+
 > ---
->  .../devicetree/bindings/drm/sunxi/sun4i-drm.txt    | 122 +++++++++++++++++++++
-
-bindings/display/sunxi/ please.
-
->  1 file changed, 122 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/drm/sunxi/sun4i-drm.txt
+> Changes in v8:
+> - Remove the specific address in the example node name. (Heiko)
 >
-> diff --git a/Documentation/devicetree/bindings/drm/sunxi/sun4i-drm.txt b/Documentation/devicetree/bindings/drm/sunxi/sun4i-drm.txt
+> Changes in v7:
+> - Simplify the commit message. (Kishon)
+>
+> Changes in v6: None
+> Changes in v5:
+> - Split binding doc's from driver changes. (Rob)
+> - Update the rockchip,grf explain in document, and correct the clock required
+>   elemets in document. (Rob & Heiko)
+>
+> Changes in v4: None
+> Changes in v3: None
+> Changes in v2: None
+>
+>  .../devicetree/bindings/phy/rockchip-dp-phy.txt    | 22 ++++++++++++++++++++++
+>  1 file changed, 22 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/phy/rockchip-dp-phy.txt
+>
+> diff --git a/Documentation/devicetree/bindings/phy/rockchip-dp-phy.txt b/Documentation/devicetree/bindings/phy/rockchip-dp-phy.txt
 > new file mode 100644
-> index 000000000000..dbdccef787b4
+> index 0000000..00902cb
 > --- /dev/null
-> +++ b/Documentation/devicetree/bindings/drm/sunxi/sun4i-drm.txt
-> @@ -0,0 +1,122 @@
-> +Allwinner A10 Display Pipeline
-> +==============================
-> +
-> +The Allwinner A10 Display pipeline is composed of several components
-> +that are going to be documented below:
-> +
-> +TV Encoder
-> +----------
-> +
-> +The TV Encoder supports the composite and VGA output. It is one end of
-> +the pipeline.
+> +++ b/Documentation/devicetree/bindings/phy/rockchip-dp-phy.txt
+> @@ -0,0 +1,22 @@
+> +Rockchip Soc Seroes Display Port PHY
+> +------------------------------------
 > +
 > +Required properties:
-> + - compatible: value should be "allwinner,sun4i-a10-tv-encoder".
-> + - reg: base address and size of memory-mapped region
-> + - clocks: the clocks driving the TV encoder
-> +
-> +TCON
-> +----
-> +
-> +The TCON acts as a CRTC and encoder for RGB / LVDS interfaces.
-
-Lets not carry DRMs old CRTC name into DT bindings. Just say "display
-controller."
-
-> +
-> +Required properties:
-> + - compatible: value should be "allwinner,sun4i-a10-tcon".
-> + - reg: base address and size of memory-mapped region
-> + - interrupts: interrupt associated to this IP
-> + - clocks: phandles to the clocks feeding the TCON. Three are needed:
-> +   - 'ahb': the interface clocks
-> +   - 'tcon-ch0': The clock driving the TCON channel 0
-> +   - 'tcon-ch1': The clock driving the TCON channel 0
-> +
-> + - clock-names: the clock names mentionned above
-
-typo
-
-> + - clock-output-names: Name of the pixel clock created
-> +
-> +
-> +Display Engine Backend
-> +----------------------
-> +
-> +The display engine backend exposes layers and sprites to the
-> +system. It's split into two components, the frontend and backend, the
-> +frontend doing formats conversion, scaling, deinterlacing, while the
-> +backend actually manages the layers.
-> +
-> +Required properties:
-> +  - compatible: value must be one of:
-> +    * allwinner,sun5i-a13-display-engine
-> +
-> +  - reg: base address and size of the memory-mapped region. Two are needed:
-> +    * backend0: registers of the display engine backend
-> +    * frontend0: registers of the display engine frontend
-
-Why the zeros? I think they should be dropped.
-
-> +  - reg_names: the region names mentionned above.
-
-typo
-
-> +
-> +  - interrupts: frontend interrupt phandle
-> +
-> +  - clocks: phandles to the clocks feeding the frontend and backend
-> +    * backend0-bus: the backend interface clock
-> +    * backend0-mod: the backend module clock
-> +    * backend0-ram: the backend DRAM clock
-> +    * frontend0-bus: the frontend interface clock
-> +    * frontend0-mod: the frontend module clock
-> +    * frontend0-ram: the frontend DRAM clock
-
-Same comment on zeros.
-
-> +  - clock-names: the clock names mentionned above
-
-typo
-
-> +
-> +  - resets: phandles to the reset controllers. Two are needed:
-> +    * backend0: backend reset controller
-> +    * frontend0: frontend reset controller
-> +  - reset-names: the reset names mentionned above
-
-typo. At least you are consistent (unlike English grammar rules). ;)
-
-> +
-> +  - allwinner,tcon: phandle to the TCON in our pipeline
-
-Use of-graph or just let the relationship live in the driver. If there
-is only 1 instance of the blocks, the latter is fine.
-
-> +
-> +Optional properties:
-> +  - allwinner,tv-encoder: phandle to the TV Encoder in our pipeline
-> +  - allwinner,panel: phandle to the panel used in our RGB interface
-
-Use of-graph please.
-
+> +- compatible : should be one of the following supported values:
+> +        - "rockchip.rk3288-dp-phy"
+> +- clocks: from common clock binding: handle to dp clock.
+> +       of memory mapped region.
+> +- clock-names: from common clock binding:
+> +       Required elements: "24m"
+> +- rockchip,grf: phandle to the syscon managing the "general register files"
+> +- #phy-cells : from the generic PHY bindings, must be 0;
 > +
 > +Example:
 > +
-> +panel: panel {
-> +       compatible = "olimex,lcd-olinuxino-43-ts";
-> +};
-> +
-> +tve: encoder at 01c0a000 {
-> +       compatible = "allwinner,sun4i-a10-tv-encoder";
-> +       reg = <0x01c0a000 0x1000>;
-> +       clocks = <&ahb_gates 34>;
-> +};
-> +
-> +tcon: lcd-controller at 01c0c000 {
-> +       compatible = "allwinner,sun4i-a10-tcon";
-> +       reg = <0x01c0c000 0x1000>;
-> +       interrupts = <44>;
-> +       clocks = <&ahb_gates 36>,
-> +                <&tcon_ch0_clk>,
-> +                <&tcon_ch1_clk>;
-> +       clock-names = "ahb",
-> +                     "tcon-ch0",
-> +                     "tcon-ch1";
-> +       clock-output-names = "tcon-pixel-clock";
-> +};
-> +
-> +de: display-engine at 01e00000 {
-> +       compatible = "allwinner,sun5i-a13-display-engine";
-> +       reg = <0x01e00000 0x20000>,
-> +             <0x01e60000 0x10000>;
-> +       reg-names = "frontend0",
-> +                   "backend0";
-> +       interrupts = <47>;
-> +       interrupt-names = "engine0";
-> +       clocks = <&ahb_gates 46>, <&de_fe_clk>,
-> +                <&dram_gates 25>, <&ahb_gates 44>,
-> +                <&de_be_clk>, <&dram_gates 26>;
-> +       clock-names = "frontend0-bus", "frontend0-mod",
-> +                     "frontend0-ram", "backend0-bus",
-> +                     "backend0-mod", "backend0-ram";
-> +       resets = <&de_fe_clk>,
-> +                <&de_be_clk>;
-> +       reset-names = "frontend0",
-> +                     "backend0";
-> +
-> +       allwinner,tcon = <&tcon>;
-> +       allwinner,tv-encoder = <&tve>;
-> +       allwinner,panel = <&panel>;
+> +edp_phy: edp-phy {
+> +       compatible = "rockchip,rk3288-dp-phy";
+> +       rockchip,grf = <&grf>;
+> +       clocks = <&cru SCLK_EDP_24M>;
+> +       clock-names = "24m";
+> +       #phy-cells = <0>;
 > +};
 > --
-> 2.6.2
+> 1.9.1
 >
-> --
-> To unsubscribe from this list: send the line "unsubscribe devicetree" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>
