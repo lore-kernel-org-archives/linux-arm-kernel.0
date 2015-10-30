@@ -1,60 +1,45 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Fri, 30 Oct 2015 16:11:17 +0000 (UTC)
-Subject: [PATCH v3 0/3] ARM: OMAP2+ McASP(3) support for DRA7xx family
-In-Reply-To: <1446191700-11057-1-git-send-email-peter.ujfalusi@ti.com>
-References: <1446191700-11057-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <alpine.DEB.2.02.1510301603530.7580@utopia.booyaka.com>
+From: stuart.yoder@freescale.com (Stuart Yoder)
+Date: Fri, 30 Oct 2015 16:15:42 +0000
+Subject: [PATCH] arm64: dts: Added syscon-reboot node for FSL's LS2085A SoC
+In-Reply-To: <41343887.dUfAz3IhqL@wuerfel>
+References: <1445650280-9966-1-git-send-email-German.Rivera@freescale.com>
+ <20151027163441.GK3091@leverpostej>
+ <CY1PR0301MB07480A8EC25BB6987883AE5687220@CY1PR0301MB0748.namprd03.prod.outlook.com>
+ <41343887.dUfAz3IhqL@wuerfel>
+Message-ID: <CY1PR0301MB0748CE1C553E440C8369FC65872F0@CY1PR0301MB0748.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi P?ter
 
-On Fri, 30 Oct 2015, Peter Ujfalusi wrote:
 
-> Changes since v2:
-> - DTS patch added which is needed because of the clock handling changes
+> -----Original Message-----
+> From: Arnd Bergmann [mailto:arnd at arndb.de]
+> Sent: Friday, October 30, 2015 8:36 AM
+> To: linux-arm-kernel at lists.infradead.org
+> Cc: Yoder Stuart-B08248; Mark Rutland; devicetree at vger.kernel.org; Sharma Bhupesh-B45370; Rivera Jose-B46482;
+> linux-kernel at vger.kernel.org; robh+dt at kernel.org; Li Yang-Leo-R58472
+> Subject: Re: [PATCH] arm64: dts: Added syscon-reboot node for FSL's LS2085A SoC
 > 
-> Felip Balbi reported that linux-next is broken right now since the DTS part of
-> the earlier series has been applied, but we do not have the mcasp hwmod in the
-> kernel:
-> ...
-> [    0.181029] platform 48468000.mcasp: Cannot lookup hwmod 'mcasp3'
-> ...
-> [    6.121072] davinci-mcasp 48468000.mcasp: _od_fail_runtime_resume: FIXME: missing hwmod/omap_dev info
-> [    6.130790] ------------[ cut here ]------------
-> [    6.135643] WARNING: CPU: 0 PID: 244 at drivers/bus/omap_l3_noc.c:147 l3_interrupt_handler+0x220/0x34c()
-> [    6.145576] 44000000.ocp:L3 Custom Error: MASTER MPU TARGET L4_PER2_P3 (Read): Data Access in User mode during Functional access
-> ...
+> On Tuesday 27 October 2015 18:25:04 Stuart Yoder wrote:
+> > I think that comment "Currently supported enable-method is psci v0.2" is a statement of
+> > intent, not what is available currently.   And the only plan I am aware of is PSCI
+> > with UEFI based firmware.
+> >
+> > U-boot is a key firmware platform for us and has no PSCI implementation available.
 > 
-> This is the followup series for the hwmod changes needed to get audio working
-> on DRA7xx family based boards.
-> The DTS patches has been applied by Tony from the original series:
-> http://www.spinics.net/lists/linux-omap/msg121473.html
-> 
-> I have addressed your comments in the hwmod data and did some research also
-> regarding to the use of ahclkx as fclk in the original submission.
-> It turned out that McASP _needs_ all clocks to be enabled (fclk, iclk and
-> ahclkx/r) to be able to access registers. The original patch where we handled
-> the ahclkx as fclk worked, because the fclk clock got enabled in the HW w/o
-> any SW interaction.
-> All in all, the McASP found in DRA7 needs all clocks to be enabled.
-> To satisfy this I have introduced a new flag to hwmod, which means that the
-> listed optional clocks need to be handled alongside with the fclk clock.
+> I believe U-boot has supported PSCI since 2013. Maybe you just need to update
+> to a newer version?
 
-Thanks.  I'm happy with your series and appreciate the indepth 
-investigation.  As you probably saw last week, we've hit the limit for 
-v4.4-rc1:
+We are using a very recent u-boot.  U-boot for ARMv8, which is what this SoC is
+based on, does not have PSCI as far as I can tell.  We (Freescale) plan to 
+eventually have an EL3 firmware component that could remain resident for 
+u-boot based systems, but it is a roadmap thing and I don't know when
+we're going to get it.
 
-http://marc.info/?l=linux-omap&m=144564929721826&w=2
+So, for now, most straightforward thing is to get reboot functionality is
+to expose the reset register via syscon-reboot in the DT...no new driver needed.
 
-This is why I haven't done anything with this series at this time.  
-Unfortunately I don't have a DRA7xx board, so I can't do any testing.  
-But if this series fixes a problem with DRA7xx in linux-next, we should 
-definitely merge it.
+Once a PSCI component is available we'll move to it.
 
-Tony, if you want to take this now, you can either take it with my ack, or 
-I can send a pull request.  Or, if you'd prefer to take it for v4.4-rc2, 
-I can send a pull request after v4.4-rc1.
-
-
-- Paul
+Thanks,
+Stuart
