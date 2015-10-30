@@ -1,186 +1,179 @@
-From: ykk@rock-chips.com (Yakir Yang)
-Date: Fri, 30 Oct 2015 09:09:15 +0800
-Subject: [PATCH v9 15/17] drm: bridge: analogix/dp: try force hpd after plug
- in lookup failed
-In-Reply-To: <1446020143-32645-1-git-send-email-ykk@rock-chips.com>
-References: <1446020143-32645-1-git-send-email-ykk@rock-chips.com>
-Message-ID: <1446167355-6387-1-git-send-email-ykk@rock-chips.com>
+From: djkurtz@chromium.org (Daniel Kurtz)
+Date: Fri, 30 Oct 2015 09:17:52 +0800
+Subject: [PATCH v6 1/3] iommu: Implement common IOMMU ops for DMA mapping
+In-Reply-To: <562E5AE4.9070001@arm.com>
+References: <cover.1443718557.git.robin.murphy@arm.com>
+ <ab8e1caa40d6da1afa4a49f30242ef4e6e1f17df.1443718557.git.robin.murphy@arm.com>
+ <1445867094.30736.14.camel@mhfsdcap03> <562E5AE4.9070001@arm.com>
+Message-ID: <CAGS+omAWCQsqk56iv0PW2ZhTJ1342GufUsJCP=VYSgCxZNLJpA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some edp screen do not have hpd signal, so we can't just return
-failed when hpd plug in detect failed.
++linux-media & VIDEOBUF2 FRAMEWORK maintainers since this is about the
+v4l2-contig's usage of the DMA API.
 
-This is an hardware property, so we need add a devicetree property
-"analogix,need-force-hpd" to indicate this sutiation.
+Hi Robin,
 
-Tested-by: Heiko Stuebner <heiko@sntech.de>
-Tested-by: Javier Martinez Canillas <javier@osg.samsung.com>
-Signed-off-by: Yakir Yang <ykk@rock-chips.com>
----
-Changes in v9: None
-Changes in v8: None
-Changes in v7: None
-Changes in v6: None
-Changes in v5: None
-Changes in v4: None
-Changes in v3:
-- Add "analogix,need-force-hpd" to indicate whether driver need foce
-  hpd when hpd detect failed.
+On Tue, Oct 27, 2015 at 12:55 AM, Robin Murphy <robin.murphy@arm.com> wrote:
+> On 26/10/15 13:44, Yong Wu wrote:
+>>
+>> On Thu, 2015-10-01 at 20:13 +0100, Robin Murphy wrote:
+>> [...]
+>>>
+>>> +/*
+>>> + * The DMA API client is passing in a scatterlist which could describe
+>>> + * any old buffer layout, but the IOMMU API requires everything to be
+>>> + * aligned to IOMMU pages. Hence the need for this complicated bit of
+>>> + * impedance-matching, to be able to hand off a suitably-aligned list,
+>>> + * but still preserve the original offsets and sizes for the caller.
+>>> + */
+>>> +int iommu_dma_map_sg(struct device *dev, struct scatterlist *sg,
+>>> +               int nents, int prot)
+>>> +{
+>>> +       struct iommu_domain *domain = iommu_get_domain_for_dev(dev);
+>>> +       struct iova_domain *iovad = domain->iova_cookie;
+>>> +       struct iova *iova;
+>>> +       struct scatterlist *s, *prev = NULL;
+>>> +       dma_addr_t dma_addr;
+>>> +       size_t iova_len = 0;
+>>> +       int i;
+>>> +
+>>> +       /*
+>>> +        * Work out how much IOVA space we need, and align the segments
+>>> to
+>>> +        * IOVA granules for the IOMMU driver to handle. With some clever
+>>> +        * trickery we can modify the list in-place, but reversibly, by
+>>> +        * hiding the original data in the as-yet-unused DMA fields.
+>>> +        */
+>>> +       for_each_sg(sg, s, nents, i) {
+>>> +               size_t s_offset = iova_offset(iovad, s->offset);
+>>> +               size_t s_length = s->length;
+>>> +
+>>> +               sg_dma_address(s) = s->offset;
+>>> +               sg_dma_len(s) = s_length;
+>>> +               s->offset -= s_offset;
+>>> +               s_length = iova_align(iovad, s_length + s_offset);
+>>> +               s->length = s_length;
+>>> +
+>>> +               /*
+>>> +                * The simple way to avoid the rare case of a segment
+>>> +                * crossing the boundary mask is to pad the previous one
+>>> +                * to end at a naturally-aligned IOVA for this one's
+>>> size,
+>>> +                * at the cost of potentially over-allocating a little.
+>>> +                */
+>>> +               if (prev) {
+>>> +                       size_t pad_len = roundup_pow_of_two(s_length);
+>>> +
+>>> +                       pad_len = (pad_len - iova_len) & (pad_len - 1);
+>>> +                       prev->length += pad_len;
+>>
+>>
+>> Hi Robin,
+>>        While our v4l2 testing, It seems that we met a problem here.
+>>        Here we update prev->length again, Do we need update
+>> sg_dma_len(prev) again too?
+>>
+>>        Some function like vb2_dc_get_contiguous_size[1] always get
+>> sg_dma_len(s) to compare instead of s->length. so it may break
+>> unexpectedly while sg_dma_len(s) is not same with s->length.
+>
+>
+> This is just tweaking the faked-up length that we hand off to iommu_map_sg()
+> (see also the iova_align() above), to trick it into bumping this segment up
+> to a suitable starting IOVA. The real length at this point is stashed in
+> sg_dma_len(s), and will be copied back into s->length in __finalise_sg(), so
+> both will hold the same true length once we return to the caller.
+>
+> Yes, it does mean that if you have a list where the segment lengths are page
+> aligned but not monotonically decreasing, e.g. {64k, 16k, 64k}, then you'll
+> still end up with a gap between the second and third segments, but that's
+> fine because the DMA API offers no guarantees about what the resulting DMA
+> addresses will be (consider the no-IOMMU case where they would each just be
+> "mapped" to their physical address). If that breaks v4l, then it's probably
+> v4l's DMA API use that needs looking at (again).
 
-Changes in v2: None
+Hmm, I thought the DMA API maps a (possibly) non-contiguous set of
+memory pages into a contiguous block in device memory address space.
+This would allow passing a dma mapped buffer to device dma using just
+a device address and length.
+IIUC, the change above breaks this model by inserting gaps in how the
+buffer is mapped to device memory, such that the buffer is no longer
+contiguous in dma address space.
 
- .../bindings/display/bridge/analogix_dp.txt        |  4 ++-
- .../bindings/display/exynos/exynos_dp.txt          |  1 +
- .../display/rockchip/analogix_dp-rockchip.txt      |  1 +
- drivers/gpu/drm/bridge/analogix/analogix_dp_core.c | 36 +++++++++++++++++++---
- drivers/gpu/drm/bridge/analogix/analogix_dp_core.h |  2 ++
- drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c  |  9 ++++++
- 6 files changed, 47 insertions(+), 6 deletions(-)
+Here is the code in question from
+drivers/media/v4l2-core/videobuf2-dma-contig.c :
 
-diff --git a/Documentation/devicetree/bindings/display/bridge/analogix_dp.txt b/Documentation/devicetree/bindings/display/bridge/analogix_dp.txt
-index 7659a7a..74f0e80 100644
---- a/Documentation/devicetree/bindings/display/bridge/analogix_dp.txt
-+++ b/Documentation/devicetree/bindings/display/bridge/analogix_dp.txt
-@@ -22,6 +22,9 @@ Required properties for dp-controller:
- 		from general PHY binding: Should be "dp".
- 
- Optional properties for dp-controller:
-+	-analogix,need-force-hpd:
-+		Indicate driver need force hpd when hpd detect failed, this
-+		is used for some eDP screen which don't have hpd signal.
- 	-hpd-gpios:
- 		Hotplug detect GPIO.
- 		Indicates which GPIO should be used for hotplug detection
-@@ -31,7 +34,6 @@ Optional properties for dp-controller:
- 		* Documentation/devicetree/bindings/display/exynos/exynos_dp.txt
- 		* Documentation/devicetree/bindings/video/analogix_dp-rockchip.txt
- 
--
- [1]: Documentation/devicetree/bindings/media/video-interfaces.txt
- -------------------------------------------------------------------------------
- 
-diff --git a/Documentation/devicetree/bindings/display/exynos/exynos_dp.txt b/Documentation/devicetree/bindings/display/exynos/exynos_dp.txt
-index 9905081..8800164 100644
---- a/Documentation/devicetree/bindings/display/exynos/exynos_dp.txt
-+++ b/Documentation/devicetree/bindings/display/exynos/exynos_dp.txt
-@@ -41,6 +41,7 @@ For the below properties, please refer to Analogix DP binding document:
- 	-phys (required)
- 	-phy-names (required)
- 	-hpd-gpios (optional)
-+	-analogix,need-force-hpd (optional)
- 	-video interfaces (optional)
- 
- Deprecated properties for DisplayPort:
-diff --git a/Documentation/devicetree/bindings/display/rockchip/analogix_dp-rockchip.txt b/Documentation/devicetree/bindings/display/rockchip/analogix_dp-rockchip.txt
-index ec93917..be18388 100644
---- a/Documentation/devicetree/bindings/display/rockchip/analogix_dp-rockchip.txt
-+++ b/Documentation/devicetree/bindings/display/rockchip/analogix_dp-rockchip.txt
-@@ -31,6 +31,7 @@ For the below properties, please refer to Analogix DP binding document:
- - phys (required)
- - phy-names (required)
- - hpd-gpios (optional)
-+- analogix,need-force-hpd (optional)
- -------------------------------------------------------------------------------
- 
- Example:
-diff --git a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
-index 563ffb1d..3842dbd 100644
---- a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
-+++ b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
-@@ -59,15 +59,38 @@ static int analogix_dp_detect_hpd(struct analogix_dp_device *dp)
- {
- 	int timeout_loop = 0;
- 
--	while (analogix_dp_get_plug_in_status(dp) != 0) {
-+	while (timeout_loop < DP_TIMEOUT_LOOP_COUNT) {
-+		if (analogix_dp_get_plug_in_status(dp) == 0)
-+			return 0;
-+
- 		timeout_loop++;
--		if (timeout_loop > DP_TIMEOUT_LOOP_COUNT) {
--			dev_err(dp->dev, "failed to get hpd plug status\n");
--			return -ETIMEDOUT;
--		}
- 		usleep_range(10, 11);
- 	}
- 
-+	/*
-+	 * Some edp screen do not have hpd signal, so we can't just
-+	 * return failed when hpd plug in detect failed, DT property
-+	 * "need-force-hpd" would indicate whether driver need this.
-+	 */
-+	if (!dp->need_force_hpd)
-+		return -ETIMEDOUT;
-+
-+	/*
-+	 * The eDP TRM indicate that if HPD_STATUS(RO) is 0, AUX CH
-+	 * will not work, so we need to give a force hpd action to
-+	 * set HPD_STATUS manually.
-+	 */
-+	dev_dbg(dp->dev, "failed to get hpd plug status, try to force hpd\n");
-+
-+	analogix_dp_force_hpd(dp);
-+
-+	if (analogix_dp_get_plug_in_status(dp) != 0) {
-+		dev_err(dp->dev, "failed to get hpd plug in status\n");
-+		return -EINVAL;
-+	}
-+
-+	dev_dbg(dp->dev, "success to get plug in status after force hpd\n");
-+
- 	return 0;
- }
- 
-@@ -1244,6 +1267,9 @@ int analogix_dp_bind(struct device *dev, struct drm_device *drm_dev,
- 	if (IS_ERR(dp->reg_base))
- 		return PTR_ERR(dp->reg_base);
- 
-+	dp->need_force_hpd =
-+		of_property_read_bool(dev->of_node, "analogix,need-force-hpd");
-+
- 	dp->hpd_gpio = of_get_named_gpio(dev->of_node, "hpd-gpios", 0);
- 	if (!gpio_is_valid(dp->hpd_gpio))
- 		dp->hpd_gpio = of_get_named_gpio(dev->of_node,
-diff --git a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.h b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.h
-index e6f8243..d3c7e0a 100644
---- a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.h
-+++ b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.h
-@@ -160,6 +160,7 @@ struct analogix_dp_device {
- 	struct phy		*phy;
- 	int			dpms_mode;
- 	int			hpd_gpio;
-+	bool                    need_force_hpd;
- 
- 	struct analogix_dp_plat_data *plat_data;
- };
-@@ -180,6 +181,7 @@ void analogix_dp_set_analog_power_down(struct analogix_dp_device *dp,
- 				       bool enable);
- void analogix_dp_init_analog_func(struct analogix_dp_device *dp);
- void analogix_dp_init_hpd(struct analogix_dp_device *dp);
-+void analogix_dp_force_hpd(struct analogix_dp_device *dp);
- enum dp_irq_type analogix_dp_get_irq_type(struct analogix_dp_device *dp);
- void analogix_dp_clear_hotplug_interrupts(struct analogix_dp_device *dp);
- void analogix_dp_reset_aux(struct analogix_dp_device *dp);
-diff --git a/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c b/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c
-index 21a3287..c7e2959 100644
---- a/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c
-+++ b/drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c
-@@ -365,6 +365,15 @@ void analogix_dp_init_hpd(struct analogix_dp_device *dp)
- 	writel(reg, dp->reg_base + ANALOGIX_DP_SYS_CTL_3);
- }
- 
-+void analogix_dp_force_hpd(struct analogix_dp_device *dp)
-+{
-+	u32 reg;
-+
-+	reg = readl(dp->reg_base + ANALOGIX_DP_SYS_CTL_3);
-+	reg = (F_HPD | HPD_CTRL);
-+	writel(reg, dp->reg_base + ANALOGIX_DP_SYS_CTL_3);
-+}
-+
- enum dp_irq_type analogix_dp_get_irq_type(struct analogix_dp_device *dp)
- {
- 	u32 reg;
--- 
-1.9.1
+static unsigned long vb2_dc_get_contiguous_size(struct sg_table *sgt)
+{
+        struct scatterlist *s;
+        dma_addr_t expected = sg_dma_address(sgt->sgl);
+        unsigned int i;
+        unsigned long size = 0;
+
+        for_each_sg(sgt->sgl, s, sgt->nents, i) {
+                if (sg_dma_address(s) != expected)
+                        break;
+                expected = sg_dma_address(s) + sg_dma_len(s);
+                size += sg_dma_len(s);
+        }
+        return size;
+}
+
+
+static void *vb2_dc_get_userptr(void *alloc_ctx, unsigned long vaddr,
+        unsigned long size, enum dma_data_direction dma_dir)
+{
+        struct vb2_dc_conf *conf = alloc_ctx;
+        struct vb2_dc_buf *buf;
+        struct frame_vector *vec;
+        unsigned long offset;
+        int n_pages, i;
+        int ret = 0;
+        struct sg_table *sgt;
+        unsigned long contig_size;
+        unsigned long dma_align = dma_get_cache_alignment();
+        DEFINE_DMA_ATTRS(attrs);
+
+        dma_set_attr(DMA_ATTR_SKIP_CPU_SYNC, &attrs);
+
+        buf = kzalloc(sizeof *buf, GFP_KERNEL);
+        buf->dma_dir = dma_dir;
+
+        offset = vaddr & ~PAGE_MASK;
+        vec = vb2_create_framevec(vaddr, size, dma_dir == DMA_FROM_DEVICE);
+        buf->vec = vec;
+        n_pages = frame_vector_count(vec);
+
+        sgt = kzalloc(sizeof(*sgt), GFP_KERNEL);
+
+        ret = sg_alloc_table_from_pages(sgt, frame_vector_pages(vec), n_pages,
+                offset, size, GFP_KERNEL);
+
+        sgt->nents = dma_map_sg_attrs(buf->dev, sgt->sgl, sgt->orig_nents,
+                                      buf->dma_dir, &attrs);
+
+        contig_size = vb2_dc_get_contiguous_size(sgt);
+        if (contig_size < size) {
+
+    <<<===   if the original buffer had sg entries that were not
+aligned on the "natural" alignment for their size, the new arm64 iommu
+core code inserts  a 'gap' in the iommu mapping, which causes
+vb2_dc_get_contiguous_size() to exit early (and return a smaller size
+than expected).
+
+                pr_err("contiguous mapping is too small %lu/%lu\n",
+                        contig_size, size);
+                ret = -EFAULT;
+                goto fail_map_sg;
+        }
+
+
+So, is the videobuf2-dma-contig.c based on an incorrect assumption
+about how the DMA API is supposed to work?
+Is it even possible to map a "contiguous-in-iova-range" mapping for a
+buffer given as an sg_table with an arbitrary set of pages?
+
+Thanks for helping to move this forward.
+
+-Dan
