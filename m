@@ -1,68 +1,55 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Fri, 30 Oct 2015 16:51:53 +0900
-Subject: [PATCH v11 6/8] arm64: renesas: add Salvator-X board support on
- DTS
-In-Reply-To: <CAMuHMdVzUPyhkfPy3s+jBK1gQ-kZqYfrQZ8Bww-iFxGOPVZn2w@mail.gmail.com>
-References: <1444890243-6978-1-git-send-email-horms+renesas@verge.net.au>
- <1444890243-6978-7-git-send-email-horms+renesas@verge.net.au>
- <20151015110139.GG8825@leverpostej>
- <20151023070032.GA4502@verge.net.au>
- <CAMuHMdVzUPyhkfPy3s+jBK1gQ-kZqYfrQZ8Bww-iFxGOPVZn2w@mail.gmail.com>
-Message-ID: <20151030075152.GE31252@verge.net.au>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Fri, 30 Oct 2015 09:54:57 +0200
+Subject: [PATCH v3 0/3] ARM: OMAP2+ McASP(3) support for DRA7xx family
+Message-ID: <1446191700-11057-1-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 29, 2015 at 08:52:12AM +0100, Geert Uytterhoeven wrote:
-> Hi Simon,
-> 
-> On Fri, Oct 23, 2015 at 9:00 AM, Simon Horman <horms@verge.net.au> wrote:
-> > On Thu, Oct 15, 2015 at 12:01:40PM +0100, Mark Rutland wrote:
-> >> > +           stdout-path = &scif2;
-> >>
-> >> No rate? It would be better to be explicit here; you should be able to
-> >> have:
-> >>
-> >>       stdout-path = "serial0:115200n8"
-> >>
-> >> Where "115200n8" is replaced with whatever configuration this board
-> >> actually has.
-> >
-> > I think that we have had this discussion before in relation to
-> > a different board for a different Renesas SoC but I could be mistaken.
-> 
-> IIRC, at that time the code to parse the options wasn't upstream yet, so
-> adding the options would have broken the serial console.
-> 
-> I can confirm it works fine on Salvator-X with
-> 
->         stdout-path = "serial0:115200n8";
+Hi Paul, Tony,
 
-Thanks.
+Changes since v2:
+- DTS patch added which is needed because of the clock handling changes
 
-Is this considered to be best practice?
-If so I am of a mind to update the patch.
+Felip Balbi reported that linux-next is broken right now since the DTS part of
+the earlier series has been applied, but we do not have the mcasp hwmod in the
+kernel:
+...
+[    0.181029] platform 48468000.mcasp: Cannot lookup hwmod 'mcasp3'
+...
+[    6.121072] davinci-mcasp 48468000.mcasp: _od_fail_runtime_resume: FIXME: missing hwmod/omap_dev info
+[    6.130790] ------------[ cut here ]------------
+[    6.135643] WARNING: CPU: 0 PID: 244 at drivers/bus/omap_l3_noc.c:147 l3_interrupt_handler+0x220/0x34c()
+[    6.145576] 44000000.ocp:L3 Custom Error: MASTER MPU TARGET L4_PER2_P3 (Read): Data Access in User mode during Functional access
+...
 
-> > The r8a7795 uses the sh-sci serial driver for which the default rate is
-> > 115200. It is hard for me to conceive of a situation where that would
-> > change without due consideration being given to the implications for DT
-> > files.
-> >
-> > Not specifying the baud here is consistent with what we have
-> > been doing for ARM32 Renesas SoCs for some time.
-> 
-> FWIW, I have updated all ARM32 Renesas DTSes locally:
->   1. Use alias in and add serial options to stdout-path,
->   2. Drop superfluous console= from bootargs (shmobile-legacy is gone,
->      and it works fine on boards with both fbdev and serial consoles).
-> 
-> And everything looks fine on the boards I could try it on (sh73a0/kzm9g,
-> r8a73a4/ape6evm, r8a7740/armadillo, r8a7791/koelsch).
-> 
-> Hence if you're open for this change, I can submit patches (or a single patch,
-> up to your preference).
+This is the followup series for the hwmod changes needed to get audio working
+on DRA7xx family based boards.
+The DTS patches has been applied by Tony from the original series:
+http://www.spinics.net/lists/linux-omap/msg121473.html
 
-Sure, I'm happy to consider that (I slightly prefer per-board patches) if:
+I have addressed your comments in the hwmod data and did some research also
+regarding to the use of ahclkx as fclk in the original submission.
+It turned out that McASP _needs_ all clocks to be enabled (fclk, iclk and
+ahclkx/r) to be able to access registers. The original patch where we handled
+the ahclkx as fclk worked, because the fclk clock got enabled in the HW w/o
+any SW interaction.
+All in all, the McASP found in DRA7 needs all clocks to be enabled.
+To satisfy this I have introduced a new flag to hwmod, which means that the
+listed optional clocks need to be handled alongside with the fclk clock.
 
-* That is now considered best practice and;
-* Due consideration is given to backwards compatibility
-  (I suspect it is new DTs work with old kernels so its a non-issue)
+Regards,
+Peter
+---
+Peter Ujfalusi (3):
+  ARM: DTS: dra7: Fix McASP3 node regarding to clocks
+  ARM: OMAP2+: hwmod: Add hwmod flag for HWMOD_OPT_CLKS_NEEDED
+  ARM: OMAP: DRA7: hwmod: Add data for McASP3
+
+ arch/arm/boot/dts/dra7.dtsi               |  4 +-
+ arch/arm/mach-omap2/omap_hwmod.c          | 66 +++++++++++++++++--------------
+ arch/arm/mach-omap2/omap_hwmod.h          |  3 ++
+ arch/arm/mach-omap2/omap_hwmod_7xx_data.c | 56 ++++++++++++++++++++++++++
+ 4 files changed, 97 insertions(+), 32 deletions(-)
+
+-- 
+2.6.1
