@@ -1,53 +1,79 @@
-From: stuart.yoder@freescale.com (Stuart Yoder)
-Date: Fri, 30 Oct 2015 16:34:26 +0000
-Subject: [PATCH v2] arm64: dts: Added syscon-reboot node for FSL's LS2085A
- SoC
-In-Reply-To: <3919319.0f6zV1T7g0@wuerfel>
-References: <1446066584-3738-1-git-send-email-German.Rivera@freescale.com>
- <3919319.0f6zV1T7g0@wuerfel>
-Message-ID: <CY1PR0301MB07483E9D229314891961B6AD872F0@CY1PR0301MB0748.namprd03.prod.outlook.com>
+From: Suravee.Suthikulpanit@amd.com (Suravee Suthikulpanit)
+Date: Fri, 30 Oct 2015 11:38:54 -0500
+Subject: [PATCH V1 00/11] MMCONFIG refactoring and ARM64 PCI hostbridge
+ init based on ACPI
+In-Reply-To: <1445963922-22711-1-git-send-email-tn@semihalf.com>
+References: <1445963922-22711-1-git-send-email-tn@semihalf.com>
+Message-ID: <56339D1E.20605@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Tested on AMD Seattle platform (Overdrive revB) w/ both MSI and legacy 
+interrupt.
 
-
-> -----Original Message-----
-> From: Arnd Bergmann [mailto:arnd at arndb.de]
-> Sent: Thursday, October 29, 2015 4:49 PM
-> To: linux-arm-kernel at lists.infradead.org
-> Cc: Rivera Jose-B46482; robh+dt at kernel.org; mark.rutland at arm.com; devicetree at vger.kernel.org; linux-
-> kernel at vger.kernel.org; Sharma Bhupesh-B45370; Li Yang-Leo-R58472; Yoder Stuart-B08248
-> Subject: Re: [PATCH v2] arm64: dts: Added syscon-reboot node for FSL's LS2085A SoC
-> 
-> On Wednesday 28 October 2015 16:09:44 J. German Rivera wrote:
-> > +       rst_ccsr: rstccsr at 1E60000 {
-> > +               compatible = "syscon";
-> > +               reg = <0x0 0x1E60000 0x0 0x10000>;
-> > +       };
-> > +
-> >
-> 
-> What does 'rstccsr' stand for? Is this by chance a reset controller?
-
-It is a region of some miscellaneous registers, some related to reset.
- 
-> If so, we probably want a real driver for it rather than just a
-> syscon.
-
-There is not other stuff in this region that to be exposed,
-and so we really don't need a real driver.
-
-My suggestion is to perhaps make that more explicit in the proposed
-device tree node, by making the reg size "4" and naming it
-as per the register name
-
-       rstcr: rstcr at 1E60000 {
-               compatible = "syscon";
-               reg = <0x0 0x1E60000 0x0 0x4>;
-       };
-
-The intent is really just to expose a single reset register
-and use syscon-reboot until PSCI is available.
+Tested-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
 
 Thanks,
-Stuart
+Suravee
+
+On 10/27/15 11:38, Tomasz Nowicki wrote:
+>  From the functionality point of view this series might be split into two logic parts:
+> 1. Making MMCONFIG code arch-agnostic which allows all architectures to collect
+>     PCI config regions and used when necessary.
+> 2. Using generic MMCONFIG code and introducing ACPI based PCI hostbridge
+>     initialization for ARM64
+>
+> Patches has been built on top of:
+> [Patch v7 0/7] Consolidate ACPI PCI root common code into ACPI core
+> https://lkml.org/lkml/2015/10/14/31
+> Git branch can be found here:
+> https://git.linaro.org/leg/acpi/acpi.git/shortlog/refs/heads/pci-acpi-upstream
+>
+> This has been tested on Cavium ThunderX 1 socket server.
+> Any help in reviewing and testing is very appreciated.
+>
+> Hanjun Guo (1):
+>    XEN / PCI: Remove the dependence on arch x86 when PCI_MMCONFIG=y
+>
+> Tomasz Nowicki (10):
+>    x86, pci: Reorder logic of pci_mmconfig_insert() function
+>    x86, pci, acpi: Move arch-agnostic MMCONFIG (aka ECAM) and ACPI code
+>      out of arch/x86/ directory
+>    pci, acpi, mcfg: Provide generic implementation of MCFG code
+>      initialization.
+>    x86, pci: mmconfig_{32,64}.c code refactoring - remove code
+>      duplication.
+>    x86, pci, ecam: mmconfig_64.c becomes default implementation for ECAM
+>      driver.
+>    pci, acpi, mcfg: Provide default RAW ACPI PCI config space accessors.
+>    pci, acpi, ecam: Add flag to indicate whether ECAM region was hot
+>      added or not.
+>    x86, pci: Use previously added ECAM hot_added flag to remove ECAM
+>      regions.
+>    pci, acpi: Provide generic way to assign bus domain number.
+>    arm64, pci, acpi: Support for ACPI based PCI hostbridge init
+>
+>   arch/arm64/Kconfig             |   6 +
+>   arch/arm64/kernel/pci.c        | 208 ++++++++++++++++++++++++++++++++--
+>   arch/x86/Kconfig               |   4 +
+>   arch/x86/include/asm/pci_x86.h |  28 +----
+>   arch/x86/pci/acpi.c            |  17 +--
+>   arch/x86/pci/mmconfig-shared.c | 250 +++++++----------------------------------
+>   arch/x86/pci/mmconfig_32.c     |  11 +-
+>   arch/x86/pci/mmconfig_64.c     |  67 +----------
+>   arch/x86/pci/numachip.c        |   1 +
+>   drivers/acpi/Makefile          |   1 +
+>   drivers/acpi/mcfg.c            | 104 +++++++++++++++++
+>   drivers/acpi/pci_root.c        |   2 +-
+>   drivers/pci/Kconfig            |  10 ++
+>   drivers/pci/Makefile           |   5 +
+>   drivers/pci/ecam.c             | 234 ++++++++++++++++++++++++++++++++++++++
+>   drivers/pci/pci.c              |  30 ++++-
+>   drivers/xen/pci.c              |   7 +-
+>   include/linux/acpi.h           |   2 +
+>   include/linux/ecam.h           |  44 ++++++++
+>   19 files changed, 691 insertions(+), 340 deletions(-)
+>   create mode 100644 drivers/acpi/mcfg.c
+>   create mode 100644 drivers/pci/ecam.c
+>   create mode 100644 include/linux/ecam.h
+>
