@@ -1,41 +1,55 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Fri, 30 Oct 2015 15:37:29 +0800
-Subject: [PATCH] i2c: designware: Don't mask TX_EMPTY if write is in progress
-Message-ID: <1446190649-1318-1-git-send-email-jszhang@marvell.com>
+From: yh.huang@mediatek.com (YH Huang)
+Date: Fri, 30 Oct 2015 15:41:40 +0800
+Subject: [PATCH v2] pwm-backlight: fix the panel power sequence
+In-Reply-To: <1446133259.3274.52.camel@pengutronix.de>
+References: <1444987060-48202-1-git-send-email-yh.huang@mediatek.com>
+ <1444988219.3541.3.camel@pengutronix.de>
+ <1445526750.27586.8.camel@mtksdaap41>
+ <1446133259.3274.52.camel@pengutronix.de>
+Message-ID: <1446190900.17558.16.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently when i2c_msg index search is completed, TX_EMPTY interrupt
-will be masked. But if the size of i2c_msg data is longer than the size
-of the tx buffer, we still need TX_EMPTY interrupt, otherwise we will
-get "controller timed out" error.
+Hi Hpilipp,
 
-This patch fixes this issue by only masking TX_EMPTY if i2c_msg index
-search is completed and write is not in progress.
+On Thu, 2015-10-29 at 16:40 +0100, Philipp Zabel wrote:
+> Hi YH,
+> 
+> Am Donnerstag, den 22.10.2015, 23:12 +0800 schrieb YH Huang:
+> > In the case of the panel disabled by the bootloader,
+> > your patch still has the following code and always enables the backlight
+> > in the probe function.
+> > pb->enable_gpio = devm_gpiod_get_optional(&pdev->dev, "enable",
+> > -						  GPIOD_OUT_HIGH);
+> 
+> You are right.
+> 
+> > What do you think if I remove these two lines in my patch?
+> > if (pb->enable_gpio)
+> > 	gpiod_direction_output(pb->enable_gpio, 0);
+> 
+> That won't work if the gpio is still configured as input. How about I
+> add the GPIOD_ASIS change to my patch you remove that and the above from
+> yours?
 
-Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
----
- drivers/i2c/busses/i2c-designware-core.c | 7 ++++---
- 1 file changed, 4 insertions(+), 3 deletions(-)
+I revise these two lines 
+if (pb->enable_gpio)
+	gpiod_direction_output(pb->enable_gpio, 0);
+into
+if (pb->enable_gpio) {
+	if(gpiod_get_value(pb->enable_gpio) == 0)
+		gpiod_direction_output(pb->enable_gpio, 0);
+	else
+		gpiod_direction_output(pb->enable_gpio, 1);
+}
 
-diff --git a/drivers/i2c/busses/i2c-designware-core.c b/drivers/i2c/busses/i2c-designware-core.c
-index 7441cdc..a2eb212 100644
---- a/drivers/i2c/busses/i2c-designware-core.c
-+++ b/drivers/i2c/busses/i2c-designware-core.c
-@@ -542,10 +542,11 @@ i2c_dw_xfer_msg(struct dw_i2c_dev *dev)
- 	}
- 
- 	/*
--	 * If i2c_msg index search is completed, we don't need TX_EMPTY
--	 * interrupt any more.
-+	 * If i2c_msg index search is completed and writing is not in progress,
-+	 * we don't need TX_EMPTY interrupt any more.
- 	 */
--	if (dev->msg_write_idx == dev->msgs_num)
-+	if (dev->msg_write_idx == dev->msgs_num &&
-+			!(dev->status & STATUS_WRITE_IN_PROGRESS))
- 		intr_mask &= ~DW_IC_INTR_TX_EMPTY;
- 
- 	if (dev->msg_err)
--- 
-2.6.2
+I am not sure what "phandle" is working for.
+My change is like your patch but remove the "phandle related" and
+"gpiod_get_direction(pb->enable_gpio) == GPIOF_DIR_OUT".
+Do we really need these?
+
+Also, do you think it is right that I do the "pwm_enable(pb->pwm);"
+before "gpiod_set_value(pb->enable_gpio, 1);" in power on function?
+
+Regards,
+YH Huang
