@@ -1,36 +1,39 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 30 Oct 2015 14:32:20 +0000
-Subject: [PATCH] arm64: dts: Added syscon-reboot node for FSL's LS2085A SoC
-In-Reply-To: <CY1PR0301MB07480A8EC25BB6987883AE5687220@CY1PR0301MB0748.namprd03.prod.outlook.com>
-References: <1445650280-9966-1-git-send-email-German.Rivera@freescale.com>
- <20151027163441.GK3091@leverpostej>
- <CY1PR0301MB07480A8EC25BB6987883AE5687220@CY1PR0301MB0748.namprd03.prod.outlook.com>
-Message-ID: <20151030143220.GC31073@leverpostej>
+Date: Fri, 30 Oct 2015 14:35:04 +0000
+Subject: [PATCH v4 3/3] arm64/efi: isolate EFI stub from the kernel proper
+In-Reply-To: <CAKv+Gu-m7dJbiF=8i=+cN=bx+y8AKu_MgHrS29jNK0fTvuwQ5Q@mail.gmail.com>
+References: <1444330924-17830-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1444330924-17830-4-git-send-email-ard.biesheuvel@linaro.org>
+ <562EA894.8070505@arm.com> <562EAA22.3010905@arm.com>
+ <CAKv+Gu-G1YS9Ha=-rtnPKJTOxBTrdSq6=Tqwq_GPW742JUE+2Q@mail.gmail.com>
+ <562F8DCE.4010308@arm.com>
+ <CAKv+Gu-m7dJbiF=8i=+cN=bx+y8AKu_MgHrS29jNK0fTvuwQ5Q@mail.gmail.com>
+Message-ID: <20151030143504.GD31073@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 27, 2015 at 06:25:04PM +0000, Stuart Yoder wrote:
-> I think that comment "Currently supported enable-method is psci v0.2" is a statement of
-> intent, not what is available currently.   And the only plan I am aware of is PSCI
-> with UEFI based firmware.
+[Adding Catalin to the To line]
+
+On Fri, Oct 30, 2015 at 01:17:24PM +0100, Ard Biesheuvel wrote:
+> On 27 October 2015 at 23:44, Jeremy Linton <jeremy.linton@arm.com> wrote:
+> > On 10/26/2015 09:20 PM, Ard Biesheuvel wrote:
+> >>
+> >> Thanks for the report. The following patch should fix it
+> >
+> >
+> > Ard,
+> >
+> > Thanks, it does fix the build problem...
+> >
+> > Now to get the darn thing to boot (not related to this AFAIK).
+> >
 > 
-> U-boot is a key firmware platform for us and has no PSCI implementation available.
+> Catalin,
+> 
+> Would you like me to resend this as a separate patch?
 
-Please note that PSCI isn't implemented by UEFI. On ARM Juno (and other
-platforms), PSCI is implemented by ARM Trusted Firmware [1], and the non-secure
-side can be UEFI (EDK2), U-Boot, or something else entirely.
+Ard's referring to the patch in a prior reply [1].
 
-> So, we need this.  The device tree simply describes the hardware that is
-> there and that's what this patch exposes.
->
-> If down the road all firmware provides a PSCI based reset interface then
-> we will naturally use that.  But we need something in the meantime to
-> let us reboot the system.
-
-I appreciate that you need this if you do not have a PSCI implementation. I was
-mislead by the comment.
-
-Thanks,
 Mark.
 
-[1] https://github.com/ARM-software/arm-trusted-firmware
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-October/381074.html
