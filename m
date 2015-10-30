@@ -1,101 +1,50 @@
-From: laura@labbott.name (Laura Abbott)
-Date: Fri, 30 Oct 2015 08:05:16 -0700
-Subject: arm64: about Add CONFIG_DEBUG_SET_MODULE_RONX suport
-In-Reply-To: <5633864F.6030203@codeaurora.org>
-References: <5633279A.7000003@huawei.com> <56332ADB.7030306@iogearbox.net>
- <563335FF.5020400@huawei.com> <5633864F.6030203@codeaurora.org>
-Message-ID: <5633872C.1000005@labbott.name>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Fri, 30 Oct 2015 23:20:41 +0800
+Subject: [PATCH 19/19] ARM: sun5i: chip: Enable the TV Encoder
+In-Reply-To: <1446214865-3972-20-git-send-email-maxime.ripard@free-electrons.com>
+References: <1446214865-3972-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1446214865-3972-20-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <CAGb2v66vjp=5GtGD-0i3OOw-wK3H4bogfvPoNzuwYvY8vt4fMQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(Argh sent that from old e-mail address. I didn't even realize
-I could send anymore. Please disregard the source of that old
-e-mail if it ends up going through)
+On Fri, Oct 30, 2015 at 10:21 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> The TV encoder is used to drive VGA and composite display.
+>
+> Enable it on the CHIP
 
-On 10/30/15 8:01 AM, Laura Abbott wrote:
-> (cc-ing the mailing list. Please always remember to do that)
+The commit message does not match the contents. Missing a patch? :)
+
+ChenYu
+
 >
-> Hi,
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> ---
+>  arch/arm/boot/dts/sun5i-r8.dtsi | 12 ++++++++++++
+>  1 file changed, 12 insertions(+)
 >
-> On 10/30/15 2:18 AM, Xishi Qiu wrote:
->> On 2015/10/30 16:31, Daniel Borkmann wrote:
->>
->>> On 10/30/2015 09:17 AM, zhong jiang wrote:
->>>> hi,can I ask you a question ? say , you provide the patch is
->>>> restricted within
->>>> the module is used. whether it can be used to other area ofmemory
->>>> like x86_64.
->>>> what is the limit?
->>>
->>> Sorry, I don't quite understand the question. You mean ...
->>>
->>> commit e6a2e1b6c24a3993ffbb69a05dda202d2830ad90
->>> Author: Daniel Borkmann <daniel@iogearbox.net>
->>> Date:   Sun Mar 1 10:14:39 2015 +0000
->>>
->>>      arm64: mm: unexport set_memory_ro and set_memory_rw
->>>
->>>      This effectively unexports set_memory_ro and set_memory_rw
->>> functions from
->>>      commit 11d91a770f1f ("arm64: Add CONFIG_DEBUG_SET_MODULE_RONX
->>> support").
->>>
->>>      No module user of those is in mainline kernel and we explicitly
->>> do not want
->>>      modules to use these functions, as they i.e. RO-protect eBPF
->>> (interpreted and
->>>      JIT'ed) images from malicious modifications/bugs.
->>>
->>>      Outside of eBPF scope, I believe also other set_memory_*
->>> functions should
->>>      be unexported on arm64 due to non-existant mainline module user.
->>> Laura
->>>      mentioned that they have some uses for modules doing
->>> set_memory_*, but
->>>      none that are in mainline and it's unclear if they would ever
->>> get there.
->>>
->>>      Signed-off-by: Daniel Borkmann <daniel@iogearbox.net>
->>>      Acked-by: Alexei Starovoitov <ast@plumgrid.com>
->>>      Acked-by: Laura Abbott <lauraa@codeaurora.org>
->>>      Signed-off-by: Will Deacon <will.deacon@arm.com>
->>>
->>> ...? What is your question in relation to this?
->>>
->>> ( x86_64 also has an implementation of set_memory_ro(). )
->>>
->>> Cheers,
->>> Daniel
->>>
->>
->> Hi Daniel,
->>
->> Sorry for didn't saying it clearly. I find this
->> interface(set_memory_ro/rw) can
->> only be used in module address. So why not extend the function? e.g.
->> like x86,
->> it can be used in direct mapping address too.
->>
->> Is there some limits in arm64 or we will do this later?
->>
+> diff --git a/arch/arm/boot/dts/sun5i-r8.dtsi b/arch/arm/boot/dts/sun5i-r8.dtsi
+> index d69df3a73cbf..e39c903da864 100644
+> --- a/arch/arm/boot/dts/sun5i-r8.dtsi
+> +++ b/arch/arm/boot/dts/sun5i-r8.dtsi
+> @@ -86,4 +86,16 @@
+>                                              "ahb_mali400";
+>                 };
+>         };
+> +
+> +       soc at 01c00000 {
+> +               tve: encoder at 01c0a000 {
+> +                       compatible = "allwinner,sun4i-a10-tv-encoder";
+> +                       reg = <0x01c0a000 0x1000>;
+> +                       clocks = <&ahb_gates 34>;
+> +               };
+> +       };
+> +};
+> +
+> +&de {
+> +       allwinner,tv-encoder = <&tve>;
+>  };
+> --
+> 2.6.2
 >
-> arm64 maps low mem (all direct mapped memory on arm64) with section
-> mappings for performance. set_memory_ro/rw works on PAGE_SIZE
-> granularity so if we wanted to use those functions on direct mapped
-> memory we would need to break down the section mappings. On arm,
-> this was a pain due to the TLB maintaince requried. On arm64, less
-> so but we still lose the benefit of the section mappings.
->
-> Do you have a use case in mind for wanting to use set_memory_ro/rw
-> outside of the module area?
->
->> One more question, in arm64, create_mapping() will create the page
->> table of direct
->> mapping area, is the page 2M or 1G? I mean like the flag
->> PAGE_KERNEL_LARGE in x86.
->>
->
-> It will try to do 1G if it can.
->
-> Thanks,
-> Laura
