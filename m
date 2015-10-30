@@ -1,108 +1,74 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 30 Oct 2015 18:21:13 +0000
-Subject: [PATCH] pwm-backlight: Avoid backlight flicker when probed from DT
-In-Reply-To: <1446133906-3076-1-git-send-email-p.zabel@pengutronix.de>
-References: <1446133906-3076-1-git-send-email-p.zabel@pengutronix.de>
-Message-ID: <20151030182113.GH4058@x1>
+From: stuart.yoder@freescale.com (Stuart Yoder)
+Date: Fri, 30 Oct 2015 18:22:58 +0000
+Subject: [PATCH v3] arm64: dts: Added syscon-reboot node for FSL's LS2085A
+ SoC
+In-Reply-To: <1446224892-29407-1-git-send-email-German.Rivera@freescale.com>
+References: <1446224892-29407-1-git-send-email-German.Rivera@freescale.com>
+Message-ID: <CY1PR0301MB0748FFB9490DB247C389330C872F0@CY1PR0301MB0748.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 29 Oct 2015, Philipp Zabel wrote:
 
-> If the driver is probed from the device tree, and there is a phandle
-> property set on it, and the enable GPIO is already configured as output,
-> and the backlight is currently disabled, keep it disabled.
-> If all these conditions are met, assume there will be some other driver
-> that can enable the backlight at the appropriate time.
+
+> -----Original Message-----
+> From: J. German Rivera [mailto:German.Rivera at freescale.com]
+> Sent: Friday, October 30, 2015 12:08 PM
+> To: robh+dt at kernel.org; mark.rutland at arm.com; devicetree at vger.kernel.org; linux-arm-
+> kernel at lists.infradead.org; linux-kernel at vger.kernel.org
+> Cc: Sharma Bhupesh-B45370; Yoder Stuart-B08248; Li Yang-Leo-R58472; Rivera Jose-B46482
+> Subject: [PATCH v3] arm64: dts: Added syscon-reboot node for FSL's LS2085A SoC
 > 
-> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
-> Reviewed-by: Christian Gmeiner <christian.gmeiner@gmail.com>
-> ---
-> Changes since v2:
->  - Leave GPIO configuration as is (GPIOD_ASIS) when requesting,
->    so we can actually check the initial state.
-> ---
->  drivers/video/backlight/pwm_bl.c | 25 ++++++++++++++++++++++++-
->  1 file changed, 24 insertions(+), 1 deletion(-)
+> Added sys-reboot node to the FSL's LS2085A SoC DT to leverage
+> the ARM-generic reboot mechanism for this SoC. This mechanism
+> is enabled through CONFIG_POWER_RESET_SYSCON.
 > 
-> diff --git a/drivers/video/backlight/pwm_bl.c b/drivers/video/backlight/pwm_bl.c
-> index ae3c6b6..8e9c261 100644
-> --- a/drivers/video/backlight/pwm_bl.c
-> +++ b/drivers/video/backlight/pwm_bl.c
-> @@ -199,6 +199,8 @@ static int pwm_backlight_probe(struct platform_device *pdev)
->  	struct backlight_properties props;
->  	struct backlight_device *bl;
->  	struct pwm_bl_data *pb;
-> +	int initial_blank = FB_BLANK_UNBLANK;
-> +	bool phandle;
->  	int ret;
->  
->  	if (!data) {
-> @@ -242,7 +244,7 @@ static int pwm_backlight_probe(struct platform_device *pdev)
->  	pb->enabled = false;
->  
->  	pb->enable_gpio = devm_gpiod_get_optional(&pdev->dev, "enable",
-> -						  GPIOD_OUT_HIGH);
-> +						  GPIOD_ASIS);
->  	if (IS_ERR(pb->enable_gpio)) {
->  		ret = PTR_ERR(pb->enable_gpio);
->  		goto err_alloc;
-> @@ -264,12 +266,32 @@ static int pwm_backlight_probe(struct platform_device *pdev)
->  		pb->enable_gpio = gpio_to_desc(data->enable_gpio);
->  	}
->  
-> +	phandle = of_find_property(pdev->dev.of_node, "phandle", NULL) != NULL;
-
-This is a little ugly.
-
-If this is the only way to identify the probedness of a device then
-you probably want to neaten it up a little.  I suggest something along
-the lines of:
-
-if (of_find_property(pdev->dev.of_node, "phandle", NULL))
-	already_probed = true;
-
-Also, do you also want to check for "linux,phandle", as this is always
-catered for in drivers/of/*
-
-> +	if (pb->enable_gpio) {
-> +		/*
-> +		 * If the driver is probed from the device tree and there is a
-> +		 * phandle link pointing to the backlight node, it is safe to
-> +		 * assume that another driver will enable the backlight at the
-> +		 * appropriate time. Therefore, if it is disabled, keep it so.
-> +		 */
-> +		if (phandle &&
-> +		    gpiod_get_direction(pb->enable_gpio) == GPIOF_DIR_OUT &&
-> +		    gpiod_get_value(pb->enable_gpio) == 0)
-> +			initial_blank = FB_BLANK_POWERDOWN;
-> +		else
-> +			gpiod_direction_output(pb->enable_gpio, 1);
-> +	}
+> Signed-off-by: J. German Rivera <German.Rivera@freescale.com>
+> ---
+> CHANGE HISTORY:
+> 
+> Changes in v2:
+> - Addressed comment form Stuart Yoder:
+>   * Removed "@<address>" from reboot node
+> 
+> Changes in v3:
+> - Addressed comment form Stuart Yoder:
+>   * Expose only the reset register
+> 
+>  arch/arm64/boot/dts/freescale/fsl-ls2085a.dtsi | 12 ++++++++++++
+>  1 file changed, 12 insertions(+)
+> 
+> diff --git a/arch/arm64/boot/dts/freescale/fsl-ls2085a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls2085a.dtsi
+> index e281ceb..5e3d894 100644
+> --- a/arch/arm64/boot/dts/freescale/fsl-ls2085a.dtsi
+> +++ b/arch/arm64/boot/dts/freescale/fsl-ls2085a.dtsi
+> @@ -131,6 +131,18 @@
+>  		interrupts = <1 9 0x4>;
+>  	};
+> 
+> +	rstcr: rstcr at 1E60000 {
+> +		compatible = "syscon";
+> +		reg = <0x0 0x1E60000 0x0 0x4>;
+> +	};
 > +
->  	pb->power_supply = devm_regulator_get(&pdev->dev, "power");
->  	if (IS_ERR(pb->power_supply)) {
->  		ret = PTR_ERR(pb->power_supply);
->  		goto err_alloc;
->  	}
->  
-> +	if (phandle && !regulator_is_enabled(pb->power_supply))
-> +		initial_blank = FB_BLANK_POWERDOWN;
+> +	reboot {
+> +		compatible ="syscon-reboot";
+> +		regmap = <&rstcr>;
+> +		offset = <0x0>;
+> +		mask = <0x2>;
+> +	};
 > +
->  	pb->pwm = devm_pwm_get(&pdev->dev, NULL);
->  	if (IS_ERR(pb->pwm) && PTR_ERR(pb->pwm) != -EPROBE_DEFER
->  	    && !pdev->dev.of_node) {
-> @@ -320,6 +342,7 @@ static int pwm_backlight_probe(struct platform_device *pdev)
->  	}
->  
->  	bl->props.brightness = data->dft_brightness;
-> +	bl->props.power = initial_blank;
->  	backlight_update_status(bl);
->  
->  	platform_set_drvdata(pdev, bl);
+>  	timer {
+>  		compatible = "arm,armv8-timer";
+>  		interrupts = <1 13 0x8>, /* Physical Secure PPI, active-low */
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+German, the other thing I just noticed that I had mentioned on 
+v1 of the patch was that the device tree has been renamed, so
+fsl-ls2085a.dtsi no longer exists.
+
+You need to rebase this on top of:
+git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git
+
+branch: for-next
+
+Thanks,
+Stuart
