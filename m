@@ -1,68 +1,80 @@
-From: zhaoshenglong@huawei.com (Shannon Zhao)
-Date: Fri, 30 Oct 2015 14:21:56 +0800
-Subject: [PATCH v4 14/21] KVM: ARM64: Add reset and access handlers for
- PMUSERENR register
-In-Reply-To: <1446186123-11548-1-git-send-email-zhaoshenglong@huawei.com>
-References: <1446186123-11548-1-git-send-email-zhaoshenglong@huawei.com>
-Message-ID: <1446186123-11548-15-git-send-email-zhaoshenglong@huawei.com>
+From: p.fedin@samsung.com (Pavel Fedin)
+Date: Fri, 30 Oct 2015 09:41:15 +0300
+Subject: [PATCH v4 2/4] ARM: dts: Add SROMc to Exynos 5410
+In-Reply-To: <CAGcde9EXfe0amqoTOwgKi-Y6=4mRcEbZrA=as-BxzfMv3ntAhQ@mail.gmail.com>
+References: <cover.1446122247.git.p.fedin@samsung.com>
+ <eafa355058ff500a72ff2e3408ab635954467a76.1446122247.git.p.fedin@samsung.com>
+ <CAGcde9EXfe0amqoTOwgKi-Y6=4mRcEbZrA=as-BxzfMv3ntAhQ@mail.gmail.com>
+Message-ID: <009f01d112dd$fab40830$f01c1890$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Shannon Zhao <shannon.zhao@linaro.org>
+ Hello!
 
-The reset value of PMUSERENR_EL0 is UNKNOWN, use reset_unknown. While
-the reset value of PMUSERENR is zero, use reset_val_cp15 with zero for
-its reset handler.
+> -----Original Message-----
+> From: linux-samsung-soc-owner at vger.kernel.org [mailto:linux-samsung-soc-owner at vger.kernel.org]
+> On Behalf Of Pankaj Dubey
+> Sent: Thursday, October 29, 2015 8:28 PM
+> To: Pavel Fedin
+> Cc: devicetree at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux-samsung-soc;
+> linux-kernel at vger.kernel.org; Rob Herring; Pawel Moll; Mark Rutland; Ian Campbell; Kumar Gala;
+> Kukjin Kim; Krzysztof Kozlowski
+> Subject: Re: [PATCH v4 2/4] ARM: dts: Add SROMc to Exynos 5410
+> 
+> Hi Pavel,
+> 
+> On 29 October 2015 at 18:12, Pavel Fedin <p.fedin@samsung.com> wrote:
+> > This machine uses own SoC device tree file, add missing part.
+> >
+> > Signed-off-by: Pavel Fedin <p.fedin@samsung.com>
+> > ---
+> >  arch/arm/boot/dts/exynos5410.dtsi | 15 +++++++++++++++
+> >  1 file changed, 15 insertions(+)
+> >
+> > diff --git a/arch/arm/boot/dts/exynos5410.dtsi b/arch/arm/boot/dts/exynos5410.dtsi
+> > index 4603356..da6a8fa0e 100644
+> > --- a/arch/arm/boot/dts/exynos5410.dtsi
+> > +++ b/arch/arm/boot/dts/exynos5410.dtsi
+> > @@ -101,6 +101,15 @@
+> >                         reg = <0x10000000 0x100>;
+> >                 };
+> >
+> > +               sromc: sromc at 12250000 {
+> > +                       #address-cells = <1>;
+> > +                       #size-cells = <1>;
+> > +                       ranges;
+> > +
+> 
+> We do not need to specify these three properties as they are already
+> present in parent node "soc".
 
-Add a helper for CP15 registers reset to specified value.
+ We do, otherwise dtc complains about defaults of #address-cells = 2 and #size-cells=1, and without empty "ranges" subnode's resources are not correctly translated.
 
-Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
----
- arch/arm64/kvm/sys_regs.c | 5 +++--
- arch/arm64/kvm/sys_regs.h | 8 ++++++++
- 2 files changed, 11 insertions(+), 2 deletions(-)
+> 
+> > +                       compatible = "samsung,exynos-srom";
+> > +                       reg = <0x12250000 0x14>;
+> > +               };
+> > +
+> >                 pmu_system_controller: system-controller at 10040000 {
+> >                         compatible = "samsung,exynos5410-pmu", "syscon";
+> >                         reg = <0x10040000 0x5000>;
+> > @@ -133,6 +142,12 @@
+> >                                                 <10 &gic 0 130 0>,
+> >                                                 <11 &gic 0 131 0>;
+> >                         };
+> > +
+> > +                       arch_timer {
+> > +                               compatible = "arm,armv7-timer";
+> > +                               clock-frequency = <24000000>;
+> > +                       };
+> > +
+> 
+> This change should not be part of this patch.
 
-diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-index e03d3b8d..c44c8e1 100644
---- a/arch/arm64/kvm/sys_regs.c
-+++ b/arch/arm64/kvm/sys_regs.c
-@@ -829,7 +829,7 @@ static const struct sys_reg_desc sys_reg_descs[] = {
- 	  access_pmu_regs, reset_unknown, PMXEVCNTR_EL0 },
- 	/* PMUSERENR_EL0 */
- 	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1110), Op2(0b000),
--	  trap_raz_wi },
-+	  access_pmu_regs, reset_unknown, PMUSERENR_EL0 },
- 	/* PMOVSSET_EL0 */
- 	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1110), Op2(0b011),
- 	  access_pmu_regs, reset_unknown, PMOVSSET_EL0 },
-@@ -1206,7 +1206,8 @@ static const struct sys_reg_desc cp15_regs[] = {
- 	  reset_unknown_cp15, c9_PMXEVTYPER },
- 	{ Op1( 0), CRn( 9), CRm(13), Op2( 2), access_pmu_cp15_regs,
- 	  reset_unknown_cp15, c9_PMXEVCNTR },
--	{ Op1( 0), CRn( 9), CRm(14), Op2( 0), trap_raz_wi },
-+	{ Op1( 0), CRn( 9), CRm(14), Op2( 0), access_pmu_cp15_regs,
-+	  reset_val_cp15,  c9_PMUSERENR, 0 },
- 	{ Op1( 0), CRn( 9), CRm(14), Op2( 1), access_pmu_cp15_regs,
- 	  reset_unknown_cp15, c9_PMINTENSET },
- 	{ Op1( 0), CRn( 9), CRm(14), Op2( 2), access_pmu_cp15_regs,
-diff --git a/arch/arm64/kvm/sys_regs.h b/arch/arm64/kvm/sys_regs.h
-index 8afeff7..aba997d 100644
---- a/arch/arm64/kvm/sys_regs.h
-+++ b/arch/arm64/kvm/sys_regs.h
-@@ -125,6 +125,14 @@ static inline void reset_val(struct kvm_vcpu *vcpu, const struct sys_reg_desc *r
- 	vcpu_sys_reg(vcpu, r->reg) = r->val;
- }
- 
-+static inline void reset_val_cp15(struct kvm_vcpu *vcpu,
-+				  const struct sys_reg_desc *r)
-+{
-+	BUG_ON(!r->reg);
-+	BUG_ON(r->reg >= NR_SYS_REGS);
-+	vcpu_cp15(vcpu, r->reg) = r->val;
-+}
-+
- static inline int cmp_sys_reg(const struct sys_reg_desc *i1,
- 			      const struct sys_reg_desc *i2)
- {
--- 
-2.0.4
+ Ooops, thank you very much, this should not have been here at all. This is a leftover from my experiments, i was tracing DT parsing code and added it just for test, to see why timer gets probed as a subnode.
+ Just forgot to remove it afterwards and it slipped into the patch.
+
+Kind regards,
+Pavel Fedin
+Expert Engineer
+Samsung Electronics Research center Russia
