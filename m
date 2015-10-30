@@ -1,87 +1,59 @@
-From: robh+dt@kernel.org (Rob Herring)
-Date: Fri, 30 Oct 2015 15:18:18 -0500
-Subject: [PATCH v2 1/3] devicetree: mfd: Add binding for the TI LM3533
-In-Reply-To: <20151030194150.GD24668@usrtlx11787.corpusers.net>
-References: <1445796586-28683-1-git-send-email-bjorn.andersson@sonymobile.com>
- <1445963373-27790-1-git-send-email-bjorn.andersson@sonymobile.com>
- <20151030184220.GJ4058@x1> <20151030194150.GD24668@usrtlx11787.corpusers.net>
-Message-ID: <CAL_Jsq+d+_JgiEfQpgD29AnD+bM7Nq94-5NTjK=LFHNg162UOw@mail.gmail.com>
+From: German.Rivera@freescale.com (J. German Rivera)
+Date: Fri, 30 Oct 2015 15:04:58 -0500
+Subject: [PATCH v4] arm64: dts: Added syscon-reboot node for FSL's LS2085A SoC
+Message-ID: <1446235498-4093-1-git-send-email-German.Rivera@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 30, 2015 at 2:41 PM, Bjorn Andersson
-<bjorn.andersson@sonymobile.com> wrote:
-> On Fri 30 Oct 11:42 PDT 2015, Lee Jones wrote:
->
-> Rob, please see the discussion regarding ti,boost-freq-khz below. Should
-> we both specify unit at the same time as we use standard units? (This is
-> not the first time I have to change this back and forth)
->
->> On Tue, 27 Oct 2015, Bjorn Andersson wrote:
->>
-> [..]
->> > +- ti,hwen-gpios:
->> > +   Usage: required
->> > +   Value type: <prop-encoded-array>
->> > +   Definition: reference to gpio pin connected to the HWEN input; as
->> > +               specified in "gpio/gpio.txt"
->>
->> Why have you made this a vendor binding?
->>
->> *-gpios is a generic property.
->>
->
-> Because the hwen gpio is a ti lm3533 specific thing, but I get what
-> you're saying. Will drop the prefix.
+Added sys-reboot node to the FSL's LS2085A SoC DT to leverage
+the ARM-generic reboot mechanism for this SoC. This mechanism
+is enabled through CONFIG_POWER_RESET_SYSCON.
 
-Actually, that is fine. -gpios is common, but the rest is specific to
-a binding. But if it is a common function, then a common name would be
-fine. Enable gpios are common for example.
+Signed-off-by: J. German Rivera <German.Rivera@freescale.com>
+---
+CHANGE HISTORY:
 
->> > +- ti,als-supply:
->> > +   Usage: optional
->> > +   Value type: <prop-encoded-array>
->> > +   Definition: reference to regulator powering the V_als input; as
->> > +               specified in "regulator/regulator.txt"
->>
->> Same goes for *-supply.
->>
->
-> Same here
->
->> > +- ti,boost-freq-khz:
->> > +   Usage: required
->> > +   Value type: <u32>
->> > +   Definition: switch-frequency of the boost converter, must be either:
->> > +               500 or 1000
->>
->> Quite a few vendors are using 'boost' now.
->>
->
-> The ti,boost-low-freq from the bq25890 binding is the only other
-> property I can find that describes the same thing. So I'm not sure I
-> follow you here.
->
->> Perhaps we need to create a set of generic bindings.
->>
->> Also, we usually measure DT bindings in HZ, not kHz.
+Changes in v2:
+- Addressed comment form Stuart Yoder:
+  * Removed "@<address>" from reboot node
 
-Surprisingly, there are not enough examples to draw much conclusion.
+Changes in v3:
+- Addressed comment form Stuart Yoder:
+  * Expose only the reset register
 
-> I thought we had defined frequencies to be in HZ and HZ only, but then
-> Rob's comment that I need to actually specify the unit doesn't make any
-> sense.
+Changes in v4:
+- Addressed comment from Arnd Bergmann:
+  * Changed compatible string to be more specific
+  * Changed node name to 'syscon' instead of 'rstcr'
+  * Changed address to lower case hex
+- Addressed comment form Stuart Yoder:
+  * Rebase on top of branch arm-soc/for-next
 
-I don't think we decided, but let's decide now. Go with Hz.
+ arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
-Really, I first prefer the property name has units and second having
-standardized units. But if there is a common property without units, I
-prefer that even more.
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
+index e81cd48..a790a90 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
++++ b/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
+@@ -153,6 +153,18 @@
+ 		};
+ 	};
 
-> Do we want these properties in a standard unit or do we want them
-> specifying the unit? Having both seems excessive.
-
-You mean "freq" would imply the units? No, we want the actual units in
-the property.
-
-Rob
++	rstcr: syscon at 1e60000 {
++		compatible = "fsl,ls2085a-rstcr", "syscon";
++		reg = <0x0 0x1e60000 0x0 0x4>;
++	};
++
++	reboot {
++		compatible ="syscon-reboot";
++		regmap = <&rstcr>;
++		offset = <0x0>;
++		mask = <0x2>;
++	};
++
+ 	timer {
+ 		compatible = "arm,armv8-timer";
+ 		interrupts = <1 13 0x8>, /* Physical Secure PPI, active-low */
+--
+2.3.3
