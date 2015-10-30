@@ -1,92 +1,156 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 30 Oct 2015 15:20:59 +0100
-Subject: [PATCH 13/19] drm: sun4i: tv: Add NTSC output standard
+Date: Fri, 30 Oct 2015 15:21:01 +0100
+Subject: [PATCH 15/19] ARM: sun5i: dt: Add display and TCON clocks
 In-Reply-To: <1446214865-3972-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1446214865-3972-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1446214865-3972-14-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1446214865-3972-16-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the settings to support the NTSC standard.
+Enable the display and TCON (channel 0 and channel 1) clocks that are going
+to be needed to drive the display engine, tcon and TV encoders.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/gpu/drm/sun4i/sun4i_tv.c | 45 ++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 45 insertions(+)
+ arch/arm/boot/dts/sun5i-a10s.dtsi |  8 +++---
+ arch/arm/boot/dts/sun5i-a13.dtsi  |  3 ++-
+ arch/arm/boot/dts/sun5i-r8.dtsi   |  5 ++--
+ arch/arm/boot/dts/sun5i.dtsi      | 53 +++++++++++++++++++++++++++++++++++++++
+ 4 files changed, 63 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/gpu/drm/sun4i/sun4i_tv.c b/drivers/gpu/drm/sun4i/sun4i_tv.c
-index 4b95d04ff457..b460406d744c 100644
---- a/drivers/gpu/drm/sun4i/sun4i_tv.c
-+++ b/drivers/gpu/drm/sun4i/sun4i_tv.c
-@@ -175,24 +175,69 @@ struct sun4i_tv {
- 	struct sun4i_drv	*drv;
- };
+diff --git a/arch/arm/boot/dts/sun5i-a10s.dtsi b/arch/arm/boot/dts/sun5i-a10s.dtsi
+index bddd0de88af6..0981a9e2db3b 100644
+--- a/arch/arm/boot/dts/sun5i-a10s.dtsi
++++ b/arch/arm/boot/dts/sun5i-a10s.dtsi
+@@ -65,8 +65,9 @@
+ 			compatible = "allwinner,simple-framebuffer",
+ 				     "simple-framebuffer";
+ 			allwinner,pipeline = "de_be0-lcd0-hdmi";
+-			clocks = <&pll5 1>, <&ahb_gates 36>, <&ahb_gates 43>,
+-				 <&ahb_gates 44>;
++			clocks = <&ahb_gates 36>, <&ahb_gates 43>,
++				 <&ahb_gates 44>, <&de_be_clk>,
++				 <&tcon_ch1_clk>;
+ 			status = "disabled";
+ 		};
  
-+struct video_levels ntsc_video_levels = {
-+	.black = 282,	.blank = 240,
-+};
-+
- struct video_levels pal_video_levels = {
- 	.black = 252,	.blank = 252,
- };
+@@ -74,7 +75,8 @@
+ 			compatible = "allwinner,simple-framebuffer",
+ 				     "simple-framebuffer";
+ 			allwinner,pipeline = "de_be0-lcd0";
+-			clocks = <&pll5 1>, <&ahb_gates 36>, <&ahb_gates 44>;
++			clocks = <&ahb_gates 36>, <&ahb_gates 44>,
++				 <&de_be_clk>, <&tcon_ch0_clk>;
+ 			status = "disabled";
+ 		};
  
-+struct burst_levels ntsc_burst_levels = {
-+	.cb = 79,	.cr = 0,
-+};
-+
- struct burst_levels pal_burst_levels = {
- 	.cb = 40,	.cr = 40,
- };
+diff --git a/arch/arm/boot/dts/sun5i-a13.dtsi b/arch/arm/boot/dts/sun5i-a13.dtsi
+index d910d3a6c41c..130644d7e054 100644
+--- a/arch/arm/boot/dts/sun5i-a13.dtsi
++++ b/arch/arm/boot/dts/sun5i-a13.dtsi
+@@ -61,7 +61,8 @@
+ 			compatible = "allwinner,simple-framebuffer",
+ 				     "simple-framebuffer";
+ 			allwinner,pipeline = "de_be0-lcd0";
+-			clocks = <&pll5 1>, <&ahb_gates 36>, <&ahb_gates 44>;
++			clocks = <&ahb_gates 36>, <&ahb_gates 44>, <&de_be_clk>,
++				 <&tcon_ch0_clk>;
+ 			status = "disabled";
+ 		};
+ 	};
+diff --git a/arch/arm/boot/dts/sun5i-r8.dtsi b/arch/arm/boot/dts/sun5i-r8.dtsi
+index 0ef865601ac9..b1e4e0170d51 100644
+--- a/arch/arm/boot/dts/sun5i-r8.dtsi
++++ b/arch/arm/boot/dts/sun5i-r8.dtsi
+@@ -51,8 +51,9 @@
+ 			compatible = "allwinner,simple-framebuffer",
+ 				     "simple-framebuffer";
+ 			allwinner,pipeline = "de_be0-lcd0-tve0";
+-			clocks = <&pll5 1>, <&ahb_gates 34>, <&ahb_gates 36>,
+-				 <&ahb_gates 44>;
++			clocks = <&ahb_gates 34>, <&ahb_gates 36>,
++				 <&ahb_gates 44>, <&de_be_clk>,
++				 <&tcon_ch1_clk>;
+ 			status = "disabled";
+ 		};
+ 	};
+diff --git a/arch/arm/boot/dts/sun5i.dtsi b/arch/arm/boot/dts/sun5i.dtsi
+index bde9a545b79f..861c5a621e70 100644
+--- a/arch/arm/boot/dts/sun5i.dtsi
++++ b/arch/arm/boot/dts/sun5i.dtsi
+@@ -129,6 +129,15 @@
+ 			clock-output-names = "pll3";
+ 		};
  
-+struct color_gains ntsc_color_gains = {
-+	.cb = 160,	.cr = 160,
-+};
++		pll3x2: pll3x2_clk {
++			compatible = "fixed-factor-clock";
++			#clock-cells = <0>;
++			clock-div = <1>;
++			clock-mult = <2>;
++			clocks = <&pll3>;
++			clock-output-names = "pll3x2";
++		};
 +
- struct color_gains pal_color_gains = {
- 	.cb = 224,	.cr = 224,
- };
+ 		pll4: clk at 01c20018 {
+ 			#clock-cells = <0>;
+ 			compatible = "allwinner,sun4i-a10-pll1-clk";
+@@ -161,6 +170,15 @@
+ 			clock-output-names = "pll7";
+ 		};
  
-+struct resync_parameters ntsc_resync_parameters = {
-+	.field = false,	.line = 14,	.pixel = 12,
-+};
++		pll7x2: pll7x2_clk {
++			compatible = "fixed-factor-clock";
++			#clock-cells = <0>;
++			clock-div = <1>;
++			clock-mult = <2>;
++			clocks = <&pll7>;
++			clock-output-names = "pll7x2";
++		};
 +
- struct resync_parameters pal_resync_parameters = {
- 	.field = true,	.line = 13,	.pixel = 12,
- };
+ 		/* dummy is 200M */
+ 		cpu: cpu at 01c20054 {
+ 			#clock-cells = <0>;
+@@ -320,6 +338,41 @@
+ 			clock-output-names = "usb_ohci0", "usb_phy";
+ 		};
  
- struct tv_mode tv_modes[] = {
- 	{
-+		.name		= "NTSC",
-+		.mode		= SUN4I_TVE_CFG0_RES_480i,
-+		.chroma_freq	= 0x21f07c1f,
-+		.yc_en		= true,
-+		.dac3_en	= true,
-+		.dac_bit25_en	= true,
++		de_be_clk: clk at 01c20104 {
++			#clock-cells = <0>;
++			#reset-cells = <0>;
++			compatible = "allwinner,sun4i-a10-display-clk";
++			reg = <0x01c20104 0x4>;
++			clocks = <&pll3>, <&pll7>, <&pll5 1>;
++			clock-output-names = "de-be";
++		};
 +
-+		.back_porch	= 118,
-+		.front_porch	= 32,
-+		.line_number	= 525,
++		de_fe_clk: clk at 01c2010c {
++			#clock-cells = <0>;
++			#reset-cells = <0>;
++			compatible = "allwinner,sun4i-a10-display-clk";
++			reg = <0x01c2010c 0x4>;
++			clocks = <&pll3>, <&pll7>, <&pll5 1>;
++			clock-output-names = "de-fe";
++		};
 +
-+		.hdisplay	= 720,
-+		.hfront_porch	= 18,
-+		.hsync_len	= 2,
-+		.hback_porch	= 118,
++		tcon_ch0_clk: clk at 01c20118 {
++			#clock-cells = <0>;
++			#reset-cells = <1>;
++			compatible = "allwinner,sun4i-a10-tcon-ch0-clk";
++			reg = <0x01c20118 0x4>;
++			clocks = <&pll3>, <&pll7>, <&pll3x2>, <&pll7x2>;
++			clock-output-names = "tcon-ch0-sclk";
++		};
 +
-+		.vdisplay	= 480,
-+		.vfront_porch	= 26,
-+		.vsync_len	= 2,
-+		.vback_porch	= 17,
++		tcon_ch1_clk: clk at 01c2012c {
++			#clock-cells = <0>;
++			compatible = "allwinner,sun4i-a10-tcon-ch1-clk";
++			reg = <0x01c2012c 0x4>;
++			clocks = <&pll3>, <&pll7>, <&pll3x2>, <&pll7x2>;
++			clock-output-names = "tcon-ch1-sclk";
++		};
 +
-+		.vblank_level	= 240,
-+
-+		.color_gains	= &ntsc_color_gains,
-+		.burst_levels	= &ntsc_burst_levels,
-+		.video_levels	= &ntsc_video_levels,
-+		.resync_params	= &ntsc_resync_parameters,
-+	},
-+	{
- 		.name		= "PAL",
- 		.mode		= SUN4I_TVE_CFG0_RES_576i,
- 		.chroma_freq	= 0x2a098acb,
+ 		codec_clk: clk at 01c20140 {
+ 			#clock-cells = <0>;
+ 			compatible = "allwinner,sun4i-a10-codec-clk";
 -- 
 2.6.2
