@@ -1,59 +1,61 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 30 Oct 2015 11:28:43 +0000
-Subject: [GIT PULL] arm64: late fixes for 4.3
-Message-ID: <20151030112843.GC20030@arm.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 30 Oct 2015 12:46:43 +0100
+Subject: [PATCH] ARM: don't infer VIPT I-cache properties from its reported
+ geometry
+Message-ID: <1446205603-14285-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+The cache geometry reported by the CCSIDR system registers is tightly
+coupled to the instructions to perform cache maintenance by set/way,
+and the architecture explicitly forbids inferring anything about the
+actual cache geometry from them:
 
-Apologies for this being so late, but we've uncovered a few nasty issues
-on arm64 which didn't settle down until yesterday and the fixes all look
-suitable for 4.3. Of the four patches, three of them are Cc'd to stable,
-with the remaining patch fixing an issue that only took effect during
-the merge window. Brief summaries are available in the tag.
+  The parameters NumSets, Associativity, and LineSize in these registers
+  define the architecturally visible parameters that are required for
+  the cache maintenance by Set/Way instructions. They are not guaranteed
+  to represent the actual microarchitectural features of a design. You
+  cannot make any inference about the actual sizes of caches based on
+  these parameters.
 
-Please pull.
+This includes calculating the way size of a VIPT I-cache to decide
+whether it is free of aliases. So remove the code that implements this
+for v7 CPUs, and treat all non-PIPT I-caches as aliasing instead.
 
-Thanks,
+Reported-by: Alex Van Brunt <avanbrunt@nvidia.com>
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+ arch/arm/kernel/setup.c | 11 +----------
+ 1 file changed, 1 insertion(+), 10 deletions(-)
 
-Will
-
---->8
-
-The following changes since commit 32b88194f71d6ae7768a29f87fbba454728273ee:
-
-  Linux 4.3-rc7 (2015-10-25 10:39:47 +0900)
-
-are available in the git repository at:
-
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux.git tags/arm64-fixes
-
-for you to fetch changes up to 73effccb9196ccc0241c3fb51dfd8de1d14ae8ed:
-
-  arm64/efi: do not assume DRAM base is aligned to 2 MB (2015-10-29 16:10:58 +0000)
-
-----------------------------------------------------------------
-arm64 fixes for 4.3
-
-- Fix corruption in SWP emulation when STXR fails due to contention
-- Fix MMU re-initialisation when resuming from a low-power state
-- Fix stack unwinding code to match what ftrace expects
-- Fix relocation code in the EFI stub when DRAM base is not 2MB aligned
-
-----------------------------------------------------------------
-Ard Biesheuvel (1):
-      arm64/efi: do not assume DRAM base is aligned to 2 MB
-
-Lorenzo Pieralisi (1):
-      arm64: kernel: fix tcr_el1.t0sz restore on systems with extended idmap
-
-Will Deacon (2):
-      arm64: compat: fix stxr failure case in SWP emulation
-      Revert "ARM64: unwind: Fix PC calculation"
-
- arch/arm64/kernel/armv8_deprecated.c | 16 +++++++++-------
- arch/arm64/kernel/efi-stub.c         | 14 ++++++++++++--
- arch/arm64/kernel/stacktrace.c       |  6 +-----
- arch/arm64/kernel/suspend.c          | 22 +++++++++++++---------
- 4 files changed, 35 insertions(+), 23 deletions(-)
+diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
+index 20edd349d379..1275135488ee 100644
+--- a/arch/arm/kernel/setup.c
++++ b/arch/arm/kernel/setup.c
+@@ -279,7 +279,6 @@ int __pure cpu_architecture(void)
+ static int cpu_has_aliasing_icache(unsigned int arch)
+ {
+ 	int aliasing_icache;
+-	unsigned int id_reg, num_sets, line_size;
+ 
+ 	/* PIPT caches never alias. */
+ 	if (icache_is_pipt())
+@@ -288,15 +287,7 @@ static int cpu_has_aliasing_icache(unsigned int arch)
+ 	/* arch specifies the register format */
+ 	switch (arch) {
+ 	case CPU_ARCH_ARMv7:
+-		asm("mcr	p15, 2, %0, c0, c0, 0 @ set CSSELR"
+-		    : /* No output operands */
+-		    : "r" (1));
+-		isb();
+-		asm("mrc	p15, 1, %0, c0, c0, 0 @ read CCSIDR"
+-		    : "=r" (id_reg));
+-		line_size = 4 << ((id_reg & 0x7) + 2);
+-		num_sets = ((id_reg >> 13) & 0x7fff) + 1;
+-		aliasing_icache = (line_size * num_sets) > PAGE_SIZE;
++		aliasing_icache = 1;
+ 		break;
+ 	case CPU_ARCH_ARMv6:
+ 		aliasing_icache = read_cpuid_cachetype() & (1 << 11);
+-- 
+2.1.4
