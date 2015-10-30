@@ -1,105 +1,134 @@
 From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Fri, 30 Oct 2015 10:00:36 +0200
-Subject: [PATCH v2 1/3] dmaengine: ti-dma-crossbar: dra7: Use bitops instead
- of idr
+Date: Fri, 30 Oct 2015 10:00:37 +0200
+Subject: [PATCH v2 2/3] dmaengine: ti-dma-crossbar: dra7: Support for
+ reserving DMA event ranges
 In-Reply-To: <1446192038-11158-1-git-send-email-peter.ujfalusi@ti.com>
 References: <1446192038-11158-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <1446192038-11158-2-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <1446192038-11158-3-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The use of idr was nice, but it was a bit heavy and we did not need the
-features it provides. Using simple bitmap to track allocated DMA channels
-is adequate here and it will be easier to add support for reserving
-channels later on.
+In eDMA the events are directly mapped to a DMA channel (for example DMA
+event 14 can only be handled by DMA channel 14). If the memcpy is enabled
+on the eDMA, there is a possibility that the crossbar driver would assign
+DMA event number already allocated in eDMA for memcpy. Furthermore the
+eDMA can be shared with DSP in which case the crossbar driver should also
+avoid mapping xbar events to DSP used event numbers (or channels).
 
 Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 ---
- drivers/dma/ti-dma-crossbar.c | 30 +++++++++++++++++++++++-------
- 1 file changed, 23 insertions(+), 7 deletions(-)
+ .../devicetree/bindings/dma/ti-dma-crossbar.txt    |  6 +++
+ drivers/dma/ti-dma-crossbar.c                      | 47 ++++++++++++++++++++--
+ 2 files changed, 49 insertions(+), 4 deletions(-)
 
+diff --git a/Documentation/devicetree/bindings/dma/ti-dma-crossbar.txt b/Documentation/devicetree/bindings/dma/ti-dma-crossbar.txt
+index b152a75dceae..aead5869a28d 100644
+--- a/Documentation/devicetree/bindings/dma/ti-dma-crossbar.txt
++++ b/Documentation/devicetree/bindings/dma/ti-dma-crossbar.txt
+@@ -14,6 +14,10 @@ The DMA controller node need to have the following poroperties:
+ 
+ Optional properties:
+ - ti,dma-safe-map: Safe routing value for unused request lines
++- ti,reserved-dma-request-ranges: DMA request ranges which should not be used
++		when mapping xbar input to DMA request, they are either
++		allocated to be used by for example the DSP or they are used as
++		memcpy channels in eDMA.
+ 
+ Notes:
+ When requesting channel via ti,dra7-dma-crossbar, the DMA clinet must request
+@@ -46,6 +50,8 @@ sdma_xbar: dma-router at 4a002b78 {
+ 	#dma-cells = <1>;
+ 	dma-requests = <205>;
+ 	ti,dma-safe-map = <0>;
++	/* Protect the sDMA request ranges: 10-14 and 100-126 */
++	ti,reserved-dma-request-ranges = <10 5>, <100 27>;
+ 	dma-masters = <&sdma>;
+ };
+ 
 diff --git a/drivers/dma/ti-dma-crossbar.c b/drivers/dma/ti-dma-crossbar.c
-index a415edbe61b1..463ad6b18a32 100644
+index 463ad6b18a32..dac7ae06cc58 100644
 --- a/drivers/dma/ti-dma-crossbar.c
 +++ b/drivers/dma/ti-dma-crossbar.c
-@@ -12,7 +12,6 @@
- #include <linux/init.h>
- #include <linux/list.h>
- #include <linux/io.h>
--#include <linux/idr.h>
- #include <linux/of_address.h>
- #include <linux/of_device.h>
- #include <linux/of_dma.h>
-@@ -198,7 +197,8 @@ struct ti_dra7_xbar_data {
+@@ -292,14 +292,22 @@ static const struct of_device_id ti_dra7_master_match[] = {
+ 	{},
+ };
+ 
++static inline void ti_dra7_xbar_reserve(int offset, int len, unsigned long *p)
++{
++	for (; len > 0; len--)
++		clear_bit(offset + (len - 1), p);
++}
++
+ static int ti_dra7_xbar_probe(struct platform_device *pdev)
+ {
+ 	struct device_node *node = pdev->dev.of_node;
+ 	const struct of_device_id *match;
+ 	struct device_node *dma_node;
+ 	struct ti_dra7_xbar_data *xbar;
++	struct property *prop;
+ 	struct resource *res;
+ 	u32 safe_val;
++	size_t sz;
  	void __iomem *iomem;
+ 	int i, ret;
  
- 	struct dma_router dmarouter;
--	struct idr map_idr;
-+	struct mutex mutex;
-+	unsigned long *dma_inuse;
+@@ -347,6 +355,33 @@ static int ti_dra7_xbar_probe(struct platform_device *pdev)
+ 	if (!of_property_read_u32(node, "ti,dma-safe-map", &safe_val))
+ 		xbar->safe_val = (u16)safe_val;
  
- 	u16 safe_val; /* Value to rest the crossbar lines */
- 	u32 xbar_requests; /* number of DMA requests connected to XBAR */
-@@ -225,7 +225,9 @@ static void ti_dra7_xbar_free(struct device *dev, void *route_data)
- 		map->xbar_in, map->xbar_out);
- 
- 	ti_dra7_xbar_write(xbar->iomem, map->xbar_out, xbar->safe_val);
--	idr_remove(&xbar->map_idr, map->xbar_out);
-+	mutex_lock(&xbar->mutex);
-+	clear_bit(map->xbar_out, xbar->dma_inuse);
-+	mutex_unlock(&xbar->mutex);
- 	kfree(map);
- }
- 
-@@ -255,8 +257,17 @@ static void *ti_dra7_xbar_route_allocate(struct of_phandle_args *dma_spec,
- 		return ERR_PTR(-ENOMEM);
- 	}
- 
--	map->xbar_out = idr_alloc(&xbar->map_idr, NULL, 0, xbar->dma_requests,
--				  GFP_KERNEL);
-+	mutex_lock(&xbar->mutex);
-+	map->xbar_out = find_first_zero_bit(xbar->dma_inuse,
-+					    xbar->dma_requests);
-+	mutex_unlock(&xbar->mutex);
-+	if (map->xbar_out == xbar->dma_requests) {
-+		dev_err(&pdev->dev, "Run out of free DMA requests\n");
-+		kfree(map);
-+		return ERR_PTR(-ENOMEM);
++
++	prop = of_find_property(node, "ti,reserved-dma-request-ranges", &sz);
++	if (prop) {
++		const char pname[] = "ti,reserved-dma-request-ranges";
++		u32 (*rsv_events)[2];
++		size_t nelm = sz / sizeof(*rsv_events);
++		int i;
++
++		if (!nelm)
++			return -EINVAL;
++
++		rsv_events = kcalloc(nelm, sizeof(*rsv_events), GFP_KERNEL);
++		if (!rsv_events)
++			return -ENOMEM;
++
++		ret = of_property_read_u32_array(node, pname, (u32 *)rsv_events,
++						 nelm * 2);
++		if (ret)
++			return ret;
++
++		for (i = 0; i < nelm; i++) {
++			ti_dra7_xbar_reserve(rsv_events[i][0], rsv_events[i][1],
++					     xbar->dma_inuse);
++		}
++		kfree(rsv_events);
 +	}
-+	set_bit(map->xbar_out, xbar->dma_inuse);
 +
- 	map->xbar_in = (u16)dma_spec->args[0];
- 
- 	dma_spec->args[0] = map->xbar_out + xbar->dma_offset;
-@@ -299,8 +310,6 @@ static int ti_dra7_xbar_probe(struct platform_device *pdev)
- 	if (!xbar)
- 		return -ENOMEM;
- 
--	idr_init(&xbar->map_idr);
--
- 	dma_node = of_parse_phandle(node, "dma-masters", 0);
- 	if (!dma_node) {
- 		dev_err(&pdev->dev, "Can't get DMA master node\n");
-@@ -322,6 +331,12 @@ static int ti_dra7_xbar_probe(struct platform_device *pdev)
- 	}
- 	of_node_put(dma_node);
- 
-+	xbar->dma_inuse = devm_kcalloc(&pdev->dev,
-+				       BITS_TO_LONGS(xbar->dma_requests),
-+				       sizeof(unsigned long), GFP_KERNEL);
-+	if (!xbar->dma_inuse)
-+		return -ENOMEM;
-+
- 	if (of_property_read_u32(node, "dma-requests", &xbar->xbar_requests)) {
- 		dev_info(&pdev->dev,
- 			 "Missing XBAR input information, using %u.\n",
-@@ -343,6 +358,7 @@ static int ti_dra7_xbar_probe(struct platform_device *pdev)
- 	xbar->dmarouter.route_free = ti_dra7_xbar_free;
- 	xbar->dma_offset = (u32)match->data;
- 
-+	mutex_init(&xbar->mutex);
+ 	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	iomem = devm_ioremap_resource(&pdev->dev, res);
+ 	if (IS_ERR(iomem))
+@@ -362,15 +397,19 @@ static int ti_dra7_xbar_probe(struct platform_device *pdev)
  	platform_set_drvdata(pdev, xbar);
  
  	/* Reset the crossbar */
+-	for (i = 0; i < xbar->dma_requests; i++)
+-		ti_dra7_xbar_write(xbar->iomem, i, xbar->safe_val);
++	for (i = 0; i < xbar->dma_requests; i++) {
++		if (!test_bit(i, xbar->dma_inuse))
++			ti_dra7_xbar_write(xbar->iomem, i, xbar->safe_val);
++	}
+ 
+ 	ret = of_dma_router_register(node, ti_dra7_xbar_route_allocate,
+ 				     &xbar->dmarouter);
+ 	if (ret) {
+ 		/* Restore the defaults for the crossbar */
+-		for (i = 0; i < xbar->dma_requests; i++)
+-			ti_dra7_xbar_write(xbar->iomem, i, i);
++		for (i = 0; i < xbar->dma_requests; i++) {
++			if (!test_bit(i, xbar->dma_inuse))
++				ti_dra7_xbar_write(xbar->iomem, i, i);
++		}
+ 	}
+ 
+ 	return ret;
 -- 
 2.6.1
