@@ -1,75 +1,27 @@
-From: robh+dt@kernel.org (Rob Herring)
-Date: Fri, 30 Oct 2015 12:15:40 -0500
-Subject: [PATCH v4 1/4] Documentation: dt-bindings: Describe SROMc
- configuration
-In-Reply-To: <56331ADB.1070602@samsung.com>
-References: <cover.1446122247.git.p.fedin@samsung.com>
- <f1fbd1a7877090f4318705f0fccbf4d96c0ebc9c.1446122247.git.p.fedin@samsung.com>
- <56330E6E.50003@samsung.com> <00a101d112e0$537a18e0$fa6e4aa0$@samsung.com>
- <56331ADB.1070602@samsung.com>
-Message-ID: <CAL_JsqKhyB7d+HQ08241-za-7vHbU49TiWJHM2vrp6jVVh4h=A@mail.gmail.com>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Fri, 30 Oct 2015 17:20:48 +0000
+Subject: [PATCH 0/2] kvmtool: allow CFLAGS and LDFLAGS override
+Message-ID: <1446225650-19710-1-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 30, 2015 at 2:23 AM, Krzysztof Kozlowski
-<k.kozlowski@samsung.com> wrote:
-> On 30.10.2015 15:58, Pavel Fedin wrote:
->>  Hello!
->>
->>>> Add documentation for new subnode properties, allowing bank configuration.
->>>> Based on u-boot implementation, but heavily reworked.
->>>
->>> Please, carefully look at:
->>> Documentation/devicetree/bindings/net/gpmc-eth.txt
->>> Documentation/devicetree/bindings/bus/ti-gpmc.txt
->>
->>  Thank you very much. Indeed, this looks very similar. By the way, should i document smsc over sromc in the same manner, writing
->> devicetree/bindings/net/sromc-eth.txt?
->>
->>  This is a short reply for now, i'll make longer one (or just a new version) after studying these existing bindings and trying to
->> apply them.
->
-> Existing SROMC bindings document is small so one document for everything
-> should be sufficient. This can be always split if new type of devices
-> will be using SROMC (BTW, do you know of any other devices using SROMC
-> on Exynos?).
->
->>
->>  Pankaj:
->>
->>>> +&sromc {
->>>> +       pinctrl-names = "default";
->>>> +       pinctrl-0 = <&srom_ctl>, <&srom_ebi>;
->>>> +
->>>> +       ethernet at 07000000 {
->>>> +               compatible = "smsc,lan9115";
->>>> +               reg = <0x07000000 0x10000>;
->>>> +               phy-mode = "mii";
->>>> +               interrupt-parent = <&gpx0>;
->>>> +               interrupts = <5 8>;
->>>> +               reg-io-width = <2>;
->>>> +               smsc,irq-push-pull;
->>>> +               smsc,force-internal-phy;
->>>> +
->>>> +               samsung,srom-bank = <3>;
->>>> +               samsung,srom-data-width = <2>;
->>>> +               samsung,srom-timing = <1 9 12 1 9 1 1>;
->>>
->>> I think this is not correct. We can't change binding of "smsc,lan9115"
->>> which is already documented here [1]. These samsung specific srom
->>> properties should be in srom node or its subnode, but not in this way.
->>
->>  So, if you look at gpmc-eth.txt, you'll see that this approach is perfectly valid (this is a reply to another msg, just don't want
->> to post one more single-line reply).
->
->
-> Yes, the binding of smsc,lan9115 is not changed.
->
-> Putting srom properties in separate bank node would be good also but
-> then some mapping (connection) between ethernet and bank should be added
-> probably...
+In the past there have been some complaints from cross-compilation
+users about missing libraries and include files. Fixing those issues
+by pointing make to the proper directories via CFLAGS and LDFLAGS
+proved to be complicated.
+This series fixes this, so custom CFLAGS and LDFLAGS can be given on
+the make command line and those will not overwrite kvmtool's vital
+internal assignments.
 
-Is this to get some data needed by the ethernet from the ROM? We have
-the nvmem binding to support that.
+Cheers,
+Andre.
 
-Rob
+Andre Przywara (2):
+  Makefile: allow overriding CFLAGS on the command line
+  Makefile: consider LDFLAGS on feature tests and when linking executables
+
+ Makefile | 45 ++++++++++++++++++++++-----------------------
+ 1 file changed, 22 insertions(+), 23 deletions(-)
+
+-- 
+2.5.1
