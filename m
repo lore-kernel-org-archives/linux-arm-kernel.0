@@ -1,248 +1,136 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Fri, 30 Oct 2015 18:27:00 +0000
-Subject: [PATCH 7/7] arm: move kernel loading into arm/kvm.c
-In-Reply-To: <1446229620-28088-1-git-send-email-andre.przywara@arm.com>
-References: <1446229620-28088-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1446229620-28088-8-git-send-email-andre.przywara@arm.com>
+From: julien.grall@citrix.com (Julien Grall)
+Date: Fri, 30 Oct 2015 18:32:54 +0000
+Subject: arm64: iomem_resource doesn't contain all the region used
+In-Reply-To: <20151030175322.GL3489@olila.local.net-space.pl>
+References: <562A4B0F.2020603@citrix.com>
+ <1445615112.2374.226.camel@citrix.com> <563106C6.8000603@citrix.com>
+ <20151029163655.GJ3489@olila.local.net-space.pl>
+ <5632565A.8050603@citrix.com>
+ <20151030175322.GL3489@olila.local.net-space.pl>
+Message-ID: <5633B7D6.6020702@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For some reasons (probably to have easy access to the command line)
-the kernel loading for arm and arm64 was located in arm/fdt.c.
-Move the routines to kvm.c (where other architectures put it) to
-only have real device tree code in fdt.c. We use the pointer in
-struct kvm to access the command line string.
+On 30/10/15 17:53, Daniel Kiper wrote:
+> Hey Julien,
 
-Signed-off-by: Andre Przywara <andre.przywara@arm.com>
----
- arm/fdt.c | 95 +--------------------------------------------------------------
- arm/kvm.c | 88 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 89 insertions(+), 94 deletions(-)
+Hi,
 
-diff --git a/arm/fdt.c b/arm/fdt.c
-index 19d7ed9..381d48f 100644
---- a/arm/fdt.c
-+++ b/arm/fdt.c
-@@ -9,14 +9,11 @@
- 
- #include <stdbool.h>
- 
--#include <asm/setup.h>
- #include <linux/byteorder.h>
- #include <linux/kernel.h>
- #include <linux/sizes.h>
- #include <linux/psci.h>
- 
--static char kern_cmdline[COMMAND_LINE_SIZE];
--
- bool kvm__load_firmware(struct kvm *kvm, const char *firmware_filename)
- {
- 	return false;
-@@ -145,7 +142,7 @@ static int setup_fdt(struct kvm *kvm)
- 	/* /chosen */
- 	_FDT(fdt_begin_node(fdt, "chosen"));
- 	_FDT(fdt_property_cell(fdt, "linux,pci-probe-only", 1));
--	_FDT(fdt_property_string(fdt, "bootargs", kern_cmdline));
-+	_FDT(fdt_property_string(fdt, "bootargs", kvm->cfg.real_cmdline));
- 
- 	/* Initrd */
- 	if (kvm->arch.initrd_size != 0) {
-@@ -223,93 +220,3 @@ static int setup_fdt(struct kvm *kvm)
- 	return 0;
- }
- late_init(setup_fdt);
--
--#define FDT_ALIGN	SZ_2M
--#define INITRD_ALIGN	4
--bool kvm__arch_load_kernel_image(struct kvm *kvm, int fd_kernel, int fd_initrd,
--				 const char *kernel_cmdline)
--{
--	void *pos, *kernel_end, *limit;
--	unsigned long guest_addr;
--	ssize_t file_size;
--
--	if (lseek(fd_kernel, 0, SEEK_SET) < 0)
--		die_perror("lseek");
--
--	/*
--	 * Linux requires the initrd and dtb to be mapped inside lowmem,
--	 * so we can't just place them@the top of memory.
--	 */
--	limit = kvm->ram_start + min(kvm->ram_size, (u64)SZ_256M) - 1;
--
--	pos = kvm->ram_start + ARM_KERN_OFFSET(kvm);
--	kvm->arch.kern_guest_start = host_to_guest_flat(kvm, pos);
--	file_size = read_file(fd_kernel, pos, limit - pos);
--	if (file_size < 0) {
--		if (errno == ENOMEM)
--			die("kernel image too big to contain in guest memory.");
--
--		die_perror("kernel read");
--	}
--	kernel_end = pos + file_size;
--	pr_info("Loaded kernel to 0x%llx (%zd bytes)",
--		kvm->arch.kern_guest_start, file_size);
--
--	/*
--	 * Now load backwards from the end of memory so the kernel
--	 * decompressor has plenty of space to work with. First up is
--	 * the device tree blob...
--	 */
--	pos = limit;
--	pos -= (FDT_MAX_SIZE + FDT_ALIGN);
--	guest_addr = ALIGN(host_to_guest_flat(kvm, pos), FDT_ALIGN);
--	pos = guest_flat_to_host(kvm, guest_addr);
--	if (pos < kernel_end)
--		die("fdt overlaps with kernel image.");
--
--	kvm->arch.dtb_guest_start = guest_addr;
--	pr_info("Placing fdt at 0x%llx - 0x%llx",
--		kvm->arch.dtb_guest_start,
--		host_to_guest_flat(kvm, limit));
--	limit = pos;
--
--	/* ... and finally the initrd, if we have one. */
--	if (fd_initrd != -1) {
--		struct stat sb;
--		unsigned long initrd_start;
--
--		if (lseek(fd_initrd, 0, SEEK_SET) < 0)
--			die_perror("lseek");
--
--		if (fstat(fd_initrd, &sb))
--			die_perror("fstat");
--
--		pos -= (sb.st_size + INITRD_ALIGN);
--		guest_addr = ALIGN(host_to_guest_flat(kvm, pos), INITRD_ALIGN);
--		pos = guest_flat_to_host(kvm, guest_addr);
--		if (pos < kernel_end)
--			die("initrd overlaps with kernel image.");
--
--		initrd_start = guest_addr;
--		file_size = read_file(fd_initrd, pos, limit - pos);
--		if (file_size == -1) {
--			if (errno == ENOMEM)
--				die("initrd too big to contain in guest memory.");
--
--			die_perror("initrd read");
--		}
--
--		kvm->arch.initrd_guest_start = initrd_start;
--		kvm->arch.initrd_size = file_size;
--		pr_info("Loaded initrd to 0x%llx (%llu bytes)",
--			kvm->arch.initrd_guest_start,
--			kvm->arch.initrd_size);
--	} else {
--		kvm->arch.initrd_size = 0;
--	}
--
--	strncpy(kern_cmdline, kernel_cmdline, COMMAND_LINE_SIZE);
--	kern_cmdline[COMMAND_LINE_SIZE - 1] = '\0';
--
--	return true;
--}
-diff --git a/arm/kvm.c b/arm/kvm.c
-index d0e4a20..433a7bc 100644
---- a/arm/kvm.c
-+++ b/arm/kvm.c
-@@ -3,6 +3,7 @@
- #include "kvm/util.h"
- #include "kvm/8250-serial.h"
- #include "kvm/virtio-console.h"
-+#include "kvm/fdt.h"
- 
- #include "arm-common/gic.h"
- 
-@@ -85,3 +86,90 @@ void kvm__arch_init(struct kvm *kvm, const char *hugetlbfs_path, u64 ram_size)
- 	if (gic__create(kvm, kvm->cfg.arch.irqchip))
- 		die("Failed to create virtual GIC");
- }
-+
-+#define FDT_ALIGN	SZ_2M
-+#define INITRD_ALIGN	4
-+bool kvm__arch_load_kernel_image(struct kvm *kvm, int fd_kernel, int fd_initrd,
-+				 const char *kernel_cmdline)
-+{
-+	void *pos, *kernel_end, *limit;
-+	unsigned long guest_addr;
-+	ssize_t file_size;
-+
-+	if (lseek(fd_kernel, 0, SEEK_SET) < 0)
-+		die_perror("lseek");
-+
-+	/*
-+	 * Linux requires the initrd and dtb to be mapped inside lowmem,
-+	 * so we can't just place them@the top of memory.
-+	 */
-+	limit = kvm->ram_start + min(kvm->ram_size, (u64)SZ_256M) - 1;
-+
-+	pos = kvm->ram_start + ARM_KERN_OFFSET(kvm);
-+	kvm->arch.kern_guest_start = host_to_guest_flat(kvm, pos);
-+	file_size = read_file(fd_kernel, pos, limit - pos);
-+	if (file_size < 0) {
-+		if (errno == ENOMEM)
-+			die("kernel image too big to contain in guest memory.");
-+
-+		die_perror("kernel read");
-+	}
-+	kernel_end = pos + file_size;
-+	pr_info("Loaded kernel to 0x%llx (%zd bytes)",
-+		kvm->arch.kern_guest_start, file_size);
-+
-+	/*
-+	 * Now load backwards from the end of memory so the kernel
-+	 * decompressor has plenty of space to work with. First up is
-+	 * the device tree blob...
-+	 */
-+	pos = limit;
-+	pos -= (FDT_MAX_SIZE + FDT_ALIGN);
-+	guest_addr = ALIGN(host_to_guest_flat(kvm, pos), FDT_ALIGN);
-+	pos = guest_flat_to_host(kvm, guest_addr);
-+	if (pos < kernel_end)
-+		die("fdt overlaps with kernel image.");
-+
-+	kvm->arch.dtb_guest_start = guest_addr;
-+	pr_info("Placing fdt at 0x%llx - 0x%llx",
-+		kvm->arch.dtb_guest_start,
-+		host_to_guest_flat(kvm, limit));
-+	limit = pos;
-+
-+	/* ... and finally the initrd, if we have one. */
-+	if (fd_initrd != -1) {
-+		struct stat sb;
-+		unsigned long initrd_start;
-+
-+		if (lseek(fd_initrd, 0, SEEK_SET) < 0)
-+			die_perror("lseek");
-+
-+		if (fstat(fd_initrd, &sb))
-+			die_perror("fstat");
-+
-+		pos -= (sb.st_size + INITRD_ALIGN);
-+		guest_addr = ALIGN(host_to_guest_flat(kvm, pos), INITRD_ALIGN);
-+		pos = guest_flat_to_host(kvm, guest_addr);
-+		if (pos < kernel_end)
-+			die("initrd overlaps with kernel image.");
-+
-+		initrd_start = guest_addr;
-+		file_size = read_file(fd_initrd, pos, limit - pos);
-+		if (file_size == -1) {
-+			if (errno == ENOMEM)
-+				die("initrd too big to contain in guest memory.");
-+
-+			die_perror("initrd read");
-+		}
-+
-+		kvm->arch.initrd_guest_start = initrd_start;
-+		kvm->arch.initrd_size = file_size;
-+		pr_info("Loaded initrd to 0x%llx (%llu bytes)",
-+			kvm->arch.initrd_guest_start,
-+			kvm->arch.initrd_size);
-+	} else {
-+		kvm->arch.initrd_size = 0;
-+	}
-+
-+	return true;
-+}
+> On Thu, Oct 29, 2015 at 05:24:42PM +0000, Julien Grall wrote:
+>> Hi Daniel,
+>>
+>> On 29/10/15 16:36, Daniel Kiper wrote:
+>>> On Wed, Oct 28, 2015 at 05:32:54PM +0000, Julien Grall wrote:
+>>>> (Adding David and Daniel)
+>>>>
+>>>> On 23/10/15 16:45, Ian Campbell wrote:
+>>>>> On Fri, 2015-10-23 at 15:58 +0100, Julien Grall wrote:
+>>>>>> Is there any way we could register the IO region used on ARM without
+>>>>>> having to enforce it in all the drivers?
+>>>>>
+>>>>> This seems like an uphill battle to me.
+>>>>
+>>>> I agree about it. However this is how x86 handle memory hotplug for xen
+>>>> ballooning. I'm wondering how this is cannot an problem for x86?
+>>>>
+>>>> Note that the problem is the same if a module is insert after hand.
+>>>
+>>> Does ARM64 support memory hotplug on bare metal? If yes then check relevant
+>>> code and do what should be done as close as possible to bare metal case
+>>> on Xen guest.
+>>
+>> AFAICT, There is no support memory hotplug for ARM64 in Linux today.
+> 
+> Are there any plans for it? Is anybody working on that stuff?
+
+I'm not aware of any plan. But I started to look at it and adding
+arch_add_memory (the arch-specific function required to support memory
+hotplug) should be pretty easy. It's a matter of few lines of code.
+
+> 
+>>>>> In terms of domU the "potential" RAM is defined by the domain builder
+>>>>> layout (currently the two banks mentioned in Xen's arch-arm.h).
+>>>>
+>>>> ... the DOMU one is more complex (see above). Today the guest layout is
+>>>> static, I wouldn't be surprised to see it becoming dynamic very soon (I
+>>>> have in mind PCI hotplug) and therefore defining static hotplug region
+>>>> would not possible.
+>>>
+>>> Please do not do that. I think that memory hotplug should not be limited
+>>> by anything but just a given platform limitations. By the way, could you
+>>> explain in details why linux/mm/memory_hotplug.c:register_memory_resource()
+>>> will not work on ARM64 guest?
+>>
+>> Sorry I should have CCed you on the first mail where I explained the
+>> problem.
+> 
+> No problem. Thanks for explanation.
+> 
+>> The problem is not register_memory_resource but how the balloon code is
+>> finding a free region in the address patch. With the patch [1] which
+>> should land in Linux 4.4, the balloon code will look for a free region
+>> within the iomem_resource. This means that we expect all the region used
+>> (or will be used in the case the driver is loaded later) by a device are
+>> registered.
+>>
+>> However, on ARM64, only a handful of drivers are effectively registering
+>> the I/O region.
+>>
+>> Any drivers using directly ioremap* or of_iomap (the ioremap version
+>> using the device tree node in parameter) won't register the I/O region used.
+>>
+>> For instance on the board I'm using not even 10% of the I/O region are
+>> registered:
+>>
+>> 42sh> cat /proc/iomem
+>>
+>> 10510000-105103ff : /soc/rtc at 10510000
+>> 1a400000-1a400fff : /soc/sata at 1a400000
+>> 1a800000-1a800fff : /soc/sata at 1a800000
+>> 1f220000-1f220fff : /soc/sata at 1a400000
+>> 1f227000-1f227fff : /soc/sata at 1a400000
+>> 1f22a000-1f22a0ff : /soc/phy at 1f22a000
+>> 1f22d000-1f22dfff : /soc/sata at 1a400000
+>> 1f22e000-1f22efff : /soc/sata at 1a400000
+>> 1f230000-1f230fff : /soc/sata at 1a800000
+>> 1f23a000-1f23a0ff : /soc/phy at 1f23a000
+>> 1f23d000-1f23dfff : /soc/sata at 1a800000
+>> 1f23e000-1f23efff : /soc/sata at 1a800000
+>> 1f2b0000-1f2bffff : csr
+>> 79000000-798fffff : /soc/msi at 79000000
+>> 4100000000-41ffffffff : System RAM
+>>   4100080000-41008b58a3 : Kernel code
+>>   410093c000-41009e9fff : Kernel data
+>> e0d0000000-e0d003ffff : cfg
+> 
+> Ugh! I though that it is a requirement that every memory/io region user
+> must register it using relevant function. It looks that it is not true.
+> So, there is only one reliable way to get info about used io/memory regions.
+> You must look at DT. However, if driver may agree with a device other
+> config and move used io/memory regions to different place without updating
+> DT then we are lost.
+
+While the Linux folks are trying to describe all the device in the
+Device Tree, it not always the case.
+
+Also, browsing the device tree to find memory range is a pain and quite
+fragile. For instance we already do that in the hypervisor to map all
+the device to DOM0 (see arch/arm/domain_build.c) but we still do have
+bug report of platform not working with this solution.
+
+> 
+>> TBH I don't see why you don't hit this issue on x86. Overall some of the
+>> drivers can be shared between the 2 architectures.
+> 
+> Are you able to point out any (x86) driver which does not behave as it should?
+
+Just thinking that on x86 you have the e820 which describe the memory
+layout of the platform.
+
+Am I correct to say that every I/O regions are described in the e820 and
+therefore registered when Linux is booting?
+
+Regards,
+
 -- 
-2.5.1
+Julien Grall
