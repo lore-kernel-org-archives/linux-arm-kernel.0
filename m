@@ -1,20 +1,22 @@
-From: peter@hurleysoftware.com (Peter Hurley)
-Date: Fri, 30 Oct 2015 09:30:21 -0400
-Subject: [PATCH v2] serial: 8250_uniphier: add earlycon support
-In-Reply-To: <1446173176-6966-1-git-send-email-yamada.masahiro@socionext.com>
-References: <1446173176-6966-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <563370ED.7040105@hurleysoftware.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 30 Oct 2015 14:36:01 +0100
+Subject: [PATCH] arm64: dts: Added syscon-reboot node for FSL's LS2085A SoC
+In-Reply-To: <CY1PR0301MB07480A8EC25BB6987883AE5687220@CY1PR0301MB0748.namprd03.prod.outlook.com>
+References: <1445650280-9966-1-git-send-email-German.Rivera@freescale.com>
+ <20151027163441.GK3091@leverpostej>
+ <CY1PR0301MB07480A8EC25BB6987883AE5687220@CY1PR0301MB0748.namprd03.prod.outlook.com>
+Message-ID: <41343887.dUfAz3IhqL@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/29/2015 10:46 PM, Masahiro Yamada wrote:
-> This reuses the code of drivers/tty/serial/8250/8250_early.c except
->
->    - Overwrite device->port.iotype and device->port.regshift for
->      UPIO_MEM32 because of_setup_earlycon() has set them for UPIO_MEM.
->
->    - Set device->baud to zero to prevent early8250_setup() from
->      initializing the divisor register because port->uartclk does not
->      match the frequency expected by this hardware.
+On Tuesday 27 October 2015 18:25:04 Stuart Yoder wrote:
+> I think that comment "Currently supported enable-method is psci v0.2" is a statement of
+> intent, not what is available currently.   And the only plan I am aware of is PSCI
+> with UEFI based firmware.
+> 
+> U-boot is a key firmware platform for us and has no PSCI implementation available.
 
-Reviewed-by: Peter Hurley <peter@hurleysoftware.com>
+I believe U-boot has supported PSCI since 2013. Maybe you just need to update
+to a newer version?
+
+	Arnd
