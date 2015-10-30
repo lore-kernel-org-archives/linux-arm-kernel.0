@@ -1,81 +1,237 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Fri, 30 Oct 2015 20:07:34 +0000
-Subject: [PATCH] Documentation: dt: Add bindings for Secure-only devices
-In-Reply-To: <CAL_JsqJz+w2SYEBLVGdZNS6J1tmt5VWV0q1G_Z2rgFfch6J=2A@mail.gmail.com>
-References: <1446127303-5082-1-git-send-email-peter.maydell@linaro.org>
- <CAL_JsqJz+w2SYEBLVGdZNS6J1tmt5VWV0q1G_Z2rgFfch6J=2A@mail.gmail.com>
-Message-ID: <CAFEAcA8qgFFhrmXePtO_xQx=YEHK8dSA-1SacR5NsQWSNTwj-w@mail.gmail.com>
+From: damien.riegel@savoirfairelinux.com (Damien Riegel)
+Date: Fri, 30 Oct 2015 16:08:13 -0400
+Subject: [PATCH v2 2/5] mfd: ts4800-syscon: add driver for TS-4800 syscon
+In-Reply-To: <20151030175656.GF4058@x1>
+References: <1446150450-22093-1-git-send-email-damien.riegel@savoirfairelinux.com>
+ <1446150450-22093-3-git-send-email-damien.riegel@savoirfairelinux.com>
+ <20151030175656.GF4058@x1>
+Message-ID: <20151030200812.GB8666@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30 October 2015 at 18:28, Rob Herring <robh+dt@kernel.org> wrote:
-> On Thu, Oct 29, 2015 at 9:01 AM, Peter Maydell <peter.maydell@linaro.org> wrote:
->> +Valid Secure world properties:
->> +
->> +- secure-status : specifies whether the device is present and usable
->> +  in the secure world. The combination of this with "status" allows
->> +  the various possible combinations of device visibility to be
->> +  specified:
->> +   status = "okay";                             // visible in S and NS
->
-> I assume neither property present or both okay also mean the same.
->
-> status = "okay"; secure-status = "okay";
->
-> We should be explicit.
+On Fri, Oct 30, 2015 at 05:56:56PM +0000, Lee Jones wrote:
+> On Thu, 29 Oct 2015, Damien Riegel wrote:
+> 
+> > Driver for TS-4800 syscon. These registers belong to a FPGA that is
+> > memory mapped and are used for counters, enable various IPs in the FPGA,
+> > control LEDs, control IOs, etc.
+> > 
+> > Currently, only the watchdog is handled.
+> 
+> Why do you require your own syscon driver?
+> 
+> What's wrong with the generic one?
+> 
 
-Yes; status defaults to "okay" (presumably this is listed in
-the overal DT binding spec somewhere), and secure-status
-defaults to "same as status, which might in turn be defaulted".
-We can list the complete set of options (neither present,
-both 'okay', status not present but secure-status present, etc),
-though it gets a bit long-winded, especially if we later add
-more secure- properties (they'd all have to have verbiage about
-"if not present, same as non-prefixed property; if both not
-present, both take the default the non-prefixed property takes
-if it's not present; if prefixed property not present, it
-defaults to same as non-prefixed property", which we already
-say in the introductory section). Still, for just status it
-would be easy enough to add a couple of lines:
+The generic one uses a regmap_config with reg_stride set to 4 and val_bits
+to 32.
 
-+    status = "okay"; secure-status = "okay"; // ditto
-+    secure-status = "okay";                  // ditto
-+    // neither explicitly defined: ditto
+TS-4800 syscon registers are 16-bit wide and must be accessed with 16
+bit read and writes:
+http://wiki.embeddedarm.com/wiki/TS-4800#Syscon
 
-(Do you want the full set of 9 options you get from multiplying
-out "okay" vs "disabled" vs not-set for each property?)
+I will address the other issues in the next version (split commit,
+license issue, style, and superfluous remove).
 
->> +   status = "disabled"; secure-status = "okay"; // S-only
->> +   status = "okay"; secure-status = "disabled"; // NS-only
->
-> In HKG when we discussed this, 'status = "secure"' was the proposal.
-> That would be simpler:
->
-> S world can use "okay" or "secure"
-> NS world can use "okay" or no property.
->
-> That leaves out the case of disabled in S and enabled for NS. We could
-> want that for s/w reasons, but can we have h/w like that?
-
-It's perfectly possible to design hardware like that (though
-I can't think of a reason to do so offhand). I think it's the desire
-to be able to describe all the possible valid h/w combinations
-that brought us to this secure- prefix design. Plus it
-extends nicely to cover other possibilities as we need it;
-for instance "device A is at S-0x10000 but NS-0x20000" can be
-done by specifying a device like:
-   status = "okay";
-   secure-status = "okay";
-   reg = < 0x20000 0x1000 >;
-   secure-regs = < 0x10000 0x1000 >;
-(apologies if I've messed the syntax up there).
-
-Just going for 'status=secure' would deal with the immediate
-requirement, but my preference is for a description that
-lets us describe all the possible configurations, not just
-the ones we think are common, and secure-* is a neat way
-of doing that (IIRC it was Grant's suggestion; speaking of
-whom, I just noticed I forgot to cc him on the original patch).
-
-thanks
--- PMM
+> > Signed-off-by: Damien Riegel <damien.riegel@savoirfairelinux.com>
+> > ---
+> >  .../devicetree/bindings/mfd/ts4800-syscon.txt      | 12 ++++
+> 
+> Separate patch please.
+> 
+> >  drivers/mfd/Kconfig                                |  7 ++
+> >  drivers/mfd/Makefile                               |  1 +
+> >  drivers/mfd/ts4800-syscon.c                        | 84 ++++++++++++++++++++++
+> >  include/linux/mfd/ts4800-syscon.h                  | 24 +++++++
+> >  5 files changed, 128 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/mfd/ts4800-syscon.txt
+> >  create mode 100644 drivers/mfd/ts4800-syscon.c
+> >  create mode 100644 include/linux/mfd/ts4800-syscon.h
+> > 
+> > diff --git a/Documentation/devicetree/bindings/mfd/ts4800-syscon.txt b/Documentation/devicetree/bindings/mfd/ts4800-syscon.txt
+> > new file mode 100644
+> > index 0000000..8dbc12c
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/mfd/ts4800-syscon.txt
+> > @@ -0,0 +1,12 @@
+> > +Technologic Systems Syscon
+> > +
+> > +Required properties:
+> > +- compatible : must be "ts,ts4800-syscon"
+> > +- reg : physical base address and length of memory mapped region
+> > +
+> > +Example:
+> > +
+> > +syscon at b0010000 {
+> > +	compatible = "ts,ts4800-syscon";
+> > +	reg = <0xb0010000 0x3d>;
+> > +};
+> > diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
+> > index 3f68dd2..8f03dce 100644
+> > --- a/drivers/mfd/Kconfig
+> > +++ b/drivers/mfd/Kconfig
+> > @@ -1302,6 +1302,13 @@ config MFD_TC6393XB
+> >  	help
+> >  	  Support for Toshiba Mobile IO Controller TC6393XB
+> >  
+> > +config MFD_TS4800_SYSCON
+> > +	tristate "TS-4800 Syscon Support"
+> > +	select REGMAP
+> > +	select REGMAP_MMIO
+> > +	help
+> > +	  Support for TS-4800's FPGA Syscon registers
+> > +
+> >  config MFD_VX855
+> >  	tristate "VIA VX855/VX875 integrated south bridge"
+> >  	depends on PCI
+> > diff --git a/drivers/mfd/Makefile b/drivers/mfd/Makefile
+> > index ea40e07..e2c0f1b 100644
+> > --- a/drivers/mfd/Makefile
+> > +++ b/drivers/mfd/Makefile
+> > @@ -181,6 +181,7 @@ obj-$(CONFIG_MFD_HI6421_PMIC)	+= hi6421-pmic-core.o
+> >  obj-$(CONFIG_MFD_DLN2)		+= dln2.o
+> >  obj-$(CONFIG_MFD_RT5033)	+= rt5033.o
+> >  obj-$(CONFIG_MFD_SKY81452)	+= sky81452.o
+> > +obj-$(CONFIG_MFD_TS4800_SYSCON)	+= ts4800-syscon.o
+> >  
+> >  intel-soc-pmic-objs		:= intel_soc_pmic_core.o intel_soc_pmic_crc.o
+> >  obj-$(CONFIG_INTEL_SOC_PMIC)	+= intel-soc-pmic.o
+> > diff --git a/drivers/mfd/ts4800-syscon.c b/drivers/mfd/ts4800-syscon.c
+> > new file mode 100644
+> > index 0000000..1e42e96
+> > --- /dev/null
+> > +++ b/drivers/mfd/ts4800-syscon.c
+> > @@ -0,0 +1,84 @@
+> > +/*
+> > + * Device driver for TS-4800 FPGA's syscon
+> > + *
+> > + * Copyright (c) 2015 - Savoir-faire Linux
+> > + *
+> > + * This program is free software; you can redistribute it and/or modify
+> > + * it under the terms of the GNU General Public License as published by
+> > + * the Free Software Foundation; either version 2 of the License, or
+> > + * (at your option) any later version.
+> 
+> Why is the MFD v2+ and the Watchdog driver only v2?
+> 
+> > + * This program is distributed in the hope it will be useful, but WITHOUT
+> > + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+> > + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+> > + * more details.
+> > + */
+> > +
+> > +#include <linux/device.h>
+> > +#include <linux/err.h>
+> > +#include <linux/mfd/core.h>
+> > +#include <linux/module.h>
+> > +#include <linux/of.h>
+> > +#include <linux/platform_device.h>
+> > +#include <linux/regmap.h>
+> > +#include <linux/mfd/ts4800-syscon.h>
+> 
+> Alphabetical.
+> 
+> > +
+> > +
+> 
+> Superfluous '\n'.
+> 
+> > +static const struct regmap_config ts4800_regmap_config = {
+> > +	.reg_bits = 32,
+> > +	.reg_stride = 2,
+> > +	.val_bits = 16,
+> > +};
+> > +
+> > +static int ts4800_syscon_probe(struct platform_device *pdev)
+> > +{
+> > +	struct ts4800_syscon *syscon;
+> > +	struct resource *res;
+> > +	void __iomem *base;
+> > +
+> > +	syscon = devm_kzalloc(&pdev->dev, sizeof(*syscon), GFP_KERNEL);
+> > +	if (!syscon)
+> > +		return -ENOMEM;
+> > +
+> > +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> > +	base = devm_ioremap_resource(&pdev->dev, res);
+> > +	if (IS_ERR(base))
+> > +		return PTR_ERR(base);
+> > +
+> > +	syscon->regmap = devm_regmap_init_mmio_clk(&pdev->dev, NULL, base,
+> > +						   &ts4800_regmap_config);
+> > +	if (IS_ERR(syscon->regmap)) {
+> > +		dev_err(&pdev->dev,
+> > +			"regmap init failed: %ld\n",
+> > +			PTR_ERR(syscon->regmap));
+> > +		return PTR_ERR(syscon->regmap);
+> > +	}
+> > +
+> > +	platform_set_drvdata(pdev, syscon);
+> > +
+> > +	return 0;
+> > +}
+> > +
+> > +static int ts4800_syscon_remove(struct platform_device *pdev)
+> > +{
+> > +	return 0;
+> > +}
+> 
+> If it doesn't do anything, don't provide it.
+> 
+> > +static const struct of_device_id ts4800_syscon_of_match[] = {
+> > +	{ .compatible = "ts,ts4800-syscon", },
+> > +	{ },
+> > +};
+> > +
+> > +static struct platform_driver ts4800_syscon_driver = {
+> > +	.driver = {
+> > +		.name	= "ts4800_syscon",
+> > +		.of_match_table = ts4800_syscon_of_match,
+> > +	},
+> > +	.probe	= ts4800_syscon_probe,
+> > +	.remove	= ts4800_syscon_remove,
+> > +};
+> > +module_platform_driver(ts4800_syscon_driver);
+> > +
+> > +MODULE_AUTHOR("Damien Riegel <damien.riegel@savoirfairelinux.com>");
+> > +MODULE_DESCRIPTION("TS-4800 Syscon driver");
+> > +MODULE_LICENSE("GPL v2");
+> 
+> This does not match the header.
+> 
+> > diff --git a/include/linux/mfd/ts4800-syscon.h b/include/linux/mfd/ts4800-syscon.h
+> > new file mode 100644
+> > index 0000000..3d29184
+> > --- /dev/null
+> > +++ b/include/linux/mfd/ts4800-syscon.h
+> > @@ -0,0 +1,24 @@
+> > +/*
+> > + * Copyright (c) 2015 - Savoir-faire Linux
+> > + *
+> > + * This program is free software; you can redistribute it and/or modify
+> > + * it under the terms of the GNU General Public License as published by
+> > + * the Free Software Foundation; either version 2 of the License, or
+> > + * (at your option) any later version.
+> > + *
+> > + * This program is distributed in the hope it will be useful, but WITHOUT
+> > + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+> > + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+> > + * more details.
+> > + */
+> > +
+> > +#ifndef __LINUX_MFD_TS4800_SYSCON_H
+> > +#define __LINUX_MFD_TS4800_SYSCON_H
+> > +
+> > +#include <linux/regmap.h>
+> > +
+> > +struct ts4800_syscon {
+> > +	struct regmap		*regmap;
+> > +};
+> > +
+> > +#endif /* __LINUX_MFD_TS4800_SYSCON_H */
+> 
+> -- 
+> Lee Jones
+> Linaro STMicroelectronics Landing Team Lead
+> Linaro.org ? Open source software for ARM SoCs
+> Follow Linaro: Facebook | Twitter | Blog
