@@ -1,113 +1,60 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Fri, 30 Oct 2015 18:26:57 +0000
-Subject: [PATCH 4/7] MIPS: use read wrappers in kernel loading
-In-Reply-To: <1446229620-28088-1-git-send-email-andre.przywara@arm.com>
-References: <1446229620-28088-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1446229620-28088-5-git-send-email-andre.przywara@arm.com>
+Date: Fri, 30 Oct 2015 18:26:53 +0000
+Subject: [PATCH 0/7] kvmtool: Cleanup kernel loading
+Message-ID: <1446229620-28088-1-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Replace the unsafe read-loops used in the MIPS kernel image loading
-with our safe read_file() and read_in_full() wrappers.
-This should fix random fails in kernel image loading, especially
-from pipes and sockets.
+Hi,
 
-Signed-off-by: Andre Przywara <andre.przywara@arm.com>
----
- mips/kvm.c | 36 ++++++++++++++++++------------------
- 1 file changed, 18 insertions(+), 18 deletions(-)
+this series cleans up kvmtool's kernel loading functionality a bit.
+It has been broken out of a previous series I sent [1] and contains
+just the cleanup and bug fix parts, which should be less controversial
+and thus easier to merge ;-)
+I will resend the pipe loading part later on as a separate series.
 
-diff --git a/mips/kvm.c b/mips/kvm.c
-index c1c596c..8fbf8de 100644
---- a/mips/kvm.c
-+++ b/mips/kvm.c
-@@ -168,20 +168,27 @@ static bool load_flat_binary(struct kvm *kvm, int fd_kernel)
- {
- 	void *p;
- 	void *k_start;
--	int nr;
-+	ssize_t kernel_size;
- 
- 	if (lseek(fd_kernel, 0, SEEK_SET) < 0)
- 		die_perror("lseek");
- 
- 	p = k_start = guest_flat_to_host(kvm, KERNEL_LOAD_ADDR);
- 
--	while ((nr = read(fd_kernel, p, 65536)) > 0)
--		p += nr;
-+	kernel_size = read_file(fd_kernel, p,
-+				kvm->cfg.ram_size - KERNEL_LOAD_ADDR);
-+	if (kernel_size == -1) {
-+		if (errno == ENOMEM)
-+			die("kernel too big for guest memory");
-+		else
-+			die_perror("kernel read");
-+	}
- 
- 	kvm->arch.is64bit = true;
- 	kvm->arch.entry_point = 0xffffffff81000000ull;
- 
--	pr_info("Loaded kernel to 0x%x (%ld bytes)", KERNEL_LOAD_ADDR, (long int)(p - k_start));
-+	pr_info("Loaded kernel to 0x%x (%zd bytes)", KERNEL_LOAD_ADDR,
-+		kernel_size);
- 
- 	return true;
- }
-@@ -197,7 +204,6 @@ static bool kvm__arch_get_elf_64_info(Elf64_Ehdr *ehdr, int fd_kernel,
- 				      struct kvm__arch_elf_info *ei)
- {
- 	int i;
--	size_t nr;
- 	Elf64_Phdr phdr;
- 
- 	if (ehdr->e_phentsize != sizeof(phdr)) {
-@@ -212,8 +218,7 @@ static bool kvm__arch_get_elf_64_info(Elf64_Ehdr *ehdr, int fd_kernel,
- 
- 	phdr.p_type = PT_NULL;
- 	for (i = 0; i < ehdr->e_phnum; i++) {
--		nr = read(fd_kernel, &phdr, sizeof(phdr));
--		if (nr != sizeof(phdr)) {
-+		if (read_in_full(fd_kernel, &phdr, sizeof(phdr)) != sizeof(phdr)) {
- 			pr_info("Couldn't read %d bytes for ELF PHDR.", (int)sizeof(phdr));
- 			return false;
- 		}
-@@ -243,7 +248,6 @@ static bool kvm__arch_get_elf_32_info(Elf32_Ehdr *ehdr, int fd_kernel,
- 				      struct kvm__arch_elf_info *ei)
- {
- 	int i;
--	size_t nr;
- 	Elf32_Phdr phdr;
- 
- 	if (ehdr->e_phentsize != sizeof(phdr)) {
-@@ -258,8 +262,7 @@ static bool kvm__arch_get_elf_32_info(Elf32_Ehdr *ehdr, int fd_kernel,
- 
- 	phdr.p_type = PT_NULL;
- 	for (i = 0; i < ehdr->e_phnum; i++) {
--		nr = read(fd_kernel, &phdr, sizeof(phdr));
--		if (nr != sizeof(phdr)) {
-+		if (read_in_full(fd_kernel, &phdr, sizeof(phdr)) != sizeof(phdr)) {
- 			pr_info("Couldn't read %d bytes for ELF PHDR.", (int)sizeof(phdr));
- 			return false;
- 		}
-@@ -334,14 +337,11 @@ static bool load_elf_binary(struct kvm *kvm, int fd_kernel)
- 	p = guest_flat_to_host(kvm, ei.load_addr);
- 
- 	pr_info("ELF Loading 0x%lx bytes from 0x%llx to 0x%llx",
--		(unsigned long)ei.len, (unsigned long long)ei.offset, (unsigned long long)ei.load_addr);
--	do {
--		nr = read(fd_kernel, p, ei.len);
--		if (nr < 0)
--			die_perror("read");
--		p += nr;
--		ei.len -= nr;
--	} while (ei.len);
-+		(unsigned long)ei.len, (unsigned long long)ei.offset,
-+		(unsigned long long)ei.load_addr);
-+
-+	if (read_in_full(fd_kernel, p, ei.len) != (ssize_t)ei.len)
-+		die_perror("read");
- 
- 	return true;
- }
+The first patch properly abstracts kernel loading to move
+responsibility into each architecture's code. It removes quite some
+ugly code from the generic kvm.c file.
+The later patches address the naive usage of read(2) to, well, read
+data from files. Doing this without coping with the subtleties of
+the UNIX read semantics (returning with less or none data read is not
+an error) can provoke hard to debug failures.
+So these patches make use of the existing and one new wrapper function
+to make sure we read everything we actually wanted to.
+The last patch moves the ARM kernel loading code into the proper
+location to be in line with the other architectures.
+
+Please have a look and give some comments!
+
+Find the branch on my kvmtool git tree on:
+git://linux-arm.org/kvmtool.git (kern_load-v2 branch)
+http://www.linux-arm.org/git?p=kvmtool.git;a=shortlog;h=refs/heads/kern_load-v2
+
+Cheers,
+Andre.
+
+[1] http://marc.info/?l=kvm&m=143825354808135&w=2
+
+Andre Przywara (7):
+  Refactor kernel image loading
+  provide generic read_file() implementation
+  powerpc: use read_file() in kernel and initrd loading
+  MIPS: use read wrappers in kernel loading
+  x86: use read wrappers in kernel loading
+  arm/arm64: use read_file() in kernel and initrd loading
+  arm: move kernel loading into arm/kvm.c
+
+ arm/fdt.c                | 99 +-----------------------------------------------
+ arm/kvm.c                | 88 ++++++++++++++++++++++++++++++++++++++++++
+ include/kvm/kvm.h        |  5 +--
+ include/kvm/read-write.h |  2 +
+ kvm.c                    | 42 ++------------------
+ mips/kvm.c               | 57 ++++++++++++++++++----------
+ powerpc/kvm.c            | 39 ++++++++++---------
+ util/read-write.c        | 21 ++++++++++
+ x86/kvm.c                | 62 +++++++++++++++---------------
+ 9 files changed, 207 insertions(+), 208 deletions(-)
+
 -- 
 2.5.1
