@@ -1,92 +1,67 @@
-From: ssimran@broadcom.com (Simran Rai)
-Date: Fri, 30 Oct 2015 11:54:56 -0700
-Subject: [PATCH 1/2] dt-bindings: sound: Add DT bindings for Broadcom Cygnus
- audio
-In-Reply-To: <1446231297-10648-1-git-send-email-ssimran@broadcom.com>
-References: <1446231297-10648-1-git-send-email-ssimran@broadcom.com>
-Message-ID: <1446231297-10648-2-git-send-email-ssimran@broadcom.com>
+From: rjui@broadcom.com (Ray Jui)
+Date: Fri, 30 Oct 2015 11:55:41 -0700
+Subject: [PATCH v3 2/2] arm64: dts: Add BRCM IPROC NAND DT node for NS2
+In-Reply-To: <20151030184907.GH13239@google.com>
+References: <1445577373-21252-1-git-send-email-anup.patel@broadcom.com>
+ <1445577373-21252-3-git-send-email-anup.patel@broadcom.com>
+ <20151028001920.GY13239@google.com> <563015FC.9040006@broadcom.com>
+ <20151028003935.GZ13239@google.com> <56301B00.1020301@broadcom.com>
+ <39063E8F96E11742B35A201CC5D095B7AFFB81@SJEXCHMB10.corp.ad.broadcom.com>
+ <5630F2E2.8060508@broadcom.com> <20151030184907.GH13239@google.com>
+Message-ID: <5633BD2D.1050808@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add bindings for audio driver in Broadcom Cygnus.
 
-Signed-off-by: Lori Hikichi <lhikichi@broadcom.com>
-Signed-off-by: Simran Rai <ssimran@broadcom.com>
-Reviewed-by: Ray Jui <rjui@broadcom.com>
-Reviewed-by: Scott Branden <sbranden@broadcom.com>
----
- .../bindings/sound/brcm,cygnus-audio.txt           |   63 ++++++++++++++++++++
- 1 file changed, 63 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/sound/brcm,cygnus-audio.txt
 
-diff --git a/Documentation/devicetree/bindings/sound/brcm,cygnus-audio.txt b/Documentation/devicetree/bindings/sound/brcm,cygnus-audio.txt
-new file mode 100644
-index 0000000..73cddb3
---- /dev/null
-+++ b/Documentation/devicetree/bindings/sound/brcm,cygnus-audio.txt
-@@ -0,0 +1,63 @@
-+BROADCOM Cygnus Audio I2S/TDM/SPDIF controller
-+
-+Required properties:
-+	- compatible : "brcm,cygnus-audio"
-+	- #address-cells: 32bit valued, 1 cell.
-+	- #size-cells:  32bit valued, 0 cell.
-+	- reg : Should contain audio registers location and length
-+	- reg-names: names of the registers listed in "reg" property
-+		Valid names are "aud" and "i2s_in". "aud" contains a
-+		set of DMA, I2S_OUT and SPDIF registers. "i2s_in" contains
-+		a set of I2S_IN registers.
-+	- clocks: PLL and leaf clocks used by audio ports
-+	- clock-names: names of 3 leaf clocks used by audio ports
-+		Valid names are "ch0_audio", "ch1_audio", "ch2_audio"
-+	- interrupts: audio DMA interrupt number
-+
-+SSP Subnode properties:
-+- reg: The index of ssp port interface to use
-+	Valid value are 0, 1, 2, or 3 (for spdif)
-+- channel-group: Surround sound grouping that controls which channel
-+  outputs belong to a group, specifically useful in Multi-channel
-+  Interfaces grouping of serial port. In multi-channel stereo, use
-+  "2_0", in 3.1 multi-channel grouping, use "3_1" and in 5.1
-+  multi-channel grouping, use "5_1".
-+
-+
-+Example:
-+	cygnus_audio: audio at 180ae000 {
-+		compatible = "brcm,cygnus-audio";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		reg = <0x180ae000 0xafd>, <0x180aec00 0x1f8>;
-+		reg-names = "aud", "i2s_in";
-+		clocks = <&audiopll BCM_CYGNUS_AUDIOPLL_CH0>,
-+				<&audiopll BCM_CYGNUS_AUDIOPLL_CH1>,
-+				<&audiopll BCM_CYGNUS_AUDIOPLL_CH2>;
-+		clock-names = "ch0_audio", "ch1_audio", "ch2_audio";
-+		interrupts = <GIC_SPI 143 IRQ_TYPE_LEVEL_HIGH>;
-+
-+		ssp0: ssp_port at 0 {
-+			reg = <0>;
-+			channel-group = "2_0"; /* Use 2_0, 3_1, 5_1 */
-+			status = "okay";
-+		};
-+
-+		ssp1: ssp_port at 1 {
-+			reg = <1>;
-+			channel-group = "2_0"; /* Use 2_0, 3_1, 5_1 */
-+			status = "disabled";
-+		};
-+
-+		ssp2: ssp_port at 2 {
-+			reg = <2>;
-+			channel-group = "2_0"; /* Use 2_0, 3_1, 5_1 */
-+			status = "disabled";
-+		};
-+
-+		spdif: spdif_port at 3 {
-+			reg = <3>;
-+			channel-group = "2_0"; /* Use 2_0, 3_1, 5_1 */
-+			status = "disabled";
-+		};
-+	};
--- 
-1.7.9.5
+On 10/30/2015 11:49 AM, Brian Norris wrote:
+> On Wed, Oct 28, 2015 at 09:08:02AM -0700, Ray Jui wrote:
+>> On 10/28/2015 2:06 AM, Anup Patel wrote:
+>>>
+>>> I think for a newly created OF devices the Linux device driver framework will
+>>> match the platform drivers in the order in which they are registered by module
+>>> init functions. Now the order of module init function calls will be based how
+>>> the .initcall section is formed by linker and order in which objects are linked.
+>>>
+>>
+>> Yes, what you said is my understanding as well, but then here is the
+>> mystery. This is the link order in brcmnand/Makefile:
+>>
+>> 1 # link order matters; don't link the more generic brcmstb_nand.o
+>> before the
+>> 2 # more specific iproc_nand.o, for instance
+>> 3 obj-$(CONFIG_MTD_NAND_BRCMNAND) += iproc_nand.o
+>> 4 obj-$(CONFIG_MTD_NAND_BRCMNAND) += bcm63138_nand.o
+>> 5 obj-$(CONFIG_MTD_NAND_BRCMNAND) += brcmstb_nand.o
+>> 6 obj-$(CONFIG_MTD_NAND_BRCMNAND) += brcmnand.o
+>>
+>> Based on the order above, probe from iproc_nand should always be
+>> called first if a matching compatible string is found. If so, then
+>> why having both compatible strings "brcm,brcmnand" and
+>> "brcm,nand-iproc" causes issues for NS2 (I remember it broke
+>> smoketest in the past when you submitted the change)? I'm not saying
+>> we should have "brcm,brcmnand" for iProc devices, but I don't get
+>> why it would cause any issue.
+>
+> FWIW, the above hack doesn't do anything if these are built as modules,
+> AFAICT. So I guess udev's (or similar) module rules would be another
+> point of failure here? Not that any of us probably care too much about
+> this driver as a module, but just throwing it out there...
+>
+> I have a feeling we'll have to solve this locally, by avoiding having
+> "independent" drivers handling similar compatible properties, as I
+> expect (despite our expectation that compatible ordering should matter)
+> this problem will not be solved any time soon in the generic
+> infrastructure.
+>
+> Or we can just use a hack (as Anup is doing) to leave off the
+> "brcm,brcmnand" compatibility property. Unless someone has brilliant
+> ideas, I guess we go with Anup's hack for now.
+
+I'm fine with that, :)
+
+Ray
+
+>
+> Brian
+>
