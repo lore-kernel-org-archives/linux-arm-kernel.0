@@ -1,34 +1,38 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 30 Oct 2015 14:46:43 +0100
-Subject: [PATCH v4] ARM: configs: Add Freescale LS1021A defconfig
-In-Reply-To: <BN3PR0301MB0867C51A52319367F981C630FE230@BN3PR0301MB0867.namprd03.prod.outlook.com>
-References: <1442480614-32345-1-git-send-email-b18965@freescale.com>
- <5073362.oArWDzYkxD@wuerfel>
- <BN3PR0301MB0867C51A52319367F981C630FE230@BN3PR0301MB0867.namprd03.prod.outlook.com>
-Message-ID: <3938714.zt8Y4X5ull@wuerfel>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 30 Oct 2015 15:00:57 +0100
+Subject: [PATCH 1/3] mtd: create a partition type device tree binding
+In-Reply-To: <20151029162908.GA13275@localhost>
+References: <1446123152-22666-1-git-send-email-linus.walleij@linaro.org>
+ <20151029162908.GA13275@localhost>
+Message-ID: <CACRpkdYS5Jf8UC2K0bNdEQZDjTeZZx44Uu-kkof+9E=4Ny0oDg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 27 October 2015 14:40:21 Huan Wang wrote:
-> > 
-> > Ok. What I was suggesting above though was to try to pinpoint exactly
-> > where it goes wrong. You have verified that it does not crash before the
-> > page tables are enabled, but that is very early. You have also shown
-> > that the kernel crashes before the point at which the 'Booting Linux on
-> > physical CPU 0xf00' message is printed to the kernel, but that is *much*
-> > later: setup_arch() calls parse_early_param(), which in turn sets up
-> > early_console_write(). This means the 'Booting Linux on physical CPU
-> > 0xf00'
-> > is still stuck in the log buffer and you may have crashed someone
-> > inbetween.
-> > 
-> > If you can call printascii(), you can try to do that just after enabling
-> > the page tables to see if that was the problem like you suspect, or
-> > otherwise add more printascii() statements between __turn_mmu_on and
-> > parse_early_param() to pinpoint the exact code that breaks.
-> [Alison Wang] Thank you very much for your help. The issue is fixed.
-> 
+On Thu, Oct 29, 2015 at 5:29 PM, Brian Norris
+<computersforpeace@gmail.com> wrote:
 
-Ah, very good. I'm curious what caused the problem in the end.
+>> +Required properties:
+>> +- partition-type : the type of partition. Only one type can be specified.
+>
+> You're supporting this as a list property (for future expansion,
+> presumably), so I can only assume the "only one type" is referring to
+> the number of different parsers available currently, not the behavior of
+> the property itself?
 
-	Arnd
+I was thinking that it would not be a list actually.
+
+The reason being that if you're anyways going to the trouble of
+specifying exactly what partition type is going to be used, you're
+not really interested in specifying a few different ones, you know
+exactly what type it is going to be.
+
+But if you think it needs to be a list, I'll specify that, no big
+deal. I'll also try to get the Linux code to handle a list then.
+
+> Also, this patch will conflict with [1]. I'll probably take [1] soon, so
+> one of us will have to rebase this.
+
+Sure I'll rebase on whatever you say.
+
+Yours,
+Linus Walleij
