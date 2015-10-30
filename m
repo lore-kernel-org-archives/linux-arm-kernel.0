@@ -1,30 +1,22 @@
-From: p.fedin@samsung.com (Pavel Fedin)
-Date: Fri, 30 Oct 2015 09:43:28 +0300
-Subject: [PATCH v4 0/4] [PATCH v4 0/4] Exynos SROMc configuration and
- Ethernet support for SMDK5410
-In-Reply-To: <CAGcde9GtepdzFLCfW+ughAdyU_sKXUhgK35z434FPOFXpmRX9Q@mail.gmail.com>
-References: <cover.1446122247.git.p.fedin@samsung.com>
- <CAGcde9GtepdzFLCfW+ughAdyU_sKXUhgK35z434FPOFXpmRX9Q@mail.gmail.com>
-Message-ID: <00a001d112de$49b31d90$dd1958b0$@samsung.com>
+From: anup.patel@broadcom.com (Anup Patel)
+Date: Fri, 30 Oct 2015 06:57:32 +0000
+Subject: [PATCH v4 0/3] NAND support for Broadcom NS2 SoC
+In-Reply-To: <1446185938-17520-1-git-send-email-anup.patel@broadcom.com>
+References: <1446185938-17520-1-git-send-email-anup.patel@broadcom.com>
+Message-ID: <39063E8F96E11742B35A201CC5D095B7B02194@SJEXCHMB10.corp.ad.broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- Hello!
+Hi All,
 
-> >  .../bindings/arm/samsung/exynos-srom.txt           | 50 ++++++++++++++++++-
-> >  arch/arm/boot/dts/exynos5410-smdk5410.dts          | 41 +++++++++++++++
-> >  arch/arm/boot/dts/exynos5410.dtsi                  | 15 ++++++
-> >  arch/arm/mach-exynos/Kconfig                       |  2 +-
-> >  drivers/soc/samsung/Kconfig                        |  2 +-
-> >  drivers/soc/samsung/exynos-srom.c                  | 58 +++++++++++++++++++++-
-> >  6 files changed, 162 insertions(+), 6 deletions(-)
-> >
-> 
-> Something wrong here, I am not able to find V4 1/4 and 3/4 in this mailing list.
+Please disregard this patchset.
 
- Which mailing list is "this"? I've just rechecked, i've got my messages back on both (linux-samsung-soc and linux-arm-kernel).
+There is an accidental typo in patch2.
 
-Kind regards,
-Pavel Fedin
-Expert Engineer
-Samsung Electronics Research center Russia
+We should use ~CFG_BUS_WIDTH instead of CFG_BUS_WIDTH
+in patch2. I will quickly send v5 patchset to fix this.
+
+Sorry, for the noise.
+
+Regards,
+Anup
