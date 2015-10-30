@@ -1,100 +1,106 @@
-From: zhaoshenglong@huawei.com (Shannon Zhao)
-Date: Fri, 30 Oct 2015 14:21:52 +0800
-Subject: [PATCH v4 10/21] KVM: ARM64: Add reset and access handlers for
- PMCCNTR register
-In-Reply-To: <1446186123-11548-1-git-send-email-zhaoshenglong@huawei.com>
-References: <1446186123-11548-1-git-send-email-zhaoshenglong@huawei.com>
-Message-ID: <1446186123-11548-11-git-send-email-zhaoshenglong@huawei.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Fri, 30 Oct 2015 15:30:06 +0900
+Subject: [PATCH v4 1/4] Documentation: dt-bindings: Describe SROMc
+ configuration
+In-Reply-To: <f1fbd1a7877090f4318705f0fccbf4d96c0ebc9c.1446122247.git.p.fedin@samsung.com>
+References: <cover.1446122247.git.p.fedin@samsung.com>
+ <f1fbd1a7877090f4318705f0fccbf4d96c0ebc9c.1446122247.git.p.fedin@samsung.com>
+Message-ID: <56330E6E.50003@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Shannon Zhao <shannon.zhao@linaro.org>
+On 29.10.2015 21:42, Pavel Fedin wrote:
+> Add documentation for new subnode properties, allowing bank configuration.
+> Based on u-boot implementation, but heavily reworked.
 
-Since the reset value of PMCCNTR is UNKNOWN, use reset_unknown for its
-reset handler. Add a new case to emulate reading and writing to PMCCNTR
-register.
+Please, carefully look at:
+Documentation/devicetree/bindings/net/gpmc-eth.txt
+Documentation/devicetree/bindings/bus/ti-gpmc.txt
 
-Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
----
- arch/arm64/kvm/sys_regs.c | 31 +++++++++++++++++++++++++++++--
- 1 file changed, 29 insertions(+), 2 deletions(-)
+1. Try to re-use existing bindings. Although I see existing bank-width
+and gpmc,device-width but yours samsung,srom-data-width seems better.
+Maybe there are other to re-use?
 
-diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-index b7ca2cd..059c84c 100644
---- a/arch/arm64/kvm/sys_regs.c
-+++ b/arch/arm64/kvm/sys_regs.c
-@@ -491,6 +491,13 @@ static bool access_pmu_regs(struct kvm_vcpu *vcpu,
- 
- 	if (p->is_write) {
- 		switch (r->reg) {
-+		case PMCCNTR_EL0: {
-+			val = kvm_pmu_get_counter_value(vcpu,
-+							ARMV8_MAX_COUNTERS - 1);
-+			vcpu_sys_reg(vcpu, r->reg) +=
-+					      (s64)*vcpu_reg(vcpu, p->Rt) - val;
-+			break;
-+		}
- 		case PMXEVCNTR_EL0: {
- 			int index = PMEVCNTR0_EL0
- 				    + vcpu_sys_reg(vcpu, PMSELR_EL0);
-@@ -529,6 +536,12 @@ static bool access_pmu_regs(struct kvm_vcpu *vcpu,
- 		}
- 	} else {
- 		switch (r->reg) {
-+		case PMCCNTR_EL0: {
-+			val = kvm_pmu_get_counter_value(vcpu,
-+							ARMV8_MAX_COUNTERS - 1);
-+			*vcpu_reg(vcpu, p->Rt) = val;
-+			break;
-+		}
- 		case PMXEVCNTR_EL0: {
- 			val = kvm_pmu_get_counter_value(vcpu,
- 						vcpu_sys_reg(vcpu, PMSELR_EL0));
-@@ -759,7 +772,7 @@ static const struct sys_reg_desc sys_reg_descs[] = {
- 	  access_pmu_regs, reset_pmceid, PMCEID1_EL0 },
- 	/* PMCCNTR_EL0 */
- 	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1101), Op2(0b000),
--	  trap_raz_wi },
-+	  access_pmu_regs, reset_unknown, PMCCNTR_EL0 },
- 	/* PMXEVTYPER_EL0 */
- 	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1101), Op2(0b001),
- 	  access_pmu_regs, reset_unknown, PMXEVTYPER_EL0 },
-@@ -978,6 +991,13 @@ static bool access_pmu_cp15_regs(struct kvm_vcpu *vcpu,
- 
- 	if (p->is_write) {
- 		switch (r->reg) {
-+		case c9_PMCCNTR: {
-+			val = kvm_pmu_get_counter_value(vcpu,
-+							ARMV8_MAX_COUNTERS - 1);
-+			vcpu_cp15(vcpu, r->reg) += (s64)*vcpu_reg(vcpu, p->Rt)
-+						   - val;
-+			break;
-+		}
- 		case c9_PMXEVCNTR: {
- 			int index = c14_PMEVCNTR0 + vcpu_cp15(vcpu, c9_PMSELR);
- 
-@@ -1014,6 +1034,12 @@ static bool access_pmu_cp15_regs(struct kvm_vcpu *vcpu,
- 		}
- 	} else {
- 		switch (r->reg) {
-+		case c9_PMCCNTR: {
-+			val = kvm_pmu_get_counter_value(vcpu,
-+							ARMV8_MAX_COUNTERS - 1);
-+			*vcpu_reg(vcpu, p->Rt) = val;
-+			break;
-+		}
- 		case c9_PMXEVCNTR: {
- 			val = kvm_pmu_get_counter_value(vcpu,
- 						    vcpu_cp15(vcpu, c9_PMSELR));
-@@ -1075,7 +1101,8 @@ static const struct sys_reg_desc cp15_regs[] = {
- 	  reset_pmceid, c9_PMCEID0 },
- 	{ Op1( 0), CRn( 9), CRm(12), Op2( 7), access_pmu_cp15_regs,
- 	  reset_pmceid, c9_PMCEID1 },
--	{ Op1( 0), CRn( 9), CRm(13), Op2( 0), trap_raz_wi },
-+	{ Op1( 0), CRn( 9), CRm(13), Op2( 0), access_pmu_cp15_regs,
-+	  reset_unknown_cp15, c9_PMCCNTR },
- 	{ Op1( 0), CRn( 9), CRm(13), Op2( 1), access_pmu_cp15_regs,
- 	  reset_unknown_cp15, c9_PMXEVTYPER },
- 	{ Op1( 0), CRn( 9), CRm(13), Op2( 2), access_pmu_cp15_regs,
--- 
-2.0.4
+2. The array of "PMC, Tacp, Tcah, Tcoh, Tacc, Tcos, Tacs" is poorly
+extendable and not very descriptive/readable. You mapped directly device
+register which is the easier way for the driver but that is not the
+purpose of binding.
+
+3. Please provide ranges for valid values and units.
+
+4. PMC is not a timing.
+
+I doubt that TI GPMC could be used in Exynos SROM but please look at it
+and get useful stuff from it.
+
+Best regards,
+Krzysztof
+
+> 
+> Signed-off-by: Pavel Fedin <p.fedin@samsung.com>
+> ---
+>  .../bindings/arm/samsung/exynos-srom.txt           | 50 +++++++++++++++++++++-
+>  1 file changed, 48 insertions(+), 2 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/samsung/exynos-srom.txt b/Documentation/devicetree/bindings/arm/samsung/exynos-srom.txt
+> index 33886d5..02ecc7f 100644
+> --- a/Documentation/devicetree/bindings/arm/samsung/exynos-srom.txt
+> +++ b/Documentation/devicetree/bindings/arm/samsung/exynos-srom.txt
+> @@ -5,8 +5,54 @@ Required properties:
+>  
+>  - reg: offset and length of the register set
+>  
+> -Example:
+> +- #address-cells, #size-cells : should be '1' if the device has sub-nodes
+> +				with 'reg' property.
+> +- ranges: allows valid 1:1 translation between child's address space and
+> +	  parent's address space
+> +
+> +Sub-nodes:
+> +The SROM controller can be used to attach external peripherials. In this case
+> +device nodes should be added as subnodes to the SROMc node. These subnodes,
+> +except regular device specification, should contain the following properties,
+> +describing configuration of the relevant SROM bank:
+> +
+> +Required properties:
+> +- samsung,srom-bank : bank number (0 - 3)
+> +
+> +- samsung,srom-timing : array of 7 integers: PMC, Tacp, Tcah, Tcoh, Tacc, Tcos,
+> +			Tacs
+> +
+> +Optional properties:
+> +- samsung,srom-data-width : data width in bytes (1 or 2). If omitted, default
+> +			    of 1 is used.
+> +
+> +Example: basic definition, no banks are configured
+>  	sromc at 12570000 {
+>  		compatible = "samsung,exynos-srom";
+> -		reg = <0x12570000 0x10>;
+> +		reg = <0x12570000 0x14>;
+> +	};
+> +
+> +Example: SROMc with smsc 911x ethernet chip on bank 3
+> +	sromc at 12570000 {
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +		ranges;
+> +
+> +		compatible = "samsung,exynos-srom";
+> +		reg = <0x12570000 0x14>;
+> +
+> +		ethernet at 07000000 {
+> +			compatible = "smsc,lan9115";
+> +			reg = <0x07000000 0x10000>;
+> +			phy-mode = "mii";
+> +			interrupt-parent = <&gpx0>;
+> +			interrupts = <5 8>;
+> +			reg-io-width = <2>;
+> +			smsc,irq-push-pull;
+> +			smsc,force-internal-phy;
+> +
+> +			samsung,srom-bank = <3>;
+> +			samsung,srom-data-width = <2>;
+> +			samsung,srom-timing = <1 9 12 1 9 1 1>;
+> +		};
+>  	};
+> 
