@@ -1,42 +1,65 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Fri, 30 Oct 2015 19:29:26 +0900
-Subject: [PATCH 2/2] pinctrl: uniphier: guard uniphier directory with
- CONFIG_PINCTRL_UNIPHIER
-In-Reply-To: <CACRpkdZ286dBTvd3EO_GTixnS=Cz-ch-H+AzNOJhZwoB63K6jw@mail.gmail.com>
-References: <1445912911-1292-1-git-send-email-yamada.masahiro@socionext.com>
- <1445912911-1292-2-git-send-email-yamada.masahiro@socionext.com>
- <CACRpkdZ286dBTvd3EO_GTixnS=Cz-ch-H+AzNOJhZwoB63K6jw@mail.gmail.com>
-Message-ID: <CAK7LNAQsD=kG1X0SXPJ78FLpgEwk023cHEjE8P2UAAPhFATqOg@mail.gmail.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Fri, 30 Oct 2015 11:34:31 +0100
+Subject: [PATCH v2] pwm-backlight: fix the panel power sequence
+In-Reply-To: <1446190900.17558.16.camel@mtksdaap41>
+References: <1444987060-48202-1-git-send-email-yh.huang@mediatek.com>
+ <1444988219.3541.3.camel@pengutronix.de>
+ <1445526750.27586.8.camel@mtksdaap41>
+ <1446133259.3274.52.camel@pengutronix.de>
+ <1446190900.17558.16.camel@mtksdaap41>
+Message-ID: <1446201271.3334.22.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus.
+Am Freitag, den 30.10.2015, 15:41 +0800 schrieb YH Huang:
+> > That won't work if the gpio is still configured as input. How about I
+> > add the GPIOD_ASIS change to my patch you remove that and the above from
+> > yours?
+> 
+> I revise these two lines 
+> if (pb->enable_gpio)
+> 	gpiod_direction_output(pb->enable_gpio, 0);
+> into
+> if (pb->enable_gpio) {
+> 	if(gpiod_get_value(pb->enable_gpio) == 0)
+> 		gpiod_direction_output(pb->enable_gpio, 0);
+> 	else
+> 		gpiod_direction_output(pb->enable_gpio, 1);
+> }
 
-2015-10-29 22:34 GMT+09:00 Linus Walleij <linus.walleij@linaro.org>:
-> On Tue, Oct 27, 2015 at 3:28 AM, Masahiro Yamada
-> <yamada.masahiro@socionext.com> wrote:
->
->> CONFIG_PINCTRL_UNIPHIER is more suitable than CONFIG_ARCH_UNIPHIER
->> to guard the drivers/pinctrl/uniphier directory.
->>
->> The current CONFIG_PINCTRL_UNIPHIER_CORE is a bit long
->> (it would break the indentation in drivers/pinctrl/Makefile),
->> so rename it into CONFIG_PINCTRL_UNIPHIER.
->>
->> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
->
-> Holding this back until we know what to do with the first patch
-> but it looks OK.
+If the GPIO is still configured as an input, the return value of
+gpiod_get_value could be random.
 
-I've re-sent this as a single patch
-in case 1/2 might take some time for review.
+> I am not sure what "phandle" is working for.
 
+The reasoning is that devices where there is no phandle link pointing to
+the backlight (for example from a simple-panel node), we should keep the
+current default behaviour (enable during probe).
 
-As you agreed with this one, please let it go in first.
+> My change is like your patch but remove the "phandle related" and
+> "gpiod_get_direction(pb->enable_gpio) == GPIOF_DIR_OUT".
+> Do we really need these?
 
+See above, I wanted to be careful not to change existing behavior in
+unexpected ways.
 
+> Also, do you think it is right that I do the "pwm_enable(pb->pwm);"
+> before "gpiod_set_value(pb->enable_gpio, 1);" in power on function?
 
+That is unclear to me, because I'm sure that depends on the actual
+constant current LED driver used.
+I suspect EN and PWM pins are completely independent on a lot of them,
+so enabling EN last should be ok to work around the problem that the PWM
+pin state might not be well defined when the PWM is disabled.
 
--- 
-Best Regards
-Masahiro Yamada
+For example, the STCS1A datasheet doesn't mention any order for enabling
+EN and PWM. In the LP8545 datasheet, the modes of operation state
+diagram suggests that enabling EN first is the proper way, on the other
+hand the PWM interface characteristics table also lists a startup delay
+for a rising EN edge while PWM is already active.
+
+But I'm not sure that there aren't any LED drivers that somehow have a
+problem with this order.
+
+regards
+Philipp
