@@ -1,59 +1,57 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 30 Oct 2015 12:08:22 +0000
-Subject: [PATCH v2 4/4] arm64: document the cache policy behavior
-In-Reply-To: <1446160842-25787-4-git-send-email-avanbrunt@nvidia.com>
-References: <1446160842-25787-1-git-send-email-avanbrunt@nvidia.com>
- <1446160842-25787-4-git-send-email-avanbrunt@nvidia.com>
-Message-ID: <20151030120822.GH20030@arm.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Fri, 30 Oct 2015 20:08:13 +0800
+Subject: [PATCH v4 18/21] KVM: ARM64: Add PMU overflow interrupt routing
+In-Reply-To: <1446186123-11548-19-git-send-email-zhaoshenglong@huawei.com>
+Message-ID: <201510302030.qrh0XuT1%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 29, 2015 at 04:20:42PM -0700, Alex Van Brunt wrote:
-> Add a comment that clairfies how the kernel should behave given the cache
+Hi Shannon,
 
-clarifies
+[auto build test ERROR on kvm/linux-next -- if it's inappropriate base, please suggest rules for selecting the more suitable base]
 
-> policy reported by the CPU.
-> 
-> Signed-off-by: Alex Van Brunt <avanbrunt@nvidia.com>
-> Cc: <stable@vger.kernel.org>
-> ---
->  arch/arm64/kernel/cpuinfo.c | 8 ++++++++
->  1 file changed, 8 insertions(+)
-> 
-> diff --git a/arch/arm64/kernel/cpuinfo.c b/arch/arm64/kernel/cpuinfo.c
-> index ae04ac1..bf7e5e2 100644
-> --- a/arch/arm64/kernel/cpuinfo.c
-> +++ b/arch/arm64/kernel/cpuinfo.c
-> @@ -49,6 +49,14 @@ static void cpuinfo_detect_icache_policy(struct cpuinfo_arm64 *info)
->  	unsigned int cpu = smp_processor_id();
->  	u32 l1ip = CTR_L1IP(info->reg_ctr);
->  
-> +	/*
-> +	 * The ARM architecture defines PIPT, VIPT and AIVIVT in terms of the
+url:    https://github.com/0day-ci/linux/commits/Shannon-Zhao/KVM-ARM64-Add-guest-PMU-support/20151030-143148
+config: arm-axm55xx_defconfig (attached as .config)
+reproduce:
+        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm 
 
--the
+All errors (new ones prefixed by >>):
 
-> +	 * the observable behavior not how the CPU implements the policy.
+   In file included from arch/arm/kvm/arm.c:31:0:
+>> include/kvm/arm_pmu.h:22:21: fatal error: asm/pmu.h: No such file or directory
+    #include <asm/pmu.h>
+                        ^
+   compilation terminated.
 
-s/not/rather than/
+vim +22 include/kvm/arm_pmu.h
 
-> +	 * Specifically, the policies differentiate the correct way to
-> +	 * invalidate the cache. The definitions say that the only
-> +	 * architecturally guaranteed way to invalidate a VIPT or AIVIVT
-> +	 * instruction cache is to invalidate the entire instruction cache.
-> +	 */
->  	if (l1ip != ICACHE_POLICY_PIPT)
->  		set_bit(ICACHEF_ALIASING, &__icache_flags);
->  	if (l1ip == ICACHE_POLICY_AIVIVT)
+219856f5 Shannon Zhao 2015-10-30  16   */
+219856f5 Shannon Zhao 2015-10-30  17  
+219856f5 Shannon Zhao 2015-10-30  18  #ifndef __ASM_ARM_KVM_PMU_H
+219856f5 Shannon Zhao 2015-10-30  19  #define __ASM_ARM_KVM_PMU_H
+219856f5 Shannon Zhao 2015-10-30  20  
+219856f5 Shannon Zhao 2015-10-30  21  #include <linux/perf_event.h>
+219856f5 Shannon Zhao 2015-10-30 @22  #include <asm/pmu.h>
+219856f5 Shannon Zhao 2015-10-30  23  
+219856f5 Shannon Zhao 2015-10-30  24  struct kvm_pmc {
+219856f5 Shannon Zhao 2015-10-30  25  	u8 idx;/* index into the pmu->pmc array */
 
-With the minor cosmetic changes:
+:::::: The code at line 22 was first introduced by commit
+:::::: 219856f54d23298fff48e6e20e7e87fc45e42798 KVM: ARM64: Define PMU data structure for each vcpu
 
-  Acked-by: Will Deacon <will.deacon@arm.com>
+:::::: TO: Shannon Zhao <shannon.zhao@linaro.org>
+:::::: CC: 0day robot <fengguang.wu@intel.com>
 
-although I don't see how we can really apply this given that we're not
-planning to revert the cache geometry stuff. Maybe you could spin a
-separate series just addressing the aliasing I-cache detection, then we
-can build on top of that?
-
-Will
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 18309 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151030/132d758a/attachment-0001.obj>
