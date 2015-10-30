@@ -1,65 +1,40 @@
-From: B48286@freescale.com (Hou Zhiqiang)
-Date: Fri, 30 Oct 2015 02:31:56 +0000
-Subject: [PATCH V6 6/6] dts/ls1043a: add LS1043ARDB board support
-In-Reply-To: <CADRPPNRKXDAQHijZtJOYo9wMPaciJnoQYhR1UWRgFGUXY=iAMg@mail.gmail.com>
-References: <1445587282-29529-1-git-send-email-B48286@freescale.com>
- <1445587282-29529-6-git-send-email-B48286@freescale.com>
- <CADRPPNRKXDAQHijZtJOYo9wMPaciJnoQYhR1UWRgFGUXY=iAMg@mail.gmail.com>
-Message-ID: <CY1PR0301MB0780F778204F6D8A393B5BB38B2F0@CY1PR0301MB0780.namprd03.prod.outlook.com>
+From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
+Date: Fri, 30 Oct 2015 02:40:04 +0000
+Subject: [PATCH v5 07/14] arm64: renesas: salvator-x: Sound SSI PIO support
+In-Reply-To: <1446161280-23097-8-git-send-email-horms+renesas@verge.net.au>
+References: <1446161280-23097-1-git-send-email-horms+renesas@verge.net.au>
+ <1446161280-23097-8-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <877fm5gk33.wl%kuninori.morimoto.gx@renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
+Hi Simon
 
-> -----Original Message-----
-> From: pku.leo at gmail.com [mailto:pku.leo at gmail.com] On Behalf Of Li Yang
-> Sent: 2015?10?30? 4:33
-> To: Hou Zhiqiang-B48286
-> Cc: linux-arm-kernel at lists.infradead.org; Catalin Marinas; Will Deacon;
-> linux-i2c at vger.kernel.org; linux-watchdog at vger.kernel.org; linux-
-> doc at vger.kernel.org; linux-clk at vger.kernel.org; Mark Rutland; Xie
-> Shaohui-B21989; Jonathan Corbet; Sharma Bhupesh-B45370; Michael Turquette;
-> wsa at the-dreams.de; sboyd at codeaurora.org; wim at iguana.be; Song Wenbin-
-> B53747; Wood Scott-B07421; Hu Mingkai-B21284; linux at roeck-us.net
-> Subject: Re: [PATCH V6 6/6] dts/ls1043a: add LS1043ARDB board support
+Thank you for your patch.
+
+> From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 > 
-> On Fri, Oct 23, 2015 at 3:01 AM, Zhiqiang Hou <B48286@freescale.com>
-> wrote:
-> > From: Shaohui Xie <Shaohui.Xie@freescale.com>
-> >
-> > Signed-off-by: Shaohui Xie <Shaohui.Xie@freescale.com>
-> > Signed-off-by: Mingkai Hu <Mingkai.Hu@freescale.com>
-> > Signed-off-by: Wenbin Song <Wenbin.Song@freescale.com>
-> > Signed-off-by: Hou Zhiqiang <B48286@freescale.com>
-> > ---
-> > V6: V5 V4 V3
-> >  - No change.
-> >
-> > V2:
-> >  - Remove the useless compatible "simple-bus" from cpld node.
-> >
-> >  arch/arm64/boot/dts/freescale/Makefile            |   2 +-
-> >  arch/arm64/boot/dts/freescale/fsl-ls1043a-rdb.dts | 116
-> > ++++++++++++++++++++++
-> >  2 files changed, 117 insertions(+), 1 deletion(-)  create mode 100644
-> > arch/arm64/boot/dts/freescale/fsl-ls1043a-rdb.dts
-> >
-> > diff --git a/arch/arm64/boot/dts/freescale/Makefile
-> > b/arch/arm64/boot/dts/freescale/Makefile
-> > index 57b41c7..33b1e57 100644
-> > --- a/arch/arm64/boot/dts/freescale/Makefile
-> > +++ b/arch/arm64/boot/dts/freescale/Makefile
-> > @@ -1,4 +1,4 @@
-> > -dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls2080a-qds.dtb
-> > fsl-ls2080a-rdb.dtb fsl-ls2080a-simu.dtb
-> > +dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls2080a-qds.dtb
-> > +fsl-ls2080a-rdb.dtb fsl-ls2080a-simu.dtb fsl-ls1043a-rdb.dtb
+> This patch adds PIO sound support for Salvator-X board.
 > 
-> I tried to apply the patch, but it can not be applied due to the change
-> from a depending ls2080 patch.  I will help to respin this patch and
-> resend the three device tree related patches.
+> Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> ---
+(snip)
+> +	cs2000: clk_multiplier at 4f {
+> +		#clock-cells = <0>;
+> +		compatible = "cirrus,cs2000-cp";
+> +		reg = <0x4f>;
+> +		clocks = <&rcar_sound 0>, <&x12_clk>;
+> +		clock-names = "clk_in", "ref_clk";
+> +		clock-frequency = <24576000>; /* 1/1 divide */
+> +	};
+> +};
 
-ok.
-
-Thanks,
-Zhiqiang
+I have posted this cs2000 driver to clk ML, but not yet accepted.
+And new version can't use "clock-frequency".
+Actually, Salvator-X sound can work without cs2000,
+but it can be limited sound rate
+Do you want to avoid cs2000 until it was accepted ?
+Then, I can create and post whole patch set.
+Or we can avoid sound support so far ?
