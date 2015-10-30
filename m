@@ -1,110 +1,317 @@
-From: brijeshkumar.singh@amd.com (Brijesh Singh)
-Date: Fri, 30 Oct 2015 11:26:58 -0500
-Subject: [PATCH v4] EDAC: Add ARM64 EDAC
-In-Reply-To: <20151028164053.GG25451@leverpostej>
-References: <1446048829-3359-1-git-send-email-brijeshkumar.singh@amd.com>
- <20151028164053.GG25451@leverpostej>
-Message-ID: <56339A52.8060701@amd.com>
+From: james.morse@arm.com (James Morse)
+Date: Fri, 30 Oct 2015 16:29:01 +0000
+Subject: [PATCH 08/16] arm64/kexec: Add core kexec support
+In-Reply-To: <a1c2a702f127d9dade1f9af8ab13decb2ef1c0da.1445297709.git.geoff@infradead.org>
+References: <cover.1445297709.git.geoff@infradead.org>
+ <a1c2a702f127d9dade1f9af8ab13decb2ef1c0da.1445297709.git.geoff@infradead.org>
+Message-ID: <56339ACD.7010506@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+Hi Geoff,
 
->> +
->> +Required properties:
->> +- compatible: Should be "arm,cortex-a57-edac" or "arm,cortex-a53-edac"
->> +
->> +Example:
->> +	edac {
->> +		compatible = "arm,cortex-a57-edac";
->> +	};
->> +
+On 20/10/15 00:38, Geoff Levand wrote:
+> Add three new files, kexec.h, machine_kexec.c and relocate_kernel.S to the
+> arm64 architecture that add support for the kexec re-boot mechanism
+> (CONFIG_KEXEC) on arm64 platforms.
 > 
-> This is insufficient for big.LITTLE, no interrupt is possible, and we
-> haven't defined the rules for accessing the registers (e.g. whether
-> write backs are permitted).
+> Signed-off-by: Geoff Levand <geoff@infradead.org>
+> ---
+>  arch/arm64/Kconfig                  |  10 +++
+>  arch/arm64/include/asm/kexec.h      |  48 +++++++++++
+>  arch/arm64/kernel/Makefile          |   2 +
+>  arch/arm64/kernel/cpu-reset.S       |   2 +-
+>  arch/arm64/kernel/machine_kexec.c   | 141 +++++++++++++++++++++++++++++++
+>  arch/arm64/kernel/relocate_kernel.S | 163 ++++++++++++++++++++++++++++++++++++
+>  include/uapi/linux/kexec.h          |   1 +
+>  7 files changed, 366 insertions(+), 1 deletion(-)
+>  create mode 100644 arch/arm64/include/asm/kexec.h
+>  create mode 100644 arch/arm64/kernel/machine_kexec.c
+>  create mode 100644 arch/arm64/kernel/relocate_kernel.S
 > 
-> Please see my prior comments [1] on those points.
-> 
-> If we're going to use this feature directly within the kernel, we need
-> to consider the envelope of possible implementations rather than your
-> use-case alone.
->
+> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> index 07d1811..73e8e31 100644
+> --- a/arch/arm64/Kconfig
+> +++ b/arch/arm64/Kconfig
+> @@ -491,6 +491,16 @@ config SECCOMP
+>  	  and the task is only allowed to execute a few safe syscalls
+>  	  defined by each seccomp mode.
+>  
+> +config KEXEC
+> +	depends on (!SMP || PM_SLEEP_SMP)
 
-I have looked at possibility of pushing correctable error logging in the
-firmware; but given current hardware limitation it seems like OS is the best
-place to implement it. Let me summaries the issues we are running into:
-
-* Correctable errors does not generate any interrupt:
-  If we have to implement error parsing inside the firmware then work need
-  to be split between OS and firmware. Maybe OS can call SMC instruction to 
-  dial into firmware and then firmware can check error syndrome registers; 
-  if it finds correctable error then build HEST table. This method will introduce
-  performance issue because it require OS executing SMC every 100ms or so to just
-  poll for correctable error. If you have any other recommendation then please share it.
+Commit 4b3dc9679cf7 got rid of '!SMP'.
 
 
-> * Interaction with firmware
-> - When/do we handle interrupts?
+> +	select KEXEC_CORE
+> +	bool "kexec system call"
+> +	---help---
+> +	  kexec is a system call that implements the ability to shutdown your
+> +	  current kernel, and to start another kernel.  It is like a reboot
+> +	  but it is independent of the system firmware.   And like a reboot
+> +	  you can start any kernel with it, not just Linux.
+> +
+>  config XEN_DOM0
+>  	def_bool y
+>  	depends on XEN
+> diff --git a/arch/arm64/kernel/cpu-reset.S b/arch/arm64/kernel/cpu-reset.S
+> index ffc9e385e..7cc7f56 100644
+> --- a/arch/arm64/kernel/cpu-reset.S
+> +++ b/arch/arm64/kernel/cpu-reset.S
+> @@ -3,7 +3,7 @@
+>   *
+>   * Copyright (C) 2001 Deep Blue Solutions Ltd.
+>   * Copyright (C) 2012 ARM Ltd.
+> - * Copyright (C) 2015 Huawei Futurewei Technologies.
+> + * Copyright (C) Huawei Futurewei Technologies.
 
-We can a properties in dt bindings:
+Move this hunk into the patch that adds the file?
 
-1) "num-interrupts = 1" - number of interrupt count. One interrupts per cluster
-    e.g if you have 4 cluster then num-interrupts=4.
-2) interrupts = <0, 92, 0> <0, 94, 0> <0, 96, 0> <0, 98, 0>  // interrupt mapping
 
-If num-interrupts = 0, then firmware handles interrupts. Optionally we can use HEST FIRMWARE-FIRST
-bit, if bit is set then firmware is handling the interrupt otherwise use DT information.
+>   *
+>   * This program is free software; you can redistribute it and/or modify
+>   * it under the terms of the GNU General Public License version 2 as
+> diff --git a/arch/arm64/kernel/relocate_kernel.S b/arch/arm64/kernel/relocate_kernel.S
+> new file mode 100644
+> index 0000000..7b07a16
+> --- /dev/null
+> +++ b/arch/arm64/kernel/relocate_kernel.S
+> @@ -0,0 +1,163 @@
+> +/*
+> + * kexec for arm64
+> + *
+> + * Copyright (C) Linaro.
+> + * Copyright (C) Huawei Futurewei Technologies.
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +
+> +#include <linux/kexec.h>
+> +
+> +#include <asm/assembler.h>
+> +#include <asm/kexec.h>
+> +#include <asm/memory.h>
+> +#include <asm/page.h>
+> +
+> +
+> +/*
+> + * arm64_relocate_new_kernel - Put a 2nd stage kernel image in place and boot it.
+> + *
+> + * The memory that the old kernel occupies may be overwritten when coping the
+> + * new image to its final location.  To assure that the
+> + * arm64_relocate_new_kernel routine which does that copy is not overwritten,
+> + * all code and data needed by arm64_relocate_new_kernel must be between the
+> + * symbols arm64_relocate_new_kernel and arm64_relocate_new_kernel_end.  The
+> + * machine_kexec() routine will copy arm64_relocate_new_kernel to the kexec
+> + * control_code_page, a special page which has been set up to be preserved
+> + * during the copy operation.
+> + */
+> +.globl arm64_relocate_new_kernel
+> +arm64_relocate_new_kernel:
+> +
+> +	/* Setup the list loop variables. */
+> +	ldr	x18, .Lkimage_head		/* x18 = list entry */
+> +	dcache_line_size x17, x0		/* x17 = dcache line size */
+> +	mov	x16, xzr			/* x16 = segment start */
+> +	mov	x15, xzr			/* x15 = entry ptr */
+> +	mov	x14, xzr			/* x14 = copy dest */
+> +
+> +	/* Check if the new image needs relocation. */
+> +	cbz	x18, .Ldone
+> +	tbnz	x18, IND_DONE_BIT, .Ldone
+> +
+> +.Lloop:
+> +	and	x13, x18, PAGE_MASK		/* x13 = addr */
+> +
+> +	/* Test the entry flags. */
+> +.Ltest_source:
+> +	tbz	x18, IND_SOURCE_BIT, .Ltest_indirection
+> +
+> +	mov x20, x14				/*  x20 = copy dest */
+> +	mov x21, x13				/*  x21 = copy src */
+> +
+> +	/* Invalidate dest page to PoC. */
+> +	mov	x0, x20
+> +	add	x19, x0, #PAGE_SIZE
+> +	sub	x1, x17, #1
+> +	bic	x0, x0, x1
+> +1:	dc	ivac, x0
+> +	add	x0, x0, x17
+> +	cmp	x0, x19
+> +	b.lo	1b
+> +	dsb	sy
 
->
->  - When is it valid to write back and clear an error? We should not do
->    this behind the back of any firmware that owns the interface.
+If I've followed all this through properly:
 
-As per A57 TRM is concerned you are right both the correctable and uncorrectable 
-error needs to clear VALID bit in L1/L2 syndrome registers. So yes we need to define
-a rule for accessing the registers. I can think of two possible approach here:
+With KVM - mmu+caches are configured, but then disabled by 'kvm: allows kvm
+cpu hotplug'. This 'arm64_relocate_new_kernel' function then runs at EL2
+with M=0, C=0, I=0.
 
-1) add "error-syndrome-reg-write-access=1" property in dt.
-   * if '1' then OS has exclusive write backs access to error syndrome register
-   * if '0' then OS will not clear the valid bit on fatal error
+Without KVM - when there is no user of EL2, the mmu+caches are left in
+whatever state the bootloader (or efi stub) left them in. From
+Documentation/arm64/booting.txt:
+> Instruction cache may be on or off.
+and
+> System caches which respect the architected cache maintenance by VA
+> operations must be configured and may be enabled.
 
-  The handler looks like this:
+So 'arm64_relocate_new_kernel' function could run at EL2 with M=0, C=?, I=?.
 
-  parse_error_syndrome () {
-   val = read_cpumerrsr
+I think this means you can't guarantee anything you are copying below
+actually makes it through the caches - booting secondary processors may get
+stale values.
 
-   if (!IS_VALID(val))
-     return
+The EFI stub disables the M and C bits when booted at EL2 with uefi - but
+it leaves the instruction cache enabled. You only clean the
+reboot_code_buffer from the data cache, so there may be stale values in the
+instruction cache.
 
-   /* log the error details */
+I think you need to disable the i-cache at EL1. If you jump to EL2, I think
+you need to disable the I/C bits there too - as you can't rely on the code
+in 'kvm: allows kvm cpu hotplug' to do this in a non-kvm case.
 
-   /* if fatal error and OS does not have exclusive write back access */
-   if (IS_FATAL(val) && !error-syndrom-reg-write-access)
-     return; 
 
-   val = ~(1UL << 31); /* clear valid bit */
-  }
+> +
+> +	/* Copy page. */
+> +1:	ldp	x22, x23, [x21]
+> +	ldp	x24, x25, [x21, #16]
+> +	ldp	x26, x27, [x21, #32]
+> +	ldp	x28, x29, [x21, #48]
+> +	add	x21, x21, #64
+> +	stnp	x22, x23, [x20]
+> +	stnp	x24, x25, [x20, #16]
+> +	stnp	x26, x27, [x20, #32]
+> +	stnp	x28, x29, [x20, #48]
+> +	add	x20, x20, #64
+> +	tst	x21, #(PAGE_SIZE - 1)
+> +	b.ne	1b
+> +
+> +	/* dest += PAGE_SIZE */
+> +	add	x14, x14, PAGE_SIZE
+> +	b	.Lnext
+> +
+> +.Ltest_indirection:
+> +	tbz	x18, IND_INDIRECTION_BIT, .Ltest_destination
+> +
+> +	/* ptr = addr */
+> +	mov	x15, x13
+> +	b	.Lnext
+> +
+> +.Ltest_destination:
+> +	tbz	x18, IND_DESTINATION_BIT, .Lnext
+> +
+> +	mov	x16, x13
+> +
+> +	/* dest = addr */
+> +	mov	x14, x13
+> +
+> +.Lnext:
+> +	/* entry = *ptr++ */
+> +	ldr	x18, [x15], #8
+> +
+> +	/* while (!(entry & DONE)) */
+> +	tbz	x18, IND_DONE_BIT, .Lloop
+> +
+> +.Ldone:
+> +	dsb	sy
+> +	isb
+> +	ic	ialluis
+> +	dsb	sy
 
-2) Use HEST FIRMWARE-FIRST bit field, if the bit is set then OS should not clear
-   the valid bit on fatal error and similarly if bit is clear then OS clears the VALID bit.
+Why the second dsb?
 
-Since firmware will never handle the correctable error hence its always safe to clear
-the VALID bit on non-fatal error. If you have any other suggestions then please share it.
 
-I am not pushing my use-case only; I am trying to work through current hardware
-limitation and still support all the possibilities. I am open to hear your suggestions.
-I am also not well versed on big.LITTILE CPU, so you may need to point me on right 
-direction as we progress. My testing is limited to Cortex A57.
+> +	isb
+> +
+> +	/* Start new image. */
+> +	ldr	x4, .Lkimage_start
+> +	mov	x0, xzr
+> +	mov	x1, xzr
+> +	mov	x2, xzr
+> +	mov	x3, xzr
 
-> 
-> I don't think the use of old_mask is sufficient here, given the mapping
-> of logical to physical ID is arbitrary. For example, we could have CPUs
-> 0,5,6,7 in one cluster, and CPUs 1,2,3,4 in another, and in that case
-> we'd check the first cluster twice.
-> 
+Once the kexec'd kernel is booting, I get:
+> WARNING: x1-x3 nonzero in violation of boot protocol:
+>         x1: 0000000080008000
+>         x2: 0000000000000020
+>         x3: 0000000000000020
+> This indicates a broken bootloader or old kernel
 
-Noted. I should use physical ID instead of logical mapping.
+Presumably this 'kimage_start' isn't pointing to the new kernel, but the
+purgatory code, (which comes from user-space?). (If so what are these xzr-s
+for?)
 
-> This also is wrong for big.LITTLE; we can't necessarily check on every
-> CPU.
-> 
+
+> +	br	x4
+> +
+> +.align 3	/* To keep the 64-bit values below naturally aligned. */
+> +
+> +/* The machine_kexec routine sets these variables via offsets from
+> + * arm64_relocate_new_kernel.
+> + */
+> +
+> +/*
+> + * .Lkimage_start - Copy of image->start, the entry point of the new
+> + * image.
+> + */
+> +.Lkimage_start:
+> +	.quad	0x0
+> +
+> +/*
+> + * .Lkimage_head - Copy of image->head, the list of kimage entries.
+> + */
+> +.Lkimage_head:
+> +	.quad	0x0
+> +
+
+I assume these .quad-s are used because you can't pass the values in via
+registers - due to the complicated soft_restart(). Given you are the only
+user, couldn't you simplify it to do all the disabling in
+arm64_relocate_new_kernel?
+
+
+> +.Lcopy_end:
+> +.org	KEXEC_CONTROL_PAGE_SIZE
+> +
+> +/*
+> + * arm64_relocate_new_kernel_size - Number of bytes to copy to the control_code_page.
+> + */
+> +.globl arm64_relocate_new_kernel_size
+> +arm64_relocate_new_kernel_size:
+> +	.quad	.Lcopy_end - arm64_relocate_new_kernel
+> +
+> +/*
+> + * arm64_kexec_kimage_start_offset - Offset for writing .Lkimage_start.
+> + */
+> +.globl arm64_kexec_kimage_start_offset
+> +arm64_kexec_kimage_start_offset:
+> +	.quad	.Lkimage_start - arm64_relocate_new_kernel
+> +
+> +/*
+> + * arm64_kexec_kimage_head_offset - Offset for writing .Lkimage_head.
+> + */
+> +.globl arm64_kexec_kimage_head_offset
+> +arm64_kexec_kimage_head_offset:
+> +	.quad	.Lkimage_head - arm64_relocate_new_kernel
+
+
+>From 'kexec -e' to the first messages from the new kernel takes ~1 minute
+on Juno, Did you see a similar delay? Or should I go looking for what I've
+configured wrong!?
+
+(Copying code with the mmu+caches on, then cleaning to PoC was noticeably
+faster for hibernate)
+
+
+I've used this series for kexec-ing between 4K and 64K page_size kernels on
+Juno.
+
+Tested-By: James Morse <james.morse@arm.com>
+
+
+
+Thanks!
+
+James
