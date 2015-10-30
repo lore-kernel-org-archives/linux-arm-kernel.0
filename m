@@ -1,48 +1,67 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Fri, 30 Oct 2015 11:44:46 +0100
-Subject: [PATCH] clocksource: dw_apb_timer_of: support timer-based delay
-In-Reply-To: <1446193659-1698-1-git-send-email-jszhang@marvell.com>
-References: <1446193659-1698-1-git-send-email-jszhang@marvell.com>
-Message-ID: <56334A1E.7060709@linaro.org>
+From: p.fedin@samsung.com (Pavel Fedin)
+Date: Fri, 30 Oct 2015 13:51:03 +0300
+Subject: [PATCH v4 2/4] ARM: dts: Add SROMc to Exynos 5410
+In-Reply-To: <56333731.1000400@samsung.com>
+References: <cover.1446122247.git.p.fedin@samsung.com>
+ <eafa355058ff500a72ff2e3408ab635954467a76.1446122247.git.p.fedin@samsung.com>
+ <CAGcde9EXfe0amqoTOwgKi-Y6=4mRcEbZrA=as-BxzfMv3ntAhQ@mail.gmail.com>
+ <009f01d112dd$fab40830$f01c1890$@samsung.com> <56333731.1000400@samsung.com>
+Message-ID: <00d501d11300$e0b4fb60$a21ef220$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/30/2015 09:27 AM, Jisheng Zhang wrote:
-> Implement an ARM delay timer to be used for udelay(). This allows us to
-> skip the delay loop calibration at boot on Marvell BG2, BG2Q, BG2CD
-> platforms. And after this patch, udelay() will be unaffected by CPU
-> frequency changes.
->
-> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
-> ---
->   drivers/clocksource/Kconfig           | 10 ++++++++++
->   drivers/clocksource/dw_apb_timer_of.c | 16 ++++++++++++++++
->   2 files changed, 26 insertions(+)
->
-> diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
-> index a7726db..7b081805 100644
-> --- a/drivers/clocksource/Kconfig
-> +++ b/drivers/clocksource/Kconfig
-> @@ -29,6 +29,16 @@ config DW_APB_TIMER_OF
->   	select DW_APB_TIMER
->   	select CLKSRC_OF
->
-> +config DW_APB_TIMER_BASED_DELAY
-> +	bool "DW APB timer based delay"
-> +	depends on ARM && DW_APB_TIMER_OF
-> +	default n
-> +	help
-> +	  This option enables support for using the DW APB timer to
-> +	  implement timer-based delay. It is useful for skiping the
-> +	  delay loop calibration at boot on some platforms. And the
-> +	  udelay() will be unaffected by CPU frequency changes.
-> +
+ Hello!
 
-Why do you want it to be optional ?
+> >>> +               sromc: sromc at 12250000 {
+> >>> +                       #address-cells = <1>;
+> >>> +                       #size-cells = <1>;
+> >>> +                       ranges;
+> >>> +
+> >>
+> >> We do not need to specify these three properties as they are already
+> >> present in parent node "soc".
+> >
+> >   We do, otherwise dtc complains about defaults of #address-cells = 2 and #size-cells=1, and
+> without empty "ranges" subnode's resources are not correctly translated.
+> >
+> 
+> First of all this patch will not give this error. So this part should
+> not be a part of this patch.
+> You should be getting above error after applying v4 4/4 "ARM: dts: Add
+> Ethernet chip to SMDK5410". So if its failing for ethernet subnode, you
+> can move this address-cells and size-cells in dts file just above
+> ethernet node as shown below:
+> 
+> index 311e7be..d69981d 100644
+> --- a/arch/arm/boot/dts/exynos5410-smdk5410.dts
+> +++ b/arch/arm/boot/dts/exynos5410-smdk5410.dts
+> @@ -95,6 +95,9 @@
+>   };
+> 
+>   &sromc {
+> +       #address-cells = <1>;
+> +       #size-cells = <1>;
+> +       ranges;
+>          pinctrl-names = "default";
+>          pinctrl-0 = <&srom_ctl>, <&srom_ebi>;
+> 
 
--- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+ IMHO this makes little of sense, because in this case you would have to duplicate these properties for every supported machine. address-cells, size-cells and ranges belong to the controller itself, not to its children.
+ Of course i could split up the patch into two, first introduce sromc, second introduce mapping. But does it worth that? Both patches would be 3 lines of code each.
+ Anyway, this specific talk is outdated by now, please check out neighbor topic, we are discussing significantly improved binding with Krzystof.
 
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+> And another question still remains open, we can't just like that change
+> "smsc,lan9115" binding by adding samsung specific properties.
+
+ I am sorry, but you either do not understand us with Krzystof, or not reading at all...
+ This is not a change in the binding. And these properties do not belong to smsc at all. They would be added to *ANY* device which sits on top of SROMc. This is more like a bus-specific extra. It's similar to "reg" property having different meanings for different buses.
+
+> Probably you can check suggestions from Krzysztof, where he pointed out
+> some hint on how other places this is getting used.
+
+ Did you read them? I did, and they do exactly the same thing as i do.
+
+Kind regards,
+Pavel Fedin
+Expert Engineer
+Samsung Electronics Research center Russia
