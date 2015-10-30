@@ -1,127 +1,68 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Fri, 30 Oct 2015 15:46:29 +0800
-Subject: [PATCH v4 1/6] clk: sunxi: Let divs clocks read the base factor
- clock name from devicetree
-In-Reply-To: <1445964626-6484-2-git-send-email-jenskuske@gmail.com>
-References: <1445964626-6484-1-git-send-email-jenskuske@gmail.com>
- <1445964626-6484-2-git-send-email-jenskuske@gmail.com>
-Message-ID: <CAGb2v670cXEPcUFLtsCMFD+s6zUSt+wQg553QXCQHtDtRh9Xmg@mail.gmail.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Fri, 30 Oct 2015 16:51:53 +0900
+Subject: [PATCH v11 6/8] arm64: renesas: add Salvator-X board support on
+ DTS
+In-Reply-To: <CAMuHMdVzUPyhkfPy3s+jBK1gQ-kZqYfrQZ8Bww-iFxGOPVZn2w@mail.gmail.com>
+References: <1444890243-6978-1-git-send-email-horms+renesas@verge.net.au>
+ <1444890243-6978-7-git-send-email-horms+renesas@verge.net.au>
+ <20151015110139.GG8825@leverpostej>
+ <20151023070032.GA4502@verge.net.au>
+ <CAMuHMdVzUPyhkfPy3s+jBK1gQ-kZqYfrQZ8Bww-iFxGOPVZn2w@mail.gmail.com>
+Message-ID: <20151030075152.GE31252@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 28, 2015 at 12:50 AM, Jens Kuske <jenskuske@gmail.com> wrote:
-> Currently, the sunxi clock driver gets the name for the base factor clock
-> of divs clocks from the name field in factors_data. This prevents reusing
-> of the factor clock for clocks with same properties, but different name.
->
-> This commit makes the divs setup function try to get a name from
-> clock-output-names in the devicetree. It also removes the name field where
-> possible and merges the sun4i PLL5 and PLL6 clocks.
+On Thu, Oct 29, 2015 at 08:52:12AM +0100, Geert Uytterhoeven wrote:
+> Hi Simon,
+> 
+> On Fri, Oct 23, 2015 at 9:00 AM, Simon Horman <horms@verge.net.au> wrote:
+> > On Thu, Oct 15, 2015 at 12:01:40PM +0100, Mark Rutland wrote:
+> >> > +           stdout-path = &scif2;
+> >>
+> >> No rate? It would be better to be explicit here; you should be able to
+> >> have:
+> >>
+> >>       stdout-path = "serial0:115200n8"
+> >>
+> >> Where "115200n8" is replaced with whatever configuration this board
+> >> actually has.
+> >
+> > I think that we have had this discussion before in relation to
+> > a different board for a different Renesas SoC but I could be mistaken.
+> 
+> IIRC, at that time the code to parse the options wasn't upstream yet, so
+> adding the options would have broken the serial console.
+> 
+> I can confirm it works fine on Salvator-X with
+> 
+>         stdout-path = "serial0:115200n8";
 
-This patch actually removes all static declarations of the name field,
-which is a good thing!
+Thanks.
 
->
-> Signed-off-by: Jens Kuske <jenskuske@gmail.com>
-> ---
->  drivers/clk/sunxi/clk-sunxi.c | 38 +++++++++++++++++++++++++++-----------
->  1 file changed, 27 insertions(+), 11 deletions(-)
->
-> diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
-> index 9c79af0c..270de42 100644
-> --- a/drivers/clk/sunxi/clk-sunxi.c
-> +++ b/drivers/clk/sunxi/clk-sunxi.c
-> @@ -704,21 +704,12 @@ static const struct factors_data sun4i_pll5_data __initconst = {
->         .enable = 31,
->         .table = &sun4i_pll5_config,
->         .getter = sun4i_get_pll5_factors,
-> -       .name = "pll5",
-> -};
-> -
-> -static const struct factors_data sun4i_pll6_data __initconst = {
-> -       .enable = 31,
-> -       .table = &sun4i_pll5_config,
-> -       .getter = sun4i_get_pll5_factors,
-> -       .name = "pll6",
->  };
->
->  static const struct factors_data sun6i_a31_pll6_data __initconst = {
->         .enable = 31,
->         .table = &sun6i_a31_pll6_config,
->         .getter = sun6i_a31_get_pll6_factors,
-> -       .name = "pll6x2",
->  };
->
->  static const struct factors_data sun5i_a13_ahb_data __initconst = {
-> @@ -902,6 +893,7 @@ struct gates_data {
->
->  #define SUNXI_DIVS_MAX_QTY     4
->  #define SUNXI_DIVISOR_WIDTH    2
-> +#define SUNXI_DIVS_BASE_NAME_MAX_LEN   8
->
->  struct divs_data {
->         const struct factors_data *factors; /* data for the factor clock */
-> @@ -941,7 +933,7 @@ static const struct divs_data pll5_divs_data __initconst = {
->  };
->
->  static const struct divs_data pll6_divs_data __initconst = {
-> -       .factors = &sun4i_pll6_data,
-> +       .factors = &sun4i_pll5_data,
->         .ndivs = 4,
->         .div = {
->                 { .shift = 0, .table = pll6_sata_tbl, .gate = 14 }, /* M, SATA */
-> @@ -983,6 +975,8 @@ static void __init sunxi_divs_clk_setup(struct device_node *node,
->         struct clk_gate *gate = NULL;
->         struct clk_fixed_factor *fix_factor;
->         struct clk_divider *divider;
-> +       struct factors_data factors = *data->factors;
-> +       char base_name[SUNXI_DIVS_BASE_NAME_MAX_LEN];
->         void __iomem *reg;
->         int ndivs = SUNXI_DIVS_MAX_QTY, i = 0;
->         int flags, clkflags;
-> @@ -991,8 +985,30 @@ static void __init sunxi_divs_clk_setup(struct device_node *node,
->         if (data->ndivs)
->                 ndivs = data->ndivs;
->
-> +       /* Try to find a name for base factor clock */
-> +       for (i = 0; i < ndivs; i++) {
-> +               if (data->div[i].self) {
-> +                       of_property_read_string_index(node, "clock-output-names",
-> +                                                     i, &factors.name);
-> +                       break;
-> +               }
-> +       }
-> +       /* If we don't have a .self clk use the first output-name up to '_' */
+Is this considered to be best practice?
+If so I am of a mind to update the patch.
 
-This actually only works for the sun4i divs clocks. sun6i-a31-pll6 uses a
-different naming convention. sun4i-a10-pll2 uses yet another, though that's
-not a divs clock. Maybe we should work on unifying them. Maxime?
+> > The r8a7795 uses the sh-sci serial driver for which the default rate is
+> > 115200. It is hard for me to conceive of a situation where that would
+> > change without due consideration being given to the implications for DT
+> > files.
+> >
+> > Not specifying the baud here is consistent with what we have
+> > been doing for ARM32 Renesas SoCs for some time.
+> 
+> FWIW, I have updated all ARM32 Renesas DTSes locally:
+>   1. Use alias in and add serial options to stdout-path,
+>   2. Drop superfluous console= from bootargs (shmobile-legacy is gone,
+>      and it works fine on boards with both fbdev and serial consoles).
+> 
+> And everything looks fine on the boards I could try it on (sh73a0/kzm9g,
+> r8a73a4/ape6evm, r8a7740/armadillo, r8a7791/koelsch).
+> 
+> Hence if you're open for this change, I can submit patches (or a single patch,
+> up to your preference).
 
-Other than these 2 bits of information, this patch looks good.
+Sure, I'm happy to consider that (I slightly prefer per-board patches) if:
 
-
-Regards
-ChenYu
-
-> +       if (factors.name == NULL) {
-> +               of_property_read_string_index(node, "clock-output-names",
-> +                                                     0, &clk_name);
-> +
-> +               for (i = 0; i < SUNXI_DIVS_BASE_NAME_MAX_LEN - 1 &&
-> +                                               clk_name[i] != '_' &&
-> +                                               clk_name[i] != '\0'; i++)
-> +                       base_name[i] = clk_name[i];
-> +
-> +               base_name[i] = '\0';
-> +               factors.name = base_name;
-> +       }
-> +
->         /* Set up factor clock that we will be dividing */
-> -       pclk = sunxi_factors_clk_setup(node, data->factors);
-> +       pclk = sunxi_factors_clk_setup(node, &factors);
->         parent = __clk_get_name(pclk);
->
->         reg = of_iomap(node, 0);
-> --
-> 2.6.2
->
+* That is now considered best practice and;
+* Due consideration is given to backwards compatibility
+  (I suspect it is new DTs work with old kernels so its a non-issue)
