@@ -1,45 +1,110 @@
-From: stuart.yoder@freescale.com (Stuart Yoder)
-Date: Fri, 30 Oct 2015 16:15:42 +0000
-Subject: [PATCH] arm64: dts: Added syscon-reboot node for FSL's LS2085A SoC
-In-Reply-To: <41343887.dUfAz3IhqL@wuerfel>
-References: <1445650280-9966-1-git-send-email-German.Rivera@freescale.com>
- <20151027163441.GK3091@leverpostej>
- <CY1PR0301MB07480A8EC25BB6987883AE5687220@CY1PR0301MB0748.namprd03.prod.outlook.com>
- <41343887.dUfAz3IhqL@wuerfel>
-Message-ID: <CY1PR0301MB0748CE1C553E440C8369FC65872F0@CY1PR0301MB0748.namprd03.prod.outlook.com>
+From: brijeshkumar.singh@amd.com (Brijesh Singh)
+Date: Fri, 30 Oct 2015 11:26:58 -0500
+Subject: [PATCH v4] EDAC: Add ARM64 EDAC
+In-Reply-To: <20151028164053.GG25451@leverpostej>
+References: <1446048829-3359-1-git-send-email-brijeshkumar.singh@amd.com>
+ <20151028164053.GG25451@leverpostej>
+Message-ID: <56339A52.8060701@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Mark,
 
-
-> -----Original Message-----
-> From: Arnd Bergmann [mailto:arnd at arndb.de]
-> Sent: Friday, October 30, 2015 8:36 AM
-> To: linux-arm-kernel at lists.infradead.org
-> Cc: Yoder Stuart-B08248; Mark Rutland; devicetree at vger.kernel.org; Sharma Bhupesh-B45370; Rivera Jose-B46482;
-> linux-kernel at vger.kernel.org; robh+dt at kernel.org; Li Yang-Leo-R58472
-> Subject: Re: [PATCH] arm64: dts: Added syscon-reboot node for FSL's LS2085A SoC
+>> +
+>> +Required properties:
+>> +- compatible: Should be "arm,cortex-a57-edac" or "arm,cortex-a53-edac"
+>> +
+>> +Example:
+>> +	edac {
+>> +		compatible = "arm,cortex-a57-edac";
+>> +	};
+>> +
 > 
-> On Tuesday 27 October 2015 18:25:04 Stuart Yoder wrote:
-> > I think that comment "Currently supported enable-method is psci v0.2" is a statement of
-> > intent, not what is available currently.   And the only plan I am aware of is PSCI
-> > with UEFI based firmware.
-> >
-> > U-boot is a key firmware platform for us and has no PSCI implementation available.
+> This is insufficient for big.LITTLE, no interrupt is possible, and we
+> haven't defined the rules for accessing the registers (e.g. whether
+> write backs are permitted).
 > 
-> I believe U-boot has supported PSCI since 2013. Maybe you just need to update
-> to a newer version?
+> Please see my prior comments [1] on those points.
+> 
+> If we're going to use this feature directly within the kernel, we need
+> to consider the envelope of possible implementations rather than your
+> use-case alone.
+>
 
-We are using a very recent u-boot.  U-boot for ARMv8, which is what this SoC is
-based on, does not have PSCI as far as I can tell.  We (Freescale) plan to 
-eventually have an EL3 firmware component that could remain resident for 
-u-boot based systems, but it is a roadmap thing and I don't know when
-we're going to get it.
+I have looked at possibility of pushing correctable error logging in the
+firmware; but given current hardware limitation it seems like OS is the best
+place to implement it. Let me summaries the issues we are running into:
 
-So, for now, most straightforward thing is to get reboot functionality is
-to expose the reset register via syscon-reboot in the DT...no new driver needed.
+* Correctable errors does not generate any interrupt:
+  If we have to implement error parsing inside the firmware then work need
+  to be split between OS and firmware. Maybe OS can call SMC instruction to 
+  dial into firmware and then firmware can check error syndrome registers; 
+  if it finds correctable error then build HEST table. This method will introduce
+  performance issue because it require OS executing SMC every 100ms or so to just
+  poll for correctable error. If you have any other recommendation then please share it.
 
-Once a PSCI component is available we'll move to it.
 
-Thanks,
-Stuart
+> * Interaction with firmware
+> - When/do we handle interrupts?
+
+We can a properties in dt bindings:
+
+1) "num-interrupts = 1" - number of interrupt count. One interrupts per cluster
+    e.g if you have 4 cluster then num-interrupts=4.
+2) interrupts = <0, 92, 0> <0, 94, 0> <0, 96, 0> <0, 98, 0>  // interrupt mapping
+
+If num-interrupts = 0, then firmware handles interrupts. Optionally we can use HEST FIRMWARE-FIRST
+bit, if bit is set then firmware is handling the interrupt otherwise use DT information.
+
+>
+>  - When is it valid to write back and clear an error? We should not do
+>    this behind the back of any firmware that owns the interface.
+
+As per A57 TRM is concerned you are right both the correctable and uncorrectable 
+error needs to clear VALID bit in L1/L2 syndrome registers. So yes we need to define
+a rule for accessing the registers. I can think of two possible approach here:
+
+1) add "error-syndrome-reg-write-access=1" property in dt.
+   * if '1' then OS has exclusive write backs access to error syndrome register
+   * if '0' then OS will not clear the valid bit on fatal error
+
+  The handler looks like this:
+
+  parse_error_syndrome () {
+   val = read_cpumerrsr
+
+   if (!IS_VALID(val))
+     return
+
+   /* log the error details */
+
+   /* if fatal error and OS does not have exclusive write back access */
+   if (IS_FATAL(val) && !error-syndrom-reg-write-access)
+     return; 
+
+   val = ~(1UL << 31); /* clear valid bit */
+  }
+
+2) Use HEST FIRMWARE-FIRST bit field, if the bit is set then OS should not clear
+   the valid bit on fatal error and similarly if bit is clear then OS clears the VALID bit.
+
+Since firmware will never handle the correctable error hence its always safe to clear
+the VALID bit on non-fatal error. If you have any other suggestions then please share it.
+
+I am not pushing my use-case only; I am trying to work through current hardware
+limitation and still support all the possibilities. I am open to hear your suggestions.
+I am also not well versed on big.LITTILE CPU, so you may need to point me on right 
+direction as we progress. My testing is limited to Cortex A57.
+
+> 
+> I don't think the use of old_mask is sufficient here, given the mapping
+> of logical to physical ID is arbitrary. For example, we could have CPUs
+> 0,5,6,7 in one cluster, and CPUs 1,2,3,4 in another, and in that case
+> we'd check the first cluster twice.
+> 
+
+Noted. I should use physical ID instead of logical mapping.
+
+> This also is wrong for big.LITTLE; we can't necessarily check on every
+> CPU.
+> 
