@@ -1,67 +1,49 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Fri, 30 Oct 2015 13:37:01 +0100
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 30 Oct 2015 13:42:01 +0100
 Subject: [PATCH] clocksource: dw_apb_timer_of: support timer-based delay
 In-Reply-To: <20151030190929.4c46066c@xhacker>
 References: <1446193659-1698-1-git-send-email-jszhang@marvell.com>
  <56334A1E.7060709@linaro.org> <20151030190929.4c46066c@xhacker>
-Message-ID: <5633646D.7030206@linaro.org>
+Message-ID: <3950525.pKSJGoymu4@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/30/2015 12:09 PM, Jisheng Zhang wrote:
-> Dear Daniel,
->
-> On Fri, 30 Oct 2015 11:44:46 +0100
-> Daniel Lezcano <daniel.lezcano@....> wrote:
->
->> On 10/30/2015 09:27 AM, Jisheng Zhang wrote:
->>> Implement an ARM delay timer to be used for udelay(). This allows us to
->>> skip the delay loop calibration at boot on Marvell BG2, BG2Q, BG2CD
->>> platforms. And after this patch, udelay() will be unaffected by CPU
->>> frequency changes.
->>>
->>> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
->>> ---
->>>    drivers/clocksource/Kconfig           | 10 ++++++++++
->>>    drivers/clocksource/dw_apb_timer_of.c | 16 ++++++++++++++++
->>>    2 files changed, 26 insertions(+)
->>>
->>> diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
->>> index a7726db..7b081805 100644
->>> --- a/drivers/clocksource/Kconfig
->>> +++ b/drivers/clocksource/Kconfig
->>> @@ -29,6 +29,16 @@ config DW_APB_TIMER_OF
->>>    	select DW_APB_TIMER
->>>    	select CLKSRC_OF
->>>
->>> +config DW_APB_TIMER_BASED_DELAY
->>> +	bool "DW APB timer based delay"
->>> +	depends on ARM && DW_APB_TIMER_OF
->>> +	default n
->>> +	help
->>> +	  This option enables support for using the DW APB timer to
->>> +	  implement timer-based delay. It is useful for skiping the
->>> +	  delay loop calibration at boot on some platforms. And the
->>> +	  udelay() will be unaffected by CPU frequency changes.
->>> +
->>
->> Why do you want it to be optional ?
->>
->
+On Friday 30 October 2015 19:09:29 Jisheng Zhang wrote:
+> > > diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
+> > > index a7726db..7b081805 100644
+> > > --- a/drivers/clocksource/Kconfig
+> > > +++ b/drivers/clocksource/Kconfig
+> > > @@ -29,6 +29,16 @@ config DW_APB_TIMER_OF
+> > >     select DW_APB_TIMER
+> > >     select CLKSRC_OF
+> > >
+> > > +config DW_APB_TIMER_BASED_DELAY
+> > > +   bool "DW APB timer based delay"
+> > > +   depends on ARM && DW_APB_TIMER_OF
+> > > +   default n
+> > > +   help
+> > > +     This option enables support for using the DW APB timer to
+> > > +     implement timer-based delay. It is useful for skiping the
+> > > +     delay loop calibration at boot on some platforms. And the
+> > > +     udelay() will be unaffected by CPU frequency changes.
+> > > +  
+> > 
+> > Why do you want it to be optional ?
+> > 
+> 
 > Because in some platforms which has arm arch timer, this dw apb timer
 > delay isn't needed, the arch timer is better. So we want it be optional
 > so that the platforms which need this feature select it manually when config
 > the kernel.
+> 
 
-Correct me if I am wrong. If you have the arch timer, you don't need the 
-dw apb timer at all, no ? So the selection would be arch arm timer *or* 
-dw_apb_timer ? not arch_arm_timer for delay and dw_apb_timer for 
-clockevents, right ?
+This is not ideal from an overall maintenance perspective. We want to
+be able to have a kernel with all drivers enabled that gives us the
+best behavior on all platforms.
 
+The current behavior appears to be that we override all previous
+registrations as long as the new one is higher resolution. Is that
+the case here? I.e. does the arch timer have a lower resultion than
+the dw-apb timer but have some other advantages?
 
--- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+	Arnd
