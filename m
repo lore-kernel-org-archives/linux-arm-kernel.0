@@ -1,60 +1,70 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Fri, 30 Oct 2015 18:26:53 +0000
-Subject: [PATCH 0/7] kvmtool: Cleanup kernel loading
-Message-ID: <1446229620-28088-1-git-send-email-andre.przywara@arm.com>
+Date: Fri, 30 Oct 2015 18:26:55 +0000
+Subject: [PATCH 2/7] provide generic read_file() implementation
+In-Reply-To: <1446229620-28088-1-git-send-email-andre.przywara@arm.com>
+References: <1446229620-28088-1-git-send-email-andre.przywara@arm.com>
+Message-ID: <1446229620-28088-3-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+In various parts of kvmtool we simply try to read files into memory,
+but fail to do so in a safe way. The read(2) syscall can return early
+having only parts of the file read, or it may return -1 due to being
+interrupted by a signal (in which case we should simply retry).
+The ARM code seems to provide the only safe implementation, so take
+that as an inspiration to provide a generic read_file() function
+usable by every part of kvmtool.
 
-this series cleans up kvmtool's kernel loading functionality a bit.
-It has been broken out of a previous series I sent [1] and contains
-just the cleanup and bug fix parts, which should be less controversial
-and thus easier to merge ;-)
-I will resend the pipe loading part later on as a separate series.
+Signed-off-by: Andre Przywara <andre.przywara@arm.com>
+---
+ include/kvm/read-write.h |  2 ++
+ util/read-write.c        | 21 +++++++++++++++++++++
+ 2 files changed, 23 insertions(+)
 
-The first patch properly abstracts kernel loading to move
-responsibility into each architecture's code. It removes quite some
-ugly code from the generic kvm.c file.
-The later patches address the naive usage of read(2) to, well, read
-data from files. Doing this without coping with the subtleties of
-the UNIX read semantics (returning with less or none data read is not
-an error) can provoke hard to debug failures.
-So these patches make use of the existing and one new wrapper function
-to make sure we read everything we actually wanted to.
-The last patch moves the ARM kernel loading code into the proper
-location to be in line with the other architectures.
-
-Please have a look and give some comments!
-
-Find the branch on my kvmtool git tree on:
-git://linux-arm.org/kvmtool.git (kern_load-v2 branch)
-http://www.linux-arm.org/git?p=kvmtool.git;a=shortlog;h=refs/heads/kern_load-v2
-
-Cheers,
-Andre.
-
-[1] http://marc.info/?l=kvm&m=143825354808135&w=2
-
-Andre Przywara (7):
-  Refactor kernel image loading
-  provide generic read_file() implementation
-  powerpc: use read_file() in kernel and initrd loading
-  MIPS: use read wrappers in kernel loading
-  x86: use read wrappers in kernel loading
-  arm/arm64: use read_file() in kernel and initrd loading
-  arm: move kernel loading into arm/kvm.c
-
- arm/fdt.c                | 99 +-----------------------------------------------
- arm/kvm.c                | 88 ++++++++++++++++++++++++++++++++++++++++++
- include/kvm/kvm.h        |  5 +--
- include/kvm/read-write.h |  2 +
- kvm.c                    | 42 ++------------------
- mips/kvm.c               | 57 ++++++++++++++++++----------
- powerpc/kvm.c            | 39 ++++++++++---------
- util/read-write.c        | 21 ++++++++++
- x86/kvm.c                | 62 +++++++++++++++---------------
- 9 files changed, 207 insertions(+), 208 deletions(-)
-
+diff --git a/include/kvm/read-write.h b/include/kvm/read-write.h
+index 67571f9..acbd6f0 100644
+--- a/include/kvm/read-write.h
++++ b/include/kvm/read-write.h
+@@ -12,6 +12,8 @@
+ ssize_t xread(int fd, void *buf, size_t count);
+ ssize_t xwrite(int fd, const void *buf, size_t count);
+ 
++ssize_t read_file(int fd, char *buf, size_t max_size);
++
+ ssize_t read_in_full(int fd, void *buf, size_t count);
+ ssize_t write_in_full(int fd, const void *buf, size_t count);
+ 
+diff --git a/util/read-write.c b/util/read-write.c
+index 44709df..bf6fb2f 100644
+--- a/util/read-write.c
++++ b/util/read-write.c
+@@ -32,6 +32,27 @@ restart:
+ 	return nr;
+ }
+ 
++/*
++ * Read in the whole file while not exceeding max_size bytes of the buffer.
++ * Returns -1 (with errno set) in case of an error (ENOMEM if buffer was
++ * too small) or the filesize if the whole file could be read.
++ */
++ssize_t read_file(int fd, char *buf, size_t max_size)
++{
++	ssize_t ret;
++	char dummy;
++
++	errno = 0;
++	ret = read_in_full(fd, buf, max_size);
++
++	/* Probe whether we reached EOF. */
++	if (xread(fd, &dummy, 1) == 0)
++		return ret;
++
++	errno = ENOMEM;
++	return -1;
++}
++
+ ssize_t read_in_full(int fd, void *buf, size_t count)
+ {
+ 	ssize_t total = 0;
 -- 
 2.5.1
