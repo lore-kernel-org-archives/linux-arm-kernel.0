@@ -1,52 +1,249 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Fri, 30 Oct 2015 10:51:45 -0700
-Subject: [PATCH 1/3] mtd: create a partition type device tree binding
-In-Reply-To: <CACRpkdYS5Jf8UC2K0bNdEQZDjTeZZx44Uu-kkof+9E=4Ny0oDg@mail.gmail.com>
-References: <1446123152-22666-1-git-send-email-linus.walleij@linaro.org>
- <20151029162908.GA13275@localhost>
- <CACRpkdYS5Jf8UC2K0bNdEQZDjTeZZx44Uu-kkof+9E=4Ny0oDg@mail.gmail.com>
-Message-ID: <20151030175145.GF13239@google.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Fri, 30 Oct 2015 17:52:40 +0000
+Subject: [PATCH v2 3/5] watchdog: ts4800: add driver for TS-4800 watchdog
+In-Reply-To: <20151030172807.GD4058@x1>
+References: <1446150450-22093-1-git-send-email-damien.riegel@savoirfairelinux.com>
+ <1446150450-22093-4-git-send-email-damien.riegel@savoirfairelinux.com>
+ <20151030172807.GD4058@x1>
+Message-ID: <20151030175240.GE4058@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 30, 2015 at 03:00:57PM +0100, Linus Walleij wrote:
-> On Thu, Oct 29, 2015 at 5:29 PM, Brian Norris
-> <computersforpeace@gmail.com> wrote:
+<whoops, I fat fingered the keyboard and sent this too early>
+
+> Where is your change-log?
 > 
-> >> +Required properties:
-> >> +- partition-type : the type of partition. Only one type can be specified.
-> >
-> > You're supporting this as a list property (for future expansion,
-> > presumably), so I can only assume the "only one type" is referring to
-> > the number of different parsers available currently, not the behavior of
-> > the property itself?
+> I have no idea what the intention of this patch is.
+
+FYI, the reason I left editing and subsequently sent by mistake was
+that I had to jump out to look at the subject in order to find the aim
+of this patch.
+
+> > Signed-off-by: Damien Riegel <damien.riegel@savoirfairelinux.com>
+> > ---
+> >  .../devicetree/bindings/mfd/ts4800-syscon.txt      |   8 +
+> >  .../devicetree/bindings/watchdog/ts4800-wdt.txt    |  12 ++
 > 
-> I was thinking that it would not be a list actually.
+> These should be in a seperate patch.
 > 
-> The reason being that if you're anyways going to the trouble of
-> specifying exactly what partition type is going to be used, you're
-> not really interested in specifying a few different ones, you know
-> exactly what type it is going to be.
+> >  drivers/mfd/Kconfig                                |   1 +
+> >  drivers/mfd/ts4800-syscon.c                        |  13 +-
+> >  drivers/watchdog/Kconfig                           |  10 +
+> >  drivers/watchdog/Makefile                          |   1 +
+> >  drivers/watchdog/ts4800_wdt.c                      | 216 +++++++++++++++++++++
+> >  7 files changed, 260 insertions(+), 1 deletion(-)
+> >  create mode 100644 Documentation/devicetree/bindings/watchdog/ts4800-wdt.txt
+> >  create mode 100644 drivers/watchdog/ts4800_wdt.c
+> > 
+> > diff --git a/Documentation/devicetree/bindings/mfd/ts4800-syscon.txt b/Documentation/devicetree/bindings/mfd/ts4800-syscon.txt
+> > index 8dbc12c..8c0fd1d 100644
+> > --- a/Documentation/devicetree/bindings/mfd/ts4800-syscon.txt
+> > +++ b/Documentation/devicetree/bindings/mfd/ts4800-syscon.txt
+> > @@ -4,9 +4,17 @@ Required properties:
+> >  - compatible : must be "ts,ts4800-syscon"
+> >  - reg : physical base address and length of memory mapped region
+> >  
+> > +The driver exposes following subdevices:
 
-OK, that makes sense. I think it's still *possible* that a board might
-have the option of more than one partition parser, and so they might
-just include both in the DTS, but that seems unlikely and so it makes
-sense not to (over)engineer for it before it's needed. Anyway, your
-binding can easily be expanded in the future if needed.
+s/exposes/registers/
 
-> But if you think it needs to be a list, I'll specify that, no big
-> deal. I'll also try to get the Linux code to handle a list then.
+> > +- a watchdog: see ../watchdog/ts4800-wdt.txt
 
-No, I think your proposal is OK then. It's possible there is some room
-for clarification in the binding, since I was confused, but that could
-mostly be attributed to my pre-existing assumptions, not a fault of the
-text.
+Remove the 'a'.
 
-> > Also, this patch will conflict with [1]. I'll probably take [1] soon, so
-> > one of us will have to rebase this.
+> >  Example:
+> >  
+> >  syscon at b0010000 {
+> >  	compatible = "ts,ts4800-syscon";
+> >  	reg = <0xb0010000 0x3d>;
+> > +
+> > +	wdt at e {
+> > +		compatible = "ts,ts4800-wdt";
+> > +		offset = <0xe>;
+> > +	};
+> >  };
+> > diff --git a/Documentation/devicetree/bindings/watchdog/ts4800-wdt.txt b/Documentation/devicetree/bindings/watchdog/ts4800-wdt.txt
+> > new file mode 100644
+> > index 0000000..a9305c2
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/watchdog/ts4800-wdt.txt
+> > @@ -0,0 +1,12 @@
+> > +Technologic Systems Watchdog
+> > +
+> > +Required properties:
+> > +- compatible : must be "ts,ts4800-wdt"
+> > +- offset : offset of the feed register from syscon base
+
+What's a 'feed' register?
+
+Also, 'offset' is a generic property that is undocumented in this
+context.  *If* there is no other generic interface to achieve whatever
+it is you're trying to achieve, then you probably want a vendor
+specific property.  However, I'm pretty sure there will be other
+means.
+
+Does the 'feed' register change from platform to platform?
+
+> > +Example:
+> > +
+> > +wdt1: wdt at b0010000 {
+> > +	compatible = "ts,ts4800-wdt";
+> > +	offset = <0xe>;
+
+Why don't you have a 'reg' property?
+
+> > +};
+> > diff --git a/drivers/mfd/Kconfig b/drivers/mfd/Kconfig
+> > index 8f03dce..95ba036 100644
+> > --- a/drivers/mfd/Kconfig
+> > +++ b/drivers/mfd/Kconfig
+> > @@ -1304,6 +1304,7 @@ config MFD_TC6393XB
+> >  
+> >  config MFD_TS4800_SYSCON
+> >  	tristate "TS-4800 Syscon Support"
+> > +	select MFD_CORE
+> >  	select REGMAP
+> >  	select REGMAP_MMIO
+> >  	help
 > 
-> Sure I'll rebase on whatever you say.
+> This change is orthogonal and has not place in this patch.
 
-OK, I'll let you know.
+Meaning all of your drviers/mfd changes.
 
-Brian
+> > diff --git a/drivers/mfd/ts4800-syscon.c b/drivers/mfd/ts4800-syscon.c
+> > index 1e42e96..03b3b04a 100644
+> > --- a/drivers/mfd/ts4800-syscon.c
+> > +++ b/drivers/mfd/ts4800-syscon.c
+> > @@ -24,6 +24,13 @@
+> >  #include <linux/mfd/ts4800-syscon.h>
+> >  
+> >  
+> > +static const struct mfd_cell ts4800_syscon_cells[] = {
+> > +	{
+> > +		.name = "ts4800-watchdog",
+> > +		.of_compatible = "ts,ts4800-wdt",
+> > +	},
+> > +};
+> > +
+> >  static const struct regmap_config ts4800_regmap_config = {
+> >  	.reg_bits = 32,
+> >  	.reg_stride = 2,
+> > @@ -56,11 +63,15 @@ static int ts4800_syscon_probe(struct platform_device *pdev)
+> >  
+> >  	platform_set_drvdata(pdev, syscon);
+> >  
+> > -	return 0;
+> > +	return mfd_add_devices(&pdev->dev, -1, ts4800_syscon_cells,
+
+Please use the correct #define instead of -1.
+
+> > +			       ARRAY_SIZE(ts4800_syscon_cells),
+> > +			       NULL, 0, NULL);
+> >  }
+> >  
+> >  static int ts4800_syscon_remove(struct platform_device *pdev)
+> >  {
+> > +	mfd_remove_devices(&pdev->dev);
+> > +
+> >  	return 0;
+> >  }
+> >  
+> > diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
+> > index 241fafd..aaa42b8 100644
+> > --- a/drivers/watchdog/Kconfig
+> > +++ b/drivers/watchdog/Kconfig
+> > @@ -417,6 +417,16 @@ config NUC900_WATCHDOG
+> >  	  To compile this driver as a module, choose M here: the
+> >  	  module will be called nuc900_wdt.
+> >  
+> > +config TS4800_WATCHDOG
+> > +	tristate "TS-4800 Watchdog"
+> > +	depends on OF
+> > +	depends on MFD_TS4800_SYSCON
+> > +	select WATCHDOG_CORE
+> > +	help
+> > +	  Technologic Systems TS-4800 has watchdog timer implemented in
+> > +	  an external FPGA. Say Y here if you want to support for the
+> > +	  watchdog timer on TS-4800 board.
+> > +
+> >  config TS72XX_WATCHDOG
+> >  	tristate "TS-72XX SBC Watchdog"
+> >  	depends on MACH_TS72XX
+> > diff --git a/drivers/watchdog/Makefile b/drivers/watchdog/Makefile
+> > index 59ea9a1..435fc93 100644
+> > --- a/drivers/watchdog/Makefile
+> > +++ b/drivers/watchdog/Makefile
+> > @@ -52,6 +52,7 @@ obj-$(CONFIG_RN5T618_WATCHDOG) += rn5t618_wdt.o
+> >  obj-$(CONFIG_COH901327_WATCHDOG) += coh901327_wdt.o
+> >  obj-$(CONFIG_STMP3XXX_RTC_WATCHDOG) += stmp3xxx_rtc_wdt.o
+> >  obj-$(CONFIG_NUC900_WATCHDOG) += nuc900_wdt.o
+> > +obj-$(CONFIG_TS4800_WATCHDOG) += ts4800_wdt.o
+> >  obj-$(CONFIG_TS72XX_WATCHDOG) += ts72xx_wdt.o
+> >  obj-$(CONFIG_IMX2_WDT) += imx2_wdt.o
+> >  obj-$(CONFIG_UX500_WATCHDOG) += ux500_wdt.o
+> > diff --git a/drivers/watchdog/ts4800_wdt.c b/drivers/watchdog/ts4800_wdt.c
+> > new file mode 100644
+> > index 0000000..9b9e638
+> > --- /dev/null
+> > +++ b/drivers/watchdog/ts4800_wdt.c
+> > @@ -0,0 +1,216 @@
+> > +/*
+> > + * ts4800_wdt.c - Watchdog driver for TS-4800 based boards
+
+Not sure what Wim's view are, but it's usually better *not* to put
+filenames in C files.
+
+> > + * Copyright (c) 2015 - Savoir-faire Linux
+> > + *
+> > + * This file is licensed under the terms of the GNU General Public
+> > + * License version 2. This program is licensed "as is" without any
+> > + * warranty of any kind, whether express or implied.
+> > + */
+> > +
+> > +#include <linux/module.h>
+> > +#include <linux/kernel.h>
+> > +#include <linux/watchdog.h>
+> > +#include <linux/platform_device.h>
+> > +#include <linux/io.h>
+> > +#include <linux/of.h>
+> > +#include <linux/mfd/ts4800-syscon.h>
+
+Alphabetical.
+
+> > +static bool nowayout = WATCHDOG_NOWAYOUT;
+> > +module_param(nowayout, bool, 0);
+> > +MODULE_PARM_DESC(nowayout,
+> > +	"Watchdog cannot be stopped once started (default="
+> > +	__MODULE_STRING(WATCHDOG_NOWAYOUT) ")");
+> > +
+> > +
+
+Superfluous '\n'.
+
+> > +/* possible feed values */
+> > +#define TS4800_WDT_FEED_2S	0x1
+> > +#define TS4800_WDT_FEED_10S	0x2
+> > +#define TS4800_WDT_DISABLE	0x3
+
+Nit: Tabbing.  Alignment.
+
+> > +
+> > +
+
+Superfluous '\n'.
+
+[...]
+
+> > +MODULE_AUTHOR("Damien Riegel <damien.riegel@savoirfairelinux.com>");
+> > +MODULE_LICENSE("GPL");
+
+GPL v2
+
+> > +MODULE_ALIAS("platform:ts4800_wdt");
+> 
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
