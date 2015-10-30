@@ -1,82 +1,108 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Fri, 30 Oct 2015 11:15:18 -0700
-Subject: [PATCH v5 2/3] mtd: mtk-nor: mtk serial flash controller driver
-In-Reply-To: <1445866839-31063-3-git-send-email-bayi.cheng@mediatek.com>
-References: <1445866839-31063-1-git-send-email-bayi.cheng@mediatek.com>
- <1445866839-31063-3-git-send-email-bayi.cheng@mediatek.com>
-Message-ID: <20151030181518.GG13239@google.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Fri, 30 Oct 2015 18:21:13 +0000
+Subject: [PATCH] pwm-backlight: Avoid backlight flicker when probed from DT
+In-Reply-To: <1446133906-3076-1-git-send-email-p.zabel@pengutronix.de>
+References: <1446133906-3076-1-git-send-email-p.zabel@pengutronix.de>
+Message-ID: <20151030182113.GH4058@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bayi,
+On Thu, 29 Oct 2015, Philipp Zabel wrote:
 
-In reviewing your updated instructions on how to read 6 bytes of ID, I
-have one more question about how the PRGDATA and SHREG registers are
-supposed to work.
+> If the driver is probed from the device tree, and there is a phandle
+> property set on it, and the enable GPIO is already configured as output,
+> and the backlight is currently disabled, keep it disabled.
+> If all these conditions are met, assume there will be some other driver
+> that can enable the backlight at the appropriate time.
+> 
+> Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+> Reviewed-by: Christian Gmeiner <christian.gmeiner@gmail.com>
+> ---
+> Changes since v2:
+>  - Leave GPIO configuration as is (GPIOD_ASIS) when requesting,
+>    so we can actually check the initial state.
+> ---
+>  drivers/video/backlight/pwm_bl.c | 25 ++++++++++++++++++++++++-
+>  1 file changed, 24 insertions(+), 1 deletion(-)
+> 
+> diff --git a/drivers/video/backlight/pwm_bl.c b/drivers/video/backlight/pwm_bl.c
+> index ae3c6b6..8e9c261 100644
+> --- a/drivers/video/backlight/pwm_bl.c
+> +++ b/drivers/video/backlight/pwm_bl.c
+> @@ -199,6 +199,8 @@ static int pwm_backlight_probe(struct platform_device *pdev)
+>  	struct backlight_properties props;
+>  	struct backlight_device *bl;
+>  	struct pwm_bl_data *pb;
+> +	int initial_blank = FB_BLANK_UNBLANK;
+> +	bool phandle;
+>  	int ret;
+>  
+>  	if (!data) {
+> @@ -242,7 +244,7 @@ static int pwm_backlight_probe(struct platform_device *pdev)
+>  	pb->enabled = false;
+>  
+>  	pb->enable_gpio = devm_gpiod_get_optional(&pdev->dev, "enable",
+> -						  GPIOD_OUT_HIGH);
+> +						  GPIOD_ASIS);
+>  	if (IS_ERR(pb->enable_gpio)) {
+>  		ret = PTR_ERR(pb->enable_gpio);
+>  		goto err_alloc;
+> @@ -264,12 +266,32 @@ static int pwm_backlight_probe(struct platform_device *pdev)
+>  		pb->enable_gpio = gpio_to_desc(data->enable_gpio);
+>  	}
+>  
+> +	phandle = of_find_property(pdev->dev.of_node, "phandle", NULL) != NULL;
 
-On Mon, Oct 26, 2015 at 09:40:38PM +0800, Bayi Cheng wrote:
-[...]
-> +static void mt8173_nor_set_read_mode(struct mt8173_nor *mt8173_nor)
-> +{
-> +	struct spi_nor *nor = &mt8173_nor->nor;
-> +
-> +	writeb(nor->read_opcode, mt8173_nor->base + MTK_NOR_PRGDATA3_REG);
+This is a little ugly.
 
-So far, I've generalized your code to say that except for a few commands
-that are treated specially by your controller, all other opcodes are
-queued up in the program/shift register this:
+If this is the only way to identify the probedness of a device then
+you probably want to neaten it up a little.  I suggest something along
+the lines of:
 
-(1) total number of bits to send/receive goes in the COUNT register (so
-    far, as many as 7*8=56?)
-(2) opcode is written to PRGDATA5
-(3) other "transmit" data (like addresses), if any, are placed on PRGDATA4..0
-(4) command is sent (execute_cmd())
-(5) data is read back in SHREG{X..0}, if needed
+if (of_find_property(pdev->dev.of_node, "phandle", NULL))
+	already_probed = true;
 
-However, I see that
+Also, do you also want to check for "linux,phandle", as this is always
+catered for in drivers/of/*
 
-(a) here in mt8173_nor_set_read_mode(), you use only PRGDATA3 (i.e.,
-this is different than step (2) above). Why is that different? Is this
-just a quirk of the read mode, which is different than the other
-arbitrary opcodes (like READ ID)?
-
-(b) it's really unclear how to determine 'X' in step (5). It seems like
-it might just be the number of bytes minus 1, since the first byte
-aligns with the "opcode" cycle. But I'm not really sure, since in one
-case (the 'default' in mt8173_nor_read_reg()) you seemingly randomly
-chose to read *only* from SHREG2. That looks wrong to me, but I don't
-actually know, because your SoC is very unclear.
-
-My patch at the end of this [1] tries to encapsulate (1)-(5) as best as
-I could, but it's really missing out on the answer to (b).
-
-Anyway, I'd really appreciate a good answer to these questions. We
-really need to get this stuff right, so your driver can handle NOR flash
-opcodes as generically as possible. Right now, your driver mostly looks
-like a series of cobbled together switch/case statements to handle the
-couple of opcodes you've tested.
-
-Regard,
-Brian
-
-[1] http://lists.infradead.org/pipermail/linux-mtd/2015-October/062919.html
-
-> +	switch (nor->flash_read) {
-> +	case SPI_NOR_FAST:
-> +		writeb(MTK_NOR_FAST_READ, mt8173_nor->base +
-> +		       MTK_NOR_CFG1_REG);
-> +		break;
-> +	case SPI_NOR_DUAL:
-> +		writeb(MTK_NOR_DUAL_READ_EN, mt8173_nor->base +
-> +		       MTK_NOR_DUAL_REG);
-> +		break;
-> +	case SPI_NOR_QUAD:
-> +		writeb(MTK_NOR_QUAD_READ_EN, mt8173_nor->base +
-> +		       MTK_NOR_DUAL_REG);
-> +		break;
-> +	default:
-> +		writeb(MTK_NOR_DUAL_DISABLE, mt8173_nor->base +
-> +		       MTK_NOR_DUAL_REG);
-> +		break;
+> +	if (pb->enable_gpio) {
+> +		/*
+> +		 * If the driver is probed from the device tree and there is a
+> +		 * phandle link pointing to the backlight node, it is safe to
+> +		 * assume that another driver will enable the backlight at the
+> +		 * appropriate time. Therefore, if it is disabled, keep it so.
+> +		 */
+> +		if (phandle &&
+> +		    gpiod_get_direction(pb->enable_gpio) == GPIOF_DIR_OUT &&
+> +		    gpiod_get_value(pb->enable_gpio) == 0)
+> +			initial_blank = FB_BLANK_POWERDOWN;
+> +		else
+> +			gpiod_direction_output(pb->enable_gpio, 1);
 > +	}
-> +}
+> +
+>  	pb->power_supply = devm_regulator_get(&pdev->dev, "power");
+>  	if (IS_ERR(pb->power_supply)) {
+>  		ret = PTR_ERR(pb->power_supply);
+>  		goto err_alloc;
+>  	}
+>  
+> +	if (phandle && !regulator_is_enabled(pb->power_supply))
+> +		initial_blank = FB_BLANK_POWERDOWN;
+> +
+>  	pb->pwm = devm_pwm_get(&pdev->dev, NULL);
+>  	if (IS_ERR(pb->pwm) && PTR_ERR(pb->pwm) != -EPROBE_DEFER
+>  	    && !pdev->dev.of_node) {
+> @@ -320,6 +342,7 @@ static int pwm_backlight_probe(struct platform_device *pdev)
+>  	}
+>  
+>  	bl->props.brightness = data->dft_brightness;
+> +	bl->props.power = initial_blank;
+>  	backlight_update_status(bl);
+>  
+>  	platform_set_drvdata(pdev, bl);
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
