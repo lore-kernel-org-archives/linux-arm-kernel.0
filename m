@@ -1,55 +1,127 @@
-From: yh.huang@mediatek.com (YH Huang)
-Date: Fri, 30 Oct 2015 15:41:40 +0800
-Subject: [PATCH v2] pwm-backlight: fix the panel power sequence
-In-Reply-To: <1446133259.3274.52.camel@pengutronix.de>
-References: <1444987060-48202-1-git-send-email-yh.huang@mediatek.com>
- <1444988219.3541.3.camel@pengutronix.de>
- <1445526750.27586.8.camel@mtksdaap41>
- <1446133259.3274.52.camel@pengutronix.de>
-Message-ID: <1446190900.17558.16.camel@mtksdaap41>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Fri, 30 Oct 2015 15:46:29 +0800
+Subject: [PATCH v4 1/6] clk: sunxi: Let divs clocks read the base factor
+ clock name from devicetree
+In-Reply-To: <1445964626-6484-2-git-send-email-jenskuske@gmail.com>
+References: <1445964626-6484-1-git-send-email-jenskuske@gmail.com>
+ <1445964626-6484-2-git-send-email-jenskuske@gmail.com>
+Message-ID: <CAGb2v670cXEPcUFLtsCMFD+s6zUSt+wQg553QXCQHtDtRh9Xmg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Hpilipp,
+On Wed, Oct 28, 2015 at 12:50 AM, Jens Kuske <jenskuske@gmail.com> wrote:
+> Currently, the sunxi clock driver gets the name for the base factor clock
+> of divs clocks from the name field in factors_data. This prevents reusing
+> of the factor clock for clocks with same properties, but different name.
+>
+> This commit makes the divs setup function try to get a name from
+> clock-output-names in the devicetree. It also removes the name field where
+> possible and merges the sun4i PLL5 and PLL6 clocks.
 
-On Thu, 2015-10-29 at 16:40 +0100, Philipp Zabel wrote:
-> Hi YH,
-> 
-> Am Donnerstag, den 22.10.2015, 23:12 +0800 schrieb YH Huang:
-> > In the case of the panel disabled by the bootloader,
-> > your patch still has the following code and always enables the backlight
-> > in the probe function.
-> > pb->enable_gpio = devm_gpiod_get_optional(&pdev->dev, "enable",
-> > -						  GPIOD_OUT_HIGH);
-> 
-> You are right.
-> 
-> > What do you think if I remove these two lines in my patch?
-> > if (pb->enable_gpio)
-> > 	gpiod_direction_output(pb->enable_gpio, 0);
-> 
-> That won't work if the gpio is still configured as input. How about I
-> add the GPIOD_ASIS change to my patch you remove that and the above from
-> yours?
+This patch actually removes all static declarations of the name field,
+which is a good thing!
 
-I revise these two lines 
-if (pb->enable_gpio)
-	gpiod_direction_output(pb->enable_gpio, 0);
-into
-if (pb->enable_gpio) {
-	if(gpiod_get_value(pb->enable_gpio) == 0)
-		gpiod_direction_output(pb->enable_gpio, 0);
-	else
-		gpiod_direction_output(pb->enable_gpio, 1);
-}
+>
+> Signed-off-by: Jens Kuske <jenskuske@gmail.com>
+> ---
+>  drivers/clk/sunxi/clk-sunxi.c | 38 +++++++++++++++++++++++++++-----------
+>  1 file changed, 27 insertions(+), 11 deletions(-)
+>
+> diff --git a/drivers/clk/sunxi/clk-sunxi.c b/drivers/clk/sunxi/clk-sunxi.c
+> index 9c79af0c..270de42 100644
+> --- a/drivers/clk/sunxi/clk-sunxi.c
+> +++ b/drivers/clk/sunxi/clk-sunxi.c
+> @@ -704,21 +704,12 @@ static const struct factors_data sun4i_pll5_data __initconst = {
+>         .enable = 31,
+>         .table = &sun4i_pll5_config,
+>         .getter = sun4i_get_pll5_factors,
+> -       .name = "pll5",
+> -};
+> -
+> -static const struct factors_data sun4i_pll6_data __initconst = {
+> -       .enable = 31,
+> -       .table = &sun4i_pll5_config,
+> -       .getter = sun4i_get_pll5_factors,
+> -       .name = "pll6",
+>  };
+>
+>  static const struct factors_data sun6i_a31_pll6_data __initconst = {
+>         .enable = 31,
+>         .table = &sun6i_a31_pll6_config,
+>         .getter = sun6i_a31_get_pll6_factors,
+> -       .name = "pll6x2",
+>  };
+>
+>  static const struct factors_data sun5i_a13_ahb_data __initconst = {
+> @@ -902,6 +893,7 @@ struct gates_data {
+>
+>  #define SUNXI_DIVS_MAX_QTY     4
+>  #define SUNXI_DIVISOR_WIDTH    2
+> +#define SUNXI_DIVS_BASE_NAME_MAX_LEN   8
+>
+>  struct divs_data {
+>         const struct factors_data *factors; /* data for the factor clock */
+> @@ -941,7 +933,7 @@ static const struct divs_data pll5_divs_data __initconst = {
+>  };
+>
+>  static const struct divs_data pll6_divs_data __initconst = {
+> -       .factors = &sun4i_pll6_data,
+> +       .factors = &sun4i_pll5_data,
+>         .ndivs = 4,
+>         .div = {
+>                 { .shift = 0, .table = pll6_sata_tbl, .gate = 14 }, /* M, SATA */
+> @@ -983,6 +975,8 @@ static void __init sunxi_divs_clk_setup(struct device_node *node,
+>         struct clk_gate *gate = NULL;
+>         struct clk_fixed_factor *fix_factor;
+>         struct clk_divider *divider;
+> +       struct factors_data factors = *data->factors;
+> +       char base_name[SUNXI_DIVS_BASE_NAME_MAX_LEN];
+>         void __iomem *reg;
+>         int ndivs = SUNXI_DIVS_MAX_QTY, i = 0;
+>         int flags, clkflags;
+> @@ -991,8 +985,30 @@ static void __init sunxi_divs_clk_setup(struct device_node *node,
+>         if (data->ndivs)
+>                 ndivs = data->ndivs;
+>
+> +       /* Try to find a name for base factor clock */
+> +       for (i = 0; i < ndivs; i++) {
+> +               if (data->div[i].self) {
+> +                       of_property_read_string_index(node, "clock-output-names",
+> +                                                     i, &factors.name);
+> +                       break;
+> +               }
+> +       }
+> +       /* If we don't have a .self clk use the first output-name up to '_' */
 
-I am not sure what "phandle" is working for.
-My change is like your patch but remove the "phandle related" and
-"gpiod_get_direction(pb->enable_gpio) == GPIOF_DIR_OUT".
-Do we really need these?
+This actually only works for the sun4i divs clocks. sun6i-a31-pll6 uses a
+different naming convention. sun4i-a10-pll2 uses yet another, though that's
+not a divs clock. Maybe we should work on unifying them. Maxime?
 
-Also, do you think it is right that I do the "pwm_enable(pb->pwm);"
-before "gpiod_set_value(pb->enable_gpio, 1);" in power on function?
+Other than these 2 bits of information, this patch looks good.
 
-Regards,
-YH Huang
+
+Regards
+ChenYu
+
+> +       if (factors.name == NULL) {
+> +               of_property_read_string_index(node, "clock-output-names",
+> +                                                     0, &clk_name);
+> +
+> +               for (i = 0; i < SUNXI_DIVS_BASE_NAME_MAX_LEN - 1 &&
+> +                                               clk_name[i] != '_' &&
+> +                                               clk_name[i] != '\0'; i++)
+> +                       base_name[i] = clk_name[i];
+> +
+> +               base_name[i] = '\0';
+> +               factors.name = base_name;
+> +       }
+> +
+>         /* Set up factor clock that we will be dividing */
+> -       pclk = sunxi_factors_clk_setup(node, data->factors);
+> +       pclk = sunxi_factors_clk_setup(node, &factors);
+>         parent = __clk_get_name(pclk);
+>
+>         reg = of_iomap(node, 0);
+> --
+> 2.6.2
+>
