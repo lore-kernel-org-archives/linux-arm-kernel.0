@@ -1,43 +1,48 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Fri, 30 Oct 2015 13:43:58 +0300
-Subject: [PATCH v5 07/14] arm64: renesas: salvator-x: Sound SSI PIO support
-In-Reply-To: <1446161280-23097-8-git-send-email-horms+renesas@verge.net.au>
-References: <1446161280-23097-1-git-send-email-horms+renesas@verge.net.au>
- <1446161280-23097-8-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <563349EE.8000606@cogentembedded.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Fri, 30 Oct 2015 11:44:46 +0100
+Subject: [PATCH] clocksource: dw_apb_timer_of: support timer-based delay
+In-Reply-To: <1446193659-1698-1-git-send-email-jszhang@marvell.com>
+References: <1446193659-1698-1-git-send-email-jszhang@marvell.com>
+Message-ID: <56334A1E.7060709@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
-
-On 10/30/2015 2:27 AM, Simon Horman wrote:
-
-> From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+On 10/30/2015 09:27 AM, Jisheng Zhang wrote:
+> Implement an ARM delay timer to be used for udelay(). This allows us to
+> skip the delay loop calibration at boot on Marvell BG2, BG2Q, BG2CD
+> platforms. And after this patch, udelay() will be unaffected by CPU
+> frequency changes.
 >
-> This patch adds PIO sound support for Salvator-X board.
->
-> Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
 > ---
->   arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts | 95 ++++++++++++++++++++++
->   1 file changed, 95 insertions(+)
+>   drivers/clocksource/Kconfig           | 10 ++++++++++
+>   drivers/clocksource/dw_apb_timer_of.c | 16 ++++++++++++++++
+>   2 files changed, 26 insertions(+)
 >
-> diff --git a/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts b/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts
-> index 0599b2be90ab..6a7df7e0ef7a 100644
-> --- a/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts
-> +++ b/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts
-[...]
-> @@ -71,4 +103,67 @@
->   	pinctrl-names = "default";
+> diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
+> index a7726db..7b081805 100644
+> --- a/drivers/clocksource/Kconfig
+> +++ b/drivers/clocksource/Kconfig
+> @@ -29,6 +29,16 @@ config DW_APB_TIMER_OF
+>   	select DW_APB_TIMER
+>   	select CLKSRC_OF
 >
->   	status = "okay";
+> +config DW_APB_TIMER_BASED_DELAY
+> +	bool "DW APB timer based delay"
+> +	depends on ARM && DW_APB_TIMER_OF
+> +	default n
+> +	help
+> +	  This option enables support for using the DW APB timer to
+> +	  implement timer-based delay. It is useful for skiping the
+> +	  delay loop calibration at boot on some platforms. And the
+> +	  udelay() will be unaffected by CPU frequency changes.
 > +
-> +	clock-frequency = <100000>;
-> +
-> +	ak4613: codec at 0x10 {
 
-    Please drop "0x" from the node name.
+Why do you want it to be optional ?
 
-[...]
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
 
-MBR, Sergei
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
