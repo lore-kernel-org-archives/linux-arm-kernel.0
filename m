@@ -1,66 +1,150 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 30 Oct 2015 15:20:53 +0100
-Subject: [PATCH 07/19] drm/panel: simple: Add timings for the Olimex
- LCD-OLinuXino-4.3TS
+Date: Fri, 30 Oct 2015 15:20:55 +0100
+Subject: [PATCH 09/19] drm: sun4i: Add DT bindings documentation
 In-Reply-To: <1446214865-3972-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1446214865-3972-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1446214865-3972-8-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1446214865-3972-10-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for the Olimex LCD-OLinuXino-4.3TS panel to the DRM simple
-panel driver.
+The display pipeline of the Allwinner A10 is involving several loosely
+coupled components.
 
-It is a 480x272 panel connected through a 24-bits RGB interface.
+Add a documentation for the bindings.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/gpu/drm/panel/panel-simple.c | 26 ++++++++++++++++++++++++++
- 1 file changed, 26 insertions(+)
+ .../devicetree/bindings/drm/sunxi/sun4i-drm.txt    | 122 +++++++++++++++++++++
+ 1 file changed, 122 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/drm/sunxi/sun4i-drm.txt
 
-diff --git a/drivers/gpu/drm/panel/panel-simple.c b/drivers/gpu/drm/panel/panel-simple.c
-index f97b73ec4713..3a9ecb64d1e6 100644
---- a/drivers/gpu/drm/panel/panel-simple.c
-+++ b/drivers/gpu/drm/panel/panel-simple.c
-@@ -1096,6 +1096,29 @@ static const struct panel_desc shelly_sca07010_bfn_lnn = {
- 	.bus_format = MEDIA_BUS_FMT_RGB666_1X18,
- };
- 
-+static const struct drm_display_mode olimex_lcd_olinuxino_43ts_mode = {
-+	.clock = 9000,
-+	.hdisplay = 480,
-+	.hsync_start = 480 + 5,
-+	.hsync_end = 480 + 5 + 30,
-+	.htotal = 480 + 5 + 30 + 10,
-+	.vdisplay = 272,
-+	.vsync_start = 272 + 8,
-+	.vsync_end = 272 + 8 + 5,
-+	.vtotal = 272 + 8 + 5 + 3,
-+	.vrefresh = 60,
+diff --git a/Documentation/devicetree/bindings/drm/sunxi/sun4i-drm.txt b/Documentation/devicetree/bindings/drm/sunxi/sun4i-drm.txt
+new file mode 100644
+index 000000000000..dbdccef787b4
+--- /dev/null
++++ b/Documentation/devicetree/bindings/drm/sunxi/sun4i-drm.txt
+@@ -0,0 +1,122 @@
++Allwinner A10 Display Pipeline
++==============================
++
++The Allwinner A10 Display pipeline is composed of several components
++that are going to be documented below:
++
++TV Encoder
++----------
++
++The TV Encoder supports the composite and VGA output. It is one end of
++the pipeline.
++
++Required properties:
++ - compatible: value should be "allwinner,sun4i-a10-tv-encoder".
++ - reg: base address and size of memory-mapped region
++ - clocks: the clocks driving the TV encoder
++
++TCON
++----
++
++The TCON acts as a CRTC and encoder for RGB / LVDS interfaces.
++
++Required properties:
++ - compatible: value should be "allwinner,sun4i-a10-tcon".
++ - reg: base address and size of memory-mapped region
++ - interrupts: interrupt associated to this IP
++ - clocks: phandles to the clocks feeding the TCON. Three are needed:
++   - 'ahb': the interface clocks
++   - 'tcon-ch0': The clock driving the TCON channel 0
++   - 'tcon-ch1': The clock driving the TCON channel 0
++
++ - clock-names: the clock names mentionned above
++ - clock-output-names: Name of the pixel clock created
++
++
++Display Engine Backend
++----------------------
++
++The display engine backend exposes layers and sprites to the
++system. It's split into two components, the frontend and backend, the
++frontend doing formats conversion, scaling, deinterlacing, while the
++backend actually manages the layers.
++
++Required properties:
++  - compatible: value must be one of:
++    * allwinner,sun5i-a13-display-engine
++
++  - reg: base address and size of the memory-mapped region. Two are needed:
++    * backend0: registers of the display engine backend
++    * frontend0: registers of the display engine frontend
++  - reg_names: the region names mentionned above.
++
++  - interrupts: frontend interrupt phandle
++
++  - clocks: phandles to the clocks feeding the frontend and backend
++    * backend0-bus: the backend interface clock
++    * backend0-mod: the backend module clock
++    * backend0-ram: the backend DRAM clock
++    * frontend0-bus: the frontend interface clock
++    * frontend0-mod: the frontend module clock
++    * frontend0-ram: the frontend DRAM clock
++  - clock-names: the clock names mentionned above
++
++  - resets: phandles to the reset controllers. Two are needed:
++    * backend0: backend reset controller
++    * frontend0: frontend reset controller
++  - reset-names: the reset names mentionned above
++
++  - allwinner,tcon: phandle to the TCON in our pipeline
++
++Optional properties:
++  - allwinner,tv-encoder: phandle to the TV Encoder in our pipeline
++  - allwinner,panel: phandle to the panel used in our RGB interface
++
++Example:
++
++panel: panel {
++	compatible = "olimex,lcd-olinuxino-43-ts";
 +};
 +
-+static const struct panel_desc olimex_lcd_olinuxino_43ts = {
-+	.modes = &olimex_lcd_olinuxino_43ts_mode,
-+	.num_modes = 1,
-+	.size = {
-+		.width = 105,
-+		.height = 67,
-+	},
-+	.bus_format = MEDIA_BUS_FMT_RGB666_1X18,
++tve: encoder at 01c0a000 {
++	compatible = "allwinner,sun4i-a10-tv-encoder";
++	reg = <0x01c0a000 0x1000>;
++	clocks = <&ahb_gates 34>;
 +};
 +
- static const struct of_device_id platform_of_match[] = {
- 	{
- 		.compatible = "ampire,am800480r3tmqwa1h",
-@@ -1191,6 +1214,9 @@ static const struct of_device_id platform_of_match[] = {
- 		.compatible = "shelly,sca07010-bfn-lnn",
- 		.data = &shelly_sca07010_bfn_lnn,
- 	}, {
-+		.compatible = "olimex,lcd-olinuxino-43-ts",
-+		.data = &olimex_lcd_olinuxino_43ts,
-+	}, {
- 		/* sentinel */
- 	}
- };
++tcon: lcd-controller at 01c0c000 {
++	compatible = "allwinner,sun4i-a10-tcon";
++	reg = <0x01c0c000 0x1000>;
++	interrupts = <44>;
++	clocks = <&ahb_gates 36>,
++		 <&tcon_ch0_clk>,
++		 <&tcon_ch1_clk>;
++	clock-names = "ahb",
++		      "tcon-ch0",
++		      "tcon-ch1";
++	clock-output-names = "tcon-pixel-clock";
++};
++
++de: display-engine at 01e00000 {
++	compatible = "allwinner,sun5i-a13-display-engine";
++	reg = <0x01e00000 0x20000>,
++	      <0x01e60000 0x10000>;
++	reg-names = "frontend0",
++		    "backend0";
++	interrupts = <47>;
++	interrupt-names = "engine0";
++	clocks = <&ahb_gates 46>, <&de_fe_clk>,
++		 <&dram_gates 25>, <&ahb_gates 44>,
++		 <&de_be_clk>, <&dram_gates 26>;
++	clock-names = "frontend0-bus", "frontend0-mod",
++		      "frontend0-ram", "backend0-bus",
++		      "backend0-mod", "backend0-ram";
++	resets = <&de_fe_clk>,
++		 <&de_be_clk>;
++	reset-names = "frontend0",
++		      "backend0";
++
++	allwinner,tcon = <&tcon>;
++	allwinner,tv-encoder = <&tve>;
++	allwinner,panel = <&panel>;
++};
 -- 
 2.6.2
