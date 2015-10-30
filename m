@@ -1,78 +1,82 @@
-From: huawei.libin@huawei.com (Li Bin)
-Date: Fri, 30 Oct 2015 16:31:04 +0800
-Subject: [PATCH 3/3] recordmcount: arm64: replace the ignored mcount call into
- nop
-In-Reply-To: <1446193864-24593-1-git-send-email-huawei.libin@huawei.com>
-References: <1446193864-24593-1-git-send-email-huawei.libin@huawei.com>
-Message-ID: <1446193864-24593-4-git-send-email-huawei.libin@huawei.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 30 Oct 2015 09:38:54 +0100
+Subject: [PATCH v2 1/3] gpio: xgene: add support to configure GPIO line as
+ input, output or external IRQ pin
+In-Reply-To: <CAFopSPQtuVxSn4SkVHtf-0AZE7MqRJ3XQMutCubzMd8CztA8CA@mail.gmail.com>
+References: <1445842175-11446-1-git-send-email-yvo@apm.com>
+ <CACRpkdbWKmRKXL=+57KQVYYRc79tgGwCi=7p4LSBwFgUwgz-gw@mail.gmail.com>
+ <CAFopSPQtuVxSn4SkVHtf-0AZE7MqRJ3XQMutCubzMd8CztA8CA@mail.gmail.com>
+Message-ID: <3805459.UaJmXm5MV7@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-By now, the recordmcount only records the function that in
-following sections:
-.text/.ref.text/.sched.text/.spinlock.text/.irqentry.text/
-.kprobes.text/.text.unlikely
+On Friday 30 October 2015 12:41:03 Quan Nguyen wrote:
+> On Thu, Oct 29, 2015 at 8:28 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> > On Mon, Oct 26, 2015 at 7:49 AM, Y Vo <yvo@apm.com> wrote:
+> > (...)
+> >> +#define XGENE_HWIRQ_TO_GPIO(hwirq)     ((hwirq) + XGENE_GPIO8_IDX)
+> >> +#define XGENE_GPIO_TO_HWIRQ(gpio)      ((gpio) - XGENE_GPIO8_IDX)
+> >> +#define GIC_IRQ_TO_GPIO_IRQ(hwirq)     ((hwirq) - XGENE_GPIO8_HWIRQ)
+> >> +#define GPIO_IRQ_TO_GIC_IRQ(hwirq)     ((hwirq) + XGENE_GPIO8_HWIRQ)
+> >
+> > I'm a bit uneasy about this, maybe I just don't get it.
+> >
+> > What is this indexing into "GIC IRQ" that is starting to happen
+> > here?
+> >
+> > The GIC (if that is drivers/irqchip/irq-gic.c) has a totally dynamic IRQ
+> > translation and the Linux IRQs it is using may change. I am worried
+> > that there is some reliance here on Linux IRQ having certain numbers
+> > because there is certainly no ABI like that.
+> >
+> > Is this 0x48 really an index into the *hardware* offset in the GIC?
+> >
+> > And if it is: why are we not getting this hardware information from the
+> > device tree like all other interrupt numbers and offsets?
+> >
+> > I'm worried about this.
+> 
+> The SPI40(0x48) through SPI45(0x4D) from GIC are mapped as external
+> IRQ0 - IRQ5 in this GPIO block, so it is hardware offset not mapped
+> irq number.
+> 
+> Below is detail:
+> 
+> + GIC: SPI40 (hwirq=0x48)  <=> SB-GPIO: (hwirq=0) (gpio line 8)
+> + GIC: SPI41 (hwirq=0x49)  <=> SB-GPIO: (hwirq=1) (gpio line 9)
+> ...
+> + GIC: SPI45 (hwirq=0x4D)  <=> SB-GPIO: (hwirq=5) (gpio line 13)
+> 
+> These defines are to help translating between Gic hardware irq and
+> SBGPIO hardware irq number.
 
-For the function that not in these sections, the call mcount
-will be in place and not be replaced when kernel boot up. And
-it will bring performance overhead, such as do_mem_abort (in
-.exception.text section). This patch make the call mcount to
-nop for this case in recordmcount.
+But the numbers are already in DT, so don't duplicate them in the
+source code but just use irq_of_parse_and_map() to get the parent
+irq number.
 
-Cc: <stable@vger.kernel.org> # 3.18+
-Signed-off-by: Li Bin <huawei.libin@huawei.com>
----
- scripts/recordmcount.c | 24 +++++++++++++++++++++++-
- 1 file changed, 23 insertions(+), 1 deletion(-)
+> >> -       u32 *irq;
+> >> +       void __iomem *regs;
+> >> +       struct irq_domain *gic_domain;
+> >> +       struct irq_domain *irq_domain;
+> >
+> > And there is some secondary gic_domain here, which is confusing
+> > since the GIC does have an IRQ domain too.
+> >
+> > I think I want a clear explanation to how this GPIO controller interacts
+> > with the GIC, and I want it to be part of the patch, as comments in the
+> > code and in the commit message (which is way too small for a complex
+> > patch like this).
+> >
+> > Otherwise I have no chance to understand what is really going on here.
+> 
+> SBGPIO currently is not capable to mask/unmask/... irqs, so these will
+> rely on the parent (GIC) instead. To do so, we need keep a parent
+> domain reference here "struct irq_domain *gic_domain" so we can find
+> correspond parent irq in runtime.
 
-diff --git a/scripts/recordmcount.c b/scripts/recordmcount.c
-index 8cc020b..698768b 100644
---- a/scripts/recordmcount.c
-+++ b/scripts/recordmcount.c
-@@ -42,6 +42,7 @@
- 
- #ifndef EM_AARCH64
- #define EM_AARCH64	183
-+#define R_AARCH64_NONE		0
- #define R_AARCH64_ABS64	257
- #endif
- 
-@@ -160,6 +161,22 @@ static int make_nop_x86(void *map, size_t const offset)
- 	return 0;
- }
- 
-+static unsigned char ideal_nop4_arm64[4] = {0x1f, 0x20, 0x03, 0xd5};
-+static int make_nop_arm64(void *map, size_t const offset)
-+{
-+	uint32_t *ptr;
-+
-+	ptr = map + offset;
-+	/* bl <_mcount> is 0x94000000 before relocation */
-+	if (*ptr != 0x94000000)
-+		return -1;
-+
-+	/* Convert to nop */
-+	ulseek(fd_map, offset, SEEK_SET);
-+	uwrite(fd_map, ideal_nop, 4);
-+	return 0;
-+}
-+
- /*
-  * Get the whole file as a programming convenience in order to avoid
-  * malloc+lseek+read+free of many pieces.  If successful, then mmap
-@@ -354,7 +371,12 @@ do_file(char const *const fname)
- 			 altmcount = "__gnu_mcount_nc";
- 			 break;
- 	case EM_AARCH64:
--			 reltype = R_AARCH64_ABS64; gpfx = '_'; break;
-+			reltype = R_AARCH64_ABS64;
-+			make_nop = make_nop_arm64;
-+			rel_type_nop = R_AARCH64_NONE;
-+			ideal_nop = ideal_nop4_arm64;
-+			gpfx = '_';
-+			break;
- 	case EM_IA_64:	 reltype = R_IA64_IMM64;   gpfx = '_'; break;
- 	case EM_METAG:	 reltype = R_METAG_ADDR32;
- 			 altmcount = "_mcount_wrapper";
--- 
-1.7.12.4
+Maybe rename the domain to 'parent_domain' or something like that
+to avoid hardcoding any knowledge of the parent IRQ controller being
+a GIC. If the same GPIO block gets reused on a PowerPC machine, we
+want the driver to just work and not have any ARM specifics in it.
+
+	Arnd
