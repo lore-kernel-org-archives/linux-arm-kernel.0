@@ -1,59 +1,61 @@
-From: German.Rivera@freescale.com (J. German Rivera)
-Date: Fri, 30 Oct 2015 15:04:58 -0500
-Subject: [PATCH v4] arm64: dts: Added syscon-reboot node for FSL's LS2085A SoC
-Message-ID: <1446235498-4093-1-git-send-email-German.Rivera@freescale.com>
+From: dan.j.williams@intel.com (Dan Williams)
+Date: Fri, 30 Oct 2015 16:19:03 -0400
+Subject: [for 4.3-final PATCH v2] memremap: fix highmem support
+Message-ID: <20151030201758.13415.13264.stgit@dwillia2-desk3.amr.corp.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Added sys-reboot node to the FSL's LS2085A SoC DT to leverage
-the ARM-generic reboot mechanism for this SoC. This mechanism
-is enabled through CONFIG_POWER_RESET_SYSCON.
+Currently memremap checks if the range is "System RAM" and returns the
+kernel linear address.  This is broken for highmem platforms where a
+range may be "System RAM", but is not part of the kernel linear mapping.
+Fallback to ioremap_cache() in these cases, to let the arch code attempt
+to handle it.
 
-Signed-off-by: J. German Rivera <German.Rivera@freescale.com>
+Note that ARM ioremap will WARN when attempting to remap ram, and in
+that case the caller needs to be fixed.  For this reason, existing
+ioremap_cache() usages for ARM are already trained to avoid attempts to
+remap ram.
+
+The impact of this bug is low for now since the pmem driver is the only
+user of memremap(), but this is important to fix before more conversions
+to memremap arrive in 4.4.
+
+Cc: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
+Reported-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Signed-off-by: Dan Williams <dan.j.williams@intel.com>
 ---
-CHANGE HISTORY:
+ kernel/memremap.c |   14 ++++++++++++--
+ 1 file changed, 12 insertions(+), 2 deletions(-)
 
-Changes in v2:
-- Addressed comment form Stuart Yoder:
-  * Removed "@<address>" from reboot node
-
-Changes in v3:
-- Addressed comment form Stuart Yoder:
-  * Expose only the reset register
-
-Changes in v4:
-- Addressed comment from Arnd Bergmann:
-  * Changed compatible string to be more specific
-  * Changed node name to 'syscon' instead of 'rstcr'
-  * Changed address to lower case hex
-- Addressed comment form Stuart Yoder:
-  * Rebase on top of branch arm-soc/for-next
-
- arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
-
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
-index e81cd48..a790a90 100644
---- a/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
-@@ -153,6 +153,18 @@
- 		};
- 	};
-
-+	rstcr: syscon at 1e60000 {
-+		compatible = "fsl,ls2085a-rstcr", "syscon";
-+		reg = <0x0 0x1e60000 0x0 0x4>;
-+	};
+diff --git a/kernel/memremap.c b/kernel/memremap.c
+index 72b0c66628b6..9d6b55587eaa 100644
+--- a/kernel/memremap.c
++++ b/kernel/memremap.c
+@@ -24,6 +24,16 @@ __weak void __iomem *ioremap_cache(resource_size_t offset, unsigned long size)
+ }
+ #endif
+ 
++static void *try_ram_remap(resource_size_t offset, size_t size)
++{
++	struct page *page = pfn_to_page(offset >> PAGE_SHIFT);
 +
-+	reboot {
-+		compatible ="syscon-reboot";
-+		regmap = <&rstcr>;
-+		offset = <0x0>;
-+		mask = <0x2>;
-+	};
++	/* In the simple case just return the existing linear address */
++	if (!PageHighMem(page))
++		return __va(offset);
++	return NULL; /* fallback to ioremap_cache */
++}
 +
- 	timer {
- 		compatible = "arm,armv8-timer";
- 		interrupts = <1 13 0x8>, /* Physical Secure PPI, active-low */
---
-2.3.3
+ /**
+  * memremap() - remap an iomem_resource as cacheable memory
+  * @offset: iomem resource start address
+@@ -66,8 +76,8 @@ void *memremap(resource_size_t offset, size_t size, unsigned long flags)
+ 		 * the requested range is potentially in "System RAM"
+ 		 */
+ 		if (is_ram == REGION_INTERSECTS)
+-			addr = __va(offset);
+-		else
++			addr = try_ram_remap(offset, size);
++		if (!addr)
+ 			addr = ioremap_cache(offset, size);
+ 	}
+ 
