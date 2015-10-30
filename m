@@ -1,38 +1,42 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Fri, 30 Oct 2015 15:00:57 +0100
-Subject: [PATCH 1/3] mtd: create a partition type device tree binding
-In-Reply-To: <20151029162908.GA13275@localhost>
-References: <1446123152-22666-1-git-send-email-linus.walleij@linaro.org>
- <20151029162908.GA13275@localhost>
-Message-ID: <CACRpkdYS5Jf8UC2K0bNdEQZDjTeZZx44Uu-kkof+9E=4Ny0oDg@mail.gmail.com>
+From: Suravee.Suthikulpanit@amd.com (Suravee Suthikulpanit)
+Date: Fri, 30 Oct 2015 09:03:55 -0500
+Subject: [PATCH V3 0/6] gicv2m: acpi: Add ACPI support for GICv2m MSI
+In-Reply-To: <CADaLNDnhn+Lax6aMseA4kPsAfKHG=L0buO6Tf-U8sxfUzn38BA@mail.gmail.com>
+References: <1445453249-32557-1-git-send-email-Suravee.Suthikulpanit@amd.com>
+ <CADaLNDnhn+Lax6aMseA4kPsAfKHG=L0buO6Tf-U8sxfUzn38BA@mail.gmail.com>
+Message-ID: <563378CB.9090005@amd.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 29, 2015 at 5:29 PM, Brian Norris
-<computersforpeace@gmail.com> wrote:
+Hi Duc
 
->> +Required properties:
->> +- partition-type : the type of partition. Only one type can be specified.
+On 10/29/15 16:25, Duc Dang wrote:
+> Hi Suravee,
+> On Wed, Oct 21, 2015 at 11:47 AM, Suravee Suthikulpanit
+> <Suravee.Suthikulpanit@amd.com>  wrote:
+>> >This patch series has been forked from the following patch series since
+>> >it no longer depends on the rest of the patches.
+>> >
+>> >   [PATCH v4 00/10] ACPI GIC Self-probing, GICv2m and GICv3 support
+>> >   https://lkml.org/lkml/2015/7/29/234
+>> >
+>> >It has been ported to use the newly introduced device fwnode_handle
+>> >for ACPI irqdmain introduced by Marc in the following patch series:
+>> >
+>> >   [PATCH v2 00/17] Divorcing irqdomain and device_node
+>> >   http://git.kernel.org/cgit/linux/kernel/git/maz/arm-platforms.git  irq/irq-domain-fwnode-v2
+>> >
+>> >The following git branch contains the submitted patches along with
+>> >the pre-requsite patches (mainly for ARM64 PCI support for ACPI).
+>> >
+>> >   https://github.com/ssuthiku/linux.git  v2m-multiframe-v3
+> I tried to clone your tree to test on my X-Gene platform but I didn't
+> see branch v2m-multiframe-v3.
+> I see similar patch set in origin/irq-domain-fwnode-v2-v2m-multiframe.
+> Can you please check?
 >
-> You're supporting this as a list property (for future expansion,
-> presumably), so I can only assume the "only one type" is referring to
-> the number of different parsers available currently, not the behavior of
-> the property itself?
 
-I was thinking that it would not be a list actually.
+It should be there now. I might have forgotten to push it to my Github. 
+Sorry for inconvenience, and thanks for testing.
 
-The reason being that if you're anyways going to the trouble of
-specifying exactly what partition type is going to be used, you're
-not really interested in specifying a few different ones, you know
-exactly what type it is going to be.
-
-But if you think it needs to be a list, I'll specify that, no big
-deal. I'll also try to get the Linux code to handle a list then.
-
-> Also, this patch will conflict with [1]. I'll probably take [1] soon, so
-> one of us will have to rebase this.
-
-Sure I'll rebase on whatever you say.
-
-Yours,
-Linus Walleij
+Suravee
