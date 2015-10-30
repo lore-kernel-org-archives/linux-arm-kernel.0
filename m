@@ -1,69 +1,36 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 30 Oct 2015 11:08:35 +0000
-Subject: [PATCH v12 1/7] arm64: renesas: r8a7795: Add Renesas R8A7795 SoC
- support
-In-Reply-To: <CANqRtoT-7hhAN907KQFYwrP7+B7tVZdDEpp0SPrnXG3YrDbKoQ@mail.gmail.com>
-References: <1445839312-8874-1-git-send-email-horms+renesas@verge.net.au>
- <1445839312-8874-2-git-send-email-horms+renesas@verge.net.au>
- <20151028184504.GG8899@e104818-lin.cambridge.arm.com>
- <CANqRtoT-7hhAN907KQFYwrP7+B7tVZdDEpp0SPrnXG3YrDbKoQ@mail.gmail.com>
-Message-ID: <20151030110835.GB2854@e104818-lin.cambridge.arm.com>
+From: sudeep.holla@arm.com (Sudeep Holla)
+Date: Fri, 30 Oct 2015 11:10:28 +0000
+Subject: [PATCH 0/3] Revert arm64 cache geometry
+In-Reply-To: <20151030110010.GA2854@e104818-lin.cambridge.arm.com>
+References: <1446068637-11509-1-git-send-email-avanbrunt@nvidia.com>
+ <20151029114005.GB389@arm.com> <1446159896024.99950@nvidia.com>
+ <20151030110010.GA2854@e104818-lin.cambridge.arm.com>
+Message-ID: <56335024.9090009@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 29, 2015 at 02:15:19PM +0900, Magnus Damm wrote:
-> On Thu, Oct 29, 2015 at 3:45 AM, Catalin Marinas
-> <catalin.marinas@arm.com> wrote:
-> > On Mon, Oct 26, 2015 at 03:01:46PM +0900, Simon Horman wrote:
-> >> --- a/arch/arm64/Kconfig.platforms
-> >> +++ b/arch/arm64/Kconfig.platforms
-> >> @@ -66,6 +66,23 @@ config ARCH_SEATTLE
-> >>       help
-> >>         This enables support for AMD Seattle SOC Family
-> >>
-> >> +config ARCH_SHMOBILE
-> >> +     bool
-> >> +
-> >> +config ARCH_RENESAS
-> >> +     bool "Renesas SoC Platforms"
-> >> +     select ARCH_SHMOBILE
-> >> +     select PINCTRL
-> >> +     select PM_GENERIC_DOMAINS if PM
-> >> +     help
-> >> +       This enables support for the ARMv8 based Renesas SoCs.
-> >> +
-> >> +config ARCH_R8A7795
-> >> +     bool "Renesas R-Car H3 SoC Platform"
-> >> +     depends on ARCH_RENESAS
-> >> +     help
-> >> +       This enables support for the Renesas R-Car H3 SoC.
-> >
-> > Do you need such fine-grained configuration? I'd really like to avoid
-> > individual SoC Kconfig entries and only include SoC families (like
-> > ARCH_RENESAS). There are some which I didn't spot at the time
-> > (ARCH_FSL_LS2085A and ARCH_TEGRA_132_SOC) but we shouldn't continue this
-> > trend any further.
-> 
-> I agree with you about coarse grained configuration in general. I am
-> also wondering how to handle cases where IP varies with SoC version.
-> =)
 
-The code should cope with multiple drivers built into the kernel anyway,
-single Image is a hard requirement. If you want to trim down an image
-for a specific SoC (production kernel), just use individual Kconfig
-entries for drivers that may depend on ARCH_RENESAS but not an
-ARCH_R8A7795 which is used in drivers/ Makefiles.
 
-> The two most common cases with SoC-specific IP for Renesas SoCs tend
-> to be Pinctrl which is using rather large tables to support the PFC
-> hardware and also the clocks (CCF) that drives the SoC specific CPG
-> hardware. For the PFC and CPG I think it makes sense to enable build
-> based on SoC model like we do already, but for the Kconfig bits in
-> arch/arm64 perhaps ARCH_RENESAS can simply select ARCH_R8A7795?
+On 30/10/15 11:00, Catalin Marinas wrote:
+> On Thu, Oct 29, 2015 at 11:03:27PM +0000, Alexander Van Brunt wrote:
 
-I'm suggesting the other way around: CONFIG_PINCTRL_R8A7795 which
-depends on ARCH_RENESAS, default y. Similarly for clocks and other
-drivers.
+[...]
+
+> BTW, it looks like I don't get any cache information on Juno with
+> 4.3-rc7, it says "Unable to detect cache hierarchy from DT for CPU
+> 0". I thought the point of the patch you are trying to revert was to
+> parse this information from the hardware registers. Sudeep, any
+> idea?
+>
+
+Yes you need to have updated DT from the mainline. Since the
+architecture doesn't provide any way of detecting the cpus sharing
+particular cache, we get that information from DT.
+
+If DT lacks that info we don't expose any information. It would be wrong
+to say that a shared cache is shared by all the cpus in the system. DT
+check was added explicitly to avoid that.
 
 -- 
-Catalin
+Regards,
+Sudeep
