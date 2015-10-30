@@ -1,84 +1,81 @@
-From: ezequiel@vanguardiasur.com.ar (Ezequiel Garcia)
-Date: Fri, 30 Oct 2015 17:00:35 -0300
-Subject: [PATCH v2] ARM: v7-M: Set an early stack for __v7m_setup
-Message-ID: <1446235235-18179-1-git-send-email-ezequiel@vanguardiasur.com.ar>
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Fri, 30 Oct 2015 20:07:34 +0000
+Subject: [PATCH] Documentation: dt: Add bindings for Secure-only devices
+In-Reply-To: <CAL_JsqJz+w2SYEBLVGdZNS6J1tmt5VWV0q1G_Z2rgFfch6J=2A@mail.gmail.com>
+References: <1446127303-5082-1-git-send-email-peter.maydell@linaro.org>
+ <CAL_JsqJz+w2SYEBLVGdZNS6J1tmt5VWV0q1G_Z2rgFfch6J=2A@mail.gmail.com>
+Message-ID: <CAFEAcA8qgFFhrmXePtO_xQx=YEHK8dSA-1SacR5NsQWSNTwj-w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On ARM v7-M, when PROCINFO_INITFUNC (__v7m_setup) is called,
-a stack is needed before calling the supervisor call (SVC),
-which is used by the supervisor call to save the context.
+On 30 October 2015 at 18:28, Rob Herring <robh+dt@kernel.org> wrote:
+> On Thu, Oct 29, 2015 at 9:01 AM, Peter Maydell <peter.maydell@linaro.org> wrote:
+>> +Valid Secure world properties:
+>> +
+>> +- secure-status : specifies whether the device is present and usable
+>> +  in the secure world. The combination of this with "status" allows
+>> +  the various possible combinations of device visibility to be
+>> +  specified:
+>> +   status = "okay";                             // visible in S and NS
+>
+> I assume neither property present or both okay also mean the same.
+>
+> status = "okay"; secure-status = "okay";
+>
+> We should be explicit.
 
-Currently, __v7m_setup() prepares a temporary stack in the .text.init
-section, which is is broken if the kernel is executing directly from
-read-only memory.
+Yes; status defaults to "okay" (presumably this is listed in
+the overal DT binding spec somewhere), and secure-status
+defaults to "same as status, which might in turn be defaulted".
+We can list the complete set of options (neither present,
+both 'okay', status not present but secure-status present, etc),
+though it gets a bit long-winded, especially if we later add
+more secure- properties (they'd all have to have verbiage about
+"if not present, same as non-prefixed property; if both not
+present, both take the default the non-prefixed property takes
+if it's not present; if prefixed property not present, it
+defaults to same as non-prefixed property", which we already
+say in the introductory section). Still, for just status it
+would be easy enough to add a couple of lines:
 
-In particular, this is the case for LPC43xx, which allows
-to execute the kernel in-place from a serial flash through its SPIFI
-controller.
++    status = "okay"; secure-status = "okay"; // ditto
++    secure-status = "okay";                  // ditto
++    // neither explicitly defined: ditto
 
-This commit fixes the issue by seting an early stack to its usual location.
+(Do you want the full set of 9 options you get from multiplying
+out "okay" vs "disabled" vs not-set for each property?)
 
-Also, __v7m_setup() is currently saving and restoring the previous
-stack. That was bogus, because there's no stack previously set,
-so this commit removes it.
+>> +   status = "disabled"; secure-status = "okay"; // S-only
+>> +   status = "okay"; secure-status = "disabled"; // NS-only
+>
+> In HKG when we discussed this, 'status = "secure"' was the proposal.
+> That would be simpler:
+>
+> S world can use "okay" or "secure"
+> NS world can use "okay" or no property.
+>
+> That leaves out the case of disabled in S and enabled for NS. We could
+> want that for s/w reasons, but can we have h/w like that?
 
-Signed-off-by: Ezequiel Garcia <ezequiel@vanguardiasur.com.ar>
-Acked-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
----
-Unless there are any further comments, I'll be pushing this
-into Russell's tracker.
+It's perfectly possible to design hardware like that (though
+I can't think of a reason to do so offhand). I think it's the desire
+to be able to describe all the possible valid h/w combinations
+that brought us to this secure- prefix design. Plus it
+extends nicely to cover other possibilities as we need it;
+for instance "device A is at S-0x10000 but NS-0x20000" can be
+done by specifying a device like:
+   status = "okay";
+   secure-status = "okay";
+   reg = < 0x20000 0x1000 >;
+   secure-regs = < 0x10000 0x1000 >;
+(apologies if I've messed the syntax up there).
 
- arch/arm/mm/proc-v7m.S | 14 +++++---------
- 1 file changed, 5 insertions(+), 9 deletions(-)
+Just going for 'status=secure' would deal with the immediate
+requirement, but my preference is for a description that
+lets us describe all the possible configurations, not just
+the ones we think are common, and secure-* is a neat way
+of doing that (IIRC it was Grant's suggestion; speaking of
+whom, I just noticed I forgot to cc him on the original patch).
 
-diff --git a/arch/arm/mm/proc-v7m.S b/arch/arm/mm/proc-v7m.S
-index 67d9209077c6..7229d8d0be1a 100644
---- a/arch/arm/mm/proc-v7m.S
-+++ b/arch/arm/mm/proc-v7m.S
-@@ -12,6 +12,7 @@
-  */
- #include <linux/linkage.h>
- #include <asm/assembler.h>
-+#include <asm/memory.h>
- #include <asm/v7m.h>
- #include "proc-macros.S"
- 
-@@ -97,19 +98,19 @@ __v7m_setup:
- 	mov	r5, #0x00800000
- 	str	r5, [r0, V7M_SCB_SHPR3]	@ set PendSV priority
- 
--	@ SVC to run the kernel in this mode
-+	@ SVC to switch to handler mode. Notice that this requires sp to
-+	@ point to writeable memory because the processor saves
-+	@ some registers to the stack.
- 	badr	r1, 1f
- 	ldr	r5, [r12, #11 * 4]	@ read the SVC vector entry
- 	str	r1, [r12, #11 * 4]	@ write the temporary SVC vector entry
- 	mov	r6, lr			@ save LR
--	mov	r7, sp			@ save SP
--	ldr	sp, =__v7m_setup_stack_top
-+	ldr	sp, =init_thread_union + THREAD_START_SP
- 	cpsie	i
- 	svc	#0
- 1:	cpsid	i
- 	str	r5, [r12, #11 * 4]	@ restore the original SVC vector entry
- 	mov	lr, r6			@ restore LR
--	mov	sp, r7			@ restore SP
- 
- 	@ Special-purpose control register
- 	mov	r1, #1
-@@ -123,11 +124,6 @@ __v7m_setup:
- 	ret	lr
- ENDPROC(__v7m_setup)
- 
--	.align 2
--__v7m_setup_stack:
--	.space	4 * 8				@ 8 registers
--__v7m_setup_stack_top:
--
- 	define_processor_functions v7m, dabort=nommu_early_abort, pabort=legacy_pabort, nommu=1
- 
- 	.section ".rodata"
--- 
-2.5.2
+thanks
+-- PMM
