@@ -1,264 +1,378 @@
 From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Fri, 30 Oct 2015 14:25:39 +0900
-Subject: [PATCH v4 4/6] ftrace: allow arch-specific stack tracer
+Date: Fri, 30 Oct 2015 14:25:41 +0900
+Subject: [PATCH v4 6/6] arm64: ftrace: add arch-specific stack tracer
 In-Reply-To: <1446182741-31019-1-git-send-email-takahiro.akashi@linaro.org>
 References: <1446182741-31019-1-git-send-email-takahiro.akashi@linaro.org>
-Message-ID: <1446182741-31019-5-git-send-email-takahiro.akashi@linaro.org>
+Message-ID: <1446182741-31019-7-git-send-email-takahiro.akashi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A stack frame may be used in a different way depending on cpu architecture.
-Thus it is not always appropriate to slurp the stack contents, as current
-check_stack() does, in order to calcurate a stack index (height) at a given
-function call. At least not on arm64.
-In addition, there is a possibility that we will mistakenly detect a stale
-stack frame which has not been overwritten.
+Stack tracer on arm64, check_stack(), is uniqeue in the following
+points:
+* analyze a function prologue of a traced function to estimate a more
+  accurate stack pointer value, replacing naive '<child's fp> + 0x10.'
+* use walk_stackframe(), instead of slurping stack contents as orignal
+  check_stack() does, to identify a stack frame and a stack index (height)
+  for every callsite.
 
-This patch makes check_stack() a weak function so as to later implement
-arch-specific version.
+Regarding a function prologue analyzer, there is no guarantee that we can
+handle all the possible patterns of function prologue as gcc does not use
+any fixed templates to generate them. 'Instruction scheduling' is another
+issue here.
+Nevertheless, the current version will surely cover almost all the cases
+in the kernel image and give us useful information on stack pointers.
+
+So this patch utilizes a function prologue only for stack tracer, and
+does not affect the behaviors of existing stacktrace functions.
 
 Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
 ---
- include/linux/ftrace.h     |   10 ++++++
- kernel/trace/trace_stack.c |   80 ++++++++++++++++++++++++--------------------
- 2 files changed, 53 insertions(+), 37 deletions(-)
+ arch/arm64/include/asm/stacktrace.h |    4 +
+ arch/arm64/kernel/ftrace.c          |   68 +++++++++++++
+ arch/arm64/kernel/stacktrace.c      |  185 ++++++++++++++++++++++++++++++++++-
+ 3 files changed, 254 insertions(+), 3 deletions(-)
 
-diff --git a/include/linux/ftrace.h b/include/linux/ftrace.h
-index d77b195..c304650 100644
---- a/include/linux/ftrace.h
-+++ b/include/linux/ftrace.h
-@@ -270,7 +270,17 @@ static inline void ftrace_kill(void) { }
- #define FTRACE_STACK_FRAME_OFFSET 0
- #endif
- 
-+#define STACK_TRACE_ENTRIES 500
-+
+diff --git a/arch/arm64/include/asm/stacktrace.h b/arch/arm64/include/asm/stacktrace.h
+index 7318f6d..47b4832 100644
+--- a/arch/arm64/include/asm/stacktrace.h
++++ b/arch/arm64/include/asm/stacktrace.h
+@@ -25,5 +25,9 @@ struct stackframe {
+ extern int unwind_frame(struct stackframe *frame);
+ extern void walk_stackframe(struct stackframe *frame,
+ 			    int (*fn)(struct stackframe *, void *), void *data);
++#ifdef CONFIG_STACK_TRACER
 +struct stack_trace;
-+
-+extern unsigned stack_trace_index[];
-+extern struct stack_trace stack_trace_max;
-+extern unsigned long stack_trace_max_size;
-+extern arch_spinlock_t max_stack_lock;
-+
- extern int stack_tracer_enabled;
-+void stack_trace_print(void);
- int
- stack_trace_sysctl(struct ctl_table *table, int write,
- 		   void __user *buffer, size_t *lenp,
-diff --git a/kernel/trace/trace_stack.c b/kernel/trace/trace_stack.c
-index 2e452e8..40f3368 100644
---- a/kernel/trace/trace_stack.c
-+++ b/kernel/trace/trace_stack.c
-@@ -16,24 +16,22 @@
++extern void save_stack_trace_sp(struct stack_trace *trace, unsigned long *sp);
++#endif
  
- #include "trace.h"
- 
--#define STACK_TRACE_ENTRIES 500
--
- static unsigned long stack_dump_trace[STACK_TRACE_ENTRIES+1] =
- 	 { [0 ... (STACK_TRACE_ENTRIES)] = ULONG_MAX };
--static unsigned stack_dump_index[STACK_TRACE_ENTRIES];
-+unsigned stack_trace_index[STACK_TRACE_ENTRIES];
- 
- /*
-  * Reserve one entry for the passed in ip. This will allow
-  * us to remove most or all of the stack size overhead
-  * added by the stack tracer itself.
+ #endif	/* __ASM_STACKTRACE_H */
+diff --git a/arch/arm64/kernel/ftrace.c b/arch/arm64/kernel/ftrace.c
+index 314f82d..e8afd42 100644
+--- a/arch/arm64/kernel/ftrace.c
++++ b/arch/arm64/kernel/ftrace.c
+@@ -9,6 +9,7 @@
+  * published by the Free Software Foundation.
   */
--static struct stack_trace max_stack_trace = {
-+struct stack_trace stack_trace_max = {
- 	.max_entries		= STACK_TRACE_ENTRIES - 1,
- 	.entries		= &stack_dump_trace[0],
+ 
++#include <linux/bug.h>
+ #include <linux/ftrace.h>
+ #include <linux/swab.h>
+ #include <linux/uaccess.h>
+@@ -16,6 +17,7 @@
+ #include <asm/cacheflush.h>
+ #include <asm/ftrace.h>
+ #include <asm/insn.h>
++#include <asm/stacktrace.h>
+ 
+ #ifdef CONFIG_DYNAMIC_FTRACE
+ /*
+@@ -173,3 +175,69 @@ int ftrace_disable_ftrace_graph_caller(void)
+ }
+ #endif /* CONFIG_DYNAMIC_FTRACE */
+ #endif /* CONFIG_FUNCTION_GRAPH_TRACER */
++
++#ifdef CONFIG_STACK_TRACER
++static unsigned long stack_trace_sp[STACK_TRACE_ENTRIES];
++static unsigned long raw_stack_trace_max_size;
++
++void check_stack(unsigned long ip, unsigned long *stack)
++{
++	unsigned long this_size, flags;
++	unsigned long top;
++	int i, j;
++
++	this_size = ((unsigned long)stack) & (THREAD_SIZE-1);
++	this_size = THREAD_SIZE - this_size;
++
++	if (this_size <= raw_stack_trace_max_size)
++		return;
++
++	/* we do not handle an interrupt stack yet */
++	if (!object_is_on_stack(stack))
++		return;
++
++	local_irq_save(flags);
++	arch_spin_lock(&max_stack_lock);
++
++	/* check again */
++	if (this_size <= raw_stack_trace_max_size)
++		goto out;
++
++	/* find out stack frames */
++	stack_trace_max.nr_entries = 0;
++	stack_trace_max.skip = 0;
++	save_stack_trace_sp(&stack_trace_max, stack_trace_sp);
++	stack_trace_max.nr_entries--; /* for the last entry ('-1') */
++
++	/* calculate a stack index for each function */
++	top = ((unsigned long)stack & ~(THREAD_SIZE-1)) + THREAD_SIZE;
++	for (i = 0; i < stack_trace_max.nr_entries; i++)
++		stack_trace_index[i] = top - stack_trace_sp[i];
++	raw_stack_trace_max_size = this_size;
++
++	/* Skip over the overhead of the stack tracer itself */
++	for (i = 0; i < stack_trace_max.nr_entries; i++) {
++		unsigned long addr;
++
++		addr = stack_trace_max.entries[i] + FTRACE_STACK_FRAME_OFFSET;
++		if (addr == ip)
++			break;
++	}
++
++	stack_trace_max.nr_entries -= i;
++	for (j = 0; j < stack_trace_max.nr_entries; j++) {
++		stack_trace_index[j] = stack_trace_index[j + i];
++		stack_trace_max.entries[j] = stack_trace_max.entries[j + i];
++	}
++	stack_trace_max_size = stack_trace_index[0];
++
++	if (task_stack_end_corrupted(current)) {
++		WARN(1, "task stack is corrupted.\n");
++		stack_trace_print();
++	}
++
++ out:
++	arch_spin_unlock(&max_stack_lock);
++	local_irq_restore(flags);
++}
++#endif /* CONFIG_STACK_TRACER */
+diff --git a/arch/arm64/kernel/stacktrace.c b/arch/arm64/kernel/stacktrace.c
+index 631c49d..1b293fe 100644
+--- a/arch/arm64/kernel/stacktrace.c
++++ b/arch/arm64/kernel/stacktrace.c
+@@ -24,6 +24,144 @@
+ #include <asm/insn.h>
+ #include <asm/stacktrace.h>
+ 
++#ifdef CONFIG_STACK_TRACER
++/*
++ * This function parses a function prologue of a traced function and
++ * determines its stack size.
++ * A return value indicates a location of @pc in a function prologue.
++ * @return value:
++ * <case 1>                       <case 1'>
++ * 1:
++ *     sub sp, sp, #XX            sub sp, sp, #XX
++ * 2:
++ *     stp x29, x30, [sp, #YY]    stp x29, x30, [sp, #--ZZ]!
++ * 3:
++ *     add x29, sp, #YY           mov x29, sp
++ * 0:
++ *
++ * <case 2>
++ * 1:
++ *     stp x29, x30, [sp, #-XX]!
++ * 3:
++ *     mov x29, sp
++ * 0:
++ *
++ * @size: sp offset from calller's sp (XX or XX + ZZ)
++ * @size2: fp offset from new sp (YY or 0)
++ */
++static int analyze_function_prologue(unsigned long pc,
++		unsigned long *size, unsigned long *size2)
++{
++	unsigned long offset;
++	u32 *addr, insn;
++	int pos = -1;
++	enum aarch64_insn_register src, dst, reg1, reg2, base;
++	int imm;
++	enum aarch64_insn_variant variant;
++	enum aarch64_insn_adsb_type adsb_type;
++	enum aarch64_insn_ldst_type ldst_type;
++
++	*size = *size2 = 0;
++
++	if (!pc)
++		goto out;
++
++	if (unlikely(!kallsyms_lookup_size_offset(pc, NULL, &offset)))
++		goto out;
++
++	addr = (u32 *)(pc - offset);
++#ifdef CONFIG_DYNAMIC_FTRACE
++	if (addr == (u32 *)ftrace_call)
++		addr = (u32 *)ftrace_caller;
++#ifdef CONFIG_FUNCTION_GRAPH_TRACER
++	else if (addr == (u32 *)ftrace_graph_caller)
++#ifdef CONFIG_DYNAMIC_FTRACE
++		addr = (u32 *)ftrace_caller;
++#else
++		addr = (u32 *)_mcount;
++#endif
++#endif
++#endif
++
++	insn = *addr;
++	pos = 1;
++
++	/* analyze a function prologue */
++	while ((unsigned long)addr < pc) {
++		if (aarch64_insn_is_branch_imm(insn) ||
++		    aarch64_insn_is_br(insn) ||
++		    aarch64_insn_is_blr(insn) ||
++		    aarch64_insn_is_ret(insn) ||
++		    aarch64_insn_is_eret(insn))
++			/* exiting a basic block */
++			goto out;
++
++		if (aarch64_insn_decode_add_sub_imm(insn, &dst, &src,
++					&imm, &variant, &adsb_type)) {
++			if ((adsb_type == AARCH64_INSN_ADSB_SUB) &&
++				(dst == AARCH64_INSN_REG_SP) &&
++				(src == AARCH64_INSN_REG_SP)) {
++				/*
++				 * Starting the following sequence:
++				 *   sub sp, sp, #xx
++				 *   stp x29, x30, [sp, #yy]
++				 *   add x29, sp, #yy
++				 */
++				WARN_ON(pos != 1);
++				pos = 2;
++				*size += imm;
++			} else if ((adsb_type == AARCH64_INSN_ADSB_ADD) &&
++				(dst == AARCH64_INSN_REG_29) &&
++				(src == AARCH64_INSN_REG_SP)) {
++				/*
++				 *   add x29, sp, #yy
++				 * or
++				 *   mov x29, sp
++				 */
++				WARN_ON(pos != 3);
++				pos = 0;
++				*size2 = imm;
++
++				break;
++			}
++		} else if (aarch64_insn_decode_load_store_pair(insn,
++					&reg1, &reg2, &base, &imm,
++					&variant, &ldst_type)) {
++			if ((ldst_type ==
++				AARCH64_INSN_LDST_STORE_PAIR_PRE_INDEX) &&
++			    (reg1 == AARCH64_INSN_REG_29) &&
++			    (reg2 == AARCH64_INSN_REG_30) &&
++			    (base == AARCH64_INSN_REG_SP)) {
++				/*
++				 * Starting the following sequence:
++				 *   stp x29, x30, [sp, #-xx]!
++				 *   mov x29, sp
++				 */
++				WARN_ON(!((pos == 1) || (pos == 2)));
++				pos = 3;
++				*size += -imm;
++			} else if ((ldst_type ==
++				AARCH64_INSN_LDST_STORE_PAIR) &&
++			    (reg1 == AARCH64_INSN_REG_29) &&
++			    (reg2 == AARCH64_INSN_REG_30) &&
++			    (base == AARCH64_INSN_REG_SP)) {
++				/*
++				 *   stp x29, x30, [sp, #yy]
++				 */
++				WARN_ON(pos != 2);
++				pos = 3;
++			}
++		}
++
++		addr++;
++		insn = *addr;
++	}
++
++out:
++	return pos;
++}
++#endif
++
+ /*
+  * AArch64 PCS assigns the frame pointer to x29.
+  *
+@@ -82,6 +220,9 @@ struct stack_trace_data {
+ #ifdef CONFIG_FUNCTION_GRAPH_TRACER
+ 	unsigned int ret_stack_index;
+ #endif
++#ifdef CONFIG_STACK_TRACER
++	unsigned long *sp;
++#endif
  };
  
--static unsigned long max_stack_size;
--static arch_spinlock_t max_stack_lock =
-+unsigned long stack_trace_max_size;
-+arch_spinlock_t max_stack_lock =
- 	(arch_spinlock_t)__ARCH_SPIN_LOCK_UNLOCKED;
- 
- static DEFINE_PER_CPU(int, trace_active);
-@@ -42,30 +40,38 @@ static DEFINE_MUTEX(stack_sysctl_mutex);
- int stack_tracer_enabled;
- static int last_stack_tracer_enabled;
- 
--static inline void print_max_stack(void)
-+void stack_trace_print(void)
- {
- 	long i;
- 	int size;
- 
- 	pr_emerg("        Depth    Size   Location    (%d entries)\n"
- 			   "        -----    ----   --------\n",
--			   max_stack_trace.nr_entries);
-+			   stack_trace_max.nr_entries);
- 
--	for (i = 0; i < max_stack_trace.nr_entries; i++) {
-+	for (i = 0; i < stack_trace_max.nr_entries; i++) {
- 		if (stack_dump_trace[i] == ULONG_MAX)
- 			break;
--		if (i+1 == max_stack_trace.nr_entries ||
-+		if (i+1 == stack_trace_max.nr_entries ||
- 				stack_dump_trace[i+1] == ULONG_MAX)
--			size = stack_dump_index[i];
-+			size = stack_trace_index[i];
- 		else
--			size = stack_dump_index[i] - stack_dump_index[i+1];
-+			size = stack_trace_index[i] - stack_trace_index[i+1];
- 
--		pr_emerg("%3ld) %8d   %5d   %pS\n", i, stack_dump_index[i],
-+		pr_emerg("%3ld) %8d   %5d   %pS\n", i, stack_trace_index[i],
- 				size, (void *)stack_dump_trace[i]);
+ static int save_trace(struct stackframe *frame, void *d)
+@@ -111,12 +252,33 @@ static int save_trace(struct stackframe *frame, void *d)
+ 		return 0;
  	}
+ 
++#ifdef CONFIG_STACK_TRACER
++	if (data->sp) {
++		if (trace->nr_entries) {
++			unsigned long child_pc, sp_off, fp_off;
++			int pos;
++
++			child_pc = trace->entries[trace->nr_entries - 1];
++			pos = analyze_function_prologue(child_pc,
++					&sp_off, &fp_off);
++			/*
++			 * frame->sp - 0x10 is actually a child's fp.
++			 * See above.
++			 */
++			data->sp[trace->nr_entries] = (pos < 0 ? frame->sp :
++					(frame->sp - 0x10) + sp_off - fp_off);
++		} else {
++			data->sp[0] = frame->sp;
++		}
++	}
++#endif
+ 	trace->entries[trace->nr_entries++] = addr;
+ 
+ 	return trace->nr_entries >= trace->max_entries;
  }
  
--static inline void
-+/*
-+ * When arch-specific code overides this function, the following
-+ * data should be filled up, assuming max_stack_lock is held to
-+ * prevent concurrent updates.
-+ *     stack_trace_index[]
-+ *     stack_trace_max
-+ *     stack_trace_max_size
-+ */
-+void __weak
- check_stack(unsigned long ip, unsigned long *stack)
+-void save_stack_trace_tsk(struct task_struct *tsk, struct stack_trace *trace)
++static void __save_stack_trace_tsk(struct task_struct *tsk,
++		struct stack_trace *trace, unsigned long *stack_dump_sp)
  {
- 	unsigned long this_size, flags; unsigned long *p, *top, *start, addr;
-@@ -78,7 +84,7 @@ check_stack(unsigned long ip, unsigned long *stack)
- 	/* Remove the frame of the tracer */
- 	this_size -= frame_size;
+ 	struct stack_trace_data data;
+ 	struct stackframe frame;
+@@ -126,6 +288,9 @@ void save_stack_trace_tsk(struct task_struct *tsk, struct stack_trace *trace)
+ #ifdef CONFIG_FUNCTION_GRAPH_TRACER
+ 	data.ret_stack_index = current->curr_ret_stack;
+ #endif
++#ifdef CONFIG_STACK_TRACER
++	data.sp = stack_dump_sp;
++#endif
  
--	if (this_size <= max_stack_size)
-+	if (this_size <= stack_trace_max_size)
- 		return;
- 
- 	/* we do not handle interrupt stacks yet */
-@@ -103,18 +109,18 @@ check_stack(unsigned long ip, unsigned long *stack)
- 		this_size -= tracer_frame;
- 
- 	/* a race could have already updated it */
--	if (this_size <= max_stack_size)
-+	if (this_size <= stack_trace_max_size)
- 		goto out;
- 
--	max_stack_size = this_size;
-+	stack_trace_max_size = this_size;
- 
--	max_stack_trace.nr_entries = 0;
--	max_stack_trace.skip = 3;
-+	stack_trace_max.nr_entries = 0;
-+	stack_trace_max.skip = 3;
- 
--	save_stack_trace(&max_stack_trace);
-+	save_stack_trace(&stack_trace_max);
- 
- 	/* Skip over the overhead of the stack tracer itself */
--	for (i = 0; i < max_stack_trace.nr_entries; i++) {
-+	for (i = 0; i < stack_trace_max.nr_entries; i++) {
- 		addr = stack_dump_trace[i] + FTRACE_STACK_FRAME_OFFSET;
- 		if (addr == ip)
- 			break;
-@@ -135,19 +141,19 @@ check_stack(unsigned long ip, unsigned long *stack)
- 	 * loop will only happen once. This code only takes place
- 	 * on a new max, so it is far from a fast path.
- 	 */
--	while (i < max_stack_trace.nr_entries) {
-+	while (i < stack_trace_max.nr_entries) {
- 		int found = 0;
- 
--		stack_dump_index[x] = this_size;
-+		stack_trace_index[x] = this_size;
- 		p = start;
- 
--		for (; p < top && i < max_stack_trace.nr_entries; p++) {
-+		for (; p < top && i < stack_trace_max.nr_entries; p++) {
- 			if (stack_dump_trace[i] == ULONG_MAX)
- 				break;
- 			addr = stack_dump_trace[i] + FTRACE_STACK_FRAME_OFFSET;
- 			if (*p == addr) {
- 				stack_dump_trace[x] = stack_dump_trace[i++];
--				this_size = stack_dump_index[x++] =
-+				this_size = stack_trace_index[x++] =
- 					(top - p) * sizeof(unsigned long);
- 				found = 1;
- 				/* Start the search from here */
-@@ -162,7 +168,7 @@ check_stack(unsigned long ip, unsigned long *stack)
- 				if (unlikely(!tracer_frame)) {
- 					tracer_frame = (p - stack) *
- 						sizeof(unsigned long);
--					max_stack_size -= tracer_frame;
-+					stack_trace_max_size -= tracer_frame;
- 				}
- 			}
- 		}
-@@ -171,12 +177,12 @@ check_stack(unsigned long ip, unsigned long *stack)
- 			i++;
+ 	if (tsk != current) {
+ 		data.no_sched_functions = 1;
+@@ -136,7 +301,8 @@ void save_stack_trace_tsk(struct task_struct *tsk, struct stack_trace *trace)
+ 		data.no_sched_functions = 0;
+ 		frame.fp = (unsigned long)__builtin_frame_address(0);
+ 		frame.sp = current_stack_pointer;
+-		frame.pc = (unsigned long)save_stack_trace_tsk;
++		asm("1:");
++		asm("ldr %0, =1b" : "=r" (frame.pc));
  	}
  
--	max_stack_trace.nr_entries = x;
-+	stack_trace_max.nr_entries = x;
- 	for (; x < i; x++)
- 		stack_dump_trace[x] = ULONG_MAX;
+ 	walk_stackframe(&frame, save_trace, &data);
+@@ -144,9 +310,22 @@ void save_stack_trace_tsk(struct task_struct *tsk, struct stack_trace *trace)
+ 		trace->entries[trace->nr_entries++] = ULONG_MAX;
+ }
  
- 	if (task_stack_end_corrupted(current)) {
--		print_max_stack();
-+		stack_trace_print();
- 		BUG();
- 	}
- 
-@@ -275,7 +281,7 @@ __next(struct seq_file *m, loff_t *pos)
++void save_stack_trace_tsk(struct task_struct *tsk, struct stack_trace *trace)
++{
++	__save_stack_trace_tsk(tsk, trace, NULL);
++}
++
+ void save_stack_trace(struct stack_trace *trace)
  {
- 	long n = *pos - 1;
- 
--	if (n > max_stack_trace.nr_entries || stack_dump_trace[n] == ULONG_MAX)
-+	if (n > stack_trace_max.nr_entries || stack_dump_trace[n] == ULONG_MAX)
- 		return NULL;
- 
- 	m->private = (void *)n;
-@@ -345,9 +351,9 @@ static int t_show(struct seq_file *m, void *v)
- 		seq_printf(m, "        Depth    Size   Location"
- 			   "    (%d entries)\n"
- 			   "        -----    ----   --------\n",
--			   max_stack_trace.nr_entries);
-+			   stack_trace_max.nr_entries);
- 
--		if (!stack_tracer_enabled && !max_stack_size)
-+		if (!stack_tracer_enabled && !stack_trace_max_size)
- 			print_disabled(m);
- 
- 		return 0;
-@@ -355,17 +361,17 @@ static int t_show(struct seq_file *m, void *v)
- 
- 	i = *(long *)v;
- 
--	if (i >= max_stack_trace.nr_entries ||
-+	if (i >= stack_trace_max.nr_entries ||
- 	    stack_dump_trace[i] == ULONG_MAX)
- 		return 0;
- 
--	if (i+1 == max_stack_trace.nr_entries ||
-+	if (i+1 == stack_trace_max.nr_entries ||
- 	    stack_dump_trace[i+1] == ULONG_MAX)
--		size = stack_dump_index[i];
-+		size = stack_trace_index[i];
- 	else
--		size = stack_dump_index[i] - stack_dump_index[i+1];
-+		size = stack_trace_index[i] - stack_trace_index[i+1];
- 
--	seq_printf(m, "%3ld) %8d   %5d   ", i, stack_dump_index[i], size);
-+	seq_printf(m, "%3ld) %8d   %5d   ", i, stack_trace_index[i], size);
- 
- 	trace_lookup_stack(m, i);
- 
-@@ -455,7 +461,7 @@ static __init int stack_trace_init(void)
- 		return 0;
- 
- 	trace_create_file("stack_max_size", 0644, d_tracer,
--			&max_stack_size, &stack_max_size_fops);
-+			&stack_trace_max_size, &stack_max_size_fops);
- 
- 	trace_create_file("stack_trace", 0444, d_tracer,
- 			NULL, &stack_trace_fops);
+-	save_stack_trace_tsk(current, trace);
++	__save_stack_trace_tsk(current, trace, NULL);
+ }
+ EXPORT_SYMBOL_GPL(save_stack_trace);
++
++#ifdef CONFIG_STACK_TRACER
++void save_stack_trace_sp(struct stack_trace *trace,
++					unsigned long *stack_dump_sp)
++{
++	__save_stack_trace_tsk(current, trace, stack_dump_sp);
++}
++#endif /* CONFIG_STACK_TRACER */
+ #endif
 -- 
 1.7.9.5
