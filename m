@@ -1,64 +1,56 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Fri, 30 Oct 2015 16:51:57 +0000
-Subject: [PATCH] MAINTAINERS: Start using the 'reviewer' (R) tag
-In-Reply-To: <CABxcv=mXD3AhWeqZJ4vigCtQ7utBgG2_BD0TKcjr2ctL2MjMbQ@mail.gmail.com>
-References: <1446030399.2757.83.camel@perches.com>
- <CABxcv=m+aMgtKPA-WBX9rTW8c3pnMmZgNG=NvnbaeOchdZ87hg@mail.gmail.com>
- <20151028113932.GS5828@x1> <20151028121454.GA4058@x1>
- <CABxcv=kCuYaYWgnvEUuTGv1RXdS6_3DR=6fnzHhAh7V-KFfCrQ@mail.gmail.com>
- <20151028133438.GC4058@x1>
- <CABxcv==Ag3ARUtQYZdfqBELAJ_CwU3to9YxmgG1yBbUJ-h9xrw@mail.gmail.com>
- <20151028143838.GG4058@x1> <563160B2.7070305@samsung.com>
- <CABxcv=mXD3AhWeqZJ4vigCtQ7utBgG2_BD0TKcjr2ctL2MjMbQ@mail.gmail.com>
-Message-ID: <20151030165157.GX4058@x1>
+From: dhdang@apm.com (Duc Dang)
+Date: Fri, 30 Oct 2015 09:53:53 -0700
+Subject: [PATCH V3 0/6] gicv2m: acpi: Add ACPI support for GICv2m MSI
+In-Reply-To: <563378CB.9090005@amd.com>
+References: <1445453249-32557-1-git-send-email-Suravee.Suthikulpanit@amd.com>
+ <CADaLNDnhn+Lax6aMseA4kPsAfKHG=L0buO6Tf-U8sxfUzn38BA@mail.gmail.com>
+ <563378CB.9090005@amd.com>
+Message-ID: <CADaLND=g=Md5YzALGQbtUHYVUSyCcAgLwJ1vAR+7mDDOdDm=_w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 29 Oct 2015, Javier Martinez Canillas wrote:
+On Fri, Oct 30, 2015 at 7:03 AM, Suravee Suthikulpanit
+<Suravee.Suthikulpanit@amd.com> wrote:
+> Hi Duc
+>
+> On 10/29/15 16:25, Duc Dang wrote:
+>>
+>> Hi Suravee,
+>> On Wed, Oct 21, 2015 at 11:47 AM, Suravee Suthikulpanit
+>> <Suravee.Suthikulpanit@amd.com>  wrote:
+>>>
+>>> >This patch series has been forked from the following patch series since
+>>> >it no longer depends on the rest of the patches.
+>>> >
+>>> >   [PATCH v4 00/10] ACPI GIC Self-probing, GICv2m and GICv3 support
+>>> >   https://lkml.org/lkml/2015/7/29/234
+>>> >
+>>> >It has been ported to use the newly introduced device fwnode_handle
+>>> >for ACPI irqdmain introduced by Marc in the following patch series:
+>>> >
+>>> >   [PATCH v2 00/17] Divorcing irqdomain and device_node
+>>> >   http://git.kernel.org/cgit/linux/kernel/git/maz/arm-platforms.git
+>>> > irq/irq-domain-fwnode-v2
+>>> >
+>>> >The following git branch contains the submitted patches along with
+>>> >the pre-requsite patches (mainly for ARM64 PCI support for ACPI).
+>>> >
+>>> >   https://github.com/ssuthiku/linux.git  v2m-multiframe-v3
+>>
+>> I tried to clone your tree to test on my X-Gene platform but I didn't
+>> see branch v2m-multiframe-v3.
+>> I see similar patch set in origin/irq-domain-fwnode-v2-v2m-multiframe.
+>> Can you please check?
+>>
+>
+> It should be there now. I might have forgotten to push it to my Github.
+> Sorry for inconvenience, and thanks for testing.
 
-> Hello Lee,
-> 
-> On Thu, Oct 29, 2015 at 12:56 AM, Krzysztof Kozlowski
-> <k.kozlowski@samsung.com> wrote:
-> > On 28.10.2015 23:38, Lee Jones wrote:
-> >> On Wed, 28 Oct 2015, Javier Martinez Canillas wrote:
-> >>> They are not maintainers according to your definition of maintainer
-> >>> that doesn't seem what most people agree with.
-> >>
-> >> "most people" so far are 3 people that I assume still want to be
-> >> Maintainers despite not actually conducting Maintainer duties, but
-> >> are rather Reviewers.  I also have 2 Acks for this patch, so thus far
-> >> that's 3 that agree and 3 that do not.  Unsurprisingly the ones that
-> >> agree are Maintainers and the ones who are not are (by my definition)
-> >> Reviewers -- go figure.
-> >>
-> >
-> > I am not sure on which side you put me finally. :)
-> > If there is a consensus among some more experienced developers that
-> > maintainer means branch and patches maintaining, then I won't see any
-> > problem with the patch nor with switching Samsung PMIC entries to review.
-> >
-> > In that case, that would be:
-> > Acked-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> >
-> 
-> Same for me, what I don't want is to have different meanings per
-> subsystems of what maintainers and reviewers mean since that could
-> confuse developers posting patches.
-> 
-> But if there is a kernel wide consensus and all subsystems entries are
-> going to be updated to use the same semantics and list as Reviewer to
-> people that don't keep git trees, then I'm OK with this patch and you
-> can add my:
-> 
-> Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
+Thanks Suravee. I see branch v2m-multiframe-v3 now. I will test and
+update you soon.
 
-Thanks Javier, but I'm going to drop this patch.
+>
+> Suravee
 
-I can see it causing more issues than it'll solve.
-
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Regards,
+Duc Dang.
