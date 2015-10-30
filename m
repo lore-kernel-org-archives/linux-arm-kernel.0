@@ -1,26 +1,53 @@
-From: davem@davemloft.net (David Miller)
-Date: Fri, 30 Oct 2015 12:22:20 +0900 (KST)
-Subject: [PATCH net-next v2 0/2] drivers: xgene: Add support RGMII
- TX/RX delay configuration
-In-Reply-To: <1445898316-21372-1-git-send-email-isubramanian@apm.com>
-References: <1445898316-21372-1-git-send-email-isubramanian@apm.com>
-Message-ID: <20151030.122220.1215954538392198950.davem@davemloft.net>
+From: caesar.upstream@gmail.com (Caesar Wang)
+Date: Fri, 30 Oct 2015 11:43:33 +0800
+Subject: [PATCH v2 1/4] clocksource: rockchip: Make the driver more
+ compatible
+In-Reply-To: <2486591.i0n1KlEQoc@diego>
+References: <1443147298-12603-1-git-send-email-wxt@rock-chips.com>
+ <1443147298-12603-2-git-send-email-wxt@rock-chips.com>
+ <560A10FB.7040408@linaro.org> <2486591.i0n1KlEQoc@diego>
+Message-ID: <5632E765.4010207@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Iyappan Subramanian <isubramanian@apm.com>
-Date: Mon, 26 Oct 2015 15:25:14 -0700
+Hi Daniel,
 
-> X-Gene RGMII ethernet controller has a RGMII bridge that performs the
-> task of converting the RGMII signal {RX_CLK,RX_CTL, RX_DATA[3:0]} from
-> PHY to GMII signal {RX_DV,RX_ER,RX_DATA[7:0]} and vice versa.  This
-> RGMII bridge has a provision to internally delay the input RX_CLK and
-> the output TX_CLK using configuration registers. This will help in
-> maintain the CLK-CTL delay relationship in various operating
-> conditions.
-> 
-> This patch adds support RGMII TX/RX delay configuration.
-> 
-> Signed-off-by: Iyappan Subramanian <isubramanian@apm.com>
+? 2015?10?01? 03:14, Heiko St?bner ??:
+> Hi Daniel,
+>
+> Am Dienstag, 29. September 2015, 06:18:03 schrieb Daniel Lezcano:
+>> On 09/25/2015 04:14 AM, Caesar Wang wrote:
+>>> Build the arm64 SoCs (e.g.: RK3368) on Rockchip platform,
+>>> There are some failure with build up on timer driver for rockchip.
+>>>
+>>> Says:
+>>> /tmp/ccdAnNy5.s:47: Error: missing immediate expression at  operand 1 --
+>>> `dsb`
+>>> ...
+>>>
+>>> The problem was different semantics of dsb on btw arm32 and arm64,
+>>> Here we can convert the dsb with insteading of dsb(sy).The "sy" param
+>>> is the default which you are allow to omit, so on arm32 dsb()and dsb(sy)
+>>> are the same.
+>>>
+>>> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
+>> Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+> as you have "just" Acked these patches, I guess you are expecting them to go
+> through the same tree as the devicetree changes, right?
 
-Series applied, thanks.
+I'm wonder if someone will apply this series patchs but the wait.:-)
+In fact, I'm no sure that the Acked is really meaning.:-
+
+>
+> Thanks
+> Heiko
+>
+> _______________________________________________
+> Linux-rockchip mailing list
+> Linux-rockchip at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-rockchip
+
+
+-- 
+Thanks,
+Caesar
