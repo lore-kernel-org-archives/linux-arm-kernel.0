@@ -1,53 +1,34 @@
-From: caesar.upstream@gmail.com (Caesar Wang)
-Date: Fri, 30 Oct 2015 11:43:33 +0800
-Subject: [PATCH v2 1/4] clocksource: rockchip: Make the driver more
- compatible
-In-Reply-To: <2486591.i0n1KlEQoc@diego>
-References: <1443147298-12603-1-git-send-email-wxt@rock-chips.com>
- <1443147298-12603-2-git-send-email-wxt@rock-chips.com>
- <560A10FB.7040408@linaro.org> <2486591.i0n1KlEQoc@diego>
-Message-ID: <5632E765.4010207@gmail.com>
+From: jcm@redhat.com (Jon Masters)
+Date: Fri, 30 Oct 2015 00:07:56 -0400
+Subject: [PATCH V1 00/11] MMCONFIG refactoring and ARM64 PCI hostbridge
+ init based on ACPI
+In-Reply-To: <1445963922-22711-1-git-send-email-tn@semihalf.com>
+References: <1445963922-22711-1-git-send-email-tn@semihalf.com>
+Message-ID: <5632ED1C.7050500@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel,
+Hi Tomasz,
 
-? 2015?10?01? 03:14, Heiko St?bner ??:
-> Hi Daniel,
->
-> Am Dienstag, 29. September 2015, 06:18:03 schrieb Daniel Lezcano:
->> On 09/25/2015 04:14 AM, Caesar Wang wrote:
->>> Build the arm64 SoCs (e.g.: RK3368) on Rockchip platform,
->>> There are some failure with build up on timer driver for rockchip.
->>>
->>> Says:
->>> /tmp/ccdAnNy5.s:47: Error: missing immediate expression at  operand 1 --
->>> `dsb`
->>> ...
->>>
->>> The problem was different semantics of dsb on btw arm32 and arm64,
->>> Here we can convert the dsb with insteading of dsb(sy).The "sy" param
->>> is the default which you are allow to omit, so on arm32 dsb()and dsb(sy)
->>> are the same.
->>>
->>> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
->> Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
-> as you have "just" Acked these patches, I guess you are expecting them to go
-> through the same tree as the devicetree changes, right?
+Thanks for posting this series.
 
-I'm wonder if someone will apply this series patchs but the wait.:-)
-In fact, I'm no sure that the Acked is really meaning.:-
+On 10/27/2015 12:38 PM, Tomasz Nowicki wrote:
 
->
-> Thanks
-> Heiko
->
-> _______________________________________________
-> Linux-rockchip mailing list
-> Linux-rockchip at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-rockchip
+> From the functionality point of view this series might be split into two logic parts:
+> 1. Making MMCONFIG code arch-agnostic which allows all architectures to collect
+>    PCI config regions and used when necessary.
+> 2. Using generic MMCONFIG code and introducing ACPI based PCI hostbridge
+>    initialization for ARM64
 
+Can I confirm that the intention here is that this replaces Hanjun's
+previous patch series? Here's the previous one we were tracking:
 
--- 
+https://lkml.kernel.org/g/1432644564-24746-1-git-send-email-hanjun.guo at linaro.org
+
+Assuming that is the case, then we will ping a number of folks to
+conduct testing and provide acks (this has already been discussed in a
+number of conversations with semiconductors over the past few days).
+
 Thanks,
-Caesar
+
+Jon.
