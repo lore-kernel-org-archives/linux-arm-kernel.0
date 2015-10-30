@@ -1,42 +1,46 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 30 Oct 2015 15:20:47 +0100
-Subject: [PATCH 01/19] clk: sunxi: Add display clock
+Date: Fri, 30 Oct 2015 15:20:48 +0100
+Subject: [PATCH 02/19] clk: sunxi: Add PLL3 clock
 In-Reply-To: <1446214865-3972-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1446214865-3972-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1446214865-3972-2-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1446214865-3972-3-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The A10 SoCs and its relatives has a special clock controller to drive the
-display engines (both frontend and backend).
+The A10 SoCs and relatives have a PLL controller to drive the PLL3 and
+PLL7, clocked from a 3MHz oscillator, that drives the display related
+clocks (GPU, display engine, TCON, etc.)
 
 Add a driver for it.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- drivers/clk/sunxi/Makefile            |   1 +
- drivers/clk/sunxi/clk-sun4i-display.c | 199 ++++++++++++++++++++++++++++++++++
- 2 files changed, 200 insertions(+)
- create mode 100644 drivers/clk/sunxi/clk-sun4i-display.c
+ drivers/clk/sunxi/Makefile         |  3 +-
+ drivers/clk/sunxi/clk-sun4i-pll3.c | 84 ++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 86 insertions(+), 1 deletion(-)
+ create mode 100644 drivers/clk/sunxi/clk-sun4i-pll3.c
 
 diff --git a/drivers/clk/sunxi/Makefile b/drivers/clk/sunxi/Makefile
-index cb4c299214ce..a9e1a5885846 100644
+index a9e1a5885846..40c32ffd912c 100644
 --- a/drivers/clk/sunxi/Makefile
 +++ b/drivers/clk/sunxi/Makefile
-@@ -9,6 +9,7 @@ obj-y += clk-a10-mod1.o
+@@ -9,8 +9,9 @@ obj-y += clk-a10-mod1.o
  obj-y += clk-a10-pll2.o
  obj-y += clk-a20-gmac.o
  obj-y += clk-mod0.o
-+obj-y += clk-sun4i-display.o
+-obj-y += clk-sun4i-display.o
  obj-y += clk-simple-gates.o
++obj-y += clk-sun4i-display.o
++obj-y += clk-sun4i-pll3.o
  obj-y += clk-sun8i-mbus.o
  obj-y += clk-sun9i-core.o
-diff --git a/drivers/clk/sunxi/clk-sun4i-display.c b/drivers/clk/sunxi/clk-sun4i-display.c
+ obj-y += clk-sun9i-mmc.o
+diff --git a/drivers/clk/sunxi/clk-sun4i-pll3.c b/drivers/clk/sunxi/clk-sun4i-pll3.c
 new file mode 100644
-index 000000000000..f13b095c6d7a
+index 000000000000..7ea178bf19fa
 --- /dev/null
-+++ b/drivers/clk/sunxi/clk-sun4i-display.c
-@@ -0,0 +1,199 @@
++++ b/drivers/clk/sunxi/clk-sun4i-pll3.c
+@@ -0,0 +1,84 @@
 +/*
 + * Copyright 2015 Maxime Ripard
 + *
@@ -55,104 +59,25 @@ index 000000000000..f13b095c6d7a
 +
 +#include <linux/clk-provider.h>
 +#include <linux/of_address.h>
-+#include <linux/reset-controller.h>
 +#include <linux/slab.h>
 +#include <linux/spinlock.h>
 +
-+#define SUN4I_A10_DISPLAY_PARENTS	3
++#define SUN4I_A10_PLL3_GATE_BIT	31
++#define SUN4I_A10_PLL3_DIV_WIDTH	7
++#define SUN4I_A10_PLL3_DIV_SHIFT	0
 +
-+#define SUN4I_A10_DISPLAY_GATE_BIT	31
-+#define SUN4I_A10_DISPLAY_RESET_BIT	30
-+#define SUN4I_A10_DISPLAY_MUX_MASK	3
-+#define SUN4I_A10_DISPLAY_MUX_SHIFT	24
-+#define SUN4I_A10_DISPLAY_DIV_WIDTH	4
-+#define SUN4I_A10_DISPLAY_DIV_SHIFT	0
++static DEFINE_SPINLOCK(sun4i_a10_pll3_lock);
 +
-+struct reset_data {
-+	void __iomem			*reg;
-+	spinlock_t			*lock;
-+	struct reset_controller_dev	rcdev;
-+};
-+
-+static DEFINE_SPINLOCK(sun4i_a10_display_lock);
-+
-+static int sun4i_a10_display_assert(struct reset_controller_dev *rcdev,
-+				    unsigned long id)
++static void __init sun4i_a10_pll3_setup(struct device_node *node)
 +{
-+	struct reset_data *data = container_of(rcdev,
-+					       struct reset_data,
-+					       rcdev);
-+	unsigned long flags;
-+	u32 reg;
-+
-+	spin_lock_irqsave(data->lock, flags);
-+
-+	reg = readl(data->reg);
-+	writel(reg & ~BIT(SUN4I_A10_DISPLAY_RESET_BIT), data->reg);
-+
-+	spin_unlock_irqrestore(data->lock, flags);
-+
-+	return 0;
-+}
-+
-+static int sun4i_a10_display_deassert(struct reset_controller_dev *rcdev,
-+				      unsigned long id)
-+{
-+	struct reset_data *data = container_of(rcdev,
-+						   struct reset_data,
-+						   rcdev);
-+	unsigned long flags;
-+	u32 reg;
-+
-+	spin_lock_irqsave(data->lock, flags);
-+
-+	reg = readl(data->reg);
-+	writel(reg | BIT(SUN4I_A10_DISPLAY_RESET_BIT), data->reg);
-+
-+	spin_unlock_irqrestore(data->lock, flags);
-+
-+	return 0;
-+}
-+
-+static int sun4i_a10_display_status(struct reset_controller_dev *rcdev,
-+				    unsigned long id)
-+{
-+	struct reset_data *data = container_of(rcdev,
-+					       struct reset_data,
-+					       rcdev);
-+
-+	return !(readl(data->reg) & BIT(SUN4I_A10_DISPLAY_RESET_BIT));
-+}
-+
-+static struct reset_control_ops sun4i_a10_display_reset_ops = {
-+	.assert		= sun4i_a10_display_assert,
-+	.deassert	= sun4i_a10_display_deassert,
-+	.status		= sun4i_a10_display_status,
-+};
-+
-+static int sun4i_a10_display_reset_xlate(struct reset_controller_dev *rcdev,
-+					 const struct of_phandle_args *spec)
-+{
-+	if (WARN_ON(spec->args_count != rcdev->of_reset_n_cells))
-+		return -EINVAL;
-+
-+	/* We only have a single reset signal */
-+	return 0;
-+}
-+
-+static void __init sun4i_a10_display_setup(struct device_node *node)
-+{
-+	const char *parents[SUN4I_A10_DISPLAY_PARENTS];
-+	const char *clk_name = node->name;
-+	struct reset_data *reset_data;
-+	struct clk_divider *div;
++	const char *clk_name = node->name, *parent;
++	struct clk_factor *mult;
 +	struct clk_gate *gate;
-+	struct clk_mux *mux;
 +	void __iomem *reg;
 +	struct clk *clk;
-+	int i;
 +
 +	of_property_read_string(node, "clock-output-names", &clk_name);
++	parent = of_clk_get_parent_name(node, 0);
 +
 +	reg = of_io_request_and_map(node, 0, of_node_full_name(node));
 +	if (IS_ERR(reg)) {
@@ -160,81 +85,45 @@ index 000000000000..f13b095c6d7a
 +		return;
 +	}
 +
-+	for (i = 0; i < SUN4I_A10_DISPLAY_PARENTS; i++)
-+		parents[i] = of_clk_get_parent_name(node, i);
-+
-+	mux = kzalloc(sizeof(*mux), GFP_KERNEL);
-+	if (!mux)
-+		return;
-+
-+	mux->reg = reg;
-+	mux->shift = SUN4I_A10_DISPLAY_MUX_SHIFT;
-+	mux->mask = SUN4I_A10_DISPLAY_MUX_MASK;
-+	mux->lock = &sun4i_a10_display_lock;
-+
 +	gate = kzalloc(sizeof(*gate), GFP_KERNEL);
 +	if (!gate)
-+		goto free_mux;
++		return;
 +
 +	gate->reg = reg;
-+	gate->bit_idx = SUN4I_A10_DISPLAY_GATE_BIT;
-+	gate->lock = &sun4i_a10_display_lock;
++	gate->bit_idx = SUN4I_A10_PLL3_GATE_BIT;
++	gate->lock = &sun4i_a10_pll3_lock;
 +
-+	div = kzalloc(sizeof(*div), GFP_KERNEL);
-+	if (!div)
++	mult = kzalloc(sizeof(*mult), GFP_KERNEL);
++	if (!mult)
 +		goto free_gate;
 +
-+	div->reg = reg;
-+	div->shift = SUN4I_A10_DISPLAY_DIV_SHIFT;
-+	div->width = SUN4I_A10_DISPLAY_DIV_WIDTH;
-+	div->lock = &sun4i_a10_display_lock;
++	mult->reg = reg;
++	mult->shift = SUN4I_A10_PLL3_DIV_SHIFT;
++	mult->width = SUN4I_A10_PLL3_DIV_WIDTH;
++	mult->lock = &sun4i_a10_pll3_lock;
 +
 +	clk = clk_register_composite(NULL, clk_name,
-+				     parents, SUN4I_A10_DISPLAY_PARENTS,
-+				     &mux->hw, &clk_mux_ops,
-+				     &div->hw, &clk_divider_ops,
++				     &parent, 1,
++				     NULL, NULL,
++				     &mult->hw, &clk_factor_ops,
 +				     &gate->hw, &clk_gate_ops,
 +				     0);
 +	if (IS_ERR(clk)) {
 +		pr_err("%s: Couldn't register the clock\n", clk_name);
-+		goto free_div;
++		goto free_mult;
 +	}
 +
 +	of_clk_add_provider(node, of_clk_src_simple_get, clk);
 +
-+	reset_data = kzalloc(sizeof(*reset_data), GFP_KERNEL);
-+	if (!reset_data)
-+		goto free_clk;
-+
-+	reset_data->reg = reg;
-+	reset_data->lock = &sun4i_a10_display_lock;
-+	reset_data->rcdev.nr_resets = 1;
-+	reset_data->rcdev.ops = &sun4i_a10_display_reset_ops;
-+	reset_data->rcdev.of_node = node;
-+	reset_data->rcdev.of_reset_n_cells = 0;
-+	reset_data->rcdev.of_xlate = &sun4i_a10_display_reset_xlate;
-+
-+	if (reset_controller_register(&reset_data->rcdev)) {
-+		pr_err("%s: Couldn't register the reset controller\n",
-+		       clk_name);
-+		goto free_reset;
-+	}
-+
 +	return;
 +
-+free_reset:
-+	kfree(reset_data);
-+free_clk:
-+	clk_unregister(clk);
-+free_div:
-+	kfree(div);
++free_mult:
++	kfree(mult);
 +free_gate:
 +	kfree(gate);
-+free_mux:
-+	kfree(mux);
 +}
 +
-+CLK_OF_DECLARE(sun4i_a10_display, "allwinner,sun4i-a10-display-clk",
-+	       sun4i_a10_display_setup);
++CLK_OF_DECLARE(sun4i_a10_pll3, "allwinner,sun4i-a10-pll3-clk",
++	       sun4i_a10_pll3_setup);
 -- 
 2.6.2
