@@ -1,64 +1,121 @@
 From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Fri, 30 Oct 2015 14:25:35 +0900
-Subject: [PATCH v4 0/6] arm64: ftrace: fix incorrect output from stack tracer
-Message-ID: <1446182741-31019-1-git-send-email-takahiro.akashi@linaro.org>
+Date: Fri, 30 Oct 2015 14:25:36 +0900
+Subject: [PATCH v4 1/6] arm64: ftrace: adjust callsite addresses examined by
+ stack tracer
+In-Reply-To: <1446182741-31019-1-git-send-email-takahiro.akashi@linaro.org>
+References: <1446182741-31019-1-git-send-email-takahiro.akashi@linaro.org>
+Message-ID: <1446182741-31019-2-git-send-email-takahiro.akashi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is the fourth patch series for fixing stack tracer on arm64.
-The original issue was reported by Jungseok[1], and then I found more
-issues[2].
-(Steven, Jungseok, sorry for not replying to your comments directly.)
+On arm64, no PC values returned by save_stack_trace() will match to LR
+values saved in stack frames on a stack after the following commit:
+    commit e306dfd06fcb ("ARM64: unwind: Fix PC calculation")
+As a result, the output from stack tracer will be messed up.
 
-I address here all the issues and implement fixes described in [2] except
-for interrupt-triggered problems(II-3) and leaf function(II-5).  Recent
-discussions[3] about introducing a dedicated interrupt stack suggests that
-we may avoid walking through from an interrupt stack to a process stack.
-(So interrupt-stack patch is a prerequisite.)
+This patch introduces an arch-defined macro, FTRACE_STACK_FRAME_OFFSET,
+so that check_stack() can handle this case correctly.
 
-Basically,
-patch1 corresponds to the original issue.
-patch2 is a proactive improvement of function_graph tracer. 
-patch3 corresponds to II-4(functions under function_graph tracer).
-patch4, 5 and 6 correspond to II-1(slurping stack) and II-2(differences
-between x86 and arm64).
+Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+---
+ arch/arm64/include/asm/ftrace.h |    5 +++--
+ arch/arm64/kernel/stacktrace.c  |    7 ++++---
+ include/linux/ftrace.h          |    7 +++++++
+ kernel/trace/trace_stack.c      |    8 +++++---
+ 4 files changed, 19 insertions(+), 8 deletions(-)
 
-Each fix can be applied independently, but if patch4, 5 and 6 are
-acceptable, patch1 is not necessary because patch7 replaces a default
-stack tracer.
-
-I tested the code with v4.3-rc7 + Jungseok's patch v5[4].
-
-Changes from v3:
-- fixed build errors/warnings reported by kbuild test robot
-- addressed Steven's comments around check_stack()
-- removed a patch ("arm64: ftrace: allow for tracing leaf functions")
-  I don't remember why I thought this was necessary, but anyhow "-pg" seems
-  to disable omit-leaf-stack-frame.
-
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-July/354126.html
-[2] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-July/355920.html 
-[3] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-September/368003.html
-[4] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-October/378699.html
-
-AKASHI Takahiro (6):
-  arm64: ftrace: adjust callsite addresses examined by stack tracer
-  arm64: ftrace: modify a stack frame in a safe way
-  arm64: ftrace: fix a stack tracer's output under function graph
-    tracer
-  ftrace: allow arch-specific stack tracer
-  arm64: insn: add instruction decoders for ldp/stp and add/sub
-  arm64: ftrace: add arch-specific stack tracer
-
- arch/arm64/include/asm/ftrace.h     |    7 +-
- arch/arm64/include/asm/insn.h       |   18 +++
- arch/arm64/include/asm/stacktrace.h |    4 +
- arch/arm64/kernel/ftrace.c          |   79 +++++++++++--
- arch/arm64/kernel/insn.c            |  102 +++++++++++++++++
- arch/arm64/kernel/stacktrace.c      |  213 ++++++++++++++++++++++++++++++++++-
- include/linux/ftrace.h              |   17 +++
- kernel/trace/trace_stack.c          |   88 ++++++++-------
- 8 files changed, 473 insertions(+), 55 deletions(-)
-
+diff --git a/arch/arm64/include/asm/ftrace.h b/arch/arm64/include/asm/ftrace.h
+index c5534fa..2b43e20 100644
+--- a/arch/arm64/include/asm/ftrace.h
++++ b/arch/arm64/include/asm/ftrace.h
+@@ -13,8 +13,9 @@
+ 
+ #include <asm/insn.h>
+ 
+-#define MCOUNT_ADDR		((unsigned long)_mcount)
+-#define MCOUNT_INSN_SIZE	AARCH64_INSN_SIZE
++#define MCOUNT_ADDR			((unsigned long)_mcount)
++#define MCOUNT_INSN_SIZE		AARCH64_INSN_SIZE
++#define FTRACE_STACK_FRAME_OFFSET	AARCH64_INSN_SIZE
+ 
+ #ifndef __ASSEMBLY__
+ #include <linux/compat.h>
+diff --git a/arch/arm64/kernel/stacktrace.c b/arch/arm64/kernel/stacktrace.c
+index 407991b..bc0689a 100644
+--- a/arch/arm64/kernel/stacktrace.c
++++ b/arch/arm64/kernel/stacktrace.c
+@@ -20,6 +20,7 @@
+ #include <linux/sched.h>
+ #include <linux/stacktrace.h>
+ 
++#include <asm/insn.h>
+ #include <asm/stacktrace.h>
+ 
+ /*
+@@ -49,10 +50,10 @@ int notrace unwind_frame(struct stackframe *frame)
+ 	frame->sp = fp + 0x10;
+ 	frame->fp = *(unsigned long *)(fp);
+ 	/*
+-	 * -4 here because we care about the PC at time of bl,
+-	 * not where the return will go.
++	 * decrement PC by AARCH64_INSN_SIZE here because we care about
++	 * the PC at time of bl, not where the return will go.
+ 	 */
+-	frame->pc = *(unsigned long *)(fp + 8) - 4;
++	frame->pc = *(unsigned long *)(fp + 8) - AARCH64_INSN_SIZE;
+ 
+ 	return 0;
+ }
+diff --git a/include/linux/ftrace.h b/include/linux/ftrace.h
+index 6cd8c0e..d77b195 100644
+--- a/include/linux/ftrace.h
++++ b/include/linux/ftrace.h
+@@ -263,6 +263,13 @@ static inline void ftrace_kill(void) { }
+ #endif /* CONFIG_FUNCTION_TRACER */
+ 
+ #ifdef CONFIG_STACK_TRACER
++/*
++ * the offset value to add to return address from save_stack_trace()
++ */
++#ifndef FTRACE_STACK_FRAME_OFFSET
++#define FTRACE_STACK_FRAME_OFFSET 0
++#endif
++
+ extern int stack_tracer_enabled;
+ int
+ stack_trace_sysctl(struct ctl_table *table, int write,
+diff --git a/kernel/trace/trace_stack.c b/kernel/trace/trace_stack.c
+index 8abf1ba..2e452e8 100644
+--- a/kernel/trace/trace_stack.c
++++ b/kernel/trace/trace_stack.c
+@@ -68,7 +68,7 @@ static inline void print_max_stack(void)
+ static inline void
+ check_stack(unsigned long ip, unsigned long *stack)
+ {
+-	unsigned long this_size, flags; unsigned long *p, *top, *start;
++	unsigned long this_size, flags; unsigned long *p, *top, *start, addr;
+ 	static int tracer_frame;
+ 	int frame_size = ACCESS_ONCE(tracer_frame);
+ 	int i, x;
+@@ -115,7 +115,8 @@ check_stack(unsigned long ip, unsigned long *stack)
+ 
+ 	/* Skip over the overhead of the stack tracer itself */
+ 	for (i = 0; i < max_stack_trace.nr_entries; i++) {
+-		if (stack_dump_trace[i] == ip)
++		addr = stack_dump_trace[i] + FTRACE_STACK_FRAME_OFFSET;
++		if (addr == ip)
+ 			break;
+ 	}
+ 
+@@ -143,7 +144,8 @@ check_stack(unsigned long ip, unsigned long *stack)
+ 		for (; p < top && i < max_stack_trace.nr_entries; p++) {
+ 			if (stack_dump_trace[i] == ULONG_MAX)
+ 				break;
+-			if (*p == stack_dump_trace[i]) {
++			addr = stack_dump_trace[i] + FTRACE_STACK_FRAME_OFFSET;
++			if (*p == addr) {
+ 				stack_dump_trace[x] = stack_dump_trace[i++];
+ 				this_size = stack_dump_index[x++] =
+ 					(top - p) * sizeof(unsigned long);
 -- 
 1.7.9.5
