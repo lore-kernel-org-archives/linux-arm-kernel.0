@@ -1,35 +1,35 @@
-From: ezequiel@vanguardiasur.com.ar (Ezequiel Garcia)
-Date: Fri, 30 Oct 2015 13:00:40 -0300
-Subject: [PATCH v2 2/4] nvmem: NXP LPC18xx EEPROM memory NVMEM driver
-In-Reply-To: <56338FF4.8050102@vanguardiasur.com.ar>
-References: <1445275946-32653-1-git-send-email-ariel@vanguardiasur.com.ar>
- <1445275946-32653-3-git-send-email-ariel@vanguardiasur.com.ar>
- <562E377A.3040604@linaro.org>
- <56338FF4.8050102@vanguardiasur.com.ar>
-Message-ID: <CAAEAJfCoNBgdJZxKpW1PO0kyHjr_LdhKMyAuPrLbHSu7-Mx-qw@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 30 Oct 2015 16:01:07 +0000
+Subject: [PATCH v4 3/3] arm64/efi: isolate EFI stub from the kernel proper
+In-Reply-To: <CAKv+Gu-m7dJbiF=8i=+cN=bx+y8AKu_MgHrS29jNK0fTvuwQ5Q@mail.gmail.com>
+References: <1444330924-17830-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1444330924-17830-4-git-send-email-ard.biesheuvel@linaro.org>
+ <562EA894.8070505@arm.com> <562EAA22.3010905@arm.com>
+ <CAKv+Gu-G1YS9Ha=-rtnPKJTOxBTrdSq6=Tqwq_GPW742JUE+2Q@mail.gmail.com>
+ <562F8DCE.4010308@arm.com>
+ <CAKv+Gu-m7dJbiF=8i=+cN=bx+y8AKu_MgHrS29jNK0fTvuwQ5Q@mail.gmail.com>
+Message-ID: <20151030160107.GA8899@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Srinivas, Ariel,
+On Fri, Oct 30, 2015 at 01:17:24PM +0100, Ard Biesheuvel wrote:
+> On 27 October 2015 at 23:44, Jeremy Linton <jeremy.linton@arm.com> wrote:
+> > On 10/26/2015 09:20 PM, Ard Biesheuvel wrote:
+> >>
+> >> Thanks for the report. The following patch should fix it
+> >
+> >
+> > Ard,
+> >
+> > Thanks, it does fix the build problem...
+> >
+> > Now to get the darn thing to boot (not related to this AFAIK).
+> 
+> Would you like me to resend this as a separate patch?
 
-On 30 October 2015 at 12:42, Ariel D'Alessandro
-<ariel@vanguardiasur.com.ar> wrote:
-> El 26/10/15 a las 11:23, Srinivas Kandagatla escribi?:
->>
->>
->> On 19/10/15 18:32, Ariel D'Alessandro wrote:
->>> This commit adds support for NXP LPC18xx EEPROM memory found in NXP
->> s/commit/patch
->
-> OK.
->
+No need to but it would be good to get an Ack from Matt since it touches
+drivers/firmware/efi/libstub/Makefile (the patch introducing
+STUBCOPY_FLAGS was already acked).
 
-What's wrong with using "commit" ?
-
-If the patch gets accepted and is merged, it will become a commit. Hence,
-it's customary to use "commit" in the commit log.
-
-I really don't think it's wrong to use either patch or commit.
 -- 
-Ezequiel Garc?a, VanguardiaSur
-www.vanguardiasur.com.ar
+Catalin
