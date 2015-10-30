@@ -1,63 +1,60 @@
-From: sudeep.holla@arm.com (Sudeep Holla)
-Date: Fri, 30 Oct 2015 12:27:15 +0000
-Subject: [PATCH 0/3] Revert arm64 cache geometry
-In-Reply-To: <20151030115744.GC2854@e104818-lin.cambridge.arm.com>
-References: <1446068637-11509-1-git-send-email-avanbrunt@nvidia.com>
- <20151029114005.GB389@arm.com> <1446159896024.99950@nvidia.com>
- <20151030110010.GA2854@e104818-lin.cambridge.arm.com>
- <56335024.9090009@arm.com>
- <20151030115744.GC2854@e104818-lin.cambridge.arm.com>
-Message-ID: <56336223.4000807@arm.com>
+From: dietmar.eggemann@arm.com (Dietmar Eggemann)
+Date: Fri, 30 Oct 2015 12:29:00 +0000
+Subject: [PATCH] ARM64: Enable multi-core scheduler support by default
+In-Reply-To: <20151029171944.GS8899@e104818-lin.cambridge.arm.com>
+References: <1445273749-16778-1-git-send-email-dietmar.eggemann@arm.com>
+ <20151029171944.GS8899@e104818-lin.cambridge.arm.com>
+Message-ID: <5633628C.1010200@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 30/10/15 11:57, Catalin Marinas wrote:
-> On Fri, Oct 30, 2015 at 11:10:28AM +0000, Sudeep Holla wrote:
->> On 30/10/15 11:00, Catalin Marinas wrote:
->>> BTW, it looks like I don't get any cache information on Juno
->>> with 4.3-rc7, it says "Unable to detect cache hierarchy from DT
->>> for CPU 0". I thought the point of the patch you are trying to
->>> revert was to parse this information from the hardware registers.
->>> Sudeep, any idea?
->>>
+On 10/29/2015 05:19 PM, Catalin Marinas wrote:
+> On Mon, Oct 19, 2015 at 05:55:49PM +0100, Dietmar Eggemann wrote:
+>> Make sure that the task scheduler domain hierarchy is set-up correctly
+>> on systems with single or multi-cluster topology.
 >>
->> Yes you need to have updated DT from the mainline. Since the
->> architecture doesn't provide any way of detecting the cpus sharing
->> particular cache, we get that information from DT.
+>> Signed-off-by: Dietmar Eggemann <dietmar.eggemann@arm.com>
+>> ---
+>>   arch/arm64/configs/defconfig | 1 +
+>>   1 file changed, 1 insertion(+)
 >>
->> If DT lacks that info we don't expose any information. It would be
->> wrong to say that a shared cache is shared by all the cpus in the
->> system. DT check was added explicitly to avoid that.
+>> diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+>> index 34d71dd86781..dc70d715bc38 100644
+>> --- a/arch/arm64/configs/defconfig
+>> +++ b/arch/arm64/configs/defconfig
+>> @@ -51,6 +51,7 @@ CONFIG_PCI=y
+>>   CONFIG_PCI_MSI=y
+>>   CONFIG_PCI_XGENE=y
+>>   CONFIG_SMP=y
+>> +CONFIG_SCHED_MC=y
+>>   CONFIG_PREEMPT=y
+>>   CONFIG_KSM=y
+>>   CONFIG_TRANSPARENT_HUGEPAGE=y
 >
-> OK, thanks for the information. The good thing is that use space
-> should already be able to cope with cache information not present in
-> sysfs.
->
+> Question: does enabling this option have any (positive) effect on the
+> vanilla kernel or it requires additional patches like EAS?
 
-True.
+It improves the task scheduler decisions on multi-cluster systems. You 
+have to iterate over all cpu's less frequently when gathering the sched 
+group statistics e.g. during CFS load-balancing.
 
-> So, rather than reverting this feature, for the Denver case we have
-> the option of either providing full cache topology information in DT
-> or providing a DT flag which states whether hardware cache ID
-> information is relevant.
->
+You essentially replace a flat (all cpus) with an hierarchical approach 
+(lowest level: sched group eq. cpu, next level: sched group eq. cluster) 
+and do CFS load balancing frequently between two cpu's of the same 
+cluster (lowest level) and less frequently between two cpus from 
+different cluster.
 
-Yes at-least few L2 cache controllers where either hardware can't 
-provide that information or provides incorrect one, already use/override
-values from DT.
+Not sure that I would see an effect on the performance score on a JUNO 
+board when running hackbench. Could give it a try ... Probably easier to 
+spot on a machine with >32 logical cpus.
 
-We can probably patch core cacheinfo itself as PPC also completely
-depends on DT(though not yet migrated to use generic cacheinfo). In that
-way we can avoid calling arch code if all the information is found in DT.
+EAS has to work with both approaches although we do all our tests with 
+CONFIG_SCHED_MC=y. EAS operates on sched groups so the actual structure 
+of the sched domain hierarchy is hidden. (at least in theory).
 
-> What about ACPI? Are there any provisions for specifying such
-> information?
->
+For me CONFIG_SCHED_MC=y is something I would expect when I evaluate the 
+task scheduler on a multi-cluster system.
 
-Not yet.
+-- Dietmar
 
--- 
-Regards,
-Sudeep
+[...]
