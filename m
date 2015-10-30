@@ -1,58 +1,64 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Thu, 29 Oct 2015 22:02:49 -0700
-Subject: [PATCH v4 2/3] mtd: mtk-nor: mtk serial flash controller driver
-In-Reply-To: <1446171159.25711.36.camel@mhfsdcap03>
-References: <1444729160-26433-1-git-send-email-bayi.cheng@mediatek.com>
- <1444729160-26433-3-git-send-email-bayi.cheng@mediatek.com>
- <20151016073959.GB28158@localhost>
- <1445178035.4832.23.camel@mhfsdcap03>
- <20151029015237.GE13239@google.com>
- <1446089334.25711.10.camel@mhfsdcap03>
- <1446126991.25711.23.camel@mhfsdcap03>
- <20151029160331.GA12954@localhost>
- <1446171159.25711.36.camel@mhfsdcap03>
-Message-ID: <20151030050249.GB31863@localhost>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Fri, 30 Oct 2015 14:25:35 +0900
+Subject: [PATCH v4 0/6] arm64: ftrace: fix incorrect output from stack tracer
+Message-ID: <1446182741-31019-1-git-send-email-takahiro.akashi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bayi,
+This is the fourth patch series for fixing stack tracer on arm64.
+The original issue was reported by Jungseok[1], and then I found more
+issues[2].
+(Steven, Jungseok, sorry for not replying to your comments directly.)
 
-On Fri, Oct 30, 2015 at 10:12:39AM +0800, bayi.cheng wrote:
-> Hi Brian,  The current station is as follows.
-> 
-> 1: put 0x9F to MTK_NOR_PRGDATA5_REG, and five 0x0 to
-> MTK_NOR_PRGDATA4_REG ~ MTK_NOR_PRGDATA0_REG, then set (1 + 5) * 8 
-> to MTK_NOR_CNT_REG, for this way, we can read five IDs.
-> 
-> 2: put 0x9F to MTK_NOR_PRGDATA5_REG, and five 0x0 to
-> MTK_NOR_PRGDATA4_REG ~ MTK_NOR_PRGDATA0_REG, then set (1 + 5 + 1) * 8
-> to MTK_NOR_CNT_REG, for this way, we can read six IDs.
-> In this case, nor flash IDs can be read from MTK_NOR_SHREG5_REG to
-> MTK_NOR_SHREG0_REG . Thanks!
+I address here all the issues and implement fixes described in [2] except
+for interrupt-triggered problems(II-3) and leaf function(II-5).  Recent
+discussions[3] about introducing a dedicated interrupt stack suggests that
+we may avoid walking through from an interrupt stack to a process stack.
+(So interrupt-stack patch is a prerequisite.)
 
-Thanks for the update. Glad to hear you can read more bytes there; the
-extra number of Shift Registers *looked* to me like you should be able
-to read even more than 5...
+Basically,
+patch1 corresponds to the original issue.
+patch2 is a proactive improvement of function_graph tracer. 
+patch3 corresponds to II-4(functions under function_graph tracer).
+patch4, 5 and 6 correspond to II-1(slurping stack) and II-2(differences
+between x86 and arm64).
 
-So in my other email, I showed you how I generalized the TX/RX function,
-so it can handle most of both the write_reg() and read_reg() functions.
-I'm not 100% sure now that it has all of the RX path correct; it worked
-for the cases I could test, but it's confusing when reading the manual
-to figure out which SHREG register I should start from. But anyway, I
-think it should only take some small adjustments to my patch to make it
-handle things properly.
+Each fix can be applied independently, but if patch4, 5 and 6 are
+acceptable, patch1 is not necessary because patch7 replaces a default
+stack tracer.
 
-I'd really appreciate it if you could incorporate my feedback and
-review/improve the ..._do_tx_rx() function I wrote, to make sure it
-handles reading any arbitrary number of bytes (at least up to 6). So,
-you might, for example, run some tests where you have spi-nor.c call
+I tested the code with v4.3-rc7 + Jungseok's patch v5[4].
 
-	nor->read_reg(nor, SPINOR_OP_RDID, id, idlen)
+Changes from v3:
+- fixed build errors/warnings reported by kbuild test robot
+- addressed Steven's comments around check_stack()
+- removed a patch ("arm64: ftrace: allow for tracing leaf functions")
+  I don't remember why I thought this was necessary, but anyhow "-pg" seems
+  to disable omit-leaf-stack-frame.
 
-with varying values for 'idlen', and make sure they all work properly.
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-July/354126.html
+[2] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-July/355920.html 
+[3] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-September/368003.html
+[4] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-October/378699.html
 
-Let me know if you have any questions about comments either here, or on
-v5.
+AKASHI Takahiro (6):
+  arm64: ftrace: adjust callsite addresses examined by stack tracer
+  arm64: ftrace: modify a stack frame in a safe way
+  arm64: ftrace: fix a stack tracer's output under function graph
+    tracer
+  ftrace: allow arch-specific stack tracer
+  arm64: insn: add instruction decoders for ldp/stp and add/sub
+  arm64: ftrace: add arch-specific stack tracer
 
-Regards,
-Brian
+ arch/arm64/include/asm/ftrace.h     |    7 +-
+ arch/arm64/include/asm/insn.h       |   18 +++
+ arch/arm64/include/asm/stacktrace.h |    4 +
+ arch/arm64/kernel/ftrace.c          |   79 +++++++++++--
+ arch/arm64/kernel/insn.c            |  102 +++++++++++++++++
+ arch/arm64/kernel/stacktrace.c      |  213 ++++++++++++++++++++++++++++++++++-
+ include/linux/ftrace.h              |   17 +++
+ kernel/trace/trace_stack.c          |   88 ++++++++-------
+ 8 files changed, 473 insertions(+), 55 deletions(-)
+
+-- 
+1.7.9.5
