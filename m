@@ -1,117 +1,127 @@
-From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Fri, 30 Oct 2015 14:54:01 +0530
-Subject: [PATCH v4 2/4] ARM: dts: Add SROMc to Exynos 5410
-In-Reply-To: <009f01d112dd$fab40830$f01c1890$@samsung.com>
-References: <cover.1446122247.git.p.fedin@samsung.com>
- <eafa355058ff500a72ff2e3408ab635954467a76.1446122247.git.p.fedin@samsung.com>
- <CAGcde9EXfe0amqoTOwgKi-Y6=4mRcEbZrA=as-BxzfMv3ntAhQ@mail.gmail.com>
- <009f01d112dd$fab40830$f01c1890$@samsung.com>
-Message-ID: <56333731.1000400@samsung.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Fri, 30 Oct 2015 09:35:00 +0000
+Subject: [PATCH v2 1/3] gpio: xgene: add support to configure GPIO line
+ as input, output or external IRQ pin
+In-Reply-To: <CAFopSPQtuVxSn4SkVHtf-0AZE7MqRJ3XQMutCubzMd8CztA8CA@mail.gmail.com>
+References: <1445842175-11446-1-git-send-email-yvo@apm.com>
+ <1445842175-11446-2-git-send-email-yvo@apm.com>
+ <CACRpkdbWKmRKXL=+57KQVYYRc79tgGwCi=7p4LSBwFgUwgz-gw@mail.gmail.com>
+ <CAFopSPQtuVxSn4SkVHtf-0AZE7MqRJ3XQMutCubzMd8CztA8CA@mail.gmail.com>
+Message-ID: <20151030093500.7ad59365@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Pavel,
+On Fri, 30 Oct 2015 12:41:03 +0700
+Quan Nguyen <qnguyen@apm.com> wrote:
 
-On Friday 30 October 2015 12:11 PM, Pavel Fedin wrote:
->   Hello!
->
->> -----Original Message-----
->> From: linux-samsung-soc-owner at vger.kernel.org [mailto:linux-samsung-soc-owner at vger.kernel.org]
->> On Behalf Of Pankaj Dubey
->> Sent: Thursday, October 29, 2015 8:28 PM
->> To: Pavel Fedin
->> Cc: devicetree at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux-samsung-soc;
->> linux-kernel at vger.kernel.org; Rob Herring; Pawel Moll; Mark Rutland; Ian Campbell; Kumar Gala;
->> Kukjin Kim; Krzysztof Kozlowski
->> Subject: Re: [PATCH v4 2/4] ARM: dts: Add SROMc to Exynos 5410
->>
->> Hi Pavel,
->>
->> On 29 October 2015 at 18:12, Pavel Fedin <p.fedin@samsung.com> wrote:
->>> This machine uses own SoC device tree file, add missing part.
->>>
->>> Signed-off-by: Pavel Fedin <p.fedin@samsung.com>
->>> ---
->>>   arch/arm/boot/dts/exynos5410.dtsi | 15 +++++++++++++++
->>>   1 file changed, 15 insertions(+)
->>>
->>> diff --git a/arch/arm/boot/dts/exynos5410.dtsi b/arch/arm/boot/dts/exynos5410.dtsi
->>> index 4603356..da6a8fa0e 100644
->>> --- a/arch/arm/boot/dts/exynos5410.dtsi
->>> +++ b/arch/arm/boot/dts/exynos5410.dtsi
->>> @@ -101,6 +101,15 @@
->>>                          reg = <0x10000000 0x100>;
->>>                  };
->>>
->>> +               sromc: sromc at 12250000 {
->>> +                       #address-cells = <1>;
->>> +                       #size-cells = <1>;
->>> +                       ranges;
->>> +
->>
->> We do not need to specify these three properties as they are already
->> present in parent node "soc".
->
->   We do, otherwise dtc complains about defaults of #address-cells = 2 and #size-cells=1, and without empty "ranges" subnode's resources are not correctly translated.
->
+> Forgive me for not turn on plain text mode my last email.
+> 
+> Hi Linus,
+> 
+> My name is Quan Nguyen, I'm working with Y Vo on this patch.
+> 
+> Allow me to explain as below:
+> 
+> In current implementation, gic irq resources were used in both sbgpio
+> and gpios-key nodes, and this causes confusion.
+> To avoid this, we introduce sbgpio driver as interrupt controller, it
+> now provides 6 external irq pins mapped from gpio line 8-13. The
+> gpio-keys node now uses sbgpio irq resources instead.
+> 
+> -- Quan
+> 
+> 
+> On Thu, Oct 29, 2015 at 8:28 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> > On Mon, Oct 26, 2015 at 7:49 AM, Y Vo <yvo@apm.com> wrote:
+> >
+> >> Add support to configure GPIO line as input, output or external IRQ pin.
+> >>
+> >> Signed-off-by: Y Vo <yvo@apm.com>
+> >
+> > As I will say again, this description is too terse, add lots of information
+> > on how IRQs work on this controller please. I get confused.
+> 
+> How about:
+> +++++++++++++++++++++++++++++++++
+> Enable X-Gene standby GPIO driver as interrupt controller, it provides
+> 6 external irq pins via gpio line 8-13.
+> +++++++++++++++++++++++++++++++++
+> >
+> > (...)
+> >
+> >> +#define XGENE_GPIO8_HWIRQ              0x48
+> >> +#define XGENE_GPIO8_IDX                        8
+> > (...)
+> >> +#define XGENE_HWIRQ_TO_GPIO(hwirq)     ((hwirq) + XGENE_GPIO8_IDX)
+> >> +#define XGENE_GPIO_TO_HWIRQ(gpio)      ((gpio) - XGENE_GPIO8_IDX)
+> >> +#define GIC_IRQ_TO_GPIO_IRQ(hwirq)     ((hwirq) - XGENE_GPIO8_HWIRQ)
+> >> +#define GPIO_IRQ_TO_GIC_IRQ(hwirq)     ((hwirq) + XGENE_GPIO8_HWIRQ)
+> >
+> > I'm a bit uneasy about this, maybe I just don't get it.
+> >
+> > What is this indexing into "GIC IRQ" that is starting to happen
+> > here?
+> >
+> > The GIC (if that is drivers/irqchip/irq-gic.c) has a totally dynamic IRQ
+> > translation and the Linux IRQs it is using may change. I am worried
+> > that there is some reliance here on Linux IRQ having certain numbers
+> > because there is certainly no ABI like that.
+> >
+> > Is this 0x48 really an index into the *hardware* offset in the GIC?
+> >
+> > And if it is: why are we not getting this hardware information from the
+> > device tree like all other interrupt numbers and offsets?
+> >
+> > I'm worried about this.
+> 
+> The SPI40(0x48) through SPI45(0x4D) from GIC are mapped as external
+> IRQ0 - IRQ5 in this GPIO block, so it is hardware offset not mapped
+> irq number.
+> 
+> Below is detail:
+> 
+> + GIC: SPI40 (hwirq=0x48)  <=> SB-GPIO: (hwirq=0) (gpio line 8)
+> + GIC: SPI41 (hwirq=0x49)  <=> SB-GPIO: (hwirq=1) (gpio line 9)
+> ...
+> + GIC: SPI45 (hwirq=0x4D)  <=> SB-GPIO: (hwirq=5) (gpio line 13)
+> 
+> These defines are to help translating between Gic hardware irq and
+> SBGPIO hardware irq number.
+> 
+> >
+> >> -       u32 *irq;
+> >> +       void __iomem *regs;
+> >> +       struct irq_domain *gic_domain;
+> >> +       struct irq_domain *irq_domain;
+> >
+> > And there is some secondary gic_domain here, which is confusing
+> > since the GIC does have an IRQ domain too.
+> >
+> > I think I want a clear explanation to how this GPIO controller interacts
+> > with the GIC, and I want it to be part of the patch, as comments in the
+> > code and in the commit message (which is way too small for a complex
+> > patch like this).
+> >
+> > Otherwise I have no chance to understand what is really going on here.
+> 
+> SBGPIO currently is not capable to mask/unmask/... irqs, so these will
+> rely on the parent (GIC) instead. To do so, we need keep a parent
+> domain reference here "struct irq_domain *gic_domain" so we can find
+> correspond parent irq in runtime.
 
-First of all this patch will not give this error. So this part should 
-not be a part of this patch.
-You should be getting above error after applying v4 4/4 "ARM: dts: Add 
-Ethernet chip to SMDK5410". So if its failing for ethernet subnode, you 
-can move this address-cells and size-cells in dts file just above 
-ethernet node as shown below:
+All this only means one thing: this should be implemented as a
+hierarchical domain, just like any other "random widget stacked on top
+of the GIC". Digging into the internals of the GIC driver is not
+acceptable anymore, and this patch is just horrible.
 
-index 311e7be..d69981d 100644
---- a/arch/arm/boot/dts/exynos5410-smdk5410.dts
-+++ b/arch/arm/boot/dts/exynos5410-smdk5410.dts
-@@ -95,6 +95,9 @@
-  };
+There is plenty of examples in the tree for you to look at and rewrite
+that code using the abstractions that are already in place.
 
-  &sromc {
-+       #address-cells = <1>;
-+       #size-cells = <1>;
-+       ranges;
-         pinctrl-names = "default";
-         pinctrl-0 = <&srom_ctl>, <&srom_ebi>;
-
-And another question still remains open, we can't just like that change 
-"smsc,lan9115" binding by adding samsung specific properties. If you 
-want to do and there is no other way, you need to update DT binding of 
-"smsc,lan9115" and get it reviewed.
-Probably you can check suggestions from Krzysztof, where he pointed out 
-some hint on how other places this is getting used.
-
+In the meantime, I am NAKing this patch. Please include the irqchip
+maintainers in the next iteration of this series.
 
 Thanks,
-Pankaj Dubey
->>
->>> +                       compatible = "samsung,exynos-srom";
->>> +                       reg = <0x12250000 0x14>;
->>> +               };
->>> +
->>>                  pmu_system_controller: system-controller at 10040000 {
->>>                          compatible = "samsung,exynos5410-pmu", "syscon";
->>>                          reg = <0x10040000 0x5000>;
->>> @@ -133,6 +142,12 @@
->>>                                                  <10 &gic 0 130 0>,
->>>                                                  <11 &gic 0 131 0>;
->>>                          };
->>> +
->>> +                       arch_timer {
->>> +                               compatible = "arm,armv7-timer";
->>> +                               clock-frequency = <24000000>;
->>> +                       };
->>> +
->>
->> This change should not be part of this patch.
->
->   Ooops, thank you very much, this should not have been here at all. This is a leftover from my experiments, i was tracing DT parsing code and added it just for test, to see why timer gets probed as a subnode.
->   Just forgot to remove it afterwards and it slipped into the patch.
->
-> Kind regards,
-> Pavel Fedin
-> Expert Engineer
-> Samsung Electronics Research center Russia
->
->
+
+	M.
+-- 
+Jazz is not dead. It just smells funny.
