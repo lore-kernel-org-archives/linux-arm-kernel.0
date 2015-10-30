@@ -1,65 +1,110 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Fri, 30 Oct 2015 11:34:31 +0100
-Subject: [PATCH v2] pwm-backlight: fix the panel power sequence
-In-Reply-To: <1446190900.17558.16.camel@mtksdaap41>
-References: <1444987060-48202-1-git-send-email-yh.huang@mediatek.com>
- <1444988219.3541.3.camel@pengutronix.de>
- <1445526750.27586.8.camel@mtksdaap41>
- <1446133259.3274.52.camel@pengutronix.de>
- <1446190900.17558.16.camel@mtksdaap41>
-Message-ID: <1446201271.3334.22.camel@pengutronix.de>
+From: moinejf@free.fr (Jean-Francois Moine)
+Date: Fri, 30 Oct 2015 11:34:42 +0100
+Subject: [PATCH v4 5/6] ARM: dts: sunxi: Add Allwinner H3 DTSI
+In-Reply-To: <1445964626-6484-6-git-send-email-jenskuske@gmail.com>
+References: <1445964626-6484-1-git-send-email-jenskuske@gmail.com>
+ <1445964626-6484-6-git-send-email-jenskuske@gmail.com>
+Message-ID: <20151030113442.1ad381f9103aa052f929d4a9@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Freitag, den 30.10.2015, 15:41 +0800 schrieb YH Huang:
-> > That won't work if the gpio is still configured as input. How about I
-> > add the GPIOD_ASIS change to my patch you remove that and the above from
-> > yours?
+On Tue, 27 Oct 2015 17:50:25 +0100
+Jens Kuske <jenskuske@gmail.com> wrote:
+
+> The Allwinner H3 is a home entertainment system oriented SoC with
+> four Cortex-A7 cores and a Mali-400MP2 GPU.
 > 
-> I revise these two lines 
-> if (pb->enable_gpio)
-> 	gpiod_direction_output(pb->enable_gpio, 0);
-> into
-> if (pb->enable_gpio) {
-> 	if(gpiod_get_value(pb->enable_gpio) == 0)
-> 		gpiod_direction_output(pb->enable_gpio, 0);
-> 	else
-> 		gpiod_direction_output(pb->enable_gpio, 1);
-> }
+> Signed-off-by: Jens Kuske <jenskuske@gmail.com>
+> ---
+>  arch/arm/boot/dts/sun8i-h3.dtsi | 482 ++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 482 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/sun8i-h3.dtsi
+> 
+> diff --git a/arch/arm/boot/dts/sun8i-h3.dtsi b/arch/arm/boot/dts/sun8i-h3.dtsi
+> new file mode 100644
+> index 0000000..c18b5f7
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/sun8i-h3.dtsi
+	[snip]
+> +	soc {
+> +		compatible = "simple-bus";
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +		ranges;
+> +
+> +		dma: dma-controller at 01c02000 {
+> +			compatible = "allwinner,sun8i-h3-dma";
+> +			reg = <0x01c02000 0x1000>;
+> +			interrupts = <GIC_SPI 50 IRQ_TYPE_LEVEL_HIGH>;
+> +			clocks = <&bus_gates 6>;
+> +			resets = <&bus_rst 6>;
+> +			#dma-cells = <1>;
+> +		};
+	[snip]
+> +
+> +		bus_rst: reset at 01c202c0 {
+> +			#reset-cells = <1>;
+> +			compatible = "allwinner,sun8i-h3-bus-reset";
+> +			reg = <0x01c202c0 0x1c>;
+> +		};
+> +
+	[snip]
+> +		uart0: serial at 01c28000 {
+> +			compatible = "snps,dw-apb-uart";
+> +			reg = <0x01c28000 0x400>;
+> +			interrupts = <GIC_SPI 0 IRQ_TYPE_LEVEL_HIGH>;
+> +			reg-shift = <2>;
+> +			reg-io-width = <4>;
+> +			clocks = <&bus_gates 112>;
+> +			resets = <&bus_rst 144>;
+> +			dmas = <&dma 6>, <&dma 6>;
+> +			dma-names = "rx", "tx";
+> +			status = "disabled";
+> +		};
 
-If the GPIO is still configured as an input, the return value of
-gpiod_get_value could be random.
+The reset definitions would be clearer with declarations as the other
+Allwinner SoCs and without driver hack:
 
-> I am not sure what "phandle" is working for.
+soc {
+	compatible = "simple-bus";
+	#address-cells = <1>;
+	#size-cells = <1>;
+	ranges;
 
-The reasoning is that devices where there is no phandle link pointing to
-the backlight (for example from a simple-panel node), we should keep the
-current default behaviour (enable during probe).
+		dma: dma-controller at 01c02000 {
+		compatible = "allwinner,sun8i-h3-dma";
+		reg = <0x01c02000 0x1000>;
+		interrupts = <GIC_SPI 50 IRQ_TYPE_LEVEL_HIGH>;
+		clocks = <&bus_gates 6>;
+		resets = <&rst_reg0 6>;
+		#dma-cells = <1>;
+	};
+    ...
+	rst_reg0: reset at 01c202c0 {
+		#reset-cells = <1>;
+		compatible = "allwinner,sun6i-a31-clock-reset";
+		reg = <0x01c202c0 0x04>;
+	};
+	...
+ 	rst_reg4: reset at 01c202d8 {
+		#reset-cells = <1>;
+		compatible = "allwinner,sun6i-a31-clock-reset";
+		reg = <0x01c202d8 0x04>;
+	};
+   ...
+	uart0: serial at 01c28000 {
+		compatible = "snps,dw-apb-uart";
+		reg = <0x01c28000 0x400>;
+		interrupts = <GIC_SPI 0 IRQ_TYPE_LEVEL_HIGH>;
+		reg-shift = <2>;
+		reg-io-width = <4>;
+		clocks = <&bus_gates 112>;
+		resets = <&rst_reg4 16>;
+		dmas = <&dma 6>, <&dma 6>;
+		dma-names = "rx", "tx";
+		status = "disabled";
+	};
 
-> My change is like your patch but remove the "phandle related" and
-> "gpiod_get_direction(pb->enable_gpio) == GPIOF_DIR_OUT".
-> Do we really need these?
-
-See above, I wanted to be careful not to change existing behavior in
-unexpected ways.
-
-> Also, do you think it is right that I do the "pwm_enable(pb->pwm);"
-> before "gpiod_set_value(pb->enable_gpio, 1);" in power on function?
-
-That is unclear to me, because I'm sure that depends on the actual
-constant current LED driver used.
-I suspect EN and PWM pins are completely independent on a lot of them,
-so enabling EN last should be ok to work around the problem that the PWM
-pin state might not be well defined when the PWM is disabled.
-
-For example, the STCS1A datasheet doesn't mention any order for enabling
-EN and PWM. In the LP8545 datasheet, the modes of operation state
-diagram suggests that enabling EN first is the proper way, on the other
-hand the PWM interface characteristics table also lists a startup delay
-for a rising EN edge while PWM is already active.
-
-But I'm not sure that there aren't any LED drivers that somehow have a
-problem with this order.
-
-regards
-Philipp
+-- 
+Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
+Jef		|		http://moinejf.free.fr/
