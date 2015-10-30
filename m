@@ -1,33 +1,57 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 30 Oct 2015 08:28:00 +0900
-Subject: [PATCH v5 14/14] arm64: defconfig: add CS2000 driver support
-In-Reply-To: <1446161280-23097-1-git-send-email-horms+renesas@verge.net.au>
-References: <1446161280-23097-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1446161280-23097-15-git-send-email-horms+renesas@verge.net.au>
+From: icoolidge@google.com (Ian Coolidge)
+Date: Thu, 29 Oct 2015 17:27:00 -0700
+Subject: [PATCH] arm: spinlock: const qualify read-only functions.
+In-Reply-To: <1446061495-38554-1-git-send-email-icoolidge@google.com>
+References: <1446061495-38554-1-git-send-email-icoolidge@google.com>
+Message-ID: <1446164820-16144-1-git-send-email-icoolidge@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+This allows assert_spin_locked() to be used against
+spinlocks that are const qualified.
 
-It is required from Renesas R-Car H3 Salvator-X board
+For example:
 
-Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+struct instance_t {
+	int data;
+	spinlock_t lock;
+};
+
+/*
+ * foo does not mutate instance.
+ * foo must be called while the lock is held.
+ */
+int foo(const instance_t *instance) {
+	assert_spin_locked(&instance->lock);
+
+	/* Code that assumes the lock is held */
+
+	return 0;
+}
+
+Signed-off-by: Ian Coolidge <icoolidge@google.com>
 ---
- arch/arm64/configs/defconfig | 1 +
- 1 file changed, 1 insertion(+)
+ arch/arm/include/asm/spinlock.h | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index 2dc7a47a40d6..083c92987b17 100644
---- a/arch/arm64/configs/defconfig
-+++ b/arch/arm64/configs/defconfig
-@@ -171,6 +171,7 @@ CONFIG_RCAR_DMAC=y
- CONFIG_VIRTIO_PCI=y
- CONFIG_VIRTIO_BALLOON=y
- CONFIG_VIRTIO_MMIO=y
-+CONFIG_COMMON_CLK_CS2000_CP=y
- CONFIG_COMMON_CLK_QCOM=y
- CONFIG_MSM_GCC_8916=y
- # CONFIG_IOMMU_SUPPORT is not set
+diff --git a/arch/arm/include/asm/spinlock.h b/arch/arm/include/asm/spinlock.h
+index 0fa4184..274ceb1 100644
+--- a/arch/arm/include/asm/spinlock.h
++++ b/arch/arm/include/asm/spinlock.h
+@@ -118,12 +118,12 @@ static inline int arch_spin_value_unlocked(arch_spinlock_t lock)
+ 	return lock.tickets.owner == lock.tickets.next;
+ }
+ 
+-static inline int arch_spin_is_locked(arch_spinlock_t *lock)
++static inline int arch_spin_is_locked(const arch_spinlock_t *lock)
+ {
+ 	return !arch_spin_value_unlocked(READ_ONCE(*lock));
+ }
+ 
+-static inline int arch_spin_is_contended(arch_spinlock_t *lock)
++static inline int arch_spin_is_contended(const arch_spinlock_t *lock)
+ {
+ 	struct __raw_tickets tickets = READ_ONCE(lock->tickets);
+ 	return (tickets.next - tickets.owner) > 1;
 -- 
-2.1.4
+2.6.0.rc2.230.g3dd15c0
