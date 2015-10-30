@@ -1,61 +1,75 @@
-From: dan.j.williams@intel.com (Dan Williams)
-Date: Fri, 30 Oct 2015 16:19:03 -0400
-Subject: [for 4.3-final PATCH v2] memremap: fix highmem support
-Message-ID: <20151030201758.13415.13264.stgit@dwillia2-desk3.amr.corp.intel.com>
+From: dhdang@apm.com (Duc Dang)
+Date: Fri, 30 Oct 2015 13:35:54 -0700
+Subject: [GIT PULL] arm64: Second batch of DTS changes for X-Gene
+ platforms queued for v4.4
+In-Reply-To: <CADaLND=otWJX5vqzGdf0Y_pwiYHafWB5TwE9GXWnHG3M2r7fOw@mail.gmail.com>
+References: <CADaLND=otWJX5vqzGdf0Y_pwiYHafWB5TwE9GXWnHG3M2r7fOw@mail.gmail.com>
+Message-ID: <CADaLND=9YSB7UaqVKkhwuoVipVUN3mOQCB9cy_=DVf2m6nzOaQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently memremap checks if the range is "System RAM" and returns the
-kernel linear address.  This is broken for highmem platforms where a
-range may be "System RAM", but is not part of the kernel linear mapping.
-Fallback to ioremap_cache() in these cases, to let the arch code attempt
-to handle it.
+On Wed, Oct 28, 2015 at 12:08 PM, Duc Dang <dhdang@apm.com> wrote:
+> Hi Arnd, Olof,
+>
+> The following changes since commit d2d0a722df735de52015f0c8a01f27a9ec28622e:
+>
+>   arm64: dts: Add poweroff device nodes for APM X-Gene 2 platform
+> (2015-10-12 14:18:38 -0700)
+>
+> are available in the git repository at:
+>
+>   https://github.com/AppliedMicro/xgene-next.git tags/xgene-dts-for-v4.4-2
+>
+> for you to fetch changes up to fa535e2632f275f0d5d4080d60c8e1331ac37549:
+>
+>   arm64: dts: Add L2 cache topology for APM X-Gene SoC (2015-10-26
+> 02:31:43 -0700)
+>
+> ----------------------------------------------------------------
+> Second batch of DTS changes for X-Gene platforms queued for v4.4
+>
+> This patch set adds DTS entries to support various IPs
+> for X-Gene v1 and X-Gene v2 SoC:
+> - X-Gene v1: Enable support for MMC, USB, GPIO controllers,
+>   I2C controller, L2 Cache topology
+> - X-Gene v2: Enable support for MMC, USB, GPIO controller,
+>   I2C controller (with RTC), PCIe controller with GICv2m MSI,
+>   EDAC, L2 Cache topology, TRNG
+>
+> ----------------------------------------------------------------
+> Duc Dang (16):
+>       arm64: dts: Add the arasan mmc DTS entries for APm X-Gene v2 SoC
+>       arm64: dts: X-Gene: Do not reset or enable/disable clock for AHB block
+>       arm64: dts: Add RNG device tree nodes for APM X-Gene v2 platform
+>       arm64: dts: Add v2m MSI frame nodes for APM X-Gene v2 platforms
+>       arm64: dts: Add PCIe node for APM X-Gene v2 platforms
+>       arm64: dts: Add USB nodes for APM X-Gene v1 platforms
+>       arm64: dts: Add USB nodes for APM X-Gene v2 platforms
+>       arm64: dts: Add APM X-Gene v1 SoC GFC GPIO controller DTS entries
+>       arm64: dts: Add APM X-Gene v2 SoC GFC GPIO controller DTS entry
+>       arm64: dts: Add Designware GPIO dts binding for APM X-Gene v1 platform
+>       arm64: dts: Add APM X-Gene v2 SoC Designware GPIO controller DTS entry
+>       arm64: dts: Add APM X-Gene v2 SoC EDAC DTS entries
+>       arm64: dts: Add Designware I2C controller DTS entries for X-Gene v1 SoC
+>       arm64: dts: Add Designware I2C controller DTS entries for X-Gene
+> v2 SoC platform
+>       arm64: dts: Add RTC DTS entry for X-Gene v2 SoC platform
+>       arm64: dts: Add L2 cache topology for APM X-Gene SoC
+>
+> Suman Tripathi (1):
+>       arm64: dts: Add the arasan mmc DTS entries for APM X-Gene v1 SoC
+>
+>  arch/arm64/boot/dts/apm/apm-merlin.dts     |  12 +
+>  arch/arm64/boot/dts/apm/apm-mustang.dts    |   4 +
+>  arch/arm64/boot/dts/apm/apm-shadowcat.dtsi | 401 +++++++++++++++++++++++++++++
+>  arch/arm64/boot/dts/apm/apm-storm.dtsi     | 126 +++++++++
+>  4 files changed, 543 insertions(+)
 
-Note that ARM ioremap will WARN when attempting to remap ram, and in
-that case the caller needs to be fixed.  For this reason, existing
-ioremap_cache() usages for ARM are already trained to avoid attempts to
-remap ram.
+Hi Arnd, Olof,
 
-The impact of this bug is low for now since the pmem driver is the only
-user of memremap(), but this is important to fix before more conversions
-to memremap arrive in 4.4.
+I am sorry that I sent this pull request late. But do you still have
+some cycle to have this change set pulled into your xgene/dt in
+next/dt for 4.4?
 
-Cc: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
-Reported-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Signed-off-by: Dan Williams <dan.j.williams@intel.com>
----
- kernel/memremap.c |   14 ++++++++++++--
- 1 file changed, 12 insertions(+), 2 deletions(-)
-
-diff --git a/kernel/memremap.c b/kernel/memremap.c
-index 72b0c66628b6..9d6b55587eaa 100644
---- a/kernel/memremap.c
-+++ b/kernel/memremap.c
-@@ -24,6 +24,16 @@ __weak void __iomem *ioremap_cache(resource_size_t offset, unsigned long size)
- }
- #endif
- 
-+static void *try_ram_remap(resource_size_t offset, size_t size)
-+{
-+	struct page *page = pfn_to_page(offset >> PAGE_SHIFT);
-+
-+	/* In the simple case just return the existing linear address */
-+	if (!PageHighMem(page))
-+		return __va(offset);
-+	return NULL; /* fallback to ioremap_cache */
-+}
-+
- /**
-  * memremap() - remap an iomem_resource as cacheable memory
-  * @offset: iomem resource start address
-@@ -66,8 +76,8 @@ void *memremap(resource_size_t offset, size_t size, unsigned long flags)
- 		 * the requested range is potentially in "System RAM"
- 		 */
- 		if (is_ram == REGION_INTERSECTS)
--			addr = __va(offset);
--		else
-+			addr = try_ram_remap(offset, size);
-+		if (!addr)
- 			addr = ioremap_cache(offset, size);
- 	}
- 
+Regards,
+Duc Dang.
