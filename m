@@ -1,35 +1,31 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 30 Oct 2015 17:32:40 +0000
-Subject: [PATCH v4] EDAC: Add ARM64 EDAC
-In-Reply-To: <20151030170605.GI31073@leverpostej>
-References: <1446048829-3359-1-git-send-email-brijeshkumar.singh@amd.com>
- <20151028164053.GG25451@leverpostej> <56339A52.8060701@amd.com>
- <20151030170605.GI31073@leverpostej>
-Message-ID: <20151030173240.GJ31073@leverpostej>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Fri, 30 Oct 2015 18:37:38 +0100
+Subject: [PATCH 09/19] drm: sun4i: Add DT bindings documentation
+In-Reply-To: <CAL_JsqLuUUApGAgdw7U8EJ7p5yrYJg8AKFB32AE9Ufrf47=WpQ@mail.gmail.com>
+References: <1446214865-3972-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1446214865-3972-10-git-send-email-maxime.ripard@free-electrons.com>
+ <CAL_JsqLuUUApGAgdw7U8EJ7p5yrYJg8AKFB32AE9Ufrf47=WpQ@mail.gmail.com>
+Message-ID: <20151030173738.GD17183@ulmo.nvidia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > > * Interaction with firmware
-> > > - When/do we handle interrupts?
-> > 
-> > We can a properties in dt bindings:
-> > 
-> > 1) "num-interrupts = 1" - number of interrupt count. One interrupts per cluster
-> >     e.g if you have 4 cluster then num-interrupts=4.
-> > 2) interrupts = <0, 92, 0> <0, 94, 0> <0, 96, 0> <0, 98, 0>  // interrupt mapping
-> > 
-> > If num-interrupts = 0, then firmware handles interrupts. Optionally we can use HEST FIRMWARE-FIRST
-> > bit, if bit is set then firmware is handling the interrupt otherwise use DT information.
+On Fri, Oct 30, 2015 at 11:40:03AM -0500, Rob Herring wrote:
+> On Fri, Oct 30, 2015 at 9:20 AM, Maxime Ripard
+[...]
+> > +Optional properties:
+> > +  - allwinner,tv-encoder: phandle to the TV Encoder in our pipeline
+> > +  - allwinner,panel: phandle to the panel used in our RGB interface
 > 
-> You won't have the HEST and DT information at the same time, given that
-> at runtime the kernel uses one of ACPI or DT.
+> Use of-graph please.
 
->From a quick look at the HEST definition, I don't doesn't seem like it's
-possible to describe this feature -- there's no error source descriptor
-for it and the generic hardware error source is not applicable.
+Why? Panels are a really simple resource and a simple phandle is fully
+capable of describing the relationship.
 
-So I'm worried that it may not be possible to use this feature with
-ACPI.
-
-Thanks,
-Mark.
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151030/9fa83dce/attachment.sig>
