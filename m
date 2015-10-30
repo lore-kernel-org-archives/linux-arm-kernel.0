@@ -1,69 +1,63 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 31 Oct 2015 00:21:08 +0100
-Subject: [RFC PATCH 1/3] PCI: iproc: generate proper configuration access
- cycles
-In-Reply-To: <20151027101820.2d2a1368@xhacker>
-References: <1445857334-6936-1-git-send-email-jszhang@marvell.com>
- <562E6056.3040203@broadcom.com> <20151027101820.2d2a1368@xhacker>
-Message-ID: <4140206.u40gNKhatz@wuerfel>
+From: lkp@intel.com (kbuild test robot)
+Date: Sat, 31 Oct 2015 07:20:17 +0800
+Subject: [PATCH 2/2] sound: soc: Add Cygnus audio driver
+In-Reply-To: <1446231297-10648-3-git-send-email-ssimran@broadcom.com>
+Message-ID: <201510310722.jTEbgeBu%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 27 October 2015 10:18:20 Jisheng Zhang wrote:
-> On Mon, 26 Oct 2015 10:18:14 -0700 Ray Jui <rjui@broadcom.com> wrote:
-> 
-> > Hi Jisheng,
-> > 
-> > On 10/26/2015 4:02 AM, Jisheng Zhang wrote:
-> > > Inspired by Russell King's patch[1], I found current iproc also has the
-> > > same issue of "reading 32-bits from the command register, modifying the
-> > > command register, and then writing it back has the effect of clearing
-> > > any status bits that were indicating at that time" as pointed out by
-> > > Russell. This patch fix this issue by using the pci_generic_config_write.
-> > >
-> > > [1]http://www.spinics.net/lists/linux-pci/msg44869.html
-> > >
-> > > Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
-> > > ---
-> > >   drivers/pci/host/pcie-iproc.c | 2 +-
-> > >   1 file changed, 1 insertion(+), 1 deletion(-)
-> > >
-> > > diff --git a/drivers/pci/host/pcie-iproc.c b/drivers/pci/host/pcie-iproc.c
-> > > index fe2efb1..0c423f2 100644
-> > > --- a/drivers/pci/host/pcie-iproc.c
-> > > +++ b/drivers/pci/host/pcie-iproc.c
-> > > @@ -111,7 +111,7 @@ static void __iomem *iproc_pcie_map_cfg_bus(struct pci_bus *bus,
-> > >   static struct pci_ops iproc_pcie_ops = {
-> > >     .map_bus = iproc_pcie_map_cfg_bus,
-> > >     .read = pci_generic_config_read32,
-> > > -   .write = pci_generic_config_write32,
-> > > +   .write = pci_generic_config_write,
-> > >   };
-> > >
-> > >   static void iproc_pcie_reset(struct iproc_pcie *pcie)
-> > >  
-> > 
-> > I have already confirmed with the ASIC team that the current iProc PCIe 
-> > controller requires 32-bit aligned access into the configuration space 
-> > due to the way how it was integrated into various iProc SoCs including 
-> > NSP, Cygnus, and NS2.
-> > 
-> > This change will prevent the driver from working properly.
-> > 
-> > I've informed our ASIC team about this issue and all future iProc based 
-> > SoCs should be able to support 8-bit, 16-bit access and therefore 
-> > pci_generic_config_write/read can be used for those SoCs.
->
-> Thanks for the information,
+Hi Simran,
 
-We discussed the same issue when the X-gene PCI host driver was first
-reviewed, and someone from APM then clarified that it had the same bug.
+[auto build test WARNING on asoc/for-next -- if it's inappropriate base, please suggest rules for selecting the more suitable base]
 
-However, I don't know the details about the Tegra implementation, or
-whether the X-Gene bug has been fixed in a newer version of the parts,
-so we need to get confirmation from the respective developers before
-applying any of the patches. If X-gene has been fixed in the meantime,
-we need to make sure we match on the exact product numbers in the
-compatible property so we only do it for the newer ones.
+url:    https://github.com/0day-ci/linux/commits/Simran-Rai/Add-audio-support-for-Broadcom-Cygnus-SoC/20151031-025721
+config: tile-allmodconfig (attached as .config)
+reproduce:
+        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=tile 
 
-	Arnd
+All warnings (new ones prefixed by >>):
+
+   sound/soc/bcm/cygnus-pcm.c: In function 'cygnus_pcm_preallocate_dma_buffer':
+>> sound/soc/bcm/cygnus-pcm.c:785:2: warning: format '%x' expects argument of type 'unsigned int', but argument 5 has type 'size_t' [-Wformat]
+
+vim +785 sound/soc/bcm/cygnus-pcm.c
+
+   769	
+   770	static int cygnus_pcm_preallocate_dma_buffer(struct snd_pcm *pcm, int stream)
+   771	{
+   772		struct snd_pcm_substream *substream = pcm->streams[stream].substream;
+   773		struct snd_soc_pcm_runtime *rtd = substream->private_data;
+   774		struct snd_dma_buffer *buf = &substream->dma_buffer;
+   775		size_t size;
+   776	
+   777		size = cygnus_pcm_hw.buffer_bytes_max;
+   778	
+   779		buf->dev.type = SNDRV_DMA_TYPE_DEV;
+   780		buf->dev.dev = pcm->card->dev;
+   781		buf->private_data = NULL;
+   782		buf->area = dma_alloc_coherent(pcm->card->dev, size,
+   783				&buf->addr, GFP_KERNEL);
+   784	
+ > 785		dev_dbg(rtd->cpu_dai->dev, "%s: size 0x%x @ 0x%p\n",
+   786					__func__, size, buf->area);
+   787	
+   788		if (!buf->area) {
+   789			dev_err(rtd->cpu_dai->dev, "%s: dma_alloc failed\n", __func__);
+   790			return -ENOMEM;
+   791		}
+   792		buf->bytes = size;
+   793	
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 41426 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151031/87e1c47d/attachment-0001.obj>
