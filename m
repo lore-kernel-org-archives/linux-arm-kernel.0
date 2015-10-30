@@ -1,150 +1,56 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 30 Oct 2015 15:20:55 +0100
-Subject: [PATCH 09/19] drm: sun4i: Add DT bindings documentation
+Date: Fri, 30 Oct 2015 15:21:04 +0100
+Subject: [PATCH 18/19] ARM: sun5i: r8: Add AHB gates to the DTSI
 In-Reply-To: <1446214865-3972-1-git-send-email-maxime.ripard@free-electrons.com>
 References: <1446214865-3972-1-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <1446214865-3972-10-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <1446214865-3972-19-git-send-email-maxime.ripard@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The display pipeline of the Allwinner A10 is involving several loosely
-coupled components.
-
-Add a documentation for the bindings.
+Add the gates definition to the R8 DTSI.
 
 Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 ---
- .../devicetree/bindings/drm/sunxi/sun4i-drm.txt    | 122 +++++++++++++++++++++
- 1 file changed, 122 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/drm/sunxi/sun4i-drm.txt
+ arch/arm/boot/dts/sun5i-r8.dtsi | 29 +++++++++++++++++++++++++++++
+ 1 file changed, 29 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/drm/sunxi/sun4i-drm.txt b/Documentation/devicetree/bindings/drm/sunxi/sun4i-drm.txt
-new file mode 100644
-index 000000000000..dbdccef787b4
---- /dev/null
-+++ b/Documentation/devicetree/bindings/drm/sunxi/sun4i-drm.txt
-@@ -0,0 +1,122 @@
-+Allwinner A10 Display Pipeline
-+==============================
+diff --git a/arch/arm/boot/dts/sun5i-r8.dtsi b/arch/arm/boot/dts/sun5i-r8.dtsi
+index 691d3de75b35..d69df3a73cbf 100644
+--- a/arch/arm/boot/dts/sun5i-r8.dtsi
++++ b/arch/arm/boot/dts/sun5i-r8.dtsi
+@@ -57,4 +57,33 @@
+ 			status = "disabled";
+ 		};
+ 	};
 +
-+The Allwinner A10 Display pipeline is composed of several components
-+that are going to be documented below:
-+
-+TV Encoder
-+----------
-+
-+The TV Encoder supports the composite and VGA output. It is one end of
-+the pipeline.
-+
-+Required properties:
-+ - compatible: value should be "allwinner,sun4i-a10-tv-encoder".
-+ - reg: base address and size of memory-mapped region
-+ - clocks: the clocks driving the TV encoder
-+
-+TCON
-+----
-+
-+The TCON acts as a CRTC and encoder for RGB / LVDS interfaces.
-+
-+Required properties:
-+ - compatible: value should be "allwinner,sun4i-a10-tcon".
-+ - reg: base address and size of memory-mapped region
-+ - interrupts: interrupt associated to this IP
-+ - clocks: phandles to the clocks feeding the TCON. Three are needed:
-+   - 'ahb': the interface clocks
-+   - 'tcon-ch0': The clock driving the TCON channel 0
-+   - 'tcon-ch1': The clock driving the TCON channel 0
-+
-+ - clock-names: the clock names mentionned above
-+ - clock-output-names: Name of the pixel clock created
-+
-+
-+Display Engine Backend
-+----------------------
-+
-+The display engine backend exposes layers and sprites to the
-+system. It's split into two components, the frontend and backend, the
-+frontend doing formats conversion, scaling, deinterlacing, while the
-+backend actually manages the layers.
-+
-+Required properties:
-+  - compatible: value must be one of:
-+    * allwinner,sun5i-a13-display-engine
-+
-+  - reg: base address and size of the memory-mapped region. Two are needed:
-+    * backend0: registers of the display engine backend
-+    * frontend0: registers of the display engine frontend
-+  - reg_names: the region names mentionned above.
-+
-+  - interrupts: frontend interrupt phandle
-+
-+  - clocks: phandles to the clocks feeding the frontend and backend
-+    * backend0-bus: the backend interface clock
-+    * backend0-mod: the backend module clock
-+    * backend0-ram: the backend DRAM clock
-+    * frontend0-bus: the frontend interface clock
-+    * frontend0-mod: the frontend module clock
-+    * frontend0-ram: the frontend DRAM clock
-+  - clock-names: the clock names mentionned above
-+
-+  - resets: phandles to the reset controllers. Two are needed:
-+    * backend0: backend reset controller
-+    * frontend0: frontend reset controller
-+  - reset-names: the reset names mentionned above
-+
-+  - allwinner,tcon: phandle to the TCON in our pipeline
-+
-+Optional properties:
-+  - allwinner,tv-encoder: phandle to the TV Encoder in our pipeline
-+  - allwinner,panel: phandle to the panel used in our RGB interface
-+
-+Example:
-+
-+panel: panel {
-+	compatible = "olimex,lcd-olinuxino-43-ts";
-+};
-+
-+tve: encoder at 01c0a000 {
-+	compatible = "allwinner,sun4i-a10-tv-encoder";
-+	reg = <0x01c0a000 0x1000>;
-+	clocks = <&ahb_gates 34>;
-+};
-+
-+tcon: lcd-controller at 01c0c000 {
-+	compatible = "allwinner,sun4i-a10-tcon";
-+	reg = <0x01c0c000 0x1000>;
-+	interrupts = <44>;
-+	clocks = <&ahb_gates 36>,
-+		 <&tcon_ch0_clk>,
-+		 <&tcon_ch1_clk>;
-+	clock-names = "ahb",
-+		      "tcon-ch0",
-+		      "tcon-ch1";
-+	clock-output-names = "tcon-pixel-clock";
-+};
-+
-+de: display-engine at 01e00000 {
-+	compatible = "allwinner,sun5i-a13-display-engine";
-+	reg = <0x01e00000 0x20000>,
-+	      <0x01e60000 0x10000>;
-+	reg-names = "frontend0",
-+		    "backend0";
-+	interrupts = <47>;
-+	interrupt-names = "engine0";
-+	clocks = <&ahb_gates 46>, <&de_fe_clk>,
-+		 <&dram_gates 25>, <&ahb_gates 44>,
-+		 <&de_be_clk>, <&dram_gates 26>;
-+	clock-names = "frontend0-bus", "frontend0-mod",
-+		      "frontend0-ram", "backend0-bus",
-+		      "backend0-mod", "backend0-ram";
-+	resets = <&de_fe_clk>,
-+		 <&de_be_clk>;
-+	reset-names = "frontend0",
-+		      "backend0";
-+
-+	allwinner,tcon = <&tcon>;
-+	allwinner,tv-encoder = <&tve>;
-+	allwinner,panel = <&panel>;
-+};
++	clocks {
++		ahb_gates: clk at 01c20060 {
++			#clock-cells = <1>;
++			compatible = "allwinner,sun5i-r8-ahb-gates-clk";
++			reg = <0x01c20060 0x8>;
++			clocks = <&ahb>;
++			clock-indices = <0>, <1>,
++					<2>, <5>, <6>,
++					<7>, <8>, <9>,
++					<10>, <13>,
++					<14>, <20>,
++					<21>, <22>,
++					<28>, <32>, <34>,
++					<36>, <40>, <44>,
++					<46>, <51>,
++					<52>;
++			clock-output-names = "ahb_usbotg", "ahb_ehci",
++					     "ahb_ohci", "ahb_ss", "ahb_dma",
++					     "ahb_bist", "ahb_mmc0", "ahb_mmc1",
++					     "ahb_mmc2", "ahb_nand",
++					     "ahb_sdram", "ahb_spi0",
++					     "ahb_spi1", "ahb_spi2",
++					     "ahb_stimer", "ahb_ve", "ahb_tve",
++					     "ahb_lcd", "ahb_csi", "ahb_de_be",
++					     "ahb_de_fe", "ahb_iep",
++					     "ahb_mali400";
++		};
++	};
+ };
 -- 
 2.6.2
