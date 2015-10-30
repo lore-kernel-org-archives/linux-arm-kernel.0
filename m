@@ -1,49 +1,75 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 30 Oct 2015 13:42:01 +0100
-Subject: [PATCH] clocksource: dw_apb_timer_of: support timer-based delay
-In-Reply-To: <20151030190929.4c46066c@xhacker>
-References: <1446193659-1698-1-git-send-email-jszhang@marvell.com>
- <56334A1E.7060709@linaro.org> <20151030190929.4c46066c@xhacker>
-Message-ID: <3950525.pKSJGoymu4@wuerfel>
+From: ariel@vanguardiasur.com.ar (Ariel D'Alessandro)
+Date: Fri, 30 Oct 2015 09:45:16 -0300
+Subject: [PATCH v2 1/4] DT: nvmem: Add NXP LPC18xx EEPROM memory binding
+ documentation
+In-Reply-To: <CAGhQ9VyCBTWh6qgZ__eNLqooNURsYr9ZVtDz2qCKoa0MoVgXtA@mail.gmail.com>
+References: <1445275946-32653-1-git-send-email-ariel@vanguardiasur.com.ar>
+ <1445275946-32653-2-git-send-email-ariel@vanguardiasur.com.ar>
+ <CAGhQ9VyCBTWh6qgZ__eNLqooNURsYr9ZVtDz2qCKoa0MoVgXtA@mail.gmail.com>
+Message-ID: <5633665C.5050107@vanguardiasur.com.ar>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 30 October 2015 19:09:29 Jisheng Zhang wrote:
-> > > diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
-> > > index a7726db..7b081805 100644
-> > > --- a/drivers/clocksource/Kconfig
-> > > +++ b/drivers/clocksource/Kconfig
-> > > @@ -29,6 +29,16 @@ config DW_APB_TIMER_OF
-> > >     select DW_APB_TIMER
-> > >     select CLKSRC_OF
-> > >
-> > > +config DW_APB_TIMER_BASED_DELAY
-> > > +   bool "DW APB timer based delay"
-> > > +   depends on ARM && DW_APB_TIMER_OF
-> > > +   default n
-> > > +   help
-> > > +     This option enables support for using the DW APB timer to
-> > > +     implement timer-based delay. It is useful for skiping the
-> > > +     delay loop calibration at boot on some platforms. And the
-> > > +     udelay() will be unaffected by CPU frequency changes.
-> > > +  
-> > 
-> > Why do you want it to be optional ?
-> > 
+Joachim,
+
+El 24/10/15 a las 18:44, Joachim Eastwood escribi?:
+> Hi Ariel,
 > 
-> Because in some platforms which has arm arch timer, this dw apb timer
-> delay isn't needed, the arch timer is better. So we want it be optional
-> so that the platforms which need this feature select it manually when config
-> the kernel.
+> On 19 October 2015 at 19:32, Ariel D'Alessandro
+> <ariel@vanguardiasur.com.ar> wrote:
+>> Add the devicetree binding document for NXP LPC18xx EEPROM memory.
+>>
+>> Signed-off-by: Ariel D'Alessandro <ariel@vanguardiasur.com.ar>
+>> ---
+>>  .../devicetree/bindings/nvmem/lpc1857-eeprom.txt   | 26 ++++++++++++++++++++++
+>>  1 file changed, 26 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/nvmem/lpc1857-eeprom.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/nvmem/lpc1857-eeprom.txt b/Documentation/devicetree/bindings/nvmem/lpc1857-eeprom.txt
+>> new file mode 100644
+>> index 0000000..01cde0d
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/nvmem/lpc1857-eeprom.txt
+>> @@ -0,0 +1,26 @@
+>> +* NXP LPC18xx EEPROM memory NVMEM driver
+>> +
+>> +Required properties:
+>> +  - compatible: Should be "nxp,lpc1857-eeprom"
+>> +  - reg: Must contain an entry with the physical base address and length
+>> +    for each entry in reg-names.
+>> +  - reg-names: Must include the following entries.
+>> +    - reg: EEPROM registers.
+>> +    - mem: EEPROM address space.
+>> +  - clocks: Must contain an entry for each entry in clock-names.
+>> +  - clock-names: Must include the following entries.
+>> +    - eeprom: EEPROM operating clock.
+>> +  - interrupts: Should contain EEPROM interrupt.
+> 
+> You should document the 'reset' property as well.
+
+Ok. Will do.
+
+> 
+>> +Example:
+>> +
+>> +  eeprom: eeprom at 4000e000 {
+>> +    compatible = "nxp,lpc1857-eeprom";
+>> +    reg = <0x4000e000 0x1000>,
+>> +          <0x20040000 0x4000>;
+>> +    reg-names = "reg", "mem";
+>> +    clocks = <&ccu1 CLK_CPU_EEPROM>;
+>> +    clock-names = "eeprom";
+>> +    resets = <&rgu 27>;
+>> +    interrupts = <4>;
+>> +  };
+> 
+> Other than that this looks good to me.
+> 
+> Acked-by: Joachim Eastwood <manabian@gmail.com>
 > 
 
-This is not ideal from an overall maintenance perspective. We want to
-be able to have a kernel with all drivers enabled that gives us the
-best behavior on all platforms.
+Great, thanks.
 
-The current behavior appears to be that we override all previous
-registrations as long as the new one is higher resolution. Is that
-the case here? I.e. does the arch timer have a lower resultion than
-the dw-apb timer but have some other advantages?
-
-	Arnd
+-- 
+Ariel D'Alessandro, VanguardiaSur
+www.vanguardiasur.com.ar
