@@ -1,110 +1,64 @@
-From: moinejf@free.fr (Jean-Francois Moine)
-Date: Fri, 30 Oct 2015 11:34:42 +0100
-Subject: [PATCH v4 5/6] ARM: dts: sunxi: Add Allwinner H3 DTSI
-In-Reply-To: <1445964626-6484-6-git-send-email-jenskuske@gmail.com>
-References: <1445964626-6484-1-git-send-email-jenskuske@gmail.com>
- <1445964626-6484-6-git-send-email-jenskuske@gmail.com>
-Message-ID: <20151030113442.1ad381f9103aa052f929d4a9@free.fr>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Fri, 30 Oct 2015 11:42:29 +0100
+Subject: [PATCH v2 1/4] clocksource: rockchip: Make the driver more
+ compatible
+In-Reply-To: <5632E765.4010207@gmail.com>
+References: <1443147298-12603-1-git-send-email-wxt@rock-chips.com>
+ <1443147298-12603-2-git-send-email-wxt@rock-chips.com>
+ <560A10FB.7040408@linaro.org> <2486591.i0n1KlEQoc@diego>
+ <5632E765.4010207@gmail.com>
+Message-ID: <56334995.6090103@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 27 Oct 2015 17:50:25 +0100
-Jens Kuske <jenskuske@gmail.com> wrote:
+On 10/30/2015 04:43 AM, Caesar Wang wrote:
+> Hi Daniel,
+>
+> ? 2015?10?01? 03:14, Heiko St?bner ??:
+>> Hi Daniel,
+>>
+>> Am Dienstag, 29. September 2015, 06:18:03 schrieb Daniel Lezcano:
+>>> On 09/25/2015 04:14 AM, Caesar Wang wrote:
+>>>> Build the arm64 SoCs (e.g.: RK3368) on Rockchip platform,
+>>>> There are some failure with build up on timer driver for rockchip.
+>>>>
+>>>> Says:
+>>>> /tmp/ccdAnNy5.s:47: Error: missing immediate expression at  operand
+>>>> 1 --
+>>>> `dsb`
+>>>> ...
+>>>>
+>>>> The problem was different semantics of dsb on btw arm32 and arm64,
+>>>> Here we can convert the dsb with insteading of dsb(sy).The "sy" param
+>>>> is the default which you are allow to omit, so on arm32 dsb()and
+>>>> dsb(sy)
+>>>> are the same.
+>>>>
+>>>> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
+>>> Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+>> as you have "just" Acked these patches, I guess you are expecting them
+>> to go
+>> through the same tree as the devicetree changes, right?
+>
+> I'm wonder if someone will apply this series patchs but the wait.:-)
+> In fact, I'm no sure that the Acked is really meaning.:-
 
-> The Allwinner H3 is a home entertainment system oriented SoC with
-> four Cortex-A7 cores and a Mali-400MP2 GPU.
-> 
-> Signed-off-by: Jens Kuske <jenskuske@gmail.com>
-> ---
->  arch/arm/boot/dts/sun8i-h3.dtsi | 482 ++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 482 insertions(+)
->  create mode 100644 arch/arm/boot/dts/sun8i-h3.dtsi
-> 
-> diff --git a/arch/arm/boot/dts/sun8i-h3.dtsi b/arch/arm/boot/dts/sun8i-h3.dtsi
-> new file mode 100644
-> index 0000000..c18b5f7
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/sun8i-h3.dtsi
-	[snip]
-> +	soc {
-> +		compatible = "simple-bus";
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
-> +		ranges;
-> +
-> +		dma: dma-controller at 01c02000 {
-> +			compatible = "allwinner,sun8i-h3-dma";
-> +			reg = <0x01c02000 0x1000>;
-> +			interrupts = <GIC_SPI 50 IRQ_TYPE_LEVEL_HIGH>;
-> +			clocks = <&bus_gates 6>;
-> +			resets = <&bus_rst 6>;
-> +			#dma-cells = <1>;
-> +		};
-	[snip]
-> +
-> +		bus_rst: reset at 01c202c0 {
-> +			#reset-cells = <1>;
-> +			compatible = "allwinner,sun8i-h3-bus-reset";
-> +			reg = <0x01c202c0 0x1c>;
-> +		};
-> +
-	[snip]
-> +		uart0: serial at 01c28000 {
-> +			compatible = "snps,dw-apb-uart";
-> +			reg = <0x01c28000 0x400>;
-> +			interrupts = <GIC_SPI 0 IRQ_TYPE_LEVEL_HIGH>;
-> +			reg-shift = <2>;
-> +			reg-io-width = <4>;
-> +			clocks = <&bus_gates 112>;
-> +			resets = <&bus_rst 144>;
-> +			dmas = <&dma 6>, <&dma 6>;
-> +			dma-names = "rx", "tx";
-> +			status = "disabled";
-> +		};
+Yes, by acking the patch I say I am ok with it and I agree it can go 
+through another tree.
 
-The reset definitions would be clearer with declarations as the other
-Allwinner SoCs and without driver hack:
+I suggest before sending patches you read carefully the file 
+Documentation/SubmittingPatches.
 
-soc {
-	compatible = "simple-bus";
-	#address-cells = <1>;
-	#size-cells = <1>;
-	ranges;
+Especially, 11), 12) and 13).
 
-		dma: dma-controller at 01c02000 {
-		compatible = "allwinner,sun8i-h3-dma";
-		reg = <0x01c02000 0x1000>;
-		interrupts = <GIC_SPI 50 IRQ_TYPE_LEVEL_HIGH>;
-		clocks = <&bus_gates 6>;
-		resets = <&rst_reg0 6>;
-		#dma-cells = <1>;
-	};
-    ...
-	rst_reg0: reset at 01c202c0 {
-		#reset-cells = <1>;
-		compatible = "allwinner,sun6i-a31-clock-reset";
-		reg = <0x01c202c0 0x04>;
-	};
-	...
- 	rst_reg4: reset at 01c202d8 {
-		#reset-cells = <1>;
-		compatible = "allwinner,sun6i-a31-clock-reset";
-		reg = <0x01c202d8 0x04>;
-	};
-   ...
-	uart0: serial at 01c28000 {
-		compatible = "snps,dw-apb-uart";
-		reg = <0x01c28000 0x400>;
-		interrupts = <GIC_SPI 0 IRQ_TYPE_LEVEL_HIGH>;
-		reg-shift = <2>;
-		reg-io-width = <4>;
-		clocks = <&bus_gates 112>;
-		resets = <&rst_reg4 16>;
-		dmas = <&dma 6>, <&dma 6>;
-		dma-names = "rx", "tx";
-		status = "disabled";
-	};
+Thanks.
+
+   -- Daniel
+
 
 -- 
-Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
-Jef		|		http://moinejf.free.fr/
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
