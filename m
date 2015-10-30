@@ -1,84 +1,35 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Fri, 30 Oct 2015 18:32:30 +0100
-Subject: [PATCH 07/19] drm/panel: simple: Add timings for the Olimex
- LCD-OLinuXino-4.3TS
-In-Reply-To: <1446214865-3972-8-git-send-email-maxime.ripard@free-electrons.com>
-References: <1446214865-3972-1-git-send-email-maxime.ripard@free-electrons.com>
- <1446214865-3972-8-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <20151030173230.GC17183@ulmo.nvidia.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 30 Oct 2015 17:32:40 +0000
+Subject: [PATCH v4] EDAC: Add ARM64 EDAC
+In-Reply-To: <20151030170605.GI31073@leverpostej>
+References: <1446048829-3359-1-git-send-email-brijeshkumar.singh@amd.com>
+ <20151028164053.GG25451@leverpostej> <56339A52.8060701@amd.com>
+ <20151030170605.GI31073@leverpostej>
+Message-ID: <20151030173240.GJ31073@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 30, 2015 at 03:20:53PM +0100, Maxime Ripard wrote:
-> Add support for the Olimex LCD-OLinuXino-4.3TS panel to the DRM simple
-> panel driver.
+> > > * Interaction with firmware
+> > > - When/do we handle interrupts?
+> > 
+> > We can a properties in dt bindings:
+> > 
+> > 1) "num-interrupts = 1" - number of interrupt count. One interrupts per cluster
+> >     e.g if you have 4 cluster then num-interrupts=4.
+> > 2) interrupts = <0, 92, 0> <0, 94, 0> <0, 96, 0> <0, 98, 0>  // interrupt mapping
+> > 
+> > If num-interrupts = 0, then firmware handles interrupts. Optionally we can use HEST FIRMWARE-FIRST
+> > bit, if bit is set then firmware is handling the interrupt otherwise use DT information.
 > 
-> It is a 480x272 panel connected through a 24-bits RGB interface.
-> 
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> ---
->  drivers/gpu/drm/panel/panel-simple.c | 26 ++++++++++++++++++++++++++
->  1 file changed, 26 insertions(+)
+> You won't have the HEST and DT information at the same time, given that
+> at runtime the kernel uses one of ACPI or DT.
 
-I don't see a patch adding the DT binding documentation for this panel.
+>From a quick look at the HEST definition, I don't doesn't seem like it's
+possible to describe this feature -- there's no error source descriptor
+for it and the generic hardware error source is not applicable.
 
-Also, the olimex vendor prefix isn't defined.
+So I'm worried that it may not be possible to use this feature with
+ACPI.
 
-> diff --git a/drivers/gpu/drm/panel/panel-simple.c b/drivers/gpu/drm/panel/panel-simple.c
-> index f97b73ec4713..3a9ecb64d1e6 100644
-> --- a/drivers/gpu/drm/panel/panel-simple.c
-> +++ b/drivers/gpu/drm/panel/panel-simple.c
-> @@ -1096,6 +1096,29 @@ static const struct panel_desc shelly_sca07010_bfn_lnn = {
->  	.bus_format = MEDIA_BUS_FMT_RGB666_1X18,
->  };
->  
-> +static const struct drm_display_mode olimex_lcd_olinuxino_43ts_mode = {
-> +	.clock = 9000,
-> +	.hdisplay = 480,
-> +	.hsync_start = 480 + 5,
-> +	.hsync_end = 480 + 5 + 30,
-> +	.htotal = 480 + 5 + 30 + 10,
-> +	.vdisplay = 272,
-> +	.vsync_start = 272 + 8,
-> +	.vsync_end = 272 + 8 + 5,
-> +	.vtotal = 272 + 8 + 5 + 3,
-> +	.vrefresh = 60,
-> +};
-> +
-> +static const struct panel_desc olimex_lcd_olinuxino_43ts = {
-> +	.modes = &olimex_lcd_olinuxino_43ts_mode,
-> +	.num_modes = 1,
-> +	.size = {
-> +		.width = 105,
-> +		.height = 67,
-> +	},
-> +	.bus_format = MEDIA_BUS_FMT_RGB666_1X18,
-> +};
-> +
-
-These mode and panel descriptors are all sorted alphabetically (by
-vendor, by model), please keep it so.
-
->  static const struct of_device_id platform_of_match[] = {
->  	{
->  		.compatible = "ampire,am800480r3tmqwa1h",
-> @@ -1191,6 +1214,9 @@ static const struct of_device_id platform_of_match[] = {
->  		.compatible = "shelly,sca07010-bfn-lnn",
->  		.data = &shelly_sca07010_bfn_lnn,
->  	}, {
-> +		.compatible = "olimex,lcd-olinuxino-43-ts",
-> +		.data = &olimex_lcd_olinuxino_43ts,
-> +	}, {
->  		/* sentinel */
->  	}
-
-Here as well.
-
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151030/b35e6456/attachment.sig>
+Thanks,
+Mark.
