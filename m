@@ -1,131 +1,89 @@
-From: bjorn.andersson@sonymobile.com (Bjorn Andersson)
-Date: Fri, 30 Oct 2015 12:41:50 -0700
-Subject: [PATCH v2 1/3] devicetree: mfd: Add binding for the TI LM3533
-In-Reply-To: <20151030184220.GJ4058@x1>
-References: <1445796586-28683-1-git-send-email-bjorn.andersson@sonymobile.com>
- <1445963373-27790-1-git-send-email-bjorn.andersson@sonymobile.com>
- <20151030184220.GJ4058@x1>
-Message-ID: <20151030194150.GD24668@usrtlx11787.corpusers.net>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Fri, 30 Oct 2015 12:47:44 -0700
+Subject: [PATCH v5 2/3] mtd: brcmnand: Force 8bit mode before doing
+ nand_scan_ident()
+In-Reply-To: <1446188361-15146-3-git-send-email-anup.patel@broadcom.com>
+References: <1446188361-15146-1-git-send-email-anup.patel@broadcom.com>
+ <1446188361-15146-3-git-send-email-anup.patel@broadcom.com>
+Message-ID: <20151030194744.GJ13239@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri 30 Oct 11:42 PDT 2015, Lee Jones wrote:
+On Fri, Oct 30, 2015 at 12:29:20PM +0530, Anup Patel wrote:
+> Just like other NAND controllers,
 
-Rob, please see the discussion regarding ti,boost-freq-khz below. Should
-we both specify unit at the same time as we use standard units? (This is
-not the first time I have to change this back and forth)
+^^ That part isn't strictly true. While READ ID data only comes out on
+the lower 8 bits, that doesn't *actually* mean you can't get valid data
+from a 16-bit bus in general; you just have to drop the upper 8 bits. That's
+what these two commits did for read ID and parameter page read commands:
 
-> On Tue, 27 Oct 2015, Bjorn Andersson wrote:
+commit 3dad2344e92c6e1aeae42df1c4824f307c51bcc7
+Author: Brian Norris <computersforpeace@gmail.com>
+Date:   Wed Jan 29 14:08:12 2014 -0800
+
+    mtd: nand: force NAND_CMD_READID onto 8-bit bus
+
+commit bd9c6e99b58255b9de1982711ac9487c9a2f18be
+Author: Brian Norris <computersforpeace@gmail.com>
+Date:   Fri Nov 29 22:04:28 2013 -0800
+
+    mtd: nand: don't use read_buf for 8-bit ONFI transfers
+
+> the NAND READID command only works
+> in 8bit mode for all versions of BRCMNAND controller.
+
+But I presume *this* statement is actually true. This NAND controller doesn't
+exactly give us a fully-flexible READID / read_byte / read_word command, as it
+works at a higher level than that (although LOW_LEVEL_OP gives us this
+flexibility now). I could imagine (though I never tested 16-bit NAND) that
+16-bit READID is broken.
+
+BTW, did you ask the HW designer about this? It'd be nice to be 100% sure.
+
+Anyway, as I noted on the cover letter, I've pushed this patch.
+
+Thanks,
+Brian
+
+> This patch forces 8bit mode for each NAND CS in brcmnand_init_cs()
+> before doing nand_scan_ident() to ensure that BRCMNAND controller
+> is in 8bit mode when NAND READID command is issued.
 > 
-[..]
-> > +- ti,hwen-gpios:
-> > +	Usage: required
-> > +	Value type: <prop-encoded-array>
-> > +	Definition: reference to gpio pin connected to the HWEN input; as
-> > +		    specified in "gpio/gpio.txt"
+> Signed-off-by: Anup Patel <anup.patel@broadcom.com>
+> Reviewed-by: Ray Jui <rjui@broadcom.com>
+> Reviewed-by: Scott Branden <sbranden@broadcom.com>
+> ---
+>  drivers/mtd/nand/brcmnand/brcmnand.c | 10 ++++++++++
+>  1 file changed, 10 insertions(+)
 > 
-> Why have you made this a vendor binding?
+> diff --git a/drivers/mtd/nand/brcmnand/brcmnand.c b/drivers/mtd/nand/brcmnand/brcmnand.c
+> index dda96fa..b410527 100644
+> --- a/drivers/mtd/nand/brcmnand/brcmnand.c
+> +++ b/drivers/mtd/nand/brcmnand/brcmnand.c
+> @@ -1912,6 +1912,7 @@ static int brcmnand_init_cs(struct brcmnand_host *host)
+>  	struct mtd_info *mtd;
+>  	struct nand_chip *chip;
+>  	int ret;
+> +	u16 cfg_offs;
+>  	struct mtd_part_parser_data ppdata = { .of_node = dn };
+>  
+>  	ret = of_property_read_u32(dn, "reg", &host->cs);
+> @@ -1954,6 +1955,15 @@ static int brcmnand_init_cs(struct brcmnand_host *host)
+>  
+>  	chip->controller = &ctrl->controller;
+>  
+> +	/*
+> +	 * The bootloader might have configured 16bit mode but
+> +	 * NAND READID command only works in 8bit mode. We force
+> +	 * 8bit mode here to ensure that NAND READID commands works.
+> +	 */
+> +	cfg_offs = brcmnand_cs_offset(ctrl, host->cs, BRCMNAND_CS_CFG);
+> +	nand_writereg(ctrl, cfg_offs,
+> +		      nand_readreg(ctrl, cfg_offs) & ~CFG_BUS_WIDTH);
+> +
+>  	if (nand_scan_ident(mtd, 1, NULL))
+>  		return -ENXIO;
+>  
+> -- 
+> 1.9.1
 > 
-> *-gpios is a generic property.
-> 
-
-Because the hwen gpio is a ti lm3533 specific thing, but I get what
-you're saying. Will drop the prefix.
-
-> > +- ti,als-supply:
-> > +	Usage: optional
-> > +	Value type: <prop-encoded-array>
-> > +	Definition: reference to regulator powering the V_als input; as
-> > +		    specified in "regulator/regulator.txt"
-> 
-> Same goes for *-supply.
-> 
-
-Same here
-
-> > +- ti,boost-freq-khz:
-> > +	Usage: required
-> > +	Value type: <u32>
-> > +	Definition: switch-frequency of the boost converter, must be either:
-> > +		    500 or 1000
-> 
-> Quite a few vendors are using 'boost' now.
-> 
-
-The ti,boost-low-freq from the bq25890 binding is the only other
-property I can find that describes the same thing. So I'm not sure I
-follow you here.
-
-> Perhaps we need to create a set of generic bindings.
-> 
-> Also, we usually measure DT bindings in HZ, not kHz.
-> 
-
-I thought we had defined frequencies to be in HZ and HZ only, but then
-Rob's comment that I need to actually specify the unit doesn't make any
-sense.
-
-Do we want these properties in a standard unit or do we want them
-specifying the unit? Having both seems excessive.
-
-> > +- ti,boost-ovp:
-> > +	Usage: required
-> > +	Value type: <u32>
-> > +	Definition: over voltage protection limit, must be one of: 16, 24, 32
-> > +		    or 40
-> 
-> Is this in volts?  If so, it should be microvolts.
-> 
-
-Okay, will update.
-
-[..]
-> > += ALS SUBNODE
-> > +The als subnode must be named "als", it carries the als related properties.
-> 
-> Perfect time to tell us what ALS is/means.
-> 
-
-You're right, I'll expand this.
-
-> > +- ti,als-resistance-ohm:
-> > +	Usage: required (unless ti,pwm-mode is specified)
-> > +	Value type: <u32>
-> > +	Definition: specifies the resistor value (R_als), in Ohm. Valid values
-> > +		    ranges from 200kOhm to 1574Ohm.
-> 
-> Might be worth specifying the values which you are actually going to
-> use here i.e. "200kOhm" is not a valid u32.
-> 
-
-I'll drop the units.
-
-> > +- ti,pwm-mode:
-> > +	Usage: optional
-> > +	Value type: <empty>
-> > +	Definition: specifies, if present, that the als should operate in pwm
-> 
-> Suggest s/pwm/PWM/
-> 
-
-OK
-
-[..]
-> > +- ti,pwm-zones:
-> > +	Usage: optional
-> > +	Value type: <u32 list>
-> > +	Definition: lists the ALS zones to be PWM controlled for this backlight,
-> > +		    the values in the list are in the range [0 - 4]
-> > +
-> 
-> It's usually a good idea to point to where all of the aforementioned
-> generic properties are documented.  I personally like the format
-> (See: ../<subsystem>/<binding>.txt)
-> 
-
-OK
-
-> > += LED NODES
-
-Regards,
-Bjorn
