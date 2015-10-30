@@ -1,85 +1,251 @@
 From: andre.przywara@arm.com (Andre Przywara)
-Date: Fri, 30 Oct 2015 18:26:56 +0000
-Subject: [PATCH 3/7] powerpc: use read_file() in kernel and initrd loading
+Date: Fri, 30 Oct 2015 18:26:54 +0000
+Subject: [PATCH 1/7] Refactor kernel image loading
 In-Reply-To: <1446229620-28088-1-git-send-email-andre.przywara@arm.com>
 References: <1446229620-28088-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <1446229620-28088-4-git-send-email-andre.przywara@arm.com>
+Message-ID: <1446229620-28088-2-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Replace the unsafe read-loops in the powerpc kernel image loading
-function with our new and safe read_file() wrapper.
-This should fix random fails in kernel image loading, especially
-from pipes and sockets.
+Let's face it: Kernel loading is quite architecture specific. Don't
+claim otherwise and move the loading routines into each
+architecture's responsibility.
+This introduces kvm__arch_load_kernel(), which each architecture can
+implement accordingly.
+Provide bzImage loading for x86 and ELF loading for MIPS as special
+cases for those architectures (removing the arch specific code from
+the generic kvm.c file on the way) and rename the existing "flat binary"
+loader functions for the other architectures to the new name.
 
 Signed-off-by: Andre Przywara <andre.przywara@arm.com>
 ---
- powerpc/kvm.c | 36 ++++++++++++++++++++----------------
- 1 file changed, 20 insertions(+), 16 deletions(-)
+ arm/fdt.c         |  4 ++--
+ include/kvm/kvm.h |  5 ++---
+ kvm.c             | 42 ++++--------------------------------------
+ mips/kvm.c        | 23 +++++++++++++++++++----
+ powerpc/kvm.c     |  3 ++-
+ x86/kvm.c         | 27 +++++++++++++++++----------
+ 6 files changed, 46 insertions(+), 58 deletions(-)
 
-diff --git a/powerpc/kvm.c b/powerpc/kvm.c
-index 13bba30..2b0bddd 100644
---- a/powerpc/kvm.c
-+++ b/powerpc/kvm.c
-@@ -162,19 +162,22 @@ bool kvm__arch_load_kernel_image(struct kvm *kvm, int fd_kernel, int fd_initrd,
+diff --git a/arm/fdt.c b/arm/fdt.c
+index 3657108..ec7453f 100644
+--- a/arm/fdt.c
++++ b/arm/fdt.c
+@@ -239,8 +239,8 @@ static int read_image(int fd, void **pos, void *limit)
+ 
+ #define FDT_ALIGN	SZ_2M
+ #define INITRD_ALIGN	4
+-int load_flat_binary(struct kvm *kvm, int fd_kernel, int fd_initrd,
+-		     const char *kernel_cmdline)
++bool kvm__arch_load_kernel_image(struct kvm *kvm, int fd_kernel, int fd_initrd,
++				 const char *kernel_cmdline)
+ {
+ 	void *pos, *kernel_end, *limit;
+ 	unsigned long guest_addr;
+diff --git a/include/kvm/kvm.h b/include/kvm/kvm.h
+index 37155db..055a7a2 100644
+--- a/include/kvm/kvm.h
++++ b/include/kvm/kvm.h
+@@ -111,9 +111,8 @@ void kvm__arch_read_term(struct kvm *kvm);
+ void *guest_flat_to_host(struct kvm *kvm, u64 offset);
+ u64 host_to_guest_flat(struct kvm *kvm, void *ptr);
+ 
+-int load_flat_binary(struct kvm *kvm, int fd_kernel, int fd_initrd, const char *kernel_cmdline);
+-int load_elf_binary(struct kvm *kvm, int fd_kernel, int fd_initrd, const char *kernel_cmdline);
+-bool load_bzimage(struct kvm *kvm, int fd_kernel, int fd_initrd, const char *kernel_cmdline);
++bool kvm__arch_load_kernel_image(struct kvm *kvm, int fd_kernel, int fd_initrd,
++				 const char *kernel_cmdline);
+ 
+ /*
+  * Debugging
+diff --git a/kvm.c b/kvm.c
+index 10ed230..ca7dfee 100644
+--- a/kvm.c
++++ b/kvm.c
+@@ -341,18 +341,6 @@ static bool initrd_check(int fd)
+ 		!memcmp(id, CPIO_MAGIC, 4);
+ }
+ 
+-int __attribute__((__weak__)) load_elf_binary(struct kvm *kvm, int fd_kernel,
+-				int fd_initrd, const char *kernel_cmdline)
+-{
+-	return false;
+-}
+-
+-bool __attribute__((__weak__)) load_bzimage(struct kvm *kvm, int fd_kernel,
+-				int fd_initrd, const char *kernel_cmdline)
+-{
+-	return false;
+-}
+-
+ bool kvm__load_kernel(struct kvm *kvm, const char *kernel_filename,
+ 		const char *initrd_filename, const char *kernel_cmdline)
+ {
+@@ -372,40 +360,18 @@ bool kvm__load_kernel(struct kvm *kvm, const char *kernel_filename,
+ 			die("%s is not an initrd", initrd_filename);
+ 	}
+ 
+-#ifdef CONFIG_X86
+-	ret = load_bzimage(kvm, fd_kernel, fd_initrd, kernel_cmdline);
+-
+-	if (ret)
+-		goto found_kernel;
+-
+-	pr_warning("%s is not a bzImage. Trying to load it as a flat binary...", kernel_filename);
+-#endif
+-
+-	ret = load_elf_binary(kvm, fd_kernel, fd_initrd, kernel_cmdline);
+-
+-	if (ret)
+-		goto found_kernel;
+-
+-	ret = load_flat_binary(kvm, fd_kernel, fd_initrd, kernel_cmdline);
+-
+-	if (ret)
+-		goto found_kernel;
++	ret = kvm__arch_load_kernel_image(kvm, fd_kernel, fd_initrd,
++					  kernel_cmdline);
+ 
+ 	if (initrd_filename)
+ 		close(fd_initrd);
+ 	close(fd_kernel);
+ 
+-	die("%s is not a valid bzImage or flat binary", kernel_filename);
+-
+-found_kernel:
+-	if (initrd_filename)
+-		close(fd_initrd);
+-	close(fd_kernel);
+-
++	if (!ret)
++		die("%s is not a valid kernel image", kernel_filename);
+ 	return ret;
+ }
+ 
+-
+ void kvm__dump_mem(struct kvm *kvm, unsigned long addr, unsigned long size, int debug_fd)
+ {
+ 	unsigned char *p;
+diff --git a/mips/kvm.c b/mips/kvm.c
+index 1925f38..c1c596c 100644
+--- a/mips/kvm.c
++++ b/mips/kvm.c
+@@ -163,7 +163,8 @@ static void kvm__mips_install_cmdline(struct kvm *kvm)
+ 
+ /* Load at the 1M point. */
+ #define KERNEL_LOAD_ADDR 0x1000000
+-int load_flat_binary(struct kvm *kvm, int fd_kernel, int fd_initrd, const char *kernel_cmdline)
++
++static bool load_flat_binary(struct kvm *kvm, int fd_kernel)
  {
  	void *p;
  	void *k_start;
--	void *i_start;
--	int nr;
-+	ssize_t filesize;
+@@ -281,7 +282,7 @@ static bool kvm__arch_get_elf_32_info(Elf32_Ehdr *ehdr, int fd_kernel,
+ 	return true;
+ }
  
+-int load_elf_binary(struct kvm *kvm, int fd_kernel, int fd_initrd, const char *kernel_cmdline)
++static bool load_elf_binary(struct kvm *kvm, int fd_kernel)
+ {
+ 	union {
+ 		Elf64_Ehdr ehdr;
+@@ -342,11 +343,25 @@ int load_elf_binary(struct kvm *kvm, int fd_kernel, int fd_initrd, const char *k
+ 		ei.len -= nr;
+ 	} while (ei.len);
+ 
+-	kvm__mips_install_cmdline(kvm);
+-
+ 	return true;
+ }
+ 
++bool kvm__arch_load_kernel_image(struct kvm *kvm, int fd_kernel, int fd_initrd,
++				 const char *kernel_cmdline)
++{
++	if (fd_initrd != -1) {
++		pr_err("Initrd not supported on MIPS.");
++		return false;
++	}
++
++	if (load_elf_binary(kvm, fd_kernel)) {
++		kvm__mips_install_cmdline(kvm);
++		return true;
++	}
++
++	return load_flat_binary(kvm, fd_kernel);
++}
++
+ void ioport__map_irq(u8 *irq)
+ {
+ }
+diff --git a/powerpc/kvm.c b/powerpc/kvm.c
+index b4c3310..13bba30 100644
+--- a/powerpc/kvm.c
++++ b/powerpc/kvm.c
+@@ -157,7 +157,8 @@ void kvm__arch_read_term(struct kvm *kvm)
+ 	spapr_hvcons_poll(kvm);
+ }
+ 
+-int load_flat_binary(struct kvm *kvm, int fd_kernel, int fd_initrd, const char *kernel_cmdline)
++bool kvm__arch_load_kernel_image(struct kvm *kvm, int fd_kernel, int fd_initrd,
++				 const char *kernel_cmdline)
+ {
+ 	void *p;
+ 	void *k_start;
+diff --git a/x86/kvm.c b/x86/kvm.c
+index 512ad67..a0204b8 100644
+--- a/x86/kvm.c
++++ b/x86/kvm.c
+@@ -206,18 +206,11 @@ static inline void *guest_real_to_host(struct kvm *kvm, u16 selector, u16 offset
+ 	return guest_flat_to_host(kvm, flat);
+ }
+ 
+-int load_flat_binary(struct kvm *kvm, int fd_kernel, int fd_initrd, const char *kernel_cmdline)
++static bool load_flat_binary(struct kvm *kvm, int fd_kernel)
+ {
+ 	void *p;
+ 	int nr;
+ 
+-	/*
+-	 * Some architectures may support loading an initrd alongside the flat kernel,
+-	 * but we do not.
+-	 */
+-	if (fd_initrd != -1)
+-		pr_warning("Loading initrd with flat binary not supported.");
+-
  	if (lseek(fd_kernel, 0, SEEK_SET) < 0)
  		die_perror("lseek");
  
- 	p = k_start = guest_flat_to_host(kvm, KERNEL_LOAD_ADDR);
+@@ -235,8 +228,8 @@ int load_flat_binary(struct kvm *kvm, int fd_kernel, int fd_initrd, const char *
  
--	while ((nr = read(fd_kernel, p, 65536)) > 0)
--		p += nr;
--
--	pr_info("Loaded kernel to 0x%x (%ld bytes)", KERNEL_LOAD_ADDR, (long)(p-k_start));
-+	filesize = read_file(fd_kernel, p, INITRD_LOAD_ADDR - KERNEL_LOAD_ADDR);
-+	if (filesize < 0) {
-+		if (errno == ENOMEM)
-+			die("Kernel overlaps initrd!");
+ static const char *BZIMAGE_MAGIC = "HdrS";
  
-+		die_perror("kernel read");
-+	}
-+	pr_info("Loaded kernel to 0x%x (%ld bytes)", KERNEL_LOAD_ADDR,
-+		filesize);
- 	if (fd_initrd != -1) {
- 		if (lseek(fd_initrd, 0, SEEK_SET) < 0)
- 			die_perror("lseek");
-@@ -183,19 +186,20 @@ bool kvm__arch_load_kernel_image(struct kvm *kvm, int fd_kernel, int fd_initrd,
- 			die("Kernel overlaps initrd!");
+-bool load_bzimage(struct kvm *kvm, int fd_kernel, int fd_initrd,
+-		  const char *kernel_cmdline)
++static bool load_bzimage(struct kvm *kvm, int fd_kernel, int fd_initrd,
++			 const char *kernel_cmdline)
+ {
+ 	struct boot_params *kern_boot;
+ 	unsigned long setup_sects;
+@@ -352,6 +345,20 @@ bool load_bzimage(struct kvm *kvm, int fd_kernel, int fd_initrd,
+ 	return true;
+ }
  
- 		/* Round up kernel size to 8byte alignment, and load initrd right after. */
--		i_start = p = guest_flat_to_host(kvm, INITRD_LOAD_ADDR);
--
--		while (((nr = read(fd_initrd, p, 65536)) > 0) &&
--		       p < (kvm->ram_start + kvm->ram_size))
--			p += nr;
--
--		if (p >= (kvm->ram_start + kvm->ram_size))
--			die("initrd too big to contain in guest RAM.\n");
-+		p = guest_flat_to_host(kvm, INITRD_LOAD_ADDR);
++bool kvm__arch_load_kernel_image(struct kvm *kvm, int fd_kernel, int fd_initrd,
++				 const char *kernel_cmdline)
++{
++	if (load_bzimage(kvm, fd_kernel, fd_initrd, kernel_cmdline))
++		return true;
++	pr_warning("Kernel image is not a bzImage.");
++	pr_warning("Trying to load it as a flat binary (no cmdline support)");
 +
-+		filesize = read_file(fd_initrd, p,
-+			       (kvm->ram_start + kvm->ram_size) - p);
-+		if (filesize < 0) {
-+			if (errno == ENOMEM)
-+				die("initrd too big to contain in guest RAM.\n");
-+			die_perror("initrd read");
-+		}
- 
- 		pr_info("Loaded initrd to 0x%x (%ld bytes)",
--			INITRD_LOAD_ADDR, (long)(p-i_start));
-+			INITRD_LOAD_ADDR, filesize);
- 		kvm->arch.initrd_gra = INITRD_LOAD_ADDR;
--		kvm->arch.initrd_size = p-i_start;
-+		kvm->arch.initrd_size = filesize;
- 	} else {
- 		kvm->arch.initrd_size = 0;
- 	}
++	if (fd_initrd != -1)
++		pr_warning("Loading initrd with flat binary not supported.");
++
++	return load_flat_binary(kvm, fd_kernel);
++}
++
+ /**
+  * kvm__arch_setup_firmware - inject BIOS into guest system memory
+  * @kvm - guest system descriptor
 -- 
 2.5.1
