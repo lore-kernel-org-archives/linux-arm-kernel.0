@@ -1,169 +1,103 @@
 From: zhaoshenglong@huawei.com (Shannon Zhao)
-Date: Fri, 30 Oct 2015 14:21:46 +0800
-Subject: [PATCH v4 04/21] KVM: ARM64: Add reset and access handlers for
- PMCR_EL0 register
+Date: Fri, 30 Oct 2015 14:21:45 +0800
+Subject: [PATCH v4 03/21] KVM: ARM64: Add offset defines for PMU registers
 In-Reply-To: <1446186123-11548-1-git-send-email-zhaoshenglong@huawei.com>
 References: <1446186123-11548-1-git-send-email-zhaoshenglong@huawei.com>
-Message-ID: <1446186123-11548-5-git-send-email-zhaoshenglong@huawei.com>
+Message-ID: <1446186123-11548-4-git-send-email-zhaoshenglong@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Shannon Zhao <shannon.zhao@linaro.org>
 
-Add reset handler which gets host value of PMCR_EL0 and make writable
-bits architecturally UNKNOWN except PMCR.E to zero. Add a common access
-handler for PMU registers which emulates writing and reading register
-and add emulation for PMCR.
+We are about to trap and emulate acccesses to each PMU register
+individually. This adds the context offsets for the AArch64 PMU
+registers and their AArch32 counterparts.
 
 Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
 ---
- arch/arm64/kvm/sys_regs.c | 106 +++++++++++++++++++++++++++++++++++++++++++++-
- 1 file changed, 104 insertions(+), 2 deletions(-)
+ arch/arm64/include/asm/kvm_asm.h | 55 ++++++++++++++++++++++++++++++++++++----
+ 1 file changed, 50 insertions(+), 5 deletions(-)
 
-diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-index d03d3af..5b591d6 100644
---- a/arch/arm64/kvm/sys_regs.c
-+++ b/arch/arm64/kvm/sys_regs.c
-@@ -33,6 +33,7 @@
- #include <asm/kvm_emulate.h>
- #include <asm/kvm_host.h>
- #include <asm/kvm_mmu.h>
-+#include <asm/pmu.h>
+diff --git a/arch/arm64/include/asm/kvm_asm.h b/arch/arm64/include/asm/kvm_asm.h
+index 5e37710..4f804c1 100644
+--- a/arch/arm64/include/asm/kvm_asm.h
++++ b/arch/arm64/include/asm/kvm_asm.h
+@@ -48,12 +48,34 @@
+ #define MDSCR_EL1	22	/* Monitor Debug System Control Register */
+ #define MDCCINT_EL1	23	/* Monitor Debug Comms Channel Interrupt Enable Reg */
  
- #include <trace/events/kvm.h>
++/* Performance Monitors Registers */
++#define PMCR_EL0	24	/* Control Register */
++#define PMOVSSET_EL0	25	/* Overflow Flag Status Set Register */
++#define PMOVSCLR_EL0	26	/* Overflow Flag Status Clear Register */
++#define PMSELR_EL0	27	/* Event Counter Selection Register */
++#define PMCEID0_EL0	28	/* Common Event Identification Register 0 */
++#define PMCEID1_EL0	29	/* Common Event Identification Register 1 */
++#define PMEVCNTR0_EL0	30	/* Event Counter Register (0-30) */
++#define PMEVCNTR30_EL0	60
++#define PMCCNTR_EL0	61	/* Cycle Counter Register */
++#define PMEVTYPER0_EL0	62	/* Event Type Register (0-30) */
++#define PMEVTYPER30_EL0	92
++#define PMCCFILTR_EL0	93	/* Cycle Count Filter Register */
++#define PMXEVCNTR_EL0	94	/* Selected Event Count Register */
++#define PMXEVTYPER_EL0	95	/* Selected Event Type Register */
++#define PMCNTENSET_EL0	96	/* Count Enable Set Register */
++#define PMCNTENCLR_EL0	97	/* Count Enable Clear Register */
++#define PMINTENSET_EL1	98	/* Interrupt Enable Set Register */
++#define PMINTENCLR_EL1	99	/* Interrupt Enable Clear Register */
++#define PMUSERENR_EL0	100	/* User Enable Register */
++#define PMSWINC_EL0	101	/* Software Increment Register */
++
+ /* 32bit specific registers. Keep them at the end of the range */
+-#define	DACR32_EL2	24	/* Domain Access Control Register */
+-#define	IFSR32_EL2	25	/* Instruction Fault Status Register */
+-#define	FPEXC32_EL2	26	/* Floating-Point Exception Control Register */
+-#define	DBGVCR32_EL2	27	/* Debug Vector Catch Register */
+-#define	NR_SYS_REGS	28
++#define	DACR32_EL2	102	/* Domain Access Control Register */
++#define	IFSR32_EL2	103	/* Instruction Fault Status Register */
++#define	FPEXC32_EL2	104	/* Floating-Point Exception Control Register */
++#define	DBGVCR32_EL2	105	/* Debug Vector Catch Register */
++#define	NR_SYS_REGS	106
  
-@@ -446,6 +447,67 @@ static void reset_mpidr(struct kvm_vcpu *vcpu, const struct sys_reg_desc *r)
- 	vcpu_sys_reg(vcpu, MPIDR_EL1) = (1ULL << 31) | mpidr;
- }
+ /* 32bit mapping */
+ #define c0_MPIDR	(MPIDR_EL1 * 2)	/* MultiProcessor ID Register */
+@@ -75,6 +97,24 @@
+ #define c6_IFAR		(c6_DFAR + 1)	/* Instruction Fault Address Register */
+ #define c7_PAR		(PAR_EL1 * 2)	/* Physical Address Register */
+ #define c7_PAR_high	(c7_PAR + 1)	/* PAR top 32 bits */
++
++/* Performance Monitors*/
++#define c9_PMCR		(PMCR_EL0 * 2)
++#define c9_PMOVSSET	(PMOVSSET_EL0 * 2)
++#define c9_PMOVSCLR	(PMOVSCLR_EL0 * 2)
++#define c9_PMCCNTR	(PMCCNTR_EL0 * 2)
++#define c9_PMSELR	(PMSELR_EL0 * 2)
++#define c9_PMCEID0	(PMCEID0_EL0 * 2)
++#define c9_PMCEID1	(PMCEID1_EL0 * 2)
++#define c9_PMXEVCNTR	(PMXEVCNTR_EL0 * 2)
++#define c9_PMXEVTYPER	(PMXEVTYPER_EL0 * 2)
++#define c9_PMCNTENSET	(PMCNTENSET_EL0 * 2)
++#define c9_PMCNTENCLR	(PMCNTENCLR_EL0 * 2)
++#define c9_PMINTENSET	(PMINTENSET_EL1 * 2)
++#define c9_PMINTENCLR	(PMINTENCLR_EL1 * 2)
++#define c9_PMUSERENR	(PMUSERENR_EL0 * 2)
++#define c9_PMSWINC	(PMSWINC_EL0 * 2)
++
+ #define c10_PRRR	(MAIR_EL1 * 2)	/* Primary Region Remap Register */
+ #define c10_NMRR	(c10_PRRR + 1)	/* Normal Memory Remap Register */
+ #define c12_VBAR	(VBAR_EL1 * 2)	/* Vector Base Address Register */
+@@ -86,6 +126,11 @@
+ #define c10_AMAIR1	(c10_AMAIR0 + 1)/* Aux Memory Attr Indirection Reg */
+ #define c14_CNTKCTL	(CNTKCTL_EL1 * 2) /* Timer Control Register (PL1) */
  
-+static void vcpu_sysreg_write(struct kvm_vcpu *vcpu,
-+			      const struct sys_reg_desc *r, u64 val)
-+{
-+	if (!vcpu_mode_is_32bit(vcpu))
-+		vcpu_sys_reg(vcpu, r->reg) = val;
-+	else
-+		vcpu_cp15(vcpu, r->reg) = lower_32_bits(val);
-+}
++/* Performance Monitors*/
++#define c14_PMEVCNTR0	(PMEVCNTR0_EL0 * 2)
++#define c14_PMEVTYPER0	(PMEVTYPER0_EL0 * 2)
++#define c14_PMCCFILTR	(PMCCFILTR_EL0 * 2)
 +
-+static void reset_pmcr(struct kvm_vcpu *vcpu, const struct sys_reg_desc *r)
-+{
-+	u64 pmcr, val;
-+
-+	asm volatile("mrs %0, pmcr_el0\n" : "=r" (pmcr));
-+	/* Writable bits of PMCR_EL0 (ARMV8_PMCR_MASK) is reset to UNKNOWN
-+	 * except PMCR.E resetting to zero.
-+	 */
-+	val = ((pmcr & ~ARMV8_PMCR_MASK) | (ARMV8_PMCR_MASK & 0xdecafbad))
-+	      & (~ARMV8_PMCR_E);
-+	vcpu_sysreg_write(vcpu, r, val);
-+}
-+
-+/* PMU registers accessor. */
-+static bool access_pmu_regs(struct kvm_vcpu *vcpu,
-+			    const struct sys_reg_params *p,
-+			    const struct sys_reg_desc *r)
-+{
-+	unsigned long val;
-+
-+	if (p->is_write) {
-+		switch (r->reg) {
-+		case PMCR_EL0: {
-+			/* Only update writeable bits of PMCR */
-+			val = vcpu_sys_reg(vcpu, r->reg);
-+			val &= ~ARMV8_PMCR_MASK;
-+			val |= *vcpu_reg(vcpu, p->Rt) & ARMV8_PMCR_MASK;
-+			vcpu_sys_reg(vcpu, r->reg) = val;
-+			break;
-+		}
-+		default:
-+			vcpu_sys_reg(vcpu, r->reg) = *vcpu_reg(vcpu, p->Rt);
-+			break;
-+		}
-+	} else {
-+		switch (r->reg) {
-+		case PMCR_EL0: {
-+			/* PMCR.P & PMCR.C are RAZ */
-+			val = vcpu_sys_reg(vcpu, r->reg)
-+			      & ~(ARMV8_PMCR_P | ARMV8_PMCR_C);
-+			*vcpu_reg(vcpu, p->Rt) = val;
-+			break;
-+		}
-+		default:
-+			*vcpu_reg(vcpu, p->Rt) = vcpu_sys_reg(vcpu, r->reg);
-+			break;
-+		}
-+	}
-+
-+	return true;
-+}
-+
- /* Silly macro to expand the DBG{BCR,BVR,WVR,WCR}n_EL1 registers in one go */
- #define DBG_BCR_BVR_WCR_WVR_EL1(n)					\
- 	/* DBGBVRn_EL1 */						\
-@@ -630,7 +692,7 @@ static const struct sys_reg_desc sys_reg_descs[] = {
- 
- 	/* PMCR_EL0 */
- 	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1100), Op2(0b000),
--	  trap_raz_wi },
-+	  access_pmu_regs, reset_pmcr, PMCR_EL0, },
- 	/* PMCNTENSET_EL0 */
- 	{ Op0(0b11), Op1(0b011), CRn(0b1001), CRm(0b1100), Op2(0b001),
- 	  trap_raz_wi },
-@@ -864,6 +926,45 @@ static const struct sys_reg_desc cp14_64_regs[] = {
- 	{ Op1( 0), CRm( 2), .access = trap_raz_wi },
- };
- 
-+/* PMU CP15 registers accessor. */
-+static bool access_pmu_cp15_regs(struct kvm_vcpu *vcpu,
-+				 const struct sys_reg_params *p,
-+				 const struct sys_reg_desc *r)
-+{
-+	unsigned long val;
-+
-+	if (p->is_write) {
-+		switch (r->reg) {
-+		case c9_PMCR: {
-+			/* Only update writeable bits of PMCR */
-+			val = vcpu_cp15(vcpu, r->reg);
-+			val &= ~ARMV8_PMCR_MASK;
-+			val |= *vcpu_reg(vcpu, p->Rt) & ARMV8_PMCR_MASK;
-+			vcpu_cp15(vcpu, r->reg) = val;
-+			break;
-+		}
-+		default:
-+			vcpu_cp15(vcpu, r->reg) = *vcpu_reg(vcpu, p->Rt);
-+			break;
-+		}
-+	} else {
-+		switch (r->reg) {
-+		case c9_PMCR: {
-+			/* PMCR.P & PMCR.C are RAZ */
-+			val = vcpu_cp15(vcpu, r->reg)
-+			      & ~(ARMV8_PMCR_P | ARMV8_PMCR_C);
-+			*vcpu_reg(vcpu, p->Rt) = val;
-+			break;
-+		}
-+		default:
-+			*vcpu_reg(vcpu, p->Rt) = vcpu_cp15(vcpu, r->reg);
-+			break;
-+		}
-+	}
-+
-+	return true;
-+}
-+
- /*
-  * Trapped cp15 registers. TTBR0/TTBR1 get a double encoding,
-  * depending on the way they are accessed (as a 32bit or a 64bit
-@@ -892,7 +993,8 @@ static const struct sys_reg_desc cp15_regs[] = {
- 	{ Op1( 0), CRn( 7), CRm(14), Op2( 2), access_dcsw },
- 
- 	/* PMU */
--	{ Op1( 0), CRn( 9), CRm(12), Op2( 0), trap_raz_wi },
-+	{ Op1( 0), CRn( 9), CRm(12), Op2( 0), access_pmu_cp15_regs,
-+	  reset_pmcr, c9_PMCR },
- 	{ Op1( 0), CRn( 9), CRm(12), Op2( 1), trap_raz_wi },
- 	{ Op1( 0), CRn( 9), CRm(12), Op2( 2), trap_raz_wi },
- 	{ Op1( 0), CRn( 9), CRm(12), Op2( 3), trap_raz_wi },
+ #define cp14_DBGDSCRext	(MDSCR_EL1 * 2)
+ #define cp14_DBGBCR0	(DBGBCR0_EL1 * 2)
+ #define cp14_DBGBVR0	(DBGBVR0_EL1 * 2)
 -- 
 2.0.4
