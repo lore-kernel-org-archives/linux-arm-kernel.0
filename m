@@ -1,42 +1,55 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Fri, 30 Oct 2015 17:35:17 +0300
-Subject: [PATCH 1/3] recordmcount: fix endianness handling bug for
- nop_mcount
-In-Reply-To: <1446193864-24593-2-git-send-email-huawei.libin@huawei.com>
-References: <1446193864-24593-1-git-send-email-huawei.libin@huawei.com>
- <1446193864-24593-2-git-send-email-huawei.libin@huawei.com>
-Message-ID: <56338025.3060602@cogentembedded.com>
+From: zajec5@gmail.com (=?UTF-8?q?Rafa=C5=82=20Mi=C5=82ecki?=)
+Date: Fri, 30 Oct 2015 15:44:01 +0100
+Subject: [PATCH] ARM: BCM5301X: Add missing Netgear R8000 LEDs
+Message-ID: <1446216241-27769-1-git-send-email-zajec5@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+Signed-off-by: Rafa? Mi?ecki <zajec5@gmail.com>
+---
+ arch/arm/boot/dts/bcm4709-netgear-r8000.dts | 30 +++++++++++++++++++++++++++++
+ 1 file changed, 30 insertions(+)
 
-On 10/30/2015 11:31 AM, Li Bin wrote:
-
-> In nop_mcount, shdr->sh_offset and welp->r_offset should handle
-> endianness properly, otherwise it will trigger Segmentation fault
-> if the recordmcount main and file.o have different endianness.
->
-> Cc: <stable@vger.kernel.org> # 3.0+
-> Signed-off-by: Li Bin <huawei.libin@huawei.com>
-> ---
->   scripts/recordmcount.h | 5 +++--
->   1 file changed, 3 insertions(+), 2 deletions(-)
->
-> diff --git a/scripts/recordmcount.h b/scripts/recordmcount.h
-> index 49b582a..dda9dba 100644
-> --- a/scripts/recordmcount.h
-> +++ b/scripts/recordmcount.h
-> @@ -376,8 +376,9 @@ static void nop_mcount(Elf_Shdr const *const relhdr,
->   			mcountsym = get_mcountsym(sym0, relp, str0);
->
->   		if (mcountsym == Elf_r_sym(relp) && !is_fake_mcount(relp)) {
-> -			if (make_nop)
-> -				ret = make_nop((void *)ehdr, shdr->sh_offset + relp->r_offset);
-> +			if (make_nop) {
-> +				ret = make_nop((void *)ehdr, _w(shdr->sh_offset) + _w(relp->r_offset));
-> +			}
-
-    {} not needed here.
-
-MBR, Sergei
+diff --git a/arch/arm/boot/dts/bcm4709-netgear-r8000.dts b/arch/arm/boot/dts/bcm4709-netgear-r8000.dts
+index 446c586..b52927c 100644
+--- a/arch/arm/boot/dts/bcm4709-netgear-r8000.dts
++++ b/arch/arm/boot/dts/bcm4709-netgear-r8000.dts
+@@ -50,6 +50,36 @@
+ 			gpios = <&chipcommon 13 GPIO_ACTIVE_LOW>;
+ 			linux,default-trigger = "default-off";
+ 		};
++
++		wireless {
++			label = "bcm53xx:white:wireless";
++			gpios = <&chipcommon 14 GPIO_ACTIVE_HIGH>;
++			linux,default-trigger = "default-off";
++		};
++
++		wps {
++			label = "bcm53xx:white:wps";
++			gpios = <&chipcommon 15 GPIO_ACTIVE_HIGH>;
++			linux,default-trigger = "default-off";
++		};
++
++		5ghz-2 {
++			label = "bcm53xx:white:5ghz-2";
++			gpios = <&chipcommon 16 GPIO_ACTIVE_LOW>;
++			linux,default-trigger = "default-off";
++		};
++
++		usb3 {
++			label = "bcm53xx:white:usb3";
++			gpios = <&chipcommon 17 GPIO_ACTIVE_LOW>;
++			linux,default-trigger = "default-off";
++		};
++
++		usb2 {
++			label = "bcm53xx:white:usb2";
++			gpios = <&chipcommon 18 GPIO_ACTIVE_LOW>;
++			linux,default-trigger = "default-off";
++		};
+ 	};
+ 
+ 	gpio-keys {
+-- 
+1.8.4.5
