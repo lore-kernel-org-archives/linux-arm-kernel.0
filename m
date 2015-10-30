@@ -1,20 +1,38 @@
 From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Fri, 30 Oct 2015 14:29:02 -0700
-Subject: [PATCH 01/19] clk: sunxi: Add display clock
-In-Reply-To: <1446214865-3972-2-git-send-email-maxime.ripard@free-electrons.com>
+Date: Fri, 30 Oct 2015 14:32:01 -0700
+Subject: [PATCH 02/19] clk: sunxi: Add PLL3 clock
+In-Reply-To: <1446214865-3972-3-git-send-email-maxime.ripard@free-electrons.com>
 References: <1446214865-3972-1-git-send-email-maxime.ripard@free-electrons.com>
- <1446214865-3972-2-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <20151030212902.GG19782@codeaurora.org>
+ <1446214865-3972-3-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <20151030213155.GH19782@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 10/30, Maxime Ripard wrote:
-> diff --git a/drivers/clk/sunxi/clk-sun4i-display.c b/drivers/clk/sunxi/clk-sun4i-display.c
+> diff --git a/drivers/clk/sunxi/Makefile b/drivers/clk/sunxi/Makefile
+> index a9e1a5885846..40c32ffd912c 100644
+> --- a/drivers/clk/sunxi/Makefile
+> +++ b/drivers/clk/sunxi/Makefile
+> @@ -9,8 +9,9 @@ obj-y += clk-a10-mod1.o
+>  obj-y += clk-a10-pll2.o
+>  obj-y += clk-a20-gmac.o
+>  obj-y += clk-mod0.o
+> -obj-y += clk-sun4i-display.o
+>  obj-y += clk-simple-gates.o
+> +obj-y += clk-sun4i-display.o
+
+Put this in the right place in patch 1 please.
+
+> +obj-y += clk-sun4i-pll3.o
+>  obj-y += clk-sun8i-mbus.o
+>  obj-y += clk-sun9i-core.o
+>  obj-y += clk-sun9i-mmc.o
+> diff --git a/drivers/clk/sunxi/clk-sun4i-pll3.c b/drivers/clk/sunxi/clk-sun4i-pll3.c
 > new file mode 100644
-> index 000000000000..f13b095c6d7a
+> index 000000000000..7ea178bf19fa
 > --- /dev/null
-> +++ b/drivers/clk/sunxi/clk-sun4i-display.c
-> @@ -0,0 +1,199 @@
+> +++ b/drivers/clk/sunxi/clk-sun4i-pll3.c
+> @@ -0,0 +1,84 @@
 > +/*
 > + * Copyright 2015 Maxime Ripard
 > + *
@@ -31,117 +49,31 @@ On 10/30, Maxime Ripard wrote:
 > + * GNU General Public License for more details.
 > + */
 > +
-
-#include <linux/kernel.h> for container_of?
-
 > +#include <linux/clk-provider.h>
 > +#include <linux/of_address.h>
-> +#include <linux/reset-controller.h>
+
+#include <linux/of.h> for of_property_read_string()
+
 > +#include <linux/slab.h>
 > +#include <linux/spinlock.h>
 > +
-> +#define SUN4I_A10_DISPLAY_PARENTS	3
+> +#define SUN4I_A10_PLL3_GATE_BIT	31
+[...]
 > +
-> +#define SUN4I_A10_DISPLAY_GATE_BIT	31
-> +#define SUN4I_A10_DISPLAY_RESET_BIT	30
-> +#define SUN4I_A10_DISPLAY_MUX_MASK	3
-> +#define SUN4I_A10_DISPLAY_MUX_SHIFT	24
-> +#define SUN4I_A10_DISPLAY_DIV_WIDTH	4
-> +#define SUN4I_A10_DISPLAY_DIV_SHIFT	0
-> +
-> +struct reset_data {
-> +	void __iomem			*reg;
-> +	spinlock_t			*lock;
-> +	struct reset_controller_dev	rcdev;
-> +};
-> +
-> +static DEFINE_SPINLOCK(sun4i_a10_display_lock);
-> +
-> +static int sun4i_a10_display_assert(struct reset_controller_dev *rcdev,
-> +				    unsigned long id)
-> +{
-> +	struct reset_data *data = container_of(rcdev,
-> +					       struct reset_data,
-> +					       rcdev);
-
-Can this be a macro rcdev_to_reset_data() or something?
-
-> +	unsigned long flags;
-[..]
-> +
-> +static int sun4i_a10_display_status(struct reset_controller_dev *rcdev,
-> +				    unsigned long id)
-> +{
-> +	struct reset_data *data = container_of(rcdev,
-> +					       struct reset_data,
-> +					       rcdev);
-> +
-> +	return !(readl(data->reg) & BIT(SUN4I_A10_DISPLAY_RESET_BIT));
-> +}
-> +
-> +static struct reset_control_ops sun4i_a10_display_reset_ops = {
-
-Someone should make it so this can be const...
-
-> +	.assert		= sun4i_a10_display_assert,
-> +	.deassert	= sun4i_a10_display_deassert,
-> +	.status		= sun4i_a10_display_status,
-> +};
-> +
-> +static int sun4i_a10_display_reset_xlate(struct reset_controller_dev *rcdev,
-> +					 const struct of_phandle_args *spec)
-> +{
-> +	if (WARN_ON(spec->args_count != rcdev->of_reset_n_cells))
-> +		return -EINVAL;
-
-Do we really need this check? Seems like something the reset core
-should handle.
-
-> +
-> +	/* We only have a single reset signal */
-> +	return 0;
-> +}
-> +
-> +static void __init sun4i_a10_display_setup(struct device_node *node)
-> +{
-> +	const char *parents[SUN4I_A10_DISPLAY_PARENTS];
-> +	const char *clk_name = node->name;
-> +	struct reset_data *reset_data;
-> +	struct clk_divider *div;
-> +	struct clk_gate *gate;
-> +	struct clk_mux *mux;
-> +	void __iomem *reg;
-> +	struct clk *clk;
-> +	int i;
-> +
-> +	of_property_read_string(node, "clock-output-names", &clk_name);
-> +
-> +	reg = of_io_request_and_map(node, 0, of_node_full_name(node));
-> +	if (IS_ERR(reg)) {
-> +		pr_err("%s: Could not map the clock registers\n", clk_name);
-> +		return;
+> +	clk = clk_register_composite(NULL, clk_name,
+> +				     &parent, 1,
+> +				     NULL, NULL,
+> +				     &mult->hw, &clk_factor_ops,
+> +				     &gate->hw, &clk_gate_ops,
+> +				     0);
+> +	if (IS_ERR(clk)) {
+> +		pr_err("%s: Couldn't register the clock\n", clk_name);
+> +		goto free_mult;
 > +	}
 > +
-> +	for (i = 0; i < SUN4I_A10_DISPLAY_PARENTS; i++)
-> +		parents[i] = of_clk_get_parent_name(node, i);
+> +	of_clk_add_provider(node, of_clk_src_simple_get, clk);
 
-of_clk_parent_fill()?
-
-> +
-> +	mux = kzalloc(sizeof(*mux), GFP_KERNEL);
-> +	if (!mux)
-[..]
-> +		goto free_reset;
-> +	}
-> +
-> +	return;
-> +
-> +free_reset:
-> +	kfree(reset_data);
-> +free_clk:
-> +	clk_unregister(clk);
-
-We really ought to have a clk_composite_unregister() API.
+I hope this doesn't fail.
 
 -- 
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
