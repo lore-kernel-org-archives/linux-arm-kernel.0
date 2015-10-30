@@ -1,33 +1,48 @@
-From: robh+dt@kernel.org (Rob Herring)
-Date: Fri, 30 Oct 2015 11:46:38 -0500
-Subject: [PATCH v8 09/17] dt-bindings: add document for rockchip variant
- of analogix_dp
-In-Reply-To: <1446020905-10670-1-git-send-email-ykk@rock-chips.com>
-References: <1446020143-32645-1-git-send-email-ykk@rock-chips.com>
- <1446020905-10670-1-git-send-email-ykk@rock-chips.com>
-Message-ID: <CAL_JsqLxkz43gj-O+r0LURg0_41SrDB7g8EAHwjxbytoUPijhA@mail.gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Fri, 30 Oct 2015 16:51:28 +0000
+Subject: [PATCH] MAINTAINERS: Start using the 'reviewer' (R) tag
+In-Reply-To: <563160B2.7070305@samsung.com>
+References: <CABxcv=mzzcx3o0m3hYzcn0DyM2pEFDZ-ZgVCjChWGf+y4Xy78A@mail.gmail.com>
+ <1446030399.2757.83.camel@perches.com>
+ <CABxcv=m+aMgtKPA-WBX9rTW8c3pnMmZgNG=NvnbaeOchdZ87hg@mail.gmail.com>
+ <20151028113932.GS5828@x1> <20151028121454.GA4058@x1>
+ <CABxcv=kCuYaYWgnvEUuTGv1RXdS6_3DR=6fnzHhAh7V-KFfCrQ@mail.gmail.com>
+ <20151028133438.GC4058@x1>
+ <CABxcv==Ag3ARUtQYZdfqBELAJ_CwU3to9YxmgG1yBbUJ-h9xrw@mail.gmail.com>
+ <20151028143838.GG4058@x1> <563160B2.7070305@samsung.com>
+Message-ID: <20151030165128.GW4058@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 28, 2015 at 3:28 AM, Yakir Yang <ykk@rock-chips.com> wrote:
-> Rockchip DP driver is a helper driver of analogix_dp coder driver,
-> so most of the DT property should be descriped in analogix_dp document.
->
-> Reviewed-by: Heiko Stuebner <heiko@sntech.de>
-> Signed-off-by: Yakir Yang <ykk@rock-chips.com>
-> ---
+On Thu, 29 Oct 2015, Krzysztof Kozlowski wrote:
 
-Looks mostly fine to me.
+> On 28.10.2015 23:38, Lee Jones wrote:
+> > On Wed, 28 Oct 2015, Javier Martinez Canillas wrote:
+> >> They are not maintainers according to your definition of maintainer
+> >> that doesn't seem what most people agree with.
+> > 
+> > "most people" so far are 3 people that I assume still want to be
+> > Maintainers despite not actually conducting Maintainer duties, but
+> > are rather Reviewers.  I also have 2 Acks for this patch, so thus far
+> > that's 3 that agree and 3 that do not.  Unsurprisingly the ones that
+> > agree are Maintainers and the ones who are not are (by my definition)
+> > Reviewers -- go figure.
+> > 
+> 
+> I am not sure on which side you put me finally. :)
+> If there is a consensus among some more experienced developers that
+> maintainer means branch and patches maintaining, then I won't see any
+> problem with the patch nor with switching Samsung PMIC entries to review.
+> 
+> In that case, that would be:
+> Acked-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 
-[...]
+Thanks Krzysztof, but I'm going to drop this patch.
 
-> +- rockchip,grf: this soc should set GRF regs, so need get grf here.
-> +
-> +- ports: contain a port node with endpoint definitions as defined in
-> +  Documentation/devicetree/bindings/media/video-interfaces.txt.
+I can see it causing more issues than it'll solve.
 
-Please document that you have 2 ports 0 and 1, port0 has 2 endpoints
-for ? and port1 has 1 endpoint connected to a panel(or another
-bridge). Otherwise that is only evident from the example.
-
-Rob
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
