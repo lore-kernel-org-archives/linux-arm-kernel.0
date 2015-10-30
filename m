@@ -1,79 +1,190 @@
-From: Suravee.Suthikulpanit@amd.com (Suravee Suthikulpanit)
-Date: Fri, 30 Oct 2015 11:38:54 -0500
-Subject: [PATCH V1 00/11] MMCONFIG refactoring and ARM64 PCI hostbridge
- init based on ACPI
-In-Reply-To: <1445963922-22711-1-git-send-email-tn@semihalf.com>
-References: <1445963922-22711-1-git-send-email-tn@semihalf.com>
-Message-ID: <56339D1E.20605@amd.com>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 30 Oct 2015 11:40:03 -0500
+Subject: [PATCH 09/19] drm: sun4i: Add DT bindings documentation
+In-Reply-To: <1446214865-3972-10-git-send-email-maxime.ripard@free-electrons.com>
+References: <1446214865-3972-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1446214865-3972-10-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <CAL_JsqLuUUApGAgdw7U8EJ7p5yrYJg8AKFB32AE9Ufrf47=WpQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Tested on AMD Seattle platform (Overdrive revB) w/ both MSI and legacy 
-interrupt.
+On Fri, Oct 30, 2015 at 9:20 AM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> The display pipeline of the Allwinner A10 is involving several loosely
+> coupled components.
+>
+> Add a documentation for the bindings.
+>
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> ---
+>  .../devicetree/bindings/drm/sunxi/sun4i-drm.txt    | 122 +++++++++++++++++++++
 
-Tested-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+bindings/display/sunxi/ please.
 
-Thanks,
-Suravee
+>  1 file changed, 122 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/drm/sunxi/sun4i-drm.txt
+>
+> diff --git a/Documentation/devicetree/bindings/drm/sunxi/sun4i-drm.txt b/Documentation/devicetree/bindings/drm/sunxi/sun4i-drm.txt
+> new file mode 100644
+> index 000000000000..dbdccef787b4
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/drm/sunxi/sun4i-drm.txt
+> @@ -0,0 +1,122 @@
+> +Allwinner A10 Display Pipeline
+> +==============================
+> +
+> +The Allwinner A10 Display pipeline is composed of several components
+> +that are going to be documented below:
+> +
+> +TV Encoder
+> +----------
+> +
+> +The TV Encoder supports the composite and VGA output. It is one end of
+> +the pipeline.
+> +
+> +Required properties:
+> + - compatible: value should be "allwinner,sun4i-a10-tv-encoder".
+> + - reg: base address and size of memory-mapped region
+> + - clocks: the clocks driving the TV encoder
+> +
+> +TCON
+> +----
+> +
+> +The TCON acts as a CRTC and encoder for RGB / LVDS interfaces.
 
-On 10/27/15 11:38, Tomasz Nowicki wrote:
->  From the functionality point of view this series might be split into two logic parts:
-> 1. Making MMCONFIG code arch-agnostic which allows all architectures to collect
->     PCI config regions and used when necessary.
-> 2. Using generic MMCONFIG code and introducing ACPI based PCI hostbridge
->     initialization for ARM64
+Lets not carry DRMs old CRTC name into DT bindings. Just say "display
+controller."
+
+> +
+> +Required properties:
+> + - compatible: value should be "allwinner,sun4i-a10-tcon".
+> + - reg: base address and size of memory-mapped region
+> + - interrupts: interrupt associated to this IP
+> + - clocks: phandles to the clocks feeding the TCON. Three are needed:
+> +   - 'ahb': the interface clocks
+> +   - 'tcon-ch0': The clock driving the TCON channel 0
+> +   - 'tcon-ch1': The clock driving the TCON channel 0
+> +
+> + - clock-names: the clock names mentionned above
+
+typo
+
+> + - clock-output-names: Name of the pixel clock created
+> +
+> +
+> +Display Engine Backend
+> +----------------------
+> +
+> +The display engine backend exposes layers and sprites to the
+> +system. It's split into two components, the frontend and backend, the
+> +frontend doing formats conversion, scaling, deinterlacing, while the
+> +backend actually manages the layers.
+> +
+> +Required properties:
+> +  - compatible: value must be one of:
+> +    * allwinner,sun5i-a13-display-engine
+> +
+> +  - reg: base address and size of the memory-mapped region. Two are needed:
+> +    * backend0: registers of the display engine backend
+> +    * frontend0: registers of the display engine frontend
+
+Why the zeros? I think they should be dropped.
+
+> +  - reg_names: the region names mentionned above.
+
+typo
+
+> +
+> +  - interrupts: frontend interrupt phandle
+> +
+> +  - clocks: phandles to the clocks feeding the frontend and backend
+> +    * backend0-bus: the backend interface clock
+> +    * backend0-mod: the backend module clock
+> +    * backend0-ram: the backend DRAM clock
+> +    * frontend0-bus: the frontend interface clock
+> +    * frontend0-mod: the frontend module clock
+> +    * frontend0-ram: the frontend DRAM clock
+
+Same comment on zeros.
+
+> +  - clock-names: the clock names mentionned above
+
+typo
+
+> +
+> +  - resets: phandles to the reset controllers. Two are needed:
+> +    * backend0: backend reset controller
+> +    * frontend0: frontend reset controller
+> +  - reset-names: the reset names mentionned above
+
+typo. At least you are consistent (unlike English grammar rules). ;)
+
+> +
+> +  - allwinner,tcon: phandle to the TCON in our pipeline
+
+Use of-graph or just let the relationship live in the driver. If there
+is only 1 instance of the blocks, the latter is fine.
+
+> +
+> +Optional properties:
+> +  - allwinner,tv-encoder: phandle to the TV Encoder in our pipeline
+> +  - allwinner,panel: phandle to the panel used in our RGB interface
+
+Use of-graph please.
+
+> +
+> +Example:
+> +
+> +panel: panel {
+> +       compatible = "olimex,lcd-olinuxino-43-ts";
+> +};
+> +
+> +tve: encoder at 01c0a000 {
+> +       compatible = "allwinner,sun4i-a10-tv-encoder";
+> +       reg = <0x01c0a000 0x1000>;
+> +       clocks = <&ahb_gates 34>;
+> +};
+> +
+> +tcon: lcd-controller at 01c0c000 {
+> +       compatible = "allwinner,sun4i-a10-tcon";
+> +       reg = <0x01c0c000 0x1000>;
+> +       interrupts = <44>;
+> +       clocks = <&ahb_gates 36>,
+> +                <&tcon_ch0_clk>,
+> +                <&tcon_ch1_clk>;
+> +       clock-names = "ahb",
+> +                     "tcon-ch0",
+> +                     "tcon-ch1";
+> +       clock-output-names = "tcon-pixel-clock";
+> +};
+> +
+> +de: display-engine at 01e00000 {
+> +       compatible = "allwinner,sun5i-a13-display-engine";
+> +       reg = <0x01e00000 0x20000>,
+> +             <0x01e60000 0x10000>;
+> +       reg-names = "frontend0",
+> +                   "backend0";
+> +       interrupts = <47>;
+> +       interrupt-names = "engine0";
+> +       clocks = <&ahb_gates 46>, <&de_fe_clk>,
+> +                <&dram_gates 25>, <&ahb_gates 44>,
+> +                <&de_be_clk>, <&dram_gates 26>;
+> +       clock-names = "frontend0-bus", "frontend0-mod",
+> +                     "frontend0-ram", "backend0-bus",
+> +                     "backend0-mod", "backend0-ram";
+> +       resets = <&de_fe_clk>,
+> +                <&de_be_clk>;
+> +       reset-names = "frontend0",
+> +                     "backend0";
+> +
+> +       allwinner,tcon = <&tcon>;
+> +       allwinner,tv-encoder = <&tve>;
+> +       allwinner,panel = <&panel>;
+> +};
+> --
+> 2.6.2
 >
-> Patches has been built on top of:
-> [Patch v7 0/7] Consolidate ACPI PCI root common code into ACPI core
-> https://lkml.org/lkml/2015/10/14/31
-> Git branch can be found here:
-> https://git.linaro.org/leg/acpi/acpi.git/shortlog/refs/heads/pci-acpi-upstream
->
-> This has been tested on Cavium ThunderX 1 socket server.
-> Any help in reviewing and testing is very appreciated.
->
-> Hanjun Guo (1):
->    XEN / PCI: Remove the dependence on arch x86 when PCI_MMCONFIG=y
->
-> Tomasz Nowicki (10):
->    x86, pci: Reorder logic of pci_mmconfig_insert() function
->    x86, pci, acpi: Move arch-agnostic MMCONFIG (aka ECAM) and ACPI code
->      out of arch/x86/ directory
->    pci, acpi, mcfg: Provide generic implementation of MCFG code
->      initialization.
->    x86, pci: mmconfig_{32,64}.c code refactoring - remove code
->      duplication.
->    x86, pci, ecam: mmconfig_64.c becomes default implementation for ECAM
->      driver.
->    pci, acpi, mcfg: Provide default RAW ACPI PCI config space accessors.
->    pci, acpi, ecam: Add flag to indicate whether ECAM region was hot
->      added or not.
->    x86, pci: Use previously added ECAM hot_added flag to remove ECAM
->      regions.
->    pci, acpi: Provide generic way to assign bus domain number.
->    arm64, pci, acpi: Support for ACPI based PCI hostbridge init
->
->   arch/arm64/Kconfig             |   6 +
->   arch/arm64/kernel/pci.c        | 208 ++++++++++++++++++++++++++++++++--
->   arch/x86/Kconfig               |   4 +
->   arch/x86/include/asm/pci_x86.h |  28 +----
->   arch/x86/pci/acpi.c            |  17 +--
->   arch/x86/pci/mmconfig-shared.c | 250 +++++++----------------------------------
->   arch/x86/pci/mmconfig_32.c     |  11 +-
->   arch/x86/pci/mmconfig_64.c     |  67 +----------
->   arch/x86/pci/numachip.c        |   1 +
->   drivers/acpi/Makefile          |   1 +
->   drivers/acpi/mcfg.c            | 104 +++++++++++++++++
->   drivers/acpi/pci_root.c        |   2 +-
->   drivers/pci/Kconfig            |  10 ++
->   drivers/pci/Makefile           |   5 +
->   drivers/pci/ecam.c             | 234 ++++++++++++++++++++++++++++++++++++++
->   drivers/pci/pci.c              |  30 ++++-
->   drivers/xen/pci.c              |   7 +-
->   include/linux/acpi.h           |   2 +
->   include/linux/ecam.h           |  44 ++++++++
->   19 files changed, 691 insertions(+), 340 deletions(-)
->   create mode 100644 drivers/acpi/mcfg.c
->   create mode 100644 drivers/pci/ecam.c
->   create mode 100644 include/linux/ecam.h
->
+> --
+> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
