@@ -1,40 +1,70 @@
-From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
-Date: Fri, 30 Oct 2015 02:40:04 +0000
-Subject: [PATCH v5 07/14] arm64: renesas: salvator-x: Sound SSI PIO support
-In-Reply-To: <1446161280-23097-8-git-send-email-horms+renesas@verge.net.au>
-References: <1446161280-23097-1-git-send-email-horms+renesas@verge.net.au>
- <1446161280-23097-8-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <877fm5gk33.wl%kuninori.morimoto.gx@renesas.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Fri, 30 Oct 2015 11:46:16 +0900
+Subject: [PATCH v2] serial: 8250_uniphier: add earlycon support
+Message-ID: <1446173176-6966-1-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This reuses the code of drivers/tty/serial/8250/8250_early.c except
 
-Hi Simon
+  - Overwrite device->port.iotype and device->port.regshift for
+    UPIO_MEM32 because of_setup_earlycon() has set them for UPIO_MEM.
 
-Thank you for your patch.
+  - Set device->baud to zero to prevent early8250_setup() from
+    initializing the divisor register because port->uartclk does not
+    match the frequency expected by this hardware.
 
-> From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-> 
-> This patch adds PIO sound support for Salvator-X board.
-> 
-> Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> ---
-(snip)
-> +	cs2000: clk_multiplier at 4f {
-> +		#clock-cells = <0>;
-> +		compatible = "cirrus,cs2000-cp";
-> +		reg = <0x4f>;
-> +		clocks = <&rcar_sound 0>, <&x12_clk>;
-> +		clock-names = "clk_in", "ref_clk";
-> +		clock-frequency = <24576000>; /* 1/1 divide */
-> +	};
-> +};
+Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+---
 
-I have posted this cs2000 driver to clk ML, but not yet accepted.
-And new version can't use "clock-frequency".
-Actually, Salvator-X sound can work without cs2000,
-but it can be limited sound rate
-Do you want to avoid cs2000 until it was accepted ?
-Then, I can create and post whole patch set.
-Or we can avoid sound support so far ?
+Changes in v2:
+  - #if IS_ENABLED(...)  -> #ifdef ...
+  - Change earlycon name from uniphier_uart to uniphier
+
+ drivers/tty/serial/8250/8250_uniphier.c | 24 ++++++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
+
+diff --git a/drivers/tty/serial/8250/8250_uniphier.c b/drivers/tty/serial/8250/8250_uniphier.c
+index 245edbb..bab6b3a 100644
+--- a/drivers/tty/serial/8250/8250_uniphier.c
++++ b/drivers/tty/serial/8250/8250_uniphier.c
+@@ -13,6 +13,7 @@
+  */
+ 
+ #include <linux/clk.h>
++#include <linux/console.h>
+ #include <linux/io.h>
+ #include <linux/module.h>
+ #include <linux/of.h>
+@@ -34,6 +35,29 @@ struct uniphier8250_priv {
+ 	spinlock_t atomic_write_lock;
+ };
+ 
++#ifdef CONFIG_SERIAL_8250_CONSOLE
++static int __init uniphier_early_console_setup(struct earlycon_device *device,
++					       const char *options)
++{
++	if (!device->port.membase)
++		return -ENODEV;
++
++	/* This hardware always expects MMIO32 register interface. */
++	device->port.iotype = UPIO_MEM32;
++	device->port.regshift = 2;
++
++	/*
++	 * Do not touch the divisor register in early_serial8250_setup();
++	 * we assume it has been initialized by a boot loader.
++	 */
++	device->baud = 0;
++
++	return early_serial8250_setup(device, options);
++}
++OF_EARLYCON_DECLARE(uniphier, "socionext,uniphier-uart",
++		    uniphier_early_console_setup);
++#endif
++
+ /*
+  * The register map is slightly different from that of 8250.
+  * IO callbacks must be overridden for correct access to FCR, LCR, and MCR.
+-- 
+1.9.1
