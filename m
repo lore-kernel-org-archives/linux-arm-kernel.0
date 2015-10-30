@@ -1,40 +1,53 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Fri, 30 Oct 2015 16:25:47 +0900
-Subject: [PATCH v5 2/5] arm64: dts: r8a7795: add EthernetAVB device node
-In-Reply-To: <20151030071745.GA31252@verge.net.au>
-References: <1444891698-8780-1-git-send-email-horms+renesas@verge.net.au>
- <1444891698-8780-3-git-send-email-horms+renesas@verge.net.au>
- <CANqRtoQLXQENVxvpMB_pymu7B+F6MhL0CBqPC4EscFTxOYt07Q@mail.gmail.com>
- <20151030071745.GA31252@verge.net.au>
-Message-ID: <20151030072546.GC31252@verge.net.au>
+Date: Fri, 30 Oct 2015 16:31:47 +0900
+Subject: [PATCH v12 1/7] arm64: renesas: r8a7795: Add Renesas R8A7795 SoC
+ support
+In-Reply-To: <CAMuHMdWrR0it7pgxQr1e+55GwuXszh8kNUQ3+dyy6WjVJe2+9Q@mail.gmail.com>
+References: <1445839312-8874-1-git-send-email-horms+renesas@verge.net.au>
+ <1445839312-8874-2-git-send-email-horms+renesas@verge.net.au>
+ <CAMuHMdWrR0it7pgxQr1e+55GwuXszh8kNUQ3+dyy6WjVJe2+9Q@mail.gmail.com>
+Message-ID: <20151030073146.GD31252@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 30, 2015 at 04:17:46PM +0900, Simon Horman wrote:
-> On Thu, Oct 29, 2015 at 05:42:43PM +0900, Magnus Damm wrote:
-> > On Thu, Oct 15, 2015 at 3:48 PM, Simon Horman
-> > <horms+renesas@verge.net.au> wrote:
-> > > From: Kazuya Mizuguchi <kazuya.mizuguchi.ks@renesas.com>
-> > >
-> > > Signed-off-by: Kazuya Mizuguchi <kazuya.mizuguchi.ks@renesas.com>
-> > > [horms: minor updates]
-> > > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> > > Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
+On Wed, Oct 28, 2015 at 09:22:34AM +0100, Geert Uytterhoeven wrote:
+> On Mon, Oct 26, 2015 at 7:01 AM, Simon Horman
+> <horms+renesas@verge.net.au> wrote:
+> > From: Gaku Inami <gaku.inami.xw@bp.renesas.com>
+> >
+> > Initial version of Renesas R-Car H3 support (V10)
+> >
+> > Signed-off-by: Gaku Inami <gaku.inami.xw@bp.renesas.com>
+> > Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+> > Signed-off-by: Magnus Damm <damm+renesas@opensource.se>
+> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 > 
-> [snip]
+> > diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+> > new file mode 100644
+> > index 000000000000..aa13115387a6
+> > --- /dev/null
+> > +++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
 > 
-> > Hi Simon,
-> > 
-> > Thanks for your efforts with the ethernet controller. In general all
-> > seems good to me, but this I came across the contents of this patch
-> > when I was browsing the SoC DTSI file. What is the reason to put this
-> > node in between dmac0 and dmac1? I don't know where is the best
-> > location, but it would be good to keep the dmac nodes together I
-> > think.
+> > +       extal_clk: extal {
+> > +               compatible = "fixed-clock";
+> > +               #clock-cells = <0>;
 > 
-> I think its just an artifact of the way the patch has been updated.
-> I'll see about cleaning it up.
+> I would add the same override comment as for extalr here, too.
 
-On slightly closer inspection it seems to be there due to sorting
-by base address. But it seems rather silly the way it is so I have it
-in mind to shuffle it down below the dmac nodes.
+Thanks, I will fix that.
+
+> > +               clock-frequency = <0>;
+> > +       };
+> > +
+> > +       extalr_clk: extalr {
+> > +               compatible = "fixed-clock";
+> > +               #clock-cells = <0>;
+> > +               /* This value must be overridden by the board */
+> > +               clock-frequency = <0>;
+> > +       };
+> 
+> Nevertheless:
+> 
+> Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
+
+Thanks!
