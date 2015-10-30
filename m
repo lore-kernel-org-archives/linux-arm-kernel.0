@@ -1,45 +1,85 @@
 From: huawei.libin@huawei.com (libin)
-Date: Fri, 30 Oct 2015 16:45:16 +0800
-Subject: [PATCH 1/3] recordmcount: fix endianness handling bug for
- nop_mcount
-In-Reply-To: <1446193864-24593-2-git-send-email-huawei.libin@huawei.com>
+Date: Fri, 30 Oct 2015 16:44:11 +0800
+Subject: [PATCH 3/3] recordmcount: arm64: replace the ignored mcount call
+ into nop
+In-Reply-To: <1446193864-24593-4-git-send-email-huawei.libin@huawei.com>
 References: <1446193864-24593-1-git-send-email-huawei.libin@huawei.com>
- <1446193864-24593-2-git-send-email-huawei.libin@huawei.com>
-Message-ID: <56332E1C.1000206@huawei.com>
+ <1446193864-24593-4-git-send-email-huawei.libin@huawei.com>
+Message-ID: <56332DDB.8060701@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
 on 2015/10/30 16:31, Li Bin wrote:
-> In nop_mcount, shdr->sh_offset and welp->r_offset should handle
-> endianness properly, otherwise it will trigger Segmentation fault
-> if the recordmcount main and file.o have different endianness.
+> By now, the recordmcount only records the function that in
+> following sections:
+> .text/.ref.text/.sched.text/.spinlock.text/.irqentry.text/
+> .kprobes.text/.text.unlikely
 > 
-
-For more information, please refer to
-	https://lkml.org/lkml/2015/10/29/258
-
-> Cc: <stable@vger.kernel.org> # 3.0+
+> For the function that not in these sections, the call mcount
+> will be in place and not be replaced when kernel boot up. And
+> it will bring performance overhead, such as do_mem_abort (in
+> .exception.text section). This patch make the call mcount to
+> nop for this case in recordmcount.
+> 
+> Cc: <stable@vger.kernel.org> # 3.18+
 > Signed-off-by: Li Bin <huawei.libin@huawei.com>
+
+Acked-by: Will Deacon <will.deacon@arm.com>
+https://lkml.org/lkml/2015/10/28/301
+
 > ---
->  scripts/recordmcount.h | 5 +++--
->  1 file changed, 3 insertions(+), 2 deletions(-)
+>  scripts/recordmcount.c | 24 +++++++++++++++++++++++-
+>  1 file changed, 23 insertions(+), 1 deletion(-)
 > 
-> diff --git a/scripts/recordmcount.h b/scripts/recordmcount.h
-> index 49b582a..dda9dba 100644
-> --- a/scripts/recordmcount.h
-> +++ b/scripts/recordmcount.h
-> @@ -376,8 +376,9 @@ static void nop_mcount(Elf_Shdr const *const relhdr,
->  			mcountsym = get_mcountsym(sym0, relp, str0);
+> diff --git a/scripts/recordmcount.c b/scripts/recordmcount.c
+> index 8cc020b..698768b 100644
+> --- a/scripts/recordmcount.c
+> +++ b/scripts/recordmcount.c
+> @@ -42,6 +42,7 @@
 >  
->  		if (mcountsym == Elf_r_sym(relp) && !is_fake_mcount(relp)) {
-> -			if (make_nop)
-> -				ret = make_nop((void *)ehdr, shdr->sh_offset + relp->r_offset);
-> +			if (make_nop) {
-> +				ret = make_nop((void *)ehdr, _w(shdr->sh_offset) + _w(relp->r_offset));
-> +			}
->  			if (warn_on_notrace_sect && !once) {
->  				printf("Section %s has mcount callers being ignored\n",
->  				       txtname);
+>  #ifndef EM_AARCH64
+>  #define EM_AARCH64	183
+> +#define R_AARCH64_NONE		0
+>  #define R_AARCH64_ABS64	257
+>  #endif
+>  
+> @@ -160,6 +161,22 @@ static int make_nop_x86(void *map, size_t const offset)
+>  	return 0;
+>  }
+>  
+> +static unsigned char ideal_nop4_arm64[4] = {0x1f, 0x20, 0x03, 0xd5};
+> +static int make_nop_arm64(void *map, size_t const offset)
+> +{
+> +	uint32_t *ptr;
+> +
+> +	ptr = map + offset;
+> +	/* bl <_mcount> is 0x94000000 before relocation */
+> +	if (*ptr != 0x94000000)
+> +		return -1;
+> +
+> +	/* Convert to nop */
+> +	ulseek(fd_map, offset, SEEK_SET);
+> +	uwrite(fd_map, ideal_nop, 4);
+> +	return 0;
+> +}
+> +
+>  /*
+>   * Get the whole file as a programming convenience in order to avoid
+>   * malloc+lseek+read+free of many pieces.  If successful, then mmap
+> @@ -354,7 +371,12 @@ do_file(char const *const fname)
+>  			 altmcount = "__gnu_mcount_nc";
+>  			 break;
+>  	case EM_AARCH64:
+> -			 reltype = R_AARCH64_ABS64; gpfx = '_'; break;
+> +			reltype = R_AARCH64_ABS64;
+> +			make_nop = make_nop_arm64;
+> +			rel_type_nop = R_AARCH64_NONE;
+> +			ideal_nop = ideal_nop4_arm64;
+> +			gpfx = '_';
+> +			break;
+>  	case EM_IA_64:	 reltype = R_IA64_IMM64;   gpfx = '_'; break;
+>  	case EM_METAG:	 reltype = R_METAG_ADDR32;
+>  			 altmcount = "_mcount_wrapper";
 > 
