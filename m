@@ -1,22 +1,34 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 30 Oct 2015 14:36:01 +0100
-Subject: [PATCH] arm64: dts: Added syscon-reboot node for FSL's LS2085A SoC
-In-Reply-To: <CY1PR0301MB07480A8EC25BB6987883AE5687220@CY1PR0301MB0748.namprd03.prod.outlook.com>
-References: <1445650280-9966-1-git-send-email-German.Rivera@freescale.com>
- <20151027163441.GK3091@leverpostej>
- <CY1PR0301MB07480A8EC25BB6987883AE5687220@CY1PR0301MB0748.namprd03.prod.outlook.com>
-Message-ID: <41343887.dUfAz3IhqL@wuerfel>
+Date: Fri, 30 Oct 2015 14:46:43 +0100
+Subject: [PATCH v4] ARM: configs: Add Freescale LS1021A defconfig
+In-Reply-To: <BN3PR0301MB0867C51A52319367F981C630FE230@BN3PR0301MB0867.namprd03.prod.outlook.com>
+References: <1442480614-32345-1-git-send-email-b18965@freescale.com>
+ <5073362.oArWDzYkxD@wuerfel>
+ <BN3PR0301MB0867C51A52319367F981C630FE230@BN3PR0301MB0867.namprd03.prod.outlook.com>
+Message-ID: <3938714.zt8Y4X5ull@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 27 October 2015 18:25:04 Stuart Yoder wrote:
-> I think that comment "Currently supported enable-method is psci v0.2" is a statement of
-> intent, not what is available currently.   And the only plan I am aware of is PSCI
-> with UEFI based firmware.
+On Tuesday 27 October 2015 14:40:21 Huan Wang wrote:
+> > 
+> > Ok. What I was suggesting above though was to try to pinpoint exactly
+> > where it goes wrong. You have verified that it does not crash before the
+> > page tables are enabled, but that is very early. You have also shown
+> > that the kernel crashes before the point at which the 'Booting Linux on
+> > physical CPU 0xf00' message is printed to the kernel, but that is *much*
+> > later: setup_arch() calls parse_early_param(), which in turn sets up
+> > early_console_write(). This means the 'Booting Linux on physical CPU
+> > 0xf00'
+> > is still stuck in the log buffer and you may have crashed someone
+> > inbetween.
+> > 
+> > If you can call printascii(), you can try to do that just after enabling
+> > the page tables to see if that was the problem like you suspect, or
+> > otherwise add more printascii() statements between __turn_mmu_on and
+> > parse_early_param() to pinpoint the exact code that breaks.
+> [Alison Wang] Thank you very much for your help. The issue is fixed.
 > 
-> U-boot is a key firmware platform for us and has no PSCI implementation available.
 
-I believe U-boot has supported PSCI since 2013. Maybe you just need to update
-to a newer version?
+Ah, very good. I'm curious what caused the problem in the end.
 
 	Arnd
