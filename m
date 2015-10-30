@@ -1,60 +1,67 @@
-From: dietmar.eggemann@arm.com (Dietmar Eggemann)
-Date: Fri, 30 Oct 2015 12:29:00 +0000
-Subject: [PATCH] ARM64: Enable multi-core scheduler support by default
-In-Reply-To: <20151029171944.GS8899@e104818-lin.cambridge.arm.com>
-References: <1445273749-16778-1-git-send-email-dietmar.eggemann@arm.com>
- <20151029171944.GS8899@e104818-lin.cambridge.arm.com>
-Message-ID: <5633628C.1010200@arm.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Fri, 30 Oct 2015 13:37:01 +0100
+Subject: [PATCH] clocksource: dw_apb_timer_of: support timer-based delay
+In-Reply-To: <20151030190929.4c46066c@xhacker>
+References: <1446193659-1698-1-git-send-email-jszhang@marvell.com>
+ <56334A1E.7060709@linaro.org> <20151030190929.4c46066c@xhacker>
+Message-ID: <5633646D.7030206@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/29/2015 05:19 PM, Catalin Marinas wrote:
-> On Mon, Oct 19, 2015 at 05:55:49PM +0100, Dietmar Eggemann wrote:
->> Make sure that the task scheduler domain hierarchy is set-up correctly
->> on systems with single or multi-cluster topology.
->>
->> Signed-off-by: Dietmar Eggemann <dietmar.eggemann@arm.com>
->> ---
->>   arch/arm64/configs/defconfig | 1 +
->>   1 file changed, 1 insertion(+)
->>
->> diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
->> index 34d71dd86781..dc70d715bc38 100644
->> --- a/arch/arm64/configs/defconfig
->> +++ b/arch/arm64/configs/defconfig
->> @@ -51,6 +51,7 @@ CONFIG_PCI=y
->>   CONFIG_PCI_MSI=y
->>   CONFIG_PCI_XGENE=y
->>   CONFIG_SMP=y
->> +CONFIG_SCHED_MC=y
->>   CONFIG_PREEMPT=y
->>   CONFIG_KSM=y
->>   CONFIG_TRANSPARENT_HUGEPAGE=y
+On 10/30/2015 12:09 PM, Jisheng Zhang wrote:
+> Dear Daniel,
 >
-> Question: does enabling this option have any (positive) effect on the
-> vanilla kernel or it requires additional patches like EAS?
+> On Fri, 30 Oct 2015 11:44:46 +0100
+> Daniel Lezcano <daniel.lezcano@....> wrote:
+>
+>> On 10/30/2015 09:27 AM, Jisheng Zhang wrote:
+>>> Implement an ARM delay timer to be used for udelay(). This allows us to
+>>> skip the delay loop calibration at boot on Marvell BG2, BG2Q, BG2CD
+>>> platforms. And after this patch, udelay() will be unaffected by CPU
+>>> frequency changes.
+>>>
+>>> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+>>> ---
+>>>    drivers/clocksource/Kconfig           | 10 ++++++++++
+>>>    drivers/clocksource/dw_apb_timer_of.c | 16 ++++++++++++++++
+>>>    2 files changed, 26 insertions(+)
+>>>
+>>> diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
+>>> index a7726db..7b081805 100644
+>>> --- a/drivers/clocksource/Kconfig
+>>> +++ b/drivers/clocksource/Kconfig
+>>> @@ -29,6 +29,16 @@ config DW_APB_TIMER_OF
+>>>    	select DW_APB_TIMER
+>>>    	select CLKSRC_OF
+>>>
+>>> +config DW_APB_TIMER_BASED_DELAY
+>>> +	bool "DW APB timer based delay"
+>>> +	depends on ARM && DW_APB_TIMER_OF
+>>> +	default n
+>>> +	help
+>>> +	  This option enables support for using the DW APB timer to
+>>> +	  implement timer-based delay. It is useful for skiping the
+>>> +	  delay loop calibration at boot on some platforms. And the
+>>> +	  udelay() will be unaffected by CPU frequency changes.
+>>> +
+>>
+>> Why do you want it to be optional ?
+>>
+>
+> Because in some platforms which has arm arch timer, this dw apb timer
+> delay isn't needed, the arch timer is better. So we want it be optional
+> so that the platforms which need this feature select it manually when config
+> the kernel.
 
-It improves the task scheduler decisions on multi-cluster systems. You 
-have to iterate over all cpu's less frequently when gathering the sched 
-group statistics e.g. during CFS load-balancing.
+Correct me if I am wrong. If you have the arch timer, you don't need the 
+dw apb timer at all, no ? So the selection would be arch arm timer *or* 
+dw_apb_timer ? not arch_arm_timer for delay and dw_apb_timer for 
+clockevents, right ?
 
-You essentially replace a flat (all cpus) with an hierarchical approach 
-(lowest level: sched group eq. cpu, next level: sched group eq. cluster) 
-and do CFS load balancing frequently between two cpu's of the same 
-cluster (lowest level) and less frequently between two cpus from 
-different cluster.
 
-Not sure that I would see an effect on the performance score on a JUNO 
-board when running hackbench. Could give it a try ... Probably easier to 
-spot on a machine with >32 logical cpus.
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
 
-EAS has to work with both approaches although we do all our tests with 
-CONFIG_SCHED_MC=y. EAS operates on sched groups so the actual structure 
-of the sched domain hierarchy is hidden. (at least in theory).
-
-For me CONFIG_SCHED_MC=y is something I would expect when I evaluate the 
-task scheduler on a multi-cluster system.
-
--- Dietmar
-
-[...]
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
