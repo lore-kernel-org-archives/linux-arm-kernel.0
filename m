@@ -1,42 +1,76 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 30 Oct 2015 20:59:19 +0100
-Subject: [PATCH v2] arm64: dts: Added syscon-reboot node for FSL's LS2085A
- SoC
-In-Reply-To: <CY1PR0301MB07483E9D229314891961B6AD872F0@CY1PR0301MB0748.namprd03.prod.outlook.com>
-References: <1446066584-3738-1-git-send-email-German.Rivera@freescale.com>
- <3919319.0f6zV1T7g0@wuerfel>
- <CY1PR0301MB07483E9D229314891961B6AD872F0@CY1PR0301MB0748.namprd03.prod.outlook.com>
-Message-ID: <3842856.zmPu9RX8Gg@wuerfel>
+From: lkp@intel.com (kbuild test robot)
+Date: Sat, 31 Oct 2015 03:59:46 +0800
+Subject: [PATCH 2/2] sound: soc: Add Cygnus audio driver
+In-Reply-To: <1446231297-10648-3-git-send-email-ssimran@broadcom.com>
+Message-ID: <201510310354.D5Au86C0%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 30 October 2015 16:34:26 Stuart Yoder wrote:
-> My suggestion is to perhaps make that more explicit in the proposed
-> device tree node, by making the reg size "4" and naming it
-> as per the register name
-> 
->        rstcr: rstcr at 1E60000 {
->                compatible = "syscon";
->                reg = <0x0 0x1E60000 0x0 0x4>;
->        };
-> 
-> The intent is really just to expose a single reset register
-> and use syscon-reboot until PSCI is available.
+Hi Simran,
 
-I would rather see a more specific compatible string here that describes
-the actual name, e.g.
+[auto build test WARNING on asoc/for-next -- if it's inappropriate base, please suggest rules for selecting the more suitable base]
 
-	compatible = "fsl,ls2085a-rstcr", "syscon";
+url:    https://github.com/0day-ci/linux/commits/Simran-Rai/Add-audio-support-for-Broadcom-Cygnus-SoC/20151031-025721
+config: x86_64-allmodconfig (attached as .config)
+reproduce:
+        # save the attached .config to linux build tree
+        make ARCH=x86_64 
 
-this way we have the option of making it a real driver later on by matching
-on the specific string, but using the fallback syscon string otherwise.
+All warnings (new ones prefixed by >>):
 
-BTW, please change the address to lowercase letters in both the node name and
-the reg property. I would also change the name to 'syscon' instead of 'rstcr',
-making that
+   In file included from include/linux/printk.h:277:0,
+                    from include/linux/kernel.h:13,
+                    from include/linux/list.h:8,
+                    from include/linux/wait.h:6,
+                    from include/linux/fs.h:5,
+                    from include/linux/debugfs.h:18,
+                    from sound/soc/bcm/cygnus-pcm.c:13:
+   sound/soc/bcm/cygnus-pcm.c: In function 'cygnus_pcm_preallocate_dma_buffer':
+>> sound/soc/bcm/cygnus-pcm.c:785:29: warning: format '%x' expects argument of type 'unsigned int', but argument 5 has type 'size_t {aka long unsigned int}' [-Wformat=]
+     dev_dbg(rtd->cpu_dai->dev, "%s: size 0x%x @ 0x%p\n",
+                                ^
+   include/linux/dynamic_debug.h:86:39: note: in definition of macro 'dynamic_dev_dbg'
+      __dynamic_dev_dbg(&descriptor, dev, fmt, \
+                                          ^
+>> sound/soc/bcm/cygnus-pcm.c:785:2: note: in expansion of macro 'dev_dbg'
+     dev_dbg(rtd->cpu_dai->dev, "%s: size 0x%x @ 0x%p\n",
+     ^
 
-	rstcr: syscon at 1e60000 {
-		...
-	};
+vim +785 sound/soc/bcm/cygnus-pcm.c
 
-	Arnd
+   769	
+   770	static int cygnus_pcm_preallocate_dma_buffer(struct snd_pcm *pcm, int stream)
+   771	{
+   772		struct snd_pcm_substream *substream = pcm->streams[stream].substream;
+   773		struct snd_soc_pcm_runtime *rtd = substream->private_data;
+   774		struct snd_dma_buffer *buf = &substream->dma_buffer;
+   775		size_t size;
+   776	
+   777		size = cygnus_pcm_hw.buffer_bytes_max;
+   778	
+   779		buf->dev.type = SNDRV_DMA_TYPE_DEV;
+   780		buf->dev.dev = pcm->card->dev;
+   781		buf->private_data = NULL;
+   782		buf->area = dma_alloc_coherent(pcm->card->dev, size,
+   783				&buf->addr, GFP_KERNEL);
+   784	
+ > 785		dev_dbg(rtd->cpu_dai->dev, "%s: size 0x%x @ 0x%p\n",
+   786					__func__, size, buf->area);
+   787	
+   788		if (!buf->area) {
+   789			dev_err(rtd->cpu_dai->dev, "%s: dma_alloc failed\n", __func__);
+   790			return -ENOMEM;
+   791		}
+   792		buf->bytes = size;
+   793	
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 50151 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151031/b8b6b49f/attachment-0001.obj>
