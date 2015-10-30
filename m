@@ -1,93 +1,132 @@
-From: anup.patel@broadcom.com (Anup Patel)
-Date: Fri, 30 Oct 2015 11:48:58 +0530
-Subject: [PATCH v4 3/3] arm64: dts: Add BRCM IPROC NAND DT node for NS2
-In-Reply-To: <1446185938-17520-1-git-send-email-anup.patel@broadcom.com>
-References: <1446185938-17520-1-git-send-email-anup.patel@broadcom.com>
-Message-ID: <1446185938-17520-4-git-send-email-anup.patel@broadcom.com>
+From: zhaoshenglong@huawei.com (Shannon Zhao)
+Date: Fri, 30 Oct 2015 14:21:43 +0800
+Subject: [PATCH v4 01/21] ARM64: Move PMU register related defines to asm/pmu.h
+In-Reply-To: <1446186123-11548-1-git-send-email-zhaoshenglong@huawei.com>
+References: <1446186123-11548-1-git-send-email-zhaoshenglong@huawei.com>
+Message-ID: <1446186123-11548-2-git-send-email-zhaoshenglong@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The NAND controller on NS2 SoC is compatible with existing
-BRCM IPROC NAND driver so let's enable it in NS2 DT and
-NS2 SVK DT.
+From: Shannon Zhao <shannon.zhao@linaro.org>
 
-This patch also fixes use of node labels in ns2-svk.dts.
+To use the ARMv8 PMU related register defines from the KVM code,
+we move the relevant definitions to asm/pmu.h header file.
 
-Signed-off-by: Anup Patel <anup.patel@broadcom.com>
-Reviewed-by: Ray Jui <rjui@broadcom.com>
-Reviewed-by: Scott Branden <sbranden@broadcom.com>
-Reviewed-by: Brian Norris <computersforpeace@gmail.com>
+Signed-off-by: Anup Patel <anup.patel@linaro.org>
+Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
 ---
- arch/arm64/boot/dts/broadcom/ns2-svk.dts | 30 ++++++++++++++++++++----------
- arch/arm64/boot/dts/broadcom/ns2.dtsi    | 14 ++++++++++++++
- 2 files changed, 34 insertions(+), 10 deletions(-)
+ arch/arm64/include/asm/pmu.h   | 45 ++++++++++++++++++++++++++++++++++++++++++
+ arch/arm64/kernel/perf_event.c | 35 --------------------------------
+ 2 files changed, 45 insertions(+), 35 deletions(-)
 
-diff --git a/arch/arm64/boot/dts/broadcom/ns2-svk.dts b/arch/arm64/boot/dts/broadcom/ns2-svk.dts
-index e5950d5..6bb3d4d 100644
---- a/arch/arm64/boot/dts/broadcom/ns2-svk.dts
-+++ b/arch/arm64/boot/dts/broadcom/ns2-svk.dts
-@@ -50,18 +50,28 @@
- 		device_type = "memory";
- 		reg = <0x000000000 0x80000000 0x00000000 0x40000000>;
- 	};
-+};
+diff --git a/arch/arm64/include/asm/pmu.h b/arch/arm64/include/asm/pmu.h
+index b7710a5..b9f394a 100644
+--- a/arch/arm64/include/asm/pmu.h
++++ b/arch/arm64/include/asm/pmu.h
+@@ -19,6 +19,51 @@
+ #ifndef __ASM_PMU_H
+ #define __ASM_PMU_H
  
--	soc: soc {
--		i2c0: i2c at 66080000 {
--			status = "ok";
--		};
-+&i2c0 {
-+	status = "ok";
-+};
++#define ARMV8_MAX_COUNTERS      32
++#define ARMV8_COUNTER_MASK      (ARMV8_MAX_COUNTERS - 1)
++
++/*
++ * Per-CPU PMCR: config reg
++ */
++#define ARMV8_PMCR_E		(1 << 0) /* Enable all counters */
++#define ARMV8_PMCR_P		(1 << 1) /* Reset all counters */
++#define ARMV8_PMCR_C		(1 << 2) /* Cycle counter reset */
++#define ARMV8_PMCR_D		(1 << 3) /* CCNT counts every 64th cpu cycle */
++#define ARMV8_PMCR_X		(1 << 4) /* Export to ETM */
++#define ARMV8_PMCR_DP		(1 << 5) /* Disable CCNT if non-invasive debug*/
++#define	ARMV8_PMCR_N_SHIFT	11	 /* Number of counters supported */
++#define	ARMV8_PMCR_N_MASK	0x1f
++#define	ARMV8_PMCR_MASK		0x3f	 /* Mask for writable bits */
++
++/*
++ * PMCNTEN: counters enable reg
++ */
++#define	ARMV8_CNTEN_MASK	0xffffffff	/* Mask for writable bits */
++
++/*
++ * PMINTEN: counters interrupt enable reg
++ */
++#define	ARMV8_INTEN_MASK	0xffffffff	/* Mask for writable bits */
++
++/*
++ * PMOVSR: counters overflow flag status reg
++ */
++#define	ARMV8_OVSR_MASK		0xffffffff	/* Mask for writable bits */
++#define	ARMV8_OVERFLOWED_MASK	ARMV8_OVSR_MASK
++
++/*
++ * PMXEVTYPER: Event selection reg
++ */
++#define	ARMV8_EVTYPE_MASK	0xc80003ff	/* Mask for writable bits */
++#define	ARMV8_EVTYPE_EVENT	0x3ff		/* Mask for EVENT bits */
++
++/*
++ * Event filters for PMUv3
++ */
++#define	ARMV8_EXCLUDE_EL1	(1 << 31)
++#define	ARMV8_EXCLUDE_EL0	(1 << 30)
++#define	ARMV8_INCLUDE_EL2	(1 << 27)
++
+ #ifdef CONFIG_HW_PERF_EVENTS
  
--		i2c1: i2c at 660b0000 {
--			status = "ok";
--		};
-+&i2c1 {
-+	status = "ok";
-+};
-+
-+&uart3 {
-+	status = "ok";
-+};
+ /* The events for a given PMU register set. */
+diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
+index f9a74d4..534e8ad 100644
+--- a/arch/arm64/kernel/perf_event.c
++++ b/arch/arm64/kernel/perf_event.c
+@@ -741,9 +741,6 @@ static const unsigned armv8_pmuv3_perf_cache_map[PERF_COUNT_HW_CACHE_MAX]
+ #define	ARMV8_IDX_COUNTER0	1
+ #define	ARMV8_IDX_COUNTER_LAST	(ARMV8_IDX_CYCLE_COUNTER + cpu_pmu->num_events - 1)
  
--		uart3: serial at 66130000 {
--			status = "ok";
--		};
-+&nand {
-+	nandcs at 0 {
-+		compatible = "brcm,nandcs";
-+		reg = <0>;
-+		nand-ecc-mode = "hw";
-+		nand-ecc-strength = <8>;
-+		nand-ecc-step-size = <512>;
-+		#address-cells = <1>;
-+		#size-cells = <1>;
- 	};
- };
-diff --git a/arch/arm64/boot/dts/broadcom/ns2.dtsi b/arch/arm64/boot/dts/broadcom/ns2.dtsi
-index f603277..9610822 100644
---- a/arch/arm64/boot/dts/broadcom/ns2.dtsi
-+++ b/arch/arm64/boot/dts/broadcom/ns2.dtsi
-@@ -212,5 +212,19 @@
- 			compatible = "brcm,iproc-rng200";
- 			reg = <0x66220000 0x28>;
- 		};
-+
-+		nand: nand at 66460000 {
-+			compatible = "brcm,nand-iproc", "brcm,brcmnand-v6.1";
-+			reg = <0x66460000 0x600>,
-+			      <0x67015408 0x600>,
-+			      <0x66460f00 0x20>;
-+			reg-names = "nand", "iproc-idm", "iproc-ext";
-+			interrupts = <GIC_SPI 420 IRQ_TYPE_LEVEL_HIGH>;
-+
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			brcm,nand-has-wp;
-+		};
- 	};
- };
+-#define	ARMV8_MAX_COUNTERS	32
+-#define	ARMV8_COUNTER_MASK	(ARMV8_MAX_COUNTERS - 1)
+-
+ /*
+  * ARMv8 low level PMU access
+  */
+@@ -754,38 +751,6 @@ static const unsigned armv8_pmuv3_perf_cache_map[PERF_COUNT_HW_CACHE_MAX]
+ #define	ARMV8_IDX_TO_COUNTER(x)	\
+ 	(((x) - ARMV8_IDX_COUNTER0) & ARMV8_COUNTER_MASK)
+ 
+-/*
+- * Per-CPU PMCR: config reg
+- */
+-#define ARMV8_PMCR_E		(1 << 0) /* Enable all counters */
+-#define ARMV8_PMCR_P		(1 << 1) /* Reset all counters */
+-#define ARMV8_PMCR_C		(1 << 2) /* Cycle counter reset */
+-#define ARMV8_PMCR_D		(1 << 3) /* CCNT counts every 64th cpu cycle */
+-#define ARMV8_PMCR_X		(1 << 4) /* Export to ETM */
+-#define ARMV8_PMCR_DP		(1 << 5) /* Disable CCNT if non-invasive debug*/
+-#define	ARMV8_PMCR_N_SHIFT	11	 /* Number of counters supported */
+-#define	ARMV8_PMCR_N_MASK	0x1f
+-#define	ARMV8_PMCR_MASK		0x3f	 /* Mask for writable bits */
+-
+-/*
+- * PMOVSR: counters overflow flag status reg
+- */
+-#define	ARMV8_OVSR_MASK		0xffffffff	/* Mask for writable bits */
+-#define	ARMV8_OVERFLOWED_MASK	ARMV8_OVSR_MASK
+-
+-/*
+- * PMXEVTYPER: Event selection reg
+- */
+-#define	ARMV8_EVTYPE_MASK	0xc80003ff	/* Mask for writable bits */
+-#define	ARMV8_EVTYPE_EVENT	0x3ff		/* Mask for EVENT bits */
+-
+-/*
+- * Event filters for PMUv3
+- */
+-#define	ARMV8_EXCLUDE_EL1	(1 << 31)
+-#define	ARMV8_EXCLUDE_EL0	(1 << 30)
+-#define	ARMV8_INCLUDE_EL2	(1 << 27)
+-
+ static inline u32 armv8pmu_pmcr_read(void)
+ {
+ 	u32 val;
 -- 
-1.9.1
+2.0.4
