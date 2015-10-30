@@ -1,81 +1,54 @@
 From: anup.patel@broadcom.com (Anup Patel)
-Date: Fri, 30 Oct 2015 11:48:56 +0530
-Subject: [PATCH v4 1/3] mtd: brcmnand: factor out CFG and CFG_EXT bitfields
+Date: Fri, 30 Oct 2015 11:48:57 +0530
+Subject: [PATCH v4 2/3] mtd: brcmnand: Force 8bit mode before doing
+ nand_scan_ident()
 In-Reply-To: <1446185938-17520-1-git-send-email-anup.patel@broadcom.com>
 References: <1446185938-17520-1-git-send-email-anup.patel@broadcom.com>
-Message-ID: <1446185938-17520-2-git-send-email-anup.patel@broadcom.com>
+Message-ID: <1446185938-17520-3-git-send-email-anup.patel@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Brian Norris <computersforpeace@gmail.com>
+Just like other NAND controllers, the NAND READID command only works
+in 8bit mode for all versions of BRCMNAND controller.
 
-Use enum instead of magic numbers for CFG and CFG_EXT bitfields.
+This patch forces 8bit mode for each NAND CS in brcmnand_init_cs()
+before doing nand_scan_ident() to ensure that BRCMNAND controller
+is in 8bit mode when NAND READID command is issued.
 
-Signed-off-by: Brian Norris <computersforpeace@gmail.com>
-Tested-by: Anup Patel <anup.patel@broadcom.com>
+Signed-off-by: Anup Patel <anup.patel@broadcom.com>
+Reviewed-by: Ray Jui <rjui@broadcom.com>
+Reviewed-by: Scott Branden <sbranden@broadcom.com>
 ---
- drivers/mtd/nand/brcmnand/brcmnand.c | 38 +++++++++++++++++++++++++++++-------
- 1 file changed, 31 insertions(+), 7 deletions(-)
+ drivers/mtd/nand/brcmnand/brcmnand.c | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
 diff --git a/drivers/mtd/nand/brcmnand/brcmnand.c b/drivers/mtd/nand/brcmnand/brcmnand.c
-index 4cba03d..dda96fa 100644
+index dda96fa..641591d 100644
 --- a/drivers/mtd/nand/brcmnand/brcmnand.c
 +++ b/drivers/mtd/nand/brcmnand/brcmnand.c
-@@ -344,6 +344,28 @@ static const u8 brcmnand_cs_offsets_cs0[] = {
- 	[BRCMNAND_CS_TIMING2]		= 0x14,
- };
+@@ -1912,6 +1912,7 @@ static int brcmnand_init_cs(struct brcmnand_host *host)
+ 	struct mtd_info *mtd;
+ 	struct nand_chip *chip;
+ 	int ret;
++	u16 cfg_offs;
+ 	struct mtd_part_parser_data ppdata = { .of_node = dn };
  
-+/*
-+ * Bitfields for the CFG and CFG_EXT registers. Pre-v7.1 controllers only had
-+ * one config register, but once the bitfields overflowed, newer controllers
-+ * (v7.1 and newer) added a CFG_EXT register and shuffled a few fields around.
-+ */
-+enum {
-+	CFG_BLK_ADR_BYTES_SHIFT		= 8,
-+	CFG_COL_ADR_BYTES_SHIFT		= 12,
-+	CFG_FUL_ADR_BYTES_SHIFT		= 16,
-+	CFG_BUS_WIDTH_SHIFT		= 23,
-+	CFG_BUS_WIDTH			= BIT(CFG_BUS_WIDTH_SHIFT),
-+	CFG_DEVICE_SIZE_SHIFT		= 24,
-+
-+	/* Only for pre-v7.1 (with no CFG_EXT register) */
-+	CFG_PAGE_SIZE_SHIFT		= 20,
-+	CFG_BLK_SIZE_SHIFT		= 28,
-+
-+	/* Only for v7.1+ (with CFG_EXT register) */
-+	CFG_EXT_PAGE_SIZE_SHIFT		= 0,
-+	CFG_EXT_BLK_SIZE_SHIFT		= 4,
-+};
-+
- /* BRCMNAND_INTFC_STATUS */
- enum {
- 	INTFC_FLASH_STATUS		= GENMASK(7, 0),
-@@ -1720,17 +1742,19 @@ static int brcmnand_set_cfg(struct brcmnand_host *host,
- 	}
- 	device_size = fls64(cfg->device_size) - fls64(BRCMNAND_MIN_DEVSIZE);
+ 	ret = of_property_read_u32(dn, "reg", &host->cs);
+@@ -1954,6 +1955,15 @@ static int brcmnand_init_cs(struct brcmnand_host *host)
  
--	tmp = (cfg->blk_adr_bytes << 8) |
--		(cfg->col_adr_bytes << 12) |
--		(cfg->ful_adr_bytes << 16) |
--		(!!(cfg->device_width == 16) << 23) |
--		(device_size << 24);
-+	tmp = (cfg->blk_adr_bytes << CFG_BLK_ADR_BYTES_SHIFT) |
-+		(cfg->col_adr_bytes << CFG_COL_ADR_BYTES_SHIFT) |
-+		(cfg->ful_adr_bytes << CFG_FUL_ADR_BYTES_SHIFT) |
-+		(!!(cfg->device_width == 16) << CFG_BUS_WIDTH_SHIFT) |
-+		(device_size << CFG_DEVICE_SIZE_SHIFT);
- 	if (cfg_offs == cfg_ext_offs) {
--		tmp |= (page_size << 20) | (block_size << 28);
-+		tmp |= (page_size << CFG_PAGE_SIZE_SHIFT) |
-+		       (block_size << CFG_BLK_SIZE_SHIFT);
- 		nand_writereg(ctrl, cfg_offs, tmp);
- 	} else {
- 		nand_writereg(ctrl, cfg_offs, tmp);
--		tmp = page_size | (block_size << 4);
-+		tmp = (page_size << CFG_EXT_PAGE_SIZE_SHIFT) |
-+		      (block_size << CFG_EXT_BLK_SIZE_SHIFT);
- 		nand_writereg(ctrl, cfg_ext_offs, tmp);
- 	}
+ 	chip->controller = &ctrl->controller;
+ 
++	/*
++	 * The bootloader might have configured 16bit mode but
++	 * NAND READID command only works in 8bit mode. We force
++	 * 8bit mode here to ensure that NAND READID commands works.
++	 */
++	cfg_offs = brcmnand_cs_offset(ctrl, host->cs, BRCMNAND_CS_CFG);
++	nand_writereg(ctrl, cfg_offs,
++		      nand_readreg(ctrl, cfg_offs) & CFG_BUS_WIDTH);
++
+ 	if (nand_scan_ident(mtd, 1, NULL))
+ 		return -ENXIO;
  
 -- 
 1.9.1
