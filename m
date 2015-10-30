@@ -1,46 +1,46 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Fri, 30 Oct 2015 16:57:58 +0900
-Subject: [PATCH v5 07/14] arm64: renesas: salvator-x: Sound SSI PIO support
-In-Reply-To: <877fm5gk33.wl%kuninori.morimoto.gx@renesas.com>
-References: <1446161280-23097-1-git-send-email-horms+renesas@verge.net.au>
- <1446161280-23097-8-git-send-email-horms+renesas@verge.net.au>
- <877fm5gk33.wl%kuninori.morimoto.gx@renesas.com>
-Message-ID: <20151030075756.GG31252@verge.net.au>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Fri, 30 Oct 2015 10:00:35 +0200
+Subject: [PATCH v2 0/3] dmaengine: ti-dma-crossbar: channel reserving and
+ edma3-tpcc support
+Message-ID: <1446192038-11158-1-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 30, 2015 at 02:40:04AM +0000, Kuninori Morimoto wrote:
-> 
-> Hi Simon
-> 
-> Thank you for your patch.
-> 
-> > From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-> > 
-> > This patch adds PIO sound support for Salvator-X board.
-> > 
-> > Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> > ---
-> (snip)
-> > +	cs2000: clk_multiplier at 4f {
-> > +		#clock-cells = <0>;
-> > +		compatible = "cirrus,cs2000-cp";
-> > +		reg = <0x4f>;
-> > +		clocks = <&rcar_sound 0>, <&x12_clk>;
-> > +		clock-names = "clk_in", "ref_clk";
-> > +		clock-frequency = <24576000>; /* 1/1 divide */
-> > +	};
-> > +};
-> 
-> I have posted this cs2000 driver to clk ML, but not yet accepted.
-> And new version can't use "clock-frequency".
-> Actually, Salvator-X sound can work without cs2000,
-> but it can be limited sound rate
-> Do you want to avoid cs2000 until it was accepted ?
-> Then, I can create and post whole patch set.
-> Or we can avoid sound support so far ?
+Hi,
 
-If we can have partial sound support without cs2000 now,
-and then fuller support with cs2000 later, then that seems
-like a good way to proceed to me.
+Changes since v1:
+- Fixed issue introduced by the bitops patch: wrong error check, also switch to
+  use find_first_zero_bit() instead of find_next_zero_bit()
+
+Cover letter:
+
+This series depends on the eDMA work I have done, which has been now applied:
+https://lkml.org/lkml/2015/10/16/64
+
+DRA7 family of chips have both sDMA and eDMA. Currently only sDMA can be used
+becasue the old driver stack for eDMA did not allowed integration w/o hacks.
+
+Due to the nature of eDMA the crossbar needs to know which eDMA events it can
+use to map incoming events towards the eDMA. In eDMA a channel is wired to be
+used with one specific event. For example eDMA event 14 can only be handled by
+eDMA channel 14.
+The eDMA itself can be shared by different processors in the system (ARM, DSP,
+etc) and since ARM/Linux is the master we need to know which channels are used
+by other cores. Also we need to mask out channels used for memcpy from the
+events we use for HW triggers.
+
+Regards,
+Peter
+---
+Peter Ujfalusi (3):
+  dmaengine: ti-dma-crossbar: dra7: Use bitops instead of idr
+  dmaengine: ti-dma-crossbar: dra7: Support for reserving DMA event
+    ranges
+  dmaengine: ti-dma-crossbar: dra7: Support for eDMA with new bindings
+
+ .../devicetree/bindings/dma/ti-dma-crossbar.txt    |  6 ++
+ drivers/dma/ti-dma-crossbar.c                      | 81 +++++++++++++++++++---
+ 2 files changed, 76 insertions(+), 11 deletions(-)
+
+-- 
+2.6.1
