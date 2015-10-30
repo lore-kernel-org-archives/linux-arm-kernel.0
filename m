@@ -1,78 +1,41 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 30 Oct 2015 11:00:10 +0000
-Subject: [PATCH 0/3] Revert arm64 cache geometry
-In-Reply-To: <1446159896024.99950@nvidia.com>
-References: <1446068637-11509-1-git-send-email-avanbrunt@nvidia.com>
- <20151029114005.GB389@arm.com> <1446159896024.99950@nvidia.com>
-Message-ID: <20151030110010.GA2854@e104818-lin.cambridge.arm.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Fri, 30 Oct 2015 12:06:04 +0100
+Subject: [PATCH 07/11] pinctrl: use ngpios propety from DT
+In-Reply-To: <56323177.6010605@openwrt.org>
+References: <1445233398-27129-1-git-send-email-pramodku@broadcom.com>
+ <1445233398-27129-8-git-send-email-pramodku@broadcom.com>
+ <CACRpkdY1GDs6ypqCiY3iiv3DkfnHchnY+bWPoCqU=_sgn9f5vQ@mail.gmail.com>
+ <0C803592FC378B4E83922050AB46442A2AD742F0@SJEXCHMB10.corp.ad.broadcom.com>
+ <CACRpkdb3FT0K+atNOTXL_e8Fs7Nm0VDLe0RPiiBKK=8o=MHqKQ@mail.gmail.com>
+ <56323177.6010605@openwrt.org>
+Message-ID: <CACRpkdZa6jX9k9XnSuZErGqf8R+Uznhj=i9OGDCZXXy0TZk5OA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 29, 2015 at 11:03:27PM +0000, Alexander Van Brunt wrote:
-> >My final concern is how this impacts userspace parsing
-> >/sys/devices/system/cpu/cpuX/cache/*. Do we need to stub that out with
-> >dummy values and extend the device-tree properties to allow inner-cache
-> >geometry to be described? I worry that simply removing the files under
-> >there could break more than it solves.
-> >
-> >Perhaps the right solution is to leave the cacheinfo code as-is and extend
-> >it so that it prefers to use DT, falling back to the registers if the
-> >properties are absent? That matches up with our treatment of MPIDR for
-> >topology too and reduces the risk of breaking any existing software.
-> 
-> I agree with Russel that the kernel really shouldn't be reporting the CPU cache
-> geometry at all.
+On Thu, Oct 29, 2015 at 3:47 PM, Jonas Gorski <jogo@openwrt.org> wrote:
 
-This would be the immediate reaction but people work around it in other
-ways like parsing the MIDR from /proc/cpuinfo and hard-coding cache
-topology in their code (when they are after a 1-2% improvement in an
-artificial benchmark that doesn't always have relevance to the real
-world). But, well, benchmarks are user space software that use a kernel
-provided ABI.
+> Using ngpios to restrict the amount of actually available GPIOs from
+> the possible amount of GPIOs seems a rather limited use, as rerouted
+> gpios are seldom at the end of the GPIO space.
 
-> I'll add that the problems he described are worse on systems
-> with more than one CPU micro-architecture like a big.LITTLE system. In those
-> systems the cache geometry of the CPU a thread is executing on can change
-> without notice.
+I need an example.
 
-This information is not meant to be continuously read at run-time but
-rather parsed once and choosing the best implementation that would be
-acceptable on all CPUs. Big.LITTLE is one of the reasons for such
-information where people would like to see the cache levels, some of
-them potentially common to all the clusters in the system.
+> So maybe it makes more sense to use ngpio as the number of
+> possible gpios and then have an additional "reserved-gpios"
+> bitmask / list of unavailable gpios?
 
-We've got repeated requests from the toolchain, graphics, Android people
-to expose such information, so we gave in and merged the patches. Since
-people are doing insane things in user space anyway, I'd rather have a
-standard interface for passing the information they need. Similarly, we
-have patches for exposing more of the CPUID space to user, though they
-are not merged yet.
+This idea is good, but let's not make upfront design until we have a
+piece of hardware that requires exactly this.
 
-> While I think that the Linux kernel should be practical, I think that it should
-> be written to work with the architectural behavior by default rather than the
-> way some processors behave. That is important because there are many
-> implementations of the ARM architecture. If we want all of them to run correctly
-> by default, then the default must be to use the architectural behavior.
+I sent a patch to the gpio.txt binding including a diplomatic statement
+on this...
 
-The Linux *kernel* is written to work with the architectural behaviour.
-What we are talking about here is user space making use of
-implementation specific behaviour.
+> Ideally those would be just consumed by a pinctrl instance, but I
+> guess that these are sometimes controlled through pinstrapping,
+> so there might be no driver to attach to them.
 
-> I think that by default, there should not be any
-> /sys/devices/system/cpu/cpu*/cache/index* nodes. Any user space application
-> that accesses these nodes already needs to handle N index* nodes. The N = 0 case
-> is valid. However, that assertion is not based on seeing any application that
-> uses the nodes.
+Uhmm.... Not quite following but all right... With gpio ranges the
+GPIO to pins are mapped, and they can switch functions at runtime.
 
-In general, user space should cope with not seeing these files,
-especially since it's new ABI and not present in older kernels. OTOH, it
-may directly try to access the current CPU information without bothering
-with the whole list (tough for big.LITTLE).
-
-BTW, it looks like I don't get any cache information on Juno with
-4.3-rc7, it says "Unable to detect cache hierarchy from DT for CPU 0". I
-thought the point of the patch you are trying to revert was to parse
-this information from the hardware registers. Sudeep, any idea?
-
--- 
-Catalin
+Yours,
+Linus Walleij
