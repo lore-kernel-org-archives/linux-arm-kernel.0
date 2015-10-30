@@ -1,124 +1,82 @@
-From: ariel@vanguardiasur.com.ar (Ariel D'Alessandro)
-Date: Fri, 30 Oct 2015 11:58:58 -0300
-Subject: [PATCH v2 2/4] nvmem: NXP LPC18xx EEPROM memory NVMEM driver
-In-Reply-To: <562E2CB1.80706@linaro.org>
-References: <1445275946-32653-1-git-send-email-ariel@vanguardiasur.com.ar>
- <1445275946-32653-3-git-send-email-ariel@vanguardiasur.com.ar>
- <CAGhQ9Vyg6sScq7yM=7judsMPHOc5VF2zf=7LPxmbmL7wF=vvgw@mail.gmail.com>
- <562E2CB1.80706@linaro.org>
-Message-ID: <563385B2.90403@vanguardiasur.com.ar>
+From: lauraa@codeaurora.org (Laura Abbott)
+Date: Fri, 30 Oct 2015 08:01:35 -0700
+Subject: arm64: about Add CONFIG_DEBUG_SET_MODULE_RONX suport
+In-Reply-To: <563335FF.5020400@huawei.com>
+References: <5633279A.7000003@huawei.com> <56332ADB.7030306@iogearbox.net>
+ <563335FF.5020400@huawei.com>
+Message-ID: <5633864F.6030203@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Srinivas,
+(cc-ing the mailing list. Please always remember to do that)
 
-El 26/10/15 a las 10:37, Srinivas Kandagatla escribi?:
-> 
-> 
-> On 24/10/15 23:04, Joachim Eastwood wrote:
->> Hi Ariel,
->>
->> On 19 October 2015 at 19:32, Ariel D'Alessandro
->> <ariel@vanguardiasur.com.ar> wrote:
->>> This commit adds support for NXP LPC18xx EEPROM memory found in NXP
->>> LPC185x/3x and LPC435x/3x/2x/1x devices.
->>>
->>> EEPROM size is 16384 bytes and it can be entirely read and
->>> written/erased with 1 word (4 bytes) granularity. The last page
->>> (128 bytes) contains the EEPROM initialization data and is not writable.
->>>
->>> Erase/program time is less than 3ms. The EEPROM device requires a
->>> ~1500 kHz clock (min 800 kHz, max 1600 kHz) that is generated dividing
->>> the system bus clock by the division factor, contained in the divider
->>> register (minus 1 encoded).
->>>
->>> Signed-off-by: Ariel D'Alessandro <ariel@vanguardiasur.com.ar>
->>> ---
->>>   drivers/nvmem/Kconfig          |   9 ++
->>>   drivers/nvmem/Makefile         |   2 +
->>>   drivers/nvmem/lpc18xx_eeprom.c | 266
->>> +++++++++++++++++++++++++++++++++++++++++
->>>   3 files changed, 277 insertions(+)
->>>   create mode 100644 drivers/nvmem/lpc18xx_eeprom.c
->>
->>> +static int lpc18xx_eeprom_gather_write(void *context, const void *reg,
->>> +                                      size_t reg_size, const void *val,
->>> +                                      size_t val_size)
->>> +{
->>> +       struct lpc18xx_eeprom_dev *eeprom = context;
->>> +       unsigned int offset = *(u32 *)reg;
->>> +
->>> +       /* 3 ms of erase/program time between each writing */
->>> +       while (val_size) {
->>> +               writel(*(u32 *)val, eeprom->mem_base + offset);
->>> +               usleep_range(3000, 4000);
->>> +               val_size -= eeprom->val_bytes;
->>> +               val += eeprom->val_bytes;
->>> +               offset += eeprom->val_bytes;
->>> +       }
->>
->> What happens here if 'val_size' is less than 4 or not dividable by 4?
->> Same thing for 'offset'.
->>
->> I tested the driver from sysfs by writing strings into the nvmem-file
->> with echo. Writing a string not dividable by 4 seems to hang the
->> system.
->>
-> 
-> I think I know the issue here:
-> Could you try this patch:
-> 
-> -------------------------------->cut<----------------------------------
-> From 8cae10eff8ea8da9c5a8058ff75abeeddd8a8224 Mon Sep 17 00:00:00 2001
-> From: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
-> Date: Mon, 26 Oct 2015 13:30:24 +0000
-> Subject: [PATCH] nvmem: core: return error for non word aligned bytes
-> 
-> nvmem providers have restrictions on register strides, so return error
-> code when users attempt to read/write buffers with sizes which are not
-> aligned to the word boundary.
-> 
-> Without this patch the userspace would continue to try as it does not
-> get any error from the nvmem core, resulting in a hang.
-> 
-> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
-> ---
->  drivers/nvmem/core.c | 6 ++++++
->  1 file changed, 6 insertions(+)
-> 
-> diff --git a/drivers/nvmem/core.c b/drivers/nvmem/core.c
-> index 6fd4e5a..9d11d98 100644
-> --- a/drivers/nvmem/core.c
-> +++ b/drivers/nvmem/core.c
-> @@ -70,6 +70,9 @@ static ssize_t bin_attr_nvmem_read(struct file *filp,
-> struct kobject *kobj,
->      if (pos >= nvmem->size)
->          return 0;
-> 
-> +    if (count < nvmem->word_size)
-> +        return -EINVAL;
-> +
->      if (pos + count > nvmem->size)
->          count = nvmem->size - pos;
-> 
-> @@ -95,6 +98,9 @@ static ssize_t bin_attr_nvmem_write(struct file *filp,
-> struct kobject *kobj,
->      if (pos >= nvmem->size)
->          return 0;
-> 
-> +    if (count < nvmem->word_size)
-> +        return -EINVAL;
-> +
->      if (pos + count > nvmem->size)
->          count = nvmem->size - pos;
-> 
+Hi,
 
-Patch looks good to me. I think that it solves the issue.
-I don't have the board here right now, so I'll check it ASAP and give
-some feedback.
+On 10/30/15 2:18 AM, Xishi Qiu wrote:
+> On 2015/10/30 16:31, Daniel Borkmann wrote:
+>
+>> On 10/30/2015 09:17 AM, zhong jiang wrote:
+>>> hi,can I ask you a question ? say , you provide the patch is restricted within
+>>> the module is used. whether it can be used to other area ofmemory like x86_64.
+>>> what is the limit?
+>>
+>> Sorry, I don't quite understand the question. You mean ...
+>>
+>> commit e6a2e1b6c24a3993ffbb69a05dda202d2830ad90
+>> Author: Daniel Borkmann <daniel@iogearbox.net>
+>> Date:   Sun Mar 1 10:14:39 2015 +0000
+>>
+>>      arm64: mm: unexport set_memory_ro and set_memory_rw
+>>
+>>      This effectively unexports set_memory_ro and set_memory_rw functions from
+>>      commit 11d91a770f1f ("arm64: Add CONFIG_DEBUG_SET_MODULE_RONX support").
+>>
+>>      No module user of those is in mainline kernel and we explicitly do not want
+>>      modules to use these functions, as they i.e. RO-protect eBPF (interpreted and
+>>      JIT'ed) images from malicious modifications/bugs.
+>>
+>>      Outside of eBPF scope, I believe also other set_memory_* functions should
+>>      be unexported on arm64 due to non-existant mainline module user. Laura
+>>      mentioned that they have some uses for modules doing set_memory_*, but
+>>      none that are in mainline and it's unclear if they would ever get there.
+>>
+>>      Signed-off-by: Daniel Borkmann <daniel@iogearbox.net>
+>>      Acked-by: Alexei Starovoitov <ast@plumgrid.com>
+>>      Acked-by: Laura Abbott <lauraa@codeaurora.org>
+>>      Signed-off-by: Will Deacon <will.deacon@arm.com>
+>>
+>> ...? What is your question in relation to this?
+>>
+>> ( x86_64 also has an implementation of set_memory_ro(). )
+>>
+>> Cheers,
+>> Daniel
+>>
+>
+> Hi Daniel,
+>
+> Sorry for didn't saying it clearly. I find this interface(set_memory_ro/rw) can
+> only be used in module address. So why not extend the function? e.g. like x86,
+> it can be used in direct mapping address too.
+>
+> Is there some limits in arm64 or we will do this later?
+>
 
-Thanks!
+arm64 maps low mem (all direct mapped memory on arm64) with section
+mappings for performance. set_memory_ro/rw works on PAGE_SIZE
+granularity so if we wanted to use those functions on direct mapped
+memory we would need to break down the section mappings. On arm,
+this was a pain due to the TLB maintaince requried. On arm64, less
+so but we still lose the benefit of the section mappings.
 
--- 
-Ariel D'Alessandro, VanguardiaSur
-www.vanguardiasur.com.ar
+Do you have a use case in mind for wanting to use set_memory_ro/rw
+outside of the module area?
+
+> One more question, in arm64, create_mapping() will create the page table of direct
+> mapping area, is the page 2M or 1G? I mean like the flag PAGE_KERNEL_LARGE in x86.
+>
+
+It will try to do 1G if it can.
+
+Thanks,
+Laura
