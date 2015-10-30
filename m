@@ -1,56 +1,42 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Sat, 31 Oct 2015 00:47:11 +0100
-Subject: [PATCH v2 1/4] clocksource: rockchip: Make the driver more
- compatible
-In-Reply-To: <56334995.6090103@linaro.org>
-References: <1443147298-12603-1-git-send-email-wxt@rock-chips.com>
- <5632E765.4010207@gmail.com> <56334995.6090103@linaro.org>
-Message-ID: <21587719.mnFBFBzBeI@phil>
+From: bjorn.andersson@sonymobile.com (Bjorn Andersson)
+Date: Fri, 30 Oct 2015 16:50:39 -0700
+Subject: [PATCH v3 2/3] iio: light: lm3533-als: Print error message on invalid
+ resistance
+In-Reply-To: <1446249040-16552-1-git-send-email-bjorn.andersson@sonymobile.com>
+References: <1446249040-16552-1-git-send-email-bjorn.andersson@sonymobile.com>
+Message-ID: <1446249040-16552-2-git-send-email-bjorn.andersson@sonymobile.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel,
+Print an error message to indicate that invalid configuration data was
+provided in the platform_data, rather than just aborting initialization.
 
-Am Freitag, 30. Oktober 2015, 11:42:29 schrieb Daniel Lezcano:
-> On 10/30/2015 04:43 AM, Caesar Wang wrote:
-> > Hi Daniel,
-> >
-> > ? 2015?10?01? 03:14, Heiko St?bner ??:
-> >> Hi Daniel,
-> >>
-> >> Am Dienstag, 29. September 2015, 06:18:03 schrieb Daniel Lezcano:
-> >>> On 09/25/2015 04:14 AM, Caesar Wang wrote:
-> >>>> Build the arm64 SoCs (e.g.: RK3368) on Rockchip platform,
-> >>>> There are some failure with build up on timer driver for rockchip.
-> >>>>
-> >>>> Says:
-> >>>> /tmp/ccdAnNy5.s:47: Error: missing immediate expression at  operand
-> >>>> 1 --
-> >>>> `dsb`
-> >>>> ...
-> >>>>
-> >>>> The problem was different semantics of dsb on btw arm32 and arm64,
-> >>>> Here we can convert the dsb with insteading of dsb(sy).The "sy" param
-> >>>> is the default which you are allow to omit, so on arm32 dsb()and
-> >>>> dsb(sy)
-> >>>> are the same.
-> >>>>
-> >>>> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
-> >>> Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
-> >> as you have "just" Acked these patches, I guess you are expecting them
-> >> to go
-> >> through the same tree as the devicetree changes, right?
-> >
-> > I'm wonder if someone will apply this series patchs but the wait.:-)
-> > In fact, I'm no sure that the Acked is really meaning.:-
-> 
-> Yes, by acking the patch I say I am ok with it and I agree it can go 
-> through another tree.
+Signed-off-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
+---
 
-although I guess the two clocksource changes could very well just go
-through your tree. dsb() -> dsb(sy) is supposed to be equal and the second
-one is just cosmetics.  The Kconfig and dts changes need to wait in any case
-for 4.5 ... but I guess that may be true for the clocksource changes as well?
+This patch can be picked independently of the other 2, but included in the
+series for "completeness".
 
+No changes since v1 in this patch.
 
-Heiko
+ drivers/iio/light/lm3533-als.c | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/iio/light/lm3533-als.c b/drivers/iio/light/lm3533-als.c
+index 076bc46fad03..e56937c40a18 100644
+--- a/drivers/iio/light/lm3533-als.c
++++ b/drivers/iio/light/lm3533-als.c
+@@ -743,8 +743,10 @@ static int lm3533_als_set_resistor(struct lm3533_als *als, u8 val)
+ {
+ 	int ret;
+ 
+-	if (val < LM3533_ALS_RESISTOR_MIN || val > LM3533_ALS_RESISTOR_MAX)
++	if (val < LM3533_ALS_RESISTOR_MIN || val > LM3533_ALS_RESISTOR_MAX) {
++		dev_err(&als->pdev->dev, "invalid resistor value\n");
+ 		return -EINVAL;
++	};
+ 
+ 	ret = lm3533_write(als->lm3533, LM3533_REG_ALS_RESISTOR_SELECT, val);
+ 	if (ret) {
+-- 
+2.4.2
