@@ -1,41 +1,60 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Sat, 31 Oct 2015 00:01:01 +0800
-Subject: [PATCH 06/19] clk: sunxi: Add Allwinner R8 AHB gates support
-In-Reply-To: <1446214865-3972-7-git-send-email-maxime.ripard@free-electrons.com>
-References: <1446214865-3972-1-git-send-email-maxime.ripard@free-electrons.com>
- <1446214865-3972-7-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <CAGb2v64ErryRq+-fToWihKONO5tgPxyydZ78gzsYYYJtOMGxWw@mail.gmail.com>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Fri, 30 Oct 2015 16:11:17 +0000 (UTC)
+Subject: [PATCH v3 0/3] ARM: OMAP2+ McASP(3) support for DRA7xx family
+In-Reply-To: <1446191700-11057-1-git-send-email-peter.ujfalusi@ti.com>
+References: <1446191700-11057-1-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <alpine.DEB.2.02.1510301603530.7580@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 30, 2015 at 10:20 PM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> The R8 has yet another array of gates for AHB. Let's add it to the list of
-> compatibles we can deal with.
->
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> ---
->  drivers/clk/sunxi/clk-simple-gates.c | 2 ++
->  1 file changed, 2 insertions(+)
->
-> diff --git a/drivers/clk/sunxi/clk-simple-gates.c b/drivers/clk/sunxi/clk-simple-gates.c
-> index 5666c767fa14..e3190a8687a8 100644
-> --- a/drivers/clk/sunxi/clk-simple-gates.c
-> +++ b/drivers/clk/sunxi/clk-simple-gates.c
-> @@ -158,5 +158,7 @@ CLK_OF_DECLARE(sun5i_a10s_ahb, "allwinner,sun5i-a10s-ahb-gates-clk",
->                sun4i_a10_ahb_init);
->  CLK_OF_DECLARE(sun5i_a13_ahb, "allwinner,sun5i-a13-ahb-gates-clk",
->                sun4i_a10_ahb_init);
-> +CLK_OF_DECLARE(sun5i_r8_ahb, "allwinner,sun5i-r8-ahb-gates-clk",
-> +              sun4i_a10_ahb_init);
->  CLK_OF_DECLARE(sun7i_a20_ahb, "allwinner,sun7i-a20-ahb-gates-clk",
->                sun4i_a10_ahb_init);
-> --
-> 2.6.2
->
+Hi P?ter
 
-Please also update Documentation/devicetree/bindings/clock/sunxi.txt
+On Fri, 30 Oct 2015, Peter Ujfalusi wrote:
 
-Otherwise,
+> Changes since v2:
+> - DTS patch added which is needed because of the clock handling changes
+> 
+> Felip Balbi reported that linux-next is broken right now since the DTS part of
+> the earlier series has been applied, but we do not have the mcasp hwmod in the
+> kernel:
+> ...
+> [    0.181029] platform 48468000.mcasp: Cannot lookup hwmod 'mcasp3'
+> ...
+> [    6.121072] davinci-mcasp 48468000.mcasp: _od_fail_runtime_resume: FIXME: missing hwmod/omap_dev info
+> [    6.130790] ------------[ cut here ]------------
+> [    6.135643] WARNING: CPU: 0 PID: 244 at drivers/bus/omap_l3_noc.c:147 l3_interrupt_handler+0x220/0x34c()
+> [    6.145576] 44000000.ocp:L3 Custom Error: MASTER MPU TARGET L4_PER2_P3 (Read): Data Access in User mode during Functional access
+> ...
+> 
+> This is the followup series for the hwmod changes needed to get audio working
+> on DRA7xx family based boards.
+> The DTS patches has been applied by Tony from the original series:
+> http://www.spinics.net/lists/linux-omap/msg121473.html
+> 
+> I have addressed your comments in the hwmod data and did some research also
+> regarding to the use of ahclkx as fclk in the original submission.
+> It turned out that McASP _needs_ all clocks to be enabled (fclk, iclk and
+> ahclkx/r) to be able to access registers. The original patch where we handled
+> the ahclkx as fclk worked, because the fclk clock got enabled in the HW w/o
+> any SW interaction.
+> All in all, the McASP found in DRA7 needs all clocks to be enabled.
+> To satisfy this I have introduced a new flag to hwmod, which means that the
+> listed optional clocks need to be handled alongside with the fclk clock.
 
-Acked-by: Chen-Yu Tsai <wens@csie.org>
+Thanks.  I'm happy with your series and appreciate the indepth 
+investigation.  As you probably saw last week, we've hit the limit for 
+v4.4-rc1:
+
+http://marc.info/?l=linux-omap&m=144564929721826&w=2
+
+This is why I haven't done anything with this series at this time.  
+Unfortunately I don't have a DRA7xx board, so I can't do any testing.  
+But if this series fixes a problem with DRA7xx in linux-next, we should 
+definitely merge it.
+
+Tony, if you want to take this now, you can either take it with my ack, or 
+I can send a pull request.  Or, if you'd prefer to take it for v4.4-rc2, 
+I can send a pull request after v4.4-rc1.
+
+
+- Paul
