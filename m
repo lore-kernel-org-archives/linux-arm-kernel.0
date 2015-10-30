@@ -1,55 +1,87 @@
-From: dianders@chromium.org (Douglas Anderson)
-Date: Fri, 30 Oct 2015 13:17:54 -0700
-Subject: [PATCH v2 2/2] ARM: dts: rockchip: Point rk3288 dwc2 usb at the full
- PHY reset
-In-Reply-To: <1446236275-12698-1-git-send-email-dianders@chromium.org>
-References: <1446236275-12698-1-git-send-email-dianders@chromium.org>
-Message-ID: <1446236275-12698-3-git-send-email-dianders@chromium.org>
+From: robh+dt@kernel.org (Rob Herring)
+Date: Fri, 30 Oct 2015 15:18:18 -0500
+Subject: [PATCH v2 1/3] devicetree: mfd: Add binding for the TI LM3533
+In-Reply-To: <20151030194150.GD24668@usrtlx11787.corpusers.net>
+References: <1445796586-28683-1-git-send-email-bjorn.andersson@sonymobile.com>
+ <1445963373-27790-1-git-send-email-bjorn.andersson@sonymobile.com>
+ <20151030184220.GJ4058@x1> <20151030194150.GD24668@usrtlx11787.corpusers.net>
+Message-ID: <CAL_Jsq+d+_JgiEfQpgD29AnD+bM7Nq94-5NTjK=LFHNg162UOw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Doug Anderson <dianders@chromium.org>
+On Fri, Oct 30, 2015 at 2:41 PM, Bjorn Andersson
+<bjorn.andersson@sonymobile.com> wrote:
+> On Fri 30 Oct 11:42 PDT 2015, Lee Jones wrote:
+>
+> Rob, please see the discussion regarding ti,boost-freq-khz below. Should
+> we both specify unit at the same time as we use standard units? (This is
+> not the first time I have to change this back and forth)
+>
+>> On Tue, 27 Oct 2015, Bjorn Andersson wrote:
+>>
+> [..]
+>> > +- ti,hwen-gpios:
+>> > +   Usage: required
+>> > +   Value type: <prop-encoded-array>
+>> > +   Definition: reference to gpio pin connected to the HWEN input; as
+>> > +               specified in "gpio/gpio.txt"
+>>
+>> Why have you made this a vendor binding?
+>>
+>> *-gpios is a generic property.
+>>
+>
+> Because the hwen gpio is a ti lm3533 specific thing, but I get what
+> you're saying. Will drop the prefix.
 
-The "host1" port (AKA the dwc2 port that isn't the OTG port) on rk3288
-has a hardware errata that causes everything to get confused when we get
-a remote wakeup.  We'll use the reset that's in the CRU to reset the
-port when it's in a bad state.
+Actually, that is fine. -gpios is common, but the rest is specific to
+a binding. But if it is a common function, then a common name would be
+fine. Enable gpios are common for example.
 
-Note that we add the reset to both dwc2 controllers even though only one
-has the errata in case we find some other use for this reset that's
-unrelated to the current hardware errata.  Only the host port gets the
-quirk property, though.
+>> > +- ti,als-supply:
+>> > +   Usage: optional
+>> > +   Value type: <prop-encoded-array>
+>> > +   Definition: reference to regulator powering the V_als input; as
+>> > +               specified in "regulator/regulator.txt"
+>>
+>> Same goes for *-supply.
+>>
+>
+> Same here
+>
+>> > +- ti,boost-freq-khz:
+>> > +   Usage: required
+>> > +   Value type: <u32>
+>> > +   Definition: switch-frequency of the boost converter, must be either:
+>> > +               500 or 1000
+>>
+>> Quite a few vendors are using 'boost' now.
+>>
+>
+> The ti,boost-low-freq from the bq25890 binding is the only other
+> property I can find that describes the same thing. So I'm not sure I
+> follow you here.
+>
+>> Perhaps we need to create a set of generic bindings.
+>>
+>> Also, we usually measure DT bindings in HZ, not kHz.
 
-Signed-off-by: Douglas Anderson <dianders@chromium.org>
----
-Changes in v2:
-- Use a full PHY reset for safety; no PHY changes needed for that.
+Surprisingly, there are not enough examples to draw much conclusion.
 
- arch/arm/boot/dts/rk3288.dtsi | 5 +++++
- 1 file changed, 5 insertions(+)
+> I thought we had defined frequencies to be in HZ and HZ only, but then
+> Rob's comment that I need to actually specify the unit doesn't make any
+> sense.
 
-diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
-index 906e938fb6bf..58773beb283f 100644
---- a/arch/arm/boot/dts/rk3288.dtsi
-+++ b/arch/arm/boot/dts/rk3288.dtsi
-@@ -496,6 +496,9 @@
- 		dr_mode = "host";
- 		phys = <&usbphy2>;
- 		phy-names = "usb2-phy";
-+		resets = <&cru SRST_USBHOST1_PHY>;
-+		reset-names = "phy-full-reset";
-+		snps,need-phy-full-reset-on-wake;
- 		status = "disabled";
- 	};
- 
-@@ -513,6 +516,8 @@
- 		g-use-dma;
- 		phys = <&usbphy0>;
- 		phy-names = "usb2-phy";
-+		resets = <&cru SRST_USBOTG_PHY>;
-+		reset-names = "phy-full-reset";
- 		status = "disabled";
- 	};
- 
--- 
-2.6.0.rc2.230.g3dd15c0
+I don't think we decided, but let's decide now. Go with Hz.
+
+Really, I first prefer the property name has units and second having
+standardized units. But if there is a common property without units, I
+prefer that even more.
+
+> Do we want these properties in a standard unit or do we want them
+> specifying the unit? Having both seems excessive.
+
+You mean "freq" would imply the units? No, we want the actual units in
+the property.
+
+Rob
