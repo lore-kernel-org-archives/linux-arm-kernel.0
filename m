@@ -1,43 +1,121 @@
-From: ykk@rock-chips.com (Yakir Yang)
-Date: Sat, 31 Oct 2015 11:15:47 +0800
-Subject: [PATCH v8 09/17] dt-bindings: add document for rockchip variant
- of analogix_dp
-In-Reply-To: <CAL_JsqLxkz43gj-O+r0LURg0_41SrDB7g8EAHwjxbytoUPijhA@mail.gmail.com>
-References: <1446020143-32645-1-git-send-email-ykk@rock-chips.com>
- <1446020905-10670-1-git-send-email-ykk@rock-chips.com>
- <CAL_JsqLxkz43gj-O+r0LURg0_41SrDB7g8EAHwjxbytoUPijhA@mail.gmail.com>
-Message-ID: <56343263.7090401@rock-chips.com>
+From: qiuxishi@huawei.com (Xishi Qiu)
+Date: Sat, 31 Oct 2015 11:56:34 +0800
+Subject: arm64: about Add CONFIG_DEBUG_SET_MODULE_RONX suport
+In-Reply-To: <5633872C.1000005@labbott.name>
+References: <5633279A.7000003@huawei.com> <56332ADB.7030306@iogearbox.net>
+ <563335FF.5020400@huawei.com> <5633864F.6030203@codeaurora.org>
+ <5633872C.1000005@labbott.name>
+Message-ID: <56343BF2.1070800@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+On 2015/10/30 23:05, Laura Abbott wrote:
 
-On 10/31/2015 12:46 AM, Rob Herring wrote:
-> On Wed, Oct 28, 2015 at 3:28 AM, Yakir Yang <ykk@rock-chips.com> wrote:
->> Rockchip DP driver is a helper driver of analogix_dp coder driver,
->> so most of the DT property should be descriped in analogix_dp document.
+> (Argh sent that from old e-mail address. I didn't even realize
+> I could send anymore. Please disregard the source of that old
+> e-mail if it ends up going through)
+> 
+> On 10/30/15 8:01 AM, Laura Abbott wrote:
+>> (cc-ing the mailing list. Please always remember to do that)
 >>
->> Reviewed-by: Heiko Stuebner <heiko@sntech.de>
->> Signed-off-by: Yakir Yang <ykk@rock-chips.com>
->> ---
-> Looks mostly fine to me.
->
-> [...]
->
->> +- rockchip,grf: this soc should set GRF regs, so need get grf here.
->> +
->> +- ports: contain a port node with endpoint definitions as defined in
->> +  Documentation/devicetree/bindings/media/video-interfaces.txt.
-> Please document that you have 2 ports 0 and 1, port0 has 2 endpoints
-> for ? and port1 has 1 endpoint connected to a panel(or another
-> bridge). Otherwise that is only evident from the example.
+>> Hi,
+>>
+>> On 10/30/15 2:18 AM, Xishi Qiu wrote:
+>>> On 2015/10/30 16:31, Daniel Borkmann wrote:
+>>>
+>>>> On 10/30/2015 09:17 AM, zhong jiang wrote:
+>>>>> hi,can I ask you a question ? say , you provide the patch is
+>>>>> restricted within
+>>>>> the module is used. whether it can be used to other area ofmemory
+>>>>> like x86_64.
+>>>>> what is the limit?
+>>>>
+>>>> Sorry, I don't quite understand the question. You mean ...
+>>>>
+>>>> commit e6a2e1b6c24a3993ffbb69a05dda202d2830ad90
+>>>> Author: Daniel Borkmann <daniel@iogearbox.net>
+>>>> Date:   Sun Mar 1 10:14:39 2015 +0000
+>>>>
+>>>>      arm64: mm: unexport set_memory_ro and set_memory_rw
+>>>>
+>>>>      This effectively unexports set_memory_ro and set_memory_rw
+>>>> functions from
+>>>>      commit 11d91a770f1f ("arm64: Add CONFIG_DEBUG_SET_MODULE_RONX
+>>>> support").
+>>>>
+>>>>      No module user of those is in mainline kernel and we explicitly
+>>>> do not want
+>>>>      modules to use these functions, as they i.e. RO-protect eBPF
+>>>> (interpreted and
+>>>>      JIT'ed) images from malicious modifications/bugs.
+>>>>
+>>>>      Outside of eBPF scope, I believe also other set_memory_*
+>>>> functions should
+>>>>      be unexported on arm64 due to non-existant mainline module user.
+>>>> Laura
+>>>>      mentioned that they have some uses for modules doing
+>>>> set_memory_*, but
+>>>>      none that are in mainline and it's unclear if they would ever
+>>>> get there.
+>>>>
+>>>>      Signed-off-by: Daniel Borkmann <daniel@iogearbox.net>
+>>>>      Acked-by: Alexei Starovoitov <ast@plumgrid.com>
+>>>>      Acked-by: Laura Abbott <lauraa@codeaurora.org>
+>>>>      Signed-off-by: Will Deacon <will.deacon@arm.com>
+>>>>
+>>>> ...? What is your question in relation to this?
+>>>>
+>>>> ( x86_64 also has an implementation of set_memory_ro(). )
+>>>>
+>>>> Cheers,
+>>>> Daniel
+>>>>
+>>>
+>>> Hi Daniel,
+>>>
+>>> Sorry for didn't saying it clearly. I find this
+>>> interface(set_memory_ro/rw) can
+>>> only be used in module address. So why not extend the function? e.g.
+>>> like x86,
+>>> it can be used in direct mapping address too.
+>>>
+>>> Is there some limits in arm64 or we will do this later?
+>>>
+>>
+>> arm64 maps low mem (all direct mapped memory on arm64) with section
+>> mappings for performance. set_memory_ro/rw works on PAGE_SIZE
+>> granularity so if we wanted to use those functions on direct mapped
+>> memory we would need to break down the section mappings. On arm,
+>> this was a pain due to the TLB maintaince requried. On arm64, less
+>> so but we still lose the benefit of the section mappings.
+>>
+>> Do you have a use case in mind for wanting to use set_memory_ro/rw
+>> outside of the module area?
+>>
 
-Okay, looks great.
+Hi Laura,
+
+How about this case?
+
+module alloc some pages which from direct mapping area, and we write
+important data(e.g. password) on the pages, the data will not be changed
+during the runtime. If someone unfriendly try to rewrite the memory,
+something is going to get worse. So we can use set_memory_ro() to protect
+the date. 
 
 Thanks,
-- Yakir
+Xishi Qiu
 
-> Rob
->
->
->
+>>> One more question, in arm64, create_mapping() will create the page
+>>> table of direct
+>>> mapping area, is the page 2M or 1G? I mean like the flag
+>>> PAGE_KERNEL_LARGE in x86.
+>>>
+>>
+>> It will try to do 1G if it can.
+>>
+>> Thanks,
+>> Laura
+> 
+> .
+> 
