@@ -1,89 +1,231 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Sat, 31 Oct 2015 02:42:39 -0700
-Subject: [GIT PULL] Allwinner DT changes for 4.4, round 3
-In-Reply-To: <20151026103409.GX10947@lukather>
-References: <20151023180711.GA11749@lukather> <4745252.gLSrJNQ42D@wuerfel>
- <9946613.K7Ehp1DEiL@wuerfel> <20151025201308.GS10947@lukather>
- <20151026010752.GG14238@localhost>
- <CAGb2v671MmpRHkWKpOd8kmEbvfTKTU9k7AU_bP+AgRuguodWkQ@mail.gmail.com>
- <20151026054828.GD4216@localhost> <20151026103409.GX10947@lukather>
-Message-ID: <CAOesGMjNQeaA0etj0fk0E_QPNLYA3WTaRCfWE7YFz50RoDXu-w@mail.gmail.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Sat, 31 Oct 2015 17:53:26 +0800
+Subject: [PATCH 04/19] clk: sunxi: Add TCON channel1 clock
+In-Reply-To: <1446214865-3972-5-git-send-email-maxime.ripard@free-electrons.com>
+References: <1446214865-3972-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1446214865-3972-5-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <CAGb2v650S8+8SNNBqx7u8k8wxHm2fSKdht=W3yA9Mh=rpU+hOA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 26, 2015 at 3:34 AM, Maxime Ripard
+On Fri, Oct 30, 2015 at 10:20 PM, Maxime Ripard
 <maxime.ripard@free-electrons.com> wrote:
-> On Mon, Oct 26, 2015 at 02:48:28PM +0900, Olof Johansson wrote:
->> On Mon, Oct 26, 2015 at 09:46:24AM +0800, Chen-Yu Tsai wrote:
->> > Hi Olof,
->> >
->> > On Mon, Oct 26, 2015 at 9:07 AM, Olof Johansson <olof@lixom.net> wrote:
->> > > On Sun, Oct 25, 2015 at 09:13:08PM +0100, Maxime Ripard wrote:
->> > >> On Fri, Oct 23, 2015 at 10:55:13PM +0200, Arnd Bergmann wrote:
->> > >> > On Friday 23 October 2015 22:41:04 Arnd Bergmann wrote:
->> > >> > > On Friday 23 October 2015 20:07:11 Maxime Ripard wrote:
->> > >> > > > Allwinner DT changes for 4.4, round 3
->> > >> > > >
->> > >> > > > A bunch of new boards, but mostly enable the support for the Audio Codec
->> > >> > > > on the older SoCs (A10, A10s, A13, A20, R8) and enable it on various
->> > >> > > > boards.
->> > >> > > >
->> > >> > > >
->> > >> > >
->> > >> > > Pulled into next/dt, thanks!
->> > >> >
->> > >> > And dropped again:
->> > >> >
->> > >> > In file included from /git/arm-soc/arch/arm/boot/dts/sun4i-a10-a1000.dts:46:0:
->> > >> > /git/arm-soc/arch/arm/boot/dts/sun4i-a10.dtsi:48:46: fatal error: dt-bindings/clock/sun4i-a10-pll2.h: No such file or directory
->> > >> >
->> > >> > Please make sure branches you send actually work by themselves.
->> > >>
->> > >> Damn, you're right... Sorry about that...
->> > >>
->> > >> You need to pull the tag sunxi-clk-for-4.4 that has been merged in the
->> > >> clk tree in 38ce30e29dc.
->> > >>
->> > >> Mike, Stephen, will that tag be stable?
->> > >
->> > > I don't see that tag in your tree, Maxime? I also don't see 38ce30e29dc in
->> > > the clk tree on kernel.org.
->> > >
->> > > I'm a little confused right now...
->> >
->> > The tag is "sunxi-clocks-for-4.4":
->> >     https://git.kernel.org/cgit/linux/kernel/git/mripard/linux.git/tag/?h=sunxi-clocks-for-4.4
->> >
->> > The merge commit in the clk tree is 938ce30e29dc:
->> >     https://git.kernel.org/cgit/linux/kernel/git/clk/linux.git/commit/?h=clk-next&id=938ce30e29dc
->>
->> Thanks, so both the tag and the hash were missing a few characters. :-)
+> The TCON is a controller generating the timings to output videos signals,
+> acting like both a CRTC and an encoder.
 >
-> Gaah, sorry...
+> It has two channels depending on the output, each channel being driven by
+> its own clock (and own clock controller).
 >
->> I've merged this in now. Note that this has resulted in a tree that won't
->> misect cleanly, since having the clk contents merged instead of used as a base
->> for the dt branch means that you could end up in a bisect state that has the DT
->> branch but not the clk branch.
+> Add a driver for the channel 1 clock.
 >
-> Even if it has been merged before the DT patches have been applied?
-> That's not really what I'd expect from bisect :/
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> ---
+>  drivers/clk/sunxi/Makefile             |   1 +
+>  drivers/clk/sunxi/clk-sun4i-tcon-ch1.c | 167 +++++++++++++++++++++++++++++++++
+>  2 files changed, 168 insertions(+)
+>  create mode 100644 drivers/clk/sunxi/clk-sun4i-tcon-ch1.c
 
-Yeah, due to the way bisect works, the only way to guarantee
-bisectability is if you base the DT branch on top of the clk branch
-when you build it. Otherwise the bisect can come down the path of only
-having the DT contents not the clk contents.
+According to the documents I have, this variant of the TCON clock
+is specific to sun5i. On sun4i/sun7i, TCON CH1 clock has the same
+layout as TCON CH0 and the other display clocks.
 
->> These are some of the reasons why I'm not overly excited about these
->> header file dependencies. :(
 >
-> Yeah, I see why now. Your suggestion of using the raw values first and
-> then switch to using the headers make sense I guess, we'll try to
-> stick to that in the future.
+> diff --git a/drivers/clk/sunxi/Makefile b/drivers/clk/sunxi/Makefile
+> index 7821b2b63d58..ed59ee4b3a85 100644
+> --- a/drivers/clk/sunxi/Makefile
+> +++ b/drivers/clk/sunxi/Makefile
+> @@ -13,6 +13,7 @@ obj-y += clk-simple-gates.o
+>  obj-y += clk-sun4i-display.o
+>  obj-y += clk-sun4i-pll3.o
+>  obj-y += clk-sun4i-tcon-ch0.o
+> +obj-y += clk-sun4i-tcon-ch1.o
+>  obj-y += clk-sun8i-mbus.o
+>  obj-y += clk-sun9i-core.o
+>  obj-y += clk-sun9i-mmc.o
+> diff --git a/drivers/clk/sunxi/clk-sun4i-tcon-ch1.c b/drivers/clk/sunxi/clk-sun4i-tcon-ch1.c
+> new file mode 100644
+> index 000000000000..9f2ab52b0bf9
+> --- /dev/null
+> +++ b/drivers/clk/sunxi/clk-sun4i-tcon-ch1.c
+> @@ -0,0 +1,167 @@
+> +/*
+> + * Copyright 2015 Maxime Ripard
+> + *
+> + * Maxime Ripard <maxime.ripard@free-electrons.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License, or
+> + * (at your option) any later version.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +
+> +#include <linux/clk-provider.h>
+> +#include <linux/of_address.h>
+> +#include <linux/slab.h>
+> +#include <linux/spinlock.h>
+> +
+> +#define SUN4I_TCON_CH1_SCLK_NAME_LEN   32
+> +
+> +#define SUN4I_A10_TCON_CH1_SCLK1_PARENTS       2
+> +#define SUN4I_A10_TCON_CH1_SCLK2_PARENTS       4
+> +
+> +#define SUN4I_A10_TCON_CH1_SCLK2_GATE_BIT      31
+> +#define SUN4I_A10_TCON_CH1_SCLK2_MUX_MASK      3
+> +#define SUN4I_A10_TCON_CH1_SCLK2_MUX_SHIFT     24
+> +#define SUN4I_A10_TCON_CH1_SCLK2_DIV_WIDTH     4
+> +#define SUN4I_A10_TCON_CH1_SCLK2_DIV_SHIFT     0
+> +
+> +#define SUN4I_A10_TCON_CH1_SCLK1_GATE_BIT      15
+> +#define SUN4I_A10_TCON_CH1_SCLK1_MUX_MASK      1
+> +#define SUN4I_A10_TCON_CH1_SCLK1_MUX_SHIFT     11
+> +
+> +static DEFINE_SPINLOCK(sun4i_a10_tcon_ch1_lock);
+> +
+> +static void __init sun4i_a10_tcon_ch1_setup(struct device_node *node)
+> +{
+> +       const char *sclk1_parents[SUN4I_A10_TCON_CH1_SCLK1_PARENTS];
+> +       const char *sclk2_parents[SUN4I_A10_TCON_CH1_SCLK2_PARENTS];
+> +       const char *sclk1_name = node->name;
+> +       char sclk2_name[SUN4I_TCON_CH1_SCLK_NAME_LEN];
+> +       char sclk2d2_name[SUN4I_TCON_CH1_SCLK_NAME_LEN];
+> +       struct clk_gate *sclk1_gate, *sclk2_gate;
+> +       struct clk_mux *sclk1_mux, *sclk2_mux;
+> +       struct clk *sclk1, *sclk2, *sclk2d2;
+> +       struct clk_divider *sclk2_div;
+> +       void __iomem *reg;
+> +       int i;
+> +
+> +       of_property_read_string(node, "clock-output-names",
+> +                               &sclk1_name);
+> +
+> +       snprintf(sclk2_name, SUN4I_TCON_CH1_SCLK_NAME_LEN,
+> +                "%s2", sclk1_name);
+> +
+> +       snprintf(sclk2d2_name, SUN4I_TCON_CH1_SCLK_NAME_LEN,
+> +                "%s2d2", sclk1_name);
+> +
+> +       reg = of_io_request_and_map(node, 0, of_node_full_name(node));
+> +       if (IS_ERR(reg)) {
+> +               pr_err("%s: Could not map the clock registers\n", sclk2_name);
+> +               return;
+> +       }
+> +
+> +       for (i = 0; i < SUN4I_A10_TCON_CH1_SCLK2_PARENTS; i++)
+> +               sclk2_parents[i] = of_clk_get_parent_name(node, i);
+> +
+> +       sclk2_mux = kzalloc(sizeof(*sclk2_mux), GFP_KERNEL);
+> +       if (!sclk2_mux)
+> +               return;
+> +
+> +       sclk2_mux->reg = reg;
+> +       sclk2_mux->shift = SUN4I_A10_TCON_CH1_SCLK2_MUX_SHIFT;
+> +       sclk2_mux->mask = SUN4I_A10_TCON_CH1_SCLK2_MUX_MASK;
+> +       sclk2_mux->lock = &sun4i_a10_tcon_ch1_lock;
+> +
+> +       sclk2_gate = kzalloc(sizeof(*sclk2_gate), GFP_KERNEL);
+> +       if (!sclk2_gate)
+> +               goto free_sclk2_mux;
+> +
+> +       sclk2_gate->reg = reg;
+> +       sclk2_gate->bit_idx = SUN4I_A10_TCON_CH1_SCLK2_GATE_BIT;
+> +       sclk2_gate->lock = &sun4i_a10_tcon_ch1_lock;
+> +
+> +       sclk2_div = kzalloc(sizeof(*sclk2_div), GFP_KERNEL);
+> +       if (!sclk2_div)
+> +               goto free_sclk2_gate;
+> +
+> +       sclk2_div->reg = reg;
+> +       sclk2_div->shift = SUN4I_A10_TCON_CH1_SCLK2_DIV_SHIFT;
+> +       sclk2_div->width = SUN4I_A10_TCON_CH1_SCLK2_DIV_WIDTH;
+> +       sclk2_div->lock = &sun4i_a10_tcon_ch1_lock;
+> +
+> +       sclk2 = clk_register_composite(NULL, sclk2_name, sclk2_parents,
+> +                                      SUN4I_A10_TCON_CH1_SCLK2_PARENTS,
+> +                                      &sclk2_mux->hw, &clk_mux_ops,
+> +                                      &sclk2_div->hw, &clk_divider_ops,
+> +                                      &sclk2_gate->hw, &clk_gate_ops,
+> +                                      0);
+> +       if (IS_ERR(sclk2)) {
+> +               pr_err("%s: Couldn't register the clock\n", sclk2_name);
+> +               goto free_sclk2_div;
+> +       }
+> +
+> +       sclk2d2 = clk_register_fixed_factor(NULL, sclk2d2_name, sclk2_name, 0,
+> +                                           1, 2);
+> +       if (IS_ERR(sclk2d2)) {
+> +               pr_err("%s: Couldn't register the clock\n", sclk2d2_name);
+> +               goto free_sclk2;
+> +       }
+> +
+> +       sclk1_parents[0] = sclk2_name;
+> +       sclk1_parents[1] = sclk2d2_name;
 
-See how it works for you. If it's awkward to do that we can try
-something else. I'd love to see some of these dependencies go away
-though.
+Is there any need to expose these 2 clocks via DT using of_clk_add_provider?
+
+Note that these complex clock trees within a clock node breaks the
+assigned-clock-parents mechanism, as you can no longer specify the output
+clock's direct parents.
 
 
--Olof
+Regards
+ChenYu
+
+> +
+> +       sclk1_mux = kzalloc(sizeof(*sclk1_mux), GFP_KERNEL);
+> +       if (!sclk1_mux)
+> +               goto free_sclk2d2;
+> +
+> +       sclk1_mux->reg = reg;
+> +       sclk1_mux->shift = SUN4I_A10_TCON_CH1_SCLK1_MUX_SHIFT;
+> +       sclk1_mux->mask = SUN4I_A10_TCON_CH1_SCLK1_MUX_MASK;
+> +       sclk1_mux->lock = &sun4i_a10_tcon_ch1_lock;
+> +
+> +       sclk1_gate = kzalloc(sizeof(*sclk1_gate), GFP_KERNEL);
+> +       if (!sclk1_gate)
+> +               goto free_sclk1_mux;
+> +
+> +       sclk1_gate->reg = reg;
+> +       sclk1_gate->bit_idx = SUN4I_A10_TCON_CH1_SCLK1_GATE_BIT;
+> +       sclk1_gate->lock = &sun4i_a10_tcon_ch1_lock;
+> +
+> +       sclk1 = clk_register_composite(NULL, sclk1_name, sclk1_parents,
+> +                                      SUN4I_A10_TCON_CH1_SCLK1_PARENTS,
+> +                                      &sclk1_mux->hw, &clk_mux_ops,
+> +                                      NULL, NULL,
+> +                                      &sclk1_gate->hw, &clk_gate_ops,
+> +                                      0);
+> +       if (IS_ERR(sclk1)) {
+> +               pr_err("%s: Couldn't register the clock\n", sclk1_name);
+> +               goto free_sclk1_gate;
+> +       }
+> +
+> +       of_clk_add_provider(node, of_clk_src_simple_get, sclk1);
+> +
+> +       return;
+> +
+> +free_sclk1_gate:
+> +       kfree(sclk1_gate);
+> +free_sclk1_mux:
+> +       kfree(sclk1_mux);
+> +free_sclk2d2:
+> +       clk_unregister(sclk2d2);
+> +free_sclk2:
+> +       clk_unregister(sclk2);
+> +free_sclk2_div:
+> +       kfree(sclk2_div);
+> +free_sclk2_gate:
+> +       kfree(sclk2_gate);
+> +free_sclk2_mux:
+> +       kfree(sclk2_mux);
+> +}
+> +
+> +CLK_OF_DECLARE(sun4i_a10_tcon_ch1, "allwinner,sun4i-a10-tcon-ch1-clk",
+> +              sun4i_a10_tcon_ch1_setup);
+> --
+> 2.6.2
+>
