@@ -1,138 +1,133 @@
-From: ykk@rock-chips.com (Yakir Yang)
-Date: Sat, 31 Oct 2015 14:42:17 +0800
-Subject: [PATCH v10 09/17] dt-bindings: add document for rockchip variant of
- analogix_dp
-In-Reply-To: <1446020143-32645-1-git-send-email-ykk@rock-chips.com>
-References: <1446020143-32645-1-git-send-email-ykk@rock-chips.com>
-Message-ID: <1446273737-15262-1-git-send-email-ykk@rock-chips.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Sat, 31 Oct 2015 00:22:26 -0700
+Subject: [GIT PULL] arm64: Second batch of DTS changes for X-Gene
+ platforms queued for v4.4
+In-Reply-To: <CADaLNDnSpoJ8+P5z1+p_ms-NPf3qAyTevvvO+93bkricBcvPoA@mail.gmail.com>
+References: <CADaLND=otWJX5vqzGdf0Y_pwiYHafWB5TwE9GXWnHG3M2r7fOw@mail.gmail.com>
+ <CADaLND=9YSB7UaqVKkhwuoVipVUN3mOQCB9cy_=DVf2m6nzOaQ@mail.gmail.com>
+ <20151031015437.GE1722@localhost>
+ <CADaLNDnSpoJ8+P5z1+p_ms-NPf3qAyTevvvO+93bkricBcvPoA@mail.gmail.com>
+Message-ID: <CAOesGMhcBy5M8Z-t5yz=7vwzAjsY04tTd4DN=ia119xwMU4OJQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rockchip DP driver is a helper driver of analogix_dp coder driver,
-so most of the DT property should be descriped in analogix_dp document.
+Hi,
 
-Reviewed-by: Heiko Stuebner <heiko@sntech.de>
-Signed-off-by: Yakir Yang <ykk@rock-chips.com>
----
-Changes in v10:
-- Removed the duplicated signed-of.
+On Fri, Oct 30, 2015 at 7:15 PM, Duc Dang <dhdang@apm.com> wrote:
+> Hi Olof,
+>
+> On Friday, October 30, 2015, Olof Johansson <olof@lixom.net> wrote:
+>>
+>> Hi Duc,
+>>
+>> On Fri, Oct 30, 2015 at 01:35:54PM -0700, Duc Dang wrote:
+>> > On Wed, Oct 28, 2015 at 12:08 PM, Duc Dang <dhdang@apm.com> wrote:
+>> > > Hi Arnd, Olof,
+>> > >
+>> > > The following changes since commit
+>> > > d2d0a722df735de52015f0c8a01f27a9ec28622e:
+>> > >
+>> > >   arm64: dts: Add poweroff device nodes for APM X-Gene 2 platform
+>> > > (2015-10-12 14:18:38 -0700)
+>> > >
+>> > > are available in the git repository at:
+>> > >
+>> > >   https://github.com/AppliedMicro/xgene-next.git
+>> > > tags/xgene-dts-for-v4.4-2
+>> > >
+>> > > for you to fetch changes up to
+>> > > fa535e2632f275f0d5d4080d60c8e1331ac37549:
+>> > >
+>> > >   arm64: dts: Add L2 cache topology for APM X-Gene SoC (2015-10-26
+>> > > 02:31:43 -0700)
+>> > >
+>> > > ----------------------------------------------------------------
+>> > > Second batch of DTS changes for X-Gene platforms queued for v4.4
+>> > >
+>> > > This patch set adds DTS entries to support various IPs
+>> > > for X-Gene v1 and X-Gene v2 SoC:
+>> > > - X-Gene v1: Enable support for MMC, USB, GPIO controllers,
+>> > >   I2C controller, L2 Cache topology
+>> > > - X-Gene v2: Enable support for MMC, USB, GPIO controller,
+>> > >   I2C controller (with RTC), PCIe controller with GICv2m MSI,
+>> > >   EDAC, L2 Cache topology, TRNG
+>> > >
+>> > > ----------------------------------------------------------------
+>> > > Duc Dang (16):
+>> > >       arm64: dts: Add the arasan mmc DTS entries for APm X-Gene v2 SoC
+>> > >       arm64: dts: X-Gene: Do not reset or enable/disable clock for AHB
+>> > > block
+>> > >       arm64: dts: Add RNG device tree nodes for APM X-Gene v2 platform
+>> > >       arm64: dts: Add v2m MSI frame nodes for APM X-Gene v2 platforms
+>> > >       arm64: dts: Add PCIe node for APM X-Gene v2 platforms
+>> > >       arm64: dts: Add USB nodes for APM X-Gene v1 platforms
+>> > >       arm64: dts: Add USB nodes for APM X-Gene v2 platforms
+>> > >       arm64: dts: Add APM X-Gene v1 SoC GFC GPIO controller DTS
+>> > > entries
+>> > >       arm64: dts: Add APM X-Gene v2 SoC GFC GPIO controller DTS entry
+>> > >       arm64: dts: Add Designware GPIO dts binding for APM X-Gene v1
+>> > > platform
+>> > >       arm64: dts: Add APM X-Gene v2 SoC Designware GPIO controller DTS
+>> > > entry
+>> > >       arm64: dts: Add APM X-Gene v2 SoC EDAC DTS entries
+>> > >       arm64: dts: Add Designware I2C controller DTS entries for X-Gene
+>> > > v1 SoC
+>> > >       arm64: dts: Add Designware I2C controller DTS entries for X-Gene
+>> > > v2 SoC platform
+>> > >       arm64: dts: Add RTC DTS entry for X-Gene v2 SoC platform
+>> > >       arm64: dts: Add L2 cache topology for APM X-Gene SoC
+>> > >
+>> > > Suman Tripathi (1):
+>> > >       arm64: dts: Add the arasan mmc DTS entries for APM X-Gene v1 SoC
+>> > >
+>> > >  arch/arm64/boot/dts/apm/apm-merlin.dts     |  12 +
+>> > >  arch/arm64/boot/dts/apm/apm-mustang.dts    |   4 +
+>> > >  arch/arm64/boot/dts/apm/apm-shadowcat.dtsi | 401
+>> > > +++++++++++++++++++++++++++++
+>> > >  arch/arm64/boot/dts/apm/apm-storm.dtsi     | 126 +++++++++
+>> > >  4 files changed, 543 insertions(+)
+>> >
+>> > Hi Arnd, Olof,
+>> >
+>> > I am sorry that I sent this pull request late. But do you still have
+>> > some cycle to have this change set pulled into your xgene/dt in
+>> > next/dt for 4.4?
+>>
+>> This is indeed showing up quite late, since the merge window opens in just
+>> a couple of days.
+>>
+>> Can I please ask that you send us a new pull request for this once -rc1 is
+>> out,
+>> and we'll queue it up for 4.5?
+>
+> Yes, I realized the merge window start this Sunday too late.
+>
+> Anyway, do you maintain a general rule like when You expect people send you
+> a pull request for the next merge window? For example: the request must be
+> before rc6?
 
-Changes in v9:
-- Document more details for 'ports' property.
+The sooner the better. Ideally most code should show up sometime
+between rc4 and rc6. After that we will usually take smaller
+incremental branches that adds a few patches on top of previous
+material.
 
-Changes in v8:
-- Modify the commit subject name. (Heiko)
+If you have cross-dependencies with other maintainer trees, for
+example due to shared introduced header files, then please try to get
+it in early in case we need to coordinate something.
 
-Changes in v7: None
-Changes in v6: None
-Changes in v5:
-- Split binding doc's from driver changes. (Rob)
-- Add eDP hotplug pinctrl property. (Heiko)
+The community as a whole has a self-imposed limit that most material
+should be in -next by -rc6, but it's not strictly enforced and is seen
+as a guideline.
 
-Changes in v4: None
-Changes in v3: None
-Changes in v2: None
+I think the ARM64 arch maintainers try to get most material in by
+-rc4, but they need slightly more bake/test time on their code so
+that's understandable.
 
- .../display/rockchip/analogix_dp-rockchip.txt      | 91 ++++++++++++++++++++++
- 1 file changed, 91 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/display/rockchip/analogix_dp-rockchip.txt
 
-diff --git a/Documentation/devicetree/bindings/display/rockchip/analogix_dp-rockchip.txt b/Documentation/devicetree/bindings/display/rockchip/analogix_dp-rockchip.txt
-new file mode 100644
-index 0000000..dae86c4
---- /dev/null
-+++ b/Documentation/devicetree/bindings/display/rockchip/analogix_dp-rockchip.txt
-@@ -0,0 +1,91 @@
-+Rockchip RK3288 specific extensions to the Analogix Display Port
-+================================
-+
-+Required properties:
-+- compatible: "rockchip,rk3288-edp";
-+
-+- reg: physical base address of the controller and length
-+
-+- clocks: from common clock binding: handle to dp clock.
-+	  of memory mapped region.
-+
-+- clock-names: from common clock binding:
-+	       Required elements: "dp" "pclk"
-+
-+- resets: Must contain an entry for each entry in reset-names.
-+	  See ../reset/reset.txt for details.
-+
-+- pinctrl-names: Names corresponding to the chip hotplug pinctrl states.
-+- pinctrl-0: pin-control mode. should be <&edp_hpd>
-+
-+- reset-names: Must include the name "dp"
-+
-+- rockchip,grf: this soc should set GRF regs, so need get grf here.
-+
-+- ports: there are 2 port nodes with endpoint definitions as defined in
-+  Documentation/devicetree/bindings/media/video-interfaces.txt.
-+    Port 0: contained 2 endpoints, connecting to the ouput of vop.
-+    Port 1: contained 1 endpoint, connecting to the input of panel.
-+
-+For the below properties, please refer to Analogix DP binding document:
-+ * Documentation/devicetree/bindings/drm/bridge/analogix_dp.txt
-+- phys (required)
-+- phy-names (required)
-+- hpd-gpios (optional)
-+-------------------------------------------------------------------------------
-+
-+Example:
-+	dp-controller: dp at ff970000 {
-+		compatible = "rockchip,rk3288-dp";
-+		reg = <0xff970000 0x4000>;
-+		interrupts = <GIC_SPI 98 IRQ_TYPE_LEVEL_HIGH>;
-+		clocks = <&cru SCLK_EDP>, <&cru PCLK_EDP_CTRL>;
-+		clock-names = "dp", "pclk";
-+		phys = <&dp_phy>;
-+		phy-names = "dp";
-+
-+		rockchip,grf = <&grf>;
-+		resets = <&cru 111>;
-+		reset-names = "dp";
-+
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&edp_hpd>;
-+
-+		status = "disabled";
-+
-+		ports {
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			edp_in: port at 0 {
-+				reg = <0>;
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				edp_in_vopb: endpoint at 0 {
-+					reg = <0>;
-+					remote-endpoint = <&vopb_out_edp>;
-+				};
-+				edp_in_vopl: endpoint at 1 {
-+					reg = <1>;
-+					remote-endpoint = <&vopl_out_edp>;
-+				};
-+			};
-+
-+			edp_out: port at 1 {
-+				reg = <1>;
-+				#address-cells = <1>;
-+				#size-cells = <0>;
-+				edp_out_panel: endpoint {
-+					reg = <0>;
-+					remote-endpoint = <&panel_in_edp>
-+				};
-+			};
-+		};
-+	};
-+
-+	pinctrl {
-+		edp {
-+			edp_hpd: edp-hpd {
-+				rockchip,pins = <7 11 RK_FUNC_2 &pcfg_pull_none>;
-+			};
-+		};
-+	};
--- 
-1.9.1
+Arnd gave a presentation about how we run the maintainer tree at this
+year's ELC, and I gave one two years ago more around how we organize
+our tree. The videos and slides are online and gives a bit of an
+overview if you're interested in learning more.
+
+
+-Olof
