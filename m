@@ -1,49 +1,89 @@
-From: yong.wu@mediatek.com (Yong Wu)
-Date: Sat, 31 Oct 2015 16:32:30 +0800
-Subject: [PATCH v5 4/6] memory: mediatek: Add SMI driver
-In-Reply-To: <562F7B12.7030201@arm.com>
-References: <1444357388-30257-1-git-send-email-yong.wu@mediatek.com>
- <1444357388-30257-5-git-send-email-yong.wu@mediatek.com>
- <562F7B12.7030201@arm.com>
-Message-ID: <1446280350.13050.90.camel@mhfsdcap03>
+From: olof@lixom.net (Olof Johansson)
+Date: Sat, 31 Oct 2015 02:42:39 -0700
+Subject: [GIT PULL] Allwinner DT changes for 4.4, round 3
+In-Reply-To: <20151026103409.GX10947@lukather>
+References: <20151023180711.GA11749@lukather> <4745252.gLSrJNQ42D@wuerfel>
+ <9946613.K7Ehp1DEiL@wuerfel> <20151025201308.GS10947@lukather>
+ <20151026010752.GG14238@localhost>
+ <CAGb2v671MmpRHkWKpOd8kmEbvfTKTU9k7AU_bP+AgRuguodWkQ@mail.gmail.com>
+ <20151026054828.GD4216@localhost> <20151026103409.GX10947@lukather>
+Message-ID: <CAOesGMjNQeaA0etj0fk0E_QPNLYA3WTaRCfWE7YFz50RoDXu-w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2015-10-27 at 13:24 +0000, Robin Murphy wrote:
-> On 09/10/15 03:23, Yong Wu wrote:
-> [...]
-> > +static int mtk_smi_probe(struct platform_device *pdev)
-> > +{
-> > +	struct device *dev = &pdev->dev;
-> > +	struct mtk_smi_data *smidata;
-> > +	int ret;
-> > +
-> > +	if (!dev->pm_domain)
-> > +		return -EPROBE_DEFER;
-> > +
-> > +	smidata = devm_kzalloc(dev, sizeof(*smidata), GFP_KERNEL);
-> > +	if (!smidata)
-> > +		return -ENOMEM;
-> > +
-> > +	smidata->clk_apb = devm_clk_get(dev, "apb");
-> > +	if (IS_ERR(smidata->clk_apb))
-> > +		return PTR_ERR(smidata->clk_apb);
-> > +
-> > +	smidata->clk_smi = devm_clk_get(dev, "smi");
-> > +	if (IS_ERR(smidata->clk_smi))
-> > +		return PTR_ERR(smidata->clk_smi);
-> > +
-> > +	pm_runtime_enable(dev);
-> > +	dev_set_drvdata(dev, smidata);
-> > +	return ret;
-> 
-> ret is used uninitialised here, but you might as well just "return 0;" 
-> and get rid of the variable entirely.
+On Mon, Oct 26, 2015 at 3:34 AM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> On Mon, Oct 26, 2015 at 02:48:28PM +0900, Olof Johansson wrote:
+>> On Mon, Oct 26, 2015 at 09:46:24AM +0800, Chen-Yu Tsai wrote:
+>> > Hi Olof,
+>> >
+>> > On Mon, Oct 26, 2015 at 9:07 AM, Olof Johansson <olof@lixom.net> wrote:
+>> > > On Sun, Oct 25, 2015 at 09:13:08PM +0100, Maxime Ripard wrote:
+>> > >> On Fri, Oct 23, 2015 at 10:55:13PM +0200, Arnd Bergmann wrote:
+>> > >> > On Friday 23 October 2015 22:41:04 Arnd Bergmann wrote:
+>> > >> > > On Friday 23 October 2015 20:07:11 Maxime Ripard wrote:
+>> > >> > > > Allwinner DT changes for 4.4, round 3
+>> > >> > > >
+>> > >> > > > A bunch of new boards, but mostly enable the support for the Audio Codec
+>> > >> > > > on the older SoCs (A10, A10s, A13, A20, R8) and enable it on various
+>> > >> > > > boards.
+>> > >> > > >
+>> > >> > > >
+>> > >> > >
+>> > >> > > Pulled into next/dt, thanks!
+>> > >> >
+>> > >> > And dropped again:
+>> > >> >
+>> > >> > In file included from /git/arm-soc/arch/arm/boot/dts/sun4i-a10-a1000.dts:46:0:
+>> > >> > /git/arm-soc/arch/arm/boot/dts/sun4i-a10.dtsi:48:46: fatal error: dt-bindings/clock/sun4i-a10-pll2.h: No such file or directory
+>> > >> >
+>> > >> > Please make sure branches you send actually work by themselves.
+>> > >>
+>> > >> Damn, you're right... Sorry about that...
+>> > >>
+>> > >> You need to pull the tag sunxi-clk-for-4.4 that has been merged in the
+>> > >> clk tree in 38ce30e29dc.
+>> > >>
+>> > >> Mike, Stephen, will that tag be stable?
+>> > >
+>> > > I don't see that tag in your tree, Maxime? I also don't see 38ce30e29dc in
+>> > > the clk tree on kernel.org.
+>> > >
+>> > > I'm a little confused right now...
+>> >
+>> > The tag is "sunxi-clocks-for-4.4":
+>> >     https://git.kernel.org/cgit/linux/kernel/git/mripard/linux.git/tag/?h=sunxi-clocks-for-4.4
+>> >
+>> > The merge commit in the clk tree is 938ce30e29dc:
+>> >     https://git.kernel.org/cgit/linux/kernel/git/clk/linux.git/commit/?h=clk-next&id=938ce30e29dc
+>>
+>> Thanks, so both the tag and the hash were missing a few characters. :-)
+>
+> Gaah, sorry...
+>
+>> I've merged this in now. Note that this has resulted in a tree that won't
+>> misect cleanly, since having the clk contents merged instead of used as a base
+>> for the dt branch means that you could end up in a bisect state that has the DT
+>> branch but not the clk branch.
+>
+> Even if it has been merged before the DT patches have been applied?
+> That's not really what I'd expect from bisect :/
 
-Thanks. I will change to "return 0" directly.
+Yeah, due to the way bisect works, the only way to guarantee
+bisectability is if you base the DT branch on top of the clk branch
+when you build it. Otherwise the bisect can come down the path of only
+having the DT contents not the clk contents.
 
-> 
-> > +}
-> 
-> Robin.
-> 
+>> These are some of the reasons why I'm not overly excited about these
+>> header file dependencies. :(
+>
+> Yeah, I see why now. Your suggestion of using the raw values first and
+> then switch to using the headers make sense I guess, we'll try to
+> stick to that in the future.
+
+See how it works for you. If it's awkward to do that we can try
+something else. I'd love to see some of these dependencies go away
+though.
+
+
+-Olof
