@@ -1,62 +1,56 @@
-From: zhaoshenglong@huawei.com (Shannon Zhao)
-Date: Sat, 31 Oct 2015 10:06:46 +0800
-Subject: [PATCH v4 18/21] KVM: ARM64: Add PMU overflow interrupt routing
-In-Reply-To: <201510302030.qrh0XuT1%fengguang.wu@intel.com>
-References: <201510302030.qrh0XuT1%fengguang.wu@intel.com>
-Message-ID: <56342236.4020108@huawei.com>
+From: huawei.libin@huawei.com (libin)
+Date: Sat, 31 Oct 2015 10:07:38 +0800
+Subject: [PATCH 1/3] recordmcount: fix endianness handling bug for
+ nop_mcount
+In-Reply-To: <56338025.3060602@cogentembedded.com>
+References: <1446193864-24593-1-git-send-email-huawei.libin@huawei.com>
+ <1446193864-24593-2-git-send-email-huawei.libin@huawei.com>
+ <56338025.3060602@cogentembedded.com>
+Message-ID: <5634226A.9060208@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
 
-Thanks for your test:)
-It fails because there is no arch/arm/include/asm/pmu.h while
-arch/arm64/include/asm/pmu.h exists. Will fix this at next version.
 
-On 2015/10/30 20:08, kbuild test robot wrote:
-> Hi Shannon,
+on 2015/10/30 22:35, Sergei Shtylyov wrote:
+> Hello.
 > 
-> [auto build test ERROR on kvm/linux-next -- if it's inappropriate base, please suggest rules for selecting the more suitable base]
+> On 10/30/2015 11:31 AM, Li Bin wrote:
 > 
-> url:    https://github.com/0day-ci/linux/commits/Shannon-Zhao/KVM-ARM64-Add-guest-PMU-support/20151030-143148
-> config: arm-axm55xx_defconfig (attached as .config)
-> reproduce:
->         wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
->         chmod +x ~/bin/make.cross
->         # save the attached .config to linux build tree
->         make.cross ARCH=arm 
+>> In nop_mcount, shdr->sh_offset and welp->r_offset should handle
+>> endianness properly, otherwise it will trigger Segmentation fault
+>> if the recordmcount main and file.o have different endianness.
+>>
+>> Cc: <stable@vger.kernel.org> # 3.0+
+>> Signed-off-by: Li Bin <huawei.libin@huawei.com>
+>> ---
+>>   scripts/recordmcount.h | 5 +++--
+>>   1 file changed, 3 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/scripts/recordmcount.h b/scripts/recordmcount.h
+>> index 49b582a..dda9dba 100644
+>> --- a/scripts/recordmcount.h
+>> +++ b/scripts/recordmcount.h
+>> @@ -376,8 +376,9 @@ static void nop_mcount(Elf_Shdr const *const relhdr,
+>>               mcountsym = get_mcountsym(sym0, relp, str0);
+>>
+>>           if (mcountsym == Elf_r_sym(relp) && !is_fake_mcount(relp)) {
+>> -            if (make_nop)
+>> -                ret = make_nop((void *)ehdr, shdr->sh_offset + relp->r_offset);
+>> +            if (make_nop) {
+>> +                ret = make_nop((void *)ehdr, _w(shdr->sh_offset) + _w(relp->r_offset));
+>> +            }
 > 
-> All errors (new ones prefixed by >>):
-> 
->    In file included from arch/arm/kvm/arm.c:31:0:
->>> include/kvm/arm_pmu.h:22:21: fatal error: asm/pmu.h: No such file or directory
->     #include <asm/pmu.h>
->                         ^
->    compilation terminated.
-> 
-> vim +22 include/kvm/arm_pmu.h
-> 
-> 219856f5 Shannon Zhao 2015-10-30  16   */
-> 219856f5 Shannon Zhao 2015-10-30  17  
-> 219856f5 Shannon Zhao 2015-10-30  18  #ifndef __ASM_ARM_KVM_PMU_H
-> 219856f5 Shannon Zhao 2015-10-30  19  #define __ASM_ARM_KVM_PMU_H
-> 219856f5 Shannon Zhao 2015-10-30  20  
-> 219856f5 Shannon Zhao 2015-10-30  21  #include <linux/perf_event.h>
-> 219856f5 Shannon Zhao 2015-10-30 @22  #include <asm/pmu.h>
-> 219856f5 Shannon Zhao 2015-10-30  23  
-> 219856f5 Shannon Zhao 2015-10-30  24  struct kvm_pmc {
-> 219856f5 Shannon Zhao 2015-10-30  25  	u8 idx;/* index into the pmu->pmc array */
-> 
-> :::::: The code at line 22 was first introduced by commit
-> :::::: 219856f54d23298fff48e6e20e7e87fc45e42798 KVM: ARM64: Define PMU data structure for each vcpu
-> 
-> :::::: TO: Shannon Zhao <shannon.zhao@linaro.org>
-> :::::: CC: 0day robot <fengguang.wu@intel.com>
-> 
-> ---
-> 0-DAY kernel test infrastructure                Open Source Technology Center
-> https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
-> 
+>    {} not needed here.
 
--- 
-Shannon
+Oh, yes. When I cleaned the debugging code, forgot delete the {}.
+
+Thanks,
+Li Bin
+
+> 
+> MBR, Sergei
+> 
+> 
+> .
+> 
