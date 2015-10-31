@@ -1,225 +1,76 @@
-From: jic23@kernel.org (Jonathan Cameron)
-Date: Sat, 31 Oct 2015 10:08:01 +0000
-Subject: [PATCH v3 1/3] devicetree: mfd: Add binding for the TI LM3533
-In-Reply-To: <1446249040-16552-1-git-send-email-bjorn.andersson@sonymobile.com>
-References: <1446249040-16552-1-git-send-email-bjorn.andersson@sonymobile.com>
-Message-ID: <56349301.5030001@kernel.org>
+From: yangyingliang@huawei.com (Yang Yingliang)
+Date: Sat, 31 Oct 2015 18:07:38 +0800
+Subject: [PATCH 1/2] clocksource: replace cycle_last validation with an
+ equal way
+In-Reply-To: <alpine.DEB.2.11.1510301533310.4032@nanos>
+References: <1445952073-7260-1-git-send-email-yangyingliang@huawei.com>
+ <1445952073-7260-2-git-send-email-yangyingliang@huawei.com>
+ <alpine.DEB.2.11.1510301533310.4032@nanos>
+Message-ID: <563492EA.90206@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 30/10/15 23:50, Bjorn Andersson wrote:
-> Add the binding for the Texas Instruments LM3533 lighting power
-> solution.
-> 
-> Signed-off-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
-For the ALS bits.  It does feel like the als resistance might become
-a generic parameter in the long term, but it's not common enough to
-conclude that now.
 
-Acked-by: Jonathan Cameron <jic23@kernel.org>
-> ---
-> 
-> Changes since v2:
-> - Drop vendor prefix of vendor properties
-> - Specify unit of various properties
-> - Fix reference paths
-> 
-> Changes since v1:
-> - Added unit to boost-freq and als-resistance (as the frequency now comes with
->   a unit specifier I changed it to be expressed in kHz)
-> 
->  Documentation/devicetree/bindings/mfd/lm3533.txt | 184 +++++++++++++++++++++++
->  1 file changed, 184 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/mfd/lm3533.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/mfd/lm3533.txt b/Documentation/devicetree/bindings/mfd/lm3533.txt
-> new file mode 100644
-> index 000000000000..963cee153a4d
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/mfd/lm3533.txt
-> @@ -0,0 +1,184 @@
-> +Texas Instruments LM3533 binding
-> +
-> +This binding describes the Texas Instruments LM3533, a lighting power solution
-> +for smartphone handsets. The common properties are described directly in the
-> +node, while each individual component are described in an optional subnode.
-> +
-> +- compatible:
-> +	Usage: required
-> +	Value type: <stringlist>
-> +	Definition: must be:
-> +		    "ti,lm3533"
-> +
-> +- reg:
-> +	Usage: required
-> +	Value type: <u32>
-> +	Definition: i2c address of the LM3533 chip
-> +
-> +- als-supply:
-> +	Usage: optional
-> +	Value type: <prop-encoded-array>
-> +	Definition: reference to regulator powering the V_als input; as
-> +		    specified in "../regulator/regulator.txt"
-> +
-> +- hwen-gpios:
-> +	Usage: required
-> +	Value type: <prop-encoded-array>
-> +	Definition: reference to gpio pin connected to the HWEN input; as
-> +		    specified in "../gpio/gpio.txt"
-> +
-> +- ti,boost-freq-hz:
-> +	Usage: required
-> +	Value type: <u32>
-> +	Definition: switch-frequency of the boost converter, must be either:
-> +		    500000 or 1000000
-> +
-> +- ti,boost-ovp-mv:
-> +	Usage: required
-> +	Value type: <u32>
-> +	Definition: over-voltage protection limit, in mV. Must be one of:
-> +		    16000, 24000, 32000 or 40000
-> +
-> +- #address-cells:
-> +	Usage: required
-> +	Value type: <u32>
-> +	Definition: must be 1
-> +
-> +- #size-cells:
-> +	Usage: required
-> +	Value type: <u32>
-> +	Definition: must be 0
-> +
-> += ALS SUBNODE
-> +The ambient light sensor subnode must be named "als", it carries the light
-> +sensor related properties.
-> +
-> +- ti,als-resistance-ohm:
-> +	Usage: required (unless ti,pwm-mode is specified)
-> +	Value type: <u32>
-> +	Definition: specifies the resistor value (R_als), in Ohm. Valid values
-> +		    ranges from 200000 to 1574 Ohm.
-> +
-> +- ti,pwm-mode:
-> +	Usage: optional
-> +	Value type: <empty>
-> +	Definition: specifies, if present, that the als should operate in PWM
-> +		    mode - rather than analog mode
-> +
-> += BACKLIGHT NODES
-> +Backlight subnodes must be named "backlight", they carry the backlight related
-> +properties.
-> +
-> +- reg:
-> +	Usage: required
-> +	Value type: <u32>
-> +	Definition: specifies which of the two backlights this node corresponds
-> +		    to
-> +
-> +- default-brightness:
-> +	Usage: optional
-> +	Value type: <32>
-> +	Definition: specifies the default brightness for the backlight, in
-> +		    units of brightness [0-255]
-> +
-> +- label:
-> +	Usage: required
-> +	Value type: <string>
-> +	Definition: specifies a name of this backlight
-> +
-> +- led-max-microamp:
-> +	Usage: required
-> +	Value type: <u32>
-> +	Definition: specifies the max current for this backlight, in uA, as
-> +		    described in "../leds/common.txt"
-> +
-> +- ti,pwm-zones:
-> +	Usage: optional
-> +	Value type: <u32 list>
-> +	Definition: lists the ALS zones to be PWM controlled for this backlight,
-> +		    the values in the list are in the range [0 - 4]
-> +
-> += LED NODES
-> +LED subnodes must be named "led", they carry the LED related properties.
-> +
-> +- reg:
-> +	Usage: required
-> +	Value type: <u32>
-> +	Definition: specifies which of the four LEDs this node corresponds to
-> +
-> +- linux,default-trigger:
-> +	Usage: optional
-> +	Value type: <string>
-> +	Definition: specifies the default trigger for the LED, as described in
-> +		    "../leds/common.txt"
-> +
-> +- label:
-> +	Usage: required
-> +	Value type: <string>
-> +	Definition: specifies a name of this LED, as described in
-> +		    "../leds/common.txt"
-> +
-> +- led-max-microamp:
-> +	Usage: required
-> +	Value type: <u32>
-> +	Definition: specifies the max current for this LED, in uA, as described
-> +		    in "../leds/common.txt"
-> +
-> +- ti,pwm-zones:
-> +	Usage: optional
-> +	Value type: <u32 list>
-> +	Definition: lists the ALS zones to be PWM controlled for this LED, the
-> +		    values in the list are in the range [0 - 4]
-> +
-> += EXAMPLE
-> +
-> +i2c at 12460000 {
-> +	compatible = "qcom,i2c-qup-v1.1.1";
-> +	...
-> +
-> +	lm3533 at 36 {
-> +		compatible = "ti,lm3533";
-> +		reg = <0x36>;
-> +
-> +		als-supply = <&pm8921_l11>;
-> +		hwen-gpios = <&pm8921_gpio 26 GPIO_ACTIVE_HIGH>;
-> +
-> +		ti,boost-freq-hz = <500000>;
-> +		ti,boost-ovp-mv = <24000>;
-> +
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +
-> +		als {
-> +			ti,als-resistance-ohm = <200000>;
-> +		};
-> +
-> +		backlight at 0 {
-> +			reg = <0>;
-> +			label = "backlight";
-> +
-> +			led-max-microamp = <20200>;
-> +		};
-> +
-> +		led at 0 {
-> +			reg = <0>;
-> +			label = "red";
-> +
-> +			led-max-microamp = <5000>;
-> +		};
-> +
-> +		led at 1 {
-> +			reg = <1>;
-> +			label = "green";
-> +
-> +			led-max-microamp = <5000>;
-> +		};
-> +
-> +		led at 2 {
-> +			reg = <2>;
-> +			label = "blue";
-> +
-> +			led-max-microamp = <5000>;
-> +		};
-> +	};
-> +
-> 
+
+On 2015/10/30 22:56, Thomas Gleixner wrote:
+> Yang,
+>
+> On Tue, 27 Oct 2015, Yang Yingliang wrote:
+>
+>> Mask the cycle values before subtraction. So we can use this
+>> validation while the clocksource mask is not 64-bits.
+>>
+>> Signed-off-by: Yang Yingliang <yangyingliang@huawei.com>
+>> Cc: Thomas Gleixner <tglx@linutronix.de>
+>> ---
+>>   kernel/time/timekeeping_internal.h | 2 +-
+>>   1 file changed, 1 insertion(+), 1 deletion(-)
+>>
+>> diff --git a/kernel/time/timekeeping_internal.h b/kernel/time/timekeeping_internal.h
+>> index 4ea005a..984f02e 100644
+>> --- a/kernel/time/timekeeping_internal.h
+>> +++ b/kernel/time/timekeeping_internal.h
+>> @@ -15,7 +15,7 @@ extern void tk_debug_account_sleep_time(struct timespec64 *t);
+>>   #ifdef CONFIG_CLOCKSOURCE_VALIDATE_LAST_CYCLE
+>>   static inline cycle_t clocksource_delta(cycle_t now, cycle_t last, cycle_t mask)
+>>   {
+>> -	cycle_t ret = (now - last) & mask;
+>> +	cycle_t ret = (now & mask) - (last & mask);
+>
+> I agree the original code is broken for all masks which are !=
+> CLOCKSOURCE_MASK(64).
+>
+> But your change does not work for actual wraparounds. You probably
+> cannot trigger it for the 56bits of the arm architected timer, but
+> that does not make it more correct.
+>
+> Assume a CLOCKSOURCE_MASK(32) and that the timer wrapped around since
+> we last read it.
+>
+> last = 0xffffffff
+> now = 0x01
+>
+> So:
+>
+> 	ret = (0x01 & 0xffffffff) - (0xffffffff & 0xffffffff);
+> -->	ret = 0x01 - 0xffffffff;
+> -->	ret = ffffffff00000002;
+>
+> -->	(s64) ret is < 0 !!!
+>
+> This is wrong as the clocksource legitimately wrapped around since we
+> accessed it last.
+>
+> The correct solution to this is:
+>
+>      	ret = (now - last) & mask;
+> 	
+> 	negative = ret & ~(mask >> 1);
+>
+> 	return negative ? 0 : ret;
+
+Thanks for your advise.
+I will resend this patch.
+
+Regards,
+Yang
