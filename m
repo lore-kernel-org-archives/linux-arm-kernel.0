@@ -1,44 +1,80 @@
-From: yangyingliang@huawei.com (Yang Yingliang)
-Date: Sat, 31 Oct 2015 18:20:55 +0800
-Subject: [PATCH resend] clocksource: modify the cycle_last validation to fit
- for non-64bit clocksourece mask
-In-Reply-To: <alpine.DEB.2.11.1510301533310.4032@nanos>
-References: <1445952073-7260-1-git-send-email-yangyingliang@huawei.com>
- <1445952073-7260-2-git-send-email-yangyingliang@huawei.com>
- <alpine.DEB.2.11.1510301533310.4032@nanos>
-Message-ID: <56349607.6070708@huawei.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Sat, 31 Oct 2015 18:28:16 +0800
+Subject: [PATCH 01/19] clk: sunxi: Add display clock
+In-Reply-To: <1446214865-3972-2-git-send-email-maxime.ripard@free-electrons.com>
+References: <1446214865-3972-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1446214865-3972-2-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <CAGb2v65uzLgKkxKh9RN58w1FZGRJKSbMFmdhZxnRzCdCArBuPw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Yang Yingliang <yangyingliang@huawei.com>
+Hi,
 
-Check the delta of now and last to make sure it's not
-negative while the clocksource mask is not 64-bits.
+On Fri, Oct 30, 2015 at 10:20 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> The A10 SoCs and its relatives has a special clock controller to drive the
+> display engines (both frontend and backend).
+>
+> Add a driver for it.
+>
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> ---
+>  drivers/clk/sunxi/Makefile            |   1 +
+>  drivers/clk/sunxi/clk-sun4i-display.c | 199 ++++++++++++++++++++++++++++++++++
+>  2 files changed, 200 insertions(+)
+>  create mode 100644 drivers/clk/sunxi/clk-sun4i-display.c
+>
+> diff --git a/drivers/clk/sunxi/Makefile b/drivers/clk/sunxi/Makefile
+> index cb4c299214ce..a9e1a5885846 100644
+> --- a/drivers/clk/sunxi/Makefile
+> +++ b/drivers/clk/sunxi/Makefile
+> @@ -9,6 +9,7 @@ obj-y += clk-a10-mod1.o
+>  obj-y += clk-a10-pll2.o
+>  obj-y += clk-a20-gmac.o
+>  obj-y += clk-mod0.o
+> +obj-y += clk-sun4i-display.o
+>  obj-y += clk-simple-gates.o
+>  obj-y += clk-sun8i-mbus.o
+>  obj-y += clk-sun9i-core.o
+> diff --git a/drivers/clk/sunxi/clk-sun4i-display.c b/drivers/clk/sunxi/clk-sun4i-display.c
+> new file mode 100644
+> index 000000000000..f13b095c6d7a
+> --- /dev/null
+> +++ b/drivers/clk/sunxi/clk-sun4i-display.c
+> @@ -0,0 +1,199 @@
+> +/*
+> + * Copyright 2015 Maxime Ripard
+> + *
+> + * Maxime Ripard <maxime.ripard@free-electrons.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License, or
+> + * (at your option) any later version.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + */
+> +
+> +#include <linux/clk-provider.h>
+> +#include <linux/of_address.h>
+> +#include <linux/reset-controller.h>
+> +#include <linux/slab.h>
+> +#include <linux/spinlock.h>
+> +
+> +#define SUN4I_A10_DISPLAY_PARENTS      3
 
-Suggested-by: Thomas Gleixner <tglx@linutronix.de>
-Signed-off-by: Yang Yingliang <yangyingliang@huawei.com>
----
-  kernel/time/timekeeping_internal.h | 3 ++-
-  1 file changed, 2 insertions(+), 1 deletion(-)
+Can we change this to 4, so we can reuse this for TCON clocks on sun4i/sun7i?
 
-diff --git a/kernel/time/timekeeping_internal.h 
-b/kernel/time/timekeeping_internal.h
-index 4ea005a..cbfcd2d 100644
---- a/kernel/time/timekeeping_internal.h
-+++ b/kernel/time/timekeeping_internal.h
-@@ -16,8 +16,9 @@ extern void tk_debug_account_sleep_time(struct 
-timespec64 *t);
-  static inline cycle_t clocksource_delta(cycle_t now, cycle_t last, 
-cycle_t mask)
-  {
-  	cycle_t ret = (now - last) & mask;
-+	cycle_t negative = ret & ~(mask >> 1);
+Thanks
 
--	return (s64) ret > 0 ? ret : 0;
-+	return negative ? 0 : ret;
-  }
-  #else
-  static inline cycle_t clocksource_delta(cycle_t now, cycle_t last, 
-cycle_t mask)
--- 
-2.5.0
+ChenYu
+
+> +#define SUN4I_A10_DISPLAY_GATE_BIT     31
+> +#define SUN4I_A10_DISPLAY_RESET_BIT    30
+> +#define SUN4I_A10_DISPLAY_MUX_MASK     3
+> +#define SUN4I_A10_DISPLAY_MUX_SHIFT    24
+> +#define SUN4I_A10_DISPLAY_DIV_WIDTH    4
+> +#define SUN4I_A10_DISPLAY_DIV_SHIFT    0
