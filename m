@@ -1,86 +1,145 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Sat, 31 Oct 2015 19:34:44 +0100
-Subject: [PATCH] arm: spinlock: const qualify read-only functions.
-In-Reply-To: <CAB3A_j9VhARfgybw-oQWVdZciSdc93i1fEL7tTdRHvdzUtQkog@mail.gmail.com>
-References: <1446061495-38554-1-git-send-email-icoolidge@google.com>
- <1446164820-16144-1-git-send-email-icoolidge@google.com>
- <CAB3A_j9VhARfgybw-oQWVdZciSdc93i1fEL7tTdRHvdzUtQkog@mail.gmail.com>
-Message-ID: <CAKv+Gu8ksbi=j=jhv2P=4dNHWY_6B+i5=LCbwrLv1TsJGNY9gA@mail.gmail.com>
+From: robh+dt@kernel.org (Rob Herring)
+Date: Sat, 31 Oct 2015 13:37:00 -0500
+Subject: [PATCH v10 09/17] dt-bindings: add document for rockchip variant
+ of analogix_dp
+In-Reply-To: <1446273737-15262-1-git-send-email-ykk@rock-chips.com>
+References: <1446020143-32645-1-git-send-email-ykk@rock-chips.com>
+ <1446273737-15262-1-git-send-email-ykk@rock-chips.com>
+Message-ID: <CAL_Jsq+Z0RSgB1aBg+x4Ez7zXAjyyn6BkOuua=3JeqpKR=v+Lg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 31 October 2015 at 18:26, Ian Coolidge <icoolidge@google.com> wrote:
-> On Thu, Oct 29, 2015 at 5:27 PM, Ian Coolidge <icoolidge@google.com> wrote:
->> This allows assert_spin_locked() to be used against
->> spinlocks that are const qualified.
->>
->> For example:
->>
->> struct instance_t {
->>         int data;
->>         spinlock_t lock;
->> };
->>
->> /*
->>  * foo does not mutate instance.
->>  * foo must be called while the lock is held.
->>  */
->> int foo(const instance_t *instance) {
->>         assert_spin_locked(&instance->lock);
->>
->>         /* Code that assumes the lock is held */
->>
->>         return 0;
->> }
->>
->> Signed-off-by: Ian Coolidge <icoolidge@google.com>
->> ---
->>  arch/arm/include/asm/spinlock.h | 4 ++--
->>  1 file changed, 2 insertions(+), 2 deletions(-)
->>
->> diff --git a/arch/arm/include/asm/spinlock.h b/arch/arm/include/asm/spinlock.h
->> index 0fa4184..274ceb1 100644
->> --- a/arch/arm/include/asm/spinlock.h
->> +++ b/arch/arm/include/asm/spinlock.h
->> @@ -118,12 +118,12 @@ static inline int arch_spin_value_unlocked(arch_spinlock_t lock)
->>         return lock.tickets.owner == lock.tickets.next;
->>  }
->>
->> -static inline int arch_spin_is_locked(arch_spinlock_t *lock)
->> +static inline int arch_spin_is_locked(const arch_spinlock_t *lock)
->>  {
->>         return !arch_spin_value_unlocked(READ_ONCE(*lock));
->>  }
->>
->> -static inline int arch_spin_is_contended(arch_spinlock_t *lock)
->> +static inline int arch_spin_is_contended(const arch_spinlock_t *lock)
->>  {
->>         struct __raw_tickets tickets = READ_ONCE(lock->tickets);
->>         return (tickets.next - tickets.owner) > 1;
->> --
->> 2.6.0.rc2.230.g3dd15c0
->>
+On Sat, Oct 31, 2015 at 1:42 AM, Yakir Yang <ykk@rock-chips.com> wrote:
+> Rockchip DP driver is a helper driver of analogix_dp coder driver,
+> so most of the DT property should be descriped in analogix_dp document.
 >
-> Arnd,
+> Reviewed-by: Heiko Stuebner <heiko@sntech.de>
+> Signed-off-by: Yakir Yang <ykk@rock-chips.com>
+
+Acked-by: Rob Herring <robh@kernel.org>
+
+> ---
+> Changes in v10:
+> - Removed the duplicated signed-of.
 >
-> Please see this patch for an updated version. I should have noted it
-> is PATCH v2 and replied to the old thread, sorry about that.
-> Anyways, I provided an example of a const spinlock. Here, in that
-> example, the spinlock is not const itself, but it is part of a
-> structure that may be const.
-> I believe the example is a good one.
+> Changes in v9:
+> - Document more details for 'ports' property.
 >
-> Also, with regards to your feedback, I don't think the length of the
-> function body is a good argument against promising not to mutate it.
+> Changes in v8:
+> - Modify the commit subject name. (Heiko)
 >
-
-Hi,
-
-Note that Ard (me) and Arnd are two different persons.
-
-I think your patch makes sense in itself, I just wonder if there are
-any real examples in the current codebase that would require it. Which
-struct is it that you are looking to constify, and in which context?
-
-Regards,
-Ard.
+> Changes in v7: None
+> Changes in v6: None
+> Changes in v5:
+> - Split binding doc's from driver changes. (Rob)
+> - Add eDP hotplug pinctrl property. (Heiko)
+>
+> Changes in v4: None
+> Changes in v3: None
+> Changes in v2: None
+>
+>  .../display/rockchip/analogix_dp-rockchip.txt      | 91 ++++++++++++++++++++++
+>  1 file changed, 91 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/display/rockchip/analogix_dp-rockchip.txt
+>
+> diff --git a/Documentation/devicetree/bindings/display/rockchip/analogix_dp-rockchip.txt b/Documentation/devicetree/bindings/display/rockchip/analogix_dp-rockchip.txt
+> new file mode 100644
+> index 0000000..dae86c4
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/display/rockchip/analogix_dp-rockchip.txt
+> @@ -0,0 +1,91 @@
+> +Rockchip RK3288 specific extensions to the Analogix Display Port
+> +================================
+> +
+> +Required properties:
+> +- compatible: "rockchip,rk3288-edp";
+> +
+> +- reg: physical base address of the controller and length
+> +
+> +- clocks: from common clock binding: handle to dp clock.
+> +         of memory mapped region.
+> +
+> +- clock-names: from common clock binding:
+> +              Required elements: "dp" "pclk"
+> +
+> +- resets: Must contain an entry for each entry in reset-names.
+> +         See ../reset/reset.txt for details.
+> +
+> +- pinctrl-names: Names corresponding to the chip hotplug pinctrl states.
+> +- pinctrl-0: pin-control mode. should be <&edp_hpd>
+> +
+> +- reset-names: Must include the name "dp"
+> +
+> +- rockchip,grf: this soc should set GRF regs, so need get grf here.
+> +
+> +- ports: there are 2 port nodes with endpoint definitions as defined in
+> +  Documentation/devicetree/bindings/media/video-interfaces.txt.
+> +    Port 0: contained 2 endpoints, connecting to the ouput of vop.
+> +    Port 1: contained 1 endpoint, connecting to the input of panel.
+> +
+> +For the below properties, please refer to Analogix DP binding document:
+> + * Documentation/devicetree/bindings/drm/bridge/analogix_dp.txt
+> +- phys (required)
+> +- phy-names (required)
+> +- hpd-gpios (optional)
+> +-------------------------------------------------------------------------------
+> +
+> +Example:
+> +       dp-controller: dp at ff970000 {
+> +               compatible = "rockchip,rk3288-dp";
+> +               reg = <0xff970000 0x4000>;
+> +               interrupts = <GIC_SPI 98 IRQ_TYPE_LEVEL_HIGH>;
+> +               clocks = <&cru SCLK_EDP>, <&cru PCLK_EDP_CTRL>;
+> +               clock-names = "dp", "pclk";
+> +               phys = <&dp_phy>;
+> +               phy-names = "dp";
+> +
+> +               rockchip,grf = <&grf>;
+> +               resets = <&cru 111>;
+> +               reset-names = "dp";
+> +
+> +               pinctrl-names = "default";
+> +               pinctrl-0 = <&edp_hpd>;
+> +
+> +               status = "disabled";
+> +
+> +               ports {
+> +                       #address-cells = <1>;
+> +                       #size-cells = <0>;
+> +                       edp_in: port at 0 {
+> +                               reg = <0>;
+> +                               #address-cells = <1>;
+> +                               #size-cells = <0>;
+> +                               edp_in_vopb: endpoint at 0 {
+> +                                       reg = <0>;
+> +                                       remote-endpoint = <&vopb_out_edp>;
+> +                               };
+> +                               edp_in_vopl: endpoint at 1 {
+> +                                       reg = <1>;
+> +                                       remote-endpoint = <&vopl_out_edp>;
+> +                               };
+> +                       };
+> +
+> +                       edp_out: port at 1 {
+> +                               reg = <1>;
+> +                               #address-cells = <1>;
+> +                               #size-cells = <0>;
+> +                               edp_out_panel: endpoint {
+> +                                       reg = <0>;
+> +                                       remote-endpoint = <&panel_in_edp>
+> +                               };
+> +                       };
+> +               };
+> +       };
+> +
+> +       pinctrl {
+> +               edp {
+> +                       edp_hpd: edp-hpd {
+> +                               rockchip,pins = <7 11 RK_FUNC_2 &pcfg_pull_none>;
+> +                       };
+> +               };
+> +       };
+> --
+> 1.9.1
+>
+>
