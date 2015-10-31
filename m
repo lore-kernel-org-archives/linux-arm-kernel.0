@@ -1,46 +1,42 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sat, 31 Oct 2015 01:41:10 +0000
-Subject: [PATCH 1/2] pinctrl: uniphier: enable UniPhier SoCs pinctrl
- drivers by default
-In-Reply-To: <CACRpkdY4hs_7dE2KicDeUj7hvbKmHu3pcwQO3eshTtSmzH2PGA@mail.gmail.com>
-References: <1445912911-1292-1-git-send-email-yamada.masahiro@socionext.com>
- <CACRpkdY4hs_7dE2KicDeUj7hvbKmHu3pcwQO3eshTtSmzH2PGA@mail.gmail.com>
-Message-ID: <20151031014110.GA1991@localhost>
+Date: Sat, 31 Oct 2015 01:42:22 +0000
+Subject: [GIT PULL] two omap regression fixes for v4.3-rc cycle
+In-Reply-To: <20151029201829.GF3078@atomide.com>
+References: <20151029201829.GF3078@atomide.com>
+Message-ID: <20151031014222.GB1722@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 29, 2015 at 02:33:34PM +0100, Linus Walleij wrote:
-> On Tue, Oct 27, 2015 at 3:28 AM, Masahiro Yamada
-> <yamada.masahiro@socionext.com> wrote:
+On Thu, Oct 29, 2015 at 01:18:30PM -0700, Tony Lindgren wrote:
+> The following changes since commit 57df5380853460bc66b59a46273ce113c923d39c:
 > 
-> > Add "default y" to the Kconfig rather than adding entries into
-> > arch/arm/configs/multi_v7_defconfig.
-> >
-> > Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+>   ARM: OMAP2+: Fix imprecise external abort caused by bogus SRAM init (2015-10-19 08:55:46 -0700)
 > 
-> (...)
-> > config PINCTRL_UNIPHIER_PH1_LD4
-> >         tristate "UniPhier PH1-LD4 SoC pinctrl driver"
-> > +       default y
-> >         select PINCTRL_UNIPHIER_CORE
+> are available in the git repository at:
 > 
-> Why is it not default y if <PH1_LD4_SOC_THING>?
+>   git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap tags/omap-for-v4.3/fixes-rc7
 > 
-> So it is only turned on if the corresponding SoC is selected?
+> for you to fetch changes up to 8f2279d5d908119a08e906be1c6b69c744d0c379:
 > 
-> Or don't you have symbols like that?
+>   usb: musb: omap2430: Fix regression caused by driver core change (2015-10-28 10:16:04 -0700)
 > 
-> ARM SoC folks: can you ACK this patch indicating that this is the way
-> you wanna handle this?
+> ----------------------------------------------------------------
+> Two omap regression fixes:
+> 
+> - Fix omap3 MUSB with DMA caused by driver core changes
+> 
+> - Fix LCD DMA interrupt number for omap1 that did not
+>   get changed for sparse IRQ changes
+> 
+> ----------------------------------------------------------------
+> Aaro Koskinen (1):
+>       ARM: OMAP1: fix incorrect INT_DMA_LCD
+> 
+> Tony Lindgren (1):
+>       usb: musb: omap2430: Fix regression caused by driver core change
+> 
 
-Most other will have a "default MACH_<foo>", but Uniphier lacks those Kconfig
-symbols. Or even a def_bool for that platform such that it's not an option if
-the platform is enabled. It makes no sense to enable a platform but not the
-pinctrl on it, so that's a good way to do it.
-
-I would honestly rather have those in the mach makefile, and make the drivers
-select the right thing by default, than having to know exactly which drivers to
-enable for a specific SoC.
+Thanks, merged.
 
 
 -Olof
