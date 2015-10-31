@@ -1,40 +1,46 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Sat, 31 Oct 2015 01:31:27 +0000
-Subject: [PATCH] ARM64: juno: disable NOR flash node by default
-In-Reply-To: <1446025195-9264-1-git-send-email-linus.walleij@linaro.org>
-References: <1446025195-9264-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <20151031013127.GA1722@localhost>
+Date: Sat, 31 Oct 2015 01:41:10 +0000
+Subject: [PATCH 1/2] pinctrl: uniphier: enable UniPhier SoCs pinctrl
+ drivers by default
+In-Reply-To: <CACRpkdY4hs_7dE2KicDeUj7hvbKmHu3pcwQO3eshTtSmzH2PGA@mail.gmail.com>
+References: <1445912911-1292-1-git-send-email-yamada.masahiro@socionext.com>
+ <CACRpkdY4hs_7dE2KicDeUj7hvbKmHu3pcwQO3eshTtSmzH2PGA@mail.gmail.com>
+Message-ID: <20151031014110.GA1991@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 28, 2015 at 10:39:55AM +0100, Linus Walleij wrote:
-> After discussing on the mailing list it turns out that
-> accessing the flash memory from the kernel can disrupt CPU
-> sleep states and CPU hotplugging, so let's disable this
-> DT node by default. Setups that want to access the flash
-> can modify this entry to enable the flash again.
+On Thu, Oct 29, 2015 at 02:33:34PM +0100, Linus Walleij wrote:
+> On Tue, Oct 27, 2015 at 3:28 AM, Masahiro Yamada
+> <yamada.masahiro@socionext.com> wrote:
 > 
-> Quoting Sudeep Holla: "the firmware assumes the flash is
-> always in read mode while Linux leaves NOR flash in
-> "read id" mode after initialization."
+> > Add "default y" to the Kconfig rather than adding entries into
+> > arch/arm/configs/multi_v7_defconfig.
+> >
+> > Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
 > 
-> Reported-by: Sudeep Holla <sudeep.holla@arm.com>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: Sudeep Holla <sudeep.holla@arm.com>
-> Cc: Liviu Dudau <Liviu.Dudau@arm.com>
-> Cc: Lorenzo Pieralisi <Lorenzo.Pieralisi@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Leif Lindholm <leif.lindholm@arm.com>
-> Cc: Ryan Harkin <ryan.harkin@linaro.org>
-> Fixes: 5078f77e1443 "ARM64: juno: add NOR flash to device tree"
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
-> ARM SoC folks: please apply this as a fix for the upcoming v4.4
-> merge window, directly to the branch where the original commit
-> resides (appears to be directly on the for-next branch or
-> something).
+> (...)
+> > config PINCTRL_UNIPHIER_PH1_LD4
+> >         tristate "UniPhier PH1-LD4 SoC pinctrl driver"
+> > +       default y
+> >         select PINCTRL_UNIPHIER_CORE
+> 
+> Why is it not default y if <PH1_LD4_SOC_THING>?
+> 
+> So it is only turned on if the corresponding SoC is selected?
+> 
+> Or don't you have symbols like that?
+> 
+> ARM SoC folks: can you ACK this patch indicating that this is the way
+> you wanna handle this?
 
-Applied, thanks.
+Most other will have a "default MACH_<foo>", but Uniphier lacks those Kconfig
+symbols. Or even a def_bool for that platform such that it's not an option if
+the platform is enabled. It makes no sense to enable a platform but not the
+pinctrl on it, so that's a good way to do it.
+
+I would honestly rather have those in the mach makefile, and make the drivers
+select the right thing by default, than having to know exactly which drivers to
+enable for a specific SoC.
 
 
 -Olof
