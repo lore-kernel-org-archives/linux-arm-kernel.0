@@ -1,36 +1,40 @@
-From: huangdaode@hisilicon.com (huangdaode)
-Date: Sat, 31 Oct 2015 09:40:16 +0800
-Subject: [PATCH RESEND v2 net-next] net: hisilicon: updates HNS config
- and documents
-In-Reply-To: <4549013.K7sn8Pca5b@wuerfel>
-References: <1445944594-244149-1-git-send-email-huangdaode@hisilicon.com>
- <4549013.K7sn8Pca5b@wuerfel>
-Message-ID: <56341C00.8080303@hisilicon.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Sat, 31 Oct 2015 01:31:27 +0000
+Subject: [PATCH] ARM64: juno: disable NOR flash node by default
+In-Reply-To: <1446025195-9264-1-git-send-email-linus.walleij@linaro.org>
+References: <1446025195-9264-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <20151031013127.GA1722@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015/10/30 22:20, Arnd Bergmann wrote:
-> On Tuesday 27 October 2015 19:16:34 huangdaode wrote:
->>            mdio at 803c0000 {
->>                      #address-cells = <1>;
->>                      #size-cells = <0>;
->> -                   compatible = "hisilicon,mdio","hisilicon,hns-mdio";
->> +                   compatible = "hisilicon,hns-mdio","hisilicon,mdio";
->>                      reg = <0x0 0x803c0000 0x0 0x10000>;
->>   
->>
-> Does "hisilicon,mdio" actually have a specific meaning? Is that just there
-> for legacy reasons?
->
-> 	Arnd
->
-> .
->
-hi Arnd,
-"hisilicon,mdio" is  the gernerical configuation compatible  for the 
-default hisilicon chip,
-We use generic hisilicon since our MDIO/PHY is same across flavour of SoCs.
+On Wed, Oct 28, 2015 at 10:39:55AM +0100, Linus Walleij wrote:
+> After discussing on the mailing list it turns out that
+> accessing the flash memory from the kernel can disrupt CPU
+> sleep states and CPU hotplugging, so let's disable this
+> DT node by default. Setups that want to access the flash
+> can modify this entry to enable the flash again.
+> 
+> Quoting Sudeep Holla: "the firmware assumes the flash is
+> always in read mode while Linux leaves NOR flash in
+> "read id" mode after initialization."
+> 
+> Reported-by: Sudeep Holla <sudeep.holla@arm.com>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Sudeep Holla <sudeep.holla@arm.com>
+> Cc: Liviu Dudau <Liviu.Dudau@arm.com>
+> Cc: Lorenzo Pieralisi <Lorenzo.Pieralisi@arm.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Leif Lindholm <leif.lindholm@arm.com>
+> Cc: Ryan Harkin <ryan.harkin@linaro.org>
+> Fixes: 5078f77e1443 "ARM64: juno: add NOR flash to device tree"
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+> ARM SoC folks: please apply this as a fix for the upcoming v4.4
+> merge window, directly to the branch where the original commit
+> resides (appears to be directly on the for-next branch or
+> something).
 
--- 
-Best Regards
-Daode Huang
+Applied, thanks.
+
+
+-Olof
