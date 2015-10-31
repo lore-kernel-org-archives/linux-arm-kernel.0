@@ -1,22 +1,36 @@
-From: tj@kernel.org (Tejun Heo)
-Date: Sat, 31 Oct 2015 09:53:13 +0900
-Subject: [PATCH 1/3] ahci: qoriq: Rename LS2085A SoC support code to
- LS2080A
-In-Reply-To: <1446099737-41854-1-git-send-email-Yuantian.Tang@freescale.com>
-References: <1446099737-41854-1-git-send-email-Yuantian.Tang@freescale.com>
-Message-ID: <20151031005313.GA3582@mtj.duckdns.org>
+From: huangdaode@hisilicon.com (huangdaode)
+Date: Sat, 31 Oct 2015 09:40:16 +0800
+Subject: [PATCH RESEND v2 net-next] net: hisilicon: updates HNS config
+ and documents
+In-Reply-To: <4549013.K7sn8Pca5b@wuerfel>
+References: <1445944594-244149-1-git-send-email-huangdaode@hisilicon.com>
+ <4549013.K7sn8Pca5b@wuerfel>
+Message-ID: <56341C00.8080303@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 29, 2015 at 02:22:15PM +0800, Tang Yuantian wrote:
-> Freescale is renaming the LS2085A SoC to LS2080A.
-> This patch addresses the same.
-> 
-> Signed-off-by: Tang Yuantian <Yuantian.Tang@freescale.com>
-
-Applied 1-3 to libata/for-4.4 with cosmetic updates.
-
-Thanks.
+On 2015/10/30 22:20, Arnd Bergmann wrote:
+> On Tuesday 27 October 2015 19:16:34 huangdaode wrote:
+>>            mdio at 803c0000 {
+>>                      #address-cells = <1>;
+>>                      #size-cells = <0>;
+>> -                   compatible = "hisilicon,mdio","hisilicon,hns-mdio";
+>> +                   compatible = "hisilicon,hns-mdio","hisilicon,mdio";
+>>                      reg = <0x0 0x803c0000 0x0 0x10000>;
+>>   
+>>
+> Does "hisilicon,mdio" actually have a specific meaning? Is that just there
+> for legacy reasons?
+>
+> 	Arnd
+>
+> .
+>
+hi Arnd,
+"hisilicon,mdio" is  the gernerical configuation compatible  for the 
+default hisilicon chip,
+We use generic hisilicon since our MDIO/PHY is same across flavour of SoCs.
 
 -- 
-tejun
+Best Regards
+Daode Huang
