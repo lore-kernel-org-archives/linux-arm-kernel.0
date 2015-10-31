@@ -1,34 +1,22 @@
-From: icoolidge@google.com (Ian Coolidge)
-Date: Sat, 31 Oct 2015 12:49:46 -0700
-Subject: [PATCH] arm: spinlock: const qualify read-only functions.
-In-Reply-To: <CAB3A_j_AHrvp213D5sqSnXWvo12NWWCEpv3AEYxT0dNsWh_mog@mail.gmail.com>
-References: <1446061495-38554-1-git-send-email-icoolidge@google.com>
- <1446164820-16144-1-git-send-email-icoolidge@google.com>
- <CAB3A_j9VhARfgybw-oQWVdZciSdc93i1fEL7tTdRHvdzUtQkog@mail.gmail.com>
- <CAKv+Gu8ksbi=j=jhv2P=4dNHWY_6B+i5=LCbwrLv1TsJGNY9gA@mail.gmail.com>
- <CAB3A_j_AHrvp213D5sqSnXWvo12NWWCEpv3AEYxT0dNsWh_mog@mail.gmail.com>
-Message-ID: <CAB3A_j8RmbCiOYfZROKh9_M9dRDhyjO-h_HTyLaamSWvHVpVNw@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Sat, 31 Oct 2015 22:13:46 +0100
+Subject: [PATCH] pinctrl: zynq: fix UTF-8 errors
+In-Reply-To: <20151030170708.GM6436@xsjsorenbubuntu>
+References: <1446213973-4999-1-git-send-email-linus.walleij@linaro.org>
+ <20151030170338.GL6436@xsjsorenbubuntu>
+ <20151030170708.GM6436@xsjsorenbubuntu>
+Message-ID: <CACRpkdZgoXuiVG=A06vs8KW=e=4uaOUs+bdb9V9-bi8zfrjpyQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 31, 2015 at 12:46 PM, Ian Coolidge <icoolidge@google.com> wrote:
-> Hi Ard,
+On Fri, Oct 30, 2015 at 6:07 PM, S?ren Brinkmann
+<soren.brinkmann@xilinx.com> wrote:
+> On Fri, 2015-10-30 at 10:03AM -0700, S?ren Brinkmann wrote:
+>> Hi Linux,
 >
-> :) D'oh, yes, I had assumed you were the same person.
->
-> It is for a driver that I would eventually like to upstream.
->
-> I see that there are many cases where assert_spin_lock is used, but
-> perhaps driver developers are underutilizing const,
-> or compiling the kernel with warnings tolerated.
->
->> Note that Ard (me) and Arnd are two different persons.
->>
->> I think your patch makes sense in itself, I just wonder if there are
->> any real examples in the current codebase that would require it. Which
->> struct is it that you are looking to constify, and in which context?
->>
->> Regards,
->> Ard.
+> Linus, of course...
 
-Sorry for the top-post, and I meant 'assert_spin_locked'.
+After screwing up your name like that I kind of deserve it...
+
+Yours,
+Linus Walleij
