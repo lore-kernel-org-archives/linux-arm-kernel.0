@@ -1,39 +1,22 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Sat, 31 Oct 2015 09:00:12 +0900
-Subject: [PATCH V6 3/6] Documentation: DT: Add entry for FSL LS1043ARDB
- board
-In-Reply-To: <1445587282-29529-3-git-send-email-B48286@freescale.com>
-References: <1445587282-29529-1-git-send-email-B48286@freescale.com>
- <1445587282-29529-3-git-send-email-B48286@freescale.com>
-Message-ID: <CAOesGMhB0JqcO1CGegUHHSQNZ_P303fdjn_OqFofXgnSFDo=og@mail.gmail.com>
+From: tj@kernel.org (Tejun Heo)
+Date: Sat, 31 Oct 2015 09:53:13 +0900
+Subject: [PATCH 1/3] ahci: qoriq: Rename LS2085A SoC support code to
+ LS2080A
+In-Reply-To: <1446099737-41854-1-git-send-email-Yuantian.Tang@freescale.com>
+References: <1446099737-41854-1-git-send-email-Yuantian.Tang@freescale.com>
+Message-ID: <20151031005313.GA3582@mtj.duckdns.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, Oct 29, 2015 at 02:22:15PM +0800, Tang Yuantian wrote:
+> Freescale is renaming the LS2085A SoC to LS2080A.
+> This patch addresses the same.
+> 
+> Signed-off-by: Tang Yuantian <Yuantian.Tang@freescale.com>
 
-On Fri, Oct 23, 2015 at 5:01 PM, Zhiqiang Hou <B48286@freescale.com> wrote:
-> From: Mingkai Hu <Mingkai.Hu@freescale.com>
->
-> Signed-off-by: Mingkai Hu <Mingkai.Hu@freescale.com>
-> Signed-off-by: Hou Zhiqiang <B48286@freescale.com>
-> ---
-> V6: V5 V4 V3 V2
->  - No change.
+Applied 1-3 to libata/for-4.4 with cosmetic updates.
 
-You have a large number of cc recipients on these emails. I don't
-think the i2c list needs to be on a board binding doc, for example.
+Thanks.
 
-Also, this patch lacks description. Even short and trivial patches
-deserve at least a one-line description. :)
-
-Finally, LeoLi asked on IRC what to do with these patches. The
-maintainer of your platform should gather them and send the platform
-portions of the patch series (DT, Kconfig, Makefile entries, etc) to
-arm at kernel.org. Please don't post patches to that alias until they are
-reviewed, and we want one maintainer (or a team, but start with one)
-to be in charge of handling this. That way we have one person that
-will learn what we expect and not, and can train others over time.
-
-
-
--Olof
+-- 
+tejun
