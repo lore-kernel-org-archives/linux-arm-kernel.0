@@ -1,41 +1,57 @@
-From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
-Date: Sat, 31 Oct 2015 15:41:57 +0000
-Subject: CPU_METHOD_OF_DECLARE() with Linux as non-secure OS
-In-Reply-To: <5633CF2A.4040504@free.fr> (Mason's message of "Fri, 30 Oct 2015
- 21:12:26 +0100")
-References: <5630C143.5080103@free.fr> <yw1xio5pd5mf.fsf@unicorn.mansr.com>
- <56325C67.8000007@free.fr> <yw1xeggdd007.fsf@unicorn.mansr.com>
- <5633CF2A.4040504@free.fr>
-Message-ID: <yw1xpozvavui.fsf@unicorn.mansr.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Sat, 31 Oct 2015 17:30:49 +0100
+Subject: [PATCH] arm: spinlock: const qualify read-only functions
+In-Reply-To: <1446079665-25366-1-git-send-email-icoolidge@google.com>
+References: <1446079665-25366-1-git-send-email-icoolidge@google.com>
+Message-ID: <CAKv+Gu_XL0mB25=PdNBfkaCB6XAWodKUd9Q+moTOfuZqfRGzYg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mason <slash.tmp@free.fr> writes:
+On 29 October 2015 at 01:47, Ian Coolidge <icoolidge@google.com> wrote:
+> This allows assert_spin_locked() to be used against
+> spinlocks that are const qualified.
+>
+> Signed-off-by: Ian Coolidge <icoolidge@google.com>
+> ---
+>  arch/arm/include/asm/spinlock.h | 6 +++---
+>  1 file changed, 3 insertions(+), 3 deletions(-)
+>
+> diff --git a/arch/arm/include/asm/spinlock.h b/arch/arm/include/asm/spinlock.h
+> index 0fa4184..3512d2d 100644
+> --- a/arch/arm/include/asm/spinlock.h
+> +++ b/arch/arm/include/asm/spinlock.h
+> @@ -113,17 +113,17 @@ static inline void arch_spin_unlock(arch_spinlock_t *lock)
+>         dsb_sev();
+>  }
+>
+> -static inline int arch_spin_value_unlocked(arch_spinlock_t lock)
+> +static inline int arch_spin_value_unlocked(const arch_spinlock_t lock)
 
-> On 29/10/2015 19:04, M?ns Rullg?rd wrote:
->
->> There's also something wrong with the L2C-310 aux control register
->> setting.  The SMC call ID from OMAP (0x109) which is also used in some
->> Sigma code I found somewhere doesn't seem to do anything, so the
->> register is left at the value set by the secure boot code.  Perhaps you
->> can check with your firmware guy if there's another way of writing that
->> register.
->
-> IIRC, only debug firmware allows writes to L2 AUXCTRL (after filtering
-> some of the bits out), while production firmware ignores them completely.
->
-> IME, the smc handler should default to return ENOTSUP; that way, when
-> a syscall disappears due to ifdef-ery, the caller gets a meaningful
-> answer.
->
-> We just had an interesting internal discussion about L2 AUXCTRL.
-> For my education, what value would you like to write to AUXCTRL? :-)
+In this case, 'lock' is passed by value, so there is really no point
+in constifying it.
 
-The best value to use depends on the workload, so it would be nice to be
-able to control all the purely performance related bits.  I see no
-possible benefit in restricting the non-secure kernel from writing
-these.
+>  {
+>         return lock.tickets.owner == lock.tickets.next;
+>  }
+>
+> -static inline int arch_spin_is_locked(arch_spinlock_t *lock)
+> +static inline int arch_spin_is_locked(const arch_spinlock_t *lock)
+>  {
+>         return !arch_spin_value_unlocked(READ_ONCE(*lock));
+>  }
+>
+> -static inline int arch_spin_is_contended(arch_spinlock_t *lock)
+> +static inline int arch_spin_is_contended(const arch_spinlock_t *lock)
+>  {
+>         struct __raw_tickets tickets = READ_ONCE(lock->tickets);
+>         return (tickets.next - tickets.owner) > 1;
+
+For these remaining cases, the 'const' only enforces that these
+functions may not change the state of the lock. I think this is of
+limited value for single-line static inline functions such as these.
+
+Could you explain your use case? Do you have code that only has access
+to constified references to arch_spinlock_t instances?
 
 -- 
-M?ns Rullg?rd
-mans at mansr.com
+Ard.
