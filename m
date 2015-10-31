@@ -1,68 +1,41 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Sat, 31 Oct 2015 14:04:47 +0100
-Subject: [PATCH v2 1/4] clocksource: rockchip: Make the driver more
- compatible
-In-Reply-To: <21587719.mnFBFBzBeI@phil>
-References: <1443147298-12603-1-git-send-email-wxt@rock-chips.com>
- <5632E765.4010207@gmail.com> <56334995.6090103@linaro.org>
- <21587719.mnFBFBzBeI@phil>
-Message-ID: <5634BC6F.6020408@linaro.org>
+From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
+Date: Sat, 31 Oct 2015 15:41:57 +0000
+Subject: CPU_METHOD_OF_DECLARE() with Linux as non-secure OS
+In-Reply-To: <5633CF2A.4040504@free.fr> (Mason's message of "Fri, 30 Oct 2015
+ 21:12:26 +0100")
+References: <5630C143.5080103@free.fr> <yw1xio5pd5mf.fsf@unicorn.mansr.com>
+ <56325C67.8000007@free.fr> <yw1xeggdd007.fsf@unicorn.mansr.com>
+ <5633CF2A.4040504@free.fr>
+Message-ID: <yw1xpozvavui.fsf@unicorn.mansr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/31/2015 12:47 AM, Heiko Stuebner wrote:
-> Hi Daniel,
+Mason <slash.tmp@free.fr> writes:
+
+> On 29/10/2015 19:04, M?ns Rullg?rd wrote:
 >
-> Am Freitag, 30. Oktober 2015, 11:42:29 schrieb Daniel Lezcano:
->> On 10/30/2015 04:43 AM, Caesar Wang wrote:
->>> Hi Daniel,
->>>
->>> ? 2015?10?01? 03:14, Heiko St?bner ??:
->>>> Hi Daniel,
->>>>
->>>> Am Dienstag, 29. September 2015, 06:18:03 schrieb Daniel Lezcano:
->>>>> On 09/25/2015 04:14 AM, Caesar Wang wrote:
->>>>>> Build the arm64 SoCs (e.g.: RK3368) on Rockchip platform,
->>>>>> There are some failure with build up on timer driver for rockchip.
->>>>>>
->>>>>> Says:
->>>>>> /tmp/ccdAnNy5.s:47: Error: missing immediate expression at  operand
->>>>>> 1 --
->>>>>> `dsb`
->>>>>> ...
->>>>>>
->>>>>> The problem was different semantics of dsb on btw arm32 and arm64,
->>>>>> Here we can convert the dsb with insteading of dsb(sy).The "sy" param
->>>>>> is the default which you are allow to omit, so on arm32 dsb()and
->>>>>> dsb(sy)
->>>>>> are the same.
->>>>>>
->>>>>> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
->>>>> Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
->>>> as you have "just" Acked these patches, I guess you are expecting them
->>>> to go
->>>> through the same tree as the devicetree changes, right?
->>>
->>> I'm wonder if someone will apply this series patchs but the wait.:-)
->>> In fact, I'm no sure that the Acked is really meaning.:-
->>
->> Yes, by acking the patch I say I am ok with it and I agree it can go
->> through another tree.
+>> There's also something wrong with the L2C-310 aux control register
+>> setting.  The SMC call ID from OMAP (0x109) which is also used in some
+>> Sigma code I found somewhere doesn't seem to do anything, so the
+>> register is left at the value set by the secure boot code.  Perhaps you
+>> can check with your firmware guy if there's another way of writing that
+>> register.
 >
-> although I guess the two clocksource changes could very well just go
-> through your tree. dsb() -> dsb(sy) is supposed to be equal and the second
-> one is just cosmetics.  The Kconfig and dts changes need to wait in any case
-> for 4.5 ... but I guess that may be true for the clocksource changes as well?
+> IIRC, only debug firmware allows writes to L2 AUXCTRL (after filtering
+> some of the bits out), while production firmware ignores them completely.
+>
+> IME, the smc handler should default to return ENOTSUP; that way, when
+> a syscall disappears due to ifdef-ery, the caller gets a meaningful
+> answer.
+>
+> We just had an interesting internal discussion about L2 AUXCTRL.
+> For my education, what value would you like to write to AUXCTRL? :-)
 
-Ok, I will take the two first patches through my tree.
-
-Thanks
-   -- Daniel
-
+The best value to use depends on the workload, so it would be nice to be
+able to control all the purely performance related bits.  I see no
+possible benefit in restricting the non-secure kernel from writing
+these.
 
 -- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+M?ns Rullg?rd
+mans at mansr.com
