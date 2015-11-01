@@ -1,58 +1,80 @@
-From: dan.j.williams@intel.com (Dan Williams)
-Date: Sun, 1 Nov 2015 12:51:09 -0800
-Subject: [GIT PULL] memremap fix for 4.3 (v2)
-In-Reply-To: <20151101203656.GR8644@n2100.arm.linux.org.uk>
-References: <1446409463.10982.4.camel@intel.com>
- <20151101203656.GR8644@n2100.arm.linux.org.uk>
-Message-ID: <CAPcyv4gyJJ0TuuTfLscByLz-z8dS=Z+VbBP302KuYucg7E-5_g@mail.gmail.com>
+From: ebiederm@xmission.com (Eric W. Biederman)
+Date: Sun, 01 Nov 2015 15:50:17 -0600
+Subject: [PATCH 1/2] mm: mmap: Add new /proc tunable for mmap_base ASLR.
+In-Reply-To: <56329880.4080103@android.com> (Daniel Cashman's message of "Thu,
+ 29 Oct 2015 15:06:56 -0700")
+References: <1446067520-31806-1-git-send-email-dcashman@android.com>
+ <871tcewoso.fsf@x220.int.ebiederm.org>
+ <CABXk95DOSKv70p+=DQvHck5LCvRDc0WDORpoobSStWhrcrCiyg@mail.gmail.com>
+ <CAEP4de2GsEwn0eeO126GEtFb-FSJoU3fgOWTAr1yPFAmyXTi0Q@mail.gmail.com>
+ <87oafiuys0.fsf@x220.int.ebiederm.org> <56329880.4080103@android.com>
+Message-ID: <87k2q1tmna.fsf@x220.int.ebiederm.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Nov 1, 2015 at 12:36 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Sun, Nov 01, 2015 at 08:24:25PM +0000, Williams, Dan J wrote:
->> diff --git a/kernel/memremap.c b/kernel/memremap.c
->> index 72b0c66628b6..9d6b55587eaa 100644
->> --- a/kernel/memremap.c
->> +++ b/kernel/memremap.c
->> @@ -24,6 +24,16 @@ __weak void __iomem *ioremap_cache(resource_size_t offset, unsigned long size)
->>  }
->>  #endif
->>
->> +static void *try_ram_remap(resource_size_t offset, size_t size)
->> +{
->> +     struct page *page = pfn_to_page(offset >> PAGE_SHIFT);
->> +
->> +     /* In the simple case just return the existing linear address */
->> +     if (!PageHighMem(page))
->> +             return __va(offset);
->> +     return NULL; /* fallback to ioremap_cache */
->
-> Right, so a highmem page results in this returning NULL, which will...
->
->> @@ -66,8 +76,8 @@ void *memremap(resource_size_t offset, size_t size, unsigned long flags)
->>                * the requested range is potentially in "System RAM"
->>                */
->>               if (is_ram == REGION_INTERSECTS)
->> -                     addr = __va(offset);
->> -             else
->> +                     addr = try_ram_remap(offset, size);
->> +             if (!addr)
->>                       addr = ioremap_cache(offset, size);
->
-> cause ioremap_cache() to be called.  That falls through on ARM to:
->
->         __arm_ioremap_pfn_caller()
->
-> and we will hit this (as I've mentioned before through explanation
-> rather than quoting code):
->
->         /*
->          * Don't allow RAM to be mapped - this causes problems with ARMv6+
->          */
->         if (WARN_ON(pfn_valid(pfn)))
->                 return NULL;
->
+Daniel Cashman <dcashman@android.com> writes:
 
-Right, which means the caller is broken and shouldn't be using
-memremap, same as misuse of ioremap_cache today.
+> On 10/28/2015 08:41 PM, Eric W. Biederman wrote:
+>> Dan Cashman <dcashman@android.com> writes:
+>> 
+>>>>> This all would be much cleaner if the arm architecture code were just to
+>>>>> register the sysctl itself.
+>>>>>
+>>>>> As it sits this looks like a patchset that does not meaninfully bisect,
+>>>>> and would result in code that is hard to trace and understand.
+>>>>
+>>>> I believe the intent is to follow up with more architecture specific
+>>>> patches to allow each architecture to define the number of bits to use
+>>>
+>>> Yes.  I included these patches together because they provide mutual
+>>> context, but each has a different outcome and they could be taken
+>>> separately.
+>> 
+>> They can not.  The first patch is incomplete by itself.
+>
+> Could you be more specific in what makes the first patch incomplete?  Is
+> it because it is essentially a no-op without additional architecture
+> changes (e.g. the second patch) or is it specifically because it
+> introduces and uses the three "mmap_rnd_bits*" variables without
+> defining them?  If the former, I'd like to avoid combining the general
+> procfs change with any architecture-specific one(s).  If the latter, I
+> hope the proposal below addresses that.
+
+A bit of both.  The fact that the code can not compile in the first
+patch because of missing variables is distressing.  Having the arch
+specific code as a separate patch is fine, but they need to remain in
+the same patchset.
+
+>>> The arm architecture-specific portion allows the changing
+>>> of the number of bits used for mmap ASLR, useful even without the
+>>> sysctl.  The sysctl patch (patch 1) provides another way of setting
+>>> this value, and the hope is that this will be adopted across multiple
+>>> architectures, with the arm changes (patch 2) providing an example.  I
+>>> hope to follow this with changes to arm64 and x86, for example.
+>> 
+>> If you want to make the code generic.  Please maximize the sharing.
+>> That is please define the variables in a generic location, as well
+>> as the Kconfig variables (if possible).
+>> 
+>> As it is you have an architecture specific piece of code that can not be
+>> reused without duplicating code, and that is just begging for problems.
+>
+> I think it would make sense to move the variable definitions into
+> mm/mmap.c, included conditionally based on the presence of
+> CONFIG_ARCH_MMAP_RND_BITS.
+>
+> As for the Kconfigs, I am open to suggestions.  I considered declaring
+> and documenting ARCH_MMAP_RND_BITS in arch/Kconfig, but I would like it
+> to be bounded in range by the _MIN and _MAX values, which necessarily
+> must be defined in the arch-specific Kconfigs.  Thus, we'd have
+> ARCH_MMAP_RND_BITS declared in arch/Kconfig as it currently is in
+> arch/arm/Kconfig defaulting to _MIN, and would declare both the _MIN and
+> _MAX in arch/Kconfig, while specifying default values in
+> arch/${ARCH}/Kconfig.
+>
+> Would these changes be more acceptable?
+
+Yes.  I don't think you can do much about the Kconfigs so I would not
+worry about that too much.
+
+Eric
