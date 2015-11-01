@@ -1,43 +1,92 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Thu, 1 Oct 2015 08:58:59 +0200
-Subject: [PATCH 1/5] ARM: sunxi: Add R8 support
-In-Reply-To: <20150930223829.GG18556@codeaurora.org>
-References: <1442566130-3497-1-git-send-email-maxime.ripard@free-electrons.com>
- <1442566130-3497-2-git-send-email-maxime.ripard@free-electrons.com>
- <20150930223829.GG18556@codeaurora.org>
-Message-ID: <20151001065859.GA7104@lukather>
+From: jungseoklee85@gmail.com (Jungseok Lee)
+Date: Sun,  1 Nov 2015 07:46:14 +0000
+Subject: [PATCH v6 0/3] Introduce IRQ stack on arm64 with percpu changes
+Message-ID: <1446363977-23656-1-git-send-email-jungseoklee85@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Sep 30, 2015 at 03:38:29PM -0700, Stephen Boyd wrote:
-> On 09/18, Maxime Ripard wrote:
-> > The R8 is a new Allwinner SoC based on the A13. While both are very
-> > similar, there's still a few differences. Introduce a new compatible to
-> > deal with them.
-> > 
-> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> > ---
-> 
-> Acked-by: Stephen Boyd <sboyd@codeaurora.org>
-> 
-> BTW, why is the entire series sent To: Mike and I? Are these
-> patches intended to go through clk tree?
+This is version 6 of IRQ stack on arm64.
 
-I wanted to have the Ack from one of you on this patch. I usually
-prefer to have the whole serie instead of a single out of context
-patch, just let me know if you feel otherwise :)
+A major change between v5 and v6 is how IRQ stack is allocated. The space
+is allocated via generic VM APIs, such as __get_free_pages() or kmalloc()
+up to v5. In contrast, PERCPU is responsible for the work in this version
+since it helps to 1) handle stack pointer with a minimum number of memory
+access and 2) unify memory allocation regardless of page size. (Now ARM64
+supports three kinds of page size: 4KB, 16KB, and 64KB.)
 
-Thanks!
-Maxime
+Unfortunately, generic percpu codes should be touched a little bit to
+support PERCPU stack allocation. That is, 'atom_size' should be adjusted
+in case of 4KB page system because stack pointer logic works on the
+assumption that IRQ stack is aligned with its own size. Although it is not
+mandated by ARMv8 architecture, the restriction faciliates IRQ re-entrance
+check and call trace linkage between procee stack and IRQ one.
+
+It would be redundant to introduce ARM64-specific setup_per_cpu_areas()
+for a single parameter, 'atom_size' change. This is why this series tries
+to update the generic percpu layer. At the same time, but, it is doubtable
+to define a new definition for a single arch support. Thus, it is arguable
+which approach is better than the other. (I tried to get feedbacks via
+linux-mm, but no comments were left.)
+
+In case of Patch1 and Patch2, v6 tag, not v1 one, is appended to align
+with a history of this IRQ work. Please let me know if it violates patch
+submission rules.
+
+Any comments are greatly welcome.
+
+Thanks in advance!
+
+Best Regards
+Jungseok Lee
+
+Changes since v5:
+- Introduced a new definition for 'atom_size' configuration
+- Used PERCPU for stack allocation, per Catalin
+
+Changes since v4: 
+- Supported 64KB page system
+- Introduced IRQ_STACK_* macro, per Catalin 
+- Rebased on top of for-next/core
+
+Changes since v3: 
+- Expanded stack trace to support IRQ stack
+- Added more comments
+
+Changes since v2: 
+- Optmised current_thread_info function as removing masking operation
+  and volatile keyword, per James and Catalin
+- Reworked irq re-enterance check logic using top-bit comparison of
+  stacks, per James
+- Added sp_el0 update in cpu_resume, per James
+- Selected HAVE_IRQ_EXIT_ON_IRQ_STACK to expose this feature explicitly
+- Added a Tested-by tag from James
+- Added comments on sp_el0 as a helper messeage
+
+Changes since v1: 
+- Rebased on top of v4.3-rc1
+- Removed Kconfig about IRQ stack, per James
+- Used PERCPU for IRQ stack, per James
+- Tried to allocate IRQ stack when CPU is about to start up, per James
+- Moved sp_el0 update into kernel_entry macro, per James
+- Dropped S_SP removal patch, per Mark and James
+
+Jungseok Lee (3):
+  percpu: remove PERCPU_ENOUGH_ROOM which is stale definition
+  percpu: add PERCPU_ATOM_SIZE for a generic percpu area setup
+  arm64: Introduce IRQ stack
+
+ arch/arm64/Kconfig                   |  1 +
+ arch/arm64/include/asm/irq.h         |  6 +++
+ arch/arm64/include/asm/percpu.h      |  6 +++
+ arch/arm64/include/asm/thread_info.h | 10 +++-
+ arch/arm64/kernel/entry.S            | 42 ++++++++++++++--
+ arch/arm64/kernel/head.S             |  5 ++
+ arch/arm64/kernel/irq.c              |  2 +
+ arch/arm64/kernel/sleep.S            |  3 ++
+ arch/arm64/kernel/smp.c              |  4 +-
+ include/linux/percpu.h               |  6 +--
+ mm/percpu.c                          |  6 +--
+ 11 files changed, 75 insertions(+), 16 deletions(-)
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151001/a57c81af/attachment.sig>
+2.5.0
