@@ -1,33 +1,41 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sun, 1 Nov 2015 10:36:25 +0100
-Subject: [PATCH v2] ASoC: sun4i-codec: use consistent names for PA controls
-In-Reply-To: <1445979645-1664-1-git-send-email-ats@offog.org>
-References: <1445979645-1664-1-git-send-email-ats@offog.org>
-Message-ID: <20151101093625.GO6114@lukather>
+Date: Sun, 1 Nov 2015 10:39:15 +0100
+Subject: [PATCH] ARM: dts: sun4i: Enable audio codec on Olimex A20-SOM-EVB
+In-Reply-To: <1446296142-4152-1-git-send-email-mweseloh42@gmail.com>
+References: <1446296142-4152-1-git-send-email-mweseloh42@gmail.com>
+Message-ID: <20151101093915.GP6114@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+Hi,
 
-On Tue, Oct 27, 2015 at 09:00:45PM +0000, Adam Sampson wrote:
-> The power amplifier for the headphone output is called "the PA" and "the
-> headphone amplifier" in Allwinner's documentation for the A10 and A20.
-> sun4i-codec calls it "PA" in some places and "Pre-Amplifier" (which
-> isn't really accurate) in others, leading to user-visible controls with
-> different names referring to the same device.
+On Sat, Oct 31, 2015 at 01:55:42PM +0100, Marcus Weseloh wrote:
+> Enable the on-chip audio codec on the Olimex A20-SOM-EVB
 > 
-> When this driver implements audio input, it'll also need to expose
-> controls for the line and mic input preamps, so just referring to "the
-> Pre-Amplifier" will be ambiguous.
+> Signed-off-by: Marcus Weseloh <mweseloh42@gmail.com>
+> ---
+>  arch/arm/boot/dts/sun7i-a20-olimex-som-evb.dts | 4 ++++
+>  1 file changed, 4 insertions(+)
 > 
-> Change it to use "Power Amplifier" consistently for the power
-> amplifier's controls.
-> 
-> Signed-off-by: Adam Sampson <ats@offog.org>
+> diff --git a/arch/arm/boot/dts/sun7i-a20-olimex-som-evb.dts b/arch/arm/boot/dts/sun7i-a20-olimex-som-evb.dts
+> index b7fe102..03352cc 100644
+> --- a/arch/arm/boot/dts/sun7i-a20-olimex-som-evb.dts
+> +++ b/arch/arm/boot/dts/sun7i-a20-olimex-som-evb.dts
+> @@ -86,6 +86,10 @@
+>  	status = "okay";
+>  };
+>  
+> +&codec {
+> +        status = "okay";
+> +};
 
-Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+The indentation in the DT in with tabs, and not spaces (and checkpatch
+actually complains about that).
 
-Thanks!
+Make sure you run checkpatch before sending a new patch.
+
+I've fixed it, and queued the patch for 4.5. Thanks!
+
 Maxime
 
 -- 
@@ -40,4 +48,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151101/f97a20c7/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151101/8a38dc94/attachment-0001.sig>
