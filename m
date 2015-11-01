@@ -1,83 +1,35 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Sun, 1 Nov 2015 17:15:44 +0900
-Subject: [PATCH v4 1/4] Documentation: dt-bindings: Describe SROMc
- configuration
-In-Reply-To: <CAL_JsqKhyB7d+HQ08241-za-7vHbU49TiWJHM2vrp6jVVh4h=A@mail.gmail.com>
-References: <cover.1446122247.git.p.fedin@samsung.com>
- <f1fbd1a7877090f4318705f0fccbf4d96c0ebc9c.1446122247.git.p.fedin@samsung.com>
- <56330E6E.50003@samsung.com> <00a101d112e0$537a18e0$fa6e4aa0$@samsung.com>
- <56331ADB.1070602@samsung.com>
- <CAL_JsqKhyB7d+HQ08241-za-7vHbU49TiWJHM2vrp6jVVh4h=A@mail.gmail.com>
-Message-ID: <5635CA30.8070901@samsung.com>
+From: jungseoklee85@gmail.com (Jungseok Lee)
+Date: Sun, 1 Nov 2015 17:30:03 +0900
+Subject: [PATCH v4 6/6] arm64: ftrace: add arch-specific stack tracer
+In-Reply-To: <1446182741-31019-7-git-send-email-takahiro.akashi@linaro.org>
+References: <1446182741-31019-1-git-send-email-takahiro.akashi@linaro.org>
+ <1446182741-31019-7-git-send-email-takahiro.akashi@linaro.org>
+Message-ID: <9BDC406F-52E1-4F8C-8245-7B49EC4C861D@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-W dniu 31.10.2015 o 02:15, Rob Herring pisze:
-> On Fri, Oct 30, 2015 at 2:23 AM, Krzysztof Kozlowski
-> <k.kozlowski@samsung.com> wrote:
->> On 30.10.2015 15:58, Pavel Fedin wrote:
->>>  Hello!
->>>
->>>>> Add documentation for new subnode properties, allowing bank configuration.
->>>>> Based on u-boot implementation, but heavily reworked.
->>>>
->>>> Please, carefully look at:
->>>> Documentation/devicetree/bindings/net/gpmc-eth.txt
->>>> Documentation/devicetree/bindings/bus/ti-gpmc.txt
->>>
->>>  Thank you very much. Indeed, this looks very similar. By the way, should i document smsc over sromc in the same manner, writing
->>> devicetree/bindings/net/sromc-eth.txt?
->>>
->>>  This is a short reply for now, i'll make longer one (or just a new version) after studying these existing bindings and trying to
->>> apply them.
->>
->> Existing SROMC bindings document is small so one document for everything
->> should be sufficient. This can be always split if new type of devices
->> will be using SROMC (BTW, do you know of any other devices using SROMC
->> on Exynos?).
->>
->>>
->>>  Pankaj:
->>>
->>>>> +&sromc {
->>>>> +       pinctrl-names = "default";
->>>>> +       pinctrl-0 = <&srom_ctl>, <&srom_ebi>;
->>>>> +
->>>>> +       ethernet at 07000000 {
->>>>> +               compatible = "smsc,lan9115";
->>>>> +               reg = <0x07000000 0x10000>;
->>>>> +               phy-mode = "mii";
->>>>> +               interrupt-parent = <&gpx0>;
->>>>> +               interrupts = <5 8>;
->>>>> +               reg-io-width = <2>;
->>>>> +               smsc,irq-push-pull;
->>>>> +               smsc,force-internal-phy;
->>>>> +
->>>>> +               samsung,srom-bank = <3>;
->>>>> +               samsung,srom-data-width = <2>;
->>>>> +               samsung,srom-timing = <1 9 12 1 9 1 1>;
->>>>
->>>> I think this is not correct. We can't change binding of "smsc,lan9115"
->>>> which is already documented here [1]. These samsung specific srom
->>>> properties should be in srom node or its subnode, but not in this way.
->>>
->>>  So, if you look at gpmc-eth.txt, you'll see that this approach is perfectly valid (this is a reply to another msg, just don't want
->>> to post one more single-line reply).
->>
->>
->> Yes, the binding of smsc,lan9115 is not changed.
->>
->> Putting srom properties in separate bank node would be good also but
->> then some mapping (connection) between ethernet and bank should be added
->> probably...
+On Oct 30, 2015, at 2:25 PM, AKASHI Takahiro wrote:
+
+Hi Akashi,
+
+> Stack tracer on arm64, check_stack(), is uniqeue in the following
+> points:
+> * analyze a function prologue of a traced function to estimate a more
+>  accurate stack pointer value, replacing naive '<child's fp> + 0x10.'
+> * use walk_stackframe(), instead of slurping stack contents as orignal
+>  check_stack() does, to identify a stack frame and a stack index (height)
+>  for every callsite.
 > 
-> Is this to get some data needed by the ethernet from the ROM? We have
-> the nvmem binding to support that.
+> Regarding a function prologue analyzer, there is no guarantee that we can
+> handle all the possible patterns of function prologue as gcc does not use
+> any fixed templates to generate them. 'Instruction scheduling' is another
+> issue here.
+> Nevertheless, the current version will surely cover almost all the cases
+> in the kernel image and give us useful information on stack pointers.
 
-No, this does not act like nvram driver. It is rather a memory
-controller. The same as existing TI GPMC:
-Documentation/devicetree/bindings/net/gpmc-eth.txt
-although configuration is different so gpmc driver cannot be reused.
+Can I get an idea on how to test the function prologue analyzer? It pretty
+tough to compare stack trace data with objdump one. Is there an easier way
+to observe this enhancement without objdump?
 
-Best regards,
-Krzysztof
+Best Regards
+Jungseok Lee
