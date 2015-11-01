@@ -1,80 +1,39 @@
-From: ebiederm@xmission.com (Eric W. Biederman)
-Date: Sun, 01 Nov 2015 15:50:17 -0600
-Subject: [PATCH 1/2] mm: mmap: Add new /proc tunable for mmap_base ASLR.
-In-Reply-To: <56329880.4080103@android.com> (Daniel Cashman's message of "Thu,
- 29 Oct 2015 15:06:56 -0700")
-References: <1446067520-31806-1-git-send-email-dcashman@android.com>
- <871tcewoso.fsf@x220.int.ebiederm.org>
- <CABXk95DOSKv70p+=DQvHck5LCvRDc0WDORpoobSStWhrcrCiyg@mail.gmail.com>
- <CAEP4de2GsEwn0eeO126GEtFb-FSJoU3fgOWTAr1yPFAmyXTi0Q@mail.gmail.com>
- <87oafiuys0.fsf@x220.int.ebiederm.org> <56329880.4080103@android.com>
-Message-ID: <87k2q1tmna.fsf@x220.int.ebiederm.org>
+From: marex@denx.de (Marek Vasut)
+Date: Mon,  2 Nov 2015 00:26:16 +0100
+Subject: [PATCH] ARM: at91/dt: sama5d4: Add pinmux for 8-bit MMC0 bus
+Message-ID: <1446420376-5419-1-git-send-email-marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Daniel Cashman <dcashman@android.com> writes:
+Add pinmux for the 4 remaining signals used in 8-bit MMC 0
+bus configuration.
 
-> On 10/28/2015 08:41 PM, Eric W. Biederman wrote:
->> Dan Cashman <dcashman@android.com> writes:
->> 
->>>>> This all would be much cleaner if the arm architecture code were just to
->>>>> register the sysctl itself.
->>>>>
->>>>> As it sits this looks like a patchset that does not meaninfully bisect,
->>>>> and would result in code that is hard to trace and understand.
->>>>
->>>> I believe the intent is to follow up with more architecture specific
->>>> patches to allow each architecture to define the number of bits to use
->>>
->>> Yes.  I included these patches together because they provide mutual
->>> context, but each has a different outcome and they could be taken
->>> separately.
->> 
->> They can not.  The first patch is incomplete by itself.
->
-> Could you be more specific in what makes the first patch incomplete?  Is
-> it because it is essentially a no-op without additional architecture
-> changes (e.g. the second patch) or is it specifically because it
-> introduces and uses the three "mmap_rnd_bits*" variables without
-> defining them?  If the former, I'd like to avoid combining the general
-> procfs change with any architecture-specific one(s).  If the latter, I
-> hope the proposal below addresses that.
+Signed-off-by: Marek Vasut <marex@denx.de>
+Cc: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+Cc: Josh Wu <josh.wu@atmel.com>
+Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
+---
+ arch/arm/boot/dts/sama5d4.dtsi | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-A bit of both.  The fact that the code can not compile in the first
-patch because of missing variables is distressing.  Having the arch
-specific code as a separate patch is fine, but they need to remain in
-the same patchset.
-
->>> The arm architecture-specific portion allows the changing
->>> of the number of bits used for mmap ASLR, useful even without the
->>> sysctl.  The sysctl patch (patch 1) provides another way of setting
->>> this value, and the hope is that this will be adopted across multiple
->>> architectures, with the arm changes (patch 2) providing an example.  I
->>> hope to follow this with changes to arm64 and x86, for example.
->> 
->> If you want to make the code generic.  Please maximize the sharing.
->> That is please define the variables in a generic location, as well
->> as the Kconfig variables (if possible).
->> 
->> As it is you have an architecture specific piece of code that can not be
->> reused without duplicating code, and that is just begging for problems.
->
-> I think it would make sense to move the variable definitions into
-> mm/mmap.c, included conditionally based on the presence of
-> CONFIG_ARCH_MMAP_RND_BITS.
->
-> As for the Kconfigs, I am open to suggestions.  I considered declaring
-> and documenting ARCH_MMAP_RND_BITS in arch/Kconfig, but I would like it
-> to be bounded in range by the _MIN and _MAX values, which necessarily
-> must be defined in the arch-specific Kconfigs.  Thus, we'd have
-> ARCH_MMAP_RND_BITS declared in arch/Kconfig as it currently is in
-> arch/arm/Kconfig defaulting to _MIN, and would declare both the _MIN and
-> _MAX in arch/Kconfig, while specifying default values in
-> arch/${ARCH}/Kconfig.
->
-> Would these changes be more acceptable?
-
-Yes.  I don't think you can do much about the Kconfigs so I would not
-worry about that too much.
-
-Eric
+diff --git a/arch/arm/boot/dts/sama5d4.dtsi b/arch/arm/boot/dts/sama5d4.dtsi
+index 8d1de29..f9f6108 100644
+--- a/arch/arm/boot/dts/sama5d4.dtsi
++++ b/arch/arm/boot/dts/sama5d4.dtsi
+@@ -1651,6 +1651,14 @@
+ 							 AT91_PIOC 9 AT91_PERIPH_B AT91_PINCTRL_PULL_UP	/* MCI0_DB3, conflict with NAND_D4 */
+ 							>;
+ 					};
++					pinctrl_mmc0_dat4_7: mmc0_dat4_7 {
++						atmel,pins =
++							<AT91_PIOC 10 AT91_PERIPH_B AT91_PINCTRL_PULL_UP	/* MCI0_DB1, conflict with NAND_D5 */
++							 AT91_PIOC 11 AT91_PERIPH_B AT91_PINCTRL_PULL_UP	/* MCI0_DB2, conflict with NAND_D6 */
++							 AT91_PIOC 12 AT91_PERIPH_B AT91_PINCTRL_PULL_UP	/* MCI0_DB3, conflict with NAND_D7 */
++							 AT91_PIOC 13 AT91_PERIPH_B AT91_PINCTRL_PULL_UP	/* MCI0_DB3, conflict with NAND_D8 */
++							>;
++					};
+ 				};
+ 
+ 				mmc1 {
+-- 
+2.1.4
