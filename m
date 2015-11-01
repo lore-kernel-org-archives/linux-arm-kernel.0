@@ -1,30 +1,29 @@
-From: sfr@canb.auug.org.au (Stephen Rothwell)
-Date: Sun, 1 Nov 2015 10:35:55 +1100
-Subject: linux-next: manual merge of the mvebu tree with the arm-soc tree
-Message-ID: <20151101103555.2464c0ee@canb.auug.org.au>
+From: vz@mleia.com (Vladimir Zapolskiy)
+Date: Sun,  1 Nov 2015 02:05:40 +0200
+Subject: [PATCH] arm: lpc32xx: remove selected HAVE_IDE
+Message-ID: <1446336340-20291-1-git-send-email-vz@mleia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+NXP LPC32xx platform does not have any controller capable for disk
+drives, selection of HAVE_IDE is not needed.
 
-Today's linux-next merge of the mvebu tree got a conflict in:
+Signed-off-by: Vladimir Zapolskiy <vz@mleia.com>
+---
+ arch/arm/Kconfig | 1 -
+ 1 file changed, 1 deletion(-)
 
-  arch/arm/mach-mvebu/pmsu.c
-
-between commit:
-
-  9d2ea95a599a ("ARM: mvebu: add broken-idle option")
-
-from the arm-soc tree and commit:
-
-  da6ee32a42c0 ("ARM: mvebu: add broken-idle option")
-
-from the mvebu tree.
-
-I fixed it up (looks like 2 version of the same thing (though different)
-so I just used the version from the arm-doc tree) and can carry the fix
-as necessary (no action is required).
-
+diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+index 72ad724..393c394 100644
+--- a/arch/arm/Kconfig
++++ b/arch/arm/Kconfig
+@@ -595,7 +595,6 @@ config ARCH_LPC32XX
+ 	select CLKSRC_MMIO
+ 	select CPU_ARM926T
+ 	select GENERIC_CLOCKEVENTS
+-	select HAVE_IDE
+ 	select USE_OF
+ 	help
+ 	  Support for the NXP LPC32XX family of processors
 -- 
-Cheers,
-Stephen Rothwell                    sfr at canb.auug.org.au
+2.1.4
