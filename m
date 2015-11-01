@@ -1,39 +1,360 @@
 From: marex@denx.de (Marek Vasut)
-Date: Mon,  2 Nov 2015 00:26:16 +0100
-Subject: [PATCH] ARM: at91/dt: sama5d4: Add pinmux for 8-bit MMC0 bus
-Message-ID: <1446420376-5419-1-git-send-email-marex@denx.de>
+Date: Mon,  2 Nov 2015 00:27:05 +0100
+Subject: [PATCH] ARM: at91/dt: sama5d4: Add support for DENX MA5D4 SoM and EVK
+Message-ID: <1446420425-5491-1-git-send-email-marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add pinmux for the 4 remaining signals used in 8-bit MMC 0
-bus configuration.
+Add support for the DENX MA5D4 SoM and MA5D4EVK board. The system
+consists of a SoM with eMMC, SPI NOR for booting, 2x SPI CAN chip
+and an EVK with microSD slot, 2x UART, 2x CAN port, 3x USB port,
+LEDs and expansion headers.
 
 Signed-off-by: Marek Vasut <marex@denx.de>
 Cc: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 Cc: Josh Wu <josh.wu@atmel.com>
 Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
 ---
- arch/arm/boot/dts/sama5d4.dtsi | 8 ++++++++
- 1 file changed, 8 insertions(+)
+ arch/arm/boot/dts/Makefile                  |   1 +
+ arch/arm/boot/dts/at91-sama5d4_ma5d4.dtsi   | 140 +++++++++++++++++++++++
+ arch/arm/boot/dts/at91-sama5d4_ma5d4evk.dts | 170 ++++++++++++++++++++++++++++
+ 3 files changed, 311 insertions(+)
+ create mode 100644 arch/arm/boot/dts/at91-sama5d4_ma5d4.dtsi
+ create mode 100644 arch/arm/boot/dts/at91-sama5d4_ma5d4evk.dts
 
-diff --git a/arch/arm/boot/dts/sama5d4.dtsi b/arch/arm/boot/dts/sama5d4.dtsi
-index 8d1de29..f9f6108 100644
---- a/arch/arm/boot/dts/sama5d4.dtsi
-+++ b/arch/arm/boot/dts/sama5d4.dtsi
-@@ -1651,6 +1651,14 @@
- 							 AT91_PIOC 9 AT91_PERIPH_B AT91_PINCTRL_PULL_UP	/* MCI0_DB3, conflict with NAND_D4 */
- 							>;
- 					};
-+					pinctrl_mmc0_dat4_7: mmc0_dat4_7 {
-+						atmel,pins =
-+							<AT91_PIOC 10 AT91_PERIPH_B AT91_PINCTRL_PULL_UP	/* MCI0_DB1, conflict with NAND_D5 */
-+							 AT91_PIOC 11 AT91_PERIPH_B AT91_PINCTRL_PULL_UP	/* MCI0_DB2, conflict with NAND_D6 */
-+							 AT91_PIOC 12 AT91_PERIPH_B AT91_PINCTRL_PULL_UP	/* MCI0_DB3, conflict with NAND_D7 */
-+							 AT91_PIOC 13 AT91_PERIPH_B AT91_PINCTRL_PULL_UP	/* MCI0_DB3, conflict with NAND_D8 */
-+							>;
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index bb8fa02..67130bb 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -48,6 +48,7 @@ dtb-$(CONFIG_SOC_SAM_V7) += \
+ 	sama5d34ek.dtb \
+ 	sama5d35ek.dtb \
+ 	sama5d36ek.dtb \
++	at91-sama5d4_ma5d4evk.dtb \
+ 	at91-sama5d4_xplained.dtb \
+ 	at91-sama5d4ek.dtb
+ dtb-$(CONFIG_ARCH_ATLAS6) += \
+diff --git a/arch/arm/boot/dts/at91-sama5d4_ma5d4.dtsi b/arch/arm/boot/dts/at91-sama5d4_ma5d4.dtsi
+new file mode 100644
+index 0000000..3dd6ee2
+--- /dev/null
++++ b/arch/arm/boot/dts/at91-sama5d4_ma5d4.dtsi
+@@ -0,0 +1,140 @@
++/*
++ * Copyright (C) 2015 Marek Vasut <marex@denx.de>
++ *
++ * The code contained herein is licensed under the GNU General Public
++ * License. You may obtain a copy of the GNU General Public License
++ * Version 2 or later at the following locations:
++ *
++ * http://www.opensource.org/licenses/gpl-license.html
++ * http://www.gnu.org/copyleft/gpl.html
++ */
++
++#include "sama5d4.dtsi"
++
++/ {
++	model = "DENX MA5D4";
++	compatible = "denx,ma5d4", "atmel,sama5d4", "atmel,sama5";
++
++	memory {
++		reg = <0x20000000 0x10000000>;
++	};
++
++	clocks {
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges;
++
++		main_clock: clock at 0 {
++			compatible = "atmel,osc", "fixed-clock";
++			clock-frequency = <12000000>;
++		};
++
++		slow_xtal {
++			clock-frequency = <32768>;
++		};
++
++		main_xtal {
++			clock-frequency = <12000000>;
++		};
++
++		clk20m: clk20m {
++			compatible = "fixed-clock";
++			#clock-cells = <0>;
++			clock-frequency = <20000000>;
++			clock-output-names = "clk20m";
++		};
++	};
++
++	ahb {
++		apb {
++			spi0: spi at f8010000 {
++				cs-gpios = <&pioC 3 0>, <0>, <0>, <0>;
++				status = "okay";
++
++				m25p80 at 0 {
++					compatible = "atmel,at25df321a";
++					spi-max-frequency = <50000000>;
++					reg = <0>;
++				};
++			};
++
++			spi1: spi at fc018000 {
++				cs-gpios = <&pioB 22 0>, <&pioB 23 0>, <0>, <0>;
++				status = "okay";
++
++				can0: can at 0 {
++					compatible = "microchip,mcp2515";
++					reg = <0>;
++					clocks = <&clk20m>;
++					interrupt-parent = <&pioE>;
++					interrupts = <6 GPIO_ACTIVE_LOW>;
++					spi-max-frequency = <10000000>;
++				};
++
++				can1: can at 1 {
++					compatible = "microchip,mcp2515";
++					reg = <1>;
++					clocks = <&clk20m>;
++					interrupt-parent = <&pioE>;
++					interrupts = <7 GPIO_ACTIVE_LOW>;
++					spi-max-frequency = <10000000>;
++				};
++			};
++
++
++			i2c0: i2c at f8014000 {
++				status = "okay";
++			};
++
++			mmc0: mmc at f8000000 {
++				pinctrl-names = "default";
++				pinctrl-0 = <&pinctrl_mmc0_clk_cmd_dat0 &pinctrl_mmc0_dat1_3 &pinctrl_mmc0_dat4_7>;
++				vmmc-supply = <&vcc_mmc0_reg>;
++				vqmmc-supply = <&vcc_3v3_reg>;
++				status = "okay";
++				slot at 0 {
++					reg = <0>;
++					bus-width = <8>;
++					broken-cd;
++				};
++			};
++
++			adc0: adc at fc034000 {
++				pinctrl-names = "default";
++				pinctrl-0 = <
++					/* external trigger conflicts with USBA_VBUS */
++					&pinctrl_adc0_ad0
++					&pinctrl_adc0_ad1
++					&pinctrl_adc0_ad2
++					&pinctrl_adc0_ad3
++					&pinctrl_adc0_ad4
++					>;
++				atmel,adc-vref = <3300>;
++				status = "okay";
++			};
++
++			watchdog at fc068640 {
++				status = "okay";
++			};
++		};
++	};
++
++	vcc_3v3_reg: fixedregulator at 0 {
++		compatible = "regulator-fixed";
++		regulator-name = "VCC 3V3";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		regulator-boot-on;
++		regulator-always-on;
++	};
++
++	vcc_mmc0_reg: fixedregulator at 1 {
++		compatible = "regulator-fixed";
++		gpio = <&pioE 15 GPIO_ACTIVE_HIGH>;
++		regulator-name = "RST_n MCI0";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		vin-supply = <&vcc_3v3_reg>;
++		regulator-boot-on;
++	};
++};
+diff --git a/arch/arm/boot/dts/at91-sama5d4_ma5d4evk.dts b/arch/arm/boot/dts/at91-sama5d4_ma5d4evk.dts
+new file mode 100644
+index 0000000..7194aef
+--- /dev/null
++++ b/arch/arm/boot/dts/at91-sama5d4_ma5d4evk.dts
+@@ -0,0 +1,170 @@
++/*
++ * Copyright (C) 2015 Marek Vasut <marex@denx.de>
++ *
++ * The code contained herein is licensed under the GNU General Public
++ * License. You may obtain a copy of the GNU General Public License
++ * Version 2 or later at the following locations:
++ *
++ * http://www.opensource.org/licenses/gpl-license.html
++ * http://www.gnu.org/copyleft/gpl.html
++ */
++
++/dts-v1/;
++#include "at91-sama5d4_ma5d4.dtsi"
++
++/ {
++	model = "DENX MA5D4EVK";
++	compatible = "denx,ma5d4evk", "atmel,sama5d4", "atmel,sama5";
++
++	chosen {
++		bootargs = "ignore_loglevel earlyprintk";
++		stdout-path = "serial3:115200n8";
++	};
++
++	ahb {
++		apb {
++			adc0: adc at fc034000 {
++				atmel,adc-ts-wires = <4>;
++				atmel,adc-ts-pressure-threshold = <10000>;
++			};
++
++			hlcdc: hlcdc at f0000000 {
++				status = "okay";
++
++				hlcdc-display-controller {
++					pinctrl-names = "default";
++					pinctrl-0 = <&pinctrl_lcd_base &pinctrl_lcd_rgb888>;
++
++					port at 0 {
++						hlcdc_panel_output: endpoint at 0 {
++							reg = <0>;
++							remote-endpoint = <&panel_input>;
++						};
 +					};
- 				};
- 
- 				mmc1 {
++				};
++
++			};
++
++			macb0: ethernet at f8020000 {
++				phy-mode = "rmii";
++				status = "okay";
++
++				phy0: ethernet-phy at 0 {
++					reg = <0>;
++				};
++			};
++
++			mmc1: mmc at fc000000 {
++				pinctrl-names = "default";
++				pinctrl-0 = <&pinctrl_mmc1_clk_cmd_dat0 &pinctrl_mmc1_dat1_3 &pinctrl_mmc1_cd>;
++				vmmc-supply = <&vcc_mmc1_reg>;
++				vqmmc-supply = <&vcc_3v3_reg>;
++				status = "okay";
++				slot at 0 {
++					reg = <0>;
++					bus-width = <4>;
++					cd-gpios = <&pioE 5 0>;
++				};
++			};
++
++			usart0: serial at f802c000 {
++				status = "okay";
++			};
++
++			usart1: serial at f8030000 {
++				status = "okay";
++			};
++
++			pinctrl at fc06a000 {
++				board {
++					pinctrl_mmc1_cd: mmc1_cd {
++						atmel,pins = <AT91_PIOE 5 AT91_PERIPH_GPIO AT91_PINCTRL_PULL_UP_DEGLITCH>;
++					};
++					pinctrl_usba_vbus: usba_vbus {
++						atmel,pins =
++							<AT91_PIOE 31 AT91_PERIPH_GPIO AT91_PINCTRL_DEGLITCH>;
++					};
++				};
++			};
++		};
++
++		usb0: gadget at 00400000 {
++			atmel,vbus-gpio = <&pioE 31 GPIO_ACTIVE_HIGH>;
++			pinctrl-names = "default";
++			pinctrl-0 = <&pinctrl_usba_vbus>;
++			status = "okay";
++		};
++
++		usb1: ohci at 00500000 {
++			num-ports = <3>;
++			atmel,vbus-gpio = <0
++					   &pioE 11 GPIO_ACTIVE_LOW
++					   &pioE 14 GPIO_ACTIVE_LOW
++					  >;
++			status = "okay";
++		};
++
++		usb2: ehci at 00600000 {
++			status = "okay";
++		};
++	};
++
++	backlight: backlight {
++		compatible = "pwm-backlight";
++		pwms = <&hlcdc_pwm 0 50000 0>;
++		brightness-levels = <0 4 8 16 32 64 128 255>;
++		default-brightness-level = <6>;
++		status = "okay";
++	};
++
++	leds {
++		compatible = "gpio-leds";
++		status = "okay";
++
++		user1 {
++			label = "user1";
++			gpios = <&pioD 28 GPIO_ACTIVE_HIGH>;
++			linux,default-trigger = "heartbeat";
++		};
++
++		user2 {
++			label = "user2";
++			gpios = <&pioD 29 GPIO_ACTIVE_HIGH>;
++			linux,default-trigger = "heartbeat";
++		};
++
++		user3 {
++			label = "user3";
++			gpios = <&pioD 30 GPIO_ACTIVE_HIGH>;
++			linux,default-trigger = "heartbeat";
++		};
++	};
++
++	panel: panel {
++		/* Actually Ampire 800480R2 */
++		compatible = "foxlink,fl500wvr00-a0t", "simple-panel";
++		backlight = <&backlight>;
++		#address-cells = <1>;
++		#size-cells = <0>;
++		status = "okay";
++
++		port at 0 {
++			#address-cells = <1>;
++			#size-cells = <0>;
++
++			panel_input: endpoint at 0 {
++				reg = <0>;
++				remote-endpoint = <&hlcdc_panel_output>;
++			};
++		};
++	};
++
++	vcc_mmc1_reg: fixedregulator at 2 {
++		compatible = "regulator-fixed";
++		gpio = <&pioE 17 GPIO_ACTIVE_LOW>;
++		regulator-name = "VDD MCI1";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		vin-supply = <&vcc_3v3_reg>;
++	};
++};
 -- 
 2.1.4
