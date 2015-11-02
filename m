@@ -1,41 +1,28 @@
-From: alison.wang@freescale.com (Huan Wang)
-Date: Mon, 2 Nov 2015 05:54:09 +0000
-Subject: [PATCH] ARM: add v7 LPAE multi-platform defconfig
-In-Reply-To: <CAOMZO5ACSg0VmYV=5Q=gWtP5OZdUXkXa_SDmTC-t8gbzmLVdEg@mail.gmail.com>
-References: <1445956507-34026-1-git-send-email-b18965@freescale.com>
- <CAOMZO5ACSg0VmYV=5Q=gWtP5OZdUXkXa_SDmTC-t8gbzmLVdEg@mail.gmail.com>
-Message-ID: <BN3PR0301MB0867D05039A429CA6CD62E54FE2C0@BN3PR0301MB0867.namprd03.prod.outlook.com>
+From: eddie.huang@mediatek.com (Eddie Huang)
+Date: Mon, 2 Nov 2015 14:35:06 +0800
+Subject: [PATCH 0/2] Mediatek I2C driver fixup
+In-Reply-To: <1445936367-30141-1-git-send-email-liguo.zhang@mediatek.com>
+References: <1445936367-30141-1-git-send-email-liguo.zhang@mediatek.com>
+Message-ID: <1446446106.12497.6.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Shawn,
+On Tue, 2015-10-27 at 16:59 +0800, Liguo Zhang wrote:
+> This series contain two patches, first is to optimize Mediatek I2C driver to use WRRD
+> if hardware support auto restart. Because auto restart will issue auto restart
+> interrupt, change to use WRRD can reduce interrupt latency. The second is to fix
+> multi transfer error in high speed mode. If hardware support auto restart, need driver
+> to send master code first.
 
-	Could you help to review this patch? If it's ok, could you help to merge it?
+Please fix checkpatch warning in 2/2, then you get my reviewed-by for
+this series:
 
-	Thanks.
+Reviewed-by:Eddie Huang <eddie.huang@mediatek.com>
 
-Best Regards,
-Alison Wang
-
-> -----Original Message-----
-> From: Fabio Estevam [mailto:festevam at gmail.com]
-> Sent: Thursday, October 29, 2015 9:11 PM
-> To: Wang Huan-B18965
-> Cc: Shawn Guo; Russell King; Arnd Bergmann; linux-arm-
-> kernel at lists.infradead.org; linux-kernel; Jin Zhengxiong-R64188; Wang
-> Huan-B18965
-> Subject: Re: [PATCH] ARM: add v7 LPAE multi-platform defconfig
 > 
-> On Tue, Oct 27, 2015 at 12:35 PM, Alison Wang <b18965@freescale.com>
-> wrote:
-> > v7 LPAE multi-platform defconfig is based on v7 multi-platform
-> > defconfig and adds LPAE support.
-> >
-> > This defconfig is verified on LS1021A which enables GIANFAR, I2C,
-> > WATCHDOG, AUDIO, EDMA and DSPI drivers, etc.
-> >
-> > Signed-off-by: Alison Wang <alison.wang@freescale.com>
+> Liguo Zhang (2):
+>   i2c: mediatek: add i2c first write then read optimization
+>   i2c: mediatek: fix i2c multi transfer issue in high speed mode
 > 
-> Much better now without CONFIG_VMSPLIT_2G=y :-)
-> 
-> Reviewed-by: Fabio Estevam <fabio.estevam@freescale.com>
+>  drivers/i2c/busses/i2c-mt65xx.c | 77 +++++++++++++++++++++++++++++++++++++----
+>  1 file changed, 71 insertions(+), 6 deletions(-)
