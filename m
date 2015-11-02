@@ -1,75 +1,53 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Mon, 2 Nov 2015 17:40:34 +0530
-Subject: [PATCH v3 0/2] thermal: mediatek: Add cpu power cooling model
-In-Reply-To: <1446461181.10039.28.camel@mtksdaap41>
-References: <1445515359-8587-1-git-send-email-dawei.chien@mediatek.com>
- <20151028154449.GH3716@ubuntu>
- <1446461181.10039.28.camel@mtksdaap41>
-Message-ID: <20151102121034.GA3639@ubuntu>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Mon, 2 Nov 2015 14:13:01 +0200
+Subject: [PATCH v2 13/14] ARM: DTS: am33xx: Use the new DT bindings for
+ the eDMA3
+In-Reply-To: <20151102100405.GJ21326@localhost>
+References: <1444979892-31626-1-git-send-email-peter.ujfalusi@ti.com>
+ <1444979892-31626-14-git-send-email-peter.ujfalusi@ti.com>
+ <CAOesGMg0KsHnbF8hEYPZ8bY8wz9fC0_m7-KS4A6kB__nUi9kAw@mail.gmail.com>
+ <20151102100405.GJ21326@localhost>
+Message-ID: <5637534D.2020304@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02-11-15, 18:46, dawei chien wrote:
-> On Wed, 2015-10-28 at 21:14 +0530, Viresh Kumar wrote:
-> > Sorry for being extremely late in reviewing this stuff. You are
-> > already on v3 and I haven't reviewed it once. Mostly due to bad timing
-> > of my holidays and other work pressure.
+Vinod,
+
+On 11/02/2015 12:04 PM, Vinod Koul wrote:
+> On Mon, Nov 02, 2015 at 01:21:19AM -0800, Olof Johansson wrote:
+>> Hi,
+>>
+>> 1) This seems to have broken BBB in -next for me, bisected down to this patch.
+>>
+>> For bootlog:
+>> http://arm-soc.lixom.net/bootlogs/next/next-20151102/bbb-arm-omap2plus_defconfig.html
+>>
+>> 2) Please avoid merging DT/platform code in your driver tree, Vinod,
+>> at least without an ack from the platform maintainer. It can be a a
+>> huge mess if they end up causing conflicts, so we always ask to merge
+>> the DT changes through the platform maintainer (Tony in this case) by
+>> default.
 > 
-> You're welcome, truly thank you for your kindly reviewing
-
-Thanks for understanding.
-
-> > Now, there are few things that I feel are not properly addressed here,
-> > and I may be wrong:
-> > - Where are the bindings for static-power-points and
-> >   dynamic-power-coefficient. Sorry I failed to see them in this or
-> >   other series you mentioned.
+> I did warn when applying that I am doing so without ACK on ARM code, noone
+> said a thing!
 > 
-> Please refer to following document (2-1,2-2) for dynamic-power &
-> static-power in detail. Besides, do I need to add another document for
-> our own MT8173 IC.
-> http://lxr.free-electrons.com/source/Documentation/thermal/cpu-cooling-api.txt
-
-That's about the power-API, but I am talking about the Device Tree
-bindings here. So, when you add any new DT bindings (Or a new property
-in device tree blobs), you need to add its documentation in
-Documentation/devicetree/bindings/... and get it approved by DT
-maintainers as well. You perhaps missed that completely, otherwise you
-would have been told really early that the new bindings aren't going
-to help.
-
-> > - Even then, why should we be adding another table into DT for
-> >   voltage/power ? And not reuse and extend the opp-v2 stuff which is
-> >   already mainlined now.
+> I knew Tony was following the work by Peter so assumed he must have been okay
+> with it otherwise would have spoken for ~couple of weeks these were in
+> review
 > 
-> We could reuse opp-v2 for static power points after OPPV2 back port to
-> our currently branch.
+> Anyway now that we have a regression, I can revert this patch if that fixes,
+> please confirm, but might break edma... peter?
 
-Your current branch doesn't matter to us. All that matters here is
-mainline, that's where you are adding code to. And you must test your
-stuff on the latest upstream branch only, not on some old kernel
-release. You can include other dependency patches though, that are
-required to make it work and mention them in cover-letter.
+Can you revert or drop the last two DTS patches?
 
-> However, as far as I know, there is no "power" in opp.c (suck like
-
-s/suck/such ?
-
-> opp-hz) as far, so I need to add something in opp.c for my purpose, suck
-> like add power in _opp_add_static_v2, and add something for return
-> "power", right? I may be wrong, please kindly give me your suggestion,
-> thank you.
-
-You first need to propose a change in DT bindings for OPPs:
-Documentation/devicetree/bindings/opp/opp.txt
-
-And then we can change the code properly.
-
-> Actually, I am considering to remove the part of static power point
-> since it is optional for Power Model. Could you agree with this?
-
-If its not important for your platform, then I don't have any issues
-with that..
+I think I will try a different route to get the split of the tpcc and tptc.
+Without the DT patches the driver will fall back to the legacy mode so things
+will work in a same way they did before.
+Or I can send a followup patch for edma.c, with that there is no need to add
+the HWMOD_INIT_NO_IDLE to hwmod and power management looks better.
+Basically I'm registering a 'dummy' driver for the edma3-tptc so omap hwmod
+code will not shut it down but we will keep the possibility to manage the
+power state still.
 
 -- 
-viresh
+P?ter
