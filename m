@@ -1,30 +1,84 @@
-From: slash.tmp@free.fr (Mason)
-Date: Mon, 2 Nov 2015 12:55:45 +0100
-Subject: CPU_METHOD_OF_DECLARE() with Linux as non-secure OS
-In-Reply-To: <20151102101750.GS8644@n2100.arm.linux.org.uk>
-References: <5630C143.5080103@free.fr> <yw1xio5pd5mf.fsf@unicorn.mansr.com>
- <56325C67.8000007@free.fr> <yw1xeggdd007.fsf@unicorn.mansr.com>
- <5633CF2A.4040504@free.fr> <yw1xpozvavui.fsf@unicorn.mansr.com>
- <20151102101750.GS8644@n2100.arm.linux.org.uk>
-Message-ID: <56374F41.3000402@free.fr>
+From: alim.akhtar@samsung.com (Alim Akhtar)
+Date: Mon, 02 Nov 2015 17:28:27 +0530
+Subject: [PATCH 1/2] arm64: dts: exynos7: Add pmic s2mps15 device tree node
+In-Reply-To: <5637495D.1080701@osg.samsung.com>
+References: <1446458641-4447-1-git-send-email-alim.akhtar@samsung.com>
+ <5637495D.1080701@osg.samsung.com>
+Message-ID: <56374FE3.9050805@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/11/2015 11:17, Russell King - ARM Linux wrote:
 
-> Eg, you could have the FLZ bit set in the L2 cache auxiliary register
-> if its wired to a Cortex A9 CPU and the FLZ signal is wired.  That
-> would be perfectly reasonable, provided the FLZ bit in the Cortex
-> A9's control register is disabled when the L2 cache is otherwise
-> disabled.
-> 
-> (I guess I ought to quieten down the pr_err() in that case...)
 
-Based on the pr_err(), I thought it was considered an error, so
-I asked the firmware author to leave L2AUX.FLZ cleared, and only
-set it just before the cache is enabled, and clear it after the
-cache is disabled.
-
-Do you remember why you considered it an error at the time?
-
-Regards.
+On 11/02/2015 05:00 PM, Javier Martinez Canillas wrote:
+> Hello Alim,
+>
+> This patch looks mostly good to me, I just have two comments below:
+>
+> On 11/02/2015 11:04 AM, Alim Akhtar wrote:
+>> This patch add pmic (s2mps15) node of espresso board,
+>> which includes addition of regulators and pmic-clk sub-nodes.
+>>
+>> Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
+>> Signed-off-by: Alim Akhtar <alim.akhtar@samsung.com>
+>> ---
+>> This patch should go in after driver side changes [1] lands.
+>> [1]-> https://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg47736.html
+>>
+>>   arch/arm64/boot/dts/exynos/exynos7-espresso.dts |  349 +++++++++++++++++++++++
+>>   1 file changed, 349 insertions(+)
+>>
+>> diff --git a/arch/arm64/boot/dts/exynos/exynos7-espresso.dts b/arch/arm64/boot/dts/exynos/exynos7-espresso.dts
+>> index 838a3626dac1..8ce04a0ec928 100644
+>> --- a/arch/arm64/boot/dts/exynos/exynos7-espresso.dts
+>> +++ b/arch/arm64/boot/dts/exynos/exynos7-espresso.dts
+>> @@ -53,6 +53,355 @@
+>>   	status = "okay";
+>>   };
+>>
+>> +&hsi2c_4 {
+>> +	samsung,i2c-sda-delay = <100>;
+>> +	samsung,i2c-max-bus-freq = <200000>;
+>> +	status = "okay";
+>> +
+>> +	s2mps15_pmic at 66 {
+>> +		compatible = "samsung,s2mps15-pmic";
+>> +		reg = <0x66>;
+>> +		interrupts = <2 0>;
+>
+> Maybe using IRQ_TYPE_NONE instead of 0?
+>
+Ok will check
+>> +		interrupt-parent = <&gpa0>;
+>> +		pinctrl-names = "default";
+>> +		pinctrl-0 = <&pmic_irq>;
+>> +		wakeup-source;
+>> +
+>> +		s2mps15_osc: clocks {
+>> +			compatible = "samsung,s2mps13-clk";
+>> +			#clock-cells = <1>;
+>> +			clock-output-names = "s2mps13_ap", "s2mps13_cp",
+>> +				"s2mps13_bt";
+>> +		};
+>> +
+>> +		regulators {
+>> +			ldo1_reg: LDO1 {
+>> +				regulator-name = "vdd_ldo1";
+>> +				regulator-min-microvolt = <500000>;
+>> +				regulator-max-microvolt = <900000>;
+>> +				regulator-always-on;
+>
+> I see that all regulators are marked as regulator-always-on but that will
+> prevent the regulator subsystem to disable unused regulators. Can you please
+> double check which regulators should really be always on and which ones can
+> be disabled if are not used?
+>
+I kept it on always, as I am still in a process for validating all IPs 
+on board. Will see if I can remove some of them, which I feel can be done.
+> After those two changes:
+>
+> Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
+>
+Thanks!
+> Best regards,
+>
