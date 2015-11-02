@@ -1,49 +1,47 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 2 Nov 2015 18:31:10 +0000
-Subject: [PATCH v6 2/3] percpu: add PERCPU_ATOM_SIZE for a generic percpu
- area setup
-In-Reply-To: <alpine.DEB.2.20.1511021210250.28799@east.gentwo.org>
-References: <1446363977-23656-1-git-send-email-jungseoklee85@gmail.com>
- <1446363977-23656-3-git-send-email-jungseoklee85@gmail.com>
- <alpine.DEB.2.20.1511021008580.27740@east.gentwo.org>
- <20151102162236.GB7637@e104818-lin.cambridge.arm.com>
- <alpine.DEB.2.20.1511021047420.28255@east.gentwo.org>
- <20151102173520.GC7637@e104818-lin.cambridge.arm.com>
- <alpine.DEB.2.20.1511021210250.28799@east.gentwo.org>
-Message-ID: <20151102183110.GD7637@e104818-lin.cambridge.arm.com>
+From: jonmason@broadcom.com (Jon Mason)
+Date: Mon, 2 Nov 2015 13:34:51 -0500
+Subject: [PATCH RESEND v4 0/2] ARM: dts: bcm5301x: Add SVK DT files and docs 
+Message-ID: <1446489293-25088-1-git-send-email-jonmason@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 02, 2015 at 12:11:33PM -0600, Christoph Lameter wrote:
-> On Mon, 2 Nov 2015, Catalin Marinas wrote:
-> 
-> > On Mon, Nov 02, 2015 at 10:48:17AM -0600, Christoph Lameter wrote:
-> > > On Mon, 2 Nov 2015, Catalin Marinas wrote:
-> > > > I haven't looked at the patch 3/3 in detail but I'm pretty sure I'll NAK
-> > > > the approach (and the definition of PERCPU_ATOM_SIZE), therefore
-> > > > rendering this patch unnecessary. IIUC, this is used to enforce some
-> > > > alignment of the per-CPU IRQ stack to be able to check whether the
-> > > > current stack is process or IRQ on exception entry. But there are other,
-> > > > less intrusive ways to achieve the same (e.g. x86).
-> > >
-> > > The percpu allocator allows the specification of alignment requirements.
-> >
-> > Patch 3/3 does something like this:
-> >
-> > DEFINE_PER_CPU(char [IRQ_STACK_SIZE], irq_stacks) __aligned(IRQ_STACK_SIZE)
-> >
-> > where IRQ_STACK_SIZE > PAGE_SIZE. AFAICT, setup_per_cpu_areas() doesn't
-> > guarantee alignment greater than PAGE_SIZE.
-> 
-> And we cannot use percpu_alloc() instead? Aligning the whole of the percpu
-> area because one allocation requires it?
+Resending due to lack of any response to the original v4 series
 
-I haven't tried but it seems that pcpu_alloc() has a WARN() when align >
-PAGE_SIZE and it would fail.
+Changes in v4:
+* Changed bootargs to stdout-path, per Sudeep Holla
 
-As I said in a previous reply, I don't think this patch is necessary,
-mainly because I don't particularly like the logic for detecting the IRQ
-stack re-entrance based on the stack pointer alignment.
+Changes in v3:
+* Updated the DT documentation compat strings
+* Modified the include files and compat strings for the SVK DT files,
+  per Hauke Mehrtens
+
+Changes in v2:
+* Reorder the patches to add the DT binding documentation prior to the
+  new DT files
+* Removed the DT documentation compat strings to only the SoCs, not the
+  individual boards
+* Fixed the compat strings in the individual device tree files
+* Added the memory node and removed the "mem=" from the bootargs
+
+
+Add device tree files and update the documentation for Broadcom
+Northstar based SVKs.  Since the bcm5301x.dtsi already exists, all that
+is necessary is the dts files to enable the UARTs.  With these files,
+the SVKs are able to boot to shell
+
+Jon Mason (2):
+  dt-bindings: Add new SoCs to bcm4708 DT bindings
+  ARM: dts: bcm5301x: Add BCM SVK DT files
+
+ .../devicetree/bindings/arm/bcm/brcm,bcm4708.txt   |  7 +++
+ arch/arm/boot/dts/Makefile                         |  5 +-
+ arch/arm/boot/dts/bcm94708.dts                     | 56 +++++++++++++++++++
+ arch/arm/boot/dts/bcm94709.dts                     | 56 +++++++++++++++++++
+ arch/arm/boot/dts/bcm953012k.dts                   | 63 ++++++++++++++++++++++
+ 5 files changed, 186 insertions(+), 1 deletion(-)
+ create mode 100644 arch/arm/boot/dts/bcm94708.dts
+ create mode 100644 arch/arm/boot/dts/bcm94709.dts
+ create mode 100644 arch/arm/boot/dts/bcm953012k.dts
 
 -- 
-Catalin
+1.9.1
