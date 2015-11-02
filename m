@@ -1,87 +1,22 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Mon, 2 Nov 2015 15:21:40 +0200
-Subject: [PATCH] dmaengine: edma: Add dummy driver skeleton for edma3-tptc
-Message-ID: <1446470500-27504-1-git-send-email-peter.ujfalusi@ti.com>
+From: timur@codeaurora.org (Timur Tabi)
+Date: Mon, 2 Nov 2015 07:27:19 -0600
+Subject: [PATCH DRAFT 1/2] drivers: serial: PL011: refactor register access
+In-Reply-To: <1446467042-24494-2-git-send-email-andre.przywara@arm.com>
+References: <1446467042-24494-1-git-send-email-andre.przywara@arm.com>
+ <1446467042-24494-2-git-send-email-andre.przywara@arm.com>
+Message-ID: <563764B7.6040202@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The eDMA3 TPTC does not need any software configuration, but it is a
-separate IP block in the SoC. In order the omap hwmod core to be able to
-handle the TPTC resources correctly in regards of PM we need to have a
-driver loaded for it.
-This patch will add a dummy driver skeleton without probe or remove
-callbacks provided.
+Andre Przywara wrote:
+> * to support UARTs with different register offsets (ZTE)
+> * to support a different bus access width (16 bits vs. 32 bits)
 
-Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
-Reported-by: Olof Johansson <olof@lixom.net>
----
-Hi,
+How exactly does this patch provide this?  The code is still calling a 
+fixed function.  How will the code dynamically call a 32-bit version 
+instead of a 16-bit version on platforms that need it?
 
-while it would have been possible to add the edma3-tptc compatible to be handled
-by the edma-tpcc driver (and when the device is tptc, do nothing) it would
-make the driver code a bit harder to follow.
-I think having separate structure for the tptc looks better and if we ever need
-to have separate driver for the tptc it will be cleaner for us the separate it.
-
-This patch alone w/o any hwmod flag changes will make sure that the edma-tptc is
-not powered down after the kernel is finished it's booting.
-
-Regards,
-Peter
-
- drivers/dma/edma.c | 19 +++++++++++++++++++
- 1 file changed, 19 insertions(+)
-
-diff --git a/drivers/dma/edma.c b/drivers/dma/edma.c
-index 31722d436a42..6b03e4e84e6b 100644
---- a/drivers/dma/edma.c
-+++ b/drivers/dma/edma.c
-@@ -269,6 +269,11 @@ static const struct of_device_id edma_of_ids[] = {
- 	{}
- };
- 
-+static const struct of_device_id edma_tptc_of_ids[] = {
-+	{ .compatible = "ti,edma3-tptc", },
-+	{}
-+};
-+
- static inline unsigned int edma_read(struct edma_cc *ecc, int offset)
- {
- 	return (unsigned int)__raw_readl(ecc->base + offset);
-@@ -2399,6 +2404,13 @@ static struct platform_driver edma_driver = {
- 	},
- };
- 
-+static struct platform_driver edma_tptc_driver = {
-+	.driver = {
-+		.name	= "edma3-tptc",
-+		.of_match_table = edma_tptc_of_ids,
-+	},
-+};
-+
- bool edma_filter_fn(struct dma_chan *chan, void *param)
- {
- 	bool match = false;
-@@ -2418,6 +2430,12 @@ EXPORT_SYMBOL(edma_filter_fn);
- 
- static int edma_init(void)
- {
-+	int ret;
-+
-+	ret = platform_driver_register(&edma_tptc_driver);
-+	if (ret)
-+		return ret;
-+
- 	return platform_driver_register(&edma_driver);
- }
- subsys_initcall(edma_init);
-@@ -2425,6 +2443,7 @@ subsys_initcall(edma_init);
- static void __exit edma_exit(void)
- {
- 	platform_driver_unregister(&edma_driver);
-+	platform_driver_unregister(&edma_tptc_driver);
- }
- module_exit(edma_exit);
- 
 -- 
-2.6.1
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the
+Code Aurora Forum, hosted by The Linux Foundation.
