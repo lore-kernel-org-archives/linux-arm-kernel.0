@@ -1,75 +1,42 @@
-From: wxt@rock-chips.com (Caesar Wang)
-Date: Mon,  2 Nov 2015 11:14:02 +0800
-Subject: [PATCH 3/3] ASoC: rockchip-rt5645: add the divider the clock for cpu
-In-Reply-To: <1446434042-2139-1-git-send-email-wxt@rock-chips.com>
-References: <1446434042-2139-1-git-send-email-wxt@rock-chips.com>
-Message-ID: <1446434042-2139-3-git-send-email-wxt@rock-chips.com>
+From: alison.wang@freescale.com (Huan Wang)
+Date: Mon, 2 Nov 2015 03:19:42 +0000
+Subject: [PATCH v4] ARM: configs: Add Freescale LS1021A defconfig
+In-Reply-To: <3938714.zt8Y4X5ull@wuerfel>
+References: <1442480614-32345-1-git-send-email-b18965@freescale.com>
+ <5073362.oArWDzYkxD@wuerfel>
+ <BN3PR0301MB0867C51A52319367F981C630FE230@BN3PR0301MB0867.namprd03.prod.outlook.com>
+ <3938714.zt8Y4X5ull@wuerfel>
+Message-ID: <BN3PR0301MB0867A9DA25D6D192EDAACB3BFE2C0@BN3PR0301MB0867.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add to set the cpu/codec DAI configure, let's divider the
-Transmit/Receive clock for cpu.
+> On Tuesday 27 October 2015 14:40:21 Huan Wang wrote:
+> > >
+> > > Ok. What I was suggesting above though was to try to pinpoint
+> > > exactly where it goes wrong. You have verified that it does not
+> > > crash before the page tables are enabled, but that is very early.
+> > > You have also shown that the kernel crashes before the point at
+> > > which the 'Booting Linux on physical CPU 0xf00' message is printed
+> > > to the kernel, but that is *much*
+> > > later: setup_arch() calls parse_early_param(), which in turn sets up
+> > > early_console_write(). This means the 'Booting Linux on physical CPU
+> > > 0xf00'
+> > > is still stuck in the log buffer and you may have crashed someone
+> > > inbetween.
+> > >
+> > > If you can call printascii(), you can try to do that just after
+> > > enabling the page tables to see if that was the problem like you
+> > > suspect, or otherwise add more printascii() statements between
+> > > __turn_mmu_on and
+> > > parse_early_param() to pinpoint the exact code that breaks.
+> > [Alison Wang] Thank you very much for your help. The issue is fixed.
+> >
+> 
+> Ah, very good. I'm curious what caused the problem in the end.
+[Alison Wang] The problem is caused by the wrong fdt_high setting (0xcfffffff).
+When 3G/1G user/kernel memory split is used, U-Boot relocates the device tree
+blob into high memory when booting the kernel and the kernel is unable to access
+the blob.
 
-In master mode, The SCLK and LRCK are configured as output,
-this patch should can set each divider to arrange the clock distribution.
-
-Signed-off-by: Caesar Wang <wxt@rock-chips.com>
----
-
- sound/soc/rockchip/rockchip_rt5645.c | 32 ++++++++++++++++++++++++++++++++
- 1 file changed, 32 insertions(+)
-
-diff --git a/sound/soc/rockchip/rockchip_rt5645.c b/sound/soc/rockchip/rockchip_rt5645.c
-index 68c62e4..35fe000 100644
---- a/sound/soc/rockchip/rockchip_rt5645.c
-+++ b/sound/soc/rockchip/rockchip_rt5645.c
-@@ -74,8 +74,25 @@ static int rk_aif1_hw_params(struct snd_pcm_substream *substream,
- 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
- 	struct snd_soc_dai *cpu_dai = rtd->cpu_dai;
- 	struct snd_soc_dai *codec_dai = rtd->codec_dai;
-+	int dai_fmt = rtd->card->dai_link->dai_fmt;
- 	int mclk;
- 
-+	/* set codec DAI configuration */
-+	ret = snd_soc_dai_set_fmt(codec_dai, dai_fmt);
-+	if (ret < 0) {
-+		dev_err(codec_dai->dev,
-+			"failed to set the format for codec side\n");
-+		return ret;
-+	}
-+
-+	/* set cpu DAI configuration */
-+	ret = snd_soc_dai_set_fmt(cpu_dai, dai_fmt);
-+	if (ret < 0) {
-+		dev_err(codec_dai->dev,
-+			"failed to set the format for cpu side\n");
-+		return ret;
-+	}
-+
- 	switch (params_rate(params)) {
- 	case 8000:
- 	case 16000:
-@@ -104,6 +121,21 @@ static int rk_aif1_hw_params(struct snd_pcm_substream *substream,
- 		return ret;
- 	}
- 
-+	/* The codec is master mode, that's not needed set clkdiv for cpu */
-+	if ((dai_fmt & SND_SOC_DAIFMT_MASTER_MASK) == SND_SOC_DAIFMT_CBM_CFM)
-+		return ret;
-+
-+	/* the LRCK clock for cpu */
-+	ret = snd_soc_dai_set_clkdiv(cpu_dai, ROCKCHIP_DIV_BCLK,
-+				     (mclk / 4) / params_rate(params));
-+	if (ret < 0)
-+		return ret;
-+
-+	/* the SCLK clock for cpu */
-+	snd_soc_dai_set_clkdiv(cpu_dai, ROCKCHIP_DIV_MCLK, 4);
-+	if (ret < 0)
-+		return ret;
-+
- 	return ret;
- }
- 
--- 
-1.9.1
+Best Regards,
+Alison Wang
