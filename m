@@ -1,54 +1,47 @@
-From: dimitri.j.ledkov@intel.com (Dimitri John Ledkov)
-Date: Mon, 2 Nov 2015 15:17:29 +0000
-Subject: [PATCH 0/7] kvmtool: Cleanup kernel loading
-In-Reply-To: <20151102145846.GH29657@arm.com>
-References: <1446229620-28088-1-git-send-email-andre.przywara@arm.com>
- <20151102145846.GH29657@arm.com>
-Message-ID: <CAK7xexmj2wKknkeMQA7Jj5d_cmfe4PtY4B3vGavesT_V8VoBMA@mail.gmail.com>
+From: marc_gonzalez@sigmadesigns.com (Marc Gonzalez)
+Date: Mon, 2 Nov 2015 16:17:10 +0100
+Subject: [PATCH v8 0/2] Sigma Designs Tango4 port
+Message-ID: <56377E76.2080209@sigmadesigns.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2 November 2015 at 14:58, Will Deacon <will.deacon@arm.com> wrote:
-> On Fri, Oct 30, 2015 at 06:26:53PM +0000, Andre Przywara wrote:
->> Hi,
->
-> Hello Andre,
->
->> this series cleans up kvmtool's kernel loading functionality a bit.
->> It has been broken out of a previous series I sent [1] and contains
->> just the cleanup and bug fix parts, which should be less controversial
->> and thus easier to merge ;-)
->> I will resend the pipe loading part later on as a separate series.
->>
->> The first patch properly abstracts kernel loading to move
->> responsibility into each architecture's code. It removes quite some
->> ugly code from the generic kvm.c file.
->> The later patches address the naive usage of read(2) to, well, read
->> data from files. Doing this without coping with the subtleties of
->> the UNIX read semantics (returning with less or none data read is not
->> an error) can provoke hard to debug failures.
->> So these patches make use of the existing and one new wrapper function
->> to make sure we read everything we actually wanted to.
->> The last patch moves the ARM kernel loading code into the proper
->> location to be in line with the other architectures.
->>
->> Please have a look and give some comments!
->
-> Looks good to me, but I'd like to see some comments from some mips/ppc/x86
-> people on the changes you're making over there.
+Hello,
 
-Looks mostly good to me, as one of the kvmtool down streams. Over at
-https://github.com/clearlinux/kvmtool we have some patches to tweak
-the x86 boot flow, which will need rebasing/retweaking) specifically
-this commit here -
-https://github.com/clearlinux/kvmtool/commit/a8dee709f85735d16739d0eda0cc00d3c1b17477
+I've added L2 cache enabling, and booting the second core (both via
+smc calls to the firmware). I think all the "basic" features are now
+supported. Future step will be adding drivers for peripheral devices.
+(However, most of our drivers definitely do not meet the stringent
+quality requirements of the Linux kernel, and are also not DT).
+
+I'm hoping this patch set is close to being accepted :-)
+
+Regards.
+
+
+Marc Gonzalez (2):
+  arm-soc: Import initial tango4 device tree
+  arm-soc: Add support for arm-based tango4 platforms
+
+ arch/arm/Kconfig                          |   2 +
+ arch/arm/Makefile                         |   1 +
+ arch/arm/boot/dts/Makefile                |   2 +
+ arch/arm/boot/dts/tango4-common.dtsi      | 121 ++++++++++++++++++++++++++++++
+ arch/arm/boot/dts/tango4-smp8758.dtsi     |  30 ++++++++
+ arch/arm/boot/dts/tango4-vantage-1172.dts |  24 ++++++
+ arch/arm/mach-tangox/Kconfig              |  12 +++
+ arch/arm/mach-tangox/Makefile             |   2 +
+ arch/arm/mach-tangox/setup.c              |  32 ++++++++
+ arch/arm/mach-tangox/smc.S                |   9 +++
+ arch/arm/mach-tangox/smc.h                |   5 ++
+ 11 files changed, 240 insertions(+)
+ create mode 100644 arch/arm/boot/dts/tango4-common.dtsi
+ create mode 100644 arch/arm/boot/dts/tango4-smp8758.dtsi
+ create mode 100644 arch/arm/boot/dts/tango4-vantage-1172.dts
+ create mode 100644 arch/arm/mach-tangox/Kconfig
+ create mode 100644 arch/arm/mach-tangox/Makefile
+ create mode 100644 arch/arm/mach-tangox/setup.c
+ create mode 100644 arch/arm/mach-tangox/smc.S
+ create mode 100644 arch/arm/mach-tangox/smc.h
 
 -- 
-Regards,
-
-Dimitri.
-53 sleeps till Christmas, or less
-
-https://clearlinux.org
-Open Source Technology Center
-Intel Corporation (UK) Ltd. - Co. Reg. #1134945 - Pipers Way, Swindon SN3 1RJ.
+2.4.5
