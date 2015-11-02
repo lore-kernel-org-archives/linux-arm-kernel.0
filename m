@@ -1,28 +1,54 @@
-From: panand@redhat.com (Pratyush Anand)
-Date: Mon, 2 Nov 2015 14:56:40 +0530
-Subject: [PATCH 08/16] arm64/kexec: Add core kexec support
-In-Reply-To: <56339ACD.7010506@arm.com>
-References: <cover.1445297709.git.geoff@infradead.org>
- <a1c2a702f127d9dade1f9af8ab13decb2ef1c0da.1445297709.git.geoff@infradead.org>
- <56339ACD.7010506@arm.com>
-Message-ID: <20151102092640.GA25166@dhcppc13.redhat.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 02 Nov 2015 09:53:19 +0000
+Subject: [PATCH 05/13 v2] irqchip/gic: assign irqchip dynamically
+In-Reply-To: <1445591083-22494-1-git-send-email-linus.walleij@linaro.org>
+References: <1445591083-22494-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <5637328F.7060601@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi James,
+Hi Linus,
 
-On 30/10/2015:04:29:01 PM, James Morse wrote:
+Sorry for the delay, I just enjoyed two weeks off, and I'm slowly making
+my way through my exploding Inbox...
+
+On 23/10/15 10:04, Linus Walleij wrote:
+> Instead of having the irqchip being a static struct, make it part
+> of the per-instance data so we can assign it a dynamic name. This
+> has the usable side effect of displaying the GIC with an instance
+> number as GIC0, GIC1 ... GICn in /proc/interrupts, which is helpful
+> when debugging cascaded GICs, such as on the ARM PB11MPCore.
 > 
-> >From 'kexec -e' to the first messages from the new kernel takes ~1 minute
-> on Juno, Did you see a similar delay? Or should I go looking for what I've
-> configured wrong!?
+> Cc: Thomas Gleixner <tglx@linutronix.de>
+> Cc: Jason Cooper <jason@lakedaemon.net>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+> ChangeLog v1->v2:
+> - Keep the static structs around, just delete the .name
+>   field assign them to the chips at registration time, updating
+>   the name field with the instance number.
+> - Also enumerate the EOIMODE1 sub-chips.
+> 
+> Marc: can't test the EOIMODE1 thing, it's far above me, but it
+> "should work". Is it correct that there is one unique and coupled
+> EOIMODE1 instance per GIC instance like this?
 
-I did had similar issues with mustang, where it was taking more than 2 min.
+I'm afraid you misinterpreted the EOIMODE==1 thing. The GIC can either
+be EOIMODE==0 (which is what most people are using on 32bit when not
+booting at HYP), or EOIMODE==1 (most 64bit systems). For systems with
+multiple GICs, the secondary GICs are always EOIMODE==0.
 
-Can you please try with my kexec-tools repo [1] where I have patches to enable
-D-cache for sha verification. Your feedback might help to upstream these patches.
+So you should only have a single irqchip structure in gic_chip_data, and
+populate it depending on the case you're in:
 
-Thanks
-~Pratyush
+- gic_nr == 0 && static_key_true(&supports_deactivate) -> EOIMODE==1
+- otherwise EOIMODE==0.
 
-[1] https://github.com/pratyushanand/kexec-tools.git : master
+Does this make more sense?
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
