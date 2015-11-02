@@ -1,82 +1,79 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Mon, 2 Nov 2015 09:03:16 +0100
-Subject: [PATCH 5/7] clocksource/drivers/pxa_timer: Move the Kconfig rule
-In-Reply-To: <CAHLCerPX+bmNMNDFEW24GWXhmrCspfY=UYkhM54ORfoiB5Xfvw@mail.gmail.com>
-References: <CAHLCerPX+bmNMNDFEW24GWXhmrCspfY=UYkhM54ORfoiB5Xfvw@mail.gmail.com>
-Message-ID: <563718C4.5050503@linaro.org>
+From: cedric.madianga@gmail.com (M'boumba Cedric Madianga)
+Date: Mon, 2 Nov 2015 09:25:35 +0100
+Subject: [PATCH v4 0/4] Add support for STM32 DMA
+In-Reply-To: <1445003956-9150-1-git-send-email-cedric.madianga@gmail.com>
+References: <1445003956-9150-1-git-send-email-cedric.madianga@gmail.com>
+Message-ID: <CAOAejn3x4RR_4LNyx3QD1SpYnpbqbpyYLdxHvPg6_TTzodJTmA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+ Hi Vinod,
 
-Hi Amit,
+Do you have any further comments or suggestions on this serie ?
 
-On 11/02/2015 08:44 AM, Amit Kucheria wrote:
-> On Fri, Oct 30, 2015 at 4:22 AM, Daniel Lezcano
-> <daniel.lezcano@linaro.org> wrote:
->> Instead of having the clocksource's Kconfig depending on the arch, let the
->> arch to select the timer it needs.
+BR,
+Cedric
+
+2015-10-16 15:59 GMT+02:00 M'boumba Cedric Madianga <cedric.madianga@gmail.com>:
+> This patchset adds support for the STM32 DMA controller.
+> This controller provides 8 channels dedicated to managing memory access
+> request from one or more peripherals.
+> Each stream can have up to 8 requests in total.
 >
-> Is this the prescribed way to do things nowadays? It leads to more
-> options showing up in 'make menuconfig'. Why do I need to see
-> CLKSRC_PXA if I'm not even compiling for ARCH_PXA (and not interesting
-> in COMPILE_TEST)?
-
-That won't happen.
-
-As the 'bool' has no string after, it won't show up in the menuconfig.
-
-Actually, with the next patch, only COMPILE_TEST will show it up in the
-
-Device Drivers->Clocksource drivers.
-
->> The CLKSRC_OF dependency is removed because already selected by the ARCH_PXA,
->> and it is added for SA1100.
+> Changes since v3:
+>  - Fix regression introduced in v3 during request channel
+>  - Fix regression introduced in v3 for cyclic mode dma transfer
+>  - update interrupt description in DT
+>  - remove half transfer interrupt management as client callback as to be
+>    called only for complete transfer
 >
-> This bit makes sense.
+> Changes since v2:
+>  - remove interrupt configuration management from DT (Mark)
+>  - remove FIFO configuration management from DT except threshold as it is very
+>    hard to handle it in the driver due to many possible combinations according
+>    to burst and bus width (Mark)
+>  - update DMA client message in DT documentation file
+>  - specify the order to be used to set per-channel DMA interrupts in the DT
+>    (Mark)
+>  - remove unused enumerations for channel and request ids (Daniel)
+>  - keep as soon as possible 80 lines char for more readability (Vinod)
+>  - replace unsigned int by u32 (Vinod)
+>  - use GFP_NOWAIT instead of GFP_ATOMIC during dma descriptors allocation
+>    (Vinod)
+>  - return error if burst is not supported in stm32_dma_get_burst() (Vinod)
+>  - return error if bus_width is not supported in stm32_dma_get_width() (Vinod)
+>  - add FIFO configuration management inside the driver except for threshold
+>  - add interrupt configuration management inside the driver (Mark)
+>  - rework stm32_dma_chan_irq() to handle error interrupt in one way (Vinod)
+>  - rework stm32_dma_set_xfer_param() to be easier to read
+>  - update stm32_dma_tx_status() to always return status from dma_cookie_status() (Vinod)
+>  - disable clk if we don't manage to stop the DMA channel during channel
+>    resources allocation (Daniel)
+>  - set driver as built-in as DMA will be required by other built-in driver
 >
->> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
->> ---
->>   arch/arm/Kconfig            | 3 +++
->>   drivers/clocksource/Kconfig | 3 +--
->>   2 files changed, 4 insertions(+), 2 deletions(-)
->>
->> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
->> index 72ad724..aa32286 100644
->> --- a/arch/arm/Kconfig
->> +++ b/arch/arm/Kconfig
->> @@ -609,6 +609,7 @@ config ARCH_PXA
->>          select AUTO_ZRELADDR
->>          select COMMON_CLK
->>          select CLKDEV_LOOKUP
->> +       select CLKSRC_PXA
->>          select CLKSRC_MMIO
->>          select CLKSRC_OF
->>          select GENERIC_CLOCKEVENTS
->> @@ -669,6 +670,8 @@ config ARCH_SA1100
->>          select ARCH_SPARSEMEM_ENABLE
->>          select CLKDEV_LOOKUP
->>          select CLKSRC_MMIO
->> +       select CLKSRC_PXA
->> +       select CLKSRC_OF if OF
->>          select CPU_FREQ
->>          select CPU_SA1100
->>          select GENERIC_CLOCKEVENTS
->> diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
->> index 5cd000c..425abbd 100644
->> --- a/drivers/clocksource/Kconfig
->> +++ b/drivers/clocksource/Kconfig
->> @@ -289,8 +289,7 @@ config CLKSRC_TANGO_XTAL
->>          select CLKSRC_OF
->>
->>   config CLKSRC_PXA
->> -       def_bool y if ARCH_PXA || ARCH_SA1100
->> -       select CLKSRC_OF if OF
->> +       bool
-
-
--- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+>  Changes since v1:
+>   - remove dmamux boolean as it is not needed
+>   - replace dma by DMA in Kconfig (Maxime)
+>   - add default return value in stm32_dma_get_width()
+>   - add defalut return value in stm32_dma_get_burst()
+>   - use lower case for constant hexadecimal values (Maxime)
+>
+> M'boumba Cedric Madianga (4):
+>   dt-bindings: Document the STM32 DMA bindings
+>   dmaengine: Add STM32 DMA driver
+>   ARM: dts: Add STM32 DMA support for STM32F429 MCU
+>   ARM: configs: Add STM32 DMA support in STM32 defconfig
+>
+>  .../devicetree/bindings/dma/stm32-dma.txt          |   82 ++
+>  arch/arm/boot/dts/stm32f429.dtsi                   |   31 +
+>  arch/arm/configs/stm32_defconfig                   |    2 +
+>  drivers/dma/Kconfig                                |   12 +
+>  drivers/dma/Makefile                               |    1 +
+>  drivers/dma/stm32-dma.c                            | 1141 ++++++++++++++++++++
+>  6 files changed, 1269 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/dma/stm32-dma.txt
+>  create mode 100644 drivers/dma/stm32-dma.c
+>
+> --
+> 1.9.1
+>
