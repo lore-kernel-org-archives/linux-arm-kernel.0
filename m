@@ -1,56 +1,32 @@
-From: damien.riegel@savoirfairelinux.com (Damien Riegel)
-Date: Mon, 2 Nov 2015 13:13:34 -0500
-Subject: [PATCH v2 2/5] mfd: ts4800-syscon: add driver for TS-4800 syscon
-In-Reply-To: <20151102091253.GS4058@x1>
-References: <1446150450-22093-1-git-send-email-damien.riegel@savoirfairelinux.com>
- <1446150450-22093-3-git-send-email-damien.riegel@savoirfairelinux.com>
- <20151030175656.GF4058@x1> <20151030200812.GB8666@localhost>
- <20151102091253.GS4058@x1>
-Message-ID: <20151102181334.GA7200@localhost>
+From: rostedt@goodmis.org (Steven Rostedt)
+Date: Mon, 2 Nov 2015 13:20:43 -0500
+Subject: [PATCH v4 1/6] arm64: ftrace: adjust callsite addresses
+ examined by stack tracer
+In-Reply-To: <20151030111618.GA20030@arm.com>
+References: <1446182741-31019-1-git-send-email-takahiro.akashi@linaro.org>
+ <1446182741-31019-2-git-send-email-takahiro.akashi@linaro.org>
+ <20151030111618.GA20030@arm.com>
+Message-ID: <20151102132043.060ef31d@gandalf.local.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 02, 2015 at 09:12:53AM +0000, Lee Jones wrote:
-> [Cc'ing Arnd]
-> 
-> On Fri, 30 Oct 2015, Damien Riegel wrote:
-> > On Fri, Oct 30, 2015 at 05:56:56PM +0000, Lee Jones wrote:
-> > > On Thu, 29 Oct 2015, Damien Riegel wrote:
-> > > 
-> > > > Driver for TS-4800 syscon. These registers belong to a FPGA that is
-> > > > memory mapped and are used for counters, enable various IPs in the FPGA,
-> > > > control LEDs, control IOs, etc.
-> > > > 
-> > > > Currently, only the watchdog is handled.
-> > > 
-> > > Why do you require your own syscon driver?
-> > > 
-> > > What's wrong with the generic one?
-> > > 
-> > 
-> > The generic one uses a regmap_config with reg_stride set to 4 and val_bits
-> > to 32.
-> > 
-> > TS-4800 syscon registers are 16-bit wide and must be accessed with 16
-> > bit read and writes:
-> > http://wiki.embeddedarm.com/wiki/TS-4800#Syscon
-> > 
-> > I will address the other issues in the next version (split commit,
-> > license issue, style, and superfluous remove).
-> 
-> The Syscon driver was written to be generic so that each
-> vendor/platform didn't require their own incarnation.  How unique is
-> the TS-4800?
-> 
-> Perhaps it might be better to supply a generic 16 bit Syscon for
-> devices akin to the TS-4800?
+On Fri, 30 Oct 2015 11:16:19 +0000
+Will Deacon <will.deacon@arm.com> wrote:
 
-The TS-4800 syscon could use a generic 16-bit syscon. There is nothing
-specific that requires a driver besides that.
-
-We could add some optional properties to the generic syscon node to
-configure reg_bits, val_bits, and reg_stride (and pad_bits ?). Would
-that be a good solution ?
-
-> Arnd, any opinion on this?
+> On Fri, Oct 30, 2015 at 02:25:36PM +0900, AKASHI Takahiro wrote:
+> > On arm64, no PC values returned by save_stack_trace() will match to LR
+> > values saved in stack frames on a stack after the following commit:
+> >     commit e306dfd06fcb ("ARM64: unwind: Fix PC calculation")
+> > As a result, the output from stack tracer will be messed up.
 > 
+> FWIW, we've decided to revert that patch for the moment. We're the only
+> architecture making that kind of adjustment, so we should fix that before
+> building on top of it.
+> 
+>
+
+What is the status of this patch set. I'm currently pulling in last
+minute patches for 4.3 and should the ftrace patch in this series be
+applied? (I still need to review it too).
+
+-- Steve
