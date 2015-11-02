@@ -1,150 +1,167 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Mon, 2 Nov 2015 17:57:54 +0000 (UTC)
-Subject: OMAP baseline test results for v4.3-rc7
-Message-ID: <alpine.DEB.2.02.1511021757180.15134@utopia.booyaka.com>
+From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
+Date: Mon, 02 Nov 2015 17:59:00 +0000
+Subject: [PATCH v8 1/2] arm-soc: Import initial tango4 device tree
+In-Reply-To: <56379945.6020407@sigmadesigns.com> (Marc Gonzalez's message of
+ "Mon, 2 Nov 2015 18:11:33 +0100")
+References: <56377E76.2080209@sigmadesigns.com>
+ <56377ED5.4070203@sigmadesigns.com>
+ <yw1xk2q09yrj.fsf@unicorn.mansr.com>
+ <56379945.6020407@sigmadesigns.com>
+Message-ID: <yw1xbnbc9taz.fsf@unicorn.mansr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Marc Gonzalez <marc_gonzalez@sigmadesigns.com> writes:
 
-Here are some basic OMAP test results for Linux v4.3-rc7.
-Logs and other details at:
+> On 02/11/2015 17:01, M?ns Rullg?rd wrote:
+>
+>> There are about a dozen more clocks that will be needed eventually.  Do
+>> you have a plan for how to add them?  (My driver already has support for
+>> most of them.)
+>
+> Can you tell me which clocks (for which device) you've needed on the smp8759?
 
-    http://www.pwsan.com/omap/testlogs/test_v4.3-rc7/20151025181941/
+For the bare minimum functionality, none.  If you want USB or SATA,
+you'll need those clocks defined.  All the media processing has a slew
+of clocks as well.
 
+>>> +	periphclk: periphclk {
+>> 
+>> Why is this not in the clocks block above?
+>
+> It was something the clk maintainer said that made me move it, but I can't
+> find it anymore. I can move it back if that's the consensus.
 
-Test summary
-------------
+Wait and see what others say.
 
-Build: uImage:
-    Pass ( 3/ 3): omap1_defconfig, omap1_defconfig_1510innovator_only,
-		  omap1_defconfig_5912osk_only
+>>> +		compatible = "fixed-factor-clock";
+>>> +		clocks = <&clkgen 0>;
+>>> +		clock-mult = <1>;
+>>> +		clock-div  = <2>;
+>> 
+>> Some Sigma source code I found on the Internet uses a divisor of 3.
+>> Which is correct?
+>
+> I was told 2.
 
-Build: uImage+dtb:
-    Pass (13/13): omap2plus_defconfig_am33xx_only/am335x-bone,
-		  omap2plus_defconfig/omap4-panda,
-		  omap2plus_defconfig/omap4-panda-es,
-		  omap2plus_defconfig/omap4-var-stk-om44,
-		  omap2plus_defconfig/omap3-evm-37xx,
-		  omap2plus_defconfig_n800_only_a/omap2420-n800,
-		  omap2plus_defconfig/omap2430-sdp,
-		  omap2plus_defconfig/am3517-evm,
-		  omap2plus_defconfig/omap3-beagle,
-		  omap2plus_defconfig/omap3-beagle-xm,
-		  omap2plus_defconfig/omap3-sbc-t3517,
-		  omap2plus_defconfig/omap5-uevm,
-		  omap2plus_defconfig/omap5-sbc-t54
+OK.
 
-Build: zImage:
-    Pass (17/17): omap2plus_defconfig, omap2plus_defconfig_am33xx_only,
-		  omap2plus_defconfig_n800_only_a,
-		  omap2plus_defconfig_n800_multi_omap2xxx,
-		  omap2plus_defconfig_2430sdp_only,
-		  omap2plus_defconfig_cpupm, omap2plus_defconfig_no_pm,
-		  omap2plus_defconfig_omap2_4_only,
-		  omap2plus_defconfig_omap3_4_only,
-		  omap2plus_defconfig_omap5_only,
-		  omap2plus_defconfig_dra7xx_only,
-		  omap2plus_defconfig_am43xx_only,
-		  rmk_omap3430_ldp_oldconfig,
-		  rmk_omap3430_ldp_allnoconfig,
-		  rmk_omap4430_sdp_oldconfig,
-		  rmk_omap4430_sdp_allnoconfig, multi_v7_defconfig
+>>> +	soc {
+>>> +		compatible = "simple-bus";
+>>> +		#address-cells = <1>;
+>>> +		#size-cells = <1>;
+>>> +		ranges;
+>> 
+>> Put interrupt-parent = <&irq0> here and save repeating it for each device.
+>
+> Each device can have either irq0, irq1, or irq2 as the parent, right?
+> The old code tried to do IRQ load-balancing "by hand". I had the vague
+> idea that I would set some devices to irq0, others to irq1, and have
+> irq_i interrupt CPU_i. Does that make no sense?
 
-Build warnings from toolchain: uImage:
-    (none)
+Which devices to assign to which CPU would depend on the expected usage,
+something only known at the board level at best.  I think it's better to
+have them all default to irq0 here and let boards override if necessary.
 
-Build warnings from toolchain: uImage+dtb:
-    (none)
+>>> +		tick-counter at 10048 {
+>>> +			compatible = "sigma,tick-counter";
+>> 
+>> This compatible name is too vague.  What if the next Sigma chip has a
+>> completely different counter?
+>
+> When this happens, I could switch to the generic method you've proposed.
 
-Build warnings from toolchain: zImage:
-    FAIL (10/17): omap2plus_defconfig, omap2plus_defconfig_am33xx_only,
-		  omap2plus_defconfig_2430sdp_only,
-		  omap2plus_defconfig_cpupm, omap2plus_defconfig_no_pm,
-		  omap2plus_defconfig_omap2_4_only,
-		  omap2plus_defconfig_omap3_4_only,
-		  omap2plus_defconfig_omap5_only,
-		  omap2plus_defconfig_dra7xx_only,
-		  omap2plus_defconfig_am43xx_only
+This name would still become misleading, and you're not allowed to
+change a DT binding incompatibly once it's been established.
 
-Boot to userspace:
-    FAIL ( 1/17): 2430sdp
-    skip ( 3/17): 5912osk, 3517evm, 5430es2sbct54
-    Pass (13/17): am335xbonelt, am335xbone, 4430es2panda, 4460pandaes,
-		  4460varsomom, 37xxevm, 3530es3beagle, 3530es31beagle,
-		  3730beaglexm, 3730es12beaglexm, cmt3517, 5430es2uevm,
-		  2420n800
+>>> +		eth0: ethernet at 26000 {
+>>> +			reg = <0x26000 0x800>;
+>>> +			interrupts = <38 IRQ_TYPE_LEVEL_HIGH>;
+>>> +			interrupt-parent = <&irq0>;
+>>> +			clocks = <&clkgen 1>;
+>>> +		};
+>> 
+>> Missing compatible string.
+>
+> It's not missing, it's elsewhere.
+> (But maybe I did it wrong.)
+>
+>>> +		intc: interrupt-controller at 6e000 {
+>>> +			reg = <0x6e000 0x400>;
+>>> +			ranges = <0 0x6e000 0x400>;
+>>> +			interrupt-parent = <&gic>;
+>>> +			interrupt-controller;
+>>> +			#address-cells = <1>;
+>>> +			#size-cells = <1>;
+>> 
+>> Missing compatible string.
+>> 
+>>> +			irq0: irq0 at 6e000 {
+>> 
+>> The node name should be interrupt-controller at 000, similarly below.
+>
+> <confused> I changed that a long time ago, and Arnd didn't flag it.
+> I'll put whatever the arm-soc maintainers say.
 
-Kernel warnings during boot to userspace:
-    FAIL ( 2/17): 4430es2panda, cmt3517
+They usually point to the ePAPR spec, which says interrupt controller
+nodes should be called interrupt-controller@<addr>.  It also says the
+<addr> following the @ should be the same as the first <reg> address,
+which here is the offset from the base address.
 
-PM: chip retention via suspend:
-    FAIL ( 6/11): am335xbonelt, 4430es2panda, 4460varsomom, 37xxevm,
-		  2430sdp, 5430es2uevm
-    Pass ( 5/11): 4460pandaes, 3530es3beagle, 3530es31beagle,
-		  3730beaglexm, 3730es12beaglexm
+>>> +	cpus {
+>>> +		#address-cells = <1>;
+>>> +		#size-cells = <0>;
+>>> +		enable-method = "sigma,tango4-smp";
+>> 
+>> This enable-method is too vague.  The next chip might be different.
+>
+> What string do you propose?
+> What if I don't expect any other tango4 chip?
 
-PM: chip retention via dynamic idle:
-    FAIL ( 6/11): am335xbonelt, 4430es2panda, 4460varsomom, 37xxevm,
-		  2430sdp, 5430es2uevm
-    Pass ( 5/11): 4460pandaes, 3530es3beagle, 3530es31beagle,
-		  3730beaglexm, 3730es12beaglexm
+Expectations are often wrong.  Use an actual chip number.
 
-PM: chip off (except CORE, due to errata) via suspend:
-    Pass ( 1/ 1): 3730beaglexm
+>> The device tree should mention the SCU.
+>
+> I left it out because I thought it was the firmware's responsibility.
+> I will double-check with the firmware author.
 
-PM: chip off (except CORE, due to errata) via dynamic idle:
-    Pass ( 1/ 1): 3730beaglexm
+It's still there, and the kernel might want to at least check how it's
+configured.
 
-PM: chip off via suspend:
-    FAIL ( 1/ 4): 37xxevm
-    Pass ( 3/ 4): 3530es3beagle, 3530es31beagle, 3730es12beaglexm
+>>> +&eth0 {
+>>> +	compatible = "sigma,smp8758-ethernet", "sigma,smp8734-ethernet", "sigma,smp8642-ethernet", "aurora,nb8800";
+>> 
+>> It's odd to specify the compatible string here.  It certainly won't
+>> change between different boards using the same chip.  Also, in the
+>> latest version of my driver, tango3 and tango4 are unfortunately not
+>> compatible.  The incompatibility only showed up once I enabled the L2
+>> cache.  I don't know quite what's going on.
+>
+> IIUC, I should move the compatible string to the SoC-specific DTS?
+> And I should remove "sigma,smp8642-ethernet"?
+>
+>>> +	phy-connection-type = "rgmii";
+>>> +	max-speed = <1000>;
+>> 
+>> You should have a node for the PHY here.
+>
+> I'm using your old ethernet driver for the time being. I just compile the
+> appropriate PHY driver, and everything works as expected. What will the
+> PHY node in DT bring?
 
-PM: chip off via dynamic idle:
-    FAIL ( 1/ 4): 37xxevm
-    Pass ( 3/ 4): 3530es3beagle, 3530es31beagle, 3730es12beaglexm
+The new driver requires it for starters.  Also, the probing acts oddly
+on my 8642 board, so it's probably best to avoid.
 
-Kernel warnings during PM test:
-    FAIL ( 1/17): 4430es2panda
+>>> +&intc {
+>>> +	compatible = "sigma,smp8758-intc", "sigma,smp8642-intc";
+>> 
+>> Wrong place for the compatible string.
+>
+> IIUC, I should move the compatible string to the SoC-specific DTS?
+>
+> Regards.
+>
 
-Obsolete Kconfig symbols:
-    FAIL ( 2/20): omap2plus_defconfig, multi_v7_defconfig
-
-
-vmlinux object size
-(delta in bytes from test_v4.3-rc6 (7379047d5585187d1288486d4627873170d0005a)):
-   text     data      bss    total  kernel
-   +606      +64      +32     +702  omap1_defconfig
-   +606      +32      +32     +670  omap1_defconfig_1510innovator_only
-   +606      +64      +32     +702  omap1_defconfig_5912osk_only
-   +528        0        0     +528  multi_v7_defconfig
-   +868      +64        0     +932  omap2plus_defconfig
-   +436      +32      +32     +500  omap2plus_defconfig_2430sdp_only
-   +868      +64        0     +932  omap2plus_defconfig_am33xx_only
-   +868      +64        0     +932  omap2plus_defconfig_am43xx_only
-   +928      +64      +64    +1056  omap2plus_defconfig_cpupm
-   +868      +64        0     +932  omap2plus_defconfig_dra7xx_only
-   +452      -32      +16     +436  omap2plus_defconfig_n800_multi_omap2xxx
-   +608      +32      +16     +656  omap2plus_defconfig_n800_only_a
-   +932      +96        0    +1028  omap2plus_defconfig_no_pm
-   +860      +72      +64     +996  omap2plus_defconfig_omap2_4_only
-   +868      +64        0     +932  omap2plus_defconfig_omap3_4_only
-   +868      +56        0     +924  omap2plus_defconfig_omap5_only
-   +392      +32      -40     +384  rmk_omap3430_ldp_allnoconfig
-   +618      +32        0     +650  rmk_omap3430_ldp_oldconfig
-   +368        0      -48     +320  rmk_omap4430_sdp_allnoconfig
-   +658        0        0     +658  rmk_omap4430_sdp_oldconfig
-
-Boot-time memory difference
-(delta in bytes from test_v4.3-rc6 (7379047d5585187d1288486d4627873170d0005a))
-  avail  rsrvd   high  freed  board          kconfig
-    -4k     4k      .      .  2430sdp        omap2plus_defconfig
-    -8k     8k      .     4k  3530es31beagle omap2plus_defconfig
-    -8k     8k      .     4k  3530es3beagle  omap2plus_defconfig
-    -8k     8k      .     4k  3730beaglexm   omap2plus_defconfig
-    -8k     8k      .     4k  3730es12beaglexmomap2plus_defconfig
-    -8k     8k      .     4k  37xxevm        omap2plus_defconfig
-    -8k     8k      .     4k  4430es2panda   omap2plus_defconfig
-    -8k     8k      .     4k  4460pandaes    omap2plus_defconfig
-    -8k     8k      .     4k  4460varsomom   omap2plus_defconfig
-    -8k     8k      .     4k  5430es2uevm    omap2plus_defconfig
-    -8k     8k      .     4k  am335xbonelt   omap2plus_defconfig
+-- 
+M?ns Rullg?rd
+mans at mansr.com
