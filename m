@@ -1,32 +1,30 @@
 From: rostedt@goodmis.org (Steven Rostedt)
-Date: Mon, 2 Nov 2015 13:20:43 -0500
-Subject: [PATCH v4 1/6] arm64: ftrace: adjust callsite addresses
- examined by stack tracer
-In-Reply-To: <20151030111618.GA20030@arm.com>
-References: <1446182741-31019-1-git-send-email-takahiro.akashi@linaro.org>
- <1446182741-31019-2-git-send-email-takahiro.akashi@linaro.org>
- <20151030111618.GA20030@arm.com>
-Message-ID: <20151102132043.060ef31d@gandalf.local.home>
+Date: Mon, 2 Nov 2015 13:26:08 -0500
+Subject: [PATCH] recordmcount: arm64: replace the ignored mcount call
+ into nop
+In-Reply-To: <5633077C.3050000@huawei.com>
+References: <1446019445-14421-1-git-send-email-huawei.libin@huawei.com>
+ <201510292118.ZYBYzBGa%fengguang.wu@intel.com>
+ <20151029150922.GE3440@arm.com> <5633077C.3050000@huawei.com>
+Message-ID: <20151102132608.59e16994@gandalf.local.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 30 Oct 2015 11:16:19 +0000
-Will Deacon <will.deacon@arm.com> wrote:
+On Fri, 30 Oct 2015 14:00:28 +0800
+libin <huawei.libin@huawei.com> wrote:
 
-> On Fri, Oct 30, 2015 at 02:25:36PM +0900, AKASHI Takahiro wrote:
-> > On arm64, no PC values returned by save_stack_trace() will match to LR
-> > values saved in stack frames on a stack after the following commit:
-> >     commit e306dfd06fcb ("ARM64: unwind: Fix PC calculation")
-> > As a result, the output from stack tracer will be messed up.
+> It is a bug in nop_mcount:
+> ...
+> if (mcountsym == Elf_r_sym(relp) && !is_fake_mcount(relp)) {
+>         if (make_nop) {
+>                 ret = make_nop((void *)ehdr, shdr->sh_offset + relp->r_offset);
+>         }
+> ...
 > 
-> FWIW, we've decided to revert that patch for the moment. We're the only
-> architecture making that kind of adjustment, so we should fix that before
-> building on top of it.
+> shdr->sh_offset and welp->r_offset should handle endianness properly as _w(shdr->sh_offset)/
+> _w(relp->r_offset). I will post a patchset including this patch soon.
 > 
->
 
-What is the status of this patch set. I'm currently pulling in last
-minute patches for 4.3 and should the ftrace patch in this series be
-applied? (I still need to review it too).
+Has this been fixed yet?
 
 -- Steve
