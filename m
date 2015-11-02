@@ -1,33 +1,26 @@
-From: santosh.shilimkar@oracle.com (santosh shilimkar)
-Date: Mon, 2 Nov 2015 10:37:40 -0800
-Subject: [PATCH v8 2/2] arm-soc: Add support for arm-based tango4 platforms
-In-Reply-To: <20151102182615.GI2684@leverpostej>
-References: <56377E76.2080209@sigmadesigns.com>
- <56377F09.6050805@sigmadesigns.com> <yw1xfv0o9xr3.fsf@unicorn.mansr.com>
- <20151102182615.GI2684@leverpostej>
-Message-ID: <5637AD74.4080206@oracle.com>
+From: jonmason@broadcom.com (Jon Mason)
+Date: Mon, 2 Nov 2015 13:40:55 -0500
+Subject: [PATCH RESEND 0/3]  ARM: dts: NSP: Add PCI, NAND,
+ and TWD Support to DT
+Message-ID: <1446489658-29705-1-git-send-email-jonmason@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/2/2015 10:26 AM, Mark Rutland wrote:
->>> +ENTRY(tango_smc)
->>> +	push	{lr}
->>> +	mov	ip, r1
->>> +	dsb
->>
->> Did you ever get a straight answer on the dsb here?
->
-> We didn't. Having a look just now, the earliest example appears to be
-> in OMAP4 L2 support patches back in 2009 [1]. I was not able to find a
-> rationale.
->
-> Given that the MMU is on (and speculative accesses are permitted) I
-> can't see what the DSB achieves -- it can't quiesce the memory system.
->
-> Santosh, any idea?
->
-IIRC, it was requirement from the OMAP ROM code to have a dsb before
-we call the SMC routine. I can't recollect more than that now.
+Resending due to lack of any response to the original series
 
-Regards,
-Santosh
+Add PCI, NAND, and TWD Support to the Broadcom Northstar Plus SoC device
+tree file.  Since no driver changes are needed to enable these pieces of
+hardware, only the device tree changes are required to make them
+functional.
+
+Jon Mason (3):
+  ARM: dts: NSP: Add PCI support
+  ARM: dts: NSP: Add NAND Support to DT
+  ARM: dts: NSP: Add TWD Support to DT
+
+ arch/arm/boot/dts/bcm-nsp.dtsi   | 104 ++++++++++++++++++++++++++++++++++++++-
+ arch/arm/boot/dts/bcm958625k.dts |  50 +++++++++++++++++++
+ 2 files changed, 153 insertions(+), 1 deletion(-)
+
+-- 
+1.9.1
