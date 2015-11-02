@@ -1,99 +1,604 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Mon, 2 Nov 2015 09:48:38 +0100
-Subject: [PATCH] clocksource: dw_apb_timer_of: support timer-based delay
-In-Reply-To: <20151102105113.72aade85@xhacker>
-References: <1446193659-1698-1-git-send-email-jszhang@marvell.com>
- <56334A1E.7060709@linaro.org> <20151030190929.4c46066c@xhacker>
- <5633646D.7030206@linaro.org> <20151102105113.72aade85@xhacker>
-Message-ID: <56372366.6090905@linaro.org>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Mon, 02 Nov 2015 09:57:43 +0100
+Subject: [PATCH 2/6] ARM: dts: imx: Add Advantech BA-16 Qseven module
+In-Reply-To: <1446160607-16053-3-git-send-email-akshay.bhat@timesys.com>
+References: <1446160607-16053-1-git-send-email-akshay.bhat@timesys.com>
+ <1446160607-16053-3-git-send-email-akshay.bhat@timesys.com>
+Message-ID: <1446454663.3156.4.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/02/2015 03:51 AM, Jisheng Zhang wrote:
-> Dear Daniel,
->
-> On Fri, 30 Oct 2015 13:37:01 +0100
-> Daniel Lezcano wrote:
->
->> On 10/30/2015 12:09 PM, Jisheng Zhang wrote:
->>> Dear Daniel,
->>>
->>> On Fri, 30 Oct 2015 11:44:46 +0100
->>> Daniel Lezcano <daniel.lezcano@....> wrote:
->>>
->>>> On 10/30/2015 09:27 AM, Jisheng Zhang wrote:
->>>>> Implement an ARM delay timer to be used for udelay(). This allows us to
->>>>> skip the delay loop calibration at boot on Marvell BG2, BG2Q, BG2CD
->>>>> platforms. And after this patch, udelay() will be unaffected by CPU
->>>>> frequency changes.
->>>>>
->>>>> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
->>>>> ---
->>>>>     drivers/clocksource/Kconfig           | 10 ++++++++++
->>>>>     drivers/clocksource/dw_apb_timer_of.c | 16 ++++++++++++++++
->>>>>     2 files changed, 26 insertions(+)
->>>>>
->>>>> diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
->>>>> index a7726db..7b081805 100644
->>>>> --- a/drivers/clocksource/Kconfig
->>>>> +++ b/drivers/clocksource/Kconfig
->>>>> @@ -29,6 +29,16 @@ config DW_APB_TIMER_OF
->>>>>     	select DW_APB_TIMER
->>>>>     	select CLKSRC_OF
->>>>>
->>>>> +config DW_APB_TIMER_BASED_DELAY
->>>>> +	bool "DW APB timer based delay"
->>>>> +	depends on ARM && DW_APB_TIMER_OF
->>>>> +	default n
->>>>> +	help
->>>>> +	  This option enables support for using the DW APB timer to
->>>>> +	  implement timer-based delay. It is useful for skiping the
->>>>> +	  delay loop calibration at boot on some platforms. And the
->>>>> +	  udelay() will be unaffected by CPU frequency changes.
->>>>> +
->>>>
->>>> Why do you want it to be optional ?
->>>>
->>>
->>> Because in some platforms which has arm arch timer, this dw apb timer
->>> delay isn't needed, the arch timer is better. So we want it be optional
->>> so that the platforms which need this feature select it manually when config
->>> the kernel.
->>
->> Correct me if I am wrong. If you have the arch timer, you don't need the
->
-> Yes, I don't need the dw apb timer if we have arch timer,
->
->> dw apb timer at all, no ? So the selection would be arch arm timer *or*
->> dw_apb_timer ? not arch_arm_timer for delay and dw_apb_timer for
->> clockevents, right ?
->
-> Yes, if we have arch timer, I prefer to use it for clockevent and delay.
->
-> Could you please provide suggestion how to handle this case?
+Am Donnerstag, den 29.10.2015, 19:16 -0400 schrieb Akshay Bhat:
+> From: Justin Waters <justin.waters@timesys.com>
+> 
+> Add support for Advantech BA-16 module based on iMX6D processor
+> 
+> http://www2.advantech.com/products/medical_computing_system/dms-ba16/mod_64aa1566-169c-483d-97c8-c2c22c163fc3.aspx
+> Signed-off-by: Akshay Bhat <akshay.bhat@timesys.com>
+> ---
+>  arch/arm/boot/dts/imx6q-ba16.dtsi | 559 ++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 559 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/imx6q-ba16.dtsi
+> 
+> diff --git a/arch/arm/boot/dts/imx6q-ba16.dtsi b/arch/arm/boot/dts/imx6q-ba16.dtsi
+> new file mode 100644
+> index 0000000..3d47039
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/imx6q-ba16.dtsi
+> @@ -0,0 +1,559 @@
+> +/*
+> + * Support for imx6 based Advantech DMS-BA16 Qseven module
+> + *
+> + * Copyright 2015 Timesys Corporation.
+> + * Copyright 2015 GE Healthcare.
+> + *
+> + * The code contained herein is licensed under the GNU General Public
+> + * License. You may obtain a copy of the GNU General Public License
+> + * Version 2 or later at the following locations:
+> + *
+> + * http://www.opensource.org/licenses/gpl-license.html
+> + * http://www.gnu.org/copyleft/gpl.html
+> + */
+> +
+> +#include "imx6q.dtsi"
+> +#include <dt-bindings/gpio/gpio.h>
+> +
+> +/ {
+> +	memory {
+> +		reg = <0x10000000 0x40000000>;
+> +	};
+> +
+> +	clocks {
+> +		clk24m: clk24m {
+> +			compatible = "fixed-clock";
+> +			#clock-cells = <0>;
+> +			clock-frequency = <24000000>;
+> +		};
+> +	};
+> +
+> +	regulators {
+> +		compatible = "simple-bus";
+> +
+> +		reg_usb_otg_vbus: regulator at 1 {
+> +			compatible = "regulator-fixed";
+> +			regulator-name = "usb_otg_vbus";
+> +			regulator-min-microvolt = <5000000>;
+> +			regulator-max-microvolt = <5000000>;
+> +		};
+> +
+> +		reg_usb_h1_vbus: regulator at 2 {
+> +			compatible = "regulator-fixed";
+> +			regulator-name = "usb_h1_vbus";
+> +			regulator-min-microvolt = <5000000>;
+> +			regulator-max-microvolt = <5000000>;
+> +		};
+> +
+> +		reg_1p8v: regulator at 3 {
+> +			compatible = "regulator-fixed";
+> +			regulator-name = "1P8V";
+> +			regulator-min-microvolt = <1800000>;
+> +			regulator-max-microvolt = <1800000>;
+> +			regulator-always-on;
+> +		};
+> +
+> +		reg_3p3v: regulator at 4 {
+> +			compatible = "regulator-fixed";
+> +			regulator-name = "3P3V";
+> +			regulator-min-microvolt = <3300000>;
+> +			regulator-max-microvolt = <3300000>;
+> +			regulator-always-on;
+> +		};
+> +
+> +		lvds_ppen: regulator at 5 {
+> +			compatible = "regulator-fixed";
+> +			regulator-name = "lvds_ppen";
+> +			regulator-min-microvolt = <3300000>;
+> +			regulator-max-microvolt = <3300000>;
+> +			regulator-boot-on;
+> +			gpio = <&gpio3 22 GPIO_ACTIVE_HIGH>;
+> +			enable-active-high;
+> +		};
+> +	};
+> +
+> +	backlight {
+> +		compatible = "pwm-backlight";
+> +		pwms = <&pwm1 0 5000000>;
+> +		brightness-levels = <  0   1   2   3   4   5   6   7   8   9
+> +				      10  11  12  13  14  15  16  17  18  19
+> +				      20  21  22  23  24  25  26  27  28  29
+> +				      30  31  32  33  34  35  36  37  38  39
+> +				      40  41  42  43  44  45  46  47  48  49
+> +				      50  51  52  53  54  55  56  57  58  59
+> +				      60  61  62  63  64  65  66  67  68  69
+> +				      70  71  72  73  74  75  76  77  78  79
+> +				      80  81  82  83  84  85  86  87  88  89
+> +				      90  91  92  93  94  95  96  97  98  99
+> +				     100 101 102 103 104 105 106 107 108 109
+> +				     110 111 112 113 114 115 116 117 118 119
+> +				     120 121 122 123 124 125 126 127 128 129
+> +				     130 131 132 133 134 135 136 137 138 139
+> +				     140 141 142 143 144 145 146 147 148 149
+> +				     150 151 152 153 154 155 156 157 158 159
+> +				     160 161 162 163 164 165 166 167 168 169
+> +				     170 171 172 173 174 175 176 177 178 179
+> +				     180 181 182 183 184 185 186 187 188 189
+> +				     190 191 192 193 194 195 196 197 198 199
+> +				     200 201 202 203 204 205 206 207 208 209
+> +				     210 211 212 213 214 215 216 217 218 219
+> +				     220 221 222 223 224 225 226 227 228 229
+> +				     230 231 232 233 234 235 236 237 238 239
+> +				     240 241 242 243 244 245 246 247 248 249
+> +				     250 251 252 253 254 255>;
+> +		default-brightness-level = <255>;
+> +		enable-gpios = <&gpio4 15 GPIO_ACTIVE_HIGH>;
+> +		power-supply = <&lvds_ppen>;
+> +	};
+> +};
+> +
+> +&audmux {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_audmux>;
+> +	status = "okay";
+> +};
+> +
+> +&ecspi1 {
+> +	fsl,spi-num-chipselects = <1>;
+> +	cs-gpios = <&gpio2 30 GPIO_ACTIVE_HIGH>;
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_ecspi1>;
+> +	status = "okay";
+> +
+> +	flash: n25q032 at 0 {
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +		compatible = "jedec,spi-nor";
+> +		spi-max-frequency = <20000000>;
+> +		reg = <0>;
+> +		partition at 0 {
+> +			label = "U-Boot";
+> +			reg = <0x0 0xC0000>;
+> +		};
+> +		partition at C0000 {
+> +			label = "env";
+> +			reg = <0xC0000 0x10000>;
+> +		};
+> +		partition at D0000 {
+> +			label = "spare";
+> +			reg = <0xD0000 0x130000>;
+> +		};
+> +	};
+> +};
+> +
+> +&fec {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_enet>;
+> +	phy-mode = "rgmii";
+> +	status = "okay";
+> +};
+> +
+> +&hdmi {
+> +	ddc-i2c-bus = <&i2c2>;
+> +	status = "okay";
+> +};
+> +
+> +&i2c1 {
+> +	clock-frequency = <100000>;
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_i2c1>;
+> +	status = "okay";
+> +};
+> +
+> +&i2c2 {
+> +	clock-frequency = <100000>;
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_i2c2>;
+> +	status = "okay";
+> +};
+> +
+> +&i2c3 {
+> +	clock-frequency = <100000>;
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_i2c3>;
+> +	status = "okay";
+> +
+> +	pmic at 58 {
+> +		compatible = "dlg,da9063";
+> +		reg = <0x58>;
+> +		interrupt-parent = <&gpio7>;
+> +		interrupts = <13 IRQ_TYPE_LEVEL_LOW>;
+> +
+> +		regulators {
+> +			vdd_bcore1: bcore1 {
+> +				regulator-min-microvolt = <1420000>;
+> +				regulator-max-microvolt = <1420000>;
+> +				regulator-always-on;
+> +				regulator-boot-on;
+> +			};
+> +
+> +			vdd_bcore2: bcore2 {
+> +				regulator-min-microvolt = <1420000>;
+> +				regulator-max-microvolt = <1420000>;
+> +				regulator-always-on;
+> +				regulator-boot-on;
+> +			};
+> +
+> +			vdd_bpro: bpro {
+> +				regulator-min-microvolt = <1500000>;
+> +				regulator-max-microvolt = <1500000>;
+> +				regulator-always-on;
+> +				regulator-boot-on;
+> +			};
+> +
+> +			vdd_bmem: bmem {
+> +				regulator-min-microvolt = <1800000>;
+> +				regulator-max-microvolt = <1800000>;
+> +				regulator-always-on;
+> +				regulator-boot-on;
+> +			};
+> +
+> +			vdd_bio: bio {
+> +				regulator-min-microvolt = <1800000>;
+> +				regulator-max-microvolt = <1800000>;
+> +				regulator-always-on;
+> +				regulator-boot-on;
+> +			};
+> +
+> +			vdd_bperi: bperi {
+> +				regulator-min-microvolt = <3300000>;
+> +				regulator-max-microvolt = <3300000>;
+> +				regulator-always-on;
+> +				regulator-boot-on;
+> +			};
+> +
+> +			vdd_ldo1: ldo1 {
+> +				regulator-min-microvolt = <600000>;
+> +				regulator-max-microvolt = <1860000>;
+> +			};
+> +
+> +			vdd_ldo2: ldo2 {
+> +				regulator-min-microvolt = <600000>;
+> +				regulator-max-microvolt = <1860000>;
+> +			};
+> +
+> +			vdd_ldo3: ldo3 {
+> +				regulator-min-microvolt = <900000>;
+> +				regulator-max-microvolt = <3440000>;
+> +			};
+> +
+> +			vdd_ldo4: ldo4 {
+> +				regulator-min-microvolt = <900000>;
+> +				regulator-max-microvolt = <3440000>;
+> +			};
+> +
+> +			vdd_ldo5: ldo5 {
+> +				regulator-min-microvolt = <900000>;
+> +				regulator-max-microvolt = <3600000>;
+> +				regulator-always-on;
+> +				regulator-boot-on;
+> +			};
+> +
+> +			vdd_ldo6: ldo6 {
+> +				regulator-min-microvolt = <900000>;
+> +				regulator-max-microvolt = <3600000>;
+> +				regulator-always-on;
+> +				regulator-boot-on;
+> +			};
+> +
+> +			vdd_ldo7: ldo7 {
+> +				regulator-min-microvolt = <900000>;
+> +				regulator-max-microvolt = <3600000>;
+> +				regulator-always-on;
+> +				regulator-boot-on;
+> +			};
+> +
+> +			vdd_ldo8: ldo8 {
+> +				regulator-min-microvolt = <900000>;
+> +				regulator-max-microvolt = <3600000>;
+> +				regulator-always-on;
+> +				regulator-boot-on;
+> +			};
+> +
+> +			vdd_ldo9: ldo9 {
+> +				regulator-min-microvolt = <950000>;
+> +				regulator-max-microvolt = <3600000>;
+> +				regulator-always-on;
+> +				regulator-boot-on;
+> +			};
+> +
+> +			vdd_ldo10: ldo10 {
+> +				regulator-min-microvolt = <900000>;
+> +				regulator-max-microvolt = <3600000>;
+> +				regulator-always-on;
+> +				regulator-boot-on;
+> +			};
+> +
+> +			vdd_ldo11: ldo11 {
+> +				regulator-min-microvolt = <900000>;
+> +				regulator-max-microvolt = <3600000>;
+> +				regulator-always-on;
+> +				regulator-boot-on;
+> +			};
 
-If I follow the logic of arch_arm_timer is better than dw_apb timer.
+There is a suspiciously high number of always-on regulators in the list
+above. Are they really required to be powered on always, or are we
+lacking supplies on some of the devices below?
 
-1. The arch_arm_timer is present
+> +		};
+> +	};
+> +};
+> +
+> +&iomuxc {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_hog>;
+> +
+> +	imx6q-ba16 {
+> +		pinctrl_hog: hoggrp {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_GPIO_4__GPIO1_IO04    0x80000000	/* uSDHC2 CD */
+> +				MX6QDL_PAD_NANDF_CS0__GPIO6_IO11 0x80000000	/* uSDHC4 CD */
+> +				MX6QDL_PAD_NANDF_CS1__GPIO6_IO14 0x80000000	/* uSDHC4 SDIO PWR */
+> +				MX6QDL_PAD_NANDF_CS2__GPIO6_IO15 0x80000000	/* uSDHC4 SDIO WP */
+> +				MX6QDL_PAD_NANDF_CS3__GPIO6_IO16 0x80000000	/* uSDHC4 SDIO LED */
+> +				MX6QDL_PAD_EIM_EB2__GPIO2_IO30   0x80000000	/* SPI1 CS */
+> +				MX6QDL_PAD_GPIO_17__GPIO7_IO12   0x80000000	/* PCIe Reset */
+> +				MX6QDL_PAD_GPIO_5__GPIO1_IO05    0x80000000	/* PCIe Wake */
+> +				MX6QDL_PAD_GPIO_0__CCM_CLKO1     0x130b0	/* FEC CLK */
+> +				MX6QDL_PAD_ENET_TX_EN__GPIO1_IO28 0x80000000	/* FEC Reset */
+> +				MX6QDL_PAD_NANDF_D0__GPIO2_IO00  0x80000000	/* GPIO0 */
+> +				MX6QDL_PAD_NANDF_D1__GPIO2_IO01  0x80000000	/* GPIO1 */
+> +				MX6QDL_PAD_NANDF_D2__GPIO2_IO02  0x80000000	/* GPIO2 */
+> +				MX6QDL_PAD_NANDF_D3__GPIO2_IO03  0x80000000	/* GPIO3 */
+> +				MX6QDL_PAD_NANDF_D4__GPIO2_IO04  0x80000000	/* GPIO4 */
+> +				MX6QDL_PAD_NANDF_D5__GPIO2_IO05  0x80000000	/* GPIO5 */
+> +				MX6QDL_PAD_NANDF_D6__GPIO2_IO06  0x80000000	/* GPIO6 */
+> +				MX6QDL_PAD_NANDF_D7__GPIO2_IO07  0x80000000	/* GPIO7 */
+> +				MX6QDL_PAD_NANDF_CLE__GPIO6_IO07 0x80000000	/* CAM_PWDN */
+> +				MX6QDL_PAD_GPIO_2__GPIO1_IO02    0x80000000	/* CAM_RST */
+> +				MX6QDL_PAD_GPIO_9__WDOG1_B       0x80000000	/* Watchdog out */
+> +				MX6QDL_PAD_GPIO_16__GPIO7_IO11   0x80000000	/* HUB_RESET */
+> +				MX6QDL_PAD_GPIO_18__GPIO7_IO13   0x80000000	/* PMIC Interrupt */
+> +				MX6QDL_PAD_GPIO_19__GPIO4_IO05   0x80000000	/* AR8033 Interrupt */
+> +				MX6QDL_PAD_KEY_ROW2__GPIO4_IO11  0x80000000	/* SUS_S3_OUT */
+> +				MX6QDL_PAD_KEY_ROW4__GPIO4_IO15  0x80000000	/* BLEN_OUT */
+> +				MX6QDL_PAD_EIM_D22__GPIO3_IO22   0x80000000	/* LVDS_PPEN_OUT */
+> +				MX6QDL_PAD_KEY_COL2__GPIO4_IO10  0x80000000	/* RTC_INT */
 
-  => dw_apb timer is not used at all
+Please don't overuse the hog group but add pins that are related to a
+specific device to the pinmux group of that device. USDHC, SPI, PCIe,
+FEC are the obvious examples from the list above.
 
-  CONFIG_ARM_ARCH_TIMER=y
-  # CONFIG_DW_APB_TIMER is not set
+> +			>;
+> +		};
+> +
+> +		pinctrl_usdhc4: usdhc4grp {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_SD4_CMD__SD4_CMD    0x17059
+> +				MX6QDL_PAD_SD4_CLK__SD4_CLK    0x17059
+> +				MX6QDL_PAD_SD4_DAT0__SD4_DATA0 0x17059
+> +				MX6QDL_PAD_SD4_DAT1__SD4_DATA1 0x17059
+> +				MX6QDL_PAD_SD4_DAT2__SD4_DATA2 0x17059
+> +				MX6QDL_PAD_SD4_DAT3__SD4_DATA3 0x17059
+> +				MX6QDL_PAD_SD4_DAT4__SD4_DATA4 0x17059
+> +				MX6QDL_PAD_SD4_DAT5__SD4_DATA5 0x17059
+> +				MX6QDL_PAD_SD4_DAT6__SD4_DATA6 0x17059
+> +				MX6QDL_PAD_SD4_DAT7__SD4_DATA7 0x17059
+> +			>;
+> +		};
+> +
+> +		pinctrl_ecspi1: ecspi1grp {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_EIM_D17__ECSPI1_MISO 0x100b1
+> +				MX6QDL_PAD_EIM_D18__ECSPI1_MOSI 0x100b1
+> +				MX6QDL_PAD_EIM_D16__ECSPI1_SCLK 0x100b1
+> +			>;
+> +		};
+> +
+> +		pinctrl_ecspi5: ecspi5rp-1 {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_SD1_DAT0__ECSPI5_MISO	0x80000000
+> +				MX6QDL_PAD_SD1_CMD__ECSPI5_MOSI		0x80000000
+> +				MX6QDL_PAD_SD1_CLK__ECSPI5_SCLK		0x80000000
+> +				MX6QDL_PAD_SD1_DAT1__GPIO1_IO17		0x80000000
+> +			>;
+> +		};
+> +
+> +		pinctrl_pwm1: pwm1grp {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_SD1_DAT3__PWM1_OUT 0x1b0b1
+> +			>;
+> +		};
+> +
+> +		pinctrl_pwm2: pwm2grp {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_GPIO_1__PWM2_OUT 0x1b0b1
+> +			>;
+> +		};
+> +
+> +		pinctrl_usbotg: usbotggrp {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_ENET_RX_ER__USB_OTG_ID 0x17059
+> +			>;
+> +		};
+> +
+> +		pinctrl_i2c1: i2c1grp {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_CSI0_DAT8__I2C1_SDA 0x4001b8b1
+> +				MX6QDL_PAD_CSI0_DAT9__I2C1_SCL 0x4001b8b1
+> +			>;
+> +		};
+> +
+> +		pinctrl_i2c2: i2c2grp {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_KEY_COL3__I2C2_SCL 0x4001b8b1
+> +				MX6QDL_PAD_KEY_ROW3__I2C2_SDA 0x4001b8b1
+> +			>;
+> +		};
+> +
+> +		pinctrl_i2c3: i2c3grp {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_GPIO_3__I2C3_SCL 0x4001b8b1
+> +				MX6QDL_PAD_GPIO_6__I2C3_SDA 0x4001b8b1
+> +			>;
+> +		};
+> +
+> +		pinctrl_uart3: uart3grp {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_EIM_D25__UART3_RX_DATA 0x1b0b1
+> +				MX6QDL_PAD_EIM_D24__UART3_TX_DATA 0x1b0b1
+> +				MX6QDL_PAD_EIM_D23__UART3_CTS_B   0x1b0b1
+> +				MX6QDL_PAD_EIM_D31__UART3_RTS_B   0x1b0b1
+> +			>;
+> +		};
+> +
+> +		pinctrl_uart4: uart4grp {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_KEY_COL0__UART4_TX_DATA 0x1b0b1
+> +				MX6QDL_PAD_KEY_ROW0__UART4_RX_DATA 0x1b0b1
+> +			>;
+> +		};
+> +
+> +		pinctrl_usdhc2: usdhc2grp {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_SD2_CMD__SD2_CMD    0x17059
+> +				MX6QDL_PAD_SD2_CLK__SD2_CLK    0x10059
+> +				MX6QDL_PAD_SD2_DAT0__SD2_DATA0 0x17059
+> +				MX6QDL_PAD_SD2_DAT1__SD2_DATA1 0x17059
+> +				MX6QDL_PAD_SD2_DAT2__SD2_DATA2 0x17059
+> +				MX6QDL_PAD_SD2_DAT3__SD2_DATA3 0x17059
+> +			>;
+> +		};
+> +
+> +		pinctrl_usdhc3: usdhc3grp {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_SD3_CMD__SD3_CMD    0x17059
+> +				MX6QDL_PAD_SD3_CLK__SD3_CLK    0x10059
+> +				MX6QDL_PAD_SD3_DAT0__SD3_DATA0 0x17059
+> +				MX6QDL_PAD_SD3_DAT1__SD3_DATA1 0x17059
+> +				MX6QDL_PAD_SD3_DAT2__SD3_DATA2 0x17059
+> +				MX6QDL_PAD_SD3_DAT3__SD3_DATA3 0x17059
+> +				MX6QDL_PAD_SD3_DAT4__SD3_DATA4 0x17059
+> +				MX6QDL_PAD_SD3_DAT5__SD3_DATA5 0x17059
+> +				MX6QDL_PAD_SD3_DAT6__SD3_DATA6 0x17059
+> +				MX6QDL_PAD_SD3_DAT7__SD3_DATA7 0x17059
+> +			>;
+> +		};
+> +
+> +		pinctrl_usdhc3_reset: usdhc3grp-reset {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_SD3_RST__SD3_RESET   0x170F9
+> +			>;
+> +		};
+> +
+> +		pinctrl_audmux: audmux {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_DISP0_DAT20__AUD4_TXC  0x130b0
+> +				MX6QDL_PAD_DISP0_DAT21__AUD4_TXD  0x130b0
+> +				MX6QDL_PAD_DISP0_DAT22__AUD4_TXFS 0x130b0
+> +				MX6QDL_PAD_DISP0_DAT23__AUD4_RXD  0x130b0
+> +			>;
+> +		};
+> +
+> +		pinctrl_enet: pinctrl_enet {
+> +			fsl,pins = <
+> +				MX6QDL_PAD_ENET_MDIO__ENET_MDIO       0x100b0
+> +				MX6QDL_PAD_ENET_MDC__ENET_MDC         0x100b0
+> +				MX6QDL_PAD_RGMII_TXC__RGMII_TXC       0x100b0
+> +				MX6QDL_PAD_RGMII_TD0__RGMII_TD0       0x100b0
+> +				MX6QDL_PAD_RGMII_TD1__RGMII_TD1       0x100b0
+> +				MX6QDL_PAD_RGMII_TD2__RGMII_TD2       0x100b0
+> +				MX6QDL_PAD_RGMII_TD3__RGMII_TD3       0x100b0
+> +				MX6QDL_PAD_RGMII_TX_CTL__RGMII_TX_CTL 0x100b0
+> +				MX6QDL_PAD_ENET_REF_CLK__ENET_TX_CLK  0x100b0
+> +				MX6QDL_PAD_RGMII_RXC__RGMII_RXC       0x1b0b0
+> +				MX6QDL_PAD_RGMII_RD0__RGMII_RD0       0x1b0b0
+> +				MX6QDL_PAD_RGMII_RD1__RGMII_RD1       0x1b0b0
+> +				MX6QDL_PAD_RGMII_RD2__RGMII_RD2       0x1b0b0
+> +				MX6QDL_PAD_RGMII_RD3__RGMII_RD3       0x1b0b0
+> +				MX6QDL_PAD_RGMII_RX_CTL__RGMII_RX_CTL 0x1b0b0
+> +			>;
+> +		};
+> +	};
+> +};
+> +
+> +&pcie {
+> +	power-on-gpio = <&gpio1 5 GPIO_ACTIVE_HIGH>;
 
-2. The arch_arm_timer is *not* present
+There is no such thing as a power-on-gpio in mainline Linux.
 
-  => dw_apb_timer is used with delay code
-
-  # CONFIG_ARM_ARCH_TIMER is not set
-  CONFIG_DW_APB_TIMER=y
-
-In both cases, DW_APB_TIMER_BASED_DELAY is not needed.
-
+> +	reset-gpio = <&gpio7 12 GPIO_ACTIVE_HIGH>;
+> +	status = "okay";
+> +};
+> +
+> +
+> +&pwm1 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_pwm1>;
+> +	status = "okay";
+> +};
+> +
+> +&pwm2 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_pwm2>;
+> +	status = "okay";
+> +};
+> +
+> +&sata {
+> +	status = "okay";
+> +};
+> +
+> +&ssi1 {
+> +	fsl,mode = "i2s-master";
+> +	status = "okay";
+> +};
+> +
+> +&uart3 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_uart3>;
+> +	fsl,uart-has-rtscts;
+> +	status = "okay";
+> +};
+> +
+> +&uart4 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_uart4>;
+> +	status = "okay";
+> +};
+> +
+> +&usbh1 {
+> +	vbus-supply = <&reg_usb_h1_vbus>;
+> +	reset-gpios = <&gpio7 11 GPIO_ACTIVE_HIGH>;
+> +	status = "okay";
+> +};
+> +
+> +&usbotg {
+> +	vbus-supply = <&reg_usb_otg_vbus>;
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_usbotg>;
+> +	disable-over-current;
+> +	status = "okay";
+> +};
+> +
+> +&usdhc2 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_usdhc2>;
+> +	cd-gpios = <&gpio1 4 GPIO_ACTIVE_LOW>;
+> +	no-1-8-v;
+> +	keep-power-in-suspend;
+> +	enable-sdio-wakeup;
+> +	status = "okay";
+> +};
+> +
+> +&usdhc3 {
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&pinctrl_usdhc3 &pinctrl_usdhc3_reset>;
+> +	bus-width = <8>;
+> +	vmmc-supply = <&vdd_bperi>;
+> +	vqmmc-supply = <&vdd_bio>;
+> +	non-removable;
+> +	keep-power-in-suspend;
+> +	status = "okay";
+> +};
 
 -- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Pengutronix e.K.             | Lucas Stach                 |
+Industrial Linux Solutions   | http://www.pengutronix.de/  |
