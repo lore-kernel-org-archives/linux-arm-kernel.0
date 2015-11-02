@@ -1,51 +1,96 @@
-From: ynorov@caviumnetworks.com (Yury Norov)
-Date: Tue, 3 Nov 2015 02:30:46 +0300
-Subject: [PATCH v6 17/17] arm64:ilp32: add ARM64_ILP32 to Kconfig
-In-Reply-To: <1446507046-24604-1-git-send-email-ynorov@caviumnetworks.com>
-References: <1446507046-24604-1-git-send-email-ynorov@caviumnetworks.com>
-Message-ID: <1446507046-24604-18-git-send-email-ynorov@caviumnetworks.com>
+From: m.smarduch@samsung.com (Mario Smarduch)
+Date: Mon, 02 Nov 2015 15:51:53 -0800
+Subject: [PATCH] KVM/arm: kernel low level debug support for ARM32 virtual
+ platforms
+Message-ID: <1446508313-24404-1-git-send-email-m.smarduch@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Andrew Pinski <apinski@cavium.com>
+Hello,
+   this is a re-post from couple weeks ago, please take time to review this 
+simple patch which simplifies DEBUG_LL and prevents kernel crash on virtual 
+platforms.
 
-This patch adds the config option for ILP32.
+Before this patch DEBUG_LL for 'dummy virtual machine':
 
-Signed-off-by: Philipp Tomsich <philipp.tomsich@theobroma-systems.com>
-Signed-off-by: Christoph Muellner <christoph.muellner@theobroma-systems.com>
-Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
-Signed-off-by: Andrew Pinski <Andrew.Pinski@caviumnetworks.com>
-Reviewed-by: David Daney <david.daney@cavium.com>
+( ) Kernel low-level debugging via EmbeddedICE DCC channel
+( ) Kernel low-level debug output via semihosting I/O
+( ) Kernel low-level debugging via 8250 UART
+( ) Kernel low-level debugging via ARM Ltd PL01x Primecell
+
+In summary if debug uart is not emulated kernel crashes.
+And once you pass that hurdle, uart physical/virtual addresses are unknown.
+DEBUG_LL comes in handy on many occasions and should be somewhat 
+intuitive to use like it is for physical platforms. For virtual platforms
+user may start daubting the host and get into a bigger mess.
+
+After this patch is applied user gets:
+
+(X) Kernel low-level debugging on QEMU Virtual Platform
+( ) Kernel low-level debugging on Kvmtool Virtual Platform
+	..... above repeated ....
+
+The virtual addresses selected follow arm reference models, high in vmalloc 
+section with high mem enabled and guest running with >= 1GB of memory. The 
+offset is leftover from arm reference models.
+
+The patch is against 4.2.0-rc2 commit 43297dda0a51
+
+Original Description
+--------------------
+When booting a VM using QEMU or Kvmtool there are no clear ways to 
+enable low level debugging for these virtual platforms. some menu port 
+choices are not supported by the virtual platforms at all. And there is no
+help on the location of physical and virtual addresses for the ports.
+This may lead to wrong debug port and a frozen VM with a blank screen.
+
+This patch adds menu selections for QEMU and Kvmtool virtual platforms for low 
+level kernel print debugging. Help section displays port physical and
+virutal addresses.
+
+ARM reference models use the MIDR register to run-time select UART port address 
+(for ARCH_VEXPRESS) based on A9 or A15 part numbers. Looked for a same approach
+but couldn't find a way to differentiate between virtual platforms, something
+like a platform register.
+
+Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
+Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
 ---
- arch/arm64/Kconfig | 9 ++++++++-
- 1 file changed, 8 insertions(+), 1 deletion(-)
+ arch/arm/Kconfig.debug | 22 ++++++++++++++++++++++
+ 1 file changed, 22 insertions(+)
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index d1dc605..afbde9c 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -680,7 +680,7 @@ source "fs/Kconfig.binfmt"
+diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+index a2e16f9..d126bd4 100644
+--- a/arch/arm/Kconfig.debug
++++ b/arch/arm/Kconfig.debug
+@@ -1155,6 +1155,28 @@ choice
+ 		  This option selects UART0 on VIA/Wondermedia System-on-a-chip
+ 		  devices, including VT8500, WM8505, WM8650 and WM8850.
  
- config COMPAT
- 	def_bool y
--	depends on AARCH32_EL0
-+	depends on AARCH32_EL0 || ARM64_ILP32
- 	select COMPAT_BINFMT_ELF
- 
- config AARCH32_EL0
-@@ -702,6 +702,13 @@ config AARCH32_EL0
- 
- 	  If you want to execute 32-bit userspace applications, say Y.
- 
-+config ARM64_ILP32
-+	bool "Kernel support for ILP32"
-+	help
-+	  This option enables support for AArch64 ILP32 user space.  ILP32
-+	  is an ABI where long and pointers are 32bits but it uses the AARCH64
-+	  instruction set.
++	config DEBUG_VIRT_UART_QEMU
++		bool "Kernel low-level debugging on QEMU Virtual Platform"
++		depends on ARCH_VIRT
++		select DEBUG_UART_PL01X
++		help
++		  Say Y here if you want the debug print routines to direct
++		  their output to PL011 UART port on QEMU Virtual Platform.
++		  Appropriate address values are:
++			PHYS		VIRT
++			0x9000000	0xf8090000
 +
- config SYSVIPC_COMPAT
- 	def_bool y
- 	depends on AARCH32_EL0 && SYSVIPC
++	config DEBUG_VIRT_UART_KVMTOOL
++		bool "Kernel low-level debugging on Kvmtool Virtual Platform"
++		depends on ARCH_VIRT
++		select DEBUG_UART_8250
++		help
++		  Say Y here if you want the debug print routines to direct
++		  their output to 8250 UART port on Kvmtool Virtual
++		  Platform. Appropriate address values are:
++			PHYS		VIRT
++			0x3f8		0xf80903f8
++
+ 	config DEBUG_ICEDCC
+ 		bool "Kernel low-level debugging via EmbeddedICE DCC channel"
+ 		help
 -- 
-2.1.4
+1.9.1
