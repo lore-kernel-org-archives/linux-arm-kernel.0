@@ -1,89 +1,150 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Mon, 02 Nov 2015 02:01:11 +0100
-Subject: [PATCH V5 0/9] PCI: ACPI: Setting up DMA coherency for PCI device
- from _CCA attribute
-In-Reply-To: <1446072654-5608-1-git-send-email-Suravee.Suthikulpanit@amd.com>
-References: <1446072654-5608-1-git-send-email-Suravee.Suthikulpanit@amd.com>
-Message-ID: <2082841.EuKXHJIeaT@vostro.rjw.lan>
+From: ykk@rock-chips.com (Yakir Yang)
+Date: Mon, 2 Nov 2015 08:41:12 +0800
+Subject: [PATCH v10 09/17] dt-bindings: add document for rockchip variant
+ of analogix_dp
+In-Reply-To: <CAL_Jsq+Z0RSgB1aBg+x4Ez7zXAjyyn6BkOuua=3JeqpKR=v+Lg@mail.gmail.com>
+References: <1446020143-32645-1-git-send-email-ykk@rock-chips.com>
+ <1446273737-15262-1-git-send-email-ykk@rock-chips.com>
+ <CAL_Jsq+Z0RSgB1aBg+x4Ez7zXAjyyn6BkOuua=3JeqpKR=v+Lg@mail.gmail.com>
+Message-ID: <5636B128.2060501@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, October 28, 2015 03:50:45 PM Suravee Suthikulpanit wrote:
-> This patch series adds support to setup DMA coherency for PCI device using
-> the ACPI _CCA attribute. According to the ACPI spec, the _CCA attribute
-> is required for ARM64. Therefore, this patch is a pre-req for ACPI PCI
-> support for ARM64 which is currently in development.  Also, this should
-> not affect other architectures that does not define 
-> CONFIG_ACPI_CCA_REQUIRED, since the default value is coherent.
-> 
-> In the process, this series also introduces enum dev_dma_attr and a set
-> of APIs to query device DMA attribute. These APIs replace the obsolete
-> device_dma_is_coherent(), and acpi_check_dma().
-> 
-> I have also included a patch from Jeremy posted here:
->     http://www.spinics.net/lists/linux-usb/msg128582.html
-> 
-> This patch series is now rebased from:
->     https://git.kernel.org/pub/scm/linux/kernel/git/rafael/linux-pm.git linux-next
-> 
-> This patch series has been tested on AMD Seattle RevB platform.
-> The git tree containing tested code and pre-req patches is available here:
->     http://github.com/ssuthiku/linux.git pci-cca-v5
-> 
-> Changes from V4: (https://lkml.org/lkml/2015/10/21/535)
->     * Clean up from Hanjun, Bjorn, and Thomas review comments
->     * Rebased on top of Rafael's latest linux-next branch
->     * Added patch 7/9 to fix the  pci_get_host_bridge_device leak
->     * Added Acked-by from Bjorn
->     * Added Reviewed-by from Hanjun
-> 
-> Changes from V3: (https://lkml.org/lkml/2015/8/26/389)
->     * Clean up suggested by Bjorn
->     * Introduce enum dev_dma_attr
->     * Replace device_dma_is_coherent() and acpi_check_dma() with
->       new APIs.
-> 
-> Changes from V2: (https://lkml.org/lkml/2015/8/25/549)
->     * Return -ENOSUPP instead of -1 (per Rafael's suggestion)
->     * Add WARN() when fail to setup DMA for PCI device when booting
->       ACPI (per Arnd's suggestion)
->     * Added Acked-by from Rob.
->     * Minor clean up
-> 
-> Changes from V1: (https://lkml.org/lkml/2015/8/13/182)
->     * Include patch 1 from Jeremy to enable support for _CCA=0
->     * Clean up acpi_check_dma() per Bjorn suggestions
->     * Split the original V1 patch into two patches (patch 3 and 4)
-> 
-> Jeremy Linton (1):
->   ACPI: Honor ACPI _CCA attribute setting
-> 
-> Suravee Suthikulpanit (8):
->   device property: Introducing enum dev_dma_attr
->   ACPI: Adding DMA Attribute APIs for ACPI Device
->   device property: Adding DMA Attribute APIs for Generic Devices
->   device property: ACPI: Make use of the new DMA Attribute APIs
->   device property: ACPI: Remove unused DMA APIs
->   of/pci: Fix pci_get_host_bridge_device leak
->   PCI: OF: Move of_pci_dma_configure() to pci_dma_configure()
->   PCI: ACPI: Add support for PCI device DMA coherency
-> 
->  drivers/acpi/acpi_platform.c              |  7 +++++-
->  drivers/acpi/glue.c                       |  8 +++---
->  drivers/acpi/scan.c                       | 42 +++++++++++++++++++++++++++++++
->  drivers/base/property.c                   | 32 +++++++++++++++++------
->  drivers/crypto/ccp/ccp-platform.c         | 15 ++++++++---
->  drivers/net/ethernet/amd/xgbe/xgbe-main.c |  8 +++++-
->  drivers/of/of_pci.c                       | 20 ---------------
->  drivers/pci/probe.c                       | 33 ++++++++++++++++++++++--
->  include/acpi/acpi_bus.h                   | 36 +++-----------------------
->  include/linux/acpi.h                      |  7 +++++-
->  include/linux/of_pci.h                    |  3 ---
->  include/linux/property.h                  | 10 +++++++-
->  12 files changed, 144 insertions(+), 77 deletions(-)
-
-Queued up for v4.4, but I'll include it into my second pull request in the
-second half of the merge window.
-
+On 11/01/2015 02:37 AM, Rob Herring wrote:
+> On Sat, Oct 31, 2015 at 1:42 AM, Yakir Yang <ykk@rock-chips.com> wrote:
+>> Rockchip DP driver is a helper driver of analogix_dp coder driver,
+>> so most of the DT property should be descriped in analogix_dp document.
+>>
+>> Reviewed-by: Heiko Stuebner <heiko@sntech.de>
+>> Signed-off-by: Yakir Yang <ykk@rock-chips.com>
+> Acked-by: Rob Herring <robh@kernel.org>
 Thanks,
-Rafael
+
+- Yakir
+>> ---
+>> Changes in v10:
+>> - Removed the duplicated signed-of.
+>>
+>> Changes in v9:
+>> - Document more details for 'ports' property.
+>>
+>> Changes in v8:
+>> - Modify the commit subject name. (Heiko)
+>>
+>> Changes in v7: None
+>> Changes in v6: None
+>> Changes in v5:
+>> - Split binding doc's from driver changes. (Rob)
+>> - Add eDP hotplug pinctrl property. (Heiko)
+>>
+>> Changes in v4: None
+>> Changes in v3: None
+>> Changes in v2: None
+>>
+>>   .../display/rockchip/analogix_dp-rockchip.txt      | 91 ++++++++++++++++++++++
+>>   1 file changed, 91 insertions(+)
+>>   create mode 100644 Documentation/devicetree/bindings/display/rockchip/analogix_dp-rockchip.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/display/rockchip/analogix_dp-rockchip.txt b/Documentation/devicetree/bindings/display/rockchip/analogix_dp-rockchip.txt
+>> new file mode 100644
+>> index 0000000..dae86c4
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/display/rockchip/analogix_dp-rockchip.txt
+>> @@ -0,0 +1,91 @@
+>> +Rockchip RK3288 specific extensions to the Analogix Display Port
+>> +================================
+>> +
+>> +Required properties:
+>> +- compatible: "rockchip,rk3288-edp";
+>> +
+>> +- reg: physical base address of the controller and length
+>> +
+>> +- clocks: from common clock binding: handle to dp clock.
+>> +         of memory mapped region.
+>> +
+>> +- clock-names: from common clock binding:
+>> +              Required elements: "dp" "pclk"
+>> +
+>> +- resets: Must contain an entry for each entry in reset-names.
+>> +         See ../reset/reset.txt for details.
+>> +
+>> +- pinctrl-names: Names corresponding to the chip hotplug pinctrl states.
+>> +- pinctrl-0: pin-control mode. should be <&edp_hpd>
+>> +
+>> +- reset-names: Must include the name "dp"
+>> +
+>> +- rockchip,grf: this soc should set GRF regs, so need get grf here.
+>> +
+>> +- ports: there are 2 port nodes with endpoint definitions as defined in
+>> +  Documentation/devicetree/bindings/media/video-interfaces.txt.
+>> +    Port 0: contained 2 endpoints, connecting to the ouput of vop.
+>> +    Port 1: contained 1 endpoint, connecting to the input of panel.
+>> +
+>> +For the below properties, please refer to Analogix DP binding document:
+>> + * Documentation/devicetree/bindings/drm/bridge/analogix_dp.txt
+>> +- phys (required)
+>> +- phy-names (required)
+>> +- hpd-gpios (optional)
+>> +-------------------------------------------------------------------------------
+>> +
+>> +Example:
+>> +       dp-controller: dp at ff970000 {
+>> +               compatible = "rockchip,rk3288-dp";
+>> +               reg = <0xff970000 0x4000>;
+>> +               interrupts = <GIC_SPI 98 IRQ_TYPE_LEVEL_HIGH>;
+>> +               clocks = <&cru SCLK_EDP>, <&cru PCLK_EDP_CTRL>;
+>> +               clock-names = "dp", "pclk";
+>> +               phys = <&dp_phy>;
+>> +               phy-names = "dp";
+>> +
+>> +               rockchip,grf = <&grf>;
+>> +               resets = <&cru 111>;
+>> +               reset-names = "dp";
+>> +
+>> +               pinctrl-names = "default";
+>> +               pinctrl-0 = <&edp_hpd>;
+>> +
+>> +               status = "disabled";
+>> +
+>> +               ports {
+>> +                       #address-cells = <1>;
+>> +                       #size-cells = <0>;
+>> +                       edp_in: port at 0 {
+>> +                               reg = <0>;
+>> +                               #address-cells = <1>;
+>> +                               #size-cells = <0>;
+>> +                               edp_in_vopb: endpoint at 0 {
+>> +                                       reg = <0>;
+>> +                                       remote-endpoint = <&vopb_out_edp>;
+>> +                               };
+>> +                               edp_in_vopl: endpoint at 1 {
+>> +                                       reg = <1>;
+>> +                                       remote-endpoint = <&vopl_out_edp>;
+>> +                               };
+>> +                       };
+>> +
+>> +                       edp_out: port at 1 {
+>> +                               reg = <1>;
+>> +                               #address-cells = <1>;
+>> +                               #size-cells = <0>;
+>> +                               edp_out_panel: endpoint {
+>> +                                       reg = <0>;
+>> +                                       remote-endpoint = <&panel_in_edp>
+>> +                               };
+>> +                       };
+>> +               };
+>> +       };
+>> +
+>> +       pinctrl {
+>> +               edp {
+>> +                       edp_hpd: edp-hpd {
+>> +                               rockchip,pins = <7 11 RK_FUNC_2 &pcfg_pull_none>;
+>> +                       };
+>> +               };
+>> +       };
+>> --
+>> 1.9.1
+>>
+>>
+>
+>
