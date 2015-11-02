@@ -1,62 +1,202 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 2 Nov 2015 14:03:13 +0000
-Subject: [PATCH v6 1/6] arm/arm64: add smccc
-In-Reply-To: <20151102135633.GA17559@ermac>
-References: <1446106888-8983-1-git-send-email-jens.wiklander@linaro.org>
- <1446106888-8983-2-git-send-email-jens.wiklander@linaro.org>
- <20151102115119.GB29657@arm.com> <20151102135633.GA17559@ermac>
-Message-ID: <20151102140313.GG2684@leverpostej>
+From: gabriele.paoloni@huawei.com (Gabriele Paoloni)
+Date: Mon, 2 Nov 2015 14:12:11 +0000
+Subject: [PATCH v13 0/6] PCI: hisi: Add PCIe host support for HiSilicon
+ SoC Hip05
+In-Reply-To: <1446111638-197070-1-git-send-email-wangzhou1@hisilicon.com>
+References: <1446111638-197070-1-git-send-email-wangzhou1@hisilicon.com>
+Message-ID: <EE11001F9E5DDD47B7634E2F8A612F2E16297124@lhreml503-mbs>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > > +/*
-> > > + * void smccc_smc(unsigned long a0, unsigned long a1, unsigned long a2,
-> > > + *		  unsigned long a3, unsigned long a4, unsigned long a5,
-> > > + *		  unsigned long a6, unsigned long a7, struct smccc_res *res)
-> > > + */
-> > > +ENTRY(smccc_smc)
-> > > +	smc	#0
-> > > +	ldr	x4, [sp]
-> > > +	stp	x0, x1, [x4, #SMC_RES_X0_OFFS]
-> > > +	stp	x2, x3, [x4, #SMC_RES_X2_OFFS]
-> > > +	ret
-> > > +ENDPROC(smccc_smc)
+Hi Bjorn
 
-> > > +/*
-> > > + * void smccc_hvc(unsigned long a0, unsigned long a1, unsigned long a2,
-> > > + *		  unsigned long a3, unsigned long a4, unsigned long a5,
-> > > + *		  unsigned long a6, unsigned long a7, struct smccc_res *res)
-> > > + */
-> > > +ENTRY(smccc_hvc)
-> > > +	hvc	#0
-> > > +	ldr	x4, [sp]
-> > > +	stp	x0, x1, [x4, #SMC_RES_X0_OFFS]
-> > > +	stp	x2, x3, [x4, #SMC_RES_X2_OFFS]
-> > > +	ret
-> > > +ENDPROC(smccc_hvc)
+I see this patchset merged into your next branch.
 
-> > > +/**
-> > > + * struct smccc_res - Result from SMC/HVC call
-> > > + * @a0-a3 result values from registers 0 to 3
-> > > + */
-> > > +struct smccc_res {
-> > > +	unsigned long a0;
-> > > +	unsigned long a1;
-> > > +	unsigned long a2;
-> > > +	unsigned long a3;
-> > > +};
-> > 
-> > Are there any endianness considerations for this structure?
+Can you confirm?
+
+Many Thanks
+
+Gab
+
+> -----Original Message-----
+> From: Wangzhou (B)
+> Sent: Thursday, October 29, 2015 9:41 AM
+> To: Bjorn Helgaas; jingoohan1 at gmail.com; pratyush.anand at gmail.com; Arnd
+> Bergmann; rmk+kernel at arm.linux.org.uk; thomas.petazzoni at free-
+> electrons.com; Gabriele Paoloni; lorenzo.pieralisi at arm.com;
+> james.morse at arm.com; Liviu.Dudau at arm.com; jason at lakedaemon.net;
+> robh at kernel.org; gabriel.fernandez at linaro.org;
+> Minghuan.Lian at freescale.com
+> Cc: linux-pci at vger.kernel.org; linux-arm-kernel at lists.infradead.org;
+> devicetree at vger.kernel.org; linux-kernel at vger.kernel.org; zhangjukuo;
+> qiuzhenfa; liudongdong (C); qiujiang; xuwei (O); Liguozhu (Kenneth);
+> Wangzhou (B)
+> Subject: [PATCH v13 0/6] PCI: hisi: Add PCIe host support for HiSilicon
+> SoC Hip05
 > 
-> No, I can't find anything in the ARM SMC Calling Convention document
-> indicating that.
-
-The calling conventions have no bearing on the structure, which is our
-invention.
-
-We stash register values (which don't have endianness) returned by the
-firmeware into the structure in the sequences above (which appear
-endian-clean to me).
-
-Thanks,
-Mark.
+> This patchset adds PCIe host support for HiSilicon SoC Hip05. The PCIe
+> hosts
+> use PCIe IP core from Synopsys, So this driver is based on designware
+> PCIe driver.
+> 
+> Hip05 is an ARMv8 architecture SoC. It should be able to use ARM64 PCIe
+> API in
+> designware PCIe driver. So this patch also adds ARM64 support for
+> designware
+> pcie.
+> 
+> This patchset is based on v4.3-rc1.
+> 
+> Change from v12:
+> - Reorder patchset as suggestion by Bjorn.
+> - Add Rob's Acked-by for DT binding.
+> - Merge HiSilicon PCIe driver, DT binding document and maintainer
+> update into
+>   one patch.
+> 
+> Change from v11:
+> - Split 3/6 in v11 to 3/8, 4/8, 5/8 in v12.
+> - Add print in pcie-hisi.c to indicate read/write hardware defect.
+> - Modify macro in 1/8 pointed by Bjorn.
+> 
+> Change from v10:
+> - Remove MSI related setting and VMID/ASID table setting, they will be
+>   implemented in BIOS.
+> - Use module_platform_driver to init pcie-hisi.c
+> - Add necessary comments.
+> 
+> Change from v9:
+> - Use syscon to get subctrl base address.
+> - 5/6 is based on [PATCH v3 0/2] arm64: Support Hisilicon Hip05-D02
+> board
+>   from Ding Tianhong
+> - Add hisi_pcie_cfg_read in pcie-hisi.c to match
+>   [PATCH v6 0/3] PCI: designware: change dw_pcie_cfg_write() and
+> dw_pcie_cfg_read()
+>   from Gabriele.
+> 
+> Change from v8:
+> - Rebase on v4.3-rc1.
+> - Add Tested-by from Gabriel and Minghuan.
+> - Remove ITS domain parsing in msi_host_init in pcie-hisi.c, no need
+> this as PCI
+>   core does related job. Add ITS base address parsing in msi_host_init.
+> - Change vmid/asid table configuration, previous configuration was
+> wrong.
+> - Add wr_own_conf callback in pcie-hisi.c.
+> - Use subsys_initcall to init hisi PCIe.
+> 
+> Change from v7:
+> - Remove pp->root_bus_nr = 0 in dra7xx, exynos, imx6, keystone,
+> layerscape,
+>   spear13xx. Pass pp->busn->start to pci_create_root_bus as root bus
+> number.
+> - Remove bus-range parsing in pcie-hisi.c.
+> 
+> Change from v6:
+> - Add Pratyush's Acked-by for 1/6 and 2/6.
+> - Add James' Tested-by for 3/6.
+> 
+> Change from v5:
+> - Merge 1/6 in this series, discussion about this can be found in [1]
+> 
+> Change from v4:
+> - Change the author of 1/5 to Gabriele.
+> - Modify problems in 3/5 pointed by Bjorn.
+> - Modify spelling problems in 4/5.
+> 
+> Change from v3:
+> - Change 1/5 to what Gabriele suggested.
+> - Use win->__res.start to get *_mod_base in 2/5, this fix a bug in v3
+> series.
+> 
+> Change from v2:
+> - Move struct pci_dev *dev and struct pci_sys_data *sys in
+>   pcibios_align_resource in 1/5.
+> - Add Gabriele's codes in 2/5 which delete unnecessary information
+> parse and
+>   use of_pci_get_host_bridge_resources for both ARM32 and ARM64.
+> - Add maintainer patch 5/5.
+> 
+> Change from RFC v1:
+> - Add 1/4 patch by Arnd which removes align_resource callback in ARM
+>   pcibios_align_resource.
+> - Change head file in pcie-designware from asm/hardirq.h to
+> linux/hardirq.h.
+> - Set pp->root_bus_nr = 0 in dra7xx, exynos, imx6, keystone, layerscape,
+>   spear13xx.
+> - Remove unnecessary parentheses of some macros in pcie-hisi.
+> - Use macro to replace some magic values.
+> - Merge two loops together and add some comments about it in
+> context_config
+>   function in pcie-hisi.
+> - Modify some value of items in pcie node example in binding document.
+> 
+> Change from RFC:
+> - delete dw_pcie_setup, dw_pcie_scan_bus, dw_pcie_map_irq and struct
+> hw_pci,
+>   merge related operations into dw_pcie_host_init.
+> 
+> Link of v12:
+> - https://lkml.org/lkml/2015/10/26/196
+> Link of v11:
+> - https://lkml.org/lkml/2015/10/16/228
+> Link of v10:
+> - http://www.spinics.net/lists/linux-pci/msg45490.html
+> Link of v9:
+> - http://www.spinics.net/lists/linux-pci/msg44545.html
+> Link of v8:
+> - http://www.spinics.net/lists/linux-pci/msg44192.html
+> Link of v7:
+> - http://www.spinics.net/lists/devicetree/msg90690.html
+> Link of v6:
+> - http://www.spinics.net/lists/linux-pci/msg43669.html
+> Link of v5:
+> - http://www.spinics.net/lists/devicetree/msg87959.html
+> Link of v4:
+> - http://www.spinics.net/lists/arm-kernel/msg433050.html
+> Link of v3:
+> - http://www.spinics.net/lists/linux-pci/msg42539.html
+> Link of v2:
+> - http://www.spinics.net/lists/linux-pci/msg41844.html
+> Link of RFC v1:
+> - http://www.spinics.net/lists/linux-pci/msg41305.html
+> Link of RFC:
+> - http://www.spinics.net/lists/linux-pci/msg40434.html
+> 
+> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-
+> July/359741.html
+> 
+> Zhou Wang (4):
+>   PCI: designware: Remove *_mod_base
+>   PCI: designware: Replace DT PCI ranges parse with
+>     of_pci_get_host_bridge_resources
+>   PCI: designware: Add ARM64 support
+>   PCI: hisi: Add PCIe host support for HiSilicon SoC Hip05
+> 
+> gabriele paoloni (2):
+>   PCI: designware: Move calculation of bus addresses to DRA7xx
+>   ARM/PCI: Replace pci_sys_data->align_resource with global function
+>     pointer
+> 
+>  .../bindings/arm/hisilicon/hisilicon.txt           |  17 ++
+>  .../devicetree/bindings/pci/hisilicon-pcie.txt     |  44 ++++
+>  MAINTAINERS                                        |   7 +
+>  arch/arm/include/asm/mach/pci.h                    |   6 -
+>  arch/arm/kernel/bios32.c                           |  12 +-
+>  drivers/pci/host/Kconfig                           |   8 +
+>  drivers/pci/host/Makefile                          |   1 +
+>  drivers/pci/host/pci-dra7xx.c                      |   7 +
+>  drivers/pci/host/pci-keystone-dw.c                 |   2 +-
+>  drivers/pci/host/pcie-designware.c                 | 249 +++++++------
+> --------
+>  drivers/pci/host/pcie-designware.h                 |  14 +-
+>  drivers/pci/host/pcie-hisi.c                       | 198
+> ++++++++++++++++
+>  12 files changed, 378 insertions(+), 187 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/pci/hisilicon-
+> pcie.txt
+>  create mode 100644 drivers/pci/host/pcie-hisi.c
+> 
+> --
+> 1.9.1
