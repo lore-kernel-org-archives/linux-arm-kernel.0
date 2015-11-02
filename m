@@ -1,80 +1,49 @@
-From: hanjun.guo@linaro.org (Hanjun Guo)
-Date: Mon, 02 Nov 2015 19:58:47 +0800
-Subject: [PATCH V5 1/9] ACPI: Honor ACPI _CCA attribute setting
-In-Reply-To: <20151102040224.GA16979@arm.org>
-References: <20151102040224.GA16979@arm.org>
-Message-ID: <56374FF7.6050008@linaro.org>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Mon, 2 Nov 2015 20:58:56 +0900
+Subject: [PATCH 2/2] arm64: dts: exynos7: Enable HS200 mode operation
+In-Reply-To: <1446458641-4447-2-git-send-email-alim.akhtar@samsung.com>
+References: <1446458641-4447-1-git-send-email-alim.akhtar@samsung.com>
+ <1446458641-4447-2-git-send-email-alim.akhtar@samsung.com>
+Message-ID: <CAJKOXPcpyBQ-2MDC6D69-p+038wxfVdS+weBGJy+r+eP6tNB-g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dennis,
+Subject - name of the board at the end (not the name of the SoC):
+arm64: dts: Enable HS200 mode operation on exynos7-espresso
 
-On 11/02/2015 12:02 PM, Dennis Chen wrote:
-> On Thu, Oct 29, 2015 at 6:50 AM, Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com> wrote:
->> From: Jeremy Linton <jeremy.linton@arm.com>
->>
->> ACPI configurations can now mark devices as noncoherent,
->> support that choice.
->>
->> NOTE: This is required to support USB on ARM Juno Development Board.
->>
->> Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
->> Signed-off-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
->> CC: Bjorn Helgaas <bhelgaas@google.com>
->> CC: Catalin Marinas <catalin.marinas@arm.com>
->> CC: Rob Herring <robh+dt@kernel.org>
->> CC: Will Deacon <will.deacon@arm.com>
->> CC: Rafael J. Wysocki <rjw@rjwysocki.net>
->> ---
->>   include/acpi/acpi_bus.h | 5 +++--
->>   1 file changed, 3 insertions(+), 2 deletions(-)
->>
->> diff --git a/include/acpi/acpi_bus.h b/include/acpi/acpi_bus.h
->> index d11eff8..0f131d2 100644
->> --- a/include/acpi/acpi_bus.h
->> +++ b/include/acpi/acpi_bus.h
->> @@ -407,7 +407,7 @@ static inline bool acpi_check_dma(struct acpi_device *adev, bool *coherent)
->>   	 * case 1. Do not support and disable DMA.
->>   	 * case 2. Support but rely on arch-specific cache maintenance for
->>   	 *         non-coherence DMA operations.
->> -	 * Currently, we implement case 1 above.
->> +	 * Currently, we implement case 2 above.
->>   	 *
->>   	 * For the case when _CCA is missing (i.e. cca_seen=0) and
->>   	 * platform specifies ACPI_CCA_REQUIRED, we do not support DMA,
->> @@ -415,7 +415,8 @@ static inline bool acpi_check_dma(struct acpi_device *adev, bool *coherent)
->>   	 *
->>   	 * See acpi_init_coherency() for more info.
->>   	 */
->> -	if (adev->flags.coherent_dma) {
->> +	if (adev->flags.coherent_dma ||
->> +	    (adev->flags.cca_seen && IS_ENABLED(CONFIG_ARM64))) {
->>   		ret = true;
->>   		if (coherent)
->>   			*coherent = adev->flags.coherent_dma;
+2015-11-02 19:04 GMT+09:00 Alim Akhtar <alim.akhtar@samsung.com>:
+> This patch enables HS200 mode operation on exynos7 based
+> espresso board.
+> This also remove _broken-cd_ property as per mmc binding documentation
+
+s/remove/removes/
+
+> which say one of the properties between broken-cd and non-removable
+
+s/say/says/
+
+> should be used. And we already use _non-removable_ as emmc mounted
+> on board which is a non-removable device.
 >
-> Hi Suravee,
+> Signed-off-by: Alim Akhtar <alim.akhtar@samsung.com>
+> ---
+>  arch/arm64/boot/dts/exynos/exynos7-espresso.dts |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 >
-> The acpi_check_dma function has been removed in patch 6 of this patch set, why it is still be used
-> here, am I missing something? If the acpi_check_dma will be used in the future, personally I'd like
+> diff --git a/arch/arm64/boot/dts/exynos/exynos7-espresso.dts b/arch/arm64/boot/dts/exynos/exynos7-espresso.dts
+> index 8ce04a0ec928..7f19b99fc85b 100644
+> --- a/arch/arm64/boot/dts/exynos/exynos7-espresso.dts
+> +++ b/arch/arm64/boot/dts/exynos/exynos7-espresso.dts
+> @@ -405,8 +405,8 @@
+>  &mmc_0 {
+>         status = "okay";
+>         num-slots = <1>;
+> -       broken-cd;
+>         cap-mmc-highspeed;
+> +       mmc-hs200-1_8v;
 
-I think this patch just to let people know that there is
-case that arch-specific cache maintenance is still needed
-for ACPI (such as Juno board), and in the later patches will
-cover this case.
+The "mmc-ddr-1_8v" should also be supported but I guess you did not
+add it on purpose?
 
-acpi_check_dma() will be replaced by acpi_get_dma_attr(),
-and in acpi_get_dma_attr() will cover that case and will
-be easily understood. (Suravee, correct me if I'm wrong :) )
-
-> to use IS_ENABLED(CONFIG_ACPI_CCA_REQUIRED) while not CONFIG_ARM64 macro here, or since _CCA attribute
-> is arch-specific, it's reasonable to leave the _CCA handling policy to the arch-specific code. For example,
-> with a link weak function like acpi_arch_check_dma() as a default handling if no arch-specific code
-> provided, the actual _CCA handling will be implemented in the ARM, Intel or other Arch if required.
-
-Actually Intel platform don't need _CCA and it's coherent
-in default, since _CCA is in ACPI spec, I would like it's
-handled in ACPI core.
-
-Thanks
-Hanjun
+Best regards,
+Krzysztof
