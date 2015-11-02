@@ -1,20 +1,165 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Mon, 2 Nov 2015 12:55:15 -0800
-Subject: [PATCH 1/2] mtd: nand: sunxi: fix
- sunxi_nfc_hw_ecc_read/write_chunk()
-In-Reply-To: <1445372161-6529-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1445372161-6529-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <20151102205515.GA7274@google.com>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Mon, 2 Nov 2015 15:06:50 -0600
+Subject: [PATCH v4 6/6] PCI: layerscape: add ls_pcie_msi_host_init
+In-Reply-To: <20151022162130.GA21237@localhost>
+References: <1444979960-24100-1-git-send-email-Minghuan.Lian@freescale.com>
+ <1444979960-24100-6-git-send-email-Minghuan.Lian@freescale.com>
+ <20151021213416.GJ1583@localhost>
+ <20151022162130.GA21237@localhost>
+Message-ID: <20151102210650.GA17552@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 20, 2015 at 10:16:00PM +0200, Boris Brezillon wrote:
-> The sunxi_nfc_hw_ecc_read/write_chunk() functions try to avoid changing
-> the column address if unnecessary, but the logic to determine whether it's
-> necessary or not is currently wrong: it adds the ecc->bytes value to the
-> current offset where it should actually add ecc->size.
-> 
-> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> Fixes 913821bdd211 "mtd: nand: sunxi: introduce sunxi_nfc_hw_ecc_read/write_chunk()"
+Your reply was *still* base64-encoded and thus rejected by the vger
+mailing lists.
 
-Pushed both to l2-mtd.git
+Minghuan wrote:
+> On Thu, Oct 22, 2015 at 11:21:30AM -0500, Bjorn Helgaas wrote:
+> > Minghuan wrote:
+> > > On Wed, Oct 21, 2015 at 04:34:16PM -0500, Bjorn Helgaas wrote:
+> > > > Hi Minghuan,
+> > > > 
+> > > > On Fri, Oct 16, 2015 at 03:19:20PM +0800, Minghuan Lian wrote:
+> > > > > Layerscape PCIe has its own MSI implementation. The patch registers
+> > > > > ls_pcie_msi_host_init() to avoid using Designware's MSI.
+> > > > > 
+> > > > > Signed-off-by: Minghuan Lian <Minghuan.Lian@freescale.com>
+> > > > > ---
+> > > > > Change log
+> > > > > v4: split from [PATCH v3] PCI: layerscape: Add PCIe support for LS1043a and LS2080a
+> > > > > 
+> > > > >  drivers/pci/host/pci-layerscape.c | 17 +++++++++++++++++
+> > > > >  1 file changed, 17 insertions(+)
+> > > > > 
+> > > > > diff --git a/drivers/pci/host/pci-layerscape.c b/drivers/pci/host/pci-layerscape.c
+> > > > > index c53692a..8fac6c8 100644
+> > > > > --- a/drivers/pci/host/pci-layerscape.c
+> > > > > +++ b/drivers/pci/host/pci-layerscape.c
+> > > > > @@ -150,14 +150,31 @@ static void ls_pcie_host_init(struct pcie_port *pp)
+> > > > >  	iowrite32(0, pcie->dbi + PCIE_DBI_RO_WR_EN);
+> > > > >  }
+> > > > >  
+> > > > > +static int ls_pcie_msi_host_init(struct pcie_port *pp,
+> > > > > +				 struct msi_controller *chip)
+> > > > > +{
+> > > > > +	struct device_node *msi_node;
+> > > > > +	struct device_node *np = pp->dev->of_node;
+> > > > > +
+> > > > > +	msi_node = of_parse_phandle(np, "msi-parent", 0);
+> > > > > +	if (!msi_node) {
+> > > > > +		dev_err(pp->dev, "failed to find msi-parent\n");
+> > > > > +		return -EINVAL;
+> > > > > +	}
+> > > > > +
+> > > > > +	return 0;
+> > > > 
+> > > > I don't see how this can be right.  I think it's OK if you want to enforce
+> > > > the presence of "msi-parent", but the other implementations of
+> > > > .msi_host_init (ks_dw_pcie_msi_host_init() and the default implementation
+> > > > in dw_pcie_host_init()) both set pp->irq_domain and call
+> > > > irq_create_mapping().
+> > > > 
+> > > > You don't do either of those, so I don't see how MSIs can work, because I
+> > > > assume the generic DesignWare code will depend on pp->irq_domain.  If
+> > > > you're planning to add more Layerscape-specific MSI support later, I think
+> > > > you should wait and include this patch with that work.
+> > 
+> > > Regarding MSI, both LS1021a and LS1043a use SCFG to implement it. I have submitted patch:
+> > > https://patchwork.kernel.org/patch/7411131/
+> > > https://patchwork.kernel.org/patch/7411141/
+> > 
+> > > While ls2085a use ITS for it, we just re-use the ITS driver.
+> > 
+> > > I notice some platform MSI driver files were placed in pci/host
+> > > folder not irqchip.  If it is ok, I would like to change driver
+> > > folder and re-submitted the MSI patch.
+> > 
+> > I suppose you're referring to drivers/pci/host/pci-xgene-msi.c.  
+> > That file doesn't really have much PCI stuff in it.  It does call
+> > pci_msi_create_irq_domain(), but that's really the only PCI interface or
+> > data structure it uses.  So I don't know if drivers/pci/host or
+> > drivers/irqchip is the best place for it and for your
+> > irq-ls-scfg-msi.c.
+> > 
+> > The connection between pci-xgene-msi.c and pci-xgene.c is not very
+> > clear to me, and that's sort of what I'm complaining about here.
+> > You're overriding a default MSI initialization method.  Usually that
+> > means you do the same thing as the default method, but in a different
+> > way.  You aren't doing the same thing at all, which makes the code
+> > hard to review.
+> > 
+> > Maybe a comment about how the MSI controller gets connected to devices
+> > below this host bridge would be enough.
+
+> 1. We need to define callback function msi_host_init() to avoid the
+> running desginware MSI related code Because our PCIe controller do not
+> enable this feature.
+> 
+> 2. we do not need to do anything such as bus->msi= ls_scfg_msi Because
+> with the latest code, when PCIe controller device is created
+> of_msi_configure() will be called and MSI domain pointed by
+> 'msi-parent' will be bound  to the device. pci_msi_get_domain(struct
+> pci_dev *dev) -> dev_get_msi_domain(&dev->dev) will return this MSI
+> domain.
+> 
+> 3. I will add a comment in the next version.
+
+Don't bother, I added a comment and applied the patch like this:
+
+
+commit 90cbdf8412d206f65ece3dcc53230e673da569c6
+Author: Minghuan Lian <Minghuan.Lian@freescale.com>
+Date:   Fri Oct 16 15:19:20 2015 +0800
+
+    PCI: layerscape: Add ls_pcie_msi_host_init()
+    
+    Layerscape PCIe has its own MSI implementation.
+    
+    Register ls_pcie_msi_host_init() to avoid using DesignWare's MSI.
+    
+    [bhelgaas: add comment]
+    Signed-off-by: Minghuan Lian <Minghuan.Lian@freescale.com>
+    Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
+
+diff --git a/drivers/pci/host/pci-layerscape.c b/drivers/pci/host/pci-layerscape.c
+index 6a9fa8a..1677890 100644
+--- a/drivers/pci/host/pci-layerscape.c
++++ b/drivers/pci/host/pci-layerscape.c
+@@ -150,14 +150,37 @@ static void ls_pcie_host_init(struct pcie_port *pp)
+ 	iowrite32(0, pcie->dbi + PCIE_DBI_RO_WR_EN);
+ }
+ 
++static int ls_pcie_msi_host_init(struct pcie_port *pp,
++				 struct msi_controller *chip)
++{
++	struct device_node *msi_node;
++	struct device_node *np = pp->dev->of_node;
++
++	/*
++	 * The MSI domain is set by the generic of_msi_configure().  This
++	 * .msi_host_init() function keeps us from doing the default MSI
++	 * domain setup in dw_pcie_host_init() and also enforces the
++	 * requirement that "msi-parent" exists.
++	 */
++	msi_node = of_parse_phandle(np, "msi-parent", 0);
++	if (!msi_node) {
++		dev_err(pp->dev, "failed to find msi-parent\n");
++		return -EINVAL;
++	}
++
++	return 0;
++}
++
+ static struct pcie_host_ops ls1021_pcie_host_ops = {
+ 	.link_up = ls1021_pcie_link_up,
+ 	.host_init = ls1021_pcie_host_init,
++	.msi_host_init = ls_pcie_msi_host_init,
+ };
+ 
+ static struct pcie_host_ops ls_pcie_host_ops = {
+ 	.link_up = ls_pcie_link_up,
+ 	.host_init = ls_pcie_host_init,
++	.msi_host_init = ls_pcie_msi_host_init,
+ };
+ 
+ static struct ls_pcie_drvdata ls1021_drvdata = {
