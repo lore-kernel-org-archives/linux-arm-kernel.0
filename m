@@ -1,75 +1,82 @@
-From: p.fedin@samsung.com (Pavel Fedin)
-Date: Mon, 02 Nov 2015 10:31:52 +0300
-Subject: [PATCH v4 1/4] Documentation: dt-bindings: Describe SROMc
- configuration
-In-Reply-To: <5635D1EE.5010604@samsung.com>
-References: <cover.1446122247.git.p.fedin@samsung.com>
- <f1fbd1a7877090f4318705f0fccbf4d96c0ebc9c.1446122247.git.p.fedin@samsung.com>
- <56330E6E.50003@samsung.com> <00d401d112ff$c426e9a0$4c74bce0$@samsung.com>
- <5635D1EE.5010604@samsung.com>
-Message-ID: <012101d11540$8c280be0$a47823a0$@samsung.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Mon, 2 Nov 2015 09:03:16 +0100
+Subject: [PATCH 5/7] clocksource/drivers/pxa_timer: Move the Kconfig rule
+In-Reply-To: <CAHLCerPX+bmNMNDFEW24GWXhmrCspfY=UYkhM54ORfoiB5Xfvw@mail.gmail.com>
+References: <CAHLCerPX+bmNMNDFEW24GWXhmrCspfY=UYkhM54ORfoiB5Xfvw@mail.gmail.com>
+Message-ID: <563718C4.5050503@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- Hello!
 
-> > --- cut exynos5410.dtsi ---
-> > 		sromc: sromc at 12250000 {
-> > 			#address-cells = <2>;
-> > 			#size-cells = <1>;
-> > 			ranges = <0 0 0x04000000 0x20000
-> > 				  1 0 0x05000000 0x20000
-> > 				  2 0 0x06000000 0x20000
-> > 				  3 0 0x07000000 0x20000>;
-> 
-> Do you have to use 2 cells for address? Cannot it be:
->  			ranges = <0 0x04000000 0x20000
->  				  1 0x05000000 0x20000
->  				  2 0x06000000 0x20000
->  				  3 0x07000000 0x20000>;
+Hi Amit,
 
- I tried this first, but it didn't work, and ranges translation
-gave me something really weird (like addr = 0x80 and
-size = 0x04000004). I decided not to dig deeply into
-"ranges" processing, but just followed GPMC approach. They say
-that first number is range ID and second number is offset within
-the range. And it just worked.
+On 11/02/2015 08:44 AM, Amit Kucheria wrote:
+> On Fri, Oct 30, 2015 at 4:22 AM, Daniel Lezcano
+> <daniel.lezcano@linaro.org> wrote:
+>> Instead of having the clocksource's Kconfig depending on the arch, let the
+>> arch to select the timer it needs.
+>
+> Is this the prescribed way to do things nowadays? It leads to more
+> options showing up in 'make menuconfig'. Why do I need to see
+> CLKSRC_PXA if I'm not even compiling for ARCH_PXA (and not interesting
+> in COMPILE_TEST)?
 
-> >  3. About samsung,srom-config array. I have the following reasons to keep if this way:
-> >     - listing every property under own name is just too much typing
-> >     - these values really do not make sense without each other, or partialy. I would say
-> that in array form they are even better
-> > readable, because it is the same order in which they go into the register.
-> 
-> For timings - OK. PMC is separate. This is not a timing.
+That won't happen.
 
- But it's srom-config, and not srom-timing anymore. So do you want
-two properties like srom-timing + srom-page-mode (with vendor prefix
-of course)?
+As the 'bool' has no string after, it won't show up in the menuconfig.
 
-> You need to document them. We are not gonna put some data looking like a
-> vendor blob into the binding. I understand that document has
-> confidential mark... all of Samsung datasheets I've seen had it. I don't
-> find it as problem but of course I am not the one to judge here. If you
-> do not feel comfortable publishing such data, get an approval from your
-> manager. You can also try to search for this in vendor code
-> (opensource.samsung.com). If it is published there, then this won't be a
-> disclosure.
+Actually, with the next patch, only COMPILE_TEST will show it up in the
 
- I've seen the actual SROMc settings in some old Android kernels, like 3.0.4.
-But they are not documented there, no comments, just #define's.
- Ok, i'll try to take a look how to minimize the actual information. :)
+Device Drivers->Clocksource drivers.
 
-> BTW, your email client is weird. You are sending non-wrapped emails
-> without format=flowed in Content-Type. Please stick to mailing list
-> convention of wrapping at 72-char.
+>> The CLKSRC_OF dependency is removed because already selected by the ARCH_PXA,
+>> and it is added for SA1100.
+>
+> This bit makes sense.
+>
+>> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+>> ---
+>>   arch/arm/Kconfig            | 3 +++
+>>   drivers/clocksource/Kconfig | 3 +--
+>>   2 files changed, 4 insertions(+), 2 deletions(-)
+>>
+>> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+>> index 72ad724..aa32286 100644
+>> --- a/arch/arm/Kconfig
+>> +++ b/arch/arm/Kconfig
+>> @@ -609,6 +609,7 @@ config ARCH_PXA
+>>          select AUTO_ZRELADDR
+>>          select COMMON_CLK
+>>          select CLKDEV_LOOKUP
+>> +       select CLKSRC_PXA
+>>          select CLKSRC_MMIO
+>>          select CLKSRC_OF
+>>          select GENERIC_CLOCKEVENTS
+>> @@ -669,6 +670,8 @@ config ARCH_SA1100
+>>          select ARCH_SPARSEMEM_ENABLE
+>>          select CLKDEV_LOOKUP
+>>          select CLKSRC_MMIO
+>> +       select CLKSRC_PXA
+>> +       select CLKSRC_OF if OF
+>>          select CPU_FREQ
+>>          select CPU_SA1100
+>>          select GENERIC_CLOCKEVENTS
+>> diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
+>> index 5cd000c..425abbd 100644
+>> --- a/drivers/clocksource/Kconfig
+>> +++ b/drivers/clocksource/Kconfig
+>> @@ -289,8 +289,7 @@ config CLKSRC_TANGO_XTAL
+>>          select CLKSRC_OF
+>>
+>>   config CLKSRC_PXA
+>> -       def_bool y if ARCH_PXA || ARCH_SA1100
+>> -       select CLKSRC_OF if OF
+>> +       bool
 
- I know, sorry, this is MS Outlook (not Express), and it's impossible
-to configure it this way (if i just set up word wrap, it starts to
-corrupt patches). I am now trying to wrap the text by hands, i hope
-it's better. And i cannot use anything else because... You know why. :)
 
-Kind regards,
-Pavel Fedin
-Expert Engineer
-Samsung Electronics Research center Russia
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
