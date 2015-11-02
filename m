@@ -1,77 +1,75 @@
-From: net147@gmail.com (Jonathan Liu)
-Date: Mon, 2 Nov 2015 13:53:20 +1100
-Subject: [linux-sunxi] [PATCH 11/19] drm: sun4i: Add composite output
-In-Reply-To: <1446214865-3972-12-git-send-email-maxime.ripard@free-electrons.com>
-References: <1446214865-3972-1-git-send-email-maxime.ripard@free-electrons.com>
- <1446214865-3972-12-git-send-email-maxime.ripard@free-electrons.com>
-Message-ID: <CANwerB0tva90mj7Anits0gfecQuLcDZ-BEctc0VNAY+Oq0dLbA@mail.gmail.com>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Mon, 2 Nov 2015 10:51:13 +0800
+Subject: [PATCH] clocksource: dw_apb_timer_of: support timer-based delay
+In-Reply-To: <5633646D.7030206@linaro.org>
+References: <1446193659-1698-1-git-send-email-jszhang@marvell.com>
+ <56334A1E.7060709@linaro.org>	<20151030190929.4c46066c@xhacker>
+ <5633646D.7030206@linaro.org>
+Message-ID: <20151102105113.72aade85@xhacker>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 31 October 2015 at 01:20, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> Some Allwinner SoCs have an IP called the TV encoder that is used to output
-> composite and VGA signals. In such a case, we need to use the second TCON
-> channel.
->
-> Add support for that TV encoder.
->
-> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> ---
->  drivers/gpu/drm/sun4i/Makefile    |   1 +
->  drivers/gpu/drm/sun4i/sun4i_drv.c |  10 +-
->  drivers/gpu/drm/sun4i/sun4i_tv.c  | 532 ++++++++++++++++++++++++++++++++++++++
->  drivers/gpu/drm/sun4i/sun4i_tv.h  |  18 ++
->  4 files changed, 560 insertions(+), 1 deletion(-)
->  create mode 100644 drivers/gpu/drm/sun4i/sun4i_tv.c
->  create mode 100644 drivers/gpu/drm/sun4i/sun4i_tv.h
->
-> diff --git a/drivers/gpu/drm/sun4i/Makefile b/drivers/gpu/drm/sun4i/Makefile
-> index 4d230b658a05..fc0dc8be82d9 100644
-> --- a/drivers/gpu/drm/sun4i/Makefile
-> +++ b/drivers/gpu/drm/sun4i/Makefile
-> @@ -6,5 +6,6 @@ sun4i-drm-y += sun4i_layer.o
->  sun4i-drm-y += sun4i_tcon.o
->
->  sun4i-drm-y += sun4i_rgb.o
-> +sun4i-drm-y += sun4i_tv.o
->
->  obj-$(CONFIG_DRM_SUN4I)                += sun4i-drm.o
-> diff --git a/drivers/gpu/drm/sun4i/sun4i_drv.c b/drivers/gpu/drm/sun4i/sun4i_drv.c
-> index f2c9c8a2eb75..3cf7a9e89afa 100644
-> --- a/drivers/gpu/drm/sun4i/sun4i_drv.c
-> +++ b/drivers/gpu/drm/sun4i/sun4i_drv.c
-> @@ -22,6 +22,7 @@
->  #include "sun4i_layer.h"
->  #include "sun4i_rgb.h"
->  #include "sun4i_tcon.h"
-> +#include "sun4i_tv.h"
->
->  static void sun4i_drv_preclose(struct drm_device *drm,
->                                struct drm_file *file_priv)
-> @@ -134,12 +135,18 @@ static int sun4i_drv_load(struct drm_device *drm, unsigned long flags)
->                 goto err_free_crtc;
->         }
->
-> +       ret = sun4i_tv_init(drm);
-> +       if (ret) {
-> +               dev_err(drm->dev, "Couldn't create our RGB output\n");
+Dear Daniel,
 
-RGB should be composite. Seems like a copy-paste error.
+On Fri, 30 Oct 2015 13:37:01 +0100
+Daniel Lezcano wrote:
 
-> +               goto err_free_rgb;
-> +       }
-> +
->         /* Create our framebuffer */
->         drv->fbdev = sun4i_framebuffer_init(drm);
->         if (IS_ERR(drv->fbdev)) {
->                 dev_err(drm->dev, "Couldn't create our framebuffer\n");
->                 ret = PTR_ERR(drv->fbdev);
-> -               goto err_free_rgb;
-> +               goto err_free_tv;
->         }
->
->         /* Enable connectors polling */
+> On 10/30/2015 12:09 PM, Jisheng Zhang wrote:
+> > Dear Daniel,
+> >
+> > On Fri, 30 Oct 2015 11:44:46 +0100
+> > Daniel Lezcano <daniel.lezcano@....> wrote:
+> >  
+> >> On 10/30/2015 09:27 AM, Jisheng Zhang wrote:  
+> >>> Implement an ARM delay timer to be used for udelay(). This allows us to
+> >>> skip the delay loop calibration at boot on Marvell BG2, BG2Q, BG2CD
+> >>> platforms. And after this patch, udelay() will be unaffected by CPU
+> >>> frequency changes.
+> >>>
+> >>> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+> >>> ---
+> >>>    drivers/clocksource/Kconfig           | 10 ++++++++++
+> >>>    drivers/clocksource/dw_apb_timer_of.c | 16 ++++++++++++++++
+> >>>    2 files changed, 26 insertions(+)
+> >>>
+> >>> diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
+> >>> index a7726db..7b081805 100644
+> >>> --- a/drivers/clocksource/Kconfig
+> >>> +++ b/drivers/clocksource/Kconfig
+> >>> @@ -29,6 +29,16 @@ config DW_APB_TIMER_OF
+> >>>    	select DW_APB_TIMER
+> >>>    	select CLKSRC_OF
+> >>>
+> >>> +config DW_APB_TIMER_BASED_DELAY
+> >>> +	bool "DW APB timer based delay"
+> >>> +	depends on ARM && DW_APB_TIMER_OF
+> >>> +	default n
+> >>> +	help
+> >>> +	  This option enables support for using the DW APB timer to
+> >>> +	  implement timer-based delay. It is useful for skiping the
+> >>> +	  delay loop calibration at boot on some platforms. And the
+> >>> +	  udelay() will be unaffected by CPU frequency changes.
+> >>> +  
+> >>
+> >> Why do you want it to be optional ?
+> >>  
+> >
+> > Because in some platforms which has arm arch timer, this dw apb timer
+> > delay isn't needed, the arch timer is better. So we want it be optional
+> > so that the platforms which need this feature select it manually when config
+> > the kernel.  
+> 
+> Correct me if I am wrong. If you have the arch timer, you don't need the 
 
-Regards,
-Jonathan
+Yes, I don't need the dw apb timer if we have arch timer,
+
+> dw apb timer at all, no ? So the selection would be arch arm timer *or* 
+> dw_apb_timer ? not arch_arm_timer for delay and dw_apb_timer for 
+> clockevents, right ?
+
+Yes, if we have arch timer, I prefer to use it for clockevent and delay.
+
+Could you please provide suggestion how to handle this case?
+
+Thanks,
+Jisheng
