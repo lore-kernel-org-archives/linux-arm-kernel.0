@@ -1,86 +1,58 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Mon, 2 Nov 2015 11:19:23 -0800
-Subject: [GIT PULL] Allwinner DT changes for 4.4, round 3
-In-Reply-To: <CAOesGMjNQeaA0etj0fk0E_QPNLYA3WTaRCfWE7YFz50RoDXu-w@mail.gmail.com>
-References: <20151023180711.GA11749@lukather> <4745252.gLSrJNQ42D@wuerfel>
- <9946613.K7Ehp1DEiL@wuerfel> <20151025201308.GS10947@lukather>
- <20151026010752.GG14238@localhost>
- <CAGb2v671MmpRHkWKpOd8kmEbvfTKTU9k7AU_bP+AgRuguodWkQ@mail.gmail.com>
- <20151026054828.GD4216@localhost> <20151026103409.GX10947@lukather>
- <CAOesGMjNQeaA0etj0fk0E_QPNLYA3WTaRCfWE7YFz50RoDXu-w@mail.gmail.com>
-Message-ID: <20151102191923.GO19782@codeaurora.org>
+From: rostedt@goodmis.org (Steven Rostedt)
+Date: Mon, 2 Nov 2015 14:33:24 -0500
+Subject: [PATCH 1/3] recordmcount: fix endianness handling bug for
+ nop_mcount
+In-Reply-To: <5634226A.9060208@huawei.com>
+References: <1446193864-24593-1-git-send-email-huawei.libin@huawei.com>
+ <1446193864-24593-2-git-send-email-huawei.libin@huawei.com>
+ <56338025.3060602@cogentembedded.com> <5634226A.9060208@huawei.com>
+Message-ID: <20151102143324.071eee7e@gandalf.local.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/31, Olof Johansson wrote:
-> On Mon, Oct 26, 2015 at 3:34 AM, Maxime Ripard
-> <maxime.ripard@free-electrons.com> wrote:
-> > On Mon, Oct 26, 2015 at 02:48:28PM +0900, Olof Johansson wrote:
-> >> On Mon, Oct 26, 2015 at 09:46:24AM +0800, Chen-Yu Tsai wrote:
-> >> > Hi Olof,
-> >> >
-> >> > On Mon, Oct 26, 2015 at 9:07 AM, Olof Johansson <olof@lixom.net> wrote:
-> >> > > On Sun, Oct 25, 2015 at 09:13:08PM +0100, Maxime Ripard wrote:
-> >> > >> On Fri, Oct 23, 2015 at 10:55:13PM +0200, Arnd Bergmann wrote:
-> >> > >> > On Friday 23 October 2015 22:41:04 Arnd Bergmann wrote:
-> >> > >> > > On Friday 23 October 2015 20:07:11 Maxime Ripard wrote:
-> >> > >> > > > Allwinner DT changes for 4.4, round 3
-> >> > >> > > >
-> >> > >> > > > A bunch of new boards, but mostly enable the support for the Audio Codec
-> >> > >> > > > on the older SoCs (A10, A10s, A13, A20, R8) and enable it on various
-> >> > >> > > > boards.
-> >> > >> > > >
-> >> > >> > > >
-> >> > >> > >
-> >> > >> > > Pulled into next/dt, thanks!
-> >> > >> >
-> >> > >> > And dropped again:
-> >> > >> >
-> >> > >> > In file included from /git/arm-soc/arch/arm/boot/dts/sun4i-a10-a1000.dts:46:0:
-> >> > >> > /git/arm-soc/arch/arm/boot/dts/sun4i-a10.dtsi:48:46: fatal error: dt-bindings/clock/sun4i-a10-pll2.h: No such file or directory
-> >> > >> >
-> >> > >> > Please make sure branches you send actually work by themselves.
-> >> > >>
-> >> > >> Damn, you're right... Sorry about that...
-> >> > >>
-> >> > >> You need to pull the tag sunxi-clk-for-4.4 that has been merged in the
-> >> > >> clk tree in 38ce30e29dc.
-> >> > >>
-> >> > >> Mike, Stephen, will that tag be stable?
-> >> > >
-> >> > > I don't see that tag in your tree, Maxime? I also don't see 38ce30e29dc in
-> >> > > the clk tree on kernel.org.
-> >> > >
-> >> > > I'm a little confused right now...
-> >> >
-> >> > The tag is "sunxi-clocks-for-4.4":
-> >> >     https://git.kernel.org/cgit/linux/kernel/git/mripard/linux.git/tag/?h=sunxi-clocks-for-4.4
-> >> >
-> >> > The merge commit in the clk tree is 938ce30e29dc:
-> >> >     https://git.kernel.org/cgit/linux/kernel/git/clk/linux.git/commit/?h=clk-next&id=938ce30e29dc
-> >>
-> >> Thanks, so both the tag and the hash were missing a few characters. :-)
-> >
-> > Gaah, sorry...
-> >
-> >> I've merged this in now. Note that this has resulted in a tree that won't
-> >> misect cleanly, since having the clk contents merged instead of used as a base
-> >> for the dt branch means that you could end up in a bisect state that has the DT
-> >> branch but not the clk branch.
-> >
-> > Even if it has been merged before the DT patches have been applied?
-> > That's not really what I'd expect from bisect :/
+On Sat, 31 Oct 2015 10:07:38 +0800
+libin <huawei.libin@huawei.com> wrote:
+
 > 
-> Yeah, due to the way bisect works, the only way to guarantee
-> bisectability is if you base the DT branch on top of the clk branch
-> when you build it. Otherwise the bisect can come down the path of only
-> having the DT contents not the clk contents.
+> 
+> on 2015/10/30 22:35, Sergei Shtylyov wrote:
+> > Hello.
+> > 
+> > On 10/30/2015 11:31 AM, Li Bin wrote:
+> > 
+> >> In nop_mcount, shdr->sh_offset and welp->r_offset should handle
+> >> endianness properly, otherwise it will trigger Segmentation fault
+> >> if the recordmcount main and file.o have different endianness.
+> >>
+> >> Cc: <stable@vger.kernel.org> # 3.0+
+> >> Signed-off-by: Li Bin <huawei.libin@huawei.com>
+> >> ---
+> >>   scripts/recordmcount.h | 5 +++--
+> >>   1 file changed, 3 insertions(+), 2 deletions(-)
+> >>
+> >> diff --git a/scripts/recordmcount.h b/scripts/recordmcount.h
+> >> index 49b582a..dda9dba 100644
+> >> --- a/scripts/recordmcount.h
+> >> +++ b/scripts/recordmcount.h
+> >> @@ -376,8 +376,9 @@ static void nop_mcount(Elf_Shdr const *const relhdr,
+> >>               mcountsym = get_mcountsym(sym0, relp, str0);
+> >>
+> >>           if (mcountsym == Elf_r_sym(relp) && !is_fake_mcount(relp)) {
+> >> -            if (make_nop)
+> >> -                ret = make_nop((void *)ehdr, shdr->sh_offset + relp->r_offset);
+> >> +            if (make_nop) {
+> >> +                ret = make_nop((void *)ehdr, _w(shdr->sh_offset) + _w(relp->r_offset));
+> >> +            }
+> > 
+> >    {} not needed here.
+> 
+> Oh, yes. When I cleaned the debugging code, forgot delete the {}.
+> 
+>
 
-Why can't the dts changes be applied directly on top of the
-branch that's in the clk tree and then sent off to arm-soc? The
-git merge && git commit technique also works, but it introduces
-an unnecessary merge commit into the history.
+Is there a new version of this patch, or should I just take this and
+remove the '{}' myself?
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+I already added the x86 update.
+
+-- Steve
