@@ -1,67 +1,74 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Mon, 2 Nov 2015 11:33:47 +0800
-Subject: [PATCH] i2c: designware: Don't mask TX_EMPTY if write is in
- progress
-In-Reply-To: <56335CA9.7080105@linux.intel.com>
-References: <1446190649-1318-1-git-send-email-jszhang@marvell.com>
- <56335CA9.7080105@linux.intel.com>
-Message-ID: <20151102113347.34d20434@xhacker>
+From: jitao.shi@mediatek.com (jitao shi)
+Date: Mon, 2 Nov 2015 11:53:41 +0800
+Subject: [RFC v2 1/2] Documentation: bridge: Add documentation for
+ ps8640 DT properties
+In-Reply-To: <1446430166-7378-1-git-send-email-jitao.shi@mediatek.com>
+References: <1446430166-7378-1-git-send-email-jitao.shi@mediatek.com>
+Message-ID: <1446436421.8671.1.camel@mszsdhlt06>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Jarkko,
-
-On Fri, 30 Oct 2015 14:03:53 +0200
-Jarkko Nikula wrote:
-
-> Hi
+On Mon, 2015-11-02 at 10:09 +0800, Jitao Shi wrote:
+> Add documentation for DT properties supported by
+> ps8640 DSI-eDP converter.
 > 
-> On 10/30/2015 09:37 AM, Jisheng Zhang wrote:
-> > Currently when i2c_msg index search is completed, TX_EMPTY interrupt
-> > will be masked. But if the size of i2c_msg data is longer than the size
-> > of the tx buffer, we still need TX_EMPTY interrupt, otherwise we will
-> > get "controller timed out" error.
-> >
-> > This patch fixes this issue by only masking TX_EMPTY if i2c_msg index
-> > search is completed and write is not in progress.
-> >
-> > Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
-> > ---
-> >   drivers/i2c/busses/i2c-designware-core.c | 7 ++++---
-> >   1 file changed, 4 insertions(+), 3 deletions(-)
-> >
-> > diff --git a/drivers/i2c/busses/i2c-designware-core.c b/drivers/i2c/busses/i2c-designware-core.c
-> > index 7441cdc..a2eb212 100644
-> > --- a/drivers/i2c/busses/i2c-designware-core.c
-> > +++ b/drivers/i2c/busses/i2c-designware-core.c
-> > @@ -542,10 +542,11 @@ i2c_dw_xfer_msg(struct dw_i2c_dev *dev)
-> >   	}
-> >
-> >   	/*
-> > -	 * If i2c_msg index search is completed, we don't need TX_EMPTY
-> > -	 * interrupt any more.
-> > +	 * If i2c_msg index search is completed and writing is not in progress,
-> > +	 * we don't need TX_EMPTY interrupt any more.
-> >   	 */
-> > -	if (dev->msg_write_idx == dev->msgs_num)
-> > +	if (dev->msg_write_idx == dev->msgs_num &&
-> > +			!(dev->status & STATUS_WRITE_IN_PROGRESS))
-> >   		intr_mask &= ~DW_IC_INTR_TX_EMPTY;
-> >  
-> This looks a possible scenario here. What I'm wondering how is the 
-> transfer ending and what condition in i2c_dw_isr() causes the complete() 
-> call?
+> Signed-off-by: Jitao Shi <jitao.shi@mediatek.com>
+---
+changes since v1:
+        1. changes power-gpios to sleep-gpios.
+        2. drop "ps8640-" in properties.
+        3. add ports property.
+> ---
+>  .../devicetree/bindings/display/bridge/ps8640.txt  |   43 ++++++++++++++++++++
+>  1 file changed, 43 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/display/bridge/ps8640.txt
 > 
-> Assuming we break the for loop in i2c_dw_xfer_msg() with buf_len > 0 and 
-> dev->msg_write_idx == dev->msgs_num how we get back inside the for loop 
-> for writing the remaining bytes and stop command?
-
-This is a good question. After more consideration, I think the following
-condition can't exist:
-
-  (msg_write_idx == dev->msgs_num) && (dev->status & STATUS_WRITE_IN_PROGRESS)
-
-so this patch isn't necessary.
-
-Thanks for your review,
-Jisheng
+> diff --git a/Documentation/devicetree/bindings/display/bridge/ps8640.txt b/Documentation/devicetree/bindings/display/bridge/ps8640.txt
+> new file mode 100644
+> index 0000000..7edc547
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/display/bridge/ps8640.txt
+> @@ -0,0 +1,43 @@
+> +ps8640-bridge bindings
+> +
+> +Required properties:
+> +	- compatible: "parade,ps8640"
+> +	- reg: first page address of the bridge.
+> +	- sleep-gpios: OF device-tree gpio specification for PD_ pin.
+> +	- reset-gpios: OF device-tree gpio specification for reset pin.
+> +	- mode-sel-gpios: OF device-tree gpio specification for mode-sel pin.
+> +	- vdd12-supply: OF device-tree regulator specification for 1.2V power.
+> +	- vdd33-supply: OF device-tree regulator specification for 3.3V power.
+> +	- ports: The device node can contain video interface port nodes per
+> +		 the video-interfaces bind[1]. For port at 0,set the reg = <0> as
+> +		 ps8640 dsi in and port at 1,set the reg = <1> as ps8640 eDP out.
+> +
+> +[1]: Documentation/devicetree/bindings/media/video-interfaces.txt
+> +
+> +Example:
+> +	edp-bridge at 18 {
+> +		compatible = "parade,ps8640";
+> +		reg = <0x18>;
+> +		sleep-gpios = <&pio 116 GPIO_ACTIVE_HIGH>;
+> +		reset-gpios = <&pio 115 GPIO_ACTIVE_HIGH>;
+> +		mode-sel-gpios = <&pio 92 GPIO_ACTIVE_HIGH>;
+> +		ps8640-1v2-supply = <&ps8640_fixed_1v2>;
+> +		ps8640-3v3-supply = <&mt6397_vgp2_reg>;
+> +
+> +		ports {
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +			port at 0 {
+> +				reg = <0>;
+> +				ps8640_in: endpoint {
+> +					remote-endpoint = <&dsi0_out>;
+> +				};
+> +			};
+> +			port at 1 {
+> +				reg = <1>;
+> +				ps8640_out: endpoint {
+> +					remote-endpoint = <&panel_in>;
+> +				};
+> +			};
+> +		};
+> +	};
