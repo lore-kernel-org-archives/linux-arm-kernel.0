@@ -1,25 +1,22 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Mon, 2 Nov 2015 21:40:07 +0530
-Subject: [PATCH v3 0/2] thermal: mediatek: Add cpu power cooling model
-In-Reply-To: <9hh4mh4bdoi.fsf@e105922-lin.cambridge.arm.com>
-References: <1445515359-8587-1-git-send-email-dawei.chien@mediatek.com>
- <20151028154449.GH3716@ubuntu>
- <9hh4mh4bdoi.fsf@e105922-lin.cambridge.arm.com>
-Message-ID: <20151102161007.GI3639@ubuntu>
+From: cl@linux.com (Christoph Lameter)
+Date: Mon, 2 Nov 2015 10:10:23 -0600 (CST)
+Subject: [PATCH v6 2/3] percpu: add PERCPU_ATOM_SIZE for a generic percpu
+ area setup
+In-Reply-To: <1446363977-23656-3-git-send-email-jungseoklee85@gmail.com>
+References: <1446363977-23656-1-git-send-email-jungseoklee85@gmail.com>
+ <1446363977-23656-3-git-send-email-jungseoklee85@gmail.com>
+Message-ID: <alpine.DEB.2.20.1511021008580.27740@east.gentwo.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02-11-15, 15:53, Punit Agrawal wrote:
-> For dynamic power, I had posted some patches[0][1][2] introducing the
-> binding as well as updating cooling device registration via cpufreq
-> driver. Now that the SCPI hwmon driver is merged, I should re-send the
-> remaining patches.
-> 
-> [0] http://lkml.iu.edu/hypermail/linux/kernel/1508.0/01020.html
-> [1] http://lkml.iu.edu/hypermail/linux/kernel/1508.0/01022.html
-> [3] http://lkml.iu.edu/hypermail/linux/kernel/1508.0/01031.html
+On Sun, 1 Nov 2015, Jungseok Lee wrote:
 
-Sure. Just that whatever can be merged with opp-v2 should be merged.
+> There is no room to adjust 'atom_size' now when a generic percpu area
+> is used. It would be redundant to write down an architecture-specific
+> setup_per_cpu_areas() in order to only change the 'atom_size'. Thus,
+> this patch adds a new definition, PERCPU_ATOM_SIZE, which is PAGE_SIZE
+> by default. The value could be updated if needed by architecture.
 
--- 
-viresh
+What is atom_size? Why would you want a difference allocation size here?
+The percpu area is virtually mapped regardless. So you will have
+contiguous addresses even without atom_size.
