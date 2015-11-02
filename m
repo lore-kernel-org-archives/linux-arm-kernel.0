@@ -1,98 +1,68 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Mon, 02 Nov 2015 02:50:40 +0100
-Subject: [PATCH v11 0/4] Allow USB devices to remain runtime-suspended
- when sleeping
-In-Reply-To: <1445956731-6304-1-git-send-email-tomeu.vizoso@collabora.com>
-References: <1445956731-6304-1-git-send-email-tomeu.vizoso@collabora.com>
-Message-ID: <2496228.i2Z9PmMBtz@vostro.rjw.lan>
+From: jitao.shi@mediatek.com (Jitao Shi)
+Date: Mon, 2 Nov 2015 10:09:25 +0800
+Subject: [RFC v2 1/2] Documentation: bridge: Add documentation for ps8640 DT
+ properties
+Message-ID: <1446430166-7378-1-git-send-email-jitao.shi@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, October 27, 2015 03:38:47 PM Tomeu Vizoso wrote:
-> Hi,
-> 
-> this is v11 of an attempt to make it easier for devices to remain in
-> runtime PM when the system goes to sleep, mainly to reduce the time
-> spent resuming devices.
-> 
-> For this, we interpret the absence of all PM callback implementations as
-> it being safe to do direct_complete, so their ancestors aren't prevented
-> from remaining runtime-suspended.
-> 
-> Additionally, the prepare() callback of USB devices will return 1 if
-> runtime PM is enabled and the current wakeup settings are correct.
-> 
-> With these changes, a uvcvideo device (for example) stays in runtime
-> suspend when the system goes to sleep and is left in that state when the
-> system resumes, not delaying it unnecessarily.
-> 
-> Thanks,
-> 
-> Tomeu
-> 
-> Changes in v11:
-> - Move calls to dev_pm_domain_set() out from &dev->power.lock as that
->   isn't needed for dev->pm_domain.
-> 
-> Changes in v10:
-> - Remove superfluous call to pm_runtime_enabled() as suggested by Alan
-> 
-> Changes in v9:
-> - Add docs noting the need for the device lock to be held before calling
->   device_is_bound()
-> - Add docs noting the need for the device lock to be held before calling
->   dev_pm_domain_set()
-> - Move to CONFIG_PM_SLEEP as suggested by Rafael and Ulf.
-> - Rename from device_check_pm_callbacks to device_pm_check_callbacks to
->   follow with the naming convention of existing API.
-> - Re-add calling to device_pm_check_callbacks from device registration
->   and when updating the PM domain of a device.
-> 
-> Changes in v8:
-> - Add device_is_bound()
-> - Add dev_pm_domain_set() and update code to use it
-> - Move no_pm_callbacks field into CONFIG_PM_SLEEP
-> - Call device_check_pm_callbacks only after a device is bound or unbound
-> 
-> Changes in v7:
-> - Reduce indentation by adding a label in device_prepare()
-> 
-> Changes in v6:
-> - Add stub for !CONFIG_PM.
-> - Move implementation of device_check_pm_callbacks to power/main.c as it
->   doesn't belong to CONFIG_PM_SLEEP.
-> - Take dev->power.lock before modifying flag.
-> 
-> Changes in v5:
-> - Check for all dev_pm_ops instances associated to a device, updating a
->   no_pm_callbacks flag at the times when that could change.
-> 
-> Tomeu Vizoso (4):
->   device core: add device_is_bound()
->   PM / Domains: add setter for dev.pm_domain
->   PM / sleep: Go direct_complete if driver has no callbacks
->   USB / PM: Allow USB devices to remain runtime-suspended when sleeping
-> 
->  arch/arm/mach-omap2/omap_device.c |  7 ++++---
->  drivers/acpi/acpi_lpss.c          |  5 +++--
->  drivers/acpi/device_pm.c          |  5 +++--
->  drivers/base/dd.c                 | 21 +++++++++++++++++++--
->  drivers/base/power/clock_ops.c    |  5 +++--
->  drivers/base/power/common.c       | 24 ++++++++++++++++++++++++
->  drivers/base/power/domain.c       |  8 ++++++--
->  drivers/base/power/main.c         | 35 +++++++++++++++++++++++++++++++++++
->  drivers/base/power/power.h        |  3 +++
->  drivers/gpu/vga/vga_switcheroo.c  | 10 +++++-----
->  drivers/misc/mei/pci-me.c         |  5 +++--
->  drivers/misc/mei/pci-txe.c        |  5 +++--
->  drivers/usb/core/port.c           |  6 ++++++
->  drivers/usb/core/usb.c            |  8 +++++++-
->  include/linux/device.h            |  2 ++
->  include/linux/pm.h                |  1 +
->  include/linux/pm_domain.h         |  3 +++
->  17 files changed, 130 insertions(+), 23 deletions(-)
+Add documentation for DT properties supported by
+ps8640 DSI-eDP converter.
 
-I've queued up this series for the second half of the v4.4 merge window.
+Signed-off-by: Jitao Shi <jitao.shi@mediatek.com>
+---
+ .../devicetree/bindings/display/bridge/ps8640.txt  |   43 ++++++++++++++++++++
+ 1 file changed, 43 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/display/bridge/ps8640.txt
 
-Thanks,
-Rafael
+diff --git a/Documentation/devicetree/bindings/display/bridge/ps8640.txt b/Documentation/devicetree/bindings/display/bridge/ps8640.txt
+new file mode 100644
+index 0000000..7edc547
+--- /dev/null
++++ b/Documentation/devicetree/bindings/display/bridge/ps8640.txt
+@@ -0,0 +1,43 @@
++ps8640-bridge bindings
++
++Required properties:
++	- compatible: "parade,ps8640"
++	- reg: first page address of the bridge.
++	- sleep-gpios: OF device-tree gpio specification for PD_ pin.
++	- reset-gpios: OF device-tree gpio specification for reset pin.
++	- mode-sel-gpios: OF device-tree gpio specification for mode-sel pin.
++	- vdd12-supply: OF device-tree regulator specification for 1.2V power.
++	- vdd33-supply: OF device-tree regulator specification for 3.3V power.
++	- ports: The device node can contain video interface port nodes per
++		 the video-interfaces bind[1]. For port at 0,set the reg = <0> as
++		 ps8640 dsi in and port at 1,set the reg = <1> as ps8640 eDP out.
++
++[1]: Documentation/devicetree/bindings/media/video-interfaces.txt
++
++Example:
++	edp-bridge at 18 {
++		compatible = "parade,ps8640";
++		reg = <0x18>;
++		sleep-gpios = <&pio 116 GPIO_ACTIVE_HIGH>;
++		reset-gpios = <&pio 115 GPIO_ACTIVE_HIGH>;
++		mode-sel-gpios = <&pio 92 GPIO_ACTIVE_HIGH>;
++		ps8640-1v2-supply = <&ps8640_fixed_1v2>;
++		ps8640-3v3-supply = <&mt6397_vgp2_reg>;
++
++		ports {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			port at 0 {
++				reg = <0>;
++				ps8640_in: endpoint {
++					remote-endpoint = <&dsi0_out>;
++				};
++			};
++			port at 1 {
++				reg = <1>;
++				ps8640_out: endpoint {
++					remote-endpoint = <&panel_in>;
++				};
++			};
++		};
++	};
+-- 
+1.7.9.5
