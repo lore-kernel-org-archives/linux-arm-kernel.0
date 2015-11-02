@@ -1,71 +1,381 @@
-From: b51503@freescale.com (Bai Ping)
-Date: Tue, 3 Nov 2015 02:06:09 +0800
-Subject: [PATCH] clk: imx: add 'is_prepared' clk_ops callback for pllv3 clk
-Message-ID: <1446487569-20757-1-git-send-email-b51503@freescale.com>
+From: alim.akhtar@samsung.com (Alim Akhtar)
+Date: Mon, 02 Nov 2015 15:34:00 +0530
+Subject: [PATCH 1/2] arm64: dts: exynos7: Add pmic s2mps15 device tree node
+Message-ID: <1446458641-4447-1-git-send-email-alim.akhtar@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add 'is_prepared' callback function for pllv3 type clk to make sure when
-the system is bootup, the unused clk is in a known state to match the
-prepare count info.
+This patch add pmic (s2mps15) node of espresso board,
+which includes addition of regulators and pmic-clk sub-nodes.
 
-Signed-off-by: Bai Ping <b51503@freescale.com>
+Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
+Signed-off-by: Alim Akhtar <alim.akhtar@samsung.com>
 ---
- drivers/clk/imx/clk-pllv3.c | 14 ++++++++++++++
- 1 file changed, 14 insertions(+)
+This patch should go in after driver side changes [1] lands.
+[1]-> https://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg47736.html
 
-diff --git a/drivers/clk/imx/clk-pllv3.c b/drivers/clk/imx/clk-pllv3.c
-index 6addf8f..c05c43d 100644
---- a/drivers/clk/imx/clk-pllv3.c
-+++ b/drivers/clk/imx/clk-pllv3.c
-@@ -97,6 +97,16 @@ static void clk_pllv3_unprepare(struct clk_hw *hw)
- 	writel_relaxed(val, pll->base);
- }
- 
-+static int clk_pllv3_is_prepared(struct clk_hw *hw)
-+{
-+	struct clk_pllv3 *pll = to_clk_pllv3(hw);
-+
-+	if (readl_relaxed(pll->base) & BM_PLL_LOCK)
-+		return 1;
-+
-+	return 0;
-+}
-+
- static unsigned long clk_pllv3_recalc_rate(struct clk_hw *hw,
- 					   unsigned long parent_rate)
- {
-@@ -139,6 +149,7 @@ static int clk_pllv3_set_rate(struct clk_hw *hw, unsigned long rate,
- static const struct clk_ops clk_pllv3_ops = {
- 	.prepare	= clk_pllv3_prepare,
- 	.unprepare	= clk_pllv3_unprepare,
-+	.is_prepared	= clk_pllv3_is_prepared,
- 	.recalc_rate	= clk_pllv3_recalc_rate,
- 	.round_rate	= clk_pllv3_round_rate,
- 	.set_rate	= clk_pllv3_set_rate,
-@@ -193,6 +204,7 @@ static int clk_pllv3_sys_set_rate(struct clk_hw *hw, unsigned long rate,
- static const struct clk_ops clk_pllv3_sys_ops = {
- 	.prepare	= clk_pllv3_prepare,
- 	.unprepare	= clk_pllv3_unprepare,
-+	.is_prepared	= clk_pllv3_is_prepared,
- 	.recalc_rate	= clk_pllv3_sys_recalc_rate,
- 	.round_rate	= clk_pllv3_sys_round_rate,
- 	.set_rate	= clk_pllv3_sys_set_rate,
-@@ -265,6 +277,7 @@ static int clk_pllv3_av_set_rate(struct clk_hw *hw, unsigned long rate,
- static const struct clk_ops clk_pllv3_av_ops = {
- 	.prepare	= clk_pllv3_prepare,
- 	.unprepare	= clk_pllv3_unprepare,
-+	.is_prepared	= clk_pllv3_is_prepared,
- 	.recalc_rate	= clk_pllv3_av_recalc_rate,
- 	.round_rate	= clk_pllv3_av_round_rate,
- 	.set_rate	= clk_pllv3_av_set_rate,
-@@ -279,6 +292,7 @@ static unsigned long clk_pllv3_enet_recalc_rate(struct clk_hw *hw,
- static const struct clk_ops clk_pllv3_enet_ops = {
- 	.prepare	= clk_pllv3_prepare,
- 	.unprepare	= clk_pllv3_unprepare,
-+	.is_prepared	= clk_pllv3_is_prepared,
- 	.recalc_rate	= clk_pllv3_enet_recalc_rate,
+ arch/arm64/boot/dts/exynos/exynos7-espresso.dts |  349 +++++++++++++++++++++++
+ 1 file changed, 349 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/exynos/exynos7-espresso.dts b/arch/arm64/boot/dts/exynos/exynos7-espresso.dts
+index 838a3626dac1..8ce04a0ec928 100644
+--- a/arch/arm64/boot/dts/exynos/exynos7-espresso.dts
++++ b/arch/arm64/boot/dts/exynos/exynos7-espresso.dts
+@@ -53,6 +53,355 @@
+ 	status = "okay";
  };
  
++&hsi2c_4 {
++	samsung,i2c-sda-delay = <100>;
++	samsung,i2c-max-bus-freq = <200000>;
++	status = "okay";
++
++	s2mps15_pmic at 66 {
++		compatible = "samsung,s2mps15-pmic";
++		reg = <0x66>;
++		interrupts = <2 0>;
++		interrupt-parent = <&gpa0>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&pmic_irq>;
++		wakeup-source;
++
++		s2mps15_osc: clocks {
++			compatible = "samsung,s2mps13-clk";
++			#clock-cells = <1>;
++			clock-output-names = "s2mps13_ap", "s2mps13_cp",
++				"s2mps13_bt";
++		};
++
++		regulators {
++			ldo1_reg: LDO1 {
++				regulator-name = "vdd_ldo1";
++				regulator-min-microvolt = <500000>;
++				regulator-max-microvolt = <900000>;
++				regulator-always-on;
++				regulator-enable-ramp-delay = <125>;
++			};
++
++			ldo2_reg: LDO2 {
++				regulator-name = "vdd_ldo2";
++				regulator-min-microvolt = <1620000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-enable-ramp-delay = <125>;
++				regulator-always-on;
++			};
++
++			ldo3_reg: LDO3 {
++				regulator-name = "vdd_ldo3";
++				regulator-min-microvolt = <1620000>;
++				regulator-max-microvolt = <1980000>;
++				regulator-always-on;
++				regulator-boot-on;
++				regulator-enable-ramp-delay = <125>;
++			};
++
++			ldo4_reg: LDO4 {
++				regulator-name = "vdd_ldo4";
++				regulator-min-microvolt = <800000>;
++				regulator-max-microvolt = <1110000>;
++				regulator-always-on;
++				regulator-enable-ramp-delay = <125>;
++			};
++
++			ldo5_reg: LDO5 {
++				regulator-name = "vdd_ldo5";
++				regulator-min-microvolt = <1620000>;
++				regulator-max-microvolt = <1980000>;
++				regulator-always-on;
++				regulator-enable-ramp-delay = <125>;
++			};
++
++			ldo6_reg: LDO6 {
++				regulator-name = "vdd_ldo6";
++				regulator-min-microvolt = <2250000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-always-on;
++				regulator-boot-on;
++				regulator-enable-ramp-delay = <125>;
++			};
++
++			ldo7_reg: LDO7 {
++				regulator-name = "vdd_ldo7";
++				regulator-min-microvolt = <700000>;
++				regulator-max-microvolt = <1150000>;
++				regulator-always-on;
++				regulator-enable-ramp-delay = <125>;
++			};
++
++			ldo8_reg: LDO8 {
++				regulator-name = "vdd_ldo8";
++				regulator-min-microvolt = <700000>;
++				regulator-max-microvolt = <1000000>;
++				regulator-always-on;
++				regulator-enable-ramp-delay = <125>;
++			};
++
++			ldo9_reg: LDO9 {
++				regulator-name = "vdd_ldo9";
++				regulator-min-microvolt = <700000>;
++				regulator-max-microvolt = <1000000>;
++				regulator-always-on;
++				regulator-enable-ramp-delay = <125>;
++			};
++
++			ldo10_reg: LDO10 {
++				regulator-name = "vdd_ldo10";
++				regulator-min-microvolt = <700000>;
++				regulator-max-microvolt = <1000000>;
++				regulator-always-on;
++				regulator-enable-ramp-delay = <125>;
++			};
++
++			ldo11_reg: LDO11 {
++				regulator-name = "vdd_ldo11";
++				regulator-min-microvolt = <1000000>;
++				regulator-max-microvolt = <1300000>;
++				regulator-always-on;
++				regulator-enable-ramp-delay = <125>;
++			};
++
++			ldo12_reg: LDO12 {
++				regulator-name = "vdd_ldo12";
++				regulator-min-microvolt = <1000000>;
++				regulator-max-microvolt = <1300000>;
++				regulator-always-on;
++				regulator-enable-ramp-delay = <125>;
++			};
++
++			ldo13_reg: LDO13 {
++				regulator-name = "vdd_ldo13";
++				regulator-min-microvolt = <1000000>;
++				regulator-max-microvolt = <1300000>;
++				regulator-always-on;
++				regulator-enable-ramp-delay = <125>;
++			};
++
++			ldo14_reg: LDO14 {
++				regulator-name = "vdd_ldo14";
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <3375000>;
++				regulator-always-on;
++				regulator-enable-ramp-delay = <125>;
++			};
++
++			ldo15_reg: LDO15 {
++				regulator-name = "vdd_ldo15";
++				regulator-min-microvolt = <1500000>;
++				regulator-max-microvolt = <2275000>;
++				regulator-always-on;
++				regulator-enable-ramp-delay = <125>;
++			};
++
++			ldo16_reg: LDO16 {
++				regulator-name = "vdd_ldo16";
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <1800000>;
++				regulator-always-on;
++				regulator-enable-ramp-delay = <125>;
++			};
++
++			ldo17_reg: LDO17 {
++				regulator-name = "vdd_ldo17";
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <3375000>;
++				regulator-always-on;
++				regulator-enable-ramp-delay = <125>;
++			};
++
++			ldo18_reg: LDO18 {
++				regulator-name = "vdd_ldo18";
++				regulator-min-microvolt = <1500000>;
++				regulator-max-microvolt = <2275000>;
++				regulator-always-on;
++				regulator-enable-ramp-delay = <125>;
++			};
++
++			ldo19_reg: LDO19 {
++				regulator-name = "vdd_ldo19";
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <3375000>;
++				regulator-always-on;
++				regulator-enable-ramp-delay = <125>;
++			};
++
++			ldo20_reg: LDO20 {
++				regulator-name = "vdd_ldo20";
++				regulator-min-microvolt = <1500000>;
++				regulator-max-microvolt = <2275000>;
++				regulator-always-on;
++				regulator-enable-ramp-delay = <125>;
++			};
++
++			ldo21_reg: LDO21 {
++				regulator-name = "vdd_ldo21";
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <3375000>;
++				regulator-always-on;
++				regulator-enable-ramp-delay = <125>;
++			};
++
++			ldo22_reg: LDO22 {
++				regulator-name = "vdd_ldo22";
++				regulator-min-microvolt = <1200000>;
++				regulator-max-microvolt = <1200000>;
++				regulator-always-on;
++				regulator-enable-ramp-delay = <125>;
++			};
++
++			ldo23_reg: LDO23 {
++				regulator-name = "vdd_ldo23";
++				regulator-min-microvolt = <1500000>;
++				regulator-max-microvolt = <2275000>;
++				regulator-always-on;
++				regulator-enable-ramp-delay = <125>;
++			};
++
++			ldo24_reg: LDO24 {
++				regulator-name = "vdd_ldo24";
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <3375000>;
++				regulator-always-on;
++				regulator-enable-ramp-delay = <125>;
++			};
++
++			ldo25_reg: LDO25 {
++				regulator-name = "vdd_ldo25";
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <3375000>;
++				regulator-always-on;
++				regulator-enable-ramp-delay = <125>;
++			};
++
++			ldo26_reg: LDO26 {
++				regulator-name = "vdd_ldo26";
++				regulator-min-microvolt = <700000>;
++				regulator-max-microvolt = <1470000>;
++				regulator-always-on;
++				regulator-enable-ramp-delay = <125>;
++			};
++
++			ldo27_reg: LDO27 {
++				regulator-name = "vdd_ldo27";
++				regulator-min-microvolt = <1500000>;
++				regulator-max-microvolt = <2275000>;
++				regulator-always-on;
++				regulator-enable-ramp-delay = <125>;
++			};
++
++			buck1_reg: BUCK1 {
++				regulator-name = "vdd_mif";
++				regulator-min-microvolt = <500000>;
++				regulator-max-microvolt = <1200000>;
++				regulator-always-on;
++				regulator-boot-on;
++				regulator-ramp-delay = <25000>;
++				regulator-enable-ramp-delay = <250>;
++			};
++
++			buck2_reg: BUCK2 {
++				regulator-name = "vdd_atlas";
++				regulator-min-microvolt = <1200000>;
++				regulator-max-microvolt = <1200000>;
++				regulator-always-on;
++				regulator-boot-on;
++				regulator-ramp-delay = <12500>;
++				regulator-enable-ramp-delay = <250>;
++			};
++
++			buck3_reg: BUCK3 {
++				regulator-name = "vdd_apollo";
++				regulator-min-microvolt = <1200000>;
++				regulator-max-microvolt = <1200000>;
++				regulator-always-on;
++				regulator-boot-on;
++				regulator-ramp-delay = <12500>;
++				regulator-enable-ramp-delay = <250>;
++			};
++
++			buck4_reg: BUCK4 {
++				regulator-name = "vdd_int";
++				regulator-min-microvolt = <500000>;
++				regulator-max-microvolt = <1200000>;
++				regulator-always-on;
++				regulator-boot-on;
++				regulator-ramp-delay = <12500>;
++				regulator-enable-ramp-delay = <250>;
++			};
++
++			buck5_reg: BUCK5 {
++				regulator-name = "vdd_buck5";
++				regulator-min-microvolt = <500000>;
++				regulator-max-microvolt = <1300000>;
++				regulator-always-on;
++				regulator-ramp-delay = <25000>;
++				regulator-enable-ramp-delay = <250>;
++			};
++
++			buck6_reg: BUCK6 {
++				regulator-name = "vdd_g3d";
++				regulator-min-microvolt = <500000>;
++				regulator-max-microvolt = <1400000>;
++				regulator-always-on;
++				regulator-ramp-delay = <12500>;
++				regulator-enable-ramp-delay = <250>;
++			};
++
++			buck7_reg: BUCK7 {
++				regulator-name = "vdd_buck7";
++				regulator-min-microvolt = <1000000>;
++				regulator-max-microvolt = <1500000>;
++				regulator-always-on;
++				regulator-boot-on;
++				regulator-ramp-delay = <25000>;
++				regulator-enable-ramp-delay = <250>;
++			};
++
++			buck8_reg: BUCK8 {
++				regulator-name = "vdd_buck8";
++				regulator-min-microvolt = <1000000>;
++				regulator-max-microvolt = <1500000>;
++				regulator-always-on;
++				regulator-boot-on;
++				regulator-ramp-delay = <25000>;
++				regulator-enable-ramp-delay = <250>;
++			};
++
++			buck9_reg: BUCK9 {
++				regulator-name = "vdd_buck9";
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <2100000>;
++				regulator-always-on;
++				regulator-boot-on;
++				regulator-ramp-delay = <25000>;
++				regulator-enable-ramp-delay = <250>;
++			};
++
++			buck10_reg: BUCK10 {
++				regulator-name = "vdd_buck10";
++				regulator-min-microvolt = <1000000>;
++				regulator-max-microvolt = <3000000>;
++				regulator-boot-on;
++				regulator-always-on;
++				regulator-ramp-delay = <25000>;
++				regulator-enable-ramp-delay = <250>;
++			};
++		};
++	};
++};
++
++&pinctrl_alive {
++	pmic_irq: pmic-irq {
++		samsung,pins = "gpa0-2";
++		samsung,pin-pud = <3>;
++		samsung,pin-drv = <3>;
++	};
++};
++
+ &mmc_0 {
+ 	status = "okay";
+ 	num-slots = <1>;
 -- 
-1.9.1
+1.7.10.4
