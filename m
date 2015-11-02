@@ -1,53 +1,54 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Mon, 2 Nov 2015 14:13:01 +0200
-Subject: [PATCH v2 13/14] ARM: DTS: am33xx: Use the new DT bindings for
- the eDMA3
-In-Reply-To: <20151102100405.GJ21326@localhost>
-References: <1444979892-31626-1-git-send-email-peter.ujfalusi@ti.com>
- <1444979892-31626-14-git-send-email-peter.ujfalusi@ti.com>
- <CAOesGMg0KsHnbF8hEYPZ8bY8wz9fC0_m7-KS4A6kB__nUi9kAw@mail.gmail.com>
- <20151102100405.GJ21326@localhost>
-Message-ID: <5637534D.2020304@ti.com>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Mon,  2 Nov 2015 12:24:00 +0000
+Subject: [PATCH DRAFT 0/2] Sketch for ZTE ZX296702 UART integration
+Message-ID: <1446467042-24494-1-git-send-email-andre.przywara@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Vinod,
+Hi,
 
-On 11/02/2015 12:04 PM, Vinod Koul wrote:
-> On Mon, Nov 02, 2015 at 01:21:19AM -0800, Olof Johansson wrote:
->> Hi,
->>
->> 1) This seems to have broken BBB in -next for me, bisected down to this patch.
->>
->> For bootlog:
->> http://arm-soc.lixom.net/bootlogs/next/next-20151102/bbb-arm-omap2plus_defconfig.html
->>
->> 2) Please avoid merging DT/platform code in your driver tree, Vinod,
->> at least without an ack from the platform maintainer. It can be a a
->> huge mess if they end up causing conflicts, so we always ask to merge
->> the DT changes through the platform maintainer (Tony in this case) by
->> default.
-> 
-> I did warn when applying that I am doing so without ACK on ARM code, noone
-> said a thing!
-> 
-> I knew Tony was following the work by Peter so assumed he must have been okay
-> with it otherwise would have spoken for ~couple of weeks these were in
-> review
-> 
-> Anyway now that we have a regression, I can revert this patch if that fixes,
-> please confirm, but might break edma... peter?
+there has been some discussion on how to integrate support for the
+ZTE ZX296702 UART, which is very similar to the PL011, but (among
+other deviations) has its registers at different offsets from the base
+address.
+Previous patches on the list [1] were reworking the whole of the PL011
+driver, creating extra churn for all architecture compliant
+implementations.
+This sketch introduces register accessor wrappers in patch 1, which
+are useful for other things as well later. Ideally the generated
+code should look identical after this one, given the compiler properly
+inlines the accessor functions.
+Based on that patch 2 then introduces a mapping table just for the
+ZTE UART, which redirects the original PL011 register offsets to the
+shifted positions on the ZTE UART.
+The impact on all other implementations are kept minimal, actually if
+the CONFIG_ symbol for that SoC is not defined, there should be no
+code difference compared to the state before.
 
-Can you revert or drop the last two DTS patches?
+I don't have access to the ZTE UART hardware, so could not test this
+(this patch set is not complete anyway), but I quickly tested for
+regressions on a Juno, which seems to work fine for me.
 
-I think I will try a different route to get the split of the tpcc and tptc.
-Without the DT patches the driver will fall back to the legacy mode so things
-will work in a same way they did before.
-Or I can send a followup patch for edma.c, with that there is no need to add
-the HWMOD_INIT_NO_IDLE to hwmod and power management looks better.
-Basically I'm registering a 'dummy' driver for the edma3-tptc so omap hwmod
-code will not shut it down but we will keep the possibility to manage the
-power state still.
+I provide these patches as a base for discussion and for future,
+proper support patches.
+Do these make sense to anyone? Is this the way to go for the ZTE UART
+implementation?
+
+Any comments are appreciated.
+
+Cheers,
+Andre.
+
+[1] http://marc.info/?l=linux-serial&m=143832897928885&w=2
+
+Andre Przywara (2):
+  drivers: serial: PL011: refactor register access
+  drivers: serial: PL011: [DRAFT] implement register diverson for ZTE
+    UART
+
+ drivers/tty/serial/amba-pl011.c | 246 +++++++++++++++++++++++-----------------
+ include/linux/amba/serial.h     |  10 ++
+ 2 files changed, 155 insertions(+), 101 deletions(-)
 
 -- 
-P?ter
+2.5.1
