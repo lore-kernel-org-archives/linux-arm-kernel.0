@@ -1,30 +1,35 @@
-From: rostedt@goodmis.org (Steven Rostedt)
-Date: Mon, 2 Nov 2015 13:26:08 -0500
-Subject: [PATCH] recordmcount: arm64: replace the ignored mcount call
- into nop
-In-Reply-To: <5633077C.3050000@huawei.com>
-References: <1446019445-14421-1-git-send-email-huawei.libin@huawei.com>
- <201510292118.ZYBYzBGa%fengguang.wu@intel.com>
- <20151029150922.GE3440@arm.com> <5633077C.3050000@huawei.com>
-Message-ID: <20151102132608.59e16994@gandalf.local.home>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 2 Nov 2015 18:26:15 +0000
+Subject: [PATCH v8 2/2] arm-soc: Add support for arm-based tango4 platforms
+In-Reply-To: <yw1xfv0o9xr3.fsf@unicorn.mansr.com>
+References: <56377E76.2080209@sigmadesigns.com>
+ <56377F09.6050805@sigmadesigns.com>
+ <yw1xfv0o9xr3.fsf@unicorn.mansr.com>
+Message-ID: <20151102182615.GI2684@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 30 Oct 2015 14:00:28 +0800
-libin <huawei.libin@huawei.com> wrote:
-
-> It is a bug in nop_mcount:
-> ...
-> if (mcountsym == Elf_r_sym(relp) && !is_fake_mcount(relp)) {
->         if (make_nop) {
->                 ret = make_nop((void *)ehdr, shdr->sh_offset + relp->r_offset);
->         }
-> ...
+> > +ENTRY(tango_smc)
+> > +	push	{lr}
+> > +	mov	ip, r1
+> > +	dsb
 > 
-> shdr->sh_offset and welp->r_offset should handle endianness properly as _w(shdr->sh_offset)/
-> _w(relp->r_offset). I will post a patchset including this patch soon.
-> 
+> Did you ever get a straight answer on the dsb here?
 
-Has this been fixed yet?
+We didn't. Having a look just now, the earliest example appears to be
+in OMAP4 L2 support patches back in 2009 [1]. I was not able to find a
+rationale.
 
--- Steve
+Given that the MMU is on (and speculative accesses are permitted) I
+can't see what the DSB achieves -- it can't quiesce the memory system.
+
+Santosh, any idea?
+
+Thanks,
+Mark.
+
+> > +	smc	#0
+> > +	pop	{pc}
+> > +ENDPROC(tango_smc)
+
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2009-December/005815.html
