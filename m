@@ -1,209 +1,100 @@
-From: cov@codeaurora.org (Christopher Covington)
-Date: Mon, 02 Nov 2015 15:13:11 -0500
-Subject: [PATCH v4 07/21] KVM: ARM64: PMU: Add perf event map and
- introduce perf event creating function
-In-Reply-To: <1446186123-11548-8-git-send-email-zhaoshenglong@huawei.com>
-References: <1446186123-11548-1-git-send-email-zhaoshenglong@huawei.com>
- <1446186123-11548-8-git-send-email-zhaoshenglong@huawei.com>
-Message-ID: <5637C3D7.2010801@codeaurora.org>
+From: edubezval@gmail.com (Eduardo Valentin)
+Date: Mon, 2 Nov 2015 12:13:47 -0800
+Subject: [PATCH v4 0/8] qcom: Add support for TSENS driver
+In-Reply-To: <1444383670-32693-1-git-send-email-rnayak@codeaurora.org>
+References: <1444383670-32693-1-git-send-email-rnayak@codeaurora.org>
+Message-ID: <20151102201345.GA4238@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/30/2015 02:21 AM, Shannon Zhao wrote:
-> From: Shannon Zhao <shannon.zhao@linaro.org>
+Rajendra,
+
+On Fri, Oct 09, 2015 at 03:11:02PM +0530, Rajendra Nayak wrote:
+> Patches 1/8 to 4/8 will need to go via the thermal tree/Eduardo.
+> Patches 5/8 to 8/8 will need to go via qcom-msm tree/Andy.
 > 
-> When we use tools like perf on host, perf passes the event type and the
-> id of this event type category to kernel, then kernel will map them to
-> hardware event number and write this number to PMU PMEVTYPER<n>_EL0
-> register. When getting the event number in KVM, directly use raw event
-> type to create a perf_event for it.
-> 
-> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
-> ---
->  arch/arm64/include/asm/pmu.h |   2 +
->  arch/arm64/kvm/Makefile      |   1 +
->  include/kvm/arm_pmu.h        |  13 +++++
->  virt/kvm/arm/pmu.c           | 117 +++++++++++++++++++++++++++++++++++++++++++
->  4 files changed, 133 insertions(+)
->  create mode 100644 virt/kvm/arm/pmu.c
-> 
-> diff --git a/arch/arm64/include/asm/pmu.h b/arch/arm64/include/asm/pmu.h
-> index b9f394a..2c025f2 100644
-> --- a/arch/arm64/include/asm/pmu.h
-> +++ b/arch/arm64/include/asm/pmu.h
-> @@ -31,6 +31,8 @@
->  #define ARMV8_PMCR_D		(1 << 3) /* CCNT counts every 64th cpu cycle */
->  #define ARMV8_PMCR_X		(1 << 4) /* Export to ETM */
->  #define ARMV8_PMCR_DP		(1 << 5) /* Disable CCNT if non-invasive debug*/
-> +/* Determines which PMCCNTR_EL0 bit generates an overflow */
-> +#define ARMV8_PMCR_LC		(1 << 6)
->  #define	ARMV8_PMCR_N_SHIFT	11	 /* Number of counters supported */
->  #define	ARMV8_PMCR_N_MASK	0x1f
->  #define	ARMV8_PMCR_MASK		0x3f	 /* Mask for writable bits */
-> diff --git a/arch/arm64/kvm/Makefile b/arch/arm64/kvm/Makefile
-> index 1949fe5..18d56d8 100644
-> --- a/arch/arm64/kvm/Makefile
-> +++ b/arch/arm64/kvm/Makefile
-> @@ -27,3 +27,4 @@ kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic-v3.o
->  kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic-v3-emul.o
->  kvm-$(CONFIG_KVM_ARM_HOST) += vgic-v3-switch.o
->  kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/arch_timer.o
-> +kvm-$(CONFIG_KVM_ARM_PMU) += $(KVM)/arm/pmu.o
-> diff --git a/include/kvm/arm_pmu.h b/include/kvm/arm_pmu.h
-> index 254d2b4..1908c88 100644
-> --- a/include/kvm/arm_pmu.h
-> +++ b/include/kvm/arm_pmu.h
-> @@ -38,4 +38,17 @@ struct kvm_pmu {
->  #endif
->  };
->  
-> +#ifdef CONFIG_KVM_ARM_PMU
-> +unsigned long kvm_pmu_get_counter_value(struct kvm_vcpu *vcpu, u32 select_idx);
-> +void kvm_pmu_set_counter_event_type(struct kvm_vcpu *vcpu, u32 data,
-> +				    u32 select_idx);
-> +#else
-> +unsigned long kvm_pmu_get_counter_value(struct kvm_vcpu *vcpu, u32 select_idx)
-> +{
-> +	return 0;
-> +}
-> +void kvm_pmu_set_counter_event_type(struct kvm_vcpu *vcpu, u32 data,
-> +				    u32 select_idx) {}
-> +#endif
-> +
->  #endif
-> diff --git a/virt/kvm/arm/pmu.c b/virt/kvm/arm/pmu.c
-> new file mode 100644
-> index 0000000..900a64c
-> --- /dev/null
-> +++ b/virt/kvm/arm/pmu.c
-> @@ -0,0 +1,117 @@
-> +/*
-> + * Copyright (C) 2015 Linaro Ltd.
-> + * Author: Shannon Zhao <shannon.zhao@linaro.org>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License version 2 as
-> + * published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope that it will be useful,
-> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
-> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-> + * GNU General Public License for more details.
-> + *
-> + * You should have received a copy of the GNU General Public License
-> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-> + */
-> +
-> +#include <linux/cpu.h>
-> +#include <linux/kvm.h>
-> +#include <linux/kvm_host.h>
-> +#include <linux/perf_event.h>
-> +#include <asm/kvm_emulate.h>
-> +#include <kvm/arm_pmu.h>
-> +
-> +/**
-> + * kvm_pmu_get_counter_value - get PMU counter value
-> + * @vcpu: The vcpu pointer
-> + * @select_idx: The counter index
-> + */
-> +unsigned long kvm_pmu_get_counter_value(struct kvm_vcpu *vcpu, u32 select_idx)
-> +{
-> +	u64 counter, enabled, running;
-> +	struct kvm_pmu *pmu = &vcpu->arch.pmu;
-> +	struct kvm_pmc *pmc = &pmu->pmc[select_idx];
-> +
-> +	if (!vcpu_mode_is_32bit(vcpu))
-> +		counter = vcpu_sys_reg(vcpu, PMEVCNTR0_EL0 + select_idx);
-> +	else
-> +		counter = vcpu_cp15(vcpu, c14_PMEVCNTR0 + select_idx);
-> +
-> +	if (pmc->perf_event)
-> +		counter += perf_event_read_value(pmc->perf_event, &enabled,
-> +						 &running);
-> +
-> +	return counter & pmc->bitmask;
-> +}
-> +
-> +/**
-> + * kvm_pmu_stop_counter - stop PMU counter
-> + * @pmc: The PMU counter pointer
-> + *
-> + * If this counter has been configured to monitor some event, release it here.
-> + */
-> +static void kvm_pmu_stop_counter(struct kvm_pmc *pmc)
-> +{
-> +	struct kvm_vcpu *vcpu = pmc->vcpu;
-> +	u64 counter;
-> +
-> +	if (pmc->perf_event) {
-> +		counter = kvm_pmu_get_counter_value(vcpu, pmc->idx);
-> +		if (!vcpu_mode_is_32bit(vcpu))
-> +			vcpu_sys_reg(vcpu, PMEVCNTR0_EL0 + pmc->idx) = counter;
-> +		else
-> +			vcpu_cp15(vcpu, c14_PMEVCNTR0 + pmc->idx) = counter;
-> +
-> +		perf_event_release_kernel(pmc->perf_event);
-> +		pmc->perf_event = NULL;
-> +	}
-> +}
-> +
-> +/**
-> + * kvm_pmu_set_counter_event_type - set selected counter to monitor some event
-> + * @vcpu: The vcpu pointer
-> + * @data: The data guest writes to PMXEVTYPER_EL0
-> + * @select_idx: The number of selected counter
-> + *
-> + * When OS accesses PMXEVTYPER_EL0, that means it wants to set a PMC to count an
-> + * event with given hardware event number. Here we call perf_event API to
-> + * emulate this action and create a kernel perf event for it.
-> + */
-> +void kvm_pmu_set_counter_event_type(struct kvm_vcpu *vcpu, u32 data,
-> +				    u32 select_idx)
-> +{
-> +	struct kvm_pmu *pmu = &vcpu->arch.pmu;
-> +	struct kvm_pmc *pmc = &pmu->pmc[select_idx];
-> +	struct perf_event *event;
-> +	struct perf_event_attr attr;
-> +	u32 eventsel;
-> +	u64 counter;
-> +
-> +	kvm_pmu_stop_counter(pmc);
-> +	eventsel = data & ARMV8_EVTYPE_EVENT;
-> +
-> +	memset(&attr, 0, sizeof(struct perf_event_attr));
-> +	attr.type = PERF_TYPE_RAW;
-> +	attr.size = sizeof(attr);
-> +	attr.pinned = 1;
-> +	attr.disabled = 1;
-
-Should this value be calculated from PMCR.E and PMCNTENSET/CLR state?
-
-> +	attr.exclude_user = data & ARMV8_EXCLUDE_EL0 ? 1 : 0;
-> +	attr.exclude_kernel = data & ARMV8_EXCLUDE_EL1 ? 1 : 0;
-> +	attr.exclude_hv = 1; /* Don't count EL2 events */
-
-Should this be calculated from PMXEVTYPER.NSH?
-
-> +	attr.exclude_host = 1; /* Don't count host events */
-> +	attr.config = eventsel;
-> +
-> +	counter = kvm_pmu_get_counter_value(vcpu, select_idx);
-> +	/* The initial sample period (overflow count) of an event. */
-> +	attr.sample_period = (-counter) & pmc->bitmask;
-> +
-> +	event = perf_event_create_kernel_counter(&attr, -1, current, NULL, pmc);
-> +	if (IS_ERR(event)) {
-> +		printk_once("kvm: pmu event creation failed %ld\n",
-> +			    PTR_ERR(event));
-> +		return;
-> +	}
-> +
-> +	pmc->perf_event = event;
-> +}
+> Eduardo, can you please take a look at the patches and let me
+> know if you see any issues.
 > 
 
+Thanks for your taking this over. I am assuming this superseeds the
+work by Narendran.
 
--- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Thanks.
+
+> Current set of patches apply on 4.3-rc4. Need to pull in clk-next
+> (for a dependent patch) to be able to test on ifc6410 board.
+> 
+> Changes since v3:
+> * Dropped 'clk: qcom: create virtual child device for TSENS' which
+> is picked up by Stephen
+> * Updated GCC bindings with optional TSENS properties
+> 
+> Changes since v2:
+> * Minor review fixes from Stephen/Punit and rebase on 4.3-rc4
+> 
+> Changes since v1:
+> * Created virtual tsens device from gcc driver for 8960,
+> with DT having a single node for gcc and tsens
+> * Minor fixes with rebasing on 4.3-rc1
+> 
+> Changes since RFC:
+> * Added support for 8916 and 8084
+> * Based off the latest nvmem framework patches [1]
+> * Minor review fixes for comments mostly from Lina
+> 
+> This is an attempt to have a single TSENS driver for
+> the different versions of the TSENS IP that exist, on
+> different qcom msm/apq SoCs'
+> Support is added for msm8916, msm8960 and msm8974 families.
+> 
+> A lot of the work is based of original code from Stephen Boyd
+> and Siddartha Mohanadoss. I have also picked some of what
+> Narendran Rajan did in his attempt to upstream the support
+> for 8960 family. I could not keep the original authorship on
+> any of the patches because I ended up moving the code around
+> quite a bit in an effort to have a single driver for the
+> various devices. I would be glad to change the authorship
+> for any of the patches if needed.
+> 
+> Rajendra Nayak (8):
+>   thermal: qcom: tsens: Add a skeletal TSENS drivers
+>   thermal: qcom: tsens-8916: Add support for 8916 family of SoCs
+>   thermal: qcom: tsens-8974: Add support for 8974 family of SoCs
+>   thermal: qcom: tsens-8960: Add support for 8960 family of SoCs
+>   arm: dts: msm8974: Add thermal zones, tsens and qfprom nodes
+>   arm: dts: apq8064: Add thermal zones, tsens and qfprom nodes
+>   arm: dts: apq8084: Add thermal zones, tsens and qfprom nodes
+>   arm64: dts: msm8916: Add thermal zones, tsens and qfprom nodes
+> 
+>  .../devicetree/bindings/clock/qcom,gcc.txt         |  20 ++
+>  .../devicetree/bindings/thermal/qcom-tsens.txt     |  33 +++
+>  arch/arm/boot/dts/qcom-apq8064.dtsi                | 101 +++++++
+>  arch/arm/boot/dts/qcom-apq8084.dtsi                | 105 ++++++++
+>  arch/arm/boot/dts/qcom-msm8974.dtsi                | 105 ++++++++
+>  arch/arm64/boot/dts/qcom/msm8916.dtsi              |  66 +++++
+>  drivers/thermal/Kconfig                            |   5 +
+>  drivers/thermal/Makefile                           |   1 +
+>  drivers/thermal/qcom/Kconfig                       |  10 +
+>  drivers/thermal/qcom/Makefile                      |   2 +
+>  drivers/thermal/qcom/tsens-8916.c                  | 107 ++++++++
+>  drivers/thermal/qcom/tsens-8960.c                  | 291 +++++++++++++++++++++
+>  drivers/thermal/qcom/tsens-8974.c                  | 239 +++++++++++++++++
+>  drivers/thermal/qcom/tsens-common.c                | 130 +++++++++
+>  drivers/thermal/qcom/tsens.c                       | 206 +++++++++++++++
+>  drivers/thermal/qcom/tsens.h                       |  69 +++++
+>  16 files changed, 1490 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/thermal/qcom-tsens.txt
+>  create mode 100644 drivers/thermal/qcom/Kconfig
+>  create mode 100644 drivers/thermal/qcom/Makefile
+>  create mode 100644 drivers/thermal/qcom/tsens-8916.c
+>  create mode 100644 drivers/thermal/qcom/tsens-8960.c
+>  create mode 100644 drivers/thermal/qcom/tsens-8974.c
+>  create mode 100644 drivers/thermal/qcom/tsens-common.c
+>  create mode 100644 drivers/thermal/qcom/tsens.c
+>  create mode 100644 drivers/thermal/qcom/tsens.h
+> 
+> -- 
+> QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member
+> of Code Aurora Forum, hosted by The Linux Foundation
+> 
