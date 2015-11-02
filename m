@@ -1,71 +1,45 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Mon, 2 Nov 2015 17:46:05 +0200
-Subject: [PATCH v2 13/14] ARM: DTS: am33xx: Use the new DT bindings for
- the eDMA3
-In-Reply-To: <20151102154057.GQ21326@localhost>
-References: <1444979892-31626-1-git-send-email-peter.ujfalusi@ti.com>
- <1444979892-31626-14-git-send-email-peter.ujfalusi@ti.com>
- <CAOesGMg0KsHnbF8hEYPZ8bY8wz9fC0_m7-KS4A6kB__nUi9kAw@mail.gmail.com>
- <20151102100405.GJ21326@localhost> <5637534D.2020304@ti.com>
- <20151102154057.GQ21326@localhost>
-Message-ID: <5637853D.8040306@ti.com>
+From: jeremy.linton@arm.com (Jeremy Linton)
+Date: Mon, 2 Nov 2015 09:48:06 -0600
+Subject: [PATCH 2/2] Convert smsc911x to use ACPI as well as DT
+In-Reply-To: <55F059F9.3080200@arm.com>
+References: <1439417187-21411-1-git-send-email-jeremy.linton@arm.com>
+ <1439417187-21411-3-git-send-email-jeremy.linton@arm.com>
+ <55F059F9.3080200@arm.com>
+Message-ID: <563785B6.50800@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Vinod,
+On 09/09/2015 11:10 AM, Marc Zyngier wrote:
+> Jeremy,
+>
+> I can see two issues here: we have a screaming interrupt, and
+> we seem to corrupt some workqueue.
+>
+> How did you get this to work? Firmware release?
 
-On 11/02/2015 05:40 PM, Vinod Koul wrote:
-> On Mon, Nov 02, 2015 at 02:13:01PM +0200, Peter Ujfalusi wrote:
->> Vinod,
->>
->> On 11/02/2015 12:04 PM, Vinod Koul wrote:
->>> On Mon, Nov 02, 2015 at 01:21:19AM -0800, Olof Johansson wrote:
->>>> Hi,
->>>>
->>>> 1) This seems to have broken BBB in -next for me, bisected down to this patch.
->>>>
->>>> For bootlog:
->>>> http://arm-soc.lixom.net/bootlogs/next/next-20151102/bbb-arm-omap2plus_defconfig.html
->>>>
->>>> 2) Please avoid merging DT/platform code in your driver tree, Vinod,
->>>> at least without an ack from the platform maintainer. It can be a a
->>>> huge mess if they end up causing conflicts, so we always ask to merge
->>>> the DT changes through the platform maintainer (Tony in this case) by
->>>> default.
->>>
->>> I did warn when applying that I am doing so without ACK on ARM code, noone
->>> said a thing!
->>>
->>> I knew Tony was following the work by Peter so assumed he must have been okay
->>> with it otherwise would have spoken for ~couple of weeks these were in
->>> review
->>>
->>> Anyway now that we have a regression, I can revert this patch if that fixes,
->>> please confirm, but might break edma... peter?
->>
->> Can you revert or drop the last two DTS patches?
->>
->> I think I will try a different route to get the split of the tpcc and tptc.
->> Without the DT patches the driver will fall back to the legacy mode so things
->> will work in a same way they did before.
->> Or I can send a followup patch for edma.c, with that there is no need to add
->> the HWMOD_INIT_NO_IDLE to hwmod and power management looks better.
->> Basically I'm registering a 'dummy' driver for the edma3-tptc so omap hwmod
->> code will not shut it down but we will keep the possibility to manage the
->> power state still.
-> 
-> Okay I have reverted the two and applied the edma patch sent, can you please
-> verify topic/edma_fix before I merge it and send my PULL request.
+Marc,
 
-The branch looks good. Thank you!
-It would have been great if the DTS changes for am335x/am437x would have been
-in 4.4, but I will send them for 4.5 after rc1 is out.
+I'm responding because its been a month or so since my last response, 
+and I haven't forgotten about this issue.
 
-> Would appreciate any tested-by
-> 
-> Thanks
-> 
+First, any custom tianocore build (*) should work. The required changes 
+have been in the last few linaro snapshots as well 
+(http://snapshots.linaro.org/components/kernel/linaro-edk2/, currently 
+at 40) but I personally haven't had a lot of luck with the prebuilt 
+images due to problems unrelated to this change. Others may have more luck.
 
+* For those that don't know, tianno core is at:
 
--- 
-P?ter
+https://github.com/tianocore/edk2.git
+Use the master branch
+
+After setting the environment variables/dependencies appropriately:
+
+make -f ArmPlatformPkg/ArmJunoPkg/Makefile all
+
+Will create a functional ACPI firmware image for all recent kernels, 
+including ACPI/PCIe ones.
+
+Thanks for everyone's patience on this,
+
+	
