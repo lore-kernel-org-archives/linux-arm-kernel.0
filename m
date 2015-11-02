@@ -1,28 +1,34 @@
-From: marc_gonzalez@sigmadesigns.com (Marc Gonzalez)
-Date: Mon, 2 Nov 2015 18:33:22 +0100
-Subject: [PATCH v8 2/2] arm-soc: Add support for arm-based tango4 platforms
-In-Reply-To: <yw1xfv0o9xr3.fsf@unicorn.mansr.com>
-References: <56377E76.2080209@sigmadesigns.com>
- <56377F09.6050805@sigmadesigns.com> <yw1xfv0o9xr3.fsf@unicorn.mansr.com>
-Message-ID: <56379E62.4080704@sigmadesigns.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 2 Nov 2015 17:35:20 +0000
+Subject: [PATCH v6 2/3] percpu: add PERCPU_ATOM_SIZE for a generic percpu
+ area setup
+In-Reply-To: <alpine.DEB.2.20.1511021047420.28255@east.gentwo.org>
+References: <1446363977-23656-1-git-send-email-jungseoklee85@gmail.com>
+ <1446363977-23656-3-git-send-email-jungseoklee85@gmail.com>
+ <alpine.DEB.2.20.1511021008580.27740@east.gentwo.org>
+ <20151102162236.GB7637@e104818-lin.cambridge.arm.com>
+ <alpine.DEB.2.20.1511021047420.28255@east.gentwo.org>
+Message-ID: <20151102173520.GC7637@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02/11/2015 17:22, M?ns Rullg?rd wrote:
+On Mon, Nov 02, 2015 at 10:48:17AM -0600, Christoph Lameter wrote:
+> On Mon, 2 Nov 2015, Catalin Marinas wrote:
+> > I haven't looked at the patch 3/3 in detail but I'm pretty sure I'll NAK
+> > the approach (and the definition of PERCPU_ATOM_SIZE), therefore
+> > rendering this patch unnecessary. IIUC, this is used to enforce some
+> > alignment of the per-CPU IRQ stack to be able to check whether the
+> > current stack is process or IRQ on exception entry. But there are other,
+> > less intrusive ways to achieve the same (e.g. x86).
+> 
+> The percpu allocator allows the specification of alignment requirements.
 
-> Unless I'm missing something, you should enable the SCU before starting
-> secondary CPUs.  It's also a good idea to structure the code with
-> separate prepare and boot functions even if all the current chips are
-> only dual-core.
+Patch 3/3 does something like this:
 
-About the SCU: I will check with the firmware author.
-About prepare: this is the firmware's responsibility.
-(Not all chips are dual-core, the 8756 is single-core.)
+DEFINE_PER_CPU(char [IRQ_STACK_SIZE], irq_stacks) __aligned(IRQ_STACK_SIZE)
 
-> What about other registers?  Does the firmware support setting the
-> prefetch control register?
+where IRQ_STACK_SIZE > PAGE_SIZE. AFAICT, setup_per_cpu_areas() doesn't
+guarantee alignment greater than PAGE_SIZE.
 
-Yes, after masking out some bits.
-My port uses the firmware-supplied value.
-
-Regards.
+-- 
+Catalin
