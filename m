@@ -1,140 +1,218 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Mon, 2 Nov 2015 22:52:43 +0900
-Subject: [PATCH 1/2] arm64: dts: exynos7: Add pmic s2mps15 device tree node
-In-Reply-To: <56375EB1.2090504@samsung.com>
-References: <1446458641-4447-1-git-send-email-alim.akhtar@samsung.com>
- <CAJKOXPfrvuH8t3Pkf2Qt8VEfMR3qOeFKHrG0i3qUf94BR1y2tQ@mail.gmail.com>
- <56375EB1.2090504@samsung.com>
-Message-ID: <CAJKOXPcPQD+3QinbaKcREQSn1yJCf2kQG0C4rhJtCS=W_25Gmw@mail.gmail.com>
+From: jens.wiklander@linaro.org (Jens Wiklander)
+Date: Mon, 2 Nov 2015 14:56:36 +0100
+Subject: [PATCH v6 1/6] arm/arm64: add smccc
+In-Reply-To: <20151102115119.GB29657@arm.com>
+References: <1446106888-8983-1-git-send-email-jens.wiklander@linaro.org>
+ <1446106888-8983-2-git-send-email-jens.wiklander@linaro.org>
+ <20151102115119.GB29657@arm.com>
+Message-ID: <20151102135633.GA17559@ermac>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-11-02 22:01 GMT+09:00 Alim Akhtar <alim.akhtar@samsung.com>:
->>>
->>>   arch/arm64/boot/dts/exynos/exynos7-espresso.dts |  349
->>> +++++++++++++++++++++++
->>>   1 file changed, 349 insertions(+)
->>>
->>> diff --git a/arch/arm64/boot/dts/exynos/exynos7-espresso.dts
->>> b/arch/arm64/boot/dts/exynos/exynos7-espresso.dts
->>> index 838a3626dac1..8ce04a0ec928 100644
->>> --- a/arch/arm64/boot/dts/exynos/exynos7-espresso.dts
->>> +++ b/arch/arm64/boot/dts/exynos/exynos7-espresso.dts
->>> @@ -53,6 +53,355 @@
->>>          status = "okay";
->>>   };
->>>
->>> +&hsi2c_4 {
->>> +       samsung,i2c-sda-delay = <100>;
->>> +       samsung,i2c-max-bus-freq = <200000>;
->>> +       status = "okay";
->>> +
->>> +       s2mps15_pmic at 66 {
->>> +               compatible = "samsung,s2mps15-pmic";
->>> +               reg = <0x66>;
->>> +               interrupts = <2 0>;
->>> +               interrupt-parent = <&gpa0>;
->>> +               pinctrl-names = "default";
->>> +               pinctrl-0 = <&pmic_irq>;
->>> +               wakeup-source;
->>> +
->>> +               s2mps15_osc: clocks {
->>> +                       compatible = "samsung,s2mps13-clk";
->>> +                       #clock-cells = <1>;
->>> +                       clock-output-names = "s2mps13_ap", "s2mps13_cp",
->>> +                               "s2mps13_bt";
->>> +               };
->>
->>
->> Don't you want to use one of these clocks for s3c-rtc (&rtc node)?
->>
-> yes, you are right, rtc on this board is currently broken, mainly because of
-> the introduction of rtc_src clock in the s3c-rtc driver.
-> That is on my do list next. will take a look.
->
-> Are you suggesting to remove this -clk node now and add along with rtc
-> changes? I feel this should go in along with this patch.
+On Mon, Nov 02, 2015 at 11:51:19AM +0000, Will Deacon wrote:
+> Hi Jens,
+> 
+> On Thu, Oct 29, 2015 at 09:21:23AM +0100, Jens Wiklander wrote:
+> > Adds helpers to do SMC and HVC based on ARM SMC Calling Convention.
+> > CONFIG_HAVE_SMCCC is enabled for architectures that may support
+> > the SMC or HVC instruction. It's the responsibility of the caller
+> > to know if the SMC instruction is supported by the platform.
+> > 
+> > Signed-off-by: Jens Wiklander <jens.wiklander@linaro.org>
+> > ---
+> >  arch/arm/Kconfig               |  4 ++
+> >  arch/arm/kernel/Makefile       |  2 +
+> >  arch/arm/kernel/smccc-call.S   | 49 +++++++++++++++++++++
+> >  arch/arm/kernel/smccc.c        | 18 ++++++++
+> >  arch/arm64/Kconfig             |  4 ++
+> >  arch/arm64/kernel/Makefile     |  1 +
+> >  arch/arm64/kernel/smccc-call.S | 43 ++++++++++++++++++
+> >  arch/arm64/kernel/smccc.c      | 18 ++++++++
+> >  include/linux/arm-smccc.h      | 98 ++++++++++++++++++++++++++++++++++++++++++
+> 
+> This should probably be split so that the arm and arm64 patches can be
+> merged separately.
 
-Just add it in consecutive patch in this series. You added here some
-providers (clock and regulators) without consumers. This of course
-looks good as a way of providing full description of the board but:
-1. For regulators always on: may be meaningless for kernel. Kernel
-does not use it. Existence of regulator subnode will fulfill driver's
-needs for probe.
-2. For clocks: actually will disable these clocks because of lack of
-consumers... which is fine but probably not what you wanted.
+OK, what's preferable two or three patches?
 
-The standard approach is to add such providers when they are needed -
-there are some consumers using them.
+> 
+> >  9 files changed, 237 insertions(+)
+> >  create mode 100644 arch/arm/kernel/smccc-call.S
+> >  create mode 100644 arch/arm/kernel/smccc.c
+> >  create mode 100644 arch/arm64/kernel/smccc-call.S
+> >  create mode 100644 arch/arm64/kernel/smccc.c
+> >  create mode 100644 include/linux/arm-smccc.h
+> 
+> [...]
+> 
+> > diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> > index 72ad724..29ab16a 100644
+> > --- a/arch/arm/Kconfig
+> > +++ b/arch/arm/Kconfig
+> > @@ -226,6 +226,9 @@ config NEED_RET_TO_USER
+> >  config ARCH_MTD_XIP
+> >  	bool
+> >  
+> > +config HAVE_SMCCC
+> > +	bool
+> 
+> If you want this to be selectable by multiple arches, wouldn't it be
+> better to define it out in a common Kconfig file? Maybe HAVE_ARM_SMCCC
+> too, for some better namespacing.
 
->>> +
->>> +               regulators {
->>> +                       ldo1_reg: LDO1 {
->>> +                               regulator-name = "vdd_ldo1";
->>> +                               regulator-min-microvolt = <500000>;
->>> +                               regulator-max-microvolt = <900000>;
->>> +                               regulator-always-on;
->>> +                               regulator-enable-ramp-delay = <125>;
->>> +                       };
+What's a good place, init/Kconfig?
 
-(...)
+> 
+> An alternative is just making your TEE driver depend on ARM || ARM64
+> and providing dummy smc wrappers that return an error code for cores
+> older than ARMv7.
 
->>> +
->>> +                       buck10_reg: BUCK10 {
->>> +                               regulator-name = "vdd_buck10";
->>> +                               regulator-min-microvolt = <1000000>;
->>> +                               regulator-max-microvolt = <3000000>;
->>> +                               regulator-boot-on;
->>> +                               regulator-always-on;
->>> +                               regulator-ramp-delay = <25000>;
->>> +                               regulator-enable-ramp-delay = <250>;
->>> +                       };
->>
->>
->> All of these ldo3 and bucks in vendor tree for Espresso board have
->> ramp delay of 12000. Also they don't have enable-ramp-delay set and
->> voltages sometimes differ. I don't have S2MPS15 datasheet so I don't
->> know what is the true value... I'll leave it up to you but it looks
->> suspicious.
->>
-> These values generally comes from our board design team, so I cann't really
-> comment on that, it may vary from board revision etc.
-> I will check if we have any updated version of recommended value and update
-> accordingly.
+It's tempting, but it would mean adding this dummy function for all
+architectures as it need to be exported to be usable from a load module.
 
-Okay, just pointing the difference. I cannot verify them.
+> 
+> > diff --git a/arch/arm64/kernel/smccc-call.S b/arch/arm64/kernel/smccc-call.S
+> > new file mode 100644
+> > index 0000000..9098bd8
+> > --- /dev/null
+> > +++ b/arch/arm64/kernel/smccc-call.S
+> > @@ -0,0 +1,43 @@
+> > +/*
+> > + * Copyright (c) 2015, Linaro Limited
+> > + *
+> > + * This program is free software; you can redistribute it and/or modify
+> > + * it under the terms of the GNU General Public License Version 2 as
+> > + * published by the Free Software Foundation.
+> > + *
+> > + * This program is distributed in the hope that it will be useful,
+> > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+> > + * GNU General Public License for more details.
+> > + *
+> > + */
+> > +#include <linux/linkage.h>
+> > +
+> > +#define SMC_RES_X0_OFFS	0
+> > +#define SMC_RES_X2_OFFS	16
+> 
+> These should be generates in asm-offsets.c
 
->
->>> +               };
->>> +       };
->>> +};
->>
->>
->> What will be the benefit of defining all of these regulators if they
->> are always on and without consumers? No one will disable them, no one
->> will change the voltage. Please provide some consumers.
->>
-> As many drivers are not yet enabled in arm64 defconfig, that is one of the
-> reason why we are not seeing many consumer for these nodes.
+OK
 
-That is not a problem. Please send a patch changing the defconfig.
-Usually defconfig (for armv7 this would be exynos and multi_v7) should
-provide bootable and working environment for all of our supported
-boards.
+> 
+> > +
+> > +/*
+> > + * void smccc_smc(unsigned long a0, unsigned long a1, unsigned long a2,
+> > + *		  unsigned long a3, unsigned long a4, unsigned long a5,
+> > + *		  unsigned long a6, unsigned long a7, struct smccc_res *res)
+> > + */
+> > +ENTRY(smccc_smc)
+> > +	smc	#0
+> > +	ldr	x4, [sp]
+> > +	stp	x0, x1, [x4, #SMC_RES_X0_OFFS]
+> > +	stp	x2, x3, [x4, #SMC_RES_X2_OFFS]
+> > +	ret
+> > +ENDPROC(smccc_smc)
+> > +
+> > +/*
+> > + * void smccc_hvc(unsigned long a0, unsigned long a1, unsigned long a2,
+> > + *		  unsigned long a3, unsigned long a4, unsigned long a5,
+> > + *		  unsigned long a6, unsigned long a7, struct smccc_res *res)
+> > + */
+> > +ENTRY(smccc_hvc)
+> > +	hvc	#0
+> > +	ldr	x4, [sp]
+> > +	stp	x0, x1, [x4, #SMC_RES_X0_OFFS]
+> > +	stp	x2, x3, [x4, #SMC_RES_X2_OFFS]
+> > +	ret
+> > +ENDPROC(smccc_hvc)
+> 
+> Maybe you could generate both of these from an asm macro that takes the
+> first instruction as a parameter?
 
-> This is the ground work being done for enabling those. If you insist will
-> try to reduce what is being used now. Moreover this was used to verify
-> functionality of pmic driver as well.
+OK
 
-Actually as a verification I think even adding simple node
-"regulators" is sufficient - driver will add all regulators anyway.
-However seeing all regulators described for particular board is
-good... but lack of consumers is disturbing because this may mean that
-it was not really fully modeled.
+> 
+> > diff --git a/arch/arm64/kernel/smccc.c b/arch/arm64/kernel/smccc.c
+> > new file mode 100644
+> > index 0000000..ed13ba3
+> > --- /dev/null
+> > +++ b/arch/arm64/kernel/smccc.c
+> > @@ -0,0 +1,18 @@
+> > +/*
+> > + * Copyright (c) 2015, Linaro Limited
+> > + *
+> > + * This software is licensed under the terms of the GNU General Public
+> > + * License version 2, as published by the Free Software Foundation, and
+> > + * may be copied, distributed, and modified under those terms.
+> > + *
+> > + * This program is distributed in the hope that it will be useful,
+> > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> > + * GNU General Public License for more details.
+> > + *
+> > + */
+> > +#include <linux/export.h>
+> > +#include <linux/arm-smccc.h>
+> > +
+> > +EXPORT_SYMBOL_GPL(smccc_smc);
+> > +EXPORT_SYMBOL_GPL(smccc_hvc);
+> 
+> Again, I think you want an arm_ prefix for some better namespacing.
 
->From my point of view - all of regulators in DT are welcomed but at
-least some of them should have a consumer. This means that someone
-took care and looked at the relationships between them.
+Agree
 
-Best regards,
-Krzysztof
+> 
+> > diff --git a/include/linux/arm-smccc.h b/include/linux/arm-smccc.h
+> 
+> [...]
+> 
+> > +#define SMCCC_SMC_32			(0 << 30)
+> > +#define SMCCC_SMC_64			(1 << 30)
+> > +#define SMCCC_FAST_CALL			(1 << 31)
+> > +#define SMCCC_STD_CALL			(0 << 31)
+> > +
+> > +#define SMCCC_OWNER_MASK		0x3F
+> > +#define SMCCC_OWNER_SHIFT		24
+> > +
+> > +#define SMCCC_FUNC_MASK			0xFFFF
+> > +
+> > +#define SMCCC_IS_FAST_CALL(smc_val)	((smc_val) & SMCCC_FAST_CALL)
+> > +#define SMCCC_IS_64(smc_val)		((smc_val) & SMCCC_SMC_64)
+> > +#define SMCCC_FUNC_NUM(smc_val)		((smc_val) & SMCCC_FUNC_MASK)
+> > +#define SMCCC_OWNER_NUM(smc_val) \
+> > +	(((smc_val) >> SMCCC_OWNER_SHIFT) & SMCCC_OWNER_MASK)
+> > +
+> > +#define SMCCC_CALL_VAL(type, calling_convention, owner, func_num) \
+> > +			((type) | (calling_convention) | \
+> > +			(((owner) & SMCCC_OWNER_MASK) << SMCCC_OWNER_SHIFT) | \
+> > +			((func_num) & SMCCC_FUNC_MASK))
+> > +
+> > +#define SMCCC_OWNER_ARCH		0
+> > +#define SMCCC_OWNER_CPU			1
+> > +#define SMCCC_OWNER_SIP			2
+> > +#define SMCCC_OWNER_OEM			3
+> > +#define SMCCC_OWNER_STANDARD		4
+> > +#define SMCCC_OWNER_TRUSTED_APP		48
+> > +#define SMCCC_OWNER_TRUSTED_APP_END	49
+> > +#define SMCCC_OWNER_TRUSTED_OS		50
+> > +#define SMCCC_OWNER_TRUSTED_OS_END	63
+> > +
+> > +/**
+> > + * struct smccc_res - Result from SMC/HVC call
+> > + * @a0-a3 result values from registers 0 to 3
+> > + */
+> > +struct smccc_res {
+> > +	unsigned long a0;
+> > +	unsigned long a1;
+> > +	unsigned long a2;
+> > +	unsigned long a3;
+> > +};
+> 
+> Are there any endianness considerations for this structure?
+
+No, I can't find anything in the ARM SMC Calling Convention document
+indicating that.
+
+Thanks,
+Jens
