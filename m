@@ -1,67 +1,30 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 2 Nov 2015 11:55:39 +0000
-Subject: [PATCH v6 2/6] drivers: psci: replace psci firmware calls
-In-Reply-To: <1446106888-8983-3-git-send-email-jens.wiklander@linaro.org>
-References: <1446106888-8983-1-git-send-email-jens.wiklander@linaro.org>
- <1446106888-8983-3-git-send-email-jens.wiklander@linaro.org>
-Message-ID: <20151102115539.GC29657@arm.com>
+From: slash.tmp@free.fr (Mason)
+Date: Mon, 2 Nov 2015 12:55:45 +0100
+Subject: CPU_METHOD_OF_DECLARE() with Linux as non-secure OS
+In-Reply-To: <20151102101750.GS8644@n2100.arm.linux.org.uk>
+References: <5630C143.5080103@free.fr> <yw1xio5pd5mf.fsf@unicorn.mansr.com>
+ <56325C67.8000007@free.fr> <yw1xeggdd007.fsf@unicorn.mansr.com>
+ <5633CF2A.4040504@free.fr> <yw1xpozvavui.fsf@unicorn.mansr.com>
+ <20151102101750.GS8644@n2100.arm.linux.org.uk>
+Message-ID: <56374F41.3000402@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 29, 2015 at 09:21:24AM +0100, Jens Wiklander wrote:
-> Switch to use a generic interface for issuing SMC/HVC based on ARM SMC
-> Calling Convention. Removes now the now unused psci-call.S.
+On 02/11/2015 11:17, Russell King - ARM Linux wrote:
+
+> Eg, you could have the FLZ bit set in the L2 cache auxiliary register
+> if its wired to a Cortex A9 CPU and the FLZ signal is wired.  That
+> would be perfectly reasonable, provided the FLZ bit in the Cortex
+> A9's control register is disabled when the L2 cache is otherwise
+> disabled.
 > 
-> Signed-off-by: Jens Wiklander <jens.wiklander@linaro.org>
-> ---
->  arch/arm/kernel/Makefile      |  1 -
->  arch/arm/kernel/psci-call.S   | 31 -------------------------------
->  arch/arm64/kernel/Makefile    |  2 +-
->  arch/arm64/kernel/psci-call.S | 28 ----------------------------
->  drivers/firmware/psci.c       | 21 +++++++++++++++++++--
->  5 files changed, 20 insertions(+), 63 deletions(-)
->  delete mode 100644 arch/arm/kernel/psci-call.S
->  delete mode 100644 arch/arm64/kernel/psci-call.S
+> (I guess I ought to quieten down the pr_err() in that case...)
 
-[...]
+Based on the pr_err(), I thought it was considered an error, so
+I asked the firmware author to leave L2AUX.FLZ cleared, and only
+set it just before the cache is enabled, and clear it after the
+cache is disabled.
 
-> diff --git a/drivers/firmware/psci.c b/drivers/firmware/psci.c
-> index 42700f0..53c9606 100644
-> --- a/drivers/firmware/psci.c
-> +++ b/drivers/firmware/psci.c
-> @@ -19,6 +19,7 @@
->  #include <linux/pm.h>
->  #include <linux/printk.h>
->  #include <linux/psci.h>
-> +#include <linux/arm-smccc.h>
->  #include <linux/reboot.h>
->  
->  #include <uapi/linux/psci.h>
-> @@ -56,8 +57,6 @@ struct psci_operations psci_ops;
->  
->  typedef unsigned long (psci_fn)(unsigned long, unsigned long,
->  				unsigned long, unsigned long);
-> -asmlinkage psci_fn __invoke_psci_fn_hvc;
-> -asmlinkage psci_fn __invoke_psci_fn_smc;
->  static psci_fn *invoke_psci_fn;
->  
->  enum psci_function {
-> @@ -70,6 +69,24 @@ enum psci_function {
->  
->  static u32 psci_function_id[PSCI_FN_MAX];
->  
-> +static unsigned long __invoke_psci_fn_hvc(unsigned long a0, unsigned long a1,
-> +			unsigned long a2, unsigned long a3)
+Do you remember why you considered it an error at the time?
 
-Minor comment, but could we keep these argument names the same as before
-please?
-
-> +{
-> +	struct smccc_res res;
-> +
-> +	smccc_hvc(a0, a1, a2, a3, 0, 0, 0, 0, &res);
-
-It's slightly tempting to use varargs instead of the '0' argument padding,
-but that will probably make the asm code unmanageable.
-
-Will
+Regards.
