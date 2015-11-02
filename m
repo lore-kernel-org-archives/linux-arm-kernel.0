@@ -1,79 +1,99 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon,  2 Nov 2015 13:31:43 +0900
-Subject: [PATCH v6 0/5] arm64: dts: r8a7795: enable EthernetAVB on Salvator-X
-Message-ID: <1446438708-22433-1-git-send-email-horms+renesas@verge.net.au>
+Date: Mon,  2 Nov 2015 13:31:44 +0900
+Subject: [PATCH v6 1/5] arm64: dts: r8a7795: add EthernetAVB device node
+In-Reply-To: <1446438708-22433-1-git-send-email-horms+renesas@verge.net.au>
+References: <1446438708-22433-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1446438708-22433-2-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Kazuya Mizuguchi <kazuya.mizuguchi.ks@renesas.com>
 
-This patchset enables the EthernetAVB on the Salvator-X board.
-With it and its dependencies in place I have have successfully
-booted to an nfsroot user-space (arm64 Debian Jessie).
+Signed-off-by: Kazuya Mizuguchi <kazuya.mizuguchi.ks@renesas.com>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-In order to achieve that I used the following command line set from u-boot.
+---
+v0 [Kazuya Mizuguchi]
 
-root=/dev/nfs ip=dhcp nfsroot=10.3.3.135:/srv/nfs/salvator-x-arm64
+v1 [Simon Horman]
+* moved to soc node
+* updated patch subject
 
+v2 [Simon Horman]
+* Specify all interrupts
+* Use named interrupts
+* Rebase
+* Remove spurious whitespace change introduce in v1
 
-Changes:
+v3 [Simon Horman]
+* As suggested by Geert Uytterhoeven
+  - Add power-domains property
+* Added Ack
 
+v4, v5
+* No change
+
+v6 [Simon Horman]
 * Update for new CPG/MSSR bindings via Geert Uytterhoeven
-* New patch to add ethernet0 alias
-* See changelog of individual patches for more details
+* Add avb node below dmac3 nodes as it seems silly to insert
+  between dmac nodes. As noted by Magnus Damm.
+---
+ arch/arm64/boot/dts/renesas/r8a7795.dtsi | 42 ++++++++++++++++++++++++++++++++
+ 1 file changed, 42 insertions(+)
 
-
-Base:
-
-This is based on:
-
-* "[PATCH v12 0/7] arm64: renesas: Add Renesas R8A7795 SoC support"
-  - topic/r8a7795-gpio-v3 branch of my renesas tree
-
-
-Runtime Dependencies:
-
-* The base (above)
-
-* "[PATCH/RFC v3 net-next 0/4] ravb: Add support for r8a7795 SoC"
-  and its dependencies
-  - David Miller's net-next tree
-
-* v4.3-rc2 for "[PATCH] gpio: rcar: GPIO_RCAR doesn't relate to ARM"
-  - Included in net-next
-
-* "[PATCH/RFC v2] sh-pfc: r8a7795: add EtherAVB support"
-  and its dependencies
-  - for-next branch of Linus Walleij's pinctl tree
-
-* "[PATCH v5 0/5] clk: shmobile: Add new CPG/MSSR driver"
-  - topic/cpg-mssr-v5 branch of Geert Uytterhoeven's renesas-drivers tree
-
-
-Availability:
-
-To aid review of this and other EtherAVB patches the following branches are
-available in my renesas tree on kernel.org.
-
-* topic/r8a7795-ravb-v6: this patchset
-* topic/r8a7795-ravb-v6.runtime:
-      the above branch and its runtime dependencies
-
-
-Geert Uytterhoeven (1):
-  arm64: renesas: salvator-x: Setup ethernet0 alias for U-Boot
-
-Kazuya Mizuguchi (2):
-  arm64: dts: r8a7795: add EthernetAVB device node
-  arm64: dts: r8a7795: enable EthernetAVB on Salvator-X
-
-Simon Horman (2):
-  arm64: dts: r8a7795: enable nfs root on Salvator-X board
-  arm64: defconfig: enable EthernetAVB
-
- arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts | 34 +++++++++++++++++-
- arch/arm64/boot/dts/renesas/r8a7795.dtsi           | 42 ++++++++++++++++++++++
- arch/arm64/configs/defconfig                       |  2 ++
- 3 files changed, 77 insertions(+), 1 deletion(-)
-
+diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+index b5eee9ff7229..f4a0ff94692a 100644
+--- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
++++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+@@ -209,6 +209,48 @@
+ 			/* Empty node for now */
+ 		};
+ 
++		avb: ethernet at e6800000 {
++			compatible = "renesas,etheravb-r8a7795";
++			reg = <0 0xe6800000 0 0x800>, <0 0xe6a00000 0 0x10000>;
++			interrupts = <GIC_SPI 39 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 40 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 41 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 42 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 43 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 44 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 45 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 46 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 47 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 48 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 49 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 50 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 51 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 52 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 53 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 54 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 55 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 56 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 57 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 58 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 59 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 60 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 61 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 62 IRQ_TYPE_LEVEL_HIGH>,
++				     <GIC_SPI 63 IRQ_TYPE_LEVEL_HIGH>;
++			interrupt-names = "ch0", "ch1", "ch2", "ch3",
++					  "ch4", "ch5", "ch6", "ch7",
++					  "ch8", "ch9", "ch10", "ch11",
++					  "ch12", "ch13", "ch14", "ch15",
++					  "ch16", "ch17", "ch18", "ch19",
++					  "ch20", "ch21", "ch22", "ch23",
++					  "ch24";
++			clocks = <&cpg CPG_MOD 812>;
++			power-domains = <&cpg>;
++			phy-mode = "rgmii-id";
++			#address-cells = <1>;
++			#size-cells = <0>;
++		};
++
+ 		scif0: serial at e6e60000 {
+ 			compatible = "renesas,scif-r8a7795", "renesas,scif";
+ 			reg = <0 0xe6e60000 0 64>;
 -- 
 2.1.4
