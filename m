@@ -1,84 +1,80 @@
-From: alim.akhtar@samsung.com (Alim Akhtar)
-Date: Mon, 02 Nov 2015 17:28:27 +0530
-Subject: [PATCH 1/2] arm64: dts: exynos7: Add pmic s2mps15 device tree node
-In-Reply-To: <5637495D.1080701@osg.samsung.com>
-References: <1446458641-4447-1-git-send-email-alim.akhtar@samsung.com>
- <5637495D.1080701@osg.samsung.com>
-Message-ID: <56374FE3.9050805@samsung.com>
+From: hanjun.guo@linaro.org (Hanjun Guo)
+Date: Mon, 02 Nov 2015 19:58:47 +0800
+Subject: [PATCH V5 1/9] ACPI: Honor ACPI _CCA attribute setting
+In-Reply-To: <20151102040224.GA16979@arm.org>
+References: <20151102040224.GA16979@arm.org>
+Message-ID: <56374FF7.6050008@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Dennis,
 
-
-On 11/02/2015 05:00 PM, Javier Martinez Canillas wrote:
-> Hello Alim,
->
-> This patch looks mostly good to me, I just have two comments below:
->
-> On 11/02/2015 11:04 AM, Alim Akhtar wrote:
->> This patch add pmic (s2mps15) node of espresso board,
->> which includes addition of regulators and pmic-clk sub-nodes.
+On 11/02/2015 12:02 PM, Dennis Chen wrote:
+> On Thu, Oct 29, 2015 at 6:50 AM, Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com> wrote:
+>> From: Jeremy Linton <jeremy.linton@arm.com>
 >>
->> Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
->> Signed-off-by: Alim Akhtar <alim.akhtar@samsung.com>
+>> ACPI configurations can now mark devices as noncoherent,
+>> support that choice.
+>>
+>> NOTE: This is required to support USB on ARM Juno Development Board.
+>>
+>> Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
+>> Signed-off-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+>> CC: Bjorn Helgaas <bhelgaas@google.com>
+>> CC: Catalin Marinas <catalin.marinas@arm.com>
+>> CC: Rob Herring <robh+dt@kernel.org>
+>> CC: Will Deacon <will.deacon@arm.com>
+>> CC: Rafael J. Wysocki <rjw@rjwysocki.net>
 >> ---
->> This patch should go in after driver side changes [1] lands.
->> [1]-> https://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg47736.html
+>>   include/acpi/acpi_bus.h | 5 +++--
+>>   1 file changed, 3 insertions(+), 2 deletions(-)
 >>
->>   arch/arm64/boot/dts/exynos/exynos7-espresso.dts |  349 +++++++++++++++++++++++
->>   1 file changed, 349 insertions(+)
->>
->> diff --git a/arch/arm64/boot/dts/exynos/exynos7-espresso.dts b/arch/arm64/boot/dts/exynos/exynos7-espresso.dts
->> index 838a3626dac1..8ce04a0ec928 100644
->> --- a/arch/arm64/boot/dts/exynos/exynos7-espresso.dts
->> +++ b/arch/arm64/boot/dts/exynos/exynos7-espresso.dts
->> @@ -53,6 +53,355 @@
->>   	status = "okay";
->>   };
->>
->> +&hsi2c_4 {
->> +	samsung,i2c-sda-delay = <100>;
->> +	samsung,i2c-max-bus-freq = <200000>;
->> +	status = "okay";
->> +
->> +	s2mps15_pmic at 66 {
->> +		compatible = "samsung,s2mps15-pmic";
->> +		reg = <0x66>;
->> +		interrupts = <2 0>;
+>> diff --git a/include/acpi/acpi_bus.h b/include/acpi/acpi_bus.h
+>> index d11eff8..0f131d2 100644
+>> --- a/include/acpi/acpi_bus.h
+>> +++ b/include/acpi/acpi_bus.h
+>> @@ -407,7 +407,7 @@ static inline bool acpi_check_dma(struct acpi_device *adev, bool *coherent)
+>>   	 * case 1. Do not support and disable DMA.
+>>   	 * case 2. Support but rely on arch-specific cache maintenance for
+>>   	 *         non-coherence DMA operations.
+>> -	 * Currently, we implement case 1 above.
+>> +	 * Currently, we implement case 2 above.
+>>   	 *
+>>   	 * For the case when _CCA is missing (i.e. cca_seen=0) and
+>>   	 * platform specifies ACPI_CCA_REQUIRED, we do not support DMA,
+>> @@ -415,7 +415,8 @@ static inline bool acpi_check_dma(struct acpi_device *adev, bool *coherent)
+>>   	 *
+>>   	 * See acpi_init_coherency() for more info.
+>>   	 */
+>> -	if (adev->flags.coherent_dma) {
+>> +	if (adev->flags.coherent_dma ||
+>> +	    (adev->flags.cca_seen && IS_ENABLED(CONFIG_ARM64))) {
+>>   		ret = true;
+>>   		if (coherent)
+>>   			*coherent = adev->flags.coherent_dma;
 >
-> Maybe using IRQ_TYPE_NONE instead of 0?
+> Hi Suravee,
 >
-Ok will check
->> +		interrupt-parent = <&gpa0>;
->> +		pinctrl-names = "default";
->> +		pinctrl-0 = <&pmic_irq>;
->> +		wakeup-source;
->> +
->> +		s2mps15_osc: clocks {
->> +			compatible = "samsung,s2mps13-clk";
->> +			#clock-cells = <1>;
->> +			clock-output-names = "s2mps13_ap", "s2mps13_cp",
->> +				"s2mps13_bt";
->> +		};
->> +
->> +		regulators {
->> +			ldo1_reg: LDO1 {
->> +				regulator-name = "vdd_ldo1";
->> +				regulator-min-microvolt = <500000>;
->> +				regulator-max-microvolt = <900000>;
->> +				regulator-always-on;
->
-> I see that all regulators are marked as regulator-always-on but that will
-> prevent the regulator subsystem to disable unused regulators. Can you please
-> double check which regulators should really be always on and which ones can
-> be disabled if are not used?
->
-I kept it on always, as I am still in a process for validating all IPs 
-on board. Will see if I can remove some of them, which I feel can be done.
-> After those two changes:
->
-> Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
->
-Thanks!
-> Best regards,
->
+> The acpi_check_dma function has been removed in patch 6 of this patch set, why it is still be used
+> here, am I missing something? If the acpi_check_dma will be used in the future, personally I'd like
+
+I think this patch just to let people know that there is
+case that arch-specific cache maintenance is still needed
+for ACPI (such as Juno board), and in the later patches will
+cover this case.
+
+acpi_check_dma() will be replaced by acpi_get_dma_attr(),
+and in acpi_get_dma_attr() will cover that case and will
+be easily understood. (Suravee, correct me if I'm wrong :) )
+
+> to use IS_ENABLED(CONFIG_ACPI_CCA_REQUIRED) while not CONFIG_ARM64 macro here, or since _CCA attribute
+> is arch-specific, it's reasonable to leave the _CCA handling policy to the arch-specific code. For example,
+> with a link weak function like acpi_arch_check_dma() as a default handling if no arch-specific code
+> provided, the actual _CCA handling will be implemented in the ARM, Intel or other Arch if required.
+
+Actually Intel platform don't need _CCA and it's coherent
+in default, since _CCA is in ACPI spec, I would like it's
+handled in ACPI core.
+
+Thanks
+Hanjun
