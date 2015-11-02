@@ -1,68 +1,75 @@
 From: wxt@rock-chips.com (Caesar Wang)
-Date: Mon,  2 Nov 2015 11:14:00 +0800
-Subject: [PATCH 1/3] ASoC: rockchip: i2s: Add set the divider clock API
-Message-ID: <1446434042-2139-1-git-send-email-wxt@rock-chips.com>
+Date: Mon,  2 Nov 2015 11:14:01 +0800
+Subject: [PATCH 2/3] ASoC: rockchip-max98090: add the divider the clock for cpu
+In-Reply-To: <1446434042-2139-1-git-send-email-wxt@rock-chips.com>
+References: <1446434042-2139-1-git-send-email-wxt@rock-chips.com>
+Message-ID: <1446434042-2139-2-git-send-email-wxt@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to support more rates, add the divider clock api.
+Add to set the cpu/codec DAI configure, let's divider the
+Transmit/Receive clock for cpu.
 
-As the input source clock to the module is MCLK_I2S,
-and by the divider of the module, the clock generator generates
-SCLK and LRCK to transmitter and receiver.
+In master mode, The SCLK and LRCK are configured as output,
+this patch should can set each divider to arrange the clock distribution.
 
 Signed-off-by: Caesar Wang <wxt@rock-chips.com>
 ---
 
- sound/soc/rockchip/rockchip_i2s.c | 29 +++++++++++++++++++++++++++++
- 1 file changed, 29 insertions(+)
+ sound/soc/rockchip/rockchip_max98090.c | 32 ++++++++++++++++++++++++++++++++
+ 1 file changed, 32 insertions(+)
 
-diff --git a/sound/soc/rockchip/rockchip_i2s.c b/sound/soc/rockchip/rockchip_i2s.c
-index b936102..2086a6a 100644
---- a/sound/soc/rockchip/rockchip_i2s.c
-+++ b/sound/soc/rockchip/rockchip_i2s.c
-@@ -286,6 +286,34 @@ static int rockchip_i2s_trigger(struct snd_pcm_substream *substream,
+diff --git a/sound/soc/rockchip/rockchip_max98090.c b/sound/soc/rockchip/rockchip_max98090.c
+index 26567b1..8547155 100644
+--- a/sound/soc/rockchip/rockchip_max98090.c
++++ b/sound/soc/rockchip/rockchip_max98090.c
+@@ -75,8 +75,25 @@ static int rk_aif1_hw_params(struct snd_pcm_substream *substream,
+ 	struct snd_soc_pcm_runtime *rtd = substream->private_data;
+ 	struct snd_soc_dai *cpu_dai = rtd->cpu_dai;
+ 	struct snd_soc_dai *codec_dai = rtd->codec_dai;
++	int dai_fmt = rtd->card->dai_link->dai_fmt;
+ 	int mclk;
+ 
++	/* set codec DAI configuration */
++	ret = snd_soc_dai_set_fmt(codec_dai, dai_fmt);
++	if (ret < 0) {
++		dev_err(codec_dai->dev,
++			"failed to set the format for codec side\n");
++		return ret;
++	}
++
++	/* set cpu DAI configuration */
++	ret = snd_soc_dai_set_fmt(cpu_dai, dai_fmt);
++	if (ret < 0) {
++		dev_err(codec_dai->dev,
++			"failed to set the format for cpu side\n");
++		return ret;
++	}
++
+ 	switch (params_rate(params)) {
+ 	case 8000:
+ 	case 16000:
+@@ -105,6 +122,21 @@ static int rk_aif1_hw_params(struct snd_pcm_substream *substream,
+ 		return ret;
+ 	}
+ 
++	/* The codec is master mode, that's not needed set clkdiv for cpu */
++	if ((dai_fmt & SND_SOC_DAIFMT_MASTER_MASK) == SND_SOC_DAIFMT_CBM_CFM)
++		return ret;
++
++	/* the LRCK clock for cpu */
++	ret = snd_soc_dai_set_clkdiv(cpu_dai, ROCKCHIP_DIV_BCLK,
++				     (mclk / 4) / params_rate(params));
++	if (ret < 0)
++		return ret;
++
++	/* the SCLK clock for cpu */
++	snd_soc_dai_set_clkdiv(cpu_dai, ROCKCHIP_DIV_MCLK, 4);
++	if (ret < 0)
++		return ret;
++
  	return ret;
  }
  
-+static int rockchip_i2s_set_clkdiv(struct snd_soc_dai *cpu_dai,
-+				   int div_id, int div)
-+{
-+	struct rk_i2s_dev *i2s = to_info(cpu_dai);
-+	unsigned int val = 0;
-+
-+	dev_dbg(i2s->dev, "%s: div_id=%d, div=%d\n", __func__, div_id, div);
-+
-+	switch (div_id) {
-+	case ROCKCHIP_DIV_BCLK:
-+		val |= I2S_CKR_TSD(div);
-+		val |= I2S_CKR_RSD(div);
-+		regmap_update_bits(i2s->regmap, I2S_CKR,
-+				   I2S_CKR_TSD_MASK | I2S_CKR_RSD_MASK,
-+				   val);
-+		break;
-+	case ROCKCHIP_DIV_MCLK:
-+		val |= I2S_CKR_MDIV(div);
-+		regmap_update_bits(i2s->regmap, I2S_CKR,
-+				   I2S_CKR_MDIV_MASK, val);
-+		break;
-+	default:
-+		return -EINVAL;
-+	}
-+
-+	return 0;
-+}
-+
- static int rockchip_i2s_set_sysclk(struct snd_soc_dai *cpu_dai, int clk_id,
- 				   unsigned int freq, int dir)
- {
-@@ -311,6 +339,7 @@ static int rockchip_i2s_dai_probe(struct snd_soc_dai *dai)
- 
- static const struct snd_soc_dai_ops rockchip_i2s_dai_ops = {
- 	.hw_params = rockchip_i2s_hw_params,
-+	.set_clkdiv = rockchip_i2s_set_clkdiv,
- 	.set_sysclk = rockchip_i2s_set_sysclk,
- 	.set_fmt = rockchip_i2s_set_fmt,
- 	.trigger = rockchip_i2s_trigger,
 -- 
 1.9.1
