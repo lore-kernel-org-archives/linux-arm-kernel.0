@@ -1,56 +1,41 @@
-From: marex@denx.de (Marek Vasut)
-Date: Mon, 2 Nov 2015 00:56:46 +0100
-Subject: [PATCH] ARM: at91/dt: sama5d4: Add support for DENX MA5D4 SoM and
- EVK
-In-Reply-To: <20151101234520.GH22331@piout.net>
-References: <1446420425-5491-1-git-send-email-marex@denx.de>
- <20151101234520.GH22331@piout.net>
-Message-ID: <201511020056.46860.marex@denx.de>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Mon, 02 Nov 2015 01:37:46 +0100
+Subject: linux-next: build failure after merge of the pm tree
+In-Reply-To: <20151101175718.130f33f2@canb.auug.org.au>
+References: <20151101175718.130f33f2@canb.auug.org.au>
+Message-ID: <2844514.qaeccbtn3B@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday, November 02, 2015 at 12:45:20 AM, Alexandre Belloni wrote:
-> Hi Marek,
+On Sunday, November 01, 2015 05:57:18 PM Stephen Rothwell wrote:
+> Hi Rafael,
 
-Hi!
+Hi,
 
-> On 02/11/2015 at 00:27:05 +0100, Marek Vasut wrote :
-> > +	clocks {
-> > +		#address-cells = <1>;
-> > +		#size-cells = <1>;
-> > +		ranges;
-> > +
+Thanks for the patch!
+
+> After merging the pm tree, today's linux-next build (arm
+> multi_v7_defconfig) failed like this:
 > 
-> You probably don't need those three properties
-
-Truth to be told, I copied those from sama5d4ek.dts , but I think
-you're right, they make no sense in this context.
-
-> > +		main_clock: clock at 0 {
-> > +			compatible = "atmel,osc", "fixed-clock";
-> > +			clock-frequency = <12000000>;
-> > +		};
-> > +
+> arch/arm/mach-mediatek/mediatek.c: In function 'mediatek_timer_init':
+> arch/arm/mach-mediatek/mediatek.c:43:2: error: implicit declaration of function 'clocksource_of_init' [-Werror=implicit-function-declaration]
+>   clocksource_of_init();
+>   ^
 > 
-> likewise, if you don't need to boot on older kernels, I'd suggest
-> removing clock at 0.
-
-Consider this fixed, I certainly don't plan to boot anything old(er).
-
-> > +/ {
-> > +	model = "DENX MA5D4EVK";
-> > +	compatible = "denx,ma5d4evk", "atmel,sama5d4", "atmel,sama5";
-> > +
-> > +	chosen {
-> > +		bootargs = "ignore_loglevel earlyprintk";
+> Caused by commit
 > 
-> I think you don't really want to enforce those options, especially
-> earlyprintk as it can lead to a crash if UART_PHYS is not set properly
-> (for example, I usually boot the same kernel on sama5d3 and sama5d4).
+>   3722ed2380ad ("clocksource: cosmetic: Drop OF 'dependency' from symbols")
+> 
+> interacting with commit
+> 
+>   9821e545c5e0 ("ARM: mediatek: enable gpt6 on boot up to make arch timer working")
+> 
+> from the arm-soc tree.
+> 
+> I applied the following merge fix patch for today (someone should tell
+> Linus when theese trees are merged):
 
-Same here, fixed.
+I'll do that.
 
-Thanks for the review! I will wait a bit and then submit a V2.
-
-Best regards,
-Marek Vasut
+Thanks,
+Rafael
