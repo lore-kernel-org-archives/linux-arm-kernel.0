@@ -1,102 +1,89 @@
 From: ynorov@caviumnetworks.com (Yury Norov)
-Date: Tue, 3 Nov 2015 02:30:29 +0300
-Subject: [RFC PATCH v6 00/17] ILP32 for ARM64
-Message-ID: <1446507046-24604-1-git-send-email-ynorov@caviumnetworks.com>
+Date: Tue, 3 Nov 2015 02:30:30 +0300
+Subject: [PATCH v6 01/17] arm64:ilp32: add documentation on the ILP32 ABI for
+ ARM64
+In-Reply-To: <1446507046-24604-1-git-send-email-ynorov@caviumnetworks.com>
+References: <1446507046-24604-1-git-send-email-ynorov@caviumnetworks.com>
+Message-ID: <1446507046-24604-2-git-send-email-ynorov@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-V6 addresses comments collected for v5 series.
-This is RFC because LTP tests fail (63 of 779).
-But I don't expect that major changes are required
-to fix regressions.
+From: Philipp Tomsich <philipp.tomsich@theobroma-systems.com>
 
-v3: https://lkml.org/lkml/2014/9/3/704
-v4: https://lkml.org/lkml/2015/4/13/691
-v5: https://lkml.org/lkml/2015/9/29/911
+Based on Andrew Pinski's original patch-series and adapted with changes
+to reduce the duplication of code-paths and resolve issue found during
+LTP testing.
 
-v6:
- - time_t, __kenel_off_t and other types turned to be 32-bit
-   for compatibility reasons (after v5 discussion);
- - related changes applied to ILP32 syscall table and handlers;
- - ILP32 VDSO code excluded. It's not mandatory, and caused questions
-   during review process. We definitely make sure we will follow up
-   with a VDSO later on because it is needed for performance reasons;
- - fixed build issues with different combinations of AARCH32 / ILP32
-   enabling in config;
- - ILP32 TLS bug fixed;
- - entry32-common.S introduced to hold wrappers needed for both ILP32
-   and AARCH32_EL0;
- - documentation updated according to latest changes;
- - rebased to the current head;
- - coding style re-checked.
-
-Andrew Pinski (13):
-  arm64: ensure the kernel is compiled for LP64
-  arm64: rename COMPAT to AARCH32_EL0 in Kconfig
-  arm64: change some CONFIG_COMPAT over to use CONFIG_AARCH32_EL0
-    instead
-  arm64:ilp32: share signal structures between ILP32 and LP64 ABIs
-  arm64: introduce is_a32_task and is_a32_thread (for AArch32 compat)
-  arm64:ilp32: add is_ilp32_compat_{task,thread} and TIF_32BIT_AARCH64
-  arm64:ilp32: share HWCAP between LP64 and ILP32
-  arm64:ilp32 use the native LP64 'start_thread' for ILP32 threads
-  arm64:ilp32: support core dump generation for ILP32
-  ptrace: Allow compat to use the native siginfo
-  arm64:ilp32: add sys_ilp32.c and a separate table (in entry.S) to use
-    it
-  arm64:ilp32: use the native siginfo instead of the compat siginfo
-  arm64:ilp32: add ARM64_ILP32 to Kconfig
-
-Jan Dakinevich (1):
-  ilp32: common 32-bit wrappers
-
-Philipp Tomsich (2):
-  arm64:ilp32: add documentation on the ILP32 ABI for ARM64
-  arm64:ilp32: change COMPAT_ELF_PLATFORM to report a a subplatform for
-    ILP32
-
-Yury Norov (1):
-  aarch64: ilp32: use generic stat64 structure
-
- Documentation/arm64/ilp32.txt         |  55 +++++++
- arch/arm64/Kconfig                    |  14 +-
- arch/arm64/Makefile                   |   5 +
- arch/arm64/include/asm/compat.h       |  70 ++++++++-
- arch/arm64/include/asm/elf.h          | 105 +++++++++++--
- arch/arm64/include/asm/fpsimd.h       |   2 +-
- arch/arm64/include/asm/hwcap.h        |  12 +-
- arch/arm64/include/asm/memory.h       |   2 +-
- arch/arm64/include/asm/processor.h    |  18 ++-
- arch/arm64/include/asm/ptrace.h       |   2 +-
- arch/arm64/include/asm/signal32.h     |  19 +++
- arch/arm64/include/asm/stat.h         |   2 +
- arch/arm64/include/asm/thread_info.h  |   3 +-
- arch/arm64/include/asm/unistd.h       |  11 +-
- arch/arm64/include/uapi/asm/siginfo.h |  21 +++
- arch/arm64/include/uapi/asm/signal.h  |  31 ++++
- arch/arm64/kernel/Makefile            |   4 +-
- arch/arm64/kernel/asm-offsets.c       |   2 +-
- arch/arm64/kernel/entry.S             |  18 ++-
- arch/arm64/kernel/entry32-common.S    |  37 +++++
- arch/arm64/kernel/entry32.S           |  29 ----
- arch/arm64/kernel/head.S              |   2 +-
- arch/arm64/kernel/hw_breakpoint.c     |   7 +-
- arch/arm64/kernel/perf_regs.c         |   2 +-
- arch/arm64/kernel/process.c           |   4 +-
- arch/arm64/kernel/ptrace.c            |  47 +++---
- arch/arm64/kernel/signal.c            |  21 ++-
- arch/arm64/kernel/sys_ilp32.c         | 278 ++++++++++++++++++++++++++++++++++
- arch/arm64/kernel/traps.c             |   4 +-
- arch/arm64/kernel/vdso.c              |  12 +-
- include/linux/compat.h                |   4 +
- include/uapi/asm-generic/siginfo.h    |  17 ++-
- include/uapi/asm-generic/signal.h     |  27 +++-
- include/uapi/asm-generic/stat.h       |   8 +-
- kernel/ptrace.c                       |  24 ++-
- 35 files changed, 806 insertions(+), 113 deletions(-)
+Signed-off-by: Philipp Tomsich <philipp.tomsich@theobroma-systems.com>
+Signed-off-by: Christoph Muellner <christoph.muellner@theobroma-systems.com>
+Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
+Signed-off-by: Andrew Pinski <Andrew.Pinski@caviumnetworks.com>
+Reviewed-by: David Daney <david.daney@cavium.com>
+---
+ Documentation/arm64/ilp32.txt | 55 +++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 55 insertions(+)
  create mode 100644 Documentation/arm64/ilp32.txt
- create mode 100644 arch/arm64/kernel/entry32-common.S
- create mode 100644 arch/arm64/kernel/sys_ilp32.c
 
+diff --git a/Documentation/arm64/ilp32.txt b/Documentation/arm64/ilp32.txt
+new file mode 100644
+index 0000000..4f6860b
+--- /dev/null
++++ b/Documentation/arm64/ilp32.txt
+@@ -0,0 +1,55 @@
++ILP32 AARCH64 SYSCALL ABI
++=========================
++Written by Andrew Pinski <apinski@cavium.com>
++Updated by Philipp Tomsich <philipp.tomsich@theobroma-systems.com>
++
++
++This document describes the ILP32 syscall ABI and where it differs
++from the generic linux syscall interface.
++
++Some structures are changed to reduce the difference in the code path
++for both ILP32 and LP64 ABIs for signal handling.
++
++The following structures have been changed so the layout of the
++structures are the same between ILP32 and LP64 ABIs, including:
++ * sigval_t        contains pointers
++ * sigevent        Uses sigval_t which causes it to be the same.  Special
++                   handing is needed for reading; in the mq_notify syscall
++ * sigaction       Conversion is handled in the userland (glibc), as the
++		    userland data structures are defined in glibc anyway.
++
++A number of structures differ between ILP32 and LP64, including:
++ * timespec        uses time_t and suseconds_t
++ * timeval         uses time_t and suseconds_t
++ * stat            uses timespec/time_t
++ * semid64_ds      uses time_t.
++ * msqid64_ds      uses time_t.
++ * shmid64_ds      uses time_t.
++ * rt_sigframe     uses siginfo and ucontext.
++ * siginfo_t       uses clock_t and sigval_t
++ * ucontext        uses stack_t and sigset_t
++ * fd_set          This is done to avoid endian issues between ILP32 and
++		   LP64. Syscalls consuming fd_set use timespec.
++ * struct msgbuf   The specification of 'struct msgbuf' defines the 'mtype'
++                   field as a 'long' (i.e. 32bit for ILP32, but 64bit for
++		   LP64).  Functions that operate on 'struct msgbuf' need
++		   to be passed through the compat-syscalls to resolve
++		   this.
++ * stack_t         contains pointers (handled in the compatibility layer)
++
++Also the syscalls which normally would pass 64bit values as two arguments;
++now pass the 64bit value as one argument.  Also they have been renamed
++(removing the 64 from the name) to avoid confusion.
++The list of these LP64 syscalls reused by ILP32 clients is:
++ * fcntl
++ * statfs
++ * fstatfs
++ * truncate
++ * ftruncate
++ * lseek
++ * sendfile
++ * newfstatat
++ * fstat
++ * mmap
++ * fadvise64
++
 -- 
 2.1.4
