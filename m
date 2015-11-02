@@ -1,83 +1,42 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Mon, 02 Nov 2015 11:10:07 +0100
-Subject: [PATCH] clk: imx: add 'is_prepared' clk_ops callback for pllv3 clk
-In-Reply-To: <1446487569-20757-1-git-send-email-b51503@freescale.com>
-References: <1446487569-20757-1-git-send-email-b51503@freescale.com>
-Message-ID: <1446459007.3156.6.camel@pengutronix.de>
+From: amit.kucheria@verdurent.com (Amit Kucheria)
+Date: Mon, 2 Nov 2015 15:40:56 +0530
+Subject: [PATCH 5/7] clocksource/drivers/pxa_timer: Move the Kconfig rule
+In-Reply-To: <563718C4.5050503@linaro.org>
+References: <CAHLCerPX+bmNMNDFEW24GWXhmrCspfY=UYkhM54ORfoiB5Xfvw@mail.gmail.com>
+ <563718C4.5050503@linaro.org>
+Message-ID: <CAHLCerMthR1up5Z5hyzxMdo=J+nYPJ9UJF2R28Ws1kyxNAWmZg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag, den 03.11.2015, 02:06 +0800 schrieb Bai Ping:
-> Add 'is_prepared' callback function for pllv3 type clk to make sure when
-> the system is bootup, the unused clk is in a known state to match the
-> prepare count info.
-> 
-What does this commit fix?
-Is it there to ensure clocks are turned off at the disable unused clocks
-phase even if they haven't been prepared even once during bootup?
+On Mon, Nov 2, 2015 at 1:33 PM, Daniel Lezcano
+<daniel.lezcano@linaro.org> wrote:
+>
+> Hi Amit,
+>
+> On 11/02/2015 08:44 AM, Amit Kucheria wrote:
+>>
+>> On Fri, Oct 30, 2015 at 4:22 AM, Daniel Lezcano
+>> <daniel.lezcano@linaro.org> wrote:
+>>>
+>>> Instead of having the clocksource's Kconfig depending on the arch, let
+>>> the
+>>> arch to select the timer it needs.
+>>
+>>
+>> Is this the prescribed way to do things nowadays? It leads to more
+>> options showing up in 'make menuconfig'. Why do I need to see
+>> CLKSRC_PXA if I'm not even compiling for ARCH_PXA (and not interesting
+>> in COMPILE_TEST)?
+>
+>
+> That won't happen.
+>
+> As the 'bool' has no string after, it won't show up in the menuconfig.
 
-Regards,
-Lucas
+Nice, I didn't know that.
 
-> Signed-off-by: Bai Ping <b51503@freescale.com>
-> ---
->  drivers/clk/imx/clk-pllv3.c | 14 ++++++++++++++
->  1 file changed, 14 insertions(+)
-> 
-> diff --git a/drivers/clk/imx/clk-pllv3.c b/drivers/clk/imx/clk-pllv3.c
-> index 6addf8f..c05c43d 100644
-> --- a/drivers/clk/imx/clk-pllv3.c
-> +++ b/drivers/clk/imx/clk-pllv3.c
-> @@ -97,6 +97,16 @@ static void clk_pllv3_unprepare(struct clk_hw *hw)
->  	writel_relaxed(val, pll->base);
->  }
->  
-> +static int clk_pllv3_is_prepared(struct clk_hw *hw)
-> +{
-> +	struct clk_pllv3 *pll = to_clk_pllv3(hw);
-> +
-> +	if (readl_relaxed(pll->base) & BM_PLL_LOCK)
-> +		return 1;
-> +
-> +	return 0;
-> +}
-> +
->  static unsigned long clk_pllv3_recalc_rate(struct clk_hw *hw,
->  					   unsigned long parent_rate)
->  {
-> @@ -139,6 +149,7 @@ static int clk_pllv3_set_rate(struct clk_hw *hw, unsigned long rate,
->  static const struct clk_ops clk_pllv3_ops = {
->  	.prepare	= clk_pllv3_prepare,
->  	.unprepare	= clk_pllv3_unprepare,
-> +	.is_prepared	= clk_pllv3_is_prepared,
->  	.recalc_rate	= clk_pllv3_recalc_rate,
->  	.round_rate	= clk_pllv3_round_rate,
->  	.set_rate	= clk_pllv3_set_rate,
-> @@ -193,6 +204,7 @@ static int clk_pllv3_sys_set_rate(struct clk_hw *hw, unsigned long rate,
->  static const struct clk_ops clk_pllv3_sys_ops = {
->  	.prepare	= clk_pllv3_prepare,
->  	.unprepare	= clk_pllv3_unprepare,
-> +	.is_prepared	= clk_pllv3_is_prepared,
->  	.recalc_rate	= clk_pllv3_sys_recalc_rate,
->  	.round_rate	= clk_pllv3_sys_round_rate,
->  	.set_rate	= clk_pllv3_sys_set_rate,
-> @@ -265,6 +277,7 @@ static int clk_pllv3_av_set_rate(struct clk_hw *hw, unsigned long rate,
->  static const struct clk_ops clk_pllv3_av_ops = {
->  	.prepare	= clk_pllv3_prepare,
->  	.unprepare	= clk_pllv3_unprepare,
-> +	.is_prepared	= clk_pllv3_is_prepared,
->  	.recalc_rate	= clk_pllv3_av_recalc_rate,
->  	.round_rate	= clk_pllv3_av_round_rate,
->  	.set_rate	= clk_pllv3_av_set_rate,
-> @@ -279,6 +292,7 @@ static unsigned long clk_pllv3_enet_recalc_rate(struct clk_hw *hw,
->  static const struct clk_ops clk_pllv3_enet_ops = {
->  	.prepare	= clk_pllv3_prepare,
->  	.unprepare	= clk_pllv3_unprepare,
-> +	.is_prepared	= clk_pllv3_is_prepared,
->  	.recalc_rate	= clk_pllv3_enet_recalc_rate,
->  };
->  
+> Actually, with the next patch, only COMPILE_TEST will show it up in the
+>
+> Device Drivers->Clocksource drivers.
 
--- 
-Pengutronix e.K.             | Lucas Stach                 |
-Industrial Linux Solutions   | http://www.pengutronix.de/  |
+Thanks.
