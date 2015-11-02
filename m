@@ -1,59 +1,104 @@
-From: cov@codeaurora.org (Christopher Covington)
-Date: Mon, 02 Nov 2015 15:54:12 -0500
-Subject: [PATCH v4 08/21] KVM: ARM64: Add reset and access
- handlers for PMXEVTYPER register
-In-Reply-To: <1446186123-11548-9-git-send-email-zhaoshenglong@huawei.com>
-References: <1446186123-11548-1-git-send-email-zhaoshenglong@huawei.com>
- <1446186123-11548-9-git-send-email-zhaoshenglong@huawei.com>
-Message-ID: <5637CD74.2010609@codeaurora.org>
+From: edubezval@gmail.com (Eduardo Valentin)
+Date: Mon, 2 Nov 2015 12:54:19 -0800
+Subject: [PATCH v4 0/8] qcom: Add support for TSENS driver
+In-Reply-To: <1444383670-32693-1-git-send-email-rnayak@codeaurora.org>
+References: <1444383670-32693-1-git-send-email-rnayak@codeaurora.org>
+Message-ID: <20151102205418.GE4469@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shannon,
-
-On 10/30/2015 02:21 AM, Shannon Zhao wrote:
-> From: Shannon Zhao <shannon.zhao@linaro.org>
+On Fri, Oct 09, 2015 at 03:11:02PM +0530, Rajendra Nayak wrote:
+> Patches 1/8 to 4/8 will need to go via the thermal tree/Eduardo.
+> Patches 5/8 to 8/8 will need to go via qcom-msm tree/Andy.
 > 
-> Since the reset value of PMXEVTYPER is UNKNOWN, use reset_unknown or
-> reset_unknown_cp15 for its reset handler. Add access handler which
-> emulates writing and reading PMXEVTYPER register. When writing to
-> PMXEVTYPER, call kvm_pmu_set_counter_event_type to create a perf_event
-> for the selected event type.
+> Eduardo, can you please take a look at the patches and let me
+> know if you see any issues.
+
+I have sent a couple of comments, most of them are not a big deal. But
+please, have a look on what concerns the thermal bindings. I want to
+reuse what we have as much as possible.
+
+The other point is regarding locking. Given that you have several
+sensors, per device, is there any need to have extra locking on top of
+what the thermal framework provides? Say, in the case a single device
+gets in use in different thermal zones, would the accesses to the
+thermal zone attempt to read registers shared by the sensors within
+the device?
+
 > 
-> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
-> ---
->  arch/arm64/kvm/sys_regs.c | 26 ++++++++++++++++++++++++--
->  1 file changed, 24 insertions(+), 2 deletions(-)
+> Current set of patches apply on 4.3-rc4. Need to pull in clk-next
+> (for a dependent patch) to be able to test on ifc6410 board.
 > 
-> diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-> index cb82b15..4e606ea 100644
-> --- a/arch/arm64/kvm/sys_regs.c
-> +++ b/arch/arm64/kvm/sys_regs.c
-> @@ -491,6 +491,17 @@ static bool access_pmu_regs(struct kvm_vcpu *vcpu,
->  
->  	if (p->is_write) {
->  		switch (r->reg) {
-> +		case PMXEVTYPER_EL0: {
-> +			val = vcpu_sys_reg(vcpu, PMSELR_EL0);
-> +			kvm_pmu_set_counter_event_type(vcpu,
-> +						       *vcpu_reg(vcpu, p->Rt),
-> +						       val);
-> +			vcpu_sys_reg(vcpu, PMXEVTYPER_EL0) =
-> +							 *vcpu_reg(vcpu, p->Rt);
-
-Why does PMXEVTYPER get set directly? It seems like it could have an accessor
-that redirected to PMEVTYPER<n>.
-
-> +			vcpu_sys_reg(vcpu, PMEVTYPER0_EL0 + val) =
-> +							 *vcpu_reg(vcpu, p->Rt);
-
-I tried to look around briefly but couldn't find counter number range checking
-in the PMSELR handler or here. Should there be some here and in PMXEVCNTR?
-
-Thanks,
-Christopher Covington
-
--- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+> Changes since v3:
+> * Dropped 'clk: qcom: create virtual child device for TSENS' which
+> is picked up by Stephen
+> * Updated GCC bindings with optional TSENS properties
+> 
+> Changes since v2:
+> * Minor review fixes from Stephen/Punit and rebase on 4.3-rc4
+> 
+> Changes since v1:
+> * Created virtual tsens device from gcc driver for 8960,
+> with DT having a single node for gcc and tsens
+> * Minor fixes with rebasing on 4.3-rc1
+> 
+> Changes since RFC:
+> * Added support for 8916 and 8084
+> * Based off the latest nvmem framework patches [1]
+> * Minor review fixes for comments mostly from Lina
+> 
+> This is an attempt to have a single TSENS driver for
+> the different versions of the TSENS IP that exist, on
+> different qcom msm/apq SoCs'
+> Support is added for msm8916, msm8960 and msm8974 families.
+> 
+> A lot of the work is based of original code from Stephen Boyd
+> and Siddartha Mohanadoss. I have also picked some of what
+> Narendran Rajan did in his attempt to upstream the support
+> for 8960 family. I could not keep the original authorship on
+> any of the patches because I ended up moving the code around
+> quite a bit in an effort to have a single driver for the
+> various devices. I would be glad to change the authorship
+> for any of the patches if needed.
+> 
+> Rajendra Nayak (8):
+>   thermal: qcom: tsens: Add a skeletal TSENS drivers
+>   thermal: qcom: tsens-8916: Add support for 8916 family of SoCs
+>   thermal: qcom: tsens-8974: Add support for 8974 family of SoCs
+>   thermal: qcom: tsens-8960: Add support for 8960 family of SoCs
+>   arm: dts: msm8974: Add thermal zones, tsens and qfprom nodes
+>   arm: dts: apq8064: Add thermal zones, tsens and qfprom nodes
+>   arm: dts: apq8084: Add thermal zones, tsens and qfprom nodes
+>   arm64: dts: msm8916: Add thermal zones, tsens and qfprom nodes
+> 
+>  .../devicetree/bindings/clock/qcom,gcc.txt         |  20 ++
+>  .../devicetree/bindings/thermal/qcom-tsens.txt     |  33 +++
+>  arch/arm/boot/dts/qcom-apq8064.dtsi                | 101 +++++++
+>  arch/arm/boot/dts/qcom-apq8084.dtsi                | 105 ++++++++
+>  arch/arm/boot/dts/qcom-msm8974.dtsi                | 105 ++++++++
+>  arch/arm64/boot/dts/qcom/msm8916.dtsi              |  66 +++++
+>  drivers/thermal/Kconfig                            |   5 +
+>  drivers/thermal/Makefile                           |   1 +
+>  drivers/thermal/qcom/Kconfig                       |  10 +
+>  drivers/thermal/qcom/Makefile                      |   2 +
+>  drivers/thermal/qcom/tsens-8916.c                  | 107 ++++++++
+>  drivers/thermal/qcom/tsens-8960.c                  | 291 +++++++++++++++++++++
+>  drivers/thermal/qcom/tsens-8974.c                  | 239 +++++++++++++++++
+>  drivers/thermal/qcom/tsens-common.c                | 130 +++++++++
+>  drivers/thermal/qcom/tsens.c                       | 206 +++++++++++++++
+>  drivers/thermal/qcom/tsens.h                       |  69 +++++
+>  16 files changed, 1490 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/thermal/qcom-tsens.txt
+>  create mode 100644 drivers/thermal/qcom/Kconfig
+>  create mode 100644 drivers/thermal/qcom/Makefile
+>  create mode 100644 drivers/thermal/qcom/tsens-8916.c
+>  create mode 100644 drivers/thermal/qcom/tsens-8960.c
+>  create mode 100644 drivers/thermal/qcom/tsens-8974.c
+>  create mode 100644 drivers/thermal/qcom/tsens-common.c
+>  create mode 100644 drivers/thermal/qcom/tsens.c
+>  create mode 100644 drivers/thermal/qcom/tsens.h
+> 
+> -- 
+> QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member
+> of Code Aurora Forum, hosted by The Linux Foundation
+> 
