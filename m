@@ -1,27 +1,32 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 2 Nov 2015 12:00:02 +0100
-Subject: [PATCH 05/13 v2] irqchip/gic: assign irqchip dynamically
-In-Reply-To: <5637328F.7060601@arm.com>
-References: <1445591083-22494-1-git-send-email-linus.walleij@linaro.org>
- <5637328F.7060601@arm.com>
-Message-ID: <CACRpkdYhe41MFBE-ANXOnMHCQ7eXtkU-h8WbRzWzfsWoh1xj=A@mail.gmail.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Mon, 02 Nov 2015 12:09:59 +0100
+Subject: [RFC v2 1/2] Documentation: bridge: Add documentation for
+ ps8640 DT properties
+In-Reply-To: <1446436421.8671.1.camel@mszsdhlt06>
+References: <1446430166-7378-1-git-send-email-jitao.shi@mediatek.com>
+ <1446436421.8671.1.camel@mszsdhlt06>
+Message-ID: <1446462599.3442.19.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 2, 2015 at 10:53 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
-> On 23/10/15 10:04, Linus Walleij wrote:
+Hi Jitao,
 
->> Marc: can't test the EOIMODE1 thing, it's far above me, but it
->> "should work". Is it correct that there is one unique and coupled
->> EOIMODE1 instance per GIC instance like this?
->
-> I'm afraid you misinterpreted the EOIMODE==1 thing. The GIC can either
-> be EOIMODE==0 (which is what most people are using on 32bit when not
-> booting at HYP), or EOIMODE==1 (most 64bit systems). For systems with
-> multiple GICs, the secondary GICs are always EOIMODE==0.
+Am Montag, den 02.11.2015, 11:53 +0800 schrieb jitao shi:
+[...]
+> > +Example:
+> > +	edp-bridge at 18 {
+> > +		compatible = "parade,ps8640";
+> > +		reg = <0x18>;
+> > +		sleep-gpios = <&pio 116 GPIO_ACTIVE_HIGH>;
+> > +		reset-gpios = <&pio 115 GPIO_ACTIVE_HIGH>;
+> > +		mode-sel-gpios = <&pio 92 GPIO_ACTIVE_HIGH>;
+> > +		ps8640-1v2-supply = <&ps8640_fixed_1v2>;
 
-So it's an either-or thing not both-and. OK that's the missing piece,
-thanks Marc, I'll fix up the patch.
+This should be vdd12-supply now.
 
-Yours,
-Linus Walleij
+> > +		ps8640-3v3-supply = <&mt6397_vgp2_reg>;
+
+Should be vdd33-supply now.
+
+regards
+Philipp
