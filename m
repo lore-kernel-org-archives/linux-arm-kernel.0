@@ -1,37 +1,49 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Mon, 02 Nov 2015 17:30:47 +0100
-Subject: [PATCH] pwm-backlight: Avoid backlight flicker when probed from DT
-In-Reply-To: <20151030182113.GH4058@x1>
-References: <1446133906-3076-1-git-send-email-p.zabel@pengutronix.de>
- <20151030182113.GH4058@x1>
-Message-ID: <1446481847.3442.61.camel@pengutronix.de>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Mon, 2 Nov 2015 17:32:22 +0100
+Subject: [PATCH 03/22] clocksource/drivers/rockchip: Make the driver more
+ compatible
+In-Reply-To: <5093304.EN6Bc2EjLr@wuerfel>
+References: <1446469011-22710-1-git-send-email-daniel.lezcano@linaro.org>
+ <1446469011-22710-3-git-send-email-daniel.lezcano@linaro.org>
+ <5093304.EN6Bc2EjLr@wuerfel>
+Message-ID: <56379016.1080601@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lee,
-
-Am Freitag, den 30.10.2015, 18:21 +0000 schrieb Lee Jones:
-> > @@ -264,12 +266,32 @@ static int pwm_backlight_probe(struct platform_device *pdev)
-> >  		pb->enable_gpio = gpio_to_desc(data->enable_gpio);
-> >  	}
-> >  
-> > +	phandle = of_find_property(pdev->dev.of_node, "phandle", NULL) != NULL;
-> 
-> This is a little ugly.
-> 
-> If this is the only way to identify the probedness of a device then
-> you probably want to neaten it up a little.  I suggest something along
-> the lines of:
+On 11/02/2015 04:33 PM, Arnd Bergmann wrote:
+> On Monday 02 November 2015 13:56:31 Daniel Lezcano wrote:
+>>   static inline void rk_timer_disable(struct clock_event_device *ce)
+>>   {
+>>          writel_relaxed(TIMER_DISABLE, rk_base(ce) + TIMER_CONTROL_REG);
+>> -       dsb();
+>> +       dsb(sy);
+>>   }
+>>
+>>   static inline void rk_timer_enable(struct clock_event_device *ce, u32 flags)
+>>   {
+>>          writel_relaxed(TIMER_ENABLE | TIMER_INT_UNMASK | flags,
+>>                         rk_base(ce) + TIMER_CONTROL_REG);
+>> -       dsb();
+>> +       dsb(sy);
+>>   }
+>>
+>>
 >
-> if (of_find_property(pdev->dev.of_node, "phandle", NULL))
-> 	already_probed = true;
-> 
-> Also, do you also want to check for "linux,phandle", as this is always
-> catered for in drivers/of/*
+> This will fail the compile test, because dsb() is not available on non-ARM
+> architectures. Would it be enough to just use the normal writel() accessor
+> here?
 
-Thanks for pointing this out. I suppose I should just check
-pdev->dev.of_node->phandle != 0 instead. That will already be
-initialized by unflatten_dt_node if either property was found.
+That's a good question and I believe we can remove it but I have to 
+setup a rockchip board before doing the changes in order to test.
 
-regards
-Philipp
+I the meantime added the COMPILE_TEST option but restricted it to ARM 
+and ARM64.
+
+
+
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
