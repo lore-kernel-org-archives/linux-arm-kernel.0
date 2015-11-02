@@ -1,32 +1,47 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Mon, 02 Nov 2015 12:09:59 +0100
-Subject: [RFC v2 1/2] Documentation: bridge: Add documentation for
- ps8640 DT properties
-In-Reply-To: <1446436421.8671.1.camel@mszsdhlt06>
-References: <1446430166-7378-1-git-send-email-jitao.shi@mediatek.com>
- <1446436421.8671.1.camel@mszsdhlt06>
-Message-ID: <1446462599.3442.19.camel@pengutronix.de>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Mon, 2 Nov 2015 12:14:08 +0100
+Subject: [PATCH 0/3] pwm: omap: Add PWM support using dual-mode timers
+Message-ID: <56374580.2070704@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jitao,
+This patch is based on an earlier patch by NeilBrown which is based on
+a older patch from Grant Erickson which provided PWM devices using
+the 'legacy' interface.
 
-Am Montag, den 02.11.2015, 11:53 +0800 schrieb jitao shi:
-[...]
-> > +Example:
-> > +	edp-bridge at 18 {
-> > +		compatible = "parade,ps8640";
-> > +		reg = <0x18>;
-> > +		sleep-gpios = <&pio 116 GPIO_ACTIVE_HIGH>;
-> > +		reset-gpios = <&pio 115 GPIO_ACTIVE_HIGH>;
-> > +		mode-sel-gpios = <&pio 92 GPIO_ACTIVE_HIGH>;
-> > +		ps8640-1v2-supply = <&ps8640_fixed_1v2>;
+The pwm driver was renamed to not be confused with the OMAP4 PWM dedicated
+hardware and was cleaned with the review from Thierry Reding.
 
-This should be vdd12-supply now.
+The first patch introduces a way to select to dmtimer clock source via a
+clocks binding and a dedicated function wit the legacy fallback.
 
-> > +		ps8640-3v3-supply = <&mt6397_vgp2_reg>;
+In order to prepare for the future form of the dmtimer (clksource or whatever),
+and less rely on specific bindings the first patch introduces the PWM driver
+with all the dmtimer calls into a platform data structure.
 
-Should be vdd33-supply now.
+The structure is then filled in plat-omap and added as auxdata for the
+ti,pwm-dmtimer-omap compatible nodes.
 
-regards
-Philipp
+Suggested-by: Tony Lindgren <tony@atomide.com>
+
+RFC Thread : http://lkml.kernel.org/r/562505DB.3010402 at baylibre.com
+
+Neil Armstrong (3):
+  arm: plat-omap: dmtimer: Add clock source from DT
+  pwm: Add PWM driver for OMAP using dual-mode timers
+  arm: plat-omap: Add PWM dmtimer platform data quirks
+
+ .../devicetree/bindings/pwm/pwm-omap-dmtimer.txt   |  18 ++
+ arch/arm/mach-omap2/pdata-quirks.c                 |  23 ++
+ arch/arm/plat-omap/dmtimer.c                       |  31 +-
+ drivers/pwm/Kconfig                                |   9 +
+ drivers/pwm/Makefile                               |   1 +
+ drivers/pwm/pwm-omap-dmtimer.c                     | 322 +++++++++++++++++++++
+ include/linux/platform_data/pwm_omap_dmtimer.h     |  69 +++++
+ 7 files changed, 472 insertions(+), 1 deletion(-)
+ create mode 100644 Documentation/devicetree/bindings/pwm/pwm-omap-dmtimer.txt
+ create mode 100644 drivers/pwm/pwm-omap-dmtimer.c
+ create mode 100644 include/linux/platform_data/pwm_omap_dmtimer.h
+
+-- 
+1.9.1
