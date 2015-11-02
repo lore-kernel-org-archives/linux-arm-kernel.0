@@ -1,100 +1,42 @@
-From: jonmason@broadcom.com (Jon Mason)
-Date: Mon, 2 Nov 2015 13:40:57 -0500
-Subject: [PATCH RESEND 2/3] ARM: dts: NSP: Add NAND Support to DT
-In-Reply-To: <1446489658-29705-1-git-send-email-jonmason@broadcom.com>
-References: <1446489658-29705-1-git-send-email-jonmason@broadcom.com>
-Message-ID: <1446489658-29705-3-git-send-email-jonmason@broadcom.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 2 Nov 2015 18:41:24 +0000
+Subject: [PATCH v4 1/6] arm64: ftrace: adjust callsite addresses examined
+ by stack tracer
+In-Reply-To: <20151102182928.GJ2684@leverpostej>
+References: <1446182741-31019-1-git-send-email-takahiro.akashi@linaro.org>
+ <1446182741-31019-2-git-send-email-takahiro.akashi@linaro.org>
+ <20151030111618.GA20030@arm.com>
+ <20151102132043.060ef31d@gandalf.local.home>
+ <20151102182928.GJ2684@leverpostej>
+Message-ID: <20151102184124.GO29657@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add NAND support to the device tree for the Broadcom Northstar Plus SoC.
-Since no driver changes are needed to enable this hardware, only the
-device tree changes are required to make this functional.
+On Mon, Nov 02, 2015 at 06:29:28PM +0000, Mark Rutland wrote:
+> On Mon, Nov 02, 2015 at 01:20:43PM -0500, Steven Rostedt wrote:
+> > On Fri, 30 Oct 2015 11:16:19 +0000
+> > Will Deacon <will.deacon@arm.com> wrote:
+> > 
+> > > On Fri, Oct 30, 2015 at 02:25:36PM +0900, AKASHI Takahiro wrote:
+> > > > On arm64, no PC values returned by save_stack_trace() will match to LR
+> > > > values saved in stack frames on a stack after the following commit:
+> > > >     commit e306dfd06fcb ("ARM64: unwind: Fix PC calculation")
+> > > > As a result, the output from stack tracer will be messed up.
+> > > 
+> > > FWIW, we've decided to revert that patch for the moment. We're the only
+> > > architecture making that kind of adjustment, so we should fix that before
+> > > building on top of it.
+> > > 
+> > >
+> > 
+> > What is the status of this patch set. I'm currently pulling in last
+> > minute patches for 4.3 and should the ftrace patch in this series be
+> > applied? (I still need to review it too).
+> 
+> The revert Will mentioned is in v4.3 (see commit 9702970c7bd3e2d6), so
+> this series needs a respin to account for that.
 
-Signed-off-by: Jon Mason <jonmason@broadcom.com>
----
- arch/arm/boot/dts/bcm-nsp.dtsi   | 16 +++++++++++++++-
- arch/arm/boot/dts/bcm958625k.dts | 38 ++++++++++++++++++++++++++++++++++++++
- 2 files changed, 53 insertions(+), 1 deletion(-)
+Right, but we're talking about the core ftrace change in patch 4, which
+is (afaict) independent of the commit you mention above.
 
-diff --git a/arch/arm/boot/dts/bcm-nsp.dtsi b/arch/arm/boot/dts/bcm-nsp.dtsi
-index 85fb1c8..62bc86f 100644
---- a/arch/arm/boot/dts/bcm-nsp.dtsi
-+++ b/arch/arm/boot/dts/bcm-nsp.dtsi
-@@ -96,7 +96,7 @@
- 
- 	axi {
- 		compatible = "simple-bus";
--		ranges = <0x00000000 0x18000000 0x00015000>;
-+		ranges = <0x00000000 0x18000000 0x0011ba08>;
- 		#address-cells = <1>;
- 		#size-cells = <1>;
- 
-@@ -187,5 +187,19 @@
- 
- 			status = "disabled";
- 		};
-+
-+		nand: nand at 18026000 {
-+			compatible = "brcm,nand-iproc", "brcm,brcmnand-v6.1";
-+			reg = <0x026000 0x600>,
-+			      <0x11b408 0x600>,
-+			      <0x026f00 0x20>;
-+			reg-names = "nand", "iproc-idm", "iproc-ext";
-+			interrupts = <GIC_SPI 68 IRQ_TYPE_LEVEL_HIGH>;
-+
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+
-+			brcm,nand-has-wp;
-+		};
- 	};
- };
-diff --git a/arch/arm/boot/dts/bcm958625k.dts b/arch/arm/boot/dts/bcm958625k.dts
-index 4859268..b966955 100644
---- a/arch/arm/boot/dts/bcm958625k.dts
-+++ b/arch/arm/boot/dts/bcm958625k.dts
-@@ -67,3 +67,41 @@
- &pcie2 {
- 	status = "okay";
- };
-+
-+&nand {
-+	nandcs at 0 {
-+		compatible = "brcm,nandcs";
-+		reg = <0>;
-+		nand-on-flash-bbt;
-+
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+
-+		nand-ecc-strength = <24>;
-+		nand-ecc-step-size = <1024>;
-+
-+		brcm,nand-oob-sector-size = <27>;
-+
-+		partition at 0 {
-+			label = "nboot";
-+			reg = <0x00000000 0x00200000>;
-+			read-only;
-+		};
-+		partition at 1 {
-+			label = "nenv";
-+			reg = <0x00200000 0x00400000>;
-+		};
-+		partition at 2 {
-+			label = "nsystem";
-+			reg = <0x00600000 0x00a00000>;
-+		};
-+		partition at 3 {
-+			label = "nrootfs";
-+			reg = <0x01000000 0x03000000>;
-+		};
-+		partition at 4 {
-+			label = "ncustfs";
-+			reg = <0x04000000 0x3c000000>;
-+		};
-+	};
-+};
--- 
-1.9.1
+Will
