@@ -1,63 +1,150 @@
-From: laura@labbott.name (Laura Abbott)
-Date: Mon, 2 Nov 2015 09:40:47 -0800
-Subject: arm64: about Add CONFIG_DEBUG_SET_MODULE_RONX suport
-In-Reply-To: <56343BF2.1070800@huawei.com>
-References: <5633279A.7000003@huawei.com> <56332ADB.7030306@iogearbox.net>
- <563335FF.5020400@huawei.com> <5633864F.6030203@codeaurora.org>
- <5633872C.1000005@labbott.name> <56343BF2.1070800@huawei.com>
-Message-ID: <5637A01F.4090806@labbott.name>
+From: paul@pwsan.com (Paul Walmsley)
+Date: Mon, 2 Nov 2015 17:57:54 +0000 (UTC)
+Subject: OMAP baseline test results for v4.3-rc7
+Message-ID: <alpine.DEB.2.02.1511021757180.15134@utopia.booyaka.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(adding Kees to see if he has any inputs)
 
-On 10/30/15 8:56 PM, Xishi Qiu wrote:
-> On 2015/10/30 23:05, Laura Abbott wrote:
->
->>>>
->>>> Hi Daniel,
->>>>
->>>> Sorry for didn't saying it clearly. I find this
->>>> interface(set_memory_ro/rw) can
->>>> only be used in module address. So why not extend the function? e.g.
->>>> like x86,
->>>> it can be used in direct mapping address too.
->>>>
->>>> Is there some limits in arm64 or we will do this later?
->>>>
->>>
->>> arm64 maps low mem (all direct mapped memory on arm64) with section
->>> mappings for performance. set_memory_ro/rw works on PAGE_SIZE
->>> granularity so if we wanted to use those functions on direct mapped
->>> memory we would need to break down the section mappings. On arm,
->>> this was a pain due to the TLB maintaince requried. On arm64, less
->>> so but we still lose the benefit of the section mappings.
->>>
->>> Do you have a use case in mind for wanting to use set_memory_ro/rw
->>> outside of the module area?
->>>
->
-> Hi Laura,
->
-> How about this case?
->
-> module alloc some pages which from direct mapping area, and we write
-> important data(e.g. password) on the pages, the data will not be changed
-> during the runtime. If someone unfriendly try to rewrite the memory,
-> something is going to get worse. So we can use set_memory_ro() to protect
-> the date.
->
+Here are some basic OMAP test results for Linux v4.3-rc7.
+Logs and other details at:
 
-How long would you expected this data to stay around (minutes? hours?)
-and how many instances of this would you expect?
+    http://www.pwsan.com/omap/testlogs/test_v4.3-rc7/20151025181941/
 
-It also looks like BPF wants to set its region as ro when in use
-(https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/include/linux/filter.h#n370) 
-So it's not completely unheard of.
-I don't think it would be too difficult to take the
-split_{pud,pmd} functions used for the direct mapping and apply them
-for the page_attr if people are willing to make the security/performance
-trade off.
 
-Thanks,
-Laura
+Test summary
+------------
+
+Build: uImage:
+    Pass ( 3/ 3): omap1_defconfig, omap1_defconfig_1510innovator_only,
+		  omap1_defconfig_5912osk_only
+
+Build: uImage+dtb:
+    Pass (13/13): omap2plus_defconfig_am33xx_only/am335x-bone,
+		  omap2plus_defconfig/omap4-panda,
+		  omap2plus_defconfig/omap4-panda-es,
+		  omap2plus_defconfig/omap4-var-stk-om44,
+		  omap2plus_defconfig/omap3-evm-37xx,
+		  omap2plus_defconfig_n800_only_a/omap2420-n800,
+		  omap2plus_defconfig/omap2430-sdp,
+		  omap2plus_defconfig/am3517-evm,
+		  omap2plus_defconfig/omap3-beagle,
+		  omap2plus_defconfig/omap3-beagle-xm,
+		  omap2plus_defconfig/omap3-sbc-t3517,
+		  omap2plus_defconfig/omap5-uevm,
+		  omap2plus_defconfig/omap5-sbc-t54
+
+Build: zImage:
+    Pass (17/17): omap2plus_defconfig, omap2plus_defconfig_am33xx_only,
+		  omap2plus_defconfig_n800_only_a,
+		  omap2plus_defconfig_n800_multi_omap2xxx,
+		  omap2plus_defconfig_2430sdp_only,
+		  omap2plus_defconfig_cpupm, omap2plus_defconfig_no_pm,
+		  omap2plus_defconfig_omap2_4_only,
+		  omap2plus_defconfig_omap3_4_only,
+		  omap2plus_defconfig_omap5_only,
+		  omap2plus_defconfig_dra7xx_only,
+		  omap2plus_defconfig_am43xx_only,
+		  rmk_omap3430_ldp_oldconfig,
+		  rmk_omap3430_ldp_allnoconfig,
+		  rmk_omap4430_sdp_oldconfig,
+		  rmk_omap4430_sdp_allnoconfig, multi_v7_defconfig
+
+Build warnings from toolchain: uImage:
+    (none)
+
+Build warnings from toolchain: uImage+dtb:
+    (none)
+
+Build warnings from toolchain: zImage:
+    FAIL (10/17): omap2plus_defconfig, omap2plus_defconfig_am33xx_only,
+		  omap2plus_defconfig_2430sdp_only,
+		  omap2plus_defconfig_cpupm, omap2plus_defconfig_no_pm,
+		  omap2plus_defconfig_omap2_4_only,
+		  omap2plus_defconfig_omap3_4_only,
+		  omap2plus_defconfig_omap5_only,
+		  omap2plus_defconfig_dra7xx_only,
+		  omap2plus_defconfig_am43xx_only
+
+Boot to userspace:
+    FAIL ( 1/17): 2430sdp
+    skip ( 3/17): 5912osk, 3517evm, 5430es2sbct54
+    Pass (13/17): am335xbonelt, am335xbone, 4430es2panda, 4460pandaes,
+		  4460varsomom, 37xxevm, 3530es3beagle, 3530es31beagle,
+		  3730beaglexm, 3730es12beaglexm, cmt3517, 5430es2uevm,
+		  2420n800
+
+Kernel warnings during boot to userspace:
+    FAIL ( 2/17): 4430es2panda, cmt3517
+
+PM: chip retention via suspend:
+    FAIL ( 6/11): am335xbonelt, 4430es2panda, 4460varsomom, 37xxevm,
+		  2430sdp, 5430es2uevm
+    Pass ( 5/11): 4460pandaes, 3530es3beagle, 3530es31beagle,
+		  3730beaglexm, 3730es12beaglexm
+
+PM: chip retention via dynamic idle:
+    FAIL ( 6/11): am335xbonelt, 4430es2panda, 4460varsomom, 37xxevm,
+		  2430sdp, 5430es2uevm
+    Pass ( 5/11): 4460pandaes, 3530es3beagle, 3530es31beagle,
+		  3730beaglexm, 3730es12beaglexm
+
+PM: chip off (except CORE, due to errata) via suspend:
+    Pass ( 1/ 1): 3730beaglexm
+
+PM: chip off (except CORE, due to errata) via dynamic idle:
+    Pass ( 1/ 1): 3730beaglexm
+
+PM: chip off via suspend:
+    FAIL ( 1/ 4): 37xxevm
+    Pass ( 3/ 4): 3530es3beagle, 3530es31beagle, 3730es12beaglexm
+
+PM: chip off via dynamic idle:
+    FAIL ( 1/ 4): 37xxevm
+    Pass ( 3/ 4): 3530es3beagle, 3530es31beagle, 3730es12beaglexm
+
+Kernel warnings during PM test:
+    FAIL ( 1/17): 4430es2panda
+
+Obsolete Kconfig symbols:
+    FAIL ( 2/20): omap2plus_defconfig, multi_v7_defconfig
+
+
+vmlinux object size
+(delta in bytes from test_v4.3-rc6 (7379047d5585187d1288486d4627873170d0005a)):
+   text     data      bss    total  kernel
+   +606      +64      +32     +702  omap1_defconfig
+   +606      +32      +32     +670  omap1_defconfig_1510innovator_only
+   +606      +64      +32     +702  omap1_defconfig_5912osk_only
+   +528        0        0     +528  multi_v7_defconfig
+   +868      +64        0     +932  omap2plus_defconfig
+   +436      +32      +32     +500  omap2plus_defconfig_2430sdp_only
+   +868      +64        0     +932  omap2plus_defconfig_am33xx_only
+   +868      +64        0     +932  omap2plus_defconfig_am43xx_only
+   +928      +64      +64    +1056  omap2plus_defconfig_cpupm
+   +868      +64        0     +932  omap2plus_defconfig_dra7xx_only
+   +452      -32      +16     +436  omap2plus_defconfig_n800_multi_omap2xxx
+   +608      +32      +16     +656  omap2plus_defconfig_n800_only_a
+   +932      +96        0    +1028  omap2plus_defconfig_no_pm
+   +860      +72      +64     +996  omap2plus_defconfig_omap2_4_only
+   +868      +64        0     +932  omap2plus_defconfig_omap3_4_only
+   +868      +56        0     +924  omap2plus_defconfig_omap5_only
+   +392      +32      -40     +384  rmk_omap3430_ldp_allnoconfig
+   +618      +32        0     +650  rmk_omap3430_ldp_oldconfig
+   +368        0      -48     +320  rmk_omap4430_sdp_allnoconfig
+   +658        0        0     +658  rmk_omap4430_sdp_oldconfig
+
+Boot-time memory difference
+(delta in bytes from test_v4.3-rc6 (7379047d5585187d1288486d4627873170d0005a))
+  avail  rsrvd   high  freed  board          kconfig
+    -4k     4k      .      .  2430sdp        omap2plus_defconfig
+    -8k     8k      .     4k  3530es31beagle omap2plus_defconfig
+    -8k     8k      .     4k  3530es3beagle  omap2plus_defconfig
+    -8k     8k      .     4k  3730beaglexm   omap2plus_defconfig
+    -8k     8k      .     4k  3730es12beaglexmomap2plus_defconfig
+    -8k     8k      .     4k  37xxevm        omap2plus_defconfig
+    -8k     8k      .     4k  4430es2panda   omap2plus_defconfig
+    -8k     8k      .     4k  4460pandaes    omap2plus_defconfig
+    -8k     8k      .     4k  4460varsomom   omap2plus_defconfig
+    -8k     8k      .     4k  5430es2uevm    omap2plus_defconfig
+    -8k     8k      .     4k  am335xbonelt   omap2plus_defconfig
