@@ -1,42 +1,38 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Mon, 2 Nov 2015 15:57:33 +0100
-Subject: [PATCH 19/22] clocksource/drivers/prcmu: Fix Kconfig and add
- COMPILE_TEST option
-In-Reply-To: <CACRpkdZXZG499JmvVjQHrWP06kJTkGE=J+ZV4WGNn3WLvbsujg@mail.gmail.com>
-References: <1446469011-22710-1-git-send-email-daniel.lezcano@linaro.org>
- <1446469011-22710-19-git-send-email-daniel.lezcano@linaro.org>
- <CACRpkdZXZG499JmvVjQHrWP06kJTkGE=J+ZV4WGNn3WLvbsujg@mail.gmail.com>
-Message-ID: <563779DD.6090808@linaro.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 2 Nov 2015 14:58:47 +0000
+Subject: [PATCH 0/7] kvmtool: Cleanup kernel loading
+In-Reply-To: <1446229620-28088-1-git-send-email-andre.przywara@arm.com>
+References: <1446229620-28088-1-git-send-email-andre.przywara@arm.com>
+Message-ID: <20151102145846.GH29657@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/02/2015 03:40 PM, Linus Walleij wrote:
-> On Mon, Nov 2, 2015 at 1:56 PM, Daniel Lezcano
-> <daniel.lezcano@linaro.org> wrote:
->
->> Let the platform's Kconfig to select the clock instead of having a reverse
->> dependency from the driver to the platform options.
->>
->> Add the COMPILE_TEST option for the compilation test coverage.
->>
->> This change is debatable as the option itself in the Kconfig allows to
->> select the driver for the platform or not. This change will make the prcmu
->> timer always selected.
->>
->> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
->
-> Acked-by: Linus Walleij <linus.walleij@linaro.org>
->
-> Please merge this into the clksrc tree.
+On Fri, Oct 30, 2015 at 06:26:53PM +0000, Andre Przywara wrote:
+> Hi,
 
-Thanks for the review.
+Hello Andre,
 
-   -- Daniel
+> this series cleans up kvmtool's kernel loading functionality a bit.
+> It has been broken out of a previous series I sent [1] and contains
+> just the cleanup and bug fix parts, which should be less controversial
+> and thus easier to merge ;-)
+> I will resend the pipe loading part later on as a separate series.
+> 
+> The first patch properly abstracts kernel loading to move
+> responsibility into each architecture's code. It removes quite some
+> ugly code from the generic kvm.c file.
+> The later patches address the naive usage of read(2) to, well, read
+> data from files. Doing this without coping with the subtleties of
+> the UNIX read semantics (returning with less or none data read is not
+> an error) can provoke hard to debug failures.
+> So these patches make use of the existing and one new wrapper function
+> to make sure we read everything we actually wanted to.
+> The last patch moves the ARM kernel loading code into the proper
+> location to be in line with the other architectures.
+> 
+> Please have a look and give some comments!
 
+Looks good to me, but I'd like to see some comments from some mips/ppc/x86
+people on the changes you're making over there.
 
--- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Will
