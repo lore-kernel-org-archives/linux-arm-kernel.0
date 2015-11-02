@@ -1,120 +1,193 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Mon, 2 Nov 2015 20:47:09 +0900
-Subject: [PATCH 1/2] pinctrl: uniphier: enable UniPhier SoCs pinctrl
- drivers by default
-In-Reply-To: <20151031014110.GA1991@localhost>
-References: <1445912911-1292-1-git-send-email-yamada.masahiro@socionext.com>
- <CACRpkdY4hs_7dE2KicDeUj7hvbKmHu3pcwQO3eshTtSmzH2PGA@mail.gmail.com>
- <20151031014110.GA1991@localhost>
-Message-ID: <CAK7LNARaHE5NU=Q2LwEGChV6BiN02s9KbiUztDJ-d7kf9Zcd9Q@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 2 Nov 2015 11:51:19 +0000
+Subject: [PATCH v6 1/6] arm/arm64: add smccc
+In-Reply-To: <1446106888-8983-2-git-send-email-jens.wiklander@linaro.org>
+References: <1446106888-8983-1-git-send-email-jens.wiklander@linaro.org>
+ <1446106888-8983-2-git-send-email-jens.wiklander@linaro.org>
+Message-ID: <20151102115119.GB29657@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Olof,
+Hi Jens,
 
+On Thu, Oct 29, 2015 at 09:21:23AM +0100, Jens Wiklander wrote:
+> Adds helpers to do SMC and HVC based on ARM SMC Calling Convention.
+> CONFIG_HAVE_SMCCC is enabled for architectures that may support
+> the SMC or HVC instruction. It's the responsibility of the caller
+> to know if the SMC instruction is supported by the platform.
+> 
+> Signed-off-by: Jens Wiklander <jens.wiklander@linaro.org>
+> ---
+>  arch/arm/Kconfig               |  4 ++
+>  arch/arm/kernel/Makefile       |  2 +
+>  arch/arm/kernel/smccc-call.S   | 49 +++++++++++++++++++++
+>  arch/arm/kernel/smccc.c        | 18 ++++++++
+>  arch/arm64/Kconfig             |  4 ++
+>  arch/arm64/kernel/Makefile     |  1 +
+>  arch/arm64/kernel/smccc-call.S | 43 ++++++++++++++++++
+>  arch/arm64/kernel/smccc.c      | 18 ++++++++
+>  include/linux/arm-smccc.h      | 98 ++++++++++++++++++++++++++++++++++++++++++
 
-2015-10-31 10:41 GMT+09:00 Olof Johansson <olof@lixom.net>:
-> On Thu, Oct 29, 2015 at 02:33:34PM +0100, Linus Walleij wrote:
->> On Tue, Oct 27, 2015 at 3:28 AM, Masahiro Yamada
->> <yamada.masahiro@socionext.com> wrote:
->>
->> > Add "default y" to the Kconfig rather than adding entries into
->> > arch/arm/configs/multi_v7_defconfig.
->> >
->> > Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
->>
->> (...)
->> > config PINCTRL_UNIPHIER_PH1_LD4
->> >         tristate "UniPhier PH1-LD4 SoC pinctrl driver"
->> > +       default y
->> >         select PINCTRL_UNIPHIER_CORE
->>
->> Why is it not default y if <PH1_LD4_SOC_THING>?
->>
->> So it is only turned on if the corresponding SoC is selected?
->>
->> Or don't you have symbols like that?
->>
->> ARM SoC folks: can you ACK this patch indicating that this is the way
->> you wanna handle this?
->
-> Most other will have a "default MACH_<foo>", but Uniphier lacks those Kconfig
-> symbols. Or even a def_bool for that platform such that it's not an option if
-> the platform is enabled. It makes no sense to enable a platform but not the
-> pinctrl on it, so that's a good way to do it.
->
-> I would honestly rather have those in the mach makefile, and make the drivers
-> select the right thing by default, than having to know exactly which drivers to
-> enable for a specific SoC.
+This should probably be split so that the arm and arm64 patches can be
+merged separately.
 
-I have a question.
+>  9 files changed, 237 insertions(+)
+>  create mode 100644 arch/arm/kernel/smccc-call.S
+>  create mode 100644 arch/arm/kernel/smccc.c
+>  create mode 100644 arch/arm64/kernel/smccc-call.S
+>  create mode 100644 arch/arm64/kernel/smccc.c
+>  create mode 100644 include/linux/arm-smccc.h
 
+[...]
 
-Most of sub-architectures define per-SoC options in their mach-<>/Kconfig,but
-some of them enable DTBs per SoC-family.
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index 72ad724..29ab16a 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -226,6 +226,9 @@ config NEED_RET_TO_USER
+>  config ARCH_MTD_XIP
+>  	bool
+>  
+> +config HAVE_SMCCC
+> +	bool
 
+If you want this to be selectable by multiple arches, wouldn't it be
+better to define it out in a common Kconfig file? Maybe HAVE_ARM_SMCCC
+too, for some better namespacing.
 
-For example,
+An alternative is just making your TEE driver depend on ARM || ARM64
+and providing dummy smc wrappers that return an error code for cores
+older than ARMv7.
 
-arch/arm/mach-exynos/Kconfig define SoC options.
+> diff --git a/arch/arm64/kernel/smccc-call.S b/arch/arm64/kernel/smccc-call.S
+> new file mode 100644
+> index 0000000..9098bd8
+> --- /dev/null
+> +++ b/arch/arm64/kernel/smccc-call.S
+> @@ -0,0 +1,43 @@
+> +/*
+> + * Copyright (c) 2015, Linaro Limited
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License Version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+> + * GNU General Public License for more details.
+> + *
+> + */
+> +#include <linux/linkage.h>
+> +
+> +#define SMC_RES_X0_OFFS	0
+> +#define SMC_RES_X2_OFFS	16
 
+These should be generates in asm-offsets.c
 
-So,
+> +
+> +/*
+> + * void smccc_smc(unsigned long a0, unsigned long a1, unsigned long a2,
+> + *		  unsigned long a3, unsigned long a4, unsigned long a5,
+> + *		  unsigned long a6, unsigned long a7, struct smccc_res *res)
+> + */
+> +ENTRY(smccc_smc)
+> +	smc	#0
+> +	ldr	x4, [sp]
+> +	stp	x0, x1, [x4, #SMC_RES_X0_OFFS]
+> +	stp	x2, x3, [x4, #SMC_RES_X2_OFFS]
+> +	ret
+> +ENDPROC(smccc_smc)
+> +
+> +/*
+> + * void smccc_hvc(unsigned long a0, unsigned long a1, unsigned long a2,
+> + *		  unsigned long a3, unsigned long a4, unsigned long a5,
+> + *		  unsigned long a6, unsigned long a7, struct smccc_res *res)
+> + */
+> +ENTRY(smccc_hvc)
+> +	hvc	#0
+> +	ldr	x4, [sp]
+> +	stp	x0, x1, [x4, #SMC_RES_X0_OFFS]
+> +	stp	x2, x3, [x4, #SMC_RES_X2_OFFS]
+> +	ret
+> +ENDPROC(smccc_hvc)
 
-dtb-$(CONFIG_ARCH_EXYNOS5) += \
-        exynos5250-arndale.dtb \
-        exynos5250-smdk5250.dtb \
-        exynos5250-snow.dtb \
-        exynos5250-spring.dtb \
-        exynos5260-xyref5260.dtb \
-        exynos5410-smdk5410.dtb \
-        exynos5420-arndale-octa.dtb \
-        exynos5420-peach-pit.dtb \
-        exynos5420-smdk5420.dtb \
-        exynos5422-odroidxu3.dtb \
-        exynos5422-odroidxu3-lite.dtb \
-        exynos5440-sd5v1.dtb \
-        exynos5440-ssdk5440.dtb \
-        exynos5800-peach-pi.dtb
+Maybe you could generate both of these from an asm macro that takes the
+first instruction as a parameter?
 
-should be like follows?
+> diff --git a/arch/arm64/kernel/smccc.c b/arch/arm64/kernel/smccc.c
+> new file mode 100644
+> index 0000000..ed13ba3
+> --- /dev/null
+> +++ b/arch/arm64/kernel/smccc.c
+> @@ -0,0 +1,18 @@
+> +/*
+> + * Copyright (c) 2015, Linaro Limited
+> + *
+> + * This software is licensed under the terms of the GNU General Public
+> + * License version 2, as published by the Free Software Foundation, and
+> + * may be copied, distributed, and modified under those terms.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + */
+> +#include <linux/export.h>
+> +#include <linux/arm-smccc.h>
+> +
+> +EXPORT_SYMBOL_GPL(smccc_smc);
+> +EXPORT_SYMBOL_GPL(smccc_hvc);
 
-dtb-$(CONFIG_SOC_EXYNOS5250) += \
-        exynos5250-arndale.dtb \
-        exynos5250-smdk5250.dtb \
-        exynos5250-snow.dtb \
-        exynos5250-spring.dtb
-dtb-$(CONFIG_SOC_EXYNOS5260) += \
-        exynos5260-xyref5260.dtb
-dtb-$(CONFIG_SOC_EXYNOS5410) += \
-        exynos5410-smdk5410.dtb
-dtb-$(CONFIG_SOC_EXYNOS5420) += \
-        exynos5420-arndale-octa.dtb \
-        exynos5420-peach-pit.dtb \
-        exynos5420-smdk5420.dtb \
-        exynos5422-odroidxu3.dtb \
-        exynos5422-odroidxu3-lite.dtb
-dtb-$(CONFIG_SOC_EXYNOS5440) += \
-        exynos5440-sd5v1.dtb \
-        exynos5440-ssdk5440.dtb
-dtb-$(CONFIG_SOC_EXYNOS5800) += \
-        exynos5800-peach-pi.dtb
+Again, I think you want an arm_ prefix for some better namespacing.
 
+> diff --git a/include/linux/arm-smccc.h b/include/linux/arm-smccc.h
 
+[...]
 
+> +#define SMCCC_SMC_32			(0 << 30)
+> +#define SMCCC_SMC_64			(1 << 30)
+> +#define SMCCC_FAST_CALL			(1 << 31)
+> +#define SMCCC_STD_CALL			(0 << 31)
+> +
+> +#define SMCCC_OWNER_MASK		0x3F
+> +#define SMCCC_OWNER_SHIFT		24
+> +
+> +#define SMCCC_FUNC_MASK			0xFFFF
+> +
+> +#define SMCCC_IS_FAST_CALL(smc_val)	((smc_val) & SMCCC_FAST_CALL)
+> +#define SMCCC_IS_64(smc_val)		((smc_val) & SMCCC_SMC_64)
+> +#define SMCCC_FUNC_NUM(smc_val)		((smc_val) & SMCCC_FUNC_MASK)
+> +#define SMCCC_OWNER_NUM(smc_val) \
+> +	(((smc_val) >> SMCCC_OWNER_SHIFT) & SMCCC_OWNER_MASK)
+> +
+> +#define SMCCC_CALL_VAL(type, calling_convention, owner, func_num) \
+> +			((type) | (calling_convention) | \
+> +			(((owner) & SMCCC_OWNER_MASK) << SMCCC_OWNER_SHIFT) | \
+> +			((func_num) & SMCCC_FUNC_MASK))
+> +
+> +#define SMCCC_OWNER_ARCH		0
+> +#define SMCCC_OWNER_CPU			1
+> +#define SMCCC_OWNER_SIP			2
+> +#define SMCCC_OWNER_OEM			3
+> +#define SMCCC_OWNER_STANDARD		4
+> +#define SMCCC_OWNER_TRUSTED_APP		48
+> +#define SMCCC_OWNER_TRUSTED_APP_END	49
+> +#define SMCCC_OWNER_TRUSTED_OS		50
+> +#define SMCCC_OWNER_TRUSTED_OS_END	63
+> +
+> +/**
+> + * struct smccc_res - Result from SMC/HVC call
+> + * @a0-a3 result values from registers 0 to 3
+> + */
+> +struct smccc_res {
+> +	unsigned long a0;
+> +	unsigned long a1;
+> +	unsigned long a2;
+> +	unsigned long a3;
+> +};
 
-Likewise for Mediatek DTBs?
+Are there any endianness considerations for this structure?
 
-dtb-$(CONFIG_ARCH_MEDIATEK) += \
-        mt6580-evbp1.dtb \
-        mt6589-aquaris5.dtb \
-        mt6592-evb.dtb \
-        mt8127-moose.dtb \
-        mt8135-evbp1.dtb
-
-
-
-
--- 
-Best Regards
-Masahiro Yamada
+Will
