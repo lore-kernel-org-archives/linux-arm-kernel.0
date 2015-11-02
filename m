@@ -1,17 +1,25 @@
-From: cl@linux.com (Christoph Lameter)
-Date: Mon, 2 Nov 2015 10:08:46 -0600 (CST)
-Subject: [PATCH v6 1/3] percpu: remove PERCPU_ENOUGH_ROOM which is stale
- definition
-In-Reply-To: <1446363977-23656-2-git-send-email-jungseoklee85@gmail.com>
-References: <1446363977-23656-1-git-send-email-jungseoklee85@gmail.com>
- <1446363977-23656-2-git-send-email-jungseoklee85@gmail.com>
-Message-ID: <alpine.DEB.2.20.1511021007400.27740@east.gentwo.org>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Mon, 2 Nov 2015 21:40:07 +0530
+Subject: [PATCH v3 0/2] thermal: mediatek: Add cpu power cooling model
+In-Reply-To: <9hh4mh4bdoi.fsf@e105922-lin.cambridge.arm.com>
+References: <1445515359-8587-1-git-send-email-dawei.chien@mediatek.com>
+ <20151028154449.GH3716@ubuntu>
+ <9hh4mh4bdoi.fsf@e105922-lin.cambridge.arm.com>
+Message-ID: <20151102161007.GI3639@ubuntu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, 1 Nov 2015, Jungseok Lee wrote:
+On 02-11-15, 15:53, Punit Agrawal wrote:
+> For dynamic power, I had posted some patches[0][1][2] introducing the
+> binding as well as updating cooling device registration via cpufreq
+> driver. Now that the SCPI hwmon driver is merged, I should re-send the
+> remaining patches.
+> 
+> [0] http://lkml.iu.edu/hypermail/linux/kernel/1508.0/01020.html
+> [1] http://lkml.iu.edu/hypermail/linux/kernel/1508.0/01022.html
+> [3] http://lkml.iu.edu/hypermail/linux/kernel/1508.0/01031.html
 
-> As pure cleanup, this patch removes PERCPU_ENOUGH_ROOM which is not
-> used any more. That is, no code refers to the definition.
+Sure. Just that whatever can be merged with opp-v2 should be merged.
 
-Acked-by: Christoph Lameter <cl@linux.com>
+-- 
+viresh
