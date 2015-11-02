@@ -1,42 +1,67 @@
-From: alison.wang@freescale.com (Huan Wang)
-Date: Mon, 2 Nov 2015 03:19:42 +0000
-Subject: [PATCH v4] ARM: configs: Add Freescale LS1021A defconfig
-In-Reply-To: <3938714.zt8Y4X5ull@wuerfel>
-References: <1442480614-32345-1-git-send-email-b18965@freescale.com>
- <5073362.oArWDzYkxD@wuerfel>
- <BN3PR0301MB0867C51A52319367F981C630FE230@BN3PR0301MB0867.namprd03.prod.outlook.com>
- <3938714.zt8Y4X5ull@wuerfel>
-Message-ID: <BN3PR0301MB0867A9DA25D6D192EDAACB3BFE2C0@BN3PR0301MB0867.namprd03.prod.outlook.com>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Mon, 2 Nov 2015 11:33:47 +0800
+Subject: [PATCH] i2c: designware: Don't mask TX_EMPTY if write is in
+ progress
+In-Reply-To: <56335CA9.7080105@linux.intel.com>
+References: <1446190649-1318-1-git-send-email-jszhang@marvell.com>
+ <56335CA9.7080105@linux.intel.com>
+Message-ID: <20151102113347.34d20434@xhacker>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> On Tuesday 27 October 2015 14:40:21 Huan Wang wrote:
-> > >
-> > > Ok. What I was suggesting above though was to try to pinpoint
-> > > exactly where it goes wrong. You have verified that it does not
-> > > crash before the page tables are enabled, but that is very early.
-> > > You have also shown that the kernel crashes before the point at
-> > > which the 'Booting Linux on physical CPU 0xf00' message is printed
-> > > to the kernel, but that is *much*
-> > > later: setup_arch() calls parse_early_param(), which in turn sets up
-> > > early_console_write(). This means the 'Booting Linux on physical CPU
-> > > 0xf00'
-> > > is still stuck in the log buffer and you may have crashed someone
-> > > inbetween.
-> > >
-> > > If you can call printascii(), you can try to do that just after
-> > > enabling the page tables to see if that was the problem like you
-> > > suspect, or otherwise add more printascii() statements between
-> > > __turn_mmu_on and
-> > > parse_early_param() to pinpoint the exact code that breaks.
-> > [Alison Wang] Thank you very much for your help. The issue is fixed.
-> >
-> 
-> Ah, very good. I'm curious what caused the problem in the end.
-[Alison Wang] The problem is caused by the wrong fdt_high setting (0xcfffffff).
-When 3G/1G user/kernel memory split is used, U-Boot relocates the device tree
-blob into high memory when booting the kernel and the kernel is unable to access
-the blob.
+Dear Jarkko,
 
-Best Regards,
-Alison Wang
+On Fri, 30 Oct 2015 14:03:53 +0200
+Jarkko Nikula wrote:
+
+> Hi
+> 
+> On 10/30/2015 09:37 AM, Jisheng Zhang wrote:
+> > Currently when i2c_msg index search is completed, TX_EMPTY interrupt
+> > will be masked. But if the size of i2c_msg data is longer than the size
+> > of the tx buffer, we still need TX_EMPTY interrupt, otherwise we will
+> > get "controller timed out" error.
+> >
+> > This patch fixes this issue by only masking TX_EMPTY if i2c_msg index
+> > search is completed and write is not in progress.
+> >
+> > Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+> > ---
+> >   drivers/i2c/busses/i2c-designware-core.c | 7 ++++---
+> >   1 file changed, 4 insertions(+), 3 deletions(-)
+> >
+> > diff --git a/drivers/i2c/busses/i2c-designware-core.c b/drivers/i2c/busses/i2c-designware-core.c
+> > index 7441cdc..a2eb212 100644
+> > --- a/drivers/i2c/busses/i2c-designware-core.c
+> > +++ b/drivers/i2c/busses/i2c-designware-core.c
+> > @@ -542,10 +542,11 @@ i2c_dw_xfer_msg(struct dw_i2c_dev *dev)
+> >   	}
+> >
+> >   	/*
+> > -	 * If i2c_msg index search is completed, we don't need TX_EMPTY
+> > -	 * interrupt any more.
+> > +	 * If i2c_msg index search is completed and writing is not in progress,
+> > +	 * we don't need TX_EMPTY interrupt any more.
+> >   	 */
+> > -	if (dev->msg_write_idx == dev->msgs_num)
+> > +	if (dev->msg_write_idx == dev->msgs_num &&
+> > +			!(dev->status & STATUS_WRITE_IN_PROGRESS))
+> >   		intr_mask &= ~DW_IC_INTR_TX_EMPTY;
+> >  
+> This looks a possible scenario here. What I'm wondering how is the 
+> transfer ending and what condition in i2c_dw_isr() causes the complete() 
+> call?
+> 
+> Assuming we break the for loop in i2c_dw_xfer_msg() with buf_len > 0 and 
+> dev->msg_write_idx == dev->msgs_num how we get back inside the for loop 
+> for writing the remaining bytes and stop command?
+
+This is a good question. After more consideration, I think the following
+condition can't exist:
+
+  (msg_write_idx == dev->msgs_num) && (dev->status & STATUS_WRITE_IN_PROGRESS)
+
+so this patch isn't necessary.
+
+Thanks for your review,
+Jisheng
