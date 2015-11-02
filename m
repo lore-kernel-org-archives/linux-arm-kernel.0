@@ -1,58 +1,120 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Mon, 02 Nov 2015 12:35:27 +0100
-Subject: [RFC v2 1/2] Documentation: bridge: Add documentation for
- ps8640 DT properties
-In-Reply-To: <1446430166-7378-1-git-send-email-jitao.shi@mediatek.com>
-References: <1446430166-7378-1-git-send-email-jitao.shi@mediatek.com>
-Message-ID: <1446464127.3442.37.camel@pengutronix.de>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Mon, 2 Nov 2015 20:47:09 +0900
+Subject: [PATCH 1/2] pinctrl: uniphier: enable UniPhier SoCs pinctrl
+ drivers by default
+In-Reply-To: <20151031014110.GA1991@localhost>
+References: <1445912911-1292-1-git-send-email-yamada.masahiro@socionext.com>
+ <CACRpkdY4hs_7dE2KicDeUj7hvbKmHu3pcwQO3eshTtSmzH2PGA@mail.gmail.com>
+ <20151031014110.GA1991@localhost>
+Message-ID: <CAK7LNARaHE5NU=Q2LwEGChV6BiN02s9KbiUztDJ-d7kf9Zcd9Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jitao,
+Hi Olof,
 
-Am Montag, den 02.11.2015, 10:09 +0800 schrieb Jitao Shi:
-> Add documentation for DT properties supported by
-> ps8640 DSI-eDP converter.
-> 
-> Signed-off-by: Jitao Shi <jitao.shi@mediatek.com>
-> ---
->  .../devicetree/bindings/display/bridge/ps8640.txt  |   43 ++++++++++++++++++++
->  1 file changed, 43 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/display/bridge/ps8640.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/display/bridge/ps8640.txt b/Documentation/devicetree/bindings/display/bridge/ps8640.txt
-> new file mode 100644
-> index 0000000..7edc547
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/display/bridge/ps8640.txt
-> @@ -0,0 +1,43 @@
-> +ps8640-bridge bindings
-> +
-> +Required properties:
-> +	- compatible: "parade,ps8640"
-> +	- reg: first page address of the bridge.
-> +	- sleep-gpios: OF device-tree gpio specification for PD_ pin.
-> +	- reset-gpios: OF device-tree gpio specification for reset pin.
-> +	- mode-sel-gpios: OF device-tree gpio specification for mode-sel pin.
-> +	- vdd12-supply: OF device-tree regulator specification for 1.2V power.
-> +	- vdd33-supply: OF device-tree regulator specification for 3.3V power.
-> +	- ports: The device node can contain video interface port nodes per
-> +		 the video-interfaces bind[1]. For port at 0,set the reg = <0> as
-> +		 ps8640 dsi in and port at 1,set the reg = <1> as ps8640 eDP out.
-> +
-> +[1]: Documentation/devicetree/bindings/media/video-interfaces.txt
-> +
-> +Example:
-> +	edp-bridge at 18 {
-> +		compatible = "parade,ps8640";
-> +		reg = <0x18>;
-> +		sleep-gpios = <&pio 116 GPIO_ACTIVE_HIGH>;
-> +		reset-gpios = <&pio 115 GPIO_ACTIVE_HIGH>;
-> +		mode-sel-gpios = <&pio 92 GPIO_ACTIVE_HIGH>;
-> +		ps8640-1v2-supply = <&ps8640_fixed_1v2>;
-> +		ps8640-3v3-supply = <&mt6397_vgp2_reg>;
 
-These two should be updated to the new regulator property names.
+2015-10-31 10:41 GMT+09:00 Olof Johansson <olof@lixom.net>:
+> On Thu, Oct 29, 2015 at 02:33:34PM +0100, Linus Walleij wrote:
+>> On Tue, Oct 27, 2015 at 3:28 AM, Masahiro Yamada
+>> <yamada.masahiro@socionext.com> wrote:
+>>
+>> > Add "default y" to the Kconfig rather than adding entries into
+>> > arch/arm/configs/multi_v7_defconfig.
+>> >
+>> > Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+>>
+>> (...)
+>> > config PINCTRL_UNIPHIER_PH1_LD4
+>> >         tristate "UniPhier PH1-LD4 SoC pinctrl driver"
+>> > +       default y
+>> >         select PINCTRL_UNIPHIER_CORE
+>>
+>> Why is it not default y if <PH1_LD4_SOC_THING>?
+>>
+>> So it is only turned on if the corresponding SoC is selected?
+>>
+>> Or don't you have symbols like that?
+>>
+>> ARM SoC folks: can you ACK this patch indicating that this is the way
+>> you wanna handle this?
+>
+> Most other will have a "default MACH_<foo>", but Uniphier lacks those Kconfig
+> symbols. Or even a def_bool for that platform such that it's not an option if
+> the platform is enabled. It makes no sense to enable a platform but not the
+> pinctrl on it, so that's a good way to do it.
+>
+> I would honestly rather have those in the mach makefile, and make the drivers
+> select the right thing by default, than having to know exactly which drivers to
+> enable for a specific SoC.
 
-regards
-Philipp
+I have a question.
+
+
+Most of sub-architectures define per-SoC options in their mach-<>/Kconfig,but
+some of them enable DTBs per SoC-family.
+
+
+For example,
+
+arch/arm/mach-exynos/Kconfig define SoC options.
+
+
+So,
+
+dtb-$(CONFIG_ARCH_EXYNOS5) += \
+        exynos5250-arndale.dtb \
+        exynos5250-smdk5250.dtb \
+        exynos5250-snow.dtb \
+        exynos5250-spring.dtb \
+        exynos5260-xyref5260.dtb \
+        exynos5410-smdk5410.dtb \
+        exynos5420-arndale-octa.dtb \
+        exynos5420-peach-pit.dtb \
+        exynos5420-smdk5420.dtb \
+        exynos5422-odroidxu3.dtb \
+        exynos5422-odroidxu3-lite.dtb \
+        exynos5440-sd5v1.dtb \
+        exynos5440-ssdk5440.dtb \
+        exynos5800-peach-pi.dtb
+
+should be like follows?
+
+dtb-$(CONFIG_SOC_EXYNOS5250) += \
+        exynos5250-arndale.dtb \
+        exynos5250-smdk5250.dtb \
+        exynos5250-snow.dtb \
+        exynos5250-spring.dtb
+dtb-$(CONFIG_SOC_EXYNOS5260) += \
+        exynos5260-xyref5260.dtb
+dtb-$(CONFIG_SOC_EXYNOS5410) += \
+        exynos5410-smdk5410.dtb
+dtb-$(CONFIG_SOC_EXYNOS5420) += \
+        exynos5420-arndale-octa.dtb \
+        exynos5420-peach-pit.dtb \
+        exynos5420-smdk5420.dtb \
+        exynos5422-odroidxu3.dtb \
+        exynos5422-odroidxu3-lite.dtb
+dtb-$(CONFIG_SOC_EXYNOS5440) += \
+        exynos5440-sd5v1.dtb \
+        exynos5440-ssdk5440.dtb
+dtb-$(CONFIG_SOC_EXYNOS5800) += \
+        exynos5800-peach-pi.dtb
+
+
+
+
+Likewise for Mediatek DTBs?
+
+dtb-$(CONFIG_ARCH_MEDIATEK) += \
+        mt6580-evbp1.dtb \
+        mt6589-aquaris5.dtb \
+        mt6592-evb.dtb \
+        mt8127-moose.dtb \
+        mt8135-evbp1.dtb
+
+
+
+
+-- 
+Best Regards
+Masahiro Yamada
