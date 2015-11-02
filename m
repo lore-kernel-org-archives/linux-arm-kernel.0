@@ -1,36 +1,79 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 2 Nov 2015 12:27:48 +0100
-Subject: Build regressions/improvements in v4.3
-In-Reply-To: <1446463587-28133-1-git-send-email-geert@linux-m68k.org>
-References: <1446463587-28133-1-git-send-email-geert@linux-m68k.org>
-Message-ID: <CAMuHMdV9_3j7y_6KtW1+Dc7+YrGP1Wcc0fZg7QTGuTafAk1v-g@mail.gmail.com>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Mon, 2 Nov 2015 12:30:37 +0100
+Subject: [PATCH 1/2] arm64: dts: exynos7: Add pmic s2mps15 device tree node
+In-Reply-To: <1446458641-4447-1-git-send-email-alim.akhtar@samsung.com>
+References: <1446458641-4447-1-git-send-email-alim.akhtar@samsung.com>
+Message-ID: <5637495D.1080701@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 2, 2015 at 12:26 PM, Geert Uytterhoeven
-<geert@linux-m68k.org> wrote:
-> JFYI, when comparing v4.3[1] to v4.3-rc7[3], the summaries are:
->   - build errors: +4/-7
+Hello Alim,
 
-  + /home/kisskb/slave/src/drivers/scsi/advansys.c: error: implicit
-declaration of function 'free_dma'
-[-Werror=implicit-function-declaration]:  => 11384:3
-  + /home/kisskb/slave/src/drivers/scsi/advansys.c: error: implicit
-declaration of function 'request_dma'
-[-Werror=implicit-function-declaration]:  => 11300:4
+This patch looks mostly good to me, I just have two comments below:
 
-arm-randconfig
+On 11/02/2015 11:04 AM, Alim Akhtar wrote:
+> This patch add pmic (s2mps15) node of espresso board,
+> which includes addition of regulators and pmic-clk sub-nodes.
+> 
+> Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
+> Signed-off-by: Alim Akhtar <alim.akhtar@samsung.com>
+> ---
+> This patch should go in after driver side changes [1] lands.
+> [1]-> https://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg47736.html
+> 
+>  arch/arm64/boot/dts/exynos/exynos7-espresso.dts |  349 +++++++++++++++++++++++
+>  1 file changed, 349 insertions(+)
+> 
+> diff --git a/arch/arm64/boot/dts/exynos/exynos7-espresso.dts b/arch/arm64/boot/dts/exynos/exynos7-espresso.dts
+> index 838a3626dac1..8ce04a0ec928 100644
+> --- a/arch/arm64/boot/dts/exynos/exynos7-espresso.dts
+> +++ b/arch/arm64/boot/dts/exynos/exynos7-espresso.dts
+> @@ -53,6 +53,355 @@
+>  	status = "okay";
+>  };
+>  
+> +&hsi2c_4 {
+> +	samsung,i2c-sda-delay = <100>;
+> +	samsung,i2c-max-bus-freq = <200000>;
+> +	status = "okay";
+> +
+> +	s2mps15_pmic at 66 {
+> +		compatible = "samsung,s2mps15-pmic";
+> +		reg = <0x66>;
+> +		interrupts = <2 0>;
 
-> [1] http://kisskb.ellerman.id.au/kisskb/head/9535/ (256 out of 254 configs)
-> [3] http://kisskb.ellerman.id.au/kisskb/head/9511/ (255 out of 254 configs)
+Maybe using IRQ_TYPE_NONE instead of 0?
 
-Gr{oetje,eeting}s,
+> +		interrupt-parent = <&gpa0>;
+> +		pinctrl-names = "default";
+> +		pinctrl-0 = <&pmic_irq>;
+> +		wakeup-source;
+> +
+> +		s2mps15_osc: clocks {
+> +			compatible = "samsung,s2mps13-clk";
+> +			#clock-cells = <1>;
+> +			clock-output-names = "s2mps13_ap", "s2mps13_cp",
+> +				"s2mps13_bt";
+> +		};
+> +
+> +		regulators {
+> +			ldo1_reg: LDO1 {
+> +				regulator-name = "vdd_ldo1";
+> +				regulator-min-microvolt = <500000>;
+> +				regulator-max-microvolt = <900000>;
+> +				regulator-always-on;
 
-                        Geert
+I see that all regulators are marked as regulator-always-on but that will
+prevent the regulator subsystem to disable unused regulators. Can you please
+double check which regulators should really be always on and which ones can
+be disabled if are not used?
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+After those two changes:
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
+
+Best regards,
+-- 
+Javier Martinez Canillas
+Open Source Group
+Samsung Research America
