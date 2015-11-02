@@ -1,52 +1,99 @@
-From: alex.aring@gmail.com (Alexander Aring)
-Date: Mon, 2 Nov 2015 09:46:02 +0100
-Subject: [RFC] rpi: add support to enable usb power domain
-In-Reply-To: <87a8r1pkfz.fsf@eliezer.anholt.net>
-References: <1446064810-5064-1-git-send-email-alex.aring@gmail.com>
- <87a8r1pkfz.fsf@eliezer.anholt.net>
-Message-ID: <20151102084557.GA1342@omega>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Mon, 2 Nov 2015 09:48:38 +0100
+Subject: [PATCH] clocksource: dw_apb_timer_of: support timer-based delay
+In-Reply-To: <20151102105113.72aade85@xhacker>
+References: <1446193659-1698-1-git-send-email-jszhang@marvell.com>
+ <56334A1E.7060709@linaro.org> <20151030190929.4c46066c@xhacker>
+ <5633646D.7030206@linaro.org> <20151102105113.72aade85@xhacker>
+Message-ID: <56372366.6090905@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 11/02/2015 03:51 AM, Jisheng Zhang wrote:
+> Dear Daniel,
+>
+> On Fri, 30 Oct 2015 13:37:01 +0100
+> Daniel Lezcano wrote:
+>
+>> On 10/30/2015 12:09 PM, Jisheng Zhang wrote:
+>>> Dear Daniel,
+>>>
+>>> On Fri, 30 Oct 2015 11:44:46 +0100
+>>> Daniel Lezcano <daniel.lezcano@....> wrote:
+>>>
+>>>> On 10/30/2015 09:27 AM, Jisheng Zhang wrote:
+>>>>> Implement an ARM delay timer to be used for udelay(). This allows us to
+>>>>> skip the delay loop calibration at boot on Marvell BG2, BG2Q, BG2CD
+>>>>> platforms. And after this patch, udelay() will be unaffected by CPU
+>>>>> frequency changes.
+>>>>>
+>>>>> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+>>>>> ---
+>>>>>     drivers/clocksource/Kconfig           | 10 ++++++++++
+>>>>>     drivers/clocksource/dw_apb_timer_of.c | 16 ++++++++++++++++
+>>>>>     2 files changed, 26 insertions(+)
+>>>>>
+>>>>> diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
+>>>>> index a7726db..7b081805 100644
+>>>>> --- a/drivers/clocksource/Kconfig
+>>>>> +++ b/drivers/clocksource/Kconfig
+>>>>> @@ -29,6 +29,16 @@ config DW_APB_TIMER_OF
+>>>>>     	select DW_APB_TIMER
+>>>>>     	select CLKSRC_OF
+>>>>>
+>>>>> +config DW_APB_TIMER_BASED_DELAY
+>>>>> +	bool "DW APB timer based delay"
+>>>>> +	depends on ARM && DW_APB_TIMER_OF
+>>>>> +	default n
+>>>>> +	help
+>>>>> +	  This option enables support for using the DW APB timer to
+>>>>> +	  implement timer-based delay. It is useful for skiping the
+>>>>> +	  delay loop calibration at boot on some platforms. And the
+>>>>> +	  udelay() will be unaffected by CPU frequency changes.
+>>>>> +
+>>>>
+>>>> Why do you want it to be optional ?
+>>>>
+>>>
+>>> Because in some platforms which has arm arch timer, this dw apb timer
+>>> delay isn't needed, the arch timer is better. So we want it be optional
+>>> so that the platforms which need this feature select it manually when config
+>>> the kernel.
+>>
+>> Correct me if I am wrong. If you have the arch timer, you don't need the
+>
+> Yes, I don't need the dw apb timer if we have arch timer,
+>
+>> dw apb timer at all, no ? So the selection would be arch arm timer *or*
+>> dw_apb_timer ? not arch_arm_timer for delay and dw_apb_timer for
+>> clockevents, right ?
+>
+> Yes, if we have arch timer, I prefer to use it for clockevent and delay.
+>
+> Could you please provide suggestion how to handle this case?
 
-On Thu, Oct 29, 2015 at 12:02:24PM -0700, Eric Anholt wrote:
-> Alexander Aring <alex.aring@gmail.com> writes:
-> 
-> > This patch adds support for RPi several Power Domains and enable support
-> > to enable the USB Power Domain when it's not enabled before.
-> >
-> > This patch based on Eric Anholt's patch to support Power Domains. He had
-> > an issue about -EPROBE_DEFER inside the power domain subsystem, this
-> > issue was solved by commit <311fa6a> ("PM / Domains: Return -EPROBE_DEFER
-> > if we fail to init or turn-on domain").
-> >
-> > It was tested with barebox and the following scripts before booting
-...
-> > Third:
-> > The barebox regulator doesn't support right now to enable/disable
-> > regulators at runtime but I want to bring this mainline in the next
-> > days. So you can't check yourself if the above scripts working right
-> > now. I describe it here to show you what exactly I tested.
-> >
-> > changes since Eric Anholts "power domain" patch:
-> >  - add for me all known power domains of the RPi, it contains the domains
-> >    0 - 9.
-> 
-> Note: None of the power domain enums other than the ones I'd had in my
-> patch are actually connected to anything in the firmware.  I don't think
-> we should be adding them, given that.
+If I follow the logic of arch_arm_timer is better than dw_apb timer.
 
-Okay. Then it makes sense that I still accessing UART and SDHC when I
-turn off the power.
+1. The arch_arm_timer is present
 
-In you patch you had SDHC, USB, DSI. Are you sure that SDHC power domain
-has any effect, because I don't see any effect and can still access the
-sd card.
+  => dw_apb timer is not used at all
 
-I using "... firmware from 2015-10-28 17:06".
+  CONFIG_ARM_ARCH_TIMER=y
+  # CONFIG_DW_APB_TIMER is not set
 
-I would add the power-domains where we have currently an use-case for it
-and this USB at the moment. Is this okay for you?
+2. The arch_arm_timer is *not* present
 
-- Alex
+  => dw_apb_timer is used with delay code
+
+  # CONFIG_ARM_ARCH_TIMER is not set
+  CONFIG_DW_APB_TIMER=y
+
+In both cases, DW_APB_TIMER_BASED_DELAY is not needed.
+
+
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
