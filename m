@@ -1,67 +1,36 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Mon, 2 Nov 2015 12:14:26 +0100
-Subject: [PATCH 3/3] arm: plat-omap: Add PWM dmtimer platform data quirks
-Message-ID: <56374592.4060201@baylibre.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 2 Nov 2015 12:27:48 +0100
+Subject: Build regressions/improvements in v4.3
+In-Reply-To: <1446463587-28133-1-git-send-email-geert@linux-m68k.org>
+References: <1446463587-28133-1-git-send-email-geert@linux-m68k.org>
+Message-ID: <CAMuHMdV9_3j7y_6KtW1+Dc7+YrGP1Wcc0fZg7QTGuTafAk1v-g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to set the currently platform dependent dmtimer
-functions pointers as platform data for the pwm-omap-dmtimer
-platform driver, add it to plat-omap auxdata_lookup table.
+On Mon, Nov 2, 2015 at 12:26 PM, Geert Uytterhoeven
+<geert@linux-m68k.org> wrote:
+> JFYI, when comparing v4.3[1] to v4.3-rc7[3], the summaries are:
+>   - build errors: +4/-7
 
-Suggested-by: Tony Lindgren <tony@atomide.com>
-Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
----
- arch/arm/mach-omap2/pdata-quirks.c | 23 +++++++++++++++++++++++
- 1 file changed, 23 insertions(+)
+  + /home/kisskb/slave/src/drivers/scsi/advansys.c: error: implicit
+declaration of function 'free_dma'
+[-Werror=implicit-function-declaration]:  => 11384:3
+  + /home/kisskb/slave/src/drivers/scsi/advansys.c: error: implicit
+declaration of function 'request_dma'
+[-Werror=implicit-function-declaration]:  => 11300:4
 
-diff --git a/arch/arm/mach-omap2/pdata-quirks.c b/arch/arm/mach-omap2/pdata-quirks.c
-index ea56397..647dec5 100644
---- a/arch/arm/mach-omap2/pdata-quirks.c
-+++ b/arch/arm/mach-omap2/pdata-quirks.c
-@@ -23,6 +23,8 @@
- #include <linux/platform_data/pinctrl-single.h>
- #include <linux/platform_data/iommu-omap.h>
- #include <linux/platform_data/wkup_m3.h>
-+#include <linux/platform_data/pwm_omap_dmtimer.h>
-+#include <plat/dmtimer.h>
+arm-randconfig
 
- #include <asm/siginfo.h>
- #include <asm/signal.h>
-@@ -453,6 +455,24 @@ void omap_auxdata_legacy_init(struct device *dev)
- 	dev->platform_data = &twl_gpio_auxdata;
- }
+> [1] http://kisskb.ellerman.id.au/kisskb/head/9535/ (256 out of 254 configs)
+> [3] http://kisskb.ellerman.id.au/kisskb/head/9511/ (255 out of 254 configs)
 
-+/* Dual mode timer PWM callbacks platdata */
-+#if IS_ENABLED(CONFIG_OMAP_DM_TIMER)
-+struct pwm_omap_dmtimer_pdata pwm_dmtimer_pdata = {
-+	.request_by_node = omap_dm_timer_request_by_node,
-+	.free = omap_dm_timer_free,
-+	.enable = omap_dm_timer_enable,
-+	.disable = omap_dm_timer_disable,
-+	.get_fclk = omap_dm_timer_get_fclk,
-+	.start = omap_dm_timer_start,
-+	.stop = omap_dm_timer_stop,
-+	.set_load = omap_dm_timer_set_load,
-+	.set_match = omap_dm_timer_set_match,
-+	.set_pwm = omap_dm_timer_set_pwm,
-+	.set_prescaler = omap_dm_timer_set_prescaler,
-+	.write_counter = omap_dm_timer_write_counter,
-+};
-+#endif
-+
- /*
-  * Few boards still need auxdata populated before we populate
-  * the dev entries in of_platform_populate().
-@@ -506,6 +526,9 @@ static struct of_dev_auxdata omap_auxdata_lookup[] __initdata = {
- 	OF_DEV_AUXDATA("ti,am4372-wkup-m3", 0x44d00000, "44d00000.wkup_m3",
- 		       &wkup_m3_data),
- #endif
-+#if IS_ENABLED(CONFIG_OMAP_DM_TIMER)
-+	OF_DEV_AUXDATA("ti,omap-dmtimer-pwm", 0, NULL, &pwm_dmtimer_pdata),
-+#endif
- #if defined(CONFIG_ARCH_OMAP4) || defined(CONFIG_SOC_OMAP5)
- 	OF_DEV_AUXDATA("ti,omap4-iommu", 0x4a066000, "4a066000.mmu",
- 		       &omap4_iommu_pdata),
--- 
-1.9.1
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
