@@ -1,23 +1,87 @@
-From: cl@linux.com (Christoph Lameter)
-Date: Mon, 2 Nov 2015 10:48:17 -0600 (CST)
-Subject: [PATCH v6 2/3] percpu: add PERCPU_ATOM_SIZE for a generic percpu
- area setup
-In-Reply-To: <20151102162236.GB7637@e104818-lin.cambridge.arm.com>
-References: <1446363977-23656-1-git-send-email-jungseoklee85@gmail.com>
- <1446363977-23656-3-git-send-email-jungseoklee85@gmail.com>
- <alpine.DEB.2.20.1511021008580.27740@east.gentwo.org>
- <20151102162236.GB7637@e104818-lin.cambridge.arm.com>
-Message-ID: <alpine.DEB.2.20.1511021047420.28255@east.gentwo.org>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Mon,  2 Nov 2015 17:55:56 +0100
+Subject: [PATCH v4] pwm-backlight: Avoid backlight flicker when probed from DT
+Message-ID: <1446483356-14338-1-git-send-email-p.zabel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2 Nov 2015, Catalin Marinas wrote:
+If the driver is probed from the device tree, and there is a phandle
+property set on it, and the enable GPIO is already configured as output,
+and the backlight is currently disabled, keep it disabled.
+If all these conditions are met, assume there will be some other driver
+that can enable the backlight at the appropriate time.
 
-> I haven't looked at the patch 3/3 in detail but I'm pretty sure I'll NAK
-> the approach (and the definition of PERCPU_ATOM_SIZE), therefore
-> rendering this patch unnecessary. IIUC, this is used to enforce some
-> alignment of the per-CPU IRQ stack to be able to check whether the
-> current stack is process or IRQ on exception entry. But there are other,
-> less intrusive ways to achieve the same (e.g. x86).
+Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+Reviewed-by: Christian Gmeiner <christian.gmeiner@gmail.com>
+---
+Changes since v3:
+ - No need to call of_find_property(of_node, "phandle", NULL),
+   just use of_node->phandle.
+ - Rebased onto v4.3
+---
+ drivers/video/backlight/pwm_bl.c | 23 ++++++++++++++++++++++-
+ 1 file changed, 22 insertions(+), 1 deletion(-)
 
-The percpu allocator allows the specification of alignment requirements.
+diff --git a/drivers/video/backlight/pwm_bl.c b/drivers/video/backlight/pwm_bl.c
+index eff379b..65e57da 100644
+--- a/drivers/video/backlight/pwm_bl.c
++++ b/drivers/video/backlight/pwm_bl.c
+@@ -199,6 +199,8 @@ static int pwm_backlight_probe(struct platform_device *pdev)
+ 	struct backlight_properties props;
+ 	struct backlight_device *bl;
+ 	struct pwm_bl_data *pb;
++	phandle phandle = pdev->dev.of_node->phandle;
++	int initial_blank = FB_BLANK_UNBLANK;
+ 	int ret;
+ 
+ 	if (!data) {
+@@ -242,7 +244,7 @@ static int pwm_backlight_probe(struct platform_device *pdev)
+ 	pb->enabled = false;
+ 
+ 	pb->enable_gpio = devm_gpiod_get_optional(&pdev->dev, "enable",
+-						  GPIOD_OUT_HIGH);
++						  GPIOD_ASIS);
+ 	if (IS_ERR(pb->enable_gpio)) {
+ 		ret = PTR_ERR(pb->enable_gpio);
+ 		goto err_alloc;
+@@ -264,12 +266,30 @@ static int pwm_backlight_probe(struct platform_device *pdev)
+ 		pb->enable_gpio = gpio_to_desc(data->enable_gpio);
+ 	}
+ 
++	if (pb->enable_gpio) {
++		/*
++		 * If the driver is probed from the device tree and there is a
++		 * phandle link pointing to the backlight node, it is safe to
++		 * assume that another driver will enable the backlight at the
++		 * appropriate time. Therefore, if it is disabled, keep it so.
++		 */
++		if (phandle &&
++		    gpiod_get_direction(pb->enable_gpio) == GPIOF_DIR_OUT &&
++		    gpiod_get_value(pb->enable_gpio) == 0)
++			initial_blank = FB_BLANK_POWERDOWN;
++		else
++			gpiod_direction_output(pb->enable_gpio, 1);
++	}
++
+ 	pb->power_supply = devm_regulator_get(&pdev->dev, "power");
+ 	if (IS_ERR(pb->power_supply)) {
+ 		ret = PTR_ERR(pb->power_supply);
+ 		goto err_alloc;
+ 	}
+ 
++	if (phandle && !regulator_is_enabled(pb->power_supply))
++		initial_blank = FB_BLANK_POWERDOWN;
++
+ 	pb->pwm = devm_pwm_get(&pdev->dev, NULL);
+ 	if (IS_ERR(pb->pwm)) {
+ 		ret = PTR_ERR(pb->pwm);
+@@ -321,6 +341,7 @@ static int pwm_backlight_probe(struct platform_device *pdev)
+ 	}
+ 
+ 	bl->props.brightness = data->dft_brightness;
++	bl->props.power = initial_blank;
+ 	backlight_update_status(bl);
+ 
+ 	platform_set_drvdata(pdev, bl);
+-- 
+2.6.1
