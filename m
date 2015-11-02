@@ -1,34 +1,63 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 2 Nov 2015 17:35:20 +0000
-Subject: [PATCH v6 2/3] percpu: add PERCPU_ATOM_SIZE for a generic percpu
- area setup
-In-Reply-To: <alpine.DEB.2.20.1511021047420.28255@east.gentwo.org>
-References: <1446363977-23656-1-git-send-email-jungseoklee85@gmail.com>
- <1446363977-23656-3-git-send-email-jungseoklee85@gmail.com>
- <alpine.DEB.2.20.1511021008580.27740@east.gentwo.org>
- <20151102162236.GB7637@e104818-lin.cambridge.arm.com>
- <alpine.DEB.2.20.1511021047420.28255@east.gentwo.org>
-Message-ID: <20151102173520.GC7637@e104818-lin.cambridge.arm.com>
+From: laura@labbott.name (Laura Abbott)
+Date: Mon, 2 Nov 2015 09:40:47 -0800
+Subject: arm64: about Add CONFIG_DEBUG_SET_MODULE_RONX suport
+In-Reply-To: <56343BF2.1070800@huawei.com>
+References: <5633279A.7000003@huawei.com> <56332ADB.7030306@iogearbox.net>
+ <563335FF.5020400@huawei.com> <5633864F.6030203@codeaurora.org>
+ <5633872C.1000005@labbott.name> <56343BF2.1070800@huawei.com>
+Message-ID: <5637A01F.4090806@labbott.name>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 02, 2015 at 10:48:17AM -0600, Christoph Lameter wrote:
-> On Mon, 2 Nov 2015, Catalin Marinas wrote:
-> > I haven't looked at the patch 3/3 in detail but I'm pretty sure I'll NAK
-> > the approach (and the definition of PERCPU_ATOM_SIZE), therefore
-> > rendering this patch unnecessary. IIUC, this is used to enforce some
-> > alignment of the per-CPU IRQ stack to be able to check whether the
-> > current stack is process or IRQ on exception entry. But there are other,
-> > less intrusive ways to achieve the same (e.g. x86).
-> 
-> The percpu allocator allows the specification of alignment requirements.
+(adding Kees to see if he has any inputs)
 
-Patch 3/3 does something like this:
+On 10/30/15 8:56 PM, Xishi Qiu wrote:
+> On 2015/10/30 23:05, Laura Abbott wrote:
+>
+>>>>
+>>>> Hi Daniel,
+>>>>
+>>>> Sorry for didn't saying it clearly. I find this
+>>>> interface(set_memory_ro/rw) can
+>>>> only be used in module address. So why not extend the function? e.g.
+>>>> like x86,
+>>>> it can be used in direct mapping address too.
+>>>>
+>>>> Is there some limits in arm64 or we will do this later?
+>>>>
+>>>
+>>> arm64 maps low mem (all direct mapped memory on arm64) with section
+>>> mappings for performance. set_memory_ro/rw works on PAGE_SIZE
+>>> granularity so if we wanted to use those functions on direct mapped
+>>> memory we would need to break down the section mappings. On arm,
+>>> this was a pain due to the TLB maintaince requried. On arm64, less
+>>> so but we still lose the benefit of the section mappings.
+>>>
+>>> Do you have a use case in mind for wanting to use set_memory_ro/rw
+>>> outside of the module area?
+>>>
+>
+> Hi Laura,
+>
+> How about this case?
+>
+> module alloc some pages which from direct mapping area, and we write
+> important data(e.g. password) on the pages, the data will not be changed
+> during the runtime. If someone unfriendly try to rewrite the memory,
+> something is going to get worse. So we can use set_memory_ro() to protect
+> the date.
+>
 
-DEFINE_PER_CPU(char [IRQ_STACK_SIZE], irq_stacks) __aligned(IRQ_STACK_SIZE)
+How long would you expected this data to stay around (minutes? hours?)
+and how many instances of this would you expect?
 
-where IRQ_STACK_SIZE > PAGE_SIZE. AFAICT, setup_per_cpu_areas() doesn't
-guarantee alignment greater than PAGE_SIZE.
+It also looks like BPF wants to set its region as ro when in use
+(https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/include/linux/filter.h#n370) 
+So it's not completely unheard of.
+I don't think it would be too difficult to take the
+split_{pud,pmd} functions used for the direct mapping and apply them
+for the page_attr if people are willing to make the security/performance
+trade off.
 
--- 
-Catalin
+Thanks,
+Laura
