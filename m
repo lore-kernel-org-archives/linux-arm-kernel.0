@@ -1,65 +1,27 @@
-From: dawei.chien@mediatek.com (dawei chien)
-Date: Mon, 2 Nov 2015 18:51:27 +0800
-Subject: [PATCH v3 2/2] arm64: dts: mt8173: Add thermal zone node for
- mt8173.
-In-Reply-To: <20151028153944.GG3716@ubuntu>
-References: <1445515359-8587-1-git-send-email-dawei.chien@mediatek.com>
- <1445515359-8587-3-git-send-email-dawei.chien@mediatek.com>
- <20151028153944.GG3716@ubuntu>
-Message-ID: <1446461487.10039.33.camel@mtksdaap41>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 2 Nov 2015 12:00:02 +0100
+Subject: [PATCH 05/13 v2] irqchip/gic: assign irqchip dynamically
+In-Reply-To: <5637328F.7060601@arm.com>
+References: <1445591083-22494-1-git-send-email-linus.walleij@linaro.org>
+ <5637328F.7060601@arm.com>
+Message-ID: <CACRpkdYhe41MFBE-ANXOnMHCQ7eXtkU-h8WbRzWzfsWoh1xj=A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2015-10-28 at 21:09 +0530, Viresh Kumar wrote:
-> On 22-10-15, 20:02, Dawei Chien wrote:
-> > Add thermal zone node to mt8173.dtsi.
-> > 
-> > Signed-off-by: Dawei Chien <dawei.chien@mediatek.com>
-> > ---
-> > This patch is base on
-> > https://patchwork.kernel.org/patch/7249821/
-> > https://patchwork.kernel.org/patch/7249861/
-> > https://patchwork.kernel.org/patch/7249891/
-> > ---
-> >  arch/arm64/boot/dts/mediatek/mt8173.dtsi |   90 ++++++++++++++++++++++++++++++
-> >  1 file changed, 90 insertions(+)
-> > 
-> > diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-> > index 3b18f37..eaf12bf 100644
-> > --- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-> > +++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-> > @@ -16,6 +16,7 @@
-> >  #include <dt-bindings/interrupt-controller/arm-gic.h>
-> >  #include <dt-bindings/power/mt8173-power.h>
-> >  #include <dt-bindings/reset-controller/mt8173-resets.h>
-> > +#include <dt-bindings/thermal/mt8173.h>
-> >  #include "mt8173-pinfunc.h"
-> >  
-> >  / {
-> > @@ -54,6 +55,18 @@
-> >  			reg = <0x000>;
-> >  			enable-method = "psci";
-> >  			cpu-idle-states = <&CPU_SLEEP_0>;
-> > +			static-power-points = <
-> > +				859000  43
-> > +				908000  52
-> > +				983000  86
-> > +				1009000 123
-> > +				1028000 138
-> > +				1083000 172
-> > +				1110900 180
-> > +				1125000 192
-> 
-> What's the unit of power here? Is this power accurate? Or just a
-> number representing the power ?
+On Mon, Nov 2, 2015 at 10:53 AM, Marc Zyngier <marc.zyngier@arm.com> wrote:
+> On 23/10/15 10:04, Linus Walleij wrote:
 
-The unit is mW. This power was measured by tools, but it may be not
-accurate enough since this tool has a error range.
+>> Marc: can't test the EOIMODE1 thing, it's far above me, but it
+>> "should work". Is it correct that there is one unique and coupled
+>> EOIMODE1 instance per GIC instance like this?
+>
+> I'm afraid you misinterpreted the EOIMODE==1 thing. The GIC can either
+> be EOIMODE==0 (which is what most people are using on 32bit when not
+> booting at HYP), or EOIMODE==1 (most 64bit systems). For systems with
+> multiple GICs, the secondary GICs are always EOIMODE==0.
 
-> > +			>;
-> > +			dynamic-power-coefficient = <263>;
-> > +			#cooling-cells = <2>;
-> >  		};
-> 
-> @Rob: Looks like another good candidate for the OPP-v2 table? Power.
-> 
+So it's an either-or thing not both-and. OK that's the missing piece,
+thanks Marc, I'll fix up the patch.
+
+Yours,
+Linus Walleij
