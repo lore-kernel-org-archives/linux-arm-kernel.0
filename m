@@ -1,97 +1,45 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Mon, 2 Nov 2015 16:00:51 -0600
-Subject: [PATCH 1/1] doc/bindings: Update Layerscape PCIe devicetree
- bindings for LS2080A
-In-Reply-To: <1445844681-11488-1-git-send-email-bhupesh.sharma@freescale.com>
-References: <1445844681-11488-1-git-send-email-bhupesh.sharma@freescale.com>
-Message-ID: <20151102220051.GB28371@localhost>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 02 Nov 2015 23:05:59 +0100
+Subject: [PATCH RESEND v2 net-next] net: hisilicon: updates HNS config and
+ documents
+In-Reply-To: <563424EB.1060804@huawei.com>
+References: <1445944594-244149-1-git-send-email-huangdaode@hisilicon.com>
+ <56341C00.8080303@hisilicon.com> <563424EB.1060804@huawei.com>
+Message-ID: <4387413.QS6YM6BNWK@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 26, 2015 at 01:01:21PM +0530, Bhupesh Sharma wrote:
-> Update the definition of the Layerscape PCI compatible string to add
-> support for LS2080A, as the controller on LS2080A is different from
-> LS1021A SoC.
-> 
-> While at it, move the clock related properties in the Designware PCIe
-> controller bindings to 'optional' set of properties.
-> 
-> Signed-off-by: Minghuan Lian <Minghuan.Lian@freescale.com>
-> Signed-off-by: Bhupesh Sharma <bhupesh.sharma@freescale.com>
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
-> ---
-> Hi Bjorn,
-> 
-> As discussed with Arnd (http://www.spinics.net/lists/linux-clk/msg04092.html),
-> this patch depends on a patch that is in your PCI tree but not yet in mainline.
-> 
-> So, sending this to you, so that you can apply the patch on top of the other
-> one.
-> 
->  .../devicetree/bindings/pci/designware-pcie.txt    |   10 +++++-----
->  .../devicetree/bindings/pci/layerscape-pci.txt     |   14 ++++++++++++--
+On Saturday 31 October 2015 02:18:19 Salil Mehta wrote:
+> On 10/31/2015 1:40 AM, huangdaode wrote:
+> > On 2015/10/30 22:20, Arnd Bergmann wrote:
+> >> On Tuesday 27 October 2015 19:16:34 huangdaode wrote:
+> >>>            mdio at 803c0000 {
+> >>>                      #address-cells = <1>;
+> >>>                      #size-cells = <0>;
+> >>> -                   compatible = "hisilicon,mdio","hisilicon,hns-mdio";
+> >>> +                   compatible = "hisilicon,hns-mdio","hisilicon,mdio";
+> >>>                      reg = <0x0 0x803c0000 0x0 0x10000>;
+> >>>
+> >> Does "hisilicon,mdio" actually have a specific meaning? Is that just 
+> >> there
+> >> for legacy reasons?
+> >>
+> >>     Arnd
+> >>
+> >> .
+> >>
+> > hi Arnd,
+> > "hisilicon,mdio" is  the gernerical configuation compatible  for the 
+> > default hisilicon chip,
+> > We use generic hisilicon since our MDIO/PHY is same across flavour of 
+> > SoCs.
+> >
+> Hi Arnd,
+> Yes, "hisilicon,mdio" exists for the legacy reasons to support older SoC 
+> Hip04.
 
-Split into two patches and applied to pci/host-designware and
-pci/host-layerscape, since the clocks change doesn't look related to
-the Layerscape change.
+I see. In that case, that compatible string should probably be mentioned
+only as 'optional' in the binding, and not used for devices other than
+hip04.
 
-> diff --git a/Documentation/devicetree/bindings/pci/designware-pcie.txt b/Documentation/devicetree/bindings/pci/designware-pcie.txt
-> index 0036ab3..576218a 100644
-> --- a/Documentation/devicetree/bindings/pci/designware-pcie.txt
-> +++ b/Documentation/devicetree/bindings/pci/designware-pcie.txt
-> @@ -14,11 +14,6 @@ Required properties:
->  - interrupt-map-mask and interrupt-map: standard PCI properties
->  	to define the mapping of the PCIe interface to interrupt
->  	numbers.
-> -- clocks: Must contain an entry for each entry in clock-names.
-> -	See ../clocks/clock-bindings.txt for details.
-> -- clock-names: Must include the following entries:
-> -	- "pcie"
-> -	- "pcie_bus"
->  
->  Optional properties:
->  - num-lanes: number of lanes to use (this property should be specified unless
-> @@ -27,3 +22,8 @@ Optional properties:
->  - bus-range: PCI bus numbers covered (it is recommended for new devicetrees to
->    specify this property, to keep backwards compatibility a range of 0x00-0xff
->    is assumed if not present)
-> +- clocks: Must contain an entry for each entry in clock-names.
-> +	See ../clocks/clock-bindings.txt for details.
-> +- clock-names: Must include the following entries:
-> +	- "pcie"
-> +	- "pcie_bus"
-> diff --git a/Documentation/devicetree/bindings/pci/layerscape-pci.txt b/Documentation/devicetree/bindings/pci/layerscape-pci.txt
-> index 6286f04..ac7e07e 100644
-> --- a/Documentation/devicetree/bindings/pci/layerscape-pci.txt
-> +++ b/Documentation/devicetree/bindings/pci/layerscape-pci.txt
-> @@ -1,10 +1,20 @@
->  Freescale Layerscape PCIe controller
->  
-> -This PCIe host controller is based on the Synopsis Designware PCIe IP
-> +This PCIe host controller is based on the Synopsys Designware PCIe IP
->  and thus inherits all the common properties defined in designware-pcie.txt.
->  
-> +This controller derives its clocks from the Reset Configuration Word (RCW)
-> +which is used to describe the PLL settings at the time of chip-reset.
-> +
-> +Also as per the available Reference Manuals, there is no specific 'version'
-> +register available in the Freescale PCIe controller register set,
-> +which can allow determining the underlying Designware PCIe controller version
-> +information.
-> +
->  Required properties:
-> -- compatible: should contain the platform identifier such as "fsl,ls1021a-pcie"
-> +- compatible: should contain the platform identifier such as:
-> +        "fsl,ls1021a-pcie", "snps,dw-pcie"
-> +        "fsl,ls2080a-pcie", "snps,dw-pcie"
->  - reg: base addresses and lengths of the PCIe controller
->  - interrupts: A list of interrupt outputs of the controller. Must contain an
->    entry for each entry in the interrupt-names property.
-> -- 
-> 1.7.9.5
-> 
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+	Arnd
