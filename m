@@ -1,46 +1,68 @@
-From: matt@codeblueprint.co.uk (Matt Fleming)
-Date: Mon, 2 Nov 2015 12:49:52 +0000
-Subject: [PATCH v4 3/3] arm64/efi: isolate EFI stub from the kernel proper
-In-Reply-To: <CAKv+Gu-G1YS9Ha=-rtnPKJTOxBTrdSq6=Tqwq_GPW742JUE+2Q@mail.gmail.com>
-References: <1444330924-17830-1-git-send-email-ard.biesheuvel@linaro.org>
- <1444330924-17830-4-git-send-email-ard.biesheuvel@linaro.org>
- <562EA894.8070505@arm.com> <562EAA22.3010905@arm.com>
- <CAKv+Gu-G1YS9Ha=-rtnPKJTOxBTrdSq6=Tqwq_GPW742JUE+2Q@mail.gmail.com>
-Message-ID: <20151102121618.GA2331@codeblueprint.co.uk>
+From: cyrille.pitchen@atmel.com (Cyrille Pitchen)
+Date: Mon, 2 Nov 2015 13:56:47 +0100
+Subject: [PATCH linux-next 0/4] mtd: spi-nor: fix Quad SPI memory support
+In-Reply-To: <201511020207.57031.marex@denx.de>
+References: <cover.1442590224.git.cyrille.pitchen@atmel.com>
+ <201511020207.57031.marex@denx.de>
+Message-ID: <56375D8F.5040403@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 27 Oct, at 11:20:51AM, Ard Biesheuvel wrote:
-> From 1179099f89db54294f419493d152083fb8e5af3d Mon Sep 17 00:00:00 2001
-> From: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> Date: Tue, 27 Oct 2015 11:12:51 +0900
-> Subject: [PATCH] arm64/efi: fix libstub build under CONFIG_MODVERSIONS
+Le 02/11/2015 02:07, Marek Vasut a ?crit :
+> On Friday, September 18, 2015 at 05:49:24 PM, Cyrille Pitchen wrote:
+>> Hi all,
 > 
-> Now that we strictly forbid absolute relocations in libstub code,
-> make sure that we don't emit any when CONFIG_MODVERSIONS is enabled,
-> by stripping the kcrctab sections from the object file. This fixes
-> a build problem under CONFIG_MODVERSIONS=y.
+> Hi!
 > 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
->  drivers/firmware/efi/libstub/Makefile | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/firmware/efi/libstub/Makefile
-> b/drivers/firmware/efi/libstub/Makefile
-> index bca9a76cbd33..acc25d7c5da2 100644
-> --- a/drivers/firmware/efi/libstub/Makefile
-> +++ b/drivers/firmware/efi/libstub/Makefile
-> @@ -51,7 +51,7 @@ lib-$(CONFIG_EFI_ARMSTUB) += arm-stub.o fdt.o string.o \
->  extra-$(CONFIG_EFI_ARMSTUB) := $(lib-y)
->  lib-$(CONFIG_EFI_ARMSTUB) := $(patsubst %.o,%.stub.o,$(lib-y))
-> 
-> -STUBCOPY_FLAGS-y := -R .debug* -R *ksymtab*
-> +STUBCOPY_FLAGS-y := -R .debug* -R *ksymtab* -R *kcrctab*
->  STUBCOPY_FLAGS-$(CONFIG_ARM64) += --prefix-alloc-sections=.init \
->     --prefix-symbols=__efistub_
->  STUBCOPY_RELOC-$(CONFIG_ARM64) := R_AARCH64_ABS
+Hi Marek!
 
-I *think* this should be OK.
+>> this series of patches fixes the QSPI support mostly for Micron and
+>> Macronix memories. There are also some updates for Spansion memories.
+>> There are also many comments to explain the implementation choices based
+>> on the datasheets from memory manufacturers.
+>>
+>> The series was backported to a at91-4.1 kernel then tested on a sama5d2
+>> xplained board, which embeds a at25df321a memory on a SPI controller and
+>> a Micron n25q128a13 QSPI memory on the new Atmel QSPI controller.
+>>
+>> The at25 memory was used to check non regression on the m25p80 driver
+>> whereas the Micron memory was used to test the fixes of the spi-nor
+>> framework. The driver for the Atmel QSPI controller will be sent in a
+>> dedicated series.
+> 
+> Are there any news on this patch series? I'd like to use that for my own
+> QSPI driver (the Cadence one), so I'd like to check on the status. Are you
+> still working on this please ?
+> 
+Nothing new from my side. This series of patches should have taken into account
+all the comments I'd received from previous series. At least, I hope so.
+If I forgot some points or if something is still missing, let me know and I'll
+update the series accordingly.
 
-Reviewed-by: Matt Fleming <matt@codeblueprint.co.uk>
+I also wait for a kind of agreement on how we could update the framework API
+so that more QSPI memories could be supported. I have already written a driver
+for an Atmel QSPI controller. This driver is based on this series of patches.
+I have to know what the updated API will be before sending another series for
+the QSPI controller driver. So this series is one proposal for some API updates
+but other proposals may exist.
+
+I've asked Brian on IRC for review and pieces of advice on how he thinks the
+work should be done. I've understood he's right now a little bit busy. I'm fine
+with it. I also often have to deal with many topics almost in the same time so
+I can understand whether he needs more time.
+
+Anyway, I guess Brian has already started to review these patches since last
+Friday he referred to a previous talk we had about some leading space:
+
+http://lists.infradead.org/pipermail/linux-mtd/2015-October/062956.html
+
+
+> Thanks!
+> 
+> Best regards,
+> Marek Vasut
+> 
+
+Best regards,
+
+Cyrille
