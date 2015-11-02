@@ -1,34 +1,98 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 2 Nov 2015 16:22:37 +0000
-Subject: [PATCH v6 2/3] percpu: add PERCPU_ATOM_SIZE for a generic percpu
- area setup
-In-Reply-To: <alpine.DEB.2.20.1511021008580.27740@east.gentwo.org>
-References: <1446363977-23656-1-git-send-email-jungseoklee85@gmail.com>
- <1446363977-23656-3-git-send-email-jungseoklee85@gmail.com>
- <alpine.DEB.2.20.1511021008580.27740@east.gentwo.org>
-Message-ID: <20151102162236.GB7637@e104818-lin.cambridge.arm.com>
+From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
+Date: Mon, 02 Nov 2015 16:22:56 +0000
+Subject: [PATCH v8 2/2] arm-soc: Add support for arm-based tango4 platforms
+In-Reply-To: <56377F09.6050805@sigmadesigns.com> (Marc Gonzalez's message of
+ "Mon, 2 Nov 2015 16:19:37 +0100")
+References: <56377E76.2080209@sigmadesigns.com>
+ <56377F09.6050805@sigmadesigns.com>
+Message-ID: <yw1xfv0o9xr3.fsf@unicorn.mansr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 02, 2015 at 10:10:23AM -0600, Christoph Lameter wrote:
-> On Sun, 1 Nov 2015, Jungseok Lee wrote:
-> 
-> > There is no room to adjust 'atom_size' now when a generic percpu area
-> > is used. It would be redundant to write down an architecture-specific
-> > setup_per_cpu_areas() in order to only change the 'atom_size'. Thus,
-> > this patch adds a new definition, PERCPU_ATOM_SIZE, which is PAGE_SIZE
-> > by default. The value could be updated if needed by architecture.
-> 
-> What is atom_size? Why would you want a difference allocation size here?
-> The percpu area is virtually mapped regardless. So you will have
-> contiguous addresses even without atom_size.
+Marc Gonzalez <marc_gonzalez@sigmadesigns.com> writes:
 
-I haven't looked at the patch 3/3 in detail but I'm pretty sure I'll NAK
-the approach (and the definition of PERCPU_ATOM_SIZE), therefore
-rendering this patch unnecessary. IIUC, this is used to enforce some
-alignment of the per-CPU IRQ stack to be able to check whether the
-current stack is process or IRQ on exception entry. But there are other,
-less intrusive ways to achieve the same (e.g. x86).
+> diff --git a/arch/arm/mach-tangox/setup.c b/arch/arm/mach-tangox/setup.c
+> new file mode 100644
+> index 000000000000..a90e04140a0e
+> --- /dev/null
+> +++ b/arch/arm/mach-tangox/setup.c
+> @@ -0,0 +1,32 @@
+> +#include <linux/smp.h>
+> +#include <asm/mach/arch.h>
+> +#include <asm/hardware/cache-l2x0.h>
+> +#include "smc.h"
+> +
+> +static int tango4_boot_secondary(unsigned int cpu, struct task_struct *idle)
+> +{
+> +	tango_set_aux_boot_addr(virt_to_phys(secondary_startup));
+> +	tango_start_aux_core();
+> +	return 0;
+> +}
+> +
+> +static struct smp_operations tango4_smp_ops __initdata = {
+> +	.smp_boot_secondary	= tango4_boot_secondary,
+> +};
+> +
+> +CPU_METHOD_OF_DECLARE(tango4_smp, "sigma,tango4-smp", &tango4_smp_ops);
+
+Unless I'm missing something, you should enable the SCU before starting
+secondary CPUs.  It's also a good idea to structure the code with
+separate prepare and boot functions even if all the current chips are
+only dual-core.
+
+> +static void tango_l2c_write(unsigned long val, unsigned int reg)
+> +{
+> +	pr_debug("%s: reg=0x%x val=0x%lx\n", __func__, reg, val);
+> +	if (reg == L2X0_CTRL)
+> +		tango_set_l2_control(val);
+
+What about other registers?  Does the firmware support setting the
+prefetch control register?
+
+> +}
+> +
+> +static const char *tango_dt_compat[] = { "sigma,tango4", NULL };
+> +
+> +DT_MACHINE_START(TANGO_DT, "Sigma Tango DT")
+> +	.dt_compat	= tango_dt_compat,
+> +	.l2c_aux_mask	= ~0,
+> +	.l2c_write_sec	= tango_l2c_write,
+> +MACHINE_END
+> diff --git a/arch/arm/mach-tangox/smc.S b/arch/arm/mach-tangox/smc.S
+> new file mode 100644
+> index 000000000000..35f9623aedb1
+> --- /dev/null
+> +++ b/arch/arm/mach-tangox/smc.S
+> @@ -0,0 +1,9 @@
+> +#include <linux/linkage.h>
+> +
+> +ENTRY(tango_smc)
+> +	push	{lr}
+> +	mov	ip, r1
+> +	dsb
+
+Did you ever get a straight answer on the dsb here?
+
+> +	smc	#0
+> +	pop	{pc}
+> +ENDPROC(tango_smc)
+> diff --git a/arch/arm/mach-tangox/smc.h b/arch/arm/mach-tangox/smc.h
+> new file mode 100644
+> index 000000000000..4e704dcf8da8
+> --- /dev/null
+> +++ b/arch/arm/mach-tangox/smc.h
+> @@ -0,0 +1,5 @@
+> +extern int tango_smc(unsigned int val, unsigned int service);
+> +
+> +#define tango_set_l2_control(val)	tango_smc(val, 0x102)
+> +#define tango_start_aux_core()		tango_smc(666, 0x104)
+
+666?
+
+> +#define tango_set_aux_boot_addr(val)	tango_smc((unsigned int)val, 0x105)
+> -- 
+> 2.4.5
 
 -- 
-Catalin
+M?ns Rullg?rd
+mans at mansr.com
