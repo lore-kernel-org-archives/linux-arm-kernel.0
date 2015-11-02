@@ -1,40 +1,41 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon,  2 Nov 2015 13:31:48 +0900
-Subject: [PATCH v6 5/5] arm64: renesas: salvator-x: Setup ethernet0 alias for
- U-Boot
-In-Reply-To: <1446438708-22433-1-git-send-email-horms+renesas@verge.net.au>
-References: <1446438708-22433-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1446438708-22433-6-git-send-email-horms+renesas@verge.net.au>
+From: alison.wang@freescale.com (Huan Wang)
+Date: Mon, 2 Nov 2015 05:54:09 +0000
+Subject: [PATCH] ARM: add v7 LPAE multi-platform defconfig
+In-Reply-To: <CAOMZO5ACSg0VmYV=5Q=gWtP5OZdUXkXa_SDmTC-t8gbzmLVdEg@mail.gmail.com>
+References: <1445956507-34026-1-git-send-email-b18965@freescale.com>
+ <CAOMZO5ACSg0VmYV=5Q=gWtP5OZdUXkXa_SDmTC-t8gbzmLVdEg@mail.gmail.com>
+Message-ID: <BN3PR0301MB0867D05039A429CA6CD62E54FE2C0@BN3PR0301MB0867.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Geert Uytterhoeven <geert+renesas@glider.be>
+Hi, Shawn,
 
-Add an ethernet0 alias for the wired network card so that U-Boot can
-find the device-node and add an appropriate "local-mac-address"
-property.
+	Could you help to review this patch? If it's ok, could you help to merge it?
 
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
-v6
-* New patch
----
- arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts | 1 +
- 1 file changed, 1 insertion(+)
+	Thanks.
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts b/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts
-index d1c2fea8bebc..4bb04982be84 100644
---- a/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts
-+++ b/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts
-@@ -18,6 +18,7 @@
- 	aliases {
- 		serial0 = &scif2;
- 		serial1 = &scif1;
-+		ethernet0 = &avb;
- 	};
- 
- 	chosen {
--- 
-2.1.4
+Best Regards,
+Alison Wang
+
+> -----Original Message-----
+> From: Fabio Estevam [mailto:festevam at gmail.com]
+> Sent: Thursday, October 29, 2015 9:11 PM
+> To: Wang Huan-B18965
+> Cc: Shawn Guo; Russell King; Arnd Bergmann; linux-arm-
+> kernel at lists.infradead.org; linux-kernel; Jin Zhengxiong-R64188; Wang
+> Huan-B18965
+> Subject: Re: [PATCH] ARM: add v7 LPAE multi-platform defconfig
+> 
+> On Tue, Oct 27, 2015 at 12:35 PM, Alison Wang <b18965@freescale.com>
+> wrote:
+> > v7 LPAE multi-platform defconfig is based on v7 multi-platform
+> > defconfig and adds LPAE support.
+> >
+> > This defconfig is verified on LS1021A which enables GIANFAR, I2C,
+> > WATCHDOG, AUDIO, EDMA and DSPI drivers, etc.
+> >
+> > Signed-off-by: Alison Wang <alison.wang@freescale.com>
+> 
+> Much better now without CONFIG_VMSPLIT_2G=y :-)
+> 
+> Reviewed-by: Fabio Estevam <fabio.estevam@freescale.com>
