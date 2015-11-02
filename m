@@ -1,52 +1,97 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 02 Nov 2015 22:56:02 +0100
-Subject: [PATCH] clocksource: dw_apb_timer_of: support timer-based delay
-In-Reply-To: <20151102110334.049b5439@xhacker>
-References: <1446193659-1698-1-git-send-email-jszhang@marvell.com>
- <3950525.pKSJGoymu4@wuerfel> <20151102110334.049b5439@xhacker>
-Message-ID: <5909853.Bs72yAP0HH@wuerfel>
+From: helgaas@kernel.org (Bjorn Helgaas)
+Date: Mon, 2 Nov 2015 16:00:51 -0600
+Subject: [PATCH 1/1] doc/bindings: Update Layerscape PCIe devicetree
+ bindings for LS2080A
+In-Reply-To: <1445844681-11488-1-git-send-email-bhupesh.sharma@freescale.com>
+References: <1445844681-11488-1-git-send-email-bhupesh.sharma@freescale.com>
+Message-ID: <20151102220051.GB28371@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 02 November 2015 11:03:34 Jisheng Zhang wrote:
-> On Fri, 30 Oct 2015 13:42:01 +0100 Arnd Bergmann wrote:
-> > 
-> > This is not ideal from an overall maintenance perspective. We want to
-> > be able to have a kernel with all drivers enabled that gives us the
-> > best behavior on all platforms.
-> > 
-> > The current behavior appears to be that we override all previous
-> > registrations as long as the new one is higher resolution. Is that
-> > the case here? I.e. does the arch timer have a lower resultion than
-> > the dw-apb timer but have some other advantages?
+On Mon, Oct 26, 2015 at 01:01:21PM +0530, Bhupesh Sharma wrote:
+> Update the definition of the Layerscape PCI compatible string to add
+> support for LS2080A, as the controller on LS2080A is different from
+> LS1021A SoC.
 > 
-> Take one Marvell Berlin platform for example, the arch timer freq is 25MHZ,
-> whose resolution is lower than the dw apb timer at 100MHZ. But dw apb timer
-> is on the APB bus while arch timer sits in CPU, so I guess the cost of
-> accessing the apb timer is higher than arch timer. 
+> While at it, move the clock related properties in the Designware PCIe
+> controller bindings to 'optional' set of properties.
+> 
+> Signed-off-by: Minghuan Lian <Minghuan.Lian@freescale.com>
+> Signed-off-by: Bhupesh Sharma <bhupesh.sharma@freescale.com>
+> Acked-by: Arnd Bergmann <arnd@arndb.de>
+> ---
+> Hi Bjorn,
+> 
+> As discussed with Arnd (http://www.spinics.net/lists/linux-clk/msg04092.html),
+> this patch depends on a patch that is in your PCI tree but not yet in mainline.
+> 
+> So, sending this to you, so that you can apply the patch on top of the other
+> one.
+> 
+>  .../devicetree/bindings/pci/designware-pcie.txt    |   10 +++++-----
+>  .../devicetree/bindings/pci/layerscape-pci.txt     |   14 ++++++++++++--
 
-Ok, I see.
+Split into two patches and applied to pci/host-designware and
+pci/host-layerscape, since the clocks change doesn't look related to
+the Layerscape change.
 
-> I have a solution for this case: in platforms with arch timer, I can mark
-> the dw apb timer as "disabled" in the dts even though the timer sits there.
-> Then I could make DW_APB_TIMER_BASED_DELAY non-optional but selected by the
-> the ARCH_XYZ. Is this acceptable?
-
-That would do the right thing, but doesn't look ideal: The DW_APB timer
-on those platforms is fully functional, and a future Linux version or
-another OS might decide to use both timers for one reason or another.
-
-I'd be happier with a solution that keeps the DT describing the hardware
-and not the way we expect Linux to use it, and instead has some heuristic
-in the selection of the delay timer. At the moment, we purely base this
-on the frequency, which as you say is suboptimal.
-
-One possible way to improve this would be to add an optional 'latency'
-property to the DT nodes (or the driver), and use a combination of latency
-and resolution to make the decision.
-A simpler way would be to always prefer the arch timer on ARM if that
-is present, even if another timer has a higher resolution. This should
-be only a few additional lines in register_current_timer_delay(), or
-possibly an additional function argument.
-
-	Arnd
+> diff --git a/Documentation/devicetree/bindings/pci/designware-pcie.txt b/Documentation/devicetree/bindings/pci/designware-pcie.txt
+> index 0036ab3..576218a 100644
+> --- a/Documentation/devicetree/bindings/pci/designware-pcie.txt
+> +++ b/Documentation/devicetree/bindings/pci/designware-pcie.txt
+> @@ -14,11 +14,6 @@ Required properties:
+>  - interrupt-map-mask and interrupt-map: standard PCI properties
+>  	to define the mapping of the PCIe interface to interrupt
+>  	numbers.
+> -- clocks: Must contain an entry for each entry in clock-names.
+> -	See ../clocks/clock-bindings.txt for details.
+> -- clock-names: Must include the following entries:
+> -	- "pcie"
+> -	- "pcie_bus"
+>  
+>  Optional properties:
+>  - num-lanes: number of lanes to use (this property should be specified unless
+> @@ -27,3 +22,8 @@ Optional properties:
+>  - bus-range: PCI bus numbers covered (it is recommended for new devicetrees to
+>    specify this property, to keep backwards compatibility a range of 0x00-0xff
+>    is assumed if not present)
+> +- clocks: Must contain an entry for each entry in clock-names.
+> +	See ../clocks/clock-bindings.txt for details.
+> +- clock-names: Must include the following entries:
+> +	- "pcie"
+> +	- "pcie_bus"
+> diff --git a/Documentation/devicetree/bindings/pci/layerscape-pci.txt b/Documentation/devicetree/bindings/pci/layerscape-pci.txt
+> index 6286f04..ac7e07e 100644
+> --- a/Documentation/devicetree/bindings/pci/layerscape-pci.txt
+> +++ b/Documentation/devicetree/bindings/pci/layerscape-pci.txt
+> @@ -1,10 +1,20 @@
+>  Freescale Layerscape PCIe controller
+>  
+> -This PCIe host controller is based on the Synopsis Designware PCIe IP
+> +This PCIe host controller is based on the Synopsys Designware PCIe IP
+>  and thus inherits all the common properties defined in designware-pcie.txt.
+>  
+> +This controller derives its clocks from the Reset Configuration Word (RCW)
+> +which is used to describe the PLL settings at the time of chip-reset.
+> +
+> +Also as per the available Reference Manuals, there is no specific 'version'
+> +register available in the Freescale PCIe controller register set,
+> +which can allow determining the underlying Designware PCIe controller version
+> +information.
+> +
+>  Required properties:
+> -- compatible: should contain the platform identifier such as "fsl,ls1021a-pcie"
+> +- compatible: should contain the platform identifier such as:
+> +        "fsl,ls1021a-pcie", "snps,dw-pcie"
+> +        "fsl,ls2080a-pcie", "snps,dw-pcie"
+>  - reg: base addresses and lengths of the PCIe controller
+>  - interrupts: A list of interrupt outputs of the controller. Must contain an
+>    entry for each entry in the interrupt-names property.
+> -- 
+> 1.7.9.5
+> 
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
