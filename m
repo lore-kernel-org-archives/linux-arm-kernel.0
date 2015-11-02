@@ -1,37 +1,83 @@
-From: alim.akhtar@samsung.com (Alim Akhtar)
-Date: Mon, 02 Nov 2015 15:34:01 +0530
-Subject: [PATCH 2/2] arm64: dts: exynos7: Enable HS200 mode operation
-In-Reply-To: <1446458641-4447-1-git-send-email-alim.akhtar@samsung.com>
-References: <1446458641-4447-1-git-send-email-alim.akhtar@samsung.com>
-Message-ID: <1446458641-4447-2-git-send-email-alim.akhtar@samsung.com>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Mon, 02 Nov 2015 11:10:07 +0100
+Subject: [PATCH] clk: imx: add 'is_prepared' clk_ops callback for pllv3 clk
+In-Reply-To: <1446487569-20757-1-git-send-email-b51503@freescale.com>
+References: <1446487569-20757-1-git-send-email-b51503@freescale.com>
+Message-ID: <1446459007.3156.6.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch enables HS200 mode operation on exynos7 based
-espresso board.
-This also remove _broken-cd_ property as per mmc binding documentation
-which say one of the properties between broken-cd and non-removable
-should be used. And we already use _non-removable_ as emmc mounted
-on board which is a non-removable device.
+Am Dienstag, den 03.11.2015, 02:06 +0800 schrieb Bai Ping:
+> Add 'is_prepared' callback function for pllv3 type clk to make sure when
+> the system is bootup, the unused clk is in a known state to match the
+> prepare count info.
+> 
+What does this commit fix?
+Is it there to ensure clocks are turned off at the disable unused clocks
+phase even if they haven't been prepared even once during bootup?
 
-Signed-off-by: Alim Akhtar <alim.akhtar@samsung.com>
----
- arch/arm64/boot/dts/exynos/exynos7-espresso.dts |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Regards,
+Lucas
 
-diff --git a/arch/arm64/boot/dts/exynos/exynos7-espresso.dts b/arch/arm64/boot/dts/exynos/exynos7-espresso.dts
-index 8ce04a0ec928..7f19b99fc85b 100644
---- a/arch/arm64/boot/dts/exynos/exynos7-espresso.dts
-+++ b/arch/arm64/boot/dts/exynos/exynos7-espresso.dts
-@@ -405,8 +405,8 @@
- &mmc_0 {
- 	status = "okay";
- 	num-slots = <1>;
--	broken-cd;
- 	cap-mmc-highspeed;
-+	mmc-hs200-1_8v;
- 	non-removable;
- 	card-detect-delay = <200>;
- 	clock-frequency = <800000000>;
+> Signed-off-by: Bai Ping <b51503@freescale.com>
+> ---
+>  drivers/clk/imx/clk-pllv3.c | 14 ++++++++++++++
+>  1 file changed, 14 insertions(+)
+> 
+> diff --git a/drivers/clk/imx/clk-pllv3.c b/drivers/clk/imx/clk-pllv3.c
+> index 6addf8f..c05c43d 100644
+> --- a/drivers/clk/imx/clk-pllv3.c
+> +++ b/drivers/clk/imx/clk-pllv3.c
+> @@ -97,6 +97,16 @@ static void clk_pllv3_unprepare(struct clk_hw *hw)
+>  	writel_relaxed(val, pll->base);
+>  }
+>  
+> +static int clk_pllv3_is_prepared(struct clk_hw *hw)
+> +{
+> +	struct clk_pllv3 *pll = to_clk_pllv3(hw);
+> +
+> +	if (readl_relaxed(pll->base) & BM_PLL_LOCK)
+> +		return 1;
+> +
+> +	return 0;
+> +}
+> +
+>  static unsigned long clk_pllv3_recalc_rate(struct clk_hw *hw,
+>  					   unsigned long parent_rate)
+>  {
+> @@ -139,6 +149,7 @@ static int clk_pllv3_set_rate(struct clk_hw *hw, unsigned long rate,
+>  static const struct clk_ops clk_pllv3_ops = {
+>  	.prepare	= clk_pllv3_prepare,
+>  	.unprepare	= clk_pllv3_unprepare,
+> +	.is_prepared	= clk_pllv3_is_prepared,
+>  	.recalc_rate	= clk_pllv3_recalc_rate,
+>  	.round_rate	= clk_pllv3_round_rate,
+>  	.set_rate	= clk_pllv3_set_rate,
+> @@ -193,6 +204,7 @@ static int clk_pllv3_sys_set_rate(struct clk_hw *hw, unsigned long rate,
+>  static const struct clk_ops clk_pllv3_sys_ops = {
+>  	.prepare	= clk_pllv3_prepare,
+>  	.unprepare	= clk_pllv3_unprepare,
+> +	.is_prepared	= clk_pllv3_is_prepared,
+>  	.recalc_rate	= clk_pllv3_sys_recalc_rate,
+>  	.round_rate	= clk_pllv3_sys_round_rate,
+>  	.set_rate	= clk_pllv3_sys_set_rate,
+> @@ -265,6 +277,7 @@ static int clk_pllv3_av_set_rate(struct clk_hw *hw, unsigned long rate,
+>  static const struct clk_ops clk_pllv3_av_ops = {
+>  	.prepare	= clk_pllv3_prepare,
+>  	.unprepare	= clk_pllv3_unprepare,
+> +	.is_prepared	= clk_pllv3_is_prepared,
+>  	.recalc_rate	= clk_pllv3_av_recalc_rate,
+>  	.round_rate	= clk_pllv3_av_round_rate,
+>  	.set_rate	= clk_pllv3_av_set_rate,
+> @@ -279,6 +292,7 @@ static unsigned long clk_pllv3_enet_recalc_rate(struct clk_hw *hw,
+>  static const struct clk_ops clk_pllv3_enet_ops = {
+>  	.prepare	= clk_pllv3_prepare,
+>  	.unprepare	= clk_pllv3_unprepare,
+> +	.is_prepared	= clk_pllv3_is_prepared,
+>  	.recalc_rate	= clk_pllv3_enet_recalc_rate,
+>  };
+>  
+
 -- 
-1.7.10.4
+Pengutronix e.K.             | Lucas Stach                 |
+Industrial Linux Solutions   | http://www.pengutronix.de/  |
