@@ -1,70 +1,52 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 03 Nov 2015 11:02:24 +0100
-Subject: [PATCH 20/22] clocksource/drivers/exynos_mct: Fix Kconfig and add
- COMPILE_TEST option
-In-Reply-To: <563872E2.10001@linaro.org>
-References: <1446469011-22710-1-git-send-email-daniel.lezcano@linaro.org>
- <563806E7.6010105@samsung.com> <563872E2.10001@linaro.org>
-Message-ID: <9713489.TbNNoNQg5A@wuerfel>
+From: vigneshr@ti.com (Vignesh R)
+Date: Tue, 3 Nov 2015 15:36:09 +0530
+Subject: [PATCH v2 0/5] Add memory mapped read support for ti-qspi
+Message-ID: <1446545174-14193-1-git-send-email-vigneshr@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 03 November 2015 09:40:02 Daniel Lezcano wrote:
-> On 11/03/2015 01:59 AM, Krzysztof Kozlowski wrote:
-> > On 03.11.2015 09:30, Krzysztof Kozlowski wrote:
-> >> On 02.11.2015 21:56, Daniel Lezcano wrote:
-> >>> Let the platform's Kconfig to select the clock instead of having a reverse
-> >>> dependency from the driver to the platform options.
-> >>
-> >> Selecting user-visible symbols is rather discouraged so why not
-> >> something like this:
-> >>
-> >> -       def_bool y if ARCH_EXYNOS
-> >> -       depends on !ARM64
-> >> +       bool "Exynos multi core timer driver"
-> >> +       depends on ARCH_EXYNOS || (COMPILE_TEST && ARM)
-> >
-> > Nope, that was wrong as we loose auto-select on Exynos. Instead:
-> > -       def_bool y if ARCH_EXYNOS
-> > -       depends on !ARM64
-> > +       bool "Exynos multi core timer driver" if ARM
-> > +       depends on ARCH_EXYNOS || COMPILE_TEST
-> > +       default y if ARCH_EXYNOS
-> >
-> > This way we avoid select (which is a reverse dependency for the driver),
-> > have it auto-selectable and compile tested on arm.
-> 
-> I think you misunderstood the patch I sent.
-> 
-> It does two things:
-> 
-> 1. Follow the thumb of rule of the current Kconfig format
-> 
->     - The timer driver is selected by the platform (exynos in this case)
->     - User can't select the driver in the menuconfig
->     - There is no dependency on the platform except for compilation test
-> 
-> 2. Add the COMPILE_TEST
-> 
->     - User can select the driver for compilation testing. This is for 
-> allyesconfig when doing compilation test coverage (exynos timer could be 
-> compiled on other platform). As the delay code is not portable, we have 
-> to restrict the compilation on the ARM platform, this is why there is 
-> the dependency on ARM.
-> 
-> I am currently looking at splitting the delay code in order to prevent 
-> this restriction on this driver and some others drivers.
 
-I suspect this will come up again in the future. The problem is
-really that drivers/clocksource has different rules from almost
-everything else, by requiring the platform to 'select' the driver.
+Changes since v1:
+Introduce API in SPI core that MTD flash driver can call for mmap read
+instead of directly calling spi-master driver callback. This API makes
+sure that SPI core msg queue is locked during mmap transfers.
+v1: https://lkml.org/lkml/2015/9/4/103
 
-The second version that Krzysztof posted is how we handle this in
-other driver subsystems, and I would generally prefer it to do this
-consistently for everything, but John Stultz has in the past argued
-strongly for using 'select' in all clocksource drivers. The reason
-is that for each platform we know in advance which driver we want,
-and there is never a need for the user to have to select the right
-one.
 
-	Arnd
+Cover letter:
+
+This patch series adds support for memory mapped read port of ti-qspi.
+ti-qspi has a special memory mapped port through which SPI flash
+memories can be accessed directly via SoC specific memory region.
+
+First patch adds a method to pass flash specific information like read
+opcode, dummy bytes etc and to request mmap read. Second patch
+implements mmap read method in ti-qspi driver. Patch 3 adapts m25p80 to
+use mmap read method before trying normal SPI transfer. Patch 4 and 5
+add memory map region DT entries for DRA7xx and AM43xx SoCs.
+
+This patch series is based on the discussions here:
+http://www.spinics.net/lists/linux-spi/msg04796.html
+
+Tested on DRA74 EVM and AM437x-SK.
+Read performance increases from ~100kB/s to ~2.5MB/s.
+
+
+Vignesh R (5):
+  spi: introduce mmap read support for spi flash devices
+  spi: spi-ti-qspi: add mmap mode read support
+  mtd: devices: m25p80: add support for mmap read request
+  ARM: dts: DRA7: add entry for qspi mmap region
+  ARM: dts: AM4372: add entry for qspi mmap region
+
+ Documentation/devicetree/bindings/spi/ti_qspi.txt | 18 ++++-
+ arch/arm/boot/dts/am4372.dtsi                     |  4 +-
+ arch/arm/boot/dts/dra7.dtsi                       |  6 +-
+ drivers/mtd/devices/m25p80.c                      |  5 ++
+ drivers/spi/spi-ti-qspi.c                         | 92 ++++++++++++++++++++++-
+ drivers/spi/spi.c                                 | 35 +++++++++
+ include/linux/spi/spi.h                           | 23 ++++++
+ 7 files changed, 174 insertions(+), 9 deletions(-)
+
+-- 
+2.6.2
