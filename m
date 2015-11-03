@@ -1,72 +1,43 @@
-From: robherring2@gmail.com (Rob Herring)
-Date: Tue, 3 Nov 2015 13:39:44 -0600
-Subject: [PATCH] KVM/arm: kernel low level debug support for ARM32 virtual
- platforms
-In-Reply-To: <56390838.3000204@samsung.com>
-References: <1446508313-24404-1-git-send-email-m.smarduch@samsung.com>
- <5638E1CD.8090006@codeaurora.org> <5638F294.4060409@samsung.com>
- <20151103175522.GA24856@arm.com> <56390838.3000204@samsung.com>
-Message-ID: <CAL_JsqJJHGwcdTDMh3WujJW0rDPxocVLEUpw95aVFC4FDEdDgA@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 3 Nov 2015 19:48:54 +0000
+Subject: Cortex-A9 SCU + ARM_ERRATA_764369
+In-Reply-To: <5639030E.6070700@free.fr>
+References: <5638E61C.30406@free.fr> <20151103172743.GE4049@leverpostej>
+ <5639030E.6070700@free.fr>
+Message-ID: <20151103194854.GE8644@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 3, 2015 at 1:17 PM, Mario Smarduch <m.smarduch@samsung.com> wrote:
->
->
-> On 11/3/2015 9:55 AM, Will Deacon wrote:
->> On Tue, Nov 03, 2015 at 09:44:52AM -0800, Mario Smarduch wrote:
->>> On 11/3/2015 8:33 AM, Christopher Covington wrote:
->>>> On 11/02/2015 06:51 PM, Mario Smarduch wrote:
->>>>>    this is a re-post from couple weeks ago, please take time to review this
->>>>> simple patch which simplifies DEBUG_LL and prevents kernel crash on virtual
->>>>> platforms.
->>>>>
->>>>> Before this patch DEBUG_LL for 'dummy virtual machine':
->>>>>
->>>>> ( ) Kernel low-level debugging via EmbeddedICE DCC channel
->>>>> ( ) Kernel low-level debug output via semihosting I/O
->>>>> ( ) Kernel low-level debugging via 8250 UART
->>>>> ( ) Kernel low-level debugging via ARM Ltd PL01x Primecell
->>>>>
->>>>> In summary if debug uart is not emulated kernel crashes.
->>>>> And once you pass that hurdle, uart physical/virtual addresses are unknown.
->>>>> DEBUG_LL comes in handy on many occasions and should be somewhat
->>>>> intuitive to use like it is for physical platforms. For virtual platforms
->>>>> user may start daubting the host and get into a bigger mess.
->>>>>
->>>>> After this patch is applied user gets:
->>>>>
->>>>> (X) Kernel low-level debugging on QEMU Virtual Platform
->>>>> ( ) Kernel low-level debugging on Kvmtool Virtual Platform
->>>>>    ..... above repeated ....
->>>>>
->>>>> The virtual addresses selected follow arm reference models, high in vmalloc
->>>>> section with high mem enabled and guest running with >= 1GB of memory. The
->>>>> offset is leftover from arm reference models.
->>>>
->>>> Which model? It doesn't appear to match the vexpress AEM/RTSM/FVP/whatever
->>>> which used 0x1c090000 for UART0.
->>>
->>> I recall QEMU virt model had it's own physical address map, for sure I saw the
->>> virtio-mmio regions assigned in some ARM document. Peter would you know?
->>>
->>> As far as kvmtool I'm not sure, currently PC1 COM1 port is used? Andre will that
->>> stay fixed?
->>
->> We make absolutely no guarantees about the memory map provided by kvmtool.
->>
->> Will
->>
->
-> If that's also the case for qemu, then I guess the best you can do is find a way
-> to dump the device tree. Find the uart, physical address and try figure out the
-> virtual address.
->
-> Pretty involved, hoped for something more automated since that's a handy feature.
+On Tue, Nov 03, 2015 at 07:55:10PM +0100, Mason wrote:
+> Sigh. ARM documentation is such a treasure hunt experience.
 
-You really only need LL_DEBUG now if you are debugging very early code
-before memory is setup and/or bad memory. Use earlycon instead which
-should already be supported both via the pl011 or semihosting. I used
-it with QEMU semihosting support.
+It's not that bad, though I do hate the ARM ARM organisation.  I wish
+it was split up into a series of stand-alone documents instead of one
+huge one - though one huge document does have the advantage of being
+trivially searchable.
 
-Rob
+> Errata Notices are not freely available, thus probably not
+> indexed by search engines.
+> 
+> The other day, I couldn't find what I was looking for in the
+> A9MPC TRM, because it was in the A9 TRM. And I suspect the
+> architected registers are only documented in the ARM ARM.
+
+Right, so what you do is you download a copy of the PDFs for the Cortex A9
+and the ARM ARM, and then either use pdftotext to generate text versions
+of them you can grep through, or open each and search through each document
+individually.
+
+When you've been working with ARM stuff for a while, you get to know to
+start at the ARM ARM, and work upwards to more specific documents - or,
+you get to know what kind of information is in which class of document
+and then you can go straight to the appropriate doc.
+
+Trust me, the documentation that ARM produces is really nice compared to
+the documents that many silicon vendors produce - many of which aren't
+worth downloading.  Many barely manage to describe any bit in various
+registers adequately, and you're left to experiment by trial and error.
+
+-- 
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
