@@ -1,115 +1,36 @@
-From: andre.przywara@arm.com (Andre Przywara)
-Date: Tue, 3 Nov 2015 13:57:45 +0000
-Subject: [PATCH DRAFT 2/2] drivers: serial: PL011: [DRAFT] implement
- register diverson for ZTE UART
-In-Reply-To: <20151103134605.GW8644@n2100.arm.linux.org.uk>
-References: <1446467042-24494-1-git-send-email-andre.przywara@arm.com>
- <1446467042-24494-3-git-send-email-andre.przywara@arm.com>
- <20151103134605.GW8644@n2100.arm.linux.org.uk>
-Message-ID: <5638BD59.9090008@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 03 Nov 2015 15:00:57 +0100
+Subject: [PATCH] dmaengine: edma: fix build without CONFIG_OF
+Message-ID: <17811472.bY8CqmdEVy@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Russell,
+During the edma rework, a build error was introduced for the
+case that CONFIG_OF is disabled:
 
-On 03/11/15 13:46, Russell King - ARM Linux wrote:
-> On Mon, Nov 02, 2015 at 12:24:02PM +0000, Andre Przywara wrote:
->> +int reg_table_zte[] = {
->> +	[UART01x_DR]	= ZX_UART01x_DR,
-> 
-> No entry for RSR, so the value will be zero.  That means when we read
-> the RSR, we'll be reading the register at offset 0.  Maybe that's
-> intentional, maybe it isn't, but it's totally screwy.
+drivers/built-in.o: In function `edma_tc_set_pm_state':
+:(.text+0x43bf0): undefined reference to `of_find_device_by_node'
 
-Well, as the subject says: it's a draft. And I scanned the file to see
-which registers are actually accessed and only entered those into the
-array. RSR is not among them. But I agree that we should eventually
-enter identity mappings for all PL011 registers in existence to cover
-future extensions to the driver. If there would be a clever way to
-differentiate uninitialised entries from "0" we could fall back to
-identify mapping upon detecting an unused index and only have the
-differing registers in the code.
+As the edma_tc_set_pm_state() function does nothing in case
+we are running without OF, this adds an IS_ENABLED() check
+that turns the function into an empty stub then and avoids the
+link error.
 
-Cheers,
-Andre.
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Fixes: ca304fa9bb76 ("ARM/dmaengine: edma: Public API to use private struct pointer")
+---
+Found on ARM randconfig builds with today's linux-next
 
-> Someone needs to document what the register layout for the ZTE UART
-> is.  Better still, point to where the spec can be found.
-> 
->> +	[UART011_LCRH]	= ZX_UART011_LCRH_TX,
->> +	[UART011_CR]	= ZX_UART011_CR,
->> +	[UART01x_FR]	= ZX_UART01x_FR,
->> +	[UART011_ICR]	= ZX_UART011_ICR,
->> +	[UART011_IBRD]	= UART011_IBRD,
->> +	[UART011_FBRD]	= UART011_FBRD,
->> +	[UART011_IFLS]	= ZX_UART011_IFLS,
->> +	[UART011_IMSC]	= ZX_UART011_IMSC,
->> +	[UART011_RIS]	= ZX_UART011_RIS,
->> +	[UART011_MIS]	= ZX_UART011_MIS,
->> +	[UART011_DMACR]	= ZX_UART011_DMACR,
->> +};
->>  static unsigned int pl011_read(struct uart_amba_port *uap, int offset)
->>  {
->> +#ifdef CONFIG_SOC_ZX296702
->> +	if (uap->vendor->reg_table)
->> +		offset = uap->vendor->reg_table[offset];
->> +#endif
->>  	return readw(uap->port.membase + offset);
->>  }
->>  
->>  static void pl011_write(struct uart_amba_port *uap, int val, int offset)
->>  {
->> +#ifdef CONFIG_SOC_ZX296702
->> +	if (uap->vendor->reg_table)
->> +		offset = uap->vendor->reg_table[offset];
->> +#endif
->>  	writew(val, uap->port.membase + offset);
->>  }
->>  
->> diff --git a/include/linux/amba/serial.h b/include/linux/amba/serial.h
->> index 0ddb5c0..1c71b83 100644
->> --- a/include/linux/amba/serial.h
->> +++ b/include/linux/amba/serial.h
->> @@ -31,6 +31,7 @@
->>   *  UART Register Offsets.
->>   */
->>  #define UART01x_DR		0x00	/* Data read or written from the interface. */
->> +#define ZX_UART01x_DR		0x04	/* Different offset in the ZTE UART. */
->>  #define UART01x_RSR		0x04	/* Receive status register (Read). */
->>  #define UART01x_ECR		0x04	/* Error clear register (Write). */
->>  #define UART010_LCRH		0x08	/* Line control register, high byte. */
->> @@ -39,6 +40,7 @@
->>  #define ST_UART011_TIMEOUT	0x0C    /* Timeout period register. */
->>  #define UART010_LCRL		0x10	/* Line control register, low byte. */
->>  #define UART010_CR		0x14	/* Control register. */
->> +#define ZX_UART01x_FR		0x14	/* Different offset in the ZTE UART. */
->>  #define UART01x_FR		0x18	/* Flag register (Read only). */
->>  #define UART010_IIR		0x1C	/* Interrupt identification register (Read). */
->>  #define UART010_ICR		0x1C	/* Interrupt clear register (Write). */
->> @@ -48,14 +50,22 @@
->>  #define UART011_FBRD		0x28	/* Fractional baud rate divisor register. */
->>  #define UART011_LCRH		0x2c	/* Line control register. */
->>  #define ST_UART011_LCRH_TX	0x2c    /* Tx Line control register. */
->> +#define ZX_UART011_LCRH_TX	0x30    /* Different offset in the ZTE UART. */
->>  #define UART011_CR		0x30	/* Control register. */
->>  #define UART011_IFLS		0x34	/* Interrupt fifo level select. */
->> +#define ZX_UART011_CR		0x34	/* Different offset in the ZTE UART. */
->> +#define ZX_UART011_IFLS		0x38	/* Different offset in the ZTE UART. */
->>  #define UART011_IMSC		0x38	/* Interrupt mask. */
->>  #define UART011_RIS		0x3c	/* Raw interrupt status. */
->>  #define UART011_MIS		0x40	/* Masked interrupt status. */
->> +#define ZX_UART011_IMSC		0x40	/* Different offset in the ZTE UART. */
->>  #define UART011_ICR		0x44	/* Interrupt clear register. */
->> +#define ZX_UART011_RIS		0x44	/* Different offset in the ZTE UART. */
->>  #define UART011_DMACR		0x48	/* DMA control register. */
->> +#define ZX_UART011_MIS		0x48	/* Different offset in the ZTE UART. */
->> +#define ZX_UART011_ICR		0x4c	/* Different offset in the ZTE UART. */
->>  #define ST_UART011_XFCR		0x50	/* XON/XOFF control register. */
->> +#define ZX_UART011_DMACR	0x50	/* Different offset in the ZTE UART. */
->>  #define ST_UART011_XON1		0x54	/* XON1 register. */
->>  #define ST_UART011_XON2		0x58	/* XON2 register. */
->>  #define ST_UART011_XOFF1	0x5C	/* XON1 register. */
->> -- 
->> 2.5.1
->>
-> 
+diff --git a/drivers/dma/edma.c b/drivers/dma/edma.c
+index 31722d436a42..16713a93da10 100644
+--- a/drivers/dma/edma.c
++++ b/drivers/dma/edma.c
+@@ -1560,7 +1560,7 @@ static void edma_tc_set_pm_state(struct edma_tc *tc, bool enable)
+ 	struct platform_device *tc_pdev;
+ 	int ret;
+ 
+-	if (!tc)
++	if (!IS_ENABLED(CONFIG_OF) || !tc)
+ 		return;
+ 
+ 	tc_pdev = of_find_device_by_node(tc->node);
