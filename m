@@ -1,187 +1,89 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Mon, 2 Nov 2015 20:19:12 -0800
-Subject: [PATCH v1 2/2] watchdog: imx2_wdt: add set_pretimeout interface
-In-Reply-To: <1446521367-25748-2-git-send-email-b38343@freescale.com>
-References: <1446521367-25748-1-git-send-email-b38343@freescale.com>
- <1446521367-25748-2-git-send-email-b38343@freescale.com>
-Message-ID: <563835C0.5010204@roeck-us.net>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Mon, 2 Nov 2015 20:38:27 -0800
+Subject: [PATCH v9 10/17] phy: Add driver for rockchip Display Port PHY
+In-Reply-To: <1446083918-30809-1-git-send-email-ykk@rock-chips.com>
+References: <1446020143-32645-1-git-send-email-ykk@rock-chips.com>
+ <1446083918-30809-1-git-send-email-ykk@rock-chips.com>
+Message-ID: <20151103043827.GA17261@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/02/2015 07:29 PM, Robin Gong wrote:
-> Enable set_pretimeout interface and trigger the pretimeout interrupt before
-> watchdog timeout event happen.
->
-> Signed-off-by: Robin Gong <b38343@freescale.com>
+Hi Yakir,
+
+On Thu, Oct 29, 2015 at 09:58:38AM +0800, Yakir Yang wrote:
+> Add phy driver for the Rockchip DisplayPort PHY module. This
+> is required to get DisplayPort working in Rockchip SoCs.
+> 
+> Reviewed-by: Heiko Stuebner <heiko@sntech.de>
+> Signed-off-by: Yakir Yang <ykk@rock-chips.com>
 > ---
->   drivers/watchdog/imx2_wdt.c | 67 ++++++++++++++++++++++++++++++++++++++++++++-
->   1 file changed, 66 insertions(+), 1 deletion(-)
->
-> diff --git a/drivers/watchdog/imx2_wdt.c b/drivers/watchdog/imx2_wdt.c
-> index 0bb1a1d..d3c6b07 100644
-> --- a/drivers/watchdog/imx2_wdt.c
-> +++ b/drivers/watchdog/imx2_wdt.c
-> @@ -24,7 +24,9 @@
->   #include <linux/clk.h>
->   #include <linux/delay.h>
->   #include <linux/init.h>
-> +#include <linux/interrupt.h>
->   #include <linux/io.h>
-> +#include <linux/irq.h>
-
-Are those two new includes both needed ?
-
->   #include <linux/jiffies.h>
->   #include <linux/kernel.h>
->   #include <linux/module.h>
-> @@ -52,12 +54,18 @@
->   #define IMX2_WDT_WRSR		0x04		/* Reset Status Register */
->   #define IMX2_WDT_WRSR_TOUT	(1 << 1)	/* -> Reset due to Timeout */
->
-> +#define IMX2_WDT_WICR		0x06		/*Interrupt Control Register*/
-> +#define IMX2_WDT_WICR_WIE	(1 << 15)	/* -> Interrupt Enable */
-> +#define IMX2_WDT_WICR_WTIS	(1 << 14)	/* -> Interrupt Status */
-> +#define IMX2_WDT_WICR_WICT	(0xFF << 0)	/* Watchdog Interrupt Timeout */
+...
+> diff --git a/drivers/phy/phy-rockchip-dp.c b/drivers/phy/phy-rockchip-dp.c
+> new file mode 100644
+> index 0000000..f3e0058
+> --- /dev/null
+> +++ b/drivers/phy/phy-rockchip-dp.c
+> @@ -0,0 +1,151 @@
+> +/*
+> + * Rockchip DP PHY driver
+> + *
+> + * Copyright (C) 2015 FuZhou Rockchip Co., Ltd.
+> + * Author: Yakir Yang <ykk@@rock-chips.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License.
+> + */
 > +
-
-"<< 0" doesn't really add any value here.
-
->   #define IMX2_WDT_WMCR		0x08		/* Misc Register */
->
->   #define IMX2_WDT_MAX_TIME	128
->   #define IMX2_WDT_DEFAULT_TIME	60		/* in seconds */
->
->   #define WDOG_SEC_TO_COUNT(s)	((s * 2 - 1) << 8)
-> +#define WDOG_SEC_TO_PRECOUNT(s)	(s * 2)		/* set WDOG pre timeout count*/
->
-					((s) * 2)
-
-Ah yes, WDOG_SEC_TO_COUNT should also use (s).
-
->   struct imx2_wdt_device {
->   	struct clk *clk;
-> @@ -80,7 +88,8 @@ MODULE_PARM_DESC(timeout, "Watchdog timeout in seconds (default="
->
->   static const struct watchdog_info imx2_wdt_info = {
->   	.identity = "imx2+ watchdog",
-> -	.options = WDIOF_KEEPALIVEPING | WDIOF_SETTIMEOUT | WDIOF_MAGICCLOSE,
-> +	.options = WDIOF_KEEPALIVEPING | WDIOF_SETTIMEOUT | WDIOF_MAGICCLOSE
-> +		   | WDIOF_PRETIMEOUT,
->   };
->
->   static int imx2_restart_handler(struct notifier_block *this, unsigned long mode,
-> @@ -207,12 +216,59 @@ static inline void imx2_wdt_ping_if_active(struct watchdog_device *wdog)
->   	}
->   }
->
-> +static int imx2_wdt_check_pretimeout_set(struct imx2_wdt_device *wdev)
-> +{
-> +	u32 val;
+> +#include <linux/module.h>
+> +#include <linux/of.h>
+> +#include <linux/clk.h>
+> +#include <linux/phy/phy.h>
+> +#include <linux/regmap.h>
+> +#include <linux/mfd/syscon.h>
+> +#include <linux/platform_device.h>
 > +
-> +	regmap_read(wdev->regmap, IMX2_WDT_WICR, &val);
-> +	return (val & IMX2_WDT_WICR_WIE) ? 1 : 0;
-
-I don't understand the point of this function.
-You check if IMX2_WDT_WICR_WIE is set,
-
-> +}
+> +#define GRF_SOC_CON12                           0x0274
 > +
-> +static int imx2_wdt_set_pretimeout(struct watchdog_device *wdog,
-> +				   unsigned int new_timeout)
-> +{
-> +	struct imx2_wdt_device *wdev = watchdog_get_drvdata(wdog);
-> +	u32 val;
-> +
-> +	regmap_read(wdev->regmap, IMX2_WDT_WICR, &val);
-> +	/* set the new pre-timeout value in the WSR */
-> +	val &= ~IMX2_WDT_WICR_WICT;
-> +	val |= WDOG_SEC_TO_PRECOUNT(new_timeout);
-> +
+> +#define GRF_EDP_REF_CLK_SEL_INTER_HIWORD_MASK   BIT(4)
+> +#define GRF_EDP_REF_CLK_SEL_INTER               BIT(4)
 
-What is the time here ? Is pretimeout the number of seconds
-until the interrupt occurs, or the number of seconds before the actual
-timeout (as per API) ?
-
-> +	if (!imx2_wdt_check_pretimeout_set(wdev))
-> +		val |= IMX2_WDT_WICR_WIE;	/*enable*/
-
-if IMX2_WDT_WICR_WIE is not set, you set it,
+Why are the above two macros the same? Judging by the RK3288 manual and
+other downstream drivers, it seems like you want the _MASK one to be
+shifted left by 16 (i.e., BIT(20)).
 
 > +
-> +	regmap_write(wdev->regmap, IMX2_WDT_WICR, val);
+> +#define GRF_EDP_PHY_SIDDQ_HIWORD_MASK           BIT(21)
+> +#define GRF_EDP_PHY_SIDDQ_ON                    0
+> +#define GRF_EDP_PHY_SIDDQ_OFF                   BIT(5)
 > +
 
-and write the result unconditionally. Unless I am missing something,
+...
 
-	regmap_write, wdev->regmap, IMX2_WDT_WICR, val | IMX2_WDT_WICR_WIE);
+> +	ret = regmap_write(dp->grf, GRF_SOC_CON12, GRF_EDP_REF_CLK_SEL_INTER |
+> +			   GRF_EDP_REF_CLK_SEL_INTER_HIWORD_MASK);
 
-would accomplish exactly the same.
+IOW, the above is writing:
 
-> +	wdog->pretimeout = new_timeout;
-> +
-> +	return 0;
-> +}
-> +
-> +static irqreturn_t imx2_wdt_isr(int irq, void *dev_id)
-> +{
-> +	struct platform_device *pdev = dev_id;
-> +	struct watchdog_device *wdog = platform_get_drvdata(pdev);
-> +	struct imx2_wdt_device *wdev = watchdog_get_drvdata(wdog);
-> +	u32 val;
-> +
-> +	regmap_read(wdev->regmap, IMX2_WDT_WICR, &val);
-> +	if (val & IMX2_WDT_WICR_WTIS) {
-> +		/*clear interrupt status bit*/
-> +		regmap_write(wdev->regmap, IMX2_WDT_WICR, val);
-> +		dev_warn(&pdev->dev, "pre-timeout:%d, %d Seconds remained\n",
-> +			 wdog->pretimeout, wdog->timeout - wdog->pretimeout);
+	BIT(4) | BIT(4)
 
-The idea here is that this should trigger a panic.
+whereas I think you want:
 
-> +	}
-> +	return IRQ_HANDLED;
-> +}
-> +
->   static const struct watchdog_ops imx2_wdt_ops = {
->   	.owner = THIS_MODULE,
->   	.start = imx2_wdt_start,
->   	.stop = imx2_wdt_stop,
->   	.ping = imx2_wdt_ping,
->   	.set_timeout = imx2_wdt_set_timeout,
-> +	.set_pretimeout = imx2_wdt_set_pretimeout,
->   };
->
->   static const struct regmap_config imx2_wdt_regmap_config = {
-> @@ -229,6 +285,7 @@ static int __init imx2_wdt_probe(struct platform_device *pdev)
->   	struct resource *res;
->   	void __iomem *base;
->   	int ret;
-> +	int irq;
->   	u32 val;
->
->   	wdev = devm_kzalloc(&pdev->dev, sizeof(*wdev), GFP_KERNEL);
-> @@ -253,6 +310,14 @@ static int __init imx2_wdt_probe(struct platform_device *pdev)
->   		return PTR_ERR(wdev->clk);
->   	}
->
-> +	irq = platform_get_irq(pdev, 0);
+	BIT(4) | BIT(20)
 
-This makes the irq mandatory. What if a platform doesn't have one configured ?
-
-> +	ret = devm_request_irq(&pdev->dev, irq, imx2_wdt_isr, 0,
-> +			       dev_name(&pdev->dev), pdev);
-> +	if (ret) {
-> +		dev_err(&pdev->dev, "can't get irq %d\n", irq);
-
-You got it, but you could not request it.
-
-This is also a bit early, as the interrupt handler uses variables which are not yet
-initialized.
-
+> +	if (ret != 0) {
+> +		dev_err(dp->dev, "Could not config GRF edp ref clk: %d\n", ret);
 > +		return ret;
 > +	}
 > +
->   	wdog			= &wdev->wdog;
->   	wdog->info		= &imx2_wdt_info;
->   	wdog->ops		= &imx2_wdt_ops;
->
+
+...
+
+(FYI, I came across this by inspection when comparing Heiko's
+'somewhat-stable' branch [1] with this series. The former brings up eDP
+fine on veyron-jaq, whereas this one doesn't yet, even with the above
+change. Still debugging the issue.)
+
+Brian
+
+[1] https://github.com/mmind/linux-rockchip/tree/devel/somewhat-stable
