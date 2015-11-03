@@ -1,36 +1,38 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 03 Nov 2015 15:00:57 +0100
-Subject: [PATCH] dmaengine: edma: fix build without CONFIG_OF
-Message-ID: <17811472.bY8CqmdEVy@wuerfel>
+Date: Tue, 03 Nov 2015 15:03:33 +0100
+Subject: [PATCH] NFC: nfcmrvl: fix SPI driver dependencies
+Message-ID: <243350307.K4hHIg3V2N@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-During the edma rework, a build error was introduced for the
-case that CONFIG_OF is disabled:
+The newly added nfcmrvl_spi driver uses the spi_nci
+infrastructure, but does not have a Kconfig dependency on
+that, so we can get a link-time error:
 
-drivers/built-in.o: In function `edma_tc_set_pm_state':
-:(.text+0x43bf0): undefined reference to `of_find_device_by_node'
+drivers/built-in.o: In function `nfcmrvl_spi_nci_send':
+(.text+0x1428dc): undefined reference to `nci_spi_send'
+drivers/built-in.o: In function `nfcmrvl_spi_probe':
+(.text+0x142a24): undefined reference to `nci_spi_allocate_spi'
+drivers/built-in.o: In function `nfcmrvl_spi_int_irq_thread_fn':
+(.text+0x142abc): undefined reference to `nci_spi_read'
 
-As the edma_tc_set_pm_state() function does nothing in case
-we are running without OF, this adds an IS_ENABLED() check
-that turns the function into an empty stub then and avoids the
-link error.
+This clarifies the dependency.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: ca304fa9bb76 ("ARM/dmaengine: edma: Public API to use private struct pointer")
+Fixes: caf6e49bf6d0 ("NFC: nfcmrvl: add spi driver")
 ---
-Found on ARM randconfig builds with today's linux-next
+Found on ARM randconfig builds on yesterday's linux-next
 
-diff --git a/drivers/dma/edma.c b/drivers/dma/edma.c
-index 31722d436a42..16713a93da10 100644
---- a/drivers/dma/edma.c
-+++ b/drivers/dma/edma.c
-@@ -1560,7 +1560,7 @@ static void edma_tc_set_pm_state(struct edma_tc *tc, bool enable)
- 	struct platform_device *tc_pdev;
- 	int ret;
+diff --git a/drivers/nfc/nfcmrvl/Kconfig b/drivers/nfc/nfcmrvl/Kconfig
+index 444ca94697d9..670af76922e0 100644
+--- a/drivers/nfc/nfcmrvl/Kconfig
++++ b/drivers/nfc/nfcmrvl/Kconfig
+@@ -44,7 +44,7 @@ config NFC_MRVL_I2C
  
--	if (!tc)
-+	if (!IS_ENABLED(CONFIG_OF) || !tc)
- 		return;
+ config NFC_MRVL_SPI
+ 	tristate "Marvell NFC-over-SPI driver"
+-	depends on NFC_MRVL && SPI
++	depends on NFC_MRVL && NFC_NCI_SPI
+ 	help
+ 	  Marvell NFC-over-SPI driver.
  
- 	tc_pdev = of_find_device_by_node(tc->node);
