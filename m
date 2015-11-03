@@ -1,99 +1,139 @@
 From: p.fedin@samsung.com (Pavel Fedin)
-Date: Tue, 03 Nov 2015 12:16:38 +0300
-Subject: [PATCH v5 1/4] Documentation: dt-bindings: Describe SROMc
+Date: Tue, 03 Nov 2015 12:16:40 +0300
+Subject: [PATCH v5 3/4] drivers: exynos-srom: Add support for bank
  configuration
 In-Reply-To: <cover.1446542020.git.p.fedin@samsung.com>
 References: <cover.1446542020.git.p.fedin@samsung.com>
-Message-ID: <9a1edb15c06e27fa1fba5773c937e3a3d363c32a.1446542020.git.p.fedin@samsung.com>
+Message-ID: <72fa025c634fa477b1d7a89c254bd3c9c43f2b27.1446542020.git.p.fedin@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add documentation for new subnode properties, allowing bank configuration.
-Based on u-boot implementation, but heavily reworked.
+Implement handling properties in subnodes and adding child devices to the
+system. Child devices will not be added if configuration fails.
+
+Since the driver now does more than suspend-resume support, dependency on
+CONFIG_PM is removed.
 
 Signed-off-by: Pavel Fedin <p.fedin@samsung.com>
 ---
- .../bindings/arm/samsung/exynos-srom.txt           | 68 +++++++++++++++++++++-
- 1 file changed, 66 insertions(+), 2 deletions(-)
+ arch/arm/mach-exynos/Kconfig      |  2 +-
+ drivers/soc/samsung/Kconfig       |  2 +-
+ drivers/soc/samsung/exynos-srom.c | 60 +++++++++++++++++++++++++++++++++++++--
+ 3 files changed, 60 insertions(+), 4 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/arm/samsung/exynos-srom.txt b/Documentation/devicetree/bindings/arm/samsung/exynos-srom.txt
-index 33886d5..ee378ca 100644
---- a/Documentation/devicetree/bindings/arm/samsung/exynos-srom.txt
-+++ b/Documentation/devicetree/bindings/arm/samsung/exynos-srom.txt
-@@ -5,8 +5,72 @@ Required properties:
+diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
+index 83c85f5..c22dc42 100644
+--- a/arch/arm/mach-exynos/Kconfig
++++ b/arch/arm/mach-exynos/Kconfig
+@@ -16,7 +16,7 @@ menuconfig ARCH_EXYNOS
+ 	select ARM_GIC
+ 	select COMMON_CLK_SAMSUNG
+ 	select EXYNOS_THERMAL
+-	select EXYNOS_SROM if PM
++	select EXYNOS_SROM
+ 	select HAVE_ARM_SCU if SMP
+ 	select HAVE_S3C2410_I2C if I2C
+ 	select HAVE_S3C2410_WATCHDOG if WATCHDOG
+diff --git a/drivers/soc/samsung/Kconfig b/drivers/soc/samsung/Kconfig
+index 2833b5b..ea4bc2a 100644
+--- a/drivers/soc/samsung/Kconfig
++++ b/drivers/soc/samsung/Kconfig
+@@ -8,6 +8,6 @@ config SOC_SAMSUNG
  
- - reg: offset and length of the register set
+ config EXYNOS_SROM
+ 	bool
+-	depends on ARM && ARCH_EXYNOS && PM
++	depends on ARM && ARCH_EXYNOS
  
--Example:
-+- #address-cells: Must be set to 2 to allow memory address translation
+ endmenu
+diff --git a/drivers/soc/samsung/exynos-srom.c b/drivers/soc/samsung/exynos-srom.c
+index 57a232d..49b5c9e 100644
+--- a/drivers/soc/samsung/exynos-srom.c
++++ b/drivers/soc/samsung/exynos-srom.c
+@@ -14,6 +14,7 @@
+ #include <linux/module.h>
+ #include <linux/of.h>
+ #include <linux/of_address.h>
++#include <linux/of_platform.h>
+ #include <linux/platform_device.h>
+ #include <linux/slab.h>
+ 
+@@ -67,11 +68,50 @@ static struct exynos_srom_reg_dump *exynos_srom_alloc_reg_dump(
+ 	return rd;
+ }
+ 
++static int decode_sromc(struct exynos_srom *srom, struct device_node *np)
++{
++	u32 bank, width, pmc;
++	u32 timing[6];
++	u32 cs, bw;
 +
-+- #size-cells: Must be set to 1 to allow CS address passing
++	if (of_property_read_u32(np, "reg", &bank))
++		return -EINVAL;
++	if (of_property_read_u32(np, "reg-io-width", &width))
++		width = 1;
++	if (of_property_read_u32(np, "samsung,srom-page-mode", &pmc))
++		pmc = 0;
++	if (of_property_read_u32_array(np, "samsung,srom-timing", timing,
++				       ARRAY_SIZE(timing)))
++		return -EINVAL;
 +
-+- ranges: Must be set up to reflect the memory layout with four integer values
-+	  per bank:
-+		<bank-number> 0 <physical address of bank> <size>
++	bank *= 4; /* Convert bank into shift/offset */
 +
-+Sub-nodes:
-+The SROM controller can be used to attach external peripherials. In this case
-+device nodes should be added as subnodes to the SROMc node. These subnodes,
-+except regular device specification, should contain the following properties,
-+describing configuration of the relevant SROM bank:
++	cs = 1 << EXYNOS_SROM_BW__BYTEENABLE__SHIFT;
++	if (width == 2)
++		cs |= 1 << EXYNOS_SROM_BW__DATAWIDTH__SHIFT;
 +
-+Required properties:
-+- reg: bank number, base address (relative to start of the bank) and size of
-+       the memory mapped for the device. Note that base address will be
-+       typically 0 as this is the start of the bank.
++	bw = __raw_readl(srom->reg_base + EXYNOS_SROM_BW);
++	bw = (bw & ~(EXYNOS_SROM_BW__CS_MASK << bank)) | (cs << bank);
++	__raw_writel(bw, srom->reg_base + EXYNOS_SROM_BW);
 +
-+- samsung,srom-timing : array of 6 integers, specifying bank timings in the
-+                        following order: Tacp, Tcah, Tcoh, Tacc, Tcos, Tacs.
-+                        Each value is specified in cycles (0 - 15) and has the
-+                        following meaning:
-+                        Tacp : Page mode access cycle at Page mode
-+                        Tcah : Address holding time after CSn
-+                        Tcoh : Chip selection hold on OEn
-+                        Tacc : Access cycle
-+                        Tcos : Chip selection set-up before OEn
-+                        Tacs : Address set-up before CSn
++	__raw_writel((pmc << EXYNOS_SROM_BCX__PMC__SHIFT) |
++		    (timing[0] << EXYNOS_SROM_BCX__TACP__SHIFT) |
++		    (timing[1] << EXYNOS_SROM_BCX__TCAH__SHIFT) |
++		    (timing[2] << EXYNOS_SROM_BCX__TCOH__SHIFT) |
++		    (timing[3] << EXYNOS_SROM_BCX__TACC__SHIFT) |
++		    (timing[4] << EXYNOS_SROM_BCX__TCOS__SHIFT) |
++		    (timing[5] << EXYNOS_SROM_BCX__TACS__SHIFT),
++		    srom->reg_base + EXYNOS_SROM_BC0 + bank);
 +
-+Optional properties:
-+- reg-io-width : data width in bytes (1 or 2). If omitted, default of 1 is used.
++	return 0;
++}
 +
-+- samsung,srom-page-mode : page mode configuration for the bank:
-+			   0 - normal (one data)
-+			   1 - four data
-+			   If omitted, default of 0 is used.
+ static int exynos_srom_probe(struct platform_device *pdev)
+ {
+-	struct device_node *np;
++	struct device_node *np, *child;
+ 	struct exynos_srom *srom;
+ 	struct device *dev = &pdev->dev;
++	bool error = false;
+ 
+ 	np = dev->of_node;
+ 	if (!np) {
+@@ -100,7 +140,23 @@ static int exynos_srom_probe(struct platform_device *pdev)
+ 		return -ENOMEM;
+ 	}
+ 
+-	return 0;
++	for_each_child_of_node(np, child) {
++		if (decode_sromc(srom, child)) {
++			dev_err(dev,
++				"Could not decode bank configuration for %s\n",
++				child->name);
++			error = true;
++		}
++	}
 +
-+Example: basic definition, no banks are configured
-+	sromc at 12570000 {
-+		compatible = "samsung,exynos-srom";
-+		reg = <0x12570000 0x14>;
-+	};
++	/*
++	 * If any bank failed to configure, we still provide suspend/resume,
++	 * but do not probe child devices
++	 */
++	if (error)
++		return 0;
 +
-+Example: SROMc with smsc 911x ethernet chip on bank 3
- 	sromc at 12570000 {
-+		#address-cells = <2>;
-+		#size-cells = <1>;
-+		ranges = <0 0 0x04000000 0x20000   // Bank0
-+			  1 0 0x05000000 0x20000   // Bank1
-+			  2 0 0x06000000 0x20000   // Bank2
-+			  3 0 0x07000000 0x20000>; // Bank3
-+
- 		compatible = "samsung,exynos-srom";
--		reg = <0x12570000 0x10>;
-+		reg = <0x12570000 0x14>;
-+
-+		ethernet at 3 {
-+			compatible = "smsc,lan9115";
-+			reg = <3 0 0x10000>;	   // Bank 3, offset = 0
-+			phy-mode = "mii";
-+			interrupt-parent = <&gpx0>;
-+			interrupts = <5 8>;
-+			reg-io-width = <2>;
-+			smsc,irq-push-pull;
-+			smsc,force-internal-phy;
-+
-+			samsung,srom-config = <1 9 12 1 9 1 1>;
-+		};
- 	};
++	return of_platform_populate(np, NULL, NULL, dev);
+ }
+ 
+ static int exynos_srom_remove(struct platform_device *pdev)
 -- 
 2.4.4
