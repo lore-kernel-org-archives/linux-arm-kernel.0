@@ -1,81 +1,121 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Tue, 3 Nov 2015 12:43:31 -0500
-Subject: [PATCH V1 11/11] arm64, pci, acpi: Support for ACPI based PCI
- hostbridge init
-In-Reply-To: <3736182.0iiYWufyXZ@wuerfel>
-References: <1445963922-22711-1-git-send-email-tn@semihalf.com>
- <5802577.H74A3Lg5B3@wuerfel> <5638E1CE.9000805@codeaurora.org>
- <3736182.0iiYWufyXZ@wuerfel>
-Message-ID: <5638F243.2050907@codeaurora.org>
+From: m.smarduch@samsung.com (Mario Smarduch)
+Date: Tue, 03 Nov 2015 09:44:52 -0800
+Subject: [PATCH] KVM/arm: kernel low level debug support for ARM32 virtual
+ platforms
+In-Reply-To: <5638E1CD.8090006@codeaurora.org>
+References: <1446508313-24404-1-git-send-email-m.smarduch@samsung.com>
+ <5638E1CD.8090006@codeaurora.org>
+Message-ID: <5638F294.4060409@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-On 11/3/2015 11:55 AM, Arnd Bergmann wrote:
-> On Tuesday 03 November 2015 11:33:18 Sinan Kaya wrote:
+On 11/3/2015 8:33 AM, Christopher Covington wrote:
+> Hi Mario,
+> 
+> On 11/02/2015 06:51 PM, Mario Smarduch wrote:
+>> Hello,
+>>    this is a re-post from couple weeks ago, please take time to review this 
+>> simple patch which simplifies DEBUG_LL and prevents kernel crash on virtual 
+>> platforms.
 >>
->> On 11/3/2015 10:59 AM, Arnd Bergmann wrote:
->>> On Tuesday 03 November 2015 10:10:21 Sinan Kaya wrote:
->>>>
->>>> I don't see anywhere in the SBSA spec addendum that the PCI
->>>> configuration space section that unaligned accesses *MUST* be supported.
->>>>
->>>> If this is required, please have this info added to the spec. I can work
->>>> with the designers for the next chip.
->>>>
->>>> Unaligned access on the current hardware returns incomplete values or
->>>> can cause bus faults. The behavior is undefined.
->>>
->>> Unaligned accesses are not allowed, but any PCI compliant device must
->>> support aligned 1, 2 or 4 byte accesses on its configuration space,
->>> though the byte-enable mechanism. In an ECAM host bridge, those are
->>> mapped to load/store accesses from the CPU with the respective width
->>> and natural alignment.
+>> Before this patch DEBUG_LL for 'dummy virtual machine':
 >>
->> As far as I see, the endpoints do not have any problems with unaligned
->> accesses. It is the host bridge itself (stuff that doesn't get on the
->> PCIe bus and uses traditional AXI kind bus internally) has problems with
->> alignment.
+>> ( ) Kernel low-level debugging via EmbeddedICE DCC channel
+>> ( ) Kernel low-level debug output via semihosting I/O
+>> ( ) Kernel low-level debugging via 8250 UART
+>> ( ) Kernel low-level debugging via ARM Ltd PL01x Primecell
 >>
->> If Linux is expecting all HW vendors to implement alignment support,
->> this needs to be put in the SBSA spec as a hard requirement.
->
-> As I said, it's not unaligned accesses at all, just 1-byte and aligned
-> 2-byte accesses, and it's not Linux mandating this but the PCI
-> spec. Please read Russell's email again, it is not possible for PCI
-> to work according to the specification unless the host bridge allows
-> sub-32-bit accesses.
+>> In summary if debug uart is not emulated kernel crashes.
+>> And once you pass that hurdle, uart physical/virtual addresses are unknown.
+>> DEBUG_LL comes in handy on many occasions and should be somewhat 
+>> intuitive to use like it is for physical platforms. For virtual platforms
+>> user may start daubting the host and get into a bigger mess.
+>>
+>> After this patch is applied user gets:
+>>
+>> (X) Kernel low-level debugging on QEMU Virtual Platform
+>> ( ) Kernel low-level debugging on Kvmtool Virtual Platform
+>> 	..... above repeated ....
+>>
+>> The virtual addresses selected follow arm reference models, high in vmalloc 
+>> section with high mem enabled and guest running with >= 1GB of memory. The 
+>> offset is leftover from arm reference models.
+> 
+> Which model? It doesn't appear to match the vexpress AEM/RTSM/FVP/whatever
+> which used 0x1c090000 for UART0.
 
-I'll check back with the hardware designers. Seeing readb/readw/readl 
-made me nervous that we are trying unaligned access from any boundaries.
+I recall QEMU virt model had it's own physical address map, for sure I saw the
+virtio-mmio regions assigned in some ARM document. Peter would you know?
 
-In any case, the hardware document says 32 bit configuration space 
-access to the host bridge only. I'll get more clarification.
+As far as kvmtool I'm not sure, currently PC1 COM1 port is used? Andre will that
+stay fixed?
 
->
-> You can probably work around this by using the legacy I/O port method
-> rather than ECAM, if the PCI host bridge itself is functional and just
-> the host bus it is connected to is buggy.
-
- From the sounds of it, we'll need a quirk for config space. We support 
-legacy I/O only to make the endpoints happy. Some endpoints do not get 
-initialized if they don't have a BAR address assigned to all the BAR 
-resources.
-
-I just saw David Daney's email. I like his idea. I think this chip will 
-fit into the same category.
-
->
-> 	Arnd
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
->
-
--- 
-Sinan Kaya
-Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a 
-Linux Foundation Collaborative Project
+> 
+>> The patch is against 4.2.0-rc2 commit 43297dda0a51
+>>
+>> Original Description
+>> --------------------
+>> When booting a VM using QEMU or Kvmtool there are no clear ways to 
+>> enable low level debugging for these virtual platforms. some menu port 
+>> choices are not supported by the virtual platforms at all. And there is no
+>> help on the location of physical and virtual addresses for the ports.
+>> This may lead to wrong debug port and a frozen VM with a blank screen.
+>>
+>> This patch adds menu selections for QEMU and Kvmtool virtual platforms for low 
+>> level kernel print debugging. Help section displays port physical and
+>> virutal addresses.
+>>
+>> ARM reference models use the MIDR register to run-time select UART port address 
+>> (for ARCH_VEXPRESS) based on A9 or A15 part numbers. Looked for a same approach
+>> but couldn't find a way to differentiate between virtual platforms, something
+>> like a platform register.
+>>
+>> Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
+>> Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
+>> ---
+>>  arch/arm/Kconfig.debug | 22 ++++++++++++++++++++++
+>>  1 file changed, 22 insertions(+)
+>>
+>> diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+>> index a2e16f9..d126bd4 100644
+>> --- a/arch/arm/Kconfig.debug
+>> +++ b/arch/arm/Kconfig.debug
+>> @@ -1155,6 +1155,28 @@ choice
+>>  		  This option selects UART0 on VIA/Wondermedia System-on-a-chip
+>>  		  devices, including VT8500, WM8505, WM8650 and WM8850.
+>>  
+>> +	config DEBUG_VIRT_UART_QEMU
+>> +		bool "Kernel low-level debugging on QEMU Virtual Platform"
+>> +		depends on ARCH_VIRT
+>> +		select DEBUG_UART_PL01X
+>> +		help
+>> +		  Say Y here if you want the debug print routines to direct
+>> +		  their output to PL011 UART port on QEMU Virtual Platform.
+>> +		  Appropriate address values are:
+>> +			PHYS		VIRT
+>> +			0x9000000	0xf8090000
+> 
+> I thought the only guarantee the virt machine had about the memory map was
+> that it would be described in the device tree.
+> 
+>> +	config DEBUG_VIRT_UART_KVMTOOL
+>> +		bool "Kernel low-level debugging on Kvmtool Virtual Platform"
+>> +		depends on ARCH_VIRT
+>> +		select DEBUG_UART_8250
+>> +		help
+>> +		  Say Y here if you want the debug print routines to direct
+>> +		  their output to 8250 UART port on Kvmtool Virtual
+>> +		  Platform. Appropriate address values are:
+>> +			PHYS		VIRT
+>> +			0x3f8		0xf80903f8
+>> +
+>>  	config DEBUG_ICEDCC
+>>  		bool "Kernel low-level debugging via EmbeddedICE DCC channel"
+>>  		help
+>>
+> 
+> Regards,
+> Christopher Covington
+> 
