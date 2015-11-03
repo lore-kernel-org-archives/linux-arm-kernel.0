@@ -1,63 +1,80 @@
 From: eric.auger@linaro.org (Eric Auger)
-Date: Tue,  3 Nov 2015 18:12:14 +0000
-Subject: [PATCH v6 3/8] vfio: platform: introduce module_vfio_reset_handler
- macro
+Date: Tue,  3 Nov 2015 18:12:18 +0000
+Subject: [PATCH v6 7/8] vfio: platform: add dev_info on device reset
 In-Reply-To: <1446574339-1843-1-git-send-email-eric.auger@linaro.org>
 References: <1446574339-1843-1-git-send-email-eric.auger@linaro.org>
-Message-ID: <1446574339-1843-4-git-send-email-eric.auger@linaro.org>
+Message-ID: <1446574339-1843-8-git-send-email-eric.auger@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The module_vfio_reset_handler macro
-- define a module alias
-- implement module init/exit function which respectively registers
-  and unregisters the reset function.
+It might be helpful for the end-user to check the device reset
+function was found by the vfio platform reset framework.
+
+Lets store a pointer to the struct device in vfio_platform_device
+and trace when the reset function is called or not found.
 
 Signed-off-by: Eric Auger <eric.auger@linaro.org>
-Reviewed-by: Arnd Bergmann <arnd@arndb.de>
 
 ---
-v4 -> v5:
-- add Arnd's R-b
 
-v3 -> v4:
-- pass reset to vfio_platform_unregister_reset
-
-v2 -> v3:
-- use vfio_platform_register_reset macro
-
-v1 -> v2:
-- remove vfio_platform_reset_private.h and move back the macro to
-  vfio_platform_private.h header: removed reset_module_register &
-  unregister (symbol_get)
-- defines the module_vfio_reset_handler macro as suggested by Arnd
-  (formerly in vfio_platform_reset_private.h)
+v3: creation
 ---
- drivers/vfio/platform/vfio_platform_private.h | 14 ++++++++++++++
- 1 file changed, 14 insertions(+)
+ drivers/vfio/platform/vfio_platform_common.c  | 14 ++++++++++++--
+ drivers/vfio/platform/vfio_platform_private.h |  1 +
+ 2 files changed, 13 insertions(+), 2 deletions(-)
 
+diff --git a/drivers/vfio/platform/vfio_platform_common.c b/drivers/vfio/platform/vfio_platform_common.c
+index f74836a..376d289 100644
+--- a/drivers/vfio/platform/vfio_platform_common.c
++++ b/drivers/vfio/platform/vfio_platform_common.c
+@@ -144,8 +144,12 @@ static void vfio_platform_release(void *device_data)
+ 	mutex_lock(&driver_lock);
+ 
+ 	if (!(--vdev->refcnt)) {
+-		if (vdev->reset)
++		if (vdev->reset) {
++			dev_info(vdev->device, "reset\n");
+ 			vdev->reset(vdev);
++		} else {
++			dev_warn(vdev->device, "no reset function found!\n");
++		}
+ 		vfio_platform_regions_cleanup(vdev);
+ 		vfio_platform_irq_cleanup(vdev);
+ 	}
+@@ -174,8 +178,12 @@ static int vfio_platform_open(void *device_data)
+ 		if (ret)
+ 			goto err_irq;
+ 
+-		if (vdev->reset)
++		if (vdev->reset) {
++			dev_info(vdev->device, "reset\n");
+ 			vdev->reset(vdev);
++		} else {
++			dev_warn(vdev->device, "no reset function found!\n");
++		}
+ 	}
+ 
+ 	vdev->refcnt++;
+@@ -551,6 +559,8 @@ int vfio_platform_probe_common(struct vfio_platform_device *vdev,
+ 		return -EINVAL;
+ 	}
+ 
++	vdev->device = dev;
++
+ 	group = iommu_group_get(dev);
+ 	if (!group) {
+ 		pr_err("VFIO: No IOMMU group for device %s\n", vdev->name);
 diff --git a/drivers/vfio/platform/vfio_platform_private.h b/drivers/vfio/platform/vfio_platform_private.h
-index c563940..fd262be 100644
+index d1b0668..42816dd 100644
 --- a/drivers/vfio/platform/vfio_platform_private.h
 +++ b/drivers/vfio/platform/vfio_platform_private.h
-@@ -110,4 +110,18 @@ static struct vfio_platform_reset_node __reset ## _node = {	\
- };								\
- __vfio_platform_register_reset(&__reset ## _node)
+@@ -59,6 +59,7 @@ struct vfio_platform_device {
+ 	struct module			*parent_module;
+ 	const char			*compat;
+ 	struct module			*reset_module;
++	struct device			*device;
  
-+#define module_vfio_reset_handler(compat, reset)		\
-+MODULE_ALIAS("vfio-reset:" compat);				\
-+static int __init reset ## _module_init(void)			\
-+{								\
-+	vfio_platform_register_reset(compat, reset);		\
-+	return 0;						\
-+};								\
-+static void __exit reset ## _module_exit(void)			\
-+{								\
-+	vfio_platform_unregister_reset(compat, reset);		\
-+};								\
-+module_init(reset ## _module_init);				\
-+module_exit(reset ## _module_exit)
-+
- #endif /* VFIO_PLATFORM_PRIVATE_H */
+ 	/*
+ 	 * These fields should be filled by the bus specific binder
 -- 
 1.9.1
