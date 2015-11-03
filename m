@@ -1,31 +1,28 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 03 Nov 2015 15:12:01 +0100
-Subject: [PATCH] raid5-cache: add crc32c Kconfig dependency
-Message-ID: <4308930.z8rrqMJU90@wuerfel>
+From: jungseoklee85@gmail.com (Jungseok Lee)
+Date: Tue, 3 Nov 2015 23:12:51 +0900
+Subject: [PATCH v6 1/3] percpu: remove PERCPU_ENOUGH_ROOM which is stale
+ definition
+In-Reply-To: <20151102191044.GA9553@mtj.duckdns.org>
+References: <1446363977-23656-1-git-send-email-jungseoklee85@gmail.com>
+ <1446363977-23656-2-git-send-email-jungseoklee85@gmail.com>
+ <20151102191044.GA9553@mtj.duckdns.org>
+Message-ID: <36E66A14-F5AE-45DA-A759-82F1BA5DFE98@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The recent change of the raid5-cache code to use crc32c instead
-of crc32 causes link errors when CONFIG_LIBCRC32C is disabled:
+On Nov 3, 2015, at 4:10 AM, Tejun Heo wrote:
 
-drivers/built-in.o: In function crc32c'
-core.c:(.text+0x1c6060): undefined reference to `crc32c'
+Dear Tejun,
 
-This adds an explicit 'select' statement like all other users
-of this function do.
+> On Sun, Nov 01, 2015 at 07:46:15AM +0000, Jungseok Lee wrote:
+>> As pure cleanup, this patch removes PERCPU_ENOUGH_ROOM which is not
+>> used any more. That is, no code refers to the definition.
+>> 
+>> Signed-off-by: Jungseok Lee <jungseoklee85@gmail.com>
+> 
+> Applied to percpu/for-4.4.
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: 5cb2fbd6ea0d ("raid5-cache: use crc32c checksum")
+Thanks for taking care of this!
 
-diff --git a/drivers/md/Kconfig b/drivers/md/Kconfig
-index 3e01e6fb3424..7913fdcfc849 100644
---- a/drivers/md/Kconfig
-+++ b/drivers/md/Kconfig
-@@ -123,6 +123,7 @@ config MD_RAID456
- 	tristate "RAID-4/RAID-5/RAID-6 mode"
- 	depends on BLK_DEV_MD
- 	select RAID6_PQ
-+	select LIBCRC32C
- 	select ASYNC_MEMCPY
- 	select ASYNC_XOR
- 	select ASYNC_PQ
+Best Regards
+Jungseok Lee
