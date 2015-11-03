@@ -1,94 +1,166 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Tue, 03 Nov 2015 09:16:11 +0900
-Subject: [PATCH v4 1/4] Documentation: dt-bindings: Describe SROMc
- configuration
-In-Reply-To: <012101d11540$8c280be0$a47823a0$@samsung.com>
-References: <cover.1446122247.git.p.fedin@samsung.com>
- <f1fbd1a7877090f4318705f0fccbf4d96c0ebc9c.1446122247.git.p.fedin@samsung.com>
- <56330E6E.50003@samsung.com> <00d401d112ff$c426e9a0$4c74bce0$@samsung.com>
- <5635D1EE.5010604@samsung.com> <012101d11540$8c280be0$a47823a0$@samsung.com>
-Message-ID: <5637FCCB.1060007@samsung.com>
+From: geoff@infradead.org (Geoff Levand)
+Date: Mon, 02 Nov 2015 16:30:16 -0800
+Subject: [PATCH 08/16] arm64/kexec: Add core kexec support
+In-Reply-To: <56339ACD.7010506@arm.com>
+References: <cover.1445297709.git.geoff@infradead.org>
+ <a1c2a702f127d9dade1f9af8ab13decb2ef1c0da.1445297709.git.geoff@infradead.org>
+ <56339ACD.7010506@arm.com>
+Message-ID: <1446510616.23374.3.camel@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02.11.2015 16:31, Pavel Fedin wrote:
->  Hello!
+Hi James,
+
+On Fri, 2015-10-30 at 16:29 +0000, James Morse wrote:
+> On 20/10/15 00:38, Geoff Levand wrote:
+> > +config KEXEC
+> > +> > 	> > depends on (!SMP || PM_SLEEP_SMP)
 > 
->>> --- cut exynos5410.dtsi ---
->>> 		sromc: sromc at 12250000 {
->>> 			#address-cells = <2>;
->>> 			#size-cells = <1>;
->>> 			ranges = <0 0 0x04000000 0x20000
->>> 				  1 0 0x05000000 0x20000
->>> 				  2 0 0x06000000 0x20000
->>> 				  3 0 0x07000000 0x20000>;
->>
->> Do you have to use 2 cells for address? Cannot it be:
->>  			ranges = <0 0x04000000 0x20000
->>  				  1 0x05000000 0x20000
->>  				  2 0x06000000 0x20000
->>  				  3 0x07000000 0x20000>;
+> Commit 4b3dc9679cf7 got rid of '!SMP'.
+
+Fixed for v11.
+
+> > - * Copyright (C) 2015 Huawei Futurewei Technologies.
+> > + * Copyright (C) Huawei Futurewei Technologies.
 > 
->  I tried this first, but it didn't work, and ranges translation
-> gave me something really weird (like addr = 0x80 and
-> size = 0x04000004).
+> Move this hunk into the patch that adds the file?
 
-Did you change the address-cells to <1>?
+Was fixed in v10.2.
+ 
 
-> I decided not to dig deeply into
-> "ranges" processing, but just followed GPMC approach. They say
-> that first number is range ID and second number is offset within
-> the range. And it just worked.
+> > +++ b/arch/arm64/kernel/relocate_kernel.S
+
+> If I've followed all this through properly:
 > 
->>>  3. About samsung,srom-config array. I have the following reasons to keep if this way:
->>>     - listing every property under own name is just too much typing
->>>     - these values really do not make sense without each other, or partialy. I would say
->> that in array form they are even better
->>> readable, because it is the same order in which they go into the register.
->>
->> For timings - OK. PMC is separate. This is not a timing.
+> With KVM - mmu+caches are configured, but then disabled by 'kvm: allows kvm
+> cpu hotplug'. This 'arm64_relocate_new_kernel' function then runs at EL2
+> with M=0, C=0, I=0.
 > 
->  But it's srom-config, and not srom-timing anymore. So do you want
-> two properties like srom-timing + srom-page-mode (with vendor prefix
-> of course)?
-
-Yes, I still want separate properties because this too generic. In next
-SoC they will extend the register and you will have to extend the
-binding. I agree for simplicity reasons to group timings in an array.
-But not entire register.
-
->> You need to document them. We are not gonna put some data looking like a
->> vendor blob into the binding. I understand that document has
->> confidential mark... all of Samsung datasheets I've seen had it. I don't
->> find it as problem but of course I am not the one to judge here. If you
->> do not feel comfortable publishing such data, get an approval from your
->> manager. You can also try to search for this in vendor code
->> (opensource.samsung.com). If it is published there, then this won't be a
->> disclosure.
+> Without KVM - when there is no user of EL2, the mmu+caches are left in
+> whatever state the bootloader (or efi stub) left them in. From
+> Documentation/arm64/booting.txt:
+> > Instruction cache may be on or off.
+> and
+> > System caches which respect the architected cache maintenance by VA
+> > operations must be configured and may be enabled.
 > 
->  I've seen the actual SROMc settings in some old Android kernels, like 3.0.4.
-> But they are not documented there, no comments, just #define's.
->  Ok, i'll try to take a look how to minimize the actual information. :)
-
-Actually 15 secs of search by grep revealed that they are already
-documented and published. I looked at first image coming into my mind:
-GT-I9300_JB
-arch/arm/mach-exynos/include/mach/sromc-exynos4.h
-
-
->> BTW, your email client is weird. You are sending non-wrapped emails
->> without format=flowed in Content-Type. Please stick to mailing list
->> convention of wrapping at 72-char.
+> So 'arm64_relocate_new_kernel' function could run at EL2 with M=0, C=?, I=?.
 > 
->  I know, sorry, this is MS Outlook (not Express), and it's impossible
-> to configure it this way (if i just set up word wrap, it starts to
-> corrupt patches). I am now trying to wrap the text by hands, i hope
-> it's better. And i cannot use anything else because... You know why. :)
+> I think this means you can't guarantee anything you are copying below
+> actually makes it through the caches - booting secondary processors may get
+> stale values.
+> 
+> The EFI stub disables the M and C bits when booted at EL2 with uefi - but
+> it leaves the instruction cache enabled. You only clean the
+> reboot_code_buffer from the data cache, so there may be stale values in the
+> instruction cache.
+> 
+> I think you need to disable the i-cache at EL1. If you jump to EL2, I think
+> you need to disable the I/C bits there too - as you can't rely on the code
+> in 'kvm: allows kvm cpu hotplug' to do this in a non-kvm case.
 
-Actually no... I don't know why...
-All of us are using whatever we want (mutt+MDA, thunderbird, kmail,
-etc.). At least in two locations I've been: in Polish R&D and in HQ.
+For consistency across all code paths, we could put in something like this:
+
++       /* Clear SCTLR_ELx_FLAGS. */
++       mrs     x0, CurrentEL
++       cmp     x0, #CurrentEL_EL2
++       b.ne    1f
++       mrs     x0, sctlr_el2
++       ldr     x1, =SCTLR_EL2_FLAGS
++       bic     x0, x0, x1
++       msr     sctlr_el2, x0
++       isb
++       b       2f
++1:     mrs     x0, sctlr_el1
++       ldr     x1, =SCTLR_EL2_FLAGS
++       bic     x0, x0, x1
++       msr     sctlr_el1, x0
++       isb
 
 
-Best regards,
-Krzysztof
+
+> > +.Ldone:
+> > +> > 	> > dsb> > 	> > sy
+> > +> > 	> > isb
+> > +> > 	> > ic> > 	> > ialluis
+> > +> > 	> > dsb> > 	> > sy
+> 
+> Why the second dsb?
+
+I removed the first isb as Mark suggested.
+
+
+> 
+> > +> > 	> > isb
+> > +
+> > +> > 	> > /* Start new image. */
+> > +> > 	> > ldr> > 	> > x4, .Lkimage_start
+> > +> > 	> > mov> > 	> > x0, xzr
+> > +> > 	> > mov> > 	> > x1, xzr
+> > +> > 	> > mov> > 	> > x2, xzr
+> > +> > 	> > mov> > 	> > x3, xzr
+> 
+> Once the kexec'd kernel is booting, I get:
+> > WARNING: x1-x3 nonzero in violation of boot protocol:
+> >         x1: 0000000080008000
+> >         x2: 0000000000000020
+> >         x3: 0000000000000020
+> > This indicates a broken bootloader or old kernel
+> 
+> Presumably this 'kimage_start' isn't pointing to the new kernel, but the
+> purgatory code, (which comes from user-space?). (If so what are these xzr-s
+> for?)
+
+The warning was from the arm64 purgatory in kexec-tools, now fixed.
+
+We don't need to zero the registers anymore.   At one time I had
+an option where the kernel found the dtb section and jumped
+directly to the new image as the 32 bit arm kernel does.
+
+> +/* The machine_kexec routine sets these variables via offsets from
+> > + * arm64_relocate_new_kernel.
+> > + */
+> > +
+> > +/*
+> > + * .Lkimage_start - Copy of image->start, the entry point of the new
+> > + * image.
+> > + */
+> > +.Lkimage_start:
+> > +> > 	> > .quad> > 	> > 0x0
+> > +
+> > +/*
+> > + * .Lkimage_head - Copy of image->head, the list of kimage entries.
+> > + */
+> > +.Lkimage_head:
+> > +> > 	> > .quad> > 	> > 0x0
+> > +
+> 
+> I assume these .quad-s are used because you can't pass the values in via
+> registers - due to the complicated soft_restart(). Given you are the only
+> user, couldn't you simplify it to do all the disabling in
+> arm64_relocate_new_kernel?
+
+I moved some things from cpu_reset to arm64_relocate_new_kernel, but
+from what Takahiro has said, to support a modular kvm some of the CPU
+shutdown code will be shared.  Maybe we can look into simplifying things
+once work on modular kvm is started.
+
+
+> 
+> From 'kexec -e' to the first messages from the new kernel takes ~1 minute
+> on Juno, Did you see a similar delay? Or should I go looking for what I've
+> configured wrong!?
+
+As Pratyush has mentioned this is most likely due to the dcaches
+being disabled.
+
+> (Copying code with the mmu+caches on, then cleaning to PoC was noticeably
+> faster for hibernate)
+> 
+> 
+> I've used this series for kexec-ing between 4K and 64K page_size kernels on
+> Juno.
+
+Thanks for testing.
+
+-Geoff
