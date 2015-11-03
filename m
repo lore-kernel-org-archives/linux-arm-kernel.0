@@ -1,37 +1,31 @@
-From: jungseoklee85@gmail.com (Jungseok Lee)
-Date: Tue, 3 Nov 2015 23:11:16 +0900
-Subject: [PATCH v6 2/3] percpu: add PERCPU_ATOM_SIZE for a generic percpu
- area setup
-In-Reply-To: <alpine.DEB.2.20.1511021008580.27740@east.gentwo.org>
-References: <1446363977-23656-1-git-send-email-jungseoklee85@gmail.com>
- <1446363977-23656-3-git-send-email-jungseoklee85@gmail.com>
- <alpine.DEB.2.20.1511021008580.27740@east.gentwo.org>
-Message-ID: <8FA31B91-D361-4F98-A2D3-EFC5D877EDB1@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 03 Nov 2015 15:12:01 +0100
+Subject: [PATCH] raid5-cache: add crc32c Kconfig dependency
+Message-ID: <4308930.z8rrqMJU90@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Nov 3, 2015, at 1:10 AM, Christoph Lameter wrote:
+The recent change of the raid5-cache code to use crc32c instead
+of crc32 causes link errors when CONFIG_LIBCRC32C is disabled:
 
-Dear Christoph,
+drivers/built-in.o: In function crc32c'
+core.c:(.text+0x1c6060): undefined reference to `crc32c'
 
-> On Sun, 1 Nov 2015, Jungseok Lee wrote:
-> 
->> There is no room to adjust 'atom_size' now when a generic percpu area
->> is used. It would be redundant to write down an architecture-specific
->> setup_per_cpu_areas() in order to only change the 'atom_size'. Thus,
->> this patch adds a new definition, PERCPU_ATOM_SIZE, which is PAGE_SIZE
->> by default. The value could be updated if needed by architecture.
-> 
-> What is atom_size? Why would you want a difference allocation size here?
-> The percpu area is virtually mapped regardless. So you will have
-> contiguous addresses even without atom_size.
+This adds an explicit 'select' statement like all other users
+of this function do.
 
-I think Catalin have already written down a perfect explanation. I'd like
-memory with an alignment greater than PAGE_SIZE. But, __per_cpu_offset[]
-is PAGE_SIZE aligned under a generic setup_per_cpu_areas(). That is,
-secondary cores cannot get that kind of space.
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Fixes: 5cb2fbd6ea0d ("raid5-cache: use crc32c checksum")
 
-Thanks for taking a look at this doubtable change!
-
-Best Regards
-Jungseok Lee
+diff --git a/drivers/md/Kconfig b/drivers/md/Kconfig
+index 3e01e6fb3424..7913fdcfc849 100644
+--- a/drivers/md/Kconfig
++++ b/drivers/md/Kconfig
+@@ -123,6 +123,7 @@ config MD_RAID456
+ 	tristate "RAID-4/RAID-5/RAID-6 mode"
+ 	depends on BLK_DEV_MD
+ 	select RAID6_PQ
++	select LIBCRC32C
+ 	select ASYNC_MEMCPY
+ 	select ASYNC_XOR
+ 	select ASYNC_PQ
