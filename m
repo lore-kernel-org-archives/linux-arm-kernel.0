@@ -1,189 +1,117 @@
-From: Minghuan.Lian@freescale.com (Lian M.H.)
-Date: Tue, 3 Nov 2015 06:08:56 +0000
-Subject: [PATCH v4 6/6] PCI: layerscape: add ls_pcie_msi_host_init
-In-Reply-To: <20151102210650.GA17552@localhost>
-References: <1444979960-24100-1-git-send-email-Minghuan.Lian@freescale.com>
- <1444979960-24100-6-git-send-email-Minghuan.Lian@freescale.com>
- <20151021213416.GJ1583@localhost> <20151022162130.GA21237@localhost>
- <20151102210650.GA17552@localhost>
-Message-ID: <DM2PR0301MB064045AFD7F7BE5158B019F0E22B0@DM2PR0301MB0640.namprd03.prod.outlook.com>
+From: b38343@freescale.com (Robin Gong)
+Date: Tue, 3 Nov 2015 14:11:23 +0800
+Subject: [PATCH v2 1/2] watchdog: add WDIOC_SETPRETIMEOUT and
+ WDIOC_GETPRETIMEOUT
+Message-ID: <1446531084-15365-1-git-send-email-b38343@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bjorn,
+Since the watchdog common framework centrialize the IOCTL interfaces of
+device driver now, the SETPRETIMEOUT and GETPRETIMEOUT need to be added
+in the common code.
 
-I am so sorry about text code setting. Now, I carefully checked the mail configuration again, hope it is ok.
-I greatly appreciate your review and comments.
+Signed-off-by: Robin Gong <b38343@freescale.com>
+---
+ drivers/watchdog/watchdog_dev.c | 37 +++++++++++++++++++++++++++++++++++++
+ include/linux/watchdog.h        | 10 ++++++++++
+ 2 files changed, 47 insertions(+)
 
-Thanks,
-Minghuan
-
-> -----Original Message-----
-> From: Bjorn Helgaas [mailto:helgaas at kernel.org]
-> Sent: Tuesday, November 03, 2015 5:07 AM
-> To: Lian Minghuan-B31939 <Minghuan.Lian@freescale.com>
-> Cc: linux-pci at vger.kernel.org; linux-arm-kernel at lists.infradead.org; Zang
-> Roy-R61911 <tie-fei.zang@freescale.com>; Hu Mingkai-B21284
-> <Mingkai.Hu@freescale.com>; Yoder Stuart-B08248
-> <stuart.yoder@freescale.com>; Li Yang-Leo-R58472 <LeoLi@freescale.com>;
-> Arnd Bergmann <arnd@arndb.de>; Bjorn Helgaas <bhelgaas@google.com>;
-> Jingoo Han <jg1.han@samsung.com>; Zhou Wang
-> <wangzhou1@hisilicon.com>; Thomas Gleixner <tglx@linutronix.de>
-> Subject: Re: [PATCH v4 6/6] PCI: layerscape: add ls_pcie_msi_host_init
-> 
-> Your reply was *still* base64-encoded and thus rejected by the vger mailing
-> lists.
-> 
-> Minghuan wrote:
-> > On Thu, Oct 22, 2015 at 11:21:30AM -0500, Bjorn Helgaas wrote:
-> > > Minghuan wrote:
-> > > > On Wed, Oct 21, 2015 at 04:34:16PM -0500, Bjorn Helgaas wrote:
-> > > > > Hi Minghuan,
-> > > > >
-> > > > > On Fri, Oct 16, 2015 at 03:19:20PM +0800, Minghuan Lian wrote:
-> > > > > > Layerscape PCIe has its own MSI implementation. The patch
-> > > > > > registers
-> > > > > > ls_pcie_msi_host_init() to avoid using Designware's MSI.
-> > > > > >
-> > > > > > Signed-off-by: Minghuan Lian <Minghuan.Lian@freescale.com>
-> > > > > > ---
-> > > > > > Change log
-> > > > > > v4: split from [PATCH v3] PCI: layerscape: Add PCIe support
-> > > > > > for LS1043a and LS2080a
-> > > > > >
-> > > > > >  drivers/pci/host/pci-layerscape.c | 17 +++++++++++++++++
-> > > > > >  1 file changed, 17 insertions(+)
-> > > > > >
-> > > > > > diff --git a/drivers/pci/host/pci-layerscape.c
-> > > > > > b/drivers/pci/host/pci-layerscape.c
-> > > > > > index c53692a..8fac6c8 100644
-> > > > > > --- a/drivers/pci/host/pci-layerscape.c
-> > > > > > +++ b/drivers/pci/host/pci-layerscape.c
-> > > > > > @@ -150,14 +150,31 @@ static void ls_pcie_host_init(struct
-> pcie_port *pp)
-> > > > > >  	iowrite32(0, pcie->dbi + PCIE_DBI_RO_WR_EN);  }
-> > > > > >
-> > > > > > +static int ls_pcie_msi_host_init(struct pcie_port *pp,
-> > > > > > +				 struct msi_controller *chip) {
-> > > > > > +	struct device_node *msi_node;
-> > > > > > +	struct device_node *np = pp->dev->of_node;
-> > > > > > +
-> > > > > > +	msi_node = of_parse_phandle(np, "msi-parent", 0);
-> > > > > > +	if (!msi_node) {
-> > > > > > +		dev_err(pp->dev, "failed to find msi-parent\n");
-> > > > > > +		return -EINVAL;
-> > > > > > +	}
-> > > > > > +
-> > > > > > +	return 0;
-> > > > >
-> > > > > I don't see how this can be right.  I think it's OK if you want
-> > > > > to enforce the presence of "msi-parent", but the other
-> > > > > implementations of .msi_host_init (ks_dw_pcie_msi_host_init()
-> > > > > and the default implementation in dw_pcie_host_init()) both set
-> > > > > pp->irq_domain and call irq_create_mapping().
-> > > > >
-> > > > > You don't do either of those, so I don't see how MSIs can work,
-> > > > > because I assume the generic DesignWare code will depend on
-> > > > > pp->irq_domain.  If you're planning to add more
-> > > > > Layerscape-specific MSI support later, I think you should wait and
-> include this patch with that work.
-> > >
-> > > > Regarding MSI, both LS1021a and LS1043a use SCFG to implement it. I
-> have submitted patch:
-> > > > https://patchwork.kernel.org/patch/7411131/
-> > > > https://patchwork.kernel.org/patch/7411141/
-> > >
-> > > > While ls2085a use ITS for it, we just re-use the ITS driver.
-> > >
-> > > > I notice some platform MSI driver files were placed in pci/host
-> > > > folder not irqchip.  If it is ok, I would like to change driver
-> > > > folder and re-submitted the MSI patch.
-> > >
-> > > I suppose you're referring to drivers/pci/host/pci-xgene-msi.c.
-> > > That file doesn't really have much PCI stuff in it.  It does call
-> > > pci_msi_create_irq_domain(), but that's really the only PCI
-> > > interface or data structure it uses.  So I don't know if
-> > > drivers/pci/host or drivers/irqchip is the best place for it and for
-> > > your irq-ls-scfg-msi.c.
-> > >
-> > > The connection between pci-xgene-msi.c and pci-xgene.c is not very
-> > > clear to me, and that's sort of what I'm complaining about here.
-> > > You're overriding a default MSI initialization method.  Usually that
-> > > means you do the same thing as the default method, but in a
-> > > different way.  You aren't doing the same thing at all, which makes
-> > > the code hard to review.
-> > >
-> > > Maybe a comment about how the MSI controller gets connected to
-> > > devices below this host bridge would be enough.
-> 
-> > 1. We need to define callback function msi_host_init() to avoid the
-> > running desginware MSI related code Because our PCIe controller do not
-> > enable this feature.
-> >
-> > 2. we do not need to do anything such as bus->msi= ls_scfg_msi Because
-> > with the latest code, when PCIe controller device is created
-> > of_msi_configure() will be called and MSI domain pointed by
-> > 'msi-parent' will be bound  to the device. pci_msi_get_domain(struct
-> > pci_dev *dev) -> dev_get_msi_domain(&dev->dev) will return this MSI
-> > domain.
-> >
-> > 3. I will add a comment in the next version.
-> 
-> Don't bother, I added a comment and applied the patch like this:
-> 
-> 
-> commit 90cbdf8412d206f65ece3dcc53230e673da569c6
-> Author: Minghuan Lian <Minghuan.Lian@freescale.com>
-> Date:   Fri Oct 16 15:19:20 2015 +0800
-> 
->     PCI: layerscape: Add ls_pcie_msi_host_init()
-> 
->     Layerscape PCIe has its own MSI implementation.
-> 
->     Register ls_pcie_msi_host_init() to avoid using DesignWare's MSI.
-> 
->     [bhelgaas: add comment]
->     Signed-off-by: Minghuan Lian <Minghuan.Lian@freescale.com>
->     Signed-off-by: Bjorn Helgaas <bhelgaas@google.com>
-> 
-> diff --git a/drivers/pci/host/pci-layerscape.c b/drivers/pci/host/pci-layerscape.c
-> index 6a9fa8a..1677890 100644
-> --- a/drivers/pci/host/pci-layerscape.c
-> +++ b/drivers/pci/host/pci-layerscape.c
-> @@ -150,14 +150,37 @@ static void ls_pcie_host_init(struct pcie_port *pp)
->  	iowrite32(0, pcie->dbi + PCIE_DBI_RO_WR_EN);  }
-> 
-> +static int ls_pcie_msi_host_init(struct pcie_port *pp,
-> +				 struct msi_controller *chip)
-> +{
-> +	struct device_node *msi_node;
-> +	struct device_node *np = pp->dev->of_node;
-> +
-> +	/*
-> +	 * The MSI domain is set by the generic of_msi_configure().  This
-> +	 * .msi_host_init() function keeps us from doing the default MSI
-> +	 * domain setup in dw_pcie_host_init() and also enforces the
-> +	 * requirement that "msi-parent" exists.
-> +	 */
-> +	msi_node = of_parse_phandle(np, "msi-parent", 0);
-> +	if (!msi_node) {
-> +		dev_err(pp->dev, "failed to find msi-parent\n");
-> +		return -EINVAL;
-> +	}
-> +
-> +	return 0;
-> +}
-> +
->  static struct pcie_host_ops ls1021_pcie_host_ops = {
->  	.link_up = ls1021_pcie_link_up,
->  	.host_init = ls1021_pcie_host_init,
-> +	.msi_host_init = ls_pcie_msi_host_init,
->  };
-> 
->  static struct pcie_host_ops ls_pcie_host_ops = {
->  	.link_up = ls_pcie_link_up,
->  	.host_init = ls_pcie_host_init,
-> +	.msi_host_init = ls_pcie_msi_host_init,
->  };
-> 
->  static struct ls_pcie_drvdata ls1021_drvdata = {
+diff --git a/drivers/watchdog/watchdog_dev.c b/drivers/watchdog/watchdog_dev.c
+index 6aaefba..f4a02e5 100644
+--- a/drivers/watchdog/watchdog_dev.c
++++ b/drivers/watchdog/watchdog_dev.c
+@@ -218,6 +218,37 @@ out_timeout:
+ }
+ 
+ /*
++ *	watchdog_set_pretimeout: set the watchdog timer pretimeout
++ *	@wddev: the watchdog device to set the timeout for
++ *	@timeout: pretimeout to set in seconds
++ */
++
++static int watchdog_set_pretimeout(struct watchdog_device *wddev,
++				   unsigned int timeout)
++{
++	int err;
++
++	if (!wddev->ops->set_pretimeout ||
++	    !(wddev->info->options & WDIOF_PRETIMEOUT))
++		return -EOPNOTSUPP;
++	if (watchdog_pretimeout_invalid(wddev, timeout))
++		return -EINVAL;
++
++	mutex_lock(&wddev->lock);
++
++	if (test_bit(WDOG_UNREGISTERED, &wddev->status)) {
++		err = -ENODEV;
++		goto out_timeout;
++	}
++
++	err = wddev->ops->set_pretimeout(wddev, timeout);
++
++out_timeout:
++	mutex_unlock(&wddev->lock);
++	return err;
++}
++
++/*
+  *	watchdog_get_timeleft: wrapper to get the time left before a reboot
+  *	@wddev: the watchdog device to get the remaining time from
+  *	@timeleft: the time that's left
+@@ -393,6 +424,12 @@ static long watchdog_ioctl(struct file *file, unsigned int cmd,
+ 		if (err)
+ 			return err;
+ 		return put_user(val, p);
++	case WDIOC_SETPRETIMEOUT:
++		if (get_user(val, p))
++			return -EFAULT;
++		return watchdog_set_pretimeout(wdd, val);
++	case WDIOC_GETPRETIMEOUT:
++		return put_user(wdd->pretimeout, p);
+ 	default:
+ 		return -ENOTTY;
+ 	}
+diff --git a/include/linux/watchdog.h b/include/linux/watchdog.h
+index d74a0e9..f936152 100644
+--- a/include/linux/watchdog.h
++++ b/include/linux/watchdog.h
+@@ -25,6 +25,7 @@ struct watchdog_device;
+  * @ping:	The routine that sends a keepalive ping to the watchdog device.
+  * @status:	The routine that shows the status of the watchdog device.
+  * @set_timeout:The routine for setting the watchdog devices timeout value.
++ * @set_pretimeout:The routine for setting the watchdog devices pretimeout.
+  * @get_timeleft:The routine that get's the time that's left before a reset.
+  * @ref:	The ref operation for dyn. allocated watchdog_device structs
+  * @unref:	The unref operation for dyn. allocated watchdog_device structs
+@@ -44,6 +45,7 @@ struct watchdog_ops {
+ 	int (*ping)(struct watchdog_device *);
+ 	unsigned int (*status)(struct watchdog_device *);
+ 	int (*set_timeout)(struct watchdog_device *, unsigned int);
++	int (*set_pretimeout)(struct watchdog_device *, unsigned int);
+ 	unsigned int (*get_timeleft)(struct watchdog_device *);
+ 	void (*ref)(struct watchdog_device *);
+ 	void (*unref)(struct watchdog_device *);
+@@ -86,6 +88,7 @@ struct watchdog_device {
+ 	const struct watchdog_ops *ops;
+ 	unsigned int bootstatus;
+ 	unsigned int timeout;
++	unsigned int pretimeout;
+ 	unsigned int min_timeout;
+ 	unsigned int max_timeout;
+ 	void *driver_data;
+@@ -123,6 +126,13 @@ static inline bool watchdog_timeout_invalid(struct watchdog_device *wdd, unsigne
+ 		(t < wdd->min_timeout || t > wdd->max_timeout));
+ }
+ 
++/* Use the following function to check if a pretimeout value is invalid */
++static inline bool watchdog_pretimeout_invalid(struct watchdog_device *wdd,
++					       unsigned int t)
++{
++	return wdd->timeout && t >= wdd->timeout;
++}
++
+ /* Use the following functions to manipulate watchdog driver specific data */
+ static inline void watchdog_set_drvdata(struct watchdog_device *wdd, void *data)
+ {
+-- 
+1.9.1
