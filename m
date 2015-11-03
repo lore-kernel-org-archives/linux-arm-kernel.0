@@ -1,72 +1,106 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 3 Nov 2015 08:39:23 +0000
-Subject: [PATCH v2 2/5] mfd: ts4800-syscon: add driver for TS-4800 syscon
-In-Reply-To: <20151103083817.GC3503@x1>
-References: <1446150450-22093-1-git-send-email-damien.riegel@savoirfairelinux.com>
- <1446150450-22093-3-git-send-email-damien.riegel@savoirfairelinux.com>
- <20151030175656.GF4058@x1> <20151030200812.GB8666@localhost>
- <20151102091253.GS4058@x1> <20151102181334.GA7200@localhost>
- <20151103083817.GC3503@x1>
-Message-ID: <20151103083923.GD3503@x1>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Tue, 3 Nov 2015 09:40:02 +0100
+Subject: [PATCH 20/22] clocksource/drivers/exynos_mct: Fix Kconfig and add
+ COMPILE_TEST option
+In-Reply-To: <563806E7.6010105@samsung.com>
+References: <1446469011-22710-1-git-send-email-daniel.lezcano@linaro.org>
+ <1446469011-22710-20-git-send-email-daniel.lezcano@linaro.org>
+ <56380040.3080600@samsung.com> <563806E7.6010105@samsung.com>
+Message-ID: <563872E2.10001@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 03 Nov 2015, Lee Jones wrote:
+On 11/03/2015 01:59 AM, Krzysztof Kozlowski wrote:
+> On 03.11.2015 09:30, Krzysztof Kozlowski wrote:
+>> On 02.11.2015 21:56, Daniel Lezcano wrote:
+>>> Let the platform's Kconfig to select the clock instead of having a reverse
+>>> dependency from the driver to the platform options.
+>>
+>> Selecting user-visible symbols is rather discouraged so why not
+>> something like this:
+>>
+>> -       def_bool y if ARCH_EXYNOS
+>> -       depends on !ARM64
+>> +       bool "Exynos multi core timer driver"
+>> +       depends on ARCH_EXYNOS || (COMPILE_TEST && ARM)
+>
+> Nope, that was wrong as we loose auto-select on Exynos. Instead:
+> -       def_bool y if ARCH_EXYNOS
+> -       depends on !ARM64
+> +       bool "Exynos multi core timer driver" if ARM
+> +       depends on ARCH_EXYNOS || COMPILE_TEST
+> +       default y if ARCH_EXYNOS
+>
+> This way we avoid select (which is a reverse dependency for the driver),
+> have it auto-selectable and compile tested on arm.
 
-> On Mon, 02 Nov 2015, Damien Riegel wrote:
-> > On Mon, Nov 02, 2015 at 09:12:53AM +0000, Lee Jones wrote:
-> > > [Cc'ing Arnd]
-> > > 
-> > > On Fri, 30 Oct 2015, Damien Riegel wrote:
-> > > > On Fri, Oct 30, 2015 at 05:56:56PM +0000, Lee Jones wrote:
-> > > > > On Thu, 29 Oct 2015, Damien Riegel wrote:
-> > > > > 
-> > > > > > Driver for TS-4800 syscon. These registers belong to a FPGA that is
-> > > > > > memory mapped and are used for counters, enable various IPs in the FPGA,
-> > > > > > control LEDs, control IOs, etc.
-> > > > > > 
-> > > > > > Currently, only the watchdog is handled.
-> > > > > 
-> > > > > Why do you require your own syscon driver?
-> > > > > 
-> > > > > What's wrong with the generic one?
-> > > > > 
-> > > > 
-> > > > The generic one uses a regmap_config with reg_stride set to 4 and val_bits
-> > > > to 32.
-> > > > 
-> > > > TS-4800 syscon registers are 16-bit wide and must be accessed with 16
-> > > > bit read and writes:
-> > > > http://wiki.embeddedarm.com/wiki/TS-4800#Syscon
-> > > > 
-> > > > I will address the other issues in the next version (split commit,
-> > > > license issue, style, and superfluous remove).
-> > > 
-> > > The Syscon driver was written to be generic so that each
-> > > vendor/platform didn't require their own incarnation.  How unique is
-> > > the TS-4800?
-> > > 
-> > > Perhaps it might be better to supply a generic 16 bit Syscon for
-> > > devices akin to the TS-4800?
-> > 
-> > The TS-4800 syscon could use a generic 16-bit syscon. There is nothing
-> > specific that requires a driver besides that.
-> > 
-> > We could add some optional properties to the generic syscon node to
-> > configure reg_bits, val_bits, and reg_stride (and pad_bits ?). Would
-> > that be a good solution ?
-> 
-> Without looking at the ramifications of such an addition, the premise
-> sounds good to me.  So long as the current behaviour remains the
-> default.
+I think you misunderstood the patch I sent.
 
-Perhaps a "syscon-16bit" compatible might be in order?
+It does two things:
 
-> > > Arnd, any opinion on this?
-> 
+1. Follow the thumb of rule of the current Kconfig format
+
+    - The timer driver is selected by the platform (exynos in this case)
+    - User can't select the driver in the menuconfig
+    - There is no dependency on the platform except for compilation test
+
+2. Add the COMPILE_TEST
+
+    - User can select the driver for compilation testing. This is for 
+allyesconfig when doing compilation test coverage (exynos timer could be 
+compiled on other platform). As the delay code is not portable, we have 
+to restrict the compilation on the ARM platform, this is why there is 
+the dependency on ARM.
+
+I am currently looking at splitting the delay code in order to prevent 
+this restriction on this driver and some others drivers.
+
+
+>>> Add the COMPILE_TEST option for the compilation test coverage. Due to the
+>>> non portable 'delay' code, this driver is only compilable on ARM.
+>>>
+>>> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+>>> ---
+>>>   arch/arm/mach-exynos/Kconfig | 1 +
+>>>   drivers/clocksource/Kconfig  | 4 ++--
+>>>   2 files changed, 3 insertions(+), 2 deletions(-)
+>>>
+>>> diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
+>>> index 3a10f1a..ff10539 100644
+>>> --- a/arch/arm/mach-exynos/Kconfig
+>>> +++ b/arch/arm/mach-exynos/Kconfig
+>>> @@ -27,6 +27,7 @@ menuconfig ARCH_EXYNOS
+>>>   	select SRAM
+>>>   	select THERMAL
+>>>   	select MFD_SYSCON
+>>> +	select CLKSRC_EXYNOS_MCT
+>>>   	help
+>>>   	  Support for SAMSUNG EXYNOS SoCs (EXYNOS4/5)
+>>>
+>>> diff --git a/drivers/clocksource/Kconfig b/drivers/clocksource/Kconfig
+>>> index 916c36d..d829cbe 100644
+>>> --- a/drivers/clocksource/Kconfig
+>>> +++ b/drivers/clocksource/Kconfig
+>>> @@ -213,8 +213,8 @@ config CLKSRC_METAG_GENERIC
+>>>   	  This option enables support for the Meta per-thread timers.
+>>>
+>>>   config CLKSRC_EXYNOS_MCT
+>>> -	def_bool y if ARCH_EXYNOS
+>>> -	depends on !ARM64
+>>> +	bool "Exynos multi core timer driver" if COMPILE_TEST
+>>> +	depends on ARM
+>>>   	help
+>>>   	  Support for Multi Core Timer controller on Exynos SoCs.
+>>>
+>>>
+>>
+>>
+>
+
 
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
