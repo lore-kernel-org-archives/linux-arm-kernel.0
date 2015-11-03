@@ -1,58 +1,51 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 3 Nov 2015 12:05:05 +0000
-Subject: [PATCH] arm64: Increase the max granular size
-In-Reply-To: <CAMuHMdWQygbxMXoOsbwek6DzZcr7J-C23VCK4ubbgUr+zj=giw@mail.gmail.com>
-References: <1442944788-17254-1-git-send-email-rric@kernel.org>
- <20151028190948.GJ8899@e104818-lin.cambridge.arm.com>
- <CAMuHMdWQygbxMXoOsbwek6DzZcr7J-C23VCK4ubbgUr+zj=giw@mail.gmail.com>
-Message-ID: <20151103120504.GF7637@e104818-lin.cambridge.arm.com>
+From: van.freenix@gmail.com (Peng Fan)
+Date: Tue,  3 Nov 2015 20:59:17 +0800
+Subject: [RFC] iommu: arm-smmu: correct reference count
+Message-ID: <1446555557-3097-1-git-send-email-van.freenix@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 03, 2015 at 12:07:06PM +0100, Geert Uytterhoeven wrote:
-> On Wed, Oct 28, 2015 at 8:09 PM, Catalin Marinas
-> <catalin.marinas@arm.com> wrote:
-> > On Tue, Sep 22, 2015 at 07:59:48PM +0200, Robert Richter wrote:
-> >> From: Tirumalesh Chalamarla <tchalamarla@cavium.com>
-> >>
-> >> Increase the standard cacheline size to avoid having locks in the same
-> >> cacheline.
-> >>
-> >> Cavium's ThunderX core implements cache lines of 128 byte size. With
-> >> current granulare size of 64 bytes (L1_CACHE_SHIFT=6) two locks could
-> >> share the same cache line leading a performance degradation.
-> >> Increasing the size fixes that.
-> >>
-> >> Increasing the size has no negative impact to cache invalidation on
-> >> systems with a smaller cache line. There is an impact on memory usage,
-> >> but that's not too important for arm64 use cases.
-> >>
-> >> Signed-off-by: Tirumalesh Chalamarla <tchalamarla@cavium.com>
-> >> Signed-off-by: Robert Richter <rrichter@cavium.com>
-> >
-> > Applied. Thanks.
-> 
-> This patch causes a BUG() on r8a7795/salvator-x, for which support is not
-> yet upstream.
-> 
-> My config (attached) uses SLAB. If I switch to SLUB, it works.
-> The arm64 defconfig works, even if I switch from SLUB to SLAB.
-[...]
-> ------------[ cut here ]------------
-> kernel BUG at mm/slab.c:2283!
-> Internal error: Oops - BUG: 0 [#1] SMP
-[...]
-> Call trace:
-> [<ffffffc00014f9b4>] __kmem_cache_create+0x21c/0x280
-> [<ffffffc00068be50>] create_boot_cache+0x4c/0x80
-> [<ffffffc00068bed8>] create_kmalloc_cache+0x54/0x88
-> [<ffffffc00068bfc0>] create_kmalloc_caches+0x50/0xf4
-> [<ffffffc00068db08>] kmem_cache_init+0x104/0x118
-> [<ffffffc00067d7d8>] start_kernel+0x218/0x33c
+iommu_group_alloc will initialize the reference count for group to 1.
+iommu_group_add_device also increase the group reference count,
+if nothing bad happends. And we need to add iommu_group_put to
+decrease the reference count for group.
 
-I haven't managed to reproduce this on a Juno kernel. Could you please
-add some debug printing to see what's being passed to kmalloc_slab()?
-The freelist_size getting out of bounds?
+Signed-off-by: Peng Fan <van.freenix@gmail.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Joerg Roedel <joro@8bytes.org>
+---
 
+Not sure whether my understanding is correct or not. I checked rockchip-iommu.c
+exynos-iommu.c and fsl_pamu_domain.c, and they all have iommu_group_put after
+iommu_group_add_device.
+
+ drivers/iommu/arm-smmu.c | 7 ++++++-
+ 1 file changed, 6 insertions(+), 1 deletion(-)
+
+diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+index 48a39df..1cab720 100644
+--- a/drivers/iommu/arm-smmu.c
++++ b/drivers/iommu/arm-smmu.c
+@@ -1344,6 +1344,7 @@ static int arm_smmu_add_platform_device(struct device *dev)
+ 	struct iommu_group *group;
+ 	struct arm_smmu_master *master;
+ 	struct arm_smmu_device *smmu = find_smmu_for_device(dev);
++	int ret;
+ 
+ 	if (!smmu)
+ 		return -ENODEV;
+@@ -1358,7 +1359,11 @@ static int arm_smmu_add_platform_device(struct device *dev)
+ 		return PTR_ERR(group);
+ 
+ 	iommu_group_set_iommudata(group, &master->cfg, NULL);
+-	return iommu_group_add_device(group, dev);
++
++	ret = iommu_group_add_device(group, dev);
++	iommu_group_put(group);
++
++	return ret;
+ }
+ 
+ static int arm_smmu_add_device(struct device *dev)
 -- 
-Catalin
+1.8.4
