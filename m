@@ -1,38 +1,81 @@
 From: alex.aring@gmail.com (Alexander Aring)
-Date: Tue,  3 Nov 2015 23:45:09 +0100
-Subject: [RFCv2 0/2] rpi: add support for rpi power domain driver
-Message-ID: <1446590711-18928-1-git-send-email-alex.aring@gmail.com>
+Date: Tue,  3 Nov 2015 23:45:10 +0100
+Subject: [RFCv2 1/2] power: domain: add pm_genpd_uninit
+In-Reply-To: <1446590711-18928-1-git-send-email-alex.aring@gmail.com>
+References: <1446590711-18928-1-git-send-email-alex.aring@gmail.com>
+Message-ID: <1446590711-18928-2-git-send-email-alex.aring@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+This patch adds function pm_genpd_uninit for undo a pm_genpd_init. This
+is useful for multiple power domains while probing. If the probing fails
+after one pm_genpd_init was called we need to undo all previous
+registrations of generic pm domains inside the gpd_list list.
 
-this patch series contains at first a patch for the power domain subsystem
-which offers to uninit generic power domains when init was called before.
+There is a check on IS_ERR_OR_NULL(genpd) which is useful to check again
+registered power domains and not registered domains, the driver can use
+this mechanism to have an array with registered and non-registered power
+domains, where non-registered power domains are NULL.
 
-The RPi Power-Domains need to be enabled/disabled by interacting with the
-RPi firmware which can fail. To cleanup the probing we need to undo the
-power domains again which was registered before.
+Cc: Rafael J. Wysocki <rjw@rjwysocki.net>
+Cc: Kevin Hilman <khilman@kernel.org>
+Cc: Ulf Hansson <ulf.hansson@linaro.org>
+Cc: Pavel Machek <pavel@ucw.cz>
+Cc: Len Brown <len.brown@intel.com>
+Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+Signed-off-by: Alexander Aring <alex.aring@gmail.com>
+---
+ drivers/base/power/domain.c | 15 +++++++++++++++
+ include/linux/pm_domain.h   |  4 ++++
+ 2 files changed, 19 insertions(+)
 
-- Alex
-
-Alexander Aring (2):
-  power: domain: add pm_genpd_uninit
-  rpi: add support to enable usb power domain
-
- .../bindings/arm/bcm/raspberrypi,bcm2835-power.txt |  25 +++
- arch/arm/boot/dts/bcm2835-rpi.dtsi                 |  11 ++
- arch/arm/boot/dts/bcm2835.dtsi                     |   2 +-
- arch/arm/mach-bcm/Kconfig                          |  10 ++
- arch/arm/mach-bcm/Makefile                         |   1 +
- arch/arm/mach-bcm/raspberrypi-power.c              | 180 +++++++++++++++++++++
- drivers/base/power/domain.c                        |  15 ++
- include/dt-bindings/arm/raspberrypi-power.h        |  14 ++
- include/linux/pm_domain.h                          |   4 +
- 9 files changed, 261 insertions(+), 1 deletion(-)
- create mode 100644 Documentation/devicetree/bindings/arm/bcm/raspberrypi,bcm2835-power.txt
- create mode 100644 arch/arm/mach-bcm/raspberrypi-power.c
- create mode 100644 include/dt-bindings/arm/raspberrypi-power.h
-
+diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
+index 16550c6..65b9d1a 100644
+--- a/drivers/base/power/domain.c
++++ b/drivers/base/power/domain.c
+@@ -1730,6 +1730,21 @@ void pm_genpd_init(struct generic_pm_domain *genpd,
+ }
+ EXPORT_SYMBOL_GPL(pm_genpd_init);
+ 
++/**
++ * pm_genpd_uninit - Uninitialize a generic I/O PM domain object.
++ * @genpd: PM domain object to initialize.
++ */
++void pm_genpd_uninit(struct generic_pm_domain *genpd)
++{
++	if (IS_ERR_OR_NULL(genpd))
++		return;
++
++	mutex_lock(&gpd_list_lock);
++	list_del(&genpd->gpd_list_node);
++	mutex_unlock(&gpd_list_lock);
++}
++EXPORT_SYMBOL_GPL(pm_genpd_uninit);
++
+ #ifdef CONFIG_PM_GENERIC_DOMAINS_OF
+ /*
+  * Device Tree based PM domain providers.
+diff --git a/include/linux/pm_domain.h b/include/linux/pm_domain.h
+index b1cf7e7..45d4f7a 100644
+--- a/include/linux/pm_domain.h
++++ b/include/linux/pm_domain.h
+@@ -143,6 +143,7 @@ extern int pm_genpd_detach_cpuidle(struct generic_pm_domain *genpd);
+ extern int pm_genpd_name_detach_cpuidle(const char *name);
+ extern void pm_genpd_init(struct generic_pm_domain *genpd,
+ 			  struct dev_power_governor *gov, bool is_off);
++extern void pm_genpd_uninit(struct generic_pm_domain *genpd);
+ 
+ extern int pm_genpd_poweron(struct generic_pm_domain *genpd);
+ extern int pm_genpd_name_poweron(const char *domain_name);
+@@ -212,6 +213,9 @@ static inline void pm_genpd_init(struct generic_pm_domain *genpd,
+ 				 struct dev_power_governor *gov, bool is_off)
+ {
+ }
++static inline void pm_genpd_uninit(struct generic_pm_domain *genpd)
++{
++}
+ static inline int pm_genpd_poweron(struct generic_pm_domain *genpd)
+ {
+ 	return -ENOSYS;
 -- 
 2.6.1
