@@ -1,135 +1,45 @@
-From: b38343@freescale.com (Robin Gong)
-Date: Tue, 3 Nov 2015 14:11:24 +0800
-Subject: [PATCH v2 2/2] watchdog: imx2_wdt: add set_pretimeout interface
-In-Reply-To: <1446531084-15365-1-git-send-email-b38343@freescale.com>
-References: <1446531084-15365-1-git-send-email-b38343@freescale.com>
-Message-ID: <1446531084-15365-2-git-send-email-b38343@freescale.com>
+From: p.fedin@samsung.com (Pavel Fedin)
+Date: Tue, 03 Nov 2015 09:58:02 +0300
+Subject: [PATCH v4 1/4] Documentation: dt-bindings: Describe SROMc
+ configuration
+In-Reply-To: <5637FCCB.1060007@samsung.com>
+References: <cover.1446122247.git.p.fedin@samsung.com>
+ <f1fbd1a7877090f4318705f0fccbf4d96c0ebc9c.1446122247.git.p.fedin@samsung.com>
+ <56330E6E.50003@samsung.com> <00d401d112ff$c426e9a0$4c74bce0$@samsung.com>
+ <5635D1EE.5010604@samsung.com> <012101d11540$8c280be0$a47823a0$@samsung.com>
+ <5637FCCB.1060007@samsung.com>
+Message-ID: <004d01d11604$fc7a2a80$f56e7f80$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable set_pretimeout interface and trigger the pretimeout interrupt before
-watchdog timeout event happen.
+ Hello!
 
-Signed-off-by: Robin Gong <b38343@freescale.com>
----
- drivers/watchdog/imx2_wdt.c | 58 ++++++++++++++++++++++++++++++++++++++++++++-
- 1 file changed, 57 insertions(+), 1 deletion(-)
+> >>> --- cut exynos5410.dtsi ---
+> >>> 		sromc: sromc at 12250000 {
+> >>> 			#address-cells = <2>;
+> >>> 			#size-cells = <1>;
+> >>> 			ranges = <0 0 0x04000000 0x20000
+> >>> 				  1 0 0x05000000 0x20000
+> >>> 				  2 0 0x06000000 0x20000
+> >>> 				  3 0 0x07000000 0x20000>;
+> >>
+> >> Do you have to use 2 cells for address? Cannot it be:
+> >>  			ranges = <0 0x04000000 0x20000
+> >>  				  1 0x05000000 0x20000
+> >>  				  2 0x06000000 0x20000
+> >>  				  3 0x07000000 0x20000>;
+> >
+> >  I tried this first, but it didn't work, and ranges translation
+> > gave me something really weird (like addr = 0x80 and
+> > size = 0x04000004).
+> 
+> Did you change the address-cells to <1>?
 
-diff --git a/drivers/watchdog/imx2_wdt.c b/drivers/watchdog/imx2_wdt.c
-index 0bb1a1d..bd42857 100644
---- a/drivers/watchdog/imx2_wdt.c
-+++ b/drivers/watchdog/imx2_wdt.c
-@@ -24,6 +24,7 @@
- #include <linux/clk.h>
- #include <linux/delay.h>
- #include <linux/init.h>
-+#include <linux/interrupt.h>
- #include <linux/io.h>
- #include <linux/jiffies.h>
- #include <linux/kernel.h>
-@@ -52,12 +53,18 @@
- #define IMX2_WDT_WRSR		0x04		/* Reset Status Register */
- #define IMX2_WDT_WRSR_TOUT	(1 << 1)	/* -> Reset due to Timeout */
- 
-+#define IMX2_WDT_WICR		0x06		/*Interrupt Control Register*/
-+#define IMX2_WDT_WICR_WIE	(1 << 15)	/* -> Interrupt Enable */
-+#define IMX2_WDT_WICR_WTIS	(1 << 14)	/* -> Interrupt Status */
-+#define IMX2_WDT_WICR_WICT	(0xFF)	/* Watchdog Interrupt Timeout */
-+
- #define IMX2_WDT_WMCR		0x08		/* Misc Register */
- 
- #define IMX2_WDT_MAX_TIME	128
- #define IMX2_WDT_DEFAULT_TIME	60		/* in seconds */
- 
- #define WDOG_SEC_TO_COUNT(s)	((s * 2 - 1) << 8)
-+#define WDOG_SEC_TO_PRECOUNT(s)	((s) * 2)	/* set WDOG pre timeout count*/
- 
- struct imx2_wdt_device {
- 	struct clk *clk;
-@@ -80,7 +87,8 @@ MODULE_PARM_DESC(timeout, "Watchdog timeout in seconds (default="
- 
- static const struct watchdog_info imx2_wdt_info = {
- 	.identity = "imx2+ watchdog",
--	.options = WDIOF_KEEPALIVEPING | WDIOF_SETTIMEOUT | WDIOF_MAGICCLOSE,
-+	.options = WDIOF_KEEPALIVEPING | WDIOF_SETTIMEOUT | WDIOF_MAGICCLOSE
-+		   | WDIOF_PRETIMEOUT,
- };
- 
- static int imx2_restart_handler(struct notifier_block *this, unsigned long mode,
-@@ -207,12 +215,49 @@ static inline void imx2_wdt_ping_if_active(struct watchdog_device *wdog)
- 	}
- }
- 
-+static int imx2_wdt_set_pretimeout(struct watchdog_device *wdog,
-+				   unsigned int new_timeout)
-+{
-+	struct imx2_wdt_device *wdev = watchdog_get_drvdata(wdog);
-+	u32 val;
-+
-+	regmap_read(wdev->regmap, IMX2_WDT_WICR, &val);
-+	/* set the new pre-timeout value in the WSR */
-+	val &= ~IMX2_WDT_WICR_WICT;
-+	val |= WDOG_SEC_TO_PRECOUNT(new_timeout);
-+
-+	regmap_write(wdev->regmap, IMX2_WDT_WICR, val | IMX2_WDT_WICR_WIE);
-+
-+	wdog->pretimeout = new_timeout;
-+
-+	return 0;
-+}
-+
-+static irqreturn_t imx2_wdt_isr(int irq, void *dev_id)
-+{
-+	struct platform_device *pdev = dev_id;
-+	struct watchdog_device *wdog = platform_get_drvdata(pdev);
-+	struct imx2_wdt_device *wdev = watchdog_get_drvdata(wdog);
-+	u32 val;
-+
-+	regmap_read(wdev->regmap, IMX2_WDT_WICR, &val);
-+	if (val & IMX2_WDT_WICR_WTIS) {
-+		/*clear interrupt status bit*/
-+		regmap_write(wdev->regmap, IMX2_WDT_WICR, val);
-+		panic("pre-timeout:%d, %d Seconds remained\n", wdog->pretimeout,
-+		      wdog->timeout - wdog->pretimeout);
-+	}
-+
-+	return IRQ_HANDLED;
-+}
-+
- static const struct watchdog_ops imx2_wdt_ops = {
- 	.owner = THIS_MODULE,
- 	.start = imx2_wdt_start,
- 	.stop = imx2_wdt_stop,
- 	.ping = imx2_wdt_ping,
- 	.set_timeout = imx2_wdt_set_timeout,
-+	.set_pretimeout = imx2_wdt_set_pretimeout,
- };
- 
- static const struct regmap_config imx2_wdt_regmap_config = {
-@@ -229,6 +274,7 @@ static int __init imx2_wdt_probe(struct platform_device *pdev)
- 	struct resource *res;
- 	void __iomem *base;
- 	int ret;
-+	int irq;
- 	u32 val;
- 
- 	wdev = devm_kzalloc(&pdev->dev, sizeof(*wdev), GFP_KERNEL);
-@@ -294,6 +340,16 @@ static int __init imx2_wdt_probe(struct platform_device *pdev)
- 		goto disable_clk;
- 	}
- 
-+	irq = platform_get_irq(pdev, 0);
-+	if (irq > 0) {
-+		ret = devm_request_irq(&pdev->dev, irq, imx2_wdt_isr, 0,
-+				       dev_name(&pdev->dev), pdev);
-+		if (ret) {
-+			dev_err(&pdev->dev, "can't get irq %d\n", irq);
-+			goto disable_clk;
-+		}
-+	}
-+
- 	wdev->restart_handler.notifier_call = imx2_restart_handler;
- 	wdev->restart_handler.priority = 128;
- 	ret = register_restart_handler(&wdev->restart_handler);
--- 
-1.9.1
+ Of course i did.
+
+ I don't quote the rest because i simply agree to what you've said. Will respin with these changes.
+
+Kind regards,
+Pavel Fedin
+Expert Engineer
+Samsung Electronics Research center Russia
