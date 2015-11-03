@@ -1,114 +1,28 @@
-From: cov@codeaurora.org (Christopher Covington)
-Date: Tue, 03 Nov 2015 11:33:17 -0500
-Subject: [PATCH] KVM/arm: kernel low level debug support for ARM32
- virtual platforms
-In-Reply-To: <1446508313-24404-1-git-send-email-m.smarduch@samsung.com>
-References: <1446508313-24404-1-git-send-email-m.smarduch@samsung.com>
-Message-ID: <5638E1CD.8090006@codeaurora.org>
+From: davem@davemloft.net (David Miller)
+Date: Tue, 03 Nov 2015 11:34:32 -0500 (EST)
+Subject: [PATCH] arcnet/com20020: add LEDS_CLASS dependency
+In-Reply-To: <10338405.rWTFsWuIBE@wuerfel>
+References: <10338405.rWTFsWuIBE@wuerfel>
+Message-ID: <20151103.113432.1400073533179795014.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mario,
+From: Arnd Bergmann <arnd@arndb.de>
+Date: Tue, 03 Nov 2015 14:51:29 +0100
 
-On 11/02/2015 06:51 PM, Mario Smarduch wrote:
-> Hello,
->    this is a re-post from couple weeks ago, please take time to review this 
-> simple patch which simplifies DEBUG_LL and prevents kernel crash on virtual 
-> platforms.
+> The newly added led trigger support in the com20020-pci driver causes
+> build errors when CONFIG_LEDS_CLASS is disabled:
 > 
-> Before this patch DEBUG_LL for 'dummy virtual machine':
+> drivers/built-in.o: In function `com20020pci_probe':
+> (.text+0x185dc4): undefined reference to `devm_led_classdev_register'
+> (.text+0x185dd8): undefined reference to `devm_led_classdev_register'
 > 
-> ( ) Kernel low-level debugging via EmbeddedICE DCC channel
-> ( ) Kernel low-level debug output via semihosting I/O
-> ( ) Kernel low-level debugging via 8250 UART
-> ( ) Kernel low-level debugging via ARM Ltd PL01x Primecell
+> This adds a Kconfig dependency to prevent the invalid configurations.
+> Other drivers appear to be split 50:50 between 'select' and 'depends on'
+> for this symbol, I picked 'depends on' as I could not find a common
+> policy and it generally causes fewer problems.
 > 
-> In summary if debug uart is not emulated kernel crashes.
-> And once you pass that hurdle, uart physical/virtual addresses are unknown.
-> DEBUG_LL comes in handy on many occasions and should be somewhat 
-> intuitive to use like it is for physical platforms. For virtual platforms
-> user may start daubting the host and get into a bigger mess.
-> 
-> After this patch is applied user gets:
-> 
-> (X) Kernel low-level debugging on QEMU Virtual Platform
-> ( ) Kernel low-level debugging on Kvmtool Virtual Platform
-> 	..... above repeated ....
-> 
-> The virtual addresses selected follow arm reference models, high in vmalloc 
-> section with high mem enabled and guest running with >= 1GB of memory. The 
-> offset is leftover from arm reference models.
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Fixes: 8890624a4e8c ("arcnet: com20020-pci: add led trigger support")
 
-Which model? It doesn't appear to match the vexpress AEM/RTSM/FVP/whatever
-which used 0x1c090000 for UART0.
-
-> The patch is against 4.2.0-rc2 commit 43297dda0a51
-> 
-> Original Description
-> --------------------
-> When booting a VM using QEMU or Kvmtool there are no clear ways to 
-> enable low level debugging for these virtual platforms. some menu port 
-> choices are not supported by the virtual platforms at all. And there is no
-> help on the location of physical and virtual addresses for the ports.
-> This may lead to wrong debug port and a frozen VM with a blank screen.
-> 
-> This patch adds menu selections for QEMU and Kvmtool virtual platforms for low 
-> level kernel print debugging. Help section displays port physical and
-> virutal addresses.
-> 
-> ARM reference models use the MIDR register to run-time select UART port address 
-> (for ARCH_VEXPRESS) based on A9 or A15 part numbers. Looked for a same approach
-> but couldn't find a way to differentiate between virtual platforms, something
-> like a platform register.
-> 
-> Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
-> Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
-> ---
->  arch/arm/Kconfig.debug | 22 ++++++++++++++++++++++
->  1 file changed, 22 insertions(+)
-> 
-> diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-> index a2e16f9..d126bd4 100644
-> --- a/arch/arm/Kconfig.debug
-> +++ b/arch/arm/Kconfig.debug
-> @@ -1155,6 +1155,28 @@ choice
->  		  This option selects UART0 on VIA/Wondermedia System-on-a-chip
->  		  devices, including VT8500, WM8505, WM8650 and WM8850.
->  
-> +	config DEBUG_VIRT_UART_QEMU
-> +		bool "Kernel low-level debugging on QEMU Virtual Platform"
-> +		depends on ARCH_VIRT
-> +		select DEBUG_UART_PL01X
-> +		help
-> +		  Say Y here if you want the debug print routines to direct
-> +		  their output to PL011 UART port on QEMU Virtual Platform.
-> +		  Appropriate address values are:
-> +			PHYS		VIRT
-> +			0x9000000	0xf8090000
-
-I thought the only guarantee the virt machine had about the memory map was
-that it would be described in the device tree.
-
-> +	config DEBUG_VIRT_UART_KVMTOOL
-> +		bool "Kernel low-level debugging on Kvmtool Virtual Platform"
-> +		depends on ARCH_VIRT
-> +		select DEBUG_UART_8250
-> +		help
-> +		  Say Y here if you want the debug print routines to direct
-> +		  their output to 8250 UART port on Kvmtool Virtual
-> +		  Platform. Appropriate address values are:
-> +			PHYS		VIRT
-> +			0x3f8		0xf80903f8
-> +
->  	config DEBUG_ICEDCC
->  		bool "Kernel low-level debugging via EmbeddedICE DCC channel"
->  		help
-> 
-
-Regards,
-Christopher Covington
-
--- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+Applied.
