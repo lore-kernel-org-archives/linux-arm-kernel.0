@@ -1,67 +1,99 @@
-From: m.smarduch@samsung.com (Mario Smarduch)
-Date: Tue, 03 Nov 2015 11:17:12 -0800
-Subject: [PATCH] KVM/arm: kernel low level debug support for ARM32 virtual
- platforms
-In-Reply-To: <20151103175522.GA24856@arm.com>
-References: <1446508313-24404-1-git-send-email-m.smarduch@samsung.com>
- <5638E1CD.8090006@codeaurora.org> <5638F294.4060409@samsung.com>
- <20151103175522.GA24856@arm.com>
-Message-ID: <56390838.3000204@samsung.com>
+From: keescook@chromium.org (Kees Cook)
+Date: Tue, 3 Nov 2015 11:19:44 -0800
+Subject: [PATCH v2 2/2] arm: mm: support ARCH_MMAP_RND_BITS.
+In-Reply-To: <1446574204-15567-2-git-send-email-dcashman@android.com>
+References: <1446574204-15567-1-git-send-email-dcashman@android.com>
+ <1446574204-15567-2-git-send-email-dcashman@android.com>
+Message-ID: <CAGXu5jKGzDD9WVQnMTT2EfupZtjpdcASUpx-3npLAB-FctLodA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Nov 3, 2015 at 10:10 AM, Daniel Cashman <dcashman@android.com> wrote:
+> From: dcashman <dcashman@google.com>
+>
+> arm: arch_mmap_rnd() uses a hard-code value of 8 to generate the
+> random offset for the mmap base address.  This value represents a
+> compromise between increased ASLR effectiveness and avoiding
+> address-space fragmentation. Replace it with a Kconfig option, which
+> is sensibly bounded, so that platform developers may choose where to
+> place this compromise. Keep 8 as the minimum acceptable value.
+>
+> Signed-off-by: Daniel Cashman <dcashman@google.com>
+
+Acked-by: Kees Cook <keescook@chromium.org>
+
+Russell, if you don't see any problems here, it might make sense not
+to put this through the ARM patch tracker since it depends on the 1/2,
+and I think x86 and arm64 (and possibly other arch) changes are coming
+too.
+
+> ---
+> Changes in v2:
+>   - Changed arch/arm/Kconfig and arch/arm/mm/mmap.c to reflect changes
+>   in [PATCH v2 1/2], specifically the movement of variables to global
+>   rather than arch-specific files.
+>
+>  arch/arm/Kconfig   | 10 ++++++++++
+>  arch/arm/mm/mmap.c |  3 +--
+>  2 files changed, 11 insertions(+), 2 deletions(-)
+>
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index 639411f..47d7561 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -35,6 +35,7 @@ config ARM
+>         select HAVE_ARCH_BITREVERSE if (CPU_32v7M || CPU_32v7) && !CPU_32v6
+>         select HAVE_ARCH_JUMP_LABEL if !XIP_KERNEL && !CPU_ENDIAN_BE32
+>         select HAVE_ARCH_KGDB if !CPU_ENDIAN_BE32
+> +       select HAVE_ARCH_MMAP_RND_BITS
+>         select HAVE_ARCH_SECCOMP_FILTER if (AEABI && !OABI_COMPAT)
+>         select HAVE_ARCH_TRACEHOOK
+>         select HAVE_BPF_JIT
+> @@ -306,6 +307,15 @@ config MMU
+>           Select if you want MMU-based virtualised addressing space
+>           support by paged memory management. If unsure, say 'Y'.
+>
+> +config ARCH_MMAP_RND_BITS_MIN
+> +       default 8
+> +
+> +config ARCH_MMAP_RND_BITS_MAX
+> +       default 14 if MMU && PAGE_OFFSET=0x40000000
+> +       default 15 if MMU && PAGE_OFFSET=0x80000000
+> +       default 16 if MMU
+> +       default 8
+> +
+>  #
+>  # The "ARM system type" choice list is ordered alphabetically by option
+>  # text.  Please add new entries in the option alphabetic order.
+> diff --git a/arch/arm/mm/mmap.c b/arch/arm/mm/mmap.c
+> index 407dc78..c938693 100644
+> --- a/arch/arm/mm/mmap.c
+> +++ b/arch/arm/mm/mmap.c
+> @@ -173,8 +173,7 @@ unsigned long arch_mmap_rnd(void)
+>  {
+>         unsigned long rnd;
+>
+> -       /* 8 bits of randomness in 20 address space bits */
+> -       rnd = (unsigned long)get_random_int() % (1 << 8);
+> +       rnd = (unsigned long)get_random_int() % (1 << mmap_rnd_bits);
+>
+>         return rnd << PAGE_SHIFT;
+>  }
+
+I like this getting pulled closer and closer to having arch_mmap_rnd()
+be identical across all architectures, and then we can just pull it
+out and leave the true variable: the entropy size.
+
+Do you have patches for x86 and arm64?
+
+-Kees
+
+> --
+> 2.6.0.rc2.230.g3dd15c0
+>
 
 
-On 11/3/2015 9:55 AM, Will Deacon wrote:
-> On Tue, Nov 03, 2015 at 09:44:52AM -0800, Mario Smarduch wrote:
->> On 11/3/2015 8:33 AM, Christopher Covington wrote:
->>> On 11/02/2015 06:51 PM, Mario Smarduch wrote:
->>>>    this is a re-post from couple weeks ago, please take time to review this 
->>>> simple patch which simplifies DEBUG_LL and prevents kernel crash on virtual 
->>>> platforms.
->>>>
->>>> Before this patch DEBUG_LL for 'dummy virtual machine':
->>>>
->>>> ( ) Kernel low-level debugging via EmbeddedICE DCC channel
->>>> ( ) Kernel low-level debug output via semihosting I/O
->>>> ( ) Kernel low-level debugging via 8250 UART
->>>> ( ) Kernel low-level debugging via ARM Ltd PL01x Primecell
->>>>
->>>> In summary if debug uart is not emulated kernel crashes.
->>>> And once you pass that hurdle, uart physical/virtual addresses are unknown.
->>>> DEBUG_LL comes in handy on many occasions and should be somewhat 
->>>> intuitive to use like it is for physical platforms. For virtual platforms
->>>> user may start daubting the host and get into a bigger mess.
->>>>
->>>> After this patch is applied user gets:
->>>>
->>>> (X) Kernel low-level debugging on QEMU Virtual Platform
->>>> ( ) Kernel low-level debugging on Kvmtool Virtual Platform
->>>> 	..... above repeated ....
->>>>
->>>> The virtual addresses selected follow arm reference models, high in vmalloc 
->>>> section with high mem enabled and guest running with >= 1GB of memory. The 
->>>> offset is leftover from arm reference models.
->>>
->>> Which model? It doesn't appear to match the vexpress AEM/RTSM/FVP/whatever
->>> which used 0x1c090000 for UART0.
->>
->> I recall QEMU virt model had it's own physical address map, for sure I saw the
->> virtio-mmio regions assigned in some ARM document. Peter would you know?
->>
->> As far as kvmtool I'm not sure, currently PC1 COM1 port is used? Andre will that
->> stay fixed?
-> 
-> We make absolutely no guarantees about the memory map provided by kvmtool.
-> 
-> Will
-> 
 
-If that's also the case for qemu, then I guess the best you can do is find a way
-to dump the device tree. Find the uart, physical address and try figure out the
-virtual address.
-
-Pretty involved, hoped for something more automated since that's a handy feature.
-
-Thanks,
-- Mario.
+-- 
+Kees Cook
+Chrome OS Security
