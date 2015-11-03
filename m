@@ -1,45 +1,33 @@
-From: helgaas@kernel.org (Bjorn Helgaas)
-Date: Tue, 3 Nov 2015 08:44:01 -0600
-Subject: [PATCH] PCI: altera: add OF_PCI dependency
-In-Reply-To: <38421064.oVjju5M930@wuerfel>
-References: <38421064.oVjju5M930@wuerfel>
-Message-ID: <20151103144401.GA17786@localhost>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 3 Nov 2015 14:48:43 +0000
+Subject: [PATCH DRAFT 0/2] Sketch for ZTE ZX296702 UART integration
+In-Reply-To: <20151103134349.GV8644@n2100.arm.linux.org.uk>
+References: <1446467042-24494-1-git-send-email-andre.przywara@arm.com>
+ <20151103134349.GV8644@n2100.arm.linux.org.uk>
+Message-ID: <20151103144843.GY8644@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 03, 2015 at 03:08:33PM +0100, Arnd Bergmann wrote:
-> The newly added altera PCI driver fails to build when CONFIG_OF
-> is disabled:
-> 
-> drivers/pci/host/pcie-altera.c: In function 'altera_pcie_parse_request_of_pci_ranges':
-> drivers/pci/host/pcie-altera.c:420:8: error: implicit declaration of function 'of_pci_get_host_bridge_resources' [-Werror=implicit-function-declaration]
-> 
-> This adds a dependency on OF_PCI for clarity, this is the symbol
-> that guards the implementation of of_pci_get_host_bridge_resources.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Fixes: 6bb4dd154ae8 ("PCI: altera: Add Altera PCIe host controller driver")
+On Tue, Nov 03, 2015 at 01:43:49PM +0000, Russell King - ARM Linux wrote:
+> So, I'm working on a replacement set of patches which does this the
+> right way, and I'll post them later today or early tomorrow, depending
+> on when I get them tested on the Versatile / Juno platforms.
 
-6bb4dd154ae8 hasn't been merged into mainline yet, so I folded this fix
-into it.  Thanks, Arnd!
+Here's my version of the changes required, following the ideas I've put
+forward in previous threads.  Build tested, but not boot tested yet.
+They're queued for my nightly build and boot test this evening.
 
-> ---
-> Found on ARM randconfig builds yesterday
-> 
-> diff --git a/drivers/pci/host/Kconfig b/drivers/pci/host/Kconfig
-> index 9e24075d83f7..f131ba947dc6 100644
-> --- a/drivers/pci/host/Kconfig
-> +++ b/drivers/pci/host/Kconfig
-> @@ -150,6 +150,7 @@ config PCIE_IPROC_BCMA
->  config PCIE_ALTERA
->  	bool "Altera PCIe controller"
->  	depends on ARM || NIOS2
-> +	depends on OF_PCI
->  	select PCI_DOMAINS
->  	help
->  	  Say Y here if you want to enable PCIe controller support on Altera
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+The final patch in the series is experimental as it's missing the
+detection to make use of the ZTE UART bits.  Also, I'm debating whether
+we should make that conditional on a config symbol so that non-ZTE
+platforms don't have to suffer the consequences of the conditional 32-bit
+accessor.
+
+ drivers/tty/serial/amba-pl011.c | 341 ++++++++++++++++++++++++++--------------
+ drivers/tty/serial/amba-pl011.h |  34 ++++
+ include/linux/amba/serial.h     |  18 +++
+ 3 files changed, 272 insertions(+), 121 deletions(-)
+
+-- 
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
