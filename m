@@ -1,55 +1,63 @@
-From: systemprogrammierung.brunner@gmail.com (Markus Brunner)
-Date: Tue, 03 Nov 2015 22:09:51 +0100
-Subject: [PATCH] drivers: net: cpsw: Add support for fixed-link PHY
-Message-ID: <2251323.UEGYDRRlj7@localhost>
+From: slash.tmp@free.fr (Mason)
+Date: Tue, 3 Nov 2015 22:18:27 +0100
+Subject: Cortex-A9 SCU + ARM_ERRATA_764369
+In-Reply-To: <56391AD3.8010904@free.fr>
+References: <5638E61C.30406@free.fr> <20151103172743.GE4049@leverpostej>
+ <5639107E.7030901@free.fr> <56391AD3.8010904@free.fr>
+Message-ID: <563924A3.4030601@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for a fixed-link devicetree sub-node in case the the 
-cpsw MAC is directly connected to a non-mdio PHY/device. 
+On 03/11/2015 21:36, Mason wrote:
 
-Signed-off-by: Markus Brunner <systemprogrammierung.brunner@gmail.com>
+> On 03/11/2015 20:52, Mason wrote:
+> 
+>> Mark Rutland wrote:
+>>
+>>> Mason wrote:
+>>>
+>>>> What is scu_base + 0x30? (SCU diagnostic control register?)
+>>>
+>>> It's documented (admittedly very sparsely) in the Software
+>>> Developers Errata Notice for Cortex-A9 processors, in the
+>>> section regarding erratum 764369.
+>>
+>> A Freescale document mentions:
+>>
+>>> Set bit[0] in the undocumented SCU diagnostic control register
+>>> located at offset 0x30 from the PERIPHBASE address. Setting this bit
+>>> disables the "migratory bit" feature. This forces a dirty cache line
+>>> to be evicted to the lower memory subsystem?which is both the point
+>>> of coherency and the point of unification?when it is being read by
+>>> another processor.
+>>
+>> Can this register be written to by a non-secure OS?
+> 
+> IIUC Rob's message, NS OS cannot write to scu_base + 0x30.
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2014-April/244341.html
+> 
+> <confused> Rob stated:
+> "these types of work-arounds must go into the bootloader or firmware."
+> 
+> Doesn't that apply to 764369 too? (At least the part setting
+> bit0 in scu_base + 0x30)
+> 
+> If a company is not using a standard boot-loader such as U-Boot,
+> does that mean it must re-implement all these work-arounds in
+> its own boot-loader?
 
----
- Documentation/devicetree/bindings/net/cpsw.txt |    5 +++++
- drivers/net/ethernet/ti/cpsw.c                 |   13 +++++++++++++
- 2 files changed, 18 insertions(+)
+AFAICT, U-Boot implements the following work-arounds.
+http://git.denx.de/?p=u-boot.git;a=blob;f=README
 
-diff -upNr linux-4.3.orig/Documentation/devicetree/bindings/net/cpsw.txt linux-4.3/Documentation/devicetree/bindings/net/cpsw.txt
---- linux-4.3.orig/Documentation/devicetree/bindings/net/cpsw.txt	2015-11-03 17:21:40.000000000 +0100
-+++ linux-4.3/Documentation/devicetree/bindings/net/cpsw.txt	2015-11-02 16:53:43.000000000 +0100
-@@ -41,6 +41,11 @@ Optional properties:
- - mac-address		: See ethernet.txt file in the same directory
- - phy-handle		: See ethernet.txt file in the same directory
- 
-+Slave sub-nodes:
-+- fixed-link		: See fixed-link.txt file in the same directory
-+			  Either the properties phy_id and phy-mode,
-+			  or the sub-node fixed-link can be specified
-+
- Note: "ti,hwmods" field is used to fetch the base address and irq
- resources from TI, omap hwmod data base during device registration.
- Future plan is to migrate hwmod data base contents into device tree
-diff -upNr linux-4.3.orig/drivers/net/ethernet/ti/cpsw.c linux-4.3/drivers/net/ethernet/ti/cpsw.c
---- linux-4.3.orig/drivers/net/ethernet/ti/cpsw.c	2015-11-03 17:18:00.000000000 +0100
-+++ linux-4.3/drivers/net/ethernet/ti/cpsw.c	2015-11-03 17:04:08.000000000 +0100
-@@ -2037,6 +2037,19 @@ static int cpsw_probe_dt(struct cpsw_pri
- 			continue;
- 
- 		priv->phy_node = of_parse_phandle(slave_node, "phy-handle", 0);
-+		if (of_phy_is_fixed_link(slave_node)) {
-+			struct phy_device *pd;
-+
-+			ret = of_phy_register_fixed_link(slave_node);
-+			if (ret)
-+				return ret;
-+			pd = of_phy_find_device(slave_node);
-+			if (!pd)
-+				return -ENODEV;
-+			snprintf(slave_data->phy_id, sizeof(slave_data->phy_id),
-+				 PHY_ID_FMT, pd->bus->id, pd->phy_id);
-+			goto no_phy_slave;
-+		}
- 		parp = of_get_property(slave_node, "phy_id", &lenp);
- 		if ((parp == NULL) || (lenp != (sizeof(void *) * 2))) {
- 			dev_err(&pdev->dev, "Missing slave[%d] phy_id property\n", i);
+	CONFIG_ARM_ERRATA_716044
+	CONFIG_ARM_ERRATA_742230
+	CONFIG_ARM_ERRATA_743622
+	CONFIG_ARM_ERRATA_751472
+	CONFIG_ARM_ERRATA_761320
+	CONFIG_ARM_ERRATA_773022
+	CONFIG_ARM_ERRATA_774769
+	CONFIG_ARM_ERRATA_794072
+
+I'll have to talk to the boot-loader and secure OS devs.
+
+Regards.
