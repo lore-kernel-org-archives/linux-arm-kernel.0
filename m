@@ -1,73 +1,84 @@
-From: dcashman@android.com (Daniel Cashman)
-Date: Tue,  3 Nov 2015 10:10:04 -0800
-Subject: [PATCH v2 2/2] arm: mm: support ARCH_MMAP_RND_BITS.
-In-Reply-To: <1446574204-15567-1-git-send-email-dcashman@android.com>
-References: <1446574204-15567-1-git-send-email-dcashman@android.com>
-Message-ID: <1446574204-15567-2-git-send-email-dcashman@android.com>
+From: eric.auger@linaro.org (Eric Auger)
+Date: Tue,  3 Nov 2015 18:12:11 +0000
+Subject: [PATCH v6 0/8] VFIO platform reset module rework
+Message-ID: <1446574339-1843-1-git-send-email-eric.auger@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: dcashman <dcashman@google.com>
+This series fixes the current implementation by getting rid of the
+usage of __symbol_get which caused a compilation issue with
+CONFIG_MODULES disabled. On top of this, the usage of MODULE_ALIAS makes
+possible to add a new reset module without being obliged to update the
+framework. The new implementation relies on the reset module registering
+its reset function to the vfio-platform driver.
 
-arm: arch_mmap_rnd() uses a hard-code value of 8 to generate the
-random offset for the mmap base address.  This value represents a
-compromise between increased ASLR effectiveness and avoiding
-address-space fragmentation. Replace it with a Kconfig option, which
-is sensibly bounded, so that platform developers may choose where to
-place this compromise. Keep 8 as the minimum acceptable value.
+The series is available at
 
-Signed-off-by: Daniel Cashman <dcashman@google.com>
----
-Changes in v2:
-  - Changed arch/arm/Kconfig and arch/arm/mm/mmap.c to reflect changes
-  in [PATCH v2 1/2], specifically the movement of variables to global
-  rather than arch-specific files.
+https://git.linaro.org/people/eric.auger/linux.git/shortlog/refs/heads/v4.3-rework-v6
 
- arch/arm/Kconfig   | 10 ++++++++++
- arch/arm/mm/mmap.c |  3 +--
- 2 files changed, 11 insertions(+), 2 deletions(-)
+Best Regards
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 639411f..47d7561 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -35,6 +35,7 @@ config ARM
- 	select HAVE_ARCH_BITREVERSE if (CPU_32v7M || CPU_32v7) && !CPU_32v6
- 	select HAVE_ARCH_JUMP_LABEL if !XIP_KERNEL && !CPU_ENDIAN_BE32
- 	select HAVE_ARCH_KGDB if !CPU_ENDIAN_BE32
-+	select HAVE_ARCH_MMAP_RND_BITS
- 	select HAVE_ARCH_SECCOMP_FILTER if (AEABI && !OABI_COMPAT)
- 	select HAVE_ARCH_TRACEHOOK
- 	select HAVE_BPF_JIT
-@@ -306,6 +307,15 @@ config MMU
- 	  Select if you want MMU-based virtualised addressing space
- 	  support by paged memory management. If unsure, say 'Y'.
- 
-+config ARCH_MMAP_RND_BITS_MIN
-+	default 8
-+
-+config ARCH_MMAP_RND_BITS_MAX
-+	default 14 if MMU && PAGE_OFFSET=0x40000000
-+	default 15 if MMU && PAGE_OFFSET=0x80000000
-+	default 16 if MMU
-+	default 8
-+
- #
- # The "ARM system type" choice list is ordered alphabetically by option
- # text.  Please add new entries in the option alphabetic order.
-diff --git a/arch/arm/mm/mmap.c b/arch/arm/mm/mmap.c
-index 407dc78..c938693 100644
---- a/arch/arm/mm/mmap.c
-+++ b/arch/arm/mm/mmap.c
-@@ -173,8 +173,7 @@ unsigned long arch_mmap_rnd(void)
- {
- 	unsigned long rnd;
- 
--	/* 8 bits of randomness in 20 address space bits */
--	rnd = (unsigned long)get_random_int() % (1 << 8);
-+	rnd = (unsigned long)get_random_int() % (1 << mmap_rnd_bits);
- 
- 	return rnd << PAGE_SHIFT;
- }
+Eric
+
+v5 -> v6:
+- add "vfio: platform: reset: calxedaxgmac: fix ioaddr leak"
+
+v4 -> v5:
+- no code change
+- only added Arnd's new R-b
+
+v3 -> v4:
+- Remove the EXPORT_SYMBOL_GPL(vfio_platform_calxedaxgmac_reset) later
+  in [6/7], to keep the functionality working all along the series
+- Add Arnd R-b (I dared to keep them despite the above change)
+- vfio_platform_unregister_reset gets the reset function to do a double
+  check on the compat and the function pointer too
+- __vfio_platform_register_reset turned to 'void'
+
+v2 -> v3:
+- use driver_mutex instead of reset_mutex
+- style fixes: single mutex_unlock
+- use static nodes; vfio_platform_register_reset now is a macro
+- vfio_platform_reset_private.h removed since reset_module_(un)register
+  disappear. No use of symbol_get anymore.
+- new patch introducing vfio-platform-base
+- reset look-up moved back at vfio-platform probe time
+- new patch featuring dev_info/dev_warn
+
+v1 -> v2:
+* in vfio_platform_common.c:
+  - move reset lookup at load time and put reset at release: this is to
+    prevent a race between the 2 load module loads
+  - reset_list becomes static
+  - vfio_platform_register/unregister_reset take a const char * as compat
+  - fix node link
+  - remove old combo struct and cleanup proto of vfio_platform_get_reset
+  - add mutex to protect the reset list
+* in calxeda xgmac reset module
+  - introduce vfio_platform_reset_private.h
+  - use module_vfio_reset_handler macro
+  - do not export vfio_platform_calxedaxgmac_reset symbol anymore
+  - add a pr_info to show the device is reset by vfio reset module
+
+
+
+Eric Auger (8):
+  vfio: platform: introduce vfio-platform-base module
+  vfio: platform: add capability to register a reset function
+  vfio: platform: introduce module_vfio_reset_handler macro
+  vfio: platform: reset: calxedaxgmac: add reset function registration
+  vfio: platform: add compat in vfio_platform_device
+  vfio: platform: use list of registered reset function
+  vfio: platform: add dev_info on device reset
+  vfio: platform: reset: calxedaxgmac: fix ioaddr leak
+
+ drivers/vfio/platform/Makefile                     |   6 +-
+ .../platform/reset/vfio_platform_calxedaxgmac.c    |  19 ++--
+ drivers/vfio/platform/vfio_amba.c                  |   1 +
+ drivers/vfio/platform/vfio_platform.c              |   1 +
+ drivers/vfio/platform/vfio_platform_common.c       | 119 +++++++++++++++------
+ drivers/vfio/platform/vfio_platform_private.h      |  40 ++++++-
+ 6 files changed, 137 insertions(+), 49 deletions(-)
+
 -- 
-2.6.0.rc2.230.g3dd15c0
+1.9.1
