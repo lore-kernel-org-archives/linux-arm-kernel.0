@@ -1,29 +1,19 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Tue, 03 Nov 2015 09:30:56 +0900
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Tue, 03 Nov 2015 09:54:38 +0900
 Subject: [PATCH 20/22] clocksource/drivers/exynos_mct: Fix Kconfig and add
  COMPILE_TEST option
 In-Reply-To: <1446469011-22710-20-git-send-email-daniel.lezcano@linaro.org>
 References: <1446469011-22710-1-git-send-email-daniel.lezcano@linaro.org>
  <1446469011-22710-20-git-send-email-daniel.lezcano@linaro.org>
-Message-ID: <56380040.3080600@samsung.com>
+Message-ID: <563805CE.8000904@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 02.11.2015 21:56, Daniel Lezcano wrote:
+Hi,
+
+On 2015? 11? 02? 21:56, Daniel Lezcano wrote:
 > Let the platform's Kconfig to select the clock instead of having a reverse
 > dependency from the driver to the platform options.
-
-Selecting user-visible symbols is rather discouraged so why not
-something like this:
-
--       def_bool y if ARCH_EXYNOS
--       depends on !ARM64
-+       bool "Exynos multi core timer driver"
-+       depends on ARCH_EXYNOS || (COMPILE_TEST && ARM)
-
-Best regards,
-Krzysztof
-
 > 
 > Add the COMPILE_TEST option for the compilation test coverage. Due to the
 > non portable 'delay' code, this driver is only compilable on ARM.
@@ -62,3 +52,11 @@ Krzysztof
 >  	  Support for Multi Core Timer controller on Exynos SoCs.
 >  
 > 
+
+Looks good to me. As you commented, delay_timer is only used on ARM 32bit.
+I'm glad to use the 'depends on ARM' instead of reverse dependency.
+
+Reviewed-by: Chanwoo Choi <cw00.choi@samsung.com>
+
+Thanks,
+Chanwoo Choi
