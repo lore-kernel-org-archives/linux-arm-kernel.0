@@ -1,32 +1,44 @@
 From: labbott@fedoraproject.org (Laura Abbott)
-Date: Tue,  3 Nov 2015 13:48:33 -0800
-Subject: [PATCH 0/2] Support for set_memory_* outside of module space
-Message-ID: <1446587315-18145-1-git-send-email-labbott@fedoraproject.org>
+Date: Tue,  3 Nov 2015 13:48:34 -0800
+Subject: [PATCH 1/2] arm64: Get existing page protections in split_pmd
+In-Reply-To: <1446587315-18145-1-git-send-email-labbott@fedoraproject.org>
+References: <1446587315-18145-1-git-send-email-labbott@fedoraproject.org>
+Message-ID: <1446587315-18145-2-git-send-email-labbott@fedoraproject.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-Hi,
+Rather than always putting the least restrictived permissions
+(PAGE_KERNEL_EXEC) when spliting a pmd into pages, use
+the existing permissions from the pmd for the page.
 
-Based on a recent discussion[1] there is interest in having set_memory_* work
-on kernel memory for security and other use cases. This patch adds the
-ability for that to happen behind a kernel option. If this is welcome enough,
-the Kconfig can be dropped. This has been briefly tested but not stress tested.
+Signed-off-by: Laura Abbott <labbott@fedoraproject.org>
+---
+ arch/arm64/mm/mmu.c | 9 ++++-----
+ 1 file changed, 4 insertions(+), 5 deletions(-)
 
-Thanks,
-Laura
-
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-October/382079.html
-
-Laura Abbott (2):
-  arm64: Get existing page protections in split_pmd
-  arm64: Allow changing of attributes outside of modules
-
- arch/arm64/Kconfig.debug | 11 +++++++
- arch/arm64/mm/mm.h       |  3 ++
- arch/arm64/mm/mmu.c      | 11 ++++---
- arch/arm64/mm/pageattr.c | 74 ++++++++++++++++++++++++++++++++++++++++++++----
- 4 files changed, 88 insertions(+), 11 deletions(-)
-
+diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+index 9211b85..ff41efa 100644
+--- a/arch/arm64/mm/mmu.c
++++ b/arch/arm64/mm/mmu.c
+@@ -75,14 +75,13 @@ static void __init *early_alloc(unsigned long sz)
+ static void split_pmd(pmd_t *pmd, pte_t *pte)
+ {
+ 	unsigned long pfn = pmd_pfn(*pmd);
++	unsigned long addr = pfn << PAGE_SHIFT;
++	pgprot_t prot = __pgprot(pmd_val(*pmd) ^ addr) | PTE_TYPE_PAGE;
++
+ 	int i = 0;
+ 
+ 	do {
+-		/*
+-		 * Need to have the least restrictive permissions available
+-		 * permissions will be fixed up later
+-		 */
+-		set_pte(pte, pfn_pte(pfn, PAGE_KERNEL_EXEC));
++		set_pte(pte, pfn_pte(pfn, prot));
+ 		pfn++;
+ 	} while (pte++, i++, i < PTRS_PER_PTE);
+ }
 -- 
 2.4.3
