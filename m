@@ -1,113 +1,70 @@
-From: caesar.upstream@gmail.com (Caesar Wang)
-Date: Tue, 3 Nov 2015 17:59:05 +0800
-Subject: [PATCH v2 1/4] clocksource: rockchip: Make the driver more
- compatible
-In-Reply-To: <56387110.4060805@linaro.org>
-References: <1443147298-12603-1-git-send-email-wxt@rock-chips.com>
- <5632E765.4010207@gmail.com> <56334995.6090103@linaro.org>
- <21587719.mnFBFBzBeI@phil> <56379D46.1000402@linaro.org>
- <56381547.5070109@gmail.com> <56387110.4060805@linaro.org>
-Message-ID: <56388569.1070108@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 03 Nov 2015 11:02:24 +0100
+Subject: [PATCH 20/22] clocksource/drivers/exynos_mct: Fix Kconfig and add
+ COMPILE_TEST option
+In-Reply-To: <563872E2.10001@linaro.org>
+References: <1446469011-22710-1-git-send-email-daniel.lezcano@linaro.org>
+ <563806E7.6010105@samsung.com> <563872E2.10001@linaro.org>
+Message-ID: <9713489.TbNNoNQg5A@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tuesday 03 November 2015 09:40:02 Daniel Lezcano wrote:
+> On 11/03/2015 01:59 AM, Krzysztof Kozlowski wrote:
+> > On 03.11.2015 09:30, Krzysztof Kozlowski wrote:
+> >> On 02.11.2015 21:56, Daniel Lezcano wrote:
+> >>> Let the platform's Kconfig to select the clock instead of having a reverse
+> >>> dependency from the driver to the platform options.
+> >>
+> >> Selecting user-visible symbols is rather discouraged so why not
+> >> something like this:
+> >>
+> >> -       def_bool y if ARCH_EXYNOS
+> >> -       depends on !ARM64
+> >> +       bool "Exynos multi core timer driver"
+> >> +       depends on ARCH_EXYNOS || (COMPILE_TEST && ARM)
+> >
+> > Nope, that was wrong as we loose auto-select on Exynos. Instead:
+> > -       def_bool y if ARCH_EXYNOS
+> > -       depends on !ARM64
+> > +       bool "Exynos multi core timer driver" if ARM
+> > +       depends on ARCH_EXYNOS || COMPILE_TEST
+> > +       default y if ARCH_EXYNOS
+> >
+> > This way we avoid select (which is a reverse dependency for the driver),
+> > have it auto-selectable and compile tested on arm.
+> 
+> I think you misunderstood the patch I sent.
+> 
+> It does two things:
+> 
+> 1. Follow the thumb of rule of the current Kconfig format
+> 
+>     - The timer driver is selected by the platform (exynos in this case)
+>     - User can't select the driver in the menuconfig
+>     - There is no dependency on the platform except for compilation test
+> 
+> 2. Add the COMPILE_TEST
+> 
+>     - User can select the driver for compilation testing. This is for 
+> allyesconfig when doing compilation test coverage (exynos timer could be 
+> compiled on other platform). As the delay code is not portable, we have 
+> to restrict the compilation on the ARM platform, this is why there is 
+> the dependency on ARM.
+> 
+> I am currently looking at splitting the delay code in order to prevent 
+> this restriction on this driver and some others drivers.
 
+I suspect this will come up again in the future. The problem is
+really that drivers/clocksource has different rules from almost
+everything else, by requiring the platform to 'select' the driver.
 
-? 2015?11?03? 16:32, Daniel Lezcano ??:
-> On 11/03/2015 03:00 AM, Caesar Wang wrote:
->> Daniel,
->>
->> ? 2015?11?03? 01:28, Daniel Lezcano ??:
->>> On 10/31/2015 12:47 AM, Heiko Stuebner wrote:
->>>> Hi Daniel,
->>>>
->>>> Am Freitag, 30. Oktober 2015, 11:42:29 schrieb Daniel Lezcano:
->>>>> On 10/30/2015 04:43 AM, Caesar Wang wrote:
->>>>>> Hi Daniel,
->>>>>>
->>>>>> ? 2015?10?01? 03:14, Heiko St?bner ??:
->>>>>>> Hi Daniel,
->>>>>>>
->>>>>>> Am Dienstag, 29. September 2015, 06:18:03 schrieb Daniel Lezcano:
->>>>>>>> On 09/25/2015 04:14 AM, Caesar Wang wrote:
->>>>>>>>> Build the arm64 SoCs (e.g.: RK3368) on Rockchip platform,
->>>>>>>>> There are some failure with build up on timer driver for 
->>>>>>>>> rockchip.
->>>>>>>>>
->>>>>>>>> Says:
->>>>>>>>> /tmp/ccdAnNy5.s:47: Error: missing immediate expression at  
->>>>>>>>> operand
->>>>>>>>> 1 --
->>>>>>>>> `dsb`
->>>>>>>>> ...
->>>>>>>>>
->>>>>>>>> The problem was different semantics of dsb on btw arm32 and 
->>>>>>>>> arm64,
->>>>>>>>> Here we can convert the dsb with insteading of dsb(sy).The "sy"
->>>>>>>>> param
->>>>>>>>> is the default which you are allow to omit, so on arm32 dsb()and
->>>>>>>>> dsb(sy)
->>>>>>>>> are the same.
->>>>>>>>>
->>>>>>>>> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
->>>>>>>> Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
->>>>>>> as you have "just" Acked these patches, I guess you are expecting
->>>>>>> them
->>>>>>> to go
->>>>>>> through the same tree as the devicetree changes, right?
->>>>>>
->>>>>> I'm wonder if someone will apply this series patchs but the wait.:-)
->>>>>> In fact, I'm no sure that the Acked is really meaning.:-
->>>>>
->>>>> Yes, by acking the patch I say I am ok with it and I agree it can go
->>>>> through another tree.
->>>>
->>>> although I guess the two clocksource changes could very well just go
->>>> through your tree. dsb() -> dsb(sy) is supposed to be equal and the
->>>> second
->>>> one is just cosmetics.  The Kconfig and dts changes need to wait in
->>>> any case
->>>> for 4.5 ... but I guess that may be true for the clocksource changes
->>>> as well?
->>>
->>> Heiko, Caesar,
->>>
->>> I am wondering if the dsb() is really necessary. Is it possible you
->>> test the timer by removing this instruction ? Otherwise I will have to
->>> setup my board again and it will take awhile.
->>>
->>
->> As the @Arnd suggestion,
->>
->> That's seem ok for me.
->> Although the writel_relaxed() and writel() a bit different  with DSB()
->> and L2's sync.
->>
->> Do I need send the patch v3?  I will test that on my board.
->>
->> I'm no sure that why the clocksource driver didn't use the
->> writel_relaxed() to work.
->> Okay, I think we should according to the suggestion or required.
->
-> I think the patch is trivial enough I can do the change myself if you 
-> test the change on your side. But it would be a good practice to send 
-> the patch you have tested. Up to you ;)
->
+The second version that Krzysztof posted is how we handle this in
+other driver subsystems, and I would generally prefer it to do this
+consistently for everything, but John Stultz has in the past argued
+strongly for using 'select' in all clocksource drivers. The reason
+is that for each platform we know in advance which driver we want,
+and there is never a need for the user to have to select the right
+one.
 
-Yup, that's also happy work.
-
-Feel free add my test tag if you remove the dsb().
-Tested-by: Caesar Wang <wxt@rock-chips.com>
-
-Thanks your send!
-
-> Thanks !
->
->   -- Daniel
->
->
-
-
--- 
-Thanks,
-Caesar
+	Arnd
