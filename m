@@ -1,41 +1,52 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 3 Nov 2015 16:19:39 +0000
-Subject: [PATCH 10/11] tty: amba-pl011: add support for 32-bit register
- access
-In-Reply-To: <5638CB41.1000807@codeaurora.org>
-References: <20151103134349.GV8644@n2100.arm.linux.org.uk>
- <E1Ztcw4-0007Ct-PP@rmk-PC.arm.linux.org.uk>
- <5638CB41.1000807@codeaurora.org>
-Message-ID: <20151103161939.GB8644@n2100.arm.linux.org.uk>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Tue, 3 Nov 2015 16:21:01 +0000
+Subject: [PATCH v10 2/5] missing include in cputime.c,
+ remove #ifdef CONFIG_PARAVIRT from sched/core.c
+In-Reply-To: <alpine.DEB.2.02.1511031536540.3438@kaball.uk.xensource.com>
+References: <alpine.DEB.2.02.1511031536540.3438@kaball.uk.xensource.com>
+Message-ID: <1446567664-11890-2-git-send-email-stefano.stabellini@eu.citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 03, 2015 at 08:57:05AM -0600, Timur Tabi wrote:
-> Russell King wrote:
-> >-	return readw(uap->port.membase + pl011_reg_to_offset(uap, reg));
-> >+	void __iomem *addr = uap->port.membase + pl011_reg_to_offset(uap, reg);
-> >+
-> >+	return uap->access_32b ? readl(addr) : readw(addr);
-> 
-> Ok, ignore my previous email.  I just noticed this.
-> 
-> This version is fine, except that it now performs a runtime check for every
-> I/O access.  Isn't that too much overhead?  access_32b will always be either
-> True or False for the life of the entire SOC.
+ifdef CONFIG_PARAVIRT in sched/core.c is redundant, as asm/paravirt.h
+is already protected by #ifdef CONFIG_PARAVIRT.
 
-It's a balance between a few more branches and killing six registers
-(r0 - r3, ip, lr) on every register access due to a function call.
-If GCC was a reasonable compiler, it could be done without incuring
-any branches, merely by using conditional instructions, but GCC on
-ARM really sucks - it wants to reload the base address, offset and
-access_32b flag on every device access despite the struct being
-marked const.  You'll get the same with your approach when adding
-the register offsets, but it'll be worse - the compiler will have to
-also reload the function pointer as well on every access.
+Add include asm/paravirt.h to cputime.c, as steal_account_process_tick
+calls paravirt_steal_clock, which is defined in paravirt.h.
 
-So, my gut feeling is that my approach is better than the function
-pointer call, especially with modern CPUs with branch prediction.
+Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+CC: mingo at redhat.com
+CC: peterz at infradead.org
+---
+ kernel/sched/core.c    |    2 --
+ kernel/sched/cputime.c |    1 +
+ 2 files changed, 1 insertion(+), 2 deletions(-)
 
+diff --git a/kernel/sched/core.c b/kernel/sched/core.c
+index bcd214e..395fad9 100644
+--- a/kernel/sched/core.c
++++ b/kernel/sched/core.c
+@@ -79,9 +79,7 @@
+ #include <asm/tlb.h>
+ #include <asm/irq_regs.h>
+ #include <asm/mutex.h>
+-#ifdef CONFIG_PARAVIRT
+ #include <asm/paravirt.h>
+-#endif
+ 
+ #include "sched.h"
+ #include "../workqueue_internal.h"
+diff --git a/kernel/sched/cputime.c b/kernel/sched/cputime.c
+index 8cbc3db..a1426fa 100644
+--- a/kernel/sched/cputime.c
++++ b/kernel/sched/cputime.c
+@@ -5,6 +5,7 @@
+ #include <linux/static_key.h>
+ #include <linux/context_tracking.h>
+ #include "sched.h"
++#include <asm/paravirt.h>
+ 
+ 
+ #ifdef CONFIG_IRQ_TIME_ACCOUNTING
 -- 
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+1.7.10.4
