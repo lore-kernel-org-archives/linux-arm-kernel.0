@@ -1,297 +1,50 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 3 Nov 2015 16:55:55 +0000
-Subject: [PATCH V1 11/11] arm64, pci, acpi: Support for ACPI based PCI
- hostbridge init
-In-Reply-To: <1445963922-22711-12-git-send-email-tn@semihalf.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 03 Nov 2015 17:55:17 +0100
+Subject: [PATCH V1 11/11] arm64, pci,
+ acpi: Support for ACPI based PCI hostbridge init
+In-Reply-To: <5638E1CE.9000805@codeaurora.org>
 References: <1445963922-22711-1-git-send-email-tn@semihalf.com>
- <1445963922-22711-12-git-send-email-tn@semihalf.com>
-Message-ID: <20151103165555.GF3574@red-moon>
+ <5802577.H74A3Lg5B3@wuerfel> <5638E1CE.9000805@codeaurora.org>
+Message-ID: <3736182.0iiYWufyXZ@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 27, 2015 at 05:38:42PM +0100, Tomasz Nowicki wrote:
+On Tuesday 03 November 2015 11:33:18 Sinan Kaya wrote:
+> 
+> On 11/3/2015 10:59 AM, Arnd Bergmann wrote:
+> > On Tuesday 03 November 2015 10:10:21 Sinan Kaya wrote:
+> >>
+> >> I don't see anywhere in the SBSA spec addendum that the PCI
+> >> configuration space section that unaligned accesses *MUST* be supported.
+> >>
+> >> If this is required, please have this info added to the spec. I can work
+> >> with the designers for the next chip.
+> >>
+> >> Unaligned access on the current hardware returns incomplete values or
+> >> can cause bus faults. The behavior is undefined.
+> >
+> > Unaligned accesses are not allowed, but any PCI compliant device must
+> > support aligned 1, 2 or 4 byte accesses on its configuration space,
+> > though the byte-enable mechanism. In an ECAM host bridge, those are
+> > mapped to load/store accesses from the CPU with the respective width
+> > and natural alignment.
+> 
+> As far as I see, the endpoints do not have any problems with unaligned 
+> accesses. It is the host bridge itself (stuff that doesn't get on the 
+> PCIe bus and uses traditional AXI kind bus internally) has problems with 
+> alignment.
+> 
+> If Linux is expecting all HW vendors to implement alignment support, 
+> this needs to be put in the SBSA spec as a hard requirement.
 
-[...]
+As I said, it's not unaligned accesses at all, just 1-byte and aligned
+2-byte accesses, and it's not Linux mandating this but the PCI
+spec. Please read Russell's email again, it is not possible for PCI
+to work according to the specification unless the host bridge allows
+sub-32-bit accesses.
 
->  menu "Kernel Features"
-> diff --git a/arch/arm64/kernel/pci.c b/arch/arm64/kernel/pci.c
-> index b3d098b..66cc1ae 100644
-> --- a/arch/arm64/kernel/pci.c
-> +++ b/arch/arm64/kernel/pci.c
-> @@ -11,12 +11,15 @@
->   */
->  
->  #include <linux/acpi.h>
-> +#include <linux/ecam.h>
->  #include <linux/init.h>
->  #include <linux/io.h>
->  #include <linux/kernel.h>
->  #include <linux/mm.h>
-> +#include <linux/of_address.h>
->  #include <linux/of_pci.h>
->  #include <linux/of_platform.h>
-> +#include <linux/pci-acpi.h>
->  #include <linux/slab.h>
->  
->  #include <asm/pci-bridge.h>
-> @@ -52,35 +55,216 @@ int pcibios_enable_device(struct pci_dev *dev, int mask)
->  }
->  
->  /*
-> - * Try to assign the IRQ number from DT when adding a new device
-> + * Try to assign the IRQ number from DT/ACPI when adding a new device
->   */
->  int pcibios_add_device(struct pci_dev *dev)
->  {
-> -	dev->irq = of_irq_parse_and_map_pci(dev, 0, 0);
-> +	if (acpi_disabled)
-> +		dev->irq = of_irq_parse_and_map_pci(dev, 0, 0);
-> +#ifdef CONFIG_ACPI
-> +	else
-> +		acpi_pci_irq_enable(dev);
-> +#endif
+You can probably work around this by using the legacy I/O port method
+rather than ECAM, if the PCI host bridge itself is functional and just
+the host bus it is connected to is buggy.
 
-This series:
-
-http://www.spinics.net/lists/linux-pci/msg45950.html
-
-will allow us to initialize the irq mapping function according to
-the boot method, code above is getting cumbersome and it is already
-overriden when booting with DT, so we will remove it altogether.
-
->  
->  	return 0;
->  }
->  
-> +#ifdef CONFIG_ACPI
-> +int pcibios_root_bridge_prepare(struct pci_host_bridge *bridge)
-> +{
-> +	struct acpi_pci_root *root = bridge->bus->sysdata;
-> +
-> +	ACPI_COMPANION_SET(&bridge->dev, root->device);
-> +	return 0;
-
-This should be made part of core code IMO.
-
-> +}
-> +
-> +void pcibios_add_bus(struct pci_bus *bus)
-> +{
-> +	acpi_pci_add_bus(bus);
-> +}
-> +
-> +void pcibios_remove_bus(struct pci_bus *bus)
-> +{
-> +	acpi_pci_remove_bus(bus);
-> +}
-
-Two functions above are identical for arm64, ia64 and x86, I do
-not think they belong in arch code.
-
-> +static int __init pcibios_assign_resources(void)
-> +{
-> +	if (acpi_disabled)
-> +		return 0;
-> +
-> +	pci_assign_unassigned_resources();
-> +	return 0;
-
-Already commented on this.
-
-> +}
->  /*
-> - * raw_pci_read/write - Platform-specific PCI config space access.
-> + * rootfs_initcall comes after subsys_initcall and fs_initcall_sync,
-> + * so we know acpi scan and PCI_FIXUP_FINAL quirks have both run.
->   */
-> -int raw_pci_read(unsigned int domain, unsigned int bus,
-> -		  unsigned int devfn, int reg, int len, u32 *val)
-> +rootfs_initcall(pcibios_assign_resources);
-> +
-> +static void __iomem *
-> +pci_mcfg_dev_base(struct pci_bus *bus, unsigned int devfn, int offset)
->  {
-> -	return -ENXIO;
-> +	struct pci_mmcfg_region *cfg;
-> +
-> +	cfg = pci_mmconfig_lookup(pci_domain_nr(bus), bus->number);
-> +	if (cfg && cfg->virt)
-> +		return cfg->virt +
-> +			(PCI_MMCFG_BUS_OFFSET(bus->number) | (devfn << 12)) +
-> +			offset;
-> +	return NULL;
-
-Why is this code arm64 specific ?
-
->  }
->  
-> -int raw_pci_write(unsigned int domain, unsigned int bus,
-> -		unsigned int devfn, int reg, int len, u32 val)
-> +struct pci_ops pci_root_ops = {
-> +	.map_bus = pci_mcfg_dev_base,
-> +	.read = pci_generic_config_read,
-> +	.write = pci_generic_config_write,
-> +};
-> +
-> +#ifdef CONFIG_PCI_MMCONFIG
-> +static int pci_add_mmconfig_region(struct acpi_pci_root_info *ci)
->  {
-> -	return -ENXIO;
-> +	struct pci_mmcfg_region *cfg;
-> +	struct acpi_pci_root *root;
-> +	int seg, start, end, err;
-> +
-> +	root = ci->root;
-> +	seg = root->segment;
-> +	start = root->secondary.start;
-> +	end = root->secondary.end;
-> +
-> +	cfg = pci_mmconfig_lookup(seg, start);
-> +	if (cfg)
-> +		return 0;
-> +
-> +	cfg = pci_mmconfig_alloc(seg, start, end, root->mcfg_addr);
-> +	if (!cfg)
-> +		return -ENOMEM;
-> +
-> +	err = pci_mmconfig_inject(cfg);
-> +	return err;
->  }
->  
-> -#ifdef CONFIG_ACPI
-> +static void pci_remove_mmconfig_region(struct acpi_pci_root_info *ci)
-> +{
-> +	struct acpi_pci_root *root = ci->root;
-> +	struct pci_mmcfg_region *cfg;
-> +
-> +	cfg = pci_mmconfig_lookup(root->segment, root->secondary.start);
-> +	if (cfg)
-> +		return;
-> +
-> +	if (cfg->hot_added)
-> +		pci_mmconfig_delete(root->segment, root->secondary.start,
-> +				    root->secondary.end);
-> +}
-> +#else
-> +static int pci_add_mmconfig_region(struct acpi_pci_root_info *ci)
-> +{
-> +	return 0;
-> +}
-> +
-> +static void pci_remove_mmconfig_region(struct acpi_pci_root_info *ci) { }
-> +#endif
-
-Ditto.
-
-> +
-> +static int pci_acpi_root_init_info(struct acpi_pci_root_info *ci)
-> +{
-> +	return pci_add_mmconfig_region(ci);
-> +}
-> +
-> +static void pci_acpi_root_release_info(struct acpi_pci_root_info *ci)
-> +{
-> +	pci_remove_mmconfig_region(ci);
-> +	kfree(ci);
-> +}
-> +
-> +static int pci_acpi_root_prepare_resources(struct acpi_pci_root_info *ci)
-> +{
-> +	struct resource_entry *entry, *tmp;
-> +	int ret;
-> +
-> +	ret = acpi_pci_probe_root_resources(ci);
-> +	if (ret < 0)
-> +		return ret;
-
-Code above is identical on arm64, ia64 and x86.
-
-> +
-> +	resource_list_for_each_entry_safe(entry, tmp, &ci->resources) {
-> +		struct resource *res = entry->res;
-> +
-> +		/*
-> +		 * Special handling for ARM IO range
-> +		 * TODO: need to move pci_register_io_range() function out
-> +		 * of drivers/of/address.c for both used by DT and ACPI
-> +		 */
-> +		if (res->flags & IORESOURCE_IO) {
-> +			unsigned long port;
-> +			int err;
-> +			resource_size_t length = res->end - res->start;
-> +
-> +			err = pci_register_io_range(res->start, length);
-> +			if (err) {
-> +				resource_list_destroy_entry(entry);
-> +				continue;
-> +			}
-> +
-> +			port = pci_address_to_pio(res->start);
-> +			if (port == (unsigned long)-1) {
-> +				resource_list_destroy_entry(entry);
-> +				continue;
-> +			}
-> +
-> +			res->start = port;
-> +			res->end = res->start + length - 1;
-> +
-> +			if (pci_remap_iospace(res, res->start) < 0)
-> +				resource_list_destroy_entry(entry);
-> +		}
-> +	}
-> +
-> +	return 0;
-> +}
-> +
-> +static struct acpi_pci_root_ops acpi_pci_root_ops = {
-> +	.pci_ops = &pci_root_ops,
-> +	.init_info = pci_acpi_root_init_info,
-> +	.release_info = pci_acpi_root_release_info,
-> +	.prepare_resources = pci_acpi_root_prepare_resources,
-> +};
-> +
->  /* Root bridge scanning */
->  struct pci_bus *pci_acpi_scan_root(struct acpi_pci_root *root)
->  {
-> -	/* TODO: Should be revisited when implementing PCI on ACPI */
-> -	return NULL;
-> +	int node = acpi_get_node(root->device->handle);
-> +	int domain = root->segment;
-> +	int busnum = root->secondary.start;
-> +	struct acpi_pci_root_info *info;
-> +	struct pci_bus *bus;
-> +
-> +	if (domain && !pci_domains_supported) {
-> +		pr_warn("PCI %04x:%02x: multiple domains not supported.\n",
-> +			domain, busnum);
-> +		return NULL;
-> +	}
-> +
-> +	info = kzalloc_node(sizeof(*info), GFP_KERNEL, node);
-> +	if (!info) {
-> +		dev_err(&root->device->dev,
-> +			"pci_bus %04x:%02x: ignored (out of memory)\n",
-> +			domain, busnum);
-> +		return NULL;
-> +	}
-> +
-> +	bus = acpi_pci_root_create(root, &acpi_pci_root_ops, info, root);
-> +
-> +	/* After the PCI-E bus has been walked and all devices discovered,
-> +	 * configure any settings of the fabric that might be necessary.
-> +	 */
-> +	if (bus) {
-> +		struct pci_bus *child;
-> +
-> +		list_for_each_entry(child, &bus->children, node)
-> +			pcie_bus_configure_settings(child);
-> +	}
-> +
-> +	return bus;
-
-Code above is entirely arch agnostic (apart from what data is passed to
-sysdata) and I think there is room for further consolidation with
-x86 and ia64, I will have a look into this.
-
-Thanks,
-Lorenzo
+	Arnd
