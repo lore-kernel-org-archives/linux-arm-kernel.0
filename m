@@ -1,62 +1,43 @@
 From: p.fedin@samsung.com (Pavel Fedin)
-Date: Tue, 03 Nov 2015 12:16:37 +0300
-Subject: [PATCH v5 0/4] Exynos SROMc configuration and Ethernet support for
- SMDK5410
-Message-ID: <cover.1446542020.git.p.fedin@samsung.com>
+Date: Tue, 03 Nov 2015 12:16:39 +0300
+Subject: [PATCH v5 2/4] ARM: dts: Add SROMc to Exynos 5410
+In-Reply-To: <cover.1446542020.git.p.fedin@samsung.com>
+References: <cover.1446542020.git.p.fedin@samsung.com>
+Message-ID: <69aa5165bf2e696c0a684a9ba49cd4d5acb25046.1446542020.git.p.fedin@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch extends Exynos SROM controller driver with ability to configure
-controller outputs and enables SMSC9115 Ethernet chip on SMDK5410 board,
-which is connected via SROMc bank #3.
+This machine uses own SoC device tree file, add missing part.
+We insert the complete description, with ranges, because we are going to
+connect devices to it. Values in ranges are SoC-specific, so they go here
+in order not to duplicate them for every machine.
 
-With this patchset, support for the whole existing SMDK range can be added.
-Actually, only bank number is different.
+Signed-off-by: Pavel Fedin <p.fedin@samsung.com>
+---
+ arch/arm/boot/dts/exynos5410.dtsi | 11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
-This patchset also depends on Exynos 5410 pinctrl support, introduced by
-patches 0003 and 0004 from this set:
-[PATCH v4 0/5] ARM: EXYNOS: ODROID-XU DT and LEDs
-http://lists.infradead.org/pipermail/linux-arm-kernel/2015-March/330862.html
-
-Pinctrl support is necessary in order to correctly configure
-multifunctional pins of the Exynos chip.
-
-v4 => v5:
-- Some cosmetic changes in the dtsi ("compatible" goes first)
-- Use correctly specified ranges for the SROMc node
-- Reuse existing properties where possible ("reg" for bank# and
-  "reg-io-width" for data width)
-- Separated page-mode property from timings array
-- More improvements to the documentation
-
-v3 => v4:
-- Devices are now added as subnodes, with additional properties. This allows
-  to cleary specify dependency. If configuration fails, error will be reported
-  and child devices will not be probed.
-- These additional properties now have "samsung,srom-XXX" format
-- Fixed code style, now better understood.
-
-v2 => v3:
-- Fixed up SROMc region size in the device tree
-- Reordered patches, documentation goes first now
-
-v1 => v2:
-- Fixed some typos and bad labels in device tree
-- Improved documentation
-
-Pavel Fedin (4):
-  Documentation: dt-bindings: Describe SROMc configuration
-  ARM: dts: Add SROMc to Exynos 5410
-  drivers: exynos-srom: Add support for bank configuration
-  ARM: dts: Add Ethernet chip to SMDK5410
-
- .../bindings/arm/samsung/exynos-srom.txt           | 68 +++++++++++++++++++++-
- arch/arm/boot/dts/exynos5410-smdk5410.dts          | 40 +++++++++++++
- arch/arm/boot/dts/exynos5410.dtsi                  | 11 ++++
- arch/arm/mach-exynos/Kconfig                       |  2 +-
- drivers/soc/samsung/Kconfig                        |  2 +-
- drivers/soc/samsung/exynos-srom.c                  | 60 ++++++++++++++++++-
- 6 files changed, 177 insertions(+), 6 deletions(-)
-
+diff --git a/arch/arm/boot/dts/exynos5410.dtsi b/arch/arm/boot/dts/exynos5410.dtsi
+index 4603356..9cfb814 100644
+--- a/arch/arm/boot/dts/exynos5410.dtsi
++++ b/arch/arm/boot/dts/exynos5410.dtsi
+@@ -101,6 +101,17 @@
+ 			reg = <0x10000000 0x100>;
+ 		};
+ 
++		sromc: sromc at 12250000 {
++			compatible = "samsung,exynos-srom";
++			reg = <0x12250000 0x14>;
++			#address-cells = <2>;
++			#size-cells = <1>;
++			ranges = <0 0 0x04000000 0x20000
++				  1 0 0x05000000 0x20000
++				  2 0 0x06000000 0x20000
++				  3 0 0x07000000 0x20000>;
++		};
++
+ 		pmu_system_controller: system-controller at 10040000 {
+ 			compatible = "samsung,exynos5410-pmu", "syscon";
+ 			reg = <0x10040000 0x5000>;
 -- 
 2.4.4
