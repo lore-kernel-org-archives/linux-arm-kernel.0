@@ -1,86 +1,58 @@
-From: gabriele.paoloni@huawei.com (Gabriele Paoloni)
-Date: Tue, 3 Nov 2015 18:00:10 +0000
-Subject: [PATCH V1 11/11] arm64, pci, acpi: Support for ACPI based PCI
- hostbridge init
-In-Reply-To: <5638F13D.3080406@caviumnetworks.com>
-References: <1445963922-22711-1-git-send-email-tn@semihalf.com>
- <1445963922-22711-12-git-send-email-tn@semihalf.com>
- <5631180D.2000902@codeaurora.org> <20151103141512.GC3574@red-moon>
- <5638D07B.2030001@linaro.org> <5638F13D.3080406@caviumnetworks.com>
-Message-ID: <EE11001F9E5DDD47B7634E2F8A612F2E1629984F@lhreml503-mbs>
+From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
+Date: Tue, 03 Nov 2015 18:02:48 +0000
+Subject: [PATCH v8 2/2] arm-soc: Add support for arm-based tango4 platforms
+In-Reply-To: <5638E920.1030009@sigmadesigns.com> (Marc Gonzalez's message of
+ "Tue, 3 Nov 2015 18:04:32 +0100")
+References: <56377E76.2080209@sigmadesigns.com>
+ <56377F09.6050805@sigmadesigns.com>
+ <yw1xfv0o9xr3.fsf@unicorn.mansr.com>
+ <20151102182615.GI2684@leverpostej> <5637AD74.4080206@oracle.com>
+ <563871A9.7050009@sigmadesigns.com>
+ <yw1xtwp38k7r.fsf@unicorn.mansr.com> <5638E2C3.4030402@oracle.com>
+ <5638E920.1030009@sigmadesigns.com>
+Message-ID: <yw1xh9l37ygn.fsf@unicorn.mansr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi David
+Marc Gonzalez <marc_gonzalez@sigmadesigns.com> writes:
 
-> -----Original Message-----
-> From: David Daney [mailto:ddaney at caviumnetworks.com]
-> Sent: 03 November 2015 17:39
-> To: Hanjun Guo
-> Cc: Lorenzo Pieralisi; Sinan Kaya; Tomasz Nowicki; bhelgaas at google.com;
-> arnd at arndb.de; will.deacon at arm.com; catalin.marinas at arm.com; rjw at rjwysocki.net;
-> jiang.liu at linux.intel.com; robert.richter at caviumnetworks.com;
-> Narinder.Dhillon at caviumnetworks.com; Liviu.Dudau at arm.com; tglx at linutronix.de;
-> Wangyijing; Suravee.Suthikulpanit at amd.com; msalter at redhat.com; linux-
-> pci at vger.kernel.org; linux-arm-kernel at lists.infradead.org; linux-
-> acpi at vger.kernel.org; linux-kernel at vger.kernel.org; Gabriele Paoloni; Wangzhou
-> (B); liudongdong (C)
-> Subject: Re: [PATCH V1 11/11] arm64, pci, acpi: Support for ACPI based PCI
-> hostbridge init
-> 
-> On 11/03/2015 07:19 AM, Hanjun Guo wrote:
-> > On 11/03/2015 10:15 PM, Lorenzo Pieralisi wrote:
-> >> On Wed, Oct 28, 2015 at 02:46:37PM -0400, Sinan Kaya wrote:
-> >>
-> >> [...]
-> >>
-> >>>> -int raw_pci_write(unsigned int domain, unsigned int bus,
-> >>>> -        unsigned int devfn, int reg, int len, u32 val)
-> >>>> +struct pci_ops pci_root_ops = {
-> >>>> +    .map_bus = pci_mcfg_dev_base,
-> >>>> +    .read = pci_generic_config_read,
-> >>>> +    .write = pci_generic_config_write,
-> >>>
-> >>>
-> >>> Can you change these with pci_generic_config_read32 and
-> >>> pci_generic_config_write32? We have some targets that can only do 32
-> >>> bits PCI config space access.
-> >>
-> >> No.
-> >>
-> >> http://www.spinics.net/lists/linux-pci/msg44869.html
-> >>
-> >> Can you be a bit more specific please ?
-> >>
-> >> Sigh. Looks like we have to start adding platform specific quirks even
-> >> before we merged the generic ACPI PCIe host controller implementation.
-> >
-> > Cc Gab, Zhou, and Dondong who upstream the hip05 (designware) PCIe host
-> > support.
-> >
-> > I think so, some platform may not support ECAM for root complex,
-> > which needs special handling of access config space, we may need
-> > to consider those cases.
-> >
-> 
-> Yes, it is indeed true.  For example, some Cavium ThunderX processors
-> fall into this category.
-> 
-> Some options I thought of are:
-> 
->   o Use DECLARE_ACPI_MCFG_FIXUP() in the kernel to supply the needed
-> config space accessors.
-> 
->   o Define additional root_device_ids that imply the needed config space
-> accessors.
+> On 03/11/2015 17:37, Santosh Shilimkar wrote:
+>> On 11/3/2015 2:12 AM, M?ns Rullg?rd wrote:
+>>> Marc Gonzalez writes:
+>>>
+>>>> Santosh Shilimkar wrote:
+>>>>
+>>>>> Mark Rutland wrote:
+>>>>>
+>>>>>> We didn't. Having a look just now, the earliest example appears to be
+>>>>>> in OMAP4 L2 support patches back in 2009 [1]. I was not able to find a
+>>>>>> rationale.
+>>>>>>
+>>>>>> Given that the MMU is on (and speculative accesses are permitted) I
+>>>>>> can't see what the DSB achieves -- it can't quiesce the memory system.
+>>>>>>
+>>>>>> Santosh, any idea?
+>>>>>
+>>>>> IIRC, it was requirement from the OMAP ROM code to have a dsb before
+>>>>> we call the SMC routine. I can't recollect more than that now.
+>>>>
+>>>> In that case, shouldn't dsb have been added to the ROM code,
+>>>> on the "other side" of the smc, so as to not depend on Linux
+>>>> code "getting it right"?
+>>>
+>>> You're new to this, aren't you? :)
+>>
+>> :-) Indeed. ROM code is burned into the chip and can't be changed.
+>
+> Oh, that kind of ROM... I thought EEPROM.
+> (Our secure OS is stored in NAND flash.)
+>
+> If I'm bored, I'll try measuring the run-time difference with
+> and without dsb.
 
-Yes I like this
+Don't bother.  This is only used during initialisation anyway.  If that
+takes a few microseconds longer, you won't be able to tell.
 
-it would fit designware too
-
-Gab
-
-> 
-> 
-> > Thanks
-> > Hanjun
+-- 
+M?ns Rullg?rd
+mans at mansr.com
