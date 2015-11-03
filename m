@@ -1,102 +1,119 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 3 Nov 2015 13:46:06 +0000
-Subject: [PATCH DRAFT 2/2] drivers: serial: PL011: [DRAFT] implement
- register diverson for ZTE UART
-In-Reply-To: <1446467042-24494-3-git-send-email-andre.przywara@arm.com>
-References: <1446467042-24494-1-git-send-email-andre.przywara@arm.com>
- <1446467042-24494-3-git-send-email-andre.przywara@arm.com>
-Message-ID: <20151103134605.GW8644@n2100.arm.linux.org.uk>
+From: jungseoklee85@gmail.com (Jungseok Lee)
+Date: Tue, 3 Nov 2015 22:49:56 +0900
+Subject: [PATCH v6 2/3] percpu: add PERCPU_ATOM_SIZE for a generic percpu
+ area setup
+In-Reply-To: <20151102162236.GB7637@e104818-lin.cambridge.arm.com>
+References: <1446363977-23656-1-git-send-email-jungseoklee85@gmail.com>
+ <1446363977-23656-3-git-send-email-jungseoklee85@gmail.com>
+ <alpine.DEB.2.20.1511021008580.27740@east.gentwo.org>
+ <20151102162236.GB7637@e104818-lin.cambridge.arm.com>
+Message-ID: <F4C06691-60EF-45FA-9AD7-9FBF8F1960AB@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 02, 2015 at 12:24:02PM +0000, Andre Przywara wrote:
-> +int reg_table_zte[] = {
-> +	[UART01x_DR]	= ZX_UART01x_DR,
+On Nov 3, 2015, at 1:22 AM, Catalin Marinas wrote:
 
-No entry for RSR, so the value will be zero.  That means when we read
-the RSR, we'll be reading the register at offset 0.  Maybe that's
-intentional, maybe it isn't, but it's totally screwy.
+Hi Catalin,
 
-Someone needs to document what the register layout for the ZTE UART
-is.  Better still, point to where the spec can be found.
-
-> +	[UART011_LCRH]	= ZX_UART011_LCRH_TX,
-> +	[UART011_CR]	= ZX_UART011_CR,
-> +	[UART01x_FR]	= ZX_UART01x_FR,
-> +	[UART011_ICR]	= ZX_UART011_ICR,
-> +	[UART011_IBRD]	= UART011_IBRD,
-> +	[UART011_FBRD]	= UART011_FBRD,
-> +	[UART011_IFLS]	= ZX_UART011_IFLS,
-> +	[UART011_IMSC]	= ZX_UART011_IMSC,
-> +	[UART011_RIS]	= ZX_UART011_RIS,
-> +	[UART011_MIS]	= ZX_UART011_MIS,
-> +	[UART011_DMACR]	= ZX_UART011_DMACR,
-> +};
->  static unsigned int pl011_read(struct uart_amba_port *uap, int offset)
->  {
-> +#ifdef CONFIG_SOC_ZX296702
-> +	if (uap->vendor->reg_table)
-> +		offset = uap->vendor->reg_table[offset];
-> +#endif
->  	return readw(uap->port.membase + offset);
->  }
->  
->  static void pl011_write(struct uart_amba_port *uap, int val, int offset)
->  {
-> +#ifdef CONFIG_SOC_ZX296702
-> +	if (uap->vendor->reg_table)
-> +		offset = uap->vendor->reg_table[offset];
-> +#endif
->  	writew(val, uap->port.membase + offset);
->  }
->  
-> diff --git a/include/linux/amba/serial.h b/include/linux/amba/serial.h
-> index 0ddb5c0..1c71b83 100644
-> --- a/include/linux/amba/serial.h
-> +++ b/include/linux/amba/serial.h
-> @@ -31,6 +31,7 @@
->   *  UART Register Offsets.
->   */
->  #define UART01x_DR		0x00	/* Data read or written from the interface. */
-> +#define ZX_UART01x_DR		0x04	/* Different offset in the ZTE UART. */
->  #define UART01x_RSR		0x04	/* Receive status register (Read). */
->  #define UART01x_ECR		0x04	/* Error clear register (Write). */
->  #define UART010_LCRH		0x08	/* Line control register, high byte. */
-> @@ -39,6 +40,7 @@
->  #define ST_UART011_TIMEOUT	0x0C    /* Timeout period register. */
->  #define UART010_LCRL		0x10	/* Line control register, low byte. */
->  #define UART010_CR		0x14	/* Control register. */
-> +#define ZX_UART01x_FR		0x14	/* Different offset in the ZTE UART. */
->  #define UART01x_FR		0x18	/* Flag register (Read only). */
->  #define UART010_IIR		0x1C	/* Interrupt identification register (Read). */
->  #define UART010_ICR		0x1C	/* Interrupt clear register (Write). */
-> @@ -48,14 +50,22 @@
->  #define UART011_FBRD		0x28	/* Fractional baud rate divisor register. */
->  #define UART011_LCRH		0x2c	/* Line control register. */
->  #define ST_UART011_LCRH_TX	0x2c    /* Tx Line control register. */
-> +#define ZX_UART011_LCRH_TX	0x30    /* Different offset in the ZTE UART. */
->  #define UART011_CR		0x30	/* Control register. */
->  #define UART011_IFLS		0x34	/* Interrupt fifo level select. */
-> +#define ZX_UART011_CR		0x34	/* Different offset in the ZTE UART. */
-> +#define ZX_UART011_IFLS		0x38	/* Different offset in the ZTE UART. */
->  #define UART011_IMSC		0x38	/* Interrupt mask. */
->  #define UART011_RIS		0x3c	/* Raw interrupt status. */
->  #define UART011_MIS		0x40	/* Masked interrupt status. */
-> +#define ZX_UART011_IMSC		0x40	/* Different offset in the ZTE UART. */
->  #define UART011_ICR		0x44	/* Interrupt clear register. */
-> +#define ZX_UART011_RIS		0x44	/* Different offset in the ZTE UART. */
->  #define UART011_DMACR		0x48	/* DMA control register. */
-> +#define ZX_UART011_MIS		0x48	/* Different offset in the ZTE UART. */
-> +#define ZX_UART011_ICR		0x4c	/* Different offset in the ZTE UART. */
->  #define ST_UART011_XFCR		0x50	/* XON/XOFF control register. */
-> +#define ZX_UART011_DMACR	0x50	/* Different offset in the ZTE UART. */
->  #define ST_UART011_XON1		0x54	/* XON1 register. */
->  #define ST_UART011_XON2		0x58	/* XON2 register. */
->  #define ST_UART011_XOFF1	0x5C	/* XON1 register. */
-> -- 
-> 2.5.1
+> On Mon, Nov 02, 2015 at 10:10:23AM -0600, Christoph Lameter wrote:
+>> On Sun, 1 Nov 2015, Jungseok Lee wrote:
+>> 
+>>> There is no room to adjust 'atom_size' now when a generic percpu area
+>>> is used. It would be redundant to write down an architecture-specific
+>>> setup_per_cpu_areas() in order to only change the 'atom_size'. Thus,
+>>> this patch adds a new definition, PERCPU_ATOM_SIZE, which is PAGE_SIZE
+>>> by default. The value could be updated if needed by architecture.
+>> 
+>> What is atom_size? Why would you want a difference allocation size here?
+>> The percpu area is virtually mapped regardless. So you will have
+>> contiguous addresses even without atom_size.
 > 
+> I haven't looked at the patch 3/3 in detail but I'm pretty sure I'll NAK
+> the approach (and the definition of PERCPU_ATOM_SIZE), therefore
+> rendering this patch unnecessary. IIUC, this is used to enforce some
+> alignment of the per-CPU IRQ stack to be able to check whether the
+> current stack is process or IRQ on exception entry. But there are other,
+> less intrusive ways to achieve the same (e.g. x86).
 
--- 
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+First of all, thanks for clarification!
+
+That is why I chose the word, 'doubtable', in the cover letter. I will
+give up this approach. I've been paranoid about "another pointer read"
+which you mentioned [1] for over a week. This wrong idea is my conclusion
+with respect to your feedback. I think I've failed to follow you here.
+
+Most ideas came from x86 implementation when I started this work. v2, [2]
+might be close to x86 approach. At that time, for IRQ re-entrance check,
+count based method was used. But count was considered a redundant variable
+since we have preempt_count. As a result, the top-bit comparison idea,
+which is an origin of this IRQ_STACK_SIZE alignment, have taken the work,
+re-entrance check. Like x86, if we pick up the count method, we could
+achieve the goal without this unnecessary alignment. How about your opinon?
+
+I copy and paste x86 code (arch/x86/entry/entry_64.S) for convenience. It has
+a comment on why the redundancy is allowed.
+
+----8<----
+        .macro interrupt func
+        cld
+        ALLOC_PT_GPREGS_ON_STACK
+        SAVE_C_REGS
+        SAVE_EXTRA_REGS
+
+        testb   $3, CS(%rsp)
+        jz      1f
+
+        /*
+         * IRQ from user mode.  Switch to kernel gsbase and inform context
+         * tracking that we're in kernel mode.
+         */
+        SWAPGS
+#ifdef CONFIG_CONTEXT_TRACKING
+        call enter_from_user_mode
+#endif
+
+1:
+        /*
+         * Save previous stack pointer, optionally switch to interrupt stack.
+         * irq_count is used to check if a CPU is already on an interrupt stack
+         * or not. While this is essentially redundant with preempt_count it is
+         * a little cheaper to use a separate counter in the PDA (short of
+         * moving irq_enter into assembly, which would be too much work)
+         */
+        movq    %rsp, %rdi
+        incl    PER_CPU_VAR(irq_count)
+        cmovzq  PER_CPU_VAR(irq_stack_ptr), %rsp
+        pushq   %rdi
+        /* We entered an interrupt context - irqs are off: */
+        TRACE_IRQS_OFF
+
+        call    \func   /* rdi points to pt_regs */
+        .endm
+
+        /*
+         * The interrupt stubs push (~vector+0x80) onto the stack and
+         * then jump to common_interrupt.
+         */
+        .p2align CONFIG_X86_L1_CACHE_SHIFT
+common_interrupt:
+        ASM_CLAC
+        addq    $-0x80, (%rsp)                  /* Adjust vector to [-256, -1] range */
+        interrupt do_IRQ
+----8<----
+
+Additionally, I've been thinking of do_softirq_own_stack() which is your
+another comment [3]. Recently, I've realized there is possibility that
+I misunderstood your intention. Did you mean that irq_handler hook is not
+enough? Should do_softirq_own_stack() be implemented together? If so,
+this is my another failure.. It perfectly makes sense.
+
+I hope these are the last two pieces of this interesting feature.
+
+Thanks again!
+
+Best Regards
+Jungseok Lee
+
+[1] https://lkml.org/lkml/2015/10/19/596
+[2] http://article.gmane.org/gmane.linux.kernel/2037257
+[3] http://article.gmane.org/gmane.linux.kernel/2041877
