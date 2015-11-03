@@ -1,33 +1,37 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 03 Nov 2015 15:08:33 +0100
-Subject: [PATCH] PCI: altera: add OF_PCI dependency
-Message-ID: <38421064.oVjju5M930@wuerfel>
+From: jungseoklee85@gmail.com (Jungseok Lee)
+Date: Tue, 3 Nov 2015 23:11:16 +0900
+Subject: [PATCH v6 2/3] percpu: add PERCPU_ATOM_SIZE for a generic percpu
+ area setup
+In-Reply-To: <alpine.DEB.2.20.1511021008580.27740@east.gentwo.org>
+References: <1446363977-23656-1-git-send-email-jungseoklee85@gmail.com>
+ <1446363977-23656-3-git-send-email-jungseoklee85@gmail.com>
+ <alpine.DEB.2.20.1511021008580.27740@east.gentwo.org>
+Message-ID: <8FA31B91-D361-4F98-A2D3-EFC5D877EDB1@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The newly added altera PCI driver fails to build when CONFIG_OF
-is disabled:
+On Nov 3, 2015, at 1:10 AM, Christoph Lameter wrote:
 
-drivers/pci/host/pcie-altera.c: In function 'altera_pcie_parse_request_of_pci_ranges':
-drivers/pci/host/pcie-altera.c:420:8: error: implicit declaration of function 'of_pci_get_host_bridge_resources' [-Werror=implicit-function-declaration]
+Dear Christoph,
 
-This adds a dependency on OF_PCI for clarity, this is the symbol
-that guards the implementation of of_pci_get_host_bridge_resources.
+> On Sun, 1 Nov 2015, Jungseok Lee wrote:
+> 
+>> There is no room to adjust 'atom_size' now when a generic percpu area
+>> is used. It would be redundant to write down an architecture-specific
+>> setup_per_cpu_areas() in order to only change the 'atom_size'. Thus,
+>> this patch adds a new definition, PERCPU_ATOM_SIZE, which is PAGE_SIZE
+>> by default. The value could be updated if needed by architecture.
+> 
+> What is atom_size? Why would you want a difference allocation size here?
+> The percpu area is virtually mapped regardless. So you will have
+> contiguous addresses even without atom_size.
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: 6bb4dd154ae8 ("PCI: altera: Add Altera PCIe host controller driver")
----
-Found on ARM randconfig builds yesterday
+I think Catalin have already written down a perfect explanation. I'd like
+memory with an alignment greater than PAGE_SIZE. But, __per_cpu_offset[]
+is PAGE_SIZE aligned under a generic setup_per_cpu_areas(). That is,
+secondary cores cannot get that kind of space.
 
-diff --git a/drivers/pci/host/Kconfig b/drivers/pci/host/Kconfig
-index 9e24075d83f7..f131ba947dc6 100644
---- a/drivers/pci/host/Kconfig
-+++ b/drivers/pci/host/Kconfig
-@@ -150,6 +150,7 @@ config PCIE_IPROC_BCMA
- config PCIE_ALTERA
- 	bool "Altera PCIe controller"
- 	depends on ARM || NIOS2
-+	depends on OF_PCI
- 	select PCI_DOMAINS
- 	help
- 	  Say Y here if you want to enable PCIe controller support on Altera
+Thanks for taking a look at this doubtable change!
+
+Best Regards
+Jungseok Lee
