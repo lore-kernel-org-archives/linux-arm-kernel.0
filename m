@@ -1,34 +1,35 @@
-From: axboe@fb.com (Jens Axboe)
-Date: Tue, 3 Nov 2015 08:25:36 -0700
-Subject: [PATCH] lightnvm: work around 32-bit built error
-In-Reply-To: <4925999.tpkPGVQaeU@wuerfel>
-References: <4925999.tpkPGVQaeU@wuerfel>
-Message-ID: <5638D1F0.7060406@fb.com>
+From: hdegoede@redhat.com (Hans de Goede)
+Date: Tue,  3 Nov 2015 16:47:20 +0100
+Subject: [PATCH] ARM: dts: sun7i: Enable audio codec on pcDuino
+Message-ID: <1446565640-21069-1-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/03/2015 06:53 AM, Arnd Bergmann wrote:
-> The newly added lightnvm incorrectly uses a sector_t variable to
-> represent a data structure with fixed length bit fields, which breaks
-> when sector_t is configured to be 32-bit:
->
-> In file included from ../drivers/lightnvm/core.c:29:0:
-> /include/linux/lightnvm.h:143:4: error: width of 'resved' exceeds its type
->      sector_t resved  : 36;
-> include/linux/lightnvm.h: In function 'ppa_set_empty':
-> /include/linux/lightnvm.h:120:20: warning: large integer implicitly truncated to unsigned type [-Woverflow]
->   #define ADDR_EMPTY (~0ULL)
+From: Jelle van der Waa <jelle@vdwaa.nl>
 
-Thanks Arnd, Matias sent another variant yesterday that changes this to 
-u64 as well.
+Enable the on-chip audio codec
 
-> This patch resolves the build error, but does not address the fact that
-> bit fields are not reliable in data structures that are interpreted
-> by firmware on another architecture. If the layout is meant to be
-> stable, the bit fields should be replaced with explicit calculations.
+Signed-off-by: Jelle van der Waa <jelle@vdwaa.nl>
+Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+---
+ arch/arm/boot/dts/sun7i-a20-pcduino3.dts | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-Matias? Are these every stored and read back, potentially on a different 
-machine?
-
+diff --git a/arch/arm/boot/dts/sun7i-a20-pcduino3.dts b/arch/arm/boot/dts/sun7i-a20-pcduino3.dts
+index 861a4a6..067f365 100644
+--- a/arch/arm/boot/dts/sun7i-a20-pcduino3.dts
++++ b/arch/arm/boot/dts/sun7i-a20-pcduino3.dts
+@@ -111,6 +111,11 @@
+ 	allwinner,pins = "PH2";
+ };
+ 
++
++&codec {
++	status = "okay";
++};
++
+ &cpu0 {
+ 	cpu-supply = <&reg_dcdc2>;
+ };
 -- 
-Jens Axboe
+2.5.0
