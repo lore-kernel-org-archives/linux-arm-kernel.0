@@ -1,80 +1,53 @@
 From: eric.auger@linaro.org (Eric Auger)
-Date: Tue,  3 Nov 2015 18:12:18 +0000
-Subject: [PATCH v6 7/8] vfio: platform: add dev_info on device reset
+Date: Tue,  3 Nov 2015 18:12:19 +0000
+Subject: [PATCH v6 8/8] vfio: platform: reset: calxedaxgmac: fix ioaddr leak
 In-Reply-To: <1446574339-1843-1-git-send-email-eric.auger@linaro.org>
 References: <1446574339-1843-1-git-send-email-eric.auger@linaro.org>
-Message-ID: <1446574339-1843-8-git-send-email-eric.auger@linaro.org>
+Message-ID: <1446574339-1843-9-git-send-email-eric.auger@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-It might be helpful for the end-user to check the device reset
-function was found by the vfio platform reset framework.
-
-Lets store a pointer to the struct device in vfio_platform_device
-and trace when the reset function is called or not found.
+In the current code the vfio_platform_region is copied on the stack.
+As a consequence the ioaddr address is not iounmapped in the vfio
+platform driver (vfio_platform_regions_cleanup). The patch uses the
+pointer to the region instead.
 
 Signed-off-by: Eric Auger <eric.auger@linaro.org>
-
 ---
+ drivers/vfio/platform/reset/vfio_platform_calxedaxgmac.c | 14 +++++++-------
+ 1 file changed, 7 insertions(+), 7 deletions(-)
 
-v3: creation
----
- drivers/vfio/platform/vfio_platform_common.c  | 14 ++++++++++++--
- drivers/vfio/platform/vfio_platform_private.h |  1 +
- 2 files changed, 13 insertions(+), 2 deletions(-)
-
-diff --git a/drivers/vfio/platform/vfio_platform_common.c b/drivers/vfio/platform/vfio_platform_common.c
-index f74836a..376d289 100644
---- a/drivers/vfio/platform/vfio_platform_common.c
-+++ b/drivers/vfio/platform/vfio_platform_common.c
-@@ -144,8 +144,12 @@ static void vfio_platform_release(void *device_data)
- 	mutex_lock(&driver_lock);
+diff --git a/drivers/vfio/platform/reset/vfio_platform_calxedaxgmac.c b/drivers/vfio/platform/reset/vfio_platform_calxedaxgmac.c
+index 640f5d8..e3d3d94 100644
+--- a/drivers/vfio/platform/reset/vfio_platform_calxedaxgmac.c
++++ b/drivers/vfio/platform/reset/vfio_platform_calxedaxgmac.c
+@@ -59,20 +59,20 @@ static inline void xgmac_mac_disable(void __iomem *ioaddr)
  
- 	if (!(--vdev->refcnt)) {
--		if (vdev->reset)
-+		if (vdev->reset) {
-+			dev_info(vdev->device, "reset\n");
- 			vdev->reset(vdev);
-+		} else {
-+			dev_warn(vdev->device, "no reset function found!\n");
-+		}
- 		vfio_platform_regions_cleanup(vdev);
- 		vfio_platform_irq_cleanup(vdev);
- 	}
-@@ -174,8 +178,12 @@ static int vfio_platform_open(void *device_data)
- 		if (ret)
- 			goto err_irq;
+ int vfio_platform_calxedaxgmac_reset(struct vfio_platform_device *vdev)
+ {
+-	struct vfio_platform_region reg = vdev->regions[0];
++	struct vfio_platform_region *reg = &vdev->regions[0];
  
--		if (vdev->reset)
-+		if (vdev->reset) {
-+			dev_info(vdev->device, "reset\n");
- 			vdev->reset(vdev);
-+		} else {
-+			dev_warn(vdev->device, "no reset function found!\n");
-+		}
+-	if (!reg.ioaddr) {
+-		reg.ioaddr =
+-			ioremap_nocache(reg.addr, reg.size);
+-		if (!reg.ioaddr)
++	if (!reg->ioaddr) {
++		reg->ioaddr =
++			ioremap_nocache(reg->addr, reg->size);
++		if (!reg->ioaddr)
+ 			return -ENOMEM;
  	}
  
- 	vdev->refcnt++;
-@@ -551,6 +559,8 @@ int vfio_platform_probe_common(struct vfio_platform_device *vdev,
- 		return -EINVAL;
- 	}
+ 	/* disable IRQ */
+-	writel(0, reg.ioaddr + XGMAC_DMA_INTR_ENA);
++	writel(0, reg->ioaddr + XGMAC_DMA_INTR_ENA);
  
-+	vdev->device = dev;
-+
- 	group = iommu_group_get(dev);
- 	if (!group) {
- 		pr_err("VFIO: No IOMMU group for device %s\n", vdev->name);
-diff --git a/drivers/vfio/platform/vfio_platform_private.h b/drivers/vfio/platform/vfio_platform_private.h
-index d1b0668..42816dd 100644
---- a/drivers/vfio/platform/vfio_platform_private.h
-+++ b/drivers/vfio/platform/vfio_platform_private.h
-@@ -59,6 +59,7 @@ struct vfio_platform_device {
- 	struct module			*parent_module;
- 	const char			*compat;
- 	struct module			*reset_module;
-+	struct device			*device;
+ 	/* Disable the MAC core */
+-	xgmac_mac_disable(reg.ioaddr);
++	xgmac_mac_disable(reg->ioaddr);
  
- 	/*
- 	 * These fields should be filled by the bus specific binder
+ 	return 0;
+ }
 -- 
 1.9.1
