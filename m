@@ -1,52 +1,41 @@
-From: vigneshr@ti.com (Vignesh R)
-Date: Tue, 3 Nov 2015 15:36:14 +0530
-Subject: [PATCH v2 5/5] ARM: dts: AM4372: add entry for qspi mmap region
-In-Reply-To: <1446545174-14193-1-git-send-email-vigneshr@ti.com>
-References: <1446545174-14193-1-git-send-email-vigneshr@ti.com>
-Message-ID: <1446545174-14193-6-git-send-email-vigneshr@ti.com>
+From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
+Date: Tue, 03 Nov 2015 10:12:56 +0000
+Subject: [PATCH v8 2/2] arm-soc: Add support for arm-based tango4 platforms
+In-Reply-To: <563871A9.7050009@sigmadesigns.com> (Marc Gonzalez's message of
+ "Tue, 3 Nov 2015 09:34:49 +0100")
+References: <56377E76.2080209@sigmadesigns.com>
+ <56377F09.6050805@sigmadesigns.com>
+ <yw1xfv0o9xr3.fsf@unicorn.mansr.com>
+ <20151102182615.GI2684@leverpostej> <5637AD74.4080206@oracle.com>
+ <563871A9.7050009@sigmadesigns.com>
+Message-ID: <yw1xtwp38k7r.fsf@unicorn.mansr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add qspi memory mapped region entries for AM43xx based SoCs. Also,
-update the binding documents for the controller to document this change.
+Marc Gonzalez <marc_gonzalez@sigmadesigns.com> writes:
 
-Signed-off-by: Vignesh R <vigneshr@ti.com>
----
- Documentation/devicetree/bindings/spi/ti_qspi.txt | 5 +++--
- arch/arm/boot/dts/am4372.dtsi                     | 4 +++-
- 2 files changed, 6 insertions(+), 3 deletions(-)
+> Santosh Shilimkar wrote:
+>
+>> Mark Rutland wrote:
+>> 
+>>> We didn't. Having a look just now, the earliest example appears to be
+>>> in OMAP4 L2 support patches back in 2009 [1]. I was not able to find a
+>>> rationale.
+>>> 
+>>> Given that the MMU is on (and speculative accesses are permitted) I
+>>> can't see what the DSB achieves -- it can't quiesce the memory system.
+>>> 
+>>> Santosh, any idea?
+>>
+>> IIRC, it was requirement from the OMAP ROM code to have a dsb before
+>> we call the SMC routine. I can't recollect more than that now.
+>
+> In that case, shouldn't dsb have been added to the ROM code,
+> on the "other side" of the smc, so as to not depend on Linux
+> code "getting it right"?
 
-diff --git a/Documentation/devicetree/bindings/spi/ti_qspi.txt b/Documentation/devicetree/bindings/spi/ti_qspi.txt
-index f05dd631bef1..05488970060b 100644
---- a/Documentation/devicetree/bindings/spi/ti_qspi.txt
-+++ b/Documentation/devicetree/bindings/spi/ti_qspi.txt
-@@ -17,9 +17,10 @@ Recommended properties:
- 
- Example:
- 
-+For am4372:
- qspi: qspi at 4b300000 {
--	compatible = "ti,dra7xxx-qspi";
--	reg = <0x47900000 0x100>, <0x30000000 0x3ffffff>;
-+	compatible = "ti,am4372-qspi";
-+	reg = <0x47900000 0x100>, <0x30000000 0x4000000>;
- 	reg-names = "qspi_base", "qspi_mmap";
- 	#address-cells = <1>;
- 	#size-cells = <0>;
-diff --git a/arch/arm/boot/dts/am4372.dtsi b/arch/arm/boot/dts/am4372.dtsi
-index 0447c04a40cc..1b2c545f3f2c 100644
---- a/arch/arm/boot/dts/am4372.dtsi
-+++ b/arch/arm/boot/dts/am4372.dtsi
-@@ -962,7 +962,9 @@
- 
- 		qspi: qspi at 47900000 {
- 			compatible = "ti,am4372-qspi";
--			reg = <0x47900000 0x100>;
-+			reg = <0x47900000 0x100>,
-+			      <0x30000000 0x4000000>;
-+			reg-names = "qspi_base", "qspi_mmap";
- 			#address-cells = <1>;
- 			#size-cells = <0>;
- 			ti,hwmods = "qspi";
+You're new to this, aren't you? :)
+
 -- 
-2.6.2
+M?ns Rullg?rd
+mans at mansr.com
