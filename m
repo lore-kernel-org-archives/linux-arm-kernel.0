@@ -1,61 +1,169 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Wed, 4 Nov 2015 01:17:20 +0800
-Subject: [PATCH v10 2/5] missing include in cputime.c, remove #ifdef
- CONFIG_PARAVIRT from sched/core.c
-In-Reply-To: <1446567664-11890-2-git-send-email-stefano.stabellini@eu.citrix.com>
-Message-ID: <201511040115.jXTJsH9r%fengguang.wu@intel.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Tue, 3 Nov 2015 09:26:16 -0800
+Subject: [PATCH v2 2/2] watchdog: imx2_wdt: add set_pretimeout interface
+In-Reply-To: <20151103080447.GB15428@shlinux2>
+References: <1446531084-15365-1-git-send-email-b38343@freescale.com>
+ <1446531084-15365-2-git-send-email-b38343@freescale.com>
+ <563866CD.1080306@roeck-us.net> <20151103080447.GB15428@shlinux2>
+Message-ID: <5638EE38.80404@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Stefano,
+On 11/03/2015 12:04 AM, Robin Gong wrote:
+> On Mon, Nov 02, 2015 at 11:48:29PM -0800, Guenter Roeck wrote:
+>> On 11/02/2015 10:11 PM, Robin Gong wrote:
+>>> Enable set_pretimeout interface and trigger the pretimeout interrupt before
+>>> watchdog timeout event happen.
+>>>
+>>> Signed-off-by: Robin Gong <b38343@freescale.com>
+>>> ---
+>>>   drivers/watchdog/imx2_wdt.c | 58 ++++++++++++++++++++++++++++++++++++++++++++-
+>>>   1 file changed, 57 insertions(+), 1 deletion(-)
+>>>
+>>> diff --git a/drivers/watchdog/imx2_wdt.c b/drivers/watchdog/imx2_wdt.c
+>>> index 0bb1a1d..bd42857 100644
+>>> --- a/drivers/watchdog/imx2_wdt.c
+>>> +++ b/drivers/watchdog/imx2_wdt.c
+>>> @@ -24,6 +24,7 @@
+>>>   #include <linux/clk.h>
+>>>   #include <linux/delay.h>
+>>>   #include <linux/init.h>
+>>> +#include <linux/interrupt.h>
+>>>   #include <linux/io.h>
+>>>   #include <linux/jiffies.h>
+>>>   #include <linux/kernel.h>
+>>> @@ -52,12 +53,18 @@
+>>>   #define IMX2_WDT_WRSR		0x04		/* Reset Status Register */
+>>>   #define IMX2_WDT_WRSR_TOUT	(1 << 1)	/* -> Reset due to Timeout */
+>>>
+>>> +#define IMX2_WDT_WICR		0x06		/*Interrupt Control Register*/
+>>> +#define IMX2_WDT_WICR_WIE	(1 << 15)	/* -> Interrupt Enable */
+>>> +#define IMX2_WDT_WICR_WTIS	(1 << 14)	/* -> Interrupt Status */
+>>> +#define IMX2_WDT_WICR_WICT	(0xFF)	/* Watchdog Interrupt Timeout */
+>>
+>> Unnecessary ( )
+>>
+>>> +
+>>>   #define IMX2_WDT_WMCR		0x08		/* Misc Register */
+>>>
+>>>   #define IMX2_WDT_MAX_TIME	128
+>>>   #define IMX2_WDT_DEFAULT_TIME	60		/* in seconds */
+>>>
+>>>   #define WDOG_SEC_TO_COUNT(s)	((s * 2 - 1) << 8)
+>>> +#define WDOG_SEC_TO_PRECOUNT(s)	((s) * 2)	/* set WDOG pre timeout count*/
+>>>
+>>>   struct imx2_wdt_device {
+>>>   	struct clk *clk;
+>>> @@ -80,7 +87,8 @@ MODULE_PARM_DESC(timeout, "Watchdog timeout in seconds (default="
+>>>
+>>>   static const struct watchdog_info imx2_wdt_info = {
+>>>   	.identity = "imx2+ watchdog",
+>>> -	.options = WDIOF_KEEPALIVEPING | WDIOF_SETTIMEOUT | WDIOF_MAGICCLOSE,
+>>> +	.options = WDIOF_KEEPALIVEPING | WDIOF_SETTIMEOUT | WDIOF_MAGICCLOSE
+>>> +		   | WDIOF_PRETIMEOUT,
+>>>   };
+>>>
+>>>   static int imx2_restart_handler(struct notifier_block *this, unsigned long mode,
+>>> @@ -207,12 +215,49 @@ static inline void imx2_wdt_ping_if_active(struct watchdog_device *wdog)
+>>>   	}
+>>>   }
+>>>
+>>> +static int imx2_wdt_set_pretimeout(struct watchdog_device *wdog,
+>>> +				   unsigned int new_timeout)
+>>> +{
+>>> +	struct imx2_wdt_device *wdev = watchdog_get_drvdata(wdog);
+>>> +	u32 val;
+>>> +
+>>> +	regmap_read(wdev->regmap, IMX2_WDT_WICR, &val);
+>>> +	/* set the new pre-timeout value in the WSR */
+>>> +	val &= ~IMX2_WDT_WICR_WICT;
+>>> +	val |= WDOG_SEC_TO_PRECOUNT(new_timeout);
+>>
+>> Looking into this, I think we need more information in the first patch.
+>> Specifically, we need a value for max_pretimeout and validate it
+>> (new_timeout must be smaller than 128 to avoid overflows, independent
+>> of the maximum timeout).
+>>
+> I think it's enough, since there is "t >= wdd->timeout" in
+> watchdog_pretimeout_invalid() of the first patch and wdd->timeout is never
+> bigger than wdd->max_timeout which setting in imx2_wdt.c as 128.
 
-[auto build test ERROR on arm64/for-next/core]
-[cannot apply to: xen-tip/linux-next]
-[also ERROR on: v4.3 next-20151103]
+We are dealing with infrastructure code here. This happens to work for your driver,
+but that doesn't mean it will work for other drivers.
 
-url:    https://github.com/0day-ci/linux/commits/Stefano-Stabellini/xen-arm-arm64-CONFIG_PARAVIRT-and-stolen-ticks-accounting/20151104-002433
-base:   https://github.com/0day-ci/linux Stefano-Stabellini/xen-arm-arm64-CONFIG_PARAVIRT-and-stolen-ticks-accounting/20151104-002433
-config: mips-jz4740 (attached as .config)
-reproduce:
-        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=mips 
+Anyway, I recalled that there is another patchset pending to add pretimeout
+support into the watchdog code. I'll have to dig that out and consolidate the two.
 
-All errors (new ones prefixed by >>):
+Guenter
 
->> kernel/sched/core.c:82:26: fatal error: asm/paravirt.h: No such file or directory
-   compilation terminated.
---
->> kernel/sched/cputime.c:8:26: fatal error: asm/paravirt.h: No such file or directory
-   compilation terminated.
-
-vim +82 kernel/sched/core.c
-
-52f5684c kernel/sched/core.c Gideon Israel Dsouza  2014-04-07  76  #include <linux/compiler.h>
-^1da177e kernel/sched.c      Linus Torvalds        2005-04-16  77  
-96f951ed kernel/sched/core.c David Howells         2012-03-28  78  #include <asm/switch_to.h>
-5517d86b kernel/sched.c      Eric Dumazet          2007-05-08  79  #include <asm/tlb.h>
-838225b4 kernel/sched.c      Satyam Sharma         2007-10-24  80  #include <asm/irq_regs.h>
-db7e527d kernel/sched/core.c Christian Borntraeger 2012-01-11  81  #include <asm/mutex.h>
-e6e6685a kernel/sched.c      Glauber Costa         2011-07-11 @82  #include <asm/paravirt.h>
-^1da177e kernel/sched.c      Linus Torvalds        2005-04-16  83  
-029632fb kernel/sched.c      Peter Zijlstra        2011-10-25  84  #include "sched.h"
-ea138446 kernel/sched/core.c Tejun Heo             2013-01-18  85  #include "../workqueue_internal.h"
-
-:::::: The code at line 82 was first introduced by commit
-:::::: e6e6685accfa81f509fadfc9624bc7c3862d75c4 KVM guest: Steal time accounting
-
-:::::: TO: Glauber Costa <glommer@redhat.com>
-:::::: CC: Avi Kivity <avi@redhat.com>
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 17582 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151104/90f9f698/attachment-0001.obj>
+>>> +
+>>> +	regmap_write(wdev->regmap, IMX2_WDT_WICR, val | IMX2_WDT_WICR_WIE);
+>>> +
+>>> +	wdog->pretimeout = new_timeout;
+>>> +
+>>> +	return 0;
+>>> +}
+>>> +
+>>> +static irqreturn_t imx2_wdt_isr(int irq, void *dev_id)
+>>> +{
+>>> +	struct platform_device *pdev = dev_id;
+>>> +	struct watchdog_device *wdog = platform_get_drvdata(pdev);
+>>> +	struct imx2_wdt_device *wdev = watchdog_get_drvdata(wdog);
+>>> +	u32 val;
+>>> +
+>>> +	regmap_read(wdev->regmap, IMX2_WDT_WICR, &val);
+>>> +	if (val & IMX2_WDT_WICR_WTIS) {
+>>> +		/*clear interrupt status bit*/
+>>> +		regmap_write(wdev->regmap, IMX2_WDT_WICR, val);
+>>> +		panic("pre-timeout:%d, %d Seconds remained\n", wdog->pretimeout,
+>>
+>> "seconds" - no capital 'S'.
+>>
+>>> +		      wdog->timeout - wdog->pretimeout);
+>>> +	}
+>>> +
+>>> +	return IRQ_HANDLED;
+>>> +}
+>>> +
+>>>   static const struct watchdog_ops imx2_wdt_ops = {
+>>>   	.owner = THIS_MODULE,
+>>>   	.start = imx2_wdt_start,
+>>>   	.stop = imx2_wdt_stop,
+>>>   	.ping = imx2_wdt_ping,
+>>>   	.set_timeout = imx2_wdt_set_timeout,
+>>> +	.set_pretimeout = imx2_wdt_set_pretimeout,
+>>>   };
+>>>
+>>>   static const struct regmap_config imx2_wdt_regmap_config = {
+>>> @@ -229,6 +274,7 @@ static int __init imx2_wdt_probe(struct platform_device *pdev)
+>>>   	struct resource *res;
+>>>   	void __iomem *base;
+>>>   	int ret;
+>>> +	int irq;
+>>>   	u32 val;
+>>>
+>>>   	wdev = devm_kzalloc(&pdev->dev, sizeof(*wdev), GFP_KERNEL);
+>>> @@ -294,6 +340,16 @@ static int __init imx2_wdt_probe(struct platform_device *pdev)
+>>>   		goto disable_clk;
+>>>   	}
+>>>
+>>> +	irq = platform_get_irq(pdev, 0);
+>>> +	if (irq > 0) {
+>>> +		ret = devm_request_irq(&pdev->dev, irq, imx2_wdt_isr, 0,
+>>> +				       dev_name(&pdev->dev), pdev);
+>>> +		if (ret) {
+>>> +			dev_err(&pdev->dev, "can't get irq %d\n", irq);
+>>> +			goto disable_clk;
+>>> +		}
+>>> +	}
+>>> +
+>>>   	wdev->restart_handler.notifier_call = imx2_restart_handler;
+>>>   	wdev->restart_handler.priority = 128;
+>>>   	ret = register_restart_handler(&wdev->restart_handler);
+>>>
+>>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-watchdog" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>
