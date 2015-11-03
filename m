@@ -1,96 +1,94 @@
-From: m.smarduch@samsung.com (Mario Smarduch)
-Date: Mon, 02 Nov 2015 15:51:53 -0800
-Subject: [PATCH] KVM/arm: kernel low level debug support for ARM32 virtual
- platforms
-Message-ID: <1446508313-24404-1-git-send-email-m.smarduch@samsung.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Tue, 03 Nov 2015 09:16:11 +0900
+Subject: [PATCH v4 1/4] Documentation: dt-bindings: Describe SROMc
+ configuration
+In-Reply-To: <012101d11540$8c280be0$a47823a0$@samsung.com>
+References: <cover.1446122247.git.p.fedin@samsung.com>
+ <f1fbd1a7877090f4318705f0fccbf4d96c0ebc9c.1446122247.git.p.fedin@samsung.com>
+ <56330E6E.50003@samsung.com> <00d401d112ff$c426e9a0$4c74bce0$@samsung.com>
+ <5635D1EE.5010604@samsung.com> <012101d11540$8c280be0$a47823a0$@samsung.com>
+Message-ID: <5637FCCB.1060007@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
-   this is a re-post from couple weeks ago, please take time to review this 
-simple patch which simplifies DEBUG_LL and prevents kernel crash on virtual 
-platforms.
+On 02.11.2015 16:31, Pavel Fedin wrote:
+>  Hello!
+> 
+>>> --- cut exynos5410.dtsi ---
+>>> 		sromc: sromc at 12250000 {
+>>> 			#address-cells = <2>;
+>>> 			#size-cells = <1>;
+>>> 			ranges = <0 0 0x04000000 0x20000
+>>> 				  1 0 0x05000000 0x20000
+>>> 				  2 0 0x06000000 0x20000
+>>> 				  3 0 0x07000000 0x20000>;
+>>
+>> Do you have to use 2 cells for address? Cannot it be:
+>>  			ranges = <0 0x04000000 0x20000
+>>  				  1 0x05000000 0x20000
+>>  				  2 0x06000000 0x20000
+>>  				  3 0x07000000 0x20000>;
+> 
+>  I tried this first, but it didn't work, and ranges translation
+> gave me something really weird (like addr = 0x80 and
+> size = 0x04000004).
 
-Before this patch DEBUG_LL for 'dummy virtual machine':
+Did you change the address-cells to <1>?
 
-( ) Kernel low-level debugging via EmbeddedICE DCC channel
-( ) Kernel low-level debug output via semihosting I/O
-( ) Kernel low-level debugging via 8250 UART
-( ) Kernel low-level debugging via ARM Ltd PL01x Primecell
+> I decided not to dig deeply into
+> "ranges" processing, but just followed GPMC approach. They say
+> that first number is range ID and second number is offset within
+> the range. And it just worked.
+> 
+>>>  3. About samsung,srom-config array. I have the following reasons to keep if this way:
+>>>     - listing every property under own name is just too much typing
+>>>     - these values really do not make sense without each other, or partialy. I would say
+>> that in array form they are even better
+>>> readable, because it is the same order in which they go into the register.
+>>
+>> For timings - OK. PMC is separate. This is not a timing.
+> 
+>  But it's srom-config, and not srom-timing anymore. So do you want
+> two properties like srom-timing + srom-page-mode (with vendor prefix
+> of course)?
 
-In summary if debug uart is not emulated kernel crashes.
-And once you pass that hurdle, uart physical/virtual addresses are unknown.
-DEBUG_LL comes in handy on many occasions and should be somewhat 
-intuitive to use like it is for physical platforms. For virtual platforms
-user may start daubting the host and get into a bigger mess.
+Yes, I still want separate properties because this too generic. In next
+SoC they will extend the register and you will have to extend the
+binding. I agree for simplicity reasons to group timings in an array.
+But not entire register.
 
-After this patch is applied user gets:
+>> You need to document them. We are not gonna put some data looking like a
+>> vendor blob into the binding. I understand that document has
+>> confidential mark... all of Samsung datasheets I've seen had it. I don't
+>> find it as problem but of course I am not the one to judge here. If you
+>> do not feel comfortable publishing such data, get an approval from your
+>> manager. You can also try to search for this in vendor code
+>> (opensource.samsung.com). If it is published there, then this won't be a
+>> disclosure.
+> 
+>  I've seen the actual SROMc settings in some old Android kernels, like 3.0.4.
+> But they are not documented there, no comments, just #define's.
+>  Ok, i'll try to take a look how to minimize the actual information. :)
 
-(X) Kernel low-level debugging on QEMU Virtual Platform
-( ) Kernel low-level debugging on Kvmtool Virtual Platform
-	..... above repeated ....
+Actually 15 secs of search by grep revealed that they are already
+documented and published. I looked at first image coming into my mind:
+GT-I9300_JB
+arch/arm/mach-exynos/include/mach/sromc-exynos4.h
 
-The virtual addresses selected follow arm reference models, high in vmalloc 
-section with high mem enabled and guest running with >= 1GB of memory. The 
-offset is leftover from arm reference models.
 
-The patch is against 4.2.0-rc2 commit 43297dda0a51
+>> BTW, your email client is weird. You are sending non-wrapped emails
+>> without format=flowed in Content-Type. Please stick to mailing list
+>> convention of wrapping at 72-char.
+> 
+>  I know, sorry, this is MS Outlook (not Express), and it's impossible
+> to configure it this way (if i just set up word wrap, it starts to
+> corrupt patches). I am now trying to wrap the text by hands, i hope
+> it's better. And i cannot use anything else because... You know why. :)
 
-Original Description
---------------------
-When booting a VM using QEMU or Kvmtool there are no clear ways to 
-enable low level debugging for these virtual platforms. some menu port 
-choices are not supported by the virtual platforms at all. And there is no
-help on the location of physical and virtual addresses for the ports.
-This may lead to wrong debug port and a frozen VM with a blank screen.
+Actually no... I don't know why...
+All of us are using whatever we want (mutt+MDA, thunderbird, kmail,
+etc.). At least in two locations I've been: in Polish R&D and in HQ.
 
-This patch adds menu selections for QEMU and Kvmtool virtual platforms for low 
-level kernel print debugging. Help section displays port physical and
-virutal addresses.
 
-ARM reference models use the MIDR register to run-time select UART port address 
-(for ARCH_VEXPRESS) based on A9 or A15 part numbers. Looked for a same approach
-but couldn't find a way to differentiate between virtual platforms, something
-like a platform register.
-
-Acked-by: Christoffer Dall <christoffer.dall@linaro.org>
-Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
----
- arch/arm/Kconfig.debug | 22 ++++++++++++++++++++++
- 1 file changed, 22 insertions(+)
-
-diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index a2e16f9..d126bd4 100644
---- a/arch/arm/Kconfig.debug
-+++ b/arch/arm/Kconfig.debug
-@@ -1155,6 +1155,28 @@ choice
- 		  This option selects UART0 on VIA/Wondermedia System-on-a-chip
- 		  devices, including VT8500, WM8505, WM8650 and WM8850.
- 
-+	config DEBUG_VIRT_UART_QEMU
-+		bool "Kernel low-level debugging on QEMU Virtual Platform"
-+		depends on ARCH_VIRT
-+		select DEBUG_UART_PL01X
-+		help
-+		  Say Y here if you want the debug print routines to direct
-+		  their output to PL011 UART port on QEMU Virtual Platform.
-+		  Appropriate address values are:
-+			PHYS		VIRT
-+			0x9000000	0xf8090000
-+
-+	config DEBUG_VIRT_UART_KVMTOOL
-+		bool "Kernel low-level debugging on Kvmtool Virtual Platform"
-+		depends on ARCH_VIRT
-+		select DEBUG_UART_8250
-+		help
-+		  Say Y here if you want the debug print routines to direct
-+		  their output to 8250 UART port on Kvmtool Virtual
-+		  Platform. Appropriate address values are:
-+			PHYS		VIRT
-+			0x3f8		0xf80903f8
-+
- 	config DEBUG_ICEDCC
- 		bool "Kernel low-level debugging via EmbeddedICE DCC channel"
- 		help
--- 
-1.9.1
+Best regards,
+Krzysztof
