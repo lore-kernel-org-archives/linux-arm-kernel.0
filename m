@@ -1,86 +1,91 @@
-From: rmk+kernel@arm.linux.org.uk (Russell King)
-Date: Tue, 03 Nov 2015 14:51:49 +0000
-Subject: [PATCH 11/11] tty: amba-pl011: add support for ZTE UART (EXPERIMENTAL)
-In-Reply-To: <20151103134349.GV8644@n2100.arm.linux.org.uk>
-References: <20151103134349.GV8644@n2100.arm.linux.org.uk>
-Message-ID: <E1Ztcw9-0007Cz-TX@rmk-PC.arm.linux.org.uk>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Tue, 3 Nov 2015 15:55:29 +0100
+Subject: [PATCH] arm64: Increase the max granular size
+In-Reply-To: <20151103143858.GI7637@e104818-lin.cambridge.arm.com>
+References: <1442944788-17254-1-git-send-email-rric@kernel.org>
+ <20151028190948.GJ8899@e104818-lin.cambridge.arm.com>
+ <CAMuHMdWQygbxMXoOsbwek6DzZcr7J-C23VCK4ubbgUr+zj=giw@mail.gmail.com>
+ <20151103120504.GF7637@e104818-lin.cambridge.arm.com>
+ <20151103143858.GI7637@e104818-lin.cambridge.arm.com>
+Message-ID: <CAMuHMdWk0fPzTSKhoCuS4wsOU1iddhKJb2SOpjo=a_9vCm_KXQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add (incomplete) support for the ZTE UART to the AMBA PL011 driver.
-This is similar to the ARM and ST variants, except it has a different
-register address layout, and requires 32-bit accesses to the registers.
-Use the newly introduced register tables and access size support to
-cope with these differences.
+Hi Catalin,
 
-Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
----
- drivers/tty/serial/amba-pl011.c | 23 +++++++++++++++++++++++
- include/linux/amba/serial.h     | 18 ++++++++++++++++++
- 2 files changed, 41 insertions(+)
+On Tue, Nov 3, 2015 at 3:38 PM, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> On Tue, Nov 03, 2015 at 12:05:05PM +0000, Catalin Marinas wrote:
+>> On Tue, Nov 03, 2015 at 12:07:06PM +0100, Geert Uytterhoeven wrote:
+>> > On Wed, Oct 28, 2015 at 8:09 PM, Catalin Marinas
+>> > <catalin.marinas@arm.com> wrote:
+>> > > On Tue, Sep 22, 2015 at 07:59:48PM +0200, Robert Richter wrote:
+>> > >> From: Tirumalesh Chalamarla <tchalamarla@cavium.com>
+>> > >>
+>> > >> Increase the standard cacheline size to avoid having locks in the same
+>> > >> cacheline.
+>> > >>
+>> > >> Cavium's ThunderX core implements cache lines of 128 byte size. With
+>> > >> current granulare size of 64 bytes (L1_CACHE_SHIFT=6) two locks could
+>> > >> share the same cache line leading a performance degradation.
+>> > >> Increasing the size fixes that.
+>> > >>
+>> > >> Increasing the size has no negative impact to cache invalidation on
+>> > >> systems with a smaller cache line. There is an impact on memory usage,
+>> > >> but that's not too important for arm64 use cases.
+>> > >>
+>> > >> Signed-off-by: Tirumalesh Chalamarla <tchalamarla@cavium.com>
+>> > >> Signed-off-by: Robert Richter <rrichter@cavium.com>
+>> > >
+>> > > Applied. Thanks.
+>> >
+>> > This patch causes a BUG() on r8a7795/salvator-x, for which support is not
+>> > yet upstream.
+>> >
+>> > My config (attached) uses SLAB. If I switch to SLUB, it works.
+>> > The arm64 defconfig works, even if I switch from SLUB to SLAB.
+>> [...]
+>> > ------------[ cut here ]------------
+>> > kernel BUG at mm/slab.c:2283!
+>> > Internal error: Oops - BUG: 0 [#1] SMP
+>> [...]
+>> > Call trace:
+>> > [<ffffffc00014f9b4>] __kmem_cache_create+0x21c/0x280
+>> > [<ffffffc00068be50>] create_boot_cache+0x4c/0x80
+>> > [<ffffffc00068bed8>] create_kmalloc_cache+0x54/0x88
+>> > [<ffffffc00068bfc0>] create_kmalloc_caches+0x50/0xf4
+>> > [<ffffffc00068db08>] kmem_cache_init+0x104/0x118
+>> > [<ffffffc00067d7d8>] start_kernel+0x218/0x33c
+>>
+>> I haven't managed to reproduce this on a Juno kernel.
+>
+> I now managed to reproduce it with your config (slightly adapted to
+> allow Juno). I'll look into it.
 
-diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
-index 8f5f82039346..373b1520083f 100644
---- a/drivers/tty/serial/amba-pl011.c
-+++ b/drivers/tty/serial/amba-pl011.c
-@@ -171,6 +171,29 @@ static struct vendor_data vendor_st = {
- 	.get_fifosize		= get_fifosize_st,
- };
- 
-+static const u16 pl011_zte_offsets[REG_ARRAY_SIZE] = {
-+	[REG_DR] = ZX_UART011_DR,
-+	[REG_FR] = ZX_UART011_FR,
-+	[REG_LCRH_RX] = ZX_UART011_LCRH,
-+	[REG_LCRH_TX] = ZX_UART011_LCRH,
-+	[REG_IBRD] = ZX_UART011_IBRD,
-+	[REG_FBRD] = ZX_UART011_FBRD,
-+	[REG_CR] = ZX_UART011_CR,
-+	[REG_IFLS] = ZX_UART011_IFLS,
-+	[REG_IMSC] = ZX_UART011_IMSC,
-+	[REG_RIS] = ZX_UART011_RIS,
-+	[REG_MIS] = ZX_UART011_MIS,
-+	[REG_ICR] = ZX_UART011_ICR,
-+	[REG_DMACR] = ZX_UART011_DMACR,
-+};
-+
-+static struct vendor_data vendor_zte = {
-+	.reg_offset		= pl011_zte_offsets,
-+	.access_32b		= true,
-+	.ifls			= UART011_IFLS_RX4_8|UART011_IFLS_TX4_8,
-+	.get_fifosize		= get_fifosize_arm,
-+};
-+
- /* Deals with DMA transactions */
- 
- struct pl011_sgbuf {
-diff --git a/include/linux/amba/serial.h b/include/linux/amba/serial.h
-index 0ddb5c02ad8b..d76a19ba2cff 100644
---- a/include/linux/amba/serial.h
-+++ b/include/linux/amba/serial.h
-@@ -65,6 +65,24 @@
- #define ST_UART011_ABCR		0x100	/* Autobaud control register. */
- #define ST_UART011_ABIMSC	0x15C	/* Autobaud interrupt mask/clear register. */
- 
-+/*
-+ * ZTE UART register offsets.  This UART has a radically different address
-+ * allocation from the ARM and ST variants, so we list all registers here.
-+ * We assume unlisted registers do not exist.
-+ */
-+#define ZX_UART011_DR		0x04
-+#define ZX_UART011_FR		0x14
-+#define ZX_UART011_IBRD		0x24
-+#define ZX_UART011_FBRD		0x28
-+#define ZX_UART011_LCRH		0x30
-+#define ZX_UART011_CR		0x34
-+#define ZX_UART011_IFLS		0x38
-+#define ZX_UART011_IMSC		0x40
-+#define ZX_UART011_RIS		0x44
-+#define ZX_UART011_MIS		0x48
-+#define ZX_UART011_ICR		0x4c
-+#define ZX_UART011_DMACR	0x50
-+
- #define UART011_DR_OE		(1 << 11)
- #define UART011_DR_BE		(1 << 10)
- #define UART011_DR_PE		(1 << 9)
--- 
-2.1.0
+Good to hear that!
+
+BTW, I see this:
+
+        freelist_size = 32
+        cache_line_size() = 64
+
+It seems like the value returned by cache_line_size() in
+arch/arm64/include/asm/cache.h disagrees with L1_CACHE_SHIFT  == 7:
+
+        static inline int cache_line_size(void)
+        {
+                u32 cwg = cache_type_cwg();
+                return cwg ? 4 << cwg : L1_CACHE_BYTES;
+        }
+
+Making cache_line_size() always return L1_CACHE_BYTES doesn't help.
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert@linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
