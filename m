@@ -1,92 +1,131 @@
-From: qiuxishi@huawei.com (Xishi Qiu)
-Date: Tue, 3 Nov 2015 10:14:41 +0800
-Subject: arm64: about Add CONFIG_DEBUG_SET_MODULE_RONX suport
-In-Reply-To: <CAGXu5jK4E=yey6iMJg1dVbsj72cj3v7F110eu5v8G-L3NLDjow@mail.gmail.com>
-References: <5633279A.7000003@huawei.com> <56332ADB.7030306@iogearbox.net>
- <563335FF.5020400@huawei.com> <5633864F.6030203@codeaurora.org>
- <5633872C.1000005@labbott.name> <56343BF2.1070800@huawei.com>
- <5637A01F.4090806@labbott.name>
- <CAGXu5jK4E=yey6iMJg1dVbsj72cj3v7F110eu5v8G-L3NLDjow@mail.gmail.com>
-Message-ID: <56381891.50605@huawei.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Tue, 03 Nov 2015 11:22:30 +0900
+Subject: [PATCH v3 7/7] drivers: soc: Add support for Exynos PMU driver
+In-Reply-To: <1445864143-25695-8-git-send-email-pankaj.dubey@samsung.com>
+References: <1445864143-25695-1-git-send-email-pankaj.dubey@samsung.com>
+ <1445864143-25695-8-git-send-email-pankaj.dubey@samsung.com>
+Message-ID: <56381A66.1010406@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015/11/3 9:24, Kees Cook wrote:
-
-> On Mon, Nov 2, 2015 at 9:40 AM, Laura Abbott <laura@labbott.name> wrote:
->> (adding Kees to see if he has any inputs)
->>
->> On 10/30/15 8:56 PM, Xishi Qiu wrote:
->>>
->>> On 2015/10/30 23:05, Laura Abbott wrote:
->>>
->>>>>>
->>>>>> Hi Daniel,
->>>>>>
->>>>>> Sorry for didn't saying it clearly. I find this
->>>>>> interface(set_memory_ro/rw) can
->>>>>> only be used in module address. So why not extend the function? e.g.
->>>>>> like x86,
->>>>>> it can be used in direct mapping address too.
->>>>>>
->>>>>> Is there some limits in arm64 or we will do this later?
->>>>>>
->>>>>
->>>>> arm64 maps low mem (all direct mapped memory on arm64) with section
->>>>> mappings for performance. set_memory_ro/rw works on PAGE_SIZE
->>>>> granularity so if we wanted to use those functions on direct mapped
->>>>> memory we would need to break down the section mappings. On arm,
->>>>> this was a pain due to the TLB maintaince requried. On arm64, less
->>>>> so but we still lose the benefit of the section mappings.
->>>>>
->>>>> Do you have a use case in mind for wanting to use set_memory_ro/rw
->>>>> outside of the module area?
->>>>>
->>>
->>> Hi Laura,
->>>
->>> How about this case?
->>>
->>> module alloc some pages which from direct mapping area, and we write
->>> important data(e.g. password) on the pages, the data will not be changed
->>> during the runtime. If someone unfriendly try to rewrite the memory,
->>> something is going to get worse. So we can use set_memory_ro() to protect
->>> the date.
->>>
->>
->> How long would you expected this data to stay around (minutes? hours?)
-
-Maybe forever.
-
->> and how many instances of this would you expect?
->>
-
->> It also looks like BPF wants to set its region as ro when in use
->> (https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/include/linux/filter.h#n370)
-
-Yes, and the memory seems from vmalloc()
-bpf_prog_realloc()
-	...
-	fp = __vmalloc(size, gfp_flags, PAGE_KERNEL);
-	...
-	fp->pages = size / PAGE_SIZE;
-	...
-
-So we'd better to support the whole kernel space(module/vmalloc/direct mapping, 
-any others?).
-
-Thanks,
-Xishi Qiu
-
->> So it's not completely unheard of.
->> I don't think it would be too difficult to take the
->> split_{pud,pmd} functions used for the direct mapping and apply them
->> for the page_attr if people are willing to make the security/performance
->> trade off.
+On 26.10.2015 21:55, Pankaj Dubey wrote:
+> This patch moves Exynos PMU driver implementation from "arm/mach-exynos"
+> to "drivers/soc/samsung". This driver is mainly used for setting misc
+> bits of register from PMU IP of Exynos SoC which will be required to
+> configure before Suspend/Resume. Currently all these settings are done
+> in "arch/arm/mach-exynos/pmu.c" but moving ahead for ARM64 based SoC
+> support, there is a need of this PMU driver in driver/* folder.
 > 
-> I think we'll start to have a growing need for this kind of thing as
-> we try to make more things RO in the heap. It's unclear to me yet how
-> much granularity we'll need, though.
+> This driver uses existing DT binding information and there should
+> be no functionality change in the supported platforms.
 > 
-> -Kees
+> Signed-off-by: Amit Daniel Kachhap <amitdanielk@gmail.com>
+> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+> ---
+>  arch/arm/mach-exynos/Kconfig                                   | 1 +
+>  arch/arm/mach-exynos/Makefile                                  | 4 +---
+>  drivers/soc/samsung/Kconfig                                    | 4 ++++
+>  drivers/soc/samsung/Makefile                                   | 4 ++++
+>  arch/arm/mach-exynos/pmu.c => drivers/soc/samsung/exynos-pmu.c | 0
+>  {arch/arm/mach-exynos => drivers/soc/samsung}/exynos-pmu.h     | 0
+>  {arch/arm/mach-exynos => drivers/soc/samsung}/exynos3250-pmu.c | 0
+>  {arch/arm/mach-exynos => drivers/soc/samsung}/exynos4-pmu.c    | 0
+>  {arch/arm/mach-exynos => drivers/soc/samsung}/exynos5250-pmu.c | 0
+>  {arch/arm/mach-exynos => drivers/soc/samsung}/exynos5420-pmu.c | 0
+>  10 files changed, 10 insertions(+), 3 deletions(-)
+>  rename arch/arm/mach-exynos/pmu.c => drivers/soc/samsung/exynos-pmu.c (100%)
+>  rename {arch/arm/mach-exynos => drivers/soc/samsung}/exynos-pmu.h (100%)
+>  rename {arch/arm/mach-exynos => drivers/soc/samsung}/exynos3250-pmu.c (100%)
+>  rename {arch/arm/mach-exynos => drivers/soc/samsung}/exynos4-pmu.c (100%)
+>  rename {arch/arm/mach-exynos => drivers/soc/samsung}/exynos5250-pmu.c (100%)
+>  rename {arch/arm/mach-exynos => drivers/soc/samsung}/exynos5420-pmu.c (100%)
+> 
+> diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
+> index 83c85f5..874cb38 100644
+> --- a/arch/arm/mach-exynos/Kconfig
+> +++ b/arch/arm/mach-exynos/Kconfig
+> @@ -16,6 +16,7 @@ menuconfig ARCH_EXYNOS
+>  	select ARM_GIC
+>  	select COMMON_CLK_SAMSUNG
+>  	select EXYNOS_THERMAL
+> +	select EXYNOS_PMU
+>  	select EXYNOS_SROM if PM
+>  	select HAVE_ARM_SCU if SMP
+>  	select HAVE_S3C2410_I2C if I2C
+> diff --git a/arch/arm/mach-exynos/Makefile b/arch/arm/mach-exynos/Makefile
+> index 2d58063..34d29df 100644
+> --- a/arch/arm/mach-exynos/Makefile
+> +++ b/arch/arm/mach-exynos/Makefile
+> @@ -9,9 +9,7 @@ ccflags-$(CONFIG_ARCH_MULTIPLATFORM) += -I$(srctree)/$(src)/include -I$(srctree)
+>  
+>  # Core
+>  
+> -obj-$(CONFIG_ARCH_EXYNOS)	+= exynos.o pmu.o exynos-smc.o firmware.o \
+> -					exynos3250-pmu.o exynos4-pmu.o \
+> -					exynos5250-pmu.o exynos5420-pmu.o
+> +obj-$(CONFIG_ARCH_EXYNOS)	+= exynos.o exynos-smc.o firmware.o
+>  
+>  obj-$(CONFIG_EXYNOS_CPU_SUSPEND) += pm.o sleep.o
+>  obj-$(CONFIG_PM_SLEEP)		+= suspend.o
+> diff --git a/drivers/soc/samsung/Kconfig b/drivers/soc/samsung/Kconfig
+> index 2833b5b..f545d6c 100644
+> --- a/drivers/soc/samsung/Kconfig
+> +++ b/drivers/soc/samsung/Kconfig
+> @@ -10,4 +10,8 @@ config EXYNOS_SROM
+>  	bool
+>  	depends on ARM && ARCH_EXYNOS && PM
+>  
+> +config EXYNOS_PMU
+> +	bool
+> +	depends on ARCH_EXYNOS
+> +
+>  endmenu
+> diff --git a/drivers/soc/samsung/Makefile b/drivers/soc/samsung/Makefile
+> index 9c554d5..26fb489 100644
+> --- a/drivers/soc/samsung/Makefile
+> +++ b/drivers/soc/samsung/Makefile
+> @@ -1 +1,5 @@
+>  obj-$(CONFIG_EXYNOS_SROM)	+= exynos-srom.o
+> +ifdef CONFIG_ARM
+> +obj-$(CONFIG_EXYNOS_PMU)	+= exynos-pmu.o exynos3250-pmu.o exynos4-pmu.o \
+> +					exynos5250-pmu.o exynos5420-pmu.o
+> +endif
+> diff --git a/arch/arm/mach-exynos/pmu.c b/drivers/soc/samsung/exynos-pmu.c
+> similarity index 100%
+> rename from arch/arm/mach-exynos/pmu.c
+> rename to drivers/soc/samsung/exynos-pmu.c
+> diff --git a/arch/arm/mach-exynos/exynos-pmu.h b/drivers/soc/samsung/exynos-pmu.h
+
+1. Please reorder the exynos_sys_powerdown_conf() to be after the
+statics. I am thinking also about adding EXPORT_SYMBOL... but maybe this
+would be over-thinking.
+
+2. I think the proper location of everything is drivers/power/reset/.
+Although I don't have strong opinion.
+
+3. Please cc linux-pm and arm-soc guys (Arnd, Olof, Kevin) on next
+iteration.
+
+Best regards,
+Krzysztof
+
+> similarity index 100%
+> rename from arch/arm/mach-exynos/exynos-pmu.h
+> rename to drivers/soc/samsung/exynos-pmu.h
+> diff --git a/arch/arm/mach-exynos/exynos3250-pmu.c b/drivers/soc/samsung/exynos3250-pmu.c
+> similarity index 100%
+> rename from arch/arm/mach-exynos/exynos3250-pmu.c
+> rename to drivers/soc/samsung/exynos3250-pmu.c
+> diff --git a/arch/arm/mach-exynos/exynos4-pmu.c b/drivers/soc/samsung/exynos4-pmu.c
+> similarity index 100%
+> rename from arch/arm/mach-exynos/exynos4-pmu.c
+> rename to drivers/soc/samsung/exynos4-pmu.c
+> diff --git a/arch/arm/mach-exynos/exynos5250-pmu.c b/drivers/soc/samsung/exynos5250-pmu.c
+> similarity index 100%
+> rename from arch/arm/mach-exynos/exynos5250-pmu.c
+> rename to drivers/soc/samsung/exynos5250-pmu.c
+> diff --git a/arch/arm/mach-exynos/exynos5420-pmu.c b/drivers/soc/samsung/exynos5420-pmu.c
+> similarity index 100%
+> rename from arch/arm/mach-exynos/exynos5420-pmu.c
+> rename to drivers/soc/samsung/exynos5420-pmu.c
 > 
