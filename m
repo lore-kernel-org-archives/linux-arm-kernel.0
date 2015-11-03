@@ -1,33 +1,31 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 3 Nov 2015 14:48:43 +0000
-Subject: [PATCH DRAFT 0/2] Sketch for ZTE ZX296702 UART integration
-In-Reply-To: <20151103134349.GV8644@n2100.arm.linux.org.uk>
-References: <1446467042-24494-1-git-send-email-andre.przywara@arm.com>
- <20151103134349.GV8644@n2100.arm.linux.org.uk>
-Message-ID: <20151103144843.GY8644@n2100.arm.linux.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 03 Nov 2015 15:50:53 +0100
+Subject: [PATCH] drm/gem: remove unused variable in drm_gem_cma_prime_mmap
+Message-ID: <5381396.mRN26lWq1C@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 03, 2015 at 01:43:49PM +0000, Russell King - ARM Linux wrote:
-> So, I'm working on a replacement set of patches which does this the
-> right way, and I'll post them later today or early tomorrow, depending
-> on when I get them tested on the Versatile / Juno platforms.
+Now that the mutex is no longer used in drm_gem_cma_prime_mmap,
+the 'dev' variable is not referenced either, which gcc warns about:
 
-Here's my version of the changes required, following the ideas I've put
-forward in previous threads.  Build tested, but not boot tested yet.
-They're queued for my nightly build and boot test this evening.
+drivers/gpu/drm/drm_gem_cma_helper.c:484:21: warning: unused variable 'dev'
 
-The final patch in the series is experimental as it's missing the
-detection to make use of the ZTE UART bits.  Also, I'm debating whether
-we should make that conditional on a config symbol so that non-ZTE
-platforms don't have to suffer the consequences of the conditional 32-bit
-accessor.
+This removes it too.
 
- drivers/tty/serial/amba-pl011.c | 341 ++++++++++++++++++++++++++--------------
- drivers/tty/serial/amba-pl011.h |  34 ++++
- include/linux/amba/serial.h     |  18 +++
- 3 files changed, 272 insertions(+), 121 deletions(-)
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Fixes: 4e270f088011 ("drm/gem: Drop struct_mutex requirement from drm_gem_mmap_obj")
+---
+Currently in drm-next, warning found on yesterday's linux-next with ARM randconfig builds
 
--- 
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+diff --git a/drivers/gpu/drm/drm_gem_cma_helper.c b/drivers/gpu/drm/drm_gem_cma_helper.c
+index 4fb4c45d039f..e109b49cd25d 100644
+--- a/drivers/gpu/drm/drm_gem_cma_helper.c
++++ b/drivers/gpu/drm/drm_gem_cma_helper.c
+@@ -481,7 +481,6 @@ int drm_gem_cma_prime_mmap(struct drm_gem_object *obj,
+ 			   struct vm_area_struct *vma)
+ {
+ 	struct drm_gem_cma_object *cma_obj;
+-	struct drm_device *dev = obj->dev;
+ 	int ret;
+ 
+ 	ret = drm_gem_mmap_obj(obj, obj->size, vma);
