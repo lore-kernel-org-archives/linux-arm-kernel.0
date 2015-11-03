@@ -1,50 +1,14 @@
-From: yh.huang@mediatek.com (YH Huang)
-Date: Tue, 3 Nov 2015 16:11:39 +0800
-Subject: [PATCH v2] pwm-backlight: fix the panel power sequence
-In-Reply-To: <1446201271.3334.22.camel@pengutronix.de>
-References: <1444987060-48202-1-git-send-email-yh.huang@mediatek.com>
- <1444988219.3541.3.camel@pengutronix.de>
- <1445526750.27586.8.camel@mtksdaap41>
- <1446133259.3274.52.camel@pengutronix.de>
- <1446190900.17558.16.camel@mtksdaap41>
- <1446201271.3334.22.camel@pengutronix.de>
-Message-ID: <1446538299.2449.8.camel@mtksdaap41>
+From: anup.patel@broadcom.com (Anup Patel)
+Date: Tue, 3 Nov 2015 08:12:27 +0000
+Subject: [PATCH v5 0/3] NAND support for Broadcom NS2 SoC
+In-Reply-To: <20151030193152.GI13239@google.com>
+References: <1446188361-15146-1-git-send-email-anup.patel@broadcom.com>
+ <20151030193152.GI13239@google.com>
+Message-ID: <39063E8F96E11742B35A201CC5D095B7B07457@SJEXCHMB10.corp.ad.broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2015-10-30 at 11:34 +0100, Philipp Zabel wrote:
-> Am Freitag, den 30.10.2015, 15:41 +0800 schrieb YH Huang:
-> > > That won't work if the gpio is still configured as input. How about I
-> > > add the GPIOD_ASIS change to my patch you remove that and the above from
-> > > yours?
-> > 
-> > I revise these two lines 
-> > if (pb->enable_gpio)
-> > 	gpiod_direction_output(pb->enable_gpio, 0);
-> > into
-> > if (pb->enable_gpio) {
-> > 	if(gpiod_get_value(pb->enable_gpio) == 0)
-> > 		gpiod_direction_output(pb->enable_gpio, 0);
-> > 	else
-> > 		gpiod_direction_output(pb->enable_gpio, 1);
-> > }
-> 
-> If the GPIO is still configured as an input, the return value of
-> gpiod_get_value could be random.
-> 
-> > I am not sure what "phandle" is working for.
-> 
-> The reasoning is that devices where there is no phandle link pointing to
-> the backlight (for example from a simple-panel node), we should keep the
-> current default behaviour (enable during probe).
-
-I have a little problem for the current default behaviour.
-Should we enable during probe?
-
-Before this patch ( http://patchwork.ozlabs.org/patch/324690/ ),
-we disable "enable-gpio" in the probe function.
-
-Do you have any idea of this?
++Arnd, +Olof
 
 Regards,
-YH Huang
+Anup
