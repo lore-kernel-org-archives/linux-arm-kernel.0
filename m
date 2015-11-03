@@ -1,135 +1,100 @@
-From: b38343@freescale.com (Robin Gong)
-Date: Tue, 3 Nov 2015 16:28:14 +0800
-Subject: [PATCH v3 2/2] watchdog: imx2_wdt: add set_pretimeout interface
-In-Reply-To: <1446539294-15419-1-git-send-email-b38343@freescale.com>
-References: <1446539294-15419-1-git-send-email-b38343@freescale.com>
-Message-ID: <1446539294-15419-2-git-send-email-b38343@freescale.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Tue, 3 Nov 2015 09:32:16 +0100
+Subject: [PATCH v2 1/4] clocksource: rockchip: Make the driver more
+ compatible
+In-Reply-To: <56381547.5070109@gmail.com>
+References: <1443147298-12603-1-git-send-email-wxt@rock-chips.com>
+ <5632E765.4010207@gmail.com> <56334995.6090103@linaro.org>
+ <21587719.mnFBFBzBeI@phil> <56379D46.1000402@linaro.org>
+ <56381547.5070109@gmail.com>
+Message-ID: <56387110.4060805@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable set_pretimeout interface and trigger the pretimeout interrupt before
-watchdog timeout event happen.
+On 11/03/2015 03:00 AM, Caesar Wang wrote:
+> Daniel,
+>
+> ? 2015?11?03? 01:28, Daniel Lezcano ??:
+>> On 10/31/2015 12:47 AM, Heiko Stuebner wrote:
+>>> Hi Daniel,
+>>>
+>>> Am Freitag, 30. Oktober 2015, 11:42:29 schrieb Daniel Lezcano:
+>>>> On 10/30/2015 04:43 AM, Caesar Wang wrote:
+>>>>> Hi Daniel,
+>>>>>
+>>>>> ? 2015?10?01? 03:14, Heiko St?bner ??:
+>>>>>> Hi Daniel,
+>>>>>>
+>>>>>> Am Dienstag, 29. September 2015, 06:18:03 schrieb Daniel Lezcano:
+>>>>>>> On 09/25/2015 04:14 AM, Caesar Wang wrote:
+>>>>>>>> Build the arm64 SoCs (e.g.: RK3368) on Rockchip platform,
+>>>>>>>> There are some failure with build up on timer driver for rockchip.
+>>>>>>>>
+>>>>>>>> Says:
+>>>>>>>> /tmp/ccdAnNy5.s:47: Error: missing immediate expression at  operand
+>>>>>>>> 1 --
+>>>>>>>> `dsb`
+>>>>>>>> ...
+>>>>>>>>
+>>>>>>>> The problem was different semantics of dsb on btw arm32 and arm64,
+>>>>>>>> Here we can convert the dsb with insteading of dsb(sy).The "sy"
+>>>>>>>> param
+>>>>>>>> is the default which you are allow to omit, so on arm32 dsb()and
+>>>>>>>> dsb(sy)
+>>>>>>>> are the same.
+>>>>>>>>
+>>>>>>>> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
+>>>>>>> Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+>>>>>> as you have "just" Acked these patches, I guess you are expecting
+>>>>>> them
+>>>>>> to go
+>>>>>> through the same tree as the devicetree changes, right?
+>>>>>
+>>>>> I'm wonder if someone will apply this series patchs but the wait.:-)
+>>>>> In fact, I'm no sure that the Acked is really meaning.:-
+>>>>
+>>>> Yes, by acking the patch I say I am ok with it and I agree it can go
+>>>> through another tree.
+>>>
+>>> although I guess the two clocksource changes could very well just go
+>>> through your tree. dsb() -> dsb(sy) is supposed to be equal and the
+>>> second
+>>> one is just cosmetics.  The Kconfig and dts changes need to wait in
+>>> any case
+>>> for 4.5 ... but I guess that may be true for the clocksource changes
+>>> as well?
+>>
+>> Heiko, Caesar,
+>>
+>> I am wondering if the dsb() is really necessary. Is it possible you
+>> test the timer by removing this instruction ? Otherwise I will have to
+>> setup my board again and it will take awhile.
+>>
+>
+> As the @Arnd suggestion,
+>
+> That's seem ok for me.
+> Although the writel_relaxed() and writel() a bit different  with DSB()
+> and L2's sync.
+>
+> Do I need send the patch v3?  I will test that on my board.
+>
+> I'm no sure that why the clocksource driver didn't use the
+> writel_relaxed() to work.
+> Okay, I think we should according to the suggestion or required.
 
-Signed-off-by: Robin Gong <b38343@freescale.com>
----
- drivers/watchdog/imx2_wdt.c | 58 ++++++++++++++++++++++++++++++++++++++++++++-
- 1 file changed, 57 insertions(+), 1 deletion(-)
+I think the patch is trivial enough I can do the change myself if you 
+test the change on your side. But it would be a good practice to send 
+the patch you have tested. Up to you ;)
 
-diff --git a/drivers/watchdog/imx2_wdt.c b/drivers/watchdog/imx2_wdt.c
-index 0bb1a1d..06631cf 100644
---- a/drivers/watchdog/imx2_wdt.c
-+++ b/drivers/watchdog/imx2_wdt.c
-@@ -24,6 +24,7 @@
- #include <linux/clk.h>
- #include <linux/delay.h>
- #include <linux/init.h>
-+#include <linux/interrupt.h>
- #include <linux/io.h>
- #include <linux/jiffies.h>
- #include <linux/kernel.h>
-@@ -52,12 +53,18 @@
- #define IMX2_WDT_WRSR		0x04		/* Reset Status Register */
- #define IMX2_WDT_WRSR_TOUT	(1 << 1)	/* -> Reset due to Timeout */
- 
-+#define IMX2_WDT_WICR		0x06		/*Interrupt Control Register*/
-+#define IMX2_WDT_WICR_WIE	(1 << 15)	/* -> Interrupt Enable */
-+#define IMX2_WDT_WICR_WTIS	(1 << 14)	/* -> Interrupt Status */
-+#define IMX2_WDT_WICR_WICT	0xFF	/* Watchdog Interrupt Timeout */
-+
- #define IMX2_WDT_WMCR		0x08		/* Misc Register */
- 
- #define IMX2_WDT_MAX_TIME	128
- #define IMX2_WDT_DEFAULT_TIME	60		/* in seconds */
- 
- #define WDOG_SEC_TO_COUNT(s)	((s * 2 - 1) << 8)
-+#define WDOG_SEC_TO_PRECOUNT(s)	((s) * 2)	/* set WDOG pre timeout count*/
- 
- struct imx2_wdt_device {
- 	struct clk *clk;
-@@ -80,7 +87,8 @@ MODULE_PARM_DESC(timeout, "Watchdog timeout in seconds (default="
- 
- static const struct watchdog_info imx2_wdt_info = {
- 	.identity = "imx2+ watchdog",
--	.options = WDIOF_KEEPALIVEPING | WDIOF_SETTIMEOUT | WDIOF_MAGICCLOSE,
-+	.options = WDIOF_KEEPALIVEPING | WDIOF_SETTIMEOUT | WDIOF_MAGICCLOSE
-+		   | WDIOF_PRETIMEOUT,
- };
- 
- static int imx2_restart_handler(struct notifier_block *this, unsigned long mode,
-@@ -207,12 +215,49 @@ static inline void imx2_wdt_ping_if_active(struct watchdog_device *wdog)
- 	}
- }
- 
-+static int imx2_wdt_set_pretimeout(struct watchdog_device *wdog,
-+				   unsigned int new_timeout)
-+{
-+	struct imx2_wdt_device *wdev = watchdog_get_drvdata(wdog);
-+	u32 val;
-+
-+	regmap_read(wdev->regmap, IMX2_WDT_WICR, &val);
-+	/* set the new pre-timeout value in the WSR */
-+	val &= ~IMX2_WDT_WICR_WICT;
-+	val |= WDOG_SEC_TO_PRECOUNT(new_timeout);
-+
-+	regmap_write(wdev->regmap, IMX2_WDT_WICR, val | IMX2_WDT_WICR_WIE);
-+
-+	wdog->pretimeout = new_timeout;
-+
-+	return 0;
-+}
-+
-+static irqreturn_t imx2_wdt_isr(int irq, void *dev_id)
-+{
-+	struct platform_device *pdev = dev_id;
-+	struct watchdog_device *wdog = platform_get_drvdata(pdev);
-+	struct imx2_wdt_device *wdev = watchdog_get_drvdata(wdog);
-+	u32 val;
-+
-+	regmap_read(wdev->regmap, IMX2_WDT_WICR, &val);
-+	if (val & IMX2_WDT_WICR_WTIS) {
-+		/*clear interrupt status bit*/
-+		regmap_write(wdev->regmap, IMX2_WDT_WICR, val);
-+		panic("pre-timeout:%d, %d seconds remained\n", wdog->pretimeout,
-+		      wdog->timeout - wdog->pretimeout);
-+	}
-+
-+	return IRQ_HANDLED;
-+}
-+
- static const struct watchdog_ops imx2_wdt_ops = {
- 	.owner = THIS_MODULE,
- 	.start = imx2_wdt_start,
- 	.stop = imx2_wdt_stop,
- 	.ping = imx2_wdt_ping,
- 	.set_timeout = imx2_wdt_set_timeout,
-+	.set_pretimeout = imx2_wdt_set_pretimeout,
- };
- 
- static const struct regmap_config imx2_wdt_regmap_config = {
-@@ -229,6 +274,7 @@ static int __init imx2_wdt_probe(struct platform_device *pdev)
- 	struct resource *res;
- 	void __iomem *base;
- 	int ret;
-+	int irq;
- 	u32 val;
- 
- 	wdev = devm_kzalloc(&pdev->dev, sizeof(*wdev), GFP_KERNEL);
-@@ -294,6 +340,16 @@ static int __init imx2_wdt_probe(struct platform_device *pdev)
- 		goto disable_clk;
- 	}
- 
-+	irq = platform_get_irq(pdev, 0);
-+	if (irq > 0) {
-+		ret = devm_request_irq(&pdev->dev, irq, imx2_wdt_isr, 0,
-+				       dev_name(&pdev->dev), pdev);
-+		if (ret) {
-+			dev_err(&pdev->dev, "can't get irq %d\n", irq);
-+			goto disable_clk;
-+		}
-+	}
-+
- 	wdev->restart_handler.notifier_call = imx2_restart_handler;
- 	wdev->restart_handler.priority = 128;
- 	ret = register_restart_handler(&wdev->restart_handler);
+Thanks !
+
+   -- Daniel
+
+
 -- 
-1.9.1
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
