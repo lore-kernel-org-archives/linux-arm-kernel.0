@@ -1,61 +1,59 @@
-From: dcashman@android.com (Daniel Cashman)
-Date: Tue, 3 Nov 2015 10:21:35 -0800
-Subject: [PATCH 1/2] mm: mmap: Add new /proc tunable for mmap_base ASLR.
-In-Reply-To: <87k2q1tmna.fsf@x220.int.ebiederm.org>
-References: <1446067520-31806-1-git-send-email-dcashman@android.com>
- <871tcewoso.fsf@x220.int.ebiederm.org>
- <CABXk95DOSKv70p+=DQvHck5LCvRDc0WDORpoobSStWhrcrCiyg@mail.gmail.com>
- <CAEP4de2GsEwn0eeO126GEtFb-FSJoU3fgOWTAr1yPFAmyXTi0Q@mail.gmail.com>
- <87oafiuys0.fsf@x220.int.ebiederm.org> <56329880.4080103@android.com>
- <87k2q1tmna.fsf@x220.int.ebiederm.org>
-Message-ID: <5638FB2F.8040107@android.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Wed, 4 Nov 2015 02:25:58 +0800
+Subject: [PATCH v10 2/5] missing include in cputime.c, remove #ifdef
+ CONFIG_PARAVIRT from sched/core.c
+In-Reply-To: <1446567664-11890-2-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <201511040206.5XWwpMS8%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/01/2015 01:50 PM, Eric W. Biederman wrote:
-> Daniel Cashman <dcashman@android.com> writes:
-> 
->> On 10/28/2015 08:41 PM, Eric W. Biederman wrote:
->>> Dan Cashman <dcashman@android.com> writes:
->>>
->>>>>> This all would be much cleaner if the arm architecture code were just to
->>>>>> register the sysctl itself.
->>>>>>
->>>>>> As it sits this looks like a patchset that does not meaninfully bisect,
->>>>>> and would result in code that is hard to trace and understand.
->>>>>
->>>>> I believe the intent is to follow up with more architecture specific
->>>>> patches to allow each architecture to define the number of bits to use
->>>>
->>>> Yes.  I included these patches together because they provide mutual
->>>> context, but each has a different outcome and they could be taken
->>>> separately.
->>>
->>> They can not.  The first patch is incomplete by itself.
->>
->> Could you be more specific in what makes the first patch incomplete?  Is
->> it because it is essentially a no-op without additional architecture
->> changes (e.g. the second patch) or is it specifically because it
->> introduces and uses the three "mmap_rnd_bits*" variables without
->> defining them?  If the former, I'd like to avoid combining the general
->> procfs change with any architecture-specific one(s).  If the latter, I
->> hope the proposal below addresses that.
-> 
-> A bit of both.  The fact that the code can not compile in the first
-> patch because of missing variables is distressing.  Having the arch
-> specific code as a separate patch is fine, but they need to remain in
-> the same patchset.
-> 
+Hi Stefano,
 
-The first patch would compile as long as CONFIG_ARCH_MMAP_RND_BITS were
-not defined without also defining the missing variables. I actually
-viewed this as a safeguard against attempting to use those variables
-without architecture support, but am ok with changing it.
+[auto build test ERROR on arm64/for-next/core]
+[cannot apply to: xen-tip/linux-next]
+[also ERROR on: v4.3 next-20151103]
 
-I've gone ahead and submitted [PATCH v2] which aims to reduce
-duplication in the arch-specific config files and concerning those
-variables.  The only caveat is that now the second patch depends on the
-first, whereas before it did not.
+url:    https://github.com/0day-ci/linux/commits/Stefano-Stabellini/xen-arm-arm64-CONFIG_PARAVIRT-and-stolen-ticks-accounting/20151104-002433
+base:   https://github.com/0day-ci/linux Stefano-Stabellini/xen-arm-arm64-CONFIG_PARAVIRT-and-stolen-ticks-accounting/20151104-002433
+config: avr32-atngw100_defconfig (attached as .config)
+reproduce:
+        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=avr32 
 
-Thank You,
-Dan
+All errors (new ones prefixed by >>):
+
+>> kernel/sched/core.c:82:26: error: asm/paravirt.h: No such file or directory
+--
+>> kernel/sched/cputime.c:8:26: error: asm/paravirt.h: No such file or directory
+
+vim +82 kernel/sched/core.c
+
+52f5684c kernel/sched/core.c Gideon Israel Dsouza  2014-04-07  76  #include <linux/compiler.h>
+^1da177e kernel/sched.c      Linus Torvalds        2005-04-16  77  
+96f951ed kernel/sched/core.c David Howells         2012-03-28  78  #include <asm/switch_to.h>
+5517d86b kernel/sched.c      Eric Dumazet          2007-05-08  79  #include <asm/tlb.h>
+838225b4 kernel/sched.c      Satyam Sharma         2007-10-24  80  #include <asm/irq_regs.h>
+db7e527d kernel/sched/core.c Christian Borntraeger 2012-01-11  81  #include <asm/mutex.h>
+e6e6685a kernel/sched.c      Glauber Costa         2011-07-11 @82  #include <asm/paravirt.h>
+^1da177e kernel/sched.c      Linus Torvalds        2005-04-16  83  
+029632fb kernel/sched.c      Peter Zijlstra        2011-10-25  84  #include "sched.h"
+ea138446 kernel/sched/core.c Tejun Heo             2013-01-18  85  #include "../workqueue_internal.h"
+
+:::::: The code at line 82 was first introduced by commit
+:::::: e6e6685accfa81f509fadfc9624bc7c3862d75c4 KVM guest: Steal time accounting
+
+:::::: TO: Glauber Costa <glommer@redhat.com>
+:::::: CC: Avi Kivity <avi@redhat.com>
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 11783 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151104/89e802ff/attachment.obj>
