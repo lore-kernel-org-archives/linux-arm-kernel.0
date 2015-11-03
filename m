@@ -1,119 +1,32 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 3 Nov 2015 16:10:59 +0000
-Subject: [PATCH V1 10/11] pci, acpi: Provide generic way to assign bus
- domain number.
-In-Reply-To: <1445963922-22711-11-git-send-email-tn@semihalf.com>
-References: <1445963922-22711-1-git-send-email-tn@semihalf.com>
- <1445963922-22711-11-git-send-email-tn@semihalf.com>
-Message-ID: <20151103161059.GE3574@red-moon>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 3 Nov 2015 16:12:07 +0000
+Subject: [PATCH 2/2] serial: amba-pl011: abstract register accessors
+In-Reply-To: <1446562867-5693-2-git-send-email-timur@codeaurora.org>
+References: <1446562867-5693-1-git-send-email-timur@codeaurora.org>
+ <1446562867-5693-2-git-send-email-timur@codeaurora.org>
+Message-ID: <20151103161206.GA8644@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 27, 2015 at 05:38:41PM +0100, Tomasz Nowicki wrote:
-> Architectures which support PCI_DOMAINS_GENERIC (like ARM64)
-> cannot call pci_bus_assign_domain_nr along ACPI PCI host bridge
-> initialization since this function needs valid parent device reference
-> to be able to retrieve domain number (aka segment).
-> 
-> We can omit that blocker and pass down host bridge device via
-> pci_create_root_bus parameter and then be able to evaluate _SEG method
-> being in pci_bus_assign_domain_nr.
-> 
-> Note that _SEG method is optional, therefore _SEG absence means
-> that all PCI buses belong to domain 0.
-> 
-> Signed-off-by: Tomasz Nowicki <tn@semihalf.com>
-> ---
->  drivers/acpi/pci_root.c |  2 +-
->  drivers/pci/pci.c       | 32 +++++++++++++++++++++++++++-----
->  2 files changed, 28 insertions(+), 6 deletions(-)
-> 
-> diff --git a/drivers/acpi/pci_root.c b/drivers/acpi/pci_root.c
-> index 850d7bf..e682dc6 100644
-> --- a/drivers/acpi/pci_root.c
-> +++ b/drivers/acpi/pci_root.c
-> @@ -839,7 +839,7 @@ struct pci_bus *acpi_pci_root_create(struct acpi_pci_root *root,
->  
->  	pci_acpi_root_add_resources(info);
->  	pci_add_resource(&info->resources, &root->secondary);
-> -	bus = pci_create_root_bus(NULL, busnum, ops->pci_ops,
-> +	bus = pci_create_root_bus(&device->dev, busnum, ops->pci_ops,
->  				  sysdata, &info->resources);
+On Tue, Nov 03, 2015 at 09:01:07AM -0600, Timur Tabi wrote:
+> Finally, note that pl011_putc() is untouched, because that function
+> does not have access to the 'uap' object.  A separate mechanism
+> is needed to switch accessors in that function.
 
-If I read x86 code correctly, they rely on the first argument to be
-NULL, I think you would break x86 by doing that, see:
+Thanks for pointing that out... that's a mistake in my patches.  It's
+very difficult to see how we could ever support earlyconsole on ZTE
+without massively overhauling the earlycon stuff.  I'll undo the
+changes there in my series.
 
-arch/x86/pci/acpi.c (pcibios_root_bridge_prepare())
+Now, as for this patch...
 
-By the way, can't we move the code setting up the ACPI_COMPANION
-to core PCI code and stop relying on sysdata for that ?
+>  	unsigned int (*get_fifosize)(struct amba_device *dev);
+> +	u16 (*regreadw)(const void __iomem *addr);
+> +	void (*regwritew)(u16 val, void __iomem *addr);
+> +	void (*regwriteb)(u8 val, void __iomem *addr);
 
-Thanks,
-Lorenzo
+regwriteb() is used nowhere in this patch.
 
->  	if (!bus)
->  		goto out_release_info;
-> diff --git a/drivers/pci/pci.c b/drivers/pci/pci.c
-> index 6a9a111..17d1857 100644
-> --- a/drivers/pci/pci.c
-> +++ b/drivers/pci/pci.c
-> @@ -25,6 +25,7 @@
->  #include <linux/device.h>
->  #include <linux/pm_runtime.h>
->  #include <linux/pci_hotplug.h>
-> +#include <linux/acpi.h>
->  #include <asm-generic/pci-bridge.h>
->  #include <asm/setup.h>
->  #include "pci.h"
-> @@ -4501,7 +4502,7 @@ int pci_get_new_domain_nr(void)
->  void pci_bus_assign_domain_nr(struct pci_bus *bus, struct device *parent)
->  {
->  	static int use_dt_domains = -1;
-> -	int domain = of_get_pci_domain_nr(parent->of_node);
-> +	int domain;
->  
->  	/*
->  	 * Check DT domain and use_dt_domains values.
-> @@ -4523,14 +4524,35 @@ void pci_bus_assign_domain_nr(struct pci_bus *bus, struct device *parent)
->  	 * API and update the use_dt_domains value to keep track of method we
->  	 * are using to assign domain numbers (use_dt_domains = 0).
->  	 *
-> +	 * IF ACPI, we expect non-DT method (use_dt_domains == -1)
-> +	 * and call _SEG method for corresponding host bridge device.
-> +	 * If _SEG method does not exist, following ACPI spec (6.5.6)
-> +	 * all PCI buses belong to domain 0.
-> +	 *
->  	 * All other combinations imply we have a platform that is trying
-> -	 * to mix domain numbers obtained from DT and pci_get_new_domain_nr(),
-> -	 * which is a recipe for domain mishandling and it is prevented by
-> -	 * invalidating the domain value (domain = -1) and printing a
-> -	 * corresponding error.
-> +	 * to mix domain numbers obtained from DT, ACPI and
-> +	 * pci_get_new_domain_nr(), which is a recipe for domain mishandling and
-> +	 * it is prevented by invalidating the domain value (domain = -1) and
-> +	 * printing a corresponding error.
->  	 */
-> +
-> +	domain = of_get_pci_domain_nr(parent->of_node);
->  	if (domain >= 0 && use_dt_domains) {
->  		use_dt_domains = 1;
-> +#ifdef CONFIG_ACPI
-> +	} else if (!acpi_disabled && use_dt_domains == -1) {
-> +		struct acpi_device *acpi_dev = to_acpi_device(parent);
-> +		unsigned long long segment = 0;
-> +		acpi_status status;
-> +
-> +		status = acpi_evaluate_integer(acpi_dev->handle,
-> +					       METHOD_NAME__SEG, NULL,
-> +					       &segment);
-> +		if (ACPI_FAILURE(status) && status != AE_NOT_FOUND)
-> +			dev_err(&acpi_dev->dev,  "can't evaluate _SEG\n");
-> +
-> +		domain = segment;
-> +#endif
->  	} else if (domain < 0 && use_dt_domains != 1) {
->  		use_dt_domains = 0;
->  		domain = pci_get_new_domain_nr();
-> -- 
-> 1.9.1
-> 
+-- 
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
