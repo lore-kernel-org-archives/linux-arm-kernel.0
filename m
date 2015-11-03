@@ -1,139 +1,74 @@
 From: p.fedin@samsung.com (Pavel Fedin)
-Date: Tue, 03 Nov 2015 12:16:40 +0300
-Subject: [PATCH v5 3/4] drivers: exynos-srom: Add support for bank
- configuration
+Date: Tue, 03 Nov 2015 12:16:41 +0300
+Subject: [PATCH v5 4/4] ARM: dts: Add Ethernet chip to SMDK5410
 In-Reply-To: <cover.1446542020.git.p.fedin@samsung.com>
 References: <cover.1446542020.git.p.fedin@samsung.com>
-Message-ID: <72fa025c634fa477b1d7a89c254bd3c9c43f2b27.1446542020.git.p.fedin@samsung.com>
+Message-ID: <4568ad982f0af1846994119961cbb798edff311c.1446542020.git.p.fedin@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Implement handling properties in subnodes and adding child devices to the
-system. Child devices will not be added if configuration fails.
-
-Since the driver now does more than suspend-resume support, dependency on
-CONFIG_PM is removed.
+The chip is smsc9115, connected via SROMc bank 3. Additionally, some GPIO
+initialization is required.
 
 Signed-off-by: Pavel Fedin <p.fedin@samsung.com>
 ---
- arch/arm/mach-exynos/Kconfig      |  2 +-
- drivers/soc/samsung/Kconfig       |  2 +-
- drivers/soc/samsung/exynos-srom.c | 60 +++++++++++++++++++++++++++++++++++++--
- 3 files changed, 60 insertions(+), 4 deletions(-)
+ arch/arm/boot/dts/exynos5410-smdk5410.dts | 40 +++++++++++++++++++++++++++++++
+ 1 file changed, 40 insertions(+)
 
-diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
-index 83c85f5..c22dc42 100644
---- a/arch/arm/mach-exynos/Kconfig
-+++ b/arch/arm/mach-exynos/Kconfig
-@@ -16,7 +16,7 @@ menuconfig ARCH_EXYNOS
- 	select ARM_GIC
- 	select COMMON_CLK_SAMSUNG
- 	select EXYNOS_THERMAL
--	select EXYNOS_SROM if PM
-+	select EXYNOS_SROM
- 	select HAVE_ARM_SCU if SMP
- 	select HAVE_S3C2410_I2C if I2C
- 	select HAVE_S3C2410_WATCHDOG if WATCHDOG
-diff --git a/drivers/soc/samsung/Kconfig b/drivers/soc/samsung/Kconfig
-index 2833b5b..ea4bc2a 100644
---- a/drivers/soc/samsung/Kconfig
-+++ b/drivers/soc/samsung/Kconfig
-@@ -8,6 +8,6 @@ config SOC_SAMSUNG
+diff --git a/arch/arm/boot/dts/exynos5410-smdk5410.dts b/arch/arm/boot/dts/exynos5410-smdk5410.dts
+index cebeaab..f41952f 100644
+--- a/arch/arm/boot/dts/exynos5410-smdk5410.dts
++++ b/arch/arm/boot/dts/exynos5410-smdk5410.dts
+@@ -61,6 +61,27 @@
+ 	disable-wp;
+ };
  
- config EXYNOS_SROM
- 	bool
--	depends on ARM && ARCH_EXYNOS && PM
-+	depends on ARM && ARCH_EXYNOS
- 
- endmenu
-diff --git a/drivers/soc/samsung/exynos-srom.c b/drivers/soc/samsung/exynos-srom.c
-index 57a232d..49b5c9e 100644
---- a/drivers/soc/samsung/exynos-srom.c
-+++ b/drivers/soc/samsung/exynos-srom.c
-@@ -14,6 +14,7 @@
- #include <linux/module.h>
- #include <linux/of.h>
- #include <linux/of_address.h>
-+#include <linux/of_platform.h>
- #include <linux/platform_device.h>
- #include <linux/slab.h>
- 
-@@ -67,11 +68,50 @@ static struct exynos_srom_reg_dump *exynos_srom_alloc_reg_dump(
- 	return rd;
- }
- 
-+static int decode_sromc(struct exynos_srom *srom, struct device_node *np)
-+{
-+	u32 bank, width, pmc;
-+	u32 timing[6];
-+	u32 cs, bw;
++&pinctrl_0 {
++	srom_ctl: srom-ctl {
++		samsung,pins = "gpy0-3", "gpy0-4", "gpy0-5",
++			       "gpy1-0", "gpy1-1", "gpy1-2", "gpy1-3";
++		samsung,pin-function = <2>;
++		samsung,pin-drv = <0>;
++	};
 +
-+	if (of_property_read_u32(np, "reg", &bank))
-+		return -EINVAL;
-+	if (of_property_read_u32(np, "reg-io-width", &width))
-+		width = 1;
-+	if (of_property_read_u32(np, "samsung,srom-page-mode", &pmc))
-+		pmc = 0;
-+	if (of_property_read_u32_array(np, "samsung,srom-timing", timing,
-+				       ARRAY_SIZE(timing)))
-+		return -EINVAL;
++	srom_ebi: srom-ebi {
++		samsung,pins = "gpy3-0", "gpy3-1", "gpy3-2", "gpy3-3",
++			       "gpy3-4", "gpy3-5", "gpy3-6", "gpy3-7",
++			       "gpy5-0", "gpy5-1", "gpy5-2", "gpy5-3",
++			       "gpy5-4", "gpy5-5", "gpy5-6", "gpy5-7",
++			       "gpy6-0", "gpy6-1", "gpy6-2", "gpy6-3",
++			       "gpy6-4", "gpy6-5", "gpy6-6", "gpy6-7";
++		samsung,pin-function = <2>;
++		samsung,pin-pud = <3>;
++		samsung,pin-drv = <0>;
++	};
++};
 +
-+	bank *= 4; /* Convert bank into shift/offset */
+ &uart0 {
+ 	status = "okay";
+ };
+@@ -72,3 +93,22 @@
+ &uart2 {
+ 	status = "okay";
+ };
 +
-+	cs = 1 << EXYNOS_SROM_BW__BYTEENABLE__SHIFT;
-+	if (width == 2)
-+		cs |= 1 << EXYNOS_SROM_BW__DATAWIDTH__SHIFT;
++&sromc {
++	pinctrl-names = "default";
++	pinctrl-0 = <&srom_ctl>, <&srom_ebi>;
 +
-+	bw = __raw_readl(srom->reg_base + EXYNOS_SROM_BW);
-+	bw = (bw & ~(EXYNOS_SROM_BW__CS_MASK << bank)) | (cs << bank);
-+	__raw_writel(bw, srom->reg_base + EXYNOS_SROM_BW);
++	ethernet at 3 {
++		compatible = "smsc,lan9115";
++		reg = <3 0 0x10000>;
++		phy-mode = "mii";
++		interrupt-parent = <&gpx0>;
++		interrupts = <5 8>;
++		reg-io-width = <2>;
++		smsc,irq-push-pull;
++		smsc,force-internal-phy;
 +
-+	__raw_writel((pmc << EXYNOS_SROM_BCX__PMC__SHIFT) |
-+		    (timing[0] << EXYNOS_SROM_BCX__TACP__SHIFT) |
-+		    (timing[1] << EXYNOS_SROM_BCX__TCAH__SHIFT) |
-+		    (timing[2] << EXYNOS_SROM_BCX__TCOH__SHIFT) |
-+		    (timing[3] << EXYNOS_SROM_BCX__TACC__SHIFT) |
-+		    (timing[4] << EXYNOS_SROM_BCX__TCOS__SHIFT) |
-+		    (timing[5] << EXYNOS_SROM_BCX__TACS__SHIFT),
-+		    srom->reg_base + EXYNOS_SROM_BC0 + bank);
-+
-+	return 0;
-+}
-+
- static int exynos_srom_probe(struct platform_device *pdev)
- {
--	struct device_node *np;
-+	struct device_node *np, *child;
- 	struct exynos_srom *srom;
- 	struct device *dev = &pdev->dev;
-+	bool error = false;
- 
- 	np = dev->of_node;
- 	if (!np) {
-@@ -100,7 +140,23 @@ static int exynos_srom_probe(struct platform_device *pdev)
- 		return -ENOMEM;
- 	}
- 
--	return 0;
-+	for_each_child_of_node(np, child) {
-+		if (decode_sromc(srom, child)) {
-+			dev_err(dev,
-+				"Could not decode bank configuration for %s\n",
-+				child->name);
-+			error = true;
-+		}
-+	}
-+
-+	/*
-+	 * If any bank failed to configure, we still provide suspend/resume,
-+	 * but do not probe child devices
-+	 */
-+	if (error)
-+		return 0;
-+
-+	return of_platform_populate(np, NULL, NULL, dev);
- }
- 
- static int exynos_srom_remove(struct platform_device *pdev)
++		samsung,srom-page-mode = <1>;
++		samsung,srom-timing = <9 12 1 9 1 1>;
++	};
++};
 -- 
 2.4.4
