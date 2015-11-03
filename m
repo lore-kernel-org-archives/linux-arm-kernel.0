@@ -1,53 +1,30 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 3 Nov 2015 14:28:11 +0000
-Subject: [PATCH v11 1/8] arm64: renesas: r8a7795: Add Renesas R8A7795 SoC
- support
-In-Reply-To: <CAMuHMdU00wJcrb7EsFjkKMw-gy04tXdGoyzPRNL-cjYZH8zneA@mail.gmail.com>
-References: <1444890243-6978-1-git-send-email-horms+renesas@verge.net.au>
- <1444890243-6978-2-git-send-email-horms+renesas@verge.net.au>
- <20151015105820.GF8825@leverpostej>
- <CAMuHMdU00wJcrb7EsFjkKMw-gy04tXdGoyzPRNL-cjYZH8zneA@mail.gmail.com>
-Message-ID: <20151103142810.GC4049@leverpostej>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Tue, 3 Nov 2015 14:30:20 +0000
+Subject: [PATCH DRAFT 2/2] drivers: serial: PL011: [DRAFT] implement
+ register diverson for ZTE UART
+In-Reply-To: <20151103142343.GX8644@n2100.arm.linux.org.uk>
+References: <1446467042-24494-1-git-send-email-andre.przywara@arm.com>
+ <1446467042-24494-3-git-send-email-andre.przywara@arm.com>
+ <20151103142343.GX8644@n2100.arm.linux.org.uk>
+Message-ID: <5638C4FC.5080407@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Oct 21, 2015 at 03:34:39PM +0200, Geert Uytterhoeven wrote:
-> Hi Mark,
+Hi,
+
+On 03/11/15 14:23, Russell King - ARM Linux wrote:
+> On Mon, Nov 02, 2015 at 12:24:02PM +0000, Andre Przywara wrote:
+>> +static struct vendor_data vendor_zte = {
 > 
-> On Thu, Oct 15, 2015 at 12:58 PM, Mark Rutland <mark.rutland@arm.com> wrote:
-> >> > +           gic: interrupt-controller at 0xf1010000 {
-> >> +                     compatible = "arm,gic-400";
-> >> +                     #interrupt-cells = <3>;
-> >> +                     #address-cells = <0>;
-> >> +                     interrupt-controller;
-> >> +                     reg = <0x0 0xf1010000 0 0x1000>,
-> >> +                           <0x0 0xf1020000 0 0x2000>;
-> >> +                     interrupts = <GIC_PPI 9
-> >> +                                     (GIC_CPU_MASK_SIMPLE(1) | IRQ_TYPE_LEVEL_HIGH)>;
-> >> +             };
-> >
-> > No GICH and GICV?
-> 
-> These seem to be defined in the "arm,gic-v3" DT bindings only, while this is
-> an "arm,gic-400" (GICD_IIDR 0x0200043b)?
+> This is unreferenced.  What's the detection mechanism for the ZTE UART?
 
-See the "GIC virtualization extensions (VGIC)" section in
-Documentation/devicetree/bindings/arm/gic.txt
+Guess why I didn't include this ;-)
 
-> I did notice hi6220.dtsi does have GICH and GICV, while it also claims
-> to be an "arm,gic-400"...
+If I get [1] correctly, then it's a "zte,zx296702-uart" compatible
+string for a starter (but no AMBA IDs, if I am not mistaken). I'd let
+them fill in other ways of detection like ACPI.
 
-That's fine, that's valid for any GICv2 with virtualization extensions.
+Cheers,
+Andre.
 
-> > Which exception level do CPUs boot at?
-> 
-> No idea.
-
-For reference, the kernel should print it out just after booting all CPUs. e.g.
-on Juno:
-
-SMP: Total of 6 processors activated.
-CPU: All CPU(s) started at EL2
-
-Thanks,
-Mark.
+[1] http://marc.info/?l=linux-serial&m=143832902328904&w=2
