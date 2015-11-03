@@ -1,77 +1,36 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 3 Nov 2015 10:12:17 +0000
-Subject: [PATCH v2 2/5] mfd: ts4800-syscon: add driver for TS-4800 syscon
-In-Reply-To: <4911273.Q2mbQ2gvpn@wuerfel>
-References: <1446150450-22093-1-git-send-email-damien.riegel@savoirfairelinux.com>
- <20151103083817.GC3503@x1> <20151103083923.GD3503@x1>
- <4911273.Q2mbQ2gvpn@wuerfel>
-Message-ID: <20151103101217.GE3503@x1>
+From: lkp@intel.com (kbuild test robot)
+Date: Tue, 3 Nov 2015 18:21:48 +0800
+Subject: [RESEND PATCH] ARM: errata: Workaround for Cortex-A12 erratum
+ 818325
+In-Reply-To: <1446538209-13490-2-git-send-email-wxt@rock-chips.com>
+Message-ID: <201511031801.GfWqzZ0v%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 03 Nov 2015, Arnd Bergmann wrote:
+Hi Huang,
 
-> On Tuesday 03 November 2015 08:39:23 Lee Jones wrote:
-> > On Tue, 03 Nov 2015, Lee Jones wrote:
-> > 
-> > > On Mon, 02 Nov 2015, Damien Riegel wrote:
-> > > > On Mon, Nov 02, 2015 at 09:12:53AM +0000, Lee Jones wrote:
-> > > > > [Cc'ing Arnd]
-> > > > > 
-> > > > > On Fri, 30 Oct 2015, Damien Riegel wrote:
-> > > > > > On Fri, Oct 30, 2015 at 05:56:56PM +0000, Lee Jones wrote:
-> > > > > > > On Thu, 29 Oct 2015, Damien Riegel wrote:
-> > > > > > > 
-> > > > > > > > Driver for TS-4800 syscon. These registers belong to a FPGA that is
-> > > > > > > > memory mapped and are used for counters, enable various IPs in the FPGA,
-> > > > > > > > control LEDs, control IOs, etc.
-> > > > > > > > 
-> > > > > > > > Currently, only the watchdog is handled.
-> > > > > > > 
-> > > > > > > Why do you require your own syscon driver?
-> > > > > > > 
-> > > > > > > What's wrong with the generic one?
-> > > > > > > 
-> > > > > > 
-> > > > > > The generic one uses a regmap_config with reg_stride set to 4 and val_bits
-> > > > > > to 32.
-> > > > > > 
-> > > > > > TS-4800 syscon registers are 16-bit wide and must be accessed with 16
-> > > > > > bit read and writes:
-> > > > > > http://wiki.embeddedarm.com/wiki/TS-4800#Syscon
-> > > > > > 
-> > > > > > I will address the other issues in the next version (split commit,
-> > > > > > license issue, style, and superfluous remove).
-> > > > > 
-> > > > > The Syscon driver was written to be generic so that each
-> > > > > vendor/platform didn't require their own incarnation.  How unique is
-> > > > > the TS-4800?
-> > > > > 
-> > > > > Perhaps it might be better to supply a generic 16 bit Syscon for
-> > > > > devices akin to the TS-4800?
-> > > > 
-> > > > The TS-4800 syscon could use a generic 16-bit syscon. There is nothing
-> > > > specific that requires a driver besides that.
-> > > > 
-> > > > We could add some optional properties to the generic syscon node to
-> > > > configure reg_bits, val_bits, and reg_stride (and pad_bits ?). Would
-> > > > that be a good solution ?
-> > > 
-> > > Without looking at the ramifications of such an addition, the premise
-> > > sounds good to me.  So long as the current behaviour remains the
-> > > default.
-> > 
-> > Perhaps a "syscon-16bit" compatible might be in order?
-> > 
-> > 
-> 
-> I think a 'buswidth=<16>;' property in addition to 'compatible="syscon"'
-> is more in line with what other subsystems do.
+[auto build test ERROR on mvebu/for-next -- if it's inappropriate base, please suggest rules for selecting the more suitable base]
 
-Perfect.  Are you happy coding this up Damien?
+url:    https://github.com/0day-ci/linux/commits/Caesar-Wang/ARM-errata-Workaround-for-Cortex-A12-erratum-818325/20151103-163417
+config: arm-prima2_defconfig (attached as .config)
+reproduce:
+        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm 
 
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+All errors (new ones prefixed by >>):
+
+   /tmp/ccjF0uyl.s: Assembler messages:
+>> /tmp/ccjF0uyl.s: Error: local label `"5" (instance number 1 of a fb label)' is not defined
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 12215 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151103/a7c6ec6c/attachment.obj>
