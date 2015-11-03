@@ -1,34 +1,73 @@
-From: fengguang.wu@intel.com (kbuild test robot)
-Date: Tue, 3 Nov 2015 22:58:21 +0800
-Subject: [stericsson:earlydebug 1/1] main.c:undefined reference to `printascii'
-Message-ID: <201511032219.HefUCe99%fengguang.wu@intel.com>
+From: timur@codeaurora.org (Timur Tabi)
+Date: Tue,  3 Nov 2015 09:01:06 -0600
+Subject: [PATCH 1/2] serial: amba-pl011: use cpu_relax when polling registers
+Message-ID: <1446562867-5693-1-git-send-email-timur@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-tree:   https://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git earlydebug
-head:   92ab8295496c4d4c50cefce1c13863ce8eda7741
-commit: 92ab8295496c4d4c50cefce1c13863ce8eda7741 [1/1] uglyhack printascii
-config: mn10300-asb2364_defconfig (attached as .config)
-reproduce:
-        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        git checkout 92ab8295496c4d4c50cefce1c13863ce8eda7741
-        # save the attached .config to linux build tree
-        make.cross ARCH=mn10300 
+Busy loops that poll on a register should call cpu_relax().  On some
+architectures, it can lower CPU power consumption or yield to a
+hyperthreaded twin processor.  It also serves as a compiler barrier,
+so it can replace barrier() calls.
 
-All errors (new ones prefixed by >>):
-
-   am33_2.0-linux-ld: Dwarf Error: mangled line number section.
-   init/built-in.o: In function `.Loc.513.1':
->> main.c:(.init.text+0x38f): undefined reference to `printascii'
-
+Signed-off-by: Timur Tabi <timur@codeaurora.org>
 ---
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 8461 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151103/1baf6944/attachment-0001.obj>
+ drivers/tty/serial/amba-pl011.c | 11 ++++++-----
+ 1 file changed, 6 insertions(+), 5 deletions(-)
+
+diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
+index 005de8c..164bd65 100644
+--- a/drivers/tty/serial/amba-pl011.c
++++ b/drivers/tty/serial/amba-pl011.c
+@@ -1076,7 +1076,7 @@ static void pl011_dma_shutdown(struct uart_amba_port *uap)
+ 
+ 	/* Disable RX and TX DMA */
+ 	while (readw(uap->port.membase + UART01x_FR) & UART01x_FR_BUSY)
+-		barrier();
++		cpu_relax();
+ 
+ 	spin_lock_irq(&uap->port.lock);
+ 	uap->dmacr &= ~(UART011_DMAONERR | UART011_RXDMAE | UART011_TXDMAE);
+@@ -1520,7 +1520,7 @@ static void pl011_put_poll_char(struct uart_port *port,
+ 	    container_of(port, struct uart_amba_port, port);
+ 
+ 	while (readw(uap->port.membase + UART01x_FR) & UART01x_FR_TXFF)
+-		barrier();
++		cpu_relax();
+ 
+ 	writew(ch, uap->port.membase + UART01x_DR);
+ }
+@@ -2053,7 +2053,7 @@ static void pl011_console_putchar(struct uart_port *port, int ch)
+ 	    container_of(port, struct uart_amba_port, port);
+ 
+ 	while (readw(uap->port.membase + UART01x_FR) & UART01x_FR_TXFF)
+-		barrier();
++		cpu_relax();
+ 	writew(ch, uap->port.membase + UART01x_DR);
+ }
+ 
+@@ -2093,6 +2093,7 @@ pl011_console_write(struct console *co, const char *s, unsigned int count)
+ 	 */
+ 	do {
+ 		status = readw(uap->port.membase + UART01x_FR);
++		cpu_relax();
+ 	} while (status & UART01x_FR_BUSY);
+ 	if (!uap->vendor->always_enabled)
+ 		writew(old_cr, uap->port.membase + UART011_CR);
+@@ -2205,10 +2206,10 @@ static struct console amba_console = {
+ static void pl011_putc(struct uart_port *port, int c)
+ {
+ 	while (readl(port->membase + UART01x_FR) & UART01x_FR_TXFF)
+-		barrier();
++		cpu_relax();
+ 	writel(c, port->membase + UART01x_DR);
+ 	while (!(readl(port->membase + UART01x_FR) & UART011_FR_TXFE))
+-		barrier();
++		cpu_relax();
+ }
+ 
+ static void pl011_early_write(struct console *con, const char *s, unsigned n)
+-- 
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project.
