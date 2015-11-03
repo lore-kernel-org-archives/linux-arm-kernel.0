@@ -1,63 +1,104 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Tue, 3 Nov 2015 15:24:06 +0100
-Subject: [PATCH v11 6/8] arm64: renesas: add Salvator-X board support on
- DTS
-In-Reply-To: <CAMuHMdVzUPyhkfPy3s+jBK1gQ-kZqYfrQZ8Bww-iFxGOPVZn2w@mail.gmail.com>
-References: <1444890243-6978-1-git-send-email-horms+renesas@verge.net.au>
- <1444890243-6978-7-git-send-email-horms+renesas@verge.net.au>
- <20151015110139.GG8825@leverpostej>
- <20151023070032.GA4502@verge.net.au>
- <CAMuHMdVzUPyhkfPy3s+jBK1gQ-kZqYfrQZ8Bww-iFxGOPVZn2w@mail.gmail.com>
-Message-ID: <CAMuHMdX=LS2sLqtgBUYeWjVkUVZE2WQwsWhbvK+wmdfZ0ycrjg@mail.gmail.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue,  3 Nov 2015 15:27:02 +0100
+Subject: [PATCH] ARM: ux500: push down Rohm TS to STUIB
+Message-ID: <1446560822-19442-1-git-send-email-linus.walleij@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark, Rob,
+The Rohm touchscreen reset and IRQ lines were registered and
+configured at the HREF board level of the design, but it is an
+integral part of the UIB (User Interface Board). Fix this by
+pushing down the pin control node to the u8500 UIB file.
 
-On Thu, Oct 29, 2015 at 8:52 AM, Geert Uytterhoeven
-<geert@linux-m68k.org> wrote:
-> On Fri, Oct 23, 2015 at 9:00 AM, Simon Horman <horms@verge.net.au> wrote:
->> On Thu, Oct 15, 2015 at 12:01:40PM +0100, Mark Rutland wrote:
->>> > +           stdout-path = &scif2;
->>>
->>> No rate? It would be better to be explicit here; you should be able to
->>> have:
->>>
->>>       stdout-path = "serial0:115200n8"
->>>
->>> Where "115200n8" is replaced with whatever configuration this board
->>> actually has.
->>
->> I think that we have had this discussion before in relation to
->> a different board for a different Renesas SoC but I could be mistaken.
->
-> IIRC, at that time the code to parse the options wasn't upstream yet, so
-> adding the options would have broken the serial console.
->
-> I can confirm it works fine on Salvator-X with
->
->         stdout-path = "serial0:115200n8";
+Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+---
+ arch/arm/boot/dts/ste-href-stuib.dtsi  | 23 +++++++++++++++++++++++
+ arch/arm/boot/dts/ste-hrefv60plus.dtsi | 18 ------------------
+ 2 files changed, 23 insertions(+), 18 deletions(-)
 
-Unfortunately this breaks earlycon support:
-
-        Malformed early option 'earlycon'
-
-The call to fdt_getprop() in early_init_dt_scan_chosen_serial() fails.
-I guess that unlike the standard console handling code, the fdt code can't
-handle aliases yet?
-
-P.S. SCIF earlycon support is not yet upstream, as it still doesn't work on
-arm32 (I discovered today it does on arm64 ;-): it pretends to work, but
-nothing is output to the serial port (until the normal serial console kicks
-in).
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+diff --git a/arch/arm/boot/dts/ste-href-stuib.dtsi b/arch/arm/boot/dts/ste-href-stuib.dtsi
+index 78b75256c638..c3987ad06d79 100644
+--- a/arch/arm/boot/dts/ste-href-stuib.dtsi
++++ b/arch/arm/boot/dts/ste-href-stuib.dtsi
+@@ -114,6 +114,8 @@
+ 				rohm,touch-max-x = <384>;
+ 				rohm,touch-max-y = <704>;
+ 				rohm,flip-y;
++				pinctrl-names = "default";
++				pinctrl-0 = <&touch_rohm_mode>;
+ 			};
+ 
+ 			bu21013_tp at 5d {
+@@ -124,6 +126,8 @@
+ 				rohm,touch-max-x = <384>;
+ 				rohm,touch-max-y = <704>;
+ 				rohm,flip-y;
++				pinctrl-names = "default";
++				pinctrl-0 = <&touch_rohm_mode>;
+ 			};
+ 		};
+ 
+@@ -166,6 +170,25 @@
+ 					};
+ 				};
+ 			};
++			touch {
++				touch_rohm_mode: touch_rohm {
++					/*
++					 * ROHM touch screen uses GPIO 143 for
++					 * RST1, GPIO 146 for RST2 and
++					 * GPIO 67 for interrupts. Pull-up
++					 * the IRQ line and drive both
++					 * reset signals low.
++					 */
++					stuib_cfg1 {
++						pins = "GPIO143_D12", "GPIO146_D13";
++						ste,config = <&gpio_out_lo>;
++					};
++					stuib_cfg2 {
++						pins = "GPIO67_G2";
++						ste,config = <&gpio_in_pu>;
++					};
++				};
++			};
+ 		};
+ 	};
+ };
+diff --git a/arch/arm/boot/dts/ste-hrefv60plus.dtsi b/arch/arm/boot/dts/ste-hrefv60plus.dtsi
+index 810cda743b6d..3d1ea1ecbd15 100644
+--- a/arch/arm/boot/dts/ste-hrefv60plus.dtsi
++++ b/arch/arm/boot/dts/ste-hrefv60plus.dtsi
+@@ -43,7 +43,6 @@
+ 				  <&vaudio_hf_hrefv60_mode>,
+ 				  <&gbf_hrefv60_mode>,
+ 				  <&hdtv_hrefv60_mode>,
+-				  <&touch_hrefv60_mode>,
+ 				  <&gpios_hrefv60_mode>;
+ 
+ 			sdi0 {
+@@ -190,23 +189,6 @@
+ 					};
+ 				 };
+ 			};
+-			touch {
+-				touch_hrefv60_mode: touch_hrefv60 {
+-					/*
+-					 * Touch screen uses GPIO 143 for RST1, GPIO 146 for RST2 and
+-					 * GPIO 67 for interrupts. Pull-up the IRQ line and drive both
+-					 * reset signals low.
+-					 */
+-					hrefv60_cfg1 {
+-						pins = "GPIO143_D12", "GPIO146_D13";
+-						ste,config = <&gpio_out_lo>;
+-					};
+-					hrefv60_cfg2 {
+-						pins = "GPIO67_G2";
+-						ste,config = <&gpio_in_pu>;
+-					};
+-				};
+-			};
+ 			mcde {
+ 				lcd_hrefv60_mode: lcd_hrefv60 {
+ 					/*
+-- 
+2.4.3
