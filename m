@@ -1,27 +1,34 @@
-From: timur@codeaurora.org (Timur Tabi)
-Date: Tue, 3 Nov 2015 08:57:05 -0600
-Subject: [PATCH 10/11] tty: amba-pl011: add support for 32-bit register
- access
-In-Reply-To: <E1Ztcw4-0007Ct-PP@rmk-PC.arm.linux.org.uk>
-References: <20151103134349.GV8644@n2100.arm.linux.org.uk>
- <E1Ztcw4-0007Ct-PP@rmk-PC.arm.linux.org.uk>
-Message-ID: <5638CB41.1000807@codeaurora.org>
+From: fengguang.wu@intel.com (kbuild test robot)
+Date: Tue, 3 Nov 2015 22:58:21 +0800
+Subject: [stericsson:earlydebug 1/1] main.c:undefined reference to `printascii'
+Message-ID: <201511032219.HefUCe99%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King wrote:
-> -	return readw(uap->port.membase + pl011_reg_to_offset(uap, reg));
-> +	void __iomem *addr = uap->port.membase + pl011_reg_to_offset(uap, reg);
-> +
-> +	return uap->access_32b ? readl(addr) : readw(addr);
+tree:   https://git.kernel.org/pub/scm/linux/kernel/git/linusw/linux-stericsson.git earlydebug
+head:   92ab8295496c4d4c50cefce1c13863ce8eda7741
+commit: 92ab8295496c4d4c50cefce1c13863ce8eda7741 [1/1] uglyhack printascii
+config: mn10300-asb2364_defconfig (attached as .config)
+reproduce:
+        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        git checkout 92ab8295496c4d4c50cefce1c13863ce8eda7741
+        # save the attached .config to linux build tree
+        make.cross ARCH=mn10300 
 
-Ok, ignore my previous email.  I just noticed this.
+All errors (new ones prefixed by >>):
 
-This version is fine, except that it now performs a runtime check for 
-every I/O access.  Isn't that too much overhead?  access_32b will always 
-be either True or False for the life of the entire SOC.
+   am33_2.0-linux-ld: Dwarf Error: mangled line number section.
+   init/built-in.o: In function `.Loc.513.1':
+>> main.c:(.init.text+0x38f): undefined reference to `printascii'
 
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the
-Code Aurora Forum, hosted by The Linux Foundation.
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 8461 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151103/1baf6944/attachment-0001.obj>
