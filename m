@@ -1,49 +1,72 @@
-From: pgynther@google.com (Petri Gynther)
-Date: Tue, 3 Nov 2015 11:33:11 -0800
-Subject: [PATCH] HID: hid-gfrm: avoid warning for input_configured API
- change
-In-Reply-To: <14835877.IL6ArpWV8Q@wuerfel>
-References: <14835877.IL6ArpWV8Q@wuerfel>
-Message-ID: <CAGXr9JGO_dcAuTyO2vjvbBwJ7xqcEZ1kWh7WAtxaQiKsdzr1+A@mail.gmail.com>
+From: robherring2@gmail.com (Rob Herring)
+Date: Tue, 3 Nov 2015 13:39:44 -0600
+Subject: [PATCH] KVM/arm: kernel low level debug support for ARM32 virtual
+ platforms
+In-Reply-To: <56390838.3000204@samsung.com>
+References: <1446508313-24404-1-git-send-email-m.smarduch@samsung.com>
+ <5638E1CD.8090006@codeaurora.org> <5638F294.4060409@samsung.com>
+ <20151103175522.GA24856@arm.com> <56390838.3000204@samsung.com>
+Message-ID: <CAL_JsqJJHGwcdTDMh3WujJW0rDPxocVLEUpw95aVFC4FDEdDgA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 3, 2015 at 6:56 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> The input_configured callback was recently changed to return
-> an 'int', but the newly added driver uses the old API:
+On Tue, Nov 3, 2015 at 1:17 PM, Mario Smarduch <m.smarduch@samsung.com> wrote:
 >
-> drivers/hid/hid-gfrm.c:151:22: warning: initialization from incompatible pointer type [-Wincompatible-pointer-types]
 >
-> This changes the driver like the other ones.
+> On 11/3/2015 9:55 AM, Will Deacon wrote:
+>> On Tue, Nov 03, 2015 at 09:44:52AM -0800, Mario Smarduch wrote:
+>>> On 11/3/2015 8:33 AM, Christopher Covington wrote:
+>>>> On 11/02/2015 06:51 PM, Mario Smarduch wrote:
+>>>>>    this is a re-post from couple weeks ago, please take time to review this
+>>>>> simple patch which simplifies DEBUG_LL and prevents kernel crash on virtual
+>>>>> platforms.
+>>>>>
+>>>>> Before this patch DEBUG_LL for 'dummy virtual machine':
+>>>>>
+>>>>> ( ) Kernel low-level debugging via EmbeddedICE DCC channel
+>>>>> ( ) Kernel low-level debug output via semihosting I/O
+>>>>> ( ) Kernel low-level debugging via 8250 UART
+>>>>> ( ) Kernel low-level debugging via ARM Ltd PL01x Primecell
+>>>>>
+>>>>> In summary if debug uart is not emulated kernel crashes.
+>>>>> And once you pass that hurdle, uart physical/virtual addresses are unknown.
+>>>>> DEBUG_LL comes in handy on many occasions and should be somewhat
+>>>>> intuitive to use like it is for physical platforms. For virtual platforms
+>>>>> user may start daubting the host and get into a bigger mess.
+>>>>>
+>>>>> After this patch is applied user gets:
+>>>>>
+>>>>> (X) Kernel low-level debugging on QEMU Virtual Platform
+>>>>> ( ) Kernel low-level debugging on Kvmtool Virtual Platform
+>>>>>    ..... above repeated ....
+>>>>>
+>>>>> The virtual addresses selected follow arm reference models, high in vmalloc
+>>>>> section with high mem enabled and guest running with >= 1GB of memory. The
+>>>>> offset is leftover from arm reference models.
+>>>>
+>>>> Which model? It doesn't appear to match the vexpress AEM/RTSM/FVP/whatever
+>>>> which used 0x1c090000 for UART0.
+>>>
+>>> I recall QEMU virt model had it's own physical address map, for sure I saw the
+>>> virtio-mmio regions assigned in some ARM document. Peter would you know?
+>>>
+>>> As far as kvmtool I'm not sure, currently PC1 COM1 port is used? Andre will that
+>>> stay fixed?
+>>
+>> We make absolutely no guarantees about the memory map provided by kvmtool.
+>>
+>> Will
+>>
 >
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> If that's also the case for qemu, then I guess the best you can do is find a way
+> to dump the device tree. Find the uart, physical address and try figure out the
+> virtual address.
+>
+> Pretty involved, hoped for something more automated since that's a handy feature.
 
-Acked-by: Petri Gynther <pgynther@google.com>
+You really only need LL_DEBUG now if you are debugging very early code
+before memory is setup and/or bad memory. Use earlycon instead which
+should already be supported both via the pl011 or semihosting. I used
+it with QEMU semihosting support.
 
-> Fixes: 34fc1322e7aa ("HID: hid-gfrm: Google Fiber TV Box remote controls")
-> Fixes: b2c68a2f1bab ("HID: hid-input: allow input_configured callback return errors")
-> ---
-> Found on ARM allmodconfig with yesterday's linux-next
->
-> diff --git a/drivers/hid/hid-gfrm.c b/drivers/hid/hid-gfrm.c
-> index 4d7b7e7f0792..075b1c020846 100644
-> --- a/drivers/hid/hid-gfrm.c
-> +++ b/drivers/hid/hid-gfrm.c
-> @@ -88,7 +88,7 @@ static int gfrm_raw_event(struct hid_device *hdev, struct hid_report *report,
->         return (ret < 0) ? ret : -1;
->  }
->
-> -static void gfrm_input_configured(struct hid_device *hid, struct hid_input *hidinput)
-> +static int gfrm_input_configured(struct hid_device *hid, struct hid_input *hidinput)
->  {
->         /*
->          * Enable software autorepeat with:
-> @@ -96,6 +96,7 @@ static void gfrm_input_configured(struct hid_device *hid, struct hid_input *hidi
->          * - repeat period: 100 msec
->          */
->         input_enable_softrepeat(hidinput->input, 400, 100);
-> +       return 0;
->  }
->
->  static int gfrm_probe(struct hid_device *hdev, const struct hid_device_id *id)
->
+Rob
