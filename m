@@ -1,32 +1,43 @@
 From: jszhang@marvell.com (Jisheng Zhang)
-Date: Tue, 3 Nov 2015 22:28:36 +0800
-Subject: [PATCH v2 2/3] ARM: arch_timer: set the arch_delay_timer rating as 400
-In-Reply-To: <1446560917-6318-1-git-send-email-jszhang@marvell.com>
-References: <1446560917-6318-1-git-send-email-jszhang@marvell.com>
-Message-ID: <1446560917-6318-3-git-send-email-jszhang@marvell.com>
+Date: Tue, 3 Nov 2015 22:28:34 +0800
+Subject: [PATCH v2 0/3] let Marvell Berlin SoCs make use of the best delay
+ timer
+Message-ID: <1446560917-6318-1-git-send-email-jszhang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch sets the arch_delay_timer rating as the same value used in
-arch_timer clocksource. This is to help register_current_timer_delay()
-to choose the best delay timer during several possible delay timers.
+In case there are several possible delay timers, we purely base the
+selection on the frequency, which is suboptimal in some cases. Take
+one Marvell Berlin platform for example: we have arch timer and dw-apb
+timer. The arch timer freq is 25MHZ while the dw-apb timer freq is
+100MHZ, current selection would choose the dw-apb timer. But the dw
+apb timer is on the APB bus while arch timer sits in CPU, the cost
+of accessing the apb timer is higher than the arch timer.
+    
+This series firstly modifies register_current_timer_delay() to choose
+the highest rating delay timer: use the rating as a primary indication
+and fall back to comparing the frequency if the rating is not set or
+the same. Then we set the arch_delay_timer rating as 400, finally
+Implement ARM delay timer for the dw_apb_timer and set its rating as 300.
 
-Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
----
- arch/arm/kernel/arch_timer.c | 1 +
- 1 file changed, 1 insertion(+)
+Since v1:
+ - add one patch to let register_current_timer_delay() to choose the the
+   highest rating delay timer
+ - add one patch to set arch_delay_timer rating as 400
+ - remove CONFIG_DW_APB_TIMER_BASED_DELAY option, use CONFIG_ARM instead.
+ - change the commit msg as "clocksource/drivers/abc: Foo...."
 
-diff --git a/arch/arm/kernel/arch_timer.c b/arch/arm/kernel/arch_timer.c
-index 1791f12..db5f556 100644
---- a/arch/arm/kernel/arch_timer.c
-+++ b/arch/arm/kernel/arch_timer.c
-@@ -28,6 +28,7 @@ static void __init arch_timer_delay_timer_register(void)
- 	/* Use the architected timer for the delay loop. */
- 	arch_delay_timer.read_current_timer = arch_timer_read_counter_long;
- 	arch_delay_timer.freq = arch_timer_get_rate();
-+	arch_delay_timer.rating = 400;
- 	register_current_timer_delay(&arch_delay_timer);
- }
- 
+
+Jisheng Zhang (3):
+  ARM: delay: choose the highest rating delay timer
+  ARM: arch_timer: set the arch_delay_timer rating as 400
+  clocksource/drivers/dw_apb_timer_of: Implement ARM delay timer
+
+ arch/arm/include/asm/delay.h          |  1 +
+ arch/arm/kernel/arch_timer.c          |  1 +
+ arch/arm/lib/delay.c                  | 16 +++++++++++++++-
+ drivers/clocksource/dw_apb_timer_of.c | 17 +++++++++++++++++
+ 4 files changed, 34 insertions(+), 1 deletion(-)
+
 -- 
 2.6.2
