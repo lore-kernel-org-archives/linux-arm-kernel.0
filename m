@@ -1,131 +1,219 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Tue, 03 Nov 2015 11:22:30 +0900
-Subject: [PATCH v3 7/7] drivers: soc: Add support for Exynos PMU driver
-In-Reply-To: <1445864143-25695-8-git-send-email-pankaj.dubey@samsung.com>
-References: <1445864143-25695-1-git-send-email-pankaj.dubey@samsung.com>
- <1445864143-25695-8-git-send-email-pankaj.dubey@samsung.com>
-Message-ID: <56381A66.1010406@samsung.com>
+From: zhaoshenglong@huawei.com (Shannon Zhao)
+Date: Tue, 3 Nov 2015 10:33:32 +0800
+Subject: [PATCH v4 07/21] KVM: ARM64: PMU: Add perf event map and introduce
+ perf event creating function
+In-Reply-To: <5637C3D7.2010801@codeaurora.org>
+References: <1446186123-11548-1-git-send-email-zhaoshenglong@huawei.com>
+ <1446186123-11548-8-git-send-email-zhaoshenglong@huawei.com>
+ <5637C3D7.2010801@codeaurora.org>
+Message-ID: <56381CFC.2070407@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 26.10.2015 21:55, Pankaj Dubey wrote:
-> This patch moves Exynos PMU driver implementation from "arm/mach-exynos"
-> to "drivers/soc/samsung". This driver is mainly used for setting misc
-> bits of register from PMU IP of Exynos SoC which will be required to
-> configure before Suspend/Resume. Currently all these settings are done
-> in "arch/arm/mach-exynos/pmu.c" but moving ahead for ARM64 based SoC
-> support, there is a need of this PMU driver in driver/* folder.
+
+
+On 2015/11/3 4:13, Christopher Covington wrote:
+> On 10/30/2015 02:21 AM, Shannon Zhao wrote:
+>> From: Shannon Zhao <shannon.zhao@linaro.org>
+>>
+>> When we use tools like perf on host, perf passes the event type and the
+>> id of this event type category to kernel, then kernel will map them to
+>> hardware event number and write this number to PMU PMEVTYPER<n>_EL0
+>> register. When getting the event number in KVM, directly use raw event
+>> type to create a perf_event for it.
+>>
+>> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+>> ---
+>>  arch/arm64/include/asm/pmu.h |   2 +
+>>  arch/arm64/kvm/Makefile      |   1 +
+>>  include/kvm/arm_pmu.h        |  13 +++++
+>>  virt/kvm/arm/pmu.c           | 117 +++++++++++++++++++++++++++++++++++++++++++
+>>  4 files changed, 133 insertions(+)
+>>  create mode 100644 virt/kvm/arm/pmu.c
+>>
+>> diff --git a/arch/arm64/include/asm/pmu.h b/arch/arm64/include/asm/pmu.h
+>> index b9f394a..2c025f2 100644
+>> --- a/arch/arm64/include/asm/pmu.h
+>> +++ b/arch/arm64/include/asm/pmu.h
+>> @@ -31,6 +31,8 @@
+>>  #define ARMV8_PMCR_D		(1 << 3) /* CCNT counts every 64th cpu cycle */
+>>  #define ARMV8_PMCR_X		(1 << 4) /* Export to ETM */
+>>  #define ARMV8_PMCR_DP		(1 << 5) /* Disable CCNT if non-invasive debug*/
+>> +/* Determines which PMCCNTR_EL0 bit generates an overflow */
+>> +#define ARMV8_PMCR_LC		(1 << 6)
+>>  #define	ARMV8_PMCR_N_SHIFT	11	 /* Number of counters supported */
+>>  #define	ARMV8_PMCR_N_MASK	0x1f
+>>  #define	ARMV8_PMCR_MASK		0x3f	 /* Mask for writable bits */
+>> diff --git a/arch/arm64/kvm/Makefile b/arch/arm64/kvm/Makefile
+>> index 1949fe5..18d56d8 100644
+>> --- a/arch/arm64/kvm/Makefile
+>> +++ b/arch/arm64/kvm/Makefile
+>> @@ -27,3 +27,4 @@ kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic-v3.o
+>>  kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/vgic-v3-emul.o
+>>  kvm-$(CONFIG_KVM_ARM_HOST) += vgic-v3-switch.o
+>>  kvm-$(CONFIG_KVM_ARM_HOST) += $(KVM)/arm/arch_timer.o
+>> +kvm-$(CONFIG_KVM_ARM_PMU) += $(KVM)/arm/pmu.o
+>> diff --git a/include/kvm/arm_pmu.h b/include/kvm/arm_pmu.h
+>> index 254d2b4..1908c88 100644
+>> --- a/include/kvm/arm_pmu.h
+>> +++ b/include/kvm/arm_pmu.h
+>> @@ -38,4 +38,17 @@ struct kvm_pmu {
+>>  #endif
+>>  };
+>>  
+>> +#ifdef CONFIG_KVM_ARM_PMU
+>> +unsigned long kvm_pmu_get_counter_value(struct kvm_vcpu *vcpu, u32 select_idx);
+>> +void kvm_pmu_set_counter_event_type(struct kvm_vcpu *vcpu, u32 data,
+>> +				    u32 select_idx);
+>> +#else
+>> +unsigned long kvm_pmu_get_counter_value(struct kvm_vcpu *vcpu, u32 select_idx)
+>> +{
+>> +	return 0;
+>> +}
+>> +void kvm_pmu_set_counter_event_type(struct kvm_vcpu *vcpu, u32 data,
+>> +				    u32 select_idx) {}
+>> +#endif
+>> +
+>>  #endif
+>> diff --git a/virt/kvm/arm/pmu.c b/virt/kvm/arm/pmu.c
+>> new file mode 100644
+>> index 0000000..900a64c
+>> --- /dev/null
+>> +++ b/virt/kvm/arm/pmu.c
+>> @@ -0,0 +1,117 @@
+>> +/*
+>> + * Copyright (C) 2015 Linaro Ltd.
+>> + * Author: Shannon Zhao <shannon.zhao@linaro.org>
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License version 2 as
+>> + * published by the Free Software Foundation.
+>> + *
+>> + * This program is distributed in the hope that it will be useful,
+>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>> + * GNU General Public License for more details.
+>> + *
+>> + * You should have received a copy of the GNU General Public License
+>> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+>> + */
+>> +
+>> +#include <linux/cpu.h>
+>> +#include <linux/kvm.h>
+>> +#include <linux/kvm_host.h>
+>> +#include <linux/perf_event.h>
+>> +#include <asm/kvm_emulate.h>
+>> +#include <kvm/arm_pmu.h>
+>> +
+>> +/**
+>> + * kvm_pmu_get_counter_value - get PMU counter value
+>> + * @vcpu: The vcpu pointer
+>> + * @select_idx: The counter index
+>> + */
+>> +unsigned long kvm_pmu_get_counter_value(struct kvm_vcpu *vcpu, u32 select_idx)
+>> +{
+>> +	u64 counter, enabled, running;
+>> +	struct kvm_pmu *pmu = &vcpu->arch.pmu;
+>> +	struct kvm_pmc *pmc = &pmu->pmc[select_idx];
+>> +
+>> +	if (!vcpu_mode_is_32bit(vcpu))
+>> +		counter = vcpu_sys_reg(vcpu, PMEVCNTR0_EL0 + select_idx);
+>> +	else
+>> +		counter = vcpu_cp15(vcpu, c14_PMEVCNTR0 + select_idx);
+>> +
+>> +	if (pmc->perf_event)
+>> +		counter += perf_event_read_value(pmc->perf_event, &enabled,
+>> +						 &running);
+>> +
+>> +	return counter & pmc->bitmask;
+>> +}
+>> +
+>> +/**
+>> + * kvm_pmu_stop_counter - stop PMU counter
+>> + * @pmc: The PMU counter pointer
+>> + *
+>> + * If this counter has been configured to monitor some event, release it here.
+>> + */
+>> +static void kvm_pmu_stop_counter(struct kvm_pmc *pmc)
+>> +{
+>> +	struct kvm_vcpu *vcpu = pmc->vcpu;
+>> +	u64 counter;
+>> +
+>> +	if (pmc->perf_event) {
+>> +		counter = kvm_pmu_get_counter_value(vcpu, pmc->idx);
+>> +		if (!vcpu_mode_is_32bit(vcpu))
+>> +			vcpu_sys_reg(vcpu, PMEVCNTR0_EL0 + pmc->idx) = counter;
+>> +		else
+>> +			vcpu_cp15(vcpu, c14_PMEVCNTR0 + pmc->idx) = counter;
+>> +
+>> +		perf_event_release_kernel(pmc->perf_event);
+>> +		pmc->perf_event = NULL;
+>> +	}
+>> +}
+>> +
+>> +/**
+>> + * kvm_pmu_set_counter_event_type - set selected counter to monitor some event
+>> + * @vcpu: The vcpu pointer
+>> + * @data: The data guest writes to PMXEVTYPER_EL0
+>> + * @select_idx: The number of selected counter
+>> + *
+>> + * When OS accesses PMXEVTYPER_EL0, that means it wants to set a PMC to count an
+>> + * event with given hardware event number. Here we call perf_event API to
+>> + * emulate this action and create a kernel perf event for it.
+>> + */
+>> +void kvm_pmu_set_counter_event_type(struct kvm_vcpu *vcpu, u32 data,
+>> +				    u32 select_idx)
+>> +{
+>> +	struct kvm_pmu *pmu = &vcpu->arch.pmu;
+>> +	struct kvm_pmc *pmc = &pmu->pmc[select_idx];
+>> +	struct perf_event *event;
+>> +	struct perf_event_attr attr;
+>> +	u32 eventsel;
+>> +	u64 counter;
+>> +
+>> +	kvm_pmu_stop_counter(pmc);
+>> +	eventsel = data & ARMV8_EVTYPE_EVENT;
+>> +
+>> +	memset(&attr, 0, sizeof(struct perf_event_attr));
+>> +	attr.type = PERF_TYPE_RAW;
+>> +	attr.size = sizeof(attr);
+>> +	attr.pinned = 1;
+>> +	attr.disabled = 1;
 > 
-> This driver uses existing DT binding information and there should
-> be no functionality change in the supported platforms.
+> Should this value be calculated from PMCR.E and PMCNTENSET/CLR state?
 > 
-> Signed-off-by: Amit Daniel Kachhap <amitdanielk@gmail.com>
-> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
-> ---
->  arch/arm/mach-exynos/Kconfig                                   | 1 +
->  arch/arm/mach-exynos/Makefile                                  | 4 +---
->  drivers/soc/samsung/Kconfig                                    | 4 ++++
->  drivers/soc/samsung/Makefile                                   | 4 ++++
->  arch/arm/mach-exynos/pmu.c => drivers/soc/samsung/exynos-pmu.c | 0
->  {arch/arm/mach-exynos => drivers/soc/samsung}/exynos-pmu.h     | 0
->  {arch/arm/mach-exynos => drivers/soc/samsung}/exynos3250-pmu.c | 0
->  {arch/arm/mach-exynos => drivers/soc/samsung}/exynos4-pmu.c    | 0
->  {arch/arm/mach-exynos => drivers/soc/samsung}/exynos5250-pmu.c | 0
->  {arch/arm/mach-exynos => drivers/soc/samsung}/exynos5420-pmu.c | 0
->  10 files changed, 10 insertions(+), 3 deletions(-)
->  rename arch/arm/mach-exynos/pmu.c => drivers/soc/samsung/exynos-pmu.c (100%)
->  rename {arch/arm/mach-exynos => drivers/soc/samsung}/exynos-pmu.h (100%)
->  rename {arch/arm/mach-exynos => drivers/soc/samsung}/exynos3250-pmu.c (100%)
->  rename {arch/arm/mach-exynos => drivers/soc/samsung}/exynos4-pmu.c (100%)
->  rename {arch/arm/mach-exynos => drivers/soc/samsung}/exynos5250-pmu.c (100%)
->  rename {arch/arm/mach-exynos => drivers/soc/samsung}/exynos5420-pmu.c (100%)
+Sure.
+
+>> +	attr.exclude_user = data & ARMV8_EXCLUDE_EL0 ? 1 : 0;
+>> +	attr.exclude_kernel = data & ARMV8_EXCLUDE_EL1 ? 1 : 0;
+>> +	attr.exclude_hv = 1; /* Don't count EL2 events */
 > 
-> diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
-> index 83c85f5..874cb38 100644
-> --- a/arch/arm/mach-exynos/Kconfig
-> +++ b/arch/arm/mach-exynos/Kconfig
-> @@ -16,6 +16,7 @@ menuconfig ARCH_EXYNOS
->  	select ARM_GIC
->  	select COMMON_CLK_SAMSUNG
->  	select EXYNOS_THERMAL
-> +	select EXYNOS_PMU
->  	select EXYNOS_SROM if PM
->  	select HAVE_ARM_SCU if SMP
->  	select HAVE_S3C2410_I2C if I2C
-> diff --git a/arch/arm/mach-exynos/Makefile b/arch/arm/mach-exynos/Makefile
-> index 2d58063..34d29df 100644
-> --- a/arch/arm/mach-exynos/Makefile
-> +++ b/arch/arm/mach-exynos/Makefile
-> @@ -9,9 +9,7 @@ ccflags-$(CONFIG_ARCH_MULTIPLATFORM) += -I$(srctree)/$(src)/include -I$(srctree)
->  
->  # Core
->  
-> -obj-$(CONFIG_ARCH_EXYNOS)	+= exynos.o pmu.o exynos-smc.o firmware.o \
-> -					exynos3250-pmu.o exynos4-pmu.o \
-> -					exynos5250-pmu.o exynos5420-pmu.o
-> +obj-$(CONFIG_ARCH_EXYNOS)	+= exynos.o exynos-smc.o firmware.o
->  
->  obj-$(CONFIG_EXYNOS_CPU_SUSPEND) += pm.o sleep.o
->  obj-$(CONFIG_PM_SLEEP)		+= suspend.o
-> diff --git a/drivers/soc/samsung/Kconfig b/drivers/soc/samsung/Kconfig
-> index 2833b5b..f545d6c 100644
-> --- a/drivers/soc/samsung/Kconfig
-> +++ b/drivers/soc/samsung/Kconfig
-> @@ -10,4 +10,8 @@ config EXYNOS_SROM
->  	bool
->  	depends on ARM && ARCH_EXYNOS && PM
->  
-> +config EXYNOS_PMU
-> +	bool
-> +	depends on ARCH_EXYNOS
-> +
->  endmenu
-> diff --git a/drivers/soc/samsung/Makefile b/drivers/soc/samsung/Makefile
-> index 9c554d5..26fb489 100644
-> --- a/drivers/soc/samsung/Makefile
-> +++ b/drivers/soc/samsung/Makefile
-> @@ -1 +1,5 @@
->  obj-$(CONFIG_EXYNOS_SROM)	+= exynos-srom.o
-> +ifdef CONFIG_ARM
-> +obj-$(CONFIG_EXYNOS_PMU)	+= exynos-pmu.o exynos3250-pmu.o exynos4-pmu.o \
-> +					exynos5250-pmu.o exynos5420-pmu.o
-> +endif
-> diff --git a/arch/arm/mach-exynos/pmu.c b/drivers/soc/samsung/exynos-pmu.c
-> similarity index 100%
-> rename from arch/arm/mach-exynos/pmu.c
-> rename to drivers/soc/samsung/exynos-pmu.c
-> diff --git a/arch/arm/mach-exynos/exynos-pmu.h b/drivers/soc/samsung/exynos-pmu.h
-
-1. Please reorder the exynos_sys_powerdown_conf() to be after the
-statics. I am thinking also about adding EXPORT_SYMBOL... but maybe this
-would be over-thinking.
-
-2. I think the proper location of everything is drivers/power/reset/.
-Although I don't have strong opinion.
-
-3. Please cc linux-pm and arm-soc guys (Arnd, Olof, Kevin) on next
-iteration.
-
-Best regards,
-Krzysztof
-
-> similarity index 100%
-> rename from arch/arm/mach-exynos/exynos-pmu.h
-> rename to drivers/soc/samsung/exynos-pmu.h
-> diff --git a/arch/arm/mach-exynos/exynos3250-pmu.c b/drivers/soc/samsung/exynos3250-pmu.c
-> similarity index 100%
-> rename from arch/arm/mach-exynos/exynos3250-pmu.c
-> rename to drivers/soc/samsung/exynos3250-pmu.c
-> diff --git a/arch/arm/mach-exynos/exynos4-pmu.c b/drivers/soc/samsung/exynos4-pmu.c
-> similarity index 100%
-> rename from arch/arm/mach-exynos/exynos4-pmu.c
-> rename to drivers/soc/samsung/exynos4-pmu.c
-> diff --git a/arch/arm/mach-exynos/exynos5250-pmu.c b/drivers/soc/samsung/exynos5250-pmu.c
-> similarity index 100%
-> rename from arch/arm/mach-exynos/exynos5250-pmu.c
-> rename to drivers/soc/samsung/exynos5250-pmu.c
-> diff --git a/arch/arm/mach-exynos/exynos5420-pmu.c b/drivers/soc/samsung/exynos5420-pmu.c
-> similarity index 100%
-> rename from arch/arm/mach-exynos/exynos5420-pmu.c
-> rename to drivers/soc/samsung/exynos5420-pmu.c
+> Should this be calculated from PMXEVTYPER.NSH?
 > 
+As discussed with Christoffer before, it's unlikely to support
+nested-virtualiztion on ARMv8 and guest will not see EL2. So it doesn't
+need to take care the value of PMXEVTYPER.NSH since it should not count
+EL2 events.
+
+>> +	attr.exclude_host = 1; /* Don't count host events */
+>> +	attr.config = eventsel;
+>> +
+>> +	counter = kvm_pmu_get_counter_value(vcpu, select_idx);
+>> +	/* The initial sample period (overflow count) of an event. */
+>> +	attr.sample_period = (-counter) & pmc->bitmask;
+>> +
+>> +	event = perf_event_create_kernel_counter(&attr, -1, current, NULL, pmc);
+>> +	if (IS_ERR(event)) {
+>> +		printk_once("kvm: pmu event creation failed %ld\n",
+>> +			    PTR_ERR(event));
+>> +		return;
+>> +	}
+>> +
+>> +	pmc->perf_event = event;
+>> +}
+>>
+> 
+> 
+
+-- 
+Shannon
