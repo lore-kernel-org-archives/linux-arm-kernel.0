@@ -1,30 +1,41 @@
-From: stuart.yoder@freescale.com (Stuart Yoder)
-Date: Tue, 3 Nov 2015 22:26:34 +0000
-Subject: [PATCH v4] arm64: dts: Added syscon-reboot node for FSL's LS2085A
- SoC
-In-Reply-To: <1446235498-4093-1-git-send-email-German.Rivera@freescale.com>
-References: <1446235498-4093-1-git-send-email-German.Rivera@freescale.com>
-Message-ID: <CY1PR0301MB0748AB5722A44E0D65F5E29F872B0@CY1PR0301MB0748.namprd03.prod.outlook.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 3 Nov 2015 22:39:04 +0000
+Subject: [PATCH v2 2/2] arm: mm: support ARCH_MMAP_RND_BITS.
+In-Reply-To: <CAGXu5jKGzDD9WVQnMTT2EfupZtjpdcASUpx-3npLAB-FctLodA@mail.gmail.com>
+References: <1446574204-15567-1-git-send-email-dcashman@android.com>
+ <1446574204-15567-2-git-send-email-dcashman@android.com>
+ <CAGXu5jKGzDD9WVQnMTT2EfupZtjpdcASUpx-3npLAB-FctLodA@mail.gmail.com>
+Message-ID: <20151103223904.GG8644@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-> -----Original Message-----
-> From: J. German Rivera [mailto:German.Rivera at freescale.com]
-> Sent: Friday, October 30, 2015 3:05 PM
-> To: robh+dt at kernel.org; mark.rutland at arm.com; devicetree at vger.kernel.org; linux-arm-
-> kernel at lists.infradead.org; linux-kernel at vger.kernel.org
-> Cc: Sharma Bhupesh-B45370; Yoder Stuart-B08248; Li Yang-Leo-R58472; Rivera Jose-B46482
-> Subject: [PATCH v4] arm64: dts: Added syscon-reboot node for FSL's LS2085A SoC
+On Tue, Nov 03, 2015 at 11:19:44AM -0800, Kees Cook wrote:
+> On Tue, Nov 3, 2015 at 10:10 AM, Daniel Cashman <dcashman@android.com> wrote:
+> > From: dcashman <dcashman@google.com>
+> >
+> > arm: arch_mmap_rnd() uses a hard-code value of 8 to generate the
+> > random offset for the mmap base address.  This value represents a
+> > compromise between increased ASLR effectiveness and avoiding
+> > address-space fragmentation. Replace it with a Kconfig option, which
+> > is sensibly bounded, so that platform developers may choose where to
+> > place this compromise. Keep 8 as the minimum acceptable value.
+> >
+> > Signed-off-by: Daniel Cashman <dcashman@google.com>
 > 
-> Added sys-reboot node to the FSL's LS2085A SoC DT to leverage
-> the ARM-generic reboot mechanism for this SoC. This mechanism
-> is enabled through CONFIG_POWER_RESET_SYSCON.
+> Acked-by: Kees Cook <keescook@chromium.org>
+> 
+> Russell, if you don't see any problems here, it might make sense not
+> to put this through the ARM patch tracker since it depends on the 1/2,
+> and I think x86 and arm64 (and possibly other arch) changes are coming
+> too.
 
-German, one thing I noticed with this patch-- with the name change to
-ls2080a, we should update the patch subject and commit message
-to reflect that.
+Yes, it looks sane, though I do wonder whether there should also be
+a Kconfig option to allow archtectures to specify the default, instead
+of the default always being the minimum randomisation.  I can see scope
+to safely pushing our mmap randomness default to 12, especially on 3GB
+setups, as we already have 11 bits of randomness on the sigpage and if
+enabled, 13 bits on the heap.
 
-Thanks,
-Stuart
+-- 
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
