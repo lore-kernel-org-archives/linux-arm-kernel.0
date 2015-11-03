@@ -1,63 +1,41 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Tue, 3 Nov 2015 16:18:52 +0000
-Subject: [PATCH v10 0/5] xen/arm/arm64: CONFIG_PARAVIRT and stolen ticks
- accounting
-Message-ID: <alpine.DEB.2.02.1511031536540.3438@kaball.uk.xensource.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 3 Nov 2015 16:19:39 +0000
+Subject: [PATCH 10/11] tty: amba-pl011: add support for 32-bit register
+ access
+In-Reply-To: <5638CB41.1000807@codeaurora.org>
+References: <20151103134349.GV8644@n2100.arm.linux.org.uk>
+ <E1Ztcw4-0007Ct-PP@rmk-PC.arm.linux.org.uk>
+ <5638CB41.1000807@codeaurora.org>
+Message-ID: <20151103161939.GB8644@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+On Tue, Nov 03, 2015 at 08:57:05AM -0600, Timur Tabi wrote:
+> Russell King wrote:
+> >-	return readw(uap->port.membase + pl011_reg_to_offset(uap, reg));
+> >+	void __iomem *addr = uap->port.membase + pl011_reg_to_offset(uap, reg);
+> >+
+> >+	return uap->access_32b ? readl(addr) : readw(addr);
+> 
+> Ok, ignore my previous email.  I just noticed this.
+> 
+> This version is fine, except that it now performs a runtime check for every
+> I/O access.  Isn't that too much overhead?  access_32b will always be either
+> True or False for the life of the entire SOC.
 
-I dusted off this series from Jan 2014. Patch #2 and #3 still need an ack.
+It's a balance between a few more branches and killing six registers
+(r0 - r3, ip, lr) on every register access due to a function call.
+If GCC was a reasonable compiler, it could be done without incuring
+any branches, merely by using conditional instructions, but GCC on
+ARM really sucks - it wants to reload the base address, offset and
+access_32b flag on every device access despite the struct being
+marked const.  You'll get the same with your approach when adding
+the register offsets, but it'll be worse - the compiler will have to
+also reload the function pointer as well on every access.
 
+So, my gut feeling is that my approach is better than the function
+pointer call, especially with modern CPUs with branch prediction.
 
-This patch series introduces stolen ticks accounting for Xen on ARM and
-ARM64.  Stolen ticks are clocksource ticks that have been "stolen" from
-the cpu, typically because Linux is running in a virtual machine and the
-vcpu has been descheduled.  To account for these ticks we introduce
-CONFIG_PARAVIRT and pv_time_ops so that we can make use of:
-
-kernel/sched/cputime.c:steal_account_process_tick
-
-Changes in v10:
-- rebase
-- remove ia64 xen changes
-- add acks
-- send the correct version of patch #2 (last time I sent an older
-  version by mistake)
-- remove ifdef CONFIG_PARAVIRT from kernel/sched/core.c
-- replace "---help---" with "help" in arm and arm64 Kconfig changes
-
-
-Stefano Stabellini (5):
-      xen: move xen_setup_runstate_info and get_runstate_snapshot to drivers/xen/time.c
-      missing include in cputime.c, remove #ifdef CONFIG_PARAVIRT from sched/core.c
-      arm: introduce CONFIG_PARAVIRT, PARAVIRT_TIME_ACCOUNTING and pv_time_ops
-      arm64: introduce CONFIG_PARAVIRT, PARAVIRT_TIME_ACCOUNTING and pv_time_ops
-      xen/arm: account for stolen ticks
-
- arch/arm/Kconfig                  |   20 ++++++++
- arch/arm/include/asm/paravirt.h   |   20 ++++++++
- arch/arm/kernel/Makefile          |    1 +
- arch/arm/kernel/paravirt.c        |   25 ++++++++++
- arch/arm/xen/enlighten.c          |   21 +++++++++
- arch/arm64/Kconfig                |   20 ++++++++
- arch/arm64/include/asm/paravirt.h |   20 ++++++++
- arch/arm64/kernel/Makefile        |    1 +
- arch/arm64/kernel/paravirt.c      |   25 ++++++++++
- arch/x86/xen/time.c               |   76 +------------------------------
- drivers/xen/Makefile              |    2 +-
- drivers/xen/time.c                |   91 +++++++++++++++++++++++++++++++++++++
- include/xen/xen-ops.h             |    5 ++
- kernel/sched/core.c               |    2 -
- kernel/sched/cputime.c            |    1 +
- 15 files changed, 252 insertions(+), 78 deletions(-)
- create mode 100644 arch/arm/include/asm/paravirt.h
- create mode 100644 arch/arm/kernel/paravirt.c
- create mode 100644 arch/arm64/include/asm/paravirt.h
- create mode 100644 arch/arm64/kernel/paravirt.c
- create mode 100644 drivers/xen/time.c
-
-Cheers,
-
-Stefano
+-- 
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
