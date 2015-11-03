@@ -1,31 +1,36 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 03 Nov 2015 09:45:25 +0100
-Subject: [RESEND PATCH] ARM: errata: Workaround for Cortex-A12 erratum
- 818325
-In-Reply-To: <1446538209-13490-2-git-send-email-wxt@rock-chips.com>
-References: <1446538209-13490-1-git-send-email-wxt@rock-chips.com>
- <1446538209-13490-2-git-send-email-wxt@rock-chips.com>
-Message-ID: <7094999.meGITi6gTu@wuerfel>
+Date: Tue, 03 Nov 2015 09:49:32 +0100
+Subject: [PATCH] clocksource: dw_apb_timer_of: support timer-based delay
+In-Reply-To: <20151103145940.18ab648f@xhacker>
+References: <1446193659-1698-1-git-send-email-jszhang@marvell.com>
+ <5909853.Bs72yAP0HH@wuerfel> <20151103145940.18ab648f@xhacker>
+Message-ID: <6198599.NHtefZl19R@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 03 November 2015 16:10:09 Caesar Wang wrote:
+On Tuesday 03 November 2015 14:59:40 Jisheng Zhang wrote:
+> > On Monday 02 November 2015 11:03:34 Jisheng Zhang wrote:
+> > > On Fri, 30 Oct 2015 13:42:01 +0100 Arnd Bergmann wrote:  
+> > I'd be happier with a solution that keeps the DT describing the hardware
+> > and not the way we expect Linux to use it, and instead has some heuristic
+> > in the selection of the delay timer. At the moment, we purely base this
+> > on the frequency, which as you say is suboptimal.
+> > 
+> > One possible way to improve this would be to add an optional 'latency'
+> > property to the DT nodes (or the driver), and use a combination of latency
+> > and resolution to make the decision.
 > 
-> +       /* Cortex-A12 Errata */
-> +       ldr     r10, =0x00000c0d                @ Cortex-A12 primary part number
-> +       teq     r0, r10
-> +       bne     5f
-> +#ifdef CONFIG_ARM_ERRATA_818325
-> +       teq     r6, #0x00                       @ present in r0p0
-> +       teqne   r6, #0x01                       @ present in r0p1-00lac0-rc11
-> +       mrceq   p15, 0, r10, c15, c0, 1         @ read diagnostic register
-> +       orreq   r10, r10, #1 << 12              @ set bit #12
-> +       mcreq   p15, 0, r10, c15, c0, 1         @ write diagnostic register
-> +       isb
-> +#endif
->         /* Cortex-A15 Errata */
+> Got it. Thanks for the suggestions. The 'latency' here seems a 'rating'
+> similar as the one in clocksource. I will cook a series for review:
 > 
+> patch 1 to make register_current_timer_delay() aware of 'rating'
+> 
+> patch 2 to set rating of arch timer as 400
+> 
+> patch 3 to add timer based delay support to dw_apb_timer whose rating is 300
 
-Does this still build? You seem to have lost the '5:' label.
+Ok. Just to make sure I got this right: your plan is to use the existing
+'rating' setting as a primary indication, and fall back to comparing the
+frequency if the rating is the same?
 
 	Arnd
