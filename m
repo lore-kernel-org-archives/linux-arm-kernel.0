@@ -1,41 +1,27 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 03 Nov 2015 15:56:34 +0100
-Subject: [PATCH] HID: hid-gfrm: avoid warning for input_configured API change
-Message-ID: <14835877.IL6ArpWV8Q@wuerfel>
+From: timur@codeaurora.org (Timur Tabi)
+Date: Tue, 3 Nov 2015 08:57:05 -0600
+Subject: [PATCH 10/11] tty: amba-pl011: add support for 32-bit register
+ access
+In-Reply-To: <E1Ztcw4-0007Ct-PP@rmk-PC.arm.linux.org.uk>
+References: <20151103134349.GV8644@n2100.arm.linux.org.uk>
+ <E1Ztcw4-0007Ct-PP@rmk-PC.arm.linux.org.uk>
+Message-ID: <5638CB41.1000807@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The input_configured callback was recently changed to return
-an 'int', but the newly added driver uses the old API:
+Russell King wrote:
+> -	return readw(uap->port.membase + pl011_reg_to_offset(uap, reg));
+> +	void __iomem *addr = uap->port.membase + pl011_reg_to_offset(uap, reg);
+> +
+> +	return uap->access_32b ? readl(addr) : readw(addr);
 
-drivers/hid/hid-gfrm.c:151:22: warning: initialization from incompatible pointer type [-Wincompatible-pointer-types]
+Ok, ignore my previous email.  I just noticed this.
 
-This changes the driver like the other ones.
+This version is fine, except that it now performs a runtime check for 
+every I/O access.  Isn't that too much overhead?  access_32b will always 
+be either True or False for the life of the entire SOC.
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: 34fc1322e7aa ("HID: hid-gfrm: Google Fiber TV Box remote controls")
-Fixes: b2c68a2f1bab ("HID: hid-input: allow input_configured callback return errors")
----
-Found on ARM allmodconfig with yesterday's linux-next
-
-diff --git a/drivers/hid/hid-gfrm.c b/drivers/hid/hid-gfrm.c
-index 4d7b7e7f0792..075b1c020846 100644
---- a/drivers/hid/hid-gfrm.c
-+++ b/drivers/hid/hid-gfrm.c
-@@ -88,7 +88,7 @@ static int gfrm_raw_event(struct hid_device *hdev, struct hid_report *report,
- 	return (ret < 0) ? ret : -1;
- }
- 
--static void gfrm_input_configured(struct hid_device *hid, struct hid_input *hidinput)
-+static int gfrm_input_configured(struct hid_device *hid, struct hid_input *hidinput)
- {
- 	/*
- 	 * Enable software autorepeat with:
-@@ -96,6 +96,7 @@ static void gfrm_input_configured(struct hid_device *hid, struct hid_input *hidi
- 	 * - repeat period: 100 msec
- 	 */
- 	input_enable_softrepeat(hidinput->input, 400, 100);
-+	return 0;
- }
- 
- static int gfrm_probe(struct hid_device *hdev, const struct hid_device_id *id)
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the
+Code Aurora Forum, hosted by The Linux Foundation.
