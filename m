@@ -1,46 +1,28 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Tue,  3 Nov 2015 14:05:57 +0100
-Subject: [PATCH] ARM: pxa: palm: Fix typos in PWM lookup table code
-Message-ID: <1446555957-27520-1-git-send-email-thierry.reding@gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 3 Nov 2015 13:17:34 +0000
+Subject: [RFC] iommu: arm-smmu: correct reference count
+In-Reply-To: <1446555557-3097-1-git-send-email-van.freenix@gmail.com>
+References: <1446555557-3097-1-git-send-email-van.freenix@gmail.com>
+Message-ID: <20151103131734.GE14159@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The patches that were applied to add PWM lookup tables for legacy boards
-were from v1 of the series instead of the revised v2 where the resulting
-build errors had already been fixed.
+On Tue, Nov 03, 2015 at 08:59:17PM +0800, Peng Fan wrote:
+> iommu_group_alloc will initialize the reference count for group to 1.
+> iommu_group_add_device also increase the group reference count,
+> if nothing bad happends. And we need to add iommu_group_put to
+> decrease the reference count for group.
+> 
+> Signed-off-by: Peng Fan <van.freenix@gmail.com>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Joerg Roedel <joro@8bytes.org>
+> ---
+> 
+> Not sure whether my understanding is correct or not. I checked rockchip-iommu.c
+> exynos-iommu.c and fsl_pamu_domain.c, and they all have iommu_group_put after
+> iommu_group_add_device.
 
-Reported-by: Arnd Bergmann <arnd@arndb.de>
-Signed-off-by: Thierry Reding <thierry.reding@gmail.com>
----
- arch/arm/mach-pxa/palm27x.c | 2 +-
- arch/arm/mach-pxa/palmtc.c  | 2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+Doesn't this pair up with the iommu_group_remove_device in
+arm_smmu_remove_device? Are you actually seeing an issue in practice?
 
-diff --git a/arch/arm/mach-pxa/palm27x.c b/arch/arm/mach-pxa/palm27x.c
-index 13eba2b26e0a..8fbfb10047ec 100644
---- a/arch/arm/mach-pxa/palm27x.c
-+++ b/arch/arm/mach-pxa/palm27x.c
-@@ -344,7 +344,7 @@ void __init palm27x_pwm_init(int bl, int lcd)
- {
- 	palm_bl_power	= bl;
- 	palm_lcd_power	= lcd;
--	pwm_add_lookup(palm27x_pwm_lookup, ARRAY_SIZE(palm27x_pwm_lookup));
-+	pwm_add_table(palm27x_pwm_lookup, ARRAY_SIZE(palm27x_pwm_lookup));
- 	platform_device_register(&palm27x_backlight);
- }
- #endif
-diff --git a/arch/arm/mach-pxa/palmtc.c b/arch/arm/mach-pxa/palmtc.c
-index aebf6de62468..0b5c3876720c 100644
---- a/arch/arm/mach-pxa/palmtc.c
-+++ b/arch/arm/mach-pxa/palmtc.c
-@@ -169,7 +169,7 @@ static inline void palmtc_keys_init(void) {}
- #if defined(CONFIG_BACKLIGHT_PWM) || defined(CONFIG_BACKLIGHT_PWM_MODULE)
- static struct pwm_lookup palmtc_pwm_lookup[] = {
- 	PWM_LOOKUP("pxa25x-pwm.1", 0, "pwm-backlight.0", NULL, PALMTC_PERIOD_NS,
--		   PWM_PERIOD_NORMAL),
-+		   PWM_POLARITY_NORMAL),
- };
- 
- static struct platform_pwm_backlight_data palmtc_backlight_data = {
--- 
-2.5.0
+Will
