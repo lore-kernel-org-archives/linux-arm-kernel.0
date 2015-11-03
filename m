@@ -1,25 +1,58 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Tue, 3 Nov 2015 13:04:24 +0100
-Subject: [PATCH 20/22] clocksource/drivers/exynos_mct: Fix Kconfig and add
- COMPILE_TEST option
-In-Reply-To: <5638A1FE.1000403@samsung.com>
-References: <1446469011-22710-1-git-send-email-daniel.lezcano@linaro.org>
- <563806E7.6010105@samsung.com> <563872E2.10001@linaro.org>
- <9713489.TbNNoNQg5A@wuerfel> <5638A1FE.1000403@samsung.com>
-Message-ID: <5638A2C8.2010100@linaro.org>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 3 Nov 2015 12:05:05 +0000
+Subject: [PATCH] arm64: Increase the max granular size
+In-Reply-To: <CAMuHMdWQygbxMXoOsbwek6DzZcr7J-C23VCK4ubbgUr+zj=giw@mail.gmail.com>
+References: <1442944788-17254-1-git-send-email-rric@kernel.org>
+ <20151028190948.GJ8899@e104818-lin.cambridge.arm.com>
+ <CAMuHMdWQygbxMXoOsbwek6DzZcr7J-C23VCK4ubbgUr+zj=giw@mail.gmail.com>
+Message-ID: <20151103120504.GF7637@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/03/2015 01:01 PM, Krzysztof Kozlowski wrote:
-> Anyway the patch worked fine and with explanation I can only confirm:
+On Tue, Nov 03, 2015 at 12:07:06PM +0100, Geert Uytterhoeven wrote:
+> On Wed, Oct 28, 2015 at 8:09 PM, Catalin Marinas
+> <catalin.marinas@arm.com> wrote:
+> > On Tue, Sep 22, 2015 at 07:59:48PM +0200, Robert Richter wrote:
+> >> From: Tirumalesh Chalamarla <tchalamarla@cavium.com>
+> >>
+> >> Increase the standard cacheline size to avoid having locks in the same
+> >> cacheline.
+> >>
+> >> Cavium's ThunderX core implements cache lines of 128 byte size. With
+> >> current granulare size of 64 bytes (L1_CACHE_SHIFT=6) two locks could
+> >> share the same cache line leading a performance degradation.
+> >> Increasing the size fixes that.
+> >>
+> >> Increasing the size has no negative impact to cache invalidation on
+> >> systems with a smaller cache line. There is an impact on memory usage,
+> >> but that's not too important for arm64 use cases.
+> >>
+> >> Signed-off-by: Tirumalesh Chalamarla <tchalamarla@cavium.com>
+> >> Signed-off-by: Robert Richter <rrichter@cavium.com>
+> >
+> > Applied. Thanks.
+> 
+> This patch causes a BUG() on r8a7795/salvator-x, for which support is not
+> yet upstream.
+> 
+> My config (attached) uses SLAB. If I switch to SLUB, it works.
+> The arm64 defconfig works, even if I switch from SLUB to SLAB.
+[...]
+> ------------[ cut here ]------------
+> kernel BUG at mm/slab.c:2283!
+> Internal error: Oops - BUG: 0 [#1] SMP
+[...]
+> Call trace:
+> [<ffffffc00014f9b4>] __kmem_cache_create+0x21c/0x280
+> [<ffffffc00068be50>] create_boot_cache+0x4c/0x80
+> [<ffffffc00068bed8>] create_kmalloc_cache+0x54/0x88
+> [<ffffffc00068bfc0>] create_kmalloc_caches+0x50/0xf4
+> [<ffffffc00068db08>] kmem_cache_init+0x104/0x118
+> [<ffffffc00067d7d8>] start_kernel+0x218/0x33c
 
-Great ! Thanks Krzysztof for testing.
-
-   -- Daniel
+I haven't managed to reproduce this on a Juno kernel. Could you please
+add some debug printing to see what's being passed to kmalloc_slab()?
+The freelist_size getting out of bounds?
 
 -- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Catalin
