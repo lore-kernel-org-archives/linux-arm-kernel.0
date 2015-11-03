@@ -1,212 +1,98 @@
 From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Tue, 03 Nov 2015 10:46:38 +0900
-Subject: [PATCH v3 2/7] ARM: EXYNOS: Move pmu specific headers under
- "linux/soc/samsung"
-In-Reply-To: <1445864143-25695-3-git-send-email-pankaj.dubey@samsung.com>
+Date: Tue, 03 Nov 2015 10:55:04 +0900
+Subject: [PATCH v3 3/7] ARCH: EXYNOS: split up exynos3250 SoC specific PMU
+ data
+In-Reply-To: <1445864143-25695-4-git-send-email-pankaj.dubey@samsung.com>
 References: <1445864143-25695-1-git-send-email-pankaj.dubey@samsung.com>
- <1445864143-25695-3-git-send-email-pankaj.dubey@samsung.com>
-Message-ID: <563811FE.6010108@samsung.com>
+ <1445864143-25695-4-git-send-email-pankaj.dubey@samsung.com>
+Message-ID: <563813F8.6000201@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 26.10.2015 21:55, Pankaj Dubey wrote:
-> Moving Exynos PMU specific header file into "include/linux/soc/samsung"
-> thus updated affected files under "mach-exynos" to use new location of
-> these header files.
+> This patch splits up mach-exynos/pmu.c file, and moves exynos3250 PMU
+> configuration data and functions handing those data into exynos3250
+> SoC specific PMU file mach-exynos/exynos3250-pmu.c.
 > 
-> Signed-off-by: Amit Daniel Kachhap <amitdanielk@gmail.com>
 > Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
 > ---
->  arch/arm/mach-exynos/exynos.c                                     | 2 +-
->  arch/arm/mach-exynos/mcpm-exynos.c                                | 2 +-
->  arch/arm/mach-exynos/platsmp.c                                    | 2 +-
->  arch/arm/mach-exynos/pm.c                                         | 4 ++--
->  arch/arm/mach-exynos/pmu.c                                        | 6 +++---
->  arch/arm/mach-exynos/suspend.c                                    | 4 ++--
->  {arch/arm/mach-exynos => include/linux/soc/samsung}/exynos-pmu.h  | 2 +-
->  .../regs-pmu.h => include/linux/soc/samsung/exynos-regs-pmu.h     | 8 ++++----
->  8 files changed, 15 insertions(+), 15 deletions(-)
->  rename {arch/arm/mach-exynos => include/linux/soc/samsung}/exynos-pmu.h (90%)
->  rename arch/arm/mach-exynos/regs-pmu.h => include/linux/soc/samsung/exynos-regs-pmu.h (99%)
+>  arch/arm/mach-exynos/Makefile         |   2 +-
+>  arch/arm/mach-exynos/exynos-pmu.h     |  47 +++++++++
+>  arch/arm/mach-exynos/exynos3250-pmu.c | 175 +++++++++++++++++++++++++++++++
+>  arch/arm/mach-exynos/pmu.c            | 189 +---------------------------------
+>  4 files changed, 224 insertions(+), 189 deletions(-)
+>  create mode 100644 arch/arm/mach-exynos/exynos-pmu.h
+>  create mode 100644 arch/arm/mach-exynos/exynos3250-pmu.c
 > 
-> diff --git a/arch/arm/mach-exynos/exynos.c b/arch/arm/mach-exynos/exynos.c
-> index 4ffb90e..5d68ce8 100644
-> --- a/arch/arm/mach-exynos/exynos.c
-> +++ b/arch/arm/mach-exynos/exynos.c
-> @@ -20,6 +20,7 @@
->  #include <linux/platform_device.h>
->  #include <linux/pm_domain.h>
->  #include <linux/irqchip.h>
-> +#include <linux/soc/samsung/exynos-regs-pmu.h>
+> diff --git a/arch/arm/mach-exynos/Makefile b/arch/arm/mach-exynos/Makefile
+> index 2f30676..e869f86 100644
+> --- a/arch/arm/mach-exynos/Makefile
+> +++ b/arch/arm/mach-exynos/Makefile
+> @@ -9,7 +9,7 @@ ccflags-$(CONFIG_ARCH_MULTIPLATFORM) += -I$(srctree)/$(src)/include -I$(srctree)
 >  
->  #include <asm/cacheflush.h>
->  #include <asm/hardware/cache-l2x0.h>
-> @@ -31,7 +32,6 @@
+>  # Core
 >  
->  #include "common.h"
->  #include "mfc.h"
-> -#include "regs-pmu.h"
+> -obj-$(CONFIG_ARCH_EXYNOS)	+= exynos.o pmu.o exynos-smc.o firmware.o
+> +obj-$(CONFIG_ARCH_EXYNOS)	+= exynos.o pmu.o exynos-smc.o firmware.o exynos3250-pmu.o
 >  
->  void __iomem *pmu_base_addr;
->  
-> diff --git a/arch/arm/mach-exynos/mcpm-exynos.c b/arch/arm/mach-exynos/mcpm-exynos.c
-> index 5697819..f086bf6 100644
-> --- a/arch/arm/mach-exynos/mcpm-exynos.c
-> +++ b/arch/arm/mach-exynos/mcpm-exynos.c
-> @@ -16,13 +16,13 @@
->  #include <linux/io.h>
->  #include <linux/of_address.h>
->  #include <linux/syscore_ops.h>
-> +#include <linux/soc/samsung/exynos-regs-pmu.h>
->  
->  #include <asm/cputype.h>
->  #include <asm/cp15.h>
->  #include <asm/mcpm.h>
->  #include <asm/smp_plat.h>
->  
-> -#include "regs-pmu.h"
->  #include "common.h"
->  
->  #define EXYNOS5420_CPUS_PER_CLUSTER	4
-> diff --git a/arch/arm/mach-exynos/platsmp.c b/arch/arm/mach-exynos/platsmp.c
-> index 98a2c0c..d5caf30 100644
-> --- a/arch/arm/mach-exynos/platsmp.c
-> +++ b/arch/arm/mach-exynos/platsmp.c
-> @@ -20,6 +20,7 @@
->  #include <linux/smp.h>
->  #include <linux/io.h>
->  #include <linux/of_address.h>
-> +#include <linux/soc/samsung/exynos-regs-pmu.h>
->  
->  #include <asm/cacheflush.h>
->  #include <asm/cp15.h>
-> @@ -30,7 +31,6 @@
->  #include <mach/map.h>
->  
->  #include "common.h"
-> -#include "regs-pmu.h"
->  
->  extern void exynos4_secondary_startup(void);
->  
-> diff --git a/arch/arm/mach-exynos/pm.c b/arch/arm/mach-exynos/pm.c
-> index 9c1506b..b9b9186 100644
-> --- a/arch/arm/mach-exynos/pm.c
-> +++ b/arch/arm/mach-exynos/pm.c
-> @@ -18,6 +18,8 @@
->  #include <linux/cpu_pm.h>
->  #include <linux/io.h>
->  #include <linux/err.h>
-> +#include <linux/soc/samsung/exynos-regs-pmu.h>
-> +#include <linux/soc/samsung/exynos-pmu.h>
->  
->  #include <asm/firmware.h>
->  #include <asm/smp_scu.h>
-> @@ -29,8 +31,6 @@
->  #include <plat/pm-common.h>
->  
->  #include "common.h"
-> -#include "exynos-pmu.h"
-> -#include "regs-pmu.h"
->  
->  static inline void __iomem *exynos_boot_vector_addr(void)
->  {
-> diff --git a/arch/arm/mach-exynos/pmu.c b/arch/arm/mach-exynos/pmu.c
-> index d936ffa..acbb012 100644
-> --- a/arch/arm/mach-exynos/pmu.c
-> +++ b/arch/arm/mach-exynos/pmu.c
-> @@ -17,10 +17,10 @@
->  #include <linux/notifier.h>
->  #include <linux/reboot.h>
->  
-> -#include <asm/cputype.h>
-> +#include <linux/soc/samsung/exynos-regs-pmu.h>
-> +#include <linux/soc/samsung/exynos-pmu.h>
->  
-> -#include "exynos-pmu.h"
-> -#include "regs-pmu.h"
-> +#include <asm/cputype.h>
->  
->  #define PMU_TABLE_END	(-1U)
->  
-> diff --git a/arch/arm/mach-exynos/suspend.c b/arch/arm/mach-exynos/suspend.c
-> index 21abd9b..d02f7c3 100644
-> --- a/arch/arm/mach-exynos/suspend.c
-> +++ b/arch/arm/mach-exynos/suspend.c
-> @@ -23,6 +23,8 @@
->  #include <linux/of_address.h>
->  #include <linux/err.h>
->  #include <linux/regulator/machine.h>
-> +#include <linux/soc/samsung/exynos-pmu.h>
-> +#include <linux/soc/samsung/exynos-regs-pmu.h>
->  
->  #include <asm/cacheflush.h>
->  #include <asm/hardware/cache-l2x0.h>
-> @@ -36,8 +38,6 @@
->  #include <plat/pm-common.h>
->  
->  #include "common.h"
-> -#include "exynos-pmu.h"
-> -#include "regs-pmu.h"
->  
->  #define REG_TABLE_END (-1U)
->  
-> diff --git a/arch/arm/mach-exynos/exynos-pmu.h b/include/linux/soc/samsung/exynos-pmu.h
-> similarity index 90%
-> rename from arch/arm/mach-exynos/exynos-pmu.h
-> rename to include/linux/soc/samsung/exynos-pmu.h
-> index a2ab0d5..50dd0aa 100644
-> --- a/arch/arm/mach-exynos/exynos-pmu.h
-> +++ b/include/linux/soc/samsung/exynos-pmu.h
-> @@ -1,5 +1,5 @@
->  /*
-> - * Copyright (c) 2014 Samsung Electronics Co., Ltd.
+>  obj-$(CONFIG_EXYNOS_CPU_SUSPEND) += pm.o sleep.o
+>  obj-$(CONFIG_PM_SLEEP)		+= suspend.o
+> diff --git a/arch/arm/mach-exynos/exynos-pmu.h b/arch/arm/mach-exynos/exynos-pmu.h
+> new file mode 100644
+> index 0000000..2da4964
+> --- /dev/null
+> +++ b/arch/arm/mach-exynos/exynos-pmu.h
+> @@ -0,0 +1,47 @@
+> +/*
 > + * Copyright (c) 2015 Samsung Electronics Co., Ltd.
+> + *		http://www.samsung.com
+> + *
+> + * Header for EXYNOS PMU Driver support
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + */
+> +
+> +#ifndef __EXYNOSPMU_H
+> +#define __EXYNOSPMU_H
 
-No changes in file, don't touch the copyright date.
+__EXYNOS_PMU_H
+(and rename it in last patch)
 
-Instead please update the header-inclusion guard:
-__SOC_EXYNOS_PMU_H
-or maybe even (because you added exynos-pmu.h in next patch):
-__LINUX_SOC_EXYNOS_PMU_H
+> +
+> +#include <linux/io.h>
+> +
+> +#define PMU_TABLE_END	(-1U)
+> +
+> +extern void __iomem *pmu_base_addr;
+> +
+> +struct exynos_pmu_conf {
+> +	unsigned int offset;
+> +	u8 val[NUM_SYS_POWERDOWN];
+> +};
+> +
+> +struct exynos_pmu_data {
+> +	const struct exynos_pmu_conf *pmu_config;
+> +	const struct exynos_pmu_conf *pmu_config_extra;
+> +
+> +	void (*pmu_init)(void);
+> +	void (*powerdown_conf)(enum sys_powerdown);
+> +	void (*powerdown_conf_extra)(enum sys_powerdown);
+> +};
+> +
+> +static inline void pmu_raw_writel(u32 val, u32 offset)
+> +{
+> +	writel_relaxed(val, pmu_base_addr + offset);
+> +}
+> +
+> +static inline u32 pmu_raw_readl(u32 offset)
+> +{
+> +	return readl_relaxed(pmu_base_addr + offset);
+> +}
 
+These shouldn't be static inlines in header because you will duplicate
+it in each compiled object. Leave optimizations to compiler.
 
->   *		http://www.samsung.com
->   *
->   * Header for EXYNOS PMU Driver support
-> diff --git a/arch/arm/mach-exynos/regs-pmu.h b/include/linux/soc/samsung/exynos-regs-pmu.h
-> similarity index 99%
-> rename from arch/arm/mach-exynos/regs-pmu.h
-> rename to include/linux/soc/samsung/exynos-regs-pmu.h
-> index 5e4f4c2..3a5b7ff 100644
-> --- a/arch/arm/mach-exynos/regs-pmu.h
-> +++ b/include/linux/soc/samsung/exynos-regs-pmu.h
-> @@ -1,5 +1,5 @@
->  /*
-> - * Copyright (c) 2010-2012 Samsung Electronics Co., Ltd.
-> + * Copyright (c) 2015 Samsung Electronics Co., Ltd.
->   *		http://www.samsung.com
->   *
->   * EXYNOS - Power management unit definition
-> @@ -9,8 +9,8 @@
->   * published by the Free Software Foundation.
->  */
->  
-> -#ifndef __ASM_ARCH_REGS_PMU_H
-> -#define __ASM_ARCH_REGS_PMU_H __FILE__
-> +#ifndef __EXYNOS_REGS_PMU_H
-> +#define __EXYNOS_REGS_PMU_H __FILE__
->  
->  #define S5P_CENTRAL_SEQ_CONFIGURATION		0x0200
->  
-> @@ -690,4 +690,4 @@
->  					 | EXYNOS5420_KFC_USE_STANDBY_WFI2  \
->  					 | EXYNOS5420_KFC_USE_STANDBY_WFI3)
->  
-> -#endif /* __ASM_ARCH_REGS_PMU_H */
-> +#endif /* __EXYNOS_REGS_PMU_H */
-> 
-
-ditto, copyright may stay but please add SOC prefix to define.
-
-Best regards,
+Rest looks good,
 Krzysztof
