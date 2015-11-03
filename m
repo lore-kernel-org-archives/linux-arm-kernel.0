@@ -1,40 +1,24 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 3 Nov 2015 20:30:44 +0000
-Subject: v7-M: Fixing XIP when the kernel is in ROM
-In-Reply-To: <20151103200901.GL4931@pengutronix.de>
-References: <562FA053.6010208@st.com>
- <CALszF6C4B-S-o3E1OHK3+bKpDQ8a64Ly-ABNQwfSfj95y7qFyA@mail.gmail.com>
- <85aea33b93066d0959d98b56f8787ba3@agner.ch>
- <CALszF6Di3LWLu_W67Zdn2LyKKRF_5U241eKFKMmJ-0s+0boFag@mail.gmail.com>
- <CAAEAJfCL8veLOi9zi8kARL2kBcYQfxwKS13-mkGbQ_U6Ojg9LA@mail.gmail.com>
- <CALszF6Aodf0nXwsrE+Rtrg6UQw-1OMGY+BdadtK-dtHYv-Bqnw@mail.gmail.com>
- <CAAEAJfCfYo+J32PuW8k2p1S5eFxeCL6qTPeTLCGrNQrA0yC1kQ@mail.gmail.com>
- <20151028074304.GN4931@pengutronix.de>
- <HK2PR06MB0561D4F2B8C36A2A1427EE5A8A2B0@HK2PR06MB0561.apcprd06.prod.outlook.com>
- <20151103200901.GL4931@pengutronix.de>
-Message-ID: <20151103203043.GF8644@n2100.arm.linux.org.uk>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Tue, 3 Nov 2015 21:36:28 +0100
+Subject: wrong value in kirkwood-ts219.dtsi
+In-Reply-To: <56390400.5070408@gmail.com>
+References: <56390400.5070408@gmail.com>
+Message-ID: <20151103203628.GA25118@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 03, 2015 at 09:09:01PM +0100, Uwe Kleine-K?nig wrote:
-> Hello, 
+On Tue, Nov 03, 2015 at 07:59:12PM +0100, Helmut Klein wrote:
+> Hallo,
 > 
-> On Tue, Nov 03, 2015 at 05:52:53PM +0000, Chris Brandt wrote:
-> > > So the right fix is to move __v7m_setup_stack to .data I guess.
-> > 
-> > 
-> > Since my set of patches went nowhere, last week we had a look at doing just that (using a pre-allocated stack in .data instead of hard coding to the top of PLAT_PHYS_OFFSET).
-> > 
-> > Here's the code we came up with. Seems to work on XIP and non-XIP builds as well as SMP and non-SMP.
-> > 
-> > 
-> > Maybe you can try this technique to allocate the temporary stack in the data section.
-> I think for v7-M it's easier. Just move the stack to .data and use it
-> from there where the linker put it to.
+> the line "reg = <0x12000 0x100>;" in the section "poweroff at 12100" is
+> not correct
+> 
+> The base address of uart1, which is connected to the pic controller
+> is 0x12100 and not 0x12000
 
-Why waste memory - we already have a stack allocated in the .data segment
-already.
+Yes, it is wrong.
 
--- 
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Do you want to produce a proper patch for this?
+
+Thanks
+	Andrew
