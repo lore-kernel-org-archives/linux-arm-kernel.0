@@ -1,41 +1,62 @@
-From: santosh.shilimkar@oracle.com (santosh shilimkar)
-Date: Tue, 3 Nov 2015 08:37:23 -0800
-Subject: [PATCH v8 2/2] arm-soc: Add support for arm-based tango4 platforms
-In-Reply-To: <yw1xtwp38k7r.fsf@unicorn.mansr.com>
-References: <56377E76.2080209@sigmadesigns.com>
- <56377F09.6050805@sigmadesigns.com> <yw1xfv0o9xr3.fsf@unicorn.mansr.com>
- <20151102182615.GI2684@leverpostej> <5637AD74.4080206@oracle.com>
- <563871A9.7050009@sigmadesigns.com> <yw1xtwp38k7r.fsf@unicorn.mansr.com>
-Message-ID: <5638E2C3.4030402@oracle.com>
+From: timur@codeaurora.org (Timur Tabi)
+Date: Tue, 3 Nov 2015 10:43:24 -0600
+Subject: [PATCH 2/2] serial: amba-pl011: abstract register accessors
+In-Reply-To: <20151103161206.GA8644@n2100.arm.linux.org.uk>
+References: <1446562867-5693-1-git-send-email-timur@codeaurora.org>
+ <1446562867-5693-2-git-send-email-timur@codeaurora.org>
+ <20151103161206.GA8644@n2100.arm.linux.org.uk>
+Message-ID: <5638E42C.3050108@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/3/2015 2:12 AM, M?ns Rullg?rd wrote:
-> Marc Gonzalez <marc_gonzalez@sigmadesigns.com> writes:
->
->> Santosh Shilimkar wrote:
->>
->>> Mark Rutland wrote:
->>>
->>>> We didn't. Having a look just now, the earliest example appears to be
->>>> in OMAP4 L2 support patches back in 2009 [1]. I was not able to find a
->>>> rationale.
->>>>
->>>> Given that the MMU is on (and speculative accesses are permitted) I
->>>> can't see what the DSB achieves -- it can't quiesce the memory system.
->>>>
->>>> Santosh, any idea?
->>>
->>> IIRC, it was requirement from the OMAP ROM code to have a dsb before
->>> we call the SMC routine. I can't recollect more than that now.
->>
->> In that case, shouldn't dsb have been added to the ROM code,
->> on the "other side" of the smc, so as to not depend on Linux
->> code "getting it right"?
->
-> You're new to this, aren't you? :)
->
-:-) Indeed. ROM code is burned into the chip and can't be changed.
+Russell King - ARM Linux wrote:
+> Thanks for pointing that out... that's a mistake in my patches.  It's
+> very difficult to see how we could ever support earlyconsole on ZTE
+> without massively overhauling the earlycon stuff.  I'll undo the
+> changes there in my series.
 
-Regards,
-Santosh
+How about a command-line option for earlycon?  We do this on our kernel 
+for now:
+
+earlycon=pl011,0x3blabla,sbsa32
+
+And then in pl011_early_console_setup(), device->con->write is set to 
+either pl011_early_write or to pl011_early_write_sbsa32, which looks 
+like this:
+
+static void pl011_putc_sbsa32(struct uart_port *port, int c)
+{
+         while (readl(port->membase + UART01x_FR) & UART01x_FR_TXFF)
+                 cpu_relax();
+         writel(c, port->membase + UART01x_DR);
+         while (!(readl(port->membase + UART01x_FR) & UART011_FR_TXFE))
+                 cpu_relax();
+}
+
+
+static void pl011_early_write_sbsa32(struct console *con, const char *s, 
+unsigned n)
+{
+         struct earlycon_device *dev = con->data;
+
+         uart_console_write(&dev->port, s, n, pl011_putc_sbsa32);
+}
+
+I would have added this to my patch, but I specifically didn't want to 
+add any new functionality.
+
+> Now, as for this patch...
+>
+>> >  	unsigned int (*get_fifosize)(struct amba_device *dev);
+>> >+	u16 (*regreadw)(const void __iomem *addr);
+>> >+	void (*regwritew)(u16 val, void __iomem *addr);
+>> >+	void (*regwriteb)(u8 val, void __iomem *addr);
+> regwriteb() is used nowhere in this patch.
+
+Sorry, I could have sworn I deleted that.  Should I bother posting a 
+version 2, since your patch is better?
+
+-- 
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the
+Code Aurora Forum, hosted by The Linux Foundation.
