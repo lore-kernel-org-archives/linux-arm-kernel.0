@@ -1,22 +1,42 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 3 Nov 2015 13:43:49 +0000
-Subject: [PATCH DRAFT 0/2] Sketch for ZTE ZX296702 UART integration
-In-Reply-To: <1446467042-24494-1-git-send-email-andre.przywara@arm.com>
-References: <1446467042-24494-1-git-send-email-andre.przywara@arm.com>
-Message-ID: <20151103134349.GV8644@n2100.arm.linux.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 03 Nov 2015 14:43:58 +0100
+Subject: [PATCH] xfs: only modify ACLs if CONFIG_XFS_POSIX_ACL enabled
+Message-ID: <4425824.kIWhRaBxBZ@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-NAK for both patches.
+A recent bug fix added a call to forget_cached_acl(), but that
+function is not always available, so we can get a build error
+here:
 
-I'm not happy with these patches since they totally ignore all the
-comments I made during the last rounds of trying to add this.  That
-disgusts me.
+fs/xfs/xfs_xattr.c: In function 'xfs_xattr_set':
+fs/xfs/xfs_xattr.c:84:4: error: implicit declaration of function 'forget_cached_acl' [-Werror=implicit-function-declaration]
 
-So, I'm working on a replacement set of patches which does this the
-right way, and I'll post them later today or early tomorrow, depending
-on when I get them tested on the Versatile / Juno platforms.
+This changes the code to use the same #ifdef that we already
+use to encapsule the existing ACL handling.
 
--- 
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Fixes: 6caa105651cb ("xfs: invalidate cached acl if set directly via xattr")
+---
+This started breaking ARM davinci_all_defconfig today in linux-next
+
+diff --git a/fs/xfs/xfs_xattr.c b/fs/xfs/xfs_xattr.c
+index 2e1eb80d5374..6229325abdd3 100644
+--- a/fs/xfs/xfs_xattr.c
++++ b/fs/xfs/xfs_xattr.c
+@@ -73,6 +73,7 @@ xfs_xattr_set(struct dentry *dentry, const char *name, const void *value,
+ 		return xfs_attr_remove(ip, (unsigned char *)name, xflags);
+ 	error = xfs_attr_set(ip, (unsigned char *)name,
+ 				(void *)value, size, xflags);
++#ifdef CONFIG_XFS_POSIX_ACL
+ 	/*
+ 	 * Invalidate any cached ACLs if the user has bypassed the ACL
+ 	 * interface. We don't validate the content whatsoever so it is caller
+@@ -85,6 +86,7 @@ xfs_xattr_set(struct dentry *dentry, const char *name, const void *value,
+ 		else if (!strncmp(name, SGI_ACL_DEFAULT, strlen(name)))
+ 			forget_cached_acl(VFS_I(ip), ACL_TYPE_DEFAULT);
+ 	}
++#endif
+ 
+ 	return error;
+ }
