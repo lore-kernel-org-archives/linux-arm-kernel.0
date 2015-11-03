@@ -1,56 +1,73 @@
 From: wxt@rock-chips.com (Caesar Wang)
-Date: Tue,  3 Nov 2015 09:33:53 +0800
-Subject: [PATCH v1 0/5] Support more sample rates, let the rates normal work
-Message-ID: <1446514438-13922-1-git-send-email-wxt@rock-chips.com>
+Date: Tue,  3 Nov 2015 09:33:54 +0800
+Subject: [PATCH v1 1/5] ASoC: rockchip: i2s: Support to set the divider clock
+ API
+In-Reply-To: <1446514438-13922-1-git-send-email-wxt@rock-chips.com>
+References: <1446514438-13922-1-git-send-email-wxt@rock-chips.com>
+Message-ID: <1446514438-13922-2-git-send-email-wxt@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-That's seem the moment rockchip-codec driver other than 44100 and 48000 do not work.
-Says the (max98090, rt5640).
+In order to support more sample rates, add the divider clock api.
 
-----
-As the chromeos reported issue:(https://chromium.googlesource.com/chromiumos/third_party/kernel/+/v3.14)
+As the input source clock to the module is MCLK_I2S,
+and by the divider of the module, the clock generator generates
+SCLK and LRCK to transmitter and receiver.
 
-For detail:
-In that bug we want to add 32000 to sound/soc/rockchip/rockchip_max98090.c rk_aif1_hw_params. However that does not work.
-
-Previously, in https://chromium-review.googlesource.com/#/c/268398/ , rate 8000, 1600, 96000 were added.
-However, those rates do not work. I got the same audio as 48000 when I run
-
-aplay -D hw:0,0 /usr/local/autotest/cros/audio/fix_440_16_half.raw --rate 8000 -f S16_LE -c2
-aplay -D hw:0,0 /usr/local/autotest/cros/audio/fix_440_16_half.raw --rate 16000 -f S16_LE -c2
-aplay -D hw:0,0 /usr/local/autotest/cros/audio/fix_440_16_half.raw --rate 96000 -f S16_LE -c2
-
-They all sound identical to
-aplay -D hw:0,0 /usr/local/autotest/cros/audio/fix_440_16_half.raw --rate 48000 -f S16_LE -c2
-
-Also, recording using
-aplay -D hw:0,0 /usr/local/test.raw --rate 96000 -f S16_LE -c2  and examine the output we see it was recording using 48000.
-
-Okay, let's add this series patchs to fix this issue.
-
-arecord -D hw:0 -f S16_LE -c 2 --rate 96000 -d 5 foobar.wav
-and
-    aplay -D hw:0 foobar.wav
-Tested on veyron devices.
-
+Signed-off-by: Caesar Wang <wxt@rock-chips.com>
+---
 
 Changes in v1:
 - change the subject and commit.
 - remove the print message dev_dbg().
-- Fix a subject missspell.
 
-Caesar Wang (5):
-  ASoC: rockchip: i2s: Support to set the divider clock API
-  ASoC: rockchip-max98090: Allow more sample rates
-  ASoC: rockchip-rt5645: Allow more sample rates
-  ASoC: rockchip-max98090: Add the divider clock for cpu
-  ASoC: rockchip-rt5645: Add the divider clock for cpu
+ sound/soc/rockchip/rockchip_i2s.c | 27 +++++++++++++++++++++++++++
+ 1 file changed, 27 insertions(+)
 
- sound/soc/rockchip/rockchip_i2s.c      | 27 +++++++++++++++++++++++++
- sound/soc/rockchip/rockchip_max98090.c | 37 ++++++++++++++++++++++++++++++++++
- sound/soc/rockchip/rockchip_rt5645.c   | 37 ++++++++++++++++++++++++++++++++++
- 3 files changed, 101 insertions(+)
-
+diff --git a/sound/soc/rockchip/rockchip_i2s.c b/sound/soc/rockchip/rockchip_i2s.c
+index b936102..23c867f 100644
+--- a/sound/soc/rockchip/rockchip_i2s.c
++++ b/sound/soc/rockchip/rockchip_i2s.c
+@@ -286,6 +286,32 @@ static int rockchip_i2s_trigger(struct snd_pcm_substream *substream,
+ 	return ret;
+ }
+ 
++static int rockchip_i2s_set_clkdiv(struct snd_soc_dai *cpu_dai,
++				   int div_id, int div)
++{
++	struct rk_i2s_dev *i2s = to_info(cpu_dai);
++	unsigned int val = 0;
++
++	switch (div_id) {
++	case ROCKCHIP_DIV_BCLK:
++		val |= I2S_CKR_TSD(div);
++		val |= I2S_CKR_RSD(div);
++		regmap_update_bits(i2s->regmap, I2S_CKR,
++				   I2S_CKR_TSD_MASK | I2S_CKR_RSD_MASK,
++				   val);
++		break;
++	case ROCKCHIP_DIV_MCLK:
++		val |= I2S_CKR_MDIV(div);
++		regmap_update_bits(i2s->regmap, I2S_CKR,
++				   I2S_CKR_MDIV_MASK, val);
++		break;
++	default:
++		return -EINVAL;
++	}
++
++	return 0;
++}
++
+ static int rockchip_i2s_set_sysclk(struct snd_soc_dai *cpu_dai, int clk_id,
+ 				   unsigned int freq, int dir)
+ {
+@@ -311,6 +337,7 @@ static int rockchip_i2s_dai_probe(struct snd_soc_dai *dai)
+ 
+ static const struct snd_soc_dai_ops rockchip_i2s_dai_ops = {
+ 	.hw_params = rockchip_i2s_hw_params,
++	.set_clkdiv = rockchip_i2s_set_clkdiv,
+ 	.set_sysclk = rockchip_i2s_set_sysclk,
+ 	.set_fmt = rockchip_i2s_set_fmt,
+ 	.trigger = rockchip_i2s_trigger,
 -- 
 1.9.1
