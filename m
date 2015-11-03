@@ -1,84 +1,62 @@
-From: daniel@iogearbox.net (Daniel Borkmann)
-Date: Tue, 03 Nov 2015 10:10:30 +0100
-Subject: arm64: about Add CONFIG_DEBUG_SET_MODULE_RONX suport
-In-Reply-To: <56381891.50605@huawei.com>
-References: <5633279A.7000003@huawei.com> <56332ADB.7030306@iogearbox.net>
- <563335FF.5020400@huawei.com> <5633864F.6030203@codeaurora.org>
- <5633872C.1000005@labbott.name> <56343BF2.1070800@huawei.com>
- <5637A01F.4090806@labbott.name>
- <CAGXu5jK4E=yey6iMJg1dVbsj72cj3v7F110eu5v8G-L3NLDjow@mail.gmail.com>
- <56381891.50605@huawei.com>
-Message-ID: <56387A06.9050206@iogearbox.net>
+From: p.fedin@samsung.com (Pavel Fedin)
+Date: Tue, 03 Nov 2015 12:16:37 +0300
+Subject: [PATCH v5 0/4] Exynos SROMc configuration and Ethernet support for
+ SMDK5410
+Message-ID: <cover.1446542020.git.p.fedin@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/03/2015 03:14 AM, Xishi Qiu wrote:
-> On 2015/11/3 9:24, Kees Cook wrote:
->
->> On Mon, Nov 2, 2015 at 9:40 AM, Laura Abbott <laura@labbott.name> wrote:
->>> (adding Kees to see if he has any inputs)
->>>
->>> On 10/30/15 8:56 PM, Xishi Qiu wrote:
->>>>
->>>> On 2015/10/30 23:05, Laura Abbott wrote:
->>>>
->>>>>>>
->>>>>>> Hi Daniel,
->>>>>>>
->>>>>>> Sorry for didn't saying it clearly. I find this
->>>>>>> interface(set_memory_ro/rw) can
->>>>>>> only be used in module address. So why not extend the function? e.g.
->>>>>>> like x86,
->>>>>>> it can be used in direct mapping address too.
->>>>>>>
->>>>>>> Is there some limits in arm64 or we will do this later?
->>>>>>>
->>>>>>
->>>>>> arm64 maps low mem (all direct mapped memory on arm64) with section
->>>>>> mappings for performance. set_memory_ro/rw works on PAGE_SIZE
->>>>>> granularity so if we wanted to use those functions on direct mapped
->>>>>> memory we would need to break down the section mappings. On arm,
->>>>>> this was a pain due to the TLB maintaince requried. On arm64, less
->>>>>> so but we still lose the benefit of the section mappings.
->>>>>>
->>>>>> Do you have a use case in mind for wanting to use set_memory_ro/rw
->>>>>> outside of the module area?
->>>>>>
->>>>
->>>> Hi Laura,
->>>>
->>>> How about this case?
->>>>
->>>> module alloc some pages which from direct mapping area, and we write
->>>> important data(e.g. password) on the pages, the data will not be changed
->>>> during the runtime. If someone unfriendly try to rewrite the memory,
->>>> something is going to get worse. So we can use set_memory_ro() to protect
->>>> the date.
->>>>
->>>
->>> How long would you expected this data to stay around (minutes? hours?)
->
-> Maybe forever.
->
->>> and how many instances of this would you expect?
->
->>> It also looks like BPF wants to set its region as ro when in use
->>> (https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/tree/include/linux/filter.h#n370)
->
-> Yes, and the memory seems from vmalloc()
-...
+This patch extends Exynos SROM controller driver with ability to configure
+controller outputs and enables SMSC9115 Ethernet chip on SMDK5410 board,
+which is connected via SROMc bank #3.
 
-In BPF, we have bpf_prog_alloc()/bpf_prog_realloc() helper that allocate a normal
-struct bpf_prog (where we later on store BPF insns into it for the interpreter,
-non executable memory here), and we have bpf_jit_binary_alloc()/bpf_jit_binary_free(),
-which is executable module memory where JITs (if enabled/available) can fill their
-opcodes into this image. If available, both are being ro-locked right after setup
-time as they strictly must not be modified.
+With this patchset, support for the whole existing SMDK range can be added.
+Actually, only bank number is different.
 
-...
->> I think we'll start to have a growing need for this kind of thing as
->> we try to make more things RO in the heap. It's unclear to me yet how
->> much granularity we'll need, though.
+This patchset also depends on Exynos 5410 pinctrl support, introduced by
+patches 0003 and 0004 from this set:
+[PATCH v4 0/5] ARM: EXYNOS: ODROID-XU DT and LEDs
+http://lists.infradead.org/pipermail/linux-arm-kernel/2015-March/330862.html
 
-Thanks,
-Daniel
+Pinctrl support is necessary in order to correctly configure
+multifunctional pins of the Exynos chip.
+
+v4 => v5:
+- Some cosmetic changes in the dtsi ("compatible" goes first)
+- Use correctly specified ranges for the SROMc node
+- Reuse existing properties where possible ("reg" for bank# and
+  "reg-io-width" for data width)
+- Separated page-mode property from timings array
+- More improvements to the documentation
+
+v3 => v4:
+- Devices are now added as subnodes, with additional properties. This allows
+  to cleary specify dependency. If configuration fails, error will be reported
+  and child devices will not be probed.
+- These additional properties now have "samsung,srom-XXX" format
+- Fixed code style, now better understood.
+
+v2 => v3:
+- Fixed up SROMc region size in the device tree
+- Reordered patches, documentation goes first now
+
+v1 => v2:
+- Fixed some typos and bad labels in device tree
+- Improved documentation
+
+Pavel Fedin (4):
+  Documentation: dt-bindings: Describe SROMc configuration
+  ARM: dts: Add SROMc to Exynos 5410
+  drivers: exynos-srom: Add support for bank configuration
+  ARM: dts: Add Ethernet chip to SMDK5410
+
+ .../bindings/arm/samsung/exynos-srom.txt           | 68 +++++++++++++++++++++-
+ arch/arm/boot/dts/exynos5410-smdk5410.dts          | 40 +++++++++++++
+ arch/arm/boot/dts/exynos5410.dtsi                  | 11 ++++
+ arch/arm/mach-exynos/Kconfig                       |  2 +-
+ drivers/soc/samsung/Kconfig                        |  2 +-
+ drivers/soc/samsung/exynos-srom.c                  | 60 ++++++++++++++++++-
+ 6 files changed, 177 insertions(+), 6 deletions(-)
+
+-- 
+2.4.4
