@@ -1,48 +1,129 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Tue, 03 Nov 2015 16:18:36 +0900
-Subject: [PATCH v4 1/4] Documentation: dt-bindings: Describe SROMc
- configuration
-In-Reply-To: <004d01d11604$fc7a2a80$f56e7f80$@samsung.com>
-References: <cover.1446122247.git.p.fedin@samsung.com>
- <f1fbd1a7877090f4318705f0fccbf4d96c0ebc9c.1446122247.git.p.fedin@samsung.com>
- <56330E6E.50003@samsung.com> <00d401d112ff$c426e9a0$4c74bce0$@samsung.com>
- <5635D1EE.5010604@samsung.com> <012101d11540$8c280be0$a47823a0$@samsung.com>
- <5637FCCB.1060007@samsung.com> <004d01d11604$fc7a2a80$f56e7f80$@samsung.com>
-Message-ID: <56385FCC.1090007@samsung.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Mon, 2 Nov 2015 23:41:22 -0800
+Subject: [PATCH v2 1/2] watchdog: add WDIOC_SETPRETIMEOUT and
+ WDIOC_GETPRETIMEOUT
+In-Reply-To: <1446531084-15365-1-git-send-email-b38343@freescale.com>
+References: <1446531084-15365-1-git-send-email-b38343@freescale.com>
+Message-ID: <56386522.3000505@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03.11.2015 15:58, Pavel Fedin wrote:
->  Hello!
-> 
->>>>> --- cut exynos5410.dtsi ---
->>>>> 		sromc: sromc at 12250000 {
->>>>> 			#address-cells = <2>;
->>>>> 			#size-cells = <1>;
->>>>> 			ranges = <0 0 0x04000000 0x20000
->>>>> 				  1 0 0x05000000 0x20000
->>>>> 				  2 0 0x06000000 0x20000
->>>>> 				  3 0 0x07000000 0x20000>;
->>>>
->>>> Do you have to use 2 cells for address? Cannot it be:
->>>>  			ranges = <0 0x04000000 0x20000
->>>>  				  1 0x05000000 0x20000
->>>>  				  2 0x06000000 0x20000
->>>>  				  3 0x07000000 0x20000>;
->>>
->>>  I tried this first, but it didn't work, and ranges translation
->>> gave me something really weird (like addr = 0x80 and
->>> size = 0x04000004).
->>
->> Did you change the address-cells to <1>?
-> 
->  Of course i did.
+On 11/02/2015 10:11 PM, Robin Gong wrote:
+> Since the watchdog common framework centrialize the IOCTL interfaces of
+> device driver now, the SETPRETIMEOUT and GETPRETIMEOUT need to be added
+> in the common code.
+>
+> Signed-off-by: Robin Gong <b38343@freescale.com>
+> ---
 
-I saw some other nodes use the ranges without the offset but maybe some
-more steps are required for such configuration.
+It would help if you could document the changes made here.
 
-So anyway send the version with the child offset and I will try to
-figure out why it is required.
+>   drivers/watchdog/watchdog_dev.c | 37 +++++++++++++++++++++++++++++++++++++
+>   include/linux/watchdog.h        | 10 ++++++++++
+>   2 files changed, 47 insertions(+)
+>
+> diff --git a/drivers/watchdog/watchdog_dev.c b/drivers/watchdog/watchdog_dev.c
+> index 6aaefba..f4a02e5 100644
+> --- a/drivers/watchdog/watchdog_dev.c
+> +++ b/drivers/watchdog/watchdog_dev.c
+> @@ -218,6 +218,37 @@ out_timeout:
+>   }
+>
+>   /*
+> + *	watchdog_set_pretimeout: set the watchdog timer pretimeout
+> + *	@wddev: the watchdog device to set the timeout for
+> + *	@timeout: pretimeout to set in seconds
+> + */
+> +
+> +static int watchdog_set_pretimeout(struct watchdog_device *wddev,
+> +				   unsigned int timeout)
+> +{
+> +	int err;
+> +
+> +	if (!wddev->ops->set_pretimeout ||
+> +	    !(wddev->info->options & WDIOF_PRETIMEOUT))
+> +		return -EOPNOTSUPP;
+> +	if (watchdog_pretimeout_invalid(wddev, timeout))
+> +		return -EINVAL;
+> +
+> +	mutex_lock(&wddev->lock);
+> +
+> +	if (test_bit(WDOG_UNREGISTERED, &wddev->status)) {
+> +		err = -ENODEV;
+> +		goto out_timeout;
+> +	}
+> +
+> +	err = wddev->ops->set_pretimeout(wddev, timeout);
+> +
+> +out_timeout:
+> +	mutex_unlock(&wddev->lock);
+> +	return err;
+> +}
+> +
+> +/*
+>    *	watchdog_get_timeleft: wrapper to get the time left before a reboot
+>    *	@wddev: the watchdog device to get the remaining time from
+>    *	@timeleft: the time that's left
+> @@ -393,6 +424,12 @@ static long watchdog_ioctl(struct file *file, unsigned int cmd,
+>   		if (err)
+>   			return err;
+>   		return put_user(val, p);
+> +	case WDIOC_SETPRETIMEOUT:
+> +		if (get_user(val, p))
+> +			return -EFAULT;
+> +		return watchdog_set_pretimeout(wdd, val);
+> +	case WDIOC_GETPRETIMEOUT:
+> +		return put_user(wdd->pretimeout, p);
+>   	default:
+>   		return -ENOTTY;
+>   	}
+> diff --git a/include/linux/watchdog.h b/include/linux/watchdog.h
+> index d74a0e9..f936152 100644
+> --- a/include/linux/watchdog.h
+> +++ b/include/linux/watchdog.h
+> @@ -25,6 +25,7 @@ struct watchdog_device;
+>    * @ping:	The routine that sends a keepalive ping to the watchdog device.
+>    * @status:	The routine that shows the status of the watchdog device.
+>    * @set_timeout:The routine for setting the watchdog devices timeout value.
+> + * @set_pretimeout:The routine for setting the watchdog devices pretimeout.
+>    * @get_timeleft:The routine that get's the time that's left before a reset.
+>    * @ref:	The ref operation for dyn. allocated watchdog_device structs
+>    * @unref:	The unref operation for dyn. allocated watchdog_device structs
+> @@ -44,6 +45,7 @@ struct watchdog_ops {
+>   	int (*ping)(struct watchdog_device *);
+>   	unsigned int (*status)(struct watchdog_device *);
+>   	int (*set_timeout)(struct watchdog_device *, unsigned int);
+> +	int (*set_pretimeout)(struct watchdog_device *, unsigned int);
+>   	unsigned int (*get_timeleft)(struct watchdog_device *);
+>   	void (*ref)(struct watchdog_device *);
+>   	void (*unref)(struct watchdog_device *);
+> @@ -86,6 +88,7 @@ struct watchdog_device {
+>   	const struct watchdog_ops *ops;
+>   	unsigned int bootstatus;
+>   	unsigned int timeout;
+> +	unsigned int pretimeout;
 
-Best regards,
-Krzysztof
+This new variable also needs to be added to and documented in
+Documentation/watchdog/watchdog-kernel-api.txt.
+
+Thanks,
+Guenter
+
+>   	unsigned int min_timeout;
+>   	unsigned int max_timeout;
+>   	void *driver_data;
+> @@ -123,6 +126,13 @@ static inline bool watchdog_timeout_invalid(struct watchdog_device *wdd, unsigne
+>   		(t < wdd->min_timeout || t > wdd->max_timeout));
+>   }
+>
+> +/* Use the following function to check if a pretimeout value is invalid */
+> +static inline bool watchdog_pretimeout_invalid(struct watchdog_device *wdd,
+> +					       unsigned int t)
+> +{
+> +	return wdd->timeout && t >= wdd->timeout;
+> +}
+> +
+>   /* Use the following functions to manipulate watchdog driver specific data */
+>   static inline void watchdog_set_drvdata(struct watchdog_device *wdd, void *data)
+>   {
+>
