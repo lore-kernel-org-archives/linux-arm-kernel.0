@@ -1,118 +1,137 @@
-From: bhupesh.sharma@freescale.com (Sharma Bhupesh)
-Date: Tue, 3 Nov 2015 03:43:26 +0000
-Subject: [PATCH 1/1] doc/bindings: Update Layerscape PCIe devicetree
- bindings for LS2080A
-In-Reply-To: <20151102220051.GB28371@localhost>
-References: <1445844681-11488-1-git-send-email-bhupesh.sharma@freescale.com>
- <20151102220051.GB28371@localhost>
-Message-ID: <BY1PR0301MB13038807B359C28FFD027455822B0@BY1PR0301MB1303.namprd03.prod.outlook.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Mon, 2 Nov 2015 20:04:20 -0800
+Subject: [PATCH v1 1/2] watchdog: add WDIOC_SETPRETIMEOUT and
+ WDIOC_GETPRETIMEOUT
+In-Reply-To: <1446521367-25748-1-git-send-email-b38343@freescale.com>
+References: <1446521367-25748-1-git-send-email-b38343@freescale.com>
+Message-ID: <56383244.3030801@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> From: Bjorn Helgaas [mailto:helgaas at kernel.org]
-> Sent: Tuesday, November 03, 2015 3:31 AM
+On 11/02/2015 07:29 PM, Robin Gong wrote:
+> Since the watchdog common framework centrialize the IOCTL interfaces of
+> device driver now, the SETPRETIMEOUT and GETPRETIMEOUT need to be added
+> in the common code.
+>
+> Signed-off-by: Robin Gong <b38343@freescale.com>
+> ---
+>   drivers/watchdog/watchdog_dev.c | 38 ++++++++++++++++++++++++++++++++++++++
+>   include/linux/watchdog.h        |  9 +++++++++
+>   2 files changed, 47 insertions(+)
+>
+> diff --git a/drivers/watchdog/watchdog_dev.c b/drivers/watchdog/watchdog_dev.c
+> index 6aaefba..02632fe 100644
+> --- a/drivers/watchdog/watchdog_dev.c
+> +++ b/drivers/watchdog/watchdog_dev.c
+> @@ -218,6 +218,37 @@ out_timeout:
+>   }
+>
+>   /*
+> + *	watchdog_set_pretimeout: set the watchdog timer pretimeout
+> + *	@wddev: the watchdog device to set the timeout for
+> + *	@timeout: pretimeout to set in seconds
+> + */
+> +
+> +static int watchdog_set_pretimeout(struct watchdog_device *wddev,
+> +							unsigned int timeout)
 
-> On Mon, Oct 26, 2015 at 01:01:21PM +0530, Bhupesh Sharma wrote:
-> > Update the definition of the Layerscape PCI compatible string to add
-> > support for LS2080A, as the controller on LS2080A is different from
-> > LS1021A SoC.
-> >
-> > While at it, move the clock related properties in the Designware PCIe
-> > controller bindings to 'optional' set of properties.
-> >
-> > Signed-off-by: Minghuan Lian <Minghuan.Lian@freescale.com>
-> > Signed-off-by: Bhupesh Sharma <bhupesh.sharma@freescale.com>
-> > Acked-by: Arnd Bergmann <arnd@arndb.de>
-> > ---
-> > Hi Bjorn,
-> >
-> > As discussed with Arnd
-> > (http://www.spinics.net/lists/linux-clk/msg04092.html),
-> > this patch depends on a patch that is in your PCI tree but not yet in
-> mainline.
-> >
-> > So, sending this to you, so that you can apply the patch on top of the
-> > other one.
-> >
-> >  .../devicetree/bindings/pci/designware-pcie.txt    |   10 +++++-----
-> >  .../devicetree/bindings/pci/layerscape-pci.txt     |   14
-> ++++++++++++--
-> 
-> Split into two patches and applied to pci/host-designware and pci/host-
-> layerscape, since the clocks change doesn't look related to the
-> Layerscape change.
+Please align with "(".
 
-Thanks Bjorn.
+> +{
+> +	int err;
+> +
+> +	if ((wddev->ops->set_pretimeout == NULL) ||
 
-Regards,
-Bhupesh
+Unnecessary ( ), and "== NULL" is unnecessary as well.
 
-> > diff --git a/Documentation/devicetree/bindings/pci/designware-pcie.txt
-> > b/Documentation/devicetree/bindings/pci/designware-pcie.txt
-> > index 0036ab3..576218a 100644
-> > --- a/Documentation/devicetree/bindings/pci/designware-pcie.txt
-> > +++ b/Documentation/devicetree/bindings/pci/designware-pcie.txt
-> > @@ -14,11 +14,6 @@ Required properties:
-> >  - interrupt-map-mask and interrupt-map: standard PCI properties
-> >  	to define the mapping of the PCIe interface to interrupt
-> >  	numbers.
-> > -- clocks: Must contain an entry for each entry in clock-names.
-> > -	See ../clocks/clock-bindings.txt for details.
-> > -- clock-names: Must include the following entries:
-> > -	- "pcie"
-> > -	- "pcie_bus"
-> >
-> >  Optional properties:
-> >  - num-lanes: number of lanes to use (this property should be
-> > specified unless @@ -27,3 +22,8 @@ Optional properties:
-> >  - bus-range: PCI bus numbers covered (it is recommended for new
-> devicetrees to
-> >    specify this property, to keep backwards compatibility a range of
-> 0x00-0xff
-> >    is assumed if not present)
-> > +- clocks: Must contain an entry for each entry in clock-names.
-> > +	See ../clocks/clock-bindings.txt for details.
-> > +- clock-names: Must include the following entries:
-> > +	- "pcie"
-> > +	- "pcie_bus"
-> > diff --git a/Documentation/devicetree/bindings/pci/layerscape-pci.txt
-> > b/Documentation/devicetree/bindings/pci/layerscape-pci.txt
-> > index 6286f04..ac7e07e 100644
-> > --- a/Documentation/devicetree/bindings/pci/layerscape-pci.txt
-> > +++ b/Documentation/devicetree/bindings/pci/layerscape-pci.txt
-> > @@ -1,10 +1,20 @@
-> >  Freescale Layerscape PCIe controller
-> >
-> > -This PCIe host controller is based on the Synopsis Designware PCIe IP
-> > +This PCIe host controller is based on the Synopsys Designware PCIe IP
-> >  and thus inherits all the common properties defined in designware-
-> pcie.txt.
-> >
-> > +This controller derives its clocks from the Reset Configuration Word
-> > +(RCW) which is used to describe the PLL settings at the time of chip-
-> reset.
-> > +
-> > +Also as per the available Reference Manuals, there is no specific
-> 'version'
-> > +register available in the Freescale PCIe controller register set,
-> > +which can allow determining the underlying Designware PCIe controller
-> > +version information.
-> > +
-> >  Required properties:
-> > -- compatible: should contain the platform identifier such as
-> "fsl,ls1021a-pcie"
-> > +- compatible: should contain the platform identifier such as:
-> > +        "fsl,ls1021a-pcie", "snps,dw-pcie"
-> > +        "fsl,ls2080a-pcie", "snps,dw-pcie"
-> >  - reg: base addresses and lengths of the PCIe controller
-> >  - interrupts: A list of interrupt outputs of the controller. Must
-> contain an
-> >    entry for each entry in the interrupt-names property.
-> > --
-> > 1.7.9.5
-> >
-> >
-> > --
-> > To unsubscribe from this list: send the line "unsubscribe linux-pci"
-> > in the body of a message to majordomo at vger.kernel.org More majordomo
-> > info at  http://vger.kernel.org/majordomo-info.html
+> +	    !(wddev->info->options & WDIOF_PRETIMEOUT))
+> +		return -EOPNOTSUPP;
+> +	if (watchdog_pretimeout_invalid(wddev, timeout))
+> +		return -EINVAL;
+> +
+> +	mutex_lock(&wddev->lock);
+> +
+> +	if (test_bit(WDOG_UNREGISTERED, &wddev->status)) {
+> +		err = -ENODEV;
+> +		goto out_timeout;
+> +	}
+> +
+> +	err = wddev->ops->set_pretimeout(wddev, timeout);
+> +
+> +out_timeout:
+> +	mutex_unlock(&wddev->lock);
+> +	return err;
+> +}
+> +
+> +/*
+>    *	watchdog_get_timeleft: wrapper to get the time left before a reboot
+>    *	@wddev: the watchdog device to get the remaining time from
+>    *	@timeleft: the time that's left
+> @@ -393,6 +424,13 @@ static long watchdog_ioctl(struct file *file, unsigned int cmd,
+>   		if (err)
+>   			return err;
+>   		return put_user(val, p);
+> +	case WDIOC_SETPRETIMEOUT:
+> +		if (get_user(val, p))
+> +			return -EFAULT;
+> +		err = watchdog_set_pretimeout(wdd, val);
+> +		return err;
+
+		return watchdog_set_pretimeout(wdd, val);
+
+> +	case WDIOC_GETPRETIMEOUT:
+> +		return put_user(wdd->pretimeout, p);
+>   	default:
+>   		return -ENOTTY;
+>   	}
+> diff --git a/include/linux/watchdog.h b/include/linux/watchdog.h
+> index d74a0e9..6ddb2d6 100644
+> --- a/include/linux/watchdog.h
+> +++ b/include/linux/watchdog.h
+> @@ -25,6 +25,7 @@ struct watchdog_device;
+>    * @ping:	The routine that sends a keepalive ping to the watchdog device.
+>    * @status:	The routine that shows the status of the watchdog device.
+>    * @set_timeout:The routine for setting the watchdog devices timeout value.
+> + * @set_pretimeout:The routine for setting the watchdog devices pretimeout.
+>    * @get_timeleft:The routine that get's the time that's left before a reset.
+>    * @ref:	The ref operation for dyn. allocated watchdog_device structs
+>    * @unref:	The unref operation for dyn. allocated watchdog_device structs
+> @@ -44,6 +45,7 @@ struct watchdog_ops {
+>   	int (*ping)(struct watchdog_device *);
+>   	unsigned int (*status)(struct watchdog_device *);
+>   	int (*set_timeout)(struct watchdog_device *, unsigned int);
+> +	int (*set_pretimeout)(struct watchdog_device *, unsigned int);
+>   	unsigned int (*get_timeleft)(struct watchdog_device *);
+>   	void (*ref)(struct watchdog_device *);
+>   	void (*unref)(struct watchdog_device *);
+> @@ -86,6 +88,7 @@ struct watchdog_device {
+>   	const struct watchdog_ops *ops;
+>   	unsigned int bootstatus;
+>   	unsigned int timeout;
+> +	unsigned int pretimeout;
+
+Description (further below) missing.
+
+>   	unsigned int min_timeout;
+>   	unsigned int max_timeout;
+>   	void *driver_data;
+> @@ -123,6 +126,12 @@ static inline bool watchdog_timeout_invalid(struct watchdog_device *wdd, unsigne
+>   		(t < wdd->min_timeout || t > wdd->max_timeout));
+>   }
+>
+> +/* Use the following function to check if a pretimeout value is invalid */
+> +static inline bool watchdog_pretimeout_invalid(struct watchdog_device *wdd, unsigned int t)
+
+Please fix checkpatch warnings.
+
+> +{
+> +	return ((wdd->timeout != 0) && (t >= wdd->timeout));
+
+Unnecessary ( ), and "!= 0" is unnecessary.
+
+> +}
+> +
+>   /* Use the following functions to manipulate watchdog driver specific data */
+>   static inline void watchdog_set_drvdata(struct watchdog_device *wdd, void *data)
+>   {
+>
