@@ -1,89 +1,145 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Mon, 2 Nov 2015 20:38:27 -0800
-Subject: [PATCH v9 10/17] phy: Add driver for rockchip Display Port PHY
-In-Reply-To: <1446083918-30809-1-git-send-email-ykk@rock-chips.com>
-References: <1446020143-32645-1-git-send-email-ykk@rock-chips.com>
- <1446083918-30809-1-git-send-email-ykk@rock-chips.com>
-Message-ID: <20151103043827.GA17261@localhost>
+From: b38343@freescale.com (Robin Gong)
+Date: Tue, 3 Nov 2015 12:47:44 +0800
+Subject: [PATCH v1 1/2] watchdog: add WDIOC_SETPRETIMEOUT and
+ WDIOC_GETPRETIMEOUT
+In-Reply-To: <56383244.3030801@roeck-us.net>
+References: <1446521367-25748-1-git-send-email-b38343@freescale.com>
+ <56383244.3030801@roeck-us.net>
+Message-ID: <20151103044741.GA26305@shlinux2>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Yakir,
-
-On Thu, Oct 29, 2015 at 09:58:38AM +0800, Yakir Yang wrote:
-> Add phy driver for the Rockchip DisplayPort PHY module. This
-> is required to get DisplayPort working in Rockchip SoCs.
+On Mon, Nov 02, 2015 at 08:04:20PM -0800, Guenter Roeck wrote:
+> On 11/02/2015 07:29 PM, Robin Gong wrote:
+> >Since the watchdog common framework centrialize the IOCTL interfaces of
+> >device driver now, the SETPRETIMEOUT and GETPRETIMEOUT need to be added
+> >in the common code.
+> >
+> >Signed-off-by: Robin Gong <b38343@freescale.com>
+> >---
+> >  drivers/watchdog/watchdog_dev.c | 38 ++++++++++++++++++++++++++++++++++++++
+> >  include/linux/watchdog.h        |  9 +++++++++
+> >  2 files changed, 47 insertions(+)
+> >
+> >diff --git a/drivers/watchdog/watchdog_dev.c b/drivers/watchdog/watchdog_dev.c
+> >index 6aaefba..02632fe 100644
+> >--- a/drivers/watchdog/watchdog_dev.c
+> >+++ b/drivers/watchdog/watchdog_dev.c
+> >@@ -218,6 +218,37 @@ out_timeout:
+> >  }
+> >
+> >  /*
+> >+ *	watchdog_set_pretimeout: set the watchdog timer pretimeout
+> >+ *	@wddev: the watchdog device to set the timeout for
+> >+ *	@timeout: pretimeout to set in seconds
+> >+ */
+> >+
+> >+static int watchdog_set_pretimeout(struct watchdog_device *wddev,
+> >+							unsigned int timeout)
 > 
-> Reviewed-by: Heiko Stuebner <heiko@sntech.de>
-> Signed-off-by: Yakir Yang <ykk@rock-chips.com>
-> ---
-...
-> diff --git a/drivers/phy/phy-rockchip-dp.c b/drivers/phy/phy-rockchip-dp.c
-> new file mode 100644
-> index 0000000..f3e0058
-> --- /dev/null
-> +++ b/drivers/phy/phy-rockchip-dp.c
-> @@ -0,0 +1,151 @@
-> +/*
-> + * Rockchip DP PHY driver
-> + *
-> + * Copyright (C) 2015 FuZhou Rockchip Co., Ltd.
-> + * Author: Yakir Yang <ykk@@rock-chips.com>
-> + *
-> + * This program is free software; you can redistribute it and/or modify
-> + * it under the terms of the GNU General Public License as published by
-> + * the Free Software Foundation; either version 2 of the License.
-> + */
-> +
-> +#include <linux/module.h>
-> +#include <linux/of.h>
-> +#include <linux/clk.h>
-> +#include <linux/phy/phy.h>
-> +#include <linux/regmap.h>
-> +#include <linux/mfd/syscon.h>
-> +#include <linux/platform_device.h>
-> +
-> +#define GRF_SOC_CON12                           0x0274
-> +
-> +#define GRF_EDP_REF_CLK_SEL_INTER_HIWORD_MASK   BIT(4)
-> +#define GRF_EDP_REF_CLK_SEL_INTER               BIT(4)
-
-Why are the above two macros the same? Judging by the RK3288 manual and
-other downstream drivers, it seems like you want the _MASK one to be
-shifted left by 16 (i.e., BIT(20)).
-
-> +
-> +#define GRF_EDP_PHY_SIDDQ_HIWORD_MASK           BIT(21)
-> +#define GRF_EDP_PHY_SIDDQ_ON                    0
-> +#define GRF_EDP_PHY_SIDDQ_OFF                   BIT(5)
-> +
-
-...
-
-> +	ret = regmap_write(dp->grf, GRF_SOC_CON12, GRF_EDP_REF_CLK_SEL_INTER |
-> +			   GRF_EDP_REF_CLK_SEL_INTER_HIWORD_MASK);
-
-IOW, the above is writing:
-
-	BIT(4) | BIT(4)
-
-whereas I think you want:
-
-	BIT(4) | BIT(20)
-
-> +	if (ret != 0) {
-> +		dev_err(dp->dev, "Could not config GRF edp ref clk: %d\n", ret);
-> +		return ret;
-> +	}
-> +
-
-...
-
-(FYI, I came across this by inspection when comparing Heiko's
-'somewhat-stable' branch [1] with this series. The former brings up eDP
-fine on veyron-jaq, whereas this one doesn't yet, even with the above
-change. Still debugging the issue.)
-
-Brian
-
-[1] https://github.com/mmind/linux-rockchip/tree/devel/somewhat-stable
+> Please align with "(".
+Will fix in v2.
+> 
+> >+{
+> >+	int err;
+> >+
+> >+	if ((wddev->ops->set_pretimeout == NULL) ||
+> 
+> Unnecessary ( ), and "== NULL" is unnecessary as well.
+> 
+why? It's useful if other device driver didn't implement set_pretimeout.
+> >+	    !(wddev->info->options & WDIOF_PRETIMEOUT))
+> >+		return -EOPNOTSUPP;
+> >+	if (watchdog_pretimeout_invalid(wddev, timeout))
+> >+		return -EINVAL;
+> >+
+> >+	mutex_lock(&wddev->lock);
+> >+
+> >+	if (test_bit(WDOG_UNREGISTERED, &wddev->status)) {
+> >+		err = -ENODEV;
+> >+		goto out_timeout;
+> >+	}
+> >+
+> >+	err = wddev->ops->set_pretimeout(wddev, timeout);
+> >+
+> >+out_timeout:
+> >+	mutex_unlock(&wddev->lock);
+> >+	return err;
+> >+}
+> >+
+> >+/*
+> >   *	watchdog_get_timeleft: wrapper to get the time left before a reboot
+> >   *	@wddev: the watchdog device to get the remaining time from
+> >   *	@timeleft: the time that's left
+> >@@ -393,6 +424,13 @@ static long watchdog_ioctl(struct file *file, unsigned int cmd,
+> >  		if (err)
+> >  			return err;
+> >  		return put_user(val, p);
+> >+	case WDIOC_SETPRETIMEOUT:
+> >+		if (get_user(val, p))
+> >+			return -EFAULT;
+> >+		err = watchdog_set_pretimeout(wdd, val);
+> >+		return err;
+> 
+> 		return watchdog_set_pretimeout(wdd, val);
+> 
+> >+	case WDIOC_GETPRETIMEOUT:
+> >+		return put_user(wdd->pretimeout, p);
+> >  	default:
+> >  		return -ENOTTY;
+> >  	}
+> >diff --git a/include/linux/watchdog.h b/include/linux/watchdog.h
+> >index d74a0e9..6ddb2d6 100644
+> >--- a/include/linux/watchdog.h
+> >+++ b/include/linux/watchdog.h
+> >@@ -25,6 +25,7 @@ struct watchdog_device;
+> >   * @ping:	The routine that sends a keepalive ping to the watchdog device.
+> >   * @status:	The routine that shows the status of the watchdog device.
+> >   * @set_timeout:The routine for setting the watchdog devices timeout value.
+> >+ * @set_pretimeout:The routine for setting the watchdog devices pretimeout.
+> >   * @get_timeleft:The routine that get's the time that's left before a reset.
+> >   * @ref:	The ref operation for dyn. allocated watchdog_device structs
+> >   * @unref:	The unref operation for dyn. allocated watchdog_device structs
+> >@@ -44,6 +45,7 @@ struct watchdog_ops {
+> >  	int (*ping)(struct watchdog_device *);
+> >  	unsigned int (*status)(struct watchdog_device *);
+> >  	int (*set_timeout)(struct watchdog_device *, unsigned int);
+> >+	int (*set_pretimeout)(struct watchdog_device *, unsigned int);
+> >  	unsigned int (*get_timeleft)(struct watchdog_device *);
+> >  	void (*ref)(struct watchdog_device *);
+> >  	void (*unref)(struct watchdog_device *);
+> >@@ -86,6 +88,7 @@ struct watchdog_device {
+> >  	const struct watchdog_ops *ops;
+> >  	unsigned int bootstatus;
+> >  	unsigned int timeout;
+> >+	unsigned int pretimeout;
+> 
+> Description (further below) missing.
+> 
+I describe it in the ahead of this structure as the above.
+> >  	unsigned int min_timeout;
+> >  	unsigned int max_timeout;
+> >  	void *driver_data;
+> >@@ -123,6 +126,12 @@ static inline bool watchdog_timeout_invalid(struct watchdog_device *wdd, unsigne
+> >  		(t < wdd->min_timeout || t > wdd->max_timeout));
+> >  }
+> >
+> >+/* Use the following function to check if a pretimeout value is invalid */
+> >+static inline bool watchdog_pretimeout_invalid(struct watchdog_device *wdd, unsigned int t)
+> 
+> Please fix checkpatch warnings.
+> 
+You mean over 80 characters? Will fix in v2.
+> >+{
+> >+	return ((wdd->timeout != 0) && (t >= wdd->timeout));
+> 
+> Unnecessary ( ), and "!= 0" is unnecessary.
+> 
+I think t >= wdd->timeout is need, since it's a pre-timeout.
+> >+}
+> >+
+> >  /* Use the following functions to manipulate watchdog driver specific data */
+> >  static inline void watchdog_set_drvdata(struct watchdog_device *wdd, void *data)
+> >  {
+> >
+> 
