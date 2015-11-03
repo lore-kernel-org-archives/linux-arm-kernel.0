@@ -1,41 +1,77 @@
-From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
-Date: Tue, 03 Nov 2015 10:12:56 +0000
-Subject: [PATCH v8 2/2] arm-soc: Add support for arm-based tango4 platforms
-In-Reply-To: <563871A9.7050009@sigmadesigns.com> (Marc Gonzalez's message of
- "Tue, 3 Nov 2015 09:34:49 +0100")
-References: <56377E76.2080209@sigmadesigns.com>
- <56377F09.6050805@sigmadesigns.com>
- <yw1xfv0o9xr3.fsf@unicorn.mansr.com>
- <20151102182615.GI2684@leverpostej> <5637AD74.4080206@oracle.com>
- <563871A9.7050009@sigmadesigns.com>
-Message-ID: <yw1xtwp38k7r.fsf@unicorn.mansr.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 3 Nov 2015 10:12:17 +0000
+Subject: [PATCH v2 2/5] mfd: ts4800-syscon: add driver for TS-4800 syscon
+In-Reply-To: <4911273.Q2mbQ2gvpn@wuerfel>
+References: <1446150450-22093-1-git-send-email-damien.riegel@savoirfairelinux.com>
+ <20151103083817.GC3503@x1> <20151103083923.GD3503@x1>
+ <4911273.Q2mbQ2gvpn@wuerfel>
+Message-ID: <20151103101217.GE3503@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Marc Gonzalez <marc_gonzalez@sigmadesigns.com> writes:
+On Tue, 03 Nov 2015, Arnd Bergmann wrote:
 
-> Santosh Shilimkar wrote:
->
->> Mark Rutland wrote:
->> 
->>> We didn't. Having a look just now, the earliest example appears to be
->>> in OMAP4 L2 support patches back in 2009 [1]. I was not able to find a
->>> rationale.
->>> 
->>> Given that the MMU is on (and speculative accesses are permitted) I
->>> can't see what the DSB achieves -- it can't quiesce the memory system.
->>> 
->>> Santosh, any idea?
->>
->> IIRC, it was requirement from the OMAP ROM code to have a dsb before
->> we call the SMC routine. I can't recollect more than that now.
->
-> In that case, shouldn't dsb have been added to the ROM code,
-> on the "other side" of the smc, so as to not depend on Linux
-> code "getting it right"?
+> On Tuesday 03 November 2015 08:39:23 Lee Jones wrote:
+> > On Tue, 03 Nov 2015, Lee Jones wrote:
+> > 
+> > > On Mon, 02 Nov 2015, Damien Riegel wrote:
+> > > > On Mon, Nov 02, 2015 at 09:12:53AM +0000, Lee Jones wrote:
+> > > > > [Cc'ing Arnd]
+> > > > > 
+> > > > > On Fri, 30 Oct 2015, Damien Riegel wrote:
+> > > > > > On Fri, Oct 30, 2015 at 05:56:56PM +0000, Lee Jones wrote:
+> > > > > > > On Thu, 29 Oct 2015, Damien Riegel wrote:
+> > > > > > > 
+> > > > > > > > Driver for TS-4800 syscon. These registers belong to a FPGA that is
+> > > > > > > > memory mapped and are used for counters, enable various IPs in the FPGA,
+> > > > > > > > control LEDs, control IOs, etc.
+> > > > > > > > 
+> > > > > > > > Currently, only the watchdog is handled.
+> > > > > > > 
+> > > > > > > Why do you require your own syscon driver?
+> > > > > > > 
+> > > > > > > What's wrong with the generic one?
+> > > > > > > 
+> > > > > > 
+> > > > > > The generic one uses a regmap_config with reg_stride set to 4 and val_bits
+> > > > > > to 32.
+> > > > > > 
+> > > > > > TS-4800 syscon registers are 16-bit wide and must be accessed with 16
+> > > > > > bit read and writes:
+> > > > > > http://wiki.embeddedarm.com/wiki/TS-4800#Syscon
+> > > > > > 
+> > > > > > I will address the other issues in the next version (split commit,
+> > > > > > license issue, style, and superfluous remove).
+> > > > > 
+> > > > > The Syscon driver was written to be generic so that each
+> > > > > vendor/platform didn't require their own incarnation.  How unique is
+> > > > > the TS-4800?
+> > > > > 
+> > > > > Perhaps it might be better to supply a generic 16 bit Syscon for
+> > > > > devices akin to the TS-4800?
+> > > > 
+> > > > The TS-4800 syscon could use a generic 16-bit syscon. There is nothing
+> > > > specific that requires a driver besides that.
+> > > > 
+> > > > We could add some optional properties to the generic syscon node to
+> > > > configure reg_bits, val_bits, and reg_stride (and pad_bits ?). Would
+> > > > that be a good solution ?
+> > > 
+> > > Without looking at the ramifications of such an addition, the premise
+> > > sounds good to me.  So long as the current behaviour remains the
+> > > default.
+> > 
+> > Perhaps a "syscon-16bit" compatible might be in order?
+> > 
+> > 
+> 
+> I think a 'buswidth=<16>;' property in addition to 'compatible="syscon"'
+> is more in line with what other subsystems do.
 
-You're new to this, aren't you? :)
+Perfect.  Are you happy coding this up Damien?
 
 -- 
-M?ns Rullg?rd
-mans at mansr.com
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
