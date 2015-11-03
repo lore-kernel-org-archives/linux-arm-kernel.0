@@ -1,62 +1,39 @@
-From: timur@codeaurora.org (Timur Tabi)
-Date: Tue, 3 Nov 2015 10:43:24 -0600
-Subject: [PATCH 2/2] serial: amba-pl011: abstract register accessors
-In-Reply-To: <20151103161206.GA8644@n2100.arm.linux.org.uk>
-References: <1446562867-5693-1-git-send-email-timur@codeaurora.org>
- <1446562867-5693-2-git-send-email-timur@codeaurora.org>
- <20151103161206.GA8644@n2100.arm.linux.org.uk>
-Message-ID: <5638E42C.3050108@codeaurora.org>
+From: mb@lightnvm.io (=?UTF-8?Q?Matias_Bj=c3=b8rling?=)
+Date: Tue, 3 Nov 2015 17:49:03 +0100
+Subject: [PATCH] lightnvm: work around 32-bit built error
+In-Reply-To: <5638D1F0.7060406@fb.com>
+References: <4925999.tpkPGVQaeU@wuerfel> <5638D1F0.7060406@fb.com>
+Message-ID: <5638E57F.9090905@lightnvm.io>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King - ARM Linux wrote:
-> Thanks for pointing that out... that's a mistake in my patches.  It's
-> very difficult to see how we could ever support earlyconsole on ZTE
-> without massively overhauling the earlycon stuff.  I'll undo the
-> changes there in my series.
+On 11/03/2015 04:25 PM, Jens Axboe wrote:
+> On 11/03/2015 06:53 AM, Arnd Bergmann wrote:
+>> The newly added lightnvm incorrectly uses a sector_t variable to
+>> represent a data structure with fixed length bit fields, which breaks
+>> when sector_t is configured to be 32-bit:
+>>
+>> In file included from ../drivers/lightnvm/core.c:29:0:
+>> /include/linux/lightnvm.h:143:4: error: width of 'resved' exceeds its
+>> type
+>>      sector_t resved  : 36;
+>> include/linux/lightnvm.h: In function 'ppa_set_empty':
+>> /include/linux/lightnvm.h:120:20: warning: large integer implicitly
+>> truncated to unsigned type [-Woverflow]
+>>   #define ADDR_EMPTY (~0ULL)
+> 
+> Thanks Arnd, Matias sent another variant yesterday that changes this to
+> u64 as well.
+> 
+>> This patch resolves the build error, but does not address the fact that
+>> bit fields are not reliable in data structures that are interpreted
+>> by firmware on another architecture. If the layout is meant to be
+>> stable, the bit fields should be replaced with explicit calculations.
+> 
+> Matias? Are these every stored and read back, potentially on a different
+> machine?
+> 
 
-How about a command-line option for earlycon?  We do this on our kernel 
-for now:
-
-earlycon=pl011,0x3blabla,sbsa32
-
-And then in pl011_early_console_setup(), device->con->write is set to 
-either pl011_early_write or to pl011_early_write_sbsa32, which looks 
-like this:
-
-static void pl011_putc_sbsa32(struct uart_port *port, int c)
-{
-         while (readl(port->membase + UART01x_FR) & UART01x_FR_TXFF)
-                 cpu_relax();
-         writel(c, port->membase + UART01x_DR);
-         while (!(readl(port->membase + UART01x_FR) & UART011_FR_TXFE))
-                 cpu_relax();
-}
-
-
-static void pl011_early_write_sbsa32(struct console *con, const char *s, 
-unsigned n)
-{
-         struct earlycon_device *dev = con->data;
-
-         uart_console_write(&dev->port, s, n, pl011_putc_sbsa32);
-}
-
-I would have added this to my patch, but I specifically didn't want to 
-add any new functionality.
-
-> Now, as for this patch...
->
->> >  	unsigned int (*get_fifosize)(struct amba_device *dev);
->> >+	u16 (*regreadw)(const void __iomem *addr);
->> >+	void (*regwritew)(u16 val, void __iomem *addr);
->> >+	void (*regwriteb)(u8 val, void __iomem *addr);
-> regwriteb() is used nowhere in this patch.
-
-Sorry, I could have sworn I deleted that.  Should I bother posting a 
-version 2, since your patch is better?
-
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the
-Code Aurora Forum, hosted by The Linux Foundation.
+They are only used for translation from the generic ppa to the device
+specific ppa in the host. They will not be stored in the device (if, it
+would be in done with another structure)
