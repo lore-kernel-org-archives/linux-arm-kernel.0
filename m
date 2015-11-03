@@ -1,54 +1,64 @@
-From: jonathanh@nvidia.com (Jon Hunter)
-Date: Tue, 3 Nov 2015 14:32:31 +0000
-Subject: Tegra baseline test results for v4.3
-Message-ID: <5638C57F.5060404@nvidia.com>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Tue, 3 Nov 2015 22:28:37 +0800
+Subject: [PATCH v2 3/3] clocksource/drivers/dw_apb_timer_of: Implement ARM
+ delay timer
+In-Reply-To: <1446560917-6318-1-git-send-email-jszhang@marvell.com>
+References: <1446560917-6318-1-git-send-email-jszhang@marvell.com>
+Message-ID: <1446560917-6318-4-git-send-email-jszhang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Here are some basic Tegra test results for Linux v4.3.
-Logs and other details at:
+Implement an ARM delay timer to be used for udelay(). This allows us to
+skip the delay loop calibration at boot on Marvell BG2, BG2Q, BG2CD
+platforms. And after this patch, udelay() will be unaffected by CPU
+frequency changes.
 
-    https://nvtb.github.io//linux/test_v4.3/20151101163102/
+Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+---
+ drivers/clocksource/dw_apb_timer_of.c | 17 +++++++++++++++++
+ 1 file changed, 17 insertions(+)
 
-
-Test summary
-------------
-
-Build: zImage:
-    Pass: ( 2/ 2): multi_v7_defconfig, tegra_defconfig
-
-Build: Image:
-    Pass: ( 1/ 1): defconfig
-
-Boot to userspace: defconfig:
-    Pass: ( 1/ 1): qemu-vexpress64
-
-Boot to userspace: multi_v7_defconfig:
-    Pass: ( 4/ 4): tegra114-dalmore-a04, tegra124-jetson-tk1,
-		   tegra20-trimslice, tegra30-beaver
-
-Boot to userspace: tegra_defconfig:
-    Pass: ( 4/ 4): tegra114-dalmore-a04, tegra124-jetson-tk1,
-		   tegra20-trimslice, tegra30-beaver
-
-
-vmlinux object size
-(delta in bytes from test_v4.3-rc7 (32b88194f71d6ae7768a29f87fbba454728273ee)):
-   text     data      bss    total  kernel
-    +46        0        0      +46  defconfig
-  +1906        0        0    +1906  multi_v7_defconfig
-   +954        0        0     +954  tegra_defconfig
-
-
-Boot-time memory difference
-(delta in bytes from test_v4.3-rc7 (32b88194f71d6ae7768a29f87fbba454728273ee))
-    avail    rsrvd     high    freed                board              kconfig                  dtb
-        .        .        .        .      qemu-vexpress64            defconfig           __internal
-        .        .        .        . tegra114-dalmore-a04   multi_v7_defconfig     tegra114-dalmore
-        .        .        .        . tegra114-dalmore-a04      tegra_defconfig     tegra114-dalmore
-        .        .        .        .  tegra124-jetson-tk1   multi_v7_defconfig  tegra124-jetson-tk1
-        .        .        .        .  tegra124-jetson-tk1      tegra_defconfig  tegra124-jetson-tk1
-        .        .        .        .    tegra20-trimslice   multi_v7_defconfig    tegra20-trimslice
-        .        .        .        .    tegra20-trimslice      tegra_defconfig    tegra20-trimslice
-        .        .        .        .       tegra30-beaver   multi_v7_defconfig       tegra30-beaver
-        .        .        .        .       tegra30-beaver      tegra_defconfig       tegra30-beaver
+diff --git a/drivers/clocksource/dw_apb_timer_of.c b/drivers/clocksource/dw_apb_timer_of.c
+index a19a3f6..7a6c3bf 100644
+--- a/drivers/clocksource/dw_apb_timer_of.c
++++ b/drivers/clocksource/dw_apb_timer_of.c
+@@ -16,6 +16,7 @@
+  * You should have received a copy of the GNU General Public License
+  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+  */
++#include <linux/delay.h>
+ #include <linux/dw_apb_timer.h>
+ #include <linux/of.h>
+ #include <linux/of_address.h>
+@@ -130,6 +131,18 @@ static void __init init_sched_clock(void)
+ 	sched_clock_register(read_sched_clock, 32, sched_rate);
+ }
+ 
++#ifdef CONFIG_ARM
++static unsigned long dw_apb_delay_timer_read(void)
++{
++	return ~readl_relaxed(sched_io_base);
++}
++
++static struct delay_timer dw_apb_delay_timer = {
++	.read_current_timer	= dw_apb_delay_timer_read,
++	.rating			= 300,
++};
++#endif
++
+ static int num_called;
+ static void __init dw_apb_timer_init(struct device_node *timer)
+ {
+@@ -142,6 +155,10 @@ static void __init dw_apb_timer_init(struct device_node *timer)
+ 		pr_debug("%s: found clocksource timer\n", __func__);
+ 		add_clocksource(timer);
+ 		init_sched_clock();
++#ifdef CONFIG_ARM
++		dw_apb_delay_timer.freq = sched_rate;
++		register_current_timer_delay(&dw_apb_delay_timer);
++#endif
+ 		break;
+ 	default:
+ 		break;
+-- 
+2.6.2
