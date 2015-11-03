@@ -1,37 +1,38 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Tue, 03 Nov 2015 12:08:44 +0100
-Subject: [PATCH v2] pwm-backlight: fix the panel power sequence
-In-Reply-To: <1446538299.2449.8.camel@mtksdaap41>
-References: <1444987060-48202-1-git-send-email-yh.huang@mediatek.com>
- <1444988219.3541.3.camel@pengutronix.de>
- <1445526750.27586.8.camel@mtksdaap41>
- <1446133259.3274.52.camel@pengutronix.de>
- <1446190900.17558.16.camel@mtksdaap41>
- <1446201271.3334.22.camel@pengutronix.de>
- <1446538299.2449.8.camel@mtksdaap41>
-Message-ID: <1446548924.3373.3.camel@pengutronix.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 3 Nov 2015 11:14:37 +0000
+Subject: [RESEND PATCH 0/1] Fix the "hard LOCKUP" when running a heavy
+ loading
+In-Reply-To: <1446538209-13490-1-git-send-email-wxt@rock-chips.com>
+References: <1446538209-13490-1-git-send-email-wxt@rock-chips.com>
+Message-ID: <20151103111437.GU8644@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi YH,
+On Tue, Nov 03, 2015 at 04:10:08PM +0800, Caesar Wang wrote:
+> As the Russell said:
+> "in other words, which can be handled by updating a control register in
+> the firmware or boot loader"
+> Maybe the better solution is in firmware.
 
-Am Dienstag, den 03.11.2015, 16:11 +0800 schrieb YH Huang:
-> > The reasoning is that devices where there is no phandle link pointing to
-> > the backlight (for example from a simple-panel node), we should keep the
-> > current default behaviour (enable during probe).
-> 
-> I have a little problem for the current default behaviour.
-> Should we enable during probe?
+The full quote is:
 
-Here I mean enabling the backlight (at the end of the probe function),
-not enabling the GPIO already when requesting it.
+"I think we're at the point where we start insisting that workarounds
+which are simple enable/disable feature bit operations (in other words,
+which can be handled by updating a control register in the firmware or
+boot loader) must be done that way, and we are not going to add such
+workarounds to the kernel anymore."
 
-> Before this patch ( http://patchwork.ozlabs.org/patch/324690/ ),
-> we disable "enable-gpio" in the probe function.
+The position hasn't changed.  Workarounds such as this should be handled
+in the firmware/boot loader before control is passed to the kernel.
 
-While before this patch the GPIO would be initialized in the disabled
-state, the call to backlight_update_status at the end of the probe
-function would still enable the backlight afterwards.
+The reason is very simple: if the C compiler can generate code which
+triggers the bug, it can generate code which triggers the bug in the
+boot loader.  So, the only place such workarounds can be done is before
+any C code gets executed.  Putting such workarounds in the kernel is
+completely inappropriate.
 
-regards
-Philipp
+Sorry, I'm not going to accept this workaround into the kernel.
+
+-- 
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
