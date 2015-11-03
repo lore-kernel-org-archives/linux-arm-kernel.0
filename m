@@ -1,41 +1,33 @@
 From: fabio.estevam@freescale.com (Fabio Estevam)
-Date: Tue, 3 Nov 2015 14:25:36 -0200
-Subject: [PATCH 1/2] ARM: dts: imx6sx: Pass the 'adck-max-frequency' property
-Message-ID: <1446567937-15025-1-git-send-email-fabio.estevam@freescale.com>
+Date: Tue, 3 Nov 2015 14:25:37 -0200
+Subject: [PATCH 2/2] ARM: imx_v6_v7_defconfig: Select VF610_ADC
+In-Reply-To: <1446567937-15025-1-git-send-email-fabio.estevam@freescale.com>
+References: <1446567937-15025-1-git-send-email-fabio.estevam@freescale.com>
+Message-ID: <1446567937-15025-2-git-send-email-fabio.estevam@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Specify the 'adck-max-frequency' property in the adc nodes.
+The vf610 adc driver is present on Vybrid, MX6SX, MX6UL and MX7D.
 
-According to Documentation/devicetree/bindings/iio/adc/vf610-adc.txt
-this is a recommended property.
+Select it by default.
 
 Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
 ---
- arch/arm/boot/dts/imx6sx.dtsi | 4 ++++
- 1 file changed, 4 insertions(+)
+ arch/arm/configs/imx_v6_v7_defconfig | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/arch/arm/boot/dts/imx6sx.dtsi b/arch/arm/boot/dts/imx6sx.dtsi
-index 167f77b..da42566 100644
---- a/arch/arm/boot/dts/imx6sx.dtsi
-+++ b/arch/arm/boot/dts/imx6sx.dtsi
-@@ -1152,6 +1152,8 @@
- 				interrupts = <GIC_SPI 100 IRQ_TYPE_LEVEL_HIGH>;
- 				clocks = <&clks IMX6SX_CLK_IPG>;
- 				clock-names = "adc";
-+				fsl,adck-max-frequency = <30000000>, <40000000>,
-+							 <20000000>;
- 				status = "disabled";
-                         };
- 
-@@ -1161,6 +1163,8 @@
- 				interrupts = <GIC_SPI 101 IRQ_TYPE_LEVEL_HIGH>;
- 				clocks = <&clks IMX6SX_CLK_IPG>;
- 				clock-names = "adc";
-+				fsl,adck-max-frequency = <30000000>, <40000000>,
-+							 <20000000>;
- 				status = "disabled";
-                         };
- 
+diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
+index 4187f69..e528955 100644
+--- a/arch/arm/configs/imx_v6_v7_defconfig
++++ b/arch/arm/configs/imx_v6_v7_defconfig
+@@ -315,6 +315,8 @@ CONFIG_MXS_DMA=y
+ CONFIG_FSL_EDMA=y
+ CONFIG_STAGING=y
+ # CONFIG_IOMMU_SUPPORT is not set
++CONFIG_IIO=y
++CONFIG_VF610_ADC=y
+ CONFIG_PWM=y
+ CONFIG_PWM_IMX=y
+ CONFIG_EXT2_FS=y
 -- 
 1.9.1
