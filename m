@@ -1,86 +1,94 @@
-From: caesar.upstream@gmail.com (Caesar Wang)
-Date: Tue, 3 Nov 2015 10:00:39 +0800
-Subject: [PATCH v2 1/4] clocksource: rockchip: Make the driver more
- compatible
-In-Reply-To: <56379D46.1000402@linaro.org>
-References: <1443147298-12603-1-git-send-email-wxt@rock-chips.com>
- <5632E765.4010207@gmail.com> <56334995.6090103@linaro.org>
- <21587719.mnFBFBzBeI@phil> <56379D46.1000402@linaro.org>
-Message-ID: <56381547.5070109@gmail.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Tue, 03 Nov 2015 11:06:02 +0900
+Subject: [PATCH v3 0/7] samsung: pmu: split up SoC specific PMU data
+In-Reply-To: <1445864143-25695-1-git-send-email-pankaj.dubey@samsung.com>
+References: <1445864143-25695-1-git-send-email-pankaj.dubey@samsung.com>
+Message-ID: <5638168A.8060500@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Daniel,
+On 26.10.2015 21:55, Pankaj Dubey wrote:
+> This patch series is a part of continuation work from following series
+> [1] and [2].
+> 
+> 1: exynos: Move pmu driver to driver/soc folder and add exynos7 support
+>    http://www.spinics.net/lists/linux-samsung-soc/msg39797.html from Amit Daniel Kacchap
+> 2: soc: samsung: pmu: split up SoC specific PMU data
+>    https://lkml.org/lkml/2015/1/7/12 from me
+> 
 
-? 2015?11?03? 01:28, Daniel Lezcano ??:
-> On 10/31/2015 12:47 AM, Heiko Stuebner wrote:
->> Hi Daniel,
->>
->> Am Freitag, 30. Oktober 2015, 11:42:29 schrieb Daniel Lezcano:
->>> On 10/30/2015 04:43 AM, Caesar Wang wrote:
->>>> Hi Daniel,
->>>>
->>>> ? 2015?10?01? 03:14, Heiko St?bner ??:
->>>>> Hi Daniel,
->>>>>
->>>>> Am Dienstag, 29. September 2015, 06:18:03 schrieb Daniel Lezcano:
->>>>>> On 09/25/2015 04:14 AM, Caesar Wang wrote:
->>>>>>> Build the arm64 SoCs (e.g.: RK3368) on Rockchip platform,
->>>>>>> There are some failure with build up on timer driver for rockchip.
->>>>>>>
->>>>>>> Says:
->>>>>>> /tmp/ccdAnNy5.s:47: Error: missing immediate expression at  operand
->>>>>>> 1 --
->>>>>>> `dsb`
->>>>>>> ...
->>>>>>>
->>>>>>> The problem was different semantics of dsb on btw arm32 and arm64,
->>>>>>> Here we can convert the dsb with insteading of dsb(sy).The "sy" 
->>>>>>> param
->>>>>>> is the default which you are allow to omit, so on arm32 dsb()and
->>>>>>> dsb(sy)
->>>>>>> are the same.
->>>>>>>
->>>>>>> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
->>>>>> Acked-by: Daniel Lezcano <daniel.lezcano@linaro.org>
->>>>> as you have "just" Acked these patches, I guess you are expecting 
->>>>> them
->>>>> to go
->>>>> through the same tree as the devicetree changes, right?
->>>>
->>>> I'm wonder if someone will apply this series patchs but the wait.:-)
->>>> In fact, I'm no sure that the Acked is really meaning.:-
->>>
->>> Yes, by acking the patch I say I am ok with it and I agree it can go
->>> through another tree.
->>
->> although I guess the two clocksource changes could very well just go
->> through your tree. dsb() -> dsb(sy) is supposed to be equal and the 
->> second
->> one is just cosmetics.  The Kconfig and dts changes need to wait in 
->> any case
->> for 4.5 ... but I guess that may be true for the clocksource changes 
->> as well?
->
-> Heiko, Caesar,
->
-> I am wondering if the dsb() is really necessary. Is it possible you 
-> test the timer by removing this instruction ? Otherwise I will have to 
-> setup my board again and it will take awhile.
->
++Cc Bartlomiej,
 
-As the @Arnd suggestion,
+There were some concerns for previous versions of this patchset. I
+cannot find all of them (e.g. Bartlomiej's are not present on lkml.org
+anymore) so I am not sure if they were addressed properly.
 
-That's seem ok for me.
-Although the writel_relaxed() and writel() a bit different  with DSB() 
-and L2's sync.
+I like the approach, it helps in reviewing the patch.
 
-Do I need send the patch v3?  I will test that on my board.
+I wonder - after adding this for ARM64 how much of duplicated code this
+approach reduce?
 
-I'm no sure that why the clocksource driver didn't use the 
-writel_relaxed() to work.
-Okay, I think we should according to the suggestion or required.
+Best regards,
+Krzysztof
 
--- 
-Thanks,
-Caesar
+> Here is another attempt for the same, in this series I am splitting up SoC
+> specific PMU configuration data into mach-exynos folder itself, before moving
+> all of them under drivers/soc/samsung/. Also instead of making all changes in
+> single patch it has been broken into SoC specific patches to avoid large size
+> of patch. With this approach there will not be unwanted big churns just after
+> adding exynos-pmu under drivers/soc/samsung.
+> 
+> All these patches are just refactoring to keep minimal changes while moving
+> exynos-pmu driver under drivers/soc/samsung/. Support for exynos7 PMU can be added
+> on top of it, in such a manner that for ARM64 build, ARM related SoC's PMU will not
+> get compiled and thus unnecessary increasing kernel image size.
+> 
+> I have tested on Peach-Pi (Exynos5880) based chromebook for boot
+> and S2R functionality.
+> 
+> These patches have been prepared on top of Kukjin Kim's for-next
+> 
+> Changes since v2:
+>  - Removed Amit's Samsung id as it's no more valid.
+>  - Rebased on latest kgene tree.
+>  - Removed redundant code from regs-pmu.h
+> 
+> 
+> Pankaj Dubey (7):
+>   ARM: EXYNOS: removing redundant code from regs-pmu.h
+>   ARM: EXYNOS: Move pmu specific headers under "linux/soc/samsung"
+>   ARCH: EXYNOS: split up exynos3250 SoC specific PMU data
+>   ARCH: EXYNOS: split up exynos4 SoC specific PMU data
+>   ARCH: EXYNOS: split up exynos5250 SoC specific PMU data
+>   ARCH: EXYNOS: split up exynos5420 SoC specific PMU data
+>   drivers: soc: Add support for Exynos PMU driver
+> 
+>  arch/arm/mach-exynos/Kconfig                       |    1 +
+>  arch/arm/mach-exynos/Makefile                      |    2 +-
+>  arch/arm/mach-exynos/exynos.c                      |    2 +-
+>  arch/arm/mach-exynos/mcpm-exynos.c                 |    2 +-
+>  arch/arm/mach-exynos/platsmp.c                     |    2 +-
+>  arch/arm/mach-exynos/pm.c                          |    4 +-
+>  arch/arm/mach-exynos/pmu.c                         | 1004 --------------------
+>  arch/arm/mach-exynos/suspend.c                     |    4 +-
+>  drivers/soc/samsung/Kconfig                        |    4 +
+>  drivers/soc/samsung/Makefile                       |    4 +
+>  drivers/soc/samsung/exynos-pmu.c                   |  168 ++++
+>  drivers/soc/samsung/exynos-pmu.h                   |   52 +
+>  drivers/soc/samsung/exynos3250-pmu.c               |  175 ++++
+>  drivers/soc/samsung/exynos4-pmu.c                  |  223 +++++
+>  drivers/soc/samsung/exynos5250-pmu.c               |  196 ++++
+>  drivers/soc/samsung/exynos5420-pmu.c               |  280 ++++++
+>  .../linux/soc/samsung}/exynos-pmu.h                |    2 +-
+>  .../linux/soc/samsung/exynos-regs-pmu.h            |   17 +-
+>  18 files changed, 1116 insertions(+), 1026 deletions(-)
+>  delete mode 100644 arch/arm/mach-exynos/pmu.c
+>  create mode 100644 drivers/soc/samsung/exynos-pmu.c
+>  create mode 100644 drivers/soc/samsung/exynos-pmu.h
+>  create mode 100644 drivers/soc/samsung/exynos3250-pmu.c
+>  create mode 100644 drivers/soc/samsung/exynos4-pmu.c
+>  create mode 100644 drivers/soc/samsung/exynos5250-pmu.c
+>  create mode 100644 drivers/soc/samsung/exynos5420-pmu.c
+>  rename {arch/arm/mach-exynos => include/linux/soc/samsung}/exynos-pmu.h (90%)
+>  rename arch/arm/mach-exynos/regs-pmu.h => include/linux/soc/samsung/exynos-regs-pmu.h (98%)
+> 
