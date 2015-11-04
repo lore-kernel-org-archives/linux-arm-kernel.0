@@ -1,97 +1,64 @@
-From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Wed, 4 Nov 2015 11:05:54 +0200
-Subject: [PATCH] dmaengine: edma: fix build without CONFIG_OF
-In-Reply-To: <16166945.0Jm7Xdjkb9@wuerfel>
-References: <17811472.bY8CqmdEVy@wuerfel> <5639B6EB.8030101@ti.com>
- <16166945.0Jm7Xdjkb9@wuerfel>
-Message-ID: <5639CA72.4050604@ti.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 4 Nov 2015 09:10:00 +0000
+Subject: [PATCH v6 1/3] iommu: Implement common IOMMU ops for DMA mapping
+In-Reply-To: <CAAFQd5COY-dvBE73R=sUWoGfXR9CvgurGchYgXB6y9eqQ=BBUQ@mail.gmail.com>
+References: <ab8e1caa40d6da1afa4a49f30242ef4e6e1f17df.1443718557.git.robin.murphy@arm.com>
+ <1445867094.30736.14.camel@mhfsdcap03> <562E5AE4.9070001@arm.com>
+ <CAGS+omAWCQsqk56iv0PW2ZhTJ1342GufUsJCP=VYSgCxZNLJpA@mail.gmail.com>
+ <56337E4D.1010304@arm.com>
+ <CAGS+omAmxbb4uVzaQh1xPmkFtcF6KP-HSV-40=sm1BRTdh+=OQ@mail.gmail.com>
+ <CAAFQd5C_dkWBZrQXtyO59ARw7q-0fg-Wk98yApC5VHdQ8-AmNw@mail.gmail.com>
+ <5638F1C4.3000900@arm.com>
+ <20151103184019.GD8644@n2100.arm.linux.org.uk>
+ <CAAFQd5COY-dvBE73R=sUWoGfXR9CvgurGchYgXB6y9eqQ=BBUQ@mail.gmail.com>
+Message-ID: <20151104091000.GH8644@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/04/2015 10:46 AM, Arnd Bergmann wrote:
-> On Wednesday 04 November 2015 09:42:35 Peter Ujfalusi wrote:
->> On 11/03/2015 04:00 PM, Arnd Bergmann wrote:
->>> During the edma rework, a build error was introduced for the
->>> case that CONFIG_OF is disabled:
->>>
->>> drivers/built-in.o: In function `edma_tc_set_pm_state':
->>> :(.text+0x43bf0): undefined reference to `of_find_device_by_node'
->>>
->>> As the edma_tc_set_pm_state() function does nothing in case
->>> we are running without OF, this adds an IS_ENABLED() check
->>> that turns the function into an empty stub then and avoids the
->>> link error.
->>>
->>> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
->>> Fixes: ca304fa9bb76 ("ARM/dmaengine: edma: Public API to use private struct pointer")
->>
->> The actual commit this patch is fixing is:
->> 1be5336bc7ba dmaengine: edma: New device tree binding
+On Wed, Nov 04, 2015 at 02:15:41PM +0900, Tomasz Figa wrote:
+> On Wed, Nov 4, 2015 at 3:40 AM, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+> > On Tue, Nov 03, 2015 at 05:41:24PM +0000, Robin Murphy wrote:
+> >> Hi Tomasz,
+> >>
+> >> On 02/11/15 13:43, Tomasz Figa wrote:
+> >> >Agreed. The dma_map_*() API is not guaranteed to return a single
+> >> >contiguous part of virtual address space for any given SG list.
+> >> >However it was understood to be able to map buffers contiguously
+> >> >mappable by the CPU into a single segment and users,
+> >> >videobuf2-dma-contig in particular, relied on this.
+> >>
+> >> I don't follow that - _any_ buffer made of page-sized chunks is going to be
+> >> mappable contiguously by the CPU; it's clearly impossible for the streaming
+> >> DMA API itself to offer such a guarantee, because it's entirely orthogonal
+> >> to the presence or otherwise of an IOMMU.
+> >
+> > Tomasz's use of "virtual address space" above in combination with the
+> > DMA API is really confusing.
 > 
-> That's what I first thought, but it seems to just move around the
-> call to of_find_device_by_node that was first introduced in the
-> commit I mentioned. Did you build-test it successfully with
-> ca304fa9bb76 and CONFIG_OF enabled? I have to admit that I
-> was just guessing from the contents and did not bisect this
-> fully.
-
-Ah, I see. That of_find_device_by_node() was used by the function used to
-build the unused channel list for the legacy old code. The whole unused
-channel list has been removed by the new DT binding patch since it was bogus
-to start with and there is no need for it anymore.
-
+> I suppose I must have mistakenly use "virtual address space" somewhere
+> instead of "IO virtual address space". I'm sorry for causing
+> confusion.
 > 
->>> ---
->>> Found on ARM randconfig builds with today's linux-next
->>
->> I have sanity built the kernel with omap2plus_defconfig and
->> davinci_all_defconfig since eDMA is used by these platforms and did not faced
->> with this issue, as obviously these defconfigs will result OF to be enabled.
-> 
-> Right. The defconfigs were all fine, and this is hard to hit
-> even in the randconfig builds.
+> The thing being discussed here is mapping of buffers described by
+> scatterlists into IO virtual address space, i.e. the operation
+> happening when dma_map_sg() is called for an IOMMU-enabled device.
 
-I just did a sanity clean _defconfig builds and they both built fine (even w/o
-this patch), phew.
+... and there, it's perfectly legal for an IOMMU to merge all entries
+in a scatterlist into one mapping - so dma_map_sg() would return 1.
 
->>> diff --git a/drivers/dma/edma.c b/drivers/dma/edma.c
->>> index 31722d436a42..16713a93da10 100644
->>> --- a/drivers/dma/edma.c
->>> +++ b/drivers/dma/edma.c
->>> @@ -1560,7 +1560,7 @@ static void edma_tc_set_pm_state(struct edma_tc *tc, bool enable)
->>>       struct platform_device *tc_pdev;
->>>       int ret;
->>>  
->>> -     if (!tc)
->>> +     if (!IS_ENABLED(CONFIG_OF) || !tc)
->>>               return;
->>
->> Should we instead put the function inside of:
->> #if IS_ENABLED(CONFIG_OF)
->> static void edma_tc_set_pm_state(struct edma_tc *tc, bool enable)
->> {
->> ...
->> }
->> #else
->> static inline void edma_tc_set_pm_state(struct edma_tc *tc, bool enable)
->> {
->> }
->> #endif /* IS_ENABLED(CONFIG_OF) */
-> 
-> I think that would be less readable, and gives no compile-time coverage
-> to the contents of the edma_tc_set_pm_state function.
+What that means is that the scatterlist contains the original number of
+entries which describes the CPU view of the buffer list using the original
+number of entries, and the DMA device view of the same but using just the
+first entry.
 
-Hrm, if the compiler knows that there is no need to compile the code after the:
-if (!IS_ENABLED(CONFIG_OF) || !tc)
-when OF is disabled, then it does not give more compile coverage then have
-empty inline function in case of !OF.
-Not sure about it, but if we disable all optimization in gcc, then we might
-get the same missing symbol?
+In other words, if you're walking a scatterlist, and doing a mixture of
+DMA and PIO, you can't assume that if you're at scatterlist entry N for
+DMA, you can switch to PIO for entry N and you'll write to the same
+memory.  (I know that there's badly written drivers in the kernel which
+unfortunately do make this assumption, and if they're used in the
+presence of an IOMMU, they _will_ be silently data corrupting.)
 
-> The effect is the same, so I'd rather stay with my version.
-
-I'm fine with both. It is up to Vinod to decide which one he prefers (I prefer
-the #if #else #endif version).
-
-Anyways:
-Acked-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+-- 
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
