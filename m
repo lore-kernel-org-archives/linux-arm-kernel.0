@@ -1,81 +1,37 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Wed, 4 Nov 2015 14:31:47 +0100
-Subject: [PATCH] KVM/arm: kernel low level debug support for ARM32
- virtual platforms
-In-Reply-To: <CAL_JsqJJHGwcdTDMh3WujJW0rDPxocVLEUpw95aVFC4FDEdDgA@mail.gmail.com>
-References: <1446508313-24404-1-git-send-email-m.smarduch@samsung.com>
- <5638E1CD.8090006@codeaurora.org> <5638F294.4060409@samsung.com>
- <20151103175522.GA24856@arm.com> <56390838.3000204@samsung.com>
- <CAL_JsqJJHGwcdTDMh3WujJW0rDPxocVLEUpw95aVFC4FDEdDgA@mail.gmail.com>
-Message-ID: <20151104133147.GB5819@cbox>
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Wed, 4 Nov 2015 14:34:34 +0100 (CET)
+Subject: [PATCH RFC 0/7] Adding core support for wire-MSI bridges
+In-Reply-To: <5620B9D6.1010708@arm.com>
+References: <1444923568-17413-1-git-send-email-marc.zyngier@arm.com>
+ <56205917.7090001@linux.intel.com> <5620B9D6.1010708@arm.com>
+Message-ID: <alpine.DEB.2.11.1511041348060.4032@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 03, 2015 at 01:39:44PM -0600, Rob Herring wrote:
-> On Tue, Nov 3, 2015 at 1:17 PM, Mario Smarduch <m.smarduch@samsung.com> wrote:
-> >
-> >
-> > On 11/3/2015 9:55 AM, Will Deacon wrote:
-> >> On Tue, Nov 03, 2015 at 09:44:52AM -0800, Mario Smarduch wrote:
-> >>> On 11/3/2015 8:33 AM, Christopher Covington wrote:
-> >>>> On 11/02/2015 06:51 PM, Mario Smarduch wrote:
-> >>>>>    this is a re-post from couple weeks ago, please take time to review this
-> >>>>> simple patch which simplifies DEBUG_LL and prevents kernel crash on virtual
-> >>>>> platforms.
-> >>>>>
-> >>>>> Before this patch DEBUG_LL for 'dummy virtual machine':
-> >>>>>
-> >>>>> ( ) Kernel low-level debugging via EmbeddedICE DCC channel
-> >>>>> ( ) Kernel low-level debug output via semihosting I/O
-> >>>>> ( ) Kernel low-level debugging via 8250 UART
-> >>>>> ( ) Kernel low-level debugging via ARM Ltd PL01x Primecell
-> >>>>>
-> >>>>> In summary if debug uart is not emulated kernel crashes.
-> >>>>> And once you pass that hurdle, uart physical/virtual addresses are unknown.
-> >>>>> DEBUG_LL comes in handy on many occasions and should be somewhat
-> >>>>> intuitive to use like it is for physical platforms. For virtual platforms
-> >>>>> user may start daubting the host and get into a bigger mess.
-> >>>>>
-> >>>>> After this patch is applied user gets:
-> >>>>>
-> >>>>> (X) Kernel low-level debugging on QEMU Virtual Platform
-> >>>>> ( ) Kernel low-level debugging on Kvmtool Virtual Platform
-> >>>>>    ..... above repeated ....
-> >>>>>
-> >>>>> The virtual addresses selected follow arm reference models, high in vmalloc
-> >>>>> section with high mem enabled and guest running with >= 1GB of memory. The
-> >>>>> offset is leftover from arm reference models.
-> >>>>
-> >>>> Which model? It doesn't appear to match the vexpress AEM/RTSM/FVP/whatever
-> >>>> which used 0x1c090000 for UART0.
-> >>>
-> >>> I recall QEMU virt model had it's own physical address map, for sure I saw the
-> >>> virtio-mmio regions assigned in some ARM document. Peter would you know?
-> >>>
-> >>> As far as kvmtool I'm not sure, currently PC1 COM1 port is used? Andre will that
-> >>> stay fixed?
-> >>
-> >> We make absolutely no guarantees about the memory map provided by kvmtool.
-> >>
-> >> Will
-> >>
-> >
-> > If that's also the case for qemu, then I guess the best you can do is find a way
-> > to dump the device tree. Find the uart, physical address and try figure out the
-> > virtual address.
-> >
-> > Pretty involved, hoped for something more automated since that's a handy feature.
-> 
-> You really only need LL_DEBUG now if you are debugging very early code
-> before memory is setup and/or bad memory. Use earlycon instead which
-> should already be supported both via the pl011 or semihosting. I used
-> it with QEMU semihosting support.
-> 
-Then we should really document how to use that with qemu's virt platform
-and kvmtool's platform on both 32-bit and 64-bit so that users can
-easily figure out what they're doing wrong when they get no output.
+Marc,
 
-In practice, the address for the pl011 is quite unlikely to change, I
-dare speculate, so that documentation shouldn't need frequent updating.
+On Fri, 16 Oct 2015, Marc Zyngier wrote:
+> On 16/10/15 02:55, Jiang Liu wrote:
+> > 	There's a working to enable Intel VMD storage device, which
+> > has the similar requirement. Basically a PCIe hierarchy is hidden
+> > behind a parent PCIe device, so we need to use the PCIe irqs on parent
+> > to de-multiple PCIe IRQs from hidden PCIe devices. Seems a chance for
+> > consolidation here.
+> 
+> Do you know if there is a 1-1 mapping between the interrupts seen by the
+> parent device and those seen by the hidden devices? Or is it a case of
+> having to demultiplex the MSIs? Looks like the former, but I'd like to
+> be sure.
 
--Christoffer
+Yes, it's a demultiplexer. No 1:1 mapping.
+
+> Sure, will do when I repost this (probably in a few weeks), and assuming
+> this fits the bill for Thomas and the MBIGEN folks.
+
+It doesn't look that bad and the resulting mbigen stuff is way less
+horrible than it was before. So I agree this is a possible solution to
+the problem.
+
+Thanks,
+
+	tglx
