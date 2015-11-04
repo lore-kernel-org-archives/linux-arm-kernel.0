@@ -1,53 +1,133 @@
-From: phil.edworthy@renesas.com (Phil Edworthy)
-Date: Wed, 4 Nov 2015 18:02:18 +0000
-Subject: PCIe host controller behind IOMMU on ARM
-In-Reply-To: <20151104153028.GR5405@arm.com>
-References: <PS1PR06MB11807CBE8EB2AC6B0158D2B5F52A0@PS1PR06MB1180.apcprd06.prod.outlook.com>
- <20151104142412.GS963@e106497-lin.cambridge.arm.com>
- <PS1PR06MB11804263DD55C54C5987654EF52A0@PS1PR06MB1180.apcprd06.prod.outlook.com>
- <20151104150147.GT963@e106497-lin.cambridge.arm.com>
- <PS1PR06MB11804C3D0155E3EFB5C43C47F52A0@PS1PR06MB1180.apcprd06.prod.outlook.com>
- <20151104153028.GR5405@arm.com>
-Message-ID: <PS1PR06MB11800B04737ED137294907B6F52A0@PS1PR06MB1180.apcprd06.prod.outlook.com>
+From: yang.shi@linaro.org (Shi, Yang)
+Date: Wed, 04 Nov 2015 10:03:21 -0800
+Subject: [PATCH] arm64: bpf: fix div-by-zero case
+In-Reply-To: <1446620204-4228-1-git-send-email-zlim.lnx@gmail.com>
+References: <1446620204-4228-1-git-send-email-zlim.lnx@gmail.com>
+Message-ID: <563A4869.1000902@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
+On 11/3/2015 10:56 PM, Zi Shen Lim wrote:
+> In the case of division by zero in a BPF program:
+> 	A = A / X;  (X == 0)
+> the expected behavior is to terminate with return value 0.
+>
+> This is confirmed by the test case introduced in commit 86bf1721b226
+> ("test_bpf: add tests checking that JIT/interpreter sets A and X to 0.").
+>
+> Reported-by: Shi, Yang <yang.shi@linaro.org>
 
-On 04 November 2015 15:30, Will wrote:
-> On Wed, Nov 04, 2015 at 03:19:13PM +0000, Phil Edworthy wrote:
-> > On 04 November 2015 15:02, Liviu wrote:
-> > > On Wed, Nov 04, 2015 at 02:48:38PM +0000, Phil Edworthy wrote:
-> > > > Sure, though since this is bog standard Intel PCIe ethernet card which works
-> > > > fine when the IOMMU is effectively unused, I don?t think there is a problem
-> > > > with that.
-> > > >
-> > > > The driver for the PCIe controller sets up the IOMMU mapping ok when I
-> > > > do a test call to dma_alloc_coherent() in the controller's driver. i.e. when I
-> > > > do this, it ends up in arm_iommu_alloc_attrs(), which calls
-> > > > __iommu_alloc_buffer() and __alloc_iova().
-> > > >
-> > > > When an endpoint driver allocates and maps a dma coherent buffer it
-> > > > also needs to end up in arm_iommu_alloc_attrs(), but it doesn't.
-> > >
-> > > Why do you think that? Remember that the only thing attached to the
-> IOMMU is
-> > > the
-> > > host controller. The endpoint is on the PCIe bus, which gets a different
-> > > translation
-> > > that the IOMMU knows nothing about. If it helps you to visualise it better,
-> think
-> > > of the host controller as another IOMMU device. It's the ops of the host
-> > > controller
-> > > that should be invoked, not the IOMMU's.
-> > Ok, that makes sense. I'll have a think and poke it a bit more...
-> 
-> Take a look at of_iommu_configure, which is currently lacking support
-> for PCI devices. It should be using a variant on the device-tree bindings
-> already in use for describing MSI device IDs, so that we can translate
-> the RequesterID of the endpoint into an ID that the IOMMU can understand.
-Whilst we want to introduce isolation at some point, right now we would like
-to use the IOMMU as this PCIe controller only uses a 32-bit AXI address.
+Thanks for coming up with the fix promptly.
+s/Shi, Yang/Yang Shi
 
-Thanks
-Phil
+Tested with the latest 4.3 kernel.
+Tested-by: Yang Shi <yang.shi@linaro.org>
+
+Yang
+
+> CC: Xi Wang <xi.wang@gmail.com>
+> CC: Alexei Starovoitov <ast@plumgrid.com>
+> CC: Catalin Marinas <catalin.marinas@arm.com>
+> CC: linux-arm-kernel at lists.infradead.org
+> CC: linux-kernel at vger.kernel.org
+> Fixes: e54bcde3d69d ("arm64: eBPF JIT compiler")
+> Cc: <stable@vger.kernel.org> # 3.18+
+> Signed-off-by: Zi Shen Lim <zlim.lnx@gmail.com>
+> ---
+>   arch/arm64/net/bpf_jit.h      |  3 ++-
+>   arch/arm64/net/bpf_jit_comp.c | 37 +++++++++++++++++++++++++------------
+>   2 files changed, 27 insertions(+), 13 deletions(-)
+>
+> diff --git a/arch/arm64/net/bpf_jit.h b/arch/arm64/net/bpf_jit.h
+> index 98a26ce..aee5637 100644
+> --- a/arch/arm64/net/bpf_jit.h
+> +++ b/arch/arm64/net/bpf_jit.h
+> @@ -1,7 +1,7 @@
+>   /*
+>    * BPF JIT compiler for ARM64
+>    *
+> - * Copyright (C) 2014 Zi Shen Lim <zlim.lnx@gmail.com>
+> + * Copyright (C) 2014-2015 Zi Shen Lim <zlim.lnx@gmail.com>
+>    *
+>    * This program is free software; you can redistribute it and/or modify
+>    * it under the terms of the GNU General Public License version 2 as
+> @@ -35,6 +35,7 @@
+>   	aarch64_insn_gen_comp_branch_imm(0, offset, Rt, A64_VARIANT(sf), \
+>   		AARCH64_INSN_BRANCH_COMP_##type)
+>   #define A64_CBZ(sf, Rt, imm19) A64_COMP_BRANCH(sf, Rt, (imm19) << 2, ZERO)
+> +#define A64_CBNZ(sf, Rt, imm19) A64_COMP_BRANCH(sf, Rt, (imm19) << 2, NONZERO)
+>
+>   /* Conditional branch (immediate) */
+>   #define A64_COND_BRANCH(cond, offset) \
+> diff --git a/arch/arm64/net/bpf_jit_comp.c b/arch/arm64/net/bpf_jit_comp.c
+> index c047598..9ae6f23 100644
+> --- a/arch/arm64/net/bpf_jit_comp.c
+> +++ b/arch/arm64/net/bpf_jit_comp.c
+> @@ -1,7 +1,7 @@
+>   /*
+>    * BPF JIT compiler for ARM64
+>    *
+> - * Copyright (C) 2014 Zi Shen Lim <zlim.lnx@gmail.com>
+> + * Copyright (C) 2014-2015 Zi Shen Lim <zlim.lnx@gmail.com>
+>    *
+>    * This program is free software; you can redistribute it and/or modify
+>    * it under the terms of the GNU General Public License version 2 as
+> @@ -225,6 +225,17 @@ static int build_insn(const struct bpf_insn *insn, struct jit_ctx *ctx)
+>   	u8 jmp_cond;
+>   	s32 jmp_offset;
+>
+> +#define check_imm(bits, imm) do {				\
+> +	if ((((imm) > 0) && ((imm) >> (bits))) ||		\
+> +	    (((imm) < 0) && (~(imm) >> (bits)))) {		\
+> +		pr_info("[%2d] imm=%d(0x%x) out of range\n",	\
+> +			i, imm, imm);				\
+> +		return -EINVAL;					\
+> +	}							\
+> +} while (0)
+> +#define check_imm19(imm) check_imm(19, imm)
+> +#define check_imm26(imm) check_imm(26, imm)
+> +
+>   	switch (code) {
+>   	/* dst = src */
+>   	case BPF_ALU | BPF_MOV | BPF_X:
+> @@ -258,8 +269,21 @@ static int build_insn(const struct bpf_insn *insn, struct jit_ctx *ctx)
+>   		break;
+>   	case BPF_ALU | BPF_DIV | BPF_X:
+>   	case BPF_ALU64 | BPF_DIV | BPF_X:
+> +	{
+> +		const u8 r0 = bpf2a64[BPF_REG_0];
+> +
+> +		/* if (src == 0) return 0 */
+> +		jmp_offset = 3; /* skip ahead to else path */
+> +		check_imm19(jmp_offset);
+> +		emit(A64_CBNZ(is64, src, jmp_offset), ctx);
+> +		emit(A64_MOVZ(1, r0, 0, 0), ctx);
+> +		jmp_offset = epilogue_offset(ctx);
+> +		check_imm26(jmp_offset);
+> +		emit(A64_B(jmp_offset), ctx);
+> +		/* else */
+>   		emit(A64_UDIV(is64, dst, dst, src), ctx);
+>   		break;
+> +	}
+>   	case BPF_ALU | BPF_MOD | BPF_X:
+>   	case BPF_ALU64 | BPF_MOD | BPF_X:
+>   		ctx->tmp_used = 1;
+> @@ -393,17 +417,6 @@ emit_bswap_uxt:
+>   		emit(A64_ASR(is64, dst, dst, imm), ctx);
+>   		break;
+>
+> -#define check_imm(bits, imm) do {				\
+> -	if ((((imm) > 0) && ((imm) >> (bits))) ||		\
+> -	    (((imm) < 0) && (~(imm) >> (bits)))) {		\
+> -		pr_info("[%2d] imm=%d(0x%x) out of range\n",	\
+> -			i, imm, imm);				\
+> -		return -EINVAL;					\
+> -	}							\
+> -} while (0)
+> -#define check_imm19(imm) check_imm(19, imm)
+> -#define check_imm26(imm) check_imm(26, imm)
+> -
+>   	/* JUMP off */
+>   	case BPF_JMP | BPF_JA:
+>   		jmp_offset = bpf2a64_offset(i + off, i, ctx);
+>
