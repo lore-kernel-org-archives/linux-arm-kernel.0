@@ -1,42 +1,37 @@
-From: vinod.koul@intel.com (Vinod Koul)
-Date: Wed, 4 Nov 2015 22:11:20 +0530
-Subject: [PATCH] dmaengine: edma: Add dummy driver skeleton for edma3-tptc
-In-Reply-To: <87egg54td4.fsf@saruman.tx.rr.com>
-References: <1446470500-27504-1-git-send-email-peter.ujfalusi@ti.com>
- <87egg54td4.fsf@saruman.tx.rr.com>
-Message-ID: <20151104164120.GO12910@localhost>
+From: davem@davemloft.net (David Miller)
+Date: Wed, 04 Nov 2015 11:38:26 -0500 (EST)
+Subject: [PATCH] sparc(64)/iommu: fixup iommu_tbl_range_alloc() types
+In-Reply-To: <561248BD.8080809@arm.com>
+References: <55FC49B8.3020100@arm.com>
+ <1442855829-11245-1-git-send-email-andre.przywara@arm.com>
+ <561248BD.8080809@arm.com>
+Message-ID: <20151104.113826.1878743361979570759.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 04, 2015 at 10:33:27AM -0600, Felipe Balbi wrote:
-> Peter Ujfalusi <peter.ujfalusi@ti.com> writes:
-> 
-> > The eDMA3 TPTC does not need any software configuration, but it is a
-> > separate IP block in the SoC. In order the omap hwmod core to be able to
-> > handle the TPTC resources correctly in regards of PM we need to have a
-> > driver loaded for it.
-> > This patch will add a dummy driver skeleton without probe or remove
-> > callbacks provided.
-> >
-> > Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
-> > Reported-by: Olof Johansson <olof@lixom.net>
-> 
-> This fixes the problem I also reported on linux-omap [1]
-> 
-> Tested-by: Felipe Balbi <balbi@ti.com>
-> 
-> [1] http://marc.info/?l=linux-omap&m=144665429032014&w=2
+From: Andre Przywara <andre.przywara@arm.com>
+Date: Mon, 5 Oct 2015 10:54:05 +0100
 
-Great, I was about to point you to this series, I will push this in -next
-now
+> On 21/09/15 18:17, Andre Przywara wrote:
+>> With DMA_ERROR_CODE now being dma_addr_t in most architectures, it
+>> turned out that iommu_tbl_range_alloc (defined in lib/iommu-common.c)
+>> is actually using a wrong return type.
+>> This was easily fixed in a previous patch, but now the types in the
+>> callers do not match anymore.
+>> This patch fixes the obvious mismatches to allow sane comparisons with
+>> the error return value.
+>> Compile-tested on sparc, sparc64, x86, ARM, arm64.
+> 
+> Is there any news on that issue? Are you willing to take either of my
+> patches to fix the compile warnings I see on ARM with LPAE enabled?
 
-Thanks
--- 
-~Vinod
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151104/f2f7609b/attachment-0001.sig>
+Sorry for the late response, I was travelling/conferencing and didn't
+have a lot of time for issues like this.
+
+I'm going to fix iommu_tbl_range_alloc()'s return value semantics.
+
+The thing it is returning is a page table index, not a dma_addr_t
+address.  So it is appropriate to create a special error indication
+value for this, independant of DMA_ERROR_CODE.
+
+I got this wrong during my initial review of these changes.
