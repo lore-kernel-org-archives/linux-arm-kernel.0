@@ -1,56 +1,55 @@
-From: yh.huang@mediatek.com (YH Huang)
-Date: Wed, 4 Nov 2015 09:47:36 +0800
-Subject: [PATCH v2] pwm-backlight: fix the panel power sequence
-In-Reply-To: <1446548924.3373.3.camel@pengutronix.de>
-References: <1444987060-48202-1-git-send-email-yh.huang@mediatek.com>
- <1444988219.3541.3.camel@pengutronix.de>
- <1445526750.27586.8.camel@mtksdaap41>
- <1446133259.3274.52.camel@pengutronix.de>
- <1446190900.17558.16.camel@mtksdaap41>
- <1446201271.3334.22.camel@pengutronix.de>
- <1446538299.2449.8.camel@mtksdaap41>
- <1446548924.3373.3.camel@pengutronix.de>
-Message-ID: <1446601656.15340.11.camel@mtksdaap41>
+From: b51431@freescale.com (Peng Fan)
+Date: Wed, 4 Nov 2015 10:48:28 +0800
+Subject: [RFC] iommu: arm-smmu: correct reference count
+In-Reply-To: <20151103131734.GE14159@arm.com>
+References: <1446555557-3097-1-git-send-email-van.freenix@gmail.com>
+ <20151103131734.GE14159@arm.com>
+Message-ID: <20151104024825.GA27479@shlinux2>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2015-11-03 at 12:08 +0100, Philipp Zabel wrote:
-> Hi YH,
-> 
-> Am Dienstag, den 03.11.2015, 16:11 +0800 schrieb YH Huang:
-> > > The reasoning is that devices where there is no phandle link pointing to
-> > > the backlight (for example from a simple-panel node), we should keep the
-> > > current default behaviour (enable during probe).
-> > 
-> > I have a little problem for the current default behaviour.
-> > Should we enable during probe?
-> 
-> Here I mean enabling the backlight (at the end of the probe function),
-> not enabling the GPIO already when requesting it.
-> 
-> > Before this patch ( http://patchwork.ozlabs.org/patch/324690/ ),
-> > we disable "enable-gpio" in the probe function.
-> 
-> While before this patch the GPIO would be initialized in the disabled
-> state, the call to backlight_update_status at the end of the probe
-> function would still enable the backlight afterwards.
+Hi Will,
 
-Based on this, could we disable it initially and update in the
-backlight_update_status function?
+On Tue, Nov 03, 2015 at 01:17:34PM +0000, Will Deacon wrote:
+>On Tue, Nov 03, 2015 at 08:59:17PM +0800, Peng Fan wrote:
+>> iommu_group_alloc will initialize the reference count for group to 1.
+>> iommu_group_add_device also increase the group reference count,
+>> if nothing bad happends. And we need to add iommu_group_put to
+>> decrease the reference count for group.
+>> 
+>> Signed-off-by: Peng Fan <van.freenix@gmail.com>
+>> Cc: Will Deacon <will.deacon@arm.com>
+>> Cc: Joerg Roedel <joro@8bytes.org>
+>> ---
+>> 
+>> Not sure whether my understanding is correct or not. I checked rockchip-iommu.c
+>> exynos-iommu.c and fsl_pamu_domain.c, and they all have iommu_group_put after
+>> iommu_group_add_device.
+>
+>Doesn't this pair up with the iommu_group_remove_device in
+>arm_smmu_remove_device? Are you actually seeing an issue in practice?
 
-Like this,
+In arm_smmu_add_platform_device,
+iommu_group_alloc --> group->device_kobj ref count will be init to 1.
+iommu_group_add_device --> group->device_kobj ref count will be added 1 to 2.
 
-if (pb->enable_gpio) {
-	if (phandle &&
-	    gpiod_get_direction(pb->enable_gpio) == GPIOF_DIR_OUT &&
-	    gpiod_get_value(pb->enable_gpio) == 1)
-		gpiod_direction_output(pb->enable_gpio, 1);
-	else
-		gpiod_direction_output(pb->enable_gpio, 0);
-}
+In arm_smmu_remove_device:
+iommu_group_remove_device --> Decrease group->device_kobj ref count by 1.
+After arm_smmu_remove_device, the ref count of group->device_kobj is not 0.
 
-And then update with props.brightness in backlight_update_status.
-I am not sure, maybe I miss something.
+So I think need to add iommu_group_put after iommu_group_add_device.
+If I am wrong, please correct me.
+
+Just code inspection, not have a platform to test this.
 
 Regards,
-YH Huang
+Peng.
+
+>
+>Will
+>_______________________________________________
+>iommu mailing list
+>iommu at lists.linux-foundation.org
+>https://lists.linuxfoundation.org/mailman/listinfo/iommu
+
+-- 
