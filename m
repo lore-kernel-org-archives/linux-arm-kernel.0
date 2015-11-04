@@ -1,173 +1,53 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 4 Nov 2015 18:01:39 +0000
-Subject: [PATCHv2 1/4] arm-cci: Refactor CCI PMU code
-In-Reply-To: <1445346326-30820-2-git-send-email-suzuki.poulose@arm.com>
-References: <1445346326-30820-1-git-send-email-suzuki.poulose@arm.com>
- <1445346326-30820-2-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <20151104180139.GF23860@leverpostej>
+From: phil.edworthy@renesas.com (Phil Edworthy)
+Date: Wed, 4 Nov 2015 18:02:18 +0000
+Subject: PCIe host controller behind IOMMU on ARM
+In-Reply-To: <20151104153028.GR5405@arm.com>
+References: <PS1PR06MB11807CBE8EB2AC6B0158D2B5F52A0@PS1PR06MB1180.apcprd06.prod.outlook.com>
+ <20151104142412.GS963@e106497-lin.cambridge.arm.com>
+ <PS1PR06MB11804263DD55C54C5987654EF52A0@PS1PR06MB1180.apcprd06.prod.outlook.com>
+ <20151104150147.GT963@e106497-lin.cambridge.arm.com>
+ <PS1PR06MB11804C3D0155E3EFB5C43C47F52A0@PS1PR06MB1180.apcprd06.prod.outlook.com>
+ <20151104153028.GR5405@arm.com>
+Message-ID: <PS1PR06MB11800B04737ED137294907B6F52A0@PS1PR06MB1180.apcprd06.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 20, 2015 at 02:05:23PM +0100, Suzuki K. Poulose wrote:
-> This patch refactors the CCI PMU driver code a little bit to
-> make it easier share the code for enabling/disabling the CCI
-> PMU. This will be used by the hooks to work around the special cases
-> where writing to a counter is not always that easy(e.g, CCI-500)
+Hi Will,
+
+On 04 November 2015 15:30, Will wrote:
+> On Wed, Nov 04, 2015 at 03:19:13PM +0000, Phil Edworthy wrote:
+> > On 04 November 2015 15:02, Liviu wrote:
+> > > On Wed, Nov 04, 2015 at 02:48:38PM +0000, Phil Edworthy wrote:
+> > > > Sure, though since this is bog standard Intel PCIe ethernet card which works
+> > > > fine when the IOMMU is effectively unused, I don?t think there is a problem
+> > > > with that.
+> > > >
+> > > > The driver for the PCIe controller sets up the IOMMU mapping ok when I
+> > > > do a test call to dma_alloc_coherent() in the controller's driver. i.e. when I
+> > > > do this, it ends up in arm_iommu_alloc_attrs(), which calls
+> > > > __iommu_alloc_buffer() and __alloc_iova().
+> > > >
+> > > > When an endpoint driver allocates and maps a dma coherent buffer it
+> > > > also needs to end up in arm_iommu_alloc_attrs(), but it doesn't.
+> > >
+> > > Why do you think that? Remember that the only thing attached to the
+> IOMMU is
+> > > the
+> > > host controller. The endpoint is on the PCIe bus, which gets a different
+> > > translation
+> > > that the IOMMU knows nothing about. If it helps you to visualise it better,
+> think
+> > > of the host controller as another IOMMU device. It's the ops of the host
+> > > controller
+> > > that should be invoked, not the IOMMU's.
+> > Ok, that makes sense. I'll have a think and poke it a bit more...
 > 
-> No functional changes.
-> 
-> Cc: Punit Agrawal <punit.agrawal@arm.com>
-> Cc: Mark Rutland <mark.rutland@arm.com>
-> Cc: arm at kernel.org
-> Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
-> ---
->  drivers/bus/arm-cci.c |   94 +++++++++++++++++++++++++++++--------------------
->  1 file changed, 56 insertions(+), 38 deletions(-)
-> 
-> diff --git a/drivers/bus/arm-cci.c b/drivers/bus/arm-cci.c
-> index 577cc4b..5435d87 100644
-> --- a/drivers/bus/arm-cci.c
-> +++ b/drivers/bus/arm-cci.c
-> @@ -738,6 +738,53 @@ static void pmu_free_irq(struct cci_pmu *cci_pmu)
->  	}
->  }
->  
-> +/* Should be called with cci_pmu->hw_events->pmu_lock */
-> +static void __cci_pmu_enable(void)
-> +{
-> +	u32 val;
-> +
-> +	/* Enable all the PMU counters. */
-> +	val = readl_relaxed(cci_ctrl_base + CCI_PMCR) | CCI_PMCR_CEN;
-> +	writel(val, cci_ctrl_base + CCI_PMCR);
-> +}
-> +
-> +/* Should be called with cci_pmu->hw_events->pmu_lock */
-> +static void __cci_pmu_disable(void)
-> +{
-> +	u32 val;
-> +
-> +	/* Disable all the PMU counters. */
-> +	val = readl_relaxed(cci_ctrl_base + CCI_PMCR) & ~CCI_PMCR_CEN;
-> +	writel(val, cci_ctrl_base + CCI_PMCR);
-> +}
-> +
-> +static void cci_pmu_enable(struct pmu *pmu)
-> +{
-> +	struct cci_pmu *cci_pmu = to_cci_pmu(pmu);
-> +	struct cci_pmu_hw_events *hw_events = &cci_pmu->hw_events;
-> +	int enabled = bitmap_weight(hw_events->used_mask, cci_pmu->num_cntrs);
-> +	unsigned long flags;
-> +
-> +	if (!enabled)
-> +		return;
-> +
-> +	raw_spin_lock_irqsave(&hw_events->pmu_lock, flags);
-> +	__cci_pmu_enable();
-> +	raw_spin_unlock_irqrestore(&hw_events->pmu_lock, flags);
-> +
-> +}
-> +
-> +static void cci_pmu_disable(struct pmu *pmu)
-> +{
-> +	struct cci_pmu *cci_pmu = to_cci_pmu(pmu);
-> +	struct cci_pmu_hw_events *hw_events = &cci_pmu->hw_events;
-> +	unsigned long flags;
-> +
-> +	raw_spin_lock_irqsave(&hw_events->pmu_lock, flags);
-> +	__cci_pmu_disable();
-> +	raw_spin_unlock_irqrestore(&hw_events->pmu_lock, flags);
-> +}
+> Take a look at of_iommu_configure, which is currently lacking support
+> for PCI devices. It should be using a variant on the device-tree bindings
+> already in use for describing MSI device IDs, so that we can translate
+> the RequesterID of the endpoint into an ID that the IOMMU can understand.
+Whilst we want to introduce isolation at some point, right now we would like
+to use the IOMMU as this PCIe controller only uses a 32-bit AXI address.
 
-Why are these moved up here? It makes the diff harder to read, and it
-doesn't seem necessary in the context of this patch.
-
-Would they otherwise have to move in a later patch? It might be better
-to move them when required (without changes).
-
->  static u32 pmu_read_counter(struct perf_event *event)
->  {
->  	struct cci_pmu *cci_pmu = to_cci_pmu(event->pmu);
-> @@ -754,16 +801,22 @@ static u32 pmu_read_counter(struct perf_event *event)
->  	return value;
->  }
->  
-> +static void __pmu_write_counter(struct cci_pmu *cci_pmu, int idx, u32 value)
-> +{
-> +	pmu_write_register(cci_pmu, value, idx, CCI_PMU_CNTR);
-> +}
-> +
->  static void pmu_write_counter(struct perf_event *event, u32 value)
->  {
->  	struct cci_pmu *cci_pmu = to_cci_pmu(event->pmu);
->  	struct hw_perf_event *hw_counter = &event->hw;
->  	int idx = hw_counter->idx;
->  
-> -	if (unlikely(!pmu_is_valid_counter(cci_pmu, idx)))
-> +	if (unlikely(!pmu_is_valid_counter(cci_pmu, idx))) {
->  		dev_err(&cci_pmu->plat_device->dev, "Invalid CCI PMU counter %d\n", idx);
-> -	else
-> -		pmu_write_register(cci_pmu, value, idx, CCI_PMU_CNTR);
-> +		return;
-> +	}
-> +	__pmu_write_counter(cci_pmu, idx, value);
->  }
-
-While I don't disagree with the new structure of this function, the
-reorganisation wasn't necessary. We only need to substitute
-__pmu_write_counter in place of pmu_write_register.
-
-I'm happy with splitting out the lower level accessors, but I think the
-additional reshuffling makes this patch overly complex. I'd prefer the
-minial facotring out if possible.
-
-Thanks,
-Mark.
-
->  
->  static u64 pmu_event_update(struct perf_event *event)
-> @@ -869,41 +922,6 @@ static void hw_perf_event_destroy(struct perf_event *event)
->  	}
->  }
->  
-> -static void cci_pmu_enable(struct pmu *pmu)
-> -{
-> -	struct cci_pmu *cci_pmu = to_cci_pmu(pmu);
-> -	struct cci_pmu_hw_events *hw_events = &cci_pmu->hw_events;
-> -	int enabled = bitmap_weight(hw_events->used_mask, cci_pmu->num_cntrs);
-> -	unsigned long flags;
-> -	u32 val;
-> -
-> -	if (!enabled)
-> -		return;
-> -
-> -	raw_spin_lock_irqsave(&hw_events->pmu_lock, flags);
-> -
-> -	/* Enable all the PMU counters. */
-> -	val = readl_relaxed(cci_ctrl_base + CCI_PMCR) | CCI_PMCR_CEN;
-> -	writel(val, cci_ctrl_base + CCI_PMCR);
-> -	raw_spin_unlock_irqrestore(&hw_events->pmu_lock, flags);
-> -
-> -}
-> -
-> -static void cci_pmu_disable(struct pmu *pmu)
-> -{
-> -	struct cci_pmu *cci_pmu = to_cci_pmu(pmu);
-> -	struct cci_pmu_hw_events *hw_events = &cci_pmu->hw_events;
-> -	unsigned long flags;
-> -	u32 val;
-> -
-> -	raw_spin_lock_irqsave(&hw_events->pmu_lock, flags);
-> -
-> -	/* Disable all the PMU counters. */
-> -	val = readl_relaxed(cci_ctrl_base + CCI_PMCR) & ~CCI_PMCR_CEN;
-> -	writel(val, cci_ctrl_base + CCI_PMCR);
-> -	raw_spin_unlock_irqrestore(&hw_events->pmu_lock, flags);
-> -}
-> -
->  /*
->   * Check if the idx represents a non-programmable counter.
->   * All the fixed event counters are mapped before the programmable
-> -- 
-> 1.7.9.5
-> 
+Thanks
+Phil
