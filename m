@@ -1,147 +1,61 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Wed,  4 Nov 2015 15:50:00 +0100
-Subject: [PULL 21/21] KVM: arm/arm64: Merge vgic_set_lr() and
- vgic_sync_lr_elrsr()
-In-Reply-To: <1446648600-27297-1-git-send-email-christoffer.dall@linaro.org>
-References: <1446648600-27297-1-git-send-email-christoffer.dall@linaro.org>
-Message-ID: <1446648600-27297-22-git-send-email-christoffer.dall@linaro.org>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 4 Nov 2015 14:54:46 +0000
+Subject: [PATCH] arm64: Increase the max granular size
+In-Reply-To: <alpine.DEB.2.20.1511040748590.17248@east.gentwo.org>
+References: <1442944788-17254-1-git-send-email-rric@kernel.org>
+ <20151028190948.GJ8899@e104818-lin.cambridge.arm.com>
+ <CAMuHMdWQygbxMXoOsbwek6DzZcr7J-C23VCK4ubbgUr+zj=giw@mail.gmail.com>
+ <20151103120504.GF7637@e104818-lin.cambridge.arm.com>
+ <20151103143858.GI7637@e104818-lin.cambridge.arm.com>
+ <CAMuHMdWk0fPzTSKhoCuS4wsOU1iddhKJb2SOpjo=a_9vCm_KXQ@mail.gmail.com>
+ <20151103185050.GJ7637@e104818-lin.cambridge.arm.com>
+ <alpine.DEB.2.20.1511031724010.8178@east.gentwo.org>
+ <20151104123640.GK7637@e104818-lin.cambridge.arm.com>
+ <alpine.DEB.2.20.1511040748590.17248@east.gentwo.org>
+Message-ID: <20151104145445.GL7637@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Pavel Fedin <p.fedin@samsung.com>
+On Wed, Nov 04, 2015 at 07:53:50AM -0600, Christoph Lameter wrote:
+> On Wed, 4 Nov 2015, Catalin Marinas wrote:
+> 
+> > The simplest option would be to make sure that off slab isn't allowed
+> > for caches of KMALLOC_MIN_SIZE or smaller, with the drawback that not
+> > only "kmalloc-128" but any other such caches will be on slab.
+> 
+> The reason for an off slab configuration is denser object packing.
+> 
+> > I think a better option would be to first check that there is a
+> > kmalloc_caches[] entry for freelist_size before deciding to go off-slab.
+> 
+> Hmmm.. Yes seems to be an option.
+> 
+> Maybe we simply revert commit 8fc9cf420b36 instead?
 
-Now we see that vgic_set_lr() and vgic_sync_lr_elrsr() are always used
-together. Merge them into one function, saving from second vgic_ops
-dereferencing every time.
+I'm fine with this. Also note that the arm64 commit changing
+L1_CACHE_BYTES to 128 hasn't been pushed yet (it's queued for 4.4).
 
-Signed-off-by: Pavel Fedin <p.fedin@samsung.com>
-Signed-off-by: Christoffer Dall <christoffer.dall@linaro.org>
----
- include/kvm/arm_vgic.h |  1 -
- virt/kvm/arm/vgic-v2.c |  5 -----
- virt/kvm/arm/vgic-v3.c |  5 -----
- virt/kvm/arm/vgic.c    | 14 ++------------
- 4 files changed, 2 insertions(+), 23 deletions(-)
+> That does not seem to make too much sense to me and the goal of the
+> commit cannot be accomplished on ARM. Your patch essentially reverts
+> the effect anyways.
 
-diff --git a/include/kvm/arm_vgic.h b/include/kvm/arm_vgic.h
-index 3936bf8..f62addc 100644
---- a/include/kvm/arm_vgic.h
-+++ b/include/kvm/arm_vgic.h
-@@ -112,7 +112,6 @@ struct vgic_vmcr {
- struct vgic_ops {
- 	struct vgic_lr	(*get_lr)(const struct kvm_vcpu *, int);
- 	void	(*set_lr)(struct kvm_vcpu *, int, struct vgic_lr);
--	void	(*sync_lr_elrsr)(struct kvm_vcpu *, int, struct vgic_lr);
- 	u64	(*get_elrsr)(const struct kvm_vcpu *vcpu);
- 	u64	(*get_eisr)(const struct kvm_vcpu *vcpu);
- 	void	(*clear_eisr)(struct kvm_vcpu *vcpu);
-diff --git a/virt/kvm/arm/vgic-v2.c b/virt/kvm/arm/vgic-v2.c
-index c0f5d7f..ff02f08 100644
---- a/virt/kvm/arm/vgic-v2.c
-+++ b/virt/kvm/arm/vgic-v2.c
-@@ -79,11 +79,7 @@ static void vgic_v2_set_lr(struct kvm_vcpu *vcpu, int lr,
- 		lr_val |= (lr_desc.source << GICH_LR_PHYSID_CPUID_SHIFT);
- 
- 	vcpu->arch.vgic_cpu.vgic_v2.vgic_lr[lr] = lr_val;
--}
- 
--static void vgic_v2_sync_lr_elrsr(struct kvm_vcpu *vcpu, int lr,
--				  struct vgic_lr lr_desc)
--{
- 	if (!(lr_desc.state & LR_STATE_MASK))
- 		vcpu->arch.vgic_cpu.vgic_v2.vgic_elrsr |= (1ULL << lr);
- 	else
-@@ -167,7 +163,6 @@ static void vgic_v2_enable(struct kvm_vcpu *vcpu)
- static const struct vgic_ops vgic_v2_ops = {
- 	.get_lr			= vgic_v2_get_lr,
- 	.set_lr			= vgic_v2_set_lr,
--	.sync_lr_elrsr		= vgic_v2_sync_lr_elrsr,
- 	.get_elrsr		= vgic_v2_get_elrsr,
- 	.get_eisr		= vgic_v2_get_eisr,
- 	.clear_eisr		= vgic_v2_clear_eisr,
-diff --git a/virt/kvm/arm/vgic-v3.c b/virt/kvm/arm/vgic-v3.c
-index 92003cb..487d635 100644
---- a/virt/kvm/arm/vgic-v3.c
-+++ b/virt/kvm/arm/vgic-v3.c
-@@ -112,11 +112,7 @@ static void vgic_v3_set_lr(struct kvm_vcpu *vcpu, int lr,
- 	}
- 
- 	vcpu->arch.vgic_cpu.vgic_v3.vgic_lr[LR_INDEX(lr)] = lr_val;
--}
- 
--static void vgic_v3_sync_lr_elrsr(struct kvm_vcpu *vcpu, int lr,
--				  struct vgic_lr lr_desc)
--{
- 	if (!(lr_desc.state & LR_STATE_MASK))
- 		vcpu->arch.vgic_cpu.vgic_v3.vgic_elrsr |= (1U << lr);
- 	else
-@@ -212,7 +208,6 @@ static void vgic_v3_enable(struct kvm_vcpu *vcpu)
- static const struct vgic_ops vgic_v3_ops = {
- 	.get_lr			= vgic_v3_get_lr,
- 	.set_lr			= vgic_v3_set_lr,
--	.sync_lr_elrsr		= vgic_v3_sync_lr_elrsr,
- 	.get_elrsr		= vgic_v3_get_elrsr,
- 	.get_eisr		= vgic_v3_get_eisr,
- 	.clear_eisr		= vgic_v3_clear_eisr,
-diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-index 96e45f3..fe451d4 100644
---- a/virt/kvm/arm/vgic.c
-+++ b/virt/kvm/arm/vgic.c
-@@ -1032,12 +1032,6 @@ static void vgic_set_lr(struct kvm_vcpu *vcpu, int lr,
- 	vgic_ops->set_lr(vcpu, lr, vlr);
- }
- 
--static void vgic_sync_lr_elrsr(struct kvm_vcpu *vcpu, int lr,
--			       struct vgic_lr vlr)
--{
--	vgic_ops->sync_lr_elrsr(vcpu, lr, vlr);
--}
--
- static inline u64 vgic_get_elrsr(struct kvm_vcpu *vcpu)
- {
- 	return vgic_ops->get_elrsr(vcpu);
-@@ -1100,7 +1094,6 @@ static void vgic_retire_lr(int lr_nr, struct kvm_vcpu *vcpu)
- 
- 	vlr.state = 0;
- 	vgic_set_lr(vcpu, lr_nr, vlr);
--	vgic_sync_lr_elrsr(vcpu, lr_nr, vlr);
- }
- 
- /*
-@@ -1162,7 +1155,6 @@ static void vgic_queue_irq_to_lr(struct kvm_vcpu *vcpu, int irq,
- 	}
- 
- 	vgic_set_lr(vcpu, lr_nr, vlr);
--	vgic_sync_lr_elrsr(vcpu, lr_nr, vlr);
- }
- 
- /*
-@@ -1340,8 +1332,6 @@ static int process_queued_irq(struct kvm_vcpu *vcpu,
- 	vlr.hwirq = 0;
- 	vgic_set_lr(vcpu, lr, vlr);
- 
--	vgic_sync_lr_elrsr(vcpu, lr, vlr);
--
- 	return pending;
- }
- 
-@@ -1442,8 +1432,6 @@ static void __kvm_vgic_sync_hwstate(struct kvm_vcpu *vcpu)
- 	bool level_pending;
- 
- 	level_pending = vgic_process_maintenance(vcpu);
--	elrsr = vgic_get_elrsr(vcpu);
--	elrsr_ptr = u64_to_bitmask(&elrsr);
- 
- 	/* Deal with HW interrupts, and clear mappings for empty LRs */
- 	for (lr = 0; lr < vgic->nr_lr; lr++) {
-@@ -1454,6 +1442,8 @@ static void __kvm_vgic_sync_hwstate(struct kvm_vcpu *vcpu)
- 	}
- 
- 	/* Check if we still have something up our sleeve... */
-+	elrsr = vgic_get_elrsr(vcpu);
-+	elrsr_ptr = u64_to_bitmask(&elrsr);
- 	pending = find_first_zero_bit(elrsr_ptr, vgic->nr_lr);
- 	if (level_pending || pending < vgic->nr_lr)
- 		set_bit(vcpu->vcpu_id, dist->irq_pending_on_cpu);
+In theory it only reverts the effect for the first kmalloc_cache
+("kmalloc-128" in the arm64 case). Any other bigger cache which would
+not be mergeable with an existing one still has the potential of
+off-slab management.
+
+> Smaller slabs really do not need off slab management anyways since they
+> will only loose a few objects per slab page.
+
+IIUC, starting with 128 slab size for a 4KB page, you have 32 objects
+per page. The freelist takes 32 bytes (or 31), therefore you waste a
+single slab object. However, only 1/4 of it is used for freelist and the
+waste gets bigger with 256 slab size, hence the original commit.
+
+BTW, assuming L1_CACHE_BYTES is 512 (I don't ever see this happening but
+just in theory), we potentially have the same issue. What would save us
+is that INDEX_NODE would match the first "kmalloc-512" cache, so we have
+it pre-populated.
+
 -- 
-2.1.2.330.g565301e.dirty
+Catalin
