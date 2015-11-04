@@ -1,54 +1,86 @@
 From: heiko@sntech.de (Heiko Stuebner)
-Date: Wed,  4 Nov 2015 22:44:07 +0100
-Subject: [PATCH 1/8] phy: rockchip-usb: fix clock get-put mismatch
+Date: Wed,  4 Nov 2015 22:44:08 +0100
+Subject: [PATCH 2/8] phy: rockchip-usb: introduce a common data-struct for the
+ device
 In-Reply-To: <1446673454-9529-1-git-send-email-heiko@sntech.de>
 References: <1446673454-9529-1-git-send-email-heiko@sntech.de>
-Message-ID: <1446673454-9529-2-git-send-email-heiko@sntech.de>
+Message-ID: <1446673454-9529-3-git-send-email-heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently the phy driver only gets the optional clock reference but
-never puts it again, neither during error handling nor on remove.
-Fix that by moving the clk_put to a devm-action that gets called at
-the right time when all other devm actions are done.
+This introduces a common struct that holds data belonging to
+the umbrella device that contains all the phys and that we
+want to use later.
 
 Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 ---
- drivers/phy/phy-rockchip-usb.c | 15 +++++++++++++++
- 1 file changed, 15 insertions(+)
+ drivers/phy/phy-rockchip-usb.c | 24 +++++++++++++++++-------
+ 1 file changed, 17 insertions(+), 7 deletions(-)
 
 diff --git a/drivers/phy/phy-rockchip-usb.c b/drivers/phy/phy-rockchip-usb.c
-index 91d6f34..dfc056b 100644
+index dfc056b..dda1994 100644
 --- a/drivers/phy/phy-rockchip-usb.c
 +++ b/drivers/phy/phy-rockchip-usb.c
-@@ -90,6 +90,14 @@ static const struct phy_ops ops = {
- 	.owner		= THIS_MODULE,
- };
+@@ -36,9 +36,14 @@
+ #define SIDDQ_ON		BIT(13)
+ #define SIDDQ_OFF		(0 << 13)
  
-+static void rockchip_usb_phy_action(void *data)
-+{
-+	struct rockchip_usb_phy *rk_phy = data;
++struct rockchip_usb_phy_base {
++	struct device *dev;
++	struct regmap *reg_base;
++};
 +
-+	if (rk_phy->clk)
-+		clk_put(rk_phy->clk);
-+}
-+
+ struct rockchip_usb_phy {
++	struct rockchip_usb_phy_base *base;
+ 	unsigned int	reg_offset;
+-	struct regmap	*reg_base;
+ 	struct clk	*clk;
+ 	struct phy	*phy;
+ };
+@@ -46,7 +51,7 @@ struct rockchip_usb_phy {
+ static int rockchip_usb_phy_power(struct rockchip_usb_phy *phy,
+ 					   bool siddq)
+ {
+-	return regmap_write(phy->reg_base, phy->reg_offset,
++	return regmap_write(phy->base->reg_base, phy->reg_offset,
+ 			    SIDDQ_WRITE_ENA | (siddq ? SIDDQ_ON : SIDDQ_OFF));
+ }
+ 
+@@ -101,17 +106,23 @@ static void rockchip_usb_phy_action(void *data)
  static int rockchip_usb_phy_probe(struct platform_device *pdev)
  {
  	struct device *dev = &pdev->dev;
-@@ -124,6 +132,13 @@ static int rockchip_usb_phy_probe(struct platform_device *pdev)
- 		if (IS_ERR(rk_phy->clk))
- 			rk_phy->clk = NULL;
++	struct rockchip_usb_phy_base *phy_base;
+ 	struct rockchip_usb_phy *rk_phy;
+ 	struct phy_provider *phy_provider;
+ 	struct device_node *child;
+-	struct regmap *grf;
+ 	unsigned int reg_offset;
+ 	int err;
  
-+		err = devm_add_action(dev, rockchip_usb_phy_action, rk_phy);
-+		if (err) {
-+			if (rk_phy->clk)
-+				clk_put(rk_phy->clk);
-+			return err;
-+		}
+-	grf = syscon_regmap_lookup_by_phandle(dev->of_node, "rockchip,grf");
+-	if (IS_ERR(grf)) {
++	phy_base = devm_kzalloc(dev, sizeof(*phy_base), GFP_KERNEL);
++	if (!phy_base)
++		return -ENOMEM;
 +
- 		rk_phy->phy = devm_phy_create(dev, child, &ops);
- 		if (IS_ERR(rk_phy->phy)) {
- 			dev_err(dev, "failed to create PHY\n");
++	phy_base->dev = dev;
++	phy_base->reg_base = syscon_regmap_lookup_by_phandle(dev->of_node,
++							     "rockchip,grf");
++	if (IS_ERR(phy_base->reg_base)) {
+ 		dev_err(&pdev->dev, "Missing rockchip,grf property\n");
+-		return PTR_ERR(grf);
++		return PTR_ERR(phy_base->reg_base);
+ 	}
+ 
+ 	for_each_available_child_of_node(dev->of_node, child) {
+@@ -126,7 +137,6 @@ static int rockchip_usb_phy_probe(struct platform_device *pdev)
+ 		}
+ 
+ 		rk_phy->reg_offset = reg_offset;
+-		rk_phy->reg_base = grf;
+ 
+ 		rk_phy->clk = of_clk_get_by_name(child, "phyclk");
+ 		if (IS_ERR(rk_phy->clk))
 -- 
 2.6.2
