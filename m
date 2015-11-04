@@ -1,28 +1,38 @@
-From: cl@linux.com (Christoph Lameter)
-Date: Wed, 4 Nov 2015 09:28:34 -0600 (CST)
-Subject: [PATCH] arm64: Increase the max granular size
-In-Reply-To: <20151104145445.GL7637@e104818-lin.cambridge.arm.com>
-References: <1442944788-17254-1-git-send-email-rric@kernel.org>
- <20151028190948.GJ8899@e104818-lin.cambridge.arm.com>
- <CAMuHMdWQygbxMXoOsbwek6DzZcr7J-C23VCK4ubbgUr+zj=giw@mail.gmail.com>
- <20151103120504.GF7637@e104818-lin.cambridge.arm.com>
- <20151103143858.GI7637@e104818-lin.cambridge.arm.com>
- <CAMuHMdWk0fPzTSKhoCuS4wsOU1iddhKJb2SOpjo=a_9vCm_KXQ@mail.gmail.com>
- <20151103185050.GJ7637@e104818-lin.cambridge.arm.com>
- <alpine.DEB.2.20.1511031724010.8178@east.gentwo.org>
- <20151104123640.GK7637@e104818-lin.cambridge.arm.com>
- <alpine.DEB.2.20.1511040748590.17248@east.gentwo.org>
- <20151104145445.GL7637@e104818-lin.cambridge.arm.com>
-Message-ID: <alpine.DEB.2.20.1511040927510.18745@east.gentwo.org>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Wed, 4 Nov 2015 23:28:27 +0800
+Subject: [patch] bus: sunxi-rsb: unlock on error in sunxi_rsb_read()
+In-Reply-To: <20151103220244.GA19280@mwanda>
+References: <20151103220244.GA19280@mwanda>
+Message-ID: <CAGb2v65nxJfszKUyOMb7sjLTtvvBTGy=FLwysLt5t_9xa1BcfQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 4 Nov 2015, Catalin Marinas wrote:
+On Wed, Nov 4, 2015 at 6:02 AM, Dan Carpenter <dan.carpenter@oracle.com> wrote:
+> Don't forget to unlock before returning an error code.
+>
+> Fixes: d787dcdb9c8f ('bus: sunxi-rsb: Add driver for Allwinner Reduced Serial Bus')
+> Signed-off-by: Dan Carpenter <dan.carpenter@oracle.com>
 
-> BTW, assuming L1_CACHE_BYTES is 512 (I don't ever see this happening but
-> just in theory), we potentially have the same issue. What would save us
-> is that INDEX_NODE would match the first "kmalloc-512" cache, so we have
-> it pre-populated.
+Acked-by: Chen-Yu Tsai <wens@csie.org>
 
-Ok maybe add some BUILD_BUG_ONs to ensure that builds fail until we have
-addressed that.
+>
+> diff --git a/drivers/bus/sunxi-rsb.c b/drivers/bus/sunxi-rsb.c
+> index 846bc29c..0cfcb39 100644
+> --- a/drivers/bus/sunxi-rsb.c
+> +++ b/drivers/bus/sunxi-rsb.c
+> @@ -342,13 +342,13 @@ static int sunxi_rsb_read(struct sunxi_rsb *rsb, u8 rtaddr, u8 addr,
+>
+>         ret = _sunxi_rsb_run_xfer(rsb);
+>         if (ret)
+> -               goto out;
+> +               goto unlock;
+>
+>         *buf = readl(rsb->regs + RSB_DATA);
+>
+> +unlock:
+>         mutex_unlock(&rsb->lock);
+>
+> -out:
+>         return ret;
+>  }
+>
