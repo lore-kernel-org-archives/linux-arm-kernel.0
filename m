@@ -1,103 +1,95 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Thu, 05 Nov 2015 00:39:25 +0100
-Subject: [PATCH v6 1/8] dt-bindings: add documentation of rk3036 clock
- controller
-In-Reply-To: <1446639503-11763-2-git-send-email-zhengxing@rock-chips.com>
-References: <1446639503-11763-1-git-send-email-zhengxing@rock-chips.com>
- <1446639503-11763-2-git-send-email-zhengxing@rock-chips.com>
-Message-ID: <2700959.OiVQMNL8Ss@phil>
+From: dianders@chromium.org (Doug Anderson)
+Date: Wed, 4 Nov 2015 15:46:04 -0800
+Subject: [PATCH 2/8] phy: rockchip-usb: introduce a common data-struct for
+ the device
+In-Reply-To: <1446673454-9529-3-git-send-email-heiko@sntech.de>
+References: <1446673454-9529-1-git-send-email-heiko@sntech.de>
+ <1446673454-9529-3-git-send-email-heiko@sntech.de>
+Message-ID: <CAD=FV=Uf0w0buknqwvW+ufao64m78i3B7Goza2pGCkjDSPU0tA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-Am Mittwoch, 4. November 2015, 20:18:16 schrieb Xing Zheng:
-> Add the devicetree binding for the cru on the rk3036 which quite similar
-> structured as previous clock controllers.
-> 
-> Signed-off-by: Xing Zheng <zhengxing@rock-chips.com>
-> Reviewed-by: Heiko Stuebner <heiko@sntech.de>
+On Wed, Nov 4, 2015 at 1:44 PM, Heiko Stuebner <heiko@sntech.de> wrote:
+> This introduces a common struct that holds data belonging to
+> the umbrella device that contains all the phys and that we
+> want to use later.
+>
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 > ---
+>  drivers/phy/phy-rockchip-usb.c | 24 +++++++++++++++++-------
+>  1 file changed, 17 insertions(+), 7 deletions(-)
+>
+> diff --git a/drivers/phy/phy-rockchip-usb.c b/drivers/phy/phy-rockchip-usb.c
+> index dfc056b..dda1994 100644
+> --- a/drivers/phy/phy-rockchip-usb.c
+> +++ b/drivers/phy/phy-rockchip-usb.c
+> @@ -36,9 +36,14 @@
+>  #define SIDDQ_ON               BIT(13)
+>  #define SIDDQ_OFF              (0 << 13)
+>
+> +struct rockchip_usb_phy_base {
+> +       struct device *dev;
+> +       struct regmap *reg_base;
+> +};
+> +
+>  struct rockchip_usb_phy {
+> +       struct rockchip_usb_phy_base *base;
+>         unsigned int    reg_offset;
+> -       struct regmap   *reg_base;
+>         struct clk      *clk;
+>         struct phy      *phy;
+>  };
+> @@ -46,7 +51,7 @@ struct rockchip_usb_phy {
+>  static int rockchip_usb_phy_power(struct rockchip_usb_phy *phy,
+>                                            bool siddq)
+>  {
+> -       return regmap_write(phy->reg_base, phy->reg_offset,
+> +       return regmap_write(phy->base->reg_base, phy->reg_offset,
+>                             SIDDQ_WRITE_ENA | (siddq ? SIDDQ_ON : SIDDQ_OFF));
+>  }
+>
+> @@ -101,17 +106,23 @@ static void rockchip_usb_phy_action(void *data)
+>  static int rockchip_usb_phy_probe(struct platform_device *pdev)
+>  {
+>         struct device *dev = &pdev->dev;
+> +       struct rockchip_usb_phy_base *phy_base;
+>         struct rockchip_usb_phy *rk_phy;
+>         struct phy_provider *phy_provider;
+>         struct device_node *child;
+> -       struct regmap *grf;
+>         unsigned int reg_offset;
+>         int err;
+>
+> -       grf = syscon_regmap_lookup_by_phandle(dev->of_node, "rockchip,grf");
+> -       if (IS_ERR(grf)) {
+> +       phy_base = devm_kzalloc(dev, sizeof(*phy_base), GFP_KERNEL);
+> +       if (!phy_base)
+> +               return -ENOMEM;
+> +
+> +       phy_base->dev = dev;
+> +       phy_base->reg_base = syscon_regmap_lookup_by_phandle(dev->of_node,
+> +                                                            "rockchip,grf");
+> +       if (IS_ERR(phy_base->reg_base)) {
+>                 dev_err(&pdev->dev, "Missing rockchip,grf property\n");
+> -               return PTR_ERR(grf);
+> +               return PTR_ERR(phy_base->reg_base);
+>         }
+>
+>         for_each_available_child_of_node(dev->of_node, child) {
+> @@ -126,7 +137,6 @@ static int rockchip_usb_phy_probe(struct platform_device *pdev)
+>                 }
+>
+>                 rk_phy->reg_offset = reg_offset;
+> -               rk_phy->reg_base = grf;
 
-your recipient-list is missing the clock maintainers+lists - sorry for
-not noticing this earlier.
+I'm probably missing something, but I would have expected a line line:
 
-While the devicetree-maintainers may Review it, we expect the clock-
-maintainers to actually apply all 4 clock-related patches.
+  rk_phy->base = phy_base;
 
-Same comment is true for
-[PATCH v6 2/8] clk: rockchip: add dt-binding header for rk3036
+Otherwise how does "base" get assigned?  Ah, I see.  You forgot it in
+this patch and then cheated and slipped it in in patch #3.  ;)  For
+nice bisectability it probably belongs here, too...
 
-
-Heiko
-
-> 
-> Changes in v6: None
-> 
->  .../bindings/clock/rockchip,rk3036-cru.txt         |   56 ++++++++++++++++++++
->  1 file changed, 56 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/clock/rockchip,rk3036-cru.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/clock/rockchip,rk3036-cru.txt b/Documentation/devicetree/bindings/clock/rockchip,rk3036-cru.txt
-> new file mode 100644
-> index 0000000..ace0599
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/clock/rockchip,rk3036-cru.txt
-> @@ -0,0 +1,56 @@
-> +* Rockchip RK3036 Clock and Reset Unit
-> +
-> +The RK3036 clock controller generates and supplies clock to various
-> +controllers within the SoC and also implements a reset controller for SoC
-> +peripherals.
-> +
-> +Required Properties:
-> +
-> +- compatible: should be "rockchip,rk3036-cru"
-> +- reg: physical base address of the controller and length of memory mapped
-> +  region.
-> +- #clock-cells: should be 1.
-> +- #reset-cells: should be 1.
-> +
-> +Optional Properties:
-> +
-> +- rockchip,grf: phandle to the syscon managing the "general register files"
-> +  If missing pll rates are not changeable, due to the missing pll lock status.
-> +
-> +Each clock is assigned an identifier and client nodes can use this identifier
-> +to specify the clock which they consume. All available clocks are defined as
-> +preprocessor macros in the dt-bindings/clock/rk3036-cru.h headers and can be
-> +used in device tree sources. Similar macros exist for the reset sources in
-> +these files.
-> +
-> +External clocks:
-> +
-> +There are several clocks that are generated outside the SoC. It is expected
-> +that they are defined using standard clock bindings with following
-> +clock-output-names:
-> + - "xin24m" - crystal input - required,
-> + - "ext_i2s" - external I2S clock - optional,
-> + - "ext_gmac" - external GMAC clock - optional
-> +
-> +Example: Clock controller node:
-> +
-> +	cru: cru at 20000000 {
-> +		compatible = "rockchip,rk3036-cru";
-> +		reg = <0x20000000 0x1000>;
-> +		rockchip,grf = <&grf>;
-> +
-> +		#clock-cells = <1>;
-> +		#reset-cells = <1>;
-> +	};
-> +
-> +Example: UART controller node that consumes the clock generated by the clock
-> +  controller:
-> +
-> +	uart0: serial at 20060000 {
-> +		compatible = "snps,dw-apb-uart";
-> +		reg = <0x20060000 0x100>;
-> +		interrupts = <GIC_SPI 20 IRQ_TYPE_LEVEL_HIGH>;
-> +		reg-shift = <2>;
-> +		reg-io-width = <4>;
-> +		clocks = <&cru SCLK_UART0>;
-> +	};
-> 
+-Doug
