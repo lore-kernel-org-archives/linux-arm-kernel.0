@@ -1,41 +1,35 @@
-From: mchan@broadcom.com (Michael Chan)
-Date: Wed, 4 Nov 2015 08:07:53 -0800
-Subject: [PATCH] bnxt_en: add VXLAN dependency
-In-Reply-To: <10667823.xAtO4QOJMM@wuerfel>
-References: <10667823.xAtO4QOJMM@wuerfel>
-Message-ID: <1446653274.3700.5.camel@LTIRV-MCHAN1.corp.ad.broadcom.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Wed, 4 Nov 2015 08:06:42 -0800
+Subject: [PATCH] ARM: dts: sun7i: Enable audio codec on pcDuino
+In-Reply-To: <1446565640-21069-1-git-send-email-hdegoede@redhat.com>
+References: <1446565640-21069-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <20151104160642.GY6114@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2015-11-04 at 16:00 +0100, Arnd Bergmann wrote: 
-> VXLAN may be a loadable module, and this driver cannot be built-in
-> in that case, or we get a link error:
-> 
-> drivers/built-in.o: In function `__bnxt_open_nic':
-> drivers/net/ethernet/broadcom/bnxt/bnxt.c:4581: undefined reference to `vxlan_get_rx_port'
-> 
-> This adds a Kconfig dependency that ensures that either VXLAN is
-> disabled (which the driver handles correctly), or we depend on
-> VXLAN itself and disallow built-in compilation when VXLAN is
-> a module.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Hi,
 
-Thanks.
-Acked-by: Michael Chan <mchan@broadcom.com>
+On Tue, Nov 03, 2015 at 04:47:20PM +0100, Hans de Goede wrote:
+> From: Jelle van der Waa <jelle@vdwaa.nl>
+> 
+> Enable the on-chip audio codec
+> 
+> Signed-off-by: Jelle van der Waa <jelle@vdwaa.nl>
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 
-> Fixes: c0c050c58d84 ("bnxt_en: New Broadcom ethernet driver.")
-> 
-> diff --git a/drivers/net/ethernet/broadcom/Kconfig b/drivers/net/ethernet/broadcom/Kconfig
-> index 67a7d520d9f5..8550df189ceb 100644
-> --- a/drivers/net/ethernet/broadcom/Kconfig
-> +++ b/drivers/net/ethernet/broadcom/Kconfig
-> @@ -173,6 +173,7 @@ config SYSTEMPORT
->  config BNXT
->  	tristate "Broadcom NetXtreme-C/E support"
->  	depends on PCI
-> +	depends on VXLAN || VXLAN=n
->  	select FW_LOADER
->  	select LIBCRC32C
->  	---help---
-> 
+I removed the extra blank line, and applied the patch.
+
+Thanks!
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151104/5941abad/attachment.sig>
