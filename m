@@ -1,195 +1,146 @@
-From: zhongjiang@huawei.com (zhong jiang)
-Date: Wed, 4 Nov 2015 11:17:07 +0800
-Subject: [PATCH 2/2] arm64: Allow changing of attributes outside of modules
-In-Reply-To: <1446587315-18145-3-git-send-email-labbott@fedoraproject.org>
-References: <1446587315-18145-1-git-send-email-labbott@fedoraproject.org>
- <1446587315-18145-3-git-send-email-labbott@fedoraproject.org>
-Message-ID: <563978B3.6020308@huawei.com>
+From: vigneshr@ti.com (Vignesh R)
+Date: Wed, 4 Nov 2015 10:18:24 +0530
+Subject: [PATCH v2 1/5] spi: introduce mmap read support for spi flash
+ devices
+In-Reply-To: <CAOMqctQ7uPXo5GzVK918DfvuaAPBvbooxW00jFP4ryyfcdLURA@mail.gmail.com>
+References: <1446545174-14193-1-git-send-email-vigneshr@ti.com>
+ <1446545174-14193-2-git-send-email-vigneshr@ti.com>
+ <CAOMqctQ7uPXo5GzVK918DfvuaAPBvbooxW00jFP4ryyfcdLURA@mail.gmail.com>
+Message-ID: <56398E18.4010100@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015/11/4 5:48, Laura Abbott wrote:
-> 
-> Currently, the set_memory_* functions that are implemented for arm64
-> are restricted to module addresses only. This was mostly done
-> because arm64 maps normal zone memory with larger page sizes to
-> improve TLB performance. This has the side effect though of making it
-> difficult to adjust attributes at the PAGE_SIZE granularity. There are
-> an increasing number of use cases related to security where it is
-> necessary to change the attributes of kernel memory. Add functionality
-> to the page attribute changing code under a Kconfig to let systems
-> designers decide if they want to make the trade off of security for TLB
-> pressure.
-> 
-> Signed-off-by: Laura Abbott <labbott@fedoraproject.org>
-> ---
->  arch/arm64/Kconfig.debug | 11 +++++++
->  arch/arm64/mm/mm.h       |  3 ++
->  arch/arm64/mm/mmu.c      |  2 +-
->  arch/arm64/mm/pageattr.c | 74 ++++++++++++++++++++++++++++++++++++++++++++----
->  4 files changed, 84 insertions(+), 6 deletions(-)
-> 
-> diff --git a/arch/arm64/Kconfig.debug b/arch/arm64/Kconfig.debug
-> index d6285ef..abc6922 100644
-> --- a/arch/arm64/Kconfig.debug
-> +++ b/arch/arm64/Kconfig.debug
-> @@ -89,6 +89,17 @@ config DEBUG_ALIGN_RODATA
->  
->  	  If in doubt, say N
->  
-> +config DEBUG_CHANGE_PAGEATTR
-> +	bool "Allow all kernel memory to have attributes changed"
-> +	help
-> +	  If this option is selected, APIs that change page attributes
-> +	  (RW <-> RO, X <-> NX) will be valid for all memory mapped in
-> +	  the kernel space. The trade off is that there may be increased
-> +	  TLB pressure from finer grained page mapping. Turn on this option
-> +	  if performance is more important than security
-> +
-> +	  If in doubt, say N
-> +
->  source "drivers/hwtracing/coresight/Kconfig"
->  
->  endmenu
-> diff --git a/arch/arm64/mm/mm.h b/arch/arm64/mm/mm.h
-> index ef47d99..7b0dcc4 100644
-> --- a/arch/arm64/mm/mm.h
-> +++ b/arch/arm64/mm/mm.h
-> @@ -1,3 +1,6 @@
->  extern void __init bootmem_init(void);
->  
->  void fixup_init(void);
-> +
-> +void split_pud(pud_t *old_pud, pmd_t *pmd);
-> +void split_pmd(pmd_t *pmd, pte_t *pte);
-> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-> index ff41efa..cefad2d 100644
-> --- a/arch/arm64/mm/mmu.c
-> +++ b/arch/arm64/mm/mmu.c
-> @@ -72,7 +72,7 @@ static void __init *early_alloc(unsigned long sz)
->  /*
->   * remap a PMD into pages
->   */
-> -static void split_pmd(pmd_t *pmd, pte_t *pte)
-> +void split_pmd(pmd_t *pmd, pte_t *pte)
->  {
->  	unsigned long pfn = pmd_pfn(*pmd);
->  	unsigned long addr = pfn << PAGE_SHIFT;
-> diff --git a/arch/arm64/mm/pageattr.c b/arch/arm64/mm/pageattr.c
-> index e47ed1c..48a4ce9 100644
-> --- a/arch/arm64/mm/pageattr.c
-> +++ b/arch/arm64/mm/pageattr.c
-> @@ -15,9 +15,12 @@
->  #include <linux/module.h>
->  #include <linux/sched.h>
->  
-> +#include <asm/pgalloc.h>
->  #include <asm/pgtable.h>
->  #include <asm/tlbflush.h>
->  
-> +#include "mm.h"
-> +
->  struct page_change_data {
->  	pgprot_t set_mask;
->  	pgprot_t clear_mask;
-> @@ -36,6 +39,66 @@ static int change_page_range(pte_t *ptep, pgtable_t token, unsigned long addr,
->  	return 0;
->  }
->  
-> +#ifdef CONFIG_DEBUG_CHANGE_PAGEATTR
-> +static int check_address(unsigned long addr)
-> +{
-> +	pgd_t *pgd = pgd_offset_k(addr);
-> +	pud_t *pud;
-> +	pmd_t *pmd;
-> +	pte_t *pte;
-> +	int ret = -EFAULT;
-> +
-> +	if (pgd_none(*pgd))
-> +		goto out;
-> +
-> +	pud = pud_offset(pgd, addr);
-> +	if (pud_none(*pud))
-> +		goto out;
-> +
-> +	if (pud_sect(*pud)) {
-> +		pmd = pmd_alloc_one(&init_mm, addr);
-> +		if (!pmd) {
-> +			ret = -ENOMEM;
-> +			goto out;
-> +		}
-> +		split_pud(pud, pmd);
-> +		pud_populate(&init_mm, pud, pmd);
-> +	}
-> +
-> +	pmd = pmd_offset(pud, addr);
-> +	if (pmd_none(*pmd))
-> +		goto out;
-> +
-> +	if (pmd_sect(*pmd)) {
-> +		pte = pte_alloc_one_kernel(&init_mm, addr);
-> +		if (!pte) {
-> +			ret = -ENOMEM;
-> +			goto out;
-> +		}
-> +		split_pmd(pmd, pte);
-> +		__pmd_populate(pmd, __pa(pte), PMD_TYPE_TABLE);
-> +	}
-> +
-> +	pte = pte_offset_kernel(pmd, addr);
-> +	if (pte_none(*pte))
-> +		goto out;
-> +
-> +	flush_tlb_all();
-> +	ret = 0;
-> +
-> +out:
-> +	return ret;
-> +}
-> +#else
-> +static int check_address(unsigned long addr)
-> +{
-> +	if (addr < MODULES_VADDR || addr >= MODULES_END)
-> +		return -EINVAL;
-> +
-> +	return 0;
-> +}
-> +#endif
-> +
->  static int change_memory_common(unsigned long addr, int numpages,
->  				pgprot_t set_mask, pgprot_t clear_mask)
->  {
-> @@ -45,17 +108,18 @@ static int change_memory_common(unsigned long addr, int numpages,
->  	int ret;
->  	struct page_change_data data;
->  
-> +	if (addr < PAGE_OFFSET && !is_vmalloc_addr((void *)addr))
-> +		return -EINVAL;
-> +
->  	if (!IS_ALIGNED(addr, PAGE_SIZE)) {
->  		start &= PAGE_MASK;
->  		end = start + size;
->  		WARN_ON_ONCE(1);
->  	}
->  
-> -	if (start < MODULES_VADDR || start >= MODULES_END)
-> -		return -EINVAL;
-> -
-> -	if (end < MODULES_VADDR || end >= MODULES_END)
-> -		return -EINVAL;
-> +	ret = check_address(addr);
-> +	if (ret)
-> +		return ret;
->  
->  	data.set_mask = set_mask;
->  	data.clear_mask = clear_mask;
+Hi,
 
-Hi Laura
+On 11/03/2015 04:49 PM, Michal Suchanek wrote:
+> On 3 November 2015 at 11:06, Vignesh R <vigneshr@ti.com> wrote:
+>> In addition to providing direct access to SPI bus, some spi controller
+>> hardwares (like ti-qspi) provide special memory mapped port
+>> to accesses SPI flash devices in order to increase read performance.
+>> This means the controller can automatically send the SPI signals
+>> required to read data from the SPI flash device.
+>> For this, spi controller needs to know flash specific information like
+>> read command to use, dummy bytes and address width. Once these settings
+>> are populated in hardware registers, any read accesses to flash's memory
+>> map region(SoC specific) through memcpy (or mem-to mem DMA copy) will be
+>> handled by controller hardware. The hardware will automatically generate
+>> SPI signals required to read data from flash and present it to CPU/DMA.
+>>
+>> Introduce spi_mtd_mmap_read() interface to support memory mapped read
+>> over SPI flash devices. SPI master drivers can implement this callback to
+>> support memory mapped read interfaces. m25p80 flash driver and other
+>> flash drivers can call this to request memory mapped read. The interface
+>> should only be used MTD flashes and cannot be used with other SPI devices.
+>>
+>> Signed-off-by: Vignesh R <vigneshr@ti.com>
+>> ---
+>>  drivers/spi/spi.c       | 35 +++++++++++++++++++++++++++++++++++
+>>  include/linux/spi/spi.h | 23 +++++++++++++++++++++++
+>>  2 files changed, 58 insertions(+)
+>>
+>> diff --git a/drivers/spi/spi.c b/drivers/spi/spi.c
+>> index a5f53de813d3..5a5c7a7d47f2 100644
+>> --- a/drivers/spi/spi.c
+>> +++ b/drivers/spi/spi.c
+>> @@ -1059,6 +1059,7 @@ static void __spi_pump_messages(struct spi_master *master, bool in_kthread)
+>>                 }
+>>         }
+>>
+>> +       mutex_lock(&master->mmap_lock_mutex);
+>>         trace_spi_message_start(master->cur_msg);
+>>
+>>         if (master->prepare_message) {
+>> @@ -1068,6 +1069,7 @@ static void __spi_pump_messages(struct spi_master *master, bool in_kthread)
+>>                                 "failed to prepare message: %d\n", ret);
+>>                         master->cur_msg->status = ret;
+>>                         spi_finalize_current_message(master);
+>> +                       mutex_unlock(&master->mmap_lock_mutex);
+>>                         return;
+>>                 }
+>>                 master->cur_msg_prepared = true;
+>> @@ -1077,6 +1079,7 @@ static void __spi_pump_messages(struct spi_master *master, bool in_kthread)
+>>         if (ret) {
+>>                 master->cur_msg->status = ret;
+>>                 spi_finalize_current_message(master);
+>> +               mutex_unlock(&master->mmap_lock_mutex);
+>>                 return;
+>>         }
+>>
+>> @@ -1084,8 +1087,10 @@ static void __spi_pump_messages(struct spi_master *master, bool in_kthread)
+>>         if (ret) {
+>>                 dev_err(&master->dev,
+>>                         "failed to transfer one message from queue\n");
+>> +               mutex_unlock(&master->mmap_lock_mutex);
+>>                 return;
+>>         }
+>> +       mutex_unlock(&master->mmap_lock_mutex);
+>>  }
+>>
+>>  /**
+>> @@ -1732,6 +1737,7 @@ int spi_register_master(struct spi_master *master)
+>>         spin_lock_init(&master->queue_lock);
+>>         spin_lock_init(&master->bus_lock_spinlock);
+>>         mutex_init(&master->bus_lock_mutex);
+>> +       mutex_init(&master->mmap_lock_mutex);
+>>         master->bus_lock_flag = 0;
+>>         init_completion(&master->xfer_completion);
+>>         if (!master->max_dma_len)
+>> @@ -2237,6 +2243,35 @@ int spi_async_locked(struct spi_device *spi, struct spi_message *message)
+>>  EXPORT_SYMBOL_GPL(spi_async_locked);
+>>
+>>
+>> +int spi_mtd_mmap_read(struct spi_device *spi, loff_t from, size_t len,
+>> +                     size_t *retlen, u_char *buf, u8 read_opcode,
+>> +                     u8 addr_width, u8 dummy_bytes)
+>> +
+>> +{
+>> +       struct spi_master *master = spi->master;
+>> +       int ret;
+>> +
+>> +       if (master->auto_runtime_pm) {
+>> +               ret = pm_runtime_get_sync(master->dev.parent);
+>> +               if (ret < 0) {
+>> +                       dev_err(&master->dev, "Failed to power device: %d\n",
+>> +                               ret);
+>> +                       goto err;
+>> +               }
+>> +       }
+>> +       mutex_lock(&master->mmap_lock_mutex);
+>> +       ret = master->spi_mtd_mmap_read(spi, from, len, retlen, buf,
+>> +                                       read_opcode, addr_width,
+>> +                                       dummy_bytes);
+>> +       mutex_unlock(&master->mmap_lock_mutex);
+>> +       if (master->auto_runtime_pm)
+>> +               pm_runtime_put(master->dev.parent);
+>> +
+>> +err:
+>> +       return ret;
+>> +}
+>> +EXPORT_SYMBOL_GPL(spi_mtd_mmap_read);
+>> +
+>>  /*-------------------------------------------------------------------------*/
+>>
+>>  /* Utility methods for SPI master protocol drivers, layered on
+>> diff --git a/include/linux/spi/spi.h b/include/linux/spi/spi.h
+>> index 6b00f18f5e6b..0a6d8ad57357 100644
+>> --- a/include/linux/spi/spi.h
+>> +++ b/include/linux/spi/spi.h
+>> @@ -297,6 +297,7 @@ static inline void spi_unregister_driver(struct spi_driver *sdrv)
+>>   * @flags: other constraints relevant to this driver
+>>   * @bus_lock_spinlock: spinlock for SPI bus locking
+>>   * @bus_lock_mutex: mutex for SPI bus locking
+>> + * @mmap_lock_mutex: mutex for locking SPI bus when mmap transfer is on.
+> 
+> Any reason to not use the bus_lock_mutex here? The bus is busy as much
+> during mmap transfer as it is during any other transfer.
 
-This patch seems vaild, but I didn't feel very reasonable.
-Because of the large page to make TLB performance better, just
-split it if it is necessary.therefore, I think the first thing
-we try to keep it, if they fail ,and then to split.
+If bus_lock_mutex is used, it will unnecessarily block queueing of new
+messages when __spi_pump_messages() is calling transfer_one_message()
+even in the case where there is no mmap mode. Hence, I chose to add new
+mutex. But looks like it doesn't matter much as __spi_sync() anyways
+blocks till message is transferred. I will drop the new mutex and use
+bus_lock_mutex in v3. Thanks!
 
-thanks
-zhongjiang
+-- 
+Regards
+Vignesh
