@@ -1,40 +1,43 @@
 From: soren.brinkmann@xilinx.com (Soren Brinkmann)
-Date: Tue, 3 Nov 2015 16:20:41 -0800
-Subject: [PATCH 0/9] tty: xuartps: Fix lock ups
-Message-ID: <1446596450-20918-1-git-send-email-soren.brinkmann@xilinx.com>
+Date: Tue, 3 Nov 2015 16:20:44 -0800
+Subject: [PATCH 3/9] tty: xuartps: Always enable transmitter in start_tx
+In-Reply-To: <1446596450-20918-1-git-send-email-soren.brinkmann@xilinx.com>
+References: <1446596450-20918-1-git-send-email-soren.brinkmann@xilinx.com>
+Message-ID: <1446596450-20918-4-git-send-email-soren.brinkmann@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+start_tx must start transmitting characters. Regardless of the state of
+the circular buffer, always enable the transmitter hardware.
 
-I recently found my system locking up under some conditions. I dug
-through the code a bit and the result is this collections of various
-changes. Some of it may not be required and has just been created out of
-half-baked theories and re-reading the documentation. The actual failing
-scenarios seem to be:
- - RX IRQ conditions are handled while the receiver is disabled, leaving
-   the driver in an infinite loop
- - console_put_char seems to be interrupted by uart_shutdown disabling
-   the transmitter while/just before printing
+Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
+---
+ drivers/tty/serial/xilinx_uartps.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
-I.e. overall I tried to serialize all operations using the port lock to
-avoid such interaction.
-
-	S?ren
-
-S?ren Brinkmann (9):
-  tty: xuartps: Beautify read-modify writes
-  tty: xuartps: Use spinlock to serialize HW access
-  tty: xuartps: Always enable transmitter in start_tx
-  tty: xuartps: Clear interrupt status register in shutdown
-  tty: xuartps: Improve startup function
-  tty: xuartps: Keep lock for whole ISR
-  tty: xuartps: Acquire port lock for shutdown
-  tty: xuartps: Move RX path into helper function
-  tty: xuartps: Only handle RX IRQs when RX is enabled
-
- drivers/tty/serial/xilinx_uartps.c | 129 ++++++++++++++++++++++---------------
- 1 file changed, 78 insertions(+), 51 deletions(-)
-
+diff --git a/drivers/tty/serial/xilinx_uartps.c b/drivers/tty/serial/xilinx_uartps.c
+index dc1987f3dc0a..5edd1efca015 100644
+--- a/drivers/tty/serial/xilinx_uartps.c
++++ b/drivers/tty/serial/xilinx_uartps.c
+@@ -512,9 +512,6 @@ static void cdns_uart_start_tx(struct uart_port *port)
+ {
+ 	unsigned int status, numbytes = port->fifosize;
+ 
+-	if (uart_circ_empty(&port->state->xmit) || uart_tx_stopped(port))
+-		return;
+-
+ 	/*
+ 	 * Set the TX enable bit and clear the TX disable bit to enable the
+ 	 * transmitter.
+@@ -524,6 +521,9 @@ static void cdns_uart_start_tx(struct uart_port *port)
+ 	status |= CDNS_UART_CR_TX_EN;
+ 	writel(status, port->membase + CDNS_UART_CR_OFFSET);
+ 
++	if (uart_circ_empty(&port->state->xmit) || uart_tx_stopped(port))
++		return;
++
+ 	while (numbytes-- && ((readl(port->membase + CDNS_UART_SR_OFFSET) &
+ 				CDNS_UART_SR_TXFULL)) != CDNS_UART_SR_TXFULL) {
+ 		/* Break if no more data available in the UART buffer */
 -- 
 2.6.2.3.ga463a5b
