@@ -1,270 +1,57 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Wed,  4 Nov 2015 16:15:48 +0100
-Subject: [PATCH 1/2] ARM: at91/dt: remove leftovers clock definition
-Message-ID: <1446650149-31563-1-git-send-email-alexandre.belloni@free-electrons.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Wed, 4 Nov 2015 15:39:10 +0000
+Subject: [PATCH] arm64: Increase the max granular size
+In-Reply-To: <alpine.DEB.2.20.1511040927510.18745@east.gentwo.org>
+References: <CAMuHMdWQygbxMXoOsbwek6DzZcr7J-C23VCK4ubbgUr+zj=giw@mail.gmail.com>
+ <20151103120504.GF7637@e104818-lin.cambridge.arm.com>
+ <20151103143858.GI7637@e104818-lin.cambridge.arm.com>
+ <CAMuHMdWk0fPzTSKhoCuS4wsOU1iddhKJb2SOpjo=a_9vCm_KXQ@mail.gmail.com>
+ <20151103185050.GJ7637@e104818-lin.cambridge.arm.com>
+ <alpine.DEB.2.20.1511031724010.8178@east.gentwo.org>
+ <20151104123640.GK7637@e104818-lin.cambridge.arm.com>
+ <alpine.DEB.2.20.1511040748590.17248@east.gentwo.org>
+ <20151104145445.GL7637@e104818-lin.cambridge.arm.com>
+ <alpine.DEB.2.20.1511040927510.18745@east.gentwo.org>
+Message-ID: <20151104153910.GN7637@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The clocks group properties and the clock at 0 node are useless, remove them
-to avoid copy pasting in future device trees.
+On Wed, Nov 04, 2015 at 09:28:34AM -0600, Christoph Lameter wrote:
+> On Wed, 4 Nov 2015, Catalin Marinas wrote:
+> 
+> > BTW, assuming L1_CACHE_BYTES is 512 (I don't ever see this happening but
+> > just in theory), we potentially have the same issue. What would save us
+> > is that INDEX_NODE would match the first "kmalloc-512" cache, so we have
+> > it pre-populated.
+> 
+> Ok maybe add some BUILD_BUG_ONs to ensure that builds fail until we have
+> addressed that.
 
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
----
- arch/arm/boot/dts/at91-kizbox.dts           |  9 ---------
- arch/arm/boot/dts/at91-sama5d2_xplained.dts |  9 ---------
- arch/arm/boot/dts/at91-sama5d4_xplained.dts |  9 ---------
- arch/arm/boot/dts/at91-sama5d4ek.dts        |  9 ---------
- arch/arm/boot/dts/at91rm9200ek.dts          |  9 ---------
- arch/arm/boot/dts/at91sam9261ek.dts         |  9 ---------
- arch/arm/boot/dts/at91sam9263ek.dts         |  9 ---------
- arch/arm/boot/dts/at91sam9g20ek_common.dtsi |  9 ---------
- arch/arm/boot/dts/at91sam9m10g45ek.dts      |  9 ---------
- arch/arm/boot/dts/at91sam9n12ek.dts         |  9 ---------
- arch/arm/boot/dts/at91sam9rlek.dts          |  9 ---------
- arch/arm/boot/dts/at91sam9x5cm.dtsi         | 11 -----------
- 12 files changed, 110 deletions(-)
+A BUILD_BUG_ON should be fine.
 
-diff --git a/arch/arm/boot/dts/at91-kizbox.dts b/arch/arm/boot/dts/at91-kizbox.dts
-index bf18ece0c027..1dcd836059ea 100644
---- a/arch/arm/boot/dts/at91-kizbox.dts
-+++ b/arch/arm/boot/dts/at91-kizbox.dts
-@@ -24,15 +24,6 @@
- 	};
- 
- 	clocks {
--		#address-cells = <1>;
--		#size-cells = <1>;
--		ranges;
--
--		main_clock: clock at 0 {
--			compatible = "atmel,osc", "fixed-clock";
--			clock-frequency = <18432000>;
--		};
--
- 		main_xtal {
- 			clock-frequency = <18432000>;
- 		};
-diff --git a/arch/arm/boot/dts/at91-sama5d2_xplained.dts b/arch/arm/boot/dts/at91-sama5d2_xplained.dts
-index e07c2b206beb..28eaf41d59da 100644
---- a/arch/arm/boot/dts/at91-sama5d2_xplained.dts
-+++ b/arch/arm/boot/dts/at91-sama5d2_xplained.dts
-@@ -59,15 +59,6 @@
- 	};
- 
- 	clocks {
--		#address-cells = <1>;
--		#size-cells = <1>;
--		ranges;
--
--		main_clock: clock at 0 {
--			compatible = "atmel,osc", "fixed-clock";
--			clock-frequency = <12000000>;
--		};
--
- 		slow_xtal {
- 			clock-frequency = <32768>;
- 		};
-diff --git a/arch/arm/boot/dts/at91-sama5d4_xplained.dts b/arch/arm/boot/dts/at91-sama5d4_xplained.dts
-index 45371a1b61b3..d3de7565efc3 100644
---- a/arch/arm/boot/dts/at91-sama5d4_xplained.dts
-+++ b/arch/arm/boot/dts/at91-sama5d4_xplained.dts
-@@ -59,15 +59,6 @@
- 	};
- 
- 	clocks {
--		#address-cells = <1>;
--		#size-cells = <1>;
--		ranges;
--
--		main_clock: clock at 0 {
--			compatible = "atmel,osc", "fixed-clock";
--			clock-frequency = <12000000>;
--		};
--
- 		slow_xtal {
- 			clock-frequency = <32768>;
- 		};
-diff --git a/arch/arm/boot/dts/at91-sama5d4ek.dts b/arch/arm/boot/dts/at91-sama5d4ek.dts
-index 6d272c0125e3..c9d8b73a65ad 100644
---- a/arch/arm/boot/dts/at91-sama5d4ek.dts
-+++ b/arch/arm/boot/dts/at91-sama5d4ek.dts
-@@ -59,15 +59,6 @@
- 	};
- 
- 	clocks {
--		#address-cells = <1>;
--		#size-cells = <1>;
--		ranges;
--
--		main_clock: clock at 0 {
--			compatible = "atmel,osc", "fixed-clock";
--			clock-frequency = <12000000>;
--		};
--
- 		slow_xtal {
- 			clock-frequency = <32768>;
- 		};
-diff --git a/arch/arm/boot/dts/at91rm9200ek.dts b/arch/arm/boot/dts/at91rm9200ek.dts
-index 8dab4b75ca97..f90e1c2d3caa 100644
---- a/arch/arm/boot/dts/at91rm9200ek.dts
-+++ b/arch/arm/boot/dts/at91rm9200ek.dts
-@@ -21,15 +21,6 @@
- 	};
- 
- 	clocks {
--		#address-cells = <1>;
--		#size-cells = <1>;
--		ranges;
--
--		main_clock: clock at 0 {
--			compatible = "atmel,osc", "fixed-clock";
--			clock-frequency = <18432000>;
--		};
--
- 		slow_xtal {
- 			clock-frequency = <32768>;
- 		};
-diff --git a/arch/arm/boot/dts/at91sam9261ek.dts b/arch/arm/boot/dts/at91sam9261ek.dts
-index 2e92ac020f23..f1971f73d7aa 100644
---- a/arch/arm/boot/dts/at91sam9261ek.dts
-+++ b/arch/arm/boot/dts/at91sam9261ek.dts
-@@ -22,15 +22,6 @@
- 	};
- 
- 	clocks {
--		#address-cells = <1>;
--		#size-cells = <1>;
--		ranges;
--
--		main_clock: clock at 0 {
--			compatible = "atmel,osc", "fixed-clock";
--			clock-frequency = <18432000>;
--		};
--
- 		slow_xtal {
- 			clock-frequency = <32768>;
- 		};
-diff --git a/arch/arm/boot/dts/at91sam9263ek.dts b/arch/arm/boot/dts/at91sam9263ek.dts
-index 23381276ffb8..c76e890069fe 100644
---- a/arch/arm/boot/dts/at91sam9263ek.dts
-+++ b/arch/arm/boot/dts/at91sam9263ek.dts
-@@ -22,15 +22,6 @@
- 	};
- 
- 	clocks {
--		#address-cells = <1>;
--		#size-cells = <1>;
--		ranges;
--
--		main_clock: clock at 0 {
--			compatible = "atmel,osc", "fixed-clock";
--			clock-frequency = <16367660>;
--		};
--
- 		slow_xtal {
- 			clock-frequency = <32768>;
- 		};
-diff --git a/arch/arm/boot/dts/at91sam9g20ek_common.dtsi b/arch/arm/boot/dts/at91sam9g20ek_common.dtsi
-index 57548a2c5a1e..658d4c1cf7f6 100644
---- a/arch/arm/boot/dts/at91sam9g20ek_common.dtsi
-+++ b/arch/arm/boot/dts/at91sam9g20ek_common.dtsi
-@@ -19,15 +19,6 @@
- 	};
- 
- 	clocks {
--		#address-cells = <1>;
--		#size-cells = <1>;
--		ranges;
--
--		main_clock: clock at 0 {
--			compatible = "atmel,osc", "fixed-clock";
--			clock-frequency = <18432000>;
--		};
--
- 		slow_xtal {
- 			clock-frequency = <32768>;
- 		};
-diff --git a/arch/arm/boot/dts/at91sam9m10g45ek.dts b/arch/arm/boot/dts/at91sam9m10g45ek.dts
-index 9d16ef8453c5..865171be739b 100644
---- a/arch/arm/boot/dts/at91sam9m10g45ek.dts
-+++ b/arch/arm/boot/dts/at91sam9m10g45ek.dts
-@@ -24,15 +24,6 @@
- 	};
- 
- 	clocks {
--		#address-cells = <1>;
--		#size-cells = <1>;
--		ranges;
--
--		main_clock: clock at 0 {
--			compatible = "atmel,osc", "fixed-clock";
--			clock-frequency = <12000000>;
--		};
--
- 		slow_xtal {
- 		      clock-frequency = <32768>;
- 		};
-diff --git a/arch/arm/boot/dts/at91sam9n12ek.dts b/arch/arm/boot/dts/at91sam9n12ek.dts
-index acf3451a332d..cb152995b4f3 100644
---- a/arch/arm/boot/dts/at91sam9n12ek.dts
-+++ b/arch/arm/boot/dts/at91sam9n12ek.dts
-@@ -23,15 +23,6 @@
- 	};
- 
- 	clocks {
--		#address-cells = <1>;
--		#size-cells = <1>;
--		ranges;
--
--		main_clock: clock at 0 {
--			compatible = "atmel,osc", "fixed-clock";
--			clock-frequency = <16000000>;
--		};
--
- 		slow_xtal {
- 			clock-frequency = <32768>;
- 		};
-diff --git a/arch/arm/boot/dts/at91sam9rlek.dts b/arch/arm/boot/dts/at91sam9rlek.dts
-index 558c9f220bed..9eea591e2a16 100644
---- a/arch/arm/boot/dts/at91sam9rlek.dts
-+++ b/arch/arm/boot/dts/at91sam9rlek.dts
-@@ -22,15 +22,6 @@
- 	};
- 
- 	clocks {
--		#address-cells = <1>;
--		#size-cells = <1>;
--		ranges;
--
--		main_clock: clock {
--			compatible = "atmel,osc", "fixed-clock";
--			clock-frequency = <12000000>;
--		};
--
- 		slow_xtal {
- 			clock-frequency = <32768>;
- 		};
-diff --git a/arch/arm/boot/dts/at91sam9x5cm.dtsi b/arch/arm/boot/dts/at91sam9x5cm.dtsi
-index 26112ebd15fc..b098ad8cd93a 100644
---- a/arch/arm/boot/dts/at91sam9x5cm.dtsi
-+++ b/arch/arm/boot/dts/at91sam9x5cm.dtsi
-@@ -13,17 +13,6 @@
- 	};
- 
- 	clocks {
--		#address-cells = <1>;
--		#size-cells = <1>;
--		ranges;
--
--		main_clock: clock at 0 {
--			compatible = "atmel,osc", "fixed-clock";
--			clock-frequency = <12000000>;
--		};
--	};
--
--	clocks {
- 		slow_xtal {
- 			clock-frequency = <32768>;
- 		};
+Thinking some more, I think if KMALLOC_MIN_SIZE is 128, there is no gain
+with off-slab management since the freelist allocation would still be
+128 bytes. An alternative to reverting while still having a little
+benefit of off-slab for 256 bytes objects (rather than 512 as we would
+get with the revert):
+
+diff --git a/mm/slab.c b/mm/slab.c
+index 4fcc5dd8d5a6..ac32b4a0f2ec 100644
+--- a/mm/slab.c
++++ b/mm/slab.c
+@@ -2212,8 +2212,8 @@ __kmem_cache_create (struct kmem_cache *cachep, unsigned long flags)
+ 	 * it too early on. Always use on-slab management when
+ 	 * SLAB_NOLEAKTRACE to avoid recursive calls into kmemleak)
+ 	 */
+-	if ((size >= (PAGE_SIZE >> 5)) && !slab_early_init &&
+-	    !(flags & SLAB_NOLEAKTRACE))
++	if ((size >= (PAGE_SIZE >> 5)) && (size > KMALLOC_MIN_SIZE) &&
++		!slab_early_init && !(flags & SLAB_NOLEAKTRACE))
+ 		/*
+ 		 * Size is large, assume best to place the slab management obj
+ 		 * off-slab (should allow better packing of objs).
+
+Whichever you prefer.
+
 -- 
-2.5.0
+Catalin
