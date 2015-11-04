@@ -1,75 +1,60 @@
-From: edubezval@gmail.com (Eduardo Valentin)
-Date: Wed, 4 Nov 2015 11:36:46 -0800
-Subject: [PATCH v3 0/2] thermal: mediatek: Add cpu power cooling model
-In-Reply-To: <9hh4mh4bdoi.fsf@e105922-lin.cambridge.arm.com>
-References: <1445515359-8587-1-git-send-email-dawei.chien@mediatek.com>
- <20151028154449.GH3716@ubuntu>
- <9hh4mh4bdoi.fsf@e105922-lin.cambridge.arm.com>
-Message-ID: <20151104193645.GB14127@localhost.localdomain>
+From: daniel@iogearbox.net (Daniel Borkmann)
+Date: Wed, 04 Nov 2015 20:39:22 +0100
+Subject: [PATCH] arm64: bpf: fix div-by-zero case
+In-Reply-To: <563A5171.5070608@linaro.org>
+References: <1446620204-4228-1-git-send-email-zlim.lnx@gmail.com>	<CAKU6vyZu5KNAipSVUMg8ASnRXztVwh57weKXxXOXkqAJ3erDBQ@mail.gmail.com>	<563A4C9A.7000002@linaro.org>
+ <CABg9mcuAuoSBg4zWYHnaTzAGsH4BK5-VhD=HRDmsHJRCUrnJUw@mail.gmail.com>
+ <563A5171.5070608@linaro.org>
+Message-ID: <563A5EEA.6020007@iogearbox.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 02, 2015 at 03:53:33PM +0000, Punit Agrawal wrote:
-> Viresh Kumar <viresh.kumar@linaro.org> writes:
-> 
-> > On 22-10-15, 20:02, Dawei Chien wrote:
-> >> Use Intelligent Power Allocation (IPA) technical to add static/dynamic power model for binding CPU thermal zone.
-> >> The power allocator governor allocates power budget to control CPU temperature.
-> >> 
-> >> Power Allocator governor is able to keep SOC temperature within a
-> >> defined temperature range to avoid SOC overheat and keep it's
-> >> performance. mt8173-cpufreq.c need to register its' own power model
-> >> with power allocator thermal governor, so that power allocator
-> >> governor can allocates suitable power budget to control CPU
-> >> temperature.
-> >> 
-> >> PATCH1 is base on
-> >> https://patchwork.kernel.org/patch/7034601/
-> >> 
-> >> PATCH2 is base on Sascha's thermal driver V9
-> >> https://patchwork.kernel.org/patch/7249821/
-> >> https://patchwork.kernel.org/patch/7249861/
-> >> https://patchwork.kernel.org/patch/7249891/
-> >> 
-> >> Change since V1:
-> >> include mt8171.h and sort header file for mt8173.dtsi
-> >> 
-> >> Change since V2:
-> >> Move dynamic/static power model in device tree
-> >> 
-> >> Dawei.Chien (2):
-> >>   thermal: mediatek: Add cpu power cooling model.
-> >>   arm64: dts: mt8173: Add thermal zone node for mt8173.
-> >
-> > Sorry for being extremely late in reviewing this stuff. You are
-> > already on v3 and I haven't reviewed it once. Mostly due to bad timing
-> > of my holidays and other work pressure.
-> >
-> > Now, there are few things that I feel are not properly addressed here,
-> > and I may be wrong:
-> > - Where are the bindings for static-power-points and
-> >   dynamic-power-coefficient. Sorry I failed to see them in this or
-> >   other series you mentioned.
-> 
-> For dynamic power, I had posted some patches[0][1][2] introducing the
-> binding as well as updating cooling device registration via cpufreq
-> driver. Now that the SCPI hwmon driver is merged, I should re-send the
-> remaining patches.
-> 
-> [0] http://lkml.iu.edu/hypermail/linux/kernel/1508.0/01020.html
+On 11/04/2015 07:41 PM, Shi, Yang wrote:
+...
+>>> Agreed, and we may need add one more test cases in test_bpf module to cover
+>>> MOD?
+>>
+>> Let me know if you have a test case ready :)
+>
+> Does the below change look like a valid test?
+>
+> +               "MOD default X",
+> +               .u.insns = {
+> +                       /*
+> +                        * A = 0x42
+> +                        * A = A mod X ; this halt the filter execution if X is 0
+> +                        * ret 0x42
+> +                        */
+> +                       BPF_STMT(BPF_LD | BPF_IMM, 0x42),
+> +                       BPF_STMT(BPF_ALU | BPF_MOD | BPF_X, 0),
+> +                       BPF_STMT(BPF_RET | BPF_K, 0x42),
+> +               },
+> +               CLASSIC | FLAG_NO_DATA,
+> +               {},
+> +               { {0x1, 0x0 } },
+> +       },
+> +       {
+> +               "MOD default A",
+> +               .u.insns = {
+> +                       /*
+> +                        * A = A mod 1
+> +                        * ret A
+> +                        */
+> +                       BPF_STMT(BPF_ALU | BPF_MOD | BPF_K, 0x1),
+> +                       BPF_STMT(BPF_RET | BPF_A, 0x0),
+> +               },
+> +               CLASSIC | FLAG_NO_DATA,
+> +               {},
+> +               { {0x1, 0x0 } },
+> +       },
+>
+> My test result with it:
+> test_bpf: #284 MOD default X jited:1 ret 66 != 0 FAIL (1 times)
+> test_bpf: #285 MOD default A jited:1 102 PASS
+>
+> If it looks right, I will post a patch to add the test cases.
 
-Are you sure this binding is applicable only to ARM cpus?
+Looks good to me.
 
-> [1] http://lkml.iu.edu/hypermail/linux/kernel/1508.0/01022.html
-> [3] http://lkml.iu.edu/hypermail/linux/kernel/1508.0/01031.html
-> 
-> > - Even then, why should we be adding another table into DT for
-> >   voltage/power ? And not reuse and extend the opp-v2 stuff which is
-> >   already mainlined now.
-> > - There are few issues with the code as well, but I want to see where
-> >   the bindings should go first. And then only discuss the code
-> >   further.
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-pm" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Thanks,
+Daniel
