@@ -1,150 +1,394 @@
-From: yong.wu@mediatek.com (Yong Wu)
-Date: Wed, 4 Nov 2015 16:39:48 +0800
-Subject: [PATCH v6 2/3] arm64: Add IOMMU dma_ops
-In-Reply-To: <80cb035144a2648a5d94eb1fec3336f17ad249f1.1443718557.git.robin.murphy@arm.com>
-References: <cover.1443718557.git.robin.murphy@arm.com>
- <80cb035144a2648a5d94eb1fec3336f17ad249f1.1443718557.git.robin.murphy@arm.com>
-Message-ID: <1446626388.6400.21.camel@mhfsdcap03>
+From: yalin.wang2010@gmail.com (yalin wang)
+Date: Wed, 4 Nov 2015 16:42:25 +0800
+Subject: [PATCH v4 6/6] arm64: ftrace: add arch-specific stack tracer
+In-Reply-To: <1446182741-31019-7-git-send-email-takahiro.akashi@linaro.org>
+References: <1446182741-31019-1-git-send-email-takahiro.akashi@linaro.org>
+ <1446182741-31019-7-git-send-email-takahiro.akashi@linaro.org>
+Message-ID: <52E99592-E6B2-4952-8C21-7DD000B61311@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2015-10-01 at 20:13 +0100, Robin Murphy wrote:
-> Taking some inspiration from the arch/arm code, implement the
-> arch-specific side of the DMA mapping ops using the new IOMMU-DMA layer.
-[...]
-> +static void *__iommu_alloc_attrs(struct device *dev, size_t size,
-> +				 dma_addr_t *handle, gfp_t gfp,
-> +				 struct dma_attrs *attrs)
+
+> On Oct 30, 2015, at 13:25, AKASHI Takahiro <takahiro.akashi@linaro.org> wrote:
+> 
+> Stack tracer on arm64, check_stack(), is uniqeue in the following
+> points:
+> * analyze a function prologue of a traced function to estimate a more
+>  accurate stack pointer value, replacing naive '<child's fp> + 0x10.'
+> * use walk_stackframe(), instead of slurping stack contents as orignal
+>  check_stack() does, to identify a stack frame and a stack index (height)
+>  for every callsite.
+> 
+> Regarding a function prologue analyzer, there is no guarantee that we can
+> handle all the possible patterns of function prologue as gcc does not use
+> any fixed templates to generate them. 'Instruction scheduling' is another
+> issue here.
+> Nevertheless, the current version will surely cover almost all the cases
+> in the kernel image and give us useful information on stack pointers.
+> 
+> So this patch utilizes a function prologue only for stack tracer, and
+> does not affect the behaviors of existing stacktrace functions.
+> 
+> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+> ---
+> arch/arm64/include/asm/stacktrace.h |    4 +
+> arch/arm64/kernel/ftrace.c          |   68 +++++++++++++
+> arch/arm64/kernel/stacktrace.c      |  185 ++++++++++++++++++++++++++++++++++-
+> 3 files changed, 254 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm64/include/asm/stacktrace.h b/arch/arm64/include/asm/stacktrace.h
+> index 7318f6d..47b4832 100644
+> --- a/arch/arm64/include/asm/stacktrace.h
+> +++ b/arch/arm64/include/asm/stacktrace.h
+> @@ -25,5 +25,9 @@ struct stackframe {
+> extern int unwind_frame(struct stackframe *frame);
+> extern void walk_stackframe(struct stackframe *frame,
+> 			    int (*fn)(struct stackframe *, void *), void *data);
+> +#ifdef CONFIG_STACK_TRACER
+> +struct stack_trace;
+> +extern void save_stack_trace_sp(struct stack_trace *trace, unsigned long *sp);
+> +#endif
+> 
+> #endif	/* __ASM_STACKTRACE_H */
+> diff --git a/arch/arm64/kernel/ftrace.c b/arch/arm64/kernel/ftrace.c
+> index 314f82d..e8afd42 100644
+> --- a/arch/arm64/kernel/ftrace.c
+> +++ b/arch/arm64/kernel/ftrace.c
+> @@ -9,6 +9,7 @@
+>  * published by the Free Software Foundation.
+>  */
+> 
+> +#include <linux/bug.h>
+> #include <linux/ftrace.h>
+> #include <linux/swab.h>
+> #include <linux/uaccess.h>
+> @@ -16,6 +17,7 @@
+> #include <asm/cacheflush.h>
+> #include <asm/ftrace.h>
+> #include <asm/insn.h>
+> +#include <asm/stacktrace.h>
+> 
+> #ifdef CONFIG_DYNAMIC_FTRACE
+> /*
+> @@ -173,3 +175,69 @@ int ftrace_disable_ftrace_graph_caller(void)
+> }
+> #endif /* CONFIG_DYNAMIC_FTRACE */
+> #endif /* CONFIG_FUNCTION_GRAPH_TRACER */
+> +
+> +#ifdef CONFIG_STACK_TRACER
+> +static unsigned long stack_trace_sp[STACK_TRACE_ENTRIES];
+> +static unsigned long raw_stack_trace_max_size;
+> +
+> +void check_stack(unsigned long ip, unsigned long *stack)
 > +{
-> +	bool coherent = is_device_dma_coherent(dev);
-> +	int ioprot = dma_direction_to_prot(DMA_BIDIRECTIONAL, coherent);
-> +	void *addr;
+> +	unsigned long this_size, flags;
+> +	unsigned long top;
+> +	int i, j;
 > +
-> +	if (WARN(!dev, "cannot create IOMMU mapping for unknown device\n"))
-> +		return NULL;
-> +	/*
-> +	 * Some drivers rely on this, and we probably don't want the
-> +	 * possibility of stale kernel data being read by devices anyway.
-> +	 */
-> +	gfp |= __GFP_ZERO;
+> +	this_size = ((unsigned long)stack) & (THREAD_SIZE-1);
+> +	this_size = THREAD_SIZE - this_size;
 > +
-> +	if (gfp & __GFP_WAIT) {
-> +		struct page **pages;
-> +		pgprot_t prot = __get_dma_pgprot(attrs, PAGE_KERNEL, coherent);
+> +	if (this_size <= raw_stack_trace_max_size)
+> +		return;
 > +
-> +		pages = iommu_dma_alloc(dev, size, gfp, ioprot,	handle,
-> +					flush_page);
-> +		if (!pages)
-> +			return NULL;
+> +	/* we do not handle an interrupt stack yet */
+> +	if (!object_is_on_stack(stack))
+> +		return;
 > +
-> +		addr = dma_common_pages_remap(pages, size, VM_USERMAP, prot,
-> +					      __builtin_return_address(0));
-> +		if (!addr)
-> +			iommu_dma_free(dev, pages, size, handle);
-> +	} else {
-> +		struct page *page;
-> +		/*
-> +		 * In atomic context we can't remap anything, so we'll only
-> +		 * get the virtually contiguous buffer we need by way of a
-> +		 * physically contiguous allocation.
-> +		 */
-> +		if (coherent) {
-> +			page = alloc_pages(gfp, get_order(size));
-> +			addr = page ? page_address(page) : NULL;
+> +	local_irq_save(flags);
+> +	arch_spin_lock(&max_stack_lock);
+> +
+> +	/* check again */
+> +	if (this_size <= raw_stack_trace_max_size)
+> +		goto out;
+> +
+> +	/* find out stack frames */
+> +	stack_trace_max.nr_entries = 0;
+> +	stack_trace_max.skip = 0;
+> +	save_stack_trace_sp(&stack_trace_max, stack_trace_sp);
+> +	stack_trace_max.nr_entries--; /* for the last entry ('-1') */
+> +
+> +	/* calculate a stack index for each function */
+> +	top = ((unsigned long)stack & ~(THREAD_SIZE-1)) + THREAD_SIZE;
+> +	for (i = 0; i < stack_trace_max.nr_entries; i++)
+> +		stack_trace_index[i] = top - stack_trace_sp[i];
+> +	raw_stack_trace_max_size = this_size;
+> +
+> +	/* Skip over the overhead of the stack tracer itself */
+> +	for (i = 0; i < stack_trace_max.nr_entries; i++) {
+> +		unsigned long addr;
+> +
+> +		addr = stack_trace_max.entries[i] + FTRACE_STACK_FRAME_OFFSET;
+> +		if (addr == ip)
+> +			break;
+> +	}
+> +
+> +	stack_trace_max.nr_entries -= i;
+> +	for (j = 0; j < stack_trace_max.nr_entries; j++) {
+> +		stack_trace_index[j] = stack_trace_index[j + i];
+> +		stack_trace_max.entries[j] = stack_trace_max.entries[j + i];
+> +	}
+> +	stack_trace_max_size = stack_trace_index[0];
+> +
+> +	if (task_stack_end_corrupted(current)) {
+> +		WARN(1, "task stack is corrupted.\n");
+> +		stack_trace_print();
+> +	}
+> +
+> + out:
+> +	arch_spin_unlock(&max_stack_lock);
+> +	local_irq_restore(flags);
+> +}
+> +#endif /* CONFIG_STACK_TRACER */
+> diff --git a/arch/arm64/kernel/stacktrace.c b/arch/arm64/kernel/stacktrace.c
+> index 631c49d..1b293fe 100644
+> --- a/arch/arm64/kernel/stacktrace.c
+> +++ b/arch/arm64/kernel/stacktrace.c
+> @@ -24,6 +24,144 @@
+> #include <asm/insn.h>
+> #include <asm/stacktrace.h>
+> 
+> +#ifdef CONFIG_STACK_TRACER
+> +/*
+> + * This function parses a function prologue of a traced function and
+> + * determines its stack size.
+> + * A return value indicates a location of @pc in a function prologue.
+> + * @return value:
+> + * <case 1>                       <case 1'>
+> + * 1:
+> + *     sub sp, sp, #XX            sub sp, sp, #XX
+> + * 2:
+> + *     stp x29, x30, [sp, #YY]    stp x29, x30, [sp, #--ZZ]!
+> + * 3:
+> + *     add x29, sp, #YY           mov x29, sp
+> + * 0:
+> + *
+> + * <case 2>
+> + * 1:
+> + *     stp x29, x30, [sp, #-XX]!
+> + * 3:
+> + *     mov x29, sp
+> + * 0:
+> + *
+> + * @size: sp offset from calller's sp (XX or XX + ZZ)
+> + * @size2: fp offset from new sp (YY or 0)
+> + */
+> +static int analyze_function_prologue(unsigned long pc,
+> +		unsigned long *size, unsigned long *size2)
+> +{
+> +	unsigned long offset;
+> +	u32 *addr, insn;
+> +	int pos = -1;
+> +	enum aarch64_insn_register src, dst, reg1, reg2, base;
+> +	int imm;
+> +	enum aarch64_insn_variant variant;
+> +	enum aarch64_insn_adsb_type adsb_type;
+> +	enum aarch64_insn_ldst_type ldst_type;
+> +
+> +	*size = *size2 = 0;
+> +
+> +	if (!pc)
+> +		goto out;
+> +
+> +	if (unlikely(!kallsyms_lookup_size_offset(pc, NULL, &offset)))
+> +		goto out;
+> +
+> +	addr = (u32 *)(pc - offset);
+> +#ifdef CONFIG_DYNAMIC_FTRACE
+> +	if (addr == (u32 *)ftrace_call)
+> +		addr = (u32 *)ftrace_caller;
+> +#ifdef CONFIG_FUNCTION_GRAPH_TRACER
+> +	else if (addr == (u32 *)ftrace_graph_caller)
+> +#ifdef CONFIG_DYNAMIC_FTRACE
+> +		addr = (u32 *)ftrace_caller;
+> +#else
+> +		addr = (u32 *)_mcount;
+> +#endif
+> +#endif
+> +#endif
+> +
+> +	insn = *addr;
+
+you should use aarch64_insn_read() or inn = le32_to_cpu(*addr)
+here ,  in case the kernel is build as big endian .
+
+
+
+> +	pos = 1;
+> +
+> +	/* analyze a function prologue */
+> +	while ((unsigned long)addr < pc) {
+> +		if (aarch64_insn_is_branch_imm(insn) ||
+> +		    aarch64_insn_is_br(insn) ||
+> +		    aarch64_insn_is_blr(insn) ||
+> +		    aarch64_insn_is_ret(insn) ||
+> +		    aarch64_insn_is_eret(insn))
+> +			/* exiting a basic block */
+> +			goto out;
+> +
+> +		if (aarch64_insn_decode_add_sub_imm(insn, &dst, &src,
+> +					&imm, &variant, &adsb_type)) {
+> +			if ((adsb_type == AARCH64_INSN_ADSB_SUB) &&
+> +				(dst == AARCH64_INSN_REG_SP) &&
+> +				(src == AARCH64_INSN_REG_SP)) {
+> +				/*
+> +				 * Starting the following sequence:
+> +				 *   sub sp, sp, #xx
+> +				 *   stp x29, x30, [sp, #yy]
+> +				 *   add x29, sp, #yy
+> +				 */
+> +				WARN_ON(pos != 1);
+> +				pos = 2;
+> +				*size += imm;
+> +			} else if ((adsb_type == AARCH64_INSN_ADSB_ADD) &&
+> +				(dst == AARCH64_INSN_REG_29) &&
+> +				(src == AARCH64_INSN_REG_SP)) {
+> +				/*
+> +				 *   add x29, sp, #yy
+> +				 * or
+> +				 *   mov x29, sp
+> +				 */
+> +				WARN_ON(pos != 3);
+> +				pos = 0;
+> +				*size2 = imm;
+> +
+> +				break;
+> +			}
+> +		} else if (aarch64_insn_decode_load_store_pair(insn,
+> +					&reg1, &reg2, &base, &imm,
+> +					&variant, &ldst_type)) {
+> +			if ((ldst_type ==
+> +				AARCH64_INSN_LDST_STORE_PAIR_PRE_INDEX) &&
+> +			    (reg1 == AARCH64_INSN_REG_29) &&
+> +			    (reg2 == AARCH64_INSN_REG_30) &&
+> +			    (base == AARCH64_INSN_REG_SP)) {
+> +				/*
+> +				 * Starting the following sequence:
+> +				 *   stp x29, x30, [sp, #-xx]!
+> +				 *   mov x29, sp
+> +				 */
+> +				WARN_ON(!((pos == 1) || (pos == 2)));
+> +				pos = 3;
+> +				*size += -imm;
+> +			} else if ((ldst_type ==
+> +				AARCH64_INSN_LDST_STORE_PAIR) &&
+> +			    (reg1 == AARCH64_INSN_REG_29) &&
+> +			    (reg2 == AARCH64_INSN_REG_30) &&
+> +			    (base == AARCH64_INSN_REG_SP)) {
+> +				/*
+> +				 *   stp x29, x30, [sp, #yy]
+> +				 */
+> +				WARN_ON(pos != 2);
+> +				pos = 3;
+> +			}
+> +		}
+> +
+> +		addr++;
+> +		insn = *addr;
+> +	}
+> +
+> +out:
+> +	return pos;
+> +}
+> +#endif
+> +
+> /*
+>  * AArch64 PCS assigns the frame pointer to x29.
+>  *
+> @@ -82,6 +220,9 @@ struct stack_trace_data {
+> #ifdef CONFIG_FUNCTION_GRAPH_TRACER
+> 	unsigned int ret_stack_index;
+> #endif
+> +#ifdef CONFIG_STACK_TRACER
+> +	unsigned long *sp;
+> +#endif
+> };
+> 
+> static int save_trace(struct stackframe *frame, void *d)
+> @@ -111,12 +252,33 @@ static int save_trace(struct stackframe *frame, void *d)
+> 		return 0;
+> 	}
+> 
+> +#ifdef CONFIG_STACK_TRACER
+> +	if (data->sp) {
+> +		if (trace->nr_entries) {
+> +			unsigned long child_pc, sp_off, fp_off;
+> +			int pos;
+> +
+> +			child_pc = trace->entries[trace->nr_entries - 1];
+> +			pos = analyze_function_prologue(child_pc,
+> +					&sp_off, &fp_off);
+> +			/*
+> +			 * frame->sp - 0x10 is actually a child's fp.
+> +			 * See above.
+> +			 */
+> +			data->sp[trace->nr_entries] = (pos < 0 ? frame->sp :
+> +					(frame->sp - 0x10) + sp_off - fp_off);
 > +		} else {
-> +			addr = __alloc_from_pool(size, &page, gfp);
-> +		}
-> +		if (!addr)
-> +			return NULL;
-> +
-> +		*handle = iommu_dma_map_page(dev, page, 0, size, ioprot);
-> +		if (iommu_dma_mapping_error(dev, *handle)) {
-> +			if (coherent)
-> +				__free_pages(page, get_order(size));
-> +			else
-> +				__free_from_pool(addr, size);
-> +			addr = NULL;
+> +			data->sp[0] = frame->sp;
 > +		}
 > +	}
-> +	return addr;
-> +}
-> +
-> +static void __iommu_free_attrs(struct device *dev, size_t size, void *cpu_addr,
-> +			       dma_addr_t handle, struct dma_attrs *attrs)
+> +#endif
+> 	trace->entries[trace->nr_entries++] = addr;
+> 
+> 	return trace->nr_entries >= trace->max_entries;
+> }
+> 
+> -void save_stack_trace_tsk(struct task_struct *tsk, struct stack_trace *trace)
+> +static void __save_stack_trace_tsk(struct task_struct *tsk,
+> +		struct stack_trace *trace, unsigned long *stack_dump_sp)
+> {
+> 	struct stack_trace_data data;
+> 	struct stackframe frame;
+> @@ -126,6 +288,9 @@ void save_stack_trace_tsk(struct task_struct *tsk, struct stack_trace *trace)
+> #ifdef CONFIG_FUNCTION_GRAPH_TRACER
+> 	data.ret_stack_index = current->curr_ret_stack;
+> #endif
+> +#ifdef CONFIG_STACK_TRACER
+> +	data.sp = stack_dump_sp;
+> +#endif
+> 
+> 	if (tsk != current) {
+> 		data.no_sched_functions = 1;
+> @@ -136,7 +301,8 @@ void save_stack_trace_tsk(struct task_struct *tsk, struct stack_trace *trace)
+> 		data.no_sched_functions = 0;
+> 		frame.fp = (unsigned long)__builtin_frame_address(0);
+> 		frame.sp = current_stack_pointer;
+> -		frame.pc = (unsigned long)save_stack_trace_tsk;
+> +		asm("1:");
+> +		asm("ldr %0, =1b" : "=r" (frame.pc));
+> 	}
+> 
+> 	walk_stackframe(&frame, save_trace, &data);
+> @@ -144,9 +310,22 @@ void save_stack_trace_tsk(struct task_struct *tsk, struct stack_trace *trace)
+> 		trace->entries[trace->nr_entries++] = ULONG_MAX;
+> }
+> 
+> +void save_stack_trace_tsk(struct task_struct *tsk, struct stack_trace *trace)
 > +{
-> +	/*
-> +	 * @cpu_addr will be one of 3 things depending on how it was allocated:
-> +	 * - A remapped array of pages from iommu_dma_alloc(), for all
-> +	 *   non-atomic allocations.
-> +	 * - A non-cacheable alias from the atomic pool, for atomic
-> +	 *   allocations by non-coherent devices.
-> +	 * - A normal lowmem address, for atomic allocations by
-> +	 *   coherent devices.
-> +	 * Hence how dodgy the below logic looks...
-> +	 */
-> +	if (__in_atomic_pool(cpu_addr, size)) {
-> +		iommu_dma_unmap_page(dev, handle, size, 0, NULL);
-> +		__free_from_pool(cpu_addr, size);
-> +	} else if (is_vmalloc_addr(cpu_addr)){
-> +		struct vm_struct *area = find_vm_area(cpu_addr);
-> +
-> +		if (WARN_ON(!area || !area->pages))
-> +			return;
-> +		iommu_dma_free(dev, area->pages, size, &handle);
-> +		dma_common_free_remap(cpu_addr, size, VM_USERMAP);
-
-Hi Robin,
-    We get a WARN issue while the size is not aligned here.
-
-    The WARN log is:
-[  206.852002] WARNING: CPU: 0 PID: 23329
-at /mnt/host/source/src/third_party/kernel/v3.18/mm/vmalloc.c:65
-vunmap_page_range+0x190/0x1b4()
-[  206.864438] Modules linked in: nls_iso8859_1 nls_cp437 vfat fat
-rfcomm i2c_dev uinput dm9601 uvcvideo btmrvl_sdio mwifiex_sdio mwifiex
-btmrvl bluetooth zram fuse cfg80211 nf_conntrack_ipv6 nf_defrag_ipv6
-ip6table_filter ip6_tables cdc_ether usbnet mii joydev snd_seq_midi
-snd_seq_midi_event snd_rawmidi snd_seq snd_seq_device ppp_async
-ppp_generic slhc tun
-[  206.902983] CPU: 0 PID: 23329 Comm: chrome Not tainted 3.18.0 #17
-[  206.910430] Hardware name: Mediatek Oak rev3 board (DT)
-[  206.920018] Call trace:
-[  206.925537] [<ffffffc000208c00>] dump_backtrace+0x0/0x140
-[  206.931905] [<ffffffc000208d5c>] show_stack+0x1c/0x28
-[  206.939158] [<ffffffc000870f80>] dump_stack+0x74/0x94
-[  206.947459] [<ffffffc0002219a4>] warn_slowpath_common+0x90/0xb8
-[  206.954100] [<ffffffc000221b58>] warn_slowpath_null+0x34/0x44
-[  206.961537] [<ffffffc000321358>] vunmap_page_range+0x18c/0x1b4
-[  206.967630] [<ffffffc0003213e4>] unmap_kernel_range+0x2c/0x78
-[  206.976977] [<ffffffc000582224>] dma_common_free_remap+0x68/0x80
-[  206.983581] [<ffffffc000217260>] __iommu_free_attrs+0x14c/0x160
-[  206.989646] [<ffffffc00066fc1c>] mtk_vcodec_mem_free+0xa0/0x15c
-[  206.996481] [<ffffffc00067e278>] vp9_free_work_buf+0x54/0x70
-[  207.002260] [<ffffffc00067f168>] vdec_vp9_deinit+0x7c/0xe8
-[  207.008134] [<ffffffc0006787d8>] vdec_if_deinit+0x84/0xec
-[  207.013820] [<ffffffc000677898>] mtk_vcodec_vdec_release+0x54/0x6c
-[  207.020672] [<ffffffc000673e3c>] fops_vcodec_release+0x7c/0xf8
-[  207.026607] [<ffffffc000652b78>] v4l2_release+0x3c/0x84
-[  207.031824] [<ffffffc00033b218>] __fput+0xf8/0x1c0
-[  207.036599] [<ffffffc00033b350>] ____fput+0x1c/0x2c
-[  207.041454] [<ffffffc00023ed78>] task_work_run+0xb0/0xd4
-[  207.046756] [<ffffffc00020872c>] do_notify_resume+0x54/0x6c
-
-
-   From the log I get in this fail case, the size of unmap here is
-0x10080, and its map size of dma_common_pages_remap in
-__iommu_alloc_attrs is 0x10080, and the corresponding dma-map size is
-0x11000(after iova_align). I think all the parameters of map and unmap
-are good, it look like not a DMA issue. but I don't know why we get this
-warning.
-Have you met this problem and give us some advices, Thanks.
-
-(If we add PAGE_ALIGN for the size in dma_alloc and dma_free, It is OK.)
-
-> +	} else {
-> +		iommu_dma_unmap_page(dev, handle, size, 0, NULL);
-> +		__free_pages(virt_to_page(cpu_addr), get_order(size));
-> +	}
+> +	__save_stack_trace_tsk(tsk, trace, NULL);
 > +}
 > +
-[...]
+> void save_stack_trace(struct stack_trace *trace)
+> {
+> -	save_stack_trace_tsk(current, trace);
+> +	__save_stack_trace_tsk(current, trace, NULL);
+> }
+> EXPORT_SYMBOL_GPL(save_stack_trace);
+> +
+> +#ifdef CONFIG_STACK_TRACER
+> +void save_stack_trace_sp(struct stack_trace *trace,
+> +					unsigned long *stack_dump_sp)
+> +{
+> +	__save_stack_trace_tsk(current, trace, stack_dump_sp);
+> +}
+> +#endif /* CONFIG_STACK_TRACER */
+> #endif
+> -- 
+> 1.7.9.5
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
