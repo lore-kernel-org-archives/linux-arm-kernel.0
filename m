@@ -1,101 +1,87 @@
-From: yang.shi@linaro.org (Shi, Yang)
-Date: Wed, 04 Nov 2015 10:41:53 -0800
-Subject: [PATCH] arm64: bpf: fix div-by-zero case
-In-Reply-To: <CABg9mcuAuoSBg4zWYHnaTzAGsH4BK5-VhD=HRDmsHJRCUrnJUw@mail.gmail.com>
-References: <1446620204-4228-1-git-send-email-zlim.lnx@gmail.com>	<CAKU6vyZu5KNAipSVUMg8ASnRXztVwh57weKXxXOXkqAJ3erDBQ@mail.gmail.com>	<563A4C9A.7000002@linaro.org>
- <CABg9mcuAuoSBg4zWYHnaTzAGsH4BK5-VhD=HRDmsHJRCUrnJUw@mail.gmail.com>
-Message-ID: <563A5171.5070608@linaro.org>
+From: cov@codeaurora.org (Christopher Covington)
+Date: Wed, 04 Nov 2015 13:49:00 -0500
+Subject: [PATCH] KVM/arm: kernel low level debug support for ARM32
+ virtual platforms
+In-Reply-To: <20151104133147.GB5819@cbox>
+References: <1446508313-24404-1-git-send-email-m.smarduch@samsung.com>
+ <5638E1CD.8090006@codeaurora.org> <5638F294.4060409@samsung.com>
+ <20151103175522.GA24856@arm.com> <56390838.3000204@samsung.com>
+ <CAL_JsqJJHGwcdTDMh3WujJW0rDPxocVLEUpw95aVFC4FDEdDgA@mail.gmail.com>
+ <20151104133147.GB5819@cbox>
+Message-ID: <563A531C.8090003@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/4/2015 10:25 AM, Z Lim wrote:
-> On Wed, Nov 4, 2015 at 10:21 AM, Shi, Yang <yang.shi@linaro.org> wrote:
->> On 11/3/2015 11:04 PM, Xi Wang wrote:
->>>
->>> On Tue, Nov 3, 2015 at 10:56 PM, Zi Shen Lim <zlim.lnx@gmail.com> wrote:
+On 11/04/2015 08:31 AM, Christoffer Dall wrote:
+> On Tue, Nov 03, 2015 at 01:39:44PM -0600, Rob Herring wrote:
+>> On Tue, Nov 3, 2015 at 1:17 PM, Mario Smarduch <m.smarduch@samsung.com> wrote:
+>>> On 11/3/2015 9:55 AM, Will Deacon wrote:
+>>>> On Tue, Nov 03, 2015 at 09:44:52AM -0800, Mario Smarduch wrote:
+>>>>> On 11/3/2015 8:33 AM, Christopher Covington wrote:
+>>>>>> On 11/02/2015 06:51 PM, Mario Smarduch wrote:
+>>>>>>>    this is a re-post from couple weeks ago, please take time to review this
+>>>>>>> simple patch which simplifies DEBUG_LL and prevents kernel crash on virtual
+>>>>>>> platforms.
+>>>>>>>
+>>>>>>> Before this patch DEBUG_LL for 'dummy virtual machine':
+>>>>>>>
+>>>>>>> ( ) Kernel low-level debugging via EmbeddedICE DCC channel
+>>>>>>> ( ) Kernel low-level debug output via semihosting I/O
+>>>>>>> ( ) Kernel low-level debugging via 8250 UART
+>>>>>>> ( ) Kernel low-level debugging via ARM Ltd PL01x Primecell
+>>>>>>>
+>>>>>>> In summary if debug uart is not emulated kernel crashes.
+>>>>>>> And once you pass that hurdle, uart physical/virtual addresses are unknown.
+>>>>>>> DEBUG_LL comes in handy on many occasions and should be somewhat
+>>>>>>> intuitive to use like it is for physical platforms. For virtual platforms
+>>>>>>> user may start daubting the host and get into a bigger mess.
+>>>>>>>
+>>>>>>> After this patch is applied user gets:
+>>>>>>>
+>>>>>>> (X) Kernel low-level debugging on QEMU Virtual Platform
+>>>>>>> ( ) Kernel low-level debugging on Kvmtool Virtual Platform
+>>>>>>>    ..... above repeated ....
+>>>>>>>
+>>>>>>> The virtual addresses selected follow arm reference models, high in vmalloc
+>>>>>>> section with high mem enabled and guest running with >= 1GB of memory. The
+>>>>>>> offset is leftover from arm reference models.
+>>>>>>
+>>>>>> Which model? It doesn't appear to match the vexpress AEM/RTSM/FVP/whatever
+>>>>>> which used 0x1c090000 for UART0.
+>>>>>
+>>>>> I recall QEMU virt model had it's own physical address map, for sure I saw the
+>>>>> virtio-mmio regions assigned in some ARM document. Peter would you know?
+>>>>>
+>>>>> As far as kvmtool I'm not sure, currently PC1 COM1 port is used? Andre will that
+>>>>> stay fixed?
 >>>>
->>>>           case BPF_ALU | BPF_DIV | BPF_X:
->>>>           case BPF_ALU64 | BPF_DIV | BPF_X:
->>>> +       {
->>>> +               const u8 r0 = bpf2a64[BPF_REG_0];
->>>> +
->>>> +               /* if (src == 0) return 0 */
->>>> +               jmp_offset = 3; /* skip ahead to else path */
->>>> +               check_imm19(jmp_offset);
->>>> +               emit(A64_CBNZ(is64, src, jmp_offset), ctx);
->>>> +               emit(A64_MOVZ(1, r0, 0, 0), ctx);
->>>> +               jmp_offset = epilogue_offset(ctx);
->>>> +               check_imm26(jmp_offset);
->>>> +               emit(A64_B(jmp_offset), ctx);
->>>> +               /* else */
->>>>                   emit(A64_UDIV(is64, dst, dst, src), ctx);
->>>>                   break;
->>>> +       }
->>>>           case BPF_ALU | BPF_MOD | BPF_X:
->>>>           case BPF_ALU64 | BPF_MOD | BPF_X:
+>>>> We make absolutely no guarantees about the memory map provided by kvmtool.
 >>>
+>>> If that's also the case for qemu, then I guess the best you can do is find a way
+>>> to dump the device tree. Find the uart, physical address and try figure out the
+>>> virtual address.
 >>>
->>> BPF_MOD might need the same fix.
->
-> I'll post a fix for this case as well.
->
+>>> Pretty involved, hoped for something more automated since that's a handy feature.
 >>
+>> You really only need LL_DEBUG now if you are debugging very early code
+>> before memory is setup and/or bad memory. Use earlycon instead which
+>> should already be supported both via the pl011 or semihosting. I used
+>> it with QEMU semihosting support.
 >>
->> Agreed, and we may need add one more test cases in test_bpf module to cover
->> MOD?
->
-> Let me know if you have a test case ready :)
+> Then we should really document how to use that with qemu's virt platform
+> and kvmtool's platform on both 32-bit and 64-bit so that users can
+> easily figure out what they're doing wrong when they get no output.
+> 
+> In practice, the address for the pl011 is quite unlikely to change, I
+> dare speculate, so that documentation shouldn't need frequent updating.
 
-Does the below change look like a valid test?
+Is it not on by default since the following change?
 
-+               "MOD default X",
-+               .u.insns = {
-+                       /*
-+                        * A = 0x42
-+                        * A = A mod X ; this halt the filter execution 
-if X is 0
-+                        * ret 0x42
-+                        */
-+                       BPF_STMT(BPF_LD | BPF_IMM, 0x42),
-+                       BPF_STMT(BPF_ALU | BPF_MOD | BPF_X, 0),
-+                       BPF_STMT(BPF_RET | BPF_K, 0x42),
-+               },
-+               CLASSIC | FLAG_NO_DATA,
-+               {},
-+               { {0x1, 0x0 } },
-+       },
-+       {
-+               "MOD default A",
-+               .u.insns = {
-+                       /*
-+                        * A = A mod 1
-+                        * ret A
-+                        */
-+                       BPF_STMT(BPF_ALU | BPF_MOD | BPF_K, 0x1),
-+                       BPF_STMT(BPF_RET | BPF_A, 0x0),
-+               },
-+               CLASSIC | FLAG_NO_DATA,
-+               {},
-+               { {0x1, 0x0 } },
-+       },
+http://git.qemu.org/?p=qemu.git;a=commitdiff;h=f022b8e95379b0433d13509706b66f38fc15dde8
 
-My test result with it:
-test_bpf: #284 MOD default X jited:1 ret 66 != 0 FAIL (1 times)
-test_bpf: #285 MOD default A jited:1 102 PASS
+Christopher Covington
 
-If it looks right, I will post a patch to add the test cases.
-
-Thanks,
-Yang
-
->
->>
->> Yang
->>
->>>
->>> _______________________________________________
->>> linux-arm-kernel mailing list
->>> linux-arm-kernel at lists.infradead.org
->>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->>>
->>
+-- 
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
