@@ -1,173 +1,75 @@
-From: b38343@freescale.com (Robin Gong)
-Date: Wed, 4 Nov 2015 15:55:43 +0800
-Subject: [PATCH v2 2/2] watchdog: imx2_wdt: add set_pretimeout interface
-In-Reply-To: <5638EE38.80404@roeck-us.net>
-References: <1446531084-15365-1-git-send-email-b38343@freescale.com>
- <1446531084-15365-2-git-send-email-b38343@freescale.com>
- <563866CD.1080306@roeck-us.net> <20151103080447.GB15428@shlinux2>
- <5638EE38.80404@roeck-us.net>
-Message-ID: <20151104075542.GB10809@shlinux2>
+From: majun258@huawei.com (majun (F))
+Date: Wed, 4 Nov 2015 16:00:16 +0800
+Subject: [PATCH RFC 7/7] irqchip: [Example] dummy wired interrupt/MSI
+ bridge driver
+In-Reply-To: <1444923568-17413-8-git-send-email-marc.zyngier@arm.com>
+References: <1444923568-17413-1-git-send-email-marc.zyngier@arm.com>
+ <1444923568-17413-8-git-send-email-marc.zyngier@arm.com>
+Message-ID: <5639BB10.1090108@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 03, 2015 at 09:26:16AM -0800, Guenter Roeck wrote:
-> On 11/03/2015 12:04 AM, Robin Gong wrote:
-> >On Mon, Nov 02, 2015 at 11:48:29PM -0800, Guenter Roeck wrote:
-> >>On 11/02/2015 10:11 PM, Robin Gong wrote:
-> >>>Enable set_pretimeout interface and trigger the pretimeout interrupt before
-> >>>watchdog timeout event happen.
-> >>>
-> >>>Signed-off-by: Robin Gong <b38343@freescale.com>
-> >>>---
-> >>>  drivers/watchdog/imx2_wdt.c | 58 ++++++++++++++++++++++++++++++++++++++++++++-
-> >>>  1 file changed, 57 insertions(+), 1 deletion(-)
-> >>>
-> >>>diff --git a/drivers/watchdog/imx2_wdt.c b/drivers/watchdog/imx2_wdt.c
-> >>>index 0bb1a1d..bd42857 100644
-> >>>--- a/drivers/watchdog/imx2_wdt.c
-> >>>+++ b/drivers/watchdog/imx2_wdt.c
-> >>>@@ -24,6 +24,7 @@
-> >>>  #include <linux/clk.h>
-> >>>  #include <linux/delay.h>
-> >>>  #include <linux/init.h>
-> >>>+#include <linux/interrupt.h>
-> >>>  #include <linux/io.h>
-> >>>  #include <linux/jiffies.h>
-> >>>  #include <linux/kernel.h>
-> >>>@@ -52,12 +53,18 @@
-> >>>  #define IMX2_WDT_WRSR		0x04		/* Reset Status Register */
-> >>>  #define IMX2_WDT_WRSR_TOUT	(1 << 1)	/* -> Reset due to Timeout */
-> >>>
-> >>>+#define IMX2_WDT_WICR		0x06		/*Interrupt Control Register*/
-> >>>+#define IMX2_WDT_WICR_WIE	(1 << 15)	/* -> Interrupt Enable */
-> >>>+#define IMX2_WDT_WICR_WTIS	(1 << 14)	/* -> Interrupt Status */
-> >>>+#define IMX2_WDT_WICR_WICT	(0xFF)	/* Watchdog Interrupt Timeout */
-> >>
-> >>Unnecessary ( )
-> >>
-> >>>+
-> >>>  #define IMX2_WDT_WMCR		0x08		/* Misc Register */
-> >>>
-> >>>  #define IMX2_WDT_MAX_TIME	128
-> >>>  #define IMX2_WDT_DEFAULT_TIME	60		/* in seconds */
-> >>>
-> >>>  #define WDOG_SEC_TO_COUNT(s)	((s * 2 - 1) << 8)
-> >>>+#define WDOG_SEC_TO_PRECOUNT(s)	((s) * 2)	/* set WDOG pre timeout count*/
-> >>>
-> >>>  struct imx2_wdt_device {
-> >>>  	struct clk *clk;
-> >>>@@ -80,7 +87,8 @@ MODULE_PARM_DESC(timeout, "Watchdog timeout in seconds (default="
-> >>>
-> >>>  static const struct watchdog_info imx2_wdt_info = {
-> >>>  	.identity = "imx2+ watchdog",
-> >>>-	.options = WDIOF_KEEPALIVEPING | WDIOF_SETTIMEOUT | WDIOF_MAGICCLOSE,
-> >>>+	.options = WDIOF_KEEPALIVEPING | WDIOF_SETTIMEOUT | WDIOF_MAGICCLOSE
-> >>>+		   | WDIOF_PRETIMEOUT,
-> >>>  };
-> >>>
-> >>>  static int imx2_restart_handler(struct notifier_block *this, unsigned long mode,
-> >>>@@ -207,12 +215,49 @@ static inline void imx2_wdt_ping_if_active(struct watchdog_device *wdog)
-> >>>  	}
-> >>>  }
-> >>>
-> >>>+static int imx2_wdt_set_pretimeout(struct watchdog_device *wdog,
-> >>>+				   unsigned int new_timeout)
-> >>>+{
-> >>>+	struct imx2_wdt_device *wdev = watchdog_get_drvdata(wdog);
-> >>>+	u32 val;
-> >>>+
-> >>>+	regmap_read(wdev->regmap, IMX2_WDT_WICR, &val);
-> >>>+	/* set the new pre-timeout value in the WSR */
-> >>>+	val &= ~IMX2_WDT_WICR_WICT;
-> >>>+	val |= WDOG_SEC_TO_PRECOUNT(new_timeout);
-> >>
-> >>Looking into this, I think we need more information in the first patch.
-> >>Specifically, we need a value for max_pretimeout and validate it
-> >>(new_timeout must be smaller than 128 to avoid overflows, independent
-> >>of the maximum timeout).
-> >>
-> >I think it's enough, since there is "t >= wdd->timeout" in
-> >watchdog_pretimeout_invalid() of the first patch and wdd->timeout is never
-> >bigger than wdd->max_timeout which setting in imx2_wdt.c as 128.
+Hi Marc:
+
+? 2015/10/15 23:39, Marc Zyngier ??:
+> In order to demonstrate how to put together a wire/MSI bridge,
+> add a dummy driver that doesn't do anything at all, except
+> for allocating interrupts.
 > 
-> We are dealing with infrastructure code here. This happens to work for your driver,
-> but that doesn't mean it will work for other drivers.
+> It comes together with an even more stupid client driver that
+> allocates an interrupt and dump the hierarchy of that interrupt.
 > 
-> Anyway, I recalled that there is another patchset pending to add pretimeout
-> support into the watchdog code. I'll have to dig that out and consolidate the two.
-> 
-> Guenter
->
-Got it. Thanks.
-> >>>+
-> >>>+	regmap_write(wdev->regmap, IMX2_WDT_WICR, val | IMX2_WDT_WICR_WIE);
-> >>>+
-> >>>+	wdog->pretimeout = new_timeout;
-> >>>+
-> >>>+	return 0;
-> >>>+}
-> >>>+
-> >>>+static irqreturn_t imx2_wdt_isr(int irq, void *dev_id)
-> >>>+{
-> >>>+	struct platform_device *pdev = dev_id;
-> >>>+	struct watchdog_device *wdog = platform_get_drvdata(pdev);
-> >>>+	struct imx2_wdt_device *wdev = watchdog_get_drvdata(wdog);
-> >>>+	u32 val;
-> >>>+
-> >>>+	regmap_read(wdev->regmap, IMX2_WDT_WICR, &val);
-> >>>+	if (val & IMX2_WDT_WICR_WTIS) {
-> >>>+		/*clear interrupt status bit*/
-> >>>+		regmap_write(wdev->regmap, IMX2_WDT_WICR, val);
-> >>>+		panic("pre-timeout:%d, %d Seconds remained\n", wdog->pretimeout,
-> >>
-> >>"seconds" - no capital 'S'.
-> >>
-> >>>+		      wdog->timeout - wdog->pretimeout);
-> >>>+	}
-> >>>+
-> >>>+	return IRQ_HANDLED;
-> >>>+}
-> >>>+
-> >>>  static const struct watchdog_ops imx2_wdt_ops = {
-> >>>  	.owner = THIS_MODULE,
-> >>>  	.start = imx2_wdt_start,
-> >>>  	.stop = imx2_wdt_stop,
-> >>>  	.ping = imx2_wdt_ping,
-> >>>  	.set_timeout = imx2_wdt_set_timeout,
-> >>>+	.set_pretimeout = imx2_wdt_set_pretimeout,
-> >>>  };
-> >>>
-> >>>  static const struct regmap_config imx2_wdt_regmap_config = {
-> >>>@@ -229,6 +274,7 @@ static int __init imx2_wdt_probe(struct platform_device *pdev)
-> >>>  	struct resource *res;
-> >>>  	void __iomem *base;
-> >>>  	int ret;
-> >>>+	int irq;
-> >>>  	u32 val;
-> >>>
-> >>>  	wdev = devm_kzalloc(&pdev->dev, sizeof(*wdev), GFP_KERNEL);
-> >>>@@ -294,6 +340,16 @@ static int __init imx2_wdt_probe(struct platform_device *pdev)
-> >>>  		goto disable_clk;
-> >>>  	}
-> >>>
-> >>>+	irq = platform_get_irq(pdev, 0);
-> >>>+	if (irq > 0) {
-> >>>+		ret = devm_request_irq(&pdev->dev, irq, imx2_wdt_isr, 0,
-> >>>+				       dev_name(&pdev->dev), pdev);
-> >>>+		if (ret) {
-> >>>+			dev_err(&pdev->dev, "can't get irq %d\n", irq);
-> >>>+			goto disable_clk;
-> >>>+		}
-> >>>+	}
-> >>>+
-> >>>  	wdev->restart_handler.notifier_call = imx2_restart_handler;
-> >>>  	wdev->restart_handler.priority = 128;
-> >>>  	ret = register_restart_handler(&wdev->restart_handler);
-> >>>
-> >>
-> >--
-> >To unsubscribe from this list: send the line "unsubscribe linux-watchdog" in
-> >the body of a message to majordomo at vger.kernel.org
-> >More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> >
-> 
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+[...]
+> +
+> +static int msichip_domain_alloc(struct irq_domain *domain, unsigned int virq,
+> +				   unsigned int nr_irqs, void *arg)
+> +{
+> +	int i, err;
+> +	irq_hw_number_t hwirq;
+> +	unsigned int type;
+> +	struct irq_fwspec *fwspec = arg;
+> +	void *data;
+> +
+> +	err = msichip_domain_translate(domain, fwspec, &hwirq, &type);
+> +	if (err)
+> +		return err;
+> +
+
+.translate function already called once in  irq_domain_translate(),
+I think we don't need call this fucntion one more time here.
+
+> +	err = platform_msi_domain_alloc(domain, virq, nr_irqs);
+> +	if (err)
+> +		return err;
+> +
+> +	data = platform_msi_get_host_data(domain);
+> +	for (i = 0; i < nr_irqs; i++)
+> +		irq_domain_set_hwirq_and_chip(domain, virq + i, hwirq + i,
+> +					      &msichip_chip, data);
+> +
+> +	return 0;
+> +}
+> +
+[...]
+> +
+> +static struct platform_driver msichip_driver = {
+> +	.driver = {
+> +		.name		= "msichip",
+> +		.of_match_table	= msichip_of_match,
+> +	},
+> +	.probe			= msichip_probe,
+> +};
+> +/* Do not define this as an irqchip */
+> +module_platform_driver(msichip_driver);
+> +
+> +
+
+I think,for a interrupt controller, msichip driver initialization maybe is too late
+for some devices which connect to this irqchip if we use module_platform_driver.
+
+So, how about use the arch_initcall to register the msichip driver?
+
+Thanks!
+Ma Jun
