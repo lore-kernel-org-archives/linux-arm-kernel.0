@@ -1,32 +1,44 @@
 From: soren.brinkmann@xilinx.com (Soren Brinkmann)
-Date: Tue, 3 Nov 2015 16:20:47 -0800
-Subject: [PATCH 6/9] tty: xuartps: Keep lock for whole ISR
+Date: Tue, 3 Nov 2015 16:20:48 -0800
+Subject: [PATCH 7/9] tty: xuartps: Acquire port lock for shutdown
 In-Reply-To: <1446596450-20918-1-git-send-email-soren.brinkmann@xilinx.com>
 References: <1446596450-20918-1-git-send-email-soren.brinkmann@xilinx.com>
-Message-ID: <1446596450-20918-7-git-send-email-soren.brinkmann@xilinx.com>
+Message-ID: <1446596450-20918-8-git-send-email-soren.brinkmann@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The RX path in the interrupt handler released a lock unnecessarily.
+Shutting down the UART port can happen while console operations are in
+progress. Holding the port lock serializes these operations and avoids
+the UART HW to be disabled in the middle of console prints.
 
 Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
 ---
- drivers/tty/serial/xilinx_uartps.c | 2 --
- 1 file changed, 2 deletions(-)
+ drivers/tty/serial/xilinx_uartps.c | 6 ++++++
+ 1 file changed, 6 insertions(+)
 
 diff --git a/drivers/tty/serial/xilinx_uartps.c b/drivers/tty/serial/xilinx_uartps.c
-index b189e600d4ab..544ea13e2e93 100644
+index 544ea13e2e93..4904eec37621 100644
 --- a/drivers/tty/serial/xilinx_uartps.c
 +++ b/drivers/tty/serial/xilinx_uartps.c
-@@ -265,9 +265,7 @@ static irqreturn_t cdns_uart_isr(int irq, void *dev_id)
- 			uart_insert_char(port, isrstatus, CDNS_UART_IXR_OVERRUN,
- 					data, status);
- 		}
--		spin_unlock(&port->lock);
- 		tty_flip_buffer_push(&port->state->port);
--		spin_lock(&port->lock);
- 	}
+@@ -823,6 +823,9 @@ static int cdns_uart_startup(struct uart_port *port)
+ static void cdns_uart_shutdown(struct uart_port *port)
+ {
+ 	int status;
++	unsigned long flags;
++
++	spin_lock_irqsave(&port->lock, flags);
  
- 	/* Dispatch an appropriate handler */
+ 	/* Disable interrupts */
+ 	status = readl(port->membase + CDNS_UART_IMR_OFFSET);
+@@ -832,6 +835,9 @@ static void cdns_uart_shutdown(struct uart_port *port)
+ 	/* Disable the TX and RX */
+ 	writel(CDNS_UART_CR_TX_DIS | CDNS_UART_CR_RX_DIS,
+ 			port->membase + CDNS_UART_CR_OFFSET);
++
++	spin_unlock_irqrestore(&port->lock, flags);
++
+ 	free_irq(port->irq, port);
+ }
+ 
 -- 
 2.6.2.3.ga463a5b
