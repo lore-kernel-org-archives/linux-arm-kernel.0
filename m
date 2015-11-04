@@ -1,24 +1,27 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Wed, 4 Nov 2015 15:34:59 -0800
-Subject: [PATCH 1/8] phy: rockchip-usb: fix clock get-put mismatch
-In-Reply-To: <1446673454-9529-2-git-send-email-heiko@sntech.de>
-References: <1446673454-9529-1-git-send-email-heiko@sntech.de>
- <1446673454-9529-2-git-send-email-heiko@sntech.de>
-Message-ID: <CAD=FV=X=tDxuc_wur-Bedi4PqWhe9Z3t_oaUQ1+6vQHmOSb+Qg@mail.gmail.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Thu, 05 Nov 2015 00:35 +0100
+Subject: [PATCH v6 8/8] rockchip: make sure timer5 is enabled on rk3036
+ platforms
+In-Reply-To: <1446639957-12030-1-git-send-email-zhengxing@rock-chips.com>
+References: <1446639503-11763-1-git-send-email-zhengxing@rock-chips.com>
+ <1446639957-12030-1-git-send-email-zhengxing@rock-chips.com>
+Message-ID: <2496205.49bBo1tRVl@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Heiko
-
-On Wed, Nov 4, 2015 at 1:44 PM, Heiko Stuebner <heiko@sntech.de> wrote:
-> Currently the phy driver only gets the optional clock reference but
-> never puts it again, neither during error handling nor on remove.
-> Fix that by moving the clk_put to a devm-action that gets called at
-> the right time when all other devm actions are done.
->
-> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+Am Mittwoch, 4. November 2015, 20:25:57 schrieb Xing Zheng:
+> The timer5 supplies the architected timer and thus as has to run when
+> the system clocksource and clockevents drivers are registered.
+> 
 > ---
->  drivers/phy/phy-rockchip-usb.c | 15 +++++++++++++++
->  1 file changed, 15 insertions(+)
+> 
+> Changes in v6:
+> Signed-off-by: Xing Zheng <zhengxing@rock-chips.com>
+> Reviewed-by: Heiko Stuebner <heiko@sntech.de>
 
-Reviewed-by: Douglas Anderson <dianders@chromium.org>
+
+This patch can work standalone, so I took the liberty of applying it to my soc 
+branch for 4.5 already, so you don't need to resend it in future versions.
+
+I fixed up the subject "ARM: rockchip:...", and moved the Signed-off-by to the 
+correct position above the "---".
