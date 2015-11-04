@@ -1,58 +1,57 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 4 Nov 2015 10:39:13 +0000
-Subject: [PATCH] ARM:dma-mapping: Handle DMA_BIDIRECTIONAL in
- _dma_page_cpu_to_dev()
-In-Reply-To: <1446631008-5854-1-git-send-email-sanjeev_sharma@mentor.com>
-References: <1446631008-5854-1-git-send-email-sanjeev_sharma@mentor.com>
-Message-ID: <20151104103913.GC5405@arm.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 4 Nov 2015 10:50:57 +0000
+Subject: [PATCH v6 1/3] iommu: Implement common IOMMU ops for DMA mapping
+In-Reply-To: <CAAFQd5ApSFC6Pm4tDhZbJOVZ7szCx=diKUtGXq=M9a5Y_4qzOQ@mail.gmail.com>
+References: <1445867094.30736.14.camel@mhfsdcap03> <562E5AE4.9070001@arm.com>
+ <CAGS+omAWCQsqk56iv0PW2ZhTJ1342GufUsJCP=VYSgCxZNLJpA@mail.gmail.com>
+ <56337E4D.1010304@arm.com>
+ <CAGS+omAmxbb4uVzaQh1xPmkFtcF6KP-HSV-40=sm1BRTdh+=OQ@mail.gmail.com>
+ <CAAFQd5C_dkWBZrQXtyO59ARw7q-0fg-Wk98yApC5VHdQ8-AmNw@mail.gmail.com>
+ <5638F1C4.3000900@arm.com>
+ <CAAFQd5A4TcvkDMFezqEpkfWL+7yO2v=Hm=twk=p-NpADPpvqEQ@mail.gmail.com>
+ <20151104092748.GI8644@n2100.arm.linux.org.uk>
+ <CAAFQd5ApSFC6Pm4tDhZbJOVZ7szCx=diKUtGXq=M9a5Y_4qzOQ@mail.gmail.com>
+Message-ID: <20151104105057.GK8644@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 04, 2015 at 03:26:48PM +0530, Sanjeev Sharma wrote:
-> _dma_page_cpu_to_dev() treat DMA_BIDIRECTIONAL similar to DMA_TO_DEVICE
-> which means that destination buffer is device memory,means cpu may have
-> written some data to source buffer and data may be in cache line.For
-> cleaner operation we need to call outer_flush_range() which will
-> clean and invalidate outer cache lines.
+On Wed, Nov 04, 2015 at 06:48:50PM +0900, Tomasz Figa wrote:
+> There is no requirement, but shouldn't it be desired for the mapping
+> code to map them as such? Otherwise, how could the IOMMU use case you
+> described above (address translator for devices which don't have the
+> capability to address a scatterlist) be handled properly?
 
-Why isn't the clean sufficient in this case? We're mapping the buffer
-to the device, so we clean the dirty lines in the CPU caches and make
-them visible to the device. If the CPU later wants to read the buffer
-(i.e. after the device has DMA'd into it), you'll need to map the
-buffer to the CPU, which will perform the invalidation of the CPU caches.
+It's up to the IOMMU code to respect the parameters that the device has
+supplied to it via the device_dma_parameters.  This doesn't currently
+allow a device to say "I want this scatterlist to be mapped as a
+contiguous device address", so really if a device has such a requirement,
+at the moment the device driver _must_ check the dma_map_sg() return
+value and act accordingly.
 
-Will
+While it's possible to say "an IOMMU should map as a single contiguous
+address" what happens when the IOMMU's device address space becomes
+fragmented?
 
-> diff --git a/arch/arm/mm/dma-mapping.c b/arch/arm/mm/dma-mapping.c
-> index e62400e..e195235 100644
-> --- a/arch/arm/mm/dma-mapping.c
-> +++ b/arch/arm/mm/dma-mapping.c
-> @@ -850,12 +850,20 @@ static void __dma_page_cpu_to_dev(struct page *page, unsigned long off,
->  	dma_cache_maint_page(page, off, size, dir, dmac_map_area);
->  
->  	paddr = page_to_phys(page) + off;
-> -	if (dir == DMA_FROM_DEVICE) {
-> -		outer_inv_range(paddr, paddr + size);
-> -	} else {
-> -		outer_clean_range(paddr, paddr + size);
-> +
-> +	switch (dir) {
-> +	case DMA_FROM_DEVICE:
-> +			outer_inv_range(paddr, paddr + size);
-> +			break;
-> +	case DMA_TO_DEVICE:
-> +			outer_clean_range(paddr, paddr + size);
-> +			break;
-> +	case DMA_BIDIRECTIONAL:
-> +			outer_flush_range(paddr, paddr + size);
-> +			break;
-> +	default:
-> +			break;
->  	}
-> -	/* FIXME: non-speculating: flush on bidirectional mappings? */
->  }
->  
->  static void __dma_page_dev_to_cpu(struct page *page, unsigned long off,
-> -- 
-> 1.7.11.7
-> 
+> Is the general conclusion now that dma_map_sg() should not be used to
+> create IOMMU mappings and we should make a step backwards making all
+> drivers (or frameworks, such as videobuf2) do that manually? That
+> would be really backwards, because code not aware of IOMMU existence
+> at all would have to become aware of it.
+
+No.  The DMA API has always had the responsibility for managing the
+IOMMU device, which may well be shared between multiple different
+devices.
+
+However, if the IOMMU is part of a device IP block (such as a GPU)
+then the decision on whether the DMA API should be used or not is up
+to the driver author.  If it has special management requirements,
+then it's probably appropriate for the device driver to manage it by
+itself.
+
+For example, a GPUs MMU may need something inserted into the GPUs
+command stream to flush the MMU TLBs.  Such cases are inappropriate
+to be using the DMA API for IOMMU management.
+
+-- 
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
