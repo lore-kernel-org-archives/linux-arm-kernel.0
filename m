@@ -1,31 +1,56 @@
-From: sameo@linux.intel.com (Samuel Ortiz)
-Date: Wed, 4 Nov 2015 02:37:14 +0100
-Subject: [PATCH] NFC: nfcmrvl: fix SPI driver dependencies
-In-Reply-To: <243350307.K4hHIg3V2N@wuerfel>
-References: <243350307.K4hHIg3V2N@wuerfel>
-Message-ID: <20151104013714.GA4090@zurbaran.home>
+From: yh.huang@mediatek.com (YH Huang)
+Date: Wed, 4 Nov 2015 09:47:36 +0800
+Subject: [PATCH v2] pwm-backlight: fix the panel power sequence
+In-Reply-To: <1446548924.3373.3.camel@pengutronix.de>
+References: <1444987060-48202-1-git-send-email-yh.huang@mediatek.com>
+ <1444988219.3541.3.camel@pengutronix.de>
+ <1445526750.27586.8.camel@mtksdaap41>
+ <1446133259.3274.52.camel@pengutronix.de>
+ <1446190900.17558.16.camel@mtksdaap41>
+ <1446201271.3334.22.camel@pengutronix.de>
+ <1446538299.2449.8.camel@mtksdaap41>
+ <1446548924.3373.3.camel@pengutronix.de>
+Message-ID: <1446601656.15340.11.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+On Tue, 2015-11-03 at 12:08 +0100, Philipp Zabel wrote:
+> Hi YH,
+> 
+> Am Dienstag, den 03.11.2015, 16:11 +0800 schrieb YH Huang:
+> > > The reasoning is that devices where there is no phandle link pointing to
+> > > the backlight (for example from a simple-panel node), we should keep the
+> > > current default behaviour (enable during probe).
+> > 
+> > I have a little problem for the current default behaviour.
+> > Should we enable during probe?
+> 
+> Here I mean enabling the backlight (at the end of the probe function),
+> not enabling the GPIO already when requesting it.
+> 
+> > Before this patch ( http://patchwork.ozlabs.org/patch/324690/ ),
+> > we disable "enable-gpio" in the probe function.
+> 
+> While before this patch the GPIO would be initialized in the disabled
+> state, the call to backlight_update_status at the end of the probe
+> function would still enable the backlight afterwards.
 
-On Tue, Nov 03, 2015 at 03:03:33PM +0100, Arnd Bergmann wrote:
-> The newly added nfcmrvl_spi driver uses the spi_nci
-> infrastructure, but does not have a Kconfig dependency on
-> that, so we can get a link-time error:
-> 
-> drivers/built-in.o: In function `nfcmrvl_spi_nci_send':
-> (.text+0x1428dc): undefined reference to `nci_spi_send'
-> drivers/built-in.o: In function `nfcmrvl_spi_probe':
-> (.text+0x142a24): undefined reference to `nci_spi_allocate_spi'
-> drivers/built-in.o: In function `nfcmrvl_spi_int_irq_thread_fn':
-> (.text+0x142abc): undefined reference to `nci_spi_read'
-> 
-> This clarifies the dependency.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Fixes: caf6e49bf6d0 ("NFC: nfcmrvl: add spi driver")
-Applied, thanks.
+Based on this, could we disable it initially and update in the
+backlight_update_status function?
 
-Cheers,
-Samuel.
+Like this,
+
+if (pb->enable_gpio) {
+	if (phandle &&
+	    gpiod_get_direction(pb->enable_gpio) == GPIOF_DIR_OUT &&
+	    gpiod_get_value(pb->enable_gpio) == 1)
+		gpiod_direction_output(pb->enable_gpio, 1);
+	else
+		gpiod_direction_output(pb->enable_gpio, 0);
+}
+
+And then update with props.brightness in backlight_update_status.
+I am not sure, maybe I miss something.
+
+Regards,
+YH Huang
