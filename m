@@ -1,32 +1,36 @@
-From: jungseoklee85@gmail.com (Jungseok Lee)
-Date: Wed, 4 Nov 2015 22:35:36 +0900
-Subject: [PATCH v6 2/3] percpu: add PERCPU_ATOM_SIZE for a generic percpu
- area setup
-In-Reply-To: <5638F5B9.3040404@arm.com>
-References: <1446363977-23656-1-git-send-email-jungseoklee85@gmail.com>
- <1446363977-23656-3-git-send-email-jungseoklee85@gmail.com>
- <alpine.DEB.2.20.1511021008580.27740@east.gentwo.org>
- <20151102162236.GB7637@e104818-lin.cambridge.arm.com>
- <F4C06691-60EF-45FA-9AD7-9FBF8F1960AB@gmail.com> <5638F5B9.3040404@arm.com>
-Message-ID: <CC50E962-D166-44EB-A610-6F70A5234802@gmail.com>
+From: cl@linux.com (Christoph Lameter)
+Date: Wed, 4 Nov 2015 07:53:50 -0600 (CST)
+Subject: [PATCH] arm64: Increase the max granular size
+In-Reply-To: <20151104123640.GK7637@e104818-lin.cambridge.arm.com>
+References: <1442944788-17254-1-git-send-email-rric@kernel.org>
+ <20151028190948.GJ8899@e104818-lin.cambridge.arm.com>
+ <CAMuHMdWQygbxMXoOsbwek6DzZcr7J-C23VCK4ubbgUr+zj=giw@mail.gmail.com>
+ <20151103120504.GF7637@e104818-lin.cambridge.arm.com>
+ <20151103143858.GI7637@e104818-lin.cambridge.arm.com>
+ <CAMuHMdWk0fPzTSKhoCuS4wsOU1iddhKJb2SOpjo=a_9vCm_KXQ@mail.gmail.com>
+ <20151103185050.GJ7637@e104818-lin.cambridge.arm.com>
+ <alpine.DEB.2.20.1511031724010.8178@east.gentwo.org>
+ <20151104123640.GK7637@e104818-lin.cambridge.arm.com>
+Message-ID: <alpine.DEB.2.20.1511040748590.17248@east.gentwo.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Nov 4, 2015, at 2:58 AM, James Morse wrote:
-> Hi Jungseok,
+On Wed, 4 Nov 2015, Catalin Marinas wrote:
 
-Hi James,
+> The simplest option would be to make sure that off slab isn't allowed
+> for caches of KMALLOC_MIN_SIZE or smaller, with the drawback that not
+> only "kmalloc-128" but any other such caches will be on slab.
 
-> On 03/11/15 13:49, Jungseok Lee wrote:
->> Additionally, I've been thinking of do_softirq_own_stack() which is your
->> another comment [3]. Recently, I've realized there is possibility that
->> I misunderstood your intention. Did you mean that irq_handler hook is not
->> enough? Should do_softirq_own_stack() be implemented together?
-> 
-> I've been putting together a version to illustrate this, I aim to post it
-> before the end of this week?
+The reason for an off slab configuration is denser object packing.
 
-It sounds great! I will wait for your version.
+> I think a better option would be to first check that there is a
+> kmalloc_caches[] entry for freelist_size before deciding to go off-slab.
 
-Best Regards
-Jungseok Lee
+Hmmm.. Yes seems to be an option.
+
+Maybe we simply revert commit 8fc9cf420b36 instead? That does not seem to
+make too much sense to me and the goal of the commit cannot be
+accomplished on ARM. Your patch essentially reverts the effect anyways.
+
+Smaller slabs really do not need off slab management anyways since they
+will only loose a few objects per slab page.
