@@ -1,45 +1,40 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 04 Nov 2015 11:29:01 +0100
-Subject: [PATCH] dmaengine: edma: fix build without CONFIG_OF
-In-Reply-To: <5639CA72.4050604@ti.com>
-References: <17811472.bY8CqmdEVy@wuerfel> <16166945.0Jm7Xdjkb9@wuerfel>
- <5639CA72.4050604@ti.com>
-Message-ID: <3771870.4l0jsKt335@wuerfel>
+Date: Wed, 04 Nov 2015 11:30:43 +0100
+Subject: [PATCH v2 0/3] let Marvell Berlin SoCs make use of the best delay
+ timer
+In-Reply-To: <5639D409.1030302@linaro.org>
+References: <1446560917-6318-1-git-send-email-jszhang@marvell.com>
+ <5639D409.1030302@linaro.org>
+Message-ID: <4359736.Q4L68M2aRW@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 04 November 2015 11:05:54 Peter Ujfalusi wrote:
-> > 
-> > I think that would be less readable, and gives no compile-time coverage
-> > to the contents of the edma_tc_set_pm_state function.
+On Wednesday 04 November 2015 10:46:49 Daniel Lezcano wrote:
+> On 11/03/2015 03:28 PM, Jisheng Zhang wrote:
+> > In case there are several possible delay timers, we purely base the
+> > selection on the frequency, which is suboptimal in some cases. Take
+> > one Marvell Berlin platform for example: we have arch timer and dw-apb
+> > timer. The arch timer freq is 25MHZ while the dw-apb timer freq is
+> > 100MHZ, current selection would choose the dw-apb timer. But the dw
+> > apb timer is on the APB bus while arch timer sits in CPU, the cost
+> > of accessing the apb timer is higher than the arch timer.
+> >
+> > This series firstly modifies register_current_timer_delay() to choose
+> > the highest rating delay timer: use the rating as a primary indication
+> > and fall back to comparing the frequency if the rating is not set or
+> > the same. Then we set the arch_delay_timer rating as 400, finally
+> > Implement ARM delay timer for the dw_apb_timer and set its rating as 300.
 > 
-> Hrm, if the compiler knows that there is no need to compile the code after the:
-> if (!IS_ENABLED(CONFIG_OF) || !tc)
-> when OF is disabled, then it does not give more compile coverage then have
-> empty inline function in case of !OF.
-
-No, the way it works (simplified but close enough here) is that gcc parses
-all the source code first and throws warnings or errors for everything that
-looks wrong to it, and only later throws out all code that it knows is never
-used before emitting the object code.
-
-The difference to the #ifdef is that the preprocessor here throws out all
-disabled code before it gets parsed, so we don't get warnings for it.
-
-> Not sure about it, but if we disable all optimization in gcc, then we might
-> get the same missing symbol?
-
-It's impossible to build the kernel with inlining disabled, because we
-rely on the same kind of optimization in lots of places.
-
-> > The effect is the same, so I'd rather stay with my version.
+> Hi Jisheng, Arnd,
 > 
-> I'm fine with both. It is up to Vinod to decide which one he prefers (I prefer
-> the #if #else #endif version).
+> I don't feel comfortable with the rating / freq think. I am afraid this 
+> approach based on heuristic will bring a lot of complexity and 
+> workarounds in the code for a small benefit.
 > 
-> Anyways:
-> Acked-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+> Why don't we define a DT entry for the delay timer ? So we delegate the 
+> choice to the platform DT definition.
 
-Thanks!
+That would be wrong, because the fact that Linux uses a timer to
+optimize its udelay() function is not a feature of the hardware.
 
 	Arnd
