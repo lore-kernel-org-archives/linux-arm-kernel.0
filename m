@@ -1,37 +1,23 @@
-From: davem@davemloft.net (David Miller)
-Date: Wed, 04 Nov 2015 11:38:26 -0500 (EST)
-Subject: [PATCH] sparc(64)/iommu: fixup iommu_tbl_range_alloc() types
-In-Reply-To: <561248BD.8080809@arm.com>
-References: <55FC49B8.3020100@arm.com>
- <1442855829-11245-1-git-send-email-andre.przywara@arm.com>
- <561248BD.8080809@arm.com>
-Message-ID: <20151104.113826.1878743361979570759.davem@davemloft.net>
+From: jean-michel.hautbois@veo-labs.com (Jean-Michel Hautbois)
+Date: Wed, 4 Nov 2015 17:52:33 +0100
+Subject: i.MX6: Increasing VPU frequency
+Message-ID: <CAH-u=82M1yCmPjBg5qeiC8JiHjM8+WsP+utX_VPKfJwJsu0QFg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Andre Przywara <andre.przywara@arm.com>
-Date: Mon, 5 Oct 2015 10:54:05 +0100
+Hi !
 
-> On 21/09/15 18:17, Andre Przywara wrote:
->> With DMA_ERROR_CODE now being dma_addr_t in most architectures, it
->> turned out that iommu_tbl_range_alloc (defined in lib/iommu-common.c)
->> is actually using a wrong return type.
->> This was easily fixed in a previous patch, but now the types in the
->> callers do not match anymore.
->> This patch fixes the obvious mismatches to allow sane comparisons with
->> the error return value.
->> Compile-tested on sparc, sparc64, x86, ARM, arm64.
-> 
-> Is there any news on that issue? Are you willing to take either of my
-> patches to fix the compile warnings I see on ARM with LPAE enabled?
+I can see in FSL kernel that VPU is configurable to 352M (it defaults
+at 264MHz in mainline I think).
+In the TRM, it is even specified at 352MHz as a default frequency,
+with a maximum of 540MHz.
 
-Sorry for the late response, I was travelling/conferencing and didn't
-have a lot of time for issues like this.
+Would it be possible to allow this clock rating modification if, for
+instance, we select a performance governor in cpufreq, or if a coda
+encoder is started with 1080p for instance ?
+If so, then how is it doable properly ?
 
-I'm going to fix iommu_tbl_range_alloc()'s return value semantics.
+Another question is the IPU frequency, but I think it can run only @264MHz...
 
-The thing it is returning is a page table index, not a dma_addr_t
-address.  So it is appropriate to create a special error indication
-value for this, independant of DMA_ERROR_CODE.
-
-I got this wrong during my initial review of these changes.
+Thanks,
+JM
