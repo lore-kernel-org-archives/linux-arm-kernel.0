@@ -1,22 +1,19 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 4 Nov 2015 07:51:11 -0800
-Subject: [patch] bus: sunxi-rsb: unlock on error in sunxi_rsb_read()
-In-Reply-To: <20151103220244.GA19280@mwanda>
-References: <20151103220244.GA19280@mwanda>
-Message-ID: <20151104155111.GU6114@lukather>
+Date: Wed, 4 Nov 2015 07:54:05 -0800
+Subject: [PATCH] ARM: dts: sun7i: Enable audio codec on Wexler TAB7200
+ tablet.
+In-Reply-To: <1446386032-19839-1-git-send-email-mamlinav@gmail.com>
+References: <1446386032-19839-1-git-send-email-mamlinav@gmail.com>
+Message-ID: <20151104155405.GV6114@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Dan,
-
-On Wed, Nov 04, 2015 at 01:02:44AM +0300, Dan Carpenter wrote:
-> Don't forget to unlock before returning an error code.
+On Sun, Nov 01, 2015 at 04:53:52PM +0300, Aleksei Mamlin wrote:
+> Enable on-chip audio codec on the Wexler TAB7200 tablet.
 > 
-> Fixes: d787dcdb9c8f ('bus: sunxi-rsb: Add driver for Allwinner Reduced Serial Bus')
-> Signed-off-by: Dan Carpenter <dan.carpenter@oracle.com>
+> Signed-off-by: Aleksei Mamlin <mamlinav@gmail.com>
 
-I just queued this for 4.4, thanks!
-
+Queued for 4.5, thanks!
 Maxime
 
 -- 
@@ -29,4 +26,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151104/43b0f17f/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151104/9307a8df/attachment.sig>
