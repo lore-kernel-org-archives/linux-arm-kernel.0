@@ -1,28 +1,65 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 04 Nov 2015 16:36:40 +0900
-Subject: [PATCH v5 0/4] Exynos SROMc configuration and Ethernet support for
- SMDK5410
-In-Reply-To: <cover.1446542020.git.p.fedin@samsung.com>
-References: <cover.1446542020.git.p.fedin@samsung.com>
-Message-ID: <5639B588.1080901@samsung.com>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Wed, 4 Nov 2015 09:42:35 +0200
+Subject: [PATCH] dmaengine: edma: fix build without CONFIG_OF
+In-Reply-To: <17811472.bY8CqmdEVy@wuerfel>
+References: <17811472.bY8CqmdEVy@wuerfel>
+Message-ID: <5639B6EB.8030101@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 03.11.2015 18:16, Pavel Fedin wrote:
-> This patch extends Exynos SROM controller driver with ability to configure
-> controller outputs and enables SMSC9115 Ethernet chip on SMDK5410 board,
-> which is connected via SROMc bank #3.
+On 11/03/2015 04:00 PM, Arnd Bergmann wrote:
+> During the edma rework, a build error was introduced for the
+> case that CONFIG_OF is disabled:
 > 
-> With this patchset, support for the whole existing SMDK range can be added.
-> Actually, only bank number is different.
+> drivers/built-in.o: In function `edma_tc_set_pm_state':
+> :(.text+0x43bf0): undefined reference to `of_find_device_by_node'
 > 
-> This patchset also depends on Exynos 5410 pinctrl support, introduced by
-> patches 0003 and 0004 from this set:
-> [PATCH v4 0/5] ARM: EXYNOS: ODROID-XU DT and LEDs
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-March/330862.html
+> As the edma_tc_set_pm_state() function does nothing in case
+> we are running without OF, this adds an IS_ENABLED() check
+> that turns the function into an empty stub then and avoids the
+> link error.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Fixes: ca304fa9bb76 ("ARM/dmaengine: edma: Public API to use private struct pointer")
 
-Only the first patch made up to kernel. The rest (2-5) received feedback
-and I am waiting for fixing it. Andreas apparently loose the interest...
+The actual commit this patch is fixing is:
+1be5336bc7ba dmaengine: edma: New device tree binding
 
-Best regards,
-Krzysztof
+> ---
+> Found on ARM randconfig builds with today's linux-next
+
+I have sanity built the kernel with omap2plus_defconfig and
+davinci_all_defconfig since eDMA is used by these platforms and did not faced
+with this issue, as obviously these defconfigs will result OF to be enabled.
+
+> diff --git a/drivers/dma/edma.c b/drivers/dma/edma.c
+> index 31722d436a42..16713a93da10 100644
+> --- a/drivers/dma/edma.c
+> +++ b/drivers/dma/edma.c
+> @@ -1560,7 +1560,7 @@ static void edma_tc_set_pm_state(struct edma_tc *tc, bool enable)
+>  	struct platform_device *tc_pdev;
+>  	int ret;
+>  
+> -	if (!tc)
+> +	if (!IS_ENABLED(CONFIG_OF) || !tc)
+>  		return;
+
+Should we instead put the function inside of:
+#if IS_ENABLED(CONFIG_OF)
+static void edma_tc_set_pm_state(struct edma_tc *tc, bool enable)
+{
+...
+}
+#else
+static inline void edma_tc_set_pm_state(struct edma_tc *tc, bool enable)
+{
+}
+#endif /* IS_ENABLED(CONFIG_OF) */
+
+
+>  
+>  	tc_pdev = of_find_device_by_node(tc->node);
+> 
+
+-- 
+P?ter
