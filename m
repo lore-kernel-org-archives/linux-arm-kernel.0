@@ -1,108 +1,27 @@
-From: m.smarduch@samsung.com (Mario Smarduch)
-Date: Wed, 04 Nov 2015 15:28:34 -0800
-Subject: [PATCH] KVM/arm: kernel low level debug support for ARM32 virtual
- platforms
-In-Reply-To: <CAKv+Gu8GJgzv82fVfCU7VQB2_ckRkzUYcQOx51rT2WgnmO_fsw@mail.gmail.com>
-References: <1446508313-24404-1-git-send-email-m.smarduch@samsung.com>
- <5638E1CD.8090006@codeaurora.org> <5638F294.4060409@samsung.com>
- <20151103175522.GA24856@arm.com> <56390838.3000204@samsung.com>
- <CAL_JsqJJHGwcdTDMh3WujJW0rDPxocVLEUpw95aVFC4FDEdDgA@mail.gmail.com>
- <20151104133147.GB5819@cbox> <563A531C.8090003@codeaurora.org>
- <CAKv+Gu8GJgzv82fVfCU7VQB2_ckRkzUYcQOx51rT2WgnmO_fsw@mail.gmail.com>
-Message-ID: <563A94A2.3010307@samsung.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Thu, 05 Nov 2015 00:33:36 +0100
+Subject: [PATCH v6 6/8] ARM: rockchip: add support smp for rk3036
+In-Reply-To: <1446639916-11957-1-git-send-email-zhengxing@rock-chips.com>
+References: <1446639503-11763-1-git-send-email-zhengxing@rock-chips.com>
+ <1446639916-11957-1-git-send-email-zhengxing@rock-chips.com>
+Message-ID: <3167530.TSdLBvl1Zs@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 11/4/2015 10:51 AM, Ard Biesheuvel wrote:
-> On 4 November 2015 at 19:49, Christopher Covington <cov@codeaurora.org> wrote:
->> On 11/04/2015 08:31 AM, Christoffer Dall wrote:
->>> On Tue, Nov 03, 2015 at 01:39:44PM -0600, Rob Herring wrote:
->>>> On Tue, Nov 3, 2015 at 1:17 PM, Mario Smarduch <m.smarduch@samsung.com> wrote:
->>>>> On 11/3/2015 9:55 AM, Will Deacon wrote:
->>>>>> On Tue, Nov 03, 2015 at 09:44:52AM -0800, Mario Smarduch wrote:
->>>>>>> On 11/3/2015 8:33 AM, Christopher Covington wrote:
->>>>>>>> On 11/02/2015 06:51 PM, Mario Smarduch wrote:
->>>>>>>>>    this is a re-post from couple weeks ago, please take time to review this
->>>>>>>>> simple patch which simplifies DEBUG_LL and prevents kernel crash on virtual
->>>>>>>>> platforms.
->>>>>>>>>
->>>>>>>>> Before this patch DEBUG_LL for 'dummy virtual machine':
->>>>>>>>>
->>>>>>>>> ( ) Kernel low-level debugging via EmbeddedICE DCC channel
->>>>>>>>> ( ) Kernel low-level debug output via semihosting I/O
->>>>>>>>> ( ) Kernel low-level debugging via 8250 UART
->>>>>>>>> ( ) Kernel low-level debugging via ARM Ltd PL01x Primecell
->>>>>>>>>
->>>>>>>>> In summary if debug uart is not emulated kernel crashes.
->>>>>>>>> And once you pass that hurdle, uart physical/virtual addresses are unknown.
->>>>>>>>> DEBUG_LL comes in handy on many occasions and should be somewhat
->>>>>>>>> intuitive to use like it is for physical platforms. For virtual platforms
->>>>>>>>> user may start daubting the host and get into a bigger mess.
->>>>>>>>>
->>>>>>>>> After this patch is applied user gets:
->>>>>>>>>
->>>>>>>>> (X) Kernel low-level debugging on QEMU Virtual Platform
->>>>>>>>> ( ) Kernel low-level debugging on Kvmtool Virtual Platform
->>>>>>>>>    ..... above repeated ....
->>>>>>>>>
->>>>>>>>> The virtual addresses selected follow arm reference models, high in vmalloc
->>>>>>>>> section with high mem enabled and guest running with >= 1GB of memory. The
->>>>>>>>> offset is leftover from arm reference models.
->>>>>>>>
->>>>>>>> Which model? It doesn't appear to match the vexpress AEM/RTSM/FVP/whatever
->>>>>>>> which used 0x1c090000 for UART0.
->>>>>>>
->>>>>>> I recall QEMU virt model had it's own physical address map, for sure I saw the
->>>>>>> virtio-mmio regions assigned in some ARM document. Peter would you know?
->>>>>>>
->>>>>>> As far as kvmtool I'm not sure, currently PC1 COM1 port is used? Andre will that
->>>>>>> stay fixed?
->>>>>>
->>>>>> We make absolutely no guarantees about the memory map provided by kvmtool.
->>>>>
->>>>> If that's also the case for qemu, then I guess the best you can do is find a way
->>>>> to dump the device tree. Find the uart, physical address and try figure out the
->>>>> virtual address.
->>>>>
->>>>> Pretty involved, hoped for something more automated since that's a handy feature.
->>>>
->>>> You really only need LL_DEBUG now if you are debugging very early code
->>>> before memory is setup and/or bad memory. Use earlycon instead which
->>>> should already be supported both via the pl011 or semihosting. I used
->>>> it with QEMU semihosting support.
->>>>
->>> Then we should really document how to use that with qemu's virt platform
->>> and kvmtool's platform on both 32-bit and 64-bit so that users can
->>> easily figure out what they're doing wrong when they get no output.
->>>
->>> In practice, the address for the pl011 is quite unlikely to change, I
->>> dare speculate, so that documentation shouldn't need frequent updating.
->>
->> Is it not on by default since the following change?
->>
->> http://git.qemu.org/?p=qemu.git;a=commitdiff;h=f022b8e95379b0433d13509706b66f38fc15dde8
->>
+Am Mittwoch, 4. November 2015, 20:25:16 schrieb Xing Zheng:
+> From: Heiko Stuebner <heiko@sntech.de>
 > 
-> Yes, but it still requires the plain 'earlycon' argument (i.e, without
-> '=pl011,...') to be passed on the kernel command line if you want
-> early output.
+> The dual-core Cortex A7 rk3036 is a bit special in that it does not allow
+> to control the actual powerdomain of the cpu cores, while the rest of the
+> smp-bringup like reset control and entry address handling stays the same.
+> Its bigger sibling, the quad-core rk3128 again allows powerdomain control.
 > 
+> So allow that case by introducing a separate smp-enable-method, that simply
+> disables powerdomain handling in the common code.
+> 
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> Tested-by: Xing Zheng <zhengxing@rock-chips.com>
+> Signed-off-by: Xing Zheng <zhengxing@rock-chips.com>
 
-I spent time debugging 'earlycon' for pl011, ironically using DEBUG_LL, from the
-looks of it no mmio uart should work for armv7. It appears earlycon_map()
-requires a fixed mapping similar to arm64.
-
-Comparing both options, DEBUG_LL takes you from kernel decompress code to early
-FDT parsing. A lot of early_print() calls won't work if DEBUG_LL is not enabled
-including dump_machine_table which ends in a endless loop. IMO it's worth
-turning this option on for that and other reasons.
-
-'earlycon' is enabled some ways up in setup_arch().
-
-As far as the patch, providing a hint to the user with probable uart addresses
-would help and in the worst case "see the latest device tree for the virtual
-platform".
-
-- Mario
+This patch can work standalone, so I took the liberty of applying it to my soc 
+branch for 4.5 already, so you don't need to resend it in future versions.
