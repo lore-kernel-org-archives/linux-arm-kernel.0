@@ -1,163 +1,52 @@
-From: l.majewski@samsung.com (Lukasz Majewski)
-Date: Wed, 04 Nov 2015 12:18:09 +0100
-Subject: [PATCH 2/5] thermal: exynos: Fix first temperature read after
- registering sensor
-In-Reply-To: <CAGOxZ51BuqBGBECngB3YnNQJ4Ae+LNfTvqntg+GxdAih4GPXzQ@mail.gmail.com>
-References: <1444282446-6419-1-git-send-email-k.kozlowski@samsung.com>
- <1444282446-6419-2-git-send-email-k.kozlowski@samsung.com>
- <CAGOxZ51BuqBGBECngB3YnNQJ4Ae+LNfTvqntg+GxdAih4GPXzQ@mail.gmail.com>
-Message-ID: <20151104121809.24f99f79@amdc2363>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Wed, 4 Nov 2015 12:19:57 +0100
+Subject: [PATCH v2 0/3] let Marvell Berlin SoCs make use of the best delay
+ timer
+In-Reply-To: <4359736.Q4L68M2aRW@wuerfel>
+References: <1446560917-6318-1-git-send-email-jszhang@marvell.com>
+ <5639D409.1030302@linaro.org> <4359736.Q4L68M2aRW@wuerfel>
+Message-ID: <5639E9DD.1080309@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alim,
+On 11/04/2015 11:30 AM, Arnd Bergmann wrote:
+> On Wednesday 04 November 2015 10:46:49 Daniel Lezcano wrote:
+>> On 11/03/2015 03:28 PM, Jisheng Zhang wrote:
+>>> In case there are several possible delay timers, we purely base the
+>>> selection on the frequency, which is suboptimal in some cases. Take
+>>> one Marvell Berlin platform for example: we have arch timer and dw-apb
+>>> timer. The arch timer freq is 25MHZ while the dw-apb timer freq is
+>>> 100MHZ, current selection would choose the dw-apb timer. But the dw
+>>> apb timer is on the APB bus while arch timer sits in CPU, the cost
+>>> of accessing the apb timer is higher than the arch timer.
+>>>
+>>> This series firstly modifies register_current_timer_delay() to choose
+>>> the highest rating delay timer: use the rating as a primary indication
+>>> and fall back to comparing the frequency if the rating is not set or
+>>> the same. Then we set the arch_delay_timer rating as 400, finally
+>>> Implement ARM delay timer for the dw_apb_timer and set its rating as 300.
+>>
+>> Hi Jisheng, Arnd,
+>>
+>> I don't feel comfortable with the rating / freq think. I am afraid this
+>> approach based on heuristic will bring a lot of complexity and
+>> workarounds in the code for a small benefit.
+>>
+>> Why don't we define a DT entry for the delay timer ? So we delegate the
+>> choice to the platform DT definition.
+>
+> That would be wrong, because the fact that Linux uses a timer to
+> optimize its udelay() function is not a feature of the hardware.
 
-> Hello,
-> 
-> On Thu, Oct 8, 2015 at 11:04 AM, Krzysztof Kozlowski
-> <k.kozlowski@samsung.com> wrote:
-> > Thermal core could not read the temperature after registering the
-> > thermal sensor with thermal_zone_of_sensor_register() because the
-> > driver was not yet initialized.
-> >
-> > The call trace looked like:
-> >     exynos_tmu_probe()
-> >         thermal_zone_of_sensor_register()
-> >             of_thermal_set_mode()
-> >                 thermal_zone_device_update()
-> >                     exynos_get_temp()
-> >                         if (!data->tmu_read) return -EINVAL;
-> >         exynos_map_dt_data()
-> >             data->tmu_read = ...
-> >
-> > This produced an error in dmesg:
-> > thermal thermal_zone0: failed to read out thermal zone (-22)
-> >
-> > Register the thermal_zone_device later, after parsing Device Tree
-> > and enabling necessary clocks, but before calling
-> > exynos_tmu_initialize() which uses the registered
-> > thermal_zone_device.
-> >
-> > Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> > Fixes: 3b6a1a805f34 ("thermal: samsung: core: Exynos TMU rework to
-> > use device tree for configuration") ---
-> Patch looks good to me.
-> 
-> Before this patch I was getting below on exynos5800 board:
-> [    2.648629] thermal thermal_zone0: failed to read out thermal zone
-> (-22) [    2.653906] 10060000.tmu supply vtmu not found, using dummy
-> regulator [    2.660521] thermal thermal_zone1: failed to read out
-> thermal zone (-22) [    2.666985] 10064000.tmu supply vtmu not found,
-> using dummy regulator [    2.673658] thermal thermal_zone2: failed to
-> read out thermal zone (-22) [    2.680093] 10068000.tmu supply vtmu
-> not found, using dummy regulator [    2.686901] thermal
-> thermal_zone3: failed to read out thermal zone (-22) [    2.693187]
-> 1006c000.tmu supply vtmu not found, using dummy regulator
-> [    2.699914] thermal thermal_zone4: failed to read out thermal zone
-> (-22) [    2.706332] 100a0000.tmu supply vtmu not found, using dummy
-> regulator
-> 
-> 
-> Reviewed-by: Alim Akhtar <alim.akhtar@samsung.com>
-> 
-> Tested on exynos5800 peach board, so
-> Tested-by: Alim Akhtar <alim.akhtar@samsung.com>
-> 
-> 
-> >  drivers/thermal/samsung/exynos_tmu.c | 27 +++++++++++++++++--------
-> --
-> >  1 file changed, 17 insertions(+), 10 deletions(-)
-> >
-> > diff --git a/drivers/thermal/samsung/exynos_tmu.c
-> > b/drivers/thermal/samsung/exynos_tmu.c index
-> > 23f4320f8ef7..bc71a61f0c4a 100644 ---
-> > a/drivers/thermal/samsung/exynos_tmu.c +++
-> > b/drivers/thermal/samsung/exynos_tmu.c @@ -1289,13 +1289,6 @@
-> > static int exynos_tmu_probe(struct platform_device *pdev)
-> > platform_set_drvdata(pdev, data); mutex_init(&data->lock);
-> >
-> > -       data->tzd = thermal_zone_of_sensor_register(&pdev->dev, 0,
-> > data,
-> > -
-> > &exynos_sensor_ops);
-> > -       if (IS_ERR(data->tzd)) {
-> > -               pr_err("thermal: tz: %p ERROR\n", data->tzd);
-> > -               return PTR_ERR(data->tzd);
-> > -       }
-> > -
-> >         /*
-> >          * Try enabling the regulator if found
-> >          * TODO: Add regulator as an SOC feature, so that regulator
-> > enable @@ -1365,21 +1358,36 @@ static int exynos_tmu_probe(struct
-> > platform_device *pdev) break;
-> >         };
-> >
-> > +       /*
-> > +        * data->tzd must be registered before calling
-> > exynos_tmu_initialize(),
-> > +        * requesting irq and calling exynos_tmu_control().
-> > +        */
-> > +       data->tzd = thermal_zone_of_sensor_register(&pdev->dev, 0,
-> > data,
-> > +
-> > &exynos_sensor_ops);
-> > +       if (IS_ERR(data->tzd)) {
-> > +               ret = PTR_ERR(data->tzd);
-> > +               dev_err(&pdev->dev, "Failed to register sensor:
-> > %d\n", ret);
-> > +               goto err_sclk;
-> > +       }
-> > +
-> >         ret = exynos_tmu_initialize(pdev);
-> >         if (ret) {
-> >                 dev_err(&pdev->dev, "Failed to initialize TMU\n");
-> > -               goto err_sclk;
-> > +               goto err_thermal;
-> >         }
-> >
-> >         ret = devm_request_irq(&pdev->dev, data->irq,
-> > exynos_tmu_irq, IRQF_TRIGGER_RISING | IRQF_SHARED,
-> > dev_name(&pdev->dev), data); if (ret) {
-> >                 dev_err(&pdev->dev, "Failed to request irq: %d\n",
-> > data->irq);
-> > -               goto err_sclk;
-> > +               goto err_thermal;
-> >         }
-> >
-> >         exynos_tmu_control(pdev, true);
-> >         return 0;
-> > +
-> > +err_thermal:
-> > +       thermal_zone_of_sensor_unregister(&pdev->dev, data->tzd);
-> >  err_sclk:
-> >         clk_disable_unprepare(data->sclk);
-> >  err_clk:
-> > @@ -1390,7 +1398,6 @@ err_clk_sec:
-> >  err_sensor:
-> >         if (!IS_ERR_OR_NULL(data->regulator))
-> >                 regulator_disable(data->regulator);
-> > -       thermal_zone_of_sensor_unregister(&pdev->dev, data->tzd);
-> >
-> >         return ret;
-> >  }
-> > --
-> > 1.9.1
-> >
-> >
-> > _______________________________________________
-> > linux-arm-kernel mailing list
-> > linux-arm-kernel at lists.infradead.org
-> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
-> 
-> 
+True.
 
-Acked-by: Lukasz Majewski <l.majewski@samsung.com>
-Tested-by: Lukasz Majewski <l.majewski@samsung.com>
+Any ideas / suggestions for an alternative ?
+
+
 
 -- 
-Best regards,
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
 
-Lukasz Majewski
-
-Samsung R&D Institute Poland (SRPOL) | Linux Platform Group
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
