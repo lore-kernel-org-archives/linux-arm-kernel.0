@@ -1,38 +1,44 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed, 4 Nov 2015 23:28:27 +0800
-Subject: [patch] bus: sunxi-rsb: unlock on error in sunxi_rsb_read()
-In-Reply-To: <20151103220244.GA19280@mwanda>
-References: <20151103220244.GA19280@mwanda>
-Message-ID: <CAGb2v65nxJfszKUyOMb7sjLTtvvBTGy=FLwysLt5t_9xa1BcfQ@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 4 Nov 2015 15:30:29 +0000
+Subject: PCIe host controller behind IOMMU on ARM
+In-Reply-To: <PS1PR06MB11804C3D0155E3EFB5C43C47F52A0@PS1PR06MB1180.apcprd06.prod.outlook.com>
+References: <PS1PR06MB11807CBE8EB2AC6B0158D2B5F52A0@PS1PR06MB1180.apcprd06.prod.outlook.com>
+ <20151104142412.GS963@e106497-lin.cambridge.arm.com>
+ <PS1PR06MB11804263DD55C54C5987654EF52A0@PS1PR06MB1180.apcprd06.prod.outlook.com>
+ <20151104150147.GT963@e106497-lin.cambridge.arm.com>
+ <PS1PR06MB11804C3D0155E3EFB5C43C47F52A0@PS1PR06MB1180.apcprd06.prod.outlook.com>
+Message-ID: <20151104153028.GR5405@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 4, 2015 at 6:02 AM, Dan Carpenter <dan.carpenter@oracle.com> wrote:
-> Don't forget to unlock before returning an error code.
->
-> Fixes: d787dcdb9c8f ('bus: sunxi-rsb: Add driver for Allwinner Reduced Serial Bus')
-> Signed-off-by: Dan Carpenter <dan.carpenter@oracle.com>
+On Wed, Nov 04, 2015 at 03:19:13PM +0000, Phil Edworthy wrote:
+> On 04 November 2015 15:02, Liviu wrote:
+> > On Wed, Nov 04, 2015 at 02:48:38PM +0000, Phil Edworthy wrote:
+> > > Sure, though since this is bog standard Intel PCIe ethernet card which works
+> > > fine when the IOMMU is effectively unused, I don?t think there is a problem
+> > > with that.
+> > >
+> > > The driver for the PCIe controller sets up the IOMMU mapping ok when I
+> > > do a test call to dma_alloc_coherent() in the controller's driver. i.e. when I
+> > > do this, it ends up in arm_iommu_alloc_attrs(), which calls
+> > > __iommu_alloc_buffer() and __alloc_iova().
+> > >
+> > > When an endpoint driver allocates and maps a dma coherent buffer it
+> > > also needs to end up in arm_iommu_alloc_attrs(), but it doesn't.
+> > 
+> > Why do you think that? Remember that the only thing attached to the IOMMU is
+> > the
+> > host controller. The endpoint is on the PCIe bus, which gets a different
+> > translation
+> > that the IOMMU knows nothing about. If it helps you to visualise it better, think
+> > of the host controller as another IOMMU device. It's the ops of the host
+> > controller
+> > that should be invoked, not the IOMMU's.
+> Ok, that makes sense. I'll have a think and poke it a bit more...
 
-Acked-by: Chen-Yu Tsai <wens@csie.org>
+Take a look at of_iommu_configure, which is currently lacking support
+for PCI devices. It should be using a variant on the device-tree bindings
+already in use for describing MSI device IDs, so that we can translate
+the RequesterID of the endpoint into an ID that the IOMMU can understand.
 
->
-> diff --git a/drivers/bus/sunxi-rsb.c b/drivers/bus/sunxi-rsb.c
-> index 846bc29c..0cfcb39 100644
-> --- a/drivers/bus/sunxi-rsb.c
-> +++ b/drivers/bus/sunxi-rsb.c
-> @@ -342,13 +342,13 @@ static int sunxi_rsb_read(struct sunxi_rsb *rsb, u8 rtaddr, u8 addr,
->
->         ret = _sunxi_rsb_run_xfer(rsb);
->         if (ret)
-> -               goto out;
-> +               goto unlock;
->
->         *buf = readl(rsb->regs + RSB_DATA);
->
-> +unlock:
->         mutex_unlock(&rsb->lock);
->
-> -out:
->         return ret;
->  }
->
+Will
