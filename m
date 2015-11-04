@@ -1,30 +1,40 @@
 From: soren.brinkmann@xilinx.com (Soren Brinkmann)
-Date: Tue, 3 Nov 2015 16:20:45 -0800
-Subject: [PATCH 4/9] tty: xuartps: Clear interrupt status register in shutdown
-In-Reply-To: <1446596450-20918-1-git-send-email-soren.brinkmann@xilinx.com>
-References: <1446596450-20918-1-git-send-email-soren.brinkmann@xilinx.com>
-Message-ID: <1446596450-20918-5-git-send-email-soren.brinkmann@xilinx.com>
+Date: Tue, 3 Nov 2015 16:20:41 -0800
+Subject: [PATCH 0/9] tty: xuartps: Fix lock ups
+Message-ID: <1446596450-20918-1-git-send-email-soren.brinkmann@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When shutting down the UART, clear the interrupt status register.
+Hi,
 
-Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
----
- drivers/tty/serial/xilinx_uartps.c | 1 +
- 1 file changed, 1 insertion(+)
+I recently found my system locking up under some conditions. I dug
+through the code a bit and the result is this collections of various
+changes. Some of it may not be required and has just been created out of
+half-baked theories and re-reading the documentation. The actual failing
+scenarios seem to be:
+ - RX IRQ conditions are handled while the receiver is disabled, leaving
+   the driver in an infinite loop
+ - console_put_char seems to be interrupted by uart_shutdown disabling
+   the transmitter while/just before printing
 
-diff --git a/drivers/tty/serial/xilinx_uartps.c b/drivers/tty/serial/xilinx_uartps.c
-index 5edd1efca015..738df6bb2646 100644
---- a/drivers/tty/serial/xilinx_uartps.c
-+++ b/drivers/tty/serial/xilinx_uartps.c
-@@ -825,6 +825,7 @@ static void cdns_uart_shutdown(struct uart_port *port)
- 	/* Disable interrupts */
- 	status = readl(port->membase + CDNS_UART_IMR_OFFSET);
- 	writel(status, port->membase + CDNS_UART_IDR_OFFSET);
-+	writel(0xffffffff, port->membase + CDNS_UART_ISR_OFFSET);
- 
- 	/* Disable the TX and RX */
- 	writel(CDNS_UART_CR_TX_DIS | CDNS_UART_CR_RX_DIS,
+I.e. overall I tried to serialize all operations using the port lock to
+avoid such interaction.
+
+	S?ren
+
+S?ren Brinkmann (9):
+  tty: xuartps: Beautify read-modify writes
+  tty: xuartps: Use spinlock to serialize HW access
+  tty: xuartps: Always enable transmitter in start_tx
+  tty: xuartps: Clear interrupt status register in shutdown
+  tty: xuartps: Improve startup function
+  tty: xuartps: Keep lock for whole ISR
+  tty: xuartps: Acquire port lock for shutdown
+  tty: xuartps: Move RX path into helper function
+  tty: xuartps: Only handle RX IRQs when RX is enabled
+
+ drivers/tty/serial/xilinx_uartps.c | 129 ++++++++++++++++++++++---------------
+ 1 file changed, 78 insertions(+), 51 deletions(-)
+
 -- 
 2.6.2.3.ga463a5b
