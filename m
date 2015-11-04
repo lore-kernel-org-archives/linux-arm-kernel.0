@@ -1,44 +1,46 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 4 Nov 2015 15:30:29 +0000
-Subject: PCIe host controller behind IOMMU on ARM
-In-Reply-To: <PS1PR06MB11804C3D0155E3EFB5C43C47F52A0@PS1PR06MB1180.apcprd06.prod.outlook.com>
-References: <PS1PR06MB11807CBE8EB2AC6B0158D2B5F52A0@PS1PR06MB1180.apcprd06.prod.outlook.com>
- <20151104142412.GS963@e106497-lin.cambridge.arm.com>
- <PS1PR06MB11804263DD55C54C5987654EF52A0@PS1PR06MB1180.apcprd06.prod.outlook.com>
- <20151104150147.GT963@e106497-lin.cambridge.arm.com>
- <PS1PR06MB11804C3D0155E3EFB5C43C47F52A0@PS1PR06MB1180.apcprd06.prod.outlook.com>
-Message-ID: <20151104153028.GR5405@arm.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Wed,  4 Nov 2015 16:15:49 +0100
+Subject: [PATCH 2/2] ARM: at91/dt: remove bootargs
+In-Reply-To: <1446650149-31563-1-git-send-email-alexandre.belloni@free-electrons.com>
+References: <1446650149-31563-1-git-send-email-alexandre.belloni@free-electrons.com>
+Message-ID: <1446650149-31563-2-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 04, 2015 at 03:19:13PM +0000, Phil Edworthy wrote:
-> On 04 November 2015 15:02, Liviu wrote:
-> > On Wed, Nov 04, 2015 at 02:48:38PM +0000, Phil Edworthy wrote:
-> > > Sure, though since this is bog standard Intel PCIe ethernet card which works
-> > > fine when the IOMMU is effectively unused, I don?t think there is a problem
-> > > with that.
-> > >
-> > > The driver for the PCIe controller sets up the IOMMU mapping ok when I
-> > > do a test call to dma_alloc_coherent() in the controller's driver. i.e. when I
-> > > do this, it ends up in arm_iommu_alloc_attrs(), which calls
-> > > __iommu_alloc_buffer() and __alloc_iova().
-> > >
-> > > When an endpoint driver allocates and maps a dma coherent buffer it
-> > > also needs to end up in arm_iommu_alloc_attrs(), but it doesn't.
-> > 
-> > Why do you think that? Remember that the only thing attached to the IOMMU is
-> > the
-> > host controller. The endpoint is on the PCIe bus, which gets a different
-> > translation
-> > that the IOMMU knows nothing about. If it helps you to visualise it better, think
-> > of the host controller as another IOMMU device. It's the ops of the host
-> > controller
-> > that should be invoked, not the IOMMU's.
-> Ok, that makes sense. I'll have a think and poke it a bit more...
+Passing earlyprintk in the bootargs may crash the board as it depends on
+having a sane DEBUG_UART_PHYS configured which is not always the case.
 
-Take a look at of_iommu_configure, which is currently lacking support
-for PCI devices. It should be using a variant on the device-tree bindings
-already in use for describing MSI device IDs, so that we can translate
-the RequesterID of the endpoint into an ID that the IOMMU can understand.
+Also remove ignore_loglevel
 
-Will
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+---
+ arch/arm/boot/dts/at91-sama5d4_xplained.dts | 1 -
+ arch/arm/boot/dts/at91-sama5d4ek.dts        | 1 -
+ 2 files changed, 2 deletions(-)
+
+diff --git a/arch/arm/boot/dts/at91-sama5d4_xplained.dts b/arch/arm/boot/dts/at91-sama5d4_xplained.dts
+index d3de7565efc3..5a8adb6a98e1 100644
+--- a/arch/arm/boot/dts/at91-sama5d4_xplained.dts
++++ b/arch/arm/boot/dts/at91-sama5d4_xplained.dts
+@@ -50,7 +50,6 @@
+ 	compatible = "atmel,sama5d4-xplained", "atmel,sama5d4", "atmel,sama5";
+ 
+ 	chosen {
+-		bootargs = "ignore_loglevel earlyprintk";
+ 		stdout-path = "serial0:115200n8";
+ 	};
+ 
+diff --git a/arch/arm/boot/dts/at91-sama5d4ek.dts b/arch/arm/boot/dts/at91-sama5d4ek.dts
+index c9d8b73a65ad..25aebb6d932b 100644
+--- a/arch/arm/boot/dts/at91-sama5d4ek.dts
++++ b/arch/arm/boot/dts/at91-sama5d4ek.dts
+@@ -50,7 +50,6 @@
+ 	compatible = "atmel,sama5d4ek", "atmel,sama5d4", "atmel,sama5";
+ 
+ 	chosen {
+-		bootargs = "ignore_loglevel earlyprintk";
+ 		stdout-path = "serial0:115200n8";
+ 	};
+ 
+-- 
+2.5.0
