@@ -1,61 +1,65 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 4 Nov 2015 14:54:46 +0000
-Subject: [PATCH] arm64: Increase the max granular size
-In-Reply-To: <alpine.DEB.2.20.1511040748590.17248@east.gentwo.org>
-References: <1442944788-17254-1-git-send-email-rric@kernel.org>
- <20151028190948.GJ8899@e104818-lin.cambridge.arm.com>
- <CAMuHMdWQygbxMXoOsbwek6DzZcr7J-C23VCK4ubbgUr+zj=giw@mail.gmail.com>
- <20151103120504.GF7637@e104818-lin.cambridge.arm.com>
- <20151103143858.GI7637@e104818-lin.cambridge.arm.com>
- <CAMuHMdWk0fPzTSKhoCuS4wsOU1iddhKJb2SOpjo=a_9vCm_KXQ@mail.gmail.com>
- <20151103185050.GJ7637@e104818-lin.cambridge.arm.com>
- <alpine.DEB.2.20.1511031724010.8178@east.gentwo.org>
- <20151104123640.GK7637@e104818-lin.cambridge.arm.com>
- <alpine.DEB.2.20.1511040748590.17248@east.gentwo.org>
-Message-ID: <20151104145445.GL7637@e104818-lin.cambridge.arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 04 Nov 2015 15:05:48 +0000
+Subject: [PATCH v7] PCI: Xilinx-NWL-PCIe: Added support for Xilinx NWL
+ PCIe Host Controller
+In-Reply-To: <8520D5D51A55D047800579B09414719801693D38@XAP-PVEXMBX01.xlnx.xilinx.com>
+References: <1446564227-4704-1-git-send-email-bharatku@xilinx.com>
+ <5638DE62.6050605@arm.com>
+ <8520D5D51A55D047800579B09414719801693C20@XAP-PVEXMBX01.xlnx.xilinx.com>
+ <5639C681.6060007@arm.com>
+ <8520D5D51A55D047800579B09414719801693D38@XAP-PVEXMBX01.xlnx.xilinx.com>
+Message-ID: <563A1ECC.3000609@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 04, 2015 at 07:53:50AM -0600, Christoph Lameter wrote:
-> On Wed, 4 Nov 2015, Catalin Marinas wrote:
+On 04/11/15 12:30, Bharat Kumar Gogada wrote:
+>>
+>>>> Also, you still lack support for MSI-X (which would come for free...).
+>>>
+>>> We don't support MSI-X in root port mode.
+>>
+>> I don't believe you. If you support single MSI, you support MSI-X (because
+>> that's mostly a property of the endpoint).
 > 
-> > The simplest option would be to make sure that off slab isn't allowed
-> > for caches of KMALLOC_MIN_SIZE or smaller, with the drawback that not
-> > only "kmalloc-128" but any other such caches will be on slab.
+> In our architecture specification MSI-X is unsupported for Root Port.
+
+I still can't believe it, but in the end, that's your own problem.
+
+>>>>> +	.chip = &nwl_msi_irq_chip,
+>>>>> +};
+>>>>> +#endif
+>>>>> +
+>>>>> +
+>>>>> +	/* setup AFI/FPCI range */
+>>>>> +	msi->pages = __get_free_pages(GFP_KERNEL, 0);
+>>>>> +	base = virt_to_phys((void *)msi->pages);
+>>>>> +	nwl_bridge_writel(pcie, lower_32_bits(base), I_MSII_BASE_LO);
+>>>>> +	nwl_bridge_writel(pcie, upper_32_bits(base), I_MSII_BASE_HI);
+>>>>
+>>>> I just read this, and I'm puzzled. Actually, puzzled is an
+>>>> understatement. Why on Earth do you need to give RAM to your MSI
+>> HW?
+>>>> This should be a device, not RAM. By the look of it, this could be
+>>>> absolutely anything. Are you sure you have to supply RAM here?
+>>>>
+>>> This is required in our hardware, so that bridge identifies incoming MWr as
+>> MSI.
+>>
+>> I'm asking why this has to be RAM. What is the actual requirement?
 > 
-> The reason for an off slab configuration is denser object packing.
-> 
-> > I think a better option would be to first check that there is a
-> > kmalloc_caches[] entry for freelist_size before deciding to go off-slab.
-> 
-> Hmmm.. Yes seems to be an option.
-> 
-> Maybe we simply revert commit 8fc9cf420b36 instead?
+> We are allocating RAM for MSI (which is expected) and assigning this address to msi->pages
+> this is what EP MSI capability will be programmed with.
+> For the bridge to detect an incoming MWr from EP as MSI, hardware needs to know MSI address
+> so the same address is programmed in the hardware register for comparison purpose.
+> It is the actual requirement from hardware.
 
-I'm fine with this. Also note that the arm64 commit changing
-L1_CACHE_BYTES to 128 hasn't been pushed yet (it's queued for 4.4).
+I understand that you need to provide an address for the bridge to
+match. I'm asking why this has to be RAM as opposed to any other device
+address. This seems to be a unique requirement (nobody else does that),
+and I'd like to understand why there is this requirement.
 
-> That does not seem to make too much sense to me and the goal of the
-> commit cannot be accomplished on ARM. Your patch essentially reverts
-> the effect anyways.
+Thanks,
 
-In theory it only reverts the effect for the first kmalloc_cache
-("kmalloc-128" in the arm64 case). Any other bigger cache which would
-not be mergeable with an existing one still has the potential of
-off-slab management.
-
-> Smaller slabs really do not need off slab management anyways since they
-> will only loose a few objects per slab page.
-
-IIUC, starting with 128 slab size for a 4KB page, you have 32 objects
-per page. The freelist takes 32 bytes (or 31), therefore you waste a
-single slab object. However, only 1/4 of it is used for freelist and the
-waste gets bigger with 256 slab size, hence the original commit.
-
-BTW, assuming L1_CACHE_BYTES is 512 (I don't ever see this happening but
-just in theory), we potentially have the same issue. What would save us
-is that INDEX_NODE would match the first "kmalloc-512" cache, so we have
-it pre-populated.
-
+	M.
 -- 
-Catalin
+Jazz is not dead. It just smells funny...
