@@ -1,69 +1,58 @@
-From: dcashman@android.com (Daniel Cashman)
-Date: Wed, 4 Nov 2015 10:22:05 -0800
-Subject: [PATCH v2 2/2] arm: mm: support ARCH_MMAP_RND_BITS.
-In-Reply-To: <CAGXu5jJWdZ57uMACwRBcOoU8MqPu9-pN+cp9WzyguY+G3C5qWg@mail.gmail.com>
-References: <1446574204-15567-1-git-send-email-dcashman@android.com>
- <1446574204-15567-2-git-send-email-dcashman@android.com>
- <CAGXu5jKGzDD9WVQnMTT2EfupZtjpdcASUpx-3npLAB-FctLodA@mail.gmail.com>
- <20151103223904.GG8644@n2100.arm.linux.org.uk>
- <CAGXu5jJWdZ57uMACwRBcOoU8MqPu9-pN+cp9WzyguY+G3C5qWg@mail.gmail.com>
-Message-ID: <563A4CCD.60803@android.com>
+From: zlim.lnx@gmail.com (Z Lim)
+Date: Wed, 4 Nov 2015 10:25:05 -0800
+Subject: [PATCH] arm64: bpf: fix div-by-zero case
+In-Reply-To: <563A4C9A.7000002@linaro.org>
+References: <1446620204-4228-1-git-send-email-zlim.lnx@gmail.com>
+ <CAKU6vyZu5KNAipSVUMg8ASnRXztVwh57weKXxXOXkqAJ3erDBQ@mail.gmail.com>
+ <563A4C9A.7000002@linaro.org>
+Message-ID: <CABg9mcuAuoSBg4zWYHnaTzAGsH4BK5-VhD=HRDmsHJRCUrnJUw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/3/15 3:18 PM, Kees Cook wrote:
-> On Tue, Nov 3, 2015 at 2:39 PM, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
->> On Tue, Nov 03, 2015 at 11:19:44AM -0800, Kees Cook wrote:
->>> On Tue, Nov 3, 2015 at 10:10 AM, Daniel Cashman <dcashman@android.com> wrote:
->>>> From: dcashman <dcashman@google.com>
->>>>
->>>> arm: arch_mmap_rnd() uses a hard-code value of 8 to generate the
->>>> random offset for the mmap base address.  This value represents a
->>>> compromise between increased ASLR effectiveness and avoiding
->>>> address-space fragmentation. Replace it with a Kconfig option, which
->>>> is sensibly bounded, so that platform developers may choose where to
->>>> place this compromise. Keep 8 as the minimum acceptable value.
->>>>
->>>> Signed-off-by: Daniel Cashman <dcashman@google.com>
->>>
->>> Acked-by: Kees Cook <keescook@chromium.org>
->>>
->>> Russell, if you don't see any problems here, it might make sense not
->>> to put this through the ARM patch tracker since it depends on the 1/2,
->>> and I think x86 and arm64 (and possibly other arch) changes are coming
->>> too.
+On Wed, Nov 4, 2015 at 10:21 AM, Shi, Yang <yang.shi@linaro.org> wrote:
+> On 11/3/2015 11:04 PM, Xi Wang wrote:
 >>
->> Yes, it looks sane, though I do wonder whether there should also be
->> a Kconfig option to allow archtectures to specify the default, instead
->> of the default always being the minimum randomisation.  I can see scope
->> to safely pushing our mmap randomness default to 12, especially on 3GB
->> setups, as we already have 11 bits of randomness on the sigpage and if
->> enabled, 13 bits on the heap.
-> 
-> My thinking is that the there shouldn't be a reason to ever have a
-> minimum that was below the default. I have no objection with it, but
-> it seems needless. Frankly minimum is "0", really, so I don't think it
-> makes much sense to have default != arch minimum. I actually view
-> "arch minimum" as "known good", so if we are happy with raising the
-> "known good" value, that should be the new minimum.
+>> On Tue, Nov 3, 2015 at 10:56 PM, Zi Shen Lim <zlim.lnx@gmail.com> wrote:
+>>>
+>>>          case BPF_ALU | BPF_DIV | BPF_X:
+>>>          case BPF_ALU64 | BPF_DIV | BPF_X:
+>>> +       {
+>>> +               const u8 r0 = bpf2a64[BPF_REG_0];
+>>> +
+>>> +               /* if (src == 0) return 0 */
+>>> +               jmp_offset = 3; /* skip ahead to else path */
+>>> +               check_imm19(jmp_offset);
+>>> +               emit(A64_CBNZ(is64, src, jmp_offset), ctx);
+>>> +               emit(A64_MOVZ(1, r0, 0, 0), ctx);
+>>> +               jmp_offset = epilogue_offset(ctx);
+>>> +               check_imm26(jmp_offset);
+>>> +               emit(A64_B(jmp_offset), ctx);
+>>> +               /* else */
+>>>                  emit(A64_UDIV(is64, dst, dst, src), ctx);
+>>>                  break;
+>>> +       }
+>>>          case BPF_ALU | BPF_MOD | BPF_X:
+>>>          case BPF_ALU64 | BPF_MOD | BPF_X:
+>>
+>>
+>> BPF_MOD might need the same fix.
 
-While I generally agree, the ability to specify a non-minimum arch
-default could be useful if there is a small fraction which relies on
-having a small value.  8 as the current minimum for arm made sense to me
-since it has already been established as minimum in the current code.
-It may be the case, as Russel has suggested for example, that we could
-up the default to 12 for the vast majority of systems, but that 8 could
-still be required for a select few.  In this case, our current solution
-would have to leave the minimum at 8, and thus leave the default at 8
-for all systems when 12 would be preferable. This patch allows those
-systems to change that, of course, so the question becomes one of opt-in
-vs opt-out for an increased amount of randomness if this situation occurred.
+I'll post a fix for this case as well.
 
-Both approaches seem reasonable to me.  Russel, if you'd still like the
-ability to specify a non-minimum default, would establishing an
-additional Kconfig variable, say ARCH_HAS_DEF_MMAP_RND_BITS, or simply
-dropping the default line from the global config be preferable?
+>
+>
+> Agreed, and we may need add one more test cases in test_bpf module to cover
+> MOD?
 
-Thank You,
-Dan
+Let me know if you have a test case ready :)
+
+>
+> Yang
+>
+>>
+>> _______________________________________________
+>> linux-arm-kernel mailing list
+>> linux-arm-kernel at lists.infradead.org
+>> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+>>
+>
