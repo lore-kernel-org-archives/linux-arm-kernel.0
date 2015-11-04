@@ -1,57 +1,77 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 4 Nov 2015 10:50:57 +0000
-Subject: [PATCH v6 1/3] iommu: Implement common IOMMU ops for DMA mapping
-In-Reply-To: <CAAFQd5ApSFC6Pm4tDhZbJOVZ7szCx=diKUtGXq=M9a5Y_4qzOQ@mail.gmail.com>
-References: <1445867094.30736.14.camel@mhfsdcap03> <562E5AE4.9070001@arm.com>
- <CAGS+omAWCQsqk56iv0PW2ZhTJ1342GufUsJCP=VYSgCxZNLJpA@mail.gmail.com>
- <56337E4D.1010304@arm.com>
- <CAGS+omAmxbb4uVzaQh1xPmkFtcF6KP-HSV-40=sm1BRTdh+=OQ@mail.gmail.com>
- <CAAFQd5C_dkWBZrQXtyO59ARw7q-0fg-Wk98yApC5VHdQ8-AmNw@mail.gmail.com>
- <5638F1C4.3000900@arm.com>
- <CAAFQd5A4TcvkDMFezqEpkfWL+7yO2v=Hm=twk=p-NpADPpvqEQ@mail.gmail.com>
- <20151104092748.GI8644@n2100.arm.linux.org.uk>
- <CAAFQd5ApSFC6Pm4tDhZbJOVZ7szCx=diKUtGXq=M9a5Y_4qzOQ@mail.gmail.com>
-Message-ID: <20151104105057.GK8644@n2100.arm.linux.org.uk>
+From: l.majewski@samsung.com (Lukasz Majewski)
+Date: Wed, 04 Nov 2015 11:51:50 +0100
+Subject: [PATCH 5/5] thermal: exynos: Directly return 0 instead of using
+ local ret variable
+In-Reply-To: <CAGOxZ52iP98Dh4tsFmmkOC8CszUYwGmSWf7QXBWWJeyEnnDGYw@mail.gmail.com>
+References: <1444282446-6419-1-git-send-email-k.kozlowski@samsung.com>
+ <1444282446-6419-5-git-send-email-k.kozlowski@samsung.com>
+ <CAGOxZ52iP98Dh4tsFmmkOC8CszUYwGmSWf7QXBWWJeyEnnDGYw@mail.gmail.com>
+Message-ID: <20151104115150.641d453e@amdc2363>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 04, 2015 at 06:48:50PM +0900, Tomasz Figa wrote:
-> There is no requirement, but shouldn't it be desired for the mapping
-> code to map them as such? Otherwise, how could the IOMMU use case you
-> described above (address translator for devices which don't have the
-> capability to address a scatterlist) be handled properly?
+Hi Alim,
 
-It's up to the IOMMU code to respect the parameters that the device has
-supplied to it via the device_dma_parameters.  This doesn't currently
-allow a device to say "I want this scatterlist to be mapped as a
-contiguous device address", so really if a device has such a requirement,
-at the moment the device driver _must_ check the dma_map_sg() return
-value and act accordingly.
+> Hello,
+> 
+> On Thu, Oct 8, 2015 at 11:04 AM, Krzysztof Kozlowski
+> <k.kozlowski@samsung.com> wrote:
+> > The 'ret' variable in exynos5440_tmu_initialize() is initialized to
+> > 0 and returned as is. Replace it with direct return statement. This
+> > also fixes coccinelle warning:
+> > drivers/thermal/samsung/exynos_tmu.c:611:5-8: Unneeded variable:
+> > "ret". Return "0" on line 654
+> >
+> > Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> > ---
+> Reviewed-by: Alim Akhtar <alim.akhtar@samsung.com>
+> 
+> >  drivers/thermal/samsung/exynos_tmu.c | 5 +++--
+> >  1 file changed, 3 insertions(+), 2 deletions(-)
+> >
+> > diff --git a/drivers/thermal/samsung/exynos_tmu.c
+> > b/drivers/thermal/samsung/exynos_tmu.c index
+> > 1af7ea8dda71..f340e6edcb49 100644 ---
+> > a/drivers/thermal/samsung/exynos_tmu.c +++
+> > b/drivers/thermal/samsung/exynos_tmu.c @@ -608,7 +608,7 @@ static
+> > int exynos5440_tmu_initialize(struct platform_device *pdev) {
+> >         struct exynos_tmu_data *data = platform_get_drvdata(pdev);
+> >         unsigned int trim_info = 0, con, rising_threshold;
+> > -       int ret = 0, threshold_code;
+> > +       int threshold_code;
+> >         int crit_temp = 0;
+> >
+> >         /*
+> > @@ -651,7 +651,8 @@ static int exynos5440_tmu_initialize(struct
+> > platform_device *pdev) /* Clear the PMIN in the common TMU register
+> > */ if (!data->id)
+> >                 writel(0, data->base_second + EXYNOS5440_TMU_PMIN);
+> > -       return ret;
+> > +
+> > +       return 0;
+> >  }
+> >
+> >  static int exynos7_tmu_initialize(struct platform_device *pdev)
+> > --
+> > 1.9.1
+> >
+> > --
+> > To unsubscribe from this list: send the line "unsubscribe
+> > linux-samsung-soc" in the body of a message to
+> > majordomo at vger.kernel.org More majordomo info at
+> > http://vger.kernel.org/majordomo-info.html
+> 
+> 
+> 
 
-While it's possible to say "an IOMMU should map as a single contiguous
-address" what happens when the IOMMU's device address space becomes
-fragmented?
+Acked-by: Lukasz Majewski <l.majewski@samsung.com>
+Tested-by: Lukasz Majewski <l.majewski@samsung.com>
 
-> Is the general conclusion now that dma_map_sg() should not be used to
-> create IOMMU mappings and we should make a step backwards making all
-> drivers (or frameworks, such as videobuf2) do that manually? That
-> would be really backwards, because code not aware of IOMMU existence
-> at all would have to become aware of it.
-
-No.  The DMA API has always had the responsibility for managing the
-IOMMU device, which may well be shared between multiple different
-devices.
-
-However, if the IOMMU is part of a device IP block (such as a GPU)
-then the decision on whether the DMA API should be used or not is up
-to the driver author.  If it has special management requirements,
-then it's probably appropriate for the device driver to manage it by
-itself.
-
-For example, a GPUs MMU may need something inserted into the GPUs
-command stream to flush the MMU TLBs.  Such cases are inappropriate
-to be using the DMA API for IOMMU management.
+Test HW: Odroid XU3 - Exynos5433
 
 -- 
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Best regards,
+
+Lukasz Majewski
+
+Samsung R&D Institute Poland (SRPOL) | Linux Platform Group
