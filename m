@@ -1,73 +1,133 @@
-From: soren.brinkmann@xilinx.com (Soren Brinkmann)
-Date: Tue, 3 Nov 2015 16:20:46 -0800
-Subject: [PATCH 5/9] tty: xuartps: Improve startup function
-In-Reply-To: <1446596450-20918-1-git-send-email-soren.brinkmann@xilinx.com>
-References: <1446596450-20918-1-git-send-email-soren.brinkmann@xilinx.com>
-Message-ID: <1446596450-20918-6-git-send-email-soren.brinkmann@xilinx.com>
+From: ykk@rock-chips.com (Yakir Yang)
+Date: Wed, 4 Nov 2015 08:48:38 +0800
+Subject: [PATCH v9 10/17] phy: Add driver for rockchip Display Port PHY
+In-Reply-To: <20151103043827.GA17261@localhost>
+References: <1446020143-32645-1-git-send-email-ykk@rock-chips.com>
+ <1446083918-30809-1-git-send-email-ykk@rock-chips.com>
+ <20151103043827.GA17261@localhost>
+Message-ID: <563955E6.7000905@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The startup function is supposed to initialize the UART for receiving.
-Hence, don't enable the TX part. Also, protect HW accesses with the port
-lock.
+Hi Brain,
 
-Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
----
- drivers/tty/serial/xilinx_uartps.c | 20 ++++++++++++--------
- 1 file changed, 12 insertions(+), 8 deletions(-)
+On 11/03/2015 12:38 PM, Brian Norris wrote:
+> Hi Yakir,
+>
+> On Thu, Oct 29, 2015 at 09:58:38AM +0800, Yakir Yang wrote:
+>> Add phy driver for the Rockchip DisplayPort PHY module. This
+>> is required to get DisplayPort working in Rockchip SoCs.
+>>
+>> Reviewed-by: Heiko Stuebner<heiko@sntech.de>
+>> Signed-off-by: Yakir Yang<ykk@rock-chips.com>
+>> ---
+> ...
+>> diff --git a/drivers/phy/phy-rockchip-dp.c b/drivers/phy/phy-rockchip-dp.c
+>> new file mode 100644
+>> index 0000000..f3e0058
+>> --- /dev/null
+>> +++ b/drivers/phy/phy-rockchip-dp.c
+>> @@ -0,0 +1,151 @@
+>> +/*
+>> + * Rockchip DP PHY driver
+>> + *
+>> + * Copyright (C) 2015 FuZhou Rockchip Co., Ltd.
+>> + * Author: Yakir Yang<ykk@@rock-chips.com>
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License as published by
+>> + * the Free Software Foundation; either version 2 of the License.
+>> + */
+>> +
+>> +#include <linux/module.h>
+>> +#include <linux/of.h>
+>> +#include <linux/clk.h>
+>> +#include <linux/phy/phy.h>
+>> +#include <linux/regmap.h>
+>> +#include <linux/mfd/syscon.h>
+>> +#include <linux/platform_device.h>
+>> +
+>> +#define GRF_SOC_CON12                           0x0274
+>> +
+>> +#define GRF_EDP_REF_CLK_SEL_INTER_HIWORD_MASK   BIT(4)
+>> +#define GRF_EDP_REF_CLK_SEL_INTER               BIT(4)
+> Why are the above two macros the same? Judging by the RK3288 manual and
+> other downstream drivers, it seems like you want the _MASK one to be
+> shifted left by 16 (i.e., BIT(20)).
 
-diff --git a/drivers/tty/serial/xilinx_uartps.c b/drivers/tty/serial/xilinx_uartps.c
-index 738df6bb2646..b189e600d4ab 100644
---- a/drivers/tty/serial/xilinx_uartps.c
-+++ b/drivers/tty/serial/xilinx_uartps.c
-@@ -755,6 +755,7 @@ static void cdns_uart_set_termios(struct uart_port *port,
-  */
- static int cdns_uart_startup(struct uart_port *port)
- {
-+	unsigned long flags;
- 	unsigned int retval = 0, status = 0;
- 
- 	retval = request_irq(port->irq, cdns_uart_isr, 0, CDNS_UART_NAME,
-@@ -762,6 +763,8 @@ static int cdns_uart_startup(struct uart_port *port)
- 	if (retval)
- 		return retval;
- 
-+	spin_lock_irqsave(&port->lock, flags);
+Oops, yes, you're right, it should be BIT(20), thanks for the catch.
+
+>> +
+>> +#define GRF_EDP_PHY_SIDDQ_HIWORD_MASK           BIT(21)
+>> +#define GRF_EDP_PHY_SIDDQ_ON                    0
+>> +#define GRF_EDP_PHY_SIDDQ_OFF                   BIT(5)
+>> +
+> ...
+>
+>> +	ret = regmap_write(dp->grf, GRF_SOC_CON12, GRF_EDP_REF_CLK_SEL_INTER |
+>> +			   GRF_EDP_REF_CLK_SEL_INTER_HIWORD_MASK);
+> IOW, the above is writing:
+>
+> 	BIT(4) | BIT(4)
+>
+> whereas I think you want:
+>
+> 	BIT(4) | BIT(20)
+>
+>> +	if (ret != 0) {
+>> +		dev_err(dp->dev, "Could not config GRF edp ref clk: %d\n", ret);
+>> +		return ret;
+>> +	}
+>> +
+> ...
+>
+> (FYI, I came across this by inspection when comparing Heiko's
+> 'somewhat-stable' branch [1] with this series. The former brings up eDP
+> fine on veyron-jaq, whereas this one doesn't yet, even with the above
+> change. Still debugging the issue.)
+
+Hmm... I'm not sure whether your eDP screen have the hotplug signal, so I
+think you can try to add "analogix,force-hpd" flag into 
+rk3288-veyron-jaq.dts
+
+&edp {
+     analogix,need-force-hpd;
+}
+
+
+If that changes couldn't fix the problem, guess you may need max the panel
+power up delay time which pointed by Heiko. Like:
+
+Thanks,
+- Yakir
+
+
+diff --git a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c 
+b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
+index 4fa5f69..546a506 100644
+--- a/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
++++ b/drivers/gpu/drm/bridge/analogix/analogix_dp_core.c
+@@ -82,6 +82,13 @@ static int analogix_dp_detect_hpd(struct 
+analogix_dp_device *dp)
+          */
+         dev_dbg(dp->dev, "failed to get hpd plug status, try to force 
+hpd\n");
+
++       /*
++        * Hotplug signal would indicate the right time to operate
++        * panel after poweron, but if the hotplug is missing, then
++        * panel would need wait hundreds of milliseconds at here.
++        */
++       mdelay(100);
 +
- 	/* Disable the TX and RX */
- 	writel(CDNS_UART_CR_TX_DIS | CDNS_UART_CR_RX_DIS,
- 			port->membase + CDNS_UART_CR_OFFSET);
-@@ -772,15 +775,14 @@ static int cdns_uart_startup(struct uart_port *port)
- 	writel(CDNS_UART_CR_TXRST | CDNS_UART_CR_RXRST,
- 			port->membase + CDNS_UART_CR_OFFSET);
- 
--	status = readl(port->membase + CDNS_UART_CR_OFFSET);
--
--	/* Clear the RX disable and TX disable bits and then set the TX enable
--	 * bit and RX enable bit to enable the transmitter and receiver.
-+	/*
-+	 * Clear the RX disable bit and then set the RX enable bit to enable
-+	 * the receiver.
- 	 */
--	writel((status & ~(CDNS_UART_CR_TX_DIS | CDNS_UART_CR_RX_DIS))
--			| (CDNS_UART_CR_TX_EN | CDNS_UART_CR_RX_EN |
--			CDNS_UART_CR_STOPBRK),
--			port->membase + CDNS_UART_CR_OFFSET);
-+	status = readl(port->membase + CDNS_UART_CR_OFFSET);
-+	status &= CDNS_UART_CR_RX_DIS;
-+	status |= CDNS_UART_CR_RX_EN;
-+	writel(status, port->membase + CDNS_UART_CR_OFFSET);
- 
- 	/* Set the Mode Register with normal mode,8 data bits,1 stop bit,
- 	 * no parity.
-@@ -811,6 +813,8 @@ static int cdns_uart_startup(struct uart_port *port)
- 		CDNS_UART_IXR_RXTRIG | CDNS_UART_IXR_TOUT,
- 		port->membase + CDNS_UART_IER_OFFSET);
- 
-+	spin_unlock_irqrestore(&port->lock, flags);
-+
- 	return retval;
- }
- 
--- 
-2.6.2.3.ga463a5b
+         analogix_dp_force_hpd(dp);
+
+         if (analogix_dp_get_plug_in_status(dp) != 0) {
+
+
+> Brian
+>
+> [1]https://github.com/mmind/linux-rockchip/tree/devel/somewhat-stable
+>
+>
+>
