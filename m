@@ -1,7 +1,9 @@
 From: luka.perkov@sartura.hr (Luka Perkov)
-Date: Wed, 4 Nov 2015 22:25:05 +0000
-Subject: [PATCH 1/4] ARM: dts: kirkwood: add Linksys EA4500
-Message-ID: <00000150d49a7cf7-e97bf540-89ce-49bf-a25e-2d082acab273-000000@email.amazonses.com>
+Date: Wed, 4 Nov 2015 22:25:07 +0000
+Subject: [PATCH 2/4] ARM: dts: kirkwood: add Linksys EA3500
+In-Reply-To: <1446675888-24495-1-git-send-email-luka.perkov@sartura.hr>
+References: <1446675888-24495-1-git-send-email-luka.perkov@sartura.hr>
+Message-ID: <00000150d49a832c-f77d66d7-8f66-4b36-ac2c-df85deee46b6-000000@email.amazonses.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -10,60 +12,48 @@ Based on dts files from OpenWrt.
 Signed-off-by: Luka Perkov <luka.perkov@sartura.hr>
 ---
  .../devicetree/bindings/arm/marvell,kirkwood.txt   |   1 +
- .../devicetree/bindings/vendor-prefixes.txt        |   1 +
  arch/arm/boot/dts/Makefile                         |   1 +
- arch/arm/boot/dts/kirkwood-ea4500.dts              | 156 +++++++++++++++++++++
- 4 files changed, 159 insertions(+)
- create mode 100644 arch/arm/boot/dts/kirkwood-ea4500.dts
+ arch/arm/boot/dts/kirkwood-ea3500.dts              | 149 +++++++++++++++++++++
+ 3 files changed, 151 insertions(+)
+ create mode 100644 arch/arm/boot/dts/kirkwood-ea3500.dts
 
 diff --git a/Documentation/devicetree/bindings/arm/marvell,kirkwood.txt b/Documentation/devicetree/bindings/arm/marvell,kirkwood.txt
-index 5171ad8..7a99d4a 100644
+index 7a99d4a..ed381a3 100644
 --- a/Documentation/devicetree/bindings/arm/marvell,kirkwood.txt
 +++ b/Documentation/devicetree/bindings/arm/marvell,kirkwood.txt
-@@ -49,6 +49,7 @@ board. Currently known boards are:
- "lacie,netspace_max_v2"
+@@ -50,6 +50,7 @@ board. Currently known boards are:
  "lacie,netspace_mini_v2"
  "lacie,netspace_v2"
-+"linksys,ea4500"
+ "linksys,ea4500"
++"linksys,ea3500"
  "marvell,db-88f6281-bp"
  "marvell,db-88f6282-bp"
  "marvell,mv88f6281gtw-ge"
-diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
-index 82d2ac9..264f8ba 100644
---- a/Documentation/devicetree/bindings/vendor-prefixes.txt
-+++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
-@@ -124,6 +124,7 @@ lantiq	Lantiq Semiconductor
- lenovo	Lenovo Group Ltd.
- lg	LG Corporation
- linux	Linux-specific binding
-+linksys	Belkin International, Inc.
- lsi	LSI Corp. (LSI Logic)
- lltc	Linear Technology Corporation
- marvell	Marvell Technology Group Ltd.
 diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index bb8fa02..a16c04b 100644
+index a16c04b..ebe5b73 100644
 --- a/arch/arm/boot/dts/Makefile
 +++ b/arch/arm/boot/dts/Makefile
 @@ -168,6 +168,7 @@ dtb-$(CONFIG_MACH_KIRKWOOD) += \
  	kirkwood-ds411.dtb \
  	kirkwood-ds411j.dtb \
  	kirkwood-ds411slim.dtb \
-+	kirkwood-ea4500.dtb \
++	kirkwood-ea3500.dtb \
+ 	kirkwood-ea4500.dtb \
  	kirkwood-goflexnet.dtb \
  	kirkwood-guruplug-server-plus.dtb \
- 	kirkwood-ib62x0.dtb \
-diff --git a/arch/arm/boot/dts/kirkwood-ea4500.dts b/arch/arm/boot/dts/kirkwood-ea4500.dts
+diff --git a/arch/arm/boot/dts/kirkwood-ea3500.dts b/arch/arm/boot/dts/kirkwood-ea3500.dts
 new file mode 100644
-index 0000000..caccc8e
+index 0000000..3a064f6
 --- /dev/null
-+++ b/arch/arm/boot/dts/kirkwood-ea4500.dts
-@@ -0,0 +1,156 @@
++++ b/arch/arm/boot/dts/kirkwood-ea3500.dts
+@@ -0,0 +1,149 @@
 +/*
-+ * kirkwood-ea4500.dts - Device Tree file for Linksys EA4500
++ * kirkwood-ea3500.dts - Device Tree file for Linksys EA3500
 + *
 + * (c) 2013 Jonas Gorski <jogo@openwrt.org>
 + * (c) 2013 Deutsche Telekom Innovation Laboratories
 + * (c) 2014 Luka Perkov <luka.perkov@sartura.hr>
++ * (c) 2014 Dan Walters <dan@walters.io>
 + *
 + * This file is licensed under the terms of the GNU General Public
 + * License version 2.  This program is licensed "as is" without any
@@ -76,12 +66,12 @@ index 0000000..caccc8e
 +#include "kirkwood-6282.dtsi"
 +
 +/ {
-+	model = "Linksys EA4500";
-+	compatible = "linksys,ea4500", "marvell,kirkwood-88f6282", "marvell,kirkwood";
++	model = "Linksys EA3500";
++	compatible = "linksys,ea3500", "marvell,kirkwood-88f6282", "marvell,kirkwood";
 +
 +	memory {
 +		device_type = "memory";
-+		reg = <0x00000000 0x8000000>;
++		reg = <0x00000000 0x4000000>;
 +	};
 +
 +	chosen {
@@ -104,13 +94,9 @@ index 0000000..caccc8e
 +
 +	ocp at f1000000 {
 +		pinctrl: pin-controller at 10000 {
-+			pmx_led_white_health: pmx-led-white-health {
++			pmx_led_green_power: pmx-led-green-power {
 +				marvell,pins = "mpp7";
 +				marvell,function = "gpo";
-+			};
-+			pmx_led_white_pulse: pmx-led-white-pulse {
-+				marvell,pins = "mpp14";
-+				marvell,function = "gpio";
 +			};
 +			pmx_btn_wps: pmx-btn-wps {
 +				marvell,pins = "mpp47";
@@ -154,17 +140,12 @@ index 0000000..caccc8e
 +
 +	gpio-leds {
 +		compatible = "gpio-leds";
-+		pinctrl-0 = < &pmx_led_white_health &pmx_led_white_pulse >;
++		pinctrl-0 = < &pmx_led_green_power >;
 +		pinctrl-names = "default";
 +
-+		white-health {
-+			label = "ea4500:white:health";
++		green-power {
++			label = "ea3500:green:power";
 +			gpios = <&gpio0 7 GPIO_ACTIVE_HIGH>;
-+		};
-+
-+		white-pulse {
-+			label = "ea4500:white:pulse";
-+			gpios = <&gpio0 14 GPIO_ACTIVE_HIGH>;
 +		};
 +	};
 +};
@@ -177,6 +158,7 @@ index 0000000..caccc8e
 +	partition at 0 {
 +		label = "u-boot";
 +		reg = <0x0000000 0x80000>;
++		read-only;
 +	};
 +
 +	partition at 80000 {
@@ -191,7 +173,7 @@ index 0000000..caccc8e
 +
 +	partition at 400000 {
 +		label = "root";
-+		reg = <0x400000 0x1c00000>;
++		reg = <0x400000 0x1200000>;
 +	};
 +};
 +
