@@ -1,331 +1,106 @@
-From: luka.perkov@sartura.hr (Luka Perkov)
-Date: Wed, 4 Nov 2015 22:25:12 +0000
-Subject: [PATCH 4/4] ARM: dts: kirkwood: add ZyXEL NSA310s
-In-Reply-To: <1446675888-24495-1-git-send-email-luka.perkov@sartura.hr>
-References: <1446675888-24495-1-git-send-email-luka.perkov@sartura.hr>
-Message-ID: <00000150d49a979a-b2d6164f-f16d-4f1d-aaa5-008f46776e82-000000@email.amazonses.com>
+From: keescook@chromium.org (Kees Cook)
+Date: Wed, 4 Nov 2015 14:37:19 -0800
+Subject: [PATCH v2 1/2] mm: mmap: Add new /proc tunable for mmap_base ASLR.
+In-Reply-To: <87r3k5mn4s.fsf@x220.int.ebiederm.org>
+References: <1446574204-15567-1-git-send-email-dcashman@android.com>
+ <20151103160410.34bbebc805c17d2f41150a19@linux-foundation.org>
+ <87k2pyppfk.fsf@x220.int.ebiederm.org>
+ <20151103173156.9ca17f52.akpm@linux-foundation.org>
+ <563A5D0D.9030109@android.com>
+ <87r3k5mn4s.fsf@x220.int.ebiederm.org>
+Message-ID: <CAGXu5jLqRUEL5a3-YXnpMvHOLq+aZjbTYiCEctpRBy=2rDWm1A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Based on dts files from OpenWrt.
+On Wed, Nov 4, 2015 at 2:10 PM, Eric W. Biederman <ebiederm@xmission.com> wrote:
+> Daniel Cashman <dcashman@android.com> writes:
+>
+>> On 11/3/15 5:31 PM, Andrew Morton wrote:
+>>> On Tue, 03 Nov 2015 18:40:31 -0600 ebiederm at xmission.com (Eric W. Biederman) wrote:
+>>>
+>>>> Andrew Morton <akpm@linux-foundation.org> writes:
+>>>>
+>>>>> On Tue,  3 Nov 2015 10:10:03 -0800 Daniel Cashman <dcashman@android.com> wrote:
+>>>>>
+>>>>>> ASLR currently only uses 8 bits to generate the random offset for the
+>>>>>> mmap base address on 32 bit architectures. This value was chosen to
+>>>>>> prevent a poorly chosen value from dividing the address space in such
+>>>>>> a way as to prevent large allocations. This may not be an issue on all
+>>>>>> platforms. Allow the specification of a minimum number of bits so that
+>>>>>> platforms desiring greater ASLR protection may determine where to place
+>>>>>> the trade-off.
+>>>>>
+>>>>> Can we please include a very good description of the motivation for this
+>>>>> change?  What is inadequate about the current code, what value does the
+>>>>> enhancement have to our users, what real-world problems are being solved,
+>>>>> etc.
+>>>>>
+>>>>> Because all we have at present is "greater ASLR protection", which doesn't
+>>>>> really tell anyone anything.
+>>>>
+>>>> The description seemed clear to me.
+>>>>
+>>>> More random bits, more entropy, more work needed to brute force.
+>>>>
+>>>> 8 bits only requires 256 tries (or a 1 in 256) chance to brute force
+>>>> something.
+>>>
+>>> Of course, but that's not really very useful.
+>>>
+>>>> We have seen in the last couple of months on Android how only having 8 bits
+>>>> doesn't help much.
+>>>
+>>> Now THAT is important.  What happened here and how well does the
+>>> proposed fix improve things?  How much longer will a brute-force attack
+>>> take to succeed, with a particular set of kernel parameters?  Is the
+>>> new duration considered to be sufficiently long and if not, are there
+>>> alternative fixes we should be looking at?
+>>>
+>>> Stuff like this.
+>>>
+>>>> Each additional bit doubles the protection (and unfortunately also
+>>>> increases fragmentation of the userspace address space).
+>>>
+>>> OK, so the benefit comes with a cost and people who are configuring
+>>> systems (and the people who are reviewing this patchset!) need to
+>>> understand the tradeoffs.  Please.
+>>
+>> The direct motivation here was in response to the libstagefright
+>> vulnerabilities that affected Android, specifically to information
+>> provided by Google's project zero at:
+>>
+>> http://googleprojectzero.blogspot.com/2015/09/stagefrightened.html
+>>
+>> The attack there specifically used the limited randomness used in
+>> generating the mmap base address as part of a brute-force-based exploit.
+>>  In this particular case, the attack was against the mediaserver process
+>> on Android, which was limited to respawning every 5 seconds, giving the
+>> attacker an average expected success rate of defeating the mmap ASLR
+>> after over 10 minutes (128 tries at 5 seconds each).  With change to the
+>> maximum proposed value of 16 bits, this would change to over 45 hours
+>> (32768 tries), which would make the user of such a system much more
+>> likely to notice such an attack.
+>>
+>> I understand the desire for this clarification, and will happily try to
+>> improve the explanation for this change, especially so that those
+>> considering use of this option understand the tradeoffs, but I also view
+>> this as one particular hardening change which is a component of making
+>> attacks such as these harder, rather than the only solution.  As for the
+>> clarification itself, where would you like it?  I could include a cover
+>> letter for this patch-set, elaborate more in the commit message itself,
+>> add more to the Kconfig help description, or some combination of the above.
+>
+> Unless I am mistaken this there is no cross over between different
+> processes of this randomization.  Would it make sense to have this as
+> an rlimit so that if you have processes on the system that are affected
+> by the tradeoff differently this setting can be changed per process?
 
-Signed-off-by: Luka Perkov <luka.perkov@sartura.hr>
-Signed-off-by: Tony Dinh <mibodhi@gmail.com>
----
- .../devicetree/bindings/arm/marvell,kirkwood.txt   |   1 +
- arch/arm/boot/dts/Makefile                         |   1 +
- arch/arm/boot/dts/kirkwood-nsa310s.dts             | 282 +++++++++++++++++++++
- 3 files changed, 284 insertions(+)
- create mode 100644 arch/arm/boot/dts/kirkwood-nsa310s.dts
+I think that could be a good future bit of work, but I'd want to get
+this in for all architectures first, so we have a more common base to
+work from before introducing a new rlimit.
 
-diff --git a/Documentation/devicetree/bindings/arm/marvell,kirkwood.txt b/Documentation/devicetree/bindings/arm/marvell,kirkwood.txt
-index 37bd190..8a1a7f7 100644
---- a/Documentation/devicetree/bindings/arm/marvell,kirkwood.txt
-+++ b/Documentation/devicetree/bindings/arm/marvell,kirkwood.txt
-@@ -101,3 +101,4 @@ board. Currently known boards are:
- "usi,topkick-1281P2"
- "zyxel,nsa310"
- "zyxel,nsa310a"
-+"zyxel,nsa310s"
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 1d6fb0d..b2ea55f 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -196,6 +196,7 @@ dtb-$(CONFIG_MACH_KIRKWOOD) += \
- 	kirkwood-ns2mini.dtb \
- 	kirkwood-nsa310.dtb \
- 	kirkwood-nsa310a.dtb \
-+	kirkwood-nsa310s.dtb \
- 	kirkwood-openblocks_a6.dtb \
- 	kirkwood-openblocks_a7.dtb \
- 	kirkwood-openrd-base.dtb \
-diff --git a/arch/arm/boot/dts/kirkwood-nsa310s.dts b/arch/arm/boot/dts/kirkwood-nsa310s.dts
-new file mode 100644
-index 0000000..afc8ecf
---- /dev/null
-+++ b/arch/arm/boot/dts/kirkwood-nsa310s.dts
-@@ -0,0 +1,282 @@
-+/dts-v1/;
-+
-+#include "kirkwood.dtsi"
-+#include "kirkwood-6281.dtsi"
-+
-+/ {
-+	model = "ZyXEL NSA310S";
-+	compatible = "zyxel,nsa310s", "marvell,kirkwood-88f6702", "marvell,kirkwood";
-+
-+	memory {
-+		device_type = "memory";
-+		reg = <0x00000000 0x10000000>;
-+	};
-+
-+	chosen {
-+		bootargs = "console=ttyS0,115200n8 earlyprintk";
-+		stdout-path = &uart0;
-+	};
-+
-+	mbus {
-+		pcie-controller {
-+			status = "okay";
-+
-+			pcie at 1,0 {
-+				status = "okay";
-+			};
-+		};
-+	};
-+
-+	ocp at f1000000 {
-+		pinctrl: pin-controller at 10000 {
-+			pinctrl-names = "default";
-+
-+			pmx_sata0: pmx-sata0 {
-+				marvell,pins;
-+				marvell,function = "sata0";
-+			};
-+			pmx_sata1: pmx-sata1 {
-+				marvell,pins;
-+				marvell,function = "sata1";
-+			};
-+			pmx_usb_power: pmx-usb-power {
-+				marvell,pins = "mpp21";
-+				marvell,function = "gpio";
-+			};
-+			pmx_pwr_off: pmx-pwr-off {
-+				marvell,pins = "mpp27";
-+				marvell,function = "gpio";
-+			};
-+			pmx_btn_reset: pmx-btn-reset {
-+				marvell,pins = "mpp24";
-+				marvell,function = "gpio";
-+			};
-+			pmx_btn_copy: pmx-btn-copy {
-+				marvell,pins = "mpp25";
-+				marvell,function = "gpio";
-+			};
-+			pmx_btn_power: pmx-btn-power {
-+				marvell,pins = "mpp26";
-+				marvell,function = "gpio";
-+			};
-+			pmx_led_hdd2_green: pmx-led-hdd2-green {
-+				marvell,pins = "mpp34";
-+				marvell,function = "gpio";
-+			};
-+			pmx_led_hdd2_red: pmx-led-hdd2-red {
-+				marvell,pins = "mpp12";
-+				marvell,function = "gpio";
-+			};
-+			pmx_led_usb_green: pmx-led-usb-green {
-+				marvell,pins = "mpp15";
-+				marvell,function = "gpio";
-+			};
-+			pmx_led_copy_green: pmx-led-copy-green {
-+				marvell,pins = "mpp22";
-+				marvell,function = "gpio";
-+			};
-+			pmx_led_copy_red: pmx-led-copy-red {
-+				marvell,pins = "mpp23";
-+				marvell,function = "gpio";
-+			};
-+			pmx_led_sys_green: pmx-led-sys-green {
-+				marvell,pins = "mpp28";
-+				marvell,function = "gpio";
-+			};
-+			pmx_led_sys_orange: pmx-led-sys-orange {
-+				marvell,pins = "mpp29";
-+				marvell,function = "gpio";
-+			};
-+			pmx_led_hdd1_green: pmx-led-hdd1-green {
-+				marvell,pins = "mpp16";
-+				marvell,function = "gpio";
-+			};
-+			pmx_led_hdd1_red: pmx-led-hdd1-red {
-+				marvell,pins = "mpp13";
-+				marvell,function = "gpio";
-+			};
-+			pmx_pwr_sata1: pmx-pwr-sata1 {
-+				marvell,pins = "mpp33";
-+				marvell,function = "gpio";
-+			};
-+		};
-+
-+		serial at 12000 {
-+			status = "okay";
-+		};
-+
-+		sata at 80000 {
-+			status = "okay";
-+			nr-ports = <2>;
-+		};
-+
-+		rtc at 10300 {
-+			status = "disabled";
-+		};
-+
-+		i2c at 11000 {
-+			status = "okay";
-+		};
-+	};
-+
-+	regulators {
-+		compatible = "simple-bus";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		pinctrl-names = "default";
-+		pinctrl-0 = <&pmx_usb_power &pmx_pwr_sata1>;
-+
-+		usb0_power: regulator at 1 {
-+			compatible = "regulator-fixed";
-+			reg = <1>;
-+			regulator-name = "USB Power";
-+			regulator-min-microvolt = <5000000>;
-+			regulator-max-microvolt = <5000000>;
-+			regulator-always-on;
-+			regulator-boot-on;
-+			enable-active-high;
-+			gpio = <&gpio0 21 GPIO_ACTIVE_HIGH>;
-+		};
-+
-+		sata1_power: regulator at 2 {
-+			compatible = "regulator-fixed";
-+			reg = <2>;
-+			regulator-name = "SATA1 Power";
-+			regulator-min-microvolt = <5000000>;
-+			regulator-max-microvolt = <5000000>;
-+			regulator-always-on;
-+			regulator-boot-on;
-+			enable-active-high;
-+			gpio = <&gpio1 1 GPIO_ACTIVE_HIGH>;
-+		};
-+	};
-+
-+
-+	gpio_keys {
-+		compatible = "gpio-keys";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		pinctrl-0 = <&pmx_btn_reset &pmx_btn_copy &pmx_btn_power>;
-+		pinctrl-names = "default";
-+
-+		button at 1 {
-+			label = "Power Button";
-+			linux,code = <KEY_POWER>;
-+			gpios = <&gpio0 26 GPIO_ACTIVE_HIGH>;
-+		};
-+		button at 2 {
-+			label = "Copy Button";
-+			linux,code = <KEY_COPY>;
-+			gpios = <&gpio0 25 GPIO_ACTIVE_LOW>;
-+		};
-+		button at 3 {
-+			label = "Reset Button";
-+			linux,code = <KEY_RESTART>;
-+			gpios = <&gpio0 24 GPIO_ACTIVE_LOW>;
-+		};
-+	};
-+
-+	gpio-leds {
-+		compatible = "gpio-leds";
-+		pinctrl-0 = <&pmx_led_hdd2_green &pmx_led_hdd2_red
-+				&pmx_led_usb_green
-+				&pmx_led_sys_green &pmx_led_sys_orange
-+				&pmx_led_copy_green &pmx_led_copy_red
-+				&pmx_led_hdd1_green &pmx_led_hdd1_red>;
-+		pinctrl-names = "default";
-+
-+		green-sys {
-+			label = "nsa310s:green:sys";
-+			gpios = <&gpio0 28 GPIO_ACTIVE_HIGH>;
-+			linux,default-trigger = "timer";
-+		};
-+		orange-sys {
-+			label = "nsa310s:orange:sys";
-+			gpios = <&gpio0 29 GPIO_ACTIVE_HIGH>;
-+		};
-+		green-hdd1 {
-+			label = "nsa310s:green:hdd1";
-+			gpios = <&gpio0 16 GPIO_ACTIVE_HIGH>;
-+		};
-+		red-hdd1 {
-+			label = "nsa310s:red:hdd1";
-+			gpios = <&gpio0 13 GPIO_ACTIVE_HIGH>;
-+		};
-+		green-hdd2 {
-+			label = "nsa310s:green:hdd2";
-+			gpios = <&gpio1 2 GPIO_ACTIVE_HIGH>;
-+		};
-+		red-hdd2 {
-+			label = "nsa310s:red:hdd2";
-+			gpios = <&gpio0 12 GPIO_ACTIVE_HIGH>;
-+		};
-+		green-usb {
-+			label = "nsa310s:green:usb";
-+			gpios = <&gpio0 15 GPIO_ACTIVE_HIGH>;
-+		};
-+		green-copy {
-+			label = "nsa310s:green:copy";
-+			gpios = <&gpio0 22 GPIO_ACTIVE_HIGH>;
-+			linux,default-trigger = "ide-disk";
-+		};
-+		red-copy {
-+			label = "nsa310s:red:copy";
-+			gpios = <&gpio0 23 GPIO_ACTIVE_HIGH>;
-+		};
-+	};
-+
-+	gpio_poweroff {
-+		compatible = "gpio-poweroff";
-+		pinctrl-0 = <&pmx_pwr_off>;
-+		pinctrl-names = "default";
-+		gpios = <&gpio0 27 GPIO_ACTIVE_HIGH>;
-+	};
-+};
-+
-+&nand {
-+	status = "okay";
-+	chip-delay = <35>;
-+
-+	partition at 0 {
-+		label = "u-boot";
-+		reg = <0x0000000 0xe0000>;
-+	};
-+
-+	partition at e0000 {
-+		label = "u-boot environment";
-+		reg = <0xe0000 0x100000>;
-+	};
-+
-+	partition at 100000 {
-+		label = "second stage u-boot";
-+		reg = <0x100000 0x200000>;
-+	};
-+
-+	partition at 200000 {
-+		label = "root";
-+		reg = <0x200000 0xfe00000>;
-+	};
-+};
-+
-+&mdio {
-+	status = "okay";
-+	ethphy0: ethernet-phy at 1 {
-+		reg = <1>;
-+		marvell,reg-init = <0x1 0x16 0x0 0x3>,
-+							<0x1 0x10 0x0 0x1017>,
-+							<0x1 0x11 0x0 0x4408>,
-+							<0x1 0x16 0x0 0x0>,
-+							<0x1 0x4 0x0 0x1e1>,
-+							<0x1 0x9 0x0 0x300>,
-+							<0x1 0x10 0x0 0x3860>,
-+							<0x1 0x0 0x0 0x9140>;
-+	};
-+};
-+
-+&eth0 {
-+	status = "okay";
-+
-+	ethernet0-port at 0 {
-+		phy-handle = <&ethphy0>;
-+	};
-+};
+-Kees
+
 -- 
-2.6.2
+Kees Cook
+Chrome OS Security
