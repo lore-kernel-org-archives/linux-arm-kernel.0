@@ -1,294 +1,122 @@
-From: Gang.Liu@freescale.com (Liu Gang)
-Date: Wed, 4 Nov 2015 14:48:24 +0800
-Subject: [PATCH 2/2] drivers/gpio: Port gpio driver to layerscape platform
-In-Reply-To: <1446619704-27669-1-git-send-email-Gang.Liu@freescale.com>
-References: <1446619704-27669-1-git-send-email-Gang.Liu@freescale.com>
-Message-ID: <1446619704-27669-2-git-send-email-Gang.Liu@freescale.com>
+From: zlim.lnx@gmail.com (Zi Shen Lim)
+Date: Tue,  3 Nov 2015 22:56:44 -0800
+Subject: [PATCH] arm64: bpf: fix div-by-zero case
+Message-ID: <1446620204-4228-1-git-send-email-zlim.lnx@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Layerscape has the same ip block/controller as
-GPIO on powerpc platform(MPC8XXX).
+In the case of division by zero in a BPF program:
+	A = A / X;  (X == 0)
+the expected behavior is to terminate with return value 0.
 
-So use portable i/o accessors, as in_be32/out_be32
-accessors are Power architecture specific whereas
-ioread32/iowrite32 and ioread32be/iowrite32be are
-available in other architectures.
+This is confirmed by the test case introduced in commit 86bf1721b226
+("test_bpf: add tests checking that JIT/interpreter sets A and X to 0.").
 
-Layerscape GPIO controller's registers may be big
-or little endian, so the code needs to get the
-endian property from DTB, then make additional
-functions to fit right register read/write
-operations.
+Reported-by: Shi, Yang <yang.shi@linaro.org>
+CC: Xi Wang <xi.wang@gmail.com>
+CC: Alexei Starovoitov <ast@plumgrid.com>
+CC: Catalin Marinas <catalin.marinas@arm.com>
+CC: linux-arm-kernel at lists.infradead.org
+CC: linux-kernel at vger.kernel.org
+Fixes: e54bcde3d69d ("arm64: eBPF JIT compiler")
+Cc: <stable@vger.kernel.org> # 3.18+
+Signed-off-by: Zi Shen Lim <zlim.lnx@gmail.com>
+---
+ arch/arm64/net/bpf_jit.h      |  3 ++-
+ arch/arm64/net/bpf_jit_comp.c | 37 +++++++++++++++++++++++++------------
+ 2 files changed, 27 insertions(+), 13 deletions(-)
 
-Currently the code can support ls2080a GPIO with
-little endian registers. And it can also work well
-on other layerscape platform with big endian GPIO
-registers.
-
-Signed-off-by: Liu Gang <Gang.Liu@freescale.com>
-Signed-off-by: Shaveta Leekha <shaveta@freescale.com>
-
-diff --git a/drivers/gpio/Kconfig b/drivers/gpio/Kconfig
-index 8949b3f..c3ca283 100644
---- a/drivers/gpio/Kconfig
-+++ b/drivers/gpio/Kconfig
-@@ -290,12 +290,12 @@ config GPIO_MPC5200
- 	depends on PPC_MPC52xx
- 
- config GPIO_MPC8XXX
--	bool "MPC512x/MPC8xxx GPIO support"
-+	bool "MPC512x/MPC8xxx/QorIQ GPIO support"
- 	depends on PPC_MPC512x || PPC_MPC831x || PPC_MPC834x || PPC_MPC837x || \
--		   FSL_SOC_BOOKE || PPC_86xx
-+		   FSL_SOC_BOOKE || PPC_86xx || ARCH_LAYERSCAPE
- 	help
- 	  Say Y here if you're going to use hardware that connects to the
--	  MPC512x/831x/834x/837x/8572/8610 GPIOs.
-+	  MPC512x/831x/834x/837x/8572/8610/QorIQ GPIOs.
- 
- config GPIO_MSM_V2
- 	tristate "Qualcomm MSM GPIO v2"
-diff --git a/drivers/gpio/gpio-mpc8xxx.c b/drivers/gpio/gpio-mpc8xxx.c
-index 48ef368..eb7a1ca 100644
---- a/drivers/gpio/gpio-mpc8xxx.c
-+++ b/drivers/gpio/gpio-mpc8xxx.c
-@@ -1,5 +1,5 @@
+diff --git a/arch/arm64/net/bpf_jit.h b/arch/arm64/net/bpf_jit.h
+index 98a26ce..aee5637 100644
+--- a/arch/arm64/net/bpf_jit.h
++++ b/arch/arm64/net/bpf_jit.h
+@@ -1,7 +1,7 @@
  /*
-- * GPIOs on MPC512x/8349/8572/8610 and compatible
-+ * GPIOs on MPC512x/8349/8572/8610/QorIQ and compatible
+  * BPF JIT compiler for ARM64
   *
-  * Copyright (C) 2008 Peter Korsgaard <jacmet@sunsite.dk>
+- * Copyright (C) 2014 Zi Shen Lim <zlim.lnx@gmail.com>
++ * Copyright (C) 2014-2015 Zi Shen Lim <zlim.lnx@gmail.com>
   *
-@@ -19,6 +19,7 @@
- #include <linux/gpio.h>
- #include <linux/slab.h>
- #include <linux/irq.h>
-+#include <linux/irqdomain.h>
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License version 2 as
+@@ -35,6 +35,7 @@
+ 	aarch64_insn_gen_comp_branch_imm(0, offset, Rt, A64_VARIANT(sf), \
+ 		AARCH64_INSN_BRANCH_COMP_##type)
+ #define A64_CBZ(sf, Rt, imm19) A64_COMP_BRANCH(sf, Rt, (imm19) << 2, ZERO)
++#define A64_CBNZ(sf, Rt, imm19) A64_COMP_BRANCH(sf, Rt, (imm19) << 2, NONZERO)
  
- #define MPC8XXX_GPIO_PINS	32
+ /* Conditional branch (immediate) */
+ #define A64_COND_BRANCH(cond, offset) \
+diff --git a/arch/arm64/net/bpf_jit_comp.c b/arch/arm64/net/bpf_jit_comp.c
+index c047598..9ae6f23 100644
+--- a/arch/arm64/net/bpf_jit_comp.c
++++ b/arch/arm64/net/bpf_jit_comp.c
+@@ -1,7 +1,7 @@
+ /*
+  * BPF JIT compiler for ARM64
+  *
+- * Copyright (C) 2014 Zi Shen Lim <zlim.lnx@gmail.com>
++ * Copyright (C) 2014-2015 Zi Shen Lim <zlim.lnx@gmail.com>
+  *
+  * This program is free software; you can redistribute it and/or modify
+  * it under the terms of the GNU General Public License version 2 as
+@@ -225,6 +225,17 @@ static int build_insn(const struct bpf_insn *insn, struct jit_ctx *ctx)
+ 	u8 jmp_cond;
+ 	s32 jmp_offset;
  
-@@ -44,6 +45,27 @@ struct mpc8xxx_gpio_chip {
- 	const void *of_dev_id_data;
- };
- 
-+static bool gpio_little_endian;
-+static inline u32 gpio_in32(void __iomem *addr)
-+{
-+	u32 val;
++#define check_imm(bits, imm) do {				\
++	if ((((imm) > 0) && ((imm) >> (bits))) ||		\
++	    (((imm) < 0) && (~(imm) >> (bits)))) {		\
++		pr_info("[%2d] imm=%d(0x%x) out of range\n",	\
++			i, imm, imm);				\
++		return -EINVAL;					\
++	}							\
++} while (0)
++#define check_imm19(imm) check_imm(19, imm)
++#define check_imm26(imm) check_imm(26, imm)
 +
-+	if (gpio_little_endian)
-+		val = ioread32(addr);
-+	else
-+		val = ioread32be(addr);
+ 	switch (code) {
+ 	/* dst = src */
+ 	case BPF_ALU | BPF_MOV | BPF_X:
+@@ -258,8 +269,21 @@ static int build_insn(const struct bpf_insn *insn, struct jit_ctx *ctx)
+ 		break;
+ 	case BPF_ALU | BPF_DIV | BPF_X:
+ 	case BPF_ALU64 | BPF_DIV | BPF_X:
++	{
++		const u8 r0 = bpf2a64[BPF_REG_0];
 +
-+	return val;
-+}
-+
-+static inline void gpio_out32(u32 val, void __iomem *addr)
-+{
-+	if (gpio_little_endian)
-+		iowrite32(val, addr);
-+	else
-+		iowrite32be(val, addr);
-+}
-+
- static inline u32 mpc8xxx_gpio2mask(unsigned int gpio)
- {
- 	return 1u << (MPC8XXX_GPIO_PINS - 1 - gpio);
-@@ -59,9 +81,17 @@ static void mpc8xxx_gpio_save_regs(struct of_mm_gpio_chip *mm)
- {
- 	struct mpc8xxx_gpio_chip *mpc8xxx_gc = to_mpc8xxx_gpio_chip(mm);
- 
--	mpc8xxx_gc->data = in_be32(mm->regs + GPIO_DAT);
-+	mpc8xxx_gc->data = gpio_in32(mm->regs + GPIO_DAT);
- }
- 
-+/* Generic set and clear bits accessor ports */
-+#define bgpio_setbits32(_addr, _v) \
-+		gpio_out32(gpio_in32(_addr) |  (_v), (_addr))
-+#define bgpio_clrbits32(_addr, _v) \
-+		gpio_out32(gpio_in32(_addr) & ~(_v), (_addr))
-+#define bgpio_clrsetbits32(addr, clear, set) \
-+		gpio_out32((gpio_in32(addr) & ~(clear)) | (set), (addr))
-+
- /* Workaround GPIO 1 errata on MPC8572/MPC8536. The status of GPIOs
-  * defined as output cannot be determined by reading GPDAT register,
-  * so we use shadow data register instead. The status of input pins
-@@ -74,9 +104,9 @@ static int mpc8572_gpio_get(struct gpio_chip *gc, unsigned int gpio)
- 	struct mpc8xxx_gpio_chip *mpc8xxx_gc = to_mpc8xxx_gpio_chip(mm);
- 	u32 out_mask, out_shadow;
- 
--	out_mask = in_be32(mm->regs + GPIO_DIR);
-+	out_mask = gpio_in32(mm->regs + GPIO_DIR);
- 
--	val = in_be32(mm->regs + GPIO_DAT) & ~out_mask;
-+	val = gpio_in32(mm->regs + GPIO_DAT) & ~out_mask;
- 	out_shadow = mpc8xxx_gc->data & out_mask;
- 
- 	return (val | out_shadow) & mpc8xxx_gpio2mask(gpio);
-@@ -86,7 +116,7 @@ static int mpc8xxx_gpio_get(struct gpio_chip *gc, unsigned int gpio)
- {
- 	struct of_mm_gpio_chip *mm = to_of_mm_gpio_chip(gc);
- 
--	return in_be32(mm->regs + GPIO_DAT) & mpc8xxx_gpio2mask(gpio);
-+	return gpio_in32(mm->regs + GPIO_DAT) & mpc8xxx_gpio2mask(gpio);
- }
- 
- static void mpc8xxx_gpio_set(struct gpio_chip *gc, unsigned int gpio, int val)
-@@ -102,7 +132,7 @@ static void mpc8xxx_gpio_set(struct gpio_chip *gc, unsigned int gpio, int val)
- 	else
- 		mpc8xxx_gc->data &= ~mpc8xxx_gpio2mask(gpio);
- 
--	out_be32(mm->regs + GPIO_DAT, mpc8xxx_gc->data);
-+	gpio_out32(mpc8xxx_gc->data, mm->regs + GPIO_DAT);
- 
- 	raw_spin_unlock_irqrestore(&mpc8xxx_gc->lock, flags);
- }
-@@ -128,7 +158,7 @@ static void mpc8xxx_gpio_set_multiple(struct gpio_chip *gc,
- 		}
- 	}
- 
--	out_be32(mm->regs + GPIO_DAT, mpc8xxx_gc->data);
-+	gpio_out32(mpc8xxx_gc->data, mm->regs + GPIO_DAT);
- 
- 	raw_spin_unlock_irqrestore(&mpc8xxx_gc->lock, flags);
- }
-@@ -141,7 +171,7 @@ static int mpc8xxx_gpio_dir_in(struct gpio_chip *gc, unsigned int gpio)
- 
- 	raw_spin_lock_irqsave(&mpc8xxx_gc->lock, flags);
- 
--	clrbits32(mm->regs + GPIO_DIR, mpc8xxx_gpio2mask(gpio));
-+	bgpio_clrbits32(mm->regs + GPIO_DIR, mpc8xxx_gpio2mask(gpio));
- 
- 	raw_spin_unlock_irqrestore(&mpc8xxx_gc->lock, flags);
- 
-@@ -158,7 +188,7 @@ static int mpc8xxx_gpio_dir_out(struct gpio_chip *gc, unsigned int gpio, int val
- 
- 	raw_spin_lock_irqsave(&mpc8xxx_gc->lock, flags);
- 
--	setbits32(mm->regs + GPIO_DIR, mpc8xxx_gpio2mask(gpio));
-+	bgpio_setbits32(mm->regs + GPIO_DIR, mpc8xxx_gpio2mask(gpio));
- 
- 	raw_spin_unlock_irqrestore(&mpc8xxx_gc->lock, flags);
- 
-@@ -201,7 +231,8 @@ static void mpc8xxx_gpio_irq_cascade(struct irq_desc *desc)
- 	struct of_mm_gpio_chip *mm = &mpc8xxx_gc->mm_gc;
- 	unsigned int mask;
- 
--	mask = in_be32(mm->regs + GPIO_IER) & in_be32(mm->regs + GPIO_IMR);
-+	mask = gpio_in32(mm->regs + GPIO_IER)
-+		& gpio_in32(mm->regs + GPIO_IMR);
- 	if (mask)
- 		generic_handle_irq(irq_linear_revmap(mpc8xxx_gc->irq,
- 						     32 - ffs(mask)));
-@@ -217,7 +248,8 @@ static void mpc8xxx_irq_unmask(struct irq_data *d)
- 
- 	raw_spin_lock_irqsave(&mpc8xxx_gc->lock, flags);
- 
--	setbits32(mm->regs + GPIO_IMR, mpc8xxx_gpio2mask(irqd_to_hwirq(d)));
-+	bgpio_setbits32(mm->regs + GPIO_IMR,
-+			mpc8xxx_gpio2mask(irqd_to_hwirq(d)));
- 
- 	raw_spin_unlock_irqrestore(&mpc8xxx_gc->lock, flags);
- }
-@@ -230,7 +262,8 @@ static void mpc8xxx_irq_mask(struct irq_data *d)
- 
- 	raw_spin_lock_irqsave(&mpc8xxx_gc->lock, flags);
- 
--	clrbits32(mm->regs + GPIO_IMR, mpc8xxx_gpio2mask(irqd_to_hwirq(d)));
-+	bgpio_clrbits32(mm->regs + GPIO_IMR,
-+			mpc8xxx_gpio2mask(irqd_to_hwirq(d)));
- 
- 	raw_spin_unlock_irqrestore(&mpc8xxx_gc->lock, flags);
- }
-@@ -240,7 +273,7 @@ static void mpc8xxx_irq_ack(struct irq_data *d)
- 	struct mpc8xxx_gpio_chip *mpc8xxx_gc = irq_data_get_irq_chip_data(d);
- 	struct of_mm_gpio_chip *mm = &mpc8xxx_gc->mm_gc;
- 
--	out_be32(mm->regs + GPIO_IER, mpc8xxx_gpio2mask(irqd_to_hwirq(d)));
-+	gpio_out32(mpc8xxx_gpio2mask(irqd_to_hwirq(d)), mm->regs + GPIO_IER);
- }
- 
- static int mpc8xxx_irq_set_type(struct irq_data *d, unsigned int flow_type)
-@@ -252,15 +285,15 @@ static int mpc8xxx_irq_set_type(struct irq_data *d, unsigned int flow_type)
- 	switch (flow_type) {
- 	case IRQ_TYPE_EDGE_FALLING:
- 		raw_spin_lock_irqsave(&mpc8xxx_gc->lock, flags);
--		setbits32(mm->regs + GPIO_ICR,
--			  mpc8xxx_gpio2mask(irqd_to_hwirq(d)));
-+		bgpio_setbits32(mm->regs + GPIO_ICR,
-+				mpc8xxx_gpio2mask(irqd_to_hwirq(d)));
- 		raw_spin_unlock_irqrestore(&mpc8xxx_gc->lock, flags);
++		/* if (src == 0) return 0 */
++		jmp_offset = 3; /* skip ahead to else path */
++		check_imm19(jmp_offset);
++		emit(A64_CBNZ(is64, src, jmp_offset), ctx);
++		emit(A64_MOVZ(1, r0, 0, 0), ctx);
++		jmp_offset = epilogue_offset(ctx);
++		check_imm26(jmp_offset);
++		emit(A64_B(jmp_offset), ctx);
++		/* else */
+ 		emit(A64_UDIV(is64, dst, dst, src), ctx);
  		break;
- 
- 	case IRQ_TYPE_EDGE_BOTH:
- 		raw_spin_lock_irqsave(&mpc8xxx_gc->lock, flags);
--		clrbits32(mm->regs + GPIO_ICR,
--			  mpc8xxx_gpio2mask(irqd_to_hwirq(d)));
-+		bgpio_clrbits32(mm->regs + GPIO_ICR,
-+				mpc8xxx_gpio2mask(irqd_to_hwirq(d)));
- 		raw_spin_unlock_irqrestore(&mpc8xxx_gc->lock, flags);
- 		break;
- 
-@@ -292,20 +325,20 @@ static int mpc512x_irq_set_type(struct irq_data *d, unsigned int flow_type)
- 	case IRQ_TYPE_EDGE_FALLING:
- 	case IRQ_TYPE_LEVEL_LOW:
- 		raw_spin_lock_irqsave(&mpc8xxx_gc->lock, flags);
--		clrsetbits_be32(reg, 3 << shift, 2 << shift);
-+		bgpio_clrsetbits32(reg, 3 << shift, 2 << shift);
- 		raw_spin_unlock_irqrestore(&mpc8xxx_gc->lock, flags);
- 		break;
- 
- 	case IRQ_TYPE_EDGE_RISING:
- 	case IRQ_TYPE_LEVEL_HIGH:
- 		raw_spin_lock_irqsave(&mpc8xxx_gc->lock, flags);
--		clrsetbits_be32(reg, 3 << shift, 1 << shift);
-+		bgpio_clrsetbits32(reg, 3 << shift, 1 << shift);
- 		raw_spin_unlock_irqrestore(&mpc8xxx_gc->lock, flags);
- 		break;
- 
- 	case IRQ_TYPE_EDGE_BOTH:
- 		raw_spin_lock_irqsave(&mpc8xxx_gc->lock, flags);
--		clrbits32(reg, 3 << shift);
-+		bgpio_clrbits32(reg, 3 << shift);
- 		raw_spin_unlock_irqrestore(&mpc8xxx_gc->lock, flags);
- 		break;
- 
-@@ -398,6 +431,14 @@ static int mpc8xxx_probe(struct platform_device *pdev)
- 	mm_gc = &mpc8xxx_gc->mm_gc;
- 	gc = &mm_gc->gc;
- 
-+	if (of_property_read_bool(np, "little-endian")) {
-+		gpio_little_endian = true;
-+		dev_dbg(&pdev->dev, "GPIO REGISTERS are LITTLE endian\n");
-+	} else {
-+		gpio_little_endian = false;
-+		dev_dbg(&pdev->dev, "GPIO REGISTERS are BIG endian\n");
 +	}
-+
- 	mm_gc->save_regs = mpc8xxx_gpio_save_regs;
- 	gc->ngpio = MPC8XXX_GPIO_PINS;
- 	gc->direction_input = mpc8xxx_gpio_dir_in;
-@@ -422,7 +463,7 @@ static int mpc8xxx_probe(struct platform_device *pdev)
- 		return ret;
+ 	case BPF_ALU | BPF_MOD | BPF_X:
+ 	case BPF_ALU64 | BPF_MOD | BPF_X:
+ 		ctx->tmp_used = 1;
+@@ -393,17 +417,6 @@ emit_bswap_uxt:
+ 		emit(A64_ASR(is64, dst, dst, imm), ctx);
+ 		break;
  
- 	mpc8xxx_gc->irqn = irq_of_parse_and_map(np, 0);
--	if (mpc8xxx_gc->irqn == NO_IRQ)
-+	if (mpc8xxx_gc->irqn == 0)
- 		return 0;
- 
- 	mpc8xxx_gc->irq = irq_domain_add_linear(np, MPC8XXX_GPIO_PINS,
-@@ -435,8 +476,8 @@ static int mpc8xxx_probe(struct platform_device *pdev)
- 		mpc8xxx_gc->of_dev_id_data = id->data;
- 
- 	/* ack and mask all irqs */
--	out_be32(mm_gc->regs + GPIO_IER, 0xffffffff);
--	out_be32(mm_gc->regs + GPIO_IMR, 0);
-+	gpio_out32(0xffffffff, mm_gc->regs + GPIO_IER);
-+	gpio_out32(0, mm_gc->regs + GPIO_IMR);
- 
- 	irq_set_chained_handler_and_data(mpc8xxx_gc->irqn,
- 					 mpc8xxx_gpio_irq_cascade, mpc8xxx_gc);
+-#define check_imm(bits, imm) do {				\
+-	if ((((imm) > 0) && ((imm) >> (bits))) ||		\
+-	    (((imm) < 0) && (~(imm) >> (bits)))) {		\
+-		pr_info("[%2d] imm=%d(0x%x) out of range\n",	\
+-			i, imm, imm);				\
+-		return -EINVAL;					\
+-	}							\
+-} while (0)
+-#define check_imm19(imm) check_imm(19, imm)
+-#define check_imm26(imm) check_imm(26, imm)
+-
+ 	/* JUMP off */
+ 	case BPF_JMP | BPF_JA:
+ 		jmp_offset = bpf2a64_offset(i + off, i, ctx);
 -- 
-2.1.0.27.g96db324
+1.9.1
