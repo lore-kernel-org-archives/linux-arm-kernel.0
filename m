@@ -1,52 +1,33 @@
-From: l.majewski@samsung.com (Lukasz Majewski)
-Date: Wed, 04 Nov 2015 11:52:11 +0100
-Subject: [PATCH 4/5] thermal: exynos: Remove unneeded semicolon
-In-Reply-To: <1444282446-6419-4-git-send-email-k.kozlowski@samsung.com>
-References: <1444282446-6419-1-git-send-email-k.kozlowski@samsung.com>
- <1444282446-6419-4-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <20151104115211.3ae5c0c0@amdc2363>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Wed, 4 Nov 2015 10:54:20 +0000
+Subject: [PATCH] ARM:dma-mapping: Handle DMA_BIDIRECTIONAL in
+ _dma_page_cpu_to_dev()
+In-Reply-To: <20151104103913.GC5405@arm.com>
+References: <1446631008-5854-1-git-send-email-sanjeev_sharma@mentor.com>
+ <20151104103913.GC5405@arm.com>
+Message-ID: <20151104105420.GL8644@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Krzysztof,
-
-> Remove semicolons after switch statement.
+On Wed, Nov 04, 2015 at 10:39:13AM +0000, Will Deacon wrote:
+> On Wed, Nov 04, 2015 at 03:26:48PM +0530, Sanjeev Sharma wrote:
+> > _dma_page_cpu_to_dev() treat DMA_BIDIRECTIONAL similar to DMA_TO_DEVICE
+> > which means that destination buffer is device memory,means cpu may have
+> > written some data to source buffer and data may be in cache line.For
+> > cleaner operation we need to call outer_flush_range() which will
+> > clean and invalidate outer cache lines.
 > 
-> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> ---
->  drivers/thermal/samsung/exynos_tmu.c | 4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/thermal/samsung/exynos_tmu.c
-> b/drivers/thermal/samsung/exynos_tmu.c index
-> eac6aebf82f3..1af7ea8dda71 100644 ---
-> a/drivers/thermal/samsung/exynos_tmu.c +++
-> b/drivers/thermal/samsung/exynos_tmu.c @@ -548,7 +548,7 @@ static int
-> exynos5433_tmu_initialize(struct platform_device *pdev) default:
->  		pdata->cal_type = TYPE_ONE_POINT_TRIMMING;
->  		break;
-> -	};
-> +	}
->  
->  	dev_info(&pdev->dev, "Calibration type is %d-point
-> calibration\n", cal_type ?  2 : 1);
-> @@ -1356,7 +1356,7 @@ static int exynos_tmu_probe(struct
-> platform_device *pdev) break;
->  	default:
->  		break;
-> -	};
-> +	}
->  
->  	/*
->  	 * data->tzd must be registered before calling
-> exynos_tmu_initialize(),
+> Why isn't the clean sufficient in this case? We're mapping the buffer
+> to the device, so we clean the dirty lines in the CPU caches and make
+> them visible to the device. If the CPU later wants to read the buffer
+> (i.e. after the device has DMA'd into it), you'll need to map the
+> buffer to the CPU, which will perform the invalidation of the CPU caches.
 
-Acked-by: Lukasz Majewski <l.majewski@samsung.com>
-Tested-by: Lukasz Majewski <l.majewski@samsung.com>
+Indeed.  bidirectional mode is already handled prefectly well by this
+code.  No patches are required.
+
+(I never received the original email.)
 
 -- 
-Best regards,
-
-Lukasz Majewski
-
-Samsung R&D Institute Poland (SRPOL) | Linux Platform Group
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
