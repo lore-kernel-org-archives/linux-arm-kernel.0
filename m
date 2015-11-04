@@ -1,23 +1,24 @@
-From: phil.edworthy@renesas.com (Phil Edworthy)
-Date: Wed, 4 Nov 2015 13:57:48 +0000
-Subject: PCIe host controller behind IOMMU on ARM
-Message-ID: <PS1PR06MB11807CBE8EB2AC6B0158D2B5F52A0@PS1PR06MB1180.apcprd06.prod.outlook.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 4 Nov 2015 14:06:26 +0000
+Subject: [PATCH v2 0/2] Add audio support for Broadcom Cygnus SoC
+In-Reply-To: <1446502284-23907-1-git-send-email-ssimran@broadcom.com>
+References: <1446502284-23907-1-git-send-email-ssimran@broadcom.com>
+Message-ID: <20151104140626.GD1717@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Mon, Nov 02, 2015 at 02:11:22PM -0800, Simran Rai wrote:
 
-I am trying to hook up a PCIe host controller that sits behind an IOMMU,
-but having some problems.
+> Simran Rai (2):
+>   dt-bindings: sound: Add DT bindings for Broadcom Cygnus audio
+>   VOIP-5227 Add Broadcom Cygnus audio driver.
 
-I'm using the pcie-rcar PCIe host controller and it works fine without
-the IOMMU, and I can attach the IOMMU to the controller such that any calls
-to dma_alloc_coherent made by the controller driver uses the iommu_ops
-version of dma_ops.
-
-However, I can't see how to make the endpoints to utilise the dma_ops that
-the controller uses. Shouldn't the endpoints inherit the dma_ops from the
-controller? Any pointers for this?
-
-Thanks
-Phil
+Please use subject lines matching the style for the subsystem.  This
+makes it easier for people to identify relevant patches.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151104/6c1f9047/attachment.sig>
