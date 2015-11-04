@@ -1,31 +1,54 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Wed, 4 Nov 2015 19:31:42 +0000
-Subject: PSCI_CPU_ON flow
-In-Reply-To: <20151104171048.GE23860@leverpostej>
-References: <BY1PR0301MB1303B5D1A8CD0B7FA07AA40A822A0@BY1PR0301MB1303.namprd03.prod.outlook.com>
- <20151104171048.GE23860@leverpostej>
-Message-ID: <20151104193142.GM8644@n2100.arm.linux.org.uk>
+From: jean-michel.hautbois@veo-labs.com (Jean-Michel Hautbois)
+Date: Wed, 4 Nov 2015 20:33:04 +0100
+Subject: i.MX6: Increasing VPU frequency
+In-Reply-To: <CALHpu366MPbxJinVL2QFM11gMHx-T=M9QXNoznOTh++oHGGmrA@mail.gmail.com>
+References: <CAH-u=82M1yCmPjBg5qeiC8JiHjM8+WsP+utX_VPKfJwJsu0QFg@mail.gmail.com>
+ <CALHpu366MPbxJinVL2QFM11gMHx-T=M9QXNoznOTh++oHGGmrA@mail.gmail.com>
+Message-ID: <CAH-u=81hMAF=r6rUKF+iuta3nC6n+4EDDz7Rn2-oGYbkbN0Jyg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 04, 2015 at 05:10:49PM +0000, Mark Rutland wrote:
-> Yes, the CPU should start at __pa(secondary_entry) in head.S. From there
-> it will branch to secondary_startup:
-> 
-> ENTRY(secondary_entry)
-> 	bl      el2_setup                       // Drop to EL1
-> 	bl      set_cpu_boot_mode_flag
-> 	b       secondary_startup
-> ENDPROC(secondary_entry)
+2015-11-04 18:04 GMT+01:00 Jon Nettleton <jon.nettleton@gmail.com>:
+> On Wed, Nov 4, 2015 at 5:52 PM, Jean-Michel Hautbois
+> <jean-michel.hautbois@veo-labs.com> wrote:
+>> Hi !
+>>
+>> I can see in FSL kernel that VPU is configurable to 352M (it defaults
+>> at 264MHz in mainline I think).
+>> In the TRM, it is even specified at 352MHz as a default frequency,
+>> with a maximum of 540MHz.
+>>
+>> Would it be possible to allow this clock rating modification if, for
+>> instance, we select a performance governor in cpufreq, or if a coda
+>> encoder is started with 1080p for instance ?
+>> If so, then how is it doable properly ?
+>
+> For some reason the FSL kernel configures the VPU to run at 352Mhz in
+> a very odd way that requires limiting the min cpu-frequency to 792Mhz.
+> It also requires clocking down a bunch of devices on pll2_pfd2_396m to
+> 352Mhz.
+>
+> The simple solution to this is to instead parent the VPU to
+> pll2_pfd0_352m which is unused.  I have found by default it is stable
+> decoding but unstable encoding at 352Mhz, most likely due to the
+> voltage changes needed that limiting the min cpu-freq to 792Mhz
+> provides.  However everything seems to work quite reliably clocking
+> that pfd to 327Mhz, which still gives a boost of almost 24%
+>
+> In my testing the performance gain in then going from 327 to 352 is
+> minimal.  Generally I think you hit AXI bus limitations rather than
+> VPU performance.
 
-We've been busy telling people to implement errata workarounds in firmware,
-and we're also busy telling people that their secondary CPUs should start
-in the kernel.  The two are incompatible with each other...
+Interesting.
+So you propose to add something like the following in
+drivers/clk/imx/clk-imx6q.cdrivers/clk/imx/clk-imx6q.c :
+imx_clk_set_rate(clk[IMX6QDL_CLK_PLL2_PFD0_352M], 327000000);
+imx_clk_set_parent(clk[IMX6QDL_CLK_VPU_AXI_SEL],
+clk[IMX6QDL_CLK_PLL2_PFD0_352M]);
 
-I think we need to come up with a clearer statement on both these subjects
-which gives people a good idea about what's required, and doesn't send out
-confusing messages.
+This should end up with a fastest VPU (in fact ~25% boost is good).
+Is it the correct way to do it ?
+Should it be done in coda instead ? And only when needed ?
 
--- 
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Thanks,
+JM
