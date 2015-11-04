@@ -1,56 +1,41 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Wed, 4 Nov 2015 08:05:47 -0800
-Subject: [PATCH v2 2/2] watchdog: imx2_wdt: add set_pretimeout interface
-In-Reply-To: <563A2849.5040707@mentor.com>
-References: <1446531084-15365-1-git-send-email-b38343@freescale.com>
- <1446531084-15365-2-git-send-email-b38343@freescale.com>
- <563A2849.5040707@mentor.com>
-Message-ID: <563A2CDB.7090101@roeck-us.net>
+From: mchan@broadcom.com (Michael Chan)
+Date: Wed, 4 Nov 2015 08:07:53 -0800
+Subject: [PATCH] bnxt_en: add VXLAN dependency
+In-Reply-To: <10667823.xAtO4QOJMM@wuerfel>
+References: <10667823.xAtO4QOJMM@wuerfel>
+Message-ID: <1446653274.3700.5.camel@LTIRV-MCHAN1.corp.ad.broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/04/2015 07:46 AM, Vladimir Zapolskiy wrote:
-> Hi Robin,
->
-> On 03.11.2015 08:11, Robin Gong wrote:
->> Enable set_pretimeout interface and trigger the pretimeout interrupt before
->> watchdog timeout event happen.
->>
->> Signed-off-by: Robin Gong <b38343@freescale.com>
->> ---
->
-> [snip]
->
->> +
->> +static irqreturn_t imx2_wdt_isr(int irq, void *dev_id)
->> +{
->> +	struct platform_device *pdev = dev_id;
->> +	struct watchdog_device *wdog = platform_get_drvdata(pdev);
->> +	struct imx2_wdt_device *wdev = watchdog_get_drvdata(wdog);
->> +	u32 val;
->> +
->> +	regmap_read(wdev->regmap, IMX2_WDT_WICR, &val);
->> +	if (val & IMX2_WDT_WICR_WTIS) {
->> +		/*clear interrupt status bit*/
->> +		regmap_write(wdev->regmap, IMX2_WDT_WICR, val);
->> +		panic("pre-timeout:%d, %d Seconds remained\n", wdog->pretimeout,
->> +		      wdog->timeout - wdog->pretimeout);
->
-> I don't think it is a good idea to panic on pretimeout interrupt, for
-> instance pretimeout interrupt may be used for any other purposes - ping
-> watchdog, dump some system information before reboot and so on.
->
-> In general I am even not completely convinced that the pretimeout interrupt
-> handler should be placed in the driver, it may happen that there are some
-> users outside, who wants to get this interrupt and act according to the event.
->
+On Wed, 2015-11-04 at 16:00 +0100, Arnd Bergmann wrote: 
+> VXLAN may be a loadable module, and this driver cannot be built-in
+> in that case, or we get a link error:
+> 
+> drivers/built-in.o: In function `__bnxt_open_nic':
+> drivers/net/ethernet/broadcom/bnxt/bnxt.c:4581: undefined reference to `vxlan_get_rx_port'
+> 
+> This adds a Kconfig dependency that ensures that either VXLAN is
+> disabled (which the driver handles correctly), or we depend on
+> VXLAN itself and disallow built-in compilation when VXLAN is
+> a module.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-Ah yes, this is one of the reasons why adding this functionality into the
-watchdog core keeps going nowhere. Some of the people involved absolutely
-insist that a watchdog pretimeout should result in a panic, others are just
-as strongly opposed to it. At the end, there is no consensus, and we end up
-doing nothing, since nothing is better than each driver behaving differently.
+Thanks.
+Acked-by: Michael Chan <mchan@broadcom.com>
 
-Just like politics, I guess :-(.
-
-Guenter
+> Fixes: c0c050c58d84 ("bnxt_en: New Broadcom ethernet driver.")
+> 
+> diff --git a/drivers/net/ethernet/broadcom/Kconfig b/drivers/net/ethernet/broadcom/Kconfig
+> index 67a7d520d9f5..8550df189ceb 100644
+> --- a/drivers/net/ethernet/broadcom/Kconfig
+> +++ b/drivers/net/ethernet/broadcom/Kconfig
+> @@ -173,6 +173,7 @@ config SYSTEMPORT
+>  config BNXT
+>  	tristate "Broadcom NetXtreme-C/E support"
+>  	depends on PCI
+> +	depends on VXLAN || VXLAN=n
+>  	select FW_LOADER
+>  	select LIBCRC32C
+>  	---help---
+> 
