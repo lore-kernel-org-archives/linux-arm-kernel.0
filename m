@@ -1,97 +1,218 @@
-From: ebiederm@xmission.com (Eric W. Biederman)
-Date: Wed, 04 Nov 2015 16:10:43 -0600
-Subject: [PATCH v2 1/2] mm: mmap: Add new /proc tunable for mmap_base ASLR.
-In-Reply-To: <563A5D0D.9030109@android.com> (Daniel Cashman's message of "Wed,
- 4 Nov 2015 11:31:25 -0800")
-References: <1446574204-15567-1-git-send-email-dcashman@android.com>
- <20151103160410.34bbebc805c17d2f41150a19@linux-foundation.org>
- <87k2pyppfk.fsf@x220.int.ebiederm.org>
- <20151103173156.9ca17f52.akpm@linux-foundation.org>
- <563A5D0D.9030109@android.com>
-Message-ID: <87r3k5mn4s.fsf@x220.int.ebiederm.org>
+From: luka.perkov@sartura.hr (Luka Perkov)
+Date: Wed, 4 Nov 2015 22:25:05 +0000
+Subject: [PATCH 1/4] ARM: dts: kirkwood: add Linksys EA4500
+Message-ID: <00000150d49a7cf7-e97bf540-89ce-49bf-a25e-2d082acab273-000000@email.amazonses.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Daniel Cashman <dcashman@android.com> writes:
+Based on dts files from OpenWrt.
 
-> On 11/3/15 5:31 PM, Andrew Morton wrote:
->> On Tue, 03 Nov 2015 18:40:31 -0600 ebiederm at xmission.com (Eric W. Biederman) wrote:
->> 
->>> Andrew Morton <akpm@linux-foundation.org> writes:
->>>
->>>> On Tue,  3 Nov 2015 10:10:03 -0800 Daniel Cashman <dcashman@android.com> wrote:
->>>>
->>>>> ASLR currently only uses 8 bits to generate the random offset for the
->>>>> mmap base address on 32 bit architectures. This value was chosen to
->>>>> prevent a poorly chosen value from dividing the address space in such
->>>>> a way as to prevent large allocations. This may not be an issue on all
->>>>> platforms. Allow the specification of a minimum number of bits so that
->>>>> platforms desiring greater ASLR protection may determine where to place
->>>>> the trade-off.
->>>>
->>>> Can we please include a very good description of the motivation for this
->>>> change?  What is inadequate about the current code, what value does the
->>>> enhancement have to our users, what real-world problems are being solved,
->>>> etc.
->>>>
->>>> Because all we have at present is "greater ASLR protection", which doesn't
->>>> really tell anyone anything.
->>>
->>> The description seemed clear to me.
->>>
->>> More random bits, more entropy, more work needed to brute force.
->>>
->>> 8 bits only requires 256 tries (or a 1 in 256) chance to brute force
->>> something.
->> 
->> Of course, but that's not really very useful.
->> 
->>> We have seen in the last couple of months on Android how only having 8 bits
->>> doesn't help much.
->> 
->> Now THAT is important.  What happened here and how well does the
->> proposed fix improve things?  How much longer will a brute-force attack
->> take to succeed, with a particular set of kernel parameters?  Is the
->> new duration considered to be sufficiently long and if not, are there
->> alternative fixes we should be looking at?
->> 
->> Stuff like this.
->> 
->>> Each additional bit doubles the protection (and unfortunately also
->>> increases fragmentation of the userspace address space).
->> 
->> OK, so the benefit comes with a cost and people who are configuring
->> systems (and the people who are reviewing this patchset!) need to
->> understand the tradeoffs.  Please.
->
-> The direct motivation here was in response to the libstagefright
-> vulnerabilities that affected Android, specifically to information
-> provided by Google's project zero at:
->
-> http://googleprojectzero.blogspot.com/2015/09/stagefrightened.html
->
-> The attack there specifically used the limited randomness used in
-> generating the mmap base address as part of a brute-force-based exploit.
->  In this particular case, the attack was against the mediaserver process
-> on Android, which was limited to respawning every 5 seconds, giving the
-> attacker an average expected success rate of defeating the mmap ASLR
-> after over 10 minutes (128 tries at 5 seconds each).  With change to the
-> maximum proposed value of 16 bits, this would change to over 45 hours
-> (32768 tries), which would make the user of such a system much more
-> likely to notice such an attack.
->
-> I understand the desire for this clarification, and will happily try to
-> improve the explanation for this change, especially so that those
-> considering use of this option understand the tradeoffs, but I also view
-> this as one particular hardening change which is a component of making
-> attacks such as these harder, rather than the only solution.  As for the
-> clarification itself, where would you like it?  I could include a cover
-> letter for this patch-set, elaborate more in the commit message itself,
-> add more to the Kconfig help description, or some combination of the above.
+Signed-off-by: Luka Perkov <luka.perkov@sartura.hr>
+---
+ .../devicetree/bindings/arm/marvell,kirkwood.txt   |   1 +
+ .../devicetree/bindings/vendor-prefixes.txt        |   1 +
+ arch/arm/boot/dts/Makefile                         |   1 +
+ arch/arm/boot/dts/kirkwood-ea4500.dts              | 156 +++++++++++++++++++++
+ 4 files changed, 159 insertions(+)
+ create mode 100644 arch/arm/boot/dts/kirkwood-ea4500.dts
 
-Unless I am mistaken this there is no cross over between different
-processes of this randomization.  Would it make sense to have this as
-an rlimit so that if you have processes on the system that are affected
-by the tradeoff differently this setting can be changed per process?
-
-Eric
+diff --git a/Documentation/devicetree/bindings/arm/marvell,kirkwood.txt b/Documentation/devicetree/bindings/arm/marvell,kirkwood.txt
+index 5171ad8..7a99d4a 100644
+--- a/Documentation/devicetree/bindings/arm/marvell,kirkwood.txt
++++ b/Documentation/devicetree/bindings/arm/marvell,kirkwood.txt
+@@ -49,6 +49,7 @@ board. Currently known boards are:
+ "lacie,netspace_max_v2"
+ "lacie,netspace_mini_v2"
+ "lacie,netspace_v2"
++"linksys,ea4500"
+ "marvell,db-88f6281-bp"
+ "marvell,db-88f6282-bp"
+ "marvell,mv88f6281gtw-ge"
+diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+index 82d2ac9..264f8ba 100644
+--- a/Documentation/devicetree/bindings/vendor-prefixes.txt
++++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+@@ -124,6 +124,7 @@ lantiq	Lantiq Semiconductor
+ lenovo	Lenovo Group Ltd.
+ lg	LG Corporation
+ linux	Linux-specific binding
++linksys	Belkin International, Inc.
+ lsi	LSI Corp. (LSI Logic)
+ lltc	Linear Technology Corporation
+ marvell	Marvell Technology Group Ltd.
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index bb8fa02..a16c04b 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -168,6 +168,7 @@ dtb-$(CONFIG_MACH_KIRKWOOD) += \
+ 	kirkwood-ds411.dtb \
+ 	kirkwood-ds411j.dtb \
+ 	kirkwood-ds411slim.dtb \
++	kirkwood-ea4500.dtb \
+ 	kirkwood-goflexnet.dtb \
+ 	kirkwood-guruplug-server-plus.dtb \
+ 	kirkwood-ib62x0.dtb \
+diff --git a/arch/arm/boot/dts/kirkwood-ea4500.dts b/arch/arm/boot/dts/kirkwood-ea4500.dts
+new file mode 100644
+index 0000000..caccc8e
+--- /dev/null
++++ b/arch/arm/boot/dts/kirkwood-ea4500.dts
+@@ -0,0 +1,156 @@
++/*
++ * kirkwood-ea4500.dts - Device Tree file for Linksys EA4500
++ *
++ * (c) 2013 Jonas Gorski <jogo@openwrt.org>
++ * (c) 2013 Deutsche Telekom Innovation Laboratories
++ * (c) 2014 Luka Perkov <luka.perkov@sartura.hr>
++ *
++ * This file is licensed under the terms of the GNU General Public
++ * License version 2.  This program is licensed "as is" without any
++ * warranty of any kind, whether express or implied.
++ */
++
++/dts-v1/;
++
++#include "kirkwood.dtsi"
++#include "kirkwood-6282.dtsi"
++
++/ {
++	model = "Linksys EA4500";
++	compatible = "linksys,ea4500", "marvell,kirkwood-88f6282", "marvell,kirkwood";
++
++	memory {
++		device_type = "memory";
++		reg = <0x00000000 0x8000000>;
++	};
++
++	chosen {
++		bootargs = "console=ttyS0,115200n8 earlyprintk";
++	};
++
++	mbus {
++		pcie-controller {
++			status = "okay";
++
++			pcie at 1,0 {
++				status = "okay";
++			};
++
++			pcie at 2,0 {
++				status = "okay";
++			};
++		};
++	};
++
++	ocp at f1000000 {
++		pinctrl: pin-controller at 10000 {
++			pmx_led_white_health: pmx-led-white-health {
++				marvell,pins = "mpp7";
++				marvell,function = "gpo";
++			};
++			pmx_led_white_pulse: pmx-led-white-pulse {
++				marvell,pins = "mpp14";
++				marvell,function = "gpio";
++			};
++			pmx_btn_wps: pmx-btn-wps {
++				marvell,pins = "mpp47";
++				marvell,function = "gpio";
++			};
++			pmx_btn_reset: pmx-btn-reset {
++				marvell,pins = "mpp48";
++				marvell,function = "gpio";
++			};
++		};
++
++		rtc at 10300 {
++			status = "disabled";
++		};
++
++		serial at 12000 {
++			status = "okay";
++		};
++
++	};
++
++	gpio_keys {
++		compatible = "gpio-keys";
++		#address-cells = <1>;
++		#size-cells = <0>;
++		pinctrl-0 = < &pmx_btn_wps &pmx_btn_reset >;
++		pinctrl-names = "default";
++
++		button at 15 {
++			label = "WPS Button";
++			linux,code = <KEY_WPS_BUTTON>;
++			gpios = <&gpio1 15 GPIO_ACTIVE_LOW>;
++		};
++
++		button at 16 {
++			label = "Reset Button";
++			linux,code = <KEY_RESTART>;
++			gpios = <&gpio1 16 GPIO_ACTIVE_LOW>;
++		};
++	};
++
++	gpio-leds {
++		compatible = "gpio-leds";
++		pinctrl-0 = < &pmx_led_white_health &pmx_led_white_pulse >;
++		pinctrl-names = "default";
++
++		white-health {
++			label = "ea4500:white:health";
++			gpios = <&gpio0 7 GPIO_ACTIVE_HIGH>;
++		};
++
++		white-pulse {
++			label = "ea4500:white:pulse";
++			gpios = <&gpio0 14 GPIO_ACTIVE_HIGH>;
++		};
++	};
++};
++
++&nand {
++	status = "okay";
++	pinctrl-0 = <&pmx_nand>;
++	pinctrl-names = "default";
++
++	partition at 0 {
++		label = "u-boot";
++		reg = <0x0000000 0x80000>;
++	};
++
++	partition at 80000 {
++		label = "u-boot environment";
++		reg = <0x80000 0x20000>;
++	};
++
++	partition at 200000 {
++		label = "kernel";
++		reg = <0x200000 0x200000>;
++	};
++
++	partition at 400000 {
++		label = "root";
++		reg = <0x400000 0x1c00000>;
++	};
++};
++
++&mdio {
++	status = "okay";
++};
++
++&eth0 {
++	status = "okay";
++	ethernet0-port at 0 {
++		speed = <1000>;
++		duplex = <1>;
++	};
++};
++
++&eth1 {
++	status = "okay";
++	ethernet1-port at 0 {
++		speed = <1000>;
++		duplex = <1>;
++	};
++};
+-- 
+2.6.2
