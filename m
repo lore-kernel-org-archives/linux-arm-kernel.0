@@ -1,133 +1,56 @@
-From: yang.shi@linaro.org (Shi, Yang)
-Date: Wed, 04 Nov 2015 10:03:21 -0800
-Subject: [PATCH] arm64: bpf: fix div-by-zero case
-In-Reply-To: <1446620204-4228-1-git-send-email-zlim.lnx@gmail.com>
-References: <1446620204-4228-1-git-send-email-zlim.lnx@gmail.com>
-Message-ID: <563A4869.1000902@linaro.org>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Wed, 4 Nov 2015 18:06:51 +0000
+Subject: [PATCHv2 2/4] arm-cci: Get the status of a counter
+In-Reply-To: <1445346326-30820-3-git-send-email-suzuki.poulose@arm.com>
+References: <1445346326-30820-1-git-send-email-suzuki.poulose@arm.com>
+ <1445346326-30820-3-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <20151104180651.GG23860@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/3/2015 10:56 PM, Zi Shen Lim wrote:
-> In the case of division by zero in a BPF program:
-> 	A = A / X;  (X == 0)
-> the expected behavior is to terminate with return value 0.
->
-> This is confirmed by the test case introduced in commit 86bf1721b226
-> ("test_bpf: add tests checking that JIT/interpreter sets A and X to 0.").
->
-> Reported-by: Shi, Yang <yang.shi@linaro.org>
-
-Thanks for coming up with the fix promptly.
-s/Shi, Yang/Yang Shi
-
-Tested with the latest 4.3 kernel.
-Tested-by: Yang Shi <yang.shi@linaro.org>
-
-Yang
-
-> CC: Xi Wang <xi.wang@gmail.com>
-> CC: Alexei Starovoitov <ast@plumgrid.com>
-> CC: Catalin Marinas <catalin.marinas@arm.com>
-> CC: linux-arm-kernel at lists.infradead.org
-> CC: linux-kernel at vger.kernel.org
-> Fixes: e54bcde3d69d ("arm64: eBPF JIT compiler")
-> Cc: <stable@vger.kernel.org> # 3.18+
-> Signed-off-by: Zi Shen Lim <zlim.lnx@gmail.com>
+On Tue, Oct 20, 2015 at 02:05:24PM +0100, Suzuki K. Poulose wrote:
+> Add helper routines to get the counter status and the event
+> programmed on it.
+> 
+> Cc: Punit Agrawal <punit.agrawal@arm.com>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: arm at kernel.org
+> Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
 > ---
->   arch/arm64/net/bpf_jit.h      |  3 ++-
->   arch/arm64/net/bpf_jit_comp.c | 37 +++++++++++++++++++++++++------------
->   2 files changed, 27 insertions(+), 13 deletions(-)
->
-> diff --git a/arch/arm64/net/bpf_jit.h b/arch/arm64/net/bpf_jit.h
-> index 98a26ce..aee5637 100644
-> --- a/arch/arm64/net/bpf_jit.h
-> +++ b/arch/arm64/net/bpf_jit.h
-> @@ -1,7 +1,7 @@
->   /*
->    * BPF JIT compiler for ARM64
->    *
-> - * Copyright (C) 2014 Zi Shen Lim <zlim.lnx@gmail.com>
-> + * Copyright (C) 2014-2015 Zi Shen Lim <zlim.lnx@gmail.com>
->    *
->    * This program is free software; you can redistribute it and/or modify
->    * it under the terms of the GNU General Public License version 2 as
-> @@ -35,6 +35,7 @@
->   	aarch64_insn_gen_comp_branch_imm(0, offset, Rt, A64_VARIANT(sf), \
->   		AARCH64_INSN_BRANCH_COMP_##type)
->   #define A64_CBZ(sf, Rt, imm19) A64_COMP_BRANCH(sf, Rt, (imm19) << 2, ZERO)
-> +#define A64_CBNZ(sf, Rt, imm19) A64_COMP_BRANCH(sf, Rt, (imm19) << 2, NONZERO)
->
->   /* Conditional branch (immediate) */
->   #define A64_COND_BRANCH(cond, offset) \
-> diff --git a/arch/arm64/net/bpf_jit_comp.c b/arch/arm64/net/bpf_jit_comp.c
-> index c047598..9ae6f23 100644
-> --- a/arch/arm64/net/bpf_jit_comp.c
-> +++ b/arch/arm64/net/bpf_jit_comp.c
-> @@ -1,7 +1,7 @@
->   /*
->    * BPF JIT compiler for ARM64
->    *
-> - * Copyright (C) 2014 Zi Shen Lim <zlim.lnx@gmail.com>
-> + * Copyright (C) 2014-2015 Zi Shen Lim <zlim.lnx@gmail.com>
->    *
->    * This program is free software; you can redistribute it and/or modify
->    * it under the terms of the GNU General Public License version 2 as
-> @@ -225,6 +225,17 @@ static int build_insn(const struct bpf_insn *insn, struct jit_ctx *ctx)
->   	u8 jmp_cond;
->   	s32 jmp_offset;
->
-> +#define check_imm(bits, imm) do {				\
-> +	if ((((imm) > 0) && ((imm) >> (bits))) ||		\
-> +	    (((imm) < 0) && (~(imm) >> (bits)))) {		\
-> +		pr_info("[%2d] imm=%d(0x%x) out of range\n",	\
-> +			i, imm, imm);				\
-> +		return -EINVAL;					\
-> +	}							\
-> +} while (0)
-> +#define check_imm19(imm) check_imm(19, imm)
-> +#define check_imm26(imm) check_imm(26, imm)
+>  drivers/bus/arm-cci.c |   10 ++++++++++
+>  1 file changed, 10 insertions(+)
+> 
+> diff --git a/drivers/bus/arm-cci.c b/drivers/bus/arm-cci.c
+> index 5435d87..1a75010 100644
+> --- a/drivers/bus/arm-cci.c
+> +++ b/drivers/bus/arm-cci.c
+> @@ -647,11 +647,21 @@ static void pmu_enable_counter(struct cci_pmu *cci_pmu, int idx)
+>  	pmu_write_register(cci_pmu, 1, idx, CCI_PMU_CNTR_CTRL);
+>  }
+>  
+> +static u32 pmu_get_counter_ctrl(struct cci_pmu *cci_pmu, int idx)
+> +{
+> +	return pmu_read_register(cci_pmu, idx, CCI_PMU_CNTR_CTRL) & 0x1;
+> +}
+
+Given the function is called pmu_get_counter_ctrl, why the '& 1'?
+
+Either this should return the raw value, or the function should be
+renamed to something like pmu_counter_is_enabled, and made bool.
+
 > +
->   	switch (code) {
->   	/* dst = src */
->   	case BPF_ALU | BPF_MOV | BPF_X:
-> @@ -258,8 +269,21 @@ static int build_insn(const struct bpf_insn *insn, struct jit_ctx *ctx)
->   		break;
->   	case BPF_ALU | BPF_DIV | BPF_X:
->   	case BPF_ALU64 | BPF_DIV | BPF_X:
-> +	{
-> +		const u8 r0 = bpf2a64[BPF_REG_0];
+>  static void pmu_set_event(struct cci_pmu *cci_pmu, int idx, unsigned long event)
+>  {
+>  	pmu_write_register(cci_pmu, event, idx, CCI_PMU_EVT_SEL);
+>  }
+>  
+> +static u32 pmu_get_event(struct cci_pmu *cci_pmu, int idx)
+> +{
+> +	return pmu_read_register(cci_pmu, idx, CCI_PMU_EVT_SEL);
+> +}
 > +
-> +		/* if (src == 0) return 0 */
-> +		jmp_offset = 3; /* skip ahead to else path */
-> +		check_imm19(jmp_offset);
-> +		emit(A64_CBNZ(is64, src, jmp_offset), ctx);
-> +		emit(A64_MOVZ(1, r0, 0, 0), ctx);
-> +		jmp_offset = epilogue_offset(ctx);
-> +		check_imm26(jmp_offset);
-> +		emit(A64_B(jmp_offset), ctx);
-> +		/* else */
->   		emit(A64_UDIV(is64, dst, dst, src), ctx);
->   		break;
-> +	}
->   	case BPF_ALU | BPF_MOD | BPF_X:
->   	case BPF_ALU64 | BPF_MOD | BPF_X:
->   		ctx->tmp_used = 1;
-> @@ -393,17 +417,6 @@ emit_bswap_uxt:
->   		emit(A64_ASR(is64, dst, dst, imm), ctx);
->   		break;
->
-> -#define check_imm(bits, imm) do {				\
-> -	if ((((imm) > 0) && ((imm) >> (bits))) ||		\
-> -	    (((imm) < 0) && (~(imm) >> (bits)))) {		\
-> -		pr_info("[%2d] imm=%d(0x%x) out of range\n",	\
-> -			i, imm, imm);				\
-> -		return -EINVAL;					\
-> -	}							\
-> -} while (0)
-> -#define check_imm19(imm) check_imm(19, imm)
-> -#define check_imm26(imm) check_imm(26, imm)
-> -
->   	/* JUMP off */
->   	case BPF_JMP | BPF_JA:
->   		jmp_offset = bpf2a64_offset(i + off, i, ctx);
->
+
+Other than the above this looks fine to me.
+
+Thanks,
+Mark.
