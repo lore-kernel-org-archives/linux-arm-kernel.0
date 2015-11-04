@@ -1,18 +1,18 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 4 Nov 2015 08:23:04 -0800
-Subject: [linux-sunxi] [PATCH v4 2/6] clk: sunxi: Add H3 clocks support
-In-Reply-To: <CAGRGNgW9nVJvAcaduF0y1ptbpLA-3MkR4LCYvh-n1=mtxTyqfg@mail.gmail.com>
+Date: Wed, 4 Nov 2015 08:24:56 -0800
+Subject: [PATCH v4 2/6] clk: sunxi: Add H3 clocks support
+In-Reply-To: <3751073.AWmm18dvKK@wuerfel>
 References: <1445964626-6484-1-git-send-email-jenskuske@gmail.com>
  <1445964626-6484-3-git-send-email-jenskuske@gmail.com>
- <CAGRGNgW9nVJvAcaduF0y1ptbpLA-3MkR4LCYvh-n1=mtxTyqfg@mail.gmail.com>
-Message-ID: <20151104162304.GZ6114@lukather>
+ <3751073.AWmm18dvKK@wuerfel>
+Message-ID: <20151104162456.GA6114@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Julian,
+Hi Arnd,
 
-On Wed, Oct 28, 2015 at 10:12:09AM +1100, Julian Calaby wrote:
-> > +       of_property_for_each_u32(node, "clock-indices", prop, p, index) {
+On Fri, Oct 30, 2015 at 09:28:55AM +0100, Arnd Bergmann wrote:
+> On Tuesday 27 October 2015 17:50:22 Jens Kuske wrote:
 > > +               of_property_read_string_index(node, "clock-output-names",
 > > +                                             i, &clk_name);
 > > +
@@ -24,27 +24,18 @@ On Wed, Oct 28, 2015 at 10:12:09AM +1100, Julian Calaby wrote:
 > > +                       clk_parent = APB1;
 > > +               else if (index >= 96 && index <= 127)
 > > +                       clk_parent = APB2;
+> > +
+> > +               clk_reg = reg + 4 * (index / 32);
+> > 
 > 
-> A way to make this reusable in the future might be to encode it in a
-> structure like:
-> 
-> static const struct bus_clock_paths sun8i_h3_bus_clock_paths __initdata = {
->         {.parent = 2, .min = 17, .max = 17}, /* index 17 is from AHB2 */
->         {.parent = 2, .min = 29, .max = 31}, /* AHB2 bank */
->         {.parent = 1, .min = 63, .max = 128}, /* AHB1 bank */
-> ...
->         {}
-> };
-> 
-> Then the code here can be reused for other clocks like this in the
-> future without too much bloat. (And this would potentially could be
-> generic enough for other platforms.)
+> Same as for the reset driver, this probably means you should have one
+> cell to indicate which bus it is for, and another cell for the
+> index.
 
-We don't really need that at the moment. There's not point in writing
-more complicated code to support a use case we don't have yet.
+It's not really comparable to the reset driver.
 
-(However, something along these lines will definitely be needed if we
-ever have another SoC having the same bus gates madness)
+What's happening here is that we have a single set of (contiguous)
+registers, controlling gates from different parents.
 
 Maxime
 
@@ -58,4 +49,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151104/b4739fa1/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151104/dd04a757/attachment.sig>
