@@ -1,169 +1,80 @@
-From: jens.wiklander@linaro.org (Jens Wiklander)
-Date: Wed,  4 Nov 2015 10:46:12 +0100
-Subject: [PATCH 4/4] drivers: psci: replace psci firmware calls
-In-Reply-To: <1446630372-1598-1-git-send-email-jens.wiklander@linaro.org>
-References: <1446630372-1598-1-git-send-email-jens.wiklander@linaro.org>
-Message-ID: <1446630372-1598-5-git-send-email-jens.wiklander@linaro.org>
+From: tfiga@chromium.org (Tomasz Figa)
+Date: Wed, 4 Nov 2015 18:48:50 +0900
+Subject: [PATCH v6 1/3] iommu: Implement common IOMMU ops for DMA mapping
+In-Reply-To: <20151104092748.GI8644@n2100.arm.linux.org.uk>
+References: <cover.1443718557.git.robin.murphy@arm.com>
+ <ab8e1caa40d6da1afa4a49f30242ef4e6e1f17df.1443718557.git.robin.murphy@arm.com>
+ <1445867094.30736.14.camel@mhfsdcap03> <562E5AE4.9070001@arm.com>
+ <CAGS+omAWCQsqk56iv0PW2ZhTJ1342GufUsJCP=VYSgCxZNLJpA@mail.gmail.com>
+ <56337E4D.1010304@arm.com>
+ <CAGS+omAmxbb4uVzaQh1xPmkFtcF6KP-HSV-40=sm1BRTdh+=OQ@mail.gmail.com>
+ <CAAFQd5C_dkWBZrQXtyO59ARw7q-0fg-Wk98yApC5VHdQ8-AmNw@mail.gmail.com>
+ <5638F1C4.3000900@arm.com>
+ <CAAFQd5A4TcvkDMFezqEpkfWL+7yO2v=Hm=twk=p-NpADPpvqEQ@mail.gmail.com>
+ <20151104092748.GI8644@n2100.arm.linux.org.uk>
+Message-ID: <CAAFQd5ApSFC6Pm4tDhZbJOVZ7szCx=diKUtGXq=M9a5Y_4qzOQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Switch to use a generic interface for issuing SMC/HVC based on ARM SMC
-Calling Convention. Removes now the now unused psci-call.S.
+On Wed, Nov 4, 2015 at 6:27 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Wed, Nov 04, 2015 at 02:12:03PM +0900, Tomasz Figa wrote:
+>> My understanding of a scatterlist was that it represents a buffer as a
+>> whole, by joining together its physically discontinuous segments.
+>
+> Correct, and it may also be scattered in CPU virtual space as well.
+>
+>> I don't see how single segments (layout of which is completely up to
+>> the allocator; often just single pages) would be usable for hardware
+>> that needs to do some work more serious than just writing a byte
+>> stream continuously to subsequent buffers. In case of such simple
+>> devices you don't even need an IOMMU (for means other than protection
+>> and/or getting over address space limitations).
+>
+> All that's required is that the addresses described in the scatterlist
+> are accessed as an apparently contiguous series of bytes.  They don't
+> have to be contiguous in any address view, provided the device access
+> appears to be contiguous.  How that is done is really neither here nor
+> there.
+>
+> IOMMUs are normally there as an address translator - for example, the
+> underlying device may not have the capability to address a scatterlist
+> (eg, because it makes effectively random access) and in order to be
+> accessible to the device, it needs to be made contiguous in device
+> address space.
+>
+> Another scenario is that you have more bits of physical address than
+> a device can generate itself for DMA purposes, and you need an IOMMU
+> to create a (possibly scattered) mapping in device address space
+> within the ability of the device to address.
+>
+> The requirements here depend on the device behind the IOMMU.
 
-Signed-off-by: Jens Wiklander <jens.wiklander@linaro.org>
----
- arch/arm/kernel/Makefile      |  1 -
- arch/arm/kernel/psci-call.S   | 31 -------------------------------
- arch/arm64/kernel/Makefile    |  2 +-
- arch/arm64/kernel/psci-call.S | 28 ----------------------------
- drivers/firmware/psci.c       | 23 +++++++++++++++++++++--
- 5 files changed, 22 insertions(+), 63 deletions(-)
- delete mode 100644 arch/arm/kernel/psci-call.S
- delete mode 100644 arch/arm64/kernel/psci-call.S
+I fully agree with you.
 
-diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
-index c89e6ab..e8afdc6 100644
---- a/arch/arm/kernel/Makefile
-+++ b/arch/arm/kernel/Makefile
-@@ -88,7 +88,6 @@ obj-$(CONFIG_EARLY_PRINTK)	+= early_printk.o
- 
- obj-$(CONFIG_ARM_VIRT_EXT)	+= hyp-stub.o
- ifeq ($(CONFIG_ARM_PSCI),y)
--obj-y				+= psci-call.o
- obj-$(CONFIG_SMP)		+= psci_smp.o
- endif
- 
-diff --git a/arch/arm/kernel/psci-call.S b/arch/arm/kernel/psci-call.S
-deleted file mode 100644
-index a78e9e1..0000000
---- a/arch/arm/kernel/psci-call.S
-+++ /dev/null
-@@ -1,31 +0,0 @@
--/*
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-- *
-- * Copyright (C) 2015 ARM Limited
-- *
-- * Author: Mark Rutland <mark.rutland@arm.com>
-- */
--
--#include <linux/linkage.h>
--
--#include <asm/opcodes-sec.h>
--#include <asm/opcodes-virt.h>
--
--/* int __invoke_psci_fn_hvc(u32 function_id, u32 arg0, u32 arg1, u32 arg2) */
--ENTRY(__invoke_psci_fn_hvc)
--	__HVC(0)
--	bx	lr
--ENDPROC(__invoke_psci_fn_hvc)
--
--/* int __invoke_psci_fn_smc(u32 function_id, u32 arg0, u32 arg1, u32 arg2) */
--ENTRY(__invoke_psci_fn_smc)
--	__SMC(0)
--	bx	lr
--ENDPROC(__invoke_psci_fn_smc)
-diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
-index c61d758..ff4b88a 100644
---- a/arch/arm64/kernel/Makefile
-+++ b/arch/arm64/kernel/Makefile
-@@ -15,7 +15,7 @@ CFLAGS_REMOVE_return_address.o = -pg
- arm64-obj-y		:= debug-monitors.o entry.o irq.o fpsimd.o		\
- 			   entry-fpsimd.o process.o ptrace.o setup.o signal.o	\
- 			   sys.o stacktrace.o time.o traps.o io.o vdso.o	\
--			   hyp-stub.o psci.o psci-call.o cpu_ops.o insn.o	\
-+			   hyp-stub.o psci.o cpu_ops.o insn.o	\
- 			   return_address.o cpuinfo.o cpu_errata.o		\
- 			   cpufeature.o alternative.o cacheinfo.o		\
- 			   smp.o smp_spin_table.o topology.o
-diff --git a/arch/arm64/kernel/psci-call.S b/arch/arm64/kernel/psci-call.S
-deleted file mode 100644
-index cf83e61..0000000
---- a/arch/arm64/kernel/psci-call.S
-+++ /dev/null
-@@ -1,28 +0,0 @@
--/*
-- * This program is free software; you can redistribute it and/or modify
-- * it under the terms of the GNU General Public License version 2 as
-- * published by the Free Software Foundation.
-- *
-- * This program is distributed in the hope that it will be useful,
-- * but WITHOUT ANY WARRANTY; without even the implied warranty of
-- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-- * GNU General Public License for more details.
-- *
-- * Copyright (C) 2015 ARM Limited
-- *
-- * Author: Will Deacon <will.deacon@arm.com>
-- */
--
--#include <linux/linkage.h>
--
--/* int __invoke_psci_fn_hvc(u64 function_id, u64 arg0, u64 arg1, u64 arg2) */
--ENTRY(__invoke_psci_fn_hvc)
--	hvc	#0
--	ret
--ENDPROC(__invoke_psci_fn_hvc)
--
--/* int __invoke_psci_fn_smc(u64 function_id, u64 arg0, u64 arg1, u64 arg2) */
--ENTRY(__invoke_psci_fn_smc)
--	smc	#0
--	ret
--ENDPROC(__invoke_psci_fn_smc)
-diff --git a/drivers/firmware/psci.c b/drivers/firmware/psci.c
-index 42700f0..9c55d11 100644
---- a/drivers/firmware/psci.c
-+++ b/drivers/firmware/psci.c
-@@ -19,6 +19,7 @@
- #include <linux/pm.h>
- #include <linux/printk.h>
- #include <linux/psci.h>
-+#include <linux/arm-smccc.h>
- #include <linux/reboot.h>
- 
- #include <uapi/linux/psci.h>
-@@ -56,8 +57,6 @@ struct psci_operations psci_ops;
- 
- typedef unsigned long (psci_fn)(unsigned long, unsigned long,
- 				unsigned long, unsigned long);
--asmlinkage psci_fn __invoke_psci_fn_hvc;
--asmlinkage psci_fn __invoke_psci_fn_smc;
- static psci_fn *invoke_psci_fn;
- 
- enum psci_function {
-@@ -70,6 +69,26 @@ enum psci_function {
- 
- static u32 psci_function_id[PSCI_FN_MAX];
- 
-+static unsigned long __invoke_psci_fn_hvc(unsigned long function_id,
-+			unsigned long arg0, unsigned long arg1,
-+			unsigned long arg2)
-+{
-+	struct arm_smccc_res res;
-+
-+	arm_smccc_hvc(function_id, arg0, arg1, arg2, 0, 0, 0, 0, &res);
-+	return res.a0;
-+}
-+
-+static unsigned long __invoke_psci_fn_smc(unsigned long function_id,
-+			unsigned long arg0, unsigned long arg1,
-+			unsigned long arg2)
-+{
-+	struct arm_smccc_res res;
-+
-+	arm_smccc_smc(function_id, arg0, arg1, arg2, 0, 0, 0, 0, &res);
-+	return res.a0;
-+}
-+
- static int psci_to_linux_errno(int errno)
- {
- 	switch (errno) {
--- 
-1.9.1
+The problem is that the code being discussed here breaks the case of
+devices that don't have the capability of addressing a scatterlist,
+supposedly for the sake of devices that have such capability (but as I
+suggested, they both could be happily supported, by distinguishing
+special values of DMA max segment size and boundary mask).
+
+>> However, IMHO the most important use case of an IOMMU is to make
+>> buffers, which are contiguous in CPU virtual address space (VA),
+>> contiguous in device's address space (IOVA).
+>
+> No - there is no requirement for CPU virtual contiguous buffers to also
+> be contiguous in the device address space.
+
+There is no requirement, but shouldn't it be desired for the mapping
+code to map them as such? Otherwise, how could the IOMMU use case you
+described above (address translator for devices which don't have the
+capability to address a scatterlist) be handled properly?
+
+Is the general conclusion now that dma_map_sg() should not be used to
+create IOMMU mappings and we should make a step backwards making all
+drivers (or frameworks, such as videobuf2) do that manually? That
+would be really backwards, because code not aware of IOMMU existence
+at all would have to become aware of it.
+
+Best regards,
+Tomasz
