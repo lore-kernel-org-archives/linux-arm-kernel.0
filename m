@@ -1,60 +1,106 @@
-From: Liviu.Dudau@arm.com (Liviu.Dudau at arm.com)
-Date: Wed, 4 Nov 2015 14:24:13 +0000
-Subject: PCIe host controller behind IOMMU on ARM
-In-Reply-To: <PS1PR06MB11807CBE8EB2AC6B0158D2B5F52A0@PS1PR06MB1180.apcprd06.prod.outlook.com>
-References: <PS1PR06MB11807CBE8EB2AC6B0158D2B5F52A0@PS1PR06MB1180.apcprd06.prod.outlook.com>
-Message-ID: <20151104142412.GS963@e106497-lin.cambridge.arm.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Wed, 4 Nov 2015 14:28:32 +0000
+Subject: [PATCH v2 2/2] sound: soc: Add Cygnus audio driver
+In-Reply-To: <1446502284-23907-3-git-send-email-ssimran@broadcom.com>
+References: <1446502284-23907-1-git-send-email-ssimran@broadcom.com>
+ <1446502284-23907-3-git-send-email-ssimran@broadcom.com>
+Message-ID: <20151104142832.GF1717@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 04, 2015 at 01:57:48PM +0000, Phil Edworthy wrote:
-> Hi,
-> 
-> I am trying to hook up a PCIe host controller that sits behind an IOMMU,
-> but having some problems.
-> 
-> I'm using the pcie-rcar PCIe host controller and it works fine without
-> the IOMMU, and I can attach the IOMMU to the controller such that any calls
-> to dma_alloc_coherent made by the controller driver uses the iommu_ops
-> version of dma_ops.
-> 
-> However, I can't see how to make the endpoints to utilise the dma_ops that
-> the controller uses. Shouldn't the endpoints inherit the dma_ops from the
-> controller? 
+On Mon, Nov 02, 2015 at 02:11:24PM -0800, Simran Rai wrote:
 
-No, not directly.
+>  sound/soc/bcm/Kconfig      |   18 +
+>  sound/soc/bcm/Makefile     |    5 +
+>  sound/soc/bcm/cygnus-pcm.c |  903 ++++++++++++++++++++++++++
+>  sound/soc/bcm/cygnus-ssp.c | 1532 ++++++++++++++++++++++++++++++++++++++++++++
+>  sound/soc/bcm/cygnus-ssp.h |  129 ++++
 
-> Any pointers for this?
+This is a very big patch which contains at least two drivers (a DMA
+driver and a DAI driver).  Please split it into at least per-driver
+patches for ease of review.
 
-You need to understand the process through which a driver for endpoint get
-an address to be passed down to the device. Have a look at
-Documentation/DMA-API-HOWTO.txt, there is a nice explanation there.
-(Hint: EP driver needs to call dma_map_single).
+> +config SND_SOC_CYGNUS_DIAG
+> +	bool "SoC platform audio for Broadcom Cygnus chips diagnostics"
+> +	depends on SND_SOC_CYGNUS
+> +	help
+> +	  Say Y if you want to add diagnostics support in ASoC audio
+> +	  on Broadcom Cygnus chips (bcm958300, bcm958305, bcm911360)
+> +
+> +	  If you don't know what to do here, say N.
 
-Also, you need to make sure that the bus address that ends up being set into
-the endpoint gets translated correctly by the host controller into an address
-that the IOMMU can then translate into physical address.
+These look like extremely specific diagnostics that I'd have expected to
+be mostly doable using the standard kernel trace infrastructure which is
+very low overhead and can just be left in the kernel all the time.  Why
+is this a configurable option?
 
-Best regards,
-Liviu
+> +/*
+> + * Enable diagnostics through menuconfig to debug the time intervals
+> + * when each playback interrupt happens.
+> + */
 
+This should've been in the Kconfig help text.
 
-> 
-> Thanks
-> Phil
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+> +	is_play = (substream->stream == SNDRV_PCM_STREAM_PLAYBACK);
 
--- 
-====================
-| I would like to |
-| fix the world,  |
-| but they're not |
-| giving me the   |
- \ source code!  /
-  ---------------
-    ?\_(?)_/?
+Why is_play?  It's only looked at once and makes things a bit more
+confusing.
+
+> +	/* If playback interrupt happened */
+> +	if (ANY_PLAYBACK_IRQ & r5_status)
+> +		handle_playback_irq(cygaud);
+> +
+> +	/* If  capture interrupt happened */
+> +	if (ANY_CAPTURE_IRQ & r5_status)
+> +		handle_capture_irq(cygaud);
+> +
+> +	/*
+> +	 * clear r5 interrupts after servicing them
+> +	 */
+> +	writel(r5_status, cygaud->audio + INTH_R5F_CLEAR_OFFSET);
+
+This will ack interrupts we didn't handle, it'd be better to mask out
+unhandled interrupts.
+
+> +	if (aio->port_type == PORT_TDM) {
+
+> +	} else if (aio->port_type == PORT_SPDIF) {
+
+> +	} else {
+> +		dev_err(aio->cygaud->dev, "Port not supported\n");
+> +		return -EINVAL;
+> +	}
+
+This looks like it should be a switch statement, you've got some other
+similar constructs in the code.
+
+> +	error = configure_vco(cygaud, p_entry);
+> +	if (error)
+> +		return error;
+
+We appear to have multiple things calling configure_vco() but I can't
+see what's ensuring that they all agree with each other about the
+settings.
+
+> +	/* Slot Width is either 16 or 32 */
+> +	if (slot_width <= 16)
+> +		bits_per_slot = 1;
+
+The check doesnn't match the comment here.
+
+> +}
+> +static int cygnus_ssp_resume(struct snd_soc_dai *cpu_dai)
+
+Blank line between functions and remove empty functions.  Though I'm not
+clear why the result doesn't undo what the suspend did...
+
+> +		ssp_regs[0] = (struct cygnus_ssp_regs) INIT_SSP_REGS(0);
+
+Why the casts?
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151104/e64e063f/attachment.sig>
