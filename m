@@ -1,55 +1,36 @@
-From: b51431@freescale.com (Peng Fan)
-Date: Wed, 4 Nov 2015 10:48:28 +0800
-Subject: [RFC] iommu: arm-smmu: correct reference count
-In-Reply-To: <20151103131734.GE14159@arm.com>
-References: <1446555557-3097-1-git-send-email-van.freenix@gmail.com>
- <20151103131734.GE14159@arm.com>
-Message-ID: <20151104024825.GA27479@shlinux2>
+From: alison.wang@freescale.com (Huan Wang)
+Date: Wed, 4 Nov 2015 03:17:06 +0000
+Subject: [PATCH] ARM: add v7 LPAE multi-platform defconfig
+In-Reply-To: <20151103143416.GA926@cbox>
+References: <1445956507-34026-1-git-send-email-b18965@freescale.com>
+ <20151103143416.GA926@cbox>
+Message-ID: <BN3PR0301MB08675CC568518D2ACA752757FE2A0@BN3PR0301MB0867.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
+> On Tue, Oct 27, 2015 at 10:35:07PM +0800, Alison Wang wrote:
+> > v7 LPAE multi-platform defconfig is based on v7 multi-platform
+> > defconfig and adds LPAE support.
+> >
+> > This defconfig is verified on LS1021A which enables GIANFAR, I2C,
+> > WATCHDOG, AUDIO, EDMA and DSPI drivers, etc.
+> >
+> > Signed-off-by: Alison Wang <alison.wang@freescale.com>
+> 
+> I think this would be great if it also had:
+> 
+> CONFIG_ARCH_VIRT=y
+> CONFIG_VIRTUALIZATION=y
+> CONFIG_KVM=y
+> 
+> That would allow it to be used for KVM testing both as host and guest.
+> 
+> FWIW, I just tried booting this on my TC2, but I don't get any output
+> from there.  Is it supposed to work on this platform?  If not, why not?
+> 
+[Alison Wang] One question, does TC2 support LPAE? If so, we could try to
+find the reason and add it in this defconfig for armv7 LPAE support.
 
-On Tue, Nov 03, 2015 at 01:17:34PM +0000, Will Deacon wrote:
->On Tue, Nov 03, 2015 at 08:59:17PM +0800, Peng Fan wrote:
->> iommu_group_alloc will initialize the reference count for group to 1.
->> iommu_group_add_device also increase the group reference count,
->> if nothing bad happends. And we need to add iommu_group_put to
->> decrease the reference count for group.
->> 
->> Signed-off-by: Peng Fan <van.freenix@gmail.com>
->> Cc: Will Deacon <will.deacon@arm.com>
->> Cc: Joerg Roedel <joro@8bytes.org>
->> ---
->> 
->> Not sure whether my understanding is correct or not. I checked rockchip-iommu.c
->> exynos-iommu.c and fsl_pamu_domain.c, and they all have iommu_group_put after
->> iommu_group_add_device.
->
->Doesn't this pair up with the iommu_group_remove_device in
->arm_smmu_remove_device? Are you actually seeing an issue in practice?
 
-In arm_smmu_add_platform_device,
-iommu_group_alloc --> group->device_kobj ref count will be init to 1.
-iommu_group_add_device --> group->device_kobj ref count will be added 1 to 2.
-
-In arm_smmu_remove_device:
-iommu_group_remove_device --> Decrease group->device_kobj ref count by 1.
-After arm_smmu_remove_device, the ref count of group->device_kobj is not 0.
-
-So I think need to add iommu_group_put after iommu_group_add_device.
-If I am wrong, please correct me.
-
-Just code inspection, not have a platform to test this.
-
-Regards,
-Peng.
-
->
->Will
->_______________________________________________
->iommu mailing list
->iommu at lists.linux-foundation.org
->https://lists.linuxfoundation.org/mailman/listinfo/iommu
-
--- 
+Best Regards,
+Alison Wang
