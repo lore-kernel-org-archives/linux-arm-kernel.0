@@ -1,63 +1,97 @@
-From: julian.calaby@gmail.com (Julian Calaby)
-Date: Thu, 5 Nov 2015 09:17:48 +1100
-Subject: [linux-sunxi] [PATCH v4 2/6] clk: sunxi: Add H3 clocks support
-In-Reply-To: <20151104162304.GZ6114@lukather>
-References: <1445964626-6484-1-git-send-email-jenskuske@gmail.com>
- <1445964626-6484-3-git-send-email-jenskuske@gmail.com>
- <CAGRGNgW9nVJvAcaduF0y1ptbpLA-3MkR4LCYvh-n1=mtxTyqfg@mail.gmail.com>
- <20151104162304.GZ6114@lukather>
-Message-ID: <CAGRGNgU1xMDQs1BnpH8KQL3bfUV_2rg_+sBCkn7PG_9gEasLhA@mail.gmail.com>
+From: ebiederm@xmission.com (Eric W. Biederman)
+Date: Wed, 04 Nov 2015 16:10:43 -0600
+Subject: [PATCH v2 1/2] mm: mmap: Add new /proc tunable for mmap_base ASLR.
+In-Reply-To: <563A5D0D.9030109@android.com> (Daniel Cashman's message of "Wed,
+ 4 Nov 2015 11:31:25 -0800")
+References: <1446574204-15567-1-git-send-email-dcashman@android.com>
+ <20151103160410.34bbebc805c17d2f41150a19@linux-foundation.org>
+ <87k2pyppfk.fsf@x220.int.ebiederm.org>
+ <20151103173156.9ca17f52.akpm@linux-foundation.org>
+ <563A5D0D.9030109@android.com>
+Message-ID: <87r3k5mn4s.fsf@x220.int.ebiederm.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Maxime,
+Daniel Cashman <dcashman@android.com> writes:
 
-On Thu, Nov 5, 2015 at 3:23 AM, Maxime Ripard
-<maxime.ripard@free-electrons.com> wrote:
-> Hi Julian,
+> On 11/3/15 5:31 PM, Andrew Morton wrote:
+>> On Tue, 03 Nov 2015 18:40:31 -0600 ebiederm at xmission.com (Eric W. Biederman) wrote:
+>> 
+>>> Andrew Morton <akpm@linux-foundation.org> writes:
+>>>
+>>>> On Tue,  3 Nov 2015 10:10:03 -0800 Daniel Cashman <dcashman@android.com> wrote:
+>>>>
+>>>>> ASLR currently only uses 8 bits to generate the random offset for the
+>>>>> mmap base address on 32 bit architectures. This value was chosen to
+>>>>> prevent a poorly chosen value from dividing the address space in such
+>>>>> a way as to prevent large allocations. This may not be an issue on all
+>>>>> platforms. Allow the specification of a minimum number of bits so that
+>>>>> platforms desiring greater ASLR protection may determine where to place
+>>>>> the trade-off.
+>>>>
+>>>> Can we please include a very good description of the motivation for this
+>>>> change?  What is inadequate about the current code, what value does the
+>>>> enhancement have to our users, what real-world problems are being solved,
+>>>> etc.
+>>>>
+>>>> Because all we have at present is "greater ASLR protection", which doesn't
+>>>> really tell anyone anything.
+>>>
+>>> The description seemed clear to me.
+>>>
+>>> More random bits, more entropy, more work needed to brute force.
+>>>
+>>> 8 bits only requires 256 tries (or a 1 in 256) chance to brute force
+>>> something.
+>> 
+>> Of course, but that's not really very useful.
+>> 
+>>> We have seen in the last couple of months on Android how only having 8 bits
+>>> doesn't help much.
+>> 
+>> Now THAT is important.  What happened here and how well does the
+>> proposed fix improve things?  How much longer will a brute-force attack
+>> take to succeed, with a particular set of kernel parameters?  Is the
+>> new duration considered to be sufficiently long and if not, are there
+>> alternative fixes we should be looking at?
+>> 
+>> Stuff like this.
+>> 
+>>> Each additional bit doubles the protection (and unfortunately also
+>>> increases fragmentation of the userspace address space).
+>> 
+>> OK, so the benefit comes with a cost and people who are configuring
+>> systems (and the people who are reviewing this patchset!) need to
+>> understand the tradeoffs.  Please.
 >
-> On Wed, Oct 28, 2015 at 10:12:09AM +1100, Julian Calaby wrote:
->> > +       of_property_for_each_u32(node, "clock-indices", prop, p, index) {
->> > +               of_property_read_string_index(node, "clock-output-names",
->> > +                                             i, &clk_name);
->> > +
->> > +               if (index == 17 || (index >= 29 && index <= 31))
->> > +                       clk_parent = AHB2;
->> > +               else if (index <= 63 || index >= 128)
->> > +                       clk_parent = AHB1;
->> > +               else if (index >= 64 && index <= 95)
->> > +                       clk_parent = APB1;
->> > +               else if (index >= 96 && index <= 127)
->> > +                       clk_parent = APB2;
->>
->> A way to make this reusable in the future might be to encode it in a
->> structure like:
->>
->> static const struct bus_clock_paths sun8i_h3_bus_clock_paths __initdata = {
->>         {.parent = 2, .min = 17, .max = 17}, /* index 17 is from AHB2 */
->>         {.parent = 2, .min = 29, .max = 31}, /* AHB2 bank */
->>         {.parent = 1, .min = 63, .max = 128}, /* AHB1 bank */
->> ...
->>         {}
->> };
->>
->> Then the code here can be reused for other clocks like this in the
->> future without too much bloat. (And this would potentially could be
->> generic enough for other platforms.)
+> The direct motivation here was in response to the libstagefright
+> vulnerabilities that affected Android, specifically to information
+> provided by Google's project zero at:
 >
-> We don't really need that at the moment. There's not point in writing
-> more complicated code to support a use case we don't have yet.
+> http://googleprojectzero.blogspot.com/2015/09/stagefrightened.html
 >
-> (However, something along these lines will definitely be needed if we
-> ever have another SoC having the same bus gates madness)
+> The attack there specifically used the limited randomness used in
+> generating the mmap base address as part of a brute-force-based exploit.
+>  In this particular case, the attack was against the mediaserver process
+> on Android, which was limited to respawning every 5 seconds, giving the
+> attacker an average expected success rate of defeating the mmap ASLR
+> after over 10 minutes (128 tries at 5 seconds each).  With change to the
+> maximum proposed value of 16 bits, this would change to over 45 hours
+> (32768 tries), which would make the user of such a system much more
+> likely to notice such an attack.
+>
+> I understand the desire for this clarification, and will happily try to
+> improve the explanation for this change, especially so that those
+> considering use of this option understand the tradeoffs, but I also view
+> this as one particular hardening change which is a component of making
+> attacks such as these harder, rather than the only solution.  As for the
+> clarification itself, where would you like it?  I could include a cover
+> letter for this patch-set, elaborate more in the commit message itself,
+> add more to the Kconfig help description, or some combination of the above.
 
-This was a suggestion for the future to address Jens' comment about
-having a bus clock driver instead of encoding it in devicetree.
+Unless I am mistaken this there is no cross over between different
+processes of this randomization.  Would it make sense to have this as
+an rlimit so that if you have processes on the system that are affected
+by the tradeoff differently this setting can be changed per process?
 
-Thanks,
-
--- 
-Julian Calaby
-
-Email: julian.calaby at gmail.com
-Profile: http://www.google.com/profiles/julian.calaby/
+Eric
