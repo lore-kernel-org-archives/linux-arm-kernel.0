@@ -1,27 +1,60 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 4 Nov 2015 14:07:46 +0000
-Subject: [PATCH v2 1/2] dt-bindings: sound: Add DT bindings for Broadcom
- Cygnus audio
-In-Reply-To: <1446502284-23907-2-git-send-email-ssimran@broadcom.com>
-References: <1446502284-23907-2-git-send-email-ssimran@broadcom.com>
-Message-ID: <20151104140746.GE1717@sirena.org.uk>
+From: Liviu.Dudau@arm.com (Liviu.Dudau at arm.com)
+Date: Wed, 4 Nov 2015 14:24:13 +0000
+Subject: PCIe host controller behind IOMMU on ARM
+In-Reply-To: <PS1PR06MB11807CBE8EB2AC6B0158D2B5F52A0@PS1PR06MB1180.apcprd06.prod.outlook.com>
+References: <PS1PR06MB11807CBE8EB2AC6B0158D2B5F52A0@PS1PR06MB1180.apcprd06.prod.outlook.com>
+Message-ID: <20151104142412.GS963@e106497-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 02, 2015 at 02:11:23PM -0800, Simran Rai wrote:
+On Wed, Nov 04, 2015 at 01:57:48PM +0000, Phil Edworthy wrote:
+> Hi,
+> 
+> I am trying to hook up a PCIe host controller that sits behind an IOMMU,
+> but having some problems.
+> 
+> I'm using the pcie-rcar PCIe host controller and it works fine without
+> the IOMMU, and I can attach the IOMMU to the controller such that any calls
+> to dma_alloc_coherent made by the controller driver uses the iommu_ops
+> version of dma_ops.
+> 
+> However, I can't see how to make the endpoints to utilise the dma_ops that
+> the controller uses. Shouldn't the endpoints inherit the dma_ops from the
+> controller? 
 
-> +- channel-group: Surround sound grouping that controls which channel
-> +  outputs belong to a group, specifically useful in Multi-channel
-> +  Interfaces grouping of serial port. In multi-channel stereo, use
-> +  "2_0", in 3.1 multi-channel grouping, use "3_1" and in 5.1
-> +  multi-channel grouping, use "5_1".
+No, not directly.
 
-I don't really understand what this means or why this is not runtime
-configured.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151104/a7a27bb4/attachment-0001.sig>
+> Any pointers for this?
+
+You need to understand the process through which a driver for endpoint get
+an address to be passed down to the device. Have a look at
+Documentation/DMA-API-HOWTO.txt, there is a nice explanation there.
+(Hint: EP driver needs to call dma_map_single).
+
+Also, you need to make sure that the bus address that ends up being set into
+the endpoint gets translated correctly by the host controller into an address
+that the IOMMU can then translate into physical address.
+
+Best regards,
+Liviu
+
+
+> 
+> Thanks
+> Phil
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-pci" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
+
+-- 
+====================
+| I would like to |
+| fix the world,  |
+| but they're not |
+| giving me the   |
+ \ source code!  /
+  ---------------
+    ?\_(?)_/?
