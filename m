@@ -1,75 +1,115 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 04 Nov 2015 09:46:41 +0100
-Subject: [PATCH] dmaengine: edma: fix build without CONFIG_OF
-In-Reply-To: <5639B6EB.8030101@ti.com>
-References: <17811472.bY8CqmdEVy@wuerfel> <5639B6EB.8030101@ti.com>
-Message-ID: <16166945.0Jm7Xdjkb9@wuerfel>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Wed, 04 Nov 2015 08:49:05 +0000
+Subject: [PATCH v7] PCI: Xilinx-NWL-PCIe: Added support for Xilinx NWL
+ PCIe Host Controller
+In-Reply-To: <8520D5D51A55D047800579B09414719801693C20@XAP-PVEXMBX01.xlnx.xilinx.com>
+References: <1446564227-4704-1-git-send-email-bharatku@xilinx.com>
+ <5638DE62.6050605@arm.com>
+ <8520D5D51A55D047800579B09414719801693C20@XAP-PVEXMBX01.xlnx.xilinx.com>
+Message-ID: <5639C681.6060007@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 04 November 2015 09:42:35 Peter Ujfalusi wrote:
-> On 11/03/2015 04:00 PM, Arnd Bergmann wrote:
-> > During the edma rework, a build error was introduced for the
-> > case that CONFIG_OF is disabled:
-> > 
-> > drivers/built-in.o: In function `edma_tc_set_pm_state':
-> > :(.text+0x43bf0): undefined reference to `of_find_device_by_node'
-> > 
-> > As the edma_tc_set_pm_state() function does nothing in case
-> > we are running without OF, this adds an IS_ENABLED() check
-> > that turns the function into an empty stub then and avoids the
-> > link error.
-> > 
-> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> > Fixes: ca304fa9bb76 ("ARM/dmaengine: edma: Public API to use private struct pointer")
+On 04/11/15 06:38, Bharat Kumar Gogada wrote:
+>>> +static struct msi_domain_info nwl_msi_domain_info = {
+>>> +	.flags = (MSI_FLAG_USE_DEF_DOM_OPS |
+>> MSI_FLAG_USE_DEF_CHIP_OPS |
+>>> +		  MSI_FLAG_MULTI_PCI_MSI),
+>>
+>> If you're supporting multi-MSI, how do you ensure that all hwirqs are
+>> contiguous as required by the spec? Clearly, your allocator doesn't provide
+>> this guarantee.
+>>
+> Oh ok, then how can we know if one EP is requesting for multiple irq's, because in pci_enable_msi_range,
+>  it does do while loop according to msi_capability_init return value 
+> which in turn requests for multiple irq's. Is there any way to find out when single EP requesting for multiple MSI?
+
+Please read what I've written: hwirqs *must* be contiguous for
+multi-MSI. If the device requests 4 MSIs, they *must* be in the [x,x+3]
+range. Your allocator only allocates one interrupt at time (ignoring the
+nr_irqs parameter).
+
+You shouldn't try to find what the device does, that's irrelevant at
+that level.
+
+>> Also, you still lack support for MSI-X (which would come for free...).
 > 
-> The actual commit this patch is fixing is:
-> 1be5336bc7ba dmaengine: edma: New device tree binding
+> We don't support MSI-X in root port mode.
 
-That's what I first thought, but it seems to just move around the
-call to of_find_device_by_node that was first introduced in the
-commit I mentioned. Did you build-test it successfully with
-ca304fa9bb76 and CONFIG_OF enabled? I have to admit that I
-was just guessing from the contents and did not bisect this
-fully.
+I don't believe you. If you support single MSI, you support MSI-X
+(because that's mostly a property of the endpoint).
 
-> > ---
-> > Found on ARM randconfig builds with today's linux-next
+>>> +	.chip = &nwl_msi_irq_chip,
+>>> +};
+>>> +#endif
+>>> +
+>>> +	irq_domain_remove(pcie->legacy_irq_domain);
+>>> +
+>>> +#ifdef CONFIG_PCI_MSI
+>>> +	irq_set_chained_handler_and_data(msi->irq_msi0, NULL, NULL);
+>>> +	irq_set_chained_handler_and_data(msi->irq_msi1, NULL, NULL);
+>>> +
+>>> +	irq_domain_remove(msi->msi_domain);
+>>> +	irq_domain_remove(msi->dev_domain);
+>>> +#endif
+>>> +
+>>> +}
+>>
+>> Remove these #ifdefs. You can test the validity of these fields before calling
+>> the various functions. You can also move this to a separate function.
 > 
-> I have sanity built the kernel with omap2plus_defconfig and
-> davinci_all_defconfig since eDMA is used by these platforms and did not faced
-> with this issue, as obviously these defconfigs will result OF to be enabled.
+> Without #ifdefs if we compile driver for legacy, MSI structures will not be available and we get compile time error.
 
-Right. The defconfigs were all fine, and this is hard to hit
-even in the randconfig builds.
+Legacy? Legacy interrupts? The msi structure is still there, you've
+embedded it in your pcie structure. Let me spell it out for you:
 
-> > diff --git a/drivers/dma/edma.c b/drivers/dma/edma.c
-> > index 31722d436a42..16713a93da10 100644
-> > --- a/drivers/dma/edma.c
-> > +++ b/drivers/dma/edma.c
-> > @@ -1560,7 +1560,7 @@ static void edma_tc_set_pm_state(struct edma_tc *tc, bool enable)
-> >       struct platform_device *tc_pdev;
-> >       int ret;
-> >  
-> > -     if (!tc)
-> > +     if (!IS_ENABLED(CONFIG_OF) || !tc)
-> >               return;
-> 
-> Should we instead put the function inside of:
-> #if IS_ENABLED(CONFIG_OF)
-> static void edma_tc_set_pm_state(struct edma_tc *tc, bool enable)
-> {
-> ...
-> }
-> #else
-> static inline void edma_tc_set_pm_state(struct edma_tc *tc, bool enable)
-> {
-> }
-> #endif /* IS_ENABLED(CONFIG_OF) */
+static void nwl_msi_free_domain(struct nwl_pcie *pcie)
+{
+	struct nwl_msi *msi = &pcie->msi;
 
-I think that would be less readable, and gives no compile-time coverage
-to the contents of the edma_tc_set_pm_state function.
+	if (msi->irq_msi0)
+		irq_set_chained_handler_and_data(msi->irq_msi0, NULL, NULL);
+	if (msi->irq_msi1)
+		irq_set_chained_handler_and_data(msi->irq_msi1, NULL, NULL);
 
-The effect is the same, so I'd rather stay with my version.
+	if (msi->msi_domain)
+		irq_domain_remove(msi->msi_domain);
+	if (msi->dev_domain)
+		irq_domain_remove(msi->dev_domain);
+}
 
-	Arnd
+static void nwl_pcie_free_irq_domain(struct nwl_pcie *pcie)
+{
+	int i;
+	u32 irq;
+
+	for (i = 0; i < 4; i++) {
+		irq = irq_find_mapping(pcie->legacy_irq_domain, i + 1);
+		if (irq > 0)
+			irq_dispose_mapping(irq);
+	}
+
+	irq_domain_remove(pcie->legacy_irq_domain);
+
+	nwl_msi_free_domain(pcie);
+}
+
+>>> +
+>>> +	/* setup AFI/FPCI range */
+>>> +	msi->pages = __get_free_pages(GFP_KERNEL, 0);
+>>> +	base = virt_to_phys((void *)msi->pages);
+>>> +	nwl_bridge_writel(pcie, lower_32_bits(base), I_MSII_BASE_LO);
+>>> +	nwl_bridge_writel(pcie, upper_32_bits(base), I_MSII_BASE_HI);
+>>
+>> I just read this, and I'm puzzled. Actually, puzzled is an understatement. Why
+>> on Earth do you need to give RAM to your MSI HW?
+>> This should be a device, not RAM. By the look of it, this could be absolutely
+>> anything. Are you sure you have to supply RAM here?
+>>
+> This is required in our hardware, so that bridge identifies incoming MWr as MSI.
+
+I'm asking why this has to be RAM. What is the actual requirement?
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
