@@ -1,41 +1,54 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Wed, 4 Nov 2015 10:46:49 +0100
-Subject: [PATCH v2 0/3] let Marvell Berlin SoCs make use of the best delay
- timer
-In-Reply-To: <1446560917-6318-1-git-send-email-jszhang@marvell.com>
-References: <1446560917-6318-1-git-send-email-jszhang@marvell.com>
-Message-ID: <5639D409.1030302@linaro.org>
+From: jens.wiklander@linaro.org (Jens Wiklander)
+Date: Wed,  4 Nov 2015 10:46:08 +0100
+Subject: [PATCH 0/4] ARM SMC Calling Convention interface
+Message-ID: <1446630372-1598-1-git-send-email-jens.wiklander@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/03/2015 03:28 PM, Jisheng Zhang wrote:
-> In case there are several possible delay timers, we purely base the
-> selection on the frequency, which is suboptimal in some cases. Take
-> one Marvell Berlin platform for example: we have arch timer and dw-apb
-> timer. The arch timer freq is 25MHZ while the dw-apb timer freq is
-> 100MHZ, current selection would choose the dw-apb timer. But the dw
-> apb timer is on the APB bus while arch timer sits in CPU, the cost
-> of accessing the apb timer is higher than the arch timer.
->
-> This series firstly modifies register_current_timer_delay() to choose
-> the highest rating delay timer: use the rating as a primary indication
-> and fall back to comparing the frequency if the rating is not set or
-> the same. Then we set the arch_delay_timer rating as 400, finally
-> Implement ARM delay timer for the dw_apb_timer and set its rating as 300.
+Hi,
 
-Hi Jisheng, Arnd,
+This patch set is broken out of the Generic TEE subsystem v6 patchset
+(https://lwn.net/Articles/662495/) sent out last week. The previous review
+comments are addressed. By isolating these patches that are useful for
+other purposes than to support the Generic TEE subsystem some complexity is
+removed from that patch set.
 
-I don't feel comfortable with the rating / freq think. I am afraid this 
-approach based on heuristic will bring a lot of complexity and 
-workarounds in the code for a small benefit.
+This patch set adds a common interface to do an SMC or HVC following ARM
+SMC Calling Convention. This interface is implemented for both the arm and
+arm64 architectures and updates the PSCI driver to use this interface
+instead for firmware communication.
 
-Why don't we define a DT entry for the delay timer ? So we delegate the 
-choice to the platform DT definition.
+Thanks,
+Jens
 
+Jens Wiklander (4):
+  arm/arm64: add arm-smccc
+  arm: add implementation for arm-smccc
+  arm64: add implementation for arm-smccc
+  drivers: psci: replace psci firmware calls
+
+ arch/arm/Kconfig                |  1 +
+ arch/arm/kernel/Makefile        |  3 +-
+ arch/arm/kernel/psci-call.S     | 31 -------------
+ arch/arm/kernel/smccc-call.S    | 46 +++++++++++++++++++
+ arch/arm/kernel/smccc.c         | 18 ++++++++
+ arch/arm64/Kconfig              |  1 +
+ arch/arm64/kernel/Makefile      |  3 +-
+ arch/arm64/kernel/asm-offsets.c |  3 ++
+ arch/arm64/kernel/psci-call.S   | 28 ------------
+ arch/arm64/kernel/smccc-call.S  | 41 +++++++++++++++++
+ arch/arm64/kernel/smccc.c       | 18 ++++++++
+ drivers/firmware/psci.c         | 23 +++++++++-
+ include/linux/arm-smccc.h       | 98 +++++++++++++++++++++++++++++++++++++++++
+ init/Kconfig                    |  3 ++
+ 14 files changed, 254 insertions(+), 63 deletions(-)
+ delete mode 100644 arch/arm/kernel/psci-call.S
+ create mode 100644 arch/arm/kernel/smccc-call.S
+ create mode 100644 arch/arm/kernel/smccc.c
+ delete mode 100644 arch/arm64/kernel/psci-call.S
+ create mode 100644 arch/arm64/kernel/smccc-call.S
+ create mode 100644 arch/arm64/kernel/smccc.c
+ create mode 100644 include/linux/arm-smccc.h
 
 -- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+1.9.1
