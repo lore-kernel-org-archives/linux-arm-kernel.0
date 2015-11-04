@@ -1,63 +1,57 @@
-From: jonathanh@nvidia.com (Jon Hunter)
-Date: Wed, 4 Nov 2015 12:16:40 +0000
-Subject: [PATCH] ARM: tegra: Enable CPUFreq support for Tegra124
- Chromebooks
-In-Reply-To: <CAAObsKAuJz6KoexA2VHPxxVCZ9PbUAFWUx6tSOmdPYq50u_=-g@mail.gmail.com>
-References: <1433331821-9648-1-git-send-email-jonathanh@nvidia.com>
- <556EE8B0.2060205@nvidia.com> <55A3B848.2080205@nvidia.com>
- <CAAObsKA0N50gfPA9sMZfnM8N+N9Oo-YHMCDdF7JdWjpxXtFJbA@mail.gmail.com>
- <20150915081234.GA25970@ulmo.nvidia.com>
- <CAAObsKAuJz6KoexA2VHPxxVCZ9PbUAFWUx6tSOmdPYq50u_=-g@mail.gmail.com>
-Message-ID: <5639F728.6090808@nvidia.com>
+From: edward.cragg@codethink.co.uk (Edward Cragg)
+Date: Wed,  4 Nov 2015 12:17:20 +0000
+Subject: [PATCH v2] ARM: meson: Add status LED for Odroid-C1
+Message-ID: <1446639440-4057-1-git-send-email-edward.cragg@codethink.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Add the blue status LED to the Hardkernel Odroid C1 board DTS.
 
-On 15/09/15 10:00, Tomeu Vizoso wrote:
-> On 15 September 2015 at 10:12, Thierry Reding <thierry.reding@gmail.com> wrote:
->> On Thu, Sep 03, 2015 at 03:40:45PM +0200, Tomeu Vizoso wrote:
->>> On 13 July 2015 at 15:08, Jon Hunter <jonathanh@nvidia.com> wrote:
->>>> On 03/06/15 12:44, Jon Hunter wrote:
->>>>> Adding LAKML. Jon
->>>>>
->>>>> On 03/06/15 12:43, Jon Hunter wrote:
->>>>>> Add the device-tree DFLL clock node and CPU regulator phandle for
->>>>>> tegra124 chromebooks to enable CPUFreq support on these boards.
->>>
->>> Ping.
->>>
->>> Thanks,
->>
->> Sorry that this has gone unnoticed for so long. I've applied it now to
->> the for-4.4/dt branch.
->>
->> Tomeu, do you want me to add your Tested-by, Reviewed-by or Acked-by
->> before I push this out?
-> 
-> I haven't done proper tests, but I have tested for several weeks a
-> branch containing these changes on a nyan-big and have found no
-> issues.
-> 
-> You can add my Reviewed-by though. Sorry for not having made this clear.
+Signed-off-by: <edward.cragg@codethink.co.uk>
+---
 
-I have noticed that system suspend to LP1 is not working on the nyan-big
-with linux-next and never exits suspend. It appears that this patch is
-the culprit. I tested cpufreq was changing the frequency as expected but
-I did not test suspend.
+Changes in v2:
+    - Remove additional copyright
 
-I have tested suspend on the jetson-tk1 with linux-next that also has
-cpufreq enabled and do not see any problems.
+ arch/arm/boot/dts/meson8b-odroidc1.dts | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
-Adding Mikko ... Mikko do you know of any reason why cpufreq could cause
-problems with suspend? I am guessing it is to do with the different
-clock used for the CPUs. Any thoughts?
-
-Tomeu, have you tried suspend on a nyan-big with next?
-
-I am testing with "rtcwake -d rtc1 -m mem -s 5".
-
-Thierry, we may need to comment out these changes for 4.3 or revert this
-patch altogether.
-
-Cheers
-Jon
+diff --git a/arch/arm/boot/dts/meson8b-odroidc1.dts b/arch/arm/boot/dts/meson8b-odroidc1.dts
+index 88669a7..1f03406 100644
+--- a/arch/arm/boot/dts/meson8b-odroidc1.dts
++++ b/arch/arm/boot/dts/meson8b-odroidc1.dts
+@@ -1,6 +1,7 @@
+ /*
+  * Copyright 2015 Endless Mobile, Inc.
+  * Author: Carlo Caione <carlo@endlessm.com>
++ * Author: Edward Cragg <edward.cragg@codethink.co.uk>
+  *
+  * This file is dual-licensed: you can use it either under the terms
+  * of the GPL or the X11 license, at your option. Note that this dual
+@@ -46,6 +47,7 @@
+ 
+ /dts-v1/;
+ #include "meson8b.dtsi"
++#include <dt-bindings/gpio/gpio.h>
+ 
+ / {
+ 	model = "Hardkernel ODROID-C1";
+@@ -58,6 +60,16 @@
+ 	memory {
+ 		reg = <0x40000000 0x40000000>;
+ 	};
++
++	leds {
++		compatible = "gpio-leds";
++		blue {
++			label = "c1:blue:alive";
++			gpios = <&gpio_ao GPIOAO_13 GPIO_ACTIVE_LOW>;
++			linux,default-trigger = "heartbeat";
++			default-state = "off";
++		};
++	};
+ };
+ 
+ &mmc0 {
+-- 
+2.6.1
