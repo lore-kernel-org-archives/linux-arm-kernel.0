@@ -1,172 +1,116 @@
-From: edubezval@gmail.com (Eduardo Valentin)
-Date: Wed, 4 Nov 2015 11:41:12 -0800
-Subject: [PATCH v3 2/2] arm64: dts: mt8173: Add thermal zone node for
- mt8173.
-In-Reply-To: <1445515359-8587-3-git-send-email-dawei.chien@mediatek.com>
-References: <1445515359-8587-1-git-send-email-dawei.chien@mediatek.com>
- <1445515359-8587-3-git-send-email-dawei.chien@mediatek.com>
-Message-ID: <20151104194111.GD14127@localhost.localdomain>
+From: clabbe.montjoie@gmail.com (LABBE Corentin)
+Date: Wed,  4 Nov 2015 21:13:37 +0100
+Subject: [PATCH 5/7] crypto: picoxcell: check return value of sg_nents_for_len
+In-Reply-To: <1446668045-8620-1-git-send-email-clabbe.montjoie@gmail.com>
+References: <1446668045-8620-1-git-send-email-clabbe.montjoie@gmail.com>
+Message-ID: <1446668045-8620-5-git-send-email-clabbe.montjoie@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 22, 2015 at 08:02:39PM +0800, Dawei Chien wrote:
-> Add thermal zone node to mt8173.dtsi.
-> 
-> Signed-off-by: Dawei Chien <dawei.chien@mediatek.com>
-> ---
-> This patch is base on
-> https://patchwork.kernel.org/patch/7249821/
-> https://patchwork.kernel.org/patch/7249861/
-> https://patchwork.kernel.org/patch/7249891/
-> ---
->  arch/arm64/boot/dts/mediatek/mt8173.dtsi |   90 ++++++++++++++++++++++++++++++
+The sg_nents_for_len() function could fail, this patch add a check for
+its return value.
+In the same time, we remove sg_count() as it is used as an alias of
+sg_nents_for_len.
 
-This patch adds also the static / dynamic power models too. Can you
-please split this patch in two: one for the thermal zones, one for the
-models.
+Signed-off-by: LABBE Corentin <clabbe.montjoie@gmail.com>
+---
+ drivers/crypto/picoxcell_crypto.c | 48 +++++++++++++++++++++++++++------------
+ 1 file changed, 34 insertions(+), 14 deletions(-)
 
->  1 file changed, 90 insertions(+)
-> 
-> diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-> index 3b18f37..eaf12bf 100644
-> --- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-> +++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-> @@ -16,6 +16,7 @@
->  #include <dt-bindings/interrupt-controller/arm-gic.h>
->  #include <dt-bindings/power/mt8173-power.h>
->  #include <dt-bindings/reset-controller/mt8173-resets.h>
-> +#include <dt-bindings/thermal/mt8173.h>
->  #include "mt8173-pinfunc.h"
->  
->  / {
-> @@ -54,6 +55,18 @@
->  			reg = <0x000>;
->  			enable-method = "psci";
->  			cpu-idle-states = <&CPU_SLEEP_0>;
-> +			static-power-points = <
-> +				859000  43
-> +				908000  52
-> +				983000  86
-> +				1009000 123
-> +				1028000 138
-> +				1083000 172
-> +				1110900 180
-> +				1125000 192
-> +			>;
-> +			dynamic-power-coefficient = <263>;
-> +			#cooling-cells = <2>;
->  		};
->  
->  		cpu1: cpu at 1 {
-> @@ -62,6 +75,17 @@
->  			reg = <0x001>;
->  			enable-method = "psci";
->  			cpu-idle-states = <&CPU_SLEEP_0>;
-> +			static-power-points = <
-> +				859000  43
-> +				908000  52
-> +				983000  86
-> +				1009000 123
-> +				1028000 138
-> +				1083000 172
-> +				1110900 180
-> +				1125000 192
-> +			>;
-> +			dynamic-power-coefficient = <263>;
->  		};
->  
->  		cpu2: cpu at 100 {
-> @@ -70,6 +94,18 @@
->  			reg = <0x100>;
->  			enable-method = "psci";
->  			cpu-idle-states = <&CPU_SLEEP_0>;
-> +			static-power-points = <
-> +				828000  72
-> +				867000  90
-> +				927000  156
-> +				968000  181
-> +				1007000 298
-> +				1049000 435
-> +				1089900 533
-> +				1125000 533
-> +			>;
-> +			dynamic-power-coefficient = <530>;
-> +			#cooling-cells = <2>;
->  		};
->  
->  		cpu3: cpu at 101 {
-> @@ -78,6 +114,17 @@
->  			reg = <0x101>;
->  			enable-method = "psci";
->  			cpu-idle-states = <&CPU_SLEEP_0>;
-> +			static-power-points = <
-> +				828000  72
-> +				867000  90
-> +				927000  156
-> +				968000  181
-> +				1007000 298
-> +				1049000 435
-> +				1089900 533
-> +				1125000 533
-> +			>;
-> +			dynamic-power-coefficient = <530>;
->  		};
->  
->  		idle-states {
-> @@ -116,6 +163,49 @@
->  		clock-output-names = "clk32k";
->  	};
->  
-> +	thermal-zones {
-> +		cpu_thermal: cpu_thermal {
-> +			polling-delay-passive = <1000>; /* milliseconds */
-> +			polling-delay = <1000>; /* milliseconds */
-> +
-> +			thermal-sensors = <&thermal MT8173_THERMAL_ZONE_CA57>;
-> +			sustainable-power = <1500>;
-> +
-> +			trips {
-> +				threshold: trip-point at 0 {
-> +					temperature = <68000>;
-> +					hysteresis = <2000>;
-> +					type = "passive";
-> +				};
-> +
-> +				target: trip-point at 1 {
-> +					temperature = <85000>;
-> +					hysteresis = <2000>;
-> +					type = "passive";
-> +				};
-> +
-> +				cpu_crit: cpu_crit at 0 {
-> +					temperature = <115000>;
-> +					hysteresis = <2000>;
-> +					type = "critical";
-> +				};
-> +			};
-> +
-> +			cooling-maps {
-> +				map at 0 {
-> +					trip = <&target>;
-> +					cooling-device = <&cpu0 0 0>;
-> +					contribution = <1024>;
-> +				};
-> +				map at 1 {
-> +					trip = <&target>;
-> +					cooling-device = <&cpu2 0 0>;
-> +					contribution = <2048>;
-> +				};
-> +			};
-> +		};
-> +	};
-> +
->  	timer {
->  		compatible = "arm,armv8-timer";
->  		interrupt-parent = <&gic>;
-> -- 
-> 1.7.9.5
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-pm" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+diff --git a/drivers/crypto/picoxcell_crypto.c b/drivers/crypto/picoxcell_crypto.c
+index da36de2..1b16eb28 100644
+--- a/drivers/crypto/picoxcell_crypto.c
++++ b/drivers/crypto/picoxcell_crypto.c
+@@ -272,12 +272,6 @@ static unsigned spacc_load_ctx(struct spacc_generic_ctx *ctx,
+ 	return indx;
+ }
+ 
+-/* Count the number of scatterlist entries in a scatterlist. */
+-static inline int sg_count(struct scatterlist *sg_list, int nbytes)
+-{
+-	return sg_nents_for_len(sg_list, nbytes);
+-}
+-
+ static inline void ddt_set(struct spacc_ddt *ddt, dma_addr_t phys, size_t len)
+ {
+ 	ddt->p = phys;
+@@ -300,7 +294,11 @@ static struct spacc_ddt *spacc_sg_to_ddt(struct spacc_engine *engine,
+ 	struct spacc_ddt *ddt;
+ 	int i;
+ 
+-	nents = sg_count(payload, nbytes);
++	nents = sg_nents_for_len(payload, nbytes);
++	if (nents < 0) {
++		dev_err(engine->dev, "Invalid numbers of SG.\n");
++		return NULL;
++	}
+ 	mapped_ents = dma_map_sg(engine->dev, payload, nents, dir);
+ 
+ 	if (mapped_ents + 1 > MAX_DDT_LEN)
+@@ -336,13 +334,21 @@ static int spacc_aead_make_ddts(struct aead_request *areq)
+ 	if (req->is_encrypt)
+ 		total += crypto_aead_authsize(aead);
+ 
+-	src_nents = sg_count(areq->src, total);
++	src_nents = sg_nents_for_len(areq->src, total);
++	if (src_nents < 0) {
++		dev_err(engine->dev, "Invalid numbers of src SG.\n");
++		return src_nents;
++	}
+ 	if (src_nents + 1 > MAX_DDT_LEN)
+ 		return -E2BIG;
+ 
+ 	dst_nents = 0;
+ 	if (areq->src != areq->dst) {
+-		dst_nents = sg_count(areq->dst, total);
++		dst_nents = sg_nents_for_len(areq->dst, total);
++		if (dst_nents < 0) {
++			dev_err(engine->dev, "Invalid numbers of dst SG.\n");
++			return dst_nents;
++		}
+ 		if (src_nents + 1 > MAX_DDT_LEN)
+ 			return -E2BIG;
+ 	}
+@@ -422,13 +428,22 @@ static void spacc_aead_free_ddts(struct spacc_req *req)
+ 			 (req->is_encrypt ? crypto_aead_authsize(aead) : 0);
+ 	struct spacc_aead_ctx *aead_ctx = crypto_aead_ctx(aead);
+ 	struct spacc_engine *engine = aead_ctx->generic.engine;
+-	unsigned nents = sg_count(areq->src, total);
++	int nents = sg_nents_for_len(areq->src, total);
++
++	/* sg_nents_for_len should not fail since it works when mapping sg */
++	if (unlikely(nents < 0)) {
++		dev_err(engine->dev, "Invalid numbers of src SG.\n");
++		return;
++	}
+ 
+ 	if (areq->src != areq->dst) {
+ 		dma_unmap_sg(engine->dev, areq->src, nents, DMA_TO_DEVICE);
+-		dma_unmap_sg(engine->dev, areq->dst,
+-			     sg_count(areq->dst, total),
+-			     DMA_FROM_DEVICE);
++		nents = sg_nents_for_len(areq->dst, total);
++		if (unlikely(nents < 0)) {
++			dev_err(engine->dev, "Invalid numbers of dst SG.\n");
++			return;
++		}
++		dma_unmap_sg(engine->dev, areq->dst, nents, DMA_FROM_DEVICE);
+ 	} else
+ 		dma_unmap_sg(engine->dev, areq->src, nents, DMA_BIDIRECTIONAL);
+ 
+@@ -440,7 +455,12 @@ static void spacc_free_ddt(struct spacc_req *req, struct spacc_ddt *ddt,
+ 			   dma_addr_t ddt_addr, struct scatterlist *payload,
+ 			   unsigned nbytes, enum dma_data_direction dir)
+ {
+-	unsigned nents = sg_count(payload, nbytes);
++	int nents = sg_nents_for_len(payload, nbytes);
++
++	if (nents < 0) {
++		dev_err(req->engine->dev, "Invalid numbers of SG.\n");
++		return;
++	}
+ 
+ 	dma_unmap_sg(req->engine->dev, payload, nents, dir);
+ 	dma_pool_free(req->engine->req_pool, ddt, ddt_addr);
+-- 
+2.4.10
