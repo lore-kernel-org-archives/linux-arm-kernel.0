@@ -1,75 +1,47 @@
-From: majun258@huawei.com (majun (F))
-Date: Wed, 4 Nov 2015 16:00:16 +0800
-Subject: [PATCH RFC 7/7] irqchip: [Example] dummy wired interrupt/MSI
- bridge driver
-In-Reply-To: <1444923568-17413-8-git-send-email-marc.zyngier@arm.com>
-References: <1444923568-17413-1-git-send-email-marc.zyngier@arm.com>
- <1444923568-17413-8-git-send-email-marc.zyngier@arm.com>
-Message-ID: <5639BB10.1090108@huawei.com>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Wed, 4 Nov 2015 17:01:58 +0900
+Subject: [PATCH v4 6/6] arm64: ftrace: add arch-specific stack tracer
+In-Reply-To: <9BDC406F-52E1-4F8C-8245-7B49EC4C861D@gmail.com>
+References: <1446182741-31019-1-git-send-email-takahiro.akashi@linaro.org>
+ <1446182741-31019-7-git-send-email-takahiro.akashi@linaro.org>
+ <9BDC406F-52E1-4F8C-8245-7B49EC4C861D@gmail.com>
+Message-ID: <5639BB76.6060903@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marc:
+Jungseok,
 
-? 2015/10/15 23:39, Marc Zyngier ??:
-> In order to demonstrate how to put together a wire/MSI bridge,
-> add a dummy driver that doesn't do anything at all, except
-> for allocating interrupts.
-> 
-> It comes together with an even more stupid client driver that
-> allocates an interrupt and dump the hierarchy of that interrupt.
-> 
-> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
-> ---
-[...]
-> +
-> +static int msichip_domain_alloc(struct irq_domain *domain, unsigned int virq,
-> +				   unsigned int nr_irqs, void *arg)
-> +{
-> +	int i, err;
-> +	irq_hw_number_t hwirq;
-> +	unsigned int type;
-> +	struct irq_fwspec *fwspec = arg;
-> +	void *data;
-> +
-> +	err = msichip_domain_translate(domain, fwspec, &hwirq, &type);
-> +	if (err)
-> +		return err;
-> +
+On 11/01/2015 05:30 PM, Jungseok Lee wrote:
+> On Oct 30, 2015, at 2:25 PM, AKASHI Takahiro wrote:
+>
+> Hi Akashi,
+>
+>> Stack tracer on arm64, check_stack(), is uniqeue in the following
+>> points:
+>> * analyze a function prologue of a traced function to estimate a more
+>>   accurate stack pointer value, replacing naive '<child's fp> + 0x10.'
+>> * use walk_stackframe(), instead of slurping stack contents as orignal
+>>   check_stack() does, to identify a stack frame and a stack index (height)
+>>   for every callsite.
+>>
+>> Regarding a function prologue analyzer, there is no guarantee that we can
+>> handle all the possible patterns of function prologue as gcc does not use
+>> any fixed templates to generate them. 'Instruction scheduling' is another
+>> issue here.
+>> Nevertheless, the current version will surely cover almost all the cases
+>> in the kernel image and give us useful information on stack pointers.
+>
+> Can I get an idea on how to test the function prologue analyzer? It pretty
+> tough to compare stack trace data with objdump one. Is there an easier way
+> to observe this enhancement without objdump?
 
-.translate function already called once in  irq_domain_translate(),
-I think we don't need call this fucntion one more time here.
+It is quite difficult to give an evidence of the correctness of my function
+prologue analyzer. I only checked the outputs from stack tracer, one by one
+(every function), by comparing it against its disassembled code.
 
-> +	err = platform_msi_domain_alloc(domain, virq, nr_irqs);
-> +	if (err)
-> +		return err;
-> +
-> +	data = platform_msi_get_host_data(domain);
-> +	for (i = 0; i < nr_irqs; i++)
-> +		irq_domain_set_hwirq_and_chip(domain, virq + i, hwirq + i,
-> +					      &msichip_chip, data);
-> +
-> +	return 0;
-> +}
-> +
-[...]
-> +
-> +static struct platform_driver msichip_driver = {
-> +	.driver = {
-> +		.name		= "msichip",
-> +		.of_match_table	= msichip_of_match,
-> +	},
-> +	.probe			= msichip_probe,
-> +};
-> +/* Do not define this as an irqchip */
-> +module_platform_driver(msichip_driver);
-> +
-> +
+Thanks,
+-Takahiro AKASHI
 
-I think,for a interrupt controller, msichip driver initialization maybe is too late
-for some devices which connect to this irqchip if we use module_platform_driver.
-
-So, how about use the arch_initcall to register the msichip driver?
-
-Thanks!
-Ma Jun
+> Best Regards
+> Jungseok Lee
+>
