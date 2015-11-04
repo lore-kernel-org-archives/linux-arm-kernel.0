@@ -1,75 +1,380 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 4 Nov 2015 12:44:19 +0100
-Subject: [PATCH 2/9] arm64/efi: refactor EFI init and runtime code for
- reuse by 32-bit ARM
-In-Reply-To: <20151010210037.GG2723@codeblueprint.co.uk>
-References: <1443719063-6832-1-git-send-email-ard.biesheuvel@linaro.org>
- <1443719063-6832-3-git-send-email-ard.biesheuvel@linaro.org>
- <20151010210037.GG2723@codeblueprint.co.uk>
-Message-ID: <CAKv+Gu-WT0Kw=X-0=r3aKK_Bn8X7q0_=bDNHqPuoR1-FjQqsBQ@mail.gmail.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Wed,  4 Nov 2015 12:54:13 +0100
+Subject: [RFC] ASoC: Add mediatek HDMI codec driver
+Message-ID: <1446638053-12143-1-git-send-email-p.zabel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10 October 2015 at 23:00, Matt Fleming <matt@codeblueprint.co.uk> wrote:
-> On Thu, 01 Oct, at 07:04:16PM, Ard Biesheuvel wrote:
->> This refactors the EFI init and runtime code that will be shared
->> between arm64 and ARM so that it can be built for both archs.
->>
->> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> ---
->>  arch/arm64/include/asm/efi.h       |  16 ++++
->>  arch/arm64/kernel/efi.c            |  51 ++++++++++
->>  drivers/firmware/efi/arm-init.c    |  11 ++-
->>  drivers/firmware/efi/arm-runtime.c | 101 ++++++--------------
->>  drivers/firmware/efi/efi.c         |   4 +-
->>  5 files changed, 105 insertions(+), 78 deletions(-)
->
-> [...]
->
->> diff --git a/drivers/firmware/efi/arm-init.c b/drivers/firmware/efi/arm-init.c
->> index 56987a5b9033..235677b86e4e 100644
->> --- a/drivers/firmware/efi/arm-init.c
->> +++ b/drivers/firmware/efi/arm-init.c
->> @@ -66,7 +66,7 @@ static int __init uefi_init(void)
->>  {
->>       efi_char16_t *c16;
->>       void *config_tables;
->> -     u64 table_size;
->> +     int table_size;
->>       char vendor[100] = "unknown";
->>       int i, retval;
->
-> Perhaps 'table_size' should be unsigned long? At the very least it
-> should be size_t, not int.
->
+From: Koro Chen <koro.chen@mediatek.com>
 
-OK, I will change that.
+This driver is based on the work of DW HDMI codec driver.
+It controls mediatek HDMI Tx's audio module, and handles
+HDMI jack detection by sharing IRQ with HDMI Tx.
 
->> diff --git a/drivers/firmware/efi/efi.c b/drivers/firmware/efi/efi.c
->> index f5e586bd3b24..2eb31e28a35c 100644
->> --- a/drivers/firmware/efi/efi.c
->> +++ b/drivers/firmware/efi/efi.c
->> @@ -23,6 +23,8 @@
->>  #include <linux/io.h>
->>  #include <linux/platform_device.h>
->>
->> +#include <asm/efi.h>
->> +
->>  struct efi __read_mostly efi = {
->>       .mps                    = EFI_INVALID_TABLE_ADDR,
->>       .acpi                   = EFI_INVALID_TABLE_ADDR,
->
-> Hmm... not quite sure why this new include is required?
->
+Signed-off-by: Koro Chen <koro.chen@mediatek.com>
+Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+---
+This goes together with the Mediatek HDMI driver at:
+https://patchwork.kernel.org/patch/7549021/ ("drm/mediatek: Add HDMI support")
+---
+ sound/soc/codecs/Makefile   |   2 +
+ sound/soc/codecs/mtk-hdmi.c | 289 ++++++++++++++++++++++++++++++++++++++++++++
+ sound/soc/codecs/mtk-hdmi.h |  31 +++++
+ 3 files changed, 322 insertions(+)
+ create mode 100644 sound/soc/codecs/mtk-hdmi.c
+ create mode 100644 sound/soc/codecs/mtk-hdmi.h
 
-I need this or the file won't build on ARM.
-
-We are currently relying on a transitive include of
-<asm/early_ioremap.h>, which does not exist on IA-64. This is a bit of
-a kludge, and I am open to better ways of dealing with this.
-(IA-64 declares early_ioremap() in asm/io.h, and #define's
-early_memremap() as an alias of it) and I am reluctant to include
-asm/early_ioremap.h in ARM's asm/io.h (as the other archs do)
-
+diff --git a/sound/soc/codecs/Makefile b/sound/soc/codecs/Makefile
+index 4a32077..b82b023 100644
+--- a/sound/soc/codecs/Makefile
++++ b/sound/soc/codecs/Makefile
+@@ -71,6 +71,7 @@ snd-soc-max98357a-objs := max98357a.o
+ snd-soc-max98925-objs := max98925.o
+ snd-soc-max9850-objs := max9850.o
+ snd-soc-mc13783-objs := mc13783.o
++snd-soc-mtk-hdmi-codec-objs := mtk-hdmi.o
+ snd-soc-ml26124-objs := ml26124.o
+ snd-soc-hdmi-codec-objs := hdmi.o
+ snd-soc-pcm1681-objs := pcm1681.o
+@@ -263,6 +264,7 @@ obj-$(CONFIG_SND_SOC_MAX98357A)	+= snd-soc-max98357a.o
+ obj-$(CONFIG_SND_SOC_MAX98925)	+= snd-soc-max98925.o
+ obj-$(CONFIG_SND_SOC_MAX9850)	+= snd-soc-max9850.o
+ obj-$(CONFIG_SND_SOC_MC13783)	+= snd-soc-mc13783.o
++obj-$(CONFIG_SND_SOC_MEDIATEK)	+= snd-soc-mtk-hdmi-codec.o
+ obj-$(CONFIG_SND_SOC_ML26124)	+= snd-soc-ml26124.o
+ obj-$(CONFIG_SND_SOC_HDMI_CODEC) += snd-soc-hdmi-codec.o
+ obj-$(CONFIG_SND_SOC_PCM1681)	+= snd-soc-pcm1681.o
+diff --git a/sound/soc/codecs/mtk-hdmi.c b/sound/soc/codecs/mtk-hdmi.c
+new file mode 100644
+index 0000000..c73a0e8
+--- /dev/null
++++ b/sound/soc/codecs/mtk-hdmi.c
+@@ -0,0 +1,289 @@
++/*
++ * mtk-hdmi.c  --  MTK HDMI ASoC codec driver
++ *
++ * Copyright (c) 2015 MediaTek Inc.
++ * Author: Koro Chen <koro.chen@mediatek.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 and
++ * only version 2 as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#include <linux/module.h>
++#include <sound/soc.h>
++#include <sound/jack.h>
++#include "mtk-hdmi.h"
++
++static int mtk_hdmi_jack_detect(struct mtk_hdmi_priv *hdmi)
++{
++	u8 jack_status;
++
++	if (!hdmi->jack)
++		return 0;
++
++	jack_status = hdmi->data.hpd_detect(hdmi->data.mtk_hdmi) ?
++			SND_JACK_LINEOUT : 0;
++	if (jack_status != hdmi->jack_status) {
++		snd_soc_jack_report(hdmi->jack, jack_status, SND_JACK_LINEOUT);
++		dev_info(hdmi->dev, "jack report [%d->%d]\n",
++			 hdmi->jack_status, jack_status);
++		hdmi->jack_status = jack_status;
++	}
++	return 0;
++}
++
++static irqreturn_t mtk_hdmi_irq(int irq, void *dev_id)
++{
++	struct mtk_hdmi_priv *hdmi = dev_id;
++
++	mtk_hdmi_jack_detect(hdmi);
++	return IRQ_HANDLED;
++}
++
++int mtk_hdmi_set_jack_detect(struct snd_soc_codec *codec,
++			     struct snd_soc_jack *jack)
++{
++	struct mtk_hdmi_priv *hdmi = snd_soc_codec_get_drvdata(codec);
++
++	hdmi->jack = jack;
++	mtk_hdmi_jack_detect(hdmi);
++	return 0;
++}
++
++static int mtk_hdmi_dai_startup(struct snd_pcm_substream *substream,
++				struct snd_soc_dai *codec_dai)
++{
++	struct mtk_hdmi_priv *hdmi = snd_soc_dai_get_drvdata(codec_dai);
++
++	hdmi->data.enable(hdmi->data.mtk_hdmi);
++	return 0;
++}
++
++static int mtk_hdmi_dai_hw_params(struct snd_pcm_substream *substream,
++				  struct snd_pcm_hw_params *params,
++				  struct snd_soc_dai *codec_dai)
++{
++	struct mtk_hdmi_priv *hdmi = snd_soc_dai_get_drvdata(codec_dai);
++	struct hdmi_audio_param hdmi_params;
++	unsigned int rate, chan;
++
++	chan = params_channels(params);
++	switch (chan) {
++	case 2:
++		hdmi_params.aud_input_chan_type = HDMI_AUD_CHAN_TYPE_2_0;
++		break;
++	case 4:
++		hdmi_params.aud_input_chan_type = HDMI_AUD_CHAN_TYPE_4_0;
++		break;
++	case 6:
++		hdmi_params.aud_input_chan_type = HDMI_AUD_CHAN_TYPE_5_1;
++		break;
++	case 8:
++		hdmi_params.aud_input_chan_type = HDMI_AUD_CHAN_TYPE_7_1;
++		break;
++	default:
++		dev_err(codec_dai->dev, "channel[%d] not supported!\n", chan);
++		return -EINVAL;
++	}
++	dev_dbg(codec_dai->dev, "[codec_dai]: chan_num = %d.\n", chan);
++
++	rate = params_rate(params);
++	switch (rate) {
++	case 32000:
++		hdmi_params.aud_hdmi_fs = HDMI_AUDIO_SAMPLE_FREQUENCY_32000;
++		hdmi_params.iec_frame_fs = HDMI_IEC_32K;
++		/* channel status byte 3: fs and clock accuracy */
++		hdmi_params.hdmi_l_channel_state[3] = 0x3;
++		break;
++	case 44100:
++		hdmi_params.aud_hdmi_fs = HDMI_AUDIO_SAMPLE_FREQUENCY_44100;
++		hdmi_params.iec_frame_fs = HDMI_IEC_44K;
++		/* channel status byte 3: fs and clock accuracy */
++		hdmi_params.hdmi_l_channel_state[3] = 0;
++		break;
++	case 48000:
++		hdmi_params.aud_hdmi_fs = HDMI_AUDIO_SAMPLE_FREQUENCY_48000;
++		hdmi_params.iec_frame_fs = HDMI_IEC_48K;
++		/* channel status byte 3: fs and clock accuracy */
++		hdmi_params.hdmi_l_channel_state[3] = 0x2;
++		break;
++	case 88200:
++		hdmi_params.aud_hdmi_fs = HDMI_AUDIO_SAMPLE_FREQUENCY_88200;
++		hdmi_params.iec_frame_fs = HDMI_IEC_88K;
++		/* channel status byte 3: fs and clock accuracy */
++		hdmi_params.hdmi_l_channel_state[3] = 0x8;
++		break;
++	case 96000:
++		hdmi_params.aud_hdmi_fs = HDMI_AUDIO_SAMPLE_FREQUENCY_96000;
++		hdmi_params.iec_frame_fs = HDMI_IEC_96K;
++		/* channel status byte 3: fs and clock accuracy */
++		hdmi_params.hdmi_l_channel_state[3] = 0xa;
++		break;
++	case 176400:
++		hdmi_params.aud_hdmi_fs = HDMI_AUDIO_SAMPLE_FREQUENCY_176400;
++		hdmi_params.iec_frame_fs = HDMI_IEC_176K;
++		/* channel status byte 3: fs and clock accuracy */
++		hdmi_params.hdmi_l_channel_state[3] = 0xc;
++		break;
++	case 192000:
++		hdmi_params.aud_hdmi_fs = HDMI_AUDIO_SAMPLE_FREQUENCY_192000;
++		hdmi_params.iec_frame_fs = HDMI_IEC_192K;
++		/* channel status byte 3: fs and clock accuracy */
++		hdmi_params.hdmi_l_channel_state[3] = 0xe;
++		break;
++	default:
++		dev_err(codec_dai->dev, "rate[%d] not supported!\n", rate);
++		return -EINVAL;
++	}
++	dev_dbg(codec_dai->dev, "[codec_dai]: sample_rate = %d.\n", rate);
++
++	hdmi_params.aud_codec = HDMI_AUDIO_CODING_TYPE_PCM;
++	hdmi_params.aud_sampe_size = HDMI_AUDIO_SAMPLE_SIZE_16;
++	hdmi_params.aud_input_type = HDMI_AUD_INPUT_I2S;
++	hdmi_params.aud_i2s_fmt = HDMI_I2S_MODE_I2S_24BIT;
++	hdmi_params.aud_mclk = HDMI_AUD_MCLK_128FS;
++
++	/* channel status */
++	/* byte 0: no copyright is asserted, mode 0 */
++	hdmi_params.hdmi_l_channel_state[0] = 1 << 2;
++	/* byte 1: category code */
++	hdmi_params.hdmi_l_channel_state[1] = 0;
++	/* byte 2: source/channel number don't take into account */
++	hdmi_params.hdmi_l_channel_state[2] = 0;
++	/* byte 4: word length 16bits */
++	hdmi_params.hdmi_l_channel_state[4] = 0x2;
++	memcpy(hdmi_params.hdmi_r_channel_state,
++	       hdmi_params.hdmi_l_channel_state,
++	       sizeof(hdmi_params.hdmi_l_channel_state));
++
++	return hdmi->data.set_audio_param(hdmi->data.mtk_hdmi, &hdmi_params);
++}
++
++static int mtk_hdmi_dai_trigger(struct snd_pcm_substream *substream,
++				int cmd, struct snd_soc_dai *codec_dai)
++{
++	struct mtk_hdmi_priv *hdmi = snd_soc_dai_get_drvdata(codec_dai);
++
++	switch (cmd) {
++	case SNDRV_PCM_TRIGGER_START:
++	case SNDRV_PCM_TRIGGER_RESUME:
++	case SNDRV_PCM_TRIGGER_PAUSE_RELEASE:
++		hdmi->data.enable(hdmi->data.mtk_hdmi);
++		break;
++	case SNDRV_PCM_TRIGGER_STOP:
++	case SNDRV_PCM_TRIGGER_SUSPEND:
++	case SNDRV_PCM_TRIGGER_PAUSE_PUSH:
++		hdmi->data.disable(hdmi->data.mtk_hdmi);
++		break;
++	default:
++		return -EINVAL;
++	}
++	return 0;
++}
++
++static void mtk_hdmi_dai_shutdown(struct snd_pcm_substream *substream,
++				  struct snd_soc_dai *codec_dai)
++{
++	struct mtk_hdmi_priv *hdmi = snd_soc_dai_get_drvdata(codec_dai);
++
++	hdmi->data.disable(hdmi->data.mtk_hdmi);
++}
++
++static const struct snd_soc_dapm_widget mtk_hdmi_widgets[] = {
++	SND_SOC_DAPM_OUTPUT("TX"),
++};
++
++static const struct snd_soc_dapm_route mtk_hdmi_routes[] = {
++	{ "TX", NULL, "TX Playback" },
++};
++
++static const struct snd_soc_dai_ops mtk_hdmi_dai_ops = {
++	.startup = mtk_hdmi_dai_startup,
++	.hw_params = mtk_hdmi_dai_hw_params,
++	.trigger = mtk_hdmi_dai_trigger,
++	.shutdown = mtk_hdmi_dai_shutdown,
++};
++
++static struct snd_soc_dai_driver mtk_hdmi_dai = {
++	.name = "mtk-hdmi-hifi",
++	.playback = {
++		.stream_name = "TX Playback",
++		.channels_min = 2,
++		.channels_max = 8,
++		.rates = SNDRV_PCM_RATE_32000 |
++			 SNDRV_PCM_RATE_44100 | SNDRV_PCM_RATE_48000 |
++			 SNDRV_PCM_RATE_88200 | SNDRV_PCM_RATE_96000 |
++			 SNDRV_PCM_RATE_176400 | SNDRV_PCM_RATE_192000,
++		.formats = SNDRV_PCM_FMTBIT_S16_LE,
++	},
++	.ops = &mtk_hdmi_dai_ops,
++};
++
++static const struct snd_soc_codec_driver mtk_hdmi_codec = {
++	.dapm_widgets = mtk_hdmi_widgets,
++	.num_dapm_widgets = ARRAY_SIZE(mtk_hdmi_widgets),
++	.dapm_routes = mtk_hdmi_routes,
++	.num_dapm_routes = ARRAY_SIZE(mtk_hdmi_routes),
++};
++
++static int mtk_hdmi_probe(struct platform_device *pdev)
++{
++	struct mtk_hdmi_audio_data *data = pdev->dev.platform_data;
++	struct mtk_hdmi_priv *hdmi;
++	int ret;
++
++	hdmi = devm_kzalloc(&pdev->dev, sizeof(*hdmi), GFP_KERNEL);
++	if (!hdmi)
++		return -ENOMEM;
++
++	hdmi->data = *data;
++	hdmi->dev = &pdev->dev;
++	platform_set_drvdata(pdev, hdmi);
++
++	ret = devm_request_threaded_irq(&pdev->dev, hdmi->data.irq,
++					NULL, mtk_hdmi_irq,
++					IRQF_SHARED | IRQF_TRIGGER_LOW |
++					IRQF_ONESHOT,
++					"mtk-hdmi-hotplug", hdmi);
++	if (ret) {
++		dev_err(&pdev->dev, "request irq failed (%d)\n", ret);
++		return ret;
++	}
++
++	ret = snd_soc_register_codec(&pdev->dev, &mtk_hdmi_codec,
++				     &mtk_hdmi_dai, 1);
++	if (ret) {
++		dev_err(&pdev->dev, "register codec failed (%d)\n", ret);
++		return ret;
++	}
++
++	dev_info(&pdev->dev, "hdmi audio init success.\n");
++
++	return 0;
++}
++
++static int mtk_hdmi_remove(struct platform_device *pdev)
++{
++	snd_soc_unregister_codec(&pdev->dev);
++	return 0;
++}
++
++static struct platform_driver mtk_hdmi_driver = {
++	.driver = {
++		.name = "mtk-hdmi-codec",
++	},
++	.probe = mtk_hdmi_probe,
++	.remove = mtk_hdmi_remove,
++};
++module_platform_driver(mtk_hdmi_driver);
++
++/* Module information */
++MODULE_DESCRIPTION("MTK HDMI codec driver");
++MODULE_AUTHOR("Koro Chen <koro.chen@mediatek.com>");
++MODULE_LICENSE("GPL v2");
++MODULE_ALIAS("platform:mtk-hdmi-codec");
+diff --git a/sound/soc/codecs/mtk-hdmi.h b/sound/soc/codecs/mtk-hdmi.h
+new file mode 100644
+index 0000000..4d270be
+--- /dev/null
++++ b/sound/soc/codecs/mtk-hdmi.h
+@@ -0,0 +1,31 @@
++/*
++ * mtk-hdmi.h  --  MTK HDMI ASoC codec driver
++ *
++ * Copyright (c) 2015 MediaTek Inc.
++ * Author: Koro Chen <koro.chen@mediatek.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 and
++ * only version 2 as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++#ifndef __MTK_HDMI_H__
++#define __MTK_HDMI_H__
++
++#include <drm/mediatek/mtk_hdmi_audio.h>
++
++struct mtk_hdmi_priv {
++	struct device *dev;
++	struct mtk_hdmi_audio_data data;
++	u8 jack_status;
++	struct snd_soc_jack *jack;
++};
++
++int mtk_hdmi_set_jack_detect(struct snd_soc_codec *codec,
++			     struct snd_soc_jack *jack);
++#endif /* __MTK_HDMI_H__ */
 -- 
-Ard.
+2.6.1
