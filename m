@@ -1,24 +1,48 @@
-From: luka.perkov@sartura.hr (Luka Perkov)
-Date: Wed, 4 Nov 2015 22:46:19 +0000
-Subject: [PATCH 1/4] ARM: dts: kirkwood: add Linksys EA4500
-In-Reply-To: <3957044.Sz6eC5OsVr@wuerfel>
-References: <00000150d49a7cf7-e97bf540-89ce-49bf-a25e-2d082acab273-000000@email.amazonses.com>
- <3957044.Sz6eC5OsVr@wuerfel>
-Message-ID: <00000150d4adea4a-a422d621-19a4-4bec-a4d8-c4ae170e8113-000000@email.amazonses.com>
+From: torvalds@linux-foundation.org (Linus Torvalds)
+Date: Wed, 4 Nov 2015 14:55:01 -0800
+Subject: [GIT PULL] arm64 updates for 4.4
+In-Reply-To: <20151104182508.GA28726@e104818-lin.cambridge.arm.com>
+References: <20151104182508.GA28726@e104818-lin.cambridge.arm.com>
+Message-ID: <CA+55aFw3Y4x0RQPjgkZSV=NkXEoMWTq7AYRBpkqd-KMt6om6sw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 04, 2015 at 11:41:01PM +0100, Arnd Bergmann wrote:
-> On Wednesday 04 November 2015 22:25:05 Luka Perkov wrote:
-> > +/ {
-> > +	model = "Linksys EA4500";
-> > +	compatible = "linksys,ea4500", "marvell,kirkwood-88f6282", "marvell,kirkwood";
-> 
-> According to https://wikidevi.com/wiki/Linksys_EA4500 there are multiple versions
-> of this device, and at least EA4500v3 is completely incompatible with the version
-> in this patch. Should we add "linksys,ea4500v1" as a compatible string to identify
-> this better?
+On Wed, Nov 4, 2015 at 10:25 AM, Catalin Marinas
+<catalin.marinas@arm.com> wrote:
+>
+> - Support for 16KB pages, with the additional bonus of a 36-bit VA
+>   space, though the latter only depending on EXPERT
 
-Right. I'll send v2 after getting some more comments.
+So I told the ppc people this many years ago, and I guess I'll tell
+you guys too: 16kB pages are not actually useful, and anybody who
+thinks they are have not actually done the math.
 
-Luka
+It ends up being a horrible waste of memory for things like the page
+cache, to the point where all the arguments for it ("it allows us to
+manage lots of memory more cheaply") are pure and utter BS, because
+you effectively lose half of that memory to fragmentation in pretty
+much all normal loads.
+
+It's good for single-process loads - if you do a lot of big fortran
+jobs, or a lot of big database loads, and nothing else, you're fine.
+Or if you are an embedded OS and only haev one particular load you
+worry about.
+
+But it is really really nasty for any general-purpose stuff, and when
+your hardware people tell you that it's a great way to make your TLB's
+more effective, tell them back that they are incompetent morons, and
+that they should just make their TLB's better.
+
+Because they are.
+
+To make them understand the problem, compare it to having a 256-byte
+cacheline. They might understand it then, because you're talking about
+things that they almost certainly *also* wanted to do, but did the
+numbers on, and realized it was bad.
+
+And on the other hand, if they go "Hmm. 256-byte cache lines? We
+should do that too", then you know they are not worth your time, and
+you can quietly tell your bosses that they should up the medication in
+the watercooler in the hw lab.
+
+                      Linus
