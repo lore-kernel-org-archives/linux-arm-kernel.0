@@ -1,45 +1,75 @@
-From: ebiederm@xmission.com (Eric W. Biederman)
-Date: Tue, 03 Nov 2015 18:40:31 -0600
-Subject: [PATCH v2 1/2] mm: mmap: Add new /proc tunable for mmap_base ASLR.
-In-Reply-To: <20151103160410.34bbebc805c17d2f41150a19@linux-foundation.org>
- (Andrew Morton's message of "Tue, 3 Nov 2015 16:04:10 -0800")
-References: <1446574204-15567-1-git-send-email-dcashman@android.com>
- <20151103160410.34bbebc805c17d2f41150a19@linux-foundation.org>
-Message-ID: <87k2pyppfk.fsf@x220.int.ebiederm.org>
+From: lkp@intel.com (kbuild test robot)
+Date: Wed, 4 Nov 2015 08:52:54 +0800
+Subject: [PATCH 2/9] tty: xuartps: Use spinlock to serialize HW access
+In-Reply-To: <1446596450-20918-3-git-send-email-soren.brinkmann@xilinx.com>
+Message-ID: <201511040850.KOF8sWEr%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Andrew Morton <akpm@linux-foundation.org> writes:
+Hi Soren,
 
-> On Tue,  3 Nov 2015 10:10:03 -0800 Daniel Cashman <dcashman@android.com> wrote:
->
->> ASLR currently only uses 8 bits to generate the random offset for the
->> mmap base address on 32 bit architectures. This value was chosen to
->> prevent a poorly chosen value from dividing the address space in such
->> a way as to prevent large allocations. This may not be an issue on all
->> platforms. Allow the specification of a minimum number of bits so that
->> platforms desiring greater ASLR protection may determine where to place
->> the trade-off.
->
-> Can we please include a very good description of the motivation for this
-> change?  What is inadequate about the current code, what value does the
-> enhancement have to our users, what real-world problems are being solved,
-> etc.
->
-> Because all we have at present is "greater ASLR protection", which doesn't
-> really tell anyone anything.
+[auto build test WARNING on v4.3-rc7]
+[also WARNING on: next-20151103]
 
-The description seemed clear to me.
+url:    https://github.com/0day-ci/linux/commits/Soren-Brinkmann/tty-xuartps-Beautify-read-modify-writes/20151104-082546
+base:   https://github.com/0day-ci/linux Soren-Brinkmann/tty-xuartps-Beautify-read-modify-writes/20151104-082546
+config: i386-allmodconfig (attached as .config)
+reproduce:
+        # save the attached .config to linux build tree
+        make ARCH=i386 
 
-More random bits, more entropy, more work needed to brute force.
+All warnings (new ones prefixed by >>):
 
-8 bits only requires 256 tries (or a 1 in 256) chance to brute force
-something.
+   drivers/tty/serial/xilinx_uartps.c: In function 'cdns_uart_poll_get_char':
+>> drivers/tty/serial/xilinx_uartps.c:948:6: warning: unused variable 'imr' [-Wunused-variable]
+     u32 imr;
+         ^
+   drivers/tty/serial/xilinx_uartps.c: In function 'cdns_uart_poll_put_char':
+   drivers/tty/serial/xilinx_uartps.c:968:6: warning: unused variable 'imr' [-Wunused-variable]
+     u32 imr;
+         ^
 
-We have seen in the last couple of months on Android how only having 8 bits
-doesn't help much.
+vim +/imr +948 drivers/tty/serial/xilinx_uartps.c
 
-Each additional bit doubles the protection (and unfortunately also
-increases fragmentation of the userspace address space).
+19038ad9f Lars-Peter Clausen 2014-11-05  932  
+19f22efdb Thomas Betker      2015-03-12  933  	val = readl(port->membase + CDNS_UART_MODEMCR_OFFSET);
+19038ad9f Lars-Peter Clausen 2014-11-05  934  
+19038ad9f Lars-Peter Clausen 2014-11-05  935  	val &= ~(CDNS_UART_MODEMCR_RTS | CDNS_UART_MODEMCR_DTR);
+19038ad9f Lars-Peter Clausen 2014-11-05  936  
+19038ad9f Lars-Peter Clausen 2014-11-05  937  	if (mctrl & TIOCM_RTS)
+19038ad9f Lars-Peter Clausen 2014-11-05  938  		val |= CDNS_UART_MODEMCR_RTS;
+19038ad9f Lars-Peter Clausen 2014-11-05  939  	if (mctrl & TIOCM_DTR)
+19038ad9f Lars-Peter Clausen 2014-11-05  940  		val |= CDNS_UART_MODEMCR_DTR;
+19038ad9f Lars-Peter Clausen 2014-11-05  941  
+19f22efdb Thomas Betker      2015-03-12  942  	writel(val, port->membase + CDNS_UART_MODEMCR_OFFSET);
+61ec90169 John Linn          2011-04-30  943  }
+61ec90169 John Linn          2011-04-30  944  
+6ee04c6c5 Vlad Lungu         2013-10-17  945  #ifdef CONFIG_CONSOLE_POLL
+d9bb3fb12 Soren Brinkmann    2014-04-04  946  static int cdns_uart_poll_get_char(struct uart_port *port)
+6ee04c6c5 Vlad Lungu         2013-10-17  947  {
+6ee04c6c5 Vlad Lungu         2013-10-17 @948  	u32 imr;
+6ee04c6c5 Vlad Lungu         2013-10-17  949  	int c;
+c2fd7b9d5 Soren Brinkmann    2015-11-03  950  	unsigned long flags;
+6ee04c6c5 Vlad Lungu         2013-10-17  951  
+c2fd7b9d5 Soren Brinkmann    2015-11-03  952  	spin_lock_irqsave(&port->lock, flags);
+6ee04c6c5 Vlad Lungu         2013-10-17  953  
+6ee04c6c5 Vlad Lungu         2013-10-17  954  	/* Check if FIFO is empty */
+19f22efdb Thomas Betker      2015-03-12  955  	if (readl(port->membase + CDNS_UART_SR_OFFSET) & CDNS_UART_SR_RXEMPTY)
+6ee04c6c5 Vlad Lungu         2013-10-17  956  		c = NO_POLL_CHAR;
 
-Eric
+:::::: The code at line 948 was first introduced by commit
+:::::: 6ee04c6c5488b2b7fdfa22c771c127411f86e610 tty: xuartps: Add polled mode support for xuartps
+
+:::::: TO: Vlad Lungu <vlad.lungu@windriver.com>
+:::::: CC: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 51591 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151104/4b67ff78/attachment-0001.obj>
