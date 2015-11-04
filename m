@@ -1,54 +1,33 @@
-From: jean-michel.hautbois@veo-labs.com (Jean-Michel Hautbois)
-Date: Wed, 4 Nov 2015 20:33:04 +0100
-Subject: i.MX6: Increasing VPU frequency
-In-Reply-To: <CALHpu366MPbxJinVL2QFM11gMHx-T=M9QXNoznOTh++oHGGmrA@mail.gmail.com>
-References: <CAH-u=82M1yCmPjBg5qeiC8JiHjM8+WsP+utX_VPKfJwJsu0QFg@mail.gmail.com>
- <CALHpu366MPbxJinVL2QFM11gMHx-T=M9QXNoznOTh++oHGGmrA@mail.gmail.com>
-Message-ID: <CAH-u=81hMAF=r6rUKF+iuta3nC6n+4EDDz7Rn2-oGYbkbN0Jyg@mail.gmail.com>
+From: dcashman@android.com (Daniel Cashman)
+Date: Wed, 4 Nov 2015 11:36:07 -0800
+Subject: [PATCH v2 1/2] mm: mmap: Add new /proc tunable for mmap_base ASLR.
+In-Reply-To: <877flxo9j5.fsf@x220.int.ebiederm.org>
+References: <1446574204-15567-1-git-send-email-dcashman@android.com>
+ <20151104093957.GA31378@dhcp22.suse.cz>
+ <877flxo9j5.fsf@x220.int.ebiederm.org>
+Message-ID: <563A5E27.2060607@android.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-11-04 18:04 GMT+01:00 Jon Nettleton <jon.nettleton@gmail.com>:
-> On Wed, Nov 4, 2015 at 5:52 PM, Jean-Michel Hautbois
-> <jean-michel.hautbois@veo-labs.com> wrote:
->> Hi !
+On 11/4/15 11:21 AM, Eric W. Biederman wrote:
+> Michal Hocko <mhocko@kernel.org> writes:
+> 
+>> On Tue 03-11-15 10:10:03, Daniel Cashman wrote:
+>> [...]
+>>> +This value can be changed after boot using the
+>>> +/proc/sys/kernel/mmap_rnd_bits tunable
 >>
->> I can see in FSL kernel that VPU is configurable to 352M (it defaults
->> at 264MHz in mainline I think).
->> In the TRM, it is even specified at 352MHz as a default frequency,
->> with a maximum of 540MHz.
->>
->> Would it be possible to allow this clock rating modification if, for
->> instance, we select a performance governor in cpufreq, or if a coda
->> encoder is started with 1080p for instance ?
->> If so, then how is it doable properly ?
->
-> For some reason the FSL kernel configures the VPU to run at 352Mhz in
-> a very odd way that requires limiting the min cpu-frequency to 792Mhz.
-> It also requires clocking down a bunch of devices on pll2_pfd2_396m to
-> 352Mhz.
->
-> The simple solution to this is to instead parent the VPU to
-> pll2_pfd0_352m which is unused.  I have found by default it is stable
-> decoding but unstable encoding at 352Mhz, most likely due to the
-> voltage changes needed that limiting the min cpu-freq to 792Mhz
-> provides.  However everything seems to work quite reliably clocking
-> that pfd to 327Mhz, which still gives a boost of almost 24%
->
-> In my testing the performance gain in then going from 327 to 352 is
-> minimal.  Generally I think you hit AXI bus limitations rather than
-> VPU performance.
+>> Why is this not sitting in /proc/sys/vm/ where we already have
+>> mmap_min_addr. These two sound like they should sit together, no?
+> 
+> Ugh.  Yes.  Moving that file before it becomes part of the ABI sounds
+> like a good idea.  Daniel when you get around to v3 please move the
+> file.
 
-Interesting.
-So you propose to add something like the following in
-drivers/clk/imx/clk-imx6q.cdrivers/clk/imx/clk-imx6q.c :
-imx_clk_set_rate(clk[IMX6QDL_CLK_PLL2_PFD0_352M], 327000000);
-imx_clk_set_parent(clk[IMX6QDL_CLK_VPU_AXI_SEL],
-clk[IMX6QDL_CLK_PLL2_PFD0_352M]);
+To answer the first question: it was put there because that's where
+randomize_va_space is located, which seemed to me to be the
+most-related/similar option.  That being said, moving it under vm works
+too.  Will change for patch-set 3.
 
-This should end up with a fastest VPU (in fact ~25% boost is good).
-Is it the correct way to do it ?
-Should it be done in coda instead ? And only when needed ?
-
-Thanks,
-JM
+Thank You,
+Dan
