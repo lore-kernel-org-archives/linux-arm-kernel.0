@@ -1,54 +1,114 @@
-From: julia.lawall@lip6.fr (Julia Lawall)
-Date: Wed, 4 Nov 2015 13:34:54 +0100 (CET)
-Subject: [patch] bus: sunxi-rsb: unlock on error in sunxi_rsb_read()
-In-Reply-To: <5639F7EB.2090308@bfs.de>
-References: <20151103220244.GA19280@mwanda> <5639F7EB.2090308@bfs.de>
-Message-ID: <alpine.DEB.2.10.1511041334180.2559@hadrien>
+From: claudio.fontana@huawei.com (Claudio Fontana)
+Date: Wed, 4 Nov 2015 13:50:52 +0100
+Subject: [RFC] arm64: perf: associate LL with L2 cache accesses and refills
+In-Reply-To: <20151104113918.GB23860@leverpostej>
+References: <1446636253-7519-1-git-send-email-hw.claudio@gmail.com>
+ <20151104113918.GB23860@leverpostej>
+Message-ID: <5639FF2C.8040409@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 04.11.2015 12:39, Mark Rutland wrote:
+> On Wed, Nov 04, 2015 at 12:24:13PM +0100, hw.claudio at gmail.com wrote:
+>> From: Claudio Fontana <claudio.fontana@huawei.com>
+>>
+>> Signed-off-by: Claudio Fontana <claudio.fontana@huawei.com>
+>> Cc: Ammar Saeed <ammar.saeed@huawei.com>
+>> ---
+>>
+>> Hello,
+> 
+> Hi,
+>  
+>> as part of some experiments with the Juno ARM64 board, we needed to get
+>> readings from the PMU regarding L2 Cache hits and misses, but we noticed
+>> that the L2 Cache Access and Refill performance counters were not hooked
+>> up in the perf API. We just did that, and that seems to produce correct
+>> results on the Juno.
+>>
+>> However I guess that these registers are not hooked up by default due to
+>> differences between different boards...how could this be done taking
+>> account of the different possible implementations? 
+> 
+> The events we list for PMUv3 are those which are required to be
+> implemented (see "D5.10.6 Required events" in ARM DDI 0487A.h). All
+> others (including the L2 events you add) are optional and may or may not
+> be implemented, so we can't expose them for all PMUv3 implementations.
+> 
+> To account for different events, we will shortly be exposing separate
+> logical PMUs (see [1]), which will allow us to support each CPU's set
+> of supported events independently. That's queued in the arm64 tree [2]
+> currently.
+> 
+> I see that per their respective TRMs, both Cortex-A53 and Cortex-A57
+> support these L2 events. It looks like when I added specialised support
+> [3,4] I simply missed them. Fancy sending a patch to correct that?
+> 
+> Thanks,
+> Mark.
 
+I gave a first look at the resources you provided, I am looking at the
+for-next/core branch you mentioned.
 
-On Wed, 4 Nov 2015, walter harms wrote:
+However, when reading the Cortex-A-53 manual it seems that even for
+those specific CPUs the L2 Counters are optional, as the L2 Cache
+itself is optional. 
 
->
->
-> Am 03.11.2015 23:02, schrieb Dan Carpenter:
-> > Don't forget to unlock before returning an error code.
-> >
-> > Fixes: d787dcdb9c8f ('bus: sunxi-rsb: Add driver for Allwinner Reduced Serial Bus')
-> > Signed-off-by: Dan Carpenter <dan.carpenter@oracle.com>
-> >
-> > diff --git a/drivers/bus/sunxi-rsb.c b/drivers/bus/sunxi-rsb.c
-> > index 846bc29c..0cfcb39 100644
-> > --- a/drivers/bus/sunxi-rsb.c
-> > +++ b/drivers/bus/sunxi-rsb.c
-> > @@ -342,13 +342,13 @@ static int sunxi_rsb_read(struct sunxi_rsb *rsb, u8 rtaddr, u8 addr,
-> >
-> >  	ret = _sunxi_rsb_run_xfer(rsb);
-> >  	if (ret)
-> > -		goto out;
-> > +		goto unlock;
-> >
-> >  	*buf = readl(rsb->regs + RSB_DATA);
-> >
-> > +unlock:
-> >  	mutex_unlock(&rsb->lock);
-> >
-> > -out:
-> >  	return ret;
-> >  }
-> >
->
-> microoptimisation:
-> You can remove the goto.
->
-> if (!ret)
-> 	*buf = readl(rsb->regs + RSB_DATA);
->
-> mutex_unlock(&rsb->lock);
-> return ret;
+Quoting from "12.4.2 Performance Monitors Common Event Identification Register 0":
 
-I think the goto is nicer.  Failure => goto.
+Table 12-6 on page 12-10 shows the PMCEID0_EL0 bit assignments
 
-julia
+[23] 0x17 L2D_CACHE_REFILL L2 Data cache refill:
+0 This event is not implemented if the Cortex-A53 processor has been configured without an L2 cache.
+1 This event is implemented if the Cortex-A53 processor has been configured with an L2 cache.
+
+[22] 0x16 L2D_CACHE L2 Data cache access:
+0 This event is not implemented if the Cortex-A53 processor has been configured without an L2 cache.
+1 This event is implemented if the Cortex-A53 processor has been configured with an L2 cache.
+
+I don't see that we are reading this register to check whether the
+hardware supports those counters or not.. shouldn't we? However, I
+think it should be a direct consequence of L2 cache being present,
+so maybe we can use the existing struct cpu_cacheinfo "num_levels"?
+
+For A-57 it does not seem to be an issue since as far as I can see
+from the manual, the L2 cache is always present.
+
+Do I understand this correctly? Ciao,
+
+Claudio 
+
+> 
+> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-October/374053.html
+> [2] https://git.kernel.org/cgit/linux/kernel/git/arm64/linux.git/log/?h=for-next/core
+> [3] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-October/374052.html
+> [4] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-October/374056.html
+> 
+>> I send this as an initial RFC to try to kickoff discussion about this.
+>>
+>> Thank you,
+>>
+>> Claudio Fontana
+>>
+>>  arch/arm64/kernel/perf_event.c | 5 +++++
+>>  1 file changed, 5 insertions(+)
+>>
+>> diff --git a/arch/arm64/kernel/perf_event.c b/arch/arm64/kernel/perf_event.c
+>> index f9a74d4..f72f2ff 100644
+>> --- a/arch/arm64/kernel/perf_event.c
+>> +++ b/arch/arm64/kernel/perf_event.c
+>> @@ -728,6 +728,11 @@ static const unsigned armv8_pmuv3_perf_cache_map[PERF_COUNT_HW_CACHE_MAX]
+>>  	[C(L1D)][C(OP_WRITE)][C(RESULT_ACCESS)]	= ARMV8_PMUV3_PERFCTR_L1_DCACHE_ACCESS,
+>>  	[C(L1D)][C(OP_WRITE)][C(RESULT_MISS)]	= ARMV8_PMUV3_PERFCTR_L1_DCACHE_REFILL,
+>>  
+>> +	[C(LL)][C(OP_READ)][C(RESULT_ACCESS)]	= ARMV8_PMUV3_PERFCTR_L2_CACHE_ACCESS,
+>> +	[C(LL)][C(OP_READ)][C(RESULT_MISS)]	= ARMV8_PMUV3_PERFCTR_L2_CACHE_REFILL,
+>> +	[C(LL)][C(OP_WRITE)][C(RESULT_ACCESS)]	= ARMV8_PMUV3_PERFCTR_L2_CACHE_ACCESS,
+>> +	[C(LL)][C(OP_WRITE)][C(RESULT_MISS)]	= ARMV8_PMUV3_PERFCTR_L2_CACHE_REFILL,
+>> +
+>>  	[C(BPU)][C(OP_READ)][C(RESULT_ACCESS)]	= ARMV8_PMUV3_PERFCTR_PC_BRANCH_PRED,
+>>  	[C(BPU)][C(OP_READ)][C(RESULT_MISS)]	= ARMV8_PMUV3_PERFCTR_PC_BRANCH_MIS_PRED,
+>>  	[C(BPU)][C(OP_WRITE)][C(RESULT_ACCESS)]	= ARMV8_PMUV3_PERFCTR_PC_BRANCH_PRED,
+>> -- 
+>> 1.8.5.3
+>>
