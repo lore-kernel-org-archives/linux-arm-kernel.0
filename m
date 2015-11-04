@@ -1,26 +1,23 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 4 Nov 2015 13:54:51 +0000
-Subject: [PATCH 1/3] ASoC: rockchip: i2s: Add set the divider clock API
-In-Reply-To: <1446434042-2139-1-git-send-email-wxt@rock-chips.com>
-References: <1446434042-2139-1-git-send-email-wxt@rock-chips.com>
-Message-ID: <20151104135451.GB1717@sirena.org.uk>
+From: phil.edworthy@renesas.com (Phil Edworthy)
+Date: Wed, 4 Nov 2015 13:57:48 +0000
+Subject: PCIe host controller behind IOMMU on ARM
+Message-ID: <PS1PR06MB11807CBE8EB2AC6B0158D2B5F52A0@PS1PR06MB1180.apcprd06.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 02, 2015 at 11:14:00AM +0800, Caesar Wang wrote:
-> In order to support more rates, add the divider clock api.
+Hi,
 
-> As the input source clock to the module is MCLK_I2S,
-> and by the divider of the module, the clock generator generates
-> SCLK and LRCK to transmitter and receiver.
+I am trying to hook up a PCIe host controller that sits behind an IOMMU,
+but having some problems.
 
-Why is this a requirement?  The clock to use as a source should normally
-be specified via set_sysclk() and any internal dividers calculated
-automatically by the driver.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151104/4932e765/attachment.sig>
+I'm using the pcie-rcar PCIe host controller and it works fine without
+the IOMMU, and I can attach the IOMMU to the controller such that any calls
+to dma_alloc_coherent made by the controller driver uses the iommu_ops
+version of dma_ops.
+
+However, I can't see how to make the endpoints to utilise the dma_ops that
+the controller uses. Shouldn't the endpoints inherit the dma_ops from the
+controller? Any pointers for this?
+
+Thanks
+Phil
