@@ -1,9 +1,9 @@
 From: luka.perkov@sartura.hr (Luka Perkov)
-Date: Wed, 4 Nov 2015 22:25:07 +0000
-Subject: [PATCH 2/4] ARM: dts: kirkwood: add Linksys EA3500
+Date: Wed, 4 Nov 2015 22:25:08 +0000
+Subject: [PATCH 3/4] ARM: dts: kirkwood: add Seagate GoFlex Home
 In-Reply-To: <1446675888-24495-1-git-send-email-luka.perkov@sartura.hr>
 References: <1446675888-24495-1-git-send-email-luka.perkov@sartura.hr>
-Message-ID: <00000150d49a832c-f77d66d7-8f66-4b36-ac2c-df85deee46b6-000000@email.amazonses.com>
+Message-ID: <00000150d49a8745-1c2bc8d4-1333-46bb-bf0e-5508ef988c73-000000@email.amazonses.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,187 +13,165 @@ Signed-off-by: Luka Perkov <luka.perkov@sartura.hr>
 ---
  .../devicetree/bindings/arm/marvell,kirkwood.txt   |   1 +
  arch/arm/boot/dts/Makefile                         |   1 +
- arch/arm/boot/dts/kirkwood-ea3500.dts              | 149 +++++++++++++++++++++
- 3 files changed, 151 insertions(+)
- create mode 100644 arch/arm/boot/dts/kirkwood-ea3500.dts
+ arch/arm/boot/dts/kirkwood-goflexhome.dts          | 127 +++++++++++++++++++++
+ 3 files changed, 129 insertions(+)
+ create mode 100644 arch/arm/boot/dts/kirkwood-goflexhome.dts
 
 diff --git a/Documentation/devicetree/bindings/arm/marvell,kirkwood.txt b/Documentation/devicetree/bindings/arm/marvell,kirkwood.txt
-index 7a99d4a..ed381a3 100644
+index ed381a3..37bd190 100644
 --- a/Documentation/devicetree/bindings/arm/marvell,kirkwood.txt
 +++ b/Documentation/devicetree/bindings/arm/marvell,kirkwood.txt
-@@ -50,6 +50,7 @@ board. Currently known boards are:
- "lacie,netspace_mini_v2"
- "lacie,netspace_v2"
- "linksys,ea4500"
-+"linksys,ea3500"
- "marvell,db-88f6281-bp"
- "marvell,db-88f6282-bp"
- "marvell,mv88f6281gtw-ge"
+@@ -72,6 +72,7 @@ board. Currently known boards are:
+ "raidsonic,ib-nas6220-b"
+ "raidsonic,ib-nas62x0"
+ "seagate,dockstar"
++"seagate,goflexhome"
+ "seagate,goflexnet"
+ "synology,ds109"
+ "synology,ds110jv10"
 diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index a16c04b..ebe5b73 100644
+index ebe5b73..1d6fb0d 100644
 --- a/arch/arm/boot/dts/Makefile
 +++ b/arch/arm/boot/dts/Makefile
-@@ -168,6 +168,7 @@ dtb-$(CONFIG_MACH_KIRKWOOD) += \
- 	kirkwood-ds411.dtb \
- 	kirkwood-ds411j.dtb \
+@@ -170,6 +170,7 @@ dtb-$(CONFIG_MACH_KIRKWOOD) += \
  	kirkwood-ds411slim.dtb \
-+	kirkwood-ea3500.dtb \
+ 	kirkwood-ea3500.dtb \
  	kirkwood-ea4500.dtb \
++	kirkwood-goflexhome.dtb \
  	kirkwood-goflexnet.dtb \
  	kirkwood-guruplug-server-plus.dtb \
-diff --git a/arch/arm/boot/dts/kirkwood-ea3500.dts b/arch/arm/boot/dts/kirkwood-ea3500.dts
+ 	kirkwood-ib62x0.dtb \
+diff --git a/arch/arm/boot/dts/kirkwood-goflexhome.dts b/arch/arm/boot/dts/kirkwood-goflexhome.dts
 new file mode 100644
-index 0000000..3a064f6
+index 0000000..5f933d4
 --- /dev/null
-+++ b/arch/arm/boot/dts/kirkwood-ea3500.dts
-@@ -0,0 +1,149 @@
-+/*
-+ * kirkwood-ea3500.dts - Device Tree file for Linksys EA3500
-+ *
-+ * (c) 2013 Jonas Gorski <jogo@openwrt.org>
-+ * (c) 2013 Deutsche Telekom Innovation Laboratories
-+ * (c) 2014 Luka Perkov <luka.perkov@sartura.hr>
-+ * (c) 2014 Dan Walters <dan@walters.io>
-+ *
-+ * This file is licensed under the terms of the GNU General Public
-+ * License version 2.  This program is licensed "as is" without any
-+ * warranty of any kind, whether express or implied.
-+ */
-+
++++ b/arch/arm/boot/dts/kirkwood-goflexhome.dts
+@@ -0,0 +1,127 @@
 +/dts-v1/;
 +
 +#include "kirkwood.dtsi"
-+#include "kirkwood-6282.dtsi"
++#include "kirkwood-6281.dtsi"
 +
 +/ {
-+	model = "Linksys EA3500";
-+	compatible = "linksys,ea3500", "marvell,kirkwood-88f6282", "marvell,kirkwood";
++	model = "Seagate GoFlex Home";
++	compatible = "seagate,goflexhome", "marvell,kirkwood-88f6281", "marvell,kirkwood";
 +
 +	memory {
 +		device_type = "memory";
-+		reg = <0x00000000 0x4000000>;
++		reg = <0x00000000 0x8000000>;
 +	};
 +
 +	chosen {
-+		bootargs = "console=ttyS0,115200n8 earlyprintk";
-+	};
-+
-+	mbus {
-+		pcie-controller {
-+			status = "okay";
-+
-+			pcie at 1,0 {
-+				status = "okay";
-+			};
-+
-+			pcie at 2,0 {
-+				status = "okay";
-+			};
-+		};
++		bootargs = "console=ttyS0,115200n8 earlyprintk root=/dev/sda1 rootdelay=10";
++		stdout-path = &uart0;
 +	};
 +
 +	ocp at f1000000 {
 +		pinctrl: pin-controller at 10000 {
-+			pmx_led_green_power: pmx-led-green-power {
-+				marvell,pins = "mpp7";
-+				marvell,function = "gpo";
++			pmx_usb_power_enable: pmx-usb-power-enable {
++				marvell,pins = "mpp29";
++				marvell,function = "gpio";
 +			};
-+			pmx_btn_wps: pmx-btn-wps {
++			pmx_led_white: pmx-led-white {
++				marvell,pins = "mpp40";
++				marvell,function = "gpio";
++			};
++			pmx_led_green: pmx-led_green {
++				marvell,pins = "mpp46";
++				marvell,function = "gpio";
++			};
++			pmx_led_orange: pmx-led-orange {
 +				marvell,pins = "mpp47";
 +				marvell,function = "gpio";
 +			};
-+			pmx_btn_reset: pmx-btn-reset {
-+				marvell,pins = "mpp48";
-+				marvell,function = "gpio";
-+			};
 +		};
-+
-+		rtc at 10300 {
-+			status = "disabled";
-+		};
-+
 +		serial at 12000 {
++			status = "ok";
++		};
++
++		sata at 80000 {
 +			status = "okay";
++			nr-ports = <2>;
 +		};
 +
 +	};
-+
-+	gpio_keys {
-+		compatible = "gpio-keys";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		pinctrl-0 = < &pmx_btn_wps &pmx_btn_reset >;
-+		pinctrl-names = "default";
-+
-+		button at 15 {
-+			label = "WPS Button";
-+			linux,code = <KEY_WPS_BUTTON>;
-+			gpios = <&gpio1 15 GPIO_ACTIVE_LOW>;
-+		};
-+
-+		button at 16 {
-+			label = "Reset Button";
-+			linux,code = <KEY_RESTART>;
-+			gpios = <&gpio1 16 GPIO_ACTIVE_LOW>;
-+		};
-+	};
-+
 +	gpio-leds {
 +		compatible = "gpio-leds";
-+		pinctrl-0 = < &pmx_led_green_power >;
++
++		health {
++			label = "status:green:health";
++			gpios = <&gpio1 14 1>;
++			linux,default-trigger = "default-on";
++		};
++		fault {
++			label = "status:orange:fault";
++			gpios = <&gpio1 15 1>;
++		};
++		misc {
++			label = "status:white:misc";
++			gpios = <&gpio1 8 1>;
++			linux,default-trigger = "ide-disk";
++		};
++	};
++	regulators {
++		compatible = "simple-bus";
++		#address-cells = <1>;
++		#size-cells = <0>;
++		pinctrl-0 = <&pmx_usb_power_enable>;
 +		pinctrl-names = "default";
 +
-+		green-power {
-+			label = "ea3500:green:power";
-+			gpios = <&gpio0 7 GPIO_ACTIVE_HIGH>;
++		usb_power: regulator at 1 {
++			compatible = "regulator-fixed";
++			reg = <1>;
++			regulator-name = "USB Power";
++			regulator-min-microvolt = <5000000>;
++			regulator-max-microvolt = <5000000>;
++			enable-active-high;
++			regulator-always-on;
++			regulator-boot-on;
++			gpio = <&gpio0 29 GPIO_ACTIVE_HIGH>;
 +		};
 +	};
 +};
 +
 +&nand {
++	chip-delay = <40>;
 +	status = "okay";
-+	pinctrl-0 = <&pmx_nand>;
-+	pinctrl-names = "default";
 +
 +	partition at 0 {
 +		label = "u-boot";
-+		reg = <0x0000000 0x80000>;
++		reg = <0x0000000 0x100000>;
 +		read-only;
 +	};
 +
-+	partition at 80000 {
-+		label = "u-boot environment";
-+		reg = <0x80000 0x20000>;
++	partition at 100000 {
++		label = "uImage";
++		reg = <0x0100000 0x400000>;
 +	};
 +
-+	partition at 200000 {
-+		label = "kernel";
-+		reg = <0x200000 0x200000>;
++	partition at 500000 {
++		label = "pogoplug";
++		reg = <0x0500000 0x2000000>;
 +	};
 +
-+	partition at 400000 {
++	partition at 2500000 {
 +		label = "root";
-+		reg = <0x400000 0x1200000>;
++		reg = <0x02500000 0xd800000>;
 +	};
 +};
 +
 +&mdio {
 +	status = "okay";
++
++	ethphy0: ethernet-phy at 0 {
++		reg = <0>;
++	};
 +};
 +
 +&eth0 {
 +	status = "okay";
 +	ethernet0-port at 0 {
-+		speed = <1000>;
-+		duplex = <1>;
-+	};
-+};
-+
-+&eth1 {
-+	status = "okay";
-+	ethernet1-port at 0 {
-+		speed = <1000>;
-+		duplex = <1>;
++		phy-handle = <&ethphy0>;
 +	};
 +};
 -- 
