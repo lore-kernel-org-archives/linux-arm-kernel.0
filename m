@@ -1,108 +1,81 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Wed,  4 Nov 2015 13:23:52 +0000
-Subject: [PATCH] arm64/dma-mapping: Fix sizes in __iommu_{alloc,free}_attrs
-Message-ID: <74bd0f4e1ecda45febc55c6c6fe0d3d616c283d0.1446643360.git.robin.murphy@arm.com>
+From: christoffer.dall@linaro.org (Christoffer Dall)
+Date: Wed, 4 Nov 2015 14:31:47 +0100
+Subject: [PATCH] KVM/arm: kernel low level debug support for ARM32
+ virtual platforms
+In-Reply-To: <CAL_JsqJJHGwcdTDMh3WujJW0rDPxocVLEUpw95aVFC4FDEdDgA@mail.gmail.com>
+References: <1446508313-24404-1-git-send-email-m.smarduch@samsung.com>
+ <5638E1CD.8090006@codeaurora.org> <5638F294.4060409@samsung.com>
+ <20151103175522.GA24856@arm.com> <56390838.3000204@samsung.com>
+ <CAL_JsqJJHGwcdTDMh3WujJW0rDPxocVLEUpw95aVFC4FDEdDgA@mail.gmail.com>
+Message-ID: <20151104133147.GB5819@cbox>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The iommu-dma layer does its own size-alignment for coherent DMA
-allocations based on IOMMU page sizes, but we still need to consider
-CPU page sizes for the cases where a non-cacheable CPU mapping is
-created. Whilst everything on the alloc/map path seems to implicitly
-align things enough to make it work, some functions used by the
-corresponding unmap/free path do not, which leads to problems freeing
-odd-sized allocations. Either way it's something we really should be
-handling explicitly, so do that to make both paths suitably robust.
+On Tue, Nov 03, 2015 at 01:39:44PM -0600, Rob Herring wrote:
+> On Tue, Nov 3, 2015 at 1:17 PM, Mario Smarduch <m.smarduch@samsung.com> wrote:
+> >
+> >
+> > On 11/3/2015 9:55 AM, Will Deacon wrote:
+> >> On Tue, Nov 03, 2015 at 09:44:52AM -0800, Mario Smarduch wrote:
+> >>> On 11/3/2015 8:33 AM, Christopher Covington wrote:
+> >>>> On 11/02/2015 06:51 PM, Mario Smarduch wrote:
+> >>>>>    this is a re-post from couple weeks ago, please take time to review this
+> >>>>> simple patch which simplifies DEBUG_LL and prevents kernel crash on virtual
+> >>>>> platforms.
+> >>>>>
+> >>>>> Before this patch DEBUG_LL for 'dummy virtual machine':
+> >>>>>
+> >>>>> ( ) Kernel low-level debugging via EmbeddedICE DCC channel
+> >>>>> ( ) Kernel low-level debug output via semihosting I/O
+> >>>>> ( ) Kernel low-level debugging via 8250 UART
+> >>>>> ( ) Kernel low-level debugging via ARM Ltd PL01x Primecell
+> >>>>>
+> >>>>> In summary if debug uart is not emulated kernel crashes.
+> >>>>> And once you pass that hurdle, uart physical/virtual addresses are unknown.
+> >>>>> DEBUG_LL comes in handy on many occasions and should be somewhat
+> >>>>> intuitive to use like it is for physical platforms. For virtual platforms
+> >>>>> user may start daubting the host and get into a bigger mess.
+> >>>>>
+> >>>>> After this patch is applied user gets:
+> >>>>>
+> >>>>> (X) Kernel low-level debugging on QEMU Virtual Platform
+> >>>>> ( ) Kernel low-level debugging on Kvmtool Virtual Platform
+> >>>>>    ..... above repeated ....
+> >>>>>
+> >>>>> The virtual addresses selected follow arm reference models, high in vmalloc
+> >>>>> section with high mem enabled and guest running with >= 1GB of memory. The
+> >>>>> offset is leftover from arm reference models.
+> >>>>
+> >>>> Which model? It doesn't appear to match the vexpress AEM/RTSM/FVP/whatever
+> >>>> which used 0x1c090000 for UART0.
+> >>>
+> >>> I recall QEMU virt model had it's own physical address map, for sure I saw the
+> >>> virtio-mmio regions assigned in some ARM document. Peter would you know?
+> >>>
+> >>> As far as kvmtool I'm not sure, currently PC1 COM1 port is used? Andre will that
+> >>> stay fixed?
+> >>
+> >> We make absolutely no guarantees about the memory map provided by kvmtool.
+> >>
+> >> Will
+> >>
+> >
+> > If that's also the case for qemu, then I guess the best you can do is find a way
+> > to dump the device tree. Find the uart, physical address and try figure out the
+> > virtual address.
+> >
+> > Pretty involved, hoped for something more automated since that's a handy feature.
+> 
+> You really only need LL_DEBUG now if you are debugging very early code
+> before memory is setup and/or bad memory. Use earlycon instead which
+> should already be supported both via the pl011 or semihosting. I used
+> it with QEMU semihosting support.
+> 
+Then we should really document how to use that with qemu's virt platform
+and kvmtool's platform on both 32-bit and 64-bit so that users can
+easily figure out what they're doing wrong when they get no output.
 
-Reported-by: Yong Wu <yong.wu@mediatek.com>
-Signed-off-by: Robin Murphy <robin.murphy@arm.com>
----
+In practice, the address for the pl011 is quite unlikely to change, I
+dare speculate, so that documentation shouldn't need frequent updating.
 
-This is based on Joerg's current master branch as the code hasn't
-landed yet, but I guess since it's now mid-merge we'll probably be
-taking it through arm64 at -rc1.
-
-Robin.
-
- arch/arm64/mm/dma-mapping.c | 19 +++++++++++++------
- 1 file changed, 13 insertions(+), 6 deletions(-)
-
-diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
-index 6320361..5de6171 100644
---- a/arch/arm64/mm/dma-mapping.c
-+++ b/arch/arm64/mm/dma-mapping.c
-@@ -552,10 +552,14 @@ static void *__iommu_alloc_attrs(struct device *dev, size_t size,
- {
- 	bool coherent = is_device_dma_coherent(dev);
- 	int ioprot = dma_direction_to_prot(DMA_BIDIRECTIONAL, coherent);
-+	size_t iosize = size;
- 	void *addr;
- 
- 	if (WARN(!dev, "cannot create IOMMU mapping for unknown device\n"))
- 		return NULL;
-+
-+	size = PAGE_ALIGN(size);
-+
- 	/*
- 	 * Some drivers rely on this, and we probably don't want the
- 	 * possibility of stale kernel data being read by devices anyway.
-@@ -566,7 +570,7 @@ static void *__iommu_alloc_attrs(struct device *dev, size_t size,
- 		struct page **pages;
- 		pgprot_t prot = __get_dma_pgprot(attrs, PAGE_KERNEL, coherent);
- 
--		pages = iommu_dma_alloc(dev, size, gfp, ioprot,	handle,
-+		pages = iommu_dma_alloc(dev, iosize, gfp, ioprot, handle,
- 					flush_page);
- 		if (!pages)
- 			return NULL;
-@@ -574,7 +578,7 @@ static void *__iommu_alloc_attrs(struct device *dev, size_t size,
- 		addr = dma_common_pages_remap(pages, size, VM_USERMAP, prot,
- 					      __builtin_return_address(0));
- 		if (!addr)
--			iommu_dma_free(dev, pages, size, handle);
-+			iommu_dma_free(dev, pages, iosize, handle);
- 	} else {
- 		struct page *page;
- 		/*
-@@ -591,7 +595,7 @@ static void *__iommu_alloc_attrs(struct device *dev, size_t size,
- 		if (!addr)
- 			return NULL;
- 
--		*handle = iommu_dma_map_page(dev, page, 0, size, ioprot);
-+		*handle = iommu_dma_map_page(dev, page, 0, iosize, ioprot);
- 		if (iommu_dma_mapping_error(dev, *handle)) {
- 			if (coherent)
- 				__free_pages(page, get_order(size));
-@@ -606,6 +610,9 @@ static void *__iommu_alloc_attrs(struct device *dev, size_t size,
- static void __iommu_free_attrs(struct device *dev, size_t size, void *cpu_addr,
- 			       dma_addr_t handle, struct dma_attrs *attrs)
- {
-+	size_t iosize = size;
-+
-+	size = PAGE_ALIGN(size);
- 	/*
- 	 * @cpu_addr will be one of 3 things depending on how it was allocated:
- 	 * - A remapped array of pages from iommu_dma_alloc(), for all
-@@ -617,17 +624,17 @@ static void __iommu_free_attrs(struct device *dev, size_t size, void *cpu_addr,
- 	 * Hence how dodgy the below logic looks...
- 	 */
- 	if (__in_atomic_pool(cpu_addr, size)) {
--		iommu_dma_unmap_page(dev, handle, size, 0, NULL);
-+		iommu_dma_unmap_page(dev, handle, iosize, 0, NULL);
- 		__free_from_pool(cpu_addr, size);
- 	} else if (is_vmalloc_addr(cpu_addr)){
- 		struct vm_struct *area = find_vm_area(cpu_addr);
- 
- 		if (WARN_ON(!area || !area->pages))
- 			return;
--		iommu_dma_free(dev, area->pages, size, &handle);
-+		iommu_dma_free(dev, area->pages, iosize, &handle);
- 		dma_common_free_remap(cpu_addr, size, VM_USERMAP);
- 	} else {
--		iommu_dma_unmap_page(dev, handle, size, 0, NULL);
-+		iommu_dma_unmap_page(dev, handle, iosize, 0, NULL);
- 		__free_pages(virt_to_page(cpu_addr), get_order(size));
- 	}
- }
--- 
-1.9.1
+-Christoffer
