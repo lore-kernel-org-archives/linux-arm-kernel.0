@@ -1,93 +1,97 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 04 Nov 2015 09:03:53 +0000
-Subject: [PATCH RFC 7/7] irqchip: [Example] dummy wired interrupt/MSI
- bridge driver
-In-Reply-To: <5639BB10.1090108@huawei.com>
-References: <1444923568-17413-1-git-send-email-marc.zyngier@arm.com>
- <1444923568-17413-8-git-send-email-marc.zyngier@arm.com>
- <5639BB10.1090108@huawei.com>
-Message-ID: <5639C9F9.2010704@arm.com>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Wed, 4 Nov 2015 11:05:54 +0200
+Subject: [PATCH] dmaengine: edma: fix build without CONFIG_OF
+In-Reply-To: <16166945.0Jm7Xdjkb9@wuerfel>
+References: <17811472.bY8CqmdEVy@wuerfel> <5639B6EB.8030101@ti.com>
+ <16166945.0Jm7Xdjkb9@wuerfel>
+Message-ID: <5639CA72.4050604@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 04/11/15 08:00, majun (F) wrote:
-> Hi Marc:
-> 
-> ? 2015/10/15 23:39, Marc Zyngier ??:
->> In order to demonstrate how to put together a wire/MSI bridge,
->> add a dummy driver that doesn't do anything at all, except
->> for allocating interrupts.
+On 11/04/2015 10:46 AM, Arnd Bergmann wrote:
+> On Wednesday 04 November 2015 09:42:35 Peter Ujfalusi wrote:
+>> On 11/03/2015 04:00 PM, Arnd Bergmann wrote:
+>>> During the edma rework, a build error was introduced for the
+>>> case that CONFIG_OF is disabled:
+>>>
+>>> drivers/built-in.o: In function `edma_tc_set_pm_state':
+>>> :(.text+0x43bf0): undefined reference to `of_find_device_by_node'
+>>>
+>>> As the edma_tc_set_pm_state() function does nothing in case
+>>> we are running without OF, this adds an IS_ENABLED() check
+>>> that turns the function into an empty stub then and avoids the
+>>> link error.
+>>>
+>>> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+>>> Fixes: ca304fa9bb76 ("ARM/dmaengine: edma: Public API to use private struct pointer")
 >>
->> It comes together with an even more stupid client driver that
->> allocates an interrupt and dump the hierarchy of that interrupt.
+>> The actual commit this patch is fixing is:
+>> 1be5336bc7ba dmaengine: edma: New device tree binding
+> 
+> That's what I first thought, but it seems to just move around the
+> call to of_find_device_by_node that was first introduced in the
+> commit I mentioned. Did you build-test it successfully with
+> ca304fa9bb76 and CONFIG_OF enabled? I have to admit that I
+> was just guessing from the contents and did not bisect this
+> fully.
+
+Ah, I see. That of_find_device_by_node() was used by the function used to
+build the unused channel list for the legacy old code. The whole unused
+channel list has been removed by the new DT binding patch since it was bogus
+to start with and there is no need for it anymore.
+
+> 
+>>> ---
+>>> Found on ARM randconfig builds with today's linux-next
 >>
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->> ---
-> [...]
->> +
->> +static int msichip_domain_alloc(struct irq_domain *domain, unsigned int virq,
->> +				   unsigned int nr_irqs, void *arg)
->> +{
->> +	int i, err;
->> +	irq_hw_number_t hwirq;
->> +	unsigned int type;
->> +	struct irq_fwspec *fwspec = arg;
->> +	void *data;
->> +
->> +	err = msichip_domain_translate(domain, fwspec, &hwirq, &type);
->> +	if (err)
->> +		return err;
->> +
+>> I have sanity built the kernel with omap2plus_defconfig and
+>> davinci_all_defconfig since eDMA is used by these platforms and did not faced
+>> with this issue, as obviously these defconfigs will result OF to be enabled.
 > 
-> .translate function already called once in  irq_domain_translate(),
-> I think we don't need call this fucntion one more time here.
+> Right. The defconfigs were all fine, and this is hard to hit
+> even in the randconfig builds.
 
-if you don't translate it here, how do you obtain the hwirq that you
-have to pass to irq_domain_set_hwirq_and_chip just below?
+I just did a sanity clean _defconfig builds and they both built fine (even w/o
+this patch), phew.
 
->> +	err = platform_msi_domain_alloc(domain, virq, nr_irqs);
->> +	if (err)
->> +		return err;
->> +
->> +	data = platform_msi_get_host_data(domain);
->> +	for (i = 0; i < nr_irqs; i++)
->> +		irq_domain_set_hwirq_and_chip(domain, virq + i, hwirq + i,
->> +					      &msichip_chip, data);
->> +
->> +	return 0;
->> +}
->> +
-> [...]
->> +
->> +static struct platform_driver msichip_driver = {
->> +	.driver = {
->> +		.name		= "msichip",
->> +		.of_match_table	= msichip_of_match,
->> +	},
->> +	.probe			= msichip_probe,
->> +};
->> +/* Do not define this as an irqchip */
->> +module_platform_driver(msichip_driver);
->> +
->> +
+>>> diff --git a/drivers/dma/edma.c b/drivers/dma/edma.c
+>>> index 31722d436a42..16713a93da10 100644
+>>> --- a/drivers/dma/edma.c
+>>> +++ b/drivers/dma/edma.c
+>>> @@ -1560,7 +1560,7 @@ static void edma_tc_set_pm_state(struct edma_tc *tc, bool enable)
+>>>       struct platform_device *tc_pdev;
+>>>       int ret;
+>>>  
+>>> -     if (!tc)
+>>> +     if (!IS_ENABLED(CONFIG_OF) || !tc)
+>>>               return;
+>>
+>> Should we instead put the function inside of:
+>> #if IS_ENABLED(CONFIG_OF)
+>> static void edma_tc_set_pm_state(struct edma_tc *tc, bool enable)
+>> {
+>> ...
+>> }
+>> #else
+>> static inline void edma_tc_set_pm_state(struct edma_tc *tc, bool enable)
+>> {
+>> }
+>> #endif /* IS_ENABLED(CONFIG_OF) */
 > 
-> I think,for a interrupt controller, msichip driver initialization maybe is too late
-> for some devices which connect to this irqchip if we use module_platform_driver.
+> I think that would be less readable, and gives no compile-time coverage
+> to the contents of the edma_tc_set_pm_state function.
 
-That's a consequence of this design. This is why I insisted on the fact
-that this is currently avoided by using deferred probe in drivers, and
-that it should be solved by having a probe order. Either way, this is
-not something that we can solve at that level (see the multiple proposal
-for this on the various lists).
+Hrm, if the compiler knows that there is no need to compile the code after the:
+if (!IS_ENABLED(CONFIG_OF) || !tc)
+when OF is disabled, then it does not give more compile coverage then have
+empty inline function in case of !OF.
+Not sure about it, but if we disable all optimization in gcc, then we might
+get the same missing symbol?
 
-> So, how about use the arch_initcall to register the msichip driver?
+> The effect is the same, so I'd rather stay with my version.
 
-You're only pushing the problem one level up. And you'll realize that
-this is not enough for some random driver. This is not sustainable, and
-must be addressed properly.
+I'm fine with both. It is up to Vinod to decide which one he prefers (I prefer
+the #if #else #endif version).
 
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Anyways:
+Acked-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
