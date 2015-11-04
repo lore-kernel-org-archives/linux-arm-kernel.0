@@ -1,30 +1,54 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Wed, 4 Nov 2015 14:41:12 +0000
-Subject: [PATCH v2 2/5] spi: spi-ti-qspi: add mmap mode read support
-In-Reply-To: <1446545174-14193-3-git-send-email-vigneshr@ti.com>
-References: <1446545174-14193-1-git-send-email-vigneshr@ti.com>
- <1446545174-14193-3-git-send-email-vigneshr@ti.com>
-Message-ID: <20151104144112.GJ1717@sirena.org.uk>
+From: phil.edworthy@renesas.com (Phil Edworthy)
+Date: Wed, 4 Nov 2015 14:48:38 +0000
+Subject: PCIe host controller behind IOMMU on ARM
+In-Reply-To: <20151104142412.GS963@e106497-lin.cambridge.arm.com>
+References: <PS1PR06MB11807CBE8EB2AC6B0158D2B5F52A0@PS1PR06MB1180.apcprd06.prod.outlook.com>
+ <20151104142412.GS963@e106497-lin.cambridge.arm.com>
+Message-ID: <PS1PR06MB11804263DD55C54C5987654EF52A0@PS1PR06MB1180.apcprd06.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 03, 2015 at 03:36:11PM +0530, Vignesh R wrote:
+Hi Liviu,
 
-> +	ti_qspi_enable_memory_map(spi);
-> +	ti_qspi_setup_mmap_read(spi, read_opcode, addr_width,
-> +				dummy_bytes);
-> +	memcpy_fromio(buf, qspi->mmap_base + from, len);
-> +	*retlen = len;
-> +	ti_qspi_disable_memory_map(spi);
+On 04 November 2015 14:24, Liviu wrote:
+> On Wed, Nov 04, 2015 at 01:57:48PM +0000, Phil Edworthy wrote:
+> > Hi,
+> >
+> > I am trying to hook up a PCIe host controller that sits behind an IOMMU,
+> > but having some problems.
+> >
+> > I'm using the pcie-rcar PCIe host controller and it works fine without
+> > the IOMMU, and I can attach the IOMMU to the controller such that any calls
+> > to dma_alloc_coherent made by the controller driver uses the iommu_ops
+> > version of dma_ops.
+> >
+> > However, I can't see how to make the endpoints to utilise the dma_ops that
+> > the controller uses. Shouldn't the endpoints inherit the dma_ops from the
+> > controller?
+> 
+> No, not directly.
+> 
+> > Any pointers for this?
+> 
+> You need to understand the process through which a driver for endpoint get
+> an address to be passed down to the device. Have a look at
+> Documentation/DMA-API-HOWTO.txt, there is a nice explanation there.
+> (Hint: EP driver needs to call dma_map_single).
+> 
+> Also, you need to make sure that the bus address that ends up being set into
+> the endpoint gets translated correctly by the host controller into an address
+> that the IOMMU can then translate into physical address.
+Sure, though since this is bog standard Intel PCIe ethernet card which works
+fine when the IOMMU is effectively unused, I don?t think there is a problem
+with that.
 
-We'll be constantly enabling and disabling memory mapping with this.
-I'm not sure that's a meaningful cost given that it doesn't actually
-remap anything but rather just switches hardware modes, we can always
-optimise it later if it is.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151104/2ec01951/attachment.sig>
+The driver for the PCIe controller sets up the IOMMU mapping ok when I
+do a test call to dma_alloc_coherent() in the controller's driver. i.e. when I
+do this, it ends up in arm_iommu_alloc_attrs(), which calls
+__iommu_alloc_buffer() and __alloc_iova().
+
+When an endpoint driver allocates and maps a dma coherent buffer it
+also needs to end up in arm_iommu_alloc_attrs(), but it doesn't.
+
+Thanks
+Phil
