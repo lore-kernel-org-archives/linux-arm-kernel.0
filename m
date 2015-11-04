@@ -1,37 +1,32 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Wed, 4 Nov 2015 14:34:34 +0100 (CET)
-Subject: [PATCH RFC 0/7] Adding core support for wire-MSI bridges
-In-Reply-To: <5620B9D6.1010708@arm.com>
-References: <1444923568-17413-1-git-send-email-marc.zyngier@arm.com>
- <56205917.7090001@linux.intel.com> <5620B9D6.1010708@arm.com>
-Message-ID: <alpine.DEB.2.11.1511041348060.4032@nanos>
+From: jungseoklee85@gmail.com (Jungseok Lee)
+Date: Wed, 4 Nov 2015 22:35:36 +0900
+Subject: [PATCH v6 2/3] percpu: add PERCPU_ATOM_SIZE for a generic percpu
+ area setup
+In-Reply-To: <5638F5B9.3040404@arm.com>
+References: <1446363977-23656-1-git-send-email-jungseoklee85@gmail.com>
+ <1446363977-23656-3-git-send-email-jungseoklee85@gmail.com>
+ <alpine.DEB.2.20.1511021008580.27740@east.gentwo.org>
+ <20151102162236.GB7637@e104818-lin.cambridge.arm.com>
+ <F4C06691-60EF-45FA-9AD7-9FBF8F1960AB@gmail.com> <5638F5B9.3040404@arm.com>
+Message-ID: <CC50E962-D166-44EB-A610-6F70A5234802@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Marc,
+On Nov 4, 2015, at 2:58 AM, James Morse wrote:
+> Hi Jungseok,
 
-On Fri, 16 Oct 2015, Marc Zyngier wrote:
-> On 16/10/15 02:55, Jiang Liu wrote:
-> > 	There's a working to enable Intel VMD storage device, which
-> > has the similar requirement. Basically a PCIe hierarchy is hidden
-> > behind a parent PCIe device, so we need to use the PCIe irqs on parent
-> > to de-multiple PCIe IRQs from hidden PCIe devices. Seems a chance for
-> > consolidation here.
+Hi James,
+
+> On 03/11/15 13:49, Jungseok Lee wrote:
+>> Additionally, I've been thinking of do_softirq_own_stack() which is your
+>> another comment [3]. Recently, I've realized there is possibility that
+>> I misunderstood your intention. Did you mean that irq_handler hook is not
+>> enough? Should do_softirq_own_stack() be implemented together?
 > 
-> Do you know if there is a 1-1 mapping between the interrupts seen by the
-> parent device and those seen by the hidden devices? Or is it a case of
-> having to demultiplex the MSIs? Looks like the former, but I'd like to
-> be sure.
+> I've been putting together a version to illustrate this, I aim to post it
+> before the end of this week?
 
-Yes, it's a demultiplexer. No 1:1 mapping.
+It sounds great! I will wait for your version.
 
-> Sure, will do when I repost this (probably in a few weeks), and assuming
-> this fits the bill for Thomas and the MBIGEN folks.
-
-It doesn't look that bad and the resulting mbigen stuff is way less
-horrible than it was before. So I agree this is a possible solution to
-the problem.
-
-Thanks,
-
-	tglx
+Best Regards
+Jungseok Lee
