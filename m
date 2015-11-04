@@ -1,99 +1,133 @@
-From: anton.bondarenko.sama@gmail.com (Anton Bondarenko)
-Date: Wed, 4 Nov 2015 22:03:47 +0100
-Subject: [PATCH v3 1/7] spi: imx: Fix DMA transfer
-In-Reply-To: <20151103070837.GA15428@shlinux2>
-References: <1446388901-6073-1-git-send-email-anton.bondarenko.sama@gmail.com>
- <1446388901-6073-2-git-send-email-anton.bondarenko.sama@gmail.com>
- <20151103070837.GA15428@shlinux2>
-Message-ID: <563A72B3.9010105@gmail.com>
+From: marex@denx.de (Marek Vasut)
+Date: Wed, 4 Nov 2015 22:29:33 +0100
+Subject: [PATCH V2] ARM: at91/dt: sama5d4: Add support for DENX MA5D4 SoM
+ and EVK
+In-Reply-To: <5639C836.5010603@atmel.com>
+References: <1446585537-10621-1-git-send-email-marex@denx.de>
+ <5639C836.5010603@atmel.com>
+Message-ID: <201511042229.33256.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Wednesday, November 04, 2015 at 09:56:22 AM, Nicolas Ferre wrote:
+> Le 03/11/2015 22:18, Marek Vasut a ?crit :
+> > Add support for the DENX MA5D4 SoM and MA5D4EVK board. The system
+> > consists of a SoM with eMMC, SPI NOR for booting, 2x SPI CAN chip
+> > and an EVK with microSD slot, 2x UART, 2x CAN port, 3x USB port,
+> > LEDs and expansion headers.
+> > 
+> > Signed-off-by: Marek Vasut <marex@denx.de>
+> 
+> Hi Marek,
+> 
+> I'm delighted to see this board submitted: thanks!
 
+Hi Nicolas,
 
-On 03.11.2015 08:08, Robin Gong wrote:
-> On Sun, Nov 01, 2015 at 03:41:35PM +0100, Anton Bondarenko wrote:
->> From: Anton Bondarenko <anton_bondarenko@mentor.com>
->>
->> RX DMA tail data handling doesn't work correctly in many cases with
->> current implementation. It happens because SPI core was setup
->> to generates both RX watermark level and RX DATA TAIL events
->> incorrectly. SPI transfer triggering for DMA also done in wrong way.
->>
->> SPI client wants to transfer 70 words for example. The old DMA
->> implementation setup RX DATA TAIL equal 6 words. In this case
->> RX DMA event will be generated after 6 words read from RX FIFO.
->> The garbage can be read out from RX FIFO because SPI HW does
->> not receive all required words to trigger RX watermark event.
->>
->> New implementation change handling of RX data tail. DMA is used to process
->> all TX data and only full chunks of RX data with size aligned to FIFO/2.
->> Driver is waiting until both TX and RX DMA transaction done and all
->> TX data are pushed out. At that moment there is only RX data tail in
->> the RX FIFO. This data read out using PIO.
->>
->> Transfer triggering changed to avoid RX data loss.
->>
->> Signed-off-by: Anton Bondarenko <anton_bondarenko@mentor.com>
->> ---
->>   drivers/spi/spi-imx.c | 115 +++++++++++++++++++++++++++++++++-----------------
->>   1 file changed, 76 insertions(+), 39 deletions(-)
->>
->> diff --git a/drivers/spi/spi-imx.c b/drivers/spi/spi-imx.c
->> @@ -967,10 +974,40 @@ static int spi_imx_dma_transfer(struct spi_imx_data *spi_imx,
->>   				dev_name(&master->dev));
->>   			spi_imx->devtype_data->reset(spi_imx);
->>   			dmaengine_terminate_all(master->dma_rx);
->> +		} else if (left) {
->> +			void *pio_buffer = transfer->rx_buf
->> +						+ (transfer->len - left);
->> +
->> +			dma_sync_sg_for_cpu(master->dma_rx->device->dev,
->> +					    &rx->sgl[rx->nents - 1], 1,
->> +					    DMA_FROM_DEVICE);
->> +
->> +			spi_imx->rx_buf = pio_buffer;
->> +			spi_imx->txfifo = left;
->> +			reinit_completion(&spi_imx->xfer_done);
->> +
->> +			spi_imx->devtype_data->intctrl(spi_imx, MXC_INT_TCEN);
->> +
->> +			timeout = wait_for_completion_timeout(
->> +					&spi_imx->xfer_done, IMX_DMA_TIMEOUT);
->> +			if (!timeout) {
->> +				pr_warn("%s %s: I/O Error in RX tail\n",
->> +					dev_driver_string(&master->dev),
->> +					dev_name(&master->dev));
->> +			}
->> +
->> +			/*
->> +			 * WARNING: this call will cause DMA debug complains
->> +			 * about wrong combination of DMA direction and sync
->> +			 * function. But we must use it to make sure the data
->> +			 * read by PIO mode will be cleared from CPU cache.
->> +			 * Otherwise SPI core will invalidate it during unmap of
->> +			 * SG buffers.
->> +			 */
->> +			dma_sync_sg_for_device(master->dma_rx->device->dev,
->> +					       &rx->sgl[rx->nents - 1], 1,
->> +					       DMA_TO_DEVICE);
-> I think the above dma_sync_sg_for_cpu for reading the last sgl by PIO mode is
-> enough, that move the right data into rx_buf which map by SPI core. And why
-> 'DMA_TO_DEVICE' for rx here?
-Actually this is described in comments above the call. So after writing 
-data tail by CPU we must ensure cache content is flushed to RAM. 
-Otherwise SPI core during dma_unmap will invalidate data in the CPU 
-cache and we loose our data tail. I'm able to reproduce this very fast 
-during 20-30 SPI transactions.
-Hope this make things clearer.
+thanks for the review :)
 
->>   		}
->> -		writel(dma |
->> -		       spi_imx->rxt_wml << MX51_ECSPI_DMA_RXT_WML_OFFSET,
->> -		       spi_imx->base + MX51_ECSPI_DMA);
->>   	}
->>
->>   	spi_imx->dma_finished = 1;
->> --
->> 2.6.2
->>
+[...]
+
+> > +			i2c0: i2c at f8014000 {
+> 
+> We tend to sort node by ascending addresses, but for sure, it's
+> absolutely up to you to sort them in whichever order you choose (and I
+> admit it sometimes led us to strange numbering schemes: so we might
+> reconsider this (soft) constrain in the future for our own boards)...
+
+Oh, this is a good point. I used to sort them by the reference, but here
+I missed the ADC anyway, so I can as well sort them by the address.
+
+> > +				status = "okay";
+> > +			};
+
+[...]
+
+> > +	backlight: backlight {
+> > +		compatible = "pwm-backlight";
+> > +		pwms = <&hlcdc_pwm 0 50000 0>;
+> > +		brightness-levels = <0 4 8 16 32 64 128 255>;
+> > +		default-brightness-level = <6>;
+> 
+> Nit: I don't see "6" in the levels just above...
+
+That's to be expected, see
+
+Documentation/devicetree/bindings/video/backlight/pwm-backlight.txt
+
+quote:
+
+11   - default-brightness-level: the default brightness level (index into the
+12       array defined by the "brightness-levels" property)
+
+So the default brighness is set to 128, which is is 50% brightness.
+
+> > +		status = "okay";
+> > +	};
+> > +
+> > +	leds {
+> > +		compatible = "gpio-leds";
+> > +		status = "okay";
+> > +
+> > +		user1 {
+> > +			label = "user1";
+> > +			gpios = <&pioD 28 GPIO_ACTIVE_HIGH>;
+> > +			linux,default-trigger = "heartbeat";
+> > +		};
+> > +
+> > +		user2 {
+> > +			label = "user2";
+> > +			gpios = <&pioD 29 GPIO_ACTIVE_HIGH>;
+> > +			linux,default-trigger = "heartbeat";
+> > +		};
+> > +
+> > +		user3 {
+> > +			label = "user3";
+> > +			gpios = <&pioD 30 GPIO_ACTIVE_HIGH>;
+> > +			linux,default-trigger = "heartbeat";
+> 
+> So all the 3 leds are blinking at "heartbeat" ? Disco party time!
+
+Hehe :-) It's probably the best way to check if they work and demonstrate
+that they do something.
+
+> > +		};
+> > +	};
+> > +
+> > +	panel: panel {
+> > +		/* Actually Ampire 800480R2 */
+> > +		compatible = "foxlink,fl500wvr00-a0t", "simple-panel";
+> > +		backlight = <&backlight>;
+> > +		#address-cells = <1>;
+> > +		#size-cells = <0>;
+> > +		status = "okay";
+> > +
+> > +		port at 0 {
+> > +			#address-cells = <1>;
+> > +			#size-cells = <0>;
+> > +
+> > +			panel_input: endpoint at 0 {
+> > +				reg = <0>;
+> > +				remote-endpoint = <&hlcdc_panel_output>;
+> > +			};
+> > +		};
+> > +	};
+> > +
+> > +	vcc_mmc1_reg: fixedregulator at 2 {
+> > +		compatible = "regulator-fixed";
+> > +		gpio = <&pioE 17 GPIO_ACTIVE_LOW>;
+> > +		regulator-name = "VDD MCI1";
+> > +		regulator-min-microvolt = <3300000>;
+> > +		regulator-max-microvolt = <3300000>;
+> > +		vin-supply = <&vcc_3v3_reg>;
+> > +	};
+> > +};
+> 
+> Apart form the little remarks, I'm absolutely fine with the patch:
+> Acked-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> 
+> Thanks Marek, it will probably go into kernel 4.5 ; we have to build the
+> at91-4.5-dt branch once the merge window is closed. It will then show up
+> in at91-next which is pulled by Stephen.
+
+Cool, thanks!
