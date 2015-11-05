@@ -1,213 +1,79 @@
-From: akshay.bhat@timesys.com (Akshay Bhat)
-Date: Thu,  5 Nov 2015 16:19:22 -0500
-Subject: [PATCH v4 2/2] ARM: dts: ventana: Add ext-reset support
-In-Reply-To: <1446758362-11702-1-git-send-email-akshay.bhat@timesys.com>
-References: <1446758362-11702-1-git-send-email-akshay.bhat@timesys.com>
-Message-ID: <1446758362-11702-3-git-send-email-akshay.bhat@timesys.com>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 5 Nov 2015 15:21:42 -0600
+Subject: [PATCH 1/2 V2] ls2080a/dts: Add little endian property for GPIO
+ IP block
+In-Reply-To: <1446691342-1943-1-git-send-email-Gang.Liu@freescale.com>
+References: <1446691342-1943-1-git-send-email-Gang.Liu@freescale.com>
+Message-ID: <20151105212142.GA22264@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Tim Harvey <tharvey@gateworks.com>
+On Thu, Nov 05, 2015 at 10:42:21AM +0800, Liu Gang wrote:
+> The GPIO block for ls2080a platform has little endian registers,
+> the GPIO driver needs this property to read/write registers by
+> right interface.
+> 
+> Signed-off-by: Liu Gang <Gang.Liu@freescale.com>
 
-The Gateworks Ventana boards have a PMIC that can be used to regulate the
-CPU voltage rails for DVFS support. In order to ensure this PMIC is properly
-reset the watchdog needs to be configured to assert its external reset
-signal.
+Acked-by: Rob Herring <robh@kernel.org>
 
-Additionally the pad used for WDOG_B needs to be configured which we add to
-iomux.
-
-Cc: Markus Pargmann <mpa@pengutronix.de>
-Signed-off-by: Tim Harvey <tharvey@gateworks.com>
----
- arch/arm/boot/dts/imx6qdl-gw51xx.dtsi | 12 ++++++++++++
- arch/arm/boot/dts/imx6qdl-gw52xx.dtsi | 12 ++++++++++++
- arch/arm/boot/dts/imx6qdl-gw53xx.dtsi | 13 +++++++++++++
- arch/arm/boot/dts/imx6qdl-gw54xx.dtsi | 17 +++++++++++++++++
- arch/arm/boot/dts/imx6qdl-gw551x.dtsi | 12 ++++++++++++
- arch/arm/boot/dts/imx6qdl-gw552x.dtsi | 12 ++++++++++++
- 6 files changed, 78 insertions(+)
-
-diff --git a/arch/arm/boot/dts/imx6qdl-gw51xx.dtsi b/arch/arm/boot/dts/imx6qdl-gw51xx.dtsi
-index 7b31fdb..d81bd72 100644
---- a/arch/arm/boot/dts/imx6qdl-gw51xx.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-gw51xx.dtsi
-@@ -210,6 +210,12 @@
- 	status = "okay";
- };
- 
-+&wdog1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_wdog>;
-+	ext-reset-output;
-+};
-+
- &iomuxc {
- 	imx6qdl-gw51xx {
- 		pinctrl_enet: enetgrp {
-@@ -328,5 +334,11 @@
- 				MX6QDL_PAD_EIM_D22__GPIO3_IO22		0x1b0b0 /* OTG_PWR_EN */
- 			>;
- 		};
-+
-+		pinctrl_wdog: wdoggrp {
-+			fsl,pins = <
-+				MX6QDL_PAD_DISP0_DAT8__WDOG1_B		0x1b0b0
-+			>;
-+		};
- 	};
- };
-diff --git a/arch/arm/boot/dts/imx6qdl-gw52xx.dtsi b/arch/arm/boot/dts/imx6qdl-gw52xx.dtsi
-index 1b66328..0d8f201 100644
---- a/arch/arm/boot/dts/imx6qdl-gw52xx.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-gw52xx.dtsi
-@@ -326,6 +326,12 @@
- 	status = "okay";
- };
- 
-+&wdog1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_wdog>;
-+	ext-reset-output;
-+};
-+
- &iomuxc {
- 	imx6qdl-gw52xx {
- 		pinctrl_audmux: audmuxgrp {
-@@ -501,5 +507,11 @@
- 				MX6QDL_PAD_NANDF_CS1__SD3_VSELECT	0x170f9
- 			>;
- 		};
-+
-+		pinctrl_wdog: wdoggrp {
-+			fsl,pins = <
-+				MX6QDL_PAD_DISP0_DAT8__WDOG1_B		0x1b0b0
-+			>;
-+		};
- 	};
- };
-diff --git a/arch/arm/boot/dts/imx6qdl-gw53xx.dtsi b/arch/arm/boot/dts/imx6qdl-gw53xx.dtsi
-index 7c51839..36f9ec6 100644
---- a/arch/arm/boot/dts/imx6qdl-gw53xx.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-gw53xx.dtsi
-@@ -332,7 +332,14 @@
- 	status = "okay";
- };
- 
-+&wdog1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_wdog>;
-+	ext-reset-output;
-+};
-+
- &iomuxc {
-+
- 	imx6qdl-gw53xx {
- 		pinctrl_audmux: audmuxgrp {
- 			fsl,pins = <
-@@ -508,5 +515,11 @@
- 				MX6QDL_PAD_NANDF_CS1__SD3_VSELECT	0x170f9
- 			>;
- 		};
-+
-+		pinctrl_wdog: wdoggrp {
-+			fsl,pins = <
-+				MX6QDL_PAD_DISP0_DAT8__WDOG1_B		0x1b0b0
-+			>;
-+		};
- 	};
- };
-diff --git a/arch/arm/boot/dts/imx6qdl-gw54xx.dtsi b/arch/arm/boot/dts/imx6qdl-gw54xx.dtsi
-index 929e0b3..0c1150f 100644
---- a/arch/arm/boot/dts/imx6qdl-gw54xx.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-gw54xx.dtsi
-@@ -425,6 +425,17 @@
- 	status = "okay";
- };
- 
-+&wdog1 {
-+	status = "disabled";
-+};
-+
-+&wdog2 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_wdog>;
-+	ext-reset-output;
-+	status = "okay";
-+};
-+
- &iomuxc {
- 	imx6qdl-gw54xx {
- 		pinctrl_audmux: audmuxgrp {
-@@ -600,5 +611,11 @@
- 				MX6QDL_PAD_NANDF_CS1__SD3_VSELECT	0x170f9
- 			>;
- 		};
-+
-+		pinctrl_wdog: wdoggrp {
-+			fsl,pins = <
-+				MX6QDL_PAD_SD1_DAT3__WDOG2_B		0x1b0b0
-+			>;
-+		};
- 	};
- };
-diff --git a/arch/arm/boot/dts/imx6qdl-gw551x.dtsi b/arch/arm/boot/dts/imx6qdl-gw551x.dtsi
-index 741f3d5..883e577 100644
---- a/arch/arm/boot/dts/imx6qdl-gw551x.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-gw551x.dtsi
-@@ -227,6 +227,12 @@
- 	status = "okay";
- };
- 
-+&wdog1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_wdog>;
-+	ext-reset-output;
-+};
-+
- &iomuxc {
- 	imx6qdl-gw51xx {
- 		pinctrl_flexcan1: flexcan1grp {
-@@ -309,5 +315,11 @@
- 				MX6QDL_PAD_GPIO_1__USB_OTG_ID		0x17059
- 			>;
- 		};
-+
-+		pinctrl_wdog: wdoggrp {
-+			fsl,pins = <
-+				MX6QDL_PAD_DISP0_DAT8__WDOG1_B		0x1b0b0
-+			>;
-+		};
- 	};
- };
-diff --git a/arch/arm/boot/dts/imx6qdl-gw552x.dtsi b/arch/arm/boot/dts/imx6qdl-gw552x.dtsi
-index d1e5048..07674c2 100644
---- a/arch/arm/boot/dts/imx6qdl-gw552x.dtsi
-+++ b/arch/arm/boot/dts/imx6qdl-gw552x.dtsi
-@@ -185,6 +185,12 @@
- 	status = "okay";
- };
- 
-+&wdog1 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&pinctrl_wdog>;
-+	ext-reset-output;
-+};
-+
- &iomuxc {
- 	imx6qdl-gw552x {
- 		pinctrl_gpio_leds: gpioledsgrp {
-@@ -262,5 +268,11 @@
- 				MX6QDL_PAD_KEY_ROW1__UART5_RX_DATA	0x1b0b1
- 			>;
-                 };
-+
-+		pinctrl_wdog: wdoggrp {
-+			fsl,pins = <
-+				MX6QDL_PAD_DISP0_DAT8__WDOG1_B		0x1b0b0
-+			>;
-+		};
- 	};
- };
--- 
-2.6.2
+> ---
+> V2 changes: No
+> 
+>  Documentation/devicetree/bindings/gpio/gpio-mpc8xxx.txt | 3 +++
+>  arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi          | 4 ++++
+>  2 files changed, 7 insertions(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/gpio/gpio-mpc8xxx.txt b/Documentation/devicetree/bindings/gpio/gpio-mpc8xxx.txt
+> index f2455c5..c836dab 100644
+> --- a/Documentation/devicetree/bindings/gpio/gpio-mpc8xxx.txt
+> +++ b/Documentation/devicetree/bindings/gpio/gpio-mpc8xxx.txt
+> @@ -10,6 +10,9 @@ Required properties:
+>    the second cell is used to specify the gpio polarity:
+>        0 = active high
+>        1 = active low
+> +- little-endian : Should be set if the GPIO has little endian
+> +		  registers. No the property means the GPIO
+> +		  registers are big endian mode.
+>  
+>  Example:
+>  
+> diff --git a/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
+> index e81cd48..0099205 100644
+> --- a/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
+> +++ b/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
+> @@ -277,6 +277,7 @@
+>  			reg = <0x0 0x2300000 0x0 0x10000>;
+>  			interrupts = <0 36 0x4>; /* Level high type */
+>  			gpio-controller;
+> +			little-endian;
+>  			#gpio-cells = <2>;
+>  			interrupt-controller;
+>  			#interrupt-cells = <2>;
+> @@ -287,6 +288,7 @@
+>  			reg = <0x0 0x2310000 0x0 0x10000>;
+>  			interrupts = <0 36 0x4>; /* Level high type */
+>  			gpio-controller;
+> +			little-endian;
+>  			#gpio-cells = <2>;
+>  			interrupt-controller;
+>  			#interrupt-cells = <2>;
+> @@ -297,6 +299,7 @@
+>  			reg = <0x0 0x2320000 0x0 0x10000>;
+>  			interrupts = <0 37 0x4>; /* Level high type */
+>  			gpio-controller;
+> +			little-endian;
+>  			#gpio-cells = <2>;
+>  			interrupt-controller;
+>  			#interrupt-cells = <2>;
+> @@ -307,6 +310,7 @@
+>  			reg = <0x0 0x2330000 0x0 0x10000>;
+>  			interrupts = <0 37 0x4>; /* Level high type */
+>  			gpio-controller;
+> +			little-endian;
+>  			#gpio-cells = <2>;
+>  			interrupt-controller;
+>  			#interrupt-cells = <2>;
+> -- 
+> 2.1.0.27.g96db324
+> 
