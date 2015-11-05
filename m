@@ -1,39 +1,43 @@
-From: robh@kernel.org (Rob Herring)
-Date: Thu, 5 Nov 2015 14:23:45 -0600
-Subject: [PATCH v2 07/10] of: Add vendor prefix for General Electric
- Company
-In-Reply-To: <1446747224-32514-8-git-send-email-akshay.bhat@timesys.com>
-References: <1446747224-32514-1-git-send-email-akshay.bhat@timesys.com>
- <1446747224-32514-8-git-send-email-akshay.bhat@timesys.com>
-Message-ID: <20151105202345.GA8352@rob-hp-laptop>
+From: hauke@hauke-m.de (Hauke Mehrtens)
+Date: Thu, 05 Nov 2015 21:25:30 +0100
+Subject: [PATCH RESEND 0/4] SMP support for Broadcom NSP
+In-Reply-To: <20151105093443.GO8644@n2100.arm.linux.org.uk>
+References: <1446702681-45339-1-git-send-email-kapilh@broadcom.com>
+ <20151105093443.GO8644@n2100.arm.linux.org.uk>
+Message-ID: <563BBB3A.6010605@hauke-m.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 05, 2015 at 01:13:41PM -0500, Akshay Bhat wrote:
-> This patch adds vendor prefix for General Electric Company
+On 11/05/2015 10:34 AM, Russell King - ARM Linux wrote:
+> On Thu, Nov 05, 2015 at 12:51:17AM -0500, Kapil Hali wrote:
+>> Hi,
+>>
+>> This series adds SMP support for Broadcom's Northstar Plus SoC.
+>>
+>> There are similar SMP enablement methods for many ARMv7 bsed SoCs.
+>> BCM NSP SoC, has a typical such mechanism - after power-on, the
+>> secondary core is held in a standby state, primary core provides a
+>> startup address for the secondary core and wakes it up. Booting of
+>> the secondary core is serialized using pen_release global variable.
 > 
-> Signed-off-by: Akshay Bhat <akshay.bhat@timesys.com>
-> ---
->  Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
->  1 file changed, 1 insertion(+)
+> Why do you need the pen_release stuff?  The above implies that you
+> have only one secondary core, and you can control when it comes out
+> of standby state.
 > 
-> diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
-> index 2b3c5ac..71dcbd5 100644
-> --- a/Documentation/devicetree/bindings/vendor-prefixes.txt
-> +++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
-> @@ -87,6 +87,7 @@ fcs	Fairchild Semiconductor
->  firefly	Firefly
->  focaltech	FocalTech Systems Co.,Ltd
->  fsl	Freescale Semiconductor
-> +ge	General Electric Company
-
-This is short too, but it is well known and the stock ticker so:
-
-Acked-by: Rob Herring <robh@kernel.org>
-
->  GEFanuc	GE Fanuc Intelligent Platforms Embedded Systems, Inc.
->  gef	GE Fanuc Intelligent Platforms Embedded Systems, Inc.
->  geniatech	Geniatech, Inc.
-> -- 
-> 2.6.2
+> Please, don't assume that the pen_release stuff is any kind of recommended
+> or standardised system.  It isn't.  It's a hack for ARMs evaluation
+> platforms.
 > 
+
+I tried to remove the pen code because I also thought/hoped that it is
+useless, but the 2. CPU did not boot any more after I removed it. I do
+not know the internals of SoC, but it looks like this is needed.
+
+I described it here:
+http://www.spinics.net/lists/arm-kernel/msg452178.html
+
+I removed this comparison and the jump afterwards ("cmp     r7, r0") and
+the 2. CPU did not boot any more. Is this pen stuff some kind of
+workaround for some bug in the silicon?
+
+Hauke
