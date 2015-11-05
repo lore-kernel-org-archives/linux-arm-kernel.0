@@ -1,59 +1,27 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Wed, 4 Nov 2015 17:06:13 -0800
-Subject: [PATCH] arm: Use kernel mm when updating section permissions
-In-Reply-To: <1446685239-28522-1-git-send-email-labbott@fedoraproject.org>
-References: <1446685239-28522-1-git-send-email-labbott@fedoraproject.org>
-Message-ID: <CAGXu5jLdZ_xFyokoXW5ZhUdTXf-O1MBLk83cG_AM_51PxXbH5A@mail.gmail.com>
+From: peter@hurleysoftware.com (Peter Hurley)
+Date: Wed, 4 Nov 2015 20:13:39 -0500
+Subject: [PATCH] KVM/arm: kernel low level debug support for ARM32 virtual
+ platforms
+In-Reply-To: <563A94A2.3010307@samsung.com>
+References: <1446508313-24404-1-git-send-email-m.smarduch@samsung.com>
+ <5638E1CD.8090006@codeaurora.org> <5638F294.4060409@samsung.com>
+ <20151103175522.GA24856@arm.com> <56390838.3000204@samsung.com>
+ <CAL_JsqJJHGwcdTDMh3WujJW0rDPxocVLEUpw95aVFC4FDEdDgA@mail.gmail.com>
+ <20151104133147.GB5819@cbox> <563A531C.8090003@codeaurora.org>
+ <CAKv+Gu8GJgzv82fVfCU7VQB2_ckRkzUYcQOx51rT2WgnmO_fsw@mail.gmail.com>
+ <563A94A2.3010307@samsung.com>
+Message-ID: <563AAD43.5090907@hurleysoftware.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 4, 2015 at 5:00 PM, Laura Abbott <labbott@fedoraproject.org> wrote:
-> Currently, read only permissions are not being applied even
-> when CONFIG_DEBUG_RODATA is set. This is because section_update
-> uses current->mm for adjusting the page tables. current->mm
-> need not be equivalent to the kernel version. Use pgd_offset_k
-> to get the proper page directory for updating.
->
-> Signed-off-by: Laura Abbott <labbott@fedoraproject.org>
-> ---
-> I found this while trying to convince myself of something.
-> Dumping the page table via debugfs and writing to kernel text were both
-> showing the lack of mappings. This was observed on QEMU. Maybe it's just a
-> QEMUism but if not it probably should go to stable.
+On 11/04/2015 06:28 PM, Mario Smarduch wrote:
+> I spent time debugging 'earlycon' for pl011, ironically using DEBUG_LL, from the
+> looks of it no mmio uart should work for armv7. It appears earlycon_map()
+> requires a fixed mapping similar to arm64.
 
-Well that's weird! debugfs showed the actual permissions that lacked
-RO? I wonder what changed. I tested this both with debugfs and lkdtm's
-KERN_WRITE test when the patches originally landed.
+commit a5f4c561b3b1 ("ARM: 8415/1: early fixmap support for earlycon")
+added ARM fixmap support for earlycon since 4.3-rc1. That was in it's 5th
+revision; various versions have been on lkml since Dec 2014 or so.
 
--Kees
-
-> ---
->  arch/arm/mm/init.c | 4 +---
->  1 file changed, 1 insertion(+), 3 deletions(-)
->
-> diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
-> index 8a63b4c..4bb936a 100644
-> --- a/arch/arm/mm/init.c
-> +++ b/arch/arm/mm/init.c
-> @@ -629,11 +629,9 @@ static struct section_perm ro_perms[] = {
->  static inline void section_update(unsigned long addr, pmdval_t mask,
->                                   pmdval_t prot)
->  {
-> -       struct mm_struct *mm;
->         pmd_t *pmd;
->
-> -       mm = current->active_mm;
-> -       pmd = pmd_offset(pud_offset(pgd_offset(mm, addr), addr), addr);
-> +       pmd = pmd_offset(pud_offset(pgd_offset_k(addr), addr), addr);
->
->  #ifdef CONFIG_ARM_LPAE
->         pmd[0] = __pmd((pmd_val(pmd[0]) & mask) | prot);
-> --
-> 2.5.0
->
-
-
-
--- 
-Kees Cook
-Chrome OS Security
+Regards,
+Peter Hurley
