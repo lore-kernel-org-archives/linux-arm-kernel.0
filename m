@@ -1,51 +1,96 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Thu, 5 Nov 2015 14:37:23 +0000
-Subject: [PATCH] arm64: cmpxchg_dbl: fix return value type
-In-Reply-To: <1446732056-31294-1-git-send-email-lorenzo.pieralisi@arm.com>
-References: <1446732056-31294-1-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <20151105143722.GD26684@arm.com>
+From: eranian@googlemail.com (Stephane Eranian)
+Date: Thu, 5 Nov 2015 15:42:31 +0100
+Subject: [RFC PATCH 0/3]perf/core: extend perf_reg and
+ perf_sample_regs_intr
+In-Reply-To: <1446669978-6366-1-git-send-email-maddy@linux.vnet.ibm.com>
+References: <1446669978-6366-1-git-send-email-maddy@linux.vnet.ibm.com>
+Message-ID: <CAMsRxfJLLV9pOr3iL8KXqVPk0dk3t_fkueW-9WHf6WiyP6DHrA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 05, 2015 at 02:00:56PM +0000, Lorenzo Pieralisi wrote:
-> The current arm64 __cmpxchg_double{_mb} implementations carry out the
-> compare exchange by first comparing the old values passed in to the
-> values read from the pointer provided and by stashing the cumulative
-> bitwise difference in a 64-bit register.
-> 
-> By comparing the register content against 0, it is possible to detect if
-> the values read differ from the old values passed in, so that the compare
-> exchange detects whether it has to bail out or carry on completing the
-> operation with the exchange.
-> 
-> Given the current implementation, to detect the cmpxchg operation
-> status, the __cmpxchg_double{_mb} functions should return the 64-bit
-> stashed bitwise difference so that the caller can detect cmpxchg failure
-> by comparing the return value content against 0. The current implementation
-> declares the return value as an int, which means that the 64-bit
-> value stashing the bitwise difference is truncated before being
-> returned to the __cmpxchg_double{_mb} callers, which means that
-> any bitwise difference present in the top 32 bits goes undetected,
-> triggering false positives and subsequent kernel failures.
-> 
-> This patch fixes the issue by declaring the arm64 __cmpxchg_double{_mb}
-> return values as a long, so that the bitwise difference is
-> properly propagated on failure, restoring the expected behaviour.
-> 
-> Fixes: e9a4b795652f ("arm64: cmpxchg_dbl: patch in lse instructions when
-> supported by the CPU")
-> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Cc: <stable@vger.kernel.org>
-> Cc: Will Deacon <will.deacon@arm.com>
+Hi,
+
+On Wed, Nov 4, 2015 at 9:46 PM, Madhavan Srinivasan
+<maddy@linux.vnet.ibm.com> wrote:
+>
+> This patchset extend the perf sample regs infrastructure
+> to include architecture specific regs. Current perf_sample_regs_intr
+> exports only registers in the pt_regs to perf.data using
+> PERF_SAMPLE_REGS_INTR sample type. But sometimes we end up looking
+> for or prefer raw register values at the interrupt during debug.
+>
+I don't quite understand this explanation here.
+What do you mean by raw register values?
+The content of pt_regs is also raw register values at interrupt.
+
+The API does not say that the content of perf_sample_regs_intr can ONLY
+contain names of registers coming from pt_regs. The meaning of each bit
+is arch specific and you are free to map to whatever is relevant for your arch.
+All the API says is that the values captured in the sampling buffer for these
+registers are taken at PMU interrupt.
+
+>
+> This patchset extends the perf_regs to include arch specific struct,
+> and makes perf_sample_regs_intr in kernel/event/core.c as __weak__
+> function. This way, an arch specific implementation of
+> perf_sample_regs_intr() can update the arch specific data to
+> the perf_regs.
+>
+> First patch defines a new structure arch_misc_reg and updates the same
+> in the struct perf_regs. Patch also modifies the perf_reg_value()
+> and perf_output_sample_regs() to take perf_regs parameter instead of pt_regs.
+>
+> Second patch updates struct arch_misc_reg for arch/powerpc with pmu registers
+> and adds offsetof macro for the same. It extends perf_reg_value()
+> to use reg idx to decide on struct to return value from.
+>
+> Third patch adds arch specific perf_sample_regs_intr() in arch/powerpc
+> to hook up the arch_misc_regs to perf_regs.
+>
+> This patchset depends on the recent posting by Anju T in
+> linuxppc-dev at lists.ozlabs.org to enable PERF_SAMPLE_REGS_INTR
+> support in arch/powerpc.
+>
+> https://patchwork.ozlabs.org/patch/539242/
+> https://patchwork.ozlabs.org/patch/539243/
+> https://patchwork.ozlabs.org/patch/539244/
+>
+> Would appreciate comments and feedback.
+>
+> Signed-off-by: Madhavan Srinivasan <maddy@linux.vnet.ibm.com>
+> Cc: Thomas Gleixner <tglx@linutronix.de>
+> Cc: Ingo Molnar <mingo@kernel.org>
+> Cc: Peter Zijlstra <peterz@infradead.org>
+> Cc: Jiri Olsa <jolsa@kernel.org>
+> Cc: Arnaldo Carvalho de Melo <acme@kernel.org>
+> Cc: Stephane Eranian <eranian@gmail.com>
+> Cc: Russell King <linux@arm.linux.org.uk>
 > Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
-> ---
->  arch/arm64/include/asm/atomic_ll_sc.h | 2 +-
->  arch/arm64/include/asm/atomic_lse.h   | 2 +-
->  2 files changed, 2 insertions(+), 2 deletions(-)
-
-Acked-by: Will Deacon <will.deacon@arm.com>
-
-Thanks for debugging this :)
-
-Will
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Benjamin Herrenschmidt <benh@kernel.crashing.org>
+> Cc: Michael Ellerman <mpe@ellerman.id.au>
+> Cc: Sukadev Bhattiprolu <sukadev@linux.vnet.ibm.com>
+>
+> Madhavan Srinivasan (3):
+>   perf/core: extend perf_regs to include arch specific regs
+>   perf/powerpc: update macros and add regs to arch_misc_reg struct
+>   perf/powerpc: Functions to update arch_misc_regs
+>
+>  arch/arm/include/asm/ptrace.h               |  2 ++
+>  arch/arm/kernel/perf_regs.c                 |  4 +++-
+>  arch/arm64/include/asm/ptrace.h             |  2 ++
+>  arch/arm64/kernel/perf_regs.c               |  4 +++-
+>  arch/powerpc/include/uapi/asm/perf_regs.h   | 10 ++++++++++
+>  arch/powerpc/include/uapi/asm/ptrace.h      | 11 +++++++++++
+>  arch/powerpc/perf/core-book3s.c             | 29 +++++++++++++++++++++++++++++
+>  arch/powerpc/perf/perf_regs.c               | 28 ++++++++++++++++++++++++++--
+>  arch/x86/include/asm/ptrace.h               |  2 ++
+>  arch/x86/kernel/perf_regs.c                 |  4 +++-
+>  include/linux/perf_regs.h                   |  5 +++--
+>  kernel/events/core.c                        |  8 ++++----
+>  tools/perf/arch/powerpc/include/perf_regs.h | 16 ++++++++++++++++
+>  13 files changed, 114 insertions(+), 11 deletions(-)
+>
+> --
+> 1.9.1
+>
