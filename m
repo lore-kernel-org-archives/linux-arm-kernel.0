@@ -1,29 +1,31 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 5 Nov 2015 19:58:46 +0100
-Subject: [PATCH/RFC] ARM: shmobile: Introduce ARCH_RENESAS
-In-Reply-To: <1446702397-24078-1-git-send-email-horms+renesas@verge.net.au>
-References: <1446702397-24078-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <CAMuHMdXQ5tvWu4dizhpkAx1Uhq9cSM8mj2JhWJUSxDx+Jyk2tQ@mail.gmail.com>
+From: ssimran@broadcom.com (Simran Rai)
+Date: Thu, 5 Nov 2015 12:01:52 -0800
+Subject: [PATCH v2 1/2] dt-bindings: sound: Add DT bindings for Broadcom
+ Cygnus audio
+In-Reply-To: <20151104140746.GE1717@sirena.org.uk>
+References: <1446502284-23907-2-git-send-email-ssimran@broadcom.com>
+ <20151104140746.GE1717@sirena.org.uk>
+Message-ID: <563BB5B0.5040501@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 5, 2015 at 6:46 AM, Simon Horman <horms+renesas@verge.net.au> wrote:
-> The purpose of this patch is to start the process of replacing both
-> ARCH_SHMOBILE and ARCH_SHMOBILE_MULTI with ARCH_RENESAS. The motivation
-> being that as time has moved on Renesas has become a name than shmobile for
-> the majority Renesas 32-bit ARM based SoCs. The name is, conveniently, also
-> applicable to (older) Renesas SH based SoCs and (newer) ARM64 based SoCs
-> although this patch only addresses 32-bit ARM.
+Hi Mark,
 
-Is this supposed to include H8/300 and m32r in the future?
+On 11/4/2015 6:07 AM, Mark Brown wrote:
+> On Mon, Nov 02, 2015 at 02:11:23PM -0800, Simran Rai wrote:
+>
+>> +- channel-group: Surround sound grouping that controls which channel
+>> +  outputs belong to a group, specifically useful in Multi-channel
+>> +  Interfaces grouping of serial port. In multi-channel stereo, use
+>> +  "2_0", in 3.1 multi-channel grouping, use "3_1" and in 5.1
+>> +  multi-channel grouping, use "5_1".
+> I don't really understand what this means or why this is not runtime
+> configured.
+By runtime configured, do you mean passing the channel grouping through 
+machine file? Is there any specific callback that I can use?
 
-Gr{oetje,eeting}s,
+I will implement your suggestions from other patches too and send out 
+next revision by early next week.
 
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Thanks,
+Simran
