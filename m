@@ -1,113 +1,84 @@
 From: akshay.bhat@timesys.com (Akshay Bhat)
-Date: Thu,  5 Nov 2015 13:13:38 -0500
-Subject: [PATCH v2 04/10] ARM: dts: imx: Add support for Advantech/GE B450v3
+Date: Thu,  5 Nov 2015 13:13:42 -0500
+Subject: [PATCH v2 08/10] ARM: dts: imx: Update vendor info for GE Bx50v3
+ boards
 In-Reply-To: <1446747224-32514-1-git-send-email-akshay.bhat@timesys.com>
 References: <1446747224-32514-1-git-send-email-akshay.bhat@timesys.com>
-Message-ID: <1446747224-32514-5-git-send-email-akshay.bhat@timesys.com>
+Message-ID: <1446747224-32514-9-git-send-email-akshay.bhat@timesys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for Advantech/GE B450v3 board.
+Update vendor and copyright info for GE Bx50v3 boards
 
 Signed-off-by: Akshay Bhat <akshay.bhat@timesys.com>
 ---
- arch/arm/boot/dts/Makefile         |  1 +
- arch/arm/boot/dts/imx6q-b450v3.dts | 75 ++++++++++++++++++++++++++++++++++++++
- 2 files changed, 76 insertions(+)
- create mode 100644 arch/arm/boot/dts/imx6q-b450v3.dts
+ arch/arm/boot/dts/imx6q-b450v3.dts | 4 ++--
+ arch/arm/boot/dts/imx6q-b650v3.dts | 4 ++--
+ arch/arm/boot/dts/imx6q-b850v3.dts | 4 ++--
+ 3 files changed, 6 insertions(+), 6 deletions(-)
 
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 30bbc37..b3330fe 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -310,6 +310,7 @@ dtb-$(CONFIG_SOC_IMX6Q) += \
- 	imx6dl-wandboard-revb1.dtb \
- 	imx6q-apf6dev.dtb \
- 	imx6q-arm2.dtb \
-+	imx6q-b450v3.dtb \
- 	imx6q-cm-fx6.dtb \
- 	imx6q-cubox-i.dtb \
- 	imx6q-dfi-fs700-m60.dtb \
 diff --git a/arch/arm/boot/dts/imx6q-b450v3.dts b/arch/arm/boot/dts/imx6q-b450v3.dts
-new file mode 100644
-index 0000000..d63d9e1
---- /dev/null
+index d63d9e1..efe9c1e 100644
+--- a/arch/arm/boot/dts/imx6q-b450v3.dts
 +++ b/arch/arm/boot/dts/imx6q-b450v3.dts
-@@ -0,0 +1,75 @@
-+/*
-+ * Copyright 2015 Timesys Corporation.
-+ * Copyright 2015 GE Healthcare.
-+ *
-+ * The code contained herein is licensed under the GNU General Public
-+ * License. You may obtain a copy of the GNU General Public License
-+ * Version 2 or later at the following locations:
-+ *
-+ * http://www.opensource.org/licenses/gpl-license.html
-+ * http://www.gnu.org/copyleft/gpl.html
-+ */
-+
-+/dts-v1/;
-+
-+#include "imx6q-bx50v3.dtsi"
-+
-+/ {
-+	model = "Advantech MX6Q B450V3 QSeven Board";
-+	compatible = "adv,imx6q-b450v3", "adv,imx6q-ba16", "fsl,imx6q";
-+
-+	chosen {
-+		stdout-path = &uart3;
-+	};
-+};
-+
-+&ldb {
-+	assigned-clocks = <&clks IMX6QDL_CLK_LDB_DI0_SEL>,
-+			  <&clks IMX6QDL_CLK_LDB_DI1_SEL>;
-+	assigned-clock-parents = <&clks IMX6QDL_CLK_PLL3_USB_OTG>,
-+				 <&clks IMX6QDL_CLK_PLL3_USB_OTG>;
-+	status = "okay";
-+
-+	lvds0: lvds-channel at 0 {
-+		fsl,data-mapping = "spwg";
-+		fsl,data-width = <24>;
-+		status = "okay";
-+
-+		display-timings {
-+			native-mode = <&timing0>;
-+			timing0: G121X1-L03 {
-+				clock-frequency = <65000000>;
-+				hactive = <1024>;
-+				vactive = <768>;
-+				hback-porch = <320>;
-+				hfront-porch = <0>;
-+				vback-porch = <0>;
-+				vfront-porch = <38>;
-+				hsync-len = <1>;
-+				vsync-len = <1>;
-+			};
-+		};
-+	};
-+
-+	lvds1: lvds-channel at 1 {
-+		fsl,data-mapping = "spwg";
-+		fsl,data-width = <24>;
-+		status = "okay";
-+
-+		display-timings {
-+			native-mode = <&timing1>;
-+			timing1: G121X1-L03 {
-+				clock-frequency = <65000000>;
-+				hactive = <1024>;
-+				vactive = <768>;
-+				hback-porch = <320>;
-+				hfront-porch = <0>;
-+				vback-porch = <0>;
-+				vfront-porch = <38>;
-+				hsync-len = <1>;
-+				vsync-len = <1>;
-+			};
-+		};
-+	};
-+
-+};
+@@ -1,6 +1,6 @@
+ /*
+  * Copyright 2015 Timesys Corporation.
+- * Copyright 2015 GE Healthcare.
++ * Copyright 2015 General Electric Company
+  *
+  * The code contained herein is licensed under the GNU General Public
+  * License. You may obtain a copy of the GNU General Public License
+@@ -16,7 +16,7 @@
+ 
+ / {
+ 	model = "Advantech MX6Q B450V3 QSeven Board";
+-	compatible = "adv,imx6q-b450v3", "adv,imx6q-ba16", "fsl,imx6q";
++	compatible = "ge,imx6q-b450v3", "adv,imx6q-ba16", "fsl,imx6q";
+ 
+ 	chosen {
+ 		stdout-path = &uart3;
+diff --git a/arch/arm/boot/dts/imx6q-b650v3.dts b/arch/arm/boot/dts/imx6q-b650v3.dts
+index 29cbdb0..d40efa9 100644
+--- a/arch/arm/boot/dts/imx6q-b650v3.dts
++++ b/arch/arm/boot/dts/imx6q-b650v3.dts
+@@ -1,6 +1,6 @@
+ /*
+  * Copyright 2015 Timesys Corporation.
+- * Copyright 2015 GE Healthcare.
++ * Copyright 2015 General Electric Company
+  *
+  * The code contained herein is licensed under the GNU General Public
+  * License. You may obtain a copy of the GNU General Public License
+@@ -16,7 +16,7 @@
+ 
+ / {
+ 	model = "Advantech MX6Q B650V3 QSeven Board";
+-	compatible = "adv,imx6q-b650v3", "adv,imx6q-ba16", "fsl,imx6q";
++	compatible = "ge,imx6q-b650v3", "adv,imx6q-ba16", "fsl,imx6q";
+ 
+ 	chosen {
+ 		stdout-path = &uart3;
+diff --git a/arch/arm/boot/dts/imx6q-b850v3.dts b/arch/arm/boot/dts/imx6q-b850v3.dts
+index be6c0da..a77f392 100644
+--- a/arch/arm/boot/dts/imx6q-b850v3.dts
++++ b/arch/arm/boot/dts/imx6q-b850v3.dts
+@@ -1,6 +1,6 @@
+ /*
+  * Copyright 2015 Timesys Corporation.
+- * Copyright 2015 GE Healthcare.
++ * Copyright 2015 General Electric Company
+  *
+  * The code contained herein is licensed under the GNU General Public
+  * License. You may obtain a copy of the GNU General Public License
+@@ -16,7 +16,7 @@
+ 
+ / {
+ 	model = "Advantech MX6Q B850V3 QSeven Board";
+-	compatible = "adv,imx6q-b850v3", "adv,imx6q-ba16", "fsl,imx6q";
++	compatible = "ge,imx6q-b850v3", "adv,imx6q-ba16", "fsl,imx6q";
+ 
+ 	chosen {
+ 		stdout-path = &uart3;
 -- 
 2.6.2
