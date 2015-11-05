@@ -1,61 +1,25 @@
 From: andrew@lunn.ch (Andrew Lunn)
-Date: Thu, 5 Nov 2015 01:23:19 +0100
-Subject: [PATCH 3/4] ARM: dts: kirkwood: add Seagate GoFlex Home
-In-Reply-To: <00000150d49a8745-1c2bc8d4-1333-46bb-bf0e-5508ef988c73-000000@email.amazonses.com>
+Date: Thu, 5 Nov 2015 01:27:07 +0100
+Subject: [PATCH 2/4] ARM: dts: kirkwood: add Linksys EA3500
+In-Reply-To: <00000150d49a832c-f77d66d7-8f66-4b36-ac2c-df85deee46b6-000000@email.amazonses.com>
 References: <1446675888-24495-1-git-send-email-luka.perkov@sartura.hr>
- <00000150d49a8745-1c2bc8d4-1333-46bb-bf0e-5508ef988c73-000000@email.amazonses.com>
-Message-ID: <20151105002319.GA8942@lunn.ch>
+ <00000150d49a832c-f77d66d7-8f66-4b36-ac2c-df85deee46b6-000000@email.amazonses.com>
+Message-ID: <20151105002707.GB8942@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> +	chosen {
-> +		bootargs = "console=ttyS0,115200n8 earlyprintk root=/dev/sda1 rootdelay=10";
+On Wed, Nov 04, 2015 at 10:25:07PM +0000, Luka Perkov wrote:
+> Based on dts files from OpenWrt.
 
-It is not normal to specify the root device. Is this really required?
-And rootdelay is also unusual.
+Hi Luka
 
-> +		stdout-path = &uart0;
-> +	};
-> +
-> +	ocp at f1000000 {
-> +		pinctrl: pin-controller at 10000 {
-> +			pmx_usb_power_enable: pmx-usb-power-enable {
-> +				marvell,pins = "mpp29";
-> +				marvell,function = "gpio";
-> +			};
-> +			pmx_led_white: pmx-led-white {
-> +				marvell,pins = "mpp40";
-> +				marvell,function = "gpio";
-> +			};
-> +			pmx_led_green: pmx-led_green {
-> +				marvell,pins = "mpp46";
+Thanks for spending the time to submit these upstream.
 
-That last _ should be -..
+It looks like a lot of the same comments apply to these files, so i
+won't keep repeat them.
 
-> +				marvell,function = "gpio";
-> +			};
-> +			pmx_led_orange: pmx-led-orange {
-> +				marvell,pins = "mpp47";
-> +				marvell,function = "gpio";
-> +			};
-> +		};
-> +		serial at 12000 {
-> +			status = "ok";
-> +		};
-> +
-> +		sata at 80000 {
-> +			status = "okay";
-> +			nr-ports = <2>;
-> +		};
-> +
-> +	};
-> +	gpio-leds {
-> +		compatible = "gpio-leds";
-> +
-> +		health {
-> +			label = "status:green:health";
-
-This does not fit the naming convention. status should be the machine
-name.
-
-	Andrew
+One thing i did notice is that turning off the internal RTC is common,
+but there is no i2c RTC. Is this correct? Do these devices not have an
+RTC?
+	Thanks
+		Andrew
