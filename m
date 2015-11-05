@@ -1,41 +1,45 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Thu, 5 Nov 2015 15:29:01 +0300
-Subject: [PATCH/RFC] ARM: shmobile: Introduce ARCH_RENESAS
-In-Reply-To: <20151105121049.GC711@verge.net.au>
-References: <1446702397-24078-1-git-send-email-horms+renesas@verge.net.au>
- <563B3ACB.9050807@cogentembedded.com> <20151105121049.GC711@verge.net.au>
-Message-ID: <563B4B8D.9050701@cogentembedded.com>
+From: vigneshr@ti.com (Vignesh R)
+Date: Thu, 5 Nov 2015 17:59:36 +0530
+Subject: [PATCH v2 1/5] spi: introduce mmap read support for spi flash
+ devices
+In-Reply-To: <20151104143915.GI1717@sirena.org.uk>
+References: <1446545174-14193-1-git-send-email-vigneshr@ti.com>
+ <1446545174-14193-2-git-send-email-vigneshr@ti.com>
+ <20151104143915.GI1717@sirena.org.uk>
+Message-ID: <563B4BB0.9020206@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/5/2015 3:10 PM, Simon Horman wrote:
 
->>> The purpose of this patch is to start the process of replacing both
->>> ARCH_SHMOBILE and ARCH_SHMOBILE_MULTI with ARCH_RENESAS. The motivation
->>> being that as time has moved on Renesas has become a name than shmobile for
->>> the majority Renesas 32-bit ARM based SoCs.
->>
->>     Couldn't parse this sentence. :-)
->
-> RENESAS seems to be a more appropriate name that SHMOBILE for the
 
-    s/that/than/. Otherwise parsable. :-)
+On 11/04/2015 08:09 PM, Mark Brown wrote:
+> On Tue, Nov 03, 2015 at 03:36:10PM +0530, Vignesh R wrote:
+> 
+>> +	}
+>> +	mutex_lock(&master->mmap_lock_mutex);
+>> +	ret = master->spi_mtd_mmap_read(spi, from, len, retlen, buf,
+>> +					read_opcode, addr_width,
+>> +					dummy_bytes);
+>> +	mutex_unlock(&master->mmap_lock_mutex);
+>> +	if (master->auto_runtime_pm)
+>> +		pm_runtime_put(master->dev.parent);
+> 
+> It's a bit worrying that this doesn't sync with the message queue except
+> via the mutex: this means that we might be out of order with respect to
+> any asynchronous transfers that are happening on the device.  I'm not
+> sure that this is a practical problem, though there is some risk of
+> unfair scheduling that would have to be under extreme load and it might
+> make sense to prioritise reads anyway.
+> 
 
-> majority of Renesas 32-bit ARM based SoCs.
->
->>> The name is, conveniently, also
->>> applicable to (older) Renesas SH based SoCs and (newer) ARM64 based SoCs
->>> although this patch only addresses 32-bit ARM.
->>>
->>> It is envisaged that follow up work may address migrating both
->>> SH SoCs and drivers from ARCH_SHMOBILE and ARCH_SHMOBILE_MULTI to
->>> ARCH_RENESAS.
->>>
->>> Proposed support for the r8a7795 ARM64 based SoC already uses ARCH_RENESAS
->>> which selects ARCH_SHMOBILE.
->>>
->>> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
->>
->> [...]
+Since mmap interface is used only by mtd flash drivers and since almost
+all mtd flash devices use synchronous transfers (spi_sync()), IMO, there
+wont be out of order problem wrt mtd flashes.
+But mmap read might delay transfers queued for non mtd flash devices. It
+is difficult to wait for all transfers already queued to be pumped out
+by __spi_pump_messages() and then do the mmap transfer. Do you have any
+thoughts on how to sync with message queue?
 
-MBR, Sergei
+-- 
+Regards
+Vignesh
