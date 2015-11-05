@@ -1,44 +1,72 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 5 Nov 2015 16:16:15 +0000
-Subject: [PATCH v1 1/5] ASoC: rockchip: i2s: Support to set the divider
- clock API
-In-Reply-To: <563AEF97.1080304@gmail.com>
-References: <1446514438-13922-1-git-send-email-wxt@rock-chips.com>
- <1446514438-13922-2-git-send-email-wxt@rock-chips.com>
- <20151104143431.GH1717@sirena.org.uk> <563AEF97.1080304@gmail.com>
-Message-ID: <20151105161615.GS18409@sirena.org.uk>
+From: elfring@users.sourceforge.net (SF Markus Elfring)
+Date: Thu, 5 Nov 2015 17:17:15 +0100
+Subject: [PATCH] pinctrl: Delete unnecessary checks before the function call
+ "pinctrl_unregister"
+In-Reply-To: <5317A59D.4@users.sourceforge.net>
+References: <5307CAA2.8060406@users.sourceforge.net>
+ <alpine.DEB.2.02.1402212321410.2043@localhost6.localdomain6>
+ <530A086E.8010901@users.sourceforge.net>
+ <alpine.DEB.2.02.1402231635510.1985@localhost6.localdomain6>
+ <530A72AA.3000601@users.sourceforge.net>
+ <alpine.DEB.2.02.1402240658210.2090@localhost6.localdomain6>
+ <530B5FB6.6010207@users.sourceforge.net>
+ <alpine.DEB.2.10.1402241710370.2074@hadrien>
+ <530C5E18.1020800@users.sourceforge.net>
+ <alpine.DEB.2.10.1402251014170.2080@hadrien>
+ <530CD2C4.4050903@users.sourceforge.net>
+ <alpine.DEB.2.10.1402251840450.7035@hadrien>
+ <530CF8FF.8080600@users.sourceforge.net>
+ <alpine.DEB.2.02.1402252117150.2047@localhost6.localdomain6>
+ <530DD06F.4090703@users.sourceforge.net>
+ <alpine.DEB.2.02.1402262129250.2221@localhost6.localdomain6>
+ <5317A59D.4@users.sourceforge.net>
+Message-ID: <563B810B.6050401@users.sourceforge.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 05, 2015 at 01:56:39PM +0800, Caesar Wang wrote:
-> ? 2015?11?04? 22:34, Mark Brown ??:
+From: Markus Elfring <elfring@users.sourceforge.net>
+Date: Thu, 5 Nov 2015 17:10:22 +0100
 
-> >Same thing as your other very similar patch: why does this feature
-> >require set_clkdiv()?
+The pinctrl_unregister() function tests whether its argument is NULL
+and then returns immediately. Thus the test around the call is not needed.
 
-> Okay, you said "
-> Why is this a requirement?  The clock to use as a source should normally
-> be specified via set_sysclk() and any internal dividers calculated
-> automatically by the driver.
-> "
+This issue was detected by using the Coccinelle software.
 
-> I think we should divider settings for these different sample rates.
+Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
+---
+ drivers/pinctrl/bcm/pinctrl-cygnus-gpio.c | 3 +--
+ drivers/pinctrl/pinctrl-single.c          | 5 +----
+ 2 files changed, 2 insertions(+), 6 deletions(-)
 
-Sure, the question is how these things get set.
-
->  If the codec is master mode, we are *not* need this operate.
->  If the codec is slave mode, we are need to divider the MCLK to setting the different sample rates.
-> (for example, the sample rates (8k, 48k) the clock is MCLK, the clock should be divider cpu ip )
-
-> "dividers calculated automatically by the driver", that should be occured by codec(max98090
-> ) driver, but the divider clocks (LRCK, SCLK) should need to set for cpu internal side.
-
-So the CPU knows what rates it needs to set and what clocks it's getting
-in, why can't it set the dividers autonomously.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151105/9aea7e8c/attachment-0001.sig>
+diff --git a/drivers/pinctrl/bcm/pinctrl-cygnus-gpio.c b/drivers/pinctrl/bcm/pinctrl-cygnus-gpio.c
+index 12a48f4..663ad0a 100644
+--- a/drivers/pinctrl/bcm/pinctrl-cygnus-gpio.c
++++ b/drivers/pinctrl/bcm/pinctrl-cygnus-gpio.c
+@@ -638,8 +638,7 @@ static int cygnus_gpio_register_pinconf(struct cygnus_gpio *chip)
+ 
+ static void cygnus_gpio_unregister_pinconf(struct cygnus_gpio *chip)
+ {
+-	if (chip->pctl)
+-		pinctrl_unregister(chip->pctl);
++	pinctrl_unregister(chip->pctl);
+ }
+ 
+ struct cygnus_gpio_data {
+diff --git a/drivers/pinctrl/pinctrl-single.c b/drivers/pinctrl/pinctrl-single.c
+index ef04b96..d24e5f1 100644
+--- a/drivers/pinctrl/pinctrl-single.c
++++ b/drivers/pinctrl/pinctrl-single.c
+@@ -1484,10 +1484,7 @@ static void pcs_irq_free(struct pcs_device *pcs)
+ static void pcs_free_resources(struct pcs_device *pcs)
+ {
+ 	pcs_irq_free(pcs);
+-
+-	if (pcs->pctl)
+-		pinctrl_unregister(pcs->pctl);
+-
++	pinctrl_unregister(pcs->pctl);
+ 	pcs_free_funcs(pcs);
+ 	pcs_free_pingroups(pcs);
+ }
+-- 
+2.6.2
