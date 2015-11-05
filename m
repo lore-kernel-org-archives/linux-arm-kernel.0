@@ -1,104 +1,63 @@
-From: gabriele.paoloni@huawei.com (Gabriele Paoloni)
-Date: Thu, 5 Nov 2015 09:43:12 +0000
-Subject: [PATCH RFC 7/7] irqchip: [Example] dummy wired interrupt/MSI
- bridge driver
-In-Reply-To: <563B22F1.901@arm.com>
-References: <1444923568-17413-1-git-send-email-marc.zyngier@arm.com>
- <1444923568-17413-8-git-send-email-marc.zyngier@arm.com>
- <5639BB10.1090108@huawei.com> <5639C9F9.2010704@arm.com>
- <EE11001F9E5DDD47B7634E2F8A612F2E1629D8DD@lhreml503-mbs>
- <563B22F1.901@arm.com>
-Message-ID: <EE11001F9E5DDD47B7634E2F8A612F2E1629EF42@lhreml503-mbs>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 5 Nov 2015 10:44:30 +0100
+Subject: [PATCH RESEND 3/4] ARM: BCM: Add SMP support for Broadcom NSP
+In-Reply-To: <1446702681-45339-4-git-send-email-kapilh@broadcom.com>
+References: <1446702681-45339-1-git-send-email-kapilh@broadcom.com>
+ <1446702681-45339-4-git-send-email-kapilh@broadcom.com>
+Message-ID: <CACRpkda8Fg+Z0h1+3dv=xAAKJnnXvPR=i5eyjLeLxFn467cvzA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Marc Zyngier [mailto:marc.zyngier at arm.com]
-> Sent: Thursday, November 05, 2015 9:36 AM
-> To: Gabriele Paoloni; majun (F); Thomas Gleixner; Jiang Liu; Jason
-> Cooper
-> Cc: linux-arm-kernel at lists.infradead.org; linux-pci at vger.kernel.org;
-> linux-kernel at vger.kernel.org
-> Subject: Re: [PATCH RFC 7/7] irqchip: [Example] dummy wired
-> interrupt/MSI bridge driver
-> 
-> On 05/11/15 08:25, Gabriele Paoloni wrote:
-> > Hi Marc
-> >
-> >> -----Original Message-----
-> >> From: linux-pci-owner at vger.kernel.org [mailto:linux-pci-
-> owner at vger.kernel.org]
-> >> On Behalf Of Marc Zyngier
-> >> Sent: 04 November 2015 09:04
-> >> To: majun (F); Thomas Gleixner; Jiang Liu; Jason Cooper
-> >> Cc: linux-arm-kernel at lists.infradead.org; linux-pci at vger.kernel.org;
-> linux-
-> >> kernel at vger.kernel.org
-> >> Subject: Re: [PATCH RFC 7/7] irqchip: [Example] dummy wired
-> interrupt/MSI
-> >> bridge driver
-> >>
-> >> On 04/11/15 08:00, majun (F) wrote:
-> 
-> [...]
-> 
-> >>> I think,for a interrupt controller, msichip driver initialization
-> maybe is
-> >> too late
-> >>> for some devices which connect to this irqchip if we use
-> >> module_platform_driver.
-> >>
-> >> That's a consequence of this design. This is why I insisted on the
-> fact
-> >> that this is currently avoided by using deferred probe in drivers,
-> and
-> >
-> > Mmm using te deferred probe would mean to rework all the drivers of
-> the
-> > potential devices connected to mbi-gen...would that be
-> sustainable/acceptable?
-> 
-> I'm tempted to reply "Not my problem". Or rather, not a problem I'm
-> trying to solve right now (or any time soon).
-> 
-> I'm pretty sure that sprinkling -EPROBE_DEFER on all possible drivers
-> will result in a resounding NAK, which is is why I suggested that
-> someone with a vested interest dedicates some quality time helping
-> those
-> who are trying to solve this issue for good.
+On Thu, Nov 5, 2015 at 6:51 AM, Kapil Hali <kapilh@broadcom.com> wrote:
 
-Yes you're right, makes perfect sense
+> Add SMP support for Broadcom's Northstar Plus SoC,
+> cpu enable method and pen_release procedures. This
+> changes also consolidates iProc family's - BCM NSP
+> and BCM Kona, SMP handling in a common file.
+>
+> Northstar Plus SoC is based on ARM Cortex-A9
+> revision r3p0 which requires configuration for ARM
+> Errata 764369 for SMP. This change adds the needed
+> configuration option.
+>
+> Signed-off-by: Kapil Hali <kapilh@broadcom.com>
+(...)
+> +/*
+> + * iProc specific entry point for secondary CPUs.  This provides
+> + * a "holding pen" into which all secondary cores are held until
+> + * we are ready for them to initialise.
+> + */
 
-> 
-> >> that it should be solved by having a probe order. Either way, this
-> is
-> >> not something that we can solve at that level (see the multiple
-> proposal
-> >> for this on the various lists).
-> >
-> > Could you point me to the relevant discussions for this...?
-> 
-> Google is, as always, your dearest friend. But here you go:
-> 
-> - LWN has some quality coverage of the KS discussions (assuming you're
-> a
-> subscriber, otherwise you'll have to wait for another week):
-> http://lwn.net/Articles/662820/
-> 
-> - There is also Tomeu Vizoso's series, which itself builds upon other
-> previous attempts at solving this: https://lwn.net/Articles/658690/
-> 
+Do you *REALLY* need the complex pen hold/release semaphore
+stuff?
 
-Great, many thanks for pointing them out.
+Consult for example commit
+c00def71efd919e8ae835a25f4f4c80a4b2d36d3
+"ARM: ux500: simplify secondary CPU boot"
 
-I'll look into these.
+I realized the pen hold/release stuff was totally surplus on the
+ux500 platform, it was probably just copied from the Vexpress
+or RealView reference design and kept around because ARM
+did things that way. And you are copying the same code from
+other platforms again. Do you *really* understand the pen hold/release
+code? (I don't.)
 
-Thanks again
+In our case it turned out that all that was really needed was:
 
-Gab
+- Map and enable SCU at .smp_prepare_cpus()
 
-> Thanks,
-> 
-> 	M.
-> --
-> Jazz is not dead. It just smells funny...
+- Write the start address for the secondary CPU(s) in their
+  magic registers/addresses i.e what you do in
+  nsp_write_lut() and then call
+  arch_send_wakeup_ipi_mask(cpumask_of(cpu)); in
+  .smp_boot_secondary()
+  It seems you may not even need the IPI, I can't see
+  that call in your patch so I guess your secondary
+  CPUs aren't in WFI at boot.
+
+No pen hold/release magic! Works like a charm for us.
+So see of you really need this horror story with copied
+assembly code from realview etc.
+
+Yours,
+Linus Walleij
