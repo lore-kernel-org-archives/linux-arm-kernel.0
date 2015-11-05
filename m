@@ -1,61 +1,70 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 5 Nov 2015 16:27:19 +0000
-Subject: [PATCH] arm: Use kernel mm when updating section permissions
-In-Reply-To: <563B81DA.2080409@redhat.com>
-References: <1446685239-28522-1-git-send-email-labbott@fedoraproject.org>
- <20151105094615.GP8644@n2100.arm.linux.org.uk>
- <563B81DA.2080409@redhat.com>
-Message-ID: <20151105162719.GQ8644@n2100.arm.linux.org.uk>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 5 Nov 2015 10:36:58 -0600
+Subject: [PATCH v2 4/5] ARM: dts: DRA7: add entry for qspi mmap region
+In-Reply-To: <1446545174-14193-5-git-send-email-vigneshr@ti.com>
+References: <1446545174-14193-1-git-send-email-vigneshr@ti.com>
+ <1446545174-14193-5-git-send-email-vigneshr@ti.com>
+Message-ID: <20151105163658.GA28885@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 05, 2015 at 08:20:42AM -0800, Laura Abbott wrote:
-> On 11/05/2015 01:46 AM, Russell King - ARM Linux wrote:
-> >On Wed, Nov 04, 2015 at 05:00:39PM -0800, Laura Abbott wrote:
-> >>Currently, read only permissions are not being applied even
-> >>when CONFIG_DEBUG_RODATA is set. This is because section_update
-> >>uses current->mm for adjusting the page tables. current->mm
-> >>need not be equivalent to the kernel version. Use pgd_offset_k
-> >>to get the proper page directory for updating.
-> >
-> >What are you trying to achieve here?  You can't use these functions
-> >at run time (after the first thread has been spawned) to change
-> >permissions, because there will be multiple copies of the kernel
-> >section mappings, and those copies will not get updated.
-> >
-> >In any case, this change will probably break kexec and ftrace, as
-> >the running thread will no longer see the updated page tables.
-> >
+On Tue, Nov 03, 2015 at 03:36:13PM +0530, Vignesh R wrote:
+> Add qspi memory mapped region entries for DRA7xx based SoCs. Also,
+> update the binding documents for the controller to document this change.
 > 
-> I think I was hitting that exact problem with multiple copies
-> not getting updated. The section_update code was being called
-> and I was seeing the tables get updated but nothing was being
-> applied when I tried to write to text or check the debugfs
-> page table. The current flow is:
+> Signed-off-by: Vignesh R <vigneshr@ti.com>
+
+You don't really need an example for every possibility, but
+
+Acked-by: Rob Herring <robh@kernel.org>
+
+> ---
+>  Documentation/devicetree/bindings/spi/ti_qspi.txt | 13 +++++++++++++
+>  arch/arm/boot/dts/dra7.dtsi                       |  6 ++++--
+>  2 files changed, 17 insertions(+), 2 deletions(-)
 > 
-> rest_init -> kernel_thread(kernel_init) and from that thread
-> mark_rodata_ro. So mark_rodata_ro is always going to happen
-> in a thread.
+> diff --git a/Documentation/devicetree/bindings/spi/ti_qspi.txt b/Documentation/devicetree/bindings/spi/ti_qspi.txt
+> index 601a360531a5..f05dd631bef1 100644
+> --- a/Documentation/devicetree/bindings/spi/ti_qspi.txt
+> +++ b/Documentation/devicetree/bindings/spi/ti_qspi.txt
+> @@ -26,3 +26,16 @@ qspi: qspi at 4b300000 {
+>  	spi-max-frequency = <25000000>;
+>  	ti,hwmods = "qspi";
+>  };
+> +
+> +For dra7xx:
+> +qspi: qspi at 4b300000 {
+> +	compatible = "ti,dra7xxx-qspi";
+> +	reg = <0x4b300000 0x100>, <0x4a002558 0x4>,
+> +	      <0x5c000000 0x4000000>;
+> +	reg-names = "qspi_base", "qspi_ctrlmod",
+> +		    "qspi_mmap";
+> +	#address-cells = <1>;
+> +	#size-cells = <0>;
+> +	spi-max-frequency = <48000000>;
+> +	ti,hwmods = "qspi";
+> +};
+> diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
+> index e289c706d27d..13c2f10ec217 100644
+> --- a/arch/arm/boot/dts/dra7.dtsi
+> +++ b/arch/arm/boot/dts/dra7.dtsi
+> @@ -1108,8 +1108,10 @@
+>  
+>  		qspi: qspi at 4b300000 {
+>  			compatible = "ti,dra7xxx-qspi";
+> -			reg = <0x4b300000 0x100>;
+> -			reg-names = "qspi_base";
+> +			reg = <0x4b300000 0x100>, <0x4a002558 0x4>,
+> +			      <0x5c000000 0x4000000>;
+> +			reg-names = "qspi_base", "qspi_ctrlmod",
+> +				    "qspi_mmap";
+>  			#address-cells = <1>;
+>  			#size-cells = <0>;
+>  			ti,hwmods = "qspi";
+> -- 
+> 2.6.2
 > 
-> Do we need to update for both init_mm and the first running
-> thread?
-
-The "first running thread" is merely coincidental for things like kexec.
-
-Hmm.  Actually, I think the existing code _should_ be fine.  At the
-point where mark_rodata_ro() is, we should still be using init_mm, so
-updating the current threads page tables should actually be updating
-the swapper_pg_dir.
-
-The other cases (kexec and ftrace) I think are also fine as they
-stand - we want to be changing the currently active page tables
-there.
-
-So, I really think we do not want to be using pgd_offset_k() here at
-all - but we need to find out what's changed to cause (presumably)
-mark_rodata_ro() not to be hitting the swapper page tables.  Maybe
-some debug in mark_rodata_ro() to find out what current->mm is?
-
--- 
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+> --
+> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
