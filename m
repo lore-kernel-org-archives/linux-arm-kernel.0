@@ -1,27 +1,61 @@
 From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 5 Nov 2015 09:56:37 +0100
-Subject: [PATCH v3 6/7] spi: imx: return error from dma channel request
-In-Reply-To: <1446388901-6073-7-git-send-email-anton.bondarenko.sama@gmail.com>
+Date: Thu, 5 Nov 2015 09:59:26 +0100
+Subject: [PATCH v3 7/7] spi: imx: defer spi initialization, if DMA engine
+ is pending
+In-Reply-To: <1446388901-6073-8-git-send-email-anton.bondarenko.sama@gmail.com>
 References: <1446388901-6073-1-git-send-email-anton.bondarenko.sama@gmail.com>
- <1446388901-6073-7-git-send-email-anton.bondarenko.sama@gmail.com>
-Message-ID: <20151105085637.GJ8526@pengutronix.de>
+ <1446388901-6073-8-git-send-email-anton.bondarenko.sama@gmail.com>
+Message-ID: <20151105085926.GK8526@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Nov 01, 2015 at 03:41:40PM +0100, Anton Bondarenko wrote:
+On Sun, Nov 01, 2015 at 03:41:41PM +0100, Anton Bondarenko wrote:
 > From: Anton Bondarenko <anton_bondarenko@mentor.com>
 > 
-> On SDMA initialization return exactly the same error, which is
-> reported by dma_request_slave_channel_reason(), it is a preceding
-> change to defer SPI DMA initialization, if SDMA module is not yet
-> available.
+> If SPI device supports DMA mode, but DMA controller is not yet
+> available due to e.g. a delay in the corresponding kernel module
+> initialization, retry to initialize SPI driver later on instead of
+> falling back into PIO only mode.
+> 
+> Signed-off-by: Vladimir Zapolskiy <vladimir_zapolskiy@mentor.com>
+> Signed-off-by: Anton Bondarenko <anton_bondarenko@mentor.com>
 
-Maybe something like: "fix probe deferral when dmaengine is not yet
-available" in the subject line will better express that this is a patch
-that should be applied ASAP. Also you can move this up to the front of
-the series when resending.
+Ok, so 6/7 is only part of the deferral story. Maybe squash the two
+patches into one?
 
 Sascha
+
+> ---
+>  drivers/spi/spi-imx.c | 12 +++++++++---
+>  1 file changed, 9 insertions(+), 3 deletions(-)
+> 
+> diff --git a/drivers/spi/spi-imx.c b/drivers/spi/spi-imx.c
+> index 6035ddd..d2ea731 100644
+> --- a/drivers/spi/spi-imx.c
+> +++ b/drivers/spi/spi-imx.c
+> @@ -1354,9 +1354,15 @@ static int spi_imx_probe(struct platform_device *pdev)
+>  	 * Only validated on i.mx6 now, can remove the constrain if validated on
+>  	 * other chips.
+>  	 */
+> -	if (is_imx51_ecspi(spi_imx) &&
+> -	    spi_imx_sdma_init(&pdev->dev, spi_imx, master))
+> -		dev_err(&pdev->dev, "dma setup error,use pio instead\n");
+> +	if (is_imx51_ecspi(spi_imx)) {
+> +		ret = spi_imx_sdma_init(&pdev->dev, spi_imx, master);
+> +		if (ret == -EPROBE_DEFER)
+> +			goto out_clk_put;
+> +
+> +		if (ret < 0)
+> +			dev_err(&pdev->dev, "dma setup error %d, use pio\n",
+> +				ret);
+> +	}
+>  
+>  	spi_imx->devtype_data->reset(spi_imx);
+>  
+> -- 
+> 2.6.2
+> 
+> 
 
 -- 
 Pengutronix e.K.                           |                             |
