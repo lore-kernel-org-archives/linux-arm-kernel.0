@@ -1,104 +1,30 @@
-From: kaloz@openwrt.org (Imre Kaloz)
-Date: Thu, 05 Nov 2015 12:00:35 +0100
-Subject: [PATCH 1/4] ARM: dts: kirkwood: add Linksys EA4500
-In-Reply-To: <00000150d49a7cf7-e97bf540-89ce-49bf-a25e-2d082acab273-000000@email.amazonses.com>
-References: <00000150d49a7cf7-e97bf540-89ce-49bf-a25e-2d082acab273-000000@email.amazonses.com>
-Message-ID: <op.x7mji9qy2s3iss@ecaz>
+From: slash.tmp@free.fr (Mason)
+Date: Thu, 5 Nov 2015 12:02:33 +0100
+Subject: Grafting old platform drivers onto a new DT kernel
+Message-ID: <563B3749.50701@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 04 Nov 2015 23:25:05 +0100, Luka Perkov <luka.perkov@sartura.hr>  
-wrote:
+Hello,
 
-<snip>
+My company provides a 3.4 kernel for an ARM-based SoC (there's also a 2.6.32
+stashed somewhere for customers refusing to upgrade) along with drivers of
+dubious quality written over the past decade.
 
-> --- a/Documentation/devicetree/bindings/arm/marvell,kirkwood.txt
-> +++ b/Documentation/devicetree/bindings/arm/marvell,kirkwood.txt
-> @@ -49,6 +49,7 @@ board. Currently known boards are:
->  "lacie,netspace_max_v2"
->  "lacie,netspace_mini_v2"
->  "lacie,netspace_v2"
-> +"linksys,ea4500"
->  "marvell,db-88f6281-bp"
->  "marvell,db-88f6282-bp"
->  "marvell,mv88f6281gtw-ge"
+I was tasked to release a new kernel, and took the opportunity to perform
+a massive clean-up by discarding everything, and adding only enough code
+on top of a recent kernel to boot to the shell.
 
-The same device was sold as the ea4200v2 as well. Please use the  
-engineering name "viper" instead, as discussed at  
-http://lists.infradead.org/pipermail/linux-arm-kernel/2015-January/319590.html
+I now have a small port with no drivers.
+(I do have working serial and ethernet.)
 
-> --- a/Documentation/devicetree/bindings/vendor-prefixes.txt
-> +++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
-> @@ -124,6 +124,7 @@ lantiq	Lantiq Semiconductor
->  lenovo	Lenovo Group Ltd.
->  lg	LG Corporation
->  linux	Linux-specific binding
-> +linksys	Belkin International, Inc.
->  lsi	LSI Corp. (LSI Logic)
->  lltc	Linear Technology Corporation
->  marvell	Marvell Technology Group Ltd.
+Since I don't have time to rewrite the drivers at the moment, I'm wondering
+if it's possible to "graft" old drivers (they're using the platform API, no
+trace of DT support) onto my small base?
 
-Although Linksys is a subsidiary of Belkin, I think linksys should stay  
-Linksys here ;)
+That way I can make management happy by providing a working new kernel,
+and I can start working on converting drivers one-by-one.
 
-> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-> index bb8fa02..a16c04b 100644
-> --- a/arch/arm/boot/dts/Makefile
-> +++ b/arch/arm/boot/dts/Makefile
-> @@ -168,6 +168,7 @@ dtb-$(CONFIG_MACH_KIRKWOOD) += \
->  	kirkwood-ds411.dtb \
->  	kirkwood-ds411j.dtb \
->  	kirkwood-ds411slim.dtb \
-> +	kirkwood-ea4500.dtb \
->  	kirkwood-goflexnet.dtb \
->  	kirkwood-guruplug-server-plus.dtb \
->  	kirkwood-ib62x0.dtb \
+Is that a realistic plan? What traps am I likely to fall into?
 
-"kirkwood-viper.dtb"
-
-> --- /dev/null
-> +++ b/arch/arm/boot/dts/kirkwood-ea4500.dts
-> @@ -0,0 +1,156 @@
-
-<snip>
-
-> +	model = "Linksys EA4500";
-> +	compatible = "linksys,ea4500", "marvell,kirkwood-88f6282",  
-> "marvell,kirkwood";
-
-model = "Linksys EA4200v2 / EA4500"
-compatible = "linksys,viper", "marvell,kirkwood-88f6282",  
-"marvell,kirkwood";
-
-<snip>
-
-> +&nand {
-> +	status = "okay";
-> +	pinctrl-0 = <&pmx_nand>;
-> +	pinctrl-names = "default";
-> +
-> +	partition at 0 {
-> +		label = "u-boot";
-> +		reg = <0x0000000 0x80000>;
-> +	};
-> +
-> +	partition at 80000 {
-> +		label = "u-boot environment";
-> +		reg = <0x80000 0x20000>;
-> +	};
-> +
-> +	partition at 200000 {
-> +		label = "kernel";
-> +		reg = <0x200000 0x200000>;
-> +	};
-> +
-> +	partition at 400000 {
-> +		label = "root";
-> +		reg = <0x400000 0x1c00000>;
-> +	};
-> +};
-
-Please use the factory partitions instead.
-
-
-Imre
+Regards.
