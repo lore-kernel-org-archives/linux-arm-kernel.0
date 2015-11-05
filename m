@@ -1,67 +1,42 @@
-From: marex@denx.de (Marek Vasut)
-Date: Thu, 5 Nov 2015 03:25:32 +0100
-Subject: [PATCH V2 2/3] ARM: at91/dt: sama5d4: Add pinmux for 8-bit MMC0
- bus
-In-Reply-To: <563ABBCD.8090802@atmel.com>
-References: <1446675264-5514-1-git-send-email-marex@denx.de>
- <1446675264-5514-2-git-send-email-marex@denx.de> <563ABBCD.8090802@atmel.com>
-Message-ID: <201511050325.32235.marex@denx.de>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Thu, 5 Nov 2015 10:28:00 +0800
+Subject: [PATCH] clk: sunxi: Refactor A31 PLL6 so that it can be reused
+In-Reply-To: <1446651896-22902-1-git-send-email-maxime.ripard@free-electrons.com>
+References: <1445964626-6484-2-git-send-email-jenskuske@gmail.com>
+ <1446651896-22902-1-git-send-email-maxime.ripard@free-electrons.com>
+Message-ID: <CAGb2v651vNyUqE_LXYnuYNhN0siywtg7Pt1TDQZUMxwZ3psmJg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, November 05, 2015 at 03:15:41 AM, Josh Wu wrote:
-> Hi, Marek
-> 
-> On 11/5/2015 6:14 AM, Marek Vasut wrote:
-> > Add pinmux for the 4 remaining signals used in 8-bit MMC 0
-> > bus configuration.
-> > 
-> > Signed-off-by: Marek Vasut <marex@denx.de>
-> > Cc: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> > Cc: Josh Wu <josh.wu@atmel.com>
-> > Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
-> > ---
-> > 
-> >   arch/arm/boot/dts/sama5d4.dtsi | 8 ++++++++
-> >   1 file changed, 8 insertions(+)
-> > 
-> > V2: Repair the incorrect comments for the pinmux, original version
-> > 
-> >      of the commment contained wrong MCI0_DAx references.
-> > 
-> > diff --git a/arch/arm/boot/dts/sama5d4.dtsi
-> > b/arch/arm/boot/dts/sama5d4.dtsi index 48ca530..d086a7d 100644
-> > --- a/arch/arm/boot/dts/sama5d4.dtsi
-> > +++ b/arch/arm/boot/dts/sama5d4.dtsi
-> > @@ -1651,6 +1651,14 @@
-> > 
-> >   							 AT91_PIOC 9 
-AT91_PERIPH_B AT91_PINCTRL_PULL_UP	/* MCI0_DA3,
-> >   							 conflict with NAND_D4 
-*/
-> >   							 
-> >   							>;
-> >   					
-> >   					};
-> > 
-> > +					pinctrl_mmc0_dat4_7: mmc0_dat4_7 {
-> > +						atmel,pins =
-> > +							<AT91_PIOC 10 
-AT91_PERIPH_B AT91_PINCTRL_PULL_UP	/* MCI0_DA4,
-> > conflict with NAND_D5 */ +							 
-AT91_PIOC 11 AT91_PERIPH_B
-> > AT91_PINCTRL_PULL_UP	/* MCI0_DA5, conflict with NAND_D6 */ +		
-					
-> > AT91_PIOC 12 AT91_PERIPH_B AT91_PINCTRL_PULL_UP	/* MCI0_DA6, conflict
-> > with NAND_D7 */ +							 
-AT91_PIOC 13 AT91_PERIPH_B
-> > AT91_PINCTRL_PULL_UP	/* MCI0_DA7, conflict with NAND_D8 */
-> 
-> PC13 is conflicted with NRD/NANDOE, not D8 (PB18).
-> with this comment fix, you can add:
-> Reviewed-by: Josh Wu <josh.wu@atmel.com>
+On Wed, Nov 4, 2015 at 11:44 PM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> Remove the fixed dividers from the PLL6 driver to be able to have a
+> reusable driver that can be used across several SoCs that share the same
+> controller, but don't have the same set of dividers for this clock, and to
+> also be reused multiple times in the same SoC, since we're droping the
+> clock name.
+>
+> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> ---
+> Hi Jens,
+>
+> Here is an alternative (untested) patch to deal with the PLL6 issue you're
+> experiencing with the H3.
+>
+> It doesn't rely on parsing clock-output-names that turns out to be pretty
+> fragile.
 
-Thanks, patch is out, hope I got it right this time.
+A quick look through. I've no problems with changing the design, but I'd
+like to keep the original names, i.e. pll6x2 for the clock module bits,
+and pll6 for the fixed divider. It better matches the user manual.
 
-Best regards,
-Marek Vasut
+>From the PLL6 register description:
+In the Clock Control Module, PLL(2X) output = PLL * 2= 24 MHz * N * K.
+
+And all places that use the "normal" output say PLL_PERIPH (that is PLL6),
+while MBUS on A23/A33 use the 2X output, and say PLL_PERIPH(2X).
+
+On the side, do we want to get rid of all the divs clocks?
+
+Regards
+ChenYu
