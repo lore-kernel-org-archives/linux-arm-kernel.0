@@ -1,72 +1,168 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 5 Nov 2015 16:13:11 +0000
-Subject: [PATCH v2 1/2] ASoC: codec: Inno codec driver for RK3036 SoC
-In-Reply-To: <1446717194-8572-2-git-send-email-zhengsq@rock-chips.com>
-References: <1446717194-8572-1-git-send-email-zhengsq@rock-chips.com>
- <1446717194-8572-2-git-send-email-zhengsq@rock-chips.com>
-Message-ID: <20151105161311.GR18409@sirena.org.uk>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 5 Nov 2015 16:13:15 +0000
+Subject: [PATCH 1/4] arm64: dts: Reserve memory regions for hi6220
+In-Reply-To: <20151105135449.GD27192@leoy-linaro>
+References: <1444365376-10728-1-git-send-email-leo.yan@linaro.org>
+ <1444365376-10728-2-git-send-email-leo.yan@linaro.org>
+ <CAL_JsqJapPM6CpaG+AYDAUQajZ4V5jREdCwA5F4vkD5jqC3bzg@mail.gmail.com>
+ <20151009133028.GB21629@leverpostej>
+ <CAL_Jsq+TrsS39L4nsRgqszTxKHyc00fLUf+BmftHnn=EV0PxhA@mail.gmail.com>
+ <20151009142034.GB528@leoy-linaro>
+ <CAL_JsqLhu03B_ADYvCYdduH2d38kajOyc=9eX_FHy4QYYhZGxQ@mail.gmail.com>
+ <20151029083301.GB16063@leoy-linaro>
+ <20151105135449.GD27192@leoy-linaro>
+Message-ID: <20151105161315.GE32247@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 05, 2015 at 05:53:13PM +0800, Shunqian Zheng wrote:
+On Thu, Nov 05, 2015 at 09:54:50PM +0800, Leo Yan wrote:
+> On Thu, Oct 29, 2015 at 04:33:01PM +0800, Leo Yan wrote:
+> > On Wed, Oct 28, 2015 at 11:32:29PM -0500, Rob Herring wrote:
+> > > On Fri, Oct 9, 2015 at 9:20 AM, Leo Yan <leo.yan@linaro.org> wrote:
+> > > > On Fri, Oct 09, 2015 at 08:50:13AM -0500, Rob Herring wrote:
+> > > >> On Fri, Oct 9, 2015 at 8:30 AM, Mark Rutland <mark.rutland@arm.com> wrote:
+> > > >> > On Fri, Oct 09, 2015 at 08:17:16AM -0500, Rob Herring wrote:
+> > > >> >> On Thu, Oct 8, 2015 at 11:36 PM, Leo Yan <leo.yan@linaro.org> wrote:
+> > > >> >> > On Hi6220, below memory regions in DDR have specific purpose:
+> > > >> >> >
+> > > >> >> >   0x05e0,0000 - 0x05ef,ffff: For MCU firmware using at runtime;
+> > > >> >> >   0x06df,f000 - 0x06df,ffff: For mailbox message data;
+> > > >> >> >   0x0740,f000 - 0x0740,ffff: For MCU firmware's section;
+> > > >> >> >   0x3e00,0000 - 0x3fff,ffff: For OP-TEE.
+> > > >> >> >
+> > > >> >> > This patch reserves these memory regions in DT.
+> > > >> >> >
+> > > >> >> > Signed-off-by: Leo Yan <leo.yan@linaro.org>
+> > > >> >> > ---
+> > > >> >> >  arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts | 16 ++++++++++++----
+> > > >> >> >  1 file changed, 12 insertions(+), 4 deletions(-)
+> > > >> >> >
+> > > >> >> > diff --git a/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts b/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
+> > > >> >> > index e36a539..e3f4cb3 100644
+> > > >> >> > --- a/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
+> > > >> >> > +++ b/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
+> > > >> >> > @@ -7,9 +7,6 @@
+> > > >> >> >
+> > > >> >> >  /dts-v1/;
+> > > >> >> >
+> > > >> >> > -/*Reserved 1MB memory for MCU*/
+> > > >> >> > -/memreserve/ 0x05e00000 0x00100000;
+> > > >> >> > -
+> > > >> >>
+> > > >> >> Why does memreserve not work for you? You can have multiple entries.
+> > > >> >>
+> > > >> >> >  #include "hi6220.dtsi"
+> > > >> >> >
+> > > >> >> >  / {
+> > > >> >> > @@ -24,8 +21,19 @@
+> > > >> >> >                 stdout-path = "serial0:115200n8";
+> > > >> >> >         };
+> > > >> >> >
+> > > >> >> > +       /*
+> > > >> >> > +        * Reserve below regions from memory node:
+> > > >> >> > +        *
+> > > >> >> > +        *  - 0x05e0,0000 - 0x05ef,ffff: MCU firmware runtime using
+> > > >> >> > +        *  - 0x06df,f000 - 0x06df,ffff: Mailbox message data
+> > > >> >> > +        *  - 0x0740,f000 - 0x0740,ffff: MCU firmware section
+> > > >> >> > +        *  - 0x3e00,0000 - 0x3fff,ffff: OP-TEE
+> > > >> >> > +        */
+> > > >> >> >         memory at 0 {
+> > > >> >> >                 device_type = "memory";
+> > > >> >> > -               reg = <0x0 0x0 0x0 0x40000000>;
+> > > >> >> > +               reg = <0x00000000 0x00000000 0x00000000 0x05e00000>,
+> > > >> >> > +                     <0x00000000 0x05f00000 0x00000000 0x00eff000>,
+> > > >> >> > +                     <0x00000000 0x06e00000 0x00000000 0x0060f000>,
+> > > >> >> > +                     <0x00000000 0x07410000 0x00000000 0x36bf0000>;
+> > > >> >>
+> > > >> >> No, don't do this. Please use memreserve or reserved-memory binding[1]
+> > > >> >> or combination of both. Probably reserved-memory if you need the
+> > > >> >> kernel to access some of these regions.
+> > > >> >
+> > > >> > I disagree at least for those portions owned by the secure world. The
+> > > >> > kernel shouldn't map those at all, so memreserve isn't appropriate. That
+> > > >> > covers OP-TEE and the MCU firmware regions, and I'd expec the EFI memory
+> > > >> > map to not list those as available to the kernel.
+> > > >>
+> > > >> I'm fine carving out the beginning or end, but otherwise think memory
+> > > >> should correspond to the physical memory. We have a way to describe
+> > > >> holes to keep out, so we should use them. If secure world uses the DT,
+> > > >> then it would either want to know its region in memory or add the DT
+> > > >> data to say what it is using. We need that to be easy to find or easy
+> > > >> to set, respectively. The size secure world needs could vary as well.
+> > > >>
+> > > >> The fact that the kernel maps the memory is the kernel's problem, not
+> > > >> a DT problem.
+> > > >>
+> > > >
+> > > > Just give more input here. In previous time, we have long discussion [1];
+> > > > So actually your suggestion is exactly same what my old patch.
+> > > >
+> > > > From previous discussion, i think here have an assumtion: Use UEFI as
+> > > > bootloader, the kernel will ignore (or remove) memreserve and reserved-memory
+> > > > nodes, so just like Mark said "the EFI memory map to not list those
+> > > > as available to the kernel". My new patch is just to follow this and
+> > > > also make sure they have same behavior for different bootloader
+> > > > (between UEFI and uboot).
+> > > 
+> > > I've read thru the thread and see 2 main conclusions. Using
+> > > reserved-memory is problematic since things like grub don't support
+> > > that. That is fine and we should stick with /mem-reserve/ for now.
+> > 
+> > Thanks for reviewing, Rob.
+> > 
+> > One thing should note: after booting with UEFI, /memreserve/ nodes
+> > will be deleted by UEFI stub; and _ONLY_ can use /reserved-memory/
+> > node to reserve memory regions.
+> > 
+> > Ard have another patch [1], after applied this patch, then all
+> > /memreserve/ nodes and /reserved-memory/ nodes nodes will be ignored
+> > to scan after booting with UEFI stub.
+> > 
+> > This is make sense, that means UEFI need provide exactly correct memory
+> > map info by self and totally not depend on DT structures.
+> > 
+> > Another minor difference between /memreserve/ node and /reserved-memory/
+> > node is: we can add property "no-map" for /reserved-memory/; so that
+> > means it will totally remove region from memory block. it's more safe
+> > for the memory region will NOT be mapped twice with different mapping
+> > attribution.
+> > 
+> > [1] http://archive.arm.linux.org.uk/lurker/message/20150922.002128.46757034.en.html
+> > 
+> > > The other thing is the desire to have the memory presented to the kernel
+> > > be the same whether it comes from UEFI or DT structures. I can see why
+> > > there is some desire to have that alignment, but that doesn't really
+> > > buy us anything. We can't eliminate some code path in the kernel doing
+> > > so. So I still think that the memory node should reflect all of memory
+> > > as defined by the h/w and mem-reserve should be used for any software
+> > > defined reserved regions.
+> > 
+> > i think before we engaged much thinking for UEFI, that's meaningful for
+> > we found what's correct implementation for UEFI. We need make sure UEFI
+> > will do correct thing for itself.
+> > 
+> > If only consider purly from DT's usage, i have no strong opinion to
+> > stick to use memory node to carve memory regions out. It's okay for me to
+> > go back to use /reserved-memory/ to reserved regions.
+> > 
+> > Mark, do you agree with this?
+> 
+> Ping ...
+> 
+> Hi Mark,
+> 
+> Could u help confirm for this? i'm planning to resend new version
+> patch series in tommorrow, but it's better can get your feedback
+> firstly.
 
-This is basically all good, a few very minor comments below but nothing
-that should take any time to fix.
+Sorry for the delay.
 
-> +static const char *rk3036_codec_antipop_text[] = {"none", "work"};
-> +static const unsigned int rk3036_codec_antipop_values[] = {0x1, 0x2};
-> +
-> +static SOC_VALUE_ENUM_DOUBLE_DECL(rk3036_codec_antipop_enum, INNO_R09,
-> +		INNO_R09_HPL_ANITPOP_SHIFT, INNO_R09_HPR_ANITPOP_SHIFT, 0x3,
-> +		rk3036_codec_antipop_text, rk3036_codec_antipop_values);
+I'm still of the opinion that given the kernel has no business even
+reading this memory, it does not make sense to use a memreserve.
 
-This looks like a simple boolean control rather than an enum - it looks
-like it's just turning antipop on and off.
+Given that, and the points about other software not knowing aobut
+/reserved-memory/, I don't think it makes sense to describe the region
+in the memory nodes.
 
-> +	SOC_DOUBLE_R_RANGE_TLV("Headphone Volume", INNO_R07, INNO_R08,
-> +		INNO_HP_GAIN_SHIFT, INNO_HP_GAIN_N39DB,
-> +		INNO_HP_GAIN_0DB, 0, rk3036_codec_hp_tlv),
-> +	SOC_DOUBLE("Zero Cross Detect", INNO_R06, INNO_R06_VOUTL_CZ_SHIFT,
-> +		INNO_R06_VOUTR_CZ_SHIFT, 1, 0),
-
-This should be "Zero Cross Switch".
-
-> +	SOC_DOUBLE("HP Mute", INNO_R09, INNO_R09_HPL_MUTE_SHIFT,
-> +		INNO_R09_HPR_MUTE_SHIFT, 1, 1),
-
-This should be "Headphone Switch".
-
-> +static int rk3036_codec_add_widgets(struct snd_soc_codec *codec)
-> +{
-> +	struct snd_soc_dapm_context *dapm = snd_soc_codec_get_dapm(codec);
-> +
-> +	snd_soc_add_codec_controls(codec, rk3036_codec_dapm_controls,
-> +		ARRAY_SIZE(rk3036_codec_dapm_controls));
-> +
-> +	snd_soc_dapm_new_controls(dapm, rk3036_codec_dapm_widgets,
-> +		ARRAY_SIZE(rk3036_codec_dapm_widgets));
-> +
-> +	snd_soc_dapm_add_routes(dapm, rk3036_codec_dapm_routes,
-> +		ARRAY_SIZE(rk3036_codec_dapm_routes));
-
-Just point at the tables from the driver structure and let the core do
-the initialisation for you.
-
-> +static int rk3036_codec_set_bias_level(struct snd_soc_codec *codec,
-> +				       enum snd_soc_bias_level level)
-> +{
-> +	switch (level) {
-> +	case SND_SOC_BIAS_STANDBY:
-> +		/* set a big current for capacitor charging. */
-> +		snd_soc_write(codec, INNO_R10, INNO_R10_MAX_CUR);
-> +		/* start precharge */
-> +		snd_soc_write(codec, INNO_R06, INNO_R06_DAC_PRECHARGE);
-
-Do we not need to wait for this to ramp?
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151105/c1e7d135/attachment.sig>
+Thanks,
+Mark.
