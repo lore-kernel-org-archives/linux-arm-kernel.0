@@ -1,39 +1,39 @@
 From: robh@kernel.org (Rob Herring)
-Date: Thu, 5 Nov 2015 14:22:13 -0600
-Subject: [PATCH v2 01/10] of: Add vendor prefix for Advantech Corporation
-In-Reply-To: <1446747224-32514-2-git-send-email-akshay.bhat@timesys.com>
+Date: Thu, 5 Nov 2015 14:23:45 -0600
+Subject: [PATCH v2 07/10] of: Add vendor prefix for General Electric
+ Company
+In-Reply-To: <1446747224-32514-8-git-send-email-akshay.bhat@timesys.com>
 References: <1446747224-32514-1-git-send-email-akshay.bhat@timesys.com>
- <1446747224-32514-2-git-send-email-akshay.bhat@timesys.com>
-Message-ID: <20151105202213.GA7468@rob-hp-laptop>
+ <1446747224-32514-8-git-send-email-akshay.bhat@timesys.com>
+Message-ID: <20151105202345.GA8352@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 05, 2015 at 01:13:35PM -0500, Akshay Bhat wrote:
-> This patch adds vendor prefix for Advantech Corporation.
+On Thu, Nov 05, 2015 at 01:13:41PM -0500, Akshay Bhat wrote:
+> This patch adds vendor prefix for General Electric Company
 > 
-> Website: http://www.advantech.com/
 > Signed-off-by: Akshay Bhat <akshay.bhat@timesys.com>
 > ---
 >  Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
 >  1 file changed, 1 insertion(+)
 > 
 > diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
-> index 55df1d4..2b3c5ac 100644
+> index 2b3c5ac..71dcbd5 100644
 > --- a/Documentation/devicetree/bindings/vendor-prefixes.txt
 > +++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
-> @@ -10,6 +10,7 @@ ad	Avionic Design GmbH
->  adapteva	Adapteva, Inc.
->  adh	AD Holdings Plc.
->  adi	Analog Devices, Inc.
-> +adv	Advantech Corporation
+> @@ -87,6 +87,7 @@ fcs	Fairchild Semiconductor
+>  firefly	Firefly
+>  focaltech	FocalTech Systems Co.,Ltd
+>  fsl	Freescale Semiconductor
+> +ge	General Electric Company
 
-adv is a bit short. I think it would be better to go with "advantech".
+This is short too, but it is well known and the stock ticker so:
 
-Rob
+Acked-by: Rob Herring <robh@kernel.org>
 
->  aeroflexgaisler	Aeroflex Gaisler AB
->  al	Annapurna Labs
->  allwinner	Allwinner Technology Co., Ltd.
+>  GEFanuc	GE Fanuc Intelligent Platforms Embedded Systems, Inc.
+>  gef	GE Fanuc Intelligent Platforms Embedded Systems, Inc.
+>  geniatech	Geniatech, Inc.
 > -- 
 > 2.6.2
 > 
