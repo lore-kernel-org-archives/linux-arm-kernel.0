@@ -1,63 +1,27 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 5 Nov 2015 10:44:30 +0100
-Subject: [PATCH RESEND 3/4] ARM: BCM: Add SMP support for Broadcom NSP
-In-Reply-To: <1446702681-45339-4-git-send-email-kapilh@broadcom.com>
-References: <1446702681-45339-1-git-send-email-kapilh@broadcom.com>
- <1446702681-45339-4-git-send-email-kapilh@broadcom.com>
-Message-ID: <CACRpkda8Fg+Z0h1+3dv=xAAKJnnXvPR=i5eyjLeLxFn467cvzA@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 5 Nov 2015 09:46:15 +0000
+Subject: [PATCH] arm: Use kernel mm when updating section permissions
+In-Reply-To: <1446685239-28522-1-git-send-email-labbott@fedoraproject.org>
+References: <1446685239-28522-1-git-send-email-labbott@fedoraproject.org>
+Message-ID: <20151105094615.GP8644@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 5, 2015 at 6:51 AM, Kapil Hali <kapilh@broadcom.com> wrote:
+On Wed, Nov 04, 2015 at 05:00:39PM -0800, Laura Abbott wrote:
+> Currently, read only permissions are not being applied even
+> when CONFIG_DEBUG_RODATA is set. This is because section_update
+> uses current->mm for adjusting the page tables. current->mm
+> need not be equivalent to the kernel version. Use pgd_offset_k
+> to get the proper page directory for updating.
 
-> Add SMP support for Broadcom's Northstar Plus SoC,
-> cpu enable method and pen_release procedures. This
-> changes also consolidates iProc family's - BCM NSP
-> and BCM Kona, SMP handling in a common file.
->
-> Northstar Plus SoC is based on ARM Cortex-A9
-> revision r3p0 which requires configuration for ARM
-> Errata 764369 for SMP. This change adds the needed
-> configuration option.
->
-> Signed-off-by: Kapil Hali <kapilh@broadcom.com>
-(...)
-> +/*
-> + * iProc specific entry point for secondary CPUs.  This provides
-> + * a "holding pen" into which all secondary cores are held until
-> + * we are ready for them to initialise.
-> + */
+What are you trying to achieve here?  You can't use these functions
+at run time (after the first thread has been spawned) to change
+permissions, because there will be multiple copies of the kernel
+section mappings, and those copies will not get updated.
 
-Do you *REALLY* need the complex pen hold/release semaphore
-stuff?
+In any case, this change will probably break kexec and ftrace, as
+the running thread will no longer see the updated page tables.
 
-Consult for example commit
-c00def71efd919e8ae835a25f4f4c80a4b2d36d3
-"ARM: ux500: simplify secondary CPU boot"
-
-I realized the pen hold/release stuff was totally surplus on the
-ux500 platform, it was probably just copied from the Vexpress
-or RealView reference design and kept around because ARM
-did things that way. And you are copying the same code from
-other platforms again. Do you *really* understand the pen hold/release
-code? (I don't.)
-
-In our case it turned out that all that was really needed was:
-
-- Map and enable SCU at .smp_prepare_cpus()
-
-- Write the start address for the secondary CPU(s) in their
-  magic registers/addresses i.e what you do in
-  nsp_write_lut() and then call
-  arch_send_wakeup_ipi_mask(cpumask_of(cpu)); in
-  .smp_boot_secondary()
-  It seems you may not even need the IPI, I can't see
-  that call in your patch so I guess your secondary
-  CPUs aren't in WFI at boot.
-
-No pen hold/release magic! Works like a charm for us.
-So see of you really need this horror story with copied
-assembly code from realview etc.
-
-Yours,
-Linus Walleij
+-- 
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
