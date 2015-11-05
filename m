@@ -1,30 +1,32 @@
-From: slash.tmp@free.fr (Mason)
-Date: Thu, 5 Nov 2015 12:02:33 +0100
-Subject: Grafting old platform drivers onto a new DT kernel
-Message-ID: <563B3749.50701@free.fr>
+From: kaloz@openwrt.org (Imre Kaloz)
+Date: Thu, 05 Nov 2015 12:03:03 +0100
+Subject: [PATCH 1/4] ARM: dts: kirkwood: add Linksys EA4500
+In-Reply-To: <3957044.Sz6eC5OsVr@wuerfel>
+References: <00000150d49a7cf7-e97bf540-89ce-49bf-a25e-2d082acab273-000000@email.amazonses.com>
+ <3957044.Sz6eC5OsVr@wuerfel>
+Message-ID: <op.x7mjnduz2s3iss@ecaz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+On Wed, 04 Nov 2015 23:41:01 +0100, Arnd Bergmann <arnd@arndb.de> wrote:
 
-My company provides a 3.4 kernel for an ARM-based SoC (there's also a 2.6.32
-stashed somewhere for customers refusing to upgrade) along with drivers of
-dubious quality written over the past decade.
+> On Wednesday 04 November 2015 22:25:05 Luka Perkov wrote:
+>> +/ {
+>> +	model = "Linksys EA4500";
+>> +	compatible = "linksys,ea4500", "marvell,kirkwood-88f6282",  
+>> "marvell,kirkwood";
+>
+> According to https://wikidevi.com/wiki/Linksys_EA4500 there are multiple  
+> versions
+> of this device, and at least EA4500v3 is completely incompatible with  
+> the version
+> in this patch. Should we add "linksys,ea4500v1" as a compatible string  
+> to identify
+> this better?
 
-I was tasked to release a new kernel, and took the opportunity to perform
-a massive clean-up by discarding everything, and adding only enough code
-on top of a recent kernel to boot to the shell.
+Not sure, as "v1" is never marked on the box/boards, and for this reason  
+as far as I remember, we've never marked "v1" on any upstream code (unlike  
+vX).
 
-I now have a small port with no drivers.
-(I do have working serial and ethernet.)
 
-Since I don't have time to rewrite the drivers at the moment, I'm wondering
-if it's possible to "graft" old drivers (they're using the platform API, no
-trace of DT support) onto my small base?
-
-That way I can make management happy by providing a working new kernel,
-and I can start working on converting drivers one-by-one.
-
-Is that a realistic plan? What traps am I likely to fall into?
-
-Regards.
+Imre
