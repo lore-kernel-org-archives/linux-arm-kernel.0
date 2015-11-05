@@ -1,51 +1,44 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu,  5 Nov 2015 10:22:59 +0100
-Subject: [PATCH] ARM: ux500: Assign proper sensore IRQs for Snowball
-Message-ID: <1446715379-4374-1-git-send-email-linus.walleij@linaro.org>
+Date: Thu, 5 Nov 2015 10:26:55 +0100
+Subject: [PATCH 18/19] ARM: dts: ste: replace legacy *,wakeup property
+ with wakeup-source
+In-Reply-To: <562F7219.9010705@arm.com>
+References: <1445422216-29375-1-git-send-email-sudeep.holla@arm.com>
+ <1445422216-29375-19-git-send-email-sudeep.holla@arm.com>
+ <CACRpkdYNFa-R8-u8JXijsCDyY+RHo4ANp+Voz3PEn6b9hcCrzQ@mail.gmail.com>
+ <562F7219.9010705@arm.com>
+Message-ID: <CACRpkdZYbZzWbZNCk7ZnNap=n59weCPA=m1jTJNPvXwR_NPsCQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Snowball gyro and magnetometer DRDY (data ready) lines are used
-as interrupt triggers by the IIO subsystem, triggering new data
-retrieveal on edges on this signal. Thus assign them as the primary
-interrupt in the device tree. The "other interrupt" coming out of
-the sensors is for alarms and similar complex events, the DRDY is
-for periodic measures, which is what we want.
+On Tue, Oct 27, 2015 at 1:46 PM, Sudeep Holla <sudeep.holla@arm.com> wrote:
+> On 27/10/15 12:34, Linus Walleij wrote:
+>> On Wed, Oct 21, 2015 at 12:10 PM, Sudeep Holla <sudeep.holla@arm.com>
+>> wrote:
+>>
+>>> Though the keyboard and other driver will continue to support the legacy
+>>> "gpio-key,wakeup", "linux,wakeup" boolean property to enable the wakeup
+>>> source, "wakeup-source" is the new standard binding.
+>>>
+>>> This patch replaces all the legacy wakeup properties with the unified
+>>> "wakeup-source" property in order to avoid any futher copy-paste
+>>> duplication.
+>>>
+>>> Cc: Linus Walleij <linus.walleij@linaro.org>
+>>> Signed-off-by: Sudeep Holla <sudeep.holla@arm.com>
+>>
+>>
+>> Acked-by: Linus Walleij <linus.walleij@linaro.org>
+>>
+>> Are you sending this to ARM SoC or do I need to handle the
+>> patch?
+>>
+>
+> Many platform maintainers preferred to pick up via their tree, so if you
+> want to pick up with other STE patches, I am fine as there's no
+> dependency on the driver changes.
 
-After this the generic_buffer tool from IIO tools gives a nice
-stream of readings after enabling the desired channels in sysfs.
+Patch applied to my ux500-devicetree branch, sorry for the delay.
 
-Cc: Denis Ciocca <denis.ciocca@st.com>
-Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
----
- arch/arm/boot/dts/ste-snowball.dts | 7 ++++---
- 1 file changed, 4 insertions(+), 3 deletions(-)
-
-diff --git a/arch/arm/boot/dts/ste-snowball.dts b/arch/arm/boot/dts/ste-snowball.dts
-index e80e42163883..08f82077b64d 100644
---- a/arch/arm/boot/dts/ste-snowball.dts
-+++ b/arch/arm/boot/dts/ste-snowball.dts
-@@ -281,7 +281,8 @@
- 				vddio-supply = <&db8500_vsmps2_reg>;
- 				pinctrl-names = "default";
- 				pinctrl-0 = <&magneto_snowball_mode>;
--				gpios = <&gpio5 5 0x4>; /* DRDY line */
-+				interrupt-parent = <&gpio5>;
-+				interrupts = <5 IRQ_TYPE_EDGE_RISING>; /* DRDY line */
- 			};
- 			l3g4200d at 68 {
- 				/* Gyroscope */
-@@ -292,9 +293,9 @@
- 				vddio-supply = <&db8500_vsmps2_reg>;
- 				pinctrl-names = "default";
- 				pinctrl-0 = <&gyro_snowball_mode>;
--				gpios = <&gpio5 6 0x4>; /* DRDY line */
- 				interrupt-parent = <&gpio5>;
--				interrupts = <9 IRQ_TYPE_EDGE_RISING>; /* INT1 */
-+				interrupts = <6 IRQ_TYPE_EDGE_RISING>, /* DRDY line */
-+					     <9 IRQ_TYPE_EDGE_RISING>; /* INT1 */
- 			};
- 			lsp001wm at 5c {
- 				/* Barometer/pressure sensor */
--- 
-2.4.3
+Yours,
+Linus Walleij
