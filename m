@@ -1,64 +1,69 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Thu, 5 Nov 2015 09:59:26 +0100
-Subject: [PATCH v3 7/7] spi: imx: defer spi initialization, if DMA engine
- is pending
-In-Reply-To: <1446388901-6073-8-git-send-email-anton.bondarenko.sama@gmail.com>
-References: <1446388901-6073-1-git-send-email-anton.bondarenko.sama@gmail.com>
- <1446388901-6073-8-git-send-email-anton.bondarenko.sama@gmail.com>
-Message-ID: <20151105085926.GK8526@pengutronix.de>
+From: p.fedin@samsung.com (Pavel Fedin)
+Date: Thu, 05 Nov 2015 12:00:43 +0300
+Subject: [PATCH v5 0/4] Exynos SROMc configuration and Ethernet support for
+ SMDK5410
+In-Reply-To: <563B189D.4080907@samsung.com>
+References: <cover.1446542020.git.p.fedin@samsung.com>
+ <5639B588.1080901@samsung.com> <000b01d1179f$ed5032b0$c7f09810$@samsung.com>
+ <563B0E4D.6020808@samsung.com> <001a01d117a6$3aed1140$b0c733c0$@samsung.com>
+ <563B189D.4080907@samsung.com>
+Message-ID: <001c01d117a8$74d70c10$5e852430$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Nov 01, 2015 at 03:41:41PM +0100, Anton Bondarenko wrote:
-> From: Anton Bondarenko <anton_bondarenko@mentor.com>
-> 
-> If SPI device supports DMA mode, but DMA controller is not yet
-> available due to e.g. a delay in the corresponding kernel module
-> initialization, retry to initialize SPI driver later on instead of
-> falling back into PIO only mode.
-> 
-> Signed-off-by: Vladimir Zapolskiy <vladimir_zapolskiy@mentor.com>
-> Signed-off-by: Anton Bondarenko <anton_bondarenko@mentor.com>
+ Hello!
 
-Ok, so 6/7 is only part of the deferral story. Maybe squash the two
-patches into one?
-
-Sascha
-
-> ---
->  drivers/spi/spi-imx.c | 12 +++++++++---
->  1 file changed, 9 insertions(+), 3 deletions(-)
+> >>>>> This patchset also depends on Exynos 5410 pinctrl support, introduced by
+> >>>>> patches 0003 and 0004 from this set:
+> >>>>> [PATCH v4 0/5] ARM: EXYNOS: ODROID-XU DT and LEDs
+> >>>>> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-March/330862.html
+> >>>>
+> >>>> Only the first patch made up to kernel. The rest (2-5) received feedback
+> >>>> and I am waiting for fixing it. Andreas apparently loose the interest...
+> >>>
+> >>>  I have rechecked the original thread on archives and found nothing new. Where can
+> >>> i read those feedbacks? Perhaps it makes sense for me to pick them up and include
+> >>> into my set.
+> >>
+> >> Go ahead. The only waiting feedback is at patch 2/5:
+> >>
+> >> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-March/330910.html
+> >> Javier's pointed use of linux,stdout-path and putting xxti in
+> >> exynos5410.dtsi (and customizing it per board if needed).
+> >>
+> >> Patches already got reviews and acks so only 2/5 is the stopper.
+> >
+> >  Ah, it's odroidXU device tree. Sorry, i don't have this particular board, and my patch
+> actually doesn't need it. I could do some
+> > blind modifications, but cannot test them, and this is out of my scope at all.
+> >  As mentioned in the commit msg, i need only 0003 and 0004 from there. Can they be picked up
+> independently? They don't need 0002 by
+> > themselves, only 0005 needs it.
 > 
-> diff --git a/drivers/spi/spi-imx.c b/drivers/spi/spi-imx.c
-> index 6035ddd..d2ea731 100644
-> --- a/drivers/spi/spi-imx.c
-> +++ b/drivers/spi/spi-imx.c
-> @@ -1354,9 +1354,15 @@ static int spi_imx_probe(struct platform_device *pdev)
->  	 * Only validated on i.mx6 now, can remove the constrain if validated on
->  	 * other chips.
->  	 */
-> -	if (is_imx51_ecspi(spi_imx) &&
-> -	    spi_imx_sdma_init(&pdev->dev, spi_imx, master))
-> -		dev_err(&pdev->dev, "dma setup error,use pio instead\n");
-> +	if (is_imx51_ecspi(spi_imx)) {
-> +		ret = spi_imx_sdma_init(&pdev->dev, spi_imx, master);
-> +		if (ret == -EPROBE_DEFER)
-> +			goto out_clk_put;
-> +
-> +		if (ret < 0)
-> +			dev_err(&pdev->dev, "dma setup error %d, use pio\n",
-> +				ret);
-> +	}
->  
->  	spi_imx->devtype_data->reset(spi_imx);
->  
-> -- 
-> 2.6.2
+> Indeed the order of patches is messed up and this makes the confusion. I
+> was waiting for resend of entire patchset but you are right - this is
+> not required. 3 and 4 can be applied independently.
 > 
-> 
+> If they apply, I will pick up them after merge window.
 
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+ They should. I have quite recent linux-next tree, i've just checked,
+0003 applies with a small fuzz and 0004 applies without problems at all.
+
+> If they don't, they will need rebasing by someone. Maybe you can take
+> care of them?
+
+ Of course. Please notify me if rebasing will be needed, i'll do it.
+
+> You have the SMDK5410 for testing, right?
+
+ Of course. And you can already get my
+
+Tested-by: Pavel Fedin <p.fedin@samsung.com>
+
+ on those two because my experimental tree already uses them, and
+everything works quite well.
+
+Kind regards,
+Pavel Fedin
+Expert Engineer
+Samsung Electronics Research center Russia
