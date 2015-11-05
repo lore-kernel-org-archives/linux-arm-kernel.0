@@ -1,76 +1,89 @@
-From: soren.brinkmann@xilinx.com (Soren Brinkmann)
-Date: Wed, 4 Nov 2015 23:21:11 -0800
-Subject: [PATCH v2 02/10] tty: xuartps: Use spinlock to serialize HW access
-In-Reply-To: <1446708079-1105-1-git-send-email-soren.brinkmann@xilinx.com>
-References: <1446708079-1105-1-git-send-email-soren.brinkmann@xilinx.com>
-Message-ID: <1446708079-1105-3-git-send-email-soren.brinkmann@xilinx.com>
+From: zhengxing@rock-chips.com (Xing Zheng)
+Date: Thu,  5 Nov 2015 15:33:55 +0800
+Subject: [PATCH v7 1/6] dt-bindings: add documentation of rk3036 clock
+ controller
+In-Reply-To: <1446708840-12038-1-git-send-email-zhengxing@rock-chips.com>
+References: <1446708840-12038-1-git-send-email-zhengxing@rock-chips.com>
+Message-ID: <1446708840-12038-2-git-send-email-zhengxing@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Instead of disabling the IRQ, use the spin lock to serialize accesses to
-the HW. This protects the driver from interference of non-IRQ callbacks
-with each other and makes the driver more consistent in its
-serialization method.
+Add the devicetree binding for the cru on the rk3036 which quite similar
+structured as previous clock controllers.
 
-Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
----
-v2:
- - remove unused variable
----
- drivers/tty/serial/xilinx_uartps.c | 18 ++++++------------
- 1 file changed, 6 insertions(+), 12 deletions(-)
 
-diff --git a/drivers/tty/serial/xilinx_uartps.c b/drivers/tty/serial/xilinx_uartps.c
-index 50d4082d2354..2c98c357d9a0 100644
---- a/drivers/tty/serial/xilinx_uartps.c
-+++ b/drivers/tty/serial/xilinx_uartps.c
-@@ -945,12 +945,10 @@ static void cdns_uart_set_mctrl(struct uart_port *port, unsigned int mctrl)
- #ifdef CONFIG_CONSOLE_POLL
- static int cdns_uart_poll_get_char(struct uart_port *port)
- {
--	u32 imr;
- 	int c;
-+	unsigned long flags;
- 
--	/* Disable all interrupts */
--	imr = readl(port->membase + CDNS_UART_IMR_OFFSET);
--	writel(imr, port->membase + CDNS_UART_IDR_OFFSET);
-+	spin_lock_irqsave(&port->lock, flags);
- 
- 	/* Check if FIFO is empty */
- 	if (readl(port->membase + CDNS_UART_SR_OFFSET) & CDNS_UART_SR_RXEMPTY)
-@@ -959,19 +957,16 @@ static int cdns_uart_poll_get_char(struct uart_port *port)
- 		c = (unsigned char) readl(
- 					port->membase + CDNS_UART_FIFO_OFFSET);
- 
--	/* Enable interrupts */
--	writel(imr, port->membase + CDNS_UART_IER_OFFSET);
-+	spin_unlock_irqrestore(&port->lock, flags);
- 
- 	return c;
- }
- 
- static void cdns_uart_poll_put_char(struct uart_port *port, unsigned char c)
- {
--	u32 imr;
-+	unsigned long flags;
- 
--	/* Disable all interrupts */
--	imr = readl(port->membase + CDNS_UART_IMR_OFFSET);
--	writel(imr, port->membase + CDNS_UART_IDR_OFFSET);
-+	spin_lock_irqsave(&port->lock, flags);
- 
- 	/* Wait until FIFO is empty */
- 	while (!(readl(port->membase + CDNS_UART_SR_OFFSET) &
-@@ -986,8 +981,7 @@ static void cdns_uart_poll_put_char(struct uart_port *port, unsigned char c)
- 				CDNS_UART_SR_TXEMPTY))
- 		cpu_relax();
- 
--	/* Enable interrupts */
--	writel(imr, port->membase + CDNS_UART_IER_OFFSET);
-+	spin_unlock_irqrestore(&port->lock, flags);
- 
- 	return;
- }
+Signed-off-by: Xing Zheng <zhengxing@rock-chips.com>
+Reviewed-by: Heiko Stuebner <heiko@sntech.de>
+Acked-by: Rob Herring <robh@kernel.org>
+---
+
+Changes in v7: None
+
+ .../bindings/clock/rockchip,rk3036-cru.txt         |   56 ++++++++++++++++++++
+ 1 file changed, 56 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/clock/rockchip,rk3036-cru.txt
+
+diff --git a/Documentation/devicetree/bindings/clock/rockchip,rk3036-cru.txt b/Documentation/devicetree/bindings/clock/rockchip,rk3036-cru.txt
+new file mode 100644
+index 0000000..ace0599
+--- /dev/null
++++ b/Documentation/devicetree/bindings/clock/rockchip,rk3036-cru.txt
+@@ -0,0 +1,56 @@
++* Rockchip RK3036 Clock and Reset Unit
++
++The RK3036 clock controller generates and supplies clock to various
++controllers within the SoC and also implements a reset controller for SoC
++peripherals.
++
++Required Properties:
++
++- compatible: should be "rockchip,rk3036-cru"
++- reg: physical base address of the controller and length of memory mapped
++  region.
++- #clock-cells: should be 1.
++- #reset-cells: should be 1.
++
++Optional Properties:
++
++- rockchip,grf: phandle to the syscon managing the "general register files"
++  If missing pll rates are not changeable, due to the missing pll lock status.
++
++Each clock is assigned an identifier and client nodes can use this identifier
++to specify the clock which they consume. All available clocks are defined as
++preprocessor macros in the dt-bindings/clock/rk3036-cru.h headers and can be
++used in device tree sources. Similar macros exist for the reset sources in
++these files.
++
++External clocks:
++
++There are several clocks that are generated outside the SoC. It is expected
++that they are defined using standard clock bindings with following
++clock-output-names:
++ - "xin24m" - crystal input - required,
++ - "ext_i2s" - external I2S clock - optional,
++ - "ext_gmac" - external GMAC clock - optional
++
++Example: Clock controller node:
++
++	cru: cru at 20000000 {
++		compatible = "rockchip,rk3036-cru";
++		reg = <0x20000000 0x1000>;
++		rockchip,grf = <&grf>;
++
++		#clock-cells = <1>;
++		#reset-cells = <1>;
++	};
++
++Example: UART controller node that consumes the clock generated by the clock
++  controller:
++
++	uart0: serial at 20060000 {
++		compatible = "snps,dw-apb-uart";
++		reg = <0x20060000 0x100>;
++		interrupts = <GIC_SPI 20 IRQ_TYPE_LEVEL_HIGH>;
++		reg-shift = <2>;
++		reg-io-width = <4>;
++		clocks = <&cru SCLK_UART0>;
++	};
 -- 
-2.6.2.3.ga463a5b
+1.7.9.5
