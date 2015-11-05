@@ -1,36 +1,124 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Thu, 05 Nov 2015 17:07:41 +0900
-Subject: [PATCH v5 0/4] Exynos SROMc configuration and Ethernet support for
- SMDK5410
-In-Reply-To: <000b01d1179f$ed5032b0$c7f09810$@samsung.com>
-References: <cover.1446542020.git.p.fedin@samsung.com>
- <5639B588.1080901@samsung.com> <000b01d1179f$ed5032b0$c7f09810$@samsung.com>
-Message-ID: <563B0E4D.6020808@samsung.com>
+From: rnayak@codeaurora.org (Rajendra Nayak)
+Date: Thu, 05 Nov 2015 13:39:25 +0530
+Subject: [PATCH v4 0/8] qcom: Add support for TSENS driver
+In-Reply-To: <20151102205418.GE4469@localhost.localdomain>
+References: <1444383670-32693-1-git-send-email-rnayak@codeaurora.org>
+ <20151102205418.GE4469@localhost.localdomain>
+Message-ID: <563B0EB5.8040407@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05.11.2015 16:59, Pavel Fedin wrote:
->  Hello!
-> 
->>> This patchset also depends on Exynos 5410 pinctrl support, introduced by
->>> patches 0003 and 0004 from this set:
->>> [PATCH v4 0/5] ARM: EXYNOS: ODROID-XU DT and LEDs
->>> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-March/330862.html
+
+
+On 11/03/2015 02:24 AM, Eduardo Valentin wrote:
+> On Fri, Oct 09, 2015 at 03:11:02PM +0530, Rajendra Nayak wrote:
+>> Patches 1/8 to 4/8 will need to go via the thermal tree/Eduardo.
+>> Patches 5/8 to 8/8 will need to go via qcom-msm tree/Andy.
 >>
->> Only the first patch made up to kernel. The rest (2-5) received feedback
->> and I am waiting for fixing it. Andreas apparently loose the interest...
+>> Eduardo, can you please take a look at the patches and let me
+>> know if you see any issues.
 > 
->  I have rechecked the original thread on archives and found nothing new. Where can
-> i read those feedbacks? Perhaps it makes sense for me to pick them up and include
-> into my set.
+> I have sent a couple of comments, most of them are not a big deal. But
+> please, have a look on what concerns the thermal bindings. I want to
+> reuse what we have as much as possible.
 
-Go ahead. The only waiting feedback is at patch 2/5:
+Sure, I'll take a look at the existing bindings.
 
-http://lists.infradead.org/pipermail/linux-arm-kernel/2015-March/330910.html
-Javier's pointed use of linux,stdout-path and putting xxti in
-exynos5410.dtsi (and customizing it per board if needed).
+> 
+> The other point is regarding locking. Given that you have several
+> sensors, per device, is there any need to have extra locking on top of
+> what the thermal framework provides? Say, in the case a single device
+> gets in use in different thermal zones, would the accesses to the
+> thermal zone attempt to read registers shared by the sensors within
+> the device?
 
-Patches already got reviews and acks so only 2/5 is the stopper.
+I don't see a case where this should happen, but I will check again
+to see if there a possibility of ending up with a situation like
+this and if it needs additional locking.
+Thanks Eduardo for the review.
 
-Best regards,
-Krzysztof
+regards,
+Rajendra
+
+> 
+>>
+>> Current set of patches apply on 4.3-rc4. Need to pull in clk-next
+>> (for a dependent patch) to be able to test on ifc6410 board.
+>>
+>> Changes since v3:
+>> * Dropped 'clk: qcom: create virtual child device for TSENS' which
+>> is picked up by Stephen
+>> * Updated GCC bindings with optional TSENS properties
+>>
+>> Changes since v2:
+>> * Minor review fixes from Stephen/Punit and rebase on 4.3-rc4
+>>
+>> Changes since v1:
+>> * Created virtual tsens device from gcc driver for 8960,
+>> with DT having a single node for gcc and tsens
+>> * Minor fixes with rebasing on 4.3-rc1
+>>
+>> Changes since RFC:
+>> * Added support for 8916 and 8084
+>> * Based off the latest nvmem framework patches [1]
+>> * Minor review fixes for comments mostly from Lina
+>>
+>> This is an attempt to have a single TSENS driver for
+>> the different versions of the TSENS IP that exist, on
+>> different qcom msm/apq SoCs'
+>> Support is added for msm8916, msm8960 and msm8974 families.
+>>
+>> A lot of the work is based of original code from Stephen Boyd
+>> and Siddartha Mohanadoss. I have also picked some of what
+>> Narendran Rajan did in his attempt to upstream the support
+>> for 8960 family. I could not keep the original authorship on
+>> any of the patches because I ended up moving the code around
+>> quite a bit in an effort to have a single driver for the
+>> various devices. I would be glad to change the authorship
+>> for any of the patches if needed.
+>>
+>> Rajendra Nayak (8):
+>>   thermal: qcom: tsens: Add a skeletal TSENS drivers
+>>   thermal: qcom: tsens-8916: Add support for 8916 family of SoCs
+>>   thermal: qcom: tsens-8974: Add support for 8974 family of SoCs
+>>   thermal: qcom: tsens-8960: Add support for 8960 family of SoCs
+>>   arm: dts: msm8974: Add thermal zones, tsens and qfprom nodes
+>>   arm: dts: apq8064: Add thermal zones, tsens and qfprom nodes
+>>   arm: dts: apq8084: Add thermal zones, tsens and qfprom nodes
+>>   arm64: dts: msm8916: Add thermal zones, tsens and qfprom nodes
+>>
+>>  .../devicetree/bindings/clock/qcom,gcc.txt         |  20 ++
+>>  .../devicetree/bindings/thermal/qcom-tsens.txt     |  33 +++
+>>  arch/arm/boot/dts/qcom-apq8064.dtsi                | 101 +++++++
+>>  arch/arm/boot/dts/qcom-apq8084.dtsi                | 105 ++++++++
+>>  arch/arm/boot/dts/qcom-msm8974.dtsi                | 105 ++++++++
+>>  arch/arm64/boot/dts/qcom/msm8916.dtsi              |  66 +++++
+>>  drivers/thermal/Kconfig                            |   5 +
+>>  drivers/thermal/Makefile                           |   1 +
+>>  drivers/thermal/qcom/Kconfig                       |  10 +
+>>  drivers/thermal/qcom/Makefile                      |   2 +
+>>  drivers/thermal/qcom/tsens-8916.c                  | 107 ++++++++
+>>  drivers/thermal/qcom/tsens-8960.c                  | 291 +++++++++++++++++++++
+>>  drivers/thermal/qcom/tsens-8974.c                  | 239 +++++++++++++++++
+>>  drivers/thermal/qcom/tsens-common.c                | 130 +++++++++
+>>  drivers/thermal/qcom/tsens.c                       | 206 +++++++++++++++
+>>  drivers/thermal/qcom/tsens.h                       |  69 +++++
+>>  16 files changed, 1490 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/thermal/qcom-tsens.txt
+>>  create mode 100644 drivers/thermal/qcom/Kconfig
+>>  create mode 100644 drivers/thermal/qcom/Makefile
+>>  create mode 100644 drivers/thermal/qcom/tsens-8916.c
+>>  create mode 100644 drivers/thermal/qcom/tsens-8960.c
+>>  create mode 100644 drivers/thermal/qcom/tsens-8974.c
+>>  create mode 100644 drivers/thermal/qcom/tsens-common.c
+>>  create mode 100644 drivers/thermal/qcom/tsens.c
+>>  create mode 100644 drivers/thermal/qcom/tsens.h
+>>
+>> -- 
+>> QUALCOMM INDIA, on behalf of Qualcomm Innovation Center, Inc. is a member
+>> of Code Aurora Forum, hosted by The Linux Foundation
+>>
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+hosted by The Linux Foundation
