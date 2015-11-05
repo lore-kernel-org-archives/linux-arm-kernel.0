@@ -1,73 +1,39 @@
-From: zlim.lnx@gmail.com (Zi Shen Lim)
-Date: Wed,  4 Nov 2015 20:43:59 -0800
-Subject: [PATCH] arm64: bpf: fix mod-by-zero case
-Message-ID: <1446698639-12362-1-git-send-email-zlim.lnx@gmail.com>
+From: peter@hurleysoftware.com (Peter Hurley)
+Date: Wed, 4 Nov 2015 23:46:25 -0500
+Subject: [PATCH 10/11] tty: amba-pl011: add support for 32-bit register
+ access
+In-Reply-To: <20151103161939.GB8644@n2100.arm.linux.org.uk>
+References: <20151103134349.GV8644@n2100.arm.linux.org.uk>
+ <E1Ztcw4-0007Ct-PP@rmk-PC.arm.linux.org.uk> <5638CB41.1000807@codeaurora.org>
+ <20151103161939.GB8644@n2100.arm.linux.org.uk>
+Message-ID: <563ADF21.8000405@hurleysoftware.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Turns out in the case of modulo by zero in a BPF program:
-	A = A % X;  (X == 0)
-the expected behavior is to terminate with return value 0.
+On 11/03/2015 11:19 AM, Russell King - ARM Linux wrote:
+> On Tue, Nov 03, 2015 at 08:57:05AM -0600, Timur Tabi wrote:
+>> Russell King wrote:
+>>> -	return readw(uap->port.membase + pl011_reg_to_offset(uap, reg));
+>>> +	void __iomem *addr = uap->port.membase + pl011_reg_to_offset(uap, reg);
+>>> +
+>>> +	return uap->access_32b ? readl(addr) : readw(addr);
+>>
+>> Ok, ignore my previous email.  I just noticed this.
+>>
+>> This version is fine, except that it now performs a runtime check for every
+>> I/O access.  Isn't that too much overhead?  access_32b will always be either
+>> True or False for the life of the entire SOC.
+> 
+> It's a balance between a few more branches and killing six registers
+> (r0 - r3, ip, lr) on every register access due to a function call.
+> If GCC was a reasonable compiler, it could be done without incuring
+> any branches, merely by using conditional instructions, but GCC on
+> ARM really sucks - it wants to reload the base address, offset and
+> access_32b flag on every device access despite the struct being
+> marked const.
 
-The bug in JIT is exposed by a new test case [1].
+The compiler reloads are probably due to the barriers in readw()/writew();
+I think the relaxed i/o accessor variants avoid the reloads.
 
-[1] https://lkml.org/lkml/2015/11/4/499
-
-Signed-off-by: Zi Shen Lim <zlim.lnx@gmail.com>
-Reported-by: Yang Shi <yang.shi@linaro.org>
-Reported-by: Xi Wang <xi.wang@gmail.com>
-CC: Alexei Starovoitov <ast@plumgrid.com>
-CC: Catalin Marinas <catalin.marinas@arm.com>
-Fixes: e54bcde3d69d ("arm64: eBPF JIT compiler")
-Cc: <stable@vger.kernel.org> # 3.18+
----
-This patch applies on top of "arm64: bpf: fix fiv-by-zero case" [2].
-
-[2] https://lkml.org/lkml/2015/11/4/25
-
- arch/arm64/net/bpf_jit_comp.c | 21 +++++++++++++--------
- 1 file changed, 13 insertions(+), 8 deletions(-)
-
-diff --git a/arch/arm64/net/bpf_jit_comp.c b/arch/arm64/net/bpf_jit_comp.c
-index 9ae6f23..6217f80 100644
---- a/arch/arm64/net/bpf_jit_comp.c
-+++ b/arch/arm64/net/bpf_jit_comp.c
-@@ -269,6 +269,8 @@ static int build_insn(const struct bpf_insn *insn, struct jit_ctx *ctx)
- 		break;
- 	case BPF_ALU | BPF_DIV | BPF_X:
- 	case BPF_ALU64 | BPF_DIV | BPF_X:
-+	case BPF_ALU | BPF_MOD | BPF_X:
-+	case BPF_ALU64 | BPF_MOD | BPF_X:
- 	{
- 		const u8 r0 = bpf2a64[BPF_REG_0];
- 
-@@ -281,16 +283,19 @@ static int build_insn(const struct bpf_insn *insn, struct jit_ctx *ctx)
- 		check_imm26(jmp_offset);
- 		emit(A64_B(jmp_offset), ctx);
- 		/* else */
--		emit(A64_UDIV(is64, dst, dst, src), ctx);
-+		switch (BPF_OP(code)) {
-+		case BPF_DIV:
-+			emit(A64_UDIV(is64, dst, dst, src), ctx);
-+			break;
-+		case BPF_MOD:
-+			ctx->tmp_used = 1;
-+			emit(A64_UDIV(is64, tmp, dst, src), ctx);
-+			emit(A64_MUL(is64, tmp, tmp, src), ctx);
-+			emit(A64_SUB(is64, dst, dst, tmp), ctx);
-+			break;
-+		}
- 		break;
- 	}
--	case BPF_ALU | BPF_MOD | BPF_X:
--	case BPF_ALU64 | BPF_MOD | BPF_X:
--		ctx->tmp_used = 1;
--		emit(A64_UDIV(is64, tmp, dst, src), ctx);
--		emit(A64_MUL(is64, tmp, tmp, src), ctx);
--		emit(A64_SUB(is64, dst, dst, tmp), ctx);
--		break;
- 	case BPF_ALU | BPF_LSH | BPF_X:
- 	case BPF_ALU64 | BPF_LSH | BPF_X:
- 		emit(A64_LSLV(is64, dst, dst, src), ctx);
--- 
-1.9.1
+Regards,
+Peter Hurley
