@@ -1,82 +1,154 @@
 From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Thu, 5 Nov 2015 15:34:56 +0000
-Subject: [PATCH v11 5/5] xen/arm: account for stolen ticks
+Date: Thu, 5 Nov 2015 15:34:55 +0000
+Subject: [PATCH v11 4/5] arm64: introduce CONFIG_PARAVIRT,
+ PARAVIRT_TIME_ACCOUNTING and pv_time_ops
 In-Reply-To: <alpine.DEB.2.02.1511051502270.13541@kaball.uk.xensource.com>
 References: <alpine.DEB.2.02.1511051502270.13541@kaball.uk.xensource.com>
-Message-ID: <1446737696-9749-5-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <1446737696-9749-4-git-send-email-stefano.stabellini@eu.citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Register the runstate_memory_area with the hypervisor.
-Use pv_time_ops.steal_clock to account for stolen ticks.
+Introduce CONFIG_PARAVIRT and PARAVIRT_TIME_ACCOUNTING on ARM64.
+Necessary duplication of paravirt.h and paravirt.c with ARM.
+
+The only paravirt interface supported is pv_time_ops.steal_clock, so no
+runtime pvops patching needed.
+
+This allows us to make use of steal_account_process_tick for stolen
+ticks accounting.
 
 Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+CC: will.deacon at arm.com
+CC: nico at linaro.org
+CC: marc.zyngier at arm.com
+CC: cov at codeaurora.org
+CC: arnd at arndb.de
+CC: olof at lixom.net
+CC: Catalin.Marinas at arm.com
 
 ---
 
-Changes in v4:
-- don't use paravirt_steal_rq_enabled: we do not support retrieving
-stolen ticks for vcpus other than one we are running on.
+Changes in v10:
+- replace "---help---" with "help"
 
-Changes in v3:
-- use BUG_ON and smp_processor_id.
+Changes in v7:
+- ifdef CONFIG_PARAVIRT the content of paravirt.h.
 ---
- arch/arm/xen/enlighten.c |   21 +++++++++++++++++++++
- 1 file changed, 21 insertions(+)
+ arch/arm64/Kconfig                |   20 ++++++++++++++++++++
+ arch/arm64/include/asm/paravirt.h |   20 ++++++++++++++++++++
+ arch/arm64/kernel/Makefile        |    1 +
+ arch/arm64/kernel/paravirt.c      |   25 +++++++++++++++++++++++++
+ 4 files changed, 66 insertions(+)
+ create mode 100644 arch/arm64/include/asm/paravirt.h
+ create mode 100644 arch/arm64/kernel/paravirt.c
 
-diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
-index fc7ea52..15621b1 100644
---- a/arch/arm/xen/enlighten.c
-+++ b/arch/arm/xen/enlighten.c
-@@ -14,7 +14,10 @@
- #include <xen/xen-ops.h>
- #include <asm/xen/hypervisor.h>
- #include <asm/xen/hypercall.h>
-+#include <asm/arch_timer.h>
- #include <asm/system_misc.h>
-+#include <asm/paravirt.h>
-+#include <linux/jump_label.h>
- #include <linux/interrupt.h>
- #include <linux/irqreturn.h>
- #include <linux/module.h>
-@@ -79,6 +82,19 @@ int xen_unmap_domain_gfn_range(struct vm_area_struct *vma,
- }
- EXPORT_SYMBOL_GPL(xen_unmap_domain_gfn_range);
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 7b10647..659e286 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -533,6 +533,25 @@ config SECCOMP
+ 	  and the task is only allowed to execute a few safe syscalls
+ 	  defined by each seccomp mode.
  
-+static unsigned long long xen_stolen_accounting(int cpu)
++config PARAVIRT
++	bool "Enable paravirtualization code"
++	help
++	  This changes the kernel so it can modify itself when it is run
++	  under a hypervisor, potentially improving performance significantly
++	  over full virtualization.
++
++config PARAVIRT_TIME_ACCOUNTING
++	bool "Paravirtual steal time accounting"
++	select PARAVIRT
++	default n
++	help
++	  Select this option to enable fine granularity task steal time
++	  accounting. Time spent executing other tasks in parallel with
++	  the current vCPU is discounted from the vCPU power. To account for
++	  that, there can be a small performance impact.
++
++	  If in doubt, say N here.
++
+ config XEN_DOM0
+ 	def_bool y
+ 	depends on XEN
+@@ -541,6 +560,7 @@ config XEN
+ 	bool "Xen guest support on ARM64"
+ 	depends on ARM64 && OF
+ 	select SWIOTLB_XEN
++	select PARAVIRT
+ 	help
+ 	  Say Y if you want to run Linux in a Virtual Machine on Xen on ARM64.
+ 
+diff --git a/arch/arm64/include/asm/paravirt.h b/arch/arm64/include/asm/paravirt.h
+new file mode 100644
+index 0000000..fd5f428
+--- /dev/null
++++ b/arch/arm64/include/asm/paravirt.h
+@@ -0,0 +1,20 @@
++#ifndef _ASM_ARM64_PARAVIRT_H
++#define _ASM_ARM64_PARAVIRT_H
++
++#ifdef CONFIG_PARAVIRT
++struct static_key;
++extern struct static_key paravirt_steal_enabled;
++extern struct static_key paravirt_steal_rq_enabled;
++
++struct pv_time_ops {
++	unsigned long long (*steal_clock)(int cpu);
++};
++extern struct pv_time_ops pv_time_ops;
++
++static inline u64 paravirt_steal_clock(int cpu)
 +{
-+	struct vcpu_runstate_info state;
-+
-+	BUG_ON(cpu != smp_processor_id());
-+
-+	xen_get_runstate_snapshot(&state);
-+
-+	WARN_ON(state.state != RUNSTATE_running);
-+
-+	return state.time[RUNSTATE_runnable] + state.time[RUNSTATE_offline];
++	return pv_time_ops.steal_clock(cpu);
 +}
++#endif
 +
- static void xen_percpu_init(void)
- {
- 	struct vcpu_register_vcpu_info info;
-@@ -104,6 +120,8 @@ static void xen_percpu_init(void)
- 	BUG_ON(err);
- 	per_cpu(xen_vcpu, cpu) = vcpup;
++#endif
+diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
+index 474691f..ca9fbe1 100644
+--- a/arch/arm64/kernel/Makefile
++++ b/arch/arm64/kernel/Makefile
+@@ -41,6 +41,7 @@ arm64-obj-$(CONFIG_EFI)			+= efi.o efi-entry.stub.o
+ arm64-obj-$(CONFIG_PCI)			+= pci.o
+ arm64-obj-$(CONFIG_ARMV8_DEPRECATED)	+= armv8_deprecated.o
+ arm64-obj-$(CONFIG_ACPI)		+= acpi.o
++arm64-obj-$(CONFIG_PARAVIRT)		+= paravirt.o
  
-+	xen_setup_runstate_info(cpu);
+ obj-y					+= $(arm64-obj-y) vdso/
+ obj-m					+= $(arm64-obj-m)
+diff --git a/arch/arm64/kernel/paravirt.c b/arch/arm64/kernel/paravirt.c
+new file mode 100644
+index 0000000..53f371e
+--- /dev/null
++++ b/arch/arm64/kernel/paravirt.c
+@@ -0,0 +1,25 @@
++/*
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * Copyright (C) 2013 Citrix Systems
++ *
++ * Author: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
++ */
 +
- after_register_vcpu_info:
- 	enable_percpu_irq(xen_events_irq, 0);
- 	put_cpu();
-@@ -271,6 +289,9 @@ static int __init xen_guest_init(void)
- 
- 	register_cpu_notifier(&xen_cpu_notifier);
- 
-+	pv_time_ops.steal_clock = xen_stolen_accounting;
-+	static_key_slow_inc(&paravirt_steal_enabled);
++#include <linux/export.h>
++#include <linux/jump_label.h>
++#include <linux/types.h>
++#include <asm/paravirt.h>
 +
- 	return 0;
- }
- early_initcall(xen_guest_init);
++struct static_key paravirt_steal_enabled;
++struct static_key paravirt_steal_rq_enabled;
++
++struct pv_time_ops pv_time_ops;
++EXPORT_SYMBOL_GPL(pv_time_ops);
 -- 
 1.7.10.4
