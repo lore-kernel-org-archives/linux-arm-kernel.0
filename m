@@ -1,54 +1,54 @@
-From: sbranden@broadcom.com (Scott Branden)
-Date: Thu, 5 Nov 2015 12:57:15 -0800
-Subject: [PATCH RESEND 1/4] dt-bindings: add SMP enable-method for
- Broadcom NSP
-In-Reply-To: <20151105204825.GA19314@rob-hp-laptop>
-References: <1446702681-45339-1-git-send-email-kapilh@broadcom.com>
- <1446702681-45339-2-git-send-email-kapilh@broadcom.com>
- <20151105204825.GA19314@rob-hp-laptop>
-Message-ID: <563BC2AB.6030204@broadcom.com>
+From: akshay.bhat@timesys.com (Akshay Bhat)
+Date: Thu,  5 Nov 2015 16:19:20 -0500
+Subject: [PATCH v4 0/2] imx6: Implement external watchdog reset
+Message-ID: <1446758362-11702-1-git-send-email-akshay.bhat@timesys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+[Rebase to next-20151105 and re-sending work done by Tim Harvey]
 
-On 15-11-05 12:48 PM, Rob Herring wrote:
-> On Thu, Nov 05, 2015 at 12:51:18AM -0500, Kapil Hali wrote:
->> Add a compatible string "brcm,bcm-nsp-smp" for Broadcom's
->> Northstar Plus CPU to the 32-bit ARM CPU device tree binding
->> documentation file and create a new binding documentation for
->> Northstar Plus CPU pen-release mechanism.
->>
->> Signed-off-by: Kapil Hali <kapilh@broadcom.com>
->> ---
->>   .../bindings/arm/bcm/brcm,nsp-cpu-method.txt       | 36 ++++++++++++++++++++++
->>   Documentation/devicetree/bindings/arm/cpus.txt     |  1 +
->>   2 files changed, 37 insertions(+)
->>   create mode 100644 Documentation/devicetree/bindings/arm/bcm/brcm,nsp-cpu-method.txt
->>
->> diff --git a/Documentation/devicetree/bindings/arm/bcm/brcm,nsp-cpu-method.txt b/Documentation/devicetree/bindings/arm/bcm/brcm,nsp-cpu-method.txt
->> new file mode 100644
->> index 0000000..8506da7
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/arm/bcm/brcm,nsp-cpu-method.txt
->> @@ -0,0 +1,36 @@
->> +Broadcom Northstar Plus SoC CPU Enable Method
->> +---------------------------------------------
->> +This binding defines the enable method used for starting secondary
->> +CPUs in the following Broadcom SoCs:
->> +  BCM58522, BCM58525, BCM58535, BCM58622, BCM58623, BCM58625, BCM88312
->> +
->> +The enable method is specified by defining the following required
->> +properties in the "cpus" device tree node:
->> +  - enable-method = "brcm,bcm-nsp-smp";
->
-> This is supposed to be per core.
->
->> +  - secondary-boot-reg = <...>;
->
-> What happens with more than 2 cores?
->
-I'm pretty sure nothing - all of these SoCs have 1 or 2 cores.
+The IMX6 watchdog supports assertion of a signal (WDOG_B) which
+can be pinmux'd to an external pin. This is typically used for boards that
+have PMIC's in control of the IMX6 power rails. In fact, failure to use
+such an external reset on boards with external PMIC's can result in various
+hangs due to the IMX6 not being fully reset [1] as well as the board failing
+to reset because its PMIC has not been reset to provide adequate voltate for
+the CPU when comming out of reset at 800Mhz when it was at 400Mhz prior to
+reset.
+ 
+This adds a new device-tree property 'ext-reset-output' to fsl-imx-wdt in
+order to indicate the board has such a reset and to cause the watchdog to be
+configured to assert WDOG_B instead of an internal reset both on a
+watchdog timeout and in system_restart.
+ 
+The second patch adds the watchdog configuration and pinmux for Gateworks
+Ventana boards.
+ 
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-March/333689.html
 
-Regards,
-Scott
+Changes:
+v3->v4:
+- Rebase and test against linux-next tag next-20151105
+
+History:
+v1: http://lists.infradead.org/pipermail/linux-arm-kernel/2015-May/347168.html
+v2: http://lists.infradead.org/pipermail/linux-arm-kernel/2015-June/348761.html
+v3: http://lists.infradead.org/pipermail/linux-arm-kernel/2015-July/360188.html
+
+Tim Harvey (2):
+  watchdog: imx2_wdt: add external reset support via 'ext-reset-output'
+    dt prop
+  ARM: dts: ventana: Add ext-reset support
+
+ .../devicetree/bindings/watchdog/fsl-imx-wdt.txt     |  2 ++
+ arch/arm/boot/dts/imx6qdl-gw51xx.dtsi                | 12 ++++++++++++
+ arch/arm/boot/dts/imx6qdl-gw52xx.dtsi                | 12 ++++++++++++
+ arch/arm/boot/dts/imx6qdl-gw53xx.dtsi                | 13 +++++++++++++
+ arch/arm/boot/dts/imx6qdl-gw54xx.dtsi                | 17 +++++++++++++++++
+ arch/arm/boot/dts/imx6qdl-gw551x.dtsi                | 12 ++++++++++++
+ arch/arm/boot/dts/imx6qdl-gw552x.dtsi                | 12 ++++++++++++
+ drivers/watchdog/imx2_wdt.c                          | 20 ++++++++++++++++++--
+ 8 files changed, 98 insertions(+), 2 deletions(-)
+
+-- 
+2.6.2
