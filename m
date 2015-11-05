@@ -1,53 +1,48 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 5 Nov 2015 08:17:56 -0800
-Subject: [PATCH 5/5] arm: boot: store ATAGs structure into DT
- "/chosen/linux,atags" entry
-In-Reply-To: <20151105114041.GC27908@pali>
-References: <1436214373-12969-1-git-send-email-pali.rohar@gmail.com>
- <20150713131902.GH26485@atomide.com>
- <20151012201640.GQ23801@atomide.com> <201510122225.12786@pali>
- <20151012204509.GT23801@atomide.com> <20151013143746.GJ23104@pali>
- <20151105114041.GC27908@pali>
-Message-ID: <20151105161756.GG3078@atomide.com>
+From: anton.bondarenko.sama@gmail.com (Anton Bondarenko)
+Date: Thu, 5 Nov 2015 17:18:31 +0100
+Subject: [PATCH v3 7/7] spi: imx: defer spi initialization, if DMA engine
+ is pending
+In-Reply-To: <20151105085926.GK8526@pengutronix.de>
+References: <1446388901-6073-1-git-send-email-anton.bondarenko.sama@gmail.com>
+ <1446388901-6073-8-git-send-email-anton.bondarenko.sama@gmail.com>
+ <20151105085926.GK8526@pengutronix.de>
+Message-ID: <563B8157.9030104@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Pali Roh?r <pali.rohar@gmail.com> [151105 03:41]:
-> On Tuesday 13 October 2015 16:37:46 Pali Roh?r wrote:
-> > On Monday 12 October 2015 13:45:09 Tony Lindgren wrote:
-> > > * Pali Roh?r <pali.rohar@gmail.com> [151012 13:29]:
-> > > > On Monday 12 October 2015 22:16:40 Tony Lindgren wrote:
-> > > > > 
-> > > > > Pali, any news on posting an updated series with the comments
-> > > > > addressed in this thread? It seems that we all pretty much agree
-> > > > > what needs to be done.
-> > > > 
-> > > > Tony, I'm not really sure what to do. Just wrap 4 and 5 patches into 
-> > > > CONFIG_KEXEC? Or something more?
-> > > 
-> > > Well for most part your patches are fine, I think there were some
-> > > minor comments on the series.
-> > > 
-> > > For the CONFIG_KEXEC dependency, we should just keep the existing
-> > > behavior and keep /proc/atags behind CONFIG_KEXEC. That's all
-> > > I believe :)
-> > > 
-> > > Regards,
-> > > 
-> > > Tony
-> > > 
-> > > 
-> > 
-> > Ok. I will add CONFIG_KEXEC into atag patches.
-> > 
-> > And there is missing documentation for these two new DT properties
-> > (marked as TODO in commit messages). Where to put them?
-> > 
-> 
-> Tony (or somebody else) ^^^
+On 05.11.2015 09:59, Sascha Hauer wrote:
+> On Sun, Nov 01, 2015 at 03:41:41PM +0100, Anton Bondarenko wrote:
+>> From: Anton Bondarenko <anton_bondarenko@mentor.com>
+>>
+>> If SPI device supports DMA mode, but DMA controller is not yet
+>> available due to e.g. a delay in the corresponding kernel module
+>> initialization, retry to initialize SPI driver later on instead of
+>> falling back into PIO only mode.
+>>
+>> Signed-off-by: Vladimir Zapolskiy <vladimir_zapolskiy@mentor.com>
+>> Signed-off-by: Anton Bondarenko <anton_bondarenko@mentor.com>
+>
+> Ok, so 6/7 is only part of the deferral story. Maybe squash the two
+> patches into one?
+>
+> Sascha
 
-How about Documentation/devicetree/bindings/arm/atags.txt?
+I would like to keep these two changes separately since I have a small 
+concern about this exact change.
 
-Regards,
+Let's assume such scenario:
+- ECSPI configured to use DMA in device tree and DMA controller 
+description specified. But there is no driver for this controller in kernel.
+In this case dmaengine will always return -EDEFER and driver postpone 
+spi-imx initialization. So finally there will be no SPI support even in 
+PIO mode.
+Or for example spi-imx will be compiled into kernel, but DMA controller 
+driver will be on SPI-NOR based rootfs.
 
-Tony
+So the question is "Should we allow user to use incorrect combination of 
+kernel configuration and DTS and work at least with some limitation?" Or 
+should we try to guarantee device tree file requirement to use DMA.
+
+Any thoughts?
+
+Regards, Anton
