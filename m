@@ -1,31 +1,39 @@
-From: ssimran@broadcom.com (Simran Rai)
-Date: Thu, 5 Nov 2015 12:01:52 -0800
-Subject: [PATCH v2 1/2] dt-bindings: sound: Add DT bindings for Broadcom
- Cygnus audio
-In-Reply-To: <20151104140746.GE1717@sirena.org.uk>
-References: <1446502284-23907-2-git-send-email-ssimran@broadcom.com>
- <20151104140746.GE1717@sirena.org.uk>
-Message-ID: <563BB5B0.5040501@broadcom.com>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 5 Nov 2015 14:22:13 -0600
+Subject: [PATCH v2 01/10] of: Add vendor prefix for Advantech Corporation
+In-Reply-To: <1446747224-32514-2-git-send-email-akshay.bhat@timesys.com>
+References: <1446747224-32514-1-git-send-email-akshay.bhat@timesys.com>
+ <1446747224-32514-2-git-send-email-akshay.bhat@timesys.com>
+Message-ID: <20151105202213.GA7468@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+On Thu, Nov 05, 2015 at 01:13:35PM -0500, Akshay Bhat wrote:
+> This patch adds vendor prefix for Advantech Corporation.
+> 
+> Website: http://www.advantech.com/
+> Signed-off-by: Akshay Bhat <akshay.bhat@timesys.com>
+> ---
+>  Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
+>  1 file changed, 1 insertion(+)
+> 
+> diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+> index 55df1d4..2b3c5ac 100644
+> --- a/Documentation/devicetree/bindings/vendor-prefixes.txt
+> +++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+> @@ -10,6 +10,7 @@ ad	Avionic Design GmbH
+>  adapteva	Adapteva, Inc.
+>  adh	AD Holdings Plc.
+>  adi	Analog Devices, Inc.
+> +adv	Advantech Corporation
 
-On 11/4/2015 6:07 AM, Mark Brown wrote:
-> On Mon, Nov 02, 2015 at 02:11:23PM -0800, Simran Rai wrote:
->
->> +- channel-group: Surround sound grouping that controls which channel
->> +  outputs belong to a group, specifically useful in Multi-channel
->> +  Interfaces grouping of serial port. In multi-channel stereo, use
->> +  "2_0", in 3.1 multi-channel grouping, use "3_1" and in 5.1
->> +  multi-channel grouping, use "5_1".
-> I don't really understand what this means or why this is not runtime
-> configured.
-By runtime configured, do you mean passing the channel grouping through 
-machine file? Is there any specific callback that I can use?
+adv is a bit short. I think it would be better to go with "advantech".
 
-I will implement your suggestions from other patches too and send out 
-next revision by early next week.
+Rob
 
-Thanks,
-Simran
+>  aeroflexgaisler	Aeroflex Gaisler AB
+>  al	Annapurna Labs
+>  allwinner	Allwinner Technology Co., Ltd.
+> -- 
+> 2.6.2
+> 
