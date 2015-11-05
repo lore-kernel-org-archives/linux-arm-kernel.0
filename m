@@ -1,40 +1,41 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 05 Nov 2015 15:03:52 +0100
-Subject: [PATCH v6 14/17] aarch64: ilp32: use generic stat64 structure
-In-Reply-To: <1446507046-24604-15-git-send-email-ynorov@caviumnetworks.com>
-References: <1446507046-24604-1-git-send-email-ynorov@caviumnetworks.com>
- <1446507046-24604-15-git-send-email-ynorov@caviumnetworks.com>
-Message-ID: <9280044.CblpxvJy8Z@wuerfel>
+From: alex.aring@gmail.com (Alexander Aring)
+Date: Thu, 5 Nov 2015 15:12:36 +0100
+Subject: [RFCv2 2/2] rpi: add support to enable usb power domain
+In-Reply-To: <20151105133510.GA12530@rob-hp-laptop>
+References: <1446590711-18928-1-git-send-email-alex.aring@gmail.com>
+ <1446590711-18928-3-git-send-email-alex.aring@gmail.com>
+ <20151105133510.GA12530@rob-hp-laptop>
+Message-ID: <20151105141231.GA599@omega>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 03 November 2015 02:30:43 Yury Norov wrote:
-> Generic 32-bit and AARCH32 stat64 structures has same names.
-> ILP32 needs generic stat64. So we can either make ILP32 mutual
-> exclusive with AARCH32, or introduce __stat64, and where needed,
-> cast stat64 to it with #define.
+Hi,
+
+On Thu, Nov 05, 2015 at 07:35:10AM -0600, Rob Herring wrote:
+> On Tue, Nov 03, 2015 at 11:45:11PM +0100, Alexander Aring wrote:
+...
+> > 
+> > diff --git a/Documentation/devicetree/bindings/arm/bcm/raspberrypi,bcm2835-power.txt b/Documentation/devicetree/bindings/arm/bcm/raspberrypi,bcm2835-power.txt
+> > new file mode 100644
+> > index 0000000..c3abc24
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/arm/bcm/raspberrypi,bcm2835-power.txt
+> > @@ -0,0 +1,25 @@
+> > +Raspberry Pi power domain driver
+> > +
+> > +Required properties:
+> > +
+> > +- compatible:		Should be "raspberrypi,bcm2835-power".
 > 
-> Second option requires to duplicate cp_new_stat64 code. But we
-> choose it, because it's more flexible to have independend support
-> for ABIs.
+> These are board or chip level power domains? If the latter, the vendor 
+> should not be raspberrypi, but Broadcom. If the former, then it should 
+> describe the board rather than the chip.
 > 
-> Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
-> Reviewed-by: David Daney <david.daney@cavium.com>
 
-I'm sorry I screwed up with the definition for stat64 in asm-generic,
-by defining it to have too short st_{a,m,c}time members.
+the access to the power domains is provided by the firmware. The
+firmware is RPi specific. On an other bcm2835 with another firmware it
+would be working complete different.
 
-This means we have to introduce another 'struct stat64' variant already
-to solve the y2038 problem, and I have patches for it already, to make
-that implementation use the same structure as the 64-bit 'struct stat'
-with 64-bit timestamps. There is also an ongoing effort from David Howells
-to create a new 'struct statx' (or maybe xstat) system call with a
-completely new layout.
+Everything which is accessable over the firmware is RPi specific.
 
-I think here it would be better to avoid adding yet another version
-for ilp32 mode, and we are better off defining 'struct stat64' in
-the arm64 headers, and share either the normal arm32 syscall entry
-(with the default asm-generic syscall) or the normal arm64 syscall
-entry (as we will do for the future replacement).
-
-	Arnd
+- Alex
