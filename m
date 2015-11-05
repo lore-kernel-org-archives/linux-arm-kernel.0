@@ -1,37 +1,41 @@
-From: keescook@chromium.org (Kees Cook)
-Date: Wed, 4 Nov 2015 17:13:59 -0800
-Subject: [PATCH] arm: Use kernel mm when updating section permissions
-In-Reply-To: <CAGXu5jLdZ_xFyokoXW5ZhUdTXf-O1MBLk83cG_AM_51PxXbH5A@mail.gmail.com>
-References: <1446685239-28522-1-git-send-email-labbott@fedoraproject.org>
- <CAGXu5jLdZ_xFyokoXW5ZhUdTXf-O1MBLk83cG_AM_51PxXbH5A@mail.gmail.com>
-Message-ID: <CAGXu5jK69kytOxp1xaojsGO2JXcZ+u0iHuKWD9sis_LFaCUC9Q@mail.gmail.com>
+From: jitao.shi@mediatek.com (jitao shi)
+Date: Thu, 5 Nov 2015 09:15:18 +0800
+Subject: [RFC v2 1/2] Documentation: bridge: Add documentation for
+ ps8640 DT properties
+In-Reply-To: <1446462599.3442.19.camel@pengutronix.de>
+References: <1446430166-7378-1-git-send-email-jitao.shi@mediatek.com>
+ <1446436421.8671.1.camel@mszsdhlt06>
+ <1446462599.3442.19.camel@pengutronix.de>
+Message-ID: <1446686118.8671.4.camel@mszsdhlt06>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 4, 2015 at 5:06 PM, Kees Cook <keescook@chromium.org> wrote:
-> On Wed, Nov 4, 2015 at 5:00 PM, Laura Abbott <labbott@fedoraproject.org> wrote:
->> Currently, read only permissions are not being applied even
->> when CONFIG_DEBUG_RODATA is set. This is because section_update
->> uses current->mm for adjusting the page tables. current->mm
->> need not be equivalent to the kernel version. Use pgd_offset_k
->> to get the proper page directory for updating.
->>
->> Signed-off-by: Laura Abbott <labbott@fedoraproject.org>
->> ---
->> I found this while trying to convince myself of something.
->> Dumping the page table via debugfs and writing to kernel text were both
->> showing the lack of mappings. This was observed on QEMU. Maybe it's just a
->> QEMUism but if not it probably should go to stable.
->
-> Well that's weird! debugfs showed the actual permissions that lacked
-> RO? I wonder what changed. I tested this both with debugfs and lkdtm's
-> KERN_WRITE test when the patches originally landed.
+On Mon, 2015-11-02 at 12:09 +0100, Philipp Zabel wrote:
+> Hi Jitao,
+> 
+> Am Montag, den 02.11.2015, 11:53 +0800 schrieb jitao shi:
+> [...]
+> > > +Example:
+> > > +	edp-bridge at 18 {
+> > > +		compatible = "parade,ps8640";
+> > > +		reg = <0x18>;
+> > > +		sleep-gpios = <&pio 116 GPIO_ACTIVE_HIGH>;
+> > > +		reset-gpios = <&pio 115 GPIO_ACTIVE_HIGH>;
+> > > +		mode-sel-gpios = <&pio 92 GPIO_ACTIVE_HIGH>;
+> > > +		ps8640-1v2-supply = <&ps8640_fixed_1v2>;
+> 
+> This should be vdd12-supply now.
 
-The comment will need adjusting too. I have a memory of needing to use
-current->mm to deal with some crazy errata and handling TLB flushes...
+Thanks a lot.  I'll fix it on V3.
 
--Kees
+> 
+> > > +		ps8640-3v3-supply = <&mt6397_vgp2_reg>;
+> 
+> Should be vdd33-supply now.
 
--- 
-Kees Cook
-Chrome OS Security
+I'll fix it on V3.
+
+> 
+> regards
+> Philipp
+> 
