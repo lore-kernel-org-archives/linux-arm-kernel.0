@@ -1,154 +1,30 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Thu, 5 Nov 2015 15:34:55 +0000
-Subject: [PATCH v11 4/5] arm64: introduce CONFIG_PARAVIRT,
- PARAVIRT_TIME_ACCOUNTING and pv_time_ops
-In-Reply-To: <alpine.DEB.2.02.1511051502270.13541@kaball.uk.xensource.com>
-References: <alpine.DEB.2.02.1511051502270.13541@kaball.uk.xensource.com>
-Message-ID: <1446737696-9749-4-git-send-email-stefano.stabellini@eu.citrix.com>
+From: javier@dowhile0.org (Javier Martinez Canillas)
+Date: Thu, 5 Nov 2015 12:42:33 -0300
+Subject: Grafting old platform drivers onto a new DT kernel
+In-Reply-To: <20151105151559.GA16666@lunn.ch>
+References: <563B3749.50701@free.fr>
+	<20151105151559.GA16666@lunn.ch>
+Message-ID: <CABxcv=k5mzw_TDsD1eQna9+HY9aqCUd03YAc62750Gs--sMozw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Introduce CONFIG_PARAVIRT and PARAVIRT_TIME_ACCOUNTING on ARM64.
-Necessary duplication of paravirt.h and paravirt.c with ARM.
+Hello,
 
-The only paravirt interface supported is pv_time_ops.steal_clock, so no
-runtime pvops patching needed.
+On Thu, Nov 5, 2015 at 12:15 PM, Andrew Lunn <andrew@lunn.ch> wrote:
+>> Since I don't have time to rewrite the drivers at the moment, I'm wondering
+>> if it's possible to "graft" old drivers (they're using the platform API, no
+>> trace of DT support) onto my small base?
+>
+> Platform drivers are still usable with DT systems. We used that fact
+> when converting platform based machines over to DT, one driver at a
+> time. Look in the git history for kirkwood devices. e.g. somewhere
+> around v3.7, arch/arm/mach-kirkwood. board-dt.c, and the various
+> board-*.c files, and the DT files in the usual place.
+>
 
-This allows us to make use of steal_account_process_tick for stolen
-ticks accounting.
+OMAP did the same and still some boards use platform data and manually
+register platform devices from board code. Take a look to
+arch/arm/mach-omap2/pdata-quirks.c to see how that is being done.
 
-Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-CC: will.deacon at arm.com
-CC: nico at linaro.org
-CC: marc.zyngier at arm.com
-CC: cov at codeaurora.org
-CC: arnd at arndb.de
-CC: olof at lixom.net
-CC: Catalin.Marinas at arm.com
-
----
-
-Changes in v10:
-- replace "---help---" with "help"
-
-Changes in v7:
-- ifdef CONFIG_PARAVIRT the content of paravirt.h.
----
- arch/arm64/Kconfig                |   20 ++++++++++++++++++++
- arch/arm64/include/asm/paravirt.h |   20 ++++++++++++++++++++
- arch/arm64/kernel/Makefile        |    1 +
- arch/arm64/kernel/paravirt.c      |   25 +++++++++++++++++++++++++
- 4 files changed, 66 insertions(+)
- create mode 100644 arch/arm64/include/asm/paravirt.h
- create mode 100644 arch/arm64/kernel/paravirt.c
-
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 7b10647..659e286 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -533,6 +533,25 @@ config SECCOMP
- 	  and the task is only allowed to execute a few safe syscalls
- 	  defined by each seccomp mode.
- 
-+config PARAVIRT
-+	bool "Enable paravirtualization code"
-+	help
-+	  This changes the kernel so it can modify itself when it is run
-+	  under a hypervisor, potentially improving performance significantly
-+	  over full virtualization.
-+
-+config PARAVIRT_TIME_ACCOUNTING
-+	bool "Paravirtual steal time accounting"
-+	select PARAVIRT
-+	default n
-+	help
-+	  Select this option to enable fine granularity task steal time
-+	  accounting. Time spent executing other tasks in parallel with
-+	  the current vCPU is discounted from the vCPU power. To account for
-+	  that, there can be a small performance impact.
-+
-+	  If in doubt, say N here.
-+
- config XEN_DOM0
- 	def_bool y
- 	depends on XEN
-@@ -541,6 +560,7 @@ config XEN
- 	bool "Xen guest support on ARM64"
- 	depends on ARM64 && OF
- 	select SWIOTLB_XEN
-+	select PARAVIRT
- 	help
- 	  Say Y if you want to run Linux in a Virtual Machine on Xen on ARM64.
- 
-diff --git a/arch/arm64/include/asm/paravirt.h b/arch/arm64/include/asm/paravirt.h
-new file mode 100644
-index 0000000..fd5f428
---- /dev/null
-+++ b/arch/arm64/include/asm/paravirt.h
-@@ -0,0 +1,20 @@
-+#ifndef _ASM_ARM64_PARAVIRT_H
-+#define _ASM_ARM64_PARAVIRT_H
-+
-+#ifdef CONFIG_PARAVIRT
-+struct static_key;
-+extern struct static_key paravirt_steal_enabled;
-+extern struct static_key paravirt_steal_rq_enabled;
-+
-+struct pv_time_ops {
-+	unsigned long long (*steal_clock)(int cpu);
-+};
-+extern struct pv_time_ops pv_time_ops;
-+
-+static inline u64 paravirt_steal_clock(int cpu)
-+{
-+	return pv_time_ops.steal_clock(cpu);
-+}
-+#endif
-+
-+#endif
-diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
-index 474691f..ca9fbe1 100644
---- a/arch/arm64/kernel/Makefile
-+++ b/arch/arm64/kernel/Makefile
-@@ -41,6 +41,7 @@ arm64-obj-$(CONFIG_EFI)			+= efi.o efi-entry.stub.o
- arm64-obj-$(CONFIG_PCI)			+= pci.o
- arm64-obj-$(CONFIG_ARMV8_DEPRECATED)	+= armv8_deprecated.o
- arm64-obj-$(CONFIG_ACPI)		+= acpi.o
-+arm64-obj-$(CONFIG_PARAVIRT)		+= paravirt.o
- 
- obj-y					+= $(arm64-obj-y) vdso/
- obj-m					+= $(arm64-obj-m)
-diff --git a/arch/arm64/kernel/paravirt.c b/arch/arm64/kernel/paravirt.c
-new file mode 100644
-index 0000000..53f371e
---- /dev/null
-+++ b/arch/arm64/kernel/paravirt.c
-@@ -0,0 +1,25 @@
-+/*
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * Copyright (C) 2013 Citrix Systems
-+ *
-+ * Author: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-+ */
-+
-+#include <linux/export.h>
-+#include <linux/jump_label.h>
-+#include <linux/types.h>
-+#include <asm/paravirt.h>
-+
-+struct static_key paravirt_steal_enabled;
-+struct static_key paravirt_steal_rq_enabled;
-+
-+struct pv_time_ops pv_time_ops;
-+EXPORT_SYMBOL_GPL(pv_time_ops);
--- 
-1.7.10.4
+Best regards,
+Javier
