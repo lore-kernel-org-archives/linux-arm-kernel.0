@@ -1,86 +1,85 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 5 Nov 2015 18:27:18 +0000
-Subject: [GIT PULL] arm64 updates for 4.4
-In-Reply-To: <CA+55aFw3Y4x0RQPjgkZSV=NkXEoMWTq7AYRBpkqd-KMt6om6sw@mail.gmail.com>
-References: <20151104182508.GA28726@e104818-lin.cambridge.arm.com>
- <CA+55aFw3Y4x0RQPjgkZSV=NkXEoMWTq7AYRBpkqd-KMt6om6sw@mail.gmail.com>
-Message-ID: <20151105182718.GV7637@e104818-lin.cambridge.arm.com>
+From: akshay.bhat@timesys.com (Akshay Bhat)
+Date: Thu, 5 Nov 2015 13:33:45 -0500
+Subject: [PATCH 2/6] ARM: dts: imx: Add Advantech BA-16 Qseven module
+In-Reply-To: <1446454663.3156.4.camel@pengutronix.de>
+References: <1446160607-16053-1-git-send-email-akshay.bhat@timesys.com>
+ <1446160607-16053-3-git-send-email-akshay.bhat@timesys.com>
+ <1446454663.3156.4.camel@pengutronix.de>
+Message-ID: <563BA109.8000208@timesys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 04, 2015 at 02:55:01PM -0800, Linus Torvalds wrote:
-> On Wed, Nov 4, 2015 at 10:25 AM, Catalin Marinas
-> <catalin.marinas@arm.com> wrote:
-> >
-> > - Support for 16KB pages, with the additional bonus of a 36-bit VA
-> >   space, though the latter only depending on EXPERT
-> 
-> So I told the ppc people this many years ago, and I guess I'll tell
-> you guys too: 16kB pages are not actually useful, and anybody who
-> thinks they are have not actually done the math.
+Hi Lucas,
 
-Without doing any benchmarks (not just the maths but taking TLB misses
-into account), I agree with you. As a note, I don't actually expect this
-feature to be used in practice, firstly because it is an optional
-architecture feature and secondly because people wanting a bigger page
-size (like Red Hat) went to the extreme 64KB size already. But adding
-this option to the kernel doesn't cost us much (some macro clean-up) and
-it's something the CPU validation people would most likely use.
+Thanks for the feedback :) I have submitted a v2 patch incorporating 
+your feedback.
 
-Who knows, maybe those people who went for 64KB pages get burnt and go
-for 16KB as an intermediate step before moving back to 4KB.
+http://lists.infradead.org/pipermail/linux-arm-kernel/2015-November/383276.html
 
-> It's good for single-process loads - if you do a lot of big fortran
-> jobs, or a lot of big database loads, and nothing else, you're fine.
+On 11/02/2015 03:57 AM, Lucas Stach wrote:
+> Am Donnerstag, den 29.10.2015, 19:16 -0400 schrieb Akshay Bhat:
+>
+> There is a suspiciously high number of always-on regulators in the list
+> above. Are they really required to be powered on always, or are we
+> lacking supplies on some of the devices below?
+>
 
-These are some of the arguments from the server camp: specific
-workloads.
+Agree, many of them do not need be always-on, fixed in v2
 
-> Or if you are an embedded OS and only haev one particular load you
-> worry about.
+>> +		};
+>> +	};
+>> +};
+>> +
+>> +&iomuxc {
+>> +	pinctrl-names = "default";
+>> +	pinctrl-0 = <&pinctrl_hog>;
+>> +
+>> +	imx6q-ba16 {
+>> +		pinctrl_hog: hoggrp {
+>> +			fsl,pins = <
+>> +				MX6QDL_PAD_GPIO_4__GPIO1_IO04    0x80000000	/* uSDHC2 CD */
+>> +				MX6QDL_PAD_NANDF_CS0__GPIO6_IO11 0x80000000	/* uSDHC4 CD */
+>> +				MX6QDL_PAD_NANDF_CS1__GPIO6_IO14 0x80000000	/* uSDHC4 SDIO PWR */
+>> +				MX6QDL_PAD_NANDF_CS2__GPIO6_IO15 0x80000000	/* uSDHC4 SDIO WP */
+>> +				MX6QDL_PAD_NANDF_CS3__GPIO6_IO16 0x80000000	/* uSDHC4 SDIO LED */
+>> +				MX6QDL_PAD_EIM_EB2__GPIO2_IO30   0x80000000	/* SPI1 CS */
+>> +				MX6QDL_PAD_GPIO_17__GPIO7_IO12   0x80000000	/* PCIe Reset */
+>> +				MX6QDL_PAD_GPIO_5__GPIO1_IO05    0x80000000	/* PCIe Wake */
+>> +				MX6QDL_PAD_GPIO_0__CCM_CLKO1     0x130b0	/* FEC CLK */
+>> +				MX6QDL_PAD_ENET_TX_EN__GPIO1_IO28 0x80000000	/* FEC Reset */
+>> +				MX6QDL_PAD_NANDF_D0__GPIO2_IO00  0x80000000	/* GPIO0 */
+>> +				MX6QDL_PAD_NANDF_D1__GPIO2_IO01  0x80000000	/* GPIO1 */
+>> +				MX6QDL_PAD_NANDF_D2__GPIO2_IO02  0x80000000	/* GPIO2 */
+>> +				MX6QDL_PAD_NANDF_D3__GPIO2_IO03  0x80000000	/* GPIO3 */
+>> +				MX6QDL_PAD_NANDF_D4__GPIO2_IO04  0x80000000	/* GPIO4 */
+>> +				MX6QDL_PAD_NANDF_D5__GPIO2_IO05  0x80000000	/* GPIO5 */
+>> +				MX6QDL_PAD_NANDF_D6__GPIO2_IO06  0x80000000	/* GPIO6 */
+>> +				MX6QDL_PAD_NANDF_D7__GPIO2_IO07  0x80000000	/* GPIO7 */
+>> +				MX6QDL_PAD_NANDF_CLE__GPIO6_IO07 0x80000000	/* CAM_PWDN */
+>> +				MX6QDL_PAD_GPIO_2__GPIO1_IO02    0x80000000	/* CAM_RST */
+>> +				MX6QDL_PAD_GPIO_9__WDOG1_B       0x80000000	/* Watchdog out */
+>> +				MX6QDL_PAD_GPIO_16__GPIO7_IO11   0x80000000	/* HUB_RESET */
+>> +				MX6QDL_PAD_GPIO_18__GPIO7_IO13   0x80000000	/* PMIC Interrupt */
+>> +				MX6QDL_PAD_GPIO_19__GPIO4_IO05   0x80000000	/* AR8033 Interrupt */
+>> +				MX6QDL_PAD_KEY_ROW2__GPIO4_IO11  0x80000000	/* SUS_S3_OUT */
+>> +				MX6QDL_PAD_KEY_ROW4__GPIO4_IO15  0x80000000	/* BLEN_OUT */
+>> +				MX6QDL_PAD_EIM_D22__GPIO3_IO22   0x80000000	/* LVDS_PPEN_OUT */
+>> +				MX6QDL_PAD_KEY_COL2__GPIO4_IO10  0x80000000	/* RTC_INT */
+>
+> Please don't overuse the hog group but add pins that are related to a
+> specific device to the pinmux group of that device. USDHC, SPI, PCIe,
+> FEC are the obvious examples from the list above.
+>
 
-It's unlikely for embedded/mobile because of the memory usage, though
-I've seen it done on 32-bit ARMv7 (Cortex-A9). The WD My Cloud NAS at
-some point upgraded the firmware to use 64KB pages in Linux (not
-something supported by mainline). I have no idea what led to their
-decision but the workloads are very specific, I guess there was some
-gain for them.
+Makes sense, have moved many of the entries from hog group into their 
+relevant groups in v2. There are a couple more which can be moved but 
+are dependent on new device tree nodes/drivers that I am yet to submit.
 
-> But it is really really nasty for any general-purpose stuff, and when
-> your hardware people tell you that it's a great way to make your TLB's
-> more effective, tell them back that they are incompetent morons, and
-> that they should just make their TLB's better.
+>> +
+>> +&pcie {
+>> +	power-on-gpio = <&gpio1 5 GPIO_ACTIVE_HIGH>;
+>
+> There is no such thing as a power-on-gpio in mainline Linux.
+>
 
-Virtualisation, nested pages is an area where you can always squeeze a
-bit more performance even if your TLBs are fast (for example, 4 levels
-guest + 4 levels host page tables would need 24 memory accesses for a
-completely cold TLB miss). But this would normally only be an option for
-the host kernel, not aimed at general purpose guest.
-
-> To make them understand the problem, compare it to having a 256-byte
-> cacheline. They might understand it then, because you're talking about
-> things that they almost certainly *also* wanted to do, but did the
-> numbers on, and realized it was bad.
-
-The difference is that a 256-byte cacheline is hard-wired and the cache
-size fixed when you build the silicon. OTOH, the page size is
-configurable and I would be very worried if 4KB pages are ever
-deprecated. The counter argument from the HW camp is usually that the
-architecture is not designed just for the current RAM limits and not
-even for the current Linux implementation. It's more like "in 10 years
-time we may afford to waste a lot more memory *or* Linux may find a way
-to merge/compress partially filled page cache pages (well, those not
-mapped to user) *or* some other workloads emerge, so we better have the
-option in early".
-
-I don't see the 4KB page configuration ever going away from the ARM
-cores and the mobile camp is pretty much tied to it. We'll have to wait
-until we see some real workloads on servers and what the larger page
-impact is. Hopefully the ecosystem (software, silicon vendors) will
-eventually converge to the best solution (which could simply be smaller
-pages and better TLBs). In the meantime, I'm giving them enough Kconfig
-rope to use it as they see appropriate. The architecture specification
-does a similar thing.
-
--- 
-Catalin
+Good catch, was a left over from 3.14 kernel. Fixed in v2.
