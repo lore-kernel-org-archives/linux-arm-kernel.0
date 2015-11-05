@@ -1,81 +1,45 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Thu,  5 Nov 2015 14:54:56 +0900
-Subject: [PATCH] reset: check return value of reset_controller_register()
-Message-ID: <1446702896-1156-1-git-send-email-yamada.masahiro@socionext.com>
+From: Sanjeev_Sharma@mentor.com (Sharma, Sanjeev)
+Date: Thu, 5 Nov 2015 05:56:10 +0000
+Subject: [PATCH] ARM:dma-mapping: Handle DMA_BIDIRECTIONAL in
+ _dma_page_cpu_to_dev()
+In-Reply-To: <20151104105420.GL8644@n2100.arm.linux.org.uk>
+References: <1446631008-5854-1-git-send-email-sanjeev_sharma@mentor.com>
+ <20151104103913.GC5405@arm.com>
+ <20151104105420.GL8644@n2100.arm.linux.org.uk>
+Message-ID: <FDC088D3B5555644AE135ED28A7ABDE98636B41D@EU-MBX-02.mgc.mentorg.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, reset_controller_register() always return 0, but it would
-be better to check its return code.
+-----Original Message-----
+From: Russell King - ARM Linux [mailto:linux at arm.linux.org.uk] 
+Sent: Wednesday, November 04, 2015 4:24 PM
+To: Will Deacon
+Cc: Sharma, Sanjeev; m.szyprowski at samsung.com; linux-arm-kernel at lists.infradead.org; linux-kernel at vger.kernel.org
+Subject: Re: [PATCH] ARM:dma-mapping: Handle DMA_BIDIRECTIONAL in _dma_page_cpu_to_dev()
 
-Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
----
+On Wed, Nov 04, 2015 at 10:39:13AM +0000, Will Deacon wrote:
+> On Wed, Nov 04, 2015 at 03:26:48PM +0530, Sanjeev Sharma wrote:
+> > _dma_page_cpu_to_dev() treat DMA_BIDIRECTIONAL similar to 
+> > DMA_TO_DEVICE which means that destination buffer is device 
+> > memory,means cpu may have written some data to source buffer and 
+> > data may be in cache line.For cleaner operation we need to call 
+> > outer_flush_range() which will clean and invalidate outer cache lines.
+> 
+> Why isn't the clean sufficient in this case? We're mapping the buffer 
+> to the device, so we clean the dirty lines in the CPU caches and make 
+> them visible to the device. If the CPU later wants to read the buffer 
+> (i.e. after the device has DMA'd into it), you'll need to map the 
+> buffer to the CPU, which will perform the invalidation of the CPU caches.
 
- drivers/reset/reset-berlin.c  | 4 +---
- drivers/reset/reset-socfpga.c | 3 +--
- drivers/reset/reset-sunxi.c   | 3 +--
- drivers/reset/reset-zynq.c    | 3 +--
- 4 files changed, 4 insertions(+), 9 deletions(-)
+Indeed.  bidirectional mode is already handled prefectly well by this code.  No patches are required.
 
-diff --git a/drivers/reset/reset-berlin.c b/drivers/reset/reset-berlin.c
-index 3c922d3..970b1ad 100644
---- a/drivers/reset/reset-berlin.c
-+++ b/drivers/reset/reset-berlin.c
-@@ -87,9 +87,7 @@ static int berlin2_reset_probe(struct platform_device *pdev)
- 	priv->rcdev.of_reset_n_cells = 2;
- 	priv->rcdev.of_xlate = berlin_reset_xlate;
- 
--	reset_controller_register(&priv->rcdev);
--
--	return 0;
-+	return reset_controller_register(&priv->rcdev);
- }
- 
- static const struct of_device_id berlin_reset_dt_match[] = {
-diff --git a/drivers/reset/reset-socfpga.c b/drivers/reset/reset-socfpga.c
-index 1a6c5d6..b7d773d 100644
---- a/drivers/reset/reset-socfpga.c
-+++ b/drivers/reset/reset-socfpga.c
-@@ -133,9 +133,8 @@ static int socfpga_reset_probe(struct platform_device *pdev)
- 	data->rcdev.nr_resets = NR_BANKS * BITS_PER_LONG;
- 	data->rcdev.ops = &socfpga_reset_ops;
- 	data->rcdev.of_node = pdev->dev.of_node;
--	reset_controller_register(&data->rcdev);
- 
--	return 0;
-+	return reset_controller_register(&data->rcdev);
- }
- 
- static int socfpga_reset_remove(struct platform_device *pdev)
-diff --git a/drivers/reset/reset-sunxi.c b/drivers/reset/reset-sunxi.c
-index 3d95c87..29ed39d 100644
---- a/drivers/reset/reset-sunxi.c
-+++ b/drivers/reset/reset-sunxi.c
-@@ -108,9 +108,8 @@ static int sunxi_reset_init(struct device_node *np)
- 	data->rcdev.nr_resets = size * 32;
- 	data->rcdev.ops = &sunxi_reset_ops;
- 	data->rcdev.of_node = np;
--	reset_controller_register(&data->rcdev);
- 
--	return 0;
-+	return reset_controller_register(&data->rcdev);
- 
- err_alloc:
- 	kfree(data);
-diff --git a/drivers/reset/reset-zynq.c b/drivers/reset/reset-zynq.c
-index 89318a5..c6b3cd8 100644
---- a/drivers/reset/reset-zynq.c
-+++ b/drivers/reset/reset-zynq.c
-@@ -121,9 +121,8 @@ static int zynq_reset_probe(struct platform_device *pdev)
- 	priv->rcdev.nr_resets = resource_size(res) / 4 * BITS_PER_LONG;
- 	priv->rcdev.ops = &zynq_reset_ops;
- 	priv->rcdev.of_node = pdev->dev.of_node;
--	reset_controller_register(&priv->rcdev);
- 
--	return 0;
-+	return reset_controller_register(&priv->rcdev);
- }
- 
- static int zynq_reset_remove(struct platform_device *pdev)
--- 
-1.9.1
+Thanks Russell & Will for providing input.
+
+Let's assume , CPU don't read the buffer then there could be the problem correct ? IMO, to handle every use case outer_flush_range can be used ?
+If still it doesn't make sense to use flush on bidirectional mappings, then FIXME comment should be removed from the function to avoid any
+Confusion.
+
+(I never received the original email.)
+
+--
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up according to speedtest.net.
