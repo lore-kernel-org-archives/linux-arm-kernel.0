@@ -1,41 +1,60 @@
 From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Thu,  5 Nov 2015 20:15:25 +0900
-Subject: [RFC PATCH 4/7] pinctrl: sunxi: remove redundant "depends on
- RESET_CONTROLLER"
-In-Reply-To: <1446722128-11961-1-git-send-email-yamada.masahiro@socionext.com>
-References: <1446722128-11961-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <1446722128-11961-5-git-send-email-yamada.masahiro@socionext.com>
+Date: Thu,  5 Nov 2015 20:15:21 +0900
+Subject: [RFC PATCH 0/7] reset: make RESET_CONTROLLER a select'ed option
+Message-ID: <1446722128-11961-1-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ARCH_SUNXI selects RESET_CONTROLLER.
-The dependency "depends on RESET_CONTROLLER" is already met.
+When I was implementing a new reset controller for my SoCs,
+I struggled to make my sub-menu shown under the reset
+controller menu.
+I noticed the Kconfig in reset sub-system are screwed up due to two
+config options (ARCH_HAS_RESET_CONTROLLER and RESET_CONTROLLER).
 
-Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
----
+I think only the former should be select'ed by relevant SoCs,
+but in fact the latter is also select'ed here and there.
+Mixing "select" to a user-configurable option is a mess.
 
- drivers/pinctrl/sunxi/Kconfig | 2 --
- 1 file changed, 2 deletions(-)
+Finally, I started to wonder whether it could be more simpler?
 
-diff --git a/drivers/pinctrl/sunxi/Kconfig b/drivers/pinctrl/sunxi/Kconfig
-index e68fd95..50bd2e3 100644
---- a/drivers/pinctrl/sunxi/Kconfig
-+++ b/drivers/pinctrl/sunxi/Kconfig
-@@ -27,7 +27,6 @@ config PINCTRL_SUN6I_A31S
- 
- config PINCTRL_SUN6I_A31_R
- 	def_bool MACH_SUN6I
--	depends on RESET_CONTROLLER
- 	select PINCTRL_SUNXI_COMMON
- 
- config PINCTRL_SUN7I_A20
-@@ -48,7 +47,6 @@ config PINCTRL_SUN8I_A83T
- 
- config PINCTRL_SUN8I_A23_R
- 	def_bool MACH_SUN8I
--	depends on RESET_CONTROLLER
- 	select PINCTRL_SUNXI_COMMON
- 
- config PINCTRL_SUN9I_A80
+The first patch drops ARCH_HAS_RESET_CONTROLLER.
+RESET_CONTROLLER should be directly selected by SoCs.
+
+The rest of this series are minor clean ups in other
+sub-systems.
+I can postpone them if changes over cross sub-systems
+are not preferred.
+
+
+
+Masahiro Yamada (7):
+  reset: drop ARCH_HAS_RESET_CONTROLLER
+  spi: sunxi: remove redundant "depends on RESET_CONTROLLER"
+  spi: tegra: remove redundant "depends on RESET_CONTROLLER"
+  pinctrl: sunxi: remove redundant "depends on RESET_CONTROLLER"
+  drm/sti: replace "select RESET_CONTROLLER" with "depends on ..."
+  drm/rockchip: remove redundant "depends on RESET_CONTROLLER"
+  drm/tegra: tegra: remove redundant "depends on RESET_CONTROLLER"
+
+ arch/arm/Kconfig                 |  3 +--
+ arch/arm/mach-berlin/Kconfig     |  2 +-
+ arch/arm/mach-imx/Kconfig        |  2 +-
+ arch/arm/mach-mmp/Kconfig        |  4 ++--
+ arch/arm/mach-prima2/Kconfig     |  2 +-
+ arch/arm/mach-rockchip/Kconfig   |  2 +-
+ arch/arm/mach-sti/Kconfig        |  1 -
+ arch/arm/mach-sunxi/Kconfig      |  1 -
+ arch/arm/mach-tegra/Kconfig      |  1 -
+ arch/arm64/Kconfig.platforms     |  3 +--
+ arch/mips/Kconfig                |  4 +---
+ drivers/gpu/drm/rockchip/Kconfig |  1 -
+ drivers/gpu/drm/sti/Kconfig      |  4 ++--
+ drivers/gpu/drm/tegra/Kconfig    |  1 -
+ drivers/pinctrl/sunxi/Kconfig    |  2 --
+ drivers/reset/Kconfig            | 12 +++++++-----
+ drivers/reset/sti/Kconfig        |  1 -
+ drivers/spi/Kconfig              |  6 ++----
+ 18 files changed, 20 insertions(+), 32 deletions(-)
+
 -- 
 1.9.1
