@@ -1,43 +1,42 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Thu, 5 Nov 2015 10:54:58 +0100
-Subject: [PATCH 11/11] tty: amba-pl011: add support for ZTE UART
- (EXPERIMENTAL)
-In-Reply-To: <20151105092703.GN8644@n2100.arm.linux.org.uk>
-References: <20151103134349.GV8644@n2100.arm.linux.org.uk>
- <E1Ztcw9-0007Cz-TX@rmk-PC.arm.linux.org.uk>
- <CACRpkdbMUTUTJvCZXusMHDO4oqhXwo1DT8=h67ej9GSoDR5jvw@mail.gmail.com>
- <20151105092703.GN8644@n2100.arm.linux.org.uk>
-Message-ID: <CACRpkdbb6WUzRxV9HUgAjiDqgYafsQ9F90pnS6E4jO55zygxmQ@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 5 Nov 2015 10:08:19 +0000
+Subject: PSCI_CPU_ON flow
+In-Reply-To: <20151104193142.GM8644@n2100.arm.linux.org.uk>
+References: <BY1PR0301MB1303B5D1A8CD0B7FA07AA40A822A0@BY1PR0301MB1303.namprd03.prod.outlook.com>
+ <20151104171048.GE23860@leverpostej>
+ <20151104193142.GM8644@n2100.arm.linux.org.uk>
+Message-ID: <20151105100819.GO7637@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 5, 2015 at 10:27 AM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Thu, Nov 05, 2015 at 09:28:23AM +0100, Linus Walleij wrote:
->> On Tue, Nov 3, 2015 at 3:51 PM, Russell King
->> <rmk+kernel@arm.linux.org.uk> wrote:
->>
->> > Add (incomplete) support for the ZTE UART to the AMBA PL011 driver.
->> > This is similar to the ARM and ST variants, except it has a different
->> > register address layout, and requires 32-bit accesses to the registers.
->> > Use the newly introduced register tables and access size support to
->> > cope with these differences.
->> >
->> > Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
->>
->> I applied the whole series, 1-11 and tested on Ux500 (ST Micro variant)
->> and on the ARM RealView PB11MPCore.
->>
->> It works like a charm. I also like the looks of this transformation.
->> Tested-by: Linus Walleij <linus.walleij@linaro.org>
->
-> As I mentioned, the change in pl011_putc() needs undoing (I've already
-> modified that in my series).  Also, I'll try switching to the relaxed
-> accessors and checking that.  Thanks for the tested-by though, can I
-> assume that you're happy I add that even with the pl011_putc() change
-> undone?
+On Wed, Nov 04, 2015 at 07:31:42PM +0000, Russell King - ARM Linux wrote:
+> On Wed, Nov 04, 2015 at 05:10:49PM +0000, Mark Rutland wrote:
+> > Yes, the CPU should start at __pa(secondary_entry) in head.S. From there
+> > it will branch to secondary_startup:
+> > 
+> > ENTRY(secondary_entry)
+> > 	bl      el2_setup                       // Drop to EL1
+> > 	bl      set_cpu_boot_mode_flag
+> > 	b       secondary_startup
+> > ENDPROC(secondary_entry)
+> 
+> We've been busy telling people to implement errata workarounds in firmware,
+> and we're also busy telling people that their secondary CPUs should start
+> in the kernel.  The two are incompatible with each other...
 
-Sure. I'm pretty sure that doesn't change much.
+I think this could have been worded better, something like: the CPU
+should enter the non-secure EL2 or EL1 at __pa(secondary_entry).
+Avoiding the word "start" means that we are not excluding the firmware.
+On arm64 we can't skip secure firmware since all CPUs reset at EL3
+anyway.
 
-Yours,
-Linus Walleij
+> I think we need to come up with a clearer statement on both these subjects
+> which gives people a good idea about what's required, and doesn't send out
+> confusing messages.
+
+I agree, Documentation/{arm/Booting,arm64/booting.txt} should clearly
+state the requirements. Not sure many people read them but at least they
+can be told about.
+
+-- 
+Catalin
