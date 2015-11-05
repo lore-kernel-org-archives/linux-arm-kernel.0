@@ -1,90 +1,32 @@
-From: bhupesh.sharma@freescale.com (Sharma Bhupesh)
-Date: Thu, 5 Nov 2015 02:54:37 +0000
-Subject: [PATCH 1/2 V2] ls2080a/dts: Add little endian property for GPIO
- IP block
-In-Reply-To: <1446691342-1943-1-git-send-email-Gang.Liu@freescale.com>
-References: <1446691342-1943-1-git-send-email-Gang.Liu@freescale.com>
-Message-ID: <BY1PR0301MB13033A8948975CFB2B4E628B82290@BY1PR0301MB1303.namprd03.prod.outlook.com>
+From: zhengxing@rock-chips.com (Xing Zheng)
+Date: Thu, 05 Nov 2015 11:00:46 +0800
+Subject: [PATCH v6 6/8] ARM: rockchip: add support smp for rk3036
+In-Reply-To: <3167530.TSdLBvl1Zs@phil>
+References: <1446639503-11763-1-git-send-email-zhengxing@rock-chips.com>
+ <1446639916-11957-1-git-send-email-zhengxing@rock-chips.com>
+ <3167530.TSdLBvl1Zs@phil>
+Message-ID: <563AC65E.6050201@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Gang,
-
-> From: Liu Gang [mailto:Gang.Liu at freescale.com]
-> Sent: Thursday, November 05, 2015 8:12 AM
-> 
-> The GPIO block for ls2080a platform has little endian registers, the GPIO
-> driver needs this property to read/write registers by right interface.
-> 
-> Signed-off-by: Liu Gang <Gang.Liu@freescale.com>
-> ---
-> V2 changes: No
-> 
->  Documentation/devicetree/bindings/gpio/gpio-mpc8xxx.txt | 3 +++
->  arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi          | 4 ++++
->  2 files changed, 7 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/gpio/gpio-mpc8xxx.txt
-> b/Documentation/devicetree/bindings/gpio/gpio-mpc8xxx.txt
-> index f2455c5..c836dab 100644
-> --- a/Documentation/devicetree/bindings/gpio/gpio-mpc8xxx.txt
-> +++ b/Documentation/devicetree/bindings/gpio/gpio-mpc8xxx.txt
-> @@ -10,6 +10,9 @@ Required properties:
->    the second cell is used to specify the gpio polarity:
->        0 = active high
->        1 = active low
-> +- little-endian : Should be set if the GPIO has little endian
-> +		  registers. No the property means the GPIO
-> +		  registers are big endian mode.
-
-Nitpick: I would suggest rewording this to the following, for better readability:
-
- +- little-endian : Should be set if the GPIO has little endian
- +		  registers. If this property is not set, then the GPIO
- +		  registers are configured in big endian mode.
-
-Regards,
-Bhupesh
-
-> 
->  Example:
-> 
-> diff --git a/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
-> b/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
-> index e81cd48..0099205 100644
-> --- a/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
-> +++ b/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
-> @@ -277,6 +277,7 @@
->  			reg = <0x0 0x2300000 0x0 0x10000>;
->  			interrupts = <0 36 0x4>; /* Level high type */
->  			gpio-controller;
-> +			little-endian;
->  			#gpio-cells = <2>;
->  			interrupt-controller;
->  			#interrupt-cells = <2>;
-> @@ -287,6 +288,7 @@
->  			reg = <0x0 0x2310000 0x0 0x10000>;
->  			interrupts = <0 36 0x4>; /* Level high type */
->  			gpio-controller;
-> +			little-endian;
->  			#gpio-cells = <2>;
->  			interrupt-controller;
->  			#interrupt-cells = <2>;
-> @@ -297,6 +299,7 @@
->  			reg = <0x0 0x2320000 0x0 0x10000>;
->  			interrupts = <0 37 0x4>; /* Level high type */
->  			gpio-controller;
-> +			little-endian;
->  			#gpio-cells = <2>;
->  			interrupt-controller;
->  			#interrupt-cells = <2>;
-> @@ -307,6 +310,7 @@
->  			reg = <0x0 0x2330000 0x0 0x10000>;
->  			interrupts = <0 37 0x4>; /* Level high type */
->  			gpio-controller;
-> +			little-endian;
->  			#gpio-cells = <2>;
->  			interrupt-controller;
->  			#interrupt-cells = <2>;
-> --
-> 2.1.0.27.g96db324
+On 2015?11?05? 07:33, Heiko Stuebner wrote:
+> Am Mittwoch, 4. November 2015, 20:25:16 schrieb Xing Zheng:
+>> From: Heiko Stuebner<heiko@sntech.de>
+>>
+>> The dual-core Cortex A7 rk3036 is a bit special in that it does not allow
+>> to control the actual powerdomain of the cpu cores, while the rest of the
+>> smp-bringup like reset control and entry address handling stays the same.
+>> Its bigger sibling, the quad-core rk3128 again allows powerdomain control.
+>>
+>> So allow that case by introducing a separate smp-enable-method, that simply
+>> disables powerdomain handling in the common code.
+>>
+>> Signed-off-by: Heiko Stuebner<heiko@sntech.de>
+>> Tested-by: Xing Zheng<zhengxing@rock-chips.com>
+>> Signed-off-by: Xing Zheng<zhengxing@rock-chips.com>
+> This patch can work standalone, so I took the liberty of applying it to my soc
+> branch for 4.5 already, so you don't need to resend it in future versions.
+>
+>
+>
+OK? thanks Heiko. :)
