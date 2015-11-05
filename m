@@ -1,59 +1,62 @@
-From: jon.nettleton@gmail.com (Jon Nettleton)
-Date: Thu, 5 Nov 2015 05:23:47 +0100
-Subject: i.MX6: Increasing VPU frequency
-In-Reply-To: <CAH-u=81hMAF=r6rUKF+iuta3nC6n+4EDDz7Rn2-oGYbkbN0Jyg@mail.gmail.com>
-References: <CAH-u=82M1yCmPjBg5qeiC8JiHjM8+WsP+utX_VPKfJwJsu0QFg@mail.gmail.com>
- <CALHpu366MPbxJinVL2QFM11gMHx-T=M9QXNoznOTh++oHGGmrA@mail.gmail.com>
- <CAH-u=81hMAF=r6rUKF+iuta3nC6n+4EDDz7Rn2-oGYbkbN0Jyg@mail.gmail.com>
-Message-ID: <CALHpu34iKGTE=tENJTFOu13LxSozRjU9bwmGxnigUXgTDsXAQw@mail.gmail.com>
+From: iamjoonsoo.kim@lge.com (Joonsoo Kim)
+Date: Thu, 5 Nov 2015 13:31:55 +0900
+Subject: [PATCH] arm64: Increase the max granular size
+In-Reply-To: <20151104153910.GN7637@e104818-lin.cambridge.arm.com>
+References: <20151103120504.GF7637@e104818-lin.cambridge.arm.com>
+ <20151103143858.GI7637@e104818-lin.cambridge.arm.com>
+ <CAMuHMdWk0fPzTSKhoCuS4wsOU1iddhKJb2SOpjo=a_9vCm_KXQ@mail.gmail.com>
+ <20151103185050.GJ7637@e104818-lin.cambridge.arm.com>
+ <alpine.DEB.2.20.1511031724010.8178@east.gentwo.org>
+ <20151104123640.GK7637@e104818-lin.cambridge.arm.com>
+ <alpine.DEB.2.20.1511040748590.17248@east.gentwo.org>
+ <20151104145445.GL7637@e104818-lin.cambridge.arm.com>
+ <alpine.DEB.2.20.1511040927510.18745@east.gentwo.org>
+ <20151104153910.GN7637@e104818-lin.cambridge.arm.com>
+Message-ID: <20151105043155.GA20374@js1304-P5Q-DELUXE>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 4, 2015 at 8:33 PM, Jean-Michel Hautbois
-<jean-michel.hautbois@veo-labs.com> wrote:
-> 2015-11-04 18:04 GMT+01:00 Jon Nettleton <jon.nettleton@gmail.com>:
->> On Wed, Nov 4, 2015 at 5:52 PM, Jean-Michel Hautbois
->> <jean-michel.hautbois@veo-labs.com> wrote:
->>> Hi !
->>>
->>> I can see in FSL kernel that VPU is configurable to 352M (it defaults
->>> at 264MHz in mainline I think).
->>> In the TRM, it is even specified at 352MHz as a default frequency,
->>> with a maximum of 540MHz.
->>>
->>> Would it be possible to allow this clock rating modification if, for
->>> instance, we select a performance governor in cpufreq, or if a coda
->>> encoder is started with 1080p for instance ?
->>> If so, then how is it doable properly ?
->>
->> For some reason the FSL kernel configures the VPU to run at 352Mhz in
->> a very odd way that requires limiting the min cpu-frequency to 792Mhz.
->> It also requires clocking down a bunch of devices on pll2_pfd2_396m to
->> 352Mhz.
->>
->> The simple solution to this is to instead parent the VPU to
->> pll2_pfd0_352m which is unused.  I have found by default it is stable
->> decoding but unstable encoding at 352Mhz, most likely due to the
->> voltage changes needed that limiting the min cpu-freq to 792Mhz
->> provides.  However everything seems to work quite reliably clocking
->> that pfd to 327Mhz, which still gives a boost of almost 24%
->>
->> In my testing the performance gain in then going from 327 to 352 is
->> minimal.  Generally I think you hit AXI bus limitations rather than
->> VPU performance.
->
-> Interesting.
-> So you propose to add something like the following in
-> drivers/clk/imx/clk-imx6q.cdrivers/clk/imx/clk-imx6q.c :
-> imx_clk_set_rate(clk[IMX6QDL_CLK_PLL2_PFD0_352M], 327000000);
-> imx_clk_set_parent(clk[IMX6QDL_CLK_VPU_AXI_SEL],
-> clk[IMX6QDL_CLK_PLL2_PFD0_352M]);
->
-> This should end up with a fastest VPU (in fact ~25% boost is good).
-> Is it the correct way to do it ?
-> Should it be done in coda instead ? And only when needed ?
+On Wed, Nov 04, 2015 at 03:39:10PM +0000, Catalin Marinas wrote:
+> On Wed, Nov 04, 2015 at 09:28:34AM -0600, Christoph Lameter wrote:
+> > On Wed, 4 Nov 2015, Catalin Marinas wrote:
+> > 
+> > > BTW, assuming L1_CACHE_BYTES is 512 (I don't ever see this happening but
+> > > just in theory), we potentially have the same issue. What would save us
+> > > is that INDEX_NODE would match the first "kmalloc-512" cache, so we have
+> > > it pre-populated.
+> > 
+> > Ok maybe add some BUILD_BUG_ONs to ensure that builds fail until we have
+> > addressed that.
+> 
+> A BUILD_BUG_ON should be fine.
+> 
+> Thinking some more, I think if KMALLOC_MIN_SIZE is 128, there is no gain
+> with off-slab management since the freelist allocation would still be
+> 128 bytes. An alternative to reverting while still having a little
+> benefit of off-slab for 256 bytes objects (rather than 512 as we would
+> get with the revert):
+> 
+> diff --git a/mm/slab.c b/mm/slab.c
+> index 4fcc5dd8d5a6..ac32b4a0f2ec 100644
+> --- a/mm/slab.c
+> +++ b/mm/slab.c
+> @@ -2212,8 +2212,8 @@ __kmem_cache_create (struct kmem_cache *cachep, unsigned long flags)
+>  	 * it too early on. Always use on-slab management when
+>  	 * SLAB_NOLEAKTRACE to avoid recursive calls into kmemleak)
+>  	 */
+> -	if ((size >= (PAGE_SIZE >> 5)) && !slab_early_init &&
+> -	    !(flags & SLAB_NOLEAKTRACE))
+> +	if ((size >= (PAGE_SIZE >> 5)) && (size > KMALLOC_MIN_SIZE) &&
+> +		!slab_early_init && !(flags & SLAB_NOLEAKTRACE))
+>  		/*
+>  		 * Size is large, assume best to place the slab management obj
+>  		 * off-slab (should allow better packing of objs).
+> 
+> Whichever you prefer.
 
-That is how I have done it.  I was going to implement dvfs for the vpu
-but found that this change really added minimal power and thermal
-overhead.  Without looking it up I believe I only saw a 10-20mA rise
-in power usage and virtually no thermal differences.
+Hello,
+
+I prefer this simple way. It looks like that it can solve the issue on
+any arbitrary configuration.
+
+Thanks.
