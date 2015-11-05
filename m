@@ -1,39 +1,39 @@
 From: akshay.bhat@timesys.com (Akshay Bhat)
-Date: Thu,  5 Nov 2015 13:13:39 -0500
-Subject: [PATCH v2 05/10] ARM: dts: imx: Add support for Advantech/GE B650v3
+Date: Thu,  5 Nov 2015 13:13:38 -0500
+Subject: [PATCH v2 04/10] ARM: dts: imx: Add support for Advantech/GE B450v3
 In-Reply-To: <1446747224-32514-1-git-send-email-akshay.bhat@timesys.com>
 References: <1446747224-32514-1-git-send-email-akshay.bhat@timesys.com>
-Message-ID: <1446747224-32514-6-git-send-email-akshay.bhat@timesys.com>
+Message-ID: <1446747224-32514-5-git-send-email-akshay.bhat@timesys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support for Advantech/GE B650v3 board.
+Add support for Advantech/GE B450v3 board.
 
 Signed-off-by: Akshay Bhat <akshay.bhat@timesys.com>
 ---
  arch/arm/boot/dts/Makefile         |  1 +
- arch/arm/boot/dts/imx6q-b650v3.dts | 74 ++++++++++++++++++++++++++++++++++++++
- 2 files changed, 75 insertions(+)
- create mode 100644 arch/arm/boot/dts/imx6q-b650v3.dts
+ arch/arm/boot/dts/imx6q-b450v3.dts | 75 ++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 76 insertions(+)
+ create mode 100644 arch/arm/boot/dts/imx6q-b450v3.dts
 
 diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index b3330fe..e2df9f8 100644
+index 30bbc37..b3330fe 100644
 --- a/arch/arm/boot/dts/Makefile
 +++ b/arch/arm/boot/dts/Makefile
-@@ -311,6 +311,7 @@ dtb-$(CONFIG_SOC_IMX6Q) += \
+@@ -310,6 +310,7 @@ dtb-$(CONFIG_SOC_IMX6Q) += \
+ 	imx6dl-wandboard-revb1.dtb \
  	imx6q-apf6dev.dtb \
  	imx6q-arm2.dtb \
- 	imx6q-b450v3.dtb \
-+	imx6q-b650v3.dtb \
++	imx6q-b450v3.dtb \
  	imx6q-cm-fx6.dtb \
  	imx6q-cubox-i.dtb \
  	imx6q-dfi-fs700-m60.dtb \
-diff --git a/arch/arm/boot/dts/imx6q-b650v3.dts b/arch/arm/boot/dts/imx6q-b650v3.dts
+diff --git a/arch/arm/boot/dts/imx6q-b450v3.dts b/arch/arm/boot/dts/imx6q-b450v3.dts
 new file mode 100644
-index 0000000..29cbdb0
+index 0000000..d63d9e1
 --- /dev/null
-+++ b/arch/arm/boot/dts/imx6q-b650v3.dts
-@@ -0,0 +1,74 @@
++++ b/arch/arm/boot/dts/imx6q-b450v3.dts
+@@ -0,0 +1,75 @@
 +/*
 + * Copyright 2015 Timesys Corporation.
 + * Copyright 2015 GE Healthcare.
@@ -51,8 +51,8 @@ index 0000000..29cbdb0
 +#include "imx6q-bx50v3.dtsi"
 +
 +/ {
-+	model = "Advantech MX6Q B650V3 QSeven Board";
-+	compatible = "adv,imx6q-b650v3", "adv,imx6q-ba16", "fsl,imx6q";
++	model = "Advantech MX6Q B450V3 QSeven Board";
++	compatible = "adv,imx6q-b450v3", "adv,imx6q-ba16", "fsl,imx6q";
 +
 +	chosen {
 +		stdout-path = &uart3;
@@ -107,6 +107,7 @@ index 0000000..29cbdb0
 +			};
 +		};
 +	};
++
 +};
 -- 
 2.6.2
