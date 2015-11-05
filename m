@@ -1,91 +1,99 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Thu, 05 Nov 2015 14:40:55 +0900
-Subject: [PATCH 1/2] arm64: dts: exynos7: Add pmic s2mps15 device tree node
-In-Reply-To: <563AEB2D.5000408@samsung.com>
-References: <1446458641-4447-1-git-send-email-alim.akhtar@samsung.com>
- <CAJKOXPfrvuH8t3Pkf2Qt8VEfMR3qOeFKHrG0i3qUf94BR1y2tQ@mail.gmail.com>
- <56375EB1.2090504@samsung.com>
- <CAJKOXPcPQD+3QinbaKcREQSn1yJCf2kQG0C4rhJtCS=W_25Gmw@mail.gmail.com>
- <563AEB2D.5000408@samsung.com>
-Message-ID: <563AEBE7.5040400@samsung.com>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Thu,  5 Nov 2015 14:46:37 +0900
+Subject: [PATCH/RFC] ARM: shmobile: Introduce ARCH_RENESAS
+Message-ID: <1446702397-24078-1-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05.11.2015 14:37, Alim Akhtar wrote:
-> Hi Krzysztof
-> 
-> On 11/02/2015 07:22 PM, Krzysztof Kozlowski wrote:
->> 2015-11-02 22:01 GMT+09:00 Alim Akhtar <alim.akhtar@samsung.com>:
->>>>>
->>>>>    arch/arm64/boot/dts/exynos/exynos7-espresso.dts |  349
->>>>> +++++++++++++++++++++++
->>>>>    1 file changed, 349 insertions(+)
->>>>>
->>>>> diff --git a/arch/arm64/boot/dts/exynos/exynos7-espresso.dts
->>>>> b/arch/arm64/boot/dts/exynos/exynos7-espresso.dts
->>>>> index 838a3626dac1..8ce04a0ec928 100644
->>>>> --- a/arch/arm64/boot/dts/exynos/exynos7-espresso.dts
->>>>> +++ b/arch/arm64/boot/dts/exynos/exynos7-espresso.dts
->>>>> @@ -53,6 +53,355 @@
->>>>>           status = "okay";
->>>>>    };
->>>>>
->>>>> +&hsi2c_4 {
->>>>> +       samsung,i2c-sda-delay = <100>;
->>>>> +       samsung,i2c-max-bus-freq = <200000>;
->>>>> +       status = "okay";
->>>>> +
->>>>> +       s2mps15_pmic at 66 {
->>>>> +               compatible = "samsung,s2mps15-pmic";
->>>>> +               reg = <0x66>;
->>>>> +               interrupts = <2 0>;
->>>>> +               interrupt-parent = <&gpa0>;
->>>>> +               pinctrl-names = "default";
->>>>> +               pinctrl-0 = <&pmic_irq>;
->>>>> +               wakeup-source;
->>>>> +
->>>>> +               s2mps15_osc: clocks {
->>>>> +                       compatible = "samsung,s2mps13-clk";
->>>>> +                       #clock-cells = <1>;
->>>>> +                       clock-output-names = "s2mps13_ap",
->>>>> "s2mps13_cp",
->>>>> +                               "s2mps13_bt";
->>>>> +               };
->>>>
->>>>
->>>> Don't you want to use one of these clocks for s3c-rtc (&rtc node)?
->>>>
->>> yes, you are right, rtc on this board is currently broken, mainly
->>> because of
->>> the introduction of rtc_src clock in the s3c-rtc driver.
->>> That is on my do list next. will take a look.
->>>
->>> Are you suggesting to remove this -clk node now and add along with rtc
->>> changes? I feel this should go in along with this patch.
->>
->> Just add it in consecutive patch in this series. You added here some
->> providers (clock and regulators) without consumers. This of course
->> looks good as a way of providing full description of the board but:
->> 1. For regulators always on: may be meaningless for kernel. Kernel
->> does not use it. Existence of regulator subnode will fulfill driver's
->> needs for probe.
->> 2. For clocks: actually will disable these clocks because of lack of
->> consumers... which is fine but probably not what you wanted.
->>
->> The standard approach is to add such providers when they are needed -
->> there are some consumers using them.
->>
-> OK. for now will keep the pmic clock added as clock will be in disabled
-> state, so it wont harm.
-> - will keep system related regulator like supply to arm,mif,int etc ..
-> will remove supplies to other peripherals IPs. Hope thats fine.
+The purpose of this patch is to start the process of replacing both
+ARCH_SHMOBILE and ARCH_SHMOBILE_MULTI with ARCH_RENESAS. The motivation
+being that as time has moved on Renesas has become a name than shmobile for
+the majority Renesas 32-bit ARM based SoCs. The name is, conveniently, also
+applicable to (older) Renesas SH based SoCs and (newer) ARM64 based SoCs
+although this patch only addresses 32-bit ARM.
 
-You don't have to remove other regulators (these without consumers).
-Describe in DT all of regulators but:
-1. Add to some of them consumers;
-2. Disable these which are not needed (by not marking always-enabled).
+It is envisaged that follow up work may address migrating both
+SH SoCs and drivers from ARCH_SHMOBILE and ARCH_SHMOBILE_MULTI to
+ARCH_RENESAS.
 
-Just like for all other boards.
+Proposed support for the r8a7795 ARM64 based SoC already uses ARCH_RENESAS
+which selects ARCH_SHMOBILE.
 
-Best regards,
-Krzysztof
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+
+---
+* ARM64 patch is
+  "[PATCH v12 1/7] arm64: renesas: r8a7795: Add Renesas R8A7795 SoC support"
+  http://www.spinics.net/lists/arm-kernel/msg455822.html
+---
+ arch/arm/configs/multi_v7_defconfig |  2 +-
+ arch/arm/configs/shmobile_defconfig |  2 +-
+ arch/arm/mach-shmobile/Kconfig      | 10 +++++++---
+ 3 files changed, 9 insertions(+), 5 deletions(-)
+
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index a5c6ebf39b0a..dc4a216e2e41 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -73,7 +73,7 @@ CONFIG_MACH_SPEAR1340=y
+ CONFIG_ARCH_STI=y
+ CONFIG_ARCH_EXYNOS=y
+ CONFIG_EXYNOS5420_MCPM=y
+-CONFIG_ARCH_SHMOBILE_MULTI=y
++CONFIG_ARCH_RENESAS=y
+ CONFIG_ARCH_EMEV2=y
+ CONFIG_ARCH_R7S72100=y
+ CONFIG_ARCH_R8A73A4=y
+diff --git a/arch/arm/configs/shmobile_defconfig b/arch/arm/configs/shmobile_defconfig
+index 3aef019c0de7..cc8ece33a7e3 100644
+--- a/arch/arm/configs/shmobile_defconfig
++++ b/arch/arm/configs/shmobile_defconfig
+@@ -9,7 +9,7 @@ CONFIG_SYSCTL_SYSCALL=y
+ CONFIG_EMBEDDED=y
+ CONFIG_PERF_EVENTS=y
+ CONFIG_SLAB=y
+-CONFIG_ARCH_SHMOBILE_MULTI=y
++CONFIG_ARCH_RENESAS=y
+ CONFIG_ARCH_EMEV2=y
+ CONFIG_ARCH_R7S72100=y
+ CONFIG_ARCH_R8A73A4=y
+diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
+index 88734a5e10ca..676e11d44e41 100644
+--- a/arch/arm/mach-shmobile/Kconfig
++++ b/arch/arm/mach-shmobile/Kconfig
+@@ -1,6 +1,8 @@
+ config ARCH_SHMOBILE
+ 	bool
+-	select ZONE_DMA if ARM_LPAE
++
++config ARCH_SHMOBILE_MULTI
++	bool
+ 
+ config PM_RCAR
+ 	bool
+@@ -29,10 +31,11 @@ config ARCH_RMOBILE
+ 	select SYS_SUPPORTS_SH_CMT
+ 	select SYS_SUPPORTS_SH_TMU
+ 
+-menuconfig ARCH_SHMOBILE_MULTI
++config ARCH_RENESAS
+ 	bool "Renesas ARM SoCs" if ARCH_MULTI_V7
+ 	depends on MMU
+ 	select ARCH_SHMOBILE
++	select ARCH_SHMOBILE_MULTI
+ 	select HAVE_ARM_SCU if SMP
+ 	select HAVE_ARM_TWD if SMP
+ 	select ARM_GIC
+@@ -40,8 +43,9 @@ menuconfig ARCH_SHMOBILE_MULTI
+ 	select NO_IOPORT_MAP
+ 	select PINCTRL
+ 	select ARCH_REQUIRE_GPIOLIB
++	select ZONE_DMA if ARM_LPAE
+ 
+-if ARCH_SHMOBILE_MULTI
++if ARCH_RENESAS
+ 
+ #comment "Renesas ARM SoCs System Type"
+ 
+-- 
+2.1.4
