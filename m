@@ -1,58 +1,104 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Thu, 05 Nov 2015 10:40:30 +0100
-Subject: [PATCH v2] pwm-backlight: fix the panel power sequence
-In-Reply-To: <1446601656.15340.11.camel@mtksdaap41>
-References: <1444987060-48202-1-git-send-email-yh.huang@mediatek.com>
- <1444988219.3541.3.camel@pengutronix.de>
- <1445526750.27586.8.camel@mtksdaap41>
- <1446133259.3274.52.camel@pengutronix.de>
- <1446190900.17558.16.camel@mtksdaap41>
- <1446201271.3334.22.camel@pengutronix.de>
- <1446538299.2449.8.camel@mtksdaap41>
- <1446548924.3373.3.camel@pengutronix.de>
- <1446601656.15340.11.camel@mtksdaap41>
-Message-ID: <1446716430.3894.12.camel@pengutronix.de>
+From: gabriele.paoloni@huawei.com (Gabriele Paoloni)
+Date: Thu, 5 Nov 2015 09:43:12 +0000
+Subject: [PATCH RFC 7/7] irqchip: [Example] dummy wired interrupt/MSI
+ bridge driver
+In-Reply-To: <563B22F1.901@arm.com>
+References: <1444923568-17413-1-git-send-email-marc.zyngier@arm.com>
+ <1444923568-17413-8-git-send-email-marc.zyngier@arm.com>
+ <5639BB10.1090108@huawei.com> <5639C9F9.2010704@arm.com>
+ <EE11001F9E5DDD47B7634E2F8A612F2E1629D8DD@lhreml503-mbs>
+ <563B22F1.901@arm.com>
+Message-ID: <EE11001F9E5DDD47B7634E2F8A612F2E1629EF42@lhreml503-mbs>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Mittwoch, den 04.11.2015, 09:47 +0800 schrieb YH Huang:
-> On Tue, 2015-11-03 at 12:08 +0100, Philipp Zabel wrote:
-> > Hi YH,
-> > 
-> > Am Dienstag, den 03.11.2015, 16:11 +0800 schrieb YH Huang:
-> > > > The reasoning is that devices where there is no phandle link pointing to
-> > > > the backlight (for example from a simple-panel node), we should keep the
-> > > > current default behaviour (enable during probe).
-> > > 
-> > > I have a little problem for the current default behaviour.
-> > > Should we enable during probe?
-> > 
-> > Here I mean enabling the backlight (at the end of the probe function),
-> > not enabling the GPIO already when requesting it.
-> > 
-> > > Before this patch ( http://patchwork.ozlabs.org/patch/324690/ ),
-> > > we disable "enable-gpio" in the probe function.
-> > 
-> > While before this patch the GPIO would be initialized in the disabled
-> > state, the call to backlight_update_status at the end of the probe
-> > function would still enable the backlight afterwards.
+> -----Original Message-----
+> From: Marc Zyngier [mailto:marc.zyngier at arm.com]
+> Sent: Thursday, November 05, 2015 9:36 AM
+> To: Gabriele Paoloni; majun (F); Thomas Gleixner; Jiang Liu; Jason
+> Cooper
+> Cc: linux-arm-kernel at lists.infradead.org; linux-pci at vger.kernel.org;
+> linux-kernel at vger.kernel.org
+> Subject: Re: [PATCH RFC 7/7] irqchip: [Example] dummy wired
+> interrupt/MSI bridge driver
 > 
-> Based on this, could we disable it initially and update in the
-> backlight_update_status function?
+> On 05/11/15 08:25, Gabriele Paoloni wrote:
+> > Hi Marc
+> >
+> >> -----Original Message-----
+> >> From: linux-pci-owner at vger.kernel.org [mailto:linux-pci-
+> owner at vger.kernel.org]
+> >> On Behalf Of Marc Zyngier
+> >> Sent: 04 November 2015 09:04
+> >> To: majun (F); Thomas Gleixner; Jiang Liu; Jason Cooper
+> >> Cc: linux-arm-kernel at lists.infradead.org; linux-pci at vger.kernel.org;
+> linux-
+> >> kernel at vger.kernel.org
+> >> Subject: Re: [PATCH RFC 7/7] irqchip: [Example] dummy wired
+> interrupt/MSI
+> >> bridge driver
+> >>
+> >> On 04/11/15 08:00, majun (F) wrote:
 > 
-> Like this,
+> [...]
 > 
-> if (pb->enable_gpio) {
-> 	if (phandle &&
-> 	    gpiod_get_direction(pb->enable_gpio) == GPIOF_DIR_OUT &&
-> 	    gpiod_get_value(pb->enable_gpio) == 1)
-> 		gpiod_direction_output(pb->enable_gpio, 1);
+> >>> I think,for a interrupt controller, msichip driver initialization
+> maybe is
+> >> too late
+> >>> for some devices which connect to this irqchip if we use
+> >> module_platform_driver.
+> >>
+> >> That's a consequence of this design. This is why I insisted on the
+> fact
+> >> that this is currently avoided by using deferred probe in drivers,
+> and
+> >
+> > Mmm using te deferred probe would mean to rework all the drivers of
+> the
+> > potential devices connected to mbi-gen...would that be
+> sustainable/acceptable?
+> 
+> I'm tempted to reply "Not my problem". Or rather, not a problem I'm
+> trying to solve right now (or any time soon).
+> 
+> I'm pretty sure that sprinkling -EPROBE_DEFER on all possible drivers
+> will result in a resounding NAK, which is is why I suggested that
+> someone with a vested interest dedicates some quality time helping
+> those
+> who are trying to solve this issue for good.
 
-The gpiod_direction_output call is a no-op, since the direction is
-already output and the value is already 1.
-Also, I propose to set initial blanking to FB_BLANK_POWERDOWN in this
-case, and wait for the panel driver to enable the backlight at the
-appropriate time.
+Yes you're right, makes perfect sense
 
-regards
-Philipp
+> 
+> >> that it should be solved by having a probe order. Either way, this
+> is
+> >> not something that we can solve at that level (see the multiple
+> proposal
+> >> for this on the various lists).
+> >
+> > Could you point me to the relevant discussions for this...?
+> 
+> Google is, as always, your dearest friend. But here you go:
+> 
+> - LWN has some quality coverage of the KS discussions (assuming you're
+> a
+> subscriber, otherwise you'll have to wait for another week):
+> http://lwn.net/Articles/662820/
+> 
+> - There is also Tomeu Vizoso's series, which itself builds upon other
+> previous attempts at solving this: https://lwn.net/Articles/658690/
+> 
+
+Great, many thanks for pointing them out.
+
+I'll look into these.
+
+Thanks again
+
+Gab
+
+> Thanks,
+> 
+> 	M.
+> --
+> Jazz is not dead. It just smells funny...
