@@ -1,42 +1,41 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Thu, 5 Nov 2015 21:10:50 +0900
-Subject: [PATCH/RFC] ARM: shmobile: Introduce ARCH_RENESAS
-In-Reply-To: <563B3ACB.9050807@cogentembedded.com>
-References: <1446702397-24078-1-git-send-email-horms+renesas@verge.net.au>
- <563B3ACB.9050807@cogentembedded.com>
-Message-ID: <20151105121049.GC711@verge.net.au>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Thu, 5 Nov 2015 13:10:54 +0100
+Subject: [PATCH] ARM: dts: zynq: describe SLCR as simple-mfd rather than
+ simple-bus
+In-Reply-To: <1446713167-29306-1-git-send-email-yamada.masahiro@socionext.com>
+References: <1446713167-29306-1-git-send-email-yamada.masahiro@socionext.com>
+Message-ID: <563B474E.2000106@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 05, 2015 at 02:17:31PM +0300, Sergei Shtylyov wrote:
-> Hello.
+On 11/05/2015 09:46 AM, Masahiro Yamada wrote:
+> The SLCR (System-Level Control Registers) block is an MFD (Multi
+> Function Device) rather than a bus.
 > 
-> On 11/5/2015 8:46 AM, Simon Horman wrote:
+> "simple-mfd" seems a more suitable compatible string than "simple-bus".
 > 
-> >The purpose of this patch is to start the process of replacing both
-> >ARCH_SHMOBILE and ARCH_SHMOBILE_MULTI with ARCH_RENESAS. The motivation
-> >being that as time has moved on Renesas has become a name than shmobile for
-> >the majority Renesas 32-bit ARM based SoCs.
+> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+> ---
 > 
->    Couldn't parse this sentence. :-)
+>  arch/arm/boot/dts/zynq-7000.dtsi | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/boot/dts/zynq-7000.dtsi b/arch/arm/boot/dts/zynq-7000.dtsi
+> index 1a5220e..64ddd4d 100644
+> --- a/arch/arm/boot/dts/zynq-7000.dtsi
+> +++ b/arch/arm/boot/dts/zynq-7000.dtsi
+> @@ -238,7 +238,7 @@
+>  		slcr: slcr at f8000000 {
+>  			#address-cells = <1>;
+>  			#size-cells = <1>;
+> -			compatible = "xlnx,zynq-slcr", "syscon", "simple-bus";
+> +			compatible = "xlnx,zynq-slcr", "syscon", "simple-mfd";
+>  			reg = <0xF8000000 0x1000>;
+>  			ranges;
+>  			clkc: clkc at 100 {
+> 
 
-RENESAS seems to be a more appropriate name that SHMOBILE for the
-majority of Renesas 32-bit ARM based SoCs.
+Applied.
 
-> >The name is, conveniently, also
-> >applicable to (older) Renesas SH based SoCs and (newer) ARM64 based SoCs
-> >although this patch only addresses 32-bit ARM.
-> >
-> >It is envisaged that follow up work may address migrating both
-> >SH SoCs and drivers from ARCH_SHMOBILE and ARCH_SHMOBILE_MULTI to
-> >ARCH_RENESAS.
-> >
-> >Proposed support for the r8a7795 ARM64 based SoC already uses ARCH_RENESAS
-> >which selects ARCH_SHMOBILE.
-> >
-> >Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> 
-> [...]
-> 
-> MBR, Sergei
-> 
+Thanks,
+Michal
