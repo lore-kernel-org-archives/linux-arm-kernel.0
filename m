@@ -1,67 +1,331 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu,  5 Nov 2015 11:50:35 +0000
-Subject: [PATCH] mm: slab: Only move management objects off-slab for sizes
- larger than KMALLOC_MIN_SIZE
-In-Reply-To: <20151105043155.GA20374@js1304-P5Q-DELUXE>
-References: <20151105043155.GA20374@js1304-P5Q-DELUXE>
-Message-ID: <1446724235-31400-1-git-send-email-catalin.marinas@arm.com>
+From: alim.akhtar@samsung.com (Alim Akhtar)
+Date: Thu, 05 Nov 2015 17:22:20 +0530
+Subject: [PATCH v2 1/2] arm64: dts: exynos7: Add pmic s2mps15 device tree node
+Message-ID: <1446724341-3568-1-git-send-email-alim.akhtar@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 8fc9cf420b36 ("slab: make more slab management structure off the
-slab") enables off-slab management objects for sizes starting with
-PAGE_SIZE >> 5. This means 128 bytes for a 4KB page configuration.
-However, on systems with a KMALLOC_MIN_SIZE of 128 (arm64 in 4.4), such
-optimisation does not make sense since the slab management allocation
-would take 128 bytes anyway (even though freelist_size is 32) with the
-additional overhead of another allocation.
+This patch add pmic (s2mps15) node of espresso board,
+which includes addition of regulators and pmic-clk sub-nodes.
 
-This patch introduces an OFF_SLAB_MIN_SIZE macro which takes
-KMALLOC_MIN_SIZE into account. It also solves a slab bug on arm64 where
-the first kmalloc_cache to be initialised after slab_early_init = 0,
-"kmalloc-128", fails to allocate off-slab management objects from the
-same "kmalloc-128" cache.
+This patch also adds {vmmc,vqmmc}-supply properties for mmc2 node.
 
-Fixes: 8fc9cf420b36 ("slab: make more slab management structure off the slab")
-Cc: <stable@vger.kernel.org> # 3.15+
-Reported-by: Geert Uytterhoeven <geert@linux-m68k.org>
-Cc: Christoph Lameter <cl@linux.com>
-Cc: Pekka Enberg <penberg@kernel.org>
-Cc: David Rientjes <rientjes@google.com>
-Cc: Joonsoo Kim <iamjoonsoo.kim@lge.com>
-Cc: Andrew Morton <akpm@linux-foundation.org>
-Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
+Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
+Signed-off-by: Alim Akhtar <alim.akhtar@samsung.com>
+Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
 ---
- mm/slab.c | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
+Changes since v1:
+* Addressed Javier and Krzysztof review comments.
+* Removed unused ldo/buck nodes.
+* Removed always-on properties from ldo/buck to disable them
+* Added a consumer of pmic supply (like mmc)
 
-diff --git a/mm/slab.c b/mm/slab.c
-index 4fcc5dd8d5a6..419b649b395e 100644
---- a/mm/slab.c
-+++ b/mm/slab.c
-@@ -282,6 +282,7 @@ static void kmem_cache_node_init(struct kmem_cache_node *parent)
+ arch/arm64/boot/dts/exynos/exynos7-espresso.dts |  280 +++++++++++++++++++++++
+ 1 file changed, 280 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/exynos/exynos7-espresso.dts b/arch/arm64/boot/dts/exynos/exynos7-espresso.dts
+index 5424cc450f72..f5a3da50ac57 100644
+--- a/arch/arm64/boot/dts/exynos/exynos7-espresso.dts
++++ b/arch/arm64/boot/dts/exynos/exynos7-espresso.dts
+@@ -11,6 +11,7 @@
  
- #define CFLGS_OFF_SLAB		(0x80000000UL)
- #define	OFF_SLAB(x)	((x)->flags & CFLGS_OFF_SLAB)
-+#define OFF_SLAB_MIN_SIZE	(max_t(size_t, PAGE_SIZE >> 5, KMALLOC_MIN_SIZE + 1))
+ /dts-v1/;
+ #include "exynos7.dtsi"
++#include <dt-bindings/interrupt-controller/irq.h>
  
- #define BATCHREFILL_LIMIT	16
- /*
-@@ -2212,7 +2213,7 @@ __kmem_cache_create (struct kmem_cache *cachep, unsigned long flags)
- 	 * it too early on. Always use on-slab management when
- 	 * SLAB_NOLEAKTRACE to avoid recursive calls into kmemleak)
- 	 */
--	if ((size >= (PAGE_SIZE >> 5)) && !slab_early_init &&
-+	if (size >= OFF_SLAB_MIN_SIZE && !slab_early_init &&
- 	    !(flags & SLAB_NOLEAKTRACE))
- 		/*
- 		 * Size is large, assume best to place the slab management obj
-@@ -2276,7 +2277,7 @@ __kmem_cache_create (struct kmem_cache *cachep, unsigned long flags)
- 		/*
- 		 * This is a possibility for one of the kmalloc_{dma,}_caches.
- 		 * But since we go off slab only for object size greater than
--		 * PAGE_SIZE/8, and kmalloc_{dma,}_caches get created
-+		 * OFF_SLAB_MIN_SIZE, and kmalloc_{dma,}_caches get created
- 		 * in ascending order,this should not happen at all.
- 		 * But leave a BUG_ON for some lucky dude.
- 		 */
+ / {
+ 	model = "Samsung Exynos7 Espresso board based on EXYNOS7";
+@@ -52,6 +53,283 @@
+ 	status = "okay";
+ };
+ 
++&hsi2c_4 {
++	samsung,i2c-sda-delay = <100>;
++	samsung,i2c-max-bus-freq = <200000>;
++	status = "okay";
++
++	s2mps15_pmic at 66 {
++		compatible = "samsung,s2mps15-pmic";
++		reg = <0x66>;
++		interrupts = <2 IRQ_TYPE_NONE>;
++		interrupt-parent = <&gpa0>;
++		pinctrl-names = "default";
++		pinctrl-0 = <&pmic_irq>;
++		wakeup-source;
++
++		s2mps15_osc: clocks {
++			compatible = "samsung,s2mps13-clk";
++			#clock-cells = <1>;
++			clock-output-names = "s2mps13_ap", "s2mps13_cp",
++				"s2mps13_bt";
++		};
++
++		regulators {
++			ldo1_reg: LDO1 {
++				regulator-name = "vdd_ldo1";
++				regulator-min-microvolt = <500000>;
++				regulator-max-microvolt = <900000>;
++				regulator-always-on;
++				regulator-enable-ramp-delay = <125>;
++			};
++
++			ldo2_reg: LDO2 {
++				regulator-name = "vqmmc-sdcard";
++				regulator-min-microvolt = <1620000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-always-on;
++				regulator-enable-ramp-delay = <125>;
++			};
++
++			ldo3_reg: LDO3 {
++				regulator-name = "vdd_ldo3";
++				regulator-min-microvolt = <1620000>;
++				regulator-max-microvolt = <1980000>;
++				regulator-always-on;
++				regulator-boot-on;
++				regulator-enable-ramp-delay = <125>;
++			};
++
++			ldo4_reg: LDO4 {
++				regulator-name = "vdd_ldo4";
++				regulator-min-microvolt = <800000>;
++				regulator-max-microvolt = <1110000>;
++				regulator-always-on;
++				regulator-enable-ramp-delay = <125>;
++			};
++
++			ldo5_reg: LDO5 {
++				regulator-name = "vdd_ldo5";
++				regulator-min-microvolt = <1620000>;
++				regulator-max-microvolt = <1980000>;
++				regulator-always-on;
++				regulator-enable-ramp-delay = <125>;
++			};
++
++			ldo6_reg: LDO6 {
++				regulator-name = "vdd_ldo6";
++				regulator-min-microvolt = <2250000>;
++				regulator-max-microvolt = <3300000>;
++				regulator-enable-ramp-delay = <125>;
++			};
++
++			ldo7_reg: LDO7 {
++				regulator-name = "vdd_ldo7";
++				regulator-min-microvolt = <700000>;
++				regulator-max-microvolt = <1150000>;
++				regulator-enable-ramp-delay = <125>;
++			};
++
++			ldo8_reg: LDO8 {
++				regulator-name = "vdd_ldo8";
++				regulator-min-microvolt = <700000>;
++				regulator-max-microvolt = <1000000>;
++				regulator-enable-ramp-delay = <125>;
++			};
++
++			ldo9_reg: LDO9 {
++				regulator-name = "vdd_ldo9";
++				regulator-min-microvolt = <700000>;
++				regulator-max-microvolt = <1000000>;
++				regulator-enable-ramp-delay = <125>;
++			};
++
++			ldo10_reg: LDO10 {
++				regulator-name = "vdd_ldo10";
++				regulator-min-microvolt = <700000>;
++				regulator-max-microvolt = <1000000>;
++				regulator-enable-ramp-delay = <125>;
++			};
++
++			ldo11_reg: LDO11 {
++				regulator-name = "vdd_ldo11";
++				regulator-min-microvolt = <1000000>;
++				regulator-max-microvolt = <1300000>;
++				regulator-always-on;
++				regulator-enable-ramp-delay = <125>;
++			};
++
++			ldo12_reg: LDO12 {
++				regulator-name = "vdd_ldo12";
++				regulator-min-microvolt = <1000000>;
++				regulator-max-microvolt = <1300000>;
++				regulator-enable-ramp-delay = <125>;
++			};
++
++			ldo13_reg: LDO13 {
++				regulator-name = "vdd_ldo13";
++				regulator-min-microvolt = <1000000>;
++				regulator-max-microvolt = <1300000>;
++				regulator-always-on;
++				regulator-enable-ramp-delay = <125>;
++			};
++
++			ldo14_reg: LDO14 {
++				regulator-name = "vdd_ldo14";
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <3375000>;
++				regulator-enable-ramp-delay = <125>;
++			};
++
++			ldo17_reg: LDO17 {
++				regulator-name = "vmmc-sdcard";
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <3375000>;
++				regulator-enable-ramp-delay = <125>;
++			};
++
++			ldo18_reg: LDO18 {
++				regulator-name = "vdd_ldo18";
++				regulator-min-microvolt = <1500000>;
++				regulator-max-microvolt = <2275000>;
++				regulator-enable-ramp-delay = <125>;
++			};
++
++			ldo19_reg: LDO19 {
++				regulator-name = "vdd_ldo19";
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <3375000>;
++				regulator-enable-ramp-delay = <125>;
++			};
++
++			ldo21_reg: LDO21 {
++				regulator-name = "vdd_ldo21";
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <3375000>;
++				regulator-enable-ramp-delay = <125>;
++			};
++
++			ldo23_reg: LDO23 {
++				regulator-name = "vdd_ldo23";
++				regulator-min-microvolt = <1500000>;
++				regulator-max-microvolt = <2275000>;
++				regulator-enable-ramp-delay = <125>;
++			};
++
++			ldo25_reg: LDO25 {
++				regulator-name = "vdd_ldo25";
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <3375000>;
++				regulator-enable-ramp-delay = <125>;
++			};
++
++			ldo26_reg: LDO26 {
++				regulator-name = "vdd_ldo26";
++				regulator-min-microvolt = <700000>;
++				regulator-max-microvolt = <1470000>;
++				regulator-enable-ramp-delay = <125>;
++			};
++
++			ldo27_reg: LDO27 {
++				regulator-name = "vdd_ldo27";
++				regulator-min-microvolt = <1500000>;
++				regulator-max-microvolt = <2275000>;
++				regulator-enable-ramp-delay = <125>;
++			};
++
++			buck1_reg: BUCK1 {
++				regulator-name = "vdd_mif";
++				regulator-min-microvolt = <500000>;
++				regulator-max-microvolt = <1200000>;
++				regulator-always-on;
++				regulator-boot-on;
++				regulator-ramp-delay = <25000>;
++				regulator-enable-ramp-delay = <250>;
++			};
++
++			buck2_reg: BUCK2 {
++				regulator-name = "vdd_atlas";
++				regulator-min-microvolt = <1200000>;
++				regulator-max-microvolt = <1200000>;
++				regulator-always-on;
++				regulator-boot-on;
++				regulator-ramp-delay = <12500>;
++				regulator-enable-ramp-delay = <250>;
++			};
++
++			buck4_reg: BUCK4 {
++				regulator-name = "vdd_int";
++				regulator-min-microvolt = <500000>;
++				regulator-max-microvolt = <1200000>;
++				regulator-always-on;
++				regulator-boot-on;
++				regulator-ramp-delay = <12500>;
++				regulator-enable-ramp-delay = <250>;
++			};
++
++			buck5_reg: BUCK5 {
++				regulator-name = "vdd_buck5";
++				regulator-min-microvolt = <500000>;
++				regulator-max-microvolt = <1300000>;
++				regulator-ramp-delay = <25000>;
++				regulator-enable-ramp-delay = <250>;
++			};
++
++			buck6_reg: BUCK6 {
++				regulator-name = "vdd_g3d";
++				regulator-min-microvolt = <500000>;
++				regulator-max-microvolt = <1400000>;
++				regulator-ramp-delay = <12500>;
++				regulator-enable-ramp-delay = <250>;
++			};
++
++			buck7_reg: BUCK7 {
++				regulator-name = "vdd_buck7";
++				regulator-min-microvolt = <1000000>;
++				regulator-max-microvolt = <1500000>;
++				regulator-always-on;
++				regulator-ramp-delay = <25000>;
++				regulator-enable-ramp-delay = <250>;
++			};
++
++			buck8_reg: BUCK8 {
++				regulator-name = "vdd_buck8";
++				regulator-min-microvolt = <1000000>;
++				regulator-max-microvolt = <1500000>;
++				regulator-always-on;
++				regulator-ramp-delay = <25000>;
++				regulator-enable-ramp-delay = <250>;
++			};
++
++			buck9_reg: BUCK9 {
++				regulator-name = "vdd_buck9";
++				regulator-min-microvolt = <1800000>;
++				regulator-max-microvolt = <2100000>;
++				regulator-always-on;
++				regulator-ramp-delay = <25000>;
++				regulator-enable-ramp-delay = <250>;
++			};
++
++			buck10_reg: BUCK10 {
++				regulator-name = "vdd_buck10";
++				regulator-min-microvolt = <1000000>;
++				regulator-max-microvolt = <3000000>;
++				regulator-always-on;
++				regulator-ramp-delay = <25000>;
++				regulator-enable-ramp-delay = <250>;
++			};
++		};
++	};
++};
++
++&pinctrl_alive {
++	pmic_irq: pmic-irq {
++		samsung,pins = "gpa0-2";
++		samsung,pin-pud = <3>;
++		samsung,pin-drv = <3>;
++	};
++};
++
+ &mmc_0 {
+ 	status = "okay";
+ 	num-slots = <1>;
+@@ -80,5 +358,7 @@
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&sd2_clk &sd2_cmd &sd2_cd &sd2_bus1 &sd2_bus4>;
+ 	bus-width = <4>;
++	vmmc-supply = <&ldo17_reg>;
++	vqmmc-supply = <&ldo2_reg>;
+ 	disable-wp;
+ };
+-- 
+1.7.10.4
