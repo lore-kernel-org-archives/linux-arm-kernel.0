@@ -1,62 +1,46 @@
 From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Thu, 5 Nov 2015 15:33:38 +0000
-Subject: [PATCH v11 0/5] xen/arm/arm64: CONFIG_PARAVIRT and stolen ticks
- accounting
-Message-ID: <alpine.DEB.2.02.1511051502270.13541@kaball.uk.xensource.com>
+Date: Thu, 5 Nov 2015 15:34:53 +0000
+Subject: [PATCH v11 2/5] missing include asm/paravirt.h in cputime.c
+In-Reply-To: <alpine.DEB.2.02.1511051502270.13541@kaball.uk.xensource.com>
+References: <alpine.DEB.2.02.1511051502270.13541@kaball.uk.xensource.com>
+Message-ID: <1446737696-9749-2-git-send-email-stefano.stabellini@eu.citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+Add include asm/paravirt.h to cputime.c, as steal_account_process_tick
+calls paravirt_steal_clock, which is defined in asm/paravirt.h.
 
-I dusted off this series from Jan 2014. Patch #2 and #3 still need an ack.
+The ifdef CONFIG_PARAVIRT is necessary because not all archs have an
+asm/paravirt.h to include.
 
+Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+CC: mingo at redhat.com
+CC: peterz at infradead.org
 
-This patch series introduces stolen ticks accounting for Xen on ARM and
-ARM64.  Stolen ticks are clocksource ticks that have been "stolen" from
-the cpu, typically because Linux is running in a virtual machine and the
-vcpu has been descheduled.  To account for these ticks we introduce
-CONFIG_PARAVIRT and pv_time_ops so that we can make use of:
-
-kernel/sched/cputime.c:steal_account_process_tick
-
+---
 
 Changes in v11:
-- add ifdef CONFIG_PARAVIRT to kernel/sched/cputime.c, because not all
-  architectures have an asm/paravirt.h header file to include
+- add ifdef CONFIG_PARAVIRT to cputime.c, because not all architectures
+  have an asm/paravirt.h header file to include
 - drop the removal of ifdef CONFIG_PARAVIRT from kernel/sched/core.c for
   the same reason
+---
+ kernel/sched/cputime.c |    3 +++
+ 1 file changed, 3 insertions(+)
 
-
-Stefano Stabellini (5):
-      xen: move xen_setup_runstate_info and get_runstate_snapshot to drivers/xen/time.c
-      missing include asm/paravirt.h in cputime.c
-      arm: introduce CONFIG_PARAVIRT, PARAVIRT_TIME_ACCOUNTING and pv_time_ops
-      arm64: introduce CONFIG_PARAVIRT, PARAVIRT_TIME_ACCOUNTING and pv_time_ops
-      xen/arm: account for stolen ticks
-
- arch/arm/Kconfig                  |   20 ++++++++
- arch/arm/include/asm/paravirt.h   |   20 ++++++++
- arch/arm/kernel/Makefile          |    1 +
- arch/arm/kernel/paravirt.c        |   25 ++++++++++
- arch/arm/xen/enlighten.c          |   21 +++++++++
- arch/arm64/Kconfig                |   20 ++++++++
- arch/arm64/include/asm/paravirt.h |   20 ++++++++
- arch/arm64/kernel/Makefile        |    1 +
- arch/arm64/kernel/paravirt.c      |   25 ++++++++++
- arch/x86/xen/time.c               |   76 +------------------------------
- drivers/xen/Makefile              |    2 +-
- drivers/xen/time.c                |   91 +++++++++++++++++++++++++++++++++++++
- include/xen/xen-ops.h             |    5 ++
- kernel/sched/cputime.c            |    3 ++
- 14 files changed, 254 insertions(+), 76 deletions(-)
- create mode 100644 arch/arm/include/asm/paravirt.h
- create mode 100644 arch/arm/kernel/paravirt.c
- create mode 100644 arch/arm64/include/asm/paravirt.h
- create mode 100644 arch/arm64/kernel/paravirt.c
- create mode 100644 drivers/xen/time.c
-
-
-
-Cheers,
-
-Stefano
+diff --git a/kernel/sched/cputime.c b/kernel/sched/cputime.c
+index 8cbc3db..c7a27c4 100644
+--- a/kernel/sched/cputime.c
++++ b/kernel/sched/cputime.c
+@@ -5,6 +5,9 @@
+ #include <linux/static_key.h>
+ #include <linux/context_tracking.h>
+ #include "sched.h"
++#ifdef CONFIG_PARAVIRT
++#include <asm/paravirt.h>
++#endif
+ 
+ 
+ #ifdef CONFIG_IRQ_TIME_ACCOUNTING
+-- 
+1.7.10.4
