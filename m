@@ -1,46 +1,20 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 5 Nov 2015 17:31:14 +0000
-Subject: [PATCH] arm64: cmpxchg_dbl: fix return value type
-In-Reply-To: <1446732056-31294-1-git-send-email-lorenzo.pieralisi@arm.com>
-References: <1446732056-31294-1-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <20151105173114.GU7637@e104818-lin.cambridge.arm.com>
+From: cl@linux.com (Christoph Lameter)
+Date: Thu, 5 Nov 2015 11:39:46 -0600 (CST)
+Subject: [PATCH] mm: slab: Only move management objects off-slab for
+ sizes larger than KMALLOC_MIN_SIZE
+In-Reply-To: <1446724235-31400-1-git-send-email-catalin.marinas@arm.com>
+References: <20151105043155.GA20374@js1304-P5Q-DELUXE>
+ <1446724235-31400-1-git-send-email-catalin.marinas@arm.com>
+Message-ID: <alpine.DEB.2.20.1511051139220.28479@east.gentwo.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 05, 2015 at 02:00:56PM +0000, Lorenzo Pieralisi wrote:
-> The current arm64 __cmpxchg_double{_mb} implementations carry out the
-> compare exchange by first comparing the old values passed in to the
-> values read from the pointer provided and by stashing the cumulative
-> bitwise difference in a 64-bit register.
-> 
-> By comparing the register content against 0, it is possible to detect if
-> the values read differ from the old values passed in, so that the compare
-> exchange detects whether it has to bail out or carry on completing the
-> operation with the exchange.
-> 
-> Given the current implementation, to detect the cmpxchg operation
-> status, the __cmpxchg_double{_mb} functions should return the 64-bit
-> stashed bitwise difference so that the caller can detect cmpxchg failure
-> by comparing the return value content against 0. The current implementation
-> declares the return value as an int, which means that the 64-bit
-> value stashing the bitwise difference is truncated before being
-> returned to the __cmpxchg_double{_mb} callers, which means that
-> any bitwise difference present in the top 32 bits goes undetected,
-> triggering false positives and subsequent kernel failures.
-> 
-> This patch fixes the issue by declaring the arm64 __cmpxchg_double{_mb}
-> return values as a long, so that the bitwise difference is
-> properly propagated on failure, restoring the expected behaviour.
-> 
-> Fixes: e9a4b795652f ("arm64: cmpxchg_dbl: patch in lse instructions when
-> supported by the CPU")
-> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Cc: <stable@vger.kernel.org>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Catalin Marinas <catalin.marinas@arm.com>
-> Cc: Marc Zyngier <marc.zyngier@arm.com>
+On Thu, 5 Nov 2015, Catalin Marinas wrote:
 
-Applied (I'll send it sometime this merging window). Thanks.
+> This patch introduces an OFF_SLAB_MIN_SIZE macro which takes
+> KMALLOC_MIN_SIZE into account. It also solves a slab bug on arm64 where
+> the first kmalloc_cache to be initialised after slab_early_init = 0,
+> "kmalloc-128", fails to allocate off-slab management objects from the
+> same "kmalloc-128" cache.
 
--- 
-Catalin
+Acked-by: Christoph Lameter <cl@linux.com>
