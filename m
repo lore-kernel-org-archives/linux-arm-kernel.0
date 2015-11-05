@@ -1,96 +1,36 @@
-From: p.fedin@samsung.com (Pavel Fedin)
-Date: Thu, 05 Nov 2015 15:03:03 +0300
-Subject: [PATCH v6 4/4] ARM: dts: Add Ethernet chip to SMDK5410
-In-Reply-To: <cover.1446724046.git.p.fedin@samsung.com>
-References: <cover.1446724046.git.p.fedin@samsung.com>
-Message-ID: <27f540c1990df410bc20dcac7a35bede19fdb45b.1446724046.git.p.fedin@samsung.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Thu, 5 Nov 2015 21:09:23 +0900
+Subject: [PATCH/RFC] ARM: shmobile: Introduce ARCH_RENESAS
+In-Reply-To: <3748528.BkhGxHFj5s@wuerfel>
+References: <1446702397-24078-1-git-send-email-horms+renesas@verge.net.au>
+ <3748528.BkhGxHFj5s@wuerfel>
+Message-ID: <20151105120923.GB711@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The chip is smsc9115, connected via SROMc bank 3. Additionally, some GPIO
-initialization is required.
+On Thu, Nov 05, 2015 at 09:43:31AM +0100, Arnd Bergmann wrote:
+> On Thursday 05 November 2015 14:46:37 Simon Horman wrote:
+> >  config PM_RCAR
+> >         bool
+> > @@ -29,10 +31,11 @@ config ARCH_RMOBILE
+> >         select SYS_SUPPORTS_SH_CMT
+> >         select SYS_SUPPORTS_SH_TMU
+> >  
+> > -menuconfig ARCH_SHMOBILE_MULTI
+> > +config ARCH_RENESAS
+> >         bool "Renesas ARM SoCs" if ARCH_MULTI_V7
+> >         depends on MMU
+> >         select ARCH_SHMOBILE
+> > +       select ARCH_SHMOBILE_MULTI
+> >         select HAVE_ARM_SCU if SMP
+> >         select HAVE_ARM_TWD if SMP
+> >         select ARM_GIC
+> > 
+> 
+> The patch looks mostly good to me, but please leave this as a
+> 'menuconfig' rather than 'config'. I'd like to keep having one
+> Kconfig submenu for each mach-* directory, as most platforms
+> do today. We should really fix the ones that don't currently do
+> it like this.
 
-Signed-off-by: Pavel Fedin <p.fedin@samsung.com>
----
- arch/arm/boot/dts/exynos5410-smdk5410.dts | 41 +++++++++++++++++++++++++++++++
- arch/arm/boot/dts/exynos5410.dtsi         |  6 +++++
- 2 files changed, 47 insertions(+)
-
-diff --git a/arch/arm/boot/dts/exynos5410-smdk5410.dts b/arch/arm/boot/dts/exynos5410-smdk5410.dts
-index cebeaab..373abf7 100644
---- a/arch/arm/boot/dts/exynos5410-smdk5410.dts
-+++ b/arch/arm/boot/dts/exynos5410-smdk5410.dts
-@@ -11,6 +11,7 @@
- 
- /dts-v1/;
- #include "exynos5410.dtsi"
-+#include <dt-bindings/interrupt-controller/irq.h>
- / {
- 	model = "Samsung SMDK5410 board based on EXYNOS5410";
- 	compatible = "samsung,smdk5410", "samsung,exynos5410", "samsung,exynos5";
-@@ -61,6 +62,46 @@
- 	disable-wp;
- };
- 
-+&pinctrl_0 {
-+	srom_ctl: srom-ctl {
-+		samsung,pins = "gpy0-3", "gpy0-4", "gpy0-5",
-+			       "gpy1-0", "gpy1-1", "gpy1-2", "gpy1-3";
-+		samsung,pin-function = <2>;
-+		samsung,pin-drv = <0>;
-+	};
-+
-+	srom_ebi: srom-ebi {
-+		samsung,pins = "gpy3-0", "gpy3-1", "gpy3-2", "gpy3-3",
-+			       "gpy3-4", "gpy3-5", "gpy3-6", "gpy3-7",
-+			       "gpy5-0", "gpy5-1", "gpy5-2", "gpy5-3",
-+			       "gpy5-4", "gpy5-5", "gpy5-6", "gpy5-7",
-+			       "gpy6-0", "gpy6-1", "gpy6-2", "gpy6-3",
-+			       "gpy6-4", "gpy6-5", "gpy6-6", "gpy6-7";
-+		samsung,pin-function = <2>;
-+		samsung,pin-pud = <3>;
-+		samsung,pin-drv = <0>;
-+	};
-+};
-+
-+&sromc {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&srom_ctl>, <&srom_ebi>;
-+
-+	ethernet at 3 {
-+		compatible = "smsc,lan9115";
-+		reg = <3 0 0x10000>;
-+		phy-mode = "mii";
-+		interrupt-parent = <&gpx0>;
-+		interrupts = <5 IRQ_TYPE_LEVEL_LOW>;
-+		reg-io-width = <2>;
-+		smsc,irq-push-pull;
-+		smsc,force-internal-phy;
-+
-+		samsung,srom-page-mode = <1>;
-+		samsung,srom-timing = <9 12 1 9 1 1>;
-+	};
-+};
-+
- &uart0 {
- 	status = "okay";
- };
-diff --git a/arch/arm/boot/dts/exynos5410.dtsi b/arch/arm/boot/dts/exynos5410.dtsi
-index e2b58f8..9cfb814 100644
---- a/arch/arm/boot/dts/exynos5410.dtsi
-+++ b/arch/arm/boot/dts/exynos5410.dtsi
-@@ -104,6 +104,12 @@
- 		sromc: sromc at 12250000 {
- 			compatible = "samsung,exynos-srom";
- 			reg = <0x12250000 0x14>;
-+			#address-cells = <2>;
-+			#size-cells = <1>;
-+			ranges = <0 0 0x04000000 0x20000
-+				  1 0 0x05000000 0x20000
-+				  2 0 0x06000000 0x20000
-+				  3 0 0x07000000 0x20000>;
- 		};
- 
- 		pmu_system_controller: system-controller at 10040000 {
--- 
-2.4.4
+Sure, will do.
