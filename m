@@ -1,32 +1,59 @@
-From: marex@denx.de (Marek Vasut)
-Date: Thu, 5 Nov 2015 05:01:13 +0100
-Subject: [PATCH V3 2/3] ARM: at91/dt: sama5d4: Add pinmux for 8-bit MMC0
- bus
-In-Reply-To: <563AC75F.3040602@atmel.com>
-References: <563ABBCD.8090802@atmel.com>
- <1446690301-8602-1-git-send-email-marex@denx.de> <563AC75F.3040602@atmel.com>
-Message-ID: <201511050501.13905.marex@denx.de>
+From: jon.nettleton@gmail.com (Jon Nettleton)
+Date: Thu, 5 Nov 2015 05:23:47 +0100
+Subject: i.MX6: Increasing VPU frequency
+In-Reply-To: <CAH-u=81hMAF=r6rUKF+iuta3nC6n+4EDDz7Rn2-oGYbkbN0Jyg@mail.gmail.com>
+References: <CAH-u=82M1yCmPjBg5qeiC8JiHjM8+WsP+utX_VPKfJwJsu0QFg@mail.gmail.com>
+ <CALHpu366MPbxJinVL2QFM11gMHx-T=M9QXNoznOTh++oHGGmrA@mail.gmail.com>
+ <CAH-u=81hMAF=r6rUKF+iuta3nC6n+4EDDz7Rn2-oGYbkbN0Jyg@mail.gmail.com>
+Message-ID: <CALHpu34iKGTE=tENJTFOu13LxSozRjU9bwmGxnigUXgTDsXAQw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday, November 05, 2015 at 04:05:03 AM, Josh Wu wrote:
-> On 11/5/2015 10:25 AM, Marek Vasut wrote:
-> > Add pinmux for the 4 remaining signals used in 8-bit MMC 0
-> > bus configuration.
-> > 
-> > Signed-off-by: Marek Vasut <marex@denx.de>
-> > Cc: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> > Cc: Josh Wu <josh.wu@atmel.com>
-> > Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
-> > ---
-> 
-> Thanks Marek for the quick fix ;-),  and
+On Wed, Nov 4, 2015 at 8:33 PM, Jean-Michel Hautbois
+<jean-michel.hautbois@veo-labs.com> wrote:
+> 2015-11-04 18:04 GMT+01:00 Jon Nettleton <jon.nettleton@gmail.com>:
+>> On Wed, Nov 4, 2015 at 5:52 PM, Jean-Michel Hautbois
+>> <jean-michel.hautbois@veo-labs.com> wrote:
+>>> Hi !
+>>>
+>>> I can see in FSL kernel that VPU is configurable to 352M (it defaults
+>>> at 264MHz in mainline I think).
+>>> In the TRM, it is even specified at 352MHz as a default frequency,
+>>> with a maximum of 540MHz.
+>>>
+>>> Would it be possible to allow this clock rating modification if, for
+>>> instance, we select a performance governor in cpufreq, or if a coda
+>>> encoder is started with 1080p for instance ?
+>>> If so, then how is it doable properly ?
+>>
+>> For some reason the FSL kernel configures the VPU to run at 352Mhz in
+>> a very odd way that requires limiting the min cpu-frequency to 792Mhz.
+>> It also requires clocking down a bunch of devices on pll2_pfd2_396m to
+>> 352Mhz.
+>>
+>> The simple solution to this is to instead parent the VPU to
+>> pll2_pfd0_352m which is unused.  I have found by default it is stable
+>> decoding but unstable encoding at 352Mhz, most likely due to the
+>> voltage changes needed that limiting the min cpu-freq to 792Mhz
+>> provides.  However everything seems to work quite reliably clocking
+>> that pfd to 327Mhz, which still gives a boost of almost 24%
+>>
+>> In my testing the performance gain in then going from 327 to 352 is
+>> minimal.  Generally I think you hit AXI bus limitations rather than
+>> VPU performance.
+>
+> Interesting.
+> So you propose to add something like the following in
+> drivers/clk/imx/clk-imx6q.cdrivers/clk/imx/clk-imx6q.c :
+> imx_clk_set_rate(clk[IMX6QDL_CLK_PLL2_PFD0_352M], 327000000);
+> imx_clk_set_parent(clk[IMX6QDL_CLK_VPU_AXI_SEL],
+> clk[IMX6QDL_CLK_PLL2_PFD0_352M]);
+>
+> This should end up with a fastest VPU (in fact ~25% boost is good).
+> Is it the correct way to do it ?
+> Should it be done in coda instead ? And only when needed ?
 
-You're welcome :)
-
-> Reviewed-by: Josh Wu <josh.wu@atmel.com>
-
-Thanks!
-
-Best regards,
-Marek Vasut
+That is how I have done it.  I was going to implement dvfs for the vpu
+but found that this change really added minimal power and thermal
+overhead.  Without looking it up I believe I only saw a 10-20mA rise
+in power usage and virtually no thermal differences.
