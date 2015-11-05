@@ -1,76 +1,44 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 5 Nov 2015 16:48:20 +0000
-Subject: [PATCH v11 1/5] xen: move xen_setup_runstate_info and
- get_runstate_snapshot to drivers/xen/time.c
-In-Reply-To: <1446737696-9749-1-git-send-email-stefano.stabellini@eu.citrix.com>
-References: <alpine.DEB.2.02.1511051502270.13541@kaball.uk.xensource.com>
- <1446737696-9749-1-git-send-email-stefano.stabellini@eu.citrix.com>
-Message-ID: <20151105164820.GF32247@leverpostej>
+From: anton.bondarenko.sama@gmail.com (Anton Bondarenko)
+Date: Thu, 5 Nov 2015 17:51:09 +0100
+Subject: [PATCH v3 1/7] spi: imx: Fix DMA transfer
+In-Reply-To: <20151105083422.GH8526@pengutronix.de>
+References: <1446388901-6073-1-git-send-email-anton.bondarenko.sama@gmail.com>
+ <1446388901-6073-2-git-send-email-anton.bondarenko.sama@gmail.com>
+ <20151105083422.GH8526@pengutronix.de>
+Message-ID: <563B88FD.8050702@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 05.11.2015 09:34, Sascha Hauer wrote:
+> On Sun, Nov 01, 2015 at 03:41:35PM +0100, Anton Bondarenko wrote:
+>> From: Anton Bondarenko <anton_bondarenko@mentor.com>
+>>
+>> RX DMA tail data handling doesn't work correctly in many cases with
+>> current implementation. It happens because SPI core was setup
+>> to generates both RX watermark level and RX DATA TAIL events
+>> incorrectly. SPI transfer triggering for DMA also done in wrong way.
+>>
+>> SPI client wants to transfer 70 words for example. The old DMA
+>> implementation setup RX DATA TAIL equal 6 words. In this case
+>> RX DMA event will be generated after 6 words read from RX FIFO.
+>> The garbage can be read out from RX FIFO because SPI HW does
+>> not receive all required words to trigger RX watermark event.
+>>
+>> New implementation change handling of RX data tail. DMA is used to process
+>> all TX data and only full chunks of RX data with size aligned to FIFO/2.
+>> Driver is waiting until both TX and RX DMA transaction done and all
+>> TX data are pushed out. At that moment there is only RX data tail in
+>> the RX FIFO. This data read out using PIO.
+>
+> Have you looked at the RX_DMA_LENGTH and RXTDEN fields of the DMA
+> register? These seem to be for handling the remaining bytes of a DMA
+> transfer which do not reach the watermark level. From reading the
+> documentation I haven't really understood how it works though.
+>
+> Sascha
+>
 
-> +static u64 get64(const u64 *p)
-> +{
-> +	u64 ret;
-> +
-> +	if (BITS_PER_LONG < 64) {
-> +		u32 *p32 = (u32 *)p;
-> +		u32 h, l;
-> +
-> +		/*
-> +		 * Read high then low, and then make sure high is
-> +		 * still the same; this will only loop if low wraps
-> +		 * and carries into high.
-> +		 * XXX some clean way to make this endian-proof?
-> +		 */
-> +		do {
-> +			h = p32[1];
-> +			barrier();
-> +			l = p32[0];
-> +			barrier();
-> +		} while (p32[1] != h);
+A lot of times. Current implementation is trying to use it, but works 
+incorrectly if length % WML != 0 (which means RX_DMA_LENGTH == 0).
 
-I realise this is simply a move of existing code, but it may be better
-to instead have:
-
-do {
-	h = READ_ONCE(p32[1]);
-	l = READ_ONCE(p32[0]);
-} while (READ_ONCE(p32[1] != h);
-
-Which ensures that each load is a single access (though it almost
-certainly would be anyway), and prevents the compiler from having to
-reload any other memory locations (which the current barrier() usage
-forces).
-
-> +
-> +		ret = (((u64)h) << 32) | l;
-> +	} else
-> +		ret = *p;
-
-Likewise, this would be better as READ_ONCE(*p), to force a single
-access.
-
-> +
-> +	return ret;
-> +}
-
-> +	do {
-> +		state_time = get64(&state->state_entry_time);
-> +		barrier();
-> +		*res = *state;
-> +		barrier();
-
-You can also have:
-
-	*res = READ_ONCE(*state);
-
-That will which will handle the barriers implicitly.
-
-Thanks,
-Mark.
-
-> +	} while (get64(&state->state_entry_time) != state_time);
-> +}
+Regards, Anton
