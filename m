@@ -1,90 +1,127 @@
 From: amanieu@gmail.com (Amanieu d'Antras)
-Date: Thu,  5 Nov 2015 00:50:26 +0000
-Subject: [PATCH v2 07/20] arm64: Use generic compat_siginfo_t
+Date: Thu,  5 Nov 2015 00:50:27 +0000
+Subject: [PATCH v2 08/20] arm64: Use generic copy_siginfo_{to,from}_user32
 In-Reply-To: <1446684640-4112-1-git-send-email-amanieu@gmail.com>
 References: <1446684640-4112-1-git-send-email-amanieu@gmail.com>
-Message-ID: <1446684640-4112-8-git-send-email-amanieu@gmail.com>
+Message-ID: <1446684640-4112-9-git-send-email-amanieu@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Signed-off-by: Amanieu d'Antras <amanieu@gmail.com>
 ---
- arch/arm64/include/asm/compat.h | 60 -----------------------------------------
- 1 file changed, 60 deletions(-)
+ arch/arm64/include/asm/compat.h |  3 --
+ arch/arm64/kernel/signal32.c    | 85 -----------------------------------------
+ 2 files changed, 88 deletions(-)
 
 diff --git a/arch/arm64/include/asm/compat.h b/arch/arm64/include/asm/compat.h
-index 5eae749..dc7cfc1 100644
+index dc7cfc1..824be1dd 100644
 --- a/arch/arm64/include/asm/compat.h
 +++ b/arch/arm64/include/asm/compat.h
-@@ -155,69 +155,9 @@ typedef union compat_sigval {
+@@ -155,9 +155,6 @@ typedef union compat_sigval {
  	compat_uptr_t	sival_ptr;
  } compat_sigval_t;
  
--#define HAVE_ARCH_COMPAT_SIGINFO_T
- #define HAVE_ARCH_COPY_SIGINFO_TO_USER32
- #define HAVE_ARCH_COPY_SIGINFO_FROM_USER32
- 
--typedef struct compat_siginfo {
--	int si_signo;
--	int si_errno;
--	int si_code;
--
--	union {
--		int _pad[128/sizeof(int) - 3];
--
--		/* kill() */
--		struct {
--			compat_pid_t _pid;	/* sender's pid */
--			__compat_uid32_t _uid;	/* sender's uid */
--		} _kill;
--
--		/* POSIX.1b timers */
--		struct {
--			compat_timer_t _tid;	/* timer id */
--			int _overrun;		/* overrun count */
--			compat_sigval_t _sigval;	/* same as below */
--			int _sys_private;       /* not to be passed to user */
--		} _timer;
--
--		/* POSIX.1b signals */
--		struct {
--			compat_pid_t _pid;	/* sender's pid */
--			__compat_uid32_t _uid;	/* sender's uid */
--			compat_sigval_t _sigval;
--		} _rt;
--
--		/* SIGCHLD */
--		struct {
--			compat_pid_t _pid;	/* which child */
--			__compat_uid32_t _uid;	/* sender's uid */
--			int _status;		/* exit code */
--			compat_clock_t _utime;
--			compat_clock_t _stime;
--		} _sigchld;
--
--		/* SIGILL, SIGFPE, SIGSEGV, SIGBUS */
--		struct {
--			compat_uptr_t _addr; /* faulting insn/memory ref. */
--			short _addr_lsb; /* LSB of the reported address */
--		} _sigfault;
--
--		/* SIGPOLL */
--		struct {
--			compat_long_t _band;	/* POLL_IN, POLL_OUT, POLL_MSG */
--			int _fd;
--		} _sigpoll;
--
--		/* SIGSYS */
--		struct {
--			compat_uptr_t _call_addr; /* calling user insn */
--			int _syscall;	/* triggering system call number */
--			compat_uint_t _arch;	/* AUDIT_ARCH_* of syscall */
--		} _sigsys;
--	} _sifields;
--} compat_siginfo_t;
+-#define HAVE_ARCH_COPY_SIGINFO_TO_USER32
+-#define HAVE_ARCH_COPY_SIGINFO_FROM_USER32
 -
  #define COMPAT_OFF_T_MAX	0x7fffffff
  #define COMPAT_LOFF_T_MAX	0x7fffffffffffffffL
  
+diff --git a/arch/arm64/kernel/signal32.c b/arch/arm64/kernel/signal32.c
+index 71ef6dc..2a69815 100644
+--- a/arch/arm64/kernel/signal32.c
++++ b/arch/arm64/kernel/signal32.c
+@@ -125,91 +125,6 @@ static inline int get_sigset_t(sigset_t *set,
+ 	return 0;
+ }
+ 
+-int copy_siginfo_to_user32(compat_siginfo_t __user *to, const siginfo_t *from)
+-{
+-	int err;
+-
+-	if (!access_ok(VERIFY_WRITE, to, sizeof(*to)))
+-		return -EFAULT;
+-
+-	/* If you change siginfo_t structure, please be sure
+-	 * this code is fixed accordingly.
+-	 * It should never copy any pad contained in the structure
+-	 * to avoid security leaks, but must copy the generic
+-	 * 3 ints plus the relevant union member.
+-	 * This routine must convert siginfo from 64bit to 32bit as well
+-	 * at the same time.
+-	 */
+-	err = __put_user(from->si_signo, &to->si_signo);
+-	err |= __put_user(from->si_errno, &to->si_errno);
+-	err |= __put_user((short)from->si_code, &to->si_code);
+-	if (from->si_code < 0)
+-		err |= __copy_to_user(&to->_sifields._pad, &from->_sifields._pad,
+-				      SI_PAD_SIZE);
+-	else switch (from->si_code & __SI_MASK) {
+-	case __SI_KILL:
+-		err |= __put_user(from->si_pid, &to->si_pid);
+-		err |= __put_user(from->si_uid, &to->si_uid);
+-		break;
+-	case __SI_TIMER:
+-		 err |= __put_user(from->si_tid, &to->si_tid);
+-		 err |= __put_user(from->si_overrun, &to->si_overrun);
+-		 err |= __put_user(from->si_int, &to->si_int);
+-		break;
+-	case __SI_POLL:
+-		err |= __put_user(from->si_band, &to->si_band);
+-		err |= __put_user(from->si_fd, &to->si_fd);
+-		break;
+-	case __SI_FAULT:
+-		err |= __put_user((compat_uptr_t)(unsigned long)from->si_addr,
+-				  &to->si_addr);
+-#ifdef BUS_MCEERR_AO
+-		/*
+-		 * Other callers might not initialize the si_lsb field,
+-		 * so check explicitely for the right codes here.
+-		 */
+-		if (from->si_signo == SIGBUS &&
+-		    (from->si_code == BUS_MCEERR_AR || from->si_code == BUS_MCEERR_AO))
+-			err |= __put_user(from->si_addr_lsb, &to->si_addr_lsb);
+-#endif
+-		break;
+-	case __SI_CHLD:
+-		err |= __put_user(from->si_pid, &to->si_pid);
+-		err |= __put_user(from->si_uid, &to->si_uid);
+-		err |= __put_user(from->si_status, &to->si_status);
+-		err |= __put_user(from->si_utime, &to->si_utime);
+-		err |= __put_user(from->si_stime, &to->si_stime);
+-		break;
+-	case __SI_RT: /* This is not generated by the kernel as of now. */
+-	case __SI_MESGQ: /* But this is */
+-		err |= __put_user(from->si_pid, &to->si_pid);
+-		err |= __put_user(from->si_uid, &to->si_uid);
+-		err |= __put_user(from->si_int, &to->si_int);
+-		break;
+-	case __SI_SYS:
+-		err |= __put_user((compat_uptr_t)(unsigned long)
+-				from->si_call_addr, &to->si_call_addr);
+-		err |= __put_user(from->si_syscall, &to->si_syscall);
+-		err |= __put_user(from->si_arch, &to->si_arch);
+-		break;
+-	default: /* this is just in case for now ... */
+-		err |= __put_user(from->si_pid, &to->si_pid);
+-		err |= __put_user(from->si_uid, &to->si_uid);
+-		break;
+-	}
+-	return err;
+-}
+-
+-int copy_siginfo_from_user32(siginfo_t *to, compat_siginfo_t __user *from)
+-{
+-	if (copy_from_user(to, from, __ARCH_SI_PREAMBLE_SIZE) ||
+-	    copy_from_user(to->_sifields._pad,
+-			   from->_sifields._pad, SI_PAD_SIZE))
+-		return -EFAULT;
+-
+-	return 0;
+-}
+-
+ /*
+  * VFP save/restore code.
+  *
 -- 
 2.6.2
