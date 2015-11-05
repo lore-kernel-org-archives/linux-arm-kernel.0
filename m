@@ -1,31 +1,69 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Thu, 5 Nov 2015 09:34:43 +0000
-Subject: [PATCH RESEND 0/4] SMP support for Broadcom NSP
-In-Reply-To: <1446702681-45339-1-git-send-email-kapilh@broadcom.com>
-References: <1446702681-45339-1-git-send-email-kapilh@broadcom.com>
-Message-ID: <20151105093443.GO8644@n2100.arm.linux.org.uk>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 05 Nov 2015 09:35:45 +0000
+Subject: [PATCH RFC 7/7] irqchip: [Example] dummy wired interrupt/MSI
+ bridge driver
+In-Reply-To: <EE11001F9E5DDD47B7634E2F8A612F2E1629D8DD@lhreml503-mbs>
+References: <1444923568-17413-1-git-send-email-marc.zyngier@arm.com>
+ <1444923568-17413-8-git-send-email-marc.zyngier@arm.com>
+ <5639BB10.1090108@huawei.com> <5639C9F9.2010704@arm.com>
+ <EE11001F9E5DDD47B7634E2F8A612F2E1629D8DD@lhreml503-mbs>
+Message-ID: <563B22F1.901@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 05, 2015 at 12:51:17AM -0500, Kapil Hali wrote:
-> Hi,
+On 05/11/15 08:25, Gabriele Paoloni wrote:
+> Hi Marc
 > 
-> This series adds SMP support for Broadcom's Northstar Plus SoC.
+>> -----Original Message-----
+>> From: linux-pci-owner at vger.kernel.org [mailto:linux-pci-owner at vger.kernel.org]
+>> On Behalf Of Marc Zyngier
+>> Sent: 04 November 2015 09:04
+>> To: majun (F); Thomas Gleixner; Jiang Liu; Jason Cooper
+>> Cc: linux-arm-kernel at lists.infradead.org; linux-pci at vger.kernel.org; linux-
+>> kernel at vger.kernel.org
+>> Subject: Re: [PATCH RFC 7/7] irqchip: [Example] dummy wired interrupt/MSI
+>> bridge driver
+>>
+>> On 04/11/15 08:00, majun (F) wrote:
+
+[...]
+
+>>> I think,for a interrupt controller, msichip driver initialization maybe is
+>> too late
+>>> for some devices which connect to this irqchip if we use
+>> module_platform_driver.
+>>
+>> That's a consequence of this design. This is why I insisted on the fact
+>> that this is currently avoided by using deferred probe in drivers, and
 > 
-> There are similar SMP enablement methods for many ARMv7 bsed SoCs.
-> BCM NSP SoC, has a typical such mechanism - after power-on, the
-> secondary core is held in a standby state, primary core provides a
-> startup address for the secondary core and wakes it up. Booting of
-> the secondary core is serialized using pen_release global variable.
+> Mmm using te deferred probe would mean to rework all the drivers of the
+> potential devices connected to mbi-gen...would that be sustainable/acceptable?
 
-Why do you need the pen_release stuff?  The above implies that you
-have only one secondary core, and you can control when it comes out
-of standby state.
+I'm tempted to reply "Not my problem". Or rather, not a problem I'm
+trying to solve right now (or any time soon).
 
-Please, don't assume that the pen_release stuff is any kind of recommended
-or standardised system.  It isn't.  It's a hack for ARMs evaluation
-platforms.
+I'm pretty sure that sprinkling -EPROBE_DEFER on all possible drivers
+will result in a resounding NAK, which is is why I suggested that
+someone with a vested interest dedicates some quality time helping those
+who are trying to solve this issue for good.
 
+>> that it should be solved by having a probe order. Either way, this is
+>> not something that we can solve at that level (see the multiple proposal
+>> for this on the various lists).
+> 
+> Could you point me to the relevant discussions for this...?
+
+Google is, as always, your dearest friend. But here you go:
+
+- LWN has some quality coverage of the KS discussions (assuming you're a
+subscriber, otherwise you'll have to wait for another week):
+http://lwn.net/Articles/662820/
+
+- There is also Tomeu Vizoso's series, which itself builds upon other
+previous attempts at solving this: https://lwn.net/Articles/658690/
+
+Thanks,
+
+	M.
 -- 
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Jazz is not dead. It just smells funny...
