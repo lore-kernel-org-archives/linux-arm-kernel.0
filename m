@@ -1,36 +1,71 @@
-From: zhengxing@rock-chips.com (Xing Zheng)
-Date: Thu, 05 Nov 2015 11:05:33 +0800
-Subject: [PATCH v6 1/8] dt-bindings: add documentation of rk3036 clock
- controller
-In-Reply-To: <2700959.OiVQMNL8Ss@phil>
-References: <1446639503-11763-1-git-send-email-zhengxing@rock-chips.com>
- <1446639503-11763-2-git-send-email-zhengxing@rock-chips.com>
- <2700959.OiVQMNL8Ss@phil>
-Message-ID: <563AC77D.3080403@rock-chips.com>
+From: zhongkaihua@huawei.com (Zhong Kaihua)
+Date: Thu, 5 Nov 2015 11:01:49 +0800
+Subject: [PATCH 2/3] dt-bindings: gpio: Documentation for Hi6220 gpio
+ driver
+In-Reply-To: <CAL_JsqK1HJ1aDRWMj+7SVXz_zBbD_qbBZ79cbWCnLeKT2++bbw@mail.gmail.com>
+References: <1446258260-72902-1-git-send-email-zhongkaihua@huawei.com>
+ <1446258260-72902-2-git-send-email-zhongkaihua@huawei.com>
+ <CAL_JsqK1HJ1aDRWMj+7SVXz_zBbD_qbBZ79cbWCnLeKT2++bbw@mail.gmail.com>
+Message-ID: <563AC69D.3070606@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015?11?05? 07:39, Heiko Stuebner wrote:
-> Hi,
->
-> Am Mittwoch, 4. November 2015, 20:18:16 schrieb Xing Zheng:
->> Add the devicetree binding for the cru on the rk3036 which quite similar
->> structured as previous clock controllers.
+On 2015/11/2 23:09, Rob Herring wrote:
+> On Fri, Oct 30, 2015 at 9:24 PM, Zhong Kaihua <zhongkaihua@huawei.com> wrote:
+>> dt-bindings: gpio: Documentation for Hi6220 gpio driver
 >>
->> Signed-off-by: Xing Zheng<zhengxing@rock-chips.com>
->> Reviewed-by: Heiko Stuebner<heiko@sntech.de>
+>> Signed-off-by: Zhong Kaihua <zhongkaihua@huawei.com>
 >> ---
-> your recipient-list is missing the clock maintainers+lists - sorry for
-> not noticing this earlier.
->
-> While the devicetree-maintainers may Review it, we expect the clock-
-> maintainers to actually apply all 4 clock-related patches.
->
-> Same comment is true for
-> [PATCH v6 2/8] clk: rockchip: add dt-binding header for rk3036
->
->
-> Heiko
->
-Sorry, and I will loop them in the next versioin.
-Thanks.
+>>  .../devicetree/bindings/gpio/gpio-hi6220.txt       | 23 ++++++++++++++++++++++
+>>  1 file changed, 23 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/gpio/gpio-hi6220.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/gpio/gpio-hi6220.txt b/Documentation/devicetree/bindings/gpio/gpio-hi6220.txt
+>> new file mode 100644
+>> index 0000000..76a8932
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/gpio/gpio-hi6220.txt
+>> @@ -0,0 +1,23 @@
+>> +Hisilicon Hi6220 GPIO controller bindings
+>> +
+>> +Required properties:
+>> +  - compatible:        "arm,pl061", "arm,primecell"
+>> +  - gpio-controller: Marks the device node as a        GPIO controller.
+>> +  - #gpio-cells: Should        be 2. See gpio.txt in this directory for a
+> 
+> Some strange spacing in here. Otherwise,
+> 
+> Acked-by: Rob Herring <robh@kernel.org>
+
+Style problems have been fixed in V2 patch.
+
+Rearrange the document patch to the first of patch set.
+
+> 
+>> +                description of the cells format.
+>> +  - interrupt-controller: Mark the device node as an interrupt controller
+>> +
+>> +Example:
+>> +
+>> +       gpio0: gpio at f8011000 {
+>> +               compatible = "arm,pl061", "arm,primecell";
+>> +               reg = <0x0 0xf8011000 0x0 0x1000>;
+>> +               interrupts = <0 52 0x4>;
+>> +               gpio-controller;
+>> +               #gpio-cells = <2>;
+>> +               interrupt-controller;
+>> +               #interrupt-cells = <2>;
+>> +               clocks = <&ao_ctrl 2>;
+>> +               clock-names = "apb_pclk";
+>> +               status = "ok";
+>> +       };
+>> --
+>> 1.9.1
+>>
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
+> .
+> 
