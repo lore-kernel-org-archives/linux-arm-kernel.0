@@ -1,157 +1,96 @@
-From: leo.yan@linaro.org (Leo Yan)
-Date: Thu, 5 Nov 2015 21:54:50 +0800
-Subject: [PATCH 1/4] arm64: dts: Reserve memory regions for hi6220
-In-Reply-To: <20151029083301.GB16063@leoy-linaro>
-References: <1444365376-10728-1-git-send-email-leo.yan@linaro.org>
- <1444365376-10728-2-git-send-email-leo.yan@linaro.org>
- <CAL_JsqJapPM6CpaG+AYDAUQajZ4V5jREdCwA5F4vkD5jqC3bzg@mail.gmail.com>
- <20151009133028.GB21629@leverpostej>
- <CAL_Jsq+TrsS39L4nsRgqszTxKHyc00fLUf+BmftHnn=EV0PxhA@mail.gmail.com>
- <20151009142034.GB528@leoy-linaro>
- <CAL_JsqLhu03B_ADYvCYdduH2d38kajOyc=9eX_FHy4QYYhZGxQ@mail.gmail.com>
- <20151029083301.GB16063@leoy-linaro>
-Message-ID: <20151105135449.GD27192@leoy-linaro>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 5 Nov 2015 14:59:08 +0100
+Subject: [PATCH] ARM: ACPI: Fix the helper which checks if only a /chosen
+ node
+In-Reply-To: <1446728187-14552-1-git-send-email-zhaoshenglong@huawei.com>
+References: <1446728187-14552-1-git-send-email-zhaoshenglong@huawei.com>
+Message-ID: <CAKv+Gu-EJxogB29vXM-G_KYjHYzXFEzgWX3f=E=3=QVGcRXJaA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 29, 2015 at 04:33:01PM +0800, Leo Yan wrote:
-> On Wed, Oct 28, 2015 at 11:32:29PM -0500, Rob Herring wrote:
-> > On Fri, Oct 9, 2015 at 9:20 AM, Leo Yan <leo.yan@linaro.org> wrote:
-> > > On Fri, Oct 09, 2015 at 08:50:13AM -0500, Rob Herring wrote:
-> > >> On Fri, Oct 9, 2015 at 8:30 AM, Mark Rutland <mark.rutland@arm.com> wrote:
-> > >> > On Fri, Oct 09, 2015 at 08:17:16AM -0500, Rob Herring wrote:
-> > >> >> On Thu, Oct 8, 2015 at 11:36 PM, Leo Yan <leo.yan@linaro.org> wrote:
-> > >> >> > On Hi6220, below memory regions in DDR have specific purpose:
-> > >> >> >
-> > >> >> >   0x05e0,0000 - 0x05ef,ffff: For MCU firmware using at runtime;
-> > >> >> >   0x06df,f000 - 0x06df,ffff: For mailbox message data;
-> > >> >> >   0x0740,f000 - 0x0740,ffff: For MCU firmware's section;
-> > >> >> >   0x3e00,0000 - 0x3fff,ffff: For OP-TEE.
-> > >> >> >
-> > >> >> > This patch reserves these memory regions in DT.
-> > >> >> >
-> > >> >> > Signed-off-by: Leo Yan <leo.yan@linaro.org>
-> > >> >> > ---
-> > >> >> >  arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts | 16 ++++++++++++----
-> > >> >> >  1 file changed, 12 insertions(+), 4 deletions(-)
-> > >> >> >
-> > >> >> > diff --git a/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts b/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
-> > >> >> > index e36a539..e3f4cb3 100644
-> > >> >> > --- a/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
-> > >> >> > +++ b/arch/arm64/boot/dts/hisilicon/hi6220-hikey.dts
-> > >> >> > @@ -7,9 +7,6 @@
-> > >> >> >
-> > >> >> >  /dts-v1/;
-> > >> >> >
-> > >> >> > -/*Reserved 1MB memory for MCU*/
-> > >> >> > -/memreserve/ 0x05e00000 0x00100000;
-> > >> >> > -
-> > >> >>
-> > >> >> Why does memreserve not work for you? You can have multiple entries.
-> > >> >>
-> > >> >> >  #include "hi6220.dtsi"
-> > >> >> >
-> > >> >> >  / {
-> > >> >> > @@ -24,8 +21,19 @@
-> > >> >> >                 stdout-path = "serial0:115200n8";
-> > >> >> >         };
-> > >> >> >
-> > >> >> > +       /*
-> > >> >> > +        * Reserve below regions from memory node:
-> > >> >> > +        *
-> > >> >> > +        *  - 0x05e0,0000 - 0x05ef,ffff: MCU firmware runtime using
-> > >> >> > +        *  - 0x06df,f000 - 0x06df,ffff: Mailbox message data
-> > >> >> > +        *  - 0x0740,f000 - 0x0740,ffff: MCU firmware section
-> > >> >> > +        *  - 0x3e00,0000 - 0x3fff,ffff: OP-TEE
-> > >> >> > +        */
-> > >> >> >         memory at 0 {
-> > >> >> >                 device_type = "memory";
-> > >> >> > -               reg = <0x0 0x0 0x0 0x40000000>;
-> > >> >> > +               reg = <0x00000000 0x00000000 0x00000000 0x05e00000>,
-> > >> >> > +                     <0x00000000 0x05f00000 0x00000000 0x00eff000>,
-> > >> >> > +                     <0x00000000 0x06e00000 0x00000000 0x0060f000>,
-> > >> >> > +                     <0x00000000 0x07410000 0x00000000 0x36bf0000>;
-> > >> >>
-> > >> >> No, don't do this. Please use memreserve or reserved-memory binding[1]
-> > >> >> or combination of both. Probably reserved-memory if you need the
-> > >> >> kernel to access some of these regions.
-> > >> >
-> > >> > I disagree at least for those portions owned by the secure world. The
-> > >> > kernel shouldn't map those at all, so memreserve isn't appropriate. That
-> > >> > covers OP-TEE and the MCU firmware regions, and I'd expec the EFI memory
-> > >> > map to not list those as available to the kernel.
-> > >>
-> > >> I'm fine carving out the beginning or end, but otherwise think memory
-> > >> should correspond to the physical memory. We have a way to describe
-> > >> holes to keep out, so we should use them. If secure world uses the DT,
-> > >> then it would either want to know its region in memory or add the DT
-> > >> data to say what it is using. We need that to be easy to find or easy
-> > >> to set, respectively. The size secure world needs could vary as well.
-> > >>
-> > >> The fact that the kernel maps the memory is the kernel's problem, not
-> > >> a DT problem.
-> > >>
-> > >
-> > > Just give more input here. In previous time, we have long discussion [1];
-> > > So actually your suggestion is exactly same what my old patch.
-> > >
-> > > From previous discussion, i think here have an assumtion: Use UEFI as
-> > > bootloader, the kernel will ignore (or remove) memreserve and reserved-memory
-> > > nodes, so just like Mark said "the EFI memory map to not list those
-> > > as available to the kernel". My new patch is just to follow this and
-> > > also make sure they have same behavior for different bootloader
-> > > (between UEFI and uboot).
-> > 
-> > I've read thru the thread and see 2 main conclusions. Using
-> > reserved-memory is problematic since things like grub don't support
-> > that. That is fine and we should stick with /mem-reserve/ for now.
-> 
-> Thanks for reviewing, Rob.
-> 
-> One thing should note: after booting with UEFI, /memreserve/ nodes
-> will be deleted by UEFI stub; and _ONLY_ can use /reserved-memory/
-> node to reserve memory regions.
-> 
-> Ard have another patch [1], after applied this patch, then all
-> /memreserve/ nodes and /reserved-memory/ nodes nodes will be ignored
-> to scan after booting with UEFI stub.
-> 
-> This is make sense, that means UEFI need provide exactly correct memory
-> map info by self and totally not depend on DT structures.
-> 
-> Another minor difference between /memreserve/ node and /reserved-memory/
-> node is: we can add property "no-map" for /reserved-memory/; so that
-> means it will totally remove region from memory block. it's more safe
-> for the memory region will NOT be mapped twice with different mapping
-> attribution.
-> 
-> [1] http://archive.arm.linux.org.uk/lurker/message/20150922.002128.46757034.en.html
-> 
-> > The other thing is the desire to have the memory presented to the kernel
-> > be the same whether it comes from UEFI or DT structures. I can see why
-> > there is some desire to have that alignment, but that doesn't really
-> > buy us anything. We can't eliminate some code path in the kernel doing
-> > so. So I still think that the memory node should reflect all of memory
-> > as defined by the h/w and mem-reserve should be used for any software
-> > defined reserved regions.
-> 
-> i think before we engaged much thinking for UEFI, that's meaningful for
-> we found what's correct implementation for UEFI. We need make sure UEFI
-> will do correct thing for itself.
-> 
-> If only consider purly from DT's usage, i have no strong opinion to
-> stick to use memory node to carve memory regions out. It's okay for me to
-> go back to use /reserved-memory/ to reserved regions.
-> 
-> Mark, do you agree with this?
+On 5 November 2015 at 13:56, Shannon Zhao <zhaoshenglong@huawei.com> wrote:
+> From: Shannon Zhao <shannon.zhao@linaro.org>
+>
+> Assuming that there are several other nodes and a /chosen node in a DTS
+> and the /chosen node is last node, of_scan_flat_dt() will return 0
 
-Ping ...
+If those 'several other nodes' are not all subnodes of /chosen, at
+least one of them will be at depth 1, right? Could you give an example
+DTS where this goes wrong?
 
-Hi Mark,
+> while
+> we expect it returns 1 when it's used to call a function to check if
+> there is only a /chosen node in DTS.
+>
 
-Could u help confirm for this? i'm planning to resend new version
-patch series in tommorrow, but it's better can get your feedback
-firstly.
+of_scan_flat_dt() will terminate early and return 1 on the first
+occasion that the callback returns 1. The callback returns 1 if it
+encounters a node at depth 1 whose name is not 'chosen'. So I am
+failing to see how this code is broken.
 
-Thanks,
-Leo Yan
+> Fix this by passing a meaningful parameter instead of NULL to
+> of_scan_flat_dt() to record if it finds a node that is not /chosen node.
+>
+
+While it is hardly a performance concern, you really don't need to
+traverse the entire FDT to figure out that /chosen is not the only
+depth 1 node.
+
+> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+> ---
+>  arch/arm64/kernel/acpi.c | 14 +++++++++++---
+>  1 file changed, 11 insertions(+), 3 deletions(-)
+>
+> diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
+> index 19de753..51c988c 100644
+> --- a/arch/arm64/kernel/acpi.c
+> +++ b/arch/arm64/kernel/acpi.c
+> @@ -60,12 +60,15 @@ static int __init dt_scan_depth1_nodes(unsigned long node,
+>                                        const char *uname, int depth,
+>                                        void *data)
+>  {
+> +       bool *found = data;
+> +
+>         /*
+>          * Return 1 as soon as we encounter a node at depth 1 that is
+>          * not the /chosen node.
+>          */
+>         if (depth == 1 && (strcmp(uname, "chosen") != 0))
+> -               return 1;
+> +               *found = true;
+> +
+>         return 0;
+>  }
+>
+> @@ -176,15 +179,20 @@ out:
+>   */
+>  void __init acpi_boot_table_init(void)
+>  {
+> +       bool found = false;
+>         /*
+>          * Enable ACPI instead of device tree unless
+>          * - ACPI has been disabled explicitly (acpi=off), or
+>          * - the device tree is not empty (it has more than just a /chosen node)
+>          *   and ACPI has not been force enabled (acpi=force)
+>          */
+> -       if (param_acpi_off ||
+> -           (!param_acpi_force && of_scan_flat_dt(dt_scan_depth1_nodes, NULL)))
+> +       if (param_acpi_off) {
+>                 return;
+> +       } else if (!param_acpi_force) {
+> +               of_scan_flat_dt(dt_scan_depth1_nodes, &found);
+> +               if (found)
+> +                       return;
+> +       }
+>
+>         /*
+>          * ACPI is disabled at this point. Enable it in order to parse
+> --
+> 2.0.4
+>
+>
+>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
