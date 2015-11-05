@@ -1,35 +1,38 @@
-From: anton.bondarenko.sama@gmail.com (Anton Bondarenko)
-Date: Thu, 5 Nov 2015 17:00:28 +0100
-Subject: [PATCH v3 6/7] spi: imx: return error from dma channel request
-In-Reply-To: <20151105085637.GJ8526@pengutronix.de>
-References: <1446388901-6073-1-git-send-email-anton.bondarenko.sama@gmail.com>
- <1446388901-6073-7-git-send-email-anton.bondarenko.sama@gmail.com>
- <20151105085637.GJ8526@pengutronix.de>
-Message-ID: <563B7D1C.7010105@gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 5 Nov 2015 08:07:19 -0800
+Subject: [PATCH] crypto: sun4i-ss: add missing statesize
+In-Reply-To: <1446709737-11316-1-git-send-email-clabbe.montjoie@gmail.com>
+References: <1446709737-11316-1-git-send-email-clabbe.montjoie@gmail.com>
+Message-ID: <20151105160719.GG6114@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05.11.2015 09:56, Sascha Hauer wrote:
-> On Sun, Nov 01, 2015 at 03:41:40PM +0100, Anton Bondarenko wrote:
->> From: Anton Bondarenko <anton_bondarenko@mentor.com>
->>
->> On SDMA initialization return exactly the same error, which is
->> reported by dma_request_slave_channel_reason(), it is a preceding
->> change to defer SPI DMA initialization, if SDMA module is not yet
->> available.
->
-> Maybe something like: "fix probe deferral when dmaengine is not yet
-> available" in the subject line will better express that this is a patch
-> that should be applied ASAP. Also you can move this up to the front of
-> the series when resending.
->
-> Sascha
->
+Hi,
 
-This patch itself does not implement deferral for spi-imx if dmaengine 
-not ready. The patch targets 2 things: give a bit more detailed error 
-information of SPI dma slave channel initialization error and provide a 
-basis for the next patch ([PATCH v3 7/7] spi: imx: defer spi 
-initialization, if DMA engine is pending).
+On Thu, Nov 05, 2015 at 08:48:57AM +0100, LABBE Corentin wrote:
+> sun4i-ss implementaton of md5/sha1 is via ahash algorithms.
+> A recent change make impossible to load them without giving statesize.
 
-Regards, Anton
+Which one?
+
+> This patch specifiy statesize for sha1 and md5.
+> 
+> Signed-off-by: LABBE Corentin <clabbe.montjoie@gmail.com>
+> Cc: stable at vger.kernel.org
+
+Please also add a Fixes tag (and the stable version it applies to).
+
+Thanks!
+Maxime
+
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151105/ae805bb8/attachment.sig>
