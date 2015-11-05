@@ -1,42 +1,41 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Thu, 5 Nov 2015 13:25:52 +0100 (CET)
-Subject: [PATCH RFC 0/7] Adding core support for wire-MSI bridges
-In-Reply-To: <563B49F0.7040000@arm.com>
-References: <1444923568-17413-1-git-send-email-marc.zyngier@arm.com>
- <56205917.7090001@linux.intel.com> <5620B9D6.1010708@arm.com>
- <alpine.DEB.2.11.1511041348060.4032@nanos> <563B49F0.7040000@arm.com>
-Message-ID: <alpine.DEB.2.11.1511051324380.4032@nanos>
+From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
+Date: Thu, 5 Nov 2015 15:29:01 +0300
+Subject: [PATCH/RFC] ARM: shmobile: Introduce ARCH_RENESAS
+In-Reply-To: <20151105121049.GC711@verge.net.au>
+References: <1446702397-24078-1-git-send-email-horms+renesas@verge.net.au>
+ <563B3ACB.9050807@cogentembedded.com> <20151105121049.GC711@verge.net.au>
+Message-ID: <563B4B8D.9050701@cogentembedded.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 5 Nov 2015, Marc Zyngier wrote:
-> On 04/11/15 13:34, Thomas Gleixner wrote:
-> > Marc,
-> > 
-> > On Fri, 16 Oct 2015, Marc Zyngier wrote:
-> >> On 16/10/15 02:55, Jiang Liu wrote:
-> >>> 	There's a working to enable Intel VMD storage device, which
-> >>> has the similar requirement. Basically a PCIe hierarchy is hidden
-> >>> behind a parent PCIe device, so we need to use the PCIe irqs on parent
-> >>> to de-multiple PCIe IRQs from hidden PCIe devices. Seems a chance for
-> >>> consolidation here.
-> >>
-> >> Do you know if there is a 1-1 mapping between the interrupts seen by the
-> >> parent device and those seen by the hidden devices? Or is it a case of
-> >> having to demultiplex the MSIs? Looks like the former, but I'd like to
-> >> be sure.
-> > 
-> > Yes, it's a demultiplexer. No 1:1 mapping.
-> 
-> Right. This doesn't exactly fit the scheme I have so far (there is a 1:1
-> mapping between the wired interrupt and the MSI), but once we are able
-> to expose an MSI domain, it could be possible to construct the MSI
-> demultiplexer on top. That's a lot of layers! ;-)
+On 11/5/2015 3:10 PM, Simon Horman wrote:
 
-Well for the demux case it doesn't make a lot of sense. It's not easy
-to describe in a hierarchy. Having that parentless MSI domain for that
-VMD case is simple enough.
+>>> The purpose of this patch is to start the process of replacing both
+>>> ARCH_SHMOBILE and ARCH_SHMOBILE_MULTI with ARCH_RENESAS. The motivation
+>>> being that as time has moved on Renesas has become a name than shmobile for
+>>> the majority Renesas 32-bit ARM based SoCs.
+>>
+>>     Couldn't parse this sentence. :-)
+>
+> RENESAS seems to be a more appropriate name that SHMOBILE for the
 
-Thanks,
+    s/that/than/. Otherwise parsable. :-)
 
-	tglx
+> majority of Renesas 32-bit ARM based SoCs.
+>
+>>> The name is, conveniently, also
+>>> applicable to (older) Renesas SH based SoCs and (newer) ARM64 based SoCs
+>>> although this patch only addresses 32-bit ARM.
+>>>
+>>> It is envisaged that follow up work may address migrating both
+>>> SH SoCs and drivers from ARCH_SHMOBILE and ARCH_SHMOBILE_MULTI to
+>>> ARCH_RENESAS.
+>>>
+>>> Proposed support for the r8a7795 ARM64 based SoC already uses ARCH_RENESAS
+>>> which selects ARCH_SHMOBILE.
+>>>
+>>> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+>>
+>> [...]
+
+MBR, Sergei
