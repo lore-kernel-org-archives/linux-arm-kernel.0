@@ -1,96 +1,71 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 5 Nov 2015 14:59:08 +0100
-Subject: [PATCH] ARM: ACPI: Fix the helper which checks if only a /chosen
- node
-In-Reply-To: <1446728187-14552-1-git-send-email-zhaoshenglong@huawei.com>
-References: <1446728187-14552-1-git-send-email-zhaoshenglong@huawei.com>
-Message-ID: <CAKv+Gu-EJxogB29vXM-G_KYjHYzXFEzgWX3f=E=3=QVGcRXJaA@mail.gmail.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Thu,  5 Nov 2015 14:00:56 +0000
+Subject: [PATCH] arm64: cmpxchg_dbl: fix return value type
+Message-ID: <1446732056-31294-1-git-send-email-lorenzo.pieralisi@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 5 November 2015 at 13:56, Shannon Zhao <zhaoshenglong@huawei.com> wrote:
-> From: Shannon Zhao <shannon.zhao@linaro.org>
->
-> Assuming that there are several other nodes and a /chosen node in a DTS
-> and the /chosen node is last node, of_scan_flat_dt() will return 0
+The current arm64 __cmpxchg_double{_mb} implementations carry out the
+compare exchange by first comparing the old values passed in to the
+values read from the pointer provided and by stashing the cumulative
+bitwise difference in a 64-bit register.
 
-If those 'several other nodes' are not all subnodes of /chosen, at
-least one of them will be at depth 1, right? Could you give an example
-DTS where this goes wrong?
+By comparing the register content against 0, it is possible to detect if
+the values read differ from the old values passed in, so that the compare
+exchange detects whether it has to bail out or carry on completing the
+operation with the exchange.
 
-> while
-> we expect it returns 1 when it's used to call a function to check if
-> there is only a /chosen node in DTS.
->
+Given the current implementation, to detect the cmpxchg operation
+status, the __cmpxchg_double{_mb} functions should return the 64-bit
+stashed bitwise difference so that the caller can detect cmpxchg failure
+by comparing the return value content against 0. The current implementation
+declares the return value as an int, which means that the 64-bit
+value stashing the bitwise difference is truncated before being
+returned to the __cmpxchg_double{_mb} callers, which means that
+any bitwise difference present in the top 32 bits goes undetected,
+triggering false positives and subsequent kernel failures.
 
-of_scan_flat_dt() will terminate early and return 1 on the first
-occasion that the callback returns 1. The callback returns 1 if it
-encounters a node at depth 1 whose name is not 'chosen'. So I am
-failing to see how this code is broken.
+This patch fixes the issue by declaring the arm64 __cmpxchg_double{_mb}
+return values as a long, so that the bitwise difference is
+properly propagated on failure, restoring the expected behaviour.
 
-> Fix this by passing a meaningful parameter instead of NULL to
-> of_scan_flat_dt() to record if it finds a node that is not /chosen node.
->
+Fixes: e9a4b795652f ("arm64: cmpxchg_dbl: patch in lse instructions when
+supported by the CPU")
+Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Cc: <stable@vger.kernel.org>
+Cc: Will Deacon <will.deacon@arm.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm64/include/asm/atomic_ll_sc.h | 2 +-
+ arch/arm64/include/asm/atomic_lse.h   | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-While it is hardly a performance concern, you really don't need to
-traverse the entire FDT to figure out that /chosen is not the only
-depth 1 node.
-
-> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
-> ---
->  arch/arm64/kernel/acpi.c | 14 +++++++++++---
->  1 file changed, 11 insertions(+), 3 deletions(-)
->
-> diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
-> index 19de753..51c988c 100644
-> --- a/arch/arm64/kernel/acpi.c
-> +++ b/arch/arm64/kernel/acpi.c
-> @@ -60,12 +60,15 @@ static int __init dt_scan_depth1_nodes(unsigned long node,
->                                        const char *uname, int depth,
->                                        void *data)
->  {
-> +       bool *found = data;
-> +
->         /*
->          * Return 1 as soon as we encounter a node at depth 1 that is
->          * not the /chosen node.
->          */
->         if (depth == 1 && (strcmp(uname, "chosen") != 0))
-> -               return 1;
-> +               *found = true;
-> +
->         return 0;
->  }
->
-> @@ -176,15 +179,20 @@ out:
->   */
->  void __init acpi_boot_table_init(void)
->  {
-> +       bool found = false;
->         /*
->          * Enable ACPI instead of device tree unless
->          * - ACPI has been disabled explicitly (acpi=off), or
->          * - the device tree is not empty (it has more than just a /chosen node)
->          *   and ACPI has not been force enabled (acpi=force)
->          */
-> -       if (param_acpi_off ||
-> -           (!param_acpi_force && of_scan_flat_dt(dt_scan_depth1_nodes, NULL)))
-> +       if (param_acpi_off) {
->                 return;
-> +       } else if (!param_acpi_force) {
-> +               of_scan_flat_dt(dt_scan_depth1_nodes, &found);
-> +               if (found)
-> +                       return;
-> +       }
->
->         /*
->          * ACPI is disabled at this point. Enable it in order to parse
-> --
-> 2.0.4
->
->
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+diff --git a/arch/arm64/include/asm/atomic_ll_sc.h b/arch/arm64/include/asm/atomic_ll_sc.h
+index 74d0b8e..f61c84f 100644
+--- a/arch/arm64/include/asm/atomic_ll_sc.h
++++ b/arch/arm64/include/asm/atomic_ll_sc.h
+@@ -233,7 +233,7 @@ __CMPXCHG_CASE( ,  ,  mb_8, dmb ish,  , l, "memory")
+ #undef __CMPXCHG_CASE
+ 
+ #define __CMPXCHG_DBL(name, mb, rel, cl)				\
+-__LL_SC_INLINE int							\
++__LL_SC_INLINE long							\
+ __LL_SC_PREFIX(__cmpxchg_double##name(unsigned long old1,		\
+ 				      unsigned long old2,		\
+ 				      unsigned long new1,		\
+diff --git a/arch/arm64/include/asm/atomic_lse.h b/arch/arm64/include/asm/atomic_lse.h
+index 1fce790..197e06a 100644
+--- a/arch/arm64/include/asm/atomic_lse.h
++++ b/arch/arm64/include/asm/atomic_lse.h
+@@ -387,7 +387,7 @@ __CMPXCHG_CASE(x,  ,  mb_8, al, "memory")
+ #define __LL_SC_CMPXCHG_DBL(op)	__LL_SC_CALL(__cmpxchg_double##op)
+ 
+ #define __CMPXCHG_DBL(name, mb, cl...)					\
+-static inline int __cmpxchg_double##name(unsigned long old1,		\
++static inline long __cmpxchg_double##name(unsigned long old1,		\
+ 					 unsigned long old2,		\
+ 					 unsigned long new1,		\
+ 					 unsigned long new2,		\
+-- 
+2.5.1
