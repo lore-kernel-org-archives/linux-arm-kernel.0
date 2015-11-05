@@ -1,71 +1,33 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Thu,  5 Nov 2015 14:00:56 +0000
-Subject: [PATCH] arm64: cmpxchg_dbl: fix return value type
-Message-ID: <1446732056-31294-1-git-send-email-lorenzo.pieralisi@arm.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Thu, 5 Nov 2015 15:06:43 +0100
+Subject: [RFC PATCH 4/7] pinctrl: sunxi: remove redundant "depends on
+ RESET_CONTROLLER"
+In-Reply-To: <CACRpkdYmdyxi+6fZNGffE6-JBZGkyq3F__Ywc4rCYYEsQeimMQ@mail.gmail.com>
+References: <1446722128-11961-1-git-send-email-yamada.masahiro@socionext.com>
+ <1446722128-11961-5-git-send-email-yamada.masahiro@socionext.com>
+ <CACRpkdYmdyxi+6fZNGffE6-JBZGkyq3F__Ywc4rCYYEsQeimMQ@mail.gmail.com>
+Message-ID: <CACRpkdb_TBDdL_Bt=8J_Sb5APq-V-rpwXqLZSjAWgtCZ10NG8g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The current arm64 __cmpxchg_double{_mb} implementations carry out the
-compare exchange by first comparing the old values passed in to the
-values read from the pointer provided and by stashing the cumulative
-bitwise difference in a 64-bit register.
+On Thu, Nov 5, 2015 at 2:40 PM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> On Thu, Nov 5, 2015 at 12:15 PM, Masahiro Yamada
+> <yamada.masahiro@socionext.com> wrote:
+>
+>> ARCH_SUNXI selects RESET_CONTROLLER.
+>> The dependency "depends on RESET_CONTROLLER" is already met.
+>>
+>> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+>
+> NACK, this pin controller needs that as dependency, I don't worry
+> that it's overspecified.
+>
+> They both do this:
+> #include <linux/reset.h>
 
-By comparing the register content against 0, it is possible to detect if
-the values read differ from the old values passed in, so that the compare
-exchange detects whether it has to bail out or carry on completing the
-operation with the exchange.
+You could of course replace the depends with select in this
+file so the menu options don't get hidden, as seems to be
+the problem as described in 0/7.
 
-Given the current implementation, to detect the cmpxchg operation
-status, the __cmpxchg_double{_mb} functions should return the 64-bit
-stashed bitwise difference so that the caller can detect cmpxchg failure
-by comparing the return value content against 0. The current implementation
-declares the return value as an int, which means that the 64-bit
-value stashing the bitwise difference is truncated before being
-returned to the __cmpxchg_double{_mb} callers, which means that
-any bitwise difference present in the top 32 bits goes undetected,
-triggering false positives and subsequent kernel failures.
-
-This patch fixes the issue by declaring the arm64 __cmpxchg_double{_mb}
-return values as a long, so that the bitwise difference is
-properly propagated on failure, restoring the expected behaviour.
-
-Fixes: e9a4b795652f ("arm64: cmpxchg_dbl: patch in lse instructions when
-supported by the CPU")
-Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Cc: <stable@vger.kernel.org>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
----
- arch/arm64/include/asm/atomic_ll_sc.h | 2 +-
- arch/arm64/include/asm/atomic_lse.h   | 2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
-
-diff --git a/arch/arm64/include/asm/atomic_ll_sc.h b/arch/arm64/include/asm/atomic_ll_sc.h
-index 74d0b8e..f61c84f 100644
---- a/arch/arm64/include/asm/atomic_ll_sc.h
-+++ b/arch/arm64/include/asm/atomic_ll_sc.h
-@@ -233,7 +233,7 @@ __CMPXCHG_CASE( ,  ,  mb_8, dmb ish,  , l, "memory")
- #undef __CMPXCHG_CASE
- 
- #define __CMPXCHG_DBL(name, mb, rel, cl)				\
--__LL_SC_INLINE int							\
-+__LL_SC_INLINE long							\
- __LL_SC_PREFIX(__cmpxchg_double##name(unsigned long old1,		\
- 				      unsigned long old2,		\
- 				      unsigned long new1,		\
-diff --git a/arch/arm64/include/asm/atomic_lse.h b/arch/arm64/include/asm/atomic_lse.h
-index 1fce790..197e06a 100644
---- a/arch/arm64/include/asm/atomic_lse.h
-+++ b/arch/arm64/include/asm/atomic_lse.h
-@@ -387,7 +387,7 @@ __CMPXCHG_CASE(x,  ,  mb_8, al, "memory")
- #define __LL_SC_CMPXCHG_DBL(op)	__LL_SC_CALL(__cmpxchg_double##op)
- 
- #define __CMPXCHG_DBL(name, mb, cl...)					\
--static inline int __cmpxchg_double##name(unsigned long old1,		\
-+static inline long __cmpxchg_double##name(unsigned long old1,		\
- 					 unsigned long old2,		\
- 					 unsigned long new1,		\
- 					 unsigned long new2,		\
--- 
-2.5.1
+Yours,
+Linus Walleij
