@@ -1,132 +1,72 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 5 Nov 2015 16:08:40 +0000
-Subject: [PATCH] mm: slab: Only move management objects off-slab for
- sizes larger than KMALLOC_MIN_SIZE
-In-Reply-To: <20151105053139.e38214a9.akpm@linux-foundation.org>
-References: <20151105043155.GA20374@js1304-P5Q-DELUXE>
- <1446724235-31400-1-git-send-email-catalin.marinas@arm.com>
- <20151105053139.e38214a9.akpm@linux-foundation.org>
-Message-ID: <20151105160839.GR7637@e104818-lin.cambridge.arm.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Thu, 5 Nov 2015 16:13:11 +0000
+Subject: [PATCH v2 1/2] ASoC: codec: Inno codec driver for RK3036 SoC
+In-Reply-To: <1446717194-8572-2-git-send-email-zhengsq@rock-chips.com>
+References: <1446717194-8572-1-git-send-email-zhengsq@rock-chips.com>
+ <1446717194-8572-2-git-send-email-zhengsq@rock-chips.com>
+Message-ID: <20151105161311.GR18409@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 05, 2015 at 05:31:39AM -0800, Andrew Morton wrote:
-> On Thu,  5 Nov 2015 11:50:35 +0000 Catalin Marinas <catalin.marinas@arm.com> wrote:
-> 
-> > Commit 8fc9cf420b36 ("slab: make more slab management structure off the
-> > slab") enables off-slab management objects for sizes starting with
-> > PAGE_SIZE >> 5. This means 128 bytes for a 4KB page configuration.
-> > However, on systems with a KMALLOC_MIN_SIZE of 128 (arm64 in 4.4), such
-> > optimisation does not make sense since the slab management allocation
-> > would take 128 bytes anyway (even though freelist_size is 32) with the
-> > additional overhead of another allocation.
-> > 
-> > This patch introduces an OFF_SLAB_MIN_SIZE macro which takes
-> > KMALLOC_MIN_SIZE into account. It also solves a slab bug on arm64 where
-> > the first kmalloc_cache to be initialised after slab_early_init = 0,
-> > "kmalloc-128", fails to allocate off-slab management objects from the
-> > same "kmalloc-128" cache.
-> 
-> That all seems to be quite minor stuff.
+On Thu, Nov 05, 2015 at 05:53:13PM +0800, Shunqian Zheng wrote:
 
-Apart from "it also solves a bug on arm64...". But I agree, the initial
-commit log doesn't give any justification for cc stable.
+This is basically all good, a few very minor comments below but nothing
+that should take any time to fix.
 
-> > Fixes: 8fc9cf420b36 ("slab: make more slab management structure off the slab")
-> > Cc: <stable@vger.kernel.org> # 3.15+
-> 
-> Yet you believe the fix should be backported.
-> 
-> So, the usual refrain: when fixing a bug, please describe the end-user
-> visible effects of that bug.
+> +static const char *rk3036_codec_antipop_text[] = {"none", "work"};
+> +static const unsigned int rk3036_codec_antipop_values[] = {0x1, 0x2};
+> +
+> +static SOC_VALUE_ENUM_DOUBLE_DECL(rk3036_codec_antipop_enum, INNO_R09,
+> +		INNO_R09_HPL_ANITPOP_SHIFT, INNO_R09_HPR_ANITPOP_SHIFT, 0x3,
+> +		rk3036_codec_antipop_text, rk3036_codec_antipop_values);
 
-What about (unless you prefer this slightly more intrusive fix:
-http://article.gmane.org/gmane.linux.ports.sh.devel/50303):
+This looks like a simple boolean control rather than an enum - it looks
+like it's just turning antipop on and off.
 
-------------------8<--------------------------
+> +	SOC_DOUBLE_R_RANGE_TLV("Headphone Volume", INNO_R07, INNO_R08,
+> +		INNO_HP_GAIN_SHIFT, INNO_HP_GAIN_N39DB,
+> +		INNO_HP_GAIN_0DB, 0, rk3036_codec_hp_tlv),
+> +	SOC_DOUBLE("Zero Cross Detect", INNO_R06, INNO_R06_VOUTL_CZ_SHIFT,
+> +		INNO_R06_VOUTR_CZ_SHIFT, 1, 0),
 
->From fda8f306b6941f4ddbefcbcfaa59fedef4a679a3 Mon Sep 17 00:00:00 2001
-From: Catalin Marinas <catalin.marinas@arm.com>
-Date: Thu, 5 Nov 2015 11:14:48 +0000
-Subject: [PATCH] mm: slab: Only move management objects off-slab for sizes
- larger than KMALLOC_MIN_SIZE
+This should be "Zero Cross Switch".
 
-On systems with a KMALLOC_MIN_SIZE of 128 (arm64, some mips and powerpc
-configurations defining ARCH_DMA_MINALIGN to 128), the first
-kmalloc_caches[] entry to be initialised after slab_early_init = 0 is
-"kmalloc-128" with index 7. Depending on the debug kernel configuration,
-sizeof(struct kmem_cache) can be larger than 128 resulting in an
-INDEX_NODE of 8.
+> +	SOC_DOUBLE("HP Mute", INNO_R09, INNO_R09_HPL_MUTE_SHIFT,
+> +		INNO_R09_HPR_MUTE_SHIFT, 1, 1),
 
-Commit 8fc9cf420b36 ("slab: make more slab management structure off the
-slab") enables off-slab management objects for sizes starting with
-PAGE_SIZE >> 5 (128 bytes for a 4KB page configuration) and the creation
-of the "kmalloc-128" cache would try to place the management objects
-off-slab. However, since KMALLOC_MIN_SIZE is already 128 and
-freelist_size == 32 in __kmem_cache_create(),
-kmalloc_slab(freelist_size) returns NULL (kmalloc_caches[7] not
-populated yet). This triggers the following bug on arm64:
+This should be "Headphone Switch".
 
-[    0.000000] kernel BUG at /work/Linux/linux-2.6-aarch64/mm/slab.c:2283!
-[    0.000000] Internal error: Oops - BUG: 0 [#1] SMP
-[    0.000000] Modules linked in:
-[    0.000000] CPU: 0 PID: 0 Comm: swapper Not tainted 4.3.0-rc4+ #540
-[    0.000000] Hardware name: Juno (DT)
-[    0.000000] task: ffffffc0006962b0 ti: ffffffc00068c000 task.ti: ffffffc00068c000
-[    0.000000] PC is at __kmem_cache_create+0x21c/0x280
-[    0.000000] LR is at __kmem_cache_create+0x210/0x280
-[...]
-[    0.000000] Call trace:
-[    0.000000] [<ffffffc000154948>] __kmem_cache_create+0x21c/0x280
-[    0.000000] [<ffffffc000652da4>] create_boot_cache+0x48/0x80
-[    0.000000] [<ffffffc000652e2c>] create_kmalloc_cache+0x50/0x88
-[    0.000000] [<ffffffc000652f14>] create_kmalloc_caches+0x4c/0xf4
-[    0.000000] [<ffffffc000654a9c>] kmem_cache_init+0x100/0x118
-[    0.000000] [<ffffffc0006447d4>] start_kernel+0x214/0x33c
+> +static int rk3036_codec_add_widgets(struct snd_soc_codec *codec)
+> +{
+> +	struct snd_soc_dapm_context *dapm = snd_soc_codec_get_dapm(codec);
+> +
+> +	snd_soc_add_codec_controls(codec, rk3036_codec_dapm_controls,
+> +		ARRAY_SIZE(rk3036_codec_dapm_controls));
+> +
+> +	snd_soc_dapm_new_controls(dapm, rk3036_codec_dapm_widgets,
+> +		ARRAY_SIZE(rk3036_codec_dapm_widgets));
+> +
+> +	snd_soc_dapm_add_routes(dapm, rk3036_codec_dapm_routes,
+> +		ARRAY_SIZE(rk3036_codec_dapm_routes));
 
-This patch introduces an OFF_SLAB_MIN_SIZE definition to avoid off-slab
-management objects for sizes equal to or smaller than KMALLOC_MIN_SIZE.
+Just point at the tables from the driver structure and let the core do
+the initialisation for you.
 
-Fixes: 8fc9cf420b36 ("slab: make more slab management structure off the slab")
-Cc: <stable@vger.kernel.org> # 3.15+
-Reported-by: Geert Uytterhoeven <geert@linux-m68k.org>
-Cc: Christoph Lameter <cl@linux.com>
-Cc: Pekka Enberg <penberg@kernel.org>
-Cc: David Rientjes <rientjes@google.com>
-Cc: Joonsoo Kim <iamjoonsoo.kim@lge.com>
-Cc: Andrew Morton <akpm@linux-foundation.org>
-Signed-off-by: Catalin Marinas <catalin.marinas@arm.com>
----
- mm/slab.c | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
+> +static int rk3036_codec_set_bias_level(struct snd_soc_codec *codec,
+> +				       enum snd_soc_bias_level level)
+> +{
+> +	switch (level) {
+> +	case SND_SOC_BIAS_STANDBY:
+> +		/* set a big current for capacitor charging. */
+> +		snd_soc_write(codec, INNO_R10, INNO_R10_MAX_CUR);
+> +		/* start precharge */
+> +		snd_soc_write(codec, INNO_R06, INNO_R06_DAC_PRECHARGE);
 
-diff --git a/mm/slab.c b/mm/slab.c
-index 4fcc5dd8d5a6..419b649b395e 100644
---- a/mm/slab.c
-+++ b/mm/slab.c
-@@ -282,6 +282,7 @@ static void kmem_cache_node_init(struct kmem_cache_node *parent)
- 
- #define CFLGS_OFF_SLAB		(0x80000000UL)
- #define	OFF_SLAB(x)	((x)->flags & CFLGS_OFF_SLAB)
-+#define OFF_SLAB_MIN_SIZE	(max_t(size_t, PAGE_SIZE >> 5, KMALLOC_MIN_SIZE + 1))
- 
- #define BATCHREFILL_LIMIT	16
- /*
-@@ -2212,7 +2213,7 @@ __kmem_cache_create (struct kmem_cache *cachep, unsigned long flags)
- 	 * it too early on. Always use on-slab management when
- 	 * SLAB_NOLEAKTRACE to avoid recursive calls into kmemleak)
- 	 */
--	if ((size >= (PAGE_SIZE >> 5)) && !slab_early_init &&
-+	if (size >= OFF_SLAB_MIN_SIZE && !slab_early_init &&
- 	    !(flags & SLAB_NOLEAKTRACE))
- 		/*
- 		 * Size is large, assume best to place the slab management obj
-@@ -2276,7 +2277,7 @@ __kmem_cache_create (struct kmem_cache *cachep, unsigned long flags)
- 		/*
- 		 * This is a possibility for one of the kmalloc_{dma,}_caches.
- 		 * But since we go off slab only for object size greater than
--		 * PAGE_SIZE/8, and kmalloc_{dma,}_caches get created
-+		 * OFF_SLAB_MIN_SIZE, and kmalloc_{dma,}_caches get created
- 		 * in ascending order,this should not happen at all.
- 		 * But leave a BUG_ON for some lucky dude.
- 		 */
+Do we not need to wait for this to ramp?
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151105/c1e7d135/attachment.sig>
