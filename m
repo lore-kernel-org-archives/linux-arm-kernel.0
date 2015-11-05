@@ -1,19 +1,31 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Thu, 05 Nov 2015 10:34:43 +0100
-Subject: [PATCH] reset: check return value of reset_controller_register()
-In-Reply-To: <1446702896-1156-1-git-send-email-yamada.masahiro@socionext.com>
-References: <1446702896-1156-1-git-send-email-yamada.masahiro@socionext.com>
-Message-ID: <1446716083.3894.8.camel@pengutronix.de>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Thu, 5 Nov 2015 09:34:43 +0000
+Subject: [PATCH RESEND 0/4] SMP support for Broadcom NSP
+In-Reply-To: <1446702681-45339-1-git-send-email-kapilh@broadcom.com>
+References: <1446702681-45339-1-git-send-email-kapilh@broadcom.com>
+Message-ID: <20151105093443.GO8644@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Donnerstag, den 05.11.2015, 14:54 +0900 schrieb Masahiro Yamada:
-> Currently, reset_controller_register() always return 0, but it would
-> be better to check its return code.
+On Thu, Nov 05, 2015 at 12:51:17AM -0500, Kapil Hali wrote:
+> Hi,
 > 
-> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+> This series adds SMP support for Broadcom's Northstar Plus SoC.
+> 
+> There are similar SMP enablement methods for many ARMv7 bsed SoCs.
+> BCM NSP SoC, has a typical such mechanism - after power-on, the
+> secondary core is held in a standby state, primary core provides a
+> startup address for the secondary core and wakes it up. Booting of
+> the secondary core is serialized using pen_release global variable.
 
-Applied with S?ren's Acked-by, thanks.
+Why do you need the pen_release stuff?  The above implies that you
+have only one secondary core, and you can control when it comes out
+of standby state.
 
-regards
-Philipp
+Please, don't assume that the pen_release stuff is any kind of recommended
+or standardised system.  It isn't.  It's a hack for ARMs evaluation
+platforms.
+
+-- 
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
