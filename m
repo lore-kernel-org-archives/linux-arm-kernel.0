@@ -1,64 +1,32 @@
-From: moinejf@free.fr (Jean-Francois Moine)
-Date: Thu, 5 Nov 2015 07:47:30 +0100
-Subject: [PATCH v4 4/6] reset: sunxi: Add Allwinner H3 bus resets
-In-Reply-To: <20151104163014.GB6114@lukather>
-References: <1445964626-6484-1-git-send-email-jenskuske@gmail.com>
- <1445964626-6484-5-git-send-email-jenskuske@gmail.com>
- <13919923.o3Dj9msmoa@wuerfel> <20151104163014.GB6114@lukather>
-Message-ID: <20151105074730.fd6a9d57a1f2c7933478c680@free.fr>
+From: rnayak@codeaurora.org (Rajendra Nayak)
+Date: Thu, 05 Nov 2015 12:21:48 +0530
+Subject: [PATCH v4 0/8] qcom: Add support for TSENS driver
+In-Reply-To: <20151102201345.GA4238@localhost.localdomain>
+References: <1444383670-32693-1-git-send-email-rnayak@codeaurora.org>
+ <20151102201345.GA4238@localhost.localdomain>
+Message-ID: <563AFC84.3070807@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 4 Nov 2015 08:30:14 -0800
-Maxime Ripard <maxime.ripard@free-electrons.com> wrote:
+Hi Eduardo,
 
-> Hi Arnd,
+On 11/03/2015 01:43 AM, Eduardo Valentin wrote:
+> Rajendra,
 > 
-> On Fri, Oct 30, 2015 at 09:27:03AM +0100, Arnd Bergmann wrote:
-> > On Tuesday 27 October 2015 17:50:24 Jens Kuske wrote:
-> > > 
-> > > +static int sun8i_h3_bus_reset_xlate(struct reset_controller_dev *rcdev,
-> > > +                                   const struct of_phandle_args *reset_spec)
-> > > +{
-> > > +       unsigned int index = reset_spec->args[0];
-> > > +
-> > > +       if (index < 96)
-> > > +               return index;
-> > > +       else if (index < 128)
-> > > +               return index + 32;
-> > > +       else if (index < 160)
-> > > +               return index + 64;
-> > > +       else
-> > > +               return -EINVAL;
-> > > +}
-> > > +
-> > > 
-> > 
-> > This looks like you are doing something wrong and should either
-> > put the actual number into DT,
+> On Fri, Oct 09, 2015 at 03:11:02PM +0530, Rajendra Nayak wrote:
+>> Patches 1/8 to 4/8 will need to go via the thermal tree/Eduardo.
+>> Patches 5/8 to 8/8 will need to go via qcom-msm tree/Andy.
+>>
+>> Eduardo, can you please take a look at the patches and let me
+>> know if you see any issues.
+>>
 > 
-> This is the actual number, except that there's some useless registers
-> in between. Allwinner documents it like that:
-> 
-> 0x0	Reset 0
-> 0x4	Reset 1
-> 0xc	Reset 2
-> 
-> So we have to adjust the offset to account with the blank register in
-> between (0x8).
-> 
-> > or use a two-cell representation, with the first cell indicating the
-> > block (0, 1 or 2), and the second cell the index.
-> 
-> And the missing register is not a block either.
-> 
-> That would also imply either changing the bindings of that driver (and
-> all the current DTS that are using it), or introducing a whole new
-> driver just to deal with some extraordinary offset calculation.
+> Thanks for your taking this over. I am assuming this superseeds the
+> work by Narendran.
 
-In the H3, the holes are not used, but what would occur if these holes
-would be used for some other purpose in future SoCs? Double mapping?
+Yes, thats correct. I took Naren's work to add support for msm8960
+family and created a single driver to work across msm8960 and
+msm8974/8916/8084 SoCs.
 
--- 
-Ken ar c'henta?	|	      ** Breizh ha Linux atav! **
-Jef		|		http://moinejf.free.fr/
+regards,
+Rajendra
