@@ -1,87 +1,204 @@
-From: andy.shevchenko@gmail.com (Andy Shevchenko)
-Date: Thu, 5 Nov 2015 11:16:16 +0200
-Subject: [PATCH] spi: mediatek: single device does not require cs_gpios
-In-Reply-To: <1446702633-14019-1-git-send-email-drinkcat@chromium.org>
-References: <1446702633-14019-1-git-send-email-drinkcat@chromium.org>
-Message-ID: <CAHp75VfAHyTOpWcTh6w2EhEy73xfUYX5T3tpXbUbBiU-tjaZnQ@mail.gmail.com>
+From: simon.guinot@sequanux.org (Simon Guinot)
+Date: Thu, 5 Nov 2015 10:20:55 +0100
+Subject: [PATCH 3/4] ARM: dts: kirkwood: add Seagate GoFlex Home
+In-Reply-To: <00000150d49a8745-1c2bc8d4-1333-46bb-bf0e-5508ef988c73-000000@email.amazonses.com>
+References: <1446675888-24495-1-git-send-email-luka.perkov@sartura.hr>
+ <00000150d49a8745-1c2bc8d4-1333-46bb-bf0e-5508ef988c73-000000@email.amazonses.com>
+Message-ID: <20151105092055.GL4665@kw.sim.vm.gnt>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 5, 2015 at 7:50 AM, Nicolas Boichat <drinkcat@chromium.org> wrote:
-> When only one device is present, it is not necessary to specify
-> cs_gpios, as the CS line can be controlled by the hardware
-> module.
->
-> Without this patch, older device tree bindings used before
-> 37457607 "spi: mediatek: mt8173 spi multiple devices support"
-> would cause a panic on boot. This fixes the crash, and
-> re-introduces backward compatibility.
->
-> Signed-off-by: Nicolas Boichat <drinkcat@chromium.org>
+Hi Luka,
+
+On Wed, Nov 04, 2015 at 10:25:08PM +0000, Luka Perkov wrote:
+> Based on dts files from OpenWrt.
+> 
+> Signed-off-by: Luka Perkov <luka.perkov@sartura.hr>
 > ---
->
-> Applies on top of broonie/spi.git topic/mtk. Thanks!
->
->  drivers/spi/spi-mt65xx.c | 26 ++++++++++++++++++--------
->  1 file changed, 18 insertions(+), 8 deletions(-)
->
-> diff --git a/drivers/spi/spi-mt65xx.c b/drivers/spi/spi-mt65xx.c
-> index 563954a..f694031 100644
-> --- a/drivers/spi/spi-mt65xx.c
-> +++ b/drivers/spi/spi-mt65xx.c
-> @@ -410,7 +410,7 @@ static int mtk_spi_setup(struct spi_device *spi)
->         if (!spi->controller_data)
->                 spi->controller_data = (void *)&mtk_default_chip_info;
->
-> -       if (mdata->dev_comp->need_pad_sel)
-> +       if (mdata->dev_comp->need_pad_sel && spi->cs_gpio >= 0)
-
-gpio_is_valid() ?
-
->                 gpio_direction_output(spi->cs_gpio, !(spi->mode & SPI_CS_HIGH));
->
->         return 0;
-> @@ -632,13 +632,23 @@ static int mtk_spi_probe(struct platform_device *pdev)
->                         goto err_put_master;
->                 }
->
-> -               for (i = 0; i < master->num_chipselect; i++) {
-> -                       ret = devm_gpio_request(&pdev->dev, master->cs_gpios[i],
-> -                                               dev_name(&pdev->dev));
-> -                       if (ret) {
-> -                               dev_err(&pdev->dev,
-> -                                       "can't get CS GPIO %i\n", i);
-> -                               goto err_put_master;
-> +               if (!master->cs_gpios && master->num_chipselect > 1) {
-> +                       dev_err(&pdev->dev,
-> +                               "cs_gpios not specified and num_chipselect > 1\n");
-> +                       ret = -EINVAL;
-> +                       goto err_put_master;
-> +               }
+>  .../devicetree/bindings/arm/marvell,kirkwood.txt   |   1 +
+>  arch/arm/boot/dts/Makefile                         |   1 +
+>  arch/arm/boot/dts/kirkwood-goflexhome.dts          | 127 +++++++++++++++++++++
+>  3 files changed, 129 insertions(+)
+>  create mode 100644 arch/arm/boot/dts/kirkwood-goflexhome.dts
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/marvell,kirkwood.txt b/Documentation/devicetree/bindings/arm/marvell,kirkwood.txt
+> index ed381a3..37bd190 100644
+> --- a/Documentation/devicetree/bindings/arm/marvell,kirkwood.txt
+> +++ b/Documentation/devicetree/bindings/arm/marvell,kirkwood.txt
+> @@ -72,6 +72,7 @@ board. Currently known boards are:
+>  "raidsonic,ib-nas6220-b"
+>  "raidsonic,ib-nas62x0"
+>  "seagate,dockstar"
+> +"seagate,goflexhome"
+>  "seagate,goflexnet"
+>  "synology,ds109"
+>  "synology,ds110jv10"
+> diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+> index ebe5b73..1d6fb0d 100644
+> --- a/arch/arm/boot/dts/Makefile
+> +++ b/arch/arm/boot/dts/Makefile
+> @@ -170,6 +170,7 @@ dtb-$(CONFIG_MACH_KIRKWOOD) += \
+>  	kirkwood-ds411slim.dtb \
+>  	kirkwood-ea3500.dtb \
+>  	kirkwood-ea4500.dtb \
+> +	kirkwood-goflexhome.dtb \
+>  	kirkwood-goflexnet.dtb \
+>  	kirkwood-guruplug-server-plus.dtb \
+>  	kirkwood-ib62x0.dtb \
+> diff --git a/arch/arm/boot/dts/kirkwood-goflexhome.dts b/arch/arm/boot/dts/kirkwood-goflexhome.dts
+> new file mode 100644
+> index 0000000..5f933d4
+> --- /dev/null
+> +++ b/arch/arm/boot/dts/kirkwood-goflexhome.dts
+> @@ -0,0 +1,127 @@
+> +/dts-v1/;
 > +
-> +               if (master->cs_gpios) {
-> +                       for (i = 0; i < master->num_chipselect; i++) {
-> +                               ret = devm_gpio_request(&pdev->dev,
-> +                                                       master->cs_gpios[i],
-> +                                                       dev_name(&pdev->dev));
-> +                               if (ret) {
-> +                                       dev_err(&pdev->dev,
-> +                                               "can't get CS GPIO %i\n", i);
-> +                                       goto err_put_master;
-> +                               }
->                         }
->                 }
->         }
-> --
-> 2.6.0.rc2.230.g3dd15c0
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-spi" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> +#include "kirkwood.dtsi"
+> +#include "kirkwood-6281.dtsi"
+> +
+> +/ {
+> +	model = "Seagate GoFlex Home";
+> +	compatible = "seagate,goflexhome", "marvell,kirkwood-88f6281", "marvell,kirkwood";
+> +
+> +	memory {
+> +		device_type = "memory";
+> +		reg = <0x00000000 0x8000000>;
+> +	};
+> +
+> +	chosen {
+> +		bootargs = "console=ttyS0,115200n8 earlyprintk root=/dev/sda1 rootdelay=10";
+> +		stdout-path = &uart0;
+> +	};
+> +
+> +	ocp at f1000000 {
+> +		pinctrl: pin-controller at 10000 {
+> +			pmx_usb_power_enable: pmx-usb-power-enable {
+> +				marvell,pins = "mpp29";
+> +				marvell,function = "gpio";
+> +			};
+> +			pmx_led_white: pmx-led-white {
+> +				marvell,pins = "mpp40";
+> +				marvell,function = "gpio";
+> +			};
+> +			pmx_led_green: pmx-led_green {
+> +				marvell,pins = "mpp46";
+> +				marvell,function = "gpio";
+> +			};
+> +			pmx_led_orange: pmx-led-orange {
+> +				marvell,pins = "mpp47";
+> +				marvell,function = "gpio";
+> +			};
+> +		};
+> +		serial at 12000 {
+> +			status = "ok";
+> +		};
+> +
+> +		sata at 80000 {
+> +			status = "okay";
+> +			nr-ports = <2>;
 
+I think nr-ports should be set to 1. This device only allows to plug a
+single HDD and there is no eSATA connectors.
 
+> +		};
+> +
+> +	};
+> +	gpio-leds {
+> +		compatible = "gpio-leds";
+> +
+> +		health {
+> +			label = "status:green:health";
+> +			gpios = <&gpio1 14 1>;
 
--- 
-With Best Regards,
-Andy Shevchenko
+It would be better to use GPIO_ACTIVE_LOW instead of 1. The same comment
+applies to the other LEDs.
+
+> +			linux,default-trigger = "default-on";
+> +		};
+> +		fault {
+> +			label = "status:orange:fault";
+> +			gpios = <&gpio1 15 1>;
+> +		};
+> +		misc {
+> +			label = "status:white:misc";
+> +			gpios = <&gpio1 8 1>;
+> +			linux,default-trigger = "ide-disk";
+
+ide-disk ? Really ? There is no way this can be correct :)
+
+> +		};
+> +	};
+> +	regulators {
+> +		compatible = "simple-bus";
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +		pinctrl-0 = <&pmx_usb_power_enable>;
+> +		pinctrl-names = "default";
+> +
+> +		usb_power: regulator at 1 {
+> +			compatible = "regulator-fixed";
+> +			reg = <1>;
+> +			regulator-name = "USB Power";
+> +			regulator-min-microvolt = <5000000>;
+> +			regulator-max-microvolt = <5000000>;
+> +			enable-active-high;
+> +			regulator-always-on;
+> +			regulator-boot-on;
+> +			gpio = <&gpio0 29 GPIO_ACTIVE_HIGH>;
+> +		};
+> +	};
+> +};
+> +
+> +&nand {
+> +	chip-delay = <40>;
+> +	status = "okay";
+> +
+> +	partition at 0 {
+> +		label = "u-boot";
+> +		reg = <0x0000000 0x100000>;
+> +		read-only;
+> +	};
+> +
+> +	partition at 100000 {
+> +		label = "uImage";
+> +		reg = <0x0100000 0x400000>;
+> +	};
+> +
+> +	partition at 500000 {
+> +		label = "pogoplug";
+> +		reg = <0x0500000 0x2000000>;
+> +	};
+> +
+> +	partition at 2500000 {
+> +		label = "root";
+> +		reg = <0x02500000 0xd800000>;
+> +	};
+> +};
+> +
+> +&mdio {
+> +	status = "okay";
+> +
+> +	ethphy0: ethernet-phy at 0 {
+> +		reg = <0>;
+> +	};
+> +};
+> +
+> +&eth0 {
+> +	status = "okay";
+> +	ethernet0-port at 0 {
+> +		phy-handle = <&ethphy0>;
+> +	};
+> +};
+
+Is there a power-off GPIO on this board ?
+
+Regards,
+
+Simon
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 181 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151105/08cee255/attachment-0001.sig>
