@@ -1,41 +1,22 @@
 From: alex.aring@gmail.com (Alexander Aring)
-Date: Thu, 5 Nov 2015 15:12:36 +0100
+Date: Thu, 5 Nov 2015 15:14:34 +0100
 Subject: [RFCv2 2/2] rpi: add support to enable usb power domain
-In-Reply-To: <20151105133510.GA12530@rob-hp-laptop>
+In-Reply-To: <563B0217.4030307@lategoodbye.de>
 References: <1446590711-18928-1-git-send-email-alex.aring@gmail.com>
  <1446590711-18928-3-git-send-email-alex.aring@gmail.com>
- <20151105133510.GA12530@rob-hp-laptop>
-Message-ID: <20151105141231.GA599@omega>
+ <563B0217.4030307@lategoodbye.de>
+Message-ID: <20151105141429.GB599@omega>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Thu, Nov 05, 2015 at 07:35:10AM -0600, Rob Herring wrote:
-> On Tue, Nov 03, 2015 at 11:45:11PM +0100, Alexander Aring wrote:
-...
-> > 
-> > diff --git a/Documentation/devicetree/bindings/arm/bcm/raspberrypi,bcm2835-power.txt b/Documentation/devicetree/bindings/arm/bcm/raspberrypi,bcm2835-power.txt
-> > new file mode 100644
-> > index 0000000..c3abc24
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/arm/bcm/raspberrypi,bcm2835-power.txt
-> > @@ -0,0 +1,25 @@
-> > +Raspberry Pi power domain driver
-> > +
-> > +Required properties:
-> > +
-> > +- compatible:		Should be "raspberrypi,bcm2835-power".
+On Thu, Nov 05, 2015 at 08:15:35AM +0100, Stefan Wahren wrote:
+> Hi Alexander,
 > 
-> These are board or chip level power domains? If the latter, the vendor 
-> should not be raspberrypi, but Broadcom. If the former, then it should 
-> describe the board rather than the chip.
+> i think this subject should better start with "ARM:".
 > 
 
-the access to the power domains is provided by the firmware. The
-firmware is RPi specific. On an other bcm2835 with another firmware it
-would be working complete different.
+ok. I will change every thing which you recognised.
 
-Everything which is accessable over the firmware is RPi specific.
+Thanks.
 
 - Alex
