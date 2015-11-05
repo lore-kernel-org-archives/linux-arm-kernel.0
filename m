@@ -1,40 +1,46 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Thu, 5 Nov 2015 17:30:01 +0000
-Subject: [PATCH v11 2/5] missing include asm/paravirt.h in cputime.c
-In-Reply-To: <20151105164032.GG3604@twins.programming.kicks-ass.net>
-References: <alpine.DEB.2.02.1511051502270.13541@kaball.uk.xensource.com>
- <1446737696-9749-2-git-send-email-stefano.stabellini@eu.citrix.com>
- <20151105164032.GG3604@twins.programming.kicks-ass.net>
-Message-ID: <alpine.DEB.2.02.1511051659580.13541@kaball.uk.xensource.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 5 Nov 2015 17:31:14 +0000
+Subject: [PATCH] arm64: cmpxchg_dbl: fix return value type
+In-Reply-To: <1446732056-31294-1-git-send-email-lorenzo.pieralisi@arm.com>
+References: <1446732056-31294-1-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <20151105173114.GU7637@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 5 Nov 2015, Peter Zijlstra wrote:
-> How can this be missing? Things compile fine now, right?
+On Thu, Nov 05, 2015 at 02:00:56PM +0000, Lorenzo Pieralisi wrote:
+> The current arm64 __cmpxchg_double{_mb} implementations carry out the
+> compare exchange by first comparing the old values passed in to the
+> values read from the pointer provided and by stashing the cumulative
+> bitwise difference in a 64-bit register.
+> 
+> By comparing the register content against 0, it is possible to detect if
+> the values read differ from the old values passed in, so that the compare
+> exchange detects whether it has to bail out or carry on completing the
+> operation with the exchange.
+> 
+> Given the current implementation, to detect the cmpxchg operation
+> status, the __cmpxchg_double{_mb} functions should return the 64-bit
+> stashed bitwise difference so that the caller can detect cmpxchg failure
+> by comparing the return value content against 0. The current implementation
+> declares the return value as an int, which means that the 64-bit
+> value stashing the bitwise difference is truncated before being
+> returned to the __cmpxchg_double{_mb} callers, which means that
+> any bitwise difference present in the top 32 bits goes undetected,
+> triggering false positives and subsequent kernel failures.
+> 
+> This patch fixes the issue by declaring the arm64 __cmpxchg_double{_mb}
+> return values as a long, so that the bitwise difference is
+> properly propagated on failure, restoring the expected behaviour.
+> 
+> Fixes: e9a4b795652f ("arm64: cmpxchg_dbl: patch in lse instructions when
+> supported by the CPU")
+> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Cc: <stable@vger.kernel.org>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: Catalin Marinas <catalin.marinas@arm.com>
+> Cc: Marc Zyngier <marc.zyngier@arm.com>
 
-Fair enough.
+Applied (I'll send it sometime this merging window). Thanks.
 
-
-> So please better explain why we do this change.
-
-asm/paravirt.h is included by one of the other headers included in
-kernel/sched/cputime.c on x86, but not on other architecures. On arm and
-arm64, where I am about to introduce asm/paravirt.h and stolen time
-support, without #include <asm/paravirt.h> in cputime.c I would get:
-
-kernel/sched/cputime.c: In function ?steal_account_process_tick?:
-kernel/sched/cputime.c:260:24: error: ?paravirt_steal_enabled? undeclared (first use in this function)
-  if (static_key_false(&paravirt_steal_enabled)) {
-
-A bit of digging on x86 (using gcc -E on cputime.c) tells me that
-asm/paravirt.h is coming from the following include chain:
-
-#include <kernel/sched/sched.h>
-#include <linux/spinlock.h>
-#include <linux/preempt.h>
-#include <asm/preempt.h>
-#include <linux/thread_info.h>
-#include <asm/thread_info.h>
-#include <asm/processor.h>
-#include <asm/msr.h>
-#include <asm/paravirt.h>
+-- 
+Catalin
