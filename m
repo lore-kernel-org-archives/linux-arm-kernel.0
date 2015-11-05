@@ -1,150 +1,93 @@
 From: robh@kernel.org (Rob Herring)
-Date: Wed, 4 Nov 2015 21:21:06 -0600
-Subject: [PATCH v6 6/8] ARM: rockchip: add support smp for rk3036
-In-Reply-To: <1446639916-11957-1-git-send-email-zhengxing@rock-chips.com>
+Date: Wed, 4 Nov 2015 21:22:56 -0600
+Subject: [PATCH v6 1/8] dt-bindings: add documentation of rk3036 clock
+ controller
+In-Reply-To: <1446639503-11763-2-git-send-email-zhengxing@rock-chips.com>
 References: <1446639503-11763-1-git-send-email-zhengxing@rock-chips.com>
- <1446639916-11957-1-git-send-email-zhengxing@rock-chips.com>
-Message-ID: <20151105032106.GA1932@rob-hp-laptop>
+ <1446639503-11763-2-git-send-email-zhengxing@rock-chips.com>
+Message-ID: <20151105032256.GA3261@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 04, 2015 at 08:25:16PM +0800, Xing Zheng wrote:
-> From: Heiko Stuebner <heiko@sntech.de>
+On Wed, Nov 04, 2015 at 08:18:16PM +0800, Xing Zheng wrote:
+> Add the devicetree binding for the cru on the rk3036 which quite similar
+> structured as previous clock controllers.
 > 
-> The dual-core Cortex A7 rk3036 is a bit special in that it does not allow
-> to control the actual powerdomain of the cpu cores, while the rest of the
-> smp-bringup like reset control and entry address handling stays the same.
-> Its bigger sibling, the quad-core rk3128 again allows powerdomain control.
-> 
-> So allow that case by introducing a separate smp-enable-method, that simply
-> disables powerdomain handling in the common code.
-> 
-> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> Tested-by: Xing Zheng <zhengxing@rock-chips.com>
 > Signed-off-by: Xing Zheng <zhengxing@rock-chips.com>
+> Reviewed-by: Heiko Stuebner <heiko@sntech.de>
+
+Acked-by: Rob Herring <robh@kernel.org>
+
 > ---
 > 
 > Changes in v6: None
 > 
->  Documentation/devicetree/bindings/arm/cpus.txt |    1 +
-
-Acked-by: Rob Herring <robh@kernel.org>
-
->  arch/arm/mach-rockchip/platsmp.c               |   45 +++++++++++++++++-------
->  2 files changed, 34 insertions(+), 12 deletions(-)
+>  .../bindings/clock/rockchip,rk3036-cru.txt         |   56 ++++++++++++++++++++
+>  1 file changed, 56 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/clock/rockchip,rk3036-cru.txt
 > 
-> diff --git a/Documentation/devicetree/bindings/arm/cpus.txt b/Documentation/devicetree/bindings/arm/cpus.txt
-> index 3a07a87..8fb0749 100644
-> --- a/Documentation/devicetree/bindings/arm/cpus.txt
-> +++ b/Documentation/devicetree/bindings/arm/cpus.txt
-> @@ -200,6 +200,7 @@ nodes to be present and contain the properties described below.
->  			    "qcom,gcc-msm8660"
->  			    "qcom,kpss-acc-v1"
->  			    "qcom,kpss-acc-v2"
-> +			    "rockchip,rk3036-smp"
->  			    "rockchip,rk3066-smp"
->  			    "ste,dbx500-smp"
->  
-> diff --git a/arch/arm/mach-rockchip/platsmp.c b/arch/arm/mach-rockchip/platsmp.c
-> index 3e7a4b7..5c138f9 100644
-> --- a/arch/arm/mach-rockchip/platsmp.c
-> +++ b/arch/arm/mach-rockchip/platsmp.c
-> @@ -42,6 +42,7 @@ static int ncores;
->  #define PMU_PWRDN_SCU		4
->  
->  static struct regmap *pmu;
-> +static int has_pmu = true;
->  
->  static int pmu_power_domain_is_on(int pd)
->  {
-> @@ -89,20 +90,23 @@ static int pmu_set_power_domain(int pd, bool on)
->  	if (!IS_ERR(rstc) && !on)
->  		reset_control_assert(rstc);
->  
-> -	ret = regmap_update_bits(pmu, PMU_PWRDN_CON, BIT(pd), val);
-> -	if (ret < 0) {
-> -		pr_err("%s: could not update power domain\n", __func__);
-> -		return ret;
-> -	}
-> -
-> -	ret = -1;
-> -	while (ret != on) {
-> -		ret = pmu_power_domain_is_on(pd);
-> +	if (has_pmu) {
-> +		ret = regmap_update_bits(pmu, PMU_PWRDN_CON, BIT(pd), val);
->  		if (ret < 0) {
-> -			pr_err("%s: could not read power domain state\n",
-> +			pr_err("%s: could not update power domain\n",
->  			       __func__);
->  			return ret;
->  		}
+> diff --git a/Documentation/devicetree/bindings/clock/rockchip,rk3036-cru.txt b/Documentation/devicetree/bindings/clock/rockchip,rk3036-cru.txt
+> new file mode 100644
+> index 0000000..ace0599
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/clock/rockchip,rk3036-cru.txt
+> @@ -0,0 +1,56 @@
+> +* Rockchip RK3036 Clock and Reset Unit
 > +
-> +		ret = -1;
-> +		while (ret != on) {
-> +			ret = pmu_power_domain_is_on(pd);
-> +			if (ret < 0) {
-> +				pr_err("%s: could not read power domain state\n",
-> +				       __func__);
-> +				return ret;
-> +			}
-> +		}
->  	}
->  
->  	if (!IS_ERR(rstc)) {
-> @@ -122,7 +126,7 @@ static int rockchip_boot_secondary(unsigned int cpu, struct task_struct *idle)
->  {
->  	int ret;
->  
-> -	if (!sram_base_addr || !pmu) {
-> +	if (!sram_base_addr || (has_pmu && !pmu)) {
->  		pr_err("%s: sram or pmu missing for cpu boot\n", __func__);
->  		return -ENXIO;
->  	}
-> @@ -275,7 +279,7 @@ static void __init rockchip_smp_prepare_cpus(unsigned int max_cpus)
->  		return;
->  	}
->  
-> -	if (rockchip_smp_prepare_pmu())
-> +	if (has_pmu && rockchip_smp_prepare_pmu())
->  		return;
->  
->  	if (read_cpuid_part() == ARM_CPU_PART_CORTEX_A9) {
-> @@ -318,6 +322,13 @@ static void __init rockchip_smp_prepare_cpus(unsigned int max_cpus)
->  		pmu_set_power_domain(0 + i, false);
->  }
->  
-> +static void __init rk3036_smp_prepare_cpus(unsigned int max_cpus)
-> +{
-> +	has_pmu = false;
+> +The RK3036 clock controller generates and supplies clock to various
+> +controllers within the SoC and also implements a reset controller for SoC
+> +peripherals.
 > +
-> +	rockchip_smp_prepare_cpus(max_cpus);
-> +}
+> +Required Properties:
 > +
->  #ifdef CONFIG_HOTPLUG_CPU
->  static int rockchip_cpu_kill(unsigned int cpu)
->  {
-> @@ -340,6 +351,15 @@ static void rockchip_cpu_die(unsigned int cpu)
->  }
->  #endif
->  
-> +static struct smp_operations rk3036_smp_ops __initdata = {
-> +	.smp_prepare_cpus	= rk3036_smp_prepare_cpus,
-> +	.smp_boot_secondary	= rockchip_boot_secondary,
-> +#ifdef CONFIG_HOTPLUG_CPU
-> +	.cpu_kill		= rockchip_cpu_kill,
-> +	.cpu_die		= rockchip_cpu_die,
-> +#endif
-> +};
+> +- compatible: should be "rockchip,rk3036-cru"
+> +- reg: physical base address of the controller and length of memory mapped
+> +  region.
+> +- #clock-cells: should be 1.
+> +- #reset-cells: should be 1.
 > +
->  static struct smp_operations rockchip_smp_ops __initdata = {
->  	.smp_prepare_cpus	= rockchip_smp_prepare_cpus,
->  	.smp_boot_secondary	= rockchip_boot_secondary,
-> @@ -349,4 +369,5 @@ static struct smp_operations rockchip_smp_ops __initdata = {
->  #endif
->  };
->  
-> +CPU_METHOD_OF_DECLARE(rk3036_smp, "rockchip,rk3036-smp", &rk3036_smp_ops);
->  CPU_METHOD_OF_DECLARE(rk3066_smp, "rockchip,rk3066-smp", &rockchip_smp_ops);
+> +Optional Properties:
+> +
+> +- rockchip,grf: phandle to the syscon managing the "general register files"
+> +  If missing pll rates are not changeable, due to the missing pll lock status.
+> +
+> +Each clock is assigned an identifier and client nodes can use this identifier
+> +to specify the clock which they consume. All available clocks are defined as
+> +preprocessor macros in the dt-bindings/clock/rk3036-cru.h headers and can be
+> +used in device tree sources. Similar macros exist for the reset sources in
+> +these files.
+> +
+> +External clocks:
+> +
+> +There are several clocks that are generated outside the SoC. It is expected
+> +that they are defined using standard clock bindings with following
+> +clock-output-names:
+> + - "xin24m" - crystal input - required,
+> + - "ext_i2s" - external I2S clock - optional,
+> + - "ext_gmac" - external GMAC clock - optional
+> +
+> +Example: Clock controller node:
+> +
+> +	cru: cru at 20000000 {
+> +		compatible = "rockchip,rk3036-cru";
+> +		reg = <0x20000000 0x1000>;
+> +		rockchip,grf = <&grf>;
+> +
+> +		#clock-cells = <1>;
+> +		#reset-cells = <1>;
+> +	};
+> +
+> +Example: UART controller node that consumes the clock generated by the clock
+> +  controller:
+> +
+> +	uart0: serial at 20060000 {
+> +		compatible = "snps,dw-apb-uart";
+> +		reg = <0x20060000 0x100>;
+> +		interrupts = <GIC_SPI 20 IRQ_TYPE_LEVEL_HIGH>;
+> +		reg-shift = <2>;
+> +		reg-io-width = <4>;
+> +		clocks = <&cru SCLK_UART0>;
+> +	};
 > -- 
 > 1.7.9.5
 > 
