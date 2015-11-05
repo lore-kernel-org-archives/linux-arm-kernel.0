@@ -1,131 +1,116 @@
 From: mmcclint@codeaurora.org (Matthew McClintock)
-Date: Thu,  5 Nov 2015 16:07:55 -0600
-Subject: [PATCH 4/5] qcom: ipq4019: Add basic board/dts support for IPQ4019 SoC
+Date: Thu,  5 Nov 2015 16:07:56 -0600
+Subject: [PATCH 5/5] dts: ipq4019: Add support for IPQ4019 DK01 board
 In-Reply-To: <1446761276-9111-1-git-send-email-mmcclint@codeaurora.org>
 References: <1446761276-9111-1-git-send-email-mmcclint@codeaurora.org>
-Message-ID: <1446761276-9111-5-git-send-email-mmcclint@codeaurora.org>
+Message-ID: <1446761276-9111-6-git-send-email-mmcclint@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add initial dts files and SoC support for IPQ4019
+Initial board support dts files for DK01 board.
 
+Signed-off-by: Senthilkumar N L <snlakshm@codeaurora.org>
 Signed-off-by: Varadarajan Narayanan <varada@codeaurora.org>
 ---
- arch/arm/boot/dts/qcom-ipq4019.dtsi | 108 ++++++++++++++++++++++++++++++++++++
- 1 file changed, 108 insertions(+)
- create mode 100644 arch/arm/boot/dts/qcom-ipq4019.dtsi
+ arch/arm/boot/dts/Makefile                      |  1 +
+ arch/arm/boot/dts/qcom-ipq4019-ap.dk01.1-c1.dts | 22 +++++++++++
+ arch/arm/boot/dts/qcom-ipq4019-ap.dk01.1.dtsi   | 49 +++++++++++++++++++++++++
+ 3 files changed, 72 insertions(+)
+ create mode 100644 arch/arm/boot/dts/qcom-ipq4019-ap.dk01.1-c1.dts
+ create mode 100644 arch/arm/boot/dts/qcom-ipq4019-ap.dk01.1.dtsi
 
-diff --git a/arch/arm/boot/dts/qcom-ipq4019.dtsi b/arch/arm/boot/dts/qcom-ipq4019.dtsi
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index bb8fa02..445340d 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -491,6 +491,7 @@ dtb-$(CONFIG_ARCH_QCOM) += \
+ 	qcom-apq8074-dragonboard.dtb \
+ 	qcom-apq8084-ifc6540.dtb \
+ 	qcom-apq8084-mtp.dtb \
++	qcom-ipq4019-ap.dk01.1-c1.dtb \
+ 	qcom-ipq8064-ap148.dtb \
+ 	qcom-msm8660-surf.dtb \
+ 	qcom-msm8960-cdp.dtb \
+diff --git a/arch/arm/boot/dts/qcom-ipq4019-ap.dk01.1-c1.dts b/arch/arm/boot/dts/qcom-ipq4019-ap.dk01.1-c1.dts
 new file mode 100644
-index 0000000..157a9ca
+index 0000000..0d92f1b
 --- /dev/null
-+++ b/arch/arm/boot/dts/qcom-ipq4019.dtsi
-@@ -0,0 +1,108 @@
-+/*
-+ * Copyright (c) 2015, The Linux Foundation. All rights reserved.
++++ b/arch/arm/boot/dts/qcom-ipq4019-ap.dk01.1-c1.dts
+@@ -0,0 +1,22 @@
++/* Copyright (c) 2015, The Linux Foundation. All rights reserved.
 + *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 and
-+ * only version 2 as published by the Free Software Foundation.
++ * Permission to use, copy, modify, and/or distribute this software for any
++ * purpose with or without fee is hereby granted, provided that the above
++ * copyright notice and this permission notice appear in all copies.
 + *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
++ * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
++ * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
++ * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
++ * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
++ * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
++ * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
++ * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
++ *
 + */
 +
-+/dts-v1/;
-+
-+#include "skeleton.dtsi"
-+#include <dt-bindings/reset/qcom,gcc-ipq4019.h>
-+#include <dt-bindings/clock/qcom,gcc-ipq4019.h>
++#include "qcom-ipq4019-ap.dk01.1.dtsi"
 +
 +/ {
-+	model = "Qualcomm Technologies, Inc. IPQ4019";
++	model = "Qualcomm Technologies, Inc. IPQ40xx/AP-DK01.1-C1";
++
++};
+diff --git a/arch/arm/boot/dts/qcom-ipq4019-ap.dk01.1.dtsi b/arch/arm/boot/dts/qcom-ipq4019-ap.dk01.1.dtsi
+new file mode 100644
+index 0000000..7448058
+--- /dev/null
++++ b/arch/arm/boot/dts/qcom-ipq4019-ap.dk01.1.dtsi
+@@ -0,0 +1,49 @@
++/* Copyright (c) 2015, The Linux Foundation. All rights reserved.
++ *
++ * Permission to use, copy, modify, and/or distribute this software for any
++ * purpose with or without fee is hereby granted, provided that the above
++ * copyright notice and this permission notice appear in all copies.
++ *
++ * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
++ * WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
++ * MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR
++ * ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
++ * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
++ * ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
++ * OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
++ *
++ */
++
++#include "qcom-ipq4019.dtsi"
++
++/ {
++	model = "Qualcomm Technologies, Inc. IPQ4019/AP-DK01.1";
 +	compatible = "qcom,ipq4019";
-+	interrupt-parent = <&intc>;
-+
-+	cpus {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		cpu at 0 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a7";
-+			reg = <0x0>;
-+			clocks = <&gcc GCC_APPS_CLK_SRC>;
-+		};
-+
-+		cpu at 1 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a7";
-+			reg = <0x1>;
-+			clocks = <&gcc GCC_APPS_CLK_SRC>;
-+		};
-+
-+		cpu at 2 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a7";
-+			reg = <0x2>;
-+			clocks = <&gcc GCC_APPS_CLK_SRC>;
-+		};
-+
-+		cpu at 3 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a7";
-+			reg = <0x3>;
-+			clocks = <&gcc GCC_APPS_CLK_SRC>;
-+		};
-+	};
 +
 +	soc {
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges;
-+		compatible = "simple-bus";
-+
-+		intc: interrupt-controller at b000000 {
-+			compatible = "qcom,msm-qgic2";
-+			interrupt-controller;
-+			#interrupt-cells = <3>;
-+			reg = <0x0b000000 0x1000>,
-+			<0x0b002000 0x1000>;
++		timer {
++			compatible = "arm,armv7-timer";
++			interrupts = <1 2 0xf08>,
++				     <1 3 0xf08>,
++				     <1 4 0xf08>,
++				     <1 1 0xf08>;
++			clock-frequency = <48000000>;
 +		};
 +
-+		gcc: clock-controller at 1800000 {
-+			compatible = "qcom,gcc-ipq4019";
-+			#clock-cells = <1>;
-+			#reset-cells = <1>;
-+			reg = <0x1800000 0x60000>;
-+		};
-+
-+		tlmm: pinctrl at 0x01000000 {
-+			compatible = "qcom,ipq4019-pinctrl";
-+			reg = <0x01000000 0x300000>;
-+			gpio-controller;
-+			#gpio-cells = <2>;
-+			interrupt-controller;
-+			#interrupt-cells = <2>;
-+			interrupts = <0 208 0>;
++		pinctrl at 0x01000000 {
++			serial_pins: serial_pinmux {
++				mux {
++					pins = "gpio60", "gpio61";
++					function = "blsp_uart0";
++					bias-disable;
++				};
++			};
 +		};
 +
 +		serial at 78af000 {
-+			compatible = "qcom,msm-uartdm-v1.4", "qcom,msm-uartdm";
-+			reg = <0x78af000 0x200>;
-+			interrupts = <0 107 0>;
-+			status = "disabled";
-+			clocks = <&gcc GCC_BLSP1_UART1_APPS_CLK>,
-+				<&gcc GCC_BLSP1_AHB_CLK>;
-+			clock-names = "core", "iface";
-+		};
-+
-+		serial at 78b0000 {
-+			compatible = "qcom,msm-uartdm-v1.4", "qcom,msm-uartdm";
-+			reg = <0x78b0000 0x200>;
-+			interrupts = <0 108 0>;
-+			status = "disabled";
-+			clocks = <&gcc GCC_BLSP1_UART2_APPS_CLK>,
-+				<&gcc GCC_BLSP1_AHB_CLK>;
-+			clock-names = "core", "iface";
++			pinctrl-0 = <&serial_pins>;
++			pinctrl-names = "default";
++			status = "ok";
 +		};
 +	};
 +};
