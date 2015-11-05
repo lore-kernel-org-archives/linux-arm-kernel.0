@@ -1,41 +1,35 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Thu, 5 Nov 2015 15:52:08 +0000
-Subject: [RFC] ASoC: Add mediatek HDMI codec driver
-In-Reply-To: <1446736519.3894.113.camel@pengutronix.de>
-References: <1446638053-12143-1-git-send-email-p.zabel@pengutronix.de>
- <20151104120343.GZ20228@sirena.org.uk>
- <1446736519.3894.113.camel@pengutronix.de>
-Message-ID: <20151105155208.GQ18409@sirena.org.uk>
+From: anton.bondarenko.sama@gmail.com (Anton Bondarenko)
+Date: Thu, 5 Nov 2015 17:00:28 +0100
+Subject: [PATCH v3 6/7] spi: imx: return error from dma channel request
+In-Reply-To: <20151105085637.GJ8526@pengutronix.de>
+References: <1446388901-6073-1-git-send-email-anton.bondarenko.sama@gmail.com>
+ <1446388901-6073-7-git-send-email-anton.bondarenko.sama@gmail.com>
+ <20151105085637.GJ8526@pengutronix.de>
+Message-ID: <563B7D1C.7010105@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 05, 2015 at 04:15:19PM +0100, Philipp Zabel wrote:
-> Am Mittwoch, den 04.11.2015, 12:03 +0000 schrieb Mark Brown:
-> > On Wed, Nov 04, 2015 at 12:54:13PM +0100, Philipp Zabel wrote:
+On 05.11.2015 09:56, Sascha Hauer wrote:
+> On Sun, Nov 01, 2015 at 03:41:40PM +0100, Anton Bondarenko wrote:
+>> From: Anton Bondarenko <anton_bondarenko@mentor.com>
+>>
+>> On SDMA initialization return exactly the same error, which is
+>> reported by dma_request_slave_channel_reason(), it is a preceding
+>> change to defer SPI DMA initialization, if SDMA module is not yet
+>> available.
+>
+> Maybe something like: "fix probe deferral when dmaengine is not yet
+> available" in the subject line will better express that this is a patch
+> that should be applied ASAP. Also you can move this up to the front of
+> the series when resending.
+>
+> Sascha
+>
 
-> > As I keep saying I really want to see some collaboration and consensus
-> > here with the goal of sharing code and achieving a consistent userspace
-> > interface rather than a lot of individual independently implemented
-> > drivers.
+This patch itself does not implement deferral for spi-imx if dmaengine 
+not ready. The patch targets 2 things: give a bit more detailed error 
+information of SPI dma slave channel initialization error and provide a 
+basis for the next patch ([PATCH v3 7/7] spi: imx: defer spi 
+initialization, if DMA engine is pending).
 
-> For eld updates and jack handling I could try to go forward with
-> Russell's notification prototype from the "[RFC,V2,0/5] another generic
-> audio hdmi codec proposal" thread:
-> https://patchwork.kernel.org/patch/7339011/
-
-> Or are you saying there shouldn't be a Mediatek specific HDMI sound
-> driver at all and this should be handled by generic code?
-
-Well, now I take a glance at the code I'm not seeing any actual hardware
-interaction here so it certainly seems like there's nothing MediaTek
-specific going on.  I've not actually looked at the code beyond a brief
-glance and doing a search for the helpers, like I say I'm really looking
-for collaboration and consensus among the people working on HDMI here
-rather than a specific solution.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151105/d4274a0c/attachment.sig>
+Regards, Anton
