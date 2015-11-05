@@ -1,94 +1,74 @@
 From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Thu, 5 Nov 2015 17:09:43 +0000
-Subject: [PATCH 1/3] xen/arm: introduce xen_read_wallclock
+Date: Thu, 5 Nov 2015 17:09:44 +0000
+Subject: [PATCH 2/3] xen/arm: introduce HYPERVISOR_dom0_op on arm and arm64
 In-Reply-To: <alpine.DEB.2.02.1511051706560.13541@kaball.uk.xensource.com>
 References: <alpine.DEB.2.02.1511051706560.13541@kaball.uk.xensource.com>
-Message-ID: <1446743385-12848-1-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <1446743385-12848-2-git-send-email-stefano.stabellini@eu.citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Read the wallclock from the shared info page at boot time.
-
 Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
 ---
- arch/arm/Kconfig         |    1 +
- arch/arm/xen/enlighten.c |   31 +++++++++++++++++++++++++++++++
- 2 files changed, 32 insertions(+)
+ arch/arm/include/asm/xen/hypercall.h |    2 ++
+ arch/arm/xen/enlighten.c             |    1 +
+ arch/arm/xen/hypercall.S             |    1 +
+ arch/arm64/xen/hypercall.S           |    1 +
+ 4 files changed, 5 insertions(+)
 
-diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
-index 60be104..a9de420 100644
---- a/arch/arm/Kconfig
-+++ b/arch/arm/Kconfig
-@@ -1852,6 +1852,7 @@ config XEN
- 	depends on CPU_V7 && !CPU_V6
- 	depends on !GENERIC_ATOMIC64
- 	depends on MMU
-+	depends on HAVE_ARM_ARCH_TIMER
- 	select ARCH_DMA_ADDR_T_64BIT
- 	select ARM_PSCI
- 	select SWIOTLB_XEN
+diff --git a/arch/arm/include/asm/xen/hypercall.h b/arch/arm/include/asm/xen/hypercall.h
+index 712b50e..7a8ee15 100644
+--- a/arch/arm/include/asm/xen/hypercall.h
++++ b/arch/arm/include/asm/xen/hypercall.h
+@@ -35,6 +35,7 @@
+ 
+ #include <xen/interface/xen.h>
+ #include <xen/interface/sched.h>
++#include <xen/interface/platform.h>
+ 
+ long privcmd_call(unsigned call, unsigned long a1,
+ 		unsigned long a2, unsigned long a3,
+@@ -49,6 +50,7 @@ int HYPERVISOR_memory_op(unsigned int cmd, void *arg);
+ int HYPERVISOR_physdev_op(int cmd, void *arg);
+ int HYPERVISOR_vcpu_op(int cmd, int vcpuid, void *extra_args);
+ int HYPERVISOR_tmem_op(void *arg);
++int HYPERVISOR_dom0_op(void *arg);
+ int HYPERVISOR_multicall(struct multicall_entry *calls, uint32_t nr);
+ 
+ static inline int
 diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
-index 15621b1..f07383d 100644
+index f07383d..b6aea9c 100644
 --- a/arch/arm/xen/enlighten.c
 +++ b/arch/arm/xen/enlighten.c
-@@ -28,6 +28,8 @@
- #include <linux/cpufreq.h>
- #include <linux/cpu.h>
- #include <linux/console.h>
-+#include <linux/timekeeping.h>
-+#include <clocksource/arm_arch_timer.h>
+@@ -359,5 +359,6 @@ EXPORT_SYMBOL_GPL(HYPERVISOR_memory_op);
+ EXPORT_SYMBOL_GPL(HYPERVISOR_physdev_op);
+ EXPORT_SYMBOL_GPL(HYPERVISOR_vcpu_op);
+ EXPORT_SYMBOL_GPL(HYPERVISOR_tmem_op);
++EXPORT_SYMBOL_GPL(HYPERVISOR_dom0_op);
+ EXPORT_SYMBOL_GPL(HYPERVISOR_multicall);
+ EXPORT_SYMBOL_GPL(privcmd_call);
+diff --git a/arch/arm/xen/hypercall.S b/arch/arm/xen/hypercall.S
+index 10fd99c..89db58f 100644
+--- a/arch/arm/xen/hypercall.S
++++ b/arch/arm/xen/hypercall.S
+@@ -89,6 +89,7 @@ HYPERCALL2(memory_op);
+ HYPERCALL2(physdev_op);
+ HYPERCALL3(vcpu_op);
+ HYPERCALL1(tmem_op);
++HYPERCALL1(dom0_op);
+ HYPERCALL2(multicall);
  
- #include <linux/mm.h>
+ ENTRY(privcmd_call)
+diff --git a/arch/arm64/xen/hypercall.S b/arch/arm64/xen/hypercall.S
+index 8bbe940..3840b1a 100644
+--- a/arch/arm64/xen/hypercall.S
++++ b/arch/arm64/xen/hypercall.S
+@@ -80,6 +80,7 @@ HYPERCALL2(memory_op);
+ HYPERCALL2(physdev_op);
+ HYPERCALL3(vcpu_op);
+ HYPERCALL1(tmem_op);
++HYPERCALL1(dom0_op);
+ HYPERCALL2(multicall);
  
-@@ -95,6 +97,32 @@ static unsigned long long xen_stolen_accounting(int cpu)
- 	return state.time[RUNSTATE_runnable] + state.time[RUNSTATE_offline];
- }
- 
-+static void xen_read_wallclock(struct timespec *ts)
-+{
-+	u32 version;
-+	u64 delta;
-+	struct timespec now;
-+	struct shared_info *s = HYPERVISOR_shared_info;
-+	struct pvclock_wall_clock *wall_clock = &(s->wc);
-+
-+	/* get wallclock at system boot */
-+	do {
-+		version = wall_clock->version;
-+		rmb();		/* fetch version before time */
-+		now.tv_sec  = wall_clock->sec;
-+		now.tv_nsec = wall_clock->nsec;
-+		rmb();		/* fetch time before checking version */
-+	} while ((wall_clock->version & 1) || (version != wall_clock->version));
-+
-+	delta = arch_timer_read_counter();	/* time since system boot */
-+	delta += now.tv_sec * (u64)NSEC_PER_SEC + now.tv_nsec;
-+
-+	now.tv_nsec = do_div(delta, NSEC_PER_SEC);
-+	now.tv_sec = delta;
-+
-+	set_normalized_timespec(ts, now.tv_sec, now.tv_nsec);
-+}
-+
- static void xen_percpu_init(void)
- {
- 	struct vcpu_register_vcpu_info info;
-@@ -218,6 +246,7 @@ static int __init xen_guest_init(void)
- 	struct shared_info *shared_info_page = NULL;
- 	struct resource res;
- 	phys_addr_t grant_frames;
-+	struct timespec ts;
- 
- 	if (!xen_domain())
- 		return 0;
-@@ -291,6 +320,8 @@ static int __init xen_guest_init(void)
- 
- 	pv_time_ops.steal_clock = xen_stolen_accounting;
- 	static_key_slow_inc(&paravirt_steal_enabled);
-+	xen_read_wallclock(&ts);
-+	do_settimeofday(&ts);
- 
- 	return 0;
- }
+ ENTRY(privcmd_call)
 -- 
 1.7.10.4
