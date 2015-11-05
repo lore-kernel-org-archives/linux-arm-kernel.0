@@ -1,92 +1,40 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Thu, 5 Nov 2015 16:04:54 +0100
-Subject: [PATCH] KVM/arm: kernel low level debug support for ARM32
- virtual platforms
-In-Reply-To: <CAKv+Gu8GJgzv82fVfCU7VQB2_ckRkzUYcQOx51rT2WgnmO_fsw@mail.gmail.com>
-References: <1446508313-24404-1-git-send-email-m.smarduch@samsung.com>
- <5638E1CD.8090006@codeaurora.org> <5638F294.4060409@samsung.com>
- <20151103175522.GA24856@arm.com> <56390838.3000204@samsung.com>
- <CAL_JsqJJHGwcdTDMh3WujJW0rDPxocVLEUpw95aVFC4FDEdDgA@mail.gmail.com>
- <20151104133147.GB5819@cbox> <563A531C.8090003@codeaurora.org>
- <CAKv+Gu8GJgzv82fVfCU7VQB2_ckRkzUYcQOx51rT2WgnmO_fsw@mail.gmail.com>
-Message-ID: <20151105150454.GE5819@cbox>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Thu, 05 Nov 2015 16:15:19 +0100
+Subject: [RFC] ASoC: Add mediatek HDMI codec driver
+In-Reply-To: <20151104120343.GZ20228@sirena.org.uk>
+References: <1446638053-12143-1-git-send-email-p.zabel@pengutronix.de>
+ <20151104120343.GZ20228@sirena.org.uk>
+Message-ID: <1446736519.3894.113.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 04, 2015 at 07:51:58PM +0100, Ard Biesheuvel wrote:
-> On 4 November 2015 at 19:49, Christopher Covington <cov@codeaurora.org> wrote:
-> > On 11/04/2015 08:31 AM, Christoffer Dall wrote:
-> >> On Tue, Nov 03, 2015 at 01:39:44PM -0600, Rob Herring wrote:
-> >>> On Tue, Nov 3, 2015 at 1:17 PM, Mario Smarduch <m.smarduch@samsung.com> wrote:
-> >>>> On 11/3/2015 9:55 AM, Will Deacon wrote:
-> >>>>> On Tue, Nov 03, 2015 at 09:44:52AM -0800, Mario Smarduch wrote:
-> >>>>>> On 11/3/2015 8:33 AM, Christopher Covington wrote:
-> >>>>>>> On 11/02/2015 06:51 PM, Mario Smarduch wrote:
-> >>>>>>>>    this is a re-post from couple weeks ago, please take time to review this
-> >>>>>>>> simple patch which simplifies DEBUG_LL and prevents kernel crash on virtual
-> >>>>>>>> platforms.
-> >>>>>>>>
-> >>>>>>>> Before this patch DEBUG_LL for 'dummy virtual machine':
-> >>>>>>>>
-> >>>>>>>> ( ) Kernel low-level debugging via EmbeddedICE DCC channel
-> >>>>>>>> ( ) Kernel low-level debug output via semihosting I/O
-> >>>>>>>> ( ) Kernel low-level debugging via 8250 UART
-> >>>>>>>> ( ) Kernel low-level debugging via ARM Ltd PL01x Primecell
-> >>>>>>>>
-> >>>>>>>> In summary if debug uart is not emulated kernel crashes.
-> >>>>>>>> And once you pass that hurdle, uart physical/virtual addresses are unknown.
-> >>>>>>>> DEBUG_LL comes in handy on many occasions and should be somewhat
-> >>>>>>>> intuitive to use like it is for physical platforms. For virtual platforms
-> >>>>>>>> user may start daubting the host and get into a bigger mess.
-> >>>>>>>>
-> >>>>>>>> After this patch is applied user gets:
-> >>>>>>>>
-> >>>>>>>> (X) Kernel low-level debugging on QEMU Virtual Platform
-> >>>>>>>> ( ) Kernel low-level debugging on Kvmtool Virtual Platform
-> >>>>>>>>    ..... above repeated ....
-> >>>>>>>>
-> >>>>>>>> The virtual addresses selected follow arm reference models, high in vmalloc
-> >>>>>>>> section with high mem enabled and guest running with >= 1GB of memory. The
-> >>>>>>>> offset is leftover from arm reference models.
-> >>>>>>>
-> >>>>>>> Which model? It doesn't appear to match the vexpress AEM/RTSM/FVP/whatever
-> >>>>>>> which used 0x1c090000 for UART0.
-> >>>>>>
-> >>>>>> I recall QEMU virt model had it's own physical address map, for sure I saw the
-> >>>>>> virtio-mmio regions assigned in some ARM document. Peter would you know?
-> >>>>>>
-> >>>>>> As far as kvmtool I'm not sure, currently PC1 COM1 port is used? Andre will that
-> >>>>>> stay fixed?
-> >>>>>
-> >>>>> We make absolutely no guarantees about the memory map provided by kvmtool.
-> >>>>
-> >>>> If that's also the case for qemu, then I guess the best you can do is find a way
-> >>>> to dump the device tree. Find the uart, physical address and try figure out the
-> >>>> virtual address.
-> >>>>
-> >>>> Pretty involved, hoped for something more automated since that's a handy feature.
-> >>>
-> >>> You really only need LL_DEBUG now if you are debugging very early code
-> >>> before memory is setup and/or bad memory. Use earlycon instead which
-> >>> should already be supported both via the pl011 or semihosting. I used
-> >>> it with QEMU semihosting support.
-> >>>
-> >> Then we should really document how to use that with qemu's virt platform
-> >> and kvmtool's platform on both 32-bit and 64-bit so that users can
-> >> easily figure out what they're doing wrong when they get no output.
-> >>
-> >> In practice, the address for the pl011 is quite unlikely to change, I
-> >> dare speculate, so that documentation shouldn't need frequent updating.
-> >
-> > Is it not on by default since the following change?
-> >
-> > http://git.qemu.org/?p=qemu.git;a=commitdiff;h=f022b8e95379b0433d13509706b66f38fc15dde8
-> >
-> 
-> Yes, but it still requires the plain 'earlycon' argument (i.e, without
-> '=pl011,...') to be passed on the kernel command line if you want
-> early output.
-> 
-I didn't notice this. Cool!
+Hi Mark,
 
--Christoffer
+Am Mittwoch, den 04.11.2015, 12:03 +0000 schrieb Mark Brown:
+> On Wed, Nov 04, 2015 at 12:54:13PM +0100, Philipp Zabel wrote:
+> 
+> > This driver is based on the work of DW HDMI codec driver.
+> > It controls mediatek HDMI Tx's audio module, and handles
+> > HDMI jack detection by sharing IRQ with HDMI Tx.
+> 
+> How does this relate to all the other HDMI related work that's going on,
+> especially around handling of the EDID data?  I'm not seeing anything in
+> here that uses the constraints code that Russell added for example. 
+
+So I'll use snd_pcm_hw_constraint_eld.
+
+> As I keep saying I really want to see some collaboration and consensus
+> here with the goal of sharing code and achieving a consistent userspace
+> interface rather than a lot of individual independently implemented
+> drivers.
+
+For eld updates and jack handling I could try to go forward with
+Russell's notification prototype from the "[RFC,V2,0/5] another generic
+audio hdmi codec proposal" thread:
+https://patchwork.kernel.org/patch/7339011/
+
+Or are you saying there shouldn't be a Mediatek specific HDMI sound
+driver at all and this should be handled by generic code?
+
+regards
+Philipp
