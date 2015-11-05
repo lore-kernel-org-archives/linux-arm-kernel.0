@@ -1,39 +1,79 @@
-From: vigneshr@ti.com (Vignesh R)
-Date: Thu, 5 Nov 2015 11:46:09 +0530
-Subject: [PATCH v2 2/5] spi: spi-ti-qspi: add mmap mode read support
-In-Reply-To: <20151104144112.GJ1717@sirena.org.uk>
-References: <1446545174-14193-1-git-send-email-vigneshr@ti.com>
- <1446545174-14193-3-git-send-email-vigneshr@ti.com>
- <20151104144112.GJ1717@sirena.org.uk>
-Message-ID: <563AF429.1000406@ti.com>
+From: jon.nettleton@gmail.com (Jon Nettleton)
+Date: Thu, 5 Nov 2015 07:46:38 +0100
+Subject: i.MX6: Increasing VPU frequency
+In-Reply-To: <CAH-u=83K7EPQ57cP=GQ6duH=bEwYxoC=YU+urLsg9kCo9eOQwA@mail.gmail.com>
+References: <CAH-u=82M1yCmPjBg5qeiC8JiHjM8+WsP+utX_VPKfJwJsu0QFg@mail.gmail.com>
+ <CALHpu366MPbxJinVL2QFM11gMHx-T=M9QXNoznOTh++oHGGmrA@mail.gmail.com>
+ <CAH-u=81hMAF=r6rUKF+iuta3nC6n+4EDDz7Rn2-oGYbkbN0Jyg@mail.gmail.com>
+ <CALHpu34iKGTE=tENJTFOu13LxSozRjU9bwmGxnigUXgTDsXAQw@mail.gmail.com>
+ <CAH-u=83K7EPQ57cP=GQ6duH=bEwYxoC=YU+urLsg9kCo9eOQwA@mail.gmail.com>
+Message-ID: <CALHpu35hgmw0YrmfBj2uOLbSu05fmGcqgsosLt=XOxCpkVGjDw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, Nov 5, 2015 at 7:43 AM, Jean-Michel Hautbois
+<jean-michel.hautbois@veo-labs.com> wrote:
+>
+> Le 5 nov. 2015 05:23, "Jon Nettleton" <jon.nettleton@gmail.com> a ?crit :
+>>
+>> On Wed, Nov 4, 2015 at 8:33 PM, Jean-Michel Hautbois
+>> <jean-michel.hautbois@veo-labs.com> wrote:
+>> > 2015-11-04 18:04 GMT+01:00 Jon Nettleton <jon.nettleton@gmail.com>:
+>> >> On Wed, Nov 4, 2015 at 5:52 PM, Jean-Michel Hautbois
+>> >> <jean-michel.hautbois@veo-labs.com> wrote:
+>> >>> Hi !
+>> >>>
+>> >>> I can see in FSL kernel that VPU is configurable to 352M (it defaults
+>> >>> at 264MHz in mainline I think).
+>> >>> In the TRM, it is even specified at 352MHz as a default frequency,
+>> >>> with a maximum of 540MHz.
+>> >>>
+>> >>> Would it be possible to allow this clock rating modification if, for
+>> >>> instance, we select a performance governor in cpufreq, or if a coda
+>> >>> encoder is started with 1080p for instance ?
+>> >>> If so, then how is it doable properly ?
+>> >>
+>> >> For some reason the FSL kernel configures the VPU to run at 352Mhz in
+>> >> a very odd way that requires limiting the min cpu-frequency to 792Mhz.
+>> >> It also requires clocking down a bunch of devices on pll2_pfd2_396m to
+>> >> 352Mhz.
+>> >>
+>> >> The simple solution to this is to instead parent the VPU to
+>> >> pll2_pfd0_352m which is unused.  I have found by default it is stable
+>> >> decoding but unstable encoding at 352Mhz, most likely due to the
+>> >> voltage changes needed that limiting the min cpu-freq to 792Mhz
+>> >> provides.  However everything seems to work quite reliably clocking
+>> >> that pfd to 327Mhz, which still gives a boost of almost 24%
+>> >>
+>> >> In my testing the performance gain in then going from 327 to 352 is
+>> >> minimal.  Generally I think you hit AXI bus limitations rather than
+>> >> VPU performance.
+>> >
+>> > Interesting.
+>> > So you propose to add something like the following in
+>> > drivers/clk/imx/clk-imx6q.cdrivers/clk/imx/clk-imx6q.c :
+>> > imx_clk_set_rate(clk[IMX6QDL_CLK_PLL2_PFD0_352M], 327000000);
+>> > imx_clk_set_parent(clk[IMX6QDL_CLK_VPU_AXI_SEL],
+>> > clk[IMX6QDL_CLK_PLL2_PFD0_352M]);
+>> >
+>> > This should end up with a fastest VPU (in fact ~25% boost is good).
+>> > Is it the correct way to do it ?
+>> > Should it be done in coda instead ? And only when needed ?
+>>
+>> That is how I have done it.  I was going to implement dvfs for the vpu
+>> but found that this change really added minimal power and thermal
+>> overhead.  Without looking it up I believe I only saw a 10-20mA rise
+>> in power usage and virtually no thermal differences.
+>
+> OK so it could even be integrated mainline... Should it be driven by DT
+> maybe?
+> Is it OK to have VPU at 327MHz and CPU at 396MHz?
+>
 
-
-On 11/04/2015 08:11 PM, Mark Brown wrote:
-> On Tue, Nov 03, 2015 at 03:36:11PM +0530, Vignesh R wrote:
-> 
->> +	ti_qspi_enable_memory_map(spi);
->> +	ti_qspi_setup_mmap_read(spi, read_opcode, addr_width,
->> +				dummy_bytes);
->> +	memcpy_fromio(buf, qspi->mmap_base + from, len);
->> +	*retlen = len;
->> +	ti_qspi_disable_memory_map(spi);
-> 
-> We'll be constantly enabling and disabling memory mapping with this.
-> I'm not sure that's a meaningful cost given that it doesn't actually
-> remap anything but rather just switches hardware modes, we can always
-> optimise it later if it is.
-> 
-
-Hmm, I will move the ti_qspi_disable_memory_map() call to
-ti_qspi_start_transfer_one(), so that mmap mode is disabled only when
-normal SPI bus transfer is requested. Further, "mmap_enabled" status
-flag can be used to determine whether mode switch is required or not.
-This should help to overcome enabling and disabling memory mapping
-between successive mmap read requests.
-
--- 
-Regards
-Vignesh
+This can certainly be changed per device via device-tree.  It does run
+fine with the cpu at 396MHz, that limitation was previously imposed
+due to the clock parent that was being used when the VPU was clocked
+to 352MHz.  There have been hints in commits that higher cpu core
+voltage is needed, but I have not found any instability so don't
+believe this is the case.  Obviously the more people that we can have
+test this change the better.
