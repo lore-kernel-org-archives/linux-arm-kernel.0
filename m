@@ -1,62 +1,73 @@
-From: iamjoonsoo.kim@lge.com (Joonsoo Kim)
-Date: Thu, 5 Nov 2015 13:40:14 +0900
-Subject: [PATCH] arm64: Increase the max granular size
-In-Reply-To: <1442944788-17254-1-git-send-email-rric@kernel.org>
-References: <1442944788-17254-1-git-send-email-rric@kernel.org>
-Message-ID: <20151105044014.GB20374@js1304-P5Q-DELUXE>
+From: zlim.lnx@gmail.com (Zi Shen Lim)
+Date: Wed,  4 Nov 2015 20:43:59 -0800
+Subject: [PATCH] arm64: bpf: fix mod-by-zero case
+Message-ID: <1446698639-12362-1-git-send-email-zlim.lnx@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Sep 22, 2015 at 07:59:48PM +0200, Robert Richter wrote:
-> From: Tirumalesh Chalamarla <tchalamarla@cavium.com>
-> 
-> Increase the standard cacheline size to avoid having locks in the same
-> cacheline.
-> 
-> Cavium's ThunderX core implements cache lines of 128 byte size. With
-> current granulare size of 64 bytes (L1_CACHE_SHIFT=6) two locks could
-> share the same cache line leading a performance degradation.
-> Increasing the size fixes that.
+Turns out in the case of modulo by zero in a BPF program:
+	A = A % X;  (X == 0)
+the expected behavior is to terminate with return value 0.
 
-Beside, slab-side bug, I don't think this argument is valid.
-Even if this change is applied, statically allocated spinlock could
-share the same cache line.
+The bug in JIT is exposed by a new test case [1].
 
-If two locks should not share the same cache line, you'd better to use
-compiler attribute such as ____cacheline_aligned_in_smp in appropriate
-place.
+[1] https://lkml.org/lkml/2015/11/4/499
 
-Thanks.
+Signed-off-by: Zi Shen Lim <zlim.lnx@gmail.com>
+Reported-by: Yang Shi <yang.shi@linaro.org>
+Reported-by: Xi Wang <xi.wang@gmail.com>
+CC: Alexei Starovoitov <ast@plumgrid.com>
+CC: Catalin Marinas <catalin.marinas@arm.com>
+Fixes: e54bcde3d69d ("arm64: eBPF JIT compiler")
+Cc: <stable@vger.kernel.org> # 3.18+
+---
+This patch applies on top of "arm64: bpf: fix fiv-by-zero case" [2].
 
-> 
-> Increasing the size has no negative impact to cache invalidation on
-> systems with a smaller cache line. There is an impact on memory usage,
-> but that's not too important for arm64 use cases.
-> 
-> Signed-off-by: Tirumalesh Chalamarla <tchalamarla@cavium.com>
-> Signed-off-by: Robert Richter <rrichter@cavium.com>
-> ---
->  arch/arm64/include/asm/cache.h | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm64/include/asm/cache.h b/arch/arm64/include/asm/cache.h
-> index bde449936e2f..5082b30bc2c0 100644
-> --- a/arch/arm64/include/asm/cache.h
-> +++ b/arch/arm64/include/asm/cache.h
-> @@ -18,7 +18,7 @@
->  
->  #include <asm/cachetype.h>
->  
-> -#define L1_CACHE_SHIFT		6
-> +#define L1_CACHE_SHIFT		7
->  #define L1_CACHE_BYTES		(1 << L1_CACHE_SHIFT)
->  
->  /*
-> -- 
-> 2.1.1
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+[2] https://lkml.org/lkml/2015/11/4/25
+
+ arch/arm64/net/bpf_jit_comp.c | 21 +++++++++++++--------
+ 1 file changed, 13 insertions(+), 8 deletions(-)
+
+diff --git a/arch/arm64/net/bpf_jit_comp.c b/arch/arm64/net/bpf_jit_comp.c
+index 9ae6f23..6217f80 100644
+--- a/arch/arm64/net/bpf_jit_comp.c
++++ b/arch/arm64/net/bpf_jit_comp.c
+@@ -269,6 +269,8 @@ static int build_insn(const struct bpf_insn *insn, struct jit_ctx *ctx)
+ 		break;
+ 	case BPF_ALU | BPF_DIV | BPF_X:
+ 	case BPF_ALU64 | BPF_DIV | BPF_X:
++	case BPF_ALU | BPF_MOD | BPF_X:
++	case BPF_ALU64 | BPF_MOD | BPF_X:
+ 	{
+ 		const u8 r0 = bpf2a64[BPF_REG_0];
+ 
+@@ -281,16 +283,19 @@ static int build_insn(const struct bpf_insn *insn, struct jit_ctx *ctx)
+ 		check_imm26(jmp_offset);
+ 		emit(A64_B(jmp_offset), ctx);
+ 		/* else */
+-		emit(A64_UDIV(is64, dst, dst, src), ctx);
++		switch (BPF_OP(code)) {
++		case BPF_DIV:
++			emit(A64_UDIV(is64, dst, dst, src), ctx);
++			break;
++		case BPF_MOD:
++			ctx->tmp_used = 1;
++			emit(A64_UDIV(is64, tmp, dst, src), ctx);
++			emit(A64_MUL(is64, tmp, tmp, src), ctx);
++			emit(A64_SUB(is64, dst, dst, tmp), ctx);
++			break;
++		}
+ 		break;
+ 	}
+-	case BPF_ALU | BPF_MOD | BPF_X:
+-	case BPF_ALU64 | BPF_MOD | BPF_X:
+-		ctx->tmp_used = 1;
+-		emit(A64_UDIV(is64, tmp, dst, src), ctx);
+-		emit(A64_MUL(is64, tmp, tmp, src), ctx);
+-		emit(A64_SUB(is64, dst, dst, tmp), ctx);
+-		break;
+ 	case BPF_ALU | BPF_LSH | BPF_X:
+ 	case BPF_ALU64 | BPF_LSH | BPF_X:
+ 		emit(A64_LSLV(is64, dst, dst, src), ctx);
+-- 
+1.9.1
