@@ -1,49 +1,60 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Thu, 5 Nov 2015 18:34:14 +0800
-Subject: [PATCH] crypto: sun4i-ss: add missing statesize
-In-Reply-To: <1446709737-11316-1-git-send-email-clabbe.montjoie@gmail.com>
-References: <1446709737-11316-1-git-send-email-clabbe.montjoie@gmail.com>
-Message-ID: <CAGb2v65FOtbigXpmN=L3af0HOjSJU8GGPY_PDvDp+3fCUCvKQw@mail.gmail.com>
+From: p.fedin@samsung.com (Pavel Fedin)
+Date: Thu, 05 Nov 2015 13:40:26 +0300
+Subject: [PATCH v5 3/4] drivers: exynos-srom: Add support for bank
+ configuration
+In-Reply-To: <5639BFD8.6040006@samsung.com>
+References: <cover.1446542020.git.p.fedin@samsung.com>
+ <72fa025c634fa477b1d7a89c254bd3c9c43f2b27.1446542020.git.p.fedin@samsung.com>
+ <5639BFD8.6040006@samsung.com>
+Message-ID: <004001d117b6$62baa1a0$282fe4e0$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 5, 2015 at 3:48 PM, LABBE Corentin
-<clabbe.montjoie@gmail.com> wrote:
-> sun4i-ss implementaton of md5/sha1 is via ahash algorithms.
-> A recent change make impossible to load them without giving statesize.
-> This patch specifiy statesize for sha1 and md5.
->
-> Signed-off-by: LABBE Corentin <clabbe.montjoie@gmail.com>
-> Cc: stable at vger.kernel.org
+ Hello!
 
-Confirmed the driver properly loads again.
+> > +static int decode_sromc(struct exynos_srom *srom, struct device_node *np)
+> 
+> I missed that one previously: add prefix and more descriptive name, like:
+> exynos_srom_parse_child()
 
-Tested-by: Chen-Yu Tsai <wens@csie.org>
+ exynos_srom_configure_bank(), is this name OK?
 
-> ---
->  drivers/crypto/sunxi-ss/sun4i-ss-core.c | 2 ++
->  1 file changed, 2 insertions(+)
->
-> diff --git a/drivers/crypto/sunxi-ss/sun4i-ss-core.c b/drivers/crypto/sunxi-ss/sun4i-ss-core.c
-> index eab6fe2..107cd2a 100644
-> --- a/drivers/crypto/sunxi-ss/sun4i-ss-core.c
-> +++ b/drivers/crypto/sunxi-ss/sun4i-ss-core.c
-> @@ -39,6 +39,7 @@ static struct sun4i_ss_alg_template ss_algs[] = {
->                 .import = sun4i_hash_import_md5,
->                 .halg = {
->                         .digestsize = MD5_DIGEST_SIZE,
-> +                       .statesize = sizeof(struct md5_state),
->                         .base = {
->                                 .cra_name = "md5",
->                                 .cra_driver_name = "md5-sun4i-ss",
-> @@ -66,6 +67,7 @@ static struct sun4i_ss_alg_template ss_algs[] = {
->                 .import = sun4i_hash_import_sha1,
->                 .halg = {
->                         .digestsize = SHA1_DIGEST_SIZE,
-> +                       .statesize = sizeof(struct sha1_state),
->                         .base = {
->                                 .cra_name = "sha1",
->                                 .cra_driver_name = "sha1-sun4i-ss",
-> --
-> 2.4.10
->
+> >  static int exynos_srom_probe(struct platform_device *pdev)
+> >  {
+> > -	struct device_node *np;
+> > +	struct device_node *np, *child;
+> >  	struct exynos_srom *srom;
+> >  	struct device *dev = &pdev->dev;
+> > +	bool error = false;
+> 
+> The 'error' name is misleading - like error for entire probe which is
+> not true.
+> 
+> Instead split it to separate function like:
+> 
+> +static int exynos_srom_parse_children(....) {
+> +       int ret = 0;
+> +
+> +	for_each_child_of_node(np, child) {
+> +               ret = exynos_srom_parse_child(srom, child);
+> +		if (ret) {
+> +			dev_err(dev,
+> +				"Could not decode bank configuration for %s: %d\n",
+> +				child->name, ret);
+> +			break;
+> +		}
+> +	}
+> +
+> +       return ret;
+> +}
+
+ Factoring out this loop is unnecessary, because i could just 'return 0' in the loop
+instead of 'error = true'. Byt my idea is to go through all banks anyway, just in
+case, to diagnose all of them. So that the user will be able to spot and fix all
+broken banks at once, instead of doing one-by-one.
+ I have renamed the variable to 'bool bad_bank_config', will this be OK?
+
+Kind regards,
+Pavel Fedin
+Expert Engineer
+Samsung Electronics Research center Russia
