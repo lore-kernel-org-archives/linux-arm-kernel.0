@@ -1,39 +1,29 @@
-From: clabbe.montjoie@gmail.com (LABBE Corentin)
-Date: Thu,  5 Nov 2015 08:48:57 +0100
-Subject: [PATCH] crypto: sun4i-ss: add missing statesize
-Message-ID: <1446709737-11316-1-git-send-email-clabbe.montjoie@gmail.com>
+From: p.fedin@samsung.com (Pavel Fedin)
+Date: Thu, 05 Nov 2015 10:59:40 +0300
+Subject: [PATCH v5 0/4] Exynos SROMc configuration and Ethernet support for
+ SMDK5410
+In-Reply-To: <5639B588.1080901@samsung.com>
+References: <cover.1446542020.git.p.fedin@samsung.com>
+ <5639B588.1080901@samsung.com>
+Message-ID: <000b01d1179f$ed5032b0$c7f09810$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-sun4i-ss implementaton of md5/sha1 is via ahash algorithms.
-A recent change make impossible to load them without giving statesize.
-This patch specifiy statesize for sha1 and md5.
+ Hello!
 
-Signed-off-by: LABBE Corentin <clabbe.montjoie@gmail.com>
-Cc: stable at vger.kernel.org
----
- drivers/crypto/sunxi-ss/sun4i-ss-core.c | 2 ++
- 1 file changed, 2 insertions(+)
+> > This patchset also depends on Exynos 5410 pinctrl support, introduced by
+> > patches 0003 and 0004 from this set:
+> > [PATCH v4 0/5] ARM: EXYNOS: ODROID-XU DT and LEDs
+> > http://lists.infradead.org/pipermail/linux-arm-kernel/2015-March/330862.html
+> 
+> Only the first patch made up to kernel. The rest (2-5) received feedback
+> and I am waiting for fixing it. Andreas apparently loose the interest...
 
-diff --git a/drivers/crypto/sunxi-ss/sun4i-ss-core.c b/drivers/crypto/sunxi-ss/sun4i-ss-core.c
-index eab6fe2..107cd2a 100644
---- a/drivers/crypto/sunxi-ss/sun4i-ss-core.c
-+++ b/drivers/crypto/sunxi-ss/sun4i-ss-core.c
-@@ -39,6 +39,7 @@ static struct sun4i_ss_alg_template ss_algs[] = {
- 		.import = sun4i_hash_import_md5,
- 		.halg = {
- 			.digestsize = MD5_DIGEST_SIZE,
-+			.statesize = sizeof(struct md5_state),
- 			.base = {
- 				.cra_name = "md5",
- 				.cra_driver_name = "md5-sun4i-ss",
-@@ -66,6 +67,7 @@ static struct sun4i_ss_alg_template ss_algs[] = {
- 		.import = sun4i_hash_import_sha1,
- 		.halg = {
- 			.digestsize = SHA1_DIGEST_SIZE,
-+			.statesize = sizeof(struct sha1_state),
- 			.base = {
- 				.cra_name = "sha1",
- 				.cra_driver_name = "sha1-sun4i-ss",
--- 
-2.4.10
+ I have rechecked the original thread on archives and found nothing new. Where can
+i read those feedbacks? Perhaps it makes sense for me to pick them up and include
+into my set.
+
+Kind regards,
+Pavel Fedin
+Expert Engineer
+Samsung Electronics Research center Russia
