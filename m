@@ -1,146 +1,87 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Thu, 05 Nov 2015 10:09:24 +0100
-Subject: [RFC v2 2/2] drm/bridge: Add I2C based driver for ps8640 bridge
-In-Reply-To: <1446430166-7378-2-git-send-email-jitao.shi@mediatek.com>
-References: <1446430166-7378-1-git-send-email-jitao.shi@mediatek.com>
- <1446430166-7378-2-git-send-email-jitao.shi@mediatek.com>
-Message-ID: <1446714564.3894.6.camel@pengutronix.de>
+From: andy.shevchenko@gmail.com (Andy Shevchenko)
+Date: Thu, 5 Nov 2015 11:16:16 +0200
+Subject: [PATCH] spi: mediatek: single device does not require cs_gpios
+In-Reply-To: <1446702633-14019-1-git-send-email-drinkcat@chromium.org>
+References: <1446702633-14019-1-git-send-email-drinkcat@chromium.org>
+Message-ID: <CAHp75VfAHyTOpWcTh6w2EhEy73xfUYX5T3tpXbUbBiU-tjaZnQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jitao,
+On Thu, Nov 5, 2015 at 7:50 AM, Nicolas Boichat <drinkcat@chromium.org> wrote:
+> When only one device is present, it is not necessary to specify
+> cs_gpios, as the CS line can be controlled by the hardware
+> module.
+>
+> Without this patch, older device tree bindings used before
+> 37457607 "spi: mediatek: mt8173 spi multiple devices support"
+> would cause a panic on boot. This fixes the crash, and
+> re-introduces backward compatibility.
+>
+> Signed-off-by: Nicolas Boichat <drinkcat@chromium.org>
+> ---
+>
+> Applies on top of broonie/spi.git topic/mtk. Thanks!
+>
+>  drivers/spi/spi-mt65xx.c | 26 ++++++++++++++++++--------
+>  1 file changed, 18 insertions(+), 8 deletions(-)
+>
+> diff --git a/drivers/spi/spi-mt65xx.c b/drivers/spi/spi-mt65xx.c
+> index 563954a..f694031 100644
+> --- a/drivers/spi/spi-mt65xx.c
+> +++ b/drivers/spi/spi-mt65xx.c
+> @@ -410,7 +410,7 @@ static int mtk_spi_setup(struct spi_device *spi)
+>         if (!spi->controller_data)
+>                 spi->controller_data = (void *)&mtk_default_chip_info;
+>
+> -       if (mdata->dev_comp->need_pad_sel)
+> +       if (mdata->dev_comp->need_pad_sel && spi->cs_gpio >= 0)
 
-some things I missed before.
+gpio_is_valid() ?
 
-Am Montag, den 02.11.2015, 10:09 +0800 schrieb Jitao Shi:
-[...]
-> +static int ps8640_regr(struct i2c_client *client, u16 i2c_addr,
-> +		       u8 reg, u8 *value)
-> +{
-> +	int ret;
+>                 gpio_direction_output(spi->cs_gpio, !(spi->mode & SPI_CS_HIGH));
+>
+>         return 0;
+> @@ -632,13 +632,23 @@ static int mtk_spi_probe(struct platform_device *pdev)
+>                         goto err_put_master;
+>                 }
+>
+> -               for (i = 0; i < master->num_chipselect; i++) {
+> -                       ret = devm_gpio_request(&pdev->dev, master->cs_gpios[i],
+> -                                               dev_name(&pdev->dev));
+> -                       if (ret) {
+> -                               dev_err(&pdev->dev,
+> -                                       "can't get CS GPIO %i\n", i);
+> -                               goto err_put_master;
+> +               if (!master->cs_gpios && master->num_chipselect > 1) {
+> +                       dev_err(&pdev->dev,
+> +                               "cs_gpios not specified and num_chipselect > 1\n");
+> +                       ret = -EINVAL;
+> +                       goto err_put_master;
+> +               }
 > +
-> +	client->addr = i2c_addr;
+> +               if (master->cs_gpios) {
+> +                       for (i = 0; i < master->num_chipselect; i++) {
+> +                               ret = devm_gpio_request(&pdev->dev,
+> +                                                       master->cs_gpios[i],
+> +                                                       dev_name(&pdev->dev));
+> +                               if (ret) {
+> +                                       dev_err(&pdev->dev,
+> +                                               "can't get CS GPIO %i\n", i);
+> +                                       goto err_put_master;
+> +                               }
+>                         }
+>                 }
+>         }
+> --
+> 2.6.0.rc2.230.g3dd15c0
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-spi" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 
-I think i2c_new_dummy should be used to create additional clients for
-the secondary addresses, instead of changing the address of the client
-with every transfer.
 
-> +	ret = i2c_master_send(client, &reg, 1);
-> +	if (ret <= 0) {
-> +		DRM_ERROR("Failed to send i2c command, ret=%d\n", ret);
-> +		return ret;
-> +	}
-> +
-> +	ret = i2c_master_recv(client, value, 1);
-> +	if (ret <= 0) {
-> +		DRM_ERROR("Failed to recv i2c data, ret=%d\n", ret);
-> +		return ret;
-> +	}
-> +
-> +	return 0;
-> +}
-[...]
-> +static int ps8640_probe(struct i2c_client *client,
-> +			const struct i2c_device_id *id)
-> +{
-> +	struct device *dev = &client->dev;
-> +	struct ps8640 *ps_bridge;
-> +	struct device_node *np = dev->of_node;
-> +	struct device_node *in_ep, *out_ep;
-> +	struct device_node *panel_node = NULL;
-> +	int ret;
-> +	u32 temp_reg;
-> +
-> +	ps_bridge = devm_kzalloc(dev, sizeof(*ps_bridge), GFP_KERNEL);
-> +	if (!ps_bridge)
-> +		return -ENOMEM;
-> +
-> +	in_ep = of_graph_get_next_endpoint(np, NULL);
-> +	if (in_ep) {
-> +		out_ep = of_graph_get_next_endpoint(np, in_ep);
-> +		of_node_put(in_ep);
-> +		if (out_ep) {
-> +			panel_node = of_graph_get_remote_port_parent(out_ep);
-> +			of_node_put(out_ep);
-> +		}
-> +	}
-> +	if (panel_node) {
-> +		ps_bridge->panel = of_drm_find_panel(panel_node);
-> +		of_node_put(panel_node);
-> +		if (!ps_bridge->panel)
-> +			return -EPROBE_DEFER;
-> +	}
-> +
-> +	ps_bridge->client = client;
-> +
-> +	ps_bridge->pwr_3v3_supply = devm_regulator_get(dev, "vdd33-supply");
 
-Should be "vdd3", regulator_get will add the "-supply" suffix.
-
-> +	if (IS_ERR(ps_bridge->pwr_3v3_supply)) {
-> +		dev_err(dev, "cannot get ps_bridge->pwr_3v3_supply\n");
-> +		return PTR_ERR(ps_bridge->pwr_3v3_supply);
-> +	}
-> +
-> +	ps_bridge->pwr_1v2_supply = devm_regulator_get(dev, "vdd12-supply");
-
-Same here, "vdd12".
-
-> +	if (IS_ERR(ps_bridge->pwr_1v2_supply)) {
-> +		dev_err(dev, "cannot get ps_bridge->pwr_1v2_supply\n");
-> +		return PTR_ERR(ps_bridge->pwr_1v2_supply);
-> +	}
-> +
-> +	ps_bridge->gpio_mode_sel_n = devm_gpiod_get(&client->dev, "mode-sel",
-> +						    GPIOD_OUT_HIGH);
-> +	if (IS_ERR(ps_bridge->gpio_mode_sel_n)) {
-> +		ret = PTR_ERR(ps_bridge->gpio_mode_sel_n);
-> +		DRM_ERROR("cannot get gpio_mode_sel_n %d\n", ret);
-> +		return ret;
-> +	}
-> +
-> +	ret = gpiod_direction_output(ps_bridge->gpio_mode_sel_n, 1);
-> +	if (ret) {
-> +		DRM_ERROR("cannot configure gpio_mode_sel_n\n");
-> +		return ret;
-> +	}
-> +
-> +	ps_bridge->gpio_slp_n = devm_gpiod_get(&client->dev, "sleep-gpios",
-> +					       GPIOD_OUT_HIGH);
-
-Should be "sleep", gpiod_get will add the "-gpios" suffix.
-
-> +	if (IS_ERR(ps_bridge->gpio_slp_n)) {
-> +		ret = PTR_ERR(ps_bridge->gpio_slp_n);
-> +		DRM_ERROR("cannot get gpio_slp_n %d\n", ret);
-> +		return ret;
-> +	}
-> +
-> +	ret = gpiod_direction_output(ps_bridge->gpio_slp_n, 1);
-> +	if (ret) {
-> +		DRM_ERROR("cannot configure gpio_slp_n\n");
-> +		return ret;
-> +	}
-
-This can be removed, the "devm_gpiod_get(..., GPIOD_OUT_HIGH);" already
-does the same.
-
-> +
-> +	ps_bridge->gpio_rst_n = devm_gpiod_get(&client->dev, "reset",
-> +					       GPIOD_OUT_HIGH);
-> +	if (IS_ERR(ps_bridge->gpio_rst_n)) {
-> +		ret = PTR_ERR(ps_bridge->gpio_rst_n);
-> +		DRM_ERROR("cannot get gpio_rst_n %d\n", ret);
-> +		return ret;
-> +	}
-> +
-> +	ret = gpiod_direction_output(ps_bridge->gpio_rst_n, 1);
-> +	if (ret) {
-> +		DRM_ERROR("cannot configure gpio_rst_n\n");
-> +		return ret;
-> +	}
-
-Same here, the gpiod_direction_output can be removed.
-
-best regards
-Philipp
+-- 
+With Best Regards,
+Andy Shevchenko
