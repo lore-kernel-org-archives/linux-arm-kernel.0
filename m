@@ -1,85 +1,70 @@
-From: akshay.bhat@timesys.com (Akshay Bhat)
-Date: Thu, 5 Nov 2015 13:33:45 -0500
-Subject: [PATCH 2/6] ARM: dts: imx: Add Advantech BA-16 Qseven module
-In-Reply-To: <1446454663.3156.4.camel@pengutronix.de>
-References: <1446160607-16053-1-git-send-email-akshay.bhat@timesys.com>
- <1446160607-16053-3-git-send-email-akshay.bhat@timesys.com>
- <1446454663.3156.4.camel@pengutronix.de>
-Message-ID: <563BA109.8000208@timesys.com>
+From: dcashman@android.com (Daniel Cashman)
+Date: Thu, 5 Nov 2015 10:44:35 -0800
+Subject: [PATCH v2 2/2] arm: mm: support ARCH_MMAP_RND_BITS.
+In-Reply-To: <563A4EDC.6090403@android.com>
+References: <1446574204-15567-1-git-send-email-dcashman@android.com>
+ <1446574204-15567-2-git-send-email-dcashman@android.com>
+ <CAGXu5jKGzDD9WVQnMTT2EfupZtjpdcASUpx-3npLAB-FctLodA@mail.gmail.com>
+ <56393FD0.6080001@android.com>
+ <CAGXu5jLe=OgZ2DG_MRXA8x6BwpEd77fNZBj3wjbDiSdiBurz7w@mail.gmail.com>
+ <563A4EDC.6090403@android.com>
+Message-ID: <563BA393.9020504@android.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Lucas,
+On 11/04/2015 10:30 AM, Daniel Cashman wrote:
+> On 11/3/15 3:21 PM, Kees Cook wrote:
+>> On Tue, Nov 3, 2015 at 3:14 PM, Daniel Cashman <dcashman@android.com> wrote:
+>>> On 11/03/2015 11:19 AM, Kees Cook wrote:
+>>>> Do you have patches for x86 and arm64?
+>>>
+>>> I was holding off on those until I could gauge upstream reception.  If
+>>> desired, I could put those together and add them as [PATCH 3/4] and
+>>> [PATCH 4/4].
+>>
+>> If they're as trivial as I'm hoping, yeah, let's toss them in now. If
+>> not, skip 'em. PowerPC, MIPS, and s390 should be relatively simple
+>> too, but one or two of those have somewhat stranger calculations when
+>> I looked, so their Kconfigs may not be as clean.
+> 
+> Creating the patches should be simple, it's the choice of minimum and
+> maximum values for each architecture that I'd be most concerned about.
+> I'll put them together, though, and the ranges can be changed following
+> discussion with those more knowledgeable, if needed.  I also don't have
+> devices on which to test the PowerPC, MIPS and s390 changes, so I'll
+> need someone's help for that.
 
-Thanks for the feedback :) I have submitted a v2 patch incorporating 
-your feedback.
+Actually, in preparing the x86 and arm64 patches, it became apparent
+that the current patch-set does not address 32-bit executables running
+on 64-bit systems (compatibility mode), since only one procfs
+mmap_rnd_bits variable is created and exported. Some possible solutions:
 
-http://lists.infradead.org/pipermail/linux-arm-kernel/2015-November/383276.html
+1) Create a second set for compatibility, e.g. mmap_rnd_compat_bits,
+mmap_rnd_compat_bits_min, mmap_rnd_compat_bits_max and export it as with
+mmap_rnd_bits.  This provides the most control and is truest to the
+spirit of this patch, but pollutes the Kconfigs and procfs a bit more,
+especially if we ever need a mmap_rnd_64compat_bits...
 
-On 11/02/2015 03:57 AM, Lucas Stach wrote:
-> Am Donnerstag, den 29.10.2015, 19:16 -0400 schrieb Akshay Bhat:
->
-> There is a suspiciously high number of always-on regulators in the list
-> above. Are they really required to be powered on always, or are we
-> lacking supplies on some of the devices below?
->
+2) Get rid of the arch-independent nature of this patch and instead let
+each arch define its own Kconfig values and procfs entries. Essentially
+the same outcome as the above, but with less disruption in the common
+kernel code, although also with a potentially variable ABI.
 
-Agree, many of them do not need be always-on, fixed in v2
+3) Default to the lowest-supported, e.g. arm64 running with
+CONFIG_COMPAT would be limited to the same range as arm.  This solution
+I think is highly undesirable, as it actually makes things worse for
+existing 64-bit platforms.
 
->> +		};
->> +	};
->> +};
->> +
->> +&iomuxc {
->> +	pinctrl-names = "default";
->> +	pinctrl-0 = <&pinctrl_hog>;
->> +
->> +	imx6q-ba16 {
->> +		pinctrl_hog: hoggrp {
->> +			fsl,pins = <
->> +				MX6QDL_PAD_GPIO_4__GPIO1_IO04    0x80000000	/* uSDHC2 CD */
->> +				MX6QDL_PAD_NANDF_CS0__GPIO6_IO11 0x80000000	/* uSDHC4 CD */
->> +				MX6QDL_PAD_NANDF_CS1__GPIO6_IO14 0x80000000	/* uSDHC4 SDIO PWR */
->> +				MX6QDL_PAD_NANDF_CS2__GPIO6_IO15 0x80000000	/* uSDHC4 SDIO WP */
->> +				MX6QDL_PAD_NANDF_CS3__GPIO6_IO16 0x80000000	/* uSDHC4 SDIO LED */
->> +				MX6QDL_PAD_EIM_EB2__GPIO2_IO30   0x80000000	/* SPI1 CS */
->> +				MX6QDL_PAD_GPIO_17__GPIO7_IO12   0x80000000	/* PCIe Reset */
->> +				MX6QDL_PAD_GPIO_5__GPIO1_IO05    0x80000000	/* PCIe Wake */
->> +				MX6QDL_PAD_GPIO_0__CCM_CLKO1     0x130b0	/* FEC CLK */
->> +				MX6QDL_PAD_ENET_TX_EN__GPIO1_IO28 0x80000000	/* FEC Reset */
->> +				MX6QDL_PAD_NANDF_D0__GPIO2_IO00  0x80000000	/* GPIO0 */
->> +				MX6QDL_PAD_NANDF_D1__GPIO2_IO01  0x80000000	/* GPIO1 */
->> +				MX6QDL_PAD_NANDF_D2__GPIO2_IO02  0x80000000	/* GPIO2 */
->> +				MX6QDL_PAD_NANDF_D3__GPIO2_IO03  0x80000000	/* GPIO3 */
->> +				MX6QDL_PAD_NANDF_D4__GPIO2_IO04  0x80000000	/* GPIO4 */
->> +				MX6QDL_PAD_NANDF_D5__GPIO2_IO05  0x80000000	/* GPIO5 */
->> +				MX6QDL_PAD_NANDF_D6__GPIO2_IO06  0x80000000	/* GPIO6 */
->> +				MX6QDL_PAD_NANDF_D7__GPIO2_IO07  0x80000000	/* GPIO7 */
->> +				MX6QDL_PAD_NANDF_CLE__GPIO6_IO07 0x80000000	/* CAM_PWDN */
->> +				MX6QDL_PAD_GPIO_2__GPIO1_IO02    0x80000000	/* CAM_RST */
->> +				MX6QDL_PAD_GPIO_9__WDOG1_B       0x80000000	/* Watchdog out */
->> +				MX6QDL_PAD_GPIO_16__GPIO7_IO11   0x80000000	/* HUB_RESET */
->> +				MX6QDL_PAD_GPIO_18__GPIO7_IO13   0x80000000	/* PMIC Interrupt */
->> +				MX6QDL_PAD_GPIO_19__GPIO4_IO05   0x80000000	/* AR8033 Interrupt */
->> +				MX6QDL_PAD_KEY_ROW2__GPIO4_IO11  0x80000000	/* SUS_S3_OUT */
->> +				MX6QDL_PAD_KEY_ROW4__GPIO4_IO15  0x80000000	/* BLEN_OUT */
->> +				MX6QDL_PAD_EIM_D22__GPIO3_IO22   0x80000000	/* LVDS_PPEN_OUT */
->> +				MX6QDL_PAD_KEY_COL2__GPIO4_IO10  0x80000000	/* RTC_INT */
->
-> Please don't overuse the hog group but add pins that are related to a
-> specific device to the pinmux group of that device. USDHC, SPI, PCIe,
-> FEC are the obvious examples from the list above.
->
+4) Support setting the COMPAT values by Kconfig, but don't expose them
+via procfs.  This keeps the procfs change simple and gets most of its
+benefits.
 
-Makes sense, have moved many of the entries from hog group into their 
-relevant groups in v2. There are a couple more which can be moved but 
-are dependent on new device tree nodes/drivers that I am yet to submit.
+5) Leave the COMPAT values specified in code, and only adjust introduce
+config and tunable options for the 64-bit processes.  Basically keep
+this patch-set as-is and not give any benefit to compatible applications.
 
->> +
->> +&pcie {
->> +	power-on-gpio = <&gpio1 5 GPIO_ACTIVE_HIGH>;
->
-> There is no such thing as a power-on-gpio in mainline Linux.
->
+My preference would be for either solutions 1 or 4, but would love
+feedback and/or other solutions. Thoughts?
 
-Good catch, was a left over from 3.14 kernel. Fixed in v2.
+Thank You,
+Dan
