@@ -1,53 +1,40 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 5 Nov 2015 17:27:57 +0000
-Subject: [PATCHv2 3/4] arm-cci: Add routines to enable/disable all counters
-In-Reply-To: <563B2C01.80701@arm.com>
-References: <1445346326-30820-1-git-send-email-suzuki.poulose@arm.com>
- <1445346326-30820-4-git-send-email-suzuki.poulose@arm.com>
- <20151104182854.GH23860@leverpostej> <563B2C01.80701@arm.com>
-Message-ID: <20151105172756.GH32247@leverpostej>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Thu, 5 Nov 2015 17:30:01 +0000
+Subject: [PATCH v11 2/5] missing include asm/paravirt.h in cputime.c
+In-Reply-To: <20151105164032.GG3604@twins.programming.kicks-ass.net>
+References: <alpine.DEB.2.02.1511051502270.13541@kaball.uk.xensource.com>
+ <1446737696-9749-2-git-send-email-stefano.stabellini@eu.citrix.com>
+ <20151105164032.GG3604@twins.programming.kicks-ass.net>
+Message-ID: <alpine.DEB.2.02.1511051659580.13541@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> >>+static void pmu_disable_counters_ctrl(struct cci_pmu *cci_pmu, unsigned long *mask)
-> >>+{
-> >>+	int i;
-> >>+
-> >>+	for (i = 0; i < cci_pmu->num_cntrs; i++) {
-> >>+		clear_bit(i, mask);
-> >>+		if (pmu_get_counter_ctrl(cci_pmu, i)) {
-> >>+			set_bit(i, mask);
-> >>+			pmu_disable_counter(cci_pmu, i);
-> >>+		}
-> >>+	}
-> >>+}
-> >
-> >I don't understand what's going on with the mask here. Why do we clear
-> >ieach bit when the only user (introduced in the next patch) explicitly
-> >clears the mask anyway?
-> 
-> To be more precise, it should have been :
-> 
-> 	if (pmu_get_counter_ctrl(cci_pmu, i)) {
-> 		set_bit(i, mask);
-> 		pmu_disable_counter(cci_pmu, i);
-> 	} else
-> 		clear_bit(i, mask);
-> 
-> >
-> >Can we not get rid of the mask entirely? The combination of used_mask
-> >and each event's hwc->state tells us which counters are actually in use.
-> 
-> The problem is that neither hwc->state nor the cci_pmu->hw_events->events is
-> protected by pmu_lock, while enable/disable counter is. So we cannot really
-> rely on ((struct perf_event *)(cci_pmu->hw_events->events[counter]))->hw->state.
+On Thu, 5 Nov 2015, Peter Zijlstra wrote:
+> How can this be missing? Things compile fine now, right?
 
-They must be protected somehow, or we'd have races against cross-calls
-and/or the interrupt handler.
+Fair enough.
 
-Are we protected due to being cpu-affine with interrupts disabled when
-modifying these, is there some other mechanism that protects us, or do
-we have additional problems here?
 
-Thanks,
-Mark.
+> So please better explain why we do this change.
+
+asm/paravirt.h is included by one of the other headers included in
+kernel/sched/cputime.c on x86, but not on other architecures. On arm and
+arm64, where I am about to introduce asm/paravirt.h and stolen time
+support, without #include <asm/paravirt.h> in cputime.c I would get:
+
+kernel/sched/cputime.c: In function ?steal_account_process_tick?:
+kernel/sched/cputime.c:260:24: error: ?paravirt_steal_enabled? undeclared (first use in this function)
+  if (static_key_false(&paravirt_steal_enabled)) {
+
+A bit of digging on x86 (using gcc -E on cputime.c) tells me that
+asm/paravirt.h is coming from the following include chain:
+
+#include <kernel/sched/sched.h>
+#include <linux/spinlock.h>
+#include <linux/preempt.h>
+#include <asm/preempt.h>
+#include <linux/thread_info.h>
+#include <asm/thread_info.h>
+#include <asm/processor.h>
+#include <asm/msr.h>
+#include <asm/paravirt.h>
