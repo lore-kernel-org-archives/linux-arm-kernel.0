@@ -1,70 +1,40 @@
-From: dcashman@android.com (Daniel Cashman)
-Date: Thu, 5 Nov 2015 10:44:35 -0800
-Subject: [PATCH v2 2/2] arm: mm: support ARCH_MMAP_RND_BITS.
-In-Reply-To: <563A4EDC.6090403@android.com>
-References: <1446574204-15567-1-git-send-email-dcashman@android.com>
- <1446574204-15567-2-git-send-email-dcashman@android.com>
- <CAGXu5jKGzDD9WVQnMTT2EfupZtjpdcASUpx-3npLAB-FctLodA@mail.gmail.com>
- <56393FD0.6080001@android.com>
- <CAGXu5jLe=OgZ2DG_MRXA8x6BwpEd77fNZBj3wjbDiSdiBurz7w@mail.gmail.com>
- <563A4EDC.6090403@android.com>
-Message-ID: <563BA393.9020504@android.com>
+From: elfring@users.sourceforge.net (SF Markus Elfring)
+Date: Thu, 5 Nov 2015 19:45:32 +0100
+Subject: [PATCH 0/2] [media] c8sectpfe: Deletion of a few unnecessary checks
+In-Reply-To: <5317A59D.4@users.sourceforge.net>
+References: <5307CAA2.8060406@users.sourceforge.net>
+ <alpine.DEB.2.02.1402212321410.2043@localhost6.localdomain6>
+ <530A086E.8010901@users.sourceforge.net>
+ <alpine.DEB.2.02.1402231635510.1985@localhost6.localdomain6>
+ <530A72AA.3000601@users.sourceforge.net>
+ <alpine.DEB.2.02.1402240658210.2090@localhost6.localdomain6>
+ <530B5FB6.6010207@users.sourceforge.net>
+ <alpine.DEB.2.10.1402241710370.2074@hadrien>
+ <530C5E18.1020800@users.sourceforge.net>
+ <alpine.DEB.2.10.1402251014170.2080@hadrien>
+ <530CD2C4.4050903@users.sourceforge.net>
+ <alpine.DEB.2.10.1402251840450.7035@hadrien>
+ <530CF8FF.8080600@users.sourceforge.net>
+ <alpine.DEB.2.02.1402252117150.2047@localhost6.localdomain6>
+ <530DD06F.4090703@users.sourceforge.net>
+ <alpine.DEB.2.02.1402262129250.2221@localhost6.localdomain6>
+ <5317A59D.4@users.sourceforge.net>
+Message-ID: <563BA3CC.4040709@users.sourceforge.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/04/2015 10:30 AM, Daniel Cashman wrote:
-> On 11/3/15 3:21 PM, Kees Cook wrote:
->> On Tue, Nov 3, 2015 at 3:14 PM, Daniel Cashman <dcashman@android.com> wrote:
->>> On 11/03/2015 11:19 AM, Kees Cook wrote:
->>>> Do you have patches for x86 and arm64?
->>>
->>> I was holding off on those until I could gauge upstream reception.  If
->>> desired, I could put those together and add them as [PATCH 3/4] and
->>> [PATCH 4/4].
->>
->> If they're as trivial as I'm hoping, yeah, let's toss them in now. If
->> not, skip 'em. PowerPC, MIPS, and s390 should be relatively simple
->> too, but one or two of those have somewhat stranger calculations when
->> I looked, so their Kconfigs may not be as clean.
-> 
-> Creating the patches should be simple, it's the choice of minimum and
-> maximum values for each architecture that I'd be most concerned about.
-> I'll put them together, though, and the ranges can be changed following
-> discussion with those more knowledgeable, if needed.  I also don't have
-> devices on which to test the PowerPC, MIPS and s390 changes, so I'll
-> need someone's help for that.
+From: Markus Elfring <elfring@users.sourceforge.net>
+Date: Thu, 5 Nov 2015 19:39:32 +0100
 
-Actually, in preparing the x86 and arm64 patches, it became apparent
-that the current patch-set does not address 32-bit executables running
-on 64-bit systems (compatibility mode), since only one procfs
-mmap_rnd_bits variable is created and exported. Some possible solutions:
+Another update suggestion was taken into account after a patch was applied
+from static source code analysis.
 
-1) Create a second set for compatibility, e.g. mmap_rnd_compat_bits,
-mmap_rnd_compat_bits_min, mmap_rnd_compat_bits_max and export it as with
-mmap_rnd_bits.  This provides the most control and is truest to the
-spirit of this patch, but pollutes the Kconfigs and procfs a bit more,
-especially if we ever need a mmap_rnd_64compat_bits...
+Markus Elfring (2):
+  Delete unnecessary checks before two function calls
+  Combine three checks into a single if block
 
-2) Get rid of the arch-independent nature of this patch and instead let
-each arch define its own Kconfig values and procfs entries. Essentially
-the same outcome as the above, but with less disruption in the common
-kernel code, although also with a potentially variable ABI.
+ drivers/media/platform/sti/c8sectpfe/c8sectpfe-common.c | 16 ++++++++--------
+ 1 file changed, 8 insertions(+), 8 deletions(-)
 
-3) Default to the lowest-supported, e.g. arm64 running with
-CONFIG_COMPAT would be limited to the same range as arm.  This solution
-I think is highly undesirable, as it actually makes things worse for
-existing 64-bit platforms.
-
-4) Support setting the COMPAT values by Kconfig, but don't expose them
-via procfs.  This keeps the procfs change simple and gets most of its
-benefits.
-
-5) Leave the COMPAT values specified in code, and only adjust introduce
-config and tunable options for the 64-bit processes.  Basically keep
-this patch-set as-is and not give any benefit to compatible applications.
-
-My preference would be for either solutions 1 or 4, but would love
-feedback and/or other solutions. Thoughts?
-
-Thank You,
-Dan
+-- 
+2.6.2
