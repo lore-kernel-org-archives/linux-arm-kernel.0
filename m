@@ -1,51 +1,48 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 5 Nov 2015 12:17:06 +0000
-Subject: [PATCH] arm64: Increase the max granular size
-In-Reply-To: <CAAmzW4MR_+0K5JbMMiRu_wVq736zVbz82ugvDYP=x6p=9JuELg@mail.gmail.com>
-References: <1442944788-17254-1-git-send-email-rric@kernel.org>
- <20151105044014.GB20374@js1304-P5Q-DELUXE>
- <20151105103214.GP7637@e104818-lin.cambridge.arm.com>
- <CAAmzW4MR_+0K5JbMMiRu_wVq736zVbz82ugvDYP=x6p=9JuELg@mail.gmail.com>
-Message-ID: <20151105121706.GQ7637@e104818-lin.cambridge.arm.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Thu, 05 Nov 2015 12:22:08 +0000
+Subject: [PATCH RFC 0/7] Adding core support for wire-MSI bridges
+In-Reply-To: <alpine.DEB.2.11.1511041348060.4032@nanos>
+References: <1444923568-17413-1-git-send-email-marc.zyngier@arm.com>
+ <56205917.7090001@linux.intel.com> <5620B9D6.1010708@arm.com>
+ <alpine.DEB.2.11.1511041348060.4032@nanos>
+Message-ID: <563B49F0.7040000@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 05, 2015 at 08:45:08PM +0900, Joonsoo Kim wrote:
-> 2015-11-05 19:32 GMT+09:00 Catalin Marinas <catalin.marinas@arm.com>:
-> > On ARM we have a notion of cache writeback granule (CWG) which tells us
-> > "the maximum size of memory that can be overwritten as a result of the
-> > eviction of a cache entry that has had a memory location in it
-> > modified". What we actually needed was ARCH_DMA_MINALIGN to be 128
-> > (currently defined to the L1_CACHE_BYTES value). However, this wouldn't
-> > have fixed the KMALLOC_MIN_SIZE, unless we somehow generate different
-> > kmalloc_caches[] and kmalloc_dma_caches[] and probably introduce a
-> > size_dma_index[].
+On 04/11/15 13:34, Thomas Gleixner wrote:
+> Marc,
 > 
-> If we create separate kmalloc caches for dma, can we apply this alignment
-> requirement only to dma caches? I guess some memory allocation request
-> that will be used for DMA operation doesn't specify GFP_DMA because
-> it doesn't want the memory from ZONE_DMA. In this case, we should apply
-> dma alignment requirement to all types of caches.
+> On Fri, 16 Oct 2015, Marc Zyngier wrote:
+>> On 16/10/15 02:55, Jiang Liu wrote:
+>>> 	There's a working to enable Intel VMD storage device, which
+>>> has the similar requirement. Basically a PCIe hierarchy is hidden
+>>> behind a parent PCIe device, so we need to use the PCIe irqs on parent
+>>> to de-multiple PCIe IRQs from hidden PCIe devices. Seems a chance for
+>>> consolidation here.
+>>
+>> Do you know if there is a 1-1 mapping between the interrupts seen by the
+>> parent device and those seen by the hidden devices? Or is it a case of
+>> having to demultiplex the MSIs? Looks like the former, but I'd like to
+>> be sure.
+> 
+> Yes, it's a demultiplexer. No 1:1 mapping.
 
-I think you are right. While something like swiotlb (through the
-streaming DMA API) could do bounce buffering and allocate one from
-ZONE_DMA, this is not guaranteed if the buffer physical address happens
-to match the dma_mask. Similarly with an IOMMU, no bouncing happens but
-the alignment is still required.
+Right. This doesn't exactly fit the scheme I have so far (there is a 1:1
+mapping between the wired interrupt and the MSI), but once we are able
+to expose an MSI domain, it could be possible to construct the MSI
+demultiplexer on top. That's a lot of layers! ;-)
 
-> If it isn't possible, is there another way to reduce memory waste due to
-> increase of dma alignment requirement in arm64?
+>> Sure, will do when I repost this (probably in a few weeks), and assuming
+>> this fits the bill for Thomas and the MBIGEN folks.
+> 
+> It doesn't look that bad and the resulting mbigen stuff is way less
+> horrible than it was before. So I agree this is a possible solution to
+> the problem.
 
-I first need to see how significant the impact is (especially for
-embedded/mobiles platforms).
+Cool. I'll revisit that after the merge window.
 
-An alternative is to leave L1_CACHE_BYTES to 64 by default but warn if
-the CWG is 128 on systems with non-coherent DMA (and hope that we won't
-have any). It's not really fix, rather an assumption. Anyway I would
-very much like the same kernel image for all platforms and no Kconfig
-entry for the cache line size but if the waste is significant, we may
-add one for some specific builds (like a mobile phone; or such vendors
-could patch the kernel themselves).
+Thanks,
 
+	M.
 -- 
-Catalin
+Jazz is not dead. It just smells funny...
