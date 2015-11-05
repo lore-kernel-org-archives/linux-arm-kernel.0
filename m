@@ -1,54 +1,80 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 05 Nov 2015 19:53:50 +0100
-Subject: [PATCH 1/3] xen/arm: introduce xen_read_wallclock
-In-Reply-To: <1446743385-12848-1-git-send-email-stefano.stabellini@eu.citrix.com>
+Date: Thu, 05 Nov 2015 19:58:32 +0100
+Subject: [PATCH 3/3] xen/arm: set the system time in Xen via the
+ XENPF_settime hypercall
+In-Reply-To: <1446743385-12848-3-git-send-email-stefano.stabellini@eu.citrix.com>
 References: <alpine.DEB.2.02.1511051706560.13541@kaball.uk.xensource.com>
- <1446743385-12848-1-git-send-email-stefano.stabellini@eu.citrix.com>
-Message-ID: <23850350.L7uJax1OoN@wuerfel>
+ <1446743385-12848-3-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <6188457.uvvdcZaVNM@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 05 November 2015 17:09:43 Stefano Stabellini wrote:
-> Read the wallclock from the shared info page at boot time.
+On Thursday 05 November 2015 17:09:45 Stefano Stabellini wrote:
+> If Linux is running as dom0, call XENPF_settime to update the system
+> time in Xen on pvclock_gtod notifications.
 > 
 > Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-
-Please use the appropriate timespec64 based functions here,
-we are in the process of converting all callers of struct timespec.
-
+> Signed-off-by: Ian Campbell <ian.campbell@citrix.com>
 > ---
-> +static void xen_read_wallclock(struct timespec *ts)
+>  arch/arm/xen/enlighten.c |   52 +++++++++++++++++++++++++++++++++++++++++++++-
+>  1 file changed, 51 insertions(+), 1 deletion(-)
+> 
+> diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
+> index b6aea9c..0176db0 100644
+> --- a/arch/arm/xen/enlighten.c
+> +++ b/arch/arm/xen/enlighten.c
+> @@ -28,6 +28,7 @@
+>  #include <linux/cpufreq.h>
+>  #include <linux/cpu.h>
+>  #include <linux/console.h>
+> +#include <linux/pvclock_gtod.h>
+>  #include <linux/timekeeping.h>
+>  #include <clocksource/arm_arch_timer.h>
+>  
+> @@ -123,6 +124,50 @@ static void xen_read_wallclock(struct timespec *ts)
+>  	set_normalized_timespec(ts, now.tv_sec, now.tv_nsec);
+>  }
+>  
+> +static int xen_pvclock_gtod_notify(struct notifier_block *nb,
+> +				   unsigned long was_set, void *priv)
 > +{
-> +	u32 version;
-> +	u64 delta;
+> +	/* Protected by the calling core code serialization */
+> +	static struct timespec next_sync;
+> +
+> +	struct xen_platform_op op;
 > +	struct timespec now;
-> +	struct shared_info *s = HYPERVISOR_shared_info;
-> +	struct pvclock_wall_clock *wall_clock = &(s->wc);
 
-pvclock_wall_clock has a 'u32 sec', so that suffers from
-a potential overflow. We should try to avoid introducing that
-on ARM, and instead have a 64-bit seconds based version,
-or alternatively a 64-bit nanoseconds version (with no
-extra seconds) that is also sufficient.
+Again, use timespec64
 
->  	struct vcpu_register_vcpu_info info;
-> @@ -218,6 +246,7 @@ static int __init xen_guest_init(void)
->  	struct shared_info *shared_info_page = NULL;
->  	struct resource res;
->  	phys_addr_t grant_frames;
-> +	struct timespec ts;
->  
->  	if (!xen_domain())
->  		return 0;
-> @@ -291,6 +320,8 @@ static int __init xen_guest_init(void)
->  
->  	pv_time_ops.steal_clock = xen_stolen_accounting;
->  	static_key_slow_inc(&paravirt_steal_enabled);
-> +	xen_read_wallclock(&ts);
-> +	do_settimeofday(&ts);
->  
+> +	now = __current_kernel_time();
 
-Once you can get a 64-bit time, call do_settimeofday64()
-here.
+We don't have __current_kernel_time64() yet, but it is trivial
+to add, just follow the example of
+current_kernel_time()/current_kernel_time64() and convert the
+existing __current_kernel_time() function into a static
+inline wrapper for the new __current_kernel_time64().
+
+> +	/*
+> +	 * We only take the expensive HV call when the clock was set
+> +	 * or when the 11 minutes RTC synchronization time elapsed.
+> +	 */
+> +	if (!was_set && timespec_compare(&now, &next_sync) < 0)
+> +		return NOTIFY_OK;
+> +
+> +	op.interface_version = XENPF_INTERFACE_VERSION;
+> +	op.cmd = XENPF_settime;
+> +	op.u.settime.secs = now.tv_sec;
+> +	op.u.settime.nsecs = now.tv_nsec;
+> +	op.u.settime.system_time = arch_timer_read_counter();
+> +	printk("GTOD: Setting to %ld.%ld at %lld\n",
+> +	       (long)op.u.settime.secs,
+> +	       (long)op.u.settime.nsecs,
+> +	       (long long)op.u.settime.system_time);
+> +	(void)HYPERVISOR_dom0_op(&op);
+
+I guess we will also need a XENPF_settime64 interface, but at
+least we can get away with implementing only that one on ARM,
+while x86 will have to support both the 32-bit and 64-bit
+based variant.
 
 	Arnd
