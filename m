@@ -1,36 +1,55 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Thu, 5 Nov 2015 14:17:31 +0300
-Subject: [PATCH/RFC] ARM: shmobile: Introduce ARCH_RENESAS
-In-Reply-To: <1446702397-24078-1-git-send-email-horms+renesas@verge.net.au>
-References: <1446702397-24078-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <563B3ACB.9050807@cogentembedded.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Thu, 5 Nov 2015 20:27:17 +0900
+Subject: [PATCH v5 4/4] ARM: dts: Add Ethernet chip to SMDK5410
+In-Reply-To: <004f01d117bb$1e4fbb40$5aef31c0$@samsung.com>
+References: <cover.1446542020.git.p.fedin@samsung.com>
+ <4568ad982f0af1846994119961cbb798edff311c.1446542020.git.p.fedin@samsung.com>
+ <5639C1A5.1040708@samsung.com> <004f01d117bb$1e4fbb40$5aef31c0$@samsung.com>
+Message-ID: <563B3D15.2070700@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+W dniu 05.11.2015 o 20:14, Pavel Fedin pisze:
+>  Hello!
+> 
+>>> +	ethernet at 3 {
+>>> +		compatible = "smsc,lan9115";
+>>> +		reg = <3 0 0x10000>;
+>>> +		phy-mode = "mii";
+>>> +		interrupt-parent = <&gpx0>;
+>>> +		interrupts = <5 8>;
+>>
+>> s/8/IRQ_TYPE_LEVEL_LOW/
+>> (is this really level low interrupt?)
+> 
+>  Yes, according to: https://github.com/AndreiLux/Perseus-S3/blob/master/arch/arm/mach-exynos/mach-smdk5250.c#L133
 
-On 11/5/2015 8:46 AM, Simon Horman wrote:
+Although this is different board, but okay.
 
-> The purpose of this patch is to start the process of replacing both
-> ARCH_SHMOBILE and ARCH_SHMOBILE_MULTI with ARCH_RENESAS. The motivation
-> being that as time has moved on Renesas has become a name than shmobile for
-> the majority Renesas 32-bit ARM based SoCs.
+> 
+>> Some other DTS include regulators: vddvario-supply and vdd33a-supply. It
+>> seems that they are not described in SMSC911x bindings but in
+>> GPMC-eth... but the smsc911x driver is requesting them. Could you
+>> investigate that? I think these regulators should be provided (and
+>> SMSC911x bindings should be updated).
+> 
+>  Sorry, i cannot. The board has lots of jumpers, which choose between fixed voltage and regulators for different components,
+> according to board's manual, but the manual is very poor IMHO, and i don't understand how to use them. And i use default,
+> fixed-voltage configuration.
+>  One of my colleagues tried to get it working, but failed. It actually requires more time, and IIRC you need to bring up i2c before
+> you can drive regulators.
+>  So can we leave it as it is for now? At least it works, and this is much better than no ethernet support at all.
 
-    Couldn't parse this sentence. :-)
+Ok, that is sufficient explanation.
 
-> The name is, conveniently, also
-> applicable to (older) Renesas SH based SoCs and (newer) ARM64 based SoCs
-> although this patch only addresses 32-bit ARM.
->
-> It is envisaged that follow up work may address migrating both
-> SH SoCs and drivers from ARCH_SHMOBILE and ARCH_SHMOBILE_MULTI to
-> ARCH_RENESAS.
->
-> Proposed support for the r8a7795 ARM64 based SoC already uses ARCH_RENESAS
-> which selects ARCH_SHMOBILE.
->
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+>> I don't have the board schematics so I couldn't verify the GPIOs.
+> 
+>  Me neither, i wrote GPIO settings according to chip datasheet i have. They are actually chip-specific, but i wrote them in board
+> file because on different boards you may use different banks, and therefore different pins. Or, if you don't use SROMc at all, you
+> can configure all pins to do something else.
+> 
 
-[...]
+Makes sense.
 
-MBR, Sergei
+Best regards,
+Krzysztof
