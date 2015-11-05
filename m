@@ -1,68 +1,48 @@
-From: qiuxishi@huawei.com (Xishi Qiu)
-Date: Thu, 5 Nov 2015 19:10:58 +0800
-Subject: [PATCH 2/2] arm64: Allow changing of attributes outside of modules
-In-Reply-To: <563A4A74.60900@redhat.com>
-References: <1446587315-18145-1-git-send-email-labbott@fedoraproject.org>
- <1446587315-18145-3-git-send-email-labbott@fedoraproject.org>
- <563974A8.3060306@huawei.com> <563A4A74.60900@redhat.com>
-Message-ID: <563B3942.90305@huawei.com>
+From: p.fedin@samsung.com (Pavel Fedin)
+Date: Thu, 05 Nov 2015 14:14:19 +0300
+Subject: [PATCH v5 4/4] ARM: dts: Add Ethernet chip to SMDK5410
+In-Reply-To: <5639C1A5.1040708@samsung.com>
+References: <cover.1446542020.git.p.fedin@samsung.com>
+ <4568ad982f0af1846994119961cbb798edff311c.1446542020.git.p.fedin@samsung.com>
+ <5639C1A5.1040708@samsung.com>
+Message-ID: <004f01d117bb$1e4fbb40$5aef31c0$@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015/11/5 2:12, Laura Abbott wrote:
+ Hello!
 
-> On 11/03/2015 06:59 PM, zhong jiang wrote:
->>
->> Hi Laura
->>
->> This patch seems vaild, but I didn't feel very reasonable.
->> Because of the large page to make TLB performance better, just
->> split it if it is necessary.therefore, I think the first thing
->> we try to keep it, if they fail ,and then to split.
->>
+> > +	ethernet at 3 {
+> > +		compatible = "smsc,lan9115";
+> > +		reg = <3 0 0x10000>;
+> > +		phy-mode = "mii";
+> > +		interrupt-parent = <&gpx0>;
+> > +		interrupts = <5 8>;
 > 
-> I'm not quite sure I understand the request. We know we are going
-> to have to have something mapped at page size granularity so we
-> are going to have to break down the larger mappings no matter
-> what. Can you explain a bit more where you think we could try to
-> keep the larger mappings?
-> 
+> s/8/IRQ_TYPE_LEVEL_LOW/
+> (is this really level low interrupt?)
 
-Hi Laura,
+ Yes, according to: https://github.com/AndreiLux/Perseus-S3/blob/master/arch/arm/mach-exynos/mach-smdk5250.c#L133
 
-He means like this, if the range is aligned with large page, we
-need not to split it, just change the flag.
+> Some other DTS include regulators: vddvario-supply and vdd33a-supply. It
+> seems that they are not described in SMSC911x bindings but in
+> GPMC-eth... but the smsc911x driver is requesting them. Could you
+> investigate that? I think these regulators should be provided (and
+> SMSC911x bindings should be updated).
 
-I have one more question.
+ Sorry, i cannot. The board has lots of jumpers, which choose between fixed voltage and regulators for different components,
+according to board's manual, but the manual is very poor IMHO, and i don't understand how to use them. And i use default,
+fixed-voltage configuration.
+ One of my colleagues tried to get it working, but failed. It actually requires more time, and IIRC you need to bring up i2c before
+you can drive regulators.
+ So can we leave it as it is for now? At least it works, and this is much better than no ethernet support at all.
 
-alloc_init_pud()
-	...
-	if (!pud_none(old_pud))
-		...
-		memblock_free(table, PAGE_SIZE);
-		...
+> I don't have the board schematics so I couldn't verify the GPIOs.
 
-Here we will free the memory from pmd page, so why not free
-more memory from 512 pte pages, if the 512 old pmds are not none?
+ Me neither, i wrote GPIO settings according to chip datasheet i have. They are actually chip-specific, but i wrote them in board
+file because on different boards you may use different banks, and therefore different pins. Or, if you don't use SROMc at all, you
+can configure all pins to do something else.
 
-Thanks,
-Xishi Qiu
-
-> At least two things I noticed looking at this again though:
-> - This only splits the start address. If the range happens
-> to overlap a pud/pmd this won't work. I'll address that in v2
-> - We're always flushing the TLB even if nothing changed. Was
-> this what you were referring to?
-> 
->  
->> thanks
->> zhongjiang
->>
->>
-> 
-> Thanks,
-> Laura
-> 
-> 
-> .
-> 
+Kind regards,
+Pavel Fedin
+Expert Engineer
+Samsung Electronics Research center Russia
