@@ -1,40 +1,26 @@
-From: p.zabel@pengutronix.de (Philipp Zabel)
-Date: Thu, 05 Nov 2015 16:15:19 +0100
-Subject: [RFC] ASoC: Add mediatek HDMI codec driver
-In-Reply-To: <20151104120343.GZ20228@sirena.org.uk>
-References: <1446638053-12143-1-git-send-email-p.zabel@pengutronix.de>
- <20151104120343.GZ20228@sirena.org.uk>
-Message-ID: <1446736519.3894.113.camel@pengutronix.de>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Thu, 5 Nov 2015 16:15:59 +0100
+Subject: Grafting old platform drivers onto a new DT kernel
+In-Reply-To: <563B3749.50701@free.fr>
+References: <563B3749.50701@free.fr>
+Message-ID: <20151105151559.GA16666@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
+> Since I don't have time to rewrite the drivers at the moment, I'm wondering
+> if it's possible to "graft" old drivers (they're using the platform API, no
+> trace of DT support) onto my small base?
 
-Am Mittwoch, den 04.11.2015, 12:03 +0000 schrieb Mark Brown:
-> On Wed, Nov 04, 2015 at 12:54:13PM +0100, Philipp Zabel wrote:
-> 
-> > This driver is based on the work of DW HDMI codec driver.
-> > It controls mediatek HDMI Tx's audio module, and handles
-> > HDMI jack detection by sharing IRQ with HDMI Tx.
-> 
-> How does this relate to all the other HDMI related work that's going on,
-> especially around handling of the EDID data?  I'm not seeing anything in
-> here that uses the constraints code that Russell added for example. 
+Platform drivers are still usable with DT systems. We used that fact
+when converting platform based machines over to DT, one driver at a
+time. Look in the git history for kirkwood devices. e.g. somewhere
+around v3.7, arch/arm/mach-kirkwood. board-dt.c, and the various
+board-*.c files, and the DT files in the usual place.
 
-So I'll use snd_pcm_hw_constraint_eld.
+> Is that a realistic plan? What traps am I likely to fall into?
 
-> As I keep saying I really want to see some collaboration and consensus
-> here with the goal of sharing code and achieving a consistent userspace
-> interface rather than a lot of individual independently implemented
-> drivers.
+It is not just the move to DT where things are different. Kernel APIs
+are not stable. So your old drivers might not even compile with a
+current kernel.
 
-For eld updates and jack handling I could try to go forward with
-Russell's notification prototype from the "[RFC,V2,0/5] another generic
-audio hdmi codec proposal" thread:
-https://patchwork.kernel.org/patch/7339011/
-
-Or are you saying there shouldn't be a Mediatek specific HDMI sound
-driver at all and this should be handled by generic code?
-
-regards
-Philipp
+	Andrew
