@@ -1,177 +1,36 @@
-From: dawei.chien@mediatek.com (dawei chien)
-Date: Thu, 5 Nov 2015 19:10:50 +0800
-Subject: [PATCH v3 2/2] arm64: dts: mt8173: Add thermal zone node for
- mt8173.
-In-Reply-To: <20151104194111.GD14127@localhost.localdomain>
-References: <1445515359-8587-1-git-send-email-dawei.chien@mediatek.com>
- <1445515359-8587-3-git-send-email-dawei.chien@mediatek.com>
- <20151104194111.GD14127@localhost.localdomain>
-Message-ID: <1446721850.4016.58.camel@mtksdaap41>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Thu, 5 Nov 2015 11:10:52 +0000
+Subject: PSCI_CPU_ON flow
+In-Reply-To: <20151104193142.GM8644@n2100.arm.linux.org.uk>
+References: <BY1PR0301MB1303B5D1A8CD0B7FA07AA40A822A0@BY1PR0301MB1303.namprd03.prod.outlook.com>
+ <20151104171048.GE23860@leverpostej>
+ <20151104193142.GM8644@n2100.arm.linux.org.uk>
+Message-ID: <20151105111051.GA28294@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2015-11-04 at 11:41 -0800, Eduardo Valentin wrote:
-> On Thu, Oct 22, 2015 at 08:02:39PM +0800, Dawei Chien wrote:
-> > Add thermal zone node to mt8173.dtsi.
+On Wed, Nov 04, 2015 at 07:31:42PM +0000, Russell King - ARM Linux wrote:
+> On Wed, Nov 04, 2015 at 05:10:49PM +0000, Mark Rutland wrote:
+> > Yes, the CPU should start at __pa(secondary_entry) in head.S. From there
+> > it will branch to secondary_startup:
 > > 
-> > Signed-off-by: Dawei Chien <dawei.chien@mediatek.com>
-> > ---
-> > This patch is base on
-> > https://patchwork.kernel.org/patch/7249821/
-> > https://patchwork.kernel.org/patch/7249861/
-> > https://patchwork.kernel.org/patch/7249891/
-> > ---
-> >  arch/arm64/boot/dts/mediatek/mt8173.dtsi |   90 ++++++++++++++++++++++++++++++
+> > ENTRY(secondary_entry)
+> > 	bl      el2_setup                       // Drop to EL1
+> > 	bl      set_cpu_boot_mode_flag
+> > 	b       secondary_startup
+> > ENDPROC(secondary_entry)
 > 
-> This patch adds also the static / dynamic power models too. Can you
-> please split this patch in two: one for the thermal zones, one for the
-> models.
+> We've been busy telling people to implement errata workarounds in firmware,
+> and we're also busy telling people that their secondary CPUs should start
+> in the kernel.  The two are incompatible with each other...
 
-Thank you for reviewing, I will split this patch in two and resend
-again.
+Indeed. The above should have read "having exited the firmware, the CPU
+should enter the kernel at __pa(secondary_entry)".
 
-> >  1 file changed, 90 insertions(+)
-> > 
-> > diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-> > index 3b18f37..eaf12bf 100644
-> > --- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-> > +++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-> > @@ -16,6 +16,7 @@
-> >  #include <dt-bindings/interrupt-controller/arm-gic.h>
-> >  #include <dt-bindings/power/mt8173-power.h>
-> >  #include <dt-bindings/reset-controller/mt8173-resets.h>
-> > +#include <dt-bindings/thermal/mt8173.h>
-> >  #include "mt8173-pinfunc.h"
-> >  
-> >  / {
-> > @@ -54,6 +55,18 @@
-> >  			reg = <0x000>;
-> >  			enable-method = "psci";
-> >  			cpu-idle-states = <&CPU_SLEEP_0>;
-> > +			static-power-points = <
-> > +				859000  43
-> > +				908000  52
-> > +				983000  86
-> > +				1009000 123
-> > +				1028000 138
-> > +				1083000 172
-> > +				1110900 180
-> > +				1125000 192
-> > +			>;
-> > +			dynamic-power-coefficient = <263>;
-> > +			#cooling-cells = <2>;
-> >  		};
-> >  
-> >  		cpu1: cpu at 1 {
-> > @@ -62,6 +75,17 @@
-> >  			reg = <0x001>;
-> >  			enable-method = "psci";
-> >  			cpu-idle-states = <&CPU_SLEEP_0>;
-> > +			static-power-points = <
-> > +				859000  43
-> > +				908000  52
-> > +				983000  86
-> > +				1009000 123
-> > +				1028000 138
-> > +				1083000 172
-> > +				1110900 180
-> > +				1125000 192
-> > +			>;
-> > +			dynamic-power-coefficient = <263>;
-> >  		};
-> >  
-> >  		cpu2: cpu at 100 {
-> > @@ -70,6 +94,18 @@
-> >  			reg = <0x100>;
-> >  			enable-method = "psci";
-> >  			cpu-idle-states = <&CPU_SLEEP_0>;
-> > +			static-power-points = <
-> > +				828000  72
-> > +				867000  90
-> > +				927000  156
-> > +				968000  181
-> > +				1007000 298
-> > +				1049000 435
-> > +				1089900 533
-> > +				1125000 533
-> > +			>;
-> > +			dynamic-power-coefficient = <530>;
-> > +			#cooling-cells = <2>;
-> >  		};
-> >  
-> >  		cpu3: cpu at 101 {
-> > @@ -78,6 +114,17 @@
-> >  			reg = <0x101>;
-> >  			enable-method = "psci";
-> >  			cpu-idle-states = <&CPU_SLEEP_0>;
-> > +			static-power-points = <
-> > +				828000  72
-> > +				867000  90
-> > +				927000  156
-> > +				968000  181
-> > +				1007000 298
-> > +				1049000 435
-> > +				1089900 533
-> > +				1125000 533
-> > +			>;
-> > +			dynamic-power-coefficient = <530>;
-> >  		};
-> >  
-> >  		idle-states {
-> > @@ -116,6 +163,49 @@
-> >  		clock-output-names = "clk32k";
-> >  	};
-> >  
-> > +	thermal-zones {
-> > +		cpu_thermal: cpu_thermal {
-> > +			polling-delay-passive = <1000>; /* milliseconds */
-> > +			polling-delay = <1000>; /* milliseconds */
-> > +
-> > +			thermal-sensors = <&thermal MT8173_THERMAL_ZONE_CA57>;
-> > +			sustainable-power = <1500>;
-> > +
-> > +			trips {
-> > +				threshold: trip-point at 0 {
-> > +					temperature = <68000>;
-> > +					hysteresis = <2000>;
-> > +					type = "passive";
-> > +				};
-> > +
-> > +				target: trip-point at 1 {
-> > +					temperature = <85000>;
-> > +					hysteresis = <2000>;
-> > +					type = "passive";
-> > +				};
-> > +
-> > +				cpu_crit: cpu_crit at 0 {
-> > +					temperature = <115000>;
-> > +					hysteresis = <2000>;
-> > +					type = "critical";
-> > +				};
-> > +			};
-> > +
-> > +			cooling-maps {
-> > +				map at 0 {
-> > +					trip = <&target>;
-> > +					cooling-device = <&cpu0 0 0>;
-> > +					contribution = <1024>;
-> > +				};
-> > +				map at 1 {
-> > +					trip = <&target>;
-> > +					cooling-device = <&cpu2 0 0>;
-> > +					contribution = <2048>;
-> > +				};
-> > +			};
-> > +		};
-> > +	};
-> > +
-> >  	timer {
-> >  		compatible = "arm,armv8-timer";
-> >  		interrupt-parent = <&gic>;
-> > -- 
-> > 1.7.9.5
-> > 
-> > --
-> > To unsubscribe from this list: send the line "unsubscribe linux-pm" in
-> > the body of a message to majordomo at vger.kernel.org
-> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Out of reset all CPUs will go through firmware, where any IMPLEMENTATION
+DEFINED initialisation (including errata workarounds and coherency
+management) will have taken place, the exception vectors necessary for
+the PSCI implementation will be registered, etc.
+
+Thanks,
+Mark.
