@@ -1,20 +1,18 @@
-From: cl@linux.com (Christoph Lameter)
-Date: Thu, 5 Nov 2015 11:39:46 -0600 (CST)
-Subject: [PATCH] mm: slab: Only move management objects off-slab for
- sizes larger than KMALLOC_MIN_SIZE
-In-Reply-To: <1446724235-31400-1-git-send-email-catalin.marinas@arm.com>
-References: <20151105043155.GA20374@js1304-P5Q-DELUXE>
- <1446724235-31400-1-git-send-email-catalin.marinas@arm.com>
-Message-ID: <alpine.DEB.2.20.1511051139220.28479@east.gentwo.org>
+From: david.vrabel@citrix.com (David Vrabel)
+Date: Thu, 5 Nov 2015 17:45:06 +0000
+Subject: [Xen-devel] [PATCH 3/3] xen/arm: set the system time in Xen via
+ the XENPF_settime hypercall
+In-Reply-To: <1446743385-12848-3-git-send-email-stefano.stabellini@eu.citrix.com>
+References: <alpine.DEB.2.02.1511051706560.13541@kaball.uk.xensource.com>
+ <1446743385-12848-3-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <563B95A2.9010304@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 5 Nov 2015, Catalin Marinas wrote:
+On 05/11/15 17:09, Stefano Stabellini wrote:
+> If Linux is running as dom0, call XENPF_settime to update the system
+> time in Xen on pvclock_gtod notifications.
 
-> This patch introduces an OFF_SLAB_MIN_SIZE macro which takes
-> KMALLOC_MIN_SIZE into account. It also solves a slab bug on arm64 where
-> the first kmalloc_cache to be initialised after slab_early_init = 0,
-> "kmalloc-128", fails to allocate off-slab management objects from the
-> same "kmalloc-128" cache.
+Isn't this a cut-and-paste from x86?  Can you make it common?
 
-Acked-by: Christoph Lameter <cl@linux.com>
+David
