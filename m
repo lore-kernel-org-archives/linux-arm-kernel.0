@@ -1,104 +1,146 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Thu, 5 Nov 2015 10:01:32 +0100
-Subject: [RFCv2 1/2] power: domain: add pm_genpd_uninit
-In-Reply-To: <1446590711-18928-2-git-send-email-alex.aring@gmail.com>
-References: <1446590711-18928-1-git-send-email-alex.aring@gmail.com>
- <1446590711-18928-2-git-send-email-alex.aring@gmail.com>
-Message-ID: <CAPDyKFrkzMZZjFRM7EbqDqmW8EXzV22O_tp8a45LVGQYSn6b3g@mail.gmail.com>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Thu, 05 Nov 2015 10:09:24 +0100
+Subject: [RFC v2 2/2] drm/bridge: Add I2C based driver for ps8640 bridge
+In-Reply-To: <1446430166-7378-2-git-send-email-jitao.shi@mediatek.com>
+References: <1446430166-7378-1-git-send-email-jitao.shi@mediatek.com>
+ <1446430166-7378-2-git-send-email-jitao.shi@mediatek.com>
+Message-ID: <1446714564.3894.6.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 3 November 2015 at 23:45, Alexander Aring <alex.aring@gmail.com> wrote:
-> This patch adds function pm_genpd_uninit for undo a pm_genpd_init. This
-> is useful for multiple power domains while probing. If the probing fails
-> after one pm_genpd_init was called we need to undo all previous
-> registrations of generic pm domains inside the gpd_list list.
+Hi Jitao,
 
-Yes, agree. Although I think it's a bit mote complicated than what you
-suggest in this simple approach. :-)
+some things I missed before.
 
->
-> There is a check on IS_ERR_OR_NULL(genpd) which is useful to check again
-> registered power domains and not registered domains, the driver can use
-> this mechanism to have an array with registered and non-registered power
-> domains, where non-registered power domains are NULL.
->
-> Cc: Rafael J. Wysocki <rjw@rjwysocki.net>
-> Cc: Kevin Hilman <khilman@kernel.org>
-> Cc: Ulf Hansson <ulf.hansson@linaro.org>
-> Cc: Pavel Machek <pavel@ucw.cz>
-> Cc: Len Brown <len.brown@intel.com>
-> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
-> Signed-off-by: Alexander Aring <alex.aring@gmail.com>
-> ---
->  drivers/base/power/domain.c | 15 +++++++++++++++
->  include/linux/pm_domain.h   |  4 ++++
->  2 files changed, 19 insertions(+)
->
-> diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
-> index 16550c6..65b9d1a 100644
-> --- a/drivers/base/power/domain.c
-> +++ b/drivers/base/power/domain.c
-> @@ -1730,6 +1730,21 @@ void pm_genpd_init(struct generic_pm_domain *genpd,
->  }
->  EXPORT_SYMBOL_GPL(pm_genpd_init);
->
-> +/**
-> + * pm_genpd_uninit - Uninitialize a generic I/O PM domain object.
-> + * @genpd: PM domain object to initialize.
-> + */
-> +void pm_genpd_uninit(struct generic_pm_domain *genpd)
+Am Montag, den 02.11.2015, 10:09 +0800 schrieb Jitao Shi:
+[...]
+> +static int ps8640_regr(struct i2c_client *client, u16 i2c_addr,
+> +		       u8 reg, u8 *value)
 > +{
-> +       if (IS_ERR_OR_NULL(genpd))
-> +               return;
+> +	int ret;
 > +
-> +       mutex_lock(&gpd_list_lock);
-> +       list_del(&genpd->gpd_list_node);
-> +       mutex_unlock(&gpd_list_lock);
+> +	client->addr = i2c_addr;
 
-This is too fragile. You don't protect from the cases below.
+I think i2c_new_dummy should be used to create additional clients for
+the secondary addresses, instead of changing the address of the client
+with every transfer.
 
-1. The genpd may have devices attached to it.
-2. The genpd may have subdomains.
-
-To deal with these case, that's when it becomes more complex which I
-guess is the reason to why nobody really cared until now.
-
-Moreover, I think there are some more structures to "uninitialize"
-besides just unlinking the genpd struct from the gpd list. For example
-a mutex_destroy() should be done.
-
+> +	ret = i2c_master_send(client, &reg, 1);
+> +	if (ret <= 0) {
+> +		DRM_ERROR("Failed to send i2c command, ret=%d\n", ret);
+> +		return ret;
+> +	}
+> +
+> +	ret = i2c_master_recv(client, value, 1);
+> +	if (ret <= 0) {
+> +		DRM_ERROR("Failed to recv i2c data, ret=%d\n", ret);
+> +		return ret;
+> +	}
+> +
+> +	return 0;
 > +}
-> +EXPORT_SYMBOL_GPL(pm_genpd_uninit);
-> +
->  #ifdef CONFIG_PM_GENERIC_DOMAINS_OF
->  /*
->   * Device Tree based PM domain providers.
-> diff --git a/include/linux/pm_domain.h b/include/linux/pm_domain.h
-> index b1cf7e7..45d4f7a 100644
-> --- a/include/linux/pm_domain.h
-> +++ b/include/linux/pm_domain.h
-> @@ -143,6 +143,7 @@ extern int pm_genpd_detach_cpuidle(struct generic_pm_domain *genpd);
->  extern int pm_genpd_name_detach_cpuidle(const char *name);
->  extern void pm_genpd_init(struct generic_pm_domain *genpd,
->                           struct dev_power_governor *gov, bool is_off);
-> +extern void pm_genpd_uninit(struct generic_pm_domain *genpd);
->
->  extern int pm_genpd_poweron(struct generic_pm_domain *genpd);
->  extern int pm_genpd_name_poweron(const char *domain_name);
-> @@ -212,6 +213,9 @@ static inline void pm_genpd_init(struct generic_pm_domain *genpd,
->                                  struct dev_power_governor *gov, bool is_off)
->  {
->  }
-> +static inline void pm_genpd_uninit(struct generic_pm_domain *genpd)
+[...]
+> +static int ps8640_probe(struct i2c_client *client,
+> +			const struct i2c_device_id *id)
 > +{
-> +}
->  static inline int pm_genpd_poweron(struct generic_pm_domain *genpd)
->  {
->         return -ENOSYS;
-> --
-> 2.6.1
->
+> +	struct device *dev = &client->dev;
+> +	struct ps8640 *ps_bridge;
+> +	struct device_node *np = dev->of_node;
+> +	struct device_node *in_ep, *out_ep;
+> +	struct device_node *panel_node = NULL;
+> +	int ret;
+> +	u32 temp_reg;
+> +
+> +	ps_bridge = devm_kzalloc(dev, sizeof(*ps_bridge), GFP_KERNEL);
+> +	if (!ps_bridge)
+> +		return -ENOMEM;
+> +
+> +	in_ep = of_graph_get_next_endpoint(np, NULL);
+> +	if (in_ep) {
+> +		out_ep = of_graph_get_next_endpoint(np, in_ep);
+> +		of_node_put(in_ep);
+> +		if (out_ep) {
+> +			panel_node = of_graph_get_remote_port_parent(out_ep);
+> +			of_node_put(out_ep);
+> +		}
+> +	}
+> +	if (panel_node) {
+> +		ps_bridge->panel = of_drm_find_panel(panel_node);
+> +		of_node_put(panel_node);
+> +		if (!ps_bridge->panel)
+> +			return -EPROBE_DEFER;
+> +	}
+> +
+> +	ps_bridge->client = client;
+> +
+> +	ps_bridge->pwr_3v3_supply = devm_regulator_get(dev, "vdd33-supply");
 
-Kind regards
-Uffe
+Should be "vdd3", regulator_get will add the "-supply" suffix.
+
+> +	if (IS_ERR(ps_bridge->pwr_3v3_supply)) {
+> +		dev_err(dev, "cannot get ps_bridge->pwr_3v3_supply\n");
+> +		return PTR_ERR(ps_bridge->pwr_3v3_supply);
+> +	}
+> +
+> +	ps_bridge->pwr_1v2_supply = devm_regulator_get(dev, "vdd12-supply");
+
+Same here, "vdd12".
+
+> +	if (IS_ERR(ps_bridge->pwr_1v2_supply)) {
+> +		dev_err(dev, "cannot get ps_bridge->pwr_1v2_supply\n");
+> +		return PTR_ERR(ps_bridge->pwr_1v2_supply);
+> +	}
+> +
+> +	ps_bridge->gpio_mode_sel_n = devm_gpiod_get(&client->dev, "mode-sel",
+> +						    GPIOD_OUT_HIGH);
+> +	if (IS_ERR(ps_bridge->gpio_mode_sel_n)) {
+> +		ret = PTR_ERR(ps_bridge->gpio_mode_sel_n);
+> +		DRM_ERROR("cannot get gpio_mode_sel_n %d\n", ret);
+> +		return ret;
+> +	}
+> +
+> +	ret = gpiod_direction_output(ps_bridge->gpio_mode_sel_n, 1);
+> +	if (ret) {
+> +		DRM_ERROR("cannot configure gpio_mode_sel_n\n");
+> +		return ret;
+> +	}
+> +
+> +	ps_bridge->gpio_slp_n = devm_gpiod_get(&client->dev, "sleep-gpios",
+> +					       GPIOD_OUT_HIGH);
+
+Should be "sleep", gpiod_get will add the "-gpios" suffix.
+
+> +	if (IS_ERR(ps_bridge->gpio_slp_n)) {
+> +		ret = PTR_ERR(ps_bridge->gpio_slp_n);
+> +		DRM_ERROR("cannot get gpio_slp_n %d\n", ret);
+> +		return ret;
+> +	}
+> +
+> +	ret = gpiod_direction_output(ps_bridge->gpio_slp_n, 1);
+> +	if (ret) {
+> +		DRM_ERROR("cannot configure gpio_slp_n\n");
+> +		return ret;
+> +	}
+
+This can be removed, the "devm_gpiod_get(..., GPIOD_OUT_HIGH);" already
+does the same.
+
+> +
+> +	ps_bridge->gpio_rst_n = devm_gpiod_get(&client->dev, "reset",
+> +					       GPIOD_OUT_HIGH);
+> +	if (IS_ERR(ps_bridge->gpio_rst_n)) {
+> +		ret = PTR_ERR(ps_bridge->gpio_rst_n);
+> +		DRM_ERROR("cannot get gpio_rst_n %d\n", ret);
+> +		return ret;
+> +	}
+> +
+> +	ret = gpiod_direction_output(ps_bridge->gpio_rst_n, 1);
+> +	if (ret) {
+> +		DRM_ERROR("cannot configure gpio_rst_n\n");
+> +		return ret;
+> +	}
+
+Same here, the gpiod_direction_output can be removed.
+
+best regards
+Philipp
