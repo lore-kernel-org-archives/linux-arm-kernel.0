@@ -1,36 +1,141 @@
-From: akpm@linux-foundation.org (Andrew Morton)
-Date: Thu, 5 Nov 2015 05:31:39 -0800
-Subject: [PATCH] mm: slab: Only move management objects off-slab for
- sizes larger than KMALLOC_MIN_SIZE
-In-Reply-To: <1446724235-31400-1-git-send-email-catalin.marinas@arm.com>
-References: <20151105043155.GA20374@js1304-P5Q-DELUXE>
- <1446724235-31400-1-git-send-email-catalin.marinas@arm.com>
-Message-ID: <20151105053139.e38214a9.akpm@linux-foundation.org>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 5 Nov 2015 07:35:10 -0600
+Subject: [RFCv2 2/2] rpi: add support to enable usb power domain
+In-Reply-To: <1446590711-18928-3-git-send-email-alex.aring@gmail.com>
+References: <1446590711-18928-1-git-send-email-alex.aring@gmail.com>
+ <1446590711-18928-3-git-send-email-alex.aring@gmail.com>
+Message-ID: <20151105133510.GA12530@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu,  5 Nov 2015 11:50:35 +0000 Catalin Marinas <catalin.marinas@arm.com> wrote:
-
-> Commit 8fc9cf420b36 ("slab: make more slab management structure off the
-> slab") enables off-slab management objects for sizes starting with
-> PAGE_SIZE >> 5. This means 128 bytes for a 4KB page configuration.
-> However, on systems with a KMALLOC_MIN_SIZE of 128 (arm64 in 4.4), such
-> optimisation does not make sense since the slab management allocation
-> would take 128 bytes anyway (even though freelist_size is 32) with the
-> additional overhead of another allocation.
+On Tue, Nov 03, 2015 at 11:45:11PM +0100, Alexander Aring wrote:
+> This patch adds support for RPi several Power Domains and enable support
+> to enable the USB Power Domain when it's not enabled before.
 > 
-> This patch introduces an OFF_SLAB_MIN_SIZE macro which takes
-> KMALLOC_MIN_SIZE into account. It also solves a slab bug on arm64 where
-> the first kmalloc_cache to be initialised after slab_early_init = 0,
-> "kmalloc-128", fails to allocate off-slab management objects from the
-> same "kmalloc-128" cache.
+> This patch based on Eric Anholt's patch to support Power Domains. He had
+> an issue about -EPROBE_DEFER inside the power domain subsystem, this
+> issue was solved by commit <311fa6a> ("PM / Domains: Return -EPROBE_DEFER
+> if we fail to init or turn-on domain").
+> 
+> It was tested with barebox and the following scripts before booting
+> linux:
+> 
+> /env/a_off:
+> 
+>  # cat /env/a_off
+>  #turn off which are enabled by default
+>  regulator -n bcm2835_mci0 -s disable
+>  regulator -n uart0-pl0110 -s disable
+> 
+> /env/a_on:
+> 
+>  # cat /env/a_on
+>  #turn off which are enabled by default
+>  regulator -n bcm2835_mci0 -s disable
+>  regulator -n uart0-pl0110 -s disable
+> 
+>  regulator -n bcm2835_mci0 -s enable
+>  regulator -n uart0-pl0110 -s enable
+>  regulator -n uart0-pl0111 -s enable
+>  regulator -n bcm2835_usb -s enable
+>  regulator -n bcm2835_i2c0 -s enable
+>  regulator -n bcm2835_i2c1 -s enable
+>  regulator -n bcm2835_i2c2 -s enable
+>  regulator -n bcm2835_spi -s enable
+>  regulator -n bcm2835_ccp2tx -s enable
+>  regulator -n bcm2835_dsi -s enable
+> 
+> /env/b:
+> 
+>  # cat /env/b
+>  sh /env/a_on
+> 
+>  regulator -n bcm2835_mci0 -s disable
+>  regulator -n uart0-pl0110 -s disable
+>  regulator -n uart0-pl0111 -s disable
+>  regulator -n bcm2835_usb -s disable
+>  regulator -n bcm2835_i2c0 -s disable
+>  regulator -n bcm2835_i2c1 -s disable
+>  regulator -n bcm2835_i2c2 -s disable
+>  regulator -n bcm2835_spi -s disable
+>  regulator -n bcm2835_ccp2tx -s disable
+>  regulator -n bcm2835_dsi -s disable
+> 
+> /env/c:
+> 
+>  # cat /env/c
+>  sh ./env/b
+> 
+>  regulator -n bcm2835_mci0 -s enable
+>  regulator -n uart0-pl0110 -s enable
+>  regulator -n uart0-pl0111 -s enable
+>  regulator -n bcm2835_usb -s enable
+>  regulator -n bcm2835_i2c0 -s enable
+>  regulator -n bcm2835_i2c1 -s enable
+>  regulator -n bcm2835_i2c2 -s enable
+>  regulator -n bcm2835_spi -s enable
+>  regulator -n bcm2835_ccp2tx -s enable
+>  regulator -n bcm2835_dsi -s enable
+> 
+> These scripts enables/disable all regulators inside the bootloader. It
+> was running with a "hard" and "soft" reset without any issues. These
+> testcases should fit to Stephen Warren suggestions:
+> 
+> "(a) before having explicitly turned the power domain on or off at all (b)
+> after having turned it on (c) after having turned it off, and for all
+> power domains."
+> 
+> Cc: Stephen Warren <swarren@wwwdotorg.org>
+> Cc: Lee Jones <lee@kernel.org>
+> Cc: Eric Anholt <eric@anholt.net>
+> Signed-off-by: Alexander Aring <alex.aring@gmail.com>
+> ---
+> changes since v2:
+>  - add pm_genpd_uninit to handle probing failure.
+>  - move power domain drive to his own driver in arch/arm/mach-bcm/
+>    Also add own devicetree node for this driver, "raspberrypi,bcm2835-power".
+>  - Removing all power domains which might exists for the firmware API but
+>    we currently have no use-case for it. I tried to keep the same domain
+>    numbering in generic power domains subsystem like they are offered from
+>    the firmware API. This works, all power_domains which are NULL inside
+>    the array of genpd_onecell_data.domains[#] will be ignored.
+>  - Adding Eric Anholt and me to the authors.
+>  - Creating devicetree documentation for the power domain driver.
+>  - fix error handling in raspberrypi_firmware_set_power.
+>  - Remove comment about mapping between power domains array, this is not
+>    necessary anymore. I add a "enabled" attribute to raspberrypi_power_domain
+>    which indicates if a domain should be registered or not (zeroed values
+>    does not indicate such handling, but enabled is false then).
+>  - remove "goto mbox" not necessary anymore because an own driver
+>    implementation.
+>  - Update devicetrees for changes in v2.
+> 
+>  .../bindings/arm/bcm/raspberrypi,bcm2835-power.txt |  25 +++
+>  arch/arm/boot/dts/bcm2835-rpi.dtsi                 |  11 ++
+>  arch/arm/boot/dts/bcm2835.dtsi                     |   2 +-
+>  arch/arm/mach-bcm/Kconfig                          |  10 ++
+>  arch/arm/mach-bcm/Makefile                         |   1 +
+>  arch/arm/mach-bcm/raspberrypi-power.c              | 180 +++++++++++++++++++++
+>  include/dt-bindings/arm/raspberrypi-power.h        |  14 ++
+>  7 files changed, 242 insertions(+), 1 deletion(-)
+>  create mode 100644 Documentation/devicetree/bindings/arm/bcm/raspberrypi,bcm2835-power.txt
+>  create mode 100644 arch/arm/mach-bcm/raspberrypi-power.c
+>  create mode 100644 include/dt-bindings/arm/raspberrypi-power.h
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/bcm/raspberrypi,bcm2835-power.txt b/Documentation/devicetree/bindings/arm/bcm/raspberrypi,bcm2835-power.txt
+> new file mode 100644
+> index 0000000..c3abc24
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/arm/bcm/raspberrypi,bcm2835-power.txt
+> @@ -0,0 +1,25 @@
+> +Raspberry Pi power domain driver
+> +
+> +Required properties:
+> +
+> +- compatible:		Should be "raspberrypi,bcm2835-power".
 
-That all seems to be quite minor stuff.
+These are board or chip level power domains? If the latter, the vendor 
+should not be raspberrypi, but Broadcom. If the former, then it should 
+describe the board rather than the chip.
 
-> Fixes: 8fc9cf420b36 ("slab: make more slab management structure off the slab")
-> Cc: <stable@vger.kernel.org> # 3.15+
-
-Yet you believe the fix should be backported.
-
-So, the usual refrain: when fixing a bug, please describe the end-user
-visible effects of that bug.
+Rob
