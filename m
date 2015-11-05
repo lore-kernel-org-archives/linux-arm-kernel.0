@@ -1,44 +1,43 @@
 From: soren.brinkmann@xilinx.com (Soren Brinkmann)
-Date: Wed, 4 Nov 2015 23:21:16 -0800
-Subject: [PATCH v2 07/10] tty: xuartps: Acquire port lock for shutdown
+Date: Wed, 4 Nov 2015 23:21:12 -0800
+Subject: [PATCH v2 03/10] tty: xuartps: Always enable transmitter in start_tx
 In-Reply-To: <1446708079-1105-1-git-send-email-soren.brinkmann@xilinx.com>
 References: <1446708079-1105-1-git-send-email-soren.brinkmann@xilinx.com>
-Message-ID: <1446708079-1105-8-git-send-email-soren.brinkmann@xilinx.com>
+Message-ID: <1446708079-1105-4-git-send-email-soren.brinkmann@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Shutting down the UART port can happen while console operations are in
-progress. Holding the port lock serializes these operations and avoids
-the UART HW to be disabled in the middle of console prints.
+start_tx must start transmitting characters. Regardless of the state of
+the circular buffer, always enable the transmitter hardware.
 
 Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
 ---
- drivers/tty/serial/xilinx_uartps.c | 6 ++++++
- 1 file changed, 6 insertions(+)
+ drivers/tty/serial/xilinx_uartps.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
 diff --git a/drivers/tty/serial/xilinx_uartps.c b/drivers/tty/serial/xilinx_uartps.c
-index 5efd1b9d220f..7fd226d65496 100644
+index 2c98c357d9a0..df6778d17949 100644
 --- a/drivers/tty/serial/xilinx_uartps.c
 +++ b/drivers/tty/serial/xilinx_uartps.c
-@@ -823,6 +823,9 @@ static int cdns_uart_startup(struct uart_port *port)
- static void cdns_uart_shutdown(struct uart_port *port)
+@@ -512,9 +512,6 @@ static void cdns_uart_start_tx(struct uart_port *port)
  {
- 	int status;
-+	unsigned long flags;
-+
-+	spin_lock_irqsave(&port->lock, flags);
+ 	unsigned int status, numbytes = port->fifosize;
  
- 	/* Disable interrupts */
- 	status = readl(port->membase + CDNS_UART_IMR_OFFSET);
-@@ -832,6 +835,9 @@ static void cdns_uart_shutdown(struct uart_port *port)
- 	/* Disable the TX and RX */
- 	writel(CDNS_UART_CR_TX_DIS | CDNS_UART_CR_RX_DIS,
- 			port->membase + CDNS_UART_CR_OFFSET);
-+
-+	spin_unlock_irqrestore(&port->lock, flags);
-+
- 	free_irq(port->irq, port);
- }
+-	if (uart_circ_empty(&port->state->xmit) || uart_tx_stopped(port))
+-		return;
+-
+ 	/*
+ 	 * Set the TX enable bit and clear the TX disable bit to enable the
+ 	 * transmitter.
+@@ -524,6 +521,9 @@ static void cdns_uart_start_tx(struct uart_port *port)
+ 	status |= CDNS_UART_CR_TX_EN;
+ 	writel(status, port->membase + CDNS_UART_CR_OFFSET);
  
++	if (uart_circ_empty(&port->state->xmit) || uart_tx_stopped(port))
++		return;
++
+ 	while (numbytes-- && ((readl(port->membase + CDNS_UART_SR_OFFSET) &
+ 				CDNS_UART_SR_TXFULL)) != CDNS_UART_SR_TXFULL) {
+ 		/* Break if no more data available in the UART buffer */
 -- 
 2.6.2.3.ga463a5b
