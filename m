@@ -1,39 +1,48 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Thu, 5 Nov 2015 10:19:00 +0000
-Subject: [PATCH] ARM: Xen: Fix the file name in comment
-In-Reply-To: <1446691251-13804-1-git-send-email-zhaoshenglong@huawei.com>
-References: <1446691251-13804-1-git-send-email-zhaoshenglong@huawei.com>
-Message-ID: <alpine.DEB.2.02.1511051018510.13541@kaball.uk.xensource.com>
+From: Suzuki.Poulose@arm.com (Suzuki K. Poulose)
+Date: Thu, 5 Nov 2015 10:19:50 +0000
+Subject: [PATCHv2 3/4] arm-cci: Add routines to enable/disable all counters
+In-Reply-To: <563B2C01.80701@arm.com>
+References: <1445346326-30820-1-git-send-email-suzuki.poulose@arm.com>
+ <1445346326-30820-4-git-send-email-suzuki.poulose@arm.com>
+ <20151104182854.GH23860@leverpostej> <563B2C01.80701@arm.com>
+Message-ID: <563B2D46.10503@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 5 Nov 2015, Shannon Zhao wrote:
-> From: Shannon Zhao <shannon.zhao@linaro.org>
-> 
-> These hypercalls are located in hypercall.S not hypervisor.S file.
-> 
-> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+On 05/11/15 10:14, Suzuki K. Poulose wrote:
+> On 04/11/15 18:28, Mark Rutland wrote:
+>> On Tue, Oct 20, 2015 at 02:05:25PM +0100, Suzuki K. Poulose wrote:
+>>> Adds helper routines to manipulate the counter controls for
+>>> all the counters on the CCI PMU.
 
-Acked-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+>>> +static void pmu_disable_counters_ctrl(struct cci_pmu *cci_pmu, unsigned long *mask)
+>>> +{
+>>> +    int i;
+>>> +
+>>> +    for (i = 0; i < cci_pmu->num_cntrs; i++) {
+>>> +        clear_bit(i, mask);
+>>> +        if (pmu_get_counter_ctrl(cci_pmu, i)) {
+>>> +            set_bit(i, mask);
+>>> +            pmu_disable_counter(cci_pmu, i);
+>>> +        }
+>>> +    }
+>>> +}
+>>
+>> I don't understand what's going on with the mask here. Why do we clear
+>> ieach bit when the only user (introduced in the next patch) explicitly
+>> clears the mask anyway?
+>
+> To be more precise, it should have been :
+>
+>      if (pmu_get_counter_ctrl(cci_pmu, i)) {
+>          set_bit(i, mask);
+>          pmu_disable_counter(cci_pmu, i);
+>      } else
+>          clear_bit(i, mask);
 
-
->  arch/arm/xen/enlighten.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
-> index eeeab07..5421706 100644
-> --- a/arch/arm/xen/enlighten.c
-> +++ b/arch/arm/xen/enlighten.c
-> @@ -284,7 +284,7 @@ void xen_arch_resume(void) { }
->  void xen_arch_suspend(void) { }
->  
->  
-> -/* In the hypervisor.S file. */
-> +/* In the hypercall.S file. */
->  EXPORT_SYMBOL_GPL(HYPERVISOR_event_channel_op);
->  EXPORT_SYMBOL_GPL(HYPERVISOR_grant_table_op);
->  EXPORT_SYMBOL_GPL(HYPERVISOR_xen_version);
-> -- 
-> 2.0.4
-> 
-> 
+Forgot to mention, the explicit clearing is for the bits that may be
+beyond the num_counters. Since we limit it to cci_pmu->num_cntrs here
+we could get rid of that.
+  
+Thanks
+Suzuki
