@@ -1,70 +1,63 @@
-From: drinkcat@chromium.org (Nicolas Boichat)
-Date: Thu,  5 Nov 2015 13:50:33 +0800
-Subject: [PATCH] spi: mediatek: single device does not require cs_gpios
-Message-ID: <1446702633-14019-1-git-send-email-drinkcat@chromium.org>
+From: kapilh@broadcom.com (Kapil Hali)
+Date: Thu, 5 Nov 2015 00:51:17 -0500
+Subject: [PATCH RESEND 0/4] SMP support for Broadcom NSP
+Message-ID: <1446702681-45339-1-git-send-email-kapilh@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When only one device is present, it is not necessary to specify
-cs_gpios, as the CS line can be controlled by the hardware
-module.
+Hi,
 
-Without this patch, older device tree bindings used before
-37457607 "spi: mediatek: mt8173 spi multiple devices support"
-would cause a panic on boot. This fixes the crash, and
-re-introduces backward compatibility.
+This series adds SMP support for Broadcom's Northstar Plus SoC.
 
-Signed-off-by: Nicolas Boichat <drinkcat@chromium.org>
----
+There are similar SMP enablement methods for many ARMv7 bsed SoCs.
+BCM NSP SoC, has a typical such mechanism - after power-on, the
+secondary core is held in a standby state, primary core provides a
+startup address for the secondary core and wakes it up. Booting of
+the secondary core is serialized using pen_release global variable.
 
-Applies on top of broonie/spi.git topic/mtk. Thanks!
+The startup address is programmed at a special register location
+which is defined in the device tree using a "secondary-boot-reg"
+property in a node whose "enable-method" property matches.
 
- drivers/spi/spi-mt65xx.c | 26 ++++++++++++++++++--------
- 1 file changed, 18 insertions(+), 8 deletions(-)
+The first patch adds cpu-enable-method in the device tree bindings
+documentation. It also updates ARM CPU device tree documentation
+with Broadcom Northstar Plus CPU details.
 
-diff --git a/drivers/spi/spi-mt65xx.c b/drivers/spi/spi-mt65xx.c
-index 563954a..f694031 100644
---- a/drivers/spi/spi-mt65xx.c
-+++ b/drivers/spi/spi-mt65xx.c
-@@ -410,7 +410,7 @@ static int mtk_spi_setup(struct spi_device *spi)
- 	if (!spi->controller_data)
- 		spi->controller_data = (void *)&mtk_default_chip_info;
- 
--	if (mdata->dev_comp->need_pad_sel)
-+	if (mdata->dev_comp->need_pad_sel && spi->cs_gpio >= 0)
- 		gpio_direction_output(spi->cs_gpio, !(spi->mode & SPI_CS_HIGH));
- 
- 	return 0;
-@@ -632,13 +632,23 @@ static int mtk_spi_probe(struct platform_device *pdev)
- 			goto err_put_master;
- 		}
- 
--		for (i = 0; i < master->num_chipselect; i++) {
--			ret = devm_gpio_request(&pdev->dev, master->cs_gpios[i],
--						dev_name(&pdev->dev));
--			if (ret) {
--				dev_err(&pdev->dev,
--					"can't get CS GPIO %i\n", i);
--				goto err_put_master;
-+		if (!master->cs_gpios && master->num_chipselect > 1) {
-+			dev_err(&pdev->dev,
-+				"cs_gpios not specified and num_chipselect > 1\n");
-+			ret = -EINVAL;
-+			goto err_put_master;
-+		}
-+
-+		if (master->cs_gpios) {
-+			for (i = 0; i < master->num_chipselect; i++) {
-+				ret = devm_gpio_request(&pdev->dev,
-+							master->cs_gpios[i],
-+							dev_name(&pdev->dev));
-+				if (ret) {
-+					dev_err(&pdev->dev,
-+						"can't get CS GPIO %i\n", i);
-+					goto err_put_master;
-+				}
- 			}
- 		}
- 	}
+The second patch adds SMP support to the BCM NSP device tree file.
+
+The third patch, enables SMP on BCM NSP. It also consolidates
+common SMP handling between BCM NSP and BCM Kona.
+
+The final patch, enables SMP on BCM 4708 and this patch is pulled
+in from Jon Mason's patch from the mailing list.
+
+This patch series is constructed based on Linux v4.3-rc2.
+
+The source code is available at GITHUB:
+https://github.com/Broadcom/cygnus-linux/tree/nsp-smp-v1
+
+Jon Mason (1):
+  ARM: BCM: Add SMP support for Broadcom 4708
+
+Kapil Hali (3):
+  dt-bindings: add SMP enable-method for Broadcom NSP
+  ARM: dts: add SMP support for Broadcom NSP
+  ARM: BCM: Add SMP support for Broadcom NSP
+
+ .../bindings/arm/bcm/brcm,nsp-cpu-method.txt       |  36 ++++++
+ Documentation/devicetree/bindings/arm/cpus.txt     |   1 +
+ arch/arm/boot/dts/bcm-nsp.dtsi                     |  33 +++--
+ arch/arm/boot/dts/bcm4708.dtsi                     |   2 +
+ arch/arm/mach-bcm/Kconfig                          |   3 +
+ arch/arm/mach-bcm/Makefile                         |  11 +-
+ arch/arm/mach-bcm/bcm_nsp.h                        |  19 +++
+ arch/arm/mach-bcm/headsmp.S                        |  37 ++++++
+ arch/arm/mach-bcm/{kona_smp.c => platsmp.c}        | 142 +++++++++++++++++++--
+ 9 files changed, 261 insertions(+), 23 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/bcm/brcm,nsp-cpu-method.txt
+ create mode 100644 arch/arm/mach-bcm/bcm_nsp.h
+ create mode 100644 arch/arm/mach-bcm/headsmp.S
+ rename arch/arm/mach-bcm/{kona_smp.c => platsmp.c} (63%)
+
 -- 
-2.6.0.rc2.230.g3dd15c0
+2.1.0
