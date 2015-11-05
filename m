@@ -1,22 +1,77 @@
-From: dbrignoli@audioscience.com (Delio Brignoli)
-Date: Thu, 5 Nov 2015 14:08:52 +0100
-Subject: Minimal support for dm814x
-Message-ID: <4999BB3D-4BB5-4F7C-96D7-FB687725CDCC@audioscience.com>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 5 Nov 2015 07:27:37 -0600
+Subject: [PATCH 1/2] ls2080a/dts: Add little endian property for GPIO IP
+ block
+In-Reply-To: <1446619704-27669-1-git-send-email-Gang.Liu@freescale.com>
+References: <1446619704-27669-1-git-send-email-Gang.Liu@freescale.com>
+Message-ID: <20151105132737.GA11186@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Tony,
+On Wed, Nov 04, 2015 at 02:48:23PM +0800, Liu Gang wrote:
+> The GPIO block for ls2080a platform has little endian registers,
+> the GPIO driver needs this property to read/write registers by
+> right interface.
+> 
+> Signed-off-by: Liu Gang <Gang.Liu@freescale.com>
 
-We use dm814x in some of our products with a kernel based on version 2.6.37 modified by TI and are considering moving to a current kernel version. I recently saw this <http://lists.infradead.org/pipermail/linux-arm-kernel/2015-June/348444.html> and I?d like to try getting our board to boot as a first step and then take it from there.
-We aim at eventually having remoteproc working (at least for the DSP) and to port fixes/features we added to our 2.6.37 based tree [2].
+Acked-by: Rob Herring <robh@kernel.org>
 
-The temporary testing branch [1] mentioned in your original message is not longer available, does that mean I can just use the master branch of <https://git.kernel.org/cgit/linux/kernel/git/tmlind/linux-omap.git> for my tests? Which toolchain did you use to build your test kernel for the hp t410?
 
-I wonder if there is anyone on this list already working on getting dm814x fully working or interested in cooperating towards this goal.
-
-Thank you!
---
-Delio
-
-[1] <https://git.kernel.org/cgit/linux/kernel/git/tmlind/linux-omap.git/log/?h=tmp-testing-dm814x-2015-06-03>
-[2] <https://github.com/audioscience/linux-omap3/tree/asi1230-upstream-tracking>
+> diff --git a/Documentation/devicetree/bindings/gpio/gpio-mpc8xxx.txt b/Documentation/devicetree/bindings/gpio/gpio-mpc8xxx.txt
+> index f2455c5..c836dab 100644
+> --- a/Documentation/devicetree/bindings/gpio/gpio-mpc8xxx.txt
+> +++ b/Documentation/devicetree/bindings/gpio/gpio-mpc8xxx.txt
+> @@ -10,6 +10,9 @@ Required properties:
+>    the second cell is used to specify the gpio polarity:
+>        0 = active high
+>        1 = active low
+> +- little-endian : Should be set if the GPIO has little endian
+> +		  registers. No the property means the GPIO
+> +		  registers are big endian mode.
+>  
+>  Example:
+>  
+> diff --git a/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
+> index f3c59f9..41bb8c1 100644
+> --- a/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
+> +++ b/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
+> @@ -277,6 +277,7 @@
+>  			reg = <0x0 0x2300000 0x0 0x10000>;
+>  			interrupts = <0 36 0x4>; /* Level high type */
+>  			gpio-controller;
+> +			little-endian;
+>  			#gpio-cells = <2>;
+>  			interrupt-controller;
+>  			#interrupt-cells = <2>;
+> @@ -287,6 +288,7 @@
+>  			reg = <0x0 0x2310000 0x0 0x10000>;
+>  			interrupts = <0 36 0x4>; /* Level high type */
+>  			gpio-controller;
+> +			little-endian;
+>  			#gpio-cells = <2>;
+>  			interrupt-controller;
+>  			#interrupt-cells = <2>;
+> @@ -297,6 +299,7 @@
+>  			reg = <0x0 0x2320000 0x0 0x10000>;
+>  			interrupts = <0 37 0x4>; /* Level high type */
+>  			gpio-controller;
+> +			little-endian;
+>  			#gpio-cells = <2>;
+>  			interrupt-controller;
+>  			#interrupt-cells = <2>;
+> @@ -307,6 +310,7 @@
+>  			reg = <0x0 0x2330000 0x0 0x10000>;
+>  			interrupts = <0 37 0x4>; /* Level high type */
+>  			gpio-controller;
+> +			little-endian;
+>  			#gpio-cells = <2>;
+>  			interrupt-controller;
+>  			#interrupt-cells = <2>;
+> -- 
+> 2.1.0.27.g96db324
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
