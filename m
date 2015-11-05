@@ -1,39 +1,24 @@
-From: p.fedin@samsung.com (Pavel Fedin)
-Date: Thu, 05 Nov 2015 14:36:36 +0300
-Subject: [PATCH v5 4/4] ARM: dts: Add Ethernet chip to SMDK5410
-In-Reply-To: <563B3D15.2070700@samsung.com>
-References: <cover.1446542020.git.p.fedin@samsung.com>
- <4568ad982f0af1846994119961cbb798edff311c.1446542020.git.p.fedin@samsung.com>
- <5639C1A5.1040708@samsung.com> <004f01d117bb$1e4fbb40$5aef31c0$@samsung.com>
- <563B3D15.2070700@samsung.com>
-Message-ID: <005001d117be$3b5709c0$b2051d40$@samsung.com>
+From: schwab@suse.de (Andreas Schwab)
+Date: Thu, 05 Nov 2015 12:36:37 +0100
+Subject: [RFC PATCH v6 00/17] ILP32 for ARM64
+In-Reply-To: <1446507046-24604-1-git-send-email-ynorov@caviumnetworks.com>
+ (Yury Norov's message of "Tue, 3 Nov 2015 02:30:29 +0300")
+References: <1446507046-24604-1-git-send-email-ynorov@caviumnetworks.com>
+Message-ID: <mvm7flw3cfu.fsf@hawking.suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- Hello!
+Yury Norov <ynorov@caviumnetworks.com> writes:
 
-> >>> +	ethernet at 3 {
-> >>> +		compatible = "smsc,lan9115";
-> >>> +		reg = <3 0 0x10000>;
-> >>> +		phy-mode = "mii";
-> >>> +		interrupt-parent = <&gpx0>;
-> >>> +		interrupts = <5 8>;
-> >>
-> >> s/8/IRQ_TYPE_LEVEL_LOW/
-> >> (is this really level low interrupt?)
-> >
-> >  Yes, according to: https://github.com/AndreiLux/Perseus-S3/blob/master/arch/arm/mach-
-> exynos/mach-smdk5250.c#L133
-> 
-> Although this is different board, but okay.
+> v6:
+>  - time_t, __kenel_off_t and other types turned to be 32-bit
+>    for compatibility reasons (after v5 discussion);
 
- I am curious too, so i examined SMSC datasheet. The IRQ is fully programmable on
-chip's side too, and our driver indeed defaults to active-low. You can switch it
-to active-high by addint smsc,irq-active-high property. But i just copied
-settings from those old Android kernels, and it just works.
- So, cleaning up and posting v6.
+Are the updated glibc patches available somewhere?
 
-Kind regards,
-Pavel Fedin
-Expert Engineer
-Samsung Electronics Research center Russia
+Andreas.
+
+-- 
+Andreas Schwab, SUSE Labs, schwab at suse.de
+GPG Key fingerprint = 0196 BAD8 1CE9 1970 F4BE  1748 E4D4 88E3 0EEA B9D7
+"And now for something completely different."
