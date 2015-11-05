@@ -1,37 +1,55 @@
-From: Suzuki.Poulose@arm.com (Suzuki K. Poulose)
-Date: Thu, 5 Nov 2015 17:52:37 +0000
-Subject: [PATCHv2 3/4] arm-cci: Add routines to enable/disable all counters
-In-Reply-To: <20151105172756.GH32247@leverpostej>
-References: <1445346326-30820-1-git-send-email-suzuki.poulose@arm.com>
- <1445346326-30820-4-git-send-email-suzuki.poulose@arm.com>
- <20151104182854.GH23860@leverpostej> <563B2C01.80701@arm.com>
- <20151105172756.GH32247@leverpostej>
-Message-ID: <563B9765.9070708@arm.com>
+From: akshay.bhat@timesys.com (Akshay Bhat)
+Date: Thu,  5 Nov 2015 13:13:34 -0500
+Subject: [PATCH v2 00/10] ARM: dts: Add Advantech board support
+Message-ID: <1446747224-32514-1-git-send-email-akshay.bhat@timesys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 05/11/15 17:27, Mark Rutland wrote:
->>> Can we not get rid of the mask entirely? The combination of used_mask
->>> and each event's hwc->state tells us which counters are actually in use.
->>
->> The problem is that neither hwc->state nor the cci_pmu->hw_events->events is
->> protected by pmu_lock, while enable/disable counter is. So we cannot really
->> rely on ((struct perf_event *)(cci_pmu->hw_events->events[counter]))->hw->state.
->
-> They must be protected somehow, or we'd have races against cross-calls
-> and/or the interrupt handler.
+This series aims to add Advantech BA-16 module (iMX6 based) and GE board support.
+Patches 7 to 10 correspond to the v2 changes.
 
->
-> Are we protected due to being cpu-affine with interrupts disabled when
-> modifying these, is there some other mechanism that protects us, or do
-> we have additional problems here?
->
+This series has been tested against linux-next tag next-20151105.
 
+Modifications:
+v1->v2:
+- Move entries from pinctrl_hog to relevant groups as suggested by Lucas Stash
+- Remove unused PCIe power-on-gpio entry as suggested by Lucas Stash
+- Remove always-on from regulators that do not need to be always-on as suggested by Lucas Stash
+- Enable support for mma8453
+- Add vendor prefix for General Electric Company as suggested by Martin Donnelly
+- Update Copyright information as suggest by Martin Donnelly
 
-Each perf_event is allocated a counter id atomically using the bit mask. So,
-once the id is allocated nobody messes with that id from the PMU side. And,
-the hw->state may have its own protection within the generic perf layer(which
-I haven't checked).
+History:
+--------
+[v1]: http://lists.infradead.org/pipermail/linux-arm-kernel/2015-October/381872.html
 
-Thanks
-Suzuki
+Akshay Bhat (8):
+  of: Add vendor prefix for Advantech Corporation
+  ARM: dts: imx: Add support for Advantech/GE B450v3
+  ARM: dts: imx: Add support for Advantech/GE B650v3
+  ARM: dts: imx: Add support for Advantech/GE B850v3
+  of: Add vendor prefix for General Electric Company
+  ARM: dts: imx: Update vendor info for GE Bx50v3 boards
+  ARM: dts: imx: Add mma8453 support
+  ARM: dts: imx6q-ba16: Cleanup pinctrl and LDO
+
+Justin Waters (2):
+  ARM: dts: imx: Add Advantech BA-16 Qseven module
+  ARM: dts: imx: Add support for Advantech/GE Bx50v3
+
+ .../devicetree/bindings/vendor-prefixes.txt        |   2 +
+ arch/arm/boot/dts/Makefile                         |   3 +
+ arch/arm/boot/dts/imx6q-b450v3.dts                 |  75 +++
+ arch/arm/boot/dts/imx6q-b650v3.dts                 |  74 +++
+ arch/arm/boot/dts/imx6q-b850v3.dts                 | 122 +++++
+ arch/arm/boot/dts/imx6q-ba16.dtsi                  | 584 +++++++++++++++++++++
+ arch/arm/boot/dts/imx6q-bx50v3.dtsi                | 211 ++++++++
+ 7 files changed, 1071 insertions(+)
+ create mode 100644 arch/arm/boot/dts/imx6q-b450v3.dts
+ create mode 100644 arch/arm/boot/dts/imx6q-b650v3.dts
+ create mode 100644 arch/arm/boot/dts/imx6q-b850v3.dts
+ create mode 100644 arch/arm/boot/dts/imx6q-ba16.dtsi
+ create mode 100644 arch/arm/boot/dts/imx6q-bx50v3.dtsi
+
+-- 
+2.6.2
