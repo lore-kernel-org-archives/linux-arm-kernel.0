@@ -1,31 +1,51 @@
 From: wenyou.yang@atmel.com (Wenyou Yang)
-Date: Thu, 5 Nov 2015 15:37:56 +0800
-Subject: [PATCH] ARM: at91/sama5_defconfig: enable watchdog driver
-Message-ID: <1446709076-24359-1-git-send-email-wenyou.yang@atmel.com>
+Date: Thu, 5 Nov 2015 15:39:30 +0800
+Subject: [PATCH] ARM: at91/dt: sama5d2: add watchdog node
+Message-ID: <1446709170-24500-1-git-send-email-wenyou.yang@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enabel AT91SAM9X / AT91CAP9 watchdog and SAMA5D4 watchdog.
+Add watchdog node to support SAMA5D4 watchdog.
 
 Signed-off-by: Wenyou Yang <wenyou.yang@atmel.com>
 ---
 
- arch/arm/configs/sama5_defconfig |    3 +++
- 1 file changed, 3 insertions(+)
+ arch/arm/boot/dts/at91-sama5d2_xplained.dts |    4 ++++
+ arch/arm/boot/dts/sama5d2.dtsi              |    7 +++++++
+ 2 files changed, 11 insertions(+)
 
-diff --git a/arch/arm/configs/sama5_defconfig b/arch/arm/configs/sama5_defconfig
-index a0c57ac..963daae 100644
---- a/arch/arm/configs/sama5_defconfig
-+++ b/arch/arm/configs/sama5_defconfig
-@@ -130,6 +130,9 @@ CONFIG_POWER_SUPPLY=y
- CONFIG_POWER_RESET=y
- # CONFIG_HWMON is not set
- CONFIG_SSB=m
-+CONFIG_WATCHDOG=y
-+CONFIG_AT91SAM9X_WATCHDOG=y
-+CONFIG_SAMA5D4_WATCHDOG=y
- CONFIG_MFD_ATMEL_FLEXCOM=y
- CONFIG_REGULATOR=y
- CONFIG_REGULATOR_FIXED_VOLTAGE=y
+diff --git a/arch/arm/boot/dts/at91-sama5d2_xplained.dts b/arch/arm/boot/dts/at91-sama5d2_xplained.dts
+index e07c2b2..de3ef02 100644
+--- a/arch/arm/boot/dts/at91-sama5d2_xplained.dts
++++ b/arch/arm/boot/dts/at91-sama5d2_xplained.dts
+@@ -181,6 +181,10 @@
+ 				};
+ 			};
+ 
++			watchdog at f8048040 {
++				status = "okay";
++			};
++
+ 			uart3: serial at fc008000 {
+ 				pinctrl-names = "default";
+ 				pinctrl-0 = <&pinctrl_uart3_default>;
+diff --git a/arch/arm/boot/dts/sama5d2.dtsi b/arch/arm/boot/dts/sama5d2.dtsi
+index c1f0cba..c29ff70 100644
+--- a/arch/arm/boot/dts/sama5d2.dtsi
++++ b/arch/arm/boot/dts/sama5d2.dtsi
+@@ -929,6 +929,13 @@
+ 				clocks = <&h32ck>;
+ 			};
+ 
++			watchdog at f8048040 {
++				compatible = "atmel,sama5d4-wdt";
++				reg = <0xf8048040 0x10>;
++				interrupts = <4 IRQ_TYPE_LEVEL_HIGH 7>;
++				status = "disabled";
++			};
++
+ 			sckc at f8048050 {
+ 				compatible = "atmel,at91sam9x5-sckc";
+ 				reg = <0xf8048050 0x4>;
 -- 
 1.7.9.5
