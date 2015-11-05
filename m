@@ -1,54 +1,36 @@
-From: josh.wu@atmel.com (Josh Wu)
-Date: Thu, 5 Nov 2015 11:05:03 +0800
-Subject: [PATCH V3 2/3] ARM: at91/dt: sama5d4: Add pinmux for 8-bit MMC0
- bus
-In-Reply-To: <1446690301-8602-1-git-send-email-marex@denx.de>
-References: <563ABBCD.8090802@atmel.com>
- <1446690301-8602-1-git-send-email-marex@denx.de>
-Message-ID: <563AC75F.3040602@atmel.com>
+From: zhengxing@rock-chips.com (Xing Zheng)
+Date: Thu, 05 Nov 2015 11:05:33 +0800
+Subject: [PATCH v6 1/8] dt-bindings: add documentation of rk3036 clock
+ controller
+In-Reply-To: <2700959.OiVQMNL8Ss@phil>
+References: <1446639503-11763-1-git-send-email-zhengxing@rock-chips.com>
+ <1446639503-11763-2-git-send-email-zhengxing@rock-chips.com>
+ <2700959.OiVQMNL8Ss@phil>
+Message-ID: <563AC77D.3080403@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-On 11/5/2015 10:25 AM, Marek Vasut wrote:
-> Add pinmux for the 4 remaining signals used in 8-bit MMC 0
-> bus configuration.
+On 2015?11?05? 07:39, Heiko Stuebner wrote:
+> Hi,
 >
-> Signed-off-by: Marek Vasut <marex@denx.de>
-> Cc: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-> Cc: Josh Wu <josh.wu@atmel.com>
-> Cc: Nicolas Ferre <nicolas.ferre@atmel.com>
-> ---
-
-Thanks Marek for the quick fix ;-),  and
-
-Reviewed-by: Josh Wu <josh.wu@atmel.com>
-
-Best Regards,
-Josh Wu
->   arch/arm/boot/dts/sama5d4.dtsi | 8 ++++++++
->   1 file changed, 8 insertions(+)
+> Am Mittwoch, 4. November 2015, 20:18:16 schrieb Xing Zheng:
+>> Add the devicetree binding for the cru on the rk3036 which quite similar
+>> structured as previous clock controllers.
+>>
+>> Signed-off-by: Xing Zheng<zhengxing@rock-chips.com>
+>> Reviewed-by: Heiko Stuebner<heiko@sntech.de>
+>> ---
+> your recipient-list is missing the clock maintainers+lists - sorry for
+> not noticing this earlier.
 >
-> V2: Repair the incorrect comments for the pinmux, original version
->      of the commment contained wrong MCI0_DAx references.
-> V3: Fix NAND_D8 -> NAND_OE
+> While the devicetree-maintainers may Review it, we expect the clock-
+> maintainers to actually apply all 4 clock-related patches.
 >
-> diff --git a/arch/arm/boot/dts/sama5d4.dtsi b/arch/arm/boot/dts/sama5d4.dtsi
-> index 48ca530..ae6041b 100644
-> --- a/arch/arm/boot/dts/sama5d4.dtsi
-> +++ b/arch/arm/boot/dts/sama5d4.dtsi
-> @@ -1651,6 +1651,14 @@
->   							 AT91_PIOC 9 AT91_PERIPH_B AT91_PINCTRL_PULL_UP	/* MCI0_DA3, conflict with NAND_D4 */
->   							>;
->   					};
-> +					pinctrl_mmc0_dat4_7: mmc0_dat4_7 {
-> +						atmel,pins =
-> +							<AT91_PIOC 10 AT91_PERIPH_B AT91_PINCTRL_PULL_UP	/* MCI0_DA4, conflict with NAND_D5 */
-> +							 AT91_PIOC 11 AT91_PERIPH_B AT91_PINCTRL_PULL_UP	/* MCI0_DA5, conflict with NAND_D6 */
-> +							 AT91_PIOC 12 AT91_PERIPH_B AT91_PINCTRL_PULL_UP	/* MCI0_DA6, conflict with NAND_D7 */
-> +							 AT91_PIOC 13 AT91_PERIPH_B AT91_PINCTRL_PULL_UP	/* MCI0_DA7, conflict with NAND_OE */
-> +							>;
-> +					};
->   				};
->   
->   				mmc1 {
+> Same comment is true for
+> [PATCH v6 2/8] clk: rockchip: add dt-binding header for rk3036
+>
+>
+> Heiko
+>
+Sorry, and I will loop them in the next versioin.
+Thanks.
