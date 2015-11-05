@@ -1,31 +1,49 @@
-From: drinkcat@chromium.org (Nicolas Boichat)
-Date: Thu, 5 Nov 2015 18:33:04 +0800
-Subject: [PATCH] spi: mediatek: single device does not require cs_gpios
-In-Reply-To: <CAHp75VfAHyTOpWcTh6w2EhEy73xfUYX5T3tpXbUbBiU-tjaZnQ@mail.gmail.com>
-References: <1446702633-14019-1-git-send-email-drinkcat@chromium.org>
- <CAHp75VfAHyTOpWcTh6w2EhEy73xfUYX5T3tpXbUbBiU-tjaZnQ@mail.gmail.com>
-Message-ID: <CANMq1KCXPjQuJUp3zOSVQQA29n9TT56Z0NPpD4o3O5s3o3nqSA@mail.gmail.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Thu, 5 Nov 2015 18:34:14 +0800
+Subject: [PATCH] crypto: sun4i-ss: add missing statesize
+In-Reply-To: <1446709737-11316-1-git-send-email-clabbe.montjoie@gmail.com>
+References: <1446709737-11316-1-git-send-email-clabbe.montjoie@gmail.com>
+Message-ID: <CAGb2v65FOtbigXpmN=L3af0HOjSJU8GGPY_PDvDp+3fCUCvKQw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 5, 2015 at 5:16 PM, Andy Shevchenko
-<andy.shevchenko@gmail.com> wrote:
-> On Thu, Nov 5, 2015 at 7:50 AM, Nicolas Boichat <drinkcat@chromium.org> wrote:
-[...]
->> diff --git a/drivers/spi/spi-mt65xx.c b/drivers/spi/spi-mt65xx.c
->> index 563954a..f694031 100644
->> --- a/drivers/spi/spi-mt65xx.c
->> +++ b/drivers/spi/spi-mt65xx.c
->> @@ -410,7 +410,7 @@ static int mtk_spi_setup(struct spi_device *spi)
->>         if (!spi->controller_data)
->>                 spi->controller_data = (void *)&mtk_default_chip_info;
->>
->> -       if (mdata->dev_comp->need_pad_sel)
->> +       if (mdata->dev_comp->need_pad_sel && spi->cs_gpio >= 0)
+On Thu, Nov 5, 2015 at 3:48 PM, LABBE Corentin
+<clabbe.montjoie@gmail.com> wrote:
+> sun4i-ss implementaton of md5/sha1 is via ahash algorithms.
+> A recent change make impossible to load them without giving statesize.
+> This patch specifiy statesize for sha1 and md5.
 >
-> gpio_is_valid() ?
+> Signed-off-by: LABBE Corentin <clabbe.montjoie@gmail.com>
+> Cc: stable at vger.kernel.org
 
-Yes, thanks! Will fix in next round. (there is a few other ones in
-driver/spi/* that should probably be fixed too...)
+Confirmed the driver properly loads again.
 
-Best,
+Tested-by: Chen-Yu Tsai <wens@csie.org>
+
+> ---
+>  drivers/crypto/sunxi-ss/sun4i-ss-core.c | 2 ++
+>  1 file changed, 2 insertions(+)
+>
+> diff --git a/drivers/crypto/sunxi-ss/sun4i-ss-core.c b/drivers/crypto/sunxi-ss/sun4i-ss-core.c
+> index eab6fe2..107cd2a 100644
+> --- a/drivers/crypto/sunxi-ss/sun4i-ss-core.c
+> +++ b/drivers/crypto/sunxi-ss/sun4i-ss-core.c
+> @@ -39,6 +39,7 @@ static struct sun4i_ss_alg_template ss_algs[] = {
+>                 .import = sun4i_hash_import_md5,
+>                 .halg = {
+>                         .digestsize = MD5_DIGEST_SIZE,
+> +                       .statesize = sizeof(struct md5_state),
+>                         .base = {
+>                                 .cra_name = "md5",
+>                                 .cra_driver_name = "md5-sun4i-ss",
+> @@ -66,6 +67,7 @@ static struct sun4i_ss_alg_template ss_algs[] = {
+>                 .import = sun4i_hash_import_sha1,
+>                 .halg = {
+>                         .digestsize = SHA1_DIGEST_SIZE,
+> +                       .statesize = sizeof(struct sha1_state),
+>                         .base = {
+>                                 .cra_name = "sha1",
+>                                 .cra_driver_name = "sha1-sun4i-ss",
+> --
+> 2.4.10
+>
