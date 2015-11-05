@@ -1,69 +1,104 @@
-From: p.fedin@samsung.com (Pavel Fedin)
-Date: Thu, 05 Nov 2015 12:00:43 +0300
-Subject: [PATCH v5 0/4] Exynos SROMc configuration and Ethernet support for
- SMDK5410
-In-Reply-To: <563B189D.4080907@samsung.com>
-References: <cover.1446542020.git.p.fedin@samsung.com>
- <5639B588.1080901@samsung.com> <000b01d1179f$ed5032b0$c7f09810$@samsung.com>
- <563B0E4D.6020808@samsung.com> <001a01d117a6$3aed1140$b0c733c0$@samsung.com>
- <563B189D.4080907@samsung.com>
-Message-ID: <001c01d117a8$74d70c10$5e852430$@samsung.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Thu, 5 Nov 2015 10:01:32 +0100
+Subject: [RFCv2 1/2] power: domain: add pm_genpd_uninit
+In-Reply-To: <1446590711-18928-2-git-send-email-alex.aring@gmail.com>
+References: <1446590711-18928-1-git-send-email-alex.aring@gmail.com>
+ <1446590711-18928-2-git-send-email-alex.aring@gmail.com>
+Message-ID: <CAPDyKFrkzMZZjFRM7EbqDqmW8EXzV22O_tp8a45LVGQYSn6b3g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- Hello!
+On 3 November 2015 at 23:45, Alexander Aring <alex.aring@gmail.com> wrote:
+> This patch adds function pm_genpd_uninit for undo a pm_genpd_init. This
+> is useful for multiple power domains while probing. If the probing fails
+> after one pm_genpd_init was called we need to undo all previous
+> registrations of generic pm domains inside the gpd_list list.
 
-> >>>>> This patchset also depends on Exynos 5410 pinctrl support, introduced by
-> >>>>> patches 0003 and 0004 from this set:
-> >>>>> [PATCH v4 0/5] ARM: EXYNOS: ODROID-XU DT and LEDs
-> >>>>> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-March/330862.html
-> >>>>
-> >>>> Only the first patch made up to kernel. The rest (2-5) received feedback
-> >>>> and I am waiting for fixing it. Andreas apparently loose the interest...
-> >>>
-> >>>  I have rechecked the original thread on archives and found nothing new. Where can
-> >>> i read those feedbacks? Perhaps it makes sense for me to pick them up and include
-> >>> into my set.
-> >>
-> >> Go ahead. The only waiting feedback is at patch 2/5:
-> >>
-> >> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-March/330910.html
-> >> Javier's pointed use of linux,stdout-path and putting xxti in
-> >> exynos5410.dtsi (and customizing it per board if needed).
-> >>
-> >> Patches already got reviews and acks so only 2/5 is the stopper.
-> >
-> >  Ah, it's odroidXU device tree. Sorry, i don't have this particular board, and my patch
-> actually doesn't need it. I could do some
-> > blind modifications, but cannot test them, and this is out of my scope at all.
-> >  As mentioned in the commit msg, i need only 0003 and 0004 from there. Can they be picked up
-> independently? They don't need 0002 by
-> > themselves, only 0005 needs it.
-> 
-> Indeed the order of patches is messed up and this makes the confusion. I
-> was waiting for resend of entire patchset but you are right - this is
-> not required. 3 and 4 can be applied independently.
-> 
-> If they apply, I will pick up them after merge window.
+Yes, agree. Although I think it's a bit mote complicated than what you
+suggest in this simple approach. :-)
 
- They should. I have quite recent linux-next tree, i've just checked,
-0003 applies with a small fuzz and 0004 applies without problems at all.
+>
+> There is a check on IS_ERR_OR_NULL(genpd) which is useful to check again
+> registered power domains and not registered domains, the driver can use
+> this mechanism to have an array with registered and non-registered power
+> domains, where non-registered power domains are NULL.
+>
+> Cc: Rafael J. Wysocki <rjw@rjwysocki.net>
+> Cc: Kevin Hilman <khilman@kernel.org>
+> Cc: Ulf Hansson <ulf.hansson@linaro.org>
+> Cc: Pavel Machek <pavel@ucw.cz>
+> Cc: Len Brown <len.brown@intel.com>
+> Cc: Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+> Signed-off-by: Alexander Aring <alex.aring@gmail.com>
+> ---
+>  drivers/base/power/domain.c | 15 +++++++++++++++
+>  include/linux/pm_domain.h   |  4 ++++
+>  2 files changed, 19 insertions(+)
+>
+> diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
+> index 16550c6..65b9d1a 100644
+> --- a/drivers/base/power/domain.c
+> +++ b/drivers/base/power/domain.c
+> @@ -1730,6 +1730,21 @@ void pm_genpd_init(struct generic_pm_domain *genpd,
+>  }
+>  EXPORT_SYMBOL_GPL(pm_genpd_init);
+>
+> +/**
+> + * pm_genpd_uninit - Uninitialize a generic I/O PM domain object.
+> + * @genpd: PM domain object to initialize.
+> + */
+> +void pm_genpd_uninit(struct generic_pm_domain *genpd)
+> +{
+> +       if (IS_ERR_OR_NULL(genpd))
+> +               return;
+> +
+> +       mutex_lock(&gpd_list_lock);
+> +       list_del(&genpd->gpd_list_node);
+> +       mutex_unlock(&gpd_list_lock);
 
-> If they don't, they will need rebasing by someone. Maybe you can take
-> care of them?
+This is too fragile. You don't protect from the cases below.
 
- Of course. Please notify me if rebasing will be needed, i'll do it.
+1. The genpd may have devices attached to it.
+2. The genpd may have subdomains.
 
-> You have the SMDK5410 for testing, right?
+To deal with these case, that's when it becomes more complex which I
+guess is the reason to why nobody really cared until now.
 
- Of course. And you can already get my
+Moreover, I think there are some more structures to "uninitialize"
+besides just unlinking the genpd struct from the gpd list. For example
+a mutex_destroy() should be done.
 
-Tested-by: Pavel Fedin <p.fedin@samsung.com>
+> +}
+> +EXPORT_SYMBOL_GPL(pm_genpd_uninit);
+> +
+>  #ifdef CONFIG_PM_GENERIC_DOMAINS_OF
+>  /*
+>   * Device Tree based PM domain providers.
+> diff --git a/include/linux/pm_domain.h b/include/linux/pm_domain.h
+> index b1cf7e7..45d4f7a 100644
+> --- a/include/linux/pm_domain.h
+> +++ b/include/linux/pm_domain.h
+> @@ -143,6 +143,7 @@ extern int pm_genpd_detach_cpuidle(struct generic_pm_domain *genpd);
+>  extern int pm_genpd_name_detach_cpuidle(const char *name);
+>  extern void pm_genpd_init(struct generic_pm_domain *genpd,
+>                           struct dev_power_governor *gov, bool is_off);
+> +extern void pm_genpd_uninit(struct generic_pm_domain *genpd);
+>
+>  extern int pm_genpd_poweron(struct generic_pm_domain *genpd);
+>  extern int pm_genpd_name_poweron(const char *domain_name);
+> @@ -212,6 +213,9 @@ static inline void pm_genpd_init(struct generic_pm_domain *genpd,
+>                                  struct dev_power_governor *gov, bool is_off)
+>  {
+>  }
+> +static inline void pm_genpd_uninit(struct generic_pm_domain *genpd)
+> +{
+> +}
+>  static inline int pm_genpd_poweron(struct generic_pm_domain *genpd)
+>  {
+>         return -ENOSYS;
+> --
+> 2.6.1
+>
 
- on those two because my experimental tree already uses them, and
-everything works quite well.
-
-Kind regards,
-Pavel Fedin
-Expert Engineer
-Samsung Electronics Research center Russia
+Kind regards
+Uffe
