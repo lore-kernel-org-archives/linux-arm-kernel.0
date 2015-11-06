@@ -1,56 +1,40 @@
-From: elfring@users.sourceforge.net (SF Markus Elfring)
-Date: Fri, 6 Nov 2015 18:38:19 +0100
-Subject: [PATCH] iommu/arm-smmu: Delete an unnecessary check before
- free_io_pgtable_ops()
-In-Reply-To: <558FFF19.1060402@users.sourceforge.net>
-References: <5307CAA2.8060406@users.sourceforge.net>
- <alpine.DEB.2.02.1402212321410.2043@localhost6.localdomain6>
- <530A086E.8010901@users.sourceforge.net>
- <alpine.DEB.2.02.1402231635510.1985@localhost6.localdomain6>
- <530A72AA.3000601@users.sourceforge.net>
- <alpine.DEB.2.02.1402240658210.2090@localhost6.localdomain6>
- <530B5FB6.6010207@users.sourceforge.net>
- <alpine.DEB.2.10.1402241710370.2074@hadrien>
- <530C5E18.1020800@users.sourceforge.net>
- <alpine.DEB.2.10.1402251014170.2080@hadrien>
- <530CD2C4.4050903@users.sourceforge.net>
- <alpine.DEB.2.10.1402251840450.7035@hadrien>
- <530CF8FF.8080600@users.sourceforge.net>
- <alpine.DEB.2.02.1402252117150.2047@localhost6.localdomain6>
- <530DD06F.4090703@users.sourceforge.net>
- <alpine.DEB.2.02.1402262129250.2221@localhost6.localdomain6>
- <5317A59D.4@users.sourceforge.net> <558FFF19.1060402@users.sourceforge.net>
-Message-ID: <563CE58B.4050802@users.sourceforge.net>
+From: yang.shi@linaro.org (Shi, Yang)
+Date: Fri, 06 Nov 2015 09:39:07 -0800
+Subject: [PATCH] arm64: remove redundant FRAME_POINTER kconfig option
+In-Reply-To: <20151106173558.GC7637@e104818-lin.cambridge.arm.com>
+References: <1446658671-16238-1-git-send-email-yang.shi@linaro.org>
+ <20151106123008.GK6087@arm.com> <20151106125002.GA8116@leverpostej>
+ <20151106162109.GZ7637@e104818-lin.cambridge.arm.com>
+ <20151106162538.GU6087@arm.com> <563CE21A.6060803@linaro.org>
+ <20151106173558.GC7637@e104818-lin.cambridge.arm.com>
+Message-ID: <563CE5BB.2080701@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Markus Elfring <elfring@users.sourceforge.net>
-Date: Fri, 6 Nov 2015 18:32:41 +0100
+On 11/6/2015 9:35 AM, Catalin Marinas wrote:
+> On Fri, Nov 06, 2015 at 09:23:38AM -0800, Shi, Yang wrote:
+>> On 11/6/2015 8:25 AM, Will Deacon wrote:
+>>> However, the patch would allow one to
+>>> disable FRAME_POINTERS (not sure it has any effect on the aarch64 gcc
+>>> though).
+>>
+>> No, it doesn't. Actually, FRAME_POINTER could be disabled regardless of the
+>> patch.
+>
+> In which case I suggest that we always select it just as a clearer
+> statement that the feature cannot be disabled (and you never know what
+> the compiler people decide to do in the future).
 
-The free_io_pgtable_ops() function tests whether its argument is NULL
-and then returns immediately. Thus the test around the call is not needed.
+Do you mean select FRAME_POINTER in ARCH_WANT_FRAME_POINTERS?
 
-This issue was detected by using the Coccinelle software.
+Yes, we could, but this may cause other architectures which select 
+ARCH_WANT_FRAME_POINTERS to have FRAME_POINTER selected too.
 
-Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
----
- drivers/iommu/arm-smmu.c | 4 +---
- 1 file changed, 1 insertion(+), 3 deletions(-)
+Or we could do:
 
-diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-index 47dc7a7..1ce4b85 100644
---- a/drivers/iommu/arm-smmu.c
-+++ b/drivers/iommu/arm-smmu.c
-@@ -945,9 +945,7 @@ static void arm_smmu_destroy_domain_context(struct iommu_domain *domain)
- 		free_irq(irq, domain);
- 	}
- 
--	if (smmu_domain->pgtbl_ops)
--		free_io_pgtable_ops(smmu_domain->pgtbl_ops);
--
-+	free_io_pgtable_ops(smmu_domain->pgtbl_ops);
- 	__arm_smmu_free_bitmap(smmu->context_map, cfg->cbndx);
- }
- 
--- 
-2.6.2
+select FRAME_POINTER is ARM64
+
+Thanks,
+Yang
+
+>
