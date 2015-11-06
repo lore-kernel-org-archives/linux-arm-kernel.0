@@ -1,49 +1,49 @@
-From: alison.wang@freescale.com (Huan Wang)
-Date: Fri, 6 Nov 2015 06:03:09 +0000
-Subject: [PATCH] ARM: add v7 LPAE multi-platform defconfig
-In-Reply-To: <8043581.ZAA0nqeSU3@wuerfel>
-References: <1445956507-34026-1-git-send-email-b18965@freescale.com>
- <20151103143416.GA926@cbox>
- <BN3PR0301MB08675CC568518D2ACA752757FE2A0@BN3PR0301MB0867.namprd03.prod.outlook.com>
- <8043581.ZAA0nqeSU3@wuerfel>
-Message-ID: <BN3PR0301MB08676406D58D9037B5A9194CFE280@BN3PR0301MB0867.namprd03.prod.outlook.com>
+From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
+Date: Fri, 6 Nov 2015 06:33:10 +0000
+Subject: [PATCH v6 00/12] arm64: renesas: add sound support
+Message-ID: <87egg3k5g6.wl%kuninori.morimoto.gx@renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> On Wednesday 04 November 2015 03:17:06 Huan Wang wrote:
-> > > On Tue, Oct 27, 2015 at 10:35:07PM +0800, Alison Wang wrote:
-> > > > v7 LPAE multi-platform defconfig is based on v7 multi-platform
-> > > > defconfig and adds LPAE support.
-> > > >
-> > > > This defconfig is verified on LS1021A which enables GIANFAR, I2C,
-> > > > WATCHDOG, AUDIO, EDMA and DSPI drivers, etc.
-> > > >
-> > > > Signed-off-by: Alison Wang <alison.wang@freescale.com>
-> > >
-> > > I think this would be great if it also had:
-> > >
-> > > CONFIG_ARCH_VIRT=y
-> > > CONFIG_VIRTUALIZATION=y
-> > > CONFIG_KVM=y
-> > >
-> > > That would allow it to be used for KVM testing both as host and
-> guest.
-> > >
-> > > FWIW, I just tried booting this on my TC2, but I don't get any
-> > > output from there.  Is it supposed to work on this platform?  If not,
-> why not?
-> > >
-> > [Alison Wang] One question, does TC2 support LPAE? If so, we could try
-> > to find the reason and add it in this defconfig for armv7 LPAE support.
-> 
-> Yes, I think we should enable all platforms that we enable in the normal
-> multi_v7_defconfig, if we decide to add a new one. Just remove the
-> platforms that are based on Cortex-A5/A8/A9, Scorpion or PJ4 rather than
-> A7/A12/A15/A17 or Krait.
-> 
-[Alison Wang] Thanks for your advice. I will try to prepare a new one according
-to your advice.
+Hi,
 
+these are v2 patches which add sound support to the r8a7795/Salvator-X.
 
-Best Regards,
-Alison Wang
+These patches are an update of Simon's v5 patch-set
+
+The main change to the patches themselves since Morimoto-san's v3 posting
+and v4 updates to that posting is to update to new CPG/MSSR bindings via
+Geert Uytterhoeven.
+
+It doesn't include cs2000 support since it is not accepted yet.
+I will send additional patch if it was accepted.
+This patches doesn't include CTU/MIX support either,
+because it is too advanced feature at this point.
+
+Base:
+
+* "[PATCH v4 0/3] arm64: renesas: r8a7795: add I2C support"
+  This can be found in the topic/r8a7795-i2c-v4 branch of
+  my renesas tree on kernel.org.
+
+Kuninori Morimoto (12):
+      arm64: renesas: r8a7795: add AUDIO_DMAC support
+      arm64: renesas: r8a7795: Sound SSI PIO support
+      arm64: renesas: r8a7795: Sound SSI DMA support
+      arm64: renesas: r8a7795: Sound SRC support
+      arm64: renesas: r8a7795: Sound DVC support
+      arm64: renesas: salvator-x: Sound SSI PIO support
+      arm64: renesas: salvator-x: Sound SSI DMA support
+      arm64: renesas: salvator-x: Sound SSI DMA support via BUSIF
+      arm64: renesas: salvator-x: Sound SRC support
+      arm64: renesas: salvator-x: Sound DVC support
+      arm64: defconfig: add Renesas R-Car DMAC driver support
+      arm64: defconfig: add Renesas sound and AK4613 support
+
+ arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts |  94 +++++++++++++++++++++++++++++++++++++++++
+ arch/arm64/boot/dts/renesas/r8a7795.dtsi           | 253 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+ arch/arm64/configs/defconfig                       |   6 +++
+ 3 files changed, 353 insertions(+)
+
+-- 
+2.1.4
