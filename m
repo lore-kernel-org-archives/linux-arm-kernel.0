@@ -1,86 +1,71 @@
-From: timur@codeaurora.org (Timur Tabi)
-Date: Thu, 5 Nov 2015 18:00:08 -0600
-Subject: [PATCH 05/11] tty: amba-pl011: add register lookup table
-In-Reply-To: <E1Ztcve-0007CO-UO@rmk-PC.arm.linux.org.uk>
-References: <20151103134349.GV8644@n2100.arm.linux.org.uk>
- <E1Ztcve-0007CO-UO@rmk-PC.arm.linux.org.uk>
-Message-ID: <563BED88.3040101@codeaurora.org>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Fri, 06 Nov 2015 09:03:16 +0900
+Subject: [PATCH v6 1/4] Documentation: dt-bindings: Describe SROMc
+ configuration
+In-Reply-To: <26ce9f26ee8537b2f81ad0bf470d1c6b1c8a1a31.1446724046.git.p.fedin@samsung.com>
+References: <cover.1446724046.git.p.fedin@samsung.com>
+ <26ce9f26ee8537b2f81ad0bf470d1c6b1c8a1a31.1446724046.git.p.fedin@samsung.com>
+Message-ID: <563BEE44.4040207@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/03/2015 08:51 AM, Russell King wrote:
->   enum {
-> -	REG_DR = UART01x_DR,
-> -	REG_ST_DMAWM = ST_UART011_DMAWM,
-> -	REG_ST_TIMEOUT = ST_UART011_TIMEOUT,
-> -	REG_FR = UART01x_FR,
-> -	REG_ST_LCRH_RX = ST_UART011_LCRH_RX,
-> -	REG_IBRD = UART011_IBRD,
-> -	REG_FBRD = UART011_FBRD,
-> -	REG_LCRH = UART011_LCRH,
-> -	REG_ST_LCRH_TX = ST_UART011_LCRH_TX,
-> -	REG_CR = UART011_CR,
-> -	REG_IFLS = UART011_IFLS,
-> -	REG_IMSC = UART011_IMSC,
-> -	REG_RIS = UART011_RIS,
-> -	REG_MIS = UART011_MIS,
-> -	REG_ICR = UART011_ICR,
-> -	REG_DMACR = UART011_DMACR,
-> -	REG_ST_XFCR = ST_UART011_XFCR,
-> -	REG_ST_XON1 = ST_UART011_XON1,
-> -	REG_ST_XON2 = ST_UART011_XON2,
-> -	REG_ST_XOFF1 = ST_UART011_XOFF1,
-> -	REG_ST_XOFF2 = ST_UART011_XOFF2,
-> -	REG_ST_ITCR = ST_UART011_ITCR,
-> -	REG_ST_ITIP = ST_UART011_ITIP,
-> -	REG_ST_ABCR = ST_UART011_ABCR,
-> -	REG_ST_ABIMSC = ST_UART011_ABIMSC,
-> +	REG_DR,
-> +	REG_ST_DMAWM,
-> +	REG_ST_TIMEOUT,
-> +	REG_FR,
-> +	REG_ST_LCRH_RX,
-> +	REG_IBRD,
-> +	REG_FBRD,
-> +	REG_LCRH,
-> +	REG_ST_LCRH_TX,
-> +	REG_CR,
-> +	REG_IFLS,
-> +	REG_IMSC,
-> +	REG_RIS,
-> +	REG_MIS,
-> +	REG_ICR,
-> +	REG_DMACR,
-> +	REG_ST_XFCR,
-> +	REG_ST_XON1,
-> +	REG_ST_XON2,
-> +	REG_ST_XOFF1,
-> +	REG_ST_XOFF2,
-> +	REG_ST_ITCR,
-> +	REG_ST_ITIP,
-> +	REG_ST_ABCR,
-> +	REG_ST_ABIMSC,
+On 05.11.2015 21:03, Pavel Fedin wrote:
+> Add documentation for new subnode properties, allowing bank configuration.
+> Based on u-boot implementation, but heavily reworked.
+> 
+> Also, fix size of SROMc mapping in the example.
+> 
+> Signed-off-by: Pavel Fedin <p.fedin@samsung.com>
+> ---
+>  .../bindings/arm/samsung/exynos-srom.txt           | 71 +++++++++++++++++++++-
+>  1 file changed, 69 insertions(+), 2 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/samsung/exynos-srom.txt b/Documentation/devicetree/bindings/arm/samsung/exynos-srom.txt
+> index 33886d5..cce5c1f 100644
+> --- a/Documentation/devicetree/bindings/arm/samsung/exynos-srom.txt
+> +++ b/Documentation/devicetree/bindings/arm/samsung/exynos-srom.txt
+> @@ -5,8 +5,75 @@ Required properties:
+>  
+>  - reg: offset and length of the register set
+>  
+> -Example:
+> +Optional properties:
+> +The SROM controller can be used to attach external peripherals. In this case
+> +extra properties, describing the bus behind it, should be specified as below:
 > +
-> +	/* The size of the array - must be last */
-> +	REG_ARRAY_SIZE,
->   };
+> +- #address-cells: Must be set to 2 to allow memory address translation
+> +
+> +- #size-cells: Must be set to 1 to allow CS address passing
+> +
+> +- ranges: Must be set up to reflect the memory layout with four integer values
+> +	  per bank:
+> +		<bank-number> 0 <physical address of bank> <size>
+> +
+> +Sub-nodes:
+> +The actual device nodes should be added as subnodes to the SROMc node. These
+> +subnodes, except regular device specification, should contain the following
+> +properties, describing configuration of the relevant SROM bank:
+> +
+> +Required properties:
+> +- reg: bank number, base address (relative to start of the bank) and size of
+> +       the memory mapped for the device. Note that base address will be
+> +       typically 0 as this is the start of the bank.
+> +
+> +- samsung,srom-timing : array of 6 integers, specifying bank timings in the
+> +                        following order: Tacp, Tcah, Tcoh, Tacc, Tcos, Tacs.
+> +                        Each value is specified in cycles and has the following
+> +                        meaning and valid range:
+> +                        Tacp : Page mode access cycle at Page mode (0 - 15)
+> +                        Tcah : Address holding time after CSn (0 - 15)
+> +                        Tcoh : Chip selection hold on OEn (0 - 15)
+> +                        Tacc : Access cycle (0 - 32)
 
-This breaks early console because REG_DR and REG_FR are now enums 
-instead of an actual register offset, and so
+All of the manuals have error here. Probably it can be either: 1-32 or
+0-31. I would bet on 0-31, what do you think?
 
-static void pl011_putc(struct uart_port *port, int c)
-{
-	while (readl(port->membase + REG_FR) & UART01x_FR_TXFF)
-		;
-	writeb(c, port->membase + REG_DR);
-	while (readl(port->membase + REG_FR) & UART01x_FR_BUSY)
-		;
-}
+Rest looks good:
 
-is wrong.  I get alignment violations because REG_FR is equal to 3 
-instead of 0x18.
+Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 
--- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the
-Code Aurora Forum, a Linux Foundation Collaborative Project.
+Best regards,
+Krzysztof
