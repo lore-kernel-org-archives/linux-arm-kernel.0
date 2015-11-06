@@ -1,284 +1,90 @@
-From: m.smarduch@samsung.com (Mario Smarduch)
-Date: Thu, 05 Nov 2015 16:23:41 -0800
-Subject: [PATCH v3 2/3] KVM/arm/arm64: enable enhanced armv7 fp/simd lazy
- switch
-In-Reply-To: <20151105144848.GC5819@cbox>
-References: <1446242193-8424-1-git-send-email-m.smarduch@samsung.com>
- <1446242193-8424-3-git-send-email-m.smarduch@samsung.com>
- <20151105144848.GC5819@cbox>
-Message-ID: <563BF30D.1040101@samsung.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 6 Nov 2015 00:24:11 +0000
+Subject: [PATCH 05/11] tty: amba-pl011: add register lookup table
+In-Reply-To: <563BED88.3040101@codeaurora.org>
+References: <20151103134349.GV8644@n2100.arm.linux.org.uk>
+ <E1Ztcve-0007CO-UO@rmk-PC.arm.linux.org.uk>
+ <563BED88.3040101@codeaurora.org>
+Message-ID: <20151106002410.GR8644@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Thu, Nov 05, 2015 at 06:00:08PM -0600, Timur Tabi wrote:
+> On 11/03/2015 08:51 AM, Russell King wrote:
+> >  enum {
+> >-	REG_DR = UART01x_DR,
+> >-	REG_ST_DMAWM = ST_UART011_DMAWM,
+> >-	REG_ST_TIMEOUT = ST_UART011_TIMEOUT,
+> >-	REG_FR = UART01x_FR,
+> >-	REG_ST_LCRH_RX = ST_UART011_LCRH_RX,
+> >-	REG_IBRD = UART011_IBRD,
+> >-	REG_FBRD = UART011_FBRD,
+> >-	REG_LCRH = UART011_LCRH,
+> >-	REG_ST_LCRH_TX = ST_UART011_LCRH_TX,
+> >-	REG_CR = UART011_CR,
+> >-	REG_IFLS = UART011_IFLS,
+> >-	REG_IMSC = UART011_IMSC,
+> >-	REG_RIS = UART011_RIS,
+> >-	REG_MIS = UART011_MIS,
+> >-	REG_ICR = UART011_ICR,
+> >-	REG_DMACR = UART011_DMACR,
+> >-	REG_ST_XFCR = ST_UART011_XFCR,
+> >-	REG_ST_XON1 = ST_UART011_XON1,
+> >-	REG_ST_XON2 = ST_UART011_XON2,
+> >-	REG_ST_XOFF1 = ST_UART011_XOFF1,
+> >-	REG_ST_XOFF2 = ST_UART011_XOFF2,
+> >-	REG_ST_ITCR = ST_UART011_ITCR,
+> >-	REG_ST_ITIP = ST_UART011_ITIP,
+> >-	REG_ST_ABCR = ST_UART011_ABCR,
+> >-	REG_ST_ABIMSC = ST_UART011_ABIMSC,
+> >+	REG_DR,
+> >+	REG_ST_DMAWM,
+> >+	REG_ST_TIMEOUT,
+> >+	REG_FR,
+> >+	REG_ST_LCRH_RX,
+> >+	REG_IBRD,
+> >+	REG_FBRD,
+> >+	REG_LCRH,
+> >+	REG_ST_LCRH_TX,
+> >+	REG_CR,
+> >+	REG_IFLS,
+> >+	REG_IMSC,
+> >+	REG_RIS,
+> >+	REG_MIS,
+> >+	REG_ICR,
+> >+	REG_DMACR,
+> >+	REG_ST_XFCR,
+> >+	REG_ST_XON1,
+> >+	REG_ST_XON2,
+> >+	REG_ST_XOFF1,
+> >+	REG_ST_XOFF2,
+> >+	REG_ST_ITCR,
+> >+	REG_ST_ITIP,
+> >+	REG_ST_ABCR,
+> >+	REG_ST_ABIMSC,
+> >+
+> >+	/* The size of the array - must be last */
+> >+	REG_ARRAY_SIZE,
+> >  };
+> 
+> This breaks early console because REG_DR and REG_FR are now enums instead of
+> an actual register offset, and so
+> 
+> static void pl011_putc(struct uart_port *port, int c)
+> {
+> 	while (readl(port->membase + REG_FR) & UART01x_FR_TXFF)
+> 		;
+> 	writeb(c, port->membase + REG_DR);
+> 	while (readl(port->membase + REG_FR) & UART01x_FR_BUSY)
+> 		;
+> }
+> 
+> is wrong.  I get alignment violations because REG_FR is equal to 3 instead
+> of 0x18.
 
+I know, and I said as much on the 3rd November in my reply to you that
+this change should be undone, and again earlier today in reply to Linus.
 
-On 11/5/2015 6:48 AM, Christoffer Dall wrote:
-> On Fri, Oct 30, 2015 at 02:56:32PM -0700, Mario Smarduch wrote:
->> This patch tracks vfp/simd hardware state with a vcpu lazy flag. vCPU lazy 
->> flag is set on guest access and traps to vfp/simd hardware switch handler. On 
->> vm-enter if lazy flag is set skip trap enable and save host fpexc. On 
->> vm-exit if flag is set skip hardware context switch and return to host with 
->> guest context. In vcpu_put check if vcpu lazy flag is set, and execute a 
->> hardware context switch to restore host.
->>
->> Also some arm64 field and empty function are added to compile for arm64.
->>
->> Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
->> ---
->>  arch/arm/include/asm/kvm_host.h   |  1 +
->>  arch/arm/kvm/arm.c                |  6 ++++
->>  arch/arm/kvm/interrupts.S         | 60 ++++++++++++++++++++++++++++-----------
->>  arch/arm/kvm/interrupts_head.S    | 14 +++++----
->>  arch/arm64/include/asm/kvm_host.h |  4 +++
->>  5 files changed, 63 insertions(+), 22 deletions(-)
->>
->> diff --git a/arch/arm/include/asm/kvm_host.h b/arch/arm/include/asm/kvm_host.h
->> index f1bf551..a9e86e0 100644
->> --- a/arch/arm/include/asm/kvm_host.h
->> +++ b/arch/arm/include/asm/kvm_host.h
->> @@ -227,6 +227,7 @@ int kvm_perf_teardown(void);
->>  void kvm_mmu_wp_memory_region(struct kvm *kvm, int slot);
->>  
->>  struct kvm_vcpu *kvm_mpidr_to_vcpu(struct kvm *kvm, unsigned long mpidr);
->> +void kvm_restore_host_vfp_state(struct kvm_vcpu *);
->>  
->>  static inline void kvm_arch_hardware_disable(void) {}
->>  static inline void kvm_arch_hardware_unsetup(void) {}
->> diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
->> index dc017ad..11a56fe 100644
->> --- a/arch/arm/kvm/arm.c
->> +++ b/arch/arm/kvm/arm.c
->> @@ -296,6 +296,12 @@ void kvm_arch_vcpu_load(struct kvm_vcpu *vcpu, int cpu)
->>  void kvm_arch_vcpu_put(struct kvm_vcpu *vcpu)
->>  {
->>  	/*
->> +	 * If fp/simd registers are dirty save guest, restore host before
-> 
-> If the fp/simd registers are dirty, then restore the host state before
-I'd drop 'releasing the cpu', the vcpu thread may be returning to
-user mode.
-> 
->> +	 * releasing the cpu.
->> +	 */
->> +	if (vcpu->arch.vfp_dirty)
->> +		kvm_restore_host_vfp_state(vcpu);
->> +	/*
->>  	 * The arch-generic KVM code expects the cpu field of a vcpu to be -1
->>  	 * if the vcpu is no longer assigned to a cpu.  This is used for the
->>  	 * optimized make_all_cpus_request path.
->> diff --git a/arch/arm/kvm/interrupts.S b/arch/arm/kvm/interrupts.S
->> index 900ef6d..ca25314 100644
->> --- a/arch/arm/kvm/interrupts.S
->> +++ b/arch/arm/kvm/interrupts.S
->> @@ -28,6 +28,32 @@
->>  #include "interrupts_head.S"
->>  
->>  	.text
->> +/**
->> + * void kvm_restore_host_vfp_state(struct vcpu *vcpu) - Executes lazy
-> 
-> nit: Can you move the multi-line description of the function into a
-> separate paragraph?
-Sure.
-> 
->> + * 	fp/simd switch, saves the guest, restores host. Called from host
->> + *	mode, placed outside of hyp region start/end.
-> 
-> Put the description in a separate paragraph and get rid of the "executes
-> lazy fp/simd swithch" part, that doesn't help understanding.  Just say
-> that this funciton restores the host state.
-Sure.
-> 
->> + */
->> +ENTRY(kvm_restore_host_vfp_state)
->> +#ifdef CONFIG_VFPv3
->> +	push    {r4-r7}
->> +
->> +	add     r7, vcpu, #VCPU_VFP_GUEST
->> +	store_vfp_state r7
->> +
->> +	add     r7, vcpu, #VCPU_VFP_HOST
->> +	ldr     r7, [r7]
->> +	restore_vfp_state r7
->> +
->> +	ldr     r3, [vcpu, #VCPU_VFP_HOST_FPEXC]
->> +	VFPFMXR FPEXC, r3
->> +
->> +	mov     r3, #0
->> +	strb    r3, [vcpu, #VCPU_VFP_DIRTY]
->> +
->> +	pop     {r4-r7}
->> +#endif
->> +	bx      lr
->> +ENDPROC(kvm_restore_host_vfp_state)
->>  
->>  __kvm_hyp_code_start:
->>  	.globl __kvm_hyp_code_start
->> @@ -119,11 +145,16 @@ ENTRY(__kvm_vcpu_run)
->>  	@ If the host kernel has not been configured with VFPv3 support,
->>  	@ then it is safer if we deny guests from using it as well.
->>  #ifdef CONFIG_VFPv3
->> -	@ Set FPEXC_EN so the guest doesn't trap floating point instructions
->> +	@ fp/simd register file has already been accessed, so skip host fpexc
->> +	@ save and access trap enable.
->> +	vfp_inlazy_mode r7, skip_guest_vfp_trap
-> 
-> So, why do we need to touch this register at all on every CPU exit?
-> 
-> Is it not true that we can only be in one of two state:
->  1) The register file is not dirty (not touched by the guest) and we
->     should trap
->  2) The register file is dirty, and we should not trap to EL2?
-> 
-> Only in the first case do we need to set the FPEXC, and couldn't we just
-> do that on vcpu_load and git rid of all this?  (except HCPTR_TCP which
-> we still need to adjust).
-
-I'm trying to think what happens if you're preempted after you saved
-the FPEXC and set the FPEXC_EN bit in kvm_arch_vcpu_load(). Could some
-thread pick up a bad FPEXC? May be possible to undo in the vcpu_put().
-
-> 
->> +
->>  	VFPFMRX r2, FPEXC		@ VMRS
->> -	push	{r2}
->> +	str     r2, [vcpu, #VCPU_VFP_HOST_FPEXC]
->>  	orr	r2, r2, #FPEXC_EN
->>  	VFPFMXR FPEXC, r2		@ VMSR
->> +	set_hcptr vmentry, (HCPTR_TCP(10) | HCPTR_TCP(11))
->> +skip_guest_vfp_trap:
->>  #endif
->>  
->>  	@ Configure Hyp-role
->> @@ -131,7 +162,7 @@ ENTRY(__kvm_vcpu_run)
->>  
->>  	@ Trap coprocessor CRx accesses
->>  	set_hstr vmentry
->> -	set_hcptr vmentry, (HCPTR_TTA | HCPTR_TCP(10) | HCPTR_TCP(11))
->> +	set_hcptr vmentry, (HCPTR_TTA)
-> 
-> based on the above I think you can rework this to set the mask based on
-> the dirty flag and only hit the HCPTR once.
-
-Not sure how to do this, tracing always needs to be enabled, and it's
-independent of FP dirty state.
-
-> 
->>  	set_hdcr vmentry
->>  
->>  	@ Write configured ID register into MIDR alias
->> @@ -170,22 +201,15 @@ __kvm_vcpu_return:
->>  	@ Don't trap coprocessor accesses for host kernel
->>  	set_hstr vmexit
->>  	set_hdcr vmexit
->> -	set_hcptr vmexit, (HCPTR_TTA | HCPTR_TCP(10) | HCPTR_TCP(11)), after_vfp_restore
->> +	set_hcptr vmexit, (HCPTR_TTA | HCPTR_TCP(10) | HCPTR_TCP(11))
->>  
->>  #ifdef CONFIG_VFPv3
->> -	@ Switch VFP/NEON hardware state to the host's
->> -	add	r7, vcpu, #VCPU_VFP_GUEST
->> -	store_vfp_state r7
->> -	add	r7, vcpu, #VCPU_VFP_HOST
->> -	ldr	r7, [r7]
->> -	restore_vfp_state r7
->> -
->> -after_vfp_restore:
->> -	@ Restore FPEXC_EN which we clobbered on entry
->> -	pop	{r2}
->> +	@ If fp/simd not dirty, restore FPEXC which we clobbered on entry.
->> +	@ Otherwise return with guest FPEXC, later saved in vcpu_put.
->> +	vfp_inlazy_mode r2, skip_restore_host_fpexc
->> +	ldr     r2, [vcpu, #VCPU_VFP_HOST_FPEXC]
-> 
-> I think you should always just restore in this in vcpu_put instead of
-> hitting on this all the time.
-True, I was thinking of stack unwinding from older code.
-> 
->>  	VFPFMXR FPEXC, r2
->> -#else
->> -after_vfp_restore:
->> +skip_restore_host_fpexc:
->>  #endif
->>  
->>  	@ Reset Hyp-role
->> @@ -485,6 +509,10 @@ switch_to_guest_vfp:
->>  	@ NEON/VFP used.  Turn on VFP access.
->>  	set_hcptr vmtrap, (HCPTR_TCP(10) | HCPTR_TCP(11))
->>  
->> +	@ set lazy mode flag, switch hardware context on vcpu_put
->> +	mov     r1, #1
->> +	strb    r1, [vcpu, #VCPU_VFP_DIRTY]
->> +
->>  	@ Switch VFP/NEON hardware state to the guest's
->>  	add	r7, r0, #VCPU_VFP_HOST
->>  	ldr	r7, [r7]
->> diff --git a/arch/arm/kvm/interrupts_head.S b/arch/arm/kvm/interrupts_head.S
->> index 51a5950..34e71ee 100644
->> --- a/arch/arm/kvm/interrupts_head.S
->> +++ b/arch/arm/kvm/interrupts_head.S
->> @@ -593,10 +593,8 @@ ARM_BE8(rev	r6, r6  )
->>   * (hardware reset value is 0). Keep previous value in r2.
->>   * An ISB is emited on vmexit/vmtrap, but executed on vmexit only if
->>   * VFP wasn't already enabled (always executed on vmtrap).
->> - * If a label is specified with vmexit, it is branched to if VFP wasn't
->> - * enabled.
->>   */
->> -.macro set_hcptr operation, mask, label = none
->> +.macro set_hcptr operation, mask
->>  	mrc	p15, 4, r2, c1, c1, 2
->>  	ldr	r3, =\mask
->>  	.if \operation == vmentry
->> @@ -611,13 +609,17 @@ ARM_BE8(rev	r6, r6  )
->>  	beq	1f
->>  	.endif
->>  	isb
->> -	.if \label != none
->> -	b	\label
->> -	.endif
->>  1:
->>  	.endif
->>  .endm
->>  
->> +/* Checks if VFP/SIMD dirty flag is set, if it is branch to label. */
->> +.macro vfp_inlazy_mode, reg, label
-> 
-> Again, I don't find this "in lazy mode" to mean that we've now switched
-> to the guest's VFP state intuitive or logical.
-> 
-> How about vfp_skip_if_dirty ?
-Yes sounds good.
-
-> 
->> +	ldr	\reg, [vcpu, #VCPU_VFP_DIRTY]
->> +	cmp	\reg, #1
->> +	beq	\label
->> +.endm
->> +
->>  /* Configures the HDCR (Hyp Debug Configuration Register) on entry/return
->>   * (hardware reset value is 0) */
->>  .macro set_hdcr operation
->> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
->> index 4562459..26a2347 100644
->> --- a/arch/arm64/include/asm/kvm_host.h
->> +++ b/arch/arm64/include/asm/kvm_host.h
->> @@ -157,6 +157,9 @@ struct kvm_vcpu_arch {
->>  	/* Interrupt related fields */
->>  	u64 irq_lines;		/* IRQ and FIQ levels */
->>  
->> +	/* fp/simd dirty flag true if guest accessed register file */
->> +	bool    vfp_dirty;
->> +
->>  	/* Cache some mmu pages needed inside spinlock regions */
->>  	struct kvm_mmu_memory_cache mmu_page_cache;
->>  
->> @@ -248,6 +251,7 @@ static inline void kvm_arch_hardware_unsetup(void) {}
->>  static inline void kvm_arch_sync_events(struct kvm *kvm) {}
->>  static inline void kvm_arch_vcpu_uninit(struct kvm_vcpu *vcpu) {}
->>  static inline void kvm_arch_sched_in(struct kvm_vcpu *vcpu, int cpu) {}
->> +static inline void kvm_restore_host_vfp_state(struct kvm_vcpu *vcpu) {}
->>  
->>  void kvm_arm_init_debug(void);
->>  void kvm_arm_setup_debug(struct kvm_vcpu *vcpu);
->> -- 
->> 1.9.1
->>
+-- 
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
