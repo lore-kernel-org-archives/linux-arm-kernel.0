@@ -1,31 +1,45 @@
 From: plaes@plaes.org (Priit Laes)
-Date: Fri,  6 Nov 2015 19:54:43 +0200
-Subject: [PATCH v3 0/3] ARM: dts: sun4i: gemei-g9: Devicetree improvements
-Message-ID: <1446832486-32319-1-git-send-email-plaes@plaes.org>
+Date: Fri,  6 Nov 2015 19:54:46 +0200
+Subject: [PATCH v3 3/3] ARM: dts: sun4i: gemei-g9: Enable sun4i audio codec
+ support
+In-Reply-To: <1446832486-32319-1-git-send-email-plaes@plaes.org>
+References: <1446832486-32319-1-git-send-email-plaes@plaes.org>
+Message-ID: <1446832486-32319-4-git-send-email-plaes@plaes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Improvements to devicetree setup:
- - Converted to use axp209 regulator nodes
- - Fix invalid regulator for LRADC keys
- - Enable audio codec node
+Gemei G9 has internal speakers and headphone jack. Audio switching
+from internal speakers to headphones is automatically handled by
+extra FT2012Q audio amplifier chip that works out of the box.
 
-Changes sinve v2:
- - Dropped applied "Added IRQ configuration for bma250 accelerometer" patch
+Signed-off-by: Priit Laes <plaes@plaes.org>
+---
+Changes since v2:
+ - Dropped routing property.
 
-Changes since v1:
- - Dropped NAND patch because driver is not yet ready
- - Dropped applied KEYBOARD_SUN4I_LRADC patch
- - Added sun4i audio codec patch
+ arch/arm/boot/dts/sun4i-a10-gemei-g9.dts | 5 ++++-
+ 1 file changed, 4 insertions(+), 1 deletion(-)
 
-
-Priit Laes (3):
-  ARM: dts: sun4i: gemei-g9: Convert to use axp209 regulator nodes
-  ARM: dts: sun4i: gemei-g9: Use reg_ldo2 instead of reg_vcc3v0
-  ARM: dts: sun4i: gemei-g9: Enable sun4i audio codec support
-
- arch/arm/boot/dts/sun4i-a10-gemei-g9.dts | 42 +++++++++++++++++++++++++++-----
- 1 file changed, 36 insertions(+), 6 deletions(-)
-
+diff --git a/arch/arm/boot/dts/sun4i-a10-gemei-g9.dts b/arch/arm/boot/dts/sun4i-a10-gemei-g9.dts
+index 16c1a67..1d73a98 100644
+--- a/arch/arm/boot/dts/sun4i-a10-gemei-g9.dts
++++ b/arch/arm/boot/dts/sun4i-a10-gemei-g9.dts
+@@ -65,12 +65,15 @@
+ /*
+  * TODO:
+  *   2x cameras via CSI
+- *   audio
++ *   audio input
+  *   AXP battery management
+  *   NAND
+  *   OTG
+  *   Touchscreen - gt801_2plus1 @ i2c adapter 2 @ 0x48
+  */
++&codec {
++	status = "okay";
++};
+ 
+ &cpu0 {
+ 	cpu-supply = <&reg_dcdc2>;
 -- 
 2.6.3
