@@ -1,29 +1,33 @@
-From: sstabellini@kernel.org (Stefano Stabellini)
-Date: Fri, 6 Nov 2015 14:45:23 +0000 (GMT)
-Subject: [Xen-devel] [PATCH 2/3] xen/arm: introduce HYPERVISOR_dom0_op
- on arm and arm64
-In-Reply-To: <563B9E1402000078000B247C@prv-mh.provo.novell.com>
-References: <alpine.DEB.2.02.1511051706560.13541@kaball.uk.xensource.com>
- <1446743385-12848-2-git-send-email-stefano.stabellini@eu.citrix.com>
- <563B9E1402000078000B247C@prv-mh.provo.novell.com>
-Message-ID: <alpine.DEB.2.02.1511061443330.23825@kaball.uk.xensource.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Fri, 6 Nov 2015 15:46:35 +0100
+Subject: [PATCH 04/10] pwm: core: use bitops
+In-Reply-To: <1445895161-2317-5-git-send-email-o.schinagl@ultimaker.com>
+References: <1445895161-2317-1-git-send-email-o.schinagl@ultimaker.com>
+ <1445895161-2317-5-git-send-email-o.schinagl@ultimaker.com>
+Message-ID: <20151106144635.GA8418@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 5 Nov 2015, Jan Beulich wrote:
-> >>> On 05.11.15 at 18:09, <stefano.stabellini@eu.citrix.com> wrote:
-> > --- a/arch/arm/xen/hypercall.S
-> > +++ b/arch/arm/xen/hypercall.S
-> > @@ -89,6 +89,7 @@ HYPERCALL2(memory_op);
-> >  HYPERCALL2(physdev_op);
-> >  HYPERCALL3(vcpu_op);
-> >  HYPERCALL1(tmem_op);
-> > +HYPERCALL1(dom0_op);
+On Mon, Oct 26, 2015 at 10:32:35PM +0100, Olliver Schinagl wrote:
+> From: Olliver Schinagl <oliver@schinagl.nl>
 > 
-> Assuming this somehow tries to mirror x86 naming - time to rename it
-> there? I don't see why you'd want to introduce a dom0_op when it
-> has been renamed to platform_op many years ago - see
-> public/dom0_ops.h.
+> The pwm header defines bits manually while there is a nice bitops.h with
+> a BIT() macro. Use the BIT() macro to set bits in pwm.h
+> 
+> Signed-off-by: Olliver Schinagl <oliver@schinagl.nl>
+> ---
+>  include/linux/pwm.h | 7 ++++---
+>  1 file changed, 4 insertions(+), 3 deletions(-)
 
-In Linux it was never renamed. I could do that now as a precursor to
-this.
+I don't think this is a useful change. The BIT() macro needs the same
+number of characters to type at the expense of requiring an additional
+include.
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151106/e6e97c99/attachment-0001.sig>
