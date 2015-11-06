@@ -1,115 +1,43 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Fri, 6 Nov 2015 08:06:47 -0600
-Subject: Linus HEAD build break
-Message-ID: <871tc31atk.fsf@saruman.tx.rr.com>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 6 Nov 2015 08:13:13 -0600
+Subject: [PATCH 1/3] mtd: create a partition type device tree binding
+In-Reply-To: <20151030175145.GF13239@google.com>
+References: <1446123152-22666-1-git-send-email-linus.walleij@linaro.org>
+ <20151029162908.GA13275@localhost>
+ <CACRpkdYS5Jf8UC2K0bNdEQZDjTeZZx44Uu-kkof+9E=4Ny0oDg@mail.gmail.com>
+ <20151030175145.GF13239@google.com>
+Message-ID: <CAL_JsqL2F3p7qBPbOiGytVyzF_aNLWbrCT0mAX1WZo6SxE3JoA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Fri, Oct 30, 2015 at 12:51 PM, Brian Norris
+<computersforpeace@gmail.com> wrote:
+> On Fri, Oct 30, 2015 at 03:00:57PM +0100, Linus Walleij wrote:
+>> On Thu, Oct 29, 2015 at 5:29 PM, Brian Norris
+>> <computersforpeace@gmail.com> wrote:
+>>
+>> >> +Required properties:
+>> >> +- partition-type : the type of partition. Only one type can be specified.
+>> >
+>> > You're supporting this as a list property (for future expansion,
+>> > presumably), so I can only assume the "only one type" is referring to
+>> > the number of different parsers available currently, not the behavior of
+>> > the property itself?
+>>
+>> I was thinking that it would not be a list actually.
+>>
+>> The reason being that if you're anyways going to the trouble of
+>> specifying exactly what partition type is going to be used, you're
+>> not really interested in specifying a few different ones, you know
+>> exactly what type it is going to be.
+>
+> OK, that makes sense. I think it's still *possible* that a board might
+> have the option of more than one partition parser, and so they might
+> just include both in the DTS, but that seems unlikely and so it makes
+> sense not to (over)engineer for it before it's needed. Anyway, your
+> binding can easily be expanded in the future if needed.
 
-Hi Marek,
+Since we now have partitions contained in a sub node, how about using
+compatible for that sub node instead.
 
-your commit af19161aaed7 ("ARM: dts: twl4030: Add iio properties for bci
-subnode") breaks build on current linus/master (which current sits in
-d1e41ff11941 Merge tag 'platform-drivers-x86-v4.4-1' of
-git://git.infradead.org/users/dvhart/linux-platform-drivers-x86) for
-anybody including twl4030.dtsi because it refers to a non-existent
-twl4030_madc label. Build output of make V=1 dtbs:
-
-<stdin>:1304:2: warning: #warning syscall mlock2 not implemented [-Wcpp]
-ERROR (phandle_references): Reference to non-existent node or label "twl4030_madc"
-
-ERROR: Input tree has errors, aborting (use -f to force output)
-scripts/Makefile.lib:293: recipe for target 'arch/arm/boot/dts/omap2430-sdp.dtb' failed
-make[2]: *** [arch/arm/boot/dts/omap2430-sdp.dtb] Error 2
-make[2]: *** Waiting for unfinished jobs....
-ERROR (phandle_references): Reference to non-existent node or label "twl4030_madc"
-
-ERROR: Input tree has errors, aborting (use -f to force output)
-scripts/Makefile.lib:293: recipe for target 'arch/arm/boot/dts/omap3430-sdp.dtb' failed
-make[2]: *** [arch/arm/boot/dts/omap3430-sdp.dtb] Error 2
-ERROR (phandle_references): Reference to non-existent node or label "twl4030_madc"
-
-ERROR (phandle_references): Reference to non-existent node or label "twl4030_madc"
-
-ERROR: Input tree has errors, aborting (use -f to force output)
-scripts/Makefile.lib:293: recipe for target 'arch/arm/boot/dts/logicpd-torpedo-37xx-devkit.dtb' failed
-make[2]: *** [arch/arm/boot/dts/logicpd-torpedo-37xx-devkit.dtb] Error 2
-ERROR: Input tree has errors, aborting (use -f to force output)
-scripts/Makefile.lib:293: recipe for target 'arch/arm/boot/dts/omap3-beagle.dtb' failed
-make[2]: *** [arch/arm/boot/dts/omap3-beagle.dtb] Error 2
-ERROR (phandle_references): Reference to non-existent node or label "twl4030_madc"
-
-ERROR: Input tree has errors, aborting (use -f to force output)
-scripts/Makefile.lib:293: recipe for target 'arch/arm/boot/dts/omap3-beagle-xm-ab.dtb' failed
-make[2]: *** [arch/arm/boot/dts/omap3-beagle-xm-ab.dtb] Error 2
-ERROR (phandle_references): Reference to non-existent node or label "twl4030_madc"
-
-ERROR: Input tree has errors, aborting (use -f to force output)
-scripts/Makefile.lib:293: recipe for target 'arch/arm/boot/dts/omap3-cm-t3530.dtb' failed
-make[2]: *** [arch/arm/boot/dts/omap3-cm-t3530.dtb] Error 2
-ERROR (phandle_references): Reference to non-existent node or label "twl4030_madc"
-
-ERROR: Input tree has errors, aborting (use -f to force output)
-scripts/Makefile.lib:293: recipe for target 'arch/arm/boot/dts/omap3-beagle-xm.dtb' failed
-make[2]: *** [arch/arm/boot/dts/omap3-beagle-xm.dtb] Error 2
-ERROR (phandle_references): Reference to non-existent node or label "twl4030_madc"
-
-ERROR: Input tree has errors, aborting (use -f to force output)
-scripts/Makefile.lib:293: recipe for target 'arch/arm/boot/dts/omap3-devkit8000.dtb' failed
-make[2]: *** [arch/arm/boot/dts/omap3-devkit8000.dtb] Error 2
-ERROR (phandle_references): Reference to non-existent node or label "twl4030_madc"
-
-ERROR (phandle_references): Reference to non-existent node or label "twl4030_madc"
-
-ERROR: Input tree has errors, aborting (use -f to force output)
-scripts/Makefile.lib:293: recipe for target 'arch/arm/boot/dts/omap3-gta04a4.dtb' failed
-make[2]: *** [arch/arm/boot/dts/omap3-gta04a4.dtb] Error 2
-ERROR: Input tree has errors, aborting (use -f to force output)
-scripts/Makefile.lib:293: recipe for target 'arch/arm/boot/dts/omap3-gta04a3.dtb' failed
-make[2]: *** [arch/arm/boot/dts/omap3-gta04a3.dtb] Error 2
-ERROR (phandle_references): Reference to non-existent node or label "twl4030_madc"
-
-ERROR (phandle_references): Reference to non-existent node or label "twl4030_madc"
-
-ERROR (phandle_references): Reference to non-existent node or label "twl4030_madc"
-
-ERROR: Input tree has errors, aborting (use -f to force output)
-ERROR: Input tree has errors, aborting (use -f to force output)
-scripts/Makefile.lib:293: recipe for target 'arch/arm/boot/dts/omap3-evm-37xx.dtb' failed
-make[2]: *** [arch/arm/boot/dts/omap3-evm-37xx.dtb] Error 2
-scripts/Makefile.lib:293: recipe for target 'arch/arm/boot/dts/omap3-evm.dtb' failed
-make[2]: *** [arch/arm/boot/dts/omap3-evm.dtb] Error 2
-ERROR: Input tree has errors, aborting (use -f to force output)
-scripts/Makefile.lib:293: recipe for target 'arch/arm/boot/dts/omap3-cm-t3730.dtb' failed
-make[2]: *** [arch/arm/boot/dts/omap3-cm-t3730.dtb] Error 2
-ERROR (phandle_references): Reference to non-existent node or label "twl4030_madc"
-
-ERROR (phandle_references): Reference to non-existent node or label "twl4030_madc"
-
-ERROR: Input tree has errors, aborting (use -f to force output)
-ERROR: Input tree has errors, aborting (use -f to force output)
-scripts/Makefile.lib:293: recipe for target 'arch/arm/boot/dts/omap3-gta04a5.dtb' failed
-make[2]: *** [arch/arm/boot/dts/omap3-gta04a5.dtb] Error 2
-scripts/Makefile.lib:293: recipe for target 'arch/arm/boot/dts/omap3-devkit8000-lcd70.dtb' failed
-make[2]: *** [arch/arm/boot/dts/omap3-devkit8000-lcd70.dtb] Error 2
-ERROR (phandle_references): Reference to non-existent node or label "twl4030_madc"
-
-ERROR: Input tree has errors, aborting (use -f to force output)
-scripts/Makefile.lib:293: recipe for target 'arch/arm/boot/dts/omap3-devkit8000-lcd43.dtb' failed
-make[2]: *** [arch/arm/boot/dts/omap3-devkit8000-lcd43.dtb] Error 2
-arch/arm/Makefile:338: recipe for target 'dtbs' failed
-make[1]: *** [dtbs] Error 2
-Makefile:146: recipe for target 'sub-make' failed
-make: *** [sub-make] Error 2
-
-Reverting that commit makes it build again.
-
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 818 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151106/37838ef1/attachment-0001.sig>
+Rob
