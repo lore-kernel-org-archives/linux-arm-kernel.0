@@ -1,70 +1,59 @@
 From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Fri,  6 Nov 2015 15:44:39 +0900
-Subject: [PATCH v5 0/6] arm64: ftrace: fix incorrect output from stack tracer
-Message-ID: <1446792285-1154-1-git-send-email-takahiro.akashi@linaro.org>
+Date: Fri,  6 Nov 2015 15:44:40 +0900
+Subject: [PATCH v5 1/6] arm64: ftrace: modify a stack frame in a safe way
+In-Reply-To: <1446792285-1154-1-git-send-email-takahiro.akashi@linaro.org>
+References: <1446792285-1154-1-git-send-email-takahiro.akashi@linaro.org>
+Message-ID: <1446792285-1154-2-git-send-email-takahiro.akashi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is the fifth patch series for fixing stack tracer on arm64.
-The original issue was reported by Jungseok[1], and then I found more
-issues[2].
+Function graph tracer modifies a return address (LR) in a stack frame by
+calling ftrace_prepare_return() in a traced function's function prologue.
+The current code does this modification before preserving an original
+address at ftrace_push_return_trace() and there is always a small window
+of inconsistency when an interrupt occurs.
 
-We don't have to care about the original issue because the root cause
-(patch "ARM64: unwind: Fix PC calculation") has been reverted in v4.3.
+This doesn't matter, as far as an interrupt stack is introduced, because
+stack tracer won't be invoked in an interrupt context. But it would be
+better to proactively minimize such a window by moving the LR modification
+after ftrace_push_return_trace().
 
-I address here all the issues and implement fixes described in [2] except
-for interrupt-triggered problems(II-3) and leaf function(II-5).  Recent
-discussions[3] about introducing a dedicated interrupt stack suggests that
-we may avoid walking through from an interrupt stack to a process stack.
-(So interrupt-stack patch is a prerequisite.)
+Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+---
+ arch/arm64/kernel/ftrace.c |   11 ++++-------
+ 1 file changed, 4 insertions(+), 7 deletions(-)
 
-Basically,
-patch1 is a proactive improvement of function_graph tracer. 
-patch2 corresponds to II-4(functions under function_graph tracer).
-patch3, 4 and 5 correspond to II-1(slurping stack) and II-2(differences
-between x86 and arm64).
-patch6 is a function prologue analyzer test. This won't attest
-the correctness of the functionality, but it can suggest that all
-the traced functions are treated properly by this function.
-(Please note that patch3 has already been queued in Steven's for-next.)
-
-I tested the code with v4.3 + Jungseok's patch v5[4].
-
-Changes from v4:
-- removed a patch("arm64: ftrace: adjust callsite addresses examined
-		by stack tracer")
-- added a function prologue analyzer test(patch 6)
-
-Changes from v3:
-- fixed build errors/warnings reported by kbuild test robot
-- addressed Steven's comments around check_stack()
-- removed a patch ("arm64: ftrace: allow for tracing leaf functions")
-  I don't remember why I thought this was necessary, but anyhow "-pg" seems
-  to disable omit-leaf-stack-frame.
-
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-July/354126.html
-[2] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-July/355920.html 
-[3] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-September/368003.html
-[4] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-October/378699.html
-
-AKASHI Takahiro (6):
-  arm64: ftrace: modify a stack frame in a safe way
-  arm64: ftrace: fix a stack tracer's output under function graph
-    tracer
-  ftrace: allow arch-specific stack tracer
-  arm64: insn: add instruction decoders for ldp/stp and add/sub
-  arm64: ftrace: add arch-specific stack tracer
-  arm64: ftrace: add a test of function prologue analyzer
-
- arch/arm64/include/asm/ftrace.h     |    2 +
- arch/arm64/include/asm/insn.h       |   18 +++
- arch/arm64/include/asm/stacktrace.h |    4 +
- arch/arm64/kernel/ftrace.c          |   75 +++++++++-
- arch/arm64/kernel/insn.c            |  102 ++++++++++++++
- arch/arm64/kernel/stacktrace.c      |  258 ++++++++++++++++++++++++++++++++++-
- include/linux/ftrace.h              |   10 ++
- kernel/trace/trace_stack.c          |   80 ++++++-----
- 8 files changed, 502 insertions(+), 47 deletions(-)
-
+diff --git a/arch/arm64/kernel/ftrace.c b/arch/arm64/kernel/ftrace.c
+index c851be7..314f82d 100644
+--- a/arch/arm64/kernel/ftrace.c
++++ b/arch/arm64/kernel/ftrace.c
+@@ -125,23 +125,20 @@ void prepare_ftrace_return(unsigned long *parent, unsigned long self_addr,
+ 	 * on other archs. It's unlikely on AArch64.
+ 	 */
+ 	old = *parent;
+-	*parent = return_hooker;
+ 
+ 	trace.func = self_addr;
+ 	trace.depth = current->curr_ret_stack + 1;
+ 
+ 	/* Only trace if the calling function expects to */
+-	if (!ftrace_graph_entry(&trace)) {
+-		*parent = old;
++	if (!ftrace_graph_entry(&trace))
+ 		return;
+-	}
+ 
+ 	err = ftrace_push_return_trace(old, self_addr, &trace.depth,
+ 				       frame_pointer);
+-	if (err == -EBUSY) {
+-		*parent = old;
++	if (err == -EBUSY)
+ 		return;
+-	}
++	else
++		*parent = return_hooker;
+ }
+ 
+ #ifdef CONFIG_DYNAMIC_FTRACE
 -- 
 1.7.9.5
