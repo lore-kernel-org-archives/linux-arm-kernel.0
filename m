@@ -1,63 +1,39 @@
-From: German.Rivera@freescale.com (J. German Rivera)
-Date: Fri, 6 Nov 2015 15:48:49 -0600
-Subject: [PATCH] arm64: dts: Added syscon-reboot node for FSL's LS2080A SoC
-Message-ID: <1446846529-10613-1-git-send-email-German.Rivera@freescale.com>
+From: ssimran@broadcom.com (Simran Rai)
+Date: Fri, 6 Nov 2015 14:10:23 -0800
+Subject: [PATCH v2 1/2] dt-bindings: sound: Add DT bindings for Broadcom
+ Cygnus audio
+In-Reply-To: <20151106103147.GZ18409@sirena.org.uk>
+References: <1446502284-23907-2-git-send-email-ssimran@broadcom.com>
+ <20151104140746.GE1717@sirena.org.uk> <563BB5B0.5040501@broadcom.com>
+ <20151106103147.GZ18409@sirena.org.uk>
+Message-ID: <563D254F.9090000@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Added sys-reboot node to the FSL's LS2080A SoC DT to leverage
-the ARM-generic reboot mechanism for this SoC. This mechanism
-is enabled through CONFIG_POWER_RESET_SYSCON.
+Hi Mark,
 
-CHANGE HISTORY:
+On 11/6/2015 2:31 AM, Mark Brown wrote:
+> On Thu, Nov 05, 2015 at 12:01:52PM -0800, Simran Rai wrote:
+>> On 11/4/2015 6:07 AM, Mark Brown wrote:
+>>> On Mon, Nov 02, 2015 at 02:11:23PM -0800, Simran Rai wrote:
+>>>> +  Interfaces grouping of serial port. In multi-channel stereo, use
+>>>> +  "2_0", in 3.1 multi-channel grouping, use "3_1" and in 5.1
+>>>> +  multi-channel grouping, use "5_1".
+>>> I don't really understand what this means or why this is not runtime
+>>> configured.
+>> By runtime configured, do you mean passing the channel grouping through
+>> machine file? Is there any specific callback that I can use?
+> No, this appears to just be setting the number of channels which is
+> normally configured depending on how many channels userspace is playing.
+This audio driver uses 'params_channels()' to determine the number of 
+channels requested by userspace in TDM mode (multiple
+channels on one audio port). Channel grouping is another mode where more 
+than one audio ports are grouped together to form
+3.1 or 5.1 surround sound and this feature has been implemented through 
+device tree settings.
+At this point, I will take out channel grouping functionality because it 
+does not work as intended. In near future, once this feature
+is fixed, how do you suggest implementing it in the driver?
 
-Changes in v3:
-- Addressed comment from Stuart Yoder
-  * Fixed commit message to refer to LS2080A instead of LS2085A.
-
-Changes in v2:
-- Addressed comment form Stuart Yoder:
-  * Removed "@<address>" from reboot node
-
-Changes in v3:
-- Addressed comment form Stuart Yoder:
-  * Expose only the reset register
-
-Changes in v4:
-- Addressed comment from Arnd Bergmann:
-  * Changed compatible string to be more specific
-  * Changed node name to 'syscon' instead of 'rstcr'
-  * Changed address to lower case hex
-- Addressed comment form Stuart Yoder:
-  * Rebase on top of branch arm-soc/for-next
-
-Signed-off-by: J. German Rivera <German.Rivera@freescale.com>
----
- arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
-
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
-index e81cd48..a790a90 100644
---- a/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
-@@ -153,6 +153,18 @@
- 		};
- 	};
- 
-+	rstcr: syscon at 1e60000 {
-+		compatible = "fsl,ls2085a-rstcr", "syscon";
-+		reg = <0x0 0x1e60000 0x0 0x4>;
-+	};
-+
-+	reboot {
-+		compatible ="syscon-reboot";
-+		regmap = <&rstcr>;
-+		offset = <0x0>;
-+		mask = <0x2>;
-+	};
-+
- 	timer {
- 		compatible = "arm,armv8-timer";
- 		interrupts = <1 13 0x8>, /* Physical Secure PPI, active-low */
--- 
-2.3.3
+Thanks,
+Simran
