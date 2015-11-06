@@ -1,37 +1,22 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Fri, 6 Nov 2015 16:37:43 +0000
-Subject: [PATCH v2] arm64: defconfig: Enable samsung MFD and related
- configs
-In-Reply-To: <CAJKOXPeWerSTi2QedEwyHRVN4xA0vWM2CSOvb5v9SWUmOSPe7Q@mail.gmail.com>
-References: <1446787654-18306-1-git-send-email-alim.akhtar@samsung.com>
- <CAJKOXPeWerSTi2QedEwyHRVN4xA0vWM2CSOvb5v9SWUmOSPe7Q@mail.gmail.com>
-Message-ID: <20151106163743.GA7637@e104818-lin.cambridge.arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 06 Nov 2015 17:38:30 +0100
+Subject: i.MX6: Oops when unplugging a USB key
+In-Reply-To: <CAH-u=81BFm1nquN5z7hFN9auV=9dPMPkRFX_PneK22UXgPbJnA@mail.gmail.com>
+References: <CAH-u=81BFm1nquN5z7hFN9auV=9dPMPkRFX_PneK22UXgPbJnA@mail.gmail.com>
+Message-ID: <4306403.1Q6hpl8dCg@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 06, 2015 at 02:47:12PM +0900, Krzysztof Kozlowski wrote:
-> 2015-11-06 14:27 GMT+09:00 Alim Akhtar <alim.akhtar@samsung.com>:
-> > Exynos7 based espresso board uses S2MPS15, a multifunction device.
-> > This patch enables S2MPS1X regulator, pmic-clk and rtc drivers utilized by
-> > the same.
-> >
-> > Signed-off-by: Alim Akhtar <alim.akhtar@samsung.com>
-> > ---
-> > Changes since v1:
-> > * updated the comment message to describe which platfrom uses it.
-> > * enable COMMON_CLK_S2MPS11 which is needed to enable pmic-clk block.
-> >
-> >  arch/arm64/configs/defconfig |    4 ++++
-> >  1 file changed, 4 insertions(+)
-> 
-> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-> 
-> Catalin,
-> 
-> Are you usually taking such arm64 defconfig changes or should they go
-> through arm-soc?
+On Friday 06 November 2015 17:32:30 Jean-Michel Hautbois wrote:
+> I have an issue on my i.MX6 board I don't understand (kernel is a 4.2)...
+> When I connect a USB key, and then disconnect it, it oopses and
+> reboots (as I have panic on oops, and reboot on panic).
+> Seems to be on the umount part...
+> The USB is connected through a smsc95xx but I don't think this is related...
 
-Usually arm-soc but I don't mind either way.
+You should normally unmount the file system before unplugging.
 
--- 
-Catalin
+Did this work on other kernels? What happens if you unplug
+that stick on your laptop while the file system is mounted?
+
+	Arnd
