@@ -1,33 +1,31 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Fri, 6 Nov 2015 14:47:12 +0900
-Subject: [PATCH v2] arm64: defconfig: Enable samsung MFD and related
- configs
-In-Reply-To: <1446787654-18306-1-git-send-email-alim.akhtar@samsung.com>
-References: <1446787654-18306-1-git-send-email-alim.akhtar@samsung.com>
-Message-ID: <CAJKOXPeWerSTi2QedEwyHRVN4xA0vWM2CSOvb5v9SWUmOSPe7Q@mail.gmail.com>
+From: yangbo.lu@freescale.com (Yangbo Lu)
+Date: Fri, 6 Nov 2015 13:43:37 +0800
+Subject: [PATCH] ARM64: dts: ls2080a: fix eSDHC endianness
+Message-ID: <1446788617-35736-1-git-send-email-yangbo.lu@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-11-06 14:27 GMT+09:00 Alim Akhtar <alim.akhtar@samsung.com>:
-> Exynos7 based espresso board uses S2MPS15, a multifunction device.
-> This patch enables S2MPS1X regulator, pmic-clk and rtc drivers utilized by
-> the same.
->
-> Signed-off-by: Alim Akhtar <alim.akhtar@samsung.com>
-> ---
-> Changes since v1:
-> * updated the comment message to describe which platfrom uses it.
-> * enable COMMON_CLK_S2MPS11 which is needed to enable pmic-clk block.
->
->  arch/arm64/configs/defconfig |    4 ++++
->  1 file changed, 4 insertions(+)
+Add the "little-endian" property to fix the issue that eSDHC
+is not working and dumping out "mmc0: Controller never released
+inhibit bit(s)." error messages constantly.
 
-Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Fixes: 5461597f6ce0 ("dts/ls2080a: Update DTSI to add support of various peripherals")
+Signed-off-by: Yangbo Lu <yangbo.lu@freescale.com>
+---
+ arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi | 1 +
+ 1 file changed, 1 insertion(+)
 
-Catalin,
-
-Are you usually taking such arm64 defconfig changes or should they go
-through arm-soc?
-
-Best regards,
-Krzysztof
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
+index e81cd48..ed45e25 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
++++ b/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
+@@ -269,6 +269,7 @@
+ 			clock-frequency = <0>;	/* Updated by bootloader */
+ 			voltage-ranges = <1800 1800 3300 3300>;
+ 			sdhci,auto-cmd12;
++			little-endian;
+ 			bus-width = <4>;
+ 		};
+ 
+-- 
+2.1.0.27.g96db324
