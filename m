@@ -1,37 +1,39 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Fri, 6 Nov 2015 11:03:04 -0800
-Subject: [PATCH] Revert "ARM: dts: twl4030: Add iio properties for bci
- subnode"
-In-Reply-To: <CAMAWPa-7_q8Sf+4VQ0EE6zU-NvacKERFgjqueNif=52Frn0enA@mail.gmail.com>
-References: <1446826430-3705-1-git-send-email-sre@kernel.org>
- <CAMAWPa-7_q8Sf+4VQ0EE6zU-NvacKERFgjqueNif=52Frn0enA@mail.gmail.com>
-Message-ID: <20151106190304.GB3218@atomide.com>
+From: timur@codeaurora.org (Timur Tabi)
+Date: Fri, 6 Nov 2015 12:59:59 -0600
+Subject: [PATCH] tty: amba-pl011: add options to earlycon for 32-bit reg
+ access
+In-Reply-To: <563C1409.4070804@hurleysoftware.com>
+References: <1446770267-26749-1-git-send-email-timur@codeaurora.org>
+ <563C07C8.9060506@hurleysoftware.com> <563C09BB.9030706@codeaurora.org>
+ <563C1409.4070804@hurleysoftware.com>
+Message-ID: <563CF8AF.50808@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Kevin Hilman <khilman@kernel.org> [151106 10:37]:
-> On Fri, Nov 6, 2015 at 8:13 AM, Sebastian Reichel <sre@kernel.org> wrote:
-> > This reverts commit af19161aaed7ff8d1a52b2e517460f2fa0774e32,
-> > which breaks the omap3 device tree build due to a wrong reference.
-> >
-> > I accidently queued this change via the power supply subsystem while
-> > telling Marek at the same time, that it should go through Tony's tree.
-> > Following that I did miss Stephen's messages about the build failure in
-> > linux-next and since he switched to merging an older snapshot nobody
-> > else noticed the problem in my tree. I didn't notice myself, since I
-> > did not build any device tree files assuming none have changed by me.
-> >
-> > Signed-off-by: Sebastian Reichel <sre@kernel.org>
-> 
-> We also found this in kernelci.org build testing, and verified that
-> this fixes the build.
-> 
-> Tested-by: Kevin Hilman <khilman@linaro.org>
-> 
-> Thanks Felipe for reporting, and thanks Sebastian for the quick fix.
+On 11/05/2015 08:44 PM, Peter Hurley wrote:
+> Or better yet, for sbsa32 earlycon, just use the existing port type constructs.
+> So,
+>
+> 	earlycon=pl011,mmio32,0x3ced1000
+>
+> which will set port->iotype to UPIO_MEM32, which in turn can be used to select
+> the correct i/o width in pl011_putc().
 
-Acked-by: Tony Lindgren <tony@atomide.com>
+That's a great idea.  But why aren't we using it for pl011_write()?
 
-Thanks,
+static void pl011_write(unsigned int val, const struct uart_amba_port *uap,
+	unsigned int reg)
+{
+	void __iomem *addr = uap->port.membase + pl011_reg_to_offset(uap, reg);
 
-Tony
+	if (uap->port.iotype == UPIO_MEM32)
+		writel(val, addr);
+	else
+		writew(val, addr);
+}
+
+
+-- 
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the
+Code Aurora Forum, a Linux Foundation Collaborative Project.
