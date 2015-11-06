@@ -1,44 +1,84 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 6 Nov 2015 14:11:22 -0800
-Subject: [PATCH 03/19] clk: sunxi: Add TCON channel0 clock
-In-Reply-To: <CAGb2v66hjH_GpkXpHdpCM+mUv-CgvqxJNFzsoRJ5MWp04b+jew@mail.gmail.com>
-References: <1446214865-3972-1-git-send-email-maxime.ripard@free-electrons.com>
- <1446214865-3972-4-git-send-email-maxime.ripard@free-electrons.com>
- <CAGb2v66hjH_GpkXpHdpCM+mUv-CgvqxJNFzsoRJ5MWp04b+jew@mail.gmail.com>
-Message-ID: <20151106221122.GL6114@lukather>
+From: javier@dowhile0.org (Javier Martinez Canillas)
+Date: Fri, 6 Nov 2015 19:12:39 -0300
+Subject: [PATCH] arm64: dts: Added syscon-reboot node for FSL's LS2080A SoC
+In-Reply-To: <1446846529-10613-1-git-send-email-German.Rivera@freescale.com>
+References: <1446846529-10613-1-git-send-email-German.Rivera@freescale.com>
+Message-ID: <CABxcv=n6UTcdskBv8fqRzfes+nCjPaFbCTDGRRDt=MStdepwWA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hello J. German,
 
-On Sat, Oct 31, 2015 at 06:19:59PM +0800, Chen-Yu Tsai wrote:
-> > +#define SUN4I_A10_TCON_CH0_RESET_SHIFT 29
-> 
-> This is sun5i specific.
-> 
-> A10s manual says bit 30 is the LCD reset, while bit 29 is the TV
-> encoder reset.  A13/R8 don't mention TCON_CH0 clock. A10/A20 have no
-> separate TV encoder reset.
-> 
-> Please rename the clock.
+On Fri, Nov 6, 2015 at 6:48 PM, J. German Rivera
+<German.Rivera@freescale.com> wrote:
+> Added sys-reboot node to the FSL's LS2080A SoC DT to leverage
+> the ARM-generic reboot mechanism for this SoC. This mechanism
+> is enabled through CONFIG_POWER_RESET_SYSCON.
+>
 
-This thing with the A10s is odd, the channel 0 is only used for the
-LCD interface, and not the tv encoder (and both the A13 and R8 do have
-a TCON).
+What's in the changelog ends as a part of the commit message and
+usually the change history is not added there...
 
-But you're right, I've fixed it.
+> CHANGE HISTORY:
+>
+> Changes in v3:
+> - Addressed comment from Stuart Yoder
+>   * Fixed commit message to refer to LS2080A instead of LS2085A.
+>
+> Changes in v2:
+> - Addressed comment form Stuart Yoder:
+>   * Removed "@<address>" from reboot node
+>
+> Changes in v3:
+> - Addressed comment form Stuart Yoder:
+>   * Expose only the reset register
+>
+> Changes in v4:
+> - Addressed comment from Arnd Bergmann:
+>   * Changed compatible string to be more specific
+>   * Changed node name to 'syscon' instead of 'rstcr'
+>   * Changed address to lower case hex
+> - Addressed comment form Stuart Yoder:
+>   * Rebase on top of branch arm-soc/for-next
+>
+> Signed-off-by: J. German Rivera <German.Rivera@freescale.com>
+> ---
 
-Thanks!
-Maxime
+...so the change history should be added here, between the '---'
+marker line and the patch diff since that section is omitted by tools
+like git-am when applying patches.
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151106/a4d60d34/attachment.sig>
+>  arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi | 12 ++++++++++++
+>  1 file changed, 12 insertions(+)
+>
+> diff --git a/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
+> index e81cd48..a790a90 100644
+> --- a/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
+> +++ b/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
+> @@ -153,6 +153,18 @@
+>                 };
+>         };
+>
+> +       rstcr: syscon at 1e60000 {
+> +               compatible = "fsl,ls2085a-rstcr", "syscon";
+> +               reg = <0x0 0x1e60000 0x0 0x4>;
+> +       };
+> +
+> +       reboot {
+> +               compatible ="syscon-reboot";
+> +               regmap = <&rstcr>;
+> +               offset = <0x0>;
+> +               mask = <0x2>;
+> +       };
+> +
+>         timer {
+>                 compatible = "arm,armv8-timer";
+>                 interrupts = <1 13 0x8>, /* Physical Secure PPI, active-low */
+> --
+
+The patch looks good to me though.
+
+Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
+
+Best regards,
+Javier
