@@ -1,103 +1,61 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Fri, 6 Nov 2015 17:42:51 +0100
-Subject: [PATCH 0/2] mmc: sdhci: potentially bad behavior when using vmmc
- supply
-In-Reply-To: <1446825570-30029-1-git-send-email-ludovic.desroches@atmel.com>
-References: <1446825570-30029-1-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <CAPDyKFrNNyUrJemgA2OHL35EqpG74_1i9bCqkVkZZZMxNGrHgw@mail.gmail.com>
+From: jassisinghbrar@gmail.com (Jassi Brar)
+Date: Fri, 6 Nov 2015 22:19:21 +0530
+Subject: [GIT PULL] Mailbox changes for v4.4
+Message-ID: <CABb+yY1t9CCMmCn25KGBPOSVvOJA5Kht9UNekoTQN6udXZEg3A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 6 November 2015 at 16:59, Ludovic Desroches
-<ludovic.desroches@atmel.com> wrote:
-> Hi,
->
-> I would like to have some feedback for these two patches. I have two questions.
->
-> 1.
->
-> To suppress the warnings telling me I have no vmmc and vqmmc supplies, I have
-> added them and discovered that adding a vmmc supply involve only writing 1 in
-> the Power Control Register involves enabling the SD Bus Power with a non valid
-> value for the SD Bus Voltage. If the host controllers strictly follows the
-> specification, it shall not enable SD Bus Power. So enough if it seems useless
-> to configure SD Bus Voltage because we have an external regulator, do it.
+Hi Linus,
 
-I can't give you a detailed answer about the sdhci HW as I only have
-limited knowledge.
+The following changes since commit 049e6dde7e57f0054fdc49102e7ef4830c698b46:
 
-What I can say is that people have been trying to fix all kind of
-crazy corner cases by adding quirks and callbacks. This seems like yet
-another one.
+  Linux 4.3-rc4 (2015-10-04 16:57:17 +0100)
 
-So, by turning sdhci into a set of library functions you could easier
-pick and decide to what suites your particular variant. In this case
-it seems like would have relied on using the external regulators to
-control voltages, instead of some internal sdhci registers.
+are available in the git repository at:
 
->
-> By the way, I am curious to understand what is really the SD Bus Voltage. I
-> mean talking about bus voltage makes me thinking more about vqmmc than vmmc.
-> Is it only bad naming or do I miss something?
->
-> From the specification, there is this figure:
->
->                     HOST
-> ---------------------------------------------------
-> | ------------        3.3V                        |       VDD
-> | | Power SW |------------------------------------|----------
-> | ------------   |              |                 |
-> |       ---------|              |                 |
-> |       |                       |                 |
-> | --------------     ----------------------       |
-> | | Ref. Volt. |-----| Regulator/Selector |       |
-> | --------------     ----------------------       |
-> |                    3.3V/1.8V  |                 |
-> |                               |                 |
-> |                               |---------------  |
-> |                               |       |  |   |  |
-> |                               |       R  R   _  |
-> |                               |       |  |   _  |
-> |                               |       |  |   |  |
-> |                               |       |  |  /// |
-> |                            -------    |  |      |       CLK
-> |                            |     |----)--)------|----------
-> |  -----------------------   |Multi|    |  |      |       CMD
-> |  |Random Logic Circuits|---|Drive|----)---------|----------
-> |  -----------------------   |I/O  |    |         |       DAT
-> |                            |     |--------------|----------
-> |                            -------              |
-> ---------------------------------------------------
->
-> In my mind vmmc is the 3.3V signal and vqmmc is the 3.3V/1.8V signal, so why
-> talking about bus voltage?
+  git://git.linaro.org/landing-teams/working/fujitsu/integration.git
+mailbox-for-next
 
-"IO voltage", "bus voltage", "VQMMC", etc they all mean the same thing
-to me. It's the voltage level of the signals going to the card.
+for you to fetch changes up to cb1ca0b3bb6681310e7fe9d29d6d4c76dd71801d:
 
->
->
-> 2.
->
-> Is the regulator-gpio usage the right thing to do for vqmmc? In my case it is
-> not really driven by a gpio but by a pio from the sdhci device. In the binding,
+  mailbox: mailbox-test: avoid reading iomem twice (2015-11-04 14:03:04 +0530)
 
-What's a "pio"?
+----------------------------------------------------------------
 
-What do you mean by the it's driven from the sdhci device?
+A TI specific quirk to get CPU control working via remote master.
+A new mailbox driver for an ST platform.
+A generic test driver to aid new driver development. And a couple
+     of fixes to make that really clean.
 
-Is it the internal HW logic of the sdhci controller that manages the
-IO voltage? And this logic can be controlled via certain register bits
-in the SDHCI controller?
+----------------------------------------------------------------
+Dan Carpenter (1):
+      mailbox: Off by one in mbox_test_message_read()
 
-> declaring the gpio is an option so I thought using this regulator fits my need.
+Dave Gerlach (1):
+      mailbox/omap: Add ti,mbox-send-noirq quirk to fix AM33xx CPU Idle
 
-In quite many cases it makes sense to model this though a gpio
-regulator. For example when you use a level shifter circuit. Those
-normally have gpio pin routed to control the voltage level output for
-the signals. For example switching between 1.8V and 2.9V.
+Jassi Brar (1):
+      mailbox: mailbox-test: avoid reading iomem twice
 
-[...]
+Lee Jones (5):
+      mailbox: dt: Supply bindings for ST's Mailbox IP
+      mailbox: Add support for ST's Mailbox IP
+      mailbox: Add generic mechanism for testing Mailbox Controllers
+      mailbox: Fix a couple of trivial static checker issues
+      mailbox: mailbox-test: Correctly repair Sparse warnings
 
-Kind regards
-Uffe
+Sudip Mukherjee (1):
+      PCC: fix dereference of ERR_PTR
+
+ .../devicetree/bindings/mailbox/omap-mailbox.txt   |   8 +
+ .../devicetree/bindings/mailbox/sti-mailbox.txt    |  51 ++
+ drivers/mailbox/Kconfig                            |  14 +
+ drivers/mailbox/Makefile                           |   4 +
+ drivers/mailbox/mailbox-sti.c                      | 513 +++++++++++++++++++++
+ drivers/mailbox/mailbox-test.c                     | 361 +++++++++++++++
+ drivers/mailbox/omap-mailbox.c                     |  49 +-
+ drivers/mailbox/pcc.c                              |   2 +-
+ 8 files changed, 997 insertions(+), 5 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/mailbox/sti-mailbox.txt
+ create mode 100644 drivers/mailbox/mailbox-sti.c
+ create mode 100644 drivers/mailbox/mailbox-test.c
