@@ -1,38 +1,50 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 6 Nov 2015 11:37:41 -0800
-Subject: [PATCH 19/19] ARM: sun5i: chip: Enable the TV Encoder
-In-Reply-To: <CAGb2v66vjp=5GtGD-0i3OOw-wK3H4bogfvPoNzuwYvY8vt4fMQ@mail.gmail.com>
-References: <1446214865-3972-1-git-send-email-maxime.ripard@free-electrons.com>
- <1446214865-3972-20-git-send-email-maxime.ripard@free-electrons.com>
- <CAGb2v66vjp=5GtGD-0i3OOw-wK3H4bogfvPoNzuwYvY8vt4fMQ@mail.gmail.com>
-Message-ID: <20151106193741.GJ6114@lukather>
+From: balbi@ti.com (Felipe Balbi)
+Date: Fri, 6 Nov 2015 13:38:38 -0600
+Subject: [PATCH] arm: omap2: board-generic: use omap4_local_timer_init for
+ AM437x
+In-Reply-To: <563C5F3C.5090900@ti.com>
+References: <1445375159-22234-1-git-send-email-balbi@ti.com>
+ <563C5F3C.5090900@ti.com>
+Message-ID: <87d1vmyl35.fsf@saruman.tx.rr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chen-Yu,
 
-On Fri, Oct 30, 2015 at 11:20:41PM +0800, Chen-Yu Tsai wrote:
-> On Fri, Oct 30, 2015 at 10:21 PM, Maxime Ripard
-> <maxime.ripard@free-electrons.com> wrote:
-> > The TV encoder is used to drive VGA and composite display.
-> >
-> > Enable it on the CHIP
-> 
-> The commit message does not match the contents. Missing a patch? :)
+Hi,
 
-No, I changed the commit a bit, and forgot to update the message :)
+Lokesh Vutla <a0131933@ti.com> writes:
+> On Wednesday 21 October 2015 02:35 AM, Felipe Balbi wrote:
+>> AM437x-based boards, can use omap4_local_timer_init()
+>> just fine. Let's use that instead.
+>
+> This is breaking AM43x-epos board.
+> Today's Linux next: http://pastebin.ubuntu.com/13122620/
+> Reverting this patch: http://pastebin.ubuntu.com/13122621/
 
-Thanks!
-Maxime
+seems like the 32k timer isn't ticking. I don't have EPOS around, care
+to confirm if that board has 32k oscillator populated ? If it doesn't,
+then we should probably disable counter32k:
+
+diff --git a/arch/arm/boot/dts/am43x-epos-evm.dts b/arch/arm/boot/dts/am43x-epos-evm.dts
+index 86c2dfbe8875..e703e32b6da6 100644
+--- a/arch/arm/boot/dts/am43x-epos-evm.dts
++++ b/arch/arm/boot/dts/am43x-epos-evm.dts
+@@ -792,3 +792,8 @@
+ 	tx-num-evt = <32>;
+ 	rx-num-evt = <32>;
+ };
++
++/* 32kHz oscillator not populated */
++&counter32k {
++	status = "disabled";
++};
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+balbi
 -------------- next part --------------
 A non-text attachment was scrubbed...
 Name: signature.asc
 Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151106/65e75bc4/attachment.sig>
+Size: 818 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151106/66fe5beb/attachment.sig>
