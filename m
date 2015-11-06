@@ -1,43 +1,51 @@
-From: mpe@ellerman.id.au (Michael Ellerman)
-Date: Fri, 06 Nov 2015 20:39:59 +1100
-Subject: [RFC PATCH 0/3]perf/core: extend perf_reg and
- perf_sample_regs_intr
-In-Reply-To: <563C5AFD.9040102@linux.vnet.ibm.com>
-References: <1446669978-6366-1-git-send-email-maddy@linux.vnet.ibm.com>
- <20151105130716.GC3604@twins.programming.kicks-ass.net>
- <20151106025844.GA28859@us.ibm.com> <563C5AFD.9040102@linux.vnet.ibm.com>
-Message-ID: <1446802799.21859.1.camel@ellerman.id.au>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Fri, 6 Nov 2015 09:44:13 +0000
+Subject: [PATCH] arm64: cmpxchg_dbl: fix return value type
+In-Reply-To: <20151105173114.GU7637@e104818-lin.cambridge.arm.com>
+References: <1446732056-31294-1-git-send-email-lorenzo.pieralisi@arm.com>
+ <20151105173114.GU7637@e104818-lin.cambridge.arm.com>
+Message-ID: <20151106094413.GA1499@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2015-11-06 at 13:17 +0530, Madhavan Srinivasan wrote:
-> On Friday 06 November 2015 08:28 AM, Sukadev Bhattiprolu wrote:
-> > Peter Zijlstra [peterz at infradead.org] wrote:
-> > > On Thu, Nov 05, 2015 at 02:16:15AM +0530, Madhavan Srinivasan wrote:
-> > > > Second patch updates struct arch_misc_reg for arch/powerpc with pmu registers
-> > > > and adds offsetof macro for the same. It extends perf_reg_value()
-> > > > to use reg idx to decide on struct to return value from.
-> > > 
-> > > Why; what's in those regs?
+On Thu, Nov 05, 2015 at 05:31:14PM +0000, Catalin Marinas wrote:
+> On Thu, Nov 05, 2015 at 02:00:56PM +0000, Lorenzo Pieralisi wrote:
+> > The current arm64 __cmpxchg_double{_mb} implementations carry out the
+> > compare exchange by first comparing the old values passed in to the
+> > values read from the pointer provided and by stashing the cumulative
+> > bitwise difference in a 64-bit register.
 > > 
-> > Those are PMU control registers/counters (in Patch 2) that are of
-> > interest only in the context of a PMU interrupt and not relevant
-> > to ptrace itself.
+> > By comparing the register content against 0, it is possible to detect if
+> > the values read differ from the old values passed in, so that the compare
+> > exchange detects whether it has to bail out or carry on completing the
+> > operation with the exchange.
+> > 
+> > Given the current implementation, to detect the cmpxchg operation
+> > status, the __cmpxchg_double{_mb} functions should return the 64-bit
+> > stashed bitwise difference so that the caller can detect cmpxchg failure
+> > by comparing the return value content against 0. The current implementation
+> > declares the return value as an int, which means that the 64-bit
+> > value stashing the bitwise difference is truncated before being
+> > returned to the __cmpxchg_double{_mb} callers, which means that
+> > any bitwise difference present in the top 32 bits goes undetected,
+> > triggering false positives and subsequent kernel failures.
+> > 
+> > This patch fixes the issue by declaring the arm64 __cmpxchg_double{_mb}
+> > return values as a long, so that the bitwise difference is
+> > properly propagated on failure, restoring the expected behaviour.
+> > 
+> > Fixes: e9a4b795652f ("arm64: cmpxchg_dbl: patch in lse instructions when
+> > supported by the CPU")
+> > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> > Cc: <stable@vger.kernel.org>
+> > Cc: Will Deacon <will.deacon@arm.com>
+> > Cc: Catalin Marinas <catalin.marinas@arm.com>
+> > Cc: Marc Zyngier <marc.zyngier@arm.com>
 > 
-> Yes. Thats right.
+> Applied (I'll send it sometime this merging window). Thanks.
 
-> > Could we add those registers to 'struct pt_regs' anyway?
-> 
-> I would prefer not to. Since as you mentioned, these are
-> not relevant to ptrace. Currently patch 2, adds only few
-> pmu registers, but would like to include more.
+Thanks, I mistakenly thought this should be sent to stable for 4.2, but
+actually I was wrong so Cc stable should be dropped to avoid noise.
 
-You can't just add them to pt_regs, it's part of the userspace ABI.
-
-We could define a kernel internal version of pt_regs, but I don't think we want
-to for this.
-
-If we did that would bloat pt_regs for all users in the kernel, when we really
-only want these regs for perf.
-
-cheers
+Thanks a lot,
+Lorenzo
