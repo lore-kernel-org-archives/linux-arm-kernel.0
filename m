@@ -1,37 +1,73 @@
-From: carlo@caione.org (Carlo Caione)
-Date: Fri,  6 Nov 2015 22:55:06 +0100
-Subject: [PATCH 4/4] ARM: dts: meson8b: Add watchdog node
-In-Reply-To: <1446846906-31520-1-git-send-email-carlo@caione.org>
-References: <1446846906-31520-1-git-send-email-carlo@caione.org>
-Message-ID: <1446846906-31520-5-git-send-email-carlo@caione.org>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Fri, 6 Nov 2015 14:02:49 -0800
+Subject: [PATCH v4 1/2] watchdog: imx2_wdt: add external reset support
+ via 'ext-reset-output' dt prop
+In-Reply-To: <CAJ+vNU2fSxRJ7YvxOfNzoEoiKgzv-dHj=+eksKxH48ekHiUw2Q@mail.gmail.com>
+References: <1446758362-11702-1-git-send-email-akshay.bhat@timesys.com>
+ <1446758362-11702-2-git-send-email-akshay.bhat@timesys.com>
+ <20151105222325.GA26159@roeck-us.net>
+ <CAJ+vNU2fSxRJ7YvxOfNzoEoiKgzv-dHj=+eksKxH48ekHiUw2Q@mail.gmail.com>
+Message-ID: <20151106220249.GA19791@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Carlo Caione <carlo@endlessm.com>
+On Fri, Nov 06, 2015 at 11:53:42AM -0800, Tim Harvey wrote:
+> On Thu, Nov 5, 2015 at 2:23 PM, Guenter Roeck <linux@roeck-us.net> wrote:
+> > On Thu, Nov 05, 2015 at 04:19:21PM -0500, Akshay Bhat wrote:
+> >> From: Tim Harvey <tharvey@gateworks.com>
+> >>
+> >> The IMX6 watchdog supports assertion of a signal (WDOG_B) which
+> >> can be pinmux'd to an external pin. This is typically used for boards that
+> >> have PMIC's in control of the IMX6 power rails. In fact, failure to use
+> >> such an external reset on boards with external PMIC's can result in various
+> >> hangs due to the IMX6 not being fully reset [1] as well as the board failing
+> >> to reset because its PMIC has not been reset to provide adequate voltage for
+> >> the CPU when coming out of reset at 800Mhz.
+> >>
+> >> This uses a new device-tree property 'ext-reset-output' to indicate the
+> >> board has such a reset and to cause the watchdog to be configured to assert
+> >> WDOG_B instead of an internal reset both on a watchdog timeout and in
+> >> system_restart.
+> >>
+> >> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-March/333689.html
+> >>
+> >> Cc: Lucas Stach <l.stach@pengutronix.de>
+> >> Signed-off-by: Tim Harvey <tharvey@gateworks.com>
+> >> ---
+> >>  .../devicetree/bindings/watchdog/fsl-imx-wdt.txt     |  2 ++
+> >>  drivers/watchdog/imx2_wdt.c                          | 20 ++++++++++++++++++--
+> >>  2 files changed, 20 insertions(+), 2 deletions(-)
+> >>
+> >> diff --git a/Documentation/devicetree/bindings/watchdog/fsl-imx-wdt.txt b/Documentation/devicetree/bindings/watchdog/fsl-imx-wdt.txt
+> >> index 8dab6fd..9b89b3a 100644
+> >> --- a/Documentation/devicetree/bindings/watchdog/fsl-imx-wdt.txt
+> >> +++ b/Documentation/devicetree/bindings/watchdog/fsl-imx-wdt.txt
+> >> @@ -9,6 +9,8 @@ Optional property:
+> >
+> > properties ?
+> >
+> >>  - big-endian: If present the watchdog device's registers are implemented
+> >>    in big endian mode, otherwise in native mode(same with CPU), for more
+> >>    detail please see: Documentation/devicetree/bindings/regmap/regmap.txt.
+> >> +- ext-reset-output: If present the watchdog device is configured to assert its
+> >
+> > Should that have a vendor prefix ? Also, not sure if "-output"
+> > has any real value in the property name. "fsl,external-reset", maybe ?
+> 
+> Hi Guenter,
+> 
+> I don't see why a vendor prefix is necessary - its a feature of the
+> IMX6 watchdog supported by this driver to be able to trigger an
+> internal chip-level reset and/or an external signal that can be hooked
+> to additional hardware.
+> 
+Sounded like vendor specific to me, but then I am not a devicetree maintainer,
+so I am not an authority on the subject.
 
-With this patch we add the watchdog node in the meson8b DTS file.
+> I started with ext-reset, but it was suggested
+> (http://lists.infradead.org/pipermail/linux-arm-kernel/2015-May/347437.html)
+> to also make it clear that this is an 'output' and not a reset input.
+> 
+No problem, as long as you get an Ack from a devicetree maintainer.
 
-Signed-off-by: Carlo Caione <carlo@endlessm.com>
----
- arch/arm/boot/dts/meson8b.dtsi | 6 ++++++
- 1 file changed, 6 insertions(+)
-
-diff --git a/arch/arm/boot/dts/meson8b.dtsi b/arch/arm/boot/dts/meson8b.dtsi
-index ee352bf..8bad557 100644
---- a/arch/arm/boot/dts/meson8b.dtsi
-+++ b/arch/arm/boot/dts/meson8b.dtsi
-@@ -105,6 +105,12 @@
- 			#interrupt-cells = <3>;
- 		};
- 
-+		wdt: watchdog at c1109900 {
-+			compatible = "amlogic,meson8b-wdt";
-+			reg = <0xc1109900 0x8>;
-+			interrupts = <0 0 1>;
-+		};
-+
- 		timer at c1109940 {
- 			compatible = "amlogic,meson6-timer";
- 			reg = <0xc1109940 0x18>;
--- 
-1.9.1
+Guenter
