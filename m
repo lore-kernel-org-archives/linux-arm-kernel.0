@@ -1,46 +1,57 @@
-From: khilman@kernel.org (Kevin Hilman)
-Date: Fri, 6 Nov 2015 15:05:23 -0800
-Subject: [PATCH] arm: Use kernel mm when updating section permissions
-In-Reply-To: <7hmvuqg3f1.fsf@deeprootsystems.com>
-References: <1446685239-28522-1-git-send-email-labbott@fedoraproject.org>
- <20151105094615.GP8644@n2100.arm.linux.org.uk>
- <563B81DA.2080409@redhat.com>
- <20151105162719.GQ8644@n2100.arm.linux.org.uk>
- <563BFCC4.8050705@redhat.com>
- <CAGXu5jLS8GPxmMQwd9qw+w+fkMqU-GYyME5WUuKZZ4qTesVzCQ@mail.gmail.com>
- <563CF510.9080506@redhat.com>
- <CAGXu5jKLgL0Kt5xCWv-3ZUX94m1DNXLqsEDQKHoq7T=m6P7tvQ@mail.gmail.com>
- <CAGXu5j+Jeg-Cwc7Tr8UeY9vkJLudw07+b=m0h-d9GuSyKiO4QA@mail.gmail.com>
- <CAMAWPa9XvdS+dF78c7Fgs4ekRy7wVnfFT=0A5NLpu0UYaqV7fA@mail.gmail.com>
- <CAGXu5j+U-Q2R1Hw4qSPpFUKz3xyYrASGc5buMJTSy0K-3mWHBA@mail.gmail.com>
- <7h8u6ahm7d.fsf@deeprootsystems.com>
- <CAGXu5jJnjHkkX3y31y5LJFhNrP=A8_BASg2MUR5rwA5MLPeVQg@mail.gmail.com>
- <7hmvuqg3f1.fsf@deeprootsystems.com>
-Message-ID: <CAMAWPa_i9H9nw_hY5-=hJmenhXW2u_9DSKgZ5mEV0c_afGgqcQ@mail.gmail.com>
+From: sbranden@broadcom.com (Scott Branden)
+Date: Fri, 6 Nov 2015 15:16:24 -0800
+Subject: [PATCH v3 4/4] ARM: BCM: Add SMP support for Broadcom 4708
+In-Reply-To: <563D1ED1.6050506@hauke-m.de>
+References: <1446844273-6460-1-git-send-email-kapilh@broadcom.com>
+ <1446844273-6460-5-git-send-email-kapilh@broadcom.com>
+ <563D1ED1.6050506@hauke-m.de>
+Message-ID: <563D34C8.4030706@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 6, 2015 at 2:37 PM, Kevin Hilman <khilman@kernel.org> wrote:
-> Kees Cook <keescook@chromium.org> writes:
->
->> On Fri, Nov 6, 2015 at 1:06 PM, Kevin Hilman <khilman@kernel.org> wrote:
->
-> [...]
->
->> Well, all the stuff I wrote tests for in lkdtm expect the kernel to
->> entirely Oops, and examining the Oops from outside is needed to verify
->> it was the correct type of Oops. I don't think testing via lkdtm can
->> be done from kselftest sensibly.
->
-> Well, at least on arm32, it's definitely oops'ing, but it's not a full
-> panic, so the oops could be grabbed from dmesg.
->
-> FWIW, below is a log from and arm32 board running mainline v4.3 that
-> runs through all the non-panic/lockup tests one after the other without
-> a reboot.
+Hi Hauke,
 
-... however, a run on arm64 and it locks up after the OVERFLOW test,
-so I think you're right that we need an "outside observer" to reliably
-determine pass/fail on these.  We'll start looking at that.
+On 15-11-06 01:42 PM, Hauke Mehrtens wrote:
+> On 11/06/2015 10:11 PM, Kapil Hali wrote:
+>> From: Jon Mason <jonmason@broadcom.com>
+>>
+>> Add SMP support for Broadcom's 4708 SoCs.
+>>
+>> Signed-off-by: Jon Mason <jonmason@broadcom.com>
+>> Acked-by: Hauke Mehrtens <hauke@hauke-m.de>
+>> Tested-by: Hauke Mehrtens <hauke@hauke-m.de>
+>> Signed-off-by: Kapil Hali <kapilh@broadcom.com>
+>
+> I tested this on a Netgear R6250 V1 (BCM4708) and SMP worked.
+>
+>> ---
+>>   arch/arm/boot/dts/bcm4708.dtsi | 2 ++
+>>   arch/arm/mach-bcm/Kconfig      | 1 +
+>>   arch/arm/mach-bcm/Makefile     | 3 +++
+>>   3 files changed, 6 insertions(+)
+>>
+>
+> ...
+>
+>> --- a/arch/arm/mach-bcm/Kconfig
+>> +++ b/arch/arm/mach-bcm/Kconfig
+>> @@ -54,6 +54,7 @@ config ARCH_BCM_NSP
+>>   config ARCH_BCM_5301X
+>>   	bool "Broadcom BCM470X / BCM5301X ARM SoC" if ARCH_MULTI_V7
+>>   	select ARCH_BCM_IPROC
+>
+> You activated ARM_ERRATA_764369 for NSP is this not needed for NS?
+>
+You would have to read the ARM CPU register and then compare to ARM 
+Errata to see whether the Errata affects NS or not.
+>
+>> +	select HAVE_SMP
+>>   	help
+>>   	  Support for Broadcom BCM470X and BCM5301X SoCs with ARM CPU cores.
+>>
+>
+> ...
+>
 
-Kevin
+Regards,
+Scott
