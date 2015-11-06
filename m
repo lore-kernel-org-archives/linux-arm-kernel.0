@@ -1,100 +1,61 @@
-From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
-Date: Fri, 6 Nov 2015 15:29:20 +0900
-Subject: [PATCH 01/12 v6] arm64: renesas: r8a7795: add AUDIO_DMAC support
-In-Reply-To: <87egg3k5g6.wl%kuninori.morimoto.gx@renesas.com>
-References: <87egg3k5g6.wl%kuninori.morimoto.gx@renesas.com>
-Message-ID: <87d1vnk5dr.wl%kuninori.morimoto.gx@renesas.com>
+From: alison.wang@freescale.com (Huan Wang)
+Date: Fri, 6 Nov 2015 06:35:06 +0000
+Subject: [PATCH] arm: kernel: utilize hrtimer based broadcast
+In-Reply-To: <20151027081834.GB1425@svinekod>
+References: <1437124312-44700-1-git-send-email-b18965@freescale.com>
+ <20151027081834.GB1425@svinekod>
+Message-ID: <BN3PR0301MB08677D6B591DD7E5BD7341D7FE280@BN3PR0301MB0867.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
 
-From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+	Could you help to review this patch?
 
-Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-Reviewed-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
-v5 -> v6
+	Thanks.
 
- - no change
 
- arch/arm64/boot/dts/renesas/r8a7795.dtsi | 64 ++++++++++++++++++++++++++++++++
- 1 file changed, 64 insertions(+)
+Best Regards,
+Alison Wang
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-index fc76934..e419163 100644
---- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-+++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-@@ -202,6 +202,70 @@
- 			#power-domain-cells = <0>;
- 		};
- 
-+		audma0: dma-controller at ec700000 {
-+			compatible = "renesas,rcar-dmac";
-+			reg = <0 0xec700000 0 0x10000>;
-+			interrupts =	<0 350 IRQ_TYPE_LEVEL_HIGH
-+					 0 320 IRQ_TYPE_LEVEL_HIGH
-+					 0 321 IRQ_TYPE_LEVEL_HIGH
-+					 0 322 IRQ_TYPE_LEVEL_HIGH
-+					 0 323 IRQ_TYPE_LEVEL_HIGH
-+					 0 324 IRQ_TYPE_LEVEL_HIGH
-+					 0 325 IRQ_TYPE_LEVEL_HIGH
-+					 0 326 IRQ_TYPE_LEVEL_HIGH
-+					 0 327 IRQ_TYPE_LEVEL_HIGH
-+					 0 328 IRQ_TYPE_LEVEL_HIGH
-+					 0 329 IRQ_TYPE_LEVEL_HIGH
-+					 0 330 IRQ_TYPE_LEVEL_HIGH
-+					 0 331 IRQ_TYPE_LEVEL_HIGH
-+					 0 332 IRQ_TYPE_LEVEL_HIGH
-+					 0 333 IRQ_TYPE_LEVEL_HIGH
-+					 0 334 IRQ_TYPE_LEVEL_HIGH
-+					 0 335 IRQ_TYPE_LEVEL_HIGH>;
-+			interrupt-names = "error",
-+					"ch0", "ch1", "ch2", "ch3",
-+					"ch4", "ch5", "ch6", "ch7",
-+					"ch8", "ch9", "ch10", "ch11",
-+					"ch12", "ch13", "ch14", "ch15";
-+			clocks = <&cpg CPG_MOD 502>;
-+			clock-names = "fck";
-+			power-domains = <&cpg>;
-+			#dma-cells = <1>;
-+			dma-channels = <16>;
-+		};
-+
-+		audma1: dma-controller at ec720000 {
-+			compatible = "renesas,rcar-dmac";
-+			reg = <0 0xec720000 0 0x10000>;
-+			interrupts =	<0 351 IRQ_TYPE_LEVEL_HIGH
-+					 0 336 IRQ_TYPE_LEVEL_HIGH
-+					 0 337 IRQ_TYPE_LEVEL_HIGH
-+					 0 338 IRQ_TYPE_LEVEL_HIGH
-+					 0 339 IRQ_TYPE_LEVEL_HIGH
-+					 0 340 IRQ_TYPE_LEVEL_HIGH
-+					 0 341 IRQ_TYPE_LEVEL_HIGH
-+					 0 342 IRQ_TYPE_LEVEL_HIGH
-+					 0 343 IRQ_TYPE_LEVEL_HIGH
-+					 0 344 IRQ_TYPE_LEVEL_HIGH
-+					 0 345 IRQ_TYPE_LEVEL_HIGH
-+					 0 346 IRQ_TYPE_LEVEL_HIGH
-+					 0 347 IRQ_TYPE_LEVEL_HIGH
-+					 0 348 IRQ_TYPE_LEVEL_HIGH
-+					 0 349 IRQ_TYPE_LEVEL_HIGH
-+					 0 382 IRQ_TYPE_LEVEL_HIGH
-+					 0 383 IRQ_TYPE_LEVEL_HIGH>;
-+			interrupt-names = "error",
-+					"ch0", "ch1", "ch2", "ch3",
-+					"ch4", "ch5", "ch6", "ch7",
-+					"ch8", "ch9", "ch10", "ch11",
-+					"ch12", "ch13", "ch14", "ch15";
-+			clocks = <&cpg CPG_MOD 501>;
-+			clock-names = "fck";
-+			power-domains = <&cpg>;
-+			#dma-cells = <1>;
-+			dma-channels = <16>;
-+		};
-+
- 		pfc: pfc at e6060000 {
- 			compatible = "renesas,pfc-r8a7795";
- 			reg = <0 0xe6060000 0 0x50c>;
--- 
-1.9.1
+> On Fri, Jul 17, 2015 at 10:11:52AM +0100, Alison Wang wrote:
+> > Hrtimer based broadcast is used on ARM platform. It can be registered
+> > as the tick broadcast device in the absence of a real external clock;
+> > device.
+> >
+> > Signed-off-by: Alison Wang <alison.wang@freescale.com>
+> 
+> This looks sensible to me. FWIW:
+> 
+> Acked-by: Mark Rutland <mark.rutland@arm.com>
+> 
+> Thanks,
+> Mark.
+> 
+> > ---
+> >  arch/arm/kernel/time.c | 3 +++
+> >  1 file changed, 3 insertions(+)
+> >
+> > diff --git a/arch/arm/kernel/time.c b/arch/arm/kernel/time.c index
+> > a66e37e..a9bc73c 100644
+> > --- a/arch/arm/kernel/time.c
+> > +++ b/arch/arm/kernel/time.c
+> > @@ -12,6 +12,7 @@
+> >   *  reading the RTC at bootup, etc...
+> >   */
+> >  #include <linux/clk-provider.h>
+> > +#include <linux/clockchips.h>
+> >  #include <linux/clocksource.h>
+> >  #include <linux/errno.h>
+> >  #include <linux/export.h>
+> > @@ -121,5 +122,7 @@ void __init time_init(void)
+> >  		of_clk_init(NULL);
+> >  #endif
+> >  		clocksource_of_init();
+> > +
+> > +		tick_setup_hrtimer_broadcast();
+> >  	}
+> >  }
+> > --
+> > 2.1.0.27.g96db324
+> >
