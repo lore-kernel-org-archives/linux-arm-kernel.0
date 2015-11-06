@@ -1,70 +1,82 @@
 From: wxt@rock-chips.com (Caesar Wang)
-Date: Fri,  6 Nov 2015 19:38:13 +0800
-Subject: [PATCH v2 0/3] Support more sample rates, let the rates normal work
-Message-ID: <1446809896-11254-1-git-send-email-wxt@rock-chips.com>
+Date: Fri,  6 Nov 2015 19:38:14 +0800
+Subject: [PATCH v2 1/3] ASoC: rockchip: i2s: change bclk and lrck according to
+ sample rates
+In-Reply-To: <1446809896-11254-1-git-send-email-wxt@rock-chips.com>
+References: <1446809896-11254-1-git-send-email-wxt@rock-chips.com>
+Message-ID: <1446809896-11254-2-git-send-email-wxt@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-That's seem the moment rockchip-codec driver other than 44100 and 48000
-do not work.
-Says the (max98090, rt5640).
+This patch sets the dividers autonomously.
 
-----
-As the chromeos reported
-issue:(https://chromium.googlesource.com/chromiumos/third_party/kernel/+/v3.14)
+when i2s works on master mode, and sample rates changed. We need to change
+bclk and lrck at the same time for cpu internal side.
 
-For detail:
-        In that bug we want to add 32000 to
-        sound/soc/rockchip/rockchip_max98090.c rk_aif1_hw_params.
-        However that does not work.
+As the input source clock to the module is MCLK_I2S,
+and by the divider of the module, the clock generator generates
+SCLK and LRCK to transmitter and receiver.
 
-        Previously, in
-        https://chromium-review.googlesource.com/#/c/268398/ , rate
-        8000, 1600, 96000 were added.
-        However, those rates do not work. I got the same audio as 48000
-        when I run
+Signed-off-by: Caesar Wang <wxt@rock-chips.com>
 
-        aplay -D hw:0,0
-        /usr/local/autotest/cros/audio/fix_440_16_half.raw --rate 8000
-        -f S16_LE -c2
-        aplay -D hw:0,0
-        /usr/local/autotest/cros/audio/fix_440_16_half.raw --rate 16000
-        -f S16_LE -c2
-        aplay -D hw:0,0
-        /usr/local/autotest/cros/audio/fix_440_16_half.raw --rate 96000
-        -f S16_LE -c2
-
-        They all sound identical to
-        aplay -D hw:0,0
-        /usr/local/autotest/cros/audio/fix_440_16_half.raw --rate 48000
-        -f S16_LE -c2
-
-        Also, recording using
-        aplay -D hw:0,0 /usr/local/test.raw --rate 96000 -f S16_LE -c2
-        and examine the output we see it was recording using 48000.
-
-        Okay, let's add this series patchs to fix this issue.
-
-        arecord -D hw:0 -f S16_LE -c 2 --rate [8000-96000] -d 5 foobar.wav
-        and
-            aplay -D hw:0 foobar.wav
-Tested on veyron devices.
-
+---
 
 Changes in v2:
 - move the set clock divider into rockchip i2s.
-- add the 64000 sample rates for max98090.
-- add the 64000 sample rate for rt5645.
 
-Caesar Wang (3):
-  ASoC: rockchip: i2s: change bclk and lrck according to sample rates
-  ASoC: rockchip-max98090: Allow more sample rates
-  ASoC: rockchip-rt5645: Allow more sample rates
+ sound/soc/rockchip/rockchip_i2s.c | 23 +++++++++++++++++++++++
+ 1 file changed, 23 insertions(+)
 
- sound/soc/rockchip/rockchip_i2s.c      | 23 +++++++++++++++++++++++
- sound/soc/rockchip/rockchip_max98090.c |  6 ++++++
- sound/soc/rockchip/rockchip_rt5645.c   |  6 ++++++
- 3 files changed, 35 insertions(+)
-
+diff --git a/sound/soc/rockchip/rockchip_i2s.c b/sound/soc/rockchip/rockchip_i2s.c
+index b936102..b349935 100644
+--- a/sound/soc/rockchip/rockchip_i2s.c
++++ b/sound/soc/rockchip/rockchip_i2s.c
+@@ -41,6 +41,7 @@ struct rk_i2s_dev {
+ */
+ 	bool tx_start;
+ 	bool rx_start;
++	bool is_master_mode;
+ };
+ 
+ static int i2s_runtime_suspend(struct device *dev)
+@@ -174,9 +175,11 @@ static int rockchip_i2s_set_fmt(struct snd_soc_dai *cpu_dai,
+ 	case SND_SOC_DAIFMT_CBS_CFS:
+ 		/* Set source clock in Master mode */
+ 		val = I2S_CKR_MSS_MASTER;
++		i2s->is_master_mode = true;
+ 		break;
+ 	case SND_SOC_DAIFMT_CBM_CFM:
+ 		val = I2S_CKR_MSS_SLAVE;
++		i2s->is_master_mode = false;
+ 		break;
+ 	default:
+ 		return -EINVAL;
+@@ -227,6 +230,26 @@ static int rockchip_i2s_hw_params(struct snd_pcm_substream *substream,
+ {
+ 	struct rk_i2s_dev *i2s = to_info(dai);
+ 	unsigned int val = 0;
++	unsigned int mclk_rate, bclk_rate, div_bclk, div_lrck;
++
++	if (i2s->is_master_mode) {
++		mclk_rate = clk_get_rate(i2s->mclk);
++		bclk_rate = 2 * 32 * params_rate(params);
++		if (bclk_rate && mclk_rate % bclk_rate)
++			return -EINVAL;
++
++		div_bclk = mclk_rate / bclk_rate;
++		div_lrck = bclk_rate / params_rate(params);
++		regmap_update_bits(i2s->regmap, I2S_CKR,
++				   I2S_CKR_MDIV_MASK,
++				   I2S_CKR_MDIV(div_bclk));
++
++		regmap_update_bits(i2s->regmap, I2S_CKR,
++				   I2S_CKR_TSD_MASK |
++				   I2S_CKR_RSD_MASK,
++				   I2S_CKR_TSD(div_lrck) |
++				   I2S_CKR_RSD(div_lrck));
++	}
+ 
+ 	switch (params_format(params)) {
+ 	case SNDRV_PCM_FORMAT_S8:
 -- 
 1.9.1
