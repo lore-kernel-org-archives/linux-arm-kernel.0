@@ -1,66 +1,113 @@
-From: vigneshr@ti.com (Vignesh R)
-Date: Fri, 6 Nov 2015 17:51:10 +0530
-Subject: [PATCH v2 5/5] ARM: dts: AM4372: add entry for qspi mmap region
-In-Reply-To: <878u6b1zgg.fsf@saruman.tx.rr.com>
-References: <1446545174-14193-1-git-send-email-vigneshr@ti.com>
- <1446545174-14193-6-git-send-email-vigneshr@ti.com>
- <20151105235124.GA2805@rob-hp-laptop> <878u6b1zgg.fsf@saruman.tx.rr.com>
-Message-ID: <563C9B36.3010107@ti.com>
+From: sjoerd.simons@collabora.co.uk (Sjoerd Simons)
+Date: Fri,  6 Nov 2015 13:22:24 +0100
+Subject: [RESEND PATCH] drm/rockchip: vop: Correct enabled clocks during setup
+Message-ID: <1446812544-28776-1-git-send-email-sjoerd.simons@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+When doing the initial setup both the hclk and the aclk need to be
+enabled otherwise the board will simply hang. This only occurs when
+building the vop driver as a module, when its built-in the initial setup
+happens to run before the clock framework shuts of unused clocks
+(including the aclk).
 
+While there also switch to doing prepare and enable in one step rather
+then separate steps to reduce the amount of code required.
 
-On 11/06/2015 10:44 AM, Felipe Balbi wrote:
-> 
-> Hi,
-> 
-> Rob Herring <robh@kernel.org> writes:
->> On Tue, Nov 03, 2015 at 03:36:14PM +0530, Vignesh R wrote:
->>> Add qspi memory mapped region entries for AM43xx based SoCs. Also,
->>> update the binding documents for the controller to document this change.
->>>
->>> Signed-off-by: Vignesh R <vigneshr@ti.com>
->>
->> Acked-by: Rob Herring <robh@kernel.org>
->>
->>> ---
->>>  Documentation/devicetree/bindings/spi/ti_qspi.txt | 5 +++--
->>>  arch/arm/boot/dts/am4372.dtsi                     | 4 +++-
->>>  2 files changed, 6 insertions(+), 3 deletions(-)
->>>
->>> diff --git a/Documentation/devicetree/bindings/spi/ti_qspi.txt b/Documentation/devicetree/bindings/spi/ti_qspi.txt
->>> index f05dd631bef1..05488970060b 100644
->>> --- a/Documentation/devicetree/bindings/spi/ti_qspi.txt
->>> +++ b/Documentation/devicetree/bindings/spi/ti_qspi.txt
->>> @@ -17,9 +17,10 @@ Recommended properties:
->>>  
->>>  Example:
->>>  
->>> +For am4372:
->>>  qspi: qspi at 4b300000 {
->>> -	compatible = "ti,dra7xxx-qspi";
->>> -	reg = <0x47900000 0x100>, <0x30000000 0x3ffffff>;
->>> +	compatible = "ti,am4372-qspi";
->>> +	reg = <0x47900000 0x100>, <0x30000000 0x4000000>;
->>>  	reg-names = "qspi_base", "qspi_mmap";
->>>  	#address-cells = <1>;
->>>  	#size-cells = <0>;
-> 
-> and how does the user for this look like ? Don't you need to give this a
-> proper 'ranges' binding ?
-> 
+Signed-off-by: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
+Acked-by: Mark Yao <mark.yao@rock-chips.com>
+Tested-by: Yakir Yang <ykk@rock-chips.com>
+Tested-by: Romain Perier <romain.perier@gmail.com>
+---
 
+ drivers/gpu/drm/rockchip/rockchip_drm_vop.c | 36 +++++++++++------------------
+ 1 file changed, 14 insertions(+), 22 deletions(-)
 
-There are no other users of qspi_mmap region except ti-qspi driver itself:
-In probe:
-	res_mmap = platform_get_resource_byname(pdev,
-			IORESOURCE_MEM, "qspi_mmap");
-	qspi->mmap_base = devm_ioremap_resource(&pdev->dev, res_mmap);
-
-and for reading from mmap region:
-	memcpy_fromio(buf, qspi->mmap_base + from, len);
-
+diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+index 5d8ae5e..48719df 100644
+--- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
++++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
+@@ -1575,32 +1575,25 @@ static int vop_initial(struct vop *vop)
+ 		return PTR_ERR(vop->dclk);
+ 	}
+ 
+-	ret = clk_prepare(vop->hclk);
+-	if (ret < 0) {
+-		dev_err(vop->dev, "failed to prepare hclk\n");
+-		return ret;
+-	}
+-
+ 	ret = clk_prepare(vop->dclk);
+ 	if (ret < 0) {
+ 		dev_err(vop->dev, "failed to prepare dclk\n");
+-		goto err_unprepare_hclk;
++		return ret;
+ 	}
+ 
+-	ret = clk_prepare(vop->aclk);
++	/* Enable both the hclk and aclk to setup the vop */
++	ret = clk_prepare_enable(vop->hclk);
+ 	if (ret < 0) {
+-		dev_err(vop->dev, "failed to prepare aclk\n");
++		dev_err(vop->dev, "failed to prepare/enable hclk\n");
+ 		goto err_unprepare_dclk;
+ 	}
+ 
+-	/*
+-	 * enable hclk, so that we can config vop register.
+-	 */
+-	ret = clk_enable(vop->hclk);
++	ret = clk_prepare_enable(vop->aclk);
+ 	if (ret < 0) {
+-		dev_err(vop->dev, "failed to prepare aclk\n");
+-		goto err_unprepare_aclk;
++		dev_err(vop->dev, "failed to prepare/enable aclk\n");
++		goto err_disable_hclk;
+ 	}
++
+ 	/*
+ 	 * do hclk_reset, reset all vop registers.
+ 	 */
+@@ -1608,7 +1601,7 @@ static int vop_initial(struct vop *vop)
+ 	if (IS_ERR(ahb_rst)) {
+ 		dev_err(vop->dev, "failed to get ahb reset\n");
+ 		ret = PTR_ERR(ahb_rst);
+-		goto err_disable_hclk;
++		goto err_disable_aclk;
+ 	}
+ 	reset_control_assert(ahb_rst);
+ 	usleep_range(10, 20);
+@@ -1634,26 +1627,25 @@ static int vop_initial(struct vop *vop)
+ 	if (IS_ERR(vop->dclk_rst)) {
+ 		dev_err(vop->dev, "failed to get dclk reset\n");
+ 		ret = PTR_ERR(vop->dclk_rst);
+-		goto err_unprepare_aclk;
++		goto err_disable_aclk;
+ 	}
+ 	reset_control_assert(vop->dclk_rst);
+ 	usleep_range(10, 20);
+ 	reset_control_deassert(vop->dclk_rst);
+ 
+ 	clk_disable(vop->hclk);
++	clk_disable(vop->aclk);
+ 
+ 	vop->is_enabled = false;
+ 
+ 	return 0;
+ 
++err_disable_aclk:
++	clk_disable_unprepare(vop->aclk);
+ err_disable_hclk:
+-	clk_disable(vop->hclk);
+-err_unprepare_aclk:
+-	clk_unprepare(vop->aclk);
++	clk_disable_unprepare(vop->hclk);
+ err_unprepare_dclk:
+ 	clk_unprepare(vop->dclk);
+-err_unprepare_hclk:
+-	clk_unprepare(vop->hclk);
+ 	return ret;
+ }
+ 
 -- 
-Regards
-Vignesh
+2.6.2
