@@ -1,60 +1,45 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Fri, 6 Nov 2015 10:42:42 +0000
-Subject: [PATCH] arm64: cmpxchg_dbl: fix return value type
-In-Reply-To: <20151106100119.GW7637@e104818-lin.cambridge.arm.com>
-References: <1446732056-31294-1-git-send-email-lorenzo.pieralisi@arm.com>
- <20151105173114.GU7637@e104818-lin.cambridge.arm.com>
- <20151106094413.GA1499@red-moon>
- <20151106100119.GW7637@e104818-lin.cambridge.arm.com>
-Message-ID: <20151106104242.GA5146@red-moon>
+From: u.kleine-koenig@pengutronix.de (=?UTF-8?q?Uwe=20Kleine-K=C3=B6nig?=)
+Date: Fri,  6 Nov 2015 11:44:29 +0100
+Subject: [PATCH] ARM: dts: imx25-pinfunc: add some more pin configurations
+Message-ID: <1446806669-32433-1-git-send-email-u.kleine-koenig@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 06, 2015 at 10:01:19AM +0000, Catalin Marinas wrote:
-> On Fri, Nov 06, 2015 at 09:44:13AM +0000, Lorenzo Pieralisi wrote:
-> > On Thu, Nov 05, 2015 at 05:31:14PM +0000, Catalin Marinas wrote:
-> > > On Thu, Nov 05, 2015 at 02:00:56PM +0000, Lorenzo Pieralisi wrote:
-> > > > The current arm64 __cmpxchg_double{_mb} implementations carry out the
-> > > > compare exchange by first comparing the old values passed in to the
-> > > > values read from the pointer provided and by stashing the cumulative
-> > > > bitwise difference in a 64-bit register.
-> > > > 
-> > > > By comparing the register content against 0, it is possible to detect if
-> > > > the values read differ from the old values passed in, so that the compare
-> > > > exchange detects whether it has to bail out or carry on completing the
-> > > > operation with the exchange.
-> > > > 
-> > > > Given the current implementation, to detect the cmpxchg operation
-> > > > status, the __cmpxchg_double{_mb} functions should return the 64-bit
-> > > > stashed bitwise difference so that the caller can detect cmpxchg failure
-> > > > by comparing the return value content against 0. The current implementation
-> > > > declares the return value as an int, which means that the 64-bit
-> > > > value stashing the bitwise difference is truncated before being
-> > > > returned to the __cmpxchg_double{_mb} callers, which means that
-> > > > any bitwise difference present in the top 32 bits goes undetected,
-> > > > triggering false positives and subsequent kernel failures.
-> > > > 
-> > > > This patch fixes the issue by declaring the arm64 __cmpxchg_double{_mb}
-> > > > return values as a long, so that the bitwise difference is
-> > > > properly propagated on failure, restoring the expected behaviour.
-> > > > 
-> > > > Fixes: e9a4b795652f ("arm64: cmpxchg_dbl: patch in lse instructions when
-> > > > supported by the CPU")
-> > > > Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> > > > Cc: <stable@vger.kernel.org>
-> > > > Cc: Will Deacon <will.deacon@arm.com>
-> > > > Cc: Catalin Marinas <catalin.marinas@arm.com>
-> > > > Cc: Marc Zyngier <marc.zyngier@arm.com>
-> > > 
-> > > Applied (I'll send it sometime this merging window). Thanks.
-> > 
-> > Thanks, I mistakenly thought this should be sent to stable for 4.2, but
-> > actually I was wrong so Cc stable should be dropped to avoid noise.
-> 
-> AFAICT, commit e9a4b795652f was merged in 4.3-rc1. Your fix will go in
-> 4.4-rc1, so cc stable is fine.
+This patch adds some values that are needed for an out-of-tree device
+tree I'm currently working with.
 
-Bah, please ignore what I wrote that's obviously wrong.
+Signed-off-by: Uwe Kleine-K?nig <u.kleine-koenig@pengutronix.de>
+---
+ arch/arm/boot/dts/imx25-pinfunc.h | 3 +++
+ 1 file changed, 3 insertions(+)
 
-Sorry for the noise,
-Lorenzo
+diff --git a/arch/arm/boot/dts/imx25-pinfunc.h b/arch/arm/boot/dts/imx25-pinfunc.h
+index 7c4b9f2f9aad..848ffa785b63 100644
+--- a/arch/arm/boot/dts/imx25-pinfunc.h
++++ b/arch/arm/boot/dts/imx25-pinfunc.h
+@@ -284,6 +284,7 @@
+ #define MX25_PAD_CONTRAST__CC4			0x118 0x310 0x000 0x11 0x000
+ #define MX25_PAD_CONTRAST__PWM4_PWMO		0x118 0x310 0x000 0x14 0x000
+ #define MX25_PAD_CONTRAST__FEC_CRS		0x118 0x310 0x508 0x15 0x001
++#define MX25_PAD_CONTRAST__USBH2_PWR		0x118 0x310 0x000 0x16 0x000
+ 
+ #define MX25_PAD_PWM__PWM			0x11c 0x314 0x000 0x10 0x000
+ #define MX25_PAD_PWM__GPIO_1_26			0x11c 0x314 0x000 0x15 0x000
+@@ -439,6 +440,7 @@
+ #define MX25_PAD_SD1_DATA3__GPIO_2_28		0x1a4 0x39c 0x000 0x15 0x000
+ 
+ #define MX25_PAD_KPP_ROW0__KPP_ROW0		0x1a8 0x3a0 0x000 0x10 0x000
++#define MX25_PAD_KPP_ROW0__UART1_DTR		0x1a8 0x3a0 0x000 0x14 0x000
+ #define MX25_PAD_KPP_ROW0__GPIO_2_29		0x1a8 0x3a0 0x000 0x15 0x000
+ 
+ #define MX25_PAD_KPP_ROW1__KPP_ROW1		0x1ac 0x3a4 0x000 0x10 0x000
+@@ -446,6 +448,7 @@
+ 
+ #define MX25_PAD_KPP_ROW2__KPP_ROW2		0x1b0 0x3a8 0x000 0x10 0x000
+ #define MX25_PAD_KPP_ROW2__CSI_D0		0x1b0 0x3a8 0x488 0x13 0x002
++#define MX25_PAD_KPP_ROW2__UART1_DCD		0x1b0 0x3a8 0x000 0x14 0x000
+ #define MX25_PAD_KPP_ROW2__GPIO_2_31		0x1b0 0x3a8 0x000 0x15 0x000
+ 
+ #define MX25_PAD_KPP_ROW3__KPP_ROW3		0x1b4 0x3ac 0x000 0x10 0x000
+-- 
+2.6.1
