@@ -1,95 +1,225 @@
 From: robh@kernel.org (Rob Herring)
-Date: Thu, 5 Nov 2015 20:18:29 -0600
-Subject: [PATCH v2 08/13] Documentation: dt-bindings: Add bindings for
- rk3288 DW MIPI DSI driver
-In-Reply-To: <1446296170-3702-9-git-send-email-zyw@rock-chips.com>
-References: <1446296170-3702-1-git-send-email-zyw@rock-chips.com>
- <1446296170-3702-9-git-send-email-zyw@rock-chips.com>
-Message-ID: <20151106021829.GA4810@rob-hp-laptop>
+Date: Thu, 5 Nov 2015 20:23:20 -0600
+Subject: [PATCH v3 1/3] devicetree: mfd: Add binding for the TI LM3533
+In-Reply-To: <1446249040-16552-1-git-send-email-bjorn.andersson@sonymobile.com>
+References: <1446249040-16552-1-git-send-email-bjorn.andersson@sonymobile.com>
+Message-ID: <20151106022319.GA13460@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Oct 31, 2015 at 08:56:04PM +0800, Chris Zhong wrote:
-> add device tree bindings for rk3288 specific Synopsys DW MIPI DSI driver
+On Fri, Oct 30, 2015 at 04:50:38PM -0700, Bjorn Andersson wrote:
+> Add the binding for the Texas Instruments LM3533 lighting power
+> solution.
 > 
-> Signed-off-by: Chris Zhong <zyw@rock-chips.com>
+> Signed-off-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
+
+Acked-by: Rob Herring <robh@kernel.org>
+
 > ---
 > 
-> Changes in v2: None
+> Changes since v2:
+> - Drop vendor prefix of vendor properties
+> - Specify unit of various properties
+> - Fix reference paths
 > 
->  .../bindings/video/dw_mipi_dsi_rockchip.txt        | 56 ++++++++++++++++++++++
->  1 file changed, 56 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/video/dw_mipi_dsi_rockchip.txt
+> Changes since v1:
+> - Added unit to boost-freq and als-resistance (as the frequency now comes with
+>   a unit specifier I changed it to be expressed in kHz)
 > 
-> diff --git a/Documentation/devicetree/bindings/video/dw_mipi_dsi_rockchip.txt b/Documentation/devicetree/bindings/video/dw_mipi_dsi_rockchip.txt
+>  Documentation/devicetree/bindings/mfd/lm3533.txt | 184 +++++++++++++++++++++++
+>  1 file changed, 184 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/mfd/lm3533.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/mfd/lm3533.txt b/Documentation/devicetree/bindings/mfd/lm3533.txt
 > new file mode 100644
-> index 0000000..4dea804
+> index 000000000000..963cee153a4d
 > --- /dev/null
-> +++ b/Documentation/devicetree/bindings/video/dw_mipi_dsi_rockchip.txt
-
-Please move to bindings/display/rockchip/
-
-
-> @@ -0,0 +1,56 @@
-> +Rockchip specific extensions to the Synopsys Designware MIPI DSI
-> +================================
+> +++ b/Documentation/devicetree/bindings/mfd/lm3533.txt
+> @@ -0,0 +1,184 @@
+> +Texas Instruments LM3533 binding
 > +
-> +Required properties:
-> +- compatible: "rockchip,rk3288-mipi-dsi", "snps,dw-mipi-dsi".
-> +- rockchip,grf: this soc should set GRF regs to mux vopl/vopb.
-> +- ports: contain a port node with endpoint definitions as defined in [1].
-> +  For vopb,set the reg = <0> and set the reg = <1> for vopl.
+> +This binding describes the Texas Instruments LM3533, a lighting power solution
+> +for smartphone handsets. The common properties are described directly in the
+> +node, while each individual component are described in an optional subnode.
 > +
-> +For more required properties, please refer to [2].
+> +- compatible:
+> +	Usage: required
+> +	Value type: <stringlist>
+> +	Definition: must be:
+> +		    "ti,lm3533"
 > +
-> +[1] Documentation/devicetree/bindings/media/video-interfaces.txt
-> +[2] Documentation/devicetree/bindings/drm/bridge/dw_mipi_dsi.txt
-
-This needs to be updated too.
-
+> +- reg:
+> +	Usage: required
+> +	Value type: <u32>
+> +	Definition: i2c address of the LM3533 chip
 > +
-> +Example:
-> +	mipi_dsi: mipi at ff960000 {
+> +- als-supply:
+> +	Usage: optional
+> +	Value type: <prop-encoded-array>
+> +	Definition: reference to regulator powering the V_als input; as
+> +		    specified in "../regulator/regulator.txt"
+> +
+> +- hwen-gpios:
+> +	Usage: required
+> +	Value type: <prop-encoded-array>
+> +	Definition: reference to gpio pin connected to the HWEN input; as
+> +		    specified in "../gpio/gpio.txt"
+> +
+> +- ti,boost-freq-hz:
+> +	Usage: required
+> +	Value type: <u32>
+> +	Definition: switch-frequency of the boost converter, must be either:
+> +		    500000 or 1000000
+> +
+> +- ti,boost-ovp-mv:
+> +	Usage: required
+> +	Value type: <u32>
+> +	Definition: over-voltage protection limit, in mV. Must be one of:
+> +		    16000, 24000, 32000 or 40000
+> +
+> +- #address-cells:
+> +	Usage: required
+> +	Value type: <u32>
+> +	Definition: must be 1
+> +
+> +- #size-cells:
+> +	Usage: required
+> +	Value type: <u32>
+> +	Definition: must be 0
+> +
+> += ALS SUBNODE
+> +The ambient light sensor subnode must be named "als", it carries the light
+> +sensor related properties.
+> +
+> +- ti,als-resistance-ohm:
+> +	Usage: required (unless ti,pwm-mode is specified)
+> +	Value type: <u32>
+> +	Definition: specifies the resistor value (R_als), in Ohm. Valid values
+> +		    ranges from 200000 to 1574 Ohm.
+> +
+> +- ti,pwm-mode:
+> +	Usage: optional
+> +	Value type: <empty>
+> +	Definition: specifies, if present, that the als should operate in PWM
+> +		    mode - rather than analog mode
+> +
+> += BACKLIGHT NODES
+> +Backlight subnodes must be named "backlight", they carry the backlight related
+> +properties.
+> +
+> +- reg:
+> +	Usage: required
+> +	Value type: <u32>
+> +	Definition: specifies which of the two backlights this node corresponds
+> +		    to
+> +
+> +- default-brightness:
+> +	Usage: optional
+> +	Value type: <32>
+> +	Definition: specifies the default brightness for the backlight, in
+> +		    units of brightness [0-255]
+> +
+> +- label:
+> +	Usage: required
+> +	Value type: <string>
+> +	Definition: specifies a name of this backlight
+> +
+> +- led-max-microamp:
+> +	Usage: required
+> +	Value type: <u32>
+> +	Definition: specifies the max current for this backlight, in uA, as
+> +		    described in "../leds/common.txt"
+> +
+> +- ti,pwm-zones:
+> +	Usage: optional
+> +	Value type: <u32 list>
+> +	Definition: lists the ALS zones to be PWM controlled for this backlight,
+> +		    the values in the list are in the range [0 - 4]
+> +
+> += LED NODES
+> +LED subnodes must be named "led", they carry the LED related properties.
+> +
+> +- reg:
+> +	Usage: required
+> +	Value type: <u32>
+> +	Definition: specifies which of the four LEDs this node corresponds to
+> +
+> +- linux,default-trigger:
+> +	Usage: optional
+> +	Value type: <string>
+> +	Definition: specifies the default trigger for the LED, as described in
+> +		    "../leds/common.txt"
+> +
+> +- label:
+> +	Usage: required
+> +	Value type: <string>
+> +	Definition: specifies a name of this LED, as described in
+> +		    "../leds/common.txt"
+> +
+> +- led-max-microamp:
+> +	Usage: required
+> +	Value type: <u32>
+> +	Definition: specifies the max current for this LED, in uA, as described
+> +		    in "../leds/common.txt"
+> +
+> +- ti,pwm-zones:
+> +	Usage: optional
+> +	Value type: <u32 list>
+> +	Definition: lists the ALS zones to be PWM controlled for this LED, the
+> +		    values in the list are in the range [0 - 4]
+> +
+> += EXAMPLE
+> +
+> +i2c at 12460000 {
+> +	compatible = "qcom,i2c-qup-v1.1.1";
+> +	...
+> +
+> +	lm3533 at 36 {
+> +		compatible = "ti,lm3533";
+> +		reg = <0x36>;
+> +
+> +		als-supply = <&pm8921_l11>;
+> +		hwen-gpios = <&pm8921_gpio 26 GPIO_ACTIVE_HIGH>;
+> +
+> +		ti,boost-freq-hz = <500000>;
+> +		ti,boost-ovp-mv = <24000>;
+> +
 > +		#address-cells = <1>;
 > +		#size-cells = <0>;
-> +		compatible = "rockchip,rk3288-mipi-dsi", "snps,dw-mipi-dsi";
-> +		reg = <0xff960000 0x4000>;
-> +		interrupts = <GIC_SPI 83 IRQ_TYPE_LEVEL_HIGH>;
-> +		clocks = <&cru SCLK_MIPI_24M>, <&cru PCLK_MIPI_DSI0>;
-> +		clock-names = "ref", "pclk";
-> +		rockchip,grf = <&grf>;
-> +		status = "okay";
 > +
-> +		ports {
-> +			#address-cells = <1>;
-> +			#size-cells = <0>;
-> +			reg = <1>;
-> +
-> +			mipi_in: port {
-> +				#address-cells = <1>;
-> +				#size-cells = <0>;
-> +				mipi_in_vopb: endpoint at 0 {
-> +					reg = <0>;
-> +					remote-endpoint = <&vopb_out_mipi>;
-> +				};
-> +				mipi_in_vopl: endpoint at 1 {
-> +					reg = <1>;
-> +					remote-endpoint = <&vopl_out_mipi>;
-> +				};
-> +			};
+> +		als {
+> +			ti,als-resistance-ohm = <200000>;
 > +		};
 > +
-> +		panel {
-> +			compatible ="boe,tv080wum-nl0";
+> +		backlight at 0 {
 > +			reg = <0>;
+> +			label = "backlight";
 > +
-> +			enable-gpios = <&gpio7 3 GPIO_ACTIVE_HIGH>;
-> +			pinctrl-names = "default";
-> +			pinctrl-0 = <&lcd_en>;
-> +			backlight = <&backlight>;
-> +			status = "okay";
+> +			led-max-microamp = <20200>;
+> +		};
+> +
+> +		led at 0 {
+> +			reg = <0>;
+> +			label = "red";
+> +
+> +			led-max-microamp = <5000>;
+> +		};
+> +
+> +		led at 1 {
+> +			reg = <1>;
+> +			label = "green";
+> +
+> +			led-max-microamp = <5000>;
+> +		};
+> +
+> +		led at 2 {
+> +			reg = <2>;
+> +			label = "blue";
+> +
+> +			led-max-microamp = <5000>;
 > +		};
 > +	};
+> +
 > -- 
-> 2.6.2
+> 2.4.2
 > 
