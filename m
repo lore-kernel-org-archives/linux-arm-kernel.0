@@ -1,49 +1,21 @@
-From: zhengsq@rock-chips.com (Shunqian Zheng)
-Date: Fri,  6 Nov 2015 16:39:22 +0800
-Subject: [PATCH v3 2/2] ASoC: RK3036: Add binding doc of inno-rk3036 codec
- driver
-In-Reply-To: <1446799162-15635-1-git-send-email-zhengsq@rock-chips.com>
-References: <1446799162-15635-1-git-send-email-zhengsq@rock-chips.com>
-Message-ID: <1446799162-15635-3-git-send-email-zhengsq@rock-chips.com>
+From: yong.wu@mediatek.com (Yong Wu)
+Date: Fri, 6 Nov 2015 16:42:52 +0800
+Subject: [PATCH v5 3/6] iommu: add ARM short descriptor page table
+ allocator
+In-Reply-To: <1444357388-30257-4-git-send-email-yong.wu@mediatek.com>
+References: <1444357388-30257-1-git-send-email-yong.wu@mediatek.com>
+ <1444357388-30257-4-git-send-email-yong.wu@mediatek.com>
+Message-ID: <1446799372.6400.28.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: ZhengShunQian <zhengsq@rock-chips.com>
+On Fri, 2015-10-09 at 10:23 +0800, Yong Wu wrote:
+> This patch is for ARM Short Descriptor Format.
+> 
+> Signed-off-by: Yong Wu <yong.wu@mediatek.com>
+> ---
 
-This patch add the binding document of inno-rk3036
-audio codec driver.
-
-Signed-off-by: ZhengShunQian <zhengsq@rock-chips.com>
----
- .../devicetree/bindings/sound/inno-rk3036.txt        | 20 ++++++++++++++++++++
- 1 file changed, 20 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/sound/inno-rk3036.txt
-
-diff --git a/Documentation/devicetree/bindings/sound/inno-rk3036.txt b/Documentation/devicetree/bindings/sound/inno-rk3036.txt
-new file mode 100644
-index 0000000..758de8e
---- /dev/null
-+++ b/Documentation/devicetree/bindings/sound/inno-rk3036.txt
-@@ -0,0 +1,20 @@
-+Inno audio codec for RK3036
-+
-+Inno audio codec is integrated inside RK3036 SoC.
-+
-+Required properties:
-+- compatible : Should be "rockchip,rk3036-codec".
-+- reg : The registers of codec.
-+- clock-names : Should be "acodec_pclk".
-+- clocks : The clock of codec.
-+- rockchip,grf : The phandle of grf device node.
-+
-+Example:
-+
-+	acodec: acodec-ana at 20030000 {
-+		compatible = "rk3036-codec";
-+		reg = <0x20030000 0x4000>;
-+		rockchip,grf = <&grf>;
-+		clock-names = "acodec_pclk";
-+		clocks = <&cru ACLK_VCODEC>;
-+	};
--- 
-1.9.1
+Hi Will, Robin,
+   Is there any comment about this patch?
+   As our project request, We are going to prepare the next version.
+Thanks very much.
