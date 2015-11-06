@@ -1,73 +1,63 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Fri, 6 Nov 2015 14:02:49 -0800
-Subject: [PATCH v4 1/2] watchdog: imx2_wdt: add external reset support
- via 'ext-reset-output' dt prop
-In-Reply-To: <CAJ+vNU2fSxRJ7YvxOfNzoEoiKgzv-dHj=+eksKxH48ekHiUw2Q@mail.gmail.com>
-References: <1446758362-11702-1-git-send-email-akshay.bhat@timesys.com>
- <1446758362-11702-2-git-send-email-akshay.bhat@timesys.com>
- <20151105222325.GA26159@roeck-us.net>
- <CAJ+vNU2fSxRJ7YvxOfNzoEoiKgzv-dHj=+eksKxH48ekHiUw2Q@mail.gmail.com>
-Message-ID: <20151106220249.GA19791@roeck-us.net>
+From: German.Rivera@freescale.com (J. German Rivera)
+Date: Fri, 6 Nov 2015 15:48:49 -0600
+Subject: [PATCH] arm64: dts: Added syscon-reboot node for FSL's LS2080A SoC
+Message-ID: <1446846529-10613-1-git-send-email-German.Rivera@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 06, 2015 at 11:53:42AM -0800, Tim Harvey wrote:
-> On Thu, Nov 5, 2015 at 2:23 PM, Guenter Roeck <linux@roeck-us.net> wrote:
-> > On Thu, Nov 05, 2015 at 04:19:21PM -0500, Akshay Bhat wrote:
-> >> From: Tim Harvey <tharvey@gateworks.com>
-> >>
-> >> The IMX6 watchdog supports assertion of a signal (WDOG_B) which
-> >> can be pinmux'd to an external pin. This is typically used for boards that
-> >> have PMIC's in control of the IMX6 power rails. In fact, failure to use
-> >> such an external reset on boards with external PMIC's can result in various
-> >> hangs due to the IMX6 not being fully reset [1] as well as the board failing
-> >> to reset because its PMIC has not been reset to provide adequate voltage for
-> >> the CPU when coming out of reset at 800Mhz.
-> >>
-> >> This uses a new device-tree property 'ext-reset-output' to indicate the
-> >> board has such a reset and to cause the watchdog to be configured to assert
-> >> WDOG_B instead of an internal reset both on a watchdog timeout and in
-> >> system_restart.
-> >>
-> >> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-March/333689.html
-> >>
-> >> Cc: Lucas Stach <l.stach@pengutronix.de>
-> >> Signed-off-by: Tim Harvey <tharvey@gateworks.com>
-> >> ---
-> >>  .../devicetree/bindings/watchdog/fsl-imx-wdt.txt     |  2 ++
-> >>  drivers/watchdog/imx2_wdt.c                          | 20 ++++++++++++++++++--
-> >>  2 files changed, 20 insertions(+), 2 deletions(-)
-> >>
-> >> diff --git a/Documentation/devicetree/bindings/watchdog/fsl-imx-wdt.txt b/Documentation/devicetree/bindings/watchdog/fsl-imx-wdt.txt
-> >> index 8dab6fd..9b89b3a 100644
-> >> --- a/Documentation/devicetree/bindings/watchdog/fsl-imx-wdt.txt
-> >> +++ b/Documentation/devicetree/bindings/watchdog/fsl-imx-wdt.txt
-> >> @@ -9,6 +9,8 @@ Optional property:
-> >
-> > properties ?
-> >
-> >>  - big-endian: If present the watchdog device's registers are implemented
-> >>    in big endian mode, otherwise in native mode(same with CPU), for more
-> >>    detail please see: Documentation/devicetree/bindings/regmap/regmap.txt.
-> >> +- ext-reset-output: If present the watchdog device is configured to assert its
-> >
-> > Should that have a vendor prefix ? Also, not sure if "-output"
-> > has any real value in the property name. "fsl,external-reset", maybe ?
-> 
-> Hi Guenter,
-> 
-> I don't see why a vendor prefix is necessary - its a feature of the
-> IMX6 watchdog supported by this driver to be able to trigger an
-> internal chip-level reset and/or an external signal that can be hooked
-> to additional hardware.
-> 
-Sounded like vendor specific to me, but then I am not a devicetree maintainer,
-so I am not an authority on the subject.
+Added sys-reboot node to the FSL's LS2080A SoC DT to leverage
+the ARM-generic reboot mechanism for this SoC. This mechanism
+is enabled through CONFIG_POWER_RESET_SYSCON.
 
-> I started with ext-reset, but it was suggested
-> (http://lists.infradead.org/pipermail/linux-arm-kernel/2015-May/347437.html)
-> to also make it clear that this is an 'output' and not a reset input.
-> 
-No problem, as long as you get an Ack from a devicetree maintainer.
+CHANGE HISTORY:
 
-Guenter
+Changes in v3:
+- Addressed comment from Stuart Yoder
+  * Fixed commit message to refer to LS2080A instead of LS2085A.
+
+Changes in v2:
+- Addressed comment form Stuart Yoder:
+  * Removed "@<address>" from reboot node
+
+Changes in v3:
+- Addressed comment form Stuart Yoder:
+  * Expose only the reset register
+
+Changes in v4:
+- Addressed comment from Arnd Bergmann:
+  * Changed compatible string to be more specific
+  * Changed node name to 'syscon' instead of 'rstcr'
+  * Changed address to lower case hex
+- Addressed comment form Stuart Yoder:
+  * Rebase on top of branch arm-soc/for-next
+
+Signed-off-by: J. German Rivera <German.Rivera@freescale.com>
+---
+ arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
+index e81cd48..a790a90 100644
+--- a/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
++++ b/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
+@@ -153,6 +153,18 @@
+ 		};
+ 	};
+ 
++	rstcr: syscon at 1e60000 {
++		compatible = "fsl,ls2085a-rstcr", "syscon";
++		reg = <0x0 0x1e60000 0x0 0x4>;
++	};
++
++	reboot {
++		compatible ="syscon-reboot";
++		regmap = <&rstcr>;
++		offset = <0x0>;
++		mask = <0x2>;
++	};
++
+ 	timer {
+ 		compatible = "arm,armv8-timer";
+ 		interrupts = <1 13 0x8>, /* Physical Secure PPI, active-low */
+-- 
+2.3.3
