@@ -1,48 +1,31 @@
-From: yoann@printk.fr (Yoann Sculo)
-Date: Fri, 6 Nov 2015 17:05:55 +0100
-Subject: [PATCH 3/4] ARM: dts: kirkwood: add Seagate GoFlex Home
-In-Reply-To: <00000150d49a8745-1c2bc8d4-1333-46bb-bf0e-5508ef988c73-000000@email.amazonses.com>
-References: <1446675888-24495-1-git-send-email-luka.perkov@sartura.hr>
- <00000150d49a8745-1c2bc8d4-1333-46bb-bf0e-5508ef988c73-000000@email.amazonses.com>
-Message-ID: <563CCFE3.7080603@printk.fr>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Fri, 6 Nov 2015 17:08:01 +0100
+Subject: [PATCH 02/10] pwm: sunxi: fix whitespace issue
+In-Reply-To: <1445895161-2317-3-git-send-email-o.schinagl@ultimaker.com>
+References: <1445895161-2317-1-git-send-email-o.schinagl@ultimaker.com>
+ <1445895161-2317-3-git-send-email-o.schinagl@ultimaker.com>
+Message-ID: <20151106160801.GG8418@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Luka,
+On Mon, Oct 26, 2015 at 10:32:33PM +0100, Olliver Schinagl wrote:
+> From: Olliver Schinagl <oliver@schinagl.nl>
+> 
+> This patch changes no code, it just fixes the whitespacing
+> 
+> Signed-off-by: Olliver Schinagl <oliver@schinagl.nl>
+> ---
+>  drivers/pwm/pwm-sun4i.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 
-I tested your patch on the GoFlex Home.
+Applied, with a slightly modified commit message.
 
-> +	gpio-leds {
-> +		compatible = "gpio-leds";
-> +
-> +		health {
-> +			label = "status:green:health";
-> +			gpios = <&gpio1 14 1>;
-> +			linux,default-trigger = "default-on";
-> +		};
-> +		fault {
-> +			label = "status:orange:fault";
-> +			gpios = <&gpio1 15 1>;
-> +		};
-> +		misc {
-> +			label = "status:white:misc";
-> +			gpios = <&gpio1 8 1>;
-> +			linux,default-trigger = "ide-disk";
-> +		};
-> +	};
-
-I noticed green and orange leds were working fine (0 == off, 1 == on). 
-But white led polarity is inverted (1 == off, 0 == on).
-
-> +	partition at 500000 {
-> +		label = "pogoplug";
-> +		reg = <0x0500000 0x2000000>;
-> +	};
-
-I don't think pogoplug is the proper label for this partition. It seems 
-duplicated from "kirkwood-goflexnet.dts" I guess you could label it 
-"data" for instance.
-
-Tested-by: Yoann Sculo <yoann@printk.fr>
-
-Yoann
+Thanks,
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151106/8467fa79/attachment-0001.sig>
