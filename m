@@ -1,88 +1,66 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 6 Nov 2015 12:17:41 +0000
-Subject: [RESEND PATCH 0/1] Fix the "hard LOCKUP" when running a heavy
- loading
-In-Reply-To: <CAD=FV=XYBeKSo7NeTt3P0nSPA_A3yQ0qHDwxsJSzsTgA5VPkoA@mail.gmail.com>
-References: <1446538209-13490-1-git-send-email-wxt@rock-chips.com>
- <20151103113030.GB14159@arm.com>
- <CAD=FV=XYBeKSo7NeTt3P0nSPA_A3yQ0qHDwxsJSzsTgA5VPkoA@mail.gmail.com>
-Message-ID: <20151106121741.GH6087@arm.com>
+From: vigneshr@ti.com (Vignesh R)
+Date: Fri, 6 Nov 2015 17:51:10 +0530
+Subject: [PATCH v2 5/5] ARM: dts: AM4372: add entry for qspi mmap region
+In-Reply-To: <878u6b1zgg.fsf@saruman.tx.rr.com>
+References: <1446545174-14193-1-git-send-email-vigneshr@ti.com>
+ <1446545174-14193-6-git-send-email-vigneshr@ti.com>
+ <20151105235124.GA2805@rob-hp-laptop> <878u6b1zgg.fsf@saruman.tx.rr.com>
+Message-ID: <563C9B36.3010107@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 03, 2015 at 11:00:20AM -0800, Doug Anderson wrote:
+
+
+On 11/06/2015 10:44 AM, Felipe Balbi wrote:
+> 
 > Hi,
-
-Hey Doug,
-
-> When CPUs are hard locked up, they are often found at:
 > 
-> <c0117c8c> v7_coherent_kern_range+0x58/0x74
->   or
-> <c0118278> v7wbi_flush_user_tlb_range+0x30/0x38
+> Rob Herring <robh@kernel.org> writes:
+>> On Tue, Nov 03, 2015 at 03:36:14PM +0530, Vignesh R wrote:
+>>> Add qspi memory mapped region entries for AM43xx based SoCs. Also,
+>>> update the binding documents for the controller to document this change.
+>>>
+>>> Signed-off-by: Vignesh R <vigneshr@ti.com>
+>>
+>> Acked-by: Rob Herring <robh@kernel.org>
+>>
+>>> ---
+>>>  Documentation/devicetree/bindings/spi/ti_qspi.txt | 5 +++--
+>>>  arch/arm/boot/dts/am4372.dtsi                     | 4 +++-
+>>>  2 files changed, 6 insertions(+), 3 deletions(-)
+>>>
+>>> diff --git a/Documentation/devicetree/bindings/spi/ti_qspi.txt b/Documentation/devicetree/bindings/spi/ti_qspi.txt
+>>> index f05dd631bef1..05488970060b 100644
+>>> --- a/Documentation/devicetree/bindings/spi/ti_qspi.txt
+>>> +++ b/Documentation/devicetree/bindings/spi/ti_qspi.txt
+>>> @@ -17,9 +17,10 @@ Recommended properties:
+>>>  
+>>>  Example:
+>>>  
+>>> +For am4372:
+>>>  qspi: qspi at 4b300000 {
+>>> -	compatible = "ti,dra7xxx-qspi";
+>>> -	reg = <0x47900000 0x100>, <0x30000000 0x3ffffff>;
+>>> +	compatible = "ti,am4372-qspi";
+>>> +	reg = <0x47900000 0x100>, <0x30000000 0x4000000>;
+>>>  	reg-names = "qspi_base", "qspi_mmap";
+>>>  	#address-cells = <1>;
+>>>  	#size-cells = <0>;
 > 
-> That made me think that an errata might be the root cause of our hard
-> lockups, since ARM errata often trigger in cache/tlb functions.  I
-> think Caesar dug up this old errata fix in response to my suggestion.
-
-I still don't see how 818325 is related, since there aren't any conditional
-stores in the sequences below.
-
-> If you know of any ARM errata that might trigger hard lockups like
-> this, I'd certainly be all ears.  It's also possible that we've got
-> something running at too low of a voltage or we've got clock dividers
-> or cache timings programmed incorrectly somewhere.  To give a more
-> full disassembly of one of the crashes:
+> and how does the user for this look like ? Don't you need to give this a
+> proper 'ranges' binding ?
 > 
->   <4>[ 1623.480846] SMP: failed to stop secondary CPUs
->   <3>[ 1623.480862] CPU1 PC: <c01827e8> __unqueue_futex+0x68/0x88
->   <3>[ 1623.480879] CPU2 PC: <c0117c8c> v7_coherent_kern_range+0x58/0x74
->   <3>[ 1623.480895] CPU3 PC: <c0118268> v7wbi_flush_user_tlb_range+0x20/0x38
-> 
-> ---
 
-Do you have any register values for these CPUs?
 
-> c01827dc:       e2841010        add     r1, r4, #16
-> c01827e0:       e2445004        sub     r5, r4, #4
-> c01827e4:       eb068d33        bl      c0325cb8 <plist_del> (File
-> Offset: 0x235cb8)
-> => c01827e8:    f595f000        pldw    [r5]
-> c01827ec:       e1953f9f        ldrex   r3, [r5]
-> c01827f0:       e2433001        sub     r3, r3, #1
-> c01827f4:       e1852f93        strex   r2, r3, [r5]
-> c01827f8:       e3320000        teq     r2, #0
-> c01827fc:       1afffffa        bne     c01827ec
-> <__unqueue_futex+0x6c> (File Offset: 0x927ec)
-> c0182800:       e89da830        ldm     sp, {r4, r5, fp, sp, pc}
+There are no other users of qspi_mmap region except ti-qspi driver itself:
+In probe:
+	res_mmap = platform_get_resource_byname(pdev,
+			IORESOURCE_MEM, "qspi_mmap");
+	qspi->mmap_base = devm_ioremap_resource(&pdev->dev, res_mmap);
 
-For example, the futex address in r5 ...
+and for reading from mmap region:
+	memcpy_fromio(buf, qspi->mmap_base + from, len);
 
-> c0117c80:       e08cc002        add     ip, ip, r2
-> c0117c84:       e15c0001        cmp     ip, r1
-> c0117c88:       3afffffb        bcc     c0117c7c
-> <v7_coherent_kern_range+0x48> (File Offset: 0x27c7c)
-> => c0117c8c:    e3a00000        mov     r0, #0
-> c0117c90:       ee070fd1        mcr     15, 0, r0, cr7, cr1, {6}
-> c0117c94:       f57ff04a        dsb     ishst
-> c0117c98:       f57ff06f        isb     sy
-> c0117c9c:       e1a0f00e        mov     pc, lr
-
-... the address in r0 for the cache maintenance ...
-
-> c0118260:       e1830600        orr     r0, r3, r0, lsl #12
-> c0118264:       e1a01601        lsl     r1, r1, #12
-> => c0118268:    ee080f33        mcr     15, 0, r0, cr8, cr3, {1}
-> c011826c:       e2800a01        add     r0, r0, #4096   ; 0x1000
-> c0118270:       e1500001        cmp     r0, r1
-> c0118274:       3afffffb        bcc     c0118268
-> <v7wbi_flush_user_tlb_range+0x20> (File Offset: 0x28268)
-> c0118278:       f57ff04b        dsb     ish
-> c011827c:       e1a0f00e        mov     pc, lr
-
-... and the address in r0 for the TLBI.
-
-Are the cores executing instructions at this point, or by "hard LOCKUP"
-do you mean that they're deadlocked in hardware?
-
-Will
+-- 
+Regards
+Vignesh
