@@ -1,59 +1,131 @@
 From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
-Date: Fri, 6 Nov 2015 06:36:54 +0000
-Subject: [PATCH 05/12 v6] arm64: renesas: r8a7795: Sound DVC support
+Date: Fri, 6 Nov 2015 06:38:02 +0000
+Subject: [PATCH 06/12 v6] arm64: renesas: salvator-x: Sound SSI PIO support
 In-Reply-To: <87egg3k5g6.wl%kuninori.morimoto.gx@renesas.com>
 References: <87egg3k5g6.wl%kuninori.morimoto.gx@renesas.com>
-Message-ID: <877flvk59y.wl%kuninori.morimoto.gx@renesas.com>
+Message-ID: <87611fk582.wl%kuninori.morimoto.gx@renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 
+This patch adds PIO sound support for Salvator-X board.
+It can use 44.1kHz base sound only at this point, since 48kHz base
+sound needs CS2000, but it is not yet upstreamed.
+
 Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
 v5 -> v6
 
- - no change
+ - remove cs2000 support
+ - tidyup sound pin
+ - tidyup suond clock
 
- arch/arm64/boot/dts/renesas/r8a7795.dtsi | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
+ arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts | 76 ++++++++++++++++++++++
+ 1 file changed, 76 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-index 4cceb93..0272c8c 100644
---- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-+++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
-@@ -529,6 +529,7 @@
- 				 <&cpg CPG_MOD 1026>, <&cpg CPG_MOD 1027>,
- 				 <&cpg CPG_MOD 1028>, <&cpg CPG_MOD 1029>,
- 				 <&cpg CPG_MOD 1030>, <&cpg CPG_MOD 1031>,
-+				 <&cpg CPG_MOD 1019>, <&cpg CPG_MOD 1018>,
- 				 <&audio_clk_a>, <&audio_clk_b>,
- 				 <&audio_clk_c>,
- 				 <&cpg CPG_CORE R8A7795_CLK_S0D4>;
-@@ -539,10 +540,22 @@
- 				      "src.9", "src.8", "src.7", "src.6",
- 				      "src.5", "src.4", "src.3", "src.2",
- 				      "src.1", "src.0",
-+				      "dvc.0", "dvc.1",
- 				      "clk_a", "clk_b", "clk_c", "clk_i";
- 			power-domains = <&cpg>;
- 			status = "disabled";
- 
-+			rcar_sound,dvc {
-+				dvc0: dvc at 0 {
-+					dmas = <&audma0 0xbc>;
-+					dma-names = "tx";
-+				};
-+				dvc1: dvc at 1 {
-+					dmas = <&audma0 0xbe>;
-+					dma-names = "tx";
-+				};
-+			};
+diff --git a/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts b/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts
+index 6a72bf7..da2d2d7 100644
+--- a/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts
++++ b/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts
+@@ -31,6 +31,28 @@
+ 		/* first 128MB is reserved for secure area. */
+ 		reg = <0x0 0x48000000 0x0 0x38000000>;
+ 	};
 +
- 			rcar_sound,src {
- 				src0: src at 0 {
- 					interrupts = <0 352 IRQ_TYPE_LEVEL_HIGH>;
++	x12_clk: x12_clk {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		clock-frequency = <24576000>;
++	};
++
++	rsnd_ak4613: sound {
++		compatible = "simple-audio-card";
++
++		simple-audio-card,format = "left_j";
++		simple-audio-card,bitclock-master = <&sndcpu>;
++		simple-audio-card,frame-master = <&sndcpu>;
++
++		sndcpu: simple-audio-card,cpu {
++			sound-dai = <&rcar_sound>;
++		};
++
++		sndcodec: simple-audio-card,codec {
++			sound-dai = <&ak4613>;
++		};
++	};
+ };
+ 
+ &extal_clk {
+@@ -56,6 +78,17 @@
+ 		renesas,groups = "avb_mdc";
+ 		renesas,function = "avb";
+ 	};
++
++	sound_pins: sound {
++		renesas,groups = "ssi01239_ctrl", "ssi0_data", "ssi1_data_a";
++		renesas,function = "ssi";
++	};
++
++	sound_clk_pins: sound_clk {
++		renesas,groups = "audio_clk_a_a", "audio_clk_b_a", "audio_clk_c_a",
++				 "audio_clkout_a", "audio_clkout3_a";
++		renesas,function = "audio_clk";
++	};
+ };
+ 
+ &scif1 {
+@@ -77,6 +110,49 @@
+ 	pinctrl-names = "default";
+ 
+ 	status = "okay";
++
++	clock-frequency = <100000>;
++
++	ak4613: codec at 10 {
++		compatible = "asahi-kasei,ak4613";
++		#sound-dai-cells = <0>;
++		reg = <0x10>;
++		clocks = <&rcar_sound 3>;
++	};
++};
++
++&rcar_sound {
++	pinctrl-0 = <&sound_pins &sound_clk_pins>;
++	pinctrl-names = "default";
++
++	/* Single DAI */
++	#sound-dai-cells = <0>;
++
++	/* audio_clkout0/1/2/3 */
++	#clock-cells = <1>;
++	clock-frequency = <11289600>;
++
++	status = "okay";
++
++	rcar_sound,dai {
++		dai0 {
++			playback = <&ssi0>;
++			capture  = <&ssi1>;
++		};
++	};
++};
++
++&ssi0 {
++	pio-transfer;
++};
++
++&ssi1 {
++	pio-transfer;
++	shared-pin;
++};
++
++&audio_clk_a {
++	clock-frequency = <22579200>;
+ };
+ 
+ &avb {
 -- 
 1.9.1
