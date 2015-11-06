@@ -1,59 +1,75 @@
-From: marek.belisko@gmail.com (Belisko Marek)
-Date: Fri, 6 Nov 2015 21:21:30 +0100
-Subject: [PATCH] Revert "ARM: dts: twl4030: Add iio properties for bci
- subnode"
-In-Reply-To: <1446826430-3705-1-git-send-email-sre@kernel.org>
-References: <1446826430-3705-1-git-send-email-sre@kernel.org>
-Message-ID: <CAAfyv35kjW+x8+JmLFz0e0LBBpeHBqAU+qj++9aBT1PSiKRYyg@mail.gmail.com>
+From: keescook@chromium.org (Kees Cook)
+Date: Fri, 6 Nov 2015 12:28:58 -0800
+Subject: [PATCH] arm: Use kernel mm when updating section permissions
+In-Reply-To: <CAMAWPa9XvdS+dF78c7Fgs4ekRy7wVnfFT=0A5NLpu0UYaqV7fA@mail.gmail.com>
+References: <1446685239-28522-1-git-send-email-labbott@fedoraproject.org>
+ <20151105094615.GP8644@n2100.arm.linux.org.uk>
+ <563B81DA.2080409@redhat.com>
+ <20151105162719.GQ8644@n2100.arm.linux.org.uk>
+ <563BFCC4.8050705@redhat.com>
+ <CAGXu5jLS8GPxmMQwd9qw+w+fkMqU-GYyME5WUuKZZ4qTesVzCQ@mail.gmail.com>
+ <563CF510.9080506@redhat.com>
+ <CAGXu5jKLgL0Kt5xCWv-3ZUX94m1DNXLqsEDQKHoq7T=m6P7tvQ@mail.gmail.com>
+ <CAGXu5j+Jeg-Cwc7Tr8UeY9vkJLudw07+b=m0h-d9GuSyKiO4QA@mail.gmail.com>
+ <CAMAWPa9XvdS+dF78c7Fgs4ekRy7wVnfFT=0A5NLpu0UYaqV7fA@mail.gmail.com>
+Message-ID: <CAGXu5j+U-Q2R1Hw4qSPpFUKz3xyYrASGc5buMJTSy0K-3mWHBA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 6, 2015 at 5:13 PM, Sebastian Reichel <sre@kernel.org> wrote:
-> This reverts commit af19161aaed7ff8d1a52b2e517460f2fa0774e32,
-> which breaks the omap3 device tree build due to a wrong reference.
+On Fri, Nov 6, 2015 at 12:11 PM, Kevin Hilman <khilman@kernel.org> wrote:
+> On Fri, Nov 6, 2015 at 11:12 AM, Kees Cook <keescook@chromium.org> wrote:
 >
-> I accidently queued this change via the power supply subsystem while
-> telling Marek at the same time, that it should go through Tony's tree.
-> Following that I did miss Stephen's messages about the build failure in
-> linux-next and since he switched to merging an older snapshot nobody
-> else noticed the problem in my tree. I didn't notice myself, since I
-> did not build any device tree files assuming none have changed by me.
-Sorry for the mess. But wouldn't be better to use correct fix instead of revert?
+> [...]
 >
-> Signed-off-by: Sebastian Reichel <sre@kernel.org>
-> ---
->  arch/arm/boot/dts/twl4030.dtsi | 2 --
->  1 file changed, 2 deletions(-)
+>> Hi Kevin and Kernel CI folks,
+>>
+>> Could lkdtm get added to the kernel-CI workflows? Extracting and
+>> validating Oops details when poking lkdtm would be extremely valuable
+>> for these cases. :)
 >
-> diff --git a/arch/arm/boot/dts/twl4030.dtsi b/arch/arm/boot/dts/twl4030.dtsi
-> index 482b7aa37808..36ae9160b558 100644
-> --- a/arch/arm/boot/dts/twl4030.dtsi
-> +++ b/arch/arm/boot/dts/twl4030.dtsi
-> @@ -22,8 +22,6 @@
->         charger: bci {
->                 compatible = "ti,twl4030-bci";
->                 interrupts = <9>, <2>;
-> -               io-channels = <&twl4030_madc 11>;
-> -               io-channel-name = "vac";
->                 bci3v1-supply = <&vusb3v1>;
->         };
+> Yeah, we can add that.
 >
-> --
-> 2.6.2
->
+> What arches should we expect this to be working on?  For starters
 
-BR,
+This is a great question. ;) They're a mix of CONFIG and hardware
+feature specific, so probably they should be run on all architectures
+and we can figure out what's missing in each case.
 
-marek
+Everything built with CONFIG_DEBUG_RODATA should pass these:
+
+WRITE_RO
+WRITE_KERN
+EXEC_DATA
+EXEC_STACK
+EXEC_KMALLOC
+EXEC_VMALLOC
+
+But architectures without CONFIG_DEBUG_RODATA should be shamed. ;)
+
+Passing EXEC_USERSPACE requires SMEP on x86, and PXN on arm64.
+Passing ACCESS_USERSPACE rquires SMAP on x86, and PAN on arm64.
+
+The recent PAN emulation CONFIG_CPU_SW_DOMAIN_PAN on non-LPAE arm
+should cover ACCESS_USERSPACE too, and maybe EXEC_USERSPACE, but I
+haven't taken a close look.
+
+It might be useful, frankly, to test everything in lkdtm.
+
+> we'll get builds going with CONFIG_LKDTM=y, and then start looking at
+> adding the tests on arches that should work.
+>
+> Thes will be an interesting failure modes to catch because a kernel
+> panic is actually a PASS, and a failure to panic is a FAIL.  :)
+
+Yup! :) And extracting the Oops message can become important too. As
+recently shown with CONFIG_CPU_SW_DOMAIN_PAN, the test was wrong, and
+the Oops showed it:
+http://www.gossamer-threads.com/lists/linux/kernel/2293320
+
+Thanks for looking into it!
+
+-Kees
 
 -- 
-as simple and primitive as possible
--------------------------------------------------
-Marek Belisko - OPEN-NANDRA
-Freelance Developer
-
-Ruska Nova Ves 219 | Presov, 08005 Slovak Republic
-Tel: +421 915 052 184
-skype: marekwhite
-twitter: #opennandra
-web: http://open-nandra.com
+Kees Cook
+Chrome OS Security
