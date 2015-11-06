@@ -1,184 +1,87 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Fri, 6 Nov 2015 12:29:07 +0100
-Subject: [PATCH 3/3] KVM/arm64: enable enhanced armv8 fp/simd lazy switch
-In-Reply-To: <563BFAE8.3010401@samsung.com>
-References: <1446242193-8424-1-git-send-email-m.smarduch@samsung.com>
- <1446242193-8424-4-git-send-email-m.smarduch@samsung.com>
- <20151105150255.GD5819@cbox> <563BFAE8.3010401@samsung.com>
-Message-ID: <20151106112907.GG5819@cbox>
+From: zhengsq@rock-chips.com (Shunqian Zheng)
+Date: Fri, 06 Nov 2015 19:35:11 +0800
+Subject: [PATCH v3 1/2] ASoC: codec: Inno codec driver for RK3036 SoC
+In-Reply-To: <20151106104541.GC18409@sirena.org.uk>
+References: <1446799162-15635-1-git-send-email-zhengsq@rock-chips.com>
+ <1446799162-15635-2-git-send-email-zhengsq@rock-chips.com>
+ <20151106104541.GC18409@sirena.org.uk>
+Message-ID: <563C906F.8020502@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 05, 2015 at 04:57:12PM -0800, Mario Smarduch wrote:
-> 
-> 
-> On 11/5/2015 7:02 AM, Christoffer Dall wrote:
-> > On Fri, Oct 30, 2015 at 02:56:33PM -0700, Mario Smarduch wrote:
-> >> This patch enables arm64 lazy fp/simd switch, similar to arm described in
-> >> second patch. Change from previous version - restore function is moved to
-> >> host. 
-> >>
-> >> Signed-off-by: Mario Smarduch <m.smarduch@samsung.com>
-> >> ---
-> >>  arch/arm64/include/asm/kvm_host.h |  2 +-
-> >>  arch/arm64/kernel/asm-offsets.c   |  1 +
-> >>  arch/arm64/kvm/hyp.S              | 37 +++++++++++++++++++++++++++++++------
-> >>  3 files changed, 33 insertions(+), 7 deletions(-)
-> >>
-> >> diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-> >> index 26a2347..dcecf92 100644
-> >> --- a/arch/arm64/include/asm/kvm_host.h
-> >> +++ b/arch/arm64/include/asm/kvm_host.h
-> >> @@ -251,11 +251,11 @@ static inline void kvm_arch_hardware_unsetup(void) {}
-> >>  static inline void kvm_arch_sync_events(struct kvm *kvm) {}
-> >>  static inline void kvm_arch_vcpu_uninit(struct kvm_vcpu *vcpu) {}
-> >>  static inline void kvm_arch_sched_in(struct kvm_vcpu *vcpu, int cpu) {}
-> >> -static inline void kvm_restore_host_vfp_state(struct kvm_vcpu *vcpu) {}
-> >>  
-> >>  void kvm_arm_init_debug(void);
-> >>  void kvm_arm_setup_debug(struct kvm_vcpu *vcpu);
-> >>  void kvm_arm_clear_debug(struct kvm_vcpu *vcpu);
-> >>  void kvm_arm_reset_debug_ptr(struct kvm_vcpu *vcpu);
-> >> +void kvm_restore_host_vfp_state(struct kvm_vcpu *vcpu);
-> >>  
-> >>  #endif /* __ARM64_KVM_HOST_H__ */
-> >> diff --git a/arch/arm64/kernel/asm-offsets.c b/arch/arm64/kernel/asm-offsets.c
-> >> index 8d89cf8..c9c5242 100644
-> >> --- a/arch/arm64/kernel/asm-offsets.c
-> >> +++ b/arch/arm64/kernel/asm-offsets.c
-> >> @@ -124,6 +124,7 @@ int main(void)
-> >>    DEFINE(VCPU_HCR_EL2,		offsetof(struct kvm_vcpu, arch.hcr_el2));
-> >>    DEFINE(VCPU_MDCR_EL2,	offsetof(struct kvm_vcpu, arch.mdcr_el2));
-> >>    DEFINE(VCPU_IRQ_LINES,	offsetof(struct kvm_vcpu, arch.irq_lines));
-> >> +  DEFINE(VCPU_VFP_DIRTY,	offsetof(struct kvm_vcpu, arch.vfp_dirty));
-> >>    DEFINE(VCPU_HOST_CONTEXT,	offsetof(struct kvm_vcpu, arch.host_cpu_context));
-> >>    DEFINE(VCPU_HOST_DEBUG_STATE, offsetof(struct kvm_vcpu, arch.host_debug_state));
-> >>    DEFINE(VCPU_TIMER_CNTV_CTL,	offsetof(struct kvm_vcpu, arch.timer_cpu.cntv_ctl));
-> >> diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
-> >> index e583613..ed2c4cf 100644
-> >> --- a/arch/arm64/kvm/hyp.S
-> >> +++ b/arch/arm64/kvm/hyp.S
-> >> @@ -36,6 +36,28 @@
-> >>  #define CPU_SYSREG_OFFSET(x)	(CPU_SYSREGS + 8*x)
-> >>  
-> >>  	.text
-> >> +
-> >> +/**
-> >> + * void kvm_restore_host_vfp_state(struct vcpu *vcpu) - Executes lazy
-> >> + *	fp/simd switch, saves the guest, restores host. Called from host
-> >> + *	mode, placed outside of hyp section.
-> > 
-> > same comments on style as previous patch
-> Got it.
-> > 
-> >> + */
-> >> +ENTRY(kvm_restore_host_vfp_state)
-> >> +	push    xzr, lr
-> >> +
-> >> +	add     x2, x0, #VCPU_CONTEXT
-> >> +	mov     w3, #0
-> >> +	strb    w3, [x0, #VCPU_VFP_DIRTY]
-> > 
-> > I've been discussing with myself if it would make more sense to clear
-> > the dirty flag in the C-code...
-> Since all the work is done here I placed it here.
+Hi Mark,
 
-yeah, that's what I thought first, but then I thought it's typically
-easier to understand the logic in the C-code and this is technically a
-side-effect from the name of the function "kvm_restore_host_vfp_state"
-which should then be "kvm_restore_host_vfp_state_and_clear_dirty_flag"
-:)
+On 2015?11?06? 18:45, Mark Brown wrote:
+> On Fri, Nov 06, 2015 at 04:39:21PM +0800, Shunqian Zheng wrote:
+>
+>> +	SOC_ENUM("Anti-pop", rk3036_codec_antipop_enum),
+> As discussed this shouldn't be an enum.
+Sure, I'll write the .get/.put/.info() for this.
+Here is the preview of it.
+Do you think the following is good to go?
 
-> > 
-> >> +
-> >> +	bl __save_fpsimd
-> >> +
-> >> +	ldr     x2, [x0, #VCPU_HOST_CONTEXT]
-> >> +	bl __restore_fpsimd
-> >> +
-> >> +	pop     xzr, lr
-> >> +	ret
-> >> +ENDPROC(kvm_restore_host_vfp_state)
-> >> +
-> >>  	.pushsection	.hyp.text, "ax"
-> >>  	.align	PAGE_SHIFT
-> >>  
-> >> @@ -482,7 +504,11 @@
-> >>  99:
-> >>  	msr     hcr_el2, x2
-> >>  	mov	x2, #CPTR_EL2_TTA
-> >> +
-> >> +	ldrb	w3, [x0, #VCPU_VFP_DIRTY]
-> >> +	tbnz    w3, #0, 98f
-> >>  	orr     x2, x2, #CPTR_EL2_TFP
-> >> +98:
-> > 
-> > mmm, don't you need to only set the fpexc32 when you're actually going
-> > to trap the guest accesses?
-> 
-> My understanding is you always need to set enable in fpexec32 for 32 bit guests,
-> otherwise EL1 would get the trap instead of EL2. Not sure if that's the point
-> you're making.
-> 
+static int rk3036_codec_antipop_info(struct snd_kcontrol *kcontrol,
+                                      struct snd_ctl_elem_info *uinfo)
+{
+         uinfo->type = SNDRV_CTL_ELEM_TYPE_BOOLEAN;
+         uinfo->count = 2;
+         uinfo->value.integer.min = 0;
+         uinfo->value.integer.max = 1;
 
-If you're expecting to trap all accesses by setting CPTR_EL2_TFP and
-you're running a 32-bit guest, you must also enable in fpexec32, because
-otherwise the trap is not taken to EL2, but to EL1 instead.
+         return 0;
+}
 
-Before these patches, we *always* expected to trap VFP accesses after
-entering the guest, but since that has now changed, you should only
-fiddle with fpexec32 if you are indeed trapping (first entry after
-vcpu_load) and if it's a 32-bit VM.
+static int rk3036_codec_antipop_get(struct snd_kcontrol *kcontrol,
+         struct snd_ctl_elem_value *ucontrol)
+{
+         struct snd_soc_component *component = snd_kcontrol_chip(kcontrol);
+         int val, ret, regval;
 
-Does that help?
 
-> > 
-> > also, you can consider only setting this in vcpu_load (jumping quickly
-> > to EL2 to do so) if we're running a 32-bit guest.  Probably worth
-> > measuring the difference between the extra EL2 jump on vcpu_load
-> > compared to hitting this register on every entry/exit.
-> 
-> Sure, makes sense since this is a hot code path.
-> > 
-> > Code-wise, it will be nicer to do it on vcpu_load.
-> > 
-> >>  	msr	cptr_el2, x2
-> >>  
-> >>  	mov	x2, #(1 << 15)	// Trap CP15 Cr=15
-> >> @@ -669,14 +695,12 @@ __restore_debug:
-> >>  	ret
-> >>  
-> >>  __save_fpsimd:
-> >> -	skip_fpsimd_state x3, 1f
-> >>  	save_fpsimd
-> >> -1:	ret
-> >> +	ret
-> >>  
-> >>  __restore_fpsimd:
-> >> -	skip_fpsimd_state x3, 1f
-> >>  	restore_fpsimd
-> >> -1:	ret
-> >> +	ret
-> >>  
-> >>  switch_to_guest_fpsimd:
-> >>  	push	x4, lr
-> >> @@ -688,6 +712,9 @@ switch_to_guest_fpsimd:
-> >>  
-> >>  	mrs	x0, tpidr_el2
-> >>  
-> >> +	mov     w2, #1
-> >> +	strb    w2, [x0, #VCPU_VFP_DIRTY]
-> > 
-> > hmm, just noticing this.  Are you not writing a 32-bit value to a
-> > potentially 8-bit field (ignoring padding in the struct), as the dirty
-> > flag is declared a bool.
-> 
-> From the manuals byte stores require a word size registers on arm64/arm32.
-> The interconnect probably drops the remaining bytes.
-> Also double checked and the compiler uses same instructions.
-> 
+         ret = snd_soc_component_read(component, INNO_R09, &regval);
+         if (ret)
+                 return ret;
+         val = ((regval >> INNO_R09_HPL_ANITPOP_SHIFT) &
+                INNO_R09_HP_ANTIPOP_MSK) == INNO_R09_HP_ANTIPOP_ON;
+         ucontrol->value.integer.value[0] = val;
 
-duh, I didn't see the 'b' in strb - I guess I was too tired to review
-patches.
+         val = ((regval >> INNO_R09_HPR_ANITPOP_SHIFT) &
+                INNO_R09_HP_ANTIPOP_MSK) == INNO_R09_HP_ANTIPOP_ON;
+         ucontrol->value.integer.value[1] = val;
 
--Christoffer
+         return 0;
+}
+
+static int rk3036_codec_antipop_put(struct snd_kcontrol *kcontrol,
+         struct snd_ctl_elem_value *ucontrol)
+{
+         struct snd_soc_component *component = snd_kcontrol_chip(kcontrol);
+         int val, ret, regmsk;
+
+         val = (ucontrol->value.integer.value[0] ?
+                INNO_R09_HP_ANTIPOP_ON : INNO_R09_HP_ANTIPOP_OFF ) <<
+               INNO_R09_HPL_ANITPOP_SHIFT;
+         val |= (ucontrol->value.integer.value[1] ?
+                 INNO_R09_HP_ANTIPOP_ON : INNO_R09_HP_ANTIPOP_OFF ) <<
+                INNO_R09_HPR_ANITPOP_SHIFT;
+
+         regmsk = INNO_R09_HP_ANTIPOP_MSK << INNO_R09_HPL_ANITPOP_SHIFT |
+                  INNO_R09_HP_ANTIPOP_MSK << INNO_R09_HPR_ANITPOP_SHIFT;
+
+         ret = snd_soc_component_update_bits(component, INNO_R09,
+                                             regmsk, val);
+         if (ret < 0)
+                 return ret;
+
+         return 0;
+}
+
+#define SOC_RK3036_CODEC_ANTIPOP_DECL(xname) \
+{       .iface = SNDRV_CTL_ELEM_IFACE_MIXER, .name = xname, \
+         .info = rk3036_codec_antipop_info, .get = 
+rk3036_codec_antipop_get, \
+         .put = rk3036_codec_antipop_put, }
+
+
+Thank you very much,
+Shunqian
