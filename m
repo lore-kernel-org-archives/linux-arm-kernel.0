@@ -1,18 +1,47 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 6 Nov 2015 12:26:42 +0000
-Subject: [PATCH 1/3] xen/arm: introduce xen_read_wallclock
-In-Reply-To: <1446743385-12848-1-git-send-email-stefano.stabellini@eu.citrix.com>
-References: <alpine.DEB.2.02.1511051706560.13541@kaball.uk.xensource.com>
- <1446743385-12848-1-git-send-email-stefano.stabellini@eu.citrix.com>
-Message-ID: <20151106122641.GC23038@leverpostej>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 6 Nov 2015 12:30:09 +0000
+Subject: [PATCH] arm64: remove redundant FRAME_POINTER kconfig option
+In-Reply-To: <1446658671-16238-1-git-send-email-yang.shi@linaro.org>
+References: <1446658671-16238-1-git-send-email-yang.shi@linaro.org>
+Message-ID: <20151106123008.GK6087@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> +	delta = arch_timer_read_counter();	/* time since system boot */
-> +	delta += now.tv_sec * (u64)NSEC_PER_SEC + now.tv_nsec;
+On Wed, Nov 04, 2015 at 09:37:51AM -0800, Yang Shi wrote:
+> FRAME_POINTER is defined in lib/Kconfig.debug, it is unnecessary to redefine
+> it in arch/arm64/Kconfig.debug.
 
-The arch counter value is not a number of nanoseconds (unless CNTFRQ
-reads as 1000000), so this doesn't look right; the units don't match.
+It might be worth noting that this adds a dependency on DEBUG_KERNEL
+for building with frame pointers. I'm ok with that (it appears to be
+enabled in defconfig and follows the vast majority of other archs) but
+it is a change in behaviour.
 
-Thanks,
-Mark.
+With that:
+
+  Acked-by: Will Deacon <will.deacon@arm.com>
+
+Will
+
+> Signed-off-by: Yang Shi <yang.shi@linaro.org>
+> ---
+>  arch/arm64/Kconfig.debug | 4 ----
+>  1 file changed, 4 deletions(-)
+> 
+> diff --git a/arch/arm64/Kconfig.debug b/arch/arm64/Kconfig.debug
+> index d6285ef..915dea7 100644
+> --- a/arch/arm64/Kconfig.debug
+> +++ b/arch/arm64/Kconfig.debug
+> @@ -2,10 +2,6 @@ menu "Kernel hacking"
+>  
+>  source "lib/Kconfig.debug"
+>  
+> -config FRAME_POINTER
+> -	bool
+> -	default y
+> -
+>  config ARM64_PTDUMP
+>  	bool "Export kernel pagetable layout to userspace via debugfs"
+>  	depends on DEBUG_KERNEL
+> -- 
+> 2.0.2
+> 
