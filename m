@@ -1,47 +1,42 @@
-From: hauke@hauke-m.de (Hauke Mehrtens)
-Date: Fri, 06 Nov 2015 22:42:41 +0100
-Subject: [PATCH v3 4/4] ARM: BCM: Add SMP support for Broadcom 4708
-In-Reply-To: <1446844273-6460-5-git-send-email-kapilh@broadcom.com>
-References: <1446844273-6460-1-git-send-email-kapilh@broadcom.com>
- <1446844273-6460-5-git-send-email-kapilh@broadcom.com>
-Message-ID: <563D1ED1.6050506@hauke-m.de>
+From: robh@kernel.org (Rob Herring)
+Date: Fri, 6 Nov 2015 15:53:10 -0600
+Subject: [PATCH v2 2/3] dmaengine: ti-dma-crossbar: dra7: Support for
+ reserving DMA event ranges
+In-Reply-To: <1446192038-11158-3-git-send-email-peter.ujfalusi@ti.com>
+References: <1446192038-11158-1-git-send-email-peter.ujfalusi@ti.com>
+ <1446192038-11158-3-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <20151106215310.GA20278@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/06/2015 10:11 PM, Kapil Hali wrote:
-> From: Jon Mason <jonmason@broadcom.com>
+On Fri, Oct 30, 2015 at 10:00:37AM +0200, Peter Ujfalusi wrote:
+> In eDMA the events are directly mapped to a DMA channel (for example DMA
+> event 14 can only be handled by DMA channel 14). If the memcpy is enabled
+> on the eDMA, there is a possibility that the crossbar driver would assign
+> DMA event number already allocated in eDMA for memcpy. Furthermore the
+> eDMA can be shared with DSP in which case the crossbar driver should also
+> avoid mapping xbar events to DSP used event numbers (or channels).
 > 
-> Add SMP support for Broadcom's 4708 SoCs.
-> 
-> Signed-off-by: Jon Mason <jonmason@broadcom.com>
-> Acked-by: Hauke Mehrtens <hauke@hauke-m.de>
-> Tested-by: Hauke Mehrtens <hauke@hauke-m.de>
-> Signed-off-by: Kapil Hali <kapilh@broadcom.com>
-
-I tested this on a Netgear R6250 V1 (BCM4708) and SMP worked.
-
+> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
 > ---
->  arch/arm/boot/dts/bcm4708.dtsi | 2 ++
->  arch/arm/mach-bcm/Kconfig      | 1 +
->  arch/arm/mach-bcm/Makefile     | 3 +++
->  3 files changed, 6 insertions(+)
+>  .../devicetree/bindings/dma/ti-dma-crossbar.txt    |  6 +++
+>  drivers/dma/ti-dma-crossbar.c                      | 47 ++++++++++++++++++++--
+>  2 files changed, 49 insertions(+), 4 deletions(-)
 > 
-
-...
-
-> --- a/arch/arm/mach-bcm/Kconfig
-> +++ b/arch/arm/mach-bcm/Kconfig
-> @@ -54,6 +54,7 @@ config ARCH_BCM_NSP
->  config ARCH_BCM_5301X
->  	bool "Broadcom BCM470X / BCM5301X ARM SoC" if ARCH_MULTI_V7
->  	select ARCH_BCM_IPROC
-
-You activated ARM_ERRATA_764369 for NSP is this not needed for NS?
-
-
-> +	select HAVE_SMP
->  	help
->  	  Support for Broadcom BCM470X and BCM5301X SoCs with ARM CPU cores.
+> diff --git a/Documentation/devicetree/bindings/dma/ti-dma-crossbar.txt b/Documentation/devicetree/bindings/dma/ti-dma-crossbar.txt
+> index b152a75dceae..aead5869a28d 100644
+> --- a/Documentation/devicetree/bindings/dma/ti-dma-crossbar.txt
+> +++ b/Documentation/devicetree/bindings/dma/ti-dma-crossbar.txt
+> @@ -14,6 +14,10 @@ The DMA controller node need to have the following poroperties:
 >  
+>  Optional properties:
+>  - ti,dma-safe-map: Safe routing value for unused request lines
+> +- ti,reserved-dma-request-ranges: DMA request ranges which should not be used
+> +		when mapping xbar input to DMA request, they are either
+> +		allocated to be used by for example the DSP or they are used as
+> +		memcpy channels in eDMA.
 
-...
+How many requests are there? I think I'd rather see this as a mask 
+value.
+
+Rob
