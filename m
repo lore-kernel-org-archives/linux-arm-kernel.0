@@ -1,75 +1,95 @@
 From: robh@kernel.org (Rob Herring)
-Date: Thu, 5 Nov 2015 20:02:51 -0600
-Subject: [RFC v2 1/2] Documentation: bridge: Add documentation for ps8640
- DT properties
-In-Reply-To: <1446430166-7378-1-git-send-email-jitao.shi@mediatek.com>
-References: <1446430166-7378-1-git-send-email-jitao.shi@mediatek.com>
-Message-ID: <20151106020251.GA3234@rob-hp-laptop>
+Date: Thu, 5 Nov 2015 20:18:29 -0600
+Subject: [PATCH v2 08/13] Documentation: dt-bindings: Add bindings for
+ rk3288 DW MIPI DSI driver
+In-Reply-To: <1446296170-3702-9-git-send-email-zyw@rock-chips.com>
+References: <1446296170-3702-1-git-send-email-zyw@rock-chips.com>
+ <1446296170-3702-9-git-send-email-zyw@rock-chips.com>
+Message-ID: <20151106021829.GA4810@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 02, 2015 at 10:09:25AM +0800, Jitao Shi wrote:
-> Add documentation for DT properties supported by
-> ps8640 DSI-eDP converter.
+On Sat, Oct 31, 2015 at 08:56:04PM +0800, Chris Zhong wrote:
+> add device tree bindings for rk3288 specific Synopsys DW MIPI DSI driver
 > 
-> Signed-off-by: Jitao Shi <jitao.shi@mediatek.com>
-
-Acked-by: Rob Herring <robh@kernel.org>
-
+> Signed-off-by: Chris Zhong <zyw@rock-chips.com>
 > ---
->  .../devicetree/bindings/display/bridge/ps8640.txt  |   43 ++++++++++++++++++++
->  1 file changed, 43 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/display/bridge/ps8640.txt
 > 
-> diff --git a/Documentation/devicetree/bindings/display/bridge/ps8640.txt b/Documentation/devicetree/bindings/display/bridge/ps8640.txt
+> Changes in v2: None
+> 
+>  .../bindings/video/dw_mipi_dsi_rockchip.txt        | 56 ++++++++++++++++++++++
+>  1 file changed, 56 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/video/dw_mipi_dsi_rockchip.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/video/dw_mipi_dsi_rockchip.txt b/Documentation/devicetree/bindings/video/dw_mipi_dsi_rockchip.txt
 > new file mode 100644
-> index 0000000..7edc547
+> index 0000000..4dea804
 > --- /dev/null
-> +++ b/Documentation/devicetree/bindings/display/bridge/ps8640.txt
-> @@ -0,0 +1,43 @@
-> +ps8640-bridge bindings
+> +++ b/Documentation/devicetree/bindings/video/dw_mipi_dsi_rockchip.txt
+
+Please move to bindings/display/rockchip/
+
+
+> @@ -0,0 +1,56 @@
+> +Rockchip specific extensions to the Synopsys Designware MIPI DSI
+> +================================
 > +
 > +Required properties:
-> +	- compatible: "parade,ps8640"
-> +	- reg: first page address of the bridge.
-> +	- sleep-gpios: OF device-tree gpio specification for PD_ pin.
-> +	- reset-gpios: OF device-tree gpio specification for reset pin.
-> +	- mode-sel-gpios: OF device-tree gpio specification for mode-sel pin.
-> +	- vdd12-supply: OF device-tree regulator specification for 1.2V power.
-> +	- vdd33-supply: OF device-tree regulator specification for 3.3V power.
-> +	- ports: The device node can contain video interface port nodes per
-> +		 the video-interfaces bind[1]. For port at 0,set the reg = <0> as
-> +		 ps8640 dsi in and port at 1,set the reg = <1> as ps8640 eDP out.
+> +- compatible: "rockchip,rk3288-mipi-dsi", "snps,dw-mipi-dsi".
+> +- rockchip,grf: this soc should set GRF regs to mux vopl/vopb.
+> +- ports: contain a port node with endpoint definitions as defined in [1].
+> +  For vopb,set the reg = <0> and set the reg = <1> for vopl.
 > +
-> +[1]: Documentation/devicetree/bindings/media/video-interfaces.txt
+> +For more required properties, please refer to [2].
+> +
+> +[1] Documentation/devicetree/bindings/media/video-interfaces.txt
+> +[2] Documentation/devicetree/bindings/drm/bridge/dw_mipi_dsi.txt
+
+This needs to be updated too.
+
 > +
 > +Example:
-> +	edp-bridge at 18 {
-> +		compatible = "parade,ps8640";
-> +		reg = <0x18>;
-> +		sleep-gpios = <&pio 116 GPIO_ACTIVE_HIGH>;
-> +		reset-gpios = <&pio 115 GPIO_ACTIVE_HIGH>;
-> +		mode-sel-gpios = <&pio 92 GPIO_ACTIVE_HIGH>;
-> +		ps8640-1v2-supply = <&ps8640_fixed_1v2>;
-> +		ps8640-3v3-supply = <&mt6397_vgp2_reg>;
+> +	mipi_dsi: mipi at ff960000 {
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +		compatible = "rockchip,rk3288-mipi-dsi", "snps,dw-mipi-dsi";
+> +		reg = <0xff960000 0x4000>;
+> +		interrupts = <GIC_SPI 83 IRQ_TYPE_LEVEL_HIGH>;
+> +		clocks = <&cru SCLK_MIPI_24M>, <&cru PCLK_MIPI_DSI0>;
+> +		clock-names = "ref", "pclk";
+> +		rockchip,grf = <&grf>;
+> +		status = "okay";
 > +
 > +		ports {
 > +			#address-cells = <1>;
 > +			#size-cells = <0>;
-> +			port at 0 {
-> +				reg = <0>;
-> +				ps8640_in: endpoint {
-> +					remote-endpoint = <&dsi0_out>;
+> +			reg = <1>;
+> +
+> +			mipi_in: port {
+> +				#address-cells = <1>;
+> +				#size-cells = <0>;
+> +				mipi_in_vopb: endpoint at 0 {
+> +					reg = <0>;
+> +					remote-endpoint = <&vopb_out_mipi>;
 > +				};
-> +			};
-> +			port at 1 {
-> +				reg = <1>;
-> +				ps8640_out: endpoint {
-> +					remote-endpoint = <&panel_in>;
+> +				mipi_in_vopl: endpoint at 1 {
+> +					reg = <1>;
+> +					remote-endpoint = <&vopl_out_mipi>;
 > +				};
 > +			};
 > +		};
+> +
+> +		panel {
+> +			compatible ="boe,tv080wum-nl0";
+> +			reg = <0>;
+> +
+> +			enable-gpios = <&gpio7 3 GPIO_ACTIVE_HIGH>;
+> +			pinctrl-names = "default";
+> +			pinctrl-0 = <&lcd_en>;
+> +			backlight = <&backlight>;
+> +			status = "okay";
+> +		};
 > +	};
 > -- 
-> 1.7.9.5
+> 2.6.2
 > 
