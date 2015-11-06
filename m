@@ -1,44 +1,59 @@
-From: agross@codeaurora.org (Andy Gross)
-Date: Fri, 6 Nov 2015 14:15:04 -0600
-Subject: [PATCH 1/3] devicetree: bindings: Document qcom board compatible
- format
-In-Reply-To: <1445894712-14350-2-git-send-email-sboyd@codeaurora.org>
-References: <1445894712-14350-1-git-send-email-sboyd@codeaurora.org>
- <1445894712-14350-2-git-send-email-sboyd@codeaurora.org>
-Message-ID: <20151106201504.GA18276@qualcomm.com>
+From: marek.belisko@gmail.com (Belisko Marek)
+Date: Fri, 6 Nov 2015 21:21:30 +0100
+Subject: [PATCH] Revert "ARM: dts: twl4030: Add iio properties for bci
+ subnode"
+In-Reply-To: <1446826430-3705-1-git-send-email-sre@kernel.org>
+References: <1446826430-3705-1-git-send-email-sre@kernel.org>
+Message-ID: <CAAfyv35kjW+x8+JmLFz0e0LBBpeHBqAU+qj++9aBT1PSiKRYyg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 26, 2015 at 02:25:10PM -0700, Stephen Boyd wrote:
-> Some qcom based bootloaders identify the dtb blob based on a set
-> of device properties like SoC, platform, PMIC, and revisions of
-> those components. In downstream kernels, these values are added
-> to the different component dtsi files (i.e. pmic dtsi file, SoC
-> dtsi file, board dtsi file, etc.) via qcom specific DT
-> properties. The dtb files are parsed by a program called dtbTool
-> that picks out these properties and creates a table of contents
-> binary blob with the property information and some offsets into
-> the concatenation of all the dtbs (termed a QCDT image).
-> 
-> The suggestion is to do this via the board compatible string
-> instead, because these qcom specific properties are never used by
-> the kernel. Add a document describing the format of the
-> compatible string that encodes all this information that's
-> currently encoded in the qcom,{msm-id,board-id,pmic-id}
-> properties in downstream devicetrees. Future bootloaders may be
-> updated to look at the compatible field instead of looking for
-> the table of contents image. For non-updateable bootloaders, a
-> new dtbTool program will parse the compatible string and generate
-> a QCDT image from it.
-> 
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+On Fri, Nov 6, 2015 at 5:13 PM, Sebastian Reichel <sre@kernel.org> wrote:
+> This reverts commit af19161aaed7ff8d1a52b2e517460f2fa0774e32,
+> which breaks the omap3 device tree build due to a wrong reference.
+>
+> I accidently queued this change via the power supply subsystem while
+> telling Marek at the same time, that it should go through Tony's tree.
+> Following that I did miss Stephen's messages about the build failure in
+> linux-next and since he switched to merging an older snapshot nobody
+> else noticed the problem in my tree. I didn't notice myself, since I
+> did not build any device tree files assuming none have changed by me.
+Sorry for the mess. But wouldn't be better to use correct fix instead of revert?
+>
+> Signed-off-by: Sebastian Reichel <sre@kernel.org>
 > ---
+>  arch/arm/boot/dts/twl4030.dtsi | 2 --
+>  1 file changed, 2 deletions(-)
+>
+> diff --git a/arch/arm/boot/dts/twl4030.dtsi b/arch/arm/boot/dts/twl4030.dtsi
+> index 482b7aa37808..36ae9160b558 100644
+> --- a/arch/arm/boot/dts/twl4030.dtsi
+> +++ b/arch/arm/boot/dts/twl4030.dtsi
+> @@ -22,8 +22,6 @@
+>         charger: bci {
+>                 compatible = "ti,twl4030-bci";
+>                 interrupts = <9>, <2>;
+> -               io-channels = <&twl4030_madc 11>;
+> -               io-channel-name = "vac";
+>                 bci3v1-supply = <&vusb3v1>;
+>         };
+>
+> --
+> 2.6.2
+>
 
-Looks workable.
+BR,
 
-Reviewed-by: Andy Gross <agross@codeaurora.org>
+marek
 
 -- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project
+as simple and primitive as possible
+-------------------------------------------------
+Marek Belisko - OPEN-NANDRA
+Freelance Developer
+
+Ruska Nova Ves 219 | Presov, 08005 Slovak Republic
+Tel: +421 915 052 184
+skype: marekwhite
+twitter: #opennandra
+web: http://open-nandra.com
