@@ -1,42 +1,42 @@
-From: yh.huang@mediatek.com (YH Huang)
-Date: Fri, 6 Nov 2015 16:31:30 +0800
-Subject: [PATCH v2] pwm-backlight: fix the panel power sequence
-In-Reply-To: <1446716430.3894.12.camel@pengutronix.de>
-References: <1444987060-48202-1-git-send-email-yh.huang@mediatek.com>
- <1444988219.3541.3.camel@pengutronix.de>
- <1445526750.27586.8.camel@mtksdaap41>
- <1446133259.3274.52.camel@pengutronix.de>
- <1446190900.17558.16.camel@mtksdaap41>
- <1446201271.3334.22.camel@pengutronix.de>
- <1446538299.2449.8.camel@mtksdaap41>
- <1446548924.3373.3.camel@pengutronix.de>
- <1446601656.15340.11.camel@mtksdaap41>
- <1446716430.3894.12.camel@pengutronix.de>
-Message-ID: <1446798690.6203.3.camel@mtksdaap41>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 6 Nov 2015 08:32:34 +0000
+Subject: [PATCH] ARM: proc-v7: Put stack in data section, handle XIP case
+In-Reply-To: <20151106075319.19378.64286.sendpatchset@little-apple>
+References: <20151106075319.19378.64286.sendpatchset@little-apple>
+Message-ID: <20151106083233.GS8644@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 2015-11-05 at 10:40 +0100, Philipp Zabel wrote:
-> > 
-> > Based on this, could we disable it initially and update in the
-> > backlight_update_status function?
-> > 
-> > Like this,
-> > 
-> > if (pb->enable_gpio) {
-> > 	if (phandle &&
-> > 	    gpiod_get_direction(pb->enable_gpio) == GPIOF_DIR_OUT &&
-> > 	    gpiod_get_value(pb->enable_gpio) == 1)
-> > 		gpiod_direction_output(pb->enable_gpio, 1);
+On Fri, Nov 06, 2015 at 04:53:19PM +0900, Magnus Damm wrote:
+> From: Magnus Damm <damm+renesas@opensource.se>
 > 
-> The gpiod_direction_output call is a no-op, since the direction is
-> already output and the value is already 1.
-> Also, I propose to set initial blanking to FB_BLANK_POWERDOWN in this
-> case, and wait for the panel driver to enable the backlight at the
-> appropriate time.
+> Adjust the ARM v7 setup code to put the temporary stack in the
+> data section and also use PLAT_PHYS_OFFSET to handle the XIP case.
+> 
+> The common case of XIP=n the code is considered to be position
+> independent while for XIP=y PLAT_PHYS_OFFSET is fixed. This
+> is based on that early code in head.S invoking PROCINFO_INITFUNC
+> seems position independent.
+> 
+> At this point two places in proc-v7.S make use of the temporary
+> stack so the PLAT_PHYS_OFFSET calculation is duplicated.
+> 
+> The XIP=n case has been tested with CPU Hotplug on r8a7779
+> (Cortex A9 Quad) and Chris [CCed] has tested the XIP=y
+> case.
+> 
+> Signed-off-by: Magnus Damm <damm+renesas@opensource.se>
+> Tested-by: Chris.Brandt at renesas.com
 
-Thanks your kindly reply.
-Your patch looks good to me.
+Sorry, but what's the problem with XIP=n ?  The above seems to avoid
+describing what the problem is there, but it spends an awful lot of
+words describing the XIP=n scenario and few describing the XIP=y
+scenario.
 
-Regards,
-YH Huang
+I think the commit message needs improving.
+
+Thanks.
+
+-- 
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
