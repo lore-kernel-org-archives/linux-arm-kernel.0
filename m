@@ -1,37 +1,44 @@
-From: khilman@kernel.org (Kevin Hilman)
-Date: Fri, 6 Nov 2015 12:11:08 -0800
-Subject: [PATCH] arm: Use kernel mm when updating section permissions
-In-Reply-To: <CAGXu5j+Jeg-Cwc7Tr8UeY9vkJLudw07+b=m0h-d9GuSyKiO4QA@mail.gmail.com>
-References: <1446685239-28522-1-git-send-email-labbott@fedoraproject.org>
- <20151105094615.GP8644@n2100.arm.linux.org.uk>
- <563B81DA.2080409@redhat.com>
- <20151105162719.GQ8644@n2100.arm.linux.org.uk>
- <563BFCC4.8050705@redhat.com>
- <CAGXu5jLS8GPxmMQwd9qw+w+fkMqU-GYyME5WUuKZZ4qTesVzCQ@mail.gmail.com>
- <563CF510.9080506@redhat.com>
- <CAGXu5jKLgL0Kt5xCWv-3ZUX94m1DNXLqsEDQKHoq7T=m6P7tvQ@mail.gmail.com>
- <CAGXu5j+Jeg-Cwc7Tr8UeY9vkJLudw07+b=m0h-d9GuSyKiO4QA@mail.gmail.com>
-Message-ID: <CAMAWPa9XvdS+dF78c7Fgs4ekRy7wVnfFT=0A5NLpu0UYaqV7fA@mail.gmail.com>
+From: agross@codeaurora.org (Andy Gross)
+Date: Fri, 6 Nov 2015 14:15:04 -0600
+Subject: [PATCH 1/3] devicetree: bindings: Document qcom board compatible
+ format
+In-Reply-To: <1445894712-14350-2-git-send-email-sboyd@codeaurora.org>
+References: <1445894712-14350-1-git-send-email-sboyd@codeaurora.org>
+ <1445894712-14350-2-git-send-email-sboyd@codeaurora.org>
+Message-ID: <20151106201504.GA18276@qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 6, 2015 at 11:12 AM, Kees Cook <keescook@chromium.org> wrote:
+On Mon, Oct 26, 2015 at 02:25:10PM -0700, Stephen Boyd wrote:
+> Some qcom based bootloaders identify the dtb blob based on a set
+> of device properties like SoC, platform, PMIC, and revisions of
+> those components. In downstream kernels, these values are added
+> to the different component dtsi files (i.e. pmic dtsi file, SoC
+> dtsi file, board dtsi file, etc.) via qcom specific DT
+> properties. The dtb files are parsed by a program called dtbTool
+> that picks out these properties and creates a table of contents
+> binary blob with the property information and some offsets into
+> the concatenation of all the dtbs (termed a QCDT image).
+> 
+> The suggestion is to do this via the board compatible string
+> instead, because these qcom specific properties are never used by
+> the kernel. Add a document describing the format of the
+> compatible string that encodes all this information that's
+> currently encoded in the qcom,{msm-id,board-id,pmic-id}
+> properties in downstream devicetrees. Future bootloaders may be
+> updated to look at the compatible field instead of looking for
+> the table of contents image. For non-updateable bootloaders, a
+> new dtbTool program will parse the compatible string and generate
+> a QCDT image from it.
+> 
+> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
+> ---
 
-[...]
+Looks workable.
 
-> Hi Kevin and Kernel CI folks,
->
-> Could lkdtm get added to the kernel-CI workflows? Extracting and
-> validating Oops details when poking lkdtm would be extremely valuable
-> for these cases. :)
+Reviewed-by: Andy Gross <agross@codeaurora.org>
 
-Yeah, we can add that.
-
-What arches should we expect this to be working on?  For starters
-we'll get builds going with CONFIG_LKDTM=y, and then start looking at
-adding the tests on arches that should work.
-
-Thes will be an interesting failure modes to catch because a kernel
-panic is actually a PASS, and a failure to panic is a FAIL.  :)
-
-Kevin
+-- 
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
