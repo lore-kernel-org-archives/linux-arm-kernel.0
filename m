@@ -1,32 +1,30 @@
-From: rostedt@goodmis.org (Steven Rostedt)
-Date: Fri, 6 Nov 2015 08:39:45 -0500
-Subject: [PATCH v5 3/6] ftrace: allow arch-specific stack tracer
-In-Reply-To: <1446792285-1154-4-git-send-email-takahiro.akashi@linaro.org>
-References: <1446792285-1154-1-git-send-email-takahiro.akashi@linaro.org>
- <1446792285-1154-4-git-send-email-takahiro.akashi@linaro.org>
-Message-ID: <20151106083945.6442b59b@gandalf.local.home>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Fri, 6 Nov 2015 14:53:04 +0100
+Subject: [PATCH] pwm: sun4i: Add support for pwm controller on sun5i SoCs
+In-Reply-To: <1444556997-28885-1-git-send-email-hdegoede@redhat.com>
+References: <1444556997-28885-1-git-send-email-hdegoede@redhat.com>
+Message-ID: <20151106135304.GD31835@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri,  6 Nov 2015 15:44:42 +0900
-AKASHI Takahiro <takahiro.akashi@linaro.org> wrote:
-
-> A stack frame may be used in a different way depending on cpu architecture.
-> Thus it is not always appropriate to slurp the stack contents, as current
-> check_stack() does, in order to calcurate a stack index (height) at a given
-> function call. At least not on arm64.
-> In addition, there is a possibility that we will mistakenly detect a stale
-> stack frame which has not been overwritten.
+On Sun, Oct 11, 2015 at 11:49:57AM +0200, Hans de Goede wrote:
+> The pwm controller on sun5i SoCs is identical to the one found on sun7i
+> SoCs. On the A13 package only one of the 2 pins is routed to the outside,
+> so only advertise one pwm there.
 > 
-> This patch makes check_stack() a weak function so as to later implement
-> arch-specific version.
-> 
-> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+> ---
+>  .../devicetree/bindings/pwm/pwm-sun4i.txt          |  2 ++
+>  drivers/pwm/pwm-sun4i.c                            | 25 ++++++++++++++++++++--
+>  2 files changed, 25 insertions(+), 2 deletions(-)
 
-Note, I already accepted this patch. I'll be pushing it to Linus today.
+Applied, thanks (with s/pwm/PWM/).
 
-I also added a patch on top of it to rename max_stack_lock to
-stack_trace_max_lock to stay consistent with the other global variables
-used in this file. You may need to update your code to handle that.
-
--- Steve
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151106/42f5bf7d/attachment.sig>
