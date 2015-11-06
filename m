@@ -1,374 +1,121 @@
 From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Fri,  6 Nov 2015 15:44:44 +0900
-Subject: [PATCH v5 5/6] arm64: ftrace: add arch-specific stack tracer
+Date: Fri,  6 Nov 2015 15:44:45 +0900
+Subject: [PATCH v5 6/6] arm64: ftrace: add a test of function prologue analyzer
 In-Reply-To: <1446792285-1154-1-git-send-email-takahiro.akashi@linaro.org>
 References: <1446792285-1154-1-git-send-email-takahiro.akashi@linaro.org>
-Message-ID: <1446792285-1154-6-git-send-email-takahiro.akashi@linaro.org>
+Message-ID: <1446792285-1154-7-git-send-email-takahiro.akashi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Stack tracer on arm64, check_stack(), is uniqeue in the following
-points:
-* analyze a function prologue of a traced function to estimate a more
-  accurate stack pointer value, replacing naive '<child's fp> + 0x10.'
-* use walk_stackframe(), instead of slurping stack contents as orignal
-  check_stack() does, to identify a stack frame and a stack index (height)
-  for every callsite.
+The patch ("arm64: ftrace: add arch-specific stack tracer") introduced
+a function prologue analyzer.
 
-Regarding a function prologue analyzer, there is no guarantee that we can
-handle all the possible patterns of function prologue as gcc does not use
-any fixed templates to generate them. 'Instruction scheduling' is another
-issue here.
-Nevertheless, the current version will surely cover almost all the cases
-in the kernel image and give us useful information on stack pointers.
+Given that there is no fixed template for a function prologue, at least
+on gcc for aarch64, a function prologue analyzer may be rather heuristic.
+So this patch adds a kernel command line option,
+function_prologue_analyzer_test, in order to run a basic test at startup
+by executing an analyzer against all the *traceable* functions.
 
-So this patch utilizes a function prologue only for stack tracer, and
-does not affect the behaviors of existing stacktrace functions.
+For function_prologue_analyzer_test=2, the output looks like:
+
+       po sp    fp    symbol
+       == ==    ==    ======
+    0: 0  0x040 0x000 gic_handle_irq+0x20/0xa4
+    1: 0  0x040 0x000 gic_handle_irq+0x34/0x114
+    2: 0  0x030 0x000 run_init_process+0x14/0x48
+    3: 0  0x020 0x000 try_to_run_init_process+0x14/0x58
+    4: 0  0x080 0x000 do_one_initcall+0x1c/0x194
+    ...
+22959: 0  0x020 0x000 tty_lock_slave+0x14/0x3c
+22960: 0  0x020 0x000 tty_unlock_slave+0x14/0x3c
+function prologue analyzer test: 0 errors
+
+"po" indicates a position of callsite of mcount(), and should be zero
+if an analyzer has parsed a function prologue successfully and reached
+a location where fp is properly updated.
+"sp" is a final offset to a parent's fp at the exit of function prologue.
+"fp" is also an ofset against sp at the exit of function prologue.
+So normally,
+  <new sp> = <old fp> + <"sp">
+  <new fp> = <new sp> - <"fp">
+
+And the last line shows the number of possible errors in the result.
+
+For function_prologue_analyzer_test=1, only the last line will be shown.
 
 Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
 ---
- arch/arm64/include/asm/stacktrace.h |    4 +
- arch/arm64/kernel/ftrace.c          |   64 ++++++++++++
- arch/arm64/kernel/stacktrace.c      |  185 ++++++++++++++++++++++++++++++++++-
- 3 files changed, 250 insertions(+), 3 deletions(-)
+ arch/arm64/kernel/stacktrace.c |   52 ++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 52 insertions(+)
 
-diff --git a/arch/arm64/include/asm/stacktrace.h b/arch/arm64/include/asm/stacktrace.h
-index 7318f6d..47b4832 100644
---- a/arch/arm64/include/asm/stacktrace.h
-+++ b/arch/arm64/include/asm/stacktrace.h
-@@ -25,5 +25,9 @@ struct stackframe {
- extern int unwind_frame(struct stackframe *frame);
- extern void walk_stackframe(struct stackframe *frame,
- 			    int (*fn)(struct stackframe *, void *), void *data);
-+#ifdef CONFIG_STACK_TRACER
-+struct stack_trace;
-+extern void save_stack_trace_sp(struct stack_trace *trace, unsigned long *sp);
-+#endif
- 
- #endif	/* __ASM_STACKTRACE_H */
-diff --git a/arch/arm64/kernel/ftrace.c b/arch/arm64/kernel/ftrace.c
-index 314f82d..46bfe37 100644
---- a/arch/arm64/kernel/ftrace.c
-+++ b/arch/arm64/kernel/ftrace.c
-@@ -9,6 +9,7 @@
-  * published by the Free Software Foundation.
-  */
- 
-+#include <linux/bug.h>
- #include <linux/ftrace.h>
- #include <linux/swab.h>
- #include <linux/uaccess.h>
-@@ -16,6 +17,7 @@
- #include <asm/cacheflush.h>
- #include <asm/ftrace.h>
- #include <asm/insn.h>
-+#include <asm/stacktrace.h>
- 
- #ifdef CONFIG_DYNAMIC_FTRACE
- /*
-@@ -173,3 +175,65 @@ int ftrace_disable_ftrace_graph_caller(void)
- }
- #endif /* CONFIG_DYNAMIC_FTRACE */
- #endif /* CONFIG_FUNCTION_GRAPH_TRACER */
-+
-+#ifdef CONFIG_STACK_TRACER
-+static unsigned long stack_trace_sp[STACK_TRACE_ENTRIES];
-+static unsigned long raw_stack_trace_max_size;
-+
-+void check_stack(unsigned long ip, unsigned long *stack)
-+{
-+	unsigned long this_size, flags;
-+	unsigned long top;
-+	int i, j;
-+
-+	this_size = ((unsigned long)stack) & (THREAD_SIZE-1);
-+	this_size = THREAD_SIZE - this_size;
-+
-+	if (this_size <= raw_stack_trace_max_size)
-+		return;
-+
-+	/* we do not handle an interrupt stack yet */
-+	if (!object_is_on_stack(stack))
-+		return;
-+
-+	local_irq_save(flags);
-+	arch_spin_lock(&max_stack_lock);
-+
-+	/* check again */
-+	if (this_size <= raw_stack_trace_max_size)
-+		goto out;
-+
-+	/* find out stack frames */
-+	stack_trace_max.nr_entries = 0;
-+	stack_trace_max.skip = 0;
-+	save_stack_trace_sp(&stack_trace_max, stack_trace_sp);
-+	stack_trace_max.nr_entries--; /* for the last entry ('-1') */
-+
-+	/* calculate a stack index for each function */
-+	top = ((unsigned long)stack & ~(THREAD_SIZE-1)) + THREAD_SIZE;
-+	for (i = 0; i < stack_trace_max.nr_entries; i++)
-+		stack_trace_index[i] = top - stack_trace_sp[i];
-+	raw_stack_trace_max_size = this_size;
-+
-+	/* Skip over the overhead of the stack tracer itself */
-+	for (i = 0; i < stack_trace_max.nr_entries; i++)
-+		if (stack_trace_max.entries[i] == ip)
-+			break;
-+
-+	stack_trace_max.nr_entries -= i;
-+	for (j = 0; j < stack_trace_max.nr_entries; j++) {
-+		stack_trace_index[j] = stack_trace_index[j + i];
-+		stack_trace_max.entries[j] = stack_trace_max.entries[j + i];
-+	}
-+	stack_trace_max_size = stack_trace_index[0];
-+
-+	if (task_stack_end_corrupted(current)) {
-+		WARN(1, "task stack is corrupted.\n");
-+		stack_trace_print();
-+	}
-+
-+ out:
-+	arch_spin_unlock(&max_stack_lock);
-+	local_irq_restore(flags);
-+}
-+#endif /* CONFIG_STACK_TRACER */
 diff --git a/arch/arm64/kernel/stacktrace.c b/arch/arm64/kernel/stacktrace.c
-index 5fd3477..4ee052a 100644
+index 4ee052a..d1a9e5b 100644
 --- a/arch/arm64/kernel/stacktrace.c
 +++ b/arch/arm64/kernel/stacktrace.c
-@@ -23,6 +23,144 @@
+@@ -18,6 +18,7 @@
+ #include <linux/kernel.h>
+ #include <linux/export.h>
+ #include <linux/ftrace.h>
++#include <linux/kallsyms.h>
+ #include <linux/sched.h>
+ #include <linux/stacktrace.h>
  
- #include <asm/stacktrace.h>
- 
-+#ifdef CONFIG_STACK_TRACER
-+/*
-+ * This function parses a function prologue of a traced function and
-+ * determines its stack size.
-+ * A return value indicates a location of @pc in a function prologue.
-+ * @return value:
-+ * <case 1>                       <case 1'>
-+ * 1:
-+ *     sub sp, sp, #XX            sub sp, sp, #XX
-+ * 2:
-+ *     stp x29, x30, [sp, #YY]    stp x29, x30, [sp, #--ZZ]!
-+ * 3:
-+ *     add x29, sp, #YY           mov x29, sp
-+ * 0:
-+ *
-+ * <case 2>
-+ * 1:
-+ *     stp x29, x30, [sp, #-XX]!
-+ * 3:
-+ *     mov x29, sp
-+ * 0:
-+ *
-+ * @size: sp offset from calller's sp (XX or XX + ZZ)
-+ * @size2: fp offset from new sp (YY or 0)
-+ */
-+static int analyze_function_prologue(unsigned long pc,
-+		unsigned long *size, unsigned long *size2)
+@@ -322,5 +323,56 @@ void save_stack_trace_sp(struct stack_trace *trace,
+ {
+ 	__save_stack_trace_tsk(current, trace, stack_dump_sp);
+ }
++
++static int start_analyzer_test __initdata;
++
++static int __init enable_analyzer_test(char *str)
 +{
-+	unsigned long offset;
-+	u32 *addr, insn;
-+	int pos = -1;
-+	enum aarch64_insn_register src, dst, reg1, reg2, base;
-+	int imm;
-+	enum aarch64_insn_variant variant;
-+	enum aarch64_insn_adsb_type adsb_type;
-+	enum aarch64_insn_ldst_type ldst_type;
-+
-+	*size = *size2 = 0;
-+
-+	if (!pc)
-+		goto out;
-+
-+	if (unlikely(!kallsyms_lookup_size_offset(pc, NULL, &offset)))
-+		goto out;
-+
-+	addr = (u32 *)(pc - offset);
-+#ifdef CONFIG_DYNAMIC_FTRACE
-+	if (addr == (u32 *)ftrace_call)
-+		addr = (u32 *)ftrace_caller;
-+#ifdef CONFIG_FUNCTION_GRAPH_TRACER
-+	else if (addr == (u32 *)ftrace_graph_caller)
-+#ifdef CONFIG_DYNAMIC_FTRACE
-+		addr = (u32 *)ftrace_caller;
-+#else
-+		addr = (u32 *)_mcount;
-+#endif
-+#endif
-+#endif
-+
-+	insn = *addr;
-+	pos = 1;
-+
-+	/* analyze a function prologue */
-+	while ((unsigned long)addr < pc) {
-+		if (aarch64_insn_is_branch_imm(insn) ||
-+		    aarch64_insn_is_br(insn) ||
-+		    aarch64_insn_is_blr(insn) ||
-+		    aarch64_insn_is_ret(insn) ||
-+		    aarch64_insn_is_eret(insn))
-+			/* exiting a basic block */
-+			goto out;
-+
-+		if (aarch64_insn_decode_add_sub_imm(insn, &dst, &src,
-+					&imm, &variant, &adsb_type)) {
-+			if ((adsb_type == AARCH64_INSN_ADSB_SUB) &&
-+				(dst == AARCH64_INSN_REG_SP) &&
-+				(src == AARCH64_INSN_REG_SP)) {
-+				/*
-+				 * Starting the following sequence:
-+				 *   sub sp, sp, #xx
-+				 *   stp x29, x30, [sp, #yy]
-+				 *   add x29, sp, #yy
-+				 */
-+				WARN_ON(pos != 1);
-+				pos = 2;
-+				*size += imm;
-+			} else if ((adsb_type == AARCH64_INSN_ADSB_ADD) &&
-+				(dst == AARCH64_INSN_REG_29) &&
-+				(src == AARCH64_INSN_REG_SP)) {
-+				/*
-+				 *   add x29, sp, #yy
-+				 * or
-+				 *   mov x29, sp
-+				 */
-+				WARN_ON(pos != 3);
-+				pos = 0;
-+				*size2 = imm;
-+
-+				break;
-+			}
-+		} else if (aarch64_insn_decode_load_store_pair(insn,
-+					&reg1, &reg2, &base, &imm,
-+					&variant, &ldst_type)) {
-+			if ((ldst_type ==
-+				AARCH64_INSN_LDST_STORE_PAIR_PRE_INDEX) &&
-+			    (reg1 == AARCH64_INSN_REG_29) &&
-+			    (reg2 == AARCH64_INSN_REG_30) &&
-+			    (base == AARCH64_INSN_REG_SP)) {
-+				/*
-+				 * Starting the following sequence:
-+				 *   stp x29, x30, [sp, #-xx]!
-+				 *   mov x29, sp
-+				 */
-+				WARN_ON(!((pos == 1) || (pos == 2)));
-+				pos = 3;
-+				*size += -imm;
-+			} else if ((ldst_type ==
-+				AARCH64_INSN_LDST_STORE_PAIR) &&
-+			    (reg1 == AARCH64_INSN_REG_29) &&
-+			    (reg2 == AARCH64_INSN_REG_30) &&
-+			    (base == AARCH64_INSN_REG_SP)) {
-+				/*
-+				 *   stp x29, x30, [sp, #yy]
-+				 */
-+				WARN_ON(pos != 2);
-+				pos = 3;
-+			}
-+		}
-+
-+		addr++;
-+		insn = *addr;
-+	}
-+
-+out:
-+	return pos;
++	get_option(&str, &start_analyzer_test);
++	return 0;
 +}
-+#endif
++early_param("function_prologue_analyzer_test", enable_analyzer_test);
 +
- /*
-  * AArch64 PCS assigns the frame pointer to x29.
-  *
-@@ -77,6 +215,9 @@ struct stack_trace_data {
- #ifdef CONFIG_FUNCTION_GRAPH_TRACER
- 	unsigned int ret_stack_index;
- #endif
-+#ifdef CONFIG_STACK_TRACER
-+	unsigned long *sp;
-+#endif
- };
- 
- static int save_trace(struct stackframe *frame, void *d)
-@@ -106,12 +247,33 @@ static int save_trace(struct stackframe *frame, void *d)
- 		return 0;
- 	}
- 
-+#ifdef CONFIG_STACK_TRACER
-+	if (data->sp) {
-+		if (trace->nr_entries) {
-+			unsigned long child_pc, sp_off, fp_off;
-+			int pos;
++static void __init do_test_function_prologue_analyzer(void)
++{
++	extern unsigned long __start_mcount_loc[];
++	extern unsigned long __stop_mcount_loc[];
++	unsigned long count, i, errors;
++	int print_once;
 +
-+			child_pc = trace->entries[trace->nr_entries - 1];
-+			pos = analyze_function_prologue(child_pc,
-+					&sp_off, &fp_off);
-+			/*
-+			 * frame->sp - 0x10 is actually a child's fp.
-+			 * See above.
-+			 */
-+			data->sp[trace->nr_entries] = (pos < 0 ? frame->sp :
-+					(frame->sp - 0x10) + sp_off - fp_off);
-+		} else {
-+			data->sp[0] = frame->sp;
++	count = __stop_mcount_loc - __start_mcount_loc;
++	errors = print_once = 0;
++	for (i = 0; i < count; i++) {
++		unsigned long addr, sp_off, fp_off;
++		int pos;
++		bool check;
++		char buf[60];
++
++		addr = __start_mcount_loc[i];
++		pos = analyze_function_prologue(addr, &sp_off, &fp_off);
++		check = ((pos != 0) || !sp_off || (sp_off <= fp_off));
++		if (check)
++			errors++;
++		if (check || (start_analyzer_test > 1)) {
++			if (!print_once) {
++				pr_debug("       po sp    fp    symbol\n");
++				pr_debug("       == ==    ==    ======\n");
++				print_once++;
++			}
++			sprint_symbol(buf, addr);
++			pr_debug("%5ld: %d  0x%03lx 0x%03lx %s\n",
++					i, pos, sp_off, fp_off, buf);
 +		}
 +	}
-+#endif
- 	trace->entries[trace->nr_entries++] = addr;
- 
- 	return trace->nr_entries >= trace->max_entries;
- }
- 
--void save_stack_trace_tsk(struct task_struct *tsk, struct stack_trace *trace)
-+static void __save_stack_trace_tsk(struct task_struct *tsk,
-+		struct stack_trace *trace, unsigned long *stack_dump_sp)
- {
- 	struct stack_trace_data data;
- 	struct stackframe frame;
-@@ -121,6 +283,9 @@ void save_stack_trace_tsk(struct task_struct *tsk, struct stack_trace *trace)
- #ifdef CONFIG_FUNCTION_GRAPH_TRACER
- 	data.ret_stack_index = current->curr_ret_stack;
- #endif
-+#ifdef CONFIG_STACK_TRACER
-+	data.sp = stack_dump_sp;
-+#endif
- 
- 	if (tsk != current) {
- 		data.no_sched_functions = 1;
-@@ -131,7 +296,8 @@ void save_stack_trace_tsk(struct task_struct *tsk, struct stack_trace *trace)
- 		data.no_sched_functions = 0;
- 		frame.fp = (unsigned long)__builtin_frame_address(0);
- 		frame.sp = current_stack_pointer;
--		frame.pc = (unsigned long)save_stack_trace_tsk;
-+		asm("1:");
-+		asm("ldr %0, =1b" : "=r" (frame.pc));
- 	}
- 
- 	walk_stackframe(&frame, save_trace, &data);
-@@ -139,9 +305,22 @@ void save_stack_trace_tsk(struct task_struct *tsk, struct stack_trace *trace)
- 		trace->entries[trace->nr_entries++] = ULONG_MAX;
- }
- 
-+void save_stack_trace_tsk(struct task_struct *tsk, struct stack_trace *trace)
-+{
-+	__save_stack_trace_tsk(tsk, trace, NULL);
++	pr_debug("function prologue analyzer test: %ld errors\n", errors);
 +}
 +
- void save_stack_trace(struct stack_trace *trace)
- {
--	save_stack_trace_tsk(current, trace);
-+	__save_stack_trace_tsk(current, trace, NULL);
- }
- EXPORT_SYMBOL_GPL(save_stack_trace);
-+
-+#ifdef CONFIG_STACK_TRACER
-+void save_stack_trace_sp(struct stack_trace *trace,
-+					unsigned long *stack_dump_sp)
++static int __init test_function_prologue_analyzer(void)
 +{
-+	__save_stack_trace_tsk(current, trace, stack_dump_sp);
++	if (start_analyzer_test)
++		do_test_function_prologue_analyzer();
++	return 0;
 +}
-+#endif /* CONFIG_STACK_TRACER */
++late_initcall(test_function_prologue_analyzer);
+ #endif /* CONFIG_STACK_TRACER */
  #endif
 -- 
 1.7.9.5
