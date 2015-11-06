@@ -1,100 +1,98 @@
-From: German.Rivera@freescale.com (Jose Rivera)
-Date: Fri, 6 Nov 2015 22:45:45 +0000
-Subject: [PATCH] arm64: dts: Added syscon-reboot node for FSL's LS2080A SoC
-In-Reply-To: <CABxcv=n6UTcdskBv8fqRzfes+nCjPaFbCTDGRRDt=MStdepwWA@mail.gmail.com>
-References: <1446846529-10613-1-git-send-email-German.Rivera@freescale.com>
- <CABxcv=n6UTcdskBv8fqRzfes+nCjPaFbCTDGRRDt=MStdepwWA@mail.gmail.com>
-Message-ID: <DM2PR0301MB1309536CB3D9024A42ED02C9FE280@DM2PR0301MB1309.namprd03.prod.outlook.com>
+From: carlo@endlessm.com (Carlo Caione)
+Date: Fri, 6 Nov 2015 23:47:38 +0100
+Subject: [PATCH 1/4] watchdog: meson: Enable meson SoC specific data
+In-Reply-To: <20151106221519.GB19791@roeck-us.net>
+References: <1446846906-31520-1-git-send-email-carlo@caione.org>
+ <1446846906-31520-2-git-send-email-carlo@caione.org>
+ <20151106221519.GB19791@roeck-us.net>
+Message-ID: <CAL9uMOH4i4ajkF2x7agHe2WZcHTJ=vs9cO+TGx8WGLOFVLZnig@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> -----Original Message-----
-> From: Javier Martinez Canillas [mailto:javier at dowhile0.org]
-> Sent: Friday, November 06, 2015 4:13 PM
-> To: Rivera Jose-B46482
-> Cc: Rob Herring; Mark Rutland; devicetree at vger.kernel.org; linux-arm-
-> kernel at lists.infradead.org; Linux Kernel; Sharma Bhupesh-B45370; Li Yang-
-> Leo-R58472; Yoder Stuart-B08248
-> Subject: Re: [PATCH] arm64: dts: Added syscon-reboot node for FSL's
-> LS2080A SoC
-> 
-> Hello J. German,
-> 
-> On Fri, Nov 6, 2015 at 6:48 PM, J. German Rivera
-> <German.Rivera@freescale.com> wrote:
-> > Added sys-reboot node to the FSL's LS2080A SoC DT to leverage the
-> > ARM-generic reboot mechanism for this SoC. This mechanism is enabled
-> > through CONFIG_POWER_RESET_SYSCON.
-> >
-> 
-> What's in the changelog ends as a part of the commit message and usually
-> the change history is not added there...
-> 
-You are right, thanks. I forgot to move the CHANGE HISTORY to be below the "---"
-Marker. I'll repost the patch.
+On Fri, Nov 6, 2015 at 11:15 PM, Guenter Roeck <linux@roeck-us.net> wrote:
 
-> > CHANGE HISTORY:
-> >
-> > Changes in v3:
-> > - Addressed comment from Stuart Yoder
-> >   * Fixed commit message to refer to LS2080A instead of LS2085A.
-> >
-> > Changes in v2:
-> > - Addressed comment form Stuart Yoder:
-> >   * Removed "@<address>" from reboot node
-> >
-> > Changes in v3:
-> > - Addressed comment form Stuart Yoder:
-> >   * Expose only the reset register
-> >
-> > Changes in v4:
-> > - Addressed comment from Arnd Bergmann:
-> >   * Changed compatible string to be more specific
-> >   * Changed node name to 'syscon' instead of 'rstcr'
-> >   * Changed address to lower case hex
-> > - Addressed comment form Stuart Yoder:
-> >   * Rebase on top of branch arm-soc/for-next
-> >
-> > Signed-off-by: J. German Rivera <German.Rivera@freescale.com>
-> > ---
-> 
-> ...so the change history should be added here, between the '---'
-> marker line and the patch diff since that section is omitted by tools
-> like git-am when applying patches.
-> 
-> >  arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi | 12 ++++++++++++
-> >  1 file changed, 12 insertions(+)
-> >
-> > diff --git a/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
-> > b/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
-> > index e81cd48..a790a90 100644
-> > --- a/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
-> > +++ b/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
-> > @@ -153,6 +153,18 @@
-> >                 };
-> >         };
-> >
-> > +       rstcr: syscon at 1e60000 {
-> > +               compatible = "fsl,ls2085a-rstcr", "syscon";
-> > +               reg = <0x0 0x1e60000 0x0 0x4>;
-> > +       };
-> > +
-> > +       reboot {
-> > +               compatible ="syscon-reboot";
-> > +               regmap = <&rstcr>;
-> > +               offset = <0x0>;
-> > +               mask = <0x2>;
-> > +       };
-> > +
-> >         timer {
-> >                 compatible = "arm,armv8-timer";
-> >                 interrupts = <1 13 0x8>, /* Physical Secure PPI,
-> > active-low */
-> > --
-> 
-> The patch looks good to me though.
-> 
-> Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
-> 
-> Best regards,
-> Javier
+>> +struct meson_wdt_data {
+>> +     unsigned int shift_enable;
+>> +     unsigned int terminal_count_mask;
+>> +     unsigned int count_unit;
+>> +};
+>> +
+>> +static struct meson_wdt_data meson6_wdt_data = {
+>> +     .shift_enable           = 22,
+>
+> I have to admit that I completely fail to understand why it would be
+> better to move the bit calculation from a constant to runtime.
+>
+> Can you explain ?
+
+No real reasons and you are right. I'll change it back.
+
+> I am also not really a friend of removing definitions, even if they are
+> only used once. But I understand that this is a matter of opinion.
+>
+>> +     .terminal_count_mask    = 0x3fffff,
+>> +     .count_unit             = 100000, /* 10 us */
+>> +};
+>> +
+>>  struct meson_wdt_dev {
+>>       struct watchdog_device wdt_dev;
+>>       void __iomem *wdt_base;
+>>       struct notifier_block restart_handler;
+>> +     struct meson_wdt_data *data;
+>>  };
+>>
+>>  static int meson_restart_handle(struct notifier_block *this, unsigned long mode,
+>>                               void *cmd)
+>>  {
+>> -     u32 tc_reboot = MESON_WDT_DC_RESET | MESON_WDT_TC_EN;
+>> +     u32 tc_reboot = MESON_WDT_DC_RESET;
+>>       struct meson_wdt_dev *meson_wdt = container_of(this,
+>>                                                      struct meson_wdt_dev,
+>>                                                      restart_handler);
+>> +     tc_reboot |= BIT(meson_wdt->data->shift_enable);
+>>
+>
+> I am quite sure that this results in a checkpatch warning.
+> Did you run your patch through checkpatch ?
+
+Yeah, no error/warnings on that line.
+
+>>       while (1) {
+>>               writel(tc_reboot, meson_wdt->wdt_base + MESON_WDT_TC);
+>> @@ -80,8 +92,8 @@ static void meson_wdt_change_timeout(struct watchdog_device *wdt_dev,
+>>       u32 reg;
+>>
+>>       reg = readl(meson_wdt->wdt_base + MESON_WDT_TC);
+>> -     reg &= ~MESON_WDT_TC_TM_MASK;
+>> -     reg |= MESON_SEC_TO_TC(timeout);
+>> +     reg &= ~(meson_wdt->data->terminal_count_mask);
+>
+> Unnecessary ( )
+
+Ok
+
+>>       meson_wdt = devm_kzalloc(&pdev->dev, sizeof(*meson_wdt), GFP_KERNEL);
+>> @@ -153,11 +172,19 @@ static int meson_wdt_probe(struct platform_device *pdev)
+>>       if (IS_ERR(meson_wdt->wdt_base))
+>>               return PTR_ERR(meson_wdt->wdt_base);
+>>
+>> +     of_id = of_match_device(meson_wdt_dt_ids, &pdev->dev);
+>> +     if (!of_id) {
+>> +             dev_err(&pdev->dev, "Unable to setup WDT data\n");
+>
+> "set up" or maybe better initialize.
+
+Ok
+
+>> +             return -ENODEV;
+>> +     }
+>> +     meson_wdt->data = (struct meson_wdt_data *) of_id->data;
+>
+> Is this typecase necessary ?
+
+Just for clarity. Not needed.
+
+I'll fix everything in v2. Thanks.
+
+-- 
+Carlo Caione
