@@ -1,31 +1,192 @@
-From: khilman@kernel.org (Kevin Hilman)
-Date: Fri, 6 Nov 2015 10:36:34 -0800
-Subject: [PATCH] Revert "ARM: dts: twl4030: Add iio properties for bci
- subnode"
-In-Reply-To: <1446826430-3705-1-git-send-email-sre@kernel.org>
-References: <1446826430-3705-1-git-send-email-sre@kernel.org>
-Message-ID: <CAMAWPa-7_q8Sf+4VQ0EE6zU-NvacKERFgjqueNif=52Frn0enA@mail.gmail.com>
+From: labbott@redhat.com (Laura Abbott)
+Date: Fri, 6 Nov 2015 10:44:32 -0800
+Subject: [PATCH] arm: Use kernel mm when updating section permissions
+In-Reply-To: <CAGXu5jLS8GPxmMQwd9qw+w+fkMqU-GYyME5WUuKZZ4qTesVzCQ@mail.gmail.com>
+References: <1446685239-28522-1-git-send-email-labbott@fedoraproject.org>
+ <20151105094615.GP8644@n2100.arm.linux.org.uk> <563B81DA.2080409@redhat.com>
+ <20151105162719.GQ8644@n2100.arm.linux.org.uk> <563BFCC4.8050705@redhat.com>
+ <CAGXu5jLS8GPxmMQwd9qw+w+fkMqU-GYyME5WUuKZZ4qTesVzCQ@mail.gmail.com>
+Message-ID: <563CF510.9080506@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 6, 2015 at 8:13 AM, Sebastian Reichel <sre@kernel.org> wrote:
-> This reverts commit af19161aaed7ff8d1a52b2e517460f2fa0774e32,
-> which breaks the omap3 device tree build due to a wrong reference.
+On 11/05/2015 05:15 PM, Kees Cook wrote:
+> On Thu, Nov 5, 2015 at 5:05 PM, Laura Abbott <labbott@redhat.com> wrote:
+>> On 11/05/2015 08:27 AM, Russell King - ARM Linux wrote:
+>>>
+>>> On Thu, Nov 05, 2015 at 08:20:42AM -0800, Laura Abbott wrote:
+>>>>
+>>>> On 11/05/2015 01:46 AM, Russell King - ARM Linux wrote:
+>>>>>
+>>>>> On Wed, Nov 04, 2015 at 05:00:39PM -0800, Laura Abbott wrote:
+>>>>>>
+>>>>>> Currently, read only permissions are not being applied even
+>>>>>> when CONFIG_DEBUG_RODATA is set. This is because section_update
+>>>>>> uses current->mm for adjusting the page tables. current->mm
+>>>>>> need not be equivalent to the kernel version. Use pgd_offset_k
+>>>>>> to get the proper page directory for updating.
+>>>>>
+>>>>>
+>>>>> What are you trying to achieve here?  You can't use these functions
+>>>>> at run time (after the first thread has been spawned) to change
+>>>>> permissions, because there will be multiple copies of the kernel
+>>>>> section mappings, and those copies will not get updated.
+>>>>>
+>>>>> In any case, this change will probably break kexec and ftrace, as
+>>>>> the running thread will no longer see the updated page tables.
+>>>>>
+>>>>
+>>>> I think I was hitting that exact problem with multiple copies
+>>>> not getting updated. The section_update code was being called
+>>>> and I was seeing the tables get updated but nothing was being
+>>>> applied when I tried to write to text or check the debugfs
+>>>> page table. The current flow is:
+>>>>
+>>>> rest_init -> kernel_thread(kernel_init) and from that thread
+>>>> mark_rodata_ro. So mark_rodata_ro is always going to happen
+>>>> in a thread.
+>>>>
+>>>> Do we need to update for both init_mm and the first running
+>>>> thread?
+>>>
+>>>
+>>> The "first running thread" is merely coincidental for things like kexec.
+>>>
+>>> Hmm.  Actually, I think the existing code _should_ be fine.  At the
+>>> point where mark_rodata_ro() is, we should still be using init_mm, so
+>>> updating the current threads page tables should actually be updating
+>>> the swapper_pg_dir.
+>>
+>>
+>> That doesn't seem to hold true. Based on what I'm seeing, we lose
+>> the the guarantee of init_mm after the first exec. If usermodehelper
+>> gets called to load a module, that triggers an exec and the kernel
+>> thread is no longer using init_mm after that. I'm testing with the
+>> multi-v7 defconfig which uses the smsc911x driver which loads a
+>> module during initcall. That gets called before mark_rodata_ro so
+>> the init_mm is never updated. I verified that disabling smsc911x
+>> makes things work as expected. I suspect the testing was never done
+>> with a driver that tried to call usermodehelper during init time.
 >
-> I accidently queued this change via the power supply subsystem while
-> telling Marek at the same time, that it should go through Tony's tree.
-> Following that I did miss Stephen's messages about the build failure in
-> linux-next and since he switched to merging an older snapshot nobody
-> else noticed the problem in my tree. I didn't notice myself, since I
-> did not build any device tree files assuming none have changed by me.
+> Ooooh. Nice catch. Yeah, my testing didn't include that case.
 >
-> Signed-off-by: Sebastian Reichel <sre@kernel.org>
+>> I got as far as narrowing it down that it happens after the usermodehelper
+>> but I wasn't able to pinpoint where exactly the switch happened. It seems
+>> like we need to have the page tables set up before any initcalls
+>> happen otherwise we risk having an exec create stray processes which we
+>> can't update.
+>
+> Can we just make mark_rodata_ro() a no-op and do the RO setting
+> earlier when we do the NX setting?
+>
 
-We also found this in kernelci.org build testing, and verified that
-this fixes the build.
+Unfortunately no. The time we are doing the nx setting is before we've finished
+with the initmem so we need the initmem to be finished and freed before we can
+mark anything RO.
 
-Tested-by: Kevin Hilman <khilman@linaro.org>
+More importantly, the NX settings are also not getting set. Compare before:
 
-Thanks Felipe for reporting, and thanks Sebastian for the quick fix.
+---[ Kernel Mapping ]---
+0xc0000000-0xc0300000           3M     RW NX
+0xc0300000-0xc1300000          16M     RW x
+0xc1300000-0xcc000000         173M     RW NX
+0xcc000000-0xcc040000         256K     RW NX     MEM/BUFFERABLE/WC
+0xcc040000-0xcc100000         768K     RW NX     MEM/CACHED/WBRA
+0xcc100000-0xcc280000        1536K     RW NX     MEM/BUFFERABLE/WC
+0xcc280000-0xd0000000       62976K     RW NX     MEM/CACHED/WBRA
+0xd0000000-0xd0200000           2M     RW NX
 
-Kevin
+and after
+
+---[ Kernel Mapping ]---
+0xc0000000-0xc0300000           3M     RW NX
+0xc0300000-0xc0c00000           9M     ro x
+0xc0c00000-0xc1100000           5M     ro NX
+0xc1100000-0xcc000000         175M     RW NX
+0xcc000000-0xcc040000         256K     RW NX     MEM/BUFFERABLE/WC
+0xcc040000-0xcc100000         768K     RW NX     MEM/CACHED/WBRA
+0xcc100000-0xcc280000        1536K     RW NX     MEM/BUFFERABLE/WC
+0xcc280000-0xd0000000       62976K     RW NX     MEM/CACHED/WBRA
+0xd0000000-0xd0200000           2M     RW NX
+
+
+with my test patch. I think setting both current->active_mm and &init_mm
+is sufficient. Maybe explicitly setting swapper_pg_dir would be cleaner?
+
+Is there a test that should be running in a CI somewhere to catch cases like
+this where the permissions are not working as expected
+
+My test patch that seems to be working:
+
+----8<-----
+
+diff --git a/arch/arm/mm/init.c b/arch/arm/mm/init.c
+index 8a63b4c..6276b234 100644
+--- a/arch/arm/mm/init.c
++++ b/arch/arm/mm/init.c
+@@ -627,12 +627,10 @@ static struct section_perm ro_perms[] = {
+   * safe to be called with preemption disabled, as under stop_machine().
+   */
+  static inline void section_update(unsigned long addr, pmdval_t mask,
+-				  pmdval_t prot)
++				  pmdval_t prot, struct mm_struct *mm)
+  {
+-	struct mm_struct *mm;
+  	pmd_t *pmd;
+  
+-	mm = current->active_mm;
+  	pmd = pmd_offset(pud_offset(pgd_offset(mm, addr), addr), addr);
+  
+  #ifdef CONFIG_ARM_LPAE
+@@ -656,7 +654,7 @@ static inline bool arch_has_strict_perms(void)
+  	return !!(get_cr() & CR_XP);
+  }
+  
+-#define set_section_perms(perms, field)	{				\
++#define set_section_perms(perms, field, all)	{			\
+  	size_t i;							\
+  	unsigned long addr;						\
+  									\
+@@ -674,31 +672,35 @@ static inline bool arch_has_strict_perms(void)
+  									\
+  		for (addr = perms[i].start;				\
+  		     addr < perms[i].end;				\
+-		     addr += SECTION_SIZE)				\
++		     addr += SECTION_SIZE) {				\
+  			section_update(addr, perms[i].mask,		\
+-				       perms[i].field);			\
++				       perms[i].field, current->active_mm); \
++			if (all)					\
++				section_update(addr, perms[i].mask,	\
++					perms[i].field, &init_mm);	\
++		}							\
+  	}								\
+  }
+  
+-static inline void fix_kernmem_perms(void)
++void fix_kernmem_perms(void)
+  {
+-	set_section_perms(nx_perms, prot);
++	set_section_perms(nx_perms, prot, true);
+  }
+  
+  #ifdef CONFIG_DEBUG_RODATA
+  void mark_rodata_ro(void)
+  {
+-	set_section_perms(ro_perms, prot);
++	set_section_perms(ro_perms, prot, true);
+  }
+  
+  void set_kernel_text_rw(void)
+  {
+-	set_section_perms(ro_perms, clear);
++	set_section_perms(ro_perms, clear, false);
+  }
+  
+  void set_kernel_text_ro(void)
+  {
+-	set_section_perms(ro_perms, prot);
++	set_section_perms(ro_perms, prot, false);
+  }
+  #endif /* CONFIG_DEBUG_RODATA */
+  
