@@ -1,22 +1,37 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 6 Nov 2015 10:45:41 +0000
-Subject: [PATCH v3 1/2] ASoC: codec: Inno codec driver for RK3036 SoC
-In-Reply-To: <1446799162-15635-2-git-send-email-zhengsq@rock-chips.com>
-References: <1446799162-15635-1-git-send-email-zhengsq@rock-chips.com>
- <1446799162-15635-2-git-send-email-zhengsq@rock-chips.com>
-Message-ID: <20151106104541.GC18409@sirena.org.uk>
+From: sjoerd.simons@collabora.co.uk (Sjoerd Simons)
+Date: Fri,  6 Nov 2015 11:46:37 +0100
+Subject: [PATCH v2] ARM: dts: rockchip: Setup ethernet0 alias for u-boot
+Message-ID: <1446806797-20912-1-git-send-email-sjoerd.simons@collabora.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 06, 2015 at 04:39:21PM +0800, Shunqian Zheng wrote:
+Add an ethernet0 alias for the RK3288 mac interface so
+that u-boot can find the device-node and fill in the mac address on
+board that support a wired network interface.
 
-> +	SOC_ENUM("Anti-pop", rk3036_codec_antipop_enum),
+Signed-off-by: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
 
-As discussed this shouldn't be an enum.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151106/1b99ff75/attachment.sig>
+---
+
+Changes in v2:
+  - Move alias from a board specific dts to the general rk3288.dtsi
+  - Don't define an all-zero mac-address property, u-boot will always
+    add the local-mac-address property which linux also uses.
+
+ arch/arm/boot/dts/rk3288.dtsi | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
+index b905cf6..f7d4c6f 100644
+--- a/arch/arm/boot/dts/rk3288.dtsi
++++ b/arch/arm/boot/dts/rk3288.dtsi
+@@ -52,6 +52,7 @@
+ 	interrupt-parent = <&gic>;
+ 
+ 	aliases {
++		ethernet0 = &gmac;
+ 		i2c0 = &i2c0;
+ 		i2c1 = &i2c1;
+ 		i2c2 = &i2c2;
+-- 
+2.6.2
