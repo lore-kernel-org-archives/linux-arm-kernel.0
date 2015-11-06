@@ -1,34 +1,70 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 6 Nov 2015 12:50:02 +0000
-Subject: [PATCH] arm64: remove redundant FRAME_POINTER kconfig option
-In-Reply-To: <20151106123008.GK6087@arm.com>
-References: <1446658671-16238-1-git-send-email-yang.shi@linaro.org>
- <20151106123008.GK6087@arm.com>
-Message-ID: <20151106125002.GA8116@leverpostej>
+From: mcoquelin.stm32@gmail.com (Maxime Coquelin)
+Date: Fri, 6 Nov 2015 13:57:32 +0100
+Subject: [PATCH v2 3/9] includes: dt-bindings: Add STM32F429 pinctrl DT
+ bindings
+In-Reply-To: <CACRpkdashSEWL+KFgD+MmdoZwjXnsXpxy-MPmDciO9n87+6BBQ@mail.gmail.com>
+References: <1445102604-11502-1-git-send-email-mcoquelin.stm32@gmail.com>
+ <1445102604-11502-4-git-send-email-mcoquelin.stm32@gmail.com>
+ <56261239.5030007@linaro.org>
+ <CALszF6DQ2G_Fzhk_SP+A0i_Z4mg9etdf1NcfQS3cPpB0zNot-w@mail.gmail.com>
+ <CACRpkdashSEWL+KFgD+MmdoZwjXnsXpxy-MPmDciO9n87+6BBQ@mail.gmail.com>
+Message-ID: <CALszF6B7928hpMDMH0_wmo-MakZX7sofO85aeBwv-aCLBHnrkA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 06, 2015 at 12:30:09PM +0000, Will Deacon wrote:
-> On Wed, Nov 04, 2015 at 09:37:51AM -0800, Yang Shi wrote:
-> > FRAME_POINTER is defined in lib/Kconfig.debug, it is unnecessary to redefine
-> > it in arch/arm64/Kconfig.debug.
-> 
-> It might be worth noting that this adds a dependency on DEBUG_KERNEL
-> for building with frame pointers. I'm ok with that (it appears to be
-> enabled in defconfig and follows the vast majority of other archs) but
-> it is a change in behaviour.
-> 
-> With that:
-> 
->   Acked-by: Will Deacon <will.deacon@arm.com>
+2015-10-22 14:35 GMT+02:00 Linus Walleij <linus.walleij@linaro.org>:
+> On Tue, Oct 20, 2015 at 6:32 PM, Maxime Coquelin
+> <mcoquelin.stm32@gmail.com> wrote:
+>> 2015-10-20 12:06 GMT+02:00 Daniel Thompson <daniel.thompson@linaro.org>:
+>>> On 17/10/15 18:23, Maxime Coquelin wrote:
+>
+>>> I suggesting that, like with the clock driver, there is no need to the
+>>> STM32F429_PAXX_FUNC_YYY macros at all.
+>>>
+>>> Given the way you can enumerate pin config options in stm32f429.dtsi then I
+>>> think stm32f429.dtsi is the only file that will ever include this header? If
+>>> so then why not just plug the values directly into the pinmux fields. Its
+>>> not duplicative and is easier to map back to data sheets.
+>>>
+>>> ~~~
+>>> #define PIN_NO(x) ...
+>>> #define PIN_AF(x) ...
+>>>
+>>> usart1_pins_a: usart1 at 0 {
+>>>                                 pins1 {
+>>>                                         pinmux = PIN_NO(9) | PIN_AF(7);
+>>>                                         bias-disable;
+>>>                                         drive-push-pull;
+>>>                                         slew-rate = <0>;
+>>>                                 };
+>>>                                 ...
+>>>                         };
+>>> ~~~
+>>
+>> The advantage with the defines is that you can see easily which pin we
+>> are talking about.
+>> Moreover, the defines are generated from the datasheet, so it is
+>> painless to generate them.
+>> And it will be consistent with Mediatek implementation, on which I
+>> heavily inspired.
+>>
+>> Linus, what is your view?
+>
+> I have no strong view of this at all.
+>
+> I would ask the opinion of other people doing numbered muxes
+> to see what is generally best for everyone to use,
+> Sascha Hauer specifically, or the Mediatek people.
 
-The code in arch/arm64/kernel/stacktrace.c assumes we have frame
-pointers regardless of FRAME_POINTER. Depending on what the compiler
-decides to use x29 for, we could get some weird fake unwinding and/or
-dodgy memory accesses.
+Thinking again at it, I persist to believe have the defines makes it
+easier to use.
+With auto-completion, it makes it faster and less error prone to
+select the right
+alternate function without parsing the datasheet.
 
-I think we should first audit the uses of frame pointers to ensure that
-they are guarded for !FRAME_POINTER.
+But as these defines are not actually used on driver side, maybe I
+could just move
+them to the dts directory?
 
-Thanks,
-Mark.
+Regards,
+Maxime
