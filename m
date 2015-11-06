@@ -1,41 +1,153 @@
-From: joshua.clayton@uniwest.com (Joshua Clayton)
-Date: Fri, 06 Nov 2015 11:12:39 -0800
-Subject: i.MX6: Oops when unplugging a USB key
-In-Reply-To: <CAH-u=81BFm1nquN5z7hFN9auV=9dPMPkRFX_PneK22UXgPbJnA@mail.gmail.com>
-References: <CAH-u=81BFm1nquN5z7hFN9auV=9dPMPkRFX_PneK22UXgPbJnA@mail.gmail.com>
-Message-ID: <2393919.Res6zC5Fd5@jclayton-pc>
+From: edubezval@gmail.com (Eduardo Valentin)
+Date: Fri, 6 Nov 2015 11:14:50 -0800
+Subject: [PATCH v2 7/9] arm64: dts: Add the thermal data found on RK3368
+In-Reply-To: <1446700685-18017-8-git-send-email-wxt@rock-chips.com>
+References: <1446700685-18017-1-git-send-email-wxt@rock-chips.com>
+ <1446700685-18017-8-git-send-email-wxt@rock-chips.com>
+Message-ID: <20151106191449.GD8202@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday, November 06, 2015 05:32:30 PM Jean-Michel Hautbois wrote:
-> Hi !
+On Thu, Nov 05, 2015 at 01:18:03PM +0800, Caesar Wang wrote:
+> This patchset add the thermal for RK3368 dts,
+> Since the two CPU clusters, with four CPU core for each cluster,
+> One cluster is optimized for high-performance(big cluster) and the othe
+> is optimized for low power(little cluster).
 > 
-> I have an issue on my i.MX6 board I don't understand (kernel is a 4.2)...
-> When I connect a USB key, and then disconnect it, it oopses and
-> reboots (as I have panic on oops, and reboot on panic).
-> Seems to be on the umount part...
-> The USB is connected through a smsc95xx but I don't think this is related...
+> This patch adds the second order for thermal throttle, and the critical
+> temperature for thermal over-tempeature protection on Software.
 > 
-> Any idea is welcome :)
+> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
+
+Acked-by: Eduardo Valentin <edubezval@gmail.com>
+
+> ---
 > 
-
-I have seen a similar issue intermitently on my imx6 based board.
-I would also like to find a fix.
-
-Specifically: unplugging usb storage occasionally causes an oops.
-
-I'm guessing a race with use-after-free, but I haven't tracked it down.
-In my environment it has been hard to reproduce, and I wasn't able to
-grok anything useful in the trace.
-
-Are you seeing this behavior consistently?
-
-Perhaps the driver is freeing more than it should when a device is disconnected.
-
--- 
-Joshua Clayton
-Software Engineer
-UniWest
-122 S. 4th Avenue
-Pasco, WA 99301
-(509) 544-0720
+> Changes in v2: None
+> Changes in v1: None
+> 
+>  arch/arm64/boot/dts/rockchip/rk3368-thermal.dtsi | 112 +++++++++++++++++++++++
+>  1 file changed, 112 insertions(+)
+>  create mode 100644 arch/arm64/boot/dts/rockchip/rk3368-thermal.dtsi
+> 
+> diff --git a/arch/arm64/boot/dts/rockchip/rk3368-thermal.dtsi b/arch/arm64/boot/dts/rockchip/rk3368-thermal.dtsi
+> new file mode 100644
+> index 0000000..a10010f
+> --- /dev/null
+> +++ b/arch/arm64/boot/dts/rockchip/rk3368-thermal.dtsi
+> @@ -0,0 +1,112 @@
+> +/*
+> + * Device Tree Source for RK3368 SoC thermal
+> + *
+> + * Copyright (c) 2015, Fuzhou Rockchip Electronics Co., Ltd
+> + * Caesar Wang <wxt@rock-chips.com>
+> + *
+> + * This file is dual-licensed: you can use it either under the terms
+> + * of the GPL or the X11 license, at your option. Note that this dual
+> + * licensing only applies to this file, and not this project as a
+> + * whole.
+> + *
+> + *  a) This file is free software; you can redistribute it and/or
+> + *     modify it under the terms of the GNU General Public License as
+> + *     published by the Free Software Foundation; either version 2 of the
+> + *     License, or (at your option) any later version.
+> + *
+> + *     This file is distributed in the hope that it will be useful,
+> + *     but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + *     GNU General Public License for more details.
+> + *
+> + * Or, alternatively,
+> + *
+> + *  b) Permission is hereby granted, free of charge, to any person
+> + *     obtaining a copy of this software and associated documentation
+> + *     files (the "Software"), to deal in the Software without
+> + *     restriction, including without limitation the rights to use,
+> + *     copy, modify, merge, publish, distribute, sublicense, and/or
+> + *     sell copies of the Software, and to permit persons to whom the
+> + *     Software is furnished to do so, subject to the following
+> + *     conditions:
+> + *
+> + *     The above copyright notice and this permission notice shall be
+> + *     included in all copies or substantial portions of the Software.
+> + *
+> + *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+> + *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
+> + *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
+> + *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
+> + *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+> + *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+> + *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+> + *     OTHER DEALINGS IN THE SOFTWARE.
+> + */
+> +
+> +#include <dt-bindings/thermal/thermal.h>
+> +
+> +cpu_thermal: cpu_thermal {
+> +	polling-delay-passive = <100>; /* milliseconds */
+> +	polling-delay = <5000>; /* milliseconds */
+> +
+> +	thermal-sensors = <&tsadc 0>;
+> +
+> +	trips {
+> +		cpu_alert0: cpu_alert0 {
+> +			temperature = <75000>; /* millicelsius */
+> +			hysteresis = <2000>; /* millicelsius */
+> +			type = "passive";
+> +		};
+> +		cpu_alert1: cpu_alert1 {
+> +			temperature = <80000>; /* millicelsius */
+> +			hysteresis = <2000>; /* millicelsius */
+> +			type = "passive";
+> +		};
+> +		cpu_crit: cpu_crit {
+> +			temperature = <95000>; /* millicelsius */
+> +			hysteresis = <2000>; /* millicelsius */
+> +			type = "critical";
+> +		};
+> +	};
+> +
+> +	cooling-maps {
+> +		map0 {
+> +			trip = <&cpu_alert0>;
+> +			cooling-device =
+> +				<&cpu_b0 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
+> +		};
+> +		map1 {
+> +			trip = <&cpu_alert1>;
+> +			cooling-device =
+> +				<&cpu_l0 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
+> +		};
+> +	};
+> +};
+> +
+> +gpu_thermal: gpu_thermal {
+> +	polling-delay-passive = <100>; /* milliseconds */
+> +	polling-delay = <5000>; /* milliseconds */
+> +
+> +	thermal-sensors = <&tsadc 1>;
+> +
+> +	trips {
+> +		gpu_alert0: gpu_alert0 {
+> +			temperature = <80000>; /* millicelsius */
+> +			hysteresis = <2000>; /* millicelsius */
+> +			type = "passive";
+> +		};
+> +		gpu_crit: gpu_crit {
+> +			temperature = <1150000>; /* millicelsius */
+> +			hysteresis = <2000>; /* millicelsius */
+> +			type = "critical";
+> +		};
+> +	};
+> +
+> +	cooling-maps {
+> +		map0 {
+> +			trip = <&gpu_alert0>;
+> +			cooling-device =
+> +				<&cpu_b0 THERMAL_NO_LIMIT THERMAL_NO_LIMIT>;
+> +		};
+> +	};
+> +};
+> -- 
+> 1.9.1
+> 
