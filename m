@@ -1,32 +1,66 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Fri, 6 Nov 2015 09:50:27 +0100
-Subject: [PATCH] ARM: shmobile: r8a7793: Add thermal device to DT
-In-Reply-To: <1446795048-29767-1-git-send-email-horms+renesas@verge.net.au>
-References: <1446795048-29767-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <CAMuHMdV-xGYvsSU1xXvB1Z9ssPD0yW_mFg=vre+dyLzs6wmiTw@mail.gmail.com>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Fri, 6 Nov 2015 17:55:31 +0900
+Subject: [PATCH] ARM: proc-v7: Put stack in data section, handle XIP case
+In-Reply-To: <20151106083233.GS8644@n2100.arm.linux.org.uk>
+References: <20151106075319.19378.64286.sendpatchset@little-apple>
+ <20151106083233.GS8644@n2100.arm.linux.org.uk>
+Message-ID: <CANqRtoTqJRhY9zP2z3LKj5CW2ZbNvSTnef9cG3XUAFswYHww2Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 6, 2015 at 8:30 AM, Simon Horman <horms+renesas@verge.net.au> wrote:
-> Instantiate the thermal sensor in the r8a7793 device tree.
+Hi Russell,
+
+On Fri, Nov 6, 2015 at 5:32 PM, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Fri, Nov 06, 2015 at 04:53:19PM +0900, Magnus Damm wrote:
+>> From: Magnus Damm <damm+renesas@opensource.se>
+>>
+>> Adjust the ARM v7 setup code to put the temporary stack in the
+>> data section and also use PLAT_PHYS_OFFSET to handle the XIP case.
+>>
+>> The common case of XIP=n the code is considered to be position
+>> independent while for XIP=y PLAT_PHYS_OFFSET is fixed. This
+>> is based on that early code in head.S invoking PROCINFO_INITFUNC
+>> seems position independent.
+>>
+>> At this point two places in proc-v7.S make use of the temporary
+>> stack so the PLAT_PHYS_OFFSET calculation is duplicated.
+>>
+>> The XIP=n case has been tested with CPU Hotplug on r8a7779
+>> (Cortex A9 Quad) and Chris [CCed] has tested the XIP=y
+>> case.
+>>
+>> Signed-off-by: Magnus Damm <damm+renesas@opensource.se>
+>> Tested-by: Chris.Brandt at renesas.com
 >
-> Based on very similar work for the r8a7790 by Magnus Damm.
+> Sorry, but what's the problem with XIP=n ?  The above seems to avoid
+> describing what the problem is there, but it spends an awful lot of
+> words describing the XIP=n scenario and few describing the XIP=y
+> scenario.
 
-Given the similarity of R-Car M2-N and M2-W, I would have referred
-to r8a7791 ;-)
+My apologies for the confusing commit message!
 
-> Cc: Magnus Damm <damm@opensource.se>
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+There is currently no problem with XIP=n, however to support XIP=y the
+temporary stack needs to move into the data section. My plan is doing
+that regardless of if XIP is enabled or not, but that makes the XIP=n
+case a bit more complex.
 
-Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
+If we move the stack into the data section then the "adr" instruction
+may no longer be able to perform PC-relative addressing. Which
+requires a rework of the code to not rely on "adr". That in turn
+requires us to handle that the MMU is disabled. And unless I'm
+mistaken the executing environment in case of XIP=n may not execute at
+the actual link address, so because of an offset adjustment
+calculation is also mandatory.
 
-Gr{oetje,eeting}s,
+> I think the commit message needs improving.
+>
+> Thanks.
 
-                        Geert
+Sure, will do! Apart from that, do you agree with the offset
+calculation and the duplication of the code? I'd be happy to rework
+things if needed.
 
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+Thanks,
 
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+/ magnus
