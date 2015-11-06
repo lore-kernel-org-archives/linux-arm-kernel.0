@@ -1,68 +1,67 @@
 From: labbott@redhat.com (Laura Abbott)
-Date: Thu, 5 Nov 2015 17:05:08 -0800
-Subject: [PATCH] arm: Use kernel mm when updating section permissions
-In-Reply-To: <20151105162719.GQ8644@n2100.arm.linux.org.uk>
-References: <1446685239-28522-1-git-send-email-labbott@fedoraproject.org>
- <20151105094615.GP8644@n2100.arm.linux.org.uk> <563B81DA.2080409@redhat.com>
- <20151105162719.GQ8644@n2100.arm.linux.org.uk>
-Message-ID: <563BFCC4.8050705@redhat.com>
+Date: Thu, 5 Nov 2015 17:11:21 -0800
+Subject: [PATCH 2/2] arm64: Allow changing of attributes outside of modules
+In-Reply-To: <563B3942.90305@huawei.com>
+References: <1446587315-18145-1-git-send-email-labbott@fedoraproject.org>
+ <1446587315-18145-3-git-send-email-labbott@fedoraproject.org>
+ <563974A8.3060306@huawei.com> <563A4A74.60900@redhat.com>
+ <563B3942.90305@huawei.com>
+Message-ID: <563BFE39.4050700@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/05/2015 08:27 AM, Russell King - ARM Linux wrote:
-> On Thu, Nov 05, 2015 at 08:20:42AM -0800, Laura Abbott wrote:
->> On 11/05/2015 01:46 AM, Russell King - ARM Linux wrote:
->>> On Wed, Nov 04, 2015 at 05:00:39PM -0800, Laura Abbott wrote:
->>>> Currently, read only permissions are not being applied even
->>>> when CONFIG_DEBUG_RODATA is set. This is because section_update
->>>> uses current->mm for adjusting the page tables. current->mm
->>>> need not be equivalent to the kernel version. Use pgd_offset_k
->>>> to get the proper page directory for updating.
->>>
->>> What are you trying to achieve here?  You can't use these functions
->>> at run time (after the first thread has been spawned) to change
->>> permissions, because there will be multiple copies of the kernel
->>> section mappings, and those copies will not get updated.
->>>
->>> In any case, this change will probably break kexec and ftrace, as
->>> the running thread will no longer see the updated page tables.
->>>
->>
->> I think I was hitting that exact problem with multiple copies
->> not getting updated. The section_update code was being called
->> and I was seeing the tables get updated but nothing was being
->> applied when I tried to write to text or check the debugfs
->> page table. The current flow is:
->>
->> rest_init -> kernel_thread(kernel_init) and from that thread
->> mark_rodata_ro. So mark_rodata_ro is always going to happen
->> in a thread.
->>
->> Do we need to update for both init_mm and the first running
->> thread?
+On 11/05/2015 03:10 AM, Xishi Qiu wrote:
+> On 2015/11/5 2:12, Laura Abbott wrote:
 >
-> The "first running thread" is merely coincidental for things like kexec.
+>> On 11/03/2015 06:59 PM, zhong jiang wrote:
+>>>
+>>> Hi Laura
+>>>
+>>> This patch seems vaild, but I didn't feel very reasonable.
+>>> Because of the large page to make TLB performance better, just
+>>> split it if it is necessary.therefore, I think the first thing
+>>> we try to keep it, if they fail ,and then to split.
+>>>
+>>
+>> I'm not quite sure I understand the request. We know we are going
+>> to have to have something mapped at page size granularity so we
+>> are going to have to break down the larger mappings no matter
+>> what. Can you explain a bit more where you think we could try to
+>> keep the larger mappings?
+>>
 >
-> Hmm.  Actually, I think the existing code _should_ be fine.  At the
-> point where mark_rodata_ro() is, we should still be using init_mm, so
-> updating the current threads page tables should actually be updating
-> the swapper_pg_dir.
+> Hi Laura,
+>
+> He means like this, if the range is aligned with large page, we
+> need not to split it, just change the flag.
+>
 
-That doesn't seem to hold true. Based on what I'm seeing, we lose
-the the guarantee of init_mm after the first exec. If usermodehelper
-gets called to load a module, that triggers an exec and the kernel
-thread is no longer using init_mm after that. I'm testing with the
-multi-v7 defconfig which uses the smsc911x driver which loads a
-module during initcall. That gets called before mark_rodata_ro so
-the init_mm is never updated. I verified that disabling smsc911x
-makes things work as expected. I suspect the testing was never done
-with a driver that tried to call usermodehelper during init time.
+This complicates the logic for doing the update. Apply to page range
+nicely walks across all the 4K pages and does the update. It looks
+like x86 does the check to keep the large pages though so I'll
+give it some thought.
 
-I got as far as narrowing it down that it happens after the usermodehelper
-but I wasn't able to pinpoint where exactly the switch happened. It seems
-like we need to have the page tables set up before any initcalls
-happen otherwise we risk having an exec create stray processes which we
-can't update.
+> I have one more question.
+>
+> alloc_init_pud()
+> 	...
+> 	if (!pud_none(old_pud))
+> 		...
+> 		memblock_free(table, PAGE_SIZE);
+> 		...
+>
+> Here we will free the memory from pmd page, so why not free
+> more memory from 512 pte pages, if the 512 old pmds are not none?
+>
+
+It would be nice to reclaim the memory but I'm not sure if that will
+work. The memory was allocated before any of the regular kernel data
+structures were set up. It's not clear if giving the pages back to
+the buddy allocator would actually work. I'll take a look though.
+  
+> Thanks,
+> Xishi Qiu
+>
 
 Thanks,
 Laura
