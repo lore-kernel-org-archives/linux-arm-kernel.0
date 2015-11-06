@@ -1,70 +1,47 @@
-From: andy.shevchenko@gmail.com (Andy Shevchenko)
-Date: Fri, 6 Nov 2015 23:36:44 +0200
-Subject: [PATCH 04/10] pwm: core: use bitops
-In-Reply-To: <563CBDF5.50904@ultimaker.com>
-References: <1445895161-2317-1-git-send-email-o.schinagl@ultimaker.com>
- <1445895161-2317-5-git-send-email-o.schinagl@ultimaker.com>
- <20151106144635.GA8418@ulmo> <563CBDF5.50904@ultimaker.com>
-Message-ID: <CAHp75VdCoM5ZtMhwt8emC8GtFEuguEXYWZCJgT4hTBcMA7yQ-A@mail.gmail.com>
+From: hauke@hauke-m.de (Hauke Mehrtens)
+Date: Fri, 06 Nov 2015 22:42:41 +0100
+Subject: [PATCH v3 4/4] ARM: BCM: Add SMP support for Broadcom 4708
+In-Reply-To: <1446844273-6460-5-git-send-email-kapilh@broadcom.com>
+References: <1446844273-6460-1-git-send-email-kapilh@broadcom.com>
+ <1446844273-6460-5-git-send-email-kapilh@broadcom.com>
+Message-ID: <563D1ED1.6050506@hauke-m.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 6, 2015 at 4:49 PM, Olliver Schinagl
-<o.schinagl@ultimaker.com> wrote:
-> Hey Thierry,
->
-> but why have the bit macro at all then :)
+On 11/06/2015 10:11 PM, Kapil Hali wrote:
+> From: Jon Mason <jonmason@broadcom.com>
+> 
+> Add SMP support for Broadcom's 4708 SoCs.
+> 
+> Signed-off-by: Jon Mason <jonmason@broadcom.com>
+> Acked-by: Hauke Mehrtens <hauke@hauke-m.de>
+> Tested-by: Hauke Mehrtens <hauke@hauke-m.de>
+> Signed-off-by: Kapil Hali <kapilh@broadcom.com>
 
-For my opinion, it's good to use in new code, or when you have this
-change as a continuation of bigger series.
-Though, others might have a different one :-)
+I tested this on a Netgear R6250 V1 (BCM4708) and SMP worked.
 
->
-> But that choice I guess I leave to you, as it's your section, I know some
-> submaintainers prefer it and want it to be used, so I guess it's something
-> in general kernel wide that should be desided on, BIT() macro preferred or
-> not.
->
-> Olliver
->
->
-> On 06-11-15 15:46, Thierry Reding wrote:
->>
->> On Mon, Oct 26, 2015 at 10:32:35PM +0100, Olliver Schinagl wrote:
->>>
->>> From: Olliver Schinagl <oliver@schinagl.nl>
->>>
->>> The pwm header defines bits manually while there is a nice bitops.h with
->>> a BIT() macro. Use the BIT() macro to set bits in pwm.h
->>>
->>> Signed-off-by: Olliver Schinagl <oliver@schinagl.nl>
->>> ---
->>>   include/linux/pwm.h | 7 ++++---
->>>   1 file changed, 4 insertions(+), 3 deletions(-)
->>
->> I don't think this is a useful change. The BIT() macro needs the same
->> number of characters to type at the expense of requiring an additional
->> include.
->>
->> Thierry
->
->
-> --
-> Met vriendelijke groeten, Kind regards, ??????
->
-> Olliver Schinagl
-> Software Engineer
-> Research & Development
-> Ultimaker B.V.
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+> ---
+>  arch/arm/boot/dts/bcm4708.dtsi | 2 ++
+>  arch/arm/mach-bcm/Kconfig      | 1 +
+>  arch/arm/mach-bcm/Makefile     | 3 +++
+>  3 files changed, 6 insertions(+)
+> 
+
+...
+
+> --- a/arch/arm/mach-bcm/Kconfig
+> +++ b/arch/arm/mach-bcm/Kconfig
+> @@ -54,6 +54,7 @@ config ARCH_BCM_NSP
+>  config ARCH_BCM_5301X
+>  	bool "Broadcom BCM470X / BCM5301X ARM SoC" if ARCH_MULTI_V7
+>  	select ARCH_BCM_IPROC
+
+You activated ARM_ERRATA_764369 for NSP is this not needed for NS?
 
 
+> +	select HAVE_SMP
+>  	help
+>  	  Support for Broadcom BCM470X and BCM5301X SoCs with ARM CPU cores.
+>  
 
--- 
-With Best Regards,
-Andy Shevchenko
+...
