@@ -1,141 +1,65 @@
-From: p.fedin@samsung.com (Pavel Fedin)
-Date: Fri, 06 Nov 2015 13:03:48 +0300
-Subject: [PATCH v7 3/4] drivers: exynos-srom: Add support for bank
- configuration
-In-Reply-To: <cover.1446799912.git.p.fedin@samsung.com>
-References: <cover.1446799912.git.p.fedin@samsung.com>
-Message-ID: <91fef32cd67119b1166996ff99334dbe6dd830c4.1446799912.git.p.fedin@samsung.com>
+From: mpe@ellerman.id.au (Michael Ellerman)
+Date: Fri, 06 Nov 2015 21:04:00 +1100
+Subject: [RFC PATCH 0/3]perf/core: extend perf_reg and
+ perf_sample_regs_intr
+In-Reply-To: <20151106092430.GO3604@twins.programming.kicks-ass.net>
+References: <1446669978-6366-1-git-send-email-maddy@linux.vnet.ibm.com>
+ <20151105130716.GC3604@twins.programming.kicks-ass.net>
+ <563C5655.3000605@linux.vnet.ibm.com>
+ <20151106092430.GO3604@twins.programming.kicks-ass.net>
+Message-ID: <1446804240.21859.4.camel@ellerman.id.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Implement handling properties in subnodes and adding child devices to the
-system. Child devices will not be added if configuration fails.
+On Fri, 2015-11-06 at 10:24 +0100, Peter Zijlstra wrote:
+> On Fri, Nov 06, 2015 at 12:57:17PM +0530, Madhavan Srinivasan wrote:
+> > On Thursday 05 November 2015 06:37 PM, Peter Zijlstra wrote:
+> > > On Thu, Nov 05, 2015 at 02:16:15AM +0530, Madhavan Srinivasan wrote:
+> > > > Second patch updates struct arch_misc_reg for arch/powerpc with pmu registers
+> > > > and adds offsetof macro for the same. It extends perf_reg_value()
+> > > > to use reg idx to decide on struct to return value from.
+> > > Why; what's in those regs?
+> > 
+> > Was out and did not have access to mail, so missed to respond in time.
+> > 
+> > In current implementation of patch 2, have added 
+> > few pmu control/status and counter registers,
+> > which give additional information about the PMU context
+> > for the sample.
+> 
+> Yes, I saw that, you still haven't answered the question though. What is
+> in those regs? Why is exposing that information like this the best
+> option.
 
-Since the driver now does more than suspend-resume support, dependency on
-CONFIG_PM is removed.
+It's a perrenial request from our hardware PMU folks to be able to see the raw
+values of the PMU registers.
 
-Signed-off-by: Pavel Fedin <p.fedin@samsung.com>
-Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
----
- arch/arm/mach-exynos/Kconfig      |  2 +-
- drivers/soc/samsung/Kconfig       |  2 +-
- drivers/soc/samsung/exynos-srom.c | 61 +++++++++++++++++++++++++++++++++++++--
- 3 files changed, 61 insertions(+), 4 deletions(-)
+I think partly it's so that they can verify that perf is doing what they want,
+and some of it is that they're interested in some of the more obscure info that
+isn't plumbed out through other perf interfaces.
 
-diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
-index 83c85f5..c22dc42 100644
---- a/arch/arm/mach-exynos/Kconfig
-+++ b/arch/arm/mach-exynos/Kconfig
-@@ -16,7 +16,7 @@ menuconfig ARCH_EXYNOS
- 	select ARM_GIC
- 	select COMMON_CLK_SAMSUNG
- 	select EXYNOS_THERMAL
--	select EXYNOS_SROM if PM
-+	select EXYNOS_SROM
- 	select HAVE_ARM_SCU if SMP
- 	select HAVE_S3C2410_I2C if I2C
- 	select HAVE_S3C2410_WATCHDOG if WATCHDOG
-diff --git a/drivers/soc/samsung/Kconfig b/drivers/soc/samsung/Kconfig
-index 2833b5b..ea4bc2a 100644
---- a/drivers/soc/samsung/Kconfig
-+++ b/drivers/soc/samsung/Kconfig
-@@ -8,6 +8,6 @@ config SOC_SAMSUNG
- 
- config EXYNOS_SROM
- 	bool
--	depends on ARM && ARCH_EXYNOS && PM
-+	depends on ARM && ARCH_EXYNOS
- 
- endmenu
-diff --git a/drivers/soc/samsung/exynos-srom.c b/drivers/soc/samsung/exynos-srom.c
-index 57a232d..a4cf547 100644
---- a/drivers/soc/samsung/exynos-srom.c
-+++ b/drivers/soc/samsung/exynos-srom.c
-@@ -14,6 +14,7 @@
- #include <linux/module.h>
- #include <linux/of.h>
- #include <linux/of_address.h>
-+#include <linux/of_platform.h>
- #include <linux/platform_device.h>
- #include <linux/slab.h>
- 
-@@ -67,11 +68,51 @@ static struct exynos_srom_reg_dump *exynos_srom_alloc_reg_dump(
- 	return rd;
- }
- 
-+static int exynos_srom_configure_bank(struct exynos_srom *srom,
-+				      struct device_node *np)
-+{
-+	u32 bank, width, pmc;
-+	u32 timing[6];
-+	u32 cs, bw;
-+
-+	if (of_property_read_u32(np, "reg", &bank))
-+		return -EINVAL;
-+	if (of_property_read_u32(np, "reg-io-width", &width))
-+		width = 1;
-+	if (of_property_read_u32(np, "samsung,srom-page-mode", &pmc))
-+		pmc = 0;
-+	if (of_property_read_u32_array(np, "samsung,srom-timing", timing,
-+				       ARRAY_SIZE(timing)))
-+		return -EINVAL;
-+
-+	bank *= 4; /* Convert bank into shift/offset */
-+
-+	cs = 1 << EXYNOS_SROM_BW__BYTEENABLE__SHIFT;
-+	if (width == 2)
-+		cs |= 1 << EXYNOS_SROM_BW__DATAWIDTH__SHIFT;
-+
-+	bw = __raw_readl(srom->reg_base + EXYNOS_SROM_BW);
-+	bw = (bw & ~(EXYNOS_SROM_BW__CS_MASK << bank)) | (cs << bank);
-+	__raw_writel(bw, srom->reg_base + EXYNOS_SROM_BW);
-+
-+	__raw_writel((pmc << EXYNOS_SROM_BCX__PMC__SHIFT) |
-+		    (timing[0] << EXYNOS_SROM_BCX__TACP__SHIFT) |
-+		    (timing[1] << EXYNOS_SROM_BCX__TCAH__SHIFT) |
-+		    (timing[2] << EXYNOS_SROM_BCX__TCOH__SHIFT) |
-+		    (timing[3] << EXYNOS_SROM_BCX__TACC__SHIFT) |
-+		    (timing[4] << EXYNOS_SROM_BCX__TCOS__SHIFT) |
-+		    (timing[5] << EXYNOS_SROM_BCX__TACS__SHIFT),
-+		    srom->reg_base + EXYNOS_SROM_BC0 + bank);
-+
-+	return 0;
-+}
-+
- static int exynos_srom_probe(struct platform_device *pdev)
- {
--	struct device_node *np;
-+	struct device_node *np, *child;
- 	struct exynos_srom *srom;
- 	struct device *dev = &pdev->dev;
-+	bool bad_bank_config = false;
- 
- 	np = dev->of_node;
- 	if (!np) {
-@@ -100,7 +141,23 @@ static int exynos_srom_probe(struct platform_device *pdev)
- 		return -ENOMEM;
- 	}
- 
--	return 0;
-+	for_each_child_of_node(np, child) {
-+		if (exynos_srom_configure_bank(srom, child)) {
-+			dev_err(dev,
-+				"Could not decode bank configuration for %s\n",
-+				child->name);
-+			bad_bank_config = true;
-+		}
-+	}
-+
-+	/*
-+	 * If any bank failed to configure, we still provide suspend/resume,
-+	 * but do not probe child devices
-+	 */
-+	if (bad_bank_config)
-+		return 0;
-+
-+	return of_platform_populate(np, NULL, NULL, dev);
- }
- 
- static int exynos_srom_remove(struct platform_device *pdev)
--- 
-2.4.4
+We've used various internal hacks over the years to keep them happy. This is an
+attempt to use a somewhat standard mechanism.
+
+It would also be helpful for those of us working on the perf hardware backends,
+to be able to verify that we're programming things correctly, without resorting
+to debug printks etc.
+
+Basically we want to sample regs at the time of the perf interrupt, so we
+though PERF_SAMPLE_REGS_INTR made senes :)
+
+But if you think this is the wrong mechanism within perf, then please let us
+know.
+
+I know perf's mission is to abstract as much of the arcane hardware details
+into a generic interface and make PMUs actually useful for normal folks, and we
+are committed to that, but it would also be useful to be able to get the raw
+values for a different type of user.
+
+Maddy's patch only exports PMC1-6 and MMCR0/1. I think we also need to export
+some others, in particular MMCRA has a lot of stuff in it, half of which is not
+even architected. So that would have to be exported as "POWER8_MMCRA". And then
+there's the SIAR/SDAR/SIER which contain a bunch of info on sampled
+instructions that is not currently plumbed out.
+
+cheers
