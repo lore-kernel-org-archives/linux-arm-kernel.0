@@ -1,54 +1,142 @@
-From: alim.akhtar@samsung.com (Alim Akhtar)
-Date: Fri, 06 Nov 2015 10:57:34 +0530
-Subject: [PATCH v2] arm64: defconfig: Enable samsung MFD and related configs
-Message-ID: <1446787654-18306-1-git-send-email-alim.akhtar@samsung.com>
+From: isubramanian@apm.com (Iyappan Subramanian)
+Date: Thu,  5 Nov 2015 21:35:06 -0800
+Subject: [PATCH net-next] drivers: net: xgene: fix RGMII 10/100Mb mode
+Message-ID: <1446788107-31856-1-git-send-email-isubramanian@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Exynos7 based espresso board uses S2MPS15, a multifunction device.
-This patch enables S2MPS1X regulator, pmic-clk and rtc drivers utilized by
-the same.
+This patch fixes the RGMII 10/100M mode by reprogramming the clock.
 
-Signed-off-by: Alim Akhtar <alim.akhtar@samsung.com>
+Signed-off-by: Iyappan Subramanian <isubramanian@apm.com>
+Tested-by: Fushen Chen <fchen@apm.com>
 ---
-Changes since v1:
-* updated the comment message to describe which platfrom uses it.
-* enable COMMON_CLK_S2MPS11 which is needed to enable pmic-clk block.
+ drivers/net/ethernet/apm/xgene/xgene_enet_hw.c   | 49 +++++++++++++++++++++++-
+ drivers/net/ethernet/apm/xgene/xgene_enet_hw.h   |  1 +
+ drivers/net/ethernet/apm/xgene/xgene_enet_main.c |  1 -
+ 3 files changed, 48 insertions(+), 3 deletions(-)
 
- arch/arm64/configs/defconfig |    4 ++++
- 1 file changed, 4 insertions(+)
-
-diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-index 9492fe7edbbc..2e1f815daa2b 100644
---- a/arch/arm64/configs/defconfig
-+++ b/arch/arm64/configs/defconfig
-@@ -131,9 +131,11 @@ CONFIG_GPIO_XGENE=y
- CONFIG_POWER_RESET_XGENE=y
- CONFIG_POWER_RESET_SYSCON=y
- # CONFIG_HWMON is not set
-+CONFIG_MFD_SEC_CORE=y
- CONFIG_REGULATOR=y
- CONFIG_REGULATOR_FIXED_VOLTAGE=y
- CONFIG_REGULATOR_QCOM_SMD_RPM=y
-+CONFIG_REGULATOR_S2MPS11=y
- CONFIG_FB=y
- CONFIG_FB_ARMCLCD=y
- CONFIG_FRAMEBUFFER_CONSOLE=y
-@@ -162,6 +164,7 @@ CONFIG_LEDS_TRIGGERS=y
- CONFIG_LEDS_TRIGGER_HEARTBEAT=y
- CONFIG_LEDS_TRIGGER_CPU=y
- CONFIG_RTC_CLASS=y
-+CONFIG_RTC_DRV_S5M=y
- CONFIG_RTC_DRV_EFI=y
- CONFIG_RTC_DRV_XGENE=y
- CONFIG_DMADEVICES=y
-@@ -169,6 +172,7 @@ CONFIG_QCOM_BAM_DMA=y
- CONFIG_VIRTIO_PCI=y
- CONFIG_VIRTIO_BALLOON=y
- CONFIG_VIRTIO_MMIO=y
-+CONFIG_COMMON_CLK_S2MPS11=y
- CONFIG_COMMON_CLK_QCOM=y
- CONFIG_MSM_GCC_8916=y
- CONFIG_HWSPINLOCK_QCOM=y
+diff --git a/drivers/net/ethernet/apm/xgene/xgene_enet_hw.c b/drivers/net/ethernet/apm/xgene/xgene_enet_hw.c
+index 33850a0..269cba77 100644
+--- a/drivers/net/ethernet/apm/xgene/xgene_enet_hw.c
++++ b/drivers/net/ethernet/apm/xgene/xgene_enet_hw.c
+@@ -459,6 +459,45 @@ static void xgene_gmac_reset(struct xgene_enet_pdata *pdata)
+ 	xgene_enet_wr_mcx_mac(pdata, MAC_CONFIG_1_ADDR, 0);
+ }
+ 
++static void rgmii_speed_set(struct xgene_enet_pdata *pdata)
++{
++	struct device *dev = &pdata->pdev->dev;
++
++	if (dev->of_node) {
++		struct clk *parent = clk_get_parent(pdata->clk);
++
++		switch (pdata->phy_speed) {
++		case SPEED_10:
++			clk_set_rate(parent, 2500000);
++			break;
++		case SPEED_100:
++			clk_set_rate(parent, 25000000);
++			break;
++		default:
++			clk_set_rate(parent, 125000000);
++			break;
++		}
++	}
++#ifdef CONFIG_ACPI
++	else {
++		switch (pdata->phy_speed) {
++		case SPEED_10:
++			acpi_evaluate_object(ACPI_HANDLE(dev),
++					     "S10", NULL, NULL);
++			break;
++		case SPEED_100:
++			acpi_evaluate_object(ACPI_HANDLE(dev),
++					     "S100", NULL, NULL);
++			break;
++		default:
++			acpi_evaluate_object(ACPI_HANDLE(dev),
++					     "S1G", NULL, NULL);
++			break;
++		}
++	}
++#endif
++}
++
+ static void xgene_gmac_init(struct xgene_enet_pdata *pdata)
+ {
+ 	struct device *dev = &pdata->pdev->dev;
+@@ -477,12 +516,14 @@ static void xgene_gmac_init(struct xgene_enet_pdata *pdata)
+ 	switch (pdata->phy_speed) {
+ 	case SPEED_10:
+ 		ENET_INTERFACE_MODE2_SET(&mc2, 1);
++		intf_ctl &= ~(ENET_LHD_MODE | ENET_GHD_MODE);
+ 		CFG_MACMODE_SET(&icm0, 0);
+ 		CFG_WAITASYNCRD_SET(&icm2, 500);
+ 		rgmii &= ~CFG_SPEED_1250;
+ 		break;
+ 	case SPEED_100:
+ 		ENET_INTERFACE_MODE2_SET(&mc2, 1);
++		intf_ctl &= ~ENET_GHD_MODE;
+ 		intf_ctl |= ENET_LHD_MODE;
+ 		CFG_MACMODE_SET(&icm0, 1);
+ 		CFG_WAITASYNCRD_SET(&icm2, 80);
+@@ -490,12 +531,15 @@ static void xgene_gmac_init(struct xgene_enet_pdata *pdata)
+ 		break;
+ 	default:
+ 		ENET_INTERFACE_MODE2_SET(&mc2, 2);
++		intf_ctl &= ~ENET_LHD_MODE;
+ 		intf_ctl |= ENET_GHD_MODE;
+-
++		CFG_MACMODE_SET(&icm0, 2);
++		CFG_WAITASYNCRD_SET(&icm2, 0);
+ 		if (dev->of_node) {
+ 			CFG_TXCLK_MUXSEL0_SET(&rgmii, pdata->tx_delay);
+ 			CFG_RXCLK_MUXSEL0_SET(&rgmii, pdata->rx_delay);
+ 		}
++		rgmii |= CFG_SPEED_1250;
+ 
+ 		xgene_enet_rd_csr(pdata, DEBUG_REG_ADDR, &value);
+ 		value |= CFG_BYPASS_UNISEC_TX | CFG_BYPASS_UNISEC_RX;
+@@ -503,7 +547,7 @@ static void xgene_gmac_init(struct xgene_enet_pdata *pdata)
+ 		break;
+ 	}
+ 
+-	mc2 |= FULL_DUPLEX2;
++	mc2 |= FULL_DUPLEX2 | PAD_CRC;
+ 	xgene_enet_wr_mcx_mac(pdata, MAC_CONFIG_2_ADDR, mc2);
+ 	xgene_enet_wr_mcx_mac(pdata, INTERFACE_CONTROL_ADDR, intf_ctl);
+ 
+@@ -522,6 +566,7 @@ static void xgene_gmac_init(struct xgene_enet_pdata *pdata)
+ 	/* Rtype should be copied from FP */
+ 	xgene_enet_wr_csr(pdata, RSIF_RAM_DBG_REG0_ADDR, 0);
+ 	xgene_enet_wr_csr(pdata, RGMII_REG_0_ADDR, rgmii);
++	rgmii_speed_set(pdata);
+ 
+ 	/* Rx-Tx traffic resume */
+ 	xgene_enet_wr_csr(pdata, CFG_LINK_AGGR_RESUME_0_ADDR, TX_PORT0);
+diff --git a/drivers/net/ethernet/apm/xgene/xgene_enet_hw.h b/drivers/net/ethernet/apm/xgene/xgene_enet_hw.h
+index 6dee73c..c153a1d 100644
+--- a/drivers/net/ethernet/apm/xgene/xgene_enet_hw.h
++++ b/drivers/net/ethernet/apm/xgene/xgene_enet_hw.h
+@@ -181,6 +181,7 @@ enum xgene_enet_rm {
+ #define ENET_LHD_MODE			BIT(25)
+ #define ENET_GHD_MODE			BIT(26)
+ #define FULL_DUPLEX2			BIT(0)
++#define PAD_CRC				BIT(2)
+ #define SCAN_AUTO_INCR			BIT(5)
+ #define TBYT_ADDR			0x38
+ #define TPKT_ADDR			0x39
+diff --git a/drivers/net/ethernet/apm/xgene/xgene_enet_main.c b/drivers/net/ethernet/apm/xgene/xgene_enet_main.c
+index ce10687..991412c 100644
+--- a/drivers/net/ethernet/apm/xgene/xgene_enet_main.c
++++ b/drivers/net/ethernet/apm/xgene/xgene_enet_main.c
+@@ -698,7 +698,6 @@ static int xgene_enet_open(struct net_device *ndev)
+ 	else
+ 		schedule_delayed_work(&pdata->link_work, PHY_POLL_LINK_OFF);
+ 
+-	netif_carrier_off(ndev);
+ 	netif_start_queue(ndev);
+ 
+ 	return ret;
 -- 
-1.7.10.4
+1.9.1
