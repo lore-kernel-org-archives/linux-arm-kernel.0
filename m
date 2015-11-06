@@ -1,42 +1,28 @@
-From: robh@kernel.org (Rob Herring)
-Date: Fri, 6 Nov 2015 15:53:10 -0600
-Subject: [PATCH v2 2/3] dmaengine: ti-dma-crossbar: dra7: Support for
- reserving DMA event ranges
-In-Reply-To: <1446192038-11158-3-git-send-email-peter.ujfalusi@ti.com>
-References: <1446192038-11158-1-git-send-email-peter.ujfalusi@ti.com>
- <1446192038-11158-3-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <20151106215310.GA20278@rob-hp-laptop>
+From: carlo@caione.org (Carlo Caione)
+Date: Fri,  6 Nov 2015 22:55:02 +0100
+Subject: [PATCH 0/4] watchdog: meson: Add meson8b watchdog
+Message-ID: <1446846906-31520-1-git-send-email-carlo@caione.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Oct 30, 2015 at 10:00:37AM +0200, Peter Ujfalusi wrote:
-> In eDMA the events are directly mapped to a DMA channel (for example DMA
-> event 14 can only be handled by DMA channel 14). If the memcpy is enabled
-> on the eDMA, there is a possibility that the crossbar driver would assign
-> DMA event number already allocated in eDMA for memcpy. Furthermore the
-> eDMA can be shared with DSP in which case the crossbar driver should also
-> avoid mapping xbar events to DSP used event numbers (or channels).
-> 
-> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
-> ---
->  .../devicetree/bindings/dma/ti-dma-crossbar.txt    |  6 +++
->  drivers/dma/ti-dma-crossbar.c                      | 47 ++++++++++++++++++++--
->  2 files changed, 49 insertions(+), 4 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/dma/ti-dma-crossbar.txt b/Documentation/devicetree/bindings/dma/ti-dma-crossbar.txt
-> index b152a75dceae..aead5869a28d 100644
-> --- a/Documentation/devicetree/bindings/dma/ti-dma-crossbar.txt
-> +++ b/Documentation/devicetree/bindings/dma/ti-dma-crossbar.txt
-> @@ -14,6 +14,10 @@ The DMA controller node need to have the following poroperties:
->  
->  Optional properties:
->  - ti,dma-safe-map: Safe routing value for unused request lines
-> +- ti,reserved-dma-request-ranges: DMA request ranges which should not be used
-> +		when mapping xbar input to DMA request, they are either
-> +		allocated to be used by for example the DSP or they are used as
-> +		memcpy channels in eDMA.
+From: Carlo Caione <carlo@endlessm.com>
 
-How many requests are there? I think I'd rather see this as a mask 
-value.
+Patchset to add support for the watchdog found on the Amlogic meson8b SoCs.
+DTS and documentation are also updated.
 
-Rob
+Carlo Caione (4):
+  watchdog: meson: Enable meson SoC specific data
+  watchdog: meson: Add meson8b SoC specific data
+  Documentation: watchdog: Add new bindings for meson8b
+  ARM: dts: meson8b: Add watchdog node
+
+ .../devicetree/bindings/watchdog/meson-wdt.txt     | 13 +++++
+ .../devicetree/bindings/watchdog/meson6-wdt.txt    | 13 -----
+ arch/arm/boot/dts/meson8b.dtsi                     |  6 +++
+ drivers/watchdog/meson_wdt.c                       | 62 ++++++++++++++++------
+ 4 files changed, 64 insertions(+), 30 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/watchdog/meson-wdt.txt
+ delete mode 100644 Documentation/devicetree/bindings/watchdog/meson6-wdt.txt
+
+-- 
+1.9.1
