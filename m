@@ -1,44 +1,32 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Fri, 6 Nov 2015 18:17:35 +0900
-Subject: [PATCH] ARM: shmobile: r8a7793: Add thermal device to DT
-In-Reply-To: <CAMuHMdV-xGYvsSU1xXvB1Z9ssPD0yW_mFg=vre+dyLzs6wmiTw@mail.gmail.com>
-References: <1446795048-29767-1-git-send-email-horms+renesas@verge.net.au>
- <CAMuHMdV-xGYvsSU1xXvB1Z9ssPD0yW_mFg=vre+dyLzs6wmiTw@mail.gmail.com>
-Message-ID: <20151106091735.GA6122@verge.net.au>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Fri, 6 Nov 2015 10:24:30 +0100
+Subject: [RFC PATCH 0/3]perf/core: extend perf_reg and
+ perf_sample_regs_intr
+In-Reply-To: <563C5655.3000605@linux.vnet.ibm.com>
+References: <1446669978-6366-1-git-send-email-maddy@linux.vnet.ibm.com>
+ <20151105130716.GC3604@twins.programming.kicks-ass.net>
+ <563C5655.3000605@linux.vnet.ibm.com>
+Message-ID: <20151106092430.GO3604@twins.programming.kicks-ass.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 06, 2015 at 09:50:27AM +0100, Geert Uytterhoeven wrote:
-> On Fri, Nov 6, 2015 at 8:30 AM, Simon Horman <horms+renesas@verge.net.au> wrote:
-> > Instantiate the thermal sensor in the r8a7793 device tree.
-> >
-> > Based on very similar work for the r8a7790 by Magnus Damm.
+On Fri, Nov 06, 2015 at 12:57:17PM +0530, Madhavan Srinivasan wrote:
 > 
-> Given the similarity of R-Car M2-N and M2-W, I would have referred
-> to r8a7791 ;-)
+> 
+> On Thursday 05 November 2015 06:37 PM, Peter Zijlstra wrote:
+> > On Thu, Nov 05, 2015 at 02:16:15AM +0530, Madhavan Srinivasan wrote:
+> >> Second patch updates struct arch_misc_reg for arch/powerpc with pmu registers
+> >> and adds offsetof macro for the same. It extends perf_reg_value()
+> >> to use reg idx to decide on struct to return value from.
+> > Why; what's in those regs?
+> 
+> Was out and did not have access to mail, so missed to respond in time.
+> 
+> In current implementation of patch 2, have added 
+> few pmu control/status and counter registers,
+> which give additional information about the PMU context
+> for the sample.
 
-True. Though for thermal the datasheet indicates H2 is also quite similar.
-
-I also prepared a very similar patch to add thermal to the r8a7794 (E2).
-But the driver reports the sensor is broken - my inspection of the code
-leads me to believe its not able to get a proper reading from the sensor.
-
-I'm wondering if anyone knows about this issue. Perhaps its specific
-to my Alt board. Or a limitation of the E2?
-
-> > Cc: Magnus Damm <damm@opensource.se>
-> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-> 
-> Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> 
-> Gr{oetje,eeting}s,
-> 
->                         Geert
-> 
-> --
-> Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-> 
-> In personal conversations with technical people, I call myself a hacker. But
-> when I'm talking to journalists I just say "programmer" or something like that.
->                                 -- Linus Torvalds
-> 
+Yes, I saw that, you still haven't answered the question though. What is
+in those regs? Why is exposing that information like this the best
+option.
