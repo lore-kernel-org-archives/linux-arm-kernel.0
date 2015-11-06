@@ -1,50 +1,160 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Fri, 6 Nov 2015 13:38:38 -0600
-Subject: [PATCH] arm: omap2: board-generic: use omap4_local_timer_init for
- AM437x
-In-Reply-To: <563C5F3C.5090900@ti.com>
-References: <1445375159-22234-1-git-send-email-balbi@ti.com>
- <563C5F3C.5090900@ti.com>
-Message-ID: <87d1vmyl35.fsf@saruman.tx.rr.com>
+From: andy.shevchenko@gmail.com (Andy Shevchenko)
+Date: Fri, 6 Nov 2015 21:39:29 +0200
+Subject: [PATCH v2 6/9] thermal: rockchip: Support the RK3368 SoCs in
+ thermal drivers
+In-Reply-To: <1446700685-18017-7-git-send-email-wxt@rock-chips.com>
+References: <1446700685-18017-1-git-send-email-wxt@rock-chips.com>
+ <1446700685-18017-7-git-send-email-wxt@rock-chips.com>
+Message-ID: <CAHp75Vd+UnqOigOV9aDrpdczFD2R+gm1iFhUe-C6vc5U-x3e1g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-Hi,
-
-Lokesh Vutla <a0131933@ti.com> writes:
-> On Wednesday 21 October 2015 02:35 AM, Felipe Balbi wrote:
->> AM437x-based boards, can use omap4_local_timer_init()
->> just fine. Let's use that instead.
+On Thu, Nov 5, 2015 at 7:18 AM, Caesar Wang <wxt@rock-chips.com> wrote:
+> The RK3368 SoCs support to 2 channel TS-ADC, the temperature criteria
+> of each channel can be configurable.
 >
-> This is breaking AM43x-epos board.
-> Today's Linux next: http://pastebin.ubuntu.com/13122620/
-> Reverting this patch: http://pastebin.ubuntu.com/13122621/
+> The system has two Temperature Sensors, channel 0 is for CPU,
+> and channel 1 is for GPU.
+>
+> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
+> ---
+>
+> Changes in v2:
+> - remove some unused, completed on other patchs.
+>
+> Changes in v1: None
+>
+>  drivers/thermal/rockchip_thermal.c | 72 ++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 72 insertions(+)
+>
+> diff --git a/drivers/thermal/rockchip_thermal.c b/drivers/thermal/rockchip_thermal.c
+> index 9df027f..47a8873 100644
+> --- a/drivers/thermal/rockchip_thermal.c
+> +++ b/drivers/thermal/rockchip_thermal.c
+> @@ -1,6 +1,9 @@
+>  /*
+>   * Copyright (c) 2014, Fuzhou Rockchip Electronics Co., Ltd
+>   *
+> + * Copyright (c) 2015, Fuzhou Rockchip Electronics Co., Ltd
+> + * Caesar Wang <wxt@rock-chips.com>
+> + *
+>   * This program is free software; you can redistribute it and/or modify it
+>   * under the terms and conditions of the GNU General Public License,
+>   * version 2, as published by the Free Software Foundation.
+> @@ -152,6 +155,8 @@ struct rockchip_thermal_data {
+>  #define TSADCV2_INT_PD_CLEAR_MASK              ~BIT(8)
+>
+>  #define TSADCV2_DATA_MASK                      0xfff
+> +#define TSADCV3_DATA_MASK                      0x3ff
+> +
+>  #define TSADCV2_HIGHT_INT_DEBOUNCE_COUNT       4
+>  #define TSADCV2_HIGHT_TSHUT_DEBOUNCE_COUNT     4
+>  #define TSADCV2_AUTO_PERIOD_TIME               250 /* msec */
+> @@ -200,6 +205,45 @@ static const struct tsadc_table v2_code_table[] = {
+>         {3421, 125000},
+>  };
+>
+> +static const struct tsadc_table v3_code_table[] = {
+> +       {0, -40000},
+> +       {106, -40000},
+> +       {108, -35000},
+> +       {110, -30000},
+> +       {112, -25000},
+> +       {114, -20000},
+> +       {116, -15000},
+> +       {118, -10000},
+> +       {120, -5000},
+> +       {122, 0},
+> +       {124, 5000},
+> +       {126, 10000},
+> +       {128, 15000},
+> +       {130, 20000},
+> +       {132, 25000},
+> +       {134, 30000},
+> +       {136, 35000},
+> +       {138, 40000},
+> +       {140, 45000},
+> +       {142, 50000},
+> +       {144, 55000},
+> +       {146, 60000},
+> +       {148, 65000},
+> +       {150, 70000},
+> +       {152, 75000},
+> +       {154, 80000},
+> +       {156, 85000},
+> +       {158, 90000},
+> +       {160, 95000},
+> +       {162, 100000},
+> +       {163, 105000},
+> +       {165, 110000},
+> +       {167, 115000},
+> +       {169, 120000},
+> +       {171, 125000},
+> +       {TSADCV3_DATA_MASK, 125000},
 
-seems like the 32k timer isn't ticking. I don't have EPOS around, care
-to confirm if that board has 32k oscillator populated ? If it doesn't,
-then we should probably disable counter32k:
+Why not function which returns one value based on the other?
 
-diff --git a/arch/arm/boot/dts/am43x-epos-evm.dts b/arch/arm/boot/dts/am43x-epos-evm.dts
-index 86c2dfbe8875..e703e32b6da6 100644
---- a/arch/arm/boot/dts/am43x-epos-evm.dts
-+++ b/arch/arm/boot/dts/am43x-epos-evm.dts
-@@ -792,3 +792,8 @@
- 	tx-num-evt = <32>;
- 	rx-num-evt = <32>;
- };
-+
-+/* 32kHz oscillator not populated */
-+&counter32k {
-+	status = "disabled";
-+};
+x < 106:   -40000
+161 >= x >= 106: -40000 + 5000 * (x - 106) / 2
+171 >= x >= 162: 100000 + 5000 * (x - 162)
+x > 171 = 125000
+
+> +};
+> +
+>  static u32 rk_tsadcv2_temp_to_code(struct chip_tsadc_table table,
+>                                    long temp)
+>  {
+> @@ -408,11 +452,39 @@ static const struct rockchip_tsadc_chip rk3288_tsadc_data = {
+>         },
+>  };
+>
+> +static const struct rockchip_tsadc_chip rk3368_tsadc_data = {
+> +       .chn_id[SENSOR_CPU] = 0, /* cpu sensor is channel 0 */
+> +       .chn_id[SENSOR_GPU] = 1, /* gpu sensor is channel 1 */
+> +       .chn_num = 2, /* two channels for tsadc */
+> +
+> +       .tshut_mode = TSHUT_MODE_GPIO, /* default TSHUT via GPIO give PMIC */
+> +       .tshut_polarity = TSHUT_LOW_ACTIVE, /* default TSHUT LOW ACTIVE */
+> +       .tshut_temp = 95000,
+> +
+> +       .initialize = rk_tsadcv2_initialize,
+> +       .irq_ack = rk_tsadcv2_irq_ack,
+> +       .control = rk_tsadcv2_control,
+> +       .get_temp = rk_tsadcv2_get_temp,
+> +       .set_tshut_temp = rk_tsadcv2_tshut_temp,
+> +       .set_tshut_mode = rk_tsadcv2_tshut_mode,
+> +
+> +       .table = {
+> +               .id = v3_code_table,
+> +               .length = ARRAY_SIZE(v3_code_table),
+> +               .data_mask = TSADCV3_DATA_MASK,
+> +               .flag = ADC_DECREMENT,
+> +       },
+> +};
+> +
+>  static const struct of_device_id of_rockchip_thermal_match[] = {
+>         {
+>                 .compatible = "rockchip,rk3288-tsadc",
+>                 .data = (void *)&rk3288_tsadc_data,
+>         },
+> +       {
+> +               .compatible = "rockchip,rk3368-tsadc",
+> +               .data = (void *)&rk3368_tsadc_data,
+> +       },
+>         { /* end */ },
+>  };
+>  MODULE_DEVICE_TABLE(of, of_rockchip_thermal_match);
+> --
+> 1.9.1
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
+
+
 
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 818 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151106/66fe5beb/attachment.sig>
+With Best Regards,
+Andy Shevchenko
