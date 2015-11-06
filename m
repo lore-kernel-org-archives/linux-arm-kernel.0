@@ -1,62 +1,36 @@
-From: sre@kernel.org (Sebastian Reichel)
-Date: Fri, 6 Nov 2015 16:34:12 +0100
-Subject: Linus HEAD build break
-In-Reply-To: <20151106145351.GA3218@atomide.com>
-References: <871tc31atk.fsf@saruman.tx.rr.com>
- <87y4ebyznc.fsf@saruman.tx.rr.com>
- <CAAfyv35Dw_8jkoPOJek0Ta6Ve=fQ_xUiJcmxR5_NFfYOU+69Vg@mail.gmail.com>
- <87vb9fyyvn.fsf@saruman.tx.rr.com>
- <20151106145351.GA3218@atomide.com>
-Message-ID: <20151106153412.GA525@earth>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 6 Nov 2015 15:42:58 +0000
+Subject: [PATCH] arm64: remove redundant FRAME_POINTER kconfig option
+In-Reply-To: <20151106125002.GA8116@leverpostej>
+References: <1446658671-16238-1-git-send-email-yang.shi@linaro.org>
+ <20151106123008.GK6087@arm.com> <20151106125002.GA8116@leverpostej>
+Message-ID: <20151106154257.GP6087@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Fri, Nov 06, 2015 at 06:53:52AM -0800, Tony Lindgren wrote:
-> * Felipe Balbi <balbi@ti.com> [151106 06:41]:
-> > Belisko Marek <marek.belisko@gmail.com> writes:
-> > > On Fri, Nov 6, 2015 at 3:24 PM, Felipe Balbi <balbi@ti.com> wrote:
-> > >> Felipe Balbi <balbi@ti.com> writes:
-> > >>> your commit af19161aaed7 ("ARM: dts: twl4030: Add iio properties for bci
-> > >>> subnode") breaks build on current linus/master (which current sits in
-> > >>
-> > >> this commit cannot be found in next. How come it's in linus/master ?
-> > > I did post fix but Tony seems doesn't merge it:
-> > > https://lkml.org/lkml/2015/10/13/816
+On Fri, Nov 06, 2015 at 12:50:02PM +0000, Mark Rutland wrote:
+> On Fri, Nov 06, 2015 at 12:30:09PM +0000, Will Deacon wrote:
+> > On Wed, Nov 04, 2015 at 09:37:51AM -0800, Yang Shi wrote:
+> > > FRAME_POINTER is defined in lib/Kconfig.debug, it is unnecessary to redefine
+> > > it in arch/arm64/Kconfig.debug.
 > > 
-> > looking at that thread, I have no idea how come the old version was
-> > merged in the first place. Tony was clear that it broke build and yet
-> > this patch has made its way to mainline and it didn't even go through
-> > linux-next, which makes the problem worse.
+> > It might be worth noting that this adds a dependency on DEBUG_KERNEL
+> > for building with frame pointers. I'm ok with that (it appears to be
+> > enabled in defconfig and follows the vast majority of other archs) but
+> > it is a change in behaviour.
 > > 
-> > Now we have a bisection point where the tree (well, some DTS files)
-> > won't even build. This is quite messy.
+> > With that:
+> > 
+> >   Acked-by: Will Deacon <will.deacon@arm.com>
 > 
-> Yes didn't I drop the patch and pointed out it breaks the build?
+> The code in arch/arm64/kernel/stacktrace.c assumes we have frame
+> pointers regardless of FRAME_POINTER. Depending on what the compiler
+> decides to use x29 for, we could get some weird fake unwinding and/or
+> dodgy memory accesses.
 > 
-> Guys, please stop doing this. Do not merge driver code that has
-> not been sitting in linux next at least a week. And for the dts
-> changes, please make sure you have proper acks.
-> 
-> And now we have yet another merge window where things unexpectedly
-> break during the merge window because of untested driver changes.
-> 
-> Please repost the fix and I'll ack it and you guys send a new pull
-> request to fix it ASAP explaining how it happened.
+> I think we should first audit the uses of frame pointers to ensure that
+> they are guarded for !FRAME_POINTER.
 
-mh for some reason I accidently added it to my next branch. I'm not
-sure why, since I did not intend to queue it at all. Sorry for the
-mess.
+Good point. The perf callchain code suffers from a similar issue.
 
-I wonder why it has not been in next, though. Checking my next tree,
-it should have been there since end of September.
-
--- Sebastian
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151106/53464c74/attachment.sig>
+Will
