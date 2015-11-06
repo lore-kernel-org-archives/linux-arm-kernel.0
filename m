@@ -1,83 +1,46 @@
 From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Fri, 6 Nov 2015 16:59:28 +0100
-Subject: [PATCH 0/2] mmc: sdhci: potentially bad behavior when using vmmc
- supply
-Message-ID: <1446825570-30029-1-git-send-email-ludovic.desroches@atmel.com>
+Date: Fri, 6 Nov 2015 16:59:29 +0100
+Subject: [PATCH 1/2] mmc: sdhci: set bus voltage before enabling bus power
+In-Reply-To: <1446825570-30029-1-git-send-email-ludovic.desroches@atmel.com>
+References: <1446825570-30029-1-git-send-email-ludovic.desroches@atmel.com>
+Message-ID: <1446825570-30029-2-git-send-email-ludovic.desroches@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+When there is a vmmc regulator, only SD Bus Power is set to 1 in the
+Power Control Register. It means SD Bus Voltage Select field is set to 0
+that is a reserved value. The SD Host Controller specification says:
+'SD Bus Power: Before setting this bit, the SD Host Driver shall set SD
+Bus Voltage Select.' and 'If the Host Driver selects an unsupported
+voltage in the SD B?us Voltage Select field, the Host Controller may
+ignore writes to SD Bus Power and keep its value at zero."
 
-I would like to have some feedback for these two patches. I have two questions.
+Having an external regulator means the SD Bus Voltage Select is useless
+but if the Host Controller strictly follows the specification then we
+need to set a valid value.
 
-1.
+Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+---
+ drivers/mmc/host/sdhci.c | 7 -------
+ 1 file changed, 7 deletions(-)
 
-To suppress the warnings telling me I have no vmmc and vqmmc supplies, I have
-added them and discovered that adding a vmmc supply involve only writing 1 in
-the Power Control Register involves enabling the SD Bus Power with a non valid
-value for the SD Bus Voltage. If the host controllers strictly follows the
-specification, it shall not enable SD Bus Power. So enough if it seems useless
-to configure SD Bus Voltage because we have an external regulator, do it.
-
-By the way, I am curious to understand what is really the SD Bus Voltage. I
-mean talking about bus voltage makes me thinking more about vqmmc than vmmc.
-Is it only bad naming or do I miss something?
-
->From the specification, there is this figure:
-
-                    HOST
----------------------------------------------------
-| ------------        3.3V                        |       VDD
-| | Power SW |------------------------------------|----------
-| ------------   |              |                 |
-|       ---------|              |                 |
-|       |                       |                 |
-| --------------     ----------------------       |
-| | Ref. Volt. |-----| Regulator/Selector |       |
-| --------------     ----------------------       |
-|                    3.3V/1.8V  |                 |
-|                               |                 |
-|                               |---------------  |
-|                               |       |  |   |  |
-|                               |       R  R   _  |
-|                               |       |  |   _  |
-|                               |       |  |   |  |
-|                               |       |  |  /// |
-|                            -------    |  |      |       CLK
-|                            |     |----)--)------|----------
-|  -----------------------   |Multi|    |  |      |       CMD
-|  |Random Logic Circuits|---|Drive|----)---------|----------
-|  -----------------------   |I/O  |    |         |       DAT
-|                            |     |--------------|----------
-|                            -------              |
----------------------------------------------------
-
-In my mind vmmc is the 3.3V signal and vqmmc is the 3.3V/1.8V signal, so why
-talking about bus voltage?
-
-
-2.
-
-Is the regulator-gpio usage the right thing to do for vqmmc? In my case it is
-not really driven by a gpio but by a pio from the sdhci device. In the binding,
-declaring the gpio is an option so I thought using this regulator fits my need.
-
-
-P.S. patch 2 is based on another patch not yet in next:
-http://www.spinics.net/lists/arm-kernel/msg453447.html
-
-Thanks
-
-Ludovic
-
-
-Ludovic Desroches (2):
-  mmc: sdhci: set bus voltage before enabling bus power
-  ARM: at91/dt: sama5d2 Xplained: add regulators for sdhci devices
-
- arch/arm/boot/dts/at91-sama5d2_xplained.dts | 14 ++++++++++++++
- drivers/mmc/host/sdhci.c                    |  7 -------
- 2 files changed, 14 insertions(+), 7 deletions(-)
-
+diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
+index ac97b46..0cfd7b2 100644
+--- a/drivers/mmc/host/sdhci.c
++++ b/drivers/mmc/host/sdhci.c
+@@ -1278,13 +1278,6 @@ static void sdhci_set_power(struct sdhci_host *host, unsigned char mode,
+ 		spin_unlock_irq(&host->lock);
+ 		mmc_regulator_set_ocr(mmc, mmc->supply.vmmc, vdd);
+ 		spin_lock_irq(&host->lock);
+-
+-		if (mode != MMC_POWER_OFF)
+-			sdhci_writeb(host, SDHCI_POWER_ON, SDHCI_POWER_CONTROL);
+-		else
+-			sdhci_writeb(host, 0, SDHCI_POWER_CONTROL);
+-
+-		return;
+ 	}
+ 
+ 	if (mode != MMC_POWER_OFF) {
 -- 
 2.5.0
