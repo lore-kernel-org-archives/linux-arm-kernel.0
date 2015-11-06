@@ -1,60 +1,49 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 6 Nov 2015 14:32:29 -0800
-Subject: [PATCH 09/19] drm: sun4i: Add DT bindings documentation
-In-Reply-To: <CAL_JsqLuUUApGAgdw7U8EJ7p5yrYJg8AKFB32AE9Ufrf47=WpQ@mail.gmail.com>
-References: <1446214865-3972-1-git-send-email-maxime.ripard@free-electrons.com>
- <1446214865-3972-10-git-send-email-maxime.ripard@free-electrons.com>
- <CAL_JsqLuUUApGAgdw7U8EJ7p5yrYJg8AKFB32AE9Ufrf47=WpQ@mail.gmail.com>
-Message-ID: <20151106223229.GM6114@lukather>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Fri, 6 Nov 2015 14:36:25 -0800
+Subject: [PATCH] Revert "ARM: dts: twl4030: Add iio properties for bci
+ subnode"
+In-Reply-To: <20151107091925.7dcd14a7@canb.auug.org.au>
+References: <1446826430-3705-1-git-send-email-sre@kernel.org>
+ <CAMAWPa-7_q8Sf+4VQ0EE6zU-NvacKERFgjqueNif=52Frn0enA@mail.gmail.com>
+ <20151107091925.7dcd14a7@canb.auug.org.au>
+Message-ID: <CAMAWPa8Fw8J45QEs-bEOqgRUp3_YYHmFEU_ZcZgrCLmAH095fw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+Hi Stephen,
 
-On Fri, Oct 30, 2015 at 11:40:03AM -0500, Rob Herring wrote:
-> > +Display Engine Backend
-> > +----------------------
-> > +
-> > +The display engine backend exposes layers and sprites to the
-> > +system. It's split into two components, the frontend and backend, the
-> > +frontend doing formats conversion, scaling, deinterlacing, while the
-> > +backend actually manages the layers.
-> > +
-> > +Required properties:
-> > +  - compatible: value must be one of:
-> > +    * allwinner,sun5i-a13-display-engine
-> > +
-> > +  - reg: base address and size of the memory-mapped region. Two are needed:
-> > +    * backend0: registers of the display engine backend
-> > +    * frontend0: registers of the display engine frontend
-> 
-> Why the zeros? I think they should be dropped.
+On Fri, Nov 6, 2015 at 2:19 PM, Stephen Rothwell <sfr@canb.auug.org.au> wrote:
 
-We have SoCs that have two backends and two frontends, hence why I
-added 0. I guess I can also add several devices for them, but then I'd
-need to move to the component framework I guess (which was the plan anyway).
+> On Fri, 6 Nov 2015 10:36:34 -0800 Kevin Hilman <khilman@kernel.org> wrote:
+>>
+>> On Fri, Nov 6, 2015 at 8:13 AM, Sebastian Reichel <sre@kernel.org> wrote:
+>> > This reverts commit af19161aaed7ff8d1a52b2e517460f2fa0774e32,
+>> > which breaks the omap3 device tree build due to a wrong reference.
+>> >
+>> > I accidently queued this change via the power supply subsystem while
+>> > telling Marek at the same time, that it should go through Tony's tree.
+>> > Following that I did miss Stephen's messages about the build failure in
+>> > linux-next and since he switched to merging an older snapshot nobody
+>> > else noticed the problem in my tree. I didn't notice myself, since I
+>> > did not build any device tree files assuming none have changed by me.
+>> >
+>> > Signed-off-by: Sebastian Reichel <sre@kernel.org>
+>>
+>> We also found this in kernelci.org build testing, and verified that
+>> this fixes the build.
+>>
+>> Tested-by: Kevin Hilman <khilman@linaro.org>
+>>
+>> Thanks Felipe for reporting, and thanks Sebastian for the quick fix.
+>
+> I think "quick fix" is a bit rich.
 
-> > +
-> > +  - allwinner,tcon: phandle to the TCON in our pipeline
-> 
-> Use of-graph or just let the relationship live in the driver. If there
-> is only 1 instance of the blocks, the latter is fine.
+You're right, sorry.  I didn't have the full context.  I wasn't fully
+aware of the history in -next of this problem.  I just found it when
+it ended up in mainline.  I don't think the problem was not getting
+your emails, looks like the problem was a major disconnect between
+what was sent to Linus and what was in -next. :(
 
-We can also have several TCON instances in the SoC, and even though
-you can on a theorical point of view use any TCON with any backend,
-usually you're tied because of how the pins are routed on the boards.
+Hopefully this snafu will help prevent that in the future,
 
-Thanks!
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151106/77e51878/attachment.sig>
+Kevin
