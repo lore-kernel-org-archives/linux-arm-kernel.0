@@ -1,46 +1,55 @@
-From: wxt@rock-chips.com (Caesar Wang)
-Date: Fri,  6 Nov 2015 19:38:16 +0800
-Subject: [PATCH v2 3/3] ASoC: rockchip-rt5645: Allow more sample rates
-In-Reply-To: <1446809896-11254-1-git-send-email-wxt@rock-chips.com>
-References: <1446809896-11254-1-git-send-email-wxt@rock-chips.com>
-Message-ID: <1446809896-11254-4-git-send-email-wxt@rock-chips.com>
+From: stefano.stabellini@citrix.com (Stefano Stabellini)
+Date: Fri, 6 Nov 2015 11:39:18 +0000
+Subject: [PATCH v11 5/5] xen/arm: account for stolen ticks
+In-Reply-To: <20151105165743.GG32247@leverpostej>
+References: <alpine.DEB.2.02.1511051502270.13541@kaball.uk.xensource.com>
+ <1446737696-9749-5-git-send-email-stefano.stabellini@eu.citrix.com>
+ <20151105165743.GG32247@leverpostej>
+Message-ID: <alpine.DEB.2.02.1511061126500.13541@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The RT5645 audio codec support sample rates from 8 to 96 kHz
-as the dai claim.
+On Thu, 5 Nov 2015, Mark Rutland wrote:
+> >  static void xen_percpu_init(void)
+> >  {
+> >  	struct vcpu_register_vcpu_info info;
+> > @@ -104,6 +120,8 @@ static void xen_percpu_init(void)
+> >  	BUG_ON(err);
+> >  	per_cpu(xen_vcpu, cpu) = vcpup;
+> >  
+> > +	xen_setup_runstate_info(cpu);
+> 
+> Does the runstate memory area get unregsitered when a kernel tears
+> things down, or is kexec somehow inhibited for xen guests?
+> 
+> i couldn't spot either happening, but I may have missed it.
 
-Signed-off-by: Caesar Wang <wxt@rock-chips.com>
+I don't think that the runstate memory area needs to be unregistered for
+kexec, but I am not very knowledgeble on kexec and Xen, CC'ing Vitaly
+and David.
 
----
 
-Changes in v2:
-- add the 64000 sample rate for rt5645.
-
- sound/soc/rockchip/rockchip_rt5645.c | 6 ++++++
- 1 file changed, 6 insertions(+)
-
-diff --git a/sound/soc/rockchip/rockchip_rt5645.c b/sound/soc/rockchip/rockchip_rt5645.c
-index 68c62e4..440a802 100644
---- a/sound/soc/rockchip/rockchip_rt5645.c
-+++ b/sound/soc/rockchip/rockchip_rt5645.c
-@@ -79,11 +79,17 @@ static int rk_aif1_hw_params(struct snd_pcm_substream *substream,
- 	switch (params_rate(params)) {
- 	case 8000:
- 	case 16000:
-+	case 24000:
-+	case 32000:
- 	case 48000:
-+	case 64000:
- 	case 96000:
- 		mclk = 12288000;
- 		break;
-+	case 11025:
-+	case 22050:
- 	case 44100:
-+	case 88200:
- 		mclk = 11289600;
- 		break;
- 	default:
--- 
-1.9.1
+> > +
+> >  after_register_vcpu_info:
+> >  	enable_percpu_irq(xen_events_irq, 0);
+> >  	put_cpu();
+> > @@ -271,6 +289,9 @@ static int __init xen_guest_init(void)
+> >  
+> >  	register_cpu_notifier(&xen_cpu_notifier);
+> >  
+> > +	pv_time_ops.steal_clock = xen_stolen_accounting;
+> > +	static_key_slow_inc(&paravirt_steal_enabled);
+> > +
+> >  	return 0;
+> >  }
+> >  early_initcall(xen_guest_init);
+> > -- 
+> > 1.7.10.4
+> > 
+> > 
+> > _______________________________________________
+> > linux-arm-kernel mailing list
+> > linux-arm-kernel at lists.infradead.org
+> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> > 
+> 
