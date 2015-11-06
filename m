@@ -1,160 +1,91 @@
-From: andy.shevchenko@gmail.com (Andy Shevchenko)
-Date: Fri, 6 Nov 2015 21:39:29 +0200
-Subject: [PATCH v2 6/9] thermal: rockchip: Support the RK3368 SoCs in
- thermal drivers
-In-Reply-To: <1446700685-18017-7-git-send-email-wxt@rock-chips.com>
-References: <1446700685-18017-1-git-send-email-wxt@rock-chips.com>
- <1446700685-18017-7-git-send-email-wxt@rock-chips.com>
-Message-ID: <CAHp75Vd+UnqOigOV9aDrpdczFD2R+gm1iFhUe-C6vc5U-x3e1g@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 6 Nov 2015 11:42:20 -0800
+Subject: [PATCH 01/19] clk: sunxi: Add display clock
+In-Reply-To: <CAGb2v65uzLgKkxKh9RN58w1FZGRJKSbMFmdhZxnRzCdCArBuPw@mail.gmail.com>
+References: <1446214865-3972-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1446214865-3972-2-git-send-email-maxime.ripard@free-electrons.com>
+ <CAGb2v65uzLgKkxKh9RN58w1FZGRJKSbMFmdhZxnRzCdCArBuPw@mail.gmail.com>
+Message-ID: <20151106194220.GK6114@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 5, 2015 at 7:18 AM, Caesar Wang <wxt@rock-chips.com> wrote:
-> The RK3368 SoCs support to 2 channel TS-ADC, the temperature criteria
-> of each channel can be configurable.
->
-> The system has two Temperature Sensors, channel 0 is for CPU,
-> and channel 1 is for GPU.
->
-> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
-> ---
->
-> Changes in v2:
-> - remove some unused, completed on other patchs.
->
-> Changes in v1: None
->
->  drivers/thermal/rockchip_thermal.c | 72 ++++++++++++++++++++++++++++++++++++++
->  1 file changed, 72 insertions(+)
->
-> diff --git a/drivers/thermal/rockchip_thermal.c b/drivers/thermal/rockchip_thermal.c
-> index 9df027f..47a8873 100644
-> --- a/drivers/thermal/rockchip_thermal.c
-> +++ b/drivers/thermal/rockchip_thermal.c
-> @@ -1,6 +1,9 @@
->  /*
->   * Copyright (c) 2014, Fuzhou Rockchip Electronics Co., Ltd
->   *
-> + * Copyright (c) 2015, Fuzhou Rockchip Electronics Co., Ltd
-> + * Caesar Wang <wxt@rock-chips.com>
-> + *
->   * This program is free software; you can redistribute it and/or modify it
->   * under the terms and conditions of the GNU General Public License,
->   * version 2, as published by the Free Software Foundation.
-> @@ -152,6 +155,8 @@ struct rockchip_thermal_data {
->  #define TSADCV2_INT_PD_CLEAR_MASK              ~BIT(8)
->
->  #define TSADCV2_DATA_MASK                      0xfff
-> +#define TSADCV3_DATA_MASK                      0x3ff
-> +
->  #define TSADCV2_HIGHT_INT_DEBOUNCE_COUNT       4
->  #define TSADCV2_HIGHT_TSHUT_DEBOUNCE_COUNT     4
->  #define TSADCV2_AUTO_PERIOD_TIME               250 /* msec */
-> @@ -200,6 +205,45 @@ static const struct tsadc_table v2_code_table[] = {
->         {3421, 125000},
->  };
->
-> +static const struct tsadc_table v3_code_table[] = {
-> +       {0, -40000},
-> +       {106, -40000},
-> +       {108, -35000},
-> +       {110, -30000},
-> +       {112, -25000},
-> +       {114, -20000},
-> +       {116, -15000},
-> +       {118, -10000},
-> +       {120, -5000},
-> +       {122, 0},
-> +       {124, 5000},
-> +       {126, 10000},
-> +       {128, 15000},
-> +       {130, 20000},
-> +       {132, 25000},
-> +       {134, 30000},
-> +       {136, 35000},
-> +       {138, 40000},
-> +       {140, 45000},
-> +       {142, 50000},
-> +       {144, 55000},
-> +       {146, 60000},
-> +       {148, 65000},
-> +       {150, 70000},
-> +       {152, 75000},
-> +       {154, 80000},
-> +       {156, 85000},
-> +       {158, 90000},
-> +       {160, 95000},
-> +       {162, 100000},
-> +       {163, 105000},
-> +       {165, 110000},
-> +       {167, 115000},
-> +       {169, 120000},
-> +       {171, 125000},
-> +       {TSADCV3_DATA_MASK, 125000},
+Hi,
 
-Why not function which returns one value based on the other?
+On Sat, Oct 31, 2015 at 06:28:16PM +0800, Chen-Yu Tsai wrote:
+> Hi,
+> 
+> On Fri, Oct 30, 2015 at 10:20 PM, Maxime Ripard
+> <maxime.ripard@free-electrons.com> wrote:
+> > The A10 SoCs and its relatives has a special clock controller to drive the
+> > display engines (both frontend and backend).
+> >
+> > Add a driver for it.
+> >
+> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> > ---
+> >  drivers/clk/sunxi/Makefile            |   1 +
+> >  drivers/clk/sunxi/clk-sun4i-display.c | 199 ++++++++++++++++++++++++++++++++++
+> >  2 files changed, 200 insertions(+)
+> >  create mode 100644 drivers/clk/sunxi/clk-sun4i-display.c
+> >
+> > diff --git a/drivers/clk/sunxi/Makefile b/drivers/clk/sunxi/Makefile
+> > index cb4c299214ce..a9e1a5885846 100644
+> > --- a/drivers/clk/sunxi/Makefile
+> > +++ b/drivers/clk/sunxi/Makefile
+> > @@ -9,6 +9,7 @@ obj-y += clk-a10-mod1.o
+> >  obj-y += clk-a10-pll2.o
+> >  obj-y += clk-a20-gmac.o
+> >  obj-y += clk-mod0.o
+> > +obj-y += clk-sun4i-display.o
+> >  obj-y += clk-simple-gates.o
+> >  obj-y += clk-sun8i-mbus.o
+> >  obj-y += clk-sun9i-core.o
+> > diff --git a/drivers/clk/sunxi/clk-sun4i-display.c b/drivers/clk/sunxi/clk-sun4i-display.c
+> > new file mode 100644
+> > index 000000000000..f13b095c6d7a
+> > --- /dev/null
+> > +++ b/drivers/clk/sunxi/clk-sun4i-display.c
+> > @@ -0,0 +1,199 @@
+> > +/*
+> > + * Copyright 2015 Maxime Ripard
+> > + *
+> > + * Maxime Ripard <maxime.ripard@free-electrons.com>
+> > + *
+> > + * This program is free software; you can redistribute it and/or modify
+> > + * it under the terms of the GNU General Public License as published by
+> > + * the Free Software Foundation; either version 2 of the License, or
+> > + * (at your option) any later version.
+> > + *
+> > + * This program is distributed in the hope that it will be useful,
+> > + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> > + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> > + * GNU General Public License for more details.
+> > + */
+> > +
+> > +#include <linux/clk-provider.h>
+> > +#include <linux/of_address.h>
+> > +#include <linux/reset-controller.h>
+> > +#include <linux/slab.h>
+> > +#include <linux/spinlock.h>
+> > +
+> > +#define SUN4I_A10_DISPLAY_PARENTS      3
+> 
+> Can we change this to 4, so we can reuse this for TCON clocks on
+> sun4i/sun7i?
 
-x < 106:   -40000
-161 >= x >= 106: -40000 + 5000 * (x - 106) / 2
-171 >= x >= 162: 100000 + 5000 * (x - 162)
-x > 171 = 125000
+Good point, I'll change this.
 
-> +};
-> +
->  static u32 rk_tsadcv2_temp_to_code(struct chip_tsadc_table table,
->                                    long temp)
->  {
-> @@ -408,11 +452,39 @@ static const struct rockchip_tsadc_chip rk3288_tsadc_data = {
->         },
->  };
->
-> +static const struct rockchip_tsadc_chip rk3368_tsadc_data = {
-> +       .chn_id[SENSOR_CPU] = 0, /* cpu sensor is channel 0 */
-> +       .chn_id[SENSOR_GPU] = 1, /* gpu sensor is channel 1 */
-> +       .chn_num = 2, /* two channels for tsadc */
-> +
-> +       .tshut_mode = TSHUT_MODE_GPIO, /* default TSHUT via GPIO give PMIC */
-> +       .tshut_polarity = TSHUT_LOW_ACTIVE, /* default TSHUT LOW ACTIVE */
-> +       .tshut_temp = 95000,
-> +
-> +       .initialize = rk_tsadcv2_initialize,
-> +       .irq_ack = rk_tsadcv2_irq_ack,
-> +       .control = rk_tsadcv2_control,
-> +       .get_temp = rk_tsadcv2_get_temp,
-> +       .set_tshut_temp = rk_tsadcv2_tshut_temp,
-> +       .set_tshut_mode = rk_tsadcv2_tshut_mode,
-> +
-> +       .table = {
-> +               .id = v3_code_table,
-> +               .length = ARRAY_SIZE(v3_code_table),
-> +               .data_mask = TSADCV3_DATA_MASK,
-> +               .flag = ADC_DECREMENT,
-> +       },
-> +};
-> +
->  static const struct of_device_id of_rockchip_thermal_match[] = {
->         {
->                 .compatible = "rockchip,rk3288-tsadc",
->                 .data = (void *)&rk3288_tsadc_data,
->         },
-> +       {
-> +               .compatible = "rockchip,rk3368-tsadc",
-> +               .data = (void *)&rk3368_tsadc_data,
-> +       },
->         { /* end */ },
->  };
->  MODULE_DEVICE_TABLE(of, of_rockchip_thermal_match);
-> --
-> 1.9.1
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
-
-
+Thanks!
+Maxime
 
 -- 
-With Best Regards,
-Andy Shevchenko
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151106/37a5dc78/attachment.sig>
