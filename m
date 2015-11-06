@@ -1,61 +1,138 @@
-From: alison.wang@freescale.com (Huan Wang)
-Date: Fri, 6 Nov 2015 06:35:06 +0000
-Subject: [PATCH] arm: kernel: utilize hrtimer based broadcast
-In-Reply-To: <20151027081834.GB1425@svinekod>
-References: <1437124312-44700-1-git-send-email-b18965@freescale.com>
- <20151027081834.GB1425@svinekod>
-Message-ID: <BN3PR0301MB08677D6B591DD7E5BD7341D7FE280@BN3PR0301MB0867.namprd03.prod.outlook.com>
+From: kuninori.morimoto.gx@renesas.com (Kuninori Morimoto)
+Date: Fri, 6 Nov 2015 06:35:14 +0000
+Subject: [PATCH 02/12 v6] arm64: renesas: r8a7795: Sound SSI PIO support
+In-Reply-To: <87egg3k5g6.wl%kuninori.morimoto.gx@renesas.com>
+References: <87egg3k5g6.wl%kuninori.morimoto.gx@renesas.com>
+Message-ID: <87bnb7k5cq.wl%kuninori.morimoto.gx@renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
 
-	Could you help to review this patch?
+From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 
-	Thanks.
+This patch adds SSI for PIO sound support
 
+Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+v5 -> v6
 
-Best Regards,
-Alison Wang
+ - no change
 
-> On Fri, Jul 17, 2015 at 10:11:52AM +0100, Alison Wang wrote:
-> > Hrtimer based broadcast is used on ARM platform. It can be registered
-> > as the tick broadcast device in the absence of a real external clock;
-> > device.
-> >
-> > Signed-off-by: Alison Wang <alison.wang@freescale.com>
-> 
-> This looks sensible to me. FWIW:
-> 
-> Acked-by: Mark Rutland <mark.rutland@arm.com>
-> 
-> Thanks,
-> Mark.
-> 
-> > ---
-> >  arch/arm/kernel/time.c | 3 +++
-> >  1 file changed, 3 insertions(+)
-> >
-> > diff --git a/arch/arm/kernel/time.c b/arch/arm/kernel/time.c index
-> > a66e37e..a9bc73c 100644
-> > --- a/arch/arm/kernel/time.c
-> > +++ b/arch/arm/kernel/time.c
-> > @@ -12,6 +12,7 @@
-> >   *  reading the RTC at bootup, etc...
-> >   */
-> >  #include <linux/clk-provider.h>
-> > +#include <linux/clockchips.h>
-> >  #include <linux/clocksource.h>
-> >  #include <linux/errno.h>
-> >  #include <linux/export.h>
-> > @@ -121,5 +122,7 @@ void __init time_init(void)
-> >  		of_clk_init(NULL);
-> >  #endif
-> >  		clocksource_of_init();
-> > +
-> > +		tick_setup_hrtimer_broadcast();
-> >  	}
-> >  }
-> > --
-> > 2.1.0.27.g96db324
-> >
+ arch/arm64/boot/dts/renesas/r8a7795.dtsi | 95 ++++++++++++++++++++++++++++++++
+ 1 file changed, 95 insertions(+)
+
+diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+index e419163..e5d3719 100644
+--- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
++++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+@@ -51,6 +51,29 @@
+ 		clock-frequency = <0>;
+ 	};
+ 
++	/*
++	 * The external audio clocks are configured as 0 Hz fixed frequency
++	 * clocks by default.
++	 * Boards that provide audio clocks should override them.
++	 */
++	audio_clk_a: audio_clk_a {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		clock-frequency = <0>;
++	};
++
++	audio_clk_b: audio_clk_b {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		clock-frequency = <0>;
++	};
++
++	audio_clk_c: audio_clk_c {
++		compatible = "fixed-clock";
++		#clock-cells = <0>;
++		clock-frequency = <0>;
++	};
++
+ 	soc {
+ 		compatible = "simple-bus";
+ 		interrupt-parent = <&gic>;
+@@ -473,5 +496,77 @@
+ 			power-domains = <&cpg>;
+ 			status = "disabled";
+ 		};
++
++		rcar_sound: sound at ec500000 {
++			/*
++			 * #sound-dai-cells is required
++			 *
++			 * Single DAI : #sound-dai-cells = <0>;	<&rcar_sound>;
++			 * Multi  DAI : #sound-dai-cells = <1>;	<&rcar_sound N>;
++			 */
++			/*
++			 * #clock-cells is required for audio_clkout0/1/2/3
++			 *
++			 * clkout	: #clock-cells = <0>;	<&rcar_sound>;
++			 * clkout0/1/2/3: #clock-cells = <1>;	<&rcar_sound N>;
++			 */
++			compatible =  "renesas,rcar_sound-r8a7795", "renesas,rcar_sound-gen3";
++			reg =	<0 0xec500000 0 0x1000>, /* SCU */
++				<0 0xec5a0000 0 0x100>,  /* ADG */
++				<0 0xec540000 0 0x1000>, /* SSIU */
++				<0 0xec541000 0 0x280>,  /* SSI */
++				<0 0xec740000 0 0x200>;  /* Audio DMAC peri peri*/
++			reg-names = "scu", "adg", "ssiu", "ssi", "audmapp";
++
++			clocks = <&cpg CPG_MOD 1005>,
++				 <&cpg CPG_MOD 1006>, <&cpg CPG_MOD 1007>,
++				 <&cpg CPG_MOD 1008>, <&cpg CPG_MOD 1009>,
++				 <&cpg CPG_MOD 1010>, <&cpg CPG_MOD 1011>,
++				 <&cpg CPG_MOD 1012>, <&cpg CPG_MOD 1013>,
++				 <&cpg CPG_MOD 1014>, <&cpg CPG_MOD 1015>,
++				 <&audio_clk_a>, <&audio_clk_b>,
++				 <&audio_clk_c>,
++				 <&cpg CPG_CORE R8A7795_CLK_S0D4>;
++			clock-names = "ssi-all",
++				      "ssi.9", "ssi.8", "ssi.7", "ssi.6",
++				      "ssi.5", "ssi.4", "ssi.3", "ssi.2",
++				      "ssi.1", "ssi.0",
++				      "clk_a", "clk_b", "clk_c", "clk_i";
++			power-domains = <&cpg>;
++			status = "disabled";
++
++			rcar_sound,ssi {
++				ssi0: ssi at 0 {
++					interrupts = <0 370 IRQ_TYPE_LEVEL_HIGH>;
++				};
++				ssi1: ssi at 1 {
++					 interrupts = <0 371 IRQ_TYPE_LEVEL_HIGH>;
++				};
++				ssi2: ssi at 2 {
++					interrupts = <0 372 IRQ_TYPE_LEVEL_HIGH>;
++				};
++				ssi3: ssi at 3 {
++					interrupts = <0 373 IRQ_TYPE_LEVEL_HIGH>;
++				};
++				ssi4: ssi at 4 {
++					interrupts = <0 374 IRQ_TYPE_LEVEL_HIGH>;
++				};
++				ssi5: ssi at 5 {
++					interrupts = <0 375 IRQ_TYPE_LEVEL_HIGH>;
++				};
++				ssi6: ssi at 6 {
++					interrupts = <0 376 IRQ_TYPE_LEVEL_HIGH>;
++				};
++				ssi7: ssi at 7 {
++					interrupts = <0 377 IRQ_TYPE_LEVEL_HIGH>;
++				};
++				ssi8: ssi at 8 {
++					interrupts = <0 378 IRQ_TYPE_LEVEL_HIGH>;
++				};
++				ssi9: ssi at 9 {
++					interrupts = <0 379 IRQ_TYPE_LEVEL_HIGH>;
++				};
++			};
++		};
+ 	};
+ };
+-- 
+1.9.1
