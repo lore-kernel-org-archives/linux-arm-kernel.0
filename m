@@ -1,64 +1,32 @@
-From: vkuznets@redhat.com (Vitaly Kuznetsov)
-Date: Fri, 06 Nov 2015 14:25:40 +0100
-Subject: [PATCH v11 5/5] xen/arm: account for stolen ticks
-In-Reply-To: <20151106115916.GA23038@leverpostej> (Mark Rutland's message of
- "Fri, 6 Nov 2015 11:59:16 +0000")
-References: <alpine.DEB.2.02.1511051502270.13541@kaball.uk.xensource.com>
- <1446737696-9749-5-git-send-email-stefano.stabellini@eu.citrix.com>
- <20151105165743.GG32247@leverpostej>
- <alpine.DEB.2.02.1511061126500.13541@kaball.uk.xensource.com>
- <563C91FD.7060703@citrix.com> <20151106115916.GA23038@leverpostej>
-Message-ID: <87egg3p8dn.fsf@vitty.brq.redhat.com>
+From: rostedt@goodmis.org (Steven Rostedt)
+Date: Fri, 6 Nov 2015 08:39:45 -0500
+Subject: [PATCH v5 3/6] ftrace: allow arch-specific stack tracer
+In-Reply-To: <1446792285-1154-4-git-send-email-takahiro.akashi@linaro.org>
+References: <1446792285-1154-1-git-send-email-takahiro.akashi@linaro.org>
+ <1446792285-1154-4-git-send-email-takahiro.akashi@linaro.org>
+Message-ID: <20151106083945.6442b59b@gandalf.local.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mark Rutland <mark.rutland@arm.com> writes:
+On Fri,  6 Nov 2015 15:44:42 +0900
+AKASHI Takahiro <takahiro.akashi@linaro.org> wrote:
 
-> On Fri, Nov 06, 2015 at 11:41:49AM +0000, David Vrabel wrote:
->> On 06/11/15 11:39, Stefano Stabellini wrote:
->> > On Thu, 5 Nov 2015, Mark Rutland wrote:
->> >>>  static void xen_percpu_init(void)
->> >>>  {
->> >>>  	struct vcpu_register_vcpu_info info;
->> >>> @@ -104,6 +120,8 @@ static void xen_percpu_init(void)
->> >>>  	BUG_ON(err);
->> >>>  	per_cpu(xen_vcpu, cpu) = vcpup;
->> >>>  
->> >>> +	xen_setup_runstate_info(cpu);
->> >>
->> >> Does the runstate memory area get unregsitered when a kernel tears
->> >> things down, or is kexec somehow inhibited for xen guests?
->> >>
->> >> i couldn't spot either happening, but I may have missed it.
->> > 
->> > I don't think that the runstate memory area needs to be unregistered for
->> > kexec, but I am not very knowledgeble on kexec and Xen, CC'ing Vitaly
->> > and David.
->> 
->> There's a whole pile of other state needing to be reset for kexec (event
->> channels and grant tables for example).  The guest needs to soft reset
->> itself (available in Xen 4.6) before kexec'ing another kernel.
->> 
->> This soft reset would also including cleaning up this shared memory region.
->
-> Ok. So we don't currently have the code kernel-side, but it looks like
-> it would be relatively simple to add (having just spotted [1])
+> A stack frame may be used in a different way depending on cpu architecture.
+> Thus it is not always appropriate to slurp the stack contents, as current
+> check_stack() does, in order to calcurate a stack index (height) at a given
+> function call. At least not on arm64.
+> In addition, there is a possibility that we will mistakenly detect a stale
+> stack frame which has not been overwritten.
+> 
+> This patch makes check_stack() a weak function so as to later implement
+> arch-specific version.
+> 
+> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
 
-already merged in 4.3 and several stable trees.
+Note, I already accepted this patch. I'll be pushing it to Linus today.
 
-> , and everything should be ready on the Xen side.`
->
+I also added a patch on top of it to rename max_stack_lock to
+stack_trace_max_lock to stay consistent with the other global variables
+used in this file. You may need to update your code to handle that.
 
-Yes, but for x86 only. arch_domain_soft_reset() is -ENOSYS for ARM
-now. It should be relatively easy to implement, one should unmap
-shared_info page and do some GIC cleanup (if it's needed at all). I'd be
-happy to help if someone's interested but unfortunately I don't have ARM
-hardware to test at this moment...
-
-> Thanks,
-> Mark.
->
-> [1] https://lkml.org/lkml/2015/9/25/152
-
--- 
-  Vitaly
+-- Steve
