@@ -1,98 +1,63 @@
-From: carlo@endlessm.com (Carlo Caione)
-Date: Fri, 6 Nov 2015 23:47:38 +0100
-Subject: [PATCH 1/4] watchdog: meson: Enable meson SoC specific data
-In-Reply-To: <20151106221519.GB19791@roeck-us.net>
-References: <1446846906-31520-1-git-send-email-carlo@caione.org>
- <1446846906-31520-2-git-send-email-carlo@caione.org>
- <20151106221519.GB19791@roeck-us.net>
-Message-ID: <CAL9uMOH4i4ajkF2x7agHe2WZcHTJ=vs9cO+TGx8WGLOFVLZnig@mail.gmail.com>
+From: jonmason@broadcom.com (Jon Mason)
+Date: Fri, 6 Nov 2015 17:54:20 -0500
+Subject: [PATCH v3 4/4] ARM: BCM: Add SMP support for Broadcom 4708
+In-Reply-To: <563D1ED1.6050506@hauke-m.de>
+References: <1446844273-6460-1-git-send-email-kapilh@broadcom.com>
+ <1446844273-6460-5-git-send-email-kapilh@broadcom.com>
+ <563D1ED1.6050506@hauke-m.de>
+Message-ID: <20151106225419.GP8792@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 6, 2015 at 11:15 PM, Guenter Roeck <linux@roeck-us.net> wrote:
+On Fri, Nov 06, 2015 at 10:42:41PM +0100, Hauke Mehrtens wrote:
+> On 11/06/2015 10:11 PM, Kapil Hali wrote:
+> > From: Jon Mason <jonmason@broadcom.com>
+> > 
+> > Add SMP support for Broadcom's 4708 SoCs.
+> > 
+> > Signed-off-by: Jon Mason <jonmason@broadcom.com>
+> > Acked-by: Hauke Mehrtens <hauke@hauke-m.de>
+> > Tested-by: Hauke Mehrtens <hauke@hauke-m.de>
+> > Signed-off-by: Kapil Hali <kapilh@broadcom.com>
+> 
+> I tested this on a Netgear R6250 V1 (BCM4708) and SMP worked.
+> 
+> > ---
+> >  arch/arm/boot/dts/bcm4708.dtsi | 2 ++
+> >  arch/arm/mach-bcm/Kconfig      | 1 +
+> >  arch/arm/mach-bcm/Makefile     | 3 +++
+> >  3 files changed, 6 insertions(+)
+> > 
+> 
+> ...
+> 
+> > --- a/arch/arm/mach-bcm/Kconfig
+> > +++ b/arch/arm/mach-bcm/Kconfig
+> > @@ -54,6 +54,7 @@ config ARCH_BCM_NSP
+> >  config ARCH_BCM_5301X
+> >  	bool "Broadcom BCM470X / BCM5301X ARM SoC" if ARCH_MULTI_V7
+> >  	select ARCH_BCM_IPROC
+> 
+> You activated ARM_ERRATA_764369 for NSP is this not needed for NS?
 
->> +struct meson_wdt_data {
->> +     unsigned int shift_enable;
->> +     unsigned int terminal_count_mask;
->> +     unsigned int count_unit;
->> +};
->> +
->> +static struct meson_wdt_data meson6_wdt_data = {
->> +     .shift_enable           = 22,
->
-> I have to admit that I completely fail to understand why it would be
-> better to move the bit calculation from a constant to runtime.
->
-> Can you explain ?
+I'm not certain the CPU version, and without that it is difficult to
+know what errata's are present in the underlying hardware.  My guess
+is that all present in NSP are present in NS (for UP and SMP).  This
+would put it as:
+        select ARM_ERRATA_754322
+        select ARM_ERRATA_775420
+        select ARM_ERRATA_764369 if SMP
 
-No real reasons and you are right. I'll change it back.
+Would you like me to have them added?
 
-> I am also not really a friend of removing definitions, even if they are
-> only used once. But I understand that this is a matter of opinion.
->
->> +     .terminal_count_mask    = 0x3fffff,
->> +     .count_unit             = 100000, /* 10 us */
->> +};
->> +
->>  struct meson_wdt_dev {
->>       struct watchdog_device wdt_dev;
->>       void __iomem *wdt_base;
->>       struct notifier_block restart_handler;
->> +     struct meson_wdt_data *data;
->>  };
->>
->>  static int meson_restart_handle(struct notifier_block *this, unsigned long mode,
->>                               void *cmd)
->>  {
->> -     u32 tc_reboot = MESON_WDT_DC_RESET | MESON_WDT_TC_EN;
->> +     u32 tc_reboot = MESON_WDT_DC_RESET;
->>       struct meson_wdt_dev *meson_wdt = container_of(this,
->>                                                      struct meson_wdt_dev,
->>                                                      restart_handler);
->> +     tc_reboot |= BIT(meson_wdt->data->shift_enable);
->>
->
-> I am quite sure that this results in a checkpatch warning.
-> Did you run your patch through checkpatch ?
+Thanks,
+Jon
 
-Yeah, no error/warnings on that line.
-
->>       while (1) {
->>               writel(tc_reboot, meson_wdt->wdt_base + MESON_WDT_TC);
->> @@ -80,8 +92,8 @@ static void meson_wdt_change_timeout(struct watchdog_device *wdt_dev,
->>       u32 reg;
->>
->>       reg = readl(meson_wdt->wdt_base + MESON_WDT_TC);
->> -     reg &= ~MESON_WDT_TC_TM_MASK;
->> -     reg |= MESON_SEC_TO_TC(timeout);
->> +     reg &= ~(meson_wdt->data->terminal_count_mask);
->
-> Unnecessary ( )
-
-Ok
-
->>       meson_wdt = devm_kzalloc(&pdev->dev, sizeof(*meson_wdt), GFP_KERNEL);
->> @@ -153,11 +172,19 @@ static int meson_wdt_probe(struct platform_device *pdev)
->>       if (IS_ERR(meson_wdt->wdt_base))
->>               return PTR_ERR(meson_wdt->wdt_base);
->>
->> +     of_id = of_match_device(meson_wdt_dt_ids, &pdev->dev);
->> +     if (!of_id) {
->> +             dev_err(&pdev->dev, "Unable to setup WDT data\n");
->
-> "set up" or maybe better initialize.
-
-Ok
-
->> +             return -ENODEV;
->> +     }
->> +     meson_wdt->data = (struct meson_wdt_data *) of_id->data;
->
-> Is this typecase necessary ?
-
-Just for clarity. Not needed.
-
-I'll fix everything in v2. Thanks.
-
--- 
-Carlo Caione
+> 
+> 
+> > +	select HAVE_SMP
+> >  	help
+> >  	  Support for Broadcom BCM470X and BCM5301X SoCs with ARM CPU cores.
+> >  
+> 
+> ...
