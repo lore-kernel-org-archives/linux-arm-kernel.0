@@ -1,42 +1,65 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 6 Nov 2015 08:32:34 +0000
-Subject: [PATCH] ARM: proc-v7: Put stack in data section, handle XIP case
-In-Reply-To: <20151106075319.19378.64286.sendpatchset@little-apple>
-References: <20151106075319.19378.64286.sendpatchset@little-apple>
-Message-ID: <20151106083233.GS8644@n2100.arm.linux.org.uk>
+From: majun258@huawei.com (MaJun)
+Date: Fri, 6 Nov 2015 16:28:38 +0800
+Subject: [PATCH v8 0/4] irqchip:support mbigen interrupt controller
+Message-ID: <1446798522-28000-1-git-send-email-majun258@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 06, 2015 at 04:53:19PM +0900, Magnus Damm wrote:
-> From: Magnus Damm <damm+renesas@opensource.se>
-> 
-> Adjust the ARM v7 setup code to put the temporary stack in the
-> data section and also use PLAT_PHYS_OFFSET to handle the XIP case.
-> 
-> The common case of XIP=n the code is considered to be position
-> independent while for XIP=y PLAT_PHYS_OFFSET is fixed. This
-> is based on that early code in head.S invoking PROCINFO_INITFUNC
-> seems position independent.
-> 
-> At this point two places in proc-v7.S make use of the temporary
-> stack so the PLAT_PHYS_OFFSET calculation is duplicated.
-> 
-> The XIP=n case has been tested with CPU Hotplug on r8a7779
-> (Cortex A9 Quad) and Chris [CCed] has tested the XIP=y
-> case.
-> 
-> Signed-off-by: Magnus Damm <damm+renesas@opensource.se>
-> Tested-by: Chris.Brandt at renesas.com
+From: Ma Jun <majun258@huawei.com>
 
-Sorry, but what's the problem with XIP=n ?  The above seems to avoid
-describing what the problem is there, but it spends an awful lot of
-words describing the XIP=n scenario and few describing the XIP=y
-scenario.
+This patch set adds the driver of mbigen and binding document for Hisilicon
+Mbigen chips.
 
-I think the commit message needs improving.
+Compared with previous version, this version changed much.
 
-Thanks.
+Because during the time between V3 and V4 of my patch, there are two
+related patches were committed by Mr.Marc Zyngier and Mr. Mark Rutland.
 
--- 
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+First, Mr. Marc Zyngier changed MSI frame and added supporting for
+platform MSI.
+
+https://lkml.org/lkml/2015/7/28/552
+
+Second, Mr.Mark Rutland changed Generic PCI MSI + IOMMU topology bindings
+
+https://lkml.org/lkml/2015/7/23/558 
+
+After V5 patch posted, Mr.Marc Zyngier posted a new patch set
+"Adding core support for wire-MSI bridges"
+
+https://lkml.org/lkml/2015/10/15/545
+
+So, mbigen v6 patch is based on this new patch even though this patch is
+still under review.
+
+Changes in v8:
+--- Fixed some tiny bugs.
+Changes in v7:
+--- Fixed the build test error when applied patch v6 3/4
+Changes in v6:
+--- Re-based mbigen driver on kernel 4.3.0-rc5 and Marc's new patch
+--- Change the mbigen chip node definition(dts).
+--- Change the interrupt cells definition(dts).
+Changes in v5:
+--- Split mbigen driver patch into 2 smaller patches.
+--- Change mbigen chip and mbigen device initialzing sequence.
+--- Initializing mbigen device instead of mbigen chip as interrupt controller
+--- Remove mbigen node from driver to make this driver more easily read.
+--- Change the mbigen chip node definition(dts).
+--- Change the interrupt cells definition(dts).
+Changes in v4:
+--- Re-based mbigen driver on kernel 4.2.0-rc2 and Marc's patch
+--- Changed the binding document based on Mark's patch.
+Ma Jun (4):
+  dt-binding:Documents of the mbigen bindings
+  irqchip: add platform device driver for mbigen device
+  irqchip:create irq domain for each mbigen device
+  irqchip:implement the mbigen irq chip operation functions
+
+ Documentation/devicetree/bindings/arm/mbigen.txt |   63 ++++
+ drivers/irqchip/Kconfig                          |    8 +
+ drivers/irqchip/Makefile                         |    1 +
+ drivers/irqchip/irq-mbigen.c                     |  328 ++++++++++++++++++++++
+ 4 files changed, 400 insertions(+), 0 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/mbigen.txt
+ create mode 100644 drivers/irqchip/irq-mbigen.c
