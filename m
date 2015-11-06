@@ -1,101 +1,64 @@
-From: thierry.reding@gmail.com (Thierry Reding)
-Date: Fri, 6 Nov 2015 16:18:16 +0100
-Subject: [PATCH 08/10] pwm: core: add pulse feature to the PWM framework
-In-Reply-To: <1445895161-2317-9-git-send-email-o.schinagl@ultimaker.com>
-References: <1445895161-2317-1-git-send-email-o.schinagl@ultimaker.com>
- <1445895161-2317-9-git-send-email-o.schinagl@ultimaker.com>
-Message-ID: <20151106151816.GD8418@ulmo>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri,  6 Nov 2015 15:25:32 +0000
+Subject: [PATCH] arm64: compat: fix stxr failure case in SWP emulation
+Message-ID: <1446823532-11572-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Oct 26, 2015 at 10:32:39PM +0100, Olliver Schinagl wrote:
-> From: Olliver Schinagl <oliver@schinagl.nl>
-> 
-> Some hardware PWM's have the possibility to only send out one (or more)
-> pulses. This can be quite a useful feature in case one wants or needs
-> only a single pulse, but at the exact width.
-> 
-> Additionally, if multiple pulses are possible, outputting a fixed amount
-> of pulses can be useful for various timing specific purposes.
+Commit 589cb22bbedacf325951014c07a35a2b01ca57f6 upstream.
 
-I see how theoretically this would be nice to have. But I'm reluctant to
-merge this feature if there aren't any users. What drivers in the kernel
-would want to use this feature? Are there new drivers being worked on
-that will need this?
+If the STXR instruction fails in the SWP emulation code, we leave *data
+overwritten with the loaded value, therefore corrupting the data written
+by a subsequent, successful attempt.
 
-> A few new functions have been expanded or added for this new behavior.
-> 
-> * pwm_config()	now takes an additional parameter to setup the number of
-> 		pulses to output. The driver may force this to 0 or 1
-> 		for if example if this feature is not or only partially
-> 		supported
+This patch re-jigs the code so that we only write back to *data once we
+know that the update has happened.
 
-This is problematic because you need to atomically update all drivers
-and users (the kbuild robot already told you that you didn't do this).
-To make things easier I suggest you wait with this change until the
-atomic PWM patches have been merged, at which point it should become a
-lot easier to deal with this kind of extension.
+Cc: <stable@vger.kernel.org> # 4.1, 4.2
+Fixes: bd35a4adc413 ("arm64: Port SWP/SWPB emulation support from arm")
+Reported-by: Shengjiu Wang <shengjiu.wang@freescale.com>
+Reported-by: Vladimir Murzin <vladimir.murzin@arm.com>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ arch/arm64/kernel/armv8_deprecated.c | 18 ++++++++++--------
+ 1 file changed, 10 insertions(+), 8 deletions(-)
 
-> * pwm_[sg]et_pulse_count()	get or set the number of pulses the pwm
-> 				framework is configured for
-> * pwm_get_pulse_count_max()	get the maximum number of pulses the pwm
-> 				driver supports
-> * pwm_pulse()		Tell the PWM to emit a pre-configured number of pulses
-
-Isn't this essentially the same as pwm_enable()? I'd think that if the
-PWM is configured to output pulses, then pwm_enable() would simply do
-what it's been configured to do (emit the pulses). Why the need for an
-additional function?
-
-> * pwm_pulse_done()	an internal function for drivers to call when
-> 			they have completed their pre-configured number
-> 			of pulses
-> * pwm_is_pulsing()	tells the callers if the pwm is busy pulsing,
-> 			yielding a little more information than just
-> 			pwm_is_enabled()
-
-Similarily, I'd think that once the PWM is done executing the series of
-pulses that it was configured for it would be automatically disabled. A
-consumer could then simply use pwm_is_enabled() and drivers could call
-pwm_disable() on their PWM to mark them as disabled when they're done
-pulsing.
-
-> Signed-off-by: Olliver Schinagl <oliver@schinagl.nl>
-> ---
->  drivers/pwm/core.c      | 30 +++++++++++++++++++----
->  drivers/pwm/pwm-gpio.c  |  3 ++-
->  drivers/pwm/pwm-sun4i.c |  3 ++-
->  drivers/pwm/sysfs.c     | 58 ++++++++++++++++++++++++++++++++++++++++++--
->  include/linux/pwm.h     | 64 ++++++++++++++++++++++++++++++++++++++++++++++---
->  5 files changed, 147 insertions(+), 11 deletions(-)
-> 
-> diff --git a/drivers/pwm/core.c b/drivers/pwm/core.c
-> index 3f9df3e..e2c1c0a 100644
-> --- a/drivers/pwm/core.c
-> +++ b/drivers/pwm/core.c
-> @@ -432,22 +432,29 @@ EXPORT_SYMBOL_GPL(pwm_free);
->   * @pwm: PWM device
->   * @duty_ns: "on" time (in nanoseconds)
->   * @period_ns: duration (in nanoseconds) of one cycle
-> + * @pulse_count: number of pulses (periods) to output on pwm_pulse
->   *
->   * Returns: 0 on success or a negative error code on failure.
->   */
-> -int pwm_config(struct pwm_device *pwm, int duty_ns, int period_ns)
-> +int pwm_config(struct pwm_device *pwm, int duty_ns, int period_ns,
-> +	       unsigned int pulse_count)
-
-Like I said, this is problematic because every driver and every consumer
-now needs to be aware of pulsing. Once the PWM atomic patches are merged
-this will become easier to do because the pulse configuration would be a
-part of the atomic state, and hence can be conveniently ignored by users
-and driver alike.
-
-Thierry
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151106/c6aac13f/attachment-0001.sig>
+diff --git a/arch/arm64/kernel/armv8_deprecated.c b/arch/arm64/kernel/armv8_deprecated.c
+index 7922c2e710ca..7ac3920b1356 100644
+--- a/arch/arm64/kernel/armv8_deprecated.c
++++ b/arch/arm64/kernel/armv8_deprecated.c
+@@ -279,22 +279,24 @@ static void register_insn_emulation_sysctl(struct ctl_table *table)
+  */
+ #define __user_swpX_asm(data, addr, res, temp, B)		\
+ 	__asm__ __volatile__(					\
+-	"	mov		%w2, %w1\n"			\
+-	"0:	ldxr"B"		%w1, [%3]\n"			\
+-	"1:	stxr"B"		%w0, %w2, [%3]\n"		\
++	"0:	ldxr"B"		%w2, [%3]\n"			\
++	"1:	stxr"B"		%w0, %w1, [%3]\n"		\
+ 	"	cbz		%w0, 2f\n"			\
+ 	"	mov		%w0, %w4\n"			\
++	"	b		3f\n"				\
+ 	"2:\n"							\
++	"	mov		%w1, %w2\n"			\
++	"3:\n"							\
+ 	"	.pushsection	 .fixup,\"ax\"\n"		\
+ 	"	.align		2\n"				\
+-	"3:	mov		%w0, %w5\n"			\
+-	"	b		2b\n"				\
++	"4:	mov		%w0, %w5\n"			\
++	"	b		3b\n"				\
+ 	"	.popsection"					\
+ 	"	.pushsection	 __ex_table,\"a\"\n"		\
+ 	"	.align		3\n"				\
+-	"	.quad		0b, 3b\n"			\
+-	"	.quad		1b, 3b\n"			\
+-	"	.popsection"					\
++	"	.quad		0b, 4b\n"			\
++	"	.quad		1b, 4b\n"			\
++	"	.popsection\n"					\
+ 	: "=&r" (res), "+r" (data), "=&r" (temp)		\
+ 	: "r" (addr), "i" (-EAGAIN), "i" (-EFAULT)		\
+ 	: "memory")
+-- 
+2.5.0
