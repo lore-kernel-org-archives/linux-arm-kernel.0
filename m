@@ -1,31 +1,38 @@
-From: mw@semihalf.com (Marcin Wojtas)
-Date: Fri, 6 Nov 2015 20:37:38 +0100
-Subject: [RFC PATCH 0/2] net: mvneta: Introduce RSS support
-In-Reply-To: <1446834911-29910-1-git-send-email-gregory.clement@free-electrons.com>
-References: <1446834911-29910-1-git-send-email-gregory.clement@free-electrons.com>
-Message-ID: <CAPv3WKcOLsjGj1iyEiPdPkdkNS2O1-RytNMZUCgUCv9QUdY6FA@mail.gmail.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Fri, 6 Nov 2015 11:37:41 -0800
+Subject: [PATCH 19/19] ARM: sun5i: chip: Enable the TV Encoder
+In-Reply-To: <CAGb2v66vjp=5GtGD-0i3OOw-wK3H4bogfvPoNzuwYvY8vt4fMQ@mail.gmail.com>
+References: <1446214865-3972-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1446214865-3972-20-git-send-email-maxime.ripard@free-electrons.com>
+ <CAGb2v66vjp=5GtGD-0i3OOw-wK3H4bogfvPoNzuwYvY8vt4fMQ@mail.gmail.com>
+Message-ID: <20151106193741.GJ6114@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Gregory,
+Hi Chen-Yu,
 
+On Fri, Oct 30, 2015 at 11:20:41PM +0800, Chen-Yu Tsai wrote:
+> On Fri, Oct 30, 2015 at 10:21 PM, Maxime Ripard
+> <maxime.ripard@free-electrons.com> wrote:
+> > The TV encoder is used to drive VGA and composite display.
+> >
+> > Enable it on the CHIP
+> 
+> The commit message does not match the contents. Missing a patch? :)
 
-> I also choose to associate all the TX queues on the same CPU that the
-> one associated to the RX queue. It allows to contain all the
-> interrupts on the same CPU. I think that an improvement on this side
-> would be the support of the XPS.
->
+No, I changed the commit a bit, and forgot to update the message :)
 
-Did you make some tries? E.g. after mapping certain txqs to CPU1, when
-using them was mvneta_tx() executing only on this CPU? Or it rather
-means that the irq will hit according to the mapping? As far as I know
-the HW, the latter should be true, which would mean the real XPS with
-this controller is impossible and the maximum we can control is the
-irq.
+Thanks!
+Maxime
 
-I think it may be worth to unmask TX irqs on all cpus, so all percpu
-napi's would be able to read tx_cause and process sent packets. I'm
-looking forward to your opinion.
-
-Best regards,
-Marcin
+-- 
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151106/65e75bc4/attachment.sig>
