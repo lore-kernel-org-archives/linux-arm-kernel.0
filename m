@@ -1,146 +1,72 @@
-From: edubezval@gmail.com (Eduardo Valentin)
-Date: Fri, 6 Nov 2015 11:11:27 -0800
-Subject: [PATCH v2 5/9] thermal: rockchip: Add the flag for adc value
- increment or decrement
-In-Reply-To: <1446700685-18017-6-git-send-email-wxt@rock-chips.com>
-References: <1446700685-18017-1-git-send-email-wxt@rock-chips.com>
- <1446700685-18017-6-git-send-email-wxt@rock-chips.com>
-Message-ID: <20151106191126.GC8202@localhost.localdomain>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 6 Nov 2015 11:03:51 -0800
+Subject: Linus HEAD build break
+In-Reply-To: <20151106160930.GB525@earth>
+References: <871tc31atk.fsf@saruman.tx.rr.com>
+ <87y4ebyznc.fsf@saruman.tx.rr.com>
+ <CAAfyv35Dw_8jkoPOJek0Ta6Ve=fQ_xUiJcmxR5_NFfYOU+69Vg@mail.gmail.com>
+ <87vb9fyyvn.fsf@saruman.tx.rr.com>
+ <20151106145351.GA3218@atomide.com> <20151106153412.GA525@earth>
+ <20151106160930.GB525@earth>
+Message-ID: <20151106190351.GC3218@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 05, 2015 at 01:18:01PM +0800, Caesar Wang wrote:
-> The conversion table has the adc value and temperature.
-> In fact, the adc value only has the increment or decrement mode in
-> conversion table.
+* Sebastian Reichel <sre@kernel.org> [151106 08:09]:
+> Hi,
 > 
-> Moment, we can add the flag to be better support the *code_to_temp*
-> for differenr SoCs.
+> On Fri, Nov 06, 2015 at 04:34:12PM +0100, Sebastian Reichel wrote:
+> > On Fri, Nov 06, 2015 at 06:53:52AM -0800, Tony Lindgren wrote:
+> > > * Felipe Balbi <balbi@ti.com> [151106 06:41]:
+> > > > Belisko Marek <marek.belisko@gmail.com> writes:
+> > > > > On Fri, Nov 6, 2015 at 3:24 PM, Felipe Balbi <balbi@ti.com> wrote:
+> > > > >> Felipe Balbi <balbi@ti.com> writes:
+> > > > >>> your commit af19161aaed7 ("ARM: dts: twl4030: Add iio properties for bci
+> > > > >>> subnode") breaks build on current linus/master (which current sits in
+> > > > >>
+> > > > >> this commit cannot be found in next. How come it's in linus/master ?
+> > > > > I did post fix but Tony seems doesn't merge it:
+> > > > > https://lkml.org/lkml/2015/10/13/816
+> > > > 
+> > > > looking at that thread, I have no idea how come the old version was
+> > > > merged in the first place. Tony was clear that it broke build and yet
+> > > > this patch has made its way to mainline and it didn't even go through
+> > > > linux-next, which makes the problem worse.
+> > > > 
+> > > > Now we have a bisection point where the tree (well, some DTS files)
+> > > > won't even build. This is quite messy.
+> > > 
+> > > Yes didn't I drop the patch and pointed out it breaks the build?
+> > > 
+> > > Guys, please stop doing this. Do not merge driver code that has
+> > > not been sitting in linux next at least a week. And for the dts
+> > > changes, please make sure you have proper acks.
+> > > 
+> > > And now we have yet another merge window where things unexpectedly
+> > > break during the merge window because of untested driver changes.
+> > > 
+> > > Please repost the fix and I'll ack it and you guys send a new pull
+> > > request to fix it ASAP explaining how it happened.
+> > 
+> > mh for some reason I accidently added it to my next branch. I'm not
+> > sure why, since I did not intend to queue it at all. Sorry for the
+> > mess.
+> > 
+> > I wonder why it has not been in next, though. Checking my next tree,
+> > it should have been there since end of September.
 > 
-> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
-> ---
+> I missed Stephen's messages about the build failure [0] and he
+> switched to using a checkout from 20150925, which is directly before
+> the patch. As a result this patch and all following patches have not
+> been tested in linux-next :(
 > 
-> Changes in v2: None
-> Changes in v1: None
-> 
->  drivers/thermal/rockchip_thermal.c | 64 ++++++++++++++++++++++++++++++--------
->  1 file changed, 51 insertions(+), 13 deletions(-)
-> 
-> diff --git a/drivers/thermal/rockchip_thermal.c b/drivers/thermal/rockchip_thermal.c
-> index e828f18..9df027f 100644
-> --- a/drivers/thermal/rockchip_thermal.c
-> +++ b/drivers/thermal/rockchip_thermal.c
-> @@ -53,6 +53,16 @@ enum sensor_id {
->  };
->  
->  /**
-> +* The conversion table has the adc value and temperature.
-> +* ADC_DECREMENT is the adc value decremnet.(e.g. v2_code_table)
-> +* ADC_INCREMNET is the adc value incremnet.(e.g. v3_code_table)
-> +*/
-> +enum adc_flag {
-> +	ADC_DECREMENT = 0,
-> +	ADC_INCREMENT,
-> +};
-> +
-> +/**
->   * The max sensors is two in rockchip SoCs.
->   * Two sensors: CPU and GPU sensor.
->   */
-> @@ -66,6 +76,9 @@ struct chip_tsadc_table {
->  
->  	/* that analogic mask data */
->  	unsigned long data_mask;
-> +
-> +	/* adc value is increment or decrement */
-> +	unsigned int flag;
+> I will send a revert to you guys in a few minutes, so that I can get
+> your ACK for sending it as pull request to Torvalds.
 
+Sounds good to me.
 
-Maybe bool? And rename to something more meaningful?
+Thanks
 
-Or do you plan to have more conditions to test in your flag?
+Tony
 
->  };
->  
->  struct rockchip_tsadc_chip {
-> @@ -223,19 +236,43 @@ static int rk_tsadcv2_code_to_temp(struct chip_tsadc_table table, u32 code,
->  
->  	WARN_ON(table.length < 2);
->  
-> -	code &= table.data_mask;
-> -	if (code < table.id[high].code)
-> +	switch (table.flag) {
-> +	case ADC_DECREMENT:
-> +		code &= table.data_mask;
-> +		if (code < table.id[high].code)
->  		return -EAGAIN;		/* Incorrect reading */
-
-Add an indentation.
->  
-> -	while (low <= high) {
-> -		if (code >= table.id[mid].code &&
-> -		    code < table.id[mid - 1].code)
-> -			break;
-> -		else if (code < table.id[mid].code)
-> -			low = mid + 1;
-> -		else
-> -			high = mid - 1;
-> -		mid = (low + high) / 2;
-> +		while (low <= high) {
-> +			if (code >= table.id[mid].code &&
-> +			    code < table.id[mid - 1].code)
-> +				break;
-> +			else if (code < table.id[mid].code)
-> +				low = mid + 1;
-> +			else
-> +				high = mid - 1;
-> +
-> +			mid = (low + high) / 2;
-> +		}
-> +		break;
-> +	case ADC_INCREMENT:
-> +		code &= table.data_mask;
-> +		if (code < table.id[low].code)
-> +		return -EAGAIN;		/* Incorrect reading */
-> +
-add an indentation.
-
-> +		while (low <= high) {
-> +			if (code >= table.id[mid - 1].code &&
-> +			    code < table.id[mid].code)
-> +				break;
-> +			else if (code > table.id[mid].code)
-> +				low = mid + 1;
-> +			else
-> +				high = mid - 1;
-> +
-> +			mid = (low + high) / 2;
-> +		}
-> +		break;
-> +	default:
-> +		pr_err("Invalid the table conversion\n");
->  	}
->  
->  	/*
-> @@ -245,8 +282,8 @@ static int rk_tsadcv2_code_to_temp(struct chip_tsadc_table table, u32 code,
->  	 * to produce less granular result.
->  	 */
->  	num = table.id[mid].temp - v2_code_table[mid - 1].temp;
-> -	num *= table.id[mid - 1].code - code;
-> -	denom = table.id[mid - 1].code - table.id[mid].code;
-> +	num *= abs(table.id[mid - 1].code - code);
-> +	denom = abs(table.id[mid - 1].code - table.id[mid].code);
->  	*temp = table.id[mid - 1].temp + (num / denom);
->  
->  	return 0;
-> @@ -367,6 +404,7 @@ static const struct rockchip_tsadc_chip rk3288_tsadc_data = {
->  		.id = v2_code_table,
->  		.length = ARRAY_SIZE(v2_code_table),
->  		.data_mask = TSADCV2_DATA_MASK,
-> +		.flag = ADC_DECREMENT,
->  	},
->  };
->  
-> -- 
-> 1.9.1
-> 
+> [0] https://lkml.org/lkml/2015/9/28/844
