@@ -1,147 +1,65 @@
-From: geoff@infradead.org (Geoff Levand)
-Date: Fri, 06 Nov 2015 19:14:36 +0000
-Subject: [PATCH 05/15] arm64: Add back cpu_reset routines
-In-Reply-To: <cover.1446836442.git.geoff@infradead.org>
-References: <cover.1446836442.git.geoff@infradead.org>
-Message-ID: <82b846e4b9855a02c404b5d1f70c79142f87c005.1446836443.git.geoff@infradead.org>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Fri, 06 Nov 2015 20:03:24 +0100
+Subject: [PATCH v2 0/9] Better compatible for the rockchip thermal and
+ support RK3368 SoCs
+In-Reply-To: <20151106184739.GA8202@localhost.localdomain>
+References: <1446700685-18017-1-git-send-email-wxt@rock-chips.com>
+ <20151106184739.GA8202@localhost.localdomain>
+Message-ID: <1509087.903MXQEqfv@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 68234df4ea7939f98431aa81113fbdce10c4a84b (arm64: kill flush_cache_all())
-removed the global arm64 routines cpu_reset() and cpu_soft_restart() needed by
-the arm64 kexec and kdump support.  Add simplified versions of those two
-routines back with some changes needed for kexec in the new files cpu_reset.S,
-and cpu_reset.h.
+Hi Eduardo, Caesar,
 
-When a CPU is reset it needs to be put into the exception level it had
-when it entered the kernel. Update cpu_reset() to accept an argument
-which signals if the reset address needs to be entered at EL1 or EL2.
+Am Freitag, 6. November 2015, 10:47:40 schrieb Eduardo Valentin:
+> On Thu, Nov 05, 2015 at 01:17:56PM +0800, Caesar Wang wrote:
+> > This series patchs are working for RK3368 on Rockchip platform.
+> > 
+> 
+> Good to see the perseverance! :-)
+> 
+> > @Heiko,
+> >     The PATCH [5/6] is working based on big/littel cluster cpufreq
+> >     added. Anyway, the PATCH [5/6] also work for next kernel.
+> > 
+> > @Eduardo,
+> > This patchset are based on linus master branch.
+> > Note: Need add the following thermal patchs for thermal driver before 
+apply
+> > this series patchs.
+> > 
+> > 1) thermal: rockchip: fix handling of invalid readings
+> > (https://patchwork.kernel.org/patch/6973101/)
+> > 
+> > 2) thermal: rockhip: fix setting thermal shutdown polarity
+> > (https://patchwork.kernel.org/patch/6973131/)
+> > 
+> > 3) dt-bindings: rockchip-thermal: Add the pinctrl states in this document
+> > (https://patchwork.kernel.org/patch/7472021/)
+> > 
+> > 4) thermal: rockchip: support the sleep pinctrl state to avoid glitches in 
+s2r
+> > (https://patchwork.kernel.org/patch/7472051/)
+> > 
+> > I'm glad these patchs have merged in thermal-soc git tree which can be 
+found at
+> > git://git.kernel.org/pub/scm/linux/kernel/git/evalenti/linux-soc-
+thermal.git
+> 
+> Yeah, apologize the delay on giving you a feedback on your code. As I
+> mentioned before, I had a couple of other things in past weeks that
+> consumed my time. 
+> 
+> Anyways, this specific patch series looks way better now that you have
+> split it further. I will have a better look on it again and let you
+> know when it will land.
 
-Signed-off-by: Geoff Levand <geoff@infradead.org>
----
- arch/arm64/kernel/cpu-reset.S | 84 +++++++++++++++++++++++++++++++++++++++++++
- arch/arm64/kernel/cpu-reset.h | 22 ++++++++++++
- 2 files changed, 106 insertions(+)
- create mode 100644 arch/arm64/kernel/cpu-reset.S
- create mode 100644 arch/arm64/kernel/cpu-reset.h
+I call dibs on the devicetree patches :-) .
 
-diff --git a/arch/arm64/kernel/cpu-reset.S b/arch/arm64/kernel/cpu-reset.S
-new file mode 100644
-index 0000000..0423f27
---- /dev/null
-+++ b/arch/arm64/kernel/cpu-reset.S
-@@ -0,0 +1,84 @@
-+/*
-+ * cpu reset routines
-+ *
-+ * Copyright (C) 2001 Deep Blue Solutions Ltd.
-+ * Copyright (C) 2012 ARM Ltd.
-+ * Copyright (C) 2015 Huawei Futurewei Technologies.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#include <linux/linkage.h>
-+#include <asm/assembler.h>
-+#include <asm/virt.h>
-+
-+#define SCTLR_ELx_I	(1 << 12)
-+#define SCTLR_ELx_SA	(1 << 3)
-+#define SCTLR_ELx_C	(1 << 2)
-+#define SCTLR_ELx_A	(1 << 1)
-+#define SCTLR_ELx_M	1
-+#define SCTLR_ELx_FLAGS	(SCTLR_ELx_M | SCTLR_ELx_A | SCTLR_ELx_C |	\
-+			 SCTLR_ELx_SA | SCTLR_ELx_I)
-+
-+.text
-+.pushsection    .idmap.text, "ax"
-+
-+.align 5
-+
-+/*
-+ * cpu_soft_restart(cpu_reset, el2_switch, entry, arg0, arg1) - Perform a cpu
-+ * soft reset.
-+ *
-+ * @cpu_reset: Physical address of the cpu_reset routine.
-+ * @el2_switch: Flag to indicate a swich to EL2 is needed, passed to cpu_reset.
-+ * @entry: Location to jump to for soft reset, passed to cpu_reset.
-+ * arg0: First argument passed to @entry.
-+ * arg1: Second argument passed to @entry.
-+ */
-+
-+ENTRY(cpu_soft_restart)
-+	mov	x18, x0				// cpu_reset
-+	mov	x0, x1				// el2_switch
-+	mov	x1, x2				// entry
-+	mov	x2, x3				// arg0
-+	mov	x3, x4				// arg1
-+	ret	x18
-+ENDPROC(cpu_soft_restart)
-+
-+/*
-+ * cpu_reset(el2_switch, entry, arg0, arg1) - Helper for cpu_soft_restart.
-+ *
-+ * @el2_switch: Flag to indicate a swich to EL2 is needed.
-+ * @entry: Location to jump to for soft reset.
-+ * arg0: First argument passed to @entry.
-+ * arg1: Second argument passed to @entry.
-+ *
-+ * Put the CPU into the same state as it would be if it had been reset, and
-+ * branch to what would be the reset vector. It must be executed with the
-+ * flat identity mapping.
-+ */
-+
-+ENTRY(cpu_reset)
-+	/* Clear sctlr_el1 flags. */
-+	mrs	x12, sctlr_el1
-+	ldr	x13, =SCTLR_ELx_FLAGS
-+	bic	x12, x12, x13
-+	msr	sctlr_el1, x12
-+	isb
-+
-+	cbz	x0, 1f				// el2_switch?
-+
-+	mov	x0, x1				// entry
-+	mov	x1, x2				// arg0
-+	mov	x2, x3				// arg1
-+	hvc	#HVC_CALL_FUNC			// no return
-+
-+1:	mov	x18, x1				// entry
-+	mov	x0, x2				// arg0
-+	mov	x1, x3				// arg1
-+	ret	x18
-+ENDPROC(cpu_reset)
-+
-+.popsection
-diff --git a/arch/arm64/kernel/cpu-reset.h b/arch/arm64/kernel/cpu-reset.h
-new file mode 100644
-index 0000000..79816b6
---- /dev/null
-+++ b/arch/arm64/kernel/cpu-reset.h
-@@ -0,0 +1,22 @@
-+/*
-+ * cpu reset routines
-+ *
-+ * Copyright (C) 2015 Huawei Futurewei Technologies.
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#if !defined(_ARM64_CPU_RESET_H)
-+#define _ARM64_CPU_RESET_H
-+
-+#include <asm/virt.h>
-+
-+void __attribute__((noreturn)) cpu_reset(unsigned long el2_switch,
-+	unsigned long entry, unsigned long arg0, unsigned long arg1);
-+void __attribute__((noreturn)) cpu_soft_restart(phys_addr_t cpu_reset,
-+	unsigned long el2_switch, unsigned long entry, unsigned long arg0,
-+	unsigned long arg1);
-+
-+#endif
--- 
-2.5.0
+Code and dt parts are very much separate, so I'd like to take the dt parts 
+though my tree and arm-soc to keep further dts changes together.
+Of course only once you are ok with the code parts :-)
+
+Devicetree parts themselfs look ok to me.
+
+Heiko
