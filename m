@@ -1,107 +1,147 @@
 From: geoff@infradead.org (Geoff Levand)
 Date: Fri, 06 Nov 2015 19:14:36 +0000
-Subject: [PATCH 08/15] arm64/kexec: Add pr_devel output
+Subject: [PATCH 05/15] arm64: Add back cpu_reset routines
 In-Reply-To: <cover.1446836442.git.geoff@infradead.org>
 References: <cover.1446836442.git.geoff@infradead.org>
-Message-ID: <b6f72b6ad75d08e46a012774d7c51e40f2046952.1446836443.git.geoff@infradead.org>
+Message-ID: <82b846e4b9855a02c404b5d1f70c79142f87c005.1446836443.git.geoff@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-To aid in debugging kexec problems or when adding new functionality to kexec add
-a new routine kexec_image_info() and several inline pr_devel statements.
+Commit 68234df4ea7939f98431aa81113fbdce10c4a84b (arm64: kill flush_cache_all())
+removed the global arm64 routines cpu_reset() and cpu_soft_restart() needed by
+the arm64 kexec and kdump support.  Add simplified versions of those two
+routines back with some changes needed for kexec in the new files cpu_reset.S,
+and cpu_reset.h.
+
+When a CPU is reset it needs to be put into the exception level it had
+when it entered the kernel. Update cpu_reset() to accept an argument
+which signals if the reset address needs to be entered at EL1 or EL2.
 
 Signed-off-by: Geoff Levand <geoff@infradead.org>
 ---
- arch/arm64/kernel/machine_kexec.c | 63 +++++++++++++++++++++++++++++++++++++++
- 1 file changed, 63 insertions(+)
+ arch/arm64/kernel/cpu-reset.S | 84 +++++++++++++++++++++++++++++++++++++++++++
+ arch/arm64/kernel/cpu-reset.h | 22 ++++++++++++
+ 2 files changed, 106 insertions(+)
+ create mode 100644 arch/arm64/kernel/cpu-reset.S
+ create mode 100644 arch/arm64/kernel/cpu-reset.h
 
-diff --git a/arch/arm64/kernel/machine_kexec.c b/arch/arm64/kernel/machine_kexec.c
-index 8b990b8..da28a26 100644
---- a/arch/arm64/kernel/machine_kexec.c
-+++ b/arch/arm64/kernel/machine_kexec.c
-@@ -25,6 +25,48 @@ extern const unsigned long arm64_relocate_new_kernel_size;
- 
- static unsigned long kimage_start;
- 
-+/**
-+ * kexec_is_dtb - Helper routine to check the device tree header signature.
+diff --git a/arch/arm64/kernel/cpu-reset.S b/arch/arm64/kernel/cpu-reset.S
+new file mode 100644
+index 0000000..0423f27
+--- /dev/null
++++ b/arch/arm64/kernel/cpu-reset.S
+@@ -0,0 +1,84 @@
++/*
++ * cpu reset routines
++ *
++ * Copyright (C) 2001 Deep Blue Solutions Ltd.
++ * Copyright (C) 2012 ARM Ltd.
++ * Copyright (C) 2015 Huawei Futurewei Technologies.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
 + */
-+static bool kexec_is_dtb(const void *dtb)
-+{
-+	__be32 magic;
 +
-+	return get_user(magic, (__be32 *)dtb) ? false :
-+		(be32_to_cpu(magic) == OF_DT_HEADER);
-+}
++#include <linux/linkage.h>
++#include <asm/assembler.h>
++#include <asm/virt.h>
 +
-+/**
-+ * kexec_image_info - For debugging output.
++#define SCTLR_ELx_I	(1 << 12)
++#define SCTLR_ELx_SA	(1 << 3)
++#define SCTLR_ELx_C	(1 << 2)
++#define SCTLR_ELx_A	(1 << 1)
++#define SCTLR_ELx_M	1
++#define SCTLR_ELx_FLAGS	(SCTLR_ELx_M | SCTLR_ELx_A | SCTLR_ELx_C |	\
++			 SCTLR_ELx_SA | SCTLR_ELx_I)
++
++.text
++.pushsection    .idmap.text, "ax"
++
++.align 5
++
++/*
++ * cpu_soft_restart(cpu_reset, el2_switch, entry, arg0, arg1) - Perform a cpu
++ * soft reset.
++ *
++ * @cpu_reset: Physical address of the cpu_reset routine.
++ * @el2_switch: Flag to indicate a swich to EL2 is needed, passed to cpu_reset.
++ * @entry: Location to jump to for soft reset, passed to cpu_reset.
++ * arg0: First argument passed to @entry.
++ * arg1: Second argument passed to @entry.
 + */
-+#define kexec_image_info(_i) _kexec_image_info(__func__, __LINE__, _i)
-+static void _kexec_image_info(const char *func, int line,
-+	const struct kimage *kimage)
-+{
-+	unsigned long i;
 +
-+#if !defined(DEBUG)
-+	return;
++ENTRY(cpu_soft_restart)
++	mov	x18, x0				// cpu_reset
++	mov	x0, x1				// el2_switch
++	mov	x1, x2				// entry
++	mov	x2, x3				// arg0
++	mov	x3, x4				// arg1
++	ret	x18
++ENDPROC(cpu_soft_restart)
++
++/*
++ * cpu_reset(el2_switch, entry, arg0, arg1) - Helper for cpu_soft_restart.
++ *
++ * @el2_switch: Flag to indicate a swich to EL2 is needed.
++ * @entry: Location to jump to for soft reset.
++ * arg0: First argument passed to @entry.
++ * arg1: Second argument passed to @entry.
++ *
++ * Put the CPU into the same state as it would be if it had been reset, and
++ * branch to what would be the reset vector. It must be executed with the
++ * flat identity mapping.
++ */
++
++ENTRY(cpu_reset)
++	/* Clear sctlr_el1 flags. */
++	mrs	x12, sctlr_el1
++	ldr	x13, =SCTLR_ELx_FLAGS
++	bic	x12, x12, x13
++	msr	sctlr_el1, x12
++	isb
++
++	cbz	x0, 1f				// el2_switch?
++
++	mov	x0, x1				// entry
++	mov	x1, x2				// arg0
++	mov	x2, x3				// arg1
++	hvc	#HVC_CALL_FUNC			// no return
++
++1:	mov	x18, x1				// entry
++	mov	x0, x2				// arg0
++	mov	x1, x3				// arg1
++	ret	x18
++ENDPROC(cpu_reset)
++
++.popsection
+diff --git a/arch/arm64/kernel/cpu-reset.h b/arch/arm64/kernel/cpu-reset.h
+new file mode 100644
+index 0000000..79816b6
+--- /dev/null
++++ b/arch/arm64/kernel/cpu-reset.h
+@@ -0,0 +1,22 @@
++/*
++ * cpu reset routines
++ *
++ * Copyright (C) 2015 Huawei Futurewei Technologies.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++#if !defined(_ARM64_CPU_RESET_H)
++#define _ARM64_CPU_RESET_H
++
++#include <asm/virt.h>
++
++void __attribute__((noreturn)) cpu_reset(unsigned long el2_switch,
++	unsigned long entry, unsigned long arg0, unsigned long arg1);
++void __attribute__((noreturn)) cpu_soft_restart(phys_addr_t cpu_reset,
++	unsigned long el2_switch, unsigned long entry, unsigned long arg0,
++	unsigned long arg1);
++
 +#endif
-+	pr_devel("%s:%d:\n", func, line);
-+	pr_devel("  kexec kimage info:\n");
-+	pr_devel("    type:        %d\n", kimage->type);
-+	pr_devel("    start:       %lx\n", kimage->start);
-+	pr_devel("    head:        %lx\n", kimage->head);
-+	pr_devel("    nr_segments: %lu\n", kimage->nr_segments);
-+
-+	for (i = 0; i < kimage->nr_segments; i++) {
-+		pr_devel("      segment[%lu]: %016lx - %016lx, %lx bytes, %lu pages%s\n",
-+			i,
-+			kimage->segment[i].mem,
-+			kimage->segment[i].mem + kimage->segment[i].memsz,
-+			kimage->segment[i].memsz,
-+			kimage->segment[i].memsz /  PAGE_SIZE,
-+			(kexec_is_dtb(kimage->segment[i].buf) ?
-+				", dtb segment" : ""));
-+	}
-+}
-+
- void machine_kexec_cleanup(struct kimage *kimage)
- {
- 	/* Empty routine needed to avoid build errors. */
-@@ -38,6 +80,8 @@ void machine_kexec_cleanup(struct kimage *kimage)
- int machine_kexec_prepare(struct kimage *kimage)
- {
- 	kimage_start = kimage->start;
-+	kexec_image_info(kimage);
-+
- 	return 0;
- }
- 
-@@ -107,6 +151,25 @@ void machine_kexec(struct kimage *kimage)
- 	reboot_code_buffer_phys = page_to_phys(kimage->control_code_page);
- 	reboot_code_buffer = phys_to_virt(reboot_code_buffer_phys);
- 
-+	kexec_image_info(kimage);
-+
-+	pr_devel("%s:%d: control_code_page:        %p\n", __func__, __LINE__,
-+		kimage->control_code_page);
-+	pr_devel("%s:%d: reboot_code_buffer_phys:  %pa\n", __func__, __LINE__,
-+		&reboot_code_buffer_phys);
-+	pr_devel("%s:%d: reboot_code_buffer:       %p\n", __func__, __LINE__,
-+		reboot_code_buffer);
-+	pr_devel("%s:%d: relocate_new_kernel:      %p\n", __func__, __LINE__,
-+		arm64_relocate_new_kernel);
-+	pr_devel("%s:%d: relocate_new_kernel_size: 0x%lx(%lu) bytes\n",
-+		__func__, __LINE__, arm64_relocate_new_kernel_size,
-+		arm64_relocate_new_kernel_size);
-+
-+	pr_devel("%s:%d: kimage_head:              %lx\n", __func__, __LINE__,
-+		kimage->head);
-+	pr_devel("%s:%d: kimage_start:             %lx\n", __func__, __LINE__,
-+		kimage_start);
-+
- 	/*
- 	 * Copy arm64_relocate_new_kernel to the reboot_code_buffer for use
- 	 * after the kernel is shut down.
 -- 
 2.5.0
