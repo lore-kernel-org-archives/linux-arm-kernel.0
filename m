@@ -1,113 +1,47 @@
-From: sjoerd.simons@collabora.co.uk (Sjoerd Simons)
-Date: Fri,  6 Nov 2015 13:22:24 +0100
-Subject: [RESEND PATCH] drm/rockchip: vop: Correct enabled clocks during setup
-Message-ID: <1446812544-28776-1-git-send-email-sjoerd.simons@collabora.co.uk>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 6 Nov 2015 12:23:39 +0000
+Subject: [RFC] iommu: arm-smmu: correct reference count
+In-Reply-To: <20151104024825.GA27479@shlinux2>
+References: <1446555557-3097-1-git-send-email-van.freenix@gmail.com>
+ <20151103131734.GE14159@arm.com> <20151104024825.GA27479@shlinux2>
+Message-ID: <20151106122338.GI6087@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When doing the initial setup both the hclk and the aclk need to be
-enabled otherwise the board will simply hang. This only occurs when
-building the vop driver as a module, when its built-in the initial setup
-happens to run before the clock framework shuts of unused clocks
-(including the aclk).
+On Wed, Nov 04, 2015 at 10:48:28AM +0800, Peng Fan wrote:
+> On Tue, Nov 03, 2015 at 01:17:34PM +0000, Will Deacon wrote:
+> >On Tue, Nov 03, 2015 at 08:59:17PM +0800, Peng Fan wrote:
+> >> iommu_group_alloc will initialize the reference count for group to 1.
+> >> iommu_group_add_device also increase the group reference count,
+> >> if nothing bad happends. And we need to add iommu_group_put to
+> >> decrease the reference count for group.
+> >> 
+> >> Signed-off-by: Peng Fan <van.freenix@gmail.com>
+> >> Cc: Will Deacon <will.deacon@arm.com>
+> >> Cc: Joerg Roedel <joro@8bytes.org>
+> >> ---
+> >> 
+> >> Not sure whether my understanding is correct or not. I checked rockchip-iommu.c
+> >> exynos-iommu.c and fsl_pamu_domain.c, and they all have iommu_group_put after
+> >> iommu_group_add_device.
+> >
+> >Doesn't this pair up with the iommu_group_remove_device in
+> >arm_smmu_remove_device? Are you actually seeing an issue in practice?
+> 
+> In arm_smmu_add_platform_device,
+> iommu_group_alloc --> group->device_kobj ref count will be init to 1.
+> iommu_group_add_device --> group->device_kobj ref count will be added 1 to 2.
+> 
+> In arm_smmu_remove_device:
+> iommu_group_remove_device --> Decrease group->device_kobj ref count by 1.
+> After arm_smmu_remove_device, the ref count of group->device_kobj is not 0.
+> 
+> So I think need to add iommu_group_put after iommu_group_add_device.
+> If I am wrong, please correct me.
 
-While there also switch to doing prepare and enable in one step rather
-then separate steps to reduce the amount of code required.
+Ok, I see what you're saying. iommu_group_get_for_dev has exactly the
+same issue, so could you update arm-smmu-v3.c as well, please?
 
-Signed-off-by: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
-Acked-by: Mark Yao <mark.yao@rock-chips.com>
-Tested-by: Yakir Yang <ykk@rock-chips.com>
-Tested-by: Romain Perier <romain.perier@gmail.com>
----
+Thanks,
 
- drivers/gpu/drm/rockchip/rockchip_drm_vop.c | 36 +++++++++++------------------
- 1 file changed, 14 insertions(+), 22 deletions(-)
-
-diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-index 5d8ae5e..48719df 100644
---- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-+++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-@@ -1575,32 +1575,25 @@ static int vop_initial(struct vop *vop)
- 		return PTR_ERR(vop->dclk);
- 	}
- 
--	ret = clk_prepare(vop->hclk);
--	if (ret < 0) {
--		dev_err(vop->dev, "failed to prepare hclk\n");
--		return ret;
--	}
--
- 	ret = clk_prepare(vop->dclk);
- 	if (ret < 0) {
- 		dev_err(vop->dev, "failed to prepare dclk\n");
--		goto err_unprepare_hclk;
-+		return ret;
- 	}
- 
--	ret = clk_prepare(vop->aclk);
-+	/* Enable both the hclk and aclk to setup the vop */
-+	ret = clk_prepare_enable(vop->hclk);
- 	if (ret < 0) {
--		dev_err(vop->dev, "failed to prepare aclk\n");
-+		dev_err(vop->dev, "failed to prepare/enable hclk\n");
- 		goto err_unprepare_dclk;
- 	}
- 
--	/*
--	 * enable hclk, so that we can config vop register.
--	 */
--	ret = clk_enable(vop->hclk);
-+	ret = clk_prepare_enable(vop->aclk);
- 	if (ret < 0) {
--		dev_err(vop->dev, "failed to prepare aclk\n");
--		goto err_unprepare_aclk;
-+		dev_err(vop->dev, "failed to prepare/enable aclk\n");
-+		goto err_disable_hclk;
- 	}
-+
- 	/*
- 	 * do hclk_reset, reset all vop registers.
- 	 */
-@@ -1608,7 +1601,7 @@ static int vop_initial(struct vop *vop)
- 	if (IS_ERR(ahb_rst)) {
- 		dev_err(vop->dev, "failed to get ahb reset\n");
- 		ret = PTR_ERR(ahb_rst);
--		goto err_disable_hclk;
-+		goto err_disable_aclk;
- 	}
- 	reset_control_assert(ahb_rst);
- 	usleep_range(10, 20);
-@@ -1634,26 +1627,25 @@ static int vop_initial(struct vop *vop)
- 	if (IS_ERR(vop->dclk_rst)) {
- 		dev_err(vop->dev, "failed to get dclk reset\n");
- 		ret = PTR_ERR(vop->dclk_rst);
--		goto err_unprepare_aclk;
-+		goto err_disable_aclk;
- 	}
- 	reset_control_assert(vop->dclk_rst);
- 	usleep_range(10, 20);
- 	reset_control_deassert(vop->dclk_rst);
- 
- 	clk_disable(vop->hclk);
-+	clk_disable(vop->aclk);
- 
- 	vop->is_enabled = false;
- 
- 	return 0;
- 
-+err_disable_aclk:
-+	clk_disable_unprepare(vop->aclk);
- err_disable_hclk:
--	clk_disable(vop->hclk);
--err_unprepare_aclk:
--	clk_unprepare(vop->aclk);
-+	clk_disable_unprepare(vop->hclk);
- err_unprepare_dclk:
- 	clk_unprepare(vop->dclk);
--err_unprepare_hclk:
--	clk_unprepare(vop->hclk);
- 	return ret;
- }
- 
--- 
-2.6.2
+Will
