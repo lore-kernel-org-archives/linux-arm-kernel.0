@@ -1,69 +1,40 @@
-From: hauke@hauke-m.de (Hauke Mehrtens)
-Date: Sat, 07 Nov 2015 00:41:21 +0100
-Subject: [PATCH v3 4/4] ARM: BCM: Add SMP support for Broadcom 4708
-In-Reply-To: <563D3777.3050208@hauke-m.de>
-References: <1446844273-6460-1-git-send-email-kapilh@broadcom.com>
- <1446844273-6460-5-git-send-email-kapilh@broadcom.com>
- <563D1ED1.6050506@hauke-m.de> <20151106225419.GP8792@broadcom.com>
- <563D3777.3050208@hauke-m.de>
-Message-ID: <563D3AA1.6050508@hauke-m.de>
+From: labbott@redhat.com (Laura Abbott)
+Date: Fri, 6 Nov 2015 15:41:57 -0800
+Subject: [PATCH] arm: Use kernel mm when updating section permissions
+In-Reply-To: <20151106204641.GT8644@n2100.arm.linux.org.uk>
+References: <1446685239-28522-1-git-send-email-labbott@fedoraproject.org>
+ <20151105094615.GP8644@n2100.arm.linux.org.uk> <563B81DA.2080409@redhat.com>
+ <20151105162719.GQ8644@n2100.arm.linux.org.uk> <563BFCC4.8050705@redhat.com>
+ <CAGXu5jLS8GPxmMQwd9qw+w+fkMqU-GYyME5WUuKZZ4qTesVzCQ@mail.gmail.com>
+ <563CF510.9080506@redhat.com> <20151106204641.GT8644@n2100.arm.linux.org.uk>
+Message-ID: <563D3AC5.4020203@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/07/2015 12:27 AM, Hauke Mehrtens wrote:
-> On 11/06/2015 11:54 PM, Jon Mason wrote:
->> On Fri, Nov 06, 2015 at 10:42:41PM +0100, Hauke Mehrtens wrote:
->>> On 11/06/2015 10:11 PM, Kapil Hali wrote:
->>>> From: Jon Mason <jonmason@broadcom.com>
->>>>
->>>> Add SMP support for Broadcom's 4708 SoCs.
->>>>
->>>> Signed-off-by: Jon Mason <jonmason@broadcom.com>
->>>> Acked-by: Hauke Mehrtens <hauke@hauke-m.de>
->>>> Tested-by: Hauke Mehrtens <hauke@hauke-m.de>
->>>> Signed-off-by: Kapil Hali <kapilh@broadcom.com>
->>>
->>> I tested this on a Netgear R6250 V1 (BCM4708) and SMP worked.
->>>
->>>> ---
->>>>  arch/arm/boot/dts/bcm4708.dtsi | 2 ++
->>>>  arch/arm/mach-bcm/Kconfig      | 1 +
->>>>  arch/arm/mach-bcm/Makefile     | 3 +++
->>>>  3 files changed, 6 insertions(+)
->>>>
->>>
->>> ...
->>>
->>>> --- a/arch/arm/mach-bcm/Kconfig
->>>> +++ b/arch/arm/mach-bcm/Kconfig
->>>> @@ -54,6 +54,7 @@ config ARCH_BCM_NSP
->>>>  config ARCH_BCM_5301X
->>>>  	bool "Broadcom BCM470X / BCM5301X ARM SoC" if ARCH_MULTI_V7
->>>>  	select ARCH_BCM_IPROC
->>>
->>> You activated ARM_ERRATA_764369 for NSP is this not needed for NS?
->>
->> I'm not certain the CPU version, and without that it is difficult to
->> know what errata's are present in the underlying hardware.  My guess
->> is that all present in NSP are present in NS (for UP and SMP).  This
->> would put it as:
->>         select ARM_ERRATA_754322
->>         select ARM_ERRATA_775420
->>         select ARM_ERRATA_764369 if SMP
->>
->> Would you like me to have them added?
->>
-> 
-> I will send a separate patch adding all the workarounds for erratas in
-> the CPU core and the cache controller.
-> 
-> Hauke
-> 
-> 
-Hi,
+On 11/06/2015 12:46 PM, Russell King - ARM Linux wrote:
+> On Fri, Nov 06, 2015 at 10:44:32AM -0800, Laura Abbott wrote:
+>> with my test patch. I think setting both current->active_mm and &init_mm
+>> is sufficient. Maybe explicitly setting swapper_pg_dir would be cleaner?
+>
+> Please, stop thinking like this.  If you're trying to change the kernel
+> section mappings after threads have been spawned, you need to change
+> them for _all_ threads, which means you need to change them for every
+> page table that's in existence at that time - you can't do just one
+> table and hope everyone updates, it doesn't work like that.
+>
 
-BCM4708 uses a Cortex-A9 rev r3p0 and a L2C-310 rev r3p2. For this CPU
-and cache controller the same workaround are needed as for NSP, if you
-will resend this patch, please add all of them.
+That's a bad assumption assumption on my part based on what I was
+observing. At the time of mark_rodata_ro, the only threads present
+are kernel threads which aren't going to have task->mm. Only the
+running thread is going to have active_mm. None of those are init_mm.
+To be complete we need:
 
-Hauke
+- Update every task->mm for every thread in every process
+- Update current->active_mm
+- Update &init_mm explicitly
+
+All this would need to be done under stop_machine as well. Does that cover
+everything or am I still off?
+
+Thanks,
+Laura
