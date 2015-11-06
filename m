@@ -1,26 +1,122 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Fri, 6 Nov 2015 10:41:38 +0900
-Subject: [PATCH/RFC] ARM: shmobile: Introduce ARCH_RENESAS
-In-Reply-To: <CAMuHMdXQ5tvWu4dizhpkAx1Uhq9cSM8mj2JhWJUSxDx+Jyk2tQ@mail.gmail.com>
-References: <1446702397-24078-1-git-send-email-horms+renesas@verge.net.au>
- <CAMuHMdXQ5tvWu4dizhpkAx1Uhq9cSM8mj2JhWJUSxDx+Jyk2tQ@mail.gmail.com>
-Message-ID: <20151106014137.GA17493@verge.net.au>
+From: peter@hurleysoftware.com (Peter Hurley)
+Date: Thu, 5 Nov 2015 20:52:08 -0500
+Subject: [PATCH] tty: amba-pl011: add options to earlycon for 32-bit reg
+ access
+In-Reply-To: <1446770267-26749-1-git-send-email-timur@codeaurora.org>
+References: <1446770267-26749-1-git-send-email-timur@codeaurora.org>
+Message-ID: <563C07C8.9060506@hurleysoftware.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 05, 2015 at 07:58:46PM +0100, Geert Uytterhoeven wrote:
-> On Thu, Nov 5, 2015 at 6:46 AM, Simon Horman <horms+renesas@verge.net.au> wrote:
-> > The purpose of this patch is to start the process of replacing both
-> > ARCH_SHMOBILE and ARCH_SHMOBILE_MULTI with ARCH_RENESAS. The motivation
-> > being that as time has moved on Renesas has become a name than shmobile for
-> > the majority Renesas 32-bit ARM based SoCs. The name is, conveniently, also
-> > applicable to (older) Renesas SH based SoCs and (newer) ARM64 based SoCs
-> > although this patch only addresses 32-bit ARM.
+On 11/05/2015 07:37 PM, Timur Tabi wrote:
+> Add the "sbsa32" command-line option to earlycon to specify that the
+> pl011 registers should be accessed with 32-bit accessors only.  This is
+> SBSA platforms
 > 
-> Is this supposed to include H8/300 and m32r in the future?
+> Similarly, also add the "zte" option for the ZTE UART.  It's functionally
+> similar to the standard PL011, but some registers are at different
+> offsets.
+> 
+> Normal console uses the "access_32b" field of the vendor data structure
+> to determine whether the registers needs 32-bit accessors.  Early console
+> is used before the vendor data is available, so we need a different
+> mechanism to choose the accessor.
+> 
+> Example:
+> 
+> 	earlycon=pl011,0x3ced1000,sbsa32
 
-Hi Geert,
+Perhaps I wasn't clear enough in my previous comments regarding this
+approach; I see no benefit to re-using the pl011 earlycon definition.
+Just define a completely new earlycon for sbsa32 (and zte):
 
-my main aim is to replace ARCH_SHMOBILE and ARCH_SHMOBILE_MULTI with
-ARCH_RENESAS. I don't believe that would cover H8/300 and m32r,
-though I am happy to stand corrected.
+EARLYCON_DECLARE(sbsa32, sbsa32_early_console_setup);
+
+Example:
+	earlycon=sbsa32,0x3ced1000
+
+
+Regards,
+Peter Hurley
+
+
+> Signed-off-by: Timur Tabi <timur@codeaurora.org>
+> ---
+> 
+> This patch applies on top of Russell's 12-part amba-pl011.c patchset.
+> 
+>  drivers/tty/serial/amba-pl011.c | 46 +++++++++++++++++++++++++++++++++++++----
+>  1 file changed, 42 insertions(+), 4 deletions(-)
+> 
+> diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
+> index 373b152..58eda89 100644
+> --- a/drivers/tty/serial/amba-pl011.c
+> +++ b/drivers/tty/serial/amba-pl011.c
+> @@ -2301,10 +2301,10 @@ static struct console amba_console = {
+>  
+>  static void pl011_putc(struct uart_port *port, int c)
+>  {
+> -	while (readl(port->membase + REG_FR) & UART01x_FR_TXFF)
+> +	while (readl(port->membase + UART01x_FR) & UART01x_FR_TXFF)
+>  		;
+> -	writeb(c, port->membase + REG_DR);
+> -	while (readl(port->membase + REG_FR) & UART01x_FR_BUSY)
+> +	writeb(c, port->membase + UART01x_DR);
+> +	while (readl(port->membase + UART01x_FR) & UART01x_FR_BUSY)
+>  		;
+>  }
+>  
+> @@ -2315,13 +2315,51 @@ static void pl011_early_write(struct console *con, const char *s, unsigned n)
+>  	uart_console_write(&dev->port, s, n, pl011_putc);
+>  }
+>  
+> +static void pl011_putc_sbsa32(struct uart_port *port, int c)
+> +{
+> +	while (readl(port->membase + UART01x_FR) & UART01x_FR_TXFF)
+> +		cpu_relax();
+> +	writel(c, port->membase + UART01x_DR);
+> +	while (readl(port->membase + UART01x_FR) & UART01x_FR_BUSY)
+> +		cpu_relax();
+> +}
+> +
+> +static void pl011_early_write_sbsa32(struct console *con, const char *s, unsigned n)
+> +{
+> +	struct earlycon_device *dev = con->data;
+> +
+> +	uart_console_write(&dev->port, s, n, pl011_putc_sbsa32);
+> +}
+> +
+> +static void pl011_putc_zte(struct uart_port *port, int c)
+> +{
+> +	while (readl(port->membase + ZX_UART011_FR) & UART01x_FR_TXFF)
+> +		cpu_relax();
+> +	writel(c, port->membase + ZX_UART011_DR);
+> +	while (readl(port->membase + ZX_UART011_FR) & UART01x_FR_BUSY)
+> +		cpu_relax();
+> +}
+> +
+> +static void pl011_early_write_zte(struct console *con, const char *s, unsigned n)
+> +{
+> +	struct earlycon_device *dev = con->data;
+> +
+> +	uart_console_write(&dev->port, s, n, pl011_putc_zte);
+> +}
+> +
+>  static int __init pl011_early_console_setup(struct earlycon_device *device,
+>  					    const char *opt)
+>  {
+>  	if (!device->port.membase)
+>  		return -ENODEV;
+>  
+> -	device->con->write = pl011_early_write;
+> +	if (strcmp(device->options, "sbsa32") == 0)
+> +		device->con->write = pl011_early_write_sbsa32;
+> +	else if (strcmp(device->options, "zte") == 0)
+> +		device->con->write = pl011_early_write_zte;
+> +	else
+> +		device->con->write = pl011_early_write;
+> +
+>  	return 0;
+>  }
+>  EARLYCON_DECLARE(pl011, pl011_early_console_setup);
+> 
