@@ -1,47 +1,43 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Fri, 6 Nov 2015 08:54:33 +0530
-Subject: [PATCH v3 1/2] thermal: mediatek: Add cpu power cooling model.
-In-Reply-To: <1446721837.4016.57.camel@mtksdaap41>
-References: <1445515359-8587-1-git-send-email-dawei.chien@mediatek.com>
- <1445515359-8587-2-git-send-email-dawei.chien@mediatek.com>
- <20151104193958.GC14127@localhost.localdomain>
- <1446721837.4016.57.camel@mtksdaap41>
-Message-ID: <20151106032433.GL3773@ubuntu>
+From: alim.akhtar@samsung.com (Alim Akhtar)
+Date: Fri, 06 Nov 2015 10:05:33 +0530
+Subject: [PATCH] arm64: defconfig: Enable samsung MFD and related configs
+Message-ID: <1446784533-31911-1-git-send-email-alim.akhtar@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Cc'ing Javi (which you should have as he wrote the power-thing for
-cpu-cooling).
+This patch enables below configs by default:
+ * CONFIG_MFD_SEC_CORE
+ * CONFIG_REGULATOR_S2MPS11
+ * CONFIG_RTC_DRV_S5M
 
-On 05-11-15, 19:10, dawei chien wrote:
-> This is because our platform currently only support mt8173_cpufreq.c, so
-> that I only add static power model for our owner IC.
+Signed-off-by: Alim Akhtar <alim.akhtar@samsung.com>
+---
+ arch/arm64/configs/defconfig |    3 +++
+ 1 file changed, 3 insertions(+)
 
-Bindings are (normally) supposed to be general than a platform
-specific.
-
-> Please understanding that I wouldn't give a DT binding document since I
-> will remove static power table on next version, but I can try to explain
-> it.
-
-Then just don't add things in the first place.
-
-> As far as I know, static power is somewhat leakage of CPU clusters, so
-> that we hardly to find a formula, which can suitable all kinds of CPUs
-> since leakage is different. In ARM IPA framework, static power only need
-> to be defined by who register cpufreq_power_cooling_register. The
-> voltage/power table is just one way to present leakage power of CPUs.
-
-The bindings don't fix the values for static power, but just provides
-a field for platforms to use. Everyone can then send its own power
-figures. Why do you thing it can't be generalized?
-
-> Actually, static power is optional since dynamic power is much more than
-> static power.
-
-Maybe, we should still capture it.
-
-@Javi ?
-
+diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+index 9492fe7edbbc..78e89e690dc1 100644
+--- a/arch/arm64/configs/defconfig
++++ b/arch/arm64/configs/defconfig
+@@ -131,9 +131,11 @@ CONFIG_GPIO_XGENE=y
+ CONFIG_POWER_RESET_XGENE=y
+ CONFIG_POWER_RESET_SYSCON=y
+ # CONFIG_HWMON is not set
++CONFIG_MFD_SEC_CORE=y
+ CONFIG_REGULATOR=y
+ CONFIG_REGULATOR_FIXED_VOLTAGE=y
+ CONFIG_REGULATOR_QCOM_SMD_RPM=y
++CONFIG_REGULATOR_S2MPS11=y
+ CONFIG_FB=y
+ CONFIG_FB_ARMCLCD=y
+ CONFIG_FRAMEBUFFER_CONSOLE=y
+@@ -162,6 +164,7 @@ CONFIG_LEDS_TRIGGERS=y
+ CONFIG_LEDS_TRIGGER_HEARTBEAT=y
+ CONFIG_LEDS_TRIGGER_CPU=y
+ CONFIG_RTC_CLASS=y
++CONFIG_RTC_DRV_S5M=y
+ CONFIG_RTC_DRV_EFI=y
+ CONFIG_RTC_DRV_XGENE=y
+ CONFIG_DMADEVICES=y
 -- 
-viresh
+1.7.10.4
