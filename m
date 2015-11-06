@@ -1,65 +1,37 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Fri, 06 Nov 2015 20:03:24 +0100
-Subject: [PATCH v2 0/9] Better compatible for the rockchip thermal and
- support RK3368 SoCs
-In-Reply-To: <20151106184739.GA8202@localhost.localdomain>
-References: <1446700685-18017-1-git-send-email-wxt@rock-chips.com>
- <20151106184739.GA8202@localhost.localdomain>
-Message-ID: <1509087.903MXQEqfv@phil>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 6 Nov 2015 11:03:04 -0800
+Subject: [PATCH] Revert "ARM: dts: twl4030: Add iio properties for bci
+ subnode"
+In-Reply-To: <CAMAWPa-7_q8Sf+4VQ0EE6zU-NvacKERFgjqueNif=52Frn0enA@mail.gmail.com>
+References: <1446826430-3705-1-git-send-email-sre@kernel.org>
+ <CAMAWPa-7_q8Sf+4VQ0EE6zU-NvacKERFgjqueNif=52Frn0enA@mail.gmail.com>
+Message-ID: <20151106190304.GB3218@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Eduardo, Caesar,
-
-Am Freitag, 6. November 2015, 10:47:40 schrieb Eduardo Valentin:
-> On Thu, Nov 05, 2015 at 01:17:56PM +0800, Caesar Wang wrote:
-> > This series patchs are working for RK3368 on Rockchip platform.
-> > 
+* Kevin Hilman <khilman@kernel.org> [151106 10:37]:
+> On Fri, Nov 6, 2015 at 8:13 AM, Sebastian Reichel <sre@kernel.org> wrote:
+> > This reverts commit af19161aaed7ff8d1a52b2e517460f2fa0774e32,
+> > which breaks the omap3 device tree build due to a wrong reference.
+> >
+> > I accidently queued this change via the power supply subsystem while
+> > telling Marek at the same time, that it should go through Tony's tree.
+> > Following that I did miss Stephen's messages about the build failure in
+> > linux-next and since he switched to merging an older snapshot nobody
+> > else noticed the problem in my tree. I didn't notice myself, since I
+> > did not build any device tree files assuming none have changed by me.
+> >
+> > Signed-off-by: Sebastian Reichel <sre@kernel.org>
 > 
-> Good to see the perseverance! :-)
+> We also found this in kernelci.org build testing, and verified that
+> this fixes the build.
 > 
-> > @Heiko,
-> >     The PATCH [5/6] is working based on big/littel cluster cpufreq
-> >     added. Anyway, the PATCH [5/6] also work for next kernel.
-> > 
-> > @Eduardo,
-> > This patchset are based on linus master branch.
-> > Note: Need add the following thermal patchs for thermal driver before 
-apply
-> > this series patchs.
-> > 
-> > 1) thermal: rockchip: fix handling of invalid readings
-> > (https://patchwork.kernel.org/patch/6973101/)
-> > 
-> > 2) thermal: rockhip: fix setting thermal shutdown polarity
-> > (https://patchwork.kernel.org/patch/6973131/)
-> > 
-> > 3) dt-bindings: rockchip-thermal: Add the pinctrl states in this document
-> > (https://patchwork.kernel.org/patch/7472021/)
-> > 
-> > 4) thermal: rockchip: support the sleep pinctrl state to avoid glitches in 
-s2r
-> > (https://patchwork.kernel.org/patch/7472051/)
-> > 
-> > I'm glad these patchs have merged in thermal-soc git tree which can be 
-found at
-> > git://git.kernel.org/pub/scm/linux/kernel/git/evalenti/linux-soc-
-thermal.git
+> Tested-by: Kevin Hilman <khilman@linaro.org>
 > 
-> Yeah, apologize the delay on giving you a feedback on your code. As I
-> mentioned before, I had a couple of other things in past weeks that
-> consumed my time. 
-> 
-> Anyways, this specific patch series looks way better now that you have
-> split it further. I will have a better look on it again and let you
-> know when it will land.
+> Thanks Felipe for reporting, and thanks Sebastian for the quick fix.
 
-I call dibs on the devicetree patches :-) .
+Acked-by: Tony Lindgren <tony@atomide.com>
 
-Code and dt parts are very much separate, so I'd like to take the dt parts 
-though my tree and arm-soc to keep further dts changes together.
-Of course only once you are ok with the code parts :-)
+Thanks,
 
-Devicetree parts themselfs look ok to me.
-
-Heiko
+Tony
