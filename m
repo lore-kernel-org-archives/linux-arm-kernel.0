@@ -1,47 +1,82 @@
-From: maxime.coquelin@st.com (Maxime Coquelin)
-Date: Fri, 6 Nov 2015 08:50:37 +0100
-Subject: [PATCH 0/2] [media] c8sectpfe: Deletion of a few unnecessary
- checks
-In-Reply-To: <563BA3CC.4040709@users.sourceforge.net>
-References: <5307CAA2.8060406@users.sourceforge.net>
- <alpine.DEB.2.02.1402212321410.2043@localhost6.localdomain6>
- <530A086E.8010901@users.sourceforge.net>
- <alpine.DEB.2.02.1402231635510.1985@localhost6.localdomain6>
- <530A72AA.3000601@users.sourceforge.net>
- <alpine.DEB.2.02.1402240658210.2090@localhost6.localdomain6>
- <530B5FB6.6010207@users.sourceforge.net>
- <alpine.DEB.2.10.1402241710370.2074@hadrien>
- <530C5E18.1020800@users.sourceforge.net>
- <alpine.DEB.2.10.1402251014170.2080@hadrien>
- <530CD2C4.4050903@users.sourceforge.net>
- <alpine.DEB.2.10.1402251840450.7035@hadrien>
- <530CF8FF.8080600@users.sourceforge.net>
- <alpine.DEB.2.02.1402252117150.2047@localhost6.localdomain6>
- <530DD06F.4090703@users.sourceforge.net>
- <alpine.DEB.2.02.1402262129250.2221@localhost6.localdomain6>
- <5317A59D.4@users.sourceforge.net> <563BA3CC.4040709@users.sourceforge.net>
-Message-ID: <563C5BCD.806@st.com>
+From: magnus.damm@gmail.com (Magnus Damm)
+Date: Fri, 06 Nov 2015 16:53:19 +0900
+Subject: [PATCH] ARM: proc-v7: Put stack in data section, handle XIP case
+Message-ID: <20151106075319.19378.64286.sendpatchset@little-apple>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Markus,
+From: Magnus Damm <damm+renesas@opensource.se>
 
-On 11/05/2015 07:45 PM, SF Markus Elfring wrote:
-> From: Markus Elfring <elfring@users.sourceforge.net>
-> Date: Thu, 5 Nov 2015 19:39:32 +0100
->
-> Another update suggestion was taken into account after a patch was applied
-> from static source code analysis.
->
-> Markus Elfring (2):
->    Delete unnecessary checks before two function calls
->    Combine three checks into a single if block
->
->   drivers/media/platform/sti/c8sectpfe/c8sectpfe-common.c | 16 ++++++++--------
->   1 file changed, 8 insertions(+), 8 deletions(-)
->
-For the series:
-Acked-by: Maxime Coquelin <maxime.coquelin@st.com>
+Adjust the ARM v7 setup code to put the temporary stack in the
+data section and also use PLAT_PHYS_OFFSET to handle the XIP case.
 
-Thanks!
-Maxime
+The common case of XIP=n the code is considered to be position
+independent while for XIP=y PLAT_PHYS_OFFSET is fixed. This
+is based on that early code in head.S invoking PROCINFO_INITFUNC
+seems position independent.
+
+At this point two places in proc-v7.S make use of the temporary
+stack so the PLAT_PHYS_OFFSET calculation is duplicated.
+
+The XIP=n case has been tested with CPU Hotplug on r8a7779
+(Cortex A9 Quad) and Chris [CCed] has tested the XIP=y
+case.
+
+Signed-off-by: Magnus Damm <damm+renesas@opensource.se>
+Tested-by: Chris.Brandt at renesas.com
+---
+
+ Please let me know if considering XIP=y position independent
+ is overkill, or if it is better to share code somehow.
+
+ arch/arm/mm/proc-v7.S |   25 +++++++++++++++++++++++--
+ 1 file changed, 23 insertions(+), 2 deletions(-)
+
+--- 0001/arch/arm/mm/proc-v7.S
++++ work/arch/arm/mm/proc-v7.S	2015-11-06 16:32:13.370513000 +0900
+@@ -274,7 +274,15 @@ __v7_ca15mp_setup:
+ __v7_b15mp_setup:
+ __v7_ca17mp_setup:
+ 	mov	r10, #0
+-1:	adr	r12, __v7_setup_stack		@ the local stack
++1:	adr	r11, __v7_setup_stack_ptr	@ pointer to local stack
++	ldmia	r11, {r0, r12}
++#ifdef CONFIG_XIP_KERNEL
++	ldr	r11, =PLAT_PHYS_OFFSET		@ fixed address
++#else
++	sub	r11, r11, r0			@ position independent offset
++#endif
++	add	r12, r12, r11			@ phys address
++	sub	r12, #PAGE_OFFSET
+ 	stmia	r12, {r0-r5, lr}		@ v7_invalidate_l1 touches r0-r6
+ 	bl      v7_invalidate_l1
+ 	ldmia	r12, {r0-r5, lr}
+@@ -415,7 +423,15 @@ __v7_pj4b_setup:
+ #endif /* CONFIG_CPU_PJ4B */
+ 
+ __v7_setup:
+-	adr	r12, __v7_setup_stack		@ the local stack
++	adr	r11, __v7_setup_stack_ptr	@ pointer to local stack
++	ldmia	r11, {r0, r12}
++#ifdef CONFIG_XIP_KERNEL
++	ldr	r11, =PLAT_PHYS_OFFSET		@ fixed address
++#else
++	sub	r11, r11, r0			@ position independent offset
++#endif
++	add	r12, r12, r11			@ phys address
++	sub	r12, #PAGE_OFFSET
+ 	stmia	r12, {r0-r5, lr}		@ v7_invalidate_l1 touches r0-r6
+ 	bl      v7_invalidate_l1
+ 	ldmia	r12, {r0-r5, lr}
+@@ -482,6 +498,11 @@ __errata_finish:
+ 	ret	lr				@ return to head.S:__ret
+ ENDPROC(__v7_setup)
+ 
++__v7_setup_stack_ptr:
++	.long	.
++	.long	__v7_setup_stack
++
++	.data
+ 	.align	2
+ __v7_setup_stack:
+ 	.space	4 * 7				@ 12 registers
