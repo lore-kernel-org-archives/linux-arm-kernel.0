@@ -1,45 +1,46 @@
-From: alim.akhtar@samsung.com (Alim Akhtar)
-Date: Fri, 06 Nov 2015 08:36:40 +0530
-Subject: [PATCH v3 2/2] arm64: dts: exynos7: Enable HS200 mode operation
-In-Reply-To: <1446779200-10457-1-git-send-email-alim.akhtar@samsung.com>
-References: <1446779200-10457-1-git-send-email-alim.akhtar@samsung.com>
-Message-ID: <1446779200-10457-2-git-send-email-alim.akhtar@samsung.com>
+From: neilb@suse.com (Neil Brown)
+Date: Fri, 06 Nov 2015 14:19:11 +1100
+Subject: [PATCH] raid5-cache: add crc32c Kconfig dependency
+In-Reply-To: <4308930.z8rrqMJU90@wuerfel>
+References: <4308930.z8rrqMJU90@wuerfel>
+Message-ID: <87si4jak7k.fsf@notabene.neil.brown.name>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch enables HS200 mode operation on exynos7 based
-espresso board.
-This also removes _broken-cd_ property as per mmc binding documentation
-which says one of the properties between broken-cd and non-removable
-should be used. And we already use _non-removable_ as emmc mounted
-on board which is a non-removable device.
+On Wed, Nov 04 2015, Arnd Bergmann wrote:
 
-Signed-off-by: Alim Akhtar <alim.akhtar@samsung.com>
-Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
-Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
----
-Chnages since v2:
-* none
+> The recent change of the raid5-cache code to use crc32c instead
+> of crc32 causes link errors when CONFIG_LIBCRC32C is disabled:
+>
+> drivers/built-in.o: In function crc32c'
+> core.c:(.text+0x1c6060): undefined reference to `crc32c'
+>
+> This adds an explicit 'select' statement like all other users
+> of this function do.
+>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Fixes: 5cb2fbd6ea0d ("raid5-cache: use crc32c checksum")
+>
+> diff --git a/drivers/md/Kconfig b/drivers/md/Kconfig
+> index 3e01e6fb3424..7913fdcfc849 100644
+> --- a/drivers/md/Kconfig
+> +++ b/drivers/md/Kconfig
+> @@ -123,6 +123,7 @@ config MD_RAID456
+>  	tristate "RAID-4/RAID-5/RAID-6 mode"
+>  	depends on BLK_DEV_MD
+>  	select RAID6_PQ
+> +	select LIBCRC32C
+>  	select ASYNC_MEMCPY
+>  	select ASYNC_XOR
+>  	select ASYNC_PQ
 
-Changes since v1:
-* Addressed Krzysztof review comments
+Applied, thanks,
 
- arch/arm64/boot/dts/exynos/exynos7-espresso.dts |    2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/arch/arm64/boot/dts/exynos/exynos7-espresso.dts b/arch/arm64/boot/dts/exynos/exynos7-espresso.dts
-index f5a3da50ac57..d8767b00862e 100644
---- a/arch/arm64/boot/dts/exynos/exynos7-espresso.dts
-+++ b/arch/arm64/boot/dts/exynos/exynos7-espresso.dts
-@@ -333,8 +333,8 @@
- &mmc_0 {
- 	status = "okay";
- 	num-slots = <1>;
--	broken-cd;
- 	cap-mmc-highspeed;
-+	mmc-hs200-1_8v;
- 	non-removable;
- 	card-detect-delay = <200>;
- 	clock-frequency = <800000000>;
--- 
-1.7.10.4
+NeilBrown
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 818 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151106/87dc5111/attachment.sig>
