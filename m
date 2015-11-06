@@ -1,28 +1,32 @@
-From: jean-michel.hautbois@veo-labs.com (Jean-Michel Hautbois)
-Date: Fri, 6 Nov 2015 17:54:17 +0100
-Subject: i.MX6: Oops when unplugging a USB key
-In-Reply-To: <4306403.1Q6hpl8dCg@wuerfel>
-References: <CAH-u=81BFm1nquN5z7hFN9auV=9dPMPkRFX_PneK22UXgPbJnA@mail.gmail.com>
- <4306403.1Q6hpl8dCg@wuerfel>
-Message-ID: <CAH-u=83oF-cJTCqfA3Onnc4TBGTa7+kCE6sBttUcfWy_r79zzw@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 6 Nov 2015 17:00:16 +0000
+Subject: [PATCH] arm64: bpf: fix mod-by-zero case
+In-Reply-To: <1446698639-12362-1-git-send-email-zlim.lnx@gmail.com>
+References: <1446698639-12362-1-git-send-email-zlim.lnx@gmail.com>
+Message-ID: <20151106170015.GB7637@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+On Wed, Nov 04, 2015 at 08:43:59PM -0800, Zi Shen Lim wrote:
+> Turns out in the case of modulo by zero in a BPF program:
+> 	A = A % X;  (X == 0)
+> the expected behavior is to terminate with return value 0.
+> 
+> The bug in JIT is exposed by a new test case [1].
+> 
+> [1] https://lkml.org/lkml/2015/11/4/499
+> 
+> Signed-off-by: Zi Shen Lim <zlim.lnx@gmail.com>
+> Reported-by: Yang Shi <yang.shi@linaro.org>
+> Reported-by: Xi Wang <xi.wang@gmail.com>
+> CC: Alexei Starovoitov <ast@plumgrid.com>
+> CC: Catalin Marinas <catalin.marinas@arm.com>
+> Fixes: e54bcde3d69d ("arm64: eBPF JIT compiler")
+> Cc: <stable@vger.kernel.org> # 3.18+
+> ---
+> This patch applies on top of "arm64: bpf: fix fiv-by-zero case" [2].
 
-2015-11-06 17:38 GMT+01:00 Arnd Bergmann <arnd@arndb.de>:
-> On Friday 06 November 2015 17:32:30 Jean-Michel Hautbois wrote:
->> I have an issue on my i.MX6 board I don't understand (kernel is a 4.2)...
->> When I connect a USB key, and then disconnect it, it oopses and
->> reboots (as I have panic on oops, and reboot on panic).
->> Seems to be on the umount part...
->> The USB is connected through a smsc95xx but I don't think this is related...
->
-> You should normally unmount the file system before unplugging.
->
-> Did this work on other kernels? What happens if you unplug
-> that stick on your laptop while the file system is mounted?
+Both patches applied. Thanks.
 
-It worked well, it will not write the last dirty page if any that's all...
-
-JM
+-- 
+Catalin
