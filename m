@@ -1,76 +1,107 @@
 From: geoff@infradead.org (Geoff Levand)
 Date: Fri, 06 Nov 2015 19:14:36 +0000
-Subject: [PATCH 03/15] arm64: Add new hcall HVC_CALL_FUNC
+Subject: [PATCH 08/15] arm64/kexec: Add pr_devel output
 In-Reply-To: <cover.1446836442.git.geoff@infradead.org>
 References: <cover.1446836442.git.geoff@infradead.org>
-Message-ID: <1bfd1af4061513bc07c38a778f1602bf4abe1e43.1446836442.git.geoff@infradead.org>
+Message-ID: <b6f72b6ad75d08e46a012774d7c51e40f2046952.1446836443.git.geoff@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the new hcall HVC_CALL_FUNC that allows execution of a function at EL2.
-During CPU reset the CPU must be brought to the exception level it had on
-entry to the kernel.  The HVC_CALL_FUNC hcall will provide the mechanism
-needed for this exception level switch.
-
-To allow the HVC_CALL_FUNC exception vector to work without a stack, which is
-needed to support an hcall at CPU reset, this implementation uses register x18
-to store the link register across the caller provided function.  This dictates
-that the caller provided function must preserve the contents of register x18.
+To aid in debugging kexec problems or when adding new functionality to kexec add
+a new routine kexec_image_info() and several inline pr_devel statements.
 
 Signed-off-by: Geoff Levand <geoff@infradead.org>
 ---
- arch/arm64/include/asm/virt.h | 13 +++++++++++++
- arch/arm64/kernel/hyp-stub.S  | 13 ++++++++++++-
- 2 files changed, 25 insertions(+), 1 deletion(-)
+ arch/arm64/kernel/machine_kexec.c | 63 +++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 63 insertions(+)
 
-diff --git a/arch/arm64/include/asm/virt.h b/arch/arm64/include/asm/virt.h
-index eb10368..3070096 100644
---- a/arch/arm64/include/asm/virt.h
-+++ b/arch/arm64/include/asm/virt.h
-@@ -45,6 +45,19 @@
+diff --git a/arch/arm64/kernel/machine_kexec.c b/arch/arm64/kernel/machine_kexec.c
+index 8b990b8..da28a26 100644
+--- a/arch/arm64/kernel/machine_kexec.c
++++ b/arch/arm64/kernel/machine_kexec.c
+@@ -25,6 +25,48 @@ extern const unsigned long arm64_relocate_new_kernel_size;
  
- #define HVC_SET_VECTORS 2
+ static unsigned long kimage_start;
  
-+/*
-+ * HVC_CALL_FUNC - Execute a function at EL2.
-+ *
-+ * @x0: Physical address of the function to be executed.
-+ * @x1: Passed as the first argument to the function.
-+ * @x2: Passed as the second argument to the function.
-+ * @x3: Passed as the third argument to the function.
-+ *
-+ * The called function must preserve the contents of register x18.
++/**
++ * kexec_is_dtb - Helper routine to check the device tree header signature.
 + */
++static bool kexec_is_dtb(const void *dtb)
++{
++	__be32 magic;
 +
-+#define HVC_CALL_FUNC 3
++	return get_user(magic, (__be32 *)dtb) ? false :
++		(be32_to_cpu(magic) == OF_DT_HEADER);
++}
 +
- #define BOOT_CPU_MODE_EL1	(0xe11)
- #define BOOT_CPU_MODE_EL2	(0xe12)
- 
-diff --git a/arch/arm64/kernel/hyp-stub.S b/arch/arm64/kernel/hyp-stub.S
-index 017ab519..e8febe9 100644
---- a/arch/arm64/kernel/hyp-stub.S
-+++ b/arch/arm64/kernel/hyp-stub.S
-@@ -67,8 +67,19 @@ el1_sync:
- 	b	2f
- 
- 1:	cmp	x18, #HVC_SET_VECTORS
--	b.ne	2f
-+	b.ne	1f
- 	msr	vbar_el2, x0
-+	b	2f
++/**
++ * kexec_image_info - For debugging output.
++ */
++#define kexec_image_info(_i) _kexec_image_info(__func__, __LINE__, _i)
++static void _kexec_image_info(const char *func, int line,
++	const struct kimage *kimage)
++{
++	unsigned long i;
 +
-+1:	cmp	x18, #HVC_CALL_FUNC
-+	b.ne	2f
-+	mov	x18, lr
-+	mov	lr, x0
-+	mov	x0, x1
-+	mov	x1, x2
-+	mov	x2, x3
-+	blr	lr
-+	mov	lr, x18
++#if !defined(DEBUG)
++	return;
++#endif
++	pr_devel("%s:%d:\n", func, line);
++	pr_devel("  kexec kimage info:\n");
++	pr_devel("    type:        %d\n", kimage->type);
++	pr_devel("    start:       %lx\n", kimage->start);
++	pr_devel("    head:        %lx\n", kimage->head);
++	pr_devel("    nr_segments: %lu\n", kimage->nr_segments);
++
++	for (i = 0; i < kimage->nr_segments; i++) {
++		pr_devel("      segment[%lu]: %016lx - %016lx, %lx bytes, %lu pages%s\n",
++			i,
++			kimage->segment[i].mem,
++			kimage->segment[i].mem + kimage->segment[i].memsz,
++			kimage->segment[i].memsz,
++			kimage->segment[i].memsz /  PAGE_SIZE,
++			(kexec_is_dtb(kimage->segment[i].buf) ?
++				", dtb segment" : ""));
++	}
++}
++
+ void machine_kexec_cleanup(struct kimage *kimage)
+ {
+ 	/* Empty routine needed to avoid build errors. */
+@@ -38,6 +80,8 @@ void machine_kexec_cleanup(struct kimage *kimage)
+ int machine_kexec_prepare(struct kimage *kimage)
+ {
+ 	kimage_start = kimage->start;
++	kexec_image_info(kimage);
++
+ 	return 0;
+ }
  
- 2:	eret
- ENDPROC(el1_sync)
+@@ -107,6 +151,25 @@ void machine_kexec(struct kimage *kimage)
+ 	reboot_code_buffer_phys = page_to_phys(kimage->control_code_page);
+ 	reboot_code_buffer = phys_to_virt(reboot_code_buffer_phys);
+ 
++	kexec_image_info(kimage);
++
++	pr_devel("%s:%d: control_code_page:        %p\n", __func__, __LINE__,
++		kimage->control_code_page);
++	pr_devel("%s:%d: reboot_code_buffer_phys:  %pa\n", __func__, __LINE__,
++		&reboot_code_buffer_phys);
++	pr_devel("%s:%d: reboot_code_buffer:       %p\n", __func__, __LINE__,
++		reboot_code_buffer);
++	pr_devel("%s:%d: relocate_new_kernel:      %p\n", __func__, __LINE__,
++		arm64_relocate_new_kernel);
++	pr_devel("%s:%d: relocate_new_kernel_size: 0x%lx(%lu) bytes\n",
++		__func__, __LINE__, arm64_relocate_new_kernel_size,
++		arm64_relocate_new_kernel_size);
++
++	pr_devel("%s:%d: kimage_head:              %lx\n", __func__, __LINE__,
++		kimage->head);
++	pr_devel("%s:%d: kimage_start:             %lx\n", __func__, __LINE__,
++		kimage_start);
++
+ 	/*
+ 	 * Copy arm64_relocate_new_kernel to the reboot_code_buffer for use
+ 	 * after the kernel is shut down.
 -- 
 2.5.0
