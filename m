@@ -1,32 +1,61 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Fri, 6 Nov 2015 12:00:20 +0000
-Subject: [PATCH v3 1/3] ASoC: rockchip: i2s: add 8 channels capture support
-In-Reply-To: <1446773891-32174-2-git-send-email-sugar.zhang@rock-chips.com>
-References: <1446773891-32174-1-git-send-email-sugar.zhang@rock-chips.com>
- <1446773891-32174-2-git-send-email-sugar.zhang@rock-chips.com>
-Message-ID: <20151106120020.GH18409@sirena.org.uk>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Fri, 6 Nov 2015 12:00:24 +0000
+Subject: [PATCH v11 1/5] xen: move xen_setup_runstate_info and
+ get_runstate_snapshot to drivers/xen/time.c
+In-Reply-To: <alpine.DEB.2.02.1511061110220.13541@kaball.uk.xensource.com>
+References: <alpine.DEB.2.02.1511051502270.13541@kaball.uk.xensource.com>
+ <1446737696-9749-1-git-send-email-stefano.stabellini@eu.citrix.com>
+ <20151105164820.GF32247@leverpostej>
+ <alpine.DEB.2.02.1511061110220.13541@kaball.uk.xensource.com>
+Message-ID: <20151106120024.GB23038@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 06, 2015 at 09:38:09AM +0800, Sugar Zhang wrote:
+On Fri, Nov 06, 2015 at 11:11:40AM +0000, Stefano Stabellini wrote:
+> On Thu, 5 Nov 2015, Mark Rutland wrote:
+> > Hi,
+> > 
+> > > +static u64 get64(const u64 *p)
+> > > +{
+> > > +	u64 ret;
+> > > +
+> > > +	if (BITS_PER_LONG < 64) {
+> > > +		u32 *p32 = (u32 *)p;
+> > > +		u32 h, l;
+> > > +
+> > > +		/*
+> > > +		 * Read high then low, and then make sure high is
+> > > +		 * still the same; this will only loop if low wraps
+> > > +		 * and carries into high.
+> > > +		 * XXX some clean way to make this endian-proof?
+> > > +		 */
+> > > +		do {
+> > > +			h = p32[1];
+> > > +			barrier();
+> > > +			l = p32[0];
+> > > +			barrier();
+> > > +		} while (p32[1] != h);
+> > 
+> > I realise this is simply a move of existing code, but it may be better
+> > to instead have:
+> > 
+> > do {
+> > 	h = READ_ONCE(p32[1]);
+> > 	l = READ_ONCE(p32[0]);
+> > } while (READ_ONCE(p32[1] != h);
+> > 
+> > Which ensures that each load is a single access (though it almost
+> > certainly would be anyway), and prevents the compiler from having to
+> > reload any other memory locations (which the current barrier() usage
+> > forces).
+> 
+> I am happy to make these changes, however for code clarity and review
+> simplicity I'll keep them on a separate patch (I like code movement to
+> remain code movement). I can squash the two patches together when
+> committing, if necessary.
 
-> +	/* refine capture channels */
-> +	if (!of_property_read_u32(node, "rockchip,capture-channels", &val)) {
-> +		if (val >= 2 && val <= 8)
-> +			rockchip_i2s_dai.capture.channels_max = val;
-> +		else
-> +			rockchip_i2s_dai.capture.channels_max = 2;
-> +	}
+Sure, I also prefer to separate code movement from code rework, so that
+makes sense to me.
 
-You should make a copy of the rockchip_i2s_dai struct in your driver
-data and modify that rather than modifying the original - what happens
-if sommeone makes a SoC with two I2S DAIs, one with many channels and
-another with only two?  Samsung SoCs often have an arrangement like that
-for exmaple.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151106/abfa0950/attachment-0001.sig>
+Thanks,
+Mark.
