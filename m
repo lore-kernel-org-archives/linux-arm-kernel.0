@@ -1,15 +1,14 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Fri, 6 Nov 2015 16:19:00 +0000
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Fri, 6 Nov 2015 16:21:09 +0000
 Subject: [PATCH] arm64: remove redundant FRAME_POINTER kconfig option
-In-Reply-To: <20151106161214.GY7637@e104818-lin.cambridge.arm.com>
+In-Reply-To: <20151106125002.GA8116@leverpostej>
 References: <1446658671-16238-1-git-send-email-yang.shi@linaro.org>
- <20151106123008.GK6087@arm.com>
- <20151106161214.GY7637@e104818-lin.cambridge.arm.com>
-Message-ID: <20151106161859.GS6087@arm.com>
+ <20151106123008.GK6087@arm.com> <20151106125002.GA8116@leverpostej>
+Message-ID: <20151106162109.GZ7637@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 06, 2015 at 04:12:14PM +0000, Catalin Marinas wrote:
+On Fri, Nov 06, 2015 at 12:50:02PM +0000, Mark Rutland wrote:
 > On Fri, Nov 06, 2015 at 12:30:09PM +0000, Will Deacon wrote:
 > > On Wed, Nov 04, 2015 at 09:37:51AM -0800, Yang Shi wrote:
 > > > FRAME_POINTER is defined in lib/Kconfig.debug, it is unnecessary to redefine
@@ -19,15 +18,20 @@ On Fri, Nov 06, 2015 at 04:12:14PM +0000, Catalin Marinas wrote:
 > > for building with frame pointers. I'm ok with that (it appears to be
 > > enabled in defconfig and follows the vast majority of other archs) but
 > > it is a change in behaviour.
+> > 
+> > With that:
+> > 
+> >   Acked-by: Will Deacon <will.deacon@arm.com>
 > 
-> We shouldn't have the dependency on DEBUG_KERNEL since we select
-> ARCH_WANT_FRAME_POINTERS on arm64. However, the patch would allow one to
-> disable FRAME_POINTERS (not sure it has any effect on the aarch64 gcc
-> though).
+> The code in arch/arm64/kernel/stacktrace.c assumes we have frame
+> pointers regardless of FRAME_POINTER. Depending on what the compiler
+> decides to use x29 for, we could get some weird fake unwinding and/or
+> dodgy memory accesses.
+> 
+> I think we should first audit the uses of frame pointers to ensure that
+> they are guarded for !FRAME_POINTER.
 
-Ah yes, you're right about DEBUG_KERNEL. I completely misread the brackets
-and the left-associativity of &&/|| works out.
+Or we just select FRAME_POINTER in the ARM64 Kconfig entry.
 
-I still think Rutland has a valid point wrt junk frame pointers, though.
-
-Will
+-- 
+Catalin
