@@ -1,58 +1,54 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Thu, 5 Nov 2015 23:14:39 -0600
-Subject: [PATCH v2 5/5] ARM: dts: AM4372: add entry for qspi mmap region
-In-Reply-To: <20151105235124.GA2805@rob-hp-laptop>
-References: <1446545174-14193-1-git-send-email-vigneshr@ti.com>
- <1446545174-14193-6-git-send-email-vigneshr@ti.com>
- <20151105235124.GA2805@rob-hp-laptop>
-Message-ID: <878u6b1zgg.fsf@saruman.tx.rr.com>
+From: alim.akhtar@samsung.com (Alim Akhtar)
+Date: Fri, 06 Nov 2015 10:57:34 +0530
+Subject: [PATCH v2] arm64: defconfig: Enable samsung MFD and related configs
+Message-ID: <1446787654-18306-1-git-send-email-alim.akhtar@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Exynos7 based espresso board uses S2MPS15, a multifunction device.
+This patch enables S2MPS1X regulator, pmic-clk and rtc drivers utilized by
+the same.
 
-Hi,
+Signed-off-by: Alim Akhtar <alim.akhtar@samsung.com>
+---
+Changes since v1:
+* updated the comment message to describe which platfrom uses it.
+* enable COMMON_CLK_S2MPS11 which is needed to enable pmic-clk block.
 
-Rob Herring <robh@kernel.org> writes:
-> On Tue, Nov 03, 2015 at 03:36:14PM +0530, Vignesh R wrote:
->> Add qspi memory mapped region entries for AM43xx based SoCs. Also,
->> update the binding documents for the controller to document this change.
->> 
->> Signed-off-by: Vignesh R <vigneshr@ti.com>
->
-> Acked-by: Rob Herring <robh@kernel.org>
->
->> ---
->>  Documentation/devicetree/bindings/spi/ti_qspi.txt | 5 +++--
->>  arch/arm/boot/dts/am4372.dtsi                     | 4 +++-
->>  2 files changed, 6 insertions(+), 3 deletions(-)
->> 
->> diff --git a/Documentation/devicetree/bindings/spi/ti_qspi.txt b/Documentation/devicetree/bindings/spi/ti_qspi.txt
->> index f05dd631bef1..05488970060b 100644
->> --- a/Documentation/devicetree/bindings/spi/ti_qspi.txt
->> +++ b/Documentation/devicetree/bindings/spi/ti_qspi.txt
->> @@ -17,9 +17,10 @@ Recommended properties:
->>  
->>  Example:
->>  
->> +For am4372:
->>  qspi: qspi at 4b300000 {
->> -	compatible = "ti,dra7xxx-qspi";
->> -	reg = <0x47900000 0x100>, <0x30000000 0x3ffffff>;
->> +	compatible = "ti,am4372-qspi";
->> +	reg = <0x47900000 0x100>, <0x30000000 0x4000000>;
->>  	reg-names = "qspi_base", "qspi_mmap";
->>  	#address-cells = <1>;
->>  	#size-cells = <0>;
+ arch/arm64/configs/defconfig |    4 ++++
+ 1 file changed, 4 insertions(+)
 
-and how does the user for this look like ? Don't you need to give this a
-proper 'ranges' binding ?
-
+diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+index 9492fe7edbbc..2e1f815daa2b 100644
+--- a/arch/arm64/configs/defconfig
++++ b/arch/arm64/configs/defconfig
+@@ -131,9 +131,11 @@ CONFIG_GPIO_XGENE=y
+ CONFIG_POWER_RESET_XGENE=y
+ CONFIG_POWER_RESET_SYSCON=y
+ # CONFIG_HWMON is not set
++CONFIG_MFD_SEC_CORE=y
+ CONFIG_REGULATOR=y
+ CONFIG_REGULATOR_FIXED_VOLTAGE=y
+ CONFIG_REGULATOR_QCOM_SMD_RPM=y
++CONFIG_REGULATOR_S2MPS11=y
+ CONFIG_FB=y
+ CONFIG_FB_ARMCLCD=y
+ CONFIG_FRAMEBUFFER_CONSOLE=y
+@@ -162,6 +164,7 @@ CONFIG_LEDS_TRIGGERS=y
+ CONFIG_LEDS_TRIGGER_HEARTBEAT=y
+ CONFIG_LEDS_TRIGGER_CPU=y
+ CONFIG_RTC_CLASS=y
++CONFIG_RTC_DRV_S5M=y
+ CONFIG_RTC_DRV_EFI=y
+ CONFIG_RTC_DRV_XGENE=y
+ CONFIG_DMADEVICES=y
+@@ -169,6 +172,7 @@ CONFIG_QCOM_BAM_DMA=y
+ CONFIG_VIRTIO_PCI=y
+ CONFIG_VIRTIO_BALLOON=y
+ CONFIG_VIRTIO_MMIO=y
++CONFIG_COMMON_CLK_S2MPS11=y
+ CONFIG_COMMON_CLK_QCOM=y
+ CONFIG_MSM_GCC_8916=y
+ CONFIG_HWSPINLOCK_QCOM=y
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 818 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151105/f7f380d9/attachment.sig>
+1.7.10.4
