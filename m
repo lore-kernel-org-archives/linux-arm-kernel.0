@@ -1,65 +1,83 @@
-From: mpe@ellerman.id.au (Michael Ellerman)
-Date: Fri, 06 Nov 2015 21:04:00 +1100
-Subject: [RFC PATCH 0/3]perf/core: extend perf_reg and
- perf_sample_regs_intr
-In-Reply-To: <20151106092430.GO3604@twins.programming.kicks-ass.net>
-References: <1446669978-6366-1-git-send-email-maddy@linux.vnet.ibm.com>
- <20151105130716.GC3604@twins.programming.kicks-ass.net>
- <563C5655.3000605@linux.vnet.ibm.com>
- <20151106092430.GO3604@twins.programming.kicks-ass.net>
-Message-ID: <1446804240.21859.4.camel@ellerman.id.au>
+From: wharms@bfs.de (walter harms)
+Date: Fri, 06 Nov 2015 11:09:29 +0100
+Subject: [PATCH 2/2] [media] c8sectpfe: Combine three checks into a single
+ if block
+In-Reply-To: <563BA50C.4060303@users.sourceforge.net>
+References: <5307CAA2.8060406@users.sourceforge.net>
+ <alpine.DEB.2.02.1402212321410.2043@localhost6.localdomain6>
+ <530A086E.8010901@users.sourceforge.net>
+ <alpine.DEB.2.02.1402231635510.1985@localhost6.localdomain6>
+ <530A72AA.3000601@users.sourceforge.net>
+ <alpine.DEB.2.02.1402240658210.2090@localhost6.localdomain6>
+ <530B5FB6.6010207@users.sourceforge.net>
+ <alpine.DEB.2.10.1402241710370.2074@hadrien>
+ <530C5E18.1020800@users.sourceforge.net>
+ <alpine.DEB.2.10.1402251014170.2080@hadrien>
+ <530CD2C4.4050903@users.sourceforge.net>
+ <alpine.DEB.2.10.1402251840450.7035@hadrien>
+ <530CF8FF.8080600@users.sourceforge.net>
+ <alpine.DEB.2.02.1402252117150.2047@localhost6.localdomain6>
+ <530DD06F.4090703@users.sourceforge.net>
+ <alpine.DEB.2.02.1402262129250.2221@localhost6.localdomain6>
+ <5317A59D.4@users.sourceforge.net> <563BA3CC.4040709@users.sourceforge.net>
+ <563BA50C.4060303@users.sourceforge.net>
+Message-ID: <563C7C59.8020907@bfs.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2015-11-06 at 10:24 +0100, Peter Zijlstra wrote:
-> On Fri, Nov 06, 2015 at 12:57:17PM +0530, Madhavan Srinivasan wrote:
-> > On Thursday 05 November 2015 06:37 PM, Peter Zijlstra wrote:
-> > > On Thu, Nov 05, 2015 at 02:16:15AM +0530, Madhavan Srinivasan wrote:
-> > > > Second patch updates struct arch_misc_reg for arch/powerpc with pmu registers
-> > > > and adds offsetof macro for the same. It extends perf_reg_value()
-> > > > to use reg idx to decide on struct to return value from.
-> > > Why; what's in those regs?
-> > 
-> > Was out and did not have access to mail, so missed to respond in time.
-> > 
-> > In current implementation of patch 2, have added 
-> > few pmu control/status and counter registers,
-> > which give additional information about the PMU context
-> > for the sample.
+
+
+Am 05.11.2015 19:50, schrieb SF Markus Elfring:
+> From: Markus Elfring <elfring@users.sourceforge.net>
+> Date: Thu, 5 Nov 2015 19:23:50 +0100
 > 
-> Yes, I saw that, you still haven't answered the question though. What is
-> in those regs? Why is exposing that information like this the best
-> option.
+> The variable "tsin" was checked three times in a loop iteration of the
+> c8sectpfe_tuner_unregister_frontend() function.
+> This implementation detail could be improved by the combination of the
+> involved statements into a single if block so that this variable will be
+> checked only once there.
+> 
+> Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
+> ---
+>  drivers/media/platform/sti/c8sectpfe/c8sectpfe-common.c | 17 +++++++++--------
+>  1 file changed, 9 insertions(+), 8 deletions(-)
+> 
+> diff --git a/drivers/media/platform/sti/c8sectpfe/c8sectpfe-common.c b/drivers/media/platform/sti/c8sectpfe/c8sectpfe-common.c
+> index 07fd6d9..2dfbe8a 100644
+> --- a/drivers/media/platform/sti/c8sectpfe/c8sectpfe-common.c
+> +++ b/drivers/media/platform/sti/c8sectpfe/c8sectpfe-common.c
+> @@ -209,17 +209,18 @@ void c8sectpfe_tuner_unregister_frontend(struct c8sectpfe *c8sectpfe,
+>  
+>  		tsin = fei->channel_data[n];
 
-It's a perrenial request from our hardware PMU folks to be able to see the raw
-values of the PMU registers.
 
-I think partly it's so that they can verify that perf is doing what they want,
-and some of it is that they're interested in some of the more obscure info that
-isn't plumbed out through other perf interfaces.
+if you do "if (!tsin) continue ;"
+you can save one indent level
 
-We've used various internal hacks over the years to keep them happy. This is an
-attempt to use a somewhat standard mechanism.
+re,
+ wh
 
-It would also be helpful for those of us working on the perf hardware backends,
-to be able to verify that we're programming things correctly, without resorting
-to debug printks etc.
-
-Basically we want to sample regs at the time of the perf interrupt, so we
-though PERF_SAMPLE_REGS_INTR made senes :)
-
-But if you think this is the wrong mechanism within perf, then please let us
-know.
-
-I know perf's mission is to abstract as much of the arcane hardware details
-into a generic interface and make PMUs actually useful for normal folks, and we
-are committed to that, but it would also be useful to be able to get the raw
-values for a different type of user.
-
-Maddy's patch only exports PMC1-6 and MMCR0/1. I think we also need to export
-some others, in particular MMCRA has a lot of stuff in it, half of which is not
-even architected. So that would have to be exported as "POWER8_MMCRA". And then
-there's the SIAR/SDAR/SIER which contain a bunch of info on sampled
-instructions that is not currently plumbed out.
-
-cheers
+>  
+> -		if (tsin && tsin->frontend) {
+> -			dvb_unregister_frontend(tsin->frontend);
+> -			dvb_frontend_detach(tsin->frontend);
+> -		}
+> +		if (tsin) {
+> +			if (tsin->frontend) {
+> +				dvb_unregister_frontend(tsin->frontend);
+> +				dvb_frontend_detach(tsin->frontend);
+> +			}
+>  
+> -		if (tsin)
+>  			i2c_put_adapter(tsin->i2c_adapter);
+>  
+> -		if (tsin && tsin->i2c_client) {
+> -			module_put(tsin->i2c_client->dev.driver->owner);
+> -			i2c_unregister_device(tsin->i2c_client);
+> +			if (tsin->i2c_client) {
+> +				module_put(tsin->i2c_client->dev.driver->owner);
+> +				i2c_unregister_device(tsin->i2c_client);
+> +			}
+>  		}
+>  	}
+>  
