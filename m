@@ -1,48 +1,32 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 6 Nov 2015 11:59:16 +0000
-Subject: [PATCH v11 5/5] xen/arm: account for stolen ticks
-In-Reply-To: <563C91FD.7060703@citrix.com>
-References: <alpine.DEB.2.02.1511051502270.13541@kaball.uk.xensource.com>
- <1446737696-9749-5-git-send-email-stefano.stabellini@eu.citrix.com>
- <20151105165743.GG32247@leverpostej>
- <alpine.DEB.2.02.1511061126500.13541@kaball.uk.xensource.com>
- <563C91FD.7060703@citrix.com>
-Message-ID: <20151106115916.GA23038@leverpostej>
+From: broonie@kernel.org (Mark Brown)
+Date: Fri, 6 Nov 2015 12:00:20 +0000
+Subject: [PATCH v3 1/3] ASoC: rockchip: i2s: add 8 channels capture support
+In-Reply-To: <1446773891-32174-2-git-send-email-sugar.zhang@rock-chips.com>
+References: <1446773891-32174-1-git-send-email-sugar.zhang@rock-chips.com>
+ <1446773891-32174-2-git-send-email-sugar.zhang@rock-chips.com>
+Message-ID: <20151106120020.GH18409@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 06, 2015 at 11:41:49AM +0000, David Vrabel wrote:
-> On 06/11/15 11:39, Stefano Stabellini wrote:
-> > On Thu, 5 Nov 2015, Mark Rutland wrote:
-> >>>  static void xen_percpu_init(void)
-> >>>  {
-> >>>  	struct vcpu_register_vcpu_info info;
-> >>> @@ -104,6 +120,8 @@ static void xen_percpu_init(void)
-> >>>  	BUG_ON(err);
-> >>>  	per_cpu(xen_vcpu, cpu) = vcpup;
-> >>>  
-> >>> +	xen_setup_runstate_info(cpu);
-> >>
-> >> Does the runstate memory area get unregsitered when a kernel tears
-> >> things down, or is kexec somehow inhibited for xen guests?
-> >>
-> >> i couldn't spot either happening, but I may have missed it.
-> > 
-> > I don't think that the runstate memory area needs to be unregistered for
-> > kexec, but I am not very knowledgeble on kexec and Xen, CC'ing Vitaly
-> > and David.
-> 
-> There's a whole pile of other state needing to be reset for kexec (event
-> channels and grant tables for example).  The guest needs to soft reset
-> itself (available in Xen 4.6) before kexec'ing another kernel.
-> 
-> This soft reset would also including cleaning up this shared memory region.
+On Fri, Nov 06, 2015 at 09:38:09AM +0800, Sugar Zhang wrote:
 
-Ok. So we don't currently have the code kernel-side, but it looks like
-it would be relatively simple to add (having just spotted [1]), and
-everything should be ready on the Xen side.`
+> +	/* refine capture channels */
+> +	if (!of_property_read_u32(node, "rockchip,capture-channels", &val)) {
+> +		if (val >= 2 && val <= 8)
+> +			rockchip_i2s_dai.capture.channels_max = val;
+> +		else
+> +			rockchip_i2s_dai.capture.channels_max = 2;
+> +	}
 
-Thanks,
-Mark.
-
-[1] https://lkml.org/lkml/2015/9/25/152
+You should make a copy of the rockchip_i2s_dai struct in your driver
+data and modify that rather than modifying the original - what happens
+if sommeone makes a SoC with two I2S DAIs, one with many channels and
+another with only two?  Samsung SoCs often have an arrangement like that
+for exmaple.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151106/abfa0950/attachment-0001.sig>
