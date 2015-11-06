@@ -1,130 +1,124 @@
 From: geoff@infradead.org (Geoff Levand)
-Date: Fri, 06 Nov 2015 19:14:37 +0000
-Subject: [PATCH 10/15] arm64: kdump: reserve memory for crash dump kernel
-In-Reply-To: <cover.1446836442.git.geoff@infradead.org>
-References: <cover.1446836442.git.geoff@infradead.org>
-Message-ID: <32e01ddb7a1d98e7619b3ecd87e7f747206ae68e.1446836443.git.geoff@infradead.org>
+Date: Fri, 06 Nov 2015 19:14:36 +0000
+Subject: [PATCH 00/15] arm64 kexec kernel patches v11
+Message-ID: <cover.1446836442.git.geoff@infradead.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: AKASHI Takahiro <takahiro.akashi@linaro.org>
+Hi All,
 
-On primary kernel, the memory region used by crash dump kernel must be
-specified by "crashkernel=" boot parameter. reserve_crashkernel()
-will allocate and reserve the region for later use.
+This series adds the core support for kexec re-boot and kdump on ARM64.  This
+version of the series combines Takahiro's kdump patches with my kexec patches.
 
-User space tools will be able to find the region marked as "Crash kernel"
-in /proc/iomem.
+To load a second stage kernel and execute a kexec re-boot or to work with kdump
+on ARM64 systems a series of patches to kexec-tools [2], which have not yet been
+merged upstream, are needed.
 
-Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
----
- arch/arm64/kernel/setup.c |  7 +++++-
- arch/arm64/mm/init.c      | 54 +++++++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 60 insertions(+), 1 deletion(-)
+I have tested kexec with the ARM Foundation model, and Takahiro has reported
+that kdump is working on the 96boards HiKey developer board.  Kexec on EFI
+systems works correctly.  More ACPI + kexec testing is needed.
 
-diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
-index 2322479..9d085ac 100644
---- a/arch/arm64/kernel/setup.c
-+++ b/arch/arm64/kernel/setup.c
-@@ -32,7 +32,6 @@
- #include <linux/screen_info.h>
- #include <linux/init.h>
- #include <linux/kexec.h>
--#include <linux/crash_dump.h>
- #include <linux/root_dev.h>
- #include <linux/cpu.h>
- #include <linux/interrupt.h>
-@@ -337,6 +336,12 @@ static void __init request_standard_resources(void)
- 		    kernel_data.end <= res->end)
- 			request_resource(res, &kernel_data);
- 	}
-+
-+#ifdef CONFIG_KEXEC
-+	/* User space tools will find "Crash kernel" region in /proc/iomem. */
-+	if (crashk_res.end)
-+		insert_resource(&iomem_resource, &crashk_res);
-+#endif
- }
- 
- #ifdef CONFIG_BLK_DEV_INITRD
-diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-index f5c0680..f33f201 100644
---- a/arch/arm64/mm/init.c
-+++ b/arch/arm64/mm/init.c
-@@ -34,6 +34,7 @@
- #include <linux/dma-contiguous.h>
- #include <linux/efi.h>
- #include <linux/swiotlb.h>
-+#include <linux/kexec.h>
- 
- #include <asm/fixmap.h>
- #include <asm/memory.h>
-@@ -66,6 +67,55 @@ static int __init early_initrd(char *p)
- early_param("initrd", early_initrd);
- #endif
- 
-+#ifdef CONFIG_KEXEC
-+/*
-+ * reserve_crashkernel() - reserves memory for crash kernel
-+ *
-+ * This function reserves memory area given in "crashkernel=" kernel command
-+ * line parameter. The memory reserved is used by dump capture kernel when
-+ * primary kernel is crashing.
-+ */
-+static void __init reserve_crashkernel(void)
-+{
-+	unsigned long long crash_size = 0, crash_base = 0;
-+	int ret;
-+
-+	ret = parse_crashkernel(boot_command_line, memblock_phys_mem_size(),
-+				&crash_size, &crash_base);
-+	if (ret)
-+		return;
-+
-+	if (crash_base == 0) {
-+		crash_base = memblock_alloc(crash_size, 1 << 21);
-+		if (crash_base == 0) {
-+			pr_warn("Unable to allocate crashkernel (size:%llx)\n",
-+				crash_size);
-+			return;
-+		}
-+	} else {
-+		/* User specifies base address explicitly. */
-+		if (!memblock_is_region_memory(crash_base, crash_size) ||
-+			memblock_is_region_reserved(crash_base, crash_size)) {
-+			pr_warn("crashkernel has wrong address or size\n");
-+			return;
-+		}
-+
-+		if (crash_base & ((1 << 21) - 1)) {
-+			pr_warn("crashkernel base address is not 2MB aligned\n");
-+			return;
-+		}
-+
-+		memblock_reserve(crash_base, crash_size);
-+	}
-+
-+	pr_info("Reserving %lldMB of memory@%lldMB for crashkernel\n",
-+		crash_size >> 20, crash_base >> 20);
-+
-+	crashk_res.start = crash_base;
-+	crashk_res.end = crash_base + crash_size - 1;
-+}
-+#endif /* CONFIG_KEXEC */
-+
- /*
-  * Return the maximum physical address for ZONE_DMA (DMA_BIT_MASK(32)). It
-  * currently assumes that for memory starting above 4G, 32-bit devices will
-@@ -170,6 +220,10 @@ void __init arm64_memblock_init(void)
- 		memblock_reserve(__virt_to_phys(initrd_start), initrd_end - initrd_start);
- #endif
- 
-+#ifdef CONFIG_KEXEC
-+	reserve_crashkernel();
-+#endif
-+
- 	early_init_fdt_scan_reserved_mem();
- 
- 	/* 4GB maximum for 32-bit only capable devices */
+Patch 1 here moves the macros from proc-macros.S to asm/assembler.h so that the
+dcache_line_size macro it defines can be uesd by kexec's relocate kernel
+routine.
+
+Patches 2 & 3 rework the ARM64 hcall mechanism to give the CPU reset routines
+the ability to switch exception levels from EL1 to EL2 for kernels that were
+entered in EL2.
+
+Patch 4 allows KVM to handle a CPU reset.
+
+Patches 5 & 6 add back the ARM64 CPU reset support that was recently removed
+from the kernel.
+
+Patches 7 - 9 add kexec support.
+
+Patches 10-15 add kdump support.
+
+Please consider all patches for inclusion.
+
+Changes since v10:
+
+o Move the flush of the new image from arm64_relocate_new_kernel to machine_kexec.
+o Pass values to arm64_relocate_new_kernel in registers, not in global variables.
+o Fixups to setting the sctlr_el1 and sctlr_el2 flags.
+
+[1]  https://git.kernel.org/cgit/linux/kernel/git/geoff/linux-kexec.git
+[2]  https://git.kernel.org/cgit/linux/kernel/git/geoff/kexec-tools.git
+
+-Geoff
+
+The following changes since commit 6a13feb9c82803e2b815eca72fa7a9f5561d7861:
+
+  Linux 4.3 (2015-11-01 16:05:25 -0800)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/geoff/linux-kexec.git kexec-v11
+
+for you to fetch changes up to 2b09b58c7586a4ca929400327d394fec3135fdd0:
+
+  arm64: kdump: relax BUG_ON() if more than one cpus are still active (2015-11-06 10:38:13 -0800)
+
+----------------------------------------------------------------
+AKASHI Takahiro (7):
+      arm64: kvm: allows kvm cpu hotplug
+      arm64: kdump: reserve memory for crash dump kernel
+      arm64: kdump: implement machine_crash_shutdown()
+      arm64: kdump: add kdump support
+      arm64: kdump: update a kernel doc
+      arm64: kdump: enable kdump in the arm64 defconfig
+      arm64: kdump: relax BUG_ON() if more than one cpus are still active
+
+Geoff Levand (8):
+      arm64: Fold proc-macros.S into assembler.h
+      arm64: Convert hcalls to use HVC immediate value
+      arm64: Add new hcall HVC_CALL_FUNC
+      arm64: Add back cpu_reset routines
+      Revert "arm64: remove dead code"
+      arm64/kexec: Add core kexec support
+      arm64/kexec: Add pr_devel output
+      arm64/kexec: Enable kexec in the arm64 defconfig
+
+ Documentation/kdump/kdump.txt       |  32 ++++-
+ arch/arm/include/asm/kvm_host.h     |  10 +-
+ arch/arm/include/asm/kvm_mmu.h      |   1 +
+ arch/arm/kvm/arm.c                  |  79 ++++++------
+ arch/arm/kvm/mmu.c                  |   5 +
+ arch/arm64/Kconfig                  |  22 ++++
+ arch/arm64/configs/defconfig        |   2 +
+ arch/arm64/include/asm/assembler.h  |  48 ++++++-
+ arch/arm64/include/asm/kexec.h      |  80 ++++++++++++
+ arch/arm64/include/asm/kvm_host.h   |  16 ++-
+ arch/arm64/include/asm/kvm_mmu.h    |   1 +
+ arch/arm64/include/asm/mmu.h        |   1 +
+ arch/arm64/include/asm/virt.h       |  49 +++++++
+ arch/arm64/kernel/Makefile          |   3 +
+ arch/arm64/kernel/cpu-reset.S       |  84 ++++++++++++
+ arch/arm64/kernel/cpu-reset.h       |  22 ++++
+ arch/arm64/kernel/crash_dump.c      |  71 +++++++++++
+ arch/arm64/kernel/head.S            |   1 -
+ arch/arm64/kernel/hyp-stub.S        |  43 +++++--
+ arch/arm64/kernel/machine_kexec.c   | 248 ++++++++++++++++++++++++++++++++++++
+ arch/arm64/kernel/relocate_kernel.S | 131 +++++++++++++++++++
+ arch/arm64/kernel/setup.c           |   7 +-
+ arch/arm64/kernel/smp.c             |  16 ++-
+ arch/arm64/kvm/hyp-init.S           |  34 ++++-
+ arch/arm64/kvm/hyp.S                |  44 +++++--
+ arch/arm64/mm/cache.S               |   2 -
+ arch/arm64/mm/init.c                |  83 ++++++++++++
+ arch/arm64/mm/mmu.c                 |  11 ++
+ arch/arm64/mm/proc-macros.S         |  64 ----------
+ arch/arm64/mm/proc.S                |   3 -
+ include/uapi/linux/kexec.h          |   1 +
+ 31 files changed, 1074 insertions(+), 140 deletions(-)
+ create mode 100644 arch/arm64/include/asm/kexec.h
+ create mode 100644 arch/arm64/kernel/cpu-reset.S
+ create mode 100644 arch/arm64/kernel/cpu-reset.h
+ create mode 100644 arch/arm64/kernel/crash_dump.c
+ create mode 100644 arch/arm64/kernel/machine_kexec.c
+ create mode 100644 arch/arm64/kernel/relocate_kernel.S
+ delete mode 100644 arch/arm64/mm/proc-macros.S
+
 -- 
 2.5.0
