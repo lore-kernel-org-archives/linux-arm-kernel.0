@@ -1,24 +1,56 @@
-From: timur@codeaurora.org (Timur Tabi)
-Date: Thu, 5 Nov 2015 18:27:13 -0600
-Subject: [PATCH 05/11] tty: amba-pl011: add register lookup table
-In-Reply-To: <20151106002410.GR8644@n2100.arm.linux.org.uk>
-References: <20151103134349.GV8644@n2100.arm.linux.org.uk>
- <E1Ztcve-0007CO-UO@rmk-PC.arm.linux.org.uk> <563BED88.3040101@codeaurora.org>
- <20151106002410.GR8644@n2100.arm.linux.org.uk>
-Message-ID: <563BF3E1.8000204@codeaurora.org>
+From: alim.akhtar@gmail.com (Alim Akhtar)
+Date: Fri, 6 Nov 2015 05:58:20 +0530
+Subject: [PATCH v2 1/2] arm64: dts: exynos7: Add pmic s2mps15 device tree
+ node
+In-Reply-To: <563BEC5C.9040707@samsung.com>
+References: <1446724341-3568-1-git-send-email-alim.akhtar@samsung.com>
+ <563BEC5C.9040707@samsung.com>
+Message-ID: <CAGOxZ53sL2D7cgo7QsxybXUo3daL7eVePEEurmHheGiXDr+1Fg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/05/2015 06:24 PM, Russell King - ARM Linux wrote:
-> I know, and I said as much on the 3rd November in my reply to you that
-> this change should be undone, and again earlier today in reply to Linus.
+On Fri, Nov 6, 2015 at 5:25 AM, Krzysztof Kozlowski
+<k.kozlowski@samsung.com> wrote:
+> On 05.11.2015 20:52, Alim Akhtar wrote:
+>> This patch add pmic (s2mps15) node of espresso board,
+>> which includes addition of regulators and pmic-clk sub-nodes.
+>
+> My comment for fixing capital letters was ignored. Do you disagree with it?
+>
+Ah! sorry about that, I missed that completely, will re-send.
+Thanks!
 
-Sorry, with so much pl011 stuff flying around, I can't keep track of 
-much anymore.
+>>
+>> This patch also adds {vmmc,vqmmc}-supply properties for mmc2 node.
+>>
+>> Signed-off-by: Abhilash Kesavan <a.kesavan@samsung.com>
+>> Signed-off-by: Alim Akhtar <alim.akhtar@samsung.com>
+>> Reviewed-by: Javier Martinez Canillas <javier@osg.samsung.com>
+>> ---
+>> Changes since v1:
+>> * Addressed Javier and Krzysztof review comments.
+>> * Removed unused ldo/buck nodes.
+>> * Removed always-on properties from ldo/buck to disable them
+>> * Added a consumer of pmic supply (like mmc)
+>>
+>>  arch/arm64/boot/dts/exynos/exynos7-espresso.dts |  280 +++++++++++++++++++++++
+>>  1 file changed, 280 insertions(+)
+>>
+>
+> Rest looks good, so with the fix above:
+>
+> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+>
+> Best regards,
+> Krzysztof
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-samsung-soc" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 
-Anyway, I do have a fix, but it's kinda ugly.  I'll post it soon.
+
 
 -- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the
-Code Aurora Forum, a Linux Foundation Collaborative Project.
+Regards,
+Alim
