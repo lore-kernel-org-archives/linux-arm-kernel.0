@@ -1,46 +1,56 @@
-From: neilb@suse.com (Neil Brown)
-Date: Fri, 06 Nov 2015 14:19:11 +1100
-Subject: [PATCH] raid5-cache: add crc32c Kconfig dependency
-In-Reply-To: <4308930.z8rrqMJU90@wuerfel>
-References: <4308930.z8rrqMJU90@wuerfel>
-Message-ID: <87si4jak7k.fsf@notabene.neil.brown.name>
+From: viresh.kumar@linaro.org (Viresh Kumar)
+Date: Fri, 6 Nov 2015 08:50:46 +0530
+Subject: [PATCH v3 0/2] thermal: mediatek: Add cpu power cooling model
+In-Reply-To: <1446721761.4016.56.camel@mtksdaap41>
+References: <1445515359-8587-1-git-send-email-dawei.chien@mediatek.com>
+ <20151028154449.GH3716@ubuntu>
+ <1446461181.10039.28.camel@mtksdaap41>
+ <20151102121034.GA3639@ubuntu>
+ <1446721761.4016.56.camel@mtksdaap41>
+Message-ID: <20151106032046.GK3773@ubuntu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 04 2015, Arnd Bergmann wrote:
+On 05-11-15, 19:09, dawei chien wrote:
+> Thank you for your kindly explaining, now I could understand what I
+> miss, I will send device tree binding on next version such like
+> following description.
+> 
+> --- a/Documentation/devicetree/bindings/clock/mt8173-cpu-dvfs.txt
+> +++ b/Documentation/devicetree/bindings/clock/mt8173-cpu-dvfs.txt
+> @@ -10,6 +10,17 @@ Required properties:
+>         Please refer to
+> Documentation/devicetree/bindings/clk/clock-bindings.txt for
+>         generic clock consumer properties.
+>  - proc-supply: Regulator for Vproc of CPU cluster.
+> +- dynamic-power-coefficient:
+> +       Usage: optional
+> +       Value type: <prop-encoded-array>
+> +       Definition: A u32 value that represents an indicative
+> +       running time dynamic power coefficient in
+> +       fundamental units of mW/MHz/uVolt^2.
+> +       The dynamic energy consumption of the CPU
+> +       is proportional to the square of the
+> +       Voltage (V) and the clock frequency (f).
+> +       Pdyn = dynamic-power-coefficient * V^2 * f
+> +       where voltage is in uV, frequency is in MHz.
 
-> The recent change of the raid5-cache code to use crc32c instead
-> of crc32 causes link errors when CONFIG_LIBCRC32C is disabled:
->
-> drivers/built-in.o: In function crc32c'
-> core.c:(.text+0x1c6060): undefined reference to `crc32c'
->
-> This adds an explicit 'select' statement like all other users
-> of this function do.
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Fixes: 5cb2fbd6ea0d ("raid5-cache: use crc32c checksum")
->
-> diff --git a/drivers/md/Kconfig b/drivers/md/Kconfig
-> index 3e01e6fb3424..7913fdcfc849 100644
-> --- a/drivers/md/Kconfig
-> +++ b/drivers/md/Kconfig
-> @@ -123,6 +123,7 @@ config MD_RAID456
->  	tristate "RAID-4/RAID-5/RAID-6 mode"
->  	depends on BLK_DEV_MD
->  	select RAID6_PQ
-> +	select LIBCRC32C
->  	select ASYNC_MEMCPY
->  	select ASYNC_XOR
->  	select ASYNC_PQ
+Please check with Punit if he is planning to add the same..
 
-Applied, thanks,
+> Thank you for your kindly explaining, Now I know I should develop and
+> test on mainline branch since this is where I try to add code.
+> 
+> However, please understanding currently mt8173_cpufreq.c is not ready
+> for OPPV2 in mainline as far, that's the reason why currently I can't
+> reuse OPPV2 and extend for static power table. My propose is for adding
+> CPU cooling device for our own product.
 
-NeilBrown
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 818 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151106/87dc5111/attachment.sig>
+Firstly, we don't care. You are pushing something to mainline, you
+have to get it tested someway on mainline.
+
+Secondly, there are *almost* no changes required to the mtk cpufreq
+driver for OPPV2. Just update your DT in a similar way it is done for
+one of the exynos platforms and it should just work fine.
+
+-- 
+viresh
