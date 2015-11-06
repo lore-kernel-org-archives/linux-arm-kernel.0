@@ -1,64 +1,101 @@
-From: sstabellini@kernel.org (Stefano Stabellini)
-Date: Fri, 6 Nov 2015 15:09:53 +0000 (GMT)
-Subject: [PATCH 1/3] xen/arm: introduce xen_read_wallclock
-In-Reply-To: <23850350.L7uJax1OoN@wuerfel>
-References: <alpine.DEB.2.02.1511051706560.13541@kaball.uk.xensource.com>
- <1446743385-12848-1-git-send-email-stefano.stabellini@eu.citrix.com>
- <23850350.L7uJax1OoN@wuerfel>
-Message-ID: <alpine.DEB.2.02.1511061502280.23825@kaball.uk.xensource.com>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Fri, 6 Nov 2015 16:18:16 +0100
+Subject: [PATCH 08/10] pwm: core: add pulse feature to the PWM framework
+In-Reply-To: <1445895161-2317-9-git-send-email-o.schinagl@ultimaker.com>
+References: <1445895161-2317-1-git-send-email-o.schinagl@ultimaker.com>
+ <1445895161-2317-9-git-send-email-o.schinagl@ultimaker.com>
+Message-ID: <20151106151816.GD8418@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 5 Nov 2015, Arnd Bergmann wrote:
-> On Thursday 05 November 2015 17:09:43 Stefano Stabellini wrote:
-> > Read the wallclock from the shared info page at boot time.
-> > 
-> > Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+On Mon, Oct 26, 2015 at 10:32:39PM +0100, Olliver Schinagl wrote:
+> From: Olliver Schinagl <oliver@schinagl.nl>
 > 
-> Please use the appropriate timespec64 based functions here,
-> we are in the process of converting all callers of struct timespec.
-
-OK, I can do that
-
-
-> > ---
-> > +static void xen_read_wallclock(struct timespec *ts)
-> > +{
-> > +	u32 version;
-> > +	u64 delta;
-> > +	struct timespec now;
-> > +	struct shared_info *s = HYPERVISOR_shared_info;
-> > +	struct pvclock_wall_clock *wall_clock = &(s->wc);
+> Some hardware PWM's have the possibility to only send out one (or more)
+> pulses. This can be quite a useful feature in case one wants or needs
+> only a single pulse, but at the exact width.
 > 
-> pvclock_wall_clock has a 'u32 sec', so that suffers from
-> a potential overflow. We should try to avoid introducing that
-> on ARM, and instead have a 64-bit seconds based version,
-> or alternatively a 64-bit nanoseconds version (with no
-> extra seconds) that is also sufficient.
+> Additionally, if multiple pulses are possible, outputting a fixed amount
+> of pulses can be useful for various timing specific purposes.
 
-Unfortunately this a preexisting ABI which is common with other existing
-architectures (see arch/x86/kernel/pvclock.c:pvclock_read_wallclock). I
-cannot just change it.
+I see how theoretically this would be nice to have. But I'm reluctant to
+merge this feature if there aren't any users. What drivers in the kernel
+would want to use this feature? Are there new drivers being worked on
+that will need this?
 
-
-> >  	struct vcpu_register_vcpu_info info;
-> > @@ -218,6 +246,7 @@ static int __init xen_guest_init(void)
-> >  	struct shared_info *shared_info_page = NULL;
-> >  	struct resource res;
-> >  	phys_addr_t grant_frames;
-> > +	struct timespec ts;
-> >  
-> >  	if (!xen_domain())
-> >  		return 0;
-> > @@ -291,6 +320,8 @@ static int __init xen_guest_init(void)
-> >  
-> >  	pv_time_ops.steal_clock = xen_stolen_accounting;
-> >  	static_key_slow_inc(&paravirt_steal_enabled);
-> > +	xen_read_wallclock(&ts);
-> > +	do_settimeofday(&ts);
-> >  
+> A few new functions have been expanded or added for this new behavior.
 > 
-> Once you can get a 64-bit time, call do_settimeofday64()
-> here.
+> * pwm_config()	now takes an additional parameter to setup the number of
+> 		pulses to output. The driver may force this to 0 or 1
+> 		for if example if this feature is not or only partially
+> 		supported
 
-OK
+This is problematic because you need to atomically update all drivers
+and users (the kbuild robot already told you that you didn't do this).
+To make things easier I suggest you wait with this change until the
+atomic PWM patches have been merged, at which point it should become a
+lot easier to deal with this kind of extension.
+
+> * pwm_[sg]et_pulse_count()	get or set the number of pulses the pwm
+> 				framework is configured for
+> * pwm_get_pulse_count_max()	get the maximum number of pulses the pwm
+> 				driver supports
+> * pwm_pulse()		Tell the PWM to emit a pre-configured number of pulses
+
+Isn't this essentially the same as pwm_enable()? I'd think that if the
+PWM is configured to output pulses, then pwm_enable() would simply do
+what it's been configured to do (emit the pulses). Why the need for an
+additional function?
+
+> * pwm_pulse_done()	an internal function for drivers to call when
+> 			they have completed their pre-configured number
+> 			of pulses
+> * pwm_is_pulsing()	tells the callers if the pwm is busy pulsing,
+> 			yielding a little more information than just
+> 			pwm_is_enabled()
+
+Similarily, I'd think that once the PWM is done executing the series of
+pulses that it was configured for it would be automatically disabled. A
+consumer could then simply use pwm_is_enabled() and drivers could call
+pwm_disable() on their PWM to mark them as disabled when they're done
+pulsing.
+
+> Signed-off-by: Olliver Schinagl <oliver@schinagl.nl>
+> ---
+>  drivers/pwm/core.c      | 30 +++++++++++++++++++----
+>  drivers/pwm/pwm-gpio.c  |  3 ++-
+>  drivers/pwm/pwm-sun4i.c |  3 ++-
+>  drivers/pwm/sysfs.c     | 58 ++++++++++++++++++++++++++++++++++++++++++--
+>  include/linux/pwm.h     | 64 ++++++++++++++++++++++++++++++++++++++++++++++---
+>  5 files changed, 147 insertions(+), 11 deletions(-)
+> 
+> diff --git a/drivers/pwm/core.c b/drivers/pwm/core.c
+> index 3f9df3e..e2c1c0a 100644
+> --- a/drivers/pwm/core.c
+> +++ b/drivers/pwm/core.c
+> @@ -432,22 +432,29 @@ EXPORT_SYMBOL_GPL(pwm_free);
+>   * @pwm: PWM device
+>   * @duty_ns: "on" time (in nanoseconds)
+>   * @period_ns: duration (in nanoseconds) of one cycle
+> + * @pulse_count: number of pulses (periods) to output on pwm_pulse
+>   *
+>   * Returns: 0 on success or a negative error code on failure.
+>   */
+> -int pwm_config(struct pwm_device *pwm, int duty_ns, int period_ns)
+> +int pwm_config(struct pwm_device *pwm, int duty_ns, int period_ns,
+> +	       unsigned int pulse_count)
+
+Like I said, this is problematic because every driver and every consumer
+now needs to be aware of pulsing. Once the PWM atomic patches are merged
+this will become easier to do because the pulse configuration would be a
+part of the atomic state, and hence can be conveniently ignored by users
+and driver alike.
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151106/c6aac13f/attachment-0001.sig>
