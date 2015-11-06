@@ -1,73 +1,88 @@
-From: kapilh@broadcom.com (Kapil Hali)
-Date: Fri, 6 Nov 2015 17:45:19 +0530
-Subject: [PATCH RESEND 3/4] ARM: BCM: Add SMP support for Broadcom NSP
-In-Reply-To: <CACRpkda8Fg+Z0h1+3dv=xAAKJnnXvPR=i5eyjLeLxFn467cvzA@mail.gmail.com>
-References: <1446702681-45339-1-git-send-email-kapilh@broadcom.com>
- <1446702681-45339-4-git-send-email-kapilh@broadcom.com>
- <CACRpkda8Fg+Z0h1+3dv=xAAKJnnXvPR=i5eyjLeLxFn467cvzA@mail.gmail.com>
-Message-ID: <563C99D7.6050102@broadcom.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Fri, 6 Nov 2015 12:17:41 +0000
+Subject: [RESEND PATCH 0/1] Fix the "hard LOCKUP" when running a heavy
+ loading
+In-Reply-To: <CAD=FV=XYBeKSo7NeTt3P0nSPA_A3yQ0qHDwxsJSzsTgA5VPkoA@mail.gmail.com>
+References: <1446538209-13490-1-git-send-email-wxt@rock-chips.com>
+ <20151103113030.GB14159@arm.com>
+ <CAD=FV=XYBeKSo7NeTt3P0nSPA_A3yQ0qHDwxsJSzsTgA5VPkoA@mail.gmail.com>
+Message-ID: <20151106121741.GH6087@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, Nov 03, 2015 at 11:00:20AM -0800, Doug Anderson wrote:
+> Hi,
 
+Hey Doug,
 
-On 11/5/2015 3:14 PM, Linus Walleij wrote:
-> On Thu, Nov 5, 2015 at 6:51 AM, Kapil Hali <kapilh@broadcom.com> wrote:
+> When CPUs are hard locked up, they are often found at:
 > 
->> Add SMP support for Broadcom's Northstar Plus SoC,
->> cpu enable method and pen_release procedures. This
->> changes also consolidates iProc family's - BCM NSP
->> and BCM Kona, SMP handling in a common file.
->>
->> Northstar Plus SoC is based on ARM Cortex-A9
->> revision r3p0 which requires configuration for ARM
->> Errata 764369 for SMP. This change adds the needed
->> configuration option.
->>
->> Signed-off-by: Kapil Hali <kapilh@broadcom.com>
-> (...)
->> +/*
->> + * iProc specific entry point for secondary CPUs.  This provides
->> + * a "holding pen" into which all secondary cores are held until
->> + * we are ready for them to initialise.
->> + */
+> <c0117c8c> v7_coherent_kern_range+0x58/0x74
+>   or
+> <c0118278> v7wbi_flush_user_tlb_range+0x30/0x38
 > 
-> Do you *REALLY* need the complex pen hold/release semaphore
-> stuff?
+> That made me think that an errata might be the root cause of our hard
+> lockups, since ARM errata often trigger in cache/tlb functions.  I
+> think Caesar dug up this old errata fix in response to my suggestion.
+
+I still don't see how 818325 is related, since there aren't any conditional
+stores in the sequences below.
+
+> If you know of any ARM errata that might trigger hard lockups like
+> this, I'd certainly be all ears.  It's also possible that we've got
+> something running at too low of a voltage or we've got clock dividers
+> or cache timings programmed incorrectly somewhere.  To give a more
+> full disassembly of one of the crashes:
 > 
-> Consult for example commit
-> c00def71efd919e8ae835a25f4f4c80a4b2d36d3
-> "ARM: ux500: simplify secondary CPU boot"
+>   <4>[ 1623.480846] SMP: failed to stop secondary CPUs
+>   <3>[ 1623.480862] CPU1 PC: <c01827e8> __unqueue_futex+0x68/0x88
+>   <3>[ 1623.480879] CPU2 PC: <c0117c8c> v7_coherent_kern_range+0x58/0x74
+>   <3>[ 1623.480895] CPU3 PC: <c0118268> v7wbi_flush_user_tlb_range+0x20/0x38
 > 
-> I realized the pen hold/release stuff was totally surplus on the
-> ux500 platform, it was probably just copied from the Vexpress
-> or RealView reference design and kept around because ARM
-> did things that way. And you are copying the same code from
-> other platforms again. Do you *really* understand the pen hold/release
-> code? (I don't.)
-> 
-> In our case it turned out that all that was really needed was:
-> 
-> - Map and enable SCU at .smp_prepare_cpus()
-> 
-> - Write the start address for the secondary CPU(s) in their
->   magic registers/addresses i.e what you do in
->   nsp_write_lut() and then call
->   arch_send_wakeup_ipi_mask(cpumask_of(cpu)); in
->   .smp_boot_secondary()
->   It seems you may not even need the IPI, I can't see
->   that call in your patch so I guess your secondary
->   CPUs aren't in WFI at boot.
-> 
-There is a dsb_sev() to get secondary core out of standby. However,
-I think arch_send_wakeup_ipi_mask() is a better way as it is per
-core. I will make the required changes in the next patch set.
-> No pen hold/release magic! Works like a charm for us.
-> So see of you really need this horror story with copied
-> assembly code from realview etc.
-> 
-> Yours,
-> Linus Walleij
-> 
-Thanks,
-Kapil Hali
+> ---
+
+Do you have any register values for these CPUs?
+
+> c01827dc:       e2841010        add     r1, r4, #16
+> c01827e0:       e2445004        sub     r5, r4, #4
+> c01827e4:       eb068d33        bl      c0325cb8 <plist_del> (File
+> Offset: 0x235cb8)
+> => c01827e8:    f595f000        pldw    [r5]
+> c01827ec:       e1953f9f        ldrex   r3, [r5]
+> c01827f0:       e2433001        sub     r3, r3, #1
+> c01827f4:       e1852f93        strex   r2, r3, [r5]
+> c01827f8:       e3320000        teq     r2, #0
+> c01827fc:       1afffffa        bne     c01827ec
+> <__unqueue_futex+0x6c> (File Offset: 0x927ec)
+> c0182800:       e89da830        ldm     sp, {r4, r5, fp, sp, pc}
+
+For example, the futex address in r5 ...
+
+> c0117c80:       e08cc002        add     ip, ip, r2
+> c0117c84:       e15c0001        cmp     ip, r1
+> c0117c88:       3afffffb        bcc     c0117c7c
+> <v7_coherent_kern_range+0x48> (File Offset: 0x27c7c)
+> => c0117c8c:    e3a00000        mov     r0, #0
+> c0117c90:       ee070fd1        mcr     15, 0, r0, cr7, cr1, {6}
+> c0117c94:       f57ff04a        dsb     ishst
+> c0117c98:       f57ff06f        isb     sy
+> c0117c9c:       e1a0f00e        mov     pc, lr
+
+... the address in r0 for the cache maintenance ...
+
+> c0118260:       e1830600        orr     r0, r3, r0, lsl #12
+> c0118264:       e1a01601        lsl     r1, r1, #12
+> => c0118268:    ee080f33        mcr     15, 0, r0, cr8, cr3, {1}
+> c011826c:       e2800a01        add     r0, r0, #4096   ; 0x1000
+> c0118270:       e1500001        cmp     r0, r1
+> c0118274:       3afffffb        bcc     c0118268
+> <v7wbi_flush_user_tlb_range+0x20> (File Offset: 0x28268)
+> c0118278:       f57ff04b        dsb     ish
+> c011827c:       e1a0f00e        mov     pc, lr
+
+... and the address in r0 for the TLBI.
+
+Are the cores executing instructions at this point, or by "hard LOCKUP"
+do you mean that they're deadlocked in hardware?
+
+Will
