@@ -1,117 +1,67 @@
-From: o.schinagl@ultimaker.com (Olliver Schinagl)
-Date: Fri, 06 Nov 2015 16:46:54 +0100
-Subject: [PATCH 08/10] pwm: core: add pulse feature to the PWM framework
-In-Reply-To: <20151106151816.GD8418@ulmo>
-References: <1445895161-2317-1-git-send-email-o.schinagl@ultimaker.com>
- <1445895161-2317-9-git-send-email-o.schinagl@ultimaker.com>
- <20151106151816.GD8418@ulmo>
-Message-ID: <563CCB6E.2090206@ultimaker.com>
+From: bayi.cheng@mediatek.com (Bayi Cheng)
+Date: Fri, 6 Nov 2015 23:48:06 +0800
+Subject: [PATCH v6 0/3] Mediatek SPI-NOR flash driver 
+Message-ID: <1446824889-16144-1-git-send-email-bayi.cheng@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hey Thierry,
+This series is based on v4.3-rc1 and l2-mtd.git [0] and erase_sector
+implementation patch [1]
 
-On 06-11-15 16:18, Thierry Reding wrote:
-> On Mon, Oct 26, 2015 at 10:32:39PM +0100, Olliver Schinagl wrote:
->> From: Olliver Schinagl <oliver@schinagl.nl>
->>
->> Some hardware PWM's have the possibility to only send out one (or more)
->> pulses. This can be quite a useful feature in case one wants or needs
->> only a single pulse, but at the exact width.
->>
->> Additionally, if multiple pulses are possible, outputting a fixed amount
->> of pulses can be useful for various timing specific purposes.
-> I see how theoretically this would be nice to have. But I'm reluctant to
-> merge this feature if there aren't any users. What drivers in the kernel
-> would want to use this feature? Are there new drivers being worked on
-> that will need this?
-I should have brought this up as to why I added this, I'm working on a 
-stepper driver framework (inspired by the pwm framework actually) and 
-rotating moters by x degree's you do by sending pulses, using controlled 
-pulses (timing wise) you can precisely move stepper motors. Yes we can 
-do this reasonably accurate in software, but doing it in hardware is so 
-much nicer.
->
->> A few new functions have been expanded or added for this new behavior.
->>
->> * pwm_config()	now takes an additional parameter to setup the number of
->> 		pulses to output. The driver may force this to 0 or 1
->> 		for if example if this feature is not or only partially
->> 		supported
-> This is problematic because you need to atomically update all drivers
-> and users (the kbuild robot already told you that you didn't do this).
-> To make things easier I suggest you wait with this change until the
-> atomic PWM patches have been merged, at which point it should become a
-> lot easier to deal with this kind of extension.
-yes, I think i mentioned this in the cover letter, I wanted to get your 
-input whilst waiting for Boris's patches. So I deffinatly want to 
-combine it then, just getting some head work started :)
->
->> * pwm_[sg]et_pulse_count()	get or set the number of pulses the pwm
->> 				framework is configured for
->> * pwm_get_pulse_count_max()	get the maximum number of pulses the pwm
->> 				driver supports
->> * pwm_pulse()		Tell the PWM to emit a pre-configured number of pulses
-> Isn't this essentially the same as pwm_enable()? I'd think that if the
-> PWM is configured to output pulses, then pwm_enable() would simply do
-> what it's been configured to do (emit the pulses). Why the need for an
-> additional function?
-pwm_pulse() should be dropped, I think I accidentally left that in the 
-documentation, sorry.
->
->> * pwm_pulse_done()	an internal function for drivers to call when
->> 			they have completed their pre-configured number
->> 			of pulses
->> * pwm_is_pulsing()	tells the callers if the pwm is busy pulsing,
->> 			yielding a little more information than just
->> 			pwm_is_enabled()
-> Similarily, I'd think that once the PWM is done executing the series of
-> pulses that it was configured for it would be automatically disabled. A
-> consumer could then simply use pwm_is_enabled() and drivers could call
-> pwm_disable() on their PWM to mark them as disabled when they're done
-> pulsing.
-I agree, pulseating can be dropped too as we know that a) the pulse flag 
-is set, b) we are enabled. But I'm not sure now if the flag is exported 
-to sysfs, in any case, sysfs should just check the pulseating flag?
->
->> Signed-off-by: Olliver Schinagl <oliver@schinagl.nl>
->> ---
->>   drivers/pwm/core.c      | 30 +++++++++++++++++++----
->>   drivers/pwm/pwm-gpio.c  |  3 ++-
->>   drivers/pwm/pwm-sun4i.c |  3 ++-
->>   drivers/pwm/sysfs.c     | 58 ++++++++++++++++++++++++++++++++++++++++++--
->>   include/linux/pwm.h     | 64 ++++++++++++++++++++++++++++++++++++++++++++++---
->>   5 files changed, 147 insertions(+), 11 deletions(-)
->>
->> diff --git a/drivers/pwm/core.c b/drivers/pwm/core.c
->> index 3f9df3e..e2c1c0a 100644
->> --- a/drivers/pwm/core.c
->> +++ b/drivers/pwm/core.c
->> @@ -432,22 +432,29 @@ EXPORT_SYMBOL_GPL(pwm_free);
->>    * @pwm: PWM device
->>    * @duty_ns: "on" time (in nanoseconds)
->>    * @period_ns: duration (in nanoseconds) of one cycle
->> + * @pulse_count: number of pulses (periods) to output on pwm_pulse
->>    *
->>    * Returns: 0 on success or a negative error code on failure.
->>    */
->> -int pwm_config(struct pwm_device *pwm, int duty_ns, int period_ns)
->> +int pwm_config(struct pwm_device *pwm, int duty_ns, int period_ns,
->> +	       unsigned int pulse_count)
-> Like I said, this is problematic because every driver and every consumer
-> now needs to be aware of pulsing. Once the PWM atomic patches are merged
-> this will become easier to do because the pulse configuration would be a
-> part of the atomic state, and hence can be conveniently ignored by users
-> and driver alike.
-I agree :) I'll take your initial comments and work with those so far in 
-cleaning stuff up. Feel free to get back to me about the validity of the 
-pwm_pulse for steppers generally
-> Thierry
+[0]: git://git.infradead.org/l2-mtd.git
+[1]: http://lists.infradead.org/pipermail/linux-mtd/2015-October//062959.html
 
--- 
-Met vriendelijke groeten, Kind regards, ??????
+Change in v6:
+1: delete mt8173_nor_do_rx
+2: delete mt8173_nor_do_rx
+3: add mt8173_nor_do_tx_rx for general usage
+4: support nor flash with 6 IDs
+5: delete mt8173_nor_erase_sector and use "nor->erase_opcode"
+6: add mt8173_nor_set_addr to programming the address register
+7: initialize the ppdata in mtk_nor_init
 
-Olliver Schinagl
-Software Engineer
-Research & Development
-Ultimaker B.V.
+Change in v5:
+1: add "status = "disable"" to device tree
+2: add document "flash" node
+3: fix some statement error in Kconfig file
+4: fix alphabetical order error in makefile
+5: delete the parament "mtd_info *mtd" in mt8173_nor structure
+6: delete SPINOR_OP_WREN repeated calls
+7: add mt8173_nor_do_tx & mt8173_nor_do_rx for them full potential
+8: use a subnode to represent the flash
+
+Change in v4:
+1: delete the parament "write_enable" for mt8173_nor_write_reg
+2: fix the build warning for calling mt8173_nor_write_single_byte
+
+Change in v3:
+1: use switch() to replace some if-else statement
+2: use shifts to replace endianness statement
+3: delete some unused macros
+4: use auto-increment mechanism for single write
+5: write address added to 32bytes
+
+Change in v2:
+1. Rebase to 4.3-rc1
+2. propagate error code
+3. delete mux clock and axi clock in dts file
+4. descripts more exactly for binding file
+5. change file names from mtk-nor.c to mtk_quadspi.c
+6. delete some functions witch were used once time
+
+Bayi Cheng (3):
+  doc: dt: add documentation for Mediatek spi-nor controller
+  mtd: mtk-nor: mtk serial flash controller driver
+  arm64: dts: mt8173: Add nor flash node
+
+ .../devicetree/bindings/mtd/mtk-quadspi.txt        |  41 ++
+ arch/arm64/boot/dts/mediatek/mt8173.dtsi           |  16 +
+ drivers/mtd/spi-nor/Kconfig                        |   7 +
+ drivers/mtd/spi-nor/Makefile                       |   1 +
+ drivers/mtd/spi-nor/mtk-quadspi.c                  | 475 +++++++++++++++++++++
+ 5 files changed, 540 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/mtd/mtk-quadspi.txt
+ create mode 100644 drivers/mtd/spi-nor/mtk-quadspi.c
+
+--
+1.8.1.1.dirty 
