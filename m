@@ -1,81 +1,35 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Sat, 07 Nov 2015 23:44:05 +0100
-Subject: [PATCH v2] ARM: dts: rockchip: Setup ethernet0 alias for u-boot
-In-Reply-To: <1446806797-20912-1-git-send-email-sjoerd.simons@collabora.co.uk>
-References: <1446806797-20912-1-git-send-email-sjoerd.simons@collabora.co.uk>
-Message-ID: <2126321.1P94dtJ1Xt@phil>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Sat, 7 Nov 2015 23:02:37 +0000
+Subject: [PATCH] tty: amba-pl011: add options to earlycon for 32-bit reg
+ access
+In-Reply-To: <563E7CF2.60609@hurleysoftware.com>
+References: <1446770267-26749-1-git-send-email-timur@codeaurora.org>
+ <563C07C8.9060506@hurleysoftware.com>
+ <563C09BB.9030706@codeaurora.org>
+ <563C1409.4070804@hurleysoftware.com>
+ <563CF8AF.50808@codeaurora.org> <563E7CF2.60609@hurleysoftware.com>
+Message-ID: <20151107230237.GU8644@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Freitag, 6. November 2015, 11:46:37 schrieb Sjoerd Simons:
-> Add an ethernet0 alias for the RK3288 mac interface so
-> that u-boot can find the device-node and fill in the mac address on
-> board that support a wired network interface.
+On Sat, Nov 07, 2015 at 05:36:34PM -0500, Peter Hurley wrote:
+> On 11/06/2015 01:59 PM, Timur Tabi wrote:
+> > On 11/05/2015 08:44 PM, Peter Hurley wrote:
+> >> Or better yet, for sbsa32 earlycon, just use the existing port type constructs.
+> >> So,
+> >>
+> >>     earlycon=pl011,mmio32,0x3ced1000
+> >>
+> >> which will set port->iotype to UPIO_MEM32, which in turn can be used to select
+> >> the correct i/o width in pl011_putc().
+> > 
+> > That's a great idea.  But why aren't we using it for pl011_write()?
 > 
-> Signed-off-by: Sjoerd Simons <sjoerd.simons@collabora.co.uk>
+> I'll note that when I review Russell's v2 series, if necessary.
 
-applied to me dts32 branch for 4.5
+And I'm not rushing to post them yet as the merge window is currently
+open.
 
-while at it, I also added the alias for other supported Rockchip Socs
-the CortexA9 ones and the rk3368, like below:
-
------------- 8< --------------
-From: Heiko Stuebner <heiko@sntech.de>
-Date: Sat, 7 Nov 2015 22:37:26 +0100
-Subject: [PATCH] ARM: dts: rockchip: Setup rk3066/rk3188 ethernet0 alias for
- u-boot
-
-Add an ethernet0 alias for the RK3066/RK3188 mac interface so
-that u-boot can find the device-node and fill in the mac address on
-boards that support a wired network interface.
-
-Signed-off-by: Heiko Stuebner <heiko@sntech.de>
----
- arch/arm/boot/dts/rk3xxx.dtsi | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/arch/arm/boot/dts/rk3xxx.dtsi b/arch/arm/boot/dts/rk3xxx.dtsi
-index 4497d28..99eeea7 100644
---- a/arch/arm/boot/dts/rk3xxx.dtsi
-+++ b/arch/arm/boot/dts/rk3xxx.dtsi
-@@ -49,6 +49,7 @@
- 	interrupt-parent = <&gic>;
- 
- 	aliases {
-+		ethernet0 = &emac;
- 		i2c0 = &i2c0;
- 		i2c1 = &i2c1;
- 		i2c2 = &i2c2;
 -- 
-2.6.2
-
------------- 8< --------------
-From: Heiko Stuebner <heiko@sntech.de>
-Date: Sat, 7 Nov 2015 22:39:26 +0100
-Subject: [PATCH] arm64: dts: rockchip: Setup rk3368 ethernet0 alias for u-boot
-
-Add an ethernet0 alias for the RK3368 mac interface so
-that u-boot can find the device-node and fill in the mac address on
-boards that support a wired network interface.
-
-Signed-off-by: Heiko Stuebner <heiko@sntech.de>
----
- arch/arm64/boot/dts/rockchip/rk3368.dtsi | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/arch/arm64/boot/dts/rockchip/rk3368.dtsi b/arch/arm64/boot/dts/rockchip/rk3368.dtsi
-index cc093a4..1f10b85 100644
---- a/arch/arm64/boot/dts/rockchip/rk3368.dtsi
-+++ b/arch/arm64/boot/dts/rockchip/rk3368.dtsi
-@@ -53,6 +53,7 @@
- 	#size-cells = <2>;
- 
- 	aliases {
-+		ethernet0 = &gmac;
- 		i2c0 = &i2c0;
- 		i2c1 = &i2c1;
- 		i2c2 = &i2c2;
--- 
-2.6.2
-
------------- 8< --------------
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
