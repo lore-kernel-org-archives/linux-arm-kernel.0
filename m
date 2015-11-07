@@ -1,75 +1,57 @@
-From: timur@codeaurora.org (Timur Tabi)
-Date: Fri,  6 Nov 2015 18:18:23 -0600
-Subject: [PATCH] tty: amba-pl011: add support for 32-bit register access for
- earlycon
-Message-ID: <1446855503-25881-1-git-send-email-timur@codeaurora.org>
+From: labbott@redhat.com (Laura Abbott)
+Date: Fri, 6 Nov 2015 16:20:26 -0800
+Subject: [PATCH] arm: Use kernel mm when updating section permissions
+In-Reply-To: <CAGXu5jLf+BAhPvQihZ02jUpSE4woP-aMhfUQ6vobZBShrZXT4g@mail.gmail.com>
+References: <1446685239-28522-1-git-send-email-labbott@fedoraproject.org>
+ <20151105094615.GP8644@n2100.arm.linux.org.uk> <563B81DA.2080409@redhat.com>
+ <20151105162719.GQ8644@n2100.arm.linux.org.uk> <563BFCC4.8050705@redhat.com>
+ <CAGXu5jLS8GPxmMQwd9qw+w+fkMqU-GYyME5WUuKZZ4qTesVzCQ@mail.gmail.com>
+ <563CF510.9080506@redhat.com> <20151106204641.GT8644@n2100.arm.linux.org.uk>
+ <563D3AC5.4020203@redhat.com>
+ <CAGXu5jLf+BAhPvQihZ02jUpSE4woP-aMhfUQ6vobZBShrZXT4g@mail.gmail.com>
+Message-ID: <563D43CA.9030405@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add support the "mmio32" earlycon option for the pl011 device.  If
-specified in the earlycon parameter, all reads/writes to pl011 registers
-during early console will use 32-bit accessors.  Normally the function
-uses 8-bit writes.
+On 11/06/2015 03:49 PM, Kees Cook wrote:
+> On Fri, Nov 6, 2015 at 3:41 PM, Laura Abbott <labbott@redhat.com> wrote:
+>> On 11/06/2015 12:46 PM, Russell King - ARM Linux wrote:
+>>>
+>>> On Fri, Nov 06, 2015 at 10:44:32AM -0800, Laura Abbott wrote:
+>>>>
+>>>> with my test patch. I think setting both current->active_mm and &init_mm
+>>>> is sufficient. Maybe explicitly setting swapper_pg_dir would be cleaner?
+>>>
+>>>
+>>> Please, stop thinking like this.  If you're trying to change the kernel
+>>> section mappings after threads have been spawned, you need to change
+>>> them for _all_ threads, which means you need to change them for every
+>>> page table that's in existence at that time - you can't do just one
+>>> table and hope everyone updates, it doesn't work like that.
+>>>
+>>
+>> That's a bad assumption assumption on my part based on what I was
+>> observing. At the time of mark_rodata_ro, the only threads present
+>> are kernel threads which aren't going to have task->mm. Only the
+>> running thread is going to have active_mm. None of those are init_mm.
+>> To be complete we need:
+>>
+>> - Update every task->mm for every thread in every process
+>> - Update current->active_mm
+>> - Update &init_mm explicitly
+>>
+>> All this would need to be done under stop_machine as well. Does that cover
+>> everything or am I still off?
+>
+> I still think we need to find an earlier place to do this. :(
+>
+> -Kees
+>
 
-Normal console uses the "access_32b" field of the vendor data structure
-to determine whether the registers needs 32-bit accessors.  Early console
-is used before the vendor data is available, so we need a different
-mechanism to choose the accessor.
+The problem is still the initmem. That needs to be writable and executable
+during inittime and then have the page tables adjusted afterwards if it is
+going to be freed back. I'll give this some more thought to see if I can
+come up with something or if anyone else has another idea.
 
-Example:
-
-	earlycon=pl011,mmio32,0x3ced1000
-
-Signed-off-by: Timur Tabi <timur@codeaurora.org>
----
-
-This patch applies on top of Russell's 12-part amba-pl011.c patchset.
-
- Documentation/kernel-parameters.txt | 5 ++++-
- drivers/tty/serial/amba-pl011.c     | 9 ++++++---
- 2 files changed, 10 insertions(+), 4 deletions(-)
-
-diff --git a/Documentation/kernel-parameters.txt b/Documentation/kernel-parameters.txt
-index 22a4b68..2436f62 100644
---- a/Documentation/kernel-parameters.txt
-+++ b/Documentation/kernel-parameters.txt
-@@ -992,10 +992,13 @@ bytes respectively. Such letter suffixes can also be entirely omitted.
- 			unspecified, the h/w is not initialized.
- 
- 		pl011,<addr>
-+		pl011,mmio32,<addr>
- 			Start an early, polled-mode console on a pl011 serial
- 			port at the specified address. The pl011 serial port
- 			must already be setup and configured. Options are not
--			yet supported.
-+			yet supported.  If 'mmio32' is specified, then only
-+			the driver will use only 32-bit accessors to read/write
-+			the device registers.
- 
- 		msm_serial,<addr>
- 			Start an early, polled-mode console on an msm serial
-diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
-index 373b152..6643ed9 100644
---- a/drivers/tty/serial/amba-pl011.c
-+++ b/drivers/tty/serial/amba-pl011.c
-@@ -2301,10 +2301,13 @@ static struct console amba_console = {
- 
- static void pl011_putc(struct uart_port *port, int c)
- {
--	while (readl(port->membase + REG_FR) & UART01x_FR_TXFF)
-+	while (readl(port->membase + UART01x_FR) & UART01x_FR_TXFF)
- 		;
--	writeb(c, port->membase + REG_DR);
--	while (readl(port->membase + REG_FR) & UART01x_FR_BUSY)
-+	if (port->iotype == UPIO_MEM32)
-+		writel(c, port->membase + UART01x_DR);
-+	else
-+		writeb(c, port->membase + UART01x_DR);
-+	while (readl(port->membase + UART01x_FR) & UART01x_FR_BUSY)
- 		;
- }
- 
--- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-a Linux Foundation Collaborative Project.
+Thanks,
+Laura
