@@ -1,51 +1,169 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Sat, 7 Nov 2015 07:29:52 -0800
-Subject: [PATCH v2 1/4] watchdog: meson: Enable meson SoC specific data
-In-Reply-To: <1446894139-6802-2-git-send-email-carlo@caione.org>
-References: <1446894139-6802-1-git-send-email-carlo@caione.org>
- <1446894139-6802-2-git-send-email-carlo@caione.org>
-Message-ID: <563E18F0.4030807@roeck-us.net>
+From: caesar.upstream@gmail.com (Caesar Wang)
+Date: Sat, 07 Nov 2015 23:38:47 +0800
+Subject: [PATCH v2 5/9] thermal: rockchip: Add the flag for adc value
+ increment or decrement
+In-Reply-To: <20151106191126.GC8202@localhost.localdomain>
+References: <1446700685-18017-1-git-send-email-wxt@rock-chips.com>
+ <1446700685-18017-6-git-send-email-wxt@rock-chips.com>
+ <20151106191126.GC8202@localhost.localdomain>
+Message-ID: <563E1B07.4060108@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/07/2015 03:02 AM, Carlo Caione wrote:
-> From: Carlo Caione <carlo@endlessm.com>
->
-> With this patch we refactor the driver code to enable watchdog support
-> for all platforms based on Amlogic meson SoCs.
->
-> Signed-off-by: Carlo Caione <carlo@endlessm.com>
-> ---
->   drivers/watchdog/meson_wdt.c | 56 ++++++++++++++++++++++++++++++--------------
->   1 file changed, 39 insertions(+), 17 deletions(-)
->
-> diff --git a/drivers/watchdog/meson_wdt.c b/drivers/watchdog/meson_wdt.c
-> index 1f4155e..446af94 100644
-> --- a/drivers/watchdog/meson_wdt.c
-> +++ b/drivers/watchdog/meson_wdt.c
-> @@ -19,6 +19,7 @@
->   #include <linux/moduleparam.h>
->   #include <linux/notifier.h>
->   #include <linux/of.h>
-> +#include <linux/of_device.h>
->   #include <linux/platform_device.h>
->   #include <linux/reboot.h>
->   #include <linux/types.h>
-> @@ -27,35 +28,47 @@
->   #define DRV_NAME		"meson_wdt"
->
->   #define MESON_WDT_TC		0x00
-> -#define MESON_WDT_TC_EN		BIT(22)
-> -#define MESON_WDT_TC_TM_MASK	0x3fffff
->   #define MESON_WDT_DC_RESET	(3 << 24)
->
->   #define MESON_WDT_RESET		0x04
->
-> -#define MESON_WDT_TIMEOUT	30
-> +#define MESON_WDT_TIMEOUT	5
+Hello Eduardo,
 
-This is not a reasonable default, the change is not mentioned
-in the description, and it is unrelated to the change at hand.
-Sorry if I overlooked it in v1.
+? 2015?11?07? 03:11, Eduardo Valentin ??:
+> On Thu, Nov 05, 2015 at 01:18:01PM +0800, Caesar Wang wrote:
+>> The conversion table has the adc value and temperature.
+>> In fact, the adc value only has the increment or decrement mode in
+>> conversion table.
+>>
+>> Moment, we can add the flag to be better support the *code_to_temp*
+>> for differenr SoCs.
+>>
+>> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
+>> ---
+>>
+>> Changes in v2: None
+>> Changes in v1: None
+>>
+>>   drivers/thermal/rockchip_thermal.c | 64 ++++++++++++++++++++++++++++++--------
+>>   1 file changed, 51 insertions(+), 13 deletions(-)
+>>
+>> diff --git a/drivers/thermal/rockchip_thermal.c b/drivers/thermal/rockchip_thermal.c
+>> index e828f18..9df027f 100644
+>> --- a/drivers/thermal/rockchip_thermal.c
+>> +++ b/drivers/thermal/rockchip_thermal.c
+>> @@ -53,6 +53,16 @@ enum sensor_id {
+>>   };
+>>   
+>>   /**
+>> +* The conversion table has the adc value and temperature.
+>> +* ADC_DECREMENT is the adc value decremnet.(e.g. v2_code_table)
+>> +* ADC_INCREMNET is the adc value incremnet.(e.g. v3_code_table)
+>> +*/
+>> +enum adc_flag {
+>> +	ADC_DECREMENT = 0,
+>> +	ADC_INCREMENT,
+>> +};
+>> +
+>> +/**
+>>    * The max sensors is two in rockchip SoCs.
+>>    * Two sensors: CPU and GPU sensor.
+>>    */
+>> @@ -66,6 +76,9 @@ struct chip_tsadc_table {
+>>   
+>>   	/* that analogic mask data */
+>>   	unsigned long data_mask;
+>> +
+>> +	/* adc value is increment or decrement */
+>> +	unsigned int flag;
+>
+> Maybe bool? And rename to something more meaningful?
 
-Guenter
+Sure, that should be a bool type.
+I guess the rename in sort_flag......(maybe will have a better name)
+
+
+>
+> Or do you plan to have more conditions to test in your flag?
+
+Moment, the flag (increment or decrement) can support all the rockchip 
+series SoCs have thermal function.
+
+>>   };
+>>   
+>>   struct rockchip_tsadc_chip {
+>> @@ -223,19 +236,43 @@ static int rk_tsadcv2_code_to_temp(struct chip_tsadc_table table, u32 code,
+>>   
+>>   	WARN_ON(table.length < 2);
+>>   
+>> -	code &= table.data_mask;
+>> -	if (code < table.id[high].code)
+>> +	switch (table.flag) {
+>> +	case ADC_DECREMENT:
+>> +		code &= table.data_mask;
+>> +		if (code < table.id[high].code)
+>>   		return -EAGAIN;		/* Incorrect reading */
+> Add an indentation.
+
+Thanks, will be fixed in next patch.
+
+
+>>   
+>> -	while (low <= high) {
+>> -		if (code >= table.id[mid].code &&
+>> -		    code < table.id[mid - 1].code)
+>> -			break;
+>> -		else if (code < table.id[mid].code)
+>> -			low = mid + 1;
+>> -		else
+>> -			high = mid - 1;
+>> -		mid = (low + high) / 2;
+>> +		while (low <= high) {
+>> +			if (code >= table.id[mid].code &&
+>> +			    code < table.id[mid - 1].code)
+>> +				break;
+>> +			else if (code < table.id[mid].code)
+>> +				low = mid + 1;
+>> +			else
+>> +				high = mid - 1;
+>> +
+>> +			mid = (low + high) / 2;
+>> +		}
+>> +		break;
+>> +	case ADC_INCREMENT:
+>> +		code &= table.data_mask;
+>> +		if (code < table.id[low].code)
+>> +		return -EAGAIN;		/* Incorrect reading */
+>> +
+> add an indentation.
+
+Ditto.
+
+Thanks,
+Caesar
+>
+>> +		while (low <= high) {
+>> +			if (code >= table.id[mid - 1].code &&
+>> +			    code < table.id[mid].code)
+>> +				break;
+>> +			else if (code > table.id[mid].code)
+>> +				low = mid + 1;
+>> +			else
+>> +				high = mid - 1;
+>> +
+>> +			mid = (low + high) / 2;
+>> +		}
+>> +		break;
+>> +	default:
+>> +		pr_err("Invalid the table conversion\n");
+>>   	}
+>>   
+>>   	/*
+>> @@ -245,8 +282,8 @@ static int rk_tsadcv2_code_to_temp(struct chip_tsadc_table table, u32 code,
+>>   	 * to produce less granular result.
+>>   	 */
+>>   	num = table.id[mid].temp - v2_code_table[mid - 1].temp;
+>> -	num *= table.id[mid - 1].code - code;
+>> -	denom = table.id[mid - 1].code - table.id[mid].code;
+>> +	num *= abs(table.id[mid - 1].code - code);
+>> +	denom = abs(table.id[mid - 1].code - table.id[mid].code);
+>>   	*temp = table.id[mid - 1].temp + (num / denom);
+>>   
+>>   	return 0;
+>> @@ -367,6 +404,7 @@ static const struct rockchip_tsadc_chip rk3288_tsadc_data = {
+>>   		.id = v2_code_table,
+>>   		.length = ARRAY_SIZE(v2_code_table),
+>>   		.data_mask = TSADCV2_DATA_MASK,
+>> +		.flag = ADC_DECREMENT,
+>>   	},
+>>   };
+>>   
+>> -- 
+>> 1.9.1
+>>
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
