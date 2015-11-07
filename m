@@ -1,83 +1,40 @@
-From: ssimran@broadcom.com (Simran Rai)
-Date: Fri, 6 Nov 2015 18:22:43 -0800
-Subject: [PATCH v3 1/3] dt-bindings: sound: Add DT bindings for Broadcom
- Cygnus audio
-In-Reply-To: <1446862965-18667-1-git-send-email-ssimran@broadcom.com>
-References: <1446862965-18667-1-git-send-email-ssimran@broadcom.com>
-Message-ID: <1446862965-18667-2-git-send-email-ssimran@broadcom.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Sat, 7 Nov 2015 03:35:16 +0100
+Subject: [PATCH v3 01/12] pwm: introduce default period and polarity
+ concepts
+In-Reply-To: <1442828009-6241-2-git-send-email-boris.brezillon@free-electrons.com>
+References: <1442828009-6241-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1442828009-6241-2-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <20151107023516.GB3849@piout.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add bindings for audio driver in Broadcom Cygnus.
+On 21/09/2015 at 11:33:18 +0200, Boris Brezillon wrote :
+> When requested by a user, the PWM is assigned a default period and polarity
+> extracted from the DT, the platform data or statically set by the driver.
+> Those default values are currently stored in the period and polarity
+> fields of the pwm_device struct, but they will be stored somewhere else
+> once we have introduced the architecture allowing for hardware state
+> retrieval.
+> 
+> The pwm_set_default_polarity and pwm_set_default_period should only be
+> used by PWM drivers or the PWM core infrastructure to specify the
+> default period and polarity values.
+> 
+> PWM users might call the pwm_get_default_period to query the default
+> period value. There is currently no helper to query the default
+> polarity, but it might be added later on if there is a need for it.
+> 
+> This patch also modifies all the places where the default helpers should
+> be used in place of the standard ones.
+> 
+> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 
-Signed-off-by: Lori Hikichi <lhikichi@broadcom.com>
-Signed-off-by: Simran Rai <ssimran@broadcom.com>
-Reviewed-by: Ray Jui <rjui@broadcom.com>
-Reviewed-by: Scott Branden <sbranden@broadcom.com>
----
- .../bindings/sound/brcm,cygnus-audio.txt           |   54 ++++++++++++++++++++
- 1 file changed, 54 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/sound/brcm,cygnus-audio.txt
+For pwm-sun4i:
+Reviewed-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
 
-diff --git a/Documentation/devicetree/bindings/sound/brcm,cygnus-audio.txt b/Documentation/devicetree/bindings/sound/brcm,cygnus-audio.txt
-new file mode 100644
-index 0000000..3c06001
---- /dev/null
-+++ b/Documentation/devicetree/bindings/sound/brcm,cygnus-audio.txt
-@@ -0,0 +1,54 @@
-+BROADCOM Cygnus Audio I2S/TDM/SPDIF controller
-+
-+Required properties:
-+	- compatible : "brcm,cygnus-audio"
-+	- #address-cells: 32bit valued, 1 cell.
-+	- #size-cells:  32bit valued, 0 cell.
-+	- reg : Should contain audio registers location and length
-+	- reg-names: names of the registers listed in "reg" property
-+		Valid names are "aud" and "i2s_in". "aud" contains a
-+		set of DMA, I2S_OUT and SPDIF registers. "i2s_in" contains
-+		a set of I2S_IN registers.
-+	- clocks: PLL and leaf clocks used by audio ports
-+	- clock-names: names of 3 leaf clocks used by audio ports
-+		Valid names are "ch0_audio", "ch1_audio", "ch2_audio"
-+	- interrupts: audio DMA interrupt number
-+
-+SSP Subnode properties:
-+- reg: The index of ssp port interface to use
-+	Valid value are 0, 1, 2, or 3 (for spdif)
-+
-+
-+Example:
-+	cygnus_audio: audio at 180ae000 {
-+		compatible = "brcm,cygnus-audio";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		reg = <0x180ae000 0xafd>, <0x180aec00 0x1f8>;
-+		reg-names = "aud", "i2s_in";
-+		clocks = <&audiopll BCM_CYGNUS_AUDIOPLL_CH0>,
-+				<&audiopll BCM_CYGNUS_AUDIOPLL_CH1>,
-+				<&audiopll BCM_CYGNUS_AUDIOPLL_CH2>;
-+		clock-names = "ch0_audio", "ch1_audio", "ch2_audio";
-+		interrupts = <GIC_SPI 143 IRQ_TYPE_LEVEL_HIGH>;
-+
-+		ssp0: ssp_port at 0 {
-+			reg = <0>;
-+			status = "okay";
-+		};
-+
-+		ssp1: ssp_port at 1 {
-+			reg = <1>;
-+			status = "disabled";
-+		};
-+
-+		ssp2: ssp_port at 2 {
-+			reg = <2>;
-+			status = "disabled";
-+		};
-+
-+		spdif: spdif_port at 3 {
-+			reg = <3>;
-+			status = "disabled";
-+		};
-+	};
+
 -- 
-1.7.9.5
+Alexandre Belloni, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
