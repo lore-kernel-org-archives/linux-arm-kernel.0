@@ -1,77 +1,149 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Sat, 07 Nov 2015 20:23:24 +0100
-Subject: [GIT PULL] arm64 updates for 4.4
-In-Reply-To: <alpine.LNX.2.00.1511071112380.9964@T520.local>
-References: <20151104182508.GA28726@e104818-lin.cambridge.arm.com>
- <6253831.r99BEBrMgd@wuerfel> <alpine.LNX.2.00.1511071112380.9964@T520.local>
-Message-ID: <5669629.gUNGHpWjD7@wuerfel>
+From: isubramanian@apm.com (Iyappan Subramanian)
+Date: Sat,  7 Nov 2015 11:50:40 -0800
+Subject: [PATCH v2] drivers: net: xgene: fix RGMII 10/100Mb mode
+Message-ID: <1446925840-14224-1-git-send-email-isubramanian@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Saturday 07 November 2015 11:56:44 Hans Ulli Kroll wrote:
-> On Fri, 6 Nov 2015, Arnd Bergmann wrote:
-> > On Friday 06 November 2015 16:04:08 Catalin Marinas wrote:
-> > > On Fri, Nov 06, 2015 at 10:57:58AM +0100, Arnd Bergmann wrote:
-> > > > On Thursday 05 November 2015 18:27:18 Catalin Marinas wrote:
-> > > > > On Wed, Nov 04, 2015 at 02:55:01PM -0800, Linus Torvalds wrote:
-> > > > > > On Wed, Nov 4, 2015 at 10:25 AM, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> > > > > > It's good for single-process loads - if you do a lot of big fortran
-> > > > > > jobs, or a lot of big database loads, and nothing else, you're fine.
-> > > > > 
-> > > > > These are some of the arguments from the server camp: specific
-> > > > > workloads.
-> > > > 
-> > > > I think (a little overgeneralized), you want 4KB pages for any file
-> > > > based mappings,
-> > > 
-> > > In general, yes, but if the main/only workload on your server is mapping
-> > > large db files, the memory usage cost may be amortised.
-> > 
-> > This will still only do you good for a database that is read into memory
-> > once and not written much, and at that point you can as well use hugepages.
-> > 
-> > The problems for using 64kb page cache on file mappings are
-> > 
-> > - while you normally want some readahead, the larger pages also result
-> >   in read-behind, so you have to actually transfer data from disk into
-> >   RAM without ever accessing it.
-> > 
-> > - When you write the data, you have to write the full 64K page because
-> >   that is the granularity of your dirty bit tracking.
-> > 
-> > So even if you don't care at all about memory consumption, you are
-> > still transferring several times more data to and from your drives.
-> > As mentioned that can be a win on some storage devices, but usually
-> > it's a loss.
-> > 
-> 
-> there is also a maybe a bigger problem.
-> I know this from my Zyxel NAS540, this thing is build around the Mindspeed 
-> Comcerto 2000 SoC
-> 
-> Zyxel is currently rolling back to support 4k page sizeses in upcommig 
-> 5.10 firmware release, because Minspeed did some stupid thing :
-> 
-> It's not possible to use some standard ARMv7 toolchain and build your 
-> own/needed userspace tools.
-> 
-> And this in change which causes the pain 
-> 
-> diff --git a/arch/arm/include/asm/elf.h b/arch/arm/include/asm/elf.h
-> -#define ELF_EXEC_PAGESIZE      4096
-> +#define ELF_EXEC_PAGESIZE      (PAGE_SIZE)
+This patch fixes the RGMII 10/100M mode by reprogramming the clock.
 
-In ARM32 binutils, ELF_MAXPAGESIZE was changed last year to 64KB, so
-binutils-2.25 or higher should support this by default, as long as you
-recompile all user binaries.
+Signed-off-by: Iyappan Subramanian <isubramanian@apm.com>
+Tested-by: Fushen Chen <fchen@apm.com>
+---
 
-> The SoC is mostly build from off the shelf IP's
-> SATA, NAND, SPI and so on
-> The only thing which is completly braindead is MAC
-> It's using some kind of VLAN tagging to support tree ports,
-> only one descriptor chain for all three interfaces.
+v2: Address v1 review comments
+	- targeting bug fix patch to "net" tree
 
-You mean they used 64KB logical page sizes to work around a broken
-ethernet MAC?
+v1: Initial revision
+---
 
-	Arnd
+ drivers/net/ethernet/apm/xgene/xgene_enet_hw.c   | 49 +++++++++++++++++++++++-
+ drivers/net/ethernet/apm/xgene/xgene_enet_hw.h   |  1 +
+ drivers/net/ethernet/apm/xgene/xgene_enet_main.c |  1 -
+ 3 files changed, 48 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/net/ethernet/apm/xgene/xgene_enet_hw.c b/drivers/net/ethernet/apm/xgene/xgene_enet_hw.c
+index 33850a0..c31e691 100644
+--- a/drivers/net/ethernet/apm/xgene/xgene_enet_hw.c
++++ b/drivers/net/ethernet/apm/xgene/xgene_enet_hw.c
+@@ -459,6 +459,45 @@ static void xgene_gmac_reset(struct xgene_enet_pdata *pdata)
+ 	xgene_enet_wr_mcx_mac(pdata, MAC_CONFIG_1_ADDR, 0);
+ }
+ 
++static void xgene_enet_configure_clock(struct xgene_enet_pdata *pdata)
++{
++	struct device *dev = &pdata->pdev->dev;
++
++	if (dev->of_node) {
++		struct clk *parent = clk_get_parent(pdata->clk);
++
++		switch (pdata->phy_speed) {
++		case SPEED_10:
++			clk_set_rate(parent, 2500000);
++			break;
++		case SPEED_100:
++			clk_set_rate(parent, 25000000);
++			break;
++		default:
++			clk_set_rate(parent, 125000000);
++			break;
++		}
++	}
++#ifdef CONFIG_ACPI
++	else {
++		switch (pdata->phy_speed) {
++		case SPEED_10:
++			acpi_evaluate_object(ACPI_HANDLE(dev),
++					     "S10", NULL, NULL);
++			break;
++		case SPEED_100:
++			acpi_evaluate_object(ACPI_HANDLE(dev),
++					     "S100", NULL, NULL);
++			break;
++		default:
++			acpi_evaluate_object(ACPI_HANDLE(dev),
++					     "S1G", NULL, NULL);
++			break;
++		}
++	}
++#endif
++}
++
+ static void xgene_gmac_init(struct xgene_enet_pdata *pdata)
+ {
+ 	struct device *dev = &pdata->pdev->dev;
+@@ -477,12 +516,14 @@ static void xgene_gmac_init(struct xgene_enet_pdata *pdata)
+ 	switch (pdata->phy_speed) {
+ 	case SPEED_10:
+ 		ENET_INTERFACE_MODE2_SET(&mc2, 1);
++		intf_ctl &= ~(ENET_LHD_MODE | ENET_GHD_MODE);
+ 		CFG_MACMODE_SET(&icm0, 0);
+ 		CFG_WAITASYNCRD_SET(&icm2, 500);
+ 		rgmii &= ~CFG_SPEED_1250;
+ 		break;
+ 	case SPEED_100:
+ 		ENET_INTERFACE_MODE2_SET(&mc2, 1);
++		intf_ctl &= ~ENET_GHD_MODE;
+ 		intf_ctl |= ENET_LHD_MODE;
+ 		CFG_MACMODE_SET(&icm0, 1);
+ 		CFG_WAITASYNCRD_SET(&icm2, 80);
+@@ -490,12 +531,15 @@ static void xgene_gmac_init(struct xgene_enet_pdata *pdata)
+ 		break;
+ 	default:
+ 		ENET_INTERFACE_MODE2_SET(&mc2, 2);
++		intf_ctl &= ~ENET_LHD_MODE;
+ 		intf_ctl |= ENET_GHD_MODE;
+-
++		CFG_MACMODE_SET(&icm0, 2);
++		CFG_WAITASYNCRD_SET(&icm2, 0);
+ 		if (dev->of_node) {
+ 			CFG_TXCLK_MUXSEL0_SET(&rgmii, pdata->tx_delay);
+ 			CFG_RXCLK_MUXSEL0_SET(&rgmii, pdata->rx_delay);
+ 		}
++		rgmii |= CFG_SPEED_1250;
+ 
+ 		xgene_enet_rd_csr(pdata, DEBUG_REG_ADDR, &value);
+ 		value |= CFG_BYPASS_UNISEC_TX | CFG_BYPASS_UNISEC_RX;
+@@ -503,7 +547,7 @@ static void xgene_gmac_init(struct xgene_enet_pdata *pdata)
+ 		break;
+ 	}
+ 
+-	mc2 |= FULL_DUPLEX2;
++	mc2 |= FULL_DUPLEX2 | PAD_CRC;
+ 	xgene_enet_wr_mcx_mac(pdata, MAC_CONFIG_2_ADDR, mc2);
+ 	xgene_enet_wr_mcx_mac(pdata, INTERFACE_CONTROL_ADDR, intf_ctl);
+ 
+@@ -522,6 +566,7 @@ static void xgene_gmac_init(struct xgene_enet_pdata *pdata)
+ 	/* Rtype should be copied from FP */
+ 	xgene_enet_wr_csr(pdata, RSIF_RAM_DBG_REG0_ADDR, 0);
+ 	xgene_enet_wr_csr(pdata, RGMII_REG_0_ADDR, rgmii);
++	xgene_enet_configure_clock(pdata);
+ 
+ 	/* Rx-Tx traffic resume */
+ 	xgene_enet_wr_csr(pdata, CFG_LINK_AGGR_RESUME_0_ADDR, TX_PORT0);
+diff --git a/drivers/net/ethernet/apm/xgene/xgene_enet_hw.h b/drivers/net/ethernet/apm/xgene/xgene_enet_hw.h
+index 6dee73c..c153a1d 100644
+--- a/drivers/net/ethernet/apm/xgene/xgene_enet_hw.h
++++ b/drivers/net/ethernet/apm/xgene/xgene_enet_hw.h
+@@ -181,6 +181,7 @@ enum xgene_enet_rm {
+ #define ENET_LHD_MODE			BIT(25)
+ #define ENET_GHD_MODE			BIT(26)
+ #define FULL_DUPLEX2			BIT(0)
++#define PAD_CRC				BIT(2)
+ #define SCAN_AUTO_INCR			BIT(5)
+ #define TBYT_ADDR			0x38
+ #define TPKT_ADDR			0x39
+diff --git a/drivers/net/ethernet/apm/xgene/xgene_enet_main.c b/drivers/net/ethernet/apm/xgene/xgene_enet_main.c
+index ce10687..991412c 100644
+--- a/drivers/net/ethernet/apm/xgene/xgene_enet_main.c
++++ b/drivers/net/ethernet/apm/xgene/xgene_enet_main.c
+@@ -698,7 +698,6 @@ static int xgene_enet_open(struct net_device *ndev)
+ 	else
+ 		schedule_delayed_work(&pdata->link_work, PHY_POLL_LINK_OFF);
+ 
+-	netif_carrier_off(ndev);
+ 	netif_start_queue(ndev);
+ 
+ 	return ret;
+-- 
+1.9.1
