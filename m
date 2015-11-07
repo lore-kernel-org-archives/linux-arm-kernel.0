@@ -1,37 +1,16 @@
-From: carlo@caione.org (Carlo Caione)
-Date: Sat,  7 Nov 2015 12:02:19 +0100
-Subject: [PATCH v2 4/4] ARM: dts: meson8b: Add watchdog node
-In-Reply-To: <1446894139-6802-1-git-send-email-carlo@caione.org>
-References: <1446894139-6802-1-git-send-email-carlo@caione.org>
-Message-ID: <1446894139-6802-5-git-send-email-carlo@caione.org>
+From: srikanth007m@gmail.com ($rik@nth )
+Date: Sat, 7 Nov 2015 18:59:22 +0530
+Subject: ARM CPU corehung
+Message-ID: <CANKSX+HaSLzy8Z-PuR2DtdMVE0_F1m-VqjLvgc8Mxiv9A9++zA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Carlo Caione <carlo@endlessm.com>
+Hi,
 
-With this patch we add the watchdog node in the meson8b DTS file.
+I am looking for some information on how to put any specific core to
+hung for certain time? Is there any way to do it from
+Kernel/userspace?
 
-Signed-off-by: Carlo Caione <carlo@endlessm.com>
----
- arch/arm/boot/dts/meson8b.dtsi | 6 ++++++
- 1 file changed, 6 insertions(+)
-
-diff --git a/arch/arm/boot/dts/meson8b.dtsi b/arch/arm/boot/dts/meson8b.dtsi
-index ee352bf..8bad557 100644
---- a/arch/arm/boot/dts/meson8b.dtsi
-+++ b/arch/arm/boot/dts/meson8b.dtsi
-@@ -105,6 +105,12 @@
- 			#interrupt-cells = <3>;
- 		};
- 
-+		wdt: watchdog at c1109900 {
-+			compatible = "amlogic,meson8b-wdt";
-+			reg = <0xc1109900 0x8>;
-+			interrupts = <0 0 1>;
-+		};
-+
- 		timer at c1109940 {
- 			compatible = "amlogic,meson6-timer";
- 			reg = <0xc1109940 0x18>;
 -- 
-1.9.1
+Thanks & Regards,
+M.Srikanth Kumar.
