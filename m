@@ -1,69 +1,42 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 6 Nov 2015 16:01:39 -0800
-Subject: [PATCH 04/19] clk: sunxi: Add TCON channel1 clock
-In-Reply-To: <CAGb2v650S8+8SNNBqx7u8k8wxHm2fSKdht=W3yA9Mh=rpU+hOA@mail.gmail.com>
-References: <1446214865-3972-1-git-send-email-maxime.ripard@free-electrons.com>
- <1446214865-3972-5-git-send-email-maxime.ripard@free-electrons.com>
- <CAGb2v650S8+8SNNBqx7u8k8wxHm2fSKdht=W3yA9Mh=rpU+hOA@mail.gmail.com>
-Message-ID: <20151107000139.GP6114@lukather>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Fri, 6 Nov 2015 16:02:43 -0800
+Subject: [PATCH 1/4] watchdog: meson: Enable meson SoC specific data
+In-Reply-To: <CAL9uMOH4i4ajkF2x7agHe2WZcHTJ=vs9cO+TGx8WGLOFVLZnig@mail.gmail.com>
+References: <1446846906-31520-1-git-send-email-carlo@caione.org>
+ <1446846906-31520-2-git-send-email-carlo@caione.org>
+ <20151106221519.GB19791@roeck-us.net>
+ <CAL9uMOH4i4ajkF2x7agHe2WZcHTJ=vs9cO+TGx8WGLOFVLZnig@mail.gmail.com>
+Message-ID: <563D3FA3.8020305@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 11/06/2015 02:47 PM, Carlo Caione wrote:
+> On Fri, Nov 6, 2015 at 11:15 PM, Guenter Roeck <linux@roeck-us.net> wrote:
+>
+[ ... ]
 
-On Sat, Oct 31, 2015 at 05:53:26PM +0800, Chen-Yu Tsai wrote:
-> On Fri, Oct 30, 2015 at 10:20 PM, Maxime Ripard
-> <maxime.ripard@free-electrons.com> wrote:
-> > The TCON is a controller generating the timings to output videos signals,
-> > acting like both a CRTC and an encoder.
-> >
-> > It has two channels depending on the output, each channel being driven by
-> > its own clock (and own clock controller).
-> >
-> > Add a driver for the channel 1 clock.
-> >
-> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> > ---
-> >  drivers/clk/sunxi/Makefile             |   1 +
-> >  drivers/clk/sunxi/clk-sun4i-tcon-ch1.c | 167 +++++++++++++++++++++++++++++++++
-> >  2 files changed, 168 insertions(+)
-> >  create mode 100644 drivers/clk/sunxi/clk-sun4i-tcon-ch1.c
-> 
-> According to the documents I have, this variant of the TCON clock
-> is specific to sun5i. On sun4i/sun7i, TCON CH1 clock has the same
-> layout as TCON CH0 and the other display clocks.
+>>>
+>>>   static int meson_restart_handle(struct notifier_block *this, unsigned long mode,
+>>>                                void *cmd)
+>>>   {
+>>> -     u32 tc_reboot = MESON_WDT_DC_RESET | MESON_WDT_TC_EN;
+>>> +     u32 tc_reboot = MESON_WDT_DC_RESET;
+>>>        struct meson_wdt_dev *meson_wdt = container_of(this,
+>>>                                                       struct meson_wdt_dev,
+>>>                                                       restart_handler);
+>>> +     tc_reboot |= BIT(meson_wdt->data->shift_enable);
+>>>
+>>
+>> I am quite sure that this results in a checkpatch warning.
+>> Did you run your patch through checkpatch ?
+>
+> Yeah, no error/warnings on that line.
+>
 
-At least for the A20, it's not true.
+There should be a warning since there is no empty line after the declarations.
+Maybe checkpatch doesn't catch it because of the continuation line above.
 
-Make sure you do not confuse LCD1 CH0 (p79, which is a channel 0
-clock), with LCD0 CH1 (p81, which is a channel 1 clock).
+Still, the extra line would be appreciated.
 
-> > +       sclk1_parents[0] = sclk2_name;
-> > +       sclk1_parents[1] = sclk2d2_name;
-> 
-> Is there any need to expose these 2 clocks via DT using of_clk_add_provider?
-
-No, as far as I'm aware, there's no user external to this clock
-driver.
-
-> Note that these complex clock trees within a clock node breaks the
-> assigned-clock-parents mechanism, as you can no longer specify the output
-> clock's direct parents.
-
-There's no point of changing the parent either. Hardware blocks are
-always connected to the leaf clock (sclk1). We could also model it as
-an extra 1-bit divider, which would simplify a bit the logic though.
-
-Maxime
-
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151106/2524a5a4/attachment-0001.sig>
+Thanks,
+Guenter
