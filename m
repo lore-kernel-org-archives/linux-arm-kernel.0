@@ -1,212 +1,51 @@
-From: caesar.upstream@gmail.com (Caesar Wang)
-Date: Sat, 07 Nov 2015 22:41:58 +0800
-Subject: [PATCH v2 4/9] thermal: rockchip: improve the conversion function
-In-Reply-To: <20151106190006.GB8202@localhost.localdomain>
-References: <1446700685-18017-1-git-send-email-wxt@rock-chips.com>
- <1446700685-18017-5-git-send-email-wxt@rock-chips.com>
- <20151106190006.GB8202@localhost.localdomain>
-Message-ID: <563E0DB6.3010704@gmail.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Sat, 7 Nov 2015 07:29:52 -0800
+Subject: [PATCH v2 1/4] watchdog: meson: Enable meson SoC specific data
+In-Reply-To: <1446894139-6802-2-git-send-email-carlo@caione.org>
+References: <1446894139-6802-1-git-send-email-carlo@caione.org>
+ <1446894139-6802-2-git-send-email-carlo@caione.org>
+Message-ID: <563E18F0.4030807@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Eduardo,
-
-? 2015?11?07? 03:00, Eduardo Valentin ??:
-> Hello Caesar,
+On 11/07/2015 03:02 AM, Carlo Caione wrote:
+> From: Carlo Caione <carlo@endlessm.com>
 >
-> On Thu, Nov 05, 2015 at 01:18:00PM +0800, Caesar Wang wrote:
->> We should make the conversion table in as a parameter since the different
->> SoCs have the different conversionion table.
->>
->> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
->> ---
->>
->> Changes in v2:
->> - make the conversion table in as a parameter both code_to_temp
->>    and temp_to_code function.
+> With this patch we refactor the driver code to enable watchdog support
+> for all platforms based on Amlogic meson SoCs.
 >
-> Now it looks cleaner. Thanks.
+> Signed-off-by: Carlo Caione <carlo@endlessm.com>
+> ---
+>   drivers/watchdog/meson_wdt.c | 56 ++++++++++++++++++++++++++++++--------------
+>   1 file changed, 39 insertions(+), 17 deletions(-)
 >
-> The comments below are probably not directly on this change. You may
-> want to add a different patch that takes care of the suggestions that
-> follows.
-
-Okay, I will send a another patch to fix it.
-Thanks your reviewing this patch.
-
-
-
-
->> Series-changes: 1
->> - As Dmitry comment, make the conversion table in as a parameter.
->>
->> Changes in v1: None
->>
->>   drivers/thermal/rockchip_thermal.c | 82 +++++++++++++++++++++++++-------------
->>   1 file changed, 55 insertions(+), 27 deletions(-)
->>
->> diff --git a/drivers/thermal/rockchip_thermal.c b/drivers/thermal/rockchip_thermal.c
->> index bdf7063..e828f18 100644
->> --- a/drivers/thermal/rockchip_thermal.c
->> +++ b/drivers/thermal/rockchip_thermal.c
->> @@ -58,6 +58,16 @@ enum sensor_id {
->>    */
->>   #define SOC_MAX_SENSORS	2
->>   
->> +struct chip_tsadc_table {
->> +	const struct tsadc_table *id;
->> +
->> +	/* the array table size*/
->> +	unsigned int length;
->> +
->> +	/* that analogic mask data */
->> +	unsigned long data_mask;
-> Are you sure this need to be long?
-
-Seem.....we should mark the 'unsigned int  or u32'.
-
-
->> +};
->> +
->>   struct rockchip_tsadc_chip {
->>   	/* The sensor id of chip correspond to the ADC channel */
->>   	int chn_id[SOC_MAX_SENSORS];
->> @@ -74,9 +84,14 @@ struct rockchip_tsadc_chip {
->>   	void (*control)(void __iomem *reg, bool on);
->>   
->>   	/* Per-sensor methods */
->> -	int (*get_temp)(int chn, void __iomem *reg, int *temp);
->> -	void (*set_tshut_temp)(int chn, void __iomem *reg, long temp);
->> +	int (*get_temp)(struct chip_tsadc_table table,
->> +			int chn, void __iomem *reg, int *temp);
->> +	void (*set_tshut_temp)(struct chip_tsadc_table table,
->> +			       int chn, void __iomem *reg, long temp);
-> Temperature is currently represented as int not long in the thermal
-> framework. You may want to send a different patch that normalize the
-> temperature representation in your driver (long -> int).
-
-Okay
-
->>   	void (*set_tshut_mode)(int chn, void __iomem *reg, enum tshut_mode m);
->> +
->> +	/* Per-table methods */
->> +	struct chip_tsadc_table table;
->>   };
->>   
->>   struct rockchip_thermal_sensor {
->> @@ -172,21 +187,22 @@ static const struct tsadc_table v2_code_table[] = {
->>   	{3421, 125000},
->>   };
->>   
->> -static u32 rk_tsadcv2_temp_to_code(long temp)
->> +static u32 rk_tsadcv2_temp_to_code(struct chip_tsadc_table table,
->> +				   long temp)
-> Same comment here.
-
-Okay
->>   {
->>   	int high, low, mid;
->>   
->>   	low = 0;
->> -	high = ARRAY_SIZE(v2_code_table) - 1;
->> +	high = table.length - 1;
->>   	mid = (high + low) / 2;
->>   
->> -	if (temp < v2_code_table[low].temp || temp > v2_code_table[high].temp)
->> +	if (temp < table.id[low].temp || temp > table.id[high].temp)
->>   		return 0;
->>   
->>   	while (low <= high) {
->> -		if (temp == v2_code_table[mid].temp)
->> -			return v2_code_table[mid].code;
->> -		else if (temp < v2_code_table[mid].temp)
->> +		if (temp == table.id[mid].temp)
->> +			return table.id[mid].code;
->> +		else if (temp < table.id[mid].temp)
->>   			high = mid - 1;
->>   		else
->>   			low = mid + 1;
->> @@ -196,25 +212,26 @@ static u32 rk_tsadcv2_temp_to_code(long temp)
->>   	return 0;
->>   }
->>   
->> -static int rk_tsadcv2_code_to_temp(u32 code, int *temp)
->> +static int rk_tsadcv2_code_to_temp(struct chip_tsadc_table table, u32 code,
->> +				   int *temp)
-> Here you are ok already.
+> diff --git a/drivers/watchdog/meson_wdt.c b/drivers/watchdog/meson_wdt.c
+> index 1f4155e..446af94 100644
+> --- a/drivers/watchdog/meson_wdt.c
+> +++ b/drivers/watchdog/meson_wdt.c
+> @@ -19,6 +19,7 @@
+>   #include <linux/moduleparam.h>
+>   #include <linux/notifier.h>
+>   #include <linux/of.h>
+> +#include <linux/of_device.h>
+>   #include <linux/platform_device.h>
+>   #include <linux/reboot.h>
+>   #include <linux/types.h>
+> @@ -27,35 +28,47 @@
+>   #define DRV_NAME		"meson_wdt"
 >
->>   {
->>   	unsigned int low = 1;
->> -	unsigned int high = ARRAY_SIZE(v2_code_table) - 1;
->> +	unsigned int high = table.length - 1;
->>   	unsigned int mid = (low + high) / 2;
->>   	unsigned int num;
->>   	unsigned long denom;
->>   
->> -	BUILD_BUG_ON(ARRAY_SIZE(v2_code_table) < 2);
->> +	WARN_ON(table.length < 2);
->>   
->> -	code &= TSADCV2_DATA_MASK;
->> -	if (code < v2_code_table[high].code)
->> +	code &= table.data_mask;
->> +	if (code < table.id[high].code)
->>   		return -EAGAIN;		/* Incorrect reading */
->>   
->>   	while (low <= high) {
->> -		if (code >= v2_code_table[mid].code &&
->> -		    code < v2_code_table[mid - 1].code)
->> +		if (code >= table.id[mid].code &&
->> +		    code < table.id[mid - 1].code)
->>   			break;
->> -		else if (code < v2_code_table[mid].code)
->> +		else if (code < table.id[mid].code)
->>   			low = mid + 1;
->>   		else
->>   			high = mid - 1;
->> @@ -227,10 +244,10 @@ static int rk_tsadcv2_code_to_temp(u32 code, int *temp)
->>   	 * temperature between 2 table entries is linear and interpolate
->>   	 * to produce less granular result.
->>   	 */
->> -	num = v2_code_table[mid].temp - v2_code_table[mid - 1].temp;
->> -	num *= v2_code_table[mid - 1].code - code;
->> -	denom = v2_code_table[mid - 1].code - v2_code_table[mid].code;
->> -	*temp = v2_code_table[mid - 1].temp + (num / denom);
->> +	num = table.id[mid].temp - v2_code_table[mid - 1].temp;
->> +	num *= table.id[mid - 1].code - code;
->> +	denom = table.id[mid - 1].code - table.id[mid].code;
->> +	*temp = table.id[mid - 1].temp + (num / denom);
->>   
->>   	return 0;
->>   }
->> @@ -290,20 +307,22 @@ static void rk_tsadcv2_control(void __iomem *regs, bool enable)
->>   	writel_relaxed(val, regs + TSADCV2_AUTO_CON);
->>   }
->>   
->> -static int rk_tsadcv2_get_temp(int chn, void __iomem *regs, int *temp)
->> +static int rk_tsadcv2_get_temp(struct chip_tsadc_table table,
->> +			       int chn, void __iomem *regs, int *temp)
->>   {
->>   	u32 val;
->>   
->>   	val = readl_relaxed(regs + TSADCV2_DATA(chn));
->>   
->> -	return rk_tsadcv2_code_to_temp(val, temp);
->> +	return rk_tsadcv2_code_to_temp(table, val, temp);
->>   }
->>   
->> -static void rk_tsadcv2_tshut_temp(int chn, void __iomem *regs, long temp)
->> +static void rk_tsadcv2_tshut_temp(struct chip_tsadc_table table,
->> +				  int chn, void __iomem *regs, long temp)
-> Here needs fixing.
+>   #define MESON_WDT_TC		0x00
+> -#define MESON_WDT_TC_EN		BIT(22)
+> -#define MESON_WDT_TC_TM_MASK	0x3fffff
+>   #define MESON_WDT_DC_RESET	(3 << 24)
+>
+>   #define MESON_WDT_RESET		0x04
+>
+> -#define MESON_WDT_TIMEOUT	30
+> +#define MESON_WDT_TIMEOUT	5
 
-Okay.
+This is not a reasonable default, the change is not mentioned
+in the description, and it is unrelated to the change at hand.
+Sorry if I overlooked it in v1.
 
->
-> BR,
->
-> Eduardo Valentin
->
-> _______________________________________________
-> Linux-rockchip mailing list
-> Linux-rockchip at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-rockchip
+Guenter
