@@ -1,66 +1,73 @@
-From: carlo@caione.org (Carlo Caione)
-Date: Sat, 7 Nov 2015 16:45:26 +0100
-Subject: [PATCH v2 1/4] watchdog: meson: Enable meson SoC specific data
-In-Reply-To: <563E18F0.4030807@roeck-us.net>
-References: <1446894139-6802-1-git-send-email-carlo@caione.org>
- <1446894139-6802-2-git-send-email-carlo@caione.org>
- <563E18F0.4030807@roeck-us.net>
-Message-ID: <CAOQ7t2a1KBUbTvtcu7ajyX35Kx1khtYHc8pGmYdYC=872oNMQA@mail.gmail.com>
+From: caesar.upstream@gmail.com (Caesar Wang)
+Date: Sat, 07 Nov 2015 23:47:45 +0800
+Subject: [PATCH v2 0/9] Better compatible for the rockchip thermal and
+ support RK3368 SoCs
+In-Reply-To: <20151106184739.GA8202@localhost.localdomain>
+References: <1446700685-18017-1-git-send-email-wxt@rock-chips.com>
+ <20151106184739.GA8202@localhost.localdomain>
+Message-ID: <563E1D21.8030502@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Nov 7, 2015 at 4:29 PM, Guenter Roeck <linux@roeck-us.net> wrote:
-> On 11/07/2015 03:02 AM, Carlo Caione wrote:
+Hi Eduardo,
+
+? 2015?11?07? 02:47, Eduardo Valentin ??:
+> Caesar,
+>
+> On Thu, Nov 05, 2015 at 01:17:56PM +0800, Caesar Wang wrote:
+>> This series patchs are working for RK3368 on Rockchip platform.
 >>
->> From: Carlo Caione <carlo@endlessm.com>
+> Good to see the perseverance! :-)
+
+I will send th patch [4-6]  next version and another pacth(fix the long 
+temp->int temp) on tomorrow.
+Need the verify it on my board firstly.:-P
+
+
+>
+>> @Heiko,
+>>      The PATCH [5/6] is working based on big/littel cluster cpufreq
+>>      added. Anyway, the PATCH [5/6] also work for next kernel.
 >>
->> With this patch we refactor the driver code to enable watchdog support
->> for all platforms based on Amlogic meson SoCs.
+>> @Eduardo,
+>> This patchset are based on linus master branch.
+>> Note: Need add the following thermal patchs for thermal driver before apply
+>> this series patchs.
 >>
->> Signed-off-by: Carlo Caione <carlo@endlessm.com>
->> ---
->>   drivers/watchdog/meson_wdt.c | 56
->> ++++++++++++++++++++++++++++++--------------
->>   1 file changed, 39 insertions(+), 17 deletions(-)
+>> 1) thermal: rockchip: fix handling of invalid readings
+>> (https://patchwork.kernel.org/patch/6973101/)
 >>
->> diff --git a/drivers/watchdog/meson_wdt.c b/drivers/watchdog/meson_wdt.c
->> index 1f4155e..446af94 100644
->> --- a/drivers/watchdog/meson_wdt.c
->> +++ b/drivers/watchdog/meson_wdt.c
->> @@ -19,6 +19,7 @@
->>   #include <linux/moduleparam.h>
->>   #include <linux/notifier.h>
->>   #include <linux/of.h>
->> +#include <linux/of_device.h>
->>   #include <linux/platform_device.h>
->>   #include <linux/reboot.h>
->>   #include <linux/types.h>
->> @@ -27,35 +28,47 @@
->>   #define DRV_NAME              "meson_wdt"
+>> 2) thermal: rockhip: fix setting thermal shutdown polarity
+>> (https://patchwork.kernel.org/patch/6973131/)
 >>
->>   #define MESON_WDT_TC          0x00
->> -#define MESON_WDT_TC_EN                BIT(22)
->> -#define MESON_WDT_TC_TM_MASK   0x3fffff
->>   #define MESON_WDT_DC_RESET    (3 << 24)
+>> 3) dt-bindings: rockchip-thermal: Add the pinctrl states in this document
+>> (https://patchwork.kernel.org/patch/7472021/)
 >>
->>   #define MESON_WDT_RESET               0x04
+>> 4) thermal: rockchip: support the sleep pinctrl state to avoid glitches in s2r
+>> (https://patchwork.kernel.org/patch/7472051/)
 >>
->> -#define MESON_WDT_TIMEOUT      30
->> +#define MESON_WDT_TIMEOUT      5
+>> I'm glad these patchs have merged in thermal-soc git tree which can be found at
+>> git://git.kernel.org/pub/scm/linux/kernel/git/evalenti/linux-soc-thermal.git
+> Yeah, apologize the delay on giving you a feedback on your code. As I
+> mentioned before, I had a couple of other things in past weeks that
+> consumed my time.
+
+I see, that have been a very response from you.
+Thank you taking your time to review this series patchs.:-)
+
+
+> Anyways, this specific patch series looks way better now that you have
+> split it further. I will have a better look on it again and let you
+> know when it will land.
+
+Many thank again.
+
+> BR,
+>
+> Eduardo Valentin
 >
 >
-> This is not a reasonable default, the change is not mentioned
-> in the description, and it is unrelated to the change at hand.
-
-The problem is that the default is too small or simply that the change
-is not mentioned?
-
-For the meson8b the maximum timeout is ~8 sec whereas for meson6 is
-~40 sec that's why I lowered the default from 30 to 5 sec.
-I can set a different default for each SoC but at least for meson8b
-the value will be always < 8 sec.
-
-Thanks,
-
--- 
-Carlo Caione
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
