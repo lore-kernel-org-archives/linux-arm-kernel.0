@@ -1,58 +1,75 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Fri, 6 Nov 2015 16:11:09 -0800
-Subject: [PATCH 04/19] clk: sunxi: Add TCON channel1 clock
-In-Reply-To: <20151030213734.GI19782@codeaurora.org>
-References: <1446214865-3972-1-git-send-email-maxime.ripard@free-electrons.com>
- <1446214865-3972-5-git-send-email-maxime.ripard@free-electrons.com>
- <20151030213734.GI19782@codeaurora.org>
-Message-ID: <20151107001109.GQ6114@lukather>
+From: timur@codeaurora.org (Timur Tabi)
+Date: Fri,  6 Nov 2015 18:18:23 -0600
+Subject: [PATCH] tty: amba-pl011: add support for 32-bit register access for
+ earlycon
+Message-ID: <1446855503-25881-1-git-send-email-timur@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Add support the "mmio32" earlycon option for the pl011 device.  If
+specified in the earlycon parameter, all reads/writes to pl011 registers
+during early console will use 32-bit accessors.  Normally the function
+uses 8-bit writes.
 
-On Fri, Oct 30, 2015 at 02:37:34PM -0700, Stephen Boyd wrote:
-> On 10/30, Maxime Ripard wrote:
-> > The TCON is a controller generating the timings to output videos signals,
-> > acting like both a CRTC and an encoder.
-> > 
-> > It has two channels depending on the output, each channel being driven by
-> > its own clock (and own clock controller).
-> > 
-> > Add a driver for the channel 1 clock.
-> > 
-> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> 
-> Similar comments apply to patches 3 and 4. Was the same code
-> copy/pasted two more times and then changed to have different
-> values?
+Normal console uses the "access_32b" field of the vendor data structure
+to determine whether the registers needs 32-bit accessors.  Early console
+is used before the vendor data is available, so we need a different
+mechanism to choose the accessor.
 
-I don't really recall, but I probably used the same skeleton yeah.
+Example:
 
-> Looks like we should consolidate all that stuff into something more
-> generic so that we don't have the same problems 3 times.
+	earlycon=pl011,mmio32,0x3ced1000
 
-Does it?
+Signed-off-by: Timur Tabi <timur@codeaurora.org>
+---
 
-They're both pretty different actually. One is a gate + mux + reset
-(patch 3), the other one is actually a combination of two clocks, one
-that is the parent of the other, the former being a gate + mux, the
-latter a gate + div.
+This patch applies on top of Russell's 12-part amba-pl011.c patchset.
 
-At least at the hardware level, they're very different, and adding
-more code to deal with both case would complicate quite a lot the
-probe code, for no real reasons.
+ Documentation/kernel-parameters.txt | 5 ++++-
+ drivers/tty/serial/amba-pl011.c     | 9 ++++++---
+ 2 files changed, 10 insertions(+), 4 deletions(-)
 
-Maxime
-
+diff --git a/Documentation/kernel-parameters.txt b/Documentation/kernel-parameters.txt
+index 22a4b68..2436f62 100644
+--- a/Documentation/kernel-parameters.txt
++++ b/Documentation/kernel-parameters.txt
+@@ -992,10 +992,13 @@ bytes respectively. Such letter suffixes can also be entirely omitted.
+ 			unspecified, the h/w is not initialized.
+ 
+ 		pl011,<addr>
++		pl011,mmio32,<addr>
+ 			Start an early, polled-mode console on a pl011 serial
+ 			port at the specified address. The pl011 serial port
+ 			must already be setup and configured. Options are not
+-			yet supported.
++			yet supported.  If 'mmio32' is specified, then only
++			the driver will use only 32-bit accessors to read/write
++			the device registers.
+ 
+ 		msm_serial,<addr>
+ 			Start an early, polled-mode console on an msm serial
+diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
+index 373b152..6643ed9 100644
+--- a/drivers/tty/serial/amba-pl011.c
++++ b/drivers/tty/serial/amba-pl011.c
+@@ -2301,10 +2301,13 @@ static struct console amba_console = {
+ 
+ static void pl011_putc(struct uart_port *port, int c)
+ {
+-	while (readl(port->membase + REG_FR) & UART01x_FR_TXFF)
++	while (readl(port->membase + UART01x_FR) & UART01x_FR_TXFF)
+ 		;
+-	writeb(c, port->membase + REG_DR);
+-	while (readl(port->membase + REG_FR) & UART01x_FR_BUSY)
++	if (port->iotype == UPIO_MEM32)
++		writel(c, port->membase + UART01x_DR);
++	else
++		writeb(c, port->membase + UART01x_DR);
++	while (readl(port->membase + UART01x_FR) & UART01x_FR_BUSY)
+ 		;
+ }
+ 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151106/7b03f575/attachment.sig>
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project.
