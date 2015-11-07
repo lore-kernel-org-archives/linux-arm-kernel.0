@@ -1,93 +1,44 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Sat, 7 Nov 2015 13:40:23 -0800
-Subject: [PATCH v3 1/4] dt-bindings: add SMP enable-method for Broadcom NSP
-In-Reply-To: <1446844273-6460-2-git-send-email-kapilh@broadcom.com>
-References: <1446844273-6460-1-git-send-email-kapilh@broadcom.com>
- <1446844273-6460-2-git-send-email-kapilh@broadcom.com>
-Message-ID: <563E6FC7.6070700@gmail.com>
+From: peter@hurleysoftware.com (Peter Hurley)
+Date: Sat, 7 Nov 2015 17:36:34 -0500
+Subject: [PATCH] tty: amba-pl011: add options to earlycon for 32-bit reg
+ access
+In-Reply-To: <563CF8AF.50808@codeaurora.org>
+References: <1446770267-26749-1-git-send-email-timur@codeaurora.org>
+ <563C07C8.9060506@hurleysoftware.com> <563C09BB.9030706@codeaurora.org>
+ <563C1409.4070804@hurleysoftware.com> <563CF8AF.50808@codeaurora.org>
+Message-ID: <563E7CF2.60609@hurleysoftware.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Le 06/11/2015 13:11, Kapil Hali a ?crit :
-> Add a compatible string "brcm,bcm-nsp-smp" for Broadcom's
-> Northstar Plus CPU to the 32-bit ARM CPU device tree binding
-> documentation file and create a new binding documentation for
-> Northstar Plus CPU.
+On 11/06/2015 01:59 PM, Timur Tabi wrote:
+> On 11/05/2015 08:44 PM, Peter Hurley wrote:
+>> Or better yet, for sbsa32 earlycon, just use the existing port type constructs.
+>> So,
+>>
+>>     earlycon=pl011,mmio32,0x3ced1000
+>>
+>> which will set port->iotype to UPIO_MEM32, which in turn can be used to select
+>> the correct i/o width in pl011_putc().
 > 
-> Signed-off-by: Kapil Hali <kapilh@broadcom.com>
-> ---
->  .../bindings/arm/bcm/brcm,nsp-cpu-method.txt       | 36 ++++++++++++++++++++++
->  Documentation/devicetree/bindings/arm/cpus.txt     |  1 +
->  2 files changed, 37 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/arm/bcm/brcm,nsp-cpu-method.txt
+> That's a great idea.  But why aren't we using it for pl011_write()?
+
+I'll note that when I review Russell's v2 series, if necessary.
+What is the plan to introduce the SBSA32 support? After the ACPI support is
+upstreamed?
+
+Regards,
+Peter Hurley
+
+
+> static void pl011_write(unsigned int val, const struct uart_amba_port *uap,
+>     unsigned int reg)
+> {
+>     void __iomem *addr = uap->port.membase + pl011_reg_to_offset(uap, reg);
 > 
-> diff --git a/Documentation/devicetree/bindings/arm/bcm/brcm,nsp-cpu-method.txt b/Documentation/devicetree/bindings/arm/bcm/brcm,nsp-cpu-method.txt
-> new file mode 100644
-> index 0000000..8506da7
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/arm/bcm/brcm,nsp-cpu-method.txt
-> @@ -0,0 +1,36 @@
-> +Broadcom Northstar Plus SoC CPU Enable Method
-> +---------------------------------------------
-> +This binding defines the enable method used for starting secondary
-> +CPUs in the following Broadcom SoCs:
-> +  BCM58522, BCM58525, BCM58535, BCM58622, BCM58623, BCM58625, BCM88312
-> +
-> +The enable method is specified by defining the following required
-> +properties in the "cpus" device tree node:
-> +  - enable-method = "brcm,bcm-nsp-smp";
-> +  - secondary-boot-reg = <...>;
-> +
-> +The secondary-boot-reg property is a u32 value that specifies the
-> +physical address of the register used to request the ROM holding pen
-> +code release a secondary CPU.
-
-Is it really how the ROM code is implemented, as a pen holding/release
-mechanism (which sounds like how this was implemented previously in the
-kernel actually) or should this be described in a more generic way as
-the physical address of the register where the secondary CPUs reset
-vector address must be written to? Or something along these lines.
-
-> +
-> +Example:
-> +	cpus {
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +		enable-method = "brcm,bcm-nsp-smp";
-
-Just a nit, but if NSP and NS are sharing the same mechanism, would not
-a more "NS-centric" property be more appropriate because NS came before NSP?
-
-> +		secondary-boot-reg = <0xffff042c>;
-> +
-> +		cpu0: cpu at 0 {
-> +			device_type = "cpu";
-> +			compatible = "arm,cortex-a9";
-> +			next-level-cache = <&L2>;
-> +			reg = <0>;
-> +		};
-> +
-> +		cpu1: cpu at 1 {
-> +			device_type = "cpu";
-> +			compatible = "arm,cortex-a9";
-> +			next-level-cache = <&L2>;
-> +			reg = <1>;
-> +		};
-> +	};
-> diff --git a/Documentation/devicetree/bindings/arm/cpus.txt b/Documentation/devicetree/bindings/arm/cpus.txt
-> index 91e6e5c..6abe3f3 100644
-> --- a/Documentation/devicetree/bindings/arm/cpus.txt
-> +++ b/Documentation/devicetree/bindings/arm/cpus.txt
-> @@ -191,6 +191,7 @@ nodes to be present and contain the properties described below.
->  			    "allwinner,sun8i-a23"
->  			    "arm,psci"
->  			    "brcm,brahma-b15"
-> +			    "brcm,bcm-nsp-smp"
->  			    "marvell,armada-375-smp"
->  			    "marvell,armada-380-smp"
->  			    "marvell,armada-390-smp"
+>     if (uap->port.iotype == UPIO_MEM32)
+>         writel(val, addr);
+>     else
+>         writew(val, addr);
+> }
 > 
-
-
--- 
-Florian
+> 
