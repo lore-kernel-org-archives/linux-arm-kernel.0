@@ -1,69 +1,52 @@
-From: German.Rivera@freescale.com (J. German Rivera)
-Date: Fri, 6 Nov 2015 19:38:13 -0600
-Subject: [PATCH v6] arm64: dts: Added syscon-reboot node for FSL's LS2080A SoC
-Message-ID: <1446860293-7145-1-git-send-email-German.Rivera@freescale.com>
+From: ssimran@broadcom.com (Simran Rai)
+Date: Fri, 6 Nov 2015 18:22:42 -0800
+Subject: [PATCH v3 0/3] sound: soc: Add audio support for Broadcom Cygnus SoC
+Message-ID: <1446862965-18667-1-git-send-email-ssimran@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Added sys-reboot node to the FSL's LS2080A SoC DT to leverage
-the ARM-generic reboot mechanism for this SoC. This mechanism
-is enabled through CONFIG_POWER_RESET_SYSCON.
+Hi,
 
-Signed-off-by: J. German Rivera <German.Rivera@freescale.com>
----
-CHANGE HISTORY:
+This patchset contains audio support for Broadcom's Cygnus SoC. It
+contains DT bindings and core audio driver. The audio driver
+supports both capture and playback of Audio PCM samples over I2S/TDM
+interface and provides playback support over SPDIF interface.
 
-Changes in v6:
-- Addressed comment from Javier Martinez Canillas
-  * Moved change history out of actual commit message
-- Addressed comment from Leo Li
-  * Refer to LS2080A in compatible string
+This patchset is derived from a previously submitted patchset:
+http://lkml.iu.edu/hypermail/linux/kernel/1503.3/05434.html
 
-Changes in v5:
-- Addressed comment from Stuart Yoder
-  * Fixed commit message to refer to LS2080A instead of LS2085A.
+This patchset has been tested on Cygnus wireless audio bcm958305K board.
+It is based on v4.3-rc5  and is available from github:
 
-Changes in v4:
-- Addressed comment from Arnd Bergmann:
-  * Changed compatible string to be more specific
-  * Changed node name to 'syscon' instead of 'rstcr'
-  * Changed address to lower case hex
-- Addressed comment form Stuart Yoder:
-  * Rebase on top of branch arm-soc/for-next
+repo: https://github.com/Broadcom/cygnus-linux/tree/cygnus-sound-v3
 
-Changes in v3:
-- Addressed comment form Stuart Yoder:
-  * Expose only the reset register
+Changes from v2:
+ - Split patchset 2/2 from v2 into patchsets 2/3 and 3/3.
+ - Remove SND_SOC_CYGNUS_DIAG. Diagnostics can be performed using
+   standard kernel trace infrastructure.
+ - Fix interrupt handler. Acknowledge only those interrupts that are
+   handledby ISR.
+ - Modify configure_vco() and the pll_macro_entry() struct to make it
+   better readable. The functionality did not change.
+ - Remove casts on macros
+ - Removed surround sound channel grouping from the driver.
 
-Changes in v2:
-- Addressed comment form Stuart Yoder:
-  * Removed "@<address>" from reboot node
+Simran Rai (3):
+  dt-bindings: sound: Add DT bindings for Broadcom Cygnus audio
+  sound: soc: Add Cygnus audio DAI driver
+  sound: soc: Add Cygnus audio DMA driver
 
- arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi | 12 ++++++++++++
- 1 file changed, 12 insertions(+)
+ .../bindings/sound/brcm,cygnus-audio.txt           |   54 +
+ sound/soc/bcm/Kconfig                              |    9 +
+ sound/soc/bcm/Makefile                             |    5 +
+ sound/soc/bcm/cygnus-pcm.c                         |  859 +++++++++++
+ sound/soc/bcm/cygnus-ssp.c                         | 1508 ++++++++++++++++++++
+ sound/soc/bcm/cygnus-ssp.h                         |  129 ++
+ 6 files changed, 2564 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/sound/brcm,cygnus-audio.txt
+ create mode 100644 sound/soc/bcm/cygnus-pcm.c
+ create mode 100644 sound/soc/bcm/cygnus-ssp.c
+ create mode 100644 sound/soc/bcm/cygnus-ssp.h
 
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
-index e81cd48..65ac35f 100644
---- a/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
-@@ -153,6 +153,18 @@
- 		};
- 	};
-
-+	rstcr: syscon at 1e60000 {
-+		compatible = "fsl,ls2080a-rstcr", "syscon";
-+		reg = <0x0 0x1e60000 0x0 0x4>;
-+	};
-+
-+	reboot {
-+		compatible ="syscon-reboot";
-+		regmap = <&rstcr>;
-+		offset = <0x0>;
-+		mask = <0x2>;
-+	};
-+
- 	timer {
- 		compatible = "arm,armv8-timer";
- 		interrupts = <1 13 0x8>, /* Physical Secure PPI, active-low */
---
-2.3.3
+-- 
+1.7.9.5
