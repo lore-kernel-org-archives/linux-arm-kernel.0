@@ -1,89 +1,95 @@
 From: heiko@sntech.de (Heiko Stuebner)
-Date: Sun,  8 Nov 2015 17:04:39 +0100
-Subject: [PATCH v2 6/8] ARM: dts: rockchip: add clock-cells for usb phy nodes
+Date: Sun,  8 Nov 2015 17:04:35 +0100
+Subject: [PATCH v2 2/8] phy: rockchip-usb: introduce a common data-struct for
+ the device
 In-Reply-To: <1446998681-26436-1-git-send-email-heiko@sntech.de>
 References: <1446998681-26436-1-git-send-email-heiko@sntech.de>
-Message-ID: <1446998681-26436-7-git-send-email-heiko@sntech.de>
+Message-ID: <1446998681-26436-3-git-send-email-heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the #clock-cells properties for the usbphy nodes as they
-provide the pll-clocks now.
+This introduces a common struct that holds data belonging to
+the umbrella device that contains all the phys and that we
+want to use later.
 
 Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 ---
- arch/arm/boot/dts/rk3066a.dtsi | 2 ++
- arch/arm/boot/dts/rk3188.dtsi  | 2 ++
- arch/arm/boot/dts/rk3288.dtsi  | 3 +++
- 3 files changed, 7 insertions(+)
+ drivers/phy/phy-rockchip-usb.c | 26 +++++++++++++++++++-------
+ 1 file changed, 19 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm/boot/dts/rk3066a.dtsi b/arch/arm/boot/dts/rk3066a.dtsi
-index 946f187..3e4b41b 100644
---- a/arch/arm/boot/dts/rk3066a.dtsi
-+++ b/arch/arm/boot/dts/rk3066a.dtsi
-@@ -181,6 +181,7 @@
- 			reg = <0x17c>;
- 			clocks = <&cru SCLK_OTGPHY0>;
- 			clock-names = "phyclk";
-+			#clock-cells = <0>;
- 		};
+diff --git a/drivers/phy/phy-rockchip-usb.c b/drivers/phy/phy-rockchip-usb.c
+index dfc056b..e081053 100644
+--- a/drivers/phy/phy-rockchip-usb.c
++++ b/drivers/phy/phy-rockchip-usb.c
+@@ -36,9 +36,14 @@
+ #define SIDDQ_ON		BIT(13)
+ #define SIDDQ_OFF		(0 << 13)
  
- 		usbphy1: usb-phy1 {
-@@ -188,6 +189,7 @@
- 			reg = <0x188>;
- 			clocks = <&cru SCLK_OTGPHY1>;
- 			clock-names = "phyclk";
-+			#clock-cells = <0>;
- 		};
- 	};
++struct rockchip_usb_phy_base {
++	struct device *dev;
++	struct regmap *reg_base;
++};
++
+ struct rockchip_usb_phy {
++	struct rockchip_usb_phy_base *base;
+ 	unsigned int	reg_offset;
+-	struct regmap	*reg_base;
+ 	struct clk	*clk;
+ 	struct phy	*phy;
+ };
+@@ -46,7 +51,7 @@ struct rockchip_usb_phy {
+ static int rockchip_usb_phy_power(struct rockchip_usb_phy *phy,
+ 					   bool siddq)
+ {
+-	return regmap_write(phy->reg_base, phy->reg_offset,
++	return regmap_write(phy->base->reg_base, phy->reg_offset,
+ 			    SIDDQ_WRITE_ENA | (siddq ? SIDDQ_ON : SIDDQ_OFF));
+ }
  
-diff --git a/arch/arm/boot/dts/rk3188.dtsi b/arch/arm/boot/dts/rk3188.dtsi
-index 6399942..48a287e 100644
---- a/arch/arm/boot/dts/rk3188.dtsi
-+++ b/arch/arm/boot/dts/rk3188.dtsi
-@@ -156,6 +156,7 @@
- 			reg = <0x10c>;
- 			clocks = <&cru SCLK_OTGPHY0>;
- 			clock-names = "phyclk";
-+			#clock-cells = <0>;
- 		};
+@@ -101,17 +106,23 @@ static void rockchip_usb_phy_action(void *data)
+ static int rockchip_usb_phy_probe(struct platform_device *pdev)
+ {
+ 	struct device *dev = &pdev->dev;
++	struct rockchip_usb_phy_base *phy_base;
+ 	struct rockchip_usb_phy *rk_phy;
+ 	struct phy_provider *phy_provider;
+ 	struct device_node *child;
+-	struct regmap *grf;
+ 	unsigned int reg_offset;
+ 	int err;
  
- 		usbphy1: usb-phy1 {
-@@ -163,6 +164,7 @@
- 			reg = <0x11c>;
- 			clocks = <&cru SCLK_OTGPHY1>;
- 			clock-names = "phyclk";
-+			#clock-cells = <0>;
- 		};
- 	};
+-	grf = syscon_regmap_lookup_by_phandle(dev->of_node, "rockchip,grf");
+-	if (IS_ERR(grf)) {
++	phy_base = devm_kzalloc(dev, sizeof(*phy_base), GFP_KERNEL);
++	if (!phy_base)
++		return -ENOMEM;
++
++	phy_base->dev = dev;
++	phy_base->reg_base = syscon_regmap_lookup_by_phandle(dev->of_node,
++							     "rockchip,grf");
++	if (IS_ERR(phy_base->reg_base)) {
+ 		dev_err(&pdev->dev, "Missing rockchip,grf property\n");
+-		return PTR_ERR(grf);
++		return PTR_ERR(phy_base->reg_base);
+ 	}
  
-diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
-index e978fb2..f778458 100644
---- a/arch/arm/boot/dts/rk3288.dtsi
-+++ b/arch/arm/boot/dts/rk3288.dtsi
-@@ -960,6 +960,7 @@
- 			reg = <0x320>;
- 			clocks = <&cru SCLK_OTGPHY0>;
- 			clock-names = "phyclk";
-+			#clock-cells = <0>;
- 		};
+ 	for_each_available_child_of_node(dev->of_node, child) {
+@@ -119,6 +130,8 @@ static int rockchip_usb_phy_probe(struct platform_device *pdev)
+ 		if (!rk_phy)
+ 			return -ENOMEM;
  
- 		usbphy1: usb-phy1 {
-@@ -967,6 +968,7 @@
- 			reg = <0x334>;
- 			clocks = <&cru SCLK_OTGPHY1>;
- 			clock-names = "phyclk";
-+			#clock-cells = <0>;
- 		};
++		rk_phy->base = phy_base;
++
+ 		if (of_property_read_u32(child, "reg", &reg_offset)) {
+ 			dev_err(dev, "missing reg property in node %s\n",
+ 				child->name);
+@@ -126,7 +139,6 @@ static int rockchip_usb_phy_probe(struct platform_device *pdev)
+ 		}
  
- 		usbphy2: usb-phy2 {
-@@ -974,6 +976,7 @@
- 			reg = <0x348>;
- 			clocks = <&cru SCLK_OTGPHY2>;
- 			clock-names = "phyclk";
-+			#clock-cells = <0>;
- 		};
- 	};
+ 		rk_phy->reg_offset = reg_offset;
+-		rk_phy->reg_base = grf;
  
+ 		rk_phy->clk = of_clk_get_by_name(child, "phyclk");
+ 		if (IS_ERR(rk_phy->clk))
 -- 
 2.6.2
