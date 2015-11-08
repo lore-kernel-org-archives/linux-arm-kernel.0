@@ -1,10 +1,10 @@
 From: julia.lawall@lip6.fr (Julia Lawall)
-Date: Sun, 8 Nov 2015 21:17:46 +0000 (GMT)
+Date: Sun, 8 Nov 2015 21:19:04 +0000 (GMT)
 Subject: [PATCH] dma: fix returnvar.cocci warnings
 In-Reply-To: <CAHp75VdRN14EWUaTPzO45Z_mBzeQ=9sqzP3mMsMSQ2nXNi5QKg@mail.gmail.com>
 References: <alpine.DEB.2.10.1511080843100.2637@hadrien>
  <CAHp75VdRN14EWUaTPzO45Z_mBzeQ=9sqzP3mMsMSQ2nXNi5QKg@mail.gmail.com>
-Message-ID: <alpine.DEB.2.10.1511082117070.2583@hadrien>
+Message-ID: <alpine.DEB.2.10.1511082118220.2583@hadrien>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -19,16 +19,15 @@ On Sun, 8 Nov 2015, Andy Shevchenko wrote:
 > >
 > > CC: Sinan Kaya <okaya@codeaurora.org>
 > > Signed-off-by: Fengguang Wu <fengguang.wu@intel.com>
-
-Signed-off-by: Julia Lawall <julia.lawall@lip6.fr>
-
-Sorry for the oversight.
-
-julia
-
 >
 > Who is the author?
 > I suppose Fengguang is the reporter, right?
+
+There is no human author...  But normally when I check these I add a
+signed off by line to them.
+
+julia
+
 >
 > > ---
 > >
