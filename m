@@ -1,713 +1,109 @@
 From: andy.shevchenko@gmail.com (Andy Shevchenko)
-Date: Sun, 8 Nov 2015 22:09:32 +0200
-Subject: [PATCH V3 3/4] dmaselftest: add memcpy selftest support functions
-In-Reply-To: <1446958380-23298-4-git-send-email-okaya@codeaurora.org>
-References: <1446958380-23298-1-git-send-email-okaya@codeaurora.org>
- <1446958380-23298-4-git-send-email-okaya@codeaurora.org>
-Message-ID: <CAHp75VfS6iCYcWeFmbK2PEUYLntQQRdsmN=7gttFpOn=CfrSZg@mail.gmail.com>
+Date: Sun, 8 Nov 2015 22:35:10 +0200
+Subject: [PATCH] acpi: add support for extended IRQ to PCI link
+In-Reply-To: <1446998832-7023-1-git-send-email-okaya@codeaurora.org>
+References: <1446998832-7023-1-git-send-email-okaya@codeaurora.org>
+Message-ID: <CAHp75VfH9-OpQdX_aoraLEcHewdRPFoR5My8mN2jU30ittS7oA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Nov 8, 2015 at 6:52 AM, Sinan Kaya <okaya@codeaurora.org> wrote:
-> This patch adds supporting utility functions
-> for selftest. The intention is to share the self
-> test code between different drivers.
+On Sun, Nov 8, 2015 at 6:07 PM, Sinan Kaya <okaya@codeaurora.org> wrote:
+> The ACPI compiler uses the extended format when
+> used interrupt numbers are greater than 256.
+> The PCI link code currently only supports simple
+> interrupt format. The IRQ numbers are represented
+> using 32 bits when extended IRQ syntax. This patch
+> changes the interrupt number type to 32 bits and
+> places an upper limit of 1020 as possible interrupt
+> id. Additional checks have been placed to prevent
+> out of bounds writes.
+
+In commit messages and in comments I see this narrow lines, any reason
+to make them short, except increasing number of lines?
+
+> --- a/drivers/acpi/pci_link.c
+> +++ b/drivers/acpi/pci_link.c
+> @@ -1,6 +1,7 @@
+>  /*
+>   *  pci_link.c - ACPI PCI Interrupt Link Device Driver ($Revision: 34 $)
+>   *
+> + *  Copyright (c) 2015, The Linux Foundation. All rights reserved.
+>   *  Copyright (C) 2001, 2002 Andy Grover <andrew.grover@intel.com>
+>   *  Copyright (C) 2001, 2002 Paul Diefenbaugh <paul.s.diefenbaugh@intel.com>
+>   *  Copyright (C) 2002       Dominik Brodowski <devel@brodo.de>
+> @@ -67,12 +68,12 @@ static struct acpi_scan_handler pci_link_handler = {
+>   * later even the link is disable. Instead, we just repick the active irq
+>   */
+>  struct acpi_pci_link_irq {
+> -       u8 active;              /* Current IRQ */
+> +       u32 active;             /* Current IRQ */
+>         u8 triggering;          /* All IRQs */
+>         u8 polarity;            /* All IRQs */
+>         u8 resource_type;
+>         u8 possible_count;
+> -       u8 possible[ACPI_PCI_LINK_MAX_POSSIBLE];
+> +       u32 possible[ACPI_PCI_LINK_MAX_POSSIBLE];
+>         u8 initialized:1;
+>         u8 reserved:7;
+>  };
+> @@ -437,7 +438,7 @@ static int acpi_pci_link_set(struct acpi_pci_link *link, int irq)
+>   * enabled system.
+>   */
 >
-> Supported test cases include:
-> 1. dma_map_single
-> 2. streaming DMA
-> 3. coherent DMA
-> 4. scatter-gather DMA
-
-All below comments about entire file, please check and update.
-
-> +struct test_result {
-> +       atomic_t counter;
-> +       wait_queue_head_t wq;
-> +       struct dma_device *dmadev;
-
-dmadev -> dma.
-
-> +};
-> +
-> +static void dma_selftest_complete(void *arg)
-> +{
-> +       struct test_result *result = arg;
-> +       struct dma_device *dmadev = result->dmadev;
-> +
-> +       atomic_inc(&result->counter);
-> +       wake_up(&result->wq);
-> +       dev_dbg(dmadev->dev, "self test transfer complete :%d\n",
-> +               atomic_read(&result->counter));
-> +}
-> +
-> +/*
-> + * Perform a transaction to verify the HW works.
-> + */
-> +static int dma_selftest_sg(struct dma_device *dmadev,
-
-dmdev -> dma
-
-> +                       struct dma_chan *dma_chanptr, u64 size,
-
-dma_chanptr -> chan
-
-> +                       unsigned long flags)
-> +{
-> +       dma_addr_t src_dma, dest_dma, dest_dma_it;
-
-src_dma -> src, dest_dma_it -> dst ?
-
-> +       u8 *dest_buf;
-
-Perhaps put nearby src_buf definition?
-
-> +       u32 i, j = 0;
-
-unsigned int
-
-> +       dma_cookie_t cookie;
-> +       struct dma_async_tx_descriptor *tx;
-
-> +       int err = 0;
-> +       int ret;
-
-Any reason to have two instead of one of similar meaning?
-
-> +       struct sg_table sg_table;
-> +       struct scatterlist      *sg;
-> +       int nents = 10, count;
-> +       bool free_channel = 1;
-> +       u8 *src_buf;
-> +       int map_count;
-> +       struct test_result result;
-
-Hmm? Maybe make names shorter?
-
-> +
-> +       init_waitqueue_head(&result.wq);
-> +       atomic_set(&result.counter, 0);
-> +       result.dmadev = dmadev;
-> +
-> +       if (!dma_chanptr)
-> +               return -ENOMEM;
-> +
-> +       if (dmadev->device_alloc_chan_resources(dma_chanptr) < 1)
-
-
-> +               return -ENODEV;
-> +
-> +       if (!dma_chanptr->device || !dmadev->dev) {
-> +               dmadev->device_free_chan_resources(dma_chanptr);
-> +               return -ENODEV;
-> +       }
-> +
-> +       ret = sg_alloc_table(&sg_table, nents, GFP_KERNEL);
-> +       if (ret) {
-> +               err = ret;
-> +               goto sg_table_alloc_failed;
-> +       }
-> +
-> +       for_each_sg(sg_table.sgl, sg, nents, i) {
-> +               u64 alloc_sz;
-> +               void *cpu_addr;
-> +
-> +               alloc_sz = round_up(size, nents);
-> +               do_div(alloc_sz, nents);
-> +               cpu_addr = kmalloc(alloc_sz, GFP_KERNEL);
-> +
-> +               if (!cpu_addr) {
-> +                       err = -ENOMEM;
-> +                       goto sg_buf_alloc_failed;
-> +               }
-> +
-> +               dev_dbg(dmadev->dev, "set sg buf[%d] :%p\n", i, cpu_addr);
-> +               sg_set_buf(sg, cpu_addr, alloc_sz);
-> +       }
-> +
-> +       dest_buf = kmalloc(round_up(size, nents), GFP_KERNEL);
-> +       if (!dest_buf) {
-> +               err = -ENOMEM;
-> +               goto dst_alloc_failed;
-> +       }
-> +       dev_dbg(dmadev->dev, "dest:%p\n", dest_buf);
-> +
-> +       /* Fill in src buffer */
-> +       count = 0;
-> +       for_each_sg(sg_table.sgl, sg, nents, i) {
-> +               src_buf = sg_virt(sg);
-> +               dev_dbg(dmadev->dev,
-> +                       "set src[%d, %d, %p] = %d\n", i, j, src_buf, count);
-> +
-> +               for (j = 0; j < sg_dma_len(sg); j++)
-> +                       src_buf[j] = count++;
-> +       }
-> +
-> +       /* dma_map_sg cleans and invalidates the cache in arm64 when
-> +        * DMA_TO_DEVICE is selected for src. That's why, we need to do
-> +        * the mapping after the data is copied.
-> +        */
-> +       map_count = dma_map_sg(dmadev->dev, sg_table.sgl, nents,
-> +                               DMA_TO_DEVICE);
-> +       if (!map_count) {
-> +               err =  -EINVAL;
-> +               goto src_map_failed;
-> +       }
-> +
-> +       dest_dma = dma_map_single(dmadev->dev, dest_buf,
-> +                               size, DMA_FROM_DEVICE);
-> +
-> +       err = dma_mapping_error(dmadev->dev, dest_dma);
-> +       if (err)
-> +               goto dest_map_failed;
-> +
-> +       /* check scatter gather list contents */
-> +       for_each_sg(sg_table.sgl, sg, map_count, i)
-> +               dev_dbg(dmadev->dev,
-> +                       "[%d/%d] src va=%p, iova = %pa len:%d\n",
-> +                       i, map_count, sg_virt(sg), &sg_dma_address(sg),
-> +                       sg_dma_len(sg));
-> +
-> +       dest_dma_it = dest_dma;
-> +       for_each_sg(sg_table.sgl, sg, map_count, i) {
-> +               src_buf = sg_virt(sg);
-> +               src_dma = sg_dma_address(sg);
-> +               dev_dbg(dmadev->dev, "src_dma: %pad dest_dma:%pad\n",
-> +                       &src_dma, &dest_dma_it);
-> +
-> +               tx = dmadev->device_prep_dma_memcpy(dma_chanptr, dest_dma_it,
-> +                               src_dma, sg_dma_len(sg), flags);
-> +               if (!tx) {
-> +                       dev_err(dmadev->dev,
-> +                               "Self-test sg failed, disabling\n");
-> +                       err = -ENODEV;
-> +                       goto prep_memcpy_failed;
-> +               }
-> +
-> +               tx->callback_param = &result;
-> +               tx->callback = dma_selftest_complete;
-> +               cookie = tx->tx_submit(tx);
-> +               dest_dma_it += sg_dma_len(sg);
-> +       }
-> +
-> +       dmadev->device_issue_pending(dma_chanptr);
-> +
-> +       /*
-> +        * It is assumed that the hardware can move the data within 1s
-> +        * and signal the OS of the completion
-> +        */
-> +       ret = wait_event_timeout(result.wq,
-> +               atomic_read(&result.counter) == (map_count),
-> +                               msecs_to_jiffies(10000));
-> +
-> +       if (ret <= 0) {
-> +               dev_err(dmadev->dev,
-> +                       "Self-test sg copy timed out, disabling\n");
-> +               err = -ENODEV;
-> +               goto tx_status;
-> +       }
-> +       dev_dbg(dmadev->dev,
-> +               "Self-test complete signal received\n");
-> +
-> +       if (dmadev->device_tx_status(dma_chanptr, cookie, NULL) !=
-> +                               DMA_COMPLETE) {
-> +               dev_err(dmadev->dev,
-> +                       "Self-test sg status not complete, disabling\n");
-> +               err = -ENODEV;
-> +               goto tx_status;
-> +       }
-> +
-> +       dma_sync_single_for_cpu(dmadev->dev, dest_dma, size,
-> +                               DMA_FROM_DEVICE);
-> +
-> +       count = 0;
-> +       for_each_sg(sg_table.sgl, sg, map_count, i) {
-> +               src_buf = sg_virt(sg);
-> +               if (memcmp(src_buf, &dest_buf[count], sg_dma_len(sg)) == 0) {
-> +                       count += sg_dma_len(sg);
-> +                       continue;
-> +               }
-> +
-> +               for (j = 0; j < sg_dma_len(sg); j++) {
-> +                       if (src_buf[j] != dest_buf[count]) {
-> +                               dev_dbg(dmadev->dev,
-> +                               "[%d, %d] (%p) src :%x dest (%p):%x cnt:%d\n",
-> +                                       i, j, &src_buf[j], src_buf[j],
-> +                                       &dest_buf[count], dest_buf[count],
-> +                                       count);
-> +                               dev_err(dmadev->dev,
-> +                                "Self-test copy failed compare, disabling\n");
-> +                               err = -EFAULT;
-> +                               return err;
-> +                               goto compare_failed;
-
-Here something wrong.
-
-> +                       }
-> +                       count++;
-> +               }
-> +       }
-> +
-> +       /*
-> +        * do not release the channel
-> +        * we want to consume all the channels on self test
-> +        */
-> +       free_channel = 0;
-> +
-> +compare_failed:
-> +tx_status:
-> +prep_memcpy_failed:
-> +       dma_unmap_single(dmadev->dev, dest_dma, size,
-> +                        DMA_FROM_DEVICE);
-> +dest_map_failed:
-> +       dma_unmap_sg(dmadev->dev, sg_table.sgl, nents,
-> +                       DMA_TO_DEVICE);
-> +
-> +src_map_failed:
-> +       kfree(dest_buf);
-> +
-> +dst_alloc_failed:
-> +sg_buf_alloc_failed:
-> +       for_each_sg(sg_table.sgl, sg, nents, i) {
-> +               if (sg_virt(sg))
-> +                       kfree(sg_virt(sg));
-> +       }
-> +       sg_free_table(&sg_table);
-> +sg_table_alloc_failed:
-> +       if (free_channel)
-> +               dmadev->device_free_chan_resources(dma_chanptr);
-> +
-> +       return err;
-> +}
-> +
-> +/*
-> + * Perform a streaming transaction to verify the HW works.
-> + */
-> +static int dma_selftest_streaming(struct dma_device *dmadev,
-> +                       struct dma_chan *dma_chanptr, u64 size,
-> +                       unsigned long flags)
-> +{
-> +       dma_addr_t src_dma, dest_dma;
-> +       u8 *dest_buf, *src_buf;
-> +       u32 i;
-> +       dma_cookie_t cookie;
-> +       struct dma_async_tx_descriptor *tx;
-> +       int err = 0;
-> +       int ret;
-> +       bool free_channel = 1;
-> +       struct test_result result;
-> +
-> +       init_waitqueue_head(&result.wq);
-> +       atomic_set(&result.counter, 0);
-> +       result.dmadev = dmadev;
-> +
-> +       if (!dma_chanptr)
-> +               return -ENOMEM;
-> +
-> +       if (dmadev->device_alloc_chan_resources(dma_chanptr) < 1)
-> +               return -ENODEV;
-> +
-> +       if (!dma_chanptr->device || !dmadev->dev) {
-> +               dmadev->device_free_chan_resources(dma_chanptr);
-> +               return -ENODEV;
-> +       }
-> +
-> +       src_buf = kmalloc(size, GFP_KERNEL);
-> +       if (!src_buf) {
-> +               err = -ENOMEM;
-> +               goto src_alloc_failed;
-> +       }
-> +
-> +       dest_buf = kmalloc(size, GFP_KERNEL);
-> +       if (!dest_buf) {
-> +               err = -ENOMEM;
-> +               goto dst_alloc_failed;
-> +       }
-> +
-> +       dev_dbg(dmadev->dev, "src: %p dest:%p\n", src_buf, dest_buf);
-> +
-> +       /* Fill in src buffer */
-> +       for (i = 0; i < size; i++)
-> +               src_buf[i] = (u8)i;
-> +
-> +       /* dma_map_single cleans and invalidates the cache in arm64 when
-> +        * DMA_TO_DEVICE is selected for src. That's why, we need to do
-> +        * the mapping after the data is copied.
-> +        */
-> +       src_dma = dma_map_single(dmadev->dev, src_buf,
-> +                                size, DMA_TO_DEVICE);
-> +
-> +       err = dma_mapping_error(dmadev->dev, src_dma);
-> +       if (err)
-> +               goto src_map_failed;
-> +
-> +       dest_dma = dma_map_single(dmadev->dev, dest_buf,
-> +                               size, DMA_FROM_DEVICE);
-> +
-> +       err = dma_mapping_error(dmadev->dev, dest_dma);
-> +       if (err)
-> +               goto dest_map_failed;
-> +       dev_dbg(dmadev->dev, "src_dma: %pad dest_dma:%pad\n", &src_dma,
-> +               &dest_dma);
-> +       tx = dmadev->device_prep_dma_memcpy(dma_chanptr, dest_dma, src_dma,
-> +                                       size, flags);
-> +       if (!tx) {
-> +               dev_err(dmadev->dev,
-> +                       "Self-test streaming failed, disabling\n");
-> +               err = -ENODEV;
-> +               goto prep_memcpy_failed;
-> +       }
-> +
-> +       tx->callback_param = &result;
-> +       tx->callback = dma_selftest_complete;
-> +       cookie = tx->tx_submit(tx);
-> +       dmadev->device_issue_pending(dma_chanptr);
-> +
-> +       /*
-> +        * It is assumed that the hardware can move the data within 1s
-> +        * and signal the OS of the completion
-> +        */
-> +       ret = wait_event_timeout(result.wq,
-> +                               atomic_read(&result.counter) == 1,
-> +                               msecs_to_jiffies(10000));
-> +
-> +       if (ret <= 0) {
-> +               dev_err(dmadev->dev,
-> +                       "Self-test copy timed out, disabling\n");
-> +               err = -ENODEV;
-> +               goto tx_status;
-> +       }
-> +       dev_dbg(dmadev->dev, "Self-test complete signal received\n");
-> +
-> +       if (dmadev->device_tx_status(dma_chanptr, cookie, NULL) !=
-> +                               DMA_COMPLETE) {
-> +               dev_err(dmadev->dev,
-> +                       "Self-test copy timed out, disabling\n");
-> +               err = -ENODEV;
-> +               goto tx_status;
-> +       }
-> +
-> +       dma_sync_single_for_cpu(dmadev->dev, dest_dma, size,
-> +                               DMA_FROM_DEVICE);
-> +
-> +       if (memcmp(src_buf, dest_buf, size)) {
-> +               for (i = 0; i < size/4; i++) {
-> +                       if (((u32 *)src_buf)[i] != ((u32 *)(dest_buf))[i]) {
-> +                               dev_dbg(dmadev->dev,
-> +                                       "[%d] src data:%x dest data:%x\n",
-> +                                       i, ((u32 *)src_buf)[i],
-> +                                       ((u32 *)(dest_buf))[i]);
-> +                               break;
-> +                       }
-> +               }
-> +               dev_err(dmadev->dev,
-> +                       "Self-test copy failed compare, disabling\n");
-> +               err = -EFAULT;
-> +               goto compare_failed;
-> +       }
-> +
-> +       /*
-> +        * do not release the channel
-> +        * we want to consume all the channels on self test
-> +        */
-> +       free_channel = 0;
-> +
-> +compare_failed:
-> +tx_status:
-> +prep_memcpy_failed:
-> +       dma_unmap_single(dmadev->dev, dest_dma, size,
-> +                        DMA_FROM_DEVICE);
-> +dest_map_failed:
-> +       dma_unmap_single(dmadev->dev, src_dma, size,
-> +                       DMA_TO_DEVICE);
-> +
-> +src_map_failed:
-> +       kfree(dest_buf);
-> +
-> +dst_alloc_failed:
-> +       kfree(src_buf);
-> +
-> +src_alloc_failed:
-> +       if (free_channel)
-> +               dmadev->device_free_chan_resources(dma_chanptr);
-> +
-> +       return err;
-> +}
-> +
-> +/*
-> + * Perform a coherent transaction to verify the HW works.
-> + */
-> +static int dma_selftest_one_coherent(struct dma_device *dmadev,
-> +                       struct dma_chan *dma_chanptr, u64 size,
-> +                       unsigned long flags)
-> +{
-> +       dma_addr_t src_dma, dest_dma;
-> +       u8 *dest_buf, *src_buf;
-> +       u32 i;
-> +       dma_cookie_t cookie;
-> +       struct dma_async_tx_descriptor *tx;
-> +       int err = 0;
-> +       int ret;
-> +       bool free_channel = true;
-> +       struct test_result result;
-> +
-> +       init_waitqueue_head(&result.wq);
-> +       atomic_set(&result.counter, 0);
-> +       result.dmadev = dmadev;
-> +
-> +       if (!dma_chanptr)
-> +               return -ENOMEM;
-> +
-> +       if (dmadev->device_alloc_chan_resources(dma_chanptr) < 1)
-> +               return -ENODEV;
-> +
-> +       if (!dma_chanptr->device || !dmadev->dev) {
-> +               dmadev->device_free_chan_resources(dma_chanptr);
-> +               return -ENODEV;
-> +       }
-> +
-> +       src_buf = dma_alloc_coherent(dmadev->dev, size,
-> +                               &src_dma, GFP_KERNEL);
-> +       if (!src_buf) {
-> +               err = -ENOMEM;
-> +               goto src_alloc_failed;
-> +       }
-> +
-> +       dest_buf = dma_alloc_coherent(dmadev->dev, size,
-> +                               &dest_dma, GFP_KERNEL);
-> +       if (!dest_buf) {
-> +               err = -ENOMEM;
-> +               goto dst_alloc_failed;
-> +       }
-> +
-> +       dev_dbg(dmadev->dev, "src: %p dest:%p\n", src_buf, dest_buf);
-> +
-> +       /* Fill in src buffer */
-> +       for (i = 0; i < size; i++)
-> +               src_buf[i] = (u8)i;
-> +
-> +       dev_dbg(dmadev->dev, "src_dma: %pad dest_dma:%pad\n", &src_dma,
-> +               &dest_dma);
-> +       tx = dmadev->device_prep_dma_memcpy(dma_chanptr, dest_dma, src_dma,
-> +                                       size,
-> +                                       flags);
-> +       if (!tx) {
-> +               dev_err(dmadev->dev,
-> +                       "Self-test coherent failed, disabling\n");
-> +               err = -ENODEV;
-> +               goto prep_memcpy_failed;
-> +       }
-> +
-> +       tx->callback_param = &result;
-> +       tx->callback = dma_selftest_complete;
-> +       cookie = tx->tx_submit(tx);
-> +       dmadev->device_issue_pending(dma_chanptr);
-> +
-> +       /*
-> +        * It is assumed that the hardware can move the data within 1s
-> +        * and signal the OS of the completion
-> +        */
-> +       ret = wait_event_timeout(result.wq,
-> +                               atomic_read(&result.counter) == 1,
-> +                               msecs_to_jiffies(10000));
-> +
-> +       if (ret <= 0) {
-> +               dev_err(dmadev->dev,
-> +                       "Self-test copy timed out, disabling\n");
-> +               err = -ENODEV;
-> +               goto tx_status;
-> +       }
-> +       dev_dbg(dmadev->dev, "Self-test complete signal received\n");
-> +
-> +       if (dmadev->device_tx_status(dma_chanptr, cookie, NULL) !=
-> +                               DMA_COMPLETE) {
-> +               dev_err(dmadev->dev,
-> +                       "Self-test copy timed out, disabling\n");
-> +               err = -ENODEV;
-> +               goto tx_status;
-> +       }
-> +
-> +       if (memcmp(src_buf, dest_buf, size)) {
-> +               for (i = 0; i < size/4; i++) {
-> +                       if (((u32 *)src_buf)[i] != ((u32 *)(dest_buf))[i]) {
-> +                               dev_dbg(dmadev->dev,
-> +                                       "[%d] src data:%x dest data:%x\n",
-> +                                       i, ((u32 *)src_buf)[i],
-> +                                       ((u32 *)(dest_buf))[i]);
-> +                               break;
-> +                       }
-> +               }
-> +               dev_err(dmadev->dev,
-> +                       "Self-test copy failed compare, disabling\n");
-> +               err = -EFAULT;
-> +               goto compare_failed;
-> +       }
-> +
-> +       /*
-> +        * do not release the channel
-> +        * we want to consume all the channels on self test
-> +        */
-> +       free_channel = 0;
-> +
-> +compare_failed:
-> +tx_status:
-> +prep_memcpy_failed:
-> +       dma_free_coherent(dmadev->dev, size, dest_buf, dest_dma);
-> +
-> +dst_alloc_failed:
-> +       dma_free_coherent(dmadev->dev, size, src_buf, src_dma);
-> +
-> +src_alloc_failed:
-> +       if (free_channel)
-> +               dmadev->device_free_chan_resources(dma_chanptr);
-> +
-> +       return err;
-> +}
-> +
-> +static int dma_selftest_all(struct dma_device *dmadev,
-> +                               bool req_coherent, bool req_sg)
-> +{
-> +       int rc = -ENODEV, i = 0;
-> +       struct dma_chan **dmach_ptr = NULL;
-> +       u32 max_channels = 0;
-> +       u64 sizes[] = {PAGE_SIZE - 1, PAGE_SIZE, PAGE_SIZE + 1, 2801, 13295};
-> +       int count = 0;
-> +       u32 j;
-> +       u64 size;
-> +       int failed = 0;
-> +       struct dma_chan *dmach = NULL;
-> +
-> +       list_for_each_entry(dmach, &dmadev->channels,
-> +                       device_node) {
-> +               max_channels++;
-> +       }
-> +
-> +       dmach_ptr = kcalloc(max_channels, sizeof(*dmach_ptr), GFP_KERNEL);
-> +       if (!dmach_ptr) {
-> +               rc = -ENOMEM;
-> +               goto failed_exit;
-> +       }
-> +
-> +       for (j = 0; j < ARRAY_SIZE(sizes); j++) {
-> +               size = sizes[j];
-> +               count = 0;
-> +               dev_dbg(dmadev->dev, "test start for size:%llx\n", size);
-> +               list_for_each_entry(dmach, &dmadev->channels,
-> +                               device_node) {
-> +                       dmach_ptr[count] = dmach;
-> +                       if (req_coherent)
-> +                               rc = dma_selftest_one_coherent(dmadev,
-> +                                       dmach, size,
-> +                                       DMA_PREP_INTERRUPT | DMA_CTRL_ACK);
-> +                       else if (req_sg)
-> +                               rc = dma_selftest_sg(dmadev,
-> +                                       dmach, size,
-> +                                       DMA_PREP_INTERRUPT | DMA_CTRL_ACK);
-> +                       else
-> +                               rc = dma_selftest_streaming(dmadev,
-> +                                       dmach, size,
-> +                                       DMA_PREP_INTERRUPT | DMA_CTRL_ACK);
-> +                       if (rc) {
-> +                               failed = 1;
-> +                               break;
-> +                       }
-> +                       dev_dbg(dmadev->dev,
-> +                               "self test passed for ch:%d\n", count);
-> +                       count++;
-> +               }
-> +
-> +               /*
-> +                * free the channels where the test passed
-> +                * Channel resources are freed for a test that fails.
-> +                */
-> +               for (i = 0; i < count; i++)
-> +                       dmadev->device_free_chan_resources(dmach_ptr[i]);
-> +
-> +               if (failed)
-> +                       break;
-> +       }
-> +
-> +failed_exit:
-> +       kfree(dmach_ptr);
-> +
-> +       return rc;
-> +}
-> +
-> +static int dma_selftest_mapsngle(struct device *dev)
-> +{
-> +       u32 buf_size = 256;
-> +       char *src;
-> +       int ret = -ENOMEM;
-> +       dma_addr_t dma_src;
-> +
-> +       src = kmalloc(buf_size, GFP_KERNEL);
-> +       if (!src)
-> +               return -ENOMEM;
-> +
-> +       strcpy(src, "hello world");
-> +
-> +       dma_src = dma_map_single(dev, src, buf_size, DMA_TO_DEVICE);
-> +       dev_dbg(dev, "mapsingle: src:%p src_dma:%pad\n", src, &dma_src);
-> +
-> +       ret = dma_mapping_error(dev, dma_src);
-> +       if (ret) {
-> +               dev_err(dev, "dma_mapping_error with ret:%d\n", ret);
-> +               ret = -ENOMEM;
-> +       } else {
-> +               if (strcmp(src, "hello world") != 0) {
-> +                       dev_err(dev, "memory content mismatch\n");
-> +                       ret = -EINVAL;
-> +               } else
-> +                       dev_dbg(dev, "mapsingle:dma_map_single works\n");
-> +
-> +               dma_unmap_single(dev, dma_src, buf_size, DMA_TO_DEVICE);
-> +       }
-> +       kfree(src);
-> +       return ret;
-> +}
-> +
-> +/*
-> + * Self test all DMA channels.
-> + */
-> +int dma_selftest_memcpy(struct dma_device *dmadev)
-> +{
-> +       int rc;
-> +
-> +       dma_selftest_mapsngle(dmadev->dev);
-> +
-> +       /* streaming test */
-> +       rc = dma_selftest_all(dmadev, false, false);
-> +       if (rc)
-> +               return rc;
-> +       dev_dbg(dmadev->dev, "streaming self test passed\n");
-> +
-> +       /* coherent test */
-> +       rc = dma_selftest_all(dmadev, true, false);
-> +       if (rc)
-> +               return rc;
-> +
-> +       dev_dbg(dmadev->dev, "coherent self test passed\n");
-> +
-> +       /* scatter gather test */
-> +       rc = dma_selftest_all(dmadev, false, true);
-> +       if (rc)
-> +               return rc;
-> +
-> +       dev_dbg(dmadev->dev, "scatter gather self test passed\n");
-> +       return 0;
-> +}
-> +EXPORT_SYMBOL_GPL(dma_selftest_memcpy);
-> --
-> Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc.
-> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux Foundation Collaborative Project
+> -#define ACPI_MAX_IRQS          256
+> +#define ACPI_MAX_IRQS          1020
+>  #define ACPI_MAX_ISA_IRQ       16
 >
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+>  #define PIRQ_PENALTY_PCI_AVAILABLE     (0)
+> @@ -493,7 +494,8 @@ int __init acpi_irq_penalty_init(void)
+>                                             penalty;
+>                         }
+>
+> -               } else if (link->irq.active) {
+> +               } else if (link->irq.active &&
+> +                       (link->irq.active < ACPI_MAX_IRQS)) {
+>                         acpi_irq_penalty[link->irq.active] +=
+>                             PIRQ_PENALTY_PCI_POSSIBLE;
+>                 }
+> @@ -542,14 +544,19 @@ static int acpi_pci_link_allocate(struct acpi_pci_link *link)
+>                 irq = link->irq.possible[link->irq.possible_count - 1];
+>
+>         if (acpi_irq_balance || !link->irq.active) {
+> -               /*
+> -                * Select the best IRQ.  This is done in reverse to promote
+> -                * the use of IRQs 9, 10, 11, and >15.
+> -                */
+> -               for (i = (link->irq.possible_count - 1); i >= 0; i--) {
+> -                       if (acpi_irq_penalty[irq] >
+> -                           acpi_irq_penalty[link->irq.possible[i]])
+> -                               irq = link->irq.possible[i];
+> +
+> +               if (irq < ACPI_MAX_IRQS) {
+> +                       /*
+> +                        * Select the best IRQ.  This is done in reverse to
+> +                        * promote the use of IRQs 9, 10, 11, and >15.
+> +                        */
+> +                       for (i = (link->irq.possible_count - 1); i >= 0;
+> +                               i--) {
 
+Why not
 
+if ((acpi_irq_balance || !link->irq.active) && irq < ACPI_MAX_IRQS) {
+ int i = link->irq.possible_count;
+
+ while (--i) {
+ ?
+ }
+}
+
+> +                               if ((link->irq.possible[i] < ACPI_MAX_IRQS) &&
+> +                                   (acpi_irq_penalty[irq] >
+> +                                   acpi_irq_penalty[link->irq.possible[i]]))
+> +                                       irq = link->irq.possible[i];
+> +                       }
+>                 }
+>         }
+>         if (acpi_irq_penalty[irq] >= PIRQ_PENALTY_ISA_ALWAYS) {
 
 -- 
 With Best Regards,
