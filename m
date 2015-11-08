@@ -1,53 +1,45 @@
-From: hgkr.klein@gmail.com (Helmut Klein)
-Date: Sun, 8 Nov 2015 12:16:57 +0100
-Subject: wrong value in kirkwood-ts219.dtsi
-In-Reply-To: <20151104151227.GA3316@lunn.ch>
-References: <56390400.5070408@gmail.com> <20151103203628.GA25118@lunn.ch>
- <5639EC29.8010604@gmail.com> <20151104151227.GA3316@lunn.ch>
-Message-ID: <563F2F29.8040005@gmail.com>
+From: carlo@caione.org (Carlo Caione)
+Date: Sun,  8 Nov 2015 13:18:55 +0100
+Subject: [PATCH v3 2/4] watchdog: meson: Add meson8b SoC specific data
+In-Reply-To: <1446985137-25498-1-git-send-email-carlo@caione.org>
+References: <1446985137-25498-1-git-send-email-carlo@caione.org>
+Message-ID: <1446985137-25498-3-git-send-email-carlo@caione.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hallo Andrew,
+From: Carlo Caione <carlo@endlessm.com>
 
-i've appended a text, which might be a "canonical patch".
+Add SoC specific data in the watchdog driver for the meson8b SoC.
 
-regards
-Helmut
-
-
-Subject: arm: make QNAP power-off work for ts219 with an appended dt blob
-
-the "reg" entry in the "poweroff" section of "kirkwood-ts219.dtsi"
-addressed the wrong uart (0 = console). this patch changes the address to
-select uart 1. this is the uart connected to the pic microcontroller,
-which can switch the device off.
-Signed-off-by: Helmut Klein <hgkr.klein@gmail.com>
+Signed-off-by: Carlo Caione <carlo@endlessm.com>
 ---
---- linux-4.3/arch/arm/boot/dts/kirkwood-ts219.dtsi.orig
-+++ linux-4.3/arch/arm/boot/dts/kirkwood-ts219.dtsi
-@@ -40,7 +40,7 @@
-};
-poweroff at 12100 {
-compatible = "qnap,power-off";
-- reg = <0x12000 0x100>;
-+ reg = <0x12100 0x100>;
-clocks = <&gate_clk 7>;
-};
-spi at 10600 {
+ drivers/watchdog/meson_wdt.c | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-
-On 04.11.2015 16:12, Andrew Lunn wrote:
-> On Wed, Nov 04, 2015 at 12:29:45PM +0100, Helmut Klein wrote:
->> Hallo Andrew,
->>
->> here is the patch (created with diff -up and then compressed with xz)
->
-> Thanks.
->
-> But unfortunately, there is a lot more process involved.  Please could
-> you take a look at Documentation/SubmittingPatches in the kernel
-> sources.
->
-> 	Andrew
->
+diff --git a/drivers/watchdog/meson_wdt.c b/drivers/watchdog/meson_wdt.c
+index 89734f0..3ec1e91 100644
+--- a/drivers/watchdog/meson_wdt.c
++++ b/drivers/watchdog/meson_wdt.c
+@@ -52,6 +52,12 @@ static struct meson_wdt_data meson6_wdt_data = {
+ 	.count_unit		= 100000, /* 10 us */
+ };
+ 
++static struct meson_wdt_data meson8b_wdt_data = {
++	.enable			= BIT(19),
++	.terminal_count_mask	= 0xffff,
++	.count_unit		= 7812, /* 128 us */
++};
++
+ struct meson_wdt_dev {
+ 	struct watchdog_device wdt_dev;
+ 	void __iomem *wdt_base;
+@@ -153,6 +159,7 @@ static const struct watchdog_ops meson_wdt_ops = {
+ 
+ static const struct of_device_id meson_wdt_dt_ids[] = {
+ 	{ .compatible = "amlogic,meson6-wdt", .data = &meson6_wdt_data },
++	{ .compatible = "amlogic,meson8b-wdt", .data = &meson8b_wdt_data },
+ 	{ /* sentinel */ }
+ };
+ MODULE_DEVICE_TABLE(of, meson_wdt_dt_ids);
+-- 
+1.9.1
