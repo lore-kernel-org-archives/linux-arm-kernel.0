@@ -1,45 +1,36 @@
-From: wxt@rock-chips.com (Caesar Wang)
-Date: Sun,  8 Nov 2015 17:26:08 +0800
-Subject: [PATCH v3 10/10] arm64: dts: Enable the Thermal on R88 board
-In-Reply-To: <1446974768-25795-1-git-send-email-wxt@rock-chips.com>
-References: <1446974768-25795-1-git-send-email-wxt@rock-chips.com>
-Message-ID: <1446974768-25795-11-git-send-email-wxt@rock-chips.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Sun, 8 Nov 2015 17:32:38 +0800
+Subject: [PATCH V3 2/4] dma: add Qualcomm Technologies HIDMA management
+ driver
+In-Reply-To: <1446958380-23298-3-git-send-email-okaya@codeaurora.org>
+Message-ID: <201511081742.Opjz2Q2o%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch enable the TS-ADC.
+Hi Sinan,
 
-When a thermal temperature is invoked use the CRU to reset the chip
-on R88 board. TSHUT is low active on this board.
+[auto build test ERROR on: robh/for-next]
+[also build test ERROR on: v4.3 next-20151106]
 
-Signed-off-by: Caesar Wang <wxt@rock-chips.com>
-Acked-by: Eduardo Valentin <edubezval@gmail.com>
+url:    https://github.com/0day-ci/linux/commits/Sinan-Kaya/ma-add-Qualcomm-Technologies-HIDMA-driver/20151108-125824
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/robh/linux for-next
+config: i386-allmodconfig (attached as .config)
+reproduce:
+        # save the attached .config to linux build tree
+        make ARCH=i386 
+
+All errors (new ones prefixed by >>):
+
+>> ERROR: "hidma_mgmt_setup" undefined!
+>> ERROR: "hidma_mgmt_init_sys" undefined!
 
 ---
-
-Changes in v3: None
-Changes in v2: None
-Changes in v1: None
-
- arch/arm64/boot/dts/rockchip/rk3368-r88.dts | 6 ++++++
- 1 file changed, 6 insertions(+)
-
-diff --git a/arch/arm64/boot/dts/rockchip/rk3368-r88.dts b/arch/arm64/boot/dts/rockchip/rk3368-r88.dts
-index 401a812..7684426a 100644
---- a/arch/arm64/boot/dts/rockchip/rk3368-r88.dts
-+++ b/arch/arm64/boot/dts/rockchip/rk3368-r88.dts
-@@ -336,6 +336,12 @@
- 	status = "okay";
- };
- 
-+&tsadc {
-+	rockchip,hw-tshut-mode = <0>; /* tshut mode 0:CRU 1:GPIO */
-+	rockchip,hw-tshut-polarity = <0>; /* tshut polarity 0:LOW 1:HIGH */
-+	status = "okay";
-+}
-+
- &uart2 {
- 	status = "okay";
- };
--- 
-1.9.1
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 51612 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151108/914a6771/attachment-0001.obj>
