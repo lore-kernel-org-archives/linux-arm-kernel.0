@@ -1,95 +1,70 @@
-From: zlim.lnx@gmail.com (Z Lim)
-Date: Sun, 8 Nov 2015 14:29:48 -0800
-Subject: [PATCH] arm64: bpf: fix JIT stack setup
-In-Reply-To: <20151108022726.GB39441@ast-mbp.thefacebook.com>
-References: <1446874577-14539-1-git-send-email-yang.shi@linaro.org>
- <20151108022726.GB39441@ast-mbp.thefacebook.com>
-Message-ID: <CABg9mcv8W4_pvkEQKtjBPi5ycMgLPksYoPtYnGr6tdcb5ER8YQ@mail.gmail.com>
+From: mans@mansr.com (Mans Rullgard)
+Date: Sun,  8 Nov 2015 23:11:40 +0000
+Subject: [PATCH v2] ARM: debug: add support for Palmchip BK-310x UART
+Message-ID: <1447024300-7279-1-git-send-email-mans@mansr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Nov 7, 2015 at 6:27 PM, Alexei Starovoitov
-<alexei.starovoitov@gmail.com> wrote:
-> On Fri, Nov 06, 2015 at 09:36:17PM -0800, Yang Shi wrote:
->> ARM64 JIT used FP (x29) as eBPF fp register, but FP is subjected to
->> change during function call so it may cause the BPF prog stack base address
->> change too. Whenever, it pointed to the bottom of BPF prog stack instead of
->> the top.
->>
->> So, when copying data via bpf_probe_read, it will be copied to (SP - offset),
->> then it may overwrite the saved FP/LR.
->>
->> Use x25 to replace FP as BPF stack base register (fp). Since x25 is callee
->> saved register, so it will keep intact during function call.
->> It is initialized in BPF prog prologue when BPF prog is started to run
->> everytime. When BPF prog exits, it could be just tossed.
->>
->> Other than this the BPf prog stack base need to be setup before function
->> call stack.
->>
->> So, the BPF stack layout looks like:
->>
->>                                  high
->>          original A64_SP =>   0:+-----+ BPF prologue
->>                                 |     | FP/LR and callee saved registers
->>          BPF fp register => +64:+-----+
->>                                 |     |
->>                                 | ... | BPF prog stack
->>                                 |     |
->>                                 |     |
->>          current A64_SP =>      +-----+
->>                                 |     |
->>                                 | ... | Function call stack
->>                                 |     |
->>                                 +-----+
->>                                   low
->>
->> Signed-off-by: Yang Shi <yang.shi@linaro.org>
->> CC: Zi Shen Lim <zlim.lnx@gmail.com>
->> CC: Xi Wang <xi.wang@gmail.com>
->
-> Thanks for tracking it down.
-> That looks like fundamental bug in arm64 jit. I'm surprised function calls worked at all.
-> Zi please review.
->
+Some SoCs use a Palmchip BK-310x UART which is mostly 16550 compatible
+but with a different register layout. While this UART has previously
+only been supported in MIPS based chips (Alchemy, Ralink), the ARM based
+SMP87xx series from Sigma Designs also uses it.
 
-For function calls (BPF_JMP | BPF_CALL), we are compliant with AAPCS64
-[1]. That part is okay.
+This patch allows the debug console to work with this type of UART.
 
+Signed-off-by: Mans Rullgard <mans@mansr.com>
+---
+Changes:
+- moved #defines to a separate file
+---
+ arch/arm/Kconfig.debug            |  9 +++++++++
+ arch/arm/include/debug/palmchip.S | 11 +++++++++++
+ 2 files changed, 20 insertions(+)
+ create mode 100644 arch/arm/include/debug/palmchip.S
 
-bpf_probe_read accesses the BPF program stack, which is based on BPF_REG_FP.
-
-This exposes an issue with how BPF_REG_FP was setup, as Yang pointed out.
-Instead of having BPF_REG_FP point to top of stack, we erroneously
-point it to the bottom of stack. When there are function calls, we run
-the risk of clobbering of BPF stack. Bad idea.
-
-Otherwise, since BPF_REG_FP is read-only, and is setup exactly once in
-prologue, it remains consistent throughout lifetime of the BPF
-program.
-
-
-Yang, can you please try the following?
-
-8<-----
---- a/arch/arm64/net/bpf_jit_comp.c
-+++ b/arch/arm64/net/bpf_jit_comp.c
-@@ -161,12 +161,12 @@ static void build_prologue(struct jit_ctx *ctx)
-        if (ctx->tmp_used)
-                emit(A64_PUSH(tmp1, tmp2, A64_SP), ctx);
-
--       /* Set up BPF stack */
--       emit(A64_SUB_I(1, A64_SP, A64_SP, stack_size), ctx);
--
-        /* Set up frame pointer */
-        emit(A64_MOV(1, fp, A64_SP), ctx);
-
-+       /* Set up BPF stack */
-+       emit(A64_SUB_I(1, A64_SP, A64_SP, stack_size), ctx);
+diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
+index 0cfd7f9..2864ed9 100644
+--- a/arch/arm/Kconfig.debug
++++ b/arch/arm/Kconfig.debug
+@@ -1314,6 +1314,7 @@ config DEBUG_SIRFSOC_UART
+ config DEBUG_LL_INCLUDE
+ 	string
+ 	default "debug/sa1100.S" if DEBUG_SA1100
++	default "debug/palmchip.S" if DEBUG_UART_8250_PALMCHIP
+ 	default "debug/8250.S" if DEBUG_LL_UART_8250 || DEBUG_UART_8250
+ 	default "debug/at91.S" if DEBUG_AT91_UART
+ 	default "debug/asm9260.S" if DEBUG_ASM9260_UART
+@@ -1597,6 +1598,14 @@ config DEBUG_UART_8250_WORD
+ 		DEBUG_BCM_KONA_UART || DEBUG_RK32_UART2 || \
+ 		DEBUG_BRCMSTB_UART
+ 
++config DEBUG_UART_8250_PALMCHIP
++	bool "8250 UART is Palmchip BK-310x"
++	depends on DEBUG_LL_UART_8250 || DEBUG_UART_8250
++	help
++	  Palmchip provides a UART implementation compatible with 16550
++	  except for having a different register layout.  Say Y here if
++	  the debug UART is of this type.
 +
-        /* Clear registers A and X */
-        emit_a64_mov_i64(ra, 0, ctx);
-        emit_a64_mov_i64(rx, 0, ctx);
------>8
-
-[1] http://infocenter.arm.com/help/topic/com.arm.doc.ihi0055b/IHI0055B_aapcs64.pdf
+ config DEBUG_UART_8250_FLOW_CONTROL
+ 	bool "Enable flow control for 8250 UART"
+ 	depends on DEBUG_LL_UART_8250 || DEBUG_UART_8250
+diff --git a/arch/arm/include/debug/palmchip.S b/arch/arm/include/debug/palmchip.S
+new file mode 100644
+index 0000000..6824b2d
+--- /dev/null
++++ b/arch/arm/include/debug/palmchip.S
+@@ -0,0 +1,11 @@
++#include <linux/serial_reg.h>
++
++#undef UART_TX
++#undef UART_LSR
++#undef UART_MSR
++
++#define UART_TX 1
++#define UART_LSR 7
++#define UART_MSR 8
++
++#include <debug/8250.S>
+-- 
+2.6.3
