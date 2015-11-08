@@ -1,37 +1,41 @@
-From: timur@codeaurora.org (Timur Tabi)
-Date: Sat, 7 Nov 2015 23:08:47 -0600
-Subject: [PATCH V3 2/4] dma: add Qualcomm Technologies HIDMA management
- driver
-In-Reply-To: <1446958380-23298-3-git-send-email-okaya@codeaurora.org>
-References: <1446958380-23298-1-git-send-email-okaya@codeaurora.org>
- <1446958380-23298-3-git-send-email-okaya@codeaurora.org>
-Message-ID: <563ED8DF.6090307@codeaurora.org>
+From: luto@amacapital.net (Andy Lutomirski)
+Date: Sat, 7 Nov 2015 21:09:27 -0800
+Subject: [PATCH v2 00/20] Fix handling of compat_siginfo_t
+In-Reply-To: <1446684640-4112-1-git-send-email-amanieu@gmail.com>
+References: <1446684640-4112-1-git-send-email-amanieu@gmail.com>
+Message-ID: <CALCETrWKK_REdX7TJO8X7jC=8k=YdgJH_txXpC4Pdzn-tukg5A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sinan Kaya wrote:
-> +	val = val & ~(MAX_BUS_REQ_LEN_MASK << MAX_BUS_WR_REQ_BIT_POS);
-> +	val = val | (mgmtdev->max_write_request << MAX_BUS_WR_REQ_BIT_POS);
-> +	val = val & ~(MAX_BUS_REQ_LEN_MASK);
-> +	val = val | (mgmtdev->max_read_request);
+On Wed, Nov 4, 2015 at 4:50 PM, Amanieu d'Antras <amanieu@gmail.com> wrote:
+> One issue that isn't resolved in this series is sending signals between a 32-bit
+> process and 64-bit process. Sending a si_int will work correctly, but a si_ptr
+> value will likely get corrupted due to the different layouts of the 32-bit and
+> 64-bit siginfo_t structures.
 
-val &= ~MAX_BUS_REQ_LEN_MASK << MAX_BUS_WR_REQ_BIT_POS;
-val |= mgmtdev->max_write_request << MAX_BUS_WR_REQ_BIT_POS;
-val &= ~MAX_BUS_REQ_LEN_MASK;
-val |= mgmtdev->max_read_request;
+This is so screwed up it's not even funny.
 
-> +static const struct of_device_id hidma_mgmt_match[] = {
-> +	{ .compatible = "qcom,hidma-mgmt", },
-> +	{ .compatible = "qcom,hidma-mgmt-1.0", },
-> +	{ .compatible = "qcom,hidma-mgmt-1.1", },
-> +	{},
-> +};
+A 64-bit big-endian compat calls rt_sigqueueinfo.  It passes in (among
+other things) a sigval_t.  The kernel can choose to interpret it as a
+pointer (call it p) or an integer (call it i).  Then (unsigned long)p
+= (i<<32) | [something].  If the number was an integer to begin with
+*and* user code zeroed out the mess first, then [something] will be 0.
+Regardless, p != i unless they're both zero.
 
-I thought Rob said that he did NOT want to use version numbers in 
-compatible strings.  And what's the difference between these three 
-versions anyway?
+If the result gets delivered to a signalfd, then it's plausible that
+everything could work.  If it gets delivered to a 64-bit siginfo, then
+all is well because it's in exactly the same screwed up state it was
+in when the signal gets sent.
 
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the
-Code Aurora Forum, hosted by The Linux Foundation.
+If, however, it's delivered to a compat task, wtf is the kernel
+supposed to do?  We're effectively supposed to convert a 64-bit
+sigval_t to a 32-bit sigval_t.  On a little-endian architecture, we
+can fudge it because it doesn't really matter whether we consider the
+pointer or the int to be authoritative.  I think that, on big-endian,
+we're screwed.
+
+BTW, x86 has its own set of screwups here.  Somehow cr2 and error_code
+ended up as part of ucontext instead of siginfo, which makes
+absolutely no sense to me and bloats task_struct.
+
+--Andy
