@@ -1,25 +1,54 @@
-From: timur@codeaurora.org (Timur Tabi)
-Date: Sun, 8 Nov 2015 15:19:40 -0600
-Subject: [PATCH] dma: fix returnvar.cocci warnings
-In-Reply-To: <CAHp75VdRN14EWUaTPzO45Z_mBzeQ=9sqzP3mMsMSQ2nXNi5QKg@mail.gmail.com>
-References: <alpine.DEB.2.10.1511080843100.2637@hadrien>
- <CAHp75VdRN14EWUaTPzO45Z_mBzeQ=9sqzP3mMsMSQ2nXNi5QKg@mail.gmail.com>
-Message-ID: <563FBC6C.8040207@codeaurora.org>
+From: jdmason@kudzu.us (Jon Mason)
+Date: Sun, 8 Nov 2015 16:24:18 -0500
+Subject: [PATCH] NTB: fix 32-bit compiler warning
+In-Reply-To: <10263287.Brd9HPYQJD@wuerfel>
+References: <10263287.Brd9HPYQJD@wuerfel>
+Message-ID: <20151108212416.GA16867@kudzu.us>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Andy Shevchenko wrote:
->> >CC: Sinan Kaya<okaya@codeaurora.org>
->> >Signed-off-by: Fengguang Wu<fengguang.wu@intel.com>
-> Who is the author?
-> I suppose Fengguang is the reporter, right?
->
+On Wed, Oct 07, 2015 at 09:59:34AM +0200, Arnd Bergmann wrote:
+> resource_size_t may be 32-bit wide on some architectures, which causes
+> this warning when building the NTB code:
+> 
+> drivers/ntb/ntb_transport.c: In function 'ntb_transport_link_work':
+> drivers/ntb/ntb_transport.c:828:46: warning: right shift count >= width of type [-Wshift-count-overflow]
+> 
+> The warning is harmless but can be avoided by using the upper_32_bits()
+> macro.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Fixes: e26a5843f7f5 ("NTB: Split ntb_hw_intel and ntb_transport drivers")
 
-These are Julia Lawall's coccinelle scripts that automatically run on 
-patches and report problems.  Just treat them like normal code reviews 
-and incorporate the change in the next version of your patch.
+Pulled in to the next release (coming out shortly).
 
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the
-Code Aurora Forum, hosted by The Linux Foundation.
+Thanks,
+Jon
+
+> ---
+> Found while building ARM allmodconfig
+> 
+> diff --git a/drivers/ntb/ntb_transport.c b/drivers/ntb/ntb_transport.c
+> index 6e3ee907d186..700f3ae833c2 100644
+> --- a/drivers/ntb/ntb_transport.c
+> +++ b/drivers/ntb/ntb_transport.c
+> @@ -825,10 +825,10 @@ static void ntb_transport_link_work(struct work_struct *work)
+>  			size = max_mw_size;
+>  
+>  		spad = MW0_SZ_HIGH + (i * 2);
+> -		ntb_peer_spad_write(ndev, spad, (u32)(size >> 32));
+> +		ntb_peer_spad_write(ndev, spad, upper_32_bits(size));
+>  
+>  		spad = MW0_SZ_LOW + (i * 2);
+> -		ntb_peer_spad_write(ndev, spad, (u32)size);
+> +		ntb_peer_spad_write(ndev, spad, lower_32_bits(size));
+>  	}
+>  
+>  	ntb_peer_spad_write(ndev, NUM_MWS, nt->mw_count);
+> 
+> -- 
+> You received this message because you are subscribed to the Google Groups "linux-ntb" group.
+> To unsubscribe from this group and stop receiving emails from it, send an email to linux-ntb+unsubscribe at googlegroups.com.
+> To post to this group, send email to linux-ntb at googlegroups.com.
+> To view this discussion on the web visit https://groups.google.com/d/msgid/linux-ntb/10263287.Brd9HPYQJD%40wuerfel.
+> For more options, visit https://groups.google.com/d/optout.
