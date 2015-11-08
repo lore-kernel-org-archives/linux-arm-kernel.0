@@ -1,95 +1,106 @@
 From: heiko@sntech.de (Heiko Stuebner)
-Date: Sun,  8 Nov 2015 17:04:35 +0100
-Subject: [PATCH v2 2/8] phy: rockchip-usb: introduce a common data-struct for
- the device
+Date: Sun,  8 Nov 2015 17:04:38 +0100
+Subject: [PATCH v2 5/8] clk: rockchip: fix usbphy-related clocks
 In-Reply-To: <1446998681-26436-1-git-send-email-heiko@sntech.de>
 References: <1446998681-26436-1-git-send-email-heiko@sntech.de>
-Message-ID: <1446998681-26436-3-git-send-email-heiko@sntech.de>
+Message-ID: <1446998681-26436-6-git-send-email-heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This introduces a common struct that holds data belonging to
-the umbrella device that contains all the phys and that we
-want to use later.
+The otgphy clocks really only drive the phy blocks. These in turn
+contain plls that then generate the 480m clocks the clock controller
+uses to supply some other clocks like uart0, gpu or the video-codec.
+
+So fix this structure to actually respect that hirarchy and removed
+that usb480m fixed-rate clock working as a placeholder till now, as
+this wouldn't even work if the supplying phy gets turned off while
+its pll-output gets used elsewhere.
 
 Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 ---
- drivers/phy/phy-rockchip-usb.c | 26 +++++++++++++++++++-------
- 1 file changed, 19 insertions(+), 7 deletions(-)
+ drivers/clk/rockchip/clk-rk3188.c | 11 +++--------
+ drivers/clk/rockchip/clk-rk3288.c | 16 +++++-----------
+ 2 files changed, 8 insertions(+), 19 deletions(-)
 
-diff --git a/drivers/phy/phy-rockchip-usb.c b/drivers/phy/phy-rockchip-usb.c
-index dfc056b..e081053 100644
---- a/drivers/phy/phy-rockchip-usb.c
-+++ b/drivers/phy/phy-rockchip-usb.c
-@@ -36,9 +36,14 @@
- #define SIDDQ_ON		BIT(13)
- #define SIDDQ_OFF		(0 << 13)
+diff --git a/drivers/clk/rockchip/clk-rk3188.c b/drivers/clk/rockchip/clk-rk3188.c
+index abb4760..7836a97 100644
+--- a/drivers/clk/rockchip/clk-rk3188.c
++++ b/drivers/clk/rockchip/clk-rk3188.c
+@@ -319,9 +319,9 @@ static struct rockchip_clk_branch common_clk_branches[] __initdata = {
+ 	 * the 480m are generated inside the usb block from these clocks,
+ 	 * but they are also a source for the hsicphy clock.
+ 	 */
+-	GATE(SCLK_OTGPHY0, "sclk_otgphy0", "usb480m", CLK_IGNORE_UNUSED,
++	GATE(SCLK_OTGPHY0, "sclk_otgphy0", "xin24m", CLK_IGNORE_UNUSED,
+ 			RK2928_CLKGATE_CON(1), 5, GFLAGS),
+-	GATE(SCLK_OTGPHY1, "sclk_otgphy1", "usb480m", CLK_IGNORE_UNUSED,
++	GATE(SCLK_OTGPHY1, "sclk_otgphy1", "xin24m", CLK_IGNORE_UNUSED,
+ 			RK2928_CLKGATE_CON(1), 6, GFLAGS),
  
-+struct rockchip_usb_phy_base {
-+	struct device *dev;
-+	struct regmap *reg_base;
-+};
-+
- struct rockchip_usb_phy {
-+	struct rockchip_usb_phy_base *base;
- 	unsigned int	reg_offset;
--	struct regmap	*reg_base;
- 	struct clk	*clk;
- 	struct phy	*phy;
+ 	COMPOSITE(0, "mac_src", mux_mac_p, 0,
+@@ -635,7 +635,7 @@ static struct clk_div_table div_rk3188_aclk_core_t[] = {
+ 	{ /* sentinel */ },
  };
-@@ -46,7 +51,7 @@ struct rockchip_usb_phy {
- static int rockchip_usb_phy_power(struct rockchip_usb_phy *phy,
- 					   bool siddq)
- {
--	return regmap_write(phy->reg_base, phy->reg_offset,
-+	return regmap_write(phy->base->reg_base, phy->reg_offset,
- 			    SIDDQ_WRITE_ENA | (siddq ? SIDDQ_ON : SIDDQ_OFF));
- }
  
-@@ -101,17 +106,23 @@ static void rockchip_usb_phy_action(void *data)
- static int rockchip_usb_phy_probe(struct platform_device *pdev)
- {
- 	struct device *dev = &pdev->dev;
-+	struct rockchip_usb_phy_base *phy_base;
- 	struct rockchip_usb_phy *rk_phy;
- 	struct phy_provider *phy_provider;
- 	struct device_node *child;
--	struct regmap *grf;
- 	unsigned int reg_offset;
- 	int err;
+-PNAME(mux_hsicphy_p)		= { "sclk_otgphy0", "sclk_otgphy1",
++PNAME(mux_hsicphy_p)		= { "sclk_otgphy0_480m", "sclk_otgphy1_480m",
+ 				    "gpll", "cpll" };
  
--	grf = syscon_regmap_lookup_by_phandle(dev->of_node, "rockchip,grf");
--	if (IS_ERR(grf)) {
-+	phy_base = devm_kzalloc(dev, sizeof(*phy_base), GFP_KERNEL);
-+	if (!phy_base)
-+		return -ENOMEM;
-+
-+	phy_base->dev = dev;
-+	phy_base->reg_base = syscon_regmap_lookup_by_phandle(dev->of_node,
-+							     "rockchip,grf");
-+	if (IS_ERR(phy_base->reg_base)) {
- 		dev_err(&pdev->dev, "Missing rockchip,grf property\n");
--		return PTR_ERR(grf);
-+		return PTR_ERR(phy_base->reg_base);
- 	}
+ static struct rockchip_clk_branch rk3188_clk_branches[] __initdata = {
+@@ -739,11 +739,6 @@ static void __init rk3188_common_clk_init(struct device_node *np)
+ 		pr_warn("%s: could not register clock xin12m: %ld\n",
+ 			__func__, PTR_ERR(clk));
  
- 	for_each_available_child_of_node(dev->of_node, child) {
-@@ -119,6 +130,8 @@ static int rockchip_usb_phy_probe(struct platform_device *pdev)
- 		if (!rk_phy)
- 			return -ENOMEM;
+-	clk = clk_register_fixed_factor(NULL, "usb480m", "xin24m", 0, 20, 1);
+-	if (IS_ERR(clk))
+-		pr_warn("%s: could not register clock usb480m: %ld\n",
+-			__func__, PTR_ERR(clk));
+-
+ 	rockchip_clk_register_branches(common_clk_branches,
+ 				  ARRAY_SIZE(common_clk_branches));
  
-+		rk_phy->base = phy_base;
-+
- 		if (of_property_read_u32(child, "reg", &reg_offset)) {
- 			dev_err(dev, "missing reg property in node %s\n",
- 				child->name);
-@@ -126,7 +139,6 @@ static int rockchip_usb_phy_probe(struct platform_device *pdev)
- 		}
+diff --git a/drivers/clk/rockchip/clk-rk3288.c b/drivers/clk/rockchip/clk-rk3288.c
+index 3fceda1..58e6d8c 100644
+--- a/drivers/clk/rockchip/clk-rk3288.c
++++ b/drivers/clk/rockchip/clk-rk3288.c
+@@ -195,8 +195,8 @@ PNAME(mux_hsadcout_p)	= { "hsadc_src", "ext_hsadc" };
+ PNAME(mux_edp_24m_p)	= { "ext_edp_24m", "xin24m" };
+ PNAME(mux_tspout_p)	= { "cpll", "gpll", "npll", "xin27m" };
  
- 		rk_phy->reg_offset = reg_offset;
--		rk_phy->reg_base = grf;
+-PNAME(mux_usbphy480m_p)		= { "sclk_otgphy1", "sclk_otgphy2",
+-				    "sclk_otgphy0" };
++PNAME(mux_usbphy480m_p)		= { "sclk_otgphy1_480m", "sclk_otgphy2_480m",
++				    "sclk_otgphy0_480m" };
+ PNAME(mux_hsicphy480m_p)	= { "cpll", "gpll", "usbphy480m_src" };
+ PNAME(mux_hsicphy12m_p)		= { "hsicphy12m_xin12m", "hsicphy12m_usbphy" };
  
- 		rk_phy->clk = of_clk_get_by_name(child, "phyclk");
- 		if (IS_ERR(rk_phy->clk))
+@@ -506,11 +506,11 @@ static struct rockchip_clk_branch rk3288_clk_branches[] __initdata = {
+ 			RK3288_CLKSEL_CON(35), 6, 2, MFLAGS, 0, 5, DFLAGS,
+ 			RK3288_CLKGATE_CON(4), 10, GFLAGS),
+ 
+-	GATE(SCLK_OTGPHY0, "sclk_otgphy0", "usb480m", CLK_IGNORE_UNUSED,
++	GATE(SCLK_OTGPHY0, "sclk_otgphy0", "xin24m", CLK_IGNORE_UNUSED,
+ 			RK3288_CLKGATE_CON(13), 4, GFLAGS),
+-	GATE(SCLK_OTGPHY1, "sclk_otgphy1", "usb480m", CLK_IGNORE_UNUSED,
++	GATE(SCLK_OTGPHY1, "sclk_otgphy1", "xin24m", CLK_IGNORE_UNUSED,
+ 			RK3288_CLKGATE_CON(13), 5, GFLAGS),
+-	GATE(SCLK_OTGPHY2, "sclk_otgphy2", "usb480m", CLK_IGNORE_UNUSED,
++	GATE(SCLK_OTGPHY2, "sclk_otgphy2", "xin24m", CLK_IGNORE_UNUSED,
+ 			RK3288_CLKGATE_CON(13), 6, GFLAGS),
+ 	GATE(SCLK_OTG_ADP, "sclk_otg_adp", "xin32k", CLK_IGNORE_UNUSED,
+ 			RK3288_CLKGATE_CON(13), 7, GFLAGS),
+@@ -874,12 +874,6 @@ static void __init rk3288_clk_init(struct device_node *np)
+ 		pr_warn("%s: could not register clock xin12m: %ld\n",
+ 			__func__, PTR_ERR(clk));
+ 
+-
+-	clk = clk_register_fixed_factor(NULL, "usb480m", "xin24m", 0, 20, 1);
+-	if (IS_ERR(clk))
+-		pr_warn("%s: could not register clock usb480m: %ld\n",
+-			__func__, PTR_ERR(clk));
+-
+ 	clk = clk_register_fixed_factor(NULL, "hclk_vcodec_pre",
+ 					"hclk_vcodec_pre_v", 0, 1, 4);
+ 	if (IS_ERR(clk))
 -- 
 2.6.2
