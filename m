@@ -1,44 +1,41 @@
-From: vz@mleia.com (Vladimir Zapolskiy)
-Date: Sun, 08 Nov 2015 17:39:51 +0200
-Subject: [PATCH v2 0/8] arm: dts: lpc32xx: updates to LPC32xx SoC and
- boards
-In-Reply-To: <3973745.SoYxz6UFdV@wuerfel>
-References: <1445117757-8073-1-git-send-email-vz@mleia.com>
- <3973745.SoYxz6UFdV@wuerfel>
-Message-ID: <563F6CC7.3050704@mleia.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Sun,  8 Nov 2015 17:04:40 +0100
+Subject: [PATCH v2 7/8] ARM: dts: rockchip: assign usbphy480m_src to the new
+ usbphy pll on veyron
+In-Reply-To: <1446998681-26436-1-git-send-email-heiko@sntech.de>
+References: <1446998681-26436-1-git-send-email-heiko@sntech.de>
+Message-ID: <1446998681-26436-8-git-send-email-heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+Veyron devices try to always set the source for usbphy480m to the usbphy0
+that is the phy connected to the otg controller, because the firmware-
+default is usbphy1, the ehci-controller connected to the internal camera
+that might get turned off way easier to save power.
 
-On 21.10.2015 17:45, Arnd Bergmann wrote:
-> On Sunday 18 October 2015 00:35:49 Vladimir Zapolskiy wrote:
->> The change improves description of NXP LPC32xx hardware, among
->> important changes it adds standard timers and external memory
->> controller nodes, splits PWM device node into two,
->>
->> Changes from v1 to v2:
->> - removed v1 2/5 "arm: dts: lpc32xx: fix improper usage of ranges property"
->> - v1 4/5 "arm: dts: lpc32xx: remove unneeded cell settings from cpus"
->>   is replaced by v2 3/8 "arm: dts: lpc32xx: add reg property to cpu device node"
->> - new change, sets physical memory offset for EA3250 and PHY3250 v5/8
->> - new change, added EMC device node v2 6/8
->> - new change, added standard timer nodes v2 7/8
->> - new change, grouped USB subdevices together v2 8/8
-> 
-> Looks ok to me. Who should pick them up? I haven't seen pull requests from
-> Roland in a while. If he's still interested in the port, I think it would be
-> best if he could create a branch here.
-> 
-> If not, we can pick them up directly this time into arm-soc, but then we
-> should find a new maintainer.
-> 
-> 	Arnd 
+In the mainline kernel we currently don't use the usbphy480m_src at all,
+as it mainly powers the uart0 source that is connected to the bluetooth
+component of the wifi/bt combo.
 
-please pick this series up for v4.3, if it is still possible.
+So move that assignment over to the new real pll clock inside the usbphy.
 
-Thank you.
+Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+---
+ arch/arm/boot/dts/rk3288-veyron.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
---
-With best wishes,
-Vladimir
+diff --git a/arch/arm/boot/dts/rk3288-veyron.dtsi b/arch/arm/boot/dts/rk3288-veyron.dtsi
+index d4263ed..c8329b5 100644
+--- a/arch/arm/boot/dts/rk3288-veyron.dtsi
++++ b/arch/arm/boot/dts/rk3288-veyron.dtsi
+@@ -410,7 +410,7 @@
+ 	status = "okay";
+ 
+ 	assigned-clocks = <&cru SCLK_USBPHY480M_SRC>;
+-	assigned-clock-parents = <&cru SCLK_OTGPHY0>;
++	assigned-clock-parents = <&usbphy0>;
+ 	dr_mode = "host";
+ };
+ 
+-- 
+2.6.2
