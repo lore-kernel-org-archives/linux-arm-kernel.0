@@ -1,59 +1,35 @@
 From: timur@codeaurora.org (Timur Tabi)
-Date: Sat, 7 Nov 2015 23:02:33 -0600
-Subject: [PATCH V3 1/4] dma: qcom_bam_dma: move to qcom directory
-In-Reply-To: <1446958380-23298-2-git-send-email-okaya@codeaurora.org>
+Date: Sat, 7 Nov 2015 23:08:47 -0600
+Subject: [PATCH V3 2/4] dma: add Qualcomm Technologies HIDMA management
+ driver
+In-Reply-To: <1446958380-23298-3-git-send-email-okaya@codeaurora.org>
 References: <1446958380-23298-1-git-send-email-okaya@codeaurora.org>
- <1446958380-23298-2-git-send-email-okaya@codeaurora.org>
-Message-ID: <563ED769.6020706@codeaurora.org>
+ <1446958380-23298-3-git-send-email-okaya@codeaurora.org>
+Message-ID: <563ED8DF.6090307@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Sinan Kaya wrote:
-> Creating a QCOM directory for all QCOM DMA
-> source files.
->
-> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
-> ---
->   drivers/dma/Kconfig        |   13 +-
->   drivers/dma/Makefile       |    2 +-
->   drivers/dma/qcom/Kconfig   |    9 +
->   drivers/dma/qcom/Makefile  |    1 +
->   drivers/dma/qcom/bam_dma.c | 1259 ++++++++++++++++++++++++++++++++++++++++++++
->   drivers/dma/qcom_bam_dma.c | 1259 --------------------------------------------
->   6 files changed, 1273 insertions(+), 1270 deletions(-)
->   create mode 100644 drivers/dma/qcom/Kconfig
->   create mode 100644 drivers/dma/qcom/Makefile
->   create mode 100644 drivers/dma/qcom/bam_dma.c
->   delete mode 100644 drivers/dma/qcom_bam_dma.c
->
-> diff --git a/drivers/dma/Kconfig b/drivers/dma/Kconfig
-> index b458475..d17d9ec 100644
-> --- a/drivers/dma/Kconfig
-> +++ b/drivers/dma/Kconfig
-> @@ -320,7 +320,7 @@ config MOXART_DMA
->   	select DMA_VIRTUAL_CHANNELS
->   	help
->   	  Enable support for the MOXA ART SoC DMA controller.
-> -
-> +
+> +	val = val & ~(MAX_BUS_REQ_LEN_MASK << MAX_BUS_WR_REQ_BIT_POS);
+> +	val = val | (mgmtdev->max_write_request << MAX_BUS_WR_REQ_BIT_POS);
+> +	val = val & ~(MAX_BUS_REQ_LEN_MASK);
+> +	val = val | (mgmtdev->max_read_request);
 
-Unrelated whitespace change.
+val &= ~MAX_BUS_REQ_LEN_MASK << MAX_BUS_WR_REQ_BIT_POS;
+val |= mgmtdev->max_write_request << MAX_BUS_WR_REQ_BIT_POS;
+val &= ~MAX_BUS_REQ_LEN_MASK;
+val |= mgmtdev->max_read_request;
 
-> diff --git a/drivers/dma/qcom/Makefile b/drivers/dma/qcom/Makefile
-> new file mode 100644
-> index 0000000..f612ae3
-> --- /dev/null
-> +++ b/drivers/dma/qcom/Makefile
-> @@ -0,0 +1 @@
-> +obj-$(CONFIG_QCOM_BAM_DMA) += bam_dma.o
-> diff --git a/drivers/dma/qcom/bam_dma.c b/drivers/dma/qcom/bam_dma.c
-> new file mode 100644
-> index 0000000..5359234
+> +static const struct of_device_id hidma_mgmt_match[] = {
+> +	{ .compatible = "qcom,hidma-mgmt", },
+> +	{ .compatible = "qcom,hidma-mgmt-1.0", },
+> +	{ .compatible = "qcom,hidma-mgmt-1.1", },
+> +	{},
+> +};
 
-Please use "git format-patch -M" when creating patches for files that 
-have moved.
-
-
+I thought Rob said that he did NOT want to use version numbers in 
+compatible strings.  And what's the difference between these three 
+versions anyway?
 
 -- 
 Sent by an employee of the Qualcomm Innovation Center, Inc.
