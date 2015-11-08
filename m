@@ -1,83 +1,57 @@
-From: lkp@intel.com (kbuild test robot)
-Date: Mon, 9 Nov 2015 03:13:23 +0800
-Subject: [PATCH V3 4/4] dma: add Qualcomm Technologies HIDMA channel driver
-In-Reply-To: <1446958380-23298-5-git-send-email-okaya@codeaurora.org>
-Message-ID: <201511090323.GmbQltpW%fengguang.wu@intel.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Sun, 8 Nov 2015 11:36:45 -0800
+Subject: [PATCH v3 1/4] dt-bindings: add SMP enable-method for Broadcom NSP
+In-Reply-To: <20151108173116.GV8644@n2100.arm.linux.org.uk>
+References: <1446844273-6460-1-git-send-email-kapilh@broadcom.com>
+ <1446844273-6460-2-git-send-email-kapilh@broadcom.com>
+ <563E6FC7.6070700@gmail.com>
+ <20151108173116.GV8644@n2100.arm.linux.org.uk>
+Message-ID: <CAGVrzcb_c9y6WbV0XoO7rHe6urEXUhCTtD3XieL7E6FHUnS=PQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sinan,
+2015-11-08 9:31 GMT-08:00 Russell King - ARM Linux <linux@arm.linux.org.uk>:
 
-[auto build test WARNING on: robh/for-next]
-[also build test WARNING on: v4.3 next-20151106]
+>> Is it really how the ROM code is implemented, as a pen holding/release
+>> mechanism (which sounds like how this was implemented previously in the
+>> kernel actually) or should this be described in a more generic way as
+>> the physical address of the register where the secondary CPUs reset
+>> vector address must be written to? Or something along these lines.
+>
+> Why do people insist on using holding pens to bring their secondary CPUs
+> into existence?  I hope the hardware people aren't being dumb and have no
+> way to hold in reset or power down their secondary CPUs, either of which
+> is a vital feature for things like kexec and the like.  If they do have
+> a way to hold secondary CPUs in reset or powered down, why aren't they
+> using that at boot instead of implementing the stupid Versatile scheme,
+> which exists because Versatile _can't_ hold its CPUs in reset or power
+> them down...
 
-url:    https://github.com/0day-ci/linux/commits/Sinan-Kaya/ma-add-Qualcomm-Technologies-HIDMA-driver/20151108-125824
-base:   https://git.kernel.org/pub/scm/linux/kernel/git/robh/linux for-next
-config: mn10300-allyesconfig (attached as .config)
-reproduce:
-        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
-        chmod +x ~/bin/make.cross
-        # save the attached .config to linux build tree
-        make.cross ARCH=mn10300 
+There are few implementations out there which suffer from this same
+mistake (mostly MIPS implementations) but that is not really relevant
+here. Most of the time this comes from not understanding software
+models and/or not properly taking into account a complex (too complex)
+reset model.
 
-All warnings (new ones prefixed by >>):
+>
+> It's times like this that I wonder what kind of drugs the hardware SoC
+> people are on, but I'm well aware that people contributing SMP bringup
+> solutions are also dumb idiots who copy the Versatile scheme with very
+> little thought... (as you can see, I'm not mincing my words here - if
+> people want to be lazy in this regard despite this having been brought
+> up multiple times, and the lead developers having said that the versatile
+> pen_release stuff should not be used, they earn themselves the right to
+> be called dumb idiots.  Simple solution to avoid that title: don't be a
+> dumb idiot by copy the Versatile SMP bring up code!  It's not a sane
+> model for any SoC sane SoC to follow.)
+>
+> Is this clear enough?
 
-   In file included from include/linux/printk.h:277:0,
-                    from include/linux/kernel.h:13,
-                    from include/linux/list.h:8,
-                    from include/linux/kobject.h:20,
-                    from include/linux/device.h:17,
-                    from include/linux/dmaengine.h:20,
-                    from drivers/dma/qcom/hidma.c:45:
-   drivers/dma/qcom/hidma.c: In function 'hidma_prep_dma_memcpy':
-   include/linux/dynamic_debug.h:64:16: warning: format '%zu' expects argument of type 'size_t', but argument 7 has type 'unsigned int' [-Wformat=]
-     static struct _ddebug  __aligned(8)   \
-                   ^
-   include/linux/dynamic_debug.h:84:2: note: in expansion of macro 'DEFINE_DYNAMIC_DEBUG_METADATA'
-     DEFINE_DYNAMIC_DEBUG_METADATA(descriptor, fmt);  \
-     ^
-   include/linux/device.h:1171:2: note: in expansion of macro 'dynamic_dev_dbg'
-     dynamic_dev_dbg(dev, format, ##__VA_ARGS__); \
-     ^
->> drivers/dma/qcom/hidma.c:391:2: note: in expansion of macro 'dev_dbg'
-     dev_dbg(mdma->ddev.dev,
-     ^
-
-vim +/dev_dbg +391 drivers/dma/qcom/hidma.c
-
-   375	
-   376		mchan->allocated = 0;
-   377		spin_unlock_irqrestore(&mchan->lock, irqflags);
-   378		dev_dbg(mdma->ddev.dev, "freed channel for %u\n", mchan->dma_sig);
-   379	}
-   380	
-   381	
-   382	static struct dma_async_tx_descriptor *
-   383	hidma_prep_dma_memcpy(struct dma_chan *dmach, dma_addr_t dma_dest,
-   384				dma_addr_t dma_src, size_t len, unsigned long flags)
-   385	{
-   386		struct hidma_chan *mchan = to_hidma_chan(dmach);
-   387		struct hidma_desc *mdesc = NULL;
-   388		struct hidma_dev *mdma = mchan->dmadev;
-   389		unsigned long irqflags;
-   390	
- > 391		dev_dbg(mdma->ddev.dev,
-   392			"memcpy: chan:%p dest:%pad src:%pad len:%zu\n", mchan,
-   393			&dma_dest, &dma_src, len);
-   394	
-   395		/* Get free descriptor */
-   396		spin_lock_irqsave(&mchan->lock, irqflags);
-   397		if (!list_empty(&mchan->free)) {
-   398			mdesc = list_first_entry(&mchan->free, struct hidma_desc,
-   399						node);
-
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 36268 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151109/27ad99a9/attachment-0001.obj>
+The actual implementation of the SMP code in the next patches do not
+use a pen holding/release mechanism anymore as it used in the previous
+iterations of these same patches, so I would say, lesson learned. My
+question was whether the binding was documenting the hardware
+implementation (which it should) or the software implementation (which
+it should not).
+-- 
+Florian
