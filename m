@@ -1,55 +1,89 @@
 From: heiko@sntech.de (Heiko Stuebner)
-Date: Sun,  8 Nov 2015 17:04:34 +0100
-Subject: [PATCH v2 1/8] phy: rockchip-usb: fix clock get-put mismatch
+Date: Sun,  8 Nov 2015 17:04:39 +0100
+Subject: [PATCH v2 6/8] ARM: dts: rockchip: add clock-cells for usb phy nodes
 In-Reply-To: <1446998681-26436-1-git-send-email-heiko@sntech.de>
 References: <1446998681-26436-1-git-send-email-heiko@sntech.de>
-Message-ID: <1446998681-26436-2-git-send-email-heiko@sntech.de>
+Message-ID: <1446998681-26436-7-git-send-email-heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently the phy driver only gets the optional clock reference but
-never puts it again, neither during error handling nor on remove.
-Fix that by moving the clk_put to a devm-action that gets called at
-the right time when all other devm actions are done.
+Add the #clock-cells properties for the usbphy nodes as they
+provide the pll-clocks now.
 
 Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-Reviewed-by: Douglas Anderson <dianders@chromium.org>
 ---
- drivers/phy/phy-rockchip-usb.c | 15 +++++++++++++++
- 1 file changed, 15 insertions(+)
+ arch/arm/boot/dts/rk3066a.dtsi | 2 ++
+ arch/arm/boot/dts/rk3188.dtsi  | 2 ++
+ arch/arm/boot/dts/rk3288.dtsi  | 3 +++
+ 3 files changed, 7 insertions(+)
 
-diff --git a/drivers/phy/phy-rockchip-usb.c b/drivers/phy/phy-rockchip-usb.c
-index 91d6f34..dfc056b 100644
---- a/drivers/phy/phy-rockchip-usb.c
-+++ b/drivers/phy/phy-rockchip-usb.c
-@@ -90,6 +90,14 @@ static const struct phy_ops ops = {
- 	.owner		= THIS_MODULE,
- };
+diff --git a/arch/arm/boot/dts/rk3066a.dtsi b/arch/arm/boot/dts/rk3066a.dtsi
+index 946f187..3e4b41b 100644
+--- a/arch/arm/boot/dts/rk3066a.dtsi
++++ b/arch/arm/boot/dts/rk3066a.dtsi
+@@ -181,6 +181,7 @@
+ 			reg = <0x17c>;
+ 			clocks = <&cru SCLK_OTGPHY0>;
+ 			clock-names = "phyclk";
++			#clock-cells = <0>;
+ 		};
  
-+static void rockchip_usb_phy_action(void *data)
-+{
-+	struct rockchip_usb_phy *rk_phy = data;
-+
-+	if (rk_phy->clk)
-+		clk_put(rk_phy->clk);
-+}
-+
- static int rockchip_usb_phy_probe(struct platform_device *pdev)
- {
- 	struct device *dev = &pdev->dev;
-@@ -124,6 +132,13 @@ static int rockchip_usb_phy_probe(struct platform_device *pdev)
- 		if (IS_ERR(rk_phy->clk))
- 			rk_phy->clk = NULL;
+ 		usbphy1: usb-phy1 {
+@@ -188,6 +189,7 @@
+ 			reg = <0x188>;
+ 			clocks = <&cru SCLK_OTGPHY1>;
+ 			clock-names = "phyclk";
++			#clock-cells = <0>;
+ 		};
+ 	};
  
-+		err = devm_add_action(dev, rockchip_usb_phy_action, rk_phy);
-+		if (err) {
-+			if (rk_phy->clk)
-+				clk_put(rk_phy->clk);
-+			return err;
-+		}
-+
- 		rk_phy->phy = devm_phy_create(dev, child, &ops);
- 		if (IS_ERR(rk_phy->phy)) {
- 			dev_err(dev, "failed to create PHY\n");
+diff --git a/arch/arm/boot/dts/rk3188.dtsi b/arch/arm/boot/dts/rk3188.dtsi
+index 6399942..48a287e 100644
+--- a/arch/arm/boot/dts/rk3188.dtsi
++++ b/arch/arm/boot/dts/rk3188.dtsi
+@@ -156,6 +156,7 @@
+ 			reg = <0x10c>;
+ 			clocks = <&cru SCLK_OTGPHY0>;
+ 			clock-names = "phyclk";
++			#clock-cells = <0>;
+ 		};
+ 
+ 		usbphy1: usb-phy1 {
+@@ -163,6 +164,7 @@
+ 			reg = <0x11c>;
+ 			clocks = <&cru SCLK_OTGPHY1>;
+ 			clock-names = "phyclk";
++			#clock-cells = <0>;
+ 		};
+ 	};
+ 
+diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
+index e978fb2..f778458 100644
+--- a/arch/arm/boot/dts/rk3288.dtsi
++++ b/arch/arm/boot/dts/rk3288.dtsi
+@@ -960,6 +960,7 @@
+ 			reg = <0x320>;
+ 			clocks = <&cru SCLK_OTGPHY0>;
+ 			clock-names = "phyclk";
++			#clock-cells = <0>;
+ 		};
+ 
+ 		usbphy1: usb-phy1 {
+@@ -967,6 +968,7 @@
+ 			reg = <0x334>;
+ 			clocks = <&cru SCLK_OTGPHY1>;
+ 			clock-names = "phyclk";
++			#clock-cells = <0>;
+ 		};
+ 
+ 		usbphy2: usb-phy2 {
+@@ -974,6 +976,7 @@
+ 			reg = <0x348>;
+ 			clocks = <&cru SCLK_OTGPHY2>;
+ 			clock-names = "phyclk";
++			#clock-cells = <0>;
+ 		};
+ 	};
+ 
 -- 
 2.6.2
