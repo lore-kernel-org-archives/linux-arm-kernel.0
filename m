@@ -1,94 +1,44 @@
-From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Sun, 8 Nov 2015 11:48:17 -0300
-Subject: [PATCH v2 0/6] ARM: dts: Use correct CD properties for SDIO and
- eMMC in Snow and Peach
-In-Reply-To: <56245DB8.7070106@samsung.com>
-References: <1444927873-15140-1-git-send-email-javier@osg.samsung.com>
- <56245DB8.7070106@samsung.com>
-Message-ID: <563F60B1.6030906@osg.samsung.com>
+From: vz@mleia.com (Vladimir Zapolskiy)
+Date: Sun, 08 Nov 2015 17:39:51 +0200
+Subject: [PATCH v2 0/8] arm: dts: lpc32xx: updates to LPC32xx SoC and
+ boards
+In-Reply-To: <3973745.SoYxz6UFdV@wuerfel>
+References: <1445117757-8073-1-git-send-email-vz@mleia.com>
+ <3973745.SoYxz6UFdV@wuerfel>
+Message-ID: <563F6CC7.3050704@mleia.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Kukjin,
+Hi Arnd,
 
-On 10/19/2015 12:04 AM, Alim Akhtar wrote:
-> Hi Javier,
+On 21.10.2015 17:45, Arnd Bergmann wrote:
+> On Sunday 18 October 2015 00:35:49 Vladimir Zapolskiy wrote:
+>> The change improves description of NXP LPC32xx hardware, among
+>> important changes it adds standard timers and external memory
+>> controller nodes, splits PWM device node into two,
+>>
+>> Changes from v1 to v2:
+>> - removed v1 2/5 "arm: dts: lpc32xx: fix improper usage of ranges property"
+>> - v1 4/5 "arm: dts: lpc32xx: remove unneeded cell settings from cpus"
+>>   is replaced by v2 3/8 "arm: dts: lpc32xx: add reg property to cpu device node"
+>> - new change, sets physical memory offset for EA3250 and PHY3250 v5/8
+>> - new change, added EMC device node v2 6/8
+>> - new change, added standard timer nodes v2 7/8
+>> - new change, grouped USB subdevices together v2 8/8
 > 
-> On 10/15/2015 10:21 PM, Javier Martinez Canillas wrote:
->> Hello,
->>
->> The Exynos Chromebooks DTS don't use the correct card detection properties
->> since these were carried from the vendor tree that had a reason to do so.
->>
->> There are two things that I noticed:
->>
->> 1) The Marvell WiFi SDIO is marked as broken-cd instead of non-removable:
->>
->> This causes the device to be removed when the system enters into a suspend
->> state which leads to the following warning when the system is resumed:
->>
->> [  181.944636] mmc2: error -2 during resume (card was removed?)
->>
->> The rationale for using broken-cd is explained in downstream commit [0] and
->> was that using the non-removable property caused issues with the mwifiex
->> driver since the reset logic called the mmc_{remove,add}_host() functions.
->>
->> But the reset logic in the mwifiex mainline driver has changed and this is
->> no longer the case so it's safe to use the non-removable property AFAICT.
->>
->> 2) The eMMC node has both broken-cd and non-removable but the MMC DT binding
->> doc (Documentation/devicetree/bindings/mmc/mmc.txt) mentions that only one
->> of these card detection properties should be used.
->>
->> So this series change both the SDIO WiFi and eMMC device nodes in the Snow,
->> Peach Pi and Peach Pit boards DTS to use the non-removable property.
->>
->> To test, I've cherry picked commit [1] from the vendor tree that adds a
->> debugfs entry to force a card reset and after the reset, the WiFi card still
->> works correctly:
->>
->> $ echo 1 > /sys/kernel/debug/mwifiex/mlan0/reset
->>
->> And also tested that both eMMC and WiFi are working correctly after a S2R.
->>
->> The test were made on an Exynos5800 Peach Pi but I don't have access to a
->> Snow anymore so testing patch 3/6 and 6/6 on that board will be appreciated.
->>
->> v1 of the series was [2] and this version fixes issues pointed out by Tomeu.
->>
->> Changes since v1:
->>   - Replace broken-cd for non-removable in the correct mmc node for Snow.
->>   - Correct the card detetion properties for eMMC in Snow, Pit and Pi.
->>   - Also remove the card-detect-delay property when using non-removable.
->>
->> [0]: https://chromium.googlesource.com/chromiumos/third_party/kernel/+/ad348e1e2381
->> [1]: https://chromium.googlesource.com/chromiumos/third_party/kernel/+/5995363523de
->> [2]: https://lkml.org/lkml/2015/10/15/294
->>
->> Best regards,
->> Javier
->>
->>
->> Javier Martinez Canillas (6):
->>    ARM: dts: Mark SDIO as non-removable in exynos5800-peach-pi
->>    ARM: dts: Mark SDIO as non-removable in exynos5420-peach-pit
->>    ARM: dts: Mark SDIO as non-removable in exynos5250-snow-common
->>    ARM: dts: Remove broken-cd from eMMC node in exynos5800-peach-pi
->>    ARM: dts: Remove broken-cd from eMMC node in exynos5420-peach-pi
->>    ARM: dts: Mark eMMC as non-removable in exynos5250-snow-common
->>
-> This series looks good to me, so feel free to add
-> Reviewed-by: Alim Akhtar <alim.akhtar@samsung.com>
-> and for patch 4 and 5: Tested-by: Alim Akhtar <alim.akhtar@samsung.com>
-> Thanks.
->
+> Looks ok to me. Who should pick them up? I haven't seen pull requests from
+> Roland in a while. If he's still interested in the port, I think it would be
+> best if he could create a branch here.
+> 
+> If not, we can pick them up directly this time into arm-soc, but then we
+> should find a new maintainer.
+> 
+> 	Arnd 
 
-You said that you are going to take this series once Alim tested / gave
-his feedback but that happened weeks ago and I still don't see these in
-your tree.
+please pick this series up for v4.3, if it is still possible.
 
-Best regards,
--- 
-Javier Martinez Canillas
-Open Source Group
-Samsung Research America
+Thank you.
+
+--
+With best wishes,
+Vladimir
