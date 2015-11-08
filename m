@@ -1,47 +1,76 @@
-From: caesar.upstream@gmail.com (Caesar Wang)
-Date: Sun, 8 Nov 2015 17:39:13 +0800
-Subject: [PATCH v2 0/9] Better compatible for the rockchip thermal and
- support RK3368 SoCs
-In-Reply-To: <4207814.5j47hyHv2C@phil>
-References: <1446700685-18017-1-git-send-email-wxt@rock-chips.com>
- <1509087.903MXQEqfv@phil> <563E1E7A.6010503@gmail.com>
- <4207814.5j47hyHv2C@phil>
-Message-ID: <563F1841.9060400@gmail.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Sun, 8 Nov 2015 17:42:10 +0800
+Subject: [PATCH v3 05/10] thermal: rockchip: Add the sort flag for adc
+ value increment or decrement
+In-Reply-To: <1446974768-25795-6-git-send-email-wxt@rock-chips.com>
+Message-ID: <201511081727.aYHG5C5A%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Heiko,
+Hi Caesar,
 
-? 2015?11?08? 07:13, Heiko Stuebner ??:
-> Hi Caesar,
->
-> Am Samstag, 7. November 2015, 23:53:30 schrieb Caesar Wang:
->> ? 2015?11?07? 03:03, Heiko Stuebner ??:[]
->>
->> [....]
->>
->>> I call dibs on the devicetree patches :-) .
->>>
->>> Code and dt parts are very much separate, so I'd like to take the dt parts
->>> though my tree and arm-soc to keep further dts changes together.
->>> Of course only once you are ok with the code parts :-)
->>>
->>> Devicetree parts themselfs look ok to me.
->> Many thanks, I guess that I don't need send the dts patch again.;-)
->> the Code is still a bit change for thermal driver.
-> I think you should still send the dts patches with next revisions. I can
-> only take the patches, once Eduardo is satisfied with the code changes
-> that include the new binding, and while I hope that this will be in v3, it
-> will be hard if we get to v5 or so, to grep through the older revisions,
-> trying to find the dts changes :-).
+[auto build test WARNING on: soc-thermal/next]
+[also build test WARNING on: next-20151106]
+[cannot apply to: rockchip/for-next v4.3]
 
-Okay, I send the v3 patchs.
+url:    https://github.com/0day-ci/linux/commits/Caesar-Wang/Better-compatible-for-the-rockchip-thermal-and-support-RK3368-SoCs/20151108-173308
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/evalenti/linux-soc-thermal next
+config: x86_64-randconfig-x014-201545 (attached as .config)
+reproduce:
+        # save the attached .config to linux build tree
+        make ARCH=x86_64 
 
+All warnings (new ones prefixed by >>):
 
->
-> Heiko
->
+   drivers/thermal/rockchip_thermal.c: In function 'rk_tsadcv2_code_to_temp':
+>> drivers/thermal/rockchip_thermal.c:239:10: warning: switch condition has boolean value [-Wswitch-bool]
+     switch (table.sort_flag) {
+             ^
+   drivers/thermal/rockchip_thermal.c: In function 'rockchip_thermal_suspend':
+   drivers/thermal/rockchip_thermal.c:720:2: error: implicit declaration of function 'pinctrl_pm_select_sleep_state' [-Werror=implicit-function-declaration]
+     pinctrl_pm_select_sleep_state(dev);
+     ^
+   drivers/thermal/rockchip_thermal.c: In function 'rockchip_thermal_resume':
+   drivers/thermal/rockchip_thermal.c:759:2: error: implicit declaration of function 'pinctrl_pm_select_default_state' [-Werror=implicit-function-declaration]
+     pinctrl_pm_select_default_state(dev);
+     ^
+   cc1: some warnings being treated as errors
 
--- 
-Thanks,
-Caesar
+vim +239 drivers/thermal/rockchip_thermal.c
+
+   223		}
+   224	
+   225		return 0;
+   226	}
+   227	
+   228	static int rk_tsadcv2_code_to_temp(struct chip_tsadc_table table, u32 code,
+   229					   int *temp)
+   230	{
+   231		unsigned int low = 1;
+   232		unsigned int high = table.length - 1;
+   233		unsigned int mid = (low + high) / 2;
+   234		unsigned int num;
+   235		unsigned long denom;
+   236	
+   237		WARN_ON(table.length < 2);
+   238	
+ > 239		switch (table.sort_flag) {
+   240		case ADC_DECREMENT:
+   241			code &= table.data_mask;
+   242			if (code < table.id[high].code)
+   243				return -EAGAIN;		/* Incorrect reading */
+   244	
+   245			while (low <= high) {
+   246				if (code >= table.id[mid].code &&
+   247				    code < table.id[mid - 1].code)
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 25156 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151108/4fab5161/attachment-0001.obj>
