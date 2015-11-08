@@ -1,25 +1,50 @@
-From: timur@codeaurora.org (Timur Tabi)
-Date: Sat, 7 Nov 2015 17:31:29 -0600
-Subject: [PATCH] tty: amba-pl011: add options to earlycon for 32-bit reg
- access
-In-Reply-To: <563E7CF2.60609@hurleysoftware.com>
-References: <1446770267-26749-1-git-send-email-timur@codeaurora.org>
- <563C07C8.9060506@hurleysoftware.com> <563C09BB.9030706@codeaurora.org>
- <563C1409.4070804@hurleysoftware.com> <563CF8AF.50808@codeaurora.org>
- <563E7CF2.60609@hurleysoftware.com>
-Message-ID: <563E89D1.4070200@codeaurora.org>
+From: alexei.starovoitov@gmail.com (Alexei Starovoitov)
+Date: Sat, 7 Nov 2015 18:27:27 -0800
+Subject: [PATCH] arm64: bpf: fix JIT stack setup
+In-Reply-To: <1446874577-14539-1-git-send-email-yang.shi@linaro.org>
+References: <1446874577-14539-1-git-send-email-yang.shi@linaro.org>
+Message-ID: <20151108022726.GB39441@ast-mbp.thefacebook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Peter Hurley wrote:
-> I'll note that when I review Russell's v2 series, if necessary.
-> What is the plan to introduce the SBSA32 support? After the ACPI support is
-> upstreamed?
+On Fri, Nov 06, 2015 at 09:36:17PM -0800, Yang Shi wrote:
+> ARM64 JIT used FP (x29) as eBPF fp register, but FP is subjected to
+> change during function call so it may cause the BPF prog stack base address
+> change too. Whenever, it pointed to the bottom of BPF prog stack instead of
+> the top.
+> 
+> So, when copying data via bpf_probe_read, it will be copied to (SP - offset),
+> then it may overwrite the saved FP/LR.
+> 
+> Use x25 to replace FP as BPF stack base register (fp). Since x25 is callee
+> saved register, so it will keep intact during function call.
+> It is initialized in BPF prog prologue when BPF prog is started to run
+> everytime. When BPF prog exits, it could be just tossed.
+> 
+> Other than this the BPf prog stack base need to be setup before function
+> call stack.
+> 
+> So, the BPF stack layout looks like:
+> 
+>                                  high
+>          original A64_SP =>   0:+-----+ BPF prologue
+>                                 |     | FP/LR and callee saved registers
+>          BPF fp register => +64:+-----+
+>                                 |     |
+>                                 | ... | BPF prog stack
+>                                 |     |
+>                                 |     |
+>          current A64_SP =>      +-----+
+>                                 |     |
+>                                 | ... | Function call stack
+>                                 |     |
+>                                 +-----+
+>                                   low
+> 
+> Signed-off-by: Yang Shi <yang.shi@linaro.org>
+> CC: Zi Shen Lim <zlim.lnx@gmail.com>
+> CC: Xi Wang <xi.wang@gmail.com>
 
-There are some patches from Leif Lindholm that address that.  However, 
-they will probably need to be reworked on top of Russell's patch set.
-
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the
-Code Aurora Forum, hosted by The Linux Foundation.
+Thanks for tracking it down.
+That looks like fundamental bug in arm64 jit. I'm surprised function calls worked at all.
+Zi please review.
