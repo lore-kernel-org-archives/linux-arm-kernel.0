@@ -1,106 +1,127 @@
 From: heiko@sntech.de (Heiko Stuebner)
-Date: Sun,  8 Nov 2015 17:04:38 +0100
-Subject: [PATCH v2 5/8] clk: rockchip: fix usbphy-related clocks
+Date: Sun,  8 Nov 2015 17:04:36 +0100
+Subject: [PATCH v2 3/8] phy: rockchip-usb: move per-phy init into a separate
+ function
 In-Reply-To: <1446998681-26436-1-git-send-email-heiko@sntech.de>
 References: <1446998681-26436-1-git-send-email-heiko@sntech.de>
-Message-ID: <1446998681-26436-6-git-send-email-heiko@sntech.de>
+Message-ID: <1446998681-26436-4-git-send-email-heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The otgphy clocks really only drive the phy blocks. These in turn
-contain plls that then generate the 480m clocks the clock controller
-uses to supply some other clocks like uart0, gpu or the video-codec.
-
-So fix this structure to actually respect that hirarchy and removed
-that usb480m fixed-rate clock working as a placeholder till now, as
-this wouldn't even work if the supplying phy gets turned off while
-its pll-output gets used elsewhere.
+This unclutters the loop in probe a lot and makes current (and future)
+error handling easier to read.
 
 Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+Reviewed-by: Douglas Anderson <dianders@chromium.org>
 ---
- drivers/clk/rockchip/clk-rk3188.c | 11 +++--------
- drivers/clk/rockchip/clk-rk3288.c | 16 +++++-----------
- 2 files changed, 8 insertions(+), 19 deletions(-)
+ drivers/phy/phy-rockchip-usb.c | 82 +++++++++++++++++++++++-------------------
+ 1 file changed, 46 insertions(+), 36 deletions(-)
 
-diff --git a/drivers/clk/rockchip/clk-rk3188.c b/drivers/clk/rockchip/clk-rk3188.c
-index abb4760..7836a97 100644
---- a/drivers/clk/rockchip/clk-rk3188.c
-+++ b/drivers/clk/rockchip/clk-rk3188.c
-@@ -319,9 +319,9 @@ static struct rockchip_clk_branch common_clk_branches[] __initdata = {
- 	 * the 480m are generated inside the usb block from these clocks,
- 	 * but they are also a source for the hsicphy clock.
- 	 */
--	GATE(SCLK_OTGPHY0, "sclk_otgphy0", "usb480m", CLK_IGNORE_UNUSED,
-+	GATE(SCLK_OTGPHY0, "sclk_otgphy0", "xin24m", CLK_IGNORE_UNUSED,
- 			RK2928_CLKGATE_CON(1), 5, GFLAGS),
--	GATE(SCLK_OTGPHY1, "sclk_otgphy1", "usb480m", CLK_IGNORE_UNUSED,
-+	GATE(SCLK_OTGPHY1, "sclk_otgphy1", "xin24m", CLK_IGNORE_UNUSED,
- 			RK2928_CLKGATE_CON(1), 6, GFLAGS),
+diff --git a/drivers/phy/phy-rockchip-usb.c b/drivers/phy/phy-rockchip-usb.c
+index e081053..3b69f61 100644
+--- a/drivers/phy/phy-rockchip-usb.c
++++ b/drivers/phy/phy-rockchip-usb.c
+@@ -103,14 +103,57 @@ static void rockchip_usb_phy_action(void *data)
+ 		clk_put(rk_phy->clk);
+ }
  
- 	COMPOSITE(0, "mac_src", mux_mac_p, 0,
-@@ -635,7 +635,7 @@ static struct clk_div_table div_rk3188_aclk_core_t[] = {
- 	{ /* sentinel */ },
- };
++static int rockchip_usb_phy_init(struct rockchip_usb_phy_base *base,
++				 struct device_node *child)
++{
++	struct rockchip_usb_phy *rk_phy;
++	unsigned int reg_offset;
++	int err;
++
++	rk_phy = devm_kzalloc(base->dev, sizeof(*rk_phy), GFP_KERNEL);
++	if (!rk_phy)
++		return -ENOMEM;
++
++	rk_phy->base = base;
++
++	if (of_property_read_u32(child, "reg", &reg_offset)) {
++		dev_err(base->dev, "missing reg property in node %s\n",
++			child->name);
++		return -EINVAL;
++	}
++
++	rk_phy->reg_offset = reg_offset;
++
++	rk_phy->clk = of_clk_get_by_name(child, "phyclk");
++	if (IS_ERR(rk_phy->clk))
++		rk_phy->clk = NULL;
++
++	err = devm_add_action(base->dev, rockchip_usb_phy_action, rk_phy);
++	if (err)
++		goto err_devm_action;
++
++	rk_phy->phy = devm_phy_create(base->dev, child, &ops);
++	if (IS_ERR(rk_phy->phy)) {
++		dev_err(base->dev, "failed to create PHY\n");
++		return PTR_ERR(rk_phy->phy);
++	}
++	phy_set_drvdata(rk_phy->phy, rk_phy);
++
++	/* only power up usb phy when it use, so disable it when init*/
++	return rockchip_usb_phy_power(rk_phy, 1);
++
++err_devm_action:
++	if (rk_phy->clk)
++		clk_put(rk_phy->clk);
++	return err;
++}
++
+ static int rockchip_usb_phy_probe(struct platform_device *pdev)
+ {
+ 	struct device *dev = &pdev->dev;
+ 	struct rockchip_usb_phy_base *phy_base;
+-	struct rockchip_usb_phy *rk_phy;
+ 	struct phy_provider *phy_provider;
+ 	struct device_node *child;
+-	unsigned int reg_offset;
+ 	int err;
  
--PNAME(mux_hsicphy_p)		= { "sclk_otgphy0", "sclk_otgphy1",
-+PNAME(mux_hsicphy_p)		= { "sclk_otgphy0_480m", "sclk_otgphy1_480m",
- 				    "gpll", "cpll" };
+ 	phy_base = devm_kzalloc(dev, sizeof(*phy_base), GFP_KERNEL);
+@@ -126,40 +169,7 @@ static int rockchip_usb_phy_probe(struct platform_device *pdev)
+ 	}
  
- static struct rockchip_clk_branch rk3188_clk_branches[] __initdata = {
-@@ -739,11 +739,6 @@ static void __init rk3188_common_clk_init(struct device_node *np)
- 		pr_warn("%s: could not register clock xin12m: %ld\n",
- 			__func__, PTR_ERR(clk));
- 
--	clk = clk_register_fixed_factor(NULL, "usb480m", "xin24m", 0, 20, 1);
--	if (IS_ERR(clk))
--		pr_warn("%s: could not register clock usb480m: %ld\n",
--			__func__, PTR_ERR(clk));
+ 	for_each_available_child_of_node(dev->of_node, child) {
+-		rk_phy = devm_kzalloc(dev, sizeof(*rk_phy), GFP_KERNEL);
+-		if (!rk_phy)
+-			return -ENOMEM;
 -
- 	rockchip_clk_register_branches(common_clk_branches,
- 				  ARRAY_SIZE(common_clk_branches));
- 
-diff --git a/drivers/clk/rockchip/clk-rk3288.c b/drivers/clk/rockchip/clk-rk3288.c
-index 3fceda1..58e6d8c 100644
---- a/drivers/clk/rockchip/clk-rk3288.c
-+++ b/drivers/clk/rockchip/clk-rk3288.c
-@@ -195,8 +195,8 @@ PNAME(mux_hsadcout_p)	= { "hsadc_src", "ext_hsadc" };
- PNAME(mux_edp_24m_p)	= { "ext_edp_24m", "xin24m" };
- PNAME(mux_tspout_p)	= { "cpll", "gpll", "npll", "xin27m" };
- 
--PNAME(mux_usbphy480m_p)		= { "sclk_otgphy1", "sclk_otgphy2",
--				    "sclk_otgphy0" };
-+PNAME(mux_usbphy480m_p)		= { "sclk_otgphy1_480m", "sclk_otgphy2_480m",
-+				    "sclk_otgphy0_480m" };
- PNAME(mux_hsicphy480m_p)	= { "cpll", "gpll", "usbphy480m_src" };
- PNAME(mux_hsicphy12m_p)		= { "hsicphy12m_xin12m", "hsicphy12m_usbphy" };
- 
-@@ -506,11 +506,11 @@ static struct rockchip_clk_branch rk3288_clk_branches[] __initdata = {
- 			RK3288_CLKSEL_CON(35), 6, 2, MFLAGS, 0, 5, DFLAGS,
- 			RK3288_CLKGATE_CON(4), 10, GFLAGS),
- 
--	GATE(SCLK_OTGPHY0, "sclk_otgphy0", "usb480m", CLK_IGNORE_UNUSED,
-+	GATE(SCLK_OTGPHY0, "sclk_otgphy0", "xin24m", CLK_IGNORE_UNUSED,
- 			RK3288_CLKGATE_CON(13), 4, GFLAGS),
--	GATE(SCLK_OTGPHY1, "sclk_otgphy1", "usb480m", CLK_IGNORE_UNUSED,
-+	GATE(SCLK_OTGPHY1, "sclk_otgphy1", "xin24m", CLK_IGNORE_UNUSED,
- 			RK3288_CLKGATE_CON(13), 5, GFLAGS),
--	GATE(SCLK_OTGPHY2, "sclk_otgphy2", "usb480m", CLK_IGNORE_UNUSED,
-+	GATE(SCLK_OTGPHY2, "sclk_otgphy2", "xin24m", CLK_IGNORE_UNUSED,
- 			RK3288_CLKGATE_CON(13), 6, GFLAGS),
- 	GATE(SCLK_OTG_ADP, "sclk_otg_adp", "xin32k", CLK_IGNORE_UNUSED,
- 			RK3288_CLKGATE_CON(13), 7, GFLAGS),
-@@ -874,12 +874,6 @@ static void __init rk3288_clk_init(struct device_node *np)
- 		pr_warn("%s: could not register clock xin12m: %ld\n",
- 			__func__, PTR_ERR(clk));
- 
+-		rk_phy->base = phy_base;
 -
--	clk = clk_register_fixed_factor(NULL, "usb480m", "xin24m", 0, 20, 1);
--	if (IS_ERR(clk))
--		pr_warn("%s: could not register clock usb480m: %ld\n",
--			__func__, PTR_ERR(clk));
+-		if (of_property_read_u32(child, "reg", &reg_offset)) {
+-			dev_err(dev, "missing reg property in node %s\n",
+-				child->name);
+-			return -EINVAL;
+-		}
 -
- 	clk = clk_register_fixed_factor(NULL, "hclk_vcodec_pre",
- 					"hclk_vcodec_pre_v", 0, 1, 4);
- 	if (IS_ERR(clk))
+-		rk_phy->reg_offset = reg_offset;
+-
+-		rk_phy->clk = of_clk_get_by_name(child, "phyclk");
+-		if (IS_ERR(rk_phy->clk))
+-			rk_phy->clk = NULL;
+-
+-		err = devm_add_action(dev, rockchip_usb_phy_action, rk_phy);
+-		if (err) {
+-			if (rk_phy->clk)
+-				clk_put(rk_phy->clk);
+-			return err;
+-		}
+-
+-		rk_phy->phy = devm_phy_create(dev, child, &ops);
+-		if (IS_ERR(rk_phy->phy)) {
+-			dev_err(dev, "failed to create PHY\n");
+-			return PTR_ERR(rk_phy->phy);
+-		}
+-		phy_set_drvdata(rk_phy->phy, rk_phy);
+-
+-		/* only power up usb phy when it use, so disable it when init*/
+-		err = rockchip_usb_phy_power(rk_phy, 1);
++		err = rockchip_usb_phy_init(phy_base, child);
+ 		if (err)
+ 			return err;
+ 	}
 -- 
 2.6.2
