@@ -1,41 +1,55 @@
 From: heiko@sntech.de (Heiko Stuebner)
-Date: Sun,  8 Nov 2015 17:04:40 +0100
-Subject: [PATCH v2 7/8] ARM: dts: rockchip: assign usbphy480m_src to the new
- usbphy pll on veyron
+Date: Sun,  8 Nov 2015 17:04:34 +0100
+Subject: [PATCH v2 1/8] phy: rockchip-usb: fix clock get-put mismatch
 In-Reply-To: <1446998681-26436-1-git-send-email-heiko@sntech.de>
 References: <1446998681-26436-1-git-send-email-heiko@sntech.de>
-Message-ID: <1446998681-26436-8-git-send-email-heiko@sntech.de>
+Message-ID: <1446998681-26436-2-git-send-email-heiko@sntech.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Veyron devices try to always set the source for usbphy480m to the usbphy0
-that is the phy connected to the otg controller, because the firmware-
-default is usbphy1, the ehci-controller connected to the internal camera
-that might get turned off way easier to save power.
-
-In the mainline kernel we currently don't use the usbphy480m_src at all,
-as it mainly powers the uart0 source that is connected to the bluetooth
-component of the wifi/bt combo.
-
-So move that assignment over to the new real pll clock inside the usbphy.
+Currently the phy driver only gets the optional clock reference but
+never puts it again, neither during error handling nor on remove.
+Fix that by moving the clk_put to a devm-action that gets called at
+the right time when all other devm actions are done.
 
 Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+Reviewed-by: Douglas Anderson <dianders@chromium.org>
 ---
- arch/arm/boot/dts/rk3288-veyron.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/phy/phy-rockchip-usb.c | 15 +++++++++++++++
+ 1 file changed, 15 insertions(+)
 
-diff --git a/arch/arm/boot/dts/rk3288-veyron.dtsi b/arch/arm/boot/dts/rk3288-veyron.dtsi
-index d4263ed..c8329b5 100644
---- a/arch/arm/boot/dts/rk3288-veyron.dtsi
-+++ b/arch/arm/boot/dts/rk3288-veyron.dtsi
-@@ -410,7 +410,7 @@
- 	status = "okay";
- 
- 	assigned-clocks = <&cru SCLK_USBPHY480M_SRC>;
--	assigned-clock-parents = <&cru SCLK_OTGPHY0>;
-+	assigned-clock-parents = <&usbphy0>;
- 	dr_mode = "host";
+diff --git a/drivers/phy/phy-rockchip-usb.c b/drivers/phy/phy-rockchip-usb.c
+index 91d6f34..dfc056b 100644
+--- a/drivers/phy/phy-rockchip-usb.c
++++ b/drivers/phy/phy-rockchip-usb.c
+@@ -90,6 +90,14 @@ static const struct phy_ops ops = {
+ 	.owner		= THIS_MODULE,
  };
  
++static void rockchip_usb_phy_action(void *data)
++{
++	struct rockchip_usb_phy *rk_phy = data;
++
++	if (rk_phy->clk)
++		clk_put(rk_phy->clk);
++}
++
+ static int rockchip_usb_phy_probe(struct platform_device *pdev)
+ {
+ 	struct device *dev = &pdev->dev;
+@@ -124,6 +132,13 @@ static int rockchip_usb_phy_probe(struct platform_device *pdev)
+ 		if (IS_ERR(rk_phy->clk))
+ 			rk_phy->clk = NULL;
+ 
++		err = devm_add_action(dev, rockchip_usb_phy_action, rk_phy);
++		if (err) {
++			if (rk_phy->clk)
++				clk_put(rk_phy->clk);
++			return err;
++		}
++
+ 		rk_phy->phy = devm_phy_create(dev, child, &ops);
+ 		if (IS_ERR(rk_phy->phy)) {
+ 			dev_err(dev, "failed to create PHY\n");
 -- 
 2.6.2
