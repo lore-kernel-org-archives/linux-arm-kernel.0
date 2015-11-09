@@ -1,96 +1,102 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 9 Nov 2015 17:59:42 +0100
-Subject: [PATCH] ARM/arm64: KVM: test properly for a PTE's uncachedness
-In-Reply-To: <20151109163519.GB12968@cbox>
-References: <1446810188-13727-1-git-send-email-ard.biesheuvel@linaro.org>
- <20151109162159.GA12968@cbox>
- <CAKv+Gu9RkX1A4rLvTbgkhTQxcVnLjc1tHRaMAOq0cgcpGvkpRg@mail.gmail.com>
- <20151109163519.GB12968@cbox>
-Message-ID: <CAKv+Gu_agkv7aDqj7fgdoWU+9k=eJ-0YU7WrDKm1_wtr_xYQ6g@mail.gmail.com>
+From: slash.tmp@free.fr (Mason)
+Date: Mon, 9 Nov 2015 18:03:47 +0100
+Subject: Grafting old platform drivers onto a new DT kernel
+In-Reply-To: <yw1xpozj5ezj.fsf@unicorn.mansr.com>
+References: <563B3749.50701@free.fr> <20151105151559.GA16666@lunn.ch>
+ <CABxcv=k5mzw_TDsD1eQna9+HY9aqCUd03YAc62750Gs--sMozw@mail.gmail.com>
+ <5640B877.4020108@free.fr> <yw1xtwov5gh1.fsf@unicorn.mansr.com>
+ <5640C4BF.2010204@free.fr> <yw1xpozj5ezj.fsf@unicorn.mansr.com>
+Message-ID: <5640D1F3.1010100@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9 November 2015 at 17:35, Christoffer Dall
-<christoffer.dall@linaro.org> wrote:
-> On Mon, Nov 09, 2015 at 05:27:40PM +0100, Ard Biesheuvel wrote:
->> On 9 November 2015 at 17:21, Christoffer Dall
->> <christoffer.dall@linaro.org> wrote:
->> > On Fri, Nov 06, 2015 at 12:43:08PM +0100, Ard Biesheuvel wrote:
->> >> The open coded tests for checking whether a PTE maps a page as
->> >> uncached use a flawed 'pte_val(xxx) & CONST != CONST' pattern,
->> >> which is not guaranteed to work since the type of a mapping is an
->> >> index into the MAIR table, not a set of mutually exclusive bits.
->> >>
->> >> Considering that, on arm64, the S2 type definitions use the following
->> >> MAIR indexes
->> >>
->> >>     #define MT_S2_NORMAL            0xf
->> >>     #define MT_S2_DEVICE_nGnRE      0x1
->> >>
->> >> we have been getting lucky merely because the S2 device mappings also
->> >> have the PTE_UXN bit set, which means that a device PTE still does not
->> >> equal a normal PTE after masking with the former type.
->> >>
->> >> Instead, implement proper checking against the MAIR indexes that are
->> >> known to define uncached memory attributes.
->> >>
->> >> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> >> ---
->> >>  arch/arm/include/asm/kvm_mmu.h   | 11 +++++++++++
->> >>  arch/arm/kvm/mmu.c               |  5 ++---
->> >>  arch/arm64/include/asm/kvm_mmu.h | 12 ++++++++++++
->> >>  3 files changed, 25 insertions(+), 3 deletions(-)
->> >>
->> >> diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
->> >> index 405aa1883307..422973835d41 100644
->> >> --- a/arch/arm/include/asm/kvm_mmu.h
->> >> +++ b/arch/arm/include/asm/kvm_mmu.h
->> >> @@ -279,6 +279,17 @@ static inline void __kvm_extend_hypmap(pgd_t *boot_hyp_pgd,
->> >>                                      pgd_t *merged_hyp_pgd,
->> >>                                      unsigned long hyp_idmap_start) { }
->> >>
->> >> +static inline bool __kvm_pte_is_uncached(pte_t pte)
->> >> +{
->> >> +     switch (pte_val(pte) & L_PTE_MT_MASK) {
->> >> +     case L_PTE_MT_UNCACHED:
->> >> +     case L_PTE_MT_BUFFERABLE:
->> >> +     case L_PTE_MT_DEV_SHARED:
->> >> +             return true;
->> >> +     }
->> >
->> > so PTEs created by setting PAGE_S2_DEVICE will end up hitting in one of
->> > these because L_PTE_S2_MT_DEV_SHARED is the same as L_PTE_MT_BUFFERABLE
->> > for stage-2 mappings and PAGE_HYP_DEVICE end up using
->> > L_PTE_MT_DEV_SHARED.
->> >
->> > Totally obvious.
->> >
+On 09/11/2015 17:12, M?ns Rullg?rd wrote:
+
+> Mason writes:
+> 
+>> On 09/11/2015 16:40, M?ns Rullg?rd wrote:
 >>
->> Hmm, perhaps not. Would you prefer all aliases of the L_PTE_MT_xx
->> constants that map to device permissions to be listed here?
+>>> The simplest solution for you is probably to add a quick and dirty DT
+>>> binding to the old driver.  If it doesn't use any driver-specific
+>>> platform data struct, you only need to set .of_match_table in the
+>>> struct platform_driver.  If there is a platform data struct, you'll also
+>>> need to write some code to populate it from DT properties.  It shouldn't
+>>> take more than a few minutes per driver in most cases.
 >>
->
-> Meh, there's no great solution and this code is all the kind of code
-> that you just need to take the time to understand.  We could add a
-> comment I suppose, if I got the above correct, I can throw something in?
->
+>> I'll try that approach, although I fear that "a few minutes per driver"
+>> is an optimistic assessment.
+> 
+> If the driver only needs an MMIO region and an IRQ, it is literally five
+> lines of code.
 
-Actually, I think the patch is wrong, and so is the commit message.
+It took me 7 days to figure out there were 2 lines missing in the
+interrupt controller driver.
 
-I got confused between HYP mappings and stage 2 mappings. HYP mappings
-use an index into the MAIR (which HYP inherits from the kernel) but
-the stage 2 mappings have a bit fiield describing the type.
+My problem is that I don't understand the platform API, nor the
+interaction with the DT API.
 
-So for one, I think that means that __kvm_pte_is_uncached() cannot be
-used for both HYP and stage-2 PTE's, or we'd need to add a parameter
-to distinguish between them.
+Let me see...
 
-For HYP mappings, we need to compare the MAIR index to values that are
-known to refer to device or uncached mappings (as the patch does)
-For S2 mappings, we need to mask the MemAttr[5:2] field, and interpret
-it according to the description in the ARM ARM, i.e., MemAttr[3:2] ==
-0b00 indicates device, MemAttr[3:0] == 0b0101 is uncached memory,
-anything else requires cache maintenance.
+In arch/arm/mach-tangox/platform_dev.c
 
--- 
-Ard.
+static struct platform_device tangox_sdhci0_device = { ... };
+static struct platform_device tangox_sdhci1_device = { ... };
+
+static void tangox_init_sdhci(void)
+{
+	if (tangox_sdio_enabled(0))
+		platform_device_register(&tangox_sdhci0_device);
+
+	if (tangox_sdio_enabled(1))
+		platform_device_register(&tangox_sdhci1_device);
+}
+
+called from tangox_init_devices() which is marked arch_initcall.
+
+
+
+In the driver
+
+static struct platform_driver tangox_platform_sdio0 = {
+	.remove		= sdhci_tangox_remove,
+	.suspend	= sdhci_tangox_suspend,
+	.resume		= sdhci_tangox_resume,
+	.driver		= {
+		.name	= "tangox-sdhci",
+		.owner	= THIS_MODULE,
+	},
+};
+
+
+static struct platform_driver tangox_platform_sdio0 = {
+	.remove		= sdhci_tangox_remove,
+	.driver		= {
+		.name	= "tangox-sdhci",
+		.owner	= THIS_MODULE,
+	},
+};
+
+static int __init tangox_sdhci_drv_init(void) {
+	return platform_driver_probe(&tangox_platform_sdio0, sdhci_tangox_probe);
+}
+
+static void __exit tangox_sdhci_drv_exit(void) {
+	platform_driver_unregister(&tangox_platform_sdio0);
+}
+
+module_init(tangox_sdhci_drv_init);
+module_exit(tangox_sdhci_drv_exit);
+
+
+The old way:
+
+1) call platform_device_register() with a "struct platform_device"
+2) call platform_driver_probe with a "struct platform_driver"
+
+The new way(?)
+
+The mess in 2) is hidden behind module_platform_driver?
+The platform_device_register() is done by the DT core?
+The struct platform_driver requires a probe function?
+
+Regards.
