@@ -1,33 +1,64 @@
 From: heiko@sntech.de (Heiko Stuebner)
-Date: Mon, 09 Nov 2015 20:49:18 +0100
-Subject: [RFC PATCH v3 1/4] drm: Introduce generic probe function for
- component based masters.
-In-Reply-To: <20151109120720.GF963@e106497-lin.cambridge.arm.com>
-References: <1445267270-23126-1-git-send-email-Liviu.Dudau@arm.com>
- <20151109120334.GZ8644@n2100.arm.linux.org.uk>
- <20151109120720.GF963@e106497-lin.cambridge.arm.com>
-Message-ID: <2772927.crXiDc9cOV@phil>
+Date: Mon, 09 Nov 2015 20:50:43 +0100
+Subject: [PATCH 1/2] drm/rockchip: create the fake mmap offset during gem
+ creation
+Message-ID: <4982827.0pnZflEOSR@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Liviu,
+Similarly to the equivalent exynos-fix in commit 48cf53f4343a
+("drm/exynos: create a fake mmap offset with gem creation") the rockchip
+drm driver also calls the drm_gem_create_mmap_offset fake-offset creation
+on every invocation of rockchip_gem_dumb_map_offset.
 
-Am Montag, 9. November 2015, 12:07:20 schrieb Liviu Dudau:
-> On Mon, Nov 09, 2015 at 12:03:35PM +0000, Russell King - ARM Linux wrote:
-> > On Mon, Nov 09, 2015 at 11:57:27AM +0000, Liviu Dudau wrote:
-> > > Meanwhile, what is your suggestion regarding the patchset. I've seen David has
-> > > sent Linus a pull request for 4.4-rc1 that includes it. Should we send a
-> > > revert for rockchip commit and then patch later the function?
-> > 
-> > It definitely needs to be fixed, and I'd suggest its early enough in the
-> > -rc cycle (which hasn't begun yet) to simply fix drm_of_component_probe()
-> > to take two compare functions.
-> 
-> I still don't have a Rockchip board to test the patch, so I need to find out
-> someone willing to test them. Mark?
+Move that to the creation of the gem to only create that offset once.
 
-I of course also have a plethora of rockchip boards, so can test stuff
-as well.
+Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+---
+ drivers/gpu/drm/rockchip/rockchip_drm_gem.c | 12 ++++++------
+ 1 file changed, 6 insertions(+), 6 deletions(-)
 
-
-Heiko
+diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_gem.c b/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
+index 4ab2f20..e50d113 100644
+--- a/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
++++ b/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
+@@ -126,8 +126,14 @@ struct rockchip_gem_object *
+ 	if (ret)
+ 		goto err_free_rk_obj;
+ 
++	ret = drm_gem_create_mmap_offset(obj);
++	if (ret)
++		goto err_free_buf;
++
+ 	return rk_obj;
+ 
++err_free_buf:
++	rockchip_gem_free_buf(rk_obj);
+ err_free_rk_obj:
+ 	kfree(rk_obj);
+ 	return ERR_PTR(ret);
+@@ -196,7 +202,6 @@ int rockchip_gem_dumb_map_offset(struct drm_file *file_priv,
+ 				 uint64_t *offset)
+ {
+ 	struct drm_gem_object *obj;
+-	int ret;
+ 
+ 	obj = drm_gem_object_lookup(dev, file_priv, handle);
+ 	if (!obj) {
+@@ -204,14 +209,9 @@ int rockchip_gem_dumb_map_offset(struct drm_file *file_priv,
+ 		return -EINVAL;
+ 	}
+ 
+-	ret = drm_gem_create_mmap_offset(obj);
+-	if (ret)
+-		goto out;
+-
+ 	*offset = drm_vma_node_offset_addr(&obj->vma_node);
+ 	DRM_DEBUG_KMS("offset = 0x%llx\n", *offset);
+ 
+-out:
+ 	drm_gem_object_unreference_unlocked(obj);
+ 
+ 	return 0;
+-- 
+2.6.2
