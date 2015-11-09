@@ -1,81 +1,52 @@
-From: fu.wei@linaro.org (Fu Wei)
-Date: Mon, 9 Nov 2015 16:30:09 +0800
-Subject: [PATCH RFC 0/3] ACPI, clocksource: add GTDT and ARM memory-mapped
- timer support
-In-Reply-To: <1446042725-5649-1-git-send-email-fu.wei@linaro.org>
-References: <1446042725-5649-1-git-send-email-fu.wei@linaro.org>
-Message-ID: <CADyBb7v2zGURXotA5B8ekr+BXry8=8zF_S5ACoEqUhZGiqui-A@mail.gmail.com>
+From: jiang.liu@linux.intel.com (Jiang Liu)
+Date: Mon, 9 Nov 2015 16:45:18 +0800
+Subject: [PATCH] acpi: add support for extended IRQ to PCI link
+In-Reply-To: <56403311.2020806@codeaurora.org>
+References: <1446998832-7023-1-git-send-email-okaya@codeaurora.org>
+ <56402E23.1070805@linux.intel.com> <56403311.2020806@codeaurora.org>
+Message-ID: <56405D1E.6020007@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all
+On 2015/11/9 13:45, Sinan Kaya wrote:
+> 
+> 
+> On 11/9/2015 12:24 AM, Jiang Liu wrote:
+>>> +    u32 possible[ACPI_PCI_LINK_MAX_POSSIBLE];
+>>> >      u8 initialized:1;
+>>> >      u8 reserved:7;
+>>> >  };
+>> Hi Sinan,
+>>     This data structure become some sort of big, any idea to reduce
+>> memory consumption?
+>> Thanks,
+>> Gerry
+>>
+> Hi Gerry,
+> 
+> There are two constants in the code.
+> 
+> #define ACPI_PCI_LINK_MAX_POSSIBLE    16
+> 
+> I changed the data type above. Previously it was consuming 16 bytes now
+> 64 bytes.
+Aha, I made a mistake. ACPI_PCI_LINK_MAX_POSSIBLE hasn't been changed,
+so the space increasing is not so big:)
 
-On 28 October 2015 at 22:32,  <fu.wei@linaro.org> wrote:
-> From: Fu Wei <fu.wei@linaro.org>
->
-> This patchset:
->     (1)Introduce ACPI GTDT parser: drivers/acpi/gtdt.c
->     Parse all kinds of timer in GTDT table of ACPI:arch timer,
->     memory-mapped timer and SBSA Generic Watchdog timer.
->     This driver can help to simplify all the relevant timer drivers,
->     and separate all the ACPI GTDT knowledge from them.
->
->     (2)Simplify ACPI code for arch timer in arm_arch_timer.c
->
->     (3)Add memory-mapped timer support in arm_arch_timer.c
->
-> [PATCH 2/3] and [PATCH 3/3] depend on a patchset
-> [PATCH v2 0/5] ACPI probing infrastructure,
-> https://lkml.org/lkml/2015/9/13/126, which has been accepted by upstream
-> maintainer, and has been merged in linux-next.git, tag: next-20151013.
-
-FYI: These dependent patches have been merged into master branch of
-vanilla kernel
-That means this patchset can be applied on mainline kernel.
-
->
-> The SBSA Generic Watchdog info parsing support have been tested with
-> a upstreaming SBSA Generic Watchdog driver:
-> https://lkml.org/lkml/2015/10/27/466
-> on the following platforms:
->     (1)ARM Foundation v8 model
->     (2)AMD Seattle platform
->
-> ARM memory-mapped timer support of this patchset has been tested
-> on the following platforms:
->     (1)ARM Foundation v8 model
->
-> Changelog:
-> v1: The first upstreaming version.
->
-> Fu Wei (3):
->   ACPI: add GTDT table parse driver into ACPI driver
->   clocksource: simplify ACPI code in arm_arch_timer.c
->   clocksource: add memory-mapped timer support in arm_arch_timer.c
->
->  drivers/acpi/Kconfig                 |   9 +
->  drivers/acpi/Makefile                |   1 +
->  drivers/acpi/gtdt.c                  | 367 +++++++++++++++++++++++++++++++++++
->  drivers/clocksource/arm_arch_timer.c | 176 +++++++++++++----
->  include/clocksource/arm_arch_timer.h |  19 ++
->  include/linux/acpi.h                 |  17 ++
->  6 files changed, 554 insertions(+), 35 deletions(-)
->  create mode 100644 drivers/acpi/gtdt.c
->
-> --
-> 2.4.3
->
-
-
-
--- 
-Best regards,
-
-Fu Wei
-Software Engineer
-Red Hat Software (Beijing) Co.,Ltd.Shanghai Branch
-Ph: +86 21 61221326(direct)
-Ph: +86 186 2020 4684 (mobile)
-Room 1512, Regus One Corporate Avenue,Level 15,
-One Corporate Avenue,222 Hubin Road,Huangpu District,
-Shanghai,China 200021
+> 
+> The second one is this.
+> 
+> #define ACPI_MAX_IRQS 256
+> 
+> I changed ACPI_MAX_IRQS to 1020 from 256. Let's assume 1024.
+> 
+> I'm concerned about this though since you warned. This used to consume
+> 1024 bytes now 4096 bytes.
+> 
+> static int acpi_irq_penalty[ACPI_MAX_IRQS] = {
+>     PIRQ_PENALTY_ISA_ALWAYS,    /* IRQ0 timer */
+> ...
+> }
+> 
+> Sinan
+> 
