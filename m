@@ -1,87 +1,50 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Mon, 9 Nov 2015 17:00:04 +0200
-Subject: [PATCH v2 2/2] gpio: zynq: Implement irq_pm_(get|put)
-In-Reply-To: <1446668160-17522-3-git-send-email-soren.brinkmann@xilinx.com>
-References: <1446668160-17522-1-git-send-email-soren.brinkmann@xilinx.com>
- <1446668160-17522-3-git-send-email-soren.brinkmann@xilinx.com>
-Message-ID: <5640B4F4.6080008@ti.com>
+From: pinskia@gmail.com (pinskia at gmail.com)
+Date: Mon, 9 Nov 2015 22:52:32 +0800
+Subject: [RFC PATCH v6 00/17] ILP32 for ARM64
+In-Reply-To: <22080083.1SbhEYEXOu@wuerfel>
+References: <1446507046-24604-1-git-send-email-ynorov@caviumnetworks.com>
+ <5795162.dlSUXvq6vJ@wuerfel> <mvmh9kv1bu8.fsf@hawking.suse.de>
+ <22080083.1SbhEYEXOu@wuerfel>
+Message-ID: <4C408453-CDE5-4564-8D22-E59296F2045C@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Soren,
 
-On 11/04/2015 10:16 PM, Soren Brinkmann wrote:
-> The driver uses runtime PM to leverage low power techniques. For
-> use-cases using GPIO as interrupt the device needs to be in an
-> appropriate state.
+
+> On Nov 9, 2015, at 10:36 PM, Arnd Bergmann <arnd@arndb.de> wrote:
 > 
-> Reported-by: John Linn <linnj@xilinx.com>
-> Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
-
-I've one question here. As I know, there is one code path when 
-GPIO HW can be accessed before request_irq() during OF boot:
-
-irq_create_of_mapping()
-- irq_create_fwspec_mapping()
-  - irq_set_irq_type()
-
-How do you handle this situation? :(
-
-> ---
-> v2:
->   - declare callbacks static
-> ---
->   drivers/gpio/gpio-zynq.c | 20 ++++++++++++++++++++
->   1 file changed, 20 insertions(+)
+>> On Monday 09 November 2015 15:33:51 Andreas Schwab wrote:
+>> Arnd Bergmann <arnd@arndb.de> writes:
+>> 
+>>>> On Monday 09 November 2015 14:23:59 Andreas Schwab wrote:
+>>>> Yury Norov <ynorov@caviumnetworks.com> writes:
+>>>> 
+>>>>> This is what I run:
+>>>>> https://github.com/norov/glibc/tree/thunderx-ilp32-32time_toff_t
+>>>> 
+>>>> That doesn't work for me:
+>>>> 
+>>>> ../sysdeps/unix/sysv/linux/generic/sysdep.h:24:22: error: ?__NR_llseek? undeclar
+>>>> ed (first use in this function)
+>>>> ../sysdeps/unix/sysv/linux/aarch64/sysdep.h:41:32: error: ?__NR_fcntl64? undeclared (first use in this function)
+>>> 
+>>> Did you re-export the kernel headers that you use as the base?
+>> 
+>> I'm using the patched 4.3 kernel headers.
 > 
-> diff --git a/drivers/gpio/gpio-zynq.c b/drivers/gpio/gpio-zynq.c
-> index 8abeacac5885..98197f778694 100644
-> --- a/drivers/gpio/gpio-zynq.c
-> +++ b/drivers/gpio/gpio-zynq.c
-> @@ -471,6 +471,22 @@ static int zynq_gpio_set_wake(struct irq_data *data, unsigned int on)
->   	return 0;
->   }
->   
-> +static int zynq_gpio_irq_pm_get(struct irq_data *data)
-> +{
-> +	struct zynq_gpio *gpio = irq_data_get_irq_chip_data(data);
-> +	struct device *dev = gpio->chip.dev;
-> +
-> +	return pm_runtime_get_sync(dev);
-> +}
-> +
-> +static void zynq_gpio_irq_pm_put(struct irq_data *data)
-> +{
-> +	struct zynq_gpio *gpio = irq_data_get_irq_chip_data(data);
-> +	struct device *dev = gpio->chip.dev;
-> +
-> +	pm_runtime_put(dev);
-> +}
-> +
->   /* irq chip descriptor */
->   static struct irq_chip zynq_gpio_level_irqchip = {
->   	.name		= DRIVER_NAME,
-> @@ -480,6 +496,8 @@ static struct irq_chip zynq_gpio_level_irqchip = {
->   	.irq_unmask	= zynq_gpio_irq_unmask,
->   	.irq_set_type	= zynq_gpio_set_irq_type,
->   	.irq_set_wake	= zynq_gpio_set_wake,
-> +	.irq_pm_get	= zynq_gpio_irq_pm_get,
-> +	.irq_pm_put	= zynq_gpio_irq_pm_put,
->   	.flags		= IRQCHIP_EOI_THREADED | IRQCHIP_EOI_IF_HANDLED |
->   			  IRQCHIP_MASK_ON_SUSPEND,
->   };
-> @@ -492,6 +510,8 @@ static struct irq_chip zynq_gpio_edge_irqchip = {
->   	.irq_unmask	= zynq_gpio_irq_unmask,
->   	.irq_set_type	= zynq_gpio_set_irq_type,
->   	.irq_set_wake	= zynq_gpio_set_wake,
-> +	.irq_pm_get	= zynq_gpio_irq_pm_get,
-> +	.irq_pm_put	= zynq_gpio_irq_pm_put,
->   	.flags		= IRQCHIP_MASK_ON_SUSPEND,
->   };
->   
+> Ok.
 > 
+>> Why is <asm/bitsperlong.h> defining __BITS_PER_LONG to 64 unconditionally?
+> 
+> It should not, that is a bug. I don't know how Yury built his glibc,
+> but it can't work if __BITS_PER_LONG is wrong.
 
 
--- 
-regards,
--grygorii
+Looks like I had changed the header file manually for building glibc and Yury and myself missed that when  he updated the patches. 
+
+
+Thanks,
+Andrew
+
+> 
+>    Arnd
