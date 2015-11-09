@@ -1,40 +1,53 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 09 Nov 2015 14:50:47 +0100
-Subject: [PATCH] power: bq27xxx_battery: Revert "Remove unneeded dependency in
- Kconfig"
-Message-ID: <3819790.E2ziFviWmU@wuerfel>
+From: sstabellini@kernel.org (Stefano Stabellini)
+Date: Mon, 9 Nov 2015 13:53:30 +0000 (GMT)
+Subject: [PATCH 1/3] xen/arm: introduce xen_read_wallclock
+In-Reply-To: <7480268.6Ff8Mvx46N@wuerfel>
+References: <alpine.DEB.2.02.1511051706560.13541@kaball.uk.xensource.com>
+ <23850350.L7uJax1OoN@wuerfel>
+ <alpine.DEB.2.02.1511061502280.23825@kaball.uk.xensource.com>
+ <7480268.6Ff8Mvx46N@wuerfel>
+Message-ID: <alpine.DEB.2.02.1511091348440.23825@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The dependency was clearly needed, without it it is possible to
-build the core i2c driver as a loadable module and the bq27xxx
-driver built-in, which results in link errors:
+On Fri, 6 Nov 2015, Arnd Bergmann wrote:
+> > > > ---
+> > > > +static void xen_read_wallclock(struct timespec *ts)
+> > > > +{
+> > > > +   u32 version;
+> > > > +   u64 delta;
+> > > > +   struct timespec now;
+> > > > +   struct shared_info *s = HYPERVISOR_shared_info;
+> > > > +   struct pvclock_wall_clock *wall_clock = &(s->wc);
+> > > 
+> > > pvclock_wall_clock has a 'u32 sec', so that suffers from
+> > > a potential overflow. We should try to avoid introducing that
+> > > on ARM, and instead have a 64-bit seconds based version,
+> > > or alternatively a 64-bit nanoseconds version (with no
+> > > extra seconds) that is also sufficient.
+> > 
+> > Unfortunately this a preexisting ABI which is common with other existing
+> > architectures (see arch/x86/kernel/pvclock.c:pvclock_read_wallclock). I
+> > cannot just change it.
+> 
+> Maybe we need a "struct pvclock_wall_clock_v2"?
+> 
+> In theory, 'u32 sec' takes us all the way until 2106, which is significantly
+> longer away than the signed overflow in 2038, but it would still be nice
+> to not introduce this limitation on ARM in the first place.
+> 
+> I'm not quite sure about how the split between pvclock_wall_clock and
+> the delta works. Normally I'd expect that pvclock_wall_clock is the wallclock
+> time as it was at boot, while delta is the number of expired nanoseconds
+> since boot. However it is unclear why the latter has a longer range
+> (539 years starting at boot, rather than 126 years starting in 1970).
 
-drivers/built-in.o: In function `bq27xxx_battery_i2c_read':
-binder.c:(.text+0x360bf0): undefined reference to `i2c_transfer'
-binder.c:(.text+0x360c10): undefined reference to `i2c_transfer'
-drivers/built-in.o: In function `bq27xxx_battery_init':
-binder.c:(.init.text+0xe668): undefined reference to `i2c_register_driver'
-drivers/built-in.o: In function `bq27xxx_battery_exit':
-binder.c:(.exit.text+0x1a0c): undefined reference to `i2c_del_driver'
+Actually we already have a sec overflow field in struct shared_info on
+the hypervisor side, called wc_sec_hi. I just need to make use of it in
+Linux. See:
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: 6bd03ce3c12a ("power: bq27xxx_battery: Remove unneeded dependency in Kconfig")
----
-The bug was originally found and fixed by Xiong Zhou, but Andrew Davis
-broke it again by reverting the fix.
+http://xenbits.xen.org/gitweb/?p=xen.git;a=blob_plain;f=xen/include/public/xen.h;hb=HEAD
 
-I found it today on my ARM randconfig builds.
+Thanks for raising my attention to the problem,
 
-diff --git a/drivers/power/Kconfig b/drivers/power/Kconfig
-index 237d7aa73e8c..9f53fb74ae6f 100644
---- a/drivers/power/Kconfig
-+++ b/drivers/power/Kconfig
-@@ -159,6 +159,7 @@ config BATTERY_SBS
- 
- config BATTERY_BQ27XXX
- 	tristate "BQ27xxx battery driver"
-+	depends on I2C || I2C=n
- 	help
- 	  Say Y here to enable support for batteries with BQ27xxx (I2C/HDQ) chips.
- 
+Stefano
