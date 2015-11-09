@@ -1,61 +1,79 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Mon, 9 Nov 2015 11:19:31 +0900
-Subject: [PATCH v11 6/8] arm64: renesas: add Salvator-X board support on
- DTS
-In-Reply-To: <CAMuHMdX=LS2sLqtgBUYeWjVkUVZE2WQwsWhbvK+wmdfZ0ycrjg@mail.gmail.com>
-References: <1444890243-6978-1-git-send-email-horms+renesas@verge.net.au>
- <1444890243-6978-7-git-send-email-horms+renesas@verge.net.au>
- <20151015110139.GG8825@leverpostej>
- <20151023070032.GA4502@verge.net.au>
- <CAMuHMdVzUPyhkfPy3s+jBK1gQ-kZqYfrQZ8Bww-iFxGOPVZn2w@mail.gmail.com>
- <CAMuHMdX=LS2sLqtgBUYeWjVkUVZE2WQwsWhbvK+wmdfZ0ycrjg@mail.gmail.com>
-Message-ID: <20151109021928.GB30553@verge.net.au>
+Date: Mon, 9 Nov 2015 11:31:21 +0900
+Subject: [PATCH v6 00/12] arm64: renesas: add sound support
+In-Reply-To: <20151109012943.GF4832@verge.net.au>
+References: <87egg3k5g6.wl%kuninori.morimoto.gx@renesas.com>
+ <20151109012943.GF4832@verge.net.au>
+Message-ID: <20151109023118.GA11532@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Mon, Nov 09, 2015 at 10:29:46AM +0900, Simon Horman wrote:
+> On Fri, Nov 06, 2015 at 06:33:10AM +0000, Kuninori Morimoto wrote:
+> > Hi,
+> > 
+> > these are v2 patches which add sound support to the r8a7795/Salvator-X.
+> > 
+> > These patches are an update of Simon's v5 patch-set
+> > 
+> > The main change to the patches themselves since Morimoto-san's v3 posting
+> > and v4 updates to that posting is to update to new CPG/MSSR bindings via
+> > Geert Uytterhoeven.
+> > 
+> > It doesn't include cs2000 support since it is not accepted yet.
+> > I will send additional patch if it was accepted.
+> > This patches doesn't include CTU/MIX support either,
+> > because it is too advanced feature at this point.
+> > 
+> > Base:
+> > 
+> > * "[PATCH v4 0/3] arm64: renesas: r8a7795: add I2C support"
+> >   This can be found in the topic/r8a7795-i2c-v4 branch of
+> >   my renesas tree on kernel.org.
+> 
+> Thanks.
+> 
+> In order to aid review I have made this patchset available in
+> the topic/r8a7795-sound-v6 branch of my renesas tree on kernel.org.
+> The topic/r8a7795-i2c-v4 branch is there too.
 
-On Tue, Nov 03, 2015 at 03:24:06PM +0100, Geert Uytterhoeven wrote:
-> Hi Mark, Rob,
-> 
-> On Thu, Oct 29, 2015 at 8:52 AM, Geert Uytterhoeven
-> <geert@linux-m68k.org> wrote:
-> > On Fri, Oct 23, 2015 at 9:00 AM, Simon Horman <horms@verge.net.au> wrote:
-> >> On Thu, Oct 15, 2015 at 12:01:40PM +0100, Mark Rutland wrote:
-> >>> > +           stdout-path = &scif2;
-> >>>
-> >>> No rate? It would be better to be explicit here; you should be able to
-> >>> have:
-> >>>
-> >>>       stdout-path = "serial0:115200n8"
-> >>>
-> >>> Where "115200n8" is replaced with whatever configuration this board
-> >>> actually has.
-> >>
-> >> I think that we have had this discussion before in relation to
-> >> a different board for a different Renesas SoC but I could be mistaken.
-> >
-> > IIRC, at that time the code to parse the options wasn't upstream yet, so
-> > adding the options would have broken the serial console.
-> >
-> > I can confirm it works fine on Salvator-X with
-> >
-> >         stdout-path = "serial0:115200n8";
-> 
-> Unfortunately this breaks earlycon support:
-> 
->         Malformed early option 'earlycon'
-> 
-> The call to fdt_getprop() in early_init_dt_scan_chosen_serial() fails.
-> I guess that unlike the standard console handling code, the fdt code can't
-> handle aliases yet?
-> 
-> P.S. SCIF earlycon support is not yet upstream, as it still doesn't work on
-> arm32 (I discovered today it does on arm64 ;-): it pretends to work, but
-> nothing is output to the serial port (until the normal serial console kicks
-> in).
+I have also pushed topic/r8a7795-sound-v6.runtime which
+is a merge of topic/r8a7795-sound-v6 with its run-time dependencies
+that I am aware of.
 
-As discussed off-list.
-
-I will update the stdout-path as Mark suggested.
-The expectation being that early con will support that syntax.
+> > Kuninori Morimoto (12):
+> >       arm64: renesas: r8a7795: add AUDIO_DMAC support
+> >       arm64: renesas: r8a7795: Sound SSI PIO support
+> >       arm64: renesas: r8a7795: Sound SSI DMA support
+> >       arm64: renesas: r8a7795: Sound SRC support
+> >       arm64: renesas: r8a7795: Sound DVC support
+> >       arm64: renesas: salvator-x: Sound SSI PIO support
+> 
+> The above patch seemed to have some fuzz. Please check that
+> I resolved that correctly.
+> 
+> >       arm64: renesas: salvator-x: Sound SSI DMA support
+> >       arm64: renesas: salvator-x: Sound SSI DMA support via BUSIF
+> >       arm64: renesas: salvator-x: Sound SRC support
+> >       arm64: renesas: salvator-x: Sound DVC support
+> >       arm64: defconfig: add Renesas R-Car DMAC driver support
+> 
+> The above patch did not apply cleanly. I have fixed that and also I
+> modified the patch to enable CONFIG_DMADEVICES as well as CONFIG_RCAR_DMAC.
+> Please check this e.g. using make savedefconfig.
+> 
+> >       arm64: defconfig: add Renesas sound and AK4613 support
+> > 
+> >  arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts |  94 +++++++++++++++++++++++++++++++++++++++++
+> >  arch/arm64/boot/dts/renesas/r8a7795.dtsi           | 253 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+> >  arch/arm64/configs/defconfig                       |   6 +++
+> >  3 files changed, 353 insertions(+)
+> > 
+> > -- 
+> > 2.1.4
+> > 
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
