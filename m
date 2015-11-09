@@ -1,26 +1,49 @@
-From: schwab@suse.de (Andreas Schwab)
-Date: Mon, 09 Nov 2015 11:01:57 +0100
-Subject: [RFC PATCH v6 00/17] ILP32 for ARM64
-In-Reply-To: <20151105221842.GA30634@yury-N73SV> (Yury Norov's message of
- "Fri, 6 Nov 2015 01:18:42 +0300")
-References: <1446507046-24604-1-git-send-email-ynorov@caviumnetworks.com>
- <mvm7flw3cfu.fsf@hawking.suse.de>
- <CA+=Sn1n4-mdTvyiXKpVj9509MrJWGpCeWdGJWcTSU9n2R8PVkg@mail.gmail.com>
- <20151105221842.GA30634@yury-N73SV>
-Message-ID: <mvmpozj1ofe.fsf@hawking.suse.de>
+From: will.deacon@arm.com (Will Deacon)
+Date: Mon, 9 Nov 2015 10:08:05 +0000
+Subject: [PATCH] ARM:dma-mapping: Handle DMA_BIDIRECTIONAL in
+ _dma_page_cpu_to_dev()
+In-Reply-To: <CAGUYZuQDiH_xzinEJ952rw9GuA9oUQSNASaNdOE1x_i97XCBrw@mail.gmail.com>
+References: <1446631008-5854-1-git-send-email-sanjeev_sharma@mentor.com>
+ <20151104103913.GC5405@arm.com>
+ <20151104105420.GL8644@n2100.arm.linux.org.uk>
+ <FDC088D3B5555644AE135ED28A7ABDE98636B41D@EU-MBX-02.mgc.mentorg.com>
+ <CAGUYZuQDiH_xzinEJ952rw9GuA9oUQSNASaNdOE1x_i97XCBrw@mail.gmail.com>
+Message-ID: <20151109100804.GA24936@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Yury Norov <ynorov@caviumnetworks.com> writes:
+On Mon, Nov 09, 2015 at 11:29:17AM +0530, sanjeev sharma wrote:
+>     On Wed, Nov 04, 2015 at 10:39:13AM +0000, Will Deacon wrote:
+>     > On Wed, Nov 04, 2015 at 03:26:48PM +0530, Sanjeev Sharma wrote:
+>     > > _dma_page_cpu_to_dev() treat DMA_BIDIRECTIONAL similar to
+>     > > DMA_TO_DEVICE which means that destination buffer is device
+>     > > memory,means cpu may have written some data to source buffer and
+>     > > data may be in cache line.For cleaner operation we need to call
+>     > > outer_flush_range() which will clean and invalidate outer cache lines.
+>     >
+>     > Why isn't the clean sufficient in this case? We're mapping the buffer
+>     > to the device, so we clean the dirty lines in the CPU caches and make
+>     > them visible to the device. If the CPU later wants to read the buffer
+>     > (i.e. after the device has DMA'd into it), you'll need to map the
+>     > buffer to the CPU, which will perform the invalidation of the CPU caches.
+> 
+>     Indeed.  bidirectional mode is already handled prefectly well by this
+>     code.  No patches are required.
+> 
+>     Thanks Russell & Will for providing input.
+> 
+>     Let's assume , CPU don't read the buffer then there could be the problem
+>     correct ? IMO, to handle every use case outer_flush_range can be used ?
+>     If still it doesn't make sense to use flush on bidirectional mappings, then
+>     FIXME comment should be removed from the function to avoid any
+>     Confusion.
+> 
+> 
+> 
+> Please let me know what you think on above comment ?
 
-> This is what I run:
-> https://github.com/norov/glibc/tree/thunderx-ilp32-32time_toff_t
+I still don't understand the problem that you're trying to fix.
 
-Thanks, rebootstrapping openSUSE Factory now.
+Sorry,
 
-Andreas.
-
--- 
-Andreas Schwab, SUSE Labs, schwab at suse.de
-GPG Key fingerprint = 0196 BAD8 1CE9 1970 F4BE  1748 E4D4 88E3 0EEA B9D7
-"And now for something completely different."
+Will
