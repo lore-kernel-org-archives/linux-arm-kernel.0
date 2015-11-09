@@ -1,58 +1,52 @@
-From: andy.shevchenko@gmail.com (Andy Shevchenko)
-Date: Mon, 9 Nov 2015 11:26:21 +0200
-Subject: [PATCH V3 3/4] dmaselftest: add memcpy selftest support functions
-In-Reply-To: <56400DD4.5080506@codeaurora.org>
-References: <1446958380-23298-1-git-send-email-okaya@codeaurora.org>
- <1446958380-23298-4-git-send-email-okaya@codeaurora.org>
- <CAHp75VfS6iCYcWeFmbK2PEUYLntQQRdsmN=7gttFpOn=CfrSZg@mail.gmail.com>
- <56400DD4.5080506@codeaurora.org>
-Message-ID: <CAHp75Vddve-yv5DQ5UWhOsfUaY0JCb_rFjwGf2tvY-8++sJmng@mail.gmail.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Mon, 9 Nov 2015 10:38:03 +0100
+Subject: [PATCH 0/2] mmc: sdhci: potentially bad behavior when using vmmc
+ supply
+In-Reply-To: <20151109074104.GB27482@odux.rfo.atmel.com>
+References: <1446825570-30029-1-git-send-email-ludovic.desroches@atmel.com>
+ <CAPDyKFrNNyUrJemgA2OHL35EqpG74_1i9bCqkVkZZZMxNGrHgw@mail.gmail.com>
+ <20151109074104.GB27482@odux.rfo.atmel.com>
+Message-ID: <CAPDyKFpC_mKXei14mdD=AYd6YBU0R4D1R=XWpf7BTgX4JDw24w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 9, 2015 at 5:07 AM, Sinan Kaya <okaya@codeaurora.org> wrote:
->
->
-> On 11/8/2015 3:09 PM, Andy Shevchenko wrote:
->>
->> On Sun, Nov 8, 2015 at 6:52 AM, Sinan Kaya <okaya@codeaurora.org> wrote:
->>>
->>> This patch adds supporting utility functions
->>> for selftest. The intention is to share the self
->>> test code between different drivers.
->>>
->>> Supported test cases include:
->>> 1. dma_map_single
->>> 2. streaming DMA
->>> 3. coherent DMA
->>> 4. scatter-gather DMA
->>
->>
+[...]
 
->>> +       u32 i, j = 0;
+>> > Is the regulator-gpio usage the right thing to do for vqmmc? In my case it is
+>> > not really driven by a gpio but by a pio from the sdhci device. In the binding,
 >>
->> unsigned int
->
-> why?
-
-Is i or j is going to be used for HW communication? No? What about
-assignment to a values of type u32? No? Plain counters? Use plain
-types.
-
-It's actually comment about your all patches I saw last week.
-
->>> +       int err = 0;
->>> +       int ret;
+>> What's a "pio"?
 >>
->>
->> Any reason to have two instead of one of similar meaning?
+>> What do you mean by the it's driven from the sdhci device?
 >>
 >
-> removed ret
+> Sorry I mean sdhci device from the SoC point of view, I should say
+> controller. So yes the signal is driven by the controller.
+>
+>> Is it the internal HW logic of the sdhci controller that manages the
+>> IO voltage? And this logic can be controlled via certain register bits
+>> in the SDHCI controller?
+>>
+>
+> Yes, it depends of the value of the '1.8V Signaling Enable' value in the
+> host control 2 register.
+>
+>> > declaring the gpio is an option so I thought using this regulator fits my need.
+>>
+>> In quite many cases it makes sense to model this though a gpio
+>> regulator. For example when you use a level shifter circuit. Those
+>> normally have gpio pin routed to control the voltage level output for
+>> the signals. For example switching between 1.8V and 2.9V.
+>>
+>
+> I agree, my concern is to know if I can consider it as a 'general' pio
+> since it is driven by the sdhci controller.
 
-Don't forget to check if it's redundant assignment (check in all your
-patches as well).
+This doesn't seems like a case where a gpio regulator should be used
+and I am not sure what problem it would solve. Beside to suppress the
+log warnings (actually those aren't warnings but informations).
 
--- 
-With Best Regards,
-Andy Shevchenko
+Isn't sdhci_do_start_signal_voltage_switch() doing what you need here?
+
+Kind regards
+Uffe
