@@ -1,49 +1,55 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Mon, 9 Nov 2015 11:09:54 +0100
-Subject: [PATCH RESEND v2 3/4] ARM: BCM: Add SMP support for Broadcom NSP
-In-Reply-To: <1446839371-22601-4-git-send-email-kapilh@broadcom.com>
-References: <1446839371-22601-1-git-send-email-kapilh@broadcom.com>
- <1446839371-22601-4-git-send-email-kapilh@broadcom.com>
-Message-ID: <CACRpkdZN-iwdR_VwktdHsw+rGQLhCgmWnERYVDE+KaYOqJR30w@mail.gmail.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Mon,  9 Nov 2015 11:13:33 +0100
+Subject: [PATCH 3/3] ARM64: dts: mt8173: Add thermal/auxadc device nodes
+In-Reply-To: <1447064013-13026-1-git-send-email-s.hauer@pengutronix.de>
+References: <1447064013-13026-1-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1447064013-13026-4-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 6, 2015 at 8:49 PM, Kapil Hali <kapilh@broadcom.com> wrote:
+This adds the thermal controller and auxadc nodes to the Mediatek MT8173
+dtsi file.
 
-> Add SMP support for Broadcom's Northstar Plus SoC
-> cpu enable method. This changes also consolidates
-> iProc family's - BCM NSP and BCM Kona, platform
-> SMP handling in a common file.
->
-> Northstar Plus SoC is based on ARM Cortex-A9
-> revision r3p0 which requires configuration for ARM
-> Errata 764369 for SMP. This change adds the needed
-> configuration option.
->
-> Signed-off-by: Kapil Hali <kapilh@broadcom.com>
+Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+Reviewed-by: Daniel Kurtz <djkurtz@chromium.org>
+---
+ arch/arm64/boot/dts/mediatek/mt8173.dtsi | 17 +++++++++++++++++
+ 1 file changed, 17 insertions(+)
 
-This version looks saner to me.
-
-> +static int nsp_write_lut(void)
-> +{
-> +       void __iomem *sku_rom_lut;
-> +       phys_addr_t secondary_startup_phy;
-> +
-> +       if (!secondary_boot) {
-> +               pr_warn("required secondary boot register not specified\n");
-> +               return -EINVAL;
-> +       }
-> +
-> +       sku_rom_lut = ioremap_nocache((phys_addr_t)secondary_boot,
-> +                                               sizeof(secondary_boot));
-
-Why is this address not just taken directly from the device tree?
-
-If it is not in the device tree: why?
-
-Also give it a sane name, bcm_sec_boot_address or so.
-"secondary_boot" sounds like a function you call to boot
-the second core.
-
-Yours,
-Linus Walleij
+diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+index 06a1564..e2ddd03 100644
+--- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
++++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+@@ -277,6 +277,11 @@
+ 				(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
+ 		};
+ 
++		auxadc: auxadc at 11001000 {
++			compatible = "mediatek,mt8173-auxadc";
++			reg = <0 0x11001000 0 0x1000>;
++		};
++
+ 		uart0: serial at 11002000 {
+ 			compatible = "mediatek,mt8173-uart",
+ 				     "mediatek,mt6577-uart";
+@@ -487,6 +492,18 @@
+ 			clock-names = "source", "hclk";
+ 			status = "disabled";
+ 		};
++
++		thermal: thermal at 1100b000 {
++			#thermal-sensor-cells = <0>;
++			compatible = "mediatek,mt8173-thermal";
++			reg = <0 0x1100b000 0 0x1000>;
++			interrupts = <0 70 IRQ_TYPE_LEVEL_LOW>;
++			clocks = <&pericfg CLK_PERI_THERM>, <&pericfg CLK_PERI_AUXADC>;
++			clock-names = "therm", "auxadc";
++			resets = <&pericfg MT8173_PERI_THERM_SW_RST>;
++			mediatek,auxadc = <&auxadc>;
++			mediatek,apmixedsys = <&apmixedsys>;
++		};
+ 	};
+ };
+ 
+-- 
+2.6.1
