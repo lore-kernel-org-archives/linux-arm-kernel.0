@@ -1,117 +1,62 @@
-From: jiang.liu@linux.intel.com (Jiang Liu)
-Date: Mon, 9 Nov 2015 13:24:51 +0800
-Subject: [PATCH] acpi: add support for extended IRQ to PCI link
-In-Reply-To: <1446998832-7023-1-git-send-email-okaya@codeaurora.org>
-References: <1446998832-7023-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <56402E23.1070805@linux.intel.com>
+From: van.freenix@gmail.com (Peng Fan)
+Date: Mon, 9 Nov 2015 13:41:45 +0800
+Subject: [RFC] iommu: arm-smmu: correct reference count
+In-Reply-To: <20151106122338.GI6087@arm.com>
+References: <1446555557-3097-1-git-send-email-van.freenix@gmail.com>
+ <20151103131734.GE14159@arm.com> <20151104024825.GA27479@shlinux2>
+ <20151106122338.GI6087@arm.com>
+Message-ID: <20151109054143.GA5704@linux-jyl1.ap.freescale.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015/11/9 0:07, Sinan Kaya wrote:
-> The ACPI compiler uses the extended format when
-> used interrupt numbers are greater than 256.
-> The PCI link code currently only supports simple
-> interrupt format. The IRQ numbers are represented
-> using 32 bits when extended IRQ syntax. This patch
-> changes the interrupt number type to 32 bits and
-> places an upper limit of 1020 as possible interrupt
-> id. Additional checks have been placed to prevent
-> out of bounds writes.
-> 
-> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
-> ---
->  drivers/acpi/pci_link.c | 35 ++++++++++++++++++++++-------------
->  1 file changed, 22 insertions(+), 13 deletions(-)
-> 
-> diff --git a/drivers/acpi/pci_link.c b/drivers/acpi/pci_link.c
-> index 7c8408b..18a9190 100644
-> --- a/drivers/acpi/pci_link.c
-> +++ b/drivers/acpi/pci_link.c
-> @@ -1,6 +1,7 @@
->  /*
->   *  pci_link.c - ACPI PCI Interrupt Link Device Driver ($Revision: 34 $)
->   *
-> + *  Copyright (c) 2015, The Linux Foundation. All rights reserved.
->   *  Copyright (C) 2001, 2002 Andy Grover <andrew.grover@intel.com>
->   *  Copyright (C) 2001, 2002 Paul Diefenbaugh <paul.s.diefenbaugh@intel.com>
->   *  Copyright (C) 2002       Dominik Brodowski <devel@brodo.de>
-> @@ -67,12 +68,12 @@ static struct acpi_scan_handler pci_link_handler = {
->   * later even the link is disable. Instead, we just repick the active irq
->   */
->  struct acpi_pci_link_irq {
-> -	u8 active;		/* Current IRQ */
-> +	u32 active;		/* Current IRQ */
->  	u8 triggering;		/* All IRQs */
->  	u8 polarity;		/* All IRQs */
->  	u8 resource_type;
->  	u8 possible_count;
-> -	u8 possible[ACPI_PCI_LINK_MAX_POSSIBLE];
-> +	u32 possible[ACPI_PCI_LINK_MAX_POSSIBLE];
->  	u8 initialized:1;
->  	u8 reserved:7;
->  };
-Hi Sinan,
-	This data structure become some sort of big, any idea to reduce
-memory consumption?
-Thanks,
-Gerry
+Hi Will,
 
-> @@ -437,7 +438,7 @@ static int acpi_pci_link_set(struct acpi_pci_link *link, int irq)
->   * enabled system.
->   */
->  
-> -#define ACPI_MAX_IRQS		256
-> +#define ACPI_MAX_IRQS		1020
->  #define ACPI_MAX_ISA_IRQ	16
->  
->  #define PIRQ_PENALTY_PCI_AVAILABLE	(0)
-> @@ -493,7 +494,8 @@ int __init acpi_irq_penalty_init(void)
->  					    penalty;
->  			}
->  
-> -		} else if (link->irq.active) {
-> +		} else if (link->irq.active &&
-> +			(link->irq.active < ACPI_MAX_IRQS)) {
->  			acpi_irq_penalty[link->irq.active] +=
->  			    PIRQ_PENALTY_PCI_POSSIBLE;
->  		}
-> @@ -542,14 +544,19 @@ static int acpi_pci_link_allocate(struct acpi_pci_link *link)
->  		irq = link->irq.possible[link->irq.possible_count - 1];
->  
->  	if (acpi_irq_balance || !link->irq.active) {
-> -		/*
-> -		 * Select the best IRQ.  This is done in reverse to promote
-> -		 * the use of IRQs 9, 10, 11, and >15.
-> -		 */
-> -		for (i = (link->irq.possible_count - 1); i >= 0; i--) {
-> -			if (acpi_irq_penalty[irq] >
-> -			    acpi_irq_penalty[link->irq.possible[i]])
-> -				irq = link->irq.possible[i];
-> +
-> +		if (irq < ACPI_MAX_IRQS) {
-> +			/*
-> +			 * Select the best IRQ.  This is done in reverse to
-> +			 * promote the use of IRQs 9, 10, 11, and >15.
-> +			 */
-> +			for (i = (link->irq.possible_count - 1); i >= 0;
-> +				i--) {
-> +				if ((link->irq.possible[i] < ACPI_MAX_IRQS) &&
-> +				    (acpi_irq_penalty[irq] >
-> +				    acpi_irq_penalty[link->irq.possible[i]]))
-> +					irq = link->irq.possible[i];
-> +			}
->  		}
->  	}
->  	if (acpi_irq_penalty[irq] >= PIRQ_PENALTY_ISA_ALWAYS) {
-> @@ -568,7 +575,9 @@ static int acpi_pci_link_allocate(struct acpi_pci_link *link)
->  			    acpi_device_bid(link->device));
->  		return -ENODEV;
->  	} else {
-> -		acpi_irq_penalty[link->irq.active] += PIRQ_PENALTY_PCI_USING;
-> +		if (link->irq.active < ACPI_MAX_IRQS)
-> +			acpi_irq_penalty[link->irq.active] +=
-> +				PIRQ_PENALTY_PCI_USING;
->  		printk(KERN_WARNING PREFIX "%s [%s] enabled at IRQ %d\n",
->  		       acpi_device_name(link->device),
->  		       acpi_device_bid(link->device), link->irq.active);
-> 
+On Fri, Nov 06, 2015 at 12:23:39PM +0000, Will Deacon wrote:
+>On Wed, Nov 04, 2015 at 10:48:28AM +0800, Peng Fan wrote:
+>> On Tue, Nov 03, 2015 at 01:17:34PM +0000, Will Deacon wrote:
+>> >On Tue, Nov 03, 2015 at 08:59:17PM +0800, Peng Fan wrote:
+>> >> iommu_group_alloc will initialize the reference count for group to 1.
+>> >> iommu_group_add_device also increase the group reference count,
+>> >> if nothing bad happends. And we need to add iommu_group_put to
+>> >> decrease the reference count for group.
+>> >> 
+>> >> Signed-off-by: Peng Fan <van.freenix@gmail.com>
+>> >> Cc: Will Deacon <will.deacon@arm.com>
+>> >> Cc: Joerg Roedel <joro@8bytes.org>
+>> >> ---
+>> >> 
+>> >> Not sure whether my understanding is correct or not. I checked rockchip-iommu.c
+>> >> exynos-iommu.c and fsl_pamu_domain.c, and they all have iommu_group_put after
+>> >> iommu_group_add_device.
+>> >
+>> >Doesn't this pair up with the iommu_group_remove_device in
+>> >arm_smmu_remove_device? Are you actually seeing an issue in practice?
+>> 
+>> In arm_smmu_add_platform_device,
+>> iommu_group_alloc --> group->device_kobj ref count will be init to 1.
+>> iommu_group_add_device --> group->device_kobj ref count will be added 1 to 2.
+>> 
+>> In arm_smmu_remove_device:
+>> iommu_group_remove_device --> Decrease group->device_kobj ref count by 1.
+>> After arm_smmu_remove_device, the ref count of group->device_kobj is not 0.
+>> 
+>> So I think need to add iommu_group_put after iommu_group_add_device.
+>> If I am wrong, please correct me.
+>
+>Ok, I see what you're saying. iommu_group_get_for_dev has exactly the
+>same issue, so could you update arm-smmu-v3.c as well, please?
+
+I did not see the update about device_group for iommu, when I worked out this patch.
+Rebased to latest linux/master, whether to arm-smmu.c or arm-smmu-v3.c,
+only add 'iommu_group_put' at the end of iommu_group_get_for_dev is ok as the
+following.
+
+I'll send out V2.
+
+Thanks,
+Peng.
+
+>
+>Thanks,
+>
+>Will
