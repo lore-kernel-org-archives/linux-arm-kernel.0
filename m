@@ -1,33 +1,38 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 9 Nov 2015 15:36:22 +0100
-Subject: [PATCH 2/2] arm64: fix R/O permissions of FDT mapping
-In-Reply-To: <20151109142714.GA21606@e104818-lin.cambridge.arm.com>
-References: <1447059346-12050-1-git-send-email-ard.biesheuvel@linaro.org>
- <1447059346-12050-3-git-send-email-ard.biesheuvel@linaro.org>
- <20151109142714.GA21606@e104818-lin.cambridge.arm.com>
-Message-ID: <CAKv+Gu9y0XjfJUta+Z_P8CU1v-e=5XN2g1yP-eabR5QqP_TfoA@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 09 Nov 2015 15:36:58 +0100
+Subject: [RFC PATCH v6 00/17] ILP32 for ARM64
+In-Reply-To: <mvmh9kv1bu8.fsf@hawking.suse.de>
+References: <1446507046-24604-1-git-send-email-ynorov@caviumnetworks.com>
+ <5795162.dlSUXvq6vJ@wuerfel> <mvmh9kv1bu8.fsf@hawking.suse.de>
+Message-ID: <22080083.1SbhEYEXOu@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9 November 2015 at 15:27, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> On Mon, Nov 09, 2015 at 09:55:46AM +0100, Ard Biesheuvel wrote:
->> The mapping permissions of the FDT are set to 'PAGE_KERNEL | PTE_RDONLY'
->> in an attempt to map the FDT as read-only. However, not only does this
->> break at build time under STRICT_MM_TYPECHECKS (since the two terms are
->> of different types in that case), it also results in both the PTE_WRITE
->> and PTE_RDONLY attributes to be set, which means the region is still
->> writable under ARMv8.1 DBM (and an attempted write will simply clear the
->> PT_RDONLY bit).
->>
->> So instead, define PAGE_KERNEL_RO (which already has an established
->> meaning across architectures) and use that instead.
->
-> I guess we don't need cc stable for this, it's only if the kernel has
-> some other bug that writes the mapped fdt.
->
+On Monday 09 November 2015 15:33:51 Andreas Schwab wrote:
+> Arnd Bergmann <arnd@arndb.de> writes:
+> 
+> > On Monday 09 November 2015 14:23:59 Andreas Schwab wrote:
+> >> Yury Norov <ynorov@caviumnetworks.com> writes:
+> >> 
+> >> > This is what I run:
+> >> > https://github.com/norov/glibc/tree/thunderx-ilp32-32time_toff_t
+> >> 
+> >> That doesn't work for me:
+> >> 
+> >> ../sysdeps/unix/sysv/linux/generic/sysdep.h:24:22: error: ?__NR_llseek? undeclar
+> >> ed (first use in this function)
+> >> ../sysdeps/unix/sysv/linux/aarch64/sysdep.h:41:32: error: ?__NR_fcntl64? undeclared (first use in this function)
+> >> 
+> >
+> > Did you re-export the kernel headers that you use as the base?
+> 
+> I'm using the patched 4.3 kernel headers.
 
-Indeed. Since only v8.1 DBM is affected, and the FDT was writable
-anyway before this was added, I don't see the point.
+Ok.
 
--- 
-Ard.
+>  Why is <asm/bitsperlong.h> defining __BITS_PER_LONG to 64 unconditionally?
+
+It should not, that is a bug. I don't know how Yury built his glibc,
+but it can't work if __BITS_PER_LONG is wrong.
+
+	Arnd
