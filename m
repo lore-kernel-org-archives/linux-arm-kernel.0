@@ -1,50 +1,109 @@
-From: afd@ti.com (Andrew F. Davis)
-Date: Mon, 9 Nov 2015 15:23:22 -0600
-Subject: [PATCH] power: bq27xxx_battery: Revert "Remove unneeded
- dependency in Kconfig"
-In-Reply-To: <10870776.N30IekZOBt@wuerfel>
-References: <3819790.E2ziFviWmU@wuerfel> <5640D02D.6040601@ti.com>
- <10870776.N30IekZOBt@wuerfel>
-Message-ID: <56410ECA.7050109@ti.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Mon, 09 Nov 2015 22:27:06 +0100
+Subject: [PATCH v2 0/8] phy: rockchip-usb: correct pll handling and
+ usb-uart
+In-Reply-To: <CAD=FV=UCQ7ESi8NiZubAwa9Zzo4uiZHqm96bVMEue=M+Th4pTA@mail.gmail.com>
+References: <1446998681-26436-1-git-send-email-heiko@sntech.de>
+ <CAD=FV=UCQ7ESi8NiZubAwa9Zzo4uiZHqm96bVMEue=M+Th4pTA@mail.gmail.com>
+Message-ID: <3369052.6pxaYT98AY@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/09/2015 02:51 PM, Arnd Bergmann wrote:
-> On Monday 09 November 2015 10:56:13 Andrew F. Davis wrote:
->> On 11/09/2015 07:50 AM, Arnd Bergmann wrote:
->> Nothing enabled by BATTERY_BQ27XXX depends on I2C, this workaround is not
->> correct as it prevents BATTERY_BQ27XXX from being built-in when I2C is a
->> module, there is no reason for this limitation.
->>
->> The undefined references are caused by BATTERY_BQ27XXX being built-in AND
->> its I2C functionality being enabled (BATTERY_BQ27XXX_I2C) while I2C is a
->> module. Reorganizing this driver is being discussed anyway, but in the
->> meantime a more correct fix would be along the lines of:
->>
->> diff --git a/drivers/power/Kconfig b/drivers/power/Kconfig
->> index 6de6ec2..d1d32f9 100644
->> --- a/drivers/power/Kconfig
->> +++ b/drivers/power/Kconfig
->> @@ -167,6 +167,7 @@ config BATTERY_BQ27XXX_I2C
->>           bool "BQ27xxx I2C support"
->>           depends on BATTERY_BQ27XXX
->>           depends on I2C
->> +       depends on !(I2C=m && BATTERY_BQ27XXX=y)
->>           default y
->>           help
->>             Say Y here to enable support for batteries with BQ27xxx (I2C) chips.
->
-> That works too, there is just very little difference in the end here,
-> and it's easier to revert an patch that only introduces a regression
-> than to do a different hack, especially if it's going to be reworked
-> soon anyway.
->
-> Do you want to submit the above as a fixup to your other patch or
-> should we just do the revert? It would be good to get one of the two
-> into -rc1.
->
+Am Montag, 9. November 2015, 13:11:18 schrieb Doug Anderson:
+> Heiko,
+> 
+> On Sun, Nov 8, 2015 at 8:04 AM, Heiko Stuebner <heiko@sntech.de> wrote:
+> > changes in v2:
+> > - add Doug's review-tag to patches 1 and 3
+> > - address comment and add the missing transistional rk_phy->base
+> >   assignment in patch2
+> >
+> >
+> > Patches 1-7 fix a long-standing issue with the clock-tree of Rockchip SoCs
+> > namely our ignorance of the usbphy-internal pll that creates the needed
+> > 480MHz but is also a supply-clock back to the core clock-controller in
+> > Rockchip SoCs.
+> >
+> > Till now that was worked around using a virtual clock in the cru itself,
+> > but that is of course ignorant of other parts then disabling the phy
+> > behind the cru's back, thus breaking potential users of these clocks.
+> >
+> >
+> > Patch 8, while not associated with the new pll handling, also builds
+> > on the groundwork introduced there and adds support for the function
+> > repurposing one of the phys as passthrough for uart-data. This enables
+> > attaching a ttl converter to the D+ and D- pins of an usb cable to
+> > receive uart data this way, when it is not really possible to attach
+> > a regular serial console to a board.
+> >
+> > One point of critique in my first iteration [0] of this was, that
+> > due to when the reconfiguration happens we may miss parts of the logs
+> > when earlycon is enabled. So far early_initcall gets used as the
+> > unflattened devicetree is necessary to set this up. Doing this for
+> > example in the early_param directly would require parsing the flattened
+> > devicetree to get needed nodes and properties.
+> >
+> > I still maintain that if you're working on anything before smp-bringup
+> > you should use a real dev-board instead or try to solder uart cables
+> > on hopefully available test-points :-) .
+> >
+> >
+> > In any case, if patch 8 causes to much headache, it could be dropped
+> > to not hinder the earlier 7 patches.
+> >
+> > [0] http://comments.gmane.org/gmane.linux.ports.arm.rockchip/715
+> >
+> > Heiko Stuebner (8):
+> >   phy: rockchip-usb: fix clock get-put mismatch
+> >   phy: rockchip-usb: introduce a common data-struct for the device
+> >   phy: rockchip-usb: move per-phy init into a separate function
+> >   phy: rockchip-usb: expose the phy-internal PLLs
+> >   clk: rockchip: fix usbphy-related clocks
+> >   ARM: dts: rockchip: add clock-cells for usb phy nodes
+> >   ARM: dts: rockchip: assign usbphy480m_src to the new usbphy pll on
+> >     veyron
+> >   phy: rockchip-usb: add handler for usb-uart functionality
+> >
+> >  .../devicetree/bindings/phy/rockchip-usb-phy.txt   |   6 +-
+> >  Documentation/kernel-parameters.txt                |   6 +
+> >  arch/arm/boot/dts/rk3066a.dtsi                     |   2 +
+> >  arch/arm/boot/dts/rk3188.dtsi                      |   2 +
+> >  arch/arm/boot/dts/rk3288-veyron.dtsi               |   2 +-
+> >  arch/arm/boot/dts/rk3288.dtsi                      |   3 +
+> >  drivers/clk/rockchip/clk-rk3188.c                  |  11 +-
+> >  drivers/clk/rockchip/clk-rk3288.c                  |  16 +-
+> >  drivers/phy/phy-rockchip-usb.c                     | 449 ++++++++++++++++++---
+> >  9 files changed, 416 insertions(+), 81 deletions(-)
+> 
+> If you happened to be in the mood for cleaning up this PHY and wanted
+> to fix up one more thing that I noticed...
+> 
+> ...you could actually increase the range of registers managed by the
+> PHYs.  For instance, in rk3288, the "host1" port isn't just managed by
+> 1 register, but by 4 (GRF_UOC2_CON0 - GRF_UOC2_CON3).  I think there
+> are 5 for the OTG port.
+> 
+> Obviously not required for this series and there's no (current) reason
+> to do anything with the rest of those registers, but it might be
+> interesting for the future...
 
-I can just submit this fix, it would probably be better for the short term
-until the rework is done.
+I'm not sure what change you're proposing :-) .
 
-Andrew
+I currently see the reg-property both in the dts and in the code as
+"offset" - the start-register, because it points to uoc_con0 for each phy.
+So if needed I was just planning on doing reg+x , as they're coming from
+the GRF anyway.
+
+One interesting point would be to move that under the GRF node, similar
+to what we're doing with the power-domains under the PMU.
+
+In retrospect I think exposing the phys individually was not the best
+decision - especially as when you dive deeper, they are not that similar
+anymore and individual functions change. But we'll have to live with that.
+
+That is by the way, also one of the reasons for having these per-phy
+structs, so that we have the possility to identify phys again and describe
+individual phy-functions but still keep the current binding.
+The usb-uart is the first user for that :-)
+
+Heiko
