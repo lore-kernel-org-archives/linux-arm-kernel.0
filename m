@@ -1,96 +1,51 @@
-From: andy.shevchenko@gmail.com (Andy Shevchenko)
-Date: Mon, 9 Nov 2015 16:14:50 +0200
-Subject: [PATCH V2 2/3] scsi: fix compiler warning for sg
-In-Reply-To: <1447034266-28003-3-git-send-email-okaya@codeaurora.org>
-References: <1447034266-28003-1-git-send-email-okaya@codeaurora.org>
- <1447034266-28003-3-git-send-email-okaya@codeaurora.org>
-Message-ID: <CAHp75VdUBKr_XQ=2_5uSww71YVz+-Shmhg5hSe5KAoeshTtMYQ@mail.gmail.com>
+From: oleg@redhat.com (Oleg Nesterov)
+Date: Mon, 9 Nov 2015 16:12:04 +0100
+Subject: [PATCH v2 00/20] Fix handling of compat_siginfo_t
+In-Reply-To: <CALCETrWKK_REdX7TJO8X7jC=8k=YdgJH_txXpC4Pdzn-tukg5A@mail.gmail.com>
+References: <1446684640-4112-1-git-send-email-amanieu@gmail.com>
+ <CALCETrWKK_REdX7TJO8X7jC=8k=YdgJH_txXpC4Pdzn-tukg5A@mail.gmail.com>
+Message-ID: <20151109151204.GA10760@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 9, 2015 at 3:57 AM, Sinan Kaya <okaya@codeaurora.org> wrote:
-> The MULDIV macro has been designed for small numbers.
-> Compiler emits an overflow warning on 64 bit systems.
-> This patch uses 64 bit numbers in order to suppress
-> warning.
+On 11/07, Andy Lutomirski wrote:
 >
-> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
-
-
-> ---
->  drivers/scsi/sg.c | 20 +++++++++++++-------
->  1 file changed, 13 insertions(+), 7 deletions(-)
+> On Wed, Nov 4, 2015 at 4:50 PM, Amanieu d'Antras <amanieu@gmail.com> wrote:
+> > One issue that isn't resolved in this series is sending signals between a 32-bit
+> > process and 64-bit process. Sending a si_int will work correctly, but a si_ptr
+> > value will likely get corrupted due to the different layouts of the 32-bit and
+> > 64-bit siginfo_t structures.
 >
-> diff --git a/drivers/scsi/sg.c b/drivers/scsi/sg.c
-> index 9d7b7db..112d8974 100644
-> --- a/drivers/scsi/sg.c
-> +++ b/drivers/scsi/sg.c
-> @@ -51,6 +51,7 @@ static int sg_version_num = 30536;    /* 2 digits for each component */
->  #include <linux/atomic.h>
->  #include <linux/ratelimit.h>
->  #include <linux/uio.h>
-> +#include <asm/div64.h>
->
->  #include "scsi.h"
->  #include <scsi/scsi_dbg.h>
-> @@ -85,12 +86,17 @@ static void sg_proc_cleanup(void);
->   * Replacing muldiv(x) by muldiv(x)=((x % d) * m) / d + int(x / d) * m
->   * calculates the same, but prevents the overflow when both m and d
->   * are "small" numbers (like HZ and USER_HZ).
-> - * Of course an overflow is inavoidable if the result of muldiv doesn't fit
-> - * in 32 bits.
->   */
-> -#define MULDIV(X,MUL,DIV) ((((X % DIV) * MUL) / DIV) + ((X / DIV) * MUL))
-> +static inline u64 mult_frac64(u64 x, u32 numer, u32 denom)
-> +{
-> +       u64 r1 = do_div(x, denom);
-> +       u64 r2 = r1 * numer;
-> +
-> +       do_div(r2, denom);
+> This is so screwed up it's not even funny.
 
-> +       return (x * numer) + r2;
+Agreed,
 
-Parens are useless, noticed later, sorry.
+> A 64-bit big-endian compat calls rt_sigqueueinfo.  It passes in (among
+> other things) a sigval_t.  The kernel can choose to interpret it
 
-Isn't mult_frac() enough here?
+I always thought that the kernel should not interpret it at all. And indeed,
+copy_siginfo_to_user() does
 
-Btw, can you mention explicitly what is the warning you get
-(copy'n'paste of the line would be okay)?
+	if (from->si_code < 0)
+		return __copy_to_user(to, from, sizeof(siginfo_t))
 
-> +}
->
-> -#define SG_DEFAULT_TIMEOUT MULDIV(SG_DEFAULT_TIMEOUT_USER, HZ, USER_HZ)
-> +#define SG_DEFAULT_TIMEOUT mult_frac64(SG_DEFAULT_TIMEOUT_USER, HZ, USER_HZ)
->
->  int sg_big_buff = SG_DEF_RESERVED_SIZE;
->  /* N.B. This variable is readable and writeable via
-> @@ -877,10 +883,10 @@ sg_ioctl(struct file *filp, unsigned int cmd_in, unsigned long arg)
->                         return result;
->                 if (val < 0)
->                         return -EIO;
-> -               if (val >= MULDIV (INT_MAX, USER_HZ, HZ))
-> -                   val = MULDIV (INT_MAX, USER_HZ, HZ);
-> +               if (val >= mult_frac64(INT_MAX, USER_HZ, HZ))
-> +                       val = mult_frac64(INT_MAX, USER_HZ, HZ);
+probably copy_siginfo_to_user32() should do something similar,@least
+it should not truncate ->si_code it it is less than zero.
+
+Not sure what signalfd_copyinfo() should do.
+
+But perhaps I was wrong, I failed to find man sigqueueinfo, and man
+sigqueue() documents that it passes sigval_t.
 
 
->                 sfp->timeout_user = val;
-> -               sfp->timeout = MULDIV (val, HZ, USER_HZ);
-> +               sfp->timeout = mult_frac64(val, HZ, USER_HZ);
->
->                 return 0;
->         case SG_GET_TIMEOUT:    /* N.B. User receives timeout as return value */
-> --
-> Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc.
-> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux Foundation Collaborative Project
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-scsi" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> BTW, x86 has its own set of screwups here.  Somehow cr2 and error_code
+> ended up as part of ucontext instead of siginfo, which makes
+> absolutely no sense to me and bloats task_struct.
 
+Yes, and probably ->ip should have been the part of siginfo too. Say,
+if you get SIGBUS you can't trust sc->ip if another signal was dequeued
+before SIGBUS, in this case sc->ip will point to the handler of that
+another signal. That is why we have SYNCHRONOUS_MASK and it helps, but
+still this doesn't look nice.
 
-
--- 
-With Best Regards,
-Andy Shevchenko
+Oleg.
