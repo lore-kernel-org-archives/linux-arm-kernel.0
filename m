@@ -1,62 +1,25 @@
-From: van.freenix@gmail.com (Peng Fan)
-Date: Mon, 9 Nov 2015 13:41:45 +0800
-Subject: [RFC] iommu: arm-smmu: correct reference count
-In-Reply-To: <20151106122338.GI6087@arm.com>
-References: <1446555557-3097-1-git-send-email-van.freenix@gmail.com>
- <20151103131734.GE14159@arm.com> <20151104024825.GA27479@shlinux2>
- <20151106122338.GI6087@arm.com>
-Message-ID: <20151109054143.GA5704@linux-jyl1.ap.freescale.net>
+From: liguo.zhang@mediatek.com (Liguo Zhang)
+Date: Mon, 9 Nov 2015 13:43:57 +0800
+Subject: [PATCH v2 0/2] Mediatek I2C Fixup 
+Message-ID: <1447047839-5223-1-git-send-email-liguo.zhang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Will,
+This series contain two patches, first is to optimize Mediatek I2C driver to use WRRD
+if hardware support auto restart. Because auto restart will issue auto restart
+interrupt, change to use WRRD can reduce interrupt latency. The second is to fix
+multi transfer error in high speed mode. If hardware support auto restart, need driver
+to send master code first.
 
-On Fri, Nov 06, 2015 at 12:23:39PM +0000, Will Deacon wrote:
->On Wed, Nov 04, 2015 at 10:48:28AM +0800, Peng Fan wrote:
->> On Tue, Nov 03, 2015 at 01:17:34PM +0000, Will Deacon wrote:
->> >On Tue, Nov 03, 2015 at 08:59:17PM +0800, Peng Fan wrote:
->> >> iommu_group_alloc will initialize the reference count for group to 1.
->> >> iommu_group_add_device also increase the group reference count,
->> >> if nothing bad happends. And we need to add iommu_group_put to
->> >> decrease the reference count for group.
->> >> 
->> >> Signed-off-by: Peng Fan <van.freenix@gmail.com>
->> >> Cc: Will Deacon <will.deacon@arm.com>
->> >> Cc: Joerg Roedel <joro@8bytes.org>
->> >> ---
->> >> 
->> >> Not sure whether my understanding is correct or not. I checked rockchip-iommu.c
->> >> exynos-iommu.c and fsl_pamu_domain.c, and they all have iommu_group_put after
->> >> iommu_group_add_device.
->> >
->> >Doesn't this pair up with the iommu_group_remove_device in
->> >arm_smmu_remove_device? Are you actually seeing an issue in practice?
->> 
->> In arm_smmu_add_platform_device,
->> iommu_group_alloc --> group->device_kobj ref count will be init to 1.
->> iommu_group_add_device --> group->device_kobj ref count will be added 1 to 2.
->> 
->> In arm_smmu_remove_device:
->> iommu_group_remove_device --> Decrease group->device_kobj ref count by 1.
->> After arm_smmu_remove_device, the ref count of group->device_kobj is not 0.
->> 
->> So I think need to add iommu_group_put after iommu_group_add_device.
->> If I am wrong, please correct me.
->
->Ok, I see what you're saying. iommu_group_get_for_dev has exactly the
->same issue, so could you update arm-smmu-v3.c as well, please?
+Change in v2:
+fix i2c checkpatch error.
 
-I did not see the update about device_group for iommu, when I worked out this patch.
-Rebased to latest linux/master, whether to arm-smmu.c or arm-smmu-v3.c,
-only add 'iommu_group_put' at the end of iommu_group_get_for_dev is ok as the
-following.
+Liguo Zhang (2):
+  i2c: mediatek: add i2c first write then read optimization
+  i2c: mediatek: fix i2c multi transfer issue in high speed mode
 
-I'll send out V2.
+ drivers/i2c/busses/i2c-mt65xx.c | 78 +++++++++++++++++++++++++++++++++++++----
+ 1 file changed, 72 insertions(+), 6 deletions(-)
 
-Thanks,
-Peng.
-
->
->Thanks,
->
->Will
+--
+1.8.1.1.dirty
