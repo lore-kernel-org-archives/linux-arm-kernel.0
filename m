@@ -1,56 +1,96 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Mon, 9 Nov 2015 15:12:46 +0100
-Subject: [PATCH 1/2] mmc: sdhci: set bus voltage before enabling bus power
-In-Reply-To: <20151109132305.GC15706@odux.rfo.atmel.com>
-References: <1446825570-30029-1-git-send-email-ludovic.desroches@atmel.com>
- <1446825570-30029-2-git-send-email-ludovic.desroches@atmel.com>
- <20151109132305.GC15706@odux.rfo.atmel.com>
-Message-ID: <CAPDyKFrTTEnSFNvmx3e__Ap9gOGpA2-bz+yrq7ibz0wXGSWCXA@mail.gmail.com>
+From: andy.shevchenko@gmail.com (Andy Shevchenko)
+Date: Mon, 9 Nov 2015 16:14:50 +0200
+Subject: [PATCH V2 2/3] scsi: fix compiler warning for sg
+In-Reply-To: <1447034266-28003-3-git-send-email-okaya@codeaurora.org>
+References: <1447034266-28003-1-git-send-email-okaya@codeaurora.org>
+ <1447034266-28003-3-git-send-email-okaya@codeaurora.org>
+Message-ID: <CAHp75VdUBKr_XQ=2_5uSww71YVz+-Shmhg5hSe5KAoeshTtMYQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9 November 2015 at 14:23, Ludovic Desroches
-<ludovic.desroches@atmel.com> wrote:
-> On Fri, Nov 06, 2015 at 04:59:29PM +0100, Ludovic Desroches wrote:
->> When there is a vmmc regulator, only SD Bus Power is set to 1 in the
->> Power Control Register. It means SD Bus Voltage Select field is set to 0
->> that is a reserved value. The SD Host Controller specification says:
->> 'SD Bus Power: Before setting this bit, the SD Host Driver shall set SD
->> Bus Voltage Select.' and 'If the Host Driver selects an unsupported
->> voltage in the SD B?us Voltage Select field, the Host Controller may
->> ignore writes to SD Bus Power and keep its value at zero."
->>
->> Having an external regulator means the SD Bus Voltage Select is useless
->> but if the Host Controller strictly follows the specification then we
->> need to set a valid value.
+On Mon, Nov 9, 2015 at 3:57 AM, Sinan Kaya <okaya@codeaurora.org> wrote:
+> The MULDIV macro has been designed for small numbers.
+> Compiler emits an overflow warning on 64 bit systems.
+> This patch uses 64 bit numbers in order to suppress
+> warning.
 >
-> Ulf,
+> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+
+
+> ---
+>  drivers/scsi/sg.c | 20 +++++++++++++-------
+>  1 file changed, 13 insertions(+), 7 deletions(-)
 >
-> What is your opinion about this patch?
+> diff --git a/drivers/scsi/sg.c b/drivers/scsi/sg.c
+> index 9d7b7db..112d8974 100644
+> --- a/drivers/scsi/sg.c
+> +++ b/drivers/scsi/sg.c
+> @@ -51,6 +51,7 @@ static int sg_version_num = 30536;    /* 2 digits for each component */
+>  #include <linux/atomic.h>
+>  #include <linux/ratelimit.h>
+>  #include <linux/uio.h>
+> +#include <asm/div64.h>
 >
-> If the 'no regulator found' message is turned in debug message, I can get
-> rid of my vmmc regulator but I really think that writing only
+>  #include "scsi.h"
+>  #include <scsi/scsi_dbg.h>
+> @@ -85,12 +86,17 @@ static void sg_proc_cleanup(void);
+>   * Replacing muldiv(x) by muldiv(x)=((x % d) * m) / d + int(x / d) * m
+>   * calculates the same, but prevents the overflow when both m and d
+>   * are "small" numbers (like HZ and USER_HZ).
+> - * Of course an overflow is inavoidable if the result of muldiv doesn't fit
+> - * in 32 bits.
+>   */
+> -#define MULDIV(X,MUL,DIV) ((((X % DIV) * MUL) / DIV) + ((X / DIV) * MUL))
+> +static inline u64 mult_frac64(u64 x, u32 numer, u32 denom)
+> +{
+> +       u64 r1 = do_div(x, denom);
+> +       u64 r2 = r1 * numer;
+> +
+> +       do_div(r2, denom);
 
-I expect you mean vqmmc?
+> +       return (x * numer) + r2;
 
-> SDHCI_POWER_ON is opposite to the sdhci spec. I would say that not
-> setting the bus voltage is a quirk!
+Parens are useless, noticed later, sorry.
 
-I don't really follow.
+Isn't mult_frac() enough here?
 
-I read the SDHCI spec and the section for the Power Control Register.
-Bit 0 needs to be set when communicating with the card as it will for
-example enables the clock. Before setting bit0 you must decide what
-signal level to use, which is done by writing to bit 1->3.
+Btw, can you mention explicitly what is the warning you get
+(copy'n'paste of the line would be okay)?
 
-If SDHCI monitors the power state (MMC_POWER_UP|ON|OFF) when its
-->set_ios() callback are invoked and in combination of using the
-->start_signal_voltage_switch() callback to change the signal voltage
-level, this *should* work out nicely.
+> +}
+>
+> -#define SG_DEFAULT_TIMEOUT MULDIV(SG_DEFAULT_TIMEOUT_USER, HZ, USER_HZ)
+> +#define SG_DEFAULT_TIMEOUT mult_frac64(SG_DEFAULT_TIMEOUT_USER, HZ, USER_HZ)
+>
+>  int sg_big_buff = SG_DEF_RESERVED_SIZE;
+>  /* N.B. This variable is readable and writeable via
+> @@ -877,10 +883,10 @@ sg_ioctl(struct file *filp, unsigned int cmd_in, unsigned long arg)
+>                         return result;
+>                 if (val < 0)
+>                         return -EIO;
+> -               if (val >= MULDIV (INT_MAX, USER_HZ, HZ))
+> -                   val = MULDIV (INT_MAX, USER_HZ, HZ);
+> +               if (val >= mult_frac64(INT_MAX, USER_HZ, HZ))
+> +                       val = mult_frac64(INT_MAX, USER_HZ, HZ);
 
-Now, looking at the related code in sdhci, I am kind of surprised that
-it works. :-) Though, again I don't have the in-depth knowledge about
-sdhci.
 
-Kind regards
-Uffe
+>                 sfp->timeout_user = val;
+> -               sfp->timeout = MULDIV (val, HZ, USER_HZ);
+> +               sfp->timeout = mult_frac64(val, HZ, USER_HZ);
+>
+>                 return 0;
+>         case SG_GET_TIMEOUT:    /* N.B. User receives timeout as return value */
+> --
+> Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc.
+> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux Foundation Collaborative Project
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-scsi" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+
+
+
+-- 
+With Best Regards,
+Andy Shevchenko
