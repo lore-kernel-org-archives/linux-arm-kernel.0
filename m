@@ -1,46 +1,116 @@
-From: dhdang@apm.com (Duc Dang)
-Date: Mon,  9 Nov 2015 10:05:45 -0800
-Subject: [PATCH v3 3/3] arm64: dts: mailbox device tree node for APM X-Gene
- platform.
-In-Reply-To: <cover.1447091625.git.dhdang@apm.com>
-References: <cover.1447091625.git.dhdang@apm.com>
-Message-ID: <757aca862f350cb7afb1fcdad2ced644461c56dd.1447091626.git.dhdang@apm.com>
+From: yang.shi@linaro.org (Shi, Yang)
+Date: Mon, 09 Nov 2015 10:08:53 -0800
+Subject: [PATCH] arm64: bpf: fix JIT stack setup
+In-Reply-To: <CABg9mcv8W4_pvkEQKtjBPi5ycMgLPksYoPtYnGr6tdcb5ER8YQ@mail.gmail.com>
+References: <1446874577-14539-1-git-send-email-yang.shi@linaro.org>	<20151108022726.GB39441@ast-mbp.thefacebook.com>
+ <CABg9mcv8W4_pvkEQKtjBPi5ycMgLPksYoPtYnGr6tdcb5ER8YQ@mail.gmail.com>
+Message-ID: <5640E135.2020007@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mailbox device tree node for APM X-Gene platform.
+On 11/8/2015 2:29 PM, Z Lim wrote:
+> On Sat, Nov 7, 2015 at 6:27 PM, Alexei Starovoitov
+> <alexei.starovoitov@gmail.com> wrote:
+>> On Fri, Nov 06, 2015 at 09:36:17PM -0800, Yang Shi wrote:
+>>> ARM64 JIT used FP (x29) as eBPF fp register, but FP is subjected to
+>>> change during function call so it may cause the BPF prog stack base address
+>>> change too. Whenever, it pointed to the bottom of BPF prog stack instead of
+>>> the top.
+>>>
+>>> So, when copying data via bpf_probe_read, it will be copied to (SP - offset),
+>>> then it may overwrite the saved FP/LR.
+>>>
+>>> Use x25 to replace FP as BPF stack base register (fp). Since x25 is callee
+>>> saved register, so it will keep intact during function call.
+>>> It is initialized in BPF prog prologue when BPF prog is started to run
+>>> everytime. When BPF prog exits, it could be just tossed.
+>>>
+>>> Other than this the BPf prog stack base need to be setup before function
+>>> call stack.
+>>>
+>>> So, the BPF stack layout looks like:
+>>>
+>>>                                   high
+>>>           original A64_SP =>   0:+-----+ BPF prologue
+>>>                                  |     | FP/LR and callee saved registers
+>>>           BPF fp register => +64:+-----+
+>>>                                  |     |
+>>>                                  | ... | BPF prog stack
+>>>                                  |     |
+>>>                                  |     |
+>>>           current A64_SP =>      +-----+
+>>>                                  |     |
+>>>                                  | ... | Function call stack
+>>>                                  |     |
+>>>                                  +-----+
+>>>                                    low
+>>>
+>>> Signed-off-by: Yang Shi <yang.shi@linaro.org>
+>>> CC: Zi Shen Lim <zlim.lnx@gmail.com>
+>>> CC: Xi Wang <xi.wang@gmail.com>
+>>
+>> Thanks for tracking it down.
+>> That looks like fundamental bug in arm64 jit. I'm surprised function calls worked at all.
+>> Zi please review.
+>>
+>
+> For function calls (BPF_JMP | BPF_CALL), we are compliant with AAPCS64
+> [1]. That part is okay.
+>
+>
+> bpf_probe_read accesses the BPF program stack, which is based on BPF_REG_FP.
+>
+> This exposes an issue with how BPF_REG_FP was setup, as Yang pointed out.
+> Instead of having BPF_REG_FP point to top of stack, we erroneously
+> point it to the bottom of stack. When there are function calls, we run
+> the risk of clobbering of BPF stack. Bad idea.
 
-[dhdang: rebase over 4.3-rc5]
-Signed-off-by: Feng Kan <fkan@apm.com>
-Signed-off-by: Duc Dang <dhdang@apm.com>
----
- arch/arm64/boot/dts/apm/apm-storm.dtsi | 14 ++++++++++++++
- 1 file changed, 14 insertions(+)
+Yes, exactly.
 
-diff --git a/arch/arm64/boot/dts/apm/apm-storm.dtsi b/arch/arm64/boot/dts/apm/apm-storm.dtsi
-index d831bc2..b36e555 100644
---- a/arch/arm64/boot/dts/apm/apm-storm.dtsi
-+++ b/arch/arm64/boot/dts/apm/apm-storm.dtsi
-@@ -604,6 +604,20 @@
- 			msi-parent = <&msi>;
- 		};
- 
-+		mailbox: slimpro-mbox at 10540000 {
-+			compatible = "apm,xgene-slimpro-mbox";
-+			reg = <0x0 0x10540000 0x0 0xa000>;
-+			#mbox-cells = <1>;
-+			interrupts =    <0x0 0x0 0x4>,
-+					<0x0 0x1 0x4>,
-+					<0x0 0x2 0x4>,
-+					<0x0 0x3 0x4>,
-+					<0x0 0x4 0x4>,
-+					<0x0 0x5 0x4>,
-+					<0x0 0x6 0x4>,
-+					<0x0 0x7 0x4>;
-+		};
-+
- 		serial0: serial at 1c020000 {
- 			status = "disabled";
- 			device_type = "serial";
--- 
-1.9.1
+>
+> Otherwise, since BPF_REG_FP is read-only, and is setup exactly once in
+> prologue, it remains consistent throughout lifetime of the BPF
+> program.
+>
+>
+> Yang, can you please try the following?
+
+It should work without the below change:
+
++       emit(A64_MOV(1, A64_FP, A64_SP), ctx);
+
+I added it to stay align with ARMv8 AAPCS to maintain the correct FP 
+during function call. It makes us get correct stack backtrace.
+
+I think we'd better to keep compliant with ARMv8 AAPCS in BPF JIT 
+prologue too.
+
+If nobody thinks it is necessary, we definitely could remove that change.
+
+Thanks,
+Yang
+
+>
+> 8<-----
+> --- a/arch/arm64/net/bpf_jit_comp.c
+> +++ b/arch/arm64/net/bpf_jit_comp.c
+> @@ -161,12 +161,12 @@ static void build_prologue(struct jit_ctx *ctx)
+>          if (ctx->tmp_used)
+>                  emit(A64_PUSH(tmp1, tmp2, A64_SP), ctx);
+>
+> -       /* Set up BPF stack */
+> -       emit(A64_SUB_I(1, A64_SP, A64_SP, stack_size), ctx);
+> -
+>          /* Set up frame pointer */
+>          emit(A64_MOV(1, fp, A64_SP), ctx);
+>
+> +       /* Set up BPF stack */
+> +       emit(A64_SUB_I(1, A64_SP, A64_SP, stack_size), ctx);
+> +
+>          /* Clear registers A and X */
+>          emit_a64_mov_i64(ra, 0, ctx);
+>          emit_a64_mov_i64(rx, 0, ctx);
+> ----->8
+>
+> [1] http://infocenter.arm.com/help/topic/com.arm.doc.ihi0055b/IHI0055B_aapcs64.pdf
+>
