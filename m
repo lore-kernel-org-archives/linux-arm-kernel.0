@@ -1,53 +1,42 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon,  9 Nov 2015 09:55:46 +0100
-Subject: [PATCH 2/2] arm64: fix R/O permissions of FDT mapping
-In-Reply-To: <1447059346-12050-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1447059346-12050-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1447059346-12050-3-git-send-email-ard.biesheuvel@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 09 Nov 2015 09:59:04 +0100
+Subject: [PATCH V2 1/3] scsi: mptxsas: try 64 bit DMA when 32 bit DMA fails
+In-Reply-To: <564046B3.8090505@suse.de>
+References: <1447034266-28003-1-git-send-email-okaya@codeaurora.org>
+ <1447034266-28003-2-git-send-email-okaya@codeaurora.org>
+ <564046B3.8090505@suse.de>
+Message-ID: <4041362.9GKaSPm9gs@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The mapping permissions of the FDT are set to 'PAGE_KERNEL | PTE_RDONLY'
-in an attempt to map the FDT as read-only. However, not only does this
-break at build time under STRICT_MM_TYPECHECKS (since the two terms are
-of different types in that case), it also results in both the PTE_WRITE
-and PTE_RDONLY attributes to be set, which means the region is still
-writable under ARMv8.1 DBM (and an attempted write will simply clear the
-PT_RDONLY bit).
+On Monday 09 November 2015 08:09:39 Hannes Reinecke wrote:
+> On 11/09/2015 02:57 AM, Sinan Kaya wrote:
+> > Current code gives up when 32 bit DMA is not supported.
+> > This problem has been observed on systems without any
+> > memory below 4 gig.
+> > 
+> > This patch tests 64 bit support before bailing out to find
+> > a working combination.
+> > 
+> That feels decidedly odd.
+> 
+> Why do you probe for 64bit if 32bit fails?
 
-So instead, define PAGE_KERNEL_RO (which already has an established
-meaning across architectures) and use that instead.
+32-bit DMA mask on PCI cannot fail, we rely on that in all sorts
+of places. If the machine has all of its RAM visible above 4GB
+PCI bus addresses, it must use an IOMMU.
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- arch/arm64/include/asm/pgtable.h | 1 +
- arch/arm64/mm/mmu.c              | 2 +-
- 2 files changed, 2 insertions(+), 1 deletion(-)
+> Typically it's the other way round, on the grounds that 64bit DMA
+> should be preferred over 32bit.
+> Can you explain why it needs to be done the other way round here?
 
-diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
-index f3acf421ded4..9819a9426b69 100644
---- a/arch/arm64/include/asm/pgtable.h
-+++ b/arch/arm64/include/asm/pgtable.h
-@@ -80,6 +80,7 @@ extern void __pgd_error(const char *file, int line, unsigned long val);
- #define _PAGE_DEFAULT		(PROT_DEFAULT | PTE_ATTRINDX(MT_NORMAL))
- 
- #define PAGE_KERNEL		__pgprot(_PAGE_DEFAULT | PTE_PXN | PTE_UXN | PTE_DIRTY | PTE_WRITE)
-+#define PAGE_KERNEL_RO		__pgprot(_PAGE_DEFAULT | PTE_PXN | PTE_UXN | PTE_DIRTY | PTE_RDONLY)
- #define PAGE_KERNEL_EXEC	__pgprot(_PAGE_DEFAULT | PTE_UXN | PTE_DIRTY | PTE_WRITE)
- #define PAGE_KERNEL_EXEC_CONT	__pgprot(_PAGE_DEFAULT | PTE_UXN | PTE_DIRTY | PTE_WRITE | PTE_CONT)
- 
-diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-index 46a2b8805c97..7471f08b1d98 100644
---- a/arch/arm64/mm/mmu.c
-+++ b/arch/arm64/mm/mmu.c
-@@ -755,7 +755,7 @@ void __set_fixmap(enum fixed_addresses idx,
- void *__init fixmap_remap_fdt(phys_addr_t dt_phys)
- {
- 	const u64 dt_virt_base = __fix_to_virt(FIX_FDT);
--	pgprot_t prot = PAGE_KERNEL | PTE_RDONLY;
-+	pgprot_t prot = PAGE_KERNEL_RO;
- 	int size, offset;
- 	void *dt_virt;
- 
--- 
-1.9.1
+Something else is odd here, the driver already checks for
+dma_get_required_mask(), which will return the smallest mask
+that fits all of RAM. If the machine has any memory above 4GB,
+it already uses the 64-bit mask, and only falls back to
+the 32-bit mask if that fails or if all memory fits within the
+first 4GB.
+
+So both the description and the patch are wrong. :(
+
+	Arnd
