@@ -1,69 +1,41 @@
 From: linux@roeck-us.net (Guenter Roeck)
-Date: Mon, 9 Nov 2015 07:07:02 -0800
-Subject: [PATCH v3 3/4] Documentation: watchdog: Add new bindings for
- meson8b
-In-Reply-To: <1446985137-25498-4-git-send-email-carlo@caione.org>
+Date: Mon, 9 Nov 2015 07:11:10 -0800
+Subject: [PATCH v3 4/4] ARM: dts: meson8b: Add watchdog node
+In-Reply-To: <1446985137-25498-5-git-send-email-carlo@caione.org>
 References: <1446985137-25498-1-git-send-email-carlo@caione.org>
- <1446985137-25498-4-git-send-email-carlo@caione.org>
-Message-ID: <5640B696.4080007@roeck-us.net>
+ <1446985137-25498-5-git-send-email-carlo@caione.org>
+Message-ID: <5640B78E.8010200@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 11/08/2015 04:18 AM, Carlo Caione wrote:
 > From: Carlo Caione <carlo@endlessm.com>
 >
-> We make the documentation not meson6 specific anymore and add the new
-> binding for meson8b SoC.
+> With this patch we add the watchdog node in the meson8b DTS file.
 >
 > Signed-off-by: Carlo Caione <carlo@endlessm.com>
+
+Reviewed-by: Guenter Roeck <linux@roeck-us.net>
+
 > ---
->   Documentation/devicetree/bindings/watchdog/meson-wdt.txt  | 13 +++++++++++++
->   Documentation/devicetree/bindings/watchdog/meson6-wdt.txt | 13 -------------
->   2 files changed, 13 insertions(+), 13 deletions(-)
->   create mode 100644 Documentation/devicetree/bindings/watchdog/meson-wdt.txt
->   delete mode 100644 Documentation/devicetree/bindings/watchdog/meson6-wdt.txt
-
-This will need an Ack from a DT maintainer for the rename.
-
-Guenter
-
+>   arch/arm/boot/dts/meson8b.dtsi | 6 ++++++
+>   1 file changed, 6 insertions(+)
 >
-> diff --git a/Documentation/devicetree/bindings/watchdog/meson-wdt.txt b/Documentation/devicetree/bindings/watchdog/meson-wdt.txt
-> new file mode 100644
-> index 0000000..ae70185
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/watchdog/meson-wdt.txt
-> @@ -0,0 +1,13 @@
-> +Meson SoCs Watchdog timer
+> diff --git a/arch/arm/boot/dts/meson8b.dtsi b/arch/arm/boot/dts/meson8b.dtsi
+> index ee352bf..8bad557 100644
+> --- a/arch/arm/boot/dts/meson8b.dtsi
+> +++ b/arch/arm/boot/dts/meson8b.dtsi
+> @@ -105,6 +105,12 @@
+>   			#interrupt-cells = <3>;
+>   		};
+>
+> +		wdt: watchdog at c1109900 {
+> +			compatible = "amlogic,meson8b-wdt";
+> +			reg = <0xc1109900 0x8>;
+> +			interrupts = <0 0 1>;
+> +		};
 > +
-> +Required properties:
-> +
-> +- compatible : should be "amlogic,meson6-wdt" or "amlogic,meson8b-wdt"
-> +- reg : Specifies base physical address and size of the registers.
-> +
-> +Example:
-> +
-> +wdt: watchdog at c1109900 {
-> +	compatible = "amlogic,meson6-wdt";
-> +	reg = <0xc1109900 0x8>;
-> +};
-> diff --git a/Documentation/devicetree/bindings/watchdog/meson6-wdt.txt b/Documentation/devicetree/bindings/watchdog/meson6-wdt.txt
-> deleted file mode 100644
-> index 9200fc2..0000000
-> --- a/Documentation/devicetree/bindings/watchdog/meson6-wdt.txt
-> +++ /dev/null
-> @@ -1,13 +0,0 @@
-> -Meson SoCs Watchdog timer
-> -
-> -Required properties:
-> -
-> -- compatible : should be "amlogic,meson6-wdt"
-> -- reg : Specifies base physical address and size of the registers.
-> -
-> -Example:
-> -
-> -wdt: watchdog at c1109900 {
-> -	compatible = "amlogic,meson6-wdt";
-> -	reg = <0xc1109900 0x8>;
-> -};
+>   		timer at c1109940 {
+>   			compatible = "amlogic,meson6-timer";
+>   			reg = <0xc1109940 0x18>;
 >
