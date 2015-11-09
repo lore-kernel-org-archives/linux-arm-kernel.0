@@ -1,66 +1,48 @@
-From: gregory.clement@free-electrons.com (Gregory CLEMENT)
-Date: Mon, 09 Nov 2015 19:19:23 +0100
-Subject: [RFC PATCH 0/2] net: mvneta: Introduce RSS support
-In-Reply-To: <CAPv3WKcOLsjGj1iyEiPdPkdkNS2O1-RytNMZUCgUCv9QUdY6FA@mail.gmail.com>
- (Marcin Wojtas's message of "Fri, 6 Nov 2015 20:37:38 +0100")
-References: <1446834911-29910-1-git-send-email-gregory.clement@free-electrons.com>
- <CAPv3WKcOLsjGj1iyEiPdPkdkNS2O1-RytNMZUCgUCv9QUdY6FA@mail.gmail.com>
-Message-ID: <87wptr593o.fsf@free-electrons.com>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 9 Nov 2015 12:19:24 -0600
+Subject: [PATCH V3 4/4] dma: add Qualcomm Technologies HIDMA channel driver
+In-Reply-To: <1446958380-23298-5-git-send-email-okaya@codeaurora.org>
+References: <1446958380-23298-1-git-send-email-okaya@codeaurora.org>
+ <1446958380-23298-5-git-send-email-okaya@codeaurora.org>
+Message-ID: <20151109181924.GA5205@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Marcin,
- 
- On ven., nov. 06 2015, Marcin Wojtas <mw@semihalf.com> wrote:
+On Sat, Nov 07, 2015 at 11:53:00PM -0500, Sinan Kaya wrote:
+> This patch adds support for hidma engine. The driver
+> consists of two logical blocks. The DMA engine interface
+> and the low-level interface. The hardware only supports
+> memcpy/memset and this driver only support memcpy
+> interface. HW and driver doesn't support slave interface.
+> 
+> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+> ---
+>  .../devicetree/bindings/dma/qcom_hidma.txt         |  18 +
+>  drivers/dma/qcom/Kconfig                           |   9 +
+>  drivers/dma/qcom/Makefile                          |   2 +
+>  drivers/dma/qcom/hidma.c                           | 743 ++++++++++++++++
+>  drivers/dma/qcom/hidma.h                           | 157 ++++
+>  drivers/dma/qcom/hidma_dbg.c                       | 225 +++++
+>  drivers/dma/qcom/hidma_ll.c                        | 944 +++++++++++++++++++++
+>  7 files changed, 2098 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/dma/qcom_hidma.txt
+>  create mode 100644 drivers/dma/qcom/hidma.c
+>  create mode 100644 drivers/dma/qcom/hidma.h
+>  create mode 100644 drivers/dma/qcom/hidma_dbg.c
+>  create mode 100644 drivers/dma/qcom/hidma_ll.c
+> 
+> diff --git a/Documentation/devicetree/bindings/dma/qcom_hidma.txt b/Documentation/devicetree/bindings/dma/qcom_hidma.txt
+> new file mode 100644
+> index 0000000..c9fb2d44
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/dma/qcom_hidma.txt
+> @@ -0,0 +1,18 @@
+> +Qualcomm Technologies HIDMA Channel driver
+> +
+> +Required properties:
+> +- compatible: must contain "qcom,hidma"
 
-> Hi Gregory,
->
->
->> I also choose to associate all the TX queues on the same CPU that the
->> one associated to the RX queue. It allows to contain all the
->> interrupts on the same CPU. I think that an improvement on this side
->> would be the support of the XPS.
->>
->
-> Did you make some tries? E.g. after mapping certain txqs to CPU1, when
-> using them was mvneta_tx() executing only on this CPU? Or it rather
-> means that the irq will hit according to the mapping? As far as I know
-> the HW, the latter should be true, which would mean the real XPS with
-> this controller is impossible and the maximum we can control is the
-> irq.
+This should be "qcom,hidma-1.0" to match the example and driver. I 
+would drop "qcom,hidma" altogether.
 
-I hoped that with XPS we can associate CPUs to all the tx queues of a
-ethernet port. For example choosing for eth2, that all the tx queues will
-be handled by CPU0 and CPU3. And for this it would involve allowing
-receiving the tx interrupts only on CPU0 and CPU3. This kind of feature
-seems to be doable with the hardware.
-
-But after reading more carefully what XPS is about and how it is used in
-the kernel, it seems we can't configure the hardware from the sysfs
-interface. From my understanding we can only indicate to the kernel
-which tx queue use for a given CPU.
-
->
-> I think it may be worth to unmask TX irqs on all cpus, so all percpu
-> napi's would be able to read tx_cause and process sent packets. I'm
-> looking forward to your opinion.
-
-By doing, this my understanding is that when an TX interrupt occurs then
-all the CPUs enter in the interrupt handler but only one can manage
-it. So, for me it looks like a big waste of CPU load. I could understand
-that it would be interesting in some situation but it doesn't seem to be
-the good default behavior. That's why I was looking for a way to let the
-use configure it according to his needs.
-
-Please correct me if I am wrong somewhere, because currently I don't
-find a good solution for it.
-
-
-Thanks,
-
-Gregory
--- 
-Gregory Clement, Free Electrons
-Kernel, drivers, real-time and embedded Linux
-development, consulting, training and support.
-http://free-electrons.com
+Rob
