@@ -1,39 +1,34 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Mon, 09 Nov 2015 20:52:43 +0100
-Subject: [PATCH 2/2] drm/rockchip: unset pgoff when mmap'ing gems
-In-Reply-To: <4982827.0pnZflEOSR@phil>
-References: <4982827.0pnZflEOSR@phil>
-Message-ID: <2793929.5WVauesvFQ@phil>
+From: zlim.lnx@gmail.com (Z Lim)
+Date: Mon, 9 Nov 2015 12:00:29 -0800
+Subject: [PATCH] arm64: bpf: fix JIT stack setup
+In-Reply-To: <5640E135.2020007@linaro.org>
+References: <1446874577-14539-1-git-send-email-yang.shi@linaro.org>
+ <20151108022726.GB39441@ast-mbp.thefacebook.com>
+ <CABg9mcv8W4_pvkEQKtjBPi5ycMgLPksYoPtYnGr6tdcb5ER8YQ@mail.gmail.com>
+ <5640E135.2020007@linaro.org>
+Message-ID: <CABg9mcvACuVK2=GBbnur94CsckN2TXRCCiXhX7A8jYQ7arMM+Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit 371f0f085f629 ("ARM: 8426/1: dma-mapping: add missing range check
- in dma_mmap()") introduced offset-checking for mappings, which collides
-with the fake-offset the drm sets for gems.
+On Mon, Nov 9, 2015 at 10:08 AM, Shi, Yang <yang.shi@linaro.org> wrote:
+> I added it to stay align with ARMv8 AAPCS to maintain the correct FP during
+> function call. It makes us get correct stack backtrace.
+>
+> I think we'd better to keep compliant with ARMv8 AAPCS in BPF JIT prologue
+> too.
+>
+> If nobody thinks it is necessary, we definitely could remove that change.
 
-Other drm-drivers set this offset to 0 before doing the mapping, so
-this looks like the correct way to go for rockchip as well.
+Oh no, I don't think anyone will say it's unnecessary!
+I agree the A64_FP-related change is a good idea, so stack unwinding works.
 
-Fixes: 371f0f085f629 ("ARM: 8426/1: dma-mapping: add missing range check in dma_mmap()")
-Signed-off-by: Heiko Stuebner <heiko@sntech.de>
----
-This patch is definitly necessary to keep the rockchip-drm working
-with kernel 4.4.
+How about splitting this into two patches? One for the BPF-related
+bug, and another for A64 FP-handling.
 
- drivers/gpu/drm/rockchip/rockchip_drm_gem.c | 1 +
- 1 file changed, 1 insertion(+)
+Thanks again for tracking this down and improving things overall for arm64 :)
 
-diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_gem.c b/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
-index e50d113..e9bc188 100644
---- a/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
-+++ b/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
-@@ -68,6 +68,7 @@ static int rockchip_drm_gem_object_mmap(struct drm_gem_object *obj,
- 	 * VM_PFNMAP flag that was set by drm_gem_mmap_obj()/drm_gem_mmap().
- 	 */
- 	vma->vm_flags &= ~VM_PFNMAP;
-+	vma->vm_pgoff = 0;
- 
- 	ret = dma_mmap_attrs(drm->dev, vma, rk_obj->kvaddr, rk_obj->dma_addr,
- 			     obj->size, &rk_obj->dma_attrs);
--- 
-2.6.2
+>
+> Thanks,
+> Yang
+>
+>
