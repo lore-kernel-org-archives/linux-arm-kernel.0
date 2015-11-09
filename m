@@ -1,38 +1,69 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 9 Nov 2015 07:06:03 -0800
-Subject: Minimal support for dm814x
-In-Reply-To: <4999BB3D-4BB5-4F7C-96D7-FB687725CDCC@audioscience.com>
-References: <4999BB3D-4BB5-4F7C-96D7-FB687725CDCC@audioscience.com>
-Message-ID: <20151109150602.GR3199@atomide.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Mon, 9 Nov 2015 07:07:02 -0800
+Subject: [PATCH v3 3/4] Documentation: watchdog: Add new bindings for
+ meson8b
+In-Reply-To: <1446985137-25498-4-git-send-email-carlo@caione.org>
+References: <1446985137-25498-1-git-send-email-carlo@caione.org>
+ <1446985137-25498-4-git-send-email-carlo@caione.org>
+Message-ID: <5640B696.4080007@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 11/08/2015 04:18 AM, Carlo Caione wrote:
+> From: Carlo Caione <carlo@endlessm.com>
+>
+> We make the documentation not meson6 specific anymore and add the new
+> binding for meson8b SoC.
+>
+> Signed-off-by: Carlo Caione <carlo@endlessm.com>
+> ---
+>   Documentation/devicetree/bindings/watchdog/meson-wdt.txt  | 13 +++++++++++++
+>   Documentation/devicetree/bindings/watchdog/meson6-wdt.txt | 13 -------------
+>   2 files changed, 13 insertions(+), 13 deletions(-)
+>   create mode 100644 Documentation/devicetree/bindings/watchdog/meson-wdt.txt
+>   delete mode 100644 Documentation/devicetree/bindings/watchdog/meson6-wdt.txt
 
-* Delio Brignoli <dbrignoli@audioscience.com> [151105 05:10]:
-> Hello Tony,
-> 
-> We use dm814x in some of our products with a kernel based on version 2.6.37 modified by TI and are considering moving to a current kernel version. I recently saw this <http://lists.infradead.org/pipermail/linux-arm-kernel/2015-June/348444.html> and I?d like to try getting our board to boot as a first step and then take it from there.
-> We aim at eventually having remoteproc working (at least for the DSP) and to port fixes/features we added to our 2.6.37 based tree [2].
+This will need an Ack from a DT maintainer for the rename.
 
-OK great. Once you post some patches, I'm sure other people will start helping
-with the effort too.
+Guenter
 
-> The temporary testing branch [1] mentioned in your original message is not longer available, does that mean I can just use the master branch of <https://git.kernel.org/cgit/linux/kernel/git/tmlind/linux-omap.git> for my tests? Which toolchain did you use to build your test kernel for the hp t410?
-
-It's now merged to mainline v4.3, so whatever is the current latest tagged
-mainline kernel release (v4.3 currently) is the one to use from now on
-natually :) The PLL support is still missing, so it relies on the bootloader
-configured PLL values for now. I'm hoping to post PLL support patches over
-next few weeks and then we can have that and more devices working for v4.5.
-
-> I wonder if there is anyone on this list already working on getting dm814x fully working or interested in cooperating towards this goal.
-
-Yes for sure. I've also addes linux-omap list to Cc.
-
-Regards,
-
-Tony
-
-> [1] <https://git.kernel.org/cgit/linux/kernel/git/tmlind/linux-omap.git/log/?h=tmp-testing-dm814x-2015-06-03>
-> [2] <https://github.com/audioscience/linux-omap3/tree/asi1230-upstream-tracking>
+>
+> diff --git a/Documentation/devicetree/bindings/watchdog/meson-wdt.txt b/Documentation/devicetree/bindings/watchdog/meson-wdt.txt
+> new file mode 100644
+> index 0000000..ae70185
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/watchdog/meson-wdt.txt
+> @@ -0,0 +1,13 @@
+> +Meson SoCs Watchdog timer
+> +
+> +Required properties:
+> +
+> +- compatible : should be "amlogic,meson6-wdt" or "amlogic,meson8b-wdt"
+> +- reg : Specifies base physical address and size of the registers.
+> +
+> +Example:
+> +
+> +wdt: watchdog at c1109900 {
+> +	compatible = "amlogic,meson6-wdt";
+> +	reg = <0xc1109900 0x8>;
+> +};
+> diff --git a/Documentation/devicetree/bindings/watchdog/meson6-wdt.txt b/Documentation/devicetree/bindings/watchdog/meson6-wdt.txt
+> deleted file mode 100644
+> index 9200fc2..0000000
+> --- a/Documentation/devicetree/bindings/watchdog/meson6-wdt.txt
+> +++ /dev/null
+> @@ -1,13 +0,0 @@
+> -Meson SoCs Watchdog timer
+> -
+> -Required properties:
+> -
+> -- compatible : should be "amlogic,meson6-wdt"
+> -- reg : Specifies base physical address and size of the registers.
+> -
+> -Example:
+> -
+> -wdt: watchdog at c1109900 {
+> -	compatible = "amlogic,meson6-wdt";
+> -	reg = <0xc1109900 0x8>;
+> -};
+>
