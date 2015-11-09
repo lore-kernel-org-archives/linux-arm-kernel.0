@@ -1,57 +1,63 @@
-From: Sanjeev_Sharma@mentor.com (Sharma, Sanjeev)
-Date: Mon, 9 Nov 2015 10:15:34 +0000
-Subject: [PATCH] ARM:dma-mapping: Handle DMA_BIDIRECTIONAL in
- _dma_page_cpu_to_dev()
-In-Reply-To: <20151109100804.GA24936@arm.com>
-References: <1446631008-5854-1-git-send-email-sanjeev_sharma@mentor.com>
- <20151104103913.GC5405@arm.com>
- <20151104105420.GL8644@n2100.arm.linux.org.uk>
- <FDC088D3B5555644AE135ED28A7ABDE98636B41D@EU-MBX-02.mgc.mentorg.com>
- <CAGUYZuQDiH_xzinEJ952rw9GuA9oUQSNASaNdOE1x_i97XCBrw@mail.gmail.com>
- <20151109100804.GA24936@arm.com>
-Message-ID: <FDC088D3B5555644AE135ED28A7ABDE98636BE5D@EU-MBX-02.mgc.mentorg.com>
+From: ludovic.desroches@atmel.com (Ludovic Desroches)
+Date: Mon, 9 Nov 2015 11:25:55 +0100
+Subject: [PATCH 0/2] mmc: sdhci: potentially bad behavior when using vmmc
+ supply
+In-Reply-To: <CAPDyKFpC_mKXei14mdD=AYd6YBU0R4D1R=XWpf7BTgX4JDw24w@mail.gmail.com>
+References: <1446825570-30029-1-git-send-email-ludovic.desroches@atmel.com>
+ <CAPDyKFrNNyUrJemgA2OHL35EqpG74_1i9bCqkVkZZZMxNGrHgw@mail.gmail.com>
+ <20151109074104.GB27482@odux.rfo.atmel.com>
+ <CAPDyKFpC_mKXei14mdD=AYd6YBU0R4D1R=XWpf7BTgX4JDw24w@mail.gmail.com>
+Message-ID: <20151109102555.GA15706@odux.rfo.atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 09, 2015 at 11:29:17AM +0530, sanjeev sharma wrote:
->     On Wed, Nov 04, 2015 at 10:39:13AM +0000, Will Deacon wrote:
->     > On Wed, Nov 04, 2015 at 03:26:48PM +0530, Sanjeev Sharma wrote:
->     > > _dma_page_cpu_to_dev() treat DMA_BIDIRECTIONAL similar to
->     > > DMA_TO_DEVICE which means that destination buffer is device
->     > > memory,means cpu may have written some data to source buffer and
->     > > data may be in cache line.For cleaner operation we need to call
->     > > outer_flush_range() which will clean and invalidate outer cache lines.
->     >
->     > Why isn't the clean sufficient in this case? We're mapping the buffer
->     > to the device, so we clean the dirty lines in the CPU caches and make
->     > them visible to the device. If the CPU later wants to read the buffer
->     > (i.e. after the device has DMA'd into it), you'll need to map the
->     > buffer to the CPU, which will perform the invalidation of the CPU caches.
+On Mon, Nov 09, 2015 at 10:38:03AM +0100, Ulf Hansson wrote:
+> [...]
 > 
->     Indeed.  bidirectional mode is already handled prefectly well by this
->     code.  No patches are required.
+> >> > Is the regulator-gpio usage the right thing to do for vqmmc? In my case it is
+> >> > not really driven by a gpio but by a pio from the sdhci device. In the binding,
+> >>
+> >> What's a "pio"?
+> >>
+> >> What do you mean by the it's driven from the sdhci device?
+> >>
+> >
+> > Sorry I mean sdhci device from the SoC point of view, I should say
+> > controller. So yes the signal is driven by the controller.
+> >
+> >> Is it the internal HW logic of the sdhci controller that manages the
+> >> IO voltage? And this logic can be controlled via certain register bits
+> >> in the SDHCI controller?
+> >>
+> >
+> > Yes, it depends of the value of the '1.8V Signaling Enable' value in the
+> > host control 2 register.
+> >
+> >> > declaring the gpio is an option so I thought using this regulator fits my need.
+> >>
+> >> In quite many cases it makes sense to model this though a gpio
+> >> regulator. For example when you use a level shifter circuit. Those
+> >> normally have gpio pin routed to control the voltage level output for
+> >> the signals. For example switching between 1.8V and 2.9V.
+> >>
+> >
+> > I agree, my concern is to know if I can consider it as a 'general' pio
+> > since it is driven by the sdhci controller.
 > 
->     Thanks Russell & Will for providing input.
+> This doesn't seems like a case where a gpio regulator should be used
+> and I am not sure what problem it would solve. Beside to suppress the
+> log warnings (actually those aren't warnings but informations).
 > 
->     Let's assume , CPU don't read the buffer then there could be the problem
->     correct ? IMO, to handle every use case outer_flush_range can be used ?
->     If still it doesn't make sense to use flush on bidirectional mappings, then
->     FIXME comment should be removed from the function to avoid any
->     Confusion.
+> Isn't sdhci_do_start_signal_voltage_switch() doing what you need here?
 > 
-> 
-> 
-> Please let me know what you think on above comment ?
 
-I still don't understand the problem that you're trying to fix.
+It is. I am only wondering the best way to describe the hardware:
+- No regulator but I have the 'no vqmmc regulator not found' message which
+  is a bit annoying and which can be interpreted as an issue for someone
+  who has no knowledge about this stuff.
+- Describe the regulator since there is one on my board. But it is not a
+  fixed regulator and even if it's close to a gpio one it is not.
 
-It may cause the following issue.
-1.we create the buffer with cache, and in some cases, the cache may be dirty.
-2.then we call the sync_for_device function with flag DMA_BIDIRECTIONAL to avoid some cache problems.
-3. however __dma_page_cpu_to_dev() just see DMA_BIDIRECTIONAL the same as 
-DMA_TO_DEVICE, which means the kernel will not invalid the cache if we use the flag DMA_BIDIRECTIONAL.
-4.since the dirty cache is not invalid, the dirty content may be showed on the buffer in the future rendering.
+Regards
 
-Sorry,
-
-Will
+Ludovic
