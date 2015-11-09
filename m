@@ -1,59 +1,109 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Mon, 9 Nov 2015 11:59:26 +0800
-Subject: [PATCH v3 3/3] ARM: dts: sun4i: gemei-g9: Enable sun4i audio
- codec support
-In-Reply-To: <1446832486-32319-4-git-send-email-plaes@plaes.org>
+Date: Mon, 9 Nov 2015 12:08:57 +0800
+Subject: [PATCH v3 1/3] ARM: dts: sun4i: gemei-g9: Convert to use axp209
+ regulator nodes
+In-Reply-To: <1446832486-32319-2-git-send-email-plaes@plaes.org>
 References: <1446832486-32319-1-git-send-email-plaes@plaes.org>
- <1446832486-32319-4-git-send-email-plaes@plaes.org>
-Message-ID: <CAGb2v66uG-0EgVR=5SS4Lk-y5mX9v3Z39xP+0f7u7BfYq-b1yw@mail.gmail.com>
+ <1446832486-32319-2-git-send-email-plaes@plaes.org>
+Message-ID: <CAGb2v65sPBg7u2JjempZKrCC8vbeywnzg9YJNGR4hxa1=UcA+Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
+
 On Sat, Nov 7, 2015 at 1:54 AM, Priit Laes <plaes@plaes.org> wrote:
-> Gemei G9 has internal speakers and headphone jack. Audio switching
-> from internal speakers to headphones is automatically handled by
-> extra FT2012Q audio amplifier chip that works out of the box.
-
-Nice that it works out of the box. The FEX file does mention:
-
-audio_pa_ctrl   = port:PH15<1><default><default><0>
-
-So either it is floating or pulled up by default? Since it works
-now I don't see any reason to block it. On the other hand once
-that binding is introduced it would be nice to add it for power
-management reasons.
-
-Acked-by: Chen-Yu Tsai <wens@csie.org>
-
+> Add regulator nodes for axp209 using the axp209.dtsi include.
+>
 > Signed-off-by: Priit Laes <plaes@plaes.org>
 > ---
-> Changes since v2:
->  - Dropped routing property.
+> Changes in v3:
+>  - Drop the ohci0 node. It's not needed.
 >
->  arch/arm/boot/dts/sun4i-a10-gemei-g9.dts | 5 ++++-
->  1 file changed, 4 insertions(+), 1 deletion(-)
+> Changes in v2:
+>  - Add the ohci0 node.
+>
+>
+>  arch/arm/boot/dts/sun4i-a10-gemei-g9.dts | 35 ++++++++++++++++++++++++++++----
+>  1 file changed, 31 insertions(+), 4 deletions(-)
 >
 > diff --git a/arch/arm/boot/dts/sun4i-a10-gemei-g9.dts b/arch/arm/boot/dts/sun4i-a10-gemei-g9.dts
-> index 16c1a67..1d73a98 100644
+> index 3f0aeb8..6b4c29d 100644
 > --- a/arch/arm/boot/dts/sun4i-a10-gemei-g9.dts
 > +++ b/arch/arm/boot/dts/sun4i-a10-gemei-g9.dts
-> @@ -65,12 +65,15 @@
->  /*
->   * TODO:
->   *   2x cameras via CSI
-> - *   audio
-> + *   audio input
->   *   AXP battery management
->   *   NAND
->   *   OTG
+> @@ -72,6 +72,10 @@
 >   *   Touchscreen - gt801_2plus1 @ i2c adapter 2 @ 0x48
 >   */
-> +&codec {
-> +       status = "okay";
-> +};
 >
->  &cpu0 {
->         cpu-supply = <&reg_dcdc2>;
+> +&cpu0 {
+> +       cpu-supply = <&reg_dcdc2>;
+> +};
+> +
+>  &ehci0 {
+>         status = "okay";
+>  };
+> @@ -86,15 +90,13 @@
+>         status = "okay";
+>
+>         axp209: pmic at 34 {
+> -               compatible = "x-powers,axp209";
+>                 reg = <0x34>;
+>                 interrupts = <0>;
+> -
+> -               interrupt-controller;
+> -               #interrupt-cells = <1>;
+>         };
+>  };
+>
+> +#include "axp209.dtsi"
+> +
+>  &i2c1 {
+>         pinctrl-names = "default";
+>         pinctrl-0 = <&i2c1_pins_a>;
+> @@ -146,6 +148,31 @@
+>         status = "okay";
+>  };
+>
+> +&reg_dcdc2 {
+> +       regulator-always-on;
+> +       regulator-min-microvolt = <1000000>;
+> +       regulator-max-microvolt = <1400000>;
+> +       regulator-name = "vdd-cpu";
+> +};
+> +
+> +&reg_dcdc3 {
+> +       regulator-always-on;
+> +       regulator-min-microvolt = <1250000>;
+> +       regulator-max-microvolt = <1250000>;
+> +       regulator-name = "vdd-int-dll";
+> +};
+
+The latest consensus for these system critical regulators
+is to use the recommended range from the datasheet. The
+voltage is set by the bootloader and never touched by Linux,
+thus avoiding any mismatch issues.
+
+> +
+> +&reg_ldo1 {
+> +       regulator-name = "vdd-rtc";
+> +};
+> +
+> +&reg_ldo2 {
+> +       regulator-always-on;
+> +       regulator-min-microvolt = <3000000>;
+> +       regulator-max-microvolt = <3000000>;
+> +       regulator-name = "avcc";
+
+That goes for this one as well.
+
+
+Regards
+ChenYu
+
+> +};
+> +
+>  &reg_usb1_vbus {
+>         status = "okay";
+>  };
 > --
 > 2.6.3
 >
