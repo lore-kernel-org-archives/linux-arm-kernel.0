@@ -1,59 +1,56 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 9 Nov 2015 12:25:14 -0600
-Subject: [PATCH V3 2/4] dma: add Qualcomm Technologies HIDMA management
- driver
-In-Reply-To: <56400230.8030303@codeaurora.org>
-References: <1446958380-23298-1-git-send-email-okaya@codeaurora.org>
- <1446958380-23298-3-git-send-email-okaya@codeaurora.org>
- <563ED8DF.6090307@codeaurora.org> <56400230.8030303@codeaurora.org>
-Message-ID: <20151109182514.GA10896@rob-hp-laptop>
+From: yang.shi@linaro.org (Yang Shi)
+Date: Mon,  9 Nov 2015 10:09:55 -0800
+Subject: [V3 PATCH] arm64: remove redundant FRAME_POINTER kconfig option and
+ force to select it
+Message-ID: <1447092595-12644-1-git-send-email-yang.shi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Nov 08, 2015 at 09:17:20PM -0500, Sinan Kaya wrote:
-> On 11/8/2015 12:08 AM, Timur Tabi wrote:
-> 
-> On 11/8/2015 12:08 AM, Timur Tabi wrote:
-> >Sinan Kaya wrote:
-> >>+    val = val & ~(MAX_BUS_REQ_LEN_MASK << MAX_BUS_WR_REQ_BIT_POS);
-> >>+    val = val | (mgmtdev->max_write_request << MAX_BUS_WR_REQ_BIT_POS);
-> >>+    val = val & ~(MAX_BUS_REQ_LEN_MASK);
-> >>+    val = val | (mgmtdev->max_read_request);
-> >
-> >val &= ~MAX_BUS_REQ_LEN_MASK << MAX_BUS_WR_REQ_BIT_POS;
-> >val |= mgmtdev->max_write_request << MAX_BUS_WR_REQ_BIT_POS;
-> >val &= ~MAX_BUS_REQ_LEN_MASK;
-> >val |= mgmtdev->max_read_request;
-> >
-> >>+static const struct of_device_id hidma_mgmt_match[] = {
-> >>+    { .compatible = "qcom,hidma-mgmt", },
-> >>+    { .compatible = "qcom,hidma-mgmt-1.0", },
-> >>+    { .compatible = "qcom,hidma-mgmt-1.1", },
-> >>+    {},
-> >>+};
-> >
-> >I thought Rob said that he did NOT want to use version numbers in
-> >compatible strings.  And what's the difference between these three
-> >versions anyway?
-> >
-> 
-> This was already discussed here.
-> 
-> https://lkml.org/lkml/2015/11/2/689
-> 
-> The agreement was to use
+FRAME_POINTER is defined in lib/Kconfig.debug, it is unnecessary to redefine
+it in arch/arm64/Kconfig.debug. Actually, the one defined in arm64 directory
+is never used.
+This adds a dependency on DEBUG_KERNEL for building with frame pointers.
 
-The suggestion...
+ARM64 depends on frame pointer to get correct stack backtrace and need
+FRAME_POINTER kconfig option enabled all the time.
+However, currect implementation makes it could be disabled, so force it
+to be selected by ARM64.
+
+Signed-off-by: Yang Shi <yang.shi@linaro.org>
+---
+change v3 --> v2:
+squash two patches into one.
+
+ arch/arm64/Kconfig       | 1 +
+ arch/arm64/Kconfig.debug | 4 ----
+ 2 files changed, 1 insertion(+), 4 deletions(-)
+
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 440d906..b554da2 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -27,6 +27,7 @@ config ARM64
+ 	select CPU_PM if (SUSPEND || CPU_IDLE)
+ 	select DCACHE_WORD_ACCESS
+ 	select EDAC_SUPPORT
++	select FRAME_POINTER
+ 	select GENERIC_ALLOCATOR
+ 	select GENERIC_CLOCKEVENTS
+ 	select GENERIC_CLOCKEVENTS_BROADCAST
+diff --git a/arch/arm64/Kconfig.debug b/arch/arm64/Kconfig.debug
+index d6285ef..915dea7 100644
+--- a/arch/arm64/Kconfig.debug
++++ b/arch/arm64/Kconfig.debug
+@@ -2,10 +2,6 @@ menu "Kernel hacking"
  
-> compatible = "qcom,hidma-mgmt-1.1", "qcom,hidma-mgmt-1.0",
-> "qcom,hidma-mgmt";
-
-I don't really want to see 3 generic-ish strings.
+ source "lib/Kconfig.debug"
  
-> I'll be adding code for v1.1 specifically in the future.
-
-Please drop "qcom,hidma-mgmt" altogether. It is already meaningless. 
-Then add the 1.1 compatible when you add the code for it. Hopefully you 
-all can decide on part number(s) by then.
-
-Rob
+-config FRAME_POINTER
+-	bool
+-	default y
+-
+ config ARM64_PTDUMP
+ 	bool "Export kernel pagetable layout to userspace via debugfs"
+ 	depends on DEBUG_KERNEL
+-- 
+2.0.2
