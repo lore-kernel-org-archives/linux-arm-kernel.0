@@ -1,74 +1,44 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 9 Nov 2015 10:39:22 -0600
-Subject: [PATCH v6 1/3] doc: dt: add documentation for Mediatek spi-nor
- controller
-In-Reply-To: <1446824889-16144-2-git-send-email-bayi.cheng@mediatek.com>
-References: <1446824889-16144-1-git-send-email-bayi.cheng@mediatek.com>
- <1446824889-16144-2-git-send-email-bayi.cheng@mediatek.com>
-Message-ID: <20151109163922.GA13578@rob-hp-laptop>
+From: andrew@lunn.ch (Andrew Lunn)
+Date: Mon, 9 Nov 2015 17:42:32 +0100
+Subject: [PATCH] mvneta: add FIXED_PHY dependency
+In-Reply-To: <4225885.EYXTHjRPmX@wuerfel>
+References: <4225885.EYXTHjRPmX@wuerfel>
+Message-ID: <20151109164232.GB3388@lunn.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 06, 2015 at 11:48:07PM +0800, Bayi Cheng wrote:
-> Add device tree binding documentation for serial flash with
-> Mediatek serial flash controller
-> 
-> Signed-off-by: Bayi Cheng <bayi.cheng@mediatek.com>
+On Mon, Nov 09, 2015 at 03:08:57PM +0100, Arnd Bergmann wrote:
+> The fixed_phy infrastructure is done in a way that is optional,
+> by providing 'static inline' helper functions doing nothing in
+> include/linux/phy_fixed.h for all its APIs. However, three out
+> of the four users (DSA, BCMGENET, and SYSTEMPORT) always
+> 'select FIXED_PHY', presumably because they need that.
 
-Acked-by: Rob Herring <robh@kernel.org>
+Hi Arnd
 
-> ---
->  .../devicetree/bindings/mtd/mtk-quadspi.txt        | 41 ++++++++++++++++++++++
->  1 file changed, 41 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/mtd/mtk-quadspi.txt
+Need is probably too strong, it could be considered an optional
+feature. If you don't have a fixed_phy property in your DT blob, you
+don't need fixed phy support in your image.
+
+> MVNETA is the fourth one, and if that is built-in but FIXED_PHY
+> is configured as a loadable module, we get a link error:
 > 
-> diff --git a/Documentation/devicetree/bindings/mtd/mtk-quadspi.txt b/Documentation/devicetree/bindings/mtd/mtk-quadspi.txt
-> new file mode 100644
-> index 0000000..866b492
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/mtd/mtk-quadspi.txt
-> @@ -0,0 +1,41 @@
-> +* MTD SPI nor driver for MTK MT81xx (and similar) serial flash controller
-> +
-> +Required properties:
-> +- compatible: 	  should be "mediatek,mt8173-nor";
-> +- reg: 		  physical base address and length of the controller's register
-> +- clocks: 	  the phandle of the clock needed by the nor controller
-> +- clock-names: 	  the name of the clocks
-> +		  the clocks needed "spi" and "sf". "spi" is used for spi bus,
-> +		  and "sf" is used for controller, these are the clocks witch
-> +		  hardware needs to enabling nor flash and nor flash controller.
-> +		  See Documentation/devicetree/bindings/clock/clock-bindings.txt for details.
-> +- #address-cells: should be <1>
-> +- #size-cells:	  should be <0>
-> +
-> +The SPI Flash must be a child of the nor_flash node and must have a
-> +compatible property.
-> +
-> +Required properties:
-> +- compatible:	  May include a device-specific string consisting of the manufacturer
-> +		  and name of the chip. Must also include "jedec,spi-nor" for any
-> +		  SPI NOR flash that can be identified by the JEDEC READ ID opcode (0x9F).
-> +- reg :		  Chip-Select number
-> +
-> +Example:
-> +
-> +nor_flash: spi at 1100d000 {
-> +	compatible = "mediatek,mt8173-nor";
-> +	reg = <0 0x1100d000 0 0xe0>;
-> +	clocks = <&pericfg CLK_PERI_SPI>,
-> +		 <&topckgen CLK_TOP_SPINFI_IFR_SEL>;
-> +	clock-names = "spi", "sf";
-> +	#address-cells = <1>;
-> +	#size-cells = <0>;
-> +	status = "disabled";
-> +
-> +	flash at 0 {
-> +		compatible = "jedec,spi-nor";
-> +		reg = <0>;
-> +	};
-> +};
-> +
-> -- 
-> 1.8.1.1.dirty
+> drivers/built-in.o: In function `mvneta_fixed_link_update':
+> fpga-mgr.c:(.text+0x33ed80): undefined reference to `fixed_phy_update_state'
 > 
+> Presumably this driver has the same dependency as the others,
+> so this patch also uses 'select' to ensure that the fixed-phy
+> support is built-in.
+
+This will work, and is uniform with the other instances. But maybe a
+more correct fix is to ensure fixed-phy is never a module when there
+is a builtin user.
+
+> Should we perhaps make 'FIXED_PHY' a silent option and remove the
+> inline helpers, based on the assumption that a driver that wants these
+> will not work without them?
+
+I suppose it comes down to, are we allowed to optionally implement
+part of the DT binding?
+
+     Andrew
