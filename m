@@ -1,81 +1,87 @@
-From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Mon, 9 Nov 2015 15:40:30 +0100
-Subject: [PATCH 1/2] mmc: sdhci: set bus voltage before enabling bus power
-In-Reply-To: <CAPDyKFrTTEnSFNvmx3e__Ap9gOGpA2-bz+yrq7ibz0wXGSWCXA@mail.gmail.com>
-References: <1446825570-30029-1-git-send-email-ludovic.desroches@atmel.com>
- <1446825570-30029-2-git-send-email-ludovic.desroches@atmel.com>
- <20151109132305.GC15706@odux.rfo.atmel.com>
- <CAPDyKFrTTEnSFNvmx3e__Ap9gOGpA2-bz+yrq7ibz0wXGSWCXA@mail.gmail.com>
-Message-ID: <20151109144030.GD15706@odux.rfo.atmel.com>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Mon, 9 Nov 2015 17:00:04 +0200
+Subject: [PATCH v2 2/2] gpio: zynq: Implement irq_pm_(get|put)
+In-Reply-To: <1446668160-17522-3-git-send-email-soren.brinkmann@xilinx.com>
+References: <1446668160-17522-1-git-send-email-soren.brinkmann@xilinx.com>
+ <1446668160-17522-3-git-send-email-soren.brinkmann@xilinx.com>
+Message-ID: <5640B4F4.6080008@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 09, 2015 at 03:12:46PM +0100, Ulf Hansson wrote:
-> On 9 November 2015 at 14:23, Ludovic Desroches
-> <ludovic.desroches@atmel.com> wrote:
-> > On Fri, Nov 06, 2015 at 04:59:29PM +0100, Ludovic Desroches wrote:
-> >> When there is a vmmc regulator, only SD Bus Power is set to 1 in the
-> >> Power Control Register. It means SD Bus Voltage Select field is set to 0
-> >> that is a reserved value. The SD Host Controller specification says:
-> >> 'SD Bus Power: Before setting this bit, the SD Host Driver shall set SD
-> >> Bus Voltage Select.' and 'If the Host Driver selects an unsupported
-> >> voltage in the SD B?us Voltage Select field, the Host Controller may
-> >> ignore writes to SD Bus Power and keep its value at zero."
-> >>
-> >> Having an external regulator means the SD Bus Voltage Select is useless
-> >> but if the Host Controller strictly follows the specification then we
-> >> need to set a valid value.
-> >
-> > Ulf,
-> >
-> > What is your opinion about this patch?
-> >
-> > If the 'no regulator found' message is turned in debug message, I can get
-> > rid of my vmmc regulator but I really think that writing only
+Hi Soren,
+
+On 11/04/2015 10:16 PM, Soren Brinkmann wrote:
+> The driver uses runtime PM to leverage low power techniques. For
+> use-cases using GPIO as interrupt the device needs to be in an
+> appropriate state.
 > 
-> I expect you mean vqmmc?
+> Reported-by: John Linn <linnj@xilinx.com>
+> Signed-off-by: Soren Brinkmann <soren.brinkmann@xilinx.com>
 
-I don't mean vmmc. In the sdhci_set_power function, we are using vmmc.
-I feel not confortable with it because the power control register
-contains 'SD Bus' fields so it should depend on vqmmc not vmmc.
+I've one question here. As I know, there is one code path when 
+GPIO HW can be accessed before request_irq() during OF boot:
 
+irq_create_of_mapping()
+- irq_create_fwspec_mapping()
+  - irq_set_irq_type()
+
+How do you handle this situation? :(
+
+> ---
+> v2:
+>   - declare callbacks static
+> ---
+>   drivers/gpio/gpio-zynq.c | 20 ++++++++++++++++++++
+>   1 file changed, 20 insertions(+)
 > 
-> > SDHCI_POWER_ON is opposite to the sdhci spec. I would say that not
-> > setting the bus voltage is a quirk!
+> diff --git a/drivers/gpio/gpio-zynq.c b/drivers/gpio/gpio-zynq.c
+> index 8abeacac5885..98197f778694 100644
+> --- a/drivers/gpio/gpio-zynq.c
+> +++ b/drivers/gpio/gpio-zynq.c
+> @@ -471,6 +471,22 @@ static int zynq_gpio_set_wake(struct irq_data *data, unsigned int on)
+>   	return 0;
+>   }
+>   
+> +static int zynq_gpio_irq_pm_get(struct irq_data *data)
+> +{
+> +	struct zynq_gpio *gpio = irq_data_get_irq_chip_data(data);
+> +	struct device *dev = gpio->chip.dev;
+> +
+> +	return pm_runtime_get_sync(dev);
+> +}
+> +
+> +static void zynq_gpio_irq_pm_put(struct irq_data *data)
+> +{
+> +	struct zynq_gpio *gpio = irq_data_get_irq_chip_data(data);
+> +	struct device *dev = gpio->chip.dev;
+> +
+> +	pm_runtime_put(dev);
+> +}
+> +
+>   /* irq chip descriptor */
+>   static struct irq_chip zynq_gpio_level_irqchip = {
+>   	.name		= DRIVER_NAME,
+> @@ -480,6 +496,8 @@ static struct irq_chip zynq_gpio_level_irqchip = {
+>   	.irq_unmask	= zynq_gpio_irq_unmask,
+>   	.irq_set_type	= zynq_gpio_set_irq_type,
+>   	.irq_set_wake	= zynq_gpio_set_wake,
+> +	.irq_pm_get	= zynq_gpio_irq_pm_get,
+> +	.irq_pm_put	= zynq_gpio_irq_pm_put,
+>   	.flags		= IRQCHIP_EOI_THREADED | IRQCHIP_EOI_IF_HANDLED |
+>   			  IRQCHIP_MASK_ON_SUSPEND,
+>   };
+> @@ -492,6 +510,8 @@ static struct irq_chip zynq_gpio_edge_irqchip = {
+>   	.irq_unmask	= zynq_gpio_irq_unmask,
+>   	.irq_set_type	= zynq_gpio_set_irq_type,
+>   	.irq_set_wake	= zynq_gpio_set_wake,
+> +	.irq_pm_get	= zynq_gpio_irq_pm_get,
+> +	.irq_pm_put	= zynq_gpio_irq_pm_put,
+>   	.flags		= IRQCHIP_MASK_ON_SUSPEND,
+>   };
+>   
 > 
-> I don't really follow.
-> 
-> I read the SDHCI spec and the section for the Power Control Register.
-> Bit 0 needs to be set when communicating with the card as it will for
-> example enables the clock. Before setting bit0 you must decide what
-> signal level to use, which is done by writing to bit 1->3.
-> 
-
-Right. But when having vmmc supply we do:
-sdhci_writeb(host, SDHCI_POWER_ON, SDHCI_POWER_CONTROL) or
-sdhci_writeb(host, 0, SDHCI_POWER_CONTROL) so we loose the signal level,
-isn't it? 
-
-> If SDHCI monitors the power state (MMC_POWER_UP|ON|OFF) when its
-> ->set_ios() callback are invoked and in combination of using the
-> ->start_signal_voltage_switch() callback to change the signal voltage
-> level, this *should* work out nicely.
-> 
-
-It is my turn to not follow! We write into the Power Control Register
-only in sdhci_set_power(). May I miss a callback or something else?
-sdhci_do_start_signal_voltage_switch doesn't modify the Power Control
-Register.
-
-> Now, looking at the related code in sdhci, I am kind of surprised that
-> it works. :-) Though, again I don't have the in-depth knowledge about
-> sdhci.
-> 
-
-Me too, I am starting to dig into the sdhci spec and some points are
-not crystal clear.
 
 
-Regards
-
-Ludovic
+-- 
+regards,
+-grygorii
