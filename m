@@ -1,95 +1,56 @@
-From: sstabellini@kernel.org (Stefano Stabellini)
-Date: Mon, 9 Nov 2015 14:10:22 +0000 (GMT)
-Subject: [PATCH 3/3] xen/arm: set the system time in Xen via the
- XENPF_settime hypercall
-In-Reply-To: <6188457.uvvdcZaVNM@wuerfel>
-References: <alpine.DEB.2.02.1511051706560.13541@kaball.uk.xensource.com>
- <1446743385-12848-3-git-send-email-stefano.stabellini@eu.citrix.com>
- <6188457.uvvdcZaVNM@wuerfel>
-Message-ID: <alpine.DEB.2.02.1511061510190.23825@kaball.uk.xensource.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Mon, 9 Nov 2015 15:12:46 +0100
+Subject: [PATCH 1/2] mmc: sdhci: set bus voltage before enabling bus power
+In-Reply-To: <20151109132305.GC15706@odux.rfo.atmel.com>
+References: <1446825570-30029-1-git-send-email-ludovic.desroches@atmel.com>
+ <1446825570-30029-2-git-send-email-ludovic.desroches@atmel.com>
+ <20151109132305.GC15706@odux.rfo.atmel.com>
+Message-ID: <CAPDyKFrTTEnSFNvmx3e__Ap9gOGpA2-bz+yrq7ibz0wXGSWCXA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 5 Nov 2015, Arnd Bergmann wrote:
-> On Thursday 05 November 2015 17:09:45 Stefano Stabellini wrote:
-> > If Linux is running as dom0, call XENPF_settime to update the system
-> > time in Xen on pvclock_gtod notifications.
-> > 
-> > Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-> > Signed-off-by: Ian Campbell <ian.campbell@citrix.com>
-> > ---
-> >  arch/arm/xen/enlighten.c |   52 +++++++++++++++++++++++++++++++++++++++++++++-
-> >  1 file changed, 51 insertions(+), 1 deletion(-)
-> > 
-> > diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
-> > index b6aea9c..0176db0 100644
-> > --- a/arch/arm/xen/enlighten.c
-> > +++ b/arch/arm/xen/enlighten.c
-> > @@ -28,6 +28,7 @@
-> >  #include <linux/cpufreq.h>
-> >  #include <linux/cpu.h>
-> >  #include <linux/console.h>
-> > +#include <linux/pvclock_gtod.h>
-> >  #include <linux/timekeeping.h>
-> >  #include <clocksource/arm_arch_timer.h>
-> >  
-> > @@ -123,6 +124,50 @@ static void xen_read_wallclock(struct timespec *ts)
-> >  	set_normalized_timespec(ts, now.tv_sec, now.tv_nsec);
-> >  }
-> >  
-> > +static int xen_pvclock_gtod_notify(struct notifier_block *nb,
-> > +				   unsigned long was_set, void *priv)
-> > +{
-> > +	/* Protected by the calling core code serialization */
-> > +	static struct timespec next_sync;
-> > +
-> > +	struct xen_platform_op op;
-> > +	struct timespec now;
-> 
-> Again, use timespec64
+On 9 November 2015 at 14:23, Ludovic Desroches
+<ludovic.desroches@atmel.com> wrote:
+> On Fri, Nov 06, 2015 at 04:59:29PM +0100, Ludovic Desroches wrote:
+>> When there is a vmmc regulator, only SD Bus Power is set to 1 in the
+>> Power Control Register. It means SD Bus Voltage Select field is set to 0
+>> that is a reserved value. The SD Host Controller specification says:
+>> 'SD Bus Power: Before setting this bit, the SD Host Driver shall set SD
+>> Bus Voltage Select.' and 'If the Host Driver selects an unsupported
+>> voltage in the SD B?us Voltage Select field, the Host Controller may
+>> ignore writes to SD Bus Power and keep its value at zero."
+>>
+>> Having an external regulator means the SD Bus Voltage Select is useless
+>> but if the Host Controller strictly follows the specification then we
+>> need to set a valid value.
+>
+> Ulf,
+>
+> What is your opinion about this patch?
+>
+> If the 'no regulator found' message is turned in debug message, I can get
+> rid of my vmmc regulator but I really think that writing only
 
-OK
+I expect you mean vqmmc?
 
+> SDHCI_POWER_ON is opposite to the sdhci spec. I would say that not
+> setting the bus voltage is a quirk!
 
-> > +	now = __current_kernel_time();
-> 
-> We don't have __current_kernel_time64() yet, but it is trivial
-> to add, just follow the example of
-> current_kernel_time()/current_kernel_time64() and convert the
-> existing __current_kernel_time() function into a static
-> inline wrapper for the new __current_kernel_time64().
+I don't really follow.
 
-All right. I guess something like:
+I read the SDHCI spec and the section for the Power Control Register.
+Bit 0 needs to be set when communicating with the card as it will for
+example enables the clock. Before setting bit0 you must decide what
+signal level to use, which is done by writing to bit 1->3.
 
-struct timespec64 __current_kernel_time64(void)
-{
-	struct timekeeper *tk = &tk_core.timekeeper;
+If SDHCI monitors the power state (MMC_POWER_UP|ON|OFF) when its
+->set_ios() callback are invoked and in combination of using the
+->start_signal_voltage_switch() callback to change the signal voltage
+level, this *should* work out nicely.
 
-	return tk_xtime(tk);
-}
+Now, looking at the related code in sdhci, I am kind of surprised that
+it works. :-) Though, again I don't have the in-depth knowledge about
+sdhci.
 
-
-> > +	/*
-> > +	 * We only take the expensive HV call when the clock was set
-> > +	 * or when the 11 minutes RTC synchronization time elapsed.
-> > +	 */
-> > +	if (!was_set && timespec_compare(&now, &next_sync) < 0)
-> > +		return NOTIFY_OK;
-> > +
-> > +	op.interface_version = XENPF_INTERFACE_VERSION;
-> > +	op.cmd = XENPF_settime;
-> > +	op.u.settime.secs = now.tv_sec;
-> > +	op.u.settime.nsecs = now.tv_nsec;
-> > +	op.u.settime.system_time = arch_timer_read_counter();
-> > +	printk("GTOD: Setting to %ld.%ld at %lld\n",
-> > +	       (long)op.u.settime.secs,
-> > +	       (long)op.u.settime.nsecs,
-> > +	       (long long)op.u.settime.system_time);
-> > +	(void)HYPERVISOR_dom0_op(&op);
-> 
-> I guess we will also need a XENPF_settime64 interface, but at
-> least we can get away with implementing only that one on ARM,
-> while x86 will have to support both the 32-bit and 64-bit
-> based variant.
-
-We already have XENPF_settime64, I'll just use it instead.
+Kind regards
+Uffe
