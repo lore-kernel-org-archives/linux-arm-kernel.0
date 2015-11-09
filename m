@@ -1,109 +1,72 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Mon, 9 Nov 2015 12:08:57 +0800
-Subject: [PATCH v3 1/3] ARM: dts: sun4i: gemei-g9: Convert to use axp209
- regulator nodes
-In-Reply-To: <1446832486-32319-2-git-send-email-plaes@plaes.org>
-References: <1446832486-32319-1-git-send-email-plaes@plaes.org>
- <1446832486-32319-2-git-send-email-plaes@plaes.org>
-Message-ID: <CAGb2v65sPBg7u2JjempZKrCC8vbeywnzg9YJNGR4hxa1=UcA+Q@mail.gmail.com>
+From: drinkcat@chromium.org (Nicolas Boichat)
+Date: Mon,  9 Nov 2015 12:14:51 +0800
+Subject: [PATCH v2] spi: mediatek: single device does not require cs_gpios
+Message-ID: <1447042491-1199-1-git-send-email-drinkcat@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+When only one device is present, it is not necessary to specify
+cs_gpios, as the CS line can be controlled by the hardware
+module.
 
-On Sat, Nov 7, 2015 at 1:54 AM, Priit Laes <plaes@plaes.org> wrote:
-> Add regulator nodes for axp209 using the axp209.dtsi include.
->
-> Signed-off-by: Priit Laes <plaes@plaes.org>
-> ---
-> Changes in v3:
->  - Drop the ohci0 node. It's not needed.
->
-> Changes in v2:
->  - Add the ohci0 node.
->
->
->  arch/arm/boot/dts/sun4i-a10-gemei-g9.dts | 35 ++++++++++++++++++++++++++++----
->  1 file changed, 31 insertions(+), 4 deletions(-)
->
-> diff --git a/arch/arm/boot/dts/sun4i-a10-gemei-g9.dts b/arch/arm/boot/dts/sun4i-a10-gemei-g9.dts
-> index 3f0aeb8..6b4c29d 100644
-> --- a/arch/arm/boot/dts/sun4i-a10-gemei-g9.dts
-> +++ b/arch/arm/boot/dts/sun4i-a10-gemei-g9.dts
-> @@ -72,6 +72,10 @@
->   *   Touchscreen - gt801_2plus1 @ i2c adapter 2 @ 0x48
->   */
->
-> +&cpu0 {
-> +       cpu-supply = <&reg_dcdc2>;
-> +};
-> +
->  &ehci0 {
->         status = "okay";
->  };
-> @@ -86,15 +90,13 @@
->         status = "okay";
->
->         axp209: pmic at 34 {
-> -               compatible = "x-powers,axp209";
->                 reg = <0x34>;
->                 interrupts = <0>;
-> -
-> -               interrupt-controller;
-> -               #interrupt-cells = <1>;
->         };
->  };
->
-> +#include "axp209.dtsi"
-> +
->  &i2c1 {
->         pinctrl-names = "default";
->         pinctrl-0 = <&i2c1_pins_a>;
-> @@ -146,6 +148,31 @@
->         status = "okay";
->  };
->
-> +&reg_dcdc2 {
-> +       regulator-always-on;
-> +       regulator-min-microvolt = <1000000>;
-> +       regulator-max-microvolt = <1400000>;
-> +       regulator-name = "vdd-cpu";
-> +};
-> +
-> +&reg_dcdc3 {
-> +       regulator-always-on;
-> +       regulator-min-microvolt = <1250000>;
-> +       regulator-max-microvolt = <1250000>;
-> +       regulator-name = "vdd-int-dll";
-> +};
+Without this patch, older device tree bindings used before
+37457607 "spi: mediatek: mt8173 spi multiple devices support"
+would cause a panic on boot. This fixes the crash, and
+re-introduces backward compatibility.
 
-The latest consensus for these system critical regulators
-is to use the recommended range from the datasheet. The
-voltage is set by the bootloader and never touched by Linux,
-thus avoiding any mismatch issues.
+Signed-off-by: Nicolas Boichat <drinkcat@chromium.org>
+---
 
-> +
-> +&reg_ldo1 {
-> +       regulator-name = "vdd-rtc";
-> +};
-> +
-> +&reg_ldo2 {
-> +       regulator-always-on;
-> +       regulator-min-microvolt = <3000000>;
-> +       regulator-max-microvolt = <3000000>;
-> +       regulator-name = "avcc";
+v2: Use gpio_is_valid()
 
-That goes for this one as well.
+Applies on top of broonie/spi.git/for-next.
 
+ drivers/spi/spi-mt65xx.c | 26 ++++++++++++++++++--------
+ 1 file changed, 18 insertions(+), 8 deletions(-)
 
-Regards
-ChenYu
-
-> +};
-> +
->  &reg_usb1_vbus {
->         status = "okay";
->  };
-> --
-> 2.6.3
->
+diff --git a/drivers/spi/spi-mt65xx.c b/drivers/spi/spi-mt65xx.c
+index 563954a..7840067 100644
+--- a/drivers/spi/spi-mt65xx.c
++++ b/drivers/spi/spi-mt65xx.c
+@@ -410,7 +410,7 @@ static int mtk_spi_setup(struct spi_device *spi)
+ 	if (!spi->controller_data)
+ 		spi->controller_data = (void *)&mtk_default_chip_info;
+ 
+-	if (mdata->dev_comp->need_pad_sel)
++	if (mdata->dev_comp->need_pad_sel && gpio_is_valid(spi->cs_gpio))
+ 		gpio_direction_output(spi->cs_gpio, !(spi->mode & SPI_CS_HIGH));
+ 
+ 	return 0;
+@@ -632,13 +632,23 @@ static int mtk_spi_probe(struct platform_device *pdev)
+ 			goto err_put_master;
+ 		}
+ 
+-		for (i = 0; i < master->num_chipselect; i++) {
+-			ret = devm_gpio_request(&pdev->dev, master->cs_gpios[i],
+-						dev_name(&pdev->dev));
+-			if (ret) {
+-				dev_err(&pdev->dev,
+-					"can't get CS GPIO %i\n", i);
+-				goto err_put_master;
++		if (!master->cs_gpios && master->num_chipselect > 1) {
++			dev_err(&pdev->dev,
++				"cs_gpios not specified and num_chipselect > 1\n");
++			ret = -EINVAL;
++			goto err_put_master;
++		}
++
++		if (master->cs_gpios) {
++			for (i = 0; i < master->num_chipselect; i++) {
++				ret = devm_gpio_request(&pdev->dev,
++							master->cs_gpios[i],
++							dev_name(&pdev->dev));
++				if (ret) {
++					dev_err(&pdev->dev,
++						"can't get CS GPIO %i\n", i);
++					goto err_put_master;
++				}
+ 			}
+ 		}
+ 	}
+-- 
+2.6.0.rc2.230.g3dd15c0
