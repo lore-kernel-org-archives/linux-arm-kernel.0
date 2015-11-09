@@ -1,90 +1,47 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Mon, 09 Nov 2015 16:16:45 +0200
-Subject: [PATCH 2/2] ARM: shmobile: gose: Configure PFC in DT
-In-Reply-To: <1447032799-13155-3-git-send-email-horms+renesas@verge.net.au>
-References: <1447032799-13155-1-git-send-email-horms+renesas@verge.net.au>
- <1447032799-13155-3-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <9791748.jMTWEhtVrm@avalon>
+From: tony@atomide.com (Tony Lindgren)
+Date: Mon, 9 Nov 2015 06:17:17 -0800
+Subject: [PATCH] Revert "ARM: dts: twl4030: Add iio properties for bci
+ subnode"
+In-Reply-To: <1446826430-3705-1-git-send-email-sre@kernel.org>
+References: <1446826430-3705-1-git-send-email-sre@kernel.org>
+Message-ID: <20151109141716.GD3218@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
-
-On Monday 09 November 2015 10:33:19 Simon Horman wrote:
-> Configure PFC for the already enabled scif and ethernet devices
-> in the device tree for the gose board.
+* Sebastian Reichel <sre@kernel.org> [151106 08:14]:
+> This reverts commit af19161aaed7ff8d1a52b2e517460f2fa0774e32,
+> which breaks the omap3 device tree build due to a wrong reference.
 > 
-> Based on similar work for the koelsch board by Laurent Pinchart and
-> Sergei Shtylyov.
+> I accidently queued this change via the power supply subsystem while
+> telling Marek at the same time, that it should go through Tony's tree.
+> Following that I did miss Stephen's messages about the build failure in
+> linux-next and since he switched to merging an older snapshot nobody
+> else noticed the problem in my tree. I didn't notice myself, since I
+> did not build any device tree files assuming none have changed by me.
 
-I can't really comment on the patch due to lack of a schematics for the Goose 
-board, but it looks good to me in principle.
+Good to hear you figured out how it happened :)
 
-Acked-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
+Acked-by: Tony Lindgren <tony@atomide.com>
 
-> Cc: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-> Cc: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+
+> Signed-off-by: Sebastian Reichel <sre@kernel.org>
 > ---
->  arch/arm/boot/dts/r8a7793-gose.dts | 31 +++++++++++++++++++++++++++++++
->  1 file changed, 31 insertions(+)
+>  arch/arm/boot/dts/twl4030.dtsi | 2 --
+>  1 file changed, 2 deletions(-)
 > 
-> diff --git a/arch/arm/boot/dts/r8a7793-gose.dts
-> b/arch/arm/boot/dts/r8a7793-gose.dts index 96443ec5f6ab..1575ef759047
-> 100644
-> --- a/arch/arm/boot/dts/r8a7793-gose.dts
-> +++ b/arch/arm/boot/dts/r8a7793-gose.dts
-> @@ -37,7 +37,32 @@
->  	clock-frequency = <20000000>;
->  };
+> diff --git a/arch/arm/boot/dts/twl4030.dtsi b/arch/arm/boot/dts/twl4030.dtsi
+> index 482b7aa37808..36ae9160b558 100644
+> --- a/arch/arm/boot/dts/twl4030.dtsi
+> +++ b/arch/arm/boot/dts/twl4030.dtsi
+> @@ -22,8 +22,6 @@
+>  	charger: bci {
+>  		compatible = "ti,twl4030-bci";
+>  		interrupts = <9>, <2>;
+> -		io-channels = <&twl4030_madc 11>;
+> -		io-channel-name = "vac";
+>  		bci3v1-supply = <&vusb3v1>;
+>  	};
+>  
+> -- 
+> 2.6.2
 > 
-> +&pfc {
-> +	scif0_pins: serial0 {
-> +		renesas,groups = "scif0_data_d";
-> +		renesas,function = "scif0";
-> +	};
-> +
-> +	scif1_pins: serial1 {
-> +		renesas,groups = "scif1_data_d";
-> +		renesas,function = "scif1";
-> +	};
-> +
-> +	ether_pins: ether {
-> +		renesas,groups = "eth_link", "eth_mdio", "eth_rmii";
-> +		renesas,function = "eth";
-> +	};
-> +
-> +	phy1_pins: phy1 {
-> +		renesas,groups = "intc_irq0";
-> +		renesas,function = "intc";
-> +	};
-> +};
-> +
->  &ether {
-> +	pinctrl-0 = <&ether_pins &phy1_pins>;
-> +	pinctrl-names = "default";
-> +
->  	phy-handle = <&phy1>;
->  	renesas,ether-link-active-low;
->  	status = "okay";
-> @@ -55,9 +80,15 @@
->  };
-> 
->  &scif0 {
-> +	pinctrl-0 = <&scif0_pins>;
-> +	pinctrl-names = "default";
-> +
->  	status = "okay";
->  };
-> 
->  &scif1 {
-> +	pinctrl-0 = <&scif1_pins>;
-> +	pinctrl-names = "default";
-> +
->  	status = "okay";
->  };
-
--- 
-Regards,
-
-Laurent Pinchart
