@@ -1,26 +1,40 @@
-From: timur@codeaurora.org (Timur Tabi)
-Date: Mon, 9 Nov 2015 07:50:48 -0600
-Subject: [PATCH] acpi: add support for extended IRQ to PCI link
-In-Reply-To: <56403311.2020806@codeaurora.org>
-References: <1446998832-7023-1-git-send-email-okaya@codeaurora.org>
- <56402E23.1070805@linux.intel.com> <56403311.2020806@codeaurora.org>
-Message-ID: <5640A4B8.9020602@codeaurora.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 09 Nov 2015 14:50:47 +0100
+Subject: [PATCH] power: bq27xxx_battery: Revert "Remove unneeded dependency in
+ Kconfig"
+Message-ID: <3819790.E2ziFviWmU@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Sinan Kaya wrote:
->
-> I'm concerned about this though since you warned. This used to consume
-> 1024 bytes now 4096 bytes.
->
-> static int acpi_irq_penalty[ACPI_MAX_IRQS] = {
->      PIRQ_PENALTY_ISA_ALWAYS,    /* IRQ0 timer */
-> ...
-> }
+The dependency was clearly needed, without it it is possible to
+build the core i2c driver as a loadable module and the bq27xxx
+driver built-in, which results in link errors:
 
-As long as it's not ever put on the stack, it should be fine.
+drivers/built-in.o: In function `bq27xxx_battery_i2c_read':
+binder.c:(.text+0x360bf0): undefined reference to `i2c_transfer'
+binder.c:(.text+0x360c10): undefined reference to `i2c_transfer'
+drivers/built-in.o: In function `bq27xxx_battery_init':
+binder.c:(.init.text+0xe668): undefined reference to `i2c_register_driver'
+drivers/built-in.o: In function `bq27xxx_battery_exit':
+binder.c:(.exit.text+0x1a0c): undefined reference to `i2c_del_driver'
 
--- 
-Sent by an employee of the Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the
-Code Aurora Forum, hosted by The Linux Foundation.
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Fixes: 6bd03ce3c12a ("power: bq27xxx_battery: Remove unneeded dependency in Kconfig")
+---
+The bug was originally found and fixed by Xiong Zhou, but Andrew Davis
+broke it again by reverting the fix.
+
+I found it today on my ARM randconfig builds.
+
+diff --git a/drivers/power/Kconfig b/drivers/power/Kconfig
+index 237d7aa73e8c..9f53fb74ae6f 100644
+--- a/drivers/power/Kconfig
++++ b/drivers/power/Kconfig
+@@ -159,6 +159,7 @@ config BATTERY_SBS
+ 
+ config BATTERY_BQ27XXX
+ 	tristate "BQ27xxx battery driver"
++	depends on I2C || I2C=n
+ 	help
+ 	  Say Y here to enable support for batteries with BQ27xxx (I2C/HDQ) chips.
+ 
