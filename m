@@ -1,76 +1,45 @@
-From: jonmason@broadcom.com (Jon Mason)
-Date: Mon, 9 Nov 2015 10:29:53 -0500
-Subject: [PATCH v3 4/4] ARM: BCM: Add SMP support for Broadcom 4708
-In-Reply-To: <563D3AA1.6050508@hauke-m.de>
-References: <1446844273-6460-1-git-send-email-kapilh@broadcom.com>
- <1446844273-6460-5-git-send-email-kapilh@broadcom.com>
- <563D1ED1.6050506@hauke-m.de> <20151106225419.GP8792@broadcom.com>
- <563D3777.3050208@hauke-m.de> <563D3AA1.6050508@hauke-m.de>
-Message-ID: <20151109152953.GH16778@broadcom.com>
+From: js07.lee@gmail.com (Jungseung Lee)
+Date: Tue, 10 Nov 2015 00:35:50 +0900
+Subject: [PATCH] arch:arm:mm:Correction in the boundary check for module
+ end address.
+In-Reply-To: <1447055848-28180-1-git-send-email-shailendra.v@samung.com>
+References: <1447055848-28180-1-git-send-email-shailendra.v@samung.com>
+Message-ID: <CAPP0e=POFR3BmH0jZvtcaWLM_zfLHG1eUcpkLX7dchrZxLigNA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Nov 07, 2015 at 12:41:21AM +0100, Hauke Mehrtens wrote:
-> On 11/07/2015 12:27 AM, Hauke Mehrtens wrote:
-> > On 11/06/2015 11:54 PM, Jon Mason wrote:
-> >> On Fri, Nov 06, 2015 at 10:42:41PM +0100, Hauke Mehrtens wrote:
-> >>> On 11/06/2015 10:11 PM, Kapil Hali wrote:
-> >>>> From: Jon Mason <jonmason@broadcom.com>
-> >>>>
-> >>>> Add SMP support for Broadcom's 4708 SoCs.
-> >>>>
-> >>>> Signed-off-by: Jon Mason <jonmason@broadcom.com>
-> >>>> Acked-by: Hauke Mehrtens <hauke@hauke-m.de>
-> >>>> Tested-by: Hauke Mehrtens <hauke@hauke-m.de>
-> >>>> Signed-off-by: Kapil Hali <kapilh@broadcom.com>
-> >>>
-> >>> I tested this on a Netgear R6250 V1 (BCM4708) and SMP worked.
-> >>>
-> >>>> ---
-> >>>>  arch/arm/boot/dts/bcm4708.dtsi | 2 ++
-> >>>>  arch/arm/mach-bcm/Kconfig      | 1 +
-> >>>>  arch/arm/mach-bcm/Makefile     | 3 +++
-> >>>>  3 files changed, 6 insertions(+)
-> >>>>
-> >>>
-> >>> ...
-> >>>
-> >>>> --- a/arch/arm/mach-bcm/Kconfig
-> >>>> +++ b/arch/arm/mach-bcm/Kconfig
-> >>>> @@ -54,6 +54,7 @@ config ARCH_BCM_NSP
-> >>>>  config ARCH_BCM_5301X
-> >>>>  	bool "Broadcom BCM470X / BCM5301X ARM SoC" if ARCH_MULTI_V7
-> >>>>  	select ARCH_BCM_IPROC
-> >>>
-> >>> You activated ARM_ERRATA_764369 for NSP is this not needed for NS?
-> >>
-> >> I'm not certain the CPU version, and without that it is difficult to
-> >> know what errata's are present in the underlying hardware.  My guess
-> >> is that all present in NSP are present in NS (for UP and SMP).  This
-> >> would put it as:
-> >>         select ARM_ERRATA_754322
-> >>         select ARM_ERRATA_775420
-> >>         select ARM_ERRATA_764369 if SMP
-> >>
-> >> Would you like me to have them added?
-> >>
-> > 
-> > I will send a separate patch adding all the workarounds for erratas in
-> > the CPU core and the cache controller.
-> > 
-> > Hauke
-> > 
-> > 
-> Hi,
-> 
-> BCM4708 uses a Cortex-A9 rev r3p0 and a L2C-310 rev r3p2. For this CPU
-> and cache controller the same workaround are needed as for NSP, if you
-> will resend this patch, please add all of them.
+Hi,
 
-Agreed.  Kapil or I will mod the patch.
+2015-11-09 16:57 GMT+09:00 Shailendra Verma <shailendra.v@samung.com>:
+> From: Shailendra Verma <Shailendra.v@samsung.com>
+>
+> The module end boundary check is not proper.The out of bound value
+> of module end can produce undesired results.
+>
+> Signed-off-by: Shailendra Verma <Shailendra.v@samsung.com>
+> Reviewed-by: Ravikant Bijendra Sharma <ravikant.s2@samsung.com>
+> ---
+>  linux-4.3-rc6/arch/arm/mm/pageattr.c |    2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+>
+> diff --git a/linux-4.3-rc6/arch/arm/mm/pageattr.c b/linux-4.3-rc6/arch/arm/mm/pageattr.c
+> index cf30daf..be7fe4b 100644
+> --- a/linux-4.3-rc6/arch/arm/mm/pageattr.c
+> +++ b/linux-4.3-rc6/arch/arm/mm/pageattr.c
+> @@ -52,7 +52,7 @@ static int change_memory_common(unsigned long addr, int numpages,
+>         if (start < MODULES_VADDR || start >= MODULES_END)
+>                 return -EINVAL;
+>
+> -       if (end < MODULES_VADDR || start >= MODULES_END)
+> +       if (end < MODULES_VADDR || end >= MODULES_END)
+>                 return -EINVAL;
+>
+>         data.set_mask = set_mask;
+> --
+> 1.7.9.5
+>
+Same patch with proper format is already submitted by Hillf.
+https://lkml.org/lkml/2015/5/3/202
 
-Thanks,
-Jon
-
-> 
-> Hauke
+Best Regards,
+Jungseung Lee
