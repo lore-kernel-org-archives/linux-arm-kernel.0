@@ -1,44 +1,63 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Mon, 9 Nov 2015 14:18:40 +0100
-Subject: [PATCH 0/2] mmc: sdhci: potentially bad behavior when using vmmc
- supply
-In-Reply-To: <20151109131437.GB15706@odux.rfo.atmel.com>
+From: ludovic.desroches@atmel.com (Ludovic Desroches)
+Date: Mon, 9 Nov 2015 14:23:05 +0100
+Subject: [PATCH 1/2] mmc: sdhci: set bus voltage before enabling bus power
+In-Reply-To: <1446825570-30029-2-git-send-email-ludovic.desroches@atmel.com>
 References: <1446825570-30029-1-git-send-email-ludovic.desroches@atmel.com>
- <CAPDyKFrNNyUrJemgA2OHL35EqpG74_1i9bCqkVkZZZMxNGrHgw@mail.gmail.com>
- <20151109074104.GB27482@odux.rfo.atmel.com>
- <CAPDyKFpC_mKXei14mdD=AYd6YBU0R4D1R=XWpf7BTgX4JDw24w@mail.gmail.com>
- <20151109102555.GA15706@odux.rfo.atmel.com>
- <CAPDyKFqrPNPrJN=9G7MfA0hVhJMecN0DqbOxqk1J57L819Zm3g@mail.gmail.com>
- <20151109131437.GB15706@odux.rfo.atmel.com>
-Message-ID: <CAPDyKFq_6Ny9hYM_Vta=HqP2KQkyLc3RqZPP9D3Xvp58u0FksA@mail.gmail.com>
+ <1446825570-30029-2-git-send-email-ludovic.desroches@atmel.com>
+Message-ID: <20151109132305.GC15706@odux.rfo.atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 9 November 2015 at 14:14, Ludovic Desroches
-<ludovic.desroches@atmel.com> wrote:
-> On Mon, Nov 09, 2015 at 11:50:50AM +0100, Ulf Hansson wrote:
->> [...]
->>
->> >>
->> >> This doesn't seems like a case where a gpio regulator should be used
->> >> and I am not sure what problem it would solve. Beside to suppress the
->> >> log warnings (actually those aren't warnings but informations).
->> >>
->> >> Isn't sdhci_do_start_signal_voltage_switch() doing what you need here?
->> >>
->> >
->> > It is. I am only wondering the best way to describe the hardware:
->> > - No regulator but I have the 'no vqmmc regulator not found' message which
->> >   is a bit annoying and which can be interpreted as an issue for someone
->> >   who has no knowledge about this stuff.
->>
->> Hmm, should we turn them into debug messages? Both regulators are optional.
->>
->
-> I think so. From my point of view, it is useless to indicate that
-> something optionnal is missing.
+On Fri, Nov 06, 2015 at 04:59:29PM +0100, Ludovic Desroches wrote:
+> When there is a vmmc regulator, only SD Bus Power is set to 1 in the
+> Power Control Register. It means SD Bus Voltage Select field is set to 0
+> that is a reserved value. The SD Host Controller specification says:
+> 'SD Bus Power: Before setting this bit, the SD Host Driver shall set SD
+> Bus Voltage Select.' and 'If the Host Driver selects an unsupported
+> voltage in the SD B?us Voltage Select field, the Host Controller may
+> ignore writes to SD Bus Power and keep its value at zero."
+> 
+> Having an external regulator means the SD Bus Voltage Select is useless
+> but if the Host Controller strictly follows the specification then we
+> need to set a valid value.
 
-Okay. Please go ahead and send a patch.
+Ulf,
 
-Kind regards
-Uffe
+What is your opinion about this patch?
+
+If the 'no regulator found' message is turned in debug message, I can get
+rid of my vmmc regulator but I really think that writing only
+SDHCI_POWER_ON is opposite to the sdhci spec. I would say that not
+setting the bus voltage is a quirk!
+
+Regards
+
+Ludovic
+
+> 
+> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+> ---
+>  drivers/mmc/host/sdhci.c | 7 -------
+>  1 file changed, 7 deletions(-)
+> 
+> diff --git a/drivers/mmc/host/sdhci.c b/drivers/mmc/host/sdhci.c
+> index ac97b46..0cfd7b2 100644
+> --- a/drivers/mmc/host/sdhci.c
+> +++ b/drivers/mmc/host/sdhci.c
+> @@ -1278,13 +1278,6 @@ static void sdhci_set_power(struct sdhci_host *host, unsigned char mode,
+>  		spin_unlock_irq(&host->lock);
+>  		mmc_regulator_set_ocr(mmc, mmc->supply.vmmc, vdd);
+>  		spin_lock_irq(&host->lock);
+> -
+> -		if (mode != MMC_POWER_OFF)
+> -			sdhci_writeb(host, SDHCI_POWER_ON, SDHCI_POWER_CONTROL);
+> -		else
+> -			sdhci_writeb(host, 0, SDHCI_POWER_CONTROL);
+> -
+> -		return;
+>  	}
+>  
+>  	if (mode != MMC_POWER_OFF) {
+> -- 
+> 2.5.0
+> 
