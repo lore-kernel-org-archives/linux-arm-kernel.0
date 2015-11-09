@@ -1,38 +1,82 @@
-From: schwab@suse.de (Andreas Schwab)
-Date: Mon, 09 Nov 2015 15:33:51 +0100
-Subject: [RFC PATCH v6 00/17] ILP32 for ARM64
-In-Reply-To: <5795162.dlSUXvq6vJ@wuerfel> (Arnd Bergmann's message of "Mon, 09
- Nov 2015 15:21:58 +0100")
-References: <1446507046-24604-1-git-send-email-ynorov@caviumnetworks.com>
- <20151105221842.GA30634@yury-N73SV> <mvmlha71f2o.fsf@hawking.suse.de>
- <5795162.dlSUXvq6vJ@wuerfel>
-Message-ID: <mvmh9kv1bu8.fsf@hawking.suse.de>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 09 Nov 2015 15:33:34 +0100
+Subject: [PATCH V2 1/3] scsi: mptxsas: try 64 bit DMA when 32 bit DMA fails
+In-Reply-To: <5640A8A8.90203@codeaurora.org>
+References: <1447034266-28003-1-git-send-email-okaya@codeaurora.org>
+ <4041362.9GKaSPm9gs@wuerfel> <5640A8A8.90203@codeaurora.org>
+Message-ID: <6940177.lD0iNnWRJy@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd Bergmann <arnd@arndb.de> writes:
+On Monday 09 November 2015 09:07:36 Sinan Kaya wrote:
+> 
+> On 11/9/2015 3:59 AM, Arnd Bergmann wrote:
+> > On Monday 09 November 2015 08:09:39 Hannes Reinecke wrote:
+> >> On 11/09/2015 02:57 AM, Sinan Kaya wrote:
+> >>> Current code gives up when 32 bit DMA is not supported.
+> >>> This problem has been observed on systems without any
+> >>> memory below 4 gig.
+> >>>
+> >>> This patch tests 64 bit support before bailing out to find
+> >>> a working combination.
+> >>>
+> >> That feels decidedly odd.
+> >>
+> >> Why do you probe for 64bit if 32bit fails?
+> >
+> > 32-bit DMA mask on PCI cannot fail, we rely on that in all sorts
+> > of places. If the machine has all of its RAM visible above 4GB
+> > PCI bus addresses, it must use an IOMMU.
+> 
+> Can you be specific? PCIe does not have this limitation. It supports 32 
+> bit and 64 bit TLPs.
+> 
+> I have not seen any limitation so far in the OS either.
 
-> On Monday 09 November 2015 14:23:59 Andreas Schwab wrote:
->> Yury Norov <ynorov@caviumnetworks.com> writes:
->> 
->> > This is what I run:
->> > https://github.com/norov/glibc/tree/thunderx-ilp32-32time_toff_t
->> 
->> That doesn't work for me:
->> 
->> ../sysdeps/unix/sysv/linux/generic/sysdep.h:24:22: error: ?__NR_llseek? undeclar
->> ed (first use in this function)
->> ../sysdeps/unix/sysv/linux/aarch64/sysdep.h:41:32: error: ?__NR_fcntl64? undeclared (first use in this function)
->> 
->
-> Did you re-export the kernel headers that you use as the base?
+See Documentation/DMA-API-HOWTO.txt
 
-I'm using the patched 4.3 kernel headers.  Why is <asm/bitsperlong.h>
-defining __BITS_PER_LONG to 64 unconditionally?
+All PCI devices start out with a 32-bit DMA mask, and Linux assumes it
+can always fall back to a 32-bit mask if a smaller mask (needed for
+some devices that only support DMA on a subset of the 4GB) or larger
+mask (needed to address high memory but can fail when the PCI host
+does not support it) cannot be set.
 
-Andreas.
+> Using IOMMU is fine but not required if the endpoint is a true 64 bit 
+> supporting endpoint. This endpoint supports 64bit too.
 
--- 
-Andreas Schwab, SUSE Labs, schwab at suse.de
-GPG Key fingerprint = 0196 BAD8 1CE9 1970 F4BE  1748 E4D4 88E3 0EEA B9D7
-"And now for something completely different."
+There are two aspects here:
+
+a) setting a 32-bit mask should not have failed. Any device that actually
+   needs 32-bit DMA will make the same call and the platform must
+   guarantee that this works. If you have a broken platform that can't
+   do this, complain to your board vendor so they wire up the RAM
+   properly, with at least the first 2GB visible to low PCI bus
+   addresses.
+
+b) If the platform has any memory above 4GB and the supports high DMA,
+   it should never have asked for the 32-bit mask before trying the
+   64-bit mask first. This is only a performance optimization, but the
+   driver seems to do the right thing, so I assume there is something
+   wrong with the platform code.
+
+> >> Typically it's the other way round, on the grounds that 64bit DMA
+> >> should be preferred over 32bit.
+> >> Can you explain why it needs to be done the other way round here?
+> >
+> > Something else is odd here, the driver already checks for
+> > dma_get_required_mask(), which will return the smallest mask
+> > that fits all of RAM. If the machine has any memory above 4GB,
+> > it already uses the 64-bit mask, and only falls back to
+> > the 32-bit mask if that fails or if all memory fits within the
+> > first 4GB.
+> >
+> 
+> I'll add some prints in the code to get to the bottom of it. I think the 
+> code is checking more than just the required mask and failing in one of 
+> the other conditions. At least that DMA comparison code was more than 
+> what I have ever seen.
+
+Ok. That should take care of b) above, but we still have a bug with a)
+that will come back to bite you if you don't address it right.
+
+	Arnd
