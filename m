@@ -1,36 +1,33 @@
 From: yang.shi@linaro.org (Yang Shi)
-Date: Mon,  9 Nov 2015 09:43:56 -0800
-Subject: [PATCH 1/2] arm64: remove redundant FRAME_POINTER kconfig option
+Date: Mon,  9 Nov 2015 09:43:57 -0800
+Subject: [PATCH 2/2] arm64: force to select FRAME_POINTER
 In-Reply-To: <1447091037-11434-1-git-send-email-yang.shi@linaro.org>
 References: <1447091037-11434-1-git-send-email-yang.shi@linaro.org>
-Message-ID: <1447091037-11434-2-git-send-email-yang.shi@linaro.org>
+Message-ID: <1447091037-11434-3-git-send-email-yang.shi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-FRAME_POINTER is defined in lib/Kconfig.debug, it is unnecessary to redefine
-it in arch/arm64/Kconfig.debug. Actually, the one defined in arm64 directory
-is never used.
-This adds a dependency on DEBUG_KERNEL for building with frame pointers.
+ARM64 depends on frame pointer to get correct stack backtrace and need
+FRAME_POINTER kconfig option enabled all the time.
+However, currect implementation makes it could be disabled, so force it
+to be selected by ARM64.
 
 Signed-off-by: Yang Shi <yang.shi@linaro.org>
 ---
- arch/arm64/Kconfig.debug | 4 ----
- 1 file changed, 4 deletions(-)
+ arch/arm64/Kconfig | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm64/Kconfig.debug b/arch/arm64/Kconfig.debug
-index d6285ef..915dea7 100644
---- a/arch/arm64/Kconfig.debug
-+++ b/arch/arm64/Kconfig.debug
-@@ -2,10 +2,6 @@ menu "Kernel hacking"
- 
- source "lib/Kconfig.debug"
- 
--config FRAME_POINTER
--	bool
--	default y
--
- config ARM64_PTDUMP
- 	bool "Export kernel pagetable layout to userspace via debugfs"
- 	depends on DEBUG_KERNEL
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 440d906..b554da2 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -27,6 +27,7 @@ config ARM64
+ 	select CPU_PM if (SUSPEND || CPU_IDLE)
+ 	select DCACHE_WORD_ACCESS
+ 	select EDAC_SUPPORT
++	select FRAME_POINTER
+ 	select GENERIC_ALLOCATOR
+ 	select GENERIC_CLOCKEVENTS
+ 	select GENERIC_CLOCKEVENTS_BROADCAST
 -- 
 2.0.2
