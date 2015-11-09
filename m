@@ -1,34 +1,33 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Mon, 9 Nov 2015 18:08:49 +0100
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 09 Nov 2015 18:12:02 +0100
 Subject: [PATCH] mvneta: add FIXED_PHY dependency
-In-Reply-To: <6910088.dNmooXDTJR@wuerfel>
-References: <4225885.EYXTHjRPmX@wuerfel> <20151109164232.GB3388@lunn.ch>
- <6910088.dNmooXDTJR@wuerfel>
-Message-ID: <20151109170849.GC3388@lunn.ch>
+In-Reply-To: <20151109170834.GE8644@n2100.arm.linux.org.uk>
+References: <4225885.EYXTHjRPmX@wuerfel> <6910088.dNmooXDTJR@wuerfel>
+ <20151109170834.GE8644@n2100.arm.linux.org.uk>
+Message-ID: <4827390.CWKT8ytt79@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> > I suppose it comes down to, are we allowed to optionally implement
-> > part of the DT binding?
+On Monday 09 November 2015 17:08:34 Russell King - ARM Linux wrote:
+> They are "optional" because when you're using a DSA switch, you don't
+> specify a PHY (because, there isn't one).  For example, this is what
+> I'm using with an Armada 388 board with a Marvell DSA switch.  The
+> DSA does not appear as a PHY, and no node in the DSA stanza can be
+> referenced for a phy entry in the ethernet device's stanza.
 > 
-> I'm not sure what you are asking. A lot of DT bindings have both
-> optional and mandatory properties. For mvneta, the "phy" and "phy-mode"
-> properties are listed as mandatory, so the driver can safely assume
-> that they are always present. If there are reasons to leave them out,
-> and for the driver to handle that case correctly, the binding
-> should be updated to mark them as optional.
+>                         eth1: ethernet at 30000 {
+>                                 compatible = "marvell,armada-370-neta";
+>                                 reg = <0x30000 0x4000>;
+>                                 interrupts-extended = <&mpic 10>;
+>                                 clocks = <&gateclk 3>;
+>                                 managed = "in-band-status";
+>                                 phy-mode = "sgmii";
+>                                 status = "okay";
+>                         };
+> 
+> 
 
-Hi Arnd
+Ok, then it would be nice to change the binding to reflect that,
+and also document the "managed" property there.
 
-You are looking at it from the perspective of the driver. I was
-meaning from the perspective of the DT blob. Can be blob assume the
-driver implements all of the binding, all of the time?
-
-You use fixed-phy when the MAC is connected to a switch, not a phy. Or
-when the MAC is connected to an SFP module. The driver can currently
-be built to not implement the fixed-phy party of the binding. Is that
-O.K. from the perspective of the DT blob? Or should the driver always
-implement all of the binding, in which these NOP stubs should be
-removed and fixed phy always be enabled for the drivers that use it.
-
-	Andrew
+	Arnd
