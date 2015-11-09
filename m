@@ -1,39 +1,28 @@
-From: haibo.chen@freescale.com (Haibo Chen)
-Date: Mon, 9 Nov 2015 21:28:24 +0800
-Subject: [PATCH v2 4/4] ARM: dts: imx7d-sdb: add ADC support
-In-Reply-To: <1447075704-4605-1-git-send-email-haibo.chen@freescale.com>
-References: <1447075704-4605-1-git-send-email-haibo.chen@freescale.com>
-Message-ID: <1447075704-4605-5-git-send-email-haibo.chen@freescale.com>
+From: timur@codeaurora.org (Timur Tabi)
+Date: Mon, 9 Nov 2015 07:48:25 -0600
+Subject: [PATCH V3 3/4] dmaselftest: add memcpy selftest support functions
+In-Reply-To: <56400909.2090300@codeaurora.org>
+References: <1446958380-23298-1-git-send-email-okaya@codeaurora.org>
+ <1446958380-23298-4-git-send-email-okaya@codeaurora.org>
+ <563EDA15.7070606@codeaurora.org> <56400909.2090300@codeaurora.org>
+Message-ID: <5640A429.6090302@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add ADC support for imx7d-sdb board.
+Sinan Kaya wrote:
+>>
+>> And why kmalloc anyway?  Why not leave it on the stack?
+>>
+>>      char src[] = "hello world";
+>>
+>> ?
+>
+> I need to call dma_map_single on this address to convert it to a DMA
+> address. That's why.
 
-Signed-off-by: Haibo Chen <haibo.chen@freescale.com>
----
- arch/arm/boot/dts/imx7d-sdb.dts | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+And you can't do that with an object that's on the stack?
 
-diff --git a/arch/arm/boot/dts/imx7d-sdb.dts b/arch/arm/boot/dts/imx7d-sdb.dts
-index 432aaf5..b2c4536 100644
---- a/arch/arm/boot/dts/imx7d-sdb.dts
-+++ b/arch/arm/boot/dts/imx7d-sdb.dts
-@@ -97,6 +97,16 @@
- 	};
- };
- 
-+&adc1 {
-+	vref-supply = <&reg_vref_1v8>;
-+	status = "okay";
-+};
-+
-+&adc2 {
-+	vref-supply = <&reg_vref_1v8>;
-+	status = "okay";
-+};
-+
- &cpu0 {
- 	arm-supply = <&sw1a_reg>;
- };
 -- 
-1.9.1
+Sent by an employee of the Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the
+Code Aurora Forum, hosted by The Linux Foundation.
