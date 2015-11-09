@@ -1,68 +1,45 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Mon, 9 Nov 2015 09:07:36 -0500
-Subject: [PATCH V2 1/3] scsi: mptxsas: try 64 bit DMA when 32 bit DMA fails
-In-Reply-To: <4041362.9GKaSPm9gs@wuerfel>
-References: <1447034266-28003-1-git-send-email-okaya@codeaurora.org>
- <1447034266-28003-2-git-send-email-okaya@codeaurora.org>
- <564046B3.8090505@suse.de> <4041362.9GKaSPm9gs@wuerfel>
-Message-ID: <5640A8A8.90203@codeaurora.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 09 Nov 2015 15:08:57 +0100
+Subject: [PATCH] mvneta: add FIXED_PHY dependency
+Message-ID: <4225885.EYXTHjRPmX@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The fixed_phy infrastructure is done in a way that is optional,
+by providing 'static inline' helper functions doing nothing in
+include/linux/phy_fixed.h for all its APIs. However, three out
+of the four users (DSA, BCMGENET, and SYSTEMPORT) always
+'select FIXED_PHY', presumably because they need that.
+MVNETA is the fourth one, and if that is built-in but FIXED_PHY
+is configured as a loadable module, we get a link error:
 
+drivers/built-in.o: In function `mvneta_fixed_link_update':
+fpga-mgr.c:(.text+0x33ed80): undefined reference to `fixed_phy_update_state'
 
-On 11/9/2015 3:59 AM, Arnd Bergmann wrote:
-> On Monday 09 November 2015 08:09:39 Hannes Reinecke wrote:
->> On 11/09/2015 02:57 AM, Sinan Kaya wrote:
->>> Current code gives up when 32 bit DMA is not supported.
->>> This problem has been observed on systems without any
->>> memory below 4 gig.
->>>
->>> This patch tests 64 bit support before bailing out to find
->>> a working combination.
->>>
->> That feels decidedly odd.
->>
->> Why do you probe for 64bit if 32bit fails?
->
-> 32-bit DMA mask on PCI cannot fail, we rely on that in all sorts
-> of places. If the machine has all of its RAM visible above 4GB
-> PCI bus addresses, it must use an IOMMU.
+Presumably this driver has the same dependency as the others,
+so this patch also uses 'select' to ensure that the fixed-phy
+support is built-in.
 
-Can you be specific? PCIe does not have this limitation. It supports 32 
-bit and 64 bit TLPs.
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Fixes: 898b2970e2c9 ("mvneta: implement SGMII-based in-band link state signaling")
+---
+Found using ARM randconfig tests. An alternative here would be
+to use 'depends on FIXED_PHY || FIXED_PHY=n', I picked the 'select'
+approach for consistency.
 
-I have not seen any limitation so far in the OS either.
+Should we perhaps make 'FIXED_PHY' a silent option and remove the
+inline helpers, based on the assumption that a driver that wants these
+will not work without them?
 
-Using IOMMU is fine but not required if the endpoint is a true 64 bit 
-supporting endpoint. This endpoint supports 64bit too.
-
->
->> Typically it's the other way round, on the grounds that 64bit DMA
->> should be preferred over 32bit.
->> Can you explain why it needs to be done the other way round here?
->
-> Something else is odd here, the driver already checks for
-> dma_get_required_mask(), which will return the smallest mask
-> that fits all of RAM. If the machine has any memory above 4GB,
-> it already uses the 64-bit mask, and only falls back to
-> the 32-bit mask if that fails or if all memory fits within the
-> first 4GB.
->
-
-I'll add some prints in the code to get to the bottom of it. I think the 
-code is checking more than just the required mask and failing in one of 
-the other conditions. At least that DMA comparison code was more than 
-what I have ever seen.
-
-
-> So both the description and the patch are wrong. :(
->
-> 	Arnd
->
-
--- 
-Sinan Kaya
-Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a 
-Linux Foundation Collaborative Project
+diff --git a/drivers/net/ethernet/marvell/Kconfig b/drivers/net/ethernet/marvell/Kconfig
+index 80af9ffce5ea..a1c862b4664d 100644
+--- a/drivers/net/ethernet/marvell/Kconfig
++++ b/drivers/net/ethernet/marvell/Kconfig
+@@ -44,6 +44,7 @@ config MVNETA
+ 	tristate "Marvell Armada 370/38x/XP network interface support"
+ 	depends on PLAT_ORION
+ 	select MVMDIO
++	select FIXED_PHY
+ 	---help---
+ 	  This driver supports the network interface units in the
+ 	  Marvell ARMADA XP, ARMADA 370 and ARMADA 38x SoC family.
