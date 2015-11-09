@@ -1,33 +1,39 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 9 Nov 2015 09:08:08 +0100
-Subject: [PATCH v6 00/12] arm64: renesas: add sound support
-In-Reply-To: <20151109012943.GF4832@verge.net.au>
-References: <87egg3k5g6.wl%kuninori.morimoto.gx@renesas.com>
- <20151109012943.GF4832@verge.net.au>
-Message-ID: <CAMuHMdXBQNCibJU4EDuFZX0zRzUZfC_4KTyXFNVLL81a51Q4RA@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 9 Nov 2015 08:17:09 +0000
+Subject: [PATCH] ARM/arm64: KVM: test properly for a PTE's uncachedness
+In-Reply-To: <1446810188-13727-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1446810188-13727-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20151109081709.2512e683@why.wild-wind.fr.eu.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
+On Fri, 6 Nov 2015 12:43:08 +0100
+Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
 
-On Mon, Nov 9, 2015 at 2:29 AM, Simon Horman <horms@verge.net.au> wrote:
->>       arm64: renesas: salvator-x: Sound SSI PIO support
->
-> The above patch seemed to have some fuzz. Please check that
-> I resolved that correctly.
+> The open coded tests for checking whether a PTE maps a page as
+> uncached use a flawed 'pte_val(xxx) & CONST != CONST' pattern,
+> which is not guaranteed to work since the type of a mapping is an
+> index into the MAIR table, not a set of mutually exclusive bits.
+> 
+> Considering that, on arm64, the S2 type definitions use the following
+> MAIR indexes
+> 
+>     #define MT_S2_NORMAL            0xf
+>     #define MT_S2_DEVICE_nGnRE      0x1
+> 
+> we have been getting lucky merely because the S2 device mappings also
+> have the PTE_UXN bit set, which means that a device PTE still does not
+> equal a normal PTE after masking with the former type.
+> 
+> Instead, implement proper checking against the MAIR indexes that are
+> known to define uncached memory attributes.
+> 
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
-The ak4613 node is now a child node of scif2 instead of i2c2, which is
-definitely not correct.
+Very well spotted, thanks Ard!
 
-"git diff topic/r8a7795-sound-v5..topic/r8a7795-sound-v6" will show you.
+Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
 
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+	M.
+-- 
+Without deviation from the norm, progress is not possible.
