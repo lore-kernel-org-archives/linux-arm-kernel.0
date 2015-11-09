@@ -1,48 +1,117 @@
-From: wxt@rock-chips.com (Caesar Wang)
-Date: Mon,  9 Nov 2015 12:49:02 +0800
-Subject: [PATCH v4 10/10] arm64: dts: Enable the Thermal on R88 board
-In-Reply-To: <1447044542-30859-1-git-send-email-wxt@rock-chips.com>
-References: <1447044542-30859-1-git-send-email-wxt@rock-chips.com>
-Message-ID: <1447044542-30859-11-git-send-email-wxt@rock-chips.com>
+From: jiang.liu@linux.intel.com (Jiang Liu)
+Date: Mon, 9 Nov 2015 13:24:51 +0800
+Subject: [PATCH] acpi: add support for extended IRQ to PCI link
+In-Reply-To: <1446998832-7023-1-git-send-email-okaya@codeaurora.org>
+References: <1446998832-7023-1-git-send-email-okaya@codeaurora.org>
+Message-ID: <56402E23.1070805@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch enable the TS-ADC.
+On 2015/11/9 0:07, Sinan Kaya wrote:
+> The ACPI compiler uses the extended format when
+> used interrupt numbers are greater than 256.
+> The PCI link code currently only supports simple
+> interrupt format. The IRQ numbers are represented
+> using 32 bits when extended IRQ syntax. This patch
+> changes the interrupt number type to 32 bits and
+> places an upper limit of 1020 as possible interrupt
+> id. Additional checks have been placed to prevent
+> out of bounds writes.
+> 
+> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
+> ---
+>  drivers/acpi/pci_link.c | 35 ++++++++++++++++++++++-------------
+>  1 file changed, 22 insertions(+), 13 deletions(-)
+> 
+> diff --git a/drivers/acpi/pci_link.c b/drivers/acpi/pci_link.c
+> index 7c8408b..18a9190 100644
+> --- a/drivers/acpi/pci_link.c
+> +++ b/drivers/acpi/pci_link.c
+> @@ -1,6 +1,7 @@
+>  /*
+>   *  pci_link.c - ACPI PCI Interrupt Link Device Driver ($Revision: 34 $)
+>   *
+> + *  Copyright (c) 2015, The Linux Foundation. All rights reserved.
+>   *  Copyright (C) 2001, 2002 Andy Grover <andrew.grover@intel.com>
+>   *  Copyright (C) 2001, 2002 Paul Diefenbaugh <paul.s.diefenbaugh@intel.com>
+>   *  Copyright (C) 2002       Dominik Brodowski <devel@brodo.de>
+> @@ -67,12 +68,12 @@ static struct acpi_scan_handler pci_link_handler = {
+>   * later even the link is disable. Instead, we just repick the active irq
+>   */
+>  struct acpi_pci_link_irq {
+> -	u8 active;		/* Current IRQ */
+> +	u32 active;		/* Current IRQ */
+>  	u8 triggering;		/* All IRQs */
+>  	u8 polarity;		/* All IRQs */
+>  	u8 resource_type;
+>  	u8 possible_count;
+> -	u8 possible[ACPI_PCI_LINK_MAX_POSSIBLE];
+> +	u32 possible[ACPI_PCI_LINK_MAX_POSSIBLE];
+>  	u8 initialized:1;
+>  	u8 reserved:7;
+>  };
+Hi Sinan,
+	This data structure become some sort of big, any idea to reduce
+memory consumption?
+Thanks,
+Gerry
 
-When a thermal temperature is invoked use the CRU to reset the chip
-on R88 board. TSHUT is low active on this board.
-
-Signed-off-by: Caesar Wang <wxt@rock-chips.com>
-Acked-by: Eduardo Valentin <edubezval@gmail.com>
-
----
-
-Changes in v4:
-- Missing the ";" caused compile error.
-
-Changes in v3: None
-Changes in v2: None
-Changes in v1: None
-
- arch/arm64/boot/dts/rockchip/rk3368-r88.dts | 6 ++++++
- 1 file changed, 6 insertions(+)
-
-diff --git a/arch/arm64/boot/dts/rockchip/rk3368-r88.dts b/arch/arm64/boot/dts/rockchip/rk3368-r88.dts
-index 401a812..104cbee 100644
---- a/arch/arm64/boot/dts/rockchip/rk3368-r88.dts
-+++ b/arch/arm64/boot/dts/rockchip/rk3368-r88.dts
-@@ -336,6 +336,12 @@
- 	status = "okay";
- };
- 
-+&tsadc {
-+	rockchip,hw-tshut-mode = <0>; /* tshut mode 0:CRU 1:GPIO */
-+	rockchip,hw-tshut-polarity = <0>; /* tshut polarity 0:LOW 1:HIGH */
-+	status = "okay";
-+};
-+
- &uart2 {
- 	status = "okay";
- };
--- 
-1.9.1
+> @@ -437,7 +438,7 @@ static int acpi_pci_link_set(struct acpi_pci_link *link, int irq)
+>   * enabled system.
+>   */
+>  
+> -#define ACPI_MAX_IRQS		256
+> +#define ACPI_MAX_IRQS		1020
+>  #define ACPI_MAX_ISA_IRQ	16
+>  
+>  #define PIRQ_PENALTY_PCI_AVAILABLE	(0)
+> @@ -493,7 +494,8 @@ int __init acpi_irq_penalty_init(void)
+>  					    penalty;
+>  			}
+>  
+> -		} else if (link->irq.active) {
+> +		} else if (link->irq.active &&
+> +			(link->irq.active < ACPI_MAX_IRQS)) {
+>  			acpi_irq_penalty[link->irq.active] +=
+>  			    PIRQ_PENALTY_PCI_POSSIBLE;
+>  		}
+> @@ -542,14 +544,19 @@ static int acpi_pci_link_allocate(struct acpi_pci_link *link)
+>  		irq = link->irq.possible[link->irq.possible_count - 1];
+>  
+>  	if (acpi_irq_balance || !link->irq.active) {
+> -		/*
+> -		 * Select the best IRQ.  This is done in reverse to promote
+> -		 * the use of IRQs 9, 10, 11, and >15.
+> -		 */
+> -		for (i = (link->irq.possible_count - 1); i >= 0; i--) {
+> -			if (acpi_irq_penalty[irq] >
+> -			    acpi_irq_penalty[link->irq.possible[i]])
+> -				irq = link->irq.possible[i];
+> +
+> +		if (irq < ACPI_MAX_IRQS) {
+> +			/*
+> +			 * Select the best IRQ.  This is done in reverse to
+> +			 * promote the use of IRQs 9, 10, 11, and >15.
+> +			 */
+> +			for (i = (link->irq.possible_count - 1); i >= 0;
+> +				i--) {
+> +				if ((link->irq.possible[i] < ACPI_MAX_IRQS) &&
+> +				    (acpi_irq_penalty[irq] >
+> +				    acpi_irq_penalty[link->irq.possible[i]]))
+> +					irq = link->irq.possible[i];
+> +			}
+>  		}
+>  	}
+>  	if (acpi_irq_penalty[irq] >= PIRQ_PENALTY_ISA_ALWAYS) {
+> @@ -568,7 +575,9 @@ static int acpi_pci_link_allocate(struct acpi_pci_link *link)
+>  			    acpi_device_bid(link->device));
+>  		return -ENODEV;
+>  	} else {
+> -		acpi_irq_penalty[link->irq.active] += PIRQ_PENALTY_PCI_USING;
+> +		if (link->irq.active < ACPI_MAX_IRQS)
+> +			acpi_irq_penalty[link->irq.active] +=
+> +				PIRQ_PENALTY_PCI_USING;
+>  		printk(KERN_WARNING PREFIX "%s [%s] enabled at IRQ %d\n",
+>  		       acpi_device_name(link->device),
+>  		       acpi_device_bid(link->device), link->irq.active);
+> 
