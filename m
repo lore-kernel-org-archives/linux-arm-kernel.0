@@ -1,38 +1,39 @@
-From: hare@suse.de (Hannes Reinecke)
-Date: Mon, 09 Nov 2015 08:15:40 +0100
-Subject: [PATCH V2 3/3] scsi: mptxsas: offload IRQ execution
-In-Reply-To: <1447034266-28003-4-git-send-email-okaya@codeaurora.org>
-References: <1447034266-28003-1-git-send-email-okaya@codeaurora.org>
- <1447034266-28003-4-git-send-email-okaya@codeaurora.org>
-Message-ID: <5640481C.9000505@suse.de>
+From: sugar.zhang@rock-chips.com (sugar)
+Date: Mon, 9 Nov 2015 15:21:53 +0800
+Subject: [PATCH v3 1/3] ASoC: rockchip: i2s: add 8 channels capture support
+In-Reply-To: <20151106120020.GH18409@sirena.org.uk>
+References: <1446773891-32174-1-git-send-email-sugar.zhang@rock-chips.com>
+ <1446773891-32174-2-git-send-email-sugar.zhang@rock-chips.com>
+ <20151106120020.GH18409@sirena.org.uk>
+Message-ID: <56404991.6000505@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/09/2015 02:57 AM, Sinan Kaya wrote:
-> The mpt2sas and mpt3sas drivers are spinning forever in
-> their IRQ handlers if there are a lot of jobs queued up
-> by the PCIe card. This handler is causing spikes for
-> the rest of the system and sluggish behavior.
-> 
-> Marking all MSI interrupts as non-shared and moving the
-> MSI interrupts to thread context. This relexes the rest
-> of the system execution.
-> 
-NACK.
 
-If there is a scalability issue when handling interrupts
-it should be fixed in the driver directly.
 
-Looking at the driver is should be possible to implement
-a worker thread handling the reply descriptor, and having the
-interrupt only to fetch the reply descriptor.
+On 11/6/2015 20:00, Mark Brown wrote:
+> On Fri, Nov 06, 2015 at 09:38:09AM +0800, Sugar Zhang wrote:
+>
+>> +	/* refine capture channels */
+>> +	if (!of_property_read_u32(node, "rockchip,capture-channels", &val)) {
+>> +		if (val >= 2 && val <= 8)
+>> +			rockchip_i2s_dai.capture.channels_max = val;
+>> +		else
+>> +			rockchip_i2s_dai.capture.channels_max = 2;
+>> +	}
+>
+> You should make a copy of the rockchip_i2s_dai struct in your driver
+> data and modify that rather than modifying the original - what happens
+> if sommeone makes a SoC with two I2S DAIs, one with many channels and
+> another with only two?  Samsung SoCs often have an arrangement like that
+> for exmaple.
+>
 
-Cheers,
-
-Hannes
--- 
-Dr. Hannes Reinecke		               zSeries & Storage
-hare at suse.de			               +49 911 74053 688
-SUSE LINUX GmbH, Maxfeldstr. 5, 90409 N?rnberg
-GF: F. Imend?rffer, J. Smithard, J. Guild, D. Upmanyu, G. Norton
-HRB 21284 (AG N?rnberg)
+Yes, I agree, because this patch was merged into mainline, I will post a 
+new one based on the latest code to fix this, thanks.
+>
+> _______________________________________________
+> Linux-rockchip mailing list
+> Linux-rockchip at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-rockchip
+>
