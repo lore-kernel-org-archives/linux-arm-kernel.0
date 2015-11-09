@@ -1,47 +1,79 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Mon, 9 Nov 2015 06:17:17 -0800
-Subject: [PATCH] Revert "ARM: dts: twl4030: Add iio properties for bci
- subnode"
-In-Reply-To: <1446826430-3705-1-git-send-email-sre@kernel.org>
-References: <1446826430-3705-1-git-send-email-sre@kernel.org>
-Message-ID: <20151109141716.GD3218@atomide.com>
+From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
+Date: Mon, 09 Nov 2015 16:18:48 +0200
+Subject: [RFC/PATCH] media: omap3isp: Set maximum DMA segment size
+In-Reply-To: <1444742316-27986-1-git-send-email-laurent.pinchart@ideasonboard.com>
+References: <1444742316-27986-1-git-send-email-laurent.pinchart@ideasonboard.com>
+Message-ID: <1560214.1Y1q0qLZA4@avalon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Sebastian Reichel <sre@kernel.org> [151106 08:14]:
-> This reverts commit af19161aaed7ff8d1a52b2e517460f2fa0774e32,
-> which breaks the omap3 device tree build due to a wrong reference.
+Hello everybody,
+
+Ping ?
+
+On Tuesday 13 October 2015 16:18:36 Laurent Pinchart wrote:
+> The maximum DMA segment size controls the IOMMU mapping granularity. Its
+> default value is 64kB, resulting in potentially non-contiguous IOMMU
+> mappings. Configure it to 4GB to ensure that buffers get mapped
+> contiguously.
 > 
-> I accidently queued this change via the power supply subsystem while
-> telling Marek at the same time, that it should go through Tony's tree.
-> Following that I did miss Stephen's messages about the build failure in
-> linux-next and since he switched to merging an older snapshot nobody
-> else noticed the problem in my tree. I didn't notice myself, since I
-> did not build any device tree files assuming none have changed by me.
-
-Good to hear you figured out how it happened :)
-
-Acked-by: Tony Lindgren <tony@atomide.com>
-
-
-> Signed-off-by: Sebastian Reichel <sre@kernel.org>
+> Signed-off-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
 > ---
->  arch/arm/boot/dts/twl4030.dtsi | 2 --
->  1 file changed, 2 deletions(-)
+>  drivers/media/platform/omap3isp/isp.c | 4 ++++
+>  drivers/media/platform/omap3isp/isp.h | 1 +
+>  2 files changed, 5 insertions(+)
 > 
-> diff --git a/arch/arm/boot/dts/twl4030.dtsi b/arch/arm/boot/dts/twl4030.dtsi
-> index 482b7aa37808..36ae9160b558 100644
-> --- a/arch/arm/boot/dts/twl4030.dtsi
-> +++ b/arch/arm/boot/dts/twl4030.dtsi
-> @@ -22,8 +22,6 @@
->  	charger: bci {
->  		compatible = "ti,twl4030-bci";
->  		interrupts = <9>, <2>;
-> -		io-channels = <&twl4030_madc 11>;
-> -		io-channel-name = "vac";
->  		bci3v1-supply = <&vusb3v1>;
->  	};
->  
-> -- 
-> 2.6.2
+> I'm posting this as an RFC because I'm not happy with the patch, even if it
+> gets the job done.
 > 
+> On ARM the maximum DMA segment size is used when creating IOMMU mappings. As
+> a large number of devices require contiguous memory buffers (this is a very
+> common requirement for video-related embedded devices) the default 64kB
+> value doesn't work.
+> 
+> I haven't investigated the history behind this API in details but I have a
+> feeling something is not quite right. We force most drivers to explicitly
+> set the maximum segment size from a default that seems valid for specific
+> use cases only. Furthermore, as the DMA parameters are not stored directly
+> in struct device this require allocation of external memory for which we
+> have no proper management rule, making automatic handling of the DMA
+> parameters in frameworks or helper functions cumbersome (for a discussion
+> on this topic see http://www.spinics.net/lists/linux-media/msg92467.html
+> and http://lists.infradead.org/pipermail/linux-arm-kernel/2014-> November/305913.html).
+> 
+> Is it time to fix this mess ?
+> 
+> diff --git a/drivers/media/platform/omap3isp/isp.c
+> b/drivers/media/platform/omap3isp/isp.c index 17430a6ed85a..ebf7dc76e94d
+> 100644
+> --- a/drivers/media/platform/omap3isp/isp.c
+> +++ b/drivers/media/platform/omap3isp/isp.c
+> @@ -2444,6 +2444,10 @@ static int isp_probe(struct platform_device *pdev)
+>  	if (ret)
+>  		goto error;
+> 
+> +	isp->dev->dma_parms = &isp->dma_parms;
+> +	dma_set_max_seg_size(isp->dev, DMA_BIT_MASK(32));
+> +	dma_set_seg_boundary(isp->dev, 0xffffffff);
+> +
+>  	platform_set_drvdata(pdev, isp);
+> 
+>  	/* Regulators */
+> diff --git a/drivers/media/platform/omap3isp/isp.h
+> b/drivers/media/platform/omap3isp/isp.h index e579943175c4..4b2231cf01be
+> 100644
+> --- a/drivers/media/platform/omap3isp/isp.h
+> +++ b/drivers/media/platform/omap3isp/isp.h
+> @@ -193,6 +193,7 @@ struct isp_device {
+>  	u32 syscon_offset;
+>  	u32 phy_type;
+> 
+> +	struct device_dma_parameters dma_parms;
+>  	struct dma_iommu_mapping *mapping;
+> 
+>  	/* ISP Obj */
+
+-- 
+Regards,
+
+Laurent Pinchart
