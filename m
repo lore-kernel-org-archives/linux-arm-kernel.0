@@ -1,98 +1,76 @@
-From: mark.yao@rock-chips.com (Mark yao)
-Date: Mon, 09 Nov 2015 17:39:25 +0800
-Subject: [RFC PATCH v3 1/4] drm: Introduce generic probe function for
- component based masters.
-In-Reply-To: <1445267270-23126-2-git-send-email-Liviu.Dudau@arm.com>
-References: <1445267270-23126-1-git-send-email-Liviu.Dudau@arm.com>
- <1445267270-23126-2-git-send-email-Liviu.Dudau@arm.com>
-Message-ID: <564069CD.2070102@rock-chips.com>
+From: Hui.Liu@freescale.com (Liu Jason)
+Date: Mon, 9 Nov 2015 09:39:43 +0000
+Subject: The alignment mismatch issues between the of_reserved_mem and the CMA
+ setup requirement
+Message-ID: <DM2PR0301MB1213832E956A5414482EDD74F3150@DM2PR0301MB1213.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015?10?19? 23:07, Liviu Dudau wrote:
-> A lot of component based DRM drivers use a variant of the same code
-> as the probe function. They bind the crtc ports in the first iteration
-> and then scan through the child nodes and bind the encoders attached
-> to the remote endpoints. Factor the common code into a separate
-> function called drm_of_component_probe() in order to increase code
-> reuse.
->
-> Cc: David Airlie <airlied@linux.ie>
-> Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
-> ---
->   drivers/gpu/drm/drm_of.c | 88 ++++++++++++++++++++++++++++++++++++++++++++++++
->   include/drm/drm_of.h     | 13 +++++++
->   2 files changed, 101 insertions(+)
->
-> diff --git a/drivers/gpu/drm/drm_of.c b/drivers/gpu/drm/drm_of.c
-> index be38840..493c05c 100644
-> --- a/drivers/gpu/drm/drm_of.c
-> +++ b/drivers/gpu/drm/drm_of.c
-> @@ -1,3 +1,4 @@
-> +#include <linux/component.h>
->   #include <linux/export.h>
->   #include <linux/list.h>
->   #include <linux/of_graph.h>
-> @@ -61,3 +62,90 @@ uint32_t drm_of_find_possible_crtcs(struct drm_device *dev,
->   	return possible_crtcs;
->   }
->   EXPORT_SYMBOL(drm_of_find_possible_crtcs);
-> +
-> +/**
-> + * drm_of_component_probe - Generic probe function for a component based master
-> + * @dev: master device containing the OF node
-> + * @compare_of: compare function used for matching components
-> + * @master_ops: component master ops to be used
-> + *
-> + * Parse the platform device OF node and bind all the components associated
-> + * with the master. Interface ports are added before the encoders in order to
-> + * satisfy their .bind requirements
-> + * See Documentation/devicetree/bindings/graph.txt for the bindings.
-> + *
-> + * Returns zero if successful, or one of the standard error codes if it fails.
-> + */
-> +int drm_of_component_probe(struct device *dev,
-> +			   int (*compare_of)(struct device *, void *),
-> +			   const struct component_master_ops *m_ops)
-> +{
-> +	struct device_node *ep, *port, *remote;
-> +	struct component_match *match = NULL;
-> +	int i;
-> +
-> +	if (!dev->of_node)
-> +		return -EINVAL;
-> +
-> +	/*
-> +	 * Bind the crtc's ports first, so that drm_of_find_possible_crtcs()
-> +	 * called from encoder's .bind callbacks works as expected
-> +	 */
-> +	for (i = 0; ; i++) {
-> +		port = of_parse_phandle(dev->of_node, "ports", i);
-> +		if (!port)
-> +			break;
-> +
-> +		if (!of_device_is_available(port->parent)) {
-> +			of_node_put(port);
-> +			continue;
-> +		}
-> +
-> +		component_match_add(dev, &match, compare_of, port);
-Hi Liviu
-       Rockchip drm can't work with drm_of_component_probe function now,
+There is an alignment mismatch issue between the of_reserved_mem and the CMA setup requirement.
 
-       At drm_of_component_probe:
-             component_match_add(dev, &match, compare_of, port);
-       And original rockchip drm use:
-             component_match_add(dev, &match, compare_of, port->parent);
+The alignment in Documentation/devicetree/bindings/reserved-memory/reserved-memory.txt
 
-      That different "port" and "port->parent" cause crtc device node 
-always mis-match.
 
-      I'm confused that rockchip use same dts node map as imx drm 
-driver, but it works
-for imx drm, not work on rockchip drm.
+alignment (optional) - length based on parent's #size-cells
+? ? ? ? ? ? ? ? ? ? ? ? - Address boundary for alignment of allocation.
 
-> +		of_node_put(port);
-> +	}
->
--- ?ark Yao
+
+But this is not exactly match the CMA setup requirement if the alignment not set or set it not correctly.
+
+The of_reserved_mem will get the alignment from the DTS and pass it to __memblock_alloc_base to
+do the memory block allocation. If no alignment property in the DTS, the align will be SMP_CACHE_BYTES
+
+BUT, The CMA setup require the alignment as the following in the code:
+
+align = PAGE_SIZE << max(MAX_ORDER - 1, pageblock_order)
+
+static int __init rmem_cma_setup(struct reserved_mem *rmem)
+{
+? ? ? ? phys_addr_t align = PAGE_SIZE << max(MAX_ORDER - 1, pageblock_order);
+? ? ? ? phys_addr_t mask = align - 1;
+? ? ? ? unsigned long node = rmem->fdt_node;
+? ? ? ? struct cma *cma;
+? ? ? ? int err;
+
+? ? ? ? if (!of_get_flat_dt_prop(node, "reusable", NULL) ||
+? ? ? ? ? ? of_get_flat_dt_prop(node, "no-map", NULL))
+? ? ? ? ? ? ? ? return -EINVAL;
+
+? ? ? ? if ((rmem->base & mask) || (rmem->size & mask)) {
+? ? ? ? ? ? ? ? pr_err("Reserved memory: incorrect alignment of CMA region\n");
+? ? ? ? ? ? ? ? return -EINVAL;
+? ? ? ? }
+? ? ? ? <snip>
+}
+
+So, there is very likely that the alignment mismatch between the of_reserved_mem and the CMA setup requirement.
+The sanity check in the rmem_cma_setup will fail and CMA not get set up in the end, this is not expected for CMA.
+
+In the test, there will be following err log when this mismatch happen.
+
+Reserved memory: incorrect alignment of CMA region.
+
+The following patch to fix this issue, any comments? 
+
+=======================================================================================
+
+diff --git a/drivers/of/of_reserved_mem.c b/drivers/of/of_reserved_mem.c
+index 62f467b..a20d4d3 100644
+--- a/drivers/of/of_reserved_mem.c
++++ b/drivers/of/of_reserved_mem.c
+@@ -124,6 +124,15 @@ static int __init __reserved_mem_alloc_size(unsigned long node,
+                align = dt_mem_next_cell(dt_root_addr_cells, &prop);
+        }
+
++       if (of_flat_dt_is_compatible(node,"shared-dma-pool")) {
++               phys_addr_t align_required = PAGE_SIZE << max(MAX_ORDER - 1, pageblock_order);
++                if (!align || align != ALIGN(align, align_required)) {
++                        pr_warn("Reserved memory: the alignment not set up correctly in '%s' node."
++                               "change from %pa to %pa \n", uname, &align, &align_required);
++                        align = align_required;
++                }
++        }
++
+
+Best Regards,
+Jason Liu
