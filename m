@@ -1,77 +1,56 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Mon, 9 Nov 2015 13:12:44 -0800
-Subject: [PATCH v2 4/8] phy: rockchip-usb: expose the phy-internal PLLs
-In-Reply-To: <40224324.AZ7Q21CbSk@phil>
-References: <1446998681-26436-1-git-send-email-heiko@sntech.de>
- <1446998681-26436-5-git-send-email-heiko@sntech.de>
- <CAD=FV=VburD9eRtNKL8DZXgspp4-nFVVOz5PnOaT8HvNG5uzFg@mail.gmail.com>
- <40224324.AZ7Q21CbSk@phil>
-Message-ID: <CAD=FV=VVJ01cdQ245Ex_e_JJmJGjaD0+QUh0kGD5ReEbfFqe=g@mail.gmail.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Mon, 9 Nov 2015 13:14:13 -0800
+Subject: [GIT PULL] Allwinner DT changes for 4.4, round 3
+In-Reply-To: <20151109000403.GU6114@lukather>
+References: <4745252.gLSrJNQ42D@wuerfel> <9946613.K7Ehp1DEiL@wuerfel>
+ <20151025201308.GS10947@lukather>
+ <20151026010752.GG14238@localhost>
+ <CAGb2v671MmpRHkWKpOd8kmEbvfTKTU9k7AU_bP+AgRuguodWkQ@mail.gmail.com>
+ <20151026054828.GD4216@localhost> <20151026103409.GX10947@lukather>
+ <CAOesGMjNQeaA0etj0fk0E_QPNLYA3WTaRCfWE7YFz50RoDXu-w@mail.gmail.com>
+ <20151102191923.GO19782@codeaurora.org>
+ <20151109000403.GU6114@lukather>
+Message-ID: <20151109211413.GC26852@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Heiko,
+On 11/08, Maxime Ripard wrote:
+> On Mon, Nov 02, 2015 at 11:19:23AM -0800, Stephen Boyd wrote:
+> > > >> I've merged this in now. Note that this has resulted in a tree that won't
+> > > >> misect cleanly, since having the clk contents merged instead of used as a base
+> > > >> for the dt branch means that you could end up in a bisect state that has the DT
+> > > >> branch but not the clk branch.
+> > > >
+> > > > Even if it has been merged before the DT patches have been applied?
+> > > > That's not really what I'd expect from bisect :/
+> > > 
+> > > Yeah, due to the way bisect works, the only way to guarantee
+> > > bisectability is if you base the DT branch on top of the clk branch
+> > > when you build it. Otherwise the bisect can come down the path of only
+> > > having the DT contents not the clk contents.
+> > 
+> > Why can't the dts changes be applied directly on top of the
+> > branch that's in the clk tree and then sent off to arm-soc? The
+> > git merge && git commit technique also works, but it introduces
+> > an unnecessary merge commit into the history.
+> 
+> Wouldn't that mean that you have to rebase your whole DT branch
+> whenever a single patch introduces a dependency on some clock patch?
+> 
 
-On Mon, Nov 9, 2015 at 1:08 PM, Heiko Stuebner <heiko@sntech.de> wrote:
-> Hi Doug,
->
-> Am Montag, 9. November 2015, 12:59:58 schrieb Doug Anderson:
->> On Sun, Nov 8, 2015 at 8:04 AM, Heiko Stuebner <heiko@sntech.de> wrote:
->> > +static const struct rockchip_usb_phy_pdata rk3066a_pdata = {
->> > +       .phys = (struct rockchip_usb_phys[]){
->> > +               { .reg = 0x17c, .pll_name = "sclk_otgphy0_480m" },
->> > +               { .reg = 0x188, .pll_name = "sclk_otgphy1_480m" },
->> > +               { /* sentinel */ }
->> > +       },
->> > +};
->> > +
->> > +static const struct rockchip_usb_phy_pdata rk3188_pdata = {
->> > +       .phys = (struct rockchip_usb_phys[]){
->> > +               { .reg = 0x10c, .pll_name = "sclk_otgphy0_480m" },
->> > +               { .reg = 0x11c, .pll_name = "sclk_otgphy1_480m" },
->> > +               { /* sentinel */ }
->> > +       },
->> > +};
->> > +
->> > +static const struct rockchip_usb_phy_pdata rk3288_pdata = {
->> > +       .phys = (struct rockchip_usb_phys[]){
->> > +               { .reg = 0x320, .pll_name = "sclk_otgphy0_480m" },
->> > +               { .reg = 0x334, .pll_name = "sclk_otgphy1_480m" },
->> > +               { .reg = 0x348, .pll_name = "sclk_otgphy2_480m" },
->> > +               { /* sentinel */ }
->> > +       },
->>
->> Slighly annoying to have to add a table for each SoC.  I'd imagine
->> this growing quite large.
->>
->> Would it be possible to query our parent clock name and then append a
->> "_480m" suffix?  Then you can magically get the name you want, right?
->> That doesn't preclude you from later overriding this or adding a "dts"
->> property for it, but it means no tables for now and (hopefully) for
->> the forseeable future.  ...and you get to kill a bunch of code in this
->> patch...
->>
->> You could fall back to some generic name based on the PHY device tree
->> node name if you wanted, or use the ID allocator...
->>
->>
->> Otherwise, this all looks good to me.  If you have a good reason why
->> using the parent name isn't a good idea, let me know and I can add my
->> Reviewed-by on this patch.
->
-> Adding a _480m suffix was my initial solution. But the phy-supply clock
-> is actually optional in the binding, so it may not be specified at all.
-> Still the code needs this pll to work at all after the change, and
-> inventing some completely random clock name seemed very strange
-> (like pll_usbphy_REG or something) - especially as this would never
-> have worked with the downstream clocks. As it is now, the downstream
-> clock-tree will work indepent of the supply clock being specified.
->
-> Also Rockchip seems to have moved to a different phy-ip, with one
-> supplying clock, one pll and everything more tightly coupled,
-> so we're probably getting a new driver for it, instead of additional
-> entries for the picophy.
+That depends on whether or not the single patch depends on the
+other patches in the "DT" branch. If it did, then do the merge
+and apply the single patch on top. But if doesn't, maybe it's
+something like new SoC support that needs a binding header, I
+would make a second DT branch that points at the branch in the
+clk tree and then apply the dt patch directly on top.
 
-OK, seems quite reasonable to me.
+Of course, this is just one way to do it. I'm mostly trying to
+avoid unnecessary merges, but sometimes merges are unavoidable.
+The most important thing is to maintain bisectability and to make
+it clear why merges from other trees are done by putting some
+sort of reason in the commit text of the merge.
 
-Reviewed-by: Douglas Anderson <dianders@chromium.org>
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
