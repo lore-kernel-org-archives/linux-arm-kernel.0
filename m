@@ -1,74 +1,74 @@
-From: js1304@gmail.com (Joonsoo Kim)
-Date: Mon, 9 Nov 2015 16:41:58 +0900
-Subject: [PATCH] arm64: Increase the max granular size
-In-Reply-To: <20151105121706.GQ7637@e104818-lin.cambridge.arm.com>
-References: <1442944788-17254-1-git-send-email-rric@kernel.org>
- <20151105044014.GB20374@js1304-P5Q-DELUXE>
- <20151105103214.GP7637@e104818-lin.cambridge.arm.com>
- <CAAmzW4MR_+0K5JbMMiRu_wVq736zVbz82ugvDYP=x6p=9JuELg@mail.gmail.com>
- <20151105121706.GQ7637@e104818-lin.cambridge.arm.com>
-Message-ID: <CAAmzW4POKyGCFETiR1gRtT0iK+iWH254PGivZDnpjU1CHizgUw@mail.gmail.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Mon, 9 Nov 2015 09:02:51 +0100
+Subject: [PATCH] ARM: shmobile: r8a7793: Add thermal device to DT
+In-Reply-To: <20151109011504.GE4832@verge.net.au>
+References: <1446795048-29767-1-git-send-email-horms+renesas@verge.net.au>
+ <CAMuHMdV-xGYvsSU1xXvB1Z9ssPD0yW_mFg=vre+dyLzs6wmiTw@mail.gmail.com>
+ <20151106091735.GA6122@verge.net.au>
+ <CAMuHMdX1-4wmfnq0MuwNDd6RmvbZ=4HkKpRp28yeb5fLHKHn7A@mail.gmail.com>
+ <20151109011504.GE4832@verge.net.au>
+Message-ID: <CAMuHMdX81Vy59uGmkiq6wLTrnWse-kMsHQRaEHFAUu5pUEtnWA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-11-05 21:17 GMT+09:00 Catalin Marinas <catalin.marinas@arm.com>:
-> On Thu, Nov 05, 2015 at 08:45:08PM +0900, Joonsoo Kim wrote:
->> 2015-11-05 19:32 GMT+09:00 Catalin Marinas <catalin.marinas@arm.com>:
->> > On ARM we have a notion of cache writeback granule (CWG) which tells us
->> > "the maximum size of memory that can be overwritten as a result of the
->> > eviction of a cache entry that has had a memory location in it
->> > modified". What we actually needed was ARCH_DMA_MINALIGN to be 128
->> > (currently defined to the L1_CACHE_BYTES value). However, this wouldn't
->> > have fixed the KMALLOC_MIN_SIZE, unless we somehow generate different
->> > kmalloc_caches[] and kmalloc_dma_caches[] and probably introduce a
->> > size_dma_index[].
+Hi Simon,
+
+On Mon, Nov 9, 2015 at 2:15 AM, Simon Horman <horms@verge.net.au> wrote:
+> On Fri, Nov 06, 2015 at 11:00:17AM +0100, Geert Uytterhoeven wrote:
+>> On Fri, Nov 6, 2015 at 10:17 AM, Simon Horman <horms@verge.net.au> wrote:
+>> > On Fri, Nov 06, 2015 at 09:50:27AM +0100, Geert Uytterhoeven wrote:
+>> >> On Fri, Nov 6, 2015 at 8:30 AM, Simon Horman <horms+renesas@verge.net.au> wrote:
+>> >> > Instantiate the thermal sensor in the r8a7793 device tree.
+>> >> >
+>> >> > Based on very similar work for the r8a7790 by Magnus Damm.
+>> >>
+>> >> Given the similarity of R-Car M2-N and M2-W, I would have referred
+>> >> to r8a7791 ;-)
+>> >
+>> > True. Though for thermal the datasheet indicates H2 is also quite similar.
+>> >
+>> > I also prepared a very similar patch to add thermal to the r8a7794 (E2).
+>> > But the driver reports the sensor is broken - my inspection of the code
+>> > leads me to believe its not able to get a proper reading from the sensor.
+>> >
+>> > I'm wondering if anyone knows about this issue. Perhaps its specific
+>> > to my Alt board. Or a limitation of the E2?
 >>
->> If we create separate kmalloc caches for dma, can we apply this alignment
->> requirement only to dma caches? I guess some memory allocation request
->> that will be used for DMA operation doesn't specify GFP_DMA because
->> it doesn't want the memory from ZONE_DMA. In this case, we should apply
->> dma alignment requirement to all types of caches.
+>> Using the same kernel image as on other boards? I.e. it's not an MSTP
+>> clock issue?
 >
-> I think you are right. While something like swiotlb (through the
-> streaming DMA API) could do bounce buffering and allocate one from
-> ZONE_DMA, this is not guaranteed if the buffer physical address happens
-> to match the dma_mask. Similarly with an IOMMU, no bouncing happens but
-> the alignment is still required.
+> I am using the same kernel image.
+> I wonder if it is an MSTP issue.
 >
->> If it isn't possible, is there another way to reduce memory waste due to
->> increase of dma alignment requirement in arm64?
+> Looking over the datasheet I see:
 >
-> I first need to see how significant the impact is (especially for
-> embedded/mobiles platforms).
+> For the r8a779[0-4] Thermal in MSTPSR5, RMSTPCR5.
+> I.e. there is a bit for thermal in those registers for all R-Car Gen-2
+> SoCs covered by the datasheet.
+>
+> But only on the r8a779[0-3] I see thermal in SRCR5, SRSTCLR5.
+> I.e. there is no bit for thermal in those registers for the r8a7794
+> which is different from the other R-Car Gen-2 SoCs covered by the datasheet.
 
-I don't have any ARM64 device. What I have just one report
-about slab usage from our developer.
+Indeed, strange. Those are the reset registers, which we don't use yet.
 
-The report shows slab usage just after android boot is done
-in ARM64.
+Can you please check from U-Boot that the thermal module is not held in reset?
+On r8a7791/koelsch I get:
 
-Total slab usage: 90 MB
-kmalloc usage: 25 MB
-kmalloc (<=64) usage: 7 MB
+=> md.l 0xe61500c4 1
+e61500c4: 00000000    ....
+=> md.l 0xe6150954 1
+e6150954: 00000000    ....
 
-This would be measured without slab_nomerge so there is
-a possibility that some usages on kmem_cache is merged
-into usage of kmalloc (<=64).
+I.e. no reset or reset clear bit is set.
 
-Anyway, if ARM64 increase L1_CACHE_BYTES to 128, roughly
-7 MB would be wasted. I don't know how this picture is varied
-in runtime, but, even boot time overhead, 7 MB looks large to me.
+Gr{oetje,eeting}s,
 
-> An alternative is to leave L1_CACHE_BYTES to 64 by default but warn if
-> the CWG is 128 on systems with non-coherent DMA (and hope that we won't
-> have any). It's not really fix, rather an assumption. Anyway I would
-> very much like the same kernel image for all platforms and no Kconfig
-> entry for the cache line size but if the waste is significant, we may
-> add one for some specific builds (like a mobile phone; or such vendors
-> could patch the kernel themselves).
+                        Geert
 
-Okay. In fact, I'm not very familiar with android device so it'd be better
-for you to ask some other android developer about how significant
-the impact is in android or mobile device.
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
 
-Thanks.
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
