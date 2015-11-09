@@ -1,109 +1,84 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Mon, 09 Nov 2015 22:27:06 +0100
-Subject: [PATCH v2 0/8] phy: rockchip-usb: correct pll handling and
- usb-uart
-In-Reply-To: <CAD=FV=UCQ7ESi8NiZubAwa9Zzo4uiZHqm96bVMEue=M+Th4pTA@mail.gmail.com>
-References: <1446998681-26436-1-git-send-email-heiko@sntech.de>
- <CAD=FV=UCQ7ESi8NiZubAwa9Zzo4uiZHqm96bVMEue=M+Th4pTA@mail.gmail.com>
-Message-ID: <3369052.6pxaYT98AY@phil>
+From: keescook@chromium.org (Kees Cook)
+Date: Mon, 9 Nov 2015 13:27:50 -0800
+Subject: [PATCH v2 2/2] arm: mm: support ARCH_MMAP_RND_BITS.
+In-Reply-To: <5640EC58.7050006@android.com>
+References: <1446574204-15567-1-git-send-email-dcashman@android.com>
+ <1446574204-15567-2-git-send-email-dcashman@android.com>
+ <CAGXu5jKGzDD9WVQnMTT2EfupZtjpdcASUpx-3npLAB-FctLodA@mail.gmail.com>
+ <56393FD0.6080001@android.com>
+ <CAGXu5jLe=OgZ2DG_MRXA8x6BwpEd77fNZBj3wjbDiSdiBurz7w@mail.gmail.com>
+ <563A4EDC.6090403@android.com> <563BA393.9020504@android.com>
+ <CAGXu5j+2xiRwt6mKrjzuf9O745GWOcjXzutONp6rz_Kj+3PfVQ@mail.gmail.com>
+ <1447040874.5195.2.camel@ellerman.id.au>
+ <5640EC58.7050006@android.com>
+Message-ID: <CAGXu5jLJM8_JqSxDagN0AHdFoXNEkn8zDBG_iJBW_Z9jeRst8g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Montag, 9. November 2015, 13:11:18 schrieb Doug Anderson:
-> Heiko,
-> 
-> On Sun, Nov 8, 2015 at 8:04 AM, Heiko Stuebner <heiko@sntech.de> wrote:
-> > changes in v2:
-> > - add Doug's review-tag to patches 1 and 3
-> > - address comment and add the missing transistional rk_phy->base
-> >   assignment in patch2
-> >
-> >
-> > Patches 1-7 fix a long-standing issue with the clock-tree of Rockchip SoCs
-> > namely our ignorance of the usbphy-internal pll that creates the needed
-> > 480MHz but is also a supply-clock back to the core clock-controller in
-> > Rockchip SoCs.
-> >
-> > Till now that was worked around using a virtual clock in the cru itself,
-> > but that is of course ignorant of other parts then disabling the phy
-> > behind the cru's back, thus breaking potential users of these clocks.
-> >
-> >
-> > Patch 8, while not associated with the new pll handling, also builds
-> > on the groundwork introduced there and adds support for the function
-> > repurposing one of the phys as passthrough for uart-data. This enables
-> > attaching a ttl converter to the D+ and D- pins of an usb cable to
-> > receive uart data this way, when it is not really possible to attach
-> > a regular serial console to a board.
-> >
-> > One point of critique in my first iteration [0] of this was, that
-> > due to when the reconfiguration happens we may miss parts of the logs
-> > when earlycon is enabled. So far early_initcall gets used as the
-> > unflattened devicetree is necessary to set this up. Doing this for
-> > example in the early_param directly would require parsing the flattened
-> > devicetree to get needed nodes and properties.
-> >
-> > I still maintain that if you're working on anything before smp-bringup
-> > you should use a real dev-board instead or try to solder uart cables
-> > on hopefully available test-points :-) .
-> >
-> >
-> > In any case, if patch 8 causes to much headache, it could be dropped
-> > to not hinder the earlier 7 patches.
-> >
-> > [0] http://comments.gmane.org/gmane.linux.ports.arm.rockchip/715
-> >
-> > Heiko Stuebner (8):
-> >   phy: rockchip-usb: fix clock get-put mismatch
-> >   phy: rockchip-usb: introduce a common data-struct for the device
-> >   phy: rockchip-usb: move per-phy init into a separate function
-> >   phy: rockchip-usb: expose the phy-internal PLLs
-> >   clk: rockchip: fix usbphy-related clocks
-> >   ARM: dts: rockchip: add clock-cells for usb phy nodes
-> >   ARM: dts: rockchip: assign usbphy480m_src to the new usbphy pll on
-> >     veyron
-> >   phy: rockchip-usb: add handler for usb-uart functionality
-> >
-> >  .../devicetree/bindings/phy/rockchip-usb-phy.txt   |   6 +-
-> >  Documentation/kernel-parameters.txt                |   6 +
-> >  arch/arm/boot/dts/rk3066a.dtsi                     |   2 +
-> >  arch/arm/boot/dts/rk3188.dtsi                      |   2 +
-> >  arch/arm/boot/dts/rk3288-veyron.dtsi               |   2 +-
-> >  arch/arm/boot/dts/rk3288.dtsi                      |   3 +
-> >  drivers/clk/rockchip/clk-rk3188.c                  |  11 +-
-> >  drivers/clk/rockchip/clk-rk3288.c                  |  16 +-
-> >  drivers/phy/phy-rockchip-usb.c                     | 449 ++++++++++++++++++---
-> >  9 files changed, 416 insertions(+), 81 deletions(-)
-> 
-> If you happened to be in the mood for cleaning up this PHY and wanted
-> to fix up one more thing that I noticed...
-> 
-> ...you could actually increase the range of registers managed by the
-> PHYs.  For instance, in rk3288, the "host1" port isn't just managed by
-> 1 register, but by 4 (GRF_UOC2_CON0 - GRF_UOC2_CON3).  I think there
-> are 5 for the OTG port.
-> 
-> Obviously not required for this series and there's no (current) reason
-> to do anything with the rest of those registers, but it might be
-> interesting for the future...
+On Mon, Nov 9, 2015 at 10:56 AM, Daniel Cashman <dcashman@android.com> wrote:
+> On 11/08/2015 07:47 PM, Michael Ellerman wrote:
+>> On Fri, 2015-11-06 at 12:52 -0800, Kees Cook wrote:
+>>> On Thu, Nov 5, 2015 at 10:44 AM, Daniel Cashman <dcashman@android.com> wrote:
+>>>> On 11/04/2015 10:30 AM, Daniel Cashman wrote:
+>>>>> On 11/3/15 3:21 PM, Kees Cook wrote:
+>>>>>> On Tue, Nov 3, 2015 at 3:14 PM, Daniel Cashman <dcashman@android.com> wrote:
+>>>>>>> On 11/03/2015 11:19 AM, Kees Cook wrote:
+>>>>>>>> Do you have patches for x86 and arm64?
+>>>>>>>
+>>>>>>> I was holding off on those until I could gauge upstream reception.  If
+>>>>>>> desired, I could put those together and add them as [PATCH 3/4] and
+>>>>>>> [PATCH 4/4].
+>>>>>>
+>>>>>> If they're as trivial as I'm hoping, yeah, let's toss them in now. If
+>>>>>> not, skip 'em. PowerPC, MIPS, and s390 should be relatively simple
+>>>>>> too, but one or two of those have somewhat stranger calculations when
+>>>>>> I looked, so their Kconfigs may not be as clean.
+>>>>>
+>>>>> Creating the patches should be simple, it's the choice of minimum and
+>>>>> maximum values for each architecture that I'd be most concerned about.
+>>>>> I'll put them together, though, and the ranges can be changed following
+>>>>> discussion with those more knowledgeable, if needed.  I also don't have
+>>>>> devices on which to test the PowerPC, MIPS and s390 changes, so I'll
+>>>>> need someone's help for that.
+>>>>
+>>>> Actually, in preparing the x86 and arm64 patches, it became apparent
+>>>> that the current patch-set does not address 32-bit executables running
+>>>> on 64-bit systems (compatibility mode), since only one procfs
+>>>> mmap_rnd_bits variable is created and exported. Some possible solutions:
+>>>
+>>> How about a single new CONFIG+sysctl that is the compat delta. For
+>>> example, on x86, it's 20 bits. Then we don't get splashed with a whole
+>>> new set of min/maxes, but we can reasonably control compat?
+>>
+>> Do you mean in addition to mmap_rnd_bits?
+>>
+>> So we'd end up with mmap_rnd_bits and also mmap_rnd_bits_compat_delta?
+>> (naming TBD)
+>>
+>> If so yeah I think that would work.
+>>
+>> It would have the nice property of allowing you to add some more randomness to
+>> all processes by bumping mmap_rnd_bits. But at the same time if you want to add
+>> a lot more randomness to 64-bit processes, but just a bit (or none) to 32-bit
+>> processes you can also do that.
+>
+> I may be misunderstanding the suggestion, or perhaps simply too
+> conservative in my desire to prevent bad values, but I still think we
+> would have need for two min-max ranges.  If using a single
+> mmap_rnd_bits_compat value, there are two approaches: to either use
+> mmap_rnd_bits for 32-bit applications and then add the compat value for
+> 64-bit or the opposite, to have mmap_rnd_bits be the default and
+> subtract the compat value for the 32-bit applications.  In either case,
+> the compat value would need to be sensibly bounded, and that bounding
+> depends on acceptable values for both 32 and 64 bit applications.
 
-I'm not sure what change you're proposing :-) .
+Yeah, I think I wasn't thinking about this well. I think two sysctls
+should be fine: mmap_rnd_bits and mmap_compat_rnd_bits. And
+internally, we'd have a second set of CONFIGs (and ranges) to deal
+with CONFIG_COMPAT.
 
-I currently see the reg-property both in the dts and in the code as
-"offset" - the start-register, because it points to uoc_con0 for each phy.
-So if needed I was just planning on doing reg+x , as they're coming from
-the GRF anyway.
+-Kees
 
-One interesting point would be to move that under the GRF node, similar
-to what we're doing with the power-domains under the PMU.
-
-In retrospect I think exposing the phys individually was not the best
-decision - especially as when you dive deeper, they are not that similar
-anymore and individual functions change. But we'll have to live with that.
-
-That is by the way, also one of the reasons for having these per-phy
-structs, so that we have the possility to identify phys again and describe
-individual phy-functions but still keep the current binding.
-The usb-uart is the first user for that :-)
-
-Heiko
+-- 
+Kees Cook
+Chrome OS Security
