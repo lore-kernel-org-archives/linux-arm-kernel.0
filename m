@@ -1,39 +1,50 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 9 Nov 2015 08:17:09 +0000
-Subject: [PATCH] ARM/arm64: KVM: test properly for a PTE's uncachedness
-In-Reply-To: <1446810188-13727-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1446810188-13727-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20151109081709.2512e683@why.wild-wind.fr.eu.org>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Mon, 9 Nov 2015 10:28:45 +0200
+Subject: [PATCH v2 2/3] dmaengine: ti-dma-crossbar: dra7: Support for
+ reserving DMA event ranges
+In-Reply-To: <20151106215310.GA20278@rob-hp-laptop>
+References: <1446192038-11158-1-git-send-email-peter.ujfalusi@ti.com>
+ <1446192038-11158-3-git-send-email-peter.ujfalusi@ti.com>
+ <20151106215310.GA20278@rob-hp-laptop>
+Message-ID: <5640593D.3020702@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 6 Nov 2015 12:43:08 +0100
-Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+On 11/06/2015 11:53 PM, Rob Herring wrote:
+> On Fri, Oct 30, 2015 at 10:00:37AM +0200, Peter Ujfalusi wrote:
+>> In eDMA the events are directly mapped to a DMA channel (for example DMA
+>> event 14 can only be handled by DMA channel 14). If the memcpy is enabled
+>> on the eDMA, there is a possibility that the crossbar driver would assign
+>> DMA event number already allocated in eDMA for memcpy. Furthermore the
+>> eDMA can be shared with DSP in which case the crossbar driver should also
+>> avoid mapping xbar events to DSP used event numbers (or channels).
+>>
+>> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+>> ---
+>>  .../devicetree/bindings/dma/ti-dma-crossbar.txt    |  6 +++
+>>  drivers/dma/ti-dma-crossbar.c                      | 47 ++++++++++++++++++++--
+>>  2 files changed, 49 insertions(+), 4 deletions(-)
+>>
+>> diff --git a/Documentation/devicetree/bindings/dma/ti-dma-crossbar.txt b/Documentation/devicetree/bindings/dma/ti-dma-crossbar.txt
+>> index b152a75dceae..aead5869a28d 100644
+>> --- a/Documentation/devicetree/bindings/dma/ti-dma-crossbar.txt
+>> +++ b/Documentation/devicetree/bindings/dma/ti-dma-crossbar.txt
+>> @@ -14,6 +14,10 @@ The DMA controller node need to have the following poroperties:
+>>  
+>>  Optional properties:
+>>  - ti,dma-safe-map: Safe routing value for unused request lines
+>> +- ti,reserved-dma-request-ranges: DMA request ranges which should not be used
+>> +		when mapping xbar input to DMA request, they are either
+>> +		allocated to be used by for example the DSP or they are used as
+>> +		memcpy channels in eDMA.
+> 
+> How many requests are there? I think I'd rather see this as a mask 
+> value.
 
-> The open coded tests for checking whether a PTE maps a page as
-> uncached use a flawed 'pte_val(xxx) & CONST != CONST' pattern,
-> which is not guaranteed to work since the type of a mapping is an
-> index into the MAIR table, not a set of mutually exclusive bits.
-> 
-> Considering that, on arm64, the S2 type definitions use the following
-> MAIR indexes
-> 
->     #define MT_S2_NORMAL            0xf
->     #define MT_S2_DEVICE_nGnRE      0x1
-> 
-> we have been getting lucky merely because the S2 device mappings also
-> have the PTE_UXN bit set, which means that a device PTE still does not
-> equal a normal PTE after masking with the former type.
-> 
-> Instead, implement proper checking against the MAIR indexes that are
-> known to define uncached memory attributes.
-> 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+The eDMA on dra7 family have 64 channels. I don't have visibility to customer
+kernels, but at least 32 channels need be allocated to be used by the DSP.
+This depends on the system design. It could be that only the memcpy channels
+need to be reserved, but in some setups we do need more than a few.
 
-Very well spotted, thanks Ard!
-
-Reviewed-by: Marc Zyngier <marc.zyngier@arm.com>
-
-	M.
 -- 
-Without deviation from the norm, progress is not possible.
+P?ter
