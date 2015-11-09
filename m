@@ -1,75 +1,33 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 09 Nov 2015 17:10:13 +0100
-Subject: [PATCH 3/3] xen/arm: set the system time in Xen via the
- XENPF_settime hypercall
-In-Reply-To: <alpine.DEB.2.02.1511061510190.23825@kaball.uk.xensource.com>
-References: <alpine.DEB.2.02.1511051706560.13541@kaball.uk.xensource.com>
- <6188457.uvvdcZaVNM@wuerfel>
- <alpine.DEB.2.02.1511061510190.23825@kaball.uk.xensource.com>
-Message-ID: <22638556.UuzKE0hp21@wuerfel>
+From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
+Date: Mon, 09 Nov 2015 16:12:16 +0000
+Subject: Grafting old platform drivers onto a new DT kernel
+In-Reply-To: <5640C4BF.2010204@free.fr> (Mason's message of "Mon, 9 Nov 2015
+ 17:07:27 +0100")
+References: <563B3749.50701@free.fr> <20151105151559.GA16666@lunn.ch>
+ <CABxcv=k5mzw_TDsD1eQna9+HY9aqCUd03YAc62750Gs--sMozw@mail.gmail.com>
+ <5640B877.4020108@free.fr> <yw1xtwov5gh1.fsf@unicorn.mansr.com>
+ <5640C4BF.2010204@free.fr>
+Message-ID: <yw1xpozj5ezj.fsf@unicorn.mansr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 09 November 2015 14:10:22 Stefano Stabellini wrote:
-> On Thu, 5 Nov 2015, Arnd Bergmann wrote:
-> > On Thursday 05 November 2015 17:09:45 Stefano Stabellini wrote:
-> > > +	now = __current_kernel_time();
-> > 
-> > We don't have __current_kernel_time64() yet, but it is trivial
-> > to add, just follow the example of
-> > current_kernel_time()/current_kernel_time64() and convert the
-> > existing __current_kernel_time() function into a static
-> > inline wrapper for the new __current_kernel_time64().
-> 
-> All right. I guess something like:
-> 
-> struct timespec64 __current_kernel_time64(void)
-> {
-> 	struct timekeeper *tk = &tk_core.timekeeper;
-> 
-> 	return tk_xtime(tk);
-> }
+Mason <slash.tmp@free.fr> writes:
 
-Yes, exactly.
+> On 09/11/2015 16:40, M?ns Rullg?rd wrote:
+>
+>> The simplest solution for you is probably to add a quick and dirty DT
+>> binding to the old driver.  If it doesn't use any driver-specific
+>> platform data struct, you only need to set .of_match_table in the
+>> struct platform_driver.  If there is a platform data struct, you'll also
+>> need to write some code to populate it from DT properties.  It shouldn't
+>> take more than a few minutes per driver in most cases.
+>
+> I'll try that approach, although I fear that "a few minutes per driver"
+> is an optimistic assessment.
 
-Just to make sure that this is actually the correct interface
-that you want to call:
+If the driver only needs an MMIO region and an IRQ, it is literally five
+lines of code.
 
-__current_kernel_time{,64}() is the fastest interface we have
-to get an approximation of the current time, while ignoring
-all of the locking.
-
-Is is possible that you instead want ktime_get_real_ts64(),
-which gives you the time as precise as the kernel knows it,
-but uses locking?
-
-> > > +	/*
-> > > +	 * We only take the expensive HV call when the clock was set
-> > > +	 * or when the 11 minutes RTC synchronization time elapsed.
-> > > +	 */
-> > > +	if (!was_set && timespec_compare(&now, &next_sync) < 0)
-> > > +		return NOTIFY_OK;
-> > > +
-> > > +	op.interface_version = XENPF_INTERFACE_VERSION;
-> > > +	op.cmd = XENPF_settime;
-> > > +	op.u.settime.secs = now.tv_sec;
-> > > +	op.u.settime.nsecs = now.tv_nsec;
-> > > +	op.u.settime.system_time = arch_timer_read_counter();
-> > > +	printk("GTOD: Setting to %ld.%ld at %lld\n",
-> > > +	       (long)op.u.settime.secs,
-> > > +	       (long)op.u.settime.nsecs,
-> > > +	       (long long)op.u.settime.system_time);
-> > > +	(void)HYPERVISOR_dom0_op(&op);
-> > 
-> > I guess we will also need a XENPF_settime64 interface, but at
-> > least we can get away with implementing only that one on ARM,
-> > while x86 will have to support both the 32-bit and 64-bit
-> > based variant.
-> 
-> We already have XENPF_settime64, I'll just use it instead.
-
-Ok, great! Then we just need to find a volunteer who can
-do the same thing on x86, with the fallback to XENPF_settime
-that they need for older hosts.
-
-	Arnd
+-- 
+M?ns Rullg?rd
+mans at mansr.com
