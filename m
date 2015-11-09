@@ -1,92 +1,82 @@
 From: heiko@sntech.de (Heiko Stuebner)
-Date: Mon, 09 Nov 2015 22:48:32 +0100
-Subject: [PATCH v2 0/8] phy: rockchip-usb: correct pll handling and
- usb-uart
-In-Reply-To: <CAD=FV=UytwJ9jthOZZEzw6ZwTFwyuTz5-B7xkuN_OgMbHKbWRA@mail.gmail.com>
+Date: Mon, 09 Nov 2015 23:08:36 +0100
+Subject: [PATCH v2 7/8] ARM: dts: rockchip: assign usbphy480m_src to the
+ new usbphy pll on veyron
+In-Reply-To: <CAD=FV=WAmx1y-Euf5-FfdcawxbduKERR-==opWT9VtnwEjmycw@mail.gmail.com>
 References: <1446998681-26436-1-git-send-email-heiko@sntech.de>
- <3369052.6pxaYT98AY@phil>
- <CAD=FV=UytwJ9jthOZZEzw6ZwTFwyuTz5-B7xkuN_OgMbHKbWRA@mail.gmail.com>
-Message-ID: <4138105.lq8ZJ1GKoN@phil>
+ <1446998681-26436-8-git-send-email-heiko@sntech.de>
+ <CAD=FV=WAmx1y-Euf5-FfdcawxbduKERR-==opWT9VtnwEjmycw@mail.gmail.com>
+Message-ID: <3737540.j79ca5LgFf@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Montag, 9. November 2015, 13:32:28 schrieb Doug Anderson:
+Am Montag, 9. November 2015, 13:08:43 schrieb Doug Anderson:
 > Heiko,
 > 
-> On Mon, Nov 9, 2015 at 1:27 PM, Heiko Stuebner <heiko@sntech.de> wrote:
-> >> If you happened to be in the mood for cleaning up this PHY and wanted
-> >> to fix up one more thing that I noticed...
-> >>
-> >> ...you could actually increase the range of registers managed by the
-> >> PHYs.  For instance, in rk3288, the "host1" port isn't just managed by
-> >> 1 register, but by 4 (GRF_UOC2_CON0 - GRF_UOC2_CON3).  I think there
-> >> are 5 for the OTG port.
-> >>
-> >> Obviously not required for this series and there's no (current) reason
-> >> to do anything with the rest of those registers, but it might be
-> >> interesting for the future...
+> On Sun, Nov 8, 2015 at 8:04 AM, Heiko Stuebner <heiko@sntech.de> wrote:
+> > Veyron devices try to always set the source for usbphy480m to the usbphy0
+> > that is the phy connected to the otg controller, because the firmware-
+> > default is usbphy1, the ehci-controller connected to the internal camera
+> > that might get turned off way easier to save power.
 > >
-> > I'm not sure what change you're proposing :-) .
-> 
-> I was proposing changing the PHY to look like:
-> 
-> usbphy: phy {
->   compatible = "rockchip,rk3288-usb-phy";
->   rockchip,grf = <&grf>;
->   #address-cells = <1>;
->   #size-cells = <1>;
->   status = "disabled";
-> 
->   usbphy0: usb-phy0 {
->     #phy-cells = <0>;
->     reg = <0x320 0x14>;
->     clocks = <&cru SCLK_OTGPHY0>;
->     clock-names = "phyclk";
->   };
->   ...
-> };
-> 
-> ...in other words change the "size-cells" for the main PHY to 1 and
-> add a length to the registers.
-> 
-> 
-> > I currently see the reg-property both in the dts and in the code as
-> > "offset" - the start-register, because it points to uoc_con0 for each phy.
-> > So if needed I was just planning on doing reg+x , as they're coming from
-> > the GRF anyway.
-> 
-> Yeah, that would work.  I was just trying to make it more obvious in
-> the DTS that there was actually a range of registers managed here...
-
-ok, that would make sense to make that a bit more visible, and it
-would even require functional changes ;-)
-
-
-> > One interesting point would be to move that under the GRF node, similar
-> > to what we're doing with the power-domains under the PMU.
+> > In the mainline kernel we currently don't use the usbphy480m_src at all,
+> > as it mainly powers the uart0 source that is connected to the bluetooth
+> > component of the wifi/bt combo.
 > >
-> > In retrospect I think exposing the phys individually was not the best
-> > decision - especially as when you dive deeper, they are not that similar
-> > anymore and individual functions change. But we'll have to live with that.
+> > So move that assignment over to the new real pll clock inside the usbphy.
+> >
+> > Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> > ---
+> >  arch/arm/boot/dts/rk3288-veyron.dtsi | 2 +-
+> >  1 file changed, 1 insertion(+), 1 deletion(-)
+> >
+> > diff --git a/arch/arm/boot/dts/rk3288-veyron.dtsi 
+b/arch/arm/boot/dts/rk3288-veyron.dtsi
+> > index d4263ed..c8329b5 100644
+> > --- a/arch/arm/boot/dts/rk3288-veyron.dtsi
+> > +++ b/arch/arm/boot/dts/rk3288-veyron.dtsi
+> > @@ -410,7 +410,7 @@
+> >         status = "okay";
+> >
+> >         assigned-clocks = <&cru SCLK_USBPHY480M_SRC>;
+> > -       assigned-clock-parents = <&cru SCLK_OTGPHY0>;
+> > +       assigned-clock-parents = <&usbphy0>;
+> >         dr_mode = "host";
+> >  };
 > 
-> Now it's my turn: I'm not sure I understand...  ;)
+> This is right, hence:
+> 
+> Reviewed-by: Douglas Anderson <dianders@chromium.org>
+> 
+> ...you will slightly break bisectability with this series though,
+> right?  In the previous patch in this series you changed the clocks in
+> the mux away from the fake ones to be the real ones.  If you have
+> either that patch without this one or this patch without that one then
+> clock parents won't get assigned properly...
+> 
+> I seem to remember that one of the USB phy clocks was kinds jittery (I
+> want to say it was the EHCI one) and that was causing problems talking
+> to the BT UART at 3Mbps.  I kinda doubt we have anyone running BT on
+> upstream over that UART (only used on veyron devices with Broadcom
+> WiFi), so maybe this is OK.  ...but if you had any other ideas for how
+> to avoid breaking bisect that would be nice.
+> 
+> If nothing else, if we're going to break bisect then the two commits
+> should reference each other and say that you need both and that with
+> only one you might see a different clock selected...
 
-as the driver currently stands (without my changes) every phy is seen as
-the same function block - it looks like phy0...phy2 have the same
-functionality and the driver cannot distinguish between them. The
-similarity is true for SIDDQ and some other generic bits (even across
-different Rockchip SoCs), but for more special functionality bits move
-their location between phys. This is even more visisble if you compare
-rk3066/rk3188/rk3288 phys.
+hmm, I wouldn't say that it breaks bisectability, because that would require 
+that some working feature does break between those two changes in the first 
+place. On Chromebooks we have either mwifiex, that doesn't even do wifi 
+sucessfully right now and the (from what I've read) not well supported bcm, of 
+which I don't know if it supports the veyron-variant's bluetooth yet.
 
-What I mean, and would like to have for the new phy-IP for rk3368 etc
-would be to have one node, then do the reference via an index like 
-<&usbphy 1> and hide the internals in the driver instead of having
-that in the dts.
+The ehci-phy getting turned off was the more pressing reason from what I've 
+read, and we're actually fixing that now :-) .
 
-That's why it's nice to be able to reidentify the phy in the driver again
-via the register/structs introduced, because now you can again know that
-phyX is actually the OTG phy etc.
+One possible way to still solve that would probably be moving the #clock-cells 
+patch before the clock-tree change and merge this dts change into the clk one.
+I'll take a look into that tomorrow.
 
 
 Heiko
