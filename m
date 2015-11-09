@@ -1,72 +1,88 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Mon, 09 Nov 2015 22:08:35 +0100
-Subject: [PATCH v2 4/8] phy: rockchip-usb: expose the phy-internal PLLs
-In-Reply-To: <CAD=FV=VburD9eRtNKL8DZXgspp4-nFVVOz5PnOaT8HvNG5uzFg@mail.gmail.com>
+From: dianders@chromium.org (Doug Anderson)
+Date: Mon, 9 Nov 2015 13:11:18 -0800
+Subject: [PATCH v2 0/8] phy: rockchip-usb: correct pll handling and
+ usb-uart
+In-Reply-To: <1446998681-26436-1-git-send-email-heiko@sntech.de>
 References: <1446998681-26436-1-git-send-email-heiko@sntech.de>
- <1446998681-26436-5-git-send-email-heiko@sntech.de>
- <CAD=FV=VburD9eRtNKL8DZXgspp4-nFVVOz5PnOaT8HvNG5uzFg@mail.gmail.com>
-Message-ID: <40224324.AZ7Q21CbSk@phil>
+Message-ID: <CAD=FV=UCQ7ESi8NiZubAwa9Zzo4uiZHqm96bVMEue=M+Th4pTA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Doug,
+Heiko,
 
-Am Montag, 9. November 2015, 12:59:58 schrieb Doug Anderson:
-> On Sun, Nov 8, 2015 at 8:04 AM, Heiko Stuebner <heiko@sntech.de> wrote:
-> > +static const struct rockchip_usb_phy_pdata rk3066a_pdata = {
-> > +       .phys = (struct rockchip_usb_phys[]){
-> > +               { .reg = 0x17c, .pll_name = "sclk_otgphy0_480m" },
-> > +               { .reg = 0x188, .pll_name = "sclk_otgphy1_480m" },
-> > +               { /* sentinel */ }
-> > +       },
-> > +};
-> > +
-> > +static const struct rockchip_usb_phy_pdata rk3188_pdata = {
-> > +       .phys = (struct rockchip_usb_phys[]){
-> > +               { .reg = 0x10c, .pll_name = "sclk_otgphy0_480m" },
-> > +               { .reg = 0x11c, .pll_name = "sclk_otgphy1_480m" },
-> > +               { /* sentinel */ }
-> > +       },
-> > +};
-> > +
-> > +static const struct rockchip_usb_phy_pdata rk3288_pdata = {
-> > +       .phys = (struct rockchip_usb_phys[]){
-> > +               { .reg = 0x320, .pll_name = "sclk_otgphy0_480m" },
-> > +               { .reg = 0x334, .pll_name = "sclk_otgphy1_480m" },
-> > +               { .reg = 0x348, .pll_name = "sclk_otgphy2_480m" },
-> > +               { /* sentinel */ }
-> > +       },
-> 
-> Slighly annoying to have to add a table for each SoC.  I'd imagine
-> this growing quite large.
-> 
-> Would it be possible to query our parent clock name and then append a
-> "_480m" suffix?  Then you can magically get the name you want, right?
-> That doesn't preclude you from later overriding this or adding a "dts"
-> property for it, but it means no tables for now and (hopefully) for
-> the forseeable future.  ...and you get to kill a bunch of code in this
-> patch...
-> 
-> You could fall back to some generic name based on the PHY device tree
-> node name if you wanted, or use the ID allocator...
-> 
-> 
-> Otherwise, this all looks good to me.  If you have a good reason why
-> using the parent name isn't a good idea, let me know and I can add my
-> Reviewed-by on this patch.
+On Sun, Nov 8, 2015 at 8:04 AM, Heiko Stuebner <heiko@sntech.de> wrote:
+> changes in v2:
+> - add Doug's review-tag to patches 1 and 3
+> - address comment and add the missing transistional rk_phy->base
+>   assignment in patch2
+>
+>
+> Patches 1-7 fix a long-standing issue with the clock-tree of Rockchip SoCs
+> namely our ignorance of the usbphy-internal pll that creates the needed
+> 480MHz but is also a supply-clock back to the core clock-controller in
+> Rockchip SoCs.
+>
+> Till now that was worked around using a virtual clock in the cru itself,
+> but that is of course ignorant of other parts then disabling the phy
+> behind the cru's back, thus breaking potential users of these clocks.
+>
+>
+> Patch 8, while not associated with the new pll handling, also builds
+> on the groundwork introduced there and adds support for the function
+> repurposing one of the phys as passthrough for uart-data. This enables
+> attaching a ttl converter to the D+ and D- pins of an usb cable to
+> receive uart data this way, when it is not really possible to attach
+> a regular serial console to a board.
+>
+> One point of critique in my first iteration [0] of this was, that
+> due to when the reconfiguration happens we may miss parts of the logs
+> when earlycon is enabled. So far early_initcall gets used as the
+> unflattened devicetree is necessary to set this up. Doing this for
+> example in the early_param directly would require parsing the flattened
+> devicetree to get needed nodes and properties.
+>
+> I still maintain that if you're working on anything before smp-bringup
+> you should use a real dev-board instead or try to solder uart cables
+> on hopefully available test-points :-) .
+>
+>
+> In any case, if patch 8 causes to much headache, it could be dropped
+> to not hinder the earlier 7 patches.
+>
+> [0] http://comments.gmane.org/gmane.linux.ports.arm.rockchip/715
+>
+> Heiko Stuebner (8):
+>   phy: rockchip-usb: fix clock get-put mismatch
+>   phy: rockchip-usb: introduce a common data-struct for the device
+>   phy: rockchip-usb: move per-phy init into a separate function
+>   phy: rockchip-usb: expose the phy-internal PLLs
+>   clk: rockchip: fix usbphy-related clocks
+>   ARM: dts: rockchip: add clock-cells for usb phy nodes
+>   ARM: dts: rockchip: assign usbphy480m_src to the new usbphy pll on
+>     veyron
+>   phy: rockchip-usb: add handler for usb-uart functionality
+>
+>  .../devicetree/bindings/phy/rockchip-usb-phy.txt   |   6 +-
+>  Documentation/kernel-parameters.txt                |   6 +
+>  arch/arm/boot/dts/rk3066a.dtsi                     |   2 +
+>  arch/arm/boot/dts/rk3188.dtsi                      |   2 +
+>  arch/arm/boot/dts/rk3288-veyron.dtsi               |   2 +-
+>  arch/arm/boot/dts/rk3288.dtsi                      |   3 +
+>  drivers/clk/rockchip/clk-rk3188.c                  |  11 +-
+>  drivers/clk/rockchip/clk-rk3288.c                  |  16 +-
+>  drivers/phy/phy-rockchip-usb.c                     | 449 ++++++++++++++++++---
+>  9 files changed, 416 insertions(+), 81 deletions(-)
 
-Adding a _480m suffix was my initial solution. But the phy-supply clock
-is actually optional in the binding, so it may not be specified at all.
-Still the code needs this pll to work at all after the change, and
-inventing some completely random clock name seemed very strange
-(like pll_usbphy_REG or something) - especially as this would never
-have worked with the downstream clocks. As it is now, the downstream
-clock-tree will work indepent of the supply clock being specified.
+If you happened to be in the mood for cleaning up this PHY and wanted
+to fix up one more thing that I noticed...
 
-Also Rockchip seems to have moved to a different phy-ip, with one
-supplying clock, one pll and everything more tightly coupled,
-so we're probably getting a new driver for it, instead of additional
-entries for the picophy.
+...you could actually increase the range of registers managed by the
+PHYs.  For instance, in rk3288, the "host1" port isn't just managed by
+1 register, but by 4 (GRF_UOC2_CON0 - GRF_UOC2_CON3).  I think there
+are 5 for the OTG port.
 
+Obviously not required for this series and there's no (current) reason
+to do anything with the rest of those registers, but it might be
+interesting for the future...
 
-Heiko
+-Doug
