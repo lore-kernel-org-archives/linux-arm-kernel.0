@@ -1,70 +1,50 @@
-From: mans@mansr.com (Mans Rullgard)
-Date: Sun,  8 Nov 2015 23:11:40 +0000
-Subject: [PATCH v2] ARM: debug: add support for Palmchip BK-310x UART
-Message-ID: <1447024300-7279-1-git-send-email-mans@mansr.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Sun, 8 Nov 2015 16:04:03 -0800
+Subject: [GIT PULL] Allwinner DT changes for 4.4, round 3
+In-Reply-To: <20151102191923.GO19782@codeaurora.org>
+References: <20151023180711.GA11749@lukather> <4745252.gLSrJNQ42D@wuerfel>
+ <9946613.K7Ehp1DEiL@wuerfel> <20151025201308.GS10947@lukather>
+ <20151026010752.GG14238@localhost>
+ <CAGb2v671MmpRHkWKpOd8kmEbvfTKTU9k7AU_bP+AgRuguodWkQ@mail.gmail.com>
+ <20151026054828.GD4216@localhost> <20151026103409.GX10947@lukather>
+ <CAOesGMjNQeaA0etj0fk0E_QPNLYA3WTaRCfWE7YFz50RoDXu-w@mail.gmail.com>
+ <20151102191923.GO19782@codeaurora.org>
+Message-ID: <20151109000403.GU6114@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some SoCs use a Palmchip BK-310x UART which is mostly 16550 compatible
-but with a different register layout. While this UART has previously
-only been supported in MIPS based chips (Alchemy, Ralink), the ARM based
-SMP87xx series from Sigma Designs also uses it.
+On Mon, Nov 02, 2015 at 11:19:23AM -0800, Stephen Boyd wrote:
+> > >> I've merged this in now. Note that this has resulted in a tree that won't
+> > >> misect cleanly, since having the clk contents merged instead of used as a base
+> > >> for the dt branch means that you could end up in a bisect state that has the DT
+> > >> branch but not the clk branch.
+> > >
+> > > Even if it has been merged before the DT patches have been applied?
+> > > That's not really what I'd expect from bisect :/
+> > 
+> > Yeah, due to the way bisect works, the only way to guarantee
+> > bisectability is if you base the DT branch on top of the clk branch
+> > when you build it. Otherwise the bisect can come down the path of only
+> > having the DT contents not the clk contents.
+> 
+> Why can't the dts changes be applied directly on top of the
+> branch that's in the clk tree and then sent off to arm-soc? The
+> git merge && git commit technique also works, but it introduces
+> an unnecessary merge commit into the history.
 
-This patch allows the debug console to work with this type of UART.
+Wouldn't that mean that you have to rebase your whole DT branch
+whenever a single patch introduces a dependency on some clock patch?
 
-Signed-off-by: Mans Rullgard <mans@mansr.com>
----
-Changes:
-- moved #defines to a separate file
----
- arch/arm/Kconfig.debug            |  9 +++++++++
- arch/arm/include/debug/palmchip.S | 11 +++++++++++
- 2 files changed, 20 insertions(+)
- create mode 100644 arch/arm/include/debug/palmchip.S
+Maxime
 
-diff --git a/arch/arm/Kconfig.debug b/arch/arm/Kconfig.debug
-index 0cfd7f9..2864ed9 100644
---- a/arch/arm/Kconfig.debug
-+++ b/arch/arm/Kconfig.debug
-@@ -1314,6 +1314,7 @@ config DEBUG_SIRFSOC_UART
- config DEBUG_LL_INCLUDE
- 	string
- 	default "debug/sa1100.S" if DEBUG_SA1100
-+	default "debug/palmchip.S" if DEBUG_UART_8250_PALMCHIP
- 	default "debug/8250.S" if DEBUG_LL_UART_8250 || DEBUG_UART_8250
- 	default "debug/at91.S" if DEBUG_AT91_UART
- 	default "debug/asm9260.S" if DEBUG_ASM9260_UART
-@@ -1597,6 +1598,14 @@ config DEBUG_UART_8250_WORD
- 		DEBUG_BCM_KONA_UART || DEBUG_RK32_UART2 || \
- 		DEBUG_BRCMSTB_UART
- 
-+config DEBUG_UART_8250_PALMCHIP
-+	bool "8250 UART is Palmchip BK-310x"
-+	depends on DEBUG_LL_UART_8250 || DEBUG_UART_8250
-+	help
-+	  Palmchip provides a UART implementation compatible with 16550
-+	  except for having a different register layout.  Say Y here if
-+	  the debug UART is of this type.
-+
- config DEBUG_UART_8250_FLOW_CONTROL
- 	bool "Enable flow control for 8250 UART"
- 	depends on DEBUG_LL_UART_8250 || DEBUG_UART_8250
-diff --git a/arch/arm/include/debug/palmchip.S b/arch/arm/include/debug/palmchip.S
-new file mode 100644
-index 0000000..6824b2d
---- /dev/null
-+++ b/arch/arm/include/debug/palmchip.S
-@@ -0,0 +1,11 @@
-+#include <linux/serial_reg.h>
-+
-+#undef UART_TX
-+#undef UART_LSR
-+#undef UART_MSR
-+
-+#define UART_TX 1
-+#define UART_LSR 7
-+#define UART_MSR 8
-+
-+#include <debug/8250.S>
 -- 
-2.6.3
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151108/9ad61516/attachment-0001.sig>
