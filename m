@@ -1,41 +1,33 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 09 Nov 2015 18:14:06 +0100
-Subject: [PATCH] mvneta: add FIXED_PHY dependency
-In-Reply-To: <20151109170849.GC3388@lunn.ch>
-References: <4225885.EYXTHjRPmX@wuerfel> <6910088.dNmooXDTJR@wuerfel>
- <20151109170849.GC3388@lunn.ch>
-Message-ID: <6970717.h7VjJkXjcM@wuerfel>
+From: sstabellini@kernel.org (Stefano Stabellini)
+Date: Mon, 9 Nov 2015 17:14:24 +0000 (GMT)
+Subject: [PATCH 1/3] xen/arm: introduce xen_read_wallclock
+In-Reply-To: <17175481.GKnbuH0F1P@wuerfel>
+References: <alpine.DEB.2.02.1511051706560.13541@kaball.uk.xensource.com>
+ <7480268.6Ff8Mvx46N@wuerfel>
+ <alpine.DEB.2.02.1511091348440.23825@kaball.uk.xensource.com>
+ <17175481.GKnbuH0F1P@wuerfel>
+Message-ID: <alpine.DEB.2.02.1511091712190.23825@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 09 November 2015 18:08:49 Andrew Lunn wrote:
-> > > I suppose it comes down to, are we allowed to optionally implement
-> > > part of the DT binding?
+On Mon, 9 Nov 2015, Arnd Bergmann wrote:
+> On Monday 09 November 2015 13:53:30 Stefano Stabellini wrote:
+> > On Fri, 6 Nov 2015, Arnd Bergmann wrote:
+> > > I'm not quite sure about how the split between pvclock_wall_clock and
+> > > the delta works. Normally I'd expect that pvclock_wall_clock is the wallclock
+> > > time as it was at boot, while delta is the number of expired nanoseconds
+> > > since boot. However it is unclear why the latter has a longer range
+> > > (539 years starting at boot, rather than 126 years starting in 1970).
 > > 
-> > I'm not sure what you are asking. A lot of DT bindings have both
-> > optional and mandatory properties. For mvneta, the "phy" and "phy-mode"
-> > properties are listed as mandatory, so the driver can safely assume
-> > that they are always present. If there are reasons to leave them out,
-> > and for the driver to handle that case correctly, the binding
-> > should be updated to mark them as optional.
+> > Actually we already have a sec overflow field in struct shared_info on
+> > the hypervisor side, called wc_sec_hi. I just need to make use of it in
+> > Linux. See:
+> > 
+> > http://xenbits.xen.org/gitweb/?p=xen.git;a=blob_plain;f=xen/include/public/xen.h;hb=HEAD
+> > 
+> > Thanks for raising my attention to the problem,
 > 
-> Hi Arnd
-> 
-> You are looking at it from the perspective of the driver. I was
-> meaning from the perspective of the DT blob. Can be blob assume the
-> driver implements all of the binding, all of the time?
+> Sounds good for Xen on ARM. This same interface is also used on
+> KVM, right? Does the extension also work there?
 
-That question is not really relevant: the DT describes the hardware,
-it doesn't matter whether there are drivers for all the bits or
-whether all properties are read.
-
-> You use fixed-phy when the MAC is connected to a switch, not a phy. Or
-> when the MAC is connected to an SFP module. The driver can currently
-> be built to not implement the fixed-phy party of the binding. Is that
-> O.K. from the perspective of the DT blob? Or should the driver always
-> implement all of the binding, in which these NOP stubs should be
-> removed and fixed phy always be enabled for the drivers that use it.
-
-Sure, that is ok.
-
-	Arnd
+It doesn't look like it (see arch/x86/kvm/x86.c:kvm_write_wall_clock).
