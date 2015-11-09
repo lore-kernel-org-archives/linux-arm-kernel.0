@@ -1,39 +1,129 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Mon, 9 Nov 2015 11:50:50 +0100
-Subject: [PATCH 0/2] mmc: sdhci: potentially bad behavior when using vmmc
- supply
-In-Reply-To: <20151109102555.GA15706@odux.rfo.atmel.com>
-References: <1446825570-30029-1-git-send-email-ludovic.desroches@atmel.com>
- <CAPDyKFrNNyUrJemgA2OHL35EqpG74_1i9bCqkVkZZZMxNGrHgw@mail.gmail.com>
- <20151109074104.GB27482@odux.rfo.atmel.com>
- <CAPDyKFpC_mKXei14mdD=AYd6YBU0R4D1R=XWpf7BTgX4JDw24w@mail.gmail.com>
- <20151109102555.GA15706@odux.rfo.atmel.com>
-Message-ID: <CAPDyKFqrPNPrJN=9G7MfA0hVhJMecN0DqbOxqk1J57L819Zm3g@mail.gmail.com>
+From: Liviu.Dudau@arm.com (Liviu Dudau)
+Date: Mon, 9 Nov 2015 10:53:16 +0000
+Subject: [RFC PATCH v3 1/4] drm: Introduce generic probe function for
+ component based masters.
+In-Reply-To: <564069CD.2070102@rock-chips.com>
+References: <1445267270-23126-1-git-send-email-Liviu.Dudau@arm.com>
+ <1445267270-23126-2-git-send-email-Liviu.Dudau@arm.com>
+ <564069CD.2070102@rock-chips.com>
+Message-ID: <20151109105316.GD963@e106497-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[...]
+On Mon, Nov 09, 2015 at 05:39:25PM +0800, Mark yao wrote:
+> On 2015?10?19? 23:07, Liviu Dudau wrote:
+> >A lot of component based DRM drivers use a variant of the same code
+> >as the probe function. They bind the crtc ports in the first iteration
+> >and then scan through the child nodes and bind the encoders attached
+> >to the remote endpoints. Factor the common code into a separate
+> >function called drm_of_component_probe() in order to increase code
+> >reuse.
+> >
+> >Cc: David Airlie <airlied@linux.ie>
+> >Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
+> >---
+> >  drivers/gpu/drm/drm_of.c | 88 ++++++++++++++++++++++++++++++++++++++++++++++++
+> >  include/drm/drm_of.h     | 13 +++++++
+> >  2 files changed, 101 insertions(+)
+> >
+> >diff --git a/drivers/gpu/drm/drm_of.c b/drivers/gpu/drm/drm_of.c
+> >index be38840..493c05c 100644
+> >--- a/drivers/gpu/drm/drm_of.c
+> >+++ b/drivers/gpu/drm/drm_of.c
+> >@@ -1,3 +1,4 @@
+> >+#include <linux/component.h>
+> >  #include <linux/export.h>
+> >  #include <linux/list.h>
+> >  #include <linux/of_graph.h>
+> >@@ -61,3 +62,90 @@ uint32_t drm_of_find_possible_crtcs(struct drm_device *dev,
+> >  	return possible_crtcs;
+> >  }
+> >  EXPORT_SYMBOL(drm_of_find_possible_crtcs);
+> >+
+> >+/**
+> >+ * drm_of_component_probe - Generic probe function for a component based master
+> >+ * @dev: master device containing the OF node
+> >+ * @compare_of: compare function used for matching components
+> >+ * @master_ops: component master ops to be used
+> >+ *
+> >+ * Parse the platform device OF node and bind all the components associated
+> >+ * with the master. Interface ports are added before the encoders in order to
+> >+ * satisfy their .bind requirements
+> >+ * See Documentation/devicetree/bindings/graph.txt for the bindings.
+> >+ *
+> >+ * Returns zero if successful, or one of the standard error codes if it fails.
+> >+ */
+> >+int drm_of_component_probe(struct device *dev,
+> >+			   int (*compare_of)(struct device *, void *),
+> >+			   const struct component_master_ops *m_ops)
+> >+{
+> >+	struct device_node *ep, *port, *remote;
+> >+	struct component_match *match = NULL;
+> >+	int i;
+> >+
+> >+	if (!dev->of_node)
+> >+		return -EINVAL;
+> >+
+> >+	/*
+> >+	 * Bind the crtc's ports first, so that drm_of_find_possible_crtcs()
+> >+	 * called from encoder's .bind callbacks works as expected
+> >+	 */
+> >+	for (i = 0; ; i++) {
+> >+		port = of_parse_phandle(dev->of_node, "ports", i);
+> >+		if (!port)
+> >+			break;
+> >+
+> >+		if (!of_device_is_available(port->parent)) {
+> >+			of_node_put(port);
+> >+			continue;
+> >+		}
+> >+
+> >+		component_match_add(dev, &match, compare_of, port);
+> Hi Liviu
+>       Rockchip drm can't work with drm_of_component_probe function now,
+> 
+>       At drm_of_component_probe:
+>             component_match_add(dev, &match, compare_of, port);
+>       And original rockchip drm use:
+>             component_match_add(dev, &match, compare_of, port->parent);
+> 
+>      That different "port" and "port->parent" cause crtc device node always
+> mis-match.
+> 
+>      I'm confused that rockchip use same dts node map as imx drm driver, but
+> it works
+> for imx drm, not work on rockchip drm.
 
->>
->> This doesn't seems like a case where a gpio regulator should be used
->> and I am not sure what problem it would solve. Beside to suppress the
->> log warnings (actually those aren't warnings but informations).
->>
->> Isn't sdhci_do_start_signal_voltage_switch() doing what you need here?
->>
->
-> It is. I am only wondering the best way to describe the hardware:
-> - No regulator but I have the 'no vqmmc regulator not found' message which
->   is a bit annoying and which can be interpreted as an issue for someone
->   who has no knowledge about this stuff.
+Hi Mark,
 
-Hmm, should we turn them into debug messages? Both regulators are optional.
+I'm (slightly) confused as well. The drivers are different so there must be a reason
+to account for the different behaviour. Unfortunately I don't have a Rockchip based
+platform ready for testing, so I would appreciate if you could add some debugging
+messages to drm_of_component_probe() when component_match_add is being called and
+compare that with the version before my patch.
 
-> - Describe the regulator since there is one on my board. But it is not a
->   fixed regulator and even if it's close to a gpio one it is not.
+Best regards,
+Liviu
 
-If it's driven by SDHCI internal logic, I would leave it to that.
-There are no need to describe it at all.
 
-Kind regards
-Uffe
+> 
+> >+		of_node_put(port);
+> >+	}
+> >
+> -- ?ark Yao
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
+-- 
+====================
+| I would like to |
+| fix the world,  |
+| but they're not |
+| giving me the   |
+ \ source code!  /
+  ---------------
+    ?\_(?)_/?
