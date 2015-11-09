@@ -1,48 +1,37 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 9 Nov 2015 12:19:24 -0600
-Subject: [PATCH V3 4/4] dma: add Qualcomm Technologies HIDMA channel driver
-In-Reply-To: <1446958380-23298-5-git-send-email-okaya@codeaurora.org>
-References: <1446958380-23298-1-git-send-email-okaya@codeaurora.org>
- <1446958380-23298-5-git-send-email-okaya@codeaurora.org>
-Message-ID: <20151109181924.GA5205@rob-hp-laptop>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 9 Nov 2015 18:20:55 +0000
+Subject: [PATCH V2 0/2] arm64: cleanup FRAME_POINTER kconfig option and
+ force to select it
+In-Reply-To: <5640E300.2000001@linaro.org>
+References: <1447091037-11434-1-git-send-email-yang.shi@linaro.org>
+ <20151109181422.GE21606@e104818-lin.cambridge.arm.com>
+ <5640E300.2000001@linaro.org>
+Message-ID: <20151109182055.GF21606@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Nov 07, 2015 at 11:53:00PM -0500, Sinan Kaya wrote:
-> This patch adds support for hidma engine. The driver
-> consists of two logical blocks. The DMA engine interface
-> and the low-level interface. The hardware only supports
-> memcpy/memset and this driver only support memcpy
-> interface. HW and driver doesn't support slave interface.
+On Mon, Nov 09, 2015 at 10:16:32AM -0800, Shi, Yang wrote:
+> On 11/9/2015 10:14 AM, Catalin Marinas wrote:
+> >On Mon, Nov 09, 2015 at 09:43:55AM -0800, Yang Shi wrote:
+> >>According to the discussion on the mailing list, this version adds a new patch
+> >>to force select FRAME_POINTER for ARM64.
+> >>
+> >>Change v2 --> v1:
+> >>1. Adds a new patch to force select FRAME_POINTER
+> >>2. Notes that this change adds a dependency on DEBUG_KERNEL for building with
+> >>frame pointers
+> >>
+> >>
+> >>Yang Shi (2):
+> >>       arm64: remove redundant FRAME_POINTER kconfig option
+> >>       arm64: force to select FRAME_POINTER
+> >
+> >Do you really need two patches for this?
 > 
-> Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
-> ---
->  .../devicetree/bindings/dma/qcom_hidma.txt         |  18 +
->  drivers/dma/qcom/Kconfig                           |   9 +
->  drivers/dma/qcom/Makefile                          |   2 +
->  drivers/dma/qcom/hidma.c                           | 743 ++++++++++++++++
->  drivers/dma/qcom/hidma.h                           | 157 ++++
->  drivers/dma/qcom/hidma_dbg.c                       | 225 +++++
->  drivers/dma/qcom/hidma_ll.c                        | 944 +++++++++++++++++++++
->  7 files changed, 2098 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/dma/qcom_hidma.txt
->  create mode 100644 drivers/dma/qcom/hidma.c
->  create mode 100644 drivers/dma/qcom/hidma.h
->  create mode 100644 drivers/dma/qcom/hidma_dbg.c
->  create mode 100644 drivers/dma/qcom/hidma_ll.c
-> 
-> diff --git a/Documentation/devicetree/bindings/dma/qcom_hidma.txt b/Documentation/devicetree/bindings/dma/qcom_hidma.txt
-> new file mode 100644
-> index 0000000..c9fb2d44
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/dma/qcom_hidma.txt
-> @@ -0,0 +1,18 @@
-> +Qualcomm Technologies HIDMA Channel driver
-> +
-> +Required properties:
-> +- compatible: must contain "qcom,hidma"
+> I just thought it may be clearer in this way. If nobody thinks it is
+> necessary, I definitely could merge them into one.
 
-This should be "qcom,hidma-1.0" to match the example and driver. I 
-would drop "qcom,hidma" altogether.
+Please merge them into one.
 
-Rob
+-- 
+Catalin
