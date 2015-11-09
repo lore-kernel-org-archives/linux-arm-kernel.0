@@ -1,33 +1,49 @@
 From: sstabellini@kernel.org (Stefano Stabellini)
-Date: Mon, 9 Nov 2015 17:14:24 +0000 (GMT)
-Subject: [PATCH 1/3] xen/arm: introduce xen_read_wallclock
-In-Reply-To: <17175481.GKnbuH0F1P@wuerfel>
+Date: Mon, 9 Nov 2015 17:17:39 +0000 (GMT)
+Subject: [PATCH 3/3] xen/arm: set the system time in Xen via the
+ XENPF_settime hypercall
+In-Reply-To: <22638556.UuzKE0hp21@wuerfel>
 References: <alpine.DEB.2.02.1511051706560.13541@kaball.uk.xensource.com>
- <7480268.6Ff8Mvx46N@wuerfel>
- <alpine.DEB.2.02.1511091348440.23825@kaball.uk.xensource.com>
- <17175481.GKnbuH0F1P@wuerfel>
-Message-ID: <alpine.DEB.2.02.1511091712190.23825@kaball.uk.xensource.com>
+ <6188457.uvvdcZaVNM@wuerfel>
+ <alpine.DEB.2.02.1511061510190.23825@kaball.uk.xensource.com>
+ <22638556.UuzKE0hp21@wuerfel>
+Message-ID: <alpine.DEB.2.02.1511091714460.23825@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Mon, 9 Nov 2015, Arnd Bergmann wrote:
-> On Monday 09 November 2015 13:53:30 Stefano Stabellini wrote:
-> > On Fri, 6 Nov 2015, Arnd Bergmann wrote:
-> > > I'm not quite sure about how the split between pvclock_wall_clock and
-> > > the delta works. Normally I'd expect that pvclock_wall_clock is the wallclock
-> > > time as it was at boot, while delta is the number of expired nanoseconds
-> > > since boot. However it is unclear why the latter has a longer range
-> > > (539 years starting at boot, rather than 126 years starting in 1970).
+> On Monday 09 November 2015 14:10:22 Stefano Stabellini wrote:
+> > On Thu, 5 Nov 2015, Arnd Bergmann wrote:
+> > > On Thursday 05 November 2015 17:09:45 Stefano Stabellini wrote:
+> > > > +	now = __current_kernel_time();
+> > > 
+> > > We don't have __current_kernel_time64() yet, but it is trivial
+> > > to add, just follow the example of
+> > > current_kernel_time()/current_kernel_time64() and convert the
+> > > existing __current_kernel_time() function into a static
+> > > inline wrapper for the new __current_kernel_time64().
 > > 
-> > Actually we already have a sec overflow field in struct shared_info on
-> > the hypervisor side, called wc_sec_hi. I just need to make use of it in
-> > Linux. See:
+> > All right. I guess something like:
 > > 
-> > http://xenbits.xen.org/gitweb/?p=xen.git;a=blob_plain;f=xen/include/public/xen.h;hb=HEAD
+> > struct timespec64 __current_kernel_time64(void)
+> > {
+> > 	struct timekeeper *tk = &tk_core.timekeeper;
 > > 
-> > Thanks for raising my attention to the problem,
+> > 	return tk_xtime(tk);
+> > }
 > 
-> Sounds good for Xen on ARM. This same interface is also used on
-> KVM, right? Does the extension also work there?
+> Yes, exactly.
+> 
+> Just to make sure that this is actually the correct interface
+> that you want to call:
+> 
+> __current_kernel_time{,64}() is the fastest interface we have
+> to get an approximation of the current time, while ignoring
+> all of the locking.
+> 
+> Is is possible that you instead want ktime_get_real_ts64(),
+> which gives you the time as precise as the kernel knows it,
+> but uses locking?
 
-It doesn't look like it (see arch/x86/kvm/x86.c:kvm_write_wall_clock).
+I am not 100% sure. Can I call ktime_get_real_ts64 from a
+pvclock_gtod notifier_call function?
