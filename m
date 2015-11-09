@@ -1,105 +1,68 @@
-From: jungseoklee85@gmail.com (Jungseok Lee)
-Date: Mon, 9 Nov 2015 23:04:06 +0900
-Subject: [PATCH v5 2/6] arm64: ftrace: fix a stack tracer's output under
- function graph tracer
-In-Reply-To: <1446792285-1154-3-git-send-email-takahiro.akashi@linaro.org>
-References: <1446792285-1154-1-git-send-email-takahiro.akashi@linaro.org>
- <1446792285-1154-3-git-send-email-takahiro.akashi@linaro.org>
-Message-ID: <3F63B5BC-C21A-4ECA-9800-374B924DB98D@gmail.com>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Mon, 9 Nov 2015 09:07:36 -0500
+Subject: [PATCH V2 1/3] scsi: mptxsas: try 64 bit DMA when 32 bit DMA fails
+In-Reply-To: <4041362.9GKaSPm9gs@wuerfel>
+References: <1447034266-28003-1-git-send-email-okaya@codeaurora.org>
+ <1447034266-28003-2-git-send-email-okaya@codeaurora.org>
+ <564046B3.8090505@suse.de> <4041362.9GKaSPm9gs@wuerfel>
+Message-ID: <5640A8A8.90203@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Nov 6, 2015, at 3:44 PM, AKASHI Takahiro wrote:
 
-Hi Akashi,
 
-> Function graph tracer modifies a return address (LR) in a stack frame
-> to hook a function return. This will result in many useless entries
-> (return_to_handler) showing up in a stack tracer's output.
-> 
-> This patch replaces such entries with originals values preserved in
-> current->ret_stack[].
-> 
-> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-> ---
-> arch/arm64/include/asm/ftrace.h |    2 ++
-> arch/arm64/kernel/stacktrace.c  |   21 +++++++++++++++++++++
-> 2 files changed, 23 insertions(+)
-> 
-> diff --git a/arch/arm64/include/asm/ftrace.h b/arch/arm64/include/asm/ftrace.h
-> index c5534fa..3c60f37 100644
-> --- a/arch/arm64/include/asm/ftrace.h
-> +++ b/arch/arm64/include/asm/ftrace.h
-> @@ -28,6 +28,8 @@ struct dyn_arch_ftrace {
-> 
-> extern unsigned long ftrace_graph_call;
-> 
-> +extern void return_to_handler(void);
-> +
-> static inline unsigned long ftrace_call_adjust(unsigned long addr)
-> {
-> 	/*
-> diff --git a/arch/arm64/kernel/stacktrace.c b/arch/arm64/kernel/stacktrace.c
-> index ccb6078..5fd3477 100644
-> --- a/arch/arm64/kernel/stacktrace.c
-> +++ b/arch/arm64/kernel/stacktrace.c
-> @@ -17,6 +17,7 @@
->  */
-> #include <linux/kernel.h>
-> #include <linux/export.h>
-> +#include <linux/ftrace.h>
-> #include <linux/sched.h>
-> #include <linux/stacktrace.h>
-> 
-> @@ -73,6 +74,9 @@ struct stack_trace_data {
-> 	struct stack_trace *trace;
-> 	unsigned int no_sched_functions;
-> 	unsigned int skip;
-> +#ifdef CONFIG_FUNCTION_GRAPH_TRACER
-> +	unsigned int ret_stack_index;
-> +#endif
-> };
-> 
-> static int save_trace(struct stackframe *frame, void *d)
-> @@ -81,6 +85,20 @@ static int save_trace(struct stackframe *frame, void *d)
-> 	struct stack_trace *trace = data->trace;
-> 	unsigned long addr = frame->pc;
-> 
-> +#ifdef CONFIG_FUNCTION_GRAPH_TRACER
-> +	if (addr == (unsigned long)return_to_handler - AARCH64_INSN_SIZE) {
+On 11/9/2015 3:59 AM, Arnd Bergmann wrote:
+> On Monday 09 November 2015 08:09:39 Hannes Reinecke wrote:
+>> On 11/09/2015 02:57 AM, Sinan Kaya wrote:
+>>> Current code gives up when 32 bit DMA is not supported.
+>>> This problem has been observed on systems without any
+>>> memory below 4 gig.
+>>>
+>>> This patch tests 64 bit support before bailing out to find
+>>> a working combination.
+>>>
+>> That feels decidedly odd.
+>>
+>> Why do you probe for 64bit if 32bit fails?
+>
+> 32-bit DMA mask on PCI cannot fail, we rely on that in all sorts
+> of places. If the machine has all of its RAM visible above 4GB
+> PCI bus addresses, it must use an IOMMU.
 
-not if (adds == (unsigned long)return_to_handler)?
+Can you be specific? PCIe does not have this limitation. It supports 32 
+bit and 64 bit TLPs.
 
-> +		/*
-> +		 * This is a case where function graph tracer has
-> +		 * modified a return address (LR) in a stack frame
-> +		 * to hook a function return.
-> +		 * So replace it to an original value.
-> +		 */
-> +		frame->pc = addr =
-> +			current->ret_stack[data->ret_stack_index--].ret
-> +							- AARCH64_INSN_SIZE;
+I have not seen any limitation so far in the OS either.
 
-Ditto. not without AARCH64_INSN_SIZE?
+Using IOMMU is fine but not required if the endpoint is a true 64 bit 
+supporting endpoint. This endpoint supports 64bit too.
 
-I've observed many return_to_handler without the changes.
-Am I missing something?
+>
+>> Typically it's the other way round, on the grounds that 64bit DMA
+>> should be preferred over 32bit.
+>> Can you explain why it needs to be done the other way round here?
+>
+> Something else is odd here, the driver already checks for
+> dma_get_required_mask(), which will return the smallest mask
+> that fits all of RAM. If the machine has any memory above 4GB,
+> it already uses the 64-bit mask, and only falls back to
+> the 32-bit mask if that fails or if all memory fits within the
+> first 4GB.
+>
 
-> +	}
-> +#endif /* CONFIG_FUNCTION_GRAPH_TRACER */
-> +
-> 	if (data->no_sched_functions && in_sched_functions(addr))
-> 		return 0;
-> 	if (data->skip) {
-> @@ -100,6 +118,9 @@ void save_stack_trace_tsk(struct task_struct *tsk, struct stack_trace *trace)
-> 
-> 	data.trace = trace;
-> 	data.skip = trace->skip;
-> +#ifdef CONFIG_FUNCTION_GRAPH_TRACER
-> +	data.ret_stack_index = current->curr_ret_stack;
+I'll add some prints in the code to get to the bottom of it. I think the 
+code is checking more than just the required mask and failing in one of 
+the other conditions. At least that DMA comparison code was more than 
+what I have ever seen.
 
-Can I get an idea on why current->curr_ret_stack is used instead of
-tsk->curr_ret_stack?
 
-Best Regards
-Jungseok Lee
+> So both the description and the patch are wrong. :(
+>
+> 	Arnd
+>
+
+-- 
+Sinan Kaya
+Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a 
+Linux Foundation Collaborative Project
