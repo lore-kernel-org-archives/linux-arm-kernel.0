@@ -1,27 +1,22 @@
 From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 9 Nov 2015 14:27:14 +0000
-Subject: [PATCH 2/2] arm64: fix R/O permissions of FDT mapping
-In-Reply-To: <1447059346-12050-3-git-send-email-ard.biesheuvel@linaro.org>
+Date: Mon, 9 Nov 2015 14:27:41 +0000
+Subject: [PATCH 0/2] arm64 STRICT_MM_TYPECHECKS fixes
+In-Reply-To: <1447059346-12050-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1447059346-12050-1-git-send-email-ard.biesheuvel@linaro.org>
- <1447059346-12050-3-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20151109142714.GA21606@e104818-lin.cambridge.arm.com>
+Message-ID: <20151109142740.GB21606@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 09, 2015 at 09:55:46AM +0100, Ard Biesheuvel wrote:
-> The mapping permissions of the FDT are set to 'PAGE_KERNEL | PTE_RDONLY'
-> in an attempt to map the FDT as read-only. However, not only does this
-> break at build time under STRICT_MM_TYPECHECKS (since the two terms are
-> of different types in that case), it also results in both the PTE_WRITE
-> and PTE_RDONLY attributes to be set, which means the region is still
-> writable under ARMv8.1 DBM (and an attempted write will simply clear the
-> PT_RDONLY bit).
+On Mon, Nov 09, 2015 at 09:55:44AM +0100, Ard Biesheuvel wrote:
+> Just a couple of things I spotted when building with STRICT_MM_TYPECHECKS
+> enabled, one of which is in new code (current merge window) and the other
+> is in code that I introduced myself in the FDT fixmap remapping code.
 > 
-> So instead, define PAGE_KERNEL_RO (which already has an established
-> meaning across architectures) and use that instead.
+> Ard Biesheuvel (2):
+>   arm64: fix STRICT_MM_TYPECHECKS issue in PTE_CONT manipulation
+>   arm64: fix R/O permissions of FDT mapping
 
-I guess we don't need cc stable for this, it's only if the kernel has
-some other bug that writes the mapped fdt.
+Both patches applied.
 
 -- 
 Catalin
