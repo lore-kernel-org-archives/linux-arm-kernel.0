@@ -1,145 +1,109 @@
 From: wxt@rock-chips.com (Caesar Wang)
-Date: Mon,  9 Nov 2015 12:48:57 +0800
-Subject: [PATCH v4 05/10] thermal: rockchip: Add the sort mode for adc value
- increment or decrement
+Date: Mon,  9 Nov 2015 12:48:58 +0800
+Subject: [PATCH v4 06/10] thermal: rockchip: consistently use int for
+ temperatures
 In-Reply-To: <1447044542-30859-1-git-send-email-wxt@rock-chips.com>
 References: <1447044542-30859-1-git-send-email-wxt@rock-chips.com>
-Message-ID: <1447044542-30859-6-git-send-email-wxt@rock-chips.com>
+Message-ID: <1447044542-30859-7-git-send-email-wxt@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The conversion table has the adc value and temperature.
-In fact, the adc value only has the increment or decrement mode in
-conversion table.
-
-Moment, we can add the sort mode to be better support the *code_to_temp*
-for differenr SoCs.
+As Temperature is currently represented as int not long in the thermal
+framework since use int intead of unsigned long/long to represent
+temperature to avoid bogus overheat detection when negative temperature
+reported.
 
 Signed-off-by: Caesar Wang <wxt@rock-chips.com>
 
 ---
 
 Changes in v4:
-- rename the flag as mode.
-- with enum type instead of bool type.
+- fix the warning from the print message.
 
 Changes in v3:
-- rename the flag-> sort_flag.
-- fix the indentation.
-- change the pr_err information.
+- As the Patch v2 comments, Add a new patch to fix it.
 
 Changes in v2: None
 Changes in v1: None
 
- drivers/thermal/rockchip_thermal.c | 68 +++++++++++++++++++++++++++++---------
- 1 file changed, 53 insertions(+), 15 deletions(-)
+ drivers/thermal/rockchip_thermal.c | 16 ++++++++--------
+ 1 file changed, 8 insertions(+), 8 deletions(-)
 
 diff --git a/drivers/thermal/rockchip_thermal.c b/drivers/thermal/rockchip_thermal.c
-index bbf082c..7c5b784 100644
+index 7c5b784..73d47f8 100644
 --- a/drivers/thermal/rockchip_thermal.c
 +++ b/drivers/thermal/rockchip_thermal.c
-@@ -54,6 +54,16 @@ enum sensor_id {
+@@ -88,7 +88,7 @@ struct rockchip_tsadc_chip {
+ 	int chn_num;
+ 
+ 	/* The hardware-controlled tshut property */
+-	long tshut_temp;
++	int tshut_temp;
+ 	enum tshut_mode tshut_mode;
+ 	enum tshut_polarity tshut_polarity;
+ 
+@@ -101,7 +101,7 @@ struct rockchip_tsadc_chip {
+ 	int (*get_temp)(struct chip_tsadc_table table,
+ 			int chn, void __iomem *reg, int *temp);
+ 	void (*set_tshut_temp)(struct chip_tsadc_table table,
+-			       int chn, void __iomem *reg, long temp);
++			       int chn, void __iomem *reg, int temp);
+ 	void (*set_tshut_mode)(int chn, void __iomem *reg, enum tshut_mode m);
+ 
+ 	/* Per-table methods */
+@@ -126,7 +126,7 @@ struct rockchip_thermal_data {
+ 
+ 	void __iomem *regs;
+ 
+-	long tshut_temp;
++	int tshut_temp;
+ 	enum tshut_mode tshut_mode;
+ 	enum tshut_polarity tshut_polarity;
+ };
+@@ -160,7 +160,7 @@ struct rockchip_thermal_data {
+ 
+ struct tsadc_table {
+ 	u32 code;
+-	long temp;
++	int temp;
  };
  
- /**
-+* The conversion table has the adc value and temperature.
-+* ADC_DECREMENT is the adc value decremnet.(e.g. v2_code_table)
-+* ADC_INCREMNET is the adc value incremnet.(e.g. v3_code_table)
-+*/
-+enum adc_sort_mode {
-+	ADC_DECREMENT = 0,
-+	ADC_INCREMENT,
-+};
-+
-+/**
-  * The max sensors is two in rockchip SoCs.
-  * Two sensors: CPU and GPU sensor.
-  */
-@@ -67,6 +77,9 @@ struct chip_tsadc_table {
- 
- 	/* that analogic mask data */
- 	u32 data_mask;
-+
-+	/* the sort mode is adc value that increment or decrement in table */
-+	enum adc_sort_mode mode;
+ static const struct tsadc_table v2_code_table[] = {
+@@ -202,7 +202,7 @@ static const struct tsadc_table v2_code_table[] = {
  };
  
- struct rockchip_tsadc_chip {
-@@ -224,19 +237,43 @@ static int rk_tsadcv2_code_to_temp(struct chip_tsadc_table table, u32 code,
+ static u32 rk_tsadcv2_temp_to_code(struct chip_tsadc_table table,
+-				   long temp)
++				   int temp)
+ {
+ 	int high, low, mid;
  
- 	WARN_ON(table.length < 2);
+@@ -356,7 +356,7 @@ static int rk_tsadcv2_get_temp(struct chip_tsadc_table table,
+ }
  
--	code &= table.data_mask;
--	if (code < table.id[high].code)
--		return -EAGAIN;		/* Incorrect reading */
--
--	while (low <= high) {
--		if (code >= table.id[mid].code &&
--		    code < table.id[mid - 1].code)
--			break;
--		else if (code < table.id[mid].code)
--			low = mid + 1;
--		else
--			high = mid - 1;
--		mid = (low + high) / 2;
-+	switch (table.mode) {
-+	case ADC_DECREMENT:
-+		code &= table.data_mask;
-+		if (code < table.id[high].code)
-+			return -EAGAIN;		/* Incorrect reading */
-+
-+		while (low <= high) {
-+			if (code >= table.id[mid].code &&
-+			    code < table.id[mid - 1].code)
-+				break;
-+			else if (code < table.id[mid].code)
-+				low = mid + 1;
-+			else
-+				high = mid - 1;
-+
-+			mid = (low + high) / 2;
-+		}
-+		break;
-+	case ADC_INCREMENT:
-+		code &= table.data_mask;
-+		if (code < table.id[low].code)
-+			return -EAGAIN;		/* Incorrect reading */
-+
-+		while (low <= high) {
-+			if (code >= table.id[mid - 1].code &&
-+			    code < table.id[mid].code)
-+				break;
-+			else if (code > table.id[mid].code)
-+				low = mid + 1;
-+			else
-+				high = mid - 1;
-+
-+			mid = (low + high) / 2;
-+		}
-+		break;
-+	default:
-+		pr_err("Invalid the conversion table\n");
+ static void rk_tsadcv2_tshut_temp(struct chip_tsadc_table table,
+-				  int chn, void __iomem *regs, long temp)
++				  int chn, void __iomem *regs, int temp)
+ {
+ 	u32 tshut_value, val;
+ 
+@@ -469,7 +469,7 @@ static int rockchip_configure_from_dt(struct device *dev,
+ 
+ 	if (of_property_read_u32(np, "rockchip,hw-tshut-temp", &shut_temp)) {
+ 		dev_warn(dev,
+-			 "Missing tshut temp property, using default %ld\n",
++			 "Missing tshut temp property, using default %d\n",
+ 			 thermal->chip->tshut_temp);
+ 		thermal->tshut_temp = thermal->chip->tshut_temp;
+ 	} else {
+@@ -477,7 +477,7 @@ static int rockchip_configure_from_dt(struct device *dev,
  	}
  
- 	/*
-@@ -246,8 +283,8 @@ static int rk_tsadcv2_code_to_temp(struct chip_tsadc_table table, u32 code,
- 	 * to produce less granular result.
- 	 */
- 	num = table.id[mid].temp - v2_code_table[mid - 1].temp;
--	num *= table.id[mid - 1].code - code;
--	denom = table.id[mid - 1].code - table.id[mid].code;
-+	num *= abs(table.id[mid - 1].code - code);
-+	denom = abs(table.id[mid - 1].code - table.id[mid].code);
- 	*temp = table.id[mid - 1].temp + (num / denom);
- 
- 	return 0;
-@@ -368,6 +405,7 @@ static const struct rockchip_tsadc_chip rk3288_tsadc_data = {
- 		.id = v2_code_table,
- 		.length = ARRAY_SIZE(v2_code_table),
- 		.data_mask = TSADCV2_DATA_MASK,
-+		.mode = ADC_DECREMENT,
- 	},
- };
- 
+ 	if (thermal->tshut_temp > INT_MAX) {
+-		dev_err(dev, "Invalid tshut temperature specified: %ld\n",
++		dev_err(dev, "Invalid tshut temperature specified: %d\n",
+ 			thermal->tshut_temp);
+ 		return -ERANGE;
+ 	}
 -- 
 1.9.1
