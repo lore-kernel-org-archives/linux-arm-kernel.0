@@ -1,77 +1,70 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Mon,  9 Nov 2015 10:33:19 +0900
-Subject: [PATCH 2/2] ARM: shmobile: gose: Configure PFC in DT
-In-Reply-To: <1447032799-13155-1-git-send-email-horms+renesas@verge.net.au>
-References: <1447032799-13155-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1447032799-13155-3-git-send-email-horms+renesas@verge.net.au>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Sun,  8 Nov 2015 20:57:45 -0500
+Subject: [PATCH V2 2/3] scsi: fix compiler warning for sg
+In-Reply-To: <1447034266-28003-1-git-send-email-okaya@codeaurora.org>
+References: <1447034266-28003-1-git-send-email-okaya@codeaurora.org>
+Message-ID: <1447034266-28003-3-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Configure PFC for the already enabled scif and ethernet devices
-in the device tree for the gose board.
+The MULDIV macro has been designed for small numbers.
+Compiler emits an overflow warning on 64 bit systems.
+This patch uses 64 bit numbers in order to suppress
+warning.
 
-Based on similar work for the koelsch board by Laurent Pinchart and
-Sergei Shtylyov.
-
-Cc: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-Cc: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
 ---
- arch/arm/boot/dts/r8a7793-gose.dts | 31 +++++++++++++++++++++++++++++++
- 1 file changed, 31 insertions(+)
+ drivers/scsi/sg.c | 20 +++++++++++++-------
+ 1 file changed, 13 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r8a7793-gose.dts b/arch/arm/boot/dts/r8a7793-gose.dts
-index 96443ec5f6ab..1575ef759047 100644
---- a/arch/arm/boot/dts/r8a7793-gose.dts
-+++ b/arch/arm/boot/dts/r8a7793-gose.dts
-@@ -37,7 +37,32 @@
- 	clock-frequency = <20000000>;
- };
+diff --git a/drivers/scsi/sg.c b/drivers/scsi/sg.c
+index 9d7b7db..112d8974 100644
+--- a/drivers/scsi/sg.c
++++ b/drivers/scsi/sg.c
+@@ -51,6 +51,7 @@ static int sg_version_num = 30536;	/* 2 digits for each component */
+ #include <linux/atomic.h>
+ #include <linux/ratelimit.h>
+ #include <linux/uio.h>
++#include <asm/div64.h>
  
-+&pfc {
-+	scif0_pins: serial0 {
-+		renesas,groups = "scif0_data_d";
-+		renesas,function = "scif0";
-+	};
+ #include "scsi.h"
+ #include <scsi/scsi_dbg.h>
+@@ -85,12 +86,17 @@ static void sg_proc_cleanup(void);
+  * Replacing muldiv(x) by muldiv(x)=((x % d) * m) / d + int(x / d) * m
+  * calculates the same, but prevents the overflow when both m and d
+  * are "small" numbers (like HZ and USER_HZ).
+- * Of course an overflow is inavoidable if the result of muldiv doesn't fit
+- * in 32 bits.
+  */
+-#define MULDIV(X,MUL,DIV) ((((X % DIV) * MUL) / DIV) + ((X / DIV) * MUL))
++static inline u64 mult_frac64(u64 x, u32 numer, u32 denom)
++{
++	u64 r1 = do_div(x, denom);
++	u64 r2 = r1 * numer;
 +
-+	scif1_pins: serial1 {
-+		renesas,groups = "scif1_data_d";
-+		renesas,function = "scif1";
-+	};
-+
-+	ether_pins: ether {
-+		renesas,groups = "eth_link", "eth_mdio", "eth_rmii";
-+		renesas,function = "eth";
-+	};
-+
-+	phy1_pins: phy1 {
-+		renesas,groups = "intc_irq0";
-+		renesas,function = "intc";
-+	};
-+};
-+
- &ether {
-+	pinctrl-0 = <&ether_pins &phy1_pins>;
-+	pinctrl-names = "default";
-+
- 	phy-handle = <&phy1>;
- 	renesas,ether-link-active-low;
- 	status = "okay";
-@@ -55,9 +80,15 @@
- };
++	do_div(r2, denom);
++	return (x * numer) + r2;
++}
  
- &scif0 {
-+	pinctrl-0 = <&scif0_pins>;
-+	pinctrl-names = "default";
-+
- 	status = "okay";
- };
+-#define SG_DEFAULT_TIMEOUT MULDIV(SG_DEFAULT_TIMEOUT_USER, HZ, USER_HZ)
++#define SG_DEFAULT_TIMEOUT mult_frac64(SG_DEFAULT_TIMEOUT_USER, HZ, USER_HZ)
  
- &scif1 {
-+	pinctrl-0 = <&scif1_pins>;
-+	pinctrl-names = "default";
-+
- 	status = "okay";
- };
+ int sg_big_buff = SG_DEF_RESERVED_SIZE;
+ /* N.B. This variable is readable and writeable via
+@@ -877,10 +883,10 @@ sg_ioctl(struct file *filp, unsigned int cmd_in, unsigned long arg)
+ 			return result;
+ 		if (val < 0)
+ 			return -EIO;
+-		if (val >= MULDIV (INT_MAX, USER_HZ, HZ))
+-		    val = MULDIV (INT_MAX, USER_HZ, HZ);
++		if (val >= mult_frac64(INT_MAX, USER_HZ, HZ))
++			val = mult_frac64(INT_MAX, USER_HZ, HZ);
+ 		sfp->timeout_user = val;
+-		sfp->timeout = MULDIV (val, HZ, USER_HZ);
++		sfp->timeout = mult_frac64(val, HZ, USER_HZ);
+ 
+ 		return 0;
+ 	case SG_GET_TIMEOUT:	/* N.B. User receives timeout as return value */
 -- 
-2.1.4
+Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux Foundation Collaborative Project
