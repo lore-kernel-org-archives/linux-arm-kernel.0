@@ -1,44 +1,66 @@
-From: andrew@lunn.ch (Andrew Lunn)
-Date: Mon, 9 Nov 2015 17:42:32 +0100
-Subject: [PATCH] mvneta: add FIXED_PHY dependency
-In-Reply-To: <4225885.EYXTHjRPmX@wuerfel>
-References: <4225885.EYXTHjRPmX@wuerfel>
-Message-ID: <20151109164232.GB3388@lunn.ch>
+From: afd@ti.com (Andrew F. Davis)
+Date: Mon, 9 Nov 2015 10:56:13 -0600
+Subject: [PATCH] power: bq27xxx_battery: Revert "Remove unneeded
+ dependency in Kconfig"
+In-Reply-To: <3819790.E2ziFviWmU@wuerfel>
+References: <3819790.E2ziFviWmU@wuerfel>
+Message-ID: <5640D02D.6040601@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 09, 2015 at 03:08:57PM +0100, Arnd Bergmann wrote:
-> The fixed_phy infrastructure is done in a way that is optional,
-> by providing 'static inline' helper functions doing nothing in
-> include/linux/phy_fixed.h for all its APIs. However, three out
-> of the four users (DSA, BCMGENET, and SYSTEMPORT) always
-> 'select FIXED_PHY', presumably because they need that.
+On 11/09/2015 07:50 AM, Arnd Bergmann wrote:
+> The dependency was clearly needed, without it it is possible to
+> build the core i2c driver as a loadable module and the bq27xxx
+> driver built-in, which results in link errors:
+>
+> drivers/built-in.o: In function `bq27xxx_battery_i2c_read':
+> binder.c:(.text+0x360bf0): undefined reference to `i2c_transfer'
+> binder.c:(.text+0x360c10): undefined reference to `i2c_transfer'
+> drivers/built-in.o: In function `bq27xxx_battery_init':
+> binder.c:(.init.text+0xe668): undefined reference to `i2c_register_driver'
+> drivers/built-in.o: In function `bq27xxx_battery_exit':
+> binder.c:(.exit.text+0x1a0c): undefined reference to `i2c_del_driver'
+>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Fixes: 6bd03ce3c12a ("power: bq27xxx_battery: Remove unneeded dependency in Kconfig")
+> ---
+> The bug was originally found and fixed by Xiong Zhou, but Andrew Davis
+> broke it again by reverting the fix.
+>
+> I found it today on my ARM randconfig builds.
+>
+> diff --git a/drivers/power/Kconfig b/drivers/power/Kconfig
+> index 237d7aa73e8c..9f53fb74ae6f 100644
+> --- a/drivers/power/Kconfig
+> +++ b/drivers/power/Kconfig
+> @@ -159,6 +159,7 @@ config BATTERY_SBS
+>
+>   config BATTERY_BQ27XXX
+>   	tristate "BQ27xxx battery driver"
+> +	depends on I2C || I2C=n
+>   	help
+>   	  Say Y here to enable support for batteries with BQ27xxx (I2C/HDQ) chips.
+>
+>
 
-Hi Arnd
+Nothing enabled by BATTERY_BQ27XXX depends on I2C, this workaround is not
+correct as it prevents BATTERY_BQ27XXX from being built-in when I2C is a
+module, there is no reason for this limitation.
 
-Need is probably too strong, it could be considered an optional
-feature. If you don't have a fixed_phy property in your DT blob, you
-don't need fixed phy support in your image.
+The undefined references are caused by BATTERY_BQ27XXX being built-in AND
+its I2C functionality being enabled (BATTERY_BQ27XXX_I2C) while I2C is a
+module. Reorganizing this driver is being discussed anyway, but in the
+meantime a more correct fix would be along the lines of:
 
-> MVNETA is the fourth one, and if that is built-in but FIXED_PHY
-> is configured as a loadable module, we get a link error:
-> 
-> drivers/built-in.o: In function `mvneta_fixed_link_update':
-> fpga-mgr.c:(.text+0x33ed80): undefined reference to `fixed_phy_update_state'
-> 
-> Presumably this driver has the same dependency as the others,
-> so this patch also uses 'select' to ensure that the fixed-phy
-> support is built-in.
-
-This will work, and is uniform with the other instances. But maybe a
-more correct fix is to ensure fixed-phy is never a module when there
-is a builtin user.
-
-> Should we perhaps make 'FIXED_PHY' a silent option and remove the
-> inline helpers, based on the assumption that a driver that wants these
-> will not work without them?
-
-I suppose it comes down to, are we allowed to optionally implement
-part of the DT binding?
-
-     Andrew
+diff --git a/drivers/power/Kconfig b/drivers/power/Kconfig
+index 6de6ec2..d1d32f9 100644
+--- a/drivers/power/Kconfig
++++ b/drivers/power/Kconfig
+@@ -167,6 +167,7 @@ config BATTERY_BQ27XXX_I2C
+         bool "BQ27xxx I2C support"
+         depends on BATTERY_BQ27XXX
+         depends on I2C
++       depends on !(I2C=m && BATTERY_BQ27XXX=y)
+         default y
+         help
+           Say Y here to enable support for batteries with BQ27xxx (I2C) chips.
