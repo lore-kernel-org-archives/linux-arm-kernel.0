@@ -1,45 +1,95 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 09 Nov 2015 15:08:57 +0100
-Subject: [PATCH] mvneta: add FIXED_PHY dependency
-Message-ID: <4225885.EYXTHjRPmX@wuerfel>
+From: sstabellini@kernel.org (Stefano Stabellini)
+Date: Mon, 9 Nov 2015 14:10:22 +0000 (GMT)
+Subject: [PATCH 3/3] xen/arm: set the system time in Xen via the
+ XENPF_settime hypercall
+In-Reply-To: <6188457.uvvdcZaVNM@wuerfel>
+References: <alpine.DEB.2.02.1511051706560.13541@kaball.uk.xensource.com>
+ <1446743385-12848-3-git-send-email-stefano.stabellini@eu.citrix.com>
+ <6188457.uvvdcZaVNM@wuerfel>
+Message-ID: <alpine.DEB.2.02.1511061510190.23825@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The fixed_phy infrastructure is done in a way that is optional,
-by providing 'static inline' helper functions doing nothing in
-include/linux/phy_fixed.h for all its APIs. However, three out
-of the four users (DSA, BCMGENET, and SYSTEMPORT) always
-'select FIXED_PHY', presumably because they need that.
-MVNETA is the fourth one, and if that is built-in but FIXED_PHY
-is configured as a loadable module, we get a link error:
+On Thu, 5 Nov 2015, Arnd Bergmann wrote:
+> On Thursday 05 November 2015 17:09:45 Stefano Stabellini wrote:
+> > If Linux is running as dom0, call XENPF_settime to update the system
+> > time in Xen on pvclock_gtod notifications.
+> > 
+> > Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+> > Signed-off-by: Ian Campbell <ian.campbell@citrix.com>
+> > ---
+> >  arch/arm/xen/enlighten.c |   52 +++++++++++++++++++++++++++++++++++++++++++++-
+> >  1 file changed, 51 insertions(+), 1 deletion(-)
+> > 
+> > diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
+> > index b6aea9c..0176db0 100644
+> > --- a/arch/arm/xen/enlighten.c
+> > +++ b/arch/arm/xen/enlighten.c
+> > @@ -28,6 +28,7 @@
+> >  #include <linux/cpufreq.h>
+> >  #include <linux/cpu.h>
+> >  #include <linux/console.h>
+> > +#include <linux/pvclock_gtod.h>
+> >  #include <linux/timekeeping.h>
+> >  #include <clocksource/arm_arch_timer.h>
+> >  
+> > @@ -123,6 +124,50 @@ static void xen_read_wallclock(struct timespec *ts)
+> >  	set_normalized_timespec(ts, now.tv_sec, now.tv_nsec);
+> >  }
+> >  
+> > +static int xen_pvclock_gtod_notify(struct notifier_block *nb,
+> > +				   unsigned long was_set, void *priv)
+> > +{
+> > +	/* Protected by the calling core code serialization */
+> > +	static struct timespec next_sync;
+> > +
+> > +	struct xen_platform_op op;
+> > +	struct timespec now;
+> 
+> Again, use timespec64
 
-drivers/built-in.o: In function `mvneta_fixed_link_update':
-fpga-mgr.c:(.text+0x33ed80): undefined reference to `fixed_phy_update_state'
+OK
 
-Presumably this driver has the same dependency as the others,
-so this patch also uses 'select' to ensure that the fixed-phy
-support is built-in.
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: 898b2970e2c9 ("mvneta: implement SGMII-based in-band link state signaling")
----
-Found using ARM randconfig tests. An alternative here would be
-to use 'depends on FIXED_PHY || FIXED_PHY=n', I picked the 'select'
-approach for consistency.
+> > +	now = __current_kernel_time();
+> 
+> We don't have __current_kernel_time64() yet, but it is trivial
+> to add, just follow the example of
+> current_kernel_time()/current_kernel_time64() and convert the
+> existing __current_kernel_time() function into a static
+> inline wrapper for the new __current_kernel_time64().
 
-Should we perhaps make 'FIXED_PHY' a silent option and remove the
-inline helpers, based on the assumption that a driver that wants these
-will not work without them?
+All right. I guess something like:
 
-diff --git a/drivers/net/ethernet/marvell/Kconfig b/drivers/net/ethernet/marvell/Kconfig
-index 80af9ffce5ea..a1c862b4664d 100644
---- a/drivers/net/ethernet/marvell/Kconfig
-+++ b/drivers/net/ethernet/marvell/Kconfig
-@@ -44,6 +44,7 @@ config MVNETA
- 	tristate "Marvell Armada 370/38x/XP network interface support"
- 	depends on PLAT_ORION
- 	select MVMDIO
-+	select FIXED_PHY
- 	---help---
- 	  This driver supports the network interface units in the
- 	  Marvell ARMADA XP, ARMADA 370 and ARMADA 38x SoC family.
+struct timespec64 __current_kernel_time64(void)
+{
+	struct timekeeper *tk = &tk_core.timekeeper;
+
+	return tk_xtime(tk);
+}
+
+
+> > +	/*
+> > +	 * We only take the expensive HV call when the clock was set
+> > +	 * or when the 11 minutes RTC synchronization time elapsed.
+> > +	 */
+> > +	if (!was_set && timespec_compare(&now, &next_sync) < 0)
+> > +		return NOTIFY_OK;
+> > +
+> > +	op.interface_version = XENPF_INTERFACE_VERSION;
+> > +	op.cmd = XENPF_settime;
+> > +	op.u.settime.secs = now.tv_sec;
+> > +	op.u.settime.nsecs = now.tv_nsec;
+> > +	op.u.settime.system_time = arch_timer_read_counter();
+> > +	printk("GTOD: Setting to %ld.%ld at %lld\n",
+> > +	       (long)op.u.settime.secs,
+> > +	       (long)op.u.settime.nsecs,
+> > +	       (long long)op.u.settime.system_time);
+> > +	(void)HYPERVISOR_dom0_op(&op);
+> 
+> I guess we will also need a XENPF_settime64 interface, but at
+> least we can get away with implementing only that one on ARM,
+> while x86 will have to support both the 32-bit and 64-bit
+> based variant.
+
+We already have XENPF_settime64, I'll just use it instead.
