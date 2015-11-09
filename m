@@ -1,117 +1,105 @@
-From: christoffer.dall@linaro.org (Christoffer Dall)
-Date: Mon, 9 Nov 2015 17:21:59 +0100
-Subject: [PATCH] ARM/arm64: KVM: test properly for a PTE's uncachedness
-In-Reply-To: <1446810188-13727-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1446810188-13727-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20151109162159.GA12968@cbox>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 9 Nov 2015 16:26:26 +0000
+Subject: Grafting old platform drivers onto a new DT kernel
+In-Reply-To: <5640B877.4020108@free.fr>
+References: <563B3749.50701@free.fr> <20151105151559.GA16666@lunn.ch>
+ <CABxcv=k5mzw_TDsD1eQna9+HY9aqCUd03YAc62750Gs--sMozw@mail.gmail.com>
+ <5640B877.4020108@free.fr>
+Message-ID: <20151109162626.GC8644@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 06, 2015 at 12:43:08PM +0100, Ard Biesheuvel wrote:
-> The open coded tests for checking whether a PTE maps a page as
-> uncached use a flawed 'pte_val(xxx) & CONST != CONST' pattern,
-> which is not guaranteed to work since the type of a mapping is an
-> index into the MAIR table, not a set of mutually exclusive bits.
+On Mon, Nov 09, 2015 at 04:15:03PM +0100, Mason wrote:
+> I tried compiling an ancient SDHCI driver on a v4.2 system. It crashes
+> all over init because several host->ops functions are required, but the
+> old driver does not define them:
+> .reset
+> .set_clock
+> .set_bus_width
+> .set_uhs_signaling
 > 
-> Considering that, on arm64, the S2 type definitions use the following
-> MAIR indexes
-> 
->     #define MT_S2_NORMAL            0xf
->     #define MT_S2_DEVICE_nGnRE      0x1
-> 
-> we have been getting lucky merely because the S2 device mappings also
-> have the PTE_UXN bit set, which means that a device PTE still does not
-> equal a normal PTE after masking with the former type.
-> 
-> Instead, implement proper checking against the MAIR indexes that are
-> known to define uncached memory attributes.
-> 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
->  arch/arm/include/asm/kvm_mmu.h   | 11 +++++++++++
->  arch/arm/kvm/mmu.c               |  5 ++---
->  arch/arm64/include/asm/kvm_mmu.h | 12 ++++++++++++
->  3 files changed, 25 insertions(+), 3 deletions(-)
-> 
-> diff --git a/arch/arm/include/asm/kvm_mmu.h b/arch/arm/include/asm/kvm_mmu.h
-> index 405aa1883307..422973835d41 100644
-> --- a/arch/arm/include/asm/kvm_mmu.h
-> +++ b/arch/arm/include/asm/kvm_mmu.h
-> @@ -279,6 +279,17 @@ static inline void __kvm_extend_hypmap(pgd_t *boot_hyp_pgd,
->  				       pgd_t *merged_hyp_pgd,
->  				       unsigned long hyp_idmap_start) { }
->  
-> +static inline bool __kvm_pte_is_uncached(pte_t pte)
-> +{
-> +	switch (pte_val(pte) & L_PTE_MT_MASK) {
-> +	case L_PTE_MT_UNCACHED:
-> +	case L_PTE_MT_BUFFERABLE:
-> +	case L_PTE_MT_DEV_SHARED:
-> +		return true;
-> +	}
+> So I downgraded to an older v3.14 kernel, and that problem vanished.
 
-so PTEs created by setting PAGE_S2_DEVICE will end up hitting in one of
-these because L_PTE_S2_MT_DEV_SHARED is the same as L_PTE_MT_BUFFERABLE
-for stage-2 mappings and PAGE_HYP_DEVICE end up using
-L_PTE_MT_DEV_SHARED.
+Nothing to do with DT.  Everything to do with improvements happening as
+the kernel moves forward, and out of tree drivers suffer because they're
+not _in_tree_.
 
-Totally obvious.
+Having stuff out of mainline is painful for this very reason, especially
+if no one maintains the driver with each kernel revision - you end up
+with a huge delta which is then very time consuming to fix.
 
-> +	return false;
-> +}
-> +
->  #endif	/* !__ASSEMBLY__ */
->  
->  #endif /* __ARM_KVM_MMU_H__ */
-> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
-> index 6984342da13d..eb9a06e3dbee 100644
-> --- a/arch/arm/kvm/mmu.c
-> +++ b/arch/arm/kvm/mmu.c
-> @@ -213,7 +213,7 @@ static void unmap_ptes(struct kvm *kvm, pmd_t *pmd,
->  			kvm_tlb_flush_vmid_ipa(kvm, addr);
->  
->  			/* No need to invalidate the cache for device mappings */
-> -			if ((pte_val(old_pte) & PAGE_S2_DEVICE) != PAGE_S2_DEVICE)
-> +			if (!__kvm_pte_is_uncached(old_pte))
->  				kvm_flush_dcache_pte(old_pte);
->  
->  			put_page(virt_to_page(pte));
-> @@ -305,8 +305,7 @@ static void stage2_flush_ptes(struct kvm *kvm, pmd_t *pmd,
->  
->  	pte = pte_offset_kernel(pmd, addr);
->  	do {
-> -		if (!pte_none(*pte) &&
-> -		    (pte_val(*pte) & PAGE_S2_DEVICE) != PAGE_S2_DEVICE)
-> +		if (!pte_none(*pte) && !__kvm_pte_is_uncached(*pte))
->  			kvm_flush_dcache_pte(*pte);
->  	} while (pte++, addr += PAGE_SIZE, addr != end);
->  }
-> diff --git a/arch/arm64/include/asm/kvm_mmu.h b/arch/arm64/include/asm/kvm_mmu.h
-> index 61505676d085..5806f412a47a 100644
-> --- a/arch/arm64/include/asm/kvm_mmu.h
-> +++ b/arch/arm64/include/asm/kvm_mmu.h
-> @@ -302,5 +302,17 @@ static inline void __kvm_extend_hypmap(pgd_t *boot_hyp_pgd,
->  	merged_hyp_pgd[idmap_idx] = __pgd(__pa(boot_hyp_pgd) | PMD_TYPE_TABLE);
->  }
->  
-> +static inline bool __kvm_pte_is_uncached(pte_t pte)
-> +{
-> +	switch (pte_val(pte) & PTE_ATTRINDX_MASK) {
-> +	case PTE_ATTRINDX(MT_DEVICE_nGnRnE):
-> +	case PTE_ATTRINDX(MT_DEVICE_nGnRE):
-> +	case PTE_ATTRINDX(MT_DEVICE_GRE):
-> +	case PTE_ATTRINDX(MT_NORMAL_NC):
-> +		return true;
-> +	}
-> +	return false;
-> +}
-> +
->  #endif /* __ASSEMBLY__ */
->  #endif /* __ARM64_KVM_MMU_H__ */
-> -- 
-> 1.9.1
+However, in this case, all you need to resolve there is to set those
+mandatory methods to the appropriate library functions - the changes
+which created the ops methods was part of an effort to change the
+horrid SDHCI core layer to be more of a library, and to stop it
+becoming a driver where every single line is conditional on a quirk
+bit being set or clear.
+
+> But I am having a problem with the IRQ setup.
 > 
+> # cat /proc/interrupts 
+>             CPU0       CPU1       
+>  18:         93          0      irq0   1 Level     serial
+>  55:       2832          0      irq0  38 Level     26000.ethernet
+>  60:          0          0      irq0  43 Edge      mmc0
+> 211:        319       2603       GIC  29 Edge      twd
+> 
+> Ethernet is using IRQ 38, as specified in the DT.
+> mmc0 is supposed to use IRQ 60.
+> 
+> I see that the mmc0 has the index 60, so I must have messed up between
+> the real irq (hwirq?) and the index Linux uses internally (virq?)
+> 
+> static struct resource sdhci_resources[] = {
+> 	{
+> 		.start	= TANGOX_SDIO0_BASE_ADDR,
+> 		.end	= TANGOX_SDIO0_BASE_ADDR + 0x1ff,
+> 		.flags	= IORESOURCE_MEM,
+> 	},
+> 	{
+> 		.start	= 60,	/* SDHCI0 IRQ */
+> 		.flags	= IORESOURCE_IRQ,
+> 	},
+> };
 
-Thanks for this patch, I'll queue it.
+That tells the kernel to use interrupt 60, which is exactly what it
+did.  To get interrupt 60 on the "irq0" controller, you need to look
+up that interrupt - this would be a hack though:
 
--Christoffer
++       struct device_node *np;
++
++       np = of_find_node_by_name(NULL, irq_controller_name);
++       if (np) {
++               struct of_phandle_args args;
++
++               args.np = np;
++               args.args[0] = irq - 1;
++               args.args_count = 1;
++
++               irq = irq_create_of_mapping(&args);
++               of_node_put(np);
++       }
++       return irq;
+
+The _easiest_ way to get an old platform driver working at a basic level
+with DT is:
+
+1. Declare the device with that compatible value in your DT, with
+   appropriate "reg" and "interrupts" properties.
+
+2. If you need platform data for _any_ device, then use a .init_machine
+   method in your platform code to call of_platform_populate() instead
+   of using the generic version in customize_machine().  Pass the 3rd
+   argument a struct of_dev_auxdata table, which allows you to bind
+   platform data to the DT-created platform devices.  Set the bus-id
+   for the device to the name of the device as it would have been
+   originally created (in other words, the driver name, optionally
+   followed by a period and a instance number.)
+
+I don't think you have to modify the platform driver at all to make it
+work (eg, you don't need an .of_match_table).  I've never used that
+stuff, so there may be issues I don't know about.
+
+-- 
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
