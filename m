@@ -1,64 +1,39 @@
 From: heiko@sntech.de (Heiko Stuebner)
-Date: Mon, 09 Nov 2015 20:50:43 +0100
-Subject: [PATCH 1/2] drm/rockchip: create the fake mmap offset during gem
- creation
-Message-ID: <4982827.0pnZflEOSR@phil>
+Date: Mon, 09 Nov 2015 20:52:43 +0100
+Subject: [PATCH 2/2] drm/rockchip: unset pgoff when mmap'ing gems
+In-Reply-To: <4982827.0pnZflEOSR@phil>
+References: <4982827.0pnZflEOSR@phil>
+Message-ID: <2793929.5WVauesvFQ@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Similarly to the equivalent exynos-fix in commit 48cf53f4343a
-("drm/exynos: create a fake mmap offset with gem creation") the rockchip
-drm driver also calls the drm_gem_create_mmap_offset fake-offset creation
-on every invocation of rockchip_gem_dumb_map_offset.
+Commit 371f0f085f629 ("ARM: 8426/1: dma-mapping: add missing range check
+ in dma_mmap()") introduced offset-checking for mappings, which collides
+with the fake-offset the drm sets for gems.
 
-Move that to the creation of the gem to only create that offset once.
+Other drm-drivers set this offset to 0 before doing the mapping, so
+this looks like the correct way to go for rockchip as well.
 
+Fixes: 371f0f085f629 ("ARM: 8426/1: dma-mapping: add missing range check in dma_mmap()")
 Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 ---
- drivers/gpu/drm/rockchip/rockchip_drm_gem.c | 12 ++++++------
- 1 file changed, 6 insertions(+), 6 deletions(-)
+This patch is definitly necessary to keep the rockchip-drm working
+with kernel 4.4.
+
+ drivers/gpu/drm/rockchip/rockchip_drm_gem.c | 1 +
+ 1 file changed, 1 insertion(+)
 
 diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_gem.c b/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
-index 4ab2f20..e50d113 100644
+index e50d113..e9bc188 100644
 --- a/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
 +++ b/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
-@@ -126,8 +126,14 @@ struct rockchip_gem_object *
- 	if (ret)
- 		goto err_free_rk_obj;
+@@ -68,6 +68,7 @@ static int rockchip_drm_gem_object_mmap(struct drm_gem_object *obj,
+ 	 * VM_PFNMAP flag that was set by drm_gem_mmap_obj()/drm_gem_mmap().
+ 	 */
+ 	vma->vm_flags &= ~VM_PFNMAP;
++	vma->vm_pgoff = 0;
  
-+	ret = drm_gem_create_mmap_offset(obj);
-+	if (ret)
-+		goto err_free_buf;
-+
- 	return rk_obj;
- 
-+err_free_buf:
-+	rockchip_gem_free_buf(rk_obj);
- err_free_rk_obj:
- 	kfree(rk_obj);
- 	return ERR_PTR(ret);
-@@ -196,7 +202,6 @@ int rockchip_gem_dumb_map_offset(struct drm_file *file_priv,
- 				 uint64_t *offset)
- {
- 	struct drm_gem_object *obj;
--	int ret;
- 
- 	obj = drm_gem_object_lookup(dev, file_priv, handle);
- 	if (!obj) {
-@@ -204,14 +209,9 @@ int rockchip_gem_dumb_map_offset(struct drm_file *file_priv,
- 		return -EINVAL;
- 	}
- 
--	ret = drm_gem_create_mmap_offset(obj);
--	if (ret)
--		goto out;
--
- 	*offset = drm_vma_node_offset_addr(&obj->vma_node);
- 	DRM_DEBUG_KMS("offset = 0x%llx\n", *offset);
- 
--out:
- 	drm_gem_object_unreference_unlocked(obj);
- 
- 	return 0;
+ 	ret = dma_mmap_attrs(drm->dev, vma, rk_obj->kvaddr, rk_obj->dma_addr,
+ 			     obj->size, &rk_obj->dma_attrs);
 -- 
 2.6.2
