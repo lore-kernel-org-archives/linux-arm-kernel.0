@@ -1,35 +1,66 @@
-From: yang.shi@linaro.org (Shi, Yang)
-Date: Mon, 09 Nov 2015 10:16:32 -0800
-Subject: [PATCH V2 0/2] arm64: cleanup FRAME_POINTER kconfig option and
- force to select it
-In-Reply-To: <20151109181422.GE21606@e104818-lin.cambridge.arm.com>
-References: <1447091037-11434-1-git-send-email-yang.shi@linaro.org>
- <20151109181422.GE21606@e104818-lin.cambridge.arm.com>
-Message-ID: <5640E300.2000001@linaro.org>
+From: gregory.clement@free-electrons.com (Gregory CLEMENT)
+Date: Mon, 09 Nov 2015 19:19:23 +0100
+Subject: [RFC PATCH 0/2] net: mvneta: Introduce RSS support
+In-Reply-To: <CAPv3WKcOLsjGj1iyEiPdPkdkNS2O1-RytNMZUCgUCv9QUdY6FA@mail.gmail.com>
+ (Marcin Wojtas's message of "Fri, 6 Nov 2015 20:37:38 +0100")
+References: <1446834911-29910-1-git-send-email-gregory.clement@free-electrons.com>
+ <CAPv3WKcOLsjGj1iyEiPdPkdkNS2O1-RytNMZUCgUCv9QUdY6FA@mail.gmail.com>
+Message-ID: <87wptr593o.fsf@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/9/2015 10:14 AM, Catalin Marinas wrote:
-> On Mon, Nov 09, 2015 at 09:43:55AM -0800, Yang Shi wrote:
->> According to the discussion on the mailing list, this version adds a new patch
->> to force select FRAME_POINTER for ARM64.
->>
->> Change v2 --> v1:
->> 1. Adds a new patch to force select FRAME_POINTER
->> 2. Notes that this change adds a dependency on DEBUG_KERNEL for building with
->> frame pointers
->>
->>
->> Yang Shi (2):
->>        arm64: remove redundant FRAME_POINTER kconfig option
->>        arm64: force to select FRAME_POINTER
->
-> Do you really need two patches for this?
+Hi Marcin,
+ 
+ On ven., nov. 06 2015, Marcin Wojtas <mw@semihalf.com> wrote:
 
-I just thought it may be clearer in this way. If nobody thinks it is 
-necessary, I definitely could merge them into one.
+> Hi Gregory,
+>
+>
+>> I also choose to associate all the TX queues on the same CPU that the
+>> one associated to the RX queue. It allows to contain all the
+>> interrupts on the same CPU. I think that an improvement on this side
+>> would be the support of the XPS.
+>>
+>
+> Did you make some tries? E.g. after mapping certain txqs to CPU1, when
+> using them was mvneta_tx() executing only on this CPU? Or it rather
+> means that the irq will hit according to the mapping? As far as I know
+> the HW, the latter should be true, which would mean the real XPS with
+> this controller is impossible and the maximum we can control is the
+> irq.
+
+I hoped that with XPS we can associate CPUs to all the tx queues of a
+ethernet port. For example choosing for eth2, that all the tx queues will
+be handled by CPU0 and CPU3. And for this it would involve allowing
+receiving the tx interrupts only on CPU0 and CPU3. This kind of feature
+seems to be doable with the hardware.
+
+But after reading more carefully what XPS is about and how it is used in
+the kernel, it seems we can't configure the hardware from the sysfs
+interface. From my understanding we can only indicate to the kernel
+which tx queue use for a given CPU.
+
+>
+> I think it may be worth to unmask TX irqs on all cpus, so all percpu
+> napi's would be able to read tx_cause and process sent packets. I'm
+> looking forward to your opinion.
+
+By doing, this my understanding is that when an TX interrupt occurs then
+all the CPUs enter in the interrupt handler but only one can manage
+it. So, for me it looks like a big waste of CPU load. I could understand
+that it would be interesting in some situation but it doesn't seem to be
+the good default behavior. That's why I was looking for a way to let the
+use configure it according to his needs.
+
+Please correct me if I am wrong somewhere, because currently I don't
+find a good solution for it.
+
 
 Thanks,
-Yang
 
->
+Gregory
+-- 
+Gregory Clement, Free Electrons
+Kernel, drivers, real-time and embedded Linux
+development, consulting, training and support.
+http://free-electrons.com
