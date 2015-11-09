@@ -1,72 +1,24 @@
-From: drinkcat@chromium.org (Nicolas Boichat)
-Date: Mon,  9 Nov 2015 12:14:51 +0800
-Subject: [PATCH v2] spi: mediatek: single device does not require cs_gpios
-Message-ID: <1447042491-1199-1-git-send-email-drinkcat@chromium.org>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Mon, 9 Nov 2015 12:17:39 +0800
+Subject: [PATCH v3 2/3] ARM: dts: sun4i: gemei-g9: Use reg_ldo2 instead of
+ reg_vcc3v0
+In-Reply-To: <1446832486-32319-3-git-send-email-plaes@plaes.org>
+References: <1446832486-32319-1-git-send-email-plaes@plaes.org>
+ <1446832486-32319-3-git-send-email-plaes@plaes.org>
+Message-ID: <CAGb2v64THR9b42G4M-p+hN6vARLVvQxhHFk=_wAM7E80ZK5Uzw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When only one device is present, it is not necessary to specify
-cs_gpios, as the CS line can be controlled by the hardware
-module.
+On Sat, Nov 7, 2015 at 1:54 AM, Priit Laes <plaes@plaes.org> wrote:
+> ADC seems to be using ldo2 for reference voltage.
+>
+> Signed-off-by: Priit Laes <plaes@plaes.org>
 
-Without this patch, older device tree bindings used before
-37457607 "spi: mediatek: mt8173 spi multiple devices support"
-would cause a panic on boot. This fixes the crash, and
-re-introduces backward compatibility.
+I assume this is from some reference design and there is no way to actually
+confirm it without exact schematics? There's no mention of it in the FEX file.
+If so you should probably expand the commit message to include the source of
+such an assumption.
 
-Signed-off-by: Nicolas Boichat <drinkcat@chromium.org>
----
-
-v2: Use gpio_is_valid()
-
-Applies on top of broonie/spi.git/for-next.
-
- drivers/spi/spi-mt65xx.c | 26 ++++++++++++++++++--------
- 1 file changed, 18 insertions(+), 8 deletions(-)
-
-diff --git a/drivers/spi/spi-mt65xx.c b/drivers/spi/spi-mt65xx.c
-index 563954a..7840067 100644
---- a/drivers/spi/spi-mt65xx.c
-+++ b/drivers/spi/spi-mt65xx.c
-@@ -410,7 +410,7 @@ static int mtk_spi_setup(struct spi_device *spi)
- 	if (!spi->controller_data)
- 		spi->controller_data = (void *)&mtk_default_chip_info;
- 
--	if (mdata->dev_comp->need_pad_sel)
-+	if (mdata->dev_comp->need_pad_sel && gpio_is_valid(spi->cs_gpio))
- 		gpio_direction_output(spi->cs_gpio, !(spi->mode & SPI_CS_HIGH));
- 
- 	return 0;
-@@ -632,13 +632,23 @@ static int mtk_spi_probe(struct platform_device *pdev)
- 			goto err_put_master;
- 		}
- 
--		for (i = 0; i < master->num_chipselect; i++) {
--			ret = devm_gpio_request(&pdev->dev, master->cs_gpios[i],
--						dev_name(&pdev->dev));
--			if (ret) {
--				dev_err(&pdev->dev,
--					"can't get CS GPIO %i\n", i);
--				goto err_put_master;
-+		if (!master->cs_gpios && master->num_chipselect > 1) {
-+			dev_err(&pdev->dev,
-+				"cs_gpios not specified and num_chipselect > 1\n");
-+			ret = -EINVAL;
-+			goto err_put_master;
-+		}
-+
-+		if (master->cs_gpios) {
-+			for (i = 0; i < master->num_chipselect; i++) {
-+				ret = devm_gpio_request(&pdev->dev,
-+							master->cs_gpios[i],
-+							dev_name(&pdev->dev));
-+				if (ret) {
-+					dev_err(&pdev->dev,
-+						"can't get CS GPIO %i\n", i);
-+					goto err_put_master;
-+				}
- 			}
- 		}
- 	}
--- 
-2.6.0.rc2.230.g3dd15c0
+> ---
+>  arch/arm/boot/dts/sun4i-a10-gemei-g9.dts | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
