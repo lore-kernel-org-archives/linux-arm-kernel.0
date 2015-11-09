@@ -1,33 +1,37 @@
-From: yang.shi@linaro.org (Yang Shi)
-Date: Mon,  9 Nov 2015 09:43:57 -0800
-Subject: [PATCH 2/2] arm64: force to select FRAME_POINTER
-In-Reply-To: <1447091037-11434-1-git-send-email-yang.shi@linaro.org>
-References: <1447091037-11434-1-git-send-email-yang.shi@linaro.org>
-Message-ID: <1447091037-11434-3-git-send-email-yang.shi@linaro.org>
+From: dhdang@apm.com (Duc Dang)
+Date: Mon,  9 Nov 2015 10:05:42 -0800
+Subject: [PATCH v3 0/3] mailbox: Add APM X-Gene platform mailbox driver
+In-Reply-To: <1429863912.2927.43.camel@x220>
+References: <1429863912.2927.43.camel@x220>
+Message-ID: <cover.1447091625.git.dhdang@apm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ARM64 depends on frame pointer to get correct stack backtrace and need
-FRAME_POINTER kconfig option enabled all the time.
-However, currect implementation makes it could be disabled, so force it
-to be selected by ARM64.
+APM X-Gene SoC has a mailbox controller that provides
+communication mechanism for X-Gene Arm64 cores to communicate
+with X-Gene SoC's Cortex M3 (SLIMpro) processor.
 
-Signed-off-by: Yang Shi <yang.shi@linaro.org>
----
- arch/arm64/Kconfig | 1 +
- 1 file changed, 1 insertion(+)
+X-Gene mailbox controller provides 8 mailbox channels, with
+each channel has a dedicated interrupt line.
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 440d906..b554da2 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -27,6 +27,7 @@ config ARM64
- 	select CPU_PM if (SUSPEND || CPU_IDLE)
- 	select DCACHE_WORD_ACCESS
- 	select EDAC_SUPPORT
-+	select FRAME_POINTER
- 	select GENERIC_ALLOCATOR
- 	select GENERIC_CLOCKEVENTS
- 	select GENERIC_CLOCKEVENTS_BROADCAST
+Changes since v2:
+        - Rebase Feng's patch set over v4.3-rc5
+        - Remove uneccessary 'inline' in function definition
+	- Use module_platform_driver instead of subsys_initcall
+        - Minor coding stype clean up
+
+Changes since v1:
+        - Add ACPI support
+        - Use defines for reg offset
+
+ .../bindings/mailbox/xgene-slimpro-mailbox.txt     |  34 +++
+ arch/arm64/boot/dts/apm/apm-storm.dtsi             |  14 ++
+ drivers/mailbox/Kconfig                            |   9 +
+ drivers/mailbox/Makefile                           |   2 +
+ drivers/mailbox/mailbox-xgene-slimpro.c            | 264 +++++++++++++++++++++
+ 5 files changed, 323 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/mailbox/xgene-slimpro-mailbox.txt
+ create mode 100644 drivers/mailbox/mailbox-xgene-slimpro.c
+
 -- 
-2.0.2
+1.9.1
