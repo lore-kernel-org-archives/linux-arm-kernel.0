@@ -1,126 +1,41 @@
-From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
-Date: Mon, 09 Nov 2015 17:13:11 +0000
-Subject: Grafting old platform drivers onto a new DT kernel
-In-Reply-To: <5640D1F3.1010100@free.fr> (Mason's message of "Mon, 9 Nov 2015
- 18:03:47 +0100")
-References: <563B3749.50701@free.fr> <20151105151559.GA16666@lunn.ch>
- <CABxcv=k5mzw_TDsD1eQna9+HY9aqCUd03YAc62750Gs--sMozw@mail.gmail.com>
- <5640B877.4020108@free.fr> <yw1xtwov5gh1.fsf@unicorn.mansr.com>
- <5640C4BF.2010204@free.fr> <yw1xpozj5ezj.fsf@unicorn.mansr.com>
- <5640D1F3.1010100@free.fr>
-Message-ID: <yw1xh9kv5c60.fsf@unicorn.mansr.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 09 Nov 2015 18:14:06 +0100
+Subject: [PATCH] mvneta: add FIXED_PHY dependency
+In-Reply-To: <20151109170849.GC3388@lunn.ch>
+References: <4225885.EYXTHjRPmX@wuerfel> <6910088.dNmooXDTJR@wuerfel>
+ <20151109170849.GC3388@lunn.ch>
+Message-ID: <6970717.h7VjJkXjcM@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mason <slash.tmp@free.fr> writes:
+On Monday 09 November 2015 18:08:49 Andrew Lunn wrote:
+> > > I suppose it comes down to, are we allowed to optionally implement
+> > > part of the DT binding?
+> > 
+> > I'm not sure what you are asking. A lot of DT bindings have both
+> > optional and mandatory properties. For mvneta, the "phy" and "phy-mode"
+> > properties are listed as mandatory, so the driver can safely assume
+> > that they are always present. If there are reasons to leave them out,
+> > and for the driver to handle that case correctly, the binding
+> > should be updated to mark them as optional.
+> 
+> Hi Arnd
+> 
+> You are looking at it from the perspective of the driver. I was
+> meaning from the perspective of the DT blob. Can be blob assume the
+> driver implements all of the binding, all of the time?
 
-> On 09/11/2015 17:12, M?ns Rullg?rd wrote:
->
->> Mason writes:
->> 
->>> On 09/11/2015 16:40, M?ns Rullg?rd wrote:
->>>
->>>> The simplest solution for you is probably to add a quick and dirty DT
->>>> binding to the old driver.  If it doesn't use any driver-specific
->>>> platform data struct, you only need to set .of_match_table in the
->>>> struct platform_driver.  If there is a platform data struct, you'll also
->>>> need to write some code to populate it from DT properties.  It shouldn't
->>>> take more than a few minutes per driver in most cases.
->>>
->>> I'll try that approach, although I fear that "a few minutes per driver"
->>> is an optimistic assessment.
->> 
->> If the driver only needs an MMIO region and an IRQ, it is literally five
->> lines of code.
->
-> It took me 7 days to figure out there were 2 lines missing in the
-> interrupt controller driver.
->
-> My problem is that I don't understand the platform API, nor the
-> interaction with the DT API.
->
-> Let me see...
->
-> In arch/arm/mach-tangox/platform_dev.c
->
-> static struct platform_device tangox_sdhci0_device = { ... };
-> static struct platform_device tangox_sdhci1_device = { ... };
->
-> static void tangox_init_sdhci(void)
-> {
-> 	if (tangox_sdio_enabled(0))
-> 		platform_device_register(&tangox_sdhci0_device);
->
-> 	if (tangox_sdio_enabled(1))
-> 		platform_device_register(&tangox_sdhci1_device);
-> }
->
-> called from tangox_init_devices() which is marked arch_initcall.
+That question is not really relevant: the DT describes the hardware,
+it doesn't matter whether there are drivers for all the bits or
+whether all properties are read.
 
-Delete all of that.  The generic DT code will create the platform
-devices based on the device tree.
+> You use fixed-phy when the MAC is connected to a switch, not a phy. Or
+> when the MAC is connected to an SFP module. The driver can currently
+> be built to not implement the fixed-phy party of the binding. Is that
+> O.K. from the perspective of the DT blob? Or should the driver always
+> implement all of the binding, in which these NOP stubs should be
+> removed and fixed phy always be enabled for the drivers that use it.
 
-> In the driver
+Sure, that is ok.
 
-Add something like this:
-
-static const struct of_device_id tangox_sdio_dt_ids[] = {
-	{ .compatible = "sigma,tangox-sdio" },
-	{ }
-};
-
-> static struct platform_driver tangox_platform_sdio0 = {
-
-	.probe		= sdhci_tangox_probe,
-
-> 	.remove		= sdhci_tangox_remove,
-> 	.suspend	= sdhci_tangox_suspend,
-> 	.resume		= sdhci_tangox_resume,
-> 	.driver		= {
-> 		.name	= "tangox-sdhci",
-> 		.owner	= THIS_MODULE,
-
-		.of_match_table = tangox_sdio_dt_ids,
-
-> 	},
-> };
-
-And that should be it.
-
-> static int __init tangox_sdhci_drv_init(void) {
-> 	return platform_driver_probe(&tangox_platform_sdio0, sdhci_tangox_probe);
-> }
->
-> static void __exit tangox_sdhci_drv_exit(void) {
-> 	platform_driver_unregister(&tangox_platform_sdio0);
-> }
->
-> module_init(tangox_sdhci_drv_init);
-> module_exit(tangox_sdhci_drv_exit);
-
-You can replace those functions and module_init()/module_exit() with
-module_platform_driver() if you want.
-
-> The old way:
->
-> 1) call platform_device_register() with a "struct platform_device"
-> 2) call platform_driver_probe with a "struct platform_driver"
->
-> The new way(?)
->
-> The mess in 2) is hidden behind module_platform_driver?
-
-module_platform_driver() is just a macro that creates standard driver
-register/unregister functions much like the ones above.
-
-> The platform_device_register() is done by the DT core?
-
-Correct.
-
-> The struct platform_driver requires a probe function?
-
-That's the usual way.
-
--- 
-M?ns Rullg?rd
-mans at mansr.com
+	Arnd
