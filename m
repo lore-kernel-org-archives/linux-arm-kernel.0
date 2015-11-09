@@ -1,125 +1,90 @@
-From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Mon, 9 Nov 2015 17:30:26 +0100
-Subject: [PATCH 1/2] mmc: sdhci: set bus voltage before enabling bus power
-In-Reply-To: <CAPDyKFquZ+_Rf07gX+i-=_bzSa7KJ5+xQ8N21kK2mvfMGdVQMw@mail.gmail.com>
-References: <1446825570-30029-1-git-send-email-ludovic.desroches@atmel.com>
- <1446825570-30029-2-git-send-email-ludovic.desroches@atmel.com>
- <20151109132305.GC15706@odux.rfo.atmel.com>
- <CAPDyKFrTTEnSFNvmx3e__Ap9gOGpA2-bz+yrq7ibz0wXGSWCXA@mail.gmail.com>
- <20151109144030.GD15706@odux.rfo.atmel.com>
- <CAPDyKFquZ+_Rf07gX+i-=_bzSa7KJ5+xQ8N21kK2mvfMGdVQMw@mail.gmail.com>
-Message-ID: <20151109163026.GE15706@odux.rfo.atmel.com>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 9 Nov 2015 10:32:30 -0600
+Subject: [PATCH v3 1/3] dt-bindings: sound: Add DT bindings for Broadcom
+ Cygnus audio
+In-Reply-To: <1446862965-18667-2-git-send-email-ssimran@broadcom.com>
+References: <1446862965-18667-1-git-send-email-ssimran@broadcom.com>
+ <1446862965-18667-2-git-send-email-ssimran@broadcom.com>
+Message-ID: <20151109163230.GA10001@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 09, 2015 at 05:00:46PM +0100, Ulf Hansson wrote:
-> On 9 November 2015 at 15:40, Ludovic Desroches
-> <ludovic.desroches@atmel.com> wrote:
-> > On Mon, Nov 09, 2015 at 03:12:46PM +0100, Ulf Hansson wrote:
-> >> On 9 November 2015 at 14:23, Ludovic Desroches
-> >> <ludovic.desroches@atmel.com> wrote:
-> >> > On Fri, Nov 06, 2015 at 04:59:29PM +0100, Ludovic Desroches wrote:
-> >> >> When there is a vmmc regulator, only SD Bus Power is set to 1 in the
-> >> >> Power Control Register. It means SD Bus Voltage Select field is set to 0
-> >> >> that is a reserved value. The SD Host Controller specification says:
-> >> >> 'SD Bus Power: Before setting this bit, the SD Host Driver shall set SD
-> >> >> Bus Voltage Select.' and 'If the Host Driver selects an unsupported
-> >> >> voltage in the SD B?us Voltage Select field, the Host Controller may
-> >> >> ignore writes to SD Bus Power and keep its value at zero."
-> >> >>
-> >> >> Having an external regulator means the SD Bus Voltage Select is useless
-> >> >> but if the Host Controller strictly follows the specification then we
-> >> >> need to set a valid value.
-> >> >
-> >> > Ulf,
-> >> >
-> >> > What is your opinion about this patch?
-> >> >
-> >> > If the 'no regulator found' message is turned in debug message, I can get
-> >> > rid of my vmmc regulator but I really think that writing only
-> >>
-> >> I expect you mean vqmmc?
-> >
-> > I don't mean vmmc. In the sdhci_set_power function, we are using vmmc.
-> > I feel not confortable with it because the power control register
-> > contains 'SD Bus' fields so it should depend on vqmmc not vmmc.
-> >
-> >>
-> >> > SDHCI_POWER_ON is opposite to the sdhci spec. I would say that not
-> >> > setting the bus voltage is a quirk!
-> >>
-> >> I don't really follow.
-> >>
-> >> I read the SDHCI spec and the section for the Power Control Register.
-> >> Bit 0 needs to be set when communicating with the card as it will for
-> >> example enables the clock. Before setting bit0 you must decide what
-> >> signal level to use, which is done by writing to bit 1->3.
-> >>
-> >
-> > Right. But when having vmmc supply we do:
-> > sdhci_writeb(host, SDHCI_POWER_ON, SDHCI_POWER_CONTROL) or
-> > sdhci_writeb(host, 0, SDHCI_POWER_CONTROL) so we loose the signal level,
-> > isn't it?
-> >
-> >> If SDHCI monitors the power state (MMC_POWER_UP|ON|OFF) when its
-> >> ->set_ios() callback are invoked and in combination of using the
-> >> ->start_signal_voltage_switch() callback to change the signal voltage
-> >> level, this *should* work out nicely.
-> >>
-> >
-> > It is my turn to not follow! We write into the Power Control Register
-> > only in sdhci_set_power(). May I miss a callback or something else?
-> > sdhci_do_start_signal_voltage_switch doesn't modify the Power Control
-> > Register.
-> >
-> >> Now, looking at the related code in sdhci, I am kind of surprised that
-> >> it works. :-) Though, again I don't have the in-depth knowledge about
-> >> sdhci.
-> >>
-> >
-> > Me too, I am starting to dig into the sdhci spec and some points are
-> > not crystal clear.
-> >
+On Fri, Nov 06, 2015 at 06:22:43PM -0800, Simran Rai wrote:
+> Add bindings for audio driver in Broadcom Cygnus.
 > 
-> Okay, I am finally starting to understand some of your concern.
-> 
-> According to the spec, the Power Control Register should control the
-> signal voltage/bus voltage. As UHS mode was added to the spec, it
-> seems like the Power Control Register couldn't cover all new cases, as
-> why Host Control 2 register needed to be added. The Host Control 2
-> register, is what sdhci_do_start_signal_voltage_switch() uses to
-> change the signal voltage level, which all makes sense to me.
-> 
-> For sdhci_set_power(); it seems to use the Power Control Register to
-> control the power to the card (VDD/VMMC). Indeed this looks *really*
-> weird/wrong. I wonder if it's working because of luck, intentional
-> violation of the SDHCI spec or because of special variants.
-> 
+> Signed-off-by: Lori Hikichi <lhikichi@broadcom.com>
+> Signed-off-by: Simran Rai <ssimran@broadcom.com>
+> Reviewed-by: Ray Jui <rjui@broadcom.com>
+> Reviewed-by: Scott Branden <sbranden@broadcom.com>
 
-Yes but I don't know if we are doing something weird/wrong or if it
-is the naming of the 'SD Bus Voltage Select' which is weird/wrong.
-
-> Especially when looking into the case when you *don't* have a VMMC
-> regulator several strange quirks exists in sdhci_set_power().
-> 
-> In the case when you *have* a VMMC, I think just setting/clearing bit
-> 0 (SDHCI_POWER_ON) and then bail out, is probably working with modern
-> HW because it's likely the only thing needed.
-> 
-> Now, this discussion was interesting, but I forgot what problem you
-> actually where trying to solve? :-)
-
-There is this discussion because of two things:
-- Fixing something I consider as a bug: when I have a VMMC, only
-  setting/clearing bit 0. Our controller strictly obeys to the spec and
-  check the 'SD Bus Voltage Select' field. Since we put a reserved value
-  (000), the Power On is not performed.
-- I was trying to get help to understand what is this 'SD Bus Voltage'.
-  For our controller and sdhci_set_power(), it seems to stand for VMMC.
-  For me, everything concerning bus voltage is related to VQMMC, so I was
-  disappointed.
+Acked-by: Rob Herring <robh@kernel.org>
 
 
-Regards
-
-Ludovic
+> ---
+>  .../bindings/sound/brcm,cygnus-audio.txt           |   54 ++++++++++++++++++++
+>  1 file changed, 54 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/sound/brcm,cygnus-audio.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/sound/brcm,cygnus-audio.txt b/Documentation/devicetree/bindings/sound/brcm,cygnus-audio.txt
+> new file mode 100644
+> index 0000000..3c06001
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/sound/brcm,cygnus-audio.txt
+> @@ -0,0 +1,54 @@
+> +BROADCOM Cygnus Audio I2S/TDM/SPDIF controller
+> +
+> +Required properties:
+> +	- compatible : "brcm,cygnus-audio"
+> +	- #address-cells: 32bit valued, 1 cell.
+> +	- #size-cells:  32bit valued, 0 cell.
+> +	- reg : Should contain audio registers location and length
+> +	- reg-names: names of the registers listed in "reg" property
+> +		Valid names are "aud" and "i2s_in". "aud" contains a
+> +		set of DMA, I2S_OUT and SPDIF registers. "i2s_in" contains
+> +		a set of I2S_IN registers.
+> +	- clocks: PLL and leaf clocks used by audio ports
+> +	- clock-names: names of 3 leaf clocks used by audio ports
+> +		Valid names are "ch0_audio", "ch1_audio", "ch2_audio"
+> +	- interrupts: audio DMA interrupt number
+> +
+> +SSP Subnode properties:
+> +- reg: The index of ssp port interface to use
+> +	Valid value are 0, 1, 2, or 3 (for spdif)
+> +
+> +
+> +Example:
+> +	cygnus_audio: audio at 180ae000 {
+> +		compatible = "brcm,cygnus-audio";
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +		reg = <0x180ae000 0xafd>, <0x180aec00 0x1f8>;
+> +		reg-names = "aud", "i2s_in";
+> +		clocks = <&audiopll BCM_CYGNUS_AUDIOPLL_CH0>,
+> +				<&audiopll BCM_CYGNUS_AUDIOPLL_CH1>,
+> +				<&audiopll BCM_CYGNUS_AUDIOPLL_CH2>;
+> +		clock-names = "ch0_audio", "ch1_audio", "ch2_audio";
+> +		interrupts = <GIC_SPI 143 IRQ_TYPE_LEVEL_HIGH>;
+> +
+> +		ssp0: ssp_port at 0 {
+> +			reg = <0>;
+> +			status = "okay";
+> +		};
+> +
+> +		ssp1: ssp_port at 1 {
+> +			reg = <1>;
+> +			status = "disabled";
+> +		};
+> +
+> +		ssp2: ssp_port at 2 {
+> +			reg = <2>;
+> +			status = "disabled";
+> +		};
+> +
+> +		spdif: spdif_port at 3 {
+> +			reg = <3>;
+> +			status = "disabled";
+> +		};
+> +	};
+> -- 
+> 1.7.9.5
+> 
