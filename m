@@ -1,90 +1,77 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Mon, 9 Nov 2015 15:58:40 +0000
-Subject: [PATCH] arm64: remove redundant FRAME_POINTER kconfig option
-In-Reply-To: <563CE9AA.8050905@linaro.org>
-References: <1446658671-16238-1-git-send-email-yang.shi@linaro.org>
- <20151106123008.GK6087@arm.com> <20151106125002.GA8116@leverpostej>
- <20151106162109.GZ7637@e104818-lin.cambridge.arm.com>
- <20151106162538.GU6087@arm.com> <563CE21A.6060803@linaro.org>
- <20151106173558.GC7637@e104818-lin.cambridge.arm.com>
- <563CE5BB.2080701@linaro.org>
- <20151106175119.GD7637@e104818-lin.cambridge.arm.com>
- <563CE9AA.8050905@linaro.org>
-Message-ID: <20151109155840.GD21606@e104818-lin.cambridge.arm.com>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 9 Nov 2015 09:59:59 -0600
+Subject: [PATCH 1/3] dt-bindings: thermal: Add binding document for
+ Mediatek thermal controller
+In-Reply-To: <1447064013-13026-2-git-send-email-s.hauer@pengutronix.de>
+References: <1447064013-13026-1-git-send-email-s.hauer@pengutronix.de>
+ <1447064013-13026-2-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <20151109155959.GA23855@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 06, 2015 at 09:55:54AM -0800, Shi, Yang wrote:
-> On 11/6/2015 9:51 AM, Catalin Marinas wrote:
-> >On Fri, Nov 06, 2015 at 09:39:07AM -0800, Shi, Yang wrote:
-> >>On 11/6/2015 9:35 AM, Catalin Marinas wrote:
-> >>>On Fri, Nov 06, 2015 at 09:23:38AM -0800, Shi, Yang wrote:
-> >>>>On 11/6/2015 8:25 AM, Will Deacon wrote:
-> >>>>>However, the patch would allow one to
-> >>>>>disable FRAME_POINTERS (not sure it has any effect on the aarch64 gcc
-> >>>>>though).
-> >>>>
-> >>>>No, it doesn't. Actually, FRAME_POINTER could be disabled regardless of the
-> >>>>patch.
-> >>>
-> >>>In which case I suggest that we always select it just as a clearer
-> >>>statement that the feature cannot be disabled (and you never know what
-> >>>the compiler people decide to do in the future).
-> >>
-> >>Do you mean select FRAME_POINTER in ARCH_WANT_FRAME_POINTERS?
-> >>
-> >>Yes, we could, but this may cause other architectures which select
-> >>ARCH_WANT_FRAME_POINTERS to have FRAME_POINTER selected too.
-> >
-> >This would have been the ideal option, something like:
-> >
-> >--- a/lib/Kconfig.debug
-> >+++ b/lib/Kconfig.debug
-> >@@ -322,7 +322,7 @@ config ARCH_WANT_FRAME_POINTERS
-> >  	help
-> >
-> >  config FRAME_POINTER
-> >-	bool "Compile the kernel with frame pointers"
-> >+	bool "Compile the kernel with frame pointers" if !ARCH_WANT_FRAME_POINTERS
-> >  	depends on DEBUG_KERNEL && \
-> >  		(CRIS || M68K || FRV || UML || \
-> >  		 AVR32 || SUPERH || BLACKFIN || MN10300 || METAG) || \
-> >
-> >But, as you said, we would need to check the other architectures
-> >selecting ARCH_WANT_FRAME_POINTERS.
+On Mon, Nov 09, 2015 at 11:13:31AM +0100, Sascha Hauer wrote:
+> This adds the device tree binding documentation for the mediatek thermal
+> controller found on Mediatek MT8173 and other SoCs.
 > 
-> How about:
-> 
-> diff --git a/lib/Kconfig.debug b/lib/Kconfig.debug
-> index 1d1521c..709255a 100644
-> --- a/lib/Kconfig.debug
-> +++ b/lib/Kconfig.debug
-> @@ -319,6 +319,7 @@ config DEBUG_SECTION_MISMATCH
->  #
->  config ARCH_WANT_FRAME_POINTERS
->         bool
-> +       select FRAME_POINTER if ARM64
->         help
-> 
->  config FRAME_POINTER
-> 
-> If other architectures want the same behavior, they could easily append to
-> the is statement. If all arches which selects ARCH_WANT_FRAME_POINTERS, the
-> if statement could be just removed.
+> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+> Reviewed-by: Daniel Kurtz <djkurtz@chromium.org>
 
-I prefer the select in the ARM64 Kconfig entry as below:
+Acked-by: Rob Herring <robh@kernel.org>
 
-> >--- a/arch/arm64/Kconfig
-> >+++ b/arch/arm64/Kconfig
-> >@@ -27,6 +27,7 @@ config ARM64
-> >  	select CPU_PM if (SUSPEND || CPU_IDLE)
-> >  	select DCACHE_WORD_ACCESS
-> >  	select EDAC_SUPPORT
-> >+	select FRAME_POINTER
-> >  	select GENERIC_ALLOCATOR
-> >  	select GENERIC_CLOCKEVENTS
-> >  	select GENERIC_CLOCKEVENTS_BROADCAST
-> >
-
--- 
-Catalin
+> ---
+>  .../bindings/thermal/mediatek-thermal.txt          | 43 ++++++++++++++++++++++
+>  1 file changed, 43 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/thermal/mediatek-thermal.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/thermal/mediatek-thermal.txt b/Documentation/devicetree/bindings/thermal/mediatek-thermal.txt
+> new file mode 100644
+> index 0000000..81f9a51
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/thermal/mediatek-thermal.txt
+> @@ -0,0 +1,43 @@
+> +* Mediatek Thermal
+> +
+> +This describes the device tree binding for the Mediatek thermal controller
+> +which measures the on-SoC temperatures. This device does not have its own ADC,
+> +instead it directly controls the AUXADC via AHB bus accesses. For this reason
+> +this device needs phandles to the AUXADC. Also it controls a mux in the
+> +apmixedsys register space via AHB bus accesses, so a phandle to the APMIXEDSYS
+> +is also needed.
+> +
+> +Required properties:
+> +- compatible: "mediatek,mt8173-thermal"
+> +- reg: Address range of the thermal controller
+> +- interrupts: IRQ for the thermal controller
+> +- clocks, clock-names: Clocks needed for the thermal controller. required
+> +                       clocks are:
+> +		       "therm":	 Main clock needed for register access
+> +		       "auxadc": The AUXADC clock
+> +- resets: Reference to the reset controller controlling the thermal controller.
+> +- mediatek,auxadc: A phandle to the AUXADC which the thermal controller uses
+> +- mediatek,apmixedsys: A phandle to the APMIXEDSYS controller.
+> +- #thermal-sensor-cells : Should be 0. See ./thermal.txt for a description.
+> +
+> +Optional properties:
+> +- nvmem-cells: A phandle to the calibration data provided by a nvmem device. If
+> +               unspecified default values shall be used.
+> +- nvmem-cell-names: Should be "calibration-data"
+> +
+> +Example:
+> +
+> +	thermal: thermal at 1100b000 {
+> +		#thermal-sensor-cells = <1>;
+> +		compatible = "mediatek,mt8173-thermal";
+> +		reg = <0 0x1100b000 0 0x1000>;
+> +		interrupts = <0 70 IRQ_TYPE_LEVEL_LOW>;
+> +		clocks = <&pericfg CLK_PERI_THERM>, <&pericfg CLK_PERI_AUXADC>;
+> +		clock-names = "therm", "auxadc";
+> +		resets = <&pericfg MT8173_PERI_THERM_SW_RST>;
+> +		reset-names = "therm";
+> +		mediatek,auxadc = <&auxadc>;
+> +		mediatek,apmixedsys = <&apmixedsys>;
+> +		nvmem-cells = <&thermal_calibration_data>;
+> +		nvmem-cell-names = "calibration-data";
+> +	};
+> -- 
+> 2.6.1
+> 
