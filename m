@@ -1,117 +1,151 @@
-From: dianders@chromium.org (Doug Anderson)
-Date: Sun, 8 Nov 2015 20:39:54 -0800
-Subject: [RESEND PATCH 0/1] Fix the "hard LOCKUP" when running a heavy
- loading
-In-Reply-To: <20151106121741.GH6087@arm.com>
-References: <1446538209-13490-1-git-send-email-wxt@rock-chips.com>
- <20151103113030.GB14159@arm.com>
- <CAD=FV=XYBeKSo7NeTt3P0nSPA_A3yQ0qHDwxsJSzsTgA5VPkoA@mail.gmail.com>
- <20151106121741.GH6087@arm.com>
-Message-ID: <CAD=FV=XFmgBoxm6oOgwu6HDajFBjsmF=1Sem_0UPN51zNO64fg@mail.gmail.com>
+From: wxt@rock-chips.com (Caesar Wang)
+Date: Mon,  9 Nov 2015 12:48:52 +0800
+Subject: [PATCH v4 00/10] Better compatible for the rockchip thermal and
+ support RK3368 SoCs
+Message-ID: <1447044542-30859-1-git-send-email-wxt@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Will,
+Thank you all for providing inputs and comments on previous versions of
+this patchset.
+Especially thanks to the (Eduardo, Dmitry, Heiko,....).
 
-On Fri, Nov 6, 2015 at 4:17 AM, Will Deacon <will.deacon@arm.com> wrote:
-> On Tue, Nov 03, 2015 at 11:00:20AM -0800, Doug Anderson wrote:
->> Hi,
->
-> Hey Doug,
->
->> When CPUs are hard locked up, they are often found at:
->>
->> <c0117c8c> v7_coherent_kern_range+0x58/0x74
->>   or
->> <c0118278> v7wbi_flush_user_tlb_range+0x30/0x38
->>
->> That made me think that an errata might be the root cause of our hard
->> lockups, since ARM errata often trigger in cache/tlb functions.  I
->> think Caesar dug up this old errata fix in response to my suggestion.
->
-> I still don't see how 818325 is related, since there aren't any conditional
-> stores in the sequences below.
->
->> If you know of any ARM errata that might trigger hard lockups like
->> this, I'd certainly be all ears.  It's also possible that we've got
->> something running at too low of a voltage or we've got clock dividers
->> or cache timings programmed incorrectly somewhere.  To give a more
->> full disassembly of one of the crashes:
->>
->>   <4>[ 1623.480846] SMP: failed to stop secondary CPUs
->>   <3>[ 1623.480862] CPU1 PC: <c01827e8> __unqueue_futex+0x68/0x88
->>   <3>[ 1623.480879] CPU2 PC: <c0117c8c> v7_coherent_kern_range+0x58/0x74
->>   <3>[ 1623.480895] CPU3 PC: <c0118268> v7wbi_flush_user_tlb_range+0x20/0x38
->>
->> ---
->
-> Do you have any register values for these CPUs?
+This series patchs are working for RK3368 on Rockchip platform.
 
-No, unfortunately not.  The only reason I have the PCs is because we
-have code to sample CPU_DBGPCSR at hard lockup time (actually any
-panic time).  There's no equivalent for other registers.  The code
-does try to sample a number of times, so the fact that we only have
-one PC value for each of the other CPUs implies that they are either
-totally stuck or running in a very tight loop (from experimentation,
-if you are running in a tight loop of just a few instructions the
-CPU_DBGPCSR for a CPU may or may not update).
+-----
+This patchset are based on linus master branch.
+Note: Need add the following thermal patchs for thermal driver before
+apply this series patchs.
+(the patchs 1) 2) 3) 4) have merged in thermal-soc git tree which can be found at
+ git://git.kernel.org/pub/scm/linux/kernel/git/evalenti/linux-soc-thermal.git)
 
-If you're curious, you can see rockchip_panic_notify() in
-<https://chromium.googlesource.com/chromiumos/third_party/kernel/+/chromeos-3.14/arch/arm/mach-rockchip/rockchip.c>.
-It's basically some code that's been ported forward from code in an
-old Android tree and it's not beautiful, but it's better than nothing.
-The code only runs if the panic notifier failed to stop the other CPUs
-in a normal way.
+1) thermal: rockchip: fix handling of invalid readings
+(https://patchwork.kernel.org/patch/6973101/)
 
-Technically (I think) I saw something in the CPU debug registers that
-would actually allow me to force another CPU to stop.  That might let
-me gain control over it and inspect the other registers.  Doing that
-is probably beyond what I have time for right now, though.
+2) thermal: rockhip: fix setting thermal shutdown polarity
+(https://patchwork.kernel.org/patch/6973131/)
+
+3) dt-bindings: rockchip-thermal: Add the pinctrl states in this document
+(https://patchwork.kernel.org/patch/7472021/)
+
+4) thermal: rockchip: support the sleep pinctrl state to avoid glitches in s2r
+(https://patchwork.kernel.org/patch/7472051/)
+
+5) thermal: rockchip: fix compile error
+(https://patchwork.kernel.org/patch/7578271/)
+
+The git log oneline my local branch as follows:
+9a3d129 arm64: dts: Enable the Thermal on R88 board
+4299e7a arm64: dts: Add main Thermal info to rk3368.dtsi
+b95724c arm64: dts: Add the thermal data found on RK3368
+c76f603 thermal: rockchip: Support the RK3368 SoCs in thermal drivers
+a3f4fdd thermal: rockchip: consistently use int for temperatures
+558b4d1ce thermal: rockchip: Add the sort flag for adc value increment or decrement
+2438be4 thermal: rockchip: improve the conversion function
+74b701d thermal: rockchip: trivial: fix typo in commit
+2d85d32 thermal: rockchip: better to compatible the driver for different SoCs
+1f2ef67 dt-bindings: rockchip-thermal: Support the RK3368 SoCs compatible
+
+87d83ce thermal: rockchip: fix compile error
+c0a5991 thermal: rockchip: support the sleep pinctrl state to avoid glitches in s2r
+11e4d6c dt-bindings: rockchip-thermal: Add the pinctrl states in this document
+6d30517 thermal: rockhip: fix setting thermal shutdown polarity
+2b50ab8 thermal: rockchip: fix handling of invalid readings
+
+ce5c2d2 arm64: fixup for mm renames
+ad804a0 Merge branch 'akpm' (patches from Andrew)
+ab9f2fa Merge tag 'for-linus' of
+git://git.kernel.org/pub/scm/linux/kernel/git/dledford/rdma
+75021d2 Merge branch 'for-linus' of
+git://git.kernel.org/pub/scm/linux/kernel/git/jikos/trivial
+6f1da31 Merge branch 'for-linus' of
+git://git.kernel.org/pub/scm/linux/kernel/git/jikos/hid
+99aaa9c Merge branch 'for-linus' of
+git://git.kernel.org/pub/scm/linux/kernel/git/jikos/livepatching
+
+----
+This series are tested on RK3368 board.
+build on arm & x86, and tested the r88 board.
+Sorry for the v3 series patchs compiling error.
+
+root at rk3368_32:/ # cat proc/version
+Linux version 4.3.0+ (wxt at ubuntu) (gcc version 4.9 20140514 (prerelease) (GCC) ) #6 SMP PREEMPT Mon Nov 9 12:35:52 CST 2015
+
+while true;do ls >/dev/null; done&
+
+while true; do grep "" /sys/class/thermal/thermal_zone[0-1]/temp; sleep
+.5; done &
+
+You can get the temperature form sensors.
+
+/sys/class/thermal/thermal_zone1/temp:30000
+/sys/class/thermal/thermal_zone0/temp:22500
+/sys/class/thermal/thermal_zone1/temp:30000
+/sys/class/thermal/thermal_zone0/temp:25000
+/sys/class/thermal/thermal_zone1/temp:30000
+/sys/class/thermal/thermal_zone0/temp:25000
+/sys/class/thermal/thermal_zone1/temp:32500
+/sys/class/thermal/thermal_zone0/temp:25000
+/sys/class/thermal/thermal_zone1/temp:30000
+/sys/class/thermal/thermal_zone0/temp:27500
+/sys/class/thermal/thermal_zone1/temp:30000
+/sys/class/thermal/thermal_zone0/temp:27500
+/sys/class/thermal/thermal_zone1/temp:32500
+/sys/class/thermal/thermal_zone0/temp:27500
+....
 
 
->> c01827dc:       e2841010        add     r1, r4, #16
->> c01827e0:       e2445004        sub     r5, r4, #4
->> c01827e4:       eb068d33        bl      c0325cb8 <plist_del> (File
->> Offset: 0x235cb8)
->> => c01827e8:    f595f000        pldw    [r5]
->> c01827ec:       e1953f9f        ldrex   r3, [r5]
->> c01827f0:       e2433001        sub     r3, r3, #1
->> c01827f4:       e1852f93        strex   r2, r3, [r5]
->> c01827f8:       e3320000        teq     r2, #0
->> c01827fc:       1afffffa        bne     c01827ec
->> <__unqueue_futex+0x6c> (File Offset: 0x927ec)
->> c0182800:       e89da830        ldm     sp, {r4, r5, fp, sp, pc}
->
-> For example, the futex address in r5 ...
->
->> c0117c80:       e08cc002        add     ip, ip, r2
->> c0117c84:       e15c0001        cmp     ip, r1
->> c0117c88:       3afffffb        bcc     c0117c7c
->> <v7_coherent_kern_range+0x48> (File Offset: 0x27c7c)
->> => c0117c8c:    e3a00000        mov     r0, #0
->> c0117c90:       ee070fd1        mcr     15, 0, r0, cr7, cr1, {6}
->> c0117c94:       f57ff04a        dsb     ishst
->> c0117c98:       f57ff06f        isb     sy
->> c0117c9c:       e1a0f00e        mov     pc, lr
->
-> ... the address in r0 for the cache maintenance ...
->
->> c0118260:       e1830600        orr     r0, r3, r0, lsl #12
->> c0118264:       e1a01601        lsl     r1, r1, #12
->> => c0118268:    ee080f33        mcr     15, 0, r0, cr8, cr3, {1}
->> c011826c:       e2800a01        add     r0, r0, #4096   ; 0x1000
->> c0118270:       e1500001        cmp     r0, r1
->> c0118274:       3afffffb        bcc     c0118268
->> <v7wbi_flush_user_tlb_range+0x20> (File Offset: 0x28268)
->> c0118278:       f57ff04b        dsb     ish
->> c011827c:       e1a0f00e        mov     pc, lr
->
-> ... and the address in r0 for the TLBI.
->
-> Are the cores executing instructions at this point, or by "hard LOCKUP"
-> do you mean that they're deadlocked in hardware?
+Changes in v4:
+- rename the flag as mode.
+- with enum type instead of bool type.
+- fix the warning from the print message.
+- :%s/sort_flag/mode.
+- rename the 'drivers' to 'driver' in subject.
+- Missing the ";" caused compile error.
 
-If they are executing, they aren't executing much.  That means it's
-likely they're deadlocked in hardware.
+Changes in v3:
+- As Eduardo comments, let's change data_mask type with 'u32' instead of
+  'unsigned long'.
+- rename the flag-> sort_flag.
+- fix the indentation.
+- change the pr_err information.
+- As the Patch v2 comments, Add a new patch to fix it.
+- :%s/flag/sort_flag
+- fix the rk3368 sort_flag as increment mode.
 
--Doug
+Changes in v2:
+- As Eduardo comments on patch v1, split in smaller changes.
+- make the conversion table in as a parameter both code_to_temp
+  and temp_to_code function.
+- remove some unused, completed on other patchs.
+- fix a copy wrong name.
+
+Changes in v1:
+- %s/thermal/rockchip-thermal in subject.
+- add a new patch for thermal driver to support more SoCs.
+- As Dmitry comment, make the conversion table in as a parameterm.
+- support the opt gpio pinctrl state.
+
+Caesar Wang (10):
+  dt-bindings: rockchip-thermal: Support the RK3368 SoCs compatible
+  thermal: rockchip: better to compatible the driver for different SoCs
+  thermal: rockchip: trivial: fix typo in commit
+  thermal: rockchip: improve the conversion function
+  thermal: rockchip: Add the sort mode for adc value increment or
+    decrement
+  thermal: rockchip: consistently use int for temperatures
+  thermal: rockchip: Support the RK3368 SoCs in thermal driver
+  arm64: dts: Add the thermal data found on RK3368
+  arm64: dts: Add main Thermal info to rk3368.dtsi
+  arm64: dts: Enable the Thermal on R88 board
+
+ .../bindings/thermal/rockchip-thermal.txt          |   4 +-
+ arch/arm64/boot/dts/rockchip/rk3368-r88.dts        |   6 +
+ arch/arm64/boot/dts/rockchip/rk3368-thermal.dtsi   | 112 +++++++
+ arch/arm64/boot/dts/rockchip/rk3368.dtsi           |  36 +++
+ drivers/thermal/rockchip_thermal.c                 | 328 +++++++++++++++------
+ 5 files changed, 397 insertions(+), 89 deletions(-)
+ create mode 100644 arch/arm64/boot/dts/rockchip/rk3368-thermal.dtsi
+
+-- 
+1.9.1
