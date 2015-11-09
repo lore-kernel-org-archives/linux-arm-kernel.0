@@ -1,79 +1,69 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Mon, 9 Nov 2015 11:31:21 +0900
-Subject: [PATCH v6 00/12] arm64: renesas: add sound support
-In-Reply-To: <20151109012943.GF4832@verge.net.au>
-References: <87egg3k5g6.wl%kuninori.morimoto.gx@renesas.com>
- <20151109012943.GF4832@verge.net.au>
-Message-ID: <20151109023118.GA11532@verge.net.au>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Sun, 8 Nov 2015 21:46:33 -0500
+Subject: [PATCH V3 3/4] dmaselftest: add memcpy selftest support functions
+In-Reply-To: <563EDA15.7070606@codeaurora.org>
+References: <1446958380-23298-1-git-send-email-okaya@codeaurora.org>
+ <1446958380-23298-4-git-send-email-okaya@codeaurora.org>
+ <563EDA15.7070606@codeaurora.org>
+Message-ID: <56400909.2090300@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 09, 2015 at 10:29:46AM +0900, Simon Horman wrote:
-> On Fri, Nov 06, 2015 at 06:33:10AM +0000, Kuninori Morimoto wrote:
-> > Hi,
-> > 
-> > these are v2 patches which add sound support to the r8a7795/Salvator-X.
-> > 
-> > These patches are an update of Simon's v5 patch-set
-> > 
-> > The main change to the patches themselves since Morimoto-san's v3 posting
-> > and v4 updates to that posting is to update to new CPG/MSSR bindings via
-> > Geert Uytterhoeven.
-> > 
-> > It doesn't include cs2000 support since it is not accepted yet.
-> > I will send additional patch if it was accepted.
-> > This patches doesn't include CTU/MIX support either,
-> > because it is too advanced feature at this point.
-> > 
-> > Base:
-> > 
-> > * "[PATCH v4 0/3] arm64: renesas: r8a7795: add I2C support"
-> >   This can be found in the topic/r8a7795-i2c-v4 branch of
-> >   my renesas tree on kernel.org.
-> 
-> Thanks.
-> 
-> In order to aid review I have made this patchset available in
-> the topic/r8a7795-sound-v6 branch of my renesas tree on kernel.org.
-> The topic/r8a7795-i2c-v4 branch is there too.
 
-I have also pushed topic/r8a7795-sound-v6.runtime which
-is a merge of topic/r8a7795-sound-v6 with its run-time dependencies
-that I am aware of.
 
-> > Kuninori Morimoto (12):
-> >       arm64: renesas: r8a7795: add AUDIO_DMAC support
-> >       arm64: renesas: r8a7795: Sound SSI PIO support
-> >       arm64: renesas: r8a7795: Sound SSI DMA support
-> >       arm64: renesas: r8a7795: Sound SRC support
-> >       arm64: renesas: r8a7795: Sound DVC support
-> >       arm64: renesas: salvator-x: Sound SSI PIO support
-> 
-> The above patch seemed to have some fuzz. Please check that
-> I resolved that correctly.
-> 
-> >       arm64: renesas: salvator-x: Sound SSI DMA support
-> >       arm64: renesas: salvator-x: Sound SSI DMA support via BUSIF
-> >       arm64: renesas: salvator-x: Sound SRC support
-> >       arm64: renesas: salvator-x: Sound DVC support
-> >       arm64: defconfig: add Renesas R-Car DMAC driver support
-> 
-> The above patch did not apply cleanly. I have fixed that and also I
-> modified the patch to enable CONFIG_DMADEVICES as well as CONFIG_RCAR_DMAC.
-> Please check this e.g. using make savedefconfig.
-> 
-> >       arm64: defconfig: add Renesas sound and AK4613 support
-> > 
-> >  arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts |  94 +++++++++++++++++++++++++++++++++++++++++
-> >  arch/arm64/boot/dts/renesas/r8a7795.dtsi           | 253 +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-> >  arch/arm64/configs/defconfig                       |   6 +++
-> >  3 files changed, 353 insertions(+)
-> > 
-> > -- 
-> > 2.1.4
-> > 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-sh" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+On 11/8/2015 12:13 AM, Timur Tabi wrote:
+> Sinan Kaya wrote:
+>
+>> +static int dma_selftest_sg(struct dma_device *dmadev,
+>> +            struct dma_chan *dma_chanptr, u64 size,
+>> +            unsigned long flags)
+>> +{
+>> +    dma_addr_t src_dma, dest_dma, dest_dma_it;
+>> +    u8 *dest_buf;
+>> +    u32 i, j = 0;
+>> +    dma_cookie_t cookie;
+>> +    struct dma_async_tx_descriptor *tx;
+>> +    int err = 0;
+>> +    int ret;
+>> +    struct sg_table sg_table;
+>> +    struct scatterlist    *sg;
+>> +    int nents = 10, count;
+>> +    bool free_channel = 1;
+>
+> Booleans are either 'true' or 'false'.
+>
+
+OK
+
+>> +static int dma_selftest_mapsngle(struct device *dev)
+>> +{
+>> +    u32 buf_size = 256;
+>> +    char *src;
+>> +    int ret = -ENOMEM;
+>> +    dma_addr_t dma_src;
+>> +
+>> +    src = kmalloc(buf_size, GFP_KERNEL);
+>> +    if (!src)
+>> +        return -ENOMEM;
+>> +
+>> +    strcpy(src, "hello world");
+>
+> kstrdup()?
+>
+> And why kmalloc anyway?  Why not leave it on the stack?
+>
+>      char src[] = "hello world";
+>
+> ?
+
+I need to call dma_map_single on this address to convert it to a DMA 
+address. That's why.
+
+>
+>
+
+-- 
+Sinan Kaya
+Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a 
+Linux Foundation Collaborative Project
