@@ -1,46 +1,105 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Mon, 9 Nov 2015 09:01:02 -0500
-Subject: [PATCH V2 3/3] scsi: mptxsas: offload IRQ execution
-In-Reply-To: <5640481C.9000505@suse.de>
-References: <1447034266-28003-1-git-send-email-okaya@codeaurora.org>
- <1447034266-28003-4-git-send-email-okaya@codeaurora.org>
- <5640481C.9000505@suse.de>
-Message-ID: <5640A71E.7070502@codeaurora.org>
+From: jungseoklee85@gmail.com (Jungseok Lee)
+Date: Mon, 9 Nov 2015 23:04:06 +0900
+Subject: [PATCH v5 2/6] arm64: ftrace: fix a stack tracer's output under
+ function graph tracer
+In-Reply-To: <1446792285-1154-3-git-send-email-takahiro.akashi@linaro.org>
+References: <1446792285-1154-1-git-send-email-takahiro.akashi@linaro.org>
+ <1446792285-1154-3-git-send-email-takahiro.akashi@linaro.org>
+Message-ID: <3F63B5BC-C21A-4ECA-9800-374B924DB98D@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Nov 6, 2015, at 3:44 PM, AKASHI Takahiro wrote:
 
+Hi Akashi,
 
-On 11/9/2015 2:15 AM, Hannes Reinecke wrote:
-> On 11/09/2015 02:57 AM, Sinan Kaya wrote:
->> The mpt2sas and mpt3sas drivers are spinning forever in
->> their IRQ handlers if there are a lot of jobs queued up
->> by the PCIe card. This handler is causing spikes for
->> the rest of the system and sluggish behavior.
->>
->> Marking all MSI interrupts as non-shared and moving the
->> MSI interrupts to thread context. This relexes the rest
->> of the system execution.
->>
-> NACK.
->
-> If there is a scalability issue when handling interrupts
-> it should be fixed in the driver directly.
->
-> Looking at the driver is should be possible to implement
-> a worker thread handling the reply descriptor, and having the
-> interrupt only to fetch the reply descriptor.
+> Function graph tracer modifies a return address (LR) in a stack frame
+> to hook a function return. This will result in many useless entries
+> (return_to_handler) showing up in a stack tracer's output.
+> 
+> This patch replaces such entries with originals values preserved in
+> current->ret_stack[].
+> 
+> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+> ---
+> arch/arm64/include/asm/ftrace.h |    2 ++
+> arch/arm64/kernel/stacktrace.c  |   21 +++++++++++++++++++++
+> 2 files changed, 23 insertions(+)
+> 
+> diff --git a/arch/arm64/include/asm/ftrace.h b/arch/arm64/include/asm/ftrace.h
+> index c5534fa..3c60f37 100644
+> --- a/arch/arm64/include/asm/ftrace.h
+> +++ b/arch/arm64/include/asm/ftrace.h
+> @@ -28,6 +28,8 @@ struct dyn_arch_ftrace {
+> 
+> extern unsigned long ftrace_graph_call;
+> 
+> +extern void return_to_handler(void);
+> +
+> static inline unsigned long ftrace_call_adjust(unsigned long addr)
+> {
+> 	/*
+> diff --git a/arch/arm64/kernel/stacktrace.c b/arch/arm64/kernel/stacktrace.c
+> index ccb6078..5fd3477 100644
+> --- a/arch/arm64/kernel/stacktrace.c
+> +++ b/arch/arm64/kernel/stacktrace.c
+> @@ -17,6 +17,7 @@
+>  */
+> #include <linux/kernel.h>
+> #include <linux/export.h>
+> +#include <linux/ftrace.h>
+> #include <linux/sched.h>
+> #include <linux/stacktrace.h>
+> 
+> @@ -73,6 +74,9 @@ struct stack_trace_data {
+> 	struct stack_trace *trace;
+> 	unsigned int no_sched_functions;
+> 	unsigned int skip;
+> +#ifdef CONFIG_FUNCTION_GRAPH_TRACER
+> +	unsigned int ret_stack_index;
+> +#endif
+> };
+> 
+> static int save_trace(struct stackframe *frame, void *d)
+> @@ -81,6 +85,20 @@ static int save_trace(struct stackframe *frame, void *d)
+> 	struct stack_trace *trace = data->trace;
+> 	unsigned long addr = frame->pc;
+> 
+> +#ifdef CONFIG_FUNCTION_GRAPH_TRACER
+> +	if (addr == (unsigned long)return_to_handler - AARCH64_INSN_SIZE) {
 
-I'll take a look.
+not if (adds == (unsigned long)return_to_handler)?
 
->
-> Cheers,
->
-> Hannes
->
+> +		/*
+> +		 * This is a case where function graph tracer has
+> +		 * modified a return address (LR) in a stack frame
+> +		 * to hook a function return.
+> +		 * So replace it to an original value.
+> +		 */
+> +		frame->pc = addr =
+> +			current->ret_stack[data->ret_stack_index--].ret
+> +							- AARCH64_INSN_SIZE;
 
--- 
-Sinan Kaya
-Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a 
-Linux Foundation Collaborative Project
+Ditto. not without AARCH64_INSN_SIZE?
+
+I've observed many return_to_handler without the changes.
+Am I missing something?
+
+> +	}
+> +#endif /* CONFIG_FUNCTION_GRAPH_TRACER */
+> +
+> 	if (data->no_sched_functions && in_sched_functions(addr))
+> 		return 0;
+> 	if (data->skip) {
+> @@ -100,6 +118,9 @@ void save_stack_trace_tsk(struct task_struct *tsk, struct stack_trace *trace)
+> 
+> 	data.trace = trace;
+> 	data.skip = trace->skip;
+> +#ifdef CONFIG_FUNCTION_GRAPH_TRACER
+> +	data.ret_stack_index = current->curr_ret_stack;
+
+Can I get an idea on why current->curr_ret_stack is used instead of
+tsk->curr_ret_stack?
+
+Best Regards
+Jungseok Lee
