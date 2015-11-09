@@ -1,47 +1,29 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sun, 8 Nov 2015 18:02:17 -0800
-Subject: [PATCH v3 0/3] ARM: dts: sun4i: gemei-g9: Devicetree improvements
-In-Reply-To: <1446832486-32319-1-git-send-email-plaes@plaes.org>
-References: <1446832486-32319-1-git-send-email-plaes@plaes.org>
-Message-ID: <20151109020217.GZ6114@lukather>
+From: slash.tmp@free.fr (Mason)
+Date: Mon, 9 Nov 2015 17:07:27 +0100
+Subject: Grafting old platform drivers onto a new DT kernel
+In-Reply-To: <yw1xtwov5gh1.fsf@unicorn.mansr.com>
+References: <563B3749.50701@free.fr> <20151105151559.GA16666@lunn.ch>
+ <CABxcv=k5mzw_TDsD1eQna9+HY9aqCUd03YAc62750Gs--sMozw@mail.gmail.com>
+ <5640B877.4020108@free.fr> <yw1xtwov5gh1.fsf@unicorn.mansr.com>
+Message-ID: <5640C4BF.2010204@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 06, 2015 at 07:54:43PM +0200, Priit Laes wrote:
-> Improvements to devicetree setup:
->  - Converted to use axp209 regulator nodes
->  - Fix invalid regulator for LRADC keys
->  - Enable audio codec node
-> 
-> Changes sinve v2:
->  - Dropped applied "Added IRQ configuration for bma250 accelerometer" patch
-> 
-> Changes since v1:
->  - Dropped NAND patch because driver is not yet ready
->  - Dropped applied KEYBOARD_SUN4I_LRADC patch
->  - Added sun4i audio codec patch
-> 
-> 
-> Priit Laes (3):
->   ARM: dts: sun4i: gemei-g9: Convert to use axp209 regulator nodes
->   ARM: dts: sun4i: gemei-g9: Use reg_ldo2 instead of reg_vcc3v0
->   ARM: dts: sun4i: gemei-g9: Enable sun4i audio codec support
-> 
->  arch/arm/boot/dts/sun4i-a10-gemei-g9.dts | 42 +++++++++++++++++++++++++++-----
->  1 file changed, 36 insertions(+), 6 deletions(-)
+On 09/11/2015 16:40, M?ns Rullg?rd wrote:
 
-Applied, thanks !
+> The simplest solution for you is probably to add a quick and dirty DT
+> binding to the old driver.  If it doesn't use any driver-specific
+> platform data struct, you only need to set .of_match_table in the
+> struct platform_driver.  If there is a platform data struct, you'll also
+> need to write some code to populate it from DT properties.  It shouldn't
+> take more than a few minutes per driver in most cases.
 
-Maxime
+I'll try that approach, although I fear that "a few minutes per driver"
+is an optimistic assessment.
 
--- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151108/71789b29/attachment.sig>
+> To get those drivers accepted upstream will obviously take a bit more
+> work.
+
+AKA "rewrite from scratch" :-)
+
+Regards.
