@@ -1,82 +1,76 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Mon, 09 Nov 2015 23:08:36 +0100
-Subject: [PATCH v2 7/8] ARM: dts: rockchip: assign usbphy480m_src to the
- new usbphy pll on veyron
-In-Reply-To: <CAD=FV=WAmx1y-Euf5-FfdcawxbduKERR-==opWT9VtnwEjmycw@mail.gmail.com>
-References: <1446998681-26436-1-git-send-email-heiko@sntech.de>
- <1446998681-26436-8-git-send-email-heiko@sntech.de>
- <CAD=FV=WAmx1y-Euf5-FfdcawxbduKERR-==opWT9VtnwEjmycw@mail.gmail.com>
-Message-ID: <3737540.j79ca5LgFf@phil>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Mon, 9 Nov 2015 17:29:58 -0500
+Subject: [PATCH] acpi: add support for extended IRQ to PCI link
+In-Reply-To: <CAHp75VfH9-OpQdX_aoraLEcHewdRPFoR5My8mN2jU30ittS7oA@mail.gmail.com>
+References: <1446998832-7023-1-git-send-email-okaya@codeaurora.org>
+ <CAHp75VfH9-OpQdX_aoraLEcHewdRPFoR5My8mN2jU30ittS7oA@mail.gmail.com>
+Message-ID: <56411E66.2030104@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Montag, 9. November 2015, 13:08:43 schrieb Doug Anderson:
-> Heiko,
-> 
-> On Sun, Nov 8, 2015 at 8:04 AM, Heiko Stuebner <heiko@sntech.de> wrote:
-> > Veyron devices try to always set the source for usbphy480m to the usbphy0
-> > that is the phy connected to the otg controller, because the firmware-
-> > default is usbphy1, the ehci-controller connected to the internal camera
-> > that might get turned off way easier to save power.
-> >
-> > In the mainline kernel we currently don't use the usbphy480m_src at all,
-> > as it mainly powers the uart0 source that is connected to the bluetooth
-> > component of the wifi/bt combo.
-> >
-> > So move that assignment over to the new real pll clock inside the usbphy.
-> >
-> > Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> > ---
-> >  arch/arm/boot/dts/rk3288-veyron.dtsi | 2 +-
-> >  1 file changed, 1 insertion(+), 1 deletion(-)
-> >
-> > diff --git a/arch/arm/boot/dts/rk3288-veyron.dtsi 
-b/arch/arm/boot/dts/rk3288-veyron.dtsi
-> > index d4263ed..c8329b5 100644
-> > --- a/arch/arm/boot/dts/rk3288-veyron.dtsi
-> > +++ b/arch/arm/boot/dts/rk3288-veyron.dtsi
-> > @@ -410,7 +410,7 @@
-> >         status = "okay";
-> >
-> >         assigned-clocks = <&cru SCLK_USBPHY480M_SRC>;
-> > -       assigned-clock-parents = <&cru SCLK_OTGPHY0>;
-> > +       assigned-clock-parents = <&usbphy0>;
-> >         dr_mode = "host";
-> >  };
-> 
-> This is right, hence:
-> 
-> Reviewed-by: Douglas Anderson <dianders@chromium.org>
-> 
-> ...you will slightly break bisectability with this series though,
-> right?  In the previous patch in this series you changed the clocks in
-> the mux away from the fake ones to be the real ones.  If you have
-> either that patch without this one or this patch without that one then
-> clock parents won't get assigned properly...
-> 
-> I seem to remember that one of the USB phy clocks was kinds jittery (I
-> want to say it was the EHCI one) and that was causing problems talking
-> to the BT UART at 3Mbps.  I kinda doubt we have anyone running BT on
-> upstream over that UART (only used on veyron devices with Broadcom
-> WiFi), so maybe this is OK.  ...but if you had any other ideas for how
-> to avoid breaking bisect that would be nice.
-> 
-> If nothing else, if we're going to break bisect then the two commits
-> should reference each other and say that you need both and that with
-> only one you might see a different clock selected...
-
-hmm, I wouldn't say that it breaks bisectability, because that would require 
-that some working feature does break between those two changes in the first 
-place. On Chromebooks we have either mwifiex, that doesn't even do wifi 
-sucessfully right now and the (from what I've read) not well supported bcm, of 
-which I don't know if it supports the veyron-variant's bluetooth yet.
-
-The ehci-phy getting turned off was the more pressing reason from what I've 
-read, and we're actually fixing that now :-) .
-
-One possible way to still solve that would probably be moving the #clock-cells 
-patch before the clock-tree change and merge this dts change into the clk one.
-I'll take a look into that tomorrow.
 
 
-Heiko
+On 11/8/2015 3:35 PM, Andy Shevchenko wrote:
+> On Sun, Nov 8, 2015 at 6:07 PM, Sinan Kaya <okaya@codeaurora.org> wrote:
+>> The ACPI compiler uses the extended format when
+>> used interrupt numbers are greater than 256.
+>> The PCI link code currently only supports simple
+>> interrupt format. The IRQ numbers are represented
+>> using 32 bits when extended IRQ syntax. This patch
+>> changes the interrupt number type to 32 bits and
+>> places an upper limit of 1020 as possible interrupt
+>> id. Additional checks have been placed to prevent
+>> out of bounds writes.
+>
+> In commit messages and in comments I see this narrow lines, any reason
+> to make them short, except increasing number of lines?
+>
+
+done
+
+>>          if (acpi_irq_balance || !link->irq.active) {
+>> -               /*
+>> -                * Select the best IRQ.  This is done in reverse to promote
+>> -                * the use of IRQs 9, 10, 11, and >15.
+>> -                */
+>> -               for (i = (link->irq.possible_count - 1); i >= 0; i--) {
+>> -                       if (acpi_irq_penalty[irq] >
+>> -                           acpi_irq_penalty[link->irq.possible[i]])
+>> -                               irq = link->irq.possible[i];
+>> +
+>> +               if (irq < ACPI_MAX_IRQS) {
+>> +                       /*
+>> +                        * Select the best IRQ.  This is done in reverse to
+>> +                        * promote the use of IRQs 9, 10, 11, and >15.
+>> +                        */
+>> +                       for (i = (link->irq.possible_count - 1); i >= 0;
+>> +                               i--) {
+>
+> Why not
+>
+> if ((acpi_irq_balance || !link->irq.active) && irq < ACPI_MAX_IRQS) {
+>   int i = link->irq.possible_count;
+>
+>   while (--i) {
+>   ?
+>   }
+> }
+
+done
+
+>
+>> +                               if ((link->irq.possible[i] < ACPI_MAX_IRQS) &&
+>> +                                   (acpi_irq_penalty[irq] >
+>> +                                   acpi_irq_penalty[link->irq.possible[i]]))
+>> +                                       irq = link->irq.possible[i];
+>> +                       }
+>>                  }
+>>          }
+>>          if (acpi_irq_penalty[irq] >= PIRQ_PENALTY_ISA_ALWAYS) {
+>
+
+-- 
+Sinan Kaya
+Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a 
+Linux Foundation Collaborative Project
