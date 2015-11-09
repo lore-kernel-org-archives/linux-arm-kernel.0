@@ -1,33 +1,31 @@
-From: mans@mansr.com (=?iso-8859-1?Q?M=E5ns_Rullg=E5rd?=)
-Date: Mon, 09 Nov 2015 16:12:16 +0000
-Subject: Grafting old platform drivers onto a new DT kernel
-In-Reply-To: <5640C4BF.2010204@free.fr> (Mason's message of "Mon, 9 Nov 2015
- 17:07:27 +0100")
-References: <563B3749.50701@free.fr> <20151105151559.GA16666@lunn.ch>
- <CABxcv=k5mzw_TDsD1eQna9+HY9aqCUd03YAc62750Gs--sMozw@mail.gmail.com>
- <5640B877.4020108@free.fr> <yw1xtwov5gh1.fsf@unicorn.mansr.com>
- <5640C4BF.2010204@free.fr>
-Message-ID: <yw1xpozj5ezj.fsf@unicorn.mansr.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 09 Nov 2015 17:16:05 +0100
+Subject: [PATCH 1/3] xen/arm: introduce xen_read_wallclock
+In-Reply-To: <alpine.DEB.2.02.1511091348440.23825@kaball.uk.xensource.com>
+References: <alpine.DEB.2.02.1511051706560.13541@kaball.uk.xensource.com>
+ <7480268.6Ff8Mvx46N@wuerfel>
+ <alpine.DEB.2.02.1511091348440.23825@kaball.uk.xensource.com>
+Message-ID: <17175481.GKnbuH0F1P@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mason <slash.tmp@free.fr> writes:
+On Monday 09 November 2015 13:53:30 Stefano Stabellini wrote:
+> On Fri, 6 Nov 2015, Arnd Bergmann wrote:
+> > I'm not quite sure about how the split between pvclock_wall_clock and
+> > the delta works. Normally I'd expect that pvclock_wall_clock is the wallclock
+> > time as it was at boot, while delta is the number of expired nanoseconds
+> > since boot. However it is unclear why the latter has a longer range
+> > (539 years starting at boot, rather than 126 years starting in 1970).
+> 
+> Actually we already have a sec overflow field in struct shared_info on
+> the hypervisor side, called wc_sec_hi. I just need to make use of it in
+> Linux. See:
+> 
+> http://xenbits.xen.org/gitweb/?p=xen.git;a=blob_plain;f=xen/include/public/xen.h;hb=HEAD
+> 
+> Thanks for raising my attention to the problem,
 
-> On 09/11/2015 16:40, M?ns Rullg?rd wrote:
->
->> The simplest solution for you is probably to add a quick and dirty DT
->> binding to the old driver.  If it doesn't use any driver-specific
->> platform data struct, you only need to set .of_match_table in the
->> struct platform_driver.  If there is a platform data struct, you'll also
->> need to write some code to populate it from DT properties.  It shouldn't
->> take more than a few minutes per driver in most cases.
->
-> I'll try that approach, although I fear that "a few minutes per driver"
-> is an optimistic assessment.
+Sounds good for Xen on ARM. This same interface is also used on
+KVM, right? Does the extension also work there?
 
-If the driver only needs an MMIO region and an IRQ, it is literally five
-lines of code.
-
--- 
-M?ns Rullg?rd
-mans at mansr.com
+	Arnd
