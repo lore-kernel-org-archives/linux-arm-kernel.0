@@ -1,53 +1,36 @@
 From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Sun, 8 Nov 2015 17:52:25 -0800
-Subject: [PATCH] clk: sunxi: Refactor A31 PLL6 so that it can be reused
-In-Reply-To: <CAGb2v651vNyUqE_LXYnuYNhN0siywtg7Pt1TDQZUMxwZ3psmJg@mail.gmail.com>
-References: <1445964626-6484-2-git-send-email-jenskuske@gmail.com>
- <1446651896-22902-1-git-send-email-maxime.ripard@free-electrons.com>
- <CAGb2v651vNyUqE_LXYnuYNhN0siywtg7Pt1TDQZUMxwZ3psmJg@mail.gmail.com>
-Message-ID: <20151109015225.GX6114@lukather>
+Date: Sun, 8 Nov 2015 18:02:17 -0800
+Subject: [PATCH v3 0/3] ARM: dts: sun4i: gemei-g9: Devicetree improvements
+In-Reply-To: <1446832486-32319-1-git-send-email-plaes@plaes.org>
+References: <1446832486-32319-1-git-send-email-plaes@plaes.org>
+Message-ID: <20151109020217.GZ6114@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Chen-Yu,
-
-On Thu, Nov 05, 2015 at 10:28:00AM +0800, Chen-Yu Tsai wrote:
-> On Wed, Nov 4, 2015 at 11:44 PM, Maxime Ripard
-> <maxime.ripard@free-electrons.com> wrote:
-> > Remove the fixed dividers from the PLL6 driver to be able to have a
-> > reusable driver that can be used across several SoCs that share the same
-> > controller, but don't have the same set of dividers for this clock, and to
-> > also be reused multiple times in the same SoC, since we're droping the
-> > clock name.
-> >
-> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
-> > ---
-> > Hi Jens,
-> >
-> > Here is an alternative (untested) patch to deal with the PLL6 issue you're
-> > experiencing with the H3.
-> >
-> > It doesn't rely on parsing clock-output-names that turns out to be pretty
-> > fragile.
+On Fri, Nov 06, 2015 at 07:54:43PM +0200, Priit Laes wrote:
+> Improvements to devicetree setup:
+>  - Converted to use axp209 regulator nodes
+>  - Fix invalid regulator for LRADC keys
+>  - Enable audio codec node
 > 
-> A quick look through. I've no problems with changing the design, but I'd
-> like to keep the original names, i.e. pll6x2 for the clock module bits,
-> and pll6 for the fixed divider. It better matches the user manual.
+> Changes sinve v2:
+>  - Dropped applied "Added IRQ configuration for bma250 accelerometer" patch
 > 
-> From the PLL6 register description:
-> In the Clock Control Module, PLL(2X) output = PLL * 2= 24 MHz * N * K.
+> Changes since v1:
+>  - Dropped NAND patch because driver is not yet ready
+>  - Dropped applied KEYBOARD_SUN4I_LRADC patch
+>  - Added sun4i audio codec patch
 > 
-> And all places that use the "normal" output say PLL_PERIPH (that is PLL6),
-> while MBUS on A23/A33 use the 2X output, and say PLL_PERIPH(2X).
+> 
+> Priit Laes (3):
+>   ARM: dts: sun4i: gemei-g9: Convert to use axp209 regulator nodes
+>   ARM: dts: sun4i: gemei-g9: Use reg_ldo2 instead of reg_vcc3v0
+>   ARM: dts: sun4i: gemei-g9: Enable sun4i audio codec support
+> 
+>  arch/arm/boot/dts/sun4i-a10-gemei-g9.dts | 42 +++++++++++++++++++++++++++-----
+>  1 file changed, 36 insertions(+), 6 deletions(-)
 
-Ack, I'll change this.
-
-> On the side, do we want to get rid of all the divs clocks?
-
-Eventually, yes. A10's PLL6 is pretty much in the same situation.
-
-PLL5 is a different story though, since it has an extra adjustable
-divider. It would probably deserve its own driver.
+Applied, thanks !
 
 Maxime
 
@@ -61,4 +44,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151108/d9730557/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151108/71789b29/attachment.sig>
