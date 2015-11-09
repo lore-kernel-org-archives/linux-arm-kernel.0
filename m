@@ -1,77 +1,107 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 9 Nov 2015 09:59:59 -0600
-Subject: [PATCH 1/3] dt-bindings: thermal: Add binding document for
- Mediatek thermal controller
-In-Reply-To: <1447064013-13026-2-git-send-email-s.hauer@pengutronix.de>
-References: <1447064013-13026-1-git-send-email-s.hauer@pengutronix.de>
- <1447064013-13026-2-git-send-email-s.hauer@pengutronix.de>
-Message-ID: <20151109155959.GA23855@rob-hp-laptop>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Mon, 9 Nov 2015 17:00:46 +0100
+Subject: [PATCH 1/2] mmc: sdhci: set bus voltage before enabling bus power
+In-Reply-To: <20151109144030.GD15706@odux.rfo.atmel.com>
+References: <1446825570-30029-1-git-send-email-ludovic.desroches@atmel.com>
+ <1446825570-30029-2-git-send-email-ludovic.desroches@atmel.com>
+ <20151109132305.GC15706@odux.rfo.atmel.com>
+ <CAPDyKFrTTEnSFNvmx3e__Ap9gOGpA2-bz+yrq7ibz0wXGSWCXA@mail.gmail.com>
+ <20151109144030.GD15706@odux.rfo.atmel.com>
+Message-ID: <CAPDyKFquZ+_Rf07gX+i-=_bzSa7KJ5+xQ8N21kK2mvfMGdVQMw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 09, 2015 at 11:13:31AM +0100, Sascha Hauer wrote:
-> This adds the device tree binding documentation for the mediatek thermal
-> controller found on Mediatek MT8173 and other SoCs.
-> 
-> Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
-> Reviewed-by: Daniel Kurtz <djkurtz@chromium.org>
+On 9 November 2015 at 15:40, Ludovic Desroches
+<ludovic.desroches@atmel.com> wrote:
+> On Mon, Nov 09, 2015 at 03:12:46PM +0100, Ulf Hansson wrote:
+>> On 9 November 2015 at 14:23, Ludovic Desroches
+>> <ludovic.desroches@atmel.com> wrote:
+>> > On Fri, Nov 06, 2015 at 04:59:29PM +0100, Ludovic Desroches wrote:
+>> >> When there is a vmmc regulator, only SD Bus Power is set to 1 in the
+>> >> Power Control Register. It means SD Bus Voltage Select field is set to 0
+>> >> that is a reserved value. The SD Host Controller specification says:
+>> >> 'SD Bus Power: Before setting this bit, the SD Host Driver shall set SD
+>> >> Bus Voltage Select.' and 'If the Host Driver selects an unsupported
+>> >> voltage in the SD B?us Voltage Select field, the Host Controller may
+>> >> ignore writes to SD Bus Power and keep its value at zero."
+>> >>
+>> >> Having an external regulator means the SD Bus Voltage Select is useless
+>> >> but if the Host Controller strictly follows the specification then we
+>> >> need to set a valid value.
+>> >
+>> > Ulf,
+>> >
+>> > What is your opinion about this patch?
+>> >
+>> > If the 'no regulator found' message is turned in debug message, I can get
+>> > rid of my vmmc regulator but I really think that writing only
+>>
+>> I expect you mean vqmmc?
+>
+> I don't mean vmmc. In the sdhci_set_power function, we are using vmmc.
+> I feel not confortable with it because the power control register
+> contains 'SD Bus' fields so it should depend on vqmmc not vmmc.
+>
+>>
+>> > SDHCI_POWER_ON is opposite to the sdhci spec. I would say that not
+>> > setting the bus voltage is a quirk!
+>>
+>> I don't really follow.
+>>
+>> I read the SDHCI spec and the section for the Power Control Register.
+>> Bit 0 needs to be set when communicating with the card as it will for
+>> example enables the clock. Before setting bit0 you must decide what
+>> signal level to use, which is done by writing to bit 1->3.
+>>
+>
+> Right. But when having vmmc supply we do:
+> sdhci_writeb(host, SDHCI_POWER_ON, SDHCI_POWER_CONTROL) or
+> sdhci_writeb(host, 0, SDHCI_POWER_CONTROL) so we loose the signal level,
+> isn't it?
+>
+>> If SDHCI monitors the power state (MMC_POWER_UP|ON|OFF) when its
+>> ->set_ios() callback are invoked and in combination of using the
+>> ->start_signal_voltage_switch() callback to change the signal voltage
+>> level, this *should* work out nicely.
+>>
+>
+> It is my turn to not follow! We write into the Power Control Register
+> only in sdhci_set_power(). May I miss a callback or something else?
+> sdhci_do_start_signal_voltage_switch doesn't modify the Power Control
+> Register.
+>
+>> Now, looking at the related code in sdhci, I am kind of surprised that
+>> it works. :-) Though, again I don't have the in-depth knowledge about
+>> sdhci.
+>>
+>
+> Me too, I am starting to dig into the sdhci spec and some points are
+> not crystal clear.
+>
 
-Acked-by: Rob Herring <robh@kernel.org>
+Okay, I am finally starting to understand some of your concern.
 
-> ---
->  .../bindings/thermal/mediatek-thermal.txt          | 43 ++++++++++++++++++++++
->  1 file changed, 43 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/thermal/mediatek-thermal.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/thermal/mediatek-thermal.txt b/Documentation/devicetree/bindings/thermal/mediatek-thermal.txt
-> new file mode 100644
-> index 0000000..81f9a51
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/thermal/mediatek-thermal.txt
-> @@ -0,0 +1,43 @@
-> +* Mediatek Thermal
-> +
-> +This describes the device tree binding for the Mediatek thermal controller
-> +which measures the on-SoC temperatures. This device does not have its own ADC,
-> +instead it directly controls the AUXADC via AHB bus accesses. For this reason
-> +this device needs phandles to the AUXADC. Also it controls a mux in the
-> +apmixedsys register space via AHB bus accesses, so a phandle to the APMIXEDSYS
-> +is also needed.
-> +
-> +Required properties:
-> +- compatible: "mediatek,mt8173-thermal"
-> +- reg: Address range of the thermal controller
-> +- interrupts: IRQ for the thermal controller
-> +- clocks, clock-names: Clocks needed for the thermal controller. required
-> +                       clocks are:
-> +		       "therm":	 Main clock needed for register access
-> +		       "auxadc": The AUXADC clock
-> +- resets: Reference to the reset controller controlling the thermal controller.
-> +- mediatek,auxadc: A phandle to the AUXADC which the thermal controller uses
-> +- mediatek,apmixedsys: A phandle to the APMIXEDSYS controller.
-> +- #thermal-sensor-cells : Should be 0. See ./thermal.txt for a description.
-> +
-> +Optional properties:
-> +- nvmem-cells: A phandle to the calibration data provided by a nvmem device. If
-> +               unspecified default values shall be used.
-> +- nvmem-cell-names: Should be "calibration-data"
-> +
-> +Example:
-> +
-> +	thermal: thermal at 1100b000 {
-> +		#thermal-sensor-cells = <1>;
-> +		compatible = "mediatek,mt8173-thermal";
-> +		reg = <0 0x1100b000 0 0x1000>;
-> +		interrupts = <0 70 IRQ_TYPE_LEVEL_LOW>;
-> +		clocks = <&pericfg CLK_PERI_THERM>, <&pericfg CLK_PERI_AUXADC>;
-> +		clock-names = "therm", "auxadc";
-> +		resets = <&pericfg MT8173_PERI_THERM_SW_RST>;
-> +		reset-names = "therm";
-> +		mediatek,auxadc = <&auxadc>;
-> +		mediatek,apmixedsys = <&apmixedsys>;
-> +		nvmem-cells = <&thermal_calibration_data>;
-> +		nvmem-cell-names = "calibration-data";
-> +	};
-> -- 
-> 2.6.1
-> 
+According to the spec, the Power Control Register should control the
+signal voltage/bus voltage. As UHS mode was added to the spec, it
+seems like the Power Control Register couldn't cover all new cases, as
+why Host Control 2 register needed to be added. The Host Control 2
+register, is what sdhci_do_start_signal_voltage_switch() uses to
+change the signal voltage level, which all makes sense to me.
+
+For sdhci_set_power(); it seems to use the Power Control Register to
+control the power to the card (VDD/VMMC). Indeed this looks *really*
+weird/wrong. I wonder if it's working because of luck, intentional
+violation of the SDHCI spec or because of special variants.
+
+Especially when looking into the case when you *don't* have a VMMC
+regulator several strange quirks exists in sdhci_set_power().
+
+In the case when you *have* a VMMC, I think just setting/clearing bit
+0 (SDHCI_POWER_ON) and then bail out, is probably working with modern
+HW because it's likely the only thing needed.
+
+Now, this discussion was interesting, but I forgot what problem you
+actually where trying to solve? :-)
+
+Kind regards
+Uffe
