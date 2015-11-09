@@ -1,53 +1,42 @@
-From: jungseoklee85@gmail.com (Jungseok Lee)
-Date: Mon, 9 Nov 2015 23:24:13 +0900
-Subject: [PATCH v5 0/6] arm64: ftrace: fix incorrect output from stack
- tracer
-In-Reply-To: <1446792285-1154-1-git-send-email-takahiro.akashi@linaro.org>
-References: <1446792285-1154-1-git-send-email-takahiro.akashi@linaro.org>
-Message-ID: <252DE845-D0C2-460C-8161-090ED08396A4@gmail.com>
+From: andy.shevchenko@gmail.com (Andy Shevchenko)
+Date: Mon, 9 Nov 2015 16:25:09 +0200
+Subject: [PATCH v2 1/2] i2c: mediatek: add i2c first write then read
+ optimization
+In-Reply-To: <1447047839-5223-2-git-send-email-liguo.zhang@mediatek.com>
+References: <1447047839-5223-1-git-send-email-liguo.zhang@mediatek.com>
+ <1447047839-5223-2-git-send-email-liguo.zhang@mediatek.com>
+Message-ID: <CAHp75VfutRR0N0bGDYMjFr+nQGFnmuoiA2afvYfuZ2aOy=2qbQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Nov 6, 2015, at 3:44 PM, AKASHI Takahiro wrote:
+On Mon, Nov 9, 2015 at 7:43 AM, Liguo Zhang <liguo.zhang@mediatek.com> wrote:
+> For platform with auto restart support, between every transfer,
+> i2c controller will trigger an interrupt and SW need to handle
+> it to start new transfer. When doing write-then-read transfer,
+> instead of restart mechanism, using WRRD mode to have controller
+> send both transfer in one request to reduce latency.
 
-Hi Akashi,
 
-> This is the fifth patch series for fixing stack tracer on arm64.
-> The original issue was reported by Jungseok[1], and then I found more
-> issues[2].
-> 
-> We don't have to care about the original issue because the root cause
-> (patch "ARM64: unwind: Fix PC calculation") has been reverted in v4.3.
-> 
-> I address here all the issues and implement fixes described in [2] except
-> for interrupt-triggered problems(II-3) and leaf function(II-5).  Recent
-> discussions[3] about introducing a dedicated interrupt stack suggests that
-> we may avoid walking through from an interrupt stack to a process stack.
-> (So interrupt-stack patch is a prerequisite.)
-> 
-> Basically,
-> patch1 is a proactive improvement of function_graph tracer. 
-> patch2 corresponds to II-4(functions under function_graph tracer).
-> patch3, 4 and 5 correspond to II-1(slurping stack) and II-2(differences
-> between x86 and arm64).
-> patch6 is a function prologue analyzer test. This won't attest
-> the correctness of the functionality, but it can suggest that all
-> the traced functions are treated properly by this function.
-> (Please note that patch3 has already been queued in Steven's for-next.)
-> 
-> I tested the code with v4.3 + Jungseok's patch v5[4].
+> @@ -518,6 +529,16 @@ static int mtk_i2c_transfer(struct i2c_adapter *adap,
+>         if (ret)
+>                 return ret;
+>
+> +       i2c->auto_restart = i2c->dev_comp->auto_restart;
+> +
+> +       /* checking if we can skip restart and optimize using WRRD mode */
+> +       if (i2c->auto_restart && num == 2) {
+> +               if (!(msgs[0].flags & I2C_M_RD) && (msgs[1].flags & I2C_M_RD) &&
+> +                   msgs[0].addr == msgs[1].addr) {
 
-I've played this series with IRQ stack patch and it works well at least
-on my system! In addition to this condition, I've run these changes without
-IRQ stack since it is in progress. I could observe a single strange behavior,
-minus stack size around elX_irq. Am I missing something?
+Nitpick (optional):
 
-My reproduction scenario is simple.
+((msgs[0].flags & msgs[1].flags) & I2C_M_RD)
+?
 
-  $ sudo echo 1 > /proc/sys/kernel/stack_trace_enabled
-  $ sudo echo function_graph > /sys/kernel/debug/tracing/current_tracer
-  $ [ Run any workload ]
-  $ sudo cat /sys/kernel/debug/tracing/stack_trace
+> +                       i2c->auto_restart = 0;
+> +               }
+> +       }
 
-Best Regards
-Jungseok Lee
+-- 
+With Best Regards,
+Andy Shevchenko
