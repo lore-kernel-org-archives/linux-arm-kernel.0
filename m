@@ -1,44 +1,56 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 09 Nov 2015 21:51:12 +0100
-Subject: [PATCH] power: bq27xxx_battery: Revert "Remove unneeded
- dependency in Kconfig"
-In-Reply-To: <5640D02D.6040601@ti.com>
-References: <3819790.E2ziFviWmU@wuerfel> <5640D02D.6040601@ti.com>
-Message-ID: <10870776.N30IekZOBt@wuerfel>
+From: dianders@chromium.org (Doug Anderson)
+Date: Mon, 9 Nov 2015 12:59:58 -0800
+Subject: [PATCH v2 4/8] phy: rockchip-usb: expose the phy-internal PLLs
+In-Reply-To: <1446998681-26436-5-git-send-email-heiko@sntech.de>
+References: <1446998681-26436-1-git-send-email-heiko@sntech.de>
+ <1446998681-26436-5-git-send-email-heiko@sntech.de>
+Message-ID: <CAD=FV=VburD9eRtNKL8DZXgspp4-nFVVOz5PnOaT8HvNG5uzFg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 09 November 2015 10:56:13 Andrew F. Davis wrote:
-> On 11/09/2015 07:50 AM, Arnd Bergmann wrote:
-> Nothing enabled by BATTERY_BQ27XXX depends on I2C, this workaround is not
-> correct as it prevents BATTERY_BQ27XXX from being built-in when I2C is a
-> module, there is no reason for this limitation.
-> 
-> The undefined references are caused by BATTERY_BQ27XXX being built-in AND
-> its I2C functionality being enabled (BATTERY_BQ27XXX_I2C) while I2C is a
-> module. Reorganizing this driver is being discussed anyway, but in the
-> meantime a more correct fix would be along the lines of:
-> 
-> diff --git a/drivers/power/Kconfig b/drivers/power/Kconfig
-> index 6de6ec2..d1d32f9 100644
-> --- a/drivers/power/Kconfig
-> +++ b/drivers/power/Kconfig
-> @@ -167,6 +167,7 @@ config BATTERY_BQ27XXX_I2C
->          bool "BQ27xxx I2C support"
->          depends on BATTERY_BQ27XXX
->          depends on I2C
-> +       depends on !(I2C=m && BATTERY_BQ27XXX=y)
->          default y
->          help
->            Say Y here to enable support for batteries with BQ27xxx (I2C) chips.
+Heiko,
 
-That works too, there is just very little difference in the end here,
-and it's easier to revert an patch that only introduces a regression
-than to do a different hack, especially if it's going to be reworked
-soon anyway.
+On Sun, Nov 8, 2015 at 8:04 AM, Heiko Stuebner <heiko@sntech.de> wrote:
+> +static const struct rockchip_usb_phy_pdata rk3066a_pdata = {
+> +       .phys = (struct rockchip_usb_phys[]){
+> +               { .reg = 0x17c, .pll_name = "sclk_otgphy0_480m" },
+> +               { .reg = 0x188, .pll_name = "sclk_otgphy1_480m" },
+> +               { /* sentinel */ }
+> +       },
+> +};
+> +
+> +static const struct rockchip_usb_phy_pdata rk3188_pdata = {
+> +       .phys = (struct rockchip_usb_phys[]){
+> +               { .reg = 0x10c, .pll_name = "sclk_otgphy0_480m" },
+> +               { .reg = 0x11c, .pll_name = "sclk_otgphy1_480m" },
+> +               { /* sentinel */ }
+> +       },
+> +};
+> +
+> +static const struct rockchip_usb_phy_pdata rk3288_pdata = {
+> +       .phys = (struct rockchip_usb_phys[]){
+> +               { .reg = 0x320, .pll_name = "sclk_otgphy0_480m" },
+> +               { .reg = 0x334, .pll_name = "sclk_otgphy1_480m" },
+> +               { .reg = 0x348, .pll_name = "sclk_otgphy2_480m" },
+> +               { /* sentinel */ }
+> +       },
 
-Do you want to submit the above as a fixup to your other patch or
-should we just do the revert? It would be good to get one of the two
-into -rc1.
+Slighly annoying to have to add a table for each SoC.  I'd imagine
+this growing quite large.
 
-	Arnd
+Would it be possible to query our parent clock name and then append a
+"_480m" suffix?  Then you can magically get the name you want, right?
+That doesn't preclude you from later overriding this or adding a "dts"
+property for it, but it means no tables for now and (hopefully) for
+the forseeable future.  ...and you get to kill a bunch of code in this
+patch...
+
+You could fall back to some generic name based on the PHY device tree
+node name if you wanted, or use the ID allocator...
+
+
+Otherwise, this all looks good to me.  If you have a good reason why
+using the parent name isn't a good idea, let me know and I can add my
+Reviewed-by on this patch.
+
+-Doug
