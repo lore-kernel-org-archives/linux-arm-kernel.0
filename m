@@ -1,49 +1,49 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Mon, 9 Nov 2015 10:08:05 +0000
-Subject: [PATCH] ARM:dma-mapping: Handle DMA_BIDIRECTIONAL in
- _dma_page_cpu_to_dev()
-In-Reply-To: <CAGUYZuQDiH_xzinEJ952rw9GuA9oUQSNASaNdOE1x_i97XCBrw@mail.gmail.com>
-References: <1446631008-5854-1-git-send-email-sanjeev_sharma@mentor.com>
- <20151104103913.GC5405@arm.com>
- <20151104105420.GL8644@n2100.arm.linux.org.uk>
- <FDC088D3B5555644AE135ED28A7ABDE98636B41D@EU-MBX-02.mgc.mentorg.com>
- <CAGUYZuQDiH_xzinEJ952rw9GuA9oUQSNASaNdOE1x_i97XCBrw@mail.gmail.com>
-Message-ID: <20151109100804.GA24936@arm.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Mon, 9 Nov 2015 11:09:54 +0100
+Subject: [PATCH RESEND v2 3/4] ARM: BCM: Add SMP support for Broadcom NSP
+In-Reply-To: <1446839371-22601-4-git-send-email-kapilh@broadcom.com>
+References: <1446839371-22601-1-git-send-email-kapilh@broadcom.com>
+ <1446839371-22601-4-git-send-email-kapilh@broadcom.com>
+Message-ID: <CACRpkdZN-iwdR_VwktdHsw+rGQLhCgmWnERYVDE+KaYOqJR30w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 09, 2015 at 11:29:17AM +0530, sanjeev sharma wrote:
->     On Wed, Nov 04, 2015 at 10:39:13AM +0000, Will Deacon wrote:
->     > On Wed, Nov 04, 2015 at 03:26:48PM +0530, Sanjeev Sharma wrote:
->     > > _dma_page_cpu_to_dev() treat DMA_BIDIRECTIONAL similar to
->     > > DMA_TO_DEVICE which means that destination buffer is device
->     > > memory,means cpu may have written some data to source buffer and
->     > > data may be in cache line.For cleaner operation we need to call
->     > > outer_flush_range() which will clean and invalidate outer cache lines.
->     >
->     > Why isn't the clean sufficient in this case? We're mapping the buffer
->     > to the device, so we clean the dirty lines in the CPU caches and make
->     > them visible to the device. If the CPU later wants to read the buffer
->     > (i.e. after the device has DMA'd into it), you'll need to map the
->     > buffer to the CPU, which will perform the invalidation of the CPU caches.
-> 
->     Indeed.  bidirectional mode is already handled prefectly well by this
->     code.  No patches are required.
-> 
->     Thanks Russell & Will for providing input.
-> 
->     Let's assume , CPU don't read the buffer then there could be the problem
->     correct ? IMO, to handle every use case outer_flush_range can be used ?
->     If still it doesn't make sense to use flush on bidirectional mappings, then
->     FIXME comment should be removed from the function to avoid any
->     Confusion.
-> 
-> 
-> 
-> Please let me know what you think on above comment ?
+On Fri, Nov 6, 2015 at 8:49 PM, Kapil Hali <kapilh@broadcom.com> wrote:
 
-I still don't understand the problem that you're trying to fix.
+> Add SMP support for Broadcom's Northstar Plus SoC
+> cpu enable method. This changes also consolidates
+> iProc family's - BCM NSP and BCM Kona, platform
+> SMP handling in a common file.
+>
+> Northstar Plus SoC is based on ARM Cortex-A9
+> revision r3p0 which requires configuration for ARM
+> Errata 764369 for SMP. This change adds the needed
+> configuration option.
+>
+> Signed-off-by: Kapil Hali <kapilh@broadcom.com>
 
-Sorry,
+This version looks saner to me.
 
-Will
+> +static int nsp_write_lut(void)
+> +{
+> +       void __iomem *sku_rom_lut;
+> +       phys_addr_t secondary_startup_phy;
+> +
+> +       if (!secondary_boot) {
+> +               pr_warn("required secondary boot register not specified\n");
+> +               return -EINVAL;
+> +       }
+> +
+> +       sku_rom_lut = ioremap_nocache((phys_addr_t)secondary_boot,
+> +                                               sizeof(secondary_boot));
+
+Why is this address not just taken directly from the device tree?
+
+If it is not in the device tree: why?
+
+Also give it a sane name, bcm_sec_boot_address or so.
+"secondary_boot" sounds like a function you call to boot
+the second core.
+
+Yours,
+Linus Walleij
