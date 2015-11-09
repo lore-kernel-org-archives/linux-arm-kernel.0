@@ -1,182 +1,76 @@
-From: caesar.upstream@gmail.com (Caesar Wang)
-Date: Mon, 9 Nov 2015 11:29:12 +0800
-Subject: [PATCH v2 5/9] thermal: rockchip: Add the flag for adc value
- increment or decrement
-In-Reply-To: <563E1B07.4060108@gmail.com>
-References: <1446700685-18017-1-git-send-email-wxt@rock-chips.com>
- <1446700685-18017-6-git-send-email-wxt@rock-chips.com>
- <20151106191126.GC8202@localhost.localdomain> <563E1B07.4060108@gmail.com>
-Message-ID: <56401308.4060602@gmail.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Mon, 9 Nov 2015 11:36:15 +0800
+Subject: [PATCH 04/19] clk: sunxi: Add TCON channel1 clock
+In-Reply-To: <20151107000139.GP6114@lukather>
+References: <1446214865-3972-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1446214865-3972-5-git-send-email-maxime.ripard@free-electrons.com>
+ <CAGb2v650S8+8SNNBqx7u8k8wxHm2fSKdht=W3yA9Mh=rpU+hOA@mail.gmail.com>
+ <20151107000139.GP6114@lukather>
+Message-ID: <CAGb2v65MUrBKA=pAC95evdiSBMaewRcnLUhBcqCbx_Pc6Jutnw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-? 2015?11?07? 23:38, Caesar Wang ??:
-> Hello Eduardo,
+On Sat, Nov 7, 2015 at 8:01 AM, Maxime Ripard
+<maxime.ripard@free-electrons.com> wrote:
+> Hi,
 >
-> ? 2015?11?07? 03:11, Eduardo Valentin ??:
->> On Thu, Nov 05, 2015 at 01:18:01PM +0800, Caesar Wang wrote:
->>> The conversion table has the adc value and temperature.
->>> In fact, the adc value only has the increment or decrement mode in
->>> conversion table.
->>>
->>> Moment, we can add the flag to be better support the *code_to_temp*
->>> for differenr SoCs.
->>>
->>> Signed-off-by: Caesar Wang <wxt@rock-chips.com>
->>> ---
->>>
->>> Changes in v2: None
->>> Changes in v1: None
->>>
->>>   drivers/thermal/rockchip_thermal.c | 64 
->>> ++++++++++++++++++++++++++++++--------
->>>   1 file changed, 51 insertions(+), 13 deletions(-)
->>>
->>> diff --git a/drivers/thermal/rockchip_thermal.c 
->>> b/drivers/thermal/rockchip_thermal.c
->>> index e828f18..9df027f 100644
->>> --- a/drivers/thermal/rockchip_thermal.c
->>> +++ b/drivers/thermal/rockchip_thermal.c
->>> @@ -53,6 +53,16 @@ enum sensor_id {
->>>   };
->>>     /**
->>> +* The conversion table has the adc value and temperature.
->>> +* ADC_DECREMENT is the adc value decremnet.(e.g. v2_code_table)
->>> +* ADC_INCREMNET is the adc value incremnet.(e.g. v3_code_table)
->>> +*/
->>> +enum adc_flag {
->>> +    ADC_DECREMENT = 0,
->>> +    ADC_INCREMENT,
->>> +};
->>> +
->>> +/**
->>>    * The max sensors is two in rockchip SoCs.
->>>    * Two sensors: CPU and GPU sensor.
->>>    */
->>> @@ -66,6 +76,9 @@ struct chip_tsadc_table {
->>>         /* that analogic mask data */
->>>       unsigned long data_mask;
->>> +
->>> +    /* adc value is increment or decrement */
->>> +    unsigned int flag;
-
-Sorry, I think to use the enum type will be better.
-
-Says:
-enum adc_sort_flag sort_flag;
-or
-enum adc_sort_mode  mode;
-
+> On Sat, Oct 31, 2015 at 05:53:26PM +0800, Chen-Yu Tsai wrote:
+>> On Fri, Oct 30, 2015 at 10:20 PM, Maxime Ripard
+>> <maxime.ripard@free-electrons.com> wrote:
+>> > The TCON is a controller generating the timings to output videos signals,
+>> > acting like both a CRTC and an encoder.
+>> >
+>> > It has two channels depending on the output, each channel being driven by
+>> > its own clock (and own clock controller).
+>> >
+>> > Add a driver for the channel 1 clock.
+>> >
+>> > Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+>> > ---
+>> >  drivers/clk/sunxi/Makefile             |   1 +
+>> >  drivers/clk/sunxi/clk-sun4i-tcon-ch1.c | 167 +++++++++++++++++++++++++++++++++
+>> >  2 files changed, 168 insertions(+)
+>> >  create mode 100644 drivers/clk/sunxi/clk-sun4i-tcon-ch1.c
 >>
->> Maybe bool? And rename to something more meaningful?
+>> According to the documents I have, this variant of the TCON clock
+>> is specific to sun5i. On sun4i/sun7i, TCON CH1 clock has the same
+>> layout as TCON CH0 and the other display clocks.
 >
-> Sure, that should be a bool type.
-> I guess the rename in sort_flag......(maybe will have a better name)
+> At least for the A20, it's not true.
 >
->
->>
->> Or do you plan to have more conditions to test in your flag?
->
-> Moment, the flag (increment or decrement) can support all the rockchip 
-> series SoCs have thermal function.
->
->>>   };
->>>     struct rockchip_tsadc_chip {
->>> @@ -223,19 +236,43 @@ static int rk_tsadcv2_code_to_temp(struct 
->>> chip_tsadc_table table, u32 code,
->>>         WARN_ON(table.length < 2);
->>>   -    code &= table.data_mask;
->>> -    if (code < table.id[high].code)
->>> +    switch (table.flag) {
->>> +    case ADC_DECREMENT:
->>> +        code &= table.data_mask;
->>> +        if (code < table.id[high].code)
->>>           return -EAGAIN;        /* Incorrect reading */
->> Add an indentation.
->
-> Thanks, will be fixed in next patch.
->
->
->>>   -    while (low <= high) {
->>> -        if (code >= table.id[mid].code &&
->>> -            code < table.id[mid - 1].code)
->>> -            break;
->>> -        else if (code < table.id[mid].code)
->>> -            low = mid + 1;
->>> -        else
->>> -            high = mid - 1;
->>> -        mid = (low + high) / 2;
->>> +        while (low <= high) {
->>> +            if (code >= table.id[mid].code &&
->>> +                code < table.id[mid - 1].code)
->>> +                break;
->>> +            else if (code < table.id[mid].code)
->>> +                low = mid + 1;
->>> +            else
->>> +                high = mid - 1;
->>> +
->>> +            mid = (low + high) / 2;
->>> +        }
->>> +        break;
->>> +    case ADC_INCREMENT:
->>> +        code &= table.data_mask;
->>> +        if (code < table.id[low].code)
->>> +        return -EAGAIN;        /* Incorrect reading */
->>> +
->> add an indentation.
->
-> Ditto.
->
-> Thanks,
-> Caesar
->>
->>> +        while (low <= high) {
->>> +            if (code >= table.id[mid - 1].code &&
->>> +                code < table.id[mid].code)
->>> +                break;
->>> +            else if (code > table.id[mid].code)
->>> +                low = mid + 1;
->>> +            else
->>> +                high = mid - 1;
->>> +
->>> +            mid = (low + high) / 2;
->>> +        }
->>> +        break;
->>> +    default:
->>> +        pr_err("Invalid the table conversion\n");
->>>       }
->>>         /*
->>> @@ -245,8 +282,8 @@ static int rk_tsadcv2_code_to_temp(struct 
->>> chip_tsadc_table table, u32 code,
->>>        * to produce less granular result.
->>>        */
->>>       num = table.id[mid].temp - v2_code_table[mid - 1].temp;
->>> -    num *= table.id[mid - 1].code - code;
->>> -    denom = table.id[mid - 1].code - table.id[mid].code;
->>> +    num *= abs(table.id[mid - 1].code - code);
->>> +    denom = abs(table.id[mid - 1].code - table.id[mid].code);
->>>       *temp = table.id[mid - 1].temp + (num / denom);
->>>         return 0;
->>> @@ -367,6 +404,7 @@ static const struct rockchip_tsadc_chip 
->>> rk3288_tsadc_data = {
->>>           .id = v2_code_table,
->>>           .length = ARRAY_SIZE(v2_code_table),
->>>           .data_mask = TSADCV2_DATA_MASK,
->>> +        .flag = ADC_DECREMENT,
->>>       },
->>>   };
->>>   --
->>> 1.9.1
->>>
->> _______________________________________________
->> linux-arm-kernel mailing list
->> linux-arm-kernel at lists.infradead.org
->> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
->
->
+> Make sure you do not confuse LCD1 CH0 (p79, which is a channel 0
+> clock), with LCD0 CH1 (p81, which is a channel 1 clock).
 
--- 
-Thanks,
-Caesar
+Right. The names are great for confusing the reader. :(
+
+>> > +       sclk1_parents[0] = sclk2_name;
+>> > +       sclk1_parents[1] = sclk2d2_name;
+>>
+>> Is there any need to expose these 2 clocks via DT using of_clk_add_provider?
+>
+> No, as far as I'm aware, there's no user external to this clock
+> driver.
+>
+>> Note that these complex clock trees within a clock node breaks the
+>> assigned-clock-parents mechanism, as you can no longer specify the output
+>> clock's direct parents.
+>
+> There's no point of changing the parent either. Hardware blocks are
+> always connected to the leaf clock (sclk1). We could also model it as
+> an extra 1-bit divider, which would simplify a bit the logic though.
+
+Probably not. You still have a gate to handle. It's just moving the
+divider from 1 clock to the other. I think the current approach of
+modeling it like the hardware is better.
+
+About reparenting, what I meant was if sclk2 is not exposed through
+of_clk_add_provider, then we can't do assigned-clocks stuff on it,
+like setting a default parent or making each channel use a different
+source pll.
+
+What I'm saying is if it is not expected to work with another core
+binding, we should probably note it somewhere.
+
+
+Regards
+ChenYu
