@@ -1,60 +1,33 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 09 Nov 2015 20:07:53 +0100
-Subject: [PATCH] drivers: pci: remove unused pci_sys_data structures
-In-Reply-To: <1447095459-21777-1-git-send-email-lorenzo.pieralisi@arm.com>
-References: <1447095459-21777-1-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <7247058.o5kTvZ3CSC@wuerfel>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Mon, 09 Nov 2015 20:49:18 +0100
+Subject: [RFC PATCH v3 1/4] drm: Introduce generic probe function for
+ component based masters.
+In-Reply-To: <20151109120720.GF963@e106497-lin.cambridge.arm.com>
+References: <1445267270-23126-1-git-send-email-Liviu.Dudau@arm.com>
+ <20151109120334.GZ8644@n2100.arm.linux.org.uk>
+ <20151109120720.GF963@e106497-lin.cambridge.arm.com>
+Message-ID: <2772927.crXiDc9cOV@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 09 November 2015 18:57:39 Lorenzo Pieralisi wrote:
-> Commit b3a72384fe29 ("ARM/PCI: Replace pci_sys_data->align_resource
-> with global function pointer") removed the struct pci_sys_data
-> dependency from the ARM pcibios functions that are part of the
-> common ARM PCI arch back-end (eg pcibios_align_resource()), so that
-> struct pci_sys_data has now become data that is only used internally
-> by the ARM bios32 layer (ie pci_common_init_dev()) and by host
-> controllers drivers callbacks (eg pci_sys_data.setup) that rely on the
-> ARM bios32 API to probe.
+Hi Liviu,
+
+Am Montag, 9. November 2015, 12:07:20 schrieb Liviu Dudau:
+> On Mon, Nov 09, 2015 at 12:03:35PM +0000, Russell King - ARM Linux wrote:
+> > On Mon, Nov 09, 2015 at 11:57:27AM +0000, Liviu Dudau wrote:
+> > > Meanwhile, what is your suggestion regarding the patchset. I've seen David has
+> > > sent Linus a pull request for 4.4-rc1 that includes it. Should we send a
+> > > revert for rockchip commit and then patch later the function?
+> > 
+> > It definitely needs to be fixed, and I'd suggest its early enough in the
+> > -rc cycle (which hasn't begun yet) to simply fix drm_of_component_probe()
+> > to take two compare functions.
 > 
-> PCI host controller drivers that do not rely on ARM bios32 calls to
-> probe do not need to have the pci_bus.sysdata pointer field pointing
-> at a struct pci_sys_data anymore, therefore it can be removed from the
-> respective drivers data structures.
-> 
-> This patch removes the pci_sys_data structures from the host
-> controller drivers that do not rely on ARM bios32 interface to
-> scan the PCI bus, completing the pci_sys_data clean-up and removing
-> the related dependency on arch/arm specific data.
-> 
-> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Cc: Arnd Bergmann <arnd@arndb.de>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: Bjorn Helgaas <bhelgaas@google.com>
-> Cc: Rob Herring <robh@kernel.org>
-> 
+> I still don't have a Rockchip board to test the patch, so I need to find out
+> someone willing to test them. Mark?
 
-Nice!
-
-Acked-by: Arnd Bergmann <arnd@arndb.de>
-
-On the downside, I just saw how b3a72384fe29 ("ARM/PCI: Replace
-pci_sys_data->align_resource with global function pointer") manages
-to get rid of the last user of this, and how this is not the way
-we had planned for it to be done.
-
-It doesn't matter that much, because there is only a single
-user of hw->align_resource, but this is now unportable code and
-cannot easily be separated from hw_pci. It also breaks if we ever
-get a machine with two different host controllers on ARM that
-don't use the same pointer here.
-
-I really would have hoped we could put that function pointer
-into 'struct pci_host_bridge' instead, and eventually killed
-off the architecture specific pcibios_align_resource function
+I of course also have a plethora of rockchip boards, so can test stuff
 as well.
 
-Any idea why it was done with a global function pointer for
-ARM rather than a proper solution?
 
-	Arnd
+Heiko
