@@ -1,25 +1,36 @@
 From: yang.shi@linaro.org (Yang Shi)
-Date: Mon,  9 Nov 2015 09:43:55 -0800
-Subject: [PATCH V2 0/2] arm64: cleanup FRAME_POINTER kconfig option and force
- to select it
-Message-ID: <1447091037-11434-1-git-send-email-yang.shi@linaro.org>
+Date: Mon,  9 Nov 2015 09:43:56 -0800
+Subject: [PATCH 1/2] arm64: remove redundant FRAME_POINTER kconfig option
+In-Reply-To: <1447091037-11434-1-git-send-email-yang.shi@linaro.org>
+References: <1447091037-11434-1-git-send-email-yang.shi@linaro.org>
+Message-ID: <1447091037-11434-2-git-send-email-yang.shi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+FRAME_POINTER is defined in lib/Kconfig.debug, it is unnecessary to redefine
+it in arch/arm64/Kconfig.debug. Actually, the one defined in arm64 directory
+is never used.
+This adds a dependency on DEBUG_KERNEL for building with frame pointers.
 
-According to the discussion on the mailing list, this version adds a new patch
-to force select FRAME_POINTER for ARM64.
-
-Change v2 --> v1:
-1. Adds a new patch to force select FRAME_POINTER
-2. Notes that this change adds a dependency on DEBUG_KERNEL for building with
-frame pointers
-
-
-Yang Shi (2):
-      arm64: remove redundant FRAME_POINTER kconfig option
-      arm64: force to select FRAME_POINTER
-
- arch/arm64/Kconfig       | 1 +
+Signed-off-by: Yang Shi <yang.shi@linaro.org>
+---
  arch/arm64/Kconfig.debug | 4 ----
- 2 files changed, 1 insertion(+), 4 deletions(-)
+ 1 file changed, 4 deletions(-)
+
+diff --git a/arch/arm64/Kconfig.debug b/arch/arm64/Kconfig.debug
+index d6285ef..915dea7 100644
+--- a/arch/arm64/Kconfig.debug
++++ b/arch/arm64/Kconfig.debug
+@@ -2,10 +2,6 @@ menu "Kernel hacking"
+ 
+ source "lib/Kconfig.debug"
+ 
+-config FRAME_POINTER
+-	bool
+-	default y
+-
+ config ARM64_PTDUMP
+ 	bool "Export kernel pagetable layout to userspace via debugfs"
+ 	depends on DEBUG_KERNEL
+-- 
+2.0.2
