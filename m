@@ -1,47 +1,44 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 9 Nov 2015 11:24:27 -0600
-Subject: [PATCH V7 1/3] Documentation: DT: Add entry for Freescale
- LS1043a-RDB board
-In-Reply-To: <1446153126-6219-2-git-send-email-leoli@freescale.com>
-References: <1446153126-6219-1-git-send-email-leoli@freescale.com>
- <1446153126-6219-2-git-send-email-leoli@freescale.com>
-Message-ID: <20151109172427.GA9733@rob-hp-laptop>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 9 Nov 2015 17:31:30 +0000
+Subject: [PATCH] mvneta: add FIXED_PHY dependency
+In-Reply-To: <4827390.CWKT8ytt79@wuerfel>
+References: <4225885.EYXTHjRPmX@wuerfel> <6910088.dNmooXDTJR@wuerfel>
+ <20151109170834.GE8644@n2100.arm.linux.org.uk>
+ <4827390.CWKT8ytt79@wuerfel>
+Message-ID: <20151109173130.GF8644@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 29, 2015 at 04:12:04PM -0500, Li Yang wrote:
-> From: Mingkai Hu <Mingkai.Hu@freescale.com>
+On Mon, Nov 09, 2015 at 06:12:02PM +0100, Arnd Bergmann wrote:
+> On Monday 09 November 2015 17:08:34 Russell King - ARM Linux wrote:
+> > They are "optional" because when you're using a DSA switch, you don't
+> > specify a PHY (because, there isn't one).  For example, this is what
+> > I'm using with an Armada 388 board with a Marvell DSA switch.  The
+> > DSA does not appear as a PHY, and no node in the DSA stanza can be
+> > referenced for a phy entry in the ethernet device's stanza.
+> > 
+> >                         eth1: ethernet at 30000 {
+> >                                 compatible = "marvell,armada-370-neta";
+> >                                 reg = <0x30000 0x4000>;
+> >                                 interrupts-extended = <&mpic 10>;
+> >                                 clocks = <&gateclk 3>;
+> >                                 managed = "in-band-status";
+> >                                 phy-mode = "sgmii";
+> >                                 status = "okay";
+> >                         };
+> > 
+> > 
 > 
-> Signed-off-by: Mingkai Hu <Mingkai.Hu@freescale.com>
-> Signed-off-by: Hou Zhiqiang <B48286@freescale.com>
-> ---
-> v2-v7: no change
+> Ok, then it would be nice to change the binding to reflect that,
+> and also document the "managed" property there.
 
-Acked-by: Rob Herring <robh@kernel.org>
+"managed" is already documented.  See
+Documentation/devicetree/bindings/net/ethernet.txt:
 
-> 
->  Documentation/devicetree/bindings/arm/fsl.txt | 4 ++++
->  1 file changed, 4 insertions(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/fsl.txt b/Documentation/devicetree/bindings/arm/fsl.txt
-> index 34c88b0..752a685 100644
-> --- a/Documentation/devicetree/bindings/arm/fsl.txt
-> +++ b/Documentation/devicetree/bindings/arm/fsl.txt
-> @@ -131,6 +131,10 @@ Example:
->  Freescale ARMv8 based Layerscape SoC family Device Tree Bindings
->  ----------------------------------------------------------------
->  
-> +LS1043A ARMv8 based RDB Board
-> +Required root node properties:
-> +    - compatible = "fsl,ls1043a-rdb", "fsl,ls1043a";
-> +
->  LS2080A ARMv8 based Simulator model
->  Required root node properties:
->      - compatible = "fsl,ls2080a-simu", "fsl,ls2080a";
-> -- 
-> 2.3.3
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe devicetree" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+- managed: string, specifies the PHY management type. Supported values are:
+  "auto", "in-band-status". "auto" is the default, it usess MDIO for
+  management if fixed-link is not specified.
+
+-- 
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
