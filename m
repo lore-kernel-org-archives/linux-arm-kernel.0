@@ -1,62 +1,73 @@
-From: yang.shi@linaro.org (Yang Shi)
-Date: Tue, 10 Nov 2015 14:41:41 -0800
-Subject: [PATCH 2/2] arm64: bpf: add BPF XADD instruction
-In-Reply-To: <1447195301-16757-1-git-send-email-yang.shi@linaro.org>
-References: <1447195301-16757-1-git-send-email-yang.shi@linaro.org>
-Message-ID: <1447195301-16757-3-git-send-email-yang.shi@linaro.org>
+From: yang.shi@linaro.org (Shi, Yang)
+Date: Tue, 10 Nov 2015 15:10:42 -0800
+Subject: Failed to build arm64 bpf samples with LLVM 3.7 on 4.3 kernel
+In-Reply-To: <CAADnVQJ+4maNAbMgTwJAHka0jX8ut5v9Nxh=4tOnhJdAbOm2hQ@mail.gmail.com>
+References: <564244B6.9050202@linaro.org>
+ <CAADnVQJ+4maNAbMgTwJAHka0jX8ut5v9Nxh=4tOnhJdAbOm2hQ@mail.gmail.com>
+Message-ID: <56427972.5000004@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-aarch64 doesn't have native support for XADD instruction, implement it by
-the below instruction sequence:
+On 11/10/2015 2:42 PM, Alexei Starovoitov wrote:
+> On Tue, Nov 10, 2015 at 11:25 AM, Shi, Yang <yang.shi@linaro.org> wrote:
+>> Hi guys,
+>>
+>> I just tried to build arm64 bpf samples on 4.3 kernel, but LLVM complain:
+>>
+>> LLVM ERROR: Inline asm not supported by this streamer because we don't have
+>> an asm parser for this target
+>>
+>> I took some time to bisect it, then found it is caused by sysreg.h
+>>
+>> There is inline assembly macro defined in sysreg.h:
+>>
+>> asm(
+>> "       .irp
+>> num,0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30\n"
+>> "       .equ    __reg_num_x\\num, \\num\n"
+>> "       .endr\n"
+>> "       .equ    __reg_num_xzr, 31\n"
+>> "\n"
+>> "       .macro  mrs_s, rt, sreg\n"
+>> "       .inst   0xd5200000|(\\sreg)|(__reg_num_\\rt)\n"
+>> "       .endm\n"
+>> "\n"
+>> "       .macro  msr_s, sreg, rt\n"
+>> "       .inst   0xd5000000|(\\sreg)|(__reg_num_\\rt)\n"
+>> "       .endm\n"
+>> );
+>>
+>> sysreg.h was not included by any other arm64 header files in 4.2, but in 4.3
+>> it is included by futex.h and uaccess.h, which are included by bpf samples
+>> via skbuff.h.
+>>
+>> But, it sounds LLVM can't recognize it. I'm not familiar with LLVM, so any
+>> suggestion?
+>>
+>> Could it be worked around by some LLVM compile flags?
+>
+> hmm this used to work. I don't have arm64 setup anymore.
 
-Load (dst + off) to a register
-Add src to it
-Store it back to (dst + off)
+Yes, sysreg.h used to be not included by any header file.
 
-Signed-off-by: Yang Shi <yang.shi@linaro.org>
-CC: Zi Shen Lim <zlim.lnx@gmail.com>
-CC: Xi Wang <xi.wang@gmail.com>
----
- arch/arm64/net/bpf_jit_comp.c | 19 +++++++++++++++----
- 1 file changed, 15 insertions(+), 4 deletions(-)
+> Try hacking it by adding #define __ASM_SYSREG_H to prevent inclusion
+> of that file? all those asms are unused anyway.
+> tracing samples include kernel headers to have exact struct layout.
+> and #include skbuff.h can be removed from almost all samples.
+> In-kernel 'struct sk_buff' only used inside tracex1_kern.c
 
-diff --git a/arch/arm64/net/bpf_jit_comp.c b/arch/arm64/net/bpf_jit_comp.c
-index 49c1f1b..0b1d2d3 100644
---- a/arch/arm64/net/bpf_jit_comp.c
-+++ b/arch/arm64/net/bpf_jit_comp.c
-@@ -609,7 +609,21 @@ emit_cond_jmp:
- 	case BPF_STX | BPF_XADD | BPF_W:
- 	/* STX XADD: lock *(u64 *)(dst + off) += src */
- 	case BPF_STX | BPF_XADD | BPF_DW:
--		goto notyet;
-+		ctx->tmp_used = 1;
-+		emit_a64_mov_i(1, tmp2, off, ctx);
-+		switch (BPF_SIZE(code)) {
-+		case BPF_W:
-+			emit(A64_LDR32(tmp, dst, tmp2), ctx);
-+			emit(A64_ADD(is64, tmp, tmp, src), ctx);
-+			emit(A64_STR32(tmp, dst, tmp2), ctx);
-+			break;
-+		case BPF_DW:
-+			emit(A64_LDR64(tmp, dst, tmp2), ctx);
-+			emit(A64_ADD(is64, tmp, tmp, src), ctx);
-+			emit(A64_STR64(tmp, dst, tmp2), ctx);
-+			break;
-+		}
-+		break;
- 
- 	/* R0 = ntohx(*(size *)(((struct sk_buff *)R6)->data + imm)) */
- 	case BPF_LD | BPF_ABS | BPF_W:
-@@ -679,9 +693,6 @@ emit_cond_jmp:
- 		}
- 		break;
- 	}
--notyet:
--		pr_info_once("*** NOT YET: opcode %02x ***\n", code);
--		return -EFAULT;
- 
- 	default:
- 		pr_err_once("unknown opcode %02x\n", code);
--- 
-2.0.2
+The below change works:
+
+         clang $(NOSTDINC_FLAGS) $(LINUXINCLUDE) $(EXTRA_CFLAGS) \
+-               -D__KERNEL__ -Wno-unused-value -Wno-pointer-sign \
++               -D__KERNEL__ -D__ASM_SYSREG_H -Wno-unused-value 
+-Wno-pointer-sign \
+                 -O2 -emit-llvm -c $< -o -| $(LLC) -march=bpf 
+-filetype=obj -o $@
+
+Is it ok for upstream too?
+
+Thanks,
+Yang
+
+>
