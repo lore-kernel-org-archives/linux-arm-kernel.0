@@ -1,57 +1,117 @@
-From: f.fainelli@gmail.com (Florian Fainelli)
-Date: Mon, 9 Nov 2015 18:29:11 -0800
-Subject: [PATCH RESEND v2 3/4] ARM: BCM: Add SMP support for Broadcom NSP
-In-Reply-To: <CACRpkdZN-iwdR_VwktdHsw+rGQLhCgmWnERYVDE+KaYOqJR30w@mail.gmail.com>
-References: <1446839371-22601-1-git-send-email-kapilh@broadcom.com>
- <1446839371-22601-4-git-send-email-kapilh@broadcom.com>
- <CACRpkdZN-iwdR_VwktdHsw+rGQLhCgmWnERYVDE+KaYOqJR30w@mail.gmail.com>
-Message-ID: <CAGVrzca34xrVznoEE2e26JyR11Q9L1sT4mJcNZ=NuprqUnZnjw@mail.gmail.com>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Tue, 10 Nov 2015 11:42:31 +0900
+Subject: [PATCH v5 2/6] arm64: ftrace: fix a stack tracer's output under
+ function graph tracer
+In-Reply-To: <3F63B5BC-C21A-4ECA-9800-374B924DB98D@gmail.com>
+References: <1446792285-1154-1-git-send-email-takahiro.akashi@linaro.org>
+ <1446792285-1154-3-git-send-email-takahiro.akashi@linaro.org>
+ <3F63B5BC-C21A-4ECA-9800-374B924DB98D@gmail.com>
+Message-ID: <56415997.1040207@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-2015-11-09 2:09 GMT-08:00 Linus Walleij <linus.walleij@linaro.org>:
-> On Fri, Nov 6, 2015 at 8:49 PM, Kapil Hali <kapilh@broadcom.com> wrote:
+On 11/09/2015 11:04 PM, Jungseok Lee wrote:
+> On Nov 6, 2015, at 3:44 PM, AKASHI Takahiro wrote:
 >
->> Add SMP support for Broadcom's Northstar Plus SoC
->> cpu enable method. This changes also consolidates
->> iProc family's - BCM NSP and BCM Kona, platform
->> SMP handling in a common file.
+> Hi Akashi,
+>
+>> Function graph tracer modifies a return address (LR) in a stack frame
+>> to hook a function return. This will result in many useless entries
+>> (return_to_handler) showing up in a stack tracer's output.
 >>
->> Northstar Plus SoC is based on ARM Cortex-A9
->> revision r3p0 which requires configuration for ARM
->> Errata 764369 for SMP. This change adds the needed
->> configuration option.
+>> This patch replaces such entries with originals values preserved in
+>> current->ret_stack[].
 >>
->> Signed-off-by: Kapil Hali <kapilh@broadcom.com>
->
-> This version looks saner to me.
->
->> +static int nsp_write_lut(void)
->> +{
->> +       void __iomem *sku_rom_lut;
->> +       phys_addr_t secondary_startup_phy;
+>> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+>> ---
+>> arch/arm64/include/asm/ftrace.h |    2 ++
+>> arch/arm64/kernel/stacktrace.c  |   21 +++++++++++++++++++++
+>> 2 files changed, 23 insertions(+)
+>>
+>> diff --git a/arch/arm64/include/asm/ftrace.h b/arch/arm64/include/asm/ftrace.h
+>> index c5534fa..3c60f37 100644
+>> --- a/arch/arm64/include/asm/ftrace.h
+>> +++ b/arch/arm64/include/asm/ftrace.h
+>> @@ -28,6 +28,8 @@ struct dyn_arch_ftrace {
+>>
+>> extern unsigned long ftrace_graph_call;
+>>
+>> +extern void return_to_handler(void);
 >> +
->> +       if (!secondary_boot) {
->> +               pr_warn("required secondary boot register not specified\n");
->> +               return -EINVAL;
->> +       }
+>> static inline unsigned long ftrace_call_adjust(unsigned long addr)
+>> {
+>> 	/*
+>> diff --git a/arch/arm64/kernel/stacktrace.c b/arch/arm64/kernel/stacktrace.c
+>> index ccb6078..5fd3477 100644
+>> --- a/arch/arm64/kernel/stacktrace.c
+>> +++ b/arch/arm64/kernel/stacktrace.c
+>> @@ -17,6 +17,7 @@
+>>   */
+>> #include <linux/kernel.h>
+>> #include <linux/export.h>
+>> +#include <linux/ftrace.h>
+>> #include <linux/sched.h>
+>> #include <linux/stacktrace.h>
+>>
+>> @@ -73,6 +74,9 @@ struct stack_trace_data {
+>> 	struct stack_trace *trace;
+>> 	unsigned int no_sched_functions;
+>> 	unsigned int skip;
+>> +#ifdef CONFIG_FUNCTION_GRAPH_TRACER
+>> +	unsigned int ret_stack_index;
+>> +#endif
+>> };
+>>
+>> static int save_trace(struct stackframe *frame, void *d)
+>> @@ -81,6 +85,20 @@ static int save_trace(struct stackframe *frame, void *d)
+>> 	struct stack_trace *trace = data->trace;
+>> 	unsigned long addr = frame->pc;
+>>
+>> +#ifdef CONFIG_FUNCTION_GRAPH_TRACER
+>> +	if (addr == (unsigned long)return_to_handler - AARCH64_INSN_SIZE) {
+>
+> not if (adds == (unsigned long)return_to_handler)?
+>
+>> +		/*
+>> +		 * This is a case where function graph tracer has
+>> +		 * modified a return address (LR) in a stack frame
+>> +		 * to hook a function return.
+>> +		 * So replace it to an original value.
+>> +		 */
+>> +		frame->pc = addr =
+>> +			current->ret_stack[data->ret_stack_index--].ret
+>> +							- AARCH64_INSN_SIZE;
+>
+> Ditto. not without AARCH64_INSN_SIZE?
+>
+> I've observed many return_to_handler without the changes.
+> Am I missing something?
+
+You're right!
+I thought I had tested the patches, but...
+
+>> +	}
+>> +#endif /* CONFIG_FUNCTION_GRAPH_TRACER */
 >> +
->> +       sku_rom_lut = ioremap_nocache((phys_addr_t)secondary_boot,
->> +                                               sizeof(secondary_boot));
+>> 	if (data->no_sched_functions && in_sched_functions(addr))
+>> 		return 0;
+>> 	if (data->skip) {
+>> @@ -100,6 +118,9 @@ void save_stack_trace_tsk(struct task_struct *tsk, struct stack_trace *trace)
+>>
+>> 	data.trace = trace;
+>> 	data.skip = trace->skip;
+>> +#ifdef CONFIG_FUNCTION_GRAPH_TRACER
+>> +	data.ret_stack_index = current->curr_ret_stack;
 >
-> Why is this address not just taken directly from the device tree?
+> Can I get an idea on why current->curr_ret_stack is used instead of
+> tsk->curr_ret_stack?
 
-It comes directly from DT, that's what bcm_smp_prepare_cpus() does
-read from Device Tree.
+Thanks for pointing this out.
+Will fix it although it works without a change since save_stack_trace_sp() is
+called only in a 'current task' context.
 
+-Takahiro AKASHI
+
+> Best Regards
+> Jungseok Lee
 >
-> If it is not in the device tree: why?
->
-> Also give it a sane name, bcm_sec_boot_address or so.
-> "secondary_boot" sounds like a function you call to boot
-> the second core.
-
-Agree with that, there could be a better name which better reflects
-this is a variable.
--- 
-Florian
