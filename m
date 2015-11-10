@@ -1,59 +1,67 @@
-From: john.stultz@linaro.org (John Stultz)
-Date: Tue, 10 Nov 2015 07:26:01 -0800
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Tue, 10 Nov 2015 10:31:33 -0500 (EST)
 Subject: [PATCH v2 1/7] timekeeping: introduce __current_kernel_time64
-In-Reply-To: <alpine.DEB.2.02.1511101507540.5676@kaball.uk.xensource.com>
+In-Reply-To: <CALAqxLUEOWP6CJxY021nDR6cEQf3VZtm8fa9waK2a=OmQJEO-g@mail.gmail.com>
 References: <alpine.DEB.2.02.1511101131350.5676@kaball.uk.xensource.com>
  <1447156675-7418-1-git-send-email-stefano.stabellini@eu.citrix.com>
  <4372800.FdTygmcuyo@wuerfel>
  <alpine.DEB.2.02.1511101507540.5676@kaball.uk.xensource.com>
-Message-ID: <CALAqxLUEOWP6CJxY021nDR6cEQf3VZtm8fa9waK2a=OmQJEO-g@mail.gmail.com>
+ <CALAqxLUEOWP6CJxY021nDR6cEQf3VZtm8fa9waK2a=OmQJEO-g@mail.gmail.com>
+Message-ID: <alpine.DEB.2.11.1511101028320.3915@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 10, 2015 at 7:10 AM, Stefano Stabellini
-<stefano.stabellini@eu.citrix.com> wrote:
-> On Tue, 10 Nov 2015, Arnd Bergmann wrote:
->> On Tuesday 10 November 2015 11:57:49 Stefano Stabellini wrote:
->> > __current_kernel_time64 returns a struct timespec64, without taking the
->> > xtime lock. Mirrors __current_kernel_time/current_kernel_time.
->> >
->>
->> Actually it doesn't mirror __current_kernel_time/current_kernel_time
->>
->> > diff --git a/include/linux/timekeeping.h b/include/linux/timekeeping.h
->> > index ec89d84..b5802bf 100644
->> > --- a/include/linux/timekeeping.h
->> > +++ b/include/linux/timekeeping.h
->> > @@ -19,7 +19,8 @@ extern int do_sys_settimeofday(const struct timespec *tv,
->> >   */
->> >  unsigned long get_seconds(void);
->> >  struct timespec64 current_kernel_time64(void);
->> > -/* does not take xtime_lock */
->> > +/* do not take xtime_lock */
->> > +struct timespec64 __current_kernel_time64(void);
->> >  struct timespec __current_kernel_time(void);
->>
->> Please change __current_kernel_time into a static inline function
->> while you are introducing the new one, to match the patch description ;-)
->
-> The implementation is:
->
->         struct timekeeper *tk = &tk_core.timekeeper;
->
->         return timespec64_to_timespec(tk_xtime(tk));
->
-> which cannot be easily made into a static inline, unless we start
-> exporting tk_core.
+On Tue, 10 Nov 2015, John Stultz wrote:
+> On Tue, Nov 10, 2015 at 7:10 AM, Stefano Stabellini
+> <stefano.stabellini@eu.citrix.com> wrote:
+> > On Tue, 10 Nov 2015, Arnd Bergmann wrote:
+> >> On Tuesday 10 November 2015 11:57:49 Stefano Stabellini wrote:
+> >> > __current_kernel_time64 returns a struct timespec64, without taking the
+> >> > xtime lock. Mirrors __current_kernel_time/current_kernel_time.
+> >> >
+> >>
+> >> Actually it doesn't mirror __current_kernel_time/current_kernel_time
+> >>
+> >> > diff --git a/include/linux/timekeeping.h b/include/linux/timekeeping.h
+> >> > index ec89d84..b5802bf 100644
+> >> > --- a/include/linux/timekeeping.h
+> >> > +++ b/include/linux/timekeeping.h
+> >> > @@ -19,7 +19,8 @@ extern int do_sys_settimeofday(const struct timespec *tv,
+> >> >   */
+> >> >  unsigned long get_seconds(void);
+> >> >  struct timespec64 current_kernel_time64(void);
+> >> > -/* does not take xtime_lock */
+> >> > +/* do not take xtime_lock */
+> >> > +struct timespec64 __current_kernel_time64(void);
+> >> >  struct timespec __current_kernel_time(void);
+> >>
+> >> Please change __current_kernel_time into a static inline function
+> >> while you are introducing the new one, to match the patch description ;-)
+> >
+> > The implementation is:
+> >
+> >         struct timekeeper *tk = &tk_core.timekeeper;
+> >
+> >         return timespec64_to_timespec(tk_xtime(tk));
+> >
+> > which cannot be easily made into a static inline, unless we start
+> > exporting tk_core.
+> 
+> So the timekeeper is passed to the notifier. So you probably want something like
+> 
+> struct timespec64 __current_kernel_time64(struct timekeeper *tk)
+> {
+>  return timespec64_to_timespec(tk_xtime(tk));
+> }
+> 
+> Then you can cast the priv pointer in the notifier to a timekeeper and
+> use it that way?
 
-So the timekeeper is passed to the notifier. So you probably want something like
+Err no. Look at commit 8758a240e2d74c5932ab51a73377e6507b7fd441
 
-struct timespec64 __current_kernel_time64(struct timekeeper *tk)
-{
- return timespec64_to_timespec(tk_xtime(tk));
-}
+i.e. Add the new 64bit function and make the existing one a static
+inline which does the timespec64 to timespec conversion.
 
-Then you can cast the priv pointer in the notifier to a timekeeper and
-use it that way?
+Thanks,
 
-thanks
--john
+	tglx
