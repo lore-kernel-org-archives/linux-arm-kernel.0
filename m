@@ -1,26 +1,39 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Tue, 10 Nov 2015 21:36:35 +0100
-Subject: [PATCH v8] can: xilinx: Convert to runtime_pm
-In-Reply-To: <1445839914-26249-1-git-send-email-appanad@xilinx.com>
-References: <1445839914-26249-1-git-send-email-appanad@xilinx.com>
-Message-ID: <56425553.3080909@pengutronix.de>
+From: davem@davemloft.net (David Miller)
+Date: Tue, 10 Nov 2015 15:40:35 -0500 (EST)
+Subject: [PATCH] bpf_trace: Make dependent on PERF_EVENTS
+In-Reply-To: <20151110152817.144195a0@gandalf.local.home>
+References: <20151110152817.144195a0@gandalf.local.home>
+Message-ID: <20151110.154035.1545699029296918207.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/26/2015 07:11 AM, Kedareswara rao Appana wrote:
-> Instead of enabling/disabling clocks at several locations in the driver,
-> Use the runtime_pm framework. This consolidates the actions for runtime PM
-> In the appropriate callbacks and makes the driver more readable and mantainable.
+From: Steven Rostedt <rostedt@goodmis.org>
+Date: Tue, 10 Nov 2015 15:28:17 -0500
+
 > 
-> Signed-off-by: Kedareswara rao Appana <appanad@xilinx.com>
+> Arnd Bergmann reported:
+> 
+>   In my ARM randconfig tests, I'm getting a build error for
+>   newly added code in bpf_perf_event_read and bpf_perf_event_output
+>   whenever CONFIG_PERF_EVENTS is disabled:
+> 
+>   kernel/trace/bpf_trace.c: In function 'bpf_perf_event_read':
+>   kernel/trace/bpf_trace.c:203:11: error: 'struct perf_event' has no member named 'oncpu'
+>   if (event->oncpu != smp_processor_id() ||
+>            ^
+>   kernel/trace/bpf_trace.c:204:11: error: 'struct perf_event' has no member named 'pmu'
+>         event->pmu->count)
+> 
+>   This can happen when UPROBE_EVENT is enabled but KPROBE_EVENT
+>   is disabled. I'm not sure if that is a configuration we care
+>   about, otherwise we could prevent this case from occuring by
+>   adding Kconfig dependencies.
+> 
+> Looking at this further, it's really that UPROBE_EVENT enables PERF_EVENTS.
+> By just having BPF_EVENTS depend on PERF_EVENTS, then all is fine.
+> 
+> Link: http://lkml.kernel.org/r/4525348.Aq9YoXkChv at wuerfel
+> Reported-by: Arnd Bergmann <arnd@arndb.de>
+> Signed-off-by: Steven Rostedt <rostedt@goodmis.org>
 
-Applied to can-next.
-
-thanks,
-Marc
-
--- 
-Pengutronix e.K.                  | Marc Kleine-Budde           |
-Industrial Linux Solutions        | Phone: +49-231-2826-924     |
-Vertretung West/Dortmund          | Fax:   +49-5121-206917-5555 |
-Amtsgericht Hildesheim, HRA 2686  | http://www.pengutronix.de   |
+I'll apply this, thanks Steven et al.
