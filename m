@@ -1,41 +1,158 @@
-From: yalin.wang2010@gmail.com (yalin wang)
-Date: Tue, 10 Nov 2015 19:09:00 +0800
-Subject: [V3 PATCH] arm64: remove redundant FRAME_POINTER kconfig option
- and force to select it
-In-Reply-To: <20151110103752.GH21606@e104818-lin.cambridge.arm.com>
-References: <1447092595-12644-1-git-send-email-yang.shi@linaro.org>
- <20151110103752.GH21606@e104818-lin.cambridge.arm.com>
-Message-ID: <49B0431C-4FDA-45CB-82AF-FA010197118D@gmail.com>
+From: ulf.hansson@linaro.org (Ulf Hansson)
+Date: Tue, 10 Nov 2015 12:12:30 +0100
+Subject: [PATCH v2] mmc: sdhci at91: add PM support
+In-Reply-To: <1447151810-21864-1-git-send-email-ludovic.desroches@atmel.com>
+References: <1447151810-21864-1-git-send-email-ludovic.desroches@atmel.com>
+Message-ID: <CAPDyKFoAwmkw0D8QbA4UV3uhhNS7hmfOiRv3ZUhMp8uoxzWnrw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 10 November 2015 at 11:36, Ludovic Desroches
+<ludovic.desroches@atmel.com> wrote:
+> Add runtime PM support and use runtime_force_suspend|resume() for system
+> PM.
+>
+> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+> ---
+>
+> Changes:
+> - from v1: take a runtime PM centric approach
+>
+>  drivers/mmc/host/sdhci-of-at91.c | 66 +++++++++++++++++++++++++++++++++++++++-
+>  1 file changed, 65 insertions(+), 1 deletion(-)
+>
+> diff --git a/drivers/mmc/host/sdhci-of-at91.c b/drivers/mmc/host/sdhci-of-at91.c
+> index 06d0b50..5dbe0ce 100644
+> --- a/drivers/mmc/host/sdhci-of-at91.c
+> +++ b/drivers/mmc/host/sdhci-of-at91.c
+> @@ -21,6 +21,8 @@
+>  #include <linux/module.h>
+>  #include <linux/of.h>
+>  #include <linux/of_device.h>
+> +#include <linux/pm.h>
+> +#include <linux/pm_runtime.h>
+>
+>  #include "sdhci-pltfm.h"
+>
+> @@ -51,6 +53,62 @@ static const struct of_device_id sdhci_at91_dt_match[] = {
+>         {}
+>  };
+>
+> +#ifdef CONFIG_PM
+> +static int sdhci_at91_runtime_suspend(struct device *dev)
+> +{
+> +       struct platform_device *pdev = to_platform_device(dev);
+> +       struct sdhci_host *host = platform_get_drvdata(pdev);
 
-> On Nov 10, 2015, at 18:37, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> 
-> On Mon, Nov 09, 2015 at 10:09:55AM -0800, Yang Shi wrote:
->> FRAME_POINTER  is defined in lib/Kconfig.debug, it is unnecessary to redefine
->> it in arch/arm64/Kconfig.debug. Actually, the one defined in arm64 directory
->> is never used.
-> 
-> That's not true since the arm64 definition seems to take precedence.
-> 
->> This adds a dependency on DEBUG_KERNEL for building with frame pointers.
-> 
-> It doesn't because arm64 selects ARCH_WANT_FRAME_POINTERS.
-> 
->> ARM64 depends on frame pointer to get correct stack backtrace and need
->> FRAME_POINTER kconfig option enabled all the time.
->> However, currect implementation makes it could be disabled, so force it
->> to be selected by ARM64.
->> 
->> Signed-off-by: Yang Shi <yang.shi@linaro.org>
-> 
-> Patch applied but I changed the commit log slightly. Thanks.
-i have a question,
-why FRAME_POINTER  config must be enabled ?
-and i see ARM arch can  disable this config .
-if i don?t need stack trace dump and the software release is for 
-final product , don?t need debug stack trace log .
-is it possible to disable it for performance reason ?
+These two lines can be replaced by:
+struct sdhci_host *host = dev_get_drvdata(dev);
 
-Thanks
+> +       struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+> +       struct sdhci_at91_priv *priv = pltfm_host->priv;
+> +       int ret;
+> +
+> +       ret = sdhci_runtime_suspend_host(host);
+> +
+> +       clk_disable_unprepare(priv->gck);
+> +       clk_disable_unprepare(priv->hclock);
+> +       clk_disable_unprepare(priv->mainck);
+> +
+> +       return ret;
+> +}
+> +
+> +static int sdhci_at91_runtime_resume(struct device *dev)
+> +{
+> +       struct platform_device *pdev = to_platform_device(dev);
+> +       struct sdhci_host *host = platform_get_drvdata(pdev);
+
+Same comment as above.
+
+> +       struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+> +       struct sdhci_at91_priv *priv = pltfm_host->priv;
+> +       int ret;
+> +
+> +       ret = clk_prepare_enable(priv->mainck);
+> +       if (ret) {
+> +               dev_err(dev, "can't enable mainck\n");
+> +               return ret;
+> +       }
+> +
+> +       ret = clk_prepare_enable(priv->hclock);
+> +       if (ret) {
+> +               dev_err(dev, "can't enable hclock\n");
+> +               return ret;
+> +       }
+> +
+> +       ret = clk_prepare_enable(priv->gck);
+> +       if (ret) {
+> +               dev_err(dev, "can't enable gck\n");
+> +               return ret;
+> +       }
+> +
+> +       return sdhci_runtime_resume_host(host);
+> +}
+> +#endif /* CONFIG_PM_RUNTIME */
+
+/s/CONFIG_PM_RUNTIME/CONFIG_PM
+
+> +
+> +static const struct dev_pm_ops sdhci_at91_dev_pm_ops = {
+> +       SET_SYSTEM_SLEEP_PM_OPS(pm_runtime_force_suspend,
+> +                               pm_runtime_force_resume)
+> +       SET_RUNTIME_PM_OPS(sdhci_at91_runtime_suspend,
+> +                          sdhci_at91_runtime_resume,
+> +                          NULL)
+> +};
+> +
+>  static int sdhci_at91_probe(struct platform_device *pdev)
+>  {
+>         const struct of_device_id       *match;
+> @@ -148,6 +206,11 @@ static int sdhci_at91_probe(struct platform_device *pdev)
+>         if (ret)
+>                 goto clocks_disable_unprepare;
+>
+> +       pm_runtime_set_active(&pdev->dev);
+> +       pm_runtime_enable(&pdev->dev);
+> +       pm_runtime_set_autosuspend_delay(&pdev->dev, 50);
+> +       pm_runtime_use_autosuspend(&pdev->dev);
+
+Move these four runtime PM calls above sdhci_add_host(), as after that
+point the host is used and thus runtime PM operations starts.
+
+> +
+>         return 0;
+>
+>  clocks_disable_unprepare:
+> @@ -165,6 +228,7 @@ static int sdhci_at91_remove(struct platform_device *pdev)
+>         struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+>         struct sdhci_at91_priv  *priv = pltfm_host->priv;
+>
+
+Add:
+pm_runtime_get_sync();
+
+> +       pm_runtime_disable(&pdev->dev);
+
+Add:
+pm_runtime_put_noidle();
+
+>         sdhci_pltfm_unregister(pdev);
+>
+>         clk_disable_unprepare(priv->gck);
+> @@ -178,7 +242,7 @@ static struct platform_driver sdhci_at91_driver = {
+>         .driver         = {
+>                 .name   = "sdhci-at91",
+>                 .of_match_table = sdhci_at91_dt_match,
+> -               .pm     = SDHCI_PLTFM_PMOPS,
+> +               .pm     = &sdhci_at91_dev_pm_ops,
+>         },
+>         .probe          = sdhci_at91_probe,
+>         .remove         = sdhci_at91_remove,
+> --
+> 2.5.0
+>
+
+Otherwise, this looks good!
+
+Kind regards
+Uffe
