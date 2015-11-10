@@ -1,80 +1,57 @@
 From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Tue, 10 Nov 2015 11:57:51 +0000
-Subject: [PATCH v2 3/7] xen/arm: introduce HYPERVISOR_platform_op on arm and
- arm64
+Date: Tue, 10 Nov 2015 11:57:49 +0000
+Subject: [PATCH v2 1/7] timekeeping: introduce __current_kernel_time64
 In-Reply-To: <alpine.DEB.2.02.1511101131350.5676@kaball.uk.xensource.com>
 References: <alpine.DEB.2.02.1511101131350.5676@kaball.uk.xensource.com>
-Message-ID: <1447156675-7418-3-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <1447156675-7418-1-git-send-email-stefano.stabellini@eu.citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+__current_kernel_time64 returns a struct timespec64, without taking the
+xtime lock. Mirrors __current_kernel_time/current_kernel_time.
+
 Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-
+CC: arnd at arndb.de
+CC: john.stultz at linaro.org
+CC: tglx at linutronix.de
+CC: mingo at kernel.org
+CC: peterz at infradead.org
 ---
+ include/linux/timekeeping.h |    3 ++-
+ kernel/time/timekeeping.c   |    7 +++++++
+ 2 files changed, 9 insertions(+), 1 deletion(-)
 
-Changes in v2:
-- rename dom0_op to platform_op
----
- arch/arm/include/asm/xen/hypercall.h |    2 ++
- arch/arm/xen/enlighten.c             |    1 +
- arch/arm/xen/hypercall.S             |    1 +
- arch/arm64/xen/hypercall.S           |    1 +
- 4 files changed, 5 insertions(+)
-
-diff --git a/arch/arm/include/asm/xen/hypercall.h b/arch/arm/include/asm/xen/hypercall.h
-index 712b50e..c3e00d0 100644
---- a/arch/arm/include/asm/xen/hypercall.h
-+++ b/arch/arm/include/asm/xen/hypercall.h
-@@ -35,6 +35,7 @@
+diff --git a/include/linux/timekeeping.h b/include/linux/timekeeping.h
+index ec89d84..b5802bf 100644
+--- a/include/linux/timekeeping.h
++++ b/include/linux/timekeeping.h
+@@ -19,7 +19,8 @@ extern int do_sys_settimeofday(const struct timespec *tv,
+  */
+ unsigned long get_seconds(void);
+ struct timespec64 current_kernel_time64(void);
+-/* does not take xtime_lock */
++/* do not take xtime_lock */
++struct timespec64 __current_kernel_time64(void);
+ struct timespec __current_kernel_time(void);
  
- #include <xen/interface/xen.h>
- #include <xen/interface/sched.h>
-+#include <xen/interface/platform.h>
+ static inline struct timespec current_kernel_time(void)
+diff --git a/kernel/time/timekeeping.c b/kernel/time/timekeeping.c
+index b1356b7..c1221c2 100644
+--- a/kernel/time/timekeeping.c
++++ b/kernel/time/timekeeping.c
+@@ -1881,6 +1881,13 @@ struct timespec __current_kernel_time(void)
+ 	return timespec64_to_timespec(tk_xtime(tk));
+ }
  
- long privcmd_call(unsigned call, unsigned long a1,
- 		unsigned long a2, unsigned long a3,
-@@ -49,6 +50,7 @@ int HYPERVISOR_memory_op(unsigned int cmd, void *arg);
- int HYPERVISOR_physdev_op(int cmd, void *arg);
- int HYPERVISOR_vcpu_op(int cmd, int vcpuid, void *extra_args);
- int HYPERVISOR_tmem_op(void *arg);
-+int HYPERVISOR_platform_op(void *arg);
- int HYPERVISOR_multicall(struct multicall_entry *calls, uint32_t nr);
- 
- static inline int
-diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
-index 15621b1..2f57ba3 100644
---- a/arch/arm/xen/enlighten.c
-+++ b/arch/arm/xen/enlighten.c
-@@ -328,5 +328,6 @@ EXPORT_SYMBOL_GPL(HYPERVISOR_memory_op);
- EXPORT_SYMBOL_GPL(HYPERVISOR_physdev_op);
- EXPORT_SYMBOL_GPL(HYPERVISOR_vcpu_op);
- EXPORT_SYMBOL_GPL(HYPERVISOR_tmem_op);
-+EXPORT_SYMBOL_GPL(HYPERVISOR_platform_op);
- EXPORT_SYMBOL_GPL(HYPERVISOR_multicall);
- EXPORT_SYMBOL_GPL(privcmd_call);
-diff --git a/arch/arm/xen/hypercall.S b/arch/arm/xen/hypercall.S
-index 10fd99c..d4539f4 100644
---- a/arch/arm/xen/hypercall.S
-+++ b/arch/arm/xen/hypercall.S
-@@ -89,6 +89,7 @@ HYPERCALL2(memory_op);
- HYPERCALL2(physdev_op);
- HYPERCALL3(vcpu_op);
- HYPERCALL1(tmem_op);
-+HYPERCALL1(platform_op);
- HYPERCALL2(multicall);
- 
- ENTRY(privcmd_call)
-diff --git a/arch/arm64/xen/hypercall.S b/arch/arm64/xen/hypercall.S
-index 8bbe940..f7d5724 100644
---- a/arch/arm64/xen/hypercall.S
-+++ b/arch/arm64/xen/hypercall.S
-@@ -80,6 +80,7 @@ HYPERCALL2(memory_op);
- HYPERCALL2(physdev_op);
- HYPERCALL3(vcpu_op);
- HYPERCALL1(tmem_op);
-+HYPERCALL1(platform_op);
- HYPERCALL2(multicall);
- 
- ENTRY(privcmd_call)
++struct timespec64 __current_kernel_time64(void)
++{
++	struct timekeeper *tk = &tk_core.timekeeper;
++
++	return tk_xtime(tk);
++}
++
+ struct timespec64 current_kernel_time64(void)
+ {
+ 	struct timekeeper *tk = &tk_core.timekeeper;
 -- 
 1.7.10.4
