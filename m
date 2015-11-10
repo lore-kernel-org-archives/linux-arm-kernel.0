@@ -1,48 +1,31 @@
-From: r64343@freescale.com (Jason Liu)
-Date: Tue, 10 Nov 2015 20:30:26 +0800
-Subject: [PATCH 1/1] drivers: of: of_reserved_mem: fixup the alignment with
- CMA setup
-Message-ID: <1447158626-7773-1-git-send-email-r64343@freescale.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 10 Nov 2015 13:39:44 +0100
+Subject: [PATCH v2 7/7] xen/arm: set the system time in Xen via the
+ XENPF_settime64 hypercall
+In-Reply-To: <1447156675-7418-7-git-send-email-stefano.stabellini@eu.citrix.com>
+References: <alpine.DEB.2.02.1511101131350.5676@kaball.uk.xensource.com>
+ <1447156675-7418-7-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <4039287.QS1nrAMb0E@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There is an alignment mismatch issue between the of_reserved_mem and
-the CMA setup requirement. The of_reserved_mem will try to get the
-alignment value from the DTS and pass it to __memblock_alloc_base to
-do the memory block base allocation, but the alignment value specified
-in the DTS may not satisfy the CAM setup requirement since CMA setup
-required the alignment as the following in the code:
+On Tuesday 10 November 2015 11:57:55 Stefano Stabellini wrote:
+> +       op.u.settime64.nsecs = now.tv_nsec;
+> +       op.u.settime64.system_time = arch_timer_read_counter() * (u64)NSEC_PER_SEC;
+> +       do_div(op.u.settime64.system_time, arch_timer_get_rate());
 
-align = PAGE_SIZE << max(MAX_ORDER - 1, pageblock_order);
+NSEC_PER_SEC is a large number, doesn't that multiplication overflow the
+64-bit system_time variable?
 
-The sanity check in the function of rmem_cma_setup will fail if the
-alignment does not setup correctly and thus CMA will fail to setup.
+> +       printk("GTOD: Setting to %llu.%u at %llu\n",
 
-This patch is to fixup the alignment to meet the CMA setup required.
+				   %llu.%09u
 
-Mailing-list-thread: https://lkml.org/lkml/2015/11/9/138
-Signed-off-by: Jason Liu <r64343@freescale.com>
-Cc: Marek Szyprowski <m.szyprowski@samsung.com>
-Cc: Grant Likely <grant.likely@linaro.org>
-Cc: Rob Herring <robh+dt@kernel.org>
----
- drivers/of/of_reserved_mem.c | 4 ++++
- 1 file changed, 4 insertions(+)
+so you get the leading zeroes.
 
-diff --git a/drivers/of/of_reserved_mem.c b/drivers/of/of_reserved_mem.c
-index 62f467b..9394311 100644
---- a/drivers/of/of_reserved_mem.c
-+++ b/drivers/of/of_reserved_mem.c
-@@ -124,6 +124,10 @@ static int __init __reserved_mem_alloc_size(unsigned long node,
- 		align = dt_mem_next_cell(dt_root_addr_cells, &prop);
- 	}
- 
-+	/* Need adjust the alignment to satisfy the CMA requirement */
-+	if (IS_ENABLED(CONFIG_CMA) && of_flat_dt_is_compatible(node, "shared-dma-pool"))
-+		align = max(align, (phys_addr_t)PAGE_SIZE << max(MAX_ORDER - 1, pageblock_order));
-+
- 	prop = of_get_flat_dt_prop(node, "alloc-ranges", &len);
- 	if (prop) {
- 
--- 
-1.8.3.2
+> +              op.u.settime64.secs,
+> +              op.u.settime64.nsecs,
+> +              op.u.settime64.system_time);
+> +       (void)HYPERVISOR_platform_op(&op);
+
+	Arnd
