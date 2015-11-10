@@ -1,54 +1,99 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 10 Nov 2015 10:45:04 +0100
-Subject: [PATCH] PCI: imx6:don't sleep in atomic context
-In-Reply-To: <1447148110.3142.6.camel@pengutronix.de>
-References: <1447066080-5859-1-git-send-email-sanjeev_sharma@mentor.com>
- <4800389.dqcmlJY3HC@wuerfel> <1447148110.3142.6.camel@pengutronix.de>
-Message-ID: <6415545.xzR4A6SaUL@wuerfel>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 10 Nov 2015 09:54:11 +0000
+Subject: [PATCH 11/15] arm64: kdump: implement machine_crash_shutdown()
+In-Reply-To: <5641472C.9080201@linaro.org>
+References: <cover.1446836442.git.geoff@infradead.org>
+ <2880455fc4abe385d5ed3919efa02177f96f4d93.1446836443.git.geoff@infradead.org>
+ <5641472C.9080201@linaro.org>
+Message-ID: <20151110095411.GB31947@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 10 November 2015 10:35:10 Lucas Stach wrote:
-> Am Dienstag, den 10.11.2015, 10:28 +0100 schrieb Arnd Bergmann:
-> > On Tuesday 10 November 2015 09:41:18 Lucas Stach wrote:
-> > > > diff --git a/drivers/pci/host/pci-imx6.c b/drivers/pci/host/pci-imx6.c
-> > > > index 233a196..9769b13 100644
-> > > > --- a/drivers/pci/host/pci-imx6.c
-> > > > +++ b/drivers/pci/host/pci-imx6.c
-> > > > @@ -499,7 +499,7 @@ static int imx6_pcie_link_up(struct pcie_port *pp)
-> > > >                * Wait a little bit, then re-check if the link finished
-> > > >                * the training.
-> > > >                */
-> > > > -             usleep_range(1000, 2000);
-> > > > +             mdelay(1000);
-> > > 
-> > > A mdelay(1000) is a whole different timescale than a usleep(1000). If
-> > > this patch works for you with mdelay(1) or maybe mdelay(2) I would be
-> > > fine with it.
-> > 
-> > mdelay(1) is still a really long time to block the CPU for, on potentially
-> > every config space access.
-> > 
-> > Everybody else just returns the link status here, which seems to be
-> > the better alternative. If you need to delay the startup, better have
-> > a msleep(1) loop in the initial probe function where you are allowed to
-> > sleep.
-> > 
-> Yes, it's somewhere on my TODO list to rework the link-up handling here,
-> but as there are quite a few timing and ordering implications in that
-> code, this needs a good thought and a good deal of testing. So I'm
-> inclined to ACK the current patch to get rid of the obvious bug and sort
-> things out properly in a follow on patchset.
+On Tue, Nov 10, 2015 at 10:23:56AM +0900, AKASHI Takahiro wrote:
+> On 11/07/2015 04:14 AM, Geoff Levand wrote:
+> >From: AKASHI Takahiro <takahiro.akashi@linaro.org>
+> >
+> >kdump calls machine_crash_shutdown() to shut down non-boot cpus and
+> >save registers' status in per-cpu ELF notes before starting the crash
+> >dump kernel. See kernel_kexec().
+> >
+> >ipi_cpu_stop() is a bit modified and used to support this behavior.
+> 
+> I've got some concerns of using ipi_cpu_stop().
+> 
+> >Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+> >---
+> >  arch/arm64/include/asm/kexec.h    | 34 +++++++++++++++++++++++++++++++++-
+> >  arch/arm64/kernel/machine_kexec.c | 31 +++++++++++++++++++++++++++++--
+> >  arch/arm64/kernel/smp.c           | 16 ++++++++++++++--
+> >  3 files changed, 76 insertions(+), 5 deletions(-)
 
-Maybe use that patch with some modifications then:
+[...]
 
-* add a comment to explain that this is currently called from possibly
-  atomic context through pci_config_{read,write} and that the link
-  state handling never belonged here.
+> >diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
+> >index dbdaacd..88aec66 100644
+> >--- a/arch/arm64/kernel/smp.c
+> >+++ b/arch/arm64/kernel/smp.c
+> >@@ -37,6 +37,7 @@
+> >  #include <linux/completion.h>
+> >  #include <linux/of.h>
+> >  #include <linux/irq_work.h>
+> >+#include <linux/kexec.h>
+> >
+> >  #include <asm/alternative.h>
+> >  #include <asm/atomic.h>
+> >@@ -54,6 +55,8 @@
+> >  #include <asm/ptrace.h>
+> >  #include <asm/virt.h>
+> >
+> >+#include "cpu-reset.h"
+> >+
+> >  #define CREATE_TRACE_POINTS
+> >  #include <trace/events/ipi.h>
+> >
+> >@@ -679,8 +682,12 @@ static DEFINE_RAW_SPINLOCK(stop_lock);
+> >  /*
+> >   * ipi_cpu_stop - handle IPI from smp_send_stop()
+> >   */
+> >-static void ipi_cpu_stop(unsigned int cpu)
+> >+static void ipi_cpu_stop(unsigned int cpu, struct pt_regs *regs)
+> >  {
+> >+#ifdef CONFIG_KEXEC
+> >+	/* printing messages may slow down the shutdown. */
+> >+	if (!in_crash_kexec)
+> >+#endif
+> >  	if (system_state == SYSTEM_BOOTING ||
+> >  	    system_state == SYSTEM_RUNNING) {
+> >  		raw_spin_lock(&stop_lock);
+> >@@ -693,6 +700,11 @@ static void ipi_cpu_stop(unsigned int cpu)
+> >
+> >  	local_irq_disable();
+> >
+> >+#ifdef CONFIG_KEXEC
+> >+	if (in_crash_kexec)
+> >+		crash_save_cpu(regs, cpu);
+> >+#endif /* CONFIG_KEXEC */
+> >+
+> >  	while (1)
+> >  		cpu_relax();
+> >  }
+> 
+> cpu_relax() is defined as asm("yield"), and this puts all but boot cpu into
+> a infinite loop of nop (actually, whether nop or other depends on hw implementation).
+> Thus all the secondary cpus are still running busy loop even after crash dump kernel
+> has started up, and the chip can potentially get overheated.
+> I ran into this situation when I tested the code on Hikey, and the system was
+> forced to be shut down by thermal driver.
+> 
+> So I'd like to modify the code a bit like:
+> if (in_crash_kernel {
+>     crash_save_cpu(regs, cpu);
+>     while (1)
+>         asm("wfi"); /* irq is disabled here. */
+> }
+> 
+> Does this make sense?
 
-* instead of looping five times for up to 2ms each, loop 100 times
-  around a udelay(20) to hopefully be done earlier. I was going to
-  suggest using time_before(timeout, jiffies) as the condition to
-  wait for, but that doesn't work if called with interrupts disabled.
+It would be even better if we could hotplug them off.
 
-	Arnd
+Will
