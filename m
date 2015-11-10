@@ -1,48 +1,24 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 10 Nov 2015 10:05:48 +0000
-Subject: [PATCH] arm64: add HAVE_LATENCYTOP_SUPPORT config
-In-Reply-To: <20151110074124.GB6672@osiris>
-References: <1446825478-24824-1-git-send-email-yalin.wang2010@gmail.com>
- <20151106160501.GR6087@arm.com>
- <247F438B-3EEA-4550-970E-A649D0E604ED@gmail.com>
- <20151106162109.GT6087@arm.com> <20151110074124.GB6672@osiris>
-Message-ID: <20151110100547.GC31947@arm.com>
+From: dbrignoli@audioscience.com (Delio Brignoli)
+Date: Tue, 10 Nov 2015 11:05:53 +0100
+Subject: Minimal support for dm814x
+In-Reply-To: <20151109150602.GR3199@atomide.com>
+References: <4999BB3D-4BB5-4F7C-96D7-FB687725CDCC@audioscience.com>
+ <20151109150602.GR3199@atomide.com>
+Message-ID: <1DDBDBA3-2330-4247-A4F4-C5960F09A491@audioscience.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Heiko,
+Hi,
 
-On Tue, Nov 10, 2015 at 08:41:24AM +0100, Heiko Carstens wrote:
-> On Fri, Nov 06, 2015 at 04:21:10PM +0000, Will Deacon wrote:
-> > On Sat, Nov 07, 2015 at 12:11:16AM +0800, yalin wang wrote:
-> > > i just enable it on ARM64,
-> > > and it can work,
-> > > i don?t see some special requirement to enable this config .
-> > 
-> > Right, so why does HAVE_LATENCYTOP_SUPPORT exist?
-> 
-> If I remember correctly then the only dependency was that an architecture
-> must have implemented save_stack_trace_tsk().
-> See git commit a3afe70b83fdbbd4d757d2911900d168bc798a31.
+On 09 Nov 2015, at 16:06, Tony Lindgren <tony@atomide.com> wrote:
+> It's now merged to mainline v4.3, so whatever is the current latest tagged
+> mainline kernel release (v4.3 currently) is the one to use from now on
+> natually :) The PLL support is still missing, so it relies on the bootloader
+> configured PLL values for now. I'm hoping to post PLL support patches over
+> next few weeks and then we can have that and more devices working for v4.5.
 
-Thanks for the pointer.
+ack, thanks for the status update.
 
-> So the name of HAVE_LATENCYTOP_SUPPORT is surely a not well chosen, and I
-> think I introduced it back then. Oh, well.
-> 
-> And looking through the kernel there is at least avr32 which would break
-> at build time if the config option would be removed completely.
-> 
-> So.. renaming it to STACKTRACE_TSK_SUPPORT would be a good idea.
-
-ftrace has a similar issue and solves it by having architectures define
-a `config STACKTRACE_SUPPORT' symbol. Over in kernel/trace/Kconfig,
-there's a `select STACKTRACE if STACKTRACE_SUPPORT', which means
-that kernel/stacktrace.c gets built and a dummy (weak symbol) version of
-save_stack_trace_tsk appears.
-
-I don't think adding another STACKTRACE-related Kconfig option is
-necessarily the best thing to do. Maybe we should instead have LATENCYTOP
-depend on STACKTRACE_SUPPORT (already the case) and select STACKTRACE?
-
-Will
+Regards
+--
+Delio
