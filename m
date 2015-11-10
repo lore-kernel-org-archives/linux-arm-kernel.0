@@ -1,57 +1,93 @@
-From: edubezval@gmail.com (Eduardo Valentin)
-Date: Tue, 10 Nov 2015 10:41:22 -0800
-Subject: [PATCH v3 1/2] thermal: mediatek: Add cpu power cooling model.
-In-Reply-To: <20151110112017.GA3551@e104805>
-References: <1445515359-8587-1-git-send-email-dawei.chien@mediatek.com>
- <1445515359-8587-2-git-send-email-dawei.chien@mediatek.com>
- <20151104193958.GC14127@localhost.localdomain>
- <1446721837.4016.57.camel@mtksdaap41>
- <20151106032433.GL3773@ubuntu> <20151110112017.GA3551@e104805>
-Message-ID: <20151110184121.GC5240@localhost.localdomain>
+From: dhdang@apm.com (Duc Dang)
+Date: Tue, 10 Nov 2015 10:42:21 -0800
+Subject: [PATCH v3 2/3] Documentation: mailbox: Add APM X-Gene SLIMpro
+ mailbox dts documentation
+In-Reply-To: <20151110141502.GA14092@rob-hp-laptop>
+References: <1429863912.2927.43.camel@x220>
+ <cover.1447091625.git.dhdang@apm.com>
+ <6be192528afbcc604653a318994ee30fa05a0e05.1447091626.git.dhdang@apm.com>
+ <20151110141502.GA14092@rob-hp-laptop>
+Message-ID: <CADaLND=i5zH1dGNtAVpVFC5uDJ4MgNy1N40ErT2qeiZyw1_cgA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 10, 2015 at 11:20:18AM +0000, Javi Merino wrote:
-> On Fri, Nov 06, 2015 at 08:54:33AM +0530, Viresh Kumar wrote:
-> > Cc'ing Javi (which you should have as he wrote the power-thing for
-> > cpu-cooling).
-> > 
-> > On 05-11-15, 19:10, dawei chien wrote:
-> > > This is because our platform currently only support mt8173_cpufreq.c, so
-> > > that I only add static power model for our owner IC.
-> > 
-> > Bindings are (normally) supposed to be general than a platform
-> > specific.
-> > 
-> > > Please understanding that I wouldn't give a DT binding document since I
-> > > will remove static power table on next version, but I can try to explain
-> > > it.
-> > 
-> > Then just don't add things in the first place.
-> > 
-> > > As far as I know, static power is somewhat leakage of CPU clusters, so
-> > > that we hardly to find a formula, which can suitable all kinds of CPUs
-> > > since leakage is different. In ARM IPA framework, static power only need
-> > > to be defined by who register cpufreq_power_cooling_register. The
-> > > voltage/power table is just one way to present leakage power of CPUs.
-> > 
-> > The bindings don't fix the values for static power, but just provides
-> > a field for platforms to use. Everyone can then send its own power
-> > figures. Why do you thing it can't be generalized?
-> 
-> The way they are described here is useful only for this platform, but
-> it's not generic.  It only takes into account voltage as (I assume)
-> it's the only variable that affects it in this implementation.  A
-> generalized version of the static power should take into account the
-> temperature and the idle state.
+On Tue, Nov 10, 2015 at 6:15 AM, Rob Herring <robh@kernel.org> wrote:
+> On Mon, Nov 09, 2015 at 10:05:44AM -0800, Duc Dang wrote:
+>> This adds the APM X-Gene SLIMpro mailbox device tree
+>> node documentation.
+>>
+>> [dhdang: rebase over 4.3-rc5]
+>> Signed-off-by: Feng Kan <fkan@apm.com>
+>> Signed-off-by: Duc Dang <dhdang@apm.com>
+>> ---
+>>  .../bindings/mailbox/xgene-slimpro-mailbox.txt     | 34 ++++++++++++++++++++++
+>>  1 file changed, 34 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/mailbox/xgene-slimpro-mailbox.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/mailbox/xgene-slimpro-mailbox.txt b/Documentation/devicetree/bindings/mailbox/xgene-slimpro-mailbox.txt
+>> new file mode 100644
+>> index 0000000..d02a3d8
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/mailbox/xgene-slimpro-mailbox.txt
+>> @@ -0,0 +1,34 @@
+>> +The APM X-Gene SLIMpro mailbox is used to communicate messages between
+>> +the ARM64 processors and the Cortex M3 (dubbed SLIMpro). It uses a simple
+>> +interrupt based door bell mechanism and can exchange simple messages using the
+>> +internal registers.
+>> +
+>> +There are total of 7 interrupts in this mailbox. Each used for an individual
+>> +door bell (or mailbox channel).
+>> +
+>> +Required properties:
+>> +- compatible:        Should be as "apm, xgene-slimpro-mbox".
+>                                           ^
+> remove the space
 
-Still, why would we have one binding to describe static power per platform?
+I will fix in next version of the patch.
+>
+>> +
+>> +- reg:               Contain the mailbox register address range.
+>
+> s/Contain/Contains/
 
-I would prefer we go towards a generalized binding description.
+Will change.
+>
+>> +
+>> +- interrupts:        7 interrupts must start from 0 to 6, interrupt 0 define the
+>> +             the interrupt for mailbox channel 0 and interrupt 1 for
+>> +             mailbox channel 1 and so likewise for the reminder.
+>
+> s/start/be/
 
-If temperature is not needed on all platforms, make it an optional
-property.
+Will change.
 
-BR,
+>
+>> +
+>> +- #mbox-cells:       only one to specify the mailbox channel number.
+>> +
+>> +Example:
+>> +
+>> +Mailbox Node:
+>> +             slimpro-mbox: slimpro-mbox at 10540000 {
+>> +                     compatible = "apm,xgene-slimpro-mbox";
+>> +                     reg = <0x0 0x10540000 0x0 0xa000>;
+>> +                     #mbox-cells = <1>;
+>> +                     interrupts =    <0x0 0x0 0x4>,
+>> +                                     <0x0 0x1 0x4>,
+>> +                                     <0x0 0x2 0x4>,
+>> +                                     <0x0 0x3 0x4>,
+>> +                                     <0x0 0x4 0x4>,
+>> +                                     <0x0 0x5 0x4>,
+>> +                                     <0x0 0x6 0x4>,
+>> +             };
+>> --
+>> 1.9.1
+>>
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 
-Eduardo Valentin
+
+Regards,
+Duc Dang.
