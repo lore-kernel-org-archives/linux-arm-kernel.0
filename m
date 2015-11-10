@@ -1,50 +1,58 @@
-From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Tue, 10 Nov 2015 11:27:33 +0000
-Subject: [PATCH v11 2/5] missing include asm/paravirt.h in cputime.c
-In-Reply-To: <20151109173619.GW3604@twins.programming.kicks-ass.net>
-References: <alpine.DEB.2.02.1511051502270.13541@kaball.uk.xensource.com>
- <1446737696-9749-2-git-send-email-stefano.stabellini@eu.citrix.com>
- <20151105164032.GG3604@twins.programming.kicks-ass.net>
- <alpine.DEB.2.02.1511051659580.13541@kaball.uk.xensource.com>
- <20151109173619.GW3604@twins.programming.kicks-ass.net>
-Message-ID: <alpine.DEB.2.02.1511101127090.5676@kaball.uk.xensource.com>
+From: javi.merino@arm.com (Javi Merino)
+Date: Tue, 10 Nov 2015 11:20:18 +0000
+Subject: [PATCH v3 1/2] thermal: mediatek: Add cpu power cooling model.
+In-Reply-To: <20151106032433.GL3773@ubuntu>
+References: <1445515359-8587-1-git-send-email-dawei.chien@mediatek.com>
+ <1445515359-8587-2-git-send-email-dawei.chien@mediatek.com>
+ <20151104193958.GC14127@localhost.localdomain>
+ <1446721837.4016.57.camel@mtksdaap41>
+ <20151106032433.GL3773@ubuntu>
+Message-ID: <20151110112017.GA3551@e104805>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 9 Nov 2015, Peter Zijlstra wrote:
-> On Thu, Nov 05, 2015 at 05:30:01PM +0000, Stefano Stabellini wrote:
-> > On Thu, 5 Nov 2015, Peter Zijlstra wrote:
-> > > How can this be missing? Things compile fine now, right?
-> > 
-> > Fair enough.
-> > 
-> > 
-> > > So please better explain why we do this change.
-> > 
-> > asm/paravirt.h is included by one of the other headers included in
-> > kernel/sched/cputime.c on x86, but not on other architecures. On arm and
-> > arm64, where I am about to introduce asm/paravirt.h and stolen time
-> > support, without #include <asm/paravirt.h> in cputime.c I would get:
-> > 
-> > kernel/sched/cputime.c: In function ?steal_account_process_tick?:
-> > kernel/sched/cputime.c:260:24: error: ?paravirt_steal_enabled? undeclared (first use in this function)
-> >   if (static_key_false(&paravirt_steal_enabled)) {
-> > 
-> > A bit of digging on x86 (using gcc -E on cputime.c) tells me that
-> > asm/paravirt.h is coming from the following include chain:
-> > 
-> > #include <kernel/sched/sched.h>
-> > #include <linux/spinlock.h>
-> > #include <linux/preempt.h>
-> > #include <asm/preempt.h>
-> > #include <linux/thread_info.h>
-> > #include <asm/thread_info.h>
-> > #include <asm/processor.h>
-> > #include <asm/msr.h>
-> > #include <asm/paravirt.h>
+On Fri, Nov 06, 2015 at 08:54:33AM +0530, Viresh Kumar wrote:
+> Cc'ing Javi (which you should have as he wrote the power-thing for
+> cpu-cooling).
 > 
+> On 05-11-15, 19:10, dawei chien wrote:
+> > This is because our platform currently only support mt8173_cpufreq.c, so
+> > that I only add static power model for our owner IC.
 > 
-> Fair enough; a slightly shorter version of that for a changelog will do
-> nicely.
+> Bindings are (normally) supposed to be general than a platform
+> specific.
+> 
+> > Please understanding that I wouldn't give a DT binding document since I
+> > will remove static power table on next version, but I can try to explain
+> > it.
+> 
+> Then just don't add things in the first place.
+> 
+> > As far as I know, static power is somewhat leakage of CPU clusters, so
+> > that we hardly to find a formula, which can suitable all kinds of CPUs
+> > since leakage is different. In ARM IPA framework, static power only need
+> > to be defined by who register cpufreq_power_cooling_register. The
+> > voltage/power table is just one way to present leakage power of CPUs.
+> 
+> The bindings don't fix the values for static power, but just provides
+> a field for platforms to use. Everyone can then send its own power
+> figures. Why do you thing it can't be generalized?
 
-Sure. Can I add your Acked-by to it?
+The way they are described here is useful only for this platform, but
+it's not generic.  It only takes into account voltage as (I assume)
+it's the only variable that affects it in this implementation.  A
+generalized version of the static power should take into account the
+temperature and the idle state.
+
+> > Actually, static power is optional since dynamic power is much more than
+> > static power.
+> 
+> Maybe, we should still capture it.
+> 
+> @Javi ?
+
+It really depends on the platform.  If dawei says that for their
+platform static power is negligible then it is ok to not capture it.
+
+Cheers,
+Javi
