@@ -1,71 +1,40 @@
-From: anton.bondarenko.sama@gmail.com (Anton Bondarenko)
-Date: Tue, 10 Nov 2015 21:20:06 +0100
-Subject: [PATCH v3 2/7] spi: imx: replace fixed timeout with calculated one
-In-Reply-To: <20151105084723.GI8526@pengutronix.de>
-References: <1446388901-6073-1-git-send-email-anton.bondarenko.sama@gmail.com>
- <1446388901-6073-3-git-send-email-anton.bondarenko.sama@gmail.com>
- <20151105084723.GI8526@pengutronix.de>
-Message-ID: <56425176.9060805@gmail.com>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Tue, 10 Nov 2015 15:26:02 -0500
+Subject: [PATCH V2 1/3] scsi: mptxsas: try 64 bit DMA when 32 bit DMA fails
+In-Reply-To: <1447185920.2187.53.camel@HansenPartnership.com>
+References: <1447034266-28003-1-git-send-email-okaya@codeaurora.org>
+ <5349261.sTnZTFhKWB@wuerfel> <56421610.50005@codeaurora.org>
+ <4982446.ZlJVrezq1Y@wuerfel> <56422725.7040809@codeaurora.org>
+ <1447180034.2187.20.camel@HansenPartnership.com>
+ <56424200.9080406@codeaurora.org>
+ <1447184611.2187.45.camel@HansenPartnership.com>
+ <56424BF4.2040207@codeaurora.org>
+ <1447185920.2187.53.camel@HansenPartnership.com>
+Message-ID: <564252DA.5000004@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-On 05.11.2015 09:47, Sascha Hauer wrote:
->> @@ -890,12 +891,40 @@ static void spi_imx_dma_tx_callback(void *cookie)
->>   	complete(&spi_imx->dma_tx_completion);
->>   }
->>
->> +static int spi_imx_calculate_timeout(struct spi_imx_data *spi_imx, int size)
->> +{
->> +	unsigned long coef1 = 1;
->> +	unsigned long coef2 = MSEC_PER_SEC;
->> +	unsigned long timeout = 0;
->> +
->> +	/* Swap coeficients to avoid div by 0 */
->> +	if (spi_imx->spi_bus_clk < MSEC_PER_SEC) {
->> +		coef1 = MSEC_PER_SEC;
->> +		coef2 = 1;
->> +	}
->> +
->> +	/* Time with actual data transfer */
->> +	timeout += DIV_ROUND_UP(8 * size * coef1,
->> +				spi_imx->spi_bus_clk / coef2);
->> +
->> +	/* Take CS change delay related to HW */
->> +	timeout += DIV_ROUND_UP((size - 1) * 4 * coef1,
->> +				spi_imx->spi_bus_clk / coef2);
->> +
->> +	/* Add extra second for scheduler related activities */
->> +	timeout += MSEC_PER_SEC;
->> +
->> +	/* Double calculated timeout */
->> +	return msecs_to_jiffies(2 * timeout);
->> +}
->
-> I think you can simplify this function to:
->
-> 	timeout = size * 8 / spi_imx->spi_bus_clk;
-> 	timeout += 2;
->
-> 	return msecs_to_jiffies(timeout * MSEC_PER_SEC);
->
-> The rationale is that when size * 8 / spi_imx->spi_bus_clk is 0 then we
-> can add another second and be fine. No need to calculate this more
-> accurate, in the end it's important to catch the timeout. If we do this
-> one or two seconds too late doesn't matter.
->
-> Sascha
->
+On 11/10/2015 3:05 PM, James Bottomley wrote:
+> OK, you don't seem to be understanding the problem: the Altix isn't a
+> LSI card, it was a SGI platform.
 
-Sascha,
+Got it.
 
-What about something like this:
-	timeout = size * (8 + 4) / spi_imx->spi_bus_clk;
-	timeout += 2;
+> It was the platform where we first
+> discovered the issue that a lot of storage cards didn't work because it
+> by default had no memory below 4GB.  The reason coherent masks were
+> introduced was initially so the Altix could manufacture and manage a
+> region of memory in the lower 4GB region and we would guarantee to make
+> allocations from it so the storage cards would then work on that
+> platform.
 
-	return msecs_to_jiffies(2 * timeout * MSEC_PER_SEC);
+I can't fix the issue if the card cannot do 64 bit DMA when IOMMU is not 
+there. I need IOMMU enabled all the time for this card.
 
-I think we still need to take into account 4 CLKs between each burst.
-
-Regards, Anton
+-- 
+Sinan Kaya
+Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a 
+Linux Foundation Collaborative Project
