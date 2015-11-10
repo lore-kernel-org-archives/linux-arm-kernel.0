@@ -1,42 +1,217 @@
-From: yingjoe.chen@mediatek.com (Yingjoe Chen)
-Date: Tue, 10 Nov 2015 08:50:53 +0800
-Subject: [PATCH v2 1/2] i2c: mediatek: add i2c first write then read
- optimization
-In-Reply-To: <CAHp75VfutRR0N0bGDYMjFr+nQGFnmuoiA2afvYfuZ2aOy=2qbQ@mail.gmail.com>
-References: <1447047839-5223-1-git-send-email-liguo.zhang@mediatek.com>
- <1447047839-5223-2-git-send-email-liguo.zhang@mediatek.com>
- <CAHp75VfutRR0N0bGDYMjFr+nQGFnmuoiA2afvYfuZ2aOy=2qbQ@mail.gmail.com>
-Message-ID: <1447116653.24760.1.camel@mtksdaap41>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Tue, 10 Nov 2015 10:23:56 +0900
+Subject: [PATCH 11/15] arm64: kdump: implement machine_crash_shutdown()
+In-Reply-To: <2880455fc4abe385d5ed3919efa02177f96f4d93.1446836443.git.geoff@infradead.org>
+References: <cover.1446836442.git.geoff@infradead.org>
+ <2880455fc4abe385d5ed3919efa02177f96f4d93.1446836443.git.geoff@infradead.org>
+Message-ID: <5641472C.9080201@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2015-11-09 at 16:25 +0200, Andy Shevchenko wrote:
-> On Mon, Nov 9, 2015 at 7:43 AM, Liguo Zhang <liguo.zhang@mediatek.com> wrote:
-> > For platform with auto restart support, between every transfer,
-> > i2c controller will trigger an interrupt and SW need to handle
-> > it to start new transfer. When doing write-then-read transfer,
-> > instead of restart mechanism, using WRRD mode to have controller
-> > send both transfer in one request to reduce latency.
-> 
-> 
-> > @@ -518,6 +529,16 @@ static int mtk_i2c_transfer(struct i2c_adapter *adap,
-> >         if (ret)
-> >                 return ret;
-> >
-> > +       i2c->auto_restart = i2c->dev_comp->auto_restart;
-> > +
-> > +       /* checking if we can skip restart and optimize using WRRD mode */
-> > +       if (i2c->auto_restart && num == 2) {
-> > +               if (!(msgs[0].flags & I2C_M_RD) && (msgs[1].flags & I2C_M_RD) &&
-> > +                   msgs[0].addr == msgs[1].addr) {
-> 
-> Nitpick (optional):
-> 
-> ((msgs[0].flags & msgs[1].flags) & I2C_M_RD)
-> ?
+On 11/07/2015 04:14 AM, Geoff Levand wrote:
+> From: AKASHI Takahiro <takahiro.akashi@linaro.org>
+>
+> kdump calls machine_crash_shutdown() to shut down non-boot cpus and
+> save registers' status in per-cpu ELF notes before starting the crash
+> dump kernel. See kernel_kexec().
+>
+> ipi_cpu_stop() is a bit modified and used to support this behavior.
 
-These 2 check for different conditions.
-The original one check the first one must NOT set I2C_M_RD, but second
-one must set I2C_M_RD.
+I've got some concerns of using ipi_cpu_stop().
 
-Joe.C
+> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+> ---
+>   arch/arm64/include/asm/kexec.h    | 34 +++++++++++++++++++++++++++++++++-
+>   arch/arm64/kernel/machine_kexec.c | 31 +++++++++++++++++++++++++++++--
+>   arch/arm64/kernel/smp.c           | 16 ++++++++++++++--
+>   3 files changed, 76 insertions(+), 5 deletions(-)
+>
+> diff --git a/arch/arm64/include/asm/kexec.h b/arch/arm64/include/asm/kexec.h
+> index 46d63cd..555a955 100644
+> --- a/arch/arm64/include/asm/kexec.h
+> +++ b/arch/arm64/include/asm/kexec.h
+> @@ -30,6 +30,8 @@
+>
+>   #if !defined(__ASSEMBLY__)
+>
+> +extern bool in_crash_kexec;
+> +
+>   /**
+>    * crash_setup_regs() - save registers for the panic kernel
+>    *
+> @@ -40,7 +42,37 @@
+>   static inline void crash_setup_regs(struct pt_regs *newregs,
+>   				    struct pt_regs *oldregs)
+>   {
+> -	/* Empty routine needed to avoid build errors. */
+> +	if (oldregs) {
+> +		memcpy(newregs, oldregs, sizeof(*newregs));
+> +	} else {
+> +		__asm__ __volatile__ (
+> +			"stp	 x0,   x1, [%3, #16 *  0]\n"
+> +			"stp	 x2,   x3, [%3, #16 *  1]\n"
+> +			"stp	 x4,   x5, [%3, #16 *  2]\n"
+> +			"stp	 x6,   x7, [%3, #16 *  3]\n"
+> +			"stp	 x8,   x9, [%3, #16 *  4]\n"
+> +			"stp	x10,  x11, [%3, #16 *  5]\n"
+> +			"stp	x12,  x13, [%3, #16 *  6]\n"
+> +			"stp	x14,  x15, [%3, #16 *  7]\n"
+> +			"stp	x16,  x17, [%3, #16 *  8]\n"
+> +			"stp	x18,  x19, [%3, #16 *  9]\n"
+> +			"stp	x20,  x21, [%3, #16 * 10]\n"
+> +			"stp	x22,  x23, [%3, #16 * 11]\n"
+> +			"stp	x24,  x25, [%3, #16 * 12]\n"
+> +			"stp	x26,  x27, [%3, #16 * 13]\n"
+> +			"stp	x28,  x29, [%3, #16 * 14]\n"
+> +			"str	x30,	   [%3, #16 * 15]\n"
+> +			"mov	%0, sp\n"
+> +			"adr	%1, 1f\n"
+> +			"mrs	%2, spsr_el1\n"
+> +		"1:"
+> +			: "=r" (newregs->sp),
+> +			  "=r" (newregs->pc),
+> +			  "=r" (newregs->pstate)
+> +			: "r"  (&newregs->regs)
+> +			: "memory"
+> +		);
+> +	}
+>   }
+>
+>   #endif /* !defined(__ASSEMBLY__) */
+> diff --git a/arch/arm64/kernel/machine_kexec.c b/arch/arm64/kernel/machine_kexec.c
+> index da28a26..d2d7e90 100644
+> --- a/arch/arm64/kernel/machine_kexec.c
+> +++ b/arch/arm64/kernel/machine_kexec.c
+> @@ -9,6 +9,7 @@
+>    * published by the Free Software Foundation.
+>    */
+>
+> +#include <linux/kernel.h>
+>   #include <linux/kexec.h>
+>   #include <linux/of_fdt.h>
+>   #include <linux/slab.h>
+> @@ -23,6 +24,7 @@
+>   extern const unsigned char arm64_relocate_new_kernel[];
+>   extern const unsigned long arm64_relocate_new_kernel_size;
+>
+> +bool in_crash_kexec;
+>   static unsigned long kimage_start;
+>
+>   /**
+> @@ -203,13 +205,38 @@ void machine_kexec(struct kimage *kimage)
+>   	 */
+>
+>   	cpu_soft_restart(virt_to_phys(cpu_reset),
+> -		is_hyp_mode_available(),
+> +		in_crash_kexec ? 0 : is_hyp_mode_available(),
+>   		reboot_code_buffer_phys, kimage->head, kimage_start);
+>
+>   	BUG(); /* Should never get here. */
+>   }
+>
+> +/**
+> + * machine_crash_shutdown - shutdown non-boot cpus and save registers
+> + */
+>   void machine_crash_shutdown(struct pt_regs *regs)
+>   {
+> -	/* Empty routine needed to avoid build errors. */
+> +	struct pt_regs dummy_regs;
+> +	int cpu;
+> +
+> +	local_irq_disable();
+> +
+> +	in_crash_kexec = true;
+> +
+> +	/*
+> +	 * clear and initialize the per-cpu info. This is necessary
+> +	 * because, otherwise, slots for offline cpus would never be
+> +	 * filled up. See smp_send_stop().
+> +	 */
+> +	memset(&dummy_regs, 0, sizeof(dummy_regs));
+> +	for_each_possible_cpu(cpu)
+> +		crash_save_cpu(&dummy_regs, cpu);
+> +
+> +	/* shutdown non-boot cpus */
+> +	smp_send_stop();
+> +
+> +	/* for boot cpu */
+> +	crash_save_cpu(regs, smp_processor_id());
+> +
+> +	pr_info("Starting crashdump kernel...\n");
+>   }
+> diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
+> index dbdaacd..88aec66 100644
+> --- a/arch/arm64/kernel/smp.c
+> +++ b/arch/arm64/kernel/smp.c
+> @@ -37,6 +37,7 @@
+>   #include <linux/completion.h>
+>   #include <linux/of.h>
+>   #include <linux/irq_work.h>
+> +#include <linux/kexec.h>
+>
+>   #include <asm/alternative.h>
+>   #include <asm/atomic.h>
+> @@ -54,6 +55,8 @@
+>   #include <asm/ptrace.h>
+>   #include <asm/virt.h>
+>
+> +#include "cpu-reset.h"
+> +
+>   #define CREATE_TRACE_POINTS
+>   #include <trace/events/ipi.h>
+>
+> @@ -679,8 +682,12 @@ static DEFINE_RAW_SPINLOCK(stop_lock);
+>   /*
+>    * ipi_cpu_stop - handle IPI from smp_send_stop()
+>    */
+> -static void ipi_cpu_stop(unsigned int cpu)
+> +static void ipi_cpu_stop(unsigned int cpu, struct pt_regs *regs)
+>   {
+> +#ifdef CONFIG_KEXEC
+> +	/* printing messages may slow down the shutdown. */
+> +	if (!in_crash_kexec)
+> +#endif
+>   	if (system_state == SYSTEM_BOOTING ||
+>   	    system_state == SYSTEM_RUNNING) {
+>   		raw_spin_lock(&stop_lock);
+> @@ -693,6 +700,11 @@ static void ipi_cpu_stop(unsigned int cpu)
+>
+>   	local_irq_disable();
+>
+> +#ifdef CONFIG_KEXEC
+> +	if (in_crash_kexec)
+> +		crash_save_cpu(regs, cpu);
+> +#endif /* CONFIG_KEXEC */
+> +
+>   	while (1)
+>   		cpu_relax();
+>   }
+
+cpu_relax() is defined as asm("yield"), and this puts all but boot cpu into
+a infinite loop of nop (actually, whether nop or other depends on hw implementation).
+Thus all the secondary cpus are still running busy loop even after crash dump kernel
+has started up, and the chip can potentially get overheated.
+I ran into this situation when I tested the code on Hikey, and the system was
+forced to be shut down by thermal driver.
+
+So I'd like to modify the code a bit like:
+if (in_crash_kernel {
+     crash_save_cpu(regs, cpu);
+     while (1)
+         asm("wfi"); /* irq is disabled here. */
+}
+
+Does this make sense?
+
+-Takahiro AKASHI
+
+> @@ -723,7 +735,7 @@ void handle_IPI(int ipinr, struct pt_regs *regs)
+>
+>   	case IPI_CPU_STOP:
+>   		irq_enter();
+> -		ipi_cpu_stop(cpu);
+> +		ipi_cpu_stop(cpu, regs);
+>   		irq_exit();
+>   		break;
+>
+>
