@@ -1,69 +1,56 @@
-From: iamjoonsoo.kim@lge.com (Joonsoo Kim)
-Date: Tue, 10 Nov 2015 09:19:50 +0900
-Subject: [PATCH] arm64: Increase the max granular size
-In-Reply-To: <20151109183608.GG21606@e104818-lin.cambridge.arm.com>
-References: <1442944788-17254-1-git-send-email-rric@kernel.org>
- <20151105044014.GB20374@js1304-P5Q-DELUXE>
- <20151105103214.GP7637@e104818-lin.cambridge.arm.com>
- <CAAmzW4MR_+0K5JbMMiRu_wVq736zVbz82ugvDYP=x6p=9JuELg@mail.gmail.com>
- <20151105121706.GQ7637@e104818-lin.cambridge.arm.com>
- <CAAmzW4POKyGCFETiR1gRtT0iK+iWH254PGivZDnpjU1CHizgUw@mail.gmail.com>
- <20151109183608.GG21606@e104818-lin.cambridge.arm.com>
-Message-ID: <20151110001949.GA13894@js1304-P5Q-DELUXE>
+From: mpe@ellerman.id.au (Michael Ellerman)
+Date: Tue, 10 Nov 2015 11:21:12 +1100
+Subject: [RFC PATCH 0/3]perf/core: extend perf_reg and
+ perf_sample_regs_intr
+In-Reply-To: <20151106102540.GR3604@twins.programming.kicks-ass.net>
+References: <1446669978-6366-1-git-send-email-maddy@linux.vnet.ibm.com>
+ <20151105130716.GC3604@twins.programming.kicks-ass.net>
+ <563C5655.3000605@linux.vnet.ibm.com>
+ <20151106092430.GO3604@twins.programming.kicks-ass.net>
+ <1446804240.21859.4.camel@ellerman.id.au>
+ <20151106102540.GR3604@twins.programming.kicks-ass.net>
+Message-ID: <1447114872.13889.2.camel@ellerman.id.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 09, 2015 at 06:36:09PM +0000, Catalin Marinas wrote:
-> On Mon, Nov 09, 2015 at 04:41:58PM +0900, Joonsoo Kim wrote:
-> > 2015-11-05 21:17 GMT+09:00 Catalin Marinas <catalin.marinas@arm.com>:
-> > > On Thu, Nov 05, 2015 at 08:45:08PM +0900, Joonsoo Kim wrote:
-> > >> If it isn't possible, is there another way to reduce memory waste due to
-> > >> increase of dma alignment requirement in arm64?
-> > >
-> > > I first need to see how significant the impact is (especially for
-> > > embedded/mobiles platforms).
-> > 
-> > I don't have any ARM64 device. What I have just one report
-> > about slab usage from our developer.
-> > 
-> > The report shows slab usage just after android boot is done
-> > in ARM64.
-> > 
-> > Total slab usage: 90 MB
-> > kmalloc usage: 25 MB
-> > kmalloc (<=64) usage: 7 MB
-> > 
-> > This would be measured without slab_nomerge so there is
-> > a possibility that some usages on kmem_cache is merged
-> > into usage of kmalloc (<=64).
-> > 
-> > Anyway, if ARM64 increase L1_CACHE_BYTES to 128, roughly
-> > 7 MB would be wasted. I don't know how this picture is varied
-> > in runtime, but, even boot time overhead, 7 MB looks large to me.
-> 
-> 7MB is considerable but I guess it wouldn't be all wasted with
-> L1_CACHE_BYTES == 128, maybe half or slightly over. It would be good to
-> know the other kmalloc caches, maybe up to 256.
-> 
-> I don't have an Android filesystem but I just tried to boot Arch
-> (aarch64). Immediately after boot and slab_nomerge, with 128 L1 I get:
-> 
-> kmalloc-128:	6624
-> kmalloc-256:	1488
-> 
-> With L1 64, I get:
-> 
-> kmalloc-64:	5760
-> kmalloc-128:	1152
-> kmalloc-192:	1155
-> kmalloc-256:	 320
-> 
-> So that's about 1.2MB vs 0.8MB. The ratio is 3:2, though I'm not sure it
-> will stay the same as the slab usage increases.
-> 
-> It would be good to get more numbers, we could add a Kconfig option just
-> for specific builds while keeping the default to 128.
+On Fri, 2015-11-06 at 11:25 +0100, Peter Zijlstra wrote:
 
-Okay.
+> On Fri, Nov 06, 2015 at 09:04:00PM +1100, Michael Ellerman wrote:
 
-Thanks.
+> > It's a perrenial request from our hardware PMU folks to be able to see the raw
+> > values of the PMU registers.
+> > 
+> > I think partly it's so that they can verify that perf is doing what they want,
+> > and some of it is that they're interested in some of the more obscure info that
+> > isn't plumbed out through other perf interfaces.
+> > 
+> > We've used various internal hacks over the years to keep them happy. This is an
+> > attempt to use a somewhat standard mechanism.
+> > 
+> > It would also be helpful for those of us working on the perf hardware backends,
+> > to be able to verify that we're programming things correctly, without resorting
+> > to debug printks etc.
+> > 
+> > Basically we want to sample regs at the time of the perf interrupt, so we
+> > though PERF_SAMPLE_REGS_INTR made senes :)
+> > 
+> > But if you think this is the wrong mechanism within perf, then please let us
+> > know.
+> > 
+> > I know perf's mission is to abstract as much of the arcane hardware details
+> > into a generic interface and make PMUs actually useful for normal folks, and we
+> > are committed to that, but it would also be useful to be able to get the raw
+> > values for a different type of user.
+> > 
+> > Maddy's patch only exports PMC1-6 and MMCR0/1. I think we also need to export
+> > some others, in particular MMCRA has a lot of stuff in it, half of which is not
+> > even architected. So that would have to be exported as "POWER8_MMCRA". And then
+> > there's the SIAR/SDAR/SIER which contain a bunch of info on sampled
+> > instructions that is not currently plumbed out.
+> 
+> OK, no objections then. But this is useful information and should be
+> included in the patch set.
+
+Thanks, yeah definitely needs more explanation in the patch set.
+
+cheers
