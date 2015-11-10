@@ -1,64 +1,42 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Tue, 10 Nov 2015 14:56:36 -0500
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 10 Nov 2015 20:56:47 +0100
 Subject: [PATCH V2 1/3] scsi: mptxsas: try 64 bit DMA when 32 bit DMA fails
-In-Reply-To: <1447184611.2187.45.camel@HansenPartnership.com>
+In-Reply-To: <56422725.7040809@codeaurora.org>
 References: <1447034266-28003-1-git-send-email-okaya@codeaurora.org>
- <5349261.sTnZTFhKWB@wuerfel> <56421610.50005@codeaurora.org>
  <4982446.ZlJVrezq1Y@wuerfel> <56422725.7040809@codeaurora.org>
- <1447180034.2187.20.camel@HansenPartnership.com>
- <56424200.9080406@codeaurora.org>
- <1447184611.2187.45.camel@HansenPartnership.com>
-Message-ID: <56424BF4.2040207@codeaurora.org>
+Message-ID: <3742888.Lmg2Y11mdz@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tuesday 10 November 2015 12:19:33 Sinan Kaya wrote:
+> On 11/10/2015 11:47 AM, Arnd Bergmann wrote:
+> > On Tuesday 10 November 2015 11:06:40 Sinan Kaya wrote:
+> >> On 11/10/2015 3:38 AM, Arnd Bergmann wrote:
+> >>   > No, as Timur found, the driver is correct and it intentionally
+> >>> sets the 32-bit mask, and that is guaranteed to work on all sane
+> >>> hardware. Don't change the driver but find a better platform for
+> >>> your workload, or talk to the people that are responsible for
+> >>> the platform and get them to fix it.
+> >>
+> >> Platform does have an IOMMU. No issues there. I am trying to clean out
+> >> the patch pipe I have in order to get this card working with and without
+> >> IOMMU.
+> >
+> > On PowerPC, I think we automatically enable the IOMMU whenever a DMA
+> > mask is set that doesn't cover all of the RAM. We could think about
+> > doing the same thing on ARM64 to make all devices work out of the box.
+> >
+> 
+> The ACPI IORT table declares whether you enable IOMMU for a particular 
+> device or not. The placement of IOMMU HW is system specific. The IORT 
+> table gives the IOMMU HW topology to the operating system.
 
+This sounds odd. Clearly you need to specify the IOMMU settings for each
+possible PCI device independent of whether the OS actually uses the IOMMU
+or not. In a lot of cases, we want to turn it off to get better performance
+when the driver has set a DMA mask that covers all of RAM, but you
+also want to enable the IOMMU for debugging purposes or for device
+assignment if you run virtual machines. The bootloader doesn't know how
+the device is going to be used, so it cannot define the policy here.
 
-On 11/10/2015 2:43 PM, James Bottomley wrote:
-> The Issue, as stated by LSI is
->
->          Initially set the consistent DMA mask to 32 bit and then change
->          it
->          to 64 bit mask after allocating RDPQ pools by calling the
->          function
->          _base_change_consistent_dma_mask. This is to ensure that all the
->          upper 32 bits of RDPQ entries's base address to be same.
->
-
-Need somebody from mpt to confirm that this behavior is still valid for 
-the recent cards besides altix.
-
-> If you set a 64 bit coherent mask before this point, you're benefiting
-> from being lucky that all the upper 32 bits of the allocations are the
-> same ... we can't code a driver to rely on luck.  Particularly not when
-> the failure mode looks like it would be silent and deadly.
-
-Of course nobody wants unreliable code.
-
-I'm wondering if I was just lucky during my testing or the 92xx and 93xx 
-hardware supports full 64 bit range. I don't have any insight into what 
-the endpoint does or what it is capable of.
-
->
->> >Another comment here from you.
->> >https://lkml.org/lkml/2015/4/2/28
->> >
->> >"Well, it was originally a hack for altix, because they had no regions
->> >below 4GB and had to specifically manufacture them.  As you know, in
->> >Linux, if Intel doesn't need it, no-one cares and the implementation
->> >bitrots."
->> >
->> >Maybe, it is time to fix the code for more recent (even decent) hardware?
-> What do you mean "fix the code"?  The code isn't broken, it's
-> parametrising issues with particular hardware.  There's no software work
-> around (except allocating memory with the correct characteristics).
-
-Need confirmation. I'm questioning if we are stuck with this behavior 
-because of altix or something else. If the latter case, the code could 
-have used PCI ID to do something special for it.
-
--- 
-Sinan Kaya
-Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a 
-Linux Foundation Collaborative Project
+	Arnd
