@@ -1,33 +1,40 @@
-From: heiko.carstens@de.ibm.com (Heiko Carstens)
-Date: Tue, 10 Nov 2015 08:41:24 +0100
-Subject: [PATCH] arm64: add HAVE_LATENCYTOP_SUPPORT config
-In-Reply-To: <20151106162109.GT6087@arm.com>
-References: <1446825478-24824-1-git-send-email-yalin.wang2010@gmail.com>
- <20151106160501.GR6087@arm.com>
- <247F438B-3EEA-4550-970E-A649D0E604ED@gmail.com>
- <20151106162109.GT6087@arm.com>
-Message-ID: <20151110074124.GB6672@osiris>
+From: monstr@monstr.eu (Michal Simek)
+Date: Tue, 10 Nov 2015 09:19:33 +0100
+Subject: [PATCH] ARM: dt: zynq: Add labels to cpu nodes to allow
+ overriding OPPs.
+In-Reply-To: <20151109185555.GN6436@xsjsorenbubuntu>
+References: <1447095111-22969-1-git-send-email-moritz.fischer@ettus.com>
+ <20151109185555.GN6436@xsjsorenbubuntu>
+Message-ID: <5641A895.6040200@monstr.eu>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 06, 2015 at 04:21:10PM +0000, Will Deacon wrote:
-> On Sat, Nov 07, 2015 at 12:11:16AM +0800, yalin wang wrote:
-> > i just enable it on ARM64,
-> > and it can work,
-> > i don?t see some special requirement to enable this config .
-> 
-> Right, so why does HAVE_LATENCYTOP_SUPPORT exist?
+On 11/09/2015 07:55 PM, S?ren Brinkmann wrote:
+> On Mon, 2015-11-09 at 10:51AM -0800, Moritz Fischer wrote:
+>> By adding labels to the cpu nodes in the dtsi, a dts that
+>> includes it can change the OPPs by referencing the cpu0
+>> through the label.
+>>
+>> Signed-off-by: Moritz Fischer <moritz.fischer@ettus.com>
+> Reviewed-by: S?ren Brinkmann <soren.brinkmann@xilinx.com>
 
-If I remember correctly then the only dependency was that an architecture
-must have implemented save_stack_trace_tsk().
-See git commit a3afe70b83fdbbd4d757d2911900d168bc798a31.
+Applied to zynq/dt.
 
-So the name of HAVE_LATENCYTOP_SUPPORT is surely a not well chosen, and I
-think I introduced it back then. Oh, well.
+Thanks,
+Michal
 
-And looking through the kernel there is at least avr32 which would break
-at build time if the config option would be removed completely.
+-- 
+Michal Simek, Ing. (M.Eng), OpenPGP -> KeyID: FE3D1F91
+w: www.monstr.eu p: +42-0-721842854
+Maintainer of Linux kernel - Microblaze cpu - http://www.monstr.eu/fdt/
+Maintainer of Linux kernel - Xilinx Zynq ARM architecture
+Microblaze U-BOOT custodian and responsible for u-boot arm zynq platform
 
-So.. renaming it to STACKTRACE_TSK_SUPPORT would be a good idea.
 
-Will do when time permits, unless somebody else volunteers.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 198 bytes
+Desc: OpenPGP digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151110/13189a22/attachment.sig>
