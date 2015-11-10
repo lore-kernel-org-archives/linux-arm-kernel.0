@@ -1,202 +1,59 @@
-From: jungseoklee85@gmail.com (Jungseok Lee)
-Date: Tue, 10 Nov 2015 22:40:41 +0900
-Subject: [PATCH v5 4/6] arm64: insn: add instruction decoders for ldp/stp
- and add/sub
-In-Reply-To: <1446792285-1154-5-git-send-email-takahiro.akashi@linaro.org>
-References: <1446792285-1154-1-git-send-email-takahiro.akashi@linaro.org>
- <1446792285-1154-5-git-send-email-takahiro.akashi@linaro.org>
-Message-ID: <999DB062-D4C8-4050-ADF7-9C6CEEC0BF73@gmail.com>
+From: m.szyprowski@samsung.com (Marek Szyprowski)
+Date: Tue, 10 Nov 2015 14:43:05 +0100
+Subject: [PATCH 1/1] drivers: of: of_reserved_mem: fixup the alignment with
+ CMA setup
+In-Reply-To: <1447158626-7773-1-git-send-email-r64343@freescale.com>
+References: <1447158626-7773-1-git-send-email-r64343@freescale.com>
+Message-ID: <5641F469.2030503@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Nov 6, 2015, at 3:44 PM, AKASHI Takahiro wrote:
-> A function prologue analyzer is a requisite for implementing stack tracer
-> and getting better views of stack usages on arm64.
-> To implement a function prologue analyzer, we have to be able to decode,
-> at least, stp, add, sub and mov instructions.
-> 
-> This patch adds decoders for those instructions, that are used solely
-> by stack tracer for now, but generic enough for other uses.
-> 
-> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+Hello,
+
+On 2015-11-10 13:30, Jason Liu wrote:
+> There is an alignment mismatch issue between the of_reserved_mem and
+> the CMA setup requirement. The of_reserved_mem will try to get the
+> alignment value from the DTS and pass it to __memblock_alloc_base to
+> do the memory block base allocation, but the alignment value specified
+> in the DTS may not satisfy the CAM setup requirement since CMA setup
+> required the alignment as the following in the code:
+>
+> align = PAGE_SIZE << max(MAX_ORDER - 1, pageblock_order);
+>
+> The sanity check in the function of rmem_cma_setup will fail if the
+> alignment does not setup correctly and thus CMA will fail to setup.
+>
+> This patch is to fixup the alignment to meet the CMA setup required.
+>
+> Mailing-list-thread: https://lkml.org/lkml/2015/11/9/138
+> Signed-off-by: Jason Liu <r64343@freescale.com>
+> Cc: Marek Szyprowski <m.szyprowski@samsung.com>
+> Cc: Grant Likely <grant.likely@linaro.org>
+> Cc: Rob Herring <robh+dt@kernel.org>
+
+Acked-by: Marek Szyprowski <m.szyprowski@samsung.com>
+
 > ---
-> arch/arm64/include/asm/insn.h |   18 ++++++++
-> arch/arm64/kernel/insn.c      |  102 +++++++++++++++++++++++++++++++++++++++++
-> 2 files changed, 120 insertions(+)
-> 
-> diff --git a/arch/arm64/include/asm/insn.h b/arch/arm64/include/asm/insn.h
-> index 30e50eb..8d5c538 100644
-> --- a/arch/arm64/include/asm/insn.h
-> +++ b/arch/arm64/include/asm/insn.h
-> @@ -165,6 +165,8 @@ enum aarch64_insn_ldst_type {
-> 	AARCH64_INSN_LDST_STORE_PAIR_PRE_INDEX,
-> 	AARCH64_INSN_LDST_LOAD_PAIR_POST_INDEX,
-> 	AARCH64_INSN_LDST_STORE_PAIR_POST_INDEX,
-> +	AARCH64_INSN_LDST_LOAD_PAIR,
-> +	AARCH64_INSN_LDST_STORE_PAIR,
-> };
-> 
-> enum aarch64_insn_adsb_type {
-> @@ -225,6 +227,8 @@ static __always_inline u32 aarch64_insn_get_##abbr##_value(void) \
-> 
-> __AARCH64_INSN_FUNCS(str_reg,	0x3FE0EC00, 0x38206800)
-> __AARCH64_INSN_FUNCS(ldr_reg,	0x3FE0EC00, 0x38606800)
-> +__AARCH64_INSN_FUNCS(stp,	0x7FC00000, 0x29000000)
-> +__AARCH64_INSN_FUNCS(ldp,	0x7FC00000, 0x29400000)
-> __AARCH64_INSN_FUNCS(stp_post,	0x7FC00000, 0x28800000)
-> __AARCH64_INSN_FUNCS(ldp_post,	0x7FC00000, 0x28C00000)
-> __AARCH64_INSN_FUNCS(stp_pre,	0x7FC00000, 0x29800000)
-> @@ -277,6 +281,7 @@ __AARCH64_INSN_FUNCS(hint,	0xFFFFF01F, 0xD503201F)
-> __AARCH64_INSN_FUNCS(br,	0xFFFFFC1F, 0xD61F0000)
-> __AARCH64_INSN_FUNCS(blr,	0xFFFFFC1F, 0xD63F0000)
-> __AARCH64_INSN_FUNCS(ret,	0xFFFFFC1F, 0xD65F0000)
-> +__AARCH64_INSN_FUNCS(eret,	0xFFFFFFFF, 0xD69F00E0)
+>   drivers/of/of_reserved_mem.c | 4 ++++
+>   1 file changed, 4 insertions(+)
+>
+> diff --git a/drivers/of/of_reserved_mem.c b/drivers/of/of_reserved_mem.c
+> index 62f467b..9394311 100644
+> --- a/drivers/of/of_reserved_mem.c
+> +++ b/drivers/of/of_reserved_mem.c
+> @@ -124,6 +124,10 @@ static int __init __reserved_mem_alloc_size(unsigned long node,
+>   		align = dt_mem_next_cell(dt_root_addr_cells, &prop);
+>   	}
+>   
+> +	/* Need adjust the alignment to satisfy the CMA requirement */
+> +	if (IS_ENABLED(CONFIG_CMA) && of_flat_dt_is_compatible(node, "shared-dma-pool"))
+> +		align = max(align, (phys_addr_t)PAGE_SIZE << max(MAX_ORDER - 1, pageblock_order));
+> +
+>   	prop = of_get_flat_dt_prop(node, "alloc-ranges", &len);
+>   	if (prop) {
+>   
 
-According to C4.2.7, the third argument looks like 0xD69F03E0. Rn field is 11111
-in case of eret.
-
-Best Regards
-Jungseok Lee
-
-> #undef	__AARCH64_INSN_FUNCS
-> 
-> @@ -370,6 +375,19 @@ bool aarch32_insn_is_wide(u32 insn);
-> u32 aarch32_insn_extract_reg_num(u32 insn, int offset);
-> u32 aarch32_insn_mcr_extract_opc2(u32 insn);
-> u32 aarch32_insn_mcr_extract_crm(u32 insn);
-> +int aarch64_insn_decode_add_sub_imm(u32 insn,
-> +				    enum aarch64_insn_register *dst,
-> +				    enum aarch64_insn_register *src,
-> +				    int *imm,
-> +				    enum aarch64_insn_variant *variant,
-> +				    enum aarch64_insn_adsb_type *type);
-> +int aarch64_insn_decode_load_store_pair(u32 insn,
-> +					enum aarch64_insn_register *reg1,
-> +					enum aarch64_insn_register *reg2,
-> +					enum aarch64_insn_register *base,
-> +					int *offset,
-> +					enum aarch64_insn_variant *variant,
-> +					enum aarch64_insn_ldst_type *type);
-> #endif /* __ASSEMBLY__ */
-> 
-> #endif	/* __ASM_INSN_H */
-> diff --git a/arch/arm64/kernel/insn.c b/arch/arm64/kernel/insn.c
-> index c08b9ad..b56a66c 100644
-> --- a/arch/arm64/kernel/insn.c
-> +++ b/arch/arm64/kernel/insn.c
-> @@ -33,6 +33,7 @@
-> #include <asm/insn.h>
-> 
-> #define AARCH64_INSN_SF_BIT	BIT(31)
-> +#define AARCH64_INSN_S_BIT	BIT(29)
-> #define AARCH64_INSN_N_BIT	BIT(22)
-> 
-> static int aarch64_insn_encoding_class[] = {
-> @@ -1141,3 +1142,104 @@ u32 aarch32_insn_mcr_extract_crm(u32 insn)
-> {
-> 	return insn & CRM_MASK;
-> }
-> +
-> +enum aarch64_insn_register aarch64_insn_extract_reg_num(u32 insn,
-> +				enum aarch64_insn_register_type type)
-> +{
-> +	int shift;
-> +
-> +	switch (type) {
-> +	case AARCH64_INSN_REGTYPE_RT:
-> +	case AARCH64_INSN_REGTYPE_RD:
-> +		shift = 0;
-> +		break;
-> +	case AARCH64_INSN_REGTYPE_RN:
-> +		shift = 5;
-> +		break;
-> +	case AARCH64_INSN_REGTYPE_RT2:
-> +	case AARCH64_INSN_REGTYPE_RA:
-> +		shift = 10;
-> +		break;
-> +	case AARCH64_INSN_REGTYPE_RM:
-> +		shift = 16;
-> +		break;
-> +	default:
-> +		pr_err("%s: unknown register type decoding %d\n", __func__,
-> +		       type);
-> +		return ~0L;
-> +	}
-> +
-> +	return (insn & (GENMASK(4, 0) << shift)) >> shift;
-> +}
-> +
-> +int aarch64_insn_decode_add_sub_imm(u32 insn,
-> +				    enum aarch64_insn_register *dst,
-> +				    enum aarch64_insn_register *src,
-> +				    int *imm,
-> +				    enum aarch64_insn_variant *variant,
-> +				    enum aarch64_insn_adsb_type *type)
-> +{
-> +	if (aarch64_insn_is_add_imm(insn))
-> +		*type =	((insn) & AARCH64_INSN_S_BIT) ?
-> +				AARCH64_INSN_ADSB_ADD_SETFLAGS :
-> +				AARCH64_INSN_ADSB_ADD;
-> +	else if (aarch64_insn_is_sub_imm(insn))
-> +		*type =	((insn) & AARCH64_INSN_S_BIT) ?
-> +				AARCH64_INSN_ADSB_SUB_SETFLAGS :
-> +				AARCH64_INSN_ADSB_SUB;
-> +	else
-> +		return 0;
-> +
-> +	*variant = (insn & AARCH64_INSN_SF_BIT) ? AARCH64_INSN_VARIANT_64BIT :
-> +					AARCH64_INSN_VARIANT_32BIT;
-> +
-> +	*dst = aarch64_insn_extract_reg_num(insn, AARCH64_INSN_REGTYPE_RD);
-> +
-> +	*src = aarch64_insn_extract_reg_num(insn, AARCH64_INSN_REGTYPE_RN);
-> +
-> +	/* TODO: ignore shilft field[23:22] */
-> +	*imm = (int)aarch64_insn_decode_immediate(AARCH64_INSN_IMM_12, insn);
-> +
-> +	return 1;
-> +}
-> +
-> +int aarch64_insn_decode_load_store_pair(u32 insn,
-> +					enum aarch64_insn_register *reg1,
-> +					enum aarch64_insn_register *reg2,
-> +					enum aarch64_insn_register *base,
-> +					int *offset,
-> +					enum aarch64_insn_variant *variant,
-> +					enum aarch64_insn_ldst_type *type)
-> +{
-> +	int imm;
-> +
-> +	if (aarch64_insn_is_stp(insn))
-> +		*type = AARCH64_INSN_LDST_STORE_PAIR;
-> +	else if (aarch64_insn_is_stp_post(insn))
-> +		*type = AARCH64_INSN_LDST_STORE_PAIR_POST_INDEX;
-> +	else if (aarch64_insn_is_stp_pre(insn))
-> +		*type = AARCH64_INSN_LDST_STORE_PAIR_PRE_INDEX;
-> +	else if (aarch64_insn_is_ldp(insn))
-> +		*type = AARCH64_INSN_LDST_LOAD_PAIR;
-> +	else if (aarch64_insn_is_ldp_post(insn))
-> +		*type = AARCH64_INSN_LDST_LOAD_PAIR_POST_INDEX;
-> +	else if (aarch64_insn_is_ldp_pre(insn))
-> +		*type = AARCH64_INSN_LDST_LOAD_PAIR_PRE_INDEX;
-> +	else
-> +		return 0;
-> +
-> +	*variant = (insn & AARCH64_INSN_S_BIT) ? AARCH64_INSN_VARIANT_64BIT :
-> +				AARCH64_INSN_VARIANT_32BIT;
-> +
-> +	*reg1 = aarch64_insn_extract_reg_num(insn, AARCH64_INSN_REGTYPE_RT);
-> +
-> +	*reg2 = aarch64_insn_extract_reg_num(insn, AARCH64_INSN_REGTYPE_RT2);
-> +
-> +	*base = aarch64_insn_extract_reg_num(insn, AARCH64_INSN_REGTYPE_RN);
-> +
-> +	imm = (int)aarch64_insn_decode_immediate(AARCH64_INSN_IMM_7, insn);
-> +	asm("sbfm %0, %0, 0, 6" : "+r" (imm));
-> +	*offset = imm * 8;
-> +
-> +	return 1;
-> +}
-> -- 
-> 1.7.9.5
-> 
+Best regards
+-- 
+Marek Szyprowski, PhD
+Samsung R&D Institute Poland
