@@ -1,107 +1,80 @@
 From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Tue, 10 Nov 2015 11:57:55 +0000
-Subject: [PATCH v2 7/7] xen/arm: set the system time in Xen via the
- XENPF_settime64 hypercall
+Date: Tue, 10 Nov 2015 11:57:51 +0000
+Subject: [PATCH v2 3/7] xen/arm: introduce HYPERVISOR_platform_op on arm and
+ arm64
 In-Reply-To: <alpine.DEB.2.02.1511101131350.5676@kaball.uk.xensource.com>
 References: <alpine.DEB.2.02.1511101131350.5676@kaball.uk.xensource.com>
-Message-ID: <1447156675-7418-7-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <1447156675-7418-3-git-send-email-stefano.stabellini@eu.citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
-
-If Linux is running as dom0, call XENPF_settime64 to update the system
-time in Xen on pvclock_gtod notifications.
 
 Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
 
 ---
 
 Changes in v2:
-- properly convert arch_timer ticker to nsec
 - rename dom0_op to platform_op
-- use timespec64 interfaces
-- use XENPF_settime64
 ---
- arch/arm/xen/enlighten.c |   54 +++++++++++++++++++++++++++++++++++++++++++++-
- 1 file changed, 53 insertions(+), 1 deletion(-)
+ arch/arm/include/asm/xen/hypercall.h |    2 ++
+ arch/arm/xen/enlighten.c             |    1 +
+ arch/arm/xen/hypercall.S             |    1 +
+ arch/arm64/xen/hypercall.S           |    1 +
+ 4 files changed, 5 insertions(+)
 
+diff --git a/arch/arm/include/asm/xen/hypercall.h b/arch/arm/include/asm/xen/hypercall.h
+index 712b50e..c3e00d0 100644
+--- a/arch/arm/include/asm/xen/hypercall.h
++++ b/arch/arm/include/asm/xen/hypercall.h
+@@ -35,6 +35,7 @@
+ 
+ #include <xen/interface/xen.h>
+ #include <xen/interface/sched.h>
++#include <xen/interface/platform.h>
+ 
+ long privcmd_call(unsigned call, unsigned long a1,
+ 		unsigned long a2, unsigned long a3,
+@@ -49,6 +50,7 @@ int HYPERVISOR_memory_op(unsigned int cmd, void *arg);
+ int HYPERVISOR_physdev_op(int cmd, void *arg);
+ int HYPERVISOR_vcpu_op(int cmd, int vcpuid, void *extra_args);
+ int HYPERVISOR_tmem_op(void *arg);
++int HYPERVISOR_platform_op(void *arg);
+ int HYPERVISOR_multicall(struct multicall_entry *calls, uint32_t nr);
+ 
+ static inline int
 diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
-index 32675b5..a991b25 100644
+index 15621b1..2f57ba3 100644
 --- a/arch/arm/xen/enlighten.c
 +++ b/arch/arm/xen/enlighten.c
-@@ -28,6 +28,7 @@
- #include <linux/cpufreq.h>
- #include <linux/cpu.h>
- #include <linux/console.h>
-+#include <linux/pvclock_gtod.h>
- #include <linux/timekeeping.h>
- #include <clocksource/arm_arch_timer.h>
+@@ -328,5 +328,6 @@ EXPORT_SYMBOL_GPL(HYPERVISOR_memory_op);
+ EXPORT_SYMBOL_GPL(HYPERVISOR_physdev_op);
+ EXPORT_SYMBOL_GPL(HYPERVISOR_vcpu_op);
+ EXPORT_SYMBOL_GPL(HYPERVISOR_tmem_op);
++EXPORT_SYMBOL_GPL(HYPERVISOR_platform_op);
+ EXPORT_SYMBOL_GPL(HYPERVISOR_multicall);
+ EXPORT_SYMBOL_GPL(privcmd_call);
+diff --git a/arch/arm/xen/hypercall.S b/arch/arm/xen/hypercall.S
+index 10fd99c..d4539f4 100644
+--- a/arch/arm/xen/hypercall.S
++++ b/arch/arm/xen/hypercall.S
+@@ -89,6 +89,7 @@ HYPERCALL2(memory_op);
+ HYPERCALL2(physdev_op);
+ HYPERCALL3(vcpu_op);
+ HYPERCALL1(tmem_op);
++HYPERCALL1(platform_op);
+ HYPERCALL2(multicall);
  
-@@ -125,6 +126,52 @@ static void xen_read_wallclock(struct timespec64 *ts)
+ ENTRY(privcmd_call)
+diff --git a/arch/arm64/xen/hypercall.S b/arch/arm64/xen/hypercall.S
+index 8bbe940..f7d5724 100644
+--- a/arch/arm64/xen/hypercall.S
++++ b/arch/arm64/xen/hypercall.S
+@@ -80,6 +80,7 @@ HYPERCALL2(memory_op);
+ HYPERCALL2(physdev_op);
+ HYPERCALL3(vcpu_op);
+ HYPERCALL1(tmem_op);
++HYPERCALL1(platform_op);
+ HYPERCALL2(multicall);
  
- }
- 
-+static int xen_pvclock_gtod_notify(struct notifier_block *nb,
-+				   unsigned long was_set, void *priv)
-+{
-+	/* Protected by the calling core code serialization */
-+	static struct timespec64 next_sync;
-+
-+	struct xen_platform_op op;
-+	struct timespec64 now;
-+
-+	now = __current_kernel_time64();
-+
-+	/*
-+	 * We only take the expensive HV call when the clock was set
-+	 * or when the 11 minutes RTC synchronization time elapsed.
-+	 */
-+	if (!was_set && timespec64_compare(&now, &next_sync) < 0)
-+		return NOTIFY_OK;
-+
-+	op.interface_version = XENPF_INTERFACE_VERSION;
-+	op.cmd = XENPF_settime64;
-+	op.u.settime64.mbz = 0;
-+	op.u.settime64.secs = now.tv_sec;
-+	op.u.settime64.nsecs = now.tv_nsec;
-+	op.u.settime64.system_time = arch_timer_read_counter() * (u64)NSEC_PER_SEC;
-+	do_div(op.u.settime64.system_time, arch_timer_get_rate());
-+	printk("GTOD: Setting to %llu.%u@%llu\n",
-+	       op.u.settime64.secs,
-+	       op.u.settime64.nsecs,
-+	       op.u.settime64.system_time);
-+	(void)HYPERVISOR_platform_op(&op);
-+
-+	/*
-+	 * Move the next drift compensation time 11 minutes
-+	 * ahead. That's emulating the sync_cmos_clock() update for
-+	 * the hardware RTC.
-+	 */
-+	next_sync = now;
-+	next_sync.tv_sec += 11 * 60;
-+
-+	return NOTIFY_OK;
-+}
-+
-+static struct notifier_block xen_pvclock_gtod_notifier = {
-+	.notifier_call = xen_pvclock_gtod_notify,
-+};
-+
- static void xen_percpu_init(void)
- {
- 	struct vcpu_register_vcpu_info info;
-@@ -323,7 +370,12 @@ static int __init xen_guest_init(void)
- 	pv_time_ops.steal_clock = xen_stolen_accounting;
- 	static_key_slow_inc(&paravirt_steal_enabled);
- 	xen_read_wallclock(&ts);
--	do_settimeofday64(&ts);
-+	if (xen_initial_domain())
-+		pvclock_gtod_register_notifier(&xen_pvclock_gtod_notifier);
-+	else {
-+		xen_read_wallclock(&ts);
-+		do_settimeofday64(&ts);
-+	}
- 
- 	return 0;
- }
+ ENTRY(privcmd_call)
 -- 
 1.7.10.4
