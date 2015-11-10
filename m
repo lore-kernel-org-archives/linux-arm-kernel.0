@@ -1,51 +1,49 @@
-From: rostedt@goodmis.org (Steven Rostedt)
-Date: Tue, 10 Nov 2015 15:28:17 -0500
-Subject: [PATCH] bpf_trace: Make dependent on PERF_EVENTS
-Message-ID: <20151110152817.144195a0@gandalf.local.home>
+From: James.Bottomley@HansenPartnership.com (James Bottomley)
+Date: Tue, 10 Nov 2015 12:35:35 -0800
+Subject: [PATCH V2 1/3] scsi: mptxsas: try 64 bit DMA when 32 bit DMA fails
+In-Reply-To: <564252DA.5000004@codeaurora.org>
+References: <1447034266-28003-1-git-send-email-okaya@codeaurora.org>
+ <5349261.sTnZTFhKWB@wuerfel> <56421610.50005@codeaurora.org>
+ <4982446.ZlJVrezq1Y@wuerfel> <56422725.7040809@codeaurora.org>
+ <1447180034.2187.20.camel@HansenPartnership.com>
+ <56424200.9080406@codeaurora.org>
+ <1447184611.2187.45.camel@HansenPartnership.com>
+ <56424BF4.2040207@codeaurora.org>
+ <1447185920.2187.53.camel@HansenPartnership.com>
+ <564252DA.5000004@codeaurora.org>
+Message-ID: <1447187735.2187.58.camel@HansenPartnership.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Tue, 2015-11-10 at 15:26 -0500, Sinan Kaya wrote:
+> 
+> On 11/10/2015 3:05 PM, James Bottomley wrote:
+> > OK, you don't seem to be understanding the problem: the Altix isn't a
+> > LSI card, it was a SGI platform.
+> 
+> Got it.
+> 
+> > It was the platform where we first
+> > discovered the issue that a lot of storage cards didn't work because it
+> > by default had no memory below 4GB.  The reason coherent masks were
+> > introduced was initially so the Altix could manufacture and manage a
+> > region of memory in the lower 4GB region and we would guarantee to make
+> > allocations from it so the storage cards would then work on that
+> > platform.
+> 
+> I can't fix the issue if the card cannot do 64 bit DMA when IOMMU is not 
+> there. I need IOMMU enabled all the time for this card.
 
-Arnd Bergmann reported:
+That depends on the limitations of your platform.  The Altix only used
+an iommu to manufacture the coherent memory for the descriptors, but the
+card itself mostly operated in bypass mode (using 64 bit physical
+addresses rather than iommu remapped ones), so all accesses except for
+the few firmware descriptor ones didn't use an iommu.  Apparently this
+was for performance reasons.
 
-  In my ARM randconfig tests, I'm getting a build error for
-  newly added code in bpf_perf_event_read and bpf_perf_event_output
-  whenever CONFIG_PERF_EVENTS is disabled:
+So, to recap, the card itself *can* do 64 bit DMA.  The limitation is
+that the RDPQ descriptors need to be all in the same region of 4G memory
+and the way the driver ensures this is to set the 64 bit coherent mask
+after using the 32 bit one to allocate the RDPQ pools.
 
-  kernel/trace/bpf_trace.c: In function 'bpf_perf_event_read':
-  kernel/trace/bpf_trace.c:203:11: error: 'struct perf_event' has no member named 'oncpu'
-  if (event->oncpu != smp_processor_id() ||
-           ^
-  kernel/trace/bpf_trace.c:204:11: error: 'struct perf_event' has no member named 'pmu'
-        event->pmu->count)
-
-  This can happen when UPROBE_EVENT is enabled but KPROBE_EVENT
-  is disabled. I'm not sure if that is a configuration we care
-  about, otherwise we could prevent this case from occuring by
-  adding Kconfig dependencies.
-
-Looking at this further, it's really that UPROBE_EVENT enables PERF_EVENTS.
-By just having BPF_EVENTS depend on PERF_EVENTS, then all is fine.
-
-Link: http://lkml.kernel.org/r/4525348.Aq9YoXkChv at wuerfel
-Reported-by: Arnd Bergmann <arnd@arndb.de>
-Signed-off-by: Steven Rostedt <rostedt@goodmis.org>
----
- kernel/trace/Kconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/kernel/trace/Kconfig b/kernel/trace/Kconfig
-index 8d6363f42169..e45db6b0d878 100644
---- a/kernel/trace/Kconfig
-+++ b/kernel/trace/Kconfig
-@@ -434,7 +434,7 @@ config UPROBE_EVENT
- 
- config BPF_EVENTS
- 	depends on BPF_SYSCALL
--	depends on KPROBE_EVENT || UPROBE_EVENT
-+	depends on (KPROBE_EVENT || UPROBE_EVENT) && PERF_EVENTS
- 	bool
- 	default y
- 	help
--- 
-1.8.3.1
+James
