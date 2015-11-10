@@ -1,44 +1,49 @@
-From: heiko.carstens@de.ibm.com (Heiko Carstens)
-Date: Tue, 10 Nov 2015 12:34:08 +0100
-Subject: [PATCH] arm64: add HAVE_LATENCYTOP_SUPPORT config
-In-Reply-To: <20151110111829.GD31947@arm.com>
-References: <1446825478-24824-1-git-send-email-yalin.wang2010@gmail.com>
- <20151106160501.GR6087@arm.com>
- <247F438B-3EEA-4550-970E-A649D0E604ED@gmail.com>
- <20151106162109.GT6087@arm.com> <20151110074124.GB6672@osiris>
- <20151110100547.GC31947@arm.com> <20151110110145.GE6672@osiris>
- <20151110111829.GD31947@arm.com>
-Message-ID: <20151110113408.GF6672@osiris>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 10 Nov 2015 11:35:05 +0000
+Subject: [V3 PATCH] arm64: remove redundant FRAME_POINTER kconfig option
+ and force to select it
+In-Reply-To: <49B0431C-4FDA-45CB-82AF-FA010197118D@gmail.com>
+References: <1447092595-12644-1-git-send-email-yang.shi@linaro.org>
+ <20151110103752.GH21606@e104818-lin.cambridge.arm.com>
+ <49B0431C-4FDA-45CB-82AF-FA010197118D@gmail.com>
+Message-ID: <20151110113505.GI21606@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> From: Will Deacon <will.deacon@arm.com>
-> Date: Tue, 10 Nov 2015 11:10:04 +0000
-> Subject: [PATCH] Kconfig: remove HAVE_LATENCYTOP_SUPPORT
-> 
-> As illustrated by a3afe70b83fd ("[S390] latencytop s390 support."),
-> HAVE_LATENCYTOP_SUPPORT is defined by an architecture to advertise an
-> implementation of save_stack_trace_tsk.
-> 
-> However, as of 9212ddb5eada ("stacktrace: provide save_stack_trace_tsk()
-> weak alias") a dummy implementation is provided if STACKTRACE=y.
-> Given that LATENCYTOP already depends on STACKTRACE_SUPPORT and selects
-> STACKTRACE, we can remove HAVE_LATENCYTOP_SUPPORT altogether.
-> 
-> Signed-off-by: Will Deacon <will.deacon@arm.com>
-> ---
->  arch/arc/Kconfig        | 3 ---
->  arch/arm/Kconfig        | 5 -----
->  arch/metag/Kconfig      | 3 ---
->  arch/microblaze/Kconfig | 3 ---
->  arch/parisc/Kconfig     | 3 ---
->  arch/powerpc/Kconfig    | 3 ---
->  arch/s390/Kconfig       | 3 ---
->  arch/sh/Kconfig         | 3 ---
->  arch/sparc/Kconfig      | 4 ----
->  arch/unicore32/Kconfig  | 3 ---
->  arch/x86/Kconfig        | 3 ---
->  lib/Kconfig.debug       | 1 -
->  12 files changed, 37 deletions(-)
+On Tue, Nov 10, 2015 at 07:09:00PM +0800, yalin wang wrote:
+> > On Nov 10, 2015, at 18:37, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> > 
+> > On Mon, Nov 09, 2015 at 10:09:55AM -0800, Yang Shi wrote:
+> >> FRAME_POINTER  is defined in lib/Kconfig.debug, it is unnecessary to redefine
+> >> it in arch/arm64/Kconfig.debug. Actually, the one defined in arm64 directory
+> >> is never used.
+> > 
+> > That's not true since the arm64 definition seems to take precedence.
+> > 
+> >> This adds a dependency on DEBUG_KERNEL for building with frame pointers.
+> > 
+> > It doesn't because arm64 selects ARCH_WANT_FRAME_POINTERS.
+> > 
+> >> ARM64 depends on frame pointer to get correct stack backtrace and need
+> >> FRAME_POINTER kconfig option enabled all the time.
+> >> However, currect implementation makes it could be disabled, so force it
+> >> to be selected by ARM64.
+> >> 
+> >> Signed-off-by: Yang Shi <yang.shi@linaro.org>
+> > 
+> > Patch applied but I changed the commit log slightly. Thanks.
+> i have a question,
+> why FRAME_POINTER  config must be enabled ?
+> and i see ARM arch can  disable this config .
+> if i don?t need stack trace dump and the software release is for 
+> final product , don?t need debug stack trace log .
+> is it possible to disable it for performance reason ?
 
-Acked-by: Heiko Carstens <heiko.carstens@de.ibm.com>
+If you don't need any stack trace, perf etc., in theory you can disable
+the option. However, the aarch64 gcc compiler always generates it (I'm
+not sure whether the AAPCS mandates it). Anyway, the performance impact
+is very small since there are more general purpose registers available
+in AArch64 already.
+
+-- 
+Catalin
