@@ -1,63 +1,77 @@
-From: koro.chen@mediatek.com (Koro Chen)
-Date: Tue, 10 Nov 2015 15:26:12 +0800
-Subject: [PATCH] ASoC: mediatek: Move 22M/24M clock control into I2S ops
-Message-ID: <1447140372-10048-1-git-send-email-koro.chen@mediatek.com>
+From: sugar.zhang@rock-chips.com (Sugar Zhang)
+Date: Tue, 10 Nov 2015 15:32:09 +0800
+Subject: [PATCH 3/3] ARM: dts: rockchip: add channels properties for i2s
+In-Reply-To: <1447140729-18267-1-git-send-email-sugar.zhang@rock-chips.com>
+References: <1447140729-18267-1-git-send-email-sugar.zhang@rock-chips.com>
+Message-ID: <1447140729-18267-4-git-send-email-sugar.zhang@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-22M/24M clocks are only required for I2S, so move the control to
-I2S DAI ops.
+add playback and capture properties to compatible various chips.
 
-Signed-off-by: Koro Chen <koro.chen@mediatek.com>
+Signed-off-by: Sugar Zhang <sugar.zhang@rock-chips.com>
 ---
- sound/soc/mediatek/mtk-afe-pcm.c |   13 ++++++-------
- 1 file changed, 6 insertions(+), 7 deletions(-)
+ arch/arm/boot/dts/rk3066a.dtsi | 6 ++++++
+ arch/arm/boot/dts/rk3188.dtsi  | 2 ++
+ arch/arm/boot/dts/rk3288.dtsi  | 2 ++
+ 3 files changed, 10 insertions(+)
 
-diff --git a/sound/soc/mediatek/mtk-afe-pcm.c b/sound/soc/mediatek/mtk-afe-pcm.c
-index f5baf3c..7f71343 100644
---- a/sound/soc/mediatek/mtk-afe-pcm.c
-+++ b/sound/soc/mediatek/mtk-afe-pcm.c
-@@ -299,8 +299,6 @@ static int mtk_afe_dais_enable_clks(struct mtk_afe *afe,
- 			dev_err(afe->dev, "Failed to enable m_ck\n");
- 			return ret;
- 		}
--		regmap_update_bits(afe->regmap, AUDIO_TOP_CON0,
--				   AUD_TCON0_PDN_22M | AUD_TCON0_PDN_24M, 0);
- 	}
+diff --git a/arch/arm/boot/dts/rk3066a.dtsi b/arch/arm/boot/dts/rk3066a.dtsi
+index 946f187..1003f9c 100644
+--- a/arch/arm/boot/dts/rk3066a.dtsi
++++ b/arch/arm/boot/dts/rk3066a.dtsi
+@@ -103,6 +103,8 @@
+ 		dma-names = "tx", "rx";
+ 		clock-names = "i2s_hclk", "i2s_clk";
+ 		clocks = <&cru HCLK_I2S0>, <&cru SCLK_I2S0>;
++		rockchip,playback-channels = <8>;
++		rockchip,capture-channels = <2>;
+ 		status = "disabled";
+ 	};
  
- 	if (b_ck) {
-@@ -340,12 +338,8 @@ static int mtk_afe_dais_set_clks(struct mtk_afe *afe,
- static void mtk_afe_dais_disable_clks(struct mtk_afe *afe,
- 				      struct clk *m_ck, struct clk *b_ck)
- {
--	if (m_ck) {
--		regmap_update_bits(afe->regmap, AUDIO_TOP_CON0,
--				   AUD_TCON0_PDN_22M | AUD_TCON0_PDN_24M,
--				   AUD_TCON0_PDN_22M | AUD_TCON0_PDN_24M);
-+	if (m_ck)
- 		clk_disable_unprepare(m_ck);
--	}
- 	if (b_ck)
- 		clk_disable_unprepare(b_ck);
- }
-@@ -360,6 +354,8 @@ static int mtk_afe_i2s_startup(struct snd_pcm_substream *substream,
- 		return 0;
+@@ -118,6 +120,8 @@
+ 		dma-names = "tx", "rx";
+ 		clock-names = "i2s_hclk", "i2s_clk";
+ 		clocks = <&cru HCLK_I2S1>, <&cru SCLK_I2S1>;
++		rockchip,playback-channels = <2>;
++		rockchip,capture-channels = <2>;
+ 		status = "disabled";
+ 	};
  
- 	mtk_afe_dais_enable_clks(afe, afe->clocks[MTK_CLK_I2S1_M], NULL);
-+	regmap_update_bits(afe->regmap, AUDIO_TOP_CON0,
-+			   AUD_TCON0_PDN_22M | AUD_TCON0_PDN_24M, 0);
- 	return 0;
- }
+@@ -133,6 +137,8 @@
+ 		dma-names = "tx", "rx";
+ 		clock-names = "i2s_hclk", "i2s_clk";
+ 		clocks = <&cru HCLK_I2S2>, <&cru SCLK_I2S2>;
++		rockchip,playback-channels = <2>;
++		rockchip,capture-channels = <2>;
+ 		status = "disabled";
+ 	};
  
-@@ -373,6 +369,9 @@ static void mtk_afe_i2s_shutdown(struct snd_pcm_substream *substream,
- 		return;
+diff --git a/arch/arm/boot/dts/rk3188.dtsi b/arch/arm/boot/dts/rk3188.dtsi
+index 3163042..b9b6b3a 100644
+--- a/arch/arm/boot/dts/rk3188.dtsi
++++ b/arch/arm/boot/dts/rk3188.dtsi
+@@ -118,6 +118,8 @@
+ 		dma-names = "tx", "rx";
+ 		clock-names = "i2s_hclk", "i2s_clk";
+ 		clocks = <&cru HCLK_I2S0>, <&cru SCLK_I2S0>;
++		rockchip,playback-channels = <2>;
++		rockchip,capture-channels = <2>;
+ 		status = "disabled";
+ 	};
  
- 	mtk_afe_set_i2s_enable(afe, false);
-+	regmap_update_bits(afe->regmap, AUDIO_TOP_CON0,
-+			   AUD_TCON0_PDN_22M | AUD_TCON0_PDN_24M,
-+			   AUD_TCON0_PDN_22M | AUD_TCON0_PDN_24M);
- 	mtk_afe_dais_disable_clks(afe, afe->clocks[MTK_CLK_I2S1_M], NULL);
+diff --git a/arch/arm/boot/dts/rk3288.dtsi b/arch/arm/boot/dts/rk3288.dtsi
+index 4e7c6b7..e7ce9f1 100644
+--- a/arch/arm/boot/dts/rk3288.dtsi
++++ b/arch/arm/boot/dts/rk3288.dtsi
+@@ -669,6 +669,8 @@
+ 		clocks = <&cru HCLK_I2S0>, <&cru SCLK_I2S0>;
+ 		pinctrl-names = "default";
+ 		pinctrl-0 = <&i2s0_bus>;
++		rockchip,playback-channels = <8>;
++		rockchip,capture-channels = <2>;
+ 		status = "disabled";
+ 	};
  
- 	/* disable AFE */
 -- 
-1.7.9.5
+2.3.6
