@@ -1,40 +1,61 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Tue, 10 Nov 2015 10:55:49 -0500 (EST)
-Subject: [PATCH v2 1/7] timekeeping: introduce __current_kernel_time64
-In-Reply-To: <CALAqxLU35iSG8dCgkKi9v_mM=xO1p1jWAhq3nX6_CAYcjUYoZQ@mail.gmail.com>
-References: <alpine.DEB.2.02.1511101131350.5676@kaball.uk.xensource.com>
- <1447156675-7418-1-git-send-email-stefano.stabellini@eu.citrix.com>
- <4372800.FdTygmcuyo@wuerfel>
- <alpine.DEB.2.02.1511101507540.5676@kaball.uk.xensource.com>
- <CALAqxLUEOWP6CJxY021nDR6cEQf3VZtm8fa9waK2a=OmQJEO-g@mail.gmail.com>
- <alpine.DEB.2.11.1511101028320.3915@nanos>
- <CALAqxLU35iSG8dCgkKi9v_mM=xO1p1jWAhq3nX6_CAYcjUYoZQ@mail.gmail.com>
-Message-ID: <alpine.DEB.2.11.1511101046420.3915@nanos>
+From: timur@codeaurora.org (Timur Tabi)
+Date: Tue, 10 Nov 2015 09:57:10 -0600
+Subject: [PATCH] pinctrl: qcom: qdf2xxx: improve error checking and reporting
+Message-ID: <1447171030-15056-1-git-send-email-timur@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 10 Nov 2015, John Stultz wrote:
-> I'm sort of objecting to a different issue, where the
-> __current_kernel_time() implementation probably shouldn't be grabbing
-> the tk_core.timekeeper directly, and instead should take a passed
-> pointer to a timekeeper. The vdso/pv_clock usage should have a
-> timekeeper passed to them that they could use.
+The driver doesn't report an error message if the ACPI tables are missing
+the num-gpios property (which indicates how many GPIOs there are on this
+SOC), and it didn't check to ensure that the mallocs didn't fail.
 
-That usage of __current_kernel_time() in that xen notifier is silly to
-begin with. The notifier gets already called with a pointer to the
-time keeper. That xen implementation just does not use it.
+Signed-off-by: Timur Tabi <timur@codeaurora.org>
+---
+ drivers/pinctrl/qcom/pinctrl-qdf2xxx.c | 14 +++++++++++---
+ 1 file changed, 11 insertions(+), 3 deletions(-)
 
-We extract exactly that information in the vdso updates without
-calling back into the core code. So for solving that xen thing we do
-not need a 64 bit variant of __current_kernel_time() at all. The
-notifier has the pointer to the timekeeper and can just grab data from
-there.
-
-> There's one useage in kdb thats maybe problematic, so maybe this will
-> need a deeper cleanup.
-
-That one is silly as well. It only wants to know the seconds portion.
-
-Thanks,
-
-	tglx
+diff --git a/drivers/pinctrl/qcom/pinctrl-qdf2xxx.c b/drivers/pinctrl/qcom/pinctrl-qdf2xxx.c
+index e9ff3bc..f448534 100644
+--- a/drivers/pinctrl/qcom/pinctrl-qdf2xxx.c
++++ b/drivers/pinctrl/qcom/pinctrl-qdf2xxx.c
+@@ -32,6 +32,9 @@
+ 
+ static struct msm_pinctrl_soc_data qdf2xxx_pinctrl;
+ 
++/* A reasonable limit to the number of GPIOS */
++#define MAX_GPIOS	256
++
+ static int qdf2xxx_pinctrl_probe(struct platform_device *pdev)
+ {
+ 	struct pinctrl_pin_desc *pins;
+@@ -42,11 +45,13 @@ static int qdf2xxx_pinctrl_probe(struct platform_device *pdev)
+ 
+ 	/* Query the number of GPIOs from ACPI */
+ 	ret = device_property_read_u32(&pdev->dev, "num-gpios", &num_gpios);
+-	if (ret < 0)
++	if (ret < 0) {
++		dev_warn(&pdev->dev, "missing num-gpios property\n");
+ 		return ret;
++	}
+ 
+-	if (!num_gpios) {
+-		dev_warn(&pdev->dev, "missing num-gpios property\n");
++	if (!num_gpios || num_gpios > MAX_GPIOS) {
++		dev_warn(&pdev->dev, "invalid num-gpios property\n");
+ 		return -ENODEV;
+ 	}
+ 
+@@ -55,6 +60,9 @@ static int qdf2xxx_pinctrl_probe(struct platform_device *pdev)
+ 	groups = devm_kcalloc(&pdev->dev, num_gpios,
+ 		sizeof(struct msm_pingroup), GFP_KERNEL);
+ 
++	if (!pins || !groups)
++		return -ENOMEM;
++
+ 	for (i = 0; i < num_gpios; i++) {
+ 		pins[i].number = i;
+ 
+-- 
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project.
