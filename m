@@ -1,60 +1,99 @@
-From: yalin.wang2010@gmail.com (yalin wang)
-Date: Tue, 10 Nov 2015 19:43:35 +0800
-Subject: [V3 PATCH] arm64: remove redundant FRAME_POINTER kconfig option
- and force to select it
-In-Reply-To: <20151110113505.GI21606@e104818-lin.cambridge.arm.com>
-References: <1447092595-12644-1-git-send-email-yang.shi@linaro.org>
- <20151110103752.GH21606@e104818-lin.cambridge.arm.com>
- <49B0431C-4FDA-45CB-82AF-FA010197118D@gmail.com>
- <20151110113505.GI21606@e104818-lin.cambridge.arm.com>
-Message-ID: <D0F23548-7A9E-4D3A-8FBD-1D8DA6FFAA26@gmail.com>
+From: pankaj.dubey@samsung.com (Pankaj Dubey)
+Date: Tue, 10 Nov 2015 17:12:55 +0530
+Subject: [PATCH v4 0/9] samsung: pmu: split up SoC specific PMU data
+Message-ID: <1447155784-12667-1-git-send-email-pankaj.dubey@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+This patch series is a part of continuation work from following series
+[1], [2] and [3]
 
-> On Nov 10, 2015, at 19:35, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> 
-> On Tue, Nov 10, 2015 at 07:09:00PM +0800, yalin wang wrote:
->>> On Nov 10, 2015, at 18:37, Catalin Marinas <catalin.marinas@arm.com> wrote:
->>> 
->>> On Mon, Nov 09, 2015 at 10:09:55AM -0800, Yang Shi wrote:
->>>> FRAME_POINTER  is defined in lib/Kconfig.debug, it is unnecessary to redefine
->>>> it in arch/arm64/Kconfig.debug. Actually, the one defined in arm64 directory
->>>> is never used.
->>> 
->>> That's not true since the arm64 definition seems to take precedence.
->>> 
->>>> This adds a dependency on DEBUG_KERNEL for building with frame pointers.
->>> 
->>> It doesn't because arm64 selects ARCH_WANT_FRAME_POINTERS.
->>> 
->>>> ARM64 depends on frame pointer to get correct stack backtrace and need
->>>> FRAME_POINTER kconfig option enabled all the time.
->>>> However, currect implementation makes it could be disabled, so force it
->>>> to be selected by ARM64.
->>>> 
->>>> Signed-off-by: Yang Shi <yang.shi@linaro.org>
->>> 
->>> Patch applied but I changed the commit log slightly. Thanks.
->> i have a question,
->> why FRAME_POINTER  config must be enabled ?
->> and i see ARM arch can  disable this config .
->> if i don?t need stack trace dump and the software release is for 
->> final product , don?t need debug stack trace log .
->> is it possible to disable it for performance reason ?
-> 
-> If you don't need any stack trace, perf etc., in theory you can disable
-> the option. However, the aarch64 gcc compiler always generates it (I'm
-> not sure whether the AAPCS mandates it). Anyway, the performance impact
-> is very small since there are more general purpose registers available
-> in AArch64 already.
-> 
-i just make a test with -fomit-frame-pointer,  seems gcc can generate code without frame pointer,
-like ARM arch.
-version:
-aarch64-linux-gnu-gcc
-gcc version 4.9.2 20140904 (prerelease) (crosstool-NG linaro-1.13.1-4.9-2014.09 - Linaro GCC 4.9-2014.09)
+1: exynos: Move pmu driver to driver/soc folder and add exynos7 support
+   http://www.spinics.net/lists/linux-samsung-soc/msg39797.html from Amit Daniel Kacchap
+2: soc: samsung: pmu: split up SoC specific PMU data
+   https://lkml.org/lkml/2015/1/7/12 from me
+3: https://lkml.org/lkml/2015/10/26/245
 
-why AARCH64 don?t have frame unwind info just like ARM arch?
+In this series I am splitting up SoC specific PMU configuration data into
+mach-exynos folder itself, before moving all of them under
+drivers/soc/samsung/. Also instead of making all changes in single patch it
+has been broken into SoC specific patches to avoid large size of patch.
+With this approach there will not be unwanted big churns just after
+adding exynos-pmu under drivers/soc/samsung.
 
-Thanks
+All these patches are just refactoring to keep minimal changes while moving
+exynos-pmu driver under drivers/soc/samsung/. Support for exynos7 PMU can
+be added on top of it, in such a manner that for ARM64 build, ARM related
+SoC's PMU will not get compiled and thus unnecessary increasing kernel image size.
+
+I have tested on Peach-Pi (Exynos5880) based chromebook for boot
+and S2R functionality.
+
+These patches have been prepared on top of Kukjin Kim's for-next and on top of
+cherry-picked change from [4].
+
+4: ARM: EXYNOS: Constify local exynos_pmu_data structure
+   https://lkml.org/lkml/2015/10/28/917
+
+Changes since v3:
+ - Keeping intact copyright dates in existing header files.
+ - Addressed review comments from Krzysztof for v3.
+ - Removing static inline function from exynos-pmu.h and
+   keeping them in PMU driver.
+ - Added new patch (2/9) for fixing potential null pointer reference in
+   exynos_sys_powerdown_conf.
+ - Added new patch (8/9) for rearranging static and non-static function for
+   better readability.
+
+Changes since v2:
+ - Removed Amit's Samsung id as it's no more valid.
+ - Rebased on latest kgene tree.
+ - Removed redundant code from regs-pmu.h
+
+Pankaj Dubey (9):
+  ARM: EXYNOS: removing redundant code from regs-pmu.h
+  ARM: EXYNOS: Fix potential NULL pointer access in
+    exynos_sys_powerdown_conf
+  ARM: EXYNOS: Move pmu specific headers under "linux/soc/samsung"
+  ARM: EXYNOS: split up exynos3250 SoC specific PMU data
+  ARM: EXYNOS: split up exynos4 SoC specific PMU data
+  ARM: EXYNOS: split up exynos5250 SoC specific PMU data
+  ARM: EXYNOS: split up exynos5420 SoC specific PMU data
+  ARM: EXYNOS: rearrange static and non-static functions of PMU driver
+  drivers: soc: Add support for Exynos PMU driver
+
+ arch/arm/mach-exynos/Kconfig                |    1 +
+ arch/arm/mach-exynos/Makefile               |    2 +-
+ arch/arm/mach-exynos/exynos-pmu.h           |   24 -
+ arch/arm/mach-exynos/exynos.c               |    4 +-
+ arch/arm/mach-exynos/mcpm-exynos.c          |    2 +-
+ arch/arm/mach-exynos/platsmp.c              |    2 +-
+ arch/arm/mach-exynos/pm.c                   |    4 +-
+ arch/arm/mach-exynos/pmu.c                  | 1004 ---------------------------
+ arch/arm/mach-exynos/regs-pmu.h             |  702 -------------------
+ arch/arm/mach-exynos/suspend.c              |    4 +-
+ drivers/soc/samsung/Kconfig                 |    4 +
+ drivers/soc/samsung/Makefile                |    4 +
+ drivers/soc/samsung/exynos-pmu.c            |  183 +++++
+ drivers/soc/samsung/exynos-pmu.h            |   45 ++
+ drivers/soc/samsung/exynos3250-pmu.c        |  175 +++++
+ drivers/soc/samsung/exynos4-pmu.c           |  223 ++++++
+ drivers/soc/samsung/exynos5250-pmu.c        |  196 ++++++
+ drivers/soc/samsung/exynos5420-pmu.c        |  280 ++++++++
+ include/linux/soc/samsung/exynos-pmu.h      |   24 +
+ include/linux/soc/samsung/exynos-regs-pmu.h |  693 ++++++++++++++++++
+ 20 files changed, 1836 insertions(+), 1740 deletions(-)
+ delete mode 100644 arch/arm/mach-exynos/exynos-pmu.h
+ delete mode 100644 arch/arm/mach-exynos/pmu.c
+ delete mode 100644 arch/arm/mach-exynos/regs-pmu.h
+ create mode 100644 drivers/soc/samsung/exynos-pmu.c
+ create mode 100644 drivers/soc/samsung/exynos-pmu.h
+ create mode 100644 drivers/soc/samsung/exynos3250-pmu.c
+ create mode 100644 drivers/soc/samsung/exynos4-pmu.c
+ create mode 100644 drivers/soc/samsung/exynos5250-pmu.c
+ create mode 100644 drivers/soc/samsung/exynos5420-pmu.c
+ create mode 100644 include/linux/soc/samsung/exynos-pmu.h
+ create mode 100644 include/linux/soc/samsung/exynos-regs-pmu.h
+
+-- 
+2.4.5
