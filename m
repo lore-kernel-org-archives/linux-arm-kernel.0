@@ -1,41 +1,64 @@
-From: yang.shi@linaro.org (Shi, Yang)
-Date: Tue, 10 Nov 2015 11:46:42 -0800
-Subject: [PATCH] arm64: bpf: fix JIT stack setup
-In-Reply-To: <CABg9mcvACuVK2=GBbnur94CsckN2TXRCCiXhX7A8jYQ7arMM+Q@mail.gmail.com>
-References: <1446874577-14539-1-git-send-email-yang.shi@linaro.org>	<20151108022726.GB39441@ast-mbp.thefacebook.com>	<CABg9mcv8W4_pvkEQKtjBPi5ycMgLPksYoPtYnGr6tdcb5ER8YQ@mail.gmail.com>	<5640E135.2020007@linaro.org>
- <CABg9mcvACuVK2=GBbnur94CsckN2TXRCCiXhX7A8jYQ7arMM+Q@mail.gmail.com>
-Message-ID: <564249A2.1070903@linaro.org>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Tue, 10 Nov 2015 14:56:36 -0500
+Subject: [PATCH V2 1/3] scsi: mptxsas: try 64 bit DMA when 32 bit DMA fails
+In-Reply-To: <1447184611.2187.45.camel@HansenPartnership.com>
+References: <1447034266-28003-1-git-send-email-okaya@codeaurora.org>
+ <5349261.sTnZTFhKWB@wuerfel> <56421610.50005@codeaurora.org>
+ <4982446.ZlJVrezq1Y@wuerfel> <56422725.7040809@codeaurora.org>
+ <1447180034.2187.20.camel@HansenPartnership.com>
+ <56424200.9080406@codeaurora.org>
+ <1447184611.2187.45.camel@HansenPartnership.com>
+Message-ID: <56424BF4.2040207@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/9/2015 12:00 PM, Z Lim wrote:
-> On Mon, Nov 9, 2015 at 10:08 AM, Shi, Yang <yang.shi@linaro.org> wrote:
->> I added it to stay align with ARMv8 AAPCS to maintain the correct FP during
->> function call. It makes us get correct stack backtrace.
->>
->> I think we'd better to keep compliant with ARMv8 AAPCS in BPF JIT prologue
->> too.
->>
->> If nobody thinks it is necessary, we definitely could remove that change.
->
-> Oh no, I don't think anyone will say it's unnecessary!
-> I agree the A64_FP-related change is a good idea, so stack unwinding works.
->
-> How about splitting this into two patches? One for the BPF-related
-> bug, and another for A64 FP-handling.
 
-I'm not sure if this is a good approach or not. IMHO, they are kind of 
-atomic. Without A64 FP-handling, that fix looks incomplete and 
-introduces another problem (stack backtrace).
 
-Thanks,
-Yang
+On 11/10/2015 2:43 PM, James Bottomley wrote:
+> The Issue, as stated by LSI is
+>
+>          Initially set the consistent DMA mask to 32 bit and then change
+>          it
+>          to 64 bit mask after allocating RDPQ pools by calling the
+>          function
+>          _base_change_consistent_dma_mask. This is to ensure that all the
+>          upper 32 bits of RDPQ entries's base address to be same.
+>
+
+Need somebody from mpt to confirm that this behavior is still valid for 
+the recent cards besides altix.
+
+> If you set a 64 bit coherent mask before this point, you're benefiting
+> from being lucky that all the upper 32 bits of the allocations are the
+> same ... we can't code a driver to rely on luck.  Particularly not when
+> the failure mode looks like it would be silent and deadly.
+
+Of course nobody wants unreliable code.
+
+I'm wondering if I was just lucky during my testing or the 92xx and 93xx 
+hardware supports full 64 bit range. I don't have any insight into what 
+the endpoint does or what it is capable of.
 
 >
-> Thanks again for tracking this down and improving things overall for arm64 :)
->
->>
->> Thanks,
->> Yang
->>
->>
+>> >Another comment here from you.
+>> >https://lkml.org/lkml/2015/4/2/28
+>> >
+>> >"Well, it was originally a hack for altix, because they had no regions
+>> >below 4GB and had to specifically manufacture them.  As you know, in
+>> >Linux, if Intel doesn't need it, no-one cares and the implementation
+>> >bitrots."
+>> >
+>> >Maybe, it is time to fix the code for more recent (even decent) hardware?
+> What do you mean "fix the code"?  The code isn't broken, it's
+> parametrising issues with particular hardware.  There's no software work
+> around (except allocating memory with the correct characteristics).
+
+Need confirmation. I'm questioning if we are stuck with this behavior 
+because of altix or something else. If the latter case, the code could 
+have used PCI ID to do something special for it.
+
+-- 
+Sinan Kaya
+Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a 
+Linux Foundation Collaborative Project
