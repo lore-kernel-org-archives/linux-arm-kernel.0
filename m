@@ -1,124 +1,130 @@
-From: laurent.pinchart@ideasonboard.com (Laurent Pinchart)
-Date: Tue, 10 Nov 2015 11:11:36 +0200
-Subject: [PATCH 1/3] ARM: shmobile: r8a7793: Add DMAC devices to DT
-In-Reply-To: <1447139641-11480-2-git-send-email-horms+renesas@verge.net.au>
-References: <1447139641-11480-1-git-send-email-horms+renesas@verge.net.au>
- <1447139641-11480-2-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <2661832.Y18F3NymRL@avalon>
+From: mark.yao@rock-chips.com (Mark Yao)
+Date: Tue, 10 Nov 2015 17:11:57 +0800
+Subject: [RESEND PATCH] drm/rockchip: import dma_buf to gem
+Message-ID: <1447146717-11423-1-git-send-email-mark.yao@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
+We want to display a buffer allocated by other driver, need import
+the buffer to gem.
 
-Thank you for the patch.
+Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
+---
+Changes in resend:
+- rebase to this patch to newest origin/drm-next 4.3-rc5
+Changes in v2:
+Adviced by Russell King
+- check sgt-nents == 1 when get iova from scatterlist
+- remove unused dma_map_sg/dma_unmap_sg, dma_buf_map_attachment->map_dma_buf
+  should do the dma_map
 
-On Tuesday 10 November 2015 16:13:59 Simon Horman wrote:
-> Instantiate the two system DMA controllers in the r8a7793 device tree.
-> 
-> Based on similar work for the r8a7793 by Laurent Pinchart.
-> 
-> Cc: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+ drivers/gpu/drm/rockchip/rockchip_drm_drv.c |    1 +
+ drivers/gpu/drm/rockchip/rockchip_drm_gem.c |   40 +++++++++++++++++++++++++--
+ drivers/gpu/drm/rockchip/rockchip_drm_gem.h |    5 +++-
+ 3 files changed, 42 insertions(+), 4 deletions(-)
 
-Reviewed-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
-
-> ---
->  arch/arm/boot/dts/r8a7793.dtsi | 72 +++++++++++++++++++++++++++++++++++++++
->  1 file changed, 72 insertions(+)
-> 
-> diff --git a/arch/arm/boot/dts/r8a7793.dtsi b/arch/arm/boot/dts/r8a7793.dtsi
-> index 4f6480f8845f..187a82dc7d9f 100644
-> --- a/arch/arm/boot/dts/r8a7793.dtsi
-> +++ b/arch/arm/boot/dts/r8a7793.dtsi
-> @@ -128,6 +128,68 @@
->  		#gpio-range-cells = <3>;
->  	};
-> 
-> +	dmac0: dma-controller at e6700000 {
-> +		compatible = "renesas,rcar-dmac";
-> +		reg = <0 0xe6700000 0 0x20000>;
-> +		interrupts = <0 197 IRQ_TYPE_LEVEL_HIGH
-> +			      0 200 IRQ_TYPE_LEVEL_HIGH
-> +			      0 201 IRQ_TYPE_LEVEL_HIGH
-> +			      0 202 IRQ_TYPE_LEVEL_HIGH
-> +			      0 203 IRQ_TYPE_LEVEL_HIGH
-> +			      0 204 IRQ_TYPE_LEVEL_HIGH
-> +			      0 205 IRQ_TYPE_LEVEL_HIGH
-> +			      0 206 IRQ_TYPE_LEVEL_HIGH
-> +			      0 207 IRQ_TYPE_LEVEL_HIGH
-> +			      0 208 IRQ_TYPE_LEVEL_HIGH
-> +			      0 209 IRQ_TYPE_LEVEL_HIGH
-> +			      0 210 IRQ_TYPE_LEVEL_HIGH
-> +			      0 211 IRQ_TYPE_LEVEL_HIGH
-> +			      0 212 IRQ_TYPE_LEVEL_HIGH
-> +			      0 213 IRQ_TYPE_LEVEL_HIGH
-> +			      0 214 IRQ_TYPE_LEVEL_HIGH>;
-> +		interrupt-names = "error",
-> +				"ch0", "ch1", "ch2", "ch3",
-> +				"ch4", "ch5", "ch6", "ch7",
-> +				"ch8", "ch9", "ch10", "ch11",
-> +				"ch12", "ch13", "ch14";
-> +		clocks = <&mstp2_clks R8A7793_CLK_SYS_DMAC0>;
-> +		clock-names = "fck";
-> +		power-domains = <&cpg_clocks>;
-> +		#dma-cells = <1>;
-> +		dma-channels = <15>;
-> +	};
-> +
-> +	dmac1: dma-controller at e6720000 {
-> +		compatible = "renesas,rcar-dmac";
-> +		reg = <0 0xe6720000 0 0x20000>;
-> +		interrupts = <0 220 IRQ_TYPE_LEVEL_HIGH
-> +			      0 216 IRQ_TYPE_LEVEL_HIGH
-> +			      0 217 IRQ_TYPE_LEVEL_HIGH
-> +			      0 218 IRQ_TYPE_LEVEL_HIGH
-> +			      0 219 IRQ_TYPE_LEVEL_HIGH
-> +			      0 308 IRQ_TYPE_LEVEL_HIGH
-> +			      0 309 IRQ_TYPE_LEVEL_HIGH
-> +			      0 310 IRQ_TYPE_LEVEL_HIGH
-> +			      0 311 IRQ_TYPE_LEVEL_HIGH
-> +			      0 312 IRQ_TYPE_LEVEL_HIGH
-> +			      0 313 IRQ_TYPE_LEVEL_HIGH
-> +			      0 314 IRQ_TYPE_LEVEL_HIGH
-> +			      0 315 IRQ_TYPE_LEVEL_HIGH
-> +			      0 316 IRQ_TYPE_LEVEL_HIGH
-> +			      0 317 IRQ_TYPE_LEVEL_HIGH
-> +			      0 318 IRQ_TYPE_LEVEL_HIGH>;
-> +		interrupt-names = "error",
-> +				"ch0", "ch1", "ch2", "ch3",
-> +				"ch4", "ch5", "ch6", "ch7",
-> +				"ch8", "ch9", "ch10", "ch11",
-> +				"ch12", "ch13", "ch14";
-> +		clocks = <&mstp2_clks R8A7793_CLK_SYS_DMAC1>;
-> +		clock-names = "fck";
-> +		power-domains = <&cpg_clocks>;
-> +		#dma-cells = <1>;
-> +		dma-channels = <15>;
-> +	};
-> +
->  	scif0: serial at e6e60000 {
->  		compatible = "renesas,scif-r8a7793", "renesas,scif";
->  		reg = <0 0xe6e60000 0 64>;
-> @@ -313,6 +375,16 @@
->  				"tmu3", "tmu2", "cmt0", "tmu0", "vsp1-du1",
->  				"vsp1-du0", "vsps";
->  		};
-> +		mstp2_clks: mstp2_clks at e6150138 {
-> +			compatible = "renesas,r8a7793-mstp-clocks", "renesas,cpg-mstp-
-clocks";
-> +			reg = <0 0xe6150138 0 4>, <0 0xe6150040 0 4>;
-> +			clocks = <&zs_clk>, <&zs_clk>;
-> +			#clock-cells = <1>;
-> +			clock-indices = <
-> +				R8A7793_CLK_SYS_DMAC1 R8A7793_CLK_SYS_DMAC0
-> +			>;
-> +			clock-output-names = "sys-dmac1", "sys-dmac0";
-> +		};
->  		mstp3_clks: mstp3_clks at e615013c {
->  			compatible = "renesas,r8a7793-mstp-clocks",
->  				     "renesas,cpg-mstp-clocks";
-
+diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_drv.c b/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
+index f22e1e1..ea5b19e 100644
+--- a/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
++++ b/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
+@@ -290,6 +290,7 @@ static struct drm_driver rockchip_drm_driver = {
+ 	.prime_handle_to_fd	= drm_gem_prime_handle_to_fd,
+ 	.prime_fd_to_handle	= drm_gem_prime_fd_to_handle,
+ 	.gem_prime_import	= drm_gem_prime_import,
++	.gem_prime_import_sg_table = rockchip_gem_prime_import_sg_table,
+ 	.gem_prime_export	= drm_gem_prime_export,
+ 	.gem_prime_get_sg_table	= rockchip_gem_prime_get_sg_table,
+ 	.gem_prime_vmap		= rockchip_gem_prime_vmap,
+diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_gem.c b/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
+index 8caea0a..1c94a30 100644
+--- a/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
++++ b/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
+@@ -18,6 +18,7 @@
+ #include <drm/drm_vma_manager.h>
+ 
+ #include <linux/dma-attrs.h>
++#include <linux/dma-buf.h>
+ 
+ #include "rockchip_drm_drv.h"
+ #include "rockchip_drm_gem.h"
+@@ -103,6 +104,36 @@ int rockchip_gem_mmap(struct file *filp, struct vm_area_struct *vma)
+ 	return rockchip_drm_gem_object_mmap(obj, vma);
+ }
+ 
++struct drm_gem_object *
++rockchip_gem_prime_import_sg_table(struct drm_device *drm,
++				   struct dma_buf_attachment *attach,
++				   struct sg_table *sgt)
++{
++	struct rockchip_gem_object *rk_obj;
++	struct drm_gem_object *obj;
++
++	/*
++	 * Todo: only support continuous buffer now, plan to found a method
++	 * to import non continuous with iommu.
++	 */
++	if (sgt->nents != 1)
++		return ERR_PTR(-EINVAL);
++
++	rk_obj = kzalloc(sizeof(*rk_obj), GFP_KERNEL);
++	if (!rk_obj)
++		return ERR_PTR(-ENOMEM);
++
++	obj = &rk_obj->base;
++
++	drm_gem_private_object_init(drm, obj, attach->dmabuf->size);
++
++	rk_obj->dma_addr = sg_dma_address(sgt->sgl);
++	rk_obj->sgt = sgt;
++	obj->size = sg_dma_len(sgt->sgl);
++
++	return obj;
++}
++
+ struct rockchip_gem_object *
+ 	rockchip_gem_create_object(struct drm_device *drm, unsigned int size,
+ 				   bool alloc_kmap)
+@@ -140,11 +171,14 @@ void rockchip_gem_free_object(struct drm_gem_object *obj)
+ {
+ 	struct rockchip_gem_object *rk_obj;
+ 
+-	drm_gem_free_mmap_offset(obj);
+-
+ 	rk_obj = to_rockchip_obj(obj);
+ 
+-	rockchip_gem_free_buf(rk_obj);
++	if (obj->import_attach) {
++		drm_prime_gem_destroy(obj, rk_obj->sgt);
++	} else {
++		drm_gem_free_mmap_offset(obj);
++		rockchip_gem_free_buf(rk_obj);
++	}
+ 
+ 	kfree(rk_obj);
+ }
+diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_gem.h b/drivers/gpu/drm/rockchip/rockchip_drm_gem.h
+index ad22618..9fd58e3 100644
+--- a/drivers/gpu/drm/rockchip/rockchip_drm_gem.h
++++ b/drivers/gpu/drm/rockchip/rockchip_drm_gem.h
+@@ -21,6 +21,7 @@ struct rockchip_gem_object {
+ 	struct drm_gem_object base;
+ 	unsigned int flags;
+ 
++	struct sg_table *sgt;
+ 	void *kvaddr;
+ 	dma_addr_t dma_addr;
+ 	struct dma_attrs dma_attrs;
+@@ -28,8 +29,10 @@ struct rockchip_gem_object {
+ 
+ struct sg_table *rockchip_gem_prime_get_sg_table(struct drm_gem_object *obj);
+ struct drm_gem_object *
+-rockchip_gem_prime_import_sg_table(struct drm_device *dev, size_t size,
++rockchip_gem_prime_import_sg_table(struct drm_device *drm,
++				   struct dma_buf_attachment *attach,
+ 				   struct sg_table *sgt);
++
+ void *rockchip_gem_prime_vmap(struct drm_gem_object *obj);
+ void rockchip_gem_prime_vunmap(struct drm_gem_object *obj, void *vaddr);
+ 
 -- 
-Regards,
-
-Laurent Pinchart
+1.7.9.5
