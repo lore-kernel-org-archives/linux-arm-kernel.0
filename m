@@ -1,82 +1,82 @@
-From: eddie.huang@mediatek.com (Eddie Huang)
-Date: Tue, 10 Nov 2015 14:11:07 +0800
-Subject: [PATCH v5 4/5] ARM: dts: mt8135: enable basic SMP bringup for
- mt8135
-In-Reply-To: <CAMAWPa_13j88SMBbYEBg2WHFEhkhR_gVZkkU_x-U5NJay05AxA@mail.gmail.com>
-References: <1443799181-50409-1-git-send-email-yingjoe.chen@mediatek.com>
- <1443799181-50409-5-git-send-email-yingjoe.chen@mediatek.com>
- <CAMAWPa-Ed2FJY2pW67EHHKBH3_eBZx0+oWfMJwc_DhEjrf7aMg@mail.gmail.com>
- <1445843717.23888.1.camel@mtksdaap41>
- <CAMAWPa_Gyq7H0qUJ32PAJh_ELdHeKWMPyHud4gaT8=Ootcu1+g@mail.gmail.com>
- <1445859610.26723.4.camel@mtksdaap41>
- <CAMAWPa_13j88SMBbYEBg2WHFEhkhR_gVZkkU_x-U5NJay05AxA@mail.gmail.com>
-Message-ID: <1447135867.14454.9.camel@mtksdaap41>
+From: mark.yao@rock-chips.com (Mark yao)
+Date: Tue, 10 Nov 2015 14:17:43 +0800
+Subject: [PATCH 1/2] drm/rockchip: create the fake mmap offset during
+ gem creation
+In-Reply-To: <4982827.0pnZflEOSR@phil>
+References: <4982827.0pnZflEOSR@phil>
+Message-ID: <56418C07.60208@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2015-11-09 at 09:59 -0800, Kevin Hilman wrote:
-> On Mon, Oct 26, 2015 at 4:40 AM, Eddie Huang <eddie.huang@mediatek.com> wrote:
-> > Hi Kevin,
-> >
-> > On Mon, 2015-10-26 at 17:06 +0900, Kevin Hilman wrote:
-> >> On Mon, Oct 26, 2015 at 4:15 PM, Yingjoe Chen <yingjoe.chen@mediatek.com> wrote:
-> >> > On Mon, 2015-10-26 at 09:56 +0900, Kevin Hilman wrote:
-> >> >> Hello,
-> >> >>
-> >> >> On Sat, Oct 3, 2015 at 12:19 AM, Yingjoe Chen <yingjoe.chen@mediatek.com> wrote:
-> >> >> > Add arch timer node to enable arch-timer support. MT8135 firmware
-> >> >> > doesn't correctly setup arch-timer frequency and CNTVOFF, add
-> >> >> > properties to workaround this.
-> >> >> >
-> >> >> > This also set cpu enable-method to enable SMP.
-> >> >> >
-> >> >> > Signed-off-by: Yingjoe Chen <yingjoe.chen@mediatek.com>
-> >> >>
-> >> >> kernelci.org started detecting new boot failures for the mt8135-evb in
-> >> >> the arm-soc tree[1], and the boot failures were bisected down to this
-> >> >> patch, which landed upstream in the form of commit d186a394bb98 (ARM:
-> >> >> dts: mt8135: enable basic SMP bringup for mt8135)
-> >> >>
-> >> >> Maybe this new SMP support requires updating the firmware on the board
-> >> >> as well?  If so, the changelog should've been a bit more explicit
-> >> >> about firmware dependencies.
-> >> >
-> >> > Kevin,
-> >> >
-> >> > Thanks for testing.
-> >> >
-> >> > No, it doesn't need new firmware. Will test to see what's going wrong.
-> >>
-> >> Thanks for following up.  I'll be glad to test any patches if you have
-> >> anything you'd like me to test.
-> >
-> > You need "clockevents/drivers/mtk: Fix spurious interrupt leading to
-> > crash" (https://lkml.org/lkml/2015/8/24/803)
-> >
-> > Daniel Lezcano already applied this patch in his tree for 4.4.
-> > (https://git.linaro.org/people/daniel.lezcano/linux.git)
-> 
-> The mt8135-evp board is still failing to boot in linux-next[1] (and
-> has been since next-20151022.)  It appears the dependencies are not
-> quite correct in linux-next either.
-> 
-> Kevin
-> 
-> [1]
-> http://kernelci.org/boot/mt8135-evbp1/job/next/kernel/next-20151109/defconfig/multi_v7_defconfig/lab/lab-khilman/?_id=564037fe59b514b2f6091909
+Hi Heiko
+      I don't think this patch is needed for rockchip drm, since 
+rockchip drm only use kms.
+I saw the discussion about ("drm/exynos: create a fake mmap offset with 
+gem creation"),
+Inki said that: "This patch makes drm_gem_create_mmap_offset to be 
+called even in case of
+not using dumb* interfaces. I.e., exynos_drm_gem_create_ioctl -> 
+exynos_drm_gem_mmap"
 
-Hi Kevin,
+So I think this patch doesn't make sense for rockchip drm.
 
-I check the log [0], it seems first time mt8135-evbp1 boot to kernel
-shell successfully, then boot again. In the second time, mt8135 stay in
-fastboot mode, waiting host send boot image, then timeout.
 
-I download zImage and dtb in [1], and kernel run to shell successfully
-on my platform.
+On 2015?11?10? 03:50, Heiko Stuebner wrote:
+> Similarly to the equivalent exynos-fix in commit 48cf53f4343a
+> ("drm/exynos: create a fake mmap offset with gem creation") the rockchip
+> drm driver also calls the drm_gem_create_mmap_offset fake-offset creation
+> on every invocation of rockchip_gem_dumb_map_offset.
+>
+> Move that to the creation of the gem to only create that offset once.
+>
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> ---
+>   drivers/gpu/drm/rockchip/rockchip_drm_gem.c | 12 ++++++------
+>   1 file changed, 6 insertions(+), 6 deletions(-)
+>
+> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_gem.c b/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
+> index 4ab2f20..e50d113 100644
+> --- a/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
+> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
+> @@ -126,8 +126,14 @@ struct rockchip_gem_object *
+>   	if (ret)
+>   		goto err_free_rk_obj;
+>   
+> +	ret = drm_gem_create_mmap_offset(obj);
+> +	if (ret)
+> +		goto err_free_buf;
+> +
+>   	return rk_obj;
+>   
+> +err_free_buf:
+> +	rockchip_gem_free_buf(rk_obj);
+>   err_free_rk_obj:
+>   	kfree(rk_obj);
+>   	return ERR_PTR(ret);
+> @@ -196,7 +202,6 @@ int rockchip_gem_dumb_map_offset(struct drm_file *file_priv,
+>   				 uint64_t *offset)
+>   {
+>   	struct drm_gem_object *obj;
+> -	int ret;
+>   
+>   	obj = drm_gem_object_lookup(dev, file_priv, handle);
+>   	if (!obj) {
+> @@ -204,14 +209,9 @@ int rockchip_gem_dumb_map_offset(struct drm_file *file_priv,
+>   		return -EINVAL;
+>   	}
+>   
+> -	ret = drm_gem_create_mmap_offset(obj);
+> -	if (ret)
+> -		goto out;
+> -
+>   	*offset = drm_vma_node_offset_addr(&obj->vma_node);
+>   	DRM_DEBUG_KMS("offset = 0x%llx\n", *offset);
+>   
+> -out:
+>   	drm_gem_object_unreference_unlocked(obj);
+>   
+>   	return 0;
 
-I don't know whether this issue caused by test environment or not.
 
-[0]
-http://storage.kernelci.org/next/next-20151109/arm-multi_v7_defconfig/lab-khilman/boot-mt8135-evbp1.txt
-[1]
-http://kernelci.org/boot/mt8135-evbp1/job/next/kernel/next-20151109/defconfig/multi_v7_defconfig/lab/lab-khilman/?_id=564037fe59b514b2f6091909#bisect-content
+-- 
+?ark Yao
