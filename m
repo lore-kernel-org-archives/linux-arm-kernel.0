@@ -1,17 +1,16 @@
 From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Tue, 10 Nov 2015 14:11:38 +0000
-Subject: [PATCH v11 4/5] arm64: introduce CONFIG_PARAVIRT,
+Date: Tue, 10 Nov 2015 14:12:57 +0000
+Subject: [PATCH v11 3/5] arm: introduce CONFIG_PARAVIRT,
  PARAVIRT_TIME_ACCOUNTING and pv_time_ops
-In-Reply-To: <1446737696-9749-4-git-send-email-stefano.stabellini@eu.citrix.com>
+In-Reply-To: <1446737696-9749-3-git-send-email-stefano.stabellini@eu.citrix.com>
 References: <alpine.DEB.2.02.1511051502270.13541@kaball.uk.xensource.com>
- <1446737696-9749-4-git-send-email-stefano.stabellini@eu.citrix.com>
-Message-ID: <alpine.DEB.2.02.1511101410550.5676@kaball.uk.xensource.com>
+ <1446737696-9749-3-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <alpine.DEB.2.02.1511101411570.5676@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On Thu, 5 Nov 2015, Stefano Stabellini wrote:
-> Introduce CONFIG_PARAVIRT and PARAVIRT_TIME_ACCOUNTING on ARM64.
-> Necessary duplication of paravirt.h and paravirt.c with ARM.
+> Introduce CONFIG_PARAVIRT and PARAVIRT_TIME_ACCOUNTING on ARM.
 > 
 > The only paravirt interface supported is pv_time_ops.steal_clock, so no
 > runtime pvops patching needed.
@@ -20,45 +19,50 @@ On Thu, 5 Nov 2015, Stefano Stabellini wrote:
 > ticks accounting.
 > 
 > Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-
-Ping?
-
-Catalin, Will,
-are you happy with this change?
-
-
+> Acked-by: Christopher Covington <cov@codeaurora.org>
+> Acked-by: Ian Campbell <ian.campbell@citrix.com>
+> CC: linux at arm.linux.org.uk
 > CC: will.deacon at arm.com
 > CC: nico at linaro.org
 > CC: marc.zyngier at arm.com
 > CC: cov at codeaurora.org
 > CC: arnd at arndb.de
 > CC: olof at lixom.net
-> CC: Catalin.Marinas at arm.com
-> 
-> ---
+
+
+Russell,
+are you OK with this patch?
+
+
+
+
 > 
 > Changes in v10:
 > - replace "---help---" with "help"
 > 
 > Changes in v7:
 > - ifdef CONFIG_PARAVIRT the content of paravirt.h.
-> ---
->  arch/arm64/Kconfig                |   20 ++++++++++++++++++++
->  arch/arm64/include/asm/paravirt.h |   20 ++++++++++++++++++++
->  arch/arm64/kernel/Makefile        |    1 +
->  arch/arm64/kernel/paravirt.c      |   25 +++++++++++++++++++++++++
->  4 files changed, 66 insertions(+)
->  create mode 100644 arch/arm64/include/asm/paravirt.h
->  create mode 100644 arch/arm64/kernel/paravirt.c
 > 
-> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-> index 7b10647..659e286 100644
-> --- a/arch/arm64/Kconfig
-> +++ b/arch/arm64/Kconfig
-> @@ -533,6 +533,25 @@ config SECCOMP
->  	  and the task is only allowed to execute a few safe syscalls
->  	  defined by each seccomp mode.
+> Changes in v3:
+> - improve commit description and Kconfig help text;
+> - no need to initialize pv_time_ops;
+> - add PARAVIRT_TIME_ACCOUNTING.
+> ---
+>  arch/arm/Kconfig                |   20 ++++++++++++++++++++
+>  arch/arm/include/asm/paravirt.h |   20 ++++++++++++++++++++
+>  arch/arm/kernel/Makefile        |    1 +
+>  arch/arm/kernel/paravirt.c      |   25 +++++++++++++++++++++++++
+>  4 files changed, 66 insertions(+)
+>  create mode 100644 arch/arm/include/asm/paravirt.h
+>  create mode 100644 arch/arm/kernel/paravirt.c
+> 
+> diff --git a/arch/arm/Kconfig b/arch/arm/Kconfig
+> index f1ed110..60be104 100644
+> --- a/arch/arm/Kconfig
+> +++ b/arch/arm/Kconfig
+> @@ -1823,6 +1823,25 @@ config SWIOTLB
+>  config IOMMU_HELPER
+>  	def_bool SWIOTLB
 >  
 > +config PARAVIRT
 > +	bool "Enable paravirtualization code"
@@ -82,22 +86,22 @@ are you happy with this change?
 >  config XEN_DOM0
 >  	def_bool y
 >  	depends on XEN
-> @@ -541,6 +560,7 @@ config XEN
->  	bool "Xen guest support on ARM64"
->  	depends on ARM64 && OF
+> @@ -1836,6 +1855,7 @@ config XEN
+>  	select ARCH_DMA_ADDR_T_64BIT
+>  	select ARM_PSCI
 >  	select SWIOTLB_XEN
 > +	select PARAVIRT
 >  	help
->  	  Say Y if you want to run Linux in a Virtual Machine on Xen on ARM64.
+>  	  Say Y if you want to run Linux in a Virtual Machine on Xen on ARM.
 >  
-> diff --git a/arch/arm64/include/asm/paravirt.h b/arch/arm64/include/asm/paravirt.h
+> diff --git a/arch/arm/include/asm/paravirt.h b/arch/arm/include/asm/paravirt.h
 > new file mode 100644
-> index 0000000..fd5f428
+> index 0000000..8435ff59
 > --- /dev/null
-> +++ b/arch/arm64/include/asm/paravirt.h
+> +++ b/arch/arm/include/asm/paravirt.h
 > @@ -0,0 +1,20 @@
-> +#ifndef _ASM_ARM64_PARAVIRT_H
-> +#define _ASM_ARM64_PARAVIRT_H
+> +#ifndef _ASM_ARM_PARAVIRT_H
+> +#define _ASM_ARM_PARAVIRT_H
 > +
 > +#ifdef CONFIG_PARAVIRT
 > +struct static_key;
@@ -116,23 +120,23 @@ are you happy with this change?
 > +#endif
 > +
 > +#endif
-> diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
-> index 474691f..ca9fbe1 100644
-> --- a/arch/arm64/kernel/Makefile
-> +++ b/arch/arm64/kernel/Makefile
-> @@ -41,6 +41,7 @@ arm64-obj-$(CONFIG_EFI)			+= efi.o efi-entry.stub.o
->  arm64-obj-$(CONFIG_PCI)			+= pci.o
->  arm64-obj-$(CONFIG_ARMV8_DEPRECATED)	+= armv8_deprecated.o
->  arm64-obj-$(CONFIG_ACPI)		+= acpi.o
-> +arm64-obj-$(CONFIG_PARAVIRT)		+= paravirt.o
+> diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
+> index af9e59b..3e6e937 100644
+> --- a/arch/arm/kernel/Makefile
+> +++ b/arch/arm/kernel/Makefile
+> @@ -81,6 +81,7 @@ obj-$(CONFIG_VDSO)		+= vdso.o
+>  ifneq ($(CONFIG_ARCH_EBSA110),y)
+>    obj-y		+= io.o
+>  endif
+> +obj-$(CONFIG_PARAVIRT)	+= paravirt.o
 >  
->  obj-y					+= $(arm64-obj-y) vdso/
->  obj-m					+= $(arm64-obj-m)
-> diff --git a/arch/arm64/kernel/paravirt.c b/arch/arm64/kernel/paravirt.c
+>  head-y			:= head$(MMUEXT).o
+>  obj-$(CONFIG_DEBUG_LL)	+= debug.o
+> diff --git a/arch/arm/kernel/paravirt.c b/arch/arm/kernel/paravirt.c
 > new file mode 100644
 > index 0000000..53f371e
 > --- /dev/null
-> +++ b/arch/arm64/kernel/paravirt.c
+> +++ b/arch/arm/kernel/paravirt.c
 > @@ -0,0 +1,25 @@
 > +/*
 > + * This program is free software; you can redistribute it and/or modify
