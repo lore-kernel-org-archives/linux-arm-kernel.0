@@ -1,73 +1,32 @@
-From: yang.shi@linaro.org (Shi, Yang)
-Date: Tue, 10 Nov 2015 15:10:42 -0800
-Subject: Failed to build arm64 bpf samples with LLVM 3.7 on 4.3 kernel
-In-Reply-To: <CAADnVQJ+4maNAbMgTwJAHka0jX8ut5v9Nxh=4tOnhJdAbOm2hQ@mail.gmail.com>
-References: <564244B6.9050202@linaro.org>
- <CAADnVQJ+4maNAbMgTwJAHka0jX8ut5v9Nxh=4tOnhJdAbOm2hQ@mail.gmail.com>
-Message-ID: <56427972.5000004@linaro.org>
+From: olof@lixom.net (Olof Johansson)
+Date: Tue, 10 Nov 2015 15:23:30 -0800
+Subject: [GIT PULL 2/6] ARM: SoC cleanups for v4.4
+In-Reply-To: <CA+55aFzUHRvx-=ioeqT-QK+Od6yGixL3q5jit6kD6-Yf5WKXJA@mail.gmail.com>
+References: <1447126404-10567-1-git-send-email-olof@lixom.net>
+ <1447126404-10567-3-git-send-email-olof@lixom.net>
+ <CA+55aFzUHRvx-=ioeqT-QK+Od6yGixL3q5jit6kD6-Yf5WKXJA@mail.gmail.com>
+Message-ID: <CAOesGMj8T=qJWkR=yF8cVrTZKiRTBhEsqTLO7Rw9kmB-sPUCKw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/10/2015 2:42 PM, Alexei Starovoitov wrote:
-> On Tue, Nov 10, 2015 at 11:25 AM, Shi, Yang <yang.shi@linaro.org> wrote:
->> Hi guys,
+On Tue, Nov 10, 2015 at 2:52 PM, Linus Torvalds
+<torvalds@linux-foundation.org> wrote:
+> On Mon, Nov 9, 2015 at 7:33 PM, Olof Johansson <olof@lixom.net> wrote:
 >>
->> I just tried to build arm64 bpf samples on 4.3 kernel, but LLVM complain:
+>> Conflicts:
 >>
->> LLVM ERROR: Inline asm not supported by this streamer because we don't have
->> an asm parser for this target
->>
->> I took some time to bisect it, then found it is caused by sysreg.h
->>
->> There is inline assembly macro defined in sysreg.h:
->>
->> asm(
->> "       .irp
->> num,0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30\n"
->> "       .equ    __reg_num_x\\num, \\num\n"
->> "       .endr\n"
->> "       .equ    __reg_num_xzr, 31\n"
->> "\n"
->> "       .macro  mrs_s, rt, sreg\n"
->> "       .inst   0xd5200000|(\\sreg)|(__reg_num_\\rt)\n"
->> "       .endm\n"
->> "\n"
->> "       .macro  msr_s, sreg, rt\n"
->> "       .inst   0xd5000000|(\\sreg)|(__reg_num_\\rt)\n"
->> "       .endm\n"
->> );
->>
->> sysreg.h was not included by any other arm64 header files in 4.2, but in 4.3
->> it is included by futex.h and uaccess.h, which are included by bpf samples
->> via skbuff.h.
->>
->> But, it sounds LLVM can't recognize it. I'm not familiar with LLVM, so any
->> suggestion?
->>
->> Could it be worked around by some LLVM compile flags?
+>> OMAP timer code has a treewide fix vs code deletion conflict. Delete
+>> the code in HEAD, go with contents from branch.
 >
-> hmm this used to work. I don't have arm64 setup anymore.
+> That doesn't look right. It also needs the clocksource_of_init ->
+> clocksource_probe changes. The code was moved around rather than
+> deleted.
 
-Yes, sysreg.h used to be not included by any header file.
+Argh, yes, of course. I usually build a local copy of the merged
+contents on top of your latest tree before sending the pull requests,
+but didn't this time.
 
-> Try hacking it by adding #define __ASM_SYSREG_H to prevent inclusion
-> of that file? all those asms are unused anyway.
-> tracing samples include kernel headers to have exact struct layout.
-> and #include skbuff.h can be removed from almost all samples.
-> In-kernel 'struct sk_buff' only used inside tracex1_kern.c
+Thanks for catching this.
 
-The below change works:
 
-         clang $(NOSTDINC_FLAGS) $(LINUXINCLUDE) $(EXTRA_CFLAGS) \
--               -D__KERNEL__ -Wno-unused-value -Wno-pointer-sign \
-+               -D__KERNEL__ -D__ASM_SYSREG_H -Wno-unused-value 
--Wno-pointer-sign \
-                 -O2 -emit-llvm -c $< -o -| $(LLC) -march=bpf 
--filetype=obj -o $@
-
-Is it ok for upstream too?
-
-Thanks,
-Yang
-
->
+-Olof
