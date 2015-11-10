@@ -1,99 +1,91 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 10 Nov 2015 09:54:11 +0000
-Subject: [PATCH 11/15] arm64: kdump: implement machine_crash_shutdown()
-In-Reply-To: <5641472C.9080201@linaro.org>
-References: <cover.1446836442.git.geoff@infradead.org>
- <2880455fc4abe385d5ed3919efa02177f96f4d93.1446836443.git.geoff@infradead.org>
- <5641472C.9080201@linaro.org>
-Message-ID: <20151110095411.GB31947@arm.com>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Tue, 10 Nov 2015 11:58:12 +0200
+Subject: [4.4-rc][PATCH] genirq / PM: restore system wake up from chained
+ interrupts
+Message-ID: <1447149492-20699-1-git-send-email-grygorii.strashko@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 10, 2015 at 10:23:56AM +0900, AKASHI Takahiro wrote:
-> On 11/07/2015 04:14 AM, Geoff Levand wrote:
-> >From: AKASHI Takahiro <takahiro.akashi@linaro.org>
-> >
-> >kdump calls machine_crash_shutdown() to shut down non-boot cpus and
-> >save registers' status in per-cpu ELF notes before starting the crash
-> >dump kernel. See kernel_kexec().
-> >
-> >ipi_cpu_stop() is a bit modified and used to support this behavior.
-> 
-> I've got some concerns of using ipi_cpu_stop().
-> 
-> >Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-> >---
-> >  arch/arm64/include/asm/kexec.h    | 34 +++++++++++++++++++++++++++++++++-
-> >  arch/arm64/kernel/machine_kexec.c | 31 +++++++++++++++++++++++++++++--
-> >  arch/arm64/kernel/smp.c           | 16 ++++++++++++++--
-> >  3 files changed, 76 insertions(+), 5 deletions(-)
+Commit e509bd7da149 ("genirq: Allow migration of chained interrupts
+by installing default action") breaks PCS wake up IRQ behaviour on
+TI OMAP based platforms (dra7-evm).
 
-[...]
+TI OMAP IRQ wake up configuration:
+GIC-irqchip->PCM_IRQ
+  |- omap_prcm_register_chain_handler
+     |- PRCM-irqchip -> PRCM_IO_IRQ
+        |- pcs_irq_chain_handler
+           |- pinctrl-irqchip -> PCS_uart1_wakeup_irq
 
-> >diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
-> >index dbdaacd..88aec66 100644
-> >--- a/arch/arm64/kernel/smp.c
-> >+++ b/arch/arm64/kernel/smp.c
-> >@@ -37,6 +37,7 @@
-> >  #include <linux/completion.h>
-> >  #include <linux/of.h>
-> >  #include <linux/irq_work.h>
-> >+#include <linux/kexec.h>
-> >
-> >  #include <asm/alternative.h>
-> >  #include <asm/atomic.h>
-> >@@ -54,6 +55,8 @@
-> >  #include <asm/ptrace.h>
-> >  #include <asm/virt.h>
-> >
-> >+#include "cpu-reset.h"
-> >+
-> >  #define CREATE_TRACE_POINTS
-> >  #include <trace/events/ipi.h>
-> >
-> >@@ -679,8 +682,12 @@ static DEFINE_RAW_SPINLOCK(stop_lock);
-> >  /*
-> >   * ipi_cpu_stop - handle IPI from smp_send_stop()
-> >   */
-> >-static void ipi_cpu_stop(unsigned int cpu)
-> >+static void ipi_cpu_stop(unsigned int cpu, struct pt_regs *regs)
-> >  {
-> >+#ifdef CONFIG_KEXEC
-> >+	/* printing messages may slow down the shutdown. */
-> >+	if (!in_crash_kexec)
-> >+#endif
-> >  	if (system_state == SYSTEM_BOOTING ||
-> >  	    system_state == SYSTEM_RUNNING) {
-> >  		raw_spin_lock(&stop_lock);
-> >@@ -693,6 +700,11 @@ static void ipi_cpu_stop(unsigned int cpu)
-> >
-> >  	local_irq_disable();
-> >
-> >+#ifdef CONFIG_KEXEC
-> >+	if (in_crash_kexec)
-> >+		crash_save_cpu(regs, cpu);
-> >+#endif /* CONFIG_KEXEC */
-> >+
-> >  	while (1)
-> >  		cpu_relax();
-> >  }
-> 
-> cpu_relax() is defined as asm("yield"), and this puts all but boot cpu into
-> a infinite loop of nop (actually, whether nop or other depends on hw implementation).
-> Thus all the secondary cpus are still running busy loop even after crash dump kernel
-> has started up, and the chip can potentially get overheated.
-> I ran into this situation when I tested the code on Hikey, and the system was
-> forced to be shut down by thermal driver.
-> 
-> So I'd like to modify the code a bit like:
-> if (in_crash_kernel {
->     crash_save_cpu(regs, cpu);
->     while (1)
->         asm("wfi"); /* irq is disabled here. */
-> }
-> 
-> Does this make sense?
+This happens because IRQ PM code (irq/pm.c) is expected to ignore
+chained interrupts by default:
+  static bool suspend_device_irq(struct irq_desc *desc)
+  {
+	if (!desc->action || desc->no_suspend_depth)
+		return false;
+ - it's expected !desc->action = true for chained interrupts;
 
-It would be even better if we could hotplug them off.
+but, after above change, all chained interrupt descriptors will
+have default action handler installed - chained_action.
+As result, chained interrupts will be silently disabled during system
+suspend.
 
-Will
+Hence, fix it by introducing helper function irq_desc_is_chained() and
+use it in suspend_device_irq() for chained interrupts identification
+and skip them, once detected.
+
+Cc: Mika Westerberg <mika.westerberg@linux.intel.com>
+Cc: Tony Lindgren <tony@atomide.com>
+Fixes: e509bd7da149 ("genirq: Allow migration of chained interrupts..")
+Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+---
+ kernel/irq/internals.h | 5 +++++
+ kernel/irq/pm.c        | 3 ++-
+ kernel/irq/proc.c      | 2 +-
+ 3 files changed, 8 insertions(+), 2 deletions(-)
+
+diff --git a/kernel/irq/internals.h b/kernel/irq/internals.h
+index 05c2188..fcab63c 100644
+--- a/kernel/irq/internals.h
++++ b/kernel/irq/internals.h
+@@ -199,6 +199,11 @@ static inline int irq_desc_get_node(struct irq_desc *desc)
+ 	return irq_common_data_get_node(&desc->irq_common_data);
+ }
+ 
++static inline int irq_desc_is_chained(struct irq_desc *desc)
++{
++	return (desc->action && desc->action == &chained_action);
++}
++
+ #ifdef CONFIG_PM_SLEEP
+ bool irq_pm_check_wakeup(struct irq_desc *desc);
+ void irq_pm_install_action(struct irq_desc *desc, struct irqaction *action);
+diff --git a/kernel/irq/pm.c b/kernel/irq/pm.c
+index e80c440..cea1de0 100644
+--- a/kernel/irq/pm.c
++++ b/kernel/irq/pm.c
+@@ -70,7 +70,8 @@ void irq_pm_remove_action(struct irq_desc *desc, struct irqaction *action)
+ 
+ static bool suspend_device_irq(struct irq_desc *desc)
+ {
+-	if (!desc->action || desc->no_suspend_depth)
++	if (!desc->action || irq_desc_is_chained(desc) ||
++	    desc->no_suspend_depth)
+ 		return false;
+ 
+ 	if (irqd_is_wakeup_set(&desc->irq_data)) {
+diff --git a/kernel/irq/proc.c b/kernel/irq/proc.c
+index a916cf1..a2c02fd 100644
+--- a/kernel/irq/proc.c
++++ b/kernel/irq/proc.c
+@@ -475,7 +475,7 @@ int show_interrupts(struct seq_file *p, void *v)
+ 	for_each_online_cpu(j)
+ 		any_count |= kstat_irqs_cpu(i, j);
+ 	action = desc->action;
+-	if ((!action || action == &chained_action) && !any_count)
++	if ((!action || irq_desc_is_chained(desc)) && !any_count)
+ 		goto out;
+ 
+ 	seq_printf(p, "%*d: ", prec, i);
+-- 
+2.6.2
