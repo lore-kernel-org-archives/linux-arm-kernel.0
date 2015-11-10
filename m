@@ -1,53 +1,40 @@
-From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Tue, 10 Nov 2015 10:09:09 +0000
-Subject: [RFC PATCH v3 1/4] drm: Introduce generic probe function for
- component based masters.
-In-Reply-To: <5641B075.6020602@rock-chips.com>
-References: <1445267270-23126-1-git-send-email-Liviu.Dudau@arm.com>
- <1445267270-23126-2-git-send-email-Liviu.Dudau@arm.com>
- <564069CD.2070102@rock-chips.com>
- <20151109114259.GX8644@n2100.arm.linux.org.uk>
- <20151109115727.GE963@e106497-lin.cambridge.arm.com>
- <5641B075.6020602@rock-chips.com>
-Message-ID: <20151110100909.GI963@e106497-lin.cambridge.arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 10 Nov 2015 11:09:48 +0100
+Subject: [PATCH V2 2/3] scsi: fix compiler warning for sg
+In-Reply-To: <5641783D.3030108@codeaurora.org>
+References: <1447034266-28003-1-git-send-email-okaya@codeaurora.org>
+ <564177D7.7070103@codeaurora.org> <5641783D.3030108@codeaurora.org>
+Message-ID: <6427533.oLIG8d5C7c@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 10, 2015 at 04:53:09PM +0800, Mark yao wrote:
->    On 2015?11?09? 19:57, Liviu Dudau wrote:
+On Monday 09 November 2015 22:53:17 Timur Tabi wrote:
+> Sinan Kaya wrote:
+> >
+> > The code says it is using these macros for small integers only which
+> > can't overflow. I was trying to get rid of compiler warning and it seems
+> > to have disappeared.
 > 
->  Meanwhile, what is your suggestion regarding the patchset. I've seen David has
->  sent Linus a pull request for 4.4-rc1 that includes it. Should we send a
->  revert for rockchip commit and then patch later the function?
+> I would double-check the assembly code, if I were you.  I don't like it 
+> when warnings just go away like that.
 > 
->    Hi Liviu
->    ??? I had sent a patch to revert this rockchip commit, verfied rockchip drm works. So we can do the fix later.
+> Besides, we *should* be using do_div() for 64-bit division.
 
-Yeah, and I'm thinking about ACK-ing it. On one hand I would like to
-have this fixed, on the other hand I don't want the rockchip platform
-to be broken. But looking at the rest of the changes I need to do it
-doesn't feel right to make you wait for them.
+I stared at this code for some time and couldn't figure out whether it
+is actually safe or not. The point here is that it doesn't actually do
+a 64-bit division here:
 
-Best regards,
-Liviu
+	MULDIV(INT_MAX, USER_HZ, HZ)
 
-> 
->    Thanks all the same. :-)
-> 
->    -- ?ark Yao
+where all arguments are 32bit and it tries to figure out whether the
+ioctl argument is too big to fit into a 32-bit number
 
-> _______________________________________________
-> dri-devel mailing list
-> dri-devel at lists.freedesktop.org
-> http://lists.freedesktop.org/mailman/listinfo/dri-devel
+but it does a 'long' division that happens to be 64-bit long on
+architectures with the respective register size when it then does
 
+	sfp->timeout = MULDIV (val, HZ, USER_HZ);
 
--- 
-====================
-| I would like to |
-| fix the world,  |
-| but they're not |
-| giving me the   |
- \ source code!  /
-  ---------------
-    ?\_(?)_/?
+to scale up the argument from USER_HZ to the possibly larger in-kernel
+HZ value. So I think it's safe as is, but I'm still not entirely sure.
+
+	Arnd
