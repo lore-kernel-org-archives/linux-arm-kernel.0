@@ -1,73 +1,61 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 10 Nov 2015 16:25:53 +0000
-Subject: [PATCH v3 1/4] dt-bindings: add SMP enable-method for Broadcom NSP
-In-Reply-To: <56421540.1020303@broadcom.com>
-References: <1446844273-6460-1-git-send-email-kapilh@broadcom.com>
- <1446844273-6460-2-git-send-email-kapilh@broadcom.com>
- <563E6FC7.6070700@gmail.com>
- <20151108173116.GV8644@n2100.arm.linux.org.uk>
- <56421540.1020303@broadcom.com>
-Message-ID: <20151110162553.GH8644@n2100.arm.linux.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 10 Nov 2015 17:47:51 +0100
+Subject: [PATCH V2 1/3] scsi: mptxsas: try 64 bit DMA when 32 bit DMA fails
+In-Reply-To: <56421610.50005@codeaurora.org>
+References: <1447034266-28003-1-git-send-email-okaya@codeaurora.org>
+ <5349261.sTnZTFhKWB@wuerfel> <56421610.50005@codeaurora.org>
+Message-ID: <4982446.ZlJVrezq1Y@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 10, 2015 at 09:33:12PM +0530, Kapil Hali wrote:
-> Hi Russel,
+On Tuesday 10 November 2015 11:06:40 Sinan Kaya wrote:
+> On 11/10/2015 3:38 AM, Arnd Bergmann wrote:
+>  > No, as Timur found, the driver is correct and it intentionally
+> > sets the 32-bit mask, and that is guaranteed to work on all sane
+> > hardware. Don't change the driver but find a better platform for
+> > your workload, or talk to the people that are responsible for
+> > the platform and get them to fix it.
+> 
+> Platform does have an IOMMU. No issues there. I am trying to clean out 
+> the patch pipe I have in order to get this card working with and without 
+> IOMMU.
 
-Wrong.  Look at my name as sent in the From: and as quoted in the very
-next line.  As far as I'm concerned (and I don't care what other people
-say) it's disrespectful to spell people's names incorrectly.
+On PowerPC, I think we automatically enable the IOMMU whenever a DMA
+mask is set that doesn't cover all of the RAM. We could think about
+doing the same thing on ARM64 to make all devices work out of the box.
 
-> It was clear the very first time itself as pointed out by you and the 
-> lead developers and hence the change was readily sent in the very next
-> patch set. I didn't change a comment in this patch, which is misleading 
-> about the SMP enable-method used in the patch set, it is my mistake and   
-> I apologies for the same. I will change it and send the next patch set.
+> > If the platform also doesn't have an IOMMU, you can probably work
+> > around it by setting up the dma-ranges property of the PCI host
+> > to map the low PCI addresses to the start of RAM. This will also
+> > require changes in the bootloader to set up the PCI outbound translation,
+> > and it will require implementing the DMA offset on ARM64, which I was
+> > hoping to avoid.
+> 
+>  From the email thread, it looks like this was introduced to support 
+> some legacy card that has 64 bit addressing limitations and is being 
+> carried around ("rotted") since then.
+> 
+> I'm the second guy after the powerpc architecture complaining about the 
+> very same issue. Any red flags?
 
-Thanks.
+What BenH was worried about here is that the driver sets different masks
+for streaming and coherent mappings, which is indeed a worry that
+could hit us on ARM as well, but I suppose we'll have to deal with
+that in platform code.
 
-> Also, before sending out the patch set, I had asked for a clarification 
-> about the method: https://lkml.org/lkml/2015/11/6/234
+Setting both masks to 32-bit is something that a lot of drivers do,
+and without IOMMU enabled, you'd hit the same bug on all of them.
+ 
+> I can't change the address map for PCIe. SBSA requires all inbound PCIe 
+> addresses to be non-translated.
 
-Sorry, I don't read every single email irrespective of how it's marked.
-There's way too much email, and way too much mail with improperly
-classified recipient lists to be able to usefully sort this mail.
-(If you do the math, the email rate during a 12 hour working day from
-just linux-arm-kernel is one email every 2.5 minutes, assuming 300 emails
-a day.  It takes way longer than that to compose a proper reply to an
-email - I've spent around 15 minutes on this one alone.  Hence, if I'm
-busy, I more or less totally ignore email now, and rarely bother to
-"catch up" with missed emails.)
+What about changing the memory map? I suspect there will be more
+problems for you in the future when all of your RAM is at high
+addresses.  Is this something you could fix in the bootloader by
+moving the first 2GB to a different CPU physical address?
 
-> For my understanding, I am repeating my query- In case of simple method of 
-> waking up secondary core, smp_boot_secondary() will always return success 
-> indicating secondary core successfully started. I understand that in 
-> __cpu_up(), primary core waits for completion till secondary core comes 
-> online or time outs. However, is it appropriate to return successful start 
-> of secondary core without knowing if it really did?
+> I'll just have to stick with IOMMU for this card.
 
-Yes, because all that your smp_boot_secondary() should be doing is
-trying to start the core.  If you encounter an error trying to do so,
-that's what the error return is for.
+Ok. But how do you currently decide whether to use the IOMMU or not?
 
-If you just set a bit somewhere to tell the hardware to release the
-secondary core's reset, then if you set the bit and return success,
-that's prefectly acceptable.  The core ARM SMP code will then wait
-up to one second for the secondary core to become known to the kernel
-before declaring that the CPU failed to come online.
-
-If it fails to appear, we assume that it will never appear - and
-actually at that point the system is in an unknown state: if the
-secondary CPU crashed during its boot, it could start scribbling
-into memory or touching devices in an unpredictable way: the only
-sane answer is to reboot the whole system to ensure that it's back
-to a known good state.  Hence why we don't provide any cleanup at
-the point of a failed secondary CPU (I've been debating about
-tainting the kernel at that point, so we know when things have
-gone bad.)
-
-Hope this helps.
-
--- 
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+	Arnd
