@@ -1,35 +1,68 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 10 Nov 2015 13:56:51 +0100
-Subject: Grafting old platform drivers onto a new DT kernel
-In-Reply-To: <5641E6C0.8090507@free.fr>
-References: <563B3749.50701@free.fr> <yw1xh9kv5c60.fsf@unicorn.mansr.com>
- <5641E6C0.8090507@free.fr>
-Message-ID: <5369244.M0xZ8N1mEo@wuerfel>
+Date: Tue, 10 Nov 2015 13:55:33 +0100
+Subject: [PATCH, REPORT] bpf_trace: build error without PERF_EVENTS
+Message-ID: <4525348.Aq9YoXkChv@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 10 November 2015 13:44:48 Mason wrote:
-> On 09/11/2015 18:13, M?ns Rullg?rd wrote:
-> 
-> > Add something like this:
-> > 
-> > static const struct of_device_id tangox_sdio_dt_ids[] = {
-> >       { .compatible = "sigma,tangox-sdio" },
-> >       { }
-> > };
-> > 
-> > static struct platform_driver tangox_platform_sdio0 = {
-> >       .probe          = sdhci_tangox_probe,
-> 
-> It looks like one side effect of this transformation is that
-> the probe function cannot be __init anymore? Is that correct?
-> 
-> For this one particular driver, it weighs 944 bytes. (I guess
-> a few kilobytes wasted is no big deal...)
+In my ARM randconfig tests, I'm getting a build error for
+newly added code in bpf_perf_event_read and bpf_perf_event_output
+whenever CONFIG_PERF_EVENTS is disabled:
 
-Strictly speaking, it was already broken before. You can
-detach and reattach a device from a driver through sysfs,
-and that will call the probe function again, so it cannot
-be marked as __init.
+kernel/trace/bpf_trace.c: In function 'bpf_perf_event_read':
+kernel/trace/bpf_trace.c:203:11: error: 'struct perf_event' has no member named 'oncpu'
+if (event->oncpu != smp_processor_id() ||
+         ^
+kernel/trace/bpf_trace.c:204:11: error: 'struct perf_event' has no member named 'pmu'
+      event->pmu->count)
 
-	Arnd
+This can happen when UPROBE_EVENT is enabled but KPROBE_EVENT
+is disabled. I'm not sure if that is a configuration we care
+about, otherwise we could prevent this case from occuring by
+adding Kconfig dependencies.
+
+Simply hiding the broken code inside #ifdef CONFIG_PERF_EVENTS
+as this patch does seems to reliably fix the error as well,
+I have built thousands of randconfig kernels since I started
+seeing this and added the workaround.
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Fixes: 62544ce8e01c ("bpf: fix bpf_perf_event_read() helper")
+Fixes: a43eec304259 ("bpf: introduce bpf_perf_event_output() helper")
+---
+I suspect my patch is not the right answer, but could someone please
+fix this?
+
+diff --git a/kernel/trace/bpf_trace.c b/kernel/trace/bpf_trace.c
+index 4228fd3682c3..82e0bc9d002a 100644
+--- a/kernel/trace/bpf_trace.c
++++ b/kernel/trace/bpf_trace.c
+@@ -186,6 +186,7 @@ const struct bpf_func_proto *bpf_get_trace_printk_proto(void)
+ 	return &bpf_trace_printk_proto;
+ }
+ 
++#if IS_ENABLED(CONFIG_PERF_EVENTS)
+ static u64 bpf_perf_event_read(u64 r1, u64 index, u64 r3, u64 r4, u64 r5)
+ {
+ 	struct bpf_map *map = (struct bpf_map *) (unsigned long) r1;
+@@ -263,6 +264,7 @@ static const struct bpf_func_proto bpf_perf_event_output_proto = {
+ 	.arg4_type	= ARG_PTR_TO_STACK,
+ 	.arg5_type	= ARG_CONST_STACK_SIZE,
+ };
++#endif
+ 
+ static const struct bpf_func_proto *kprobe_prog_func_proto(enum bpf_func_id func_id)
+ {
+@@ -289,10 +291,12 @@ static const struct bpf_func_proto *kprobe_prog_func_proto(enum bpf_func_id func
+ 		return bpf_get_trace_printk_proto();
+ 	case BPF_FUNC_get_smp_processor_id:
+ 		return &bpf_get_smp_processor_id_proto;
++#if IS_ENABLED(CONFIG_PERF_EVENTS)
+ 	case BPF_FUNC_perf_event_read:
+ 		return &bpf_perf_event_read_proto;
+ 	case BPF_FUNC_perf_event_output:
+ 		return &bpf_perf_event_output_proto;
++#endif
+ 	default:
+ 		return NULL;
+ 	}
