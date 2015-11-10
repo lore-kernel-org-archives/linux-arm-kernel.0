@@ -1,42 +1,33 @@
 From: thierry.reding@gmail.com (Thierry Reding)
-Date: Tue, 10 Nov 2015 18:32:57 +0100
-Subject: [PATCH v4] pwm-backlight: Avoid backlight flicker when probed
- from DT
-In-Reply-To: <3447562.c3gSANEMio@phil>
-References: <1446483356-14338-1-git-send-email-p.zabel@pengutronix.de>
- <3447562.c3gSANEMio@phil>
-Message-ID: <20151110173257.GA21727@ulmo>
+Date: Tue, 10 Nov 2015 18:34:16 +0100
+Subject: [PATCH v3 00/12] pwm: add support for atomic update
+In-Reply-To: <2341981.a79ioYM9Es@diego>
+References: <1442828009-6241-1-git-send-email-boris.brezillon@free-electrons.com>
+ <2341981.a79ioYM9Es@diego>
+Message-ID: <20151110173416.GB21727@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 10, 2015 at 03:18:10PM +0100, Heiko Stuebner wrote:
-> Hi Philipp,
+On Mon, Oct 19, 2015 at 12:12:12PM +0200, Heiko St?bner wrote:
+> Hi Thierry,
 > 
-> Am Montag, 2. November 2015, 17:55:56 schrieb Philipp Zabel:
-> > If the driver is probed from the device tree, and there is a phandle
-> > property set on it, and the enable GPIO is already configured as output,
-> > and the backlight is currently disabled, keep it disabled.
-> > If all these conditions are met, assume there will be some other driver
-> > that can enable the backlight at the appropriate time.
+> Am Montag, 21. September 2015, 11:33:17 schrieb Boris Brezillon:
+> > Hello,
 > > 
-> > Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
-> > Reviewed-by: Christian Gmeiner <christian.gmeiner@gmail.com>
+> > This series adds support for atomic PWM update, or IOW, the capability
+> > to update all the parameters of a PWM device (enabled/disabled, period,
+> > duty and polarity) in one go.
 > 
-> this patch improves the white screen when booting a veyron chromebook
-> a lot. I still see a small white flash, but that can probably come from
-> the WIP edp driver.
+> is anything more blocking this series? It's now sitting on the lists for 
+> nearly a month and everybody seems happy with it, so it would be really nice 
+> to have in mainline :-) .
+> 
+> Especially as this also makes it possible for Rockchip Chromebooks to actually 
+> control the logic-regulator that is implemented as pwm-regulator there.
 
-Some panels require a couple of frames before they actually enable. You
-may want to look at the datasheet of your panel to see if it has some
-specific requirement and update the panel driver with that.
-
->From a high-level view the way that this is supposed to work is that
-your encoder driver (e.g. eDP) "prepares" the panel, then starts sending
-frames and finally "enables" the panel. With something like the simple
-panel driver you can influence this by setting the delay.enable field in
-the panel descriptor.
-
-See struct panel_desc in drivers/gpu/drm/panel/panel-simple.c
+Last time I tried to put this into linux-next I got immediately
+bombarded by a number of build failures, so I backed things out. The
+current plan is to give this another try after v4.4-rc1.
 
 Thierry
 -------------- next part --------------
@@ -45,4 +36,4 @@ Name: signature.asc
 Type: application/pgp-signature
 Size: 819 bytes
 Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151110/9e3d4e8b/attachment.sig>
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151110/e697db3d/attachment.sig>
