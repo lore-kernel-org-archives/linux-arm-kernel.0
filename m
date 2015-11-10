@@ -1,35 +1,59 @@
-From: jens.wiklander@linaro.org (Jens Wiklander)
-Date: Tue, 10 Nov 2015 16:25:19 +0100
-Subject: [PATCH 2/4] arm: add implementation for arm-smccc
-In-Reply-To: <20151106122510.GJ6087@arm.com>
-References: <1446630372-1598-1-git-send-email-jens.wiklander@linaro.org>
- <1446630372-1598-3-git-send-email-jens.wiklander@linaro.org>
- <20151104102327.GJ8644@n2100.arm.linux.org.uk>
- <20151106122510.GJ6087@arm.com>
-Message-ID: <20151110152518.GA1702@ermac>
+From: john.stultz@linaro.org (John Stultz)
+Date: Tue, 10 Nov 2015 07:26:01 -0800
+Subject: [PATCH v2 1/7] timekeeping: introduce __current_kernel_time64
+In-Reply-To: <alpine.DEB.2.02.1511101507540.5676@kaball.uk.xensource.com>
+References: <alpine.DEB.2.02.1511101131350.5676@kaball.uk.xensource.com>
+ <1447156675-7418-1-git-send-email-stefano.stabellini@eu.citrix.com>
+ <4372800.FdTygmcuyo@wuerfel>
+ <alpine.DEB.2.02.1511101507540.5676@kaball.uk.xensource.com>
+Message-ID: <CALAqxLUEOWP6CJxY021nDR6cEQf3VZtm8fa9waK2a=OmQJEO-g@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 06, 2015 at 12:25:10PM +0000, Will Deacon wrote:
-> On Wed, Nov 04, 2015 at 10:23:27AM +0000, Russell King - ARM Linux wrote:
-> > On Wed, Nov 04, 2015 at 10:46:10AM +0100, Jens Wiklander wrote:
-> > > +	.macro SMCCC instr
-> > > +	mov	r12, sp
-> > > +	push	{r4-r7}
-> > > +	ldm	r12, {r4-r7}
-> > > +	\instr
-> > > +	pop	{r4-r7}
-> > > +	ldr	r12, [sp, #(4 * 4)]
-> > > +	stm	r12, {r0-r3}
-> > > +	bx	lr
-> > > +	.endm
-> > 
-> > Please add unwinding support to this.
-> 
-> Likewise for the arm64 part (which should be easy with
-> .cfi_startproc/.cfi_endproc).
+On Tue, Nov 10, 2015 at 7:10 AM, Stefano Stabellini
+<stefano.stabellini@eu.citrix.com> wrote:
+> On Tue, 10 Nov 2015, Arnd Bergmann wrote:
+>> On Tuesday 10 November 2015 11:57:49 Stefano Stabellini wrote:
+>> > __current_kernel_time64 returns a struct timespec64, without taking the
+>> > xtime lock. Mirrors __current_kernel_time/current_kernel_time.
+>> >
+>>
+>> Actually it doesn't mirror __current_kernel_time/current_kernel_time
+>>
+>> > diff --git a/include/linux/timekeeping.h b/include/linux/timekeeping.h
+>> > index ec89d84..b5802bf 100644
+>> > --- a/include/linux/timekeeping.h
+>> > +++ b/include/linux/timekeeping.h
+>> > @@ -19,7 +19,8 @@ extern int do_sys_settimeofday(const struct timespec *tv,
+>> >   */
+>> >  unsigned long get_seconds(void);
+>> >  struct timespec64 current_kernel_time64(void);
+>> > -/* does not take xtime_lock */
+>> > +/* do not take xtime_lock */
+>> > +struct timespec64 __current_kernel_time64(void);
+>> >  struct timespec __current_kernel_time(void);
+>>
+>> Please change __current_kernel_time into a static inline function
+>> while you are introducing the new one, to match the patch description ;-)
+>
+> The implementation is:
+>
+>         struct timekeeper *tk = &tk_core.timekeeper;
+>
+>         return timespec64_to_timespec(tk_xtime(tk));
+>
+> which cannot be easily made into a static inline, unless we start
+> exporting tk_core.
 
-Thanks for the feedback, I'll send out a v2 with this.
+So the timekeeper is passed to the notifier. So you probably want something like
 
---
-Jens
+struct timespec64 __current_kernel_time64(struct timekeeper *tk)
+{
+ return timespec64_to_timespec(tk_xtime(tk));
+}
+
+Then you can cast the priv pointer in the notifier to a timekeeper and
+use it that way?
+
+thanks
+-john
