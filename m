@@ -1,49 +1,45 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 10 Nov 2015 13:32:10 +0100
-Subject: [PATCH v2 4/7] xen: introduce XENPF_settime64
-In-Reply-To: <1447156675-7418-4-git-send-email-stefano.stabellini@eu.citrix.com>
+Date: Tue, 10 Nov 2015 13:35:41 +0100
+Subject: [PATCH v2 6/7] xen/arm: introduce xen_read_wallclock
+In-Reply-To: <1447156675-7418-6-git-send-email-stefano.stabellini@eu.citrix.com>
 References: <alpine.DEB.2.02.1511101131350.5676@kaball.uk.xensource.com>
- <1447156675-7418-4-git-send-email-stefano.stabellini@eu.citrix.com>
-Message-ID: <3704230.3XlU4asf6t@wuerfel>
+ <1447156675-7418-6-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <3711503.LuojCRibK3@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 10 November 2015 11:57:52 Stefano Stabellini wrote:
-> Rename the current XENPF_settime hypercall and related struct to
-> XENPF_settime32.
-> 
-> Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-> CC: konrad.wilk at oracle.com
-> CC: david.vrabel at citrix.com
-> CC: boris.ostrovsky at oracle.com
+On Tuesday 10 November 2015 11:57:54 Stefano Stabellini wrote:
+> +static void xen_read_wallclock(struct timespec64 *ts)
+> +{
+> +       u32 version;
+> +       u64 delta;
+> +       struct timespec64 now;
+> +       struct shared_info *s = HYPERVISOR_shared_info;
+> +       struct pvclock_wall_clock *wall_clock = &(s->wc);
+> +
+> +       /* get wallclock at system boot */
+> +       do {
+> +               version = wall_clock->version;
+> +               rmb();          /* fetch version before time */
+> +               now.tv_sec  = ((uint64_t)wall_clock->sec_hi << 32) | wall_clock->sec;
+> +               now.tv_nsec = wall_clock->nsec;
+> +               rmb();          /* fetch time before checking version */
+> +       } while ((wall_clock->version & 1) || (version != wall_clock->version));
+> +
+> +       delta = arch_timer_read_counter() * (u64)NSEC_PER_SEC;
+> +       do_div(delta, arch_timer_get_rate());     /* time since system boot */
+> +       delta += now.tv_sec * (u64)NSEC_PER_SEC + now.tv_nsec;
+> +
+> +       now.tv_nsec = do_div(delta, NSEC_PER_SEC);
+> +       now.tv_sec = delta;
+> +
+> +       set_normalized_timespec64(ts, now.tv_sec, now.tv_nsec);
+> +
+> +}
 
-Looks good.
-
-> ---
->  arch/x86/xen/time.c              |    8 ++++----
->  include/xen/interface/platform.h |   18 ++++++++++++++----
->  2 files changed, 18 insertions(+), 8 deletions(-)
-> 
-> diff --git a/arch/x86/xen/time.c b/arch/x86/xen/time.c
-> index 663c2ea..3bbd377 100644
-> --- a/arch/x86/xen/time.c
-> +++ b/arch/x86/xen/time.c
-> @@ -134,10 +134,10 @@ static int xen_pvclock_gtod_notify(struct notifier_block *nb,
->         if (!was_set && timespec_compare(&now, &next_sync) < 0)
->                 return NOTIFY_OK;
->  
-> -       op.cmd = XENPF_settime;
-> -       op.u.settime.secs = now.tv_sec;
-> -       op.u.settime.nsecs = now.tv_nsec;
-> -       op.u.settime.system_time = xen_clocksource_read();
-> +       op.cmd = XENPF_settime32;
-> +       op.u.settime32.secs = now.tv_sec;
-> +       op.u.settime32.nsecs = now.tv_nsec;
-> +       op.u.settime32.system_time = xen_clocksource_read();
->  
->         (void)HYPERVISOR_platform_op(&op);
-
-I suppose someone will have to get back to this eventually and
-change the code to try XENPF_settime64 first.
+Instead of the two do_div(), I would do the entire calculation in
+terms of nanoseconds and then call ns_to_timespec64() in the end
+instead of set_normalized_timespec64(). That is just an optimization
+though, your version looks correct as well.
 
 	Arnd
