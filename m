@@ -1,58 +1,101 @@
-From: gabriele.paoloni@huawei.com (Gabriele Paoloni)
-Date: Tue, 10 Nov 2015 06:19:17 +0000
-Subject: [PATCH] drivers: pci: remove unused pci_sys_data structures
-In-Reply-To: <7247058.o5kTvZ3CSC@wuerfel>
-References: <1447095459-21777-1-git-send-email-lorenzo.pieralisi@arm.com>
- <7247058.o5kTvZ3CSC@wuerfel>
-Message-ID: <EE11001F9E5DDD47B7634E2F8A612F2E162A5EC2@lhreml503-mbs>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Tue, 10 Nov 2015 07:46:16 +0100
+Subject: [PATCH 1/2] drm/rockchip: create the fake mmap offset during gem
+ creation
+In-Reply-To: <56418C07.60208@rock-chips.com>
+References: <4982827.0pnZflEOSR@phil> <56418C07.60208@rock-chips.com>
+Message-ID: <5676968.2ELIqayQry@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd
+Hi Mark,
 
-[...]
+Am Dienstag, 10. November 2015, 14:17:43 schrieb Mark yao:
+> Hi Heiko
+>       I don't think this patch is needed for rockchip drm, since 
+> rockchip drm only use kms.
+> I saw the discussion about ("drm/exynos: create a fake mmap offset with 
+> gem creation"),
+> Inki said that: "This patch makes drm_gem_create_mmap_offset to be 
+> called even in case of
+> not using dumb* interfaces. I.e., exynos_drm_gem_create_ioctl -> 
+> exynos_drm_gem_mmap"
 > 
-> Nice!
-> 
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
-> 
-> On the downside, I just saw how b3a72384fe29 ("ARM/PCI: Replace
-> pci_sys_data->align_resource with global function pointer") manages
-> to get rid of the last user of this, and how this is not the way
-> we had planned for it to be done.
-> 
-> It doesn't matter that much, because there is only a single
-> user of hw->align_resource, but this is now unportable code and
-> cannot easily be separated from hw_pci. It also breaks if we ever
-> get a machine with two different host controllers on ARM that
-> don't use the same pointer here.
-> 
-> I really would have hoped we could put that function pointer
-> into 'struct pci_host_bridge' instead, and eventually killed
-> off the architecture specific pcibios_align_resource function
-> as well.
+> So I think this patch doesn't make sense for rockchip drm.
 
-say we move that in pci_host_bridge struct,
+ok :-) . I'm not that knowledgable when it comes to drm and just found that 
+similar change in exynos while searching for the dma issue.
 
-Are you suggesting to modify pcibios_init_hw to assign the 
-align_resource function pointer at the end after
-pci_scan_root_bus_msi() has created the host bridge structure;
-then we can retrieve it in pcibios_align_resource using
-pci_find_host_bridge(dev->bus)....?
+So we can drop this patch and you could just merge patch2 as well as
+
+	[RESEND PATCH] drm/rockchip: vop: Correct enabled clocks during setup
+
+from Sjoerd and send these two to Dave as fixes for 4.4?
+
+
+Thanks
+Heiko
 
 > 
-> Any idea why it was done with a global function pointer for
-> ARM rather than a proper solution?
-
-Well just because I didn't think about the solution above...
-
-If you think the above one can work I can send out another
-patch to fix this...
-
-Many Thanks
-
-Gab
-
-
 > 
-> 	Arnd
+> On 2015?11?10? 03:50, Heiko Stuebner wrote:
+> > Similarly to the equivalent exynos-fix in commit 48cf53f4343a
+> > ("drm/exynos: create a fake mmap offset with gem creation") the rockchip
+> > drm driver also calls the drm_gem_create_mmap_offset fake-offset creation
+> > on every invocation of rockchip_gem_dumb_map_offset.
+> >
+> > Move that to the creation of the gem to only create that offset once.
+> >
+> > Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> > ---
+> >   drivers/gpu/drm/rockchip/rockchip_drm_gem.c | 12 ++++++------
+> >   1 file changed, 6 insertions(+), 6 deletions(-)
+> >
+> > diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_gem.c 
+b/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
+> > index 4ab2f20..e50d113 100644
+> > --- a/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
+> > +++ b/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
+> > @@ -126,8 +126,14 @@ struct rockchip_gem_object *
+> >   	if (ret)
+> >   		goto err_free_rk_obj;
+> >   
+> > +	ret = drm_gem_create_mmap_offset(obj);
+> > +	if (ret)
+> > +		goto err_free_buf;
+> > +
+> >   	return rk_obj;
+> >   
+> > +err_free_buf:
+> > +	rockchip_gem_free_buf(rk_obj);
+> >   err_free_rk_obj:
+> >   	kfree(rk_obj);
+> >   	return ERR_PTR(ret);
+> > @@ -196,7 +202,6 @@ int rockchip_gem_dumb_map_offset(struct drm_file 
+*file_priv,
+> >   				 uint64_t *offset)
+> >   {
+> >   	struct drm_gem_object *obj;
+> > -	int ret;
+> >   
+> >   	obj = drm_gem_object_lookup(dev, file_priv, handle);
+> >   	if (!obj) {
+> > @@ -204,14 +209,9 @@ int rockchip_gem_dumb_map_offset(struct drm_file 
+*file_priv,
+> >   		return -EINVAL;
+> >   	}
+> >   
+> > -	ret = drm_gem_create_mmap_offset(obj);
+> > -	if (ret)
+> > -		goto out;
+> > -
+> >   	*offset = drm_vma_node_offset_addr(&obj->vma_node);
+> >   	DRM_DEBUG_KMS("offset = 0x%llx\n", *offset);
+> >   
+> > -out:
+> >   	drm_gem_object_unreference_unlocked(obj);
+> >   
+> >   	return 0;
+> 
+> 
+> 
