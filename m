@@ -1,68 +1,95 @@
 From: kapilh@broadcom.com (Kapil Hali)
-Date: Tue, 10 Nov 2015 21:51:32 +0530
-Subject: [PATCH RESEND v2 3/4] ARM: BCM: Add SMP support for Broadcom NSP
-In-Reply-To: <CAGVrzca34xrVznoEE2e26JyR11Q9L1sT4mJcNZ=NuprqUnZnjw@mail.gmail.com>
-References: <1446839371-22601-1-git-send-email-kapilh@broadcom.com>
- <1446839371-22601-4-git-send-email-kapilh@broadcom.com>
- <CACRpkdZN-iwdR_VwktdHsw+rGQLhCgmWnERYVDE+KaYOqJR30w@mail.gmail.com>
- <CAGVrzca34xrVznoEE2e26JyR11Q9L1sT4mJcNZ=NuprqUnZnjw@mail.gmail.com>
-Message-ID: <5642198C.2040205@broadcom.com>
+Date: Tue, 10 Nov 2015 21:56:17 +0530
+Subject: [PATCH v3 1/4] dt-bindings: add SMP enable-method for Broadcom NSP
+In-Reply-To: <CAL_JsqL4FqEFN848eZjnnCj_1N7C1K1OkzFHLVxgG5srHpdGEw@mail.gmail.com>
+References: <1446844273-6460-1-git-send-email-kapilh@broadcom.com>
+ <1446844273-6460-2-git-send-email-kapilh@broadcom.com>
+ <CAL_JsqL4FqEFN848eZjnnCj_1N7C1K1OkzFHLVxgG5srHpdGEw@mail.gmail.com>
+Message-ID: <56421AA9.5010106@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Florian, Linus,
+Hi Rob,
 
-On 11/10/2015 7:59 AM, Florian Fainelli wrote:
-> 2015-11-09 2:09 GMT-08:00 Linus Walleij <linus.walleij@linaro.org>:
->> On Fri, Nov 6, 2015 at 8:49 PM, Kapil Hali <kapilh@broadcom.com> wrote:
+On 11/7/2015 11:33 PM, Rob Herring wrote:
+> On Fri, Nov 6, 2015 at 3:11 PM, Kapil Hali <kapilh@broadcom.com> wrote:
+>> Add a compatible string "brcm,bcm-nsp-smp" for Broadcom's
+>> Northstar Plus CPU to the 32-bit ARM CPU device tree binding
+>> documentation file and create a new binding documentation for
+>> Northstar Plus CPU.
 >>
->>> Add SMP support for Broadcom's Northstar Plus SoC
->>> cpu enable method. This changes also consolidates
->>> iProc family's - BCM NSP and BCM Kona, platform
->>> SMP handling in a common file.
->>>
->>> Northstar Plus SoC is based on ARM Cortex-A9
->>> revision r3p0 which requires configuration for ARM
->>> Errata 764369 for SMP. This change adds the needed
->>> configuration option.
->>>
->>> Signed-off-by: Kapil Hali <kapilh@broadcom.com>
+>> Signed-off-by: Kapil Hali <kapilh@broadcom.com>
+>> ---
+>>  .../bindings/arm/bcm/brcm,nsp-cpu-method.txt       | 36 ++++++++++++++++++++++
+>>  Documentation/devicetree/bindings/arm/cpus.txt     |  1 +
+>>  2 files changed, 37 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/arm/bcm/brcm,nsp-cpu-method.txt
 >>
->> This version looks saner to me.
->>
->>> +static int nsp_write_lut(void)
->>> +{
->>> +       void __iomem *sku_rom_lut;
->>> +       phys_addr_t secondary_startup_phy;
->>> +
->>> +       if (!secondary_boot) {
->>> +               pr_warn("required secondary boot register not specified\n");
->>> +               return -EINVAL;
->>> +       }
->>> +
->>> +       sku_rom_lut = ioremap_nocache((phys_addr_t)secondary_boot,
->>> +                                               sizeof(secondary_boot));
->>
->> Why is this address not just taken directly from the device tree?
+>> diff --git a/Documentation/devicetree/bindings/arm/bcm/brcm,nsp-cpu-method.txt b/Documentation/devicetree/bindings/arm/bcm/brcm,nsp-cpu-method.txt
+>> new file mode 100644
+>> index 0000000..8506da7
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/arm/bcm/brcm,nsp-cpu-method.txt
+>> @@ -0,0 +1,36 @@
+>> +Broadcom Northstar Plus SoC CPU Enable Method
+>> +---------------------------------------------
+>> +This binding defines the enable method used for starting secondary
+>> +CPUs in the following Broadcom SoCs:
+>> +  BCM58522, BCM58525, BCM58535, BCM58622, BCM58623, BCM58625, BCM88312
+>> +
+>> +The enable method is specified by defining the following required
+>> +properties in the "cpus" device tree node:
+>> +  - enable-method = "brcm,bcm-nsp-smp";
 > 
-> It comes directly from DT, that's what bcm_smp_prepare_cpus() does
-> read from Device Tree.
+> As I said already, this is supposed to be per cpu.
 > 
+>> +  - secondary-boot-reg = <...>;
+> 
+> And then you might as well move this too.
+> 
+NS/NSP family of SoCs have maximum of two cores. There would not be a
+need for another boot-reg in this family of SoCs. However, I agree, it 
+should go to individual CPU nodes. I will do the change in the next patch.
+>> +
+>> +The secondary-boot-reg property is a u32 value that specifies the
+>> +physical address of the register used to request the ROM holding pen
+>> +code release a secondary CPU.
+>> +
+>> +Example:
+>> +       cpus {
+>> +               #address-cells = <1>;
+>> +               #size-cells = <0>;
+>> +               enable-method = "brcm,bcm-nsp-smp";
+>> +               secondary-boot-reg = <0xffff042c>;
+>> +
+>> +               cpu0: cpu at 0 {
+>> +                       device_type = "cpu";
+>> +                       compatible = "arm,cortex-a9";
+>> +                       next-level-cache = <&L2>;
+>> +                       reg = <0>;
+>> +               };
+>> +
+>> +               cpu1: cpu at 1 {
+>> +                       device_type = "cpu";
+>> +                       compatible = "arm,cortex-a9";
+>> +                       next-level-cache = <&L2>;
+>> +                       reg = <1>;
+>> +               };
+>> +       };
+>> diff --git a/Documentation/devicetree/bindings/arm/cpus.txt b/Documentation/devicetree/bindings/arm/cpus.txt
+>> index 91e6e5c..6abe3f3 100644
+>> --- a/Documentation/devicetree/bindings/arm/cpus.txt
+>> +++ b/Documentation/devicetree/bindings/arm/cpus.txt
+>> @@ -191,6 +191,7 @@ nodes to be present and contain the properties described below.
+>>                             "allwinner,sun8i-a23"
+>>                             "arm,psci"
+>>                             "brcm,brahma-b15"
+>> +                           "brcm,bcm-nsp-smp"
+>>                             "marvell,armada-375-smp"
+>>                             "marvell,armada-380-smp"
+>>                             "marvell,armada-390-smp"
+>> --
+>> 2.1.0
 >>
->> If it is not in the device tree: why?
->>
->> Also give it a sane name, bcm_sec_boot_address or so.
->> "secondary_boot" sounds like a function you call to boot
->> the second core.
-> 
-> Agree with that, there could be a better name which better reflects
-> this is a variable.
-> 
-As this change is consolidating SMP implementation, I kept the same 
-name of the variable which was used in kona_smp.c so that the changes
-in the common code is minimal. Also, the fact that the change is part
-of up-streamed code, I didn't alter with the variable name. Shall I 
-change it in the next patch?
-
 Thanks,
-Kapil
+Kapil Hali
