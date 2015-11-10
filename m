@@ -1,101 +1,25 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Tue, 10 Nov 2015 09:06:41 +0900
-Subject: [PATCH v2] ARM: shmobile: Introduce ARCH_RENESAS
-Message-ID: <1447114001-7731-1-git-send-email-horms+renesas@verge.net.au>
+From: horms@verge.net.au (Simon Horman)
+Date: Tue, 10 Nov 2015 09:10:38 +0900
+Subject: [PATCH] ARM: shmobile: r8a7793: Add thermal device to DT
+In-Reply-To: <CAMuHMdV-xGYvsSU1xXvB1Z9ssPD0yW_mFg=vre+dyLzs6wmiTw@mail.gmail.com>
+References: <1446795048-29767-1-git-send-email-horms+renesas@verge.net.au>
+ <CAMuHMdV-xGYvsSU1xXvB1Z9ssPD0yW_mFg=vre+dyLzs6wmiTw@mail.gmail.com>
+Message-ID: <20151110001037.GA1040@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The purpose of this patch is to start the process of replacing both
-ARCH_SHMOBILE and ARCH_SHMOBILE_MULTI with ARCH_RENESAS.
+On Fri, Nov 06, 2015 at 09:50:27AM +0100, Geert Uytterhoeven wrote:
+> On Fri, Nov 6, 2015 at 8:30 AM, Simon Horman <horms+renesas@verge.net.au> wrote:
+> > Instantiate the thermal sensor in the r8a7793 device tree.
+> >
+> > Based on very similar work for the r8a7790 by Magnus Damm.
+> 
+> Given the similarity of R-Car M2-N and M2-W, I would have referred
+> to r8a7791 ;-)
+> 
+> > Cc: Magnus Damm <damm@opensource.se>
+> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> 
+> Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
 
-RENESAS seems to be a more appropriate name than SHMOBILE for the majority
-of Renesas 32-bit ARM based SoCs. The name is conveniently also (newer)
-ARM64 based SoCs.
-
-This patches only addresses 32-bit ARM based SoCs.  Proposed support for
-the ARM64 based r8a7795 SoC already uses ARCH_RENESAS which selects
-ARCH_SHMOBILE.
-
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-
----
-* ARM64 patch is
-  "[PATCH v12 1/7] arm64: renesas: r8a7795: Add Renesas R8A7795 SoC support"
-  http://www.spinics.net/lists/arm-kernel/msg455822.html
-
-v2
-* Leave 'menuconfig' in tact rather than converting to 'config'.
-  As suggested by Arnd Bergmann
-* Reword changelog
----
- arch/arm/configs/multi_v7_defconfig |  2 +-
- arch/arm/configs/shmobile_defconfig |  2 +-
- arch/arm/mach-shmobile/Kconfig      | 10 +++++++---
- 3 files changed, 9 insertions(+), 5 deletions(-)
-
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index a5c6ebf39b0a..dc4a216e2e41 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -73,7 +73,7 @@ CONFIG_MACH_SPEAR1340=y
- CONFIG_ARCH_STI=y
- CONFIG_ARCH_EXYNOS=y
- CONFIG_EXYNOS5420_MCPM=y
--CONFIG_ARCH_SHMOBILE_MULTI=y
-+CONFIG_ARCH_RENESAS=y
- CONFIG_ARCH_EMEV2=y
- CONFIG_ARCH_R7S72100=y
- CONFIG_ARCH_R8A73A4=y
-diff --git a/arch/arm/configs/shmobile_defconfig b/arch/arm/configs/shmobile_defconfig
-index 3aef019c0de7..cc8ece33a7e3 100644
---- a/arch/arm/configs/shmobile_defconfig
-+++ b/arch/arm/configs/shmobile_defconfig
-@@ -9,7 +9,7 @@ CONFIG_SYSCTL_SYSCALL=y
- CONFIG_EMBEDDED=y
- CONFIG_PERF_EVENTS=y
- CONFIG_SLAB=y
--CONFIG_ARCH_SHMOBILE_MULTI=y
-+CONFIG_ARCH_RENESAS=y
- CONFIG_ARCH_EMEV2=y
- CONFIG_ARCH_R7S72100=y
- CONFIG_ARCH_R8A73A4=y
-diff --git a/arch/arm/mach-shmobile/Kconfig b/arch/arm/mach-shmobile/Kconfig
-index 88734a5e10ca..4ed72b124235 100644
---- a/arch/arm/mach-shmobile/Kconfig
-+++ b/arch/arm/mach-shmobile/Kconfig
-@@ -1,6 +1,8 @@
- config ARCH_SHMOBILE
- 	bool
--	select ZONE_DMA if ARM_LPAE
-+
-+config ARCH_SHMOBILE_MULTI
-+	bool
- 
- config PM_RCAR
- 	bool
-@@ -29,10 +31,11 @@ config ARCH_RMOBILE
- 	select SYS_SUPPORTS_SH_CMT
- 	select SYS_SUPPORTS_SH_TMU
- 
--menuconfig ARCH_SHMOBILE_MULTI
-+menuconfig ARCH_RENESAS
- 	bool "Renesas ARM SoCs" if ARCH_MULTI_V7
- 	depends on MMU
- 	select ARCH_SHMOBILE
-+	select ARCH_SHMOBILE_MULTI
- 	select HAVE_ARM_SCU if SMP
- 	select HAVE_ARM_TWD if SMP
- 	select ARM_GIC
-@@ -40,8 +43,9 @@ menuconfig ARCH_SHMOBILE_MULTI
- 	select NO_IOPORT_MAP
- 	select PINCTRL
- 	select ARCH_REQUIRE_GPIOLIB
-+	select ZONE_DMA if ARM_LPAE
- 
--if ARCH_SHMOBILE_MULTI
-+if ARCH_RENESAS
- 
- #comment "Renesas ARM SoCs System Type"
- 
--- 
-2.1.4
+Thanks, I have queued this up.
