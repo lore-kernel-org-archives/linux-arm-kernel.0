@@ -1,40 +1,69 @@
-From: laura@labbott.name (Laura Abbott)
-Date: Mon, 9 Nov 2015 17:34:11 -0800
-Subject: [PATCHv4] mm: Don't offset memmap for flatmem
-In-Reply-To: <CA+8MBbLGdYfQRPnVmT=te1y3C7PhCcXqbDGXb7LtqvCWTA+vDQ@mail.gmail.com>
-References: <1444253335-5811-1-git-send-email-labbott@fedoraproject.org>
- <CA+8MBbLGdYfQRPnVmT=te1y3C7PhCcXqbDGXb7LtqvCWTA+vDQ@mail.gmail.com>
-Message-ID: <56414993.8070709@labbott.name>
+From: van.freenix@gmail.com (Peng Fan)
+Date: Tue, 10 Nov 2015 09:56:26 +0800
+Subject: [RFC V3] iommu: arm-smmu: correct group reference count
+Message-ID: <1447120586-17847-1-git-send-email-van.freenix@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/9/15 3:20 PM, Tony Luck wrote:
->> @@ -4984,9 +4987,9 @@ static void __init_refok alloc_node_mem_map(struct pglist_data *pgdat)
->>           */
->>          if (pgdat == NODE_DATA(0)) {
->>                  mem_map = NODE_DATA(0)->node_mem_map;
->> -#ifdef CONFIG_HAVE_MEMBLOCK_NODE_MAP
->> +#if defined(CONFIG_HAVE_MEMBLOCK_NODE_MAP) || defined(CONFIG_FLATMEM)
->>                  if (page_to_pfn(mem_map) != pgdat->node_start_pfn)
->> -                       mem_map -= (pgdat->node_start_pfn - ARCH_PFN_OFFSET);
->> +                       mem_map -= offset;
->>   #endif /* CONFIG_HAVE_MEMBLOCK_NODE_MAP */
->>          }
->>   #endif
->
-> This piece breaks ia64.  See the comment earlier in the function
-> that "ia64 gets its own node_mem_map" ... so we skip the initialization
-> of offset ... and arrive down here and just subtract "0" from mem_map.
->
-> Attached patch fixes ia64 ... does ARM still work if this is applied?
->
-> -Tony
->
+The basic flow for add a device:
+ arm_smmu_add_device
+        |->iommu_group_get_for_dev
+            |->iommu_group_get
+                     return group;  (1)
+            |->ops->device_group : Init/increase reference count to/by 1.
+            |->iommu_group_add_device : Increase reference count by 1.
+		     return group   (2)
+        |->return 0;
 
-Yes, this still fixes the problem for me. I see the pfn <-> page
-translation working as expected.
+Since we are adding one device, the flow is (2) and the group reference
+count will be increased by 2. So, we need to add iommu_group_put at the
+end of arm_smmu_add_device to decrease the count by 1.
 
-Tested-by: Laura Abbott <laura@labbott.name>
+Signed-off-by: Peng Fan <van.freenix@gmail.com>
+Cc: Will Deacon <will.deacon@arm.com>
+---
+ drivers/iommu/arm-smmu-v3.c | 7 ++++++-
+ drivers/iommu/arm-smmu.c    | 2 ++
+ 2 files changed, 8 insertions(+), 1 deletion(-)
 
-Thanks,
-Laura
+diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+index 4e5118a..ac333ee 100644
+--- a/drivers/iommu/arm-smmu-v3.c
++++ b/drivers/iommu/arm-smmu-v3.c
+@@ -1825,8 +1825,10 @@ static int arm_smmu_add_device(struct device *dev)
+ 	pci_for_each_dma_alias(pdev, __arm_smmu_get_pci_sid, &sid);
+ 	for (i = 0; i < smmu_group->num_sids; ++i) {
+ 		/* If we already know about this SID, then we're done */
+-		if (smmu_group->sids[i] == sid)
++		if (smmu_group->sids[i] == sid) {
++			iommu_group_put(group);
+ 			return 0;
++		}
+ 	}
+ 
+ 	/* Check the SID is in range of the SMMU and our stream table */
+@@ -1855,6 +1857,9 @@ static int arm_smmu_add_device(struct device *dev)
+ 	/* Add the new SID */
+ 	sids[smmu_group->num_sids - 1] = sid;
+ 	smmu_group->sids = sids;
++
++	iommu_group_put(group);
++
+ 	return 0;
+ 
+ out_put_group:
+diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
+index 47dc7a7..af6afce 100644
+--- a/drivers/iommu/arm-smmu.c
++++ b/drivers/iommu/arm-smmu.c
+@@ -1357,6 +1357,8 @@ static int arm_smmu_add_device(struct device *dev)
+ 	if (IS_ERR(group))
+ 		return PTR_ERR(group);
+ 
++	iommu_group_put(group);
++
+ 	return 0;
+ }
+ 
+-- 
+1.8.4
