@@ -1,16 +1,13 @@
-From: davem@davemloft.net (David Miller)
-Date: Tue, 10 Nov 2015 15:40:35 -0500 (EST)
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 10 Nov 2015 21:39:54 +0100
 Subject: [PATCH] bpf_trace: Make dependent on PERF_EVENTS
 In-Reply-To: <20151110152817.144195a0@gandalf.local.home>
 References: <20151110152817.144195a0@gandalf.local.home>
-Message-ID: <20151110.154035.1545699029296918207.davem@davemloft.net>
+Message-ID: <48940555.m1MPQSFTCK@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Steven Rostedt <rostedt@goodmis.org>
-Date: Tue, 10 Nov 2015 15:28:17 -0500
-
-> 
+On Tuesday 10 November 2015 15:28:17 Steven Rostedt wrote:
 > Arnd Bergmann reported:
 > 
 >   In my ARM randconfig tests, I'm getting a build error for
@@ -35,5 +32,8 @@ Date: Tue, 10 Nov 2015 15:28:17 -0500
 > Link: http://lkml.kernel.org/r/4525348.Aq9YoXkChv at wuerfel
 > Reported-by: Arnd Bergmann <arnd@arndb.de>
 > Signed-off-by: Steven Rostedt <rostedt@goodmis.org>
+> 
 
-I'll apply this, thanks Steven et al.
+Ok, sounds good.
+
+Acked-by: Arnd Bergmann <arnd@arndb.de>
