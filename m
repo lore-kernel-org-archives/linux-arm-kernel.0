@@ -1,53 +1,82 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Tue, 10 Nov 2015 00:59:54 -0500
-Subject: [PATCH V2 3/3] scsi: mptxsas: offload IRQ execution
-In-Reply-To: <5640481C.9000505@suse.de>
-References: <1447034266-28003-1-git-send-email-okaya@codeaurora.org>
- <1447034266-28003-4-git-send-email-okaya@codeaurora.org>
- <5640481C.9000505@suse.de>
-Message-ID: <564187DA.6090508@codeaurora.org>
+From: eddie.huang@mediatek.com (Eddie Huang)
+Date: Tue, 10 Nov 2015 14:11:07 +0800
+Subject: [PATCH v5 4/5] ARM: dts: mt8135: enable basic SMP bringup for
+ mt8135
+In-Reply-To: <CAMAWPa_13j88SMBbYEBg2WHFEhkhR_gVZkkU_x-U5NJay05AxA@mail.gmail.com>
+References: <1443799181-50409-1-git-send-email-yingjoe.chen@mediatek.com>
+ <1443799181-50409-5-git-send-email-yingjoe.chen@mediatek.com>
+ <CAMAWPa-Ed2FJY2pW67EHHKBH3_eBZx0+oWfMJwc_DhEjrf7aMg@mail.gmail.com>
+ <1445843717.23888.1.camel@mtksdaap41>
+ <CAMAWPa_Gyq7H0qUJ32PAJh_ELdHeKWMPyHud4gaT8=Ootcu1+g@mail.gmail.com>
+ <1445859610.26723.4.camel@mtksdaap41>
+ <CAMAWPa_13j88SMBbYEBg2WHFEhkhR_gVZkkU_x-U5NJay05AxA@mail.gmail.com>
+Message-ID: <1447135867.14454.9.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, 2015-11-09 at 09:59 -0800, Kevin Hilman wrote:
+> On Mon, Oct 26, 2015 at 4:40 AM, Eddie Huang <eddie.huang@mediatek.com> wrote:
+> > Hi Kevin,
+> >
+> > On Mon, 2015-10-26 at 17:06 +0900, Kevin Hilman wrote:
+> >> On Mon, Oct 26, 2015 at 4:15 PM, Yingjoe Chen <yingjoe.chen@mediatek.com> wrote:
+> >> > On Mon, 2015-10-26 at 09:56 +0900, Kevin Hilman wrote:
+> >> >> Hello,
+> >> >>
+> >> >> On Sat, Oct 3, 2015 at 12:19 AM, Yingjoe Chen <yingjoe.chen@mediatek.com> wrote:
+> >> >> > Add arch timer node to enable arch-timer support. MT8135 firmware
+> >> >> > doesn't correctly setup arch-timer frequency and CNTVOFF, add
+> >> >> > properties to workaround this.
+> >> >> >
+> >> >> > This also set cpu enable-method to enable SMP.
+> >> >> >
+> >> >> > Signed-off-by: Yingjoe Chen <yingjoe.chen@mediatek.com>
+> >> >>
+> >> >> kernelci.org started detecting new boot failures for the mt8135-evb in
+> >> >> the arm-soc tree[1], and the boot failures were bisected down to this
+> >> >> patch, which landed upstream in the form of commit d186a394bb98 (ARM:
+> >> >> dts: mt8135: enable basic SMP bringup for mt8135)
+> >> >>
+> >> >> Maybe this new SMP support requires updating the firmware on the board
+> >> >> as well?  If so, the changelog should've been a bit more explicit
+> >> >> about firmware dependencies.
+> >> >
+> >> > Kevin,
+> >> >
+> >> > Thanks for testing.
+> >> >
+> >> > No, it doesn't need new firmware. Will test to see what's going wrong.
+> >>
+> >> Thanks for following up.  I'll be glad to test any patches if you have
+> >> anything you'd like me to test.
+> >
+> > You need "clockevents/drivers/mtk: Fix spurious interrupt leading to
+> > crash" (https://lkml.org/lkml/2015/8/24/803)
+> >
+> > Daniel Lezcano already applied this patch in his tree for 4.4.
+> > (https://git.linaro.org/people/daniel.lezcano/linux.git)
+> 
+> The mt8135-evp board is still failing to boot in linux-next[1] (and
+> has been since next-20151022.)  It appears the dependencies are not
+> quite correct in linux-next either.
+> 
+> Kevin
+> 
+> [1]
+> http://kernelci.org/boot/mt8135-evbp1/job/next/kernel/next-20151109/defconfig/multi_v7_defconfig/lab/lab-khilman/?_id=564037fe59b514b2f6091909
 
+Hi Kevin,
 
-On 11/9/2015 2:15 AM, Hannes Reinecke wrote:
-> On 11/09/2015 02:57 AM, Sinan Kaya wrote:
->> The mpt2sas and mpt3sas drivers are spinning forever in
->> their IRQ handlers if there are a lot of jobs queued up
->> by the PCIe card. This handler is causing spikes for
->> the rest of the system and sluggish behavior.
->>
->> Marking all MSI interrupts as non-shared and moving the
->> MSI interrupts to thread context. This relexes the rest
->> of the system execution.
->>
-> NACK.
->
-> If there is a scalability issue when handling interrupts
-> it should be fixed in the driver directly.
->
-> Looking at the driver is should be possible to implement
-> a worker thread handling the reply descriptor, and having the
-> interrupt only to fetch the reply descriptor.
->
+I check the log [0], it seems first time mt8135-evbp1 boot to kernel
+shell successfully, then boot again. In the second time, mt8135 stay in
+fastboot mode, waiting host send boot image, then timeout.
 
-Can you go into the detail about which part of the _base_interrupt 
-function needs to be executed in ISR context and which part can be 
-queued up to worker thread?
+I download zImage and dtb in [1], and kernel run to shell successfully
+on my platform.
 
-I'm not familiar with the hardware or the code. That's why, I moved the 
-entire ISR into the thread context.
+I don't know whether this issue caused by test environment or not.
 
-
-
-> Cheers,
->
-> Hannes
->
-
--- 
-Sinan Kaya
-Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a 
-Linux Foundation Collaborative Project
+[0]
+http://storage.kernelci.org/next/next-20151109/arm-multi_v7_defconfig/lab-khilman/boot-mt8135-evbp1.txt
+[1]
+http://kernelci.org/boot/mt8135-evbp1/job/next/kernel/next-20151109/defconfig/multi_v7_defconfig/lab/lab-khilman/?_id=564037fe59b514b2f6091909#bisect-content
