@@ -1,44 +1,53 @@
-From: mark.yao@rock-chips.com (Mark yao)
-Date: Tue, 10 Nov 2015 13:53:44 +0800
-Subject: [PATCH 2/2] drm/rockchip: unset pgoff when mmap'ing gems
-In-Reply-To: <2793929.5WVauesvFQ@phil>
-References: <4982827.0pnZflEOSR@phil> <2793929.5WVauesvFQ@phil>
-Message-ID: <56418668.8080306@rock-chips.com>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Tue, 10 Nov 2015 00:59:54 -0500
+Subject: [PATCH V2 3/3] scsi: mptxsas: offload IRQ execution
+In-Reply-To: <5640481C.9000505@suse.de>
+References: <1447034266-28003-1-git-send-email-okaya@codeaurora.org>
+ <1447034266-28003-4-git-send-email-okaya@codeaurora.org>
+ <5640481C.9000505@suse.de>
+Message-ID: <564187DA.6090508@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015?11?10? 03:52, Heiko Stuebner wrote:
-> Commit 371f0f085f629 ("ARM: 8426/1: dma-mapping: add missing range check
->   in dma_mmap()") introduced offset-checking for mappings, which collides
-> with the fake-offset the drm sets for gems.
+
+
+On 11/9/2015 2:15 AM, Hannes Reinecke wrote:
+> On 11/09/2015 02:57 AM, Sinan Kaya wrote:
+>> The mpt2sas and mpt3sas drivers are spinning forever in
+>> their IRQ handlers if there are a lot of jobs queued up
+>> by the PCIe card. This handler is causing spikes for
+>> the rest of the system and sluggish behavior.
+>>
+>> Marking all MSI interrupts as non-shared and moving the
+>> MSI interrupts to thread context. This relexes the rest
+>> of the system execution.
+>>
+> NACK.
 >
-> Other drm-drivers set this offset to 0 before doing the mapping, so
-> this looks like the correct way to go for rockchip as well.
+> If there is a scalability issue when handling interrupts
+> it should be fixed in the driver directly.
 >
-> Fixes: 371f0f085f629 ("ARM: 8426/1: dma-mapping: add missing range check in dma_mmap()")
-> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
-> ---
-> This patch is definitly necessary to keep the rockchip-drm working
-> with kernel 4.4.
+> Looking at the driver is should be possible to implement
+> a worker thread handling the reply descriptor, and having the
+> interrupt only to fetch the reply descriptor.
 >
->   drivers/gpu/drm/rockchip/rockchip_drm_gem.c | 1 +
->   1 file changed, 1 insertion(+)
+
+Can you go into the detail about which part of the _base_interrupt 
+function needs to be executed in ISR context and which part can be 
+queued up to worker thread?
+
+I'm not familiar with the hardware or the code. That's why, I moved the 
+entire ISR into the thread context.
+
+
+
+> Cheers,
 >
-> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_gem.c b/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
-> index e50d113..e9bc188 100644
-> --- a/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
-> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
-> @@ -68,6 +68,7 @@ static int rockchip_drm_gem_object_mmap(struct drm_gem_object *obj,
->   	 * VM_PFNMAP flag that was set by drm_gem_mmap_obj()/drm_gem_mmap().
->   	 */
->   	vma->vm_flags &= ~VM_PFNMAP;
-> +	vma->vm_pgoff = 0;
->   
->   	ret = dma_mmap_attrs(drm->dev, vma, rk_obj->kvaddr, rk_obj->dma_addr,
->   			     obj->size, &rk_obj->dma_attrs);
-Hi Heiko
-      Sorry for miss this patch, thanks for the fix.
-      Acked-by: Mark Yao <mark.yao@rock-chips.com>
+> Hannes
+>
 
 -- 
-?ark Yao
+Sinan Kaya
+Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a 
+Linux Foundation Collaborative Project
