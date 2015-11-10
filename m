@@ -1,80 +1,164 @@
-From: robh@kernel.org (Rob Herring)
-Date: Tue, 10 Nov 2015 08:15:02 -0600
-Subject: [PATCH v3 2/3] Documentation: mailbox: Add APM X-Gene SLIMpro
- mailbox dts documentation
-In-Reply-To: <6be192528afbcc604653a318994ee30fa05a0e05.1447091626.git.dhdang@apm.com>
-References: <1429863912.2927.43.camel@x220>
- <cover.1447091625.git.dhdang@apm.com>
- <6be192528afbcc604653a318994ee30fa05a0e05.1447091626.git.dhdang@apm.com>
-Message-ID: <20151110141502.GA14092@rob-hp-laptop>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Tue, 10 Nov 2015 14:11:38 +0000
+Subject: [PATCH v11 4/5] arm64: introduce CONFIG_PARAVIRT,
+ PARAVIRT_TIME_ACCOUNTING and pv_time_ops
+In-Reply-To: <1446737696-9749-4-git-send-email-stefano.stabellini@eu.citrix.com>
+References: <alpine.DEB.2.02.1511051502270.13541@kaball.uk.xensource.com>
+ <1446737696-9749-4-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <alpine.DEB.2.02.1511101410550.5676@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 09, 2015 at 10:05:44AM -0800, Duc Dang wrote:
-> This adds the APM X-Gene SLIMpro mailbox device tree
-> node documentation.
+On Thu, 5 Nov 2015, Stefano Stabellini wrote:
+> Introduce CONFIG_PARAVIRT and PARAVIRT_TIME_ACCOUNTING on ARM64.
+> Necessary duplication of paravirt.h and paravirt.c with ARM.
 > 
-> [dhdang: rebase over 4.3-rc5]
-> Signed-off-by: Feng Kan <fkan@apm.com>
-> Signed-off-by: Duc Dang <dhdang@apm.com>
+> The only paravirt interface supported is pv_time_ops.steal_clock, so no
+> runtime pvops patching needed.
+> 
+> This allows us to make use of steal_account_process_tick for stolen
+> ticks accounting.
+> 
+> Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+
+Ping?
+
+Catalin, Will,
+are you happy with this change?
+
+
+> CC: will.deacon at arm.com
+> CC: nico at linaro.org
+> CC: marc.zyngier at arm.com
+> CC: cov at codeaurora.org
+> CC: arnd at arndb.de
+> CC: olof at lixom.net
+> CC: Catalin.Marinas at arm.com
+> 
 > ---
->  .../bindings/mailbox/xgene-slimpro-mailbox.txt     | 34 ++++++++++++++++++++++
->  1 file changed, 34 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/mailbox/xgene-slimpro-mailbox.txt
 > 
-> diff --git a/Documentation/devicetree/bindings/mailbox/xgene-slimpro-mailbox.txt b/Documentation/devicetree/bindings/mailbox/xgene-slimpro-mailbox.txt
+> Changes in v10:
+> - replace "---help---" with "help"
+> 
+> Changes in v7:
+> - ifdef CONFIG_PARAVIRT the content of paravirt.h.
+> ---
+>  arch/arm64/Kconfig                |   20 ++++++++++++++++++++
+>  arch/arm64/include/asm/paravirt.h |   20 ++++++++++++++++++++
+>  arch/arm64/kernel/Makefile        |    1 +
+>  arch/arm64/kernel/paravirt.c      |   25 +++++++++++++++++++++++++
+>  4 files changed, 66 insertions(+)
+>  create mode 100644 arch/arm64/include/asm/paravirt.h
+>  create mode 100644 arch/arm64/kernel/paravirt.c
+> 
+> diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+> index 7b10647..659e286 100644
+> --- a/arch/arm64/Kconfig
+> +++ b/arch/arm64/Kconfig
+> @@ -533,6 +533,25 @@ config SECCOMP
+>  	  and the task is only allowed to execute a few safe syscalls
+>  	  defined by each seccomp mode.
+>  
+> +config PARAVIRT
+> +	bool "Enable paravirtualization code"
+> +	help
+> +	  This changes the kernel so it can modify itself when it is run
+> +	  under a hypervisor, potentially improving performance significantly
+> +	  over full virtualization.
+> +
+> +config PARAVIRT_TIME_ACCOUNTING
+> +	bool "Paravirtual steal time accounting"
+> +	select PARAVIRT
+> +	default n
+> +	help
+> +	  Select this option to enable fine granularity task steal time
+> +	  accounting. Time spent executing other tasks in parallel with
+> +	  the current vCPU is discounted from the vCPU power. To account for
+> +	  that, there can be a small performance impact.
+> +
+> +	  If in doubt, say N here.
+> +
+>  config XEN_DOM0
+>  	def_bool y
+>  	depends on XEN
+> @@ -541,6 +560,7 @@ config XEN
+>  	bool "Xen guest support on ARM64"
+>  	depends on ARM64 && OF
+>  	select SWIOTLB_XEN
+> +	select PARAVIRT
+>  	help
+>  	  Say Y if you want to run Linux in a Virtual Machine on Xen on ARM64.
+>  
+> diff --git a/arch/arm64/include/asm/paravirt.h b/arch/arm64/include/asm/paravirt.h
 > new file mode 100644
-> index 0000000..d02a3d8
+> index 0000000..fd5f428
 > --- /dev/null
-> +++ b/Documentation/devicetree/bindings/mailbox/xgene-slimpro-mailbox.txt
-> @@ -0,0 +1,34 @@
-> +The APM X-Gene SLIMpro mailbox is used to communicate messages between
-> +the ARM64 processors and the Cortex M3 (dubbed SLIMpro). It uses a simple
-> +interrupt based door bell mechanism and can exchange simple messages using the
-> +internal registers.
+> +++ b/arch/arm64/include/asm/paravirt.h
+> @@ -0,0 +1,20 @@
+> +#ifndef _ASM_ARM64_PARAVIRT_H
+> +#define _ASM_ARM64_PARAVIRT_H
 > +
-> +There are total of 7 interrupts in this mailbox. Each used for an individual
-> +door bell (or mailbox channel).
+> +#ifdef CONFIG_PARAVIRT
+> +struct static_key;
+> +extern struct static_key paravirt_steal_enabled;
+> +extern struct static_key paravirt_steal_rq_enabled;
 > +
-> +Required properties:
-> +- compatible:	Should be as "apm, xgene-slimpro-mbox".
-                                          ^
-remove the space
-
+> +struct pv_time_ops {
+> +	unsigned long long (*steal_clock)(int cpu);
+> +};
+> +extern struct pv_time_ops pv_time_ops;
 > +
-> +- reg:		Contain the mailbox register address range.
-
-s/Contain/Contains/
-
+> +static inline u64 paravirt_steal_clock(int cpu)
+> +{
+> +	return pv_time_ops.steal_clock(cpu);
+> +}
+> +#endif
 > +
-> +- interrupts:	7 interrupts must start from 0 to 6, interrupt 0 define the
-> +		the interrupt for mailbox channel 0 and interrupt 1 for
-> +		mailbox channel 1 and so likewise for the reminder.
-
-s/start/be/
-
+> +#endif
+> diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
+> index 474691f..ca9fbe1 100644
+> --- a/arch/arm64/kernel/Makefile
+> +++ b/arch/arm64/kernel/Makefile
+> @@ -41,6 +41,7 @@ arm64-obj-$(CONFIG_EFI)			+= efi.o efi-entry.stub.o
+>  arm64-obj-$(CONFIG_PCI)			+= pci.o
+>  arm64-obj-$(CONFIG_ARMV8_DEPRECATED)	+= armv8_deprecated.o
+>  arm64-obj-$(CONFIG_ACPI)		+= acpi.o
+> +arm64-obj-$(CONFIG_PARAVIRT)		+= paravirt.o
+>  
+>  obj-y					+= $(arm64-obj-y) vdso/
+>  obj-m					+= $(arm64-obj-m)
+> diff --git a/arch/arm64/kernel/paravirt.c b/arch/arm64/kernel/paravirt.c
+> new file mode 100644
+> index 0000000..53f371e
+> --- /dev/null
+> +++ b/arch/arm64/kernel/paravirt.c
+> @@ -0,0 +1,25 @@
+> +/*
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License version 2 as
+> + * published by the Free Software Foundation.
+> + *
+> + * This program is distributed in the hope that it will be useful,
+> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+> + * GNU General Public License for more details.
+> + *
+> + * Copyright (C) 2013 Citrix Systems
+> + *
+> + * Author: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+> + */
 > +
-> +- #mbox-cells:	only one to specify the mailbox channel number.
+> +#include <linux/export.h>
+> +#include <linux/jump_label.h>
+> +#include <linux/types.h>
+> +#include <asm/paravirt.h>
 > +
-> +Example:
+> +struct static_key paravirt_steal_enabled;
+> +struct static_key paravirt_steal_rq_enabled;
 > +
-> +Mailbox Node:
-> +		slimpro-mbox: slimpro-mbox at 10540000 {
-> +			compatible = "apm,xgene-slimpro-mbox";
-> +			reg = <0x0 0x10540000 0x0 0xa000>;
-> +			#mbox-cells = <1>;
-> +			interrupts =  	<0x0 0x0 0x4>,
-> +					<0x0 0x1 0x4>,
-> +					<0x0 0x2 0x4>,
-> +					<0x0 0x3 0x4>,
-> +					<0x0 0x4 0x4>,
-> +					<0x0 0x5 0x4>,
-> +					<0x0 0x6 0x4>,
-> +		};
+> +struct pv_time_ops pv_time_ops;
+> +EXPORT_SYMBOL_GPL(pv_time_ops);
 > -- 
-> 1.9.1
+> 1.7.10.4
 > 
-> --
-> To unsubscribe from this list: send the line "unsubscribe devicetree" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
