@@ -1,164 +1,122 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Mon, 9 Nov 2015 19:01:15 -0800
-Subject: [PATCH v6 2/3] mtd: mtk-nor: mtk serial flash controller driver
-In-Reply-To: <1446824889-16144-3-git-send-email-bayi.cheng@mediatek.com>
-References: <1446824889-16144-1-git-send-email-bayi.cheng@mediatek.com>
- <1446824889-16144-3-git-send-email-bayi.cheng@mediatek.com>
-Message-ID: <20151110030115.GM12143@google.com>
+From: Hui.Liu@freescale.com (Liu Jason)
+Date: Tue, 10 Nov 2015 03:08:09 +0000
+Subject: The alignment mismatch issues between the of_reserved_mem and the
+ CMA setup requirement
+In-Reply-To: <CAL_JsqKdXeTKSb=J09eYyGEa1MQ7bXod=jQr-pLSi11J9hM3MQ@mail.gmail.com>
+References: <DM2PR0301MB1213832E956A5414482EDD74F3150@DM2PR0301MB1213.namprd03.prod.outlook.com>
+ <CAL_JsqKdXeTKSb=J09eYyGEa1MQ7bXod=jQr-pLSi11J9hM3MQ@mail.gmail.com>
+Message-ID: <DM2PR0301MB12131BEF8C317FC929E04CE2F3140@DM2PR0301MB1213.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Bayi,
-
-A few small comments.
-
-On Fri, Nov 06, 2015 at 11:48:08PM +0800, Bayi Cheng wrote:
-> add spi nor flash driver for mediatek controller
+> -----Original Message-----
+> From: Rob Herring [mailto:robh+dt at kernel.org]
+> Sent: Monday, November 09, 2015 10:26 PM
+> To: Liu Hui-R64343
+> Cc: devicetree at vger.kernel.org; linux-kernel at vger.kernel.org; linux-arm-
+> kernel at lists.infradead.org; m.szyprowski at samsung.com;
+> grant.likely at linaro.org
+> Subject: Re: The alignment mismatch issues between the of_reserved_mem
+> and the CMA setup requirement
 > 
-> Signed-off-by: Bayi Cheng <bayi.cheng@mediatek.com>
-> ---
->  drivers/mtd/spi-nor/Kconfig       |   7 +
->  drivers/mtd/spi-nor/Makefile      |   1 +
->  drivers/mtd/spi-nor/mtk-quadspi.c | 475 ++++++++++++++++++++++++++++++++++++++
->  3 files changed, 483 insertions(+)
->  create mode 100644 drivers/mtd/spi-nor/mtk-quadspi.c
+> On Mon, Nov 9, 2015 at 3:39 AM, Liu Jason <Hui.Liu@freescale.com> wrote:
+> > There is an alignment mismatch issue between the of_reserved_mem and
+> the CMA setup requirement.
+> >
+> > The alignment in
+> > Documentation/devicetree/bindings/reserved-memory/reserved-memory.txt
+> >
+> >
+> > alignment (optional) - length based on parent's #size-cells
+> >                         - Address boundary for alignment of allocation.
+> >
+> >
+> > But this is not exactly match the CMA setup requirement if the
+> alignment not set or set it not correctly.
+> >
+> > The of_reserved_mem will get the alignment from the DTS and pass it to
+> > __memblock_alloc_base to do the memory block allocation. If no
+> > alignment property in the DTS, the align will be SMP_CACHE_BYTES
+> 
+> IMO, any alignment requirement in the DTB should reflect h/w alignment
+> requirements. We can't know what alignment the OS wants. So if the OS
+> needs to further increase the alignment, it should adjust the alignment.
+> 
+
+Agree.
+
+> >
+> > BUT, The CMA setup require the alignment as the following in the code:
+> >
+> > align = PAGE_SIZE << max(MAX_ORDER - 1, pageblock_order)
+> >
+> > static int __init rmem_cma_setup(struct reserved_mem *rmem) {
+> >         phys_addr_t align = PAGE_SIZE << max(MAX_ORDER - 1,
+> pageblock_order);
+> >         phys_addr_t mask = align - 1;
+> >         unsigned long node = rmem->fdt_node;
+> >         struct cma *cma;
+> >         int err;
+> >
+> >         if (!of_get_flat_dt_prop(node, "reusable", NULL) ||
+> >             of_get_flat_dt_prop(node, "no-map", NULL))
+> >                 return -EINVAL;
+> >
+> >         if ((rmem->base & mask) || (rmem->size & mask)) {
+> >                 pr_err("Reserved memory: incorrect alignment of CMA
+> region\n");
+> >                 return -EINVAL;
+> >         }
+> >         <snip>
+> > }
+> >
+> > So, there is very likely that the alignment mismatch between the
+> of_reserved_mem and the CMA setup requirement.
+> > The sanity check in the rmem_cma_setup will fail and CMA not get set up
+> in the end, this is not expected for CMA.
+> >
+> > In the test, there will be following err log when this mismatch happen.
+> >
+> > Reserved memory: incorrect alignment of CMA region.
+> >
+> > The following patch to fix this issue, any comments?
+> >
+> > ======================================================================
+> > =================
+> >
+> > diff --git a/drivers/of/of_reserved_mem.c
+> > b/drivers/of/of_reserved_mem.c index 62f467b..a20d4d3 100644
+> > --- a/drivers/of/of_reserved_mem.c
+> > +++ b/drivers/of/of_reserved_mem.c
+> > @@ -124,6 +124,15 @@ static int __init
+> __reserved_mem_alloc_size(unsigned long node,
+> >                 align = dt_mem_next_cell(dt_root_addr_cells, &prop);
+> >         }
+> >
+> > +       if (of_flat_dt_is_compatible(node,"shared-dma-pool")) {
+> > +               phys_addr_t align_required = PAGE_SIZE << max(MAX_ORDER
+> - 1, pageblock_order);
+> > +                if (!align || align != ALIGN(align, align_required)) {
+> > +                        pr_warn("Reserved memory: the alignment not
+> set up correctly in '%s' node."
+> > +                               "change from %pa to %pa \n", uname,
+> &align, &align_required);
+> > +                        align = align_required;
+> > +                }
+> > +        }
+> 
+> You simply need the max required from the DT (which could be more) or CMA,
+> so this can be simplified to:
+> 
+> align = max(align, PAGE_SIZE << max(MAX_ORDER - 1, pageblock_order));
+> 
+> I don't think you should warn here either.
+
+If don't want to give some message to tell that the alignment in the DTS specified has been
+Updated, the code can be simpler as you said. 
 
 
-> diff --git a/drivers/mtd/spi-nor/Makefile b/drivers/mtd/spi-nor/Makefile
-> index e53333e..0bf3a7f8 100644
-> --- a/drivers/mtd/spi-nor/Makefile
-> +++ b/drivers/mtd/spi-nor/Makefile
-> @@ -1,3 +1,4 @@
->  obj-$(CONFIG_MTD_SPI_NOR)	+= spi-nor.o
->  obj-$(CONFIG_SPI_FSL_QUADSPI)	+= fsl-quadspi.o
-> +obj-$(CONFIG_MTD_MT81xx_NOR)    += mtk-quadspi.o
->  obj-$(CONFIG_SPI_NXP_SPIFI)	+= nxp-spifi.o
-> diff --git a/drivers/mtd/spi-nor/mtk-quadspi.c b/drivers/mtd/spi-nor/mtk-quadspi.c
-> new file mode 100644
-> index 0000000..6582811
-> --- /dev/null
-> +++ b/drivers/mtd/spi-nor/mtk-quadspi.c
-> @@ -0,0 +1,475 @@
+I can submit one patch for this if there is no more comments on this. 
 
-...
-
-> +/* Can shift up to 48 bits (6 bytes) of TX/RX */
-> +#define MTK_NOR_MAX_SHIFT		6
-
-...
-
-> +static int mt8173_nor_do_tx_rx(struct mt8173_nor *mt8173_nor, u8 op,
-> +			       u8 *tx, int txlen, u8 *rx, int rxlen)
-> +{
-> +	int len = 1 + txlen + rxlen;
-> +	int i, ret, idx;
-> +
-> +	if (len > MTK_NOR_MAX_SHIFT + 1)
-> +		return -EINVAL;
-
-So I see you adjusted these bounds to add 1, which inspired one of my
-questions on the cover letter.
-
-Why do you allow len=7, which means you'd program 7*8 to the COUNT
-register, when the SoC manual says it has a max of 48? Is the manual
-wrong?
-
-I notice you added the '+ 1' to your driver, so it allows:
-
-	do_tx_rx( txlen = 0 , rxlen = 6) /* e.g., for READ ID */
-
-but that means your driver also allows:
-
-	do_tx_rx( txlen = 6, rxlen = 0) /* ERROR: this will allow out of
-					   bounds write on PRGDATA
-					   register -1 */
-
-If I understand correctly, the following constraints are more correct:
-
-	/* Can only transmit 1 opcode and 5 other bytes */
-	if (1 + txlen > MTK_NOR_MAX_SHIFT)
-		return -EINVAL;
-
-	/* Can only receive 6 bytes after the opcode */
-	if (rxlen > MTK_NOR_MAX_SHIFT)
-		return -EINVAL;
-
-	/* Can only handle XXX bytes total */
-	/* How many bytes is the max for register MTK_NOR_CNT_REG ? */
-	if (len > XXX)
-		return -EINVAL;
-
-> +
-> +	writeb(len * 8, mt8173_nor->base + MTK_NOR_CNT_REG);
-> +
-> +	/* start at PRGDATA5, go down to PRGDATA0 */
-> +	idx = MTK_NOR_MAX_SHIFT - 1;
-> +
-> +	/* opcode */
-> +	writeb(op, mt8173_nor->base + MTK_NOR_PRG_REG(idx));
-> +	idx--;
-> +
-> +	/* program TX data */
-> +	for (i = 0; i < txlen; i++, idx--)
-> +		writeb(tx[i], mt8173_nor->base + MTK_NOR_PRG_REG(idx));
-> +
-> +	/* clear out rest of TX registers */
-> +	while (idx >= 0) {
-> +		writeb(0, mt8173_nor->base + MTK_NOR_PRG_REG(idx));
-> +		idx--;
-> +	}
-> +
-> +	ret = mt8173_nor_execute_cmd(mt8173_nor, MTK_NOR_PRG_CMD);
-> +	if (ret)
-> +		return ret;
-> +
-> +	/* restart at first RX byte */
-> +	idx = rxlen - 1;
-> +
-> +	/* read out RX data */
-> +	for (i = 0; i < rxlen; i++, idx--)
-> +		rx[i] = readb(mt8173_nor->base + MTK_NOR_SHREG(idx));
-> +
-> +	return 0;
-> +}
-> +
-
-...
-
-> +static int __init mtk_nor_init(struct mt8173_nor *mt8173_nor,
-> +			       struct device_node *flash_node)
-> +{
-> +	struct mtd_part_parser_data ppdata = {
-> +		.of_node = flash_node,
-> +	};
-> +	int ret;
-> +	struct spi_nor *nor;
-
-Normally we'd have a blank line here.
-
-> +	/* initialize controller to accept commands */
-> +	writel(MTK_NOR_ENABLE_SF_CMD, mt8173_nor->base + MTK_NOR_WRPROT_REG);
-> +
-> +	nor = &mt8173_nor->nor;
-> +	nor->dev = mt8173_nor->dev;
-> +	nor->priv = mt8173_nor;
-> +	nor->flash_node = flash_node;
-> +
-> +	/* fill the hooks to spi nor */
-> +	nor->read = mt8173_nor_read;
-> +	nor->read_reg = mt8173_nor_read_reg;
-> +	nor->write = mt8173_nor_write;
-> +	nor->write_reg = mt8173_nor_write_reg;
-> +	nor->mtd.owner = THIS_MODULE;
-> +	nor->mtd.name = "mtk_nor";
-> +	/* initialized with NULL */
-> +	ret = spi_nor_scan(nor, NULL, SPI_NOR_DUAL);
-> +	if (ret)
-> +		return ret;
-> +
-> +	return mtd_device_parse_register(&nor->mtd, NULL, &ppdata, NULL, 0);
-> +}
-
-...
-
-Brian
+> 
+> Rob
