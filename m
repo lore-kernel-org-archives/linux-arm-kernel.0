@@ -1,68 +1,51 @@
-From: James.Bottomley@HansenPartnership.com (James Bottomley)
-Date: Tue, 10 Nov 2015 10:27:14 -0800
-Subject: [PATCH V2 1/3] scsi: mptxsas: try 64 bit DMA when 32 bit DMA fails
-In-Reply-To: <56422725.7040809@codeaurora.org>
-References: <1447034266-28003-1-git-send-email-okaya@codeaurora.org>
- <5349261.sTnZTFhKWB@wuerfel> <56421610.50005@codeaurora.org>
- <4982446.ZlJVrezq1Y@wuerfel> <56422725.7040809@codeaurora.org>
-Message-ID: <1447180034.2187.20.camel@HansenPartnership.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Tue, 10 Nov 2015 19:26:59 +0100
+Subject: [PATCH v3 00/12] pwm: add support for atomic update
+In-Reply-To: <20151110173416.GB21727@ulmo>
+References: <1442828009-6241-1-git-send-email-boris.brezillon@free-electrons.com>
+ <2341981.a79ioYM9Es@diego> <20151110173416.GB21727@ulmo>
+Message-ID: <20151110192659.3eaa800c@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2015-11-10 at 12:19 -0500, Sinan Kaya wrote:
-> On 11/10/2015 11:47 AM, Arnd Bergmann wrote:
-> > On Tuesday 10 November 2015 11:06:40 Sinan Kaya wrote:
-> >> On 11/10/2015 3:38 AM, Arnd Bergmann wrote:
-> >>   From the email thread, it looks like this was introduced to support
-> >> some legacy card that has 64 bit addressing limitations and is being
-> >> carried around ("rotted") since then.
-> >>
-> >> I'm the second guy after the powerpc architecture complaining about the
-> >> very same issue. Any red flags?
-> >
-> > What BenH was worried about here is that the driver sets different masks
-> > for streaming and coherent mappings, which is indeed a worry that
-> > could hit us on ARM as well, but I suppose we'll have to deal with
-> > that in platform code.
-> >
-> > Setting both masks to 32-bit is something that a lot of drivers do,
-> > and without IOMMU enabled, you'd hit the same bug on all of them.
-> >
+Hi Thierry,
+
+On Tue, 10 Nov 2015 18:34:16 +0100
+Thierry Reding <thierry.reding@gmail.com> wrote:
+
+> On Mon, Oct 19, 2015 at 12:12:12PM +0200, Heiko St?bner wrote:
+> > Hi Thierry,
+> > 
+> > Am Montag, 21. September 2015, 11:33:17 schrieb Boris Brezillon:
+> > > Hello,
+> > > 
+> > > This series adds support for atomic PWM update, or IOW, the capability
+> > > to update all the parameters of a PWM device (enabled/disabled, period,
+> > > duty and polarity) in one go.
+> > 
+> > is anything more blocking this series? It's now sitting on the lists for 
+> > nearly a month and everybody seems happy with it, so it would be really nice 
+> > to have in mainline :-) .
+> > 
+> > Especially as this also makes it possible for Rockchip Chromebooks to actually 
+> > control the logic-regulator that is implemented as pwm-regulator there.
 > 
-> Maybe, maybe not. This is the only card that I had problems with.
+> Last time I tried to put this into linux-next I got immediately
+> bombarded by a number of build failures, so I backed things out. The
+> current plan is to give this another try after v4.4-rc1.
 
-Your characterisation of "some legacy card" isn't entirely correct.
-Just to clarify how this happens, most I/O cards today are intelligent
-offload engines which means they have some type of embedded CPU (it can
-even be a specially designed asic).  This CPU is driven by firmware
-which is mostly (but not always) in the machine language of the CPU.
-DMA transfers are sometimes run by this CPU, but mostly handed off to a
-separate offload engine.  When the board gets revised, it's often easier
-to update the offload engine to 64 bits and keep the CPU at 32 (or even
-16) bits.  This means that all the internal addresses in the firmware
-are 32 bit only.  As I read the comments in the original thread, it
-looks like the mpt people tried to mitigate this by using segment
-registers for external addresses firmware uses ... that's why they say
-that they don't have to have all the addresses in DMA32 ... they just
-need the upper 32 bits to be constant so they can correctly program the
-segment register.  Unfortunately, we have no way to parametrise this to
-the DMA allocation code.
+Could you paste the build failures (I didn't receive any notification)?
+BTW, I just rebased my branch on pwm/for-next and it seems to compile
+correctly, but maybe you're compiling on more platforms (or different
+drivers than I do).
 
-You'll find the same thing with Adaptec SPI cards.  Their route to 64
-bits was via an initial 39 bit extension that had them layering the
-additional 7 bits into the unused lower region of the page descriptors
-for the firmware (keeping the actual pointers to DMA at 32 bits because
-they're always parametrised as address, offset, length and the address
-is always a 4k page).
+Best Regards,
 
-Eventually, everything will rev to 64 bits and this problem will go
-away, but, as I suspect you know, it takes time for the embedded world
-to get to where everyone else already is.
+Boris
 
-As Arnd said, if you failed to allow for this in your platform, then
-oops, just don't use the card.  I think this solution would be better
-than trying to get the driver to work out which cards can support 64 bit
-firmware descriptors and only failing on your platform for those that
-can't.
 
-James
+
+-- 
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
