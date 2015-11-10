@@ -1,58 +1,44 @@
-From: javi.merino@arm.com (Javi Merino)
-Date: Tue, 10 Nov 2015 11:20:18 +0000
-Subject: [PATCH v3 1/2] thermal: mediatek: Add cpu power cooling model.
-In-Reply-To: <20151106032433.GL3773@ubuntu>
-References: <1445515359-8587-1-git-send-email-dawei.chien@mediatek.com>
- <1445515359-8587-2-git-send-email-dawei.chien@mediatek.com>
- <20151104193958.GC14127@localhost.localdomain>
- <1446721837.4016.57.camel@mtksdaap41>
- <20151106032433.GL3773@ubuntu>
-Message-ID: <20151110112017.GA3551@e104805>
+From: heiko.carstens@de.ibm.com (Heiko Carstens)
+Date: Tue, 10 Nov 2015 12:34:08 +0100
+Subject: [PATCH] arm64: add HAVE_LATENCYTOP_SUPPORT config
+In-Reply-To: <20151110111829.GD31947@arm.com>
+References: <1446825478-24824-1-git-send-email-yalin.wang2010@gmail.com>
+ <20151106160501.GR6087@arm.com>
+ <247F438B-3EEA-4550-970E-A649D0E604ED@gmail.com>
+ <20151106162109.GT6087@arm.com> <20151110074124.GB6672@osiris>
+ <20151110100547.GC31947@arm.com> <20151110110145.GE6672@osiris>
+ <20151110111829.GD31947@arm.com>
+Message-ID: <20151110113408.GF6672@osiris>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 06, 2015 at 08:54:33AM +0530, Viresh Kumar wrote:
-> Cc'ing Javi (which you should have as he wrote the power-thing for
-> cpu-cooling).
+> From: Will Deacon <will.deacon@arm.com>
+> Date: Tue, 10 Nov 2015 11:10:04 +0000
+> Subject: [PATCH] Kconfig: remove HAVE_LATENCYTOP_SUPPORT
 > 
-> On 05-11-15, 19:10, dawei chien wrote:
-> > This is because our platform currently only support mt8173_cpufreq.c, so
-> > that I only add static power model for our owner IC.
+> As illustrated by a3afe70b83fd ("[S390] latencytop s390 support."),
+> HAVE_LATENCYTOP_SUPPORT is defined by an architecture to advertise an
+> implementation of save_stack_trace_tsk.
 > 
-> Bindings are (normally) supposed to be general than a platform
-> specific.
+> However, as of 9212ddb5eada ("stacktrace: provide save_stack_trace_tsk()
+> weak alias") a dummy implementation is provided if STACKTRACE=y.
+> Given that LATENCYTOP already depends on STACKTRACE_SUPPORT and selects
+> STACKTRACE, we can remove HAVE_LATENCYTOP_SUPPORT altogether.
 > 
-> > Please understanding that I wouldn't give a DT binding document since I
-> > will remove static power table on next version, but I can try to explain
-> > it.
-> 
-> Then just don't add things in the first place.
-> 
-> > As far as I know, static power is somewhat leakage of CPU clusters, so
-> > that we hardly to find a formula, which can suitable all kinds of CPUs
-> > since leakage is different. In ARM IPA framework, static power only need
-> > to be defined by who register cpufreq_power_cooling_register. The
-> > voltage/power table is just one way to present leakage power of CPUs.
-> 
-> The bindings don't fix the values for static power, but just provides
-> a field for platforms to use. Everyone can then send its own power
-> figures. Why do you thing it can't be generalized?
+> Signed-off-by: Will Deacon <will.deacon@arm.com>
+> ---
+>  arch/arc/Kconfig        | 3 ---
+>  arch/arm/Kconfig        | 5 -----
+>  arch/metag/Kconfig      | 3 ---
+>  arch/microblaze/Kconfig | 3 ---
+>  arch/parisc/Kconfig     | 3 ---
+>  arch/powerpc/Kconfig    | 3 ---
+>  arch/s390/Kconfig       | 3 ---
+>  arch/sh/Kconfig         | 3 ---
+>  arch/sparc/Kconfig      | 4 ----
+>  arch/unicore32/Kconfig  | 3 ---
+>  arch/x86/Kconfig        | 3 ---
+>  lib/Kconfig.debug       | 1 -
+>  12 files changed, 37 deletions(-)
 
-The way they are described here is useful only for this platform, but
-it's not generic.  It only takes into account voltage as (I assume)
-it's the only variable that affects it in this implementation.  A
-generalized version of the static power should take into account the
-temperature and the idle state.
-
-> > Actually, static power is optional since dynamic power is much more than
-> > static power.
-> 
-> Maybe, we should still capture it.
-> 
-> @Javi ?
-
-It really depends on the platform.  If dawei says that for their
-platform static power is negligible then it is ok to not capture it.
-
-Cheers,
-Javi
+Acked-by: Heiko Carstens <heiko.carstens@de.ibm.com>
