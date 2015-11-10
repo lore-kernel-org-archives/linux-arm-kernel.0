@@ -1,69 +1,57 @@
-From: van.freenix@gmail.com (Peng Fan)
-Date: Tue, 10 Nov 2015 09:56:26 +0800
-Subject: [RFC V3] iommu: arm-smmu: correct group reference count
-Message-ID: <1447120586-17847-1-git-send-email-van.freenix@gmail.com>
+From: f.fainelli@gmail.com (Florian Fainelli)
+Date: Mon, 9 Nov 2015 18:29:11 -0800
+Subject: [PATCH RESEND v2 3/4] ARM: BCM: Add SMP support for Broadcom NSP
+In-Reply-To: <CACRpkdZN-iwdR_VwktdHsw+rGQLhCgmWnERYVDE+KaYOqJR30w@mail.gmail.com>
+References: <1446839371-22601-1-git-send-email-kapilh@broadcom.com>
+ <1446839371-22601-4-git-send-email-kapilh@broadcom.com>
+ <CACRpkdZN-iwdR_VwktdHsw+rGQLhCgmWnERYVDE+KaYOqJR30w@mail.gmail.com>
+Message-ID: <CAGVrzca34xrVznoEE2e26JyR11Q9L1sT4mJcNZ=NuprqUnZnjw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The basic flow for add a device:
- arm_smmu_add_device
-        |->iommu_group_get_for_dev
-            |->iommu_group_get
-                     return group;  (1)
-            |->ops->device_group : Init/increase reference count to/by 1.
-            |->iommu_group_add_device : Increase reference count by 1.
-		     return group   (2)
-        |->return 0;
+2015-11-09 2:09 GMT-08:00 Linus Walleij <linus.walleij@linaro.org>:
+> On Fri, Nov 6, 2015 at 8:49 PM, Kapil Hali <kapilh@broadcom.com> wrote:
+>
+>> Add SMP support for Broadcom's Northstar Plus SoC
+>> cpu enable method. This changes also consolidates
+>> iProc family's - BCM NSP and BCM Kona, platform
+>> SMP handling in a common file.
+>>
+>> Northstar Plus SoC is based on ARM Cortex-A9
+>> revision r3p0 which requires configuration for ARM
+>> Errata 764369 for SMP. This change adds the needed
+>> configuration option.
+>>
+>> Signed-off-by: Kapil Hali <kapilh@broadcom.com>
+>
+> This version looks saner to me.
+>
+>> +static int nsp_write_lut(void)
+>> +{
+>> +       void __iomem *sku_rom_lut;
+>> +       phys_addr_t secondary_startup_phy;
+>> +
+>> +       if (!secondary_boot) {
+>> +               pr_warn("required secondary boot register not specified\n");
+>> +               return -EINVAL;
+>> +       }
+>> +
+>> +       sku_rom_lut = ioremap_nocache((phys_addr_t)secondary_boot,
+>> +                                               sizeof(secondary_boot));
+>
+> Why is this address not just taken directly from the device tree?
 
-Since we are adding one device, the flow is (2) and the group reference
-count will be increased by 2. So, we need to add iommu_group_put at the
-end of arm_smmu_add_device to decrease the count by 1.
+It comes directly from DT, that's what bcm_smp_prepare_cpus() does
+read from Device Tree.
 
-Signed-off-by: Peng Fan <van.freenix@gmail.com>
-Cc: Will Deacon <will.deacon@arm.com>
----
- drivers/iommu/arm-smmu-v3.c | 7 ++++++-
- drivers/iommu/arm-smmu.c    | 2 ++
- 2 files changed, 8 insertions(+), 1 deletion(-)
+>
+> If it is not in the device tree: why?
+>
+> Also give it a sane name, bcm_sec_boot_address or so.
+> "secondary_boot" sounds like a function you call to boot
+> the second core.
 
-diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-index 4e5118a..ac333ee 100644
---- a/drivers/iommu/arm-smmu-v3.c
-+++ b/drivers/iommu/arm-smmu-v3.c
-@@ -1825,8 +1825,10 @@ static int arm_smmu_add_device(struct device *dev)
- 	pci_for_each_dma_alias(pdev, __arm_smmu_get_pci_sid, &sid);
- 	for (i = 0; i < smmu_group->num_sids; ++i) {
- 		/* If we already know about this SID, then we're done */
--		if (smmu_group->sids[i] == sid)
-+		if (smmu_group->sids[i] == sid) {
-+			iommu_group_put(group);
- 			return 0;
-+		}
- 	}
- 
- 	/* Check the SID is in range of the SMMU and our stream table */
-@@ -1855,6 +1857,9 @@ static int arm_smmu_add_device(struct device *dev)
- 	/* Add the new SID */
- 	sids[smmu_group->num_sids - 1] = sid;
- 	smmu_group->sids = sids;
-+
-+	iommu_group_put(group);
-+
- 	return 0;
- 
- out_put_group:
-diff --git a/drivers/iommu/arm-smmu.c b/drivers/iommu/arm-smmu.c
-index 47dc7a7..af6afce 100644
---- a/drivers/iommu/arm-smmu.c
-+++ b/drivers/iommu/arm-smmu.c
-@@ -1357,6 +1357,8 @@ static int arm_smmu_add_device(struct device *dev)
- 	if (IS_ERR(group))
- 		return PTR_ERR(group);
- 
-+	iommu_group_put(group);
-+
- 	return 0;
- }
- 
+Agree with that, there could be a better name which better reflects
+this is a variable.
 -- 
-1.8.4
+Florian
