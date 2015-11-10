@@ -1,55 +1,163 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Tue, 10 Nov 2015 15:57:34 +0100
-Subject: [PATCH] drm/rockchip: vop: fix window origin calculation
-In-Reply-To: <1447149550-18595-1-git-send-email-mark.yao@rock-chips.com>
-References: <1447149550-18595-1-git-send-email-mark.yao@rock-chips.com>
-Message-ID: <2130118.giXtpUm1Fo@phil>
+From: lars@metafoo.de (Lars-Peter Clausen)
+Date: Tue, 10 Nov 2015 15:58:14 +0100
+Subject: [PATCH v2 1/4] iio: adc: add IMX7D ADC driver support
+In-Reply-To: <1447075704-4605-2-git-send-email-haibo.chen@freescale.com>
+References: <1447075704-4605-1-git-send-email-haibo.chen@freescale.com>
+ <1447075704-4605-2-git-send-email-haibo.chen@freescale.com>
+Message-ID: <56420606.4070505@metafoo.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag, 10. November 2015, 17:59:10 schrieb Mark Yao:
-> From: Dominik Behr <dbehr@chromium.org>
+On 11/09/2015 02:28 PM, Haibo Chen wrote:
+> Freescale i.MX7D soc contains a new ADC IP. This patch add this ADC
+> driver support, and the driver only support ADC software trigger.
 > 
-> VOP_WINx_DSP_ST does not require subtracting 1 from the values written to
-> it. It actually causes the screen to be shifted by one pixel.
-> 
-> Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
+> Signed-off-by: Haibo Chen <haibo.chen@freescale.com>
 
-One thing I noticed, the original patch [0] had a Signed-off from
-Dominik already and you should keep that as he is the author, and then
-add your Signed-off below that, as you are the submitter,
+Looks pretty good, a few comments inline.
 
-So it would look like:
+[...]
+> +#include <linux/module.h>
+> +#include <linux/platform_device.h>
+> +#include <linux/interrupt.h>
+> +#include <linux/delay.h>
+> +#include <linux/kernel.h>
+> +#include <linux/slab.h>
+> +#include <linux/io.h>
+> +#include <linux/clk.h>
+> +#include <linux/completion.h>
+> +#include <linux/of.h>
+> +#include <linux/of_irq.h>
+> +#include <linux/regulator/consumer.h>
+> +#include <linux/of_platform.h>
+> +#include <linux/err.h>
 
-Signed-off-by: Dominik Behr <dbehr@chromium.org>
-Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
+I don't think you need all of these.
+
+[...]
+> +static void imx7d_adc_feature_config(struct imx7d_adc *info)
+> +{
+> +	info->adc_feature.clk_pre_div = IMX7D_ADC_ANALOG_CLK_PRE_DIV_4;
+> +	info->adc_feature.avg_num = IMX7D_ADC_AVERAGE_NUM_32;
+> +	info->adc_feature.core_time_unit = 1;
+> +	info->adc_feature.average_en = true;
+
+What's the plan for these? Right now they are always initialized to the same
+static value.
 
 
-That may not need a repost, but should probably be corrected when applying
-the patch.
+> +}
+[...]
+> +static int imx7d_adc_read_raw(struct iio_dev *indio_dev,
+> +			struct iio_chan_spec const *chan,
+> +			int *val,
+> +			int *val2,
+> +			long mask)
+> +{
+> +	struct imx7d_adc *info = iio_priv(indio_dev);
+> +
+> +	u32 channel;
+> +	long ret;
+> +
+> +	switch (mask) {
+> +	case IIO_CHAN_INFO_RAW:
+> +		mutex_lock(&indio_dev->mlock);
+> +		reinit_completion(&info->completion);
+> +
+> +		channel = (chan->channel) & 0x0f;
+> +		info->channel = channel;
+> +		imx7d_adc_channel_set(info);
 
-Heiko
+How about just passing channel directy adc_channel_set() instead of doing it
+implicitly through the info struct?
 
-[0] https://chromium-review.googlesource.com/#/c/233251/
+[...]
+> +static irqreturn_t imx7d_adc_isr(int irq, void *dev_id)
+> +{
+> +	struct imx7d_adc *info = (struct imx7d_adc *)dev_id;
+> +	int status;
+> +
+> +	status = readl(info->regs + IMX7D_REG_ADC_INT_STATUS);
+> +	if (status & IMX7D_REG_ADC_INT_STATUS_CHANNEL_INT_STATUS) {
+> +		info->value = imx7d_adc_read_data(info);
+> +		complete(&info->completion);
+> +	}
+> +	writel(0, info->regs + IMX7D_REG_ADC_INT_STATUS);
 
+Is the hardware really this broken? If the interrupt happens between reading
+the status register and clearing it here it will be missed.
 
-> ---
->  drivers/gpu/drm/rockchip/rockchip_drm_vop.c |    4 ++--
->  1 file changed, 2 insertions(+), 2 deletions(-)
-> 
-> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-> index 48719df..4730ae4 100644
-> --- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
-> @@ -959,8 +959,8 @@ static int vop_update_plane_event(struct drm_plane *plane,
->  	val = (dest.y2 - dest.y1 - 1) << 16;
->  	val |= (dest.x2 - dest.x1 - 1) & 0xffff;
->  	VOP_WIN_SET(vop, win, dsp_info, val);
-> -	val = (dsp_sty - 1) << 16;
-> -	val |= (dsp_stx - 1) & 0xffff;
-> +	val = dsp_sty << 16;
-> +	val |= dsp_stx & 0xffff;
->  	VOP_WIN_SET(vop, win, dsp_st, val);
->  	VOP_WIN_SET(vop, win, rb_swap, rb_swap);
->  
-> 
+> +
+> +	return IRQ_HANDLED;
+
+You should only return IRQ_HANDLED if you actually handled are interrupt.
+
+> +}
+[...]
+> +
+> +static int imx7d_adc_probe(struct platform_device *pdev)
+> +{
+> +	struct imx7d_adc *info;
+> +	struct iio_dev *indio_dev;
+> +	struct resource *mem;
+> +	int irq;
+> +	int ret;
+> +	u32 channels;
+> +
+> +	indio_dev = devm_iio_device_alloc(&pdev->dev, sizeof(struct imx7d_adc));
+> +	if (!indio_dev) {
+> +		dev_err(&pdev->dev, "Failed allocating iio device\n");
+> +		return -ENOMEM;
+> +	}
+> +
+> +	info = iio_priv(indio_dev);
+> +	info->dev = &pdev->dev;
+> +
+> +	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> +	info->regs = devm_ioremap_resource(&pdev->dev, mem);
+> +	if (IS_ERR(info->regs)) {
+> +		ret = PTR_ERR(info->regs);
+> +		dev_err(&pdev->dev, "failed to remap adc memory: %d\n", ret);
+> +		return ret;
+> +	}
+> +
+> +	irq = platform_get_irq(pdev, 0);
+> +	if (irq < 0) {
+> +		dev_err(&pdev->dev, "no irq resource?\n");
+> +		return irq;
+> +	}
+> +
+> +	ret = devm_request_irq(info->dev, irq,
+> +				imx7d_adc_isr, 0,
+> +				dev_name(&pdev->dev), info);
+
+This is too early. Completion is not initialized, clocks are not enabled, etc...
+
+> +	if (ret < 0) {
+> +		dev_err(&pdev->dev, "failed requesting irq, irq = %d\n", irq);
+> +		return ret;
+> +	}
+> +
+[...]
+> +	ret  = of_property_read_u32(pdev->dev.of_node,
+
+Extra space.
+
+> +					"num-channels", &channels);
+
+What decides how many channels are in use?
+
+> +	if (ret)
+> +		channels = ARRAY_SIZE(imx7d_adc_iio_channels);
+> +
+> +	indio_dev->name = dev_name(&pdev->dev);
+> +	indio_dev->dev.parent = &pdev->dev;
+> +	indio_dev->dev.of_node = pdev->dev.of_node;
+> +	indio_dev->info = &imx7d_adc_iio_info;
+> +	indio_dev->modes = INDIO_DIRECT_MODE;
+> +	indio_dev->channels = imx7d_adc_iio_channels;
+> +	indio_dev->num_channels = (int)channels;
+
+I don't think you need the case here.
+
+>[...]
