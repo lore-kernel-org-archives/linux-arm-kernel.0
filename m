@@ -1,72 +1,45 @@
-From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Tue, 10 Nov 2015 17:13:03 +0530
-Subject: [PATCH v4 8/9] ARM: EXYNOS: rearrange static and non-static functions
- of PMU driver
-In-Reply-To: <1447155784-12667-1-git-send-email-pankaj.dubey@samsung.com>
-References: <1447155784-12667-1-git-send-email-pankaj.dubey@samsung.com>
-Message-ID: <1447155784-12667-9-git-send-email-pankaj.dubey@samsung.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 10 Nov 2015 11:54:00 +0000
+Subject: [V3 PATCH] arm64: remove redundant FRAME_POINTER kconfig option
+ and force to select it
+In-Reply-To: <D0F23548-7A9E-4D3A-8FBD-1D8DA6FFAA26@gmail.com>
+References: <1447092595-12644-1-git-send-email-yang.shi@linaro.org>
+ <20151110103752.GH21606@e104818-lin.cambridge.arm.com>
+ <49B0431C-4FDA-45CB-82AF-FA010197118D@gmail.com>
+ <20151110113505.GI21606@e104818-lin.cambridge.arm.com>
+ <D0F23548-7A9E-4D3A-8FBD-1D8DA6FFAA26@gmail.com>
+Message-ID: <20151110115359.GE31947@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch moves exynos_sys_powerdown_conf function above all
-static functions.
+On Tue, Nov 10, 2015 at 07:43:35PM +0800, yalin wang wrote:
+> > On Nov 10, 2015, at 19:35, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> > On Tue, Nov 10, 2015 at 07:09:00PM +0800, yalin wang wrote:
+> >> i have a question,
+> >> why FRAME_POINTER  config must be enabled ?
+> >> and i see ARM arch can  disable this config .
+> >> if i don?t need stack trace dump and the software release is for 
+> >> final product , don?t need debug stack trace log .
+> >> is it possible to disable it for performance reason ?
+> > 
+> > If you don't need any stack trace, perf etc., in theory you can disable
+> > the option. However, the aarch64 gcc compiler always generates it (I'm
+> > not sure whether the AAPCS mandates it). Anyway, the performance impact
+> > is very small since there are more general purpose registers available
+> > in AArch64 already.
+> > 
+> i just make a test with -fomit-frame-pointer,  seems gcc can generate code
+> without frame pointer,
 
-Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
----
- arch/arm/mach-exynos/pmu.c | 34 +++++++++++++++++-----------------
- 1 file changed, 17 insertions(+), 17 deletions(-)
+Building without frame-pointers *severely* limits our ability (as
+open-source developers) to debug problems that we are unable to reproduce
+locally. Given the lack of widely available hardware compared to the
+number of platforms in development, I'm strongly opposed to offering this
+as a supported option for mainline kernels without a compelling performance
+argument.
 
-diff --git a/arch/arm/mach-exynos/pmu.c b/arch/arm/mach-exynos/pmu.c
-index e01bdf1..f300ac9 100644
---- a/arch/arm/mach-exynos/pmu.c
-+++ b/arch/arm/mach-exynos/pmu.c
-@@ -39,23 +39,6 @@ u32 pmu_raw_readl(u32 offset)
- 	return readl_relaxed(pmu_base_addr + offset);
- }
- 
--static void exynos_power_off(void)
--{
--	unsigned int tmp;
--
--	pr_info("Power down.\n");
--	tmp = pmu_raw_readl(EXYNOS_PS_HOLD_CONTROL);
--	tmp ^= (1 << 8);
--	pmu_raw_writel(tmp, EXYNOS_PS_HOLD_CONTROL);
--
--	/* Wait a little so we don't give a false warning below */
--	mdelay(100);
--
--	pr_err("Power down failed, please power off system manually.\n");
--	while (1)
--		;
--}
--
- void exynos_sys_powerdown_conf(enum sys_powerdown mode)
- {
- 	unsigned int i;
-@@ -85,6 +68,23 @@ void exynos_sys_powerdown_conf(enum sys_powerdown mode)
- 	}
- }
- 
-+static void exynos_power_off(void)
-+{
-+	unsigned int tmp;
-+
-+	pr_info("Power down.\n");
-+	tmp = pmu_raw_readl(EXYNOS_PS_HOLD_CONTROL);
-+	tmp ^= (1 << 8);
-+	pmu_raw_writel(tmp, EXYNOS_PS_HOLD_CONTROL);
-+
-+	/* Wait a little so we don't give a false warning below */
-+	mdelay(100);
-+
-+	pr_err("Power down failed, please power off system manually.\n");
-+	while (1)
-+		;
-+}
-+
- static int pmu_restart_notify(struct notifier_block *this,
- 		unsigned long code, void *unused)
- {
--- 
-2.4.5
+We have a significant number of general-purpose registers available on
+arm64, so I would expect the omission of a framepointer to have a
+somewhat limited impact on performance.
+
+Will
