@@ -1,68 +1,172 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 10 Nov 2015 13:55:33 +0100
-Subject: [PATCH, REPORT] bpf_trace: build error without PERF_EVENTS
-Message-ID: <4525348.Aq9YoXkChv@wuerfel>
+From: ludovic.desroches@atmel.com (Ludovic Desroches)
+Date: Tue, 10 Nov 2015 14:21:05 +0100
+Subject: [PATCH v2] mmc: sdhci at91: add PM support
+In-Reply-To: <CAPDyKFoAwmkw0D8QbA4UV3uhhNS7hmfOiRv3ZUhMp8uoxzWnrw@mail.gmail.com>
+References: <1447151810-21864-1-git-send-email-ludovic.desroches@atmel.com>
+ <CAPDyKFoAwmkw0D8QbA4UV3uhhNS7hmfOiRv3ZUhMp8uoxzWnrw@mail.gmail.com>
+Message-ID: <20151110132105.GF15706@odux.rfo.atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In my ARM randconfig tests, I'm getting a build error for
-newly added code in bpf_perf_event_read and bpf_perf_event_output
-whenever CONFIG_PERF_EVENTS is disabled:
+On Tue, Nov 10, 2015 at 12:12:30PM +0100, Ulf Hansson wrote:
+> On 10 November 2015 at 11:36, Ludovic Desroches
+> <ludovic.desroches@atmel.com> wrote:
+> > Add runtime PM support and use runtime_force_suspend|resume() for system
+> > PM.
+> >
+> > Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+> > ---
+> >
+> > Changes:
+> > - from v1: take a runtime PM centric approach
+> >
+> >  drivers/mmc/host/sdhci-of-at91.c | 66 +++++++++++++++++++++++++++++++++++++++-
+> >  1 file changed, 65 insertions(+), 1 deletion(-)
+> >
+> > diff --git a/drivers/mmc/host/sdhci-of-at91.c b/drivers/mmc/host/sdhci-of-at91.c
+> > index 06d0b50..5dbe0ce 100644
+> > --- a/drivers/mmc/host/sdhci-of-at91.c
+> > +++ b/drivers/mmc/host/sdhci-of-at91.c
+> > @@ -21,6 +21,8 @@
+> >  #include <linux/module.h>
+> >  #include <linux/of.h>
+> >  #include <linux/of_device.h>
+> > +#include <linux/pm.h>
+> > +#include <linux/pm_runtime.h>
+> >
+> >  #include "sdhci-pltfm.h"
+> >
+> > @@ -51,6 +53,62 @@ static const struct of_device_id sdhci_at91_dt_match[] = {
+> >         {}
+> >  };
+> >
+> > +#ifdef CONFIG_PM
+> > +static int sdhci_at91_runtime_suspend(struct device *dev)
+> > +{
+> > +       struct platform_device *pdev = to_platform_device(dev);
+> > +       struct sdhci_host *host = platform_get_drvdata(pdev);
+> 
+> These two lines can be replaced by:
+> struct sdhci_host *host = dev_get_drvdata(dev);
+> 
 
-kernel/trace/bpf_trace.c: In function 'bpf_perf_event_read':
-kernel/trace/bpf_trace.c:203:11: error: 'struct perf_event' has no member named 'oncpu'
-if (event->oncpu != smp_processor_id() ||
-         ^
-kernel/trace/bpf_trace.c:204:11: error: 'struct perf_event' has no member named 'pmu'
-      event->pmu->count)
+Oh yes, trying to complicate things!
 
-This can happen when UPROBE_EVENT is enabled but KPROBE_EVENT
-is disabled. I'm not sure if that is a configuration we care
-about, otherwise we could prevent this case from occuring by
-adding Kconfig dependencies.
+> > +       struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+> > +       struct sdhci_at91_priv *priv = pltfm_host->priv;
+> > +       int ret;
+> > +
+> > +       ret = sdhci_runtime_suspend_host(host);
+> > +
+> > +       clk_disable_unprepare(priv->gck);
+> > +       clk_disable_unprepare(priv->hclock);
+> > +       clk_disable_unprepare(priv->mainck);
+> > +
+> > +       return ret;
+> > +}
+> > +
+> > +static int sdhci_at91_runtime_resume(struct device *dev)
+> > +{
+> > +       struct platform_device *pdev = to_platform_device(dev);
+> > +       struct sdhci_host *host = platform_get_drvdata(pdev);
+> 
+> Same comment as above.
+> 
+> > +       struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+> > +       struct sdhci_at91_priv *priv = pltfm_host->priv;
+> > +       int ret;
+> > +
+> > +       ret = clk_prepare_enable(priv->mainck);
+> > +       if (ret) {
+> > +               dev_err(dev, "can't enable mainck\n");
+> > +               return ret;
+> > +       }
+> > +
+> > +       ret = clk_prepare_enable(priv->hclock);
+> > +       if (ret) {
+> > +               dev_err(dev, "can't enable hclock\n");
+> > +               return ret;
+> > +       }
+> > +
+> > +       ret = clk_prepare_enable(priv->gck);
+> > +       if (ret) {
+> > +               dev_err(dev, "can't enable gck\n");
+> > +               return ret;
+> > +       }
+> > +
+> > +       return sdhci_runtime_resume_host(host);
+> > +}
+> > +#endif /* CONFIG_PM_RUNTIME */
+> 
+> /s/CONFIG_PM_RUNTIME/CONFIG_PM
+> 
+> > +
+> > +static const struct dev_pm_ops sdhci_at91_dev_pm_ops = {
+> > +       SET_SYSTEM_SLEEP_PM_OPS(pm_runtime_force_suspend,
+> > +                               pm_runtime_force_resume)
+> > +       SET_RUNTIME_PM_OPS(sdhci_at91_runtime_suspend,
+> > +                          sdhci_at91_runtime_resume,
+> > +                          NULL)
+> > +};
+> > +
+> >  static int sdhci_at91_probe(struct platform_device *pdev)
+> >  {
+> >         const struct of_device_id       *match;
+> > @@ -148,6 +206,11 @@ static int sdhci_at91_probe(struct platform_device *pdev)
+> >         if (ret)
+> >                 goto clocks_disable_unprepare;
+> >
+> > +       pm_runtime_set_active(&pdev->dev);
+> > +       pm_runtime_enable(&pdev->dev);
+> > +       pm_runtime_set_autosuspend_delay(&pdev->dev, 50);
+> > +       pm_runtime_use_autosuspend(&pdev->dev);
+> 
+> Move these four runtime PM calls above sdhci_add_host(), as after that
+> point the host is used and thus runtime PM operations starts.
+> 
 
-Simply hiding the broken code inside #ifdef CONFIG_PERF_EVENTS
-as this patch does seems to reliably fix the error as well,
-I have built thousands of randconfig kernels since I started
-seeing this and added the workaround.
+Ok.
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: 62544ce8e01c ("bpf: fix bpf_perf_event_read() helper")
-Fixes: a43eec304259 ("bpf: introduce bpf_perf_event_output() helper")
----
-I suspect my patch is not the right answer, but could someone please
-fix this?
+> > +
+> >         return 0;
+> >
+> >  clocks_disable_unprepare:
+> > @@ -165,6 +228,7 @@ static int sdhci_at91_remove(struct platform_device *pdev)
+> >         struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
+> >         struct sdhci_at91_priv  *priv = pltfm_host->priv;
+> >
+> 
+> Add:
+> pm_runtime_get_sync();
+> 
+> > +       pm_runtime_disable(&pdev->dev);
+> 
+> Add:
+> pm_runtime_put_noidle();
+> 
 
-diff --git a/kernel/trace/bpf_trace.c b/kernel/trace/bpf_trace.c
-index 4228fd3682c3..82e0bc9d002a 100644
---- a/kernel/trace/bpf_trace.c
-+++ b/kernel/trace/bpf_trace.c
-@@ -186,6 +186,7 @@ const struct bpf_func_proto *bpf_get_trace_printk_proto(void)
- 	return &bpf_trace_printk_proto;
- }
- 
-+#if IS_ENABLED(CONFIG_PERF_EVENTS)
- static u64 bpf_perf_event_read(u64 r1, u64 index, u64 r3, u64 r4, u64 r5)
- {
- 	struct bpf_map *map = (struct bpf_map *) (unsigned long) r1;
-@@ -263,6 +264,7 @@ static const struct bpf_func_proto bpf_perf_event_output_proto = {
- 	.arg4_type	= ARG_PTR_TO_STACK,
- 	.arg5_type	= ARG_CONST_STACK_SIZE,
- };
-+#endif
- 
- static const struct bpf_func_proto *kprobe_prog_func_proto(enum bpf_func_id func_id)
- {
-@@ -289,10 +291,12 @@ static const struct bpf_func_proto *kprobe_prog_func_proto(enum bpf_func_id func
- 		return bpf_get_trace_printk_proto();
- 	case BPF_FUNC_get_smp_processor_id:
- 		return &bpf_get_smp_processor_id_proto;
-+#if IS_ENABLED(CONFIG_PERF_EVENTS)
- 	case BPF_FUNC_perf_event_read:
- 		return &bpf_perf_event_read_proto;
- 	case BPF_FUNC_perf_event_output:
- 		return &bpf_perf_event_output_proto;
-+#endif
- 	default:
- 		return NULL;
- 	}
+This time I should complicate things a bit more.
+
+> >         sdhci_pltfm_unregister(pdev);
+> >
+> >         clk_disable_unprepare(priv->gck);
+> > @@ -178,7 +242,7 @@ static struct platform_driver sdhci_at91_driver = {
+> >         .driver         = {
+> >                 .name   = "sdhci-at91",
+> >                 .of_match_table = sdhci_at91_dt_match,
+> > -               .pm     = SDHCI_PLTFM_PMOPS,
+> > +               .pm     = &sdhci_at91_dev_pm_ops,
+> >         },
+> >         .probe          = sdhci_at91_probe,
+> >         .remove         = sdhci_at91_remove,
+> > --
+> > 2.5.0
+> >
+> 
+> Otherwise, this looks good!
+
+Thanks for your feedback, v3 is coming.
+
+Regards
+
+Ludovic
