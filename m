@@ -1,61 +1,44 @@
-From: vigneshr@ti.com (Vignesh R)
-Date: Tue, 10 Nov 2015 10:59:58 +0530
-Subject: [PATCH v3 4/5] ARM: dts: DRA7: add entry for qspi mmap region
-In-Reply-To: <1447133399-25658-1-git-send-email-vigneshr@ti.com>
-References: <1447133399-25658-1-git-send-email-vigneshr@ti.com>
-Message-ID: <1447133399-25658-5-git-send-email-vigneshr@ti.com>
+From: mark.yao@rock-chips.com (Mark yao)
+Date: Tue, 10 Nov 2015 13:53:44 +0800
+Subject: [PATCH 2/2] drm/rockchip: unset pgoff when mmap'ing gems
+In-Reply-To: <2793929.5WVauesvFQ@phil>
+References: <4982827.0pnZflEOSR@phil> <2793929.5WVauesvFQ@phil>
+Message-ID: <56418668.8080306@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add qspi memory mapped region entries for DRA7xx based SoCs. Also,
-update the binding documents for the controller to document this change.
+On 2015?11?10? 03:52, Heiko Stuebner wrote:
+> Commit 371f0f085f629 ("ARM: 8426/1: dma-mapping: add missing range check
+>   in dma_mmap()") introduced offset-checking for mappings, which collides
+> with the fake-offset the drm sets for gems.
+>
+> Other drm-drivers set this offset to 0 before doing the mapping, so
+> this looks like the correct way to go for rockchip as well.
+>
+> Fixes: 371f0f085f629 ("ARM: 8426/1: dma-mapping: add missing range check in dma_mmap()")
+> Signed-off-by: Heiko Stuebner <heiko@sntech.de>
+> ---
+> This patch is definitly necessary to keep the rockchip-drm working
+> with kernel 4.4.
+>
+>   drivers/gpu/drm/rockchip/rockchip_drm_gem.c | 1 +
+>   1 file changed, 1 insertion(+)
+>
+> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_gem.c b/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
+> index e50d113..e9bc188 100644
+> --- a/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
+> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
+> @@ -68,6 +68,7 @@ static int rockchip_drm_gem_object_mmap(struct drm_gem_object *obj,
+>   	 * VM_PFNMAP flag that was set by drm_gem_mmap_obj()/drm_gem_mmap().
+>   	 */
+>   	vma->vm_flags &= ~VM_PFNMAP;
+> +	vma->vm_pgoff = 0;
+>   
+>   	ret = dma_mmap_attrs(drm->dev, vma, rk_obj->kvaddr, rk_obj->dma_addr,
+>   			     obj->size, &rk_obj->dma_attrs);
+Hi Heiko
+      Sorry for miss this patch, thanks for the fix.
+      Acked-by: Mark Yao <mark.yao@rock-chips.com>
 
-Signed-off-by: Vignesh R <vigneshr@ti.com>
-Acked-by: Rob Herring <robh@kernel.org>
----
- Documentation/devicetree/bindings/spi/ti_qspi.txt | 14 ++++++++++++++
- arch/arm/boot/dts/dra7.dtsi                       |  7 +++++--
- 2 files changed, 19 insertions(+), 2 deletions(-)
-
-diff --git a/Documentation/devicetree/bindings/spi/ti_qspi.txt b/Documentation/devicetree/bindings/spi/ti_qspi.txt
-index 601a360531a5..334aa3f32cbc 100644
---- a/Documentation/devicetree/bindings/spi/ti_qspi.txt
-+++ b/Documentation/devicetree/bindings/spi/ti_qspi.txt
-@@ -26,3 +26,17 @@ qspi: qspi at 4b300000 {
- 	spi-max-frequency = <25000000>;
- 	ti,hwmods = "qspi";
- };
-+
-+For dra7xx:
-+qspi: qspi at 4b300000 {
-+	compatible = "ti,dra7xxx-qspi";
-+	reg = <0x4b300000 0x100>,
-+	      <0x5c000000 0x4000000>,
-+	      <0x4a002558 0x4>;
-+	reg-names = "qspi_base", "qspi_mmap",
-+		    "qspi_ctrlmod";
-+	#address-cells = <1>;
-+	#size-cells = <0>;
-+	spi-max-frequency = <48000000>;
-+	ti,hwmods = "qspi";
-+};
-diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
-index 8fedddc35999..ad93fe2ccab8 100644
---- a/arch/arm/boot/dts/dra7.dtsi
-+++ b/arch/arm/boot/dts/dra7.dtsi
-@@ -1108,8 +1108,11 @@
- 
- 		qspi: qspi at 4b300000 {
- 			compatible = "ti,dra7xxx-qspi";
--			reg = <0x4b300000 0x100>;
--			reg-names = "qspi_base";
-+			reg = <0x4b300000 0x100>,
-+			      <0x5c000000 0x4000000>,
-+			      <0x4a002558 0x4>;
-+			reg-names = "qspi_base", "qspi_mmap",
-+				    "qspi_ctrlmod";
- 			#address-cells = <1>;
- 			#size-cells = <0>;
- 			ti,hwmods = "qspi";
 -- 
-2.6.3
+?ark Yao
