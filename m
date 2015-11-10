@@ -1,86 +1,71 @@
-From: hillf.zj@alibaba-inc.com (Hillf Danton)
-Date: Tue, 10 Nov 2015 10:50:40 +0800
-Subject: [PATCH] arch:arm:mm:Correction in the boundary check for module
- end address.
-In-Reply-To: <20151109160137.GA8644@n2100.arm.linux.org.uk>
-References: <1447055848-28180-1-git-send-email-shailendra.v@samung.com>
- <CAPP0e=POFR3BmH0jZvtcaWLM_zfLHG1eUcpkLX7dchrZxLigNA@mail.gmail.com>
- <20151109160137.GA8644@n2100.arm.linux.org.uk>
-Message-ID: <049601d11b62$986780c0$c9368240$@alibaba-inc.com>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Tue, 10 Nov 2015 11:58:24 +0900
+Subject: [PATCH v5 0/6] arm64: ftrace: fix incorrect output from stack
+ tracer
+In-Reply-To: <252DE845-D0C2-460C-8161-090ED08396A4@gmail.com>
+References: <1446792285-1154-1-git-send-email-takahiro.akashi@linaro.org>
+ <252DE845-D0C2-460C-8161-090ED08396A4@gmail.com>
+Message-ID: <56415D50.40500@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> On Tue, Nov 10, 2015 at 12:35:50AM +0900, Jungseung Lee wrote:
-> > Hi,
-> >
-> > 2015-11-09 16:57 GMT+09:00 Shailendra Verma <shailendra.v@samung.com>:
-> > > From: Shailendra Verma <Shailendra.v@samsung.com>
-> > >
-> > > The module end boundary check is not proper.The out of bound value
-> > > of module end can produce undesired results.
-> > >
-> > > Signed-off-by: Shailendra Verma <Shailendra.v@samsung.com>
-> > > Reviewed-by: Ravikant Bijendra Sharma <ravikant.s2@samsung.com>
-> > > ---
-> > >  linux-4.3-rc6/arch/arm/mm/pageattr.c |    2 +-
-> > >  1 file changed, 1 insertion(+), 1 deletion(-)
-> > >
-> > > diff --git a/linux-4.3-rc6/arch/arm/mm/pageattr.c b/linux-4.3-rc6/arch/arm/mm/pageattr.c
-> > > index cf30daf..be7fe4b 100644
-> > > --- a/linux-4.3-rc6/arch/arm/mm/pageattr.c
-> > > +++ b/linux-4.3-rc6/arch/arm/mm/pageattr.c
-> > > @@ -52,7 +52,7 @@ static int change_memory_common(unsigned long addr, int numpages,
-> > >         if (start < MODULES_VADDR || start >= MODULES_END)
-> > >                 return -EINVAL;
-> > >
-> > > -       if (end < MODULES_VADDR || start >= MODULES_END)
-> > > +       if (end < MODULES_VADDR || end >= MODULES_END)
-> > >                 return -EINVAL;
-> > >
-> > >         data.set_mask = set_mask;
-> > > --
-> > > 1.7.9.5
-> > >
-> > Same patch with proper format is already submitted by Hillf.
-> > https://lkml.org/lkml/2015/5/3/202
-> 
-> What happened to that patch?  It should at least have had a:
-> 
-> Fixes: f2ca09f381a5 ("ARM: 8311/1: Don't use is_module_addr in setting page attributes")
-> 
-> tag on it, and it needs to find its way into the patch system.  As
-> no one has reported a crash (I don't think it's crash-causing, but is
-> merely a correctness issue) I don't see any reason to backport it to
-> stable trees.
-> 
-> Other changes are needed here as well - the original commit creating
-> this contains:
-> 
-> +       if (!IS_ALIGNED(addr, PAGE_SIZE)) {
-> +               start &= PAGE_MASK;
-> +               end = start + size;
-> +               WARN_ON_ONCE(1);
-> +       }
-> 
-> which is truely amazing.  Fine, it may not be intended to work with
-> non-aligned addresses, but if we're going to round the start down,
-> then rounding the end down as well like that is also buggy.
-> 
-> 	unsigned long start = addr;
-> 	unsigned long size = PAGE_SIZE * numpages;
-> 	unsigned long end = start + size;
-> 
-> 	if (WARN_ON_ONCE(!IS_ALIGNED(addr, PAGE_SIZE)) {
-> 		start &= PAGE_MASK;
-> 		end = PAGE_ALIGN(end);
-> 	}
-> 
-> would be much better - this will round 'end' up, so we encompass the
-> entire requested region.
-> 
-Would you please respin, Shailendra, with Russell's comments
-addressed, and with
-Reported-by: Hillf Danton <hillf.zj@alibaba-inc.com> ?
+On 11/09/2015 11:24 PM, Jungseok Lee wrote:
+> On Nov 6, 2015, at 3:44 PM, AKASHI Takahiro wrote:
+>
+> Hi Akashi,
+>
+>> This is the fifth patch series for fixing stack tracer on arm64.
+>> The original issue was reported by Jungseok[1], and then I found more
+>> issues[2].
+>>
+>> We don't have to care about the original issue because the root cause
+>> (patch "ARM64: unwind: Fix PC calculation") has been reverted in v4.3.
+>>
+>> I address here all the issues and implement fixes described in [2] except
+>> for interrupt-triggered problems(II-3) and leaf function(II-5).  Recent
+>> discussions[3] about introducing a dedicated interrupt stack suggests that
+>> we may avoid walking through from an interrupt stack to a process stack.
+>> (So interrupt-stack patch is a prerequisite.)
+>>
+>> Basically,
+>> patch1 is a proactive improvement of function_graph tracer.
+>> patch2 corresponds to II-4(functions under function_graph tracer).
+>> patch3, 4 and 5 correspond to II-1(slurping stack) and II-2(differences
+>> between x86 and arm64).
+>> patch6 is a function prologue analyzer test. This won't attest
+>> the correctness of the functionality, but it can suggest that all
+>> the traced functions are treated properly by this function.
+>> (Please note that patch3 has already been queued in Steven's for-next.)
+>>
+>> I tested the code with v4.3 + Jungseok's patch v5[4].
+>
+> I've played this series with IRQ stack patch and it works well at least
+> on my system! In addition to this condition, I've run these changes without
+> IRQ stack since it is in progress. I could observe a single strange behavior,
+> minus stack size around elX_irq. Am I missing something?
 
-thanks
-Hillf
+You saw the result like:
+  ...
+  13)     4336      64   gic_handle_irq+0x5c/0xa4
+  14)     4272     576   el1_irq+0x68/0xd8
+  15)     3696    -160   smc_hardware_send_pkt+0x278/0x42c
+
+This is the most difficult problem that I mentioned in II-3 of [1] and tried to fix.
+For example, smc_hardware_send_pkt is NOT the function interrupted, but
+_raw_spin_unlock_irqstore which is called at '+0x278/0x42c' is.
+Giving a *perfect* solution against it is quite tough (and complicated).
+Since you have introduced interrupt stack and even on x86 an interrupt stack is
+not supported, I removed related patches.
+
+-Takahiro AKASHI
+
+> My reproduction scenario is simple.
+>
+>    $ sudo echo 1 > /proc/sys/kernel/stack_trace_enabled
+>    $ sudo echo function_graph > /sys/kernel/debug/tracing/current_tracer
+>    $ [ Run any workload ]
+>    $ sudo cat /sys/kernel/debug/tracing/stack_trace
+>
+> Best Regards
+> Jungseok Lee
+>
