@@ -1,45 +1,48 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 10 Nov 2015 13:35:41 +0100
-Subject: [PATCH v2 6/7] xen/arm: introduce xen_read_wallclock
-In-Reply-To: <1447156675-7418-6-git-send-email-stefano.stabellini@eu.citrix.com>
-References: <alpine.DEB.2.02.1511101131350.5676@kaball.uk.xensource.com>
- <1447156675-7418-6-git-send-email-stefano.stabellini@eu.citrix.com>
-Message-ID: <3711503.LuojCRibK3@wuerfel>
+From: r64343@freescale.com (Jason Liu)
+Date: Tue, 10 Nov 2015 20:30:26 +0800
+Subject: [PATCH 1/1] drivers: of: of_reserved_mem: fixup the alignment with
+ CMA setup
+Message-ID: <1447158626-7773-1-git-send-email-r64343@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 10 November 2015 11:57:54 Stefano Stabellini wrote:
-> +static void xen_read_wallclock(struct timespec64 *ts)
-> +{
-> +       u32 version;
-> +       u64 delta;
-> +       struct timespec64 now;
-> +       struct shared_info *s = HYPERVISOR_shared_info;
-> +       struct pvclock_wall_clock *wall_clock = &(s->wc);
-> +
-> +       /* get wallclock at system boot */
-> +       do {
-> +               version = wall_clock->version;
-> +               rmb();          /* fetch version before time */
-> +               now.tv_sec  = ((uint64_t)wall_clock->sec_hi << 32) | wall_clock->sec;
-> +               now.tv_nsec = wall_clock->nsec;
-> +               rmb();          /* fetch time before checking version */
-> +       } while ((wall_clock->version & 1) || (version != wall_clock->version));
-> +
-> +       delta = arch_timer_read_counter() * (u64)NSEC_PER_SEC;
-> +       do_div(delta, arch_timer_get_rate());     /* time since system boot */
-> +       delta += now.tv_sec * (u64)NSEC_PER_SEC + now.tv_nsec;
-> +
-> +       now.tv_nsec = do_div(delta, NSEC_PER_SEC);
-> +       now.tv_sec = delta;
-> +
-> +       set_normalized_timespec64(ts, now.tv_sec, now.tv_nsec);
-> +
-> +}
+There is an alignment mismatch issue between the of_reserved_mem and
+the CMA setup requirement. The of_reserved_mem will try to get the
+alignment value from the DTS and pass it to __memblock_alloc_base to
+do the memory block base allocation, but the alignment value specified
+in the DTS may not satisfy the CAM setup requirement since CMA setup
+required the alignment as the following in the code:
 
-Instead of the two do_div(), I would do the entire calculation in
-terms of nanoseconds and then call ns_to_timespec64() in the end
-instead of set_normalized_timespec64(). That is just an optimization
-though, your version looks correct as well.
+align = PAGE_SIZE << max(MAX_ORDER - 1, pageblock_order);
 
-	Arnd
+The sanity check in the function of rmem_cma_setup will fail if the
+alignment does not setup correctly and thus CMA will fail to setup.
+
+This patch is to fixup the alignment to meet the CMA setup required.
+
+Mailing-list-thread: https://lkml.org/lkml/2015/11/9/138
+Signed-off-by: Jason Liu <r64343@freescale.com>
+Cc: Marek Szyprowski <m.szyprowski@samsung.com>
+Cc: Grant Likely <grant.likely@linaro.org>
+Cc: Rob Herring <robh+dt@kernel.org>
+---
+ drivers/of/of_reserved_mem.c | 4 ++++
+ 1 file changed, 4 insertions(+)
+
+diff --git a/drivers/of/of_reserved_mem.c b/drivers/of/of_reserved_mem.c
+index 62f467b..9394311 100644
+--- a/drivers/of/of_reserved_mem.c
++++ b/drivers/of/of_reserved_mem.c
+@@ -124,6 +124,10 @@ static int __init __reserved_mem_alloc_size(unsigned long node,
+ 		align = dt_mem_next_cell(dt_root_addr_cells, &prop);
+ 	}
+ 
++	/* Need adjust the alignment to satisfy the CMA requirement */
++	if (IS_ENABLED(CONFIG_CMA) && of_flat_dt_is_compatible(node, "shared-dma-pool"))
++		align = max(align, (phys_addr_t)PAGE_SIZE << max(MAX_ORDER - 1, pageblock_order));
++
+ 	prop = of_get_flat_dt_prop(node, "alloc-ranges", &len);
+ 	if (prop) {
+ 
+-- 
+1.8.3.2
