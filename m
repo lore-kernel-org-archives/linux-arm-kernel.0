@@ -1,51 +1,57 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Tue, 10 Nov 2015 19:26:59 +0100
-Subject: [PATCH v3 00/12] pwm: add support for atomic update
-In-Reply-To: <20151110173416.GB21727@ulmo>
-References: <1442828009-6241-1-git-send-email-boris.brezillon@free-electrons.com>
- <2341981.a79ioYM9Es@diego> <20151110173416.GB21727@ulmo>
-Message-ID: <20151110192659.3eaa800c@bbrezillon>
+From: edubezval@gmail.com (Eduardo Valentin)
+Date: Tue, 10 Nov 2015 10:41:22 -0800
+Subject: [PATCH v3 1/2] thermal: mediatek: Add cpu power cooling model.
+In-Reply-To: <20151110112017.GA3551@e104805>
+References: <1445515359-8587-1-git-send-email-dawei.chien@mediatek.com>
+ <1445515359-8587-2-git-send-email-dawei.chien@mediatek.com>
+ <20151104193958.GC14127@localhost.localdomain>
+ <1446721837.4016.57.camel@mtksdaap41>
+ <20151106032433.GL3773@ubuntu> <20151110112017.GA3551@e104805>
+Message-ID: <20151110184121.GC5240@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Thierry,
-
-On Tue, 10 Nov 2015 18:34:16 +0100
-Thierry Reding <thierry.reding@gmail.com> wrote:
-
-> On Mon, Oct 19, 2015 at 12:12:12PM +0200, Heiko St?bner wrote:
-> > Hi Thierry,
+On Tue, Nov 10, 2015 at 11:20:18AM +0000, Javi Merino wrote:
+> On Fri, Nov 06, 2015 at 08:54:33AM +0530, Viresh Kumar wrote:
+> > Cc'ing Javi (which you should have as he wrote the power-thing for
+> > cpu-cooling).
 > > 
-> > Am Montag, 21. September 2015, 11:33:17 schrieb Boris Brezillon:
-> > > Hello,
-> > > 
-> > > This series adds support for atomic PWM update, or IOW, the capability
-> > > to update all the parameters of a PWM device (enabled/disabled, period,
-> > > duty and polarity) in one go.
+> > On 05-11-15, 19:10, dawei chien wrote:
+> > > This is because our platform currently only support mt8173_cpufreq.c, so
+> > > that I only add static power model for our owner IC.
 > > 
-> > is anything more blocking this series? It's now sitting on the lists for 
-> > nearly a month and everybody seems happy with it, so it would be really nice 
-> > to have in mainline :-) .
+> > Bindings are (normally) supposed to be general than a platform
+> > specific.
 > > 
-> > Especially as this also makes it possible for Rockchip Chromebooks to actually 
-> > control the logic-regulator that is implemented as pwm-regulator there.
+> > > Please understanding that I wouldn't give a DT binding document since I
+> > > will remove static power table on next version, but I can try to explain
+> > > it.
+> > 
+> > Then just don't add things in the first place.
+> > 
+> > > As far as I know, static power is somewhat leakage of CPU clusters, so
+> > > that we hardly to find a formula, which can suitable all kinds of CPUs
+> > > since leakage is different. In ARM IPA framework, static power only need
+> > > to be defined by who register cpufreq_power_cooling_register. The
+> > > voltage/power table is just one way to present leakage power of CPUs.
+> > 
+> > The bindings don't fix the values for static power, but just provides
+> > a field for platforms to use. Everyone can then send its own power
+> > figures. Why do you thing it can't be generalized?
 > 
-> Last time I tried to put this into linux-next I got immediately
-> bombarded by a number of build failures, so I backed things out. The
-> current plan is to give this another try after v4.4-rc1.
+> The way they are described here is useful only for this platform, but
+> it's not generic.  It only takes into account voltage as (I assume)
+> it's the only variable that affects it in this implementation.  A
+> generalized version of the static power should take into account the
+> temperature and the idle state.
 
-Could you paste the build failures (I didn't receive any notification)?
-BTW, I just rebased my branch on pwm/for-next and it seems to compile
-correctly, but maybe you're compiling on more platforms (or different
-drivers than I do).
+Still, why would we have one binding to describe static power per platform?
 
-Best Regards,
+I would prefer we go towards a generalized binding description.
 
-Boris
+If temperature is not needed on all platforms, make it an optional
+property.
 
+BR,
 
-
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Eduardo Valentin
