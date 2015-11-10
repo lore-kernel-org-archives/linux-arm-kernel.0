@@ -1,68 +1,202 @@
 From: jungseoklee85@gmail.com (Jungseok Lee)
-Date: Tue, 10 Nov 2015 22:32:47 +0900
-Subject: [PATCH v5 0/6] arm64: ftrace: fix incorrect output from stack
- tracer
-In-Reply-To: <56415D50.40500@linaro.org>
+Date: Tue, 10 Nov 2015 22:40:41 +0900
+Subject: [PATCH v5 4/6] arm64: insn: add instruction decoders for ldp/stp
+ and add/sub
+In-Reply-To: <1446792285-1154-5-git-send-email-takahiro.akashi@linaro.org>
 References: <1446792285-1154-1-git-send-email-takahiro.akashi@linaro.org>
- <252DE845-D0C2-460C-8161-090ED08396A4@gmail.com> <56415D50.40500@linaro.org>
-Message-ID: <06B8BFC7-E3A5-4FF8-8897-27AD597D2E45@gmail.com>
+ <1446792285-1154-5-git-send-email-takahiro.akashi@linaro.org>
+Message-ID: <999DB062-D4C8-4050-ADF7-9C6CEEC0BF73@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Nov 10, 2015, at 11:58 AM, AKASHI Takahiro wrote:
-
-Hi Akashi,
-
-> On 11/09/2015 11:24 PM, Jungseok Lee wrote:
->> On Nov 6, 2015, at 3:44 PM, AKASHI Takahiro wrote:
->> 
->> Hi Akashi,
->> 
->>> This is the fifth patch series for fixing stack tracer on arm64.
->>> The original issue was reported by Jungseok[1], and then I found more
->>> issues[2].
->>> 
->>> We don't have to care about the original issue because the root cause
->>> (patch "ARM64: unwind: Fix PC calculation") has been reverted in v4.3.
->>> 
->>> I address here all the issues and implement fixes described in [2] except
->>> for interrupt-triggered problems(II-3) and leaf function(II-5).  Recent
->>> discussions[3] about introducing a dedicated interrupt stack suggests that
->>> we may avoid walking through from an interrupt stack to a process stack.
->>> (So interrupt-stack patch is a prerequisite.)
->>> 
->>> Basically,
->>> patch1 is a proactive improvement of function_graph tracer.
->>> patch2 corresponds to II-4(functions under function_graph tracer).
->>> patch3, 4 and 5 correspond to II-1(slurping stack) and II-2(differences
->>> between x86 and arm64).
->>> patch6 is a function prologue analyzer test. This won't attest
->>> the correctness of the functionality, but it can suggest that all
->>> the traced functions are treated properly by this function.
->>> (Please note that patch3 has already been queued in Steven's for-next.)
->>> 
->>> I tested the code with v4.3 + Jungseok's patch v5[4].
->> 
->> I've played this series with IRQ stack patch and it works well at least
->> on my system! In addition to this condition, I've run these changes without
->> IRQ stack since it is in progress. I could observe a single strange behavior,
->> minus stack size around elX_irq. Am I missing something?
+On Nov 6, 2015, at 3:44 PM, AKASHI Takahiro wrote:
+> A function prologue analyzer is a requisite for implementing stack tracer
+> and getting better views of stack usages on arm64.
+> To implement a function prologue analyzer, we have to be able to decode,
+> at least, stp, add, sub and mov instructions.
 > 
-> You saw the result like:
-> ...
-> 13)     4336      64   gic_handle_irq+0x5c/0xa4
-> 14)     4272     576   el1_irq+0x68/0xd8
-> 15)     3696    -160   smc_hardware_send_pkt+0x278/0x42c
+> This patch adds decoders for those instructions, that are used solely
+> by stack tracer for now, but generic enough for other uses.
 > 
-> This is the most difficult problem that I mentioned in II-3 of [1] and tried to fix.
-> For example, smc_hardware_send_pkt is NOT the function interrupted, but
-> _raw_spin_unlock_irqstore which is called at '+0x278/0x42c' is.
-> Giving a *perfect* solution against it is quite tough (and complicated).
-> Since you have introduced interrupt stack and even on x86 an interrupt stack is
-> not supported, I removed related patches.
+> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+> ---
+> arch/arm64/include/asm/insn.h |   18 ++++++++
+> arch/arm64/kernel/insn.c      |  102 +++++++++++++++++++++++++++++++++++++++++
+> 2 files changed, 120 insertions(+)
+> 
+> diff --git a/arch/arm64/include/asm/insn.h b/arch/arm64/include/asm/insn.h
+> index 30e50eb..8d5c538 100644
+> --- a/arch/arm64/include/asm/insn.h
+> +++ b/arch/arm64/include/asm/insn.h
+> @@ -165,6 +165,8 @@ enum aarch64_insn_ldst_type {
+> 	AARCH64_INSN_LDST_STORE_PAIR_PRE_INDEX,
+> 	AARCH64_INSN_LDST_LOAD_PAIR_POST_INDEX,
+> 	AARCH64_INSN_LDST_STORE_PAIR_POST_INDEX,
+> +	AARCH64_INSN_LDST_LOAD_PAIR,
+> +	AARCH64_INSN_LDST_STORE_PAIR,
+> };
+> 
+> enum aarch64_insn_adsb_type {
+> @@ -225,6 +227,8 @@ static __always_inline u32 aarch64_insn_get_##abbr##_value(void) \
+> 
+> __AARCH64_INSN_FUNCS(str_reg,	0x3FE0EC00, 0x38206800)
+> __AARCH64_INSN_FUNCS(ldr_reg,	0x3FE0EC00, 0x38606800)
+> +__AARCH64_INSN_FUNCS(stp,	0x7FC00000, 0x29000000)
+> +__AARCH64_INSN_FUNCS(ldp,	0x7FC00000, 0x29400000)
+> __AARCH64_INSN_FUNCS(stp_post,	0x7FC00000, 0x28800000)
+> __AARCH64_INSN_FUNCS(ldp_post,	0x7FC00000, 0x28C00000)
+> __AARCH64_INSN_FUNCS(stp_pre,	0x7FC00000, 0x29800000)
+> @@ -277,6 +281,7 @@ __AARCH64_INSN_FUNCS(hint,	0xFFFFF01F, 0xD503201F)
+> __AARCH64_INSN_FUNCS(br,	0xFFFFFC1F, 0xD61F0000)
+> __AARCH64_INSN_FUNCS(blr,	0xFFFFFC1F, 0xD63F0000)
+> __AARCH64_INSN_FUNCS(ret,	0xFFFFFC1F, 0xD65F0000)
+> +__AARCH64_INSN_FUNCS(eret,	0xFFFFFFFF, 0xD69F00E0)
 
-Yes, that is what I've observed. I was not sure whether the behavior is related to
-II-3, interrupted frame, or not. Thanks for clarification!
+According to C4.2.7, the third argument looks like 0xD69F03E0. Rn field is 11111
+in case of eret.
 
 Best Regards
 Jungseok Lee
+
+> #undef	__AARCH64_INSN_FUNCS
+> 
+> @@ -370,6 +375,19 @@ bool aarch32_insn_is_wide(u32 insn);
+> u32 aarch32_insn_extract_reg_num(u32 insn, int offset);
+> u32 aarch32_insn_mcr_extract_opc2(u32 insn);
+> u32 aarch32_insn_mcr_extract_crm(u32 insn);
+> +int aarch64_insn_decode_add_sub_imm(u32 insn,
+> +				    enum aarch64_insn_register *dst,
+> +				    enum aarch64_insn_register *src,
+> +				    int *imm,
+> +				    enum aarch64_insn_variant *variant,
+> +				    enum aarch64_insn_adsb_type *type);
+> +int aarch64_insn_decode_load_store_pair(u32 insn,
+> +					enum aarch64_insn_register *reg1,
+> +					enum aarch64_insn_register *reg2,
+> +					enum aarch64_insn_register *base,
+> +					int *offset,
+> +					enum aarch64_insn_variant *variant,
+> +					enum aarch64_insn_ldst_type *type);
+> #endif /* __ASSEMBLY__ */
+> 
+> #endif	/* __ASM_INSN_H */
+> diff --git a/arch/arm64/kernel/insn.c b/arch/arm64/kernel/insn.c
+> index c08b9ad..b56a66c 100644
+> --- a/arch/arm64/kernel/insn.c
+> +++ b/arch/arm64/kernel/insn.c
+> @@ -33,6 +33,7 @@
+> #include <asm/insn.h>
+> 
+> #define AARCH64_INSN_SF_BIT	BIT(31)
+> +#define AARCH64_INSN_S_BIT	BIT(29)
+> #define AARCH64_INSN_N_BIT	BIT(22)
+> 
+> static int aarch64_insn_encoding_class[] = {
+> @@ -1141,3 +1142,104 @@ u32 aarch32_insn_mcr_extract_crm(u32 insn)
+> {
+> 	return insn & CRM_MASK;
+> }
+> +
+> +enum aarch64_insn_register aarch64_insn_extract_reg_num(u32 insn,
+> +				enum aarch64_insn_register_type type)
+> +{
+> +	int shift;
+> +
+> +	switch (type) {
+> +	case AARCH64_INSN_REGTYPE_RT:
+> +	case AARCH64_INSN_REGTYPE_RD:
+> +		shift = 0;
+> +		break;
+> +	case AARCH64_INSN_REGTYPE_RN:
+> +		shift = 5;
+> +		break;
+> +	case AARCH64_INSN_REGTYPE_RT2:
+> +	case AARCH64_INSN_REGTYPE_RA:
+> +		shift = 10;
+> +		break;
+> +	case AARCH64_INSN_REGTYPE_RM:
+> +		shift = 16;
+> +		break;
+> +	default:
+> +		pr_err("%s: unknown register type decoding %d\n", __func__,
+> +		       type);
+> +		return ~0L;
+> +	}
+> +
+> +	return (insn & (GENMASK(4, 0) << shift)) >> shift;
+> +}
+> +
+> +int aarch64_insn_decode_add_sub_imm(u32 insn,
+> +				    enum aarch64_insn_register *dst,
+> +				    enum aarch64_insn_register *src,
+> +				    int *imm,
+> +				    enum aarch64_insn_variant *variant,
+> +				    enum aarch64_insn_adsb_type *type)
+> +{
+> +	if (aarch64_insn_is_add_imm(insn))
+> +		*type =	((insn) & AARCH64_INSN_S_BIT) ?
+> +				AARCH64_INSN_ADSB_ADD_SETFLAGS :
+> +				AARCH64_INSN_ADSB_ADD;
+> +	else if (aarch64_insn_is_sub_imm(insn))
+> +		*type =	((insn) & AARCH64_INSN_S_BIT) ?
+> +				AARCH64_INSN_ADSB_SUB_SETFLAGS :
+> +				AARCH64_INSN_ADSB_SUB;
+> +	else
+> +		return 0;
+> +
+> +	*variant = (insn & AARCH64_INSN_SF_BIT) ? AARCH64_INSN_VARIANT_64BIT :
+> +					AARCH64_INSN_VARIANT_32BIT;
+> +
+> +	*dst = aarch64_insn_extract_reg_num(insn, AARCH64_INSN_REGTYPE_RD);
+> +
+> +	*src = aarch64_insn_extract_reg_num(insn, AARCH64_INSN_REGTYPE_RN);
+> +
+> +	/* TODO: ignore shilft field[23:22] */
+> +	*imm = (int)aarch64_insn_decode_immediate(AARCH64_INSN_IMM_12, insn);
+> +
+> +	return 1;
+> +}
+> +
+> +int aarch64_insn_decode_load_store_pair(u32 insn,
+> +					enum aarch64_insn_register *reg1,
+> +					enum aarch64_insn_register *reg2,
+> +					enum aarch64_insn_register *base,
+> +					int *offset,
+> +					enum aarch64_insn_variant *variant,
+> +					enum aarch64_insn_ldst_type *type)
+> +{
+> +	int imm;
+> +
+> +	if (aarch64_insn_is_stp(insn))
+> +		*type = AARCH64_INSN_LDST_STORE_PAIR;
+> +	else if (aarch64_insn_is_stp_post(insn))
+> +		*type = AARCH64_INSN_LDST_STORE_PAIR_POST_INDEX;
+> +	else if (aarch64_insn_is_stp_pre(insn))
+> +		*type = AARCH64_INSN_LDST_STORE_PAIR_PRE_INDEX;
+> +	else if (aarch64_insn_is_ldp(insn))
+> +		*type = AARCH64_INSN_LDST_LOAD_PAIR;
+> +	else if (aarch64_insn_is_ldp_post(insn))
+> +		*type = AARCH64_INSN_LDST_LOAD_PAIR_POST_INDEX;
+> +	else if (aarch64_insn_is_ldp_pre(insn))
+> +		*type = AARCH64_INSN_LDST_LOAD_PAIR_PRE_INDEX;
+> +	else
+> +		return 0;
+> +
+> +	*variant = (insn & AARCH64_INSN_S_BIT) ? AARCH64_INSN_VARIANT_64BIT :
+> +				AARCH64_INSN_VARIANT_32BIT;
+> +
+> +	*reg1 = aarch64_insn_extract_reg_num(insn, AARCH64_INSN_REGTYPE_RT);
+> +
+> +	*reg2 = aarch64_insn_extract_reg_num(insn, AARCH64_INSN_REGTYPE_RT2);
+> +
+> +	*base = aarch64_insn_extract_reg_num(insn, AARCH64_INSN_REGTYPE_RN);
+> +
+> +	imm = (int)aarch64_insn_decode_immediate(AARCH64_INSN_IMM_7, insn);
+> +	asm("sbfm %0, %0, 0, 6" : "+r" (imm));
+> +	*offset = imm * 8;
+> +
+> +	return 1;
+> +}
+> -- 
+> 1.7.9.5
+> 
