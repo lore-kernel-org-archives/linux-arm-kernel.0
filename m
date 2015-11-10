@@ -1,158 +1,46 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Tue, 10 Nov 2015 12:12:30 +0100
-Subject: [PATCH v2] mmc: sdhci at91: add PM support
-In-Reply-To: <1447151810-21864-1-git-send-email-ludovic.desroches@atmel.com>
-References: <1447151810-21864-1-git-send-email-ludovic.desroches@atmel.com>
-Message-ID: <CAPDyKFoAwmkw0D8QbA4UV3uhhNS7hmfOiRv3ZUhMp8uoxzWnrw@mail.gmail.com>
+From: mika.westerberg@linux.intel.com (Mika Westerberg)
+Date: Tue, 10 Nov 2015 13:13:14 +0200
+Subject: [4.4-rc][PATCH] genirq / PM: restore system wake up from chained
+ interrupts
+In-Reply-To: <1447149492-20699-1-git-send-email-grygorii.strashko@ti.com>
+References: <1447149492-20699-1-git-send-email-grygorii.strashko@ti.com>
+Message-ID: <20151110111314.GC1509@lahna.fi.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10 November 2015 at 11:36, Ludovic Desroches
-<ludovic.desroches@atmel.com> wrote:
-> Add runtime PM support and use runtime_force_suspend|resume() for system
-> PM.
->
-> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
-> ---
->
-> Changes:
-> - from v1: take a runtime PM centric approach
->
->  drivers/mmc/host/sdhci-of-at91.c | 66 +++++++++++++++++++++++++++++++++++++++-
->  1 file changed, 65 insertions(+), 1 deletion(-)
->
-> diff --git a/drivers/mmc/host/sdhci-of-at91.c b/drivers/mmc/host/sdhci-of-at91.c
-> index 06d0b50..5dbe0ce 100644
-> --- a/drivers/mmc/host/sdhci-of-at91.c
-> +++ b/drivers/mmc/host/sdhci-of-at91.c
-> @@ -21,6 +21,8 @@
->  #include <linux/module.h>
->  #include <linux/of.h>
->  #include <linux/of_device.h>
-> +#include <linux/pm.h>
-> +#include <linux/pm_runtime.h>
->
->  #include "sdhci-pltfm.h"
->
-> @@ -51,6 +53,62 @@ static const struct of_device_id sdhci_at91_dt_match[] = {
->         {}
->  };
->
-> +#ifdef CONFIG_PM
-> +static int sdhci_at91_runtime_suspend(struct device *dev)
-> +{
-> +       struct platform_device *pdev = to_platform_device(dev);
-> +       struct sdhci_host *host = platform_get_drvdata(pdev);
+On Tue, Nov 10, 2015 at 11:58:12AM +0200, Grygorii Strashko wrote:
+> Commit e509bd7da149 ("genirq: Allow migration of chained interrupts
+> by installing default action") breaks PCS wake up IRQ behaviour on
+> TI OMAP based platforms (dra7-evm).
+> 
+> TI OMAP IRQ wake up configuration:
+> GIC-irqchip->PCM_IRQ
+>   |- omap_prcm_register_chain_handler
+>      |- PRCM-irqchip -> PRCM_IO_IRQ
+>         |- pcs_irq_chain_handler
+>            |- pinctrl-irqchip -> PCS_uart1_wakeup_irq
+> 
+> This happens because IRQ PM code (irq/pm.c) is expected to ignore
+> chained interrupts by default:
+>   static bool suspend_device_irq(struct irq_desc *desc)
+>   {
+> 	if (!desc->action || desc->no_suspend_depth)
+> 		return false;
+>  - it's expected !desc->action = true for chained interrupts;
 
-These two lines can be replaced by:
-struct sdhci_host *host = dev_get_drvdata(dev);
+Indeed it is. I missed that, sorry.
 
-> +       struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
-> +       struct sdhci_at91_priv *priv = pltfm_host->priv;
-> +       int ret;
-> +
-> +       ret = sdhci_runtime_suspend_host(host);
-> +
-> +       clk_disable_unprepare(priv->gck);
-> +       clk_disable_unprepare(priv->hclock);
-> +       clk_disable_unprepare(priv->mainck);
-> +
-> +       return ret;
-> +}
-> +
-> +static int sdhci_at91_runtime_resume(struct device *dev)
-> +{
-> +       struct platform_device *pdev = to_platform_device(dev);
-> +       struct sdhci_host *host = platform_get_drvdata(pdev);
+> but, after above change, all chained interrupt descriptors will
+> have default action handler installed - chained_action.
+> As result, chained interrupts will be silently disabled during system
+> suspend.
+> 
+> Hence, fix it by introducing helper function irq_desc_is_chained() and
+> use it in suspend_device_irq() for chained interrupts identification
+> and skip them, once detected.
+> 
+> Cc: Mika Westerberg <mika.westerberg@linux.intel.com>
 
-Same comment as above.
+FWIW,
 
-> +       struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
-> +       struct sdhci_at91_priv *priv = pltfm_host->priv;
-> +       int ret;
-> +
-> +       ret = clk_prepare_enable(priv->mainck);
-> +       if (ret) {
-> +               dev_err(dev, "can't enable mainck\n");
-> +               return ret;
-> +       }
-> +
-> +       ret = clk_prepare_enable(priv->hclock);
-> +       if (ret) {
-> +               dev_err(dev, "can't enable hclock\n");
-> +               return ret;
-> +       }
-> +
-> +       ret = clk_prepare_enable(priv->gck);
-> +       if (ret) {
-> +               dev_err(dev, "can't enable gck\n");
-> +               return ret;
-> +       }
-> +
-> +       return sdhci_runtime_resume_host(host);
-> +}
-> +#endif /* CONFIG_PM_RUNTIME */
-
-/s/CONFIG_PM_RUNTIME/CONFIG_PM
-
-> +
-> +static const struct dev_pm_ops sdhci_at91_dev_pm_ops = {
-> +       SET_SYSTEM_SLEEP_PM_OPS(pm_runtime_force_suspend,
-> +                               pm_runtime_force_resume)
-> +       SET_RUNTIME_PM_OPS(sdhci_at91_runtime_suspend,
-> +                          sdhci_at91_runtime_resume,
-> +                          NULL)
-> +};
-> +
->  static int sdhci_at91_probe(struct platform_device *pdev)
->  {
->         const struct of_device_id       *match;
-> @@ -148,6 +206,11 @@ static int sdhci_at91_probe(struct platform_device *pdev)
->         if (ret)
->                 goto clocks_disable_unprepare;
->
-> +       pm_runtime_set_active(&pdev->dev);
-> +       pm_runtime_enable(&pdev->dev);
-> +       pm_runtime_set_autosuspend_delay(&pdev->dev, 50);
-> +       pm_runtime_use_autosuspend(&pdev->dev);
-
-Move these four runtime PM calls above sdhci_add_host(), as after that
-point the host is used and thus runtime PM operations starts.
-
-> +
->         return 0;
->
->  clocks_disable_unprepare:
-> @@ -165,6 +228,7 @@ static int sdhci_at91_remove(struct platform_device *pdev)
->         struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
->         struct sdhci_at91_priv  *priv = pltfm_host->priv;
->
-
-Add:
-pm_runtime_get_sync();
-
-> +       pm_runtime_disable(&pdev->dev);
-
-Add:
-pm_runtime_put_noidle();
-
->         sdhci_pltfm_unregister(pdev);
->
->         clk_disable_unprepare(priv->gck);
-> @@ -178,7 +242,7 @@ static struct platform_driver sdhci_at91_driver = {
->         .driver         = {
->                 .name   = "sdhci-at91",
->                 .of_match_table = sdhci_at91_dt_match,
-> -               .pm     = SDHCI_PLTFM_PMOPS,
-> +               .pm     = &sdhci_at91_dev_pm_ops,
->         },
->         .probe          = sdhci_at91_probe,
->         .remove         = sdhci_at91_remove,
-> --
-> 2.5.0
->
-
-Otherwise, this looks good!
-
-Kind regards
-Uffe
+Reviewed-by: Mika Westerberg <mika.westerberg@linux.intel.com>
