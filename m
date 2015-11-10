@@ -1,56 +1,48 @@
-From: daniel@iogearbox.net (Daniel Borkmann)
-Date: Tue, 10 Nov 2015 18:23:14 +0100
-Subject: [PATCH, REPORT] bpf_trace: build error without PERF_EVENTS
-In-Reply-To: <20151110171421.GA21650@ast-mbp.thefacebook.com>
-References: <4525348.Aq9YoXkChv@wuerfel> <5641F1BA.6040701@iogearbox.net>
- <20151110092501.0bc676c9@gandalf.local.home>
- <20151110171421.GA21650@ast-mbp.thefacebook.com>
-Message-ID: <56422802.5050901@iogearbox.net>
+From: thierry.reding@gmail.com (Thierry Reding)
+Date: Tue, 10 Nov 2015 18:32:57 +0100
+Subject: [PATCH v4] pwm-backlight: Avoid backlight flicker when probed
+ from DT
+In-Reply-To: <3447562.c3gSANEMio@phil>
+References: <1446483356-14338-1-git-send-email-p.zabel@pengutronix.de>
+ <3447562.c3gSANEMio@phil>
+Message-ID: <20151110173257.GA21727@ulmo>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/10/2015 06:14 PM, Alexei Starovoitov wrote:
-> On Tue, Nov 10, 2015 at 09:25:01AM -0500, Steven Rostedt wrote:
->> On Tue, 10 Nov 2015 14:31:38 +0100
->> Daniel Borkmann <daniel@iogearbox.net> wrote:
->>
->>> On 11/10/2015 01:55 PM, Arnd Bergmann wrote:
->>>> In my ARM randconfig tests, I'm getting a build error for
->>>> newly added code in bpf_perf_event_read and bpf_perf_event_output
->>>> whenever CONFIG_PERF_EVENTS is disabled:
->>>>
->>>> kernel/trace/bpf_trace.c: In function 'bpf_perf_event_read':
->>>> kernel/trace/bpf_trace.c:203:11: error: 'struct perf_event' has no member named 'oncpu'
->>>> if (event->oncpu != smp_processor_id() ||
->>>>            ^
->>>> kernel/trace/bpf_trace.c:204:11: error: 'struct perf_event' has no member named 'pmu'
->>>>         event->pmu->count)
->>>>
->>>> This can happen when UPROBE_EVENT is enabled but KPROBE_EVENT
->>>> is disabled. I'm not sure if that is a configuration we care
->>>> about, otherwise we could prevent this case from occuring by
->>>> adding Kconfig dependencies.
->>>
->>> I think that seems better than spreading #if IS_ENABLEDs into the code.
->>> Probably enough to add a 'depends on PERF_EVENTS' to config BPF_EVENTS,
->>> so it's also explicitly documented.
->>>
->>
->> So just do the following then?
->>
->> -- Steve
->>
->> diff --git a/kernel/trace/Kconfig b/kernel/trace/Kconfig
->> index 8d6363f42169..f5aecff2d243 100644
->> --- a/kernel/trace/Kconfig
->> +++ b/kernel/trace/Kconfig
->> @@ -434,7 +434,7 @@ config UPROBE_EVENT
->>
->>   config BPF_EVENTS
->>   	depends on BPF_SYSCALL
->> -	depends on KPROBE_EVENT || UPROBE_EVENT
->> +	depends on KPROBE_EVENT && UPROBE_EVENT
->
-> yeah that's definitely cleaner and avoids ifdef creep in the future.
+On Tue, Nov 10, 2015 at 03:18:10PM +0100, Heiko Stuebner wrote:
+> Hi Philipp,
+> 
+> Am Montag, 2. November 2015, 17:55:56 schrieb Philipp Zabel:
+> > If the driver is probed from the device tree, and there is a phandle
+> > property set on it, and the enable GPIO is already configured as output,
+> > and the backlight is currently disabled, keep it disabled.
+> > If all these conditions are met, assume there will be some other driver
+> > that can enable the backlight at the appropriate time.
+> > 
+> > Signed-off-by: Philipp Zabel <p.zabel@pengutronix.de>
+> > Reviewed-by: Christian Gmeiner <christian.gmeiner@gmail.com>
+> 
+> this patch improves the white screen when booting a veyron chromebook
+> a lot. I still see a small white flash, but that can probably come from
+> the WIP edp driver.
 
-Agreed, that's better.
+Some panels require a couple of frames before they actually enable. You
+may want to look at the datasheet of your panel to see if it has some
+specific requirement and update the panel driver with that.
+
+>From a high-level view the way that this is supposed to work is that
+your encoder driver (e.g. eDP) "prepares" the panel, then starts sending
+frames and finally "enables" the panel. With something like the simple
+panel driver you can influence this by setting the delay.enable field in
+the panel descriptor.
+
+See struct panel_desc in drivers/gpu/drm/panel/panel-simple.c
+
+Thierry
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151110/9e3d4e8b/attachment.sig>
