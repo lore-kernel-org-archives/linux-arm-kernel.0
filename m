@@ -1,79 +1,40 @@
-From: john.stultz@linaro.org (John Stultz)
-Date: Tue, 10 Nov 2015 07:41:44 -0800
+From: tglx@linutronix.de (Thomas Gleixner)
+Date: Tue, 10 Nov 2015 10:55:49 -0500 (EST)
 Subject: [PATCH v2 1/7] timekeeping: introduce __current_kernel_time64
-In-Reply-To: <alpine.DEB.2.11.1511101028320.3915@nanos>
+In-Reply-To: <CALAqxLU35iSG8dCgkKi9v_mM=xO1p1jWAhq3nX6_CAYcjUYoZQ@mail.gmail.com>
 References: <alpine.DEB.2.02.1511101131350.5676@kaball.uk.xensource.com>
  <1447156675-7418-1-git-send-email-stefano.stabellini@eu.citrix.com>
  <4372800.FdTygmcuyo@wuerfel>
  <alpine.DEB.2.02.1511101507540.5676@kaball.uk.xensource.com>
  <CALAqxLUEOWP6CJxY021nDR6cEQf3VZtm8fa9waK2a=OmQJEO-g@mail.gmail.com>
  <alpine.DEB.2.11.1511101028320.3915@nanos>
-Message-ID: <CALAqxLU35iSG8dCgkKi9v_mM=xO1p1jWAhq3nX6_CAYcjUYoZQ@mail.gmail.com>
+ <CALAqxLU35iSG8dCgkKi9v_mM=xO1p1jWAhq3nX6_CAYcjUYoZQ@mail.gmail.com>
+Message-ID: <alpine.DEB.2.11.1511101046420.3915@nanos>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 10, 2015 at 7:31 AM, Thomas Gleixner <tglx@linutronix.de> wrote:
-> On Tue, 10 Nov 2015, John Stultz wrote:
->> On Tue, Nov 10, 2015 at 7:10 AM, Stefano Stabellini
->> <stefano.stabellini@eu.citrix.com> wrote:
->> > On Tue, 10 Nov 2015, Arnd Bergmann wrote:
->> >> On Tuesday 10 November 2015 11:57:49 Stefano Stabellini wrote:
->> >> > __current_kernel_time64 returns a struct timespec64, without taking the
->> >> > xtime lock. Mirrors __current_kernel_time/current_kernel_time.
->> >> >
->> >>
->> >> Actually it doesn't mirror __current_kernel_time/current_kernel_time
->> >>
->> >> > diff --git a/include/linux/timekeeping.h b/include/linux/timekeeping.h
->> >> > index ec89d84..b5802bf 100644
->> >> > --- a/include/linux/timekeeping.h
->> >> > +++ b/include/linux/timekeeping.h
->> >> > @@ -19,7 +19,8 @@ extern int do_sys_settimeofday(const struct timespec *tv,
->> >> >   */
->> >> >  unsigned long get_seconds(void);
->> >> >  struct timespec64 current_kernel_time64(void);
->> >> > -/* does not take xtime_lock */
->> >> > +/* do not take xtime_lock */
->> >> > +struct timespec64 __current_kernel_time64(void);
->> >> >  struct timespec __current_kernel_time(void);
->> >>
->> >> Please change __current_kernel_time into a static inline function
->> >> while you are introducing the new one, to match the patch description ;-)
->> >
->> > The implementation is:
->> >
->> >         struct timekeeper *tk = &tk_core.timekeeper;
->> >
->> >         return timespec64_to_timespec(tk_xtime(tk));
->> >
->> > which cannot be easily made into a static inline, unless we start
->> > exporting tk_core.
->>
->> So the timekeeper is passed to the notifier. So you probably want something like
->>
->> struct timespec64 __current_kernel_time64(struct timekeeper *tk)
->> {
->>  return timespec64_to_timespec(tk_xtime(tk));
->> }
->>
->> Then you can cast the priv pointer in the notifier to a timekeeper and
->> use it that way?
->
-> Err no. Look at commit 8758a240e2d74c5932ab51a73377e6507b7fd441
->
-> i.e. Add the new 64bit function and make the existing one a static
-> inline which does the timespec64 to timespec conversion.
+On Tue, 10 Nov 2015, John Stultz wrote:
+> I'm sort of objecting to a different issue, where the
+> __current_kernel_time() implementation probably shouldn't be grabbing
+> the tk_core.timekeeper directly, and instead should take a passed
+> pointer to a timekeeper. The vdso/pv_clock usage should have a
+> timekeeper passed to them that they could use.
 
-So yea. The style there is what should be done.
+That usage of __current_kernel_time() in that xen notifier is silly to
+begin with. The notifier gets already called with a pointer to the
+time keeper. That xen implementation just does not use it.
 
-I'm sort of objecting to a different issue, where the
-__current_kernel_time() implementation probably shouldn't be grabbing
-the tk_core.timekeeper directly, and instead should take a passed
-pointer to a timekeeper. The vdso/pv_clock usage should have a
-timekeeper passed to them that they could use.
+We extract exactly that information in the vdso updates without
+calling back into the core code. So for solving that xen thing we do
+not need a 64 bit variant of __current_kernel_time() at all. The
+notifier has the pointer to the timekeeper and can just grab data from
+there.
 
-There's one useage in kdb thats maybe problematic, so maybe this will
-need a deeper cleanup.
+> There's one useage in kdb thats maybe problematic, so maybe this will
+> need a deeper cleanup.
 
-thanks
--john
+That one is silly as well. It only wants to know the seconds portion.
+
+Thanks,
+
+	tglx
