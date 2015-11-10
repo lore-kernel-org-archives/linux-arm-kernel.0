@@ -1,330 +1,244 @@
 From: olof@lixom.net (Olof Johansson)
-Date: Mon,  9 Nov 2015 19:33:20 -0800
-Subject: [GIT PULL 2/6] ARM: SoC cleanups for v4.4
+Date: Mon,  9 Nov 2015 19:33:22 -0800
+Subject: [GIT PULL 4/6] ARM: SoC driver updates for v4.4
 In-Reply-To: <1447126404-10567-1-git-send-email-olof@lixom.net>
 References: <1447126404-10567-1-git-send-email-olof@lixom.net>
-Message-ID: <1447126404-10567-3-git-send-email-olof@lixom.net>
+Message-ID: <1447126404-10567-5-git-send-email-olof@lixom.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Again we have a sizable (but not huge) cleanup branch with a net delta of about
--3k lines.
+As we've enabled multiplatform kernels on ARM, and greatly done away with
+the contents under arch/arm/mach-*, there's still need for SoC-related
+drivers to go somewhere.
 
-Main contents here is:
+Many of them go in through other driver trees, but we still have
+drivers/soc to hold some of the "doesn't fit anywhere" lowlevel code
+that might be shared between ARM and ARM64 (or just in general makes
+sense to not have under the architecture directory).
 
-- A bunch of development/cleanup of a few PXA boards
-- Removal of bockw platforms on shmobile, since the platform has now gone
-  completely multiplatform. Whee!
-- move of the 32kHz timer on OMAP to a proper timesource
-- Misc cleanup of older OMAP material (incl removal of one board file)
-- Switch over to new common PWM lookup support for several platforms
+This branch contains mostly such code:
 
-There's also a handful of other cleanups across the tree, but the above are
-the major pieces.
+- Drivers for qualcomm SoCs for SMEM, SMD and SMD-RPM, used to communicate
+with power management blocks on these SoCs for use by clock, regulator and
+bus frequency drivers.
+- Allwinner Reduced Serial Bus driver, again used to communicate with PMICs.
+- Drivers for ARM's SCPI (System Control Processor). Not to be confused with
+PSCI (Power State Coordination Interface). SCPI is used to communicate with
+the assistant embedded cores doing power management, and we have yet to see
+how many of them will implement this for their hardware vs abstracting in
+other ways (or not at all like in the past).
+- To make confusion between SCPI and PSCI more likely, this release also
+includes an update of PSCI to interface version 1.0.
+- Rockchip support for power domains.
+- A driver to talk to the firmware on Raspberry Pi.
 
 
 
 Conflicts:
 
-OMAP timer code has a treewide fix vs code deletion conflict. Delete
-the code in HEAD, go with contents from branch.
+None
 
 ----------------------------------------------------------------
 
-The following changes since commit 97f0fe6cec0cac661e1fc89ed2071fc5ab646c76:
+The following changes since commit 13102660efc5d7b4bf0ef6915e43d8c6b5084b68:
 
-  Merge tag 'armsoc-fixes-nc' into HEAD
+  Merge tag 'armsoc-soc' into HEAD
 
 are available in the git repository at:
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/armsoc-cleanup
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git tags/armsoc-drivers
 
-for you to fetch changes up to d3dc3df6330e4b4d799bef4aac6f934b5e726b1c:
+for you to fetch changes up to d13a5c8c4c3dbe299659bcff805f79a2c83e2bbc:
 
-  Merge tag 'omap-for-v4.4/soc-clean-up' of git://git.kernel.org/pub/scm/linux/kernel/git/tmlind/linux-omap into next/cleanup
+  soc: qcom: smd-rpm: Correct size of outgoing message
 
 ----------------------------------------------------------------
 
-Andrzej Hajda (1):
-      ARM: shmobile: apmu: correct type of CPU id
+Alexander Aring (1):
+      ARM: bcm2835: add mutual inclusion protection
 
-Arnd Bergmann (5):
-      Merge tag 'renesas-cleanup-for-v4.4' of git://git.kernel.org/.../horms/renesas into next/cleanup
-      Merge tag 'efm32-for-4.4-rc1' of git://git.pengutronix.de/git/ukl/linux into next/cleanup
-      Merge tag 'mvebu-cleanup-4.4-1' of git://git.infradead.org/linux-mvebu into next/cleanup
-      Merge tag 'omap-for-v4.4/cleanup-pt1' of git://git.kernel.org/.../tmlind/linux-omap into next/cleanup
-      ARM: pxa: remove incorrect __init annotation on pxa27x_set_pwrmode
+Alexandre Belloni (1):
+      clocksource: atmel-st: get and use slow clock
 
-Felipe Balbi (13):
-      arm: omap2: timer: always define omap4_local_timer_init
-      arm: omap2: timer: get rid of obfuscating macros
-      arm: omap2: timer: add a gptimer argument to sync32k_timer_init()
-      arm: omap2: timer: remove __omap_gptimer_init()
-      arm: omap2: timer: provide generic sync32k_timer_init function
-      arm: omap2: timer: move realtime_counter_init() around
-      arm: omap2: timer: always call clocksource_of_init() when DT
-      arm: omap2: timer: rename omap_sync32k_timer_init()
-      clocksource: add TI 32.768 Hz counter driver
-      arm: omap2+: select 32k clocksource driver
-      arm: omap2: timer: limit hwmod usage to non-DT boots
-      clocksource: ti-32k: make it depend on GENERIC_CLOCKSOURCE
-      arm: omap2: board-generic: use omap4_local_timer_init for AM437x
+Andy Gross (1):
+      Merge tag 'qcom-fixes-for-4.3-rc1' into base-for-4.4
 
-Franklin S Cooper Jr (2):
-      ARM: DRA7/AM335x/AM437x: hwmod: Remove elm address space from hwmod data
-      ARM: DRA7/AM335x/AM437x: hwmod: Remove gpmc address space from hwmod data
+Antoine Tenart (1):
+      clk: berlin: add cpuclk
 
-Geert Uytterhoeven (10):
-      ARM: shmobile: Remove unused declaration of r8a7778_add_standard_devices_dt()
-      ARM: shmobile: Remove obsolete sh-gpio.h
-      ARM: shmobile: Remove obsolete custom earlyprintk code
-      ARM: shmobile: Remove obsolete intc.h
-      ARM: shmobile: Remove obsolete legacy PM Domain leftovers
-      ARM: shmobile: Remove obsolete earlytimer registration
-      ARM: shmobile: Remove obsolete twd_local_timer declaration
-      ARM: shmobile: smp: Make shmobile_smp_apmu_cpu_shutdown() static
-      ARM: shmobile: r8a7778: Make r8a7778_init_irq_dt() static
-      ARM: shmobile: r8a7779: Remove legacy PM Domain remainings
+Arnd Bergmann (9):
+      Merge tag 'renesas-clk-for-v4.4' of git://git.kernel.org/.../horms/renesas into next/drivers
+      Merge tag 'at91-cleanup-4.4' of git://git.kernel.org/.../abelloni/linux into next/drivers
+      Merge tag 'v4.4-rockchip-drivers1' of git://git.kernel.org/.../mmind/linux-rockchip into next/drivers
+      Merge tag 'arm-scpi-for-v4.4' of git://git.kernel.org/.../sudeep.holla/linux into next/drivers
+      firmware: qcom-scm: build for correct architecture level
+      Merge tag 'drivers_pl172_for_4.4' of https://github.com/manabian/linux-lpc into next/drivers
+      Merge tag 'berlin-new-cpuclk-for-4.4-1' of git://git.infradead.org/users/hesselba/linux-berlin into next/drivers
+      Merge tag 'qcom-soc-for-4.4' of git://codeaurora.org/quic/kernel/agross-msm into next/drivers
+      soc: qcom/smem: add HWSPINLOCK dependency
 
-Gregory CLEMENT (1):
-      ARM: mvebu: Use a CR_C constant instead of a hard-coded one
+Bjorn Andersson (5):
+      soc: qcom: smd: Implement id_table driver matching
+      soc: qcom: smd: Reject send of too big packets
+      soc: qcom: smd: Correct SMEM items for upper channels
+      soc: qcom: smd-rpm: Correct the active vs sleep state flagging
+      soc: qcom: smd-rpm: Correct size of outgoing message
 
-Jarkko Nikula (1):
-      ARM: pxa: Remove unused clock_enable field from struct pxa2xx_spi_master
+Boris Brezillon (2):
+      clocksource: tcb_clksrc: fix setup_clkevents error path
+      misc: atmel_tclib: get and use slow clock
 
-Javier Martinez Canillas (3):
-      ARM: OMAP3: vc: Remove unused macros
-      ARM: OMAP2+: Remove unneeded semicolons
-      ARM: OMAP: Remove duplicated operand in OR operation
+Caesar Wang (3):
+      dt-bindings: add power-domain header for RK3288 SoCs
+      dt-bindings: add document of Rockchip power domains
+      soc: rockchip: power-domain: Add power domain driver
+
+Chen-Yu Tsai (2):
+      bus: sunxi-rsb: Add Allwinner Reduced Serial Bus (RSB) controller bindings
+      bus: sunxi-rsb: Add driver for Allwinner Reduced Serial Bus
+
+Eric Anholt (1):
+      ARM: bcm2835: Add the Raspberry Pi firmware driver
+
+Geert Uytterhoeven (1):
+      dt-bindings: Correct paths in Rockchip power domains binding document
+
+Heiko Stuebner (2):
+      Merge branch 'v4.4-armsoc/pd-headers' into v4.4-armsoc/drivers
+      soc: rockchip: power-domain: don't try to print the clock name in error case
 
 Julia Lawall (1):
-      ARM: shmobile: R-Mobile: add missing of_node_put
+      soc: qcom: smd: delete unneeded of_node_put
 
-Keerthy (1):
-      ARM: OMAP: Change all cpu_is_* occurences to soc_is_* for id.c
-
-Ladislav Michl (1):
-      ARM: OMAP1: Remove board support for VoiceBlue board
-
-Laurent Pinchart (2):
-      ARM: shmobile: Remove legacy clock support leftovers
-      ARM: OMAP2+: Remove legacy OMAP3 ISP instantiation
-
-Lee Jones (1):
-      ARM: shmobile: dt: Rename incorrect interrupt related binding
-
-Lucas Stach (1):
-      ARM: mvebu: remove the workaround imprecise abort fault handler
-
-Marc Zyngier (1):
-      ARM: Remove open-coded version of IRQCHIP_DECLARE
+Lorenzo Pieralisi (6):
+      drivers: firmware: psci: add INVALID_ADDRESS return value
+      drivers: firmware: psci: move power_state handling to generic code
+      drivers: firmware: psci: add PSCI_FEATURES call
+      drivers: firmware: psci: add extended stateid power_state support
+      drivers: firmware: psci: add PSCI v1.0 DT bindings
+      drivers: psci: make PSCI 1.0 functions initialization version dependent
 
 Olof Johansson (4):
-      Merge tag 'renesas-cleanup2-for-v4.4' of git://git.kernel.org/.../horms/renesas into next/cleanup
-      Merge tag 'mvebu-cleanup-4.4-2' of git://git.infradead.org/linux-mvebu into next/cleanup
-      Merge tag 'pxa-for-4.4' of https://github.com/rjarzmik/linux into next/cleanup
-      Merge tag 'omap-for-v4.4/soc-clean-up' of git://git.kernel.org/.../tmlind/linux-omap into next/cleanup
+      Merge tag 'firmware/psci-1.0' of git://git.kernel.org/.../lpieralisi/linux into next/drivers
+      Merge branch 'drivers/psci2' into next/drivers
+      Merge tag 'v4.4-rockchip-drivers2' of git://git.kernel.org/.../mmind/linux-rockchip into next/drivers
+      Merge tag 'arm/soc/for-4.4/rpi-drivers' of https://github.com/Broadcom/stblinux into next/drivers
 
-Petr Cvek (22):
-      ARM: pxa: magician: Fix indentation in machine files
-      ARM: pxa: magician: Print more specific error message for global GPIOs
-      ARM: pxa: magician: Optimize debug messages for LCD power
-      ARM: pxa: magician: Change description of LCD power GPIO
-      ARM: pxa: magician: Add new discovered EGPIO pins
-      ARM: pxa: magician: Rename abstract LCD GPIOs
-      ARM: pxa: magician: Optimize powerup delays for Samsung LCD
-      ARM: pxa: magician: Rename charger cable detection EGPIOs
-      ARM: pxa: magician: Optimize Samsung LCD refresh to 50Hz
-      ARM: pxa: magician: Fix and add charging detection functions
-      ARM: pxa: magician: Fix platform data for both PXA27x I2C controllers
-      ARM: pxa: magician: Fix redundant GPIO request for pxaficp_ir
-      ARM: pxa: magician: Fix support for Intel Strata NOR Flash
-      ARM: pxa: magician: Fix wrongly enabled USB host ports
-      ARM: pxa: magician: Remove definition of the STUART port
-      ARM: pxa: magician: Add debug message for backlight brightness function
-      ARM: pxa: magician: Add missing regulator for PWM backlight
-      ARM: pxa: magician: Move platform_add_devices() to the end of magician_init()
-      ARM: pxa: magician: Change comments to be more informative
-      ARM: pxa: magician: Add support for MAX1587A Vcore regulator
-      ARM: pxa: magician: Add support for PXA27x UDC
-      ARM: pxa: magician: Remove pdata for pasic3-leds
+Punit Agrawal (4):
+      Documentation: add DT bindings for ARM SCPI sensors
+      firmware: arm_scpi: Extend to support sensors
+      hwmon: Support sensors exported via ARM SCP interface
+      hwmon: Support thermal zones registration for SCP temperature sensors
 
-Robert Jarzmik (2):
-      ARM: pxa: add resources to pxaficp_ir
-      ARM: pxa: mioa701: add wm9713 codec
+Rob Clark (2):
+      qcom-scm: fix endianess issue in __qcom_scm_is_call_available
+      qcom-scm: add missing prototype for qcom_scm_is_available()
 
-Simon Horman (1):
-      ARM: shmobile: remove Makefile.boot
+Sebastian Hesselbarth (2):
+      ARM: berlin: dts: add CLKID_CPU for BG2Q
+      Merge tag 'berlin-dt-cpuclk-for-4.4-1' into berlin/cpuclk
 
-Stephen Boyd (1):
-      ARM: Remove __ref on hotplug cpu die path
+Stephen Boyd (11):
+      PM / clk: Do not __clk_get passed in clock-references
+      soc: qcom: smem: Avoid NULL pointer exception on remove
+      soc: qcom: Reorder SMEM/SMD configs
+      soc: qcom: Make qcom_smem_get() return a pointer
+      soc: qcom: smem: Handle big endian CPUs
+      soc: qcom: smd: Represent channel layout in structures
+      soc: qcom: smd: Use __iowrite32_copy() instead of open-coding it
+      soc: qcom: smd: Remove use of VLAIS
+      soc: qcom: smd_rpm: Handle big endian CPUs
+      soc: qcom: smd: Handle big endian CPUs
+      soc: qcom: smem: Move RPM message ram out of smem DT node
 
-Suman Anna (3):
-      ARM: OMAP4: hwmod data: Remove spinlock hwmod addrs
-      ARM: DRA7: hwmod data: Remove spinlock hwmod addrs
-      ARM: OMAP3: hwmod data: Remove legacy mailbox data and addrs
+Sudeep Holla (7):
+      Documentation: add DT binding for ARM System Control and Power Interface(SCPI) protocol
+      firmware: add support for ARM System Control and Power Interface(SCPI) protocol
+      clk: add support for clocks provided by SCP(System Control Processor)
+      clk: scpi: add support for cpufreq virtual device
+      cpufreq: arm_big_little: add SCPI interface driver
+      drivers: firmware: psci: define more generic PSCI_FN_NATIVE macro
+      drivers: firmware: psci: add system suspend support
 
-Tero Kristo (1):
-      ARM: OMAP3: clock: remove un-used core dpll re-program code
+Thierry Reding (1):
+      soc: rockchip: Restrict to ARCH_ROCKCHIP
 
-Thierry Reding (17):
-      ARM: pxa: colibri-pxa270-income: Use PWM lookup table
-      ARM: pxa: ezx: Use PWM lookup table
-      ARM: pxa: hx4700: Remove unused field initializers
-      ARM: pxa: lpd270: Use PWM lookup table
-      ARM: pxa: magician: Use PWM lookup table
-      ARM: pxa: mainstone: Use PWM lookup table
-      ARM: pxa: mioa701: Use PWM lookup table
-      ARM: pxa: palm27x: Use PWM lookup table
-      ARM: pxa: palmte2: Use PWM lookup table
-      ARM: pxa: pcm990: Use PWM lookup table
-      ARM: pxa: raumfeld: Use PWM lookup table
-      ARM: pxa: viper: Use PWM lookup table
-      ARM: pxa: palmtc: Use PWM lookup table
-      ARM: pxa: cm-x300: Use PWM lookup table
-      ARM: pxa: tavorevb: Use PWM lookup table
-      ARM: pxa: z2: Use PWM lookup table
-      ARM: pxa: zylonite: Use PWM lookup table
-
-Tony Lindgren (3):
-      ARM: OMAP2+: Rename cpu_is macros to soc_is
-      Merge branch 'for-tony' of git://git.kernel.org/.../balbi/usb into omap-for-v4.4/soc
-      Merge tag 'for-v4.4/omap-hwmod-cleanup-a' of git://git.kernel.org/.../pjw/omap-pending into omap-for-v4.4/soc
-
-Ulrich Hecht (12):
-      ARM: shmobile: bockw: remove "reference" device tree
-      ARM: shmobile: bockw: remove "reference" board file and config
-      ARM: shmobile: remove paragraph on DT reference platforms
-      ARM: shmobile: bockw: remove legacy board file and config
-      ARM: shmobile: r8a7778: remove obsolete setup code
-      ARM: shmobile: Kconfig: remove obsolete option ARCH_R8A7778
-      ARM: shmobile: r8a7778: remove legacy clock implementation
-      ARM: shmobile: remove ARCH_SHMOBILE_LEGACY option
-      ARM: shmobile: bockw: remove legacy defconfig
-      MAINTAINERS: remove references to dropped marzen and bockw defconfigs
-      ARM: shmobile: bockw: remove legacy DTB build target
-      ARM: shmobile: Kconfig: remove unused SHMOBILE_TIMER_HZ section
-
-Uwe Kleine-K?nig (3):
-      ARM: efm32: switch to properly namespaced location property
-      ARM: efm32: switch to vendor,device compatible strings
-      ARM: pxa: raumfeld: make some variables static
+Vladimir Zapolskiy (4):
+      memory: pl172: correct MPMC peripheral ID register bits
+      memory: pl172: add ARM PrimeCell PL175 MPMC support
+      memory: pl172: add ARM PrimeCell PL176 MPMC support
+      doc: dt: arm,pl172: add description of PL175 and PL176 controllers
 
 
- .../devicetree/bindings/arm/shmobile.txt        |   6 -
- .../renesas-memory-controllers.txt              |   6 +-
- Documentation/spi/pxa2xx                        |   6 -
- MAINTAINERS                                     |   2 -
- arch/arm/Kconfig                                |  26 +-
- arch/arm/Kconfig.debug                          |   3 +-
- arch/arm/boot/dts/Makefile                      |   3 -
- arch/arm/boot/dts/efm32gg-dk3750.dts            |   8 +-
- arch/arm/boot/dts/efm32gg.dtsi                  |  32 +-
- arch/arm/boot/dts/r8a7778-bockw-reference.dts   | 139 ----
- arch/arm/configs/bockw_defconfig                | 133 ----
- arch/arm/kernel/psci_smp.c                      |   4 +-
- arch/arm/mach-exynos/suspend.c                  |   3 +-
- arch/arm/mach-imx/gpc.c                         |   8 +-
- arch/arm/mach-mvebu/board-v7.c                  |  35 -
- arch/arm/mach-mvebu/pmsu.c                      |   4 +-
- arch/arm/mach-omap1/Kconfig                     |   7 -
- arch/arm/mach-omap1/Makefile                    |   1 -
- arch/arm/mach-omap1/board-voiceblue.c           | 296 --------
- .../mach-omap1/include/mach/board-voiceblue.h   |  19 -
- arch/arm/mach-omap2/Kconfig                     |   1 +
- arch/arm/mach-omap2/Makefile                    |   3 -
- arch/arm/mach-omap2/board-generic.c             |  12 +-
- arch/arm/mach-omap2/board-ldp.c                 |   2 +-
- arch/arm/mach-omap2/board-rx51.c                |   2 +-
- arch/arm/mach-omap2/clkt34xx_dpll3m2.c          | 122 ---
- arch/arm/mach-omap2/common.h                    |   3 +-
- arch/arm/mach-omap2/devices.c                   |  53 --
- arch/arm/mach-omap2/devices.h                   |  19 -
- arch/arm/mach-omap2/id.c                        |  30 +-
- arch/arm/mach-omap2/omap-hotplug.c              |   2 +-
- arch/arm/mach-omap2/omap-wakeupgen.c            |  10 +-
- .../omap_hwmod_33xx_43xx_interconnect_data.c    |  20 -
- arch/arm/mach-omap2/omap_hwmod_3xxx_data.c      |  29 -
- arch/arm/mach-omap2/omap_hwmod_44xx_data.c      |  10 -
- arch/arm/mach-omap2/omap_hwmod_54xx_data.c      |   3 +-
- arch/arm/mach-omap2/omap_hwmod_7xx_data.c       |  30 -
- arch/arm/mach-omap2/pm44xx.c                    |   2 +-
- arch/arm/mach-omap2/powerdomains3xxx_data.c     |   2 +-
- arch/arm/mach-omap2/soc.h                       | 195 ++---
- arch/arm/mach-omap2/sram.c                      |  25 -
- arch/arm/mach-omap2/sram.h                      |  14 -
- arch/arm/mach-omap2/sram34xx.S                  | 346 ---------
- arch/arm/mach-omap2/timer.c                     | 162 ++--
- arch/arm/mach-omap2/vc.c                        |   4 -
- arch/arm/mach-prima2/hotplug.c                  |   2 +-
- arch/arm/mach-pxa/cm-x300.c                     |   9 +-
- arch/arm/mach-pxa/colibri-pxa270-income.c       |   9 +-
- arch/arm/mach-pxa/devices.c                     |  20 +
- arch/arm/mach-pxa/ezx.c                         |   9 +-
- arch/arm/mach-pxa/hx4700.c                      |   3 -
- arch/arm/mach-pxa/icontrol.c                    |   2 -
- arch/arm/mach-pxa/include/mach/magician.h       |  70 +-
- arch/arm/mach-pxa/include/mach/pxa27x.h         |   2 +-
- arch/arm/mach-pxa/lpd270.c                      |   9 +-
- arch/arm/mach-pxa/magician.c                    | 680 ++++++++++-------
- arch/arm/mach-pxa/mainstone.c                   |  19 +-
- arch/arm/mach-pxa/mioa701.c                     |  11 +-
- arch/arm/mach-pxa/palm27x.c                     |   9 +-
- arch/arm/mach-pxa/palmtc.c                      |   9 +-
- arch/arm/mach-pxa/palmte2.c                     |   9 +-
- arch/arm/mach-pxa/pcm990-baseboard.c            |   9 +-
- arch/arm/mach-pxa/pxa27x.c                      |   2 +-
- arch/arm/mach-pxa/raumfeld.c                    |  21 +-
- arch/arm/mach-pxa/tavorevb.c                    |  13 +-
- arch/arm/mach-pxa/viper.c                       |   9 +-
- arch/arm/mach-pxa/z2.c                          |  15 +-
- arch/arm/mach-pxa/zylonite.c                    |   9 +-
- arch/arm/mach-qcom/platsmp.c                    |   2 +-
- arch/arm/mach-realview/hotplug.c                |   2 +-
- arch/arm/mach-shmobile/Kconfig                  |  73 --
- arch/arm/mach-shmobile/Makefile                 |  14 +-
- arch/arm/mach-shmobile/Makefile.boot            |  12 -
- arch/arm/mach-shmobile/board-bockw-reference.c  |  86 ---
- arch/arm/mach-shmobile/board-bockw.c            | 737 -------------------
- arch/arm/mach-shmobile/clock-r8a7778.c          | 342 ---------
- arch/arm/mach-shmobile/clock.c                  |  47 --
- arch/arm/mach-shmobile/clock.h                  |  42 --
- arch/arm/mach-shmobile/common.h                 |   5 -
- arch/arm/mach-shmobile/console.c                |  27 -
- arch/arm/mach-shmobile/intc.h                   | 295 --------
- arch/arm/mach-shmobile/platsmp-apmu.c           |   4 +-
- arch/arm/mach-shmobile/pm-r8a7779.c             |  99 ---
- arch/arm/mach-shmobile/pm-rmobile.c             |   4 +-
- arch/arm/mach-shmobile/pm-rmobile.h             |   9 -
- arch/arm/mach-shmobile/r8a7778.h                |  78 --
- arch/arm/mach-shmobile/r8a7779.h                |   8 -
- arch/arm/mach-shmobile/setup-r8a7778.c          | 563 +-------------
- arch/arm/mach-shmobile/sh-gpio.h                |  29 -
- arch/arm/mach-shmobile/timer.c                  |  21 -
- arch/arm/mach-spear/hotplug.c                   |   2 +-
- arch/arm/mach-tegra/hotplug.c                   |   2 +-
- arch/arm/mach-ux500/hotplug.c                   |   2 +-
- arch/arm/mach-vexpress/hotplug.c                |   2 +-
- drivers/clocksource/Kconfig                     |   8 +
- drivers/clocksource/Makefile                    |   1 +
- drivers/clocksource/timer-ti-32k.c              | 126 ++++
- include/linux/spi/pxa2xx_spi.h                  |   1 -
- 98 files changed, 1002 insertions(+), 4433 deletions(-)
- delete mode 100644 arch/arm/boot/dts/r8a7778-bockw-reference.dts
- delete mode 100644 arch/arm/configs/bockw_defconfig
- delete mode 100644 arch/arm/mach-omap1/board-voiceblue.c
- delete mode 100644 arch/arm/mach-omap1/include/mach/board-voiceblue.h
- delete mode 100644 arch/arm/mach-omap2/clkt34xx_dpll3m2.c
- delete mode 100644 arch/arm/mach-omap2/devices.h
- delete mode 100644 arch/arm/mach-omap2/sram34xx.S
- delete mode 100644 arch/arm/mach-shmobile/Makefile.boot
- delete mode 100644 arch/arm/mach-shmobile/board-bockw-reference.c
- delete mode 100644 arch/arm/mach-shmobile/board-bockw.c
- delete mode 100644 arch/arm/mach-shmobile/clock-r8a7778.c
- delete mode 100644 arch/arm/mach-shmobile/clock.c
- delete mode 100644 arch/arm/mach-shmobile/clock.h
- delete mode 100644 arch/arm/mach-shmobile/console.c
- delete mode 100644 arch/arm/mach-shmobile/intc.h
- delete mode 100644 arch/arm/mach-shmobile/r8a7778.h
- delete mode 100644 arch/arm/mach-shmobile/sh-gpio.h
- create mode 100644 drivers/clocksource/timer-ti-32k.c
+ .../devicetree/bindings/arm/arm,scpi.txt        | 188 +++++
+ Documentation/devicetree/bindings/arm/psci.txt  |   6 +
+ .../devicetree/bindings/bus/sunxi-rsb.txt       |  47 ++
+ .../bindings/memory-controllers/arm,pl172.txt   |   8 +-
+ .../bindings/soc/rockchip/power_domain.txt      |  46 ++
+ Documentation/hwmon/scpi-hwmon                  |  33 +
+ MAINTAINERS                                     |  10 +
+ arch/arm/boot/dts/qcom-msm8974.dtsi             |  17 +-
+ arch/arm64/kernel/psci.c                        |  14 -
+ drivers/base/power/clock_ops.c                  |   6 +-
+ drivers/bus/Kconfig                             |  11 +
+ drivers/bus/Makefile                            |   1 +
+ drivers/bus/sunxi-rsb.c                         | 783 +++++++++++++++++++
+ drivers/clk/Kconfig                             |  10 +
+ drivers/clk/Makefile                            |   1 +
+ drivers/clk/berlin/bg2q.c                       |  14 +-
+ drivers/clk/clk-scpi.c                          | 325 ++++++++
+ drivers/clocksource/tcb_clksrc.c                |  12 +-
+ drivers/clocksource/timer-atmel-st.c            |  31 +-
+ drivers/cpufreq/Kconfig.arm                     |  10 +
+ drivers/cpufreq/Makefile                        |   1 +
+ drivers/cpufreq/scpi-cpufreq.c                  | 124 +++
+ drivers/firmware/Kconfig                        |  26 +
+ drivers/firmware/Makefile                       |   4 +-
+ drivers/firmware/arm_scpi.c                     | 771 ++++++++++++++++++
+ drivers/firmware/psci.c                         | 108 ++-
+ drivers/firmware/qcom_scm-32.c                  |   6 +-
+ drivers/firmware/raspberrypi.c                  | 260 ++++++
+ drivers/hwmon/Kconfig                           |   8 +
+ drivers/hwmon/Makefile                          |   1 +
+ drivers/hwmon/scpi-hwmon.c                      | 288 +++++++
+ drivers/memory/pl172.c                          |  26 +-
+ drivers/misc/atmel_tclib.c                      |   4 +
+ drivers/pwm/pwm-atmel-tcb.c                     |  26 +-
+ drivers/soc/Kconfig                             |   1 +
+ drivers/soc/Makefile                            |   1 +
+ drivers/soc/qcom/Kconfig                        |  17 +-
+ drivers/soc/qcom/smd-rpm.c                      |  68 +-
+ drivers/soc/qcom/smd.c                          | 296 ++++---
+ drivers/soc/qcom/smem.c                         | 368 +++++----
+ drivers/soc/rockchip/Kconfig                    |  18 +
+ drivers/soc/rockchip/Makefile                   |   4 +
+ drivers/soc/rockchip/pm_domains.c               | 490 ++++++++++++
+ include/dt-bindings/clock/berlin2q.h            |   1 +
+ include/dt-bindings/power/rk3288-power.h        |  31 +
+ include/linux/atmel_tc.h                        |   1 +
+ include/linux/psci.h                            |   2 +
+ include/linux/qcom_scm.h                        |   2 +
+ include/linux/scpi_protocol.h                   |  78 ++
+ include/linux/soc/qcom/smd.h                    |  11 +
+ include/linux/soc/qcom/smem.h                   |   2 +-
+ include/linux/sunxi-rsb.h                       | 105 +++
+ include/soc/bcm2835/raspberrypi-firmware.h      | 120 +++
+ include/uapi/linux/psci.h                       |  18 +
+ 54 files changed, 4467 insertions(+), 393 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/arm,scpi.txt
+ create mode 100644 Documentation/devicetree/bindings/bus/sunxi-rsb.txt
+ create mode 100644 Documentation/devicetree/bindings/soc/rockchip/power_domain.txt
+ create mode 100644 Documentation/hwmon/scpi-hwmon
+ create mode 100644 drivers/bus/sunxi-rsb.c
+ create mode 100644 drivers/clk/clk-scpi.c
+ create mode 100644 drivers/cpufreq/scpi-cpufreq.c
+ create mode 100644 drivers/firmware/arm_scpi.c
+ create mode 100644 drivers/firmware/raspberrypi.c
+ create mode 100644 drivers/hwmon/scpi-hwmon.c
+ create mode 100644 drivers/soc/rockchip/Kconfig
+ create mode 100644 drivers/soc/rockchip/Makefile
+ create mode 100644 drivers/soc/rockchip/pm_domains.c
+ create mode 100644 include/dt-bindings/power/rk3288-power.h
+ create mode 100644 include/linux/scpi_protocol.h
+ create mode 100644 include/linux/sunxi-rsb.h
+ create mode 100644 include/soc/bcm2835/raspberrypi-firmware.h
