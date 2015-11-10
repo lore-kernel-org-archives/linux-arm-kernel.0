@@ -1,40 +1,79 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 10 Nov 2015 11:09:48 +0100
-Subject: [PATCH V2 2/3] scsi: fix compiler warning for sg
-In-Reply-To: <5641783D.3030108@codeaurora.org>
-References: <1447034266-28003-1-git-send-email-okaya@codeaurora.org>
- <564177D7.7070103@codeaurora.org> <5641783D.3030108@codeaurora.org>
-Message-ID: <6427533.oLIG8d5C7c@wuerfel>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Tue, 10 Nov 2015 11:11:06 +0100
+Subject: [PATCH] clk: imx: add 'is_prepared' clk_ops callback for pllv3 clk
+In-Reply-To: <1446487569-20757-1-git-send-email-b51503@freescale.com>
+References: <1446487569-20757-1-git-send-email-b51503@freescale.com>
+Message-ID: <1447150266.3142.11.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 09 November 2015 22:53:17 Timur Tabi wrote:
-> Sinan Kaya wrote:
-> >
-> > The code says it is using these macros for small integers only which
-> > can't overflow. I was trying to get rid of compiler warning and it seems
-> > to have disappeared.
+Am Dienstag, den 03.11.2015, 02:06 +0800 schrieb Bai Ping:
+> Add 'is_prepared' callback function for pllv3 type clk to make sure when
+> the system is bootup, the unused clk is in a known state to match the
+> prepare count info.
 > 
-> I would double-check the assembly code, if I were you.  I don't like it 
-> when warnings just go away like that.
+> Signed-off-by: Bai Ping <b51503@freescale.com>
+
+Reviewed-by: Lucas Stach <l.stach@pengutronix.de>
+
+> ---
+>  drivers/clk/imx/clk-pllv3.c | 14 ++++++++++++++
+>  1 file changed, 14 insertions(+)
 > 
-> Besides, we *should* be using do_div() for 64-bit division.
+> diff --git a/drivers/clk/imx/clk-pllv3.c b/drivers/clk/imx/clk-pllv3.c
+> index 6addf8f..c05c43d 100644
+> --- a/drivers/clk/imx/clk-pllv3.c
+> +++ b/drivers/clk/imx/clk-pllv3.c
+> @@ -97,6 +97,16 @@ static void clk_pllv3_unprepare(struct clk_hw *hw)
+>  	writel_relaxed(val, pll->base);
+>  }
+>  
+> +static int clk_pllv3_is_prepared(struct clk_hw *hw)
+> +{
+> +	struct clk_pllv3 *pll = to_clk_pllv3(hw);
+> +
+> +	if (readl_relaxed(pll->base) & BM_PLL_LOCK)
+> +		return 1;
+> +
+> +	return 0;
+> +}
+> +
+>  static unsigned long clk_pllv3_recalc_rate(struct clk_hw *hw,
+>  					   unsigned long parent_rate)
+>  {
+> @@ -139,6 +149,7 @@ static int clk_pllv3_set_rate(struct clk_hw *hw, unsigned long rate,
+>  static const struct clk_ops clk_pllv3_ops = {
+>  	.prepare	= clk_pllv3_prepare,
+>  	.unprepare	= clk_pllv3_unprepare,
+> +	.is_prepared	= clk_pllv3_is_prepared,
+>  	.recalc_rate	= clk_pllv3_recalc_rate,
+>  	.round_rate	= clk_pllv3_round_rate,
+>  	.set_rate	= clk_pllv3_set_rate,
+> @@ -193,6 +204,7 @@ static int clk_pllv3_sys_set_rate(struct clk_hw *hw, unsigned long rate,
+>  static const struct clk_ops clk_pllv3_sys_ops = {
+>  	.prepare	= clk_pllv3_prepare,
+>  	.unprepare	= clk_pllv3_unprepare,
+> +	.is_prepared	= clk_pllv3_is_prepared,
+>  	.recalc_rate	= clk_pllv3_sys_recalc_rate,
+>  	.round_rate	= clk_pllv3_sys_round_rate,
+>  	.set_rate	= clk_pllv3_sys_set_rate,
+> @@ -265,6 +277,7 @@ static int clk_pllv3_av_set_rate(struct clk_hw *hw, unsigned long rate,
+>  static const struct clk_ops clk_pllv3_av_ops = {
+>  	.prepare	= clk_pllv3_prepare,
+>  	.unprepare	= clk_pllv3_unprepare,
+> +	.is_prepared	= clk_pllv3_is_prepared,
+>  	.recalc_rate	= clk_pllv3_av_recalc_rate,
+>  	.round_rate	= clk_pllv3_av_round_rate,
+>  	.set_rate	= clk_pllv3_av_set_rate,
+> @@ -279,6 +292,7 @@ static unsigned long clk_pllv3_enet_recalc_rate(struct clk_hw *hw,
+>  static const struct clk_ops clk_pllv3_enet_ops = {
+>  	.prepare	= clk_pllv3_prepare,
+>  	.unprepare	= clk_pllv3_unprepare,
+> +	.is_prepared	= clk_pllv3_is_prepared,
+>  	.recalc_rate	= clk_pllv3_enet_recalc_rate,
+>  };
+>  
 
-I stared at this code for some time and couldn't figure out whether it
-is actually safe or not. The point here is that it doesn't actually do
-a 64-bit division here:
-
-	MULDIV(INT_MAX, USER_HZ, HZ)
-
-where all arguments are 32bit and it tries to figure out whether the
-ioctl argument is too big to fit into a 32-bit number
-
-but it does a 'long' division that happens to be 64-bit long on
-architectures with the respective register size when it then does
-
-	sfp->timeout = MULDIV (val, HZ, USER_HZ);
-
-to scale up the argument from USER_HZ to the possibly larger in-kernel
-HZ value. So I think it's safe as is, but I'm still not entirely sure.
-
-	Arnd
+-- 
+Pengutronix e.K.             | Lucas Stach                 |
+Industrial Linux Solutions   | http://www.pengutronix.de/  |
