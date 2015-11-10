@@ -1,65 +1,54 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 10 Nov 2015 10:39:43 +0100
-Subject: [PATCH] drivers: pci: remove unused pci_sys_data structures
-In-Reply-To: <EE11001F9E5DDD47B7634E2F8A612F2E162A5EC2@lhreml503-mbs>
-References: <1447095459-21777-1-git-send-email-lorenzo.pieralisi@arm.com>
- <7247058.o5kTvZ3CSC@wuerfel>
- <EE11001F9E5DDD47B7634E2F8A612F2E162A5EC2@lhreml503-mbs>
-Message-ID: <3909067.XQHO4zq4LS@wuerfel>
+Date: Tue, 10 Nov 2015 10:45:04 +0100
+Subject: [PATCH] PCI: imx6:don't sleep in atomic context
+In-Reply-To: <1447148110.3142.6.camel@pengutronix.de>
+References: <1447066080-5859-1-git-send-email-sanjeev_sharma@mentor.com>
+ <4800389.dqcmlJY3HC@wuerfel> <1447148110.3142.6.camel@pengutronix.de>
+Message-ID: <6415545.xzR4A6SaUL@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 10 November 2015 06:19:17 Gabriele Paoloni wrote:
-> > Acked-by: Arnd Bergmann <arnd@arndb.de>
+On Tuesday 10 November 2015 10:35:10 Lucas Stach wrote:
+> Am Dienstag, den 10.11.2015, 10:28 +0100 schrieb Arnd Bergmann:
+> > On Tuesday 10 November 2015 09:41:18 Lucas Stach wrote:
+> > > > diff --git a/drivers/pci/host/pci-imx6.c b/drivers/pci/host/pci-imx6.c
+> > > > index 233a196..9769b13 100644
+> > > > --- a/drivers/pci/host/pci-imx6.c
+> > > > +++ b/drivers/pci/host/pci-imx6.c
+> > > > @@ -499,7 +499,7 @@ static int imx6_pcie_link_up(struct pcie_port *pp)
+> > > >                * Wait a little bit, then re-check if the link finished
+> > > >                * the training.
+> > > >                */
+> > > > -             usleep_range(1000, 2000);
+> > > > +             mdelay(1000);
+> > > 
+> > > A mdelay(1000) is a whole different timescale than a usleep(1000). If
+> > > this patch works for you with mdelay(1) or maybe mdelay(2) I would be
+> > > fine with it.
 > > 
-> > On the downside, I just saw how b3a72384fe29 ("ARM/PCI: Replace
-> > pci_sys_data->align_resource with global function pointer") manages
-> > to get rid of the last user of this, and how this is not the way
-> > we had planned for it to be done.
+> > mdelay(1) is still a really long time to block the CPU for, on potentially
+> > every config space access.
 > > 
-> > It doesn't matter that much, because there is only a single
-> > user of hw->align_resource, but this is now unportable code and
-> > cannot easily be separated from hw_pci. It also breaks if we ever
-> > get a machine with two different host controllers on ARM that
-> > don't use the same pointer here.
+> > Everybody else just returns the link status here, which seems to be
+> > the better alternative. If you need to delay the startup, better have
+> > a msleep(1) loop in the initial probe function where you are allowed to
+> > sleep.
 > > 
-> > I really would have hoped we could put that function pointer
-> > into 'struct pci_host_bridge' instead, and eventually killed
-> > off the architecture specific pcibios_align_resource function
-> > as well.
-> 
-> say we move that in pci_host_bridge struct,
-> 
-> Are you suggesting to modify pcibios_init_hw to assign the 
-> align_resource function pointer at the end after
-> pci_scan_root_bus_msi() has created the host bridge structure;
-> then we can retrieve it in pcibios_align_resource using
-> pci_find_host_bridge(dev->bus)....?
+> Yes, it's somewhere on my TODO list to rework the link-up handling here,
+> but as there are quite a few timing and ordering implications in that
+> code, this needs a good thought and a good deal of testing. So I'm
+> inclined to ACK the current patch to get rid of the obvious bug and sort
+> things out properly in a follow on patchset.
 
-What I had in mind was more along the lines of removing the
-any mention of the align_resource callback from the ARM bios32.c
-code and to have the pci-mvebu driver set the pointer manually
-at an appropriate point (I did not look what would be that
-point). What you suggest above would work too, just doesn't go
-as far.
+Maybe use that patch with some modifications then:
 
-In the long run, I think it would be good to migrate all drivers
-in drivers/pci/host/ away from calling pcibios_init_hw() at
-all, and just use architecture-independent interfaces and leave
-the hw_pci/pci_sys_data based implementation for the traditional
-PCI host implementations that we have in arch/arm/mach-* for
-platforms that do not use devicetree. This is not something I'm
-asking you to do at this point, though any help here is appreciated.
+* add a comment to explain that this is currently called from possibly
+  atomic context through pci_config_{read,write} and that the link
+  state handling never belonged here.
 
-> > Any idea why it was done with a global function pointer for
-> > ARM rather than a proper solution?
-> 
-> Well just because I didn't think about the solution above...
-> 
-> If you think the above one can work I can send out another
-> patch to fix this...
-
-That would be great, yes. As I said, it's currently harmless
-but it would be better to get it right.
+* instead of looping five times for up to 2ms each, loop 100 times
+  around a udelay(20) to hopefully be done earlier. I was going to
+  suggest using time_before(timeout, jiffies) as the condition to
+  wait for, but that doesn't work if called with interrupts disabled.
 
 	Arnd
