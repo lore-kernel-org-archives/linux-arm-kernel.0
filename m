@@ -1,126 +1,32 @@
-From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Tue, 10 Nov 2015 11:36:50 +0100
-Subject: [PATCH v2] mmc: sdhci at91: add PM support
-Message-ID: <1447151810-21864-1-git-send-email-ludovic.desroches@atmel.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 10 Nov 2015 10:37:52 +0000
+Subject: [V3 PATCH] arm64: remove redundant FRAME_POINTER kconfig option
+ and force to select it
+In-Reply-To: <1447092595-12644-1-git-send-email-yang.shi@linaro.org>
+References: <1447092595-12644-1-git-send-email-yang.shi@linaro.org>
+Message-ID: <20151110103752.GH21606@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add runtime PM support and use runtime_force_suspend|resume() for system
-PM.
+On Mon, Nov 09, 2015 at 10:09:55AM -0800, Yang Shi wrote:
+> FRAME_POINTER is defined in lib/Kconfig.debug, it is unnecessary to redefine
+> it in arch/arm64/Kconfig.debug. Actually, the one defined in arm64 directory
+> is never used.
 
-Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
----
+That's not true since the arm64 definition seems to take precedence.
 
-Changes:
-- from v1: take a runtime PM centric approach
+> This adds a dependency on DEBUG_KERNEL for building with frame pointers.
 
- drivers/mmc/host/sdhci-of-at91.c | 66 +++++++++++++++++++++++++++++++++++++++-
- 1 file changed, 65 insertions(+), 1 deletion(-)
+It doesn't because arm64 selects ARCH_WANT_FRAME_POINTERS.
 
-diff --git a/drivers/mmc/host/sdhci-of-at91.c b/drivers/mmc/host/sdhci-of-at91.c
-index 06d0b50..5dbe0ce 100644
---- a/drivers/mmc/host/sdhci-of-at91.c
-+++ b/drivers/mmc/host/sdhci-of-at91.c
-@@ -21,6 +21,8 @@
- #include <linux/module.h>
- #include <linux/of.h>
- #include <linux/of_device.h>
-+#include <linux/pm.h>
-+#include <linux/pm_runtime.h>
- 
- #include "sdhci-pltfm.h"
- 
-@@ -51,6 +53,62 @@ static const struct of_device_id sdhci_at91_dt_match[] = {
- 	{}
- };
- 
-+#ifdef CONFIG_PM
-+static int sdhci_at91_runtime_suspend(struct device *dev)
-+{
-+	struct platform_device *pdev = to_platform_device(dev);
-+	struct sdhci_host *host = platform_get_drvdata(pdev);
-+	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
-+	struct sdhci_at91_priv *priv = pltfm_host->priv;
-+	int ret;
-+
-+	ret = sdhci_runtime_suspend_host(host);
-+
-+	clk_disable_unprepare(priv->gck);
-+	clk_disable_unprepare(priv->hclock);
-+	clk_disable_unprepare(priv->mainck);
-+
-+	return ret;
-+}
-+
-+static int sdhci_at91_runtime_resume(struct device *dev)
-+{
-+	struct platform_device *pdev = to_platform_device(dev);
-+	struct sdhci_host *host = platform_get_drvdata(pdev);
-+	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
-+	struct sdhci_at91_priv *priv = pltfm_host->priv;
-+	int ret;
-+
-+	ret = clk_prepare_enable(priv->mainck);
-+	if (ret) {
-+		dev_err(dev, "can't enable mainck\n");
-+		return ret;
-+	}
-+
-+	ret = clk_prepare_enable(priv->hclock);
-+	if (ret) {
-+		dev_err(dev, "can't enable hclock\n");
-+		return ret;
-+	}
-+
-+	ret = clk_prepare_enable(priv->gck);
-+	if (ret) {
-+		dev_err(dev, "can't enable gck\n");
-+		return ret;
-+	}
-+
-+	return sdhci_runtime_resume_host(host);
-+}
-+#endif /* CONFIG_PM_RUNTIME */
-+
-+static const struct dev_pm_ops sdhci_at91_dev_pm_ops = {
-+	SET_SYSTEM_SLEEP_PM_OPS(pm_runtime_force_suspend,
-+				pm_runtime_force_resume)
-+	SET_RUNTIME_PM_OPS(sdhci_at91_runtime_suspend,
-+			   sdhci_at91_runtime_resume,
-+			   NULL)
-+};
-+
- static int sdhci_at91_probe(struct platform_device *pdev)
- {
- 	const struct of_device_id	*match;
-@@ -148,6 +206,11 @@ static int sdhci_at91_probe(struct platform_device *pdev)
- 	if (ret)
- 		goto clocks_disable_unprepare;
- 
-+	pm_runtime_set_active(&pdev->dev);
-+	pm_runtime_enable(&pdev->dev);
-+	pm_runtime_set_autosuspend_delay(&pdev->dev, 50);
-+	pm_runtime_use_autosuspend(&pdev->dev);
-+
- 	return 0;
- 
- clocks_disable_unprepare:
-@@ -165,6 +228,7 @@ static int sdhci_at91_remove(struct platform_device *pdev)
- 	struct sdhci_pltfm_host	*pltfm_host = sdhci_priv(host);
- 	struct sdhci_at91_priv	*priv = pltfm_host->priv;
- 
-+	pm_runtime_disable(&pdev->dev);
- 	sdhci_pltfm_unregister(pdev);
- 
- 	clk_disable_unprepare(priv->gck);
-@@ -178,7 +242,7 @@ static struct platform_driver sdhci_at91_driver = {
- 	.driver		= {
- 		.name	= "sdhci-at91",
- 		.of_match_table = sdhci_at91_dt_match,
--		.pm	= SDHCI_PLTFM_PMOPS,
-+		.pm	= &sdhci_at91_dev_pm_ops,
- 	},
- 	.probe		= sdhci_at91_probe,
- 	.remove		= sdhci_at91_remove,
+> ARM64 depends on frame pointer to get correct stack backtrace and need
+> FRAME_POINTER kconfig option enabled all the time.
+> However, currect implementation makes it could be disabled, so force it
+> to be selected by ARM64.
+> 
+> Signed-off-by: Yang Shi <yang.shi@linaro.org>
+
+Patch applied but I changed the commit log slightly. Thanks.
+
 -- 
-2.5.0
+Catalin
