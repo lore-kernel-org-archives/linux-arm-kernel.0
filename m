@@ -1,117 +1,70 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Tue, 10 Nov 2015 11:42:31 +0900
-Subject: [PATCH v5 2/6] arm64: ftrace: fix a stack tracer's output under
- function graph tracer
-In-Reply-To: <3F63B5BC-C21A-4ECA-9800-374B924DB98D@gmail.com>
-References: <1446792285-1154-1-git-send-email-takahiro.akashi@linaro.org>
- <1446792285-1154-3-git-send-email-takahiro.akashi@linaro.org>
- <3F63B5BC-C21A-4ECA-9800-374B924DB98D@gmail.com>
-Message-ID: <56415997.1040207@linaro.org>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Mon, 9 Nov 2015 18:46:11 -0800
+Subject: [PATCH v6 0/3] Mediatek SPI-NOR flash driver
+In-Reply-To: <1446824889-16144-1-git-send-email-bayi.cheng@mediatek.com>
+References: <1446824889-16144-1-git-send-email-bayi.cheng@mediatek.com>
+Message-ID: <20151110024611.GL12143@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/09/2015 11:04 PM, Jungseok Lee wrote:
-> On Nov 6, 2015, at 3:44 PM, AKASHI Takahiro wrote:
->
-> Hi Akashi,
->
->> Function graph tracer modifies a return address (LR) in a stack frame
->> to hook a function return. This will result in many useless entries
->> (return_to_handler) showing up in a stack tracer's output.
->>
->> This patch replaces such entries with originals values preserved in
->> current->ret_stack[].
->>
->> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
->> ---
->> arch/arm64/include/asm/ftrace.h |    2 ++
->> arch/arm64/kernel/stacktrace.c  |   21 +++++++++++++++++++++
->> 2 files changed, 23 insertions(+)
->>
->> diff --git a/arch/arm64/include/asm/ftrace.h b/arch/arm64/include/asm/ftrace.h
->> index c5534fa..3c60f37 100644
->> --- a/arch/arm64/include/asm/ftrace.h
->> +++ b/arch/arm64/include/asm/ftrace.h
->> @@ -28,6 +28,8 @@ struct dyn_arch_ftrace {
->>
->> extern unsigned long ftrace_graph_call;
->>
->> +extern void return_to_handler(void);
->> +
->> static inline unsigned long ftrace_call_adjust(unsigned long addr)
->> {
->> 	/*
->> diff --git a/arch/arm64/kernel/stacktrace.c b/arch/arm64/kernel/stacktrace.c
->> index ccb6078..5fd3477 100644
->> --- a/arch/arm64/kernel/stacktrace.c
->> +++ b/arch/arm64/kernel/stacktrace.c
->> @@ -17,6 +17,7 @@
->>   */
->> #include <linux/kernel.h>
->> #include <linux/export.h>
->> +#include <linux/ftrace.h>
->> #include <linux/sched.h>
->> #include <linux/stacktrace.h>
->>
->> @@ -73,6 +74,9 @@ struct stack_trace_data {
->> 	struct stack_trace *trace;
->> 	unsigned int no_sched_functions;
->> 	unsigned int skip;
->> +#ifdef CONFIG_FUNCTION_GRAPH_TRACER
->> +	unsigned int ret_stack_index;
->> +#endif
->> };
->>
->> static int save_trace(struct stackframe *frame, void *d)
->> @@ -81,6 +85,20 @@ static int save_trace(struct stackframe *frame, void *d)
->> 	struct stack_trace *trace = data->trace;
->> 	unsigned long addr = frame->pc;
->>
->> +#ifdef CONFIG_FUNCTION_GRAPH_TRACER
->> +	if (addr == (unsigned long)return_to_handler - AARCH64_INSN_SIZE) {
->
-> not if (adds == (unsigned long)return_to_handler)?
->
->> +		/*
->> +		 * This is a case where function graph tracer has
->> +		 * modified a return address (LR) in a stack frame
->> +		 * to hook a function return.
->> +		 * So replace it to an original value.
->> +		 */
->> +		frame->pc = addr =
->> +			current->ret_stack[data->ret_stack_index--].ret
->> +							- AARCH64_INSN_SIZE;
->
-> Ditto. not without AARCH64_INSN_SIZE?
->
-> I've observed many return_to_handler without the changes.
-> Am I missing something?
+Hi Bayi,
 
-You're right!
-I thought I had tested the patches, but...
+On Fri, Nov 06, 2015 at 11:48:06PM +0800, Bayi Cheng wrote:
+> This series is based on v4.3-rc1 and l2-mtd.git [0] and erase_sector
+> implementation patch [1]
+> 
+> [0]: git://git.infradead.org/l2-mtd.git
+> [1]: http://lists.infradead.org/pipermail/linux-mtd/2015-October//062959.html
+> 
+> Change in v6:
+> 1: delete mt8173_nor_do_rx
+> 2: delete mt8173_nor_do_rx
+> 3: add mt8173_nor_do_tx_rx for general usage
+> 4: support nor flash with 6 IDs
+> 5: delete mt8173_nor_erase_sector and use "nor->erase_opcode"
+> 6: add mt8173_nor_set_addr to programming the address register
+> 7: initialize the ppdata in mtk_nor_init
 
->> +	}
->> +#endif /* CONFIG_FUNCTION_GRAPH_TRACER */
->> +
->> 	if (data->no_sched_functions && in_sched_functions(addr))
->> 		return 0;
->> 	if (data->skip) {
->> @@ -100,6 +118,9 @@ void save_stack_trace_tsk(struct task_struct *tsk, struct stack_trace *trace)
->>
->> 	data.trace = trace;
->> 	data.skip = trace->skip;
->> +#ifdef CONFIG_FUNCTION_GRAPH_TRACER
->> +	data.ret_stack_index = current->curr_ret_stack;
->
-> Can I get an idea on why current->curr_ret_stack is used instead of
-> tsk->curr_ret_stack?
+This series is looking a lot better to me. Thanks for incorporating (and
+I hope fully reviewing and testing!) my suggested changes. I have a just
+a few small comments that I might post to the driver patch, and if
+that's all that's outstanding, I can fix them up myself before applying.
 
-Thanks for pointing this out.
-Will fix it although it works without a change since save_stack_trace_sp() is
-called only in a 'current task' context.
+I believe you didn't completely answer all my questions from v5 though.
+I'll repeat a bit here. Particularly, refer to [1].
+I'll summarize; I understand that your common transmit/receive operation
+works something like this:
 
--Takahiro AKASHI
+Quoting from [1]:
+> (1) total number of bits to send/receive goes in the COUNT register (so
+>     far, as many as 7*8=56?)
+> (2) opcode is written to PRGDATA5
+> (3) other "transmit" data (like addresses), if any, are placed on PRGDATA4..0
+> (4) command is sent (execute_cmd())
+> (5) data is read back in SHREG{X..0}, if needed
 
-> Best Regards
-> Jungseok Lee
->
+My questions were:
+
+(a) Why does mt8173_nor_set_read_mode() use PRGDATA3? That's not
+    mentioned in the SoC manual, and it doesn't really match any of the
+    steps above. Perhaps it's just a quirk of the controller's
+    programming model?
+
+(b) How do you determine X from step (5)?
+
+Right now, your code seems to answer that X is "rxlen - 1". Correct?
+
+If that's correct and if I put all of my understanding together
+correctly, this means that you can actually shift out (in PRGDATA) up to
+6 bytes (that is, 1 opcode and 5 tx bytes) and shift in (in SHREG) up to
+7 bytes, except that the first byte is received during the opcode cycle,
+and so it is discarded, and we effectively receive only 6 bytes.
+
+Is that all correct? If so, then I think you still need to adjust the
+boundary conditions in your do_tx_rx() function. (I'll comment on the
+driver to point out the specifics.)
+
+Regards,
+Brian
+
+[1] http://lists.infradead.org/pipermail/linux-mtd/2015-October/062951.html
