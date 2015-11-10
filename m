@@ -1,82 +1,28 @@
-From: appana.durga.rao@xilinx.com (Appana Durga Kedareswara Rao)
-Date: Tue, 10 Nov 2015 10:23:35 +0000
-Subject: [PATCH v9] dmaengine: Add Xilinx AXI Direct Memory Access
- Engine driver support
-In-Reply-To: <20151006074459.GA23420@vkoul-mobl.iind.intel.com>
-References: <1440432666-10310-1-git-send-email-appanad@xilinx.com>
- <20151005152628.GE13501@vkoul-mobl.iind.intel.com>
- <C246CAC1457055469EF09E3A7AC4E11A4A4EC2DE@XAP-PVEXMBX01.xlnx.xilinx.com>
- <20151006074459.GA23420@vkoul-mobl.iind.intel.com>
-Message-ID: <C246CAC1457055469EF09E3A7AC4E11A4A4FA395@XAP-PVEXMBX01.xlnx.xilinx.com>
+From: dbrignoli@audioscience.com (Delio Brignoli)
+Date: Tue, 10 Nov 2015 11:23:35 +0100
+Subject: Minimal support for dm814x
+In-Reply-To: <CAALWOA-NUyRYaGbmBZpc6CcFga8_BKPZ9WQTxa3t09bHS_6=qA@mail.gmail.com>
+References: <4999BB3D-4BB5-4F7C-96D7-FB687725CDCC@audioscience.com>
+ <20151109150602.GR3199@atomide.com>
+ <CAALWOA-NUyRYaGbmBZpc6CcFga8_BKPZ9WQTxa3t09bHS_6=qA@mail.gmail.com>
+Message-ID: <7933071D-84FD-4A85-8CD0-CC504CE1D9D1@audioscience.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Vinod,
+On 10 Nov 2015, at 09:50, Matthijs van Duin <matthijsvanduin@gmail.com> wrote:
+> On 9 November 2015 at 16:06, Tony Lindgren <tony@atomide.com> wrote:
+>> The PLL support is still missing, so it relies on the bootloader
+>> configured PLL values for now. I'm hoping to post PLL support patches over
+>> next few weeks and then we can have that and more devices working for v4.5.
+> 
+> Ah, yes, configuring a DPLL-LJ is fun.. figuring out how to write the
+> desired ratio as M/(M2*(1+N)) while simultaneously satisfying all
+> constraints on M, N, M2, refclk, and dco. :-)
 
-> -----Original Message-----
-> From: dmaengine-owner at vger.kernel.org [mailto:dmaengine-
-> owner at vger.kernel.org] On Behalf Of Vinod Koul
-> Sent: Tuesday, October 06, 2015 1:15 PM
-> To: Appana Durga Kedareswara Rao
-> Cc: dan.j.williams at intel.com; Michal Simek; Soren Brinkmann;
-> moritz.fischer at ettus.com; anirudha at xilinx.com; dmaengine at vger.kernel.org;
-> linux-arm-kernel at lists.infradead.org; linux-kernel at vger.kernel.org; Anirudha
-> Sarangi
-> Subject: Re: [PATCH v9] dmaengine: Add Xilinx AXI Direct Memory Access Engine
-> driver support
-> 
-> On Mon, Oct 05, 2015 at 03:48:39PM +0000, Appana Durga Kedareswara Rao
-> wrote:
-> > > Pls justify why we should have two drivers. Looking at code makes me think
-> > > otherwise
-> >
-> >
-> [pls wrap your messages within 80 chars, I have reflowed below]
-> 
-> > I agree with you and even initially we had a common driver with the
-> > similar implementation as you were mentioning.  Later on, being soft IPs,
-> > new features were added and the IPs became diversified. As an example,
-> > this driver has a residue Calculation whereas the other driver (VDMA) is
-> > not applicable and the way interrupts are handled is completely different.
-> > Briefly, they are two complete different IPs with a different register set
-> > and descriptor format. Eventually, it became too complex To manage the
-> > common driver as the code became messy with lot of conditions around.
-> > Mainly the validation process is a big concern, as every change In the IP
-> > compels to test all the complete features of both IPs.  So, we got
-> > convinced to the approach of separating the drivers to overcome this and
-> > it comes with Few addition lines of common code.
-> 
-> No it is not that hard, bunch of people already do that.
-> 
-> You need is a smart probe or perhaps invoke IP specfic method to
-> initialize dma controller.
-> 
-> In above case no one forces you to register status callback for both, you
-> can do based on the controller probed...
-> 
-> I am sorry but validation is not a strong point here. I have a driver which
-> manages bunch of different generations. Reuse helps in having lesser code
-> and bug fixes across generations easily..
-> 
-> We cant have two drivers pretty much doing same thing in kernel
-> 
-> Please fix this and come back
+Yes, indeed. We have the additional requirement of being able to adjust the frequency (by a relatively small amount) without loss of lock. Recalculating the DCO mode and M,N,M2 from scratch each time based on the target frequency, like was done in the 2.6.37 based tree from TI was not acceptable, so we try to change m2 first to see if we can reach the target frequency and fall back to recalculate parameters from scratch if that fails.
 
-Sorry for delayed response. I was out sick.
-I had internal discussions with my team. Both DMA's target for completely different use cases, have different register sets and different descriptor formats.  Interrupt processing is also different. Each of these IPs undergo frequent changes and enhancements. Having a single driver means for any small change in any of the IPs the testing has to happen across a whole lot of test cases which looks inefficient.
-Thinking futuristically where we don't know in which way the IP changes can happen, I feel it is always good to have separate drivers. We can't predict the HW changes and since the DMAs are targeted for different use cases, we may end up in tricky situations if we have a single driver.
-I do agree that code reuse is generally efficient. But for our case we are not dealing with generations of same IP, but completely different IPs. Though there are some similarities between them, I feel the differences are many.
-On v7 of this series, I had put the same observation to which you seem to have agreed. That is the reason I went ahead with other comments. At this point it is definitely really hard for me to merge.  
+BTW, are you aware of section 2.1.2 of ?TMS320DM814x DaVinci Digital Media Processors Silicon Revisions 3.0, 2.1?? <http://www.ti.com/lit/er/sprz343c/sprz343c.pdf>
 
-However, if you still insist and see a lot of value in having a single driver, I will see what I can do. As I said, it will be some work and in long term it will be a maintenance issue for Xilinx and our customers.
-
-Regards,
-Kedar.
-
-> 
-> --
-> ~Vinod
-> --
-> To unsubscribe from this list: send the line "unsubscribe dmaengine" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Regards
+?
+Delio
