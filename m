@@ -1,39 +1,55 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Tue, 10 Nov 2015 16:58:09 -0600
-Subject: [GIT PULL 2/6] ARM: SoC cleanups for v4.4
-In-Reply-To: <CA+55aFzUHRvx-=ioeqT-QK+Od6yGixL3q5jit6kD6-Yf5WKXJA@mail.gmail.com>
-References: <1447126404-10567-1-git-send-email-olof@lixom.net>
- <1447126404-10567-3-git-send-email-olof@lixom.net>
- <CA+55aFzUHRvx-=ioeqT-QK+Od6yGixL3q5jit6kD6-Yf5WKXJA@mail.gmail.com>
-Message-ID: <87y4e5sbr2.fsf@saruman.tx.rr.com>
+From: yang.shi@linaro.org (Yang Shi)
+Date: Tue, 10 Nov 2015 14:41:40 -0800
+Subject: [PATCH 1/2] arm64: bpf: add 'store immediate' instruction
+In-Reply-To: <1447195301-16757-1-git-send-email-yang.shi@linaro.org>
+References: <1447195301-16757-1-git-send-email-yang.shi@linaro.org>
+Message-ID: <1447195301-16757-2-git-send-email-yang.shi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+aarch64 doesn't have native store immediate instruction, such operation
+has to be implemented by the below instruction sequence:
 
-Hi,
+Load immediate to register
+Store register
 
-Linus Torvalds <torvalds@linux-foundation.org> writes:
-> On Mon, Nov 9, 2015 at 7:33 PM, Olof Johansson <olof@lixom.net> wrote:
->>
->> Conflicts:
->>
->> OMAP timer code has a treewide fix vs code deletion conflict. Delete
->> the code in HEAD, go with contents from branch.
->
-> That doesn't look right. It also needs the clocksource_of_init ->
-> clocksource_probe changes. The code was moved around rather than
-> deleted.
+Signed-off-by: Yang Shi <yang.shi@linaro.org>
+CC: Zi Shen Lim <zlim.lnx@gmail.com>
+CC: Xi Wang <xi.wang@gmail.com>
+---
+ arch/arm64/net/bpf_jit_comp.c | 20 +++++++++++++++++++-
+ 1 file changed, 19 insertions(+), 1 deletion(-)
 
-correct. Moved from arch/arm/mach-omap2/ to drivers/clocksource/. We're
-trying to get all our timer code to drivers/clocksource and make it
-DT-only (when all other platforms switch away from legacy boot).
-
+diff --git a/arch/arm64/net/bpf_jit_comp.c b/arch/arm64/net/bpf_jit_comp.c
+index 6809647..49c1f1b 100644
+--- a/arch/arm64/net/bpf_jit_comp.c
++++ b/arch/arm64/net/bpf_jit_comp.c
+@@ -563,7 +563,25 @@ emit_cond_jmp:
+ 	case BPF_ST | BPF_MEM | BPF_H:
+ 	case BPF_ST | BPF_MEM | BPF_B:
+ 	case BPF_ST | BPF_MEM | BPF_DW:
+-		goto notyet;
++		/* Load imm to a register then store it */
++		ctx->tmp_used = 1;
++		emit_a64_mov_i(1, tmp2, off, ctx);
++		emit_a64_mov_i(1, tmp, imm, ctx);
++		switch (BPF_SIZE(code)) {
++		case BPF_W:
++			emit(A64_STR32(tmp, dst, tmp2), ctx);
++			break;
++		case BPF_H:
++			emit(A64_STRH(tmp, dst, tmp2), ctx);
++			break;
++		case BPF_B:
++			emit(A64_STRB(tmp, dst, tmp2), ctx);
++			break;
++		case BPF_DW:
++			emit(A64_STR64(tmp, dst, tmp2), ctx);
++			break;
++		}
++		break;
+ 
+ 	/* STX: *(size *)(dst + off) = src */
+ 	case BPF_STX | BPF_MEM | BPF_W:
 -- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 818 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151110/d7212538/attachment.sig>
+2.0.2
