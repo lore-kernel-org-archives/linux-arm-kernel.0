@@ -1,31 +1,31 @@
 From: akshay.bhat@timesys.com (Akshay Bhat)
-Date: Tue, 10 Nov 2015 13:00:02 -0500
-Subject: [PATCH v3 1/7] of: Add vendor prefix for Advantech Corporation
+Date: Tue, 10 Nov 2015 13:00:03 -0500
+Subject: [PATCH v3 2/7] of: Add vendor prefix for General Electric Company
 In-Reply-To: <1447178408-26982-1-git-send-email-akshay.bhat@timesys.com>
 References: <1447178408-26982-1-git-send-email-akshay.bhat@timesys.com>
-Message-ID: <1447178408-26982-2-git-send-email-akshay.bhat@timesys.com>
+Message-ID: <1447178408-26982-3-git-send-email-akshay.bhat@timesys.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds vendor prefix for Advantech Corporation.
+This patch adds vendor prefix for General Electric Company
 
-Website: http://www.advantech.com/
 Signed-off-by: Akshay Bhat <akshay.bhat@timesys.com>
+Acked-by: Rob Herring <robh@kernel.org>
 ---
  Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
  1 file changed, 1 insertion(+)
 
 diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
-index 55df1d4..5134b24 100644
+index 5134b24..598154c 100644
 --- a/Documentation/devicetree/bindings/vendor-prefixes.txt
 +++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
-@@ -10,6 +10,7 @@ ad	Avionic Design GmbH
- adapteva	Adapteva, Inc.
- adh	AD Holdings Plc.
- adi	Analog Devices, Inc.
-+advantech	Advantech Corporation
- aeroflexgaisler	Aeroflex Gaisler AB
- al	Annapurna Labs
- allwinner	Allwinner Technology Co., Ltd.
+@@ -87,6 +87,7 @@ fcs	Fairchild Semiconductor
+ firefly	Firefly
+ focaltech	FocalTech Systems Co.,Ltd
+ fsl	Freescale Semiconductor
++ge	General Electric Company
+ GEFanuc	GE Fanuc Intelligent Platforms Embedded Systems, Inc.
+ gef	GE Fanuc Intelligent Platforms Embedded Systems, Inc.
+ geniatech	Geniatech, Inc.
 -- 
 2.6.3
