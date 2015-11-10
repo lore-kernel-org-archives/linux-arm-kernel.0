@@ -1,39 +1,30 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Mon, 9 Nov 2015 19:38:12 -0800
-Subject: [RFC PATCH] ARM: add v7 LPAE multi-platform defconfig
-In-Reply-To: <1447124035-18585-1-git-send-email-b18965@freescale.com>
-References: <1447124035-18585-1-git-send-email-b18965@freescale.com>
-Message-ID: <CAOesGMgvfdMj_GB3w_dvxxPkgBZUpo=kQ+60a89yY__-QT2eBA@mail.gmail.com>
+From: sre@kernel.org (Sebastian Reichel)
+Date: Tue, 10 Nov 2015 04:50:02 +0100
+Subject: [PATCH] power: bq27xxx_battery: Add I2C module check dependency
+ in Kconfig
+In-Reply-To: <1447104183-13556-1-git-send-email-afd@ti.com>
+References: <1447104183-13556-1-git-send-email-afd@ti.com>
+Message-ID: <20151110035002.GB2712@earth>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Alison,
+Hi,
 
-On Mon, Nov 9, 2015 at 6:53 PM, Alison Wang <b18965@freescale.com> wrote:
-> v7 LPAE multi-platform defconfig is based on v7 multi-platform
-> defconfig and adds LPAE support.
->
-> The platforms based on Cortex-A7/A12/A15/A17, PJ4B, Krait are
-> also enabled in this defconfig. But Cortex-A5/A8/A9, Scorpion
-> and PJ4 are removed.
->
-> This defconfig is verified on LS1021A which enables GIANFAR,
-> I2C, WATCHDOG, AUDIO, EDMA and DSPI drivers, etc.
->
-> The other platforms need to be verified by the platform
-> maintainers too.
->
-> Signed-off-by: Alison Wang <alison.wang@freescale.com>
+On Mon, Nov 09, 2015 at 03:23:03PM -0600, Andrew F. Davis wrote:
+> Check if I2C core has been built as a module when BATTERY_BQ27XXX
+> is built-in. If so disable I2C functionality.
+> 
+> Fixes: 6bd03ce3c12a ("power: bq27xxx_battery: Remove unneeded dependency in Kconfig")
+> Reported-by: Arnd Bergmann <arnd@arndb.de>
+> Signed-off-by: Andrew F. Davis <afd@ti.com>
 
-This has been discussed before, and what we have chosen to do is to
-just have a multi_v7_defconfig that all these platforms are enabled on
-but with LPAE off.
+Thanks, queued.
 
-Instead, what we do when building (and on our build/boot builders) is
-to take multi_v7 and provide the snippet that turns on ARM_LPAE at
-that time.
-
-
-Regards,
-
--Olof
+-- Sebastian
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151110/d3a5041c/attachment.sig>
