@@ -1,150 +1,41 @@
-From: Liviu.Dudau@arm.com (Liviu.Dudau at arm.com)
-Date: Tue, 10 Nov 2015 11:00:37 +0000
-Subject: [PATCH] Revert "drm/rockchip: Convert the probe function to the
- generic drm_of_component_probe()"
-In-Reply-To: <1447145239-10546-1-git-send-email-mark.yao@rock-chips.com>
-References: <1447145239-10546-1-git-send-email-mark.yao@rock-chips.com>
-Message-ID: <20151110110037.GM963@e106497-lin.cambridge.arm.com>
+From: yalin.wang2010@gmail.com (yalin wang)
+Date: Tue, 10 Nov 2015 19:09:00 +0800
+Subject: [V3 PATCH] arm64: remove redundant FRAME_POINTER kconfig option
+ and force to select it
+In-Reply-To: <20151110103752.GH21606@e104818-lin.cambridge.arm.com>
+References: <1447092595-12644-1-git-send-email-yang.shi@linaro.org>
+ <20151110103752.GH21606@e104818-lin.cambridge.arm.com>
+Message-ID: <49B0431C-4FDA-45CB-82AF-FA010197118D@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 10, 2015 at 04:47:19PM +0800, Mark Yao wrote:
-> This reverts commit 52f5eb60940de889ce98a876f6933b574ead3225.
-> 
-> Rockchip drm can't work with generic drm_of_component_probe now
-> 
-> Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
 
-Acked-by: Liviu Dudau <Liviu.Dudau@arm.com>
+> On Nov 10, 2015, at 18:37, Catalin Marinas <catalin.marinas@arm.com> wrote:
+> 
+> On Mon, Nov 09, 2015 at 10:09:55AM -0800, Yang Shi wrote:
+>> FRAME_POINTER  is defined in lib/Kconfig.debug, it is unnecessary to redefine
+>> it in arch/arm64/Kconfig.debug. Actually, the one defined in arm64 directory
+>> is never used.
+> 
+> That's not true since the arm64 definition seems to take precedence.
+> 
+>> This adds a dependency on DEBUG_KERNEL for building with frame pointers.
+> 
+> It doesn't because arm64 selects ARCH_WANT_FRAME_POINTERS.
+> 
+>> ARM64 depends on frame pointer to get correct stack backtrace and need
+>> FRAME_POINTER kconfig option enabled all the time.
+>> However, currect implementation makes it could be disabled, so force it
+>> to be selected by ARM64.
+>> 
+>> Signed-off-by: Yang Shi <yang.shi@linaro.org>
+> 
+> Patch applied but I changed the commit log slightly. Thanks.
+i have a question,
+why FRAME_POINTER  config must be enabled ?
+and i see ARM arch can  disable this config .
+if i don?t need stack trace dump and the software release is for 
+final product , don?t need debug stack trace log .
+is it possible to disable it for performance reason ?
 
-> ---
->  drivers/gpu/drm/rockchip/rockchip_drm_drv.c |   81 +++++++++++++++++++++++++--
->  1 file changed, 75 insertions(+), 6 deletions(-)
-> 
-> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_drv.c b/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
-> index d26e0cc..f22e1e1 100644
-> --- a/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
-> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
-> @@ -19,7 +19,6 @@
->  #include <drm/drmP.h>
->  #include <drm/drm_crtc_helper.h>
->  #include <drm/drm_fb_helper.h>
-> -#include <drm/drm_of.h>
->  #include <linux/dma-mapping.h>
->  #include <linux/pm_runtime.h>
->  #include <linux/module.h>
-> @@ -419,6 +418,29 @@ static int compare_of(struct device *dev, void *data)
->  	return dev->of_node == np;
->  }
->  
-> +static void rockchip_add_endpoints(struct device *dev,
-> +				   struct component_match **match,
-> +				   struct device_node *port)
-> +{
-> +	struct device_node *ep, *remote;
-> +
-> +	for_each_child_of_node(port, ep) {
-> +		remote = of_graph_get_remote_port_parent(ep);
-> +		if (!remote || !of_device_is_available(remote)) {
-> +			of_node_put(remote);
-> +			continue;
-> +		} else if (!of_device_is_available(remote->parent)) {
-> +			dev_warn(dev, "parent device of %s is not available\n",
-> +				 remote->full_name);
-> +			of_node_put(remote);
-> +			continue;
-> +		}
-> +
-> +		component_match_add(dev, match, compare_of, remote);
-> +		of_node_put(remote);
-> +	}
-> +}
-> +
->  static int rockchip_drm_bind(struct device *dev)
->  {
->  	struct drm_device *drm;
-> @@ -461,14 +483,61 @@ static const struct component_master_ops rockchip_drm_ops = {
->  
->  static int rockchip_drm_platform_probe(struct platform_device *pdev)
->  {
-> -	int ret = drm_of_component_probe(&pdev->dev, compare_of,
-> -					 &rockchip_drm_ops);
-> +	struct device *dev = &pdev->dev;
-> +	struct component_match *match = NULL;
-> +	struct device_node *np = dev->of_node;
-> +	struct device_node *port;
-> +	int i;
->  
-> -	/* keep compatibility with old code that was returning -ENODEV */
-> -	if (ret == -EINVAL)
-> +	if (!np)
->  		return -ENODEV;
-> +	/*
-> +	 * Bind the crtc ports first, so that
-> +	 * drm_of_find_possible_crtcs called from encoder .bind callbacks
-> +	 * works as expected.
-> +	 */
-> +	for (i = 0;; i++) {
-> +		port = of_parse_phandle(np, "ports", i);
-> +		if (!port)
-> +			break;
-> +
-> +		if (!of_device_is_available(port->parent)) {
-> +			of_node_put(port);
-> +			continue;
-> +		}
->  
-> -	return ret;
-> +		component_match_add(dev, &match, compare_of, port->parent);
-> +		of_node_put(port);
-> +	}
-> +
-> +	if (i == 0) {
-> +		dev_err(dev, "missing 'ports' property\n");
-> +		return -ENODEV;
-> +	}
-> +
-> +	if (!match) {
-> +		dev_err(dev, "No available vop found for display-subsystem.\n");
-> +		return -ENODEV;
-> +	}
-> +	/*
-> +	 * For each bound crtc, bind the encoders attached to its
-> +	 * remote endpoint.
-> +	 */
-> +	for (i = 0;; i++) {
-> +		port = of_parse_phandle(np, "ports", i);
-> +		if (!port)
-> +			break;
-> +
-> +		if (!of_device_is_available(port->parent)) {
-> +			of_node_put(port);
-> +			continue;
-> +		}
-> +
-> +		rockchip_add_endpoints(dev, &match, port);
-> +		of_node_put(port);
-> +	}
-> +
-> +	return component_master_add_with_match(dev, &rockchip_drm_ops, match);
->  }
->  
->  static int rockchip_drm_platform_remove(struct platform_device *pdev)
-> -- 
-> 1.7.9.5
-> 
-> 
-> _______________________________________________
-> dri-devel mailing list
-> dri-devel at lists.freedesktop.org
-> http://lists.freedesktop.org/mailman/listinfo/dri-devel
-
--- 
-====================
-| I would like to |
-| fix the world,  |
-| but they're not |
-| giving me the   |
- \ source code!  /
-  ---------------
-    ?\_(?)_/?
+Thanks
