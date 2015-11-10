@@ -1,49 +1,26 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 10 Nov 2015 11:35:05 +0000
-Subject: [V3 PATCH] arm64: remove redundant FRAME_POINTER kconfig option
- and force to select it
-In-Reply-To: <49B0431C-4FDA-45CB-82AF-FA010197118D@gmail.com>
-References: <1447092595-12644-1-git-send-email-yang.shi@linaro.org>
- <20151110103752.GH21606@e104818-lin.cambridge.arm.com>
- <49B0431C-4FDA-45CB-82AF-FA010197118D@gmail.com>
-Message-ID: <20151110113505.GI21606@e104818-lin.cambridge.arm.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Tue, 10 Nov 2015 12:42:21 +0100
+Subject: [PATCH] drm/rockchip: vop: fix window origin calculation
+In-Reply-To: <1447149550-18595-1-git-send-email-mark.yao@rock-chips.com>
+References: <1447149550-18595-1-git-send-email-mark.yao@rock-chips.com>
+Message-ID: <1671071.tld3k90Oeo@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 10, 2015 at 07:09:00PM +0800, yalin wang wrote:
-> > On Nov 10, 2015, at 18:37, Catalin Marinas <catalin.marinas@arm.com> wrote:
-> > 
-> > On Mon, Nov 09, 2015 at 10:09:55AM -0800, Yang Shi wrote:
-> >> FRAME_POINTER  is defined in lib/Kconfig.debug, it is unnecessary to redefine
-> >> it in arch/arm64/Kconfig.debug. Actually, the one defined in arm64 directory
-> >> is never used.
-> > 
-> > That's not true since the arm64 definition seems to take precedence.
-> > 
-> >> This adds a dependency on DEBUG_KERNEL for building with frame pointers.
-> > 
-> > It doesn't because arm64 selects ARCH_WANT_FRAME_POINTERS.
-> > 
-> >> ARM64 depends on frame pointer to get correct stack backtrace and need
-> >> FRAME_POINTER kconfig option enabled all the time.
-> >> However, currect implementation makes it could be disabled, so force it
-> >> to be selected by ARM64.
-> >> 
-> >> Signed-off-by: Yang Shi <yang.shi@linaro.org>
-> > 
-> > Patch applied but I changed the commit log slightly. Thanks.
-> i have a question,
-> why FRAME_POINTER  config must be enabled ?
-> and i see ARM arch can  disable this config .
-> if i don?t need stack trace dump and the software release is for 
-> final product , don?t need debug stack trace log .
-> is it possible to disable it for performance reason ?
+Am Dienstag, 10. November 2015, 17:59:10 schrieb Mark Yao:
+> From: Dominik Behr <dbehr@chromium.org>
+> 
+> VOP_WINx_DSP_ST does not require subtracting 1 from the values written to
+> it. It actually causes the screen to be shifted by one pixel.
+> 
+> Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
 
-If you don't need any stack trace, perf etc., in theory you can disable
-the option. However, the aarch64 gcc compiler always generates it (I'm
-not sure whether the AAPCS mandates it). Anyway, the performance impact
-is very small since there are more general purpose registers available
-in AArch64 already.
+funny I never noticed that shift, but now that you mention it, I see it too
+on my Chromebook and the patch fixes this. I've also looked up the
+matching data in the TRM, so
 
--- 
-Catalin
+Reviewed-by: Heiko Stuebner <heiko@sntech.de>
+Tested-by: Heiko Stuebner <heiko@sntech.de>
+
+
+Heiko
