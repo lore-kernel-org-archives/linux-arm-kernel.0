@@ -1,95 +1,73 @@
-From: kapilh@broadcom.com (Kapil Hali)
-Date: Tue, 10 Nov 2015 21:56:17 +0530
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Tue, 10 Nov 2015 16:25:53 +0000
 Subject: [PATCH v3 1/4] dt-bindings: add SMP enable-method for Broadcom NSP
-In-Reply-To: <CAL_JsqL4FqEFN848eZjnnCj_1N7C1K1OkzFHLVxgG5srHpdGEw@mail.gmail.com>
+In-Reply-To: <56421540.1020303@broadcom.com>
 References: <1446844273-6460-1-git-send-email-kapilh@broadcom.com>
  <1446844273-6460-2-git-send-email-kapilh@broadcom.com>
- <CAL_JsqL4FqEFN848eZjnnCj_1N7C1K1OkzFHLVxgG5srHpdGEw@mail.gmail.com>
-Message-ID: <56421AA9.5010106@broadcom.com>
+ <563E6FC7.6070700@gmail.com>
+ <20151108173116.GV8644@n2100.arm.linux.org.uk>
+ <56421540.1020303@broadcom.com>
+Message-ID: <20151110162553.GH8644@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+On Tue, Nov 10, 2015 at 09:33:12PM +0530, Kapil Hali wrote:
+> Hi Russel,
 
-On 11/7/2015 11:33 PM, Rob Herring wrote:
-> On Fri, Nov 6, 2015 at 3:11 PM, Kapil Hali <kapilh@broadcom.com> wrote:
->> Add a compatible string "brcm,bcm-nsp-smp" for Broadcom's
->> Northstar Plus CPU to the 32-bit ARM CPU device tree binding
->> documentation file and create a new binding documentation for
->> Northstar Plus CPU.
->>
->> Signed-off-by: Kapil Hali <kapilh@broadcom.com>
->> ---
->>  .../bindings/arm/bcm/brcm,nsp-cpu-method.txt       | 36 ++++++++++++++++++++++
->>  Documentation/devicetree/bindings/arm/cpus.txt     |  1 +
->>  2 files changed, 37 insertions(+)
->>  create mode 100644 Documentation/devicetree/bindings/arm/bcm/brcm,nsp-cpu-method.txt
->>
->> diff --git a/Documentation/devicetree/bindings/arm/bcm/brcm,nsp-cpu-method.txt b/Documentation/devicetree/bindings/arm/bcm/brcm,nsp-cpu-method.txt
->> new file mode 100644
->> index 0000000..8506da7
->> --- /dev/null
->> +++ b/Documentation/devicetree/bindings/arm/bcm/brcm,nsp-cpu-method.txt
->> @@ -0,0 +1,36 @@
->> +Broadcom Northstar Plus SoC CPU Enable Method
->> +---------------------------------------------
->> +This binding defines the enable method used for starting secondary
->> +CPUs in the following Broadcom SoCs:
->> +  BCM58522, BCM58525, BCM58535, BCM58622, BCM58623, BCM58625, BCM88312
->> +
->> +The enable method is specified by defining the following required
->> +properties in the "cpus" device tree node:
->> +  - enable-method = "brcm,bcm-nsp-smp";
-> 
-> As I said already, this is supposed to be per cpu.
-> 
->> +  - secondary-boot-reg = <...>;
-> 
-> And then you might as well move this too.
-> 
-NS/NSP family of SoCs have maximum of two cores. There would not be a
-need for another boot-reg in this family of SoCs. However, I agree, it 
-should go to individual CPU nodes. I will do the change in the next patch.
->> +
->> +The secondary-boot-reg property is a u32 value that specifies the
->> +physical address of the register used to request the ROM holding pen
->> +code release a secondary CPU.
->> +
->> +Example:
->> +       cpus {
->> +               #address-cells = <1>;
->> +               #size-cells = <0>;
->> +               enable-method = "brcm,bcm-nsp-smp";
->> +               secondary-boot-reg = <0xffff042c>;
->> +
->> +               cpu0: cpu at 0 {
->> +                       device_type = "cpu";
->> +                       compatible = "arm,cortex-a9";
->> +                       next-level-cache = <&L2>;
->> +                       reg = <0>;
->> +               };
->> +
->> +               cpu1: cpu at 1 {
->> +                       device_type = "cpu";
->> +                       compatible = "arm,cortex-a9";
->> +                       next-level-cache = <&L2>;
->> +                       reg = <1>;
->> +               };
->> +       };
->> diff --git a/Documentation/devicetree/bindings/arm/cpus.txt b/Documentation/devicetree/bindings/arm/cpus.txt
->> index 91e6e5c..6abe3f3 100644
->> --- a/Documentation/devicetree/bindings/arm/cpus.txt
->> +++ b/Documentation/devicetree/bindings/arm/cpus.txt
->> @@ -191,6 +191,7 @@ nodes to be present and contain the properties described below.
->>                             "allwinner,sun8i-a23"
->>                             "arm,psci"
->>                             "brcm,brahma-b15"
->> +                           "brcm,bcm-nsp-smp"
->>                             "marvell,armada-375-smp"
->>                             "marvell,armada-380-smp"
->>                             "marvell,armada-390-smp"
->> --
->> 2.1.0
->>
-Thanks,
-Kapil Hali
+Wrong.  Look at my name as sent in the From: and as quoted in the very
+next line.  As far as I'm concerned (and I don't care what other people
+say) it's disrespectful to spell people's names incorrectly.
+
+> It was clear the very first time itself as pointed out by you and the 
+> lead developers and hence the change was readily sent in the very next
+> patch set. I didn't change a comment in this patch, which is misleading 
+> about the SMP enable-method used in the patch set, it is my mistake and   
+> I apologies for the same. I will change it and send the next patch set.
+
+Thanks.
+
+> Also, before sending out the patch set, I had asked for a clarification 
+> about the method: https://lkml.org/lkml/2015/11/6/234
+
+Sorry, I don't read every single email irrespective of how it's marked.
+There's way too much email, and way too much mail with improperly
+classified recipient lists to be able to usefully sort this mail.
+(If you do the math, the email rate during a 12 hour working day from
+just linux-arm-kernel is one email every 2.5 minutes, assuming 300 emails
+a day.  It takes way longer than that to compose a proper reply to an
+email - I've spent around 15 minutes on this one alone.  Hence, if I'm
+busy, I more or less totally ignore email now, and rarely bother to
+"catch up" with missed emails.)
+
+> For my understanding, I am repeating my query- In case of simple method of 
+> waking up secondary core, smp_boot_secondary() will always return success 
+> indicating secondary core successfully started. I understand that in 
+> __cpu_up(), primary core waits for completion till secondary core comes 
+> online or time outs. However, is it appropriate to return successful start 
+> of secondary core without knowing if it really did?
+
+Yes, because all that your smp_boot_secondary() should be doing is
+trying to start the core.  If you encounter an error trying to do so,
+that's what the error return is for.
+
+If you just set a bit somewhere to tell the hardware to release the
+secondary core's reset, then if you set the bit and return success,
+that's prefectly acceptable.  The core ARM SMP code will then wait
+up to one second for the secondary core to become known to the kernel
+before declaring that the CPU failed to come online.
+
+If it fails to appear, we assume that it will never appear - and
+actually at that point the system is in an unknown state: if the
+secondary CPU crashed during its boot, it could start scribbling
+into memory or touching devices in an unpredictable way: the only
+sane answer is to reboot the whole system to ensure that it's back
+to a known good state.  Hence why we don't provide any cleanup at
+the point of a failed secondary CPU (I've been debating about
+tainting the kernel at that point, so we know when things have
+gone bad.)
+
+Hope this helps.
+
+-- 
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
