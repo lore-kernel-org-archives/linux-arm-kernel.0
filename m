@@ -1,73 +1,33 @@
-From: sugar.zhang@rock-chips.com (Sugar Zhang)
-Date: Tue, 10 Nov 2015 15:32:07 +0800
-Subject: [PATCH 1/3] ASoC: rockchip: i2s: compatible with different chips
-In-Reply-To: <1447140729-18267-1-git-send-email-sugar.zhang@rock-chips.com>
-References: <1447140729-18267-1-git-send-email-sugar.zhang@rock-chips.com>
-Message-ID: <1447140729-18267-2-git-send-email-sugar.zhang@rock-chips.com>
+From: heiko.carstens@de.ibm.com (Heiko Carstens)
+Date: Tue, 10 Nov 2015 08:41:24 +0100
+Subject: [PATCH] arm64: add HAVE_LATENCYTOP_SUPPORT config
+In-Reply-To: <20151106162109.GT6087@arm.com>
+References: <1446825478-24824-1-git-send-email-yalin.wang2010@gmail.com>
+ <20151106160501.GR6087@arm.com>
+ <247F438B-3EEA-4550-970E-A649D0E604ED@gmail.com>
+ <20151106162109.GT6087@arm.com>
+Message-ID: <20151110074124.GB6672@osiris>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-there maybe more than one i2s module inside chip, and these i2s modules
-have different channels features.
+On Fri, Nov 06, 2015 at 04:21:10PM +0000, Will Deacon wrote:
+> On Sat, Nov 07, 2015 at 12:11:16AM +0800, yalin wang wrote:
+> > i just enable it on ARM64,
+> > and it can work,
+> > i don?t see some special requirement to enable this config .
+> 
+> Right, so why does HAVE_LATENCYTOP_SUPPORT exist?
 
-for example: there are 3 i2s in rk3066, one support 8 channels playback
-and 2 channels capture, but the others only support 2 channels playback
-and 2 channels capture.
+If I remember correctly then the only dependency was that an architecture
+must have implemented save_stack_trace_tsk().
+See git commit a3afe70b83fdbbd4d757d2911900d168bc798a31.
 
-in order to compatible with these various chips, we add playback and
-capture property to specify these values.
+So the name of HAVE_LATENCYTOP_SUPPORT is surely a not well chosen, and I
+think I introduced it back then. Oh, well.
 
-there are default channels configuration in driver: 8 channels playback
-and 2 channels capture. if not add property, we use the default values.
+And looking through the kernel there is at least avr32 which would break
+at build time if the config option would be removed completely.
 
-Signed-off-by: Sugar Zhang <sugar.zhang@rock-chips.com>
----
- sound/soc/rockchip/rockchip_i2s.c | 20 +++++++++++++++-----
- 1 file changed, 15 insertions(+), 5 deletions(-)
+So.. renaming it to STACKTRACE_TSK_SUPPORT would be a good idea.
 
-diff --git a/sound/soc/rockchip/rockchip_i2s.c b/sound/soc/rockchip/rockchip_i2s.c
-index 58ee645..ec88e94 100644
---- a/sound/soc/rockchip/rockchip_i2s.c
-+++ b/sound/soc/rockchip/rockchip_i2s.c
-@@ -451,6 +451,7 @@ static int rockchip_i2s_probe(struct platform_device *pdev)
- {
- 	struct device_node *node = pdev->dev.of_node;
- 	struct rk_i2s_dev *i2s;
-+	struct snd_soc_dai_driver *soc_dai;
- 	struct resource *res;
- 	void __iomem *regs;
- 	int ret;
-@@ -511,17 +512,26 @@ static int rockchip_i2s_probe(struct platform_device *pdev)
- 			goto err_pm_disable;
- 	}
- 
--	/* refine capture channels */
-+	soc_dai = devm_kzalloc(&pdev->dev,
-+			       sizeof(*soc_dai), GFP_KERNEL);
-+	if (!soc_dai)
-+		return -ENOMEM;
-+
-+	memcpy(soc_dai, &rockchip_i2s_dai, sizeof(*soc_dai));
-+	if (!of_property_read_u32(node, "rockchip,playback-channels", &val)) {
-+		if (val >= 2 && val <= 8)
-+			soc_dai->playback.channels_max = val;
-+	}
-+
- 	if (!of_property_read_u32(node, "rockchip,capture-channels", &val)) {
- 		if (val >= 2 && val <= 8)
--			rockchip_i2s_dai.capture.channels_max = val;
--		else
--			rockchip_i2s_dai.capture.channels_max = 2;
-+			soc_dai->capture.channels_max = val;
- 	}
- 
- 	ret = devm_snd_soc_register_component(&pdev->dev,
- 					      &rockchip_i2s_component,
--					      &rockchip_i2s_dai, 1);
-+					      soc_dai, 1);
-+
- 	if (ret) {
- 		dev_err(&pdev->dev, "Could not register DAI\n");
- 		goto err_suspend;
--- 
-2.3.6
+Will do when time permits, unless somebody else volunteers.
