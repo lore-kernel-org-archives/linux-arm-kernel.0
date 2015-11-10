@@ -1,47 +1,80 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Tue, 10 Nov 2015 10:35:10 +0100
-Subject: [PATCH] PCI: imx6:don't sleep in atomic context
-In-Reply-To: <4800389.dqcmlJY3HC@wuerfel>
-References: <1447066080-5859-1-git-send-email-sanjeev_sharma@mentor.com>
- <1447144878.3142.3.camel@pengutronix.de> <4800389.dqcmlJY3HC@wuerfel>
-Message-ID: <1447148110.3142.6.camel@pengutronix.de>
+From: zyw@rock-chips.com (Chris Zhong)
+Date: Tue, 10 Nov 2015 17:35:31 +0800
+Subject: [PATCH] clk: rockchip: switch PLLs to slow mode before reboot for
+ rk3288
+Message-ID: <1447148131-30041-1-git-send-email-zyw@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Dienstag, den 10.11.2015, 10:28 +0100 schrieb Arnd Bergmann:
-> On Tuesday 10 November 2015 09:41:18 Lucas Stach wrote:
-> > > diff --git a/drivers/pci/host/pci-imx6.c b/drivers/pci/host/pci-imx6.c
-> > > index 233a196..9769b13 100644
-> > > --- a/drivers/pci/host/pci-imx6.c
-> > > +++ b/drivers/pci/host/pci-imx6.c
-> > > @@ -499,7 +499,7 @@ static int imx6_pcie_link_up(struct pcie_port *pp)
-> > >                * Wait a little bit, then re-check if the link finished
-> > >                * the training.
-> > >                */
-> > > -             usleep_range(1000, 2000);
-> > > +             mdelay(1000);
-> > 
-> > A mdelay(1000) is a whole different timescale than a usleep(1000). If
-> > this patch works for you with mdelay(1) or maybe mdelay(2) I would be
-> > fine with it.
-> 
-> mdelay(1) is still a really long time to block the CPU for, on potentially
-> every config space access.
-> 
-> Everybody else just returns the link status here, which seems to be
-> the better alternative. If you need to delay the startup, better have
-> a msleep(1) loop in the initial probe function where you are allowed to
-> sleep.
-> 
-Yes, it's somewhere on my TODO list to rework the link-up handling here,
-but as there are quite a few timing and ordering implications in that
-code, this needs a good thought and a good deal of testing. So I'm
-inclined to ACK the current patch to get rid of the obvious bug and sort
-things out properly in a follow on patchset.
+We've been seeing some crashes at reboot test on rk3288-based systems,
+which boards have not reset pin connected to NPOR, they reboot by
+setting 0xfdb9 to RK3288_GLB_SRST_FST register. If the APLL works in
+a high frequency mode, some IPs might hang during soft reset.
+It appears that we can fix the problem by switching to slow mode before
+reboot, just like what we did before suspend.
 
-Regards,
-Lucas
+Signed-off-by: Chris Zhong <zyw@rock-chips.com>
 
+---
+
+ drivers/clk/rockchip/clk-rk3288.c | 31 +++++++++++++++++++++++++++++++
+ 1 file changed, 31 insertions(+)
+
+diff --git a/drivers/clk/rockchip/clk-rk3288.c b/drivers/clk/rockchip/clk-rk3288.c
+index 9040878..524662c 100644
+--- a/drivers/clk/rockchip/clk-rk3288.c
++++ b/drivers/clk/rockchip/clk-rk3288.c
+@@ -16,6 +16,7 @@
+ #include <linux/clk-provider.h>
+ #include <linux/of.h>
+ #include <linux/of_address.h>
++#include <linux/reboot.h>
+ #include <linux/syscore_ops.h>
+ #include <dt-bindings/clock/rk3288-cru.h>
+ #include "clk.h"
+@@ -855,6 +856,34 @@ static void rk3288_clk_sleep_init(void __iomem *reg_base)
+ static void rk3288_clk_sleep_init(void __iomem *reg_base) {}
+ #endif
+ 
++void __iomem *mode_con_reg;
++static int rk3288_restart_notify(struct notifier_block *this,
++				   unsigned long mode, void *cmd)
++{
++	writel(0xf3030000, mode_con_reg);
++	return NOTIFY_DONE;
++}
++
++static struct notifier_block rk3288_restart_handler = {
++	.notifier_call = rk3288_restart_notify,
++	/* Switch PLLs other than DPLL (for SDRAM) to slow mode before reboot
++	 * to avoid crashes in reset, so this priority must bigger than the one
++	 * in rockchip_restart_handler.
++	 */
++	.priority = 129,
++};
++
++void __init rk3288_register_restart_notifier(void __iomem *reg)
++{
++	int ret;
++
++	mode_con_reg = reg;
++	ret = register_restart_handler(&rk3288_restart_handler);
++	if (ret)
++		pr_err("%s: cannot register restart handler, %d\n",
++		       __func__, ret);
++}
++
+ static void __init rk3288_clk_init(struct device_node *np)
+ {
+ 	void __iomem *reg_base;
+@@ -910,6 +939,8 @@ static void __init rk3288_clk_init(struct device_node *np)
+ 	rockchip_register_softrst(np, 12, reg_base + RK3288_SOFTRST_CON(0),
+ 				  ROCKCHIP_SOFTRST_HIWORD_MASK);
+ 
++	rk3288_register_restart_notifier(reg_base + RK3288_MODE_CON);
++
+ 	rockchip_register_restart_notifier(RK3288_GLB_SRST_FST);
+ 	rk3288_clk_sleep_init(reg_base);
+ }
 -- 
-Pengutronix e.K.             | Lucas Stach                 |
-Industrial Linux Solutions   | http://www.pengutronix.de/  |
+2.6.3
