@@ -1,53 +1,41 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Tue, 10 Nov 2015 15:58:19 -0500
+From: timur@codeaurora.org (Timur Tabi)
+Date: Tue, 10 Nov 2015 15:03:59 -0600
 Subject: [PATCH V2 1/3] scsi: mptxsas: try 64 bit DMA when 32 bit DMA fails
-In-Reply-To: <3742888.Lmg2Y11mdz@wuerfel>
+In-Reply-To: <6333643.g8NiezT8gD@wuerfel>
 References: <1447034266-28003-1-git-send-email-okaya@codeaurora.org>
- <4982446.ZlJVrezq1Y@wuerfel> <56422725.7040809@codeaurora.org>
- <3742888.Lmg2Y11mdz@wuerfel>
-Message-ID: <56425A6B.2070900@codeaurora.org>
+ <4982446.ZlJVrezq1Y@wuerfel> <564222CB.3000701@codeaurora.org>
+ <6333643.g8NiezT8gD@wuerfel>
+Message-ID: <56425BBF.6000308@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 11/10/2015 01:13 PM, Arnd Bergmann wrote:
+> If the mask is 64-bit by default on ARM64, that is a bug that we need
+> to fix urgently. Can you verify this?
 
+I think the mask is 0 by default, because there's no code in ARM64 that 
+actually sets the mask.
 
-On 11/10/2015 2:56 PM, Arnd Bergmann wrote:
->> The ACPI IORT table declares whether you enable IOMMU for a particular
->> >device or not. The placement of IOMMU HW is system specific. The IORT
->> >table gives the IOMMU HW topology to the operating system.
-> This sounds odd. Clearly you need to specify the IOMMU settings for each
-> possible PCI device independent of whether the OS actually uses the IOMMU
-> or not.
+Take a look at arch_setup_pdev_archdata() in 
+arch/powerpc/kernel/setup-common.c.
 
-There are provisions to have DMA mask in the PCIe host bridge not at the 
-PCIe device level inside IORT table. This setting is specific for each 
-PCIe bus. It is not per PCIe device.
+void arch_setup_pdev_archdata(struct platform_device *pdev)
+{
+         pdev->archdata.dma_mask = DMA_BIT_MASK(32);
+         pdev->dev.dma_mask = &pdev->archdata.dma_mask;
+         set_dma_ops(&pdev->dev, &dma_direct_ops);
+}
 
-It is assumed that the endpoint device driver knows the hardware for 
-PCIe devices. The driver can also query the supported DMA bits by this 
-platform via DMA APIs and will request the correct DMA mask from the DMA 
-subsystem (surprise!).
+I don't see anything equivalent in arch/arm64
 
->In a lot of cases, we want to turn it off to get better performance
-> when the driver has set a DMA mask that covers all of RAM, but you
-> also want to enable the IOMMU for debugging purposes or for device
-> assignment if you run virtual machines. The bootloader doesn't know how
-> the device is going to be used, so it cannot define the policy here.
+> A lot of PCI devices can only do 32-bit DMA, and we have plenty
+> of drivers that don't bother setting a mask at all because the 32-bit
+> mask is the default on all other architectures.
 
-I think we'll end up adding a virtualization option to the UEFI BIOS 
-similar to how Intel platforms work. Based on this switch, we'll end up 
-patching the ACPI table.
-
-If I remove the IORT entry, then the device is in coherent mode with 
-device accessing the full RAM range.
-
-If I have the IORT table, the device is in IOMMU translation mode.
-
-Details are in the IORT spec.
-
+In our drivers for 32-bit devices, we have to explicitly set the DMA 
+mask to 32-bits in order to get any DMA working.
 
 -- 
-Sinan Kaya
-Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a 
-Linux Foundation Collaborative Project
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the
+Code Aurora Forum, a Linux Foundation Collaborative Project.
