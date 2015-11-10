@@ -1,39 +1,27 @@
 From: horms@verge.net.au (Simon Horman)
-Date: Tue, 10 Nov 2015 09:11:12 +0900
-Subject: [PATCH v6 00/12] arm64: renesas: add sound support
-In-Reply-To: <CAMuHMdWv1Ae1JTDyN2JkuHC1Fmfw25gtmmUkSMUitrUQnv82Ug@mail.gmail.com>
-References: <87egg3k5g6.wl%kuninori.morimoto.gx@renesas.com>
- <20151109012943.GF4832@verge.net.au>
- <CAMuHMdXBQNCibJU4EDuFZX0zRzUZfC_4KTyXFNVLL81a51Q4RA@mail.gmail.com>
- <20151109090139.GM4832@verge.net.au>
- <CAMuHMdWv1Ae1JTDyN2JkuHC1Fmfw25gtmmUkSMUitrUQnv82Ug@mail.gmail.com>
-Message-ID: <20151110001111.GB1040@verge.net.au>
+Date: Tue, 10 Nov 2015 09:13:21 +0900
+Subject: [PATCH 2/2] ARM: shmobile: gose: Configure PFC in DT
+In-Reply-To: <9791748.jMTWEhtVrm@avalon>
+References: <1447032799-13155-1-git-send-email-horms+renesas@verge.net.au>
+ <1447032799-13155-3-git-send-email-horms+renesas@verge.net.au>
+ <9791748.jMTWEhtVrm@avalon>
+Message-ID: <20151110001320.GC1040@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 09, 2015 at 10:07:20AM +0100, Geert Uytterhoeven wrote:
+On Mon, Nov 09, 2015 at 04:16:45PM +0200, Laurent Pinchart wrote:
 > Hi Simon,
 > 
-> On Mon, Nov 9, 2015 at 10:01 AM, Simon Horman <horms@verge.net.au> wrote:
-> > On Mon, Nov 09, 2015 at 09:08:08AM +0100, Geert Uytterhoeven wrote:
-> >> On Mon, Nov 9, 2015 at 2:29 AM, Simon Horman <horms@verge.net.au> wrote:
-> >> >>       arm64: renesas: salvator-x: Sound SSI PIO support
-> >> >
-> >> > The above patch seemed to have some fuzz. Please check that
-> >> > I resolved that correctly.
-> >>
-> >> The ak4613 node is now a child node of scif2 instead of i2c2, which is
-> >> definitely not correct.
-> >>
-> >> "git diff topic/r8a7795-sound-v5..topic/r8a7795-sound-v6" will show you.
-> >
-> > Thanks, that is a bit of a disaster. Sorry about that.
-> >
-> > I have tried to fix the problem and re-pushed topic/r8a7795-sound-v6.
-> > The head commit is now:
-> >
-> > 03a185979391 ("arm64: defconfig: add Renesas sound and AK4613 support")
+> On Monday 09 November 2015 10:33:19 Simon Horman wrote:
+> > Configure PFC for the already enabled scif and ethernet devices
+> > in the device tree for the gose board.
+> > 
+> > Based on similar work for the koelsch board by Laurent Pinchart and
+> > Sergei Shtylyov.
 > 
-> Thanks, looks much better now.
+> I can't really comment on the patch due to lack of a schematics for the Goose 
+> board, but it looks good to me in principle.
+> 
+> Acked-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-Thanks for checking.
+Thanks, I have queued up both patches of this series.
