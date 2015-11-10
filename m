@@ -1,55 +1,158 @@
 From: vigneshr@ti.com (Vignesh R)
-Date: Tue, 10 Nov 2015 10:59:54 +0530
-Subject: [PATCH v3 0/5] Add memory mapped read support for ti-qspi
-Message-ID: <1447133399-25658-1-git-send-email-vigneshr@ti.com>
+Date: Tue, 10 Nov 2015 10:59:55 +0530
+Subject: [PATCH v3 1/5] spi: introduce mmap read support for spi flash devices
+In-Reply-To: <1447133399-25658-1-git-send-email-vigneshr@ti.com>
+References: <1447133399-25658-1-git-send-email-vigneshr@ti.com>
+Message-ID: <1447133399-25658-2-git-send-email-vigneshr@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+In addition to providing direct access to SPI bus, some spi controller
+hardwares (like ti-qspi) provide special memory mapped port
+to accesses SPI flash devices in order to increase read performance.
+This means the controller can automatically send the SPI signals
+required to read data from the SPI flash device.
+For this, spi controller needs to know flash specific information like
+read command to use, dummy bytes and address width. Once these settings
+are populated in hardware registers, any read accesses to flash's memory
+map region(SoC specific) through memcpy (or mem-to mem DMA copy) will be
+handled by controller hardware. The hardware will automatically generate
+SPI signals required to read data from flash and present it to CPU/DMA.
 
-Changes since v2:
-Remove mmap_lock_mutex.
-Optimize enable/disable of mmap mode.
+Introduce spi_mtd_mmap_read() interface to support memory mapped read
+over SPI flash devices. SPI master drivers can implement this callback to
+support memory mapped read interfaces. m25p80 flash driver and other
+flash drivers can call this to request memory mapped read. The interface
+should only be used MTD flashes and cannot be used with other SPI devices.
 
-Changes since v1:
-Introduce API in SPI core that MTD flash driver can call for mmap read
-instead of directly calling spi-master driver callback. This API makes
-sure that SPI core msg queue is locked during mmap transfers.
-v1: https://lkml.org/lkml/2015/9/4/103
+Signed-off-by: Vignesh R <vigneshr@ti.com>
+---
+v3:
+ * Remove use of mmap_lock_mutex, use bus_lock_mutex instead.
 
+ drivers/spi/spi.c       | 34 ++++++++++++++++++++++++++++++++++
+ include/linux/spi/spi.h | 20 ++++++++++++++++++++
+ 2 files changed, 54 insertions(+)
 
-Cover letter:
-
-This patch series adds support for memory mapped read port of ti-qspi.
-ti-qspi has a special memory mapped port through which SPI flash
-memories can be accessed directly via SoC specific memory region.
-
-First patch adds a method to pass flash specific information like read
-opcode, dummy bytes etc and to request mmap read. Second patch
-implements mmap read method in ti-qspi driver. Patch 3 adapts m25p80 to
-use mmap read method before trying normal SPI transfer. Patch 4 and 5
-add memory map region DT entries for DRA7xx and AM43xx SoCs.
-
-This patch series is based on the discussions here:
-http://www.spinics.net/lists/linux-spi/msg04796.html
-
-Tested on DRA74 EVM and AM437x-SK.
-Read performance increases from ~100kB/s to ~2.5MB/s.
-
-Vignesh R (5):
-  spi: introduce mmap read support for spi flash devices
-  spi: spi-ti-qspi: add mmap mode read support
-  mtd: devices: m25p80: add support for mmap read request
-  ARM: dts: DRA7: add entry for qspi mmap region
-  ARM: dts: AM4372: add entry for qspi mmap region
-
- Documentation/devicetree/bindings/spi/ti_qspi.txt | 19 ++++-
- arch/arm/boot/dts/am4372.dtsi                     |  4 +-
- arch/arm/boot/dts/dra7.dtsi                       |  7 +-
- drivers/mtd/devices/m25p80.c                      |  5 ++
- drivers/spi/spi-ti-qspi.c                         | 99 ++++++++++++++++++++++-
- drivers/spi/spi.c                                 | 34 ++++++++
- include/linux/spi/spi.h                           | 20 +++++
- 7 files changed, 179 insertions(+), 9 deletions(-)
-
+diff --git a/drivers/spi/spi.c b/drivers/spi/spi.c
+index e2415be209d5..0448d29fefc8 100644
+--- a/drivers/spi/spi.c
++++ b/drivers/spi/spi.c
+@@ -1134,6 +1134,7 @@ static void __spi_pump_messages(struct spi_master *master, bool in_kthread)
+ 		}
+ 	}
+ 
++	mutex_lock(&master->bus_lock_mutex);
+ 	trace_spi_message_start(master->cur_msg);
+ 
+ 	if (master->prepare_message) {
+@@ -1143,6 +1144,7 @@ static void __spi_pump_messages(struct spi_master *master, bool in_kthread)
+ 				"failed to prepare message: %d\n", ret);
+ 			master->cur_msg->status = ret;
+ 			spi_finalize_current_message(master);
++			mutex_unlock(&master->bus_lock_mutex);
+ 			return;
+ 		}
+ 		master->cur_msg_prepared = true;
+@@ -1152,6 +1154,7 @@ static void __spi_pump_messages(struct spi_master *master, bool in_kthread)
+ 	if (ret) {
+ 		master->cur_msg->status = ret;
+ 		spi_finalize_current_message(master);
++		mutex_unlock(&master->bus_lock_mutex);
+ 		return;
+ 	}
+ 
+@@ -1159,8 +1162,10 @@ static void __spi_pump_messages(struct spi_master *master, bool in_kthread)
+ 	if (ret) {
+ 		dev_err(&master->dev,
+ 			"failed to transfer one message from queue\n");
++		mutex_unlock(&master->bus_lock_mutex);
+ 		return;
+ 	}
++	mutex_unlock(&master->bus_lock_mutex);
+ }
+ 
+ /**
+@@ -2327,6 +2332,35 @@ int spi_async_locked(struct spi_device *spi, struct spi_message *message)
+ EXPORT_SYMBOL_GPL(spi_async_locked);
+ 
+ 
++int spi_mtd_mmap_read(struct spi_device *spi, loff_t from, size_t len,
++		      size_t *retlen, u_char *buf, u8 read_opcode,
++		      u8 addr_width, u8 dummy_bytes)
++
++{
++	struct spi_master *master = spi->master;
++	int ret;
++
++	if (master->auto_runtime_pm) {
++		ret = pm_runtime_get_sync(master->dev.parent);
++		if (ret < 0) {
++			dev_err(&master->dev, "Failed to power device: %d\n",
++				ret);
++			goto err;
++		}
++	}
++	mutex_lock(&master->bus_lock_mutex);
++	ret = master->spi_mtd_mmap_read(spi, from, len, retlen, buf,
++					read_opcode, addr_width,
++					dummy_bytes);
++	mutex_unlock(&master->bus_lock_mutex);
++	if (master->auto_runtime_pm)
++		pm_runtime_put(master->dev.parent);
++
++err:
++	return ret;
++}
++EXPORT_SYMBOL_GPL(spi_mtd_mmap_read);
++
+ /*-------------------------------------------------------------------------*/
+ 
+ /* Utility methods for SPI master protocol drivers, layered on
+diff --git a/include/linux/spi/spi.h b/include/linux/spi/spi.h
+index cce80e6dc7d1..2f2c431b8917 100644
+--- a/include/linux/spi/spi.h
++++ b/include/linux/spi/spi.h
+@@ -361,6 +361,11 @@ static inline void spi_unregister_driver(struct spi_driver *sdrv)
+  * @handle_err: the subsystem calls the driver to handle an error that occurs
+  *		in the generic implementation of transfer_one_message().
+  * @unprepare_message: undo any work done by prepare_message().
++ * @spi_mtd_mmap_read: some spi-controller hardwares provide memory.
++ *                     Flash drivers (like m25p80) can request memory
++ *                     mapped read via this method. This interface
++ *                     should only be used by mtd flashes and cannot be
++ *                     used by other spi devices.
+  * @cs_gpios: Array of GPIOs to use as chip select lines; one per CS
+  *	number. Any individual value may be -ENOENT for CS lines that
+  *	are not GPIOs (driven by the SPI controller itself).
+@@ -507,6 +512,11 @@ struct spi_master {
+ 			       struct spi_message *message);
+ 	int (*unprepare_message)(struct spi_master *master,
+ 				 struct spi_message *message);
++	int (*spi_mtd_mmap_read)(struct  spi_device *spi,
++				 loff_t from, size_t len,
++				 size_t *retlen, u_char *buf,
++				 u8 read_opcode, u8 addr_width,
++				 u8 dummy_bytes);
+ 
+ 	/*
+ 	 * These hooks are for drivers that use a generic implementation
+@@ -999,6 +1009,16 @@ static inline ssize_t spi_w8r16be(struct spi_device *spi, u8 cmd)
+ 	return be16_to_cpu(result);
+ }
+ 
++/* SPI core interface for memory mapped read support */
++static inline bool spi_mmap_read_supported(struct spi_device *spi)
++{
++	return spi->master->spi_mtd_mmap_read ? true : false;
++}
++
++int spi_mtd_mmap_read(struct spi_device *spi, loff_t from, size_t len,
++		      size_t *retlen, u_char *buf, u8 read_opcode,
++		      u8 addr_width, u8 dummy_bytes);
++
+ /*---------------------------------------------------------------------------*/
+ 
+ /*
 -- 
 2.6.3
