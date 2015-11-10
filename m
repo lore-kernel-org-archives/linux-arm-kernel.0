@@ -1,53 +1,63 @@
-From: alison.wang@freescale.com (Huan Wang)
-Date: Tue, 10 Nov 2015 07:19:07 +0000
-Subject: [RFC PATCH] ARM: add v7 LPAE multi-platform defconfig
-In-Reply-To: <CAOesGMgvfdMj_GB3w_dvxxPkgBZUpo=kQ+60a89yY__-QT2eBA@mail.gmail.com>
-References: <1447124035-18585-1-git-send-email-b18965@freescale.com>
- <CAOesGMgvfdMj_GB3w_dvxxPkgBZUpo=kQ+60a89yY__-QT2eBA@mail.gmail.com>
-Message-ID: <BN3PR0301MB08672E0D8AE0DC458290DFF3FE140@BN3PR0301MB0867.namprd03.prod.outlook.com>
+From: koro.chen@mediatek.com (Koro Chen)
+Date: Tue, 10 Nov 2015 15:26:12 +0800
+Subject: [PATCH] ASoC: mediatek: Move 22M/24M clock control into I2S ops
+Message-ID: <1447140372-10048-1-git-send-email-koro.chen@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Olof,
+22M/24M clocks are only required for I2S, so move the control to
+I2S DAI ops.
+
+Signed-off-by: Koro Chen <koro.chen@mediatek.com>
+---
+ sound/soc/mediatek/mtk-afe-pcm.c |   13 ++++++-------
+ 1 file changed, 6 insertions(+), 7 deletions(-)
+
+diff --git a/sound/soc/mediatek/mtk-afe-pcm.c b/sound/soc/mediatek/mtk-afe-pcm.c
+index f5baf3c..7f71343 100644
+--- a/sound/soc/mediatek/mtk-afe-pcm.c
++++ b/sound/soc/mediatek/mtk-afe-pcm.c
+@@ -299,8 +299,6 @@ static int mtk_afe_dais_enable_clks(struct mtk_afe *afe,
+ 			dev_err(afe->dev, "Failed to enable m_ck\n");
+ 			return ret;
+ 		}
+-		regmap_update_bits(afe->regmap, AUDIO_TOP_CON0,
+-				   AUD_TCON0_PDN_22M | AUD_TCON0_PDN_24M, 0);
+ 	}
  
-> On Mon, Nov 9, 2015 at 6:53 PM, Alison Wang <b18965@freescale.com> wrote:
-> > v7 LPAE multi-platform defconfig is based on v7 multi-platform
-> > defconfig and adds LPAE support.
-> >
-> > The platforms based on Cortex-A7/A12/A15/A17, PJ4B, Krait are also
-> > enabled in this defconfig. But Cortex-A5/A8/A9, Scorpion and PJ4 are
-> > removed.
-> >
-> > This defconfig is verified on LS1021A which enables GIANFAR, I2C,
-> > WATCHDOG, AUDIO, EDMA and DSPI drivers, etc.
-> >
-> > The other platforms need to be verified by the platform maintainers
-> > too.
-> >
-> > Signed-off-by: Alison Wang <alison.wang@freescale.com>
-> 
-> This has been discussed before, and what we have chosen to do is to just
-> have a multi_v7_defconfig that all these platforms are enabled on but
-> with LPAE off.
-> 
-> Instead, what we do when building (and on our build/boot builders) is to
-> take multi_v7 and provide the snippet that turns on ARM_LPAE at that
-> time.
-> 
-> 
-[Alison Wang] Thanks for your reply. I tried to make this multi_v7_lpae_defconfig
-according to the discussion with Russell King. He suggested to make a multi_v7_lpae_defconfig
-rather than creating a new load of platform specific defconfigs. Attached is his original email.
-
-King, do you have any comment about Olof's reply?
-
-
-Best Regards,
-Alison Wang
--------------- next part --------------
-An embedded message was scrubbed...
-From: Russell King - ARM Linux <linux@arm.linux.org.uk>
-Subject: Re: [PATCH v4] ARM: configs: Add Freescale LS1021A defconfig
-Date: Thu, 17 Sep 2015 10:34:14 +0000
-Size: 3564
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151110/3f4d0355/attachment.mht>
+ 	if (b_ck) {
+@@ -340,12 +338,8 @@ static int mtk_afe_dais_set_clks(struct mtk_afe *afe,
+ static void mtk_afe_dais_disable_clks(struct mtk_afe *afe,
+ 				      struct clk *m_ck, struct clk *b_ck)
+ {
+-	if (m_ck) {
+-		regmap_update_bits(afe->regmap, AUDIO_TOP_CON0,
+-				   AUD_TCON0_PDN_22M | AUD_TCON0_PDN_24M,
+-				   AUD_TCON0_PDN_22M | AUD_TCON0_PDN_24M);
++	if (m_ck)
+ 		clk_disable_unprepare(m_ck);
+-	}
+ 	if (b_ck)
+ 		clk_disable_unprepare(b_ck);
+ }
+@@ -360,6 +354,8 @@ static int mtk_afe_i2s_startup(struct snd_pcm_substream *substream,
+ 		return 0;
+ 
+ 	mtk_afe_dais_enable_clks(afe, afe->clocks[MTK_CLK_I2S1_M], NULL);
++	regmap_update_bits(afe->regmap, AUDIO_TOP_CON0,
++			   AUD_TCON0_PDN_22M | AUD_TCON0_PDN_24M, 0);
+ 	return 0;
+ }
+ 
+@@ -373,6 +369,9 @@ static void mtk_afe_i2s_shutdown(struct snd_pcm_substream *substream,
+ 		return;
+ 
+ 	mtk_afe_set_i2s_enable(afe, false);
++	regmap_update_bits(afe->regmap, AUDIO_TOP_CON0,
++			   AUD_TCON0_PDN_22M | AUD_TCON0_PDN_24M,
++			   AUD_TCON0_PDN_22M | AUD_TCON0_PDN_24M);
+ 	mtk_afe_dais_disable_clks(afe, afe->clocks[MTK_CLK_I2S1_M], NULL);
+ 
+ 	/* disable AFE */
+-- 
+1.7.9.5
