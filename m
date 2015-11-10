@@ -1,43 +1,56 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 10 Nov 2015 13:17:55 +0100
-Subject: [PATCH] drm/amdgpu: fix seq_printf format string
-Message-ID: <6655728.oIVJfmhexk@wuerfel>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Tue, 10 Nov 2015 13:19:12 +0100
+Subject: [PATCH v11 2/5] missing include asm/paravirt.h in cputime.c
+In-Reply-To: <alpine.DEB.2.02.1511101127090.5676@kaball.uk.xensource.com>
+References: <alpine.DEB.2.02.1511051502270.13541@kaball.uk.xensource.com>
+ <1446737696-9749-2-git-send-email-stefano.stabellini@eu.citrix.com>
+ <20151105164032.GG3604@twins.programming.kicks-ass.net>
+ <alpine.DEB.2.02.1511051659580.13541@kaball.uk.xensource.com>
+ <20151109173619.GW3604@twins.programming.kicks-ass.net>
+ <alpine.DEB.2.02.1511101127090.5676@kaball.uk.xensource.com>
+Message-ID: <20151110121912.GA17308@twins.programming.kicks-ass.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The amdgpu driver has a debugfs interface that shows the amount of
-VRAM in use, but the newly added code causes a build error on
-all 32-bit architectures:
+On Tue, Nov 10, 2015 at 11:27:33AM +0000, Stefano Stabellini wrote:
+> On Mon, 9 Nov 2015, Peter Zijlstra wrote:
+> > On Thu, Nov 05, 2015 at 05:30:01PM +0000, Stefano Stabellini wrote:
+> > > On Thu, 5 Nov 2015, Peter Zijlstra wrote:
+> > > > How can this be missing? Things compile fine now, right?
+> > > 
+> > > Fair enough.
+> > > 
+> > > 
+> > > > So please better explain why we do this change.
+> > > 
+> > > asm/paravirt.h is included by one of the other headers included in
+> > > kernel/sched/cputime.c on x86, but not on other architecures. On arm and
+> > > arm64, where I am about to introduce asm/paravirt.h and stolen time
+> > > support, without #include <asm/paravirt.h> in cputime.c I would get:
+> > > 
+> > > kernel/sched/cputime.c: In function ?steal_account_process_tick?:
+> > > kernel/sched/cputime.c:260:24: error: ?paravirt_steal_enabled? undeclared (first use in this function)
+> > >   if (static_key_false(&paravirt_steal_enabled)) {
+> > > 
+> > > A bit of digging on x86 (using gcc -E on cputime.c) tells me that
+> > > asm/paravirt.h is coming from the following include chain:
+> > > 
+> > > #include <kernel/sched/sched.h>
+> > > #include <linux/spinlock.h>
+> > > #include <linux/preempt.h>
+> > > #include <asm/preempt.h>
+> > > #include <linux/thread_info.h>
+> > > #include <asm/thread_info.h>
+> > > #include <asm/processor.h>
+> > > #include <asm/msr.h>
+> > > #include <asm/paravirt.h>
+> > 
+> > 
+> > Fair enough; a slightly shorter version of that for a changelog will do
+> > nicely.
+> 
+> Sure. Can I add your Acked-by to it?
 
-drivers/gpu/drm/amd/amdgpu/amdgpu_ttm.c:1076:17: warning: format '%lu' expects argument of type 'long unsigned int', but argument 4 has type 'long long int' [-Wformat=]
+Yep, no objection if the changelog is updated as per the above.
 
-This fixes the format string to use "%llu" for printing 64-bit
-numbers, which works everywhere, as long as we also cast to 'u64'.
-Unlike atomic64_t, u64 is defined as 'unsigned long long' on
-all architectures.
-
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: a2ef8a974931 ("drm/amdgpu: add vram usage into debugfs")
----
-This appeared a few weeks ago with ARM allmodconfig. I was waiting for
-someone to complain about the warning on x86 first, but that apparently
-has not happened.
-
-diff --git a/drivers/gpu/drm/amd/amdgpu/amdgpu_ttm.c b/drivers/gpu/drm/amd/amdgpu/amdgpu_ttm.c
-index 81bb8e9fc26d..d4bac5f49939 100644
---- a/drivers/gpu/drm/amd/amdgpu/amdgpu_ttm.c
-+++ b/drivers/gpu/drm/amd/amdgpu/amdgpu_ttm.c
-@@ -1073,10 +1073,10 @@ static int amdgpu_mm_dump_table(struct seq_file *m, void *data)
- 	ret = drm_mm_dump_table(m, mm);
- 	spin_unlock(&glob->lru_lock);
- 	if (ttm_pl == TTM_PL_VRAM)
--		seq_printf(m, "man size:%llu pages, ram usage:%luMB, vis usage:%luMB\n",
-+		seq_printf(m, "man size:%llu pages, ram usage:%lluMB, vis usage:%lluMB\n",
- 			   adev->mman.bdev.man[ttm_pl].size,
--			   atomic64_read(&adev->vram_usage) >> 20,
--			   atomic64_read(&adev->vram_vis_usage) >> 20);
-+			   (u64)atomic64_read(&adev->vram_usage) >> 20,
-+			   (u64)atomic64_read(&adev->vram_vis_usage) >> 20);
- 	return ret;
- }
- 
+Acked-by: Peter Zijlstra (Intel) <peterz@infradead.org>
