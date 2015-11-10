@@ -1,39 +1,36 @@
-From: Yuantian.Tang@freescale.com (Yuantian.Tang at freescale.com)
-Date: Tue, 10 Nov 2015 11:06:38 +0800
-Subject: [PATCH] ARM: DTS: LS1021A: add SATA node to DTS
-Message-ID: <1447124798-34952-1-git-send-email-Yuantian.Tang@freescale.com>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Mon, 9 Nov 2015 22:21:15 -0500
+Subject: [PATCH V2 2/3] scsi: fix compiler warning for sg
+In-Reply-To: <CAHp75VdUBKr_XQ=2_5uSww71YVz+-Shmhg5hSe5KAoeshTtMYQ@mail.gmail.com>
+References: <1447034266-28003-1-git-send-email-okaya@codeaurora.org>
+ <1447034266-28003-3-git-send-email-okaya@codeaurora.org>
+ <CAHp75VdUBKr_XQ=2_5uSww71YVz+-Shmhg5hSe5KAoeshTtMYQ@mail.gmail.com>
+Message-ID: <564162AB.6080803@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Tang Yuantian <Yuantian.Tang@freescale.com>
 
-Added SATA node to LS1021A DTS to support SATA function.
 
-Signed-off-by: Tang Yuantian <Yuantian.Tang@freescale.com>
----
- arch/arm/boot/dts/ls1021a.dtsi | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+On 11/9/2015 9:14 AM, Andy Shevchenko wrote:
+> Parens are useless, noticed later, sorry.
+>
+> Isn't mult_frac() enough here?
+>
+> Btw, can you mention explicitly what is the warning you get
+> (copy'n'paste of the line would be okay)?
 
-diff --git a/arch/arm/boot/dts/ls1021a.dtsi b/arch/arm/boot/dts/ls1021a.dtsi
-index 973a496..89e2af3 100644
---- a/arch/arm/boot/dts/ls1021a.dtsi
-+++ b/arch/arm/boot/dts/ls1021a.dtsi
-@@ -142,6 +142,16 @@
- 			status = "disabled";
- 		};
- 
-+		sata: sata at 3200000 {
-+			compatible = "fsl,ls1021a-ahci";
-+			reg = <0x0 0x3200000 0x0 0x10000>,
-+			      <0x0 0x20220520 0x0 0x4>;
-+			interrupts = <GIC_SPI 101 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&platform_clk 1>;
-+			reg-names = "ahci", "sata-ecc";
-+			dma-coherent;
-+		};
-+
- 		scfg: scfg at 1570000 {
- 			compatible = "fsl,ls1021a-scfg", "syscon";
- 			reg = <0x0 0x1570000 0x0 0x10000>;
+I created this patch back in March with an older version of the compiler 
+and older kernel (3.19). I'm no longer able to reproduce this with this 
+compiler and linux-next.
+
+Thread model: posix
+gcc version 4.8.3 20140401 (prerelease) (crosstool-NG 
+linaro-1.13.1-4.8-2014.04 - Linaro GCC 4.8-2014.04)
+
+I'll drop this patch.
+
 -- 
-2.1.0.27.g96db324
+Sinan Kaya
+Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a 
+Linux Foundation Collaborative Project
