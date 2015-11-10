@@ -1,55 +1,24 @@
 From: yang.shi@linaro.org (Yang Shi)
-Date: Tue, 10 Nov 2015 14:41:40 -0800
-Subject: [PATCH 1/2] arm64: bpf: add 'store immediate' instruction
-In-Reply-To: <1447195301-16757-1-git-send-email-yang.shi@linaro.org>
-References: <1447195301-16757-1-git-send-email-yang.shi@linaro.org>
-Message-ID: <1447195301-16757-2-git-send-email-yang.shi@linaro.org>
+Date: Tue, 10 Nov 2015 14:41:39 -0800
+Subject: [PATCH 0/2] arm64: bpf: add BPF_ST and BPF_XADD instructions support
+Message-ID: <1447195301-16757-1-git-send-email-yang.shi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-aarch64 doesn't have native store immediate instruction, such operation
-has to be implemented by the below instruction sequence:
 
-Load immediate to register
-Store register
+Current ARM64 BPF JIT doesn't have store immediate and XADD instructions
+support, and aarch64 doesn't have native instructions for them. Implement
+them in instruction sequence. For detail, please refer to the commit log.
 
-Signed-off-by: Yang Shi <yang.shi@linaro.org>
-CC: Zi Shen Lim <zlim.lnx@gmail.com>
-CC: Xi Wang <xi.wang@gmail.com>
----
- arch/arm64/net/bpf_jit_comp.c | 20 +++++++++++++++++++-
- 1 file changed, 19 insertions(+), 1 deletion(-)
+The implementation is tested by test_bpf kernel module.
 
-diff --git a/arch/arm64/net/bpf_jit_comp.c b/arch/arm64/net/bpf_jit_comp.c
-index 6809647..49c1f1b 100644
---- a/arch/arm64/net/bpf_jit_comp.c
-+++ b/arch/arm64/net/bpf_jit_comp.c
-@@ -563,7 +563,25 @@ emit_cond_jmp:
- 	case BPF_ST | BPF_MEM | BPF_H:
- 	case BPF_ST | BPF_MEM | BPF_B:
- 	case BPF_ST | BPF_MEM | BPF_DW:
--		goto notyet;
-+		/* Load imm to a register then store it */
-+		ctx->tmp_used = 1;
-+		emit_a64_mov_i(1, tmp2, off, ctx);
-+		emit_a64_mov_i(1, tmp, imm, ctx);
-+		switch (BPF_SIZE(code)) {
-+		case BPF_W:
-+			emit(A64_STR32(tmp, dst, tmp2), ctx);
-+			break;
-+		case BPF_H:
-+			emit(A64_STRH(tmp, dst, tmp2), ctx);
-+			break;
-+		case BPF_B:
-+			emit(A64_STRB(tmp, dst, tmp2), ctx);
-+			break;
-+		case BPF_DW:
-+			emit(A64_STR64(tmp, dst, tmp2), ctx);
-+			break;
-+		}
-+		break;
- 
- 	/* STX: *(size *)(dst + off) = src */
- 	case BPF_STX | BPF_MEM | BPF_W:
--- 
-2.0.2
+The patches are applied after my BPF JIT stack fix [1].
+
+[1] https://patches.linaro.org/56268/
+
+Yang Shi (2):
+      arm64: bpf: add 'store immediate' instruction
+      arm64: bpf: add BPF XADD instruction
+
+ arch/arm64/net/bpf_jit_comp.c | 39 ++++++++++++++++++++++++++++++++++-----
+ 1 file changed, 34 insertions(+), 5 deletions(-)
