@@ -1,69 +1,70 @@
 From: okaya@codeaurora.org (Sinan Kaya)
-Date: Mon, 9 Nov 2015 23:55:02 -0500
-Subject: [PATCH V3 3/4] dmaselftest: add memcpy selftest support functions
-In-Reply-To: <CAHp75Vddve-yv5DQ5UWhOsfUaY0JCb_rFjwGf2tvY-8++sJmng@mail.gmail.com>
+Date: Mon, 9 Nov 2015 23:57:31 -0500
+Subject: [PATCH V3 2/4] dma: add Qualcomm Technologies HIDMA management
+ driver
+In-Reply-To: <20151109182514.GA10896@rob-hp-laptop>
 References: <1446958380-23298-1-git-send-email-okaya@codeaurora.org>
- <1446958380-23298-4-git-send-email-okaya@codeaurora.org>
- <CAHp75VfS6iCYcWeFmbK2PEUYLntQQRdsmN=7gttFpOn=CfrSZg@mail.gmail.com>
- <56400DD4.5080506@codeaurora.org>
- <CAHp75Vddve-yv5DQ5UWhOsfUaY0JCb_rFjwGf2tvY-8++sJmng@mail.gmail.com>
-Message-ID: <564178A5.6080603@codeaurora.org>
+ <1446958380-23298-3-git-send-email-okaya@codeaurora.org>
+ <563ED8DF.6090307@codeaurora.org> <56400230.8030303@codeaurora.org>
+ <20151109182514.GA10896@rob-hp-laptop>
+Message-ID: <5641793B.6050902@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-On 11/9/2015 4:26 AM, Andy Shevchenko wrote:
-> On Mon, Nov 9, 2015 at 5:07 AM, Sinan Kaya <okaya@codeaurora.org> wrote:
+On 11/9/2015 1:25 PM, Rob Herring wrote:
+> On Sun, Nov 08, 2015 at 09:17:20PM -0500, Sinan Kaya wrote:
+>> On 11/8/2015 12:08 AM, Timur Tabi wrote:
 >>
+>> On 11/8/2015 12:08 AM, Timur Tabi wrote:
+>>> Sinan Kaya wrote:
+>>>> +    val = val & ~(MAX_BUS_REQ_LEN_MASK << MAX_BUS_WR_REQ_BIT_POS);
+>>>> +    val = val | (mgmtdev->max_write_request << MAX_BUS_WR_REQ_BIT_POS);
+>>>> +    val = val & ~(MAX_BUS_REQ_LEN_MASK);
+>>>> +    val = val | (mgmtdev->max_read_request);
+>>>
+>>> val &= ~MAX_BUS_REQ_LEN_MASK << MAX_BUS_WR_REQ_BIT_POS;
+>>> val |= mgmtdev->max_write_request << MAX_BUS_WR_REQ_BIT_POS;
+>>> val &= ~MAX_BUS_REQ_LEN_MASK;
+>>> val |= mgmtdev->max_read_request;
+>>>
+>>>> +static const struct of_device_id hidma_mgmt_match[] = {
+>>>> +    { .compatible = "qcom,hidma-mgmt", },
+>>>> +    { .compatible = "qcom,hidma-mgmt-1.0", },
+>>>> +    { .compatible = "qcom,hidma-mgmt-1.1", },
+>>>> +    {},
+>>>> +};
+>>>
+>>> I thought Rob said that he did NOT want to use version numbers in
+>>> compatible strings.  And what's the difference between these three
+>>> versions anyway?
+>>>
 >>
->> On 11/8/2015 3:09 PM, Andy Shevchenko wrote:
->>>
->>> On Sun, Nov 8, 2015 at 6:52 AM, Sinan Kaya <okaya@codeaurora.org> wrote:
->>>>
->>>> This patch adds supporting utility functions
->>>> for selftest. The intention is to share the self
->>>> test code between different drivers.
->>>>
->>>> Supported test cases include:
->>>> 1. dma_map_single
->>>> 2. streaming DMA
->>>> 3. coherent DMA
->>>> 4. scatter-gather DMA
->>>
->>>
+>> This was already discussed here.
+>>
+>> https://lkml.org/lkml/2015/11/2/689
+>>
+>> The agreement was to use
 >
->>>> +       u32 i, j = 0;
->>>
->>> unsigned int
->>
->> why?
+> The suggestion...
 >
-> Is i or j is going to be used for HW communication? No? What about
-> assignment to a values of type u32? No? Plain counters? Use plain
-> types.
+>> compatible = "qcom,hidma-mgmt-1.1", "qcom,hidma-mgmt-1.0",
+>> "qcom,hidma-mgmt";
+>
+> I don't really want to see 3 generic-ish strings.
+>
+>> I'll be adding code for v1.1 specifically in the future.
+>
+> Please drop "qcom,hidma-mgmt" altogether. It is already meaningless.
+> Then add the 1.1 compatible when you add the code for it. Hopefully you
+> all can decide on part number(s) by then.
+>
+> Rob
+>
 
-OK. I did an internal code review before posting the patch. Nobody 
-complained about iterator types. I am trying to find what goes as a good 
-practice vs. what is personal style.
+OK. I'll only have "qcom,hidma-mgmt-1.0" for now.
 
->
-> It's actually comment about your all patches I saw last week.
->
->>>> +       int err = 0;
->>>> +       int ret;
->>>
->>>
->>> Any reason to have two instead of one of similar meaning?
->>>
->>
->> removed ret
->
-> Don't forget to check if it's redundant assignment (check in all your
-> patches as well).
->
-
-I'll look.
 
 -- 
 Sinan Kaya
