@@ -1,31 +1,102 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 10 Nov 2015 15:47:41 +0100
-Subject: [PATCH v2 4/7] xen: introduce XENPF_settime64
-In-Reply-To: <alpine.DEB.2.02.1511101442391.5676@kaball.uk.xensource.com>
-References: <alpine.DEB.2.02.1511101131350.5676@kaball.uk.xensource.com>
- <3704230.3XlU4asf6t@wuerfel>
- <alpine.DEB.2.02.1511101442391.5676@kaball.uk.xensource.com>
-Message-ID: <4987575.1BuEyGKJst@wuerfel>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 10 Nov 2015 08:51:46 -0600
+Subject: [PATCH] Documentation: dt: Add bindings for Secure-only devices
+In-Reply-To: <CAFEAcA8qgFFhrmXePtO_xQx=YEHK8dSA-1SacR5NsQWSNTwj-w@mail.gmail.com>
+References: <1446127303-5082-1-git-send-email-peter.maydell@linaro.org>
+ <CAL_JsqJz+w2SYEBLVGdZNS6J1tmt5VWV0q1G_Z2rgFfch6J=2A@mail.gmail.com>
+ <CAFEAcA8qgFFhrmXePtO_xQx=YEHK8dSA-1SacR5NsQWSNTwj-w@mail.gmail.com>
+Message-ID: <20151110145146.GA1551@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 10 November 2015 14:43:26 Stefano Stabellini wrote:
-> On Tue, 10 Nov 2015, Arnd Bergmann wrote:
-> > On Tuesday 10 November 2015 11:57:52 Stefano Stabellini wrote:
-> > > Rename the current XENPF_settime hypercall and related struct to
-> > > XENPF_settime32.
-> > > 
-> > > Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-> > > CC: konrad.wilk at oracle.com
-> > > CC: david.vrabel at citrix.com
-> > > CC: boris.ostrovsky at oracle.com
-> > 
-> > Looks good.
+On Fri, Oct 30, 2015 at 08:07:34PM +0000, Peter Maydell wrote:
+> On 30 October 2015 at 18:28, Rob Herring <robh+dt@kernel.org> wrote:
+> > On Thu, Oct 29, 2015 at 9:01 AM, Peter Maydell <peter.maydell@linaro.org> wrote:
+> >> +Valid Secure world properties:
+> >> +
+> >> +- secure-status : specifies whether the device is present and usable
+> >> +  in the secure world. The combination of this with "status" allows
+> >> +  the various possible combinations of device visibility to be
+> >> +  specified:
+> >> +   status = "okay";                             // visible in S and NS
+> >
+> > I assume neither property present or both okay also mean the same.
+> >
+> > status = "okay"; secure-status = "okay";
+> >
+> > We should be explicit.
 > 
-> Can I add your acked-by?
+> Yes; status defaults to "okay" (presumably this is listed in
+> the overal DT binding spec somewhere), and secure-status
+> defaults to "same as status, which might in turn be defaulted".
+> We can list the complete set of options (neither present,
+> both 'okay', status not present but secure-status present, etc),
+> though it gets a bit long-winded, especially if we later add
+> more secure- properties (they'd all have to have verbiage about
+> "if not present, same as non-prefixed property; if both not
+> present, both take the default the non-prefixed property takes
+> if it's not present; if prefixed property not present, it
+> defaults to same as non-prefixed property", which we already
+> say in the introductory section). Still, for just status it
+> would be easy enough to add a couple of lines:
 > 
+> +    status = "okay"; secure-status = "okay"; // ditto
+> +    secure-status = "okay";                  // ditto
+> +    // neither explicitly defined: ditto
 > 
+> (Do you want the full set of 9 options you get from multiplying
+> out "okay" vs "disabled" vs not-set for each property?)
 
-Yes, please do.
+Better to err on completeness. The inheritance is easily missed.
 
-	Arnd
+Also, one nit. Use C style comments so when people copy-n-paste this it 
+is the correct style.
+
+> 
+> >> +   status = "disabled"; secure-status = "okay"; // S-only
+> >> +   status = "okay"; secure-status = "disabled"; // NS-only
+> >
+> > In HKG when we discussed this, 'status = "secure"' was the proposal.
+> > That would be simpler:
+> >
+> > S world can use "okay" or "secure"
+> > NS world can use "okay" or no property.
+> >
+> > That leaves out the case of disabled in S and enabled for NS. We could
+> > want that for s/w reasons, but can we have h/w like that?
+> 
+> It's perfectly possible to design hardware like that (though
+> I can't think of a reason to do so offhand). I think it's the desire
+> to be able to describe all the possible valid h/w combinations
+> that brought us to this secure- prefix design. Plus it
+> extends nicely to cover other possibilities as we need it;
+> for instance "device A is at S-0x10000 but NS-0x20000" can be
+> done by specifying a device like:
+>    status = "okay";
+>    secure-status = "okay";
+>    reg = < 0x20000 0x1000 >;
+>    secure-regs = < 0x10000 0x1000 >;
+> (apologies if I've messed the syntax up there).
+> 
+> Just going for 'status=secure' would deal with the immediate
+> requirement, but my preference is for a description that
+> lets us describe all the possible configurations, not just
+> the ones we think are common, and secure-* is a neat way
+> of doing that (IIRC it was Grant's suggestion; speaking of
+> whom, I just noticed I forgot to cc him on the original patch).
+
+I don't really want to give blanket approval to use secure-* prefix, but 
+I'm okay with secure-status I guess.
+
+For secure-reg in particular, I would do something different and 
+similar to PCI where we add another address cell to define the address 
+space as secure or non-secure. So your example becomes:
+
+    reg = <0 0x20000 0x1000 >,
+          <1 0x10000 0x1000 >;
+
+The bus compatible would also have to be something like 
+"arm,secure-bus". No point in debating this now. We can worry about it 
+when we have an example.
+
+Rob
