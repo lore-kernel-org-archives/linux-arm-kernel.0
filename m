@@ -1,45 +1,37 @@
-From: James.Bottomley@HansenPartnership.com (James Bottomley)
-Date: Tue, 10 Nov 2015 12:05:20 -0800
-Subject: [PATCH V2 1/3] scsi: mptxsas: try 64 bit DMA when 32 bit DMA fails
-In-Reply-To: <56424BF4.2040207@codeaurora.org>
-References: <1447034266-28003-1-git-send-email-okaya@codeaurora.org>
- <5349261.sTnZTFhKWB@wuerfel> <56421610.50005@codeaurora.org>
- <4982446.ZlJVrezq1Y@wuerfel> <56422725.7040809@codeaurora.org>
- <1447180034.2187.20.camel@HansenPartnership.com>
- <56424200.9080406@codeaurora.org>
- <1447184611.2187.45.camel@HansenPartnership.com>
- <56424BF4.2040207@codeaurora.org>
-Message-ID: <1447185920.2187.53.camel@HansenPartnership.com>
+From: robh+dt@kernel.org (Rob Herring)
+Date: Tue, 10 Nov 2015 14:09:06 -0600
+Subject: [PATCH v3 1/7] of: Add vendor prefix for Advantech Corporation
+In-Reply-To: <1447178408-26982-2-git-send-email-akshay.bhat@timesys.com>
+References: <1447178408-26982-1-git-send-email-akshay.bhat@timesys.com>
+ <1447178408-26982-2-git-send-email-akshay.bhat@timesys.com>
+Message-ID: <CAL_JsqJ==2cM9q-8OVDiGmW_+tU0CNKmUgDz3NafNvdut4Q2=w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 2015-11-10 at 14:56 -0500, Sinan Kaya wrote:
-> 
-> On 11/10/2015 2:43 PM, James Bottomley wrote:
-> > The Issue, as stated by LSI is
-> >
-> >          Initially set the consistent DMA mask to 32 bit and then change
-> >          it
-> >          to 64 bit mask after allocating RDPQ pools by calling the
-> >          function
-> >          _base_change_consistent_dma_mask. This is to ensure that all the
-> >          upper 32 bits of RDPQ entries's base address to be same.
-> >
-> 
-> Need somebody from mpt to confirm that this behavior is still valid for 
-> the recent cards besides altix.
+On Tue, Nov 10, 2015 at 12:00 PM, Akshay Bhat <akshay.bhat@timesys.com> wrote:
+> This patch adds vendor prefix for Advantech Corporation.
+>
+> Website: http://www.advantech.com/
+> Signed-off-by: Akshay Bhat <akshay.bhat@timesys.com>
 
-OK, you don't seem to be understanding the problem: the Altix isn't a
-LSI card, it was a SGI platform.  It was the platform where we first
-discovered the issue that a lot of storage cards didn't work because it
-by default had no memory below 4GB.  The reason coherent masks were
-introduced was initially so the Altix could manufacture and manage a
-region of memory in the lower 4GB region and we would guarantee to make
-allocations from it so the storage cards would then work on that
-platform.
+Acked-by: Rob Herring <robh@kernel.org>
 
-I thought the Altix was a historical relic because after they
-disappeared, there was no other platform with this issue ...  until you
-came along.
-
-James
+> ---
+>  Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
+>  1 file changed, 1 insertion(+)
+>
+> diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+> index 55df1d4..5134b24 100644
+> --- a/Documentation/devicetree/bindings/vendor-prefixes.txt
+> +++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+> @@ -10,6 +10,7 @@ ad    Avionic Design GmbH
+>  adapteva       Adapteva, Inc.
+>  adh    AD Holdings Plc.
+>  adi    Analog Devices, Inc.
+> +advantech      Advantech Corporation
+>  aeroflexgaisler        Aeroflex Gaisler AB
+>  al     Annapurna Labs
+>  allwinner      Allwinner Technology Co., Ltd.
+> --
+> 2.6.3
+>
