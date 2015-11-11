@@ -1,25 +1,35 @@
-From: schwab@suse.de (Andreas Schwab)
-Date: Wed, 11 Nov 2015 18:54:00 +0100
-Subject: [PATCH v6 13/17] arm64:ilp32: add sys_ilp32.c and a separate
- table (in entry.S) to use it
-In-Reply-To: <1446507046-24604-14-git-send-email-ynorov@caviumnetworks.com>
- (Yury Norov's message of "Tue, 3 Nov 2015 02:30:42 +0300")
-References: <1446507046-24604-1-git-send-email-ynorov@caviumnetworks.com>
- <1446507046-24604-14-git-send-email-ynorov@caviumnetworks.com>
-Message-ID: <mvmsi4cxw07.fsf@hawking.suse.de>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Wed, 11 Nov 2015 18:57:41 +0100
+Subject: [PATCH 2/2] arm64: bpf: add BPF XADD instruction
+In-Reply-To: <20151111.123548.1039494689070388545.davem@davemloft.net>
+References: <56436420.9090401@iogearbox.net> <20151111162341.GN9562@arm.com>
+ <20151111172659.GA86334@ast-mbp.thefacebook.com>
+ <20151111.123548.1039494689070388545.davem@davemloft.net>
+Message-ID: <20151111175741.GR17308@twins.programming.kicks-ass.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Yury Norov <ynorov@caviumnetworks.com> writes:
+On Wed, Nov 11, 2015 at 12:35:48PM -0500, David Miller wrote:
+> From: Alexei Starovoitov <alexei.starovoitov@gmail.com>
+> Date: Wed, 11 Nov 2015 09:27:00 -0800
+> 
+> > BPF_XADD == atomic_add() in kernel. period.
+> > we are not going to deprecate it or introduce something else.
+> 
+> Agreed, it makes no sense to try and tie C99 or whatever atomic
+> semantics to something that is already clearly defined to have
+> exactly kernel atomic_add() semantics.
 
-> +#define sys_clock_gettime       compat_sys_clock_gettime
-> +#define sys_clock_settime       compat_sys_clock_settime
+Dave, this really doesn't make any sense to me. __sync primitives have
+well defined semantics and (e)BPF is violating this.
 
-You also need to redirect sys_clock_nanosleep.
+Furthermore, the fetch_and_add (or XADD) name has well defined
+semantics, which (e)BPF also violates.
 
-Andreas.
+Atomicy is hard enough as it is, backends giving random interpretations
+to them isn't helping anybody.
 
--- 
-Andreas Schwab, SUSE Labs, schwab at suse.de
-GPG Key fingerprint = 0196 BAD8 1CE9 1970 F4BE  1748 E4D4 88E3 0EEA B9D7
-"And now for something completely different."
+It also baffles me that Alexei is seemingly unwilling to change/rev the
+(e)BPF instructions, which would be invisible to the regular user, he
+does want to change the language itself, which will impact all
+'scripts'.
