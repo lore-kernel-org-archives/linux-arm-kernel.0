@@ -1,101 +1,263 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 11 Nov 2015 17:21:56 -0600
-Subject: [PATCHv7 1/3] ARM: dts: Add Altera L2 Cache and OCRAM EDAC entries
-In-Reply-To: <1445979483-8035-1-git-send-email-dinguyen@opensource.altera.com>
-References: <1445979483-8035-1-git-send-email-dinguyen@opensource.altera.com>
-Message-ID: <20151111232156.GA31910@rob-hp-laptop>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Thu, 12 Nov 2015 00:23:36 +0100
+Subject: [PATCH v8 10/17] phy: Add driver for rockchip Display Port PHY
+In-Reply-To: <1446021033-11537-1-git-send-email-ykk@rock-chips.com>
+References: <1446020143-32645-1-git-send-email-ykk@rock-chips.com>
+ <1446021033-11537-1-git-send-email-ykk@rock-chips.com>
+Message-ID: <2368662.QeV0VQYq26@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Oct 27, 2015 at 03:58:03PM -0500, dinguyen at opensource.altera.com wrote:
-> From: Thor Thayer <tthayer@opensource.altera.com>
+Hi Yakir,
+
+Am Mittwoch, 28. Oktober 2015, 16:30:33 schrieb Yakir Yang:
+> Add phy driver for the Rockchip DisplayPort PHY module. This
+> is required to get DisplayPort working in Rockchip SoCs.
 > 
-> Adding the device tree entries and bindings needed to support
-> the Altera L2 cache and On-Chip RAM EDAC. This patch relies upon
-> an earlier patch to declare and setup On-chip RAM properly.
-> http://www.spinics.net/lists/devicetree/msg51117.html
-> 
-> Signed-off-by: Thor Thayer <tthayer@opensource.altera.com>
-> Signed-off-by: Dinh Nguyen <dinguyen@opensource.altera.com>
+> Reviewed-by: Heiko Stuebner <heiko@sntech.de>
+> Signed-off-by: Yakir Yang <ykk@rock-chips.com>
+
+a general thing I have been pondering, we should probably move the
+dp-phy under the GRF. Similar to the new power-domains being
+a full child of the PMU, the dp-phy is a full child-device of the GRF.
+
+That would include:
+- making the GRF a simply-mfd (just adding that property)
+- moving the dts node under it
+- making the driver get its regmap from its parent (just like
+  drivers/soc/rockchip/pm_domains.c does)
+
+
+The usbphy is another example of that, and I think I'll be moving it
+below the grf as well.
+
+
+Heiko
+
 > ---
-> v7: No Change
-> v6: Change to nested EDAC device nodes based on community
->     feedback. Remove L2 syscon. Use consolidated binding.
-> v3-5: No Change
-> v2: Remove OCRAM declaration and reference prior patch.
-> ---
->  .../bindings/arm/altera/socfpga-edac.txt           | 46 ++++++++++++++++++++++
->  arch/arm/boot/dts/socfpga.dtsi                     | 20 ++++++++++
->  2 files changed, 66 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/arm/altera/socfpga-edac.txt
+> Changes in v8:
+> - Fix the mixed spacers on macro definitions. (Heiko)
+> - Remove the unnecessary empty line after clk_prepare_enable. (Heiko)
 > 
-> diff --git a/Documentation/devicetree/bindings/arm/altera/socfpga-edac.txt b/Documentation/devicetree/bindings/arm/altera/socfpga-edac.txt
+> Changes in v7:
+> - Simply the commit message. (Kishon)
+> - Symmetrical enable/disbale the phy clock and power. (Kishon)
+> 
+> Changes in v6: None
+> Changes in v5:
+> - Remove "reg" DT property, cause driver could poweron/poweroff phy via
+>   the exist "grf" syscon already. And rename the example DT node from
+>   "edp_phy: phy at ff770274" to "edp_phy: edp-phy" directly. (Heiko)
+> - Add deivce_node at the front of driver, update phy_ops type from "static
+>   struct" to "static const struct". And correct the input paramters of
+>   devm_phy_create() interfaces. (Heiko)
+> 
+> Changes in v4:
+> - Add commit message, and remove the redundant rockchip_dp_phy_init()
+>   function, move those code to probe() method. And remove driver .owner
+>   number. (Kishon)
+> 
+> Changes in v3:
+> - Suggest, add rockchip dp phy driver, collect the phy clocks and
+>   power control. (Heiko)
+> 
+> Changes in v2: None
+> 
+>  drivers/phy/Kconfig           |   7 ++
+>  drivers/phy/Makefile          |   1 +
+>  drivers/phy/phy-rockchip-dp.c | 155 ++++++++++++++++++++++++++++++++++++++++++
+>  3 files changed, 163 insertions(+)
+>  create mode 100644 drivers/phy/phy-rockchip-dp.c
+> 
+> diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
+> index 7eb5859d..7355819 100644
+> --- a/drivers/phy/Kconfig
+> +++ b/drivers/phy/Kconfig
+> @@ -319,6 +319,13 @@ config PHY_ROCKCHIP_USB
+>  	help
+>  	  Enable this to support the Rockchip USB 2.0 PHY.
+>  
+> +config PHY_ROCKCHIP_DP
+> +	tristate "Rockchip Display Port PHY Driver"
+> +	depends on ARCH_ROCKCHIP && OF
+> +	select GENERIC_PHY
+> +	help
+> +	  Enable this to support the Rockchip Display Port PHY.
+> +
+>  config PHY_ST_SPEAR1310_MIPHY
+>  	tristate "ST SPEAR1310-MIPHY driver"
+>  	select GENERIC_PHY
+> diff --git a/drivers/phy/Makefile b/drivers/phy/Makefile
+> index 075db1a..b1700cd 100644
+> --- a/drivers/phy/Makefile
+> +++ b/drivers/phy/Makefile
+> @@ -35,6 +35,7 @@ phy-exynos-usb2-$(CONFIG_PHY_S5PV210_USB2)	+= phy-s5pv210-usb2.o
+>  obj-$(CONFIG_PHY_EXYNOS5_USBDRD)	+= phy-exynos5-usbdrd.o
+>  obj-$(CONFIG_PHY_QCOM_APQ8064_SATA)	+= phy-qcom-apq8064-sata.o
+>  obj-$(CONFIG_PHY_ROCKCHIP_USB) += phy-rockchip-usb.o
+> +obj-$(CONFIG_PHY_ROCKCHIP_DP)		+= phy-rockchip-dp.o
+>  obj-$(CONFIG_PHY_QCOM_IPQ806X_SATA)	+= phy-qcom-ipq806x-sata.o
+>  obj-$(CONFIG_PHY_ST_SPEAR1310_MIPHY)	+= phy-spear1310-miphy.o
+>  obj-$(CONFIG_PHY_ST_SPEAR1340_MIPHY)	+= phy-spear1340-miphy.o
+> diff --git a/drivers/phy/phy-rockchip-dp.c b/drivers/phy/phy-rockchip-dp.c
 > new file mode 100644
-> index 0000000..4bf32e1
+> index 0000000..c82c22f
 > --- /dev/null
-> +++ b/Documentation/devicetree/bindings/arm/altera/socfpga-edac.txt
-> @@ -0,0 +1,46 @@
-> +Altera SoCFPGA Error Detection and Correction [EDAC]
+> +++ b/drivers/phy/phy-rockchip-dp.c
+> @@ -0,0 +1,155 @@
+> +/*
+> + * Rockchip DP PHY driver
+> + *
+> + * Copyright (C) 2015 FuZhou Rockchip Co., Ltd.
+> + * Author: Yakir Yang <ykk@@rock-chips.com>
+> + *
+> + * This program is free software; you can redistribute it and/or modify
+> + * it under the terms of the GNU General Public License as published by
+> + * the Free Software Foundation; either version 2 of the License.
+> + */
 > +
-> +Required Properties:
-> +- compatible : Should be "altr,edac"
-
-What is the actual block name? I doubt it happens to match the kernel 
-subsystem.
-
-> +- #address-cells: must be 1
-> +- #size-cells: must be 1
-> +- ranges : standard definition, should translate from local addresses
-
-What is the point of having 2 levels? I think you can remove it.
-
+> +#include <linux/io.h>
+> +#include <linux/kernel.h>
+> +#include <linux/module.h>
+> +#include <linux/of.h>
+> +#include <linux/of_address.h>
+> +#include <linux/clk.h>
+> +#include <linux/phy/phy.h>
+> +#include <linux/regmap.h>
+> +#include <linux/mfd/syscon.h>
+> +#include <linux/platform_device.h>
 > +
-> +Subcomponents:
+> +#define GRF_SOC_CON12                           0x0274
 > +
-> +L2 Cache ECC
-> +Required Properties:
-> +- compatible : Should be "altr,l2-edac"
-
-Same comment about name. It should also have the chip name in it.
-
-> +- reg : Address and size for ECC error interrupt clear registers.
-> +- interrupts : Should be single bit error interrupt, then double bit error
-> +	interrupt. Note the rising edge type.
+> +#define GRF_EDP_REF_CLK_SEL_INTER_HIWORD_MASK   BIT(4)
+> +#define GRF_EDP_REF_CLK_SEL_INTER               BIT(4)
 > +
-> +On Chip RAM ECC
-> +Required Properties:
-> +- compatible : Should be "altr,ocram-edac"
-
-Ditto.
-
-> +- reg : Address and size for ECC error interrupt clear registers.
-> +- iram : phandle to On-Chip RAM definition.
-
-This should probably be standardized and put into the SRAM binding. 
-There's 2 cases to consider: phandle to all of SRAM and phandle to 
-sub-node of SRAM.
-
-> +- interrupts : Should be single bit error interrupt, then double bit error
-> +	interrupt. Note the rising edge type.
+> +#define GRF_EDP_PHY_SIDDQ_HIWORD_MASK           BIT(21)
+> +#define GRF_EDP_PHY_SIDDQ_ON                    0
+> +#define GRF_EDP_PHY_SIDDQ_OFF                   BIT(5)
 > +
-> +Example:
+> +struct rockchip_dp_phy {
+> +	struct device  *dev;
+> +	struct regmap  *grf;
+> +	struct clk     *phy_24m;
+> +};
 > +
-> +	soc_ecc {
-> +		compatible = "altr,edac";
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
-> +		ranges;
+> +static int rockchip_set_phy_state(struct phy *phy, bool enable)
+> +{
+> +	struct rockchip_dp_phy *dp = phy_get_drvdata(phy);
+> +	int ret;
 > +
-> +		l2edac at ffd08140 {
-> +			compatible = "altr,l2-edac";
-> +			reg = <0xffd08140 0x4>;
-> +			interrupts = <0 36 1>, <0 37 1>;
-> +		};
+> +	if (enable) {
+> +		ret = regmap_write(dp->grf, GRF_SOC_CON12,
+> +				   GRF_EDP_PHY_SIDDQ_HIWORD_MASK |
+> +				   GRF_EDP_PHY_SIDDQ_ON);
+> +		if (ret < 0) {
+> +			dev_err(dp->dev, "Can't enable PHY power %d\n", ret);
+> +			return ret;
+> +		}
 > +
-> +		ocramedac at ffd08144 {
-> +			compatible = "altr,ocram-edac";
-> +			reg = <0xffd08144 0x4>;
-> +			iram = <&ocram>;
-> +			interrupts = <0 178 1>, <0 179 1>;
-> +		};
-> +	};
+> +		ret = clk_prepare_enable(dp->phy_24m);
+> +	} else {
+> +		clk_disable_unprepare(dp->phy_24m);
+> +
+> +		ret = regmap_write(dp->grf, GRF_SOC_CON12,
+> +				   GRF_EDP_PHY_SIDDQ_HIWORD_MASK |
+> +				   GRF_EDP_PHY_SIDDQ_OFF);
+> +	}
+> +
+> +	return ret;
+> +}
+> +
+> +static int rockchip_dp_phy_power_on(struct phy *phy)
+> +{
+> +	return rockchip_set_phy_state(phy, true);
+> +}
+> +
+> +static int rockchip_dp_phy_power_off(struct phy *phy)
+> +{
+> +	return rockchip_set_phy_state(phy, false);
+> +}
+> +
+> +static const struct phy_ops rockchip_dp_phy_ops = {
+> +	.power_on	= rockchip_dp_phy_power_on,
+> +	.power_off	= rockchip_dp_phy_power_off,
+> +	.owner		= THIS_MODULE,
+> +};
+> +
+> +static int rockchip_dp_phy_probe(struct platform_device *pdev)
+> +{
+> +	struct device *dev = &pdev->dev;
+> +	struct device_node *np = dev->of_node;
+> +	struct phy_provider *phy_provider;
+> +	struct rockchip_dp_phy *dp;
+> +	struct resource *res;
+> +	struct phy *phy;
+> +	int ret;
+> +
+> +	if (!np)
+> +		return -ENODEV;
+> +
+> +	dp = devm_kzalloc(dev, sizeof(*dp), GFP_KERNEL);
+> +	if (IS_ERR(dp))
+> +		return -ENOMEM;
+> +
+> +	dp->dev = dev;
+> +
+> +	dp->phy_24m = devm_clk_get(dev, "24m");
+> +	if (IS_ERR(dp->phy_24m)) {
+> +		dev_err(dev, "cannot get clock 24m\n");
+> +		return PTR_ERR(dp->phy_24m);
+> +	}
+> +
+> +	ret = clk_set_rate(dp->phy_24m, 24000000);
+> +	if (ret < 0) {
+> +		dev_err(dp->dev, "cannot set clock phy_24m %d\n", ret);
+> +		return ret;
+> +	}
+> +
+> +	dp->grf = syscon_regmap_lookup_by_phandle(np, "rockchip,grf");
+> +	if (IS_ERR(dp->grf)) {
+> +		dev_err(dev, "rk3288-dp needs rockchip,grf property\n");
+> +		return PTR_ERR(dp->grf);
+> +	}
+> +
+> +	ret = regmap_write(dp->grf, GRF_SOC_CON12, GRF_EDP_REF_CLK_SEL_INTER |
+> +			   GRF_EDP_REF_CLK_SEL_INTER_HIWORD_MASK);
+> +	if (ret != 0) {
+> +		dev_err(dp->dev, "Could not config GRF edp ref clk: %d\n", ret);
+> +		return ret;
+> +	}
+> +
+> +	phy = devm_phy_create(dev, np, &rockchip_dp_phy_ops);
+> +	if (IS_ERR(phy)) {
+> +		dev_err(dev, "failed to create phy\n");
+> +		return PTR_ERR(phy);
+> +	}
+> +	phy_set_drvdata(phy, dp);
+> +
+> +	phy_provider = devm_of_phy_provider_register(dev, of_phy_simple_xlate);
+> +
+> +	return PTR_ERR_OR_ZERO(phy_provider);
+> +}
+> +
+> +static const struct of_device_id rockchip_dp_phy_dt_ids[] = {
+> +	{ .compatible = "rockchip,rk3288-dp-phy" },
+> +	{}
+> +};
+> +
+> +MODULE_DEVICE_TABLE(of, rockchip_dp_phy_dt_ids);
+> +
+> +static struct platform_driver rockchip_dp_phy_driver = {
+> +	.probe		= rockchip_dp_phy_probe,
+> +	.driver		= {
+> +		.name	= "rockchip-dp-phy",
+> +		.of_match_table = rockchip_dp_phy_dt_ids,
+> +	},
+> +};
+> +
+> +module_platform_driver(rockchip_dp_phy_driver);
+> +
+> +MODULE_AUTHOR("Yakir Yang <ykk@rock-chips.com>");
+> +MODULE_DESCRIPTION("Rockchip DP PHY driver");
+> +MODULE_LICENSE("GPL v2");
+> 
