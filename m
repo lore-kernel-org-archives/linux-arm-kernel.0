@@ -1,44 +1,111 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 11 Nov 2015 23:32:11 +0100
-Subject: [PATCH, RESEND] orangefs: use %zu format string for size_t
-Message-ID: <4529098.FXCydd13Bl@wuerfel>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 11 Nov 2015 14:44:29 -0800
+Subject: [PATCH v3 3/3] ARM: OMAP: DRA7: hwmod: Add data for McASP3
+In-Reply-To: <1446191700-11057-4-git-send-email-peter.ujfalusi@ti.com>
+References: <1446191700-11057-1-git-send-email-peter.ujfalusi@ti.com>
+ <1446191700-11057-4-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <20151111224428.GJ3218@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 32-bit architectures, 'size_t' and 'unsigned long' are not necessarily
-the same, so we get a compiler warning about it:
+Peter,
 
-fs/orangefs/pvfs2-bufmap.c: In function 'pvfs_bufmap_copy_from_iovec':
-fs/orangefs/pvfs2-bufmap.c:521:8: warning: format '%lu' expects argument of type 'long unsigned int', but argument 4 has type 'size_t {aka unsigned int}' [-Wformat=]
+* Peter Ujfalusi <peter.ujfalusi@ti.com> [151030 00:55]:
+> McASP3 is used by default on DRA7x based boards for audio.
 
-This changes the code to use %zu instead of %lu, which always
-matches size_t.
+Looks like this one no longer applies cleanly. Can you please
+rebase and test against current mainline?
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: 4d1c44043b26e ("Orangefs: use iov_iter interface")
----
-Sent originally on October 7, but not yet applied, and we still get the
-same warnings. Please apply.
+Regards,
 
-diff --git a/fs/orangefs/pvfs2-bufmap.c b/fs/orangefs/pvfs2-bufmap.c
-index 9d0392a3e824..06fb797dedda 100644
---- a/fs/orangefs/pvfs2-bufmap.c
-+++ b/fs/orangefs/pvfs2-bufmap.c
-@@ -518,7 +518,7 @@ int pvfs_bufmap_copy_from_iovec(struct pvfs2_bufmap *bufmap,
- 	int i;
- 
- 	gossip_debug(GOSSIP_BUFMAP_DEBUG,
--		     "%s: buffer_index:%d: size:%lu:\n",
-+		     "%s: buffer_index:%d: size:%zu:\n",
- 		     __func__, buffer_index, size);
- 
- 	to = &bufmap->desc_array[buffer_index];
-@@ -550,7 +550,7 @@ int pvfs_bufmap_copy_to_iovec(struct pvfs2_bufmap *bufmap,
- 	size_t written;
- 
- 	gossip_debug(GOSSIP_BUFMAP_DEBUG,
--		     "%s: buffer_index:%d: iov_iter_count(iter):%lu:\n",
-+		     "%s: buffer_index:%d: iov_iter_count(iter):%zu:\n",
- 		     __func__, buffer_index, iov_iter_count(iter));
- 
- 	from = &bufmap->desc_array[buffer_index];
+Tony
+
+> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+> ---
+>  arch/arm/mach-omap2/omap_hwmod_7xx_data.c | 56 +++++++++++++++++++++++++++++++
+>  1 file changed, 56 insertions(+)
+> 
+> diff --git a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
+> index 562247bced49..d798ebe218b2 100644
+> --- a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
+> +++ b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
+> @@ -1298,6 +1298,44 @@ static struct omap_hwmod dra7xx_mcspi4_hwmod = {
+>  };
+>  
+>  /*
+> + * 'mcasp' class
+> + *
+> + */
+> +static struct omap_hwmod_class_sysconfig dra7xx_mcasp_sysc = {
+> +	.sysc_offs	= 0x0004,
+> +	.sysc_flags	= SYSC_HAS_SIDLEMODE,
+> +	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART),
+> +	.sysc_fields	= &omap_hwmod_sysc_type3,
+> +};
+> +
+> +static struct omap_hwmod_class dra7xx_mcasp_hwmod_class = {
+> +	.name	= "mcasp",
+> +	.sysc	= &dra7xx_mcasp_sysc,
+> +};
+> +
+> +/* mcasp3 */
+> +static struct omap_hwmod_opt_clk mcasp3_opt_clks[] = {
+> +	{ .role = "ahclkx", .clk = "mcasp3_ahclkx_mux" },
+> +};
+> +
+> +static struct omap_hwmod dra7xx_mcasp3_hwmod = {
+> +	.name		= "mcasp3",
+> +	.class		= &dra7xx_mcasp_hwmod_class,
+> +	.clkdm_name	= "l4per2_clkdm",
+> +	.main_clk	= "mcasp3_aux_gfclk_mux",
+> +	.flags		= HWMOD_OPT_CLKS_NEEDED,
+> +	.prcm = {
+> +		.omap4 = {
+> +			.clkctrl_offs = DRA7XX_CM_L4PER2_MCASP3_CLKCTRL_OFFSET,
+> +			.context_offs = DRA7XX_RM_L4PER2_MCASP3_CONTEXT_OFFSET,
+> +			.modulemode   = MODULEMODE_SWCTRL,
+> +		},
+> +	},
+> +	.opt_clks	= mcasp3_opt_clks,
+> +	.opt_clks_cnt	= ARRAY_SIZE(mcasp3_opt_clks),
+> +};
+> +
+> +/*
+>   * 'mmc' class
+>   *
+>   */
+> @@ -2566,6 +2604,22 @@ static struct omap_hwmod_ocp_if dra7xx_l3_main_1__hdmi = {
+>  	.user		= OCP_USER_MPU | OCP_USER_SDMA,
+>  };
+>  
+> +/* l4_per2 -> mcasp3 */
+> +static struct omap_hwmod_ocp_if dra7xx_l4_per2__mcasp3 = {
+> +	.master		= &dra7xx_l4_per2_hwmod,
+> +	.slave		= &dra7xx_mcasp3_hwmod,
+> +	.clk		= "l4_root_clk_div",
+> +	.user		= OCP_USER_MPU | OCP_USER_SDMA,
+> +};
+> +
+> +/* l3_main_1 -> mcasp3 */
+> +static struct omap_hwmod_ocp_if dra7xx_l3_main_1__mcasp3 = {
+> +	.master		= &dra7xx_l3_main_1_hwmod,
+> +	.slave		= &dra7xx_mcasp3_hwmod,
+> +	.clk		= "l3_iclk_div",
+> +	.user		= OCP_USER_MPU | OCP_USER_SDMA,
+> +};
+> +
+>  static struct omap_hwmod_addr_space dra7xx_elm_addrs[] = {
+>  	{
+>  		.pa_start	= 0x48078000,
+> @@ -3338,6 +3392,8 @@ static struct omap_hwmod_ocp_if *dra7xx_hwmod_ocp_ifs[] __initdata = {
+>  	&dra7xx_l4_wkup__dcan1,
+>  	&dra7xx_l4_per2__dcan2,
+>  	&dra7xx_l4_per2__cpgmac0,
+> +	&dra7xx_l4_per2__mcasp3,
+> +	&dra7xx_l3_main_1__mcasp3,
+>  	&dra7xx_gmac__mdio,
+>  	&dra7xx_l4_cfg__dma_system,
+>  	&dra7xx_l3_main_1__dss,
+> -- 
+> 2.6.1
+> 
