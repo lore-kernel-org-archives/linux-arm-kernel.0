@@ -1,85 +1,40 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 11 Nov 2015 14:22:36 -0600
-Subject: [RFC PATCH v1 2/2] dt-bindings: add document for Innosilicon
- HDMI on Rockchip platform
-In-Reply-To: <1447228052-4897-1-git-send-email-ykk@rock-chips.com>
-References: <1447227952-4787-1-git-send-email-ykk@rock-chips.com>
- <1447228052-4897-1-git-send-email-ykk@rock-chips.com>
-Message-ID: <20151111202236.GA5629@rob-hp-laptop>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 11 Nov 2015 21:22:35 +0100
+Subject: PCIe host controller behind IOMMU on ARM
+In-Reply-To: <20151111182456.GV963@e106497-lin.cambridge.arm.com>
+References: <PS1PR06MB11807CBE8EB2AC6B0158D2B5F52A0@PS1PR06MB1180.apcprd06.prod.outlook.com>
+ <PS1PR06MB11806B65D3408BDFBEAD9D3AF5150@PS1PR06MB1180.apcprd06.prod.outlook.com>
+ <20151111182456.GV963@e106497-lin.cambridge.arm.com>
+Message-ID: <4372968.dQOnUSIksK@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 11, 2015 at 03:47:32PM +0800, Yakir Yang wrote:
-> Signed-off-by: Yakir Yang <ykk@rock-chips.com>
+On Wednesday 11 November 2015 18:24:56 Liviu.Dudau at arm.com wrote:
+> 
+> > Somewhat related to this, since our PCIe controller HW is limited to
+> > 32-bit AXI address range, before trying to hook up the IOMMU I have
+> > tried to limit the dma_mask for PCI cards to DMA_BIT_MASK(32). The
+> > reason being that Linux uses a 1 to 1 mapping between PCI addresses
+> > and cpu (phys) addresses when there isn't an IOMMU involved, so I
+> > think that we need to limit the PCI address space used.
+> 
+> I think you're mixing things a bit or not explaining them very well. Having the
+> PCIe controller limited to 32-bit AXI does not mean that the PCIe bus cannot
+> carry 64-bit addresses. It depends on how they get translated by the host bridge
+> or its associated ATS block. I can't see why you can't have a setup where
+> the CPU addresses are 32-bit but the PCIe bus addresses are all 64-bit.
+> You just have to be careful on how you setup your mem64 ranges so that they don't
+> overlap with the 32-bit ranges when translated.
+> 
+> And no, you should not limit at the card driver the DMA_BIT_MASK() unless the
+> card is not capable of supporting more than 32-bit addresses.
 
-Acked-by: Rob Herring <robh@kernel.org>
+I think we are missing one crucial bit of infrastructure on ARM64 at
+the moment: the dma_set_mask() function should fail if a driver asks
+for a mask that is larger than the dma-ranges property of the parent
+device (or any device higher up in the hierarchy) allows.
 
-> ---
->  .../display/rockchip/inno_hdmi-rockchip.txt        | 50 ++++++++++++++++++++++
->  1 file changed, 50 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/display/rockchip/inno_hdmi-rockchip.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/display/rockchip/inno_hdmi-rockchip.txt b/Documentation/devicetree/bindings/display/rockchip/inno_hdmi-rockchip.txt
-> new file mode 100644
-> index 0000000..1898408
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/display/rockchip/inno_hdmi-rockchip.txt
-> @@ -0,0 +1,50 @@
-> +Rockchip specific extensions to the Innosilicon HDMI
-> +================================
-> +
-> +Required properties:
-> +- compatible:
-> +	"rockchip,rk3036-dw-hdmi";
-> +- reg:
-> +	Physical base address and length of the controller's registers.
-> +- clocks, clock-names:
-> +	Phandle to hdmi controller clock, name should be "pclk"
-> +- interrupts:
-> +	HDMI interrupt number
-> +- ports:
-> +	Contain one port node with endpoint definitions as defined in
-> +	Documentation/devicetree/bindings/graph.txt.
-> +- pinctrl-0, pinctrl-name:
-> +	Switch the iomux of HPD/CEC pins to HDMI function.
-> +
-> +Example:
-> +hdmi: hdmi at 20034000 {
-> +	compatible = "rockchip,rk3036-inno-hdmi";
-> +	reg = <0x20034000 0x4000>;
-> +	interrupts = <GIC_SPI 45 IRQ_TYPE_LEVEL_HIGH>;
-> +	clocks = <&cru  PCLK_HDMI>;
-> +	clock-names = "pclk";
-> +	pinctrl-names = "default";
-> +	pinctrl-0 = <&hdmi_ctl>;
-> +	status = "disabled";
-> +
-> +	hdmi_in: port {
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +		hdmi_in_lcdc: endpoint at 0 {
-> +			reg = <0>;
-> +			remote-endpoint = <&lcdc_out_hdmi>;
-> +		};
-> +	};
-> +};
-> +
-> +&pinctrl {
-> +	hdmi {
-> +		hdmi_ctl: hdmi-ctl {
-> +			rockchip,pins = <1 8  RK_FUNC_1 &pcfg_pull_none>,
-> +					<1 9  RK_FUNC_1 &pcfg_pull_none>,
-> +					<1 10 RK_FUNC_1 &pcfg_pull_none>,
-> +					<1 11 RK_FUNC_1 &pcfg_pull_none>;
-> +		};
-> +	};
-> +
-> +};
-> -- 
-> 1.9.1
-> 
-> 
-> _______________________________________________
-> dri-devel mailing list
-> dri-devel at lists.freedesktop.org
-> http://lists.freedesktop.org/mailman/listinfo/dri-devel
+Drivers that want a larger mask should try that first, and then fall
+back to a 32-bit mask, which is guaranteed to work.
+
+	Arnd
