@@ -1,45 +1,55 @@
-From: yang.shi@linaro.org (Shi, Yang)
-Date: Tue, 10 Nov 2015 16:53:28 -0800
-Subject: Failed to build arm64 bpf samples with LLVM 3.7 on 4.3 kernel
-In-Reply-To: <20151111004716.GB47378@ast-mbp.thefacebook.com>
-References: <564244B6.9050202@linaro.org>
- <CAADnVQJ+4maNAbMgTwJAHka0jX8ut5v9Nxh=4tOnhJdAbOm2hQ@mail.gmail.com>
- <56427972.5000004@linaro.org>
- <20151111004716.GB47378@ast-mbp.thefacebook.com>
-Message-ID: <56429188.5040602@linaro.org>
+From: mark.yao@rock-chips.com (Mark yao)
+Date: Wed, 11 Nov 2015 08:56:51 +0800
+Subject: [GIT PULL] drm/rockchip: fixes
+Message-ID: <56429253.6050107@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/10/2015 4:47 PM, Alexei Starovoitov wrote:
-> On Tue, Nov 10, 2015 at 03:10:42PM -0800, Shi, Yang wrote:
->>
->>> Try hacking it by adding #define __ASM_SYSREG_H to prevent inclusion
->>> of that file? all those asms are unused anyway.
->>> tracing samples include kernel headers to have exact struct layout.
->>> and #include skbuff.h can be removed from almost all samples.
->>> In-kernel 'struct sk_buff' only used inside tracex1_kern.c
->>
->> The below change works:
->>
->>          clang $(NOSTDINC_FLAGS) $(LINUXINCLUDE) $(EXTRA_CFLAGS) \
->> -               -D__KERNEL__ -Wno-unused-value -Wno-pointer-sign \
->> +               -D__KERNEL__ -D__ASM_SYSREG_H -Wno-unused-value
->> -Wno-pointer-sign \
->>                  -O2 -emit-llvm -c $< -o -| $(LLC) -march=bpf -filetype=obj
->> -o $@
->>
->> Is it ok for upstream too?
->
-> It's fragile and ugly, but I don't see a cleaner way for arm64,
-> so yes, please submit it officially.
+Hi Dave
+      Here are some fixes for drm/rockchip:
+         drm/rockchip can't work now, we need the patch
+                 Revert "drm/rockchip: Convert the probe function to the 
+generic drm_of_component_probe()"
+         and other three fixes are also needed.
 
-Yes, but anyway I could add some comment to explain the workaround. If 
-anyone else run into such issue in the future, at least they could know 
-how to workaround it.
+      I'd like you can land them.
 
-Thanks,
-Yang
+The following changes since commit 
+816d2206f0f9953ca854e4ff1a2749a5cbd62715:
 
->
-> Thanks!
->
+   Merge tag 'drm-intel-next-fixes-2015-11-06' of 
+git://anongit.freedesktop.org/drm-intel into drm-next (2015-11-07 
+17:16:59 +1000)
+
+are available in the git repository at:
+
+
+https://github.com/markyzq/kernel-drm-rockchip.git drm-rockchip-2015-11-11
+
+for you to fetch changes up to 55ac58b5d27a35b8caaa9bd07eb1d2899473130c:
+
+   drm/rockchip: vop: fix window origin calculation (2015-11-11 08:36:18 
++0800)
+
+----------------------------------------------------------------
+Dominik Behr (1):
+       drm/rockchip: vop: fix window origin calculation
+
+Heiko Stuebner (1):
+       drm/rockchip: unset pgoff when mmap'ing gems
+
+Mark Yao (1):
+       Revert "drm/rockchip: Convert the probe function to the generic 
+drm_of_component_probe()"
+
+Sjoerd Simons (1):
+       drm/rockchip: vop: Correct enabled clocks during setup
+
+  drivers/gpu/drm/rockchip/rockchip_drm_drv.c |   81 
++++++++++++++++++++++++++--
+  drivers/gpu/drm/rockchip/rockchip_drm_gem.c |    1 +
+  drivers/gpu/drm/rockchip/rockchip_drm_vop.c |   40 ++++++-------
+  3 files changed, 92 insertions(+), 30 deletions(-)
+
+-- 
+?ark Yao
