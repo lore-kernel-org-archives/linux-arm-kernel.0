@@ -1,35 +1,78 @@
-From: chris.brandt@renesas.com (Chris Brandt)
-Date: Wed, 11 Nov 2015 09:31:09 -0500
-Subject: [PATCH] ARM: xip: Fix module loading
-Message-ID: <1447252269-22864-1-git-send-email-chris.brandt@renesas.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Wed, 11 Nov 2015 14:54:16 +0000
+Subject: [PATCH] iommu/dma: Map scatterlists more parsimoniously
+Message-ID: <104b4682056bc5b4aa0afadd39196c03fc06555d.1447249098.git.robin.murphy@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For an XIP kernel, RAM start at _sdata instead of _stext. This fixes an
-issue where when you load a module, vmalloc would return virtual memory
-that the MMU has incorrectly mapped to non-RAM physical addresses.
-This fix is similar to what is already done in arm_memblock_init().
+Whilst blindly assuming the worst case for segment boundaries and
+aligning every segment individually is safe from the point of view
+of respecting the device's parameters, it is also undeniably a waste
+of IOVA space. Futhermore, the knock-on effects of more pages than
+necessary being exposed to device access, additional overhead in page
+table updates and TLB invalidations, etc., are even more undesirable.
 
-Signed-off-by: Chris Brandt <chris.brandt@renesas.com>
+Improve matters by taking the actual boundary mask into account to
+actively detect the cases in which we really do need to adjust a
+segment, and avoid wasting space in the remainder.
+
+Signed-off-by: Robin Murphy <robin.murphy@arm.com>
 ---
- arch/arm/mm/mmu.c |    4 ++++
- 1 file changed, 4 insertions(+)
 
-diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-index dd5a56b..d60cb8c 100644
---- a/arch/arm/mm/mmu.c
-+++ b/arch/arm/mm/mmu.c
-@@ -1383,7 +1383,11 @@ static void __init kmap_init(void)
- static void __init map_lowmem(void)
- {
- 	struct memblock_region *reg;
-+#ifdef CONFIG_XIP_KERNEL
-+	phys_addr_t kernel_x_start = round_down(__pa(_sdata), SECTION_SIZE);
-+#else
- 	phys_addr_t kernel_x_start = round_down(__pa(_stext), SECTION_SIZE);
-+#endif
- 	phys_addr_t kernel_x_end = round_up(__pa(__init_end), SECTION_SIZE);
+Hi all,
+
+I've given this some brief testing on Juno with USB and (via magic
+PCI hacks) SATA to confirm that all the +1s and -1s at least seem to
+be in the right places, so I'm throwing it out now for a head-start on
+checking whether it also helps the media folks with the v4l portability
+issues they're up against (I'm confident it should). If all goes well I
+figure I'll repost next week based on rc1 instead of some random local
+development commit.
+
+Robin.
+
+ drivers/iommu/dma-iommu.c | 19 +++++++++++--------
+ 1 file changed, 11 insertions(+), 8 deletions(-)
+
+diff --git a/drivers/iommu/dma-iommu.c b/drivers/iommu/dma-iommu.c
+index 3a20db4..821ebc4 100644
+--- a/drivers/iommu/dma-iommu.c
++++ b/drivers/iommu/dma-iommu.c
+@@ -441,6 +441,7 @@ int iommu_dma_map_sg(struct device *dev, struct scatterlist *sg,
+ 	struct scatterlist *s, *prev = NULL;
+ 	dma_addr_t dma_addr;
+ 	size_t iova_len = 0;
++	unsigned long mask = dma_get_seg_boundary(dev);
+ 	int i;
  
- 	/* Map all the lowmem memory banks. */
+ 	/*
+@@ -460,17 +461,19 @@ int iommu_dma_map_sg(struct device *dev, struct scatterlist *sg,
+ 		s->length = s_length;
+ 
+ 		/*
+-		 * The simple way to avoid the rare case of a segment
+-		 * crossing the boundary mask is to pad the previous one
+-		 * to end at a naturally-aligned IOVA for this one's size,
+-		 * at the cost of potentially over-allocating a little.
++		 * With a single size-aligned IOVA allocation, no segment risks
++		 * crossing the boundary mask unless the total size exceeds
++		 * the mask itself. The simple way to maintain alignment when
++		 * that does happen is to pad the previous segment to end at the
++		 * next boundary, at the cost of over-allocating a little.
+ 		 */
+ 		if (prev) {
+-			size_t pad_len = roundup_pow_of_two(s_length);
++			size_t pad_len = (mask - iova_len + 1) & mask;
+ 
+-			pad_len = (pad_len - iova_len) & (pad_len - 1);
+-			prev->length += pad_len;
+-			iova_len += pad_len;
++			if (pad_len && pad_len < s_length - 1) {
++				prev->length += pad_len;
++				iova_len += pad_len;
++			}
+ 		}
+ 
+ 		iova_len += s_length;
 -- 
-1.7.9.5
+1.9.1
