@@ -1,44 +1,43 @@
-From: wxt@rock-chips.com (Caesar Wang)
-Date: Wed, 11 Nov 2015 15:34:31 +0800
-Subject: [PATCH 4/4] ARM: dts: rockchip: add eFuse node for rk3188 SoCs
-In-Reply-To: <1447227272-1728-1-git-send-email-wxt@rock-chips.com>
-References: <1447227272-1728-1-git-send-email-wxt@rock-chips.com>
-Message-ID: <1447227272-1728-5-git-send-email-wxt@rock-chips.com>
+From: ykk@rock-chips.com (Yakir Yang)
+Date: Wed, 11 Nov 2015 15:45:52 +0800
+Subject: [RFC PATCH v1 0/2] Introduce Innosilicon HDMI driver on Rockchip
+ platforms
+Message-ID: <1447227952-4787-1-git-send-email-ykk@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch add the eFuse dt node for rk3188 SoCs.
+Hi guys:
 
-Signed-off-by: Caesar Wang <wxt@rock-chips.com>
+Here are a brief introduction to Innosilicon HDMI IP:
+ - Support HDMI 1.4a, HDCP 1.2 and DVI 1.0 standard compliant transmitter
+ - Support HDMI1.4 a/b 3D function defined in HDMI 1.4 a/b spec
+ - Digital video interface supports a pixel size of 24, 30, 36, 48bits color
+   depth in RGB
+ - S/PDIF output supports PCM, Dolby Digital, DTS digital audio transmission
+   (32-192kHz Fs) using IEC60958 and IEC 61937
+ - The EDID and CEC function are also supported by Innosilicon HDMI Transmitter
+   Controlle
 
----
+This IP have been integrated on some Rockchip CPUs (like RK3036/RK312x), due
+to those CPUs haven't been landed on manline kernel, so I creat a branch to
+verify this series [https://github.com/rockchip-linux/kernel].
 
- arch/arm/boot/dts/rk3188.dtsi | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
+- Yakir
 
-diff --git a/arch/arm/boot/dts/rk3188.dtsi b/arch/arm/boot/dts/rk3188.dtsi
-index 6399942..b01ef45 100644
---- a/arch/arm/boot/dts/rk3188.dtsi
-+++ b/arch/arm/boot/dts/rk3188.dtsi
-@@ -144,6 +144,19 @@
- 		#reset-cells = <1>;
- 	};
- 
-+	efuse: efuse at 20010000 {
-+		compatible = "rockchip,rockchip-efuse";
-+		reg = <0x20010000 0x4000>;
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		clocks = <&cru PCLK_EFUSE>;
-+		clock-names = "pclk_efuse";
-+
-+		cpu_leakage: cpu_leakage {
-+			reg = <0x17 0x1>;
-+		};
-+	};
-+
- 	usbphy: phy {
- 		compatible = "rockchip,rk3188-usb-phy", "rockchip,rk3288-usb-phy";
- 		rockchip,grf = <&grf>;
+
+Yakir Yang (2):
+  drm: rockchip/hdmi: add Innosilicon HDMI support
+  dt-bindings: add document for Innosilicon HDMI on Rockchip platform
+
+ .../display/rockchip/inno_hdmi-rockchip.txt        |   50 +
+ drivers/gpu/drm/rockchip/Kconfig                   |    8 +
+ drivers/gpu/drm/rockchip/Makefile                  |    1 +
+ drivers/gpu/drm/rockchip/inno_hdmi.c               | 1008 ++++++++++++++++++++
+ drivers/gpu/drm/rockchip/inno_hdmi.h               |  364 +++++++
+ 5 files changed, 1431 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/display/rockchip/inno_hdmi-rockchip.txt
+ create mode 100644 drivers/gpu/drm/rockchip/inno_hdmi.c
+ create mode 100644 drivers/gpu/drm/rockchip/inno_hdmi.h
+
 -- 
 1.9.1
