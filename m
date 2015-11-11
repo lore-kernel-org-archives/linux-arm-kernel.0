@@ -1,64 +1,63 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Tue, 10 Nov 2015 19:15:52 -0800
-Subject: [PATCH 07/10] mtd: factor out v1 partition parsing
-In-Reply-To: <1444914533-27782-8-git-send-email-linus.walleij@linaro.org>
-References: <1444914533-27782-1-git-send-email-linus.walleij@linaro.org>
- <1444914533-27782-8-git-send-email-linus.walleij@linaro.org>
-Message-ID: <20151111031552.GY12143@google.com>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Wed, 11 Nov 2015 12:16:27 +0900
+Subject: How to implement common clk in multi function controller?
+Message-ID: <CAK7LNASM+tJpd-kBHGHe7TXWm4i-UEfbq7T3dn99p2fKFwtxAA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi.
 
-On Thu, Oct 15, 2015 at 03:08:50PM +0200, Linus Walleij wrote:
-> This breaks out the parsing of v1 partitions so we can later add
-> a v2 partition parser.
-> 
-> Cc: Ryan Harkin <ryan.harkin@linaro.org>
-> Cc: Liviu Dudau <liviu.dudau@arm.com>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
->  drivers/mtd/afs.c | 88 +++++++++++++++++++++++++++++++------------------------
->  1 file changed, 50 insertions(+), 38 deletions(-)
-> 
-> diff --git a/drivers/mtd/afs.c b/drivers/mtd/afs.c
-> index 2307f54195f5..ace27f447abc 100644
-> --- a/drivers/mtd/afs.c
-> +++ b/drivers/mtd/afs.c
-> @@ -181,14 +181,18 @@ afs_read_iis_v1(struct mtd_info *mtd, struct image_info_v1 *iis, u_int ptr)
->  	return ret;
->  }
->  
-> -static int parse_afs_partitions(struct mtd_info *mtd,
-> -				struct mtd_partition **pparts,
-> -				struct mtd_part_parser_data *data)
-> +static int afs_parse_v1_partition(struct mtd_info *mtd,
-> +				  u_int off, struct mtd_partition *part)
->  {
-> -	struct mtd_partition *parts;
-> -	u_int mask, off, sz;
-> -	int ret = 0;
-> -	int i;
-> +	struct image_info_v1 iis;
-> +	u_int mask;
-> +	/*
-> +	 * Static checks cannot see that we bail out if we have an error
-> +	 * reading the footer.
-> +	 */
-> +	u_int uninitialized_var(iis_ptr);
-> +	u_int uninitialized_var(img_ptr);
+I am implementing clk and reset drivers for my SoCs.
+(drivers/clk/uniphier/* and drivers/reset/uniphier/*)
 
-What's this uninitialized_var() stuff about? These variables seem to
-clearly be initialized before use. Did this hang around from some
-preliminary code that got refactored?
 
-> +	int ret;
->  
->  	/*
->  	 * This is the address mask; we use this to mask off out of
+In my SoCs, one hardware block contains various
+registers for both clock and reset controlling.
+(so, it is like a MFD system controller device).
+I think it is a common case.
 
-...
 
-Otherwise, looks OK.
+I am guessing my device tree would be like follows:
+(one syscon device contains clk and rst devices under it)
 
-Brian
+syscon {
+     compatible = "socionext,uniphier-syscon",
+                 "syscon", "simple-mfd";
+     reg = <...   ...>;
+
+     clk_ctrl {
+            .compatible = "socionext,uniphier-clkctrl";
+            #clock-cells = <1>;
+     };
+
+     rst_ctrl {
+             .compatible = "socionext,uniphier-rstctrl";
+             #reset-cells = <1>;
+     };
+};
+
+
+
+One problem I noticed was,
+we are supposed to use regmap for register access
+if we use syscon.
+
+OTOH, common clk APIs such as clk-gate, clk-divider
+expect simple register access via writel()/readl().
+
+Is it a good idea to expand such APIs to regmap?
+
+
+Of course, I could my own uniphier/clk-gate.c
+to use regmap as other SoCs do.
+
+But, I think regmap is general demand, so
+I am wondering if it could be supported in common parts.
+
+Or, any other good solution exists?
+
+
+
+-- 
+Best Regards
+Masahiro Yamada
