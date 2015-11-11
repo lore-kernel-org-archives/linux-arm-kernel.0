@@ -1,51 +1,30 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Wed, 11 Nov 2015 13:39:00 -0800
-Subject: [PATCH v6 3/3] arm64: dts: mt8173: Add nor flash node
-In-Reply-To: <1446824889-16144-4-git-send-email-bayi.cheng@mediatek.com>
-References: <1446824889-16144-1-git-send-email-bayi.cheng@mediatek.com>
- <1446824889-16144-4-git-send-email-bayi.cheng@mediatek.com>
-Message-ID: <20151111213900.GK12143@google.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 11 Nov 2015 13:40:44 -0800
+Subject: [PATCH] ARM: OMAP: DRA7: hwmod: Add data for McASP3
+In-Reply-To: <alpine.DEB.2.02.1511112022100.24530@utopia.booyaka.com>
+References: <1447261631-26362-1-git-send-email-balbi@ti.com>
+ <56439641.6070901@ti.com>
+ <alpine.DEB.2.02.1511112022100.24530@utopia.booyaka.com>
+Message-ID: <20151111214043.GI3218@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 06, 2015 at 11:48:09PM +0800, Bayi Cheng wrote:
-> Add Mediatek nor flash node
+* Paul Walmsley <paul@pwsan.com> [151111 12:23]:
+> On Wed, 11 Nov 2015, Peter Ujfalusi wrote:
 > 
-> Signed-off-by: Bayi Cheng <bayi.cheng@mediatek.com>
+> > On 11/11/2015 07:07 PM, Felipe Balbi wrote:
+> > > From: Peter Ujfalusi <peter.ujfalusi@ti.com>
+> > > 
+> > > McASP3 is used by default on DRA7x based boards for audio.
+> > 
+> > While this patch works, it is not the correct one(s) to apply.
+> > https://lkml.org/lkml/2015/10/30/91
+> > is the series which should have been applied to 4.4.
+> > Paul acked the series, but for some reason it missed the initial ARM pull for 4.4
+> 
+> It missed it because I was late getting my patches out for 4.4...
 
-Acked-by: Brian Norris <computersforpeace@gmail.com>
+OK applying all three as fixes with your ack like you requested
+in the original thread.
 
-> ---
->  arch/arm64/boot/dts/mediatek/mt8173.dtsi | 16 ++++++++++++++++
->  1 file changed, 16 insertions(+)
-> 
-> diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-> index d18ee42..f5f08eb 100644
-> --- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-> +++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-> @@ -365,6 +365,22 @@
->  			status = "disabled";
->  		};
->  
-> +		nor_flash: spi at 1100d000 {
-> +			compatible = "mediatek,mt8173-nor";
-> +			reg = <0 0x1100d000 0 0xe0>;
-> +			clocks = <&pericfg CLK_PERI_SPI>,
-> +				 <&topckgen CLK_TOP_SPINFI_IFR_SEL>;
-> +			clock-names = "spi", "sf";
-> +			#address-cells = <1>;
-> +			#size-cells = <0>;
-> +			status = "disabled";
-> +
-> +			flash at 0 {
-> +				compatible = "jedec,spi-nor";
-> +				reg = <0>;
-> +			};
-> +		};
-> +
->  		i2c3: i2c3 at 11010000 {
->  			compatible = "mediatek,mt8173-i2c";
->  			reg = <0 0x11010000 0 0x70>,
-> -- 
-> 1.8.1.1.dirty
-> 
+Tony
