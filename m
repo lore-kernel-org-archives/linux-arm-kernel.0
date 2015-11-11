@@ -1,63 +1,32 @@
-From: mark.yao@rock-chips.com (Mark yao)
-Date: Wed, 11 Nov 2015 08:30:19 +0800
-Subject: [PATCH] drm/rockchip: vop: fix window origin calculation
-In-Reply-To: <2130118.giXtpUm1Fo@phil>
-References: <1447149550-18595-1-git-send-email-mark.yao@rock-chips.com>
- <2130118.giXtpUm1Fo@phil>
-Message-ID: <56428C1B.5000405@rock-chips.com>
+From: alexei.starovoitov@gmail.com (Alexei Starovoitov)
+Date: Tue, 10 Nov 2015 16:42:09 -0800
+Subject: [PATCH 2/2] arm64: bpf: add BPF XADD instruction
+In-Reply-To: <56428B1A.5090303@linaro.org>
+References: <1447195301-16757-1-git-send-email-yang.shi@linaro.org>
+ <1447195301-16757-3-git-send-email-yang.shi@linaro.org>
+ <1447200535.17135.88.camel@edumazet-glaptop2.roam.corp.google.com>
+ <56428B1A.5090303@linaro.org>
+Message-ID: <20151111004208.GA47378@ast-mbp.thefacebook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015?11?10? 22:57, Heiko Stuebner wrote:
-> Am Dienstag, 10. November 2015, 17:59:10 schrieb Mark Yao:
->> From: Dominik Behr <dbehr@chromium.org>
->>
->> VOP_WINx_DSP_ST does not require subtracting 1 from the values written to
->> it. It actually causes the screen to be shifted by one pixel.
->>
->> Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
-> One thing I noticed, the original patch [0] had a Signed-off from
-> Dominik already and you should keep that as he is the author, and then
-> add your Signed-off below that, as you are the submitter,
->
-> So it would look like:
->
-> Signed-off-by: Dominik Behr <dbehr@chromium.org>
-> Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
->
->
-> That may not need a repost, but should probably be corrected when applying
-> the patch.
->
-> Heiko
->
-> [0] https://chromium-review.googlesource.com/#/c/233251/
->
-Got it, thanks.
->> ---
->>   drivers/gpu/drm/rockchip/rockchip_drm_vop.c |    4 ++--
->>   1 file changed, 2 insertions(+), 2 deletions(-)
->>
->> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
->> index 48719df..4730ae4 100644
->> --- a/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
->> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_vop.c
->> @@ -959,8 +959,8 @@ static int vop_update_plane_event(struct drm_plane *plane,
->>   	val = (dest.y2 - dest.y1 - 1) << 16;
->>   	val |= (dest.x2 - dest.x1 - 1) & 0xffff;
->>   	VOP_WIN_SET(vop, win, dsp_info, val);
->> -	val = (dsp_sty - 1) << 16;
->> -	val |= (dsp_stx - 1) & 0xffff;
->> +	val = dsp_sty << 16;
->> +	val |= dsp_stx & 0xffff;
->>   	VOP_WIN_SET(vop, win, dsp_st, val);
->>   	VOP_WIN_SET(vop, win, rb_swap, rb_swap);
->>   
->>
->
->
->
+On Tue, Nov 10, 2015 at 04:26:02PM -0800, Shi, Yang wrote:
+> On 11/10/2015 4:08 PM, Eric Dumazet wrote:
+> >On Tue, 2015-11-10 at 14:41 -0800, Yang Shi wrote:
+> >>aarch64 doesn't have native support for XADD instruction, implement it by
+> >>the below instruction sequence:
+> >>
+> >>Load (dst + off) to a register
+> >>Add src to it
+> >>Store it back to (dst + off)
+> >
+> >Not really what is needed ?
+> >
+> >See this BPF_XADD as an atomic_add() equivalent.
+> 
+> I see. Thanks. The documentation doesn't say too much about "exclusive" add.
+> If so it should need load-acquire/store-release.
 
-
--- 
-?ark Yao
+I think doc is clear enough, but it can always be improved. Pls suggest a patch.
+It's quite hard to write a test for atomicity in test_bpf framework, so
+code review is the key. Eric, thanks for catching it!
