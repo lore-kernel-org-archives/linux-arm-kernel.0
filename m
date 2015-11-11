@@ -1,280 +1,209 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Tue, 10 Nov 2015 19:20:05 -0800
-Subject: [PATCH 10/10] mtd: afs: add v2 partition parsing
-In-Reply-To: <1444914533-27782-11-git-send-email-linus.walleij@linaro.org>
-References: <1444914533-27782-1-git-send-email-linus.walleij@linaro.org>
- <1444914533-27782-11-git-send-email-linus.walleij@linaro.org>
-Message-ID: <20151111032005.GA12143@google.com>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Wed, 11 Nov 2015 13:54:37 +0900
+Subject: [PATCH v5 4/6] arm64: insn: add instruction decoders for ldp/stp
+ and add/sub
+In-Reply-To: <999DB062-D4C8-4050-ADF7-9C6CEEC0BF73@gmail.com>
+References: <1446792285-1154-1-git-send-email-takahiro.akashi@linaro.org>
+ <1446792285-1154-5-git-send-email-takahiro.akashi@linaro.org>
+ <999DB062-D4C8-4050-ADF7-9C6CEEC0BF73@gmail.com>
+Message-ID: <5642CA0D.9080708@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On 11/10/2015 10:40 PM, Jungseok Lee wrote:
+> On Nov 6, 2015, at 3:44 PM, AKASHI Takahiro wrote:
+>> A function prologue analyzer is a requisite for implementing stack tracer
+>> and getting better views of stack usages on arm64.
+>> To implement a function prologue analyzer, we have to be able to decode,
+>> at least, stp, add, sub and mov instructions.
+>>
+>> This patch adds decoders for those instructions, that are used solely
+>> by stack tracer for now, but generic enough for other uses.
+>>
+>> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+>> ---
+>> arch/arm64/include/asm/insn.h |   18 ++++++++
+>> arch/arm64/kernel/insn.c      |  102 +++++++++++++++++++++++++++++++++++++++++
+>> 2 files changed, 120 insertions(+)
+>>
+>> diff --git a/arch/arm64/include/asm/insn.h b/arch/arm64/include/asm/insn.h
+>> index 30e50eb..8d5c538 100644
+>> --- a/arch/arm64/include/asm/insn.h
+>> +++ b/arch/arm64/include/asm/insn.h
+>> @@ -165,6 +165,8 @@ enum aarch64_insn_ldst_type {
+>> 	AARCH64_INSN_LDST_STORE_PAIR_PRE_INDEX,
+>> 	AARCH64_INSN_LDST_LOAD_PAIR_POST_INDEX,
+>> 	AARCH64_INSN_LDST_STORE_PAIR_POST_INDEX,
+>> +	AARCH64_INSN_LDST_LOAD_PAIR,
+>> +	AARCH64_INSN_LDST_STORE_PAIR,
+>> };
+>>
+>> enum aarch64_insn_adsb_type {
+>> @@ -225,6 +227,8 @@ static __always_inline u32 aarch64_insn_get_##abbr##_value(void) \
+>>
+>> __AARCH64_INSN_FUNCS(str_reg,	0x3FE0EC00, 0x38206800)
+>> __AARCH64_INSN_FUNCS(ldr_reg,	0x3FE0EC00, 0x38606800)
+>> +__AARCH64_INSN_FUNCS(stp,	0x7FC00000, 0x29000000)
+>> +__AARCH64_INSN_FUNCS(ldp,	0x7FC00000, 0x29400000)
+>> __AARCH64_INSN_FUNCS(stp_post,	0x7FC00000, 0x28800000)
+>> __AARCH64_INSN_FUNCS(ldp_post,	0x7FC00000, 0x28C00000)
+>> __AARCH64_INSN_FUNCS(stp_pre,	0x7FC00000, 0x29800000)
+>> @@ -277,6 +281,7 @@ __AARCH64_INSN_FUNCS(hint,	0xFFFFF01F, 0xD503201F)
+>> __AARCH64_INSN_FUNCS(br,	0xFFFFFC1F, 0xD61F0000)
+>> __AARCH64_INSN_FUNCS(blr,	0xFFFFFC1F, 0xD63F0000)
+>> __AARCH64_INSN_FUNCS(ret,	0xFFFFFC1F, 0xD65F0000)
+>> +__AARCH64_INSN_FUNCS(eret,	0xFFFFFFFF, 0xD69F00E0)
+>
+> According to C4.2.7, the third argument looks like 0xD69F03E0. Rn field is 11111
+> in case of eret.
 
-Only reviewing part of this patch, as I gotta run now.
+Thanks. Fix it (c3.2.7 though).
 
-On Thu, Oct 15, 2015 at 03:08:53PM +0200, Linus Walleij wrote:
-> The AFS v2 partition type appear in later ARM reference designs
-> such as RealView, Versatile Express and the 64bit Juno Development
-> Platform.
-> 
-> The image informations is padded with a 32bit word (4 bytes) on
-> the 32bit platforms and a 64bit word (8 bytes) on the 64bit
-> platforms. The boot monitor source code gives at hand that this
-> is because the first entry in the struct mapped over the image
-> information is a "next" pointer for a linked list, filled in
-> by firmware after reading in the info block, and always zero
-> in the flash. We adjust padding by checking what padding gives
-> the right checksum.
-> 
-> This was tested on:
-> - Integrator/AP (v1 partitions)
-> - RealView PB11MPCore (v2 32bit partitions)
-> - Juno Development System (v2 64bit partitions)
-> 
-> All systems display the images in flash very nicely as separate
-> partitions, e.g on Juno:
-> 
-> 4 afs partitions found on MTD device 8000000.flash
-> Creating 4 MTD partitions on "8000000.flash":
-> 0x000000040000-0x0000000c0000 : "fip"
-> 0x000000ec0000-0x0000018c0000 : "Image"
-> 0x000000f00000-0x000000f40000 : "juno"
-> 0x000003ec0000-0x000003f00000 : "bl1"
-> 
-> Cc: Ryan Harkin <ryan.harkin@linaro.org>
-> Cc: Liviu Dudau <liviu.dudau@arm.com>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
->  drivers/mtd/afs.c | 158 +++++++++++++++++++++++++++++++++++++++++++++++++++++-
->  1 file changed, 157 insertions(+), 1 deletion(-)
-> 
-> diff --git a/drivers/mtd/afs.c b/drivers/mtd/afs.c
-> index 1ce6842c917c..e46b035bf4d2 100644
-> --- a/drivers/mtd/afs.c
-> +++ b/drivers/mtd/afs.c
-> @@ -3,6 +3,7 @@
->      drivers/mtd/afs.c: ARM Flash Layout/Partitioning
->  
->      Copyright ? 2000 ARM Limited
-> +    Copyright (C) 2015 Linus Walleij
+-Takahiro AKASHI
 
-The two copyright symbols don't match.
-
->  
->     This program is free software; you can redistribute it and/or modify
->     it under the terms of the GNU General Public License as published by
-> @@ -35,6 +36,8 @@
->  #include <linux/mtd/partitions.h>
->  
->  #define AFSV1_FOOTER_MAGIC 0xA0FFFF9F
-> +#define AFSV2_FOOTER_MAGIC1 0x464C5348 /* "FLSH" */
-> +#define AFSV2_FOOTER_MAGIC2 0x464F4F54 /* "FOOT" */
->  
->  struct footer_v1 {
->  	u32 image_info_base;	/* Address of first word of ImageFooter  */
-> @@ -68,6 +71,22 @@ static u32 word_sum(void *words, int num)
->  	return sum;
->  }
->  
-> +static u32 word_sum_v2(u32 *p, u32 num)
-> +{
-> +	u32 sum = 0;
-> +	int i;
-> +
-> +	for (i = 0; i < num; i++) {
-> +		u32 val;
-> +
-> +		val = p[i];
-> +		if (val > ~sum)
-> +			sum++;
-> +		sum += val;
-> +	}
-> +	return ~sum;
-> +}
-> +
->  static bool afs_is_v1(struct mtd_info *mtd, u_int off)
->  {
->  	/* The magic is 12 bytes from the end of the erase block */
-> @@ -88,6 +107,27 @@ static bool afs_is_v1(struct mtd_info *mtd, u_int off)
->  	return (magic == AFSV1_FOOTER_MAGIC);
->  }
->  
-> +static bool afs_is_v2(struct mtd_info *mtd, u_int off)
-> +{
-> +	/* The magic is the 8 last bytes of the erase block */
-> +	u_int ptr = off + mtd->erasesize - 8;
-> +	u32 foot[2];
-> +	size_t sz;
-> +	int ret;
-> +
-> +	ret = mtd_read(mtd, ptr, 8, &sz, (u_char *)foot);
-> +	if (ret < 0) {
-> +		printk(KERN_ERR "AFS: mtd read failed at 0x%x: %d\n",
-> +		       ptr, ret);
-> +		return false;
-> +	}
-> +	if (ret >= 0 && sz != 8)
-> +		return false;
-> +
-> +	return (foot[0] == AFSV2_FOOTER_MAGIC1 &&
-> +		foot[1] == AFSV2_FOOTER_MAGIC2);
-> +}
-> +
->  static int afs_parse_v1_partition(struct mtd_info *mtd,
->  				  u_int off, struct mtd_partition *part)
->  {
-> @@ -185,6 +225,113 @@ static int afs_parse_v1_partition(struct mtd_info *mtd,
->  	return 0;
->  }
->  
-> +static int afs_parse_v2_partition(struct mtd_info *mtd,
-> +				  u_int off, struct mtd_partition *part)
-> +{
-> +	u_int ptr;
-> +	u32 footer[12];
-> +	u32 imginfo[36];
-> +	char *name;
-> +	u32 version;
-> +	u32 entrypoint;
-> +	u32 attributes;
-> +	u32 region_count;
-> +	u32 block_start;
-> +	u32 block_end;
-> +	u32 crc;
-> +	size_t sz;
-> +	int ret;
-> +	int i;
-> +	int pad = 0;
-> +
-> +	pr_debug("Parsing v2 partition @%08x-%08x\n",
-> +		 off, off + mtd->erasesize);
-> +
-> +	/* First read the footer */
-> +	ptr = off + mtd->erasesize - sizeof(footer);
-> +	ret = mtd_read(mtd, ptr, sizeof(footer), &sz, (u_char *)footer);
-> +	if ((ret < 0) || (ret >= 0 && sz != sizeof(footer))) {
-> +		pr_err("AFS: mtd read failed at 0x%x: %d\n",
-> +		       ptr, ret);
-> +		return -EIO;
-> +	}
-> +	name = (char *) &footer[0];
-> +	version = footer[9];
-> +	ptr = off + mtd->erasesize - sizeof(footer) - footer[8];
-> +
-> +	pr_debug("found image \"%s\", version %08x, info @%08x\n",
-> +		 name, version, ptr);
-> +
-> +	/* Then read the image information */
-> +	ret = mtd_read(mtd, ptr, sizeof(imginfo), &sz, (u_char *)imginfo);
-> +	if ((ret < 0) || (ret >= 0 && sz != sizeof(imginfo))) {
-> +		pr_err("AFS: mtd read failed at 0x%x: %d\n",
-> +		       ptr, ret);
-> +		return -EIO;
-> +	}
-> +
-> +	/* 32bit platforms have 4 bytes padding */
-> +	crc = word_sum_v2(&imginfo[1], 34);
-> +	if (!crc) {
-> +		pr_debug("Padding 1 word (4 bytes)\n");
-> +		pad = 1;
-> +	} else {
-> +		/* 64bit platforms have 8 bytes padding */
-> +		crc = word_sum_v2(&imginfo[2], 34);
-> +		if (!crc) {
-> +			pr_debug("Padding 2 words (8 bytes)\n");
-> +			pad = 2;
-> +		}
-> +	}
-> +	if (crc) {
-> +		pr_err("AFS: bad checksum on v2 image info: %08x\n", crc);
-> +		return -EINVAL;
-> +	}
-> +	entrypoint = imginfo[pad];
-> +	attributes = imginfo[pad+1];
-> +	region_count = imginfo[pad+2];
-> +	block_start = imginfo[20];
-> +	block_end = imginfo[21];
-> +
-> +	pr_debug("image entry=%08x, attr=%08x, regions=%08x, "
-> +		 "bs=%08x, be=%08x\n",
-> +		 entrypoint, attributes, region_count,
-> +		 block_start, block_end);
-> +
-> +	for (i = 0; i < region_count; i++) {
-> +		u32 region_load_addr = imginfo[pad + 3 + i*4];
-> +		u32 region_size = imginfo[pad + 4 + i*4];
-> +		u32 region_offset = imginfo[pad + 5 + i*4];
-> +		u32 region_start;
-> +		u32 region_end;
-> +
-> +		pr_debug("  region %d: address: %08x, size: %08x, "
-> +			 "offset: %08x\n",
-> +			 i,
-> +			 region_load_addr,
-> +			 region_size,
-> +			 region_offset);
-> +
-> +		region_start = off + region_offset;
-> +		region_end = region_start + region_size;
-> +		/* Align partition to end of erase block */
-> +		region_end += (mtd->erasesize - 1);
-> +		region_end &= ~(mtd->erasesize -1);
-> +		pr_debug("   partition start = %08x, partition end = %08x\n",
-> +			 region_start, region_end);
-> +
-> +		/* Create one partition per region */
-> +		part->name = kstrdup(name, GFP_KERNEL);
-> +		if (!part->name)
-> +			return -ENOMEM;
-> +		part->offset = region_start;
-> +		part->size = region_end - region_start;
-> +		part->mask_flags = 0;
-> +	}
-> +
-> +	return 0;
-> +}
-> +
->  static int parse_afs_partitions(struct mtd_info *mtd,
->  				struct mtd_partition **pparts,
->  				struct mtd_part_parser_data *data)
-> @@ -200,6 +347,10 @@ static int parse_afs_partitions(struct mtd_info *mtd,
->  			sz += sizeof(struct mtd_partition);
->  			i += 1;
->  		}
-> +		if (afs_is_v2(mtd, off)) {
-> +			sz += sizeof(struct mtd_partition);
-> +			i += 1;
-> +		}
->  	}
->  
->  	if (!i)
-> @@ -213,13 +364,18 @@ static int parse_afs_partitions(struct mtd_info *mtd,
->  	 * Identify the partitions
->  	 */
->  	for (i = off = 0; off < mtd->size; off += mtd->erasesize) {
-> -
->  		if (afs_is_v1(mtd, off)) {
->  			ret = afs_parse_v1_partition(mtd, off, &parts[i]);
->  			if (ret)
->  				goto out_free_parts;
->  			i++;
->  		}
-> +		if (afs_is_v2(mtd, off)) {
-
-Do we really want to allow a single block to be counted as both v1 and
-v2? I'm not sure if that's possible given the data structure, but this
-seems like it should be an 'else if', to avoid unnecessary scanning.
-
-You also might save yourself a bit if you check for v2 first. Not a big
-deal but I thought I'd throw it out there.
-
-> +			ret = afs_parse_v2_partition(mtd, off, &parts[i]);
-> +			if (ret)
-> +				goto out_free_parts;
-> +			i++;
-> +		}
->  	}
->  
->  	*pparts = parts;
-
-Brian
+> Best Regards
+> Jungseok Lee
+>
+>> #undef	__AARCH64_INSN_FUNCS
+>>
+>> @@ -370,6 +375,19 @@ bool aarch32_insn_is_wide(u32 insn);
+>> u32 aarch32_insn_extract_reg_num(u32 insn, int offset);
+>> u32 aarch32_insn_mcr_extract_opc2(u32 insn);
+>> u32 aarch32_insn_mcr_extract_crm(u32 insn);
+>> +int aarch64_insn_decode_add_sub_imm(u32 insn,
+>> +				    enum aarch64_insn_register *dst,
+>> +				    enum aarch64_insn_register *src,
+>> +				    int *imm,
+>> +				    enum aarch64_insn_variant *variant,
+>> +				    enum aarch64_insn_adsb_type *type);
+>> +int aarch64_insn_decode_load_store_pair(u32 insn,
+>> +					enum aarch64_insn_register *reg1,
+>> +					enum aarch64_insn_register *reg2,
+>> +					enum aarch64_insn_register *base,
+>> +					int *offset,
+>> +					enum aarch64_insn_variant *variant,
+>> +					enum aarch64_insn_ldst_type *type);
+>> #endif /* __ASSEMBLY__ */
+>>
+>> #endif	/* __ASM_INSN_H */
+>> diff --git a/arch/arm64/kernel/insn.c b/arch/arm64/kernel/insn.c
+>> index c08b9ad..b56a66c 100644
+>> --- a/arch/arm64/kernel/insn.c
+>> +++ b/arch/arm64/kernel/insn.c
+>> @@ -33,6 +33,7 @@
+>> #include <asm/insn.h>
+>>
+>> #define AARCH64_INSN_SF_BIT	BIT(31)
+>> +#define AARCH64_INSN_S_BIT	BIT(29)
+>> #define AARCH64_INSN_N_BIT	BIT(22)
+>>
+>> static int aarch64_insn_encoding_class[] = {
+>> @@ -1141,3 +1142,104 @@ u32 aarch32_insn_mcr_extract_crm(u32 insn)
+>> {
+>> 	return insn & CRM_MASK;
+>> }
+>> +
+>> +enum aarch64_insn_register aarch64_insn_extract_reg_num(u32 insn,
+>> +				enum aarch64_insn_register_type type)
+>> +{
+>> +	int shift;
+>> +
+>> +	switch (type) {
+>> +	case AARCH64_INSN_REGTYPE_RT:
+>> +	case AARCH64_INSN_REGTYPE_RD:
+>> +		shift = 0;
+>> +		break;
+>> +	case AARCH64_INSN_REGTYPE_RN:
+>> +		shift = 5;
+>> +		break;
+>> +	case AARCH64_INSN_REGTYPE_RT2:
+>> +	case AARCH64_INSN_REGTYPE_RA:
+>> +		shift = 10;
+>> +		break;
+>> +	case AARCH64_INSN_REGTYPE_RM:
+>> +		shift = 16;
+>> +		break;
+>> +	default:
+>> +		pr_err("%s: unknown register type decoding %d\n", __func__,
+>> +		       type);
+>> +		return ~0L;
+>> +	}
+>> +
+>> +	return (insn & (GENMASK(4, 0) << shift)) >> shift;
+>> +}
+>> +
+>> +int aarch64_insn_decode_add_sub_imm(u32 insn,
+>> +				    enum aarch64_insn_register *dst,
+>> +				    enum aarch64_insn_register *src,
+>> +				    int *imm,
+>> +				    enum aarch64_insn_variant *variant,
+>> +				    enum aarch64_insn_adsb_type *type)
+>> +{
+>> +	if (aarch64_insn_is_add_imm(insn))
+>> +		*type =	((insn) & AARCH64_INSN_S_BIT) ?
+>> +				AARCH64_INSN_ADSB_ADD_SETFLAGS :
+>> +				AARCH64_INSN_ADSB_ADD;
+>> +	else if (aarch64_insn_is_sub_imm(insn))
+>> +		*type =	((insn) & AARCH64_INSN_S_BIT) ?
+>> +				AARCH64_INSN_ADSB_SUB_SETFLAGS :
+>> +				AARCH64_INSN_ADSB_SUB;
+>> +	else
+>> +		return 0;
+>> +
+>> +	*variant = (insn & AARCH64_INSN_SF_BIT) ? AARCH64_INSN_VARIANT_64BIT :
+>> +					AARCH64_INSN_VARIANT_32BIT;
+>> +
+>> +	*dst = aarch64_insn_extract_reg_num(insn, AARCH64_INSN_REGTYPE_RD);
+>> +
+>> +	*src = aarch64_insn_extract_reg_num(insn, AARCH64_INSN_REGTYPE_RN);
+>> +
+>> +	/* TODO: ignore shilft field[23:22] */
+>> +	*imm = (int)aarch64_insn_decode_immediate(AARCH64_INSN_IMM_12, insn);
+>> +
+>> +	return 1;
+>> +}
+>> +
+>> +int aarch64_insn_decode_load_store_pair(u32 insn,
+>> +					enum aarch64_insn_register *reg1,
+>> +					enum aarch64_insn_register *reg2,
+>> +					enum aarch64_insn_register *base,
+>> +					int *offset,
+>> +					enum aarch64_insn_variant *variant,
+>> +					enum aarch64_insn_ldst_type *type)
+>> +{
+>> +	int imm;
+>> +
+>> +	if (aarch64_insn_is_stp(insn))
+>> +		*type = AARCH64_INSN_LDST_STORE_PAIR;
+>> +	else if (aarch64_insn_is_stp_post(insn))
+>> +		*type = AARCH64_INSN_LDST_STORE_PAIR_POST_INDEX;
+>> +	else if (aarch64_insn_is_stp_pre(insn))
+>> +		*type = AARCH64_INSN_LDST_STORE_PAIR_PRE_INDEX;
+>> +	else if (aarch64_insn_is_ldp(insn))
+>> +		*type = AARCH64_INSN_LDST_LOAD_PAIR;
+>> +	else if (aarch64_insn_is_ldp_post(insn))
+>> +		*type = AARCH64_INSN_LDST_LOAD_PAIR_POST_INDEX;
+>> +	else if (aarch64_insn_is_ldp_pre(insn))
+>> +		*type = AARCH64_INSN_LDST_LOAD_PAIR_PRE_INDEX;
+>> +	else
+>> +		return 0;
+>> +
+>> +	*variant = (insn & AARCH64_INSN_S_BIT) ? AARCH64_INSN_VARIANT_64BIT :
+>> +				AARCH64_INSN_VARIANT_32BIT;
+>> +
+>> +	*reg1 = aarch64_insn_extract_reg_num(insn, AARCH64_INSN_REGTYPE_RT);
+>> +
+>> +	*reg2 = aarch64_insn_extract_reg_num(insn, AARCH64_INSN_REGTYPE_RT2);
+>> +
+>> +	*base = aarch64_insn_extract_reg_num(insn, AARCH64_INSN_REGTYPE_RN);
+>> +
+>> +	imm = (int)aarch64_insn_decode_immediate(AARCH64_INSN_IMM_7, insn);
+>> +	asm("sbfm %0, %0, 0, 6" : "+r" (imm));
+>> +	*offset = imm * 8;
+>> +
+>> +	return 1;
+>> +}
+>> --
+>> 1.7.9.5
+>>
+>
