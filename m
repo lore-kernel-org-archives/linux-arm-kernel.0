@@ -1,63 +1,69 @@
-From: eddie.huang@mediatek.com (Eddie Huang)
-Date: Wed, 11 Nov 2015 15:55:57 +0800
-Subject: [PATCH v5 4/5] ARM: dts: mt8135: enable basic SMP bringup for
- mt8135
-In-Reply-To: <7h1tbx1gjp.fsf@deeprootsystems.com>
-References: <1443799181-50409-1-git-send-email-yingjoe.chen@mediatek.com>
- <1443799181-50409-5-git-send-email-yingjoe.chen@mediatek.com>
- <CAMAWPa-Ed2FJY2pW67EHHKBH3_eBZx0+oWfMJwc_DhEjrf7aMg@mail.gmail.com>
- <1445843717.23888.1.camel@mtksdaap41>
- <CAMAWPa_Gyq7H0qUJ32PAJh_ELdHeKWMPyHud4gaT8=Ootcu1+g@mail.gmail.com>
- <1445859610.26723.4.camel@mtksdaap41>
- <CAMAWPa_13j88SMBbYEBg2WHFEhkhR_gVZkkU_x-U5NJay05AxA@mail.gmail.com>
- <1447135867.14454.9.camel@mtksdaap41> <7h1tbx1gjp.fsf@deeprootsystems.com>
-Message-ID: <1447228557.20886.10.camel@mtksdaap41>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Wed, 11 Nov 2015 10:01:32 +0200
+Subject: [PATCH v3 0/3] ARM: OMAP2+ McASP(3) support for DRA7xx family
+In-Reply-To: <alpine.DEB.2.02.1510301603530.7580@utopia.booyaka.com>
+References: <1446191700-11057-1-git-send-email-peter.ujfalusi@ti.com>
+ <alpine.DEB.2.02.1510301603530.7580@utopia.booyaka.com>
+Message-ID: <5642F5DC.8030902@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Kevin,
+Tony,
 
-On Tue, 2015-11-10 at 17:16 -0800, Kevin Hilman wrote:
-> Hi Eddie,
+On 10/30/2015 06:11 PM, Paul Walmsley wrote:
+> Hi P?ter
 > 
-> [...]
+> On Fri, 30 Oct 2015, Peter Ujfalusi wrote:
 > 
-> > I check the log [0],
+>> Changes since v2:
+>> - DTS patch added which is needed because of the clock handling changes
+>>
+>> Felip Balbi reported that linux-next is broken right now since the DTS part of
+>> the earlier series has been applied, but we do not have the mcasp hwmod in the
+>> kernel:
+>> ...
+>> [    0.181029] platform 48468000.mcasp: Cannot lookup hwmod 'mcasp3'
+>> ...
+>> [    6.121072] davinci-mcasp 48468000.mcasp: _od_fail_runtime_resume: FIXME: missing hwmod/omap_dev info
+>> [    6.130790] ------------[ cut here ]------------
+>> [    6.135643] WARNING: CPU: 0 PID: 244 at drivers/bus/omap_l3_noc.c:147 l3_interrupt_handler+0x220/0x34c()
+>> [    6.145576] 44000000.ocp:L3 Custom Error: MASTER MPU TARGET L4_PER2_P3 (Read): Data Access in User mode during Functional access
+>> ...
+>>
+>> This is the followup series for the hwmod changes needed to get audio working
+>> on DRA7xx family based boards.
+>> The DTS patches has been applied by Tony from the original series:
+>> http://www.spinics.net/lists/linux-omap/msg121473.html
+>>
+>> I have addressed your comments in the hwmod data and did some research also
+>> regarding to the use of ahclkx as fclk in the original submission.
+>> It turned out that McASP _needs_ all clocks to be enabled (fclk, iclk and
+>> ahclkx/r) to be able to access registers. The original patch where we handled
+>> the ahclkx as fclk worked, because the fclk clock got enabled in the HW w/o
+>> any SW interaction.
+>> All in all, the McASP found in DRA7 needs all clocks to be enabled.
+>> To satisfy this I have introduced a new flag to hwmod, which means that the
+>> listed optional clocks need to be handled alongside with the fclk clock.
 > 
-> Thanks for checking into this boot failure.
+> Thanks.  I'm happy with your series and appreciate the indepth 
+> investigation.  As you probably saw last week, we've hit the limit for 
+> v4.4-rc1:
 > 
-> > it seems first time mt8135-evbp1 boot to kernel
-> > shell successfully, then boot again. In the second time, mt8135 stay in
-> > fastboot mode, waiting host send boot image, then timeout.
+> http://marc.info/?l=linux-omap&m=144564929721826&w=2
 > 
-> Actually, it never gets to a shell the first time.  If you look closely,
-> the target reboots as soon as userspace starts.   Look for the PYBOOT
-> line which says "finished booting, starting userspace"
+> This is why I haven't done anything with this series at this time.  
+> Unfortunately I don't have a DRA7xx board, so I can't do any testing.  
+> But if this series fixes a problem with DRA7xx in linux-next, we should 
+> definitely merge it.
 > 
-> Later on, pyboot thinks it finds a root shell due to finding '#'
-> characters, but clearly it never got to a shell.
-> 
-> > I download zImage and dtb in [1], and kernel run to shell successfully
-> > on my platform.
-> 
-> Are you can you try using a ramdisk as well?  You can use the pre-built
-> one here:
-> http://storage.kernelci.org/images/rootfs/buildroot/armel/rootfs.cpio.gz
-> 
+> Tony, if you want to take this now, you can either take it with my ack, or 
+> I can send a pull request.  Or, if you'd prefer to take it for v4.4-rc2, 
+> I can send a pull request after v4.4-rc1.
 
-Yes, I tried this ramdisk, and I can reproduce fail issue.
+The ARM soc changes for 4.4 are now pulled in to mainline, including the
+DRA7/72/X15 audio related DTS changes, but this three patch is not. This means
+that dra7-evm, dra72-evm and bealge-x15 will not boot from mainline.
+Is there a way to push these patches as soon as possible?
 
-> Please check my boot logs to see how I'm generating the boot.img file
-> (search for mkbootimg) with a kernel/dtb/ramdisk.  It may be possible
-> that the kernel image size with a ramdisk is breaking some of the
-> assumptions in the fastboot mode.  I've seen problems like this on other
-> platforms due to hard-coded sizes/addresses in the boot firmware.
-> 
-
-MT8135 allocate 10MB for BOOT partition, but the test boot.img is 11MB,
-thus cause user space fail. I will prepare new firmware that extend BOOT
-partition to 16MB. and put new firmware on Howard's github. I will mail
-to you when I am ready..
-
-Eddie
-Thanks
+Thanks,
+P?ter
