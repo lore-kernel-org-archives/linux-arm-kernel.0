@@ -1,58 +1,80 @@
-From: alexei.starovoitov@gmail.com (Alexei Starovoitov)
-Date: Wed, 11 Nov 2015 15:40:15 -0800
-Subject: [PATCH 2/2] arm64: bpf: add BPF XADD instruction
-In-Reply-To: <20151111222135.GU17308@twins.programming.kicks-ass.net>
-References: <20151111162341.GN9562@arm.com>
- <20151111172659.GA86334@ast-mbp.thefacebook.com>
- <20151111.123548.1039494689070388545.davem@davemloft.net>
- <20151111175741.GR17308@twins.programming.kicks-ass.net>
- <20151111181132.GA90947@ast-mbp.thefacebook.com>
- <20151111183128.GS17308@twins.programming.kicks-ass.net>
- <20151111184427.GH11639@twins.programming.kicks-ass.net>
- <20151111185415.GI11639@twins.programming.kicks-ass.net>
- <20151111195558.GA4173@ast-mbp.thefacebook.com>
- <20151111222135.GU17308@twins.programming.kicks-ass.net>
-Message-ID: <20151111234014.GA17014@ast-mbp.thefacebook.com>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Wed, 11 Nov 2015 15:50:05 -0800
+Subject: [PATCH v5 4/5] ARM: dts: mt8135: enable basic SMP bringup for
+ mt8135
+In-Reply-To: <1447228557.20886.10.camel@mtksdaap41> (Eddie Huang's message of
+ "Wed, 11 Nov 2015 15:55:57 +0800")
+References: <1443799181-50409-1-git-send-email-yingjoe.chen@mediatek.com>
+ <1443799181-50409-5-git-send-email-yingjoe.chen@mediatek.com>
+ <CAMAWPa-Ed2FJY2pW67EHHKBH3_eBZx0+oWfMJwc_DhEjrf7aMg@mail.gmail.com>
+ <1445843717.23888.1.camel@mtksdaap41>
+ <CAMAWPa_Gyq7H0qUJ32PAJh_ELdHeKWMPyHud4gaT8=Ootcu1+g@mail.gmail.com>
+ <1445859610.26723.4.camel@mtksdaap41>
+ <CAMAWPa_13j88SMBbYEBg2WHFEhkhR_gVZkkU_x-U5NJay05AxA@mail.gmail.com>
+ <1447135867.14454.9.camel@mtksdaap41>
+ <7h1tbx1gjp.fsf@deeprootsystems.com>
+ <1447228557.20886.10.camel@mtksdaap41>
+Message-ID: <7hpozgyu36.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 11, 2015 at 11:21:35PM +0100, Peter Zijlstra wrote:
-> On Wed, Nov 11, 2015 at 11:55:59AM -0800, Alexei Starovoitov wrote:
-> > Therefore things like memory barriers, full set of atomics are not applicable
-> > in bpf world.
-> 
-> There are still plenty of wait-free constructs one can make using them.
+Hi Eddie,
 
-yes, but all such lock-free algos are typically based on cmpxchg8b and
-tight loop, so it would be very hard for verifier to proof termination
-of such loops. I think when we'd need to add something like this, we'll
-add new bpf insn that will be membarrier+cmpxhg8b+check+loop as
-a single insn, so it cannot be misused.
-I don't know of any concrete use case yet. All possible though.
+Eddie Huang <eddie.huang@mediatek.com> writes:
 
-> Say a barrier/rendezvous construct for knowing when an event has
-> happened on all CPUs.
-> 
-> But if you really do not want any of that, I suppose that is a valid
-> choice.
+> On Tue, 2015-11-10 at 17:16 -0800, Kevin Hilman wrote:
+>> Hi Eddie,
+>> 
+>> [...]
+>> 
+>> > I check the log [0],
+>> 
+>> Thanks for checking into this boot failure.
+>> 
+>> > it seems first time mt8135-evbp1 boot to kernel
+>> > shell successfully, then boot again. In the second time, mt8135 stay in
+>> > fastboot mode, waiting host send boot image, then timeout.
+>> 
+>> Actually, it never gets to a shell the first time.  If you look closely,
+>> the target reboots as soon as userspace starts.   Look for the PYBOOT
+>> line which says "finished booting, starting userspace"
+>> 
+>> Later on, pyboot thinks it finds a root shell due to finding '#'
+>> characters, but clearly it never got to a shell.
+>> 
+>> > I download zImage and dtb in [1], and kernel run to shell successfully
+>> > on my platform.
+>> 
+>> Are you can you try using a ramdisk as well?  You can use the pre-built
+>> one here:
+>> http://storage.kernelci.org/images/rootfs/buildroot/armel/rootfs.cpio.gz
+>> 
+>
+> Yes, I tried this ramdisk, and I can reproduce fail issue.
+>
 
-I do want it :) and I think in the future we'll add a bunch
-of interesting stuff. May be including things like above. I just
-don't want to rush things in just because x86 has such insn
-or because gcc has a builtin for it.
-Like we discussed adding popcnt insn. It can be useful in some cases,
-but doesn't seem to worth the pain of adding it to interpreter, JITs
-and llvm backends... as of today... May be tomorrow it will be must have.
+OK, good.   Thanks for looking into it.
 
-> Is even privileged (e)BPF not allowed things like this? I was thinking
-> the strict no loops stuff was for unpriv (e)BPF only.
+>> Please check my boot logs to see how I'm generating the boot.img file
+>> (search for mkbootimg) with a kernel/dtb/ramdisk.  It may be possible
+>> that the kernel image size with a ramdisk is breaking some of the
+>> assumptions in the fastboot mode.  I've seen problems like this on other
+>> platforms due to hard-coded sizes/addresses in the boot firmware.
+>> 
+>
+> MT8135 allocate 10MB for BOOT partition, but the test boot.img is 11MB,
+> thus cause user space fail.
 
-the only difference between unpriv and priv is the ability to send
-all values (including kernel addresses) to user space (like tracing
-needs to see all registers). The rest is the same.
-root should never crash the kernel as well. If we relax even little bit
-for root then the whole bpf stuff is no better than kernel module.
+Aha, I was right!  ;)
 
-btw, support for mini loops was requested many times in the past.
-I guess we'd have to add something like this, but it's tricky.
-Mainly because control flow graph analysis becomes much more complicated.
+> I will prepare new firmware that extend BOOT
+> partition to 16MB. and put new firmware on Howard's github. I will mail
+> to you when I am ready..
+
+Great, thanks for working on this.
+
+Any chance of making it even bigger?  We're working on running some more
+automated testing from a ramdisk, and those ramdisks will be easily
+30-50 Mb with modules included and a rootfs with extra tests.
+
+Kevin
