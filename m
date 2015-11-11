@@ -1,63 +1,66 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 11 Nov 2015 11:58:52 +0000
-Subject: [PATCH 2/2] arm64: bpf: add BPF XADD instruction
-In-Reply-To: <56431B83.5060500@iogearbox.net>
-References: <1447195301-16757-1-git-send-email-yang.shi@linaro.org>
- <20151111004208.GA47378@ast-mbp.thefacebook.com>
- <CABg9mcux0wEC5=nWuR9o8NwUTp73zqZ-N2e67_f7oS_mX1XGdg@mail.gmail.com>
- <4902833.k8y8bz0YLV@wuerfel> <20151111102406.GB9562@arm.com>
- <56431B83.5060500@iogearbox.net>
-Message-ID: <20151111115851.GE9562@arm.com>
+From: dawei.chien@mediatek.com (dawei chien)
+Date: Wed, 11 Nov 2015 20:00:45 +0800
+Subject: [PATCH v3 0/2] thermal: mediatek: Add cpu power cooling model
+In-Reply-To: <20151106032046.GK3773@ubuntu>
+References: <1445515359-8587-1-git-send-email-dawei.chien@mediatek.com>
+ <20151028154449.GH3716@ubuntu> <1446461181.10039.28.camel@mtksdaap41>
+ <20151102121034.GA3639@ubuntu> <1446721761.4016.56.camel@mtksdaap41>
+ <20151106032046.GK3773@ubuntu>
+Message-ID: <1447243245.11462.19.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel,
-
-On Wed, Nov 11, 2015 at 11:42:11AM +0100, Daniel Borkmann wrote:
-> On 11/11/2015 11:24 AM, Will Deacon wrote:
-> >On Wed, Nov 11, 2015 at 09:49:48AM +0100, Arnd Bergmann wrote:
-> >>On Tuesday 10 November 2015 18:52:45 Z Lim wrote:
-> >>>On Tue, Nov 10, 2015 at 4:42 PM, Alexei Starovoitov
-> >>><alexei.starovoitov@gmail.com> wrote:
-> >>>>On Tue, Nov 10, 2015 at 04:26:02PM -0800, Shi, Yang wrote:
-> >>>>>On 11/10/2015 4:08 PM, Eric Dumazet wrote:
-> >>>>>>On Tue, 2015-11-10 at 14:41 -0800, Yang Shi wrote:
-> >>>>>>>aarch64 doesn't have native support for XADD instruction, implement it by
-> >>>>>>>the below instruction sequence:
-> >>>
-> >>>aarch64 supports atomic add in ARMv8.1.
-> >>>For ARMv8(.0), please consider using LDXR/STXR sequence.
-> >>
-> >>Is it worth optimizing for the 8.1 case? It would add a bit of complexity
-> >>to make the code depend on the CPU feature, but it's certainly doable.
-> >
-> >What's the atomicity required for? Put another way, what are we racing
-> >with (I thought bpf was single-threaded)? Do we need to worry about
-> >memory barriers?
-> >
-> >Apologies if these are stupid questions, but all I could find was
-> >samples/bpf/sock_example.c and it didn't help much :(
+On Fri, 2015-11-06 at 08:50 +0530, Viresh Kumar wrote:
+> On 05-11-15, 19:09, dawei chien wrote:
+> > Thank you for your kindly explaining, now I could understand what I
+> > miss, I will send device tree binding on next version such like
+> > following description.
+> > 
+> > --- a/Documentation/devicetree/bindings/clock/mt8173-cpu-dvfs.txt
+> > +++ b/Documentation/devicetree/bindings/clock/mt8173-cpu-dvfs.txt
+> > @@ -10,6 +10,17 @@ Required properties:
+> >         Please refer to
+> > Documentation/devicetree/bindings/clk/clock-bindings.txt for
+> >         generic clock consumer properties.
+> >  - proc-supply: Regulator for Vproc of CPU cluster.
+> > +- dynamic-power-coefficient:
+> > +       Usage: optional
+> > +       Value type: <prop-encoded-array>
+> > +       Definition: A u32 value that represents an indicative
+> > +       running time dynamic power coefficient in
+> > +       fundamental units of mW/MHz/uVolt^2.
+> > +       The dynamic energy consumption of the CPU
+> > +       is proportional to the square of the
+> > +       Voltage (V) and the clock frequency (f).
+> > +       Pdyn = dynamic-power-coefficient * V^2 * f
+> > +       where voltage is in uV, frequency is in MHz.
 > 
-> The equivalent code more readable in restricted C syntax (that can be
-> compiled by llvm) can be found in samples/bpf/sockex1_kern.c. So the
-> built-in __sync_fetch_and_add() will be translated into a BPF_XADD
-> insn variant.
+> Please check with Punit if he is planning to add the same.
+Punit just sent the patch for this binding[1] yesterday, so I will re-send next version once his patch has been reviewed.
+> > Thank you for your kindly explaining, Now I know I should develop and
+> > test on mainline branch since this is where I try to add code.
+> > 
+> > However, please understanding currently mt8173_cpufreq.c is not ready
+> > for OPPV2 in mainline as far, that's the reason why currently I can't
+> > reuse OPPV2 and extend for static power table. My propose is for adding
+> > CPU cooling device for our own product.
+> 
+> Firstly, we don't care. You are pushing something to mainline, you
+> have to get it tested someway on mainline.
+> 
+> Secondly, there are *almost* no changes required to the mtk cpufreq
+> driver for OPPV2. Just update your DT in a similar way it is done for
+> one of the exynos platforms and it should just work fine.
+> 
+In our platform, thermal throttling is good enough with dynamic power
+only, so my plan is to send dynamic power model first in next version.
 
-Yikes, so the memory-model for BPF is based around the deprecated GCC
-__sync builtins, that inherit their semantics from ia64? Any reason not
-to use the C11-compatible __atomic builtins[1] as a base?
+Regarding static power model, we will continue discussing with ARM to
+find a better solution.
 
-> What you can race against is that an eBPF map can be _shared_ by
-> multiple eBPF programs that are attached somewhere in the system, and
-> they could all update a particular entry/counter from the map at the
-> same time.
+Thanks.
 
-Ok, so it does sound like eBPF needs to define/choose a memory-model and
-I worry that riding on the back of __sync isn't necessarily the right
-thing to do, particularly as its fallen out of favour with the compiler
-folks. On weakly-ordered architectures, it's also going to result in
-heavy-weight barriers for all atomic operations.
+[1] https://lkml.org/lkml/2015/11/9/542
 
-Will
-
-[1] https://gcc.gnu.org/onlinedocs/gcc/_005f_005fatomic-Builtins.html
+BR,
+Dawei
