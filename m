@@ -1,163 +1,280 @@
 From: computersforpeace@gmail.com (Brian Norris)
-Date: Tue, 10 Nov 2015 19:17:03 -0800
-Subject: [PATCH 08/10] mtd: afs: factor footer parsing into the v1 part
- parsing
-In-Reply-To: <1444914533-27782-9-git-send-email-linus.walleij@linaro.org>
+Date: Tue, 10 Nov 2015 19:20:05 -0800
+Subject: [PATCH 10/10] mtd: afs: add v2 partition parsing
+In-Reply-To: <1444914533-27782-11-git-send-email-linus.walleij@linaro.org>
 References: <1444914533-27782-1-git-send-email-linus.walleij@linaro.org>
- <1444914533-27782-9-git-send-email-linus.walleij@linaro.org>
-Message-ID: <20151111031703.GZ12143@google.com>
+ <1444914533-27782-11-git-send-email-linus.walleij@linaro.org>
+Message-ID: <20151111032005.GA12143@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On Thu, Oct 15, 2015 at 03:08:51PM +0200, Linus Walleij wrote:
-> This simplifies the code by factoring in the image footer
-> parsing into the single function parsing the AFSv1 partitions.
+Only reviewing part of this patch, as I gotta run now.
+
+On Thu, Oct 15, 2015 at 03:08:53PM +0200, Linus Walleij wrote:
+> The AFS v2 partition type appear in later ARM reference designs
+> such as RealView, Versatile Express and the 64bit Juno Development
+> Platform.
+> 
+> The image informations is padded with a 32bit word (4 bytes) on
+> the 32bit platforms and a 64bit word (8 bytes) on the 64bit
+> platforms. The boot monitor source code gives at hand that this
+> is because the first entry in the struct mapped over the image
+> information is a "next" pointer for a linked list, filled in
+> by firmware after reading in the info block, and always zero
+> in the flash. We adjust padding by checking what padding gives
+> the right checksum.
+> 
+> This was tested on:
+> - Integrator/AP (v1 partitions)
+> - RealView PB11MPCore (v2 32bit partitions)
+> - Juno Development System (v2 64bit partitions)
+> 
+> All systems display the images in flash very nicely as separate
+> partitions, e.g on Juno:
+> 
+> 4 afs partitions found on MTD device 8000000.flash
+> Creating 4 MTD partitions on "8000000.flash":
+> 0x000000040000-0x0000000c0000 : "fip"
+> 0x000000ec0000-0x0000018c0000 : "Image"
+> 0x000000f00000-0x000000f40000 : "juno"
+> 0x000003ec0000-0x000003f00000 : "bl1"
 > 
 > Cc: Ryan Harkin <ryan.harkin@linaro.org>
 > Cc: Liviu Dudau <liviu.dudau@arm.com>
 > Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
 > ---
->  drivers/mtd/afs.c | 98 ++++++++++++++++++++++---------------------------------
->  1 file changed, 39 insertions(+), 59 deletions(-)
+>  drivers/mtd/afs.c | 158 +++++++++++++++++++++++++++++++++++++++++++++++++++++-
+>  1 file changed, 157 insertions(+), 1 deletion(-)
 > 
 > diff --git a/drivers/mtd/afs.c b/drivers/mtd/afs.c
-> index ace27f447abc..cdee8295d4c0 100644
+> index 1ce6842c917c..e46b035bf4d2 100644
 > --- a/drivers/mtd/afs.c
 > +++ b/drivers/mtd/afs.c
-> @@ -89,63 +89,6 @@ static bool afs_is_v1(struct mtd_info *mtd, u_int off)
+> @@ -3,6 +3,7 @@
+>      drivers/mtd/afs.c: ARM Flash Layout/Partitioning
+>  
+>      Copyright ? 2000 ARM Limited
+> +    Copyright (C) 2015 Linus Walleij
+
+The two copyright symbols don't match.
+
+>  
+>     This program is free software; you can redistribute it and/or modify
+>     it under the terms of the GNU General Public License as published by
+> @@ -35,6 +36,8 @@
+>  #include <linux/mtd/partitions.h>
+>  
+>  #define AFSV1_FOOTER_MAGIC 0xA0FFFF9F
+> +#define AFSV2_FOOTER_MAGIC1 0x464C5348 /* "FLSH" */
+> +#define AFSV2_FOOTER_MAGIC2 0x464F4F54 /* "FOOT" */
+>  
+>  struct footer_v1 {
+>  	u32 image_info_base;	/* Address of first word of ImageFooter  */
+> @@ -68,6 +71,22 @@ static u32 word_sum(void *words, int num)
+>  	return sum;
 >  }
 >  
->  static int
-> -afs_read_footer_v1(struct mtd_info *mtd, u_int *img_start, u_int *iis_start,
-> -		   u_int off, u_int mask)
-> -{
-> -	struct footer_v1 fs;
-> -	u_int ptr = off + mtd->erasesize - sizeof(fs);
-> -	size_t sz;
-> -	int ret;
-> -
-> -	ret = mtd_read(mtd, ptr, sizeof(fs), &sz, (u_char *)&fs);
-> -	if (ret >= 0 && sz != sizeof(fs))
-> -		ret = -EINVAL;
-> -
-> -	if (ret < 0) {
-> -		printk(KERN_ERR "AFS: mtd read failed at 0x%x: %d\n",
-> -			ptr, ret);
-> -		return ret;
-> -	}
-> -
-> -	/*
-> -	 * Does it contain the magic number?
-> -	 */
-> -	if (fs.signature != AFSV1_FOOTER_MAGIC)
-> -		return 0;
-> -
-> -	/*
-> -	 * Check the checksum.
-> -	 */
-> -	if (word_sum(&fs, sizeof(fs) / sizeof(u32)) != 0xffffffff)
-> -		return 0;
-> -
-> -	/*
-> -	 * Don't touch the SIB.
-> -	 */
-> -	if (fs.type == 2)
-> -		return 0;
-> -
-> -	*iis_start = fs.image_info_base & mask;
-> -	*img_start = fs.image_start & mask;
-> -
-> -	/*
-> -	 * Check the image info base.  This can not
-> -	 * be located after the footer structure.
-> -	 */
-> -	if (*iis_start >= ptr)
-> -		return 0;
-> -
-> -	/*
-> -	 * Check the start of this image.  The image
-> -	 * data can not be located after this block.
-> -	 */
-> -	if (*img_start > off)
-> -		return 0;
-> -
-> -	return 1;
-> -}
-> -
-> -static int
->  afs_read_iis_v1(struct mtd_info *mtd, struct image_info_v1 *iis, u_int ptr)
+> +static u32 word_sum_v2(u32 *p, u32 num)
+> +{
+> +	u32 sum = 0;
+> +	int i;
+> +
+> +	for (i = 0; i < num; i++) {
+> +		u32 val;
+> +
+> +		val = p[i];
+> +		if (val > ~sum)
+> +			sum++;
+> +		sum += val;
+> +	}
+> +	return ~sum;
+> +}
+> +
+>  static bool afs_is_v1(struct mtd_info *mtd, u_int off)
 >  {
->  	size_t sz;
-> @@ -184,6 +127,7 @@ afs_read_iis_v1(struct mtd_info *mtd, struct image_info_v1 *iis, u_int ptr)
->  static int afs_parse_v1_partition(struct mtd_info *mtd,
->  				  u_int off, struct mtd_partition *part)
->  {
-> +	struct footer_v1 fs;
->  	struct image_info_v1 iis;
->  	u_int mask;
->  	/*
-> @@ -192,6 +136,8 @@ static int afs_parse_v1_partition(struct mtd_info *mtd,
->  	 */
->  	u_int uninitialized_var(iis_ptr);
->  	u_int uninitialized_var(img_ptr);
-> +	u_int ptr;
+>  	/* The magic is 12 bytes from the end of the erase block */
+> @@ -88,6 +107,27 @@ static bool afs_is_v1(struct mtd_info *mtd, u_int off)
+>  	return (magic == AFSV1_FOOTER_MAGIC);
+>  }
+>  
+> +static bool afs_is_v2(struct mtd_info *mtd, u_int off)
+> +{
+> +	/* The magic is the 8 last bytes of the erase block */
+> +	u_int ptr = off + mtd->erasesize - 8;
+> +	u32 foot[2];
 > +	size_t sz;
->  	int ret;
->  
->  	/*
-> @@ -200,9 +146,43 @@ static int afs_parse_v1_partition(struct mtd_info *mtd,
->  	 */
->  	mask = mtd->size - 1;
->  
-> -	ret = afs_read_footer_v1(mtd, &img_ptr, &iis_ptr, off, mask);
-> -	if (ret < 0)
-> +	ptr = off + mtd->erasesize - sizeof(fs);
-> +	ret = mtd_read(mtd, ptr, sizeof(fs), &sz, (u_char *)&fs);
-> +	if (ret >= 0 && sz != sizeof(fs))
-> +		ret = -EINVAL;
+> +	int ret;
+> +
+> +	ret = mtd_read(mtd, ptr, 8, &sz, (u_char *)foot);
 > +	if (ret < 0) {
 > +		printk(KERN_ERR "AFS: mtd read failed at 0x%x: %d\n",
 > +		       ptr, ret);
->  		return ret;
+> +		return false;
 > +	}
-> +	/*
-> +	 * Check the checksum.
-> +	 */
-> +	if (word_sum(&fs, sizeof(fs) / sizeof(u32)) != 0xffffffff)
+> +	if (ret >= 0 && sz != 8)
+> +		return false;
+> +
+> +	return (foot[0] == AFSV2_FOOTER_MAGIC1 &&
+> +		foot[1] == AFSV2_FOOTER_MAGIC2);
+> +}
+> +
+>  static int afs_parse_v1_partition(struct mtd_info *mtd,
+>  				  u_int off, struct mtd_partition *part)
+>  {
+> @@ -185,6 +225,113 @@ static int afs_parse_v1_partition(struct mtd_info *mtd,
+>  	return 0;
+>  }
+>  
+> +static int afs_parse_v2_partition(struct mtd_info *mtd,
+> +				  u_int off, struct mtd_partition *part)
+> +{
+> +	u_int ptr;
+> +	u32 footer[12];
+> +	u32 imginfo[36];
+> +	char *name;
+> +	u32 version;
+> +	u32 entrypoint;
+> +	u32 attributes;
+> +	u32 region_count;
+> +	u32 block_start;
+> +	u32 block_end;
+> +	u32 crc;
+> +	size_t sz;
+> +	int ret;
+> +	int i;
+> +	int pad = 0;
+> +
+> +	pr_debug("Parsing v2 partition @%08x-%08x\n",
+> +		 off, off + mtd->erasesize);
+> +
+> +	/* First read the footer */
+> +	ptr = off + mtd->erasesize - sizeof(footer);
+> +	ret = mtd_read(mtd, ptr, sizeof(footer), &sz, (u_char *)footer);
+> +	if ((ret < 0) || (ret >= 0 && sz != sizeof(footer))) {
+> +		pr_err("AFS: mtd read failed at 0x%x: %d\n",
+> +		       ptr, ret);
+> +		return -EIO;
+> +	}
+> +	name = (char *) &footer[0];
+> +	version = footer[9];
+> +	ptr = off + mtd->erasesize - sizeof(footer) - footer[8];
+> +
+> +	pr_debug("found image \"%s\", version %08x, info @%08x\n",
+> +		 name, version, ptr);
+> +
+> +	/* Then read the image information */
+> +	ret = mtd_read(mtd, ptr, sizeof(imginfo), &sz, (u_char *)imginfo);
+> +	if ((ret < 0) || (ret >= 0 && sz != sizeof(imginfo))) {
+> +		pr_err("AFS: mtd read failed at 0x%x: %d\n",
+> +		       ptr, ret);
+> +		return -EIO;
+> +	}
+> +
+> +	/* 32bit platforms have 4 bytes padding */
+> +	crc = word_sum_v2(&imginfo[1], 34);
+> +	if (!crc) {
+> +		pr_debug("Padding 1 word (4 bytes)\n");
+> +		pad = 1;
+> +	} else {
+> +		/* 64bit platforms have 8 bytes padding */
+> +		crc = word_sum_v2(&imginfo[2], 34);
+> +		if (!crc) {
+> +			pr_debug("Padding 2 words (8 bytes)\n");
+> +			pad = 2;
+> +		}
+> +	}
+> +	if (crc) {
+> +		pr_err("AFS: bad checksum on v2 image info: %08x\n", crc);
 > +		return -EINVAL;
+> +	}
+> +	entrypoint = imginfo[pad];
+> +	attributes = imginfo[pad+1];
+> +	region_count = imginfo[pad+2];
+> +	block_start = imginfo[20];
+> +	block_end = imginfo[21];
+> +
+> +	pr_debug("image entry=%08x, attr=%08x, regions=%08x, "
+> +		 "bs=%08x, be=%08x\n",
+> +		 entrypoint, attributes, region_count,
+> +		 block_start, block_end);
+> +
+> +	for (i = 0; i < region_count; i++) {
+> +		u32 region_load_addr = imginfo[pad + 3 + i*4];
+> +		u32 region_size = imginfo[pad + 4 + i*4];
+> +		u32 region_offset = imginfo[pad + 5 + i*4];
+> +		u32 region_start;
+> +		u32 region_end;
+> +
+> +		pr_debug("  region %d: address: %08x, size: %08x, "
+> +			 "offset: %08x\n",
+> +			 i,
+> +			 region_load_addr,
+> +			 region_size,
+> +			 region_offset);
+> +
+> +		region_start = off + region_offset;
+> +		region_end = region_start + region_size;
+> +		/* Align partition to end of erase block */
+> +		region_end += (mtd->erasesize - 1);
+> +		region_end &= ~(mtd->erasesize -1);
+> +		pr_debug("   partition start = %08x, partition end = %08x\n",
+> +			 region_start, region_end);
+> +
+> +		/* Create one partition per region */
+> +		part->name = kstrdup(name, GFP_KERNEL);
+> +		if (!part->name)
+> +			return -ENOMEM;
+> +		part->offset = region_start;
+> +		part->size = region_end - region_start;
+> +		part->mask_flags = 0;
+> +	}
+> +
+> +	return 0;
+> +}
+> +
+>  static int parse_afs_partitions(struct mtd_info *mtd,
+>  				struct mtd_partition **pparts,
+>  				struct mtd_part_parser_data *data)
+> @@ -200,6 +347,10 @@ static int parse_afs_partitions(struct mtd_info *mtd,
+>  			sz += sizeof(struct mtd_partition);
+>  			i += 1;
+>  		}
+> +		if (afs_is_v2(mtd, off)) {
+> +			sz += sizeof(struct mtd_partition);
+> +			i += 1;
+> +		}
+>  	}
+>  
+>  	if (!i)
+> @@ -213,13 +364,18 @@ static int parse_afs_partitions(struct mtd_info *mtd,
+>  	 * Identify the partitions
+>  	 */
+>  	for (i = off = 0; off < mtd->size; off += mtd->erasesize) {
+> -
+>  		if (afs_is_v1(mtd, off)) {
+>  			ret = afs_parse_v1_partition(mtd, off, &parts[i]);
+>  			if (ret)
+>  				goto out_free_parts;
+>  			i++;
+>  		}
+> +		if (afs_is_v2(mtd, off)) {
 
-^^ This was modified. See my other comments about it.
+Do we really want to allow a single block to be counted as both v1 and
+v2? I'm not sure if that's possible given the data structure, but this
+seems like it should be an 'else if', to avoid unnecessary scanning.
+
+You also might save yourself a bit if you check for v2 first. Not a big
+deal but I thought I'd throw it out there.
+
+> +			ret = afs_parse_v2_partition(mtd, off, &parts[i]);
+> +			if (ret)
+> +				goto out_free_parts;
+> +			i++;
+> +		}
+>  	}
+>  
+>  	*pparts = parts;
 
 Brian
-
-> +
-> +	/*
-> +	 * Hide the SIB (System Information Block)
-> +	 */
-> +	if (fs.type == 2)
-> +		return 0;
-> +
-> +	iis_ptr = fs.image_info_base & mask;
-> +	img_ptr = fs.image_start & mask;
-> +
-> +	/*
-> +	 * Check the image info base.  This can not
-> +	 * be located after the footer structure.
-> +	 */
-> +	if (iis_ptr >= ptr)
-> +		return 0;
-> +
-> +	/*
-> +	 * Check the start of this image.  The image
-> +	 * data can not be located after this block.
-> +	 */
-> +	if (img_ptr > off)
-> +		return 0;
->  
->  	/* Read the image info block */
->  	ret = afs_read_iis_v1(mtd, &iis, iis_ptr);
-> -- 
-> 2.4.3
-> 
