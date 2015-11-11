@@ -1,54 +1,57 @@
-From: Hui.Liu@freescale.com (Liu Jason)
-Date: Wed, 11 Nov 2015 10:06:48 +0000
-Subject: [PATCH 1/1] dmaengine: imx-sdma: remove __init annotation on
- sdma_event_remap
-In-Reply-To: <4267122.WHg3VAy8bL@wuerfel>
-References: <1447233649-21464-1-git-send-email-r64343@freescale.com>
- <4267122.WHg3VAy8bL@wuerfel>
-Message-ID: <DM2PR0301MB121329F0B68A9D0D00F9A7B9F3130@DM2PR0301MB1213.namprd03.prod.outlook.com>
+From: gabriele.paoloni@huawei.com (Gabriele Paoloni)
+Date: Wed, 11 Nov 2015 10:09:45 +0000
+Subject: [PATCH] ARM/PCI: move align_resource function pointer into
+ pci_host_bridge structure
+In-Reply-To: <5509277.PRqCf43vDc@wuerfel>
+References: <1447204345-143793-1-git-send-email-gabriele.paoloni@huawei.com>
+ <5509277.PRqCf43vDc@wuerfel>
+Message-ID: <EE11001F9E5DDD47B7634E2F8A612F2E162A7A2E@lhreml503-mbs>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 > -----Original Message-----
 > From: Arnd Bergmann [mailto:arnd at arndb.de]
-> Sent: Wednesday, November 11, 2015 6:02 PM
+> Sent: Wednesday, November 11, 2015 4:48 PM
 > To: linux-arm-kernel at lists.infradead.org
-> Cc: Liu Hui-R64343; dmaengine at vger.kernel.org; vinod.koul at intel.com;
-> dan.j.williams at intel.com; linux-kernel at vger.kernel.org
-> Subject: Re: [PATCH 1/1] dmaengine: imx-sdma: remove __init annotation on
-> sdma_event_remap
+> Cc: Gabriele Paoloni; linux-pci at vger.kernel.org;
+> lorenzo.pieralisi at arm.com; linux at arm.linux.org.uk; xuwei (O); Wangzhou
+> (B); bhelgaas at google.com; Liguozhu (Kenneth)
+> Subject: Re: [PATCH] ARM/PCI: move align_resource function pointer into
+> pci_host_bridge structure
 > 
-> On Wednesday 11 November 2015 17:20:49 Jason Liu wrote:
-> > The sdma_probe function will call sdma_event_remap, but
-> > sdma_event_remap marked with the __init annotation which make the
-> > kbuild complains as the following log:
-> >
-> > WARNING: drivers/dma/built-in.o(.text+0x56fc): Section mismatch in
-> > reference from the function sdma_probe() to the function
-> > .init.text:sdma_event_remap() The function sdma_probe() references the
-> > function __init sdma_event_remap().
-> > This is often because sdma_probe lacks a __init annotation or the
-> > annotation of sdma_event_remap is wrong.
-> >
-> > Remove the __init annotation on sdma_event_remap to kill this build
-> > warning
-> >
-> > Signed-off-by: Jason Liu <r64343@freescale.com>
-> > Cc: Vinod Koul <vinod.koul@intel.com>
-> > Cc: Dan Williams <dan.j.williams@intel.com>
-> >
+> On Wednesday 11 November 2015 09:12:25 Gabriele Paoloni wrote:
+> > From: gabpao01 <gabriele.paoloni@huawei.com>
 > 
-> Looks good. I wonder why I have not caught this with the randconfig
-> builds yet.
-> 
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
-> 
-> One hint for the future: in the patch description, write less about the
-> kbuild warning and more about the actual impact of the bug (calling a
-> discarded function if the device gets unbound and rebound later, or if we
-> get deferred probing).
+> Regardless of this patch, you might want to update your global git
+> config
+> to use the proper name for your commits.
 
-Yes, that is true indeed. Thanks Arnd.
+Sorry, I am travelling and moved to another PC...I didn't notice
+the wrong name, my bad.
 
+> 
+> > commit b3a72384fe29 ("ARM/PCI: Replace
+> > pci_sys_data->align_resource with global function pointer") has
+> > introduced a global function pointer that makes the ARM specific
+> > code not portable and broken in case any platform have a two
+> > different HW IPs for the PCIe host bridge controller.
+> > This patch moves align_resource function pointer into
+> > pci_host_bridge structure so that the code is now suitable to be
+> > reworked as we want to get rid of hw_pci structure (the host bridge
+> > drivers can just set the align function pointer in the
+> > pci_host_bridge structure) and there is no more broken code for a
+> > SoC with two HW IPs.
+> >
+> > Signed-off-by: Gabriele Paoloni <gabriele.paoloni@huawei.com>
+> 
+> Thanks for doing this, that addresses my main concerns, and is probably
+> small enough to still get it into 4.4 if Bjorn agrees with the general
+> idea of putting more function pointers into struct pci_host_bridge.
+> 
+> As a follow-on to this, we can now try to get rid of
+> pcibios_align_resource
+> by moving the existing per-architecture implementations in there as
+> well,
+> with a reasonable default for the common case.
 > 
 > 	Arnd
