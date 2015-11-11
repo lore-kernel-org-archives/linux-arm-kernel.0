@@ -1,25 +1,31 @@
-From: alex.aring@gmail.com (Alexander Aring)
-Date: Wed, 11 Nov 2015 19:00:21 +0100
-Subject: [RFCv2 1/2] power: domain: add pm_genpd_uninit
-In-Reply-To: <20151105143445.GC599@omega>
-References: <1446590711-18928-1-git-send-email-alex.aring@gmail.com>
- <1446590711-18928-2-git-send-email-alex.aring@gmail.com>
- <CAPDyKFrkzMZZjFRM7EbqDqmW8EXzV22O_tp8a45LVGQYSn6b3g@mail.gmail.com>
- <20151105143445.GC599@omega>
-Message-ID: <20151111180019.GB2621@omega>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Wed, 11 Nov 2015 10:01:46 -0800
+Subject: [PATCH 00/10] ARM MTD AFS v2 partition support
+In-Reply-To: <CACRpkdafrinB=EdjRT2coHbG9o==QGPHqe0YNOk99gnFRkP_bg@mail.gmail.com>
+References: <1444914533-27782-1-git-send-email-linus.walleij@linaro.org>
+ <20151111021549.GV12143@google.com>
+ <CACRpkdafrinB=EdjRT2coHbG9o==QGPHqe0YNOk99gnFRkP_bg@mail.gmail.com>
+Message-ID: <20151111180146.GB12143@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Thu, Nov 05, 2015 at 03:34:45PM +0100, Alexander Aring wrote:
+On Wed, Nov 11, 2015 at 04:13:19PM +0100, Linus Walleij wrote:
+> On Wed, Nov 11, 2015 at 3:15 AM, Brian Norris
+> <computersforpeace@gmail.com> wrote:
 > 
-> What do you suggest to me for e.g. the raspberrypi power domain driver,
-> also simple ignore such error handling?
+> > Also, do you have a pointer that documents the v2 format? I can probably
+> > find something myself, but I'm a bit lazy, and if you have something
+> > easy to point me to, that'd save me some time :)
 > 
+> There are no documents. The documentation is the source code for
+> the on-board boot monitor (first thing started by the ROM) that
+> comes with the board on a CD/DVD. A .h file documents the struct
+> that is simply written to flash as footer and image info. I don't
+> think I may post it, the structs in the kernel correspond to these
+> structs.
 
-ping, I also can add some WARN_ON_ONCE, if the list for sub-domains,
-etc. are not empty. This would then report about wrong use of
-pm_genpd_uninit.
+Well, laziness paid off then; I probably wouldn't have been very
+successful if I looked myself.
 
-- Alex
+Thanks,
+Brian
