@@ -1,39 +1,57 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 11 Nov 2015 11:01:33 +0100
-Subject: [PATCH 1/1] dmaengine: imx-sdma: remove __init annotation on
- sdma_event_remap
-In-Reply-To: <1447233649-21464-1-git-send-email-r64343@freescale.com>
-References: <1447233649-21464-1-git-send-email-r64343@freescale.com>
-Message-ID: <4267122.WHg3VAy8bL@wuerfel>
+From: jens.wiklander@linaro.org (Jens Wiklander)
+Date: Wed, 11 Nov 2015 11:04:22 +0100
+Subject: [PATCH v2 0/4] ARM SMC Calling Convention interface
+Message-ID: <1447236266-7491-1-git-send-email-jens.wiklander@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 11 November 2015 17:20:49 Jason Liu wrote:
-> The sdma_probe function will call sdma_event_remap, but sdma_event_remap
-> marked with the __init annotation which make the kbuild complains as the
-> following log:
-> 
-> WARNING: drivers/dma/built-in.o(.text+0x56fc): Section mismatch in reference
-> from the function sdma_probe() to the function .init.text:sdma_event_remap()
-> The function sdma_probe() references
-> the function __init sdma_event_remap().
-> This is often because sdma_probe lacks a __init
-> annotation or the annotation of sdma_event_remap is wrong.
-> 
-> Remove the __init annotation on sdma_event_remap to kill this build warning
-> 
-> Signed-off-by: Jason Liu <r64343@freescale.com>
-> Cc: Vinod Koul <vinod.koul@intel.com>
-> Cc: Dan Williams <dan.j.williams@intel.com>
-> 
+Hi,
 
-Looks good. I wonder why I have not caught this with the randconfig builds yet.
+This patch set is based on the Generic TEE subsystem v6 patchset
+(https://lwn.net/Articles/662495/) sent out two weeks ago. By isolating
+the ARM SMC Calling Convention patches that are useful for other purposes
+than to support the Generic TEE subsystem some complexity is removed from
+that patch set.
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+This patch set adds a common interface to do an SMC or HVC following ARM
+SMC Calling Convention. The interface is implemented for both the arm and
+arm64 architectures and updates the PSCI driver to use this interface
+instead for firmware communication.
 
-One hint for the future: in the patch description, write less about the
-kbuild warning and more about the actual impact of the bug (calling a
-discarded function if the device gets unbound and rebound later, or
-if we get deferred probing).
+v2:
+* Added unwinding support in the assembly functions
 
-	Arnd
+Thanks,
+Jens
+
+Jens Wiklander (4):
+  arm/arm64: add arm-smccc
+  arm: add implementation for arm-smccc
+  arm64: add implementation for arm-smccc
+  drivers: psci: replace psci firmware calls
+
+ arch/arm/Kconfig                |  1 +
+ arch/arm/kernel/Makefile        |  3 +-
+ arch/arm/kernel/psci-call.S     | 31 -------------
+ arch/arm/kernel/smccc-call.S    | 50 +++++++++++++++++++++
+ arch/arm/kernel/smccc.c         | 18 ++++++++
+ arch/arm64/Kconfig              |  1 +
+ arch/arm64/kernel/Makefile      |  3 +-
+ arch/arm64/kernel/asm-offsets.c |  3 ++
+ arch/arm64/kernel/psci-call.S   | 28 ------------
+ arch/arm64/kernel/smccc-call.S  | 43 ++++++++++++++++++
+ arch/arm64/kernel/smccc.c       | 18 ++++++++
+ drivers/firmware/psci.c         | 23 +++++++++-
+ include/linux/arm-smccc.h       | 98 +++++++++++++++++++++++++++++++++++++++++
+ init/Kconfig                    |  3 ++
+ 14 files changed, 260 insertions(+), 63 deletions(-)
+ delete mode 100644 arch/arm/kernel/psci-call.S
+ create mode 100644 arch/arm/kernel/smccc-call.S
+ create mode 100644 arch/arm/kernel/smccc.c
+ delete mode 100644 arch/arm64/kernel/psci-call.S
+ create mode 100644 arch/arm64/kernel/smccc-call.S
+ create mode 100644 arch/arm64/kernel/smccc.c
+ create mode 100644 include/linux/arm-smccc.h
+
+-- 
+1.9.1
