@@ -1,50 +1,36 @@
-From: alexei.starovoitov@gmail.com (Alexei Starovoitov)
-Date: Wed, 11 Nov 2015 09:27:00 -0800
-Subject: [PATCH 2/2] arm64: bpf: add BPF XADD instruction
-In-Reply-To: <20151111162341.GN9562@arm.com>
-References: <CABg9mcux0wEC5=nWuR9o8NwUTp73zqZ-N2e67_f7oS_mX1XGdg@mail.gmail.com>
- <4902833.k8y8bz0YLV@wuerfel> <20151111102406.GB9562@arm.com>
- <56431B83.5060500@iogearbox.net> <20151111115851.GE9562@arm.com>
- <564332B0.2090103@iogearbox.net> <20151111123831.GJ9562@arm.com>
- <20151111125807.GP17308@twins.programming.kicks-ass.net>
- <56436420.9090401@iogearbox.net> <20151111162341.GN9562@arm.com>
-Message-ID: <20151111172659.GA86334@ast-mbp.thefacebook.com>
+From: uri.mashiach@compulab.co.il (Uri Mashiach)
+Date: Wed, 11 Nov 2015 19:32:17 +0200
+Subject: [PATCH 0/6] ARM: OMAP2+: dts: cm-t335: initial support
+In-Reply-To: <1445948100-16446-1-git-send-email-uri.mashiach@compulab.co.il>
+References: <1445948100-16446-1-git-send-email-uri.mashiach@compulab.co.il>
+Message-ID: <56437BA1.8030807@compulab.co.il>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 11, 2015 at 04:23:41PM +0000, Will Deacon wrote:
-> 
-> If we're going to document it, a bug tracker might be a good place to
-> start. The behaviour, as it stands, is broken wrt the definition of the
-> __sync primitives. That is, there is no way to build __sync_fetch_and_add
-> out of BPF_XADD without changing its semantics.
+Gentle ping
 
-BPF_XADD == atomic_add() in kernel. period.
-we are not going to deprecate it or introduce something else.
-Semantics of __sync* or atomic in C standard and/or gcc/llvm has
-nothing to do with this.
-arm64 JIT needs to JIT bpf_xadd insn equivalent to the code
-of atomic_add() which is 'stadd' in armv8.1.
-The cpu check can be done by jit and for older cpus just fall back
-to interpreter. trivial.
-
-> We could fix this by either:
-> 
-> (1) Defining BPF_XADD to match __sync_fetch_and_add (including memory
->     barriers).
-
-nope.
-
-> (2) Introducing some new BPF_ atomics, that map to something like the
->     C11 __atomic builtins and deprecating BPF_XADD in favour of these.
-
-nope.
-
-> (3) Introducing new source-language intrinsics to match what BPF can do
->     (unlikely to be popular).
-
-llvm's __sync intrinsic is used temporarily until we have time to do
-new intrinsic in llvm that matches kernel's atomic_add() properly.
-It will be done similar to llvm-bpf load_byte/word intrinsics.
-Note that we've been hiding it under lock_xadd() wrapper, like here:
-https://github.com/iovisor/bcc/blob/master/examples/networking/tunnel_monitor/monitor.c#L130
+On 27/10/15 14:14, Uri Mashiach wrote:
+> Add basic support for CompuLab cm-t335 module based on AM335X SoC.
+>
+> CM-T335 is a tiny computer-on-module (CoM) / system-on-module (SoM)
+> The module is built around the Texas Instruments Sitara AM3352/4
+> system-on-chip.
+>
+> The CPU is supplemented with up-to 512MB DDR3 and up-to 1GB of on-board
+> NAND storage, WiFi connected to SPI, Bluetooth, Analog audio, Gigabit
+> Ethernet, CAN bus.
+>
+> Ilya Ledvich (6):
+>    ARM: OMAP2+: dts: cm-t335: add initial support
+>    ARM: OMAP2+: dts: cm-t335: add basic support for I2C
+>    ARM: OMAP2+: dts: cm-t335: add support for NAND flash
+>    ARM: OMAP2+: dts: cm-t335: add support for MMC
+>    ARM: OMAP2+: dts: cm-t335: add support for network device
+>    ARM: OMAP2+: dts: cm-t335: add support for PWM backlight
+>
+>   .../devicetree/bindings/arm/omap/omap.txt          |   3 +
+>   arch/arm/boot/dts/Makefile                         |   7 +-
+>   arch/arm/boot/dts/am335x-cm-t335.dts               | 347 +++++++++++++++++++++
+>   3 files changed, 354 insertions(+), 3 deletions(-)
+>   create mode 100644 arch/arm/boot/dts/am335x-cm-t335.dts
+>
