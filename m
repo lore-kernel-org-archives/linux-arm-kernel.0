@@ -1,89 +1,118 @@
-From: alim.akhtar@samsung.com (Alim Akhtar)
-Date: Wed, 11 Nov 2015 13:33:23 +0530
-Subject: PSCI: NULL pointer dereference
-Message-ID: <5642F64B.3030801@samsung.com>
+From: vinod.koul@intel.com (Vinod Koul)
+Date: Wed, 11 Nov 2015 13:44:08 +0530
+Subject: [PATCH v2 1/3] dma: Add Freescale qDMA engine driver support
+In-Reply-To: <1445565553-1141-1-git-send-email-yao.yuan@freescale.com>
+References: <1445565553-1141-1-git-send-email-yao.yuan@freescale.com>
+Message-ID: <20151111081408.GI25173@localhost>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark/Lorenzo,
+On Fri, Oct 23, 2015 at 09:59:11AM +0800, Yuan Yao wrote:
 
-Getting a NULL pointer dereference from psci_0_2_set_functions() like [1].
-But this goes away with a addition of a printk (see blow diff) or a 
-udelay(10) with the same firmware on the board.
+> +config FSL_QDMA
+> +	tristate "Freescale qDMA engine support"
+> +	depends on SOC_LS1021A || ARCH_LAYERSCAPE
 
-diff --git a/drivers/firmware/psci.c b/drivers/firmware/psci.c
-index d24f35d74b27..92a0798e4138 100644
---- a/drivers/firmware/psci.c
-+++ b/drivers/firmware/psci.c
-@@ -312,6 +312,7 @@ static void __init psci_0_2_set_functions(void)
-         psci_function_id[PSCI_FN_CPU_OFF] = PSCI_0_2_FN_CPU_OFF;
-         psci_ops.cpu_off = psci_cpu_off;
+Where is this ARCH defined, quick grep revealed none
 
-+       pr_info("Using standard PSCI v0.2 function IDs CPU_OFF\n");
-         psci_function_id[PSCI_FN_CPU_ON] = PSCI_FN_NATIVE(0_2, CPU_ON);
-         psci_ops.cpu_on = psci_cpu_on;
+> +static void fsl_qdma_set_tcd_params(struct fsl_qdma_chan *fsl_chan,
+> +					u64 src, u64 dst, u32 nbytes)
+> +{
+> +	void __iomem *addr = fsl_chan->qdma->membase;
+> +	u32 reg;
+> +
+> +	/*
+> +	 * Source address.
+> +	 * Represents address bits 31-0 of a 49-bit source address.
+> +	 */
+> +	qdma_writel(fsl_chan->qdma, (u32)src, addr + FSL_QDMA_DLSAR);
+> +	/*
+> +	 * Source address.
+> +	 * Represents address bits 47-32 of a 49-bit source address.
+> +	 */
+> +	reg = qdma_readl(fsl_chan->qdma, addr + FSL_QDMA_DLSATR);
+> +	reg |= (u16)(src >> 32) & 0xffff;
+> +	reg |= FSL_QDMA_SRTTYPE_R_N;
+> +	qdma_writel(fsl_chan->qdma, reg, addr + FSL_QDMA_DLSATR);
 
+How does this work on systems with enither endieness ?
 
-My firmware returns PSCI_E_NOT_SUPPORTED for psci_migrate() and 
-PSCI_TOS_NOT_PRESENT_MP for psci_migrate_info_type().
+Also why not use readq/writeq helpers, registers seem to be contagious
 
-Any idea, what going wrong?
-Why adding a print or delay always works?
+> +static enum dma_status fsl_qdma_tx_status(struct dma_chan *chan,
+> +		dma_cookie_t cookie, struct dma_tx_state *txstate)
+> +{
+> +	return dma_cookie_status(chan, cookie, txstate);
 
-[1]:
-==============
+No residue ?
 
-psci: probing for conduit method from DT.
-psci: PSCIv0.2 detected in firmware.
-psci: Using standard PSCI v0.2 function IDs
-Unable to handle kernel NULL pointer dereference at virtual address 00000be8
-pgd = ffffffc00097f000
-[00000be8] *pgd=0000000000000000, *pud=0000000000000000
-Internal error: Oops: 96000045 [#1] PREEMPT SMP
-Modules linked in:
-CPU: 0 PID: 0 Comm: swapper Not tainted 4.3.0-next-20151109+ #13
+> +static irqreturn_t fsl_qdma_controller_handler_err(int irq, void *dev_id)
+> +{
+> +	struct fsl_qdma_engine *fsl_qdma = dev_id;
+> +	u32 reg;
+> +
+> +	reg = qdma_readl(fsl_qdma, fsl_qdma->membase + FSL_QDMA_DLSR);
+> +
+> +	if (reg & FSL_QDMA_DLSR_TE) {
+> +		dev_err(fsl_qdma->dma_dev.dev,
+> +			"Transfer error. Check your address please!\n");
 
-task: ffffffc0008d1100 ti: ffffffc0008c4000 task.ti: ffffffc0008c4000
-PC is at psci_0_2_init+0x90/0x290
-LR is at psci_0_2_init+0x84/0x290
-pc : [<ffffffc00084e4a0>] lr : [<ffffffc00084e494>] pstate: 600002c5
-sp : ffffffc0008c7eb0
-x29: ffffffc0008c7eb0 x28: 0000000000000000
-x27: ffffffc002000000 x26: ffffffc0008d28b0
-x25: ffffffc0007680b8 x24: ffffffc0008d2000
-x23: ffffffc0008d75b0 x22: 0000000000000000
-x21: 0000000000000000 x20: 0000000000000bb8
-x19: 0000000000000000 x18: 0000000000000000
-x17: 0000000000000000 x16: 0000000000000000
-x15: 0000000000000000 x14: 0000000000000000
-x13: 0000000000000000 x12: 0000000000000006
-x11: 0000000000000000 x10: 000000000000000f
-x9 : 0000000000000010 x8 : 6620322e30762049
-x7 : ffffffc0008caa58 x6 : 0000000000000001
-x5 : ffffffc0003bfda4 x4 : 0000000000000000
-x3 : 0000000000000000 x2 : 0000000000000001
-x1 : ffffffc0004c77bc x0 : 000000000000002b
+It would help to print the addresses...
 
-Process swapper (pid: 0, stack limit = 0xffffffc0008c4020)
-Stack: (0xffffffc0008c7eb0 to 0xffffffc0008c8000)
-7ea0:                                   ffffffc0008c7ee0 ffffffc00084e6cc
-7ec0: ffffffc0befe5f80 ffffffc0009524a8 ffffffc0008d2ab0 ffffffc0008e0000
-7ee0: ffffffc0008c7f00 ffffffc00082b618 ffffffc0befe5f80 ffffffc00089c708
-7f00: ffffffc0008c7fa0 ffffffc000828668 0000000000000001 ffffffc000861d80
-7f20: 0000000048000000 0000000000000000 ffffffc0008ca000 0000000040000000
-7f40: 000000004097c000 000000004097f000 ffffffc000081198 00000000ffffffc8
-7f60: 000000008f065000 ffffffc0005d80a0 0000000000000001 0000000048000000
-7f80: ffffffffffffffff 0000000000000000 0000000000000080 fefefefefefefefe
-7fa0: 0000000000000000 00000000405d4000 000000008f065000 0000000000000e11
-7fc0: 0000000048000000 0000000000000000 0000000000000000 0000000040000000
-7fe0: 0000000000000000 ffffffc0008625a8 0000000000000000 0000000000000000
-Call trace:
-[<ffffffc00084e4a0>] psci_0_2_init+0x90/0x290
-[<ffffffc00084e6cc>] psci_dt_init+0x2c/0x3c
-[<ffffffc00082b618>] setup_arch+0x384/0x550
-[<ffffffc000828668>] start_kernel+0x98/0x3b8
-[<00000000405d4000>] 0x405d4000
-Code: 97e3c1ec b0ffe3c1 912ee2b4 911ef021 (f9001a81)
----[ end trace cb88537fdc8fa200 ]---
-Kernel panic - not syncing: Attempted to kill the idle task!
----[ end Kernel panic - not syncing: Attempted to kill the idle task!
+> +		ret = devm_request_irq(&pdev->dev, fsl_qdma->controller_irq,
+> +				fsl_qdma_controller_handler, 0,
+> +				"qDMA controller", fsl_qdma);
+> +		if (ret) {
+> +			dev_err(&pdev->dev,
+> +				"Can't register qDMA controller IRQ.\n");
+> +			return  ret;
+> +		}
+> +
+> +		ret = devm_request_irq(&pdev->dev, fsl_qdma->err_irq,
+> +				fsl_qdma_controller_handler_err, 0,
+> +				"qDMA err", fsl_qdma);
+> +		if (ret) {
+> +			dev_err(&pdev->dev, "Can't register qDMA err IRQ.\n");
+> +			return  ret;
+> +		}
+
+why do you want devm variant here..?
+
+> +	dma_cap_set(DMA_PRIVATE, fsl_qdma->dma_dev.cap_mask);
+> +	dma_cap_set(DMA_MEMCPY, fsl_qdma->dma_dev.cap_mask);
+> +
+> +	fsl_qdma->dma_dev.dev = &pdev->dev;
+> +	fsl_qdma->dma_dev.device_free_chan_resources
+> +		= fsl_qdma_free_chan_resources;
+> +	fsl_qdma->dma_dev.device_tx_status = fsl_qdma_tx_status;
+> +	fsl_qdma->dma_dev.device_prep_dma_memcpy = fsl_qdma_prep_memcpy;
+> +	fsl_qdma->dma_dev.device_issue_pending = fsl_qdma_issue_pending;
+
+No terminate_all callback?
+
+> +static int fsl_qdma_remove(struct platform_device *pdev)
+> +{
+> +	struct device_node *np = pdev->dev.of_node;
+> +	struct fsl_qdma_engine *fsl_qdma = platform_get_drvdata(pdev);
+> +
+> +	of_dma_controller_free(np);
+> +	dma_async_device_unregister(&fsl_qdma->dma_dev);
+
+And as i said above, the irq is left enabled, pls free that up
+
+> +static int __init fsl_qdma_init(void)
+> +{
+> +	return platform_driver_register(&fsl_qdma_driver);
+> +}
+> +subsys_initcall(fsl_qdma_init);
+> +
+> +static void __exit fsl_qdma_exit(void)
+> +{
+> +	platform_driver_unregister(&fsl_qdma_driver);
+> +}
+> +module_exit(fsl_qdma_exit);
+
+module_platform_driver please
+
+-- 
+~Vinod
