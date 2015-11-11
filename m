@@ -1,112 +1,68 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Wed, 11 Nov 2015 08:10:58 +0530
-Subject: [PATCH V3 5/5] ARM: dts: exynos4412: Rename OPP nodes as opp@<opp-hz>
-In-Reply-To: <cover.1447209519.git.viresh.kumar@linaro.org>
-References: <cover.1447209519.git.viresh.kumar@linaro.org>
-Message-ID: <af18ab62fc9c52e082380ce5989ea287304c9bde.1447209519.git.viresh.kumar@linaro.org>
+From: zlim.lnx@gmail.com (Z Lim)
+Date: Tue, 10 Nov 2015 18:45:39 -0800
+Subject: [PATCH 1/2] arm64: bpf: add 'store immediate' instruction
+In-Reply-To: <1447195301-16757-2-git-send-email-yang.shi@linaro.org>
+References: <1447195301-16757-1-git-send-email-yang.shi@linaro.org>
+ <1447195301-16757-2-git-send-email-yang.shi@linaro.org>
+Message-ID: <CABg9mct-_AF9+kvZ0OG_JTMHkfj+OEsR2vonrxF=yD-yA6ihQw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-OPP bindings got updated to name OPP nodes this way, make changes
-according to that.
+On Tue, Nov 10, 2015 at 2:41 PM, Yang Shi <yang.shi@linaro.org> wrote:
+> aarch64 doesn't have native store immediate instruction, such operation
 
-Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-Signed-off-by: Viresh Kumar <viresh.kumar@linaro.org>
----
- arch/arm/boot/dts/exynos4412.dtsi | 28 ++++++++++++++--------------
- 1 file changed, 14 insertions(+), 14 deletions(-)
+Actually, aarch64 does have "STR (immediate)". For arm64 JIT, we can
+consider using it as an optimization.
 
-diff --git a/arch/arm/boot/dts/exynos4412.dtsi b/arch/arm/boot/dts/exynos4412.dtsi
-index 294cfe40388d..40beede46e55 100644
---- a/arch/arm/boot/dts/exynos4412.dtsi
-+++ b/arch/arm/boot/dts/exynos4412.dtsi
-@@ -64,73 +64,73 @@
- 		compatible = "operating-points-v2";
- 		opp-shared;
- 
--		opp00 {
-+		opp at 200000000 {
- 			opp-hz = /bits/ 64 <200000000>;
- 			opp-microvolt = <900000>;
- 			clock-latency-ns = <200000>;
- 		};
--		opp01 {
-+		opp at 300000000 {
- 			opp-hz = /bits/ 64 <300000000>;
- 			opp-microvolt = <900000>;
- 			clock-latency-ns = <200000>;
- 		};
--		opp02 {
-+		opp at 400000000 {
- 			opp-hz = /bits/ 64 <400000000>;
- 			opp-microvolt = <925000>;
- 			clock-latency-ns = <200000>;
- 		};
--		opp03 {
-+		opp at 500000000 {
- 			opp-hz = /bits/ 64 <500000000>;
- 			opp-microvolt = <950000>;
- 			clock-latency-ns = <200000>;
- 		};
--		opp04 {
-+		opp at 600000000 {
- 			opp-hz = /bits/ 64 <600000000>;
- 			opp-microvolt = <975000>;
- 			clock-latency-ns = <200000>;
- 		};
--		opp05 {
-+		opp at 700000000 {
- 			opp-hz = /bits/ 64 <700000000>;
- 			opp-microvolt = <987500>;
- 			clock-latency-ns = <200000>;
- 		};
--		opp06 {
-+		opp at 800000000 {
- 			opp-hz = /bits/ 64 <800000000>;
- 			opp-microvolt = <1000000>;
- 			clock-latency-ns = <200000>;
- 			opp-suspend;
- 		};
--		opp07 {
-+		opp at 900000000 {
- 			opp-hz = /bits/ 64 <900000000>;
- 			opp-microvolt = <1037500>;
- 			clock-latency-ns = <200000>;
- 		};
--		opp08 {
-+		opp at 1000000000 {
- 			opp-hz = /bits/ 64 <1000000000>;
- 			opp-microvolt = <1087500>;
- 			clock-latency-ns = <200000>;
- 		};
--		opp09 {
-+		opp at 1100000000 {
- 			opp-hz = /bits/ 64 <1100000000>;
- 			opp-microvolt = <1137500>;
- 			clock-latency-ns = <200000>;
- 		};
--		opp10 {
-+		opp at 1200000000 {
- 			opp-hz = /bits/ 64 <1200000000>;
- 			opp-microvolt = <1187500>;
- 			clock-latency-ns = <200000>;
- 		};
--		opp11 {
-+		opp at 1300000000 {
- 			opp-hz = /bits/ 64 <1300000000>;
- 			opp-microvolt = <1250000>;
- 			clock-latency-ns = <200000>;
- 		};
--		opp12 {
-+		opp at 1400000000 {
- 			opp-hz = /bits/ 64 <1400000000>;
- 			opp-microvolt = <1287500>;
- 			clock-latency-ns = <200000>;
- 		};
--		opp13 {
-+		opp at 1500000000 {
- 			opp-hz = /bits/ 64 <1500000000>;
- 			opp-microvolt = <1350000>;
- 			clock-latency-ns = <200000>;
--- 
-2.6.2.198.g614a2ac
+You may also want to consider adding a note about the corresponding test cases:
+    commit cffc642d93f9 ("test_bpf: add 173 new testcases for eBPF").
+
+Otherwise, the patch below looks good.
+Reviewed-by: Zi Shen Lim <zlim.lnx@gmail.com>
+
+> has to be implemented by the below instruction sequence:
+>
+> Load immediate to register
+> Store register
+>
+> Signed-off-by: Yang Shi <yang.shi@linaro.org>
+> CC: Zi Shen Lim <zlim.lnx@gmail.com>
+> CC: Xi Wang <xi.wang@gmail.com>
+> ---
+>  arch/arm64/net/bpf_jit_comp.c | 20 +++++++++++++++++++-
+>  1 file changed, 19 insertions(+), 1 deletion(-)
+>
+> diff --git a/arch/arm64/net/bpf_jit_comp.c b/arch/arm64/net/bpf_jit_comp.c
+> index 6809647..49c1f1b 100644
+> --- a/arch/arm64/net/bpf_jit_comp.c
+> +++ b/arch/arm64/net/bpf_jit_comp.c
+> @@ -563,7 +563,25 @@ emit_cond_jmp:
+>         case BPF_ST | BPF_MEM | BPF_H:
+>         case BPF_ST | BPF_MEM | BPF_B:
+>         case BPF_ST | BPF_MEM | BPF_DW:
+> -               goto notyet;
+> +               /* Load imm to a register then store it */
+> +               ctx->tmp_used = 1;
+> +               emit_a64_mov_i(1, tmp2, off, ctx);
+> +               emit_a64_mov_i(1, tmp, imm, ctx);
+> +               switch (BPF_SIZE(code)) {
+> +               case BPF_W:
+> +                       emit(A64_STR32(tmp, dst, tmp2), ctx);
+> +                       break;
+> +               case BPF_H:
+> +                       emit(A64_STRH(tmp, dst, tmp2), ctx);
+> +                       break;
+> +               case BPF_B:
+> +                       emit(A64_STRB(tmp, dst, tmp2), ctx);
+> +                       break;
+> +               case BPF_DW:
+> +                       emit(A64_STR64(tmp, dst, tmp2), ctx);
+> +                       break;
+> +               }
+> +               break;
+>
+>         /* STX: *(size *)(dst + off) = src */
+>         case BPF_STX | BPF_MEM | BPF_W:
+> --
+> 2.0.2
+>
