@@ -1,32 +1,21 @@
-From: mkl@pengutronix.de (Marc Kleine-Budde)
-Date: Wed, 11 Nov 2015 14:32:44 +0100
-Subject: [PATCH] ARM: dts: imx25: add alias for pwm nodes
-Message-ID: <1447248764-17005-1-git-send-email-mkl@pengutronix.de>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Wed, 11 Nov 2015 14:42:14 +0100
+Subject: [RFC v3 1/2] Documentation: bridge: Add documentation for
+ ps8640 DT properties
+In-Reply-To: <1447246394-18815-1-git-send-email-jitao.shi@mediatek.com>
+References: <1447246394-18815-1-git-send-email-jitao.shi@mediatek.com>
+Message-ID: <1447249334.4185.10.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This, together with the corresponding patch to pwm-imx.c,  allows to order the
-pwm devices correctly.
+Am Mittwoch, den 11.11.2015, 20:53 +0800 schrieb Jitao Shi:
+> Add documentation for DT properties supported by
+> ps8640 DSI-eDP converter.
+> 
+> Signed-off-by: Jitao Shi <jitao.shi@mediatek.com>
+> Acked-by: Rob Herring <robh@kernel.org>
 
-Signed-off-by: Marc Kleine-Budde <mkl@pengutronix.de>
----
- arch/arm/boot/dts/imx25.dtsi | 4 ++++
- 1 file changed, 4 insertions(+)
+Reviewed-by: Philipp Zabel <p.zabel@pengutronix.de>
 
-diff --git a/arch/arm/boot/dts/imx25.dtsi b/arch/arm/boot/dts/imx25.dtsi
-index 677f81d9dcd5..cde329e9b9e3 100644
---- a/arch/arm/boot/dts/imx25.dtsi
-+++ b/arch/arm/boot/dts/imx25.dtsi
-@@ -24,6 +24,10 @@
- 		i2c2 = &i2c3;
- 		mmc0 = &esdhc1;
- 		mmc1 = &esdhc2;
-+		pwm0 = &pwm1;
-+		pwm1 = &pwm2;
-+		pwm2 = &pwm3;
-+		pwm3 = &pwm4;
- 		serial0 = &uart1;
- 		serial1 = &uart2;
- 		serial2 = &uart3;
--- 
-2.6.1
+best regards
+Philipp
