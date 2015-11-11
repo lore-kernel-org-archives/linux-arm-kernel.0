@@ -1,26 +1,85 @@
-From: paul@pwsan.com (Paul Walmsley)
-Date: Wed, 11 Nov 2015 20:22:34 +0000 (UTC)
-Subject: [PATCH] ARM: OMAP: DRA7: hwmod: Add data for McASP3
-In-Reply-To: <56439641.6070901@ti.com>
-References: <1447261631-26362-1-git-send-email-balbi@ti.com>
- <56439641.6070901@ti.com>
-Message-ID: <alpine.DEB.2.02.1511112022100.24530@utopia.booyaka.com>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 11 Nov 2015 14:22:36 -0600
+Subject: [RFC PATCH v1 2/2] dt-bindings: add document for Innosilicon
+ HDMI on Rockchip platform
+In-Reply-To: <1447228052-4897-1-git-send-email-ykk@rock-chips.com>
+References: <1447227952-4787-1-git-send-email-ykk@rock-chips.com>
+ <1447228052-4897-1-git-send-email-ykk@rock-chips.com>
+Message-ID: <20151111202236.GA5629@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 11 Nov 2015, Peter Ujfalusi wrote:
+On Wed, Nov 11, 2015 at 03:47:32PM +0800, Yakir Yang wrote:
+> Signed-off-by: Yakir Yang <ykk@rock-chips.com>
 
-> On 11/11/2015 07:07 PM, Felipe Balbi wrote:
-> > From: Peter Ujfalusi <peter.ujfalusi@ti.com>
-> > 
-> > McASP3 is used by default on DRA7x based boards for audio.
+Acked-by: Rob Herring <robh@kernel.org>
+
+> ---
+>  .../display/rockchip/inno_hdmi-rockchip.txt        | 50 ++++++++++++++++++++++
+>  1 file changed, 50 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/display/rockchip/inno_hdmi-rockchip.txt
 > 
-> While this patch works, it is not the correct one(s) to apply.
-> https://lkml.org/lkml/2015/10/30/91
-> is the series which should have been applied to 4.4.
-> Paul acked the series, but for some reason it missed the initial ARM pull for 4.4
-
-It missed it because I was late getting my patches out for 4.4...
-
-
-- Paul
+> diff --git a/Documentation/devicetree/bindings/display/rockchip/inno_hdmi-rockchip.txt b/Documentation/devicetree/bindings/display/rockchip/inno_hdmi-rockchip.txt
+> new file mode 100644
+> index 0000000..1898408
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/display/rockchip/inno_hdmi-rockchip.txt
+> @@ -0,0 +1,50 @@
+> +Rockchip specific extensions to the Innosilicon HDMI
+> +================================
+> +
+> +Required properties:
+> +- compatible:
+> +	"rockchip,rk3036-dw-hdmi";
+> +- reg:
+> +	Physical base address and length of the controller's registers.
+> +- clocks, clock-names:
+> +	Phandle to hdmi controller clock, name should be "pclk"
+> +- interrupts:
+> +	HDMI interrupt number
+> +- ports:
+> +	Contain one port node with endpoint definitions as defined in
+> +	Documentation/devicetree/bindings/graph.txt.
+> +- pinctrl-0, pinctrl-name:
+> +	Switch the iomux of HPD/CEC pins to HDMI function.
+> +
+> +Example:
+> +hdmi: hdmi at 20034000 {
+> +	compatible = "rockchip,rk3036-inno-hdmi";
+> +	reg = <0x20034000 0x4000>;
+> +	interrupts = <GIC_SPI 45 IRQ_TYPE_LEVEL_HIGH>;
+> +	clocks = <&cru  PCLK_HDMI>;
+> +	clock-names = "pclk";
+> +	pinctrl-names = "default";
+> +	pinctrl-0 = <&hdmi_ctl>;
+> +	status = "disabled";
+> +
+> +	hdmi_in: port {
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +		hdmi_in_lcdc: endpoint at 0 {
+> +			reg = <0>;
+> +			remote-endpoint = <&lcdc_out_hdmi>;
+> +		};
+> +	};
+> +};
+> +
+> +&pinctrl {
+> +	hdmi {
+> +		hdmi_ctl: hdmi-ctl {
+> +			rockchip,pins = <1 8  RK_FUNC_1 &pcfg_pull_none>,
+> +					<1 9  RK_FUNC_1 &pcfg_pull_none>,
+> +					<1 10 RK_FUNC_1 &pcfg_pull_none>,
+> +					<1 11 RK_FUNC_1 &pcfg_pull_none>;
+> +		};
+> +	};
+> +
+> +};
+> -- 
+> 1.9.1
+> 
+> 
+> _______________________________________________
+> dri-devel mailing list
+> dri-devel at lists.freedesktop.org
+> http://lists.freedesktop.org/mailman/listinfo/dri-devel
