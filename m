@@ -1,42 +1,36 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Wed, 11 Nov 2015 19:54:15 +0100
+From: davem@davemloft.net (David Miller)
+Date: Wed, 11 Nov 2015 14:01:06 -0500 (EST)
 Subject: [PATCH 2/2] arm64: bpf: add BPF XADD instruction
-In-Reply-To: <20151111184427.GH11639@twins.programming.kicks-ass.net>
-References: <56436420.9090401@iogearbox.net> <20151111162341.GN9562@arm.com>
- <20151111172659.GA86334@ast-mbp.thefacebook.com>
+In-Reply-To: <20151111174401.GO9562@arm.com>
+References: <20151111172659.GA86334@ast-mbp.thefacebook.com>
  <20151111.123548.1039494689070388545.davem@davemloft.net>
- <20151111175741.GR17308@twins.programming.kicks-ass.net>
- <20151111181132.GA90947@ast-mbp.thefacebook.com>
- <20151111183128.GS17308@twins.programming.kicks-ass.net>
- <20151111184427.GH11639@twins.programming.kicks-ass.net>
-Message-ID: <20151111185415.GI11639@twins.programming.kicks-ass.net>
+ <20151111174401.GO9562@arm.com>
+Message-ID: <20151111.140106.1736782849444456527.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 11, 2015 at 07:44:27PM +0100, Peter Zijlstra wrote:
-> On Wed, Nov 11, 2015 at 07:31:28PM +0100, Peter Zijlstra wrote:
-> > > Add new one that does 'fetch_and_add' ? What is the real use case it
-> > > will be used for?
-> > 
-> > Look at all the atomic_{add,dec}_return*() users in the kernel. A typical
-> > example would be a reader-writer lock implementations. See
-> > include/asm-generic/rwsem.h for examples.
+From: Will Deacon <will.deacon@arm.com>
+Date: Wed, 11 Nov 2015 17:44:01 +0000
+
+> On Wed, Nov 11, 2015 at 12:35:48PM -0500, David Miller wrote:
+>> From: Alexei Starovoitov <alexei.starovoitov@gmail.com>
+>> Date: Wed, 11 Nov 2015 09:27:00 -0800
+>> 
+>> > BPF_XADD == atomic_add() in kernel. period.
+>> > we are not going to deprecate it or introduce something else.
+>> 
+>> Agreed, it makes no sense to try and tie C99 or whatever atomic
+>> semantics to something that is already clearly defined to have
+>> exactly kernel atomic_add() semantics.
 > 
-> Maybe a better example would be refcounting, where you free on 0.
-> 
-> 	if (!fetch_add(&obj->ref, -1))
-> 		free(obj);
+> ... and which is emitted by LLVM when asked to compile __sync_fetch_and_add,
+> which has clearly defined (yet conflicting) semantics.
 
-Urgh, too used to the atomic_add_return(), which returns post op. That
-wants to be:
+Alexei clearly stated that he knows about this issue and will fully
+fix this up in LLVM.
 
-	if (fetch_add(&obj->ref, -1) == 1)
-		free(obj);
+What more do you need to hear from him once he's stated that he is
+aware and is working on it?  Meanwhile you should make your JIT emit
+what is expected, rather than arguing to change the semantics.
 
-Note that I would very much recommend _against_ encoding the post-op
-thing in instructions. It works for reversible operations (like add) but
-is pointless for irreversible operations (like or).
-
-That is, given or_return(), you cannot reconstruct the state
-prior to the operation, so or_return() provides less information than
-fetch_or().
+Thanks.
