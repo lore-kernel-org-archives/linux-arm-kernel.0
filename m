@@ -1,66 +1,22 @@
-From: dawei.chien@mediatek.com (dawei chien)
-Date: Wed, 11 Nov 2015 20:00:45 +0800
-Subject: [PATCH v3 0/2] thermal: mediatek: Add cpu power cooling model
-In-Reply-To: <20151106032046.GK3773@ubuntu>
-References: <1445515359-8587-1-git-send-email-dawei.chien@mediatek.com>
- <20151028154449.GH3716@ubuntu> <1446461181.10039.28.camel@mtksdaap41>
- <20151102121034.GA3639@ubuntu> <1446721761.4016.56.camel@mtksdaap41>
- <20151106032046.GK3773@ubuntu>
-Message-ID: <1447243245.11462.19.camel@mtksdaap41>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 11 Nov 2015 12:12:56 +0000
+Subject: [PATCH 1/2] arm64: bpf: add 'store immediate' instruction
+In-Reply-To: <CABg9mct-_AF9+kvZ0OG_JTMHkfj+OEsR2vonrxF=yD-yA6ihQw@mail.gmail.com>
+References: <1447195301-16757-1-git-send-email-yang.shi@linaro.org>
+ <1447195301-16757-2-git-send-email-yang.shi@linaro.org>
+ <CABg9mct-_AF9+kvZ0OG_JTMHkfj+OEsR2vonrxF=yD-yA6ihQw@mail.gmail.com>
+Message-ID: <20151111121256.GI9562@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2015-11-06 at 08:50 +0530, Viresh Kumar wrote:
-> On 05-11-15, 19:09, dawei chien wrote:
-> > Thank you for your kindly explaining, now I could understand what I
-> > miss, I will send device tree binding on next version such like
-> > following description.
-> > 
-> > --- a/Documentation/devicetree/bindings/clock/mt8173-cpu-dvfs.txt
-> > +++ b/Documentation/devicetree/bindings/clock/mt8173-cpu-dvfs.txt
-> > @@ -10,6 +10,17 @@ Required properties:
-> >         Please refer to
-> > Documentation/devicetree/bindings/clk/clock-bindings.txt for
-> >         generic clock consumer properties.
-> >  - proc-supply: Regulator for Vproc of CPU cluster.
-> > +- dynamic-power-coefficient:
-> > +       Usage: optional
-> > +       Value type: <prop-encoded-array>
-> > +       Definition: A u32 value that represents an indicative
-> > +       running time dynamic power coefficient in
-> > +       fundamental units of mW/MHz/uVolt^2.
-> > +       The dynamic energy consumption of the CPU
-> > +       is proportional to the square of the
-> > +       Voltage (V) and the clock frequency (f).
-> > +       Pdyn = dynamic-power-coefficient * V^2 * f
-> > +       where voltage is in uV, frequency is in MHz.
+On Tue, Nov 10, 2015 at 06:45:39PM -0800, Z Lim wrote:
+> On Tue, Nov 10, 2015 at 2:41 PM, Yang Shi <yang.shi@linaro.org> wrote:
+> > aarch64 doesn't have native store immediate instruction, such operation
 > 
-> Please check with Punit if he is planning to add the same.
-Punit just sent the patch for this binding[1] yesterday, so I will re-send next version once his patch has been reviewed.
-> > Thank you for your kindly explaining, Now I know I should develop and
-> > test on mainline branch since this is where I try to add code.
-> > 
-> > However, please understanding currently mt8173_cpufreq.c is not ready
-> > for OPPV2 in mainline as far, that's the reason why currently I can't
-> > reuse OPPV2 and extend for static power table. My propose is for adding
-> > CPU cooling device for our own product.
-> 
-> Firstly, we don't care. You are pushing something to mainline, you
-> have to get it tested someway on mainline.
-> 
-> Secondly, there are *almost* no changes required to the mtk cpufreq
-> driver for OPPV2. Just update your DT in a similar way it is done for
-> one of the exynos platforms and it should just work fine.
-> 
-In our platform, thermal throttling is good enough with dynamic power
-only, so my plan is to send dynamic power model first in next version.
+> Actually, aarch64 does have "STR (immediate)". For arm64 JIT, we can
+> consider using it as an optimization.
 
-Regarding static power model, we will continue discussing with ARM to
-find a better solution.
+Yes, I'd definitely like to see that in preference to moving via a
+temporary register.
 
-Thanks.
-
-[1] https://lkml.org/lkml/2015/11/9/542
-
-BR,
-Dawei
+Will
