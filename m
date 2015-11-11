@@ -1,31 +1,72 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 11 Nov 2015 12:39:56 +0000
-Subject: [PATCH 1/2] arm64: bpf: add 'store immediate' instruction
-In-Reply-To: <20151111121256.GI9562@arm.com>
-References: <1447195301-16757-1-git-send-email-yang.shi@linaro.org>
- <1447195301-16757-2-git-send-email-yang.shi@linaro.org>
- <CABg9mct-_AF9+kvZ0OG_JTMHkfj+OEsR2vonrxF=yD-yA6ihQw@mail.gmail.com>
- <20151111121256.GI9562@arm.com>
-Message-ID: <20151111123955.GK9562@arm.com>
+From: jitao.shi@mediatek.com (Jitao Shi)
+Date: Wed, 11 Nov 2015 20:53:13 +0800
+Subject: [RFC v3 1/2] Documentation: bridge: Add documentation for ps8640 DT
+ properties
+Message-ID: <1447246394-18815-1-git-send-email-jitao.shi@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 11, 2015 at 12:12:56PM +0000, Will Deacon wrote:
-> On Tue, Nov 10, 2015 at 06:45:39PM -0800, Z Lim wrote:
-> > On Tue, Nov 10, 2015 at 2:41 PM, Yang Shi <yang.shi@linaro.org> wrote:
-> > > aarch64 doesn't have native store immediate instruction, such operation
-> > 
-> > Actually, aarch64 does have "STR (immediate)". For arm64 JIT, we can
-> > consider using it as an optimization.
-> 
-> Yes, I'd definitely like to see that in preference to moving via a
-> temporary register.
+Add documentation for DT properties supported by
+ps8640 DSI-eDP converter.
 
-Wait a second, we're both talking rubbish here :) The STR (immediate)
-form is referring to the addressing mode, whereas this patch wants to
-store an immediate value to memory, which does need moving to a register
-first.
+Signed-off-by: Jitao Shi <jitao.shi@mediatek.com>
+Acked-by: Rob Herring <robh@kernel.org>
+---
+changes since v2:
+        tune properties in example match Required properties
+---
+ .../devicetree/bindings/display/bridge/ps8640.txt  |   43 ++++++++++++++++++++
+ 1 file changed, 43 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/display/bridge/ps8640.txt
 
-So the original patch is fine.
-
-Will
+diff --git a/Documentation/devicetree/bindings/display/bridge/ps8640.txt b/Documentation/devicetree/bindings/display/bridge/ps8640.txt
+new file mode 100644
+index 0000000..a3e0971
+--- /dev/null
++++ b/Documentation/devicetree/bindings/display/bridge/ps8640.txt
+@@ -0,0 +1,43 @@
++ps8640-bridge bindings
++
++Required properties:
++	- compatible: "parade,ps8640"
++	- reg: first page address of the bridge.
++	- sleep-gpios: OF device-tree gpio specification for PD_ pin.
++	- reset-gpios: OF device-tree gpio specification for reset pin.
++	- mode-sel-gpios: OF device-tree gpio specification for mode-sel pin.
++	- vdd12-supply: OF device-tree regulator specification for 1.2V power.
++	- vdd33-supply: OF device-tree regulator specification for 3.3V power.
++	- ports: The device node can contain video interface port nodes per
++		 the video-interfaces bind[1]. For port at 0,set the reg = <0> as
++		 ps8640 dsi in and port at 1,set the reg = <1> as ps8640 eDP out.
++
++[1]: Documentation/devicetree/bindings/media/video-interfaces.txt
++
++Example:
++	edp-bridge at 18 {
++		compatible = "parade,ps8640";
++		reg = <0x18>;
++		sleep-gpios = <&pio 116 GPIO_ACTIVE_HIGH>;
++		reset-gpios = <&pio 115 GPIO_ACTIVE_HIGH>;
++		mode-sel-gpios = <&pio 92 GPIO_ACTIVE_HIGH>;
++		vdd12-supply = <&ps8640_fixed_1v2>;
++		vdd33-supply = <&mt6397_vgp2_reg>;
++
++		ports {
++			#address-cells = <1>;
++			#size-cells = <0>;
++			port at 0 {
++				reg = <0>;
++				ps8640_in: endpoint {
++					remote-endpoint = <&dsi0_out>;
++				};
++			};
++			port at 1 {
++				reg = <1>;
++				ps8640_out: endpoint {
++					remote-endpoint = <&panel_in>;
++				};
++			};
++		};
++	};
+-- 
+1.7.9.5
