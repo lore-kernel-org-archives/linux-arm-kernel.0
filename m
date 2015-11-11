@@ -1,104 +1,124 @@
-From: vigneshr@ti.com (R, Vignesh)
-Date: Wed, 11 Nov 2015 12:20:46 +0530
-Subject: [PATCH v3 1/5] spi: introduce mmap read support for spi flash
- devices
-In-Reply-To: <20151110232341.GU12143@google.com>
-References: <1447133399-25658-1-git-send-email-vigneshr@ti.com>
- <1447133399-25658-2-git-send-email-vigneshr@ti.com>
- <20151110232341.GU12143@google.com>
-Message-ID: <5642E546.3040806@ti.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Wed, 11 Nov 2015 07:59:14 +0100
+Subject: [PATCH v2] clk: rockchip: switch PLLs to slow mode before reboot
+ for rk3288
+In-Reply-To: <1447220891-14900-1-git-send-email-zyw@rock-chips.com>
+References: <1447220891-14900-1-git-send-email-zyw@rock-chips.com>
+Message-ID: <5837542.TKsKPxNRPz@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Brain,
+Hi Chris,
 
-On 11/11/2015 4:53 AM, Brian Norris wrote:
-> Hi Vignesh,
+one nit below, otherwise
+
+Reviewed-by: Heiko Stuebner <heiko@sntech.de>
+
+Am Mittwoch, 11. November 2015, 13:48:11 schrieb Chris Zhong:
+> We've been seeing some crashes at reboot test on rk3288-based systems,
+> which boards have not reset pin connected to NPOR, they reboot by
+> setting 0xfdb9 to RK3288_GLB_SRST_FST register. If the APLL works in
+> a high frequency mode, some IPs might hang during soft reset.
+> It appears that we can fix the problem by switching to slow mode before
+> reboot, just like what we did before suspend.
 > 
-> Sorry for the late review. I did not have time to review much back when
-> you submitted your first RFCs for this.
+> Signed-off-by: Chris Zhong <zyw@rock-chips.com>
 > 
-> On Tue, Nov 10, 2015 at 10:59:55AM +0530, Vignesh R wrote:
->> diff --git a/include/linux/spi/spi.h b/include/linux/spi/spi.h
->> index cce80e6dc7d1..2f2c431b8917 100644Hi
->> --- a/include/linux/spi/spi.h
->> +++ b/include/linux/spi/spi.h
->> @@ -361,6 +361,11 @@ static inline void spi_unregister_driver(struct spi_driver *sdrv)
->>   * @handle_err: the subsystem calls the driver to handle an error that occurs
->>   *		in the generic implementation of transfer_one_message().
->>   * @unprepare_message: undo any work done by prepare_message().
->> + * @spi_mtd_mmap_read: some spi-controller hardwares provide memory.
->> + *                     Flash drivers (like m25p80) can request memory
->> + *                     mapped read via this method. This interface
->> + *                     should only be used by mtd flashes and cannot be
->> + *                     used by other spi devices.
->>   * @cs_gpios: Array of GPIOs to use as chip select lines; one per CS
->>   *	number. Any individual value may be -ENOENT for CS lines that
->>   *	are not GPIOs (driven by the SPI controller itself).
->> @@ -507,6 +512,11 @@ struct spi_master {
->>  			       struct spi_message *message);
->>  	int (*unprepare_message)(struct spi_master *master,
->>  				 struct spi_message *message);
->> +	int (*spi_mtd_mmap_read)(struct  spi_device *spi,
->> +				 loff_t from, size_t len,
->> +				 size_t *retlen, u_char *buf,
->> +				 u8 read_opcode, u8 addr_width,
->> +				 u8 dummy_bytes);
+> ---
 > 
-> Is this API really sufficient? There are actually quite a few other
-> flash-related parameters that might be relevant to a controller. I
-> presume you happen not hit them because of the particular cases you're
-> using this for right now, but:
+> Changes in v2:
+> replace restart_handlers with the shutdown callback of syscore
 > 
->  * How many I/O lines are being used? These can vary depending on the
->    type of flash and the number of I/O lines supported by the controller
->    and connected on the board.
+>  drivers/clk/rockchip/clk-rk3288.c | 36 +++++++++++++++++++-----------------
+>  1 file changed, 19 insertions(+), 17 deletions(-)
 > 
+> diff --git a/drivers/clk/rockchip/clk-rk3288.c b/drivers/clk/rockchip/clk-rk3288.c
+> index 9040878..5ce44af 100644
+> --- a/drivers/clk/rockchip/clk-rk3288.c
+> +++ b/drivers/clk/rockchip/clk-rk3288.c
+> @@ -16,6 +16,7 @@
+>  #include <linux/clk-provider.h>
+>  #include <linux/of.h>
+>  #include <linux/of_address.h>
+> +#include <linux/reboot.h>
 
-This API communicates whatever data is currently communicated via
-spi_message through spi_sync/transfer_one interfaces.
+unrelated change?
 
->  * The previous point can vary across parts of the message. There are
->    various combinations of 1/2/4 lines used for opcode/address/data. We
->    only support a few of those combinations in m25p80 right now, but
->    you're not specifying any of that in this API. I guess you're just
->    making assumptions? (BTW, I think there are others having problems
->    with the difference between different "quad" modes on Micron flash; I
->    haven't sorted through all the discussion there.)
+>  #include <linux/syscore_ops.h>
+>  #include <dt-bindings/clock/rk3288-cru.h>
+>  #include "clk.h"
+> @@ -783,9 +784,9 @@ static const char *const rk3288_critical_clocks[] __initconst = {
+>  	"pclk_pd_pmu",
+>  };
+>  
+> -#ifdef CONFIG_PM_SLEEP
+>  static void __iomem *rk3288_cru_base;
+>  
+> +#ifdef CONFIG_PM_SLEEP
+>  /* Some CRU registers will be reset in maskrom when the system
+>   * wakes up from fastboot.
+>   * So save them before suspend, restore them after resume.
+> @@ -839,34 +840,32 @@ static void rk3288_clk_resume(void)
+>  			       rk3288_cru_base + reg_id);
+>  	}
+>  }
+> +#endif
+>  
+> -static struct syscore_ops rk3288_clk_syscore_ops = {
+> -	.suspend = rk3288_clk_suspend,
+> -	.resume = rk3288_clk_resume,
+> -};
+> -
+> -static void rk3288_clk_sleep_init(void __iomem *reg_base)
+> +static void rk3288_clk_shutdown(void)
+>  {
+> -	rk3288_cru_base = reg_base;
+> -	register_syscore_ops(&rk3288_clk_syscore_ops);
+> +	writel_relaxed(0xf3030000, rk3288_cru_base + RK3288_MODE_CON);
+>  }
+>  
+> -#else /* CONFIG_PM_SLEEP */
+> -static void rk3288_clk_sleep_init(void __iomem *reg_base) {}
+> +static struct syscore_ops rk3288_clk_syscore_ops = {
+> +#ifdef CONFIG_PM_SLEEP
+> +	.suspend = rk3288_clk_suspend,
+> +	.resume = rk3288_clk_resume,
+>  #endif
+> +	.shutdown = rk3288_clk_shutdown,
+> +};
+>  
+>  static void __init rk3288_clk_init(struct device_node *np)
+>  {
+> -	void __iomem *reg_base;
+>  	struct clk *clk;
+>  
+> -	reg_base = of_iomap(np, 0);
+> -	if (!reg_base) {
+> +	rk3288_cru_base = of_iomap(np, 0);
+> +	if (!rk3288_cru_base) {
+>  		pr_err("%s: could not map cru region\n", __func__);
+>  		return;
+>  	}
+>  
+> -	rockchip_clk_init(np, reg_base, CLK_NR_CLKS);
+> +	rockchip_clk_init(np, rk3288_cru_base, CLK_NR_CLKS);
+>  
+>  	/* xin12m is created by an cru-internal divider */
+>  	clk = clk_register_fixed_factor(NULL, "xin12m", "xin24m", 0, 1, 2);
+> @@ -907,10 +906,13 @@ static void __init rk3288_clk_init(struct device_node *np)
+>  			&rk3288_cpuclk_data, rk3288_cpuclk_rates,
+>  			ARRAY_SIZE(rk3288_cpuclk_rates));
+>  
+> -	rockchip_register_softrst(np, 12, reg_base + RK3288_SOFTRST_CON(0),
+> +	rockchip_register_softrst(np, 12,
+> +				  rk3288_cru_base + RK3288_SOFTRST_CON(0),
+>  				  ROCKCHIP_SOFTRST_HIWORD_MASK);
+>  
+>  	rockchip_register_restart_notifier(RK3288_GLB_SRST_FST);
+> -	rk3288_clk_sleep_init(reg_base);
+> +
+> +	register_syscore_ops(&rk3288_clk_syscore_ops);
+> +;
+>  }
+>  CLK_OF_DECLARE(rk3288_cru, "rockchip,rk3288-cru", rk3288_clk_init);
 > 
-
-How is the spi controller currently being made aware of this via
-m25p80_read / spi_sync() interface? AFAIK, mode field of spi_device
-struct tell whether to do normal/dual/quad read but there is no info
-communicated wrt 1/2/4 opcode/address/data combinations. And there is no
-info indicating capabilities of spi-master wrt no of IO lines for
-opcode/address/data that it can support.
-
->    There are typically both flash device and SPI controller constraints
->    on this question, so there needs to be some kind of negotiation
->    involved, I expect. Or at least, the SPI master needs to expose which
->    modes it can support with this flash-read API.
-> 
-
-If spi-master capabilities are known then spi_mmap_read_supported() (or
-a new function perhaps) can be used for negotiation. These capabilities
-can be added incrementally once ability to specify spi-master
-capabilities are in place.
-
-> Also, this API doesn't actually have anything to do with memory mapping.
-> It has to do with the de facto standard flash protocol. So I don't think
-> mmap belongs in the name; it should be something about flash. (I know of
-> at least one other controller that could probably use this API, excpet
-> it doesn't use memory mapping to accomplish the accelerated flash read.)
-> 
-
-As far as TI QSPI controller is concerned, the accelerated read happens
-via mmap port whereby a predefined memory address space of SoC is
-exposed as QSPI mmap region. This region can be accessed like normal
-RAM(via memcpy()) and the QSPI controller interface takes care of
-fetching data from flash on SPI bus automatically hence, I named it as
-above. But, I have no hard feelings if it needs to be generalized to
-spi_mtd_read() or something else.
-
-Regards
-Vignesh
