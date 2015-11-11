@@ -1,40 +1,46 @@
-From: thomas.petazzoni@free-electrons.com (Thomas Petazzoni)
-Date: Wed, 11 Nov 2015 09:26:38 +0100
-Subject: [PATCH 0/5] Fix regression introduced by set_irq_flags() removal
-In-Reply-To: <alpine.DEB.2.11.1510202121590.8159@nanos>
-References: <1445347435-2333-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20151020140427.GE3953@io.lakedaemon.net>
- <20151020160828.497fcc80@free-electrons.com>
- <alpine.DEB.2.11.1510202121590.8159@nanos>
-Message-ID: <20151111092638.587a53a4@free-electrons.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 11 Nov 2015 09:42 +0100
+Subject: [kbuild-all] [PATCH V3 4/4] dma: add Qualcomm Technologies HIDMA
+ channel driver
+In-Reply-To: <20151111022103.GA29459@wfg-t540p.sh.intel.com>
+References: <201511090323.GmbQltpW%fengguang.wu@intel.com>
+ <563FEC48.2010404@codeaurora.org>
+ <20151111022103.GA29459@wfg-t540p.sh.intel.com>
+Message-ID: <4119660.BobUIRMK6T@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thomas,
-
-On Tue, 20 Oct 2015 21:23:29 +0200 (CEST), Thomas Gleixner wrote:
-
-> > However, relying on IRQ_NOAUTOEN being cleared doesn't seem like the
-> > right long term solution, which is why I implemented what I believe is
-> > a (hopefully) better long term solution.
+On Wednesday 11 November 2015 10:21:03 Fengguang Wu wrote:
+> Hi Sinan,
 > 
-> Agreed.
-> 
-> I'll go over the proposed solution tomorrow afternoon (I'm
-> traveling/conferencing...)
+> Sorry please ignore this warning -- it's actually a problem specific
+> to the mn10300 arch. I'll disable such warning in mn10300 in future.
 
-Have you had the time to consider the proposed solution? For 4.3 we
-implemented the quick work-around that consisted in clearing
-IRQ_NOAUTOEN, but it's probably not a very good long-term solution.
+I just tried to find what happened here. mn10300 appears to define
+the type based on the gcc version:
 
-Don't hesitate to let me know if you'd like to see some modifications
-to the proposed approach, or if you have a totally different approach
-in mind.
+#if __GNUC__ == 4
+typedef unsigned int    __kernel_size_t;
+typedef signed int      __kernel_ssize_t;
+#else
+typedef unsigned long   __kernel_size_t;
+typedef signed long     __kernel_ssize_t;
+#endif
 
-Thanks,
+while gcc defines it based on whether you are using a Linux targetted
+gcc or a bare-metal one:
 
-Thomas
--- 
-Thomas Petazzoni, CTO, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
+gcc/config/mn10300/linux.h:#undef SIZE_TYPE
+gcc/config/mn10300/mn10300.h:#undef  SIZE_TYPE
+gcc/config/mn10300/mn10300.h:#define SIZE_TYPE "unsigned int"
+
+I can think of two reasons why it went wrong here:
+
+a) You are using gcc-5.x, and the check in the kernel should be ">="
+   rather than "==". We should probably fix that regardless
+
+b) You are using a bare-metal gcc rather than a Linux version.
+
+I couldn't find an mn10300 gcc on kernel.org, which one do you use?
+
+	Arnd
