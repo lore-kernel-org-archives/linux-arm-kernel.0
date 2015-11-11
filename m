@@ -1,34 +1,64 @@
-From: zlim.lnx@gmail.com (Z Lim)
-Date: Tue, 10 Nov 2015 19:11:12 -0800
-Subject: [PATCH] arm64: bpf: fix JIT stack setup
-In-Reply-To: <564249A2.1070903@linaro.org>
-References: <1446874577-14539-1-git-send-email-yang.shi@linaro.org>
- <20151108022726.GB39441@ast-mbp.thefacebook.com>
- <CABg9mcv8W4_pvkEQKtjBPi5ycMgLPksYoPtYnGr6tdcb5ER8YQ@mail.gmail.com>
- <5640E135.2020007@linaro.org>
- <CABg9mcvACuVK2=GBbnur94CsckN2TXRCCiXhX7A8jYQ7arMM+Q@mail.gmail.com>
- <564249A2.1070903@linaro.org>
-Message-ID: <CABg9mct8EnLAZoc5YyM5DFhw1PhdyTysxwsHiq9H5pNXh8ChLw@mail.gmail.com>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Tue, 10 Nov 2015 19:15:52 -0800
+Subject: [PATCH 07/10] mtd: factor out v1 partition parsing
+In-Reply-To: <1444914533-27782-8-git-send-email-linus.walleij@linaro.org>
+References: <1444914533-27782-1-git-send-email-linus.walleij@linaro.org>
+ <1444914533-27782-8-git-send-email-linus.walleij@linaro.org>
+Message-ID: <20151111031552.GY12143@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 10, 2015 at 11:46 AM, Shi, Yang <yang.shi@linaro.org> wrote:
-> On 11/9/2015 12:00 PM, Z Lim wrote:
->>
->> How about splitting this into two patches? One for the BPF-related
->> bug, and another for A64 FP-handling.
->
-> I'm not sure if this is a good approach or not. IMHO, they are kind of
-> atomic. Without A64 FP-handling, that fix looks incomplete and introduces
-> another problem (stack backtrace).
->
+Hi,
 
-The first, even on its own, doesn't make things worse, only better.
-The second, which we agree needs to be fixed also, addresses a different issue.
+On Thu, Oct 15, 2015 at 03:08:50PM +0200, Linus Walleij wrote:
+> This breaks out the parsing of v1 partitions so we can later add
+> a v2 partition parser.
+> 
+> Cc: Ryan Harkin <ryan.harkin@linaro.org>
+> Cc: Liviu Dudau <liviu.dudau@arm.com>
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+>  drivers/mtd/afs.c | 88 +++++++++++++++++++++++++++++++------------------------
+>  1 file changed, 50 insertions(+), 38 deletions(-)
+> 
+> diff --git a/drivers/mtd/afs.c b/drivers/mtd/afs.c
+> index 2307f54195f5..ace27f447abc 100644
+> --- a/drivers/mtd/afs.c
+> +++ b/drivers/mtd/afs.c
+> @@ -181,14 +181,18 @@ afs_read_iis_v1(struct mtd_info *mtd, struct image_info_v1 *iis, u_int ptr)
+>  	return ret;
+>  }
+>  
+> -static int parse_afs_partitions(struct mtd_info *mtd,
+> -				struct mtd_partition **pparts,
+> -				struct mtd_part_parser_data *data)
+> +static int afs_parse_v1_partition(struct mtd_info *mtd,
+> +				  u_int off, struct mtd_partition *part)
+>  {
+> -	struct mtd_partition *parts;
+> -	u_int mask, off, sz;
+> -	int ret = 0;
+> -	int i;
+> +	struct image_info_v1 iis;
+> +	u_int mask;
+> +	/*
+> +	 * Static checks cannot see that we bail out if we have an error
+> +	 * reading the footer.
+> +	 */
+> +	u_int uninitialized_var(iis_ptr);
+> +	u_int uninitialized_var(img_ptr);
 
-Either way, please also note that these patches fix the original
-implementation. We do want -stable to pick these up.
+What's this uninitialized_var() stuff about? These variables seem to
+clearly be initialized before use. Did this hang around from some
+preliminary code that got refactored?
 
-Suggestions for the diagram:
-- As an enhancement, would you mind showing the A64_FP also?
-- Please revisit "+64:"
+> +	int ret;
+>  
+>  	/*
+>  	 * This is the address mask; we use this to mask off out of
+
+...
+
+Otherwise, looks OK.
+
+Brian
