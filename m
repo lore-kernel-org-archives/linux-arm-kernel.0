@@ -1,38 +1,47 @@
-From: ulf.hansson@linaro.org (Ulf Hansson)
-Date: Wed, 11 Nov 2015 21:33:40 +0100
-Subject: [RFCv2 1/2] power: domain: add pm_genpd_uninit
-In-Reply-To: <20151111180019.GB2621@omega>
-References: <1446590711-18928-1-git-send-email-alex.aring@gmail.com>
- <1446590711-18928-2-git-send-email-alex.aring@gmail.com>
- <CAPDyKFrkzMZZjFRM7EbqDqmW8EXzV22O_tp8a45LVGQYSn6b3g@mail.gmail.com>
- <20151105143445.GC599@omega> <20151111180019.GB2621@omega>
-Message-ID: <CAPDyKFr2HdQWdrTD_E5s9cdU917mbn29DYk-Q1ydEd8ROoNHUg@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 11 Nov 2015 21:33:57 +0100
+Subject: [PATCH v3 5/6] xen/arm: introduce xen_read_wallclock
+In-Reply-To: <1447260696-450-5-git-send-email-stefano.stabellini@eu.citrix.com>
+References: <alpine.DEB.2.02.1511111639500.5676@kaball.uk.xensource.com>
+ <1447260696-450-5-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <6299736.g7Jp9b7byl@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11 November 2015 at 19:00, Alexander Aring <alex.aring@gmail.com> wrote:
-> Hi,
->
-> On Thu, Nov 05, 2015 at 03:34:45PM +0100, Alexander Aring wrote:
->>
->> What do you suggest to me for e.g. the raspberrypi power domain driver,
->> also simple ignore such error handling?
->>
->
-> ping, I also can add some WARN_ON_ONCE, if the list for sub-domains,
-> etc. are not empty. This would then report about wrong use of
-> pm_genpd_uninit.
->
-> - Alex
+On Wednesday 11 November 2015 16:51:35 Stefano Stabellini wrote:
+> +static void xen_read_wallclock(struct timespec64 *ts)
+> +{
+> +       u32 version;
+> +       u64 delta;
+> +       struct timespec64 now;
+> +       struct shared_info *s = HYPERVISOR_shared_info;
+> +       struct pvclock_wall_clock *wall_clock = &(s->wc);
+> +
+> +       /* get wallclock at system boot */
+> +       do {
+> +               version = wall_clock->version;
+> +               rmb();          /* fetch version before time */
+> +               now.tv_sec  = ((uint64_t)wall_clock->sec_hi << 32) | wall_clock->sec;
+> +               now.tv_nsec = wall_clock->nsec;
+> +               rmb();          /* fetch time before checking version */
+> +       } while ((wall_clock->version & 1) || (version != wall_clock->version));
+> +
+> +       /* time since system boot */
+> +       delta = ktime_get_ns();
+> +       delta += now.tv_sec * (u64)NSEC_PER_SEC + now.tv_nsec;
+> +
+> +       *ts = ns_to_timespec64(delta);
+> +}
 
-Sorry for the delay.
+Looks correct to me and better than the previous versions, but you are still
+converting from timespec64 to nanoseconds and back. While I previously
+recommended going all the way to nanoseconds here, I guess this you
+can even avoid the ns_to_timespec64() if you stay within timespec64
+domain and replace the last lines with
 
-I think what you suggest would be an okay solution, at least it will
-improve the current behaviour.
+	ktime_get_ts64(&ts_monotonic);
+	*ts = timespec64_add(now, ts_monotonic);
 
-We should verify for sub-domains, attached devices, and if the genpd
-has an of-provider. That's all I can think of right now, but there may
-be other things as well.
+which avoids both the multiplication and division.
 
-Kind regards
-Uffe
+	Arnd
