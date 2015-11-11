@@ -1,128 +1,123 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 11 Nov 2015 14:14:12 -0800
-Subject: [PATCH 08/19] drm: Add Allwinner A10 Display Engine support
-In-Reply-To: <20151030144409.GZ16848@phenom.ffwll.local>
-References: <1446214865-3972-1-git-send-email-maxime.ripard@free-electrons.com>
- <1446214865-3972-9-git-send-email-maxime.ripard@free-electrons.com>
- <20151030144409.GZ16848@phenom.ffwll.local>
-Message-ID: <20151111221412.GH6114@lukather>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Wed, 11 Nov 2015 15:17:50 -0700
+Subject: [PATCH V3 00/26] Coresight integration with perf
+Message-ID: <1447280296-19147-1-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel,
+This patchset aims to integrate configuration and control of
+the Coresight tracers with the perf sub-system.
 
-Thanks for your review!
+The goal is to use PMUs to represent tracers and the auxiliary
+buffer enhancement to collect processor traces.  As such a lot
+of work is done to move the current Coresight sysFS oriented
+configuration and control commands to perf's AUX API.
 
-On Fri, Oct 30, 2015 at 03:44:09PM +0100, Daniel Vetter wrote:
-> > +static void sun4i_crtc_disable(struct drm_crtc *crtc)
-> > +{
-> > +	struct sun4i_crtc *scrtc = drm_crtc_to_sun4i_crtc(crtc);
-> > +	struct sun4i_drv *drv = scrtc->drv;
-> > +
-> > +	DRM_DEBUG_DRIVER("Disabling the CRTC\n");
-> > +
-> > +	if (!scrtc->enabled)
-> > +		return;
-> 
-> Please don't do this - the atomic state should always reflect the true hw
-> state (fix that up with either hw state readout or reset in the ->reset
-> callbacks), and the atomic helpers guarantee that they'll never call you
-> when not needed. If you don't trust them do a WARN_ON at least, but no
-> early silent returns.
-> 
-> Personally I'd just rip it out, it's too much trouble. And for debugging
-> the atomic helpers already trace it all (or at least should).
+For the time being the work concentrates on ETMv3 and ETB1.0
+sink buffer.  Work on ETMv4 and other type of sink buffers
+will follow once a foundation has been established.
 
-Ok. Is there a preferred way to do HW state readout, or should I just
-add that to my probe?
+Best regards,
+Mathieu
 
-> > +static int sun4i_drv_connector_plug_all(struct drm_device *drm)
-> 
-> Laurent Pinchart has this as a rfc patch for drm core, please coordinate
-> with him and rebase on top of his patches.
+Changes since V2:
+* Rebased to v4.3.
+* Used the -M option to "git format-patch".
+* Decoupled tracers and path - both are now completely independent.
+* Moved path enablement/release to Perf's add/del functions.
+* Moved PM runtime operations to the coresight core rather than
+  individual drivers.
+* Enhanced mutual exclusion scheme between perf and sysFS.
+* Removed architecture specific define in perf cmd line tool.
+* Got rid of unused fields in structure 'cs_buffers'.
+* Enhanced changelog for patch 16/26.
 
-Ack, I will.
+Changes since V1:
+ * Fixed typos in typographical error in documentation.
+ * Moved to a multi session support scheme.
+ * Split static and dynamic tracer configuration.
+ * Fixed configuration for user and kernel space tracing.
+ * Using WARN_ON_ONCE() rather than WARN_ON().
+ * Implemented strategy to prevent tracers from being used simultaneously.
+ * Changed sink_ops::unset_buffer() to sink_ops::reset_buffer().
+ * Moves ETM's sysFS interface from driver core to dedicated file.
+ * Removed spinlock in "etm_cpu_id()".
+ * Aggregated PMU driver pieces in a single patch.
+ * Added user space changes and rebased everything to v4.3-rc5.
 
-> > +static int sun4i_drv_enable_vblank(struct drm_device *drm, int pipe)
-> > +{
-> > +	struct sun4i_drv *drv = drm->dev_private;
-> > +	struct sun4i_tcon *tcon = drv->tcon;
-> > +
-> > +	DRM_DEBUG_DRIVER("Enabling VBLANK on pipe %d\n", pipe);
-> > +
-> > +	sun4i_tcon_enable_vblank(tcon, true);
-> > +
-> > +	return 0;
-> 
-> atomic helpers rely on enable_vblank failing correctly when the pipe is
-> off and vlbanks will never happen. You probably need a correct error code
-> here that checks crtc->state->active (well not that directly but something
-> derived from it, since the pointer chase would be racy).
+Mathieu Poirier (26):
+  coresight: etm3x: moving etm_readl/writel to header file
+  coresight: etm3x: moving sysFS entries to dedicated file
+  coresight: etm3x: unlocking tracers in default arch init
+  coresight: etm3x: splitting struct etm_drvdata
+  coresight: etm3x: implementing 'cpu_id()' API
+  coresight: associating path with session rather than tracer
+  coresight: moving PM runtime operations to core framework
+  coresight: etm3x: adding operation mode for etm_enable()
+  coresight: add API to get sink from path
+  coresight: etm3x: set progbit to stop trace collection
+  coresight: etm3x: changing default trace configuration
+  coresight: etm3x: consolidating initial config
+  coresight: etm3x: implementing user/kernel mode tracing
+  coresight: etm3x: adding perf_get/set_config() API
+  coresight: etm3x: implementing perf_enable/disable() API
+  perf: changing pmu::setup_aux() parameter to include event
+  coresight: etb10: moving to local atomic operations
+  coresight: adding operation mode for sink->enable()
+  coresight: etb10: implementing AUX space API
+  coresight: etm-perf: new PMU driver for ETM tracers
+  coresight: introducing a global trace ID function
+  coresight: updating documentation to reflect integration with perf
+  perf tools: making function set_max_cpu_num() non static
+  perf tools: adding perf_session to *info_prive_size()
+  perf tools: making coresight PMU listable
+  perf tools: adding coresight etm PMU record capabilities
 
-Ok.
-
-> I know it's a bit a mess since we don't have kms-native vblank driver
-> hooks yet and really the drm core should get this right for you. It'll
-> happen eventually, but drm_irq.c is a bit moldy ;-)
-
-I can't really use drm_irq anyway, since we don't have a single
-interrupt for the VBLANK, but two, that we have to use depending on
-the output.
-
-> > +static void sun4i_drv_disable_vblank(struct drm_device *drm, int pipe)
-> > +{
-> > +	struct sun4i_drv *drv = drm->dev_private;
-> > +	struct sun4i_tcon *tcon = drv->tcon;
-> > +
-> > +	DRM_DEBUG_DRIVER("Disabling VBLANK on pipe %d\n", pipe);
-> > +
-> > +	sun4i_tcon_enable_vblank(tcon, false);
-> > +}
-> > +
-> > +static int sun4i_drv_load(struct drm_device *drm, unsigned long flags)
-> 
-> load/unload callbacks are depracated since fundamentally racy, and we
-> can't fix that due to the pile of legacy dri1 drivers. Please use
-> drm_dev_alloc/register/unregister/unref functions instead, with the
-> load/unload code placed in between to avoid races with userspace seeing
-> the device/driver (e.g. in sysfs) while it's in a partially defunct state.
-> 
-> Relevant kerneldoc has the details, at least in linux-next.
-
-Ok.
-
-> > +static void sun4i_backend_layer_atomic_update(struct drm_plane *plane,
-> > +					      struct drm_plane_state *old_state)
-> > +{
-> > +	struct sun4i_layer *layer = plane_to_sun4i_layer(plane);
-> > +	struct sun4i_drv *drv = layer->drv;
-> > +	struct sun4i_backend *backend = drv->backend;
-> > +
-> > +	sun4i_backend_update_layer_coord(backend, layer->id, plane);
-> > +	sun4i_backend_update_layer_formats(backend, layer->id, plane);
-> > +	sun4i_backend_update_layer_buffer(backend, layer->id, plane);
-> > +	sun4i_backend_layer_enable(backend, layer->id, true);
-> > +	sun4i_backend_commit(backend);
-> 
-> Not idea how exactly your hw works, but the call to sun4i_backend_commit
-> probably should be in the crtc->atomic_flush function, to make sure that
-> plane updates across multiple planes are indeed atomic.
-
-The hardware will not take the register writes into account until a
-bit is set (in the _commit function), so I guess putting it in
-atomic_flush makes sense.
-
-Thanks!
-Maxime
+ Documentation/trace/coresight.txt                  |  138 +-
+ MAINTAINERS                                        |    4 +
+ arch/x86/kernel/cpu/perf_event_intel_bts.c         |    4 +-
+ arch/x86/kernel/cpu/perf_event_intel_pt.c          |    5 +-
+ drivers/hwtracing/coresight/Kconfig                |    1 +
+ drivers/hwtracing/coresight/Makefile               |    4 +-
+ drivers/hwtracing/coresight/coresight-etb10.c      |  268 ++-
+ drivers/hwtracing/coresight/coresight-etm-perf.c   |  438 +++++
+ drivers/hwtracing/coresight/coresight-etm-perf.h   |   32 +
+ drivers/hwtracing/coresight/coresight-etm.h        |  143 +-
+ .../hwtracing/coresight/coresight-etm3x-sysfs.c    | 1442 +++++++++++++++
+ drivers/hwtracing/coresight/coresight-etm3x.c      | 1875 +++++---------------
+ drivers/hwtracing/coresight/coresight-etm4x.c      |    8 +-
+ drivers/hwtracing/coresight/coresight-funnel.c     |    2 -
+ drivers/hwtracing/coresight/coresight-priv.h       |   15 +
+ .../coresight/coresight-replicator-qcom.c          |    4 -
+ drivers/hwtracing/coresight/coresight-replicator.c |    2 -
+ drivers/hwtracing/coresight/coresight-tmc.c        |    7 +-
+ drivers/hwtracing/coresight/coresight-tpiu.c       |    4 +-
+ drivers/hwtracing/coresight/coresight.c            |  330 ++--
+ include/linux/coresight-pmu.h                      |   39 +
+ include/linux/coresight.h                          |   36 +-
+ include/linux/perf_event.h                         |    2 +-
+ kernel/events/ring_buffer.c                        |    2 +-
+ tools/perf/arch/arm/util/Build                     |    2 +
+ tools/perf/arch/arm/util/auxtrace.c                |   48 +
+ tools/perf/arch/arm/util/cs_etm.c                  |  466 +++++
+ tools/perf/arch/arm/util/cs_etm.h                  |   44 +
+ tools/perf/arch/arm/util/pmu.c                     |   34 +
+ tools/perf/arch/x86/util/intel-bts.c               |    4 +-
+ tools/perf/arch/x86/util/intel-pt.c                |    4 +-
+ tools/perf/config/Makefile                         |   17 +-
+ tools/perf/util/auxtrace.c                         |    8 +-
+ tools/perf/util/auxtrace.h                         |    7 +-
+ tools/perf/util/cpumap.c                           |    2 +-
+ tools/perf/util/cpumap.h                           |    1 +
+ 36 files changed, 3787 insertions(+), 1655 deletions(-)
+ create mode 100644 drivers/hwtracing/coresight/coresight-etm-perf.c
+ create mode 100644 drivers/hwtracing/coresight/coresight-etm-perf.h
+ create mode 100644 drivers/hwtracing/coresight/coresight-etm3x-sysfs.c
+ create mode 100644 include/linux/coresight-pmu.h
+ create mode 100644 tools/perf/arch/arm/util/auxtrace.c
+ create mode 100644 tools/perf/arch/arm/util/cs_etm.c
+ create mode 100644 tools/perf/arch/arm/util/cs_etm.h
+ create mode 100644 tools/perf/arch/arm/util/pmu.c
 
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151111/9c71edcb/attachment.sig>
+1.9.1
