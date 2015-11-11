@@ -1,52 +1,47 @@
 From: labbott@fedoraproject.org (Laura Abbott)
-Date: Tue, 10 Nov 2015 18:03:20 -0800
-Subject: [PATCH 1/2] arm64: Fix STRICT_MM_TYPECHECKS errors from pgprot
-Message-ID: <1447207401-12023-1-git-send-email-labbott@fedoraproject.org>
+Date: Tue, 10 Nov 2015 18:03:21 -0800
+Subject: [PATCH 2/2] arm: kvm: Fix STRICT_MM_TYPECHECK errors
+In-Reply-To: <1447207401-12023-1-git-send-email-labbott@fedoraproject.org>
+References: <1447207401-12023-1-git-send-email-labbott@fedoraproject.org>
+Message-ID: <1447207401-12023-2-git-send-email-labbott@fedoraproject.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-Several accesses of pgprot values are incorrect when compiled with
-STRICT_MM_TYPECHECKS. Use the appropriate pgprot_val/__pgprot wrappers
-to access the structures appropriately.
+PAGE_S2_DEVICE is a pgprot val and needs to be accessed using the proper
+accessors. Switch to these accessors to avoid errors with
+STRICT_MM_TYPECHECK.
 
 Signed-off-by: Laura Abbott <labbott@fedoraproject.org>
 ---
-Found while working on the set_memory_* work
+Found in the course of other work
 ---
- arch/arm64/mm/mmu.c | 6 +++---
- 1 file changed, 3 insertions(+), 3 deletions(-)
+ arch/arm/kvm/mmu.c | 6 ++++--
+ 1 file changed, 4 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-index c2fa6b5..83a1162 100644
---- a/arch/arm64/mm/mmu.c
-+++ b/arch/arm64/mm/mmu.c
-@@ -146,7 +146,7 @@ static void alloc_init_pte(pmd_t *pmd, unsigned long addr,
- 		if (((addr | next | phys) & ~CONT_MASK) == 0) {
- 			/* a block of CONT_PTES  */
- 			__populate_init_pte(pte, addr, next, phys,
--					    prot | __pgprot(PTE_CONT));
-+					 __pgprot(pgprot_val(prot) | PTE_CONT));
- 		} else {
- 			/*
- 			 * If the range being split is already inside of a
-@@ -475,7 +475,7 @@ void mark_rodata_ro(void)
- {
- 	create_mapping_late(__pa(_stext), (unsigned long)_stext,
- 				(unsigned long)_etext - (unsigned long)_stext,
--				PAGE_KERNEL_EXEC | PTE_RDONLY);
-+				__pgprot(pgprot_val(PAGE_KERNEL_EXEC) | PTE_RDONLY));
+diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+index 6984342..43f8162 100644
+--- a/arch/arm/kvm/mmu.c
++++ b/arch/arm/kvm/mmu.c
+@@ -213,7 +213,8 @@ static void unmap_ptes(struct kvm *kvm, pmd_t *pmd,
+ 			kvm_tlb_flush_vmid_ipa(kvm, addr);
  
+ 			/* No need to invalidate the cache for device mappings */
+-			if ((pte_val(old_pte) & PAGE_S2_DEVICE) != PAGE_S2_DEVICE)
++			if ((pte_val(old_pte) & pgprot_val(PAGE_S2_DEVICE)) !=
++			     pgprot_val(PAGE_S2_DEVICE))
+ 				kvm_flush_dcache_pte(old_pte);
+ 
+ 			put_page(virt_to_page(pte));
+@@ -306,7 +307,8 @@ static void stage2_flush_ptes(struct kvm *kvm, pmd_t *pmd,
+ 	pte = pte_offset_kernel(pmd, addr);
+ 	do {
+ 		if (!pte_none(*pte) &&
+-		    (pte_val(*pte) & PAGE_S2_DEVICE) != PAGE_S2_DEVICE)
++		    (pte_val(*pte) & pgprot_val(PAGE_S2_DEVICE)) !=
++		     pgprot_val(PAGE_S2_DEVICE))
+ 			kvm_flush_dcache_pte(*pte);
+ 	} while (pte++, addr += PAGE_SIZE, addr != end);
  }
- #endif
-@@ -691,7 +691,7 @@ void __set_fixmap(enum fixed_addresses idx,
- void *__init fixmap_remap_fdt(phys_addr_t dt_phys)
- {
- 	const u64 dt_virt_base = __fix_to_virt(FIX_FDT);
--	pgprot_t prot = PAGE_KERNEL | PTE_RDONLY;
-+	pgprot_t prot = __pgprot(pgprot_val(PAGE_KERNEL) | PTE_RDONLY);
- 	int size, offset;
- 	void *dt_virt;
- 
 -- 
 2.5.0
