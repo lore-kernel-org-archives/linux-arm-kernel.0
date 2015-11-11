@@ -1,74 +1,63 @@
-From: ykk@rock-chips.com (Yakir Yang)
-Date: Wed, 11 Nov 2015 15:47:32 +0800
-Subject: [RFC PATCH v1 2/2] dt-bindings: add document for Innosilicon HDMI on
- Rockchip platform
-In-Reply-To: <1447227952-4787-1-git-send-email-ykk@rock-chips.com>
-References: <1447227952-4787-1-git-send-email-ykk@rock-chips.com>
-Message-ID: <1447228052-4897-1-git-send-email-ykk@rock-chips.com>
+From: eddie.huang@mediatek.com (Eddie Huang)
+Date: Wed, 11 Nov 2015 15:55:57 +0800
+Subject: [PATCH v5 4/5] ARM: dts: mt8135: enable basic SMP bringup for
+ mt8135
+In-Reply-To: <7h1tbx1gjp.fsf@deeprootsystems.com>
+References: <1443799181-50409-1-git-send-email-yingjoe.chen@mediatek.com>
+ <1443799181-50409-5-git-send-email-yingjoe.chen@mediatek.com>
+ <CAMAWPa-Ed2FJY2pW67EHHKBH3_eBZx0+oWfMJwc_DhEjrf7aMg@mail.gmail.com>
+ <1445843717.23888.1.camel@mtksdaap41>
+ <CAMAWPa_Gyq7H0qUJ32PAJh_ELdHeKWMPyHud4gaT8=Ootcu1+g@mail.gmail.com>
+ <1445859610.26723.4.camel@mtksdaap41>
+ <CAMAWPa_13j88SMBbYEBg2WHFEhkhR_gVZkkU_x-U5NJay05AxA@mail.gmail.com>
+ <1447135867.14454.9.camel@mtksdaap41> <7h1tbx1gjp.fsf@deeprootsystems.com>
+Message-ID: <1447228557.20886.10.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Signed-off-by: Yakir Yang <ykk@rock-chips.com>
----
- .../display/rockchip/inno_hdmi-rockchip.txt        | 50 ++++++++++++++++++++++
- 1 file changed, 50 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/display/rockchip/inno_hdmi-rockchip.txt
+Hi Kevin,
 
-diff --git a/Documentation/devicetree/bindings/display/rockchip/inno_hdmi-rockchip.txt b/Documentation/devicetree/bindings/display/rockchip/inno_hdmi-rockchip.txt
-new file mode 100644
-index 0000000..1898408
---- /dev/null
-+++ b/Documentation/devicetree/bindings/display/rockchip/inno_hdmi-rockchip.txt
-@@ -0,0 +1,50 @@
-+Rockchip specific extensions to the Innosilicon HDMI
-+================================
-+
-+Required properties:
-+- compatible:
-+	"rockchip,rk3036-dw-hdmi";
-+- reg:
-+	Physical base address and length of the controller's registers.
-+- clocks, clock-names:
-+	Phandle to hdmi controller clock, name should be "pclk"
-+- interrupts:
-+	HDMI interrupt number
-+- ports:
-+	Contain one port node with endpoint definitions as defined in
-+	Documentation/devicetree/bindings/graph.txt.
-+- pinctrl-0, pinctrl-name:
-+	Switch the iomux of HPD/CEC pins to HDMI function.
-+
-+Example:
-+hdmi: hdmi at 20034000 {
-+	compatible = "rockchip,rk3036-inno-hdmi";
-+	reg = <0x20034000 0x4000>;
-+	interrupts = <GIC_SPI 45 IRQ_TYPE_LEVEL_HIGH>;
-+	clocks = <&cru  PCLK_HDMI>;
-+	clock-names = "pclk";
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&hdmi_ctl>;
-+	status = "disabled";
-+
-+	hdmi_in: port {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		hdmi_in_lcdc: endpoint at 0 {
-+			reg = <0>;
-+			remote-endpoint = <&lcdc_out_hdmi>;
-+		};
-+	};
-+};
-+
-+&pinctrl {
-+	hdmi {
-+		hdmi_ctl: hdmi-ctl {
-+			rockchip,pins = <1 8  RK_FUNC_1 &pcfg_pull_none>,
-+					<1 9  RK_FUNC_1 &pcfg_pull_none>,
-+					<1 10 RK_FUNC_1 &pcfg_pull_none>,
-+					<1 11 RK_FUNC_1 &pcfg_pull_none>;
-+		};
-+	};
-+
-+};
--- 
-1.9.1
+On Tue, 2015-11-10 at 17:16 -0800, Kevin Hilman wrote:
+> Hi Eddie,
+> 
+> [...]
+> 
+> > I check the log [0],
+> 
+> Thanks for checking into this boot failure.
+> 
+> > it seems first time mt8135-evbp1 boot to kernel
+> > shell successfully, then boot again. In the second time, mt8135 stay in
+> > fastboot mode, waiting host send boot image, then timeout.
+> 
+> Actually, it never gets to a shell the first time.  If you look closely,
+> the target reboots as soon as userspace starts.   Look for the PYBOOT
+> line which says "finished booting, starting userspace"
+> 
+> Later on, pyboot thinks it finds a root shell due to finding '#'
+> characters, but clearly it never got to a shell.
+> 
+> > I download zImage and dtb in [1], and kernel run to shell successfully
+> > on my platform.
+> 
+> Are you can you try using a ramdisk as well?  You can use the pre-built
+> one here:
+> http://storage.kernelci.org/images/rootfs/buildroot/armel/rootfs.cpio.gz
+> 
+
+Yes, I tried this ramdisk, and I can reproduce fail issue.
+
+> Please check my boot logs to see how I'm generating the boot.img file
+> (search for mkbootimg) with a kernel/dtb/ramdisk.  It may be possible
+> that the kernel image size with a ramdisk is breaking some of the
+> assumptions in the fastboot mode.  I've seen problems like this on other
+> platforms due to hard-coded sizes/addresses in the boot firmware.
+> 
+
+MT8135 allocate 10MB for BOOT partition, but the test boot.img is 11MB,
+thus cause user space fail. I will prepare new firmware that extend BOOT
+partition to 16MB. and put new firmware on Howard's github. I will mail
+to you when I am ready..
+
+Eddie
+Thanks
