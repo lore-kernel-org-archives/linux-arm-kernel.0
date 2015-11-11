@@ -1,42 +1,113 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Tue, 10 Nov 2015 18:15:49 -0800
-Subject: [PATCH 00/10] ARM MTD AFS v2 partition support
-In-Reply-To: <1444914533-27782-1-git-send-email-linus.walleij@linaro.org>
-References: <1444914533-27782-1-git-send-email-linus.walleij@linaro.org>
-Message-ID: <20151111021549.GV12143@google.com>
+From: lkp@intel.com (Fengguang Wu)
+Date: Wed, 11 Nov 2015 10:21:03 +0800
+Subject: [kbuild-all] [PATCH V3 4/4] dma: add Qualcomm Technologies HIDMA
+ channel driver
+In-Reply-To: <563FEC48.2010404@codeaurora.org>
+References: <201511090323.GmbQltpW%fengguang.wu@intel.com>
+ <563FEC48.2010404@codeaurora.org>
+Message-ID: <20151111022103.GA29459@wfg-t540p.sh.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+Hi Sinan,
 
-On Thu, Oct 15, 2015 at 03:08:43PM +0200, Linus Walleij wrote:
-> Years ago, the ARM reference platforms moved away from the footer
-> format parsed by the current AFS code in MTD. As far as I can
-> tell this begun with the RealView reference designs (mach-realview)
-> and the new format has been used in RealView, Versatile Express
-> and recently the Juno Development platform (64bit).
+Sorry please ignore this warning -- it's actually a problem specific
+to the mn10300 arch. I'll disable such warning in mn10300 in future.
+
+Thanks,
+Fengguang
+
+On Sun, Nov 08, 2015 at 07:43:52PM -0500, Sinan Kaya wrote:
 > 
-> The code has not been working for newer designs for a long time.
-> Proper parsing of the flash image partitions is very helpful when
-> you want to replace firmware when running full Linux and none of
-> the boot monitors or boot loaders.
 > 
-> After this, AFS parsing will work on all ARM reference designs,
-> or well, all I could test. I tested the Integrator/AP, RealView
-> PB11MPCore and Juno Development Platform.
+> On 11/8/2015 2:13 PM, kbuild test robot wrote:
+> >Hi Sinan,
+> >
+> >[auto build test WARNING on: robh/for-next]
+> >[also build test WARNING on: v4.3 next-20151106]
+> >
+> >url:    https://github.com/0day-ci/linux/commits/Sinan-Kaya/ma-add-Qualcomm-Technologies-HIDMA-driver/20151108-125824
+> >base:   https://git.kernel.org/pub/scm/linux/kernel/git/robh/linux for-next
+> >config: mn10300-allyesconfig (attached as .config)
+> >reproduce:
+> >         wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+> >         chmod +x ~/bin/make.cross
+> >         # save the attached .config to linux build tree
+> >         make.cross ARCH=mn10300
+> >
+> >All warnings (new ones prefixed by >>):
+> >
+> >    In file included from include/linux/printk.h:277:0,
+> >                     from include/linux/kernel.h:13,
+> >                     from include/linux/list.h:8,
+> >                     from include/linux/kobject.h:20,
+> >                     from include/linux/device.h:17,
+> >                     from include/linux/dmaengine.h:20,
+> >                     from drivers/dma/qcom/hidma.c:45:
+> >    drivers/dma/qcom/hidma.c: In function 'hidma_prep_dma_memcpy':
+> >    include/linux/dynamic_debug.h:64:16: warning: format '%zu' expects argument of type 'size_t', but argument 7 has type 'unsigned int' [-Wformat=]
+> >      static struct _ddebug  __aligned(8)   \
+> >                    ^
+> >    include/linux/dynamic_debug.h:84:2: note: in expansion of macro 'DEFINE_DYNAMIC_DEBUG_METADATA'
+> >      DEFINE_DYNAMIC_DEBUG_METADATA(descriptor, fmt);  \
+> >      ^
+> >    include/linux/device.h:1171:2: note: in expansion of macro 'dynamic_dev_dbg'
+> >      dynamic_dev_dbg(dev, format, ##__VA_ARGS__); \
+> >      ^
+> >>>drivers/dma/qcom/hidma.c:391:2: note: in expansion of macro 'dev_dbg'
+> >      dev_dbg(mdma->ddev.dev,
+> >      ^
+> >
+> >vim +/dev_dbg +391 drivers/dma/qcom/hidma.c
+> >
+> >    375	
+> >    376		mchan->allocated = 0;
+> >    377		spin_unlock_irqrestore(&mchan->lock, irqflags);
+> >    378		dev_dbg(mdma->ddev.dev, "freed channel for %u\n", mchan->dma_sig);
+> >    379	}
+> >    380	
+> >    381	
+> >    382	static struct dma_async_tx_descriptor *
+> >    383	hidma_prep_dma_memcpy(struct dma_chan *dmach, dma_addr_t dma_dest,
+> >    384				dma_addr_t dma_src, size_t len, unsigned long flags)
+> >    385	{
+> >    386		struct hidma_chan *mchan = to_hidma_chan(dmach);
+> >    387		struct hidma_desc *mdesc = NULL;
+> >    388		struct hidma_dev *mdma = mchan->dmadev;
+> >    389		unsigned long irqflags;
+> >    390	
+> >  > 391		dev_dbg(mdma->ddev.dev,
+> >    392			"memcpy: chan:%p dest:%pad src:%pad len:%zu\n", mchan,
+> >    393			&dma_dest, &dma_src, len);
+> >    394	
 > 
-> The first 9 patches basically refactors the current code to
-> make the old partition format more encapsulated, while the last
-> patch adds the new v2 format.
-
-Pushed the first 4 to l2-mtd.git/next (for 4.5). I'll move them to
-/master when the merge window closes.
-
-I'm reviewing the rest, but I have some comments on patch 5.
-
-Also, do you have a pointer that documents the v2 format? I can probably
-find something myself, but I'm a bit lazy, and if you have something
-easy to point me to, that'd save me some time :)
-
-Regards,
-Brian
+> What am I missing?
+> 
+> len is size_t. This page says use %zu for size_t.
+> 
+> https://www.kernel.org/doc/Documentation/printk-formats.txt
+> 
+> 
+> 
+> >    395		/* Get free descriptor */
+> >    396		spin_lock_irqsave(&mchan->lock, irqflags);
+> >    397		if (!list_empty(&mchan->free)) {
+> >    398			mdesc = list_first_entry(&mchan->free, struct hidma_desc,
+> >    399						node);
+> >
+> >---
+> >0-DAY kernel test infrastructure                Open Source Technology Center
+> >https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+> >
+> 
+> 
+> 
+> -- 
+> Sinan Kaya
+> Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc.
+> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux
+> Foundation Collaborative Project
+> _______________________________________________
+> kbuild-all mailing list
+> kbuild-all at lists.01.org
+> https://lists.01.org/mailman/listinfo/kbuild-all
