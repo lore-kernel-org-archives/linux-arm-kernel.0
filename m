@@ -1,33 +1,19 @@
-From: thomas.betker@freenet.de (Thomas Betker)
-Date: Wed, 11 Nov 2015 21:24:38 +0100
-Subject: [PATCH] iio: adc: xilinx: Fix VREFN scale
-Message-ID: <1447273478-2530-1-git-send-email-thomas.betker@freenet.de>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 11 Nov 2015 14:29:19 -0600
+Subject: [PATCH v8] PCI: Xilinx-NWL-PCIe: Added support for Xilinx NWL
+ PCIe Host Controller
+In-Reply-To: <1447223619-30945-1-git-send-email-bharatku@xilinx.com>
+References: <1447223619-30945-1-git-send-email-bharatku@xilinx.com>
+Message-ID: <20151111202919.GA7281@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Thomas Betker <thomas.betker@rohde-schwarz.com>
+On Wed, Nov 11, 2015 at 12:03:39PM +0530, Bharat Kumar Gogada wrote:
+> Adding PCIe Root Port driver for Xilinx PCIe NWL bridge IP.
+> 
+> Signed-off-by: Bharat Kumar Gogada <bharatku@xilinx.com>
+> Signed-off-by: Ravi Kiran Gummaluri <rgummal@xilinx.com>
 
-The scaling factor for VREFN is 3.0/4096 (not 1.0/4096), just as for
-VREFP. This is not immediately obvious from the specification (Xilinx
-UG480), but has been confirmed by Xilinx support.
+I acked v7. Please add acks when sending a new version.
 
-Suggested-by: Hartmut Knaack <knaack.h@gmx.de>
-Signed-off-by: Thomas Betker <thomas.betker@rohde-schwarz.com>
----
- drivers/iio/adc/xilinx-xadc-core.c | 1 +
- 1 file changed, 1 insertion(+)
-
-diff --git a/drivers/iio/adc/xilinx-xadc-core.c b/drivers/iio/adc/xilinx-xadc-core.c
-index 0370624..02e636a 100644
---- a/drivers/iio/adc/xilinx-xadc-core.c
-+++ b/drivers/iio/adc/xilinx-xadc-core.c
-@@ -841,6 +841,7 @@ static int xadc_read_raw(struct iio_dev *indio_dev,
- 			case XADC_REG_VCCINT:
- 			case XADC_REG_VCCAUX:
- 			case XADC_REG_VREFP:
-+			case XADC_REG_VREFN:
- 			case XADC_REG_VCCBRAM:
- 			case XADC_REG_VCCPINT:
- 			case XADC_REG_VCCPAUX:
--- 
-2.6.3
+Acked-by: Rob Herring <robh@kernel.org>
