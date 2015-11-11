@@ -1,69 +1,38 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Wed, 11 Nov 2015 13:40:54 -0600
-Subject: [PATCH v3 0/3] ARM: OMAP2+ McASP(3) support for DRA7xx family
-In-Reply-To: <1446191700-11057-1-git-send-email-peter.ujfalusi@ti.com>
-References: <1446191700-11057-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <874mgss4s9.fsf@saruman.tx.rr.com>
+From: daniel@iogearbox.net (Daniel Borkmann)
+Date: Wed, 11 Nov 2015 20:41:16 +0100
+Subject: [PATCH 2/2] arm64: bpf: add BPF XADD instruction
+In-Reply-To: <20151111192352.GT17308@twins.programming.kicks-ass.net>
+References: <56436420.9090401@iogearbox.net> <20151111162341.GN9562@arm.com>
+ <20151111172659.GA86334@ast-mbp.thefacebook.com>
+ <20151111.123548.1039494689070388545.davem@davemloft.net>
+ <20151111175741.GR17308@twins.programming.kicks-ass.net>
+ <20151111181132.GA90947@ast-mbp.thefacebook.com>
+ <20151111183128.GS17308@twins.programming.kicks-ass.net>
+ <56438DE7.4080300@iogearbox.net>
+ <20151111192352.GT17308@twins.programming.kicks-ass.net>
+Message-ID: <564399DC.6010209@iogearbox.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-Hi,
-
-Peter Ujfalusi <peter.ujfalusi@ti.com> writes:
-> Hi Paul, Tony,
+On 11/11/2015 08:23 PM, Peter Zijlstra wrote:
+> On Wed, Nov 11, 2015 at 07:50:15PM +0100, Daniel Borkmann wrote:
+>> Well, on that note, it's not like you just change the target to bpf in your
+>> Makefile and can compile (& load into the kernel) anything you want with it.
+>> You do have to write small, restricted programs from scratch for a specific
+>> use-case with the limited set of helper functions and intrinsics that are
+>> available from the kernel. So I don't think that "Programs that used to work
+>> will now no longer work." holds if you regard it as such.
 >
-> Changes since v2:
-> - DTS patch added which is needed because of the clock handling changes
+> So I don't get this argument. If everything is so targeted, then why are
+> the BPF instructions an ABI.
 >
-> Felip Balbi reported that linux-next is broken right now since the DTS part of
-> the earlier series has been applied, but we do not have the mcasp hwmod in the
-> kernel:
-> ...
-> [    0.181029] platform 48468000.mcasp: Cannot lookup hwmod 'mcasp3'
-> ...
-> [    6.121072] davinci-mcasp 48468000.mcasp: _od_fail_runtime_resume: FIXME: missing hwmod/omap_dev info
-> [    6.130790] ------------[ cut here ]------------
-> [    6.135643] WARNING: CPU: 0 PID: 244 at drivers/bus/omap_l3_noc.c:147 l3_interrupt_handler+0x220/0x34c()
-> [    6.145576] 44000000.ocp:L3 Custom Error: MASTER MPU TARGET L4_PER2_P3 (Read): Data Access in User mode during Functional access
-> ...
+> If OTOH you're expected to be able to transfer these small proglets,
+> then too I would expect to transfer the source of these proglets.
 >
-> This is the followup series for the hwmod changes needed to get audio working
-> on DRA7xx family based boards.
-> The DTS patches has been applied by Tony from the original series:
-> http://www.spinics.net/lists/linux-omap/msg121473.html
->
-> I have addressed your comments in the hwmod data and did some research also
-> regarding to the use of ahclkx as fclk in the original submission.
-> It turned out that McASP _needs_ all clocks to be enabled (fclk, iclk and
-> ahclkx/r) to be able to access registers. The original patch where we handled
-> the ahclkx as fclk worked, because the fclk clock got enabled in the HW w/o
-> any SW interaction.
-> All in all, the McASP found in DRA7 needs all clocks to be enabled.
-> To satisfy this I have introduced a new flag to hwmod, which means that the
-> listed optional clocks need to be handled alongside with the fclk clock.
->
-> Regards,
-> Peter
-> ---
-> Peter Ujfalusi (3):
->   ARM: DTS: dra7: Fix McASP3 node regarding to clocks
->   ARM: OMAP2+: hwmod: Add hwmod flag for HWMOD_OPT_CLKS_NEEDED
->   ARM: OMAP: DRA7: hwmod: Add data for McASP3
+> You cannot argue both ways.
 
-I have tested these patches with today's HEAD + rtc 1307 fix. Boots fine
-and I can't see the splat I was seeing with beagle x15.
-
-Tested-by: Felipe Balbi <balbi@ti.com>
-
-logs: http://hastebin.com/ololizojat
-
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 818 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151111/a5c358d0/attachment.sig>
+Ohh, I think we were talking past each other. ;) So, yeah, you'd likely need
+to add new intrinstics that then map to the existing BPF_XADD instructions,
+and perhaps spill a warning when __sync_fetch_and_add() is being used to
+advise the developer to switch to the new intrinstics instead. From kernel
+ABI PoV nothing would change.
