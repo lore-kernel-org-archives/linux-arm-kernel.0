@@ -1,42 +1,58 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 12 Nov 2015 00:23:43 +0100
-Subject: [PATCH v6 13/17] arm64:ilp32: add sys_ilp32.c and a separate
- table (in entry.S) to use it
-In-Reply-To: <87k2pojfsy.fsf@igel.home>
-References: <1446507046-24604-1-git-send-email-ynorov@caviumnetworks.com>
- <20577001.4Nl3YnQ8k2@wuerfel> <87k2pojfsy.fsf@igel.home>
-Message-ID: <10433819.KzDuoxzSn7@wuerfel>
+From: alexei.starovoitov@gmail.com (Alexei Starovoitov)
+Date: Wed, 11 Nov 2015 15:40:15 -0800
+Subject: [PATCH 2/2] arm64: bpf: add BPF XADD instruction
+In-Reply-To: <20151111222135.GU17308@twins.programming.kicks-ass.net>
+References: <20151111162341.GN9562@arm.com>
+ <20151111172659.GA86334@ast-mbp.thefacebook.com>
+ <20151111.123548.1039494689070388545.davem@davemloft.net>
+ <20151111175741.GR17308@twins.programming.kicks-ass.net>
+ <20151111181132.GA90947@ast-mbp.thefacebook.com>
+ <20151111183128.GS17308@twins.programming.kicks-ass.net>
+ <20151111184427.GH11639@twins.programming.kicks-ass.net>
+ <20151111185415.GI11639@twins.programming.kicks-ass.net>
+ <20151111195558.GA4173@ast-mbp.thefacebook.com>
+ <20151111222135.GU17308@twins.programming.kicks-ass.net>
+Message-ID: <20151111234014.GA17014@ast-mbp.thefacebook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 12 November 2015 00:07:41 Andreas Schwab wrote:
-> Arnd Bergmann <arnd@arndb.de> writes:
+On Wed, Nov 11, 2015 at 11:21:35PM +0100, Peter Zijlstra wrote:
+> On Wed, Nov 11, 2015 at 11:55:59AM -0800, Alexei Starovoitov wrote:
+> > Therefore things like memory barriers, full set of atomics are not applicable
+> > in bpf world.
 > 
-> > On Wednesday 11 November 2015 18:54:00 Andreas Schwab wrote:
-> >> Yury Norov <ynorov@caviumnetworks.com> writes:
-> >> 
-> >> > +#define sys_clock_gettime       compat_sys_clock_gettime
-> >> > +#define sys_clock_settime       compat_sys_clock_settime
-> >> 
-> >> You also need to redirect sys_clock_nanosleep.
-> >
-> > Note that based on my comment, that table would be turned around, and
-> > only the syscalls get overridden that do not have the normal
-> > compat mode behavior (mostly the ones that pass a 64-bit register).
+> There are still plenty of wait-free constructs one can make using them.
+
+yes, but all such lock-free algos are typically based on cmpxchg8b and
+tight loop, so it would be very hard for verifier to proof termination
+of such loops. I think when we'd need to add something like this, we'll
+add new bpf insn that will be membarrier+cmpxhg8b+check+loop as
+a single insn, so it cannot be misused.
+I don't know of any concrete use case yet. All possible though.
+
+> Say a barrier/rendezvous construct for knowing when an event has
+> happened on all CPUs.
 > 
-> Is it intented that _all_ off_t-like syscalls are implemented by the
-> 64bit variants?  Currently, this isn't fully implemented (lseek is
-> implemented by sys_llseek and mmap by an mmap2 wrapper).
+> But if you really do not want any of that, I suppose that is a valid
+> choice.
 
-I think either way is fine for the two examples. I think it's clear
-that we want __NR_llseek as 62 and __NR_mmap2 as 222. Whether those
-use the compat_sys_llseek/compat_sys_mmap2_wrapper or
-sys_lseek/sys_mmap entry points is not overly important, we can use
-whatever is more convenient to glibc: if we can kill off an
-architecture specific wrapper function in glibc by adding one line
-to the kernel, that seems worthwhile.
+I do want it :) and I think in the future we'll add a bunch
+of interesting stuff. May be including things like above. I just
+don't want to rush things in just because x86 has such insn
+or because gcc has a builtin for it.
+Like we discussed adding popcnt insn. It can be useful in some cases,
+but doesn't seem to worth the pain of adding it to interpreter, JITs
+and llvm backends... as of today... May be tomorrow it will be must have.
 
-It's a bit confusing, because user space off_t matches the kernel's
-off_t, loff_t, but not the __kernel_off_t from the uapi headers.
+> Is even privileged (e)BPF not allowed things like this? I was thinking
+> the strict no loops stuff was for unpriv (e)BPF only.
 
-	Arnd
+the only difference between unpriv and priv is the ability to send
+all values (including kernel addresses) to user space (like tracing
+needs to see all registers). The rest is the same.
+root should never crash the kernel as well. If we relax even little bit
+for root then the whole bpf stuff is no better than kernel module.
+
+btw, support for mini loops was requested many times in the past.
+I guess we'd have to add something like this, but it's tricky.
+Mainly because control flow graph analysis becomes much more complicated.
