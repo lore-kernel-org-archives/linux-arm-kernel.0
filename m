@@ -1,78 +1,26 @@
-From: robin.murphy@arm.com (Robin Murphy)
-Date: Wed, 11 Nov 2015 14:54:16 +0000
-Subject: [PATCH] iommu/dma: Map scatterlists more parsimoniously
-Message-ID: <104b4682056bc5b4aa0afadd39196c03fc06555d.1447249098.git.robin.murphy@arm.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Wed, 11 Nov 2015 16:13:19 +0100
+Subject: [PATCH 00/10] ARM MTD AFS v2 partition support
+In-Reply-To: <20151111021549.GV12143@google.com>
+References: <1444914533-27782-1-git-send-email-linus.walleij@linaro.org>
+ <20151111021549.GV12143@google.com>
+Message-ID: <CACRpkdafrinB=EdjRT2coHbG9o==QGPHqe0YNOk99gnFRkP_bg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Whilst blindly assuming the worst case for segment boundaries and
-aligning every segment individually is safe from the point of view
-of respecting the device's parameters, it is also undeniably a waste
-of IOVA space. Futhermore, the knock-on effects of more pages than
-necessary being exposed to device access, additional overhead in page
-table updates and TLB invalidations, etc., are even more undesirable.
+On Wed, Nov 11, 2015 at 3:15 AM, Brian Norris
+<computersforpeace@gmail.com> wrote:
 
-Improve matters by taking the actual boundary mask into account to
-actively detect the cases in which we really do need to adjust a
-segment, and avoid wasting space in the remainder.
+> Also, do you have a pointer that documents the v2 format? I can probably
+> find something myself, but I'm a bit lazy, and if you have something
+> easy to point me to, that'd save me some time :)
 
-Signed-off-by: Robin Murphy <robin.murphy@arm.com>
----
+There are no documents. The documentation is the source code for
+the on-board boot monitor (first thing started by the ROM) that
+comes with the board on a CD/DVD. A .h file documents the struct
+that is simply written to flash as footer and image info. I don't
+think I may post it, the structs in the kernel correspond to these
+structs.
 
-Hi all,
-
-I've given this some brief testing on Juno with USB and (via magic
-PCI hacks) SATA to confirm that all the +1s and -1s at least seem to
-be in the right places, so I'm throwing it out now for a head-start on
-checking whether it also helps the media folks with the v4l portability
-issues they're up against (I'm confident it should). If all goes well I
-figure I'll repost next week based on rc1 instead of some random local
-development commit.
-
-Robin.
-
- drivers/iommu/dma-iommu.c | 19 +++++++++++--------
- 1 file changed, 11 insertions(+), 8 deletions(-)
-
-diff --git a/drivers/iommu/dma-iommu.c b/drivers/iommu/dma-iommu.c
-index 3a20db4..821ebc4 100644
---- a/drivers/iommu/dma-iommu.c
-+++ b/drivers/iommu/dma-iommu.c
-@@ -441,6 +441,7 @@ int iommu_dma_map_sg(struct device *dev, struct scatterlist *sg,
- 	struct scatterlist *s, *prev = NULL;
- 	dma_addr_t dma_addr;
- 	size_t iova_len = 0;
-+	unsigned long mask = dma_get_seg_boundary(dev);
- 	int i;
- 
- 	/*
-@@ -460,17 +461,19 @@ int iommu_dma_map_sg(struct device *dev, struct scatterlist *sg,
- 		s->length = s_length;
- 
- 		/*
--		 * The simple way to avoid the rare case of a segment
--		 * crossing the boundary mask is to pad the previous one
--		 * to end at a naturally-aligned IOVA for this one's size,
--		 * at the cost of potentially over-allocating a little.
-+		 * With a single size-aligned IOVA allocation, no segment risks
-+		 * crossing the boundary mask unless the total size exceeds
-+		 * the mask itself. The simple way to maintain alignment when
-+		 * that does happen is to pad the previous segment to end at the
-+		 * next boundary, at the cost of over-allocating a little.
- 		 */
- 		if (prev) {
--			size_t pad_len = roundup_pow_of_two(s_length);
-+			size_t pad_len = (mask - iova_len + 1) & mask;
- 
--			pad_len = (pad_len - iova_len) & (pad_len - 1);
--			prev->length += pad_len;
--			iova_len += pad_len;
-+			if (pad_len && pad_len < s_length - 1) {
-+				prev->length += pad_len;
-+				iova_len += pad_len;
-+			}
- 		}
- 
- 		iova_len += s_length;
--- 
-1.9.1
+Yours,
+Linus Walleij
