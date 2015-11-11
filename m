@@ -1,86 +1,58 @@
-From: vz@mleia.com (Vladimir Zapolskiy)
-Date: Wed, 11 Nov 2015 11:30:40 +0200
-Subject: How to implement common clk in multi function controller?
-In-Reply-To: <CAK7LNASM+tJpd-kBHGHe7TXWm4i-UEfbq7T3dn99p2fKFwtxAA@mail.gmail.com>
-References: <CAK7LNASM+tJpd-kBHGHe7TXWm4i-UEfbq7T3dn99p2fKFwtxAA@mail.gmail.com>
-Message-ID: <56430AC0.5090707@mleia.com>
+From: javi.merino@arm.com (Javi Merino)
+Date: Wed, 11 Nov 2015 09:36:57 +0000
+Subject: [PATCH v3 1/2] thermal: mediatek: Add cpu power cooling model.
+In-Reply-To: <20151110184121.GC5240@localhost.localdomain>
+References: <1445515359-8587-1-git-send-email-dawei.chien@mediatek.com>
+ <1445515359-8587-2-git-send-email-dawei.chien@mediatek.com>
+ <20151104193958.GC14127@localhost.localdomain>
+ <1446721837.4016.57.camel@mtksdaap41>
+ <20151106032433.GL3773@ubuntu> <20151110112017.GA3551@e104805>
+ <20151110184121.GC5240@localhost.localdomain>
+Message-ID: <20151111093656.GA2781@e104805>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Masahiro,
+On Tue, Nov 10, 2015 at 10:41:22AM -0800, Eduardo Valentin wrote:
+> On Tue, Nov 10, 2015 at 11:20:18AM +0000, Javi Merino wrote:
+> > On Fri, Nov 06, 2015 at 08:54:33AM +0530, Viresh Kumar wrote:
+> > > Cc'ing Javi (which you should have as he wrote the power-thing for
+> > > cpu-cooling).
+> > > 
+> > > On 05-11-15, 19:10, dawei chien wrote:
+> > > > This is because our platform currently only support mt8173_cpufreq.c, so
+> > > > that I only add static power model for our owner IC.
+> > > 
+> > > Bindings are (normally) supposed to be general than a platform
+> > > specific.
+> > > 
+> > > > Please understanding that I wouldn't give a DT binding document since I
+> > > > will remove static power table on next version, but I can try to explain
+> > > > it.
+> > > 
+> > > Then just don't add things in the first place.
+> > > 
+> > > > As far as I know, static power is somewhat leakage of CPU clusters, so
+> > > > that we hardly to find a formula, which can suitable all kinds of CPUs
+> > > > since leakage is different. In ARM IPA framework, static power only need
+> > > > to be defined by who register cpufreq_power_cooling_register. The
+> > > > voltage/power table is just one way to present leakage power of CPUs.
+> > > 
+> > > The bindings don't fix the values for static power, but just provides
+> > > a field for platforms to use. Everyone can then send its own power
+> > > figures. Why do you thing it can't be generalized?
+> > 
+> > The way they are described here is useful only for this platform, but
+> > it's not generic.  It only takes into account voltage as (I assume)
+> > it's the only variable that affects it in this implementation.  A
+> > generalized version of the static power should take into account the
+> > temperature and the idle state.
+> 
+> Still, why would we have one binding to describe static power per platform?
+> 
+> I would prefer we go towards a generalized binding description.
 
-On 11.11.2015 05:16, Masahiro Yamada wrote:
-> Hi.
-> 
-> I am implementing clk and reset drivers for my SoCs.
-> (drivers/clk/uniphier/* and drivers/reset/uniphier/*)
-> 
-> 
-> In my SoCs, one hardware block contains various
-> registers for both clock and reset controlling.
-> (so, it is like a MFD system controller device).
-> I think it is a common case.
-> 
+Sure, I wasn't saying that we want one binding per platform.  I was
+just saying that this binding can't be made generic because it's not.
 
-I met the same problem with LPC32xx clocks, one hardware block
-contains clock controller, power controller, wakeup
-controllers and partially pinmux and dma configuration.
-
-I've sent a mmio version for review some time ago, but I had
-to change interface to regmap recently.
-
-> I am guessing my device tree would be like follows:
-> (one syscon device contains clk and rst devices under it)
-> 
-> syscon {
->      compatible = "socionext,uniphier-syscon",
->                  "syscon", "simple-mfd";
->      reg = <...   ...>;
-> 
->      clk_ctrl {
->             .compatible = "socionext,uniphier-clkctrl";
->             #clock-cells = <1>;
->      };
-> 
->      rst_ctrl {
->              .compatible = "socionext,uniphier-rstctrl";
->              #reset-cells = <1>;
->      };
-> };
-> 
-
-Eventually I implement the same layout, but replace "syscon" and
-"simple-mfd" with "simple-bus" only.
-
-For a single interface syscon_node_to_regmap() I don't see a point to
-add a dependency on MFD and syscon.
-
-> 
-> One problem I noticed was,
-> we are supposed to use regmap for register access
-> if we use syscon.
->
-> OTOH, common clk APIs such as clk-gate, clk-divider
-> expect simple register access via writel()/readl().
-> 
-> Is it a good idea to expand such APIs to regmap?
-
-It might be a good idea.
-
-> 
-> Of course, I could my own uniphier/clk-gate.c
-> to use regmap as other SoCs do.
-> 
-> But, I think regmap is general demand, so
-> I am wondering if it could be supported in common parts.
-> 
-> Or, any other good solution exists?
->
-
-I had to copy low-level parts from clk-gate, clk-divider and clk-mux to
-my driver and reimplement them on regmap API, of course I won't call
-this as a good solution, but if regmap is unavoidable, that's what remains.
-
---
-With best wishes,
-Vladimir
+Cheers,
+Javi
