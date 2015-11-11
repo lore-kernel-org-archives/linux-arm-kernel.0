@@ -1,139 +1,59 @@
-From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Wed, 11 Nov 2015 19:11:48 +0100
-Subject: [PATCH v4] mmc: sdhci at91: add PM support
-Message-ID: <1447265508-8583-1-git-send-email-ludovic.desroches@atmel.com>
+From: alexei.starovoitov@gmail.com (Alexei Starovoitov)
+Date: Wed, 11 Nov 2015 10:11:33 -0800
+Subject: [PATCH 2/2] arm64: bpf: add BPF XADD instruction
+In-Reply-To: <20151111175741.GR17308@twins.programming.kicks-ass.net>
+References: <56436420.9090401@iogearbox.net> <20151111162341.GN9562@arm.com>
+ <20151111172659.GA86334@ast-mbp.thefacebook.com>
+ <20151111.123548.1039494689070388545.davem@davemloft.net>
+ <20151111175741.GR17308@twins.programming.kicks-ass.net>
+Message-ID: <20151111181132.GA90947@ast-mbp.thefacebook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add runtime PM support and use runtime_force_suspend|resume() for system
-PM.
+On Wed, Nov 11, 2015 at 06:57:41PM +0100, Peter Zijlstra wrote:
+> On Wed, Nov 11, 2015 at 12:35:48PM -0500, David Miller wrote:
+> > From: Alexei Starovoitov <alexei.starovoitov@gmail.com>
+> > Date: Wed, 11 Nov 2015 09:27:00 -0800
+> > 
+> > > BPF_XADD == atomic_add() in kernel. period.
+> > > we are not going to deprecate it or introduce something else.
+> > 
+> > Agreed, it makes no sense to try and tie C99 or whatever atomic
+> > semantics to something that is already clearly defined to have
+> > exactly kernel atomic_add() semantics.
+> 
+> Dave, this really doesn't make any sense to me. __sync primitives have
+> well defined semantics and (e)BPF is violating this.
 
-Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
----
+bpf_xadd was never meant to be __sync_fetch_and_add equivalent.
+>From the day one it meant to be atomic_add() as kernel does it.
+I did piggy back on __sync in the llvm backend because it was the quick
+and dirty way to move forward.
+In retrospect I should have introduced a clean intrinstic for that instead,
+but it's not too late to do it now. user space we can change at any time
+unlike kernel.
 
-Changes:
-- from v3: add error handling of runtime PM
-- from v2: cleanup thanks to Ulf feedback
-- from v1: take a runtime PM centric approach
+> Furthermore, the fetch_and_add (or XADD) name has well defined
+> semantics, which (e)BPF also violates.
 
- drivers/mmc/host/sdhci-of-at91.c | 72 ++++++++++++++++++++++++++++++++++++++--
- 1 file changed, 70 insertions(+), 2 deletions(-)
+bpf_xadd also didn't meant to be 'fetch'. It was void return from the beginning.
 
-diff --git a/drivers/mmc/host/sdhci-of-at91.c b/drivers/mmc/host/sdhci-of-at91.c
-index 06d0b50..81ab9db 100644
---- a/drivers/mmc/host/sdhci-of-at91.c
-+++ b/drivers/mmc/host/sdhci-of-at91.c
-@@ -21,6 +21,8 @@
- #include <linux/module.h>
- #include <linux/of.h>
- #include <linux/of_device.h>
-+#include <linux/pm.h>
-+#include <linux/pm_runtime.h>
- 
- #include "sdhci-pltfm.h"
- 
-@@ -51,6 +53,60 @@ static const struct of_device_id sdhci_at91_dt_match[] = {
- 	{}
- };
- 
-+#ifdef CONFIG_PM
-+static int sdhci_at91_runtime_suspend(struct device *dev)
-+{
-+	struct sdhci_host *host = dev_get_drvdata(dev);
-+	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
-+	struct sdhci_at91_priv *priv = pltfm_host->priv;
-+	int ret;
-+
-+	ret = sdhci_runtime_suspend_host(host);
-+
-+	clk_disable_unprepare(priv->gck);
-+	clk_disable_unprepare(priv->hclock);
-+	clk_disable_unprepare(priv->mainck);
-+
-+	return ret;
-+}
-+
-+static int sdhci_at91_runtime_resume(struct device *dev)
-+{
-+	struct sdhci_host *host = dev_get_drvdata(dev);
-+	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
-+	struct sdhci_at91_priv *priv = pltfm_host->priv;
-+	int ret;
-+
-+	ret = clk_prepare_enable(priv->mainck);
-+	if (ret) {
-+		dev_err(dev, "can't enable mainck\n");
-+		return ret;
-+	}
-+
-+	ret = clk_prepare_enable(priv->hclock);
-+	if (ret) {
-+		dev_err(dev, "can't enable hclock\n");
-+		return ret;
-+	}
-+
-+	ret = clk_prepare_enable(priv->gck);
-+	if (ret) {
-+		dev_err(dev, "can't enable gck\n");
-+		return ret;
-+	}
-+
-+	return sdhci_runtime_resume_host(host);
-+}
-+#endif /* CONFIG_PM */
-+
-+static const struct dev_pm_ops sdhci_at91_dev_pm_ops = {
-+	SET_SYSTEM_SLEEP_PM_OPS(pm_runtime_force_suspend,
-+				pm_runtime_force_resume)
-+	SET_RUNTIME_PM_OPS(sdhci_at91_runtime_suspend,
-+			   sdhci_at91_runtime_resume,
-+			   NULL)
-+};
-+
- static int sdhci_at91_probe(struct platform_device *pdev)
- {
- 	const struct of_device_id	*match;
-@@ -144,12 +200,20 @@ static int sdhci_at91_probe(struct platform_device *pdev)
- 
- 	sdhci_get_of_property(pdev);
- 
-+	pm_runtime_set_active(&pdev->dev);
-+	pm_runtime_enable(&pdev->dev);
-+	pm_runtime_set_autosuspend_delay(&pdev->dev, 50);
-+	pm_runtime_use_autosuspend(&pdev->dev);
-+
- 	ret = sdhci_add_host(host);
- 	if (ret)
--		goto clocks_disable_unprepare;
-+		goto pm_runtime_disable;
- 
- 	return 0;
- 
-+pm_runtime_disable:
-+	pm_runtime_disable(&pdev->dev);
-+	pm_runtime_set_suspended(&pdev->dev);
- clocks_disable_unprepare:
- 	clk_disable_unprepare(priv->gck);
- 	clk_disable_unprepare(priv->mainck);
-@@ -165,6 +229,10 @@ static int sdhci_at91_remove(struct platform_device *pdev)
- 	struct sdhci_pltfm_host	*pltfm_host = sdhci_priv(host);
- 	struct sdhci_at91_priv	*priv = pltfm_host->priv;
- 
-+	pm_runtime_get_sync(&pdev->dev);
-+	pm_runtime_disable(&pdev->dev);
-+	pm_runtime_put_noidle(&pdev->dev);
-+
- 	sdhci_pltfm_unregister(pdev);
- 
- 	clk_disable_unprepare(priv->gck);
-@@ -178,7 +246,7 @@ static struct platform_driver sdhci_at91_driver = {
- 	.driver		= {
- 		.name	= "sdhci-at91",
- 		.of_match_table = sdhci_at91_dt_match,
--		.pm	= SDHCI_PLTFM_PMOPS,
-+		.pm	= &sdhci_at91_dev_pm_ops,
- 	},
- 	.probe		= sdhci_at91_probe,
- 	.remove		= sdhci_at91_remove,
--- 
-2.5.0
+> Atomicy is hard enough as it is, backends giving random interpretations
+> to them isn't helping anybody.
+
+no randomness. bpf_xadd == atomic_add() in kernel.
+imo that is the simplest and cleanest intepretantion one can have, no?
+
+> It also baffles me that Alexei is seemingly unwilling to change/rev the
+> (e)BPF instructions, which would be invisible to the regular user, he
+> does want to change the language itself, which will impact all
+> 'scripts'.
+
+well, we cannot change it in kernel because it's ABI.
+I'm not against adding new insns. We definitely can, but let's figure out why?
+Is anything broken? No. So what new insns make sense?
+Add new one that does 'fetch_and_add' ? What is the real use case it
+will be used for?
+Adding new intrinsic to llvm is not a big deal. I'll add it as soon
+as I have time to work on it or if somebody beats me to it I would be
+glad to test it and apply it.
