@@ -1,29 +1,39 @@
-From: pablo@netfilter.org (Pablo Neira Ayuso)
-Date: Wed, 11 Nov 2015 14:17:42 +0100
-Subject: [PATCH] netfilter: nfnetlink_log: work around uninitialized
- variable warning
-In-Reply-To: <17817903.Md6b3ydRpX@wuerfel>
-References: <17817903.Md6b3ydRpX@wuerfel>
-Message-ID: <20151111131742.GA6079@salvia>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 11 Nov 2015 14:31:33 +0100
+Subject: [PATCH v2 1/7] timekeeping: introduce __current_kernel_time64
+In-Reply-To: <alpine.DEB.2.02.1511101656330.5676@kaball.uk.xensource.com>
+References: <alpine.DEB.2.02.1511101131350.5676@kaball.uk.xensource.com>
+ <alpine.DEB.2.11.1511101046420.3915@nanos>
+ <alpine.DEB.2.02.1511101656330.5676@kaball.uk.xensource.com>
+Message-ID: <23540141.N5sax8EYBi@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 10, 2015 at 01:08:15PM +0100, Arnd Bergmann wrote:
-> After a recent (correct) change, gcc started warning about the use
-> of the 'flags' variable in nfulnl_recv_config()
+On Wednesday 11 November 2015 11:51:26 Stefano Stabellini wrote:
+> On Tue, 10 Nov 2015, Thomas Gleixner wrote:
+> > On Tue, 10 Nov 2015, John Stultz wrote:
+> > > I'm sort of objecting to a different issue, where the
+> > > __current_kernel_time() implementation probably shouldn't be grabbing
+> > > the tk_core.timekeeper directly, and instead should take a passed
+> > > pointer to a timekeeper. The vdso/pv_clock usage should have a
+> > > timekeeper passed to them that they could use.
+> > 
+> > That usage of __current_kernel_time() in that xen notifier is silly to
+> > begin with. The notifier gets already called with a pointer to the
+> > time keeper. That xen implementation just does not use it.
+> >
+> > We extract exactly that information in the vdso updates without
+> > calling back into the core code. So for solving that xen thing we do
+> > not need a 64 bit variant of __current_kernel_time() at all. The
+> > notifier has the pointer to the timekeeper and can just grab data from
+> > there.
 > 
-> net/netfilter/nfnetlink_log.c: In function 'nfulnl_recv_config':
-> net/netfilter/nfnetlink_log.c:320:14: warning: 'flags' may be used uninitialized in this function [-Wmaybe-uninitialized]
-> net/netfilter/nfnetlink_log.c:828:6: note: 'flags' was declared here
-> 
-> The warning first shows up in ARM s3c2410_defconfig with gcc-4.3 or
-> higher (including 5.2.1, which is the latest version I checked) I
-> tried working around it by rearranging the code but had no success
-> with that.
-> 
-> As a last resort, this initializes the variable to zero, which shuts
-> up the warning, but means that we don't get a warning if the code
-> is ever changed in a way that actually causes the variable to be
-> used without first being written.
+> Many thanks for the suggestion, I'll do that.
+> Should I open code tk_xtime in the xen notifier, or should I export it
+> in timekeeper_internal.h?
 
-Applied, thanks!
+tk_xtime is a 'static inline' function, I don't see a good way to
+make that accessible, and you really want the elements separately,
+so I'd open-code it without going through timespec64.
+
+	Arnd
