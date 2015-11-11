@@ -1,19 +1,110 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 11 Nov 2015 21:35:04 +0100
-Subject: [PATCH v3 6/6] xen/arm: set the system time in Xen via the
- XENPF_settime64 hypercall
-In-Reply-To: <1447260696-450-6-git-send-email-stefano.stabellini@eu.citrix.com>
-References: <alpine.DEB.2.02.1511111639500.5676@kaball.uk.xensource.com>
- <1447260696-450-6-git-send-email-stefano.stabellini@eu.citrix.com>
-Message-ID: <4497434.eqiq2DWK3j@wuerfel>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Wed, 11 Nov 2015 12:38:23 -0800
+Subject: [PATCH v6 1/3] doc: dt: add documentation for Mediatek spi-nor
+ controller
+In-Reply-To: <1446824889-16144-2-git-send-email-bayi.cheng@mediatek.com>
+References: <1446824889-16144-1-git-send-email-bayi.cheng@mediatek.com>
+ <1446824889-16144-2-git-send-email-bayi.cheng@mediatek.com>
+Message-ID: <20151111203823.GJ12143@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 11 November 2015 16:51:36 Stefano Stabellini wrote:
-> If Linux is running as dom0, call XENPF_settime64 to update the system
-> time in Xen on pvclock_gtod notifications.
+On Fri, Nov 06, 2015 at 11:48:07PM +0800, Bayi Cheng wrote:
+> Add device tree binding documentation for serial flash with
+> Mediatek serial flash controller
 > 
-> Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-> 
+> Signed-off-by: Bayi Cheng <bayi.cheng@mediatek.com>
+> ---
 
-Acked-by: Arnd Bergmann <arnd@arndb.de>
+Applied to l2-mtd.git/next (for 4.5). This will show up in
+linux-next.git after the merge window.
+
+Also squashed in a small diff (below), to fix up some language issues
+and to refer the reader to the jedec,spi-nor.txt document.
+
+>  .../devicetree/bindings/mtd/mtk-quadspi.txt        | 41 ++++++++++++++++++++++
+>  1 file changed, 41 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/mtd/mtk-quadspi.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/mtd/mtk-quadspi.txt b/Documentation/devicetree/bindings/mtd/mtk-quadspi.txt
+> new file mode 100644
+> index 0000000..866b492
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/mtd/mtk-quadspi.txt
+> @@ -0,0 +1,41 @@
+> +* MTD SPI nor driver for MTK MT81xx (and similar) serial flash controller
+
+The DT binding document shouldn't be talking about software (i.e.,
+shouldn't be talking about "drivers").
+
+> +
+> +Required properties:
+> +- compatible: 	  should be "mediatek,mt8173-nor";
+> +- reg: 		  physical base address and length of the controller's register
+> +- clocks: 	  the phandle of the clock needed by the nor controller
+> +- clock-names: 	  the name of the clocks
+> +		  the clocks needed "spi" and "sf". "spi" is used for spi bus,
+> +		  and "sf" is used for controller, these are the clocks witch
+> +		  hardware needs to enabling nor flash and nor flash controller.
+> +		  See Documentation/devicetree/bindings/clock/clock-bindings.txt for details.
+> +- #address-cells: should be <1>
+> +- #size-cells:	  should be <0>
+> +
+> +The SPI Flash must be a child of the nor_flash node and must have a
+> +compatible property.
+> +
+> +Required properties:
+> +- compatible:	  May include a device-specific string consisting of the manufacturer
+> +		  and name of the chip. Must also include "jedec,spi-nor" for any
+> +		  SPI NOR flash that can be identified by the JEDEC READ ID opcode (0x9F).
+> +- reg :		  Chip-Select number
+> +
+> +Example:
+> +
+> +nor_flash: spi at 1100d000 {
+> +	compatible = "mediatek,mt8173-nor";
+> +	reg = <0 0x1100d000 0 0xe0>;
+> +	clocks = <&pericfg CLK_PERI_SPI>,
+> +		 <&topckgen CLK_TOP_SPINFI_IFR_SEL>;
+> +	clock-names = "spi", "sf";
+> +	#address-cells = <1>;
+> +	#size-cells = <0>;
+> +	status = "disabled";
+> +
+> +	flash at 0 {
+> +		compatible = "jedec,spi-nor";
+> +		reg = <0>;
+> +	};
+> +};
+> +
+
+diff --git a/Documentation/devicetree/bindings/mtd/mtk-quadspi.txt b/Documentation/devicetree/bindings/mtd/mtk-quadspi.txt
+index 866b492c38d2..fb314f09861b 100644
+--- a/Documentation/devicetree/bindings/mtd/mtk-quadspi.txt
++++ b/Documentation/devicetree/bindings/mtd/mtk-quadspi.txt
+@@ -1,19 +1,19 @@
+-* MTD SPI nor driver for MTK MT81xx (and similar) serial flash controller
++* Serial NOR flash controller for MTK MT81xx (and similar)
+ 
+ Required properties:
+ - compatible: 	  should be "mediatek,mt8173-nor";
+ - reg: 		  physical base address and length of the controller's register
+-- clocks: 	  the phandle of the clock needed by the nor controller
+-- clock-names: 	  the name of the clocks
+-		  the clocks needed "spi" and "sf". "spi" is used for spi bus,
++- clocks: 	  the phandle of the clocks needed by the nor controller
++- clock-names: 	  the names of the clocks
++		  the clocks should be named "spi" and "sf". "spi" is used for spi bus,
+ 		  and "sf" is used for controller, these are the clocks witch
+ 		  hardware needs to enabling nor flash and nor flash controller.
+ 		  See Documentation/devicetree/bindings/clock/clock-bindings.txt for details.
+ - #address-cells: should be <1>
+ - #size-cells:	  should be <0>
+ 
+-The SPI Flash must be a child of the nor_flash node and must have a
+-compatible property.
++The SPI flash must be a child of the nor_flash node and must have a
++compatible property. Also see jedec,spi-nor.txt.
+ 
+ Required properties:
+ - compatible:	  May include a device-specific string consisting of the manufacturer
