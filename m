@@ -1,51 +1,37 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Wed, 11 Nov 2015 20:47:43 +0900
-Subject: [PATCH] ARM: cache-uniphier: use common API to find the next level
- cache
-Message-ID: <1447242463-2881-1-git-send-email-yamada.masahiro@socionext.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Wed, 11 Nov 2015 11:51:26 +0000
+Subject: [PATCH v2 1/7] timekeeping: introduce __current_kernel_time64
+In-Reply-To: <alpine.DEB.2.11.1511101046420.3915@nanos>
+References: <alpine.DEB.2.02.1511101131350.5676@kaball.uk.xensource.com>
+ <1447156675-7418-1-git-send-email-stefano.stabellini@eu.citrix.com>
+ <4372800.FdTygmcuyo@wuerfel>
+ <alpine.DEB.2.02.1511101507540.5676@kaball.uk.xensource.com>
+ <CALAqxLUEOWP6CJxY021nDR6cEQf3VZtm8fa9waK2a=OmQJEO-g@mail.gmail.com>
+ <alpine.DEB.2.11.1511101028320.3915@nanos>
+ <CALAqxLU35iSG8dCgkKi9v_mM=xO1p1jWAhq3nX6_CAYcjUYoZQ@mail.gmail.com>
+ <alpine.DEB.2.11.1511101046420.3915@nanos>
+Message-ID: <alpine.DEB.2.02.1511101656330.5676@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The function uniphier_cache_get_next_level_node() does the same thing
-as of_find_next_cache_node().  Drop the former and stick to the common
-API.
+On Tue, 10 Nov 2015, Thomas Gleixner wrote:
+> On Tue, 10 Nov 2015, John Stultz wrote:
+> > I'm sort of objecting to a different issue, where the
+> > __current_kernel_time() implementation probably shouldn't be grabbing
+> > the tk_core.timekeeper directly, and instead should take a passed
+> > pointer to a timekeeper. The vdso/pv_clock usage should have a
+> > timekeeper passed to them that they could use.
+> 
+> That usage of __current_kernel_time() in that xen notifier is silly to
+> begin with. The notifier gets already called with a pointer to the
+> time keeper. That xen implementation just does not use it.
+>
+> We extract exactly that information in the vdso updates without
+> calling back into the core code. So for solving that xen thing we do
+> not need a 64 bit variant of __current_kernel_time() at all. The
+> notifier has the pointer to the timekeeper and can just grab data from
+> there.
 
-Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
----
-
- arch/arm/mm/cache-uniphier.c | 13 +------------
- 1 file changed, 1 insertion(+), 12 deletions(-)
-
-diff --git a/arch/arm/mm/cache-uniphier.c b/arch/arm/mm/cache-uniphier.c
-index 0502ba1..a6fa7b7 100644
---- a/arch/arm/mm/cache-uniphier.c
-+++ b/arch/arm/mm/cache-uniphier.c
-@@ -377,17 +377,6 @@ static const struct of_device_id uniphier_cache_match[] __initconst = {
- 	{ /* sentinel */ }
- };
- 
--static struct device_node * __init uniphier_cache_get_next_level_node(
--							struct device_node *np)
--{
--	u32 phandle;
--
--	if (of_property_read_u32(np, "next-level-cache", &phandle))
--		return NULL;
--
--	return of_find_node_by_phandle(phandle);
--}
--
- static int __init __uniphier_cache_init(struct device_node *np,
- 					unsigned int *cache_level)
- {
-@@ -491,7 +480,7 @@ static int __init __uniphier_cache_init(struct device_node *np,
- 	 * next level cache fails because we want to continue with available
- 	 * cache levels.
- 	 */
--	next_np = uniphier_cache_get_next_level_node(np);
-+	next_np = of_find_next_cache_node(np);
- 	if (next_np) {
- 		(*cache_level)++;
- 		ret = __uniphier_cache_init(next_np, cache_level);
--- 
-1.9.1
+Many thanks for the suggestion, I'll do that.
+Should I open code tk_xtime in the xen notifier, or should I export it
+in timekeeper_internal.h?
