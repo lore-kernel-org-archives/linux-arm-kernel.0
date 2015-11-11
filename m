@@ -1,48 +1,29 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Wed, 11 Nov 2015 13:58:07 +0100
-Subject: [PATCH 2/2] arm64: bpf: add BPF XADD instruction
-In-Reply-To: <20151111123831.GJ9562@arm.com>
-References: <1447195301-16757-1-git-send-email-yang.shi@linaro.org>
- <20151111004208.GA47378@ast-mbp.thefacebook.com>
- <CABg9mcux0wEC5=nWuR9o8NwUTp73zqZ-N2e67_f7oS_mX1XGdg@mail.gmail.com>
- <4902833.k8y8bz0YLV@wuerfel> <20151111102406.GB9562@arm.com>
- <56431B83.5060500@iogearbox.net> <20151111115851.GE9562@arm.com>
- <564332B0.2090103@iogearbox.net> <20151111123831.GJ9562@arm.com>
-Message-ID: <20151111125807.GP17308@twins.programming.kicks-ass.net>
+From: pablo@netfilter.org (Pablo Neira Ayuso)
+Date: Wed, 11 Nov 2015 14:17:42 +0100
+Subject: [PATCH] netfilter: nfnetlink_log: work around uninitialized
+ variable warning
+In-Reply-To: <17817903.Md6b3ydRpX@wuerfel>
+References: <17817903.Md6b3ydRpX@wuerfel>
+Message-ID: <20151111131742.GA6079@salvia>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 11, 2015 at 12:38:31PM +0000, Will Deacon wrote:
-> > Hmm, gcc doesn't have an eBPF compiler backend, so this won't work on
-> > gcc at all. The eBPF backend in LLVM recognizes the __sync_fetch_and_add()
-> > keyword and maps that to a BPF_XADD version (BPF_W or BPF_DW). In the
-> > interpreter (__bpf_prog_run()), as Eric mentioned, this maps to atomic_add()
-> > and atomic64_add(), respectively. So the struct bpf_insn prog[] you saw
-> > from sock_example.c can be regarded as one possible equivalent program
-> > section output from the compiler.
+On Tue, Nov 10, 2015 at 01:08:15PM +0100, Arnd Bergmann wrote:
+> After a recent (correct) change, gcc started warning about the use
+> of the 'flags' variable in nfulnl_recv_config()
 > 
-> Ok, so if I understand you correctly, then __sync_fetch_and_add() has
-> different semantics depending on the backend target. That seems counter
-> to the LLVM atomics Documentation:
+> net/netfilter/nfnetlink_log.c: In function 'nfulnl_recv_config':
+> net/netfilter/nfnetlink_log.c:320:14: warning: 'flags' may be used uninitialized in this function [-Wmaybe-uninitialized]
+> net/netfilter/nfnetlink_log.c:828:6: note: 'flags' was declared here
 > 
->   http://llvm.org/docs/Atomics.html
+> The warning first shows up in ARM s3c2410_defconfig with gcc-4.3 or
+> higher (including 5.2.1, which is the latest version I checked) I
+> tried working around it by rearranging the code but had no success
+> with that.
 > 
-> which specifically calls out the __sync_* primitives as being
-> sequentially-consistent and requiring barriers on ARM (which isn't the
-> case for atomic[64]_add in the kernel).
-> 
-> If we re-use the __sync_* naming scheme in the source language, I don't
-> think we can overlay our own semantics in the backend. The
-> __sync_fetch_and_add primitive is also expected to return the old value,
-> which doesn't appear to be the case for BPF_XADD.
+> As a last resort, this initializes the variable to zero, which shuts
+> up the warning, but means that we don't get a warning if the code
+> is ever changed in a way that actually causes the variable to be
+> used without first being written.
 
-Yikes. That's double fail. Please don't do this.
-
-If you use the __sync stuff (and I agree with Will, you should not) it
-really _SHOULD_ be sequentially consistent, which means full barriers
-all over the place.
-
-And if you name something XADD (exchange and add, or fetch-add) then it
-had better return the previous value.
-
-atomic*_add() does neither.
+Applied, thanks!
