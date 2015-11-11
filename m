@@ -1,45 +1,76 @@
-From: maxime.ripard@free-electrons.com (Maxime Ripard)
-Date: Wed, 11 Nov 2015 14:22:10 -0800
-Subject: [PATCH] crypto: sun4i-ss: add missing statesize
-In-Reply-To: <20151109035848.GA2163@gondor.apana.org.au>
-References: <1447006457@msgid.manchmal.in-ulm.de>
- <20151109035848.GA2163@gondor.apana.org.au>
-Message-ID: <20151111222210.GI6114@lukather>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Wed, 11 Nov 2015 15:18:11 -0700
+Subject: [PATCH V3 21/26] coresight: introducing a global trace ID function
+In-Reply-To: <1447280296-19147-1-git-send-email-mathieu.poirier@linaro.org>
+References: <1447280296-19147-1-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1447280296-19147-22-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 09, 2015 at 11:58:48AM +0800, Herbert Xu wrote:
-> Christoph Biedl <linux-kernel.bfrz@manchmal.in-ulm.de> wrote:
-> >
-> > Fixes: should rather point to the commit that caused the breakage in my
-> > opinion. Which did this by intention:
-> 
-> Absolutely not.  That patch is correct and if you revert that
-> you will simply end up registering a broken driver into the system
-> that may then lead to crashes that can be triggered from user-space.
+TraceID values have to be unique for all tracers and
+consistent between drivers and user space.  As such
+introducing a central function to be used whenever a
+traceID value is required.
 
-Yeah my point was that the commit log should be something like
+The patch also account for data traceIDs, which are usually
+I(N) + 1.
 
-"""
-sun4i-ss implementaton of md5/sha1 is via ahash algorithms.
+Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+---
+ drivers/hwtracing/coresight/coresight-etm3x.c |  7 ++-----
+ include/linux/coresight-pmu.h                 | 12 ++++++++++++
+ 2 files changed, 14 insertions(+), 5 deletions(-)
 
-Commit 8996eafdcbad ('crypto: ahash - ensure statesize is non-zero')
-made impossible to load them without giving statesize. This patch
-specifiy statesize for sha1 and md5.
-
-Fixes: 6298e948215f ("crypto: sunxi-ss - Add Allwinner Security System crypto accelerator")
-"""
-
-Maxime
-
+diff --git a/drivers/hwtracing/coresight/coresight-etm3x.c b/drivers/hwtracing/coresight/coresight-etm3x.c
+index c07b7d3eee86..ebd569986bd4 100644
+--- a/drivers/hwtracing/coresight/coresight-etm3x.c
++++ b/drivers/hwtracing/coresight/coresight-etm3x.c
+@@ -27,6 +27,7 @@
+ #include <linux/cpu.h>
+ #include <linux/of.h>
+ #include <linux/coresight.h>
++#include <linux/coresight-pmu.h>
+ #include <linux/amba/bus.h>
+ #include <linux/seq_file.h>
+ #include <linux/uaccess.h>
+@@ -784,11 +785,7 @@ static void etm_init_arch_data(void *info)
+ 
+ static void etm_init_trace_id(struct etm_drvdata *drvdata)
+ {
+-	/*
+-	 * A trace ID of value 0 is invalid, so let's start at some
+-	 * random value that fits in 7 bits and go from there.
+-	 */
+-	drvdata->traceid = 0x10 + drvdata->cpu;
++	drvdata->traceid = coresight_get_trace_id(drvdata->cpu);
+ }
+ 
+ static int etm_probe(struct amba_device *adev, const struct amba_id *id)
+diff --git a/include/linux/coresight-pmu.h b/include/linux/coresight-pmu.h
+index 6c5386b23b10..7d410260661b 100644
+--- a/include/linux/coresight-pmu.h
++++ b/include/linux/coresight-pmu.h
+@@ -19,9 +19,21 @@
+ #define _LINUX_CORESIGHT_PMU_H
+ 
+ #define CORESIGHT_ETM_PMU_NAME "cs_etm"
++#define CORESIGHT_ETM_PMU_SEED  0x10
+ 
+ /* ETMv3.5/PTM's ETMCR config bit */
+ #define ETM_OPT_CYCACC  12
+ #define ETM_OPT_TS      28
+ 
++static inline int coresight_get_trace_id(int cpu)
++{
++	/*
++	 * A trace ID of value 0 is invalid, so let's start at some
++	 * random value that fits in 7 bits and go from there.  Since
++	 * the common convention is to have data trace IDs be I(N) + 1,
++	 * set instruction trace IDs as a function of the CPU number.
++	 */
++	return (CORESIGHT_ETM_PMU_SEED + (cpu * 2));
++}
++
+ #endif
 -- 
-Maxime Ripard, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: Digital signature
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151111/a7e0287d/attachment-0001.sig>
+1.9.1
