@@ -1,50 +1,52 @@
 From: labbott@fedoraproject.org (Laura Abbott)
-Date: Tue, 10 Nov 2015 17:57:36 -0800
-Subject: [PATCHv2 1/2] arm64: Get existing page protections in split_pmd
-In-Reply-To: <1447207057-11323-1-git-send-email-labbott@fedoraproject.org>
-References: <1447207057-11323-1-git-send-email-labbott@fedoraproject.org>
-Message-ID: <1447207057-11323-2-git-send-email-labbott@fedoraproject.org>
+Date: Tue, 10 Nov 2015 18:03:20 -0800
+Subject: [PATCH 1/2] arm64: Fix STRICT_MM_TYPECHECKS errors from pgprot
+Message-ID: <1447207401-12023-1-git-send-email-labbott@fedoraproject.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Rather than always putting the least restrictived permissions
-(PAGE_KERNEL_EXEC) when spliting a pmd into pages, use
-the existing permissions from the pmd for the page.
+
+Several accesses of pgprot values are incorrect when compiled with
+STRICT_MM_TYPECHECKS. Use the appropriate pgprot_val/__pgprot wrappers
+to access the structures appropriately.
 
 Signed-off-by: Laura Abbott <labbott@fedoraproject.org>
 ---
-v2: Typo and typechecking fixed
-
-I chose not to add the Reviewed-by from Ard here because of the addition of
-the contiguous bit in split_pmd. Not sure if I should be explicitly carrying
-it over.
+Found while working on the set_memory_* work
 ---
- arch/arm64/mm/mmu.c | 10 ++++------
- 1 file changed, 4 insertions(+), 6 deletions(-)
+ arch/arm64/mm/mmu.c | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
 
 diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-index c2fa6b5..496c3fd 100644
+index c2fa6b5..83a1162 100644
 --- a/arch/arm64/mm/mmu.c
 +++ b/arch/arm64/mm/mmu.c
-@@ -76,15 +76,13 @@ static void __init *early_alloc(unsigned long sz)
- static void split_pmd(pmd_t *pmd, pte_t *pte)
+@@ -146,7 +146,7 @@ static void alloc_init_pte(pmd_t *pmd, unsigned long addr,
+ 		if (((addr | next | phys) & ~CONT_MASK) == 0) {
+ 			/* a block of CONT_PTES  */
+ 			__populate_init_pte(pte, addr, next, phys,
+-					    prot | __pgprot(PTE_CONT));
++					 __pgprot(pgprot_val(prot) | PTE_CONT));
+ 		} else {
+ 			/*
+ 			 * If the range being split is already inside of a
+@@ -475,7 +475,7 @@ void mark_rodata_ro(void)
  {
- 	unsigned long pfn = pmd_pfn(*pmd);
-+	unsigned long addr = pfn << PAGE_SHIFT;
-+	pgprot_t prot = __pgprot((pmd_val(*pmd) ^ addr) | PTE_TYPE_PAGE);
-+
- 	int i = 0;
+ 	create_mapping_late(__pa(_stext), (unsigned long)_stext,
+ 				(unsigned long)_etext - (unsigned long)_stext,
+-				PAGE_KERNEL_EXEC | PTE_RDONLY);
++				__pgprot(pgprot_val(PAGE_KERNEL_EXEC) | PTE_RDONLY));
  
- 	do {
--		/*
--		 * Need to have the least restrictive permissions available
--		 * permissions will be fixed up later. Default the new page
--		 * range as contiguous ptes.
--		 */
--		set_pte(pte, pfn_pte(pfn, PAGE_KERNEL_EXEC_CONT));
-+		set_pte(pte, pfn_pte(pfn, prot));
- 		pfn++;
- 	} while (pte++, i++, i < PTRS_PER_PTE);
  }
+ #endif
+@@ -691,7 +691,7 @@ void __set_fixmap(enum fixed_addresses idx,
+ void *__init fixmap_remap_fdt(phys_addr_t dt_phys)
+ {
+ 	const u64 dt_virt_base = __fix_to_virt(FIX_FDT);
+-	pgprot_t prot = PAGE_KERNEL | PTE_RDONLY;
++	pgprot_t prot = __pgprot(pgprot_val(PAGE_KERNEL) | PTE_RDONLY);
+ 	int size, offset;
+ 	void *dt_virt;
+ 
 -- 
 2.5.0
