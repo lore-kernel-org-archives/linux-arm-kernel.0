@@ -1,37 +1,60 @@
-From: schwab@suse.de (Andreas Schwab)
-Date: Thu, 12 Nov 2015 00:07:41 +0100
-Subject: [PATCH v6 13/17] arm64:ilp32: add sys_ilp32.c and a separate
- table (in entry.S) to use it
-In-Reply-To: <20577001.4Nl3YnQ8k2@wuerfel> (Arnd Bergmann's message of "Wed,
- 11 Nov 2015 21:40:32 +0100")
-References: <1446507046-24604-1-git-send-email-ynorov@caviumnetworks.com>
- <1446507046-24604-14-git-send-email-ynorov@caviumnetworks.com>
- <mvmsi4cxw07.fsf@hawking.suse.de> <20577001.4Nl3YnQ8k2@wuerfel>
-Message-ID: <87k2pojfsy.fsf@igel.home>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 11 Nov 2015 17:10:42 -0600
+Subject: [PATCH v9 15/17] drm: bridge: analogix/dp: try force hpd after
+ plug in lookup failed
+In-Reply-To: <1446167355-6387-1-git-send-email-ykk@rock-chips.com>
+References: <1446020143-32645-1-git-send-email-ykk@rock-chips.com>
+ <1446167355-6387-1-git-send-email-ykk@rock-chips.com>
+Message-ID: <20151111231042.GA29893@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd Bergmann <arnd@arndb.de> writes:
+On Fri, Oct 30, 2015 at 09:09:15AM +0800, Yakir Yang wrote:
+> Some edp screen do not have hpd signal, so we can't just return
+> failed when hpd plug in detect failed.
+> 
+> This is an hardware property, so we need add a devicetree property
+> "analogix,need-force-hpd" to indicate this sutiation.
+> 
+> Tested-by: Heiko Stuebner <heiko@sntech.de>
+> Tested-by: Javier Martinez Canillas <javier@osg.samsung.com>
+> Signed-off-by: Yakir Yang <ykk@rock-chips.com>
+> ---
 
-> On Wednesday 11 November 2015 18:54:00 Andreas Schwab wrote:
->> Yury Norov <ynorov@caviumnetworks.com> writes:
->> 
->> > +#define sys_clock_gettime       compat_sys_clock_gettime
->> > +#define sys_clock_settime       compat_sys_clock_settime
->> 
->> You also need to redirect sys_clock_nanosleep.
->
-> Note that based on my comment, that table would be turned around, and
-> only the syscalls get overridden that do not have the normal
-> compat mode behavior (mostly the ones that pass a 64-bit register).
+I didn't find this one in v10. Did it get dropped?
 
-Is it intented that _all_ off_t-like syscalls are implemented by the
-64bit variants?  Currently, this isn't fully implemented (lseek is
-implemented by sys_llseek and mmap by an mmap2 wrapper).
+> Changes in v9: None
+> Changes in v8: None
+> Changes in v7: None
+> Changes in v6: None
+> Changes in v5: None
+> Changes in v4: None
+> Changes in v3:
+> - Add "analogix,need-force-hpd" to indicate whether driver need foce
+>   hpd when hpd detect failed.
+> 
+> Changes in v2: None
+> 
+>  .../bindings/display/bridge/analogix_dp.txt        |  4 ++-
+>  .../bindings/display/exynos/exynos_dp.txt          |  1 +
+>  .../display/rockchip/analogix_dp-rockchip.txt      |  1 +
+>  drivers/gpu/drm/bridge/analogix/analogix_dp_core.c | 36 +++++++++++++++++++---
+>  drivers/gpu/drm/bridge/analogix/analogix_dp_core.h |  2 ++
+>  drivers/gpu/drm/bridge/analogix/analogix_dp_reg.c  |  9 ++++++
+>  6 files changed, 47 insertions(+), 6 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/display/bridge/analogix_dp.txt b/Documentation/devicetree/bindings/display/bridge/analogix_dp.txt
+> index 7659a7a..74f0e80 100644
+> --- a/Documentation/devicetree/bindings/display/bridge/analogix_dp.txt
+> +++ b/Documentation/devicetree/bindings/display/bridge/analogix_dp.txt
+> @@ -22,6 +22,9 @@ Required properties for dp-controller:
+>  		from general PHY binding: Should be "dp".
+>  
+>  Optional properties for dp-controller:
+> +	-analogix,need-force-hpd:
+> +		Indicate driver need force hpd when hpd detect failed, this
+> +		is used for some eDP screen which don't have hpd signal.
 
-Andreas.
+This should be a generic property.
 
--- 
-Andreas Schwab, SUSE Labs, schwab at suse.de
-GPG Key fingerprint = 0196 BAD8 1CE9 1970 F4BE  1748 E4D4 88E3 0EEA B9D7
-"And now for something completely different."
+Rob
