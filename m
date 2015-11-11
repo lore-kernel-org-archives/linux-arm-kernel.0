@@ -1,135 +1,65 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Wed, 11 Nov 2015 08:47:10 -0800
-Subject: [PATCH] rtc: ds1307: fix kernel splat due to wakeup irq handling
-In-Reply-To: <1447258261-2102-1-git-send-email-balbi@ti.com>
-References: <1447258261-2102-1-git-send-email-balbi@ti.com>
-Message-ID: <20151111164710.GE3218@atomide.com>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Wed, 11 Nov 2015 16:49:16 +0000
+Subject: [PATCH v3 0/6] Xen wallclock on arm and arm64
+Message-ID: <alpine.DEB.2.02.1511111639500.5676@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Felipe Balbi <balbi@ti.com> [151111 08:11]:
-> Since commit 3fffd1283927 ("i2c: allow specifying
-> separate wakeup interrupt in device tree") we have
-> automatic wakeup irq support for i2c devices. That
-> commit missed the fact that rtc-1307 had its own
-> wakeup irq handling and ended up introducing a
-> kernel splat for at least Beagle x15 boards.
-> 
-> Fix that by reverting original commit _and_ passing
-> correct interrupt names on DTS so i2c-core can
-> choose correct IRQ as wakeup.
-> 
-> Now that we have automatic wakeirq support, we can
-> revert the original commit which did it manually.
-> 
-> Fixes the following warning:
-> 
-> [   10.346582] WARNING: CPU: 1 PID: 263 at linux/drivers/base/power/wakeirq.c:43 dev_pm_attach_wake_irq+0xbc/0xd4()
-> [   10.359244] rtc-ds1307 2-006f: wake irq already initialized
+Hi all,
 
-Best to merge the dts change along with the driver fix in this case:
+this series introduces PV wallclock time support on arm and arm64.
 
-Acked-by: Tony Lindgren <tony@atomide.com>
+Changes in v3:
+- use ktime_get_ns instead of calling into the arch_timer functions
+  directly
+- read the wallclock from the late_initcall
+- s/%llu.%0u/%llu.%09u
+- in xen_pvclock_gtod_notify use the passed struct timekeeper pointer
+  rather than calling __current_kernel_time64
+- use the passed struct timekeeper pointer to get the system time too
+- drop introduce __current_kernel_time64
 
 
-> Cc: Nishanth Menon <nm@ti.com>
-> Signed-off-by: Felipe Balbi <balbi@ti.com>
-> ---
->  arch/arm/boot/dts/am57xx-beagle-x15.dts |  1 +
->  drivers/rtc/rtc-ds1307.c                | 36 +++------------------------------
->  2 files changed, 4 insertions(+), 33 deletions(-)
-> 
-> diff --git a/arch/arm/boot/dts/am57xx-beagle-x15.dts b/arch/arm/boot/dts/am57xx-beagle-x15.dts
-> index d9ba6b879fc1..00352e761b8c 100644
-> --- a/arch/arm/boot/dts/am57xx-beagle-x15.dts
-> +++ b/arch/arm/boot/dts/am57xx-beagle-x15.dts
-> @@ -604,6 +604,7 @@
->  		reg = <0x6f>;
->  		interrupts-extended = <&crossbar_mpu GIC_SPI 2 IRQ_TYPE_EDGE_RISING>,
->  				      <&dra7_pmx_core 0x424>;
-> +		interrupt-names = "irq", "wakeup";
->  
->  		pinctrl-names = "default";
->  		pinctrl-0 = <&mcp79410_pins_default>;
-> diff --git a/drivers/rtc/rtc-ds1307.c b/drivers/rtc/rtc-ds1307.c
-> index 188006c55ce0..325836818826 100644
-> --- a/drivers/rtc/rtc-ds1307.c
-> +++ b/drivers/rtc/rtc-ds1307.c
-> @@ -15,9 +15,6 @@
->  #include <linux/i2c.h>
->  #include <linux/init.h>
->  #include <linux/module.h>
-> -#include <linux/of_device.h>
-> -#include <linux/of_irq.h>
-> -#include <linux/pm_wakeirq.h>
->  #include <linux/rtc/ds1307.h>
->  #include <linux/rtc.h>
->  #include <linux/slab.h>
-> @@ -117,7 +114,6 @@ struct ds1307 {
->  #define HAS_ALARM	1		/* bit 1 == irq claimed */
->  	struct i2c_client	*client;
->  	struct rtc_device	*rtc;
-> -	int			wakeirq;
->  	s32 (*read_block_data)(const struct i2c_client *client, u8 command,
->  			       u8 length, u8 *values);
->  	s32 (*write_block_data)(const struct i2c_client *client, u8 command,
-> @@ -1146,8 +1142,6 @@ read_rtc:
->  	}
->  
->  	if (want_irq) {
-> -		struct device_node *node = client->dev.of_node;
-> -
->  		err = devm_request_threaded_irq(&client->dev,
->  						client->irq, NULL, irq_handler,
->  						IRQF_SHARED | IRQF_ONESHOT,
-> @@ -1155,34 +1149,13 @@ read_rtc:
->  		if (err) {
->  			client->irq = 0;
->  			dev_err(&client->dev, "unable to request IRQ!\n");
-> -			goto no_irq;
-> -		}
-> -
-> -		set_bit(HAS_ALARM, &ds1307->flags);
-> -		dev_dbg(&client->dev, "got IRQ %d\n", client->irq);
-> -
-> -		/* Currently supported by OF code only! */
-> -		if (!node)
-> -			goto no_irq;
-> -
-> -		err = of_irq_get(node, 1);
-> -		if (err <= 0) {
-> -			if (err == -EPROBE_DEFER)
-> -				goto exit;
-> -			goto no_irq;
-> -		}
-> -		ds1307->wakeirq = err;
-> +		} else {
->  
-> -		err = dev_pm_set_dedicated_wake_irq(&client->dev,
-> -						    ds1307->wakeirq);
-> -		if (err) {
-> -			dev_err(&client->dev, "unable to setup wakeIRQ %d!\n",
-> -				err);
-> -			goto exit;
-> +			set_bit(HAS_ALARM, &ds1307->flags);
-> +			dev_dbg(&client->dev, "got IRQ %d\n", client->irq);
->  		}
->  	}
->  
-> -no_irq:
->  	if (chip->nvram_size) {
->  
->  		ds1307->nvram = devm_kzalloc(&client->dev,
-> @@ -1226,9 +1199,6 @@ static int ds1307_remove(struct i2c_client *client)
->  {
->  	struct ds1307 *ds1307 = i2c_get_clientdata(client);
->  
-> -	if (ds1307->wakeirq)
-> -		dev_pm_clear_wake_irq(&client->dev);
-> -
->  	if (test_and_clear_bit(HAS_NVRAM, &ds1307->flags))
->  		sysfs_remove_bin_file(&client->dev.kobj, ds1307->nvram);
->  
-> -- 
-> 2.6.2
-> 
+Changes in v2:
+- introduce __current_kernel_time64
+- rename dom0_op to platform_op
+- introduce XENPF_settime64
+- extend pvclock_wall_clock with sec_hi
+- properly convert arch_timer ticker to nsec
+- use timespec64 interfaces
+- use sec_hi to get a 64-bit seconds value
+- use XENPF_settime64
+- rename dom0_op to platform_op
+
+
+Stefano Stabellini (6):
+      xen: rename dom0_op to platform_op
+      xen/arm: introduce HYPERVISOR_platform_op on arm and arm64
+      xen: introduce XENPF_settime64
+      arm: extend pvclock_wall_clock with sec_hi
+      xen/arm: introduce xen_read_wallclock
+      xen/arm: set the system time in Xen via the XENPF_settime64 hypercall
+
+ arch/arm/include/asm/xen/hypercall.h |    2 +
+ arch/arm/include/asm/xen/interface.h |    1 +
+ arch/arm/xen/enlighten.c             |   86 +++++++++++++++++++++++++++++++++-
+ arch/arm/xen/hypercall.S             |    1 +
+ arch/arm64/xen/hypercall.S           |    1 +
+ arch/x86/include/asm/xen/hypercall.h |    6 +--
+ arch/x86/xen/apic.c                  |    2 +-
+ arch/x86/xen/enlighten.c             |    8 ++--
+ arch/x86/xen/time.c                  |   10 ++--
+ drivers/xen/acpi.c                   |    2 +-
+ drivers/xen/efi.c                    |   30 ++++++------
+ drivers/xen/pcpu.c                   |    8 ++--
+ drivers/xen/xen-acpi-cpuhotplug.c    |    2 +-
+ drivers/xen/xen-acpi-pad.c           |    4 +-
+ drivers/xen/xen-acpi-processor.c     |    8 ++--
+ drivers/xen/xenfs/xensyms.c          |    4 +-
+ include/xen/interface/platform.h     |   18 +++++--
+ include/xen/interface/xen.h          |    2 +-
+ 18 files changed, 147 insertions(+), 48 deletions(-)
+
+Cheers,
+
+Stefano
