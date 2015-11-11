@@ -1,91 +1,129 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Wed, 11 Nov 2015 11:24:41 -0800
-Subject: [PATCH v3 1/5] spi: introduce mmap read support for spi flash
- devices
-In-Reply-To: <1447133399-25658-2-git-send-email-vigneshr@ti.com>
-References: <1447133399-25658-1-git-send-email-vigneshr@ti.com>
- <1447133399-25658-2-git-send-email-vigneshr@ti.com>
-Message-ID: <20151111192441.GG12143@google.com>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Wed, 11 Nov 2015 21:25:53 +0200
+Subject: [PATCH] ARM: OMAP: DRA7: hwmod: Add data for McASP3
+In-Reply-To: <1447261631-26362-1-git-send-email-balbi@ti.com>
+References: <1447261631-26362-1-git-send-email-balbi@ti.com>
+Message-ID: <56439641.6070901@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In addition to my other comments:
+Felipe,
 
-On Tue, Nov 10, 2015 at 10:59:55AM +0530, Vignesh R wrote:
-> In addition to providing direct access to SPI bus, some spi controller
-> hardwares (like ti-qspi) provide special memory mapped port
-> to accesses SPI flash devices in order to increase read performance.
-> This means the controller can automatically send the SPI signals
-> required to read data from the SPI flash device.
-> For this, spi controller needs to know flash specific information like
-> read command to use, dummy bytes and address width. Once these settings
-> are populated in hardware registers, any read accesses to flash's memory
-> map region(SoC specific) through memcpy (or mem-to mem DMA copy) will be
-> handled by controller hardware. The hardware will automatically generate
-> SPI signals required to read data from flash and present it to CPU/DMA.
+On 11/11/2015 07:07 PM, Felipe Balbi wrote:
+> From: Peter Ujfalusi <peter.ujfalusi@ti.com>
 > 
-> Introduce spi_mtd_mmap_read() interface to support memory mapped read
-> over SPI flash devices. SPI master drivers can implement this callback to
-> support memory mapped read interfaces. m25p80 flash driver and other
-> flash drivers can call this to request memory mapped read. The interface
-> should only be used MTD flashes and cannot be used with other SPI devices.
+> McASP3 is used by default on DRA7x based boards for audio.
+
+While this patch works, it is not the correct one(s) to apply.
+https://lkml.org/lkml/2015/10/30/91
+is the series which should have been applied to 4.4.
+Paul acked the series, but for some reason it missed the initial ARM pull for 4.4
+
+-- 
+P?ter
+
 > 
-> Signed-off-by: Vignesh R <vigneshr@ti.com>
+> This fixes following error with Beagle x15:
+> 
+> [    0.402190] platform 48468000.mcasp: Cannot lookup hwmod 'mcasp3'
+> 
+> which is followed by a splat:
+> 
+> [   11.207663] Unhandled fault: imprecise external abort (0x1406) at 0x00000000
+> [   11.207670] ------------[ cut here ]------------
+> [   11.207683] WARNING: CPU: 0 PID: 272 at /home/balbi/workspace/linux/drivers/bus/omap_l3_noc.c:147 l3_interrupt_handler+0x220/0x34c()
+> [   11.207688] 44000000.ocp:L3 Custom Error: MASTER MPU TARGET L4_PER2_P3 (Read): Data Access in User mode during Functional access
+> [   11.207742] Modules linked in: snd_soc_simple_card(+) omapdss leds_gpio led_class gpio_fan extcon_usb_gpio cpufreq_dt omap_wdt phy_omap_usb2 snd_soc_davinci_mcasp snd_soc_edma snd_soc_omap snd_soc_tlv320aic3x rtc_omap snd_soc_core ti_soc_thermal dwc3_omap snd_pcm_dmaengine snd_pcm extcon_palmas snd_timer extcon snd rtc_palmas rtc_ds1307 tmp102 palmas_pwrbutton thermal_sys soundcore hwmon autofs4
+> [   11.207748] CPU: 0 PID: 272 Comm: systemd-udevd Not tainted 4.3.0-11482-g3d26f1f5fc82-dirty #27
+> [   11.207751] Hardware name: Generic DRA74X (Flattened Device Tree)
+> [   11.207765] [<c0017c3c>] (unwind_backtrace) from [<c0013f80>] (show_stack+0x10/0x14)
+> [   11.207772] [<c0013f80>] (show_stack) from [<c034d444>] (dump_stack+0x84/0x9c)
+> [   11.207783] [<c034d444>] (dump_stack) from [<c003cc24>] (warn_slowpath_common+0x78/0xb4)
+> [   11.207790] [<c003cc24>] (warn_slowpath_common) from [<c003cc90>] (warn_slowpath_fmt+0x30/0x40)
+> [   11.207798] [<c003cc90>] (warn_slowpath_fmt) from [<c0379ce0>] (l3_interrupt_handler+0x220/0x34c)
+> [   11.207805] [<c0379ce0>] (l3_interrupt_handler) from [<c009d9c0>] (handle_irq_event_percpu+0x44/0x1f0)
+> [   11.207811] [<c009d9c0>] (handle_irq_event_percpu) from [<c009dba4>] (handle_irq_event+0x38/0x5c)
+> [   11.207818] [<c009dba4>] (handle_irq_event) from [<c00a0d68>] (handle_fasteoi_irq+0xcc/0x1b0)
+> [   11.207824] [<c00a0d68>] (handle_fasteoi_irq) from [<c009d070>] (generic_handle_irq+0x20/0x34)
+> [   11.207829] [<c009d070>] (generic_handle_irq) from [<c009d350>] (__handle_domain_irq+0x64/0xe0)
+> [   11.207835] [<c009d350>] (__handle_domain_irq) from [<c0009520>] (gic_handle_irq+0x40/0x8c)
+> [   11.207842] [<c0009520>] (gic_handle_irq) from [<c06521b4>] (__irq_usr+0x54/0x80)
+> [   11.207846] Exception stack(0xed143fb0 to 0xed143ff8)
+> [   11.207851] 3fa0:                                     7f69b370 7f69b368 00000370 00000000
+> [   11.207857] 3fc0: b6ddb4e0 7f69b370 00000016 7f69b308 be8db278 be8db2a0 7f68b024 00000001
+> [   11.207863] 3fe0: b6ddb4e0 be8db180 b6d46a47 b6d46a50 60000030 ffffffff
+> [   11.207866] ---[ end trace 7d8de48d1bc8fbac ]---
+> 
+> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+> Signed-off-by: Felipe Balbi <balbi@ti.com>
 > ---
-...
-> diff --git a/include/linux/spi/spi.h b/include/linux/spi/spi.h
-> index cce80e6dc7d1..2f2c431b8917 100644
-> --- a/include/linux/spi/spi.h
-> +++ b/include/linux/spi/spi.h
-> @@ -361,6 +361,11 @@ static inline void spi_unregister_driver(struct spi_driver *sdrv)
->   * @handle_err: the subsystem calls the driver to handle an error that occurs
->   *		in the generic implementation of transfer_one_message().
->   * @unprepare_message: undo any work done by prepare_message().
-> + * @spi_mtd_mmap_read: some spi-controller hardwares provide memory.
-> + *                     Flash drivers (like m25p80) can request memory
-> + *                     mapped read via this method. This interface
-> + *                     should only be used by mtd flashes and cannot be
-> + *                     used by other spi devices.
->   * @cs_gpios: Array of GPIOs to use as chip select lines; one per CS
->   *	number. Any individual value may be -ENOENT for CS lines that
->   *	are not GPIOs (driven by the SPI controller itself).
-> @@ -507,6 +512,11 @@ struct spi_master {
->  			       struct spi_message *message);
->  	int (*unprepare_message)(struct spi_master *master,
->  				 struct spi_message *message);
-> +	int (*spi_mtd_mmap_read)(struct  spi_device *spi,
-> +				 loff_t from, size_t len,
-> +				 size_t *retlen, u_char *buf,
-> +				 u8 read_opcode, u8 addr_width,
-> +				 u8 dummy_bytes);
-
-This is seeming to be a longer and longer list of arguments. I know MTD
-has a bad habit of long argument lists (which then cause a ton of
-unnecessary churn when things need changed in the API), but perhaps we
-can limit the damage to the SPI layer. Perhaps this deserves a struct to
-encapsulate all the flash read arguments? Like:
-
-struct spi_flash_read_message {
-	loff_t from;
-	size_t len;
-	size_t *retlen;
-	void *buf;
-	u8 read_opcode;
-	u8 addr_width;
-	u8 dummy_bits;
-	// additional fields to describe rx_nbits for opcode/addr/data
-};
-
-struct spi_master {
-	...
-	int (*spi_flash_read)(struct spi_device *spi,
-			      struct spi_flash_message *msg);
-};
-
+>  arch/arm/mach-omap2/omap_hwmod_7xx_data.c | 41 +++++++++++++++++++++++++++++++
+>  1 file changed, 41 insertions(+)
+> 
+> diff --git a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
+> index 51d1ecb384bd..b730c582a1f7 100644
+> --- a/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
+> +++ b/arch/arm/mach-omap2/omap_hwmod_7xx_data.c
+> @@ -1298,6 +1298,38 @@ static struct omap_hwmod dra7xx_mcspi4_hwmod = {
+>  };
 >  
->  	/*
->  	 * These hooks are for drivers that use a generic implementation
-
-...
-
-Brian
+>  /*
+> + * 'mcasp' class
+> + *
+> + */
+> +static struct omap_hwmod_class_sysconfig dra7xx_mcasp_sysc = {
+> +	.sysc_offs	= 0x0004,
+> +	.sysc_flags	= SYSC_HAS_SIDLEMODE,
+> +	.idlemodes	= (SIDLE_FORCE | SIDLE_NO | SIDLE_SMART),
+> +	.sysc_fields	= &omap_hwmod_sysc_type3,
+> +};
+> +
+> +static struct omap_hwmod_class dra7xx_mcasp_hwmod_class = {
+> +	.name	= "mcasp",
+> +	.sysc	= &dra7xx_mcasp_sysc,
+> +};
+> +
+> +/* mcasp3 */
+> +static struct omap_hwmod dra7xx_mcasp3_hwmod = {
+> +	.name		= "mcasp3",
+> +	.class		= &dra7xx_mcasp_hwmod_class,
+> +	.clkdm_name	= "l4per2_clkdm",
+> +	.main_clk	= "mcasp3_ahclkx_mux",
+> +	.flags		= HWMOD_SWSUP_SIDLE,
+> +	.prcm = {
+> +		.omap4 = {
+> +			.clkctrl_offs = DRA7XX_CM_L4PER2_MCASP3_CLKCTRL_OFFSET,
+> +			.context_offs = DRA7XX_RM_L4PER2_MCASP3_CONTEXT_OFFSET,
+> +			.modulemode   = MODULEMODE_SWCTRL,
+> +		},
+> +	},
+> +};
+> +
+> +/*
+>   * 'mmc' class
+>   *
+>   */
+> @@ -2566,6 +2598,14 @@ static struct omap_hwmod_ocp_if dra7xx_l3_main_1__hdmi = {
+>  	.user		= OCP_USER_MPU | OCP_USER_SDMA,
+>  };
+>  
+> +/* l4_per2 -> mcasp3 */
+> +static struct omap_hwmod_ocp_if dra7xx_l4_per2__mcasp3 = {
+> +	.master		= &dra7xx_l4_per2_hwmod,
+> +	.slave		= &dra7xx_mcasp3_hwmod,
+> +	.clk		= "l3_iclk_div",
+> +	.user		= OCP_USER_MPU | OCP_USER_SDMA,
+> +};
+> +
+>  /* l4_per1 -> elm */
+>  static struct omap_hwmod_ocp_if dra7xx_l4_per1__elm = {
+>  	.master		= &dra7xx_l4_per1_hwmod,
+> @@ -3308,6 +3348,7 @@ static struct omap_hwmod_ocp_if *dra7xx_hwmod_ocp_ifs[] __initdata = {
+>  	&dra7xx_l4_wkup__dcan1,
+>  	&dra7xx_l4_per2__dcan2,
+>  	&dra7xx_l4_per2__cpgmac0,
+> +	&dra7xx_l4_per2__mcasp3,
+>  	&dra7xx_gmac__mdio,
+>  	&dra7xx_l4_cfg__dma_system,
+>  	&dra7xx_l3_main_1__dss,
+> 
