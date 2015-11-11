@@ -1,67 +1,51 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Wed, 11 Nov 2015 11:40:39 +0000
-Subject: [PATCH v2 10/11] PM / Hibernate: clean cached pages on
- architectures that require it
-In-Reply-To: <1445966960-31724-11-git-send-email-james.morse@arm.com>
-References: <1445966960-31724-1-git-send-email-james.morse@arm.com>
- <1445966960-31724-11-git-send-email-james.morse@arm.com>
-Message-ID: <20151111114039.GA8375@red-moon>
+From: yamada.masahiro@socionext.com (Masahiro Yamada)
+Date: Wed, 11 Nov 2015 20:47:43 +0900
+Subject: [PATCH] ARM: cache-uniphier: use common API to find the next level
+ cache
+Message-ID: <1447242463-2881-1-git-send-email-yamada.masahiro@socionext.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Pavel, Rafael,
+The function uniphier_cache_get_next_level_node() does the same thing
+as of_find_next_cache_node().  Drop the former and stick to the common
+API.
 
-Do you have any feedback on this patch ?
+Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
+---
 
-It is fundamental to this series and affects Hibernate core code so if you
-have any feedback that would be much appreciated.
+ arch/arm/mm/cache-uniphier.c | 13 +------------
+ 1 file changed, 1 insertion(+), 12 deletions(-)
 
-Thanks a lot,
-Lorenzo
-
-On Tue, Oct 27, 2015 at 05:29:19PM +0000, James Morse wrote:
-> Some architectures require code written to memory as if it were data to be
-> 'cleaned' from any data caches so that the processor can fetch them as new
-> instructions.
-> 
-> During resume from hibernate, the snapshot code copies some pages directly,
-> meaning these architectures do not get a chance to perform their cache
-> maintenance. Add a call to flush_icache_range(), which is provided by
-> architectures that require it, to perform the maintenance.
-> 
-> This mirrors the kernel's behaviour when loading kernel modules and when
-> mapping executable pages to user space.
-> 
-> Signed-off-by: James Morse <james.morse@arm.com>
-> ---
->  kernel/power/snapshot.c | 4 ++++
->  1 file changed, 4 insertions(+)
-> 
-> diff --git a/kernel/power/snapshot.c b/kernel/power/snapshot.c
-> index 5235dd4e1e2f..139fc449ad75 100644
-> --- a/kernel/power/snapshot.c
-> +++ b/kernel/power/snapshot.c
-> @@ -31,6 +31,7 @@
->  #include <linux/ktime.h>
->  
->  #include <asm/uaccess.h>
-> +#include <asm/cacheflush.h>
->  #include <asm/mmu_context.h>
->  #include <asm/pgtable.h>
->  #include <asm/tlbflush.h>
-> @@ -1196,9 +1197,12 @@ static unsigned int count_data_pages(void)
->  static inline void do_copy_page(long *dst, long *src)
->  {
->  	int n;
-> +	unsigned long __maybe_unused start = (unsigned long)dst;
->  
->  	for (n = PAGE_SIZE / sizeof(long); n; n--)
->  		*dst++ = *src++;
-> +
-> +	flush_icache_range(start, start+PAGE_SIZE);
->  }
->  
->  
-> -- 
-> 2.1.4
-> 
+diff --git a/arch/arm/mm/cache-uniphier.c b/arch/arm/mm/cache-uniphier.c
+index 0502ba1..a6fa7b7 100644
+--- a/arch/arm/mm/cache-uniphier.c
++++ b/arch/arm/mm/cache-uniphier.c
+@@ -377,17 +377,6 @@ static const struct of_device_id uniphier_cache_match[] __initconst = {
+ 	{ /* sentinel */ }
+ };
+ 
+-static struct device_node * __init uniphier_cache_get_next_level_node(
+-							struct device_node *np)
+-{
+-	u32 phandle;
+-
+-	if (of_property_read_u32(np, "next-level-cache", &phandle))
+-		return NULL;
+-
+-	return of_find_node_by_phandle(phandle);
+-}
+-
+ static int __init __uniphier_cache_init(struct device_node *np,
+ 					unsigned int *cache_level)
+ {
+@@ -491,7 +480,7 @@ static int __init __uniphier_cache_init(struct device_node *np,
+ 	 * next level cache fails because we want to continue with available
+ 	 * cache levels.
+ 	 */
+-	next_np = uniphier_cache_get_next_level_node(np);
++	next_np = of_find_next_cache_node(np);
+ 	if (next_np) {
+ 		(*cache_level)++;
+ 		ret = __uniphier_cache_init(next_np, cache_level);
+-- 
+1.9.1
