@@ -1,74 +1,31 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 11 Nov 2015 12:38:31 +0000
-Subject: [PATCH 2/2] arm64: bpf: add BPF XADD instruction
-In-Reply-To: <564332B0.2090103@iogearbox.net>
+Date: Wed, 11 Nov 2015 12:39:56 +0000
+Subject: [PATCH 1/2] arm64: bpf: add 'store immediate' instruction
+In-Reply-To: <20151111121256.GI9562@arm.com>
 References: <1447195301-16757-1-git-send-email-yang.shi@linaro.org>
- <20151111004208.GA47378@ast-mbp.thefacebook.com>
- <CABg9mcux0wEC5=nWuR9o8NwUTp73zqZ-N2e67_f7oS_mX1XGdg@mail.gmail.com>
- <4902833.k8y8bz0YLV@wuerfel> <20151111102406.GB9562@arm.com>
- <56431B83.5060500@iogearbox.net> <20151111115851.GE9562@arm.com>
- <564332B0.2090103@iogearbox.net>
-Message-ID: <20151111123831.GJ9562@arm.com>
+ <1447195301-16757-2-git-send-email-yang.shi@linaro.org>
+ <CABg9mct-_AF9+kvZ0OG_JTMHkfj+OEsR2vonrxF=yD-yA6ihQw@mail.gmail.com>
+ <20151111121256.GI9562@arm.com>
+Message-ID: <20151111123955.GK9562@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 11, 2015 at 01:21:04PM +0100, Daniel Borkmann wrote:
-> On 11/11/2015 12:58 PM, Will Deacon wrote:
-> >On Wed, Nov 11, 2015 at 11:42:11AM +0100, Daniel Borkmann wrote:
-> >>On 11/11/2015 11:24 AM, Will Deacon wrote:
-> >>>On Wed, Nov 11, 2015 at 09:49:48AM +0100, Arnd Bergmann wrote:
-> >>>>On Tuesday 10 November 2015 18:52:45 Z Lim wrote:
-> >>>>>On Tue, Nov 10, 2015 at 4:42 PM, Alexei Starovoitov
-> >>>>><alexei.starovoitov@gmail.com> wrote:
-> >>>>>>On Tue, Nov 10, 2015 at 04:26:02PM -0800, Shi, Yang wrote:
-> >>>>>>>On 11/10/2015 4:08 PM, Eric Dumazet wrote:
-> >>>>>>>>On Tue, 2015-11-10 at 14:41 -0800, Yang Shi wrote:
-> >>>>>>>>>aarch64 doesn't have native support for XADD instruction, implement it by
-> >>>>>>>>>the below instruction sequence:
-> >>>>>
-> >>>>>aarch64 supports atomic add in ARMv8.1.
-> >>>>>For ARMv8(.0), please consider using LDXR/STXR sequence.
-> >>>>
-> >>>>Is it worth optimizing for the 8.1 case? It would add a bit of complexity
-> >>>>to make the code depend on the CPU feature, but it's certainly doable.
-> >>>
-> >>>What's the atomicity required for? Put another way, what are we racing
-> >>>with (I thought bpf was single-threaded)? Do we need to worry about
-> >>>memory barriers?
-> >>>
-> >>>Apologies if these are stupid questions, but all I could find was
-> >>>samples/bpf/sock_example.c and it didn't help much :(
-> >>
-> >>The equivalent code more readable in restricted C syntax (that can be
-> >>compiled by llvm) can be found in samples/bpf/sockex1_kern.c. So the
-> >>built-in __sync_fetch_and_add() will be translated into a BPF_XADD
-> >>insn variant.
-> >
-> >Yikes, so the memory-model for BPF is based around the deprecated GCC
-> >__sync builtins, that inherit their semantics from ia64? Any reason not
-> >to use the C11-compatible __atomic builtins[1] as a base?
+On Wed, Nov 11, 2015 at 12:12:56PM +0000, Will Deacon wrote:
+> On Tue, Nov 10, 2015 at 06:45:39PM -0800, Z Lim wrote:
+> > On Tue, Nov 10, 2015 at 2:41 PM, Yang Shi <yang.shi@linaro.org> wrote:
+> > > aarch64 doesn't have native store immediate instruction, such operation
+> > 
+> > Actually, aarch64 does have "STR (immediate)". For arm64 JIT, we can
+> > consider using it as an optimization.
 > 
-> Hmm, gcc doesn't have an eBPF compiler backend, so this won't work on
-> gcc at all. The eBPF backend in LLVM recognizes the __sync_fetch_and_add()
-> keyword and maps that to a BPF_XADD version (BPF_W or BPF_DW). In the
-> interpreter (__bpf_prog_run()), as Eric mentioned, this maps to atomic_add()
-> and atomic64_add(), respectively. So the struct bpf_insn prog[] you saw
-> from sock_example.c can be regarded as one possible equivalent program
-> section output from the compiler.
+> Yes, I'd definitely like to see that in preference to moving via a
+> temporary register.
 
-Ok, so if I understand you correctly, then __sync_fetch_and_add() has
-different semantics depending on the backend target. That seems counter
-to the LLVM atomics Documentation:
+Wait a second, we're both talking rubbish here :) The STR (immediate)
+form is referring to the addressing mode, whereas this patch wants to
+store an immediate value to memory, which does need moving to a register
+first.
 
-  http://llvm.org/docs/Atomics.html
-
-which specifically calls out the __sync_* primitives as being
-sequentially-consistent and requiring barriers on ARM (which isn't the
-case for atomic[64]_add in the kernel).
-
-If we re-use the __sync_* naming scheme in the source language, I don't
-think we can overlay our own semantics in the backend. The
-__sync_fetch_and_add primitive is also expected to return the old value,
-which doesn't appear to be the case for BPF_XADD.
+So the original patch is fine.
 
 Will
