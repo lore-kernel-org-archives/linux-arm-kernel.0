@@ -1,141 +1,54 @@
-From: jens.wiklander@linaro.org (Jens Wiklander)
-Date: Wed, 11 Nov 2015 11:04:25 +0100
-Subject: [PATCH v2 3/4] arm64: add implementation for arm-smccc
-In-Reply-To: <1447236266-7491-1-git-send-email-jens.wiklander@linaro.org>
-References: <1447236266-7491-1-git-send-email-jens.wiklander@linaro.org>
-Message-ID: <1447236266-7491-4-git-send-email-jens.wiklander@linaro.org>
+From: Hui.Liu@freescale.com (Liu Jason)
+Date: Wed, 11 Nov 2015 10:06:48 +0000
+Subject: [PATCH 1/1] dmaengine: imx-sdma: remove __init annotation on
+ sdma_event_remap
+In-Reply-To: <4267122.WHg3VAy8bL@wuerfel>
+References: <1447233649-21464-1-git-send-email-r64343@freescale.com>
+ <4267122.WHg3VAy8bL@wuerfel>
+Message-ID: <DM2PR0301MB121329F0B68A9D0D00F9A7B9F3130@DM2PR0301MB1213.namprd03.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adds implementation for arm-smccc and enables CONFIG_HAVE_SMCCC.
+> -----Original Message-----
+> From: Arnd Bergmann [mailto:arnd at arndb.de]
+> Sent: Wednesday, November 11, 2015 6:02 PM
+> To: linux-arm-kernel at lists.infradead.org
+> Cc: Liu Hui-R64343; dmaengine at vger.kernel.org; vinod.koul at intel.com;
+> dan.j.williams at intel.com; linux-kernel at vger.kernel.org
+> Subject: Re: [PATCH 1/1] dmaengine: imx-sdma: remove __init annotation on
+> sdma_event_remap
+> 
+> On Wednesday 11 November 2015 17:20:49 Jason Liu wrote:
+> > The sdma_probe function will call sdma_event_remap, but
+> > sdma_event_remap marked with the __init annotation which make the
+> > kbuild complains as the following log:
+> >
+> > WARNING: drivers/dma/built-in.o(.text+0x56fc): Section mismatch in
+> > reference from the function sdma_probe() to the function
+> > .init.text:sdma_event_remap() The function sdma_probe() references the
+> > function __init sdma_event_remap().
+> > This is often because sdma_probe lacks a __init annotation or the
+> > annotation of sdma_event_remap is wrong.
+> >
+> > Remove the __init annotation on sdma_event_remap to kill this build
+> > warning
+> >
+> > Signed-off-by: Jason Liu <r64343@freescale.com>
+> > Cc: Vinod Koul <vinod.koul@intel.com>
+> > Cc: Dan Williams <dan.j.williams@intel.com>
+> >
+> 
+> Looks good. I wonder why I have not caught this with the randconfig
+> builds yet.
+> 
+> Acked-by: Arnd Bergmann <arnd@arndb.de>
+> 
+> One hint for the future: in the patch description, write less about the
+> kbuild warning and more about the actual impact of the bug (calling a
+> discarded function if the device gets unbound and rebound later, or if we
+> get deferred probing).
 
-Signed-off-by: Jens Wiklander <jens.wiklander@linaro.org>
----
- arch/arm64/Kconfig              |  1 +
- arch/arm64/kernel/Makefile      |  1 +
- arch/arm64/kernel/asm-offsets.c |  3 +++
- arch/arm64/kernel/smccc-call.S  | 43 +++++++++++++++++++++++++++++++++++++++++
- arch/arm64/kernel/smccc.c       | 18 +++++++++++++++++
- 5 files changed, 66 insertions(+)
- create mode 100644 arch/arm64/kernel/smccc-call.S
- create mode 100644 arch/arm64/kernel/smccc.c
+Yes, that is true indeed. Thanks Arnd.
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 07d1811..a7332ca 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -89,6 +89,7 @@ config ARM64
- 	select SPARSE_IRQ
- 	select SYSCTL_EXCEPTION_TRACE
- 	select HAVE_CONTEXT_TRACKING
-+	select HAVE_ARM_SMCCC
- 	help
- 	  ARM 64-bit (AArch64) Linux support.
- 
-diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
-index 22dc9bc..c61d758 100644
---- a/arch/arm64/kernel/Makefile
-+++ b/arch/arm64/kernel/Makefile
-@@ -36,6 +36,7 @@ arm64-obj-$(CONFIG_EFI)			+= efi.o efi-stub.o efi-entry.o
- arm64-obj-$(CONFIG_PCI)			+= pci.o
- arm64-obj-$(CONFIG_ARMV8_DEPRECATED)	+= armv8_deprecated.o
- arm64-obj-$(CONFIG_ACPI)		+= acpi.o
-+arm64-obj-$(CONFIG_HAVE_ARM_SMCCC)	+= smccc-call.o smccc.o
- 
- obj-y					+= $(arm64-obj-y) vdso/
- obj-m					+= $(arm64-obj-m)
-diff --git a/arch/arm64/kernel/asm-offsets.c b/arch/arm64/kernel/asm-offsets.c
-index 8d89cf8..cfa0885 100644
---- a/arch/arm64/kernel/asm-offsets.c
-+++ b/arch/arm64/kernel/asm-offsets.c
-@@ -28,6 +28,7 @@
- #include <asm/suspend.h>
- #include <asm/vdso_datapage.h>
- #include <linux/kbuild.h>
-+#include <linux/arm-smccc.h>
- 
- int main(void)
- {
-@@ -161,5 +162,7 @@ int main(void)
-   DEFINE(SLEEP_SAVE_SP_PHYS,	offsetof(struct sleep_save_sp, save_ptr_stash_phys));
-   DEFINE(SLEEP_SAVE_SP_VIRT,	offsetof(struct sleep_save_sp, save_ptr_stash));
- #endif
-+  DEFINE(ARM_SMCCC_RES_X0_OFFS,	offsetof(struct arm_smccc_res, a0));
-+  DEFINE(ARM_SMCCC_RES_X2_OFFS,	offsetof(struct arm_smccc_res, a2));
-   return 0;
- }
-diff --git a/arch/arm64/kernel/smccc-call.S b/arch/arm64/kernel/smccc-call.S
-new file mode 100644
-index 0000000..ae0496f
---- /dev/null
-+++ b/arch/arm64/kernel/smccc-call.S
-@@ -0,0 +1,43 @@
-+/*
-+ * Copyright (c) 2015, Linaro Limited
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License Version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-+ * GNU General Public License for more details.
-+ *
-+ */
-+#include <linux/linkage.h>
-+#include <asm/asm-offsets.h>
-+
-+	.macro SMCCC instr
-+	.cfi_startproc
-+	\instr	#0
-+	ldr	x4, [sp]
-+	stp	x0, x1, [x4, #ARM_SMCCC_RES_X0_OFFS]
-+	stp	x2, x3, [x4, #ARM_SMCCC_RES_X2_OFFS]
-+	ret
-+	.cfi_endproc
-+	.endm
-+
-+/*
-+ * void arm_smccc_smc(unsigned long a0, unsigned long a1, unsigned long a2,
-+ *		  unsigned long a3, unsigned long a4, unsigned long a5,
-+ *		  unsigned long a6, unsigned long a7, struct arm_smccc_res *res)
-+ */
-+ENTRY(arm_smccc_smc)
-+	SMCCC	smc
-+ENDPROC(arm_smccc_smc)
-+
-+/*
-+ * void arm_smccc_hvc(unsigned long a0, unsigned long a1, unsigned long a2,
-+ *		  unsigned long a3, unsigned long a4, unsigned long a5,
-+ *		  unsigned long a6, unsigned long a7, struct arm_smccc_res *res)
-+ */
-+ENTRY(arm_smccc_hvc)
-+	SMCCC	hvc
-+ENDPROC(arm_smccc_hvc)
-diff --git a/arch/arm64/kernel/smccc.c b/arch/arm64/kernel/smccc.c
-new file mode 100644
-index 0000000..7941210
---- /dev/null
-+++ b/arch/arm64/kernel/smccc.c
-@@ -0,0 +1,18 @@
-+/*
-+ * Copyright (c) 2015, Linaro Limited
-+ *
-+ * This software is licensed under the terms of the GNU General Public
-+ * License version 2, as published by the Free Software Foundation, and
-+ * may be copied, distributed, and modified under those terms.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ */
-+#include <linux/export.h>
-+#include <linux/arm-smccc.h>
-+
-+EXPORT_SYMBOL_GPL(arm_smccc_smc);
-+EXPORT_SYMBOL_GPL(arm_smccc_hvc);
--- 
-1.9.1
+> 
+> 	Arnd
