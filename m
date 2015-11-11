@@ -1,27 +1,141 @@
-From: festevam@gmail.com (Fabio Estevam)
-Date: Wed, 11 Nov 2015 13:16:20 -0200
-Subject: [PATCH V2 06/11] mmc: sdhci-esdhc-imx: fix cd regression for dt
- platform
-In-Reply-To: <CAOCHtYj1QuEYLg4vbxshWkYXPe6r9b5OP7hh_O0WoE6xfL0mjw@mail.gmail.com>
-References: <1437569590-5228-1-git-send-email-aisheng.dong@freescale.com>
- <1437569590-5228-7-git-send-email-aisheng.dong@freescale.com>
- <2333b5f060a8e45bd8adcdab55365fab@agner.ch>
- <CAOMZO5BUKmqczyVgz_WgYmBMeuGugDS4uVjw+LXebxf-nPDTyw@mail.gmail.com>
- <CAOMZO5Dz0KijjryoPihoXsP4b5Wy_5rock++oY=i-9gESThUbg@mail.gmail.com>
- <CAOCHtYgayRZoHxJ2d8f1mO0QW_=N4Mx2_RSCrADKERHdP9TGYQ@mail.gmail.com>
- <CAOMZO5D2LNS93XVx86fL7oLTgy4apU036v-ohhv-=kw5gFsCww@mail.gmail.com>
- <CAOCHtYj1QuEYLg4vbxshWkYXPe6r9b5OP7hh_O0WoE6xfL0mjw@mail.gmail.com>
-Message-ID: <CAOMZO5CJsRoXpsV2e0WTzKWmQJxvb45DVOAUeUGH_Oro_svfQA@mail.gmail.com>
+From: daniel@iogearbox.net (Daniel Borkmann)
+Date: Wed, 11 Nov 2015 16:52:00 +0100
+Subject: [PATCH 2/2] arm64: bpf: add BPF XADD instruction
+In-Reply-To: <20151111125807.GP17308@twins.programming.kicks-ass.net>
+References: <1447195301-16757-1-git-send-email-yang.shi@linaro.org>
+ <20151111004208.GA47378@ast-mbp.thefacebook.com>
+ <CABg9mcux0wEC5=nWuR9o8NwUTp73zqZ-N2e67_f7oS_mX1XGdg@mail.gmail.com>
+ <4902833.k8y8bz0YLV@wuerfel> <20151111102406.GB9562@arm.com>
+ <56431B83.5060500@iogearbox.net> <20151111115851.GE9562@arm.com>
+ <564332B0.2090103@iogearbox.net> <20151111123831.GJ9562@arm.com>
+ <20151111125807.GP17308@twins.programming.kicks-ass.net>
+Message-ID: <56436420.9090401@iogearbox.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Robert,
-
-On Sun, Oct 25, 2015 at 7:33 PM, Robert Nelson <robertcnelson@gmail.com> wrote:
-
-> Thanks Fabio, that fixes the regression on v4.1.11 on my wand's... Too
-> bad it's also not in:
+On 11/11/2015 01:58 PM, Peter Zijlstra wrote:
+> On Wed, Nov 11, 2015 at 12:38:31PM +0000, Will Deacon wrote:
+>>> Hmm, gcc doesn't have an eBPF compiler backend, so this won't work on
+>>> gcc at all. The eBPF backend in LLVM recognizes the __sync_fetch_and_add()
+>>> keyword and maps that to a BPF_XADD version (BPF_W or BPF_DW). In the
+>>> interpreter (__bpf_prog_run()), as Eric mentioned, this maps to atomic_add()
+>>> and atomic64_add(), respectively. So the struct bpf_insn prog[] you saw
+>>> from sock_example.c can be regarded as one possible equivalent program
+>>> section output from the compiler.
+>>
+>> Ok, so if I understand you correctly, then __sync_fetch_and_add() has
+>> different semantics depending on the backend target. That seems counter
+>> to the LLVM atomics Documentation:
+>>
+>>    http://llvm.org/docs/Atomics.html
+>>
+>> which specifically calls out the __sync_* primitives as being
+>> sequentially-consistent and requiring barriers on ARM (which isn't the
+>> case for atomic[64]_add in the kernel).
+>>
+>> If we re-use the __sync_* naming scheme in the source language, I don't
+>> think we can overlay our own semantics in the backend. The
+>> __sync_fetch_and_add primitive is also expected to return the old value,
+>> which doesn't appear to be the case for BPF_XADD.
 >
-> https://lkml.org/lkml/2015/10/23/516
+> Yikes. That's double fail. Please don't do this.
+>
+> If you use the __sync stuff (and I agree with Will, you should not) it
+> really _SHOULD_ be sequentially consistent, which means full barriers
+> all over the place.
+>
+> And if you name something XADD (exchange and add, or fetch-add) then it
+> had better return the previous value.
+>
+> atomic*_add() does neither.
 
-The fix is in 4.1.13 now.
+unsigned int ui;
+unsigned long long ull;
+
+void foo(void)
+{
+   (void) __sync_fetch_and_add(&ui, 1);
+   (void) __sync_fetch_and_add(&ull, 1);
+}
+
+So clang front-end translates this snippet into intermediate
+representation of ...
+
+clang test.c -S -emit-llvm -o -
+[...]
+define void @foo() #0 {
+   %1 = atomicrmw add i32* @ui, i32 1 seq_cst
+   %2 = atomicrmw add i64* @ull, i64 1 seq_cst
+   ret void
+}
+[...]
+
+... which, if I see this correctly, then maps atomicrmw add {i32,i64}
+in the BPF target into BPF_XADD as mentioned:
+
+// Atomics
+class XADD<bits<2> SizeOp, string OpcodeStr, PatFrag OpNode>
+     : InstBPF<(outs GPR:$dst), (ins MEMri:$addr, GPR:$val),
+               !strconcat(OpcodeStr, "\t$dst, $addr, $val"),
+               [(set GPR:$dst, (OpNode ADDRri:$addr, GPR:$val))]> {
+   bits<3> mode;
+   bits<2> size;
+   bits<4> src;
+   bits<20> addr;
+
+   let Inst{63-61} = mode;
+   let Inst{60-59} = size;
+   let Inst{51-48} = addr{19-16}; // base reg
+   let Inst{55-52} = src;
+   let Inst{47-32} = addr{15-0}; // offset
+
+   let mode = 6;     // BPF_XADD
+   let size = SizeOp;
+   let BPFClass = 3; // BPF_STX
+}
+
+let Constraints = "$dst = $val" in {
+def XADD32 : XADD<0, "xadd32", atomic_load_add_32>;
+def XADD64 : XADD<3, "xadd64", atomic_load_add_64>;
+// undefined def XADD16 : XADD<1, "xadd16", atomic_load_add_16>;
+// undefined def XADD8  : XADD<2, "xadd8", atomic_load_add_8>;
+}
+
+I played a bit around with eBPF code to assign the __sync_fetch_and_add()
+return value to a var and dump it to trace pipe, or use it as return code.
+llvm compiles it (with the result assignment) and it looks like:
+
+[...]
+206: (b7) r3 = 3
+207: (db) lock *(u64 *)(r0 +0) += r3
+208: (bf) r1 = r10
+209: (07) r1 += -16
+210: (b7) r2 = 10
+211: (85) call 6 // r3 dumped here
+[...]
+
+[...]
+206: (b7) r5 = 3
+207: (db) lock *(u64 *)(r0 +0) += r5
+208: (bf) r1 = r10
+209: (07) r1 += -16
+210: (b7) r2 = 10
+211: (b7) r3 = 43
+212: (b7) r4 = 42
+213: (85) call 6 // r5 dumped here
+[...]
+
+[...]
+11: (b7) r0 = 3
+12: (db) lock *(u64 *)(r1 +0) += r0
+13: (95) exit // r0 returned here
+[...]
+
+What it seems is that we 'get back' the value (== 3 here in r3, r5, r0)
+that we're adding, at least that's what seems to be generated wrt
+register assignments. Hmm, the semantic differences of bpf target
+should be documented somewhere for people writing eBPF programs to
+be aware of.
+
+Best,
+Daniel
