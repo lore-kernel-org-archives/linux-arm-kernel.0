@@ -1,26 +1,31 @@
 From: davem@davemloft.net (David Miller)
-Date: Wed, 11 Nov 2015 14:01:47 -0500 (EST)
+Date: Wed, 11 Nov 2015 14:04:53 -0500 (EST)
 Subject: [PATCH 2/2] arm64: bpf: add BPF XADD instruction
-In-Reply-To: <20151111181132.GA90947@ast-mbp.thefacebook.com>
-References: <20151111.123548.1039494689070388545.davem@davemloft.net>
- <20151111175741.GR17308@twins.programming.kicks-ass.net>
- <20151111181132.GA90947@ast-mbp.thefacebook.com>
-Message-ID: <20151111.140147.946865774411167562.davem@davemloft.net>
+In-Reply-To: <56438DE7.4080300@iogearbox.net>
+References: <20151111181132.GA90947@ast-mbp.thefacebook.com>
+ <20151111183128.GS17308@twins.programming.kicks-ass.net>
+ <56438DE7.4080300@iogearbox.net>
+Message-ID: <20151111.140453.442347400380318914.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Alexei Starovoitov <alexei.starovoitov@gmail.com>
-Date: Wed, 11 Nov 2015 10:11:33 -0800
+From: Daniel Borkmann <daniel@iogearbox.net>
+Date: Wed, 11 Nov 2015 19:50:15 +0100
 
-> bpf_xadd was never meant to be __sync_fetch_and_add equivalent.
-> From the day one it meant to be atomic_add() as kernel does it.
-
-+1
-
-> I did piggy back on __sync in the llvm backend because it was the quick
-> and dirty way to move forward.
-> In retrospect I should have introduced a clean intrinstic for that instead,
-> but it's not too late to do it now. user space we can change at any time
-> unlike kernel.
+> Well, on that note, it's not like you just change the target to bpf
+> in your Makefile and can compile (& load into the kernel) anything
+> you want with it.  You do have to write small, restricted programs
+> from scratch for a specific use-case with the limited set of helper
+> functions and intrinsics that are available from the kernel. So I
+> don't think that "Programs that used to work will now no longer
+> work." holds if you regard it as such.
 
 +1
+
+Strict C language semantics do not apply here at all, we are talking
+about purposfully built modules of "C like" code that have any
+semantics we want and make the most sense for us.
+
+Maybe BPF_XADD is unfortunately named, but this is tangental to
+our ability to choose what atomic operations mean and what semantics
+they match up to.
