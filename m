@@ -1,133 +1,106 @@
-From: Liviu.Dudau@arm.com (Liviu.Dudau at arm.com)
-Date: Wed, 11 Nov 2015 18:24:56 +0000
-Subject: PCIe host controller behind IOMMU on ARM
-In-Reply-To: <PS1PR06MB11806B65D3408BDFBEAD9D3AF5150@PS1PR06MB1180.apcprd06.prod.outlook.com>
-References: <PS1PR06MB11807CBE8EB2AC6B0158D2B5F52A0@PS1PR06MB1180.apcprd06.prod.outlook.com>
- <20151104142412.GS963@e106497-lin.cambridge.arm.com>
- <PS1PR06MB11804263DD55C54C5987654EF52A0@PS1PR06MB1180.apcprd06.prod.outlook.com>
- <20151104150147.GT963@e106497-lin.cambridge.arm.com>
- <PS1PR06MB11806B65D3408BDFBEAD9D3AF5150@PS1PR06MB1180.apcprd06.prod.outlook.com>
-Message-ID: <20151111182456.GV963@e106497-lin.cambridge.arm.com>
+From: peterz@infradead.org (Peter Zijlstra)
+Date: Wed, 11 Nov 2015 19:31:28 +0100
+Subject: [PATCH 2/2] arm64: bpf: add BPF XADD instruction
+In-Reply-To: <20151111181132.GA90947@ast-mbp.thefacebook.com>
+References: <56436420.9090401@iogearbox.net> <20151111162341.GN9562@arm.com>
+ <20151111172659.GA86334@ast-mbp.thefacebook.com>
+ <20151111.123548.1039494689070388545.davem@davemloft.net>
+ <20151111175741.GR17308@twins.programming.kicks-ass.net>
+ <20151111181132.GA90947@ast-mbp.thefacebook.com>
+Message-ID: <20151111183128.GS17308@twins.programming.kicks-ass.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 09, 2015 at 12:32:13PM +0000, Phil Edworthy wrote:
-> Hi Liviu, Will,
+On Wed, Nov 11, 2015 at 10:11:33AM -0800, Alexei Starovoitov wrote:
+> On Wed, Nov 11, 2015 at 06:57:41PM +0100, Peter Zijlstra wrote:
+> > On Wed, Nov 11, 2015 at 12:35:48PM -0500, David Miller wrote:
+> > > From: Alexei Starovoitov <alexei.starovoitov@gmail.com>
+> > > Date: Wed, 11 Nov 2015 09:27:00 -0800
+> > > 
+> > > > BPF_XADD == atomic_add() in kernel. period.
+> > > > we are not going to deprecate it or introduce something else.
+> > > 
+> > > Agreed, it makes no sense to try and tie C99 or whatever atomic
+> > > semantics to something that is already clearly defined to have
+> > > exactly kernel atomic_add() semantics.
+> > 
+> > Dave, this really doesn't make any sense to me. __sync primitives have
+> > well defined semantics and (e)BPF is violating this.
 > 
-> On 04 November 2015 15:19, Phil wrote:
-> > On 04 November 2015 15:02, Liviu wrote:
-> > > On Wed, Nov 04, 2015 at 02:48:38PM +0000, Phil Edworthy wrote:
-> > > > Hi Liviu,
-> > > >
-> > > > On 04 November 2015 14:24, Liviu wrote:
-> > > > > On Wed, Nov 04, 2015 at 01:57:48PM +0000, Phil Edworthy wrote:
-> > > > > > Hi,
-> > > > > >
-> > > > > > I am trying to hook up a PCIe host controller that sits behind an IOMMU,
-> > > > > > but having some problems.
-> > > > > >
-> > > > > > I'm using the pcie-rcar PCIe host controller and it works fine without
-> > > > > > the IOMMU, and I can attach the IOMMU to the controller such that any
-> > > calls
-> > > > > > to dma_alloc_coherent made by the controller driver uses the
-> > iommu_ops
-> > > > > > version of dma_ops.
-> > > > > >
-> > > > > > However, I can't see how to make the endpoints to utilise the dma_ops
-> > that
-> > > > > > the controller uses. Shouldn't the endpoints inherit the dma_ops from the
-> > > > > > controller?
-> > > > >
-> > > > > No, not directly.
-> > > > >
-> > > > > > Any pointers for this?
-> > > > >
-> > > > > You need to understand the process through which a driver for endpoint
-> > get
-> > > > > an address to be passed down to the device. Have a look at
-> > > > > Documentation/DMA-API-HOWTO.txt, there is a nice explanation there.
-> > > > > (Hint: EP driver needs to call dma_map_single).
-> > > > >
-> > > > > Also, you need to make sure that the bus address that ends up being set
-> > into
-> > > > > the endpoint gets translated correctly by the host controller into an address
-> > > > > that the IOMMU can then translate into physical address.
-> > > > Sure, though since this is bog standard Intel PCIe ethernet card which works
-> > > > fine when the IOMMU is effectively unused, I don?t think there is a problem
-> > > > with that.
-> > > >
-> > > > The driver for the PCIe controller sets up the IOMMU mapping ok when I
-> > > > do a test call to dma_alloc_coherent() in the controller's driver. i.e. when I
-> > > > do this, it ends up in arm_iommu_alloc_attrs(), which calls
-> > > > __iommu_alloc_buffer() and __alloc_iova().
-> > > >
-> > > > When an endpoint driver allocates and maps a dma coherent buffer it
-> > > > also needs to end up in arm_iommu_alloc_attrs(), but it doesn't.
-> > >
-> > > Why do you think that? Remember that the only thing attached to the IOMMU
-> > is
-> > > the
-> > > host controller. The endpoint is on the PCIe bus, which gets a different
-> > > translation
-> > > that the IOMMU knows nothing about. If it helps you to visualise it better, think
-> > > of the host controller as another IOMMU device. It's the ops of the host
-> > > controller
-> > > that should be invoked, not the IOMMU's.
-> > Ok, that makes sense. I'll have a think and poke it a bit more...
+> bpf_xadd was never meant to be __sync_fetch_and_add equivalent.
+> From the day one it meant to be atomic_add() as kernel does it.
+> I did piggy back on __sync in the llvm backend because it was the quick
+> and dirty way to move forward.
+> In retrospect I should have introduced a clean intrinstic for that instead,
+> but it's not too late to do it now. user space we can change at any time
+> unlike kernel.
 
-Hi Phil,
+I would argue that breaking userspace (language in this case) is equally
+bad. Programs that used to work will now no longer work.
 
-Not trying to ignore your email, but I thought this is more in Will's backyard.
-
-> Somewhat related to this, since our PCIe controller HW is limited to
-> 32-bit AXI address range, before trying to hook up the IOMMU I have
-> tried to limit the dma_mask for PCI cards to DMA_BIT_MASK(32). The
-> reason being that Linux uses a 1 to 1 mapping between PCI addresses
-> and cpu (phys) addresses when there isn't an IOMMU involved, so I
-> think that we need to limit the PCI address space used.
-
-I think you're mixing things a bit or not explaining them very well. Having the
-PCIe controller limited to 32-bit AXI does not mean that the PCIe bus cannot
-carry 64-bit addresses. It depends on how they get translated by the host bridge
-or its associated ATS block. I can't see why you can't have a setup where
-the CPU addresses are 32-bit but the PCIe bus addresses are all 64-bit.
-You just have to be careful on how you setup your mem64 ranges so that they don't
-overlap with the 32-bit ranges when translated.
-
-And no, you should not limit at the card driver the DMA_BIT_MASK() unless the
-card is not capable of supporting more than 32-bit addresses.
-
+> > Furthermore, the fetch_and_add (or XADD) name has well defined
+> > semantics, which (e)BPF also violates.
 > 
-> Since pci_setup_device() sets up dma_mask, I added a bus notifier in the
-> PCIe controller driver so I can change the mask, if needed, on the
-> BUS_NOTIFY_BOUND_DRIVER action.
-> However, I think there is the potential for card drivers to allocate and
-> map buffers before the bus notifier get called. Additionally, I've seen
-> drivers change their behaviour based on the success or failure of
-> dma_set_mask_and_coherent(dev, DMA_BIT_MASK(64)), so the
-> driver could, theoretically at least, operate in a way that is not
-> compatible with a more restricted dma_mask (though I can't think
-> of any way this would not work with hardware I've seen).
+> bpf_xadd also didn't meant to be 'fetch'. It was void return from the beginning.
+
+Then why the 'X'? The XADD name, does and always has meant: eXchange-ADD,
+this means it must have a return value.
+
+You using the XADD name for something that is not in fact XADD is just
+wrong.
+
+> > Atomicy is hard enough as it is, backends giving random interpretations
+> > to them isn't helping anybody.
 > 
-> So, I think that using a bus notifier is the wrong way to go, but I don?t
-> know what other options I have. Any suggestions?
+> no randomness. 
 
-I would first have a look at how the PCIe bus addresses are translated by the
-host controller. 
+You mean every other backend translating __sync_fetch_and_add()
+differently than you isn't random on your part?
 
-Best regards,
-Liviu
+> bpf_xadd == atomic_add() in kernel.
+> imo that is the simplest and cleanest intepretantion one can have, no?
 
+Wrong though, if you'd named it BPF_ADD, sure, XADD, not so much. That
+is 'randomly' co-opting something that has well defined meaning and
+semantics with something else.
+
+> > It also baffles me that Alexei is seemingly unwilling to change/rev the
+> > (e)BPF instructions, which would be invisible to the regular user, he
+> > does want to change the language itself, which will impact all
+> > 'scripts'.
 > 
-> Thanks for your help
-> Phil
+> well, we cannot change it in kernel because it's ABI.
 
--- 
-====================
-| I would like to |
-| fix the world,  |
-| but they're not |
-| giving me the   |
- \ source code!  /
-  ---------------
-    ?\_(?)_/?
+You can always rev it. Introduce a new set, and wait for users of the
+old set to die, then remove it. We do that all the time with Linux ABI.
+
+> I'm not against adding new insns. We definitely can, but let's figure out why?
+> Is anything broken? No. 
+
+Yes, __sync_fetch_and_add() is broken when pulled through the eBPF
+backend.
+
+> So what new insns make sense?
+
+Depends a bit on how fancy you want to go. If you want to support weakly
+ordered architectures at full speed you'll need more (and more
+complexity) than if you decide to not go that way.
+
+The simplest option would be a fully ordered compare-and-swap operation.
+That is enough to implement everything else (at a cost). The other
+extreme is a weak ll/sc with an optimizer pass recognising various forms
+to translate into 'better' native instructions.
+
+> Add new one that does 'fetch_and_add' ? What is the real use case it
+> will be used for?
+
+Look at all the atomic_{add,dec}_return*() users in the kernel. A typical
+example would be a reader-writer lock implementations. See
+include/asm-generic/rwsem.h for examples.
+
+> Adding new intrinsic to llvm is not a big deal. I'll add it as soon
+> as I have time to work on it or if somebody beats me to it I would be
+> glad to test it and apply it.
+
+This isn't a speed coding contest. You want to think about this
+properly.
