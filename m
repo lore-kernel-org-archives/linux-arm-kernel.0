@@ -1,33 +1,33 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 11 Nov 2015 21:26:31 +0100
-Subject: [PATCH 2/2] [media] include/media: move platform driver headers
- to a separate dir
-In-Reply-To: <09e182fa61a7122356b790cd2a4a7f622dabb4ce.1447261977.git.mchehab@osg.samsung.com>
-References: <413d2bb0b813a7e62867de7a94b0ab61e16cb1cb.1447261977.git.mchehab@osg.samsung.com>
- <09e182fa61a7122356b790cd2a4a7f622dabb4ce.1447261977.git.mchehab@osg.samsung.com>
-Message-ID: <4220808.QEkJDXYE1T@wuerfel>
+From: thomas.betker@freenet.de (Thomas Betker)
+Date: Wed, 11 Nov 2015 21:24:38 +0100
+Subject: [PATCH] iio: adc: xilinx: Fix VREFN scale
+Message-ID: <1447273478-2530-1-git-send-email-thomas.betker@freenet.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 11 November 2015 15:14:48 Mauro Carvalho Chehab wrote:
->  rename include/media/{ => platform}/exynos-fimc.h (100%)
->  rename include/media/{ => platform}/mmp-camera.h (100%)
->  rename include/media/{ => platform}/omap1_camera.h (100%)
->  rename include/media/{ => platform}/omap4iss.h (100%)
->  rename include/media/{ => platform}/s3c_camif.h (100%)
->  rename include/media/{ => platform}/s5p_hdmi.h (100%)
->  rename include/media/{ => platform}/sh_mobile_ceu.h (100%)
->  rename include/media/{ => platform}/sh_mobile_csi2.h (100%)
->  rename include/media/{ => platform}/sh_vou.h (100%)
->  rename include/media/{ => platform}/sii9234.h (100%)
->  rename include/media/{ => platform}/soc_camera.h (100%)
->  rename include/media/{ => platform}/soc_camera_platform.h (98%)
->  rename include/media/{ => platform}/soc_mediabus.h (100%)
+From: Thomas Betker <thomas.betker@rohde-schwarz.com>
 
-This still seems to be a mix of various things. Some of these are interfaces
-between drivers, while others declare a foo_platform_data structure that
-is used to interface between platform code and the driver.
+The scaling factor for VREFN is 3.0/4096 (not 1.0/4096), just as for
+VREFP. This is not immediately obvious from the specification (Xilinx
+UG480), but has been confirmed by Xilinx support.
 
-I think the latter should go into include/linux/platform_data/media/*.h instead.
+Suggested-by: Hartmut Knaack <knaack.h@gmx.de>
+Signed-off-by: Thomas Betker <thomas.betker@rohde-schwarz.com>
+---
+ drivers/iio/adc/xilinx-xadc-core.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-	Arnd
+diff --git a/drivers/iio/adc/xilinx-xadc-core.c b/drivers/iio/adc/xilinx-xadc-core.c
+index 0370624..02e636a 100644
+--- a/drivers/iio/adc/xilinx-xadc-core.c
++++ b/drivers/iio/adc/xilinx-xadc-core.c
+@@ -841,6 +841,7 @@ static int xadc_read_raw(struct iio_dev *indio_dev,
+ 			case XADC_REG_VCCINT:
+ 			case XADC_REG_VCCAUX:
+ 			case XADC_REG_VREFP:
++			case XADC_REG_VREFN:
+ 			case XADC_REG_VCCBRAM:
+ 			case XADC_REG_VCCPINT:
+ 			case XADC_REG_VCCPAUX:
+-- 
+2.6.3
