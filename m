@@ -1,82 +1,62 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 11 Nov 2015 18:46:54 +0000
-Subject: [PATCH 2/2] arm64: bpf: add BPF XADD instruction
-In-Reply-To: <20151111181132.GA90947@ast-mbp.thefacebook.com>
-References: <56436420.9090401@iogearbox.net> <20151111162341.GN9562@arm.com>
- <20151111172659.GA86334@ast-mbp.thefacebook.com>
- <20151111.123548.1039494689070388545.davem@davemloft.net>
- <20151111175741.GR17308@twins.programming.kicks-ass.net>
- <20151111181132.GA90947@ast-mbp.thefacebook.com>
-Message-ID: <20151111184654.GQ9562@arm.com>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 11 Nov 2015 12:48:50 -0600
+Subject: [PATCH v2 1/4] drm: arm: Add DT bindings documentation for HDLCD
+ driver.
+In-Reply-To: <1447258010-2234-2-git-send-email-Liviu.Dudau@arm.com>
+References: <1447258010-2234-1-git-send-email-Liviu.Dudau@arm.com>
+ <1447258010-2234-2-git-send-email-Liviu.Dudau@arm.com>
+Message-ID: <20151111184849.GA9172@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 11, 2015 at 10:11:33AM -0800, Alexei Starovoitov wrote:
-> On Wed, Nov 11, 2015 at 06:57:41PM +0100, Peter Zijlstra wrote:
-> > On Wed, Nov 11, 2015 at 12:35:48PM -0500, David Miller wrote:
-> > > From: Alexei Starovoitov <alexei.starovoitov@gmail.com>
-> > > Date: Wed, 11 Nov 2015 09:27:00 -0800
-> > > 
-> > > > BPF_XADD == atomic_add() in kernel. period.
-> > > > we are not going to deprecate it or introduce something else.
-> > > 
-> > > Agreed, it makes no sense to try and tie C99 or whatever atomic
-> > > semantics to something that is already clearly defined to have
-> > > exactly kernel atomic_add() semantics.
-> > 
-> > Dave, this really doesn't make any sense to me. __sync primitives have
-> > well defined semantics and (e)BPF is violating this.
+On Wed, Nov 11, 2015 at 04:06:47PM +0000, Liviu Dudau wrote:
+> Cc: Rob Herring <robh+dt@kernel.org>
+> Cc: Pawel Moll <pawel.moll@arm.com>
+> Cc: Mark Rutland <mark.rutland@arm.com>
+> Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
+> Cc: Kumar Gala <galak@codeaurora.org>
 > 
-> bpf_xadd was never meant to be __sync_fetch_and_add equivalent.
-> From the day one it meant to be atomic_add() as kernel does it.
-> I did piggy back on __sync in the llvm backend because it was the quick
-> and dirty way to move forward.
-> In retrospect I should have introduced a clean intrinstic for that instead,
-> but it's not too late to do it now. user space we can change at any time
-> unlike kernel.
+> Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
 
-But it's not just "user space", it's the source language definition!
-I also don't see how you can change it now, without simply rejecting
-the __sync primitives outright.
+Looks pretty good, but a few comments.
 
-> > Furthermore, the fetch_and_add (or XADD) name has well defined
-> > semantics, which (e)BPF also violates.
+> ---
+>  .../devicetree/bindings/drm/arm/arm,hdlcd.txt      | 74 ++++++++++++++++++++++
+>  1 file changed, 74 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/drm/arm/arm,hdlcd.txt
 > 
-> bpf_xadd also didn't meant to be 'fetch'. It was void return from the beginning.
+> diff --git a/Documentation/devicetree/bindings/drm/arm/arm,hdlcd.txt b/Documentation/devicetree/bindings/drm/arm/arm,hdlcd.txt
+> new file mode 100644
+> index 0000000..b57f1b9
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/drm/arm/arm,hdlcd.txt
+> @@ -0,0 +1,74 @@
+> +ARM HDLCD
+> +
+> +This is a display controller found on several development platforms produced
+> +by ARM Ltd and in more modern of its' Fast Models. The HDLCD is an RGB
+> +streamer that reads the data from a framebuffer and sends it to a single
+> +digital encoder (DVI or HDMI).
+> +
+> +Required properties:
+> +  - compatible: "arm,hdlcd"
 
-Right, so it's just a misnomer.
+Kind of generic. Something more specific please.
 
-> > Atomicy is hard enough as it is, backends giving random interpretations
-> > to them isn't helping anybody.
-> 
-> no randomness. bpf_xadd == atomic_add() in kernel.
-> imo that is the simplest and cleanest intepretantion one can have, no?
+> +  - reg: Physical base address and length of the controller's registers.
+> +    If a second pair of address and length values is present this specifies
+> +    the presence of a DMA coherent memory area that the HDLCD can use as
+> +    framebuffer instead of normal CMA memory.
 
-I don't really mind, as long as there is a semantic that everybody agrees
-on. Really, I just want this to be consistent because memory models are
-a PITA enough without having multiple interpretations flying around.
+This is on-chip RAM or nornal system RAM? We already have bindings for 
+both.
 
-> > It also baffles me that Alexei is seemingly unwilling to change/rev the
-> > (e)BPF instructions, which would be invisible to the regular user, he
-> > does want to change the language itself, which will impact all
-> > 'scripts'.
-> 
-> well, we cannot change it in kernel because it's ABI.
-> I'm not against adding new insns. We definitely can, but let's figure out why?
-> Is anything broken? No. So what new insns make sense?
-
-If you end up needing a suite of atomics, I would suggest the __atomic
-builtins because they are likely to be more portable and more flexible
-than trying to use the kernel memory model outside of the environment
-for which it was developed. However, I agree with you that we can cross
-that bridge when we get there.
-
-> Adding new intrinsic to llvm is not a big deal. I'll add it as soon
-> as I have time to work on it or if somebody beats me to it I would be
-> glad to test it and apply it.
-
-I'm more interested in what you do about the existing intrinsic. Anyway,
-I'll raise a ticket against LLVM so that they're aware (and maybe
-somebody else will fix it :).
-
-Will
+> +  - interrupts: One interrupt used by the display controller to notify the
+> +    interrupt controller when any of the interrupt sources programmed in
+> +    the interrupt mask register have activated.
+> +  - clocks: A list of phandle + clock-specifier pairs, one for each
+> +    entry in 'clock-names'.
+> +  - clock-names: A list of clock names. For HDLD it should contain:
+> +      - "pxlclk" for the clock feeding the output PLL of the controller.
+> +  - port: The HDLCD connection to an encoder chip. The connection is modelled
+> +    using the OF graph bindings specified in Documentation/devicetree/bindings/graph.txt.
