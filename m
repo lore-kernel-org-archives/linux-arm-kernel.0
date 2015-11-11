@@ -1,76 +1,135 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 11 Nov 2015 16:23:41 +0000
-Subject: [PATCH 2/2] arm64: bpf: add BPF XADD instruction
-In-Reply-To: <56436420.9090401@iogearbox.net>
-References: <20151111004208.GA47378@ast-mbp.thefacebook.com>
- <CABg9mcux0wEC5=nWuR9o8NwUTp73zqZ-N2e67_f7oS_mX1XGdg@mail.gmail.com>
- <4902833.k8y8bz0YLV@wuerfel> <20151111102406.GB9562@arm.com>
- <56431B83.5060500@iogearbox.net> <20151111115851.GE9562@arm.com>
- <564332B0.2090103@iogearbox.net> <20151111123831.GJ9562@arm.com>
- <20151111125807.GP17308@twins.programming.kicks-ass.net>
- <56436420.9090401@iogearbox.net>
-Message-ID: <20151111162341.GN9562@arm.com>
+From: tony@atomide.com (Tony Lindgren)
+Date: Wed, 11 Nov 2015 08:47:10 -0800
+Subject: [PATCH] rtc: ds1307: fix kernel splat due to wakeup irq handling
+In-Reply-To: <1447258261-2102-1-git-send-email-balbi@ti.com>
+References: <1447258261-2102-1-git-send-email-balbi@ti.com>
+Message-ID: <20151111164710.GE3218@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Daniel,
-
-Thanks for investigating this further.
-
-On Wed, Nov 11, 2015 at 04:52:00PM +0100, Daniel Borkmann wrote:
-> I played a bit around with eBPF code to assign the __sync_fetch_and_add()
-> return value to a var and dump it to trace pipe, or use it as return code.
-> llvm compiles it (with the result assignment) and it looks like:
+* Felipe Balbi <balbi@ti.com> [151111 08:11]:
+> Since commit 3fffd1283927 ("i2c: allow specifying
+> separate wakeup interrupt in device tree") we have
+> automatic wakeup irq support for i2c devices. That
+> commit missed the fact that rtc-1307 had its own
+> wakeup irq handling and ended up introducing a
+> kernel splat for at least Beagle x15 boards.
 > 
-> [...]
-> 206: (b7) r3 = 3
-> 207: (db) lock *(u64 *)(r0 +0) += r3
-> 208: (bf) r1 = r10
-> 209: (07) r1 += -16
-> 210: (b7) r2 = 10
-> 211: (85) call 6 // r3 dumped here
-> [...]
+> Fix that by reverting original commit _and_ passing
+> correct interrupt names on DTS so i2c-core can
+> choose correct IRQ as wakeup.
 > 
-> [...]
-> 206: (b7) r5 = 3
-> 207: (db) lock *(u64 *)(r0 +0) += r5
-> 208: (bf) r1 = r10
-> 209: (07) r1 += -16
-> 210: (b7) r2 = 10
-> 211: (b7) r3 = 43
-> 212: (b7) r4 = 42
-> 213: (85) call 6 // r5 dumped here
-> [...]
+> Now that we have automatic wakeirq support, we can
+> revert the original commit which did it manually.
 > 
-> [...]
-> 11: (b7) r0 = 3
-> 12: (db) lock *(u64 *)(r1 +0) += r0
-> 13: (95) exit // r0 returned here
-> [...]
+> Fixes the following warning:
 > 
-> What it seems is that we 'get back' the value (== 3 here in r3, r5, r0)
-> that we're adding, at least that's what seems to be generated wrt
-> register assignments. Hmm, the semantic differences of bpf target
-> should be documented somewhere for people writing eBPF programs to
-> be aware of.
+> [   10.346582] WARNING: CPU: 1 PID: 263 at linux/drivers/base/power/wakeirq.c:43 dev_pm_attach_wake_irq+0xbc/0xd4()
+> [   10.359244] rtc-ds1307 2-006f: wake irq already initialized
 
-If we're going to document it, a bug tracker might be a good place to
-start. The behaviour, as it stands, is broken wrt the definition of the
-__sync primitives. That is, there is no way to build __sync_fetch_and_add
-out of BPF_XADD without changing its semantics.
+Best to merge the dts change along with the driver fix in this case:
 
-We could fix this by either:
+Acked-by: Tony Lindgren <tony@atomide.com>
 
-(1) Defining BPF_XADD to match __sync_fetch_and_add (including memory
-    barriers).
 
-(2) Introducing some new BPF_ atomics, that map to something like the
-    C11 __atomic builtins and deprecating BPF_XADD in favour of these.
-
-(3) Introducing new source-language intrinsics to match what BPF can do
-    (unlikely to be popular).
-
-As it stands, I'm not especially keen on adding BPF_XADD to the arm64
-JIT backend until we have at least (1) and preferably (2) as well.
-
-Will
+> Cc: Nishanth Menon <nm@ti.com>
+> Signed-off-by: Felipe Balbi <balbi@ti.com>
+> ---
+>  arch/arm/boot/dts/am57xx-beagle-x15.dts |  1 +
+>  drivers/rtc/rtc-ds1307.c                | 36 +++------------------------------
+>  2 files changed, 4 insertions(+), 33 deletions(-)
+> 
+> diff --git a/arch/arm/boot/dts/am57xx-beagle-x15.dts b/arch/arm/boot/dts/am57xx-beagle-x15.dts
+> index d9ba6b879fc1..00352e761b8c 100644
+> --- a/arch/arm/boot/dts/am57xx-beagle-x15.dts
+> +++ b/arch/arm/boot/dts/am57xx-beagle-x15.dts
+> @@ -604,6 +604,7 @@
+>  		reg = <0x6f>;
+>  		interrupts-extended = <&crossbar_mpu GIC_SPI 2 IRQ_TYPE_EDGE_RISING>,
+>  				      <&dra7_pmx_core 0x424>;
+> +		interrupt-names = "irq", "wakeup";
+>  
+>  		pinctrl-names = "default";
+>  		pinctrl-0 = <&mcp79410_pins_default>;
+> diff --git a/drivers/rtc/rtc-ds1307.c b/drivers/rtc/rtc-ds1307.c
+> index 188006c55ce0..325836818826 100644
+> --- a/drivers/rtc/rtc-ds1307.c
+> +++ b/drivers/rtc/rtc-ds1307.c
+> @@ -15,9 +15,6 @@
+>  #include <linux/i2c.h>
+>  #include <linux/init.h>
+>  #include <linux/module.h>
+> -#include <linux/of_device.h>
+> -#include <linux/of_irq.h>
+> -#include <linux/pm_wakeirq.h>
+>  #include <linux/rtc/ds1307.h>
+>  #include <linux/rtc.h>
+>  #include <linux/slab.h>
+> @@ -117,7 +114,6 @@ struct ds1307 {
+>  #define HAS_ALARM	1		/* bit 1 == irq claimed */
+>  	struct i2c_client	*client;
+>  	struct rtc_device	*rtc;
+> -	int			wakeirq;
+>  	s32 (*read_block_data)(const struct i2c_client *client, u8 command,
+>  			       u8 length, u8 *values);
+>  	s32 (*write_block_data)(const struct i2c_client *client, u8 command,
+> @@ -1146,8 +1142,6 @@ read_rtc:
+>  	}
+>  
+>  	if (want_irq) {
+> -		struct device_node *node = client->dev.of_node;
+> -
+>  		err = devm_request_threaded_irq(&client->dev,
+>  						client->irq, NULL, irq_handler,
+>  						IRQF_SHARED | IRQF_ONESHOT,
+> @@ -1155,34 +1149,13 @@ read_rtc:
+>  		if (err) {
+>  			client->irq = 0;
+>  			dev_err(&client->dev, "unable to request IRQ!\n");
+> -			goto no_irq;
+> -		}
+> -
+> -		set_bit(HAS_ALARM, &ds1307->flags);
+> -		dev_dbg(&client->dev, "got IRQ %d\n", client->irq);
+> -
+> -		/* Currently supported by OF code only! */
+> -		if (!node)
+> -			goto no_irq;
+> -
+> -		err = of_irq_get(node, 1);
+> -		if (err <= 0) {
+> -			if (err == -EPROBE_DEFER)
+> -				goto exit;
+> -			goto no_irq;
+> -		}
+> -		ds1307->wakeirq = err;
+> +		} else {
+>  
+> -		err = dev_pm_set_dedicated_wake_irq(&client->dev,
+> -						    ds1307->wakeirq);
+> -		if (err) {
+> -			dev_err(&client->dev, "unable to setup wakeIRQ %d!\n",
+> -				err);
+> -			goto exit;
+> +			set_bit(HAS_ALARM, &ds1307->flags);
+> +			dev_dbg(&client->dev, "got IRQ %d\n", client->irq);
+>  		}
+>  	}
+>  
+> -no_irq:
+>  	if (chip->nvram_size) {
+>  
+>  		ds1307->nvram = devm_kzalloc(&client->dev,
+> @@ -1226,9 +1199,6 @@ static int ds1307_remove(struct i2c_client *client)
+>  {
+>  	struct ds1307 *ds1307 = i2c_get_clientdata(client);
+>  
+> -	if (ds1307->wakeirq)
+> -		dev_pm_clear_wake_irq(&client->dev);
+> -
+>  	if (test_and_clear_bit(HAS_NVRAM, &ds1307->flags))
+>  		sysfs_remove_bin_file(&client->dev.kobj, ds1307->nvram);
+>  
+> -- 
+> 2.6.2
+> 
