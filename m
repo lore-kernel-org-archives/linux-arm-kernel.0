@@ -1,114 +1,139 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Wed, 11 Nov 2015 10:09:01 -0800
-Subject: [PATCH 09/10] mtd: afs: factor the IIS read into partition parser
-In-Reply-To: <1444914533-27782-10-git-send-email-linus.walleij@linaro.org>
-References: <1444914533-27782-1-git-send-email-linus.walleij@linaro.org>
- <1444914533-27782-10-git-send-email-linus.walleij@linaro.org>
-Message-ID: <20151111180901.GC12143@google.com>
+From: ludovic.desroches@atmel.com (Ludovic Desroches)
+Date: Wed, 11 Nov 2015 19:11:48 +0100
+Subject: [PATCH v4] mmc: sdhci at91: add PM support
+Message-ID: <1447265508-8583-1-git-send-email-ludovic.desroches@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+Add runtime PM support and use runtime_force_suspend|resume() for system
+PM.
 
-On Thu, Oct 15, 2015 at 03:08:52PM +0200, Linus Walleij wrote:
-> Factor the IIS (Image Information Structure) reading into the
-> partition parser, giving us a single, clean partition parser
-> function.
-> 
-> Cc: Ryan Harkin <ryan.harkin@linaro.org>
-> Cc: Liviu Dudau <liviu.dudau@arm.com>
-> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
->  drivers/mtd/afs.c | 59 +++++++++++++++++++------------------------------------
->  1 file changed, 20 insertions(+), 39 deletions(-)
-> 
-> diff --git a/drivers/mtd/afs.c b/drivers/mtd/afs.c
-> index cdee8295d4c0..1ce6842c917c 100644
-> --- a/drivers/mtd/afs.c
-> +++ b/drivers/mtd/afs.c
-> @@ -88,42 +88,6 @@ static bool afs_is_v1(struct mtd_info *mtd, u_int off)
->  	return (magic == AFSV1_FOOTER_MAGIC);
->  }
->  
-> -static int
-> -afs_read_iis_v1(struct mtd_info *mtd, struct image_info_v1 *iis, u_int ptr)
-> -{
-> -	size_t sz;
-> -	int ret, i;
-> -
-> -	memset(iis, 0, sizeof(*iis));
-> -	ret = mtd_read(mtd, ptr, sizeof(*iis), &sz, (u_char *)iis);
-> -	if (ret < 0)
-> -		goto failed;
-> -
-> -	if (sz != sizeof(*iis)) {
-> -		ret = -EINVAL;
-> -		goto failed;
-> -	}
-> -
-> -	ret = 0;
-> -
-> -	/*
-> -	 * Validate the name - it must be NUL terminated.
-> -	 */
-> -	for (i = 0; i < sizeof(iis->name); i++)
-> -		if (iis->name[i] == '\0')
-> -			break;
-> -
-> -	if (i < sizeof(iis->name))
-> -		ret = 1;
-> -
-> -	return ret;
-> -
-> - failed:
-> -	printk(KERN_ERR "AFS: mtd read failed at 0x%x: %d\n",
-> -		ptr, ret);
-> -	return ret;
-> -}
-> -
->  static int afs_parse_v1_partition(struct mtd_info *mtd,
->  				  u_int off, struct mtd_partition *part)
->  {
-> @@ -139,6 +103,7 @@ static int afs_parse_v1_partition(struct mtd_info *mtd,
->  	u_int ptr;
->  	size_t sz;
->  	int ret;
-> +	int i;
->  
->  	/*
->  	 * This is the address mask; we use this to mask off out of
-> @@ -185,9 +150,25 @@ static int afs_parse_v1_partition(struct mtd_info *mtd,
->  		return 0;
->  
->  	/* Read the image info block */
-> -	ret = afs_read_iis_v1(mtd, &iis, iis_ptr);
-> -	if (ret < 0)
-> -		return ret;
-> +	memset(&iis, 0, sizeof(iis));
-> +	ret = mtd_read(mtd, iis_ptr, sizeof(iis), &sz, (u_char *)&iis);
-> +	if (ret < 0) {
-> +		printk(KERN_ERR "AFS: mtd read failed at 0x%x: %d\n",
-> +		       iis_ptr, ret);
-> +		return -EINVAL;
-> +	}
-> +
-> +	if (sz != sizeof(iis))
-> +		return -EINVAL;
-> +
-> +	/*
-> +	 * Validate the name - it must be NUL terminated.
-> +	 */
-> +	for (i = 0; i < sizeof(iis.name); i++)
-> +		if (iis.name[i] == '\0')
-> +			break;
-> +	if (i > sizeof(iis.name))
+Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+---
 
-The above condition is not a correct refactoring. That should be an
-inclusive comparison (i.e., i >= sizeof(iis.name)).
+Changes:
+- from v3: add error handling of runtime PM
+- from v2: cleanup thanks to Ulf feedback
+- from v1: take a runtime PM centric approach
 
-> +		return -EINVAL;
->  
->  	part->name = kstrdup(iis.name, GFP_KERNEL);
->  	if (!part->name)
+ drivers/mmc/host/sdhci-of-at91.c | 72 ++++++++++++++++++++++++++++++++++++++--
+ 1 file changed, 70 insertions(+), 2 deletions(-)
 
-Brian
+diff --git a/drivers/mmc/host/sdhci-of-at91.c b/drivers/mmc/host/sdhci-of-at91.c
+index 06d0b50..81ab9db 100644
+--- a/drivers/mmc/host/sdhci-of-at91.c
++++ b/drivers/mmc/host/sdhci-of-at91.c
+@@ -21,6 +21,8 @@
+ #include <linux/module.h>
+ #include <linux/of.h>
+ #include <linux/of_device.h>
++#include <linux/pm.h>
++#include <linux/pm_runtime.h>
+ 
+ #include "sdhci-pltfm.h"
+ 
+@@ -51,6 +53,60 @@ static const struct of_device_id sdhci_at91_dt_match[] = {
+ 	{}
+ };
+ 
++#ifdef CONFIG_PM
++static int sdhci_at91_runtime_suspend(struct device *dev)
++{
++	struct sdhci_host *host = dev_get_drvdata(dev);
++	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
++	struct sdhci_at91_priv *priv = pltfm_host->priv;
++	int ret;
++
++	ret = sdhci_runtime_suspend_host(host);
++
++	clk_disable_unprepare(priv->gck);
++	clk_disable_unprepare(priv->hclock);
++	clk_disable_unprepare(priv->mainck);
++
++	return ret;
++}
++
++static int sdhci_at91_runtime_resume(struct device *dev)
++{
++	struct sdhci_host *host = dev_get_drvdata(dev);
++	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
++	struct sdhci_at91_priv *priv = pltfm_host->priv;
++	int ret;
++
++	ret = clk_prepare_enable(priv->mainck);
++	if (ret) {
++		dev_err(dev, "can't enable mainck\n");
++		return ret;
++	}
++
++	ret = clk_prepare_enable(priv->hclock);
++	if (ret) {
++		dev_err(dev, "can't enable hclock\n");
++		return ret;
++	}
++
++	ret = clk_prepare_enable(priv->gck);
++	if (ret) {
++		dev_err(dev, "can't enable gck\n");
++		return ret;
++	}
++
++	return sdhci_runtime_resume_host(host);
++}
++#endif /* CONFIG_PM */
++
++static const struct dev_pm_ops sdhci_at91_dev_pm_ops = {
++	SET_SYSTEM_SLEEP_PM_OPS(pm_runtime_force_suspend,
++				pm_runtime_force_resume)
++	SET_RUNTIME_PM_OPS(sdhci_at91_runtime_suspend,
++			   sdhci_at91_runtime_resume,
++			   NULL)
++};
++
+ static int sdhci_at91_probe(struct platform_device *pdev)
+ {
+ 	const struct of_device_id	*match;
+@@ -144,12 +200,20 @@ static int sdhci_at91_probe(struct platform_device *pdev)
+ 
+ 	sdhci_get_of_property(pdev);
+ 
++	pm_runtime_set_active(&pdev->dev);
++	pm_runtime_enable(&pdev->dev);
++	pm_runtime_set_autosuspend_delay(&pdev->dev, 50);
++	pm_runtime_use_autosuspend(&pdev->dev);
++
+ 	ret = sdhci_add_host(host);
+ 	if (ret)
+-		goto clocks_disable_unprepare;
++		goto pm_runtime_disable;
+ 
+ 	return 0;
+ 
++pm_runtime_disable:
++	pm_runtime_disable(&pdev->dev);
++	pm_runtime_set_suspended(&pdev->dev);
+ clocks_disable_unprepare:
+ 	clk_disable_unprepare(priv->gck);
+ 	clk_disable_unprepare(priv->mainck);
+@@ -165,6 +229,10 @@ static int sdhci_at91_remove(struct platform_device *pdev)
+ 	struct sdhci_pltfm_host	*pltfm_host = sdhci_priv(host);
+ 	struct sdhci_at91_priv	*priv = pltfm_host->priv;
+ 
++	pm_runtime_get_sync(&pdev->dev);
++	pm_runtime_disable(&pdev->dev);
++	pm_runtime_put_noidle(&pdev->dev);
++
+ 	sdhci_pltfm_unregister(pdev);
+ 
+ 	clk_disable_unprepare(priv->gck);
+@@ -178,7 +246,7 @@ static struct platform_driver sdhci_at91_driver = {
+ 	.driver		= {
+ 		.name	= "sdhci-at91",
+ 		.of_match_table = sdhci_at91_dt_match,
+-		.pm	= SDHCI_PLTFM_PMOPS,
++		.pm	= &sdhci_at91_dev_pm_ops,
+ 	},
+ 	.probe		= sdhci_at91_probe,
+ 	.remove		= sdhci_at91_remove,
+-- 
+2.5.0
