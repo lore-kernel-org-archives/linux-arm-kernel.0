@@ -1,209 +1,307 @@
 From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Wed, 11 Nov 2015 13:54:37 +0900
-Subject: [PATCH v5 4/6] arm64: insn: add instruction decoders for ldp/stp
- and add/sub
-In-Reply-To: <999DB062-D4C8-4050-ADF7-9C6CEEC0BF73@gmail.com>
+Date: Wed, 11 Nov 2015 14:03:42 +0900
+Subject: [PATCH v5 5/6] arm64: ftrace: add arch-specific stack tracer
+In-Reply-To: <823AA540-A025-4D44-852A-10F4A99A5760@gmail.com>
 References: <1446792285-1154-1-git-send-email-takahiro.akashi@linaro.org>
- <1446792285-1154-5-git-send-email-takahiro.akashi@linaro.org>
- <999DB062-D4C8-4050-ADF7-9C6CEEC0BF73@gmail.com>
-Message-ID: <5642CA0D.9080708@linaro.org>
+ <1446792285-1154-6-git-send-email-takahiro.akashi@linaro.org>
+ <823AA540-A025-4D44-852A-10F4A99A5760@gmail.com>
+Message-ID: <5642CC2E.7010405@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/10/2015 10:40 PM, Jungseok Lee wrote:
+Jungseok,
+
+On 11/10/2015 11:05 PM, Jungseok Lee wrote:
 > On Nov 6, 2015, at 3:44 PM, AKASHI Takahiro wrote:
->> A function prologue analyzer is a requisite for implementing stack tracer
->> and getting better views of stack usages on arm64.
->> To implement a function prologue analyzer, we have to be able to decode,
->> at least, stp, add, sub and mov instructions.
+>
+> Hi Akashi,
+>
+>> Stack tracer on arm64, check_stack(), is uniqeue in the following
+>> points:
+>> * analyze a function prologue of a traced function to estimate a more
+>>   accurate stack pointer value, replacing naive '<child's fp> + 0x10.'
+>> * use walk_stackframe(), instead of slurping stack contents as orignal
+>>   check_stack() does, to identify a stack frame and a stack index (height)
+>>   for every callsite.
 >>
->> This patch adds decoders for those instructions, that are used solely
->> by stack tracer for now, but generic enough for other uses.
+>> Regarding a function prologue analyzer, there is no guarantee that we can
+>> handle all the possible patterns of function prologue as gcc does not use
+>> any fixed templates to generate them. 'Instruction scheduling' is another
+>> issue here.
+>> Nevertheless, the current version will surely cover almost all the cases
+>> in the kernel image and give us useful information on stack pointers.
+>>
+>> So this patch utilizes a function prologue only for stack tracer, and
+>> does not affect the behaviors of existing stacktrace functions.
 >>
 >> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
 >> ---
->> arch/arm64/include/asm/insn.h |   18 ++++++++
->> arch/arm64/kernel/insn.c      |  102 +++++++++++++++++++++++++++++++++++++++++
->> 2 files changed, 120 insertions(+)
+>> arch/arm64/include/asm/stacktrace.h |    4 +
+>> arch/arm64/kernel/ftrace.c          |   64 ++++++++++++
+>> arch/arm64/kernel/stacktrace.c      |  185 ++++++++++++++++++++++++++++++++++-
+>> 3 files changed, 250 insertions(+), 3 deletions(-)
 >>
->> diff --git a/arch/arm64/include/asm/insn.h b/arch/arm64/include/asm/insn.h
->> index 30e50eb..8d5c538 100644
->> --- a/arch/arm64/include/asm/insn.h
->> +++ b/arch/arm64/include/asm/insn.h
->> @@ -165,6 +165,8 @@ enum aarch64_insn_ldst_type {
->> 	AARCH64_INSN_LDST_STORE_PAIR_PRE_INDEX,
->> 	AARCH64_INSN_LDST_LOAD_PAIR_POST_INDEX,
->> 	AARCH64_INSN_LDST_STORE_PAIR_POST_INDEX,
->> +	AARCH64_INSN_LDST_LOAD_PAIR,
->> +	AARCH64_INSN_LDST_STORE_PAIR,
->> };
+>> diff --git a/arch/arm64/include/asm/stacktrace.h b/arch/arm64/include/asm/stacktrace.h
+>> index 7318f6d..47b4832 100644
+>> --- a/arch/arm64/include/asm/stacktrace.h
+>> +++ b/arch/arm64/include/asm/stacktrace.h
+>> @@ -25,5 +25,9 @@ struct stackframe {
+>> extern int unwind_frame(struct stackframe *frame);
+>> extern void walk_stackframe(struct stackframe *frame,
+>> 			    int (*fn)(struct stackframe *, void *), void *data);
+>> +#ifdef CONFIG_STACK_TRACER
+>> +struct stack_trace;
+>> +extern void save_stack_trace_sp(struct stack_trace *trace, unsigned long *sp);
+>> +#endif
 >>
->> enum aarch64_insn_adsb_type {
->> @@ -225,6 +227,8 @@ static __always_inline u32 aarch64_insn_get_##abbr##_value(void) \
+>> #endif	/* __ASM_STACKTRACE_H */
+>> diff --git a/arch/arm64/kernel/ftrace.c b/arch/arm64/kernel/ftrace.c
+>> index 314f82d..46bfe37 100644
+>> --- a/arch/arm64/kernel/ftrace.c
+>> +++ b/arch/arm64/kernel/ftrace.c
+>> @@ -9,6 +9,7 @@
+>>   * published by the Free Software Foundation.
+>>   */
 >>
->> __AARCH64_INSN_FUNCS(str_reg,	0x3FE0EC00, 0x38206800)
->> __AARCH64_INSN_FUNCS(ldr_reg,	0x3FE0EC00, 0x38606800)
->> +__AARCH64_INSN_FUNCS(stp,	0x7FC00000, 0x29000000)
->> +__AARCH64_INSN_FUNCS(ldp,	0x7FC00000, 0x29400000)
->> __AARCH64_INSN_FUNCS(stp_post,	0x7FC00000, 0x28800000)
->> __AARCH64_INSN_FUNCS(ldp_post,	0x7FC00000, 0x28C00000)
->> __AARCH64_INSN_FUNCS(stp_pre,	0x7FC00000, 0x29800000)
->> @@ -277,6 +281,7 @@ __AARCH64_INSN_FUNCS(hint,	0xFFFFF01F, 0xD503201F)
->> __AARCH64_INSN_FUNCS(br,	0xFFFFFC1F, 0xD61F0000)
->> __AARCH64_INSN_FUNCS(blr,	0xFFFFFC1F, 0xD63F0000)
->> __AARCH64_INSN_FUNCS(ret,	0xFFFFFC1F, 0xD65F0000)
->> +__AARCH64_INSN_FUNCS(eret,	0xFFFFFFFF, 0xD69F00E0)
+>> +#include <linux/bug.h>
+>> #include <linux/ftrace.h>
+>> #include <linux/swab.h>
+>> #include <linux/uaccess.h>
+>> @@ -16,6 +17,7 @@
+>> #include <asm/cacheflush.h>
+>> #include <asm/ftrace.h>
+>> #include <asm/insn.h>
+>> +#include <asm/stacktrace.h>
+>>
+>> #ifdef CONFIG_DYNAMIC_FTRACE
+>> /*
+>> @@ -173,3 +175,65 @@ int ftrace_disable_ftrace_graph_caller(void)
+>> }
+>> #endif /* CONFIG_DYNAMIC_FTRACE */
+>> #endif /* CONFIG_FUNCTION_GRAPH_TRACER */
+>> +
+>> +#ifdef CONFIG_STACK_TRACER
+>> +static unsigned long stack_trace_sp[STACK_TRACE_ENTRIES];
+>> +static unsigned long raw_stack_trace_max_size;
+>> +
+>> +void check_stack(unsigned long ip, unsigned long *stack)
+>> +{
+>> +	unsigned long this_size, flags;
+>> +	unsigned long top;
+>> +	int i, j;
+>> +
+>> +	this_size = ((unsigned long)stack) & (THREAD_SIZE-1);
+>> +	this_size = THREAD_SIZE - this_size;
+>> +
+>> +	if (this_size <= raw_stack_trace_max_size)
+>> +		return;
+>> +
+>> +	/* we do not handle an interrupt stack yet */
+>> +	if (!object_is_on_stack(stack))
+>> +		return;
+>> +
+>> +	local_irq_save(flags);
+>> +	arch_spin_lock(&max_stack_lock);
+>> +
+>> +	/* check again */
+>> +	if (this_size <= raw_stack_trace_max_size)
+>> +		goto out;
+>> +
+>> +	/* find out stack frames */
+>> +	stack_trace_max.nr_entries = 0;
+>> +	stack_trace_max.skip = 0;
+>> +	save_stack_trace_sp(&stack_trace_max, stack_trace_sp);
+>> +	stack_trace_max.nr_entries--; /* for the last entry ('-1') */
+>> +
+>> +	/* calculate a stack index for each function */
+>> +	top = ((unsigned long)stack & ~(THREAD_SIZE-1)) + THREAD_SIZE;
+>> +	for (i = 0; i < stack_trace_max.nr_entries; i++)
+>> +		stack_trace_index[i] = top - stack_trace_sp[i];
+>> +	raw_stack_trace_max_size = this_size;
+>> +
+>> +	/* Skip over the overhead of the stack tracer itself */
+>> +	for (i = 0; i < stack_trace_max.nr_entries; i++)
+>> +		if (stack_trace_max.entries[i] == ip)
+>> +			break;
+>> +
+>> +	stack_trace_max.nr_entries -= i;
+>> +	for (j = 0; j < stack_trace_max.nr_entries; j++) {
+>> +		stack_trace_index[j] = stack_trace_index[j + i];
+>> +		stack_trace_max.entries[j] = stack_trace_max.entries[j + i];
+>> +	}
+>> +	stack_trace_max_size = stack_trace_index[0];
+>> +
+>> +	if (task_stack_end_corrupted(current)) {
+>> +		WARN(1, "task stack is corrupted.\n");
+>> +		stack_trace_print();
+>> +	}
+>> +
+>> + out:
+>> +	arch_spin_unlock(&max_stack_lock);
+>> +	local_irq_restore(flags);
+>> +}
+>> +#endif /* CONFIG_STACK_TRACER */
+>> diff --git a/arch/arm64/kernel/stacktrace.c b/arch/arm64/kernel/stacktrace.c
+>> index 5fd3477..4ee052a 100644
+>> --- a/arch/arm64/kernel/stacktrace.c
+>> +++ b/arch/arm64/kernel/stacktrace.c
+>> @@ -23,6 +23,144 @@
+>>
+>> #include <asm/stacktrace.h>
+>>
+>> +#ifdef CONFIG_STACK_TRACER
+>> +/*
+>> + * This function parses a function prologue of a traced function and
+>> + * determines its stack size.
+>> + * A return value indicates a location of @pc in a function prologue.
+>> + * @return value:
+>> + * <case 1>                       <case 1'>
+>> + * 1:
+>> + *     sub sp, sp, #XX            sub sp, sp, #XX
+>> + * 2:
+>> + *     stp x29, x30, [sp, #YY]    stp x29, x30, [sp, #--ZZ]!
+>> + * 3:
+>> + *     add x29, sp, #YY           mov x29, sp
+>> + * 0:
+>> + *
+>> + * <case 2>
+>> + * 1:
+>> + *     stp x29, x30, [sp, #-XX]!
+>> + * 3:
+>> + *     mov x29, sp
+>> + * 0:
+>> + *
+>> + * @size: sp offset from calller's sp (XX or XX + ZZ)
+>> + * @size2: fp offset from new sp (YY or 0)
+>> + */
+>> +static int analyze_function_prologue(unsigned long pc,
+>> +		unsigned long *size, unsigned long *size2)
+>> +{
+>> +	unsigned long offset;
+>> +	u32 *addr, insn;
+>> +	int pos = -1;
+>> +	enum aarch64_insn_register src, dst, reg1, reg2, base;
+>> +	int imm;
+>> +	enum aarch64_insn_variant variant;
+>> +	enum aarch64_insn_adsb_type adsb_type;
+>> +	enum aarch64_insn_ldst_type ldst_type;
+>> +
+>> +	*size = *size2 = 0;
+>> +
+>> +	if (!pc)
+>> +		goto out;
+>> +
+>> +	if (unlikely(!kallsyms_lookup_size_offset(pc, NULL, &offset)))
+>> +		goto out;
+>> +
+>> +	addr = (u32 *)(pc - offset);
+>> +#ifdef CONFIG_DYNAMIC_FTRACE
+>> +	if (addr == (u32 *)ftrace_call)
+>> +		addr = (u32 *)ftrace_caller;
+>> +#ifdef CONFIG_FUNCTION_GRAPH_TRACER
+>> +	else if (addr == (u32 *)ftrace_graph_caller)
+>> +#ifdef CONFIG_DYNAMIC_FTRACE
+>> +		addr = (u32 *)ftrace_caller;
+>> +#else
+>> +		addr = (u32 *)_mcount;
+>> +#endif
+>> +#endif
+>> +#endif
+>> +
+>> +	insn = *addr;
+>> +	pos = 1;
+>> +
+>> +	/* analyze a function prologue */
+>> +	while ((unsigned long)addr < pc) {
+>> +		if (aarch64_insn_is_branch_imm(insn) ||
+>> +		    aarch64_insn_is_br(insn) ||
+>> +		    aarch64_insn_is_blr(insn) ||
+>> +		    aarch64_insn_is_ret(insn) ||
+>> +		    aarch64_insn_is_eret(insn))
+>> +			/* exiting a basic block */
+>> +			goto out;
+>> +
+>> +		if (aarch64_insn_decode_add_sub_imm(insn, &dst, &src,
+>> +					&imm, &variant, &adsb_type)) {
+>> +			if ((adsb_type == AARCH64_INSN_ADSB_SUB) &&
+>> +				(dst == AARCH64_INSN_REG_SP) &&
+>> +				(src == AARCH64_INSN_REG_SP)) {
+>> +				/*
+>> +				 * Starting the following sequence:
+>> +				 *   sub sp, sp, #xx
+>> +				 *   stp x29, x30, [sp, #yy]
+>> +				 *   add x29, sp, #yy
+>> +				 */
+>> +				WARN_ON(pos != 1);
+>> +				pos = 2;
+>> +				*size += imm;
+>> +			} else if ((adsb_type == AARCH64_INSN_ADSB_ADD) &&
+>> +				(dst == AARCH64_INSN_REG_29) &&
+>> +				(src == AARCH64_INSN_REG_SP)) {
+>> +				/*
+>> +				 *   add x29, sp, #yy
+>> +				 * or
+>> +				 *   mov x29, sp
+>> +				 */
+>> +				WARN_ON(pos != 3);
+>> +				pos = 0;
+>> +				*size2 = imm;
+>> +
+>> +				break;
+>> +			}
+>> +		} else if (aarch64_insn_decode_load_store_pair(insn,
+>> +					&reg1, &reg2, &base, &imm,
+>> +					&variant, &ldst_type)) {
+>> +			if ((ldst_type ==
+>> +				AARCH64_INSN_LDST_STORE_PAIR_PRE_INDEX) &&
+>> +			    (reg1 == AARCH64_INSN_REG_29) &&
+>> +			    (reg2 == AARCH64_INSN_REG_30) &&
+>> +			    (base == AARCH64_INSN_REG_SP)) {
+>> +				/*
+>> +				 * Starting the following sequence:
+>> +				 *   stp x29, x30, [sp, #-xx]!
+>> +				 *   mov x29, sp
+>> +				 */
+>> +				WARN_ON(!((pos == 1) || (pos == 2)));
+>> +				pos = 3;
+>> +				*size += -imm;
+>> +			} else if ((ldst_type ==
+>> +				AARCH64_INSN_LDST_STORE_PAIR) &&
+>> +			    (reg1 == AARCH64_INSN_REG_29) &&
+>> +			    (reg2 == AARCH64_INSN_REG_30) &&
+>> +			    (base == AARCH64_INSN_REG_SP)) {
+>> +				/*
+>> +				 *   stp x29, x30, [sp, #yy]
+>> +				 */
+>> +				WARN_ON(pos != 2);
+>> +				pos = 3;
+>> +			}
+>> +		}
+>> +
+>> +		addr++;
+>> +		insn = *addr;
+>> +	}
+>> +
+>> +out:
+>> +	return pos;
+>> +}
+>> +#endif
+>> +
 >
-> According to C4.2.7, the third argument looks like 0xD69F03E0. Rn field is 11111
-> in case of eret.
+> A small instruction decoder in software!
+>
+>  From a high level point of view, it makes sense to deal with only three main
+> cases. Since it is tough to deal with all function prologues in perspective
+> of computational overhead and implementation complexity, the above change looks
+> like a pretty good tradeoff. This is what I can say now. I'm also interested
+> in feedbacks from other folks.
 
-Thanks. Fix it (c3.2.7 though).
+I really appreciate your reviews and comments on the whole series of my patches
+(#2 to #5).
+May I add Reviewed-by (and Tested-by?) with your name if you like?
 
 -Takahiro AKASHI
 
 > Best Regards
 > Jungseok Lee
->
->> #undef	__AARCH64_INSN_FUNCS
->>
->> @@ -370,6 +375,19 @@ bool aarch32_insn_is_wide(u32 insn);
->> u32 aarch32_insn_extract_reg_num(u32 insn, int offset);
->> u32 aarch32_insn_mcr_extract_opc2(u32 insn);
->> u32 aarch32_insn_mcr_extract_crm(u32 insn);
->> +int aarch64_insn_decode_add_sub_imm(u32 insn,
->> +				    enum aarch64_insn_register *dst,
->> +				    enum aarch64_insn_register *src,
->> +				    int *imm,
->> +				    enum aarch64_insn_variant *variant,
->> +				    enum aarch64_insn_adsb_type *type);
->> +int aarch64_insn_decode_load_store_pair(u32 insn,
->> +					enum aarch64_insn_register *reg1,
->> +					enum aarch64_insn_register *reg2,
->> +					enum aarch64_insn_register *base,
->> +					int *offset,
->> +					enum aarch64_insn_variant *variant,
->> +					enum aarch64_insn_ldst_type *type);
->> #endif /* __ASSEMBLY__ */
->>
->> #endif	/* __ASM_INSN_H */
->> diff --git a/arch/arm64/kernel/insn.c b/arch/arm64/kernel/insn.c
->> index c08b9ad..b56a66c 100644
->> --- a/arch/arm64/kernel/insn.c
->> +++ b/arch/arm64/kernel/insn.c
->> @@ -33,6 +33,7 @@
->> #include <asm/insn.h>
->>
->> #define AARCH64_INSN_SF_BIT	BIT(31)
->> +#define AARCH64_INSN_S_BIT	BIT(29)
->> #define AARCH64_INSN_N_BIT	BIT(22)
->>
->> static int aarch64_insn_encoding_class[] = {
->> @@ -1141,3 +1142,104 @@ u32 aarch32_insn_mcr_extract_crm(u32 insn)
->> {
->> 	return insn & CRM_MASK;
->> }
->> +
->> +enum aarch64_insn_register aarch64_insn_extract_reg_num(u32 insn,
->> +				enum aarch64_insn_register_type type)
->> +{
->> +	int shift;
->> +
->> +	switch (type) {
->> +	case AARCH64_INSN_REGTYPE_RT:
->> +	case AARCH64_INSN_REGTYPE_RD:
->> +		shift = 0;
->> +		break;
->> +	case AARCH64_INSN_REGTYPE_RN:
->> +		shift = 5;
->> +		break;
->> +	case AARCH64_INSN_REGTYPE_RT2:
->> +	case AARCH64_INSN_REGTYPE_RA:
->> +		shift = 10;
->> +		break;
->> +	case AARCH64_INSN_REGTYPE_RM:
->> +		shift = 16;
->> +		break;
->> +	default:
->> +		pr_err("%s: unknown register type decoding %d\n", __func__,
->> +		       type);
->> +		return ~0L;
->> +	}
->> +
->> +	return (insn & (GENMASK(4, 0) << shift)) >> shift;
->> +}
->> +
->> +int aarch64_insn_decode_add_sub_imm(u32 insn,
->> +				    enum aarch64_insn_register *dst,
->> +				    enum aarch64_insn_register *src,
->> +				    int *imm,
->> +				    enum aarch64_insn_variant *variant,
->> +				    enum aarch64_insn_adsb_type *type)
->> +{
->> +	if (aarch64_insn_is_add_imm(insn))
->> +		*type =	((insn) & AARCH64_INSN_S_BIT) ?
->> +				AARCH64_INSN_ADSB_ADD_SETFLAGS :
->> +				AARCH64_INSN_ADSB_ADD;
->> +	else if (aarch64_insn_is_sub_imm(insn))
->> +		*type =	((insn) & AARCH64_INSN_S_BIT) ?
->> +				AARCH64_INSN_ADSB_SUB_SETFLAGS :
->> +				AARCH64_INSN_ADSB_SUB;
->> +	else
->> +		return 0;
->> +
->> +	*variant = (insn & AARCH64_INSN_SF_BIT) ? AARCH64_INSN_VARIANT_64BIT :
->> +					AARCH64_INSN_VARIANT_32BIT;
->> +
->> +	*dst = aarch64_insn_extract_reg_num(insn, AARCH64_INSN_REGTYPE_RD);
->> +
->> +	*src = aarch64_insn_extract_reg_num(insn, AARCH64_INSN_REGTYPE_RN);
->> +
->> +	/* TODO: ignore shilft field[23:22] */
->> +	*imm = (int)aarch64_insn_decode_immediate(AARCH64_INSN_IMM_12, insn);
->> +
->> +	return 1;
->> +}
->> +
->> +int aarch64_insn_decode_load_store_pair(u32 insn,
->> +					enum aarch64_insn_register *reg1,
->> +					enum aarch64_insn_register *reg2,
->> +					enum aarch64_insn_register *base,
->> +					int *offset,
->> +					enum aarch64_insn_variant *variant,
->> +					enum aarch64_insn_ldst_type *type)
->> +{
->> +	int imm;
->> +
->> +	if (aarch64_insn_is_stp(insn))
->> +		*type = AARCH64_INSN_LDST_STORE_PAIR;
->> +	else if (aarch64_insn_is_stp_post(insn))
->> +		*type = AARCH64_INSN_LDST_STORE_PAIR_POST_INDEX;
->> +	else if (aarch64_insn_is_stp_pre(insn))
->> +		*type = AARCH64_INSN_LDST_STORE_PAIR_PRE_INDEX;
->> +	else if (aarch64_insn_is_ldp(insn))
->> +		*type = AARCH64_INSN_LDST_LOAD_PAIR;
->> +	else if (aarch64_insn_is_ldp_post(insn))
->> +		*type = AARCH64_INSN_LDST_LOAD_PAIR_POST_INDEX;
->> +	else if (aarch64_insn_is_ldp_pre(insn))
->> +		*type = AARCH64_INSN_LDST_LOAD_PAIR_PRE_INDEX;
->> +	else
->> +		return 0;
->> +
->> +	*variant = (insn & AARCH64_INSN_S_BIT) ? AARCH64_INSN_VARIANT_64BIT :
->> +				AARCH64_INSN_VARIANT_32BIT;
->> +
->> +	*reg1 = aarch64_insn_extract_reg_num(insn, AARCH64_INSN_REGTYPE_RT);
->> +
->> +	*reg2 = aarch64_insn_extract_reg_num(insn, AARCH64_INSN_REGTYPE_RT2);
->> +
->> +	*base = aarch64_insn_extract_reg_num(insn, AARCH64_INSN_REGTYPE_RN);
->> +
->> +	imm = (int)aarch64_insn_decode_immediate(AARCH64_INSN_IMM_7, insn);
->> +	asm("sbfm %0, %0, 0, 6" : "+r" (imm));
->> +	*offset = imm * 8;
->> +
->> +	return 1;
->> +}
->> --
->> 1.7.9.5
->>
 >
