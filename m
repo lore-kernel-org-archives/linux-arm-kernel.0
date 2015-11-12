@@ -1,116 +1,89 @@
 From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Thu, 12 Nov 2015 17:30:47 +0000
-Subject: [PATCH v4 6/7] xen/arm: set the system time in Xen via the
- XENPF_settime64 hypercall
+Date: Thu, 12 Nov 2015 17:30:48 +0000
+Subject: [PATCH v4 7/7] xen/x86: support XENPF_settime64
 In-Reply-To: <alpine.DEB.2.02.1511121726370.526@kaball.uk.xensource.com>
 References: <alpine.DEB.2.02.1511121726370.526@kaball.uk.xensource.com>
-Message-ID: <1447349448-22610-6-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <1447349448-22610-7-git-send-email-stefano.stabellini@eu.citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If Linux is running as dom0, call XENPF_settime64 to update the system
-time in Xen on pvclock_gtod notifications.
+Try XENPF_settime64 first, if it is not available fall back to
+XENPF_settime32.
+
+No need to call __current_kernel_time() when all the info needed are
+already passed via the struct timekeeper * argument.
+
+Return NOTIFY_BAD in case of errors.
 
 Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-Acked-by: Arnd Bergmann <arnd@arndb.de>
-
+CC: konrad.wilk at oracle.com
+CC: david.vrabel at citrix.com
+CC: boris.ostrovsky at oracle.com
 ---
+ arch/x86/xen/time.c |   35 ++++++++++++++++++++++++++++-------
+ 1 file changed, 28 insertions(+), 7 deletions(-)
 
-Changes in v3:
-- s/%llu.%0u/%llu.%09u
-- in xen_pvclock_gtod_notify use the passed struct timekeeper pointer
-  rather than calling __current_kernel_time64
-- use the passed struct timekeeper pointer to get the system time too
-
-Changes in v2:
-- properly convert arch_timer ticker to nsec
-- rename dom0_op to platform_op
-- use timespec64 interfaces
-- use XENPF_settime64
----
- arch/arm/xen/enlighten.c |   55 +++++++++++++++++++++++++++++++++++++++++++++-
- 1 file changed, 54 insertions(+), 1 deletion(-)
-
-diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
-index 6ae4ef5..613f7e0 100644
---- a/arch/arm/xen/enlighten.c
-+++ b/arch/arm/xen/enlighten.c
-@@ -28,7 +28,10 @@
- #include <linux/cpufreq.h>
- #include <linux/cpu.h>
- #include <linux/console.h>
-+#include <linux/pvclock_gtod.h>
-+#include <linux/time64.h>
- #include <linux/timekeeping.h>
+diff --git a/arch/x86/xen/time.c b/arch/x86/xen/time.c
+index 3bbd377..4b8af45 100644
+--- a/arch/x86/xen/time.c
++++ b/arch/x86/xen/time.c
+@@ -16,6 +16,7 @@
+ #include <linux/gfp.h>
+ #include <linux/slab.h>
+ #include <linux/pvclock_gtod.h>
 +#include <linux/timekeeper_internal.h>
  
- #include <linux/mm.h>
+ #include <asm/pvclock.h>
+ #include <asm/xen/hypervisor.h>
+@@ -123,9 +124,13 @@ static int xen_pvclock_gtod_notify(struct notifier_block *nb,
+ 	static struct timespec next_sync;
  
-@@ -117,6 +120,54 @@ static void xen_read_wallclock(struct timespec64 *ts)
- 	*ts = timespec64_add(now, ts_monotonic);
- }
- 
-+static int xen_pvclock_gtod_notify(struct notifier_block *nb,
-+				   unsigned long was_set, void *priv)
-+{
-+	/* Protected by the calling core code serialization */
-+	static struct timespec64 next_sync;
-+
-+	struct xen_platform_op op;
-+	struct timespec64 now, system_time;
+ 	struct xen_platform_op op;
+-	struct timespec now;
++	struct timespec64 now;
 +	struct timekeeper *tk = priv;
-+
++	static bool settime64_supported = true;
++	int ret;
+ 
+-	now = __current_kernel_time();
 +	now.tv_sec = tk->xtime_sec;
 +	now.tv_nsec = (long)(tk->tkr_mono.xtime_nsec >> tk->tkr_mono.shift);
-+	system_time = timespec64_add(now, tk->wall_to_monotonic);
-+
-+	/*
-+	 * We only take the expensive HV call when the clock was set
-+	 * or when the 11 minutes RTC synchronization time elapsed.
-+	 */
-+	if (!was_set && timespec64_compare(&now, &next_sync) < 0)
-+		return NOTIFY_OK;
-+
-+	op.interface_version = XENPF_INTERFACE_VERSION;
-+	op.cmd = XENPF_settime64;
-+	op.u.settime64.mbz = 0;
-+	op.u.settime64.secs = now.tv_sec;
-+	op.u.settime64.nsecs = now.tv_nsec;
-+	op.u.settime64.system_time = timespec64_to_ns(&system_time);
-+	printk("GTOD: Setting to %llu.%09u@%llu\n",
-+	       op.u.settime64.secs,
-+	       op.u.settime64.nsecs,
-+	       op.u.settime64.system_time);
-+	(void)HYPERVISOR_platform_op(&op);
-+
-+	/*
-+	 * Move the next drift compensation time 11 minutes
-+	 * ahead. That's emulating the sync_cmos_clock() update for
-+	 * the hardware RTC.
-+	 */
-+	next_sync = now;
-+	next_sync.tv_sec += 11 * 60;
-+
-+	return NOTIFY_OK;
-+}
-+
-+static struct notifier_block xen_pvclock_gtod_notifier = {
-+	.notifier_call = xen_pvclock_gtod_notify,
-+};
-+
- static void xen_percpu_init(void)
- {
- 	struct vcpu_register_vcpu_info info;
-@@ -313,7 +364,9 @@ static int __init xen_guest_init(void)
  
- 	pv_time_ops.steal_clock = xen_stolen_accounting;
- 	static_key_slow_inc(&paravirt_steal_enabled);
--
-+	if (xen_initial_domain())
-+		pvclock_gtod_register_notifier(&xen_pvclock_gtod_notifier);
-+ 
- 	return 0;
- }
- early_initcall(xen_guest_init);
+ 	/*
+ 	 * We only take the expensive HV call when the clock was set
+@@ -134,12 +139,28 @@ static int xen_pvclock_gtod_notify(struct notifier_block *nb,
+ 	if (!was_set && timespec_compare(&now, &next_sync) < 0)
+ 		return NOTIFY_OK;
+ 
+-	op.cmd = XENPF_settime32;
+-	op.u.settime32.secs = now.tv_sec;
+-	op.u.settime32.nsecs = now.tv_nsec;
+-	op.u.settime32.system_time = xen_clocksource_read();
++again:
++	if (settime64_supported) {
++		op.cmd = XENPF_settime64;
++		op.u.settime64.mbz = 0;
++		op.u.settime64.secs = now.tv_sec;
++		op.u.settime64.nsecs = now.tv_nsec;
++		op.u.settime64.system_time = xen_clocksource_read();
++	} else {
++		op.cmd = XENPF_settime32;
++		op.u.settime32.secs = now.tv_sec;
++		op.u.settime32.nsecs = now.tv_nsec;
++		op.u.settime32.system_time = xen_clocksource_read();
++	}
++
++	ret = HYPERVISOR_platform_op(&op);
+ 
+-	(void)HYPERVISOR_platform_op(&op);
++	if (ret == -ENOSYS && settime64_supported) {
++		settime64_supported = false;
++		goto again;
++	}
++	if (ret < 0)
++		return NOTIFY_BAD;
+ 
+ 	/*
+ 	 * Move the next drift compensation time 11 minutes
 -- 
 1.7.10.4
