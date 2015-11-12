@@ -1,87 +1,81 @@
-From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Thu, 12 Nov 2015 15:15:49 +0100
-Subject: [PATCH 1/4] arm: omap2+: add missing HWMOD_NO_IDLEST in 81xx
- hwmod data
-In-Reply-To: <CAA3gFWs8-3pqiZR8vYLDWdXwWjUcd9UK23W3dODGTT+FY55E7g@mail.gmail.com>
-References: <5628A9F2.3010801@baylibre.com> <20151024012112.GA3078@atomide.com>
- <CAA3gFWs8-3pqiZR8vYLDWdXwWjUcd9UK23W3dODGTT+FY55E7g@mail.gmail.com>
-Message-ID: <56449F15.10508@baylibre.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 12 Nov 2015 15:16:53 +0100
+Subject: [PATCH] dma: at_xdmac: use %pad format string for dma_addr_t
+Message-ID: <3796793.2XNherj1df@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10/24/2015 12:09 PM, Neil Armstrong wrote:
-> Hi,
-> 
-> 2015-10-24 3:21 GMT+02:00 Tony Lindgren <tony@atomide.com>:
->>
->> Hi,
->>
->> * Neil Armstrong <narmstrong@baylibre.com> [151022 02:19]:
->>> Add missing HWMOD_NO_IDLEST hwmod flag for entries no
->>> having omap4 clkctrl values.
->>
->> Have you checked this is the case both in dm814x and dm816x TRM?
->> Also the documentation may not be complete FYI, might be also
->> worth checking the legacy TI kernel tree to be sure.
->>
->> Regards,
->>
->> Tony
->>
->>> Cc: Brian Hutchinson <b.hutchman@gmail.com>
->>> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
->>> ---
->>>  arch/arm/mach-omap2/omap_hwmod_81xx_data.c | 3 +++
->>>  1 file changed, 3 insertions(+)
->>>
->>> diff --git a/arch/arm/mach-omap2/omap_hwmod_81xx_data.c b/arch/arm/mach-omap2/omap_hwmod_81xx_data.c
->>> index b1288f5..6256052 100644
->>> --- a/arch/arm/mach-omap2/omap_hwmod_81xx_data.c
->>> +++ b/arch/arm/mach-omap2/omap_hwmod_81xx_data.c
->>> @@ -144,6 +144,7 @@ static struct omap_hwmod dm81xx_l4_ls_hwmod = {
->>>       .name           = "l4_ls",
->>>       .clkdm_name     = "alwon_l3s_clkdm",
->>>       .class          = &l4_hwmod_class,
->>> +     .flags          = HWMOD_NO_IDLEST,
->>>  };
-> In DM814x TRM, the CM_ALWON_L3_SLOW_CLKSTCTRL does not have IDLEST field.
-> Same in DM816x TRM.
-> 
->>>
->>>  /*
->>> @@ -155,6 +156,7 @@ static struct omap_hwmod dm81xx_l4_hs_hwmod = {
->>>       .name           = "l4_hs",
->>>       .clkdm_name     = "alwon_l3_med_clkdm",
->>>       .class          = &l4_hwmod_class,
->>> +     .flags          = HWMOD_NO_IDLEST,
->>>  };
-> In DM814x TRM, the CM_ALWON_L3_MED_CLKSTCTRL does not have IDLEST field.
-> Same in DM816x TRM.
-> 
->>>
->>>  /* L3 slow -> L4 ls peripheral interface running at 125MHz */
->>> @@ -850,6 +852,7 @@ static struct omap_hwmod dm816x_emac0_hwmod = {
->>>       .name           = "emac0",
->>>       .clkdm_name     = "alwon_ethernet_clkdm",
->>>       .class          = &dm816x_emac_hwmod_class,
->>> +     .flags          = HWMOD_NO_IDLEST,
->>>  };
-> In this particular case, the IDLEST is handled in the MDIO hwmod.
-> 
->>>
->>>  static struct omap_hwmod_ocp_if dm81xx_l4_hs__emac0 = {
->>> --
->>> 1.9.1
-> 
-> I'll check the TI tree to be sure...
-> 
-> Regards,
-> Neil
-> 
-Tony,
+dma_addr_t may be defined as 32 or 64 bit depending on configuration,
+so it cannot be printed using the normal format strings, as
+gcc correctly warns:
 
-In TI's tree, there is no L3_MED hwmod but the L3_SLOW hwmod has NO_IDLEST flag.
+drivers/dma/at_xdmac.c: In function 'at_xdmac_interleaved_queue_desc':
+drivers/dma/at_xdmac.c:922:51: warning: format '%x' expects argument of type 'unsigned int', but argument 5 has type 'dma_addr_t {aka long long unsigned int}' [-Wformat=]
 
-Is there any other issue about this patchset ?
+This changes the format strings to use the special "%pad" format
+string that prints a dma_addr_t, and changes the arguments so we
+pass the address by reference as required.
 
-Neil
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+Found on arm multi_v7_defconfig+LPAE
+
+diff --git a/drivers/dma/at_xdmac.c b/drivers/dma/at_xdmac.c
+index b5e132d4bae5..7f039de143f0 100644
+--- a/drivers/dma/at_xdmac.c
++++ b/drivers/dma/at_xdmac.c
+@@ -920,8 +920,8 @@ at_xdmac_interleaved_queue_desc(struct dma_chan *chan,
+ 	desc->lld.mbr_cfg = chan_cc;
+ 
+ 	dev_dbg(chan2dev(chan),
+-		"%s: lld: mbr_sa=0x%08x, mbr_da=0x%08x, mbr_ubc=0x%08x, mbr_cfg=0x%08x\n",
+-		__func__, desc->lld.mbr_sa, desc->lld.mbr_da,
++		"%s: lld: mbr_sa=%pad, mbr_da=%pad, mbr_ubc=0x%08x, mbr_cfg=0x%08x\n",
++		__func__, &desc->lld.mbr_sa, &desc->lld.mbr_da,
+ 		desc->lld.mbr_ubc, desc->lld.mbr_cfg);
+ 
+ 	/* Chain lld. */
+@@ -953,8 +953,8 @@ at_xdmac_prep_interleaved(struct dma_chan *chan,
+ 	if ((xt->numf > 1) && (xt->frame_size > 1))
+ 		return NULL;
+ 
+-	dev_dbg(chan2dev(chan), "%s: src=0x%08x, dest=0x%08x, numf=%d, frame_size=%d, flags=0x%lx\n",
+-		__func__, xt->src_start, xt->dst_start,	xt->numf,
++	dev_dbg(chan2dev(chan), "%s: src=%pad, dest=%pad, numf=%d, frame_size=%d, flags=0x%lx\n",
++		__func__, &xt->src_start, &xt->dst_start,	xt->numf,
+ 		xt->frame_size, flags);
+ 
+ 	src_addr = xt->src_start;
+@@ -1179,8 +1179,8 @@ static struct at_xdmac_desc *at_xdmac_memset_create_desc(struct dma_chan *chan,
+ 	desc->lld.mbr_cfg = chan_cc;
+ 
+ 	dev_dbg(chan2dev(chan),
+-		"%s: lld: mbr_da=0x%08x, mbr_ds=0x%08x, mbr_ubc=0x%08x, mbr_cfg=0x%08x\n",
+-		__func__, desc->lld.mbr_da, desc->lld.mbr_ds, desc->lld.mbr_ubc,
++		"%s: lld: mbr_da=%pad, mbr_ds=%pad, mbr_ubc=0x%08x, mbr_cfg=0x%08x\n",
++		__func__, &desc->lld.mbr_da, &desc->lld.mbr_ds, desc->lld.mbr_ubc,
+ 		desc->lld.mbr_cfg);
+ 
+ 	return desc;
+@@ -1193,8 +1193,8 @@ at_xdmac_prep_dma_memset(struct dma_chan *chan, dma_addr_t dest, int value,
+ 	struct at_xdmac_chan	*atchan = to_at_xdmac_chan(chan);
+ 	struct at_xdmac_desc	*desc;
+ 
+-	dev_dbg(chan2dev(chan), "%s: dest=0x%08x, len=%d, pattern=0x%x, flags=0x%lx\n",
+-		__func__, dest, len, value, flags);
++	dev_dbg(chan2dev(chan), "%s: dest=%pad, len=%d, pattern=0x%x, flags=0x%lx\n",
++		__func__, &dest, len, value, flags);
+ 
+ 	if (unlikely(!len))
+ 		return NULL;
+@@ -1229,8 +1229,8 @@ at_xdmac_prep_dma_memset_sg(struct dma_chan *chan, struct scatterlist *sgl,
+ 
+ 	/* Prepare descriptors. */
+ 	for_each_sg(sgl, sg, sg_len, i) {
+-		dev_dbg(chan2dev(chan), "%s: dest=0x%08x, len=%d, pattern=0x%x, flags=0x%lx\n",
+-			__func__, sg_dma_address(sg), sg_dma_len(sg),
++		dev_dbg(chan2dev(chan), "%s: dest=%pad, len=%d, pattern=0x%x, flags=0x%lx\n",
++			__func__, &sg_dma_address(sg), sg_dma_len(sg),
+ 			value, flags);
+ 		desc = at_xdmac_memset_create_desc(chan, atchan,
+ 						   sg_dma_address(sg),
