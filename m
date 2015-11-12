@@ -1,53 +1,94 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Thu, 12 Nov 2015 09:32:10 +0900
-Subject: [PATCH v7 1/4] Documentation: dt-bindings: Describe SROMc
- configuration
-In-Reply-To: <CAL_JsqLtWwdGHKKfS8b6E0Urh6gYopZcwpdyvJGWCRm7x81YzA@mail.gmail.com>
-References: <cover.1446799912.git.p.fedin@samsung.com>
- <0bc58ce0fd39767834f486c4c0cfbbd70044caed.1446799912.git.p.fedin@samsung.com>
- <CAL_JsqLsD9gA2-AWYGaHvOuZhhDmE2BHmPMU2nJjPYEvQJdNHQ@mail.gmail.com>
- <009301d11c4c$6eaa1eb0$4bfe5c10$@samsung.com>
- <CAL_JsqLtWwdGHKKfS8b6E0Urh6gYopZcwpdyvJGWCRm7x81YzA@mail.gmail.com>
-Message-ID: <5643DE0A.2060400@samsung.com>
+From: ykk@rock-chips.com (Yakir Yang)
+Date: Thu, 12 Nov 2015 09:07:34 +0800
+Subject: [RFC PATCH v1 2/2] dt-bindings: add document for Innosilicon HDMI
+ on Rockchip platform
+In-Reply-To: <20151111202236.GA5629@rob-hp-laptop>
+References: <1447227952-4787-1-git-send-email-ykk@rock-chips.com>
+ <1447228052-4897-1-git-send-email-ykk@rock-chips.com>
+ <20151111202236.GA5629@rob-hp-laptop>
+Message-ID: <5643E656.9000709@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12.11.2015 05:43, Rob Herring wrote:
-> On Wed, Nov 11, 2015 at 12:44 AM, Pavel Fedin <p.fedin@samsung.com> wrote:
->>  Hello!
+Hi Rob,
+
+On 11/12/2015 04:22 AM, Rob Herring wrote:
+> On Wed, Nov 11, 2015 at 03:47:32PM +0800, Yakir Yang wrote:
+>> Signed-off-by: Yakir Yang <ykk@rock-chips.com>
+> Acked-by: Rob Herring <robh@kernel.org>
+
+Thanks you for responding   ;)
+
+- Yakir
+
+>> ---
+>>   .../display/rockchip/inno_hdmi-rockchip.txt        | 50 ++++++++++++++++++++++
+>>   1 file changed, 50 insertions(+)
+>>   create mode 100644 Documentation/devicetree/bindings/display/rockchip/inno_hdmi-rockchip.txt
 >>
->>>> +- samsung,srom-timing : array of 6 integers, specifying bank timings in the
->>>> +                        following order: Tacp, Tcah, Tcoh, Tacc, Tcos, Tacs.
->>>> +                        Each value is specified in cycles and has the following
->>>> +                        meaning and valid range:
->>>> +                        Tacp : Page mode access cycle at Page mode (0 - 15)
->>>> +                        Tcah : Address holding time after CSn (0 - 15)
->>>> +                        Tcoh : Chip selection hold on OEn (0 - 15)
->>>> +                        Tacc : Access cycle (0 - 31, the actual time is N + 1)
->>>> +                        Tcos : Chip selection set-up before OEn (0 - 15)
->>>> +                        Tacs : Address set-up before CSn (0 - 15)
->>>
->>> This is not easily extended. Perhaps a property per value instead.
+>> diff --git a/Documentation/devicetree/bindings/display/rockchip/inno_hdmi-rockchip.txt b/Documentation/devicetree/bindings/display/rockchip/inno_hdmi-rockchip.txt
+>> new file mode 100644
+>> index 0000000..1898408
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/display/rockchip/inno_hdmi-rockchip.txt
+>> @@ -0,0 +1,50 @@
+>> +Rockchip specific extensions to the Innosilicon HDMI
+>> +================================
+>> +
+>> +Required properties:
+>> +- compatible:
+>> +	"rockchip,rk3036-dw-hdmi";
+>> +- reg:
+>> +	Physical base address and length of the controller's registers.
+>> +- clocks, clock-names:
+>> +	Phandle to hdmi controller clock, name should be "pclk"
+>> +- interrupts:
+>> +	HDMI interrupt number
+>> +- ports:
+>> +	Contain one port node with endpoint definitions as defined in
+>> +	Documentation/devicetree/bindings/graph.txt.
+>> +- pinctrl-0, pinctrl-name:
+>> +	Switch the iomux of HPD/CEC pins to HDMI function.
+>> +
+>> +Example:
+>> +hdmi: hdmi at 20034000 {
+>> +	compatible = "rockchip,rk3036-inno-hdmi";
+>> +	reg = <0x20034000 0x4000>;
+>> +	interrupts = <GIC_SPI 45 IRQ_TYPE_LEVEL_HIGH>;
+>> +	clocks = <&cru  PCLK_HDMI>;
+>> +	clock-names = "pclk";
+>> +	pinctrl-names = "default";
+>> +	pinctrl-0 = <&hdmi_ctl>;
+>> +	status = "disabled";
+>> +
+>> +	hdmi_in: port {
+>> +		#address-cells = <1>;
+>> +		#size-cells = <0>;
+>> +		hdmi_in_lcdc: endpoint at 0 {
+>> +			reg = <0>;
+>> +			remote-endpoint = <&lcdc_out_hdmi>;
+>> +		};
+>> +	};
+>> +};
+>> +
+>> +&pinctrl {
+>> +	hdmi {
+>> +		hdmi_ctl: hdmi-ctl {
+>> +			rockchip,pins = <1 8  RK_FUNC_1 &pcfg_pull_none>,
+>> +					<1 9  RK_FUNC_1 &pcfg_pull_none>,
+>> +					<1 10 RK_FUNC_1 &pcfg_pull_none>,
+>> +					<1 11 RK_FUNC_1 &pcfg_pull_none>;
+>> +		};
+>> +	};
+>> +
+>> +};
+>> -- 
+>> 1.9.1
 >>
->>  We had a discussion with Krzysztof about it, he agreed with this form of the property.
->> My concern was that it's just too much typing, and makes little sense because these
->> settings always go together. If register layout changes, or parameter set changes in
->> incompatible way, then it's another device, not exynos-srom anymore.
->>  So would you agree with that, or is your position strong?
-> 
-> I'm thinking for a new version of the controller which could add (or
-> remove) new timing parameters, but then I guess you can interpret the
-> field differently based on the compatible string. Anyway, your problem
-> to deal with.
-
-Actually I also preferred properties per one timing... but finally
-agreed on simpler approach.
-
-Adding new parameters to the array is still possible (because the order
-matters) and removal as well (by ignoring some indices). All ARMv7
-Exynos SoCs have exactly the same registers for SROM controller
-(Exynos3250, Exynos4, Exynos5). On newer Exynos ARMv8 (Exynos5433 and
-Exynos7420) I don't know because it is not documented.
-
-Best regards,
-Krzysztof
+>>
+>> _______________________________________________
+>> dri-devel mailing list
+>> dri-devel at lists.freedesktop.org
+>> http://lists.freedesktop.org/mailman/listinfo/dri-devel
+>
+>
