@@ -1,50 +1,39 @@
-From: rostedt@goodmis.org (Steven Rostedt)
-Date: Thu, 12 Nov 2015 10:49:13 -0500
-Subject: [PATCH] sched/rt: hide push_irq_work_func declaration
-In-Reply-To: <4129441.9nXLnMzV6v@wuerfel>
-References: <3810009.VdDTV0h1Qp@wuerfel>
- <20151112094739.0168e191@gandalf.local.home>
- <4129441.9nXLnMzV6v@wuerfel>
-Message-ID: <20151112104913.4f68a92c@gandalf.local.home>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 12 Nov 2015 16:50:41 +0100
+Subject: pj4 -marm breaks thumb ftrace
+In-Reply-To: <alpine.LFD.2.20.1511120953020.5826@knanqh.ubzr>
+References: <20151112095020.GB15032@codeaurora.org>
+ <56446A40.7000304@linaro.org>
+ <alpine.LFD.2.20.1511120953020.5826@knanqh.ubzr>
+Message-ID: <CAKv+Gu-h5VYx+18KBg1y6o3JbqR+Fyhy6Ne7ZUDfFChCKJ5O5Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 12 Nov 2015 16:14:06 +0100
-Arnd Bergmann <arnd@arndb.de> wrote:
+On 12 November 2015 at 16:22, Nicolas Pitre <nicolas.pitre@linaro.org> wrote:
+> On Thu, 12 Nov 2015, Ard Biesheuvel wrote:
+>
+[...]
+>
+> You might add __INIT here.
+>
+>> +ENTRY(pj4_cp_access_read)
+>> +     mrc     p15, 0, r0, c1, c0, 2
+>> +     ret     lr
+>> +ENDPROC(pj4_cp_access_read)
+>> +
+>> +ENTRY(pj4_cp_access_write)
+>> +     mcr     p15, 0, r0, c1, c0, 2
+>> +     mrc     p15, 0, r0, c1, c0, 2
+>> +     mov     r0, r0
+>> +     sub     pc, pc, #4
+>> +     ret     lr
+>> +ENDPROC(pj4_cp_access_write)
+>> +
+>
+> And __FINIT here.
+>
 
-> On Thursday 12 November 2015 09:47:39 Steven Rostedt wrote:
-> > > -#ifdef CONFIG_SMP
-> > > +#if IS_ENABLED(CONFIG_SMP) && defined(HAVE_RT_PUSH_IPI)  
-> > 
-> > Why IS_ENABLED() and not defined()?
-> >
-> > #if defined(CONFIG_SMP) && defined(HAVE_RT_PUSH_IPI)
-> > 
-> > I thought IS_ENABLED() is used for C code, like:
-> > 
-> >         if (IS_ENABLED(CONFIG_SMP)) {
-> >                 [...]
-> >         }  
-> 
-> "#if IS_ENABLED(CONFIG_foo)" has another property, which is
-> to evaluate to true when Kconfig has set the symbol to "=m".
-> Obviously that cannot happen for CONFIG_SMP, but some
-> maintainers prefer using IS_ENABLED() consistently for all
-> config symbols.
-> 
-> I don't care much either way, and it's easily changed if
-> we still want the patch and you prefer a plain #if defined().
-> 
+OK, I will do that. Thanks for the tip.
 
-For this instance, I do prefer the "defined()" version. I can
-understand the IS_ENABLED() for module configs. But I don't see the
-need to make all #if's use it. Maybe because I don't deal with module
-configs much.
-
-Anyway, this patch should probably go in now as a current "fix", and
-the redesign should be looked at as well, but that's unrelated to your
-arch, and you shouldn't need to worry about it.
-
-Thanks,
-
--- Steve
+-- 
+Ard.
