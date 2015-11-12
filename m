@@ -1,28 +1,22 @@
-From: rostedt@goodmis.org (Steven Rostedt)
-Date: Thu, 12 Nov 2015 10:16:20 -0500
-Subject: [PATCH] sched/rt: hide push_irq_work_func declaration
-In-Reply-To: <20151112145331.GC17308@twins.programming.kicks-ass.net>
-References: <3810009.VdDTV0h1Qp@wuerfel>
- <20151112145331.GC17308@twins.programming.kicks-ass.net>
-Message-ID: <20151112101620.2dcd5dce@gandalf.local.home>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 12 Nov 2015 15:22:11 +0000
+Subject: [PATCH 0/3] arm64: make some functions static
+In-Reply-To: <1447329884-1644-1-git-send-email-jszhang@marvell.com>
+References: <1447329884-1644-1-git-send-email-jszhang@marvell.com>
+Message-ID: <20151112152211.GI5627@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 12 Nov 2015 15:53:31 +0100
-Peter Zijlstra <peterz@infradead.org> wrote:
-
-> On Thu, Nov 12, 2015 at 03:22:22PM +0100, Arnd Bergmann wrote:
-> > -#ifdef CONFIG_SMP
-> > +#if IS_ENABLED(CONFIG_SMP) && defined(HAVE_RT_PUSH_IPI)
-> >  static void push_irq_work_func(struct irq_work *work);
-> >  #endif  
+On Thu, Nov 12, 2015 at 08:04:41PM +0800, Jisheng Zhang wrote:
+> These functions are only called within the its own file, so they could
+> be declared static.
 > 
-> I think we can get tid of the whole HAVE_RT_PUSH_IPI thing after:
-> 8053871d0f7f ("smp: Fix smp_call_function_single_async() locking")
-> 
-> That should allow us to use smp_calling_function_single_async() instead
-> of irq_work_queue_on(), removing the dependency on irq_work.
+> Jisheng Zhang (3):
+>   arm64: smp: make of_parse_and_init_cpus static
+>   arm64: mmu: make split_pud and fixup_executable static
+>   arm64: suspend: make hw_breakpoint_restore static
 
-Interesting. I'll have to take a look at that.
+Patches applied. Thanks.
 
--- Steve
+-- 
+Catalin
