@@ -1,48 +1,44 @@
-From: matthijsvanduin@gmail.com (Matthijs van Duin)
-Date: Thu, 12 Nov 2015 10:20:24 +0100
-Subject: Minimal support for dm814x
-In-Reply-To: <20151111174028.GF3218@atomide.com>
-References: <4999BB3D-4BB5-4F7C-96D7-FB687725CDCC@audioscience.com>
- <20151109150602.GR3199@atomide.com>
- <CAALWOA-NUyRYaGbmBZpc6CcFga8_BKPZ9WQTxa3t09bHS_6=qA@mail.gmail.com>
- <7933071D-84FD-4A85-8CD0-CC504CE1D9D1@audioscience.com>
- <20151111174028.GF3218@atomide.com>
-Message-ID: <CAALWOA_dEtajQBLrXesQ2bRCDf-1Dzg_tJw_=yAmaO=T3=KMZQ@mail.gmail.com>
+From: heiko@sntech.de (Heiko Stuebner)
+Date: Thu, 12 Nov 2015 10:21:51 +0100
+Subject: [PATCH v8 10/17] phy: Add driver for rockchip Display Port PHY
+In-Reply-To: <5643FB43.6090408@rock-chips.com>
+References: <1446020143-32645-1-git-send-email-ykk@rock-chips.com>
+ <2368662.QeV0VQYq26@phil> <5643FB43.6090408@rock-chips.com>
+Message-ID: <1942026.CO9sWmi7sq@phil>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11 November 2015 at 18:40, Tony Lindgren <tony@atomide.com> wrote:
-> Well we do first try to set the rate using the divider only at least for
-> drivers/clk/ti/fapll.c used on dm816x. I'm thinking about doing a similar
-> driver for the dm814x adpll where we have a PLL and separate output clocks
-> in a single driver as the PLL and output control registers are all mixed in.
+Hi Yakir,
 
-Well the output control *is* part of the PLL block. More importantly,
-due to the constraints of DPLL-LJ you may need to consider the
-postdivider and PLL config together to produce the desired output
-frequency.
+Am Donnerstag, 12. November 2015, 10:36:51 schrieb Yakir Yang:
+> On 11/12/2015 07:23 AM, Heiko Stuebner wrote:
+> > Am Mittwoch, 28. Oktober 2015, 16:30:33 schrieb Yakir Yang:
+> >> Add phy driver for the Rockchip DisplayPort PHY module. This
+> >> is required to get DisplayPort working in Rockchip SoCs.
+> >>
+> >> Reviewed-by: Heiko Stuebner <heiko@sntech.de>
+> >> Signed-off-by: Yakir Yang <ykk@rock-chips.com>
+> > a general thing I have been pondering, we should probably move the
+> > dp-phy under the GRF. Similar to the new power-domains being
+> > a full child of the PMU, the dp-phy is a full child-device of the GRF.
+> >
+> > That would include:
+> > - making the GRF a simply-mfd (just adding that property)
+> > - moving the dts node under it
+> > - making the driver get its regmap from its parent (just like
+> >    drivers/soc/rockchip/pm_domains.c does)
+> >
+> >
+> > The usbphy is another example of that, and I think I'll be moving it
+> > below the grf as well.
+> 
+> Sounds great, pretty cool to collect those scattered "GRF" driver,
+> if you want me do some rebase on your changes, please note me :)
 
-Note BTW that afaik exactly the same two DPLL types are used in nearly
-all TI SoCs (with exception of DM816x, and some enhancements have been
-made in the latest SoCs), but since the PLLs themselves only have
-wires sticking out, the register interface can vary significantly
-between devices. Most of them also wrap a layer of abstraction around
-them, while it seems the DM814x just directly wired all available
-signals into registers, no added sugar.
-
-Another difference is that normally nearly all DPLLs are DPLL-S (aka
-"type A") and often only one is -LJ (aka "type B"), while the
-situation is reversed on the DM814x which has only one instance of
-DPLL-S and 12 instances of DPLL-LJ. Also unusual is that none have
-more than one output divider (no HSDIVIDER blocks present) and only
-two (HDMI and USB) make direct use of the undivided dco clock. This
-means that, with those two exceptions, you do have complete freedom in
-configuring the PLL for the needs of its single output clock.
-
-It does however also mean you can't really escape dealing with the
-fussiness of DPLL-LJ like you can on other devices (e.g. the am335x
-has only one, which is configured correctly by ROM and can't be
-reconfigured without breaking USB.)
+nope, that won't be necessary ... I'm currently doing some usbphy
+reorganization/cleanups for 4.5 first, so to keep conflicts down I'll do
+the move probably for 4.6. As I expect your edp series to make it into
+4.5 we'll also not have conflicts here then :-)
 
 
-Matthijs
+Heiko
