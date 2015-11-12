@@ -1,64 +1,43 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Thu, 12 Nov 2015 14:51:37 +0300
-Subject: [PATCH v2 3/3] ARM: shmobile: gose: Add QSPI device to DT
-In-Reply-To: <1447291763-27527-4-git-send-email-horms+renesas@verge.net.au>
-References: <1447291763-27527-1-git-send-email-horms+renesas@verge.net.au>
- <1447291763-27527-4-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <56447D49.6060907@cogentembedded.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Thu, 12 Nov 2015 11:52:33 +0000
+Subject: [PATCH v2 10/11] PM / Hibernate: clean cached pages on
+ architectures that require it
+In-Reply-To: <36DF59CE26D8EE47B0655C516E9CE64028672FF5@shsmsx102.ccr.corp.intel.com>
+References: <1445966960-31724-1-git-send-email-james.morse@arm.com>
+ <1445966960-31724-11-git-send-email-james.morse@arm.com>
+ <20151111114039.GA8375@red-moon>
+ <36DF59CE26D8EE47B0655C516E9CE64028672FF5@shsmsx102.ccr.corp.intel.com>
+Message-ID: <20151112115233.GB2657@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/12/2015 4:29 AM, Simon Horman wrote:
-
-> Enable the QSPI controller in the gose device tree.
->
-> Based similar work for the silk board by by Vladimir Barinov and
-> Sergei Shtylyov.
->
-> Cc: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
-> Cc: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
->
-> ---
-> Tested: Read /dev/mtd0 with 512K blocks at 1.7MB/s
->
-> v2
-> * Move partitions into partitions subnode
->    as suggested by Geert Uytterhoeven.
-> ---
->   arch/arm/boot/dts/r8a7793-gose.dts | 43 ++++++++++++++++++++++++++++++++++++++
->   1 file changed, 43 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/r8a7793-gose.dts b/arch/arm/boot/dts/r8a7793-gose.dts
-> index 1575ef759047..79be514d3a1c 100644
-> --- a/arch/arm/boot/dts/r8a7793-gose.dts
-> +++ b/arch/arm/boot/dts/r8a7793-gose.dts
-[...]
-> @@ -92,3 +97,41 @@
->
->   	status = "okay";
->   };
-> +
-> +&qspi {
-> +	pinctrl-0 = <&qspi_pins>;
-> +	pinctrl-names = "default";
-> +
-> +	status = "okay";
-> +
-> +	flash at 0 {
-> +		compatible = "spansion,s25fl512s", "jedec,spi-nor";
-> +		reg = <0>;
-> +		spi-max-frequency = <30000000>;
-> +		spi-tx-bus-width = <4>;
-> +		spi-rx-bus-width = <4>;
-> +		spi-cpol;
-> +		spi-cpha;
-> +		m25p,fast-read;
-> +
-> +		partitions{
-
-    Need space before {.
+On Thu, Nov 12, 2015 at 02:53:35AM +0000, Chen, Yu C wrote:
 
 [...]
 
-MBR, Sergei
+> > > static inline void do_copy_page(long *dst, long *src)  {
+> > >  	int n;
+> > > +	unsigned long __maybe_unused start = (unsigned long)dst;
+> > >
+> > >  	for (n = PAGE_SIZE / sizeof(long); n; n--)
+> > >  		*dst++ = *src++;
+> > > +
+> > > +	flush_icache_range(start, start+PAGE_SIZE);
+> > >  }
+> How about invalid all icache lines before doing do_copy_page, since
+> do_copy_page might deal with both data pages and execute pages, that might be
+> redundant to do it for every page?
+
+The point here is to make sure I-cache and D-cache are in sync, because
+the page we are copying can be executable code, so flush_icache_range is
+there to make sure that the code is cleaned from the D-cache to a cache
+level that is visible to the I-cache (yes, the I-cache range is
+invalidate too in the process).
+
+I agree it is redundant for data pages, the point is, you do not really
+know what you are copying at this stage, we can extend the snapshot
+code to flag the pages accordingly, but it might well be overkill, so
+we posted this patch to get consensus before proceeding.
+
+Thanks,
+Lorenzo
