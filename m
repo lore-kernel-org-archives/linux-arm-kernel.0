@@ -1,67 +1,35 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 12 Nov 2015 15:14:23 +0100
-Subject: [PATCH] mmc: dw_mmc: use resource_size_t to store physical address
-Message-ID: <28102387.ALpaBHpim0@wuerfel>
+Date: Thu, 12 Nov 2015 15:15:38 +0100
+Subject: [PATCH] pinctrl: at91-pio4: use %pr format string for resource
+Message-ID: <3726450.XyTgssZ1KT@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The dw_mmc driver stores the physical address of the MMIO registers
-in a pointer, which requires the use of type casts, and is actually
-broken if anyone ever has this device on a 32-bit SoC in registers
-above 4GB. Gcc warns about this possibility when the driver is built
-with ARM LPAE enabled:
+resource_size_t may be defined as 32 or 64 bit depending on configuration,
+so it cannot be printed using the normal format strings, as gcc correctly
+warns:
 
-mmc/host/dw_mmc.c: In function 'dw_mci_edmac_start_dma':
-mmc/host/dw_mmc.c:702:17: warning: cast from pointer to integer of different size
-  cfg.dst_addr = (dma_addr_t)(host->phy_regs + fifo_offset);
-                 ^
-mmc/host/dw_mmc-pltfm.c: In function 'dw_mci_pltfm_register':
-mmc/host/dw_mmc-pltfm.c:63:19: warning: cast to pointer from integer of different size
-  host->phy_regs = (void *)(regs->start);
+pinctrl-at91-pio4.c: In function 'atmel_pinctrl_probe':
+pinctrl-at91-pio4.c:1003:41: warning: format '%u' expects argument of type 'unsigned int', but argument 5 has type 'resource_size_t {aka long long unsigned int}' [-Wformat=]
+   dev_dbg(dev, "bank %i: hwirq=%u\n", i, res->start);
 
-This changes the code to use resource_size_t, which gets rid of the
-warning, the bug and the useless casts.
+This changes the format string to use the special "%pr" format
+string that prints a resource, and changes the arguments so we
+the resource structure directly. I'm also swapping out the arguments
+to match the text in the format string.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
->From the arm64 allmodconfig build reports
 
-diff --git a/drivers/mmc/host/dw_mmc-pltfm.c b/drivers/mmc/host/dw_mmc-pltfm.c
-index 7e1d13b68b06..81bdeeb05a4d 100644
---- a/drivers/mmc/host/dw_mmc-pltfm.c
-+++ b/drivers/mmc/host/dw_mmc-pltfm.c
-@@ -60,7 +60,7 @@ int dw_mci_pltfm_register(struct platform_device *pdev,
+diff --git a/drivers/pinctrl/pinctrl-at91-pio4.c b/drivers/pinctrl/pinctrl-at91-pio4.c
+index 33edd07d9149..23217e990eaf 100644
+--- a/drivers/pinctrl/pinctrl-at91-pio4.c
++++ b/drivers/pinctrl/pinctrl-at91-pio4.c
+@@ -1000,7 +1000,7 @@ static int atmel_pinctrl_probe(struct platform_device *pdev)
+ 		atmel_pioctrl->irqs[i] = res->start;
+ 		irq_set_chained_handler(res->start, atmel_gpio_irq_handler);
+ 		irq_set_handler_data(res->start, atmel_pioctrl);
+-		dev_dbg(dev, "bank %i: hwirq=%u\n", i, res->start);
++		dev_dbg(dev, "bank %pr: hwirq=%u\n", res, i);
+ 	}
  
- 	regs = platform_get_resource(pdev, IORESOURCE_MEM, 0);
- 	/* Get registers' physical base address */
--	host->phy_regs = (void *)(regs->start);
-+	host->phy_regs = regs->start;
- 	host->regs = devm_ioremap_resource(&pdev->dev, regs);
- 	if (IS_ERR(host->regs))
- 		return PTR_ERR(host->regs);
-diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
-index 7a6cedbe48a8..fb204ee6ff89 100644
---- a/drivers/mmc/host/dw_mmc.c
-+++ b/drivers/mmc/host/dw_mmc.c
-@@ -699,7 +699,7 @@ static int dw_mci_edmac_start_dma(struct dw_mci *host,
- 	int ret = 0;
- 
- 	/* Set external dma config: burst size, burst width */
--	cfg.dst_addr = (dma_addr_t)(host->phy_regs + fifo_offset);
-+	cfg.dst_addr = host->phy_regs + fifo_offset;
- 	cfg.src_addr = cfg.dst_addr;
- 	cfg.dst_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
- 	cfg.src_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
-diff --git a/include/linux/mmc/dw_mmc.h b/include/linux/mmc/dw_mmc.h
-index f67b2ec18e6d..7776afb0ffa5 100644
---- a/include/linux/mmc/dw_mmc.h
-+++ b/include/linux/mmc/dw_mmc.h
-@@ -172,7 +172,7 @@ struct dw_mci {
- 	/* For edmac */
- 	struct dw_mci_dma_slave *dms;
- 	/* Registers's physical base address */
--	void                    *phy_regs;
-+	resource_size_t		phy_regs;
- 
- 	u32			cmd_status;
- 	u32			data_status;
+ 	atmel_pioctrl->irq_domain = irq_domain_add_linear(dev->of_node,
