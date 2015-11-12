@@ -1,87 +1,37 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Thu, 12 Nov 2015 14:37:19 +0100
-Subject: [PATCH v2 3/3] ARM: BCM5301X: remove workaround imprecise abort
- fault handler
-In-Reply-To: <1444905142-21500-4-git-send-email-l.stach@pengutronix.de>
-References: <1444905142-21500-1-git-send-email-l.stach@pengutronix.de>
- <1444905142-21500-4-git-send-email-l.stach@pengutronix.de>
-Message-ID: <1447335439.3101.8.camel@pengutronix.de>
+From: schwab@suse.de (Andreas Schwab)
+Date: Thu, 12 Nov 2015 14:47:18 +0100
+Subject: [PATCH v6 13/17] arm64:ilp32: add sys_ilp32.c and a separate
+ table (in entry.S) to use it
+In-Reply-To: <16446627.b0Lo936ZJj@wuerfel> (Arnd Bergmann's message of "Thu,
+ 12 Nov 2015 14:24:57 +0100")
+References: <1446507046-24604-1-git-send-email-ynorov@caviumnetworks.com>
+ <4796230.MStNPjWNEu@wuerfel> <mvmk2pny2js.fsf@hawking.suse.de>
+ <16446627.b0Lo936ZJj@wuerfel>
+Message-ID: <mvm4mgrxrbt.fsf@hawking.suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hauke,
+Arnd Bergmann <arnd@arndb.de> writes:
 
-can you please take this patch through your tree for 4.4? The first
-patch in this series went in through Russells tree, so the below code
-now has the possibility to hide a real abort later during boot.
+> On Thursday 12 November 2015 10:44:55 Andreas Schwab wrote:
+>> Arnd Bergmann <arnd@arndb.de> writes:
+>> 
+>> > What do you mean with 32-bit off_t?
+>> 
+>> An ABI with 32-bit off_t, ie. all currently implemented 32-bit ABIs.
+>> 
+>> > Do you mean that glibc emulates a 32-bit off_t on top of the 64-bit
+>> > __kernel_loff_t?
+>> 
+>> Glibc is bridging the user-space ABI to the kernel ABI.
+>
+> Ok, but why?
 
-Regards,
-Lucas
+That's how the ABI is defined right now.  I didn't make that up.
 
-Am Donnerstag, den 15.10.2015, 12:32 +0200 schrieb Lucas Stach:
-> This is not needed anymore. Handling a potentially pending imprecise external
-> abort left behind by the bootloader is now done in a slightly safer way inside
-> the common ARM startup code.
-> 
-> Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
-> Acked-by: Hauke Mehrtens <hauke@hauke-m.de>
-> ---
->  arch/arm/mach-bcm/bcm_5301x.c | 35 -----------------------------------
->  1 file changed, 35 deletions(-)
-> 
-> diff --git a/arch/arm/mach-bcm/bcm_5301x.c b/arch/arm/mach-bcm/bcm_5301x.c
-> index 5478fe6bcce6..c8830a2b0d60 100644
-> --- a/arch/arm/mach-bcm/bcm_5301x.c
-> +++ b/arch/arm/mach-bcm/bcm_5301x.c
-> @@ -9,40 +9,6 @@
->  #include <asm/hardware/cache-l2x0.h>
->  
->  #include <asm/mach/arch.h>
-> -#include <asm/siginfo.h>
-> -#include <asm/signal.h>
-> -
-> -
-> -static bool first_fault = true;
-> -
-> -static int bcm5301x_abort_handler(unsigned long addr, unsigned int fsr,
-> -				 struct pt_regs *regs)
-> -{
-> -	if ((fsr == 0x1406 || fsr == 0x1c06) && first_fault) {
-> -		first_fault = false;
-> -
-> -		/*
-> -		 * These faults with codes 0x1406 (BCM4709) or 0x1c06 happens
-> -		 * for no good reason, possibly left over from the CFE boot
-> -		 * loader.
-> -		 */
-> -		pr_warn("External imprecise Data abort at addr=%#lx, fsr=%#x ignored.\n",
-> -			addr, fsr);
-> -
-> -		/* Returning non-zero causes fault display and panic */
-> -		return 0;
-> -	}
-> -
-> -	/* Others should cause a fault */
-> -	return 1;
-> -}
-> -
-> -static void __init bcm5301x_init_early(void)
-> -{
-> -	/* Install our hook */
-> -	hook_fault_code(16 + 6, bcm5301x_abort_handler, SIGBUS, BUS_OBJERR,
-> -			"imprecise external abort");
-> -}
->  
->  static const char *const bcm5301x_dt_compat[] __initconst = {
->  	"brcm,bcm4708",
-> @@ -52,6 +18,5 @@ static const char *const bcm5301x_dt_compat[] __initconst = {
->  DT_MACHINE_START(BCM5301X, "BCM5301X")
->  	.l2c_aux_val	= 0,
->  	.l2c_aux_mask	= ~0,
-> -	.init_early	= bcm5301x_init_early,
->  	.dt_compat	= bcm5301x_dt_compat,
->  MACHINE_END
+Andreas.
 
 -- 
-Pengutronix e.K.             | Lucas Stach                 |
-Industrial Linux Solutions   | http://www.pengutronix.de/  |
+Andreas Schwab, SUSE Labs, schwab at suse.de
+GPG Key fingerprint = 0196 BAD8 1CE9 1970 F4BE  1748 E4D4 88E3 0EEA B9D7
+"And now for something completely different."
