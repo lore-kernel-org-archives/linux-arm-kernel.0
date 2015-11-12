@@ -1,41 +1,30 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Thu, 12 Nov 2015 11:44:15 +0100
-Subject: [PATCH v2 3/3] ARM: shmobile: gose: Add QSPI device to DT
-In-Reply-To: <1447291763-27527-4-git-send-email-horms+renesas@verge.net.au>
-References: <1447291763-27527-1-git-send-email-horms+renesas@verge.net.au>
- <1447291763-27527-4-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <CAMuHMdWi=uTAtNvhSA54JDms_pLW0zjKQ_VH8xU3eY6BGiwV5A@mail.gmail.com>
+From: tixy@linaro.org (Jon Medhurst (Tixy))
+Date: Thu, 12 Nov 2015 10:52:25 +0000
+Subject: [PATCH v2 1/4] drm: arm: Add DT bindings documentation for
+ HDLCD driver.
+In-Reply-To: <20151112104210.GZ963@e106497-lin.cambridge.arm.com>
+References: <1447258010-2234-1-git-send-email-Liviu.Dudau@arm.com>
+ <1447258010-2234-2-git-send-email-Liviu.Dudau@arm.com>
+ <20151111184849.GA9172@rob-hp-laptop>
+ <20151112104210.GZ963@e106497-lin.cambridge.arm.com>
+Message-ID: <1447325545.2825.9.camel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Simon,
-
-On Thu, Nov 12, 2015 at 2:29 AM, Simon Horman
-<horms+renesas@verge.net.au> wrote:
-> Enable the QSPI controller in the gose device tree.
+On Thu, 2015-11-12 at 10:42 +0000, Liviu Dudau wrote:
+> > This is on-chip RAM or nornal system RAM? We already have bindings
+> for 
+> > both.
 >
-> Based similar work for the silk board by by Vladimir Barinov and
-> Sergei Shtylyov.
->
-> Cc: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
-> Cc: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> Juno has a set of TLX (ThinLinks) connectors on the board where an
+> FPGA can be attached. On r1
+> the code running on FPGA can even participate as an AXI master with
+> full coherency. The FPGA
+> has local memory that we want to share with the HDLCD to be used as a
+> framebuffer.
 
-Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
+The HDLCD on the Juno chip or one implemented in the FPGA? I assume you
+mean the latter but just wanted to check.
 
-> ---
-> Tested: Read /dev/mtd0 with 512K blocks at 1.7MB/s
-
-That's slow: I get 6.7 MB/s on koelsch (69.9 Mbps for Quad Read according
-to my in-kernel QSPI debug code). Is this with SYS-DMAC enabled?
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+-- 
+Tixy
