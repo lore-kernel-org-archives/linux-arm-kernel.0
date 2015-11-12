@@ -1,212 +1,101 @@
-From: alex.bennee@linaro.org (=?UTF-8?q?Alex=20Benn=C3=A9e?=)
-Date: Thu, 12 Nov 2015 16:20:51 +0000
-Subject: [PATCH v9 6/6] tests/guest-debug: introduce basic gdbstub tests
-In-Reply-To: <1447345251-22625-1-git-send-email-alex.bennee@linaro.org>
-References: <1447345251-22625-1-git-send-email-alex.bennee@linaro.org>
-Message-ID: <1447345251-22625-7-git-send-email-alex.bennee@linaro.org>
+From: peter.maydell@linaro.org (Peter Maydell)
+Date: Thu, 12 Nov 2015 16:24:50 +0000
+Subject: [PATCH v2] Documentation: dt: Add bindings for Secure-only devices
+Message-ID: <1447345490-29671-1-git-send-email-peter.maydell@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Alex Benn?e <alex@bennee.com>
+The existing device tree bindings assume that we are only trying to
+describe a single address space with a device tree (for ARM, either
+the Normal or the Secure world). Some uses for device tree need to
+describe both Normal and Secure worlds in a single device tree. Add
+documentation of how to do this, by adding extra properties which
+describe when a device appears differently in the two worlds or when
+it only appears in one of them.
 
-The aim of these tests is to combine with an appropriate kernel
-image (with symbol-file vmlinux) and check it behaves as it should.
-Given a kernel it checks:
+The binding describes the general principles for adding new
+properties describing the secure world, but for now we only need a
+single new property, "secure-status", which can be used to annotate
+devices to indicate that they are only visible in one of the two
+worlds.
 
-  - single step
-  - software breakpoint
-  - hardware breakpoint
-  - access, read and write watchpoints
+The primary expected use of this binding is for a virtual machine
+like QEMU to describe the VM layout to a TrustZone aware firmware
+(which would then use the secure-only devices itself, and pass the DT
+on to a kernel running in the non-secure world, which ignores the
+secure-only devices and uses the rest).
 
-On success it returns 0 to the calling process.
-
-I've not plumbed this into the "make check" logic though as we need a
-solution for providing non-host binaries to the tests. However the test
-is structured to work with pretty much any Linux kernel image as it
-uses the basic kernel_init code which is common across architectures.
-
-Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
+Signed-off-by: Peter Maydell <peter.maydell@linaro.org>
 ---
- tests/guest-debug/test-gdbstub.py | 171 ++++++++++++++++++++++++++++++++++++++
- 1 file changed, 171 insertions(+)
- create mode 100644 tests/guest-debug/test-gdbstub.py
+This binding doesn't affect the kernel itself, but the kernel
+Documentation/ tree is the de-facto current place where all DT
+bindings are documented, so Grant suggested this was the right
+place to send a doc patch.
 
-diff --git a/tests/guest-debug/test-gdbstub.py b/tests/guest-debug/test-gdbstub.py
+Changes v1->v2:
+ * list all the status/secure-status combinations explicitly
+ * use /* */ comment syntax, not //
+
+ Documentation/devicetree/bindings/arm/secure.txt | 51 ++++++++++++++++++++++++
+ 1 file changed, 51 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/secure.txt
+
+diff --git a/Documentation/devicetree/bindings/arm/secure.txt b/Documentation/devicetree/bindings/arm/secure.txt
 new file mode 100644
-index 0000000..aa53567
+index 0000000..7ed5ed6
 --- /dev/null
-+++ b/tests/guest-debug/test-gdbstub.py
-@@ -0,0 +1,171 @@
-+#
-+# This script needs to be run on startup
-+# qemu -kernel ${KERNEL} -s -S
-+# and then:
-+# gdb ${KERNEL}.vmlinux -x ${QEMU_SRC}/tests/guest-debug/test-gdbstub.py
++++ b/Documentation/devicetree/bindings/arm/secure.txt
+@@ -0,0 +1,51 @@
++* ARM Secure world bindings
 +
-+import gdb
++ARM CPUs with TrustZone support have two distinct address spaces,
++"Normal" and "Secure". Most devicetree consumers (including the Linux
++kernel) are not TrustZone aware and run entirely in either the Normal
++world or the Secure world. However some devicetree consumers are
++TrustZone aware and need to be able to determine whether devices are
++visible only in the Secure address space, only in the Normal address
++space, or visible in both. (One example of that situation would be a
++virtual machine which boots Secure firmware and wants to tell the
++firmware about the layout of the machine via devicetree.)
 +
-+failcount = 0
++The general principle of the naming scheme for Secure world bindings
++is that any property that needs a different value in the Secure world
++can be supported by prefixing the property name with "secure-". So for
++instance "secure-reg" would override "reg". If there is no "secure-"
++property then the Secure world value is the same as specified for the
++Normal world by the non-prefixed property. However, only the
++properties listed below may validly have "secure-" versions; this list
++will be enlarged on a case-by-case basis.
 +
-+def report(cond, msg):
-+    "Report success/fail of test"
-+    if cond:
-+        print "PASS: %s" % (msg)
-+    else:
-+        print "FAIL: %s" % (msg)
-+        failcount += 1
++Defining the bindings in this way means that a device tree which has
++been annotated to indicate the presence of Secure-only devices can
++still be processed unmodified by existing Non-secure software (and in
++particular by the kernel).
 +
-+def check_step():
-+    "Step an instruction, check it moved."
-+    start_pc = gdb.parse_and_eval('$pc')
-+    gdb.execute("si")
-+    end_pc = gdb.parse_and_eval('$pc')
++Note that it is still valid for bindings intended for purely Secure
++world consumers (like kernels that run entirely in Secure) to simply
++describe the view of Secure world using the standard bindings. These
++secure- bindings only need to be used where both the Secure and Normal
++world views need to be described in a single device tree.
 +
-+    return not (start_pc == end_pc)
++Valid Secure world properties:
 +
++- secure-status : specifies whether the device is present and usable
++  in the secure world. The combination of this with "status" allows
++  the various possible combinations of device visibility to be
++  specified. If "secure-status" is not specified it defaults to the
++  same value as "status"; if "status" is not specified either then
++  both default to "okay". This means the following combinations are
++  possible:
 +
-+def check_break(sym_name):
-+    "Setup breakpoint, continue and check we stopped."
-+    sym, ok = gdb.lookup_symbol(sym_name)
-+    bp = gdb.Breakpoint(sym_name)
-+
-+    gdb.execute("c")
-+
-+    # hopefully we came back
-+    end_pc = gdb.parse_and_eval('$pc')
-+    print "%s == %s %d" % (end_pc, sym.value(), bp.hit_count)
-+    bp.delete()
-+
-+    # can we test we hit bp?
-+    return end_pc == sym.value()
-+
-+
-+# We need to do hbreak manually as the python interface doesn't export it
-+def check_hbreak(sym_name):
-+    "Setup hardware breakpoint, continue and check we stopped."
-+    sym, ok = gdb.lookup_symbol(sym_name)
-+    gdb.execute("hbreak %s" % (sym_name))
-+    gdb.execute("c")
-+
-+    # hopefully we came back
-+    end_pc = gdb.parse_and_eval('$pc')
-+    print "%s == %s" % (end_pc, sym.value())
-+
-+    if end_pc == sym.value():
-+        gdb.execute("d 1")
-+        return True
-+    else:
-+        return False
-+
-+
-+class WatchPoint(gdb.Breakpoint):
-+
-+    def get_wpstr(self, sym_name):
-+        "Setup sym and wp_str for given symbol."
-+        self.sym, ok = gdb.lookup_symbol(sym_name)
-+        wp_addr = gdb.parse_and_eval(sym_name).address
-+        self.wp_str = '*(%(type)s)(&%(address)s)' % dict(
-+            type = wp_addr.type, address = sym_name)
-+
-+        return(self.wp_str)
-+
-+    def __init__(self, sym_name, type):
-+        wp_str = self.get_wpstr(sym_name)
-+        super(WatchPoint, self).__init__(wp_str, gdb.BP_WATCHPOINT, type)
-+
-+    def stop(self):
-+        end_pc = gdb.parse_and_eval('$pc')
-+        print "HIT WP @ %s" % (end_pc)
-+        return True
-+
-+
-+def do_one_watch(sym, wtype, text):
-+
-+    wp = WatchPoint(sym, wtype)
-+    gdb.execute("c")
-+    report_str = "%s for %s (%s)" % (text, sym, wp.sym.value())
-+
-+    if wp.hit_count > 0:
-+        report(True, report_str)
-+        wp.delete()
-+    else:
-+        report(False, report_str)
-+
-+
-+def check_watches(sym_name):
-+    "Watch a symbol for any access."
-+
-+    # Should hit for any read
-+    do_one_watch(sym_name, gdb.WP_ACCESS, "awatch")
-+
-+    # Again should hit for reads
-+    do_one_watch(sym_name, gdb.WP_READ, "rwatch")
-+
-+    # Finally when it is written
-+    do_one_watch(sym_name, gdb.WP_WRITE, "watch")
-+
-+
-+class CatchBreakpoint(gdb.Breakpoint):
-+    def __init__(self, sym_name):
-+        super(CatchBreakpoint, self).__init__(sym_name)
-+        self.sym, ok = gdb.lookup_symbol(sym_name)
-+
-+    def stop(self):
-+        end_pc = gdb.parse_and_eval ('$pc')
-+        print "CB: %s == %s" % (end_pc, self.sym.value())
-+        if end_pc == sym.value():
-+            report(False, "Hit final catchpoint")
-+
-+
-+def run_test():
-+    "Run throught the tests one by one"
-+
-+    print "Checking we can step the first few instructions"
-+    step_ok = 0
-+    for i in xrange(3):
-+        if check_step():
-+            step_ok += 1
-+
-+    report(step_ok == 3, "single step in boot code")
-+
-+    print "Checking HW breakpoint works"
-+    break_ok = check_hbreak("kernel_init")
-+    report(break_ok, "hbreak @ kernel_init")
-+
-+    # Can't set this up until we are in the kernel proper
-+    # if we make it to run_init_process we've over-run and
-+    # one of the tests failed
-+    print "Setup catch-all for run_init_process"
-+    cbp = CatchBreakpoint("run_init_process")
-+    cpb2 = CatchBreakpoint("try_to_run_init_process")
-+
-+    print "Checking Normal breakpoint works"
-+    break_ok = check_break("wait_for_completion")
-+    report(break_ok, "break @ wait_for_completion")
-+
-+    print "Checking watchpoint works"
-+    check_watches("system_state")
-+
-+#
-+# This runs as the script it sourced (via -x)
-+#
-+
-+try:
-+    print "Connecting to remote"
-+    gdb.execute("target remote localhost:1234")
-+
-+    # These are not very useful in scripts
-+    gdb.execute("set pagination off")
-+    gdb.execute("set confirm off")
-+
-+    # Run the actual tests
-+    run_test()
-+
-+except:
-+    print "GDB Exception while running test"
-+    failcount += 1
-+
-+# Finally kill the inferior and exit gdb with a count of failures
-+gdb.execute("kill")
-+exit(failcount)
++   /* Neither specified: default to visible in both S and NS */
++   secure-status = "okay";                          /* visible in both */
++   status = "okay";                                 /* visible in both */
++   status = "okay"; secure-status = "okay";         /* visible in both */
++   secure-status = "disabled";                      /* NS-only */
++   status = "okay"; secure-status = "disabled";     /* NS-only */
++   status = "disabled"; secure-status = "okay";     /* S-only */
++   status = "disabled";                             /* disabled in both */
++   status = "disabled"; secure-status = "disabled"; /* disabled in both */
 -- 
-2.6.3
+1.9.1
