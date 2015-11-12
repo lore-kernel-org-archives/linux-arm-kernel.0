@@ -1,101 +1,55 @@
-From: peter.maydell@linaro.org (Peter Maydell)
-Date: Thu, 12 Nov 2015 16:24:50 +0000
-Subject: [PATCH v2] Documentation: dt: Add bindings for Secure-only devices
-Message-ID: <1447345490-29671-1-git-send-email-peter.maydell@linaro.org>
+From: rostedt@goodmis.org (Steven Rostedt)
+Date: Thu, 12 Nov 2015 11:27:41 -0500
+Subject: [PATCH v2] sched/rt: hide push_irq_work_func declaration
+In-Reply-To: <3828565.oKfGk7yNIT@wuerfel>
+References: <3810009.VdDTV0h1Qp@wuerfel>
+	<3828565.oKfGk7yNIT@wuerfel>
+Message-ID: <20151112112741.3cec9496@gandalf.local.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The existing device tree bindings assume that we are only trying to
-describe a single address space with a device tree (for ARM, either
-the Normal or the Secure world). Some uses for device tree need to
-describe both Normal and Secure worlds in a single device tree. Add
-documentation of how to do this, by adding extra properties which
-describe when a device appears differently in the two worlds or when
-it only appears in one of them.
+On Thu, 12 Nov 2015 17:19:58 +0100
+Arnd Bergmann <arnd@arndb.de> wrote:
 
-The binding describes the general principles for adding new
-properties describing the secure world, but for now we only need a
-single new property, "secure-status", which can be used to annotate
-devices to indicate that they are only visible in one of the two
-worlds.
+> The push_irq_work_func() function is conditionally defined only
+> when both CONFIG_SMP and HAVE_RT_PUSH_IPI are defined, but the
+> forward declaration remains visibile without HAVE_RT_PUSH_IPI,
+> causing a gcc warning in ARM64 allnoconfig:
+> 
+> kernel/sched/rt.c:68:13: warning: 'push_irq_work_func' declared 'static' but never defined [-Wunused-function]
+> 
+> This changes the code to use the same condition for both the
+> declaration and the function definition, which gets rid of the
+> warning.
+> 
+> As Peter Zijlstra, we can possibly get rid of the whole HAVE_RT_PUSH_IPI
+> thing after:
+> 8053871d0f7f ("smp: Fix smp_call_function_single_async() locking")
+> 
+> Until that is done, this patch can be used to avoid the warning.
 
-The primary expected use of this binding is for a virtual machine
-like QEMU to describe the VM layout to a TrustZone aware firmware
-(which would then use the secure-only devices itself, and pass the DT
-on to a kernel running in the non-secure world, which ignores the
-secure-only devices and uses the rest).
+Acked-by: Steven Rostedt <rostedt@goodmis.org>
 
-Signed-off-by: Peter Maydell <peter.maydell@linaro.org>
----
-This binding doesn't affect the kernel itself, but the kernel
-Documentation/ tree is the de-facto current place where all DT
-bindings are documented, so Grant suggested this was the right
-place to send a doc patch.
+-- Steve
 
-Changes v1->v2:
- * list all the status/secure-status combinations explicitly
- * use /* */ comment syntax, not //
-
- Documentation/devicetree/bindings/arm/secure.txt | 51 ++++++++++++++++++++++++
- 1 file changed, 51 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/arm/secure.txt
-
-diff --git a/Documentation/devicetree/bindings/arm/secure.txt b/Documentation/devicetree/bindings/arm/secure.txt
-new file mode 100644
-index 0000000..7ed5ed6
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/secure.txt
-@@ -0,0 +1,51 @@
-+* ARM Secure world bindings
-+
-+ARM CPUs with TrustZone support have two distinct address spaces,
-+"Normal" and "Secure". Most devicetree consumers (including the Linux
-+kernel) are not TrustZone aware and run entirely in either the Normal
-+world or the Secure world. However some devicetree consumers are
-+TrustZone aware and need to be able to determine whether devices are
-+visible only in the Secure address space, only in the Normal address
-+space, or visible in both. (One example of that situation would be a
-+virtual machine which boots Secure firmware and wants to tell the
-+firmware about the layout of the machine via devicetree.)
-+
-+The general principle of the naming scheme for Secure world bindings
-+is that any property that needs a different value in the Secure world
-+can be supported by prefixing the property name with "secure-". So for
-+instance "secure-reg" would override "reg". If there is no "secure-"
-+property then the Secure world value is the same as specified for the
-+Normal world by the non-prefixed property. However, only the
-+properties listed below may validly have "secure-" versions; this list
-+will be enlarged on a case-by-case basis.
-+
-+Defining the bindings in this way means that a device tree which has
-+been annotated to indicate the presence of Secure-only devices can
-+still be processed unmodified by existing Non-secure software (and in
-+particular by the kernel).
-+
-+Note that it is still valid for bindings intended for purely Secure
-+world consumers (like kernels that run entirely in Secure) to simply
-+describe the view of Secure world using the standard bindings. These
-+secure- bindings only need to be used where both the Secure and Normal
-+world views need to be described in a single device tree.
-+
-+Valid Secure world properties:
-+
-+- secure-status : specifies whether the device is present and usable
-+  in the secure world. The combination of this with "status" allows
-+  the various possible combinations of device visibility to be
-+  specified. If "secure-status" is not specified it defaults to the
-+  same value as "status"; if "status" is not specified either then
-+  both default to "okay". This means the following combinations are
-+  possible:
-+
-+   /* Neither specified: default to visible in both S and NS */
-+   secure-status = "okay";                          /* visible in both */
-+   status = "okay";                                 /* visible in both */
-+   status = "okay"; secure-status = "okay";         /* visible in both */
-+   secure-status = "disabled";                      /* NS-only */
-+   status = "okay"; secure-status = "disabled";     /* NS-only */
-+   status = "disabled"; secure-status = "okay";     /* S-only */
-+   status = "disabled";                             /* disabled in both */
-+   status = "disabled"; secure-status = "disabled"; /* disabled in both */
--- 
-1.9.1
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Fixes: b6366f048e0c ("sched/rt: Use IPI to trigger RT task push migration instead of pulling")
+> ---
+> Found on arm64 allnoconfig
+> 
+> v2: now using #if defined() instead IS_ENABLED()
+> 
+> diff --git a/kernel/sched/rt.c b/kernel/sched/rt.c
+> index e3cc16312046..ce7b36d6f477 100644
+> --- a/kernel/sched/rt.c
+> +++ b/kernel/sched/rt.c
+> @@ -64,7 +64,7 @@ static void start_rt_bandwidth(struct rt_bandwidth *rt_b)
+>         raw_spin_unlock(&rt_b->rt_runtime_lock);
+>  }
+>  
+> -#ifdef CONFIG_SMP
+> +#if defined(CONFIG_SMP) && defined(HAVE_RT_PUSH_IPI)
+>  static void push_irq_work_func(struct irq_work *work);
+>  #endif
+>  
