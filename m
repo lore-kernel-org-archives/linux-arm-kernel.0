@@ -1,121 +1,684 @@
 From: okaya@codeaurora.org (Sinan Kaya)
-Date: Thu, 12 Nov 2015 01:41:16 -0500
-Subject: [PATCH V4 1/4] dma: qcom_bam_dma: move to qcom directory
+Date: Thu, 12 Nov 2015 01:41:18 -0500
+Subject: [PATCH V4 3/4] dmaselftest: add memcpy selftest support functions
 In-Reply-To: <1447310481-25463-1-git-send-email-okaya@codeaurora.org>
 References: <1447310481-25463-1-git-send-email-okaya@codeaurora.org>
-Message-ID: <1447310481-25463-2-git-send-email-okaya@codeaurora.org>
+Message-ID: <1447310481-25463-4-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Creating a QCOM directory for all QCOM DMA source
-files.
+This patch adds supporting utility functions for selftest.
+The intention is to share the self test code between
+different drivers.
+
+Supported test cases include:
+1. dma_map_single
+2. streaming DMA
+3. coherent DMA
+4. scatter-gather DMA
 
 Signed-off-by: Sinan Kaya <okaya@codeaurora.org>
 ---
- drivers/dma/Kconfig                            | 11 ++---------
- drivers/dma/Makefile                           |  2 +-
- drivers/dma/qcom/Kconfig                       |  9 +++++++++
- drivers/dma/qcom/Makefile                      |  1 +
- drivers/dma/{qcom_bam_dma.c => qcom/bam_dma.c} |  6 +++---
- 5 files changed, 16 insertions(+), 13 deletions(-)
- create mode 100644 drivers/dma/qcom/Kconfig
- create mode 100644 drivers/dma/qcom/Makefile
- rename drivers/dma/{qcom_bam_dma.c => qcom/bam_dma.c} (99%)
+ drivers/dma/dmaengine.h   |   2 +
+ drivers/dma/dmaselftest.c | 638 ++++++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 640 insertions(+)
+ create mode 100644 drivers/dma/dmaselftest.c
 
-diff --git a/drivers/dma/Kconfig b/drivers/dma/Kconfig
-index b458475..47b1b98 100644
---- a/drivers/dma/Kconfig
-+++ b/drivers/dma/Kconfig
-@@ -408,15 +408,6 @@ config PXA_DMA
- 	  16 to 32 channels for peripheral to memory or memory to memory
- 	  transfers.
+diff --git a/drivers/dma/dmaengine.h b/drivers/dma/dmaengine.h
+index 17f983a..05b5a84 100644
+--- a/drivers/dma/dmaengine.h
++++ b/drivers/dma/dmaengine.h
+@@ -86,4 +86,6 @@ static inline void dma_set_residue(struct dma_tx_state *state, u32 residue)
+ 		state->residue = residue;
+ }
  
--config QCOM_BAM_DMA
--	tristate "QCOM BAM DMA support"
--	depends on ARCH_QCOM || (COMPILE_TEST && OF && ARM)
--	select DMA_ENGINE
--	select DMA_VIRTUAL_CHANNELS
--	---help---
--	  Enable support for the QCOM BAM DMA controller.  This controller
--	  provides DMA capabilities for a variety of on-chip devices.
--
- config SIRF_DMA
- 	tristate "CSR SiRFprimaII/SiRFmarco DMA support"
- 	depends on ARCH_SIRF
-@@ -527,6 +518,8 @@ config ZX_DMA
- # driver files
- source "drivers/dma/bestcomm/Kconfig"
- 
-+source "drivers/dma/qcom/Kconfig"
++int dma_selftest_memcpy(struct dma_device *dmadev);
 +
- source "drivers/dma/dw/Kconfig"
- 
- source "drivers/dma/hsu/Kconfig"
-diff --git a/drivers/dma/Makefile b/drivers/dma/Makefile
-index 7711a71..8dba90d 100644
---- a/drivers/dma/Makefile
-+++ b/drivers/dma/Makefile
-@@ -52,7 +52,6 @@ obj-$(CONFIG_PCH_DMA) += pch_dma.o
- obj-$(CONFIG_PL330_DMA) += pl330.o
- obj-$(CONFIG_PPC_BESTCOMM) += bestcomm/
- obj-$(CONFIG_PXA_DMA) += pxa_dma.o
--obj-$(CONFIG_QCOM_BAM_DMA) += qcom_bam_dma.o
- obj-$(CONFIG_RENESAS_DMA) += sh/
- obj-$(CONFIG_SIRF_DMA) += sirf-dma.o
- obj-$(CONFIG_STE_DMA40) += ste_dma40.o ste_dma40_ll.o
-@@ -66,4 +65,5 @@ obj-$(CONFIG_TI_EDMA) += edma.o
- obj-$(CONFIG_XGENE_DMA) += xgene-dma.o
- obj-$(CONFIG_ZX_DMA) += zx296702_dma.o
- 
-+obj-y += qcom/
- obj-y += xilinx/
-diff --git a/drivers/dma/qcom/Kconfig b/drivers/dma/qcom/Kconfig
+ #endif
+diff --git a/drivers/dma/dmaselftest.c b/drivers/dma/dmaselftest.c
 new file mode 100644
-index 0000000..17545df
+index 0000000..423a9a3
 --- /dev/null
-+++ b/drivers/dma/qcom/Kconfig
-@@ -0,0 +1,9 @@
-+config QCOM_BAM_DMA
-+	tristate "QCOM BAM DMA support"
-+	depends on ARCH_QCOM || (COMPILE_TEST && OF && ARM)
-+	select DMA_ENGINE
-+	select DMA_VIRTUAL_CHANNELS
-+	---help---
-+	  Enable support for the QCOM BAM DMA controller.  This controller
-+	  provides DMA capabilities for a variety of on-chip devices.
++++ b/drivers/dma/dmaselftest.c
+@@ -0,0 +1,638 @@
++/*
++ * DMA self test code borrowed from Qualcomm Technologies HIDMA driver
++ *
++ * Copyright (c) 2015, The Linux Foundation. All rights reserved.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 and
++ * only version 2 as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
 +
-diff --git a/drivers/dma/qcom/Makefile b/drivers/dma/qcom/Makefile
-new file mode 100644
-index 0000000..f612ae3
---- /dev/null
-+++ b/drivers/dma/qcom/Makefile
-@@ -0,0 +1 @@
-+obj-$(CONFIG_QCOM_BAM_DMA) += bam_dma.o
-diff --git a/drivers/dma/qcom_bam_dma.c b/drivers/dma/qcom/bam_dma.c
-similarity index 99%
-rename from drivers/dma/qcom_bam_dma.c
-rename to drivers/dma/qcom/bam_dma.c
-index 5a250cd..5359234 100644
---- a/drivers/dma/qcom_bam_dma.c
-+++ b/drivers/dma/qcom/bam_dma.c
-@@ -1,5 +1,5 @@
- /*
-- * Copyright (c) 2013-2014, The Linux Foundation. All rights reserved.
-+ * Copyright (c) 2013-2015, The Linux Foundation. All rights reserved.
-  *
-  * This program is free software; you can redistribute it and/or modify
-  * it under the terms of the GNU General Public License version 2 and
-@@ -49,8 +49,8 @@
- #include <linux/clk.h>
- #include <linux/dmaengine.h>
- 
--#include "dmaengine.h"
--#include "virt-dma.h"
-+#include "../dmaengine.h"
-+#include "../virt-dma.h"
- 
- struct bam_desc_hw {
- 	u32 addr;		/* Buffer physical address */
++#include <linux/dmaengine.h>
++#include <linux/dma-mapping.h>
++#include <linux/list.h>
++#include <linux/atomic.h>
++#include <linux/wait.h>
++#include <linux/sched.h>
++#include <linux/slab.h>
++
++struct test_result {
++	atomic_t counter;
++	wait_queue_head_t wq;
++	struct dma_device *dma;
++};
++
++static void dma_selftest_complete(void *arg)
++{
++	struct test_result *result = arg;
++	struct dma_device *dma = result->dma;
++
++	atomic_inc(&result->counter);
++	wake_up(&result->wq);
++	dev_dbg(dma->dev, "self test transfer complete :%d\n",
++		atomic_read(&result->counter));
++}
++
++/*
++ * Perform a transaction to verify the HW works.
++ */
++static int dma_selftest_sg(struct dma_device *dma,
++			struct dma_chan *chan, u64 size,
++			unsigned long flags)
++{
++	struct dma_async_tx_descriptor *tx;
++	struct sg_table sg_table;
++	struct scatterlist *sg;
++	struct test_result result;
++	dma_addr_t src, dest, dest_it;
++	u8 *src_buf, *dest_buf;
++	unsigned int i, j;
++	dma_cookie_t cookie;
++	int err;
++	int nents = 10, count;
++	bool free_channel = true;
++	int map_count;
++
++	init_waitqueue_head(&result.wq);
++	atomic_set(&result.counter, 0);
++	result.dma = dma;
++
++	if (!chan)
++		return -ENOMEM;
++
++	if (dma->device_alloc_chan_resources(chan) < 1)
++		return -ENODEV;
++
++	if (!chan->device || !dma->dev) {
++		dma->device_free_chan_resources(chan);
++		return -ENODEV;
++	}
++
++	err = sg_alloc_table(&sg_table, nents, GFP_KERNEL);
++	if (err)
++		goto sg_table_alloc_failed;
++
++	for_each_sg(sg_table.sgl, sg, nents, i) {
++		u64 alloc_sz;
++		void *cpu_addr;
++
++		alloc_sz = round_up(size, nents);
++		do_div(alloc_sz, nents);
++		cpu_addr = kmalloc(alloc_sz, GFP_KERNEL);
++
++		if (!cpu_addr) {
++			err = -ENOMEM;
++			goto sg_buf_alloc_failed;
++		}
++
++		dev_dbg(dma->dev, "set sg buf[%d] :%p\n", i, cpu_addr);
++		sg_set_buf(sg, cpu_addr, alloc_sz);
++	}
++
++	dest_buf = kmalloc(round_up(size, nents), GFP_KERNEL);
++	if (!dest_buf) {
++		err = -ENOMEM;
++		goto dst_alloc_failed;
++	}
++	dev_dbg(dma->dev, "dest:%p\n", dest_buf);
++
++	/* Fill in src buffer */
++	count = 0;
++	for_each_sg(sg_table.sgl, sg, nents, i) {
++		src_buf = sg_virt(sg);
++		dev_dbg(dma->dev,
++			"set src[%d, %p] = %d\n", i, src_buf, count);
++
++		for (j = 0; j < sg_dma_len(sg); j++)
++			src_buf[j] = count++;
++	}
++
++	/* dma_map_sg cleans and invalidates the cache in arm64 when
++	 * DMA_TO_DEVICE is selected for src. That's why, we need to do
++	 * the mapping after the data is copied.
++	 */
++	map_count = dma_map_sg(dma->dev, sg_table.sgl, nents, DMA_TO_DEVICE);
++	if (!map_count) {
++		err =  -EINVAL;
++		goto src_map_failed;
++	}
++
++	dest = dma_map_single(dma->dev, dest_buf, size, DMA_FROM_DEVICE);
++
++	err = dma_mapping_error(dma->dev, dest);
++	if (err)
++		goto dest_map_failed;
++
++	/* check scatter gather list contents */
++	for_each_sg(sg_table.sgl, sg, map_count, i)
++		dev_dbg(dma->dev, "[%d/%d] src va=%p, iova = %pa len:%d\n",
++			i, map_count, sg_virt(sg), &sg_dma_address(sg),
++			sg_dma_len(sg));
++
++	dest_it = dest;
++	for_each_sg(sg_table.sgl, sg, map_count, i) {
++		src_buf = sg_virt(sg);
++		src = sg_dma_address(sg);
++		dev_dbg(dma->dev, "src: %pad dest:%pad\n",
++			&src, &dest_it);
++
++		tx = dma->device_prep_dma_memcpy(chan, dest_it, src,
++					sg_dma_len(sg), flags);
++		if (!tx) {
++			dev_err(dma->dev,
++				"Self-test sg failed, disabling\n");
++			err = -ENODEV;
++			goto prep_memcpy_failed;
++		}
++
++		tx->callback_param = &result;
++		tx->callback = dma_selftest_complete;
++		cookie = tx->tx_submit(tx);
++		dest_it += sg_dma_len(sg);
++	}
++
++	dma->device_issue_pending(chan);
++
++	/*
++	 * It is assumed that the hardware can move the data within 1s
++	 * and signal the OS of the completion
++	 */
++	err = wait_event_timeout(result.wq,
++				atomic_read(&result.counter) == (map_count),
++				msecs_to_jiffies(10000));
++
++	if (err <= 0) {
++		dev_err(dma->dev, "Self-test sg copy timed out, disabling\n");
++		err = -ENODEV;
++		goto tx_status;
++	}
++	err = 0;
++	dev_dbg(dma->dev,
++		"Self-test complete signal received\n");
++
++	if (dma->device_tx_status(chan, cookie, NULL) != DMA_COMPLETE) {
++		dev_err(dma->dev,
++			"Self-test sg status not complete, disabling\n");
++		err = -ENODEV;
++		goto tx_status;
++	}
++
++	dma_sync_single_for_cpu(dma->dev, dest, size, DMA_FROM_DEVICE);
++
++	count = 0;
++	for_each_sg(sg_table.sgl, sg, map_count, i) {
++		src_buf = sg_virt(sg);
++		if (memcmp(src_buf, &dest_buf[count], sg_dma_len(sg)) == 0) {
++			count += sg_dma_len(sg);
++			continue;
++		}
++
++		for (j = 0; j < sg_dma_len(sg); j++) {
++			if (src_buf[j] != dest_buf[count]) {
++				dev_dbg(dma->dev,
++				"[%d, %d] (%p) src :%x dest (%p):%x cnt:%d\n",
++					i, j, &src_buf[j], src_buf[j],
++					&dest_buf[count], dest_buf[count],
++					count);
++				dev_err(dma->dev,
++				 "Self-test copy failed compare, disabling\n");
++				err = -EFAULT;
++				goto compare_failed;
++			}
++			count++;
++		}
++	}
++
++	/*
++	 * do not release the channel
++	 * we want to consume all the channels on self test
++	 */
++	free_channel = false;
++
++compare_failed:
++tx_status:
++prep_memcpy_failed:
++	dma_unmap_single(dma->dev, dest, size, DMA_FROM_DEVICE);
++dest_map_failed:
++	dma_unmap_sg(dma->dev, sg_table.sgl, nents, DMA_TO_DEVICE);
++
++src_map_failed:
++	kfree(dest_buf);
++
++dst_alloc_failed:
++sg_buf_alloc_failed:
++	for_each_sg(sg_table.sgl, sg, nents, i) {
++		if (sg_virt(sg))
++			kfree(sg_virt(sg));
++	}
++	sg_free_table(&sg_table);
++sg_table_alloc_failed:
++	if (free_channel)
++		dma->device_free_chan_resources(chan);
++
++	return err;
++}
++
++/*
++ * Perform a streaming transaction to verify the HW works.
++ */
++static int dma_selftest_streaming(struct dma_device *dma,
++			struct dma_chan *chan, u64 size,
++			unsigned long flags)
++{
++	struct dma_async_tx_descriptor *tx;
++	struct test_result result;
++	dma_addr_t src, dest;
++	u8 *dest_buf, *src_buf;
++	unsigned int i;
++	dma_cookie_t cookie;
++	int err;
++	bool free_channel = true;
++
++	init_waitqueue_head(&result.wq);
++	atomic_set(&result.counter, 0);
++	result.dma = dma;
++
++	if (!chan)
++		return -ENOMEM;
++
++	if (dma->device_alloc_chan_resources(chan) < 1)
++		return -ENODEV;
++
++	if (!chan->device || !dma->dev) {
++		dma->device_free_chan_resources(chan);
++		return -ENODEV;
++	}
++
++	src_buf = kmalloc(size, GFP_KERNEL);
++	if (!src_buf) {
++		err = -ENOMEM;
++		goto src_alloc_failed;
++	}
++
++	dest_buf = kmalloc(size, GFP_KERNEL);
++	if (!dest_buf) {
++		err = -ENOMEM;
++		goto dst_alloc_failed;
++	}
++
++	dev_dbg(dma->dev, "src: %p dest:%p\n", src_buf, dest_buf);
++
++	/* Fill in src buffer */
++	for (i = 0; i < size; i++)
++		src_buf[i] = (u8)i;
++
++	/* dma_map_single cleans and invalidates the cache in arm64 when
++	 * DMA_TO_DEVICE is selected for src. That's why, we need to do
++	 * the mapping after the data is copied.
++	 */
++	src = dma_map_single(dma->dev, src_buf, size, DMA_TO_DEVICE);
++
++	err = dma_mapping_error(dma->dev, src);
++	if (err)
++		goto src_map_failed;
++
++	dest = dma_map_single(dma->dev, dest_buf, size, DMA_FROM_DEVICE);
++
++	err = dma_mapping_error(dma->dev, dest);
++	if (err)
++		goto dest_map_failed;
++	dev_dbg(dma->dev, "src: %pad dest:%pad\n", &src, &dest);
++	tx = dma->device_prep_dma_memcpy(chan, dest, src,
++					size, flags);
++	if (!tx) {
++		dev_err(dma->dev, "Self-test streaming failed, disabling\n");
++		err = -ENODEV;
++		goto prep_memcpy_failed;
++	}
++
++	tx->callback_param = &result;
++	tx->callback = dma_selftest_complete;
++	cookie = tx->tx_submit(tx);
++	dma->device_issue_pending(chan);
++
++	/*
++	 * It is assumed that the hardware can move the data within 1s
++	 * and signal the OS of the completion
++	 */
++	err = wait_event_timeout(result.wq,
++				atomic_read(&result.counter) == 1,
++				msecs_to_jiffies(10000));
++
++	if (err <= 0) {
++		dev_err(dma->dev, "Self-test copy timed out, disabling\n");
++		err = -ENODEV;
++		goto tx_status;
++	}
++	err = 0;
++	dev_dbg(dma->dev, "Self-test complete signal received\n");
++
++	if (dma->device_tx_status(chan, cookie, NULL) != DMA_COMPLETE) {
++		dev_err(dma->dev,
++			"Self-test copy timed out, disabling\n");
++		err = -ENODEV;
++		goto tx_status;
++	}
++
++	dma_sync_single_for_cpu(dma->dev, dest, size, DMA_FROM_DEVICE);
++
++	if (memcmp(src_buf, dest_buf, size)) {
++		for (i = 0; i < size/4; i++) {
++			if (((u32 *)src_buf)[i] != ((u32 *)(dest_buf))[i]) {
++				dev_dbg(dma->dev,
++					"[%d] src data:%x dest data:%x\n",
++					i, ((u32 *)src_buf)[i],
++					((u32 *)(dest_buf))[i]);
++				break;
++			}
++		}
++		dev_err(dma->dev,
++			"Self-test copy failed compare, disabling\n");
++		err = -EFAULT;
++		goto compare_failed;
++	}
++
++	/*
++	 * do not release the channel
++	 * we want to consume all the channels on self test
++	 */
++	free_channel = false;
++
++compare_failed:
++tx_status:
++prep_memcpy_failed:
++	dma_unmap_single(dma->dev, dest, size,
++			 DMA_FROM_DEVICE);
++dest_map_failed:
++	dma_unmap_single(dma->dev, src, size,
++			DMA_TO_DEVICE);
++
++src_map_failed:
++	kfree(dest_buf);
++
++dst_alloc_failed:
++	kfree(src_buf);
++
++src_alloc_failed:
++	if (free_channel)
++		dma->device_free_chan_resources(chan);
++
++	return err;
++}
++
++/*
++ * Perform a coherent transaction to verify the HW works.
++ */
++static int dma_selftest_one_coherent(struct dma_device *dma,
++			struct dma_chan *chan, u64 size, unsigned long flags)
++{
++	struct dma_async_tx_descriptor *tx;
++	struct test_result result;
++	dma_addr_t src, dest;
++	u8 *dest_buf, *src_buf;
++	unsigned int i;
++	dma_cookie_t cookie;
++	int err;
++	bool free_channel = true;
++
++	init_waitqueue_head(&result.wq);
++	atomic_set(&result.counter, 0);
++	result.dma = dma;
++
++	if (!chan)
++		return -ENOMEM;
++
++	if (dma->device_alloc_chan_resources(chan) < 1)
++		return -ENODEV;
++
++	if (!chan->device || !dma->dev) {
++		dma->device_free_chan_resources(chan);
++		return -ENODEV;
++	}
++
++	src_buf = dma_alloc_coherent(dma->dev, size, &src, GFP_KERNEL);
++	if (!src_buf) {
++		err = -ENOMEM;
++		goto src_alloc_failed;
++	}
++
++	dest_buf = dma_alloc_coherent(dma->dev, size, &dest, GFP_KERNEL);
++	if (!dest_buf) {
++		err = -ENOMEM;
++		goto dst_alloc_failed;
++	}
++
++	dev_dbg(dma->dev, "src: %p dest:%p\n", src_buf, dest_buf);
++
++	/* Fill in src buffer */
++	for (i = 0; i < size; i++)
++		src_buf[i] = (u8)i;
++
++	dev_dbg(dma->dev, "src: %pad dest:%pad\n", &src, &dest);
++	tx = dma->device_prep_dma_memcpy(chan, dest, src, size, flags);
++	if (!tx) {
++		dev_err(dma->dev, "Self-test coherent failed, disabling\n");
++		err = -ENODEV;
++		goto prep_memcpy_failed;
++	}
++
++	tx->callback_param = &result;
++	tx->callback = dma_selftest_complete;
++	cookie = tx->tx_submit(tx);
++	dma->device_issue_pending(chan);
++
++	/*
++	 * It is assumed that the hardware can move the data within 1s
++	 * and signal the OS of the completion
++	 */
++	err = wait_event_timeout(result.wq,
++				atomic_read(&result.counter) == 1,
++				msecs_to_jiffies(10000));
++
++	if (err <= 0) {
++		dev_err(dma->dev, "Self-test copy timed out, disabling\n");
++		err = -ENODEV;
++		goto tx_status;
++	}
++	err = 0;
++	dev_dbg(dma->dev, "Self-test complete signal received\n");
++
++	if (dma->device_tx_status(chan, cookie, NULL) != DMA_COMPLETE) {
++		dev_err(dma->dev,
++			"Self-test copy timed out, disabling\n");
++		err = -ENODEV;
++		goto tx_status;
++	}
++
++	if (memcmp(src_buf, dest_buf, size)) {
++		for (i = 0; i < size/4; i++) {
++			if (((u32 *)src_buf)[i] != ((u32 *)(dest_buf))[i]) {
++				dev_dbg(dma->dev,
++					"[%d] src data:%x dest data:%x\n",
++					i, ((u32 *)src_buf)[i],
++					((u32 *)(dest_buf))[i]);
++				break;
++			}
++		}
++		dev_err(dma->dev,
++			"Self-test copy failed compare, disabling\n");
++		err = -EFAULT;
++		goto compare_failed;
++	}
++
++	/*
++	 * do not release the channel
++	 * we want to consume all the channels on self test
++	 */
++	free_channel = false;
++
++compare_failed:
++tx_status:
++prep_memcpy_failed:
++	dma_free_coherent(dma->dev, size, dest_buf, dest);
++
++dst_alloc_failed:
++	dma_free_coherent(dma->dev, size, src_buf, src);
++
++src_alloc_failed:
++	if (free_channel)
++		dma->device_free_chan_resources(chan);
++
++	return err;
++}
++
++static int dma_selftest_all(struct dma_device *dma,
++				bool req_coherent, bool req_sg)
++{
++	struct dma_chan **dmach_ptr;
++	struct dma_chan *dmach;
++	unsigned int i, j;
++	u32 max_channels = 0;
++	u64 sizes[] = {PAGE_SIZE - 1, PAGE_SIZE, PAGE_SIZE + 1, 2801, 13295};
++	int count;
++	u64 size;
++	int rc;
++	int failed = 0;
++
++	list_for_each_entry(dmach, &dma->channels, device_node) {
++		max_channels++;
++	}
++
++	dmach_ptr = kcalloc(max_channels, sizeof(*dmach_ptr), GFP_KERNEL);
++	if (!dmach_ptr) {
++		rc = -ENOMEM;
++		goto failed_exit;
++	}
++
++	for (j = 0; j < ARRAY_SIZE(sizes); j++) {
++		size = sizes[j];
++		count = 0;
++		dev_dbg(dma->dev, "test start for size:%llx\n", size);
++		list_for_each_entry(dmach, &dma->channels, device_node) {
++			dmach_ptr[count] = dmach;
++			if (req_coherent)
++				rc = dma_selftest_one_coherent(dma, dmach,
++					size,
++					DMA_PREP_INTERRUPT | DMA_CTRL_ACK);
++			else if (req_sg)
++				rc = dma_selftest_sg(dma, dmach, size,
++					DMA_PREP_INTERRUPT | DMA_CTRL_ACK);
++			else
++				rc = dma_selftest_streaming(dma, dmach, size,
++					DMA_PREP_INTERRUPT | DMA_CTRL_ACK);
++			if (rc) {
++				failed = 1;
++				break;
++			}
++			dev_dbg(dma->dev,
++				"self test passed for ch:%d\n", count);
++			count++;
++		}
++
++		/*
++		 * free the channels where the test passed
++		 * Channel resources are freed for a test that fails.
++		 */
++		for (i = 0; i < count; i++)
++			dma->device_free_chan_resources(dmach_ptr[i]);
++
++		if (failed)
++			break;
++	}
++
++	rc = 0;
++
++failed_exit:
++	kfree(dmach_ptr);
++
++	return rc;
++}
++
++static int dma_selftest_mapsngle(struct device *dev)
++{
++	u32 buf_size = 256;
++	dma_addr_t dma_src;
++	char *src;
++	int ret;
++
++	src = kmalloc(buf_size, GFP_KERNEL);
++	if (!src)
++		return -ENOMEM;
++
++	strcpy(src, "hello world");
++
++	dma_src = dma_map_single(dev, src, buf_size, DMA_TO_DEVICE);
++	dev_dbg(dev, "mapsingle: src:%p src:%pad\n", src, &dma_src);
++
++	ret = dma_mapping_error(dev, dma_src);
++	if (ret)
++		dev_err(dev, "dma_mapping_error with ret:%d\n", ret);
++	else {
++		if (strcmp(src, "hello world") != 0) {
++			dev_err(dev, "memory content mismatch\n");
++			ret = -EINVAL;
++		} else
++			dev_dbg(dev, "mapsingle:dma_map_single works\n");
++
++		dma_unmap_single(dev, dma_src, buf_size, DMA_TO_DEVICE);
++	}
++	kfree(src);
++	return ret;
++}
++
++/*
++ * Self test all DMA channels.
++ */
++int dma_selftest_memcpy(struct dma_device *dma)
++{
++	int rc;
++
++	dma_selftest_mapsngle(dma->dev);
++
++	/* streaming test */
++	rc = dma_selftest_all(dma, false, false);
++	if (rc)
++		return rc;
++	dev_dbg(dma->dev, "streaming self test passed\n");
++
++	/* coherent test */
++	rc = dma_selftest_all(dma, true, false);
++	if (rc)
++		return rc;
++
++	dev_dbg(dma->dev, "coherent self test passed\n");
++
++	/* scatter gather test */
++	rc = dma_selftest_all(dma, false, true);
++	if (rc)
++		return rc;
++
++	dev_dbg(dma->dev, "scatter gather self test passed\n");
++	return 0;
++}
++EXPORT_SYMBOL_GPL(dma_selftest_memcpy);
 -- 
 Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc.
 Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux Foundation Collaborative Project
