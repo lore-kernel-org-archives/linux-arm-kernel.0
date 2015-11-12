@@ -1,36 +1,57 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 12 Nov 2015 15:22:22 +0100
-Subject: [PATCH] sched/rt: hide push_irq_work_func declaration
-Message-ID: <3810009.VdDTV0h1Qp@wuerfel>
+Date: Thu, 12 Nov 2015 15:24:29 +0100
+Subject: [PATCH] clk: st: avoid uninitialized variable use
+Message-ID: <3719029.IbREgssWiU@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The push_irq_work_func() function is conditionally defined only
-when both CONFIG_SMP and HAVE_RT_PUSH_IPI are defined, but the
-forward declaration remains visibile without HAVE_RT_PUSH_IPI,
-causing a gcc warning in ARM64 allnoconfig:
+quadfs_pll_fs660c32_round_rate prints a few structure members
+that are never initialized, and also doesn't print the only one
+it cares about. We get a gcc warning about the ones that
+are printed:
 
-kernel/sched/rt.c:68:13: warning: 'push_irq_work_func' declared 'static' but never defined [-Wunused-function]
+clk/st/clkgen-fsyn.c:560:93: warning: 'params.sdiv' may be used uninitialized in this function
+clk/st/clkgen-fsyn.c:560:93: warning: 'params.mdiv' may be used uninitialized in this function
+clk/st/clkgen-fsyn.c:560:93: warning: 'params.pe' may be used uninitialized in this function
+clk/st/clkgen-fsyn.c:560:93: warning: 'params.nsdiv' may be used uninitialized in this function
 
-This changes the code to use the same condition for both the
-declaration and the function definition, which gets rid of the
-warning.
+This changes the code to no longer print uninitialized data, and
+for good measure it also prints the ndiv member that is being
+set.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: b6366f048e0c ("sched/rt: Use IPI to trigger RT task push migration instead of pulling")
----
-Found on arm64 allnoconfig
+Fixes: 5f7aa9071e93 ("clk: st: Support for QUADFS inside ClockGenB/C/D/E/F")
 
-diff --git a/kernel/sched/rt.c b/kernel/sched/rt.c
-index e3cc16312046..ce7b36d6f477 100644
---- a/kernel/sched/rt.c
-+++ b/kernel/sched/rt.c
-@@ -64,7 +64,7 @@ static void start_rt_bandwidth(struct rt_bandwidth *rt_b)
- 	raw_spin_unlock(&rt_b->rt_runtime_lock);
+diff --git a/drivers/clk/st/clkgen-fsyn.c b/drivers/clk/st/clkgen-fsyn.c
+index 576cd0354d48..ccb324d97160 100644
+--- a/drivers/clk/st/clkgen-fsyn.c
++++ b/drivers/clk/st/clkgen-fsyn.c
+@@ -549,19 +549,20 @@ static int clk_fs660c32_vco_get_params(unsigned long input,
+ 	return 0;
  }
  
--#ifdef CONFIG_SMP
-+#if IS_ENABLED(CONFIG_SMP) && defined(HAVE_RT_PUSH_IPI)
- static void push_irq_work_func(struct irq_work *work);
- #endif
+-static long quadfs_pll_fs660c32_round_rate(struct clk_hw *hw, unsigned long rate
+-		, unsigned long *prate)
++static long quadfs_pll_fs660c32_round_rate(struct clk_hw *hw,
++					   unsigned long rate,
++					   unsigned long *prate)
+ {
+ 	struct stm_fs params;
  
+-	if (!clk_fs660c32_vco_get_params(*prate, rate, &params))
+-		clk_fs660c32_vco_get_rate(*prate, &params, &rate);
++	if (clk_fs660c32_vco_get_params(*prate, rate, &params))
++		return rate;
+ 
+-	pr_debug("%s: %s new rate %ld [sdiv=0x%x,md=0x%x,pe=0x%x,nsdiv3=%u]\n",
++	clk_fs660c32_vco_get_rate(*prate, &params, &rate);
++
++	pr_debug("%s: %s new rate %ld [ndiv=%u]\n",
+ 		 __func__, clk_hw_get_name(hw),
+-		 rate, (unsigned int)params.sdiv,
+-		 (unsigned int)params.mdiv,
+-		 (unsigned int)params.pe, (unsigned int)params.nsdiv);
++		 rate, (unsigned int)params.ndiv);
+ 
+ 	return rate;
+ }
