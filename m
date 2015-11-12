@@ -1,63 +1,62 @@
-From: vigneshr@ti.com (Vignesh R)
-Date: Thu, 12 Nov 2015 10:02:56 +0530
-Subject: [PATCH v3 1/5] spi: introduce mmap read support for spi flash
- devices
-In-Reply-To: <20151111192441.GG12143@google.com>
-References: <1447133399-25658-1-git-send-email-vigneshr@ti.com>
- <1447133399-25658-2-git-send-email-vigneshr@ti.com>
- <20151111192441.GG12143@google.com>
-Message-ID: <56441678.6040504@ti.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Thu, 12 Nov 2015 13:35:18 +0900
+Subject: [PATCH v4 9/9] drivers: soc: Add support for Exynos PMU driver
+In-Reply-To: <1447155784-12667-10-git-send-email-pankaj.dubey@samsung.com>
+References: <1447155784-12667-1-git-send-email-pankaj.dubey@samsung.com>
+ <1447155784-12667-10-git-send-email-pankaj.dubey@samsung.com>
+Message-ID: <56441706.5070206@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Brian,
-
-On 11/12/2015 12:54 AM, Brian Norris wrote:
-> In addition to my other comments:
+On 10.11.2015 20:43, Pankaj Dubey wrote:
+> This patch moves Exynos PMU driver implementation from "arm/mach-exynos"
+> to "drivers/soc/samsung". This driver is mainly used for setting misc
+> bits of register from PMU IP of Exynos SoC which will be required to
+> configure before Suspend/Resume. Currently all these settings are done
+> in "arch/arm/mach-exynos/pmu.c" but moving ahead for ARM64 based SoC
+> support, there is a need of this PMU driver in driver/* folder.
 > 
-
-[...]
-
->> +	int (*spi_mtd_mmap_read)(struct  spi_device *spi,
->> +				 loff_t from, size_t len,
->> +				 size_t *retlen, u_char *buf,
->> +				 u8 read_opcode, u8 addr_width,
->> +				 u8 dummy_bytes);
+> This driver uses existing DT binding information and there should
+> be no functionality change in the supported platforms.
 > 
-> This is seeming to be a longer and longer list of arguments. I know MTD
-> has a bad habit of long argument lists (which then cause a ton of
-> unnecessary churn when things need changed in the API), but perhaps we
-> can limit the damage to the SPI layer. Perhaps this deserves a struct to
-> encapsulate all the flash read arguments? Like:
-> 
-> struct spi_flash_read_message {
-> 	loff_t from;
-> 	size_t len;
-> 	size_t *retlen;
-> 	void *buf;
-> 	u8 read_opcode;
-> 	u8 addr_width;
-> 	u8 dummy_bits;
-> 	// additional fields to describe rx_nbits for opcode/addr/data
-> };
-> 
-> struct spi_master {
-> 	...
-> 	int (*spi_flash_read)(struct spi_device *spi,
-> 			      struct spi_flash_message *msg);
-> };
+> Signed-off-by: Amit Daniel Kachhap <amitdanielk@gmail.com>
+> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+> ---
+>  arch/arm/mach-exynos/Kconfig          |   1 +
+>  arch/arm/mach-exynos/Makefile         |   4 +-
+>  arch/arm/mach-exynos/exynos-pmu.h     |  45 ------
+>  arch/arm/mach-exynos/exynos3250-pmu.c | 175 ---------------------
+>  arch/arm/mach-exynos/exynos4-pmu.c    | 223 ---------------------------
+>  arch/arm/mach-exynos/exynos5250-pmu.c | 196 ------------------------
+>  arch/arm/mach-exynos/exynos5420-pmu.c | 280 ----------------------------------
+>  arch/arm/mach-exynos/pmu.c            | 183 ----------------------
+>  drivers/soc/samsung/Kconfig           |   4 +
+>  drivers/soc/samsung/Makefile          |   4 +
+>  drivers/soc/samsung/exynos-pmu.c      | 183 ++++++++++++++++++++++
+>  drivers/soc/samsung/exynos-pmu.h      |  45 ++++++
+>  drivers/soc/samsung/exynos3250-pmu.c  | 175 +++++++++++++++++++++
+>  drivers/soc/samsung/exynos4-pmu.c     | 223 +++++++++++++++++++++++++++
+>  drivers/soc/samsung/exynos5250-pmu.c  | 196 ++++++++++++++++++++++++
+>  drivers/soc/samsung/exynos5420-pmu.c  | 280 ++++++++++++++++++++++++++++++++++
+>  16 files changed, 1112 insertions(+), 1105 deletions(-)
+>  delete mode 100644 arch/arm/mach-exynos/exynos-pmu.h
+>  delete mode 100644 arch/arm/mach-exynos/exynos3250-pmu.c
+>  delete mode 100644 arch/arm/mach-exynos/exynos4-pmu.c
+>  delete mode 100644 arch/arm/mach-exynos/exynos5250-pmu.c
+>  delete mode 100644 arch/arm/mach-exynos/exynos5420-pmu.c
+>  delete mode 100644 arch/arm/mach-exynos/pmu.c
+>  create mode 100644 drivers/soc/samsung/exynos-pmu.c
+>  create mode 100644 drivers/soc/samsung/exynos-pmu.h
+>  create mode 100644 drivers/soc/samsung/exynos3250-pmu.c
+>  create mode 100644 drivers/soc/samsung/exynos4-pmu.c
+>  create mode 100644 drivers/soc/samsung/exynos5250-pmu.c
+>  create mode 100644 drivers/soc/samsung/exynos5420-pmu.c
 
+Again - renames were not detected. This is strange... and actually
+unreadable. The previous patch looked much better. What happened?
 
-Yeah.. I think struct encapsulation helps, this can also be used to pass
-sg lists for dma in future. I will rework the series with your
-suggestion to include nbits for opcode/addr/data.
-Also, will add validation logic (similar to __spi_validate()) to check
-whether master supports dual/quad mode for opcode/addr/data. I am
-planning to add this validation code to spi_flash_read_validate(in place
-of spi_mmap_read_supported())
-Thanks!
+Please send also entire patchset to linux-pm mailing list. I asked about
+it last time and can't see it as recipient here.
 
-
--- 
-Regards
-Vignesh
+Best regards,
+Krzysztof
