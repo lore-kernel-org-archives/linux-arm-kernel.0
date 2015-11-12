@@ -1,35 +1,31 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 12 Nov 2015 15:37:12 +0100
-Subject: [PATCH] ARM64: build vdso without libgcov
-Message-ID: <8988881.1vH1oNjPUl@wuerfel>
+Date: Thu, 12 Nov 2015 15:41:08 +0100
+Subject: [PATCH] ARM64: use linux/types.h in kvm.h
+Message-ID: <9679324.UdV9GV0mFA@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On a cross-toolchain without glibc support, libgcov may not be
-available, and attempting to build an arm64 kernel with GCOV
-enabled then results in a build error:
+We should always use linux/types.h instead of asm/types.h for
+consistency, and Kbuild actually warns about it:
 
-/home/arnd/cross-gcc/lib/gcc/aarch64-linux/5.2.1/../../../../aarch64-linux/bin/ld: cannot find -lgcov
+./usr/include/asm/kvm.h:35: include of <linux/types.h> is preferred over <asm/types.h>
 
-We don't really want to link libgcov into the vdso anyway, so
-this patch just disables GCOV in the vdso directory, just as
-we do for most other architectures.
+This patch does as Kbuild asks us.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
-Found trying to build allmodconfig
+Found on ARM64 allmodconfig
 
-diff --git a/arch/arm64/kernel/vdso/Makefile b/arch/arm64/kernel/vdso/Makefile
-index f6fe17d88da5..b467fd0a384b 100644
---- a/arch/arm64/kernel/vdso/Makefile
-+++ b/arch/arm64/kernel/vdso/Makefile
-@@ -15,6 +15,9 @@ ccflags-y := -shared -fno-common -fno-builtin
- ccflags-y += -nostdlib -Wl,-soname=linux-vdso.so.1 \
- 		$(call cc-ldoption, -Wl$(comma)--hash-style=sysv)
+diff --git a/arch/arm64/include/uapi/asm/kvm.h b/arch/arm64/include/uapi/asm/kvm.h
+index 0cd7b5947dfc..2d4ca4bb0dd3 100644
+--- a/arch/arm64/include/uapi/asm/kvm.h
++++ b/arch/arm64/include/uapi/asm/kvm.h
+@@ -32,7 +32,7 @@
  
-+# Disable gcov profiling for VDSO code
-+GCOV_PROFILE := n
-+
- # Workaround for bare-metal (ELF) toolchains that neglect to pass -shared
- # down to collect2, resulting in silent corruption of the vDSO image.
- ccflags-y += -Wl,-shared
+ #ifndef __ASSEMBLY__
+ #include <linux/psci.h>
+-#include <asm/types.h>
++#include <linux/types.h>
+ #include <asm/ptrace.h>
+ 
+ #define __KVM_HAVE_GUEST_DEBUG
