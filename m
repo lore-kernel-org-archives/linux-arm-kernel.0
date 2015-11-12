@@ -1,48 +1,56 @@
-From: sboyd@codeaurora.org (Stephen Boyd)
-Date: Thu, 12 Nov 2015 12:31:54 -0800
-Subject: [PATCH 01/19] clk: sunxi: Add display clock
-In-Reply-To: <20151106233926.GN6114@lukather>
-References: <1446214865-3972-1-git-send-email-maxime.ripard@free-electrons.com>
- <1446214865-3972-2-git-send-email-maxime.ripard@free-electrons.com>
- <20151030212902.GG19782@codeaurora.org>
- <20151106233926.GN6114@lukather>
-Message-ID: <20151112203154.GE15032@codeaurora.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 12 Nov 2015 21:52:30 +0100
+Subject: [PATCH] stmmac: avoid ipq806x constant overflow warning
+In-Reply-To: <20151112.122528.1794206832971213176.davem@davemloft.net>
+References: <4391788.dtYArQ4mVi@wuerfel>
+ <20151112.122528.1794206832971213176.davem@davemloft.net>
+Message-ID: <3729464.5X0HBxzvx5@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/06, Maxime Ripard wrote:
-> Hi Stephen,
+On Thursday 12 November 2015 12:25:28 David Miller wrote:
+> From: Arnd Bergmann <arnd@arndb.de>
+> Date: Thu, 12 Nov 2015 15:12:48 +0100
 > 
-> Thanks for your feedback!
-> 
-> On Fri, Oct 30, 2015 at 02:29:02PM -0700, Stephen Boyd wrote:
-> > > +
-> > > +	mux = kzalloc(sizeof(*mux), GFP_KERNEL);
-> > > +	if (!mux)
-> > [..]
-> > > +		goto free_reset;
-> > > +	}
-> > > +
-> > > +	return;
-> > > +
-> > > +free_reset:
-> > > +	kfree(reset_data);
-> > > +free_clk:
-> > > +	clk_unregister(clk);
+> > Building dwmac-ipq806x on a 64-bit architecture produces a harmless
+> > warning from gcc:
 > > 
-> > We really ought to have a clk_composite_unregister() API.
+> > stmmac/dwmac-ipq806x.c: In function 'ipq806x_gmac_probe':
+> > include/linux/bitops.h:6:19: warning: overflow in implicit constant conversion [-Woverflow]
+> >   val = QSGMII_PHY_CDR_EN |
+> > stmmac/dwmac-ipq806x.c:333:8: note: in expansion of macro 'QSGMII_PHY_CDR_EN'
+> >  #define QSGMII_PHY_CDR_EN   BIT(0)
+> >  #define BIT(nr)   (1UL << (nr))
+> > 
+> > The compiler warns about the fact that a 64-bit literal is passed
+> > into a function that takes a 32-bit argument. I could not fully understand
+> > why it warns despite the fact that this number is always small enough
+> > to fit, but changing the use of BIT() macros into the equivalent hexadecimal
+> > representation avoids the warning
+> > 
+> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> > Fixes: b1c17215d718 ("stmmac: add ipq806x glue layer")
 > 
-> Can we?
+> I've seen this warning too on x86_64 and had been meaning to look
+> into it, thanks for taking the initiative. 
 > 
-> We can always unregister the clock itself, but do we have a way to
-> retrieve the structure that has been allocated in there?
-> 
-> (note that it also applies to the generic clocks registration: muxes,
-> dividers, and so on).
+> Moving away from using BIT() is somewhat disappointing, because we
+> want to encourage people to use these macros.
 
-Yes we have a way. We've done the same sort of design for other
-generic clocks. Do the __clk_get_hw() thing like in clk-divider.c
+Ok, I never really liked that macro, so I didn't mind removing it. ;-)
 
--- 
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
-a Linux Foundation Collaborative Project
+I spent too much time working at IBM where all internal documentation
+uses bit numbers that call the MSB bit 0, and drivers use randomly
+either the IBM notation or the one that everyone else uses, so I always
+found the hex numbers way more intuitive.
+
+> Also I don't even understand the compiler's behavior, it's warning
+> about QSGMII_PHY_CDR_EN but if you define only that to "0x1u" it still
+> warns about QSGMII_PHY_CDR_EN.
+> 
+> The warning goes away only if you change all 5 BIT() uses.
+
+Yes, I have spent the time to analyze the problem now and it all makes
+sense. A proper patch follows.
+
+	Arnd
