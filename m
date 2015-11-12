@@ -1,64 +1,50 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 12 Nov 2015 16:40:23 +0100
-Subject: [PATCH 2/3] arm64: reimplement page_is_ram() using memblock and
- UEFI memory map
-In-Reply-To: <20151112153150.GC2681@codeblueprint.co.uk>
-References: <1446126059-25336-1-git-send-email-ard.biesheuvel@linaro.org>
- <1446126059-25336-3-git-send-email-ard.biesheuvel@linaro.org>
- <20151112153150.GC2681@codeblueprint.co.uk>
-Message-ID: <CAKv+Gu8oYv1Ad=n+dgM5o-DTs-xSdSrv9RaDJEu_cQvppLssfw@mail.gmail.com>
+From: rostedt@goodmis.org (Steven Rostedt)
+Date: Thu, 12 Nov 2015 10:49:13 -0500
+Subject: [PATCH] sched/rt: hide push_irq_work_func declaration
+In-Reply-To: <4129441.9nXLnMzV6v@wuerfel>
+References: <3810009.VdDTV0h1Qp@wuerfel>
+ <20151112094739.0168e191@gandalf.local.home>
+ <4129441.9nXLnMzV6v@wuerfel>
+Message-ID: <20151112104913.4f68a92c@gandalf.local.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12 November 2015 at 16:31, Matt Fleming <matt@codeblueprint.co.uk> wrote:
-> On Thu, 29 Oct, at 02:40:58PM, Ard Biesheuvel wrote:
->> This patch overrides the __weak default implementation of page_is_ram(),
->> which uses string comparisons to find entries called 'System RAM' in
->> /proc/iomem. Since we used the contents of memblock to create those entries
->> in the first place, let's use memblock directly.
->>
->> Also, since the UEFI memory map may describe regions backed by RAM that are
->> not in memblock (i.e., reserved regions that were removed from the linear
->> mapping), check the pfn against the UEFI memory map as well.
->>
->> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> ---
->>  arch/arm64/mm/mmu.c | 34 ++++++++++++++++++++
->>  1 file changed, 34 insertions(+)
->
-> Am I correct in thinking that the purpose of this series is just to
-> placate acpi_os_ioremap() on arm64, and its use of page_is_ram()?
->
+On Thu, 12 Nov 2015 16:14:06 +0100
+Arnd Bergmann <arnd@arndb.de> wrote:
 
-That is currently the primary user, but we need this information for
-other purposes as well. One example is /dev/mem, which is used for
-both devices and memory (for instance, tools like dmidecode rely
-heavily on it). When using it to access a memory region that we
-punched out of the linear mapping, we should typically not map it as a
-device, since unaligned accesses cause faults in that case.
+> On Thursday 12 November 2015 09:47:39 Steven Rostedt wrote:
+> > > -#ifdef CONFIG_SMP
+> > > +#if IS_ENABLED(CONFIG_SMP) && defined(HAVE_RT_PUSH_IPI)  
+> > 
+> > Why IS_ENABLED() and not defined()?
+> >
+> > #if defined(CONFIG_SMP) && defined(HAVE_RT_PUSH_IPI)
+> > 
+> > I thought IS_ENABLED() is used for C code, like:
+> > 
+> >         if (IS_ENABLED(CONFIG_SMP)) {
+> >                 [...]
+> >         }  
+> 
+> "#if IS_ENABLED(CONFIG_foo)" has another property, which is
+> to evaluate to true when Kconfig has set the symbol to "=m".
+> Obviously that cannot happen for CONFIG_SMP, but some
+> maintainers prefer using IS_ENABLED() consistently for all
+> config symbols.
+> 
+> I don't care much either way, and it's easily changed if
+> we still want the patch and you prefer a plain #if defined().
+> 
 
-In summary, it would be nice if we could preserve the 'is ram"
-annotation for regions that are not covered by the linear mapping.
+For this instance, I do prefer the "defined()" version. I can
+understand the IS_ENABLED() for module configs. But I don't see the
+need to make all #if's use it. Maybe because I don't deal with module
+configs much.
 
-> While there aren't many users of page_is_ram() right now, I can see
-> how in the future if new users are added they'd be extremely confused
-> to find that page_is_ram(pfn) returns true but 'pfn' isn't accessible
-> by the kernel proper.
->
+Anyway, this patch should probably go in now as a current "fix", and
+the redesign should be looked at as well, but that's unrelated to your
+arch, and you shouldn't need to worry about it.
 
-Well, who knows. page_is_ram() is poorly documented, and so is the
-'System RAM' iomem annotation that its default implementation relies
-on.
+Thanks,
 
-> Wouldn't it make more sense to teach acpi_os_ioremap() about these
-> special reserved regions outside of page_is_ram()?
-
-Perhaps. But it would introduce EFI dependencies into that code.
-
-The bottom line is that I would like to be able to remove UEFI
-occupied or reserved regions from the linear mapping without breaking
-ACPI, whose use of page_is_ram() results in alignment faults when
-accessing such regions.
-
--- 
-Ard.
+-- Steve
