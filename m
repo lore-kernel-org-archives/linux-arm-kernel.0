@@ -1,42 +1,70 @@
-From: yang.shi@linaro.org (Shi, Yang)
-Date: Thu, 12 Nov 2015 11:33:15 -0800
-Subject: [PATCH 1/2] arm64: bpf: add 'store immediate' instruction
-In-Reply-To: <20151111123955.GK9562@arm.com>
-References: <1447195301-16757-1-git-send-email-yang.shi@linaro.org>
- <1447195301-16757-2-git-send-email-yang.shi@linaro.org>
- <CABg9mct-_AF9+kvZ0OG_JTMHkfj+OEsR2vonrxF=yD-yA6ihQw@mail.gmail.com>
- <20151111121256.GI9562@arm.com> <20151111123955.GK9562@arm.com>
-Message-ID: <5644E97B.6050203@linaro.org>
+From: balbi@ti.com (Felipe Balbi)
+Date: Thu, 12 Nov 2015 13:33:26 -0600
+Subject: [PATCH] gpio: omap: fix debounce time calculation
+In-Reply-To: <5644E85C.8010807@ti.com>
+References: <1447350640-20347-1-git-send-email-balbi@ti.com>
+ <5644D4F5.8070006@ti.com> <87egfvqecr.fsf@saruman.tx.rr.com>
+ <5644E85C.8010807@ti.com>
+Message-ID: <877flnqagp.fsf@saruman.tx.rr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/11/2015 4:39 AM, Will Deacon wrote:
-> On Wed, Nov 11, 2015 at 12:12:56PM +0000, Will Deacon wrote:
->> On Tue, Nov 10, 2015 at 06:45:39PM -0800, Z Lim wrote:
->>> On Tue, Nov 10, 2015 at 2:41 PM, Yang Shi <yang.shi@linaro.org> wrote:
->>>> aarch64 doesn't have native store immediate instruction, such operation
->>>
->>> Actually, aarch64 does have "STR (immediate)". For arm64 JIT, we can
->>> consider using it as an optimization.
+
+Hi,
+
+Grygorii Strashko <grygorii.strashko@ti.com> writes:
+> On 11/12/2015 08:09 PM, Felipe Balbi wrote:
 >>
->> Yes, I'd definitely like to see that in preference to moving via a
->> temporary register.
+>> Hi,
+>>
+>> Grygorii Strashko <grygorii.strashko@ti.com> writes:
+>>> On 11/12/2015 07:50 PM, Felipe Balbi wrote:
+>>>> According to TRM, debounce is measured in periods of
+>>>> the functional clock of the GPIO IP. This means that
+>>>
+>>>
+>>> What TRM? link pls.
+>>>
+>>> http://www.ti.com/lit/ug/spruhl7d/spruhl7d.pdf
+>>>
+>>> 28.4.1.24 GPIO_DEBOUNCINGTIME Register (offset = 154h) [reset = 0h]
+>>>
+>>> The GPIO_DEBOUNCINGTIME register controls debouncing time (the value is
+>>> global for all ports). The debouncing cell is running with the
+>>> debouncing clock (32 kHz), this register represents the number of the
+>>> clock cycle(s) (31 s long) to be used.
+>>>
+>>> Debouncing Value in 31 microsecond steps.
+>>> Debouncing Value = (DEBOUNCETIME + 1) * 31 microseconds.
+>>
+>> DRA7xx:
+>>
+>> "
+>> 8-bit values specifying the debouncing time. It is n-
+>> periods of the muxed clock, which can come from either
+>> a true 32k oscillator/pad of from the system clock. It
+>> depends on which boot mode is selected. For more
+>> information see Chapter 32, Initialization.
+>> "
+>>
 >
-> Wait a second, we're both talking rubbish here :) The STR (immediate)
-> form is referring to the addressing mode, whereas this patch wants to
-> store an immediate value to memory, which does need moving to a register
-> first.
-
-Yes, the immediate means immediate offset for addressing index. Doesn't 
-mean to store immediate to memory.
-
-I don't think any load-store architecture has store immediate instruction.
-
-Thanks,
-Yang
-
+> See
+> http://www.ti.com/lit/ug/spruhz6d/spruhz6d.pdf
+> 27.4.3 General-Purpose Interface Clock Configuration
+> 27.4.3.1 Clocking
 >
-> So the original patch is fine.
->
-> Will
->
+> This completely unclear. Sry, I think this patch can't be used as is,
+> first of all because of backward compatibility issues.
+
+yeah, might be. No issues, I'll just go dig older TRMs and trying to
+figure this one out. Meanwhile, let's let's keep it as is.
+
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 818 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151112/bf68f282/attachment-0001.sig>
