@@ -1,143 +1,34 @@
 From: peter.ujfalusi@ti.com (Peter Ujfalusi)
-Date: Thu, 12 Nov 2015 09:32:58 +0200
-Subject: [PATCH v4 2/3] ARM: OMAP2+: hwmod: Add hwmod flag for
- HWMOD_OPT_CLKS_NEEDED
+Date: Thu, 12 Nov 2015 09:32:57 +0200
+Subject: [PATCH v4 1/3] ARM: DTS: dra7: Fix McASP3 node regarding to clocks
 In-Reply-To: <1447313579-23873-1-git-send-email-peter.ujfalusi@ti.com>
 References: <1447313579-23873-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <1447313579-23873-3-git-send-email-peter.ujfalusi@ti.com>
+Message-ID: <1447313579-23873-2-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some module needs more than one functional clock in order to be accessible,
-like the McASPs found in DRA7xx family.
-This flag will indicate that the opt_clks need to be handled at the same
-time as the main_clk for the given hwmod, ensuring that all needed clocks
-are enabled before we try to access the module's address space.
+McASP node needs to list all mandatory clocks: gfclk and ahclkx
 
 Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
-Acked-by: Paul Walmsley <paul@pwsan.com>
 Tested-by: Felipe Balbi <balbi@ti.com>
 ---
- arch/arm/mach-omap2/omap_hwmod.c | 66 ++++++++++++++++++++++------------------
- arch/arm/mach-omap2/omap_hwmod.h |  3 ++
- 2 files changed, 39 insertions(+), 30 deletions(-)
+ arch/arm/boot/dts/dra7.dtsi | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/mach-omap2/omap_hwmod.c b/arch/arm/mach-omap2/omap_hwmod.c
-index cc8a987149e2..48495ad82aba 100644
---- a/arch/arm/mach-omap2/omap_hwmod.c
-+++ b/arch/arm/mach-omap2/omap_hwmod.c
-@@ -890,6 +890,36 @@ static int _init_opt_clks(struct omap_hwmod *oh)
- 	return ret;
- }
+diff --git a/arch/arm/boot/dts/dra7.dtsi b/arch/arm/boot/dts/dra7.dtsi
+index bc672fb91466..fe99231cbde5 100644
+--- a/arch/arm/boot/dts/dra7.dtsi
++++ b/arch/arm/boot/dts/dra7.dtsi
+@@ -1459,8 +1459,8 @@
+ 			interrupt-names = "tx", "rx";
+ 			dmas = <&sdma_xbar 133>, <&sdma_xbar 132>;
+ 			dma-names = "tx", "rx";
+-			clocks = <&mcasp3_ahclkx_mux>;
+-			clock-names = "fck";
++			clocks = <&mcasp3_aux_gfclk_mux>, <&mcasp3_ahclkx_mux>;
++			clock-names = "fck", "ahclkx";
+ 			status = "disabled";
+ 		};
  
-+static void _enable_optional_clocks(struct omap_hwmod *oh)
-+{
-+	struct omap_hwmod_opt_clk *oc;
-+	int i;
-+
-+	pr_debug("omap_hwmod: %s: enabling optional clocks\n", oh->name);
-+
-+	for (i = oh->opt_clks_cnt, oc = oh->opt_clks; i > 0; i--, oc++)
-+		if (oc->_clk) {
-+			pr_debug("omap_hwmod: enable %s:%s\n", oc->role,
-+				 __clk_get_name(oc->_clk));
-+			clk_enable(oc->_clk);
-+		}
-+}
-+
-+static void _disable_optional_clocks(struct omap_hwmod *oh)
-+{
-+	struct omap_hwmod_opt_clk *oc;
-+	int i;
-+
-+	pr_debug("omap_hwmod: %s: disabling optional clocks\n", oh->name);
-+
-+	for (i = oh->opt_clks_cnt, oc = oh->opt_clks; i > 0; i--, oc++)
-+		if (oc->_clk) {
-+			pr_debug("omap_hwmod: disable %s:%s\n", oc->role,
-+				 __clk_get_name(oc->_clk));
-+			clk_disable(oc->_clk);
-+		}
-+}
-+
- /**
-  * _enable_clocks - enable hwmod main clock and interface clocks
-  * @oh: struct omap_hwmod *
-@@ -917,6 +947,9 @@ static int _enable_clocks(struct omap_hwmod *oh)
- 			clk_enable(os->_clk);
- 	}
- 
-+	if (oh->flags & HWMOD_OPT_CLKS_NEEDED)
-+		_enable_optional_clocks(oh);
-+
- 	/* The opt clocks are controlled by the device driver. */
- 
- 	return 0;
-@@ -948,41 +981,14 @@ static int _disable_clocks(struct omap_hwmod *oh)
- 			clk_disable(os->_clk);
- 	}
- 
-+	if (oh->flags & HWMOD_OPT_CLKS_NEEDED)
-+		_disable_optional_clocks(oh);
-+
- 	/* The opt clocks are controlled by the device driver. */
- 
- 	return 0;
- }
- 
--static void _enable_optional_clocks(struct omap_hwmod *oh)
--{
--	struct omap_hwmod_opt_clk *oc;
--	int i;
--
--	pr_debug("omap_hwmod: %s: enabling optional clocks\n", oh->name);
--
--	for (i = oh->opt_clks_cnt, oc = oh->opt_clks; i > 0; i--, oc++)
--		if (oc->_clk) {
--			pr_debug("omap_hwmod: enable %s:%s\n", oc->role,
--				 __clk_get_name(oc->_clk));
--			clk_enable(oc->_clk);
--		}
--}
--
--static void _disable_optional_clocks(struct omap_hwmod *oh)
--{
--	struct omap_hwmod_opt_clk *oc;
--	int i;
--
--	pr_debug("omap_hwmod: %s: disabling optional clocks\n", oh->name);
--
--	for (i = oh->opt_clks_cnt, oc = oh->opt_clks; i > 0; i--, oc++)
--		if (oc->_clk) {
--			pr_debug("omap_hwmod: disable %s:%s\n", oc->role,
--				 __clk_get_name(oc->_clk));
--			clk_disable(oc->_clk);
--		}
--}
--
- /**
-  * _omap4_enable_module - enable CLKCTRL modulemode on OMAP4
-  * @oh: struct omap_hwmod *
-diff --git a/arch/arm/mach-omap2/omap_hwmod.h b/arch/arm/mach-omap2/omap_hwmod.h
-index ca6df1a73475..76bce11c85a4 100644
---- a/arch/arm/mach-omap2/omap_hwmod.h
-+++ b/arch/arm/mach-omap2/omap_hwmod.h
-@@ -523,6 +523,8 @@ struct omap_hwmod_omap4_prcm {
-  * HWMOD_RECONFIG_IO_CHAIN: omap_hwmod code needs to reconfigure wake-up 
-  *     events by calling _reconfigure_io_chain() when a device is enabled
-  *     or idled.
-+ * HWMOD_OPT_CLKS_NEEDED: The optional clocks are needed for the module to
-+ *     operate and they need to be handled at the same time as the main_clk.
-  */
- #define HWMOD_SWSUP_SIDLE			(1 << 0)
- #define HWMOD_SWSUP_MSTANDBY			(1 << 1)
-@@ -538,6 +540,7 @@ struct omap_hwmod_omap4_prcm {
- #define HWMOD_FORCE_MSTANDBY			(1 << 11)
- #define HWMOD_SWSUP_SIDLE_ACT			(1 << 12)
- #define HWMOD_RECONFIG_IO_CHAIN			(1 << 13)
-+#define HWMOD_OPT_CLKS_NEEDED			(1 << 14)
- 
- /*
-  * omap_hwmod._int_flags definitions
 -- 
 2.6.2
