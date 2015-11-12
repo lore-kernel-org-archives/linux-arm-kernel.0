@@ -1,45 +1,76 @@
-From: gnurou@gmail.com (Alexandre Courbot)
-Date: Thu, 12 Nov 2015 21:53:50 +0900
-Subject: [PATCH v2] nouveau: arm: Add MODULE_FIRMWARE for gk20a
-In-Reply-To: <CABr+WTmG1p6-dGGpWJgGBAJydyWz=2aPj-e93X9metn8y8Qrcg@mail.gmail.com>
-References: <1443452893-18246-1-git-send-email-kwizart@gmail.com>
- <CAAVeFuJLJO4LvLqq2w9gMe6V6L3VDi+Gz59GvwKF2v8OWTWgBQ@mail.gmail.com>
- <CABr+WTmG1p6-dGGpWJgGBAJydyWz=2aPj-e93X9metn8y8Qrcg@mail.gmail.com>
-Message-ID: <CAAVeFuLNadYawJB0zZHzMc3CA7GiukEox=FGH8wupXjyK576MQ@mail.gmail.com>
+From: p.fedin@samsung.com (Pavel Fedin)
+Date: Thu, 12 Nov 2015 16:12:03 +0300
+Subject: [PATCH v8 0/4] Exynos SROMc configuration and Ethernet support for
+ SMDK5410
+Message-ID: <cover.1447333689.git.p.fedin@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 11, 2015 at 6:29 PM, Nicolas Chauvet <kwizart@gmail.com> wrote:
-> 2015-09-30 6:57 GMT+02:00 Alexandre Courbot <gnurou@gmail.com>:
->>
->> On Tue, Sep 29, 2015 at 12:08 AM, Nicolas Chauvet <kwizart@gmail.com>
->> wrote:
->> > This patch is needed by initramfs tools to detect
->> > the required firmware files for the module.
->> >
->> > This patch tests for either TEGRA_124_SOC or TEGRA_132_SOC
->> > for the firmwares related to the Tegra K1 generation.
->> >
->> > v2: move the MODULE_FIRMWARE to the nvidia_platform.c file.
->> >  This will avoid to test for NOUVEAU_PLATFORM_DRIVER
->>
->> Nice, thanks for doing this change!
->>
->> Reviewed-by: Alexandre Courbot <acourbot@nvidia.com>
->
->
-> Thx for the review.
-> FYI I've tested the patch on top of 4.3+ kernels, and the initramfs
-> generated with dracut works as expected.
->
-> Is there any other concern with this patch ?
->
-> It's certainly late for 4.4,I would expect it to hit kernel 4.3 at some
-> point, but I don't think everything is wired from userspace(Xorg/Wayland)
-> wrt dGPU support.
-> So It could also wait for 4.5.
-> What do you think ?
+This patch extends Exynos SROM controller driver with ability to configure
+controller outputs and enables SMSC9115 Ethernet chip on SMDK5410 board,
+which is connected via SROMc bank #3.
 
-I don't see a particular reason to hurry, however this patch has been
-sitting around for one month now - Ben, is there any particular reason
-for not merging it?
+With this patchset, support for the whole existing SMDK range can be added.
+Actually, only bank number is different.
+
+This patchset also depends on Exynos 5410 pinctrl support, introduced by
+patches 0003 and 0004 from this set:
+[PATCH v4 0/5] ARM: EXYNOS: ODROID-XU DT and LEDs
+http://lists.infradead.org/pipermail/linux-arm-kernel/2015-March/330862.html
+
+Pinctrl support is necessary in order to correctly configure
+multifunctional pins of the Exynos chip.
+
+v7 => v8:
+- More fixes to documentation
+
+v6 => v7:
+- Fixed stupid error in Tacc description in the documentation
+
+v5 => v6:
+- Even more improvements to the documentation, fixed some errors and typos.
+- Separated adding bus ranges from generic SROMc support
+- Some stuff renamed for even better code readability
+- Stylistic cleanups in the DTS (everything in alphabetic order, use named
+  constant name for interrupt config byte)
+
+v4 => v5:
+- Some cosmetic changes in the dtsi ("compatible" goes first)
+- Use correctly specified ranges for the SROMc node
+- Reuse existing properties where possible ("reg" for bank# and
+  "reg-io-width" for data width)
+- Separated page-mode property from timings array
+- More improvements to the documentation
+
+v3 => v4:
+- Devices are now added as subnodes, with additional properties. This allows
+  to cleary specify dependency. If configuration fails, error will be reported
+  and child devices will not be probed.
+- These additional properties now have "samsung,srom-XXX" format
+- Fixed code style, now better understood.
+
+v2 => v3:
+- Fixed up SROMc region size in the device tree
+- Reordered patches, documentation goes first now
+
+v1 => v2:
+- Fixed some typos and bad labels in device tree
+- Improved documentation
+
+
+Pavel Fedin (4):
+  Documentation: dt-bindings: Describe SROMc configuration
+  ARM: dts: Add SROMc to Exynos 5410
+  drivers: exynos-srom: Add support for bank configuration
+  ARM: dts: Add Ethernet chip to SMDK5410
+
+ .../bindings/arm/samsung/exynos-srom.txt           | 73 +++++++++++++++++++++-
+ arch/arm/boot/dts/exynos5410-smdk5410.dts          | 41 ++++++++++++
+ arch/arm/boot/dts/exynos5410.dtsi                  | 11 ++++
+ arch/arm/mach-exynos/Kconfig                       |  2 +-
+ drivers/soc/samsung/Kconfig                        |  2 +-
+ drivers/soc/samsung/exynos-srom.c                  | 61 +++++++++++++++++-
+ 6 files changed, 184 insertions(+), 6 deletions(-)
+
+-- 
+2.4.4
