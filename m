@@ -1,123 +1,212 @@
 From: alex.bennee@linaro.org (=?UTF-8?q?Alex=20Benn=C3=A9e?=)
-Date: Thu, 12 Nov 2015 16:20:50 +0000
-Subject: [PATCH v9 5/6] target-arm: kvm - re-inject guest debug exceptions
+Date: Thu, 12 Nov 2015 16:20:51 +0000
+Subject: [PATCH v9 6/6] tests/guest-debug: introduce basic gdbstub tests
 In-Reply-To: <1447345251-22625-1-git-send-email-alex.bennee@linaro.org>
 References: <1447345251-22625-1-git-send-email-alex.bennee@linaro.org>
-Message-ID: <1447345251-22625-6-git-send-email-alex.bennee@linaro.org>
+Message-ID: <1447345251-22625-7-git-send-email-alex.bennee@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Alex Benn?e <alex@bennee.com>
 
-If we can't find details for the debug exception in our debug state
-then we can assume the exception is due to debugging inside the guest.
-To inject the exception into the guest state we re-use the TCG exception
-code (do_interupt).
+The aim of these tests is to combine with an appropriate kernel
+image (with symbol-file vmlinux) and check it behaves as it should.
+Given a kernel it checks:
 
-However while guest debugging is in effect we currently can't handle the
-guest using single step which is heavily used by GDB.
+  - single step
+  - software breakpoint
+  - hardware breakpoint
+  - access, read and write watchpoints
+
+On success it returns 0 to the calling process.
+
+I've not plumbed this into the "make check" logic though as we need a
+solution for providing non-host binaries to the tests. However the test
+is structured to work with pretty much any Linux kernel image as it
+uses the basic kernel_init code which is common across architectures.
 
 Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
-
 ---
-v5:
-  - new for v5
----
- target-arm/helper-a64.c | 12 ++++++++++--
- target-arm/kvm.c        | 27 +++++++++++++++++++--------
- 2 files changed, 29 insertions(+), 10 deletions(-)
+ tests/guest-debug/test-gdbstub.py | 171 ++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 171 insertions(+)
+ create mode 100644 tests/guest-debug/test-gdbstub.py
 
-diff --git a/target-arm/helper-a64.c b/target-arm/helper-a64.c
-index deb8dbe..fc3ccdf 100644
---- a/target-arm/helper-a64.c
-+++ b/target-arm/helper-a64.c
-@@ -25,6 +25,7 @@
- #include "qemu/bitops.h"
- #include "internals.h"
- #include "qemu/crc32c.h"
-+#include "sysemu/kvm.h"
- #include <zlib.h> /* For crc32 */
- 
- /* C2.4.7 Multiply and divide */
-@@ -469,7 +470,8 @@ void aarch64_cpu_do_interrupt(CPUState *cs)
-                   new_el);
-     if (qemu_loglevel_mask(CPU_LOG_INT)
-         && !excp_is_internal(cs->exception_index)) {
--        qemu_log_mask(CPU_LOG_INT, "...with ESR 0x%" PRIx32 "\n",
-+        qemu_log_mask(CPU_LOG_INT, "...with ESR %x/0x%" PRIx32 "\n",
-+                      env->exception.syndrome >> ARM_EL_EC_SHIFT,
-                       env->exception.syndrome);
-     }
- 
-@@ -535,6 +537,12 @@ void aarch64_cpu_do_interrupt(CPUState *cs)
-     aarch64_restore_sp(env, new_el);
- 
-     env->pc = addr;
--    cs->interrupt_request |= CPU_INTERRUPT_EXITTB;
+diff --git a/tests/guest-debug/test-gdbstub.py b/tests/guest-debug/test-gdbstub.py
+new file mode 100644
+index 0000000..aa53567
+--- /dev/null
++++ b/tests/guest-debug/test-gdbstub.py
+@@ -0,0 +1,171 @@
++#
++# This script needs to be run on startup
++# qemu -kernel ${KERNEL} -s -S
++# and then:
++# gdb ${KERNEL}.vmlinux -x ${QEMU_SRC}/tests/guest-debug/test-gdbstub.py
 +
-+    qemu_log_mask(CPU_LOG_INT, "...to EL%d PC 0x%" PRIx64 " PSTATE 0x%x\n",
-+                  new_el, env->pc, pstate_read(env));
++import gdb
 +
-+    if (!kvm_enabled()) {
-+        cs->interrupt_request |= CPU_INTERRUPT_EXITTB;
-+    }
- }
- #endif
-diff --git a/target-arm/kvm.c b/target-arm/kvm.c
-index 1f57e92..4ac177a 100644
---- a/target-arm/kvm.c
-+++ b/target-arm/kvm.c
-@@ -529,9 +529,10 @@ static int kvm_handle_debug(CPUState *cs, struct kvm_run *run)
-     struct kvm_debug_exit_arch *arch_info = &run->debug.arch;
-     int hsr_ec = arch_info->hsr >> ARM_EL_EC_SHIFT;
-     ARMCPU *cpu = ARM_CPU(cs);
-+    CPUClass *cc = CPU_GET_CLASS(cs);
-     CPUARMState *env = &cpu->env;
- 
--    /* Ensure PC is synchronised */
-+    /* Ensure all state is synchronised */
-     kvm_cpu_synchronize_state(cs);
- 
-     switch (hsr_ec) {
-@@ -539,7 +540,14 @@ static int kvm_handle_debug(CPUState *cs, struct kvm_run *run)
-         if (cs->singlestep_enabled) {
-             return true;
-         } else {
--            error_report("Came out of SINGLE STEP when not enabled");
-+            /*
-+             * The kernel should have supressed the guests ability to
-+             * single step at this point so something has gone wrong.
-+             */
-+            error_report("%s: guest single-step while debugging unsupported"
-+                         " (%"PRIx64", %"PRIx32")\n",
-+                         __func__, env->pc, arch_info->hsr);
-+            return false;
-         }
-         break;
-     case EC_AA64_BKPT:
-@@ -564,14 +572,17 @@ static int kvm_handle_debug(CPUState *cs, struct kvm_run *run)
-     default:
-         error_report("%s: unhandled debug exit (%"PRIx32", %"PRIx64")\n",
-                      __func__, arch_info->hsr, env->pc);
-+        return false;
-     }
- 
--    /* If we don't handle this it could be it really is for the
--       guest to handle */
--    qemu_log_mask(LOG_UNIMP,
--                  "%s: re-injecting exception not yet implemented"
--                  " (0x%"PRIx32", %"PRIx64")\n",
--                  __func__, hsr_ec, env->pc);
-+    /* If we are not handling the debug exception it must belong to
-+     * the guest. Let's re-use the existing TCG interrupt code to set
-+     * everything up properly
-+     */
-+    cs->exception_index = EXCP_BKPT;
-+    env->exception.syndrome = arch_info->hsr;
-+    env->exception.vaddress = arch_info->far;
-+    cc->do_interrupt(cs);
- 
-     return false;
- }
++failcount = 0
++
++def report(cond, msg):
++    "Report success/fail of test"
++    if cond:
++        print "PASS: %s" % (msg)
++    else:
++        print "FAIL: %s" % (msg)
++        failcount += 1
++
++def check_step():
++    "Step an instruction, check it moved."
++    start_pc = gdb.parse_and_eval('$pc')
++    gdb.execute("si")
++    end_pc = gdb.parse_and_eval('$pc')
++
++    return not (start_pc == end_pc)
++
++
++def check_break(sym_name):
++    "Setup breakpoint, continue and check we stopped."
++    sym, ok = gdb.lookup_symbol(sym_name)
++    bp = gdb.Breakpoint(sym_name)
++
++    gdb.execute("c")
++
++    # hopefully we came back
++    end_pc = gdb.parse_and_eval('$pc')
++    print "%s == %s %d" % (end_pc, sym.value(), bp.hit_count)
++    bp.delete()
++
++    # can we test we hit bp?
++    return end_pc == sym.value()
++
++
++# We need to do hbreak manually as the python interface doesn't export it
++def check_hbreak(sym_name):
++    "Setup hardware breakpoint, continue and check we stopped."
++    sym, ok = gdb.lookup_symbol(sym_name)
++    gdb.execute("hbreak %s" % (sym_name))
++    gdb.execute("c")
++
++    # hopefully we came back
++    end_pc = gdb.parse_and_eval('$pc')
++    print "%s == %s" % (end_pc, sym.value())
++
++    if end_pc == sym.value():
++        gdb.execute("d 1")
++        return True
++    else:
++        return False
++
++
++class WatchPoint(gdb.Breakpoint):
++
++    def get_wpstr(self, sym_name):
++        "Setup sym and wp_str for given symbol."
++        self.sym, ok = gdb.lookup_symbol(sym_name)
++        wp_addr = gdb.parse_and_eval(sym_name).address
++        self.wp_str = '*(%(type)s)(&%(address)s)' % dict(
++            type = wp_addr.type, address = sym_name)
++
++        return(self.wp_str)
++
++    def __init__(self, sym_name, type):
++        wp_str = self.get_wpstr(sym_name)
++        super(WatchPoint, self).__init__(wp_str, gdb.BP_WATCHPOINT, type)
++
++    def stop(self):
++        end_pc = gdb.parse_and_eval('$pc')
++        print "HIT WP @ %s" % (end_pc)
++        return True
++
++
++def do_one_watch(sym, wtype, text):
++
++    wp = WatchPoint(sym, wtype)
++    gdb.execute("c")
++    report_str = "%s for %s (%s)" % (text, sym, wp.sym.value())
++
++    if wp.hit_count > 0:
++        report(True, report_str)
++        wp.delete()
++    else:
++        report(False, report_str)
++
++
++def check_watches(sym_name):
++    "Watch a symbol for any access."
++
++    # Should hit for any read
++    do_one_watch(sym_name, gdb.WP_ACCESS, "awatch")
++
++    # Again should hit for reads
++    do_one_watch(sym_name, gdb.WP_READ, "rwatch")
++
++    # Finally when it is written
++    do_one_watch(sym_name, gdb.WP_WRITE, "watch")
++
++
++class CatchBreakpoint(gdb.Breakpoint):
++    def __init__(self, sym_name):
++        super(CatchBreakpoint, self).__init__(sym_name)
++        self.sym, ok = gdb.lookup_symbol(sym_name)
++
++    def stop(self):
++        end_pc = gdb.parse_and_eval ('$pc')
++        print "CB: %s == %s" % (end_pc, self.sym.value())
++        if end_pc == sym.value():
++            report(False, "Hit final catchpoint")
++
++
++def run_test():
++    "Run throught the tests one by one"
++
++    print "Checking we can step the first few instructions"
++    step_ok = 0
++    for i in xrange(3):
++        if check_step():
++            step_ok += 1
++
++    report(step_ok == 3, "single step in boot code")
++
++    print "Checking HW breakpoint works"
++    break_ok = check_hbreak("kernel_init")
++    report(break_ok, "hbreak @ kernel_init")
++
++    # Can't set this up until we are in the kernel proper
++    # if we make it to run_init_process we've over-run and
++    # one of the tests failed
++    print "Setup catch-all for run_init_process"
++    cbp = CatchBreakpoint("run_init_process")
++    cpb2 = CatchBreakpoint("try_to_run_init_process")
++
++    print "Checking Normal breakpoint works"
++    break_ok = check_break("wait_for_completion")
++    report(break_ok, "break @ wait_for_completion")
++
++    print "Checking watchpoint works"
++    check_watches("system_state")
++
++#
++# This runs as the script it sourced (via -x)
++#
++
++try:
++    print "Connecting to remote"
++    gdb.execute("target remote localhost:1234")
++
++    # These are not very useful in scripts
++    gdb.execute("set pagination off")
++    gdb.execute("set confirm off")
++
++    # Run the actual tests
++    run_test()
++
++except:
++    print "GDB Exception while running test"
++    failcount += 1
++
++# Finally kill the inferior and exit gdb with a count of failures
++gdb.execute("kill")
++exit(failcount)
 -- 
 2.6.3
