@@ -1,41 +1,56 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 12 Nov 2015 20:27:49 +0100
-Subject: [PATCH v3 3/6] xen: introduce XENPF_settime64
-In-Reply-To: <5644C97F.7070502@oracle.com>
-References: <alpine.DEB.2.02.1511111639500.5676@kaball.uk.xensource.com>
- <alpine.DEB.2.02.1511121634040.526@kaball.uk.xensource.com>
- <5644C97F.7070502@oracle.com>
-Message-ID: <9604059.Dn94ENEdgP@wuerfel>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Thu, 12 Nov 2015 21:28:28 +0200
+Subject: [PATCH] gpio: omap: fix debounce time calculation
+In-Reply-To: <87egfvqecr.fsf@saruman.tx.rr.com>
+References: <1447350640-20347-1-git-send-email-balbi@ti.com>
+ <5644D4F5.8070006@ti.com> <87egfvqecr.fsf@saruman.tx.rr.com>
+Message-ID: <5644E85C.8010807@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 12 November 2015 12:16:47 Boris Ostrovsky wrote:
-> >>> diff --git a/arch/x86/xen/time.c b/arch/x86/xen/time.c
-> >>> index 663c2ea..3bbd377 100644
-> >>> --- a/arch/x86/xen/time.c
-> >>> +++ b/arch/x86/xen/time.c
-> >>> @@ -134,10 +134,10 @@ static int xen_pvclock_gtod_notify(struct
-> >>> notifier_block *nb,
-> >>>     if (!was_set && timespec_compare(&now, &next_sync) < 0)
-> >>>             return NOTIFY_OK;
-> >>>    -        op.cmd = XENPF_settime;
-> >>> -   op.u.settime.secs = now.tv_sec;
-> >>> -   op.u.settime.nsecs = now.tv_nsec;
-> >>> -   op.u.settime.system_time = xen_clocksource_read();
-> >>> +   op.cmd = XENPF_settime32;
-> >>> +   op.u.settime32.secs = now.tv_sec;
-> >>> +   op.u.settime32.nsecs = now.tv_nsec;
-> >>> +   op.u.settime32.system_time = xen_clocksource_read();
-> >> Can/should we switch to time64 here? (This would require a couple more changes
-> >> but they would all be local to this routine).
-> > I can do that, but it should be a separate patch. I'll queue it at the
-> > end of the series.
-> 
-> Didn't Arnd just say that something needs to be done in the hypervisor 
-> for that to work? Or did I misunderstood him?
+On 11/12/2015 08:09 PM, Felipe Balbi wrote:
+>
+> Hi,
+>
+> Grygorii Strashko <grygorii.strashko@ti.com> writes:
+>> On 11/12/2015 07:50 PM, Felipe Balbi wrote:
+>>> According to TRM, debounce is measured in periods of
+>>> the functional clock of the GPIO IP. This means that
+>>
+>>
+>> What TRM? link pls.
+>>
+>> http://www.ti.com/lit/ug/spruhl7d/spruhl7d.pdf
+>>
+>> 28.4.1.24 GPIO_DEBOUNCINGTIME Register (offset = 154h) [reset = 0h]
+>>
+>> The GPIO_DEBOUNCINGTIME register controls debouncing time (the value is
+>> global for all ports). The debouncing cell is running with the
+>> debouncing clock (32 kHz), this register represents the number of the
+>> clock cycle(s) (31 s long) to be used.
+>>
+>> Debouncing Value in 31 microsecond steps.
+>> Debouncing Value = (DEBOUNCETIME + 1) * 31 microseconds.
+>
+> DRA7xx:
+>
+> "
+> 8-bit values specifying the debouncing time. It is n-
+> periods of the muxed clock, which can come from either
+> a true 32k oscillator/pad of from the system clock. It
+> depends on which boot mode is selected. For more
+> information see Chapter 32, Initialization.
+> "
+>
 
-What I meant is that we need to do both sides in order to actually use
-64-bit times, but the patches are otherwise independent of one another
-because a change to either side is not allowed to break the other.
+See
+http://www.ti.com/lit/ug/spruhz6d/spruhz6d.pdf
+27.4.3 General-Purpose Interface Clock Configuration
+27.4.3.1 Clocking
 
-	Arnd
+This completely unclear. Sry, I think this patch can't be used as is,
+first of all because of backward compatibility issues.
+
+-- 
+regards,
+-grygorii
