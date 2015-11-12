@@ -1,70 +1,84 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 12 Nov 2015 10:00:27 -0800
-Subject: [PATCH v4 0/3] ARM: OMAP2+ McASP(3) support for DRA7xx family
-In-Reply-To: <1447313579-23873-1-git-send-email-peter.ujfalusi@ti.com>
-References: <1447313579-23873-1-git-send-email-peter.ujfalusi@ti.com>
-Message-ID: <20151112180027.GP3218@atomide.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 12 Nov 2015 18:05:08 +0000
+Subject: [GIT PULL] arm64 fixes for 4.4-rc1
+Message-ID: <20151112180504.GA10702@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Peter Ujfalusi <peter.ujfalusi@ti.com> [151111 23:33]:
-> Hi Tony,
-> 
-> Changes since v3:
-> - rebased on mainline's HEAD
-> - Added Tested-by from Felipe
-> - Added Acked-by from Paul for the hwmod patches
-> 
-> Changes since v2:
-> - DTS patch added which is needed because of the clock handling changes
-> 
-> Felip Balbi reported that linux-next is broken right now since the DTS part of
-> the earlier series has been applied, but we do not have the mcasp hwmod in the
-> kernel:
-> ...
-> [    0.181029] platform 48468000.mcasp: Cannot lookup hwmod 'mcasp3'
-> ...
-> [    6.121072] davinci-mcasp 48468000.mcasp: _od_fail_runtime_resume: FIXME: missing hwmod/omap_dev info
-> [    6.130790] ------------[ cut here ]------------
-> [    6.135643] WARNING: CPU: 0 PID: 244 at drivers/bus/omap_l3_noc.c:147 l3_interrupt_handler+0x220/0x34c()
-> [    6.145576] 44000000.ocp:L3 Custom Error: MASTER MPU TARGET L4_PER2_P3 (Read): Data Access in User mode during Functional access
+Hi Linus,
 
+Here's a second pull request for this merging window with some
+fixes/clean-ups (on top of the initial request, based on 4.3-rc4).
+Thanks.
 
-Thanks applying all three into omap-for-v4.4/fixes.
+The following changes since commit f8f8bdc48851da979c6e0e4808b6031122e4af47:
 
-Tony
+  arm64/efi: fix libstub build under CONFIG_MODVERSIONS (2015-11-02 13:50:17 +0000)
 
-> ...
-> 
-> This is the followup series for the hwmod changes needed to get audio working
-> on DRA7xx family based boards.
-> The DTS patches has been applied by Tony from the original series:
-> http://www.spinics.net/lists/linux-omap/msg121473.html
-> 
-> I have addressed your comments in the hwmod data and did some research also
-> regarding to the use of ahclkx as fclk in the original submission.
-> It turned out that McASP _needs_ all clocks to be enabled (fclk, iclk and
-> ahclkx/r) to be able to access registers. The original patch where we handled
-> the ahclkx as fclk worked, because the fclk clock got enabled in the HW w/o
-> any SW interaction.
-> All in all, the McASP found in DRA7 needs all clocks to be enabled.
-> To satisfy this I have introduced a new flag to hwmod, which means that the
-> listed optional clocks need to be handled alongside with the fclk clock.
-> 
-> Regards,
-> Peter
-> ---
-> Peter Ujfalusi (3):
->   ARM: DTS: dra7: Fix McASP3 node regarding to clocks
->   ARM: OMAP2+: hwmod: Add hwmod flag for HWMOD_OPT_CLKS_NEEDED
->   ARM: OMAP: DRA7: hwmod: Add data for McASP3
-> 
->  arch/arm/boot/dts/dra7.dtsi               |  4 +-
->  arch/arm/mach-omap2/omap_hwmod.c          | 66 +++++++++++++++++--------------
->  arch/arm/mach-omap2/omap_hwmod.h          |  3 ++
->  arch/arm/mach-omap2/omap_hwmod_7xx_data.c | 56 ++++++++++++++++++++++++++
->  4 files changed, 97 insertions(+), 32 deletions(-)
-> 
-> -- 
-> 2.6.2
-> 
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux tags/arm64-fixes
+
+for you to fetch changes up to 01b305a234943c25c336a6f2f77932a4eaf125fa:
+
+  arm64: suspend: make hw_breakpoint_restore static (2015-11-12 15:18:14 +0000)
+
+----------------------------------------------------------------
+arm64 fixes and clean-ups:
+
+- __cmpxchg_double*() return type fix to avoid truncation of a long to
+  int and subsequent logical "not" in cmpxchg_double() misinterpreting
+  the operation success/failure
+- BPF fixes for mod and div by zero
+- Fix compilation with STRICT_MM_TYPECHECKS enabled
+- VDSO build fix without libgcov
+- Some static and __maybe_unused annotations
+- Kconfig clean-up (FRAME_POINTER)
+- defconfig update for CRYPTO_CRC32_ARM64
+
+----------------------------------------------------------------
+Ard Biesheuvel (2):
+      arm64: fix STRICT_MM_TYPECHECKS issue in PTE_CONT manipulation
+      arm64: fix R/O permissions of FDT mapping
+
+Arnd Bergmann (3):
+      arm64: mark cpus_have_hwcap as __maybe_unused
+      arm64: build vdso without libgcov
+      arm64: use linux/types.h in kvm.h
+
+Catalin Marinas (1):
+      arm64: Enable CRYPTO_CRC32_ARM64 in defconfig
+
+Jisheng Zhang (3):
+      arm64: smp: make of_parse_and_init_cpus static
+      arm64: mmu: make split_pud and fixup_executable static
+      arm64: suspend: make hw_breakpoint_restore static
+
+Lorenzo Pieralisi (1):
+      arm64: cmpxchg_dbl: fix return value type
+
+Yang Shi (1):
+      arm64: remove redundant FRAME_POINTER kconfig option and force to select it
+
+Zi Shen Lim (2):
+      arm64: bpf: fix div-by-zero case
+      arm64: bpf: fix mod-by-zero case
+
+ arch/arm64/Kconfig                    |  1 +
+ arch/arm64/Kconfig.debug              |  4 ---
+ arch/arm64/configs/defconfig          |  1 +
+ arch/arm64/include/asm/atomic_ll_sc.h |  2 +-
+ arch/arm64/include/asm/atomic_lse.h   |  2 +-
+ arch/arm64/include/asm/pgtable.h      |  1 +
+ arch/arm64/include/uapi/asm/kvm.h     |  2 +-
+ arch/arm64/kernel/cpufeature.c        |  2 +-
+ arch/arm64/kernel/smp.c               |  2 +-
+ arch/arm64/kernel/suspend.c           |  2 +-
+ arch/arm64/kernel/vdso/Makefile       |  3 ++
+ arch/arm64/mm/mmu.c                   |  8 +++---
+ arch/arm64/net/bpf_jit.h              |  3 +-
+ arch/arm64/net/bpf_jit_comp.c         | 54 +++++++++++++++++++++++------------
+ 14 files changed, 54 insertions(+), 33 deletions(-)
+
+-- 
+Catalin
