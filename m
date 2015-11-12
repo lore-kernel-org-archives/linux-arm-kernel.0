@@ -1,56 +1,54 @@
 From: alex.bennee@linaro.org (=?UTF-8?q?Alex=20Benn=C3=A9e?=)
-Date: Thu, 12 Nov 2015 16:20:45 +0000
-Subject: [PATCH v9 0/6] QEMU support for KVM Guest Debug on arm64
-Message-ID: <1447345251-22625-1-git-send-email-alex.bennee@linaro.org>
+Date: Thu, 12 Nov 2015 16:20:48 +0000
+Subject: [PATCH v9 3/6] target-arm: kvm - support for single step
+In-Reply-To: <1447345251-22625-1-git-send-email-alex.bennee@linaro.org>
+References: <1447345251-22625-1-git-send-email-alex.bennee@linaro.org>
+Message-ID: <1447345251-22625-4-git-send-email-alex.bennee@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+This adds support for single-step. There isn't much to do on the QEMU
+side as after we set-up the request for single step via the debug ioctl
+it is all handled within the kernel.
 
-Here is the latest patch set to support debugging of KVM guests on
-arm64. The main changes since the last post are that the kernel
-patches have now been mainlined. As the recent master has synced up
-headers they are no longer needed for this series.
+Signed-off-by: Alex Benn?e <alex.bennee@linaro.org>
 
-I've add a GDB Python based test into tests/guest-debug. However I
-haven't plumbed it in to the "make check" machinery as we don't really
-have a good solution for adding binaries for testing (especially in
-TCG cases). This patch can be dropped if wanted and I'll just keep it
-locally.
+---
+v2
+  - convert to using HSR_EC
+v3
+  - use internals.h definitions
+---
+ target-arm/kvm.c | 10 ++++++++++
+ 1 file changed, 10 insertions(+)
 
-So in summary the changes are:
-
-  - Kernel ABI now finalised and mainlined
-  - Fixed the handling of watchpoints
-  - Removed manual array fiddling in favour of g_array
-  - Addressed most of Peter Maydell's review comments
-  - The patch series is now checkpatch.pl clean
-
-More detailed changelogs are attached to each patch.
-
-GIT Repo:
-
-The patch series is based off a recent master and can be found at:
-
-https://github.com/stsquad/qemu
-branch: kvm/guest-debug-v9
-
-
-Alex Benn?e (6):
-  target-arm: kvm64 - introduce kvm_arm_init_debug()
-  target-arm: kvm - implement software breakpoints
-  target-arm: kvm - support for single step
-  target-arm: kvm - add support for HW assisted debug
-  target-arm: kvm - re-inject guest debug exceptions
-  tests/guest-debug: introduce basic gdbstub tests
-
- target-arm/helper-a64.c           |  12 +-
- target-arm/kvm.c                  | 137 +++++++++++---
- target-arm/kvm64.c                | 366 ++++++++++++++++++++++++++++++++++++++
- target-arm/kvm_arm.h              |  38 ++++
- tests/guest-debug/test-gdbstub.py | 171 ++++++++++++++++++
- 5 files changed, 696 insertions(+), 28 deletions(-)
- create mode 100644 tests/guest-debug/test-gdbstub.py
-
+diff --git a/target-arm/kvm.c b/target-arm/kvm.c
+index 50f70ef..d505a7e 100644
+--- a/target-arm/kvm.c
++++ b/target-arm/kvm.c
+@@ -535,6 +535,13 @@ static int kvm_handle_debug(CPUState *cs, struct kvm_run *run)
+     kvm_cpu_synchronize_state(cs);
+ 
+     switch (hsr_ec) {
++    case EC_SOFTWARESTEP:
++        if (cs->singlestep_enabled) {
++            return true;
++        } else {
++            error_report("Came out of SINGLE STEP when not enabled");
++        }
++        break;
+     case EC_AA64_BKPT:
+         if (kvm_find_sw_breakpoint(cs, env->pc)) {
+             return true;
+@@ -595,6 +602,9 @@ int kvm_arch_on_sigbus(int code, void *addr)
+ 
+ void kvm_arch_update_guest_debug(CPUState *cs, struct kvm_guest_debug *dbg)
+ {
++    if (cs->singlestep_enabled) {
++        dbg->control |= KVM_GUESTDBG_ENABLE | KVM_GUESTDBG_SINGLESTEP;
++    }
+     if (kvm_sw_breakpoints_active(cs)) {
+         dbg->control |= KVM_GUESTDBG_ENABLE | KVM_GUESTDBG_USE_SW_BP;
+     }
 -- 
 2.6.3
