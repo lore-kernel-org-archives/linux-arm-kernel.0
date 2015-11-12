@@ -1,62 +1,81 @@
 From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Thu, 12 Nov 2015 13:35:18 +0900
-Subject: [PATCH v4 9/9] drivers: soc: Add support for Exynos PMU driver
-In-Reply-To: <1447155784-12667-10-git-send-email-pankaj.dubey@samsung.com>
+Date: Thu, 12 Nov 2015 13:39:02 +0900
+Subject: [PATCH v4 8/9] ARM: EXYNOS: rearrange static and non-static
+ functions of PMU driver
+In-Reply-To: <1447155784-12667-9-git-send-email-pankaj.dubey@samsung.com>
 References: <1447155784-12667-1-git-send-email-pankaj.dubey@samsung.com>
- <1447155784-12667-10-git-send-email-pankaj.dubey@samsung.com>
-Message-ID: <56441706.5070206@samsung.com>
+ <1447155784-12667-9-git-send-email-pankaj.dubey@samsung.com>
+Message-ID: <564417E6.8070905@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 On 10.11.2015 20:43, Pankaj Dubey wrote:
-> This patch moves Exynos PMU driver implementation from "arm/mach-exynos"
-> to "drivers/soc/samsung". This driver is mainly used for setting misc
-> bits of register from PMU IP of Exynos SoC which will be required to
-> configure before Suspend/Resume. Currently all these settings are done
-> in "arch/arm/mach-exynos/pmu.c" but moving ahead for ARM64 based SoC
-> support, there is a need of this PMU driver in driver/* folder.
-> 
-> This driver uses existing DT binding information and there should
-> be no functionality change in the supported platforms.
-> 
-> Signed-off-by: Amit Daniel Kachhap <amitdanielk@gmail.com>
-> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
-> ---
->  arch/arm/mach-exynos/Kconfig          |   1 +
->  arch/arm/mach-exynos/Makefile         |   4 +-
->  arch/arm/mach-exynos/exynos-pmu.h     |  45 ------
->  arch/arm/mach-exynos/exynos3250-pmu.c | 175 ---------------------
->  arch/arm/mach-exynos/exynos4-pmu.c    | 223 ---------------------------
->  arch/arm/mach-exynos/exynos5250-pmu.c | 196 ------------------------
->  arch/arm/mach-exynos/exynos5420-pmu.c | 280 ----------------------------------
->  arch/arm/mach-exynos/pmu.c            | 183 ----------------------
->  drivers/soc/samsung/Kconfig           |   4 +
->  drivers/soc/samsung/Makefile          |   4 +
->  drivers/soc/samsung/exynos-pmu.c      | 183 ++++++++++++++++++++++
->  drivers/soc/samsung/exynos-pmu.h      |  45 ++++++
->  drivers/soc/samsung/exynos3250-pmu.c  | 175 +++++++++++++++++++++
->  drivers/soc/samsung/exynos4-pmu.c     | 223 +++++++++++++++++++++++++++
->  drivers/soc/samsung/exynos5250-pmu.c  | 196 ++++++++++++++++++++++++
->  drivers/soc/samsung/exynos5420-pmu.c  | 280 ++++++++++++++++++++++++++++++++++
->  16 files changed, 1112 insertions(+), 1105 deletions(-)
->  delete mode 100644 arch/arm/mach-exynos/exynos-pmu.h
->  delete mode 100644 arch/arm/mach-exynos/exynos3250-pmu.c
->  delete mode 100644 arch/arm/mach-exynos/exynos4-pmu.c
->  delete mode 100644 arch/arm/mach-exynos/exynos5250-pmu.c
->  delete mode 100644 arch/arm/mach-exynos/exynos5420-pmu.c
->  delete mode 100644 arch/arm/mach-exynos/pmu.c
->  create mode 100644 drivers/soc/samsung/exynos-pmu.c
->  create mode 100644 drivers/soc/samsung/exynos-pmu.h
->  create mode 100644 drivers/soc/samsung/exynos3250-pmu.c
->  create mode 100644 drivers/soc/samsung/exynos4-pmu.c
->  create mode 100644 drivers/soc/samsung/exynos5250-pmu.c
->  create mode 100644 drivers/soc/samsung/exynos5420-pmu.c
+> This patch moves exynos_sys_powerdown_conf function above all
+> static functions.
 
-Again - renames were not detected. This is strange... and actually
-unreadable. The previous patch looked much better. What happened?
-
-Please send also entire patchset to linux-pm mailing list. I asked about
-it last time and can't see it as recipient here.
+Please (always) describe the reason, the answer to "why?". In this case
+I know why, but other reviewers may not and other people grepping
+through history definitely won't know.
 
 Best regards,
 Krzysztof
+
+> 
+> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+> ---
+>  arch/arm/mach-exynos/pmu.c | 34 +++++++++++++++++-----------------
+>  1 file changed, 17 insertions(+), 17 deletions(-)
+> 
+> diff --git a/arch/arm/mach-exynos/pmu.c b/arch/arm/mach-exynos/pmu.c
+> index e01bdf1..f300ac9 100644
+> --- a/arch/arm/mach-exynos/pmu.c
+> +++ b/arch/arm/mach-exynos/pmu.c
+> @@ -39,23 +39,6 @@ u32 pmu_raw_readl(u32 offset)
+>  	return readl_relaxed(pmu_base_addr + offset);
+>  }
+>  
+> -static void exynos_power_off(void)
+> -{
+> -	unsigned int tmp;
+> -
+> -	pr_info("Power down.\n");
+> -	tmp = pmu_raw_readl(EXYNOS_PS_HOLD_CONTROL);
+> -	tmp ^= (1 << 8);
+> -	pmu_raw_writel(tmp, EXYNOS_PS_HOLD_CONTROL);
+> -
+> -	/* Wait a little so we don't give a false warning below */
+> -	mdelay(100);
+> -
+> -	pr_err("Power down failed, please power off system manually.\n");
+> -	while (1)
+> -		;
+> -}
+> -
+>  void exynos_sys_powerdown_conf(enum sys_powerdown mode)
+>  {
+>  	unsigned int i;
+> @@ -85,6 +68,23 @@ void exynos_sys_powerdown_conf(enum sys_powerdown mode)
+>  	}
+>  }
+>  
+> +static void exynos_power_off(void)
+> +{
+> +	unsigned int tmp;
+> +
+> +	pr_info("Power down.\n");
+> +	tmp = pmu_raw_readl(EXYNOS_PS_HOLD_CONTROL);
+> +	tmp ^= (1 << 8);
+> +	pmu_raw_writel(tmp, EXYNOS_PS_HOLD_CONTROL);
+> +
+> +	/* Wait a little so we don't give a false warning below */
+> +	mdelay(100);
+> +
+> +	pr_err("Power down failed, please power off system manually.\n");
+> +	while (1)
+> +		;
+> +}
+> +
+>  static int pmu_restart_notify(struct notifier_block *this,
+>  		unsigned long code, void *unused)
+>  {
+> 
