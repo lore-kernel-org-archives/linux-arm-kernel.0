@@ -1,49 +1,88 @@
-From: florian@openwrt.org (Florian Fainelli)
-Date: Thu, 12 Nov 2015 10:40:19 -0800
-Subject: [PATCH] spi: bcm63xx: use correct format string for printing
- a resource
-In-Reply-To: <8442314.JjGyK1Sa3M@wuerfel>
-References: <8442314.JjGyK1Sa3M@wuerfel>
-Message-ID: <5644DD13.9070206@openwrt.org>
+From: plaes@plaes.org (Priit Laes)
+Date: Thu, 12 Nov 2015 20:53:19 +0200
+Subject: [linux-sunxi] Re: [PATCH v3 3/3] ARM: dts: sun4i: gemei-g9:
+ Enable sun4i audio codec support
+In-Reply-To: <CAGb2v66uG-0EgVR=5SS4Lk-y5mX9v3Z39xP+0f7u7BfYq-b1yw@mail.gmail.com>
+References: <1446832486-32319-1-git-send-email-plaes@plaes.org>
+ <1446832486-32319-4-git-send-email-plaes@plaes.org>
+ <CAGb2v66uG-0EgVR=5SS4Lk-y5mX9v3Z39xP+0f7u7BfYq-b1yw@mail.gmail.com>
+Message-ID: <1447354399.31635.10.camel@plaes.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/11/15 08:44, Arnd Bergmann wrote:
-> With a 64-bit resource_size_t, we get a build warning on bcm63xx_spi_probe:
+On Mon, 2015-11-09 at 11:59 +0800, Chen-Yu Tsai wrote:
+> On Sat, Nov 7, 2015 at 1:54 AM, Priit Laes <plaes@plaes.org> wrote:
+> > Gemei G9 has internal speakers and headphone jack. Audio switching
+> > from internal speakers to headphones is automatically handled by
+> > extra FT2012Q audio amplifier chip that works out of the box.
 > 
-> drivers/spi/spi-bcm63xx.c:565:16: warning: format '%x' expects argument of type 'unsigned int', but argument 3 has type 'resource_size_t {aka long long unsigned int}' [-Wformat=]
+> Nice that it works out of the box. The FEX file does mention:
 > 
-> As we are printing a resource, we can just use the %pr format
-> specifier that pretty-prints the address and avoids the warning.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> audio_pa_ctrl???= port:PH15<1><default><default><0>
 
-Acked-by: Florian Fainelli <f.fainelli@gmail.com>
+Nice catch.
 
-Thanks
+Setting it low mutes audio, and setting it back high unmutes.
 
-> ---
-> Found on arm multi_v7_defconfig with LPAE
+
+
+> So either it is floating or pulled up by default? Since it works
+> now I don't see any reason to block it. On the other hand once
+> that binding is introduced it would be nice to add it for power
+> management reasons.
+
+Should I just add comment about it or do something like this:
+
+&codec {
+? status = "okay";
+? /*
+? ?* TODO: Add codec_ext_pwr_pin to turn off external audio AMP
+? ?&pio {
+? ? ?codec_ext_pwr_pin:?codec_ext_pwr_pin at 0?{
+? ? ? ?allwinner,pins = "PH15";
+? ? ? ?allwinner,function = "gpio_out";
+? ? ? ?allwinner,drive = <SUN4I_PINCTRL_10_MA>;
+? ? ? ?allwinner,pull = <SUN4I_PINCTRL_PULL_UP>;
+? ? ?}
+? ?}
+? ?*/
+}
+
+
 > 
-> diff --git a/drivers/spi/spi-bcm63xx.c b/drivers/spi/spi-bcm63xx.c
-> index 06858e04ec59..bf9a610e5b89 100644
-> --- a/drivers/spi/spi-bcm63xx.c
-> +++ b/drivers/spi/spi-bcm63xx.c
-> @@ -562,8 +562,8 @@ static int bcm63xx_spi_probe(struct platform_device *pdev)
->  		goto out_clk_disable;
->  	}
->  
-> -	dev_info(dev, "at 0x%08x (irq %d, FIFOs size %d)\n",
-> -		 r->start, irq, bs->fifo_size);
-> +	dev_info(dev, "at %pr (irq %d, FIFOs size %d)\n",
-> +		 r, irq, bs->fifo_size);
->  
->  	return 0;
->  
+> Acked-by: Chen-Yu Tsai <wens@csie.org>
 > 
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> > Signed-off-by: Priit Laes <plaes@plaes.org>
+> > ---
+> > Changes since v2:
+> > ?- Dropped routing property.
+> > 
+> > ?arch/arm/boot/dts/sun4i-a10-gemei-g9.dts | 5 ++++-
+> > ?1 file changed, 4 insertions(+), 1 deletion(-)
+> > 
+> > diff --git a/arch/arm/boot/dts/sun4i-a10-gemei-g9.dts
+> > b/arch/arm/boot/dts/sun4i-a10-gemei-g9.dts
+> > index 16c1a67..1d73a98 100644
+> > --- a/arch/arm/boot/dts/sun4i-a10-gemei-g9.dts
+> > +++ b/arch/arm/boot/dts/sun4i-a10-gemei-g9.dts
+> > @@ -65,12 +65,15 @@
+> > ?/*
+> > ? * TODO:
+> > ? *???2x cameras via CSI
+> > - *???audio
+> > + *???audio input
+> > ? *???AXP battery management
+> > ? *???NAND
+> > ? *???OTG
+> > ? *???Touchscreen - gt801_2plus1 @ i2c adapter 2 @ 0x48
+> > ? */
+> > +&codec {
+> > +???????status = "okay";
+> > +};
+> > 
+> > ?&cpu0 {
+> > ????????cpu-supply = <&reg_dcdc2>;
+> > --
+> > 2.6.3
+> > 
 > 
