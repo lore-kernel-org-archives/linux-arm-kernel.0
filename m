@@ -1,52 +1,26 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Thu, 12 Nov 2015 12:09:24 -0600
-Subject: [PATCH] gpio: omap: fix debounce time calculation
-In-Reply-To: <5644D4F5.8070006@ti.com>
-References: <1447350640-20347-1-git-send-email-balbi@ti.com>
- <5644D4F5.8070006@ti.com>
-Message-ID: <87egfvqecr.fsf@saruman.tx.rr.com>
+From: edubezval@gmail.com (Eduardo Valentin)
+Date: Thu, 12 Nov 2015 10:29:52 -0800
+Subject: [PATCH v4 00/10] Better compatible for the rockchip thermal and
+ support RK3368 SoCs
+In-Reply-To: <1447044542-30859-1-git-send-email-wxt@rock-chips.com>
+References: <1447044542-30859-1-git-send-email-wxt@rock-chips.com>
+Message-ID: <20151112182950.GB4361@localhost.localdomain>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On Mon, Nov 09, 2015 at 12:48:52PM +0800, Caesar Wang wrote:
+> Thank you all for providing inputs and comments on previous versions of
+> this patchset.
+> Especially thanks to the (Eduardo, Dmitry, Heiko,....).
+> 
+> This series patchs are working for RK3368 on Rockchip platform.
 
-Hi,
+Do you have any results on existing support? Is the driver still in one
+piece for rk3288?
 
-Grygorii Strashko <grygorii.strashko@ti.com> writes:
-> On 11/12/2015 07:50 PM, Felipe Balbi wrote:
->> According to TRM, debounce is measured in periods of
->> the functional clock of the GPIO IP. This means that
->
->
-> What TRM? link pls.
->
-> http://www.ti.com/lit/ug/spruhl7d/spruhl7d.pdf
->
-> 28.4.1.24 GPIO_DEBOUNCINGTIME Register (offset = 154h) [reset = 0h]
->
-> The GPIO_DEBOUNCINGTIME register controls debouncing time (the value is
-> global for all ports). The debouncing cell is running with the
-> debouncing clock (32 kHz), this register represents the number of the
-> clock cycle(s) (31 s long) to be used.
->
-> Debouncing Value in 31 microsecond steps.
-> Debouncing Value = (DEBOUNCETIME + 1) * 31 microseconds.
+I am planing to send your series in next rc cycles. It won't appear in
+linux-next until merge window finishes.
 
-DRA7xx:
+BR,
 
-"
-8-bit values specifying the debouncing time. It is n-
-periods of the muxed clock, which can come from either
-a true 32k oscillator/pad of from the system clock. It
-depends on which boot mode is selected. For more
-information see Chapter 32, Initialization.
-"
-
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 818 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151112/d86a43f3/attachment.sig>
+Eduardo Valentin
