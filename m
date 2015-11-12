@@ -1,70 +1,35 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Thu, 12 Nov 2015 09:57:40 +0100
-Subject: [PATCH 2/2] arm64: bpf: add BPF XADD instruction
-In-Reply-To: <20151111234014.GA17014@ast-mbp.thefacebook.com>
-References: <20151111172659.GA86334@ast-mbp.thefacebook.com>
- <20151111.123548.1039494689070388545.davem@davemloft.net>
- <20151111175741.GR17308@twins.programming.kicks-ass.net>
- <20151111181132.GA90947@ast-mbp.thefacebook.com>
- <20151111183128.GS17308@twins.programming.kicks-ass.net>
- <20151111184427.GH11639@twins.programming.kicks-ass.net>
- <20151111185415.GI11639@twins.programming.kicks-ass.net>
- <20151111195558.GA4173@ast-mbp.thefacebook.com>
- <20151111222135.GU17308@twins.programming.kicks-ass.net>
- <20151111234014.GA17014@ast-mbp.thefacebook.com>
-Message-ID: <20151112085740.GV17308@twins.programming.kicks-ass.net>
+From: schwab@suse.de (Andreas Schwab)
+Date: Thu, 12 Nov 2015 09:58:43 +0100
+Subject: [PATCH v6 13/17] arm64:ilp32: add sys_ilp32.c and a separate
+ table (in entry.S) to use it
+In-Reply-To: <10433819.KzDuoxzSn7@wuerfel> (Arnd Bergmann's message of "Thu,
+ 12 Nov 2015 00:23:43 +0100")
+References: <1446507046-24604-1-git-send-email-ynorov@caviumnetworks.com>
+ <20577001.4Nl3YnQ8k2@wuerfel> <87k2pojfsy.fsf@igel.home>
+ <10433819.KzDuoxzSn7@wuerfel>
+Message-ID: <mvmoaezy4os.fsf@hawking.suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 11, 2015 at 03:40:15PM -0800, Alexei Starovoitov wrote:
-> On Wed, Nov 11, 2015 at 11:21:35PM +0100, Peter Zijlstra wrote:
-> > On Wed, Nov 11, 2015 at 11:55:59AM -0800, Alexei Starovoitov wrote:
-> > > Therefore things like memory barriers, full set of atomics are not applicable
-> > > in bpf world.
-> > 
-> > There are still plenty of wait-free constructs one can make using them.
-> 
-> yes, but all such lock-free algos are typically based on cmpxchg8b and
-> tight loop, so it would be very hard for verifier to proof termination
-> of such loops. I think when we'd need to add something like this, we'll
-> add new bpf insn that will be membarrier+cmpxhg8b+check+loop as
-> a single insn, so it cannot be misused.
-> I don't know of any concrete use case yet. All possible though.
+Arnd Bergmann <arnd@arndb.de> writes:
 
-So this is where the 'unconditional' atomic ops come in handy.
+> I think either way is fine for the two examples. I think it's clear
+> that we want __NR_llseek as 62 and __NR_mmap2 as 222. Whether those
+> use the compat_sys_llseek/compat_sys_mmap2_wrapper or
+> sys_lseek/sys_mmap entry points is not overly important, we can use
+> whatever is more convenient to glibc: if we can kill off an
+> architecture specific wrapper function in glibc by adding one line
+> to the kernel, that seems worthwhile.
 
-Like the x86: xchg, lock {xadd,add,sub,inc,dec,or,and,xor}
+Currently most off_t-like syscalls need a new glibc wrapper since the
+existing ones are either for 32bit off_t+off64_t (with split off64_t
+syscall arguments) or pure 64bit off_t architectures.  Since ilp32 now
+(mostly) has 32bit off_t, but 64bit off_t-like syscalls neither of them
+fit.
 
-Those do not have a loop, and then you can create truly wait-free
-things; even some applications of cmpxchg do not actually need the loop.
+Andreas.
 
-But this class of wait-free constructs is indeed significantly smaller
-than the class of lock-less constructs.
-
-> btw, support for mini loops was requested many times in the past.
-> I guess we'd have to add something like this, but it's tricky.
-> Mainly because control flow graph analysis becomes much more complicated.
-
-Agreed, that does sound like an 'interesting' problem :-)
-
-Something like:
-
-atomic_op(ptr, f)
-{
-	for (;;) {
-		val = *ptr;
-		new = f(val)
-		old = cmpxchg(ptr, val, new);
-		if (old == val)
-			break;
-
-		cpu_relax();
-	}
-}
-
-might be castable as an instruction I suppose, but I'm not sure you have
-function references in (e)BPF.
-
-The above is 'sane' if f is sane (although there is a
-starvation case, which is why things like sparc (iirc) need an
-increasing backoff instead of cpu_relax()).
+-- 
+Andreas Schwab, SUSE Labs, schwab at suse.de
+GPG Key fingerprint = 0196 BAD8 1CE9 1970 F4BE  1748 E4D4 88E3 0EEA B9D7
+"And now for something completely different."
