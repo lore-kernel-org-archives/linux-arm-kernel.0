@@ -1,69 +1,40 @@
-From: santosh.shilimkar@oracle.com (santosh shilimkar)
-Date: Thu, 12 Nov 2015 12:02:19 -0800
-Subject: [PATCH] gpio: omap: fix debounce time calculation
-In-Reply-To: <877flnqagp.fsf@saruman.tx.rr.com>
-References: <1447350640-20347-1-git-send-email-balbi@ti.com>
- <5644D4F5.8070006@ti.com> <87egfvqecr.fsf@saruman.tx.rr.com>
- <5644E85C.8010807@ti.com> <877flnqagp.fsf@saruman.tx.rr.com>
-Message-ID: <5644F04B.6080406@oracle.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Thu, 12 Nov 2015 12:11:35 -0800
+Subject: pj4 -marm breaks thumb ftrace
+In-Reply-To: <56446A40.7000304@linaro.org>
+References: <20151112095020.GB15032@codeaurora.org>
+ <56446A40.7000304@linaro.org>
+Message-ID: <20151112201135.GD15032@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/12/2015 11:33 AM, Felipe Balbi wrote:
->
-> Hi,
->
-> Grygorii Strashko <grygorii.strashko@ti.com> writes:
->> On 11/12/2015 08:09 PM, Felipe Balbi wrote:
->>>
->>> Hi,
->>>
->>> Grygorii Strashko <grygorii.strashko@ti.com> writes:
->>>> On 11/12/2015 07:50 PM, Felipe Balbi wrote:
->>>>> According to TRM, debounce is measured in periods of
->>>>> the functional clock of the GPIO IP. This means that
->>>>
->>>>
->>>> What TRM? link pls.
->>>>
->>>> http://www.ti.com/lit/ug/spruhl7d/spruhl7d.pdf
->>>>
->>>> 28.4.1.24 GPIO_DEBOUNCINGTIME Register (offset = 154h) [reset = 0h]
->>>>
->>>> The GPIO_DEBOUNCINGTIME register controls debouncing time (the value is
->>>> global for all ports). The debouncing cell is running with the
->>>> debouncing clock (32 kHz), this register represents the number of the
->>>> clock cycle(s) (31 s long) to be used.
->>>>
->>>> Debouncing Value in 31 microsecond steps.
->>>> Debouncing Value = (DEBOUNCETIME + 1) * 31 microseconds.
->>>
->>> DRA7xx:
->>>
->>> "
->>> 8-bit values specifying the debouncing time. It is n-
->>> periods of the muxed clock, which can come from either
->>> a true 32k oscillator/pad of from the system clock. It
->>> depends on which boot mode is selected. For more
->>> information see Chapter 32, Initialization.
->>> "
->>>
->>
->> See
->> http://www.ti.com/lit/ug/spruhz6d/spruhz6d.pdf
->> 27.4.3 General-Purpose Interface Clock Configuration
->> 27.4.3.1 Clocking
->>
->> This completely unclear. Sry, I think this patch can't be used as is,
->> first of all because of backward compatibility issues.
->
-> yeah, might be. No issues, I'll just go dig older TRMs and trying to
-> figure this one out. Meanwhile, let's let's keep it as is.
->
-Just to be clear, being a common GPIO driver, it can't break
-backward compatibility. So NAK for current patch.
-If needed, please setup different debounce functions based
-on GPIO IP numbers if it makes is efficient/accurate.
+On 11/12, Ard Biesheuvel wrote:
+> On 12 November 2015 at 10:50, Stephen Boyd <sboyd@codeaurora.org> wrote:
+> 
+> -----8<-----
+> From de52762b71c85c6c2142a67ba8833a13d4ca8acb Mon Sep 17 00:00:00 2001
+> From: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> Date: Thu, 12 Nov 2015 11:17:46 +0100
+> Subject: [PATCH] ARM: PJ4: move coprocessor register access sequences to
+>  iwmmxt.S
+> 
+> The PJ4 inline asm sequences in pj4-cp0.c cannot be built in Thumb-2
+> mode, due to the way they perform arithmetic on the program counter,
+> so it is built in ARM mode instead. However, building C files in ARM
+> mode under CONFIG_THUMB2_KERNEL is problematic, since the
+> instrumentation performed by subsystems like ftrace does not expect
+> having to deal with interworking branches.
+> 
+> So instead, revert to building pj4-cp0.c in Thumb-2 mode, and move the
+> offending sequences to iwmmxt.S, which is not instrumented anyway,
+> and is already built in ARM mode unconditionally.
+> 
+> Reported-by: Stephen Boyd <sboyd@codeaurora.org>
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
-Regards,
-Santosh
+I was thinking alone the same lines for an alternate solution. If
+you resend with the __INIT stuff I'll test it out.
+
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
