@@ -1,79 +1,48 @@
-From: peter@hurleysoftware.com (Peter Hurley)
-Date: Thu, 12 Nov 2015 07:17:47 -0500
-Subject: [PATCH] ARM: xip: Use correct symbol for end of ROM marker
-In-Reply-To: <1447251455-22731-1-git-send-email-chris.brandt@renesas.com>
-References: <1447251455-22731-1-git-send-email-chris.brandt@renesas.com>
-Message-ID: <5644836B.2050608@hurleysoftware.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 12 Nov 2015 13:21:02 +0100
+Subject: [PATCH] PCI: hisi: Fix Section mismatch compilation warning for
+ probe()
+In-Reply-To: <1447329728-1589-1-git-send-email-jszhang@marvell.com>
+References: <1447329728-1589-1-git-send-email-jszhang@marvell.com>
+Message-ID: <4599031.EERjkvxHAA@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/11/2015 09:17 AM, Chris Brandt wrote:
-> For an XIP build, _edata_loc, not _etext, represents the end of the
-> binary image that will be programmed into ROM and mapped into the
-> MODULES_VADDR area.
-> With an XIP kernel, nothing is loaded into RAM before boot, meaning
-> you have to take into account the size of the entire binary image
-> that was programmed, including the init data values that will be copied
-> to RAM during kernel boot.
+On Thursday 12 November 2015 20:02:08 Jisheng Zhang wrote:
+> Following compilation warning occurs when compiled with:
+> CONFIG_DEBUG_SECTION_MISMATCH=y
 > 
-> This fixes the bug where you might lose the end of your kernel area
-> after page table setup is complete.
+>  WARNING: drivers/pci/host/built-in.o(.data+0x308): Section mismatch in
+>  reference from the variable hisi_pcie_driver to the function
+>  .init.text:hisi_pcie_probe()
 > 
-> 
-> Signed-off-by: Chris Brandt <chris.brandt@renesas.com>
+> Fix it by dropping __init from hisi_pcie_probe().
+
+The patch description should ideally say what the impact is here, not
+only what the warning says.
+
+> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+> Fixes: 500a1d9a43e0 ("PCI: hisi: Add HiSilicon SoC Hip05 PCIe driver")
 > ---
->  arch/arm/mm/mmu.c              |    4 ++--
->  include/asm-generic/sections.h |    2 +-
->  2 files changed, 3 insertions(+), 3 deletions(-)
+>  drivers/pci/host/pcie-hisi.c | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-> index 4867f5d..dd5a56b 100644
-> --- a/arch/arm/mm/mmu.c
-> +++ b/arch/arm/mm/mmu.c
-> @@ -1210,7 +1210,7 @@ static inline void prepare_page_table(void)
+> diff --git a/drivers/pci/host/pcie-hisi.c b/drivers/pci/host/pcie-hisi.c
+> index 35457ec..1cc0a21 100644
+> --- a/drivers/pci/host/pcie-hisi.c
+> +++ b/drivers/pci/host/pcie-hisi.c
+> @@ -139,7 +139,7 @@ static int __init hisi_add_pcie_port(struct pcie_port *pp,
+>         return 0;
+>  }
 >  
->  #ifdef CONFIG_XIP_KERNEL
->  	/* The XIP kernel is mapped in the module area -- skip over it */
-> -	addr = ((unsigned long)_etext + PMD_SIZE - 1) & PMD_MASK;
-> +	addr = ((unsigned long)_edata_loc + PMD_SIZE - 1) & PMD_MASK;
->  #endif
->  	for ( ; addr < PAGE_OFFSET; addr += PMD_SIZE)
->  		pmd_clear(pmd_off_k(addr));
-> @@ -1292,7 +1292,7 @@ static void __init devicemaps_init(const struct machine_desc *mdesc)
->  #ifdef CONFIG_XIP_KERNEL
->  	map.pfn = __phys_to_pfn(CONFIG_XIP_PHYS_ADDR & SECTION_MASK);
->  	map.virtual = MODULES_VADDR;
-> -	map.length = ((unsigned long)_etext - map.virtual + ~SECTION_MASK) & SECTION_MASK;
-> +	map.length = ((unsigned long)_edata_loc - map.virtual + ~SECTION_MASK) & SECTION_MASK;
->  	map.type = MT_ROM;
->  	create_mapping(&map);
->  #endif
-> diff --git a/include/asm-generic/sections.h b/include/asm-generic/sections.h
-> index b58fd66..195554d 100644
-> --- a/include/asm-generic/sections.h
-> +++ b/include/asm-generic/sections.h
-> @@ -26,7 +26,7 @@
->   *	__ctors_start, __ctors_end
->   */
->  extern char _text[], _stext[], _etext[];
-> -extern char _data[], _sdata[], _edata[];
-> +extern char _data[], _sdata[], _edata[], _edata_loc[];
->  extern char __bss_start[], __bss_stop[];
->  extern char __init_begin[], __init_end[];
->  extern char _sinittext[], _einittext[];
-> 
+> -static int __init hisi_pcie_probe(struct platform_device *pdev)
+> +static int hisi_pcie_probe(struct platform_device *pdev)
+>  {
+>         struct hisi_pcie *hisi_pcie;
+>         struct pcie_port *pp;
 
-I think below is required as well.
+This seems incomplete, you now get a new warning about hisi_add_pcie_port().
 
---- a/arch/arm/kernel/module.c
-+++ b/arch/arm/kernel/module.c
-@@ -34,7 +36,7 @@
-  * recompiling the whole kernel when CONFIG_XIP_KERNEL is turned on/off.
-  */
- #undef MODULES_VADDR
--#define MODULES_VADDR	(((unsigned long)_etext + ~PMD_MASK) & PMD_MASK)
-+#define MODULES_VADDR	(((unsigned long)_edata_loc + ~PMD_MASK) & PMD_MASK)
- #endif
- 
-Regards,
-Peter Hurley
+I did a similar patch yesterday, will follow up with my version.
+
+	Arnd
