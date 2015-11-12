@@ -1,72 +1,85 @@
 From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
-Date: Thu, 12 Nov 2015 17:29:47 +0000
-Subject: [PATCH v4 0/7] Xen wallclock on arm and arm64
-Message-ID: <alpine.DEB.2.02.1511121726370.526@kaball.uk.xensource.com>
+Date: Thu, 12 Nov 2015 17:30:46 +0000
+Subject: [PATCH v4 5/7] xen/arm: introduce xen_read_wallclock
+In-Reply-To: <alpine.DEB.2.02.1511121726370.526@kaball.uk.xensource.com>
+References: <alpine.DEB.2.02.1511121726370.526@kaball.uk.xensource.com>
+Message-ID: <1447349448-22610-5-git-send-email-stefano.stabellini@eu.citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+Read the wallclock from the shared info page at boot time.
 
-this series introduces PV wallclock time support on arm and arm64.
+Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
 
+---
 
 Changes in v4:
 - simplify xen_read_wallclock
-- add a patch to support XENPF_settime64 on x86
-
 
 Changes in v3:
 - use ktime_get_ns instead of calling into the arch_timer functions
   directly
 - read the wallclock from the late_initcall
-- s/%llu.%0u/%llu.%09u
-- in xen_pvclock_gtod_notify use the passed struct timekeeper pointer
-  rather than calling __current_kernel_time64
-- use the passed struct timekeeper pointer to get the system time too
-- drop introduce __current_kernel_time64
-
 
 Changes in v2:
-- introduce __current_kernel_time64
-- rename dom0_op to platform_op
-- introduce XENPF_settime64
-- extend pvclock_wall_clock with sec_hi
 - properly convert arch_timer ticker to nsec
 - use timespec64 interfaces
 - use sec_hi to get a 64-bit seconds value
-- use XENPF_settime64
-- rename dom0_op to platform_op
+---
+ arch/arm/xen/enlighten.c |   27 +++++++++++++++++++++++++++
+ 1 file changed, 27 insertions(+)
 
-
-Stefano Stabellini (7):
-      xen: rename dom0_op to platform_op
-      xen/arm: introduce HYPERVISOR_platform_op on arm and arm64
-      xen: introduce XENPF_settime64
-      arm: extend pvclock_wall_clock with sec_hi
-      xen/arm: introduce xen_read_wallclock
-      xen/arm: set the system time in Xen via the XENPF_settime64 hypercall
-      xen/x86: support XENPF_settime64
-
- arch/arm/include/asm/xen/hypercall.h |    2 +
- arch/arm/include/asm/xen/interface.h |    1 +
- arch/arm/xen/enlighten.c             |   83 +++++++++++++++++++++++++++++++++-
- arch/arm/xen/hypercall.S             |    1 +
- arch/arm64/xen/hypercall.S           |    1 +
- arch/x86/include/asm/xen/hypercall.h |    6 +--
- arch/x86/xen/apic.c                  |    2 +-
- arch/x86/xen/enlighten.c             |    8 ++--
- arch/x86/xen/time.c                  |   35 +++++++++++---
- drivers/xen/acpi.c                   |    2 +-
- drivers/xen/efi.c                    |   30 ++++++------
- drivers/xen/pcpu.c                   |    8 ++--
- drivers/xen/xen-acpi-cpuhotplug.c    |    2 +-
- drivers/xen/xen-acpi-pad.c           |    4 +-
- drivers/xen/xen-acpi-processor.c     |    8 ++--
- drivers/xen/xenfs/xensyms.c          |    4 +-
- include/xen/interface/platform.h     |   18 ++++++--
- include/xen/interface/xen.h          |    2 +-
- 18 files changed, 167 insertions(+), 50 deletions(-)
-
-Cheers,
-
-Stefano
+diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
+index 2f57ba3..6ae4ef5 100644
+--- a/arch/arm/xen/enlighten.c
++++ b/arch/arm/xen/enlighten.c
+@@ -28,6 +28,7 @@
+ #include <linux/cpufreq.h>
+ #include <linux/cpu.h>
+ #include <linux/console.h>
++#include <linux/timekeeping.h>
+ 
+ #include <linux/mm.h>
+ 
+@@ -95,6 +96,27 @@ static unsigned long long xen_stolen_accounting(int cpu)
+ 	return state.time[RUNSTATE_runnable] + state.time[RUNSTATE_offline];
+ }
+ 
++static void xen_read_wallclock(struct timespec64 *ts)
++{
++	u32 version;
++	struct timespec64 now, ts_monotonic;
++	struct shared_info *s = HYPERVISOR_shared_info;
++	struct pvclock_wall_clock *wall_clock = &(s->wc);
++
++	/* get wallclock at system boot */
++	do {
++		version = wall_clock->version;
++		rmb();		/* fetch version before time */
++		now.tv_sec  = ((uint64_t)wall_clock->sec_hi << 32) | wall_clock->sec;
++		now.tv_nsec = wall_clock->nsec;
++		rmb();		/* fetch time before checking version */
++	} while ((wall_clock->version & 1) || (version != wall_clock->version));
++
++	/* time since system boot */
++	ktime_get_ts64(&ts_monotonic);
++	*ts = timespec64_add(now, ts_monotonic);
++}
++
+ static void xen_percpu_init(void)
+ {
+ 	struct vcpu_register_vcpu_info info;
+@@ -303,6 +325,11 @@ static int __init xen_pm_init(void)
+ 
+ 	pm_power_off = xen_power_off;
+ 	arm_pm_restart = xen_restart;
++	if (!xen_initial_domain()) {
++		struct timespec64 ts;
++		xen_read_wallclock(&ts);
++		do_settimeofday64(&ts);
++	}
+ 
+ 	return 0;
+ }
+-- 
+1.7.10.4
