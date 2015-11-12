@@ -1,26 +1,29 @@
 From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Thu, 12 Nov 2015 15:07:25 +0100
-Subject: [PATCH v2 0/5] arm: dts: complete dm816x device tree
-Message-ID: <56449D1D.4030803@baylibre.com>
+Date: Thu, 12 Nov 2015 15:07:30 +0100
+Subject: [PATCH v2 1/5] arm: dts: add dm816x missing #mbox-cells
+Message-ID: <56449D22.9030507@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to fix support for the dm816x platform, add missing bits in
-the dm816x dtsi and cleanup OCP.
+Add missing #mbox-cells for dm816x mbox DT node.
 
-The last patch adds support for the omap4-hwspinlock.
+Cc: Brian Hutchinson <b.hutchman@gmail.com>
+Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+---
+ arch/arm/boot/dts/dm816x.dtsi | 1 +
+ 1 file changed, 1 insertion(+)
 
-v2: add ocp hwmod cleanup
-
-Neil Armstrong (5):
-  arm: dts: add dm816x missing #mbox-cells
-  arm: dts: add dm816x missing spi DT dma handles
-  arm: dts: add dm816x pwm property to timers
-  arm: dts: remove dm816x invalid DT l3_main hwmod
-  arm: dts: Add omap4-hwspinlock support in dm816x
-
- arch/arm/boot/dts/dm816x.dtsi | 20 +++++++++++++++++---
- 1 file changed, 17 insertions(+), 3 deletions(-)
-
+diff --git a/arch/arm/boot/dts/dm816x.dtsi b/arch/arm/boot/dts/dm816x.dtsi
+index 3c99cfa..a7a34e4 100644
+--- a/arch/arm/boot/dts/dm816x.dtsi
++++ b/arch/arm/boot/dts/dm816x.dtsi
+@@ -218,6 +218,7 @@
+ 			reg = <0x480c8000 0x2000>;
+ 			interrupts = <77>;
+ 			ti,hwmods = "mailbox";
++			#mbox-cells = <1>;
+ 			ti,mbox-num-users = <4>;
+ 			ti,mbox-num-fifos = <12>;
+ 			mbox_dsp: mbox_dsp {
 -- 
 1.9.1
