@@ -1,20 +1,28 @@
-From: peterz@infradead.org (Peter Zijlstra)
-Date: Thu, 12 Nov 2015 15:53:31 +0100
-Subject: [PATCH] sched/rt: hide push_irq_work_func declaration
-In-Reply-To: <3810009.VdDTV0h1Qp@wuerfel>
-References: <3810009.VdDTV0h1Qp@wuerfel>
-Message-ID: <20151112145331.GC17308@twins.programming.kicks-ass.net>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Thu, 12 Nov 2015 14:57:59 +0000
+Subject: [PATCH] ARM64: mark cpus_have_hwcap as __maybe_unused
+In-Reply-To: <5369626.MJXv4CTaxt@wuerfel>
+References: <5369626.MJXv4CTaxt@wuerfel>
+Message-ID: <20151112145759.GH5627@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 12, 2015 at 03:22:22PM +0100, Arnd Bergmann wrote:
-> -#ifdef CONFIG_SMP
-> +#if IS_ENABLED(CONFIG_SMP) && defined(HAVE_RT_PUSH_IPI)
->  static void push_irq_work_func(struct irq_work *work);
->  #endif
+On Thu, Nov 12, 2015 at 03:20:16PM +0100, Arnd Bergmann wrote:
+> cpus_have_hwcap() is defined as a 'static' function an only used in
+> one place that is inside of an #ifdef, so we get a warning when
+> the only user is disabled:
+> 
+> arch/arm64/kernel/cpufeature.c:699:13: warning: 'cpus_have_hwcap' defined but not used [-Wunused-function]
+> 
+> This marks the function as __maybe_unused, so the compiler knows that
+> it can drop the function definition without warning about it.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Fixes: 37b01d53ceef ("arm64/HWCAP: Use system wide safe values")
+> ---
+> Found on arm64 allnoconfig
 
-I think we can get tid of the whole HAVE_RT_PUSH_IPI thing after:
-8053871d0f7f ("smp: Fix smp_call_function_single_async() locking")
+I applied this patch and the other two you just posted. Thanks.
 
-That should allow us to use smp_calling_function_single_async() instead
-of irq_work_queue_on(), removing the dependency on irq_work.
+-- 
+Catalin
