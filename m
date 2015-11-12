@@ -1,84 +1,100 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Thu, 12 Nov 2015 18:05:08 +0000
-Subject: [GIT PULL] arm64 fixes for 4.4-rc1
-Message-ID: <20151112180504.GA10702@e104818-lin.cambridge.arm.com>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Thu, 12 Nov 2015 20:05:41 +0200
+Subject: [PATCH] gpio: omap: fix debounce time calculation
+In-Reply-To: <1447350640-20347-1-git-send-email-balbi@ti.com>
+References: <1447350640-20347-1-git-send-email-balbi@ti.com>
+Message-ID: <5644D4F5.8070006@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Linus,
+On 11/12/2015 07:50 PM, Felipe Balbi wrote:
+> According to TRM, debounce is measured in periods of
+> the functional clock of the GPIO IP. This means that
 
-Here's a second pull request for this merging window with some
-fixes/clean-ups (on top of the initial request, based on 4.3-rc4).
-Thanks.
 
-The following changes since commit f8f8bdc48851da979c6e0e4808b6031122e4af47:
+What TRM? link pls.
 
-  arm64/efi: fix libstub build under CONFIG_MODVERSIONS (2015-11-02 13:50:17 +0000)
+http://www.ti.com/lit/ug/spruhl7d/spruhl7d.pdf
 
-are available in the git repository at:
+28.4.1.24 GPIO_DEBOUNCINGTIME Register (offset = 154h) [reset = 0h]
 
-  git://git.kernel.org/pub/scm/linux/kernel/git/arm64/linux tags/arm64-fixes
+The GPIO_DEBOUNCINGTIME register controls debouncing time (the value is
+global for all ports). The debouncing cell is running with the
+debouncing clock (32 kHz), this register represents the number of the
+clock cycle(s) (31 s long) to be used.
 
-for you to fetch changes up to 01b305a234943c25c336a6f2f77932a4eaf125fa:
+Debouncing Value in 31 microsecond steps.
+Debouncing Value = (DEBOUNCETIME + 1) * 31 microseconds.
 
-  arm64: suspend: make hw_breakpoint_restore static (2015-11-12 15:18:14 +0000)
+> we should divide by the rate of functional clock.
+> 
+> Signed-off-by: Felipe Balbi <balbi@ti.com>
+> ---
+>   drivers/gpio/gpio-omap.c | 24 +++++++++++++++++-------
+>   1 file changed, 17 insertions(+), 7 deletions(-)
+> 
+> diff --git a/drivers/gpio/gpio-omap.c b/drivers/gpio/gpio-omap.c
+> index 56d2d026e62e..2b29fd195521 100644
+> --- a/drivers/gpio/gpio-omap.c
+> +++ b/drivers/gpio/gpio-omap.c
+> @@ -217,15 +217,29 @@ static void omap2_set_gpio_debounce(struct gpio_bank *bank, unsigned offset,
+>   	u32			val;
+>   	u32			l;
+>   	bool			enable = !!debounce;
+> +	unsigned long		flags;
+>   
+>   	if (!bank->dbck_flag)
+>   		return;
+>   
+>   	if (enable) {
+> -		debounce = DIV_ROUND_UP(debounce, 31) - 1;
+> +		struct clk	*clk;
+> +		unsigned long	rate;
+> +
+> +		clk = clk_get(bank->dev, "fck");
+> +		if (IS_ERR(clk)) {
+> +			dev_err(bank->dev, "can't get clock\n");
+> +			return;
+> +		}
+> +
+> +		rate = clk_get_rate(clk);
+> +		clk_put(clk);
+> +
+> +		debounce = DIV_ROUND_UP(debounce, rate);
+>   		debounce &= OMAP4_GPIO_DEBOUNCINGTIME_MASK;
+>   	}
+>   
+> +	raw_spin_lock_irqsave(&bank->lock, flags);
+>   	l = BIT(offset);
+>   
+>   	clk_enable(bank->dbck);
+> @@ -256,6 +270,7 @@ static void omap2_set_gpio_debounce(struct gpio_bank *bank, unsigned offset,
+>   		bank->context.debounce = debounce;
+>   		bank->context.debounce_en = val;
+>   	}
+> +	raw_spin_unlock_irqrestore(&bank->lock, flags);
+>   }
+>   
+>   /**
+> @@ -1002,14 +1017,9 @@ static int omap_gpio_output(struct gpio_chip *chip, unsigned offset, int value)
+>   static int omap_gpio_debounce(struct gpio_chip *chip, unsigned offset,
+>   			      unsigned debounce)
+>   {
+> -	struct gpio_bank *bank;
+> -	unsigned long flags;
+> -
+> -	bank = container_of(chip, struct gpio_bank, chip);
+> +	struct gpio_bank *bank = container_of(chip, struct gpio_bank, chip);
+>   
+> -	raw_spin_lock_irqsave(&bank->lock, flags);
+>   	omap2_set_gpio_debounce(bank, offset, debounce);
+> -	raw_spin_unlock_irqrestore(&bank->lock, flags);
+>   
+>   	return 0;
+>   }
+> 
 
-----------------------------------------------------------------
-arm64 fixes and clean-ups:
-
-- __cmpxchg_double*() return type fix to avoid truncation of a long to
-  int and subsequent logical "not" in cmpxchg_double() misinterpreting
-  the operation success/failure
-- BPF fixes for mod and div by zero
-- Fix compilation with STRICT_MM_TYPECHECKS enabled
-- VDSO build fix without libgcov
-- Some static and __maybe_unused annotations
-- Kconfig clean-up (FRAME_POINTER)
-- defconfig update for CRYPTO_CRC32_ARM64
-
-----------------------------------------------------------------
-Ard Biesheuvel (2):
-      arm64: fix STRICT_MM_TYPECHECKS issue in PTE_CONT manipulation
-      arm64: fix R/O permissions of FDT mapping
-
-Arnd Bergmann (3):
-      arm64: mark cpus_have_hwcap as __maybe_unused
-      arm64: build vdso without libgcov
-      arm64: use linux/types.h in kvm.h
-
-Catalin Marinas (1):
-      arm64: Enable CRYPTO_CRC32_ARM64 in defconfig
-
-Jisheng Zhang (3):
-      arm64: smp: make of_parse_and_init_cpus static
-      arm64: mmu: make split_pud and fixup_executable static
-      arm64: suspend: make hw_breakpoint_restore static
-
-Lorenzo Pieralisi (1):
-      arm64: cmpxchg_dbl: fix return value type
-
-Yang Shi (1):
-      arm64: remove redundant FRAME_POINTER kconfig option and force to select it
-
-Zi Shen Lim (2):
-      arm64: bpf: fix div-by-zero case
-      arm64: bpf: fix mod-by-zero case
-
- arch/arm64/Kconfig                    |  1 +
- arch/arm64/Kconfig.debug              |  4 ---
- arch/arm64/configs/defconfig          |  1 +
- arch/arm64/include/asm/atomic_ll_sc.h |  2 +-
- arch/arm64/include/asm/atomic_lse.h   |  2 +-
- arch/arm64/include/asm/pgtable.h      |  1 +
- arch/arm64/include/uapi/asm/kvm.h     |  2 +-
- arch/arm64/kernel/cpufeature.c        |  2 +-
- arch/arm64/kernel/smp.c               |  2 +-
- arch/arm64/kernel/suspend.c           |  2 +-
- arch/arm64/kernel/vdso/Makefile       |  3 ++
- arch/arm64/mm/mmu.c                   |  8 +++---
- arch/arm64/net/bpf_jit.h              |  3 +-
- arch/arm64/net/bpf_jit_comp.c         | 54 +++++++++++++++++++++++------------
- 14 files changed, 54 insertions(+), 33 deletions(-)
 
 -- 
-Catalin
+regards,
+-grygorii
