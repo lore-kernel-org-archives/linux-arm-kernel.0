@@ -1,76 +1,107 @@
 From: p.fedin@samsung.com (Pavel Fedin)
-Date: Thu, 12 Nov 2015 16:12:03 +0300
-Subject: [PATCH v8 0/4] Exynos SROMc configuration and Ethernet support for
- SMDK5410
-Message-ID: <cover.1447333689.git.p.fedin@samsung.com>
+Date: Thu, 12 Nov 2015 16:12:04 +0300
+Subject: [PATCH v8 1/4] Documentation: dt-bindings: Describe SROMc
+ configuration
+In-Reply-To: <cover.1447333689.git.p.fedin@samsung.com>
+References: <cover.1447333689.git.p.fedin@samsung.com>
+Message-ID: <e9e18ab5aa7a147aaa63d1900ad52174413e86d9.1447333689.git.p.fedin@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch extends Exynos SROM controller driver with ability to configure
-controller outputs and enables SMSC9115 Ethernet chip on SMDK5410 board,
-which is connected via SROMc bank #3.
+Add documentation for new subnode properties, allowing bank configuration.
+Based on u-boot implementation, but heavily reworked.
 
-With this patchset, support for the whole existing SMDK range can be added.
-Actually, only bank number is different.
+Also, fix size of SROMc mapping in the example.
 
-This patchset also depends on Exynos 5410 pinctrl support, introduced by
-patches 0003 and 0004 from this set:
-[PATCH v4 0/5] ARM: EXYNOS: ODROID-XU DT and LEDs
-http://lists.infradead.org/pipermail/linux-arm-kernel/2015-March/330862.html
-
-Pinctrl support is necessary in order to correctly configure
-multifunctional pins of the Exynos chip.
-
-v7 => v8:
-- More fixes to documentation
-
-v6 => v7:
-- Fixed stupid error in Tacc description in the documentation
-
-v5 => v6:
-- Even more improvements to the documentation, fixed some errors and typos.
-- Separated adding bus ranges from generic SROMc support
-- Some stuff renamed for even better code readability
-- Stylistic cleanups in the DTS (everything in alphabetic order, use named
-  constant name for interrupt config byte)
-
-v4 => v5:
-- Some cosmetic changes in the dtsi ("compatible" goes first)
-- Use correctly specified ranges for the SROMc node
-- Reuse existing properties where possible ("reg" for bank# and
-  "reg-io-width" for data width)
-- Separated page-mode property from timings array
-- More improvements to the documentation
-
-v3 => v4:
-- Devices are now added as subnodes, with additional properties. This allows
-  to cleary specify dependency. If configuration fails, error will be reported
-  and child devices will not be probed.
-- These additional properties now have "samsung,srom-XXX" format
-- Fixed code style, now better understood.
-
-v2 => v3:
-- Fixed up SROMc region size in the device tree
-- Reordered patches, documentation goes first now
-
-v1 => v2:
-- Fixed some typos and bad labels in device tree
-- Improved documentation
-
-
-Pavel Fedin (4):
-  Documentation: dt-bindings: Describe SROMc configuration
-  ARM: dts: Add SROMc to Exynos 5410
-  drivers: exynos-srom: Add support for bank configuration
-  ARM: dts: Add Ethernet chip to SMDK5410
-
+Signed-off-by: Pavel Fedin <p.fedin@samsung.com>
+Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+---
  .../bindings/arm/samsung/exynos-srom.txt           | 73 +++++++++++++++++++++-
- arch/arm/boot/dts/exynos5410-smdk5410.dts          | 41 ++++++++++++
- arch/arm/boot/dts/exynos5410.dtsi                  | 11 ++++
- arch/arm/mach-exynos/Kconfig                       |  2 +-
- drivers/soc/samsung/Kconfig                        |  2 +-
- drivers/soc/samsung/exynos-srom.c                  | 61 +++++++++++++++++-
- 6 files changed, 184 insertions(+), 6 deletions(-)
+ 1 file changed, 71 insertions(+), 2 deletions(-)
 
+diff --git a/Documentation/devicetree/bindings/arm/samsung/exynos-srom.txt b/Documentation/devicetree/bindings/arm/samsung/exynos-srom.txt
+index 33886d5..07c8507 100644
+--- a/Documentation/devicetree/bindings/arm/samsung/exynos-srom.txt
++++ b/Documentation/devicetree/bindings/arm/samsung/exynos-srom.txt
+@@ -5,8 +5,77 @@ Required properties:
+ 
+ - reg: offset and length of the register set
+ 
+-Example:
++Optional properties:
++The SROM controller can be used to attach external peripherals. In this case
++extra properties, describing the bus behind it, should be specified as below:
++
++- #address-cells: Must be set to 2 to allow device address translation.
++		  Address is specified as (bank#, offset).
++
++- #size-cells: Must be set to 1 to allow device size passing
++
++- ranges: Must be set up to reflect the memory layout with four integer values
++	  per bank:
++		<bank-number> 0 <parent address of bank> <size>
++
++Sub-nodes:
++The actual device nodes should be added as subnodes to the SROMc node. These
++subnodes, except regular device specification, should contain the following
++properties, describing configuration of the relevant SROM bank:
++
++Required properties:
++- reg: bank number, base address (relative to start of the bank) and size of
++       the memory mapped for the device. Note that base address will be
++       typically 0 as this is the start of the bank.
++
++- samsung,srom-timing : array of 6 integers, specifying bank timings in the
++                        following order: Tacp, Tcah, Tcoh, Tacc, Tcos, Tacs.
++                        Each value is specified in cycles and has the following
++                        meaning and valid range:
++                        Tacp : Page mode access cycle at Page mode (0 - 15)
++                        Tcah : Address holding time after CSn (0 - 15)
++                        Tcoh : Chip selection hold on OEn (0 - 15)
++                        Tacc : Access cycle (0 - 31, the actual time is N + 1)
++                        Tcos : Chip selection set-up before OEn (0 - 15)
++                        Tacs : Address set-up before CSn (0 - 15)
++
++Optional properties:
++- reg-io-width : data width in bytes (1 or 2). If omitted, default of 1 is used.
++
++- samsung,srom-page-mode : page mode configuration for the bank:
++			   0 - normal (one data)
++			   1 - four data
++			   If omitted, default of 0 is used.
++
++Example: basic definition, no banks are configured
++	sromc at 12570000 {
++		compatible = "samsung,exynos-srom";
++		reg = <0x12570000 0x14>;
++	};
++
++Example: SROMc with SMSC911x ethernet chip on bank 3
+ 	sromc at 12570000 {
++		#address-cells = <2>;
++		#size-cells = <1>;
++		ranges = <0 0 0x04000000 0x20000   // Bank0
++			  1 0 0x05000000 0x20000   // Bank1
++			  2 0 0x06000000 0x20000   // Bank2
++			  3 0 0x07000000 0x20000>; // Bank3
++
+ 		compatible = "samsung,exynos-srom";
+-		reg = <0x12570000 0x10>;
++		reg = <0x12570000 0x14>;
++
++		ethernet at 3 {
++			compatible = "smsc,lan9115";
++			reg = <3 0 0x10000>;	   // Bank 3, offset = 0
++			phy-mode = "mii";
++			interrupt-parent = <&gpx0>;
++			interrupts = <5 8>;
++			reg-io-width = <2>;
++			smsc,irq-push-pull;
++			smsc,force-internal-phy;
++
++			samsung,srom-page-mode = <1>;
++			samsung,srom-timing = <9 12 1 9 1 1>;
++		};
+ 	};
 -- 
 2.4.4
