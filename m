@@ -1,29 +1,35 @@
 From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Thu, 12 Nov 2015 15:07:45 +0100
-Subject: [PATCH v2 4/5] arm: dts: remove dm816x invalid DT l3_main hwmod
-Message-ID: <56449D31.7010801@baylibre.com>
+Date: Thu, 12 Nov 2015 15:07:49 +0100
+Subject: [PATCH v2 5/5] arm: dts: Add omap4-hwspinlock support in dm816x
+Message-ID: <56449D35.1040104@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Remove invalid l3_main hwmod entry from dm816x DT ocp node.
+Add dm816x DT entries for omap4-hwspinlock support as hwmod spinbox.
 
 Cc: Brian Hutchinson <b.hutchman@gmail.com>
 Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
 ---
- arch/arm/boot/dts/dm816x.dtsi | 1 -
- 1 file changed, 1 deletion(-)
+ arch/arm/boot/dts/dm816x.dtsi | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
 diff --git a/arch/arm/boot/dts/dm816x.dtsi b/arch/arm/boot/dts/dm816x.dtsi
-index 51ad4a9..b9feeea 100644
+index b9feeea..eb9bea1 100644
 --- a/arch/arm/boot/dts/dm816x.dtsi
 +++ b/arch/arm/boot/dts/dm816x.dtsi
-@@ -64,7 +64,6 @@
- 		#address-cells = <1>;
- 		#size-cells = <1>;
- 		ranges;
--		ti,hwmods = "l3_main";
+@@ -226,6 +226,13 @@
+ 			};
+ 		};
 
- 		prcm: prcm at 48180000 {
- 			compatible = "ti,dm816-prcm";
++		spinbox: spinbox at 480ca000 {
++			compatible = "ti,omap4-hwspinlock";
++			reg = <0x480ca000 0x2000>;
++			ti,hwmods = "spinbox";
++			#hwlock-cells = <1>;
++		};
++
+ 		mdio: mdio at 4a100800 {
+ 			compatible = "ti,davinci_mdio";
+ 			#address-cells = <1>;
 -- 
 1.9.1
