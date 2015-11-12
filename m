@@ -1,81 +1,86 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 12 Nov 2015 07:36:02 +0100
-Subject: aarch64-linux-gnu-objdump gives all zeros in init_sequence_f[]
-In-Reply-To: <20151112054316.GA5043@dragon>
-References: <20151112054316.GA5043@dragon>
-Message-ID: <CAKv+Gu8KyP8YQzhiJu6ThnMJCUc2U9mUhJk6mdxL3PGcV59Bcw@mail.gmail.com>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Thu, 12 Nov 2015 01:41:15 -0500
+Subject: [PATCH V4 0/4] dma: add Qualcomm Technologies HIDMA driver
+Message-ID: <1447310481-25463-1-git-send-email-okaya@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12 November 2015 at 06:43, Shawn Guo <shawn.guo@linaro.org> wrote:
-> Hi,
->
-> I need some help to understand aarch64-linux-gnu-objdump output in .data
-> section as below.  It's part of the dump of u-boot image with command
-> 'aarch64-linux-gnu-objdump -D -z u-boot'.
->
-> Disassembly of section .data:
->
-> 0000000035039898 <reserved_list>:
->         <snip>
->
-> 0000000035039948 <init_sequence_f>:
->     35039948:   00000000        .word   0x00000000
-[...]
->     35039a48:   00000000        .word   0x00000000
->     35039a4c:   00000000        .word   0x00000000
->
-> The init_sequence_f[] is an array defined in U-Boot v2015.04 source
-> common/board_f.c, which holds a bunch of pointers to critical
-> initialization functions that have to be called during boot.  Obviously,
-> the array cannot be all zeros like what objdump tells.  And I confirmed
-> that by printing the pointers at run-time as below.
->
-[..]
->
-> Here are my questions:
->
-> - Is this only because that ARM 64-bit toolchain doesn't show the real
->   value of the pointers, or there are some linking or run-time magics to
->   get these pointers correct when the binary is actually running?
->
+The Qualcomm Technologies HIDMA device has been designed
+to support virtualization technology. The driver has been
+divided into two to follow the hardware design.
 
-AArch64 uses the ELF RELA relocation format, where the target location
-of the relocation is not used to hold the addend. In contrast, ARM
-uses the REL format, where the addend is stored in the same place
-where the result of the relocation computation needs to be stored.
+1. HIDMA Management driver
+2. HIDMA Channel driver
 
-Since U-Boot is a PIE executable, it makes heavy use of
-R_ARM_RELATIVE/R_AARCH64_RELATIVE relocations, which are not symbol
-based, but simply point to places in the binary such as your init
-array) where the offset between the link time and load time addresses
-needs to be taken into account. For this type of relocation (and since
-the u-boot link time base address is 0x0), the addends happen to
-coincide with the actual addresses of the functions. These relocations
-are applied at runtime by u-boot itself, since it moves itself to the
-top of DRAM right after boot.
+Each HIDMA HW consists of multiple channels. These channels
+share some set of common parameters. These parameters are
+initialized by the management driver during power up.
+Same management driver is used for monitoring the execution
+of the channels. Management driver can change the performance
+behavior dynamically such as bandwidth allocation and
+prioritization in the future.
 
-In the AArch64 case, these addends are stored in the relocation
-entries themselves. If you dump the relocations form the u-boot binary
-using readelf, you will probably find the values you are looking for.
+The management driver is executed in hypervisor context and
+is the main management entity for all channels provided by
+the device.
 
-> - Is this different behavior between ARM 32-bit and 64-bit toolchain
->   expected?  Or did I miss anything on 64-bit toolchain usage?
->
+Changes from V3: (https://lkml.org/lkml/2015/11/7/256)
+* use git format-patch -M to reduce the difference
 
-This is expected, although a bit unfortunate, since you may need a
-post-build step to apply the relocations in case you need them applied
-in the static image (i.e., a ROM image).
+Changes from V3: (https://lkml.org/lkml/2015/11/7/257)
+* add missing EXPORT_SYMBOL_GPL for hidma_mgmt_init_sys and
+hidma_mgmt_setup
+* simplify bitwise set and clear statements
+
+Changes from V3: (https://lkml.org/lkml/2015/11/7/258)
+* none
+
+Changes from V3: (https://lkml.org/lkml/2015/11/7/259)
+* remove return code on hidma_ll_start and hidma_ll_queue_request
+* remove the checks after platform_get_resource.
+* reorder the pm calls in failure path.
+* simplify bit clear and set operations.
+* correct device tree documentation compatible string
+* clean unnecessary initializations and use unsigned int for
+iterator types
+
+Sinan Kaya (4):
+  dma: qcom_bam_dma: move to qcom directory
+  dma: add Qualcomm Technologies HIDMA management driver
+  dmaselftest: add memcpy selftest support functions
+  dma: add Qualcomm Technologies HIDMA channel driver
+
+ .../devicetree/bindings/dma/qcom_hidma.txt         |  18 +
+ .../devicetree/bindings/dma/qcom_hidma_mgmt.txt    |  61 ++
+ drivers/dma/Kconfig                                |  11 +-
+ drivers/dma/Makefile                               |   2 +-
+ drivers/dma/dmaengine.h                            |   2 +
+ drivers/dma/dmaselftest.c                          | 638 ++++++++++++++
+ drivers/dma/qcom/Kconfig                           |  29 +
+ drivers/dma/qcom/Makefile                          |   4 +
+ drivers/dma/{qcom_bam_dma.c => qcom/bam_dma.c}     |   6 +-
+ drivers/dma/qcom/hidma.c                           | 736 ++++++++++++++++
+ drivers/dma/qcom/hidma.h                           | 157 ++++
+ drivers/dma/qcom/hidma_dbg.c                       | 225 +++++
+ drivers/dma/qcom/hidma_ll.c                        | 939 +++++++++++++++++++++
+ drivers/dma/qcom/hidma_mgmt.c                      | 312 +++++++
+ drivers/dma/qcom/hidma_mgmt.h                      |  38 +
+ drivers/dma/qcom/hidma_mgmt_sys.c                  | 231 +++++
+ 16 files changed, 3396 insertions(+), 13 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/dma/qcom_hidma.txt
+ create mode 100644 Documentation/devicetree/bindings/dma/qcom_hidma_mgmt.txt
+ create mode 100644 drivers/dma/dmaselftest.c
+ create mode 100644 drivers/dma/qcom/Kconfig
+ create mode 100644 drivers/dma/qcom/Makefile
+ rename drivers/dma/{qcom_bam_dma.c => qcom/bam_dma.c} (99%)
+ create mode 100644 drivers/dma/qcom/hidma.c
+ create mode 100644 drivers/dma/qcom/hidma.h
+ create mode 100644 drivers/dma/qcom/hidma_dbg.c
+ create mode 100644 drivers/dma/qcom/hidma_ll.c
+ create mode 100644 drivers/dma/qcom/hidma_mgmt.c
+ create mode 100644 drivers/dma/qcom/hidma_mgmt.h
+ create mode 100644 drivers/dma/qcom/hidma_mgmt_sys.c
 
 -- 
-Ard.
-
-
-> Any hints or comments are much appreciated.
->
-> Thanks,
-> Shawn
-> _______________________________________________
-> linaro-dev mailing list
-> linaro-dev at lists.linaro.org
-> https://lists.linaro.org/mailman/listinfo/linaro-dev
+Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a Linux Foundation Collaborative Project
