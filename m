@@ -1,40 +1,73 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Thu, 12 Nov 2015 12:06:06 -0600
-Subject: [PATCH] arm: omap2: Kconfig: select TWD and global timer on AM43xx
- devices
-Message-ID: <1447351566-2328-1-git-send-email-balbi@ti.com>
+From: maxime.ripard@free-electrons.com (Maxime Ripard)
+Date: Thu, 12 Nov 2015 10:08:32 -0800
+Subject: [PATCH] clocksource/drivers/timer_sun5i: Replace code by
+ clocksource_mmio_init
+In-Reply-To: <1447348278-16277-1-git-send-email-daniel.lezcano@linaro.org>
+References: <1447348278-16277-1-git-send-email-daniel.lezcano@linaro.org>
+Message-ID: <20151112180832.GE32142@lukather>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Make sure to tell the kernel that AM437x has
-TWD and global timers.
+Hi Daniel,
 
-Signed-off-by: Felipe Balbi <balbi@ti.com>
----
+On Thu, Nov 12, 2015 at 06:11:18PM +0100, Daniel Lezcano wrote:
+> The current code to initialize, register and read the clocksource is
+> already factored out in mmio.c via the clocksource_mmio_init function.
+> 
+> The only difference is the readl vs readl_relaxed.
+> 
+> Factor out the code with the clocksource_mmio_init function.
+> 
+> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+> ---
+>  drivers/clocksource/timer-sun5i.c | 16 ++--------------
+>  1 file changed, 2 insertions(+), 14 deletions(-)
+> 
+> diff --git a/drivers/clocksource/timer-sun5i.c b/drivers/clocksource/timer-sun5i.c
+> index bca9573..dc3793c 100644
+> --- a/drivers/clocksource/timer-sun5i.c
+> +++ b/drivers/clocksource/timer-sun5i.c
+> @@ -152,13 +152,6 @@ static irqreturn_t sun5i_timer_interrupt(int irq, void *dev_id)
+>  	return IRQ_HANDLED;
+>  }
+>  
+> -static cycle_t sun5i_clksrc_read(struct clocksource *clksrc)
+> -{
+> -	struct sun5i_timer_clksrc *cs = to_sun5i_timer_clksrc(clksrc);
+> -
+> -	return ~readl(cs->timer.base + TIMER_CNTVAL_LO_REG(1));
+> -}
+> -
+>  static int sun5i_rate_cb_clksrc(struct notifier_block *nb,
+>  				unsigned long event, void *data)
+>  {
+> @@ -217,13 +210,8 @@ static int __init sun5i_setup_clocksource(struct device_node *node,
+>  	writel(TIMER_CTL_ENABLE | TIMER_CTL_RELOAD,
+>  	       base + TIMER_CTL_REG(1));
+>  
+> -	cs->clksrc.name = node->name;
+> -	cs->clksrc.rating = 340;
+> -	cs->clksrc.read = sun5i_clksrc_read;
+> -	cs->clksrc.mask = CLOCKSOURCE_MASK(32);
+> -	cs->clksrc.flags = CLOCK_SOURCE_IS_CONTINUOUS;
+> -
+> -	ret = clocksource_register_hz(&cs->clksrc, rate);
+> +	ret = clocksource_mmio_init(base + TIMER_CNTVAL_LO_REG(1), node->name,
+> +				    rate, 340, UINT_MAX, clocksource_mmio_readw_down);
 
-Hi Tony,
+Shouldn't it be clocksource_mmio_readl_down?
 
-now that all dependencies are in place, we can
-finally enable twd and global_timer for AM437x.
+Thanks!
+Maxime
 
-cheers
-
- arch/arm/mach-omap2/Kconfig | 3 +++
- 1 file changed, 3 insertions(+)
-
-diff --git a/arch/arm/mach-omap2/Kconfig b/arch/arm/mach-omap2/Kconfig
-index 5076d3f334d2..bb3daf0fa7f7 100644
---- a/arch/arm/mach-omap2/Kconfig
-+++ b/arch/arm/mach-omap2/Kconfig
-@@ -65,6 +65,9 @@ config SOC_AM43XX
- 	select MACH_OMAP_GENERIC
- 	select MIGHT_HAVE_CACHE_L2X0
- 	select HAVE_ARM_SCU
-+	select HAVE_ARM_TWD
-+	select ARM_GLOBAL_TIMER
-+	select CLKSRC_ARM_GLOBAL_TIMER_SCHED_CLOCK
- 
- config SOC_DRA7XX
- 	bool "TI DRA7XX"
 -- 
-2.6.2
+Maxime Ripard, Free Electrons
+Embedded Linux, Kernel and Android engineering
+http://free-electrons.com
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: Digital signature
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151112/4de92519/attachment-0001.sig>
