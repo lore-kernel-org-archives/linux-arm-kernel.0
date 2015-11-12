@@ -1,28 +1,26 @@
-From: incoming@interfax.net (Interfax)
-Date: Wed, 11 Nov 2015 22:01:39 -0600
-Subject: You have received a new fax, document 00737842
-Message-ID: <0f18010bdee06ca6262e966f5da9d996@icatt.mobi>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Thu, 12 Nov 2015 13:03:11 +0900
+Subject: [PATCH v4 2/9] ARM: EXYNOS: Fix potential NULL pointer access in
+ exynos_sys_powerdown_conf
+In-Reply-To: <1447155784-12667-3-git-send-email-pankaj.dubey@samsung.com>
+References: <1447155784-12667-1-git-send-email-pankaj.dubey@samsung.com>
+ <1447155784-12667-3-git-send-email-pankaj.dubey@samsung.com>
+Message-ID: <56440F7F.6090408@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-A new fax document for you.
+On 10.11.2015 20:42, Pankaj Dubey wrote:
+> If no platform devices binded to the driver but driver itself loaded and
+> exynos_sys_powerdown_conf is called from
+> arch/arm/mach-exynos/{suspend.c, pm.c} it will result in NULL pointer access,
+> to prevent this added check on pmu_context for NULL.
+> 
+> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+> ---
+>  arch/arm/mach-exynos/pmu.c | 6 +++++-
+>  1 file changed, 5 insertions(+), 1 deletion(-)
 
-Please, download fax document attached to this email.
+Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 
-Scanned:         Thu, 12 Nov 2015 04:16:29 +0300
-Processed in:    48 seconds
-Document name:   document-00737842.doc
-File size:       203 Kb
-Pages sent:      12
-Scan quality:    200 DPI
-Sender:          Todd Santos
-
-Thanks for choosing Interfax!
-
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: document-00737842.zip
-Type: application/zip
-Size: 1611 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151111/930de022/attachment.zip>
+Best regards,
+Krzysztof
