@@ -1,56 +1,83 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 12 Nov 2015 21:52:30 +0100
-Subject: [PATCH] stmmac: avoid ipq806x constant overflow warning
-In-Reply-To: <20151112.122528.1794206832971213176.davem@davemloft.net>
-References: <4391788.dtYArQ4mVi@wuerfel>
- <20151112.122528.1794206832971213176.davem@davemloft.net>
-Message-ID: <3729464.5X0HBxzvx5@wuerfel>
+From: chris.brandt@renesas.com (Chris Brandt)
+Date: Thu, 12 Nov 2015 16:01:48 -0500
+Subject: [PATCH v2] ARM: xip: Use correct symbol for end of ROM marker
+In-Reply-To: <1447251455-22731-1-git-send-email-chris.brandt@renesas.com>
+References: <1447251455-22731-1-git-send-email-chris.brandt@renesas.com>
+Message-ID: <1447362108-4333-1-git-send-email-chris.brandt@renesas.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 12 November 2015 12:25:28 David Miller wrote:
-> From: Arnd Bergmann <arnd@arndb.de>
-> Date: Thu, 12 Nov 2015 15:12:48 +0100
-> 
-> > Building dwmac-ipq806x on a 64-bit architecture produces a harmless
-> > warning from gcc:
-> > 
-> > stmmac/dwmac-ipq806x.c: In function 'ipq806x_gmac_probe':
-> > include/linux/bitops.h:6:19: warning: overflow in implicit constant conversion [-Woverflow]
-> >   val = QSGMII_PHY_CDR_EN |
-> > stmmac/dwmac-ipq806x.c:333:8: note: in expansion of macro 'QSGMII_PHY_CDR_EN'
-> >  #define QSGMII_PHY_CDR_EN   BIT(0)
-> >  #define BIT(nr)   (1UL << (nr))
-> > 
-> > The compiler warns about the fact that a 64-bit literal is passed
-> > into a function that takes a 32-bit argument. I could not fully understand
-> > why it warns despite the fact that this number is always small enough
-> > to fit, but changing the use of BIT() macros into the equivalent hexadecimal
-> > representation avoids the warning
-> > 
-> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> > Fixes: b1c17215d718 ("stmmac: add ipq806x glue layer")
-> 
-> I've seen this warning too on x86_64 and had been meaning to look
-> into it, thanks for taking the initiative. 
-> 
-> Moving away from using BIT() is somewhat disappointing, because we
-> want to encourage people to use these macros.
+For an XIP build, _edata_loc, not _etext, represents the end of the
+binary image that will be programmed into ROM and mapped into the
+MODULES_VADDR area.
+With an XIP kernel, nothing is loaded into RAM before boot, meaning
+you have to take into account the size of the entire binary image
+that was programmed, including the init data values that will be copied
+to RAM during kernel boot.
 
-Ok, I never really liked that macro, so I didn't mind removing it. ;-)
+This fixes the bug where you might lose the end of your kernel area
+after page table setup is complete.
 
-I spent too much time working at IBM where all internal documentation
-uses bit numbers that call the MSB bit 0, and drivers use randomly
-either the IBM notation or the one that everyone else uses, so I always
-found the hex numbers way more intuitive.
+Signed-off-by: Chris Brandt <chris.brandt@renesas.com>
+---
+v2
+* Added change for MODULES_VADDR
+* Moved extern to new file asm/sections.h
+---
+ arch/arm/include/asm/sections.h |    8 ++++++++
+ arch/arm/kernel/module.c        |    2 +-
+ arch/arm/mm/mmu.c               |    4 ++--
+ 3 files changed, 11 insertions(+), 3 deletions(-)
+ create mode 100644 arch/arm/include/asm/sections.h
 
-> Also I don't even understand the compiler's behavior, it's warning
-> about QSGMII_PHY_CDR_EN but if you define only that to "0x1u" it still
-> warns about QSGMII_PHY_CDR_EN.
-> 
-> The warning goes away only if you change all 5 BIT() uses.
-
-Yes, I have spent the time to analyze the problem now and it all makes
-sense. A proper patch follows.
-
-	Arnd
+diff --git a/arch/arm/include/asm/sections.h b/arch/arm/include/asm/sections.h
+new file mode 100644
+index 0000000..401eb3c2
+--- /dev/null
++++ b/arch/arm/include/asm/sections.h
+@@ -0,0 +1,8 @@
++#ifndef _ASM_ARM_SECTIONS_H
++#define _ASM_ARM_SECTIONS_H
++
++#include <asm-generic/sections.h>
++
++extern char _edata_loc[];
++
++#endif	/* _ASM_ARM_SECTIONS_H */
+diff --git a/arch/arm/kernel/module.c b/arch/arm/kernel/module.c
+index efdddcb..41ae2cc 100644
+--- a/arch/arm/kernel/module.c
++++ b/arch/arm/kernel/module.c
+@@ -34,7 +34,7 @@
+  * recompiling the whole kernel when CONFIG_XIP_KERNEL is turned on/off.
+  */
+ #undef MODULES_VADDR
+-#define MODULES_VADDR	(((unsigned long)_etext + ~PMD_MASK) & PMD_MASK)
++#define MODULES_VADDR	(((unsigned long)_edata_loc + ~PMD_MASK) & PMD_MASK)
+ #endif
+ 
+ #ifdef CONFIG_MMU
+diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+index 4867f5d..dd5a56b 100644
+--- a/arch/arm/mm/mmu.c
++++ b/arch/arm/mm/mmu.c
+@@ -1210,7 +1210,7 @@ static inline void prepare_page_table(void)
+ 
+ #ifdef CONFIG_XIP_KERNEL
+ 	/* The XIP kernel is mapped in the module area -- skip over it */
+-	addr = ((unsigned long)_etext + PMD_SIZE - 1) & PMD_MASK;
++	addr = ((unsigned long)_edata_loc + PMD_SIZE - 1) & PMD_MASK;
+ #endif
+ 	for ( ; addr < PAGE_OFFSET; addr += PMD_SIZE)
+ 		pmd_clear(pmd_off_k(addr));
+@@ -1292,7 +1292,7 @@ static void __init devicemaps_init(const struct machine_desc *mdesc)
+ #ifdef CONFIG_XIP_KERNEL
+ 	map.pfn = __phys_to_pfn(CONFIG_XIP_PHYS_ADDR & SECTION_MASK);
+ 	map.virtual = MODULES_VADDR;
+-	map.length = ((unsigned long)_etext - map.virtual + ~SECTION_MASK) & SECTION_MASK;
++	map.length = ((unsigned long)_edata_loc - map.virtual + ~SECTION_MASK) & SECTION_MASK;
+ 	map.type = MT_ROM;
+ 	create_mapping(&map);
+ #endif
+-- 
+1.7.9.5
