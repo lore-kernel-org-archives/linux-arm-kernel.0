@@ -1,34 +1,28 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 12 Nov 2015 16:14:06 +0100
+From: rostedt@goodmis.org (Steven Rostedt)
+Date: Thu, 12 Nov 2015 10:16:20 -0500
 Subject: [PATCH] sched/rt: hide push_irq_work_func declaration
-In-Reply-To: <20151112094739.0168e191@gandalf.local.home>
+In-Reply-To: <20151112145331.GC17308@twins.programming.kicks-ass.net>
 References: <3810009.VdDTV0h1Qp@wuerfel>
- <20151112094739.0168e191@gandalf.local.home>
-Message-ID: <4129441.9nXLnMzV6v@wuerfel>
+ <20151112145331.GC17308@twins.programming.kicks-ass.net>
+Message-ID: <20151112101620.2dcd5dce@gandalf.local.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 12 November 2015 09:47:39 Steven Rostedt wrote:
+On Thu, 12 Nov 2015 15:53:31 +0100
+Peter Zijlstra <peterz@infradead.org> wrote:
+
+> On Thu, Nov 12, 2015 at 03:22:22PM +0100, Arnd Bergmann wrote:
 > > -#ifdef CONFIG_SMP
 > > +#if IS_ENABLED(CONFIG_SMP) && defined(HAVE_RT_PUSH_IPI)
+> >  static void push_irq_work_func(struct irq_work *work);
+> >  #endif  
 > 
-> Why IS_ENABLED() and not defined()?
->
-> #if defined(CONFIG_SMP) && defined(HAVE_RT_PUSH_IPI)
+> I think we can get tid of the whole HAVE_RT_PUSH_IPI thing after:
+> 8053871d0f7f ("smp: Fix smp_call_function_single_async() locking")
 > 
-> I thought IS_ENABLED() is used for C code, like:
-> 
->         if (IS_ENABLED(CONFIG_SMP)) {
->                 [...]
->         }
+> That should allow us to use smp_calling_function_single_async() instead
+> of irq_work_queue_on(), removing the dependency on irq_work.
 
-"#if IS_ENABLED(CONFIG_foo)" has another property, which is
-to evaluate to true when Kconfig has set the symbol to "=m".
-Obviously that cannot happen for CONFIG_SMP, but some
-maintainers prefer using IS_ENABLED() consistently for all
-config symbols.
+Interesting. I'll have to take a look at that.
 
-I don't care much either way, and it's easily changed if
-we still want the patch and you prefer a plain #if defined().
-
-	Arnd
+-- Steve
