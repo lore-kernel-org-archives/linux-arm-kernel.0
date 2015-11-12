@@ -1,80 +1,78 @@
-From: khilman@kernel.org (Kevin Hilman)
-Date: Wed, 11 Nov 2015 15:50:05 -0800
-Subject: [PATCH v5 4/5] ARM: dts: mt8135: enable basic SMP bringup for
- mt8135
-In-Reply-To: <1447228557.20886.10.camel@mtksdaap41> (Eddie Huang's message of
- "Wed, 11 Nov 2015 15:55:57 +0800")
-References: <1443799181-50409-1-git-send-email-yingjoe.chen@mediatek.com>
- <1443799181-50409-5-git-send-email-yingjoe.chen@mediatek.com>
- <CAMAWPa-Ed2FJY2pW67EHHKBH3_eBZx0+oWfMJwc_DhEjrf7aMg@mail.gmail.com>
- <1445843717.23888.1.camel@mtksdaap41>
- <CAMAWPa_Gyq7H0qUJ32PAJh_ELdHeKWMPyHud4gaT8=Ootcu1+g@mail.gmail.com>
- <1445859610.26723.4.camel@mtksdaap41>
- <CAMAWPa_13j88SMBbYEBg2WHFEhkhR_gVZkkU_x-U5NJay05AxA@mail.gmail.com>
- <1447135867.14454.9.camel@mtksdaap41>
- <7h1tbx1gjp.fsf@deeprootsystems.com>
- <1447228557.20886.10.camel@mtksdaap41>
-Message-ID: <7hpozgyu36.fsf@deeprootsystems.com>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Thu, 12 Nov 2015 01:48:32 +0100
+Subject: [PATCH v2 10/11] PM / Hibernate: clean cached pages on
+ architectures that require it
+In-Reply-To: <20151111114039.GA8375@red-moon>
+References: <1445966960-31724-1-git-send-email-james.morse@arm.com>
+ <1445966960-31724-11-git-send-email-james.morse@arm.com>
+ <20151111114039.GA8375@red-moon>
+Message-ID: <2039611.PJaFlk1sMi@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Eddie,
+On Wednesday, November 11, 2015 11:40:39 AM Lorenzo Pieralisi wrote:
+> Hi Pavel, Rafael,
+> 
+> Do you have any feedback on this patch ?
+> 
+> It is fundamental to this series and affects Hibernate core code so if you
+> have any feedback that would be much appreciated.
 
-Eddie Huang <eddie.huang@mediatek.com> writes:
+I'm really not familiar with the flush_icache_range() interface.
 
-> On Tue, 2015-11-10 at 17:16 -0800, Kevin Hilman wrote:
->> Hi Eddie,
->> 
->> [...]
->> 
->> > I check the log [0],
->> 
->> Thanks for checking into this boot failure.
->> 
->> > it seems first time mt8135-evbp1 boot to kernel
->> > shell successfully, then boot again. In the second time, mt8135 stay in
->> > fastboot mode, waiting host send boot image, then timeout.
->> 
->> Actually, it never gets to a shell the first time.  If you look closely,
->> the target reboots as soon as userspace starts.   Look for the PYBOOT
->> line which says "finished booting, starting userspace"
->> 
->> Later on, pyboot thinks it finds a root shell due to finding '#'
->> characters, but clearly it never got to a shell.
->> 
->> > I download zImage and dtb in [1], and kernel run to shell successfully
->> > on my platform.
->> 
->> Are you can you try using a ramdisk as well?  You can use the pre-built
->> one here:
->> http://storage.kernelci.org/images/rootfs/buildroot/armel/rootfs.cpio.gz
->> 
->
-> Yes, I tried this ramdisk, and I can reproduce fail issue.
->
+What exactly does it do?
 
-OK, good.   Thanks for looking into it.
+Rafael
 
->> Please check my boot logs to see how I'm generating the boot.img file
->> (search for mkbootimg) with a kernel/dtb/ramdisk.  It may be possible
->> that the kernel image size with a ramdisk is breaking some of the
->> assumptions in the fastboot mode.  I've seen problems like this on other
->> platforms due to hard-coded sizes/addresses in the boot firmware.
->> 
->
-> MT8135 allocate 10MB for BOOT partition, but the test boot.img is 11MB,
-> thus cause user space fail.
 
-Aha, I was right!  ;)
+> On Tue, Oct 27, 2015 at 05:29:19PM +0000, James Morse wrote:
+> > Some architectures require code written to memory as if it were data to be
+> > 'cleaned' from any data caches so that the processor can fetch them as new
+> > instructions.
+> > 
+> > During resume from hibernate, the snapshot code copies some pages directly,
+> > meaning these architectures do not get a chance to perform their cache
+> > maintenance. Add a call to flush_icache_range(), which is provided by
+> > architectures that require it, to perform the maintenance.
+> > 
+> > This mirrors the kernel's behaviour when loading kernel modules and when
+> > mapping executable pages to user space.
+> > 
+> > Signed-off-by: James Morse <james.morse@arm.com>
+> > ---
+> >  kernel/power/snapshot.c | 4 ++++
+> >  1 file changed, 4 insertions(+)
+> > 
+> > diff --git a/kernel/power/snapshot.c b/kernel/power/snapshot.c
+> > index 5235dd4e1e2f..139fc449ad75 100644
+> > --- a/kernel/power/snapshot.c
+> > +++ b/kernel/power/snapshot.c
+> > @@ -31,6 +31,7 @@
+> >  #include <linux/ktime.h>
+> >  
+> >  #include <asm/uaccess.h>
+> > +#include <asm/cacheflush.h>
+> >  #include <asm/mmu_context.h>
+> >  #include <asm/pgtable.h>
+> >  #include <asm/tlbflush.h>
+> > @@ -1196,9 +1197,12 @@ static unsigned int count_data_pages(void)
+> >  static inline void do_copy_page(long *dst, long *src)
+> >  {
+> >  	int n;
+> > +	unsigned long __maybe_unused start = (unsigned long)dst;
+> >  
+> >  	for (n = PAGE_SIZE / sizeof(long); n; n--)
+> >  		*dst++ = *src++;
+> > +
+> > +	flush_icache_range(start, start+PAGE_SIZE);
+> >  }
+> >  
+> >  
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-pm" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
 
-> I will prepare new firmware that extend BOOT
-> partition to 16MB. and put new firmware on Howard's github. I will mail
-> to you when I am ready..
-
-Great, thanks for working on this.
-
-Any chance of making it even bigger?  We're working on running some more
-automated testing from a ramdisk, and those ramdisks will be easily
-30-50 Mb with modules included and a rootfs with extra tests.
-
-Kevin
+-- 
+I speak only for myself.
+Rafael J. Wysocki, Intel Open Source Technology Center.
