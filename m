@@ -1,41 +1,54 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Thu, 12 Nov 2015 15:47:01 +0100
-Subject: [PATCH] pwm: sun4i: fix a possible NULL dereference
-In-Reply-To: <1447314132-29458-1-git-send-email-clabbe.montjoie@gmail.com>
-References: <1447314132-29458-1-git-send-email-clabbe.montjoie@gmail.com>
-Message-ID: <20151112144701.GD4230@piout.net>
+From: rostedt@goodmis.org (Steven Rostedt)
+Date: Thu, 12 Nov 2015 09:47:39 -0500
+Subject: [PATCH] sched/rt: hide push_irq_work_func declaration
+In-Reply-To: <3810009.VdDTV0h1Qp@wuerfel>
+References: <3810009.VdDTV0h1Qp@wuerfel>
+Message-ID: <20151112094739.0168e191@gandalf.local.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+On Thu, 12 Nov 2015 15:22:22 +0100
+Arnd Bergmann <arnd@arndb.de> wrote:
 
-On 12/11/2015 at 08:42:12 +0100, LABBE Corentin wrote :
-> of_match_device could return NULL, and so cause a NULL pointer
-> dereference later.
+> The push_irq_work_func() function is conditionally defined only
+> when both CONFIG_SMP and HAVE_RT_PUSH_IPI are defined, but the
+> forward declaration remains visibile without HAVE_RT_PUSH_IPI,
+> causing a gcc warning in ARM64 allnoconfig:
 > 
-> Reported-by: coverity (CID 1324139)
-> Signed-off-by: LABBE Corentin <clabbe.montjoie@gmail.com>
+> kernel/sched/rt.c:68:13: warning: 'push_irq_work_func' declared 'static' but never defined [-Wunused-function]
+> 
+> This changes the code to use the same condition for both the
+> declaration and the function definition, which gets rid of the
+> warning.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Fixes: b6366f048e0c ("sched/rt: Use IPI to trigger RT task push migration instead of pulling")
 > ---
->  drivers/pwm/pwm-sun4i.c | 2 ++
->  1 file changed, 2 insertions(+)
+> Found on arm64 allnoconfig
 > 
-> diff --git a/drivers/pwm/pwm-sun4i.c b/drivers/pwm/pwm-sun4i.c
-> index cd9dde5..3011fcc 100644
-> --- a/drivers/pwm/pwm-sun4i.c
-> +++ b/drivers/pwm/pwm-sun4i.c
-> @@ -291,6 +291,8 @@ static int sun4i_pwm_probe(struct platform_device *pdev)
->  	const struct of_device_id *match;
+> diff --git a/kernel/sched/rt.c b/kernel/sched/rt.c
+> index e3cc16312046..ce7b36d6f477 100644
+> --- a/kernel/sched/rt.c
+> +++ b/kernel/sched/rt.c
+> @@ -64,7 +64,7 @@ static void start_rt_bandwidth(struct rt_bandwidth *rt_b)
+>  	raw_spin_unlock(&rt_b->rt_runtime_lock);
+>  }
 >  
->  	match = of_match_device(sun4i_pwm_dt_ids, &pdev->dev);
-> +	if (!match)
-> +		return -ENODEV;
+> -#ifdef CONFIG_SMP
+> +#if IS_ENABLED(CONFIG_SMP) && defined(HAVE_RT_PUSH_IPI)
+
+Why IS_ENABLED() and not defined()?
+
+#if defined(CONFIG_SMP) && defined(HAVE_RT_PUSH_IPI)
+
+I thought IS_ENABLED() is used for C code, like:
+
+	if (IS_ENABLED(CONFIG_SMP)) {
+		[...]
+	}
+
+-- Steve
+
+>  static void push_irq_work_func(struct irq_work *work);
+>  #endif
 >  
-
-This will never happen. If it is not matching, then sun4i_pwm_probe is
-not called.
-
-
--- 
-Alexandre Belloni, Free Electrons
-Embedded Linux, Kernel and Android engineering
-http://free-electrons.com
