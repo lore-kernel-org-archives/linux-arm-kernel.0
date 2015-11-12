@@ -1,31 +1,38 @@
 From: jszhang@marvell.com (Jisheng Zhang)
-Date: Thu, 12 Nov 2015 20:00:39 +0800
-Subject: [PATCH] drivers: firmware: psci: drop duplicate const from
- psci_of_match
-Message-ID: <1447329639-1544-1-git-send-email-jszhang@marvell.com>
+Date: Thu, 12 Nov 2015 20:02:08 +0800
+Subject: [PATCH] PCI: hisi: Fix Section mismatch compilation warning for
+ probe()
+Message-ID: <1447329728-1589-1-git-send-email-jszhang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This is to fix below sparse warning:
-drivers/firmware/psci.c:427:40: warning: duplicate const
+Following compilation warning occurs when compiled with:
+CONFIG_DEBUG_SECTION_MISMATCH=y
+
+ WARNING: drivers/pci/host/built-in.o(.data+0x308): Section mismatch in
+ reference from the variable hisi_pcie_driver to the function
+ .init.text:hisi_pcie_probe()
+
+Fix it by dropping __init from hisi_pcie_probe().
 
 Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+Fixes: 500a1d9a43e0 ("PCI: hisi: Add HiSilicon SoC Hip05 PCIe driver")
 ---
- drivers/firmware/psci.c | 2 +-
+ drivers/pci/host/pcie-hisi.c | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/firmware/psci.c b/drivers/firmware/psci.c
-index d24f35d..ae70d24 100644
---- a/drivers/firmware/psci.c
-+++ b/drivers/firmware/psci.c
-@@ -424,7 +424,7 @@ out_put_node:
- 	return err;
+diff --git a/drivers/pci/host/pcie-hisi.c b/drivers/pci/host/pcie-hisi.c
+index 35457ec..1cc0a21 100644
+--- a/drivers/pci/host/pcie-hisi.c
++++ b/drivers/pci/host/pcie-hisi.c
+@@ -139,7 +139,7 @@ static int __init hisi_add_pcie_port(struct pcie_port *pp,
+ 	return 0;
  }
  
--static const struct of_device_id const psci_of_match[] __initconst = {
-+static const struct of_device_id psci_of_match[] __initconst = {
- 	{ .compatible = "arm,psci",	.data = psci_0_1_init},
- 	{ .compatible = "arm,psci-0.2",	.data = psci_0_2_init},
- 	{ .compatible = "arm,psci-1.0",	.data = psci_0_2_init},
+-static int __init hisi_pcie_probe(struct platform_device *pdev)
++static int hisi_pcie_probe(struct platform_device *pdev)
+ {
+ 	struct hisi_pcie *hisi_pcie;
+ 	struct pcie_port *pp;
 -- 
 2.6.2
