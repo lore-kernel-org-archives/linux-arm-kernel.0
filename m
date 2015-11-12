@@ -1,49 +1,67 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 12 Nov 2015 15:12:48 +0100
-Subject: [PATCH] stmmac: avoid ipq806x constant overflow warning
-Message-ID: <4391788.dtYArQ4mVi@wuerfel>
+Date: Thu, 12 Nov 2015 15:14:23 +0100
+Subject: [PATCH] mmc: dw_mmc: use resource_size_t to store physical address
+Message-ID: <28102387.ALpaBHpim0@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Building dwmac-ipq806x on a 64-bit architecture produces a harmless
-warning from gcc:
+The dw_mmc driver stores the physical address of the MMIO registers
+in a pointer, which requires the use of type casts, and is actually
+broken if anyone ever has this device on a 32-bit SoC in registers
+above 4GB. Gcc warns about this possibility when the driver is built
+with ARM LPAE enabled:
 
-stmmac/dwmac-ipq806x.c: In function 'ipq806x_gmac_probe':
-include/linux/bitops.h:6:19: warning: overflow in implicit constant conversion [-Woverflow]
-  val = QSGMII_PHY_CDR_EN |
-stmmac/dwmac-ipq806x.c:333:8: note: in expansion of macro 'QSGMII_PHY_CDR_EN'
- #define QSGMII_PHY_CDR_EN   BIT(0)
- #define BIT(nr)   (1UL << (nr))
+mmc/host/dw_mmc.c: In function 'dw_mci_edmac_start_dma':
+mmc/host/dw_mmc.c:702:17: warning: cast from pointer to integer of different size
+  cfg.dst_addr = (dma_addr_t)(host->phy_regs + fifo_offset);
+                 ^
+mmc/host/dw_mmc-pltfm.c: In function 'dw_mci_pltfm_register':
+mmc/host/dw_mmc-pltfm.c:63:19: warning: cast to pointer from integer of different size
+  host->phy_regs = (void *)(regs->start);
 
-The compiler warns about the fact that a 64-bit literal is passed
-into a function that takes a 32-bit argument. I could not fully understand
-why it warns despite the fact that this number is always small enough
-to fit, but changing the use of BIT() macros into the equivalent hexadecimal
-representation avoids the warning
+This changes the code to use resource_size_t, which gets rid of the
+warning, the bug and the useless casts.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: b1c17215d718 ("stmmac: add ipq806x glue layer")
 ---
-This came up on the arm64 allmodconfig build
+>From the arm64 allmodconfig build reports
 
-diff --git a/drivers/net/ethernet/stmicro/stmmac/dwmac-ipq806x.c b/drivers/net/ethernet/stmicro/stmmac/dwmac-ipq806x.c
-index 9d89bdbf029f..4abd9b0b542a 100644
---- a/drivers/net/ethernet/stmicro/stmmac/dwmac-ipq806x.c
-+++ b/drivers/net/ethernet/stmicro/stmmac/dwmac-ipq806x.c
-@@ -77,11 +77,11 @@
- /* Only GMAC1/2/3 support SGMII and their CTL register are not contiguous */
- #define QSGMII_PHY_SGMII_CTL(x)			((x == 1) ? 0x134 : \
- 						 (0x13c + (4 * (x - 2))))
--#define QSGMII_PHY_CDR_EN			BIT(0)
--#define QSGMII_PHY_RX_FRONT_EN			BIT(1)
--#define QSGMII_PHY_RX_SIGNAL_DETECT_EN		BIT(2)
--#define QSGMII_PHY_TX_DRIVER_EN			BIT(3)
--#define QSGMII_PHY_QSGMII_EN			BIT(7)
-+#define QSGMII_PHY_CDR_EN			0x01u
-+#define QSGMII_PHY_RX_FRONT_EN			0x02u
-+#define QSGMII_PHY_RX_SIGNAL_DETECT_EN		0x04u
-+#define QSGMII_PHY_TX_DRIVER_EN			0x08u
-+#define QSGMII_PHY_QSGMII_EN			0x80u
- #define QSGMII_PHY_PHASE_LOOP_GAIN_OFFSET	12
- #define QSGMII_PHY_PHASE_LOOP_GAIN_MASK		0x7
- #define QSGMII_PHY_RX_DC_BIAS_OFFSET		18
+diff --git a/drivers/mmc/host/dw_mmc-pltfm.c b/drivers/mmc/host/dw_mmc-pltfm.c
+index 7e1d13b68b06..81bdeeb05a4d 100644
+--- a/drivers/mmc/host/dw_mmc-pltfm.c
++++ b/drivers/mmc/host/dw_mmc-pltfm.c
+@@ -60,7 +60,7 @@ int dw_mci_pltfm_register(struct platform_device *pdev,
+ 
+ 	regs = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+ 	/* Get registers' physical base address */
+-	host->phy_regs = (void *)(regs->start);
++	host->phy_regs = regs->start;
+ 	host->regs = devm_ioremap_resource(&pdev->dev, regs);
+ 	if (IS_ERR(host->regs))
+ 		return PTR_ERR(host->regs);
+diff --git a/drivers/mmc/host/dw_mmc.c b/drivers/mmc/host/dw_mmc.c
+index 7a6cedbe48a8..fb204ee6ff89 100644
+--- a/drivers/mmc/host/dw_mmc.c
++++ b/drivers/mmc/host/dw_mmc.c
+@@ -699,7 +699,7 @@ static int dw_mci_edmac_start_dma(struct dw_mci *host,
+ 	int ret = 0;
+ 
+ 	/* Set external dma config: burst size, burst width */
+-	cfg.dst_addr = (dma_addr_t)(host->phy_regs + fifo_offset);
++	cfg.dst_addr = host->phy_regs + fifo_offset;
+ 	cfg.src_addr = cfg.dst_addr;
+ 	cfg.dst_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
+ 	cfg.src_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
+diff --git a/include/linux/mmc/dw_mmc.h b/include/linux/mmc/dw_mmc.h
+index f67b2ec18e6d..7776afb0ffa5 100644
+--- a/include/linux/mmc/dw_mmc.h
++++ b/include/linux/mmc/dw_mmc.h
+@@ -172,7 +172,7 @@ struct dw_mci {
+ 	/* For edmac */
+ 	struct dw_mci_dma_slave *dms;
+ 	/* Registers's physical base address */
+-	void                    *phy_regs;
++	resource_size_t		phy_regs;
+ 
+ 	u32			cmd_status;
+ 	u32			data_status;
