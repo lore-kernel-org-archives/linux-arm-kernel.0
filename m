@@ -1,34 +1,36 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 12 Nov 2015 15:20:16 +0100
-Subject: [PATCH] ARM64: mark cpus_have_hwcap as __maybe_unused
-Message-ID: <5369626.MJXv4CTaxt@wuerfel>
+Date: Thu, 12 Nov 2015 15:22:22 +0100
+Subject: [PATCH] sched/rt: hide push_irq_work_func declaration
+Message-ID: <3810009.VdDTV0h1Qp@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-cpus_have_hwcap() is defined as a 'static' function an only used in
-one place that is inside of an #ifdef, so we get a warning when
-the only user is disabled:
+The push_irq_work_func() function is conditionally defined only
+when both CONFIG_SMP and HAVE_RT_PUSH_IPI are defined, but the
+forward declaration remains visibile without HAVE_RT_PUSH_IPI,
+causing a gcc warning in ARM64 allnoconfig:
 
-arch/arm64/kernel/cpufeature.c:699:13: warning: 'cpus_have_hwcap' defined but not used [-Wunused-function]
+kernel/sched/rt.c:68:13: warning: 'push_irq_work_func' declared 'static' but never defined [-Wunused-function]
 
-This marks the function as __maybe_unused, so the compiler knows that
-it can drop the function definition without warning about it.
+This changes the code to use the same condition for both the
+declaration and the function definition, which gets rid of the
+warning.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: 37b01d53ceef ("arm64/HWCAP: Use system wide safe values")
+Fixes: b6366f048e0c ("sched/rt: Use IPI to trigger RT task push migration instead of pulling")
 ---
 Found on arm64 allnoconfig
 
-diff --git a/arch/arm64/kernel/cpufeature.c b/arch/arm64/kernel/cpufeature.c
-index 52f0d7a5a1c2..c8cf89223b5a 100644
---- a/arch/arm64/kernel/cpufeature.c
-+++ b/arch/arm64/kernel/cpufeature.c
-@@ -696,7 +696,7 @@ static void cap_set_hwcap(const struct arm64_cpu_capabilities *cap)
+diff --git a/kernel/sched/rt.c b/kernel/sched/rt.c
+index e3cc16312046..ce7b36d6f477 100644
+--- a/kernel/sched/rt.c
++++ b/kernel/sched/rt.c
+@@ -64,7 +64,7 @@ static void start_rt_bandwidth(struct rt_bandwidth *rt_b)
+ 	raw_spin_unlock(&rt_b->rt_runtime_lock);
  }
  
- /* Check if we have a particular HWCAP enabled */
--static bool cpus_have_hwcap(const struct arm64_cpu_capabilities *cap)
-+static bool __maybe_unused cpus_have_hwcap(const struct arm64_cpu_capabilities *cap)
- {
- 	bool rc;
+-#ifdef CONFIG_SMP
++#if IS_ENABLED(CONFIG_SMP) && defined(HAVE_RT_PUSH_IPI)
+ static void push_irq_work_func(struct irq_work *work);
+ #endif
  
