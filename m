@@ -1,30 +1,31 @@
 From: jszhang@marvell.com (Jisheng Zhang)
-Date: Thu, 12 Nov 2015 19:59:14 +0800
-Subject: [PATCH] KVM: arm/arm64: vgic: make vgic_io_ops static
-Message-ID: <1447329554-1500-1-git-send-email-jszhang@marvell.com>
+Date: Thu, 12 Nov 2015 20:00:39 +0800
+Subject: [PATCH] drivers: firmware: psci: drop duplicate const from
+ psci_of_match
+Message-ID: <1447329639-1544-1-git-send-email-jszhang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-vgic_io_ops is only referenced within vgic.c, so it can be declared
-static.
+This is to fix below sparse warning:
+drivers/firmware/psci.c:427:40: warning: duplicate const
 
 Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
 ---
- virt/kvm/arm/vgic.c | 2 +-
+ drivers/firmware/psci.c | 2 +-
  1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/virt/kvm/arm/vgic.c b/virt/kvm/arm/vgic.c
-index 5335383..8ef7279 100644
---- a/virt/kvm/arm/vgic.c
-+++ b/virt/kvm/arm/vgic.c
-@@ -878,7 +878,7 @@ static int vgic_handle_mmio_write(struct kvm_vcpu *vcpu,
- 				       true);
+diff --git a/drivers/firmware/psci.c b/drivers/firmware/psci.c
+index d24f35d..ae70d24 100644
+--- a/drivers/firmware/psci.c
++++ b/drivers/firmware/psci.c
+@@ -424,7 +424,7 @@ out_put_node:
+ 	return err;
  }
  
--struct kvm_io_device_ops vgic_io_ops = {
-+static struct kvm_io_device_ops vgic_io_ops = {
- 	.read	= vgic_handle_mmio_read,
- 	.write	= vgic_handle_mmio_write,
- };
+-static const struct of_device_id const psci_of_match[] __initconst = {
++static const struct of_device_id psci_of_match[] __initconst = {
+ 	{ .compatible = "arm,psci",	.data = psci_0_1_init},
+ 	{ .compatible = "arm,psci-0.2",	.data = psci_0_2_init},
+ 	{ .compatible = "arm,psci-1.0",	.data = psci_0_2_init},
 -- 
 2.6.2
