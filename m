@@ -1,101 +1,51 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Thu, 12 Nov 2015 16:13:09 +0000
-Subject: [PATCH 0/3] remove UEFI reserved regions from the linear mapping
-In-Reply-To: <CAKv+Gu8Rd3T_2mjMkx0VZQ052mFjxufGB-U7_EuivvR+5M64cw@mail.gmail.com>
-References: <1446126059-25336-1-git-send-email-ard.biesheuvel@linaro.org>
- <20151112155523.GD26564@leverpostej>
- <CAKv+Gu8Rd3T_2mjMkx0VZQ052mFjxufGB-U7_EuivvR+5M64cw@mail.gmail.com>
-Message-ID: <20151112161309.GF26564@leverpostej>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 12 Nov 2015 17:16:41 +0100
+Subject: PCIe host controller behind IOMMU on ARM
+In-Reply-To: <PS1PR06MB11802B4278C95E3808EEBDD5F5120@PS1PR06MB1180.apcprd06.prod.outlook.com>
+References: <PS1PR06MB11807CBE8EB2AC6B0158D2B5F52A0@PS1PR06MB1180.apcprd06.prod.outlook.com>
+ <6255198.JqytBn7T9E@wuerfel>
+ <PS1PR06MB11802B4278C95E3808EEBDD5F5120@PS1PR06MB1180.apcprd06.prod.outlook.com>
+Message-ID: <4169020.aC5VXkILQm@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 12, 2015 at 05:01:19PM +0100, Ard Biesheuvel wrote:
-> On 12 November 2015 at 16:55, Mark Rutland <mark.rutland@arm.com> wrote:
-> > On Thu, Oct 29, 2015 at 02:40:56PM +0100, Ard Biesheuvel wrote:
-> >> This is yet another approach to solving the issues around removing RAM
-> >> regions known to UEFI from the linear mapping while preserving the record
-> >> of the fact that these regions are backed by memory.
-> >>
-> >> The previous approach added a memblock flag called MEMBLOCK_NOMAP to keep
-> >> track of RAM regions that should be removed from the linear mapping.
-> >>
-> >> The primary motivation for the new approach is the observation that there
-> >> is only a single use case that requires this, which is acpi_os_ioremap().
-> >> Since ACPI implies UEFI on arm64 platforms, and since acpi_os_ioremap()
-> >> uses page_is_ram() internally (which is a __weak generic function), we
-> >> can simply reimplement page_is_ram() to take the UEFI memory map into
-> >> account if we are booted via UEFI.
-> >
-> > Just to check, is the above the only reason for this new approach? Or
-> > were there other issues with the MEMBLOCK_NOMAP approach other than the
-> > diffstat?
-> >
-> > I quite liked the MEMBLOCK_NOMAP approach as it looked reusable.
-> >
+On Thursday 12 November 2015 15:33:41 Phil Edworthy wrote:
+> On 12 November 2015 09:49, Arnd Bergmann wrote:
+> > On Thursday 12 November 2015 09:26:33 Phil Edworthy wrote:
+> > > On 11 November 2015 18:25, LIviu wrote:
+> > > > On Mon, Nov 09, 2015 at 12:32:13PM +0000, Phil Edworthy wrote:
+> > 
+> > of_dma_configure calls of_dma_get_range to do all this for the PCIe host,
+> > and then calls arch_setup_dma_ops() so the architecture specific code can
+> > enforce the limits in dma_set_mask and pick an appropriate set of dma
+> > operations. The missing part is in the implementation of arch_setup_dma_ops,
+> > which currently happily ignores the base and limit.
+> I don't think it's as simple as that, though I could be wrong!
 > 
-> I think the MEMBLOCK_NOMAP approach is sound, but it is harder to
-> prove that there are no corner cases that behave incorrectly.
+> First off, of_dma_configure() sets a default coherent_dma_mask to 4GiB.
+> This default is set for the 'platform soc' device. For my own testing I increased
+> this to DMA_BIT_MASK(63). Note that setting it to DMA_BIT_MASK(64) causes
+> boot failure that I haven't looked into.
 
-Ok.
+Most platform devices actually need the 32-bit mask, so we intentionally
+followed what PCI does here and default to that and require platform drivers
+to explicitly ask for a larger mask if they need it.
 
-> > I take it there aren't any lurking instances of page_is_ram() used to
-> > test if something exists in the linear mapping?
-> >
-> 
-> Well, first of all, the linear mapping only covers lowmem, so that in
-> itself would not be a portable use. In general, pfn_valid() would be
-> the correct test for that (possibly combined with PageHighmem())
+> Then pci_device_add() sets the devices coherent_dma_mask to 4GiB before
+> calling of_pci_dma_configure(). I assume it does this on the basis that this is a
+> good default for PCI drivers that don't call dma_set_mask().
+> So if arch_setup_dma_ops() walks up the parents to limit the mask, you'll hit
+> this mask.
 
-Good point, I hadn't considered that.
+arch_setup_dma_ops() does not walk up the hierarchy, of_dma_configure()
+does this before calling arch_setup_dma_ops(). The PCI devices start out
+with the 32-bit mask, but the limit should be whatever PCI host uses.
 
-> page_is_ram() and the 'System RAM' iomem region are so poorly defined
-> or documented that we may be better off just removing it in the first
-> place and replace it with something meaningful.
+> Finally, dma_set_mask_and_coherent() is called from the PCI card driver
+> but it doesn't check the parents dma masks either.
 
-I'd be very much in favour of tightening up and/or replacing
-page_is_ram with something well-defined.
+The way I think this should work is that arch_setup_dma_ops() stores the
+allowed mask in the struct device, and that dma_set_mask compares the
+mask against that.
 
-I believe that some userspace depends on the 'System RAM' info (e.g. I
-think kexec tools parse that to decide a good location for the next
-kernel), but I would expect that users want to know about _usable_ RAM
-rather than anything that happens to be physical RAM.
-
-> >> Patch #1 slightly reorders the UEFI runtime services initialization routines
-> >> so that the EFI_MEMMAP flag is only set if the permanent mapping of the UEFI
-> >> memory map is in place.
-> >
-> > This also means that the memory map is mapped even with EFI runtime
-> > support disabled, but I guess that's not a big problem.
-> >
-> 
-> Yes. You need that anyway if you are going to rely on it even when the
-> runtime services are disabled.
-
-Not with the MEMBLOCK_NOMAP approach.
-
-I don't have a strong case for caring about that; I only imagine that
-being a problem if you're trying to track down extremely nasty memory
-corruption / bad pointer bugs and want the bare minimum VA space mapped.
-Even then the impact is minimal.
-
-> > As a side thought, it would be nice if we could memremap_ro the system
-> > table and memory map in future to prevent potential corruption, given
-> > they have fixed VAs and are always mapped.
-> >
-> 
-> I agree, and I already have some local patches using
-> early_memremap_ro() for the EFI init code.
-
-Ah, nice!
-
-> memremap_ro() does not actually exist yet, but I intend to propose
-> MEMREMAP_RO and MEMREMAP_NX flags to Dan Williams's memremap() work
-> once I get around to it.
-
-That sounds good; I would certainly be in favour of that.
-
-For some reason I thought the memremap arch changes had gone in for
-v4.3, but I see that's not the case. I'll take a look around.
-
-Thanks,
-Mark.
+	Arnd
