@@ -1,225 +1,518 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Thu, 12 Nov 2015 21:48:45 +0800
-Subject: [PATCH] PCI: designware: bail out if host_init failed
-Message-ID: <1447336125-5010-1-git-send-email-jszhang@marvell.com>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 12 Nov 2015 08:01:22 -0600
+Subject: [PATCH v2] regulator: tps65217: remove tps65217.dtsi file
+In-Reply-To: <1445949397-22745-1-git-send-email-hs@denx.de>
+References: <1445949397-22745-1-git-send-email-hs@denx.de>
+Message-ID: <20151112140122.GA1076@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-There's no reason to continue the initialization such as configure
-register, scan root bus etc. if customized host_init() failed. This
-patch tries to check the host_init result, bail out if failed.
+On Tue, Oct 27, 2015 at 01:36:36PM +0100, Heiko Schocher wrote:
+> remove tps65217.dtsi and adapt all boards, which
+> used it.
+> 
+> Signed-off-by: Heiko Schocher <hs@denx.de>
+> Tested-by: Keerthy <j-keerthy@ti.com>
+> Acked-by: Mark Brown <broonie@kernel.org>
 
-Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
----
- drivers/pci/host/pci-dra7xx.c      |  4 +++-
- drivers/pci/host/pci-exynos.c      |  4 +++-
- drivers/pci/host/pci-imx6.c        |  4 +++-
- drivers/pci/host/pci-keystone.c    |  4 +++-
- drivers/pci/host/pci-layerscape.c  | 25 ++++++++++++++++---------
- drivers/pci/host/pcie-designware.c |  7 +++++--
- drivers/pci/host/pcie-designware.h |  2 +-
- drivers/pci/host/pcie-spear13xx.c  |  4 +++-
- 8 files changed, 37 insertions(+), 17 deletions(-)
+Acked-by: Rob Herring <robh@kernel.org>
 
-diff --git a/drivers/pci/host/pci-dra7xx.c b/drivers/pci/host/pci-dra7xx.c
-index 8c36880..b3160a1 100644
---- a/drivers/pci/host/pci-dra7xx.c
-+++ b/drivers/pci/host/pci-dra7xx.c
-@@ -149,7 +149,7 @@ static void dra7xx_pcie_enable_interrupts(struct pcie_port *pp)
- 				   LEG_EP_INTERRUPTS);
- }
- 
--static void dra7xx_pcie_host_init(struct pcie_port *pp)
-+static int dra7xx_pcie_host_init(struct pcie_port *pp)
- {
- 	dw_pcie_setup_rc(pp);
- 
-@@ -162,6 +162,8 @@ static void dra7xx_pcie_host_init(struct pcie_port *pp)
- 	if (IS_ENABLED(CONFIG_PCI_MSI))
- 		dw_pcie_msi_init(pp);
- 	dra7xx_pcie_enable_interrupts(pp);
-+
-+	return 0;
- }
- 
- static struct pcie_host_ops dra7xx_pcie_host_ops = {
-diff --git a/drivers/pci/host/pci-exynos.c b/drivers/pci/host/pci-exynos.c
-index 01095e1..57f370b 100644
---- a/drivers/pci/host/pci-exynos.c
-+++ b/drivers/pci/host/pci-exynos.c
-@@ -481,10 +481,12 @@ static int exynos_pcie_link_up(struct pcie_port *pp)
- 	return 0;
- }
- 
--static void exynos_pcie_host_init(struct pcie_port *pp)
-+static int exynos_pcie_host_init(struct pcie_port *pp)
- {
- 	exynos_pcie_establish_link(pp);
- 	exynos_pcie_enable_interrupts(pp);
-+
-+	return 0;
- }
- 
- static struct pcie_host_ops exynos_pcie_host_ops = {
-diff --git a/drivers/pci/host/pci-imx6.c b/drivers/pci/host/pci-imx6.c
-index 22e8224..9a46680 100644
---- a/drivers/pci/host/pci-imx6.c
-+++ b/drivers/pci/host/pci-imx6.c
-@@ -425,7 +425,7 @@ static int imx6_pcie_establish_link(struct pcie_port *pp)
- 	return 0;
- }
- 
--static void imx6_pcie_host_init(struct pcie_port *pp)
-+static int imx6_pcie_host_init(struct pcie_port *pp)
- {
- 	imx6_pcie_assert_core_reset(pp);
- 
-@@ -439,6 +439,8 @@ static void imx6_pcie_host_init(struct pcie_port *pp)
- 
- 	if (IS_ENABLED(CONFIG_PCI_MSI))
- 		dw_pcie_msi_init(pp);
-+
-+	return 0;
- }
- 
- static void imx6_pcie_reset_phy(struct pcie_port *pp)
-diff --git a/drivers/pci/host/pci-keystone.c b/drivers/pci/host/pci-keystone.c
-index 0aa81bd..2604571 100644
---- a/drivers/pci/host/pci-keystone.c
-+++ b/drivers/pci/host/pci-keystone.c
-@@ -250,7 +250,7 @@ static int keystone_pcie_fault(unsigned long addr, unsigned int fsr,
- 	return 0;
- }
- 
--static void __init ks_pcie_host_init(struct pcie_port *pp)
-+static int __init ks_pcie_host_init(struct pcie_port *pp)
- {
- 	struct keystone_pcie *ks_pcie = to_keystone_pcie(pp);
- 	u32 val;
-@@ -277,6 +277,8 @@ static void __init ks_pcie_host_init(struct pcie_port *pp)
- 	 */
- 	hook_fault_code(17, keystone_pcie_fault, SIGBUS, 0,
- 			"Asynchronous external abort");
-+
-+	return 0;
- }
- 
- static struct pcie_host_ops keystone_pcie_host_ops = {
-diff --git a/drivers/pci/host/pci-layerscape.c b/drivers/pci/host/pci-layerscape.c
-index 3923bed..a6e9070 100644
---- a/drivers/pci/host/pci-layerscape.c
-+++ b/drivers/pci/host/pci-layerscape.c
-@@ -94,8 +94,9 @@ static int ls1021_pcie_link_up(struct pcie_port *pp)
- 	return 1;
- }
- 
--static void ls1021_pcie_host_init(struct pcie_port *pp)
-+static int ls1021_pcie_host_init(struct pcie_port *pp)
- {
-+	int ret;
- 	struct ls_pcie *pcie = to_ls_pcie(pp);
- 	u32 val, index[2];
- 
-@@ -103,15 +104,14 @@ static void ls1021_pcie_host_init(struct pcie_port *pp)
- 						     "fsl,pcie-scfg");
- 	if (IS_ERR(pcie->scfg)) {
- 		dev_err(pp->dev, "No syscfg phandle specified\n");
--		pcie->scfg = NULL;
--		return;
-+		ret = PTR_ERR(pcie->scfg);
-+		goto err;
- 	}
- 
--	if (of_property_read_u32_array(pp->dev->of_node,
--				       "fsl,pcie-scfg", index, 2)) {
--		pcie->scfg = NULL;
--		return;
--	}
-+	ret = of_property_read_u32_array(pp->dev->of_node,
-+					 "fsl,pcie-scfg", index, 2);
-+	if (ret)
-+		goto err;
- 	pcie->index = index[1];
- 
- 	dw_pcie_setup_rc(pp);
-@@ -123,6 +123,11 @@ static void ls1021_pcie_host_init(struct pcie_port *pp)
- 	val = ioread32(pcie->dbi + PCIE_STRFMR1);
- 	val &= 0xffff;
- 	iowrite32(val, pcie->dbi + PCIE_STRFMR1);
-+
-+	return 0;
-+err:
-+	pcie->scfg = NULL;
-+	return ret;
- }
- 
- static int ls_pcie_link_up(struct pcie_port *pp)
-@@ -140,7 +145,7 @@ static int ls_pcie_link_up(struct pcie_port *pp)
- 	return 1;
- }
- 
--static void ls_pcie_host_init(struct pcie_port *pp)
-+static int ls_pcie_host_init(struct pcie_port *pp)
- {
- 	struct ls_pcie *pcie = to_ls_pcie(pp);
- 
-@@ -148,6 +153,8 @@ static void ls_pcie_host_init(struct pcie_port *pp)
- 	ls_pcie_fix_class(pcie);
- 	ls_pcie_clear_multifunction(pcie);
- 	iowrite32(0, pcie->dbi + PCIE_DBI_RO_WR_EN);
-+
-+	return 0;
- }
- 
- static int ls_pcie_msi_host_init(struct pcie_port *pp,
-diff --git a/drivers/pci/host/pcie-designware.c b/drivers/pci/host/pcie-designware.c
-index 540f077..a80a9ba 100644
---- a/drivers/pci/host/pcie-designware.c
-+++ b/drivers/pci/host/pcie-designware.c
-@@ -515,8 +515,11 @@ int dw_pcie_host_init(struct pcie_port *pp)
- 		}
- 	}
- 
--	if (pp->ops->host_init)
--		pp->ops->host_init(pp);
-+	if (pp->ops->host_init) {
-+		ret = pp->ops->host_init(pp);
-+		if (ret)
-+			return ret;
-+	}
- 
- 	if (!pp->ops->rd_other_conf)
- 		dw_pcie_prog_outbound_atu(pp, PCIE_ATU_REGION_INDEX1,
-diff --git a/drivers/pci/host/pcie-designware.h b/drivers/pci/host/pcie-designware.h
-index 2356d29..7b5317f 100644
---- a/drivers/pci/host/pcie-designware.h
-+++ b/drivers/pci/host/pcie-designware.h
-@@ -63,7 +63,7 @@ struct pcie_host_ops {
- 	int (*wr_other_conf)(struct pcie_port *pp, struct pci_bus *bus,
- 			unsigned int devfn, int where, int size, u32 val);
- 	int (*link_up)(struct pcie_port *pp);
--	void (*host_init)(struct pcie_port *pp);
-+	int (*host_init)(struct pcie_port *pp);
- 	void (*msi_set_irq)(struct pcie_port *pp, int irq);
- 	void (*msi_clear_irq)(struct pcie_port *pp, int irq);
- 	phys_addr_t (*get_msi_addr)(struct pcie_port *pp);
-diff --git a/drivers/pci/host/pcie-spear13xx.c b/drivers/pci/host/pcie-spear13xx.c
-index b95b756..50b3b31 100644
---- a/drivers/pci/host/pcie-spear13xx.c
-+++ b/drivers/pci/host/pcie-spear13xx.c
-@@ -256,10 +256,12 @@ static int spear13xx_pcie_link_up(struct pcie_port *pp)
- 	return 0;
- }
- 
--static void spear13xx_pcie_host_init(struct pcie_port *pp)
-+static int spear13xx_pcie_host_init(struct pcie_port *pp)
- {
- 	spear13xx_pcie_establish_link(pp);
- 	spear13xx_pcie_enable_interrupts(pp);
-+
-+	return 0;
- }
- 
- static struct pcie_host_ops spear13xx_pcie_host_ops = {
--- 
-2.6.2
+> ---
+> Suggested by Mark Brown, see:
+> https://lkml.org/lkml/2015/10/21/581
+> 
+> Changes in v2:
+> - accidentially removed tps65217.txt
+>   do not remove it, add Sebastian Reichel to
+>   cc, as he also deteted this.
+> - add Acked-by from Mark Brown
+> - add Tested-by from j-keerthy
+> 
+>  .../devicetree/bindings/regulator/tps65217.txt     | 10 ++++
+>  arch/arm/boot/dts/am335x-bone-common.dtsi          | 14 ++++--
+>  arch/arm/boot/dts/am335x-chilisom.dtsi             | 14 +++++-
+>  arch/arm/boot/dts/am335x-nano.dts                  | 14 +++++-
+>  arch/arm/boot/dts/am335x-pepper.dts                | 14 +++++-
+>  arch/arm/boot/dts/am335x-sl50.dts                  | 13 ++++-
+>  arch/arm/boot/dts/tps65217.dtsi                    | 56 ----------------------
+>  7 files changed, 68 insertions(+), 67 deletions(-)
+>  delete mode 100644 arch/arm/boot/dts/tps65217.dtsi
+> 
+> diff --git a/Documentation/devicetree/bindings/regulator/tps65217.txt b/Documentation/devicetree/bindings/regulator/tps65217.txt
+> index 4f05d20..d181096 100644
+> --- a/Documentation/devicetree/bindings/regulator/tps65217.txt
+> +++ b/Documentation/devicetree/bindings/regulator/tps65217.txt
+> @@ -26,7 +26,11 @@ Example:
+>  		ti,pmic-shutdown-controller;
+>  
+>  		regulators {
+> +			#address-cells = <1>;
+> +			#size-cells = <0>;
+> +
+>  			dcdc1_reg: dcdc1 {
+> +				reg = <0>;
+>  				regulator-min-microvolt = <900000>;
+>  				regulator-max-microvolt = <1800000>;
+>  				regulator-boot-on;
+> @@ -34,6 +38,7 @@ Example:
+>  			};
+>  
+>  			dcdc2_reg: dcdc2 {
+> +				reg = <1>;
+>  				regulator-min-microvolt = <900000>;
+>  				regulator-max-microvolt = <3300000>;
+>  				regulator-boot-on;
+> @@ -41,6 +46,7 @@ Example:
+>  			};
+>  
+>  			dcdc3_reg: dcc3 {
+> +				reg = <2>;
+>  				regulator-min-microvolt = <900000>;
+>  				regulator-max-microvolt = <1500000>;
+>  				regulator-boot-on;
+> @@ -48,6 +54,7 @@ Example:
+>  			};
+>  
+>  			ldo1_reg: ldo1 {
+> +				reg = <3>;
+>  				regulator-min-microvolt = <1000000>;
+>  				regulator-max-microvolt = <3300000>;
+>  				regulator-boot-on;
+> @@ -55,6 +62,7 @@ Example:
+>  			};
+>  
+>  			ldo2_reg: ldo2 {
+> +				reg = <4>;
+>  				regulator-min-microvolt = <900000>;
+>  				regulator-max-microvolt = <3300000>;
+>  				regulator-boot-on;
+> @@ -62,6 +70,7 @@ Example:
+>  			};
+>  
+>  			ldo3_reg: ldo3 {
+> +				reg = <5>;
+>  				regulator-min-microvolt = <1800000>;
+>  				regulator-max-microvolt = <3300000>;
+>  				regulator-boot-on;
+> @@ -69,6 +78,7 @@ Example:
+>  			};
+>  
+>  			ldo4_reg: ldo4 {
+> +				reg = <6>;
+>  				regulator-min-microvolt = <1800000>;
+>  				regulator-max-microvolt = <3300000>;
+>  				regulator-boot-on;
+> diff --git a/arch/arm/boot/dts/am335x-bone-common.dtsi b/arch/arm/boot/dts/am335x-bone-common.dtsi
+> index fec7834..0c4bde0 100644
+> --- a/arch/arm/boot/dts/am335x-bone-common.dtsi
+> +++ b/arch/arm/boot/dts/am335x-bone-common.dtsi
+> @@ -285,10 +285,8 @@
+>  	};
+>  };
+>  
+> -
+> -/include/ "tps65217.dtsi"
+> -
+>  &tps {
+> +	compatible = "ti,tps65217";
+>  	/*
+>  	 * Configure pmic to enter OFF-state instead of SLEEP-state ("RTC-only
+>  	 * mode") at poweroff.  Most BeagleBone versions do not support RTC-only
+> @@ -309,12 +307,17 @@
+>  	ti,pmic-shutdown-controller;
+>  
+>  	regulators {
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +
+>  		dcdc1_reg: regulator at 0 {
+> +			reg = <0>;
+>  			regulator-name = "vdds_dpr";
+>  			regulator-always-on;
+>  		};
+>  
+>  		dcdc2_reg: regulator at 1 {
+> +			reg = <1>;
+>  			/* VDD_MPU voltage limits 0.95V - 1.26V with +/-4% tolerance */
+>  			regulator-name = "vdd_mpu";
+>  			regulator-min-microvolt = <925000>;
+> @@ -324,6 +327,7 @@
+>  		};
+>  
+>  		dcdc3_reg: regulator at 2 {
+> +			reg = <2>;
+>  			/* VDD_CORE voltage limits 0.95V - 1.1V with +/-4% tolerance */
+>  			regulator-name = "vdd_core";
+>  			regulator-min-microvolt = <925000>;
+> @@ -333,21 +337,25 @@
+>  		};
+>  
+>  		ldo1_reg: regulator at 3 {
+> +			reg = <3>;
+>  			regulator-name = "vio,vrtc,vdds";
+>  			regulator-always-on;
+>  		};
+>  
+>  		ldo2_reg: regulator at 4 {
+> +			reg = <4>;
+>  			regulator-name = "vdd_3v3aux";
+>  			regulator-always-on;
+>  		};
+>  
+>  		ldo3_reg: regulator at 5 {
+> +			reg = <5>;
+>  			regulator-name = "vdd_1v8";
+>  			regulator-always-on;
+>  		};
+>  
+>  		ldo4_reg: regulator at 6 {
+> +			reg = <6>;
+>  			regulator-name = "vdd_3v3a";
+>  			regulator-always-on;
+>  		};
+> diff --git a/arch/arm/boot/dts/am335x-chilisom.dtsi b/arch/arm/boot/dts/am335x-chilisom.dtsi
+> index 7e9a34d..9f5ee9a 100644
+> --- a/arch/arm/boot/dts/am335x-chilisom.dtsi
+> +++ b/arch/arm/boot/dts/am335x-chilisom.dtsi
+> @@ -128,16 +128,21 @@
+>  
+>  };
+>  
+> -/include/ "tps65217.dtsi"
+> -
+>  &tps {
+> +	compatible = "ti,tps65217";
+> +
+>  	regulators {
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +
+>  		dcdc1_reg: regulator at 0 {
+> +			reg = <0>;
+>  			regulator-name = "vdds_dpr";
+>  			regulator-always-on;
+>  		};
+>  
+>  		dcdc2_reg: regulator at 1 {
+> +			reg = <1>;
+>  			/* VDD_MPU voltage limits 0.95V - 1.26V with +/-4% tolerance */
+>  			regulator-name = "vdd_mpu";
+>  			regulator-min-microvolt = <925000>;
+> @@ -147,6 +152,7 @@
+>  		};
+>  
+>  		dcdc3_reg: regulator at 2 {
+> +			reg = <2>;
+>  			/* VDD_CORE voltage limits 0.95V - 1.1V with +/-4% tolerance */
+>  			regulator-name = "vdd_core";
+>  			regulator-min-microvolt = <925000>;
+> @@ -156,24 +162,28 @@
+>  		};
+>  
+>  		ldo1_reg: regulator at 3 {
+> +			reg = <3>;
+>  			regulator-name = "vio,vrtc,vdds";
+>  			regulator-boot-on;
+>  			regulator-always-on;
+>  		};
+>  
+>  		ldo2_reg: regulator at 4 {
+> +			reg = <4>;
+>  			regulator-name = "vdd_3v3aux";
+>  			regulator-boot-on;
+>  			regulator-always-on;
+>  		};
+>  
+>  		ldo3_reg: regulator at 5 {
+> +			reg = <5>;
+>  			regulator-name = "vdd_1v8";
+>  			regulator-boot-on;
+>  			regulator-always-on;
+>  		};
+>  
+>  		ldo4_reg: regulator at 6 {
+> +			reg = <6>;
+>  			regulator-name = "vdd_3v3d";
+>  			regulator-boot-on;
+>  			regulator-always-on;
+> diff --git a/arch/arm/boot/dts/am335x-nano.dts b/arch/arm/boot/dts/am335x-nano.dts
+> index 5ed4ca6..041adb8 100644
+> --- a/arch/arm/boot/dts/am335x-nano.dts
+> +++ b/arch/arm/boot/dts/am335x-nano.dts
+> @@ -375,11 +375,15 @@
+>  	wp-gpios = <&gpio3 18 0>;
+>  };
+>  
+> -#include "tps65217.dtsi"
+> -
+>  &tps {
+> +	compatible = "ti,tps65217";
+> +
+>  	regulators {
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +
+>  		dcdc1_reg: regulator at 0 {
+> +			reg = <0>;
+>  			/* +1.5V voltage with ?4% tolerance */
+>  			regulator-min-microvolt = <1450000>;
+>  			regulator-max-microvolt = <1550000>;
+> @@ -388,6 +392,7 @@
+>  		};
+>  
+>  		dcdc2_reg: regulator at 1 {
+> +			reg = <1>;
+>  			/* VDD_MPU voltage limits 0.95V - 1.1V with ?4% tolerance */
+>  			regulator-name = "vdd_mpu";
+>  			regulator-min-microvolt = <915000>;
+> @@ -397,6 +402,7 @@
+>  		};
+>  
+>  		dcdc3_reg: regulator at 2 {
+> +			reg = <2>;
+>  			/* VDD_CORE voltage limits 0.95V - 1.1V with ?4% tolerance */
+>  			regulator-name = "vdd_core";
+>  			regulator-min-microvolt = <915000>;
+> @@ -406,6 +412,7 @@
+>  		};
+>  
+>  		ldo1_reg: regulator at 3 {
+> +			reg = <3>;
+>  			/* +1.8V voltage with ?4% tolerance */
+>  			regulator-min-microvolt = <1750000>;
+>  			regulator-max-microvolt = <1870000>;
+> @@ -414,6 +421,7 @@
+>  		};
+>  
+>  		ldo2_reg: regulator at 4 {
+> +			reg = <4>;
+>  			/* +3.3V voltage with ?4% tolerance */
+>  			regulator-min-microvolt = <3175000>;
+>  			regulator-max-microvolt = <3430000>;
+> @@ -422,6 +430,7 @@
+>  		};
+>  
+>  		ldo3_reg: regulator at 5 {
+> +			reg = <5>;
+>  			/* +1.8V voltage with ?4% tolerance */
+>  			regulator-min-microvolt = <1750000>;
+>  			regulator-max-microvolt = <1870000>;
+> @@ -430,6 +439,7 @@
+>  		};
+>  
+>  		ldo4_reg: regulator at 6 {
+> +			reg = <6>;
+>  			/* +3.3V voltage with ?4% tolerance */
+>  			regulator-min-microvolt = <3175000>;
+>  			regulator-max-microvolt = <3430000>;
+> diff --git a/arch/arm/boot/dts/am335x-pepper.dts b/arch/arm/boot/dts/am335x-pepper.dts
+> index 7106114..32924a9 100644
+> --- a/arch/arm/boot/dts/am335x-pepper.dts
+> +++ b/arch/arm/boot/dts/am335x-pepper.dts
+> @@ -427,9 +427,9 @@
+>  	vin-supply = <&vbat>;
+>  };
+>  
+> -/include/ "tps65217.dtsi"
+> -
+>  &tps {
+> +	compatible = "ti,tps65217";
+> +
+>  	backlight {
+>  		isel = <1>; /* ISET1 */
+>  		fdim = <200>; /* TPS65217_BL_FDIM_200HZ */
+> @@ -437,12 +437,17 @@
+>  	};
+>  
+>  	regulators {
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +
+>  		dcdc1_reg: regulator at 0 {
+> +			reg = <0>;
+>  			/* VDD_1V8 system supply */
+>  			regulator-always-on;
+>  		};
+>  
+>  		dcdc2_reg: regulator at 1 {
+> +			reg = <1>;
+>  			/* VDD_CORE voltage limits 0.95V - 1.26V with +/-4% tolerance */
+>  			regulator-name = "vdd_core";
+>  			regulator-min-microvolt = <925000>;
+> @@ -452,6 +457,7 @@
+>  		};
+>  
+>  		dcdc3_reg: regulator at 2 {
+> +			reg = <2>;
+>  			/* VDD_MPU voltage limits 0.95V - 1.1V with +/-4% tolerance */
+>  			regulator-name = "vdd_mpu";
+>  			regulator-min-microvolt = <925000>;
+> @@ -461,18 +467,21 @@
+>  		};
+>  
+>  		ldo1_reg: regulator at 3 {
+> +			reg = <3>;
+>  			/* VRTC 1.8V always-on supply */
+>  			regulator-name = "vrtc,vdds";
+>  			regulator-always-on;
+>  		};
+>  
+>  		ldo2_reg: regulator at 4 {
+> +			reg = <4>;
+>  			/* 3.3V rail */
+>  			regulator-name = "vdd_3v3aux";
+>  			regulator-always-on;
+>  		};
+>  
+>  		ldo3_reg: regulator at 5 {
+> +			reg = <5>;
+>  			/* VDD_3V3A 3.3V rail */
+>  			regulator-name = "vdd_3v3a";
+>  			regulator-min-microvolt = <3300000>;
+> @@ -480,6 +489,7 @@
+>  		};
+>  
+>  		ldo4_reg: regulator at 6 {
+> +			reg = <6>;
+>  			/* VDD_3V3B 3.3V rail */
+>  			regulator-name = "vdd_3v3b";
+>  			regulator-always-on;
+> diff --git a/arch/arm/boot/dts/am335x-sl50.dts b/arch/arm/boot/dts/am335x-sl50.dts
+> index 3303c28..d38edfa 100644
+> --- a/arch/arm/boot/dts/am335x-sl50.dts
+> +++ b/arch/arm/boot/dts/am335x-sl50.dts
+> @@ -375,16 +375,19 @@
+>  	pinctrl-0 = <&uart4_pins>;
+>  };
+>  
+> -#include "tps65217.dtsi"
+> -
+>  &tps {
+> +	compatible = "ti,tps65217";
+>  	ti,pmic-shutdown-controller;
+>  
+>  	interrupt-parent = <&intc>;
+>  	interrupts = <7>;	/* NNMI */
+>  
+>  	regulators {
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +
+>  		dcdc1_reg: regulator at 0 {
+> +			reg = <0>;
+>  			/* VDDS_DDR */
+>  			regulator-min-microvolt = <1500000>;
+>  			regulator-max-microvolt = <1500000>;
+> @@ -392,6 +395,7 @@
+>  		};
+>  
+>  		dcdc2_reg: regulator at 1 {
+> +			reg = <1>;
+>  			/* VDD_MPU voltage limits 0.95V - 1.26V with +/-4% tolerance */
+>  			regulator-name = "vdd_mpu";
+>  			regulator-min-microvolt = <925000>;
+> @@ -401,6 +405,7 @@
+>  		};
+>  
+>  		dcdc3_reg: regulator at 2 {
+> +			reg = <2>;
+>  			/* VDD_CORE voltage limits 0.95V - 1.1V with +/-4% tolerance */
+>  			regulator-name = "vdd_core";
+>  			regulator-min-microvolt = <925000>;
+> @@ -410,6 +415,7 @@
+>  		};
+>  
+>  		ldo1_reg: regulator at 3 {
+> +			reg = <3>;
+>  			/* VRTC / VIO / VDDS*/
+>  			regulator-always-on;
+>  			regulator-min-microvolt = <1800000>;
+> @@ -417,6 +423,7 @@
+>  		};
+>  
+>  		ldo2_reg: regulator at 4 {
+> +			reg = <4>;
+>  			/* VDD_3V3AUX */
+>  			regulator-always-on;
+>  			regulator-min-microvolt = <3300000>;
+> @@ -424,6 +431,7 @@
+>  		};
+>  
+>  		ldo3_reg: regulator at 5 {
+> +			reg = <5>;
+>  			/* VDD_1V8 */
+>  			regulator-min-microvolt = <1800000>;
+>  			regulator-max-microvolt = <1800000>;
+> @@ -431,6 +439,7 @@
+>  		};
+>  
+>  		ldo4_reg: regulator at 6 {
+> +			reg = <6>;
+>  			/* VDD_3V3A */
+>  			regulator-min-microvolt = <3300000>;
+>  			regulator-max-microvolt = <3300000>;
+> diff --git a/arch/arm/boot/dts/tps65217.dtsi b/arch/arm/boot/dts/tps65217.dtsi
+> deleted file mode 100644
+> index a632724..0000000
+> --- a/arch/arm/boot/dts/tps65217.dtsi
+> +++ /dev/null
+> @@ -1,56 +0,0 @@
+> -/*
+> - * Copyright (C) 2012 Texas Instruments Incorporated - http://www.ti.com/
+> - *
+> - * This program is free software; you can redistribute it and/or modify
+> - * it under the terms of the GNU General Public License version 2 as
+> - * published by the Free Software Foundation.
+> - */
+> -
+> -/*
+> - * Integrated Power Management Chip
+> - * http://www.ti.com/lit/ds/symlink/tps65217.pdf
+> - */
+> -
+> -&tps {
+> -	compatible = "ti,tps65217";
+> -
+> -	regulators {
+> -		#address-cells = <1>;
+> -		#size-cells = <0>;
+> -
+> -		dcdc1_reg: regulator at 0 {
+> -			reg = <0>;
+> -			regulator-compatible = "dcdc1";
+> -		};
+> -
+> -		dcdc2_reg: regulator at 1 {
+> -			reg = <1>;
+> -			regulator-compatible = "dcdc2";
+> -		};
+> -
+> -		dcdc3_reg: regulator at 2 {
+> -			reg = <2>;
+> -			regulator-compatible = "dcdc3";
+> -		};
+> -
+> -		ldo1_reg: regulator at 3 {
+> -			reg = <3>;
+> -			regulator-compatible = "ldo1";
+> -		};
+> -
+> -		ldo2_reg: regulator at 4 {
+> -			reg = <4>;
+> -			regulator-compatible = "ldo2";
+> -		};
+> -
+> -		ldo3_reg: regulator at 5 {
+> -			reg = <5>;
+> -			regulator-compatible = "ldo3";
+> -		};
+> -
+> -		ldo4_reg: regulator at 6 {
+> -			reg = <6>;
+> -			regulator-compatible = "ldo4";
+> -		};
+> -	};
+> -};
+> -- 
+> 2.1.0
+> 
