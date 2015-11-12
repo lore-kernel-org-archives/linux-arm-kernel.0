@@ -1,7 +1,7 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 12 Nov 2015 15:16:53 +0100
-Subject: [PATCH] dma: at_xdmac: use %pad format string for dma_addr_t
-Message-ID: <3796793.2XNherj1df@wuerfel>
+Date: Thu, 12 Nov 2015 15:18:22 +0100
+Subject: [PATCH] dma: at_hdmac: use %pad format string for dma_addr_t
+Message-ID: <3938068.0vDFThTK2h@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -9,8 +9,8 @@ dma_addr_t may be defined as 32 or 64 bit depending on configuration,
 so it cannot be printed using the normal format strings, as
 gcc correctly warns:
 
-drivers/dma/at_xdmac.c: In function 'at_xdmac_interleaved_queue_desc':
-drivers/dma/at_xdmac.c:922:51: warning: format '%x' expects argument of type 'unsigned int', but argument 5 has type 'dma_addr_t {aka long long unsigned int}' [-Wformat=]
+drivers/dma/at_hdmac.c: In function 'atc_prep_dma_interleaved':
+drivers/dma/at_hdmac.c:731:28: warning: format '%x' expects argument of type 'unsigned int', but argument 4 has type 'dma_addr_t {aka long long unsigned int}' [-Wformat=]
 
 This changes the format strings to use the special "%pad" format
 string that prints a dma_addr_t, and changes the arguments so we
@@ -18,64 +18,82 @@ pass the address by reference as required.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
-Found on arm multi_v7_defconfig+LPAE
+Found on ARM multi_v7_defconfig build with LPAE enabled
 
-diff --git a/drivers/dma/at_xdmac.c b/drivers/dma/at_xdmac.c
-index b5e132d4bae5..7f039de143f0 100644
---- a/drivers/dma/at_xdmac.c
-+++ b/drivers/dma/at_xdmac.c
-@@ -920,8 +920,8 @@ at_xdmac_interleaved_queue_desc(struct dma_chan *chan,
- 	desc->lld.mbr_cfg = chan_cc;
- 
- 	dev_dbg(chan2dev(chan),
--		"%s: lld: mbr_sa=0x%08x, mbr_da=0x%08x, mbr_ubc=0x%08x, mbr_cfg=0x%08x\n",
--		__func__, desc->lld.mbr_sa, desc->lld.mbr_da,
-+		"%s: lld: mbr_sa=%pad, mbr_da=%pad, mbr_ubc=0x%08x, mbr_cfg=0x%08x\n",
-+		__func__, &desc->lld.mbr_sa, &desc->lld.mbr_da,
- 		desc->lld.mbr_ubc, desc->lld.mbr_cfg);
- 
- 	/* Chain lld. */
-@@ -953,8 +953,8 @@ at_xdmac_prep_interleaved(struct dma_chan *chan,
- 	if ((xt->numf > 1) && (xt->frame_size > 1))
+diff --git a/drivers/dma/at_hdmac.c b/drivers/dma/at_hdmac.c
+index 4e55239c7a30..53d22eb73b56 100644
+--- a/drivers/dma/at_hdmac.c
++++ b/drivers/dma/at_hdmac.c
+@@ -729,8 +729,8 @@ atc_prep_dma_interleaved(struct dma_chan *chan,
  		return NULL;
  
--	dev_dbg(chan2dev(chan), "%s: src=0x%08x, dest=0x%08x, numf=%d, frame_size=%d, flags=0x%lx\n",
--		__func__, xt->src_start, xt->dst_start,	xt->numf,
-+	dev_dbg(chan2dev(chan), "%s: src=%pad, dest=%pad, numf=%d, frame_size=%d, flags=0x%lx\n",
-+		__func__, &xt->src_start, &xt->dst_start,	xt->numf,
+ 	dev_info(chan2dev(chan),
+-		 "%s: src=0x%08x, dest=0x%08x, numf=%d, frame_size=%d, flags=0x%lx\n",
+-		__func__, xt->src_start, xt->dst_start, xt->numf,
++		 "%s: src=%pad, dest=%pad, numf=%d, frame_size=%d, flags=0x%lx\n",
++		__func__, &xt->src_start, &xt->dst_start, xt->numf,
  		xt->frame_size, flags);
  
- 	src_addr = xt->src_start;
-@@ -1179,8 +1179,8 @@ static struct at_xdmac_desc *at_xdmac_memset_create_desc(struct dma_chan *chan,
- 	desc->lld.mbr_cfg = chan_cc;
+ 	/*
+@@ -824,8 +824,8 @@ atc_prep_dma_memcpy(struct dma_chan *chan, dma_addr_t dest, dma_addr_t src,
+ 	u32			ctrla;
+ 	u32			ctrlb;
  
- 	dev_dbg(chan2dev(chan),
--		"%s: lld: mbr_da=0x%08x, mbr_ds=0x%08x, mbr_ubc=0x%08x, mbr_cfg=0x%08x\n",
--		__func__, desc->lld.mbr_da, desc->lld.mbr_ds, desc->lld.mbr_ubc,
-+		"%s: lld: mbr_da=%pad, mbr_ds=%pad, mbr_ubc=0x%08x, mbr_cfg=0x%08x\n",
-+		__func__, &desc->lld.mbr_da, &desc->lld.mbr_ds, desc->lld.mbr_ubc,
- 		desc->lld.mbr_cfg);
+-	dev_vdbg(chan2dev(chan), "prep_dma_memcpy: d0x%x s0x%x l0x%zx f0x%lx\n",
+-			dest, src, len, flags);
++	dev_vdbg(chan2dev(chan), "prep_dma_memcpy: d%pad s%pad l0x%zx f0x%lx\n",
++			&dest, &src, len, flags);
  
- 	return desc;
-@@ -1193,8 +1193,8 @@ at_xdmac_prep_dma_memset(struct dma_chan *chan, dma_addr_t dest, int value,
- 	struct at_xdmac_chan	*atchan = to_at_xdmac_chan(chan);
- 	struct at_xdmac_desc	*desc;
+ 	if (unlikely(!len)) {
+ 		dev_dbg(chan2dev(chan), "prep_dma_memcpy: length is zero!\n");
+@@ -938,8 +938,8 @@ atc_prep_dma_memset(struct dma_chan *chan, dma_addr_t dest, int value,
+ 	void __iomem		*vaddr;
+ 	dma_addr_t		paddr;
  
--	dev_dbg(chan2dev(chan), "%s: dest=0x%08x, len=%d, pattern=0x%x, flags=0x%lx\n",
--		__func__, dest, len, value, flags);
-+	dev_dbg(chan2dev(chan), "%s: dest=%pad, len=%d, pattern=0x%x, flags=0x%lx\n",
-+		__func__, &dest, len, value, flags);
+-	dev_vdbg(chan2dev(chan), "%s: d0x%x v0x%x l0x%zx f0x%lx\n", __func__,
+-		dest, value, len, flags);
++	dev_vdbg(chan2dev(chan), "%s: d%pad v0x%x l0x%zx f0x%lx\n", __func__,
++		&dest, value, len, flags);
  
- 	if (unlikely(!len))
- 		return NULL;
-@@ -1229,8 +1229,8 @@ at_xdmac_prep_dma_memset_sg(struct dma_chan *chan, struct scatterlist *sgl,
+ 	if (unlikely(!len)) {
+ 		dev_dbg(chan2dev(chan), "%s: length is zero!\n", __func__);
+@@ -1022,8 +1022,8 @@ atc_prep_dma_memset_sg(struct dma_chan *chan,
+ 		dma_addr_t dest = sg_dma_address(sg);
+ 		size_t len = sg_dma_len(sg);
  
- 	/* Prepare descriptors. */
- 	for_each_sg(sgl, sg, sg_len, i) {
--		dev_dbg(chan2dev(chan), "%s: dest=0x%08x, len=%d, pattern=0x%x, flags=0x%lx\n",
--			__func__, sg_dma_address(sg), sg_dma_len(sg),
-+		dev_dbg(chan2dev(chan), "%s: dest=%pad, len=%d, pattern=0x%x, flags=0x%lx\n",
-+			__func__, &sg_dma_address(sg), sg_dma_len(sg),
- 			value, flags);
- 		desc = at_xdmac_memset_create_desc(chan, atchan,
- 						   sg_dma_address(sg),
+-		dev_vdbg(chan2dev(chan), "%s: d0x%08x, l0x%zx\n",
+-			 __func__, dest, len);
++		dev_vdbg(chan2dev(chan), "%s: d%pad, l0x%zx\n",
++			 __func__, &dest, len);
+ 
+ 		if (!is_dma_fill_aligned(chan->device, dest, 0, len)) {
+ 			dev_err(chan2dev(chan), "%s: buffer is not aligned\n",
+@@ -1439,9 +1439,9 @@ atc_prep_dma_cyclic(struct dma_chan *chan, dma_addr_t buf_addr, size_t buf_len,
+ 	unsigned int		periods = buf_len / period_len;
+ 	unsigned int		i;
+ 
+-	dev_vdbg(chan2dev(chan), "prep_dma_cyclic: %s buf at 0x%08x - %d (%d/%d)\n",
++	dev_vdbg(chan2dev(chan), "prep_dma_cyclic: %s buf@%pad - %d (%d/%d)\n",
+ 			direction == DMA_MEM_TO_DEV ? "TO DEVICE" : "FROM DEVICE",
+-			buf_addr,
++			&buf_addr,
+ 			periods, buf_len, period_len);
+ 
+ 	if (unlikely(!atslave || !buf_len || !period_len)) {
+diff --git a/drivers/dma/at_hdmac_regs.h b/drivers/dma/at_hdmac_regs.h
+index d1cfc8c876f9..7f58f06157f6 100644
+--- a/drivers/dma/at_hdmac_regs.h
++++ b/drivers/dma/at_hdmac_regs.h
+@@ -385,9 +385,9 @@ static void vdbg_dump_regs(struct at_dma_chan *atchan) {}
+ static void atc_dump_lli(struct at_dma_chan *atchan, struct at_lli *lli)
+ {
+ 	dev_crit(chan2dev(&atchan->chan_common),
+-		 "  desc: s0x%x d0x%x ctrl0x%x:0x%x l0x%x\n",
+-		 lli->saddr, lli->daddr,
+-		 lli->ctrla, lli->ctrlb, lli->dscr);
++		 "  desc: s%pad d%pad ctrl0x%x:0x%x l0x%pad\n",
++		 &lli->saddr, &lli->daddr,
++		 lli->ctrla, lli->ctrlb, &lli->dscr);
+ }
+ 
+ 
