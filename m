@@ -1,44 +1,35 @@
-From: heiko@sntech.de (Heiko Stuebner)
-Date: Thu, 12 Nov 2015 10:21:51 +0100
-Subject: [PATCH v8 10/17] phy: Add driver for rockchip Display Port PHY
-In-Reply-To: <5643FB43.6090408@rock-chips.com>
-References: <1446020143-32645-1-git-send-email-ykk@rock-chips.com>
- <2368662.QeV0VQYq26@phil> <5643FB43.6090408@rock-chips.com>
-Message-ID: <1942026.CO9sWmi7sq@phil>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 12 Nov 2015 10:22 +0100
+Subject: [PATCH v6 13/17] arm64:ilp32: add sys_ilp32.c and a separate
+ table (in entry.S) to use it
+In-Reply-To: <mvmoaezy4os.fsf@hawking.suse.de>
+References: <1446507046-24604-1-git-send-email-ynorov@caviumnetworks.com>
+ <10433819.KzDuoxzSn7@wuerfel> <mvmoaezy4os.fsf@hawking.suse.de>
+Message-ID: <4796230.MStNPjWNEu@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Yakir,
-
-Am Donnerstag, 12. November 2015, 10:36:51 schrieb Yakir Yang:
-> On 11/12/2015 07:23 AM, Heiko Stuebner wrote:
-> > Am Mittwoch, 28. Oktober 2015, 16:30:33 schrieb Yakir Yang:
-> >> Add phy driver for the Rockchip DisplayPort PHY module. This
-> >> is required to get DisplayPort working in Rockchip SoCs.
-> >>
-> >> Reviewed-by: Heiko Stuebner <heiko@sntech.de>
-> >> Signed-off-by: Yakir Yang <ykk@rock-chips.com>
-> > a general thing I have been pondering, we should probably move the
-> > dp-phy under the GRF. Similar to the new power-domains being
-> > a full child of the PMU, the dp-phy is a full child-device of the GRF.
-> >
-> > That would include:
-> > - making the GRF a simply-mfd (just adding that property)
-> > - moving the dts node under it
-> > - making the driver get its regmap from its parent (just like
-> >    drivers/soc/rockchip/pm_domains.c does)
-> >
-> >
-> > The usbphy is another example of that, and I think I'll be moving it
-> > below the grf as well.
+On Thursday 12 November 2015 09:58:43 Andreas Schwab wrote:
+> Arnd Bergmann <arnd@arndb.de> writes:
 > 
-> Sounds great, pretty cool to collect those scattered "GRF" driver,
-> if you want me do some rebase on your changes, please note me :)
+> > I think either way is fine for the two examples. I think it's clear
+> > that we want __NR_llseek as 62 and __NR_mmap2 as 222. Whether those
+> > use the compat_sys_llseek/compat_sys_mmap2_wrapper or
+> > sys_lseek/sys_mmap entry points is not overly important, we can use
+> > whatever is more convenient to glibc: if we can kill off an
+> > architecture specific wrapper function in glibc by adding one line
+> > to the kernel, that seems worthwhile.
+> 
+> Currently most off_t-like syscalls need a new glibc wrapper since the
+> existing ones are either for 32bit off_t+off64_t (with split off64_t
+> syscall arguments) or pure 64bit off_t architectures.  Since ilp32 now
+> (mostly) has 32bit off_t, but 64bit off_t-like syscalls neither of them
+> fit.
 
-nope, that won't be necessary ... I'm currently doing some usbphy
-reorganization/cleanups for 4.5 first, so to keep conflicts down I'll do
-the move probably for 4.6. As I expect your edp series to make it into
-4.5 we'll also not have conflicts here then :-)
+What do you mean with 32-bit off_t? Do you mean that glibc emulates
+a 32-bit off_t on top of the 64-bit __kernel_loff_t? That sounds a bit
+backwards. I would expect that all new architectures that only have
+__kernel_loff_t based syscalls but not __kernel_off_t based ones only
+ever use a 64-bit off_t in libc.
 
-
-Heiko
+	Arnd
