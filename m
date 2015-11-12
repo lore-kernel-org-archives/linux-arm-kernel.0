@@ -1,91 +1,36 @@
-From: boris.ostrovsky@oracle.com (Boris Ostrovsky)
-Date: Thu, 12 Nov 2015 10:30:23 -0500
-Subject: [PATCH v3 3/6] xen: introduce XENPF_settime64
-In-Reply-To: <1447260696-450-3-git-send-email-stefano.stabellini@eu.citrix.com>
-References: <alpine.DEB.2.02.1511111639500.5676@kaball.uk.xensource.com>
- <1447260696-450-3-git-send-email-stefano.stabellini@eu.citrix.com>
-Message-ID: <5644B08F.9000205@oracle.com>
+From: matt@codeblueprint.co.uk (Matt Fleming)
+Date: Thu, 12 Nov 2015 15:31:50 +0000
+Subject: [PATCH 2/3] arm64: reimplement page_is_ram() using memblock and
+ UEFI memory map
+In-Reply-To: <1446126059-25336-3-git-send-email-ard.biesheuvel@linaro.org>
+References: <1446126059-25336-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1446126059-25336-3-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20151112153150.GC2681@codeblueprint.co.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/11/2015 11:51 AM, Stefano Stabellini wrote:
-> Rename the current XENPF_settime hypercall and related struct to
-> XENPF_settime32.
->
-> Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
-> CC: konrad.wilk at oracle.com
-> CC: david.vrabel at citrix.com
-> CC: boris.ostrovsky at oracle.com
+On Thu, 29 Oct, at 02:40:58PM, Ard Biesheuvel wrote:
+> This patch overrides the __weak default implementation of page_is_ram(),
+> which uses string comparisons to find entries called 'System RAM' in
+> /proc/iomem. Since we used the contents of memblock to create those entries
+> in the first place, let's use memblock directly.
+> 
+> Also, since the UEFI memory map may describe regions backed by RAM that are
+> not in memblock (i.e., reserved regions that were removed from the linear
+> mapping), check the pfn against the UEFI memory map as well.
+> 
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 > ---
->   arch/x86/xen/time.c              |    8 ++++----
->   include/xen/interface/platform.h |   18 ++++++++++++++----
->   2 files changed, 18 insertions(+), 8 deletions(-)
->
-> diff --git a/arch/x86/xen/time.c b/arch/x86/xen/time.c
-> index 663c2ea..3bbd377 100644
-> --- a/arch/x86/xen/time.c
-> +++ b/arch/x86/xen/time.c
-> @@ -134,10 +134,10 @@ static int xen_pvclock_gtod_notify(struct notifier_block *nb,
->   	if (!was_set && timespec_compare(&now, &next_sync) < 0)
->   		return NOTIFY_OK;
->   
-> -	op.cmd = XENPF_settime;
-> -	op.u.settime.secs = now.tv_sec;
-> -	op.u.settime.nsecs = now.tv_nsec;
-> -	op.u.settime.system_time = xen_clocksource_read();
-> +	op.cmd = XENPF_settime32;
-> +	op.u.settime32.secs = now.tv_sec;
-> +	op.u.settime32.nsecs = now.tv_nsec;
-> +	op.u.settime32.system_time = xen_clocksource_read();
+>  arch/arm64/mm/mmu.c | 34 ++++++++++++++++++++
+>  1 file changed, 34 insertions(+)
+ 
+Am I correct in thinking that the purpose of this series is just to
+placate acpi_os_ioremap() on arm64, and its use of page_is_ram()?
 
-Can/should we switch to time64 here? (This would require a couple more 
-changes but they would all be local to this routine).
+While there aren't many users of page_is_ram() right now, I can see
+how in the future if new users are added they'd be extremely confused
+to find that page_is_ram(pfn) returns true but 'pfn' isn't accessible
+by the kernel proper.
 
--boris
-
-
->   
->   	(void)HYPERVISOR_platform_op(&op);
->   
-> diff --git a/include/xen/interface/platform.h b/include/xen/interface/platform.h
-> index 8e03587..732efb0 100644
-> --- a/include/xen/interface/platform.h
-> +++ b/include/xen/interface/platform.h
-> @@ -35,14 +35,23 @@
->    * Set clock such that it would read <secs,nsecs> after 00:00:00 UTC,
->    * 1 January, 1970 if the current system time was <system_time>.
->    */
-> -#define XENPF_settime             17
-> -struct xenpf_settime {
-> +#define XENPF_settime32             17
-> +struct xenpf_settime32 {
->   	/* IN variables. */
->   	uint32_t secs;
->   	uint32_t nsecs;
->   	uint64_t system_time;
->   };
-> -DEFINE_GUEST_HANDLE_STRUCT(xenpf_settime_t);
-> +DEFINE_GUEST_HANDLE_STRUCT(xenpf_settime32_t);
-> +#define XENPF_settime64           62
-> +struct xenpf_settime64 {
-> +    /* IN variables. */
-> +    uint64_t secs;
-> +    uint32_t nsecs;
-> +    uint32_t mbz;
-> +    uint64_t system_time;
-> +};
-> +DEFINE_GUEST_HANDLE_STRUCT(xenpf_settime64_t);
->   
->   /*
->    * Request memory range (@mfn, @mfn+ at nr_mfns-1) to have type @type.
-> @@ -495,7 +504,8 @@ struct xen_platform_op {
->   	uint32_t cmd;
->   	uint32_t interface_version; /* XENPF_INTERFACE_VERSION */
->   	union {
-> -		struct xenpf_settime           settime;
-> +		struct xenpf_settime32         settime32;
-> +		struct xenpf_settime64         settime64;
->   		struct xenpf_add_memtype       add_memtype;
->   		struct xenpf_del_memtype       del_memtype;
->   		struct xenpf_read_memtype      read_memtype;
+Wouldn't it make more sense to teach acpi_os_ioremap() about these
+special reserved regions outside of page_is_ram()?
