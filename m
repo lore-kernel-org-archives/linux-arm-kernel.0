@@ -1,83 +1,67 @@
-From: chris.brandt@renesas.com (Chris Brandt)
-Date: Thu, 12 Nov 2015 16:01:48 -0500
-Subject: [PATCH v2] ARM: xip: Use correct symbol for end of ROM marker
-In-Reply-To: <1447251455-22731-1-git-send-email-chris.brandt@renesas.com>
-References: <1447251455-22731-1-git-send-email-chris.brandt@renesas.com>
-Message-ID: <1447362108-4333-1-git-send-email-chris.brandt@renesas.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Thu, 12 Nov 2015 22:03:40 +0100
+Subject: [PATCH v2] stmmac: avoid ipq806x constant overflow warning
+In-Reply-To: <3729464.5X0HBxzvx5@wuerfel>
+References: <4391788.dtYArQ4mVi@wuerfel>
+ <20151112.122528.1794206832971213176.davem@davemloft.net>
+ <3729464.5X0HBxzvx5@wuerfel>
+Message-ID: <3825178.3luTQFAgny@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-For an XIP build, _edata_loc, not _etext, represents the end of the
-binary image that will be programmed into ROM and mapped into the
-MODULES_VADDR area.
-With an XIP kernel, nothing is loaded into RAM before boot, meaning
-you have to take into account the size of the entire binary image
-that was programmed, including the init data values that will be copied
-to RAM during kernel boot.
+Building dwmac-ipq806x on a 64-bit architecture produces a harmless
+warning from gcc:
 
-This fixes the bug where you might lose the end of your kernel area
-after page table setup is complete.
+stmmac/dwmac-ipq806x.c: In function 'ipq806x_gmac_probe':
+include/linux/bitops.h:6:19: warning: overflow in implicit constant conversion [-Woverflow]
+  val = QSGMII_PHY_CDR_EN |
+stmmac/dwmac-ipq806x.c:333:8: note: in expansion of macro 'QSGMII_PHY_CDR_EN'
+ #define QSGMII_PHY_CDR_EN   BIT(0)
+ #define BIT(nr)   (1UL << (nr))
 
-Signed-off-by: Chris Brandt <chris.brandt@renesas.com>
----
-v2
-* Added change for MODULES_VADDR
-* Moved extern to new file asm/sections.h
----
- arch/arm/include/asm/sections.h |    8 ++++++++
- arch/arm/kernel/module.c        |    2 +-
- arch/arm/mm/mmu.c               |    4 ++--
- 3 files changed, 11 insertions(+), 3 deletions(-)
- create mode 100644 arch/arm/include/asm/sections.h
+This is a result of the type conversion rules in C, when we take the
+logical OR of multiple different types. In particular, we have
+and unsigned long
 
-diff --git a/arch/arm/include/asm/sections.h b/arch/arm/include/asm/sections.h
-new file mode 100644
-index 0000000..401eb3c2
---- /dev/null
-+++ b/arch/arm/include/asm/sections.h
-@@ -0,0 +1,8 @@
-+#ifndef _ASM_ARM_SECTIONS_H
-+#define _ASM_ARM_SECTIONS_H
-+
-+#include <asm-generic/sections.h>
-+
-+extern char _edata_loc[];
-+
-+#endif	/* _ASM_ARM_SECTIONS_H */
-diff --git a/arch/arm/kernel/module.c b/arch/arm/kernel/module.c
-index efdddcb..41ae2cc 100644
---- a/arch/arm/kernel/module.c
-+++ b/arch/arm/kernel/module.c
-@@ -34,7 +34,7 @@
-  * recompiling the whole kernel when CONFIG_XIP_KERNEL is turned on/off.
-  */
- #undef MODULES_VADDR
--#define MODULES_VADDR	(((unsigned long)_etext + ~PMD_MASK) & PMD_MASK)
-+#define MODULES_VADDR	(((unsigned long)_edata_loc + ~PMD_MASK) & PMD_MASK)
- #endif
+	QSGMII_PHY_CDR_EN == BIT(0) == (1ul << 0) == 0x0000000000000001ul
+
+and a signed int
+
+	0xC << QSGMII_PHY_TX_DRV_AMP_OFFSET == 0xc0000000
+
+which together gives a signed long value
+
+	0xffffffffc0000001l
+
+and when this is passed into a function that takes an unsigned int type,
+gcc warns about the signed overflow and the loss of the upper 32-bits that
+are all ones.
+
+This patch adds 'ul' type modifiers to the literal numbers passed in
+here, so now the expression remains an 'unsigned long' with the upper
+bits all zero, and that avoids the signed overflow and the warning.
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Fixes: b1c17215d718 ("stmmac: add ipq806x glue layer")
+
+diff --git a/drivers/net/ethernet/stmicro/stmmac/dwmac-ipq806x.c b/drivers/net/ethernet/stmicro/stmmac/dwmac-ipq806x.c
+index 9d89bdbf029f..82de68b1a452 100644
+--- a/drivers/net/ethernet/stmicro/stmmac/dwmac-ipq806x.c
++++ b/drivers/net/ethernet/stmicro/stmmac/dwmac-ipq806x.c
+@@ -337,11 +337,11 @@ static int ipq806x_gmac_probe(struct platform_device *pdev)
+ 			     QSGMII_PHY_RX_SIGNAL_DETECT_EN |
+ 			     QSGMII_PHY_TX_DRIVER_EN |
+ 			     QSGMII_PHY_QSGMII_EN |
+-			     0x4 << QSGMII_PHY_PHASE_LOOP_GAIN_OFFSET |
+-			     0x3 << QSGMII_PHY_RX_DC_BIAS_OFFSET |
+-			     0x1 << QSGMII_PHY_RX_INPUT_EQU_OFFSET |
+-			     0x2 << QSGMII_PHY_CDR_PI_SLEW_OFFSET |
+-			     0xC << QSGMII_PHY_TX_DRV_AMP_OFFSET);
++			     0x4ul << QSGMII_PHY_PHASE_LOOP_GAIN_OFFSET |
++			     0x3ul << QSGMII_PHY_RX_DC_BIAS_OFFSET |
++			     0x1ul << QSGMII_PHY_RX_INPUT_EQU_OFFSET |
++			     0x2ul << QSGMII_PHY_CDR_PI_SLEW_OFFSET |
++			     0xCul << QSGMII_PHY_TX_DRV_AMP_OFFSET);
+ 	}
  
- #ifdef CONFIG_MMU
-diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
-index 4867f5d..dd5a56b 100644
---- a/arch/arm/mm/mmu.c
-+++ b/arch/arm/mm/mmu.c
-@@ -1210,7 +1210,7 @@ static inline void prepare_page_table(void)
- 
- #ifdef CONFIG_XIP_KERNEL
- 	/* The XIP kernel is mapped in the module area -- skip over it */
--	addr = ((unsigned long)_etext + PMD_SIZE - 1) & PMD_MASK;
-+	addr = ((unsigned long)_edata_loc + PMD_SIZE - 1) & PMD_MASK;
- #endif
- 	for ( ; addr < PAGE_OFFSET; addr += PMD_SIZE)
- 		pmd_clear(pmd_off_k(addr));
-@@ -1292,7 +1292,7 @@ static void __init devicemaps_init(const struct machine_desc *mdesc)
- #ifdef CONFIG_XIP_KERNEL
- 	map.pfn = __phys_to_pfn(CONFIG_XIP_PHYS_ADDR & SECTION_MASK);
- 	map.virtual = MODULES_VADDR;
--	map.length = ((unsigned long)_etext - map.virtual + ~SECTION_MASK) & SECTION_MASK;
-+	map.length = ((unsigned long)_edata_loc - map.virtual + ~SECTION_MASK) & SECTION_MASK;
- 	map.type = MT_ROM;
- 	create_mapping(&map);
- #endif
--- 
-1.7.9.5
+ 	plat_dat->has_gmac = true;
