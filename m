@@ -1,54 +1,72 @@
-From: davem@davemloft.net (David Miller)
-Date: Thu, 12 Nov 2015 12:25:28 -0500 (EST)
-Subject: [PATCH] stmmac: avoid ipq806x constant overflow warning
-In-Reply-To: <4391788.dtYArQ4mVi@wuerfel>
-References: <4391788.dtYArQ4mVi@wuerfel>
-Message-ID: <20151112.122528.1794206832971213176.davem@davemloft.net>
+From: stefano.stabellini@eu.citrix.com (Stefano Stabellini)
+Date: Thu, 12 Nov 2015 17:29:47 +0000
+Subject: [PATCH v4 0/7] Xen wallclock on arm and arm64
+Message-ID: <alpine.DEB.2.02.1511121726370.526@kaball.uk.xensource.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Arnd Bergmann <arnd@arndb.de>
-Date: Thu, 12 Nov 2015 15:12:48 +0100
+Hi all,
 
-> Building dwmac-ipq806x on a 64-bit architecture produces a harmless
-> warning from gcc:
-> 
-> stmmac/dwmac-ipq806x.c: In function 'ipq806x_gmac_probe':
-> include/linux/bitops.h:6:19: warning: overflow in implicit constant conversion [-Woverflow]
->   val = QSGMII_PHY_CDR_EN |
-> stmmac/dwmac-ipq806x.c:333:8: note: in expansion of macro 'QSGMII_PHY_CDR_EN'
->  #define QSGMII_PHY_CDR_EN   BIT(0)
->  #define BIT(nr)   (1UL << (nr))
-> 
-> The compiler warns about the fact that a 64-bit literal is passed
-> into a function that takes a 32-bit argument. I could not fully understand
-> why it warns despite the fact that this number is always small enough
-> to fit, but changing the use of BIT() macros into the equivalent hexadecimal
-> representation avoids the warning
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Fixes: b1c17215d718 ("stmmac: add ipq806x glue layer")
+this series introduces PV wallclock time support on arm and arm64.
 
-I've seen this warning too on x86_64 and had been meaning to look
-into it, thanks for taking the initiative. :)
 
-Moving away from using BIT() is somewhat disappointing, because we
-want to encourage people to use these macros.
+Changes in v4:
+- simplify xen_read_wallclock
+- add a patch to support XENPF_settime64 on x86
 
-I think it's also easier from a driver author and auditing
-perspective, you can see that something is being defined as bit X and
-then check the documentation for the chip to see if bit X is correct
-or not.
 
-With the hex values there is more mental work and room for... mistakes.
+Changes in v3:
+- use ktime_get_ns instead of calling into the arch_timer functions
+  directly
+- read the wallclock from the late_initcall
+- s/%llu.%0u/%llu.%09u
+- in xen_pvclock_gtod_notify use the passed struct timekeeper pointer
+  rather than calling __current_kernel_time64
+- use the passed struct timekeeper pointer to get the system time too
+- drop introduce __current_kernel_time64
 
-Also I don't even understand the compiler's behavior, it's warning
-about QSGMII_PHY_CDR_EN but if you define only that to "0x1u" it still
-warns about QSGMII_PHY_CDR_EN.
 
-The warning goes away only if you change all 5 BIT() uses.
+Changes in v2:
+- introduce __current_kernel_time64
+- rename dom0_op to platform_op
+- introduce XENPF_settime64
+- extend pvclock_wall_clock with sec_hi
+- properly convert arch_timer ticker to nsec
+- use timespec64 interfaces
+- use sec_hi to get a 64-bit seconds value
+- use XENPF_settime64
+- rename dom0_op to platform_op
 
-This makes me like the change even less, something foul is going on
-here and I'd rather figure out what that is than install this patch.
 
-Thanks.
+Stefano Stabellini (7):
+      xen: rename dom0_op to platform_op
+      xen/arm: introduce HYPERVISOR_platform_op on arm and arm64
+      xen: introduce XENPF_settime64
+      arm: extend pvclock_wall_clock with sec_hi
+      xen/arm: introduce xen_read_wallclock
+      xen/arm: set the system time in Xen via the XENPF_settime64 hypercall
+      xen/x86: support XENPF_settime64
+
+ arch/arm/include/asm/xen/hypercall.h |    2 +
+ arch/arm/include/asm/xen/interface.h |    1 +
+ arch/arm/xen/enlighten.c             |   83 +++++++++++++++++++++++++++++++++-
+ arch/arm/xen/hypercall.S             |    1 +
+ arch/arm64/xen/hypercall.S           |    1 +
+ arch/x86/include/asm/xen/hypercall.h |    6 +--
+ arch/x86/xen/apic.c                  |    2 +-
+ arch/x86/xen/enlighten.c             |    8 ++--
+ arch/x86/xen/time.c                  |   35 +++++++++++---
+ drivers/xen/acpi.c                   |    2 +-
+ drivers/xen/efi.c                    |   30 ++++++------
+ drivers/xen/pcpu.c                   |    8 ++--
+ drivers/xen/xen-acpi-cpuhotplug.c    |    2 +-
+ drivers/xen/xen-acpi-pad.c           |    4 +-
+ drivers/xen/xen-acpi-processor.c     |    8 ++--
+ drivers/xen/xenfs/xensyms.c          |    4 +-
+ include/xen/interface/platform.h     |   18 ++++++--
+ include/xen/interface/xen.h          |    2 +-
+ 18 files changed, 167 insertions(+), 50 deletions(-)
+
+Cheers,
+
+Stefano
