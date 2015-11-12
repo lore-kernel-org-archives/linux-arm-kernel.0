@@ -1,34 +1,72 @@
-From: edubezval@gmail.com (Eduardo Valentin)
-Date: Thu, 12 Nov 2015 10:31:20 -0800
-Subject: [PATCH v4 00/10] Better compatible for the rockchip thermal and
- support RK3368 SoCs
-In-Reply-To: <20151112182950.GB4361@localhost.localdomain>
-References: <1447044542-30859-1-git-send-email-wxt@rock-chips.com>
- <20151112182950.GB4361@localhost.localdomain>
-Message-ID: <20151112183119.GA5289@localhost.localdomain>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Thu, 12 Nov 2015 19:36:52 +0100
+Subject: [PATCH] clocksource/drivers/timer_sun5i: Replace code by
+ clocksource_mmio_init
+In-Reply-To: <20151112180832.GE32142@lukather>
+References: <1447348278-16277-1-git-send-email-daniel.lezcano@linaro.org>
+ <20151112180832.GE32142@lukather>
+Message-ID: <5644DC44.40808@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 12, 2015 at 10:29:52AM -0800, Eduardo Valentin wrote:
-> On Mon, Nov 09, 2015 at 12:48:52PM +0800, Caesar Wang wrote:
-> > Thank you all for providing inputs and comments on previous versions of
-> > this patchset.
-> > Especially thanks to the (Eduardo, Dmitry, Heiko,....).
-> > 
-> > This series patchs are working for RK3368 on Rockchip platform.
-> 
-> Do you have any results on existing support? Is the driver still in one
-> piece for rk3288?
-> 
-> I am planing to send your series in next rc cycles. It won't appear in
-> linux-next until merge window finishes.
+On 11/12/2015 07:08 PM, Maxime Ripard wrote:
+> Hi Daniel,
+>
+> On Thu, Nov 12, 2015 at 06:11:18PM +0100, Daniel Lezcano wrote:
+>> The current code to initialize, register and read the clocksource is
+>> already factored out in mmio.c via the clocksource_mmio_init function.
+>>
+>> The only difference is the readl vs readl_relaxed.
+>>
+>> Factor out the code with the clocksource_mmio_init function.
+>>
+>> Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
+>> ---
+>>   drivers/clocksource/timer-sun5i.c | 16 ++--------------
+>>   1 file changed, 2 insertions(+), 14 deletions(-)
+>>
+>> diff --git a/drivers/clocksource/timer-sun5i.c b/drivers/clocksource/timer-sun5i.c
+>> index bca9573..dc3793c 100644
+>> --- a/drivers/clocksource/timer-sun5i.c
+>> +++ b/drivers/clocksource/timer-sun5i.c
+>> @@ -152,13 +152,6 @@ static irqreturn_t sun5i_timer_interrupt(int irq, void *dev_id)
+>>   	return IRQ_HANDLED;
+>>   }
+>>
+>> -static cycle_t sun5i_clksrc_read(struct clocksource *clksrc)
+>> -{
+>> -	struct sun5i_timer_clksrc *cs = to_sun5i_timer_clksrc(clksrc);
+>> -
+>> -	return ~readl(cs->timer.base + TIMER_CNTVAL_LO_REG(1));
+>> -}
+>> -
+>>   static int sun5i_rate_cb_clksrc(struct notifier_block *nb,
+>>   				unsigned long event, void *data)
+>>   {
+>> @@ -217,13 +210,8 @@ static int __init sun5i_setup_clocksource(struct device_node *node,
+>>   	writel(TIMER_CTL_ENABLE | TIMER_CTL_RELOAD,
+>>   	       base + TIMER_CTL_REG(1));
+>>
+>> -	cs->clksrc.name = node->name;
+>> -	cs->clksrc.rating = 340;
+>> -	cs->clksrc.read = sun5i_clksrc_read;
+>> -	cs->clksrc.mask = CLOCKSOURCE_MASK(32);
+>> -	cs->clksrc.flags = CLOCK_SOURCE_IS_CONTINUOUS;
+>> -
+>> -	ret = clocksource_register_hz(&cs->clksrc, rate);
+>> +	ret = clocksource_mmio_init(base + TIMER_CNTVAL_LO_REG(1), node->name,
+>> +				    rate, 340, UINT_MAX, clocksource_mmio_readw_down);
+>
+> Shouldn't it be clocksource_mmio_readl_down?
 
-To be more specific, only patches 1-7. DT bindings go via the right
-machine tree.
+Ah yes. Thanks for catching this. I will fix it.
 
-Thanks
+   -- Daniel
 
-> 
-> BR,
-> 
-> Eduardo Valentin
+
+-- 
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
