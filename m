@@ -1,41 +1,79 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Thu, 12 Nov 2015 20:04:43 +0800
-Subject: [PATCH 2/3] arm64: mmu: make split_pud and fixup_executable static
-In-Reply-To: <1447329884-1644-1-git-send-email-jszhang@marvell.com>
-References: <1447329884-1644-1-git-send-email-jszhang@marvell.com>
-Message-ID: <1447329884-1644-3-git-send-email-jszhang@marvell.com>
+From: peter@hurleysoftware.com (Peter Hurley)
+Date: Thu, 12 Nov 2015 07:17:47 -0500
+Subject: [PATCH] ARM: xip: Use correct symbol for end of ROM marker
+In-Reply-To: <1447251455-22731-1-git-send-email-chris.brandt@renesas.com>
+References: <1447251455-22731-1-git-send-email-chris.brandt@renesas.com>
+Message-ID: <5644836B.2050608@hurleysoftware.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-split_pud and fixup_executable are only called from within mmu.c, so
-they can be declared static.
+On 11/11/2015 09:17 AM, Chris Brandt wrote:
+> For an XIP build, _edata_loc, not _etext, represents the end of the
+> binary image that will be programmed into ROM and mapped into the
+> MODULES_VADDR area.
+> With an XIP kernel, nothing is loaded into RAM before boot, meaning
+> you have to take into account the size of the entire binary image
+> that was programmed, including the init data values that will be copied
+> to RAM during kernel boot.
+> 
+> This fixes the bug where you might lose the end of your kernel area
+> after page table setup is complete.
+> 
+> 
+> Signed-off-by: Chris Brandt <chris.brandt@renesas.com>
+> ---
+>  arch/arm/mm/mmu.c              |    4 ++--
+>  include/asm-generic/sections.h |    2 +-
+>  2 files changed, 3 insertions(+), 3 deletions(-)
+> 
+> diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+> index 4867f5d..dd5a56b 100644
+> --- a/arch/arm/mm/mmu.c
+> +++ b/arch/arm/mm/mmu.c
+> @@ -1210,7 +1210,7 @@ static inline void prepare_page_table(void)
+>  
+>  #ifdef CONFIG_XIP_KERNEL
+>  	/* The XIP kernel is mapped in the module area -- skip over it */
+> -	addr = ((unsigned long)_etext + PMD_SIZE - 1) & PMD_MASK;
+> +	addr = ((unsigned long)_edata_loc + PMD_SIZE - 1) & PMD_MASK;
+>  #endif
+>  	for ( ; addr < PAGE_OFFSET; addr += PMD_SIZE)
+>  		pmd_clear(pmd_off_k(addr));
+> @@ -1292,7 +1292,7 @@ static void __init devicemaps_init(const struct machine_desc *mdesc)
+>  #ifdef CONFIG_XIP_KERNEL
+>  	map.pfn = __phys_to_pfn(CONFIG_XIP_PHYS_ADDR & SECTION_MASK);
+>  	map.virtual = MODULES_VADDR;
+> -	map.length = ((unsigned long)_etext - map.virtual + ~SECTION_MASK) & SECTION_MASK;
+> +	map.length = ((unsigned long)_edata_loc - map.virtual + ~SECTION_MASK) & SECTION_MASK;
+>  	map.type = MT_ROM;
+>  	create_mapping(&map);
+>  #endif
+> diff --git a/include/asm-generic/sections.h b/include/asm-generic/sections.h
+> index b58fd66..195554d 100644
+> --- a/include/asm-generic/sections.h
+> +++ b/include/asm-generic/sections.h
+> @@ -26,7 +26,7 @@
+>   *	__ctors_start, __ctors_end
+>   */
+>  extern char _text[], _stext[], _etext[];
+> -extern char _data[], _sdata[], _edata[];
+> +extern char _data[], _sdata[], _edata[], _edata_loc[];
+>  extern char __bss_start[], __bss_stop[];
+>  extern char __init_begin[], __init_end[];
+>  extern char _sinittext[], _einittext[];
+> 
 
-Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
----
- arch/arm64/mm/mmu.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+I think below is required as well.
 
-diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-index c2fa6b5..02306c3 100644
---- a/arch/arm64/mm/mmu.c
-+++ b/arch/arm64/mm/mmu.c
-@@ -165,7 +165,7 @@ static void alloc_init_pte(pmd_t *pmd, unsigned long addr,
- 	} while (addr != end);
- }
+--- a/arch/arm/kernel/module.c
++++ b/arch/arm/kernel/module.c
+@@ -34,7 +36,7 @@
+  * recompiling the whole kernel when CONFIG_XIP_KERNEL is turned on/off.
+  */
+ #undef MODULES_VADDR
+-#define MODULES_VADDR	(((unsigned long)_etext + ~PMD_MASK) & PMD_MASK)
++#define MODULES_VADDR	(((unsigned long)_edata_loc + ~PMD_MASK) & PMD_MASK)
+ #endif
  
--void split_pud(pud_t *old_pud, pmd_t *pmd)
-+static void split_pud(pud_t *old_pud, pmd_t *pmd)
- {
- 	unsigned long addr = pud_pfn(*old_pud) << PAGE_SHIFT;
- 	pgprot_t prot = __pgprot(pud_val(*old_pud) ^ addr);
-@@ -447,7 +447,7 @@ static void __init map_mem(void)
- 	memblock_set_current_limit(MEMBLOCK_ALLOC_ANYWHERE);
- }
- 
--void __init fixup_executable(void)
-+static void __init fixup_executable(void)
- {
- #ifdef CONFIG_DEBUG_RODATA
- 	/* now that we are actually fully mapped, make the start/end more fine grained */
--- 
-2.6.2
+Regards,
+Peter Hurley
