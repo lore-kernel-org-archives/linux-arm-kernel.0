@@ -1,88 +1,57 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Thu, 12 Nov 2015 10:29:23 +0900
-Subject: [PATCH v2 3/3] ARM: shmobile: gose: Add QSPI device to DT
-In-Reply-To: <1447291763-27527-1-git-send-email-horms+renesas@verge.net.au>
-References: <1447291763-27527-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1447291763-27527-4-git-send-email-horms+renesas@verge.net.au>
+From: huangdaode@hisilicon.com (huangdaode)
+Date: Thu, 12 Nov 2015 10:11:24 +0800
+Subject: [PATCH RESEND v2 net-next] net: hisilicon: updates HNS config
+ and documents
+In-Reply-To: <4387413.QS6YM6BNWK@wuerfel>
+References: <1445944594-244149-1-git-send-email-huangdaode@hisilicon.com>
+ <56341C00.8080303@hisilicon.com> <563424EB.1060804@huawei.com>
+ <4387413.QS6YM6BNWK@wuerfel>
+Message-ID: <5643F54C.3010303@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Enable the QSPI controller in the gose device tree.
+On 2015/11/3 6:05, Arnd Bergmann wrote:
+> On Saturday 31 October 2015 02:18:19 Salil Mehta wrote:
+>> On 10/31/2015 1:40 AM, huangdaode wrote:
+>>> On 2015/10/30 22:20, Arnd Bergmann wrote:
+>>>> On Tuesday 27 October 2015 19:16:34 huangdaode wrote:
+>>>>>             mdio at 803c0000 {
+>>>>>                       #address-cells = <1>;
+>>>>>                       #size-cells = <0>;
+>>>>> -                   compatible = "hisilicon,mdio","hisilicon,hns-mdio";
+>>>>> +                   compatible = "hisilicon,hns-mdio","hisilicon,mdio";
+>>>>>                       reg = <0x0 0x803c0000 0x0 0x10000>;
+>>>>>
+>>>> Does "hisilicon,mdio" actually have a specific meaning? Is that just
+>>>> there
+>>>> for legacy reasons?
+>>>>
+>>>>      Arnd
+>>>>
+>>>> .
+>>>>
+>>> hi Arnd,
+>>> "hisilicon,mdio" is  the gernerical configuation compatible  for the
+>>> default hisilicon chip,
+>>> We use generic hisilicon since our MDIO/PHY is same across flavour of
+>>> SoCs.
+>>>
+>> Hi Arnd,
+>> Yes, "hisilicon,mdio" exists for the legacy reasons to support older SoC
+>> Hip04.
+> I see. In that case, that compatible string should probably be mentioned
+> only as 'optional' in the binding, and not used for devices other than
+> hip04.
+>
+> 	Arnd
+>
+> .
+>
+Hi, Arnd
+ok, ill send a patch to specify it, please Ack then.
+thanks
+Daode.
 
-Based similar work for the silk board by by Vladimir Barinov and
-Sergei Shtylyov.
-
-Cc: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
-Cc: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-
----
-Tested: Read /dev/mtd0 with 512K blocks at 1.7MB/s
-
-v2
-* Move partitions into partitions subnode
-  as suggested by Geert Uytterhoeven.
----
- arch/arm/boot/dts/r8a7793-gose.dts | 43 ++++++++++++++++++++++++++++++++++++++
- 1 file changed, 43 insertions(+)
-
-diff --git a/arch/arm/boot/dts/r8a7793-gose.dts b/arch/arm/boot/dts/r8a7793-gose.dts
-index 1575ef759047..79be514d3a1c 100644
---- a/arch/arm/boot/dts/r8a7793-gose.dts
-+++ b/arch/arm/boot/dts/r8a7793-gose.dts
-@@ -57,6 +57,11 @@
- 		renesas,groups = "intc_irq0";
- 		renesas,function = "intc";
- 	};
-+
-+	qspi_pins: spi0 {
-+		renesas,groups = "qspi_ctrl", "qspi_data4";
-+		renesas,function = "qspi";
-+	};
- };
- 
- &ether {
-@@ -92,3 +97,41 @@
- 
- 	status = "okay";
- };
-+
-+&qspi {
-+	pinctrl-0 = <&qspi_pins>;
-+	pinctrl-names = "default";
-+
-+	status = "okay";
-+
-+	flash at 0 {
-+		compatible = "spansion,s25fl512s", "jedec,spi-nor";
-+		reg = <0>;
-+		spi-max-frequency = <30000000>;
-+		spi-tx-bus-width = <4>;
-+		spi-rx-bus-width = <4>;
-+		spi-cpol;
-+		spi-cpha;
-+		m25p,fast-read;
-+
-+		partitions{
-+			#address-cells = <1>;
-+			#size-cells = <1>;
-+
-+			partition at 0 {
-+				label = "loader";
-+				reg = <0x00000000 0x00040000>;
-+				read-only;
-+			};
-+			partition at 40000 {
-+				label = "user";
-+				reg = <0x00040000 0x00400000>;
-+				read-only;
-+			};
-+			partition at 440000 {
-+				label = "flash";
-+				reg = <0x00440000 0x03bc0000>;
-+			};
-+		};
-+	};
-+};
 -- 
-2.1.4
+Best Regards
+Daode Huang
