@@ -1,56 +1,49 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Thu, 12 Nov 2015 19:40:13 +0100
-Subject: [PATCH V2] clocksource/drivers/timer_sun5i: Replace code by
- clocksource_mmio_init
-Message-ID: <1447353613-18778-1-git-send-email-daniel.lezcano@linaro.org>
+From: florian@openwrt.org (Florian Fainelli)
+Date: Thu, 12 Nov 2015 10:40:19 -0800
+Subject: [PATCH] spi: bcm63xx: use correct format string for printing
+ a resource
+In-Reply-To: <8442314.JjGyK1Sa3M@wuerfel>
+References: <8442314.JjGyK1Sa3M@wuerfel>
+Message-ID: <5644DD13.9070206@openwrt.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The current code to initialize, register and read the clocksource is
-already factored out in mmio.c via the clocksource_mmio_init function.
+On 12/11/15 08:44, Arnd Bergmann wrote:
+> With a 64-bit resource_size_t, we get a build warning on bcm63xx_spi_probe:
+> 
+> drivers/spi/spi-bcm63xx.c:565:16: warning: format '%x' expects argument of type 'unsigned int', but argument 3 has type 'resource_size_t {aka long long unsigned int}' [-Wformat=]
+> 
+> As we are printing a resource, we can just use the %pr format
+> specifier that pretty-prints the address and avoids the warning.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-The only difference is the readl vs readl_relaxed.
+Acked-by: Florian Fainelli <f.fainelli@gmail.com>
 
-Factor out the code with the clocksource_mmio_init function.
+Thanks
 
-Signed-off-by: Daniel Lezcano <daniel.lezcano@linaro.org>
----
- drivers/clocksource/timer-sun5i.c | 16 ++--------------
- 1 file changed, 2 insertions(+), 14 deletions(-)
-
-diff --git a/drivers/clocksource/timer-sun5i.c b/drivers/clocksource/timer-sun5i.c
-index bca9573..55d7258 100644
---- a/drivers/clocksource/timer-sun5i.c
-+++ b/drivers/clocksource/timer-sun5i.c
-@@ -152,13 +152,6 @@ static irqreturn_t sun5i_timer_interrupt(int irq, void *dev_id)
- 	return IRQ_HANDLED;
- }
- 
--static cycle_t sun5i_clksrc_read(struct clocksource *clksrc)
--{
--	struct sun5i_timer_clksrc *cs = to_sun5i_timer_clksrc(clksrc);
--
--	return ~readl(cs->timer.base + TIMER_CNTVAL_LO_REG(1));
--}
--
- static int sun5i_rate_cb_clksrc(struct notifier_block *nb,
- 				unsigned long event, void *data)
- {
-@@ -217,13 +210,8 @@ static int __init sun5i_setup_clocksource(struct device_node *node,
- 	writel(TIMER_CTL_ENABLE | TIMER_CTL_RELOAD,
- 	       base + TIMER_CTL_REG(1));
- 
--	cs->clksrc.name = node->name;
--	cs->clksrc.rating = 340;
--	cs->clksrc.read = sun5i_clksrc_read;
--	cs->clksrc.mask = CLOCKSOURCE_MASK(32);
--	cs->clksrc.flags = CLOCK_SOURCE_IS_CONTINUOUS;
--
--	ret = clocksource_register_hz(&cs->clksrc, rate);
-+	ret = clocksource_mmio_init(base + TIMER_CNTVAL_LO_REG(1), node->name,
-+				    rate, 340, UINT_MAX, clocksource_mmio_readl_down);
- 	if (ret) {
- 		pr_err("Couldn't register clock source.\n");
- 		goto err_remove_notifier;
--- 
-1.9.1
+> ---
+> Found on arm multi_v7_defconfig with LPAE
+> 
+> diff --git a/drivers/spi/spi-bcm63xx.c b/drivers/spi/spi-bcm63xx.c
+> index 06858e04ec59..bf9a610e5b89 100644
+> --- a/drivers/spi/spi-bcm63xx.c
+> +++ b/drivers/spi/spi-bcm63xx.c
+> @@ -562,8 +562,8 @@ static int bcm63xx_spi_probe(struct platform_device *pdev)
+>  		goto out_clk_disable;
+>  	}
+>  
+> -	dev_info(dev, "at 0x%08x (irq %d, FIFOs size %d)\n",
+> -		 r->start, irq, bs->fifo_size);
+> +	dev_info(dev, "at %pr (irq %d, FIFOs size %d)\n",
+> +		 r, irq, bs->fifo_size);
+>  
+>  	return 0;
+>  
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
