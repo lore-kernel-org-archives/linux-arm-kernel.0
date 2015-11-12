@@ -1,164 +1,165 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Thu, 12 Nov 2015 11:30:24 +0100
-Subject: pj4 -marm breaks thumb ftrace
-In-Reply-To: <20151112095020.GB15032@codeaurora.org>
-References: <20151112095020.GB15032@codeaurora.org>
-Message-ID: <56446A40.7000304@linaro.org>
+From: Liviu.Dudau@arm.com (Liviu.Dudau at arm.com)
+Date: Thu, 12 Nov 2015 10:32:00 +0000
+Subject: PCIe host controller behind IOMMU on ARM
+In-Reply-To: <PS1PR06MB118013A957CFFDF129430C58F5120@PS1PR06MB1180.apcprd06.prod.outlook.com>
+References: <PS1PR06MB11807CBE8EB2AC6B0158D2B5F52A0@PS1PR06MB1180.apcprd06.prod.outlook.com>
+ <20151104142412.GS963@e106497-lin.cambridge.arm.com>
+ <PS1PR06MB11804263DD55C54C5987654EF52A0@PS1PR06MB1180.apcprd06.prod.outlook.com>
+ <20151104150147.GT963@e106497-lin.cambridge.arm.com>
+ <PS1PR06MB11806B65D3408BDFBEAD9D3AF5150@PS1PR06MB1180.apcprd06.prod.outlook.com>
+ <20151111182456.GV963@e106497-lin.cambridge.arm.com>
+ <PS1PR06MB118013A957CFFDF129430C58F5120@PS1PR06MB1180.apcprd06.prod.outlook.com>
+Message-ID: <20151112103200.GW963@e106497-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12 November 2015 at 10:50, Stephen Boyd <sboyd@codeaurora.org> wrote:
-> When I boot up a thumb2 multi-v7 kernel with ftrace enabled I get
-> this ftrace bug splat.
->
-> WARNING: CPU: 0 PID: 0 at kernel/trace/ftrace.c:1979
-> ftrace_bug+0x115/0x1bc()
-> Modules linked in:
-> CPU: 0 PID: 0 Comm: swapper/0 Not tainted 4.3.0-10337-g3ea2911b81d3-dirty #129
-> Hardware name: Qualcomm (Flattened Device Tree)
-> [<c030cf09>] (unwind_backtrace) from [<c030903d>] (show_stack+0x11/0x14)
-> [<c030903d>] (show_stack) from [<c0501337>] (dump_stack+0x57/0x6c)
-> [<c0501337>] (dump_stack) from [<c033249b>] (warn_slowpath_common+0x57/0x88)
-> [<c033249b>] (warn_slowpath_common) from [<c03324e3>] (warn_slowpath_null+0x17/0x1c)
-> [<c03324e3>] (warn_slowpath_null) from [<c038c359>] (ftrace_bug+0x115/0x1bc)
-> [<c038c359>] (ftrace_bug) from [<c038c5d7>] (ftrace_process_locs+0x1d7/0x3e4)
-> [<c038c5d7>] (ftrace_process_locs) from [<c0e18391>] (ftrace_init+0x49/0xb0)
-> [<c0e18391>] (ftrace_init) from [<c0e0095b>] (start_kernel+0x26f/0x2d8)
-> [<c0e0095b>] (start_kernel) from [<0020807f>] (0x20807f)
-> ---[ end trace cb88537fdc8fa200 ]---
-> ftrace failed to modify [<c030e1e4>] iwmmxt_do+0x8/0x3c
->  actual: dc:f8:ff:fa
-> ftrace record flags: 0
->  (0)   expected tramp: c030c565
->
-> I suspect this is caused by commit 13d1b9575ac2 (ARM: 8221/1:
-> PJ4: allow building in Thumb-2 mode, 2014-11-25) which adds an
-> -marm flag to the compilation of arch/arm/kernel/pj4-cp0.c. When
-> ftrace tries to replace the instruction in ftrace_make_nop() ->
-> ftrace_modify_code(), it gets confused because it checks to make
-> sure the instruction it's replacing is actually a branch to
-> mcount with a thumb encoding. But given that the branch is done
-> in arm instead of thumb it doesn't see the instruction it's
-> looking for and bails out with this bug.
->
-> Should we mark this whole file as notrace? That at least seems to
-> fix the problem for me. I imagine we could make things more
-> complicated and try to figure out if the branch is either arm or
-> thumb and replace it with the appropriate nop or interworking
-> branch to ftrace code, but do we really care?
->
+On Thu, Nov 12, 2015 at 09:26:33AM +0000, Phil Edworthy wrote:
+> Hi Liviu, Arnd,
+> 
+> On 11 November 2015 18:25, LIviu wrote:
+> > On Mon, Nov 09, 2015 at 12:32:13PM +0000, Phil Edworthy wrote:
+> > > Hi Liviu, Will,
+> > >
+> > > On 04 November 2015 15:19, Phil wrote:
+> > > > On 04 November 2015 15:02, Liviu wrote:
+> > > > > On Wed, Nov 04, 2015 at 02:48:38PM +0000, Phil Edworthy wrote:
+> > > > > > Hi Liviu,
+> > > > > >
+> > > > > > On 04 November 2015 14:24, Liviu wrote:
+> > > > > > > On Wed, Nov 04, 2015 at 01:57:48PM +0000, Phil Edworthy wrote:
+> > > > > > > > Hi,
+> > > > > > > >
+> > > > > > > > I am trying to hook up a PCIe host controller that sits behind an
+> > IOMMU,
+> > > > > > > > but having some problems.
+> > > > > > > >
+> > > > > > > > I'm using the pcie-rcar PCIe host controller and it works fine without
+> > > > > > > > the IOMMU, and I can attach the IOMMU to the controller such that
+> > any
+> > > > > calls
+> > > > > > > > to dma_alloc_coherent made by the controller driver uses the
+> > > > iommu_ops
+> > > > > > > > version of dma_ops.
+> > > > > > > >
+> > > > > > > > However, I can't see how to make the endpoints to utilise the
+> > dma_ops
+> > > > that
+> > > > > > > > the controller uses. Shouldn't the endpoints inherit the dma_ops from
+> > the
+> > > > > > > > controller?
+> > > > > > >
+> > > > > > > No, not directly.
+> > > > > > >
+> > > > > > > > Any pointers for this?
+> > > > > > >
+> > > > > > > You need to understand the process through which a driver for
+> > endpoint
+> > > > get
+> > > > > > > an address to be passed down to the device. Have a look at
+> > > > > > > Documentation/DMA-API-HOWTO.txt, there is a nice explanation there.
+> > > > > > > (Hint: EP driver needs to call dma_map_single).
+> > > > > > >
+> > > > > > > Also, you need to make sure that the bus address that ends up being set
+> > > > into
+> > > > > > > the endpoint gets translated correctly by the host controller into an
+> > address
+> > > > > > > that the IOMMU can then translate into physical address.
+> > > > > > Sure, though since this is bog standard Intel PCIe ethernet card which
+> > works
+> > > > > > fine when the IOMMU is effectively unused, I don?t think there is a
+> > problem
+> > > > > > with that.
+> > > > > >
+> > > > > > The driver for the PCIe controller sets up the IOMMU mapping ok when I
+> > > > > > do a test call to dma_alloc_coherent() in the controller's driver. i.e. when I
+> > > > > > do this, it ends up in arm_iommu_alloc_attrs(), which calls
+> > > > > > __iommu_alloc_buffer() and __alloc_iova().
+> > > > > >
+> > > > > > When an endpoint driver allocates and maps a dma coherent buffer it
+> > > > > > also needs to end up in arm_iommu_alloc_attrs(), but it doesn't.
+> > > > >
+> > > > > Why do you think that? Remember that the only thing attached to the
+> > IOMMU
+> > > > is
+> > > > > the
+> > > > > host controller. The endpoint is on the PCIe bus, which gets a different
+> > > > > translation
+> > > > > that the IOMMU knows nothing about. If it helps you to visualise it better,
+> > think
+> > > > > of the host controller as another IOMMU device. It's the ops of the host
+> > > > > controller
+> > > > > that should be invoked, not the IOMMU's.
+> > > > Ok, that makes sense. I'll have a think and poke it a bit more...
+> > 
+> > Hi Phil,
+> > 
+> > Not trying to ignore your email, but I thought this is more in Will's backyard.
+> > 
+> > > Somewhat related to this, since our PCIe controller HW is limited to
+> > > 32-bit AXI address range, before trying to hook up the IOMMU I have
+> > > tried to limit the dma_mask for PCI cards to DMA_BIT_MASK(32). The
+> > > reason being that Linux uses a 1 to 1 mapping between PCI addresses
+> > > and cpu (phys) addresses when there isn't an IOMMU involved, so I
+> > > think that we need to limit the PCI address space used.
+> > 
+> > I think you're mixing things a bit or not explaining them very well. Having the
+> > PCIe controller limited to 32-bit AXI does not mean that the PCIe bus cannot
+> > carry 64-bit addresses. It depends on how they get translated by the host bridge
+> > or its associated ATS block. I can't see why you can't have a setup where
+> > the CPU addresses are 32-bit but the PCIe bus addresses are all 64-bit.
+> > You just have to be careful on how you setup your mem64 ranges so that they
+> > don't
+> > overlap with the 32-bit ranges when translated.
+> From a HW point of view I agree that we can setup the PCI host bridge such that
+> it uses 64-bit PCI address, with 32-bit cpu addresses. Though in practice doesn't
+> this mean that the dma ops used by card drivers has to be provided by our PCI
+> host bridge driver so we can apply the translation to those PCI addresses?
 
-I wonder if we should simply fix the code instead.
+I thought all addresses that are set into the cards go through
+pcibios_resource_to_bus() which give you the PCI address to set, although I have to
+admit that when DMA gets involved I'm not 100% sure of the whole flow.
 
-Compiling pj4-cp0.c in thumb mode fails on the sub instruction in the 
-following sequence:
+Best regards,
+Liviu
 
-static void __init pj4_cp_access_write(u32 value)
-{
-u32 temp;
+> This comes back to my point below about how to do this. Adding a bus notifier
+> to do this may be too late, and arm64 doesn't implement set_dma_ops().
+> 
+> > And no, you should not limit at the card driver the DMA_BIT_MASK() unless the
+> > card is not capable of supporting more than 32-bit addresses.
+> If there was infrastructure that checked all parents dma-ranges when the
+> dma_set_mask() function is called as Arnd pointed out, this would nicely solve
+> the problem.
+> 
+> > > Since pci_setup_device() sets up dma_mask, I added a bus notifier in the
+> > > PCIe controller driver so I can change the mask, if needed, on the
+> > > BUS_NOTIFY_BOUND_DRIVER action.
+> > > However, I think there is the potential for card drivers to allocate and
+> > > map buffers before the bus notifier get called. Additionally, I've seen
+> > > drivers change their behaviour based on the success or failure of
+> > > dma_set_mask_and_coherent(dev, DMA_BIT_MASK(64)), so the
+> > > driver could, theoretically at least, operate in a way that is not
+> > > compatible with a more restricted dma_mask (though I can't think
+> > > of any way this would not work with hardware I've seen).
+> > >
+> > > So, I think that using a bus notifier is the wrong way to go, but I don?t
+> > > know what other options I have. Any suggestions?
+> > 
+> > I would first have a look at how the PCIe bus addresses are translated by the
+> > host controller.
+> > 
+> > Best regards,
+> > Liviu
+> > 
+> Thanks
+> Phil
 
-     __asm__ __volatile__ (
-         "mcr p15, 0, %1, c1, c0, 2\n\t"
-         "mrc p15, 0, %0, c1, c0, 2\n\t"
-         "mov %0, %0\n\t"
-         "sub pc, pc, #4\n\t"
-         : "=r" (temp) : "r" (value));
-}
-
-I wonder if the sub instruction is simply there to flush the pipeline, 
-but let's not get into that. I propose we just apply the patch below to 
-move this code (and its _read() counterpart) to iwmmxt.S, which is 
-already built as ARM, and not subject to instrumentation.
-
------8<-----
- From de52762b71c85c6c2142a67ba8833a13d4ca8acb Mon Sep 17 00:00:00 2001
-From: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Date: Thu, 12 Nov 2015 11:17:46 +0100
-Subject: [PATCH] ARM: PJ4: move coprocessor register access sequences to
-  iwmmxt.S
-
-The PJ4 inline asm sequences in pj4-cp0.c cannot be built in Thumb-2 
-mode, due to the way they perform arithmetic on the program counter, so 
-it is built in ARM mode instead. However, building C files in ARM mode 
-under CONFIG_THUMB2_KERNEL is problematic, since the instrumentation 
-performed by subsystems like ftrace does not expect having to deal with 
-interworking branches.
-
-So instead, revert to building pj4-cp0.c in Thumb-2 mode, and move the
-offending sequences to iwmmxt.S, which is not instrumented anyway, and 
-is already built in ARM mode unconditionally.
-
-Reported-by: Stephen Boyd <sboyd@codeaurora.org>
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-
-diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
-index af9e59bf3831..3c789496297f 100644
---- a/arch/arm/kernel/Makefile
-+++ b/arch/arm/kernel/Makefile
-@@ -73,7 +73,6 @@ obj-$(CONFIG_IWMMXT)		+= iwmmxt.o
-  obj-$(CONFIG_PERF_EVENTS)	+= perf_regs.o perf_callchain.o
-  obj-$(CONFIG_HW_PERF_EVENTS)	+= perf_event_xscale.o perf_event_v6.o \
-  				   perf_event_v7.o
--CFLAGS_pj4-cp0.o		:= -marm
-  AFLAGS_iwmmxt.o			:= -Wa,-mcpu=iwmmxt
-  obj-$(CONFIG_ARM_CPU_TOPOLOGY)  += topology.o
-  obj-$(CONFIG_VDSO)		+= vdso.o
-diff --git a/arch/arm/kernel/iwmmxt.S b/arch/arm/kernel/iwmmxt.S
-index 49fadbda8c63..2cd418f1b9c3 100644
---- a/arch/arm/kernel/iwmmxt.S
-+++ b/arch/arm/kernel/iwmmxt.S
-@@ -370,3 +370,19 @@ ENDPROC(iwmmxt_task_release)
-  concan_owner:
-  	.word	0
-
-+#if defined(CONFIG_CPU_PJ4) || defined(CONFIG_CPU_PJ4B)
-+
-+ENTRY(pj4_cp_access_read)
-+	mrc	p15, 0, r0, c1, c0, 2
-+	ret	lr
-+ENDPROC(pj4_cp_access_read)
-+
-+ENTRY(pj4_cp_access_write)
-+	mcr	p15, 0, r0, c1, c0, 2
-+	mrc	p15, 0, r0, c1, c0, 2
-+	mov	r0, r0
-+	sub	pc, pc, #4
-+	ret	lr
-+ENDPROC(pj4_cp_access_write)
-+
-+#endif
-diff --git a/arch/arm/kernel/pj4-cp0.c b/arch/arm/kernel/pj4-cp0.c
-index 8153e36b2491..4f226e175734 100644
---- a/arch/arm/kernel/pj4-cp0.c
-+++ b/arch/arm/kernel/pj4-cp0.c
-@@ -49,28 +49,8 @@
-  	.notifier_call	= iwmmxt_do,
-  };
-
--
--static u32 __init pj4_cp_access_read(void)
--{
--	u32 value;
--
--	__asm__ __volatile__ (
--		"mrc	p15, 0, %0, c1, c0, 2\n\t"
--		: "=r" (value));
--	return value;
--}
--
--static void __init pj4_cp_access_write(u32 value)
--{
--	u32 temp;
--
--	__asm__ __volatile__ (
--		"mcr	p15, 0, %1, c1, c0, 2\n\t"
--		"mrc	p15, 0, %0, c1, c0, 2\n\t"
--		"mov	%0, %0\n\t"
--		"sub	pc, pc, #4\n\t"
--		: "=r" (temp) : "r" (value));
--}
-+asmlinkage u32 pj4_cp_access_read(void);
-+asmlinkage void pj4_cp_access_write(u32 value);
-
-  static int __init pj4_get_iwmmxt_version(void)
-  {
+-- 
+====================
+| I would like to |
+| fix the world,  |
+| but they're not |
+| giving me the   |
+ \ source code!  /
+  ---------------
+    ?\_(?)_/?
