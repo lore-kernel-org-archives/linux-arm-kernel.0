@@ -1,87 +1,45 @@
-From: eddie.huang@mediatek.com (Eddie Huang)
-Date: Thu, 12 Nov 2015 20:46:19 +0800
-Subject: [PATCH v5 4/5] ARM: dts: mt8135: enable basic SMP bringup for
- mt8135
-In-Reply-To: <7hwptnddhs.fsf@deeprootsystems.com>
-References: <1443799181-50409-1-git-send-email-yingjoe.chen@mediatek.com>
- <1443799181-50409-5-git-send-email-yingjoe.chen@mediatek.com>
- <CAMAWPa-Ed2FJY2pW67EHHKBH3_eBZx0+oWfMJwc_DhEjrf7aMg@mail.gmail.com>
- <1445843717.23888.1.camel@mtksdaap41>
- <CAMAWPa_Gyq7H0qUJ32PAJh_ELdHeKWMPyHud4gaT8=Ootcu1+g@mail.gmail.com>
- <1445859610.26723.4.camel@mtksdaap41>
- <CAMAWPa_13j88SMBbYEBg2WHFEhkhR_gVZkkU_x-U5NJay05AxA@mail.gmail.com>
- <1447135867.14454.9.camel@mtksdaap41> <7h1tbx1gjp.fsf@deeprootsystems.com>
- <1447228557.20886.10.camel@mtksdaap41> <7hpozgyu36.fsf@deeprootsystems.com>
- <7hwptnddhs.fsf@deeprootsystems.com>
-Message-ID: <1447332379.4156.5.camel@mtksdaap41>
+From: gnurou@gmail.com (Alexandre Courbot)
+Date: Thu, 12 Nov 2015 21:53:50 +0900
+Subject: [PATCH v2] nouveau: arm: Add MODULE_FIRMWARE for gk20a
+In-Reply-To: <CABr+WTmG1p6-dGGpWJgGBAJydyWz=2aPj-e93X9metn8y8Qrcg@mail.gmail.com>
+References: <1443452893-18246-1-git-send-email-kwizart@gmail.com>
+ <CAAVeFuJLJO4LvLqq2w9gMe6V6L3VDi+Gz59GvwKF2v8OWTWgBQ@mail.gmail.com>
+ <CABr+WTmG1p6-dGGpWJgGBAJydyWz=2aPj-e93X9metn8y8Qrcg@mail.gmail.com>
+Message-ID: <CAAVeFuLNadYawJB0zZHzMc3CA7GiukEox=FGH8wupXjyK576MQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2015-11-11 at 20:54 -0800, Kevin Hilman wrote:
-> Hi Eddie,
-> 
-> Kevin Hilman <khilman@kernel.org> writes:
-> 
-> > Eddie Huang <eddie.huang@mediatek.com> writes:
-> >
-> >> On Tue, 2015-11-10 at 17:16 -0800, Kevin Hilman wrote:
-> >>> Hi Eddie,
-> >>> 
-> >>> [...]
-> >>> 
-> >>> > I check the log [0],
-> >>> 
-> >>> Thanks for checking into this boot failure.
-> >>> 
-> >>> > it seems first time mt8135-evbp1 boot to kernel
-> >>> > shell successfully, then boot again. In the second time, mt8135 stay in
-> >>> > fastboot mode, waiting host send boot image, then timeout.
-> >>> 
-> >>> Actually, it never gets to a shell the first time.  If you look closely,
-> >>> the target reboots as soon as userspace starts.   Look for the PYBOOT
-> >>> line which says "finished booting, starting userspace"
-> >>> 
-> >>> Later on, pyboot thinks it finds a root shell due to finding '#'
-> >>> characters, but clearly it never got to a shell.
-> >>> 
-> >>> > I download zImage and dtb in [1], and kernel run to shell successfully
-> >>> > on my platform.
-> >>> 
-> >>> Are you can you try using a ramdisk as well?  You can use the pre-built
-> >>> one here:
-> >>> http://storage.kernelci.org/images/rootfs/buildroot/armel/rootfs.cpio.gz
-> >>> 
-> >>
-> >> Yes, I tried this ramdisk, and I can reproduce fail issue.
-> >>
-> >
-> > OK, good.   Thanks for looking into it.
-> >
-> >>> Please check my boot logs to see how I'm generating the boot.img file
-> >>> (search for mkbootimg) with a kernel/dtb/ramdisk.  It may be possible
-> >>> that the kernel image size with a ramdisk is breaking some of the
-> >>> assumptions in the fastboot mode.  I've seen problems like this on other
-> >>> platforms due to hard-coded sizes/addresses in the boot firmware.
-> >>> 
-> >>
-> >> MT8135 allocate 10MB for BOOT partition, but the test boot.img is 11MB,
-> >> thus cause user space fail.
-> >
-> > Aha, I was right!  ;)
-> 
-> Also notice in kernelci.org that the mt8173 board has also been failing
-> to boot in mainline[1].  I wonder if this same limitation exists in the
-> mt8173 boot firmware?
-> 
+On Wed, Nov 11, 2015 at 6:29 PM, Nicolas Chauvet <kwizart@gmail.com> wrote:
+> 2015-09-30 6:57 GMT+02:00 Alexandre Courbot <gnurou@gmail.com>:
+>>
+>> On Tue, Sep 29, 2015 at 12:08 AM, Nicolas Chauvet <kwizart@gmail.com>
+>> wrote:
+>> > This patch is needed by initramfs tools to detect
+>> > the required firmware files for the module.
+>> >
+>> > This patch tests for either TEGRA_124_SOC or TEGRA_132_SOC
+>> > for the firmwares related to the Tegra K1 generation.
+>> >
+>> > v2: move the MODULE_FIRMWARE to the nvidia_platform.c file.
+>> >  This will avoid to test for NOUVEAU_PLATFORM_DRIVER
+>>
+>> Nice, thanks for doing this change!
+>>
+>> Reviewed-by: Alexandre Courbot <acourbot@nvidia.com>
+>
+>
+> Thx for the review.
+> FYI I've tested the patch on top of 4.3+ kernels, and the initramfs
+> generated with dracut works as expected.
+>
+> Is there any other concern with this patch ?
+>
+> It's certainly late for 4.4,I would expect it to hit kernel 4.3 at some
+> point, but I don't think everything is wired from userspace(Xorg/Wayland)
+> wrt dGPU support.
+> So It could also wait for 4.5.
+> What do you think ?
 
-MT8173 is another case, the failure is due to following commit:
-67e56c5 arm64: dts: mt8173: Add subsystem clock controller device nodes
-
-It is because this commit register MM subsystem clock, but kernel don't
-use MM clock yet, then CCF disable it. (My internal platform kernel
-command include clk_ignore_unused parameter, so don't have this
-problem).I will do further checking and release solution later. Thanks
-your testing.
-
-Eddie
-Thanks
+I don't see a particular reason to hurry, however this patch has been
+sitting around for one month now - Ben, is there any particular reason
+for not merging it?
