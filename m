@@ -1,39 +1,25 @@
 From: sebastian@breakpoint.cc (Sebastian Andrzej Siewior)
-Date: Thu, 12 Nov 2015 11:06:18 +0100
-Subject: [PATCH v2 repost] ARM: Availability of psci_smp_available depends on
- CONFIG_SMP
-Message-ID: <1447322778-5237-1-git-send-email-sebastian@breakpoint.cc>
+Date: Thu, 12 Nov 2015 11:07:56 +0100
+Subject: [PATCH v2 1/2] ARM: Availability of psci_smp_available depends
+ on CONFIG_SMP
+In-Reply-To: <20151112094920.GB20270@arm.com>
+References: <cover.1442990383.git.jan.kiszka@siemens.com>
+ <8b94f7869972d64f442f97208707a5856cbc8b14.1442990383.git.jan.kiszka@siemens.com>
+ <20151006081122.GA21527@ulmo.nvidia.com>
+ <20151006151857.GA2416@arm.com>
+ <20151112094332.GA4645@breakpoint.cc>
+ <20151112094920.GB20270@arm.com>
+Message-ID: <20151112100755.GA4915@breakpoint.cc>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Jan Kiszka <jan.kiszka@siemens.com>
+On 2015-11-12 09:49:20 [+0000], Will Deacon wrote:
+> I wasn't planning to pick this one up as I assumed you'd be taking it
+> via arm-soc along with the second patch that depends on it. I just
+> stopped moaning about not understanding it :)
 
-Ensure that we can use psci_smp_available without checking for
-CONFIG_SMP first (CONFIG_ARM_PSCI=y, CONFIG_SMP=n and
-CONFIG_ARCH_TEGRA_124_SOC=y):
+Ah, okay, thanks for the update. I just reposted it and hope for the best.
 
-|arch/arm/mach-tegra/built-in.o: In function `tegra114_cpuidle_init':
-|arch/arm/mach-tegra/cpuidle-tegra114.c:93: undefined reference to `psci_smp_available'
-|Makefile:927: recipe for target 'vmlinux' failed
+> Will
 
-Signed-off-by: Jan Kiszka <jan.kiszka@siemens.com>
-Signed-off-by: Sebastian Andrzej Siewior <bigeasy@linutronix.de>
----
-
-Will Deacon said:
-"I just stopped moaning about not understanding it :)"
-
- arch/arm/include/asm/psci.h | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
---- a/arch/arm/include/asm/psci.h
-+++ b/arch/arm/include/asm/psci.h
-@@ -16,7 +16,7 @@
- 
- extern struct smp_operations psci_smp_ops;
- 
--#ifdef CONFIG_ARM_PSCI
-+#if defined(CONFIG_ARM_PSCI) && defined(CONFIG_SMP)
- bool psci_smp_available(void);
- #else
- static inline bool psci_smp_available(void) { return false; }
+Sebastian
