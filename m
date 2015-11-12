@@ -1,51 +1,19 @@
-From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Thu, 12 Nov 2015 11:09:37 +0000
-Subject: [PATCH v2 1/4] drm: arm: Add DT bindings documentation for HDLCD
- driver.
-In-Reply-To: <1447325545.2825.9.camel@linaro.org>
-References: <1447258010-2234-1-git-send-email-Liviu.Dudau@arm.com>
- <1447258010-2234-2-git-send-email-Liviu.Dudau@arm.com>
- <20151111184849.GA9172@rob-hp-laptop>
- <20151112104210.GZ963@e106497-lin.cambridge.arm.com>
- <1447325545.2825.9.camel@linaro.org>
-Message-ID: <20151112110937.GA963@e106497-lin.cambridge.arm.com>
+From: lars.persson@axis.com (Lars Persson)
+Date: Thu, 12 Nov 2015 12:10:12 +0100
+Subject: [PATCH v2 2/4] arm: add implementation for arm-smccc
+In-Reply-To: <1447236266-7491-3-git-send-email-jens.wiklander@linaro.org>
+References: <1447236266-7491-1-git-send-email-jens.wiklander@linaro.org>
+ <1447236266-7491-3-git-send-email-jens.wiklander@linaro.org>
+Message-ID: <56447394.2090201@axis.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 12, 2015 at 10:52:25AM +0000, Jon Medhurst (Tixy) wrote:
-> On Thu, 2015-11-12 at 10:42 +0000, Liviu Dudau wrote:
-> > > This is on-chip RAM or nornal system RAM? We already have bindings
-> > for 
-> > > both.
-> >
-> > Juno has a set of TLX (ThinLinks) connectors on the board where an
-> > FPGA can be attached. On r1
-> > the code running on FPGA can even participate as an AXI master with
-> > full coherency. The FPGA
-> > has local memory that we want to share with the HDLCD to be used as a
-> > framebuffer.
-> 
-> The HDLCD on the Juno chip or one implemented in the FPGA? I assume you
-> mean the latter but just wanted to check.
 
-You can have a GPU on the FPGA, and you want to read the framebuffer
-off the FPGA's memory to render it on screen using the SoC's HDLCD. Hope
-this makes sense.
 
-Best regards,
-Liviu
-
-> 
-> -- 
-> Tixy
-> 
-
--- 
-====================
-| I would like to |
-| fix the world,  |
-| but they're not |
-| giving me the   |
- \ source code!  /
-  ---------------
-    ?\_(?)_/?
+On 11/11/2015 11:04 AM, Jens Wiklander wrote:
+> Adds implementation for arm-smccc and enables CONFIG_HAVE_SMCCC for
+> architectures that may support arm-smccc. It's the responsibility of the
+> caller to know if the SMC instruction is supported by the platform.
+>
+> Signed-off-by: Jens Wiklander <jens.wiklander@linaro.org>
+Reviewed-by: Lars Persson <lars.persson@axis.com>
