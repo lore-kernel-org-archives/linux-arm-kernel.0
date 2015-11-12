@@ -1,55 +1,78 @@
-From: rostedt@goodmis.org (Steven Rostedt)
-Date: Thu, 12 Nov 2015 11:27:41 -0500
-Subject: [PATCH v2] sched/rt: hide push_irq_work_func declaration
-In-Reply-To: <3828565.oKfGk7yNIT@wuerfel>
-References: <3810009.VdDTV0h1Qp@wuerfel>
-	<3828565.oKfGk7yNIT@wuerfel>
-Message-ID: <20151112112741.3cec9496@gandalf.local.home>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Thu, 12 Nov 2015 17:30:47 +0100
+Subject: [PATCH 0/3] remove UEFI reserved regions from the linear mapping
+In-Reply-To: <20151112161309.GF26564@leverpostej>
+References: <1446126059-25336-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20151112155523.GD26564@leverpostej>
+ <CAKv+Gu8Rd3T_2mjMkx0VZQ052mFjxufGB-U7_EuivvR+5M64cw@mail.gmail.com>
+ <20151112161309.GF26564@leverpostej>
+Message-ID: <CAKv+Gu-p9F79xA3F==-2K8n29QfdSk=2Q1cq=cs_EAMF4sT+Ng@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, 12 Nov 2015 17:19:58 +0100
-Arnd Bergmann <arnd@arndb.de> wrote:
+On 12 November 2015 at 17:13, Mark Rutland <mark.rutland@arm.com> wrote:
+> On Thu, Nov 12, 2015 at 05:01:19PM +0100, Ard Biesheuvel wrote:
+>> On 12 November 2015 at 16:55, Mark Rutland <mark.rutland@arm.com> wrote:
+>> > On Thu, Oct 29, 2015 at 02:40:56PM +0100, Ard Biesheuvel wrote:
+[...]
+>> >> Patch #1 slightly reorders the UEFI runtime services initialization routines
+>> >> so that the EFI_MEMMAP flag is only set if the permanent mapping of the UEFI
+>> >> memory map is in place.
+>> >
+>> > This also means that the memory map is mapped even with EFI runtime
+>> > support disabled, but I guess that's not a big problem.
+>> >
+>>
+>> Yes. You need that anyway if you are going to rely on it even when the
+>> runtime services are disabled.
+>
+> Not with the MEMBLOCK_NOMAP approach.
+>
 
-> The push_irq_work_func() function is conditionally defined only
-> when both CONFIG_SMP and HAVE_RT_PUSH_IPI are defined, but the
-> forward declaration remains visibile without HAVE_RT_PUSH_IPI,
-> causing a gcc warning in ARM64 allnoconfig:
-> 
-> kernel/sched/rt.c:68:13: warning: 'push_irq_work_func' declared 'static' but never defined [-Wunused-function]
-> 
-> This changes the code to use the same condition for both the
-> declaration and the function definition, which gets rid of the
-> warning.
-> 
-> As Peter Zijlstra, we can possibly get rid of the whole HAVE_RT_PUSH_IPI
-> thing after:
-> 8053871d0f7f ("smp: Fix smp_call_function_single_async() locking")
-> 
-> Until that is done, this patch can be used to avoid the warning.
+No, you're right. And actually, it also avoids the whole page_is_ram()
+problem, since all regions (including the NOMAP ones) are registered
+as 'System RAM' ranges, so in that respect, nothing changes from the
+ACPI/page_is_ram() pov
 
-Acked-by: Steven Rostedt <rostedt@goodmis.org>
+> I don't have a strong case for caring about that; I only imagine that
+> being a problem if you're trying to track down extremely nasty memory
+> corruption / bad pointer bugs and want the bare minimum VA space mapped.
+> Even then the impact is minimal.
+>
 
--- Steve
+Indeed. And in general, I am in favour of not relying on the UEFI
+memory map at all if we can avoid it, but use memblock as an
+intermediate memory map that is equally available on !UEFI boots.
 
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Fixes: b6366f048e0c ("sched/rt: Use IPI to trigger RT task push migration instead of pulling")
-> ---
-> Found on arm64 allnoconfig
-> 
-> v2: now using #if defined() instead IS_ENABLED()
-> 
-> diff --git a/kernel/sched/rt.c b/kernel/sched/rt.c
-> index e3cc16312046..ce7b36d6f477 100644
-> --- a/kernel/sched/rt.c
-> +++ b/kernel/sched/rt.c
-> @@ -64,7 +64,7 @@ static void start_rt_bandwidth(struct rt_bandwidth *rt_b)
->         raw_spin_unlock(&rt_b->rt_runtime_lock);
->  }
->  
-> -#ifdef CONFIG_SMP
-> +#if defined(CONFIG_SMP) && defined(HAVE_RT_PUSH_IPI)
->  static void push_irq_work_func(struct irq_work *work);
->  #endif
->  
+>> > As a side thought, it would be nice if we could memremap_ro the system
+>> > table and memory map in future to prevent potential corruption, given
+>> > they have fixed VAs and are always mapped.
+>> >
+>>
+>> I agree, and I already have some local patches using
+>> early_memremap_ro() for the EFI init code.
+>
+> Ah, nice!
+>
+>> memremap_ro() does not actually exist yet, but I intend to propose
+>> MEMREMAP_RO and MEMREMAP_NX flags to Dan Williams's memremap() work
+>> once I get around to it.
+>
+> That sounds good; I would certainly be in favour of that.
+>
+> For some reason I thought the memremap arch changes had gone in for
+> v4.3, but I see that's not the case. I'll take a look around.
+>
+
+There are some complications, I think. On ARM, ioremap_cache()
+disallows remapping of pfn_valid() pages, whereas arm64 short circuits
+those to return the linear mapping directly (which, again for highmem
+reasons, is not feasible on ARM)
+
+Anyway, I am trying not to make changes on the arm64 side that are
+difficult to port to ARM. MEMBLOCK_NOMAP works fine on both sides, so
+perhaps I should just revert to using that instead of opening the
+page_is_ram() can of worms.
+
+-- 
+Ard.
