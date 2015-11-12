@@ -1,48 +1,60 @@
-From: p.fedin@samsung.com (Pavel Fedin)
-Date: Thu, 12 Nov 2015 10:02:06 +0300
-Subject: [PATCH v7 1/4] Documentation: dt-bindings: Describe SROMc
- configuration
-In-Reply-To: <CAL_JsqLtWwdGHKKfS8b6E0Urh6gYopZcwpdyvJGWCRm7x81YzA@mail.gmail.com>
-References: <cover.1446799912.git.p.fedin@samsung.com>
- <0bc58ce0fd39767834f486c4c0cfbbd70044caed.1446799912.git.p.fedin@samsung.com>
- <CAL_JsqLsD9gA2-AWYGaHvOuZhhDmE2BHmPMU2nJjPYEvQJdNHQ@mail.gmail.com>
- <009301d11c4c$6eaa1eb0$4bfe5c10$@samsung.com>
- <CAL_JsqLtWwdGHKKfS8b6E0Urh6gYopZcwpdyvJGWCRm7x81YzA@mail.gmail.com>
-Message-ID: <00f901d11d18$0b68e760$223ab620$@samsung.com>
+From: peter.ujfalusi@ti.com (Peter Ujfalusi)
+Date: Thu, 12 Nov 2015 09:32:56 +0200
+Subject: [PATCH v4 0/3] ARM: OMAP2+ McASP(3) support for DRA7xx family
+Message-ID: <1447313579-23873-1-git-send-email-peter.ujfalusi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- Hello!
+Hi Tony,
 
-> >> > +- samsung,srom-timing : array of 6 integers, specifying bank timings in the
-> >> > +                        following order: Tacp, Tcah, Tcoh, Tacc, Tcos, Tacs.
-> >> > +                        Each value is specified in cycles and has the following
-> >> > +                        meaning and valid range:
-> >> > +                        Tacp : Page mode access cycle at Page mode (0 - 15)
-> >> > +                        Tcah : Address holding time after CSn (0 - 15)
-> >> > +                        Tcoh : Chip selection hold on OEn (0 - 15)
-> >> > +                        Tacc : Access cycle (0 - 31, the actual time is N + 1)
-> >> > +                        Tcos : Chip selection set-up before OEn (0 - 15)
-> >> > +                        Tacs : Address set-up before CSn (0 - 15)
-> >>
-> >> This is not easily extended. Perhaps a property per value instead.
-> >
-> >  We had a discussion with Krzysztof about it, he agreed with this form of the property.
-> > My concern was that it's just too much typing, and makes little sense because these
-> > settings always go together. If register layout changes, or parameter set changes in
-> > incompatible way, then it's another device, not exynos-srom anymore.
-> >  So would you agree with that, or is your position strong?
-> 
-> I'm thinking for a new version of the controller which could add (or
-> remove) new timing parameters, but then I guess you can interpret the
-> field differently based on the compatible string. Anyway, your problem
-> to deal with.
+Changes since v3:
+- rebased on mainline's HEAD
+- Added Tested-by from Felipe
+- Added Acked-by from Paul for the hwmod patches
 
- Of course, my thought is that if compatible string is different,
-then it's already a different device. And of course it would have different parameters.
- So, OK, i'll post new version with fixed documentation today.
+Changes since v2:
+- DTS patch added which is needed because of the clock handling changes
 
-Kind regards,
-Pavel Fedin
-Expert Engineer
-Samsung Electronics Research center Russia
+Felip Balbi reported that linux-next is broken right now since the DTS part of
+the earlier series has been applied, but we do not have the mcasp hwmod in the
+kernel:
+...
+[    0.181029] platform 48468000.mcasp: Cannot lookup hwmod 'mcasp3'
+...
+[    6.121072] davinci-mcasp 48468000.mcasp: _od_fail_runtime_resume: FIXME: missing hwmod/omap_dev info
+[    6.130790] ------------[ cut here ]------------
+[    6.135643] WARNING: CPU: 0 PID: 244 at drivers/bus/omap_l3_noc.c:147 l3_interrupt_handler+0x220/0x34c()
+[    6.145576] 44000000.ocp:L3 Custom Error: MASTER MPU TARGET L4_PER2_P3 (Read): Data Access in User mode during Functional access
+...
+
+This is the followup series for the hwmod changes needed to get audio working
+on DRA7xx family based boards.
+The DTS patches has been applied by Tony from the original series:
+http://www.spinics.net/lists/linux-omap/msg121473.html
+
+I have addressed your comments in the hwmod data and did some research also
+regarding to the use of ahclkx as fclk in the original submission.
+It turned out that McASP _needs_ all clocks to be enabled (fclk, iclk and
+ahclkx/r) to be able to access registers. The original patch where we handled
+the ahclkx as fclk worked, because the fclk clock got enabled in the HW w/o
+any SW interaction.
+All in all, the McASP found in DRA7 needs all clocks to be enabled.
+To satisfy this I have introduced a new flag to hwmod, which means that the
+listed optional clocks need to be handled alongside with the fclk clock.
+
+Regards,
+Peter
+---
+Peter Ujfalusi (3):
+  ARM: DTS: dra7: Fix McASP3 node regarding to clocks
+  ARM: OMAP2+: hwmod: Add hwmod flag for HWMOD_OPT_CLKS_NEEDED
+  ARM: OMAP: DRA7: hwmod: Add data for McASP3
+
+ arch/arm/boot/dts/dra7.dtsi               |  4 +-
+ arch/arm/mach-omap2/omap_hwmod.c          | 66 +++++++++++++++++--------------
+ arch/arm/mach-omap2/omap_hwmod.h          |  3 ++
+ arch/arm/mach-omap2/omap_hwmod_7xx_data.c | 56 ++++++++++++++++++++++++++
+ 4 files changed, 97 insertions(+), 32 deletions(-)
+
+-- 
+2.6.2
