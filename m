@@ -1,57 +1,35 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Thu, 12 Nov 2015 15:24:29 +0100
-Subject: [PATCH] clk: st: avoid uninitialized variable use
-Message-ID: <3719029.IbREgssWiU@wuerfel>
+Date: Thu, 12 Nov 2015 15:37:12 +0100
+Subject: [PATCH] ARM64: build vdso without libgcov
+Message-ID: <8988881.1vH1oNjPUl@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-quadfs_pll_fs660c32_round_rate prints a few structure members
-that are never initialized, and also doesn't print the only one
-it cares about. We get a gcc warning about the ones that
-are printed:
+On a cross-toolchain without glibc support, libgcov may not be
+available, and attempting to build an arm64 kernel with GCOV
+enabled then results in a build error:
 
-clk/st/clkgen-fsyn.c:560:93: warning: 'params.sdiv' may be used uninitialized in this function
-clk/st/clkgen-fsyn.c:560:93: warning: 'params.mdiv' may be used uninitialized in this function
-clk/st/clkgen-fsyn.c:560:93: warning: 'params.pe' may be used uninitialized in this function
-clk/st/clkgen-fsyn.c:560:93: warning: 'params.nsdiv' may be used uninitialized in this function
+/home/arnd/cross-gcc/lib/gcc/aarch64-linux/5.2.1/../../../../aarch64-linux/bin/ld: cannot find -lgcov
 
-This changes the code to no longer print uninitialized data, and
-for good measure it also prints the ndiv member that is being
-set.
+We don't really want to link libgcov into the vdso anyway, so
+this patch just disables GCOV in the vdso directory, just as
+we do for most other architectures.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: 5f7aa9071e93 ("clk: st: Support for QUADFS inside ClockGenB/C/D/E/F")
+---
+Found trying to build allmodconfig
 
-diff --git a/drivers/clk/st/clkgen-fsyn.c b/drivers/clk/st/clkgen-fsyn.c
-index 576cd0354d48..ccb324d97160 100644
---- a/drivers/clk/st/clkgen-fsyn.c
-+++ b/drivers/clk/st/clkgen-fsyn.c
-@@ -549,19 +549,20 @@ static int clk_fs660c32_vco_get_params(unsigned long input,
- 	return 0;
- }
+diff --git a/arch/arm64/kernel/vdso/Makefile b/arch/arm64/kernel/vdso/Makefile
+index f6fe17d88da5..b467fd0a384b 100644
+--- a/arch/arm64/kernel/vdso/Makefile
++++ b/arch/arm64/kernel/vdso/Makefile
+@@ -15,6 +15,9 @@ ccflags-y := -shared -fno-common -fno-builtin
+ ccflags-y += -nostdlib -Wl,-soname=linux-vdso.so.1 \
+ 		$(call cc-ldoption, -Wl$(comma)--hash-style=sysv)
  
--static long quadfs_pll_fs660c32_round_rate(struct clk_hw *hw, unsigned long rate
--		, unsigned long *prate)
-+static long quadfs_pll_fs660c32_round_rate(struct clk_hw *hw,
-+					   unsigned long rate,
-+					   unsigned long *prate)
- {
- 	struct stm_fs params;
- 
--	if (!clk_fs660c32_vco_get_params(*prate, rate, &params))
--		clk_fs660c32_vco_get_rate(*prate, &params, &rate);
-+	if (clk_fs660c32_vco_get_params(*prate, rate, &params))
-+		return rate;
- 
--	pr_debug("%s: %s new rate %ld [sdiv=0x%x,md=0x%x,pe=0x%x,nsdiv3=%u]\n",
-+	clk_fs660c32_vco_get_rate(*prate, &params, &rate);
++# Disable gcov profiling for VDSO code
++GCOV_PROFILE := n
 +
-+	pr_debug("%s: %s new rate %ld [ndiv=%u]\n",
- 		 __func__, clk_hw_get_name(hw),
--		 rate, (unsigned int)params.sdiv,
--		 (unsigned int)params.mdiv,
--		 (unsigned int)params.pe, (unsigned int)params.nsdiv);
-+		 rate, (unsigned int)params.ndiv);
- 
- 	return rate;
- }
+ # Workaround for bare-metal (ELF) toolchains that neglect to pass -shared
+ # down to collect2, resulting in silent corruption of the vDSO image.
+ ccflags-y += -Wl,-shared
