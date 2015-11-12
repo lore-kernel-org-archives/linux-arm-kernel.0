@@ -1,101 +1,40 @@
-From: tony@atomide.com (Tony Lindgren)
-Date: Thu, 12 Nov 2015 09:51:17 -0800
-Subject: [PATCH v2 2/3] ARM: OMAP2+: remove custom abort handler for t410
-In-Reply-To: <1447335155.3101.6.camel@pengutronix.de>
-References: <1444905142-21500-1-git-send-email-l.stach@pengutronix.de>
- <1444905142-21500-3-git-send-email-l.stach@pengutronix.de>
- <1447335155.3101.6.camel@pengutronix.de>
-Message-ID: <20151112175116.GO3218@atomide.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Thu, 12 Nov 2015 11:53:01 -0600
+Subject: [PATCH 2/2] arm: boot: beaglex15: pass correct interrupt
+In-Reply-To: <1447350781-20649-1-git-send-email-balbi@ti.com>
+References: <1447350781-20649-1-git-send-email-balbi@ti.com>
+Message-ID: <1447350781-20649-3-git-send-email-balbi@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-* Lucas Stach <l.stach@pengutronix.de> [151112 05:33]:
-> Tony,
-> 
-> can you please take this patch through the OMAP tree for 4.4? The first
-> patch in this series went in through Russells tree, so the below code
-> now has the possibility to hide a real abort later during boot.
+According to latest schematics [1], GPIO_1/VBUSDET
+on TPS659038 is tied to AM57x GPIO4_21. We can use
+that as a VBUS interrupt, instead of relying on
+PMIC's VBUS interrupts which don't seem to be firing
+on x15 at all.
 
-OK will do thanks. I've also verified that the abort handler is no longer
-needed. After seeing where it happens, fixing it was trivial :)
+A follow up patch will add support for using this
+GPIO-based interrupt mechanism for notifying about
+VBUS.
 
-FYI, the fix was 57df53808534 ("ARM: OMAP2+: Fix imprecise external abort
-caused by bogus SRAM init"). Other platforms may have similar issues where
-it's not really anything left behind by the bootloader but a real kernel
-bug.
+[1] https://github.com/beagleboard/beagleboard-x15/blob/master/BeagleBoard-X15_RevA2.pdf
 
-Regards,
+Signed-off-by: Felipe Balbi <balbi@ti.com>
+---
+ arch/arm/boot/dts/am57xx-beagle-x15.dts | 1 +
+ 1 file changed, 1 insertion(+)
 
-Tony
-
-> 
-> Am Donnerstag, den 15.10.2015, 12:32 +0200 schrieb Lucas Stach:
-> > This is not needed anymore. Handling a potentially pending imprecise external
-> > abort left behind by the bootloader is now done in a slightly safer way inside
-> > the common ARM startup code.
-> > 
-> > Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
-> > Acked-by: Tony Lindgren <tony@atomide.com>
-> > ---
-> >  arch/arm/mach-omap2/pdata-quirks.c | 29 -----------------------------
-> >  1 file changed, 29 deletions(-)
-> > 
-> > diff --git a/arch/arm/mach-omap2/pdata-quirks.c b/arch/arm/mach-omap2/pdata-quirks.c
-> > index ea56397599c2..3a2bc2a88db4 100644
-> > --- a/arch/arm/mach-omap2/pdata-quirks.c
-> > +++ b/arch/arm/mach-omap2/pdata-quirks.c
-> > @@ -24,9 +24,6 @@
-> >  #include <linux/platform_data/iommu-omap.h>
-> >  #include <linux/platform_data/wkup_m3.h>
-> >  
-> > -#include <asm/siginfo.h>
-> > -#include <asm/signal.h>
-> > -
-> >  #include "common.h"
-> >  #include "common-board-devices.h"
-> >  #include "dss-common.h"
-> > @@ -385,29 +382,6 @@ static void __init omap3_pandora_legacy_init(void)
-> >  }
-> >  #endif /* CONFIG_ARCH_OMAP3 */
-> >  
-> > -#ifdef CONFIG_SOC_TI81XX
-> > -static int fault_fixed_up;
-> > -
-> > -static int t410_abort_handler(unsigned long addr, unsigned int fsr,
-> > -			      struct pt_regs *regs)
-> > -{
-> > -	if ((fsr == 0x406 || fsr == 0xc06) && !fault_fixed_up) {
-> > -		pr_warn("External imprecise Data abort at addr=%#lx, fsr=%#x ignored.\n",
-> > -			addr, fsr);
-> > -		fault_fixed_up = 1;
-> > -		return 0;
-> > -	}
-> > -
-> > -	return 1;
-> > -}
-> > -
-> > -static void __init t410_abort_init(void)
-> > -{
-> > -	hook_fault_code(16 + 6, t410_abort_handler, SIGBUS, BUS_OBJERR,
-> > -			"imprecise external abort");
-> > -}
-> > -#endif
-> > -
-> >  #if defined(CONFIG_ARCH_OMAP4) || defined(CONFIG_SOC_OMAP5)
-> >  static struct iommu_platform_data omap4_iommu_pdata = {
-> >  	.reset_name = "mmu_cache",
-> > @@ -536,9 +510,6 @@ static struct pdata_init pdata_quirks[] __initdata = {
-> >  	{ "openpandora,omap3-pandora-600mhz", omap3_pandora_legacy_init, },
-> >  	{ "openpandora,omap3-pandora-1ghz", omap3_pandora_legacy_init, },
-> >  #endif
-> > -#ifdef CONFIG_SOC_TI81XX
-> > -	{ "hp,t410", t410_abort_init, },
-> > -#endif
-> >  #ifdef CONFIG_SOC_OMAP5
-> >  	{ "ti,omap5-uevm", omap5_uevm_legacy_init, },
-> >  #endif
-> 
-> -- 
-> Pengutronix e.K.             | Lucas Stach                 |
-> Industrial Linux Solutions   | http://www.pengutronix.de/  |
-> 
+diff --git a/arch/arm/boot/dts/am57xx-beagle-x15.dts b/arch/arm/boot/dts/am57xx-beagle-x15.dts
+index 6f3a1a7ec5f9..5e47162f7883 100644
+--- a/arch/arm/boot/dts/am57xx-beagle-x15.dts
++++ b/arch/arm/boot/dts/am57xx-beagle-x15.dts
+@@ -560,6 +560,7 @@
+ 		extcon_usb2: tps659038_usb {
+ 			compatible = "ti,palmas-usb-vid";
+ 			ti,enable-vbus-detection;
++			interrupts-extended = <&gpio4 21 IRQ_TYPE_EDGE_RISING>;
+ 		};
+ 
+ 	};
+-- 
+2.6.2
