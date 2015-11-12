@@ -1,78 +1,53 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Thu, 12 Nov 2015 01:48:32 +0100
-Subject: [PATCH v2 10/11] PM / Hibernate: clean cached pages on
- architectures that require it
-In-Reply-To: <20151111114039.GA8375@red-moon>
-References: <1445966960-31724-1-git-send-email-james.morse@arm.com>
- <1445966960-31724-11-git-send-email-james.morse@arm.com>
- <20151111114039.GA8375@red-moon>
-Message-ID: <2039611.PJaFlk1sMi@vostro.rjw.lan>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Thu, 12 Nov 2015 09:32:10 +0900
+Subject: [PATCH v7 1/4] Documentation: dt-bindings: Describe SROMc
+ configuration
+In-Reply-To: <CAL_JsqLtWwdGHKKfS8b6E0Urh6gYopZcwpdyvJGWCRm7x81YzA@mail.gmail.com>
+References: <cover.1446799912.git.p.fedin@samsung.com>
+ <0bc58ce0fd39767834f486c4c0cfbbd70044caed.1446799912.git.p.fedin@samsung.com>
+ <CAL_JsqLsD9gA2-AWYGaHvOuZhhDmE2BHmPMU2nJjPYEvQJdNHQ@mail.gmail.com>
+ <009301d11c4c$6eaa1eb0$4bfe5c10$@samsung.com>
+ <CAL_JsqLtWwdGHKKfS8b6E0Urh6gYopZcwpdyvJGWCRm7x81YzA@mail.gmail.com>
+Message-ID: <5643DE0A.2060400@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, November 11, 2015 11:40:39 AM Lorenzo Pieralisi wrote:
-> Hi Pavel, Rafael,
+On 12.11.2015 05:43, Rob Herring wrote:
+> On Wed, Nov 11, 2015 at 12:44 AM, Pavel Fedin <p.fedin@samsung.com> wrote:
+>>  Hello!
+>>
+>>>> +- samsung,srom-timing : array of 6 integers, specifying bank timings in the
+>>>> +                        following order: Tacp, Tcah, Tcoh, Tacc, Tcos, Tacs.
+>>>> +                        Each value is specified in cycles and has the following
+>>>> +                        meaning and valid range:
+>>>> +                        Tacp : Page mode access cycle at Page mode (0 - 15)
+>>>> +                        Tcah : Address holding time after CSn (0 - 15)
+>>>> +                        Tcoh : Chip selection hold on OEn (0 - 15)
+>>>> +                        Tacc : Access cycle (0 - 31, the actual time is N + 1)
+>>>> +                        Tcos : Chip selection set-up before OEn (0 - 15)
+>>>> +                        Tacs : Address set-up before CSn (0 - 15)
+>>>
+>>> This is not easily extended. Perhaps a property per value instead.
+>>
+>>  We had a discussion with Krzysztof about it, he agreed with this form of the property.
+>> My concern was that it's just too much typing, and makes little sense because these
+>> settings always go together. If register layout changes, or parameter set changes in
+>> incompatible way, then it's another device, not exynos-srom anymore.
+>>  So would you agree with that, or is your position strong?
 > 
-> Do you have any feedback on this patch ?
-> 
-> It is fundamental to this series and affects Hibernate core code so if you
-> have any feedback that would be much appreciated.
+> I'm thinking for a new version of the controller which could add (or
+> remove) new timing parameters, but then I guess you can interpret the
+> field differently based on the compatible string. Anyway, your problem
+> to deal with.
 
-I'm really not familiar with the flush_icache_range() interface.
+Actually I also preferred properties per one timing... but finally
+agreed on simpler approach.
 
-What exactly does it do?
+Adding new parameters to the array is still possible (because the order
+matters) and removal as well (by ignoring some indices). All ARMv7
+Exynos SoCs have exactly the same registers for SROM controller
+(Exynos3250, Exynos4, Exynos5). On newer Exynos ARMv8 (Exynos5433 and
+Exynos7420) I don't know because it is not documented.
 
-Rafael
-
-
-> On Tue, Oct 27, 2015 at 05:29:19PM +0000, James Morse wrote:
-> > Some architectures require code written to memory as if it were data to be
-> > 'cleaned' from any data caches so that the processor can fetch them as new
-> > instructions.
-> > 
-> > During resume from hibernate, the snapshot code copies some pages directly,
-> > meaning these architectures do not get a chance to perform their cache
-> > maintenance. Add a call to flush_icache_range(), which is provided by
-> > architectures that require it, to perform the maintenance.
-> > 
-> > This mirrors the kernel's behaviour when loading kernel modules and when
-> > mapping executable pages to user space.
-> > 
-> > Signed-off-by: James Morse <james.morse@arm.com>
-> > ---
-> >  kernel/power/snapshot.c | 4 ++++
-> >  1 file changed, 4 insertions(+)
-> > 
-> > diff --git a/kernel/power/snapshot.c b/kernel/power/snapshot.c
-> > index 5235dd4e1e2f..139fc449ad75 100644
-> > --- a/kernel/power/snapshot.c
-> > +++ b/kernel/power/snapshot.c
-> > @@ -31,6 +31,7 @@
-> >  #include <linux/ktime.h>
-> >  
-> >  #include <asm/uaccess.h>
-> > +#include <asm/cacheflush.h>
-> >  #include <asm/mmu_context.h>
-> >  #include <asm/pgtable.h>
-> >  #include <asm/tlbflush.h>
-> > @@ -1196,9 +1197,12 @@ static unsigned int count_data_pages(void)
-> >  static inline void do_copy_page(long *dst, long *src)
-> >  {
-> >  	int n;
-> > +	unsigned long __maybe_unused start = (unsigned long)dst;
-> >  
-> >  	for (n = PAGE_SIZE / sizeof(long); n; n--)
-> >  		*dst++ = *src++;
-> > +
-> > +	flush_icache_range(start, start+PAGE_SIZE);
-> >  }
-> >  
-> >  
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-pm" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-
--- 
-I speak only for myself.
-Rafael J. Wysocki, Intel Open Source Technology Center.
+Best regards,
+Krzysztof
