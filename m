@@ -1,35 +1,77 @@
-From: schwab@suse.de (Andreas Schwab)
-Date: Thu, 12 Nov 2015 09:58:43 +0100
-Subject: [PATCH v6 13/17] arm64:ilp32: add sys_ilp32.c and a separate
- table (in entry.S) to use it
-In-Reply-To: <10433819.KzDuoxzSn7@wuerfel> (Arnd Bergmann's message of "Thu,
- 12 Nov 2015 00:23:43 +0100")
-References: <1446507046-24604-1-git-send-email-ynorov@caviumnetworks.com>
- <20577001.4Nl3YnQ8k2@wuerfel> <87k2pojfsy.fsf@igel.home>
- <10433819.KzDuoxzSn7@wuerfel>
-Message-ID: <mvmoaezy4os.fsf@hawking.suse.de>
+From: bigeasy@linutronix.de (Sebastian Andrzej Siewior)
+Date: Thu, 12 Nov 2015 10:19:24 +0100
+Subject: [PATCH] PCI: dra7xx: mark dra7xx_pcie_msi irq as IRQF_NO_THREAD
+In-Reply-To: <563D06BF.5010707@ti.com>
+References: <1446748990-27722-1-git-send-email-grygorii.strashko@ti.com>
+ <563C6A7D.7040503@linutronix.de> <563D06BF.5010707@ti.com>
+Message-ID: <5644599C.8030905@linutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd Bergmann <arnd@arndb.de> writes:
+On 11/06/2015 08:59 PM, Grygorii Strashko wrote:
+> Hi Sebastian,
 
-> I think either way is fine for the two examples. I think it's clear
-> that we want __NR_llseek as 62 and __NR_mmap2 as 222. Whether those
-> use the compat_sys_llseek/compat_sys_mmap2_wrapper or
-> sys_lseek/sys_mmap entry points is not overly important, we can use
-> whatever is more convenient to glibc: if we can kill off an
-> architecture specific wrapper function in glibc by adding one line
-> to the kernel, that seems worthwhile.
+Hi Grygorii,
 
-Currently most off_t-like syscalls need a new glibc wrapper since the
-existing ones are either for 32bit off_t+off64_t (with split off64_t
-syscall arguments) or pure 64bit off_t architectures.  Since ilp32 now
-(mostly) has 32bit off_t, but 64bit off_t-like syscalls neither of them
-fit.
+> - IRQF_NO_THREAD is the first considered option for such kind of issues.
+>   But: Now in LKML there are ~60 occurrences of IRQF_NO_THREAD - most of
+>   them are used by Arch code. And It's only used by 6 drivers (drivers/*) [Addendum 2].
+>   During past year, I've found only two threads related to IRQF_NO_THREAD
+>   and, in both cases, IRQF_NO_THREAD was added for arch specific IRQs which
+>   can't be threaded (https://lists.ozlabs.org/pipermail/linuxppc-dev/2014-November/122659.html,
+>   https://lkml.org/lkml/2015/4/21/404).
 
-Andreas.
+That powerpc patch you reference is doing the same thing you are doing
+here.
 
--- 
-Andreas Schwab, SUSE Labs, schwab at suse.de
-GPG Key fingerprint = 0196 BAD8 1CE9 1970 F4BE  1748 E4D4 88E3 0EEA B9D7
-"And now for something completely different."
+> - ARM UP system: TI's am437xx SoCs for example.
+>    Here everything is started from /drivers/irqchip/irq-gic.c -> gic_handle_irq()
+> 
+
+> GIC IRQ handler gic_handle_irq() may process more than one IRQ without leaving HW IRQ mode
+> (during my experiments I saw up to 6 IRQs processed in one cycle).
+
+not only GIC. But then what good does it do if it leaves and returns
+immediately back to the routine?
+
+> As result, It was concluded, that having such current HW/SW and all IRQs forced threaded [1],
+> it will be potentially possible to predict system behavior, because gic_handle_irq() will
+> do the same things for most of processed IRQs.
+> But, once there will be chained [2] or IRQF_NO_THREAD [3] IRQs - complete unpredictability.
+
+I would not go as far as "complete unpredictability". What you do (or
+should do) is testing the system for longer period of time with
+different behavior in order to estimate the worst case.
+You can't predict the system anyway since it is way too complex. Just
+try something that ensures that cyclictest is no longer cache hot and
+see what happens then.
+
+> So, It was selected as goal to have all PPI IRQs (forced) threaded. And if someone
+> will require faster IRQ handling - IRQF_NO_THREAD can be always added, but it will
+> be custom solution then. 
+> 
+> I'd be appreciated for your comments - if above problem is not a problem.
+> Good - IRQF_NO_THREAD forever!
+
+Yes, we try to avoid IRQF_NO_THREAD under all circumstances. However it
+is required for low-level arch code. This includes basically
+everything that is using raw-locks which includes interrupt controller
+(the "real" ones like GIC or cascading like MSI or GPIO).
+Here it is simple - you have a cascading MSI-interrupt controller and
+as such it should be IRQF_NO_THREAD marked.
+The latency spikes in worst case are not huge as explained earlier: The
+only thing your cascading controller is allowed to do is to mark
+interrupt as pending (which is with threaded interrupts just a task
+wakeup).
+And this is not a -RT only problem: it is broken in vanilla linux with
+threaded interrupts as well.
+
+Btw: There is an exception to this rule (as always): If you are on a
+slow/blocking bus then you don't do IRQF_NO_THREAD. A slow bus would be
+a GPIO controller behind an I2C/SPI controller which also acts as an
+interrupt controller. Here you use a threaded-handler +
+handle_nested_irq().
+
+> Thanks.
+
+Sebastian
