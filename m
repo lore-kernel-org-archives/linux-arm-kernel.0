@@ -1,81 +1,79 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Thu, 12 Nov 2015 13:39:02 +0900
-Subject: [PATCH v4 8/9] ARM: EXYNOS: rearrange static and non-static
- functions of PMU driver
-In-Reply-To: <1447155784-12667-9-git-send-email-pankaj.dubey@samsung.com>
-References: <1447155784-12667-1-git-send-email-pankaj.dubey@samsung.com>
- <1447155784-12667-9-git-send-email-pankaj.dubey@samsung.com>
-Message-ID: <564417E6.8070905@samsung.com>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Wed, 11 Nov 2015 20:54:07 -0800
+Subject: [PATCH v5 4/5] ARM: dts: mt8135: enable basic SMP bringup for
+ mt8135
+In-Reply-To: <7hpozgyu36.fsf@deeprootsystems.com> (Kevin Hilman's message of
+ "Wed, 11 Nov 2015 15:50:05 -0800")
+References: <1443799181-50409-1-git-send-email-yingjoe.chen@mediatek.com>
+ <1443799181-50409-5-git-send-email-yingjoe.chen@mediatek.com>
+ <CAMAWPa-Ed2FJY2pW67EHHKBH3_eBZx0+oWfMJwc_DhEjrf7aMg@mail.gmail.com>
+ <1445843717.23888.1.camel@mtksdaap41>
+ <CAMAWPa_Gyq7H0qUJ32PAJh_ELdHeKWMPyHud4gaT8=Ootcu1+g@mail.gmail.com>
+ <1445859610.26723.4.camel@mtksdaap41>
+ <CAMAWPa_13j88SMBbYEBg2WHFEhkhR_gVZkkU_x-U5NJay05AxA@mail.gmail.com>
+ <1447135867.14454.9.camel@mtksdaap41>
+ <7h1tbx1gjp.fsf@deeprootsystems.com>
+ <1447228557.20886.10.camel@mtksdaap41>
+ <7hpozgyu36.fsf@deeprootsystems.com>
+Message-ID: <7hwptnddhs.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 10.11.2015 20:43, Pankaj Dubey wrote:
-> This patch moves exynos_sys_powerdown_conf function above all
-> static functions.
+Hi Eddie,
 
-Please (always) describe the reason, the answer to "why?". In this case
-I know why, but other reviewers may not and other people grepping
-through history definitely won't know.
+Kevin Hilman <khilman@kernel.org> writes:
 
-Best regards,
-Krzysztof
+> Eddie Huang <eddie.huang@mediatek.com> writes:
+>
+>> On Tue, 2015-11-10 at 17:16 -0800, Kevin Hilman wrote:
+>>> Hi Eddie,
+>>> 
+>>> [...]
+>>> 
+>>> > I check the log [0],
+>>> 
+>>> Thanks for checking into this boot failure.
+>>> 
+>>> > it seems first time mt8135-evbp1 boot to kernel
+>>> > shell successfully, then boot again. In the second time, mt8135 stay in
+>>> > fastboot mode, waiting host send boot image, then timeout.
+>>> 
+>>> Actually, it never gets to a shell the first time.  If you look closely,
+>>> the target reboots as soon as userspace starts.   Look for the PYBOOT
+>>> line which says "finished booting, starting userspace"
+>>> 
+>>> Later on, pyboot thinks it finds a root shell due to finding '#'
+>>> characters, but clearly it never got to a shell.
+>>> 
+>>> > I download zImage and dtb in [1], and kernel run to shell successfully
+>>> > on my platform.
+>>> 
+>>> Are you can you try using a ramdisk as well?  You can use the pre-built
+>>> one here:
+>>> http://storage.kernelci.org/images/rootfs/buildroot/armel/rootfs.cpio.gz
+>>> 
+>>
+>> Yes, I tried this ramdisk, and I can reproduce fail issue.
+>>
+>
+> OK, good.   Thanks for looking into it.
+>
+>>> Please check my boot logs to see how I'm generating the boot.img file
+>>> (search for mkbootimg) with a kernel/dtb/ramdisk.  It may be possible
+>>> that the kernel image size with a ramdisk is breaking some of the
+>>> assumptions in the fastboot mode.  I've seen problems like this on other
+>>> platforms due to hard-coded sizes/addresses in the boot firmware.
+>>> 
+>>
+>> MT8135 allocate 10MB for BOOT partition, but the test boot.img is 11MB,
+>> thus cause user space fail.
+>
+> Aha, I was right!  ;)
 
-> 
-> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
-> ---
->  arch/arm/mach-exynos/pmu.c | 34 +++++++++++++++++-----------------
->  1 file changed, 17 insertions(+), 17 deletions(-)
-> 
-> diff --git a/arch/arm/mach-exynos/pmu.c b/arch/arm/mach-exynos/pmu.c
-> index e01bdf1..f300ac9 100644
-> --- a/arch/arm/mach-exynos/pmu.c
-> +++ b/arch/arm/mach-exynos/pmu.c
-> @@ -39,23 +39,6 @@ u32 pmu_raw_readl(u32 offset)
->  	return readl_relaxed(pmu_base_addr + offset);
->  }
->  
-> -static void exynos_power_off(void)
-> -{
-> -	unsigned int tmp;
-> -
-> -	pr_info("Power down.\n");
-> -	tmp = pmu_raw_readl(EXYNOS_PS_HOLD_CONTROL);
-> -	tmp ^= (1 << 8);
-> -	pmu_raw_writel(tmp, EXYNOS_PS_HOLD_CONTROL);
-> -
-> -	/* Wait a little so we don't give a false warning below */
-> -	mdelay(100);
-> -
-> -	pr_err("Power down failed, please power off system manually.\n");
-> -	while (1)
-> -		;
-> -}
-> -
->  void exynos_sys_powerdown_conf(enum sys_powerdown mode)
->  {
->  	unsigned int i;
-> @@ -85,6 +68,23 @@ void exynos_sys_powerdown_conf(enum sys_powerdown mode)
->  	}
->  }
->  
-> +static void exynos_power_off(void)
-> +{
-> +	unsigned int tmp;
-> +
-> +	pr_info("Power down.\n");
-> +	tmp = pmu_raw_readl(EXYNOS_PS_HOLD_CONTROL);
-> +	tmp ^= (1 << 8);
-> +	pmu_raw_writel(tmp, EXYNOS_PS_HOLD_CONTROL);
-> +
-> +	/* Wait a little so we don't give a false warning below */
-> +	mdelay(100);
-> +
-> +	pr_err("Power down failed, please power off system manually.\n");
-> +	while (1)
-> +		;
-> +}
-> +
->  static int pmu_restart_notify(struct notifier_block *this,
->  		unsigned long code, void *unused)
->  {
-> 
+Also notice in kernelci.org that the mt8173 board has also been failing
+to boot in mainline[1].  I wonder if this same limitation exists in the
+mt8173 boot firmware?
+
+Kevin
+
+[1] http://kernelci.org/boot/mt8173-evb/job/mainline/kernel/v4.3-11553-g8d3de01cfa37/defconfig/defconfig/lab/lab-khilman/?_id=5643bc3959b5145c9e0918f4
