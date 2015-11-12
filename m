@@ -1,116 +1,140 @@
-From: yang.shi@linaro.org (Yang Shi)
-Date: Thu, 12 Nov 2015 13:57:01 -0800
-Subject: [PATCH 2/2] arm64: bpf: make BPF prologue and epilogue align with
- ARM64 AAPCS
-In-Reply-To: <1447365421-1309-1-git-send-email-yang.shi@linaro.org>
-References: <1447365421-1309-1-git-send-email-yang.shi@linaro.org>
-Message-ID: <1447365421-1309-3-git-send-email-yang.shi@linaro.org>
+From: robh@kernel.org (Rob Herring)
+Date: Thu, 12 Nov 2015 17:10:04 -0600
+Subject: [PATCH 1/3] devicetree: bindings: Document qcom board compatible
+ format
+In-Reply-To: <20151112194408.GC15032@codeaurora.org>
+References: <1445894712-14350-1-git-send-email-sboyd@codeaurora.org>
+ <1445894712-14350-2-git-send-email-sboyd@codeaurora.org>
+ <20151112164948.GA24938@rob-hp-laptop>
+ <20151112194408.GC15032@codeaurora.org>
+Message-ID: <CAL_Jsq+5QD2Ce8snovw6vC31NvD5oB+Yos1VuZDjXfKa3fPvDQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Save and restore FP/LR in BPF prog prologue and epilogue, save SP to FP
-in prologue in order to get the correct stack backtrace.
+On Thu, Nov 12, 2015 at 1:44 PM, Stephen Boyd <sboyd@codeaurora.org> wrote:
+> On 11/12, Rob Herring wrote:
+>> On Mon, Oct 26, 2015 at 02:25:10PM -0700, Stephen Boyd wrote:
+>> > Some qcom based bootloaders identify the dtb blob based on a set
+>> > of device properties like SoC, platform, PMIC, and revisions of
+>> > those components. In downstream kernels, these values are added
+>> > to the different component dtsi files (i.e. pmic dtsi file, SoC
+>> > dtsi file, board dtsi file, etc.) via qcom specific DT
+>> > properties. The dtb files are parsed by a program called dtbTool
+>> > that picks out these properties and creates a table of contents
+>> > binary blob with the property information and some offsets into
+>> > the concatenation of all the dtbs (termed a QCDT image).
+>>
+>> Got a pointer to what these properties look like?
+>
+> Do you mean the blob header format? You can see that described
+> in a text document next to the C file for dtbtool[1].
 
-However, ARM64 JIT used FP (x29) as eBPF fp register, FP is subjected to
-change during function call so it may cause the BPF prog stack base address
-change too.
+Thanks.
 
-Use x25 to replace FP as BPF stack base register (fp). Since x25 is callee
-saved register, so it will keep intact during function call.
-It is initialized in BPF prog prologue when BPF prog is started to run
-everytime. When BPF prog exits, it could be just tossed.
+>> > +Some qcom based bootloaders identify the dtb blob based on a set of
+>> > +device properties like SoC, platform, PMIC, and revisions of those components.
+>> > +To support this scheme, we encode this information into the board compatible
+>> > +string.
+>>
+>> Why does all this need to be a single property?
+>
+> Because the different vendor properties were rejected by arm-soc
+> maintainers and the board compatible string was suggested as the
+> place to put such information.
 
-So, the BPF stack layout looks like:
+I'm surprised an 80+ character compatible stream is okay. The parts
+giving me heartburn here are not mentioned in the previous discussion
+nor the QCDT format.
 
-                                 high
-         original A64_SP =>   0:+-----+ BPF prologue
-                                |     | FP/LR and callee saved registers
-         BPF fp register => -64:+-----+
-                                |     |
-                                | ... | BPF prog stack
-                                |     |
-                                |     |
-         current A64_SP/FP =>   +-----+
-                                |     |
-                                | ... | Function call stack
-                                |     |
-                                +-----+
-                                  low
+As presented previously I agree with the push back. However, we could
+do standard properties for SOC and board versions rather than
+something vendor specific. Then the existing kernel support for
+versions could use it. We could also just make this compatible string
+formatting standard for more than just QC boards.
 
-CC: Zi Shen Lim <zlim.lnx@gmail.com>
-CC: Xi Wang <xi.wang@gmail.com>
-Signed-off-by: Yang Shi <yang.shi@linaro.org>
----
- arch/arm64/net/bpf_jit_comp.c | 34 +++++++++++++++++++++++++++++-----
- 1 file changed, 29 insertions(+), 5 deletions(-)
+>> > +
+>> > +The 'soc_version', 'plat_version' and 'pmic_version' elements take the form of
+>> > +v<Major>.<Minor> where the minor number may be omitted when it's zero, i.e.
+>> > +v1.0 is the same as v1. If all versions of the 'plat_version' element's match,
+>> > +then a wildcard '*' should be used, e.g. 'v*'.
+>> > +
+>> > +The 'foundry_id', 'subtype', and 'mb' elements are one or more digits from 0
+>> > +to 9.
+>>
+>> Can you define what these are exactly. I gather mb is RAM size.
+>
+> Not really, foundry_id is a number and so is subtype.
 
-diff --git a/arch/arm64/net/bpf_jit_comp.c b/arch/arm64/net/bpf_jit_comp.c
-index ac8b548..8753bb7 100644
---- a/arch/arm64/net/bpf_jit_comp.c
-+++ b/arch/arm64/net/bpf_jit_comp.c
-@@ -50,7 +50,7 @@ static const int bpf2a64[] = {
- 	[BPF_REG_8] = A64_R(21),
- 	[BPF_REG_9] = A64_R(22),
- 	/* read-only frame pointer to access stack */
--	[BPF_REG_FP] = A64_FP,
-+	[BPF_REG_FP] = A64_R(25),
- 	/* temporary register for internal BPF JIT */
- 	[TMP_REG_1] = A64_R(23),
- 	[TMP_REG_2] = A64_R(24),
-@@ -155,17 +155,41 @@ static void build_prologue(struct jit_ctx *ctx)
- 	stack_size += 4; /* extra for skb_copy_bits buffer */
- 	stack_size = STACK_ALIGN(stack_size);
- 
-+	/*
-+	 * BPF prog stack layout
-+	 *
-+	 *                         high
-+	 * original A64_SP =>   0:+-----+ BPF prologue
-+	 *                        |     | FP/LR and callee saved registers
-+	 * BPF fp register => -64:+-----+
-+	 *                        |     |
-+	 *                        | ... | BPF prog stack
-+	 *                        |     |
-+	 *                        |     |
-+	 * current A64_SP/FP =>   +-----+
-+	 *                        |     |
-+	 *                        | ... | Function call stack
-+	 *                        |     |
-+	 *                        +-----+
-+	 *                          low
-+	 *
-+	 */
-+
-+	/* Save FP and LR registers to stay align with ARM64 AAPCS */
-+	emit(A64_PUSH(A64_FP, A64_LR, A64_SP), ctx);
-+
- 	/* Save callee-saved register */
- 	emit(A64_PUSH(r6, r7, A64_SP), ctx);
- 	emit(A64_PUSH(r8, r9, A64_SP), ctx);
- 	if (ctx->tmp_used)
- 		emit(A64_PUSH(tmp1, tmp2, A64_SP), ctx);
- 
--	/* Set up frame pointer */
-+	/* Set up BPF prog stack base register (x25) */
- 	emit(A64_MOV(1, fp, A64_SP), ctx);
- 
--	/* Set up BPF stack */
-+	/* Set up function call stack */
- 	emit(A64_SUB_I(1, A64_SP, A64_SP, stack_size), ctx);
-+	emit(A64_MOV(1, A64_FP, A64_SP), ctx);
- 
- 	/* Clear registers A and X */
- 	emit_a64_mov_i64(ra, 0, ctx);
-@@ -196,8 +220,8 @@ static void build_epilogue(struct jit_ctx *ctx)
- 	emit(A64_POP(r8, r9, A64_SP), ctx);
- 	emit(A64_POP(r6, r7, A64_SP), ctx);
- 
--	/* Restore frame pointer */
--	emit(A64_MOV(1, fp, A64_SP), ctx);
-+	/* Restore FP/LR registers */
-+	emit(A64_POP(A64_FP, A64_LR, A64_SP), ctx);
- 
- 	/* Set return value */
- 	emit(A64_MOV(1, A64_R(0), r0), ctx);
--- 
-2.0.2
+For mb, can't the tool just parse the memory node to get ram size
+rather than parsing the compatible.
+
+>> > +
+>> > +The 'panel' element must be one of the following strings:
+>> > +
+>> > +   720p
+>> > +   fWVGA
+>> > +   hd
+>> > +   qHD
+>>
+>> How is this used?
+>
+> I believe this was added so that we could have different dtbs for
+> devices that have different panels on them. I'm not sure this is
+> still used though. It could be legacy.
+
+Dealing with multiple panels is fairly common. I think you could use
+an alias to the panel node and match using its compatible or
+resolution.
+
+>> > +The 'boot' element must be one of the following strings:
+>> > +
+>> > +   emmc_sdc1
+>> > +   ufs
+>> > +
+
+Again, perhaps an alias would work here.
+
+>> > +The 'pmic' element must be one of the following strings:
+>> > +
+>> > +   pm8841
+>> > +   pm8019
+>> > +   pm8110
+>> > +   pma8084
+>> > +   pmi8962
+>> > +   pmd9635
+>> > +   pm8994
+>> > +   pmi8994
+>> > +   pm8916
+>> > +   pm8004
+>> > +   pm8909
+>> > +
+>> > +The 'pmic' element is specified in order of ascending USID. The PMIC in USID0
+>> > +goes first, and then USID2, USID4, and finally USID6. Up to four PMICs may be
+>> > +specified and no holes in the USID number space are allowed.
+>>
+>> What is USID?
+>
+> USID is Unique Slave IDentifier. It's an SPMI concept.
+
+Okay, then please say "SPMI USID" or something.
+
+>> > +Examples:
+>> > +
+>> > +   "qcom,msm8916-v1-cdp-pm8916-v2.1"
+>> > +
+>> > +A CDP board with an msm8916 SoC, version 1 paired with a pm8916 PMIC of version
+>> > +2.1.
+>> > +
+>> > +   "qcom,apq8074-v2.0-2-dragonboard/1-v0.1-512MB-panel-qHD-boot-emmc_sdc1-pm8941-v0.2-pm8909-v2.2-pma8084-v3-pm8110-v1"
+>>
+>> Which example is more common?
+>>
+>
+> The former. I tried to make up the worst case example so we could
+> see how large the string may become.
+
+I'm generally okay with the former. It's the latter that I don't like
+so much. I'd like Arnd's thoughts here given he had many of the
+comments.
+
+Rob
