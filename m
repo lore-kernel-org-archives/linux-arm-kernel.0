@@ -1,44 +1,42 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Fri, 13 Nov 2015 15:46:47 +0800
-Subject: [PATCH] clocksource/drivers/dw_apb_timer: use {readl|writel}_relaxed
-Message-ID: <1447400807-4706-1-git-send-email-jszhang@marvell.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Fri, 13 Nov 2015 08:52:14 +0100
+Subject: [PATCH v2 3/3] ARM: shmobile: gose: Add QSPI device to DT
+In-Reply-To: <20151113005157.GF20462@verge.net.au>
+References: <1447291763-27527-1-git-send-email-horms+renesas@verge.net.au>
+ <1447291763-27527-4-git-send-email-horms+renesas@verge.net.au>
+ <CAMuHMdWi=uTAtNvhSA54JDms_pLW0zjKQ_VH8xU3eY6BGiwV5A@mail.gmail.com>
+ <20151113005157.GF20462@verge.net.au>
+Message-ID: <CAMuHMdV9pWAdP-dOTDnkxCDkb1azGjKNH8u-8yvNbaUTWSSCDA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-readl/writel is too expensive on Cortex A9 w/ outer L2 cache,
-especially the writel will try to hold l2x0_lock, which could increase
-chance of L2 cache maintance spinning at the l2x0_lock.
+Hi Simon,
 
-The driver does not perform DMA, so it's safe to use the relaxed
-version. From another side, the relaxed io accessor macros are
-available on all architectures now, so we can use the relaxed versions
-to get a trivial overall system performance improvement on some
-architectures.
+On Fri, Nov 13, 2015 at 1:51 AM, Simon Horman <horms@verge.net.au> wrote:
+>> > Tested: Read /dev/mtd0 with 512K blocks at 1.7MB/s
+>>
+>> That's slow: I get 6.7 MB/s on koelsch (69.9 Mbps for Quad Read according
+>> to my in-kernel QSPI debug code). Is this with SYS-DMAC enabled?
+>
+> Yes it does seem very small.
+>
+> I think that the problem is that /dev/mtd0 is very small, only 262kB.
+> And I do not see any interrupts for dma-controllers when reading from hit.
 
-Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
----
- drivers/clocksource/dw_apb_timer.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+Performance suffers badly from using small block sizes, so that explains it.
 
-diff --git a/drivers/clocksource/dw_apb_timer.c b/drivers/clocksource/dw_apb_timer.c
-index c76c750..04282ee 100644
---- a/drivers/clocksource/dw_apb_timer.c
-+++ b/drivers/clocksource/dw_apb_timer.c
-@@ -51,13 +51,13 @@ clocksource_to_dw_apb_clocksource(struct clocksource *cs)
- 
- static unsigned long apbt_readl(struct dw_apb_timer *timer, unsigned long offs)
- {
--	return readl(timer->base + offs);
-+	return readl_relaxed(timer->base + offs);
- }
- 
- static void apbt_writel(struct dw_apb_timer *timer, unsigned long val,
- 		 unsigned long offs)
- {
--	writel(val, timer->base + offs);
-+	writel_relaxed(val, timer->base + offs);
- }
- 
- static void apbt_disable_int(struct dw_apb_timer *timer)
--- 
-2.6.2
+> /dev/mdt1 is much later, 4.2MB.
+> dd reads that at ~7MB/s using 512kB blocks.
+
+That's better.
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
