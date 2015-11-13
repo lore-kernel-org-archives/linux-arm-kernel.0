@@ -1,98 +1,126 @@
-From: julien.grall@citrix.com (Julien Grall)
-Date: Fri, 13 Nov 2015 18:31:40 +0000
-Subject: [Xen-devel] [PATCH v4 2/7] xen/arm: introduce
- HYPERVISOR_platform_op on arm and arm64
-In-Reply-To: <alpine.DEB.2.02.1511131757360.2653@kaball.uk.xensource.com>
-References: <alpine.DEB.2.02.1511121726370.526@kaball.uk.xensource.com>
- <1447349448-22610-2-git-send-email-stefano.stabellini@eu.citrix.com>
- <5645E868.30706@citrix.com>
- <alpine.DEB.2.02.1511131757360.2653@kaball.uk.xensource.com>
-Message-ID: <56462C8C.8040909@citrix.com>
+From: mathieu.poirier@linaro.org (Mathieu Poirier)
+Date: Fri, 13 Nov 2015 11:44:51 -0700
+Subject: [PATCH V4 00/26] Coresight integration with perf 
+Message-ID: <1447440317-1977-1-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(CC David, Boris and Konrad)
+This patchset aims to integrate configuration and control of
+the Coresight tracers with the perf sub-system.
 
-On 13/11/15 18:10, Stefano Stabellini wrote:
-> On Fri, 13 Nov 2015, Julien Grall wrote:
->> Hi Stefano,
->>
->> On 12/11/15 17:30, Stefano Stabellini wrote:
->>> Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
->>>
->>> ---
->>>
->>> Changes in v2:
->>> - rename dom0_op to platform_op
->>> ---
->>>  arch/arm/include/asm/xen/hypercall.h |    2 ++
->>>  arch/arm/xen/enlighten.c             |    1 +
->>>  arch/arm/xen/hypercall.S             |    1 +
->>>  arch/arm64/xen/hypercall.S           |    1 +
->>>  4 files changed, 5 insertions(+)
->>>
->>> diff --git a/arch/arm/include/asm/xen/hypercall.h b/arch/arm/include/asm/xen/hypercall.h
->>> index 712b50e..c3e00d0 100644
->>> --- a/arch/arm/include/asm/xen/hypercall.h
->>> +++ b/arch/arm/include/asm/xen/hypercall.h
->>> @@ -35,6 +35,7 @@
->>>  
->>>  #include <xen/interface/xen.h>
->>>  #include <xen/interface/sched.h>
->>> +#include <xen/interface/platform.h>
->>>  
->>>  long privcmd_call(unsigned call, unsigned long a1,
->>>  		unsigned long a2, unsigned long a3,
->>> @@ -49,6 +50,7 @@ int HYPERVISOR_memory_op(unsigned int cmd, void *arg);
->>>  int HYPERVISOR_physdev_op(int cmd, void *arg);
->>>  int HYPERVISOR_vcpu_op(int cmd, int vcpuid, void *extra_args);
->>>  int HYPERVISOR_tmem_op(void *arg);
->>> +int HYPERVISOR_platform_op(void *arg);
->>
->> int HYPERVISOR_platform_op(struct xen_platform_op *platform_op) to allow
->> compiler type checking and match the x86 version.
-> 
-> Yeah, I am just following the same pattern as the others
+The goal is to use PMUs to represent tracers and the auxiliary
+buffer enhancement to collect processor traces.  As such a lot
+of work is done to move the current Coresight sysFS oriented
+configuration and control commands to perf's AUX API.
 
-It's not necessary to repeat a mistake just because the other does.
+For the time being the work concentrates on ETMv3 and ETB1.0
+sink buffer.  Work on ETMv4 and other type of sink buffers
+will follow once a foundation has been established.
 
-If it's possible to use struct xen_platform_op, then please do it.
-Having extra safety from the compiler could be useful to spot stupid
-mistake.
+Best regards,
+Mathieu
 
-> 
->> Also, the implementation of the helper differ from x86. On x86, the
->> helper takes care of setting the interface_version while here you
->> request the caller to do it.
->>
->> It's better if we have similar requirement across the architecture as
->> this helpers may be called from common code.
-> 
-> I agree with your point (I thought about it myself) but the current
-> assembly scheme for hypercalls doesn't work well with that. I would have
-> to introduce, and maintain going forward, two special hypercall
-> implementations in assembly, one for arm and another for arm64, just to
-> set interface_version. I don't think it is worth it; I prefer to have to
-> maintain the explicit interface_version setting at the call sites (that
-> today is just one).
+Changes since V3:
+* Rebased to GKH's char-misc-next tree (e2d8680741ed).
 
-Sooner of later we will support EFI runtime and co. There are ~10
-references of this platform op hypercall in the common code ([1]), and I
-wouldn't be surprised if it continues to grow.
+Changes since V2:
+* Rebased to v4.3.
+* Used the -M option to "git format-patch".
+* Decoupled tracers and path - both are now completely independent.
+* Moved path enablement/release to Perf's add/del functions.
+* Moved PM runtime operations to the coresight core rather than
+  individual drivers.
+* Enhanced mutual exclusion scheme between perf and sysFS.
+* Removed architecture specific define in perf cmd line tool.
+* Got rid of unused fields in structure 'cs_buffers'.
+* Enhanced changelog for patch 16/26.
 
-So every single time someone is using the hypercall in the code we would
-have to remember that the x86 and ARM implementation is different. Are
-you ready to review every future patches to check that this will work as
-expected? IHMO, this will be a pain compare to maintaining a different
-set of hypercall.
+Changes since V1:
+ * Fixed typos in typographical error in documentation.
+ * Moved to a multi session support scheme.
+ * Split static and dynamic tracer configuration.
+ * Fixed configuration for user and kernel space tracing.
+ * Using WARN_ON_ONCE() rather than WARN_ON().
+ * Implemented strategy to prevent tracers from being used simultaneously.
+ * Changed sink_ops::unset_buffer() to sink_ops::reset_buffer().
+ * Moves ETM's sysFS interface from driver core to dedicated file.
+ * Removed spinlock in "etm_cpu_id()".
+ * Aggregated PMU driver pieces in a single patch.
+ * Added user space changes and rebased everything to v4.3-rc5.
 
-I really think we need to have the same behavior for all the hypercalls
-helpers accross all the architectures. This is really helpful when
-implementation arch-agnostic driver.
+Mathieu Poirier (26):
+  coresight: etm3x: moving etm_readl/writel to header file
+  coresight: etm3x: moving sysFS entries to dedicated file
+  coresight: etm3x: unlocking tracers in default arch init
+  coresight: etm3x: splitting struct etm_drvdata
+  coresight: etm3x: implementing 'cpu_id()' API
+  coresight: associating path with session rather than tracer
+  coresight: moving PM runtime operations to core framework
+  coresight: etm3x: adding operation mode for etm_enable()
+  coresight: add API to get sink from path
+  coresight: etm3x: set progbit to stop trace collection
+  coresight: etm3x: changing default trace configuration
+  coresight: etm3x: consolidating initial config
+  coresight: etm3x: implementing user/kernel mode tracing
+  coresight: etm3x: adding perf_get/set_config() API
+  coresight: etm3x: implementing perf_enable/disable() API
+  perf: changing pmu::setup_aux() parameter to include event
+  coresight: etb10: moving to local atomic operations
+  coresight: adding operation mode for sink->enable()
+  coresight: etb10: implementing AUX space API
+  coresight: etm-perf: new PMU driver for ETM tracers
+  coresight: introducing a global trace ID function
+  coresight: updating documentation to reflect integration with perf
+  perf tools: making function set_max_cpu_num() non static
+  perf tools: adding perf_session to *info_prive_size()
+  perf tools: making coresight PMU listable
+  perf tools: adding coresight etm PMU record capabilities
 
-Regards,
-
-[1] http://lxr.free-electrons.com/ident?i=HYPERVISOR_dom0_op
+ Documentation/trace/coresight.txt                  |  138 +-
+ MAINTAINERS                                        |    4 +
+ arch/x86/kernel/cpu/perf_event_intel_bts.c         |    4 +-
+ arch/x86/kernel/cpu/perf_event_intel_pt.c          |    5 +-
+ drivers/hwtracing/coresight/Kconfig                |    1 +
+ drivers/hwtracing/coresight/Makefile               |    4 +-
+ drivers/hwtracing/coresight/coresight-etb10.c      |  268 ++-
+ drivers/hwtracing/coresight/coresight-etm-perf.c   |  438 +++++
+ drivers/hwtracing/coresight/coresight-etm-perf.h   |   32 +
+ drivers/hwtracing/coresight/coresight-etm.h        |  143 +-
+ .../hwtracing/coresight/coresight-etm3x-sysfs.c    | 1442 +++++++++++++++
+ drivers/hwtracing/coresight/coresight-etm3x.c      | 1875 +++++---------------
+ drivers/hwtracing/coresight/coresight-etm4x.c      |    8 +-
+ drivers/hwtracing/coresight/coresight-funnel.c     |    2 -
+ drivers/hwtracing/coresight/coresight-priv.h       |   15 +
+ .../coresight/coresight-replicator-qcom.c          |    4 -
+ drivers/hwtracing/coresight/coresight-replicator.c |    2 -
+ drivers/hwtracing/coresight/coresight-tmc.c        |    7 +-
+ drivers/hwtracing/coresight/coresight-tpiu.c       |    4 +-
+ drivers/hwtracing/coresight/coresight.c            |  330 ++--
+ include/linux/coresight-pmu.h                      |   39 +
+ include/linux/coresight.h                          |   36 +-
+ include/linux/perf_event.h                         |    2 +-
+ kernel/events/ring_buffer.c                        |    2 +-
+ tools/perf/arch/arm/util/Build                     |    2 +
+ tools/perf/arch/arm/util/auxtrace.c                |   48 +
+ tools/perf/arch/arm/util/cs_etm.c                  |  466 +++++
+ tools/perf/arch/arm/util/cs_etm.h                  |   44 +
+ tools/perf/arch/arm/util/pmu.c                     |   34 +
+ tools/perf/arch/x86/util/intel-bts.c               |    4 +-
+ tools/perf/arch/x86/util/intel-pt.c                |    4 +-
+ tools/perf/config/Makefile                         |   17 +-
+ tools/perf/util/auxtrace.c                         |    8 +-
+ tools/perf/util/auxtrace.h                         |    7 +-
+ tools/perf/util/cpumap.c                           |    2 +-
+ tools/perf/util/cpumap.h                           |    1 +
+ 36 files changed, 3787 insertions(+), 1655 deletions(-)
+ create mode 100644 drivers/hwtracing/coresight/coresight-etm-perf.c
+ create mode 100644 drivers/hwtracing/coresight/coresight-etm-perf.h
+ create mode 100644 drivers/hwtracing/coresight/coresight-etm3x-sysfs.c
+ create mode 100644 include/linux/coresight-pmu.h
+ create mode 100644 tools/perf/arch/arm/util/auxtrace.c
+ create mode 100644 tools/perf/arch/arm/util/cs_etm.c
+ create mode 100644 tools/perf/arch/arm/util/cs_etm.h
+ create mode 100644 tools/perf/arch/arm/util/pmu.c
 
 -- 
-Julien Grall
+1.9.1
