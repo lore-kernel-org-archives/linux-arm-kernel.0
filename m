@@ -1,144 +1,122 @@
-From: lars@metafoo.de (Lars-Peter Clausen)
-Date: Fri, 13 Nov 2015 10:52:40 +0100
-Subject: [PATCH v2 1/4] iio: adc: add IMX7D ADC driver support
-In-Reply-To: <20151113093934.GA21068@b51421-server.ap.freescale.net>
-References: <1447075704-4605-1-git-send-email-haibo.chen@freescale.com>
- <1447075704-4605-2-git-send-email-haibo.chen@freescale.com>
- <56420606.4070505@metafoo.de>
- <20151113093934.GA21068@b51421-server.ap.freescale.net>
-Message-ID: <5645B2E8.8070906@metafoo.de>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Fri, 13 Nov 2015 17:59:48 +0800
+Subject: [PATCH] clocksource/drivers/arm_global_timer: Always use
+ {readl|writel}_relaxed
+In-Reply-To: <10575502.sxpiT76bOp@wuerfel>
+References: <1447403678-7217-1-git-send-email-jszhang@marvell.com>
+ <20151113164025.344a0faf@xhacker>	<10575502.sxpiT76bOp@wuerfel>
+Message-ID: <20151113175948.69f610e9@xhacker>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/13/2015 10:39 AM, Haibo Chen wrote:
-[...]
->>> +static void imx7d_adc_feature_config(struct imx7d_adc *info)
->>> +{
->>> +	info->adc_feature.clk_pre_div = IMX7D_ADC_ANALOG_CLK_PRE_DIV_4;
->>> +	info->adc_feature.avg_num = IMX7D_ADC_AVERAGE_NUM_32;
->>> +	info->adc_feature.core_time_unit = 1;
->>> +	info->adc_feature.average_en = true;
->>
->> What's the plan for these? Right now they are always initialized to the same
->> static value.
->>
-> 
-> In future, we can get these values from dts file, currently we just use the static value.
+Dear Arnd,
 
-Those seem to be software configuration values though, not part of hardware
-description.
+On Fri, 13 Nov 2015 10:28:01 +0100
+Arnd Bergmann <arnd@arndb.de> wrote:
 
+> On Friday 13 November 2015 16:40:25 Jisheng Zhang wrote:
+> > On Fri, 13 Nov 2015 16:34:38 +0800
+> > Jisheng Zhang <jszhang@marvell.com> wrote:
+> >   
+> > > This driver use both readl/writel and their relaxed version, this patch
+> > > tries to unify the io accesses.  
+> > 
+> > I'm sorry. This is the version I'd like to send for review and merge. Can you
+> > please kindly have a review?  
 > 
->>
->>> +}
->> [...]
->>> +static int imx7d_adc_read_raw(struct iio_dev *indio_dev,
->>> +			struct iio_chan_spec const *chan,
->>> +			int *val,
->>> +			int *val2,
->>> +			long mask)
->>> +{
->>> +	struct imx7d_adc *info = iio_priv(indio_dev);
->>> +
->>> +	u32 channel;
->>> +	long ret;
->>> +
->>> +	switch (mask) {
->>> +	case IIO_CHAN_INFO_RAW:
->>> +		mutex_lock(&indio_dev->mlock);
->>> +		reinit_completion(&info->completion);
->>> +
->>> +		channel = (chan->channel) & 0x0f;
->>> +		info->channel = channel;
->>> +		imx7d_adc_channel_set(info);
->>
->> How about just passing channel directy adc_channel_set() instead of doing it
->> implicitly through the info struct?
->>
+> I would prefer to use write_relaxed() as sparingly as we can, it is too
+> hard to verify each case to ensure that we don't have to watch out
+> for ordering or locking issues.
 > 
-> I think there is no difference, besides, using this parameter info struct can keep align with other functions.
-> eg.  imx7d_adc_sample_set(), imx7d_adc_hw_init(), imx7d_adc_get_sample_rate(), all these functions have the same parameter.
+> > > diff --git a/drivers/clocksource/arm_global_timer.c b/drivers/clocksource/arm_global_timer.c
+> > > index a2cb6fa..84a5a5d 100644
+> > > --- a/drivers/clocksource/arm_global_timer.c
+> > > +++ b/drivers/clocksource/arm_global_timer.c
+> > > @@ -99,27 +99,27 @@ static void gt_compare_set(unsigned long delta, int periodic)
+> > >  
+> > >  	counter += delta;
+> > >  	ctrl = GT_CONTROL_TIMER_ENABLE;
+> > > -	writel(ctrl, gt_base + GT_CONTROL);
+> > > -	writel(lower_32_bits(counter), gt_base + GT_COMP0);
+> > > -	writel(upper_32_bits(counter), gt_base + GT_COMP1);
+> > > +	writel_relaxed(ctrl, gt_base + GT_CONTROL);
+> > > +	writel_relaxed(lower_32_bits(counter), gt_base + GT_COMP0);
+> > > +	writel_relaxed(upper_32_bits(counter), gt_base + GT_COMP1);
+> > >  
+> > >  	if (periodic) {
+> > > -		writel(delta, gt_base + GT_AUTO_INC);
+> > > +		writel_relaxed(delta, gt_base + GT_AUTO_INC);
+> > >  		ctrl |= GT_CONTROL_AUTO_INC;
+> > >  	}
+> > >  
+> > >  	ctrl |= GT_CONTROL_COMP_ENABLE | GT_CONTROL_IRQ_ENABLE;
+> > > -	writel(ctrl, gt_base + GT_CONTROL);
+> > > +	writel_relaxed(ctrl, gt_base + GT_CONTROL);
+> > >  }  
 > 
->> [...]
->>> +static irqreturn_t imx7d_adc_isr(int irq, void *dev_id)
->>> +{
->>> +	struct imx7d_adc *info = (struct imx7d_adc *)dev_id;
->>> +	int status;
->>> +
->>> +	status = readl(info->regs + IMX7D_REG_ADC_INT_STATUS);
->>> +	if (status & IMX7D_REG_ADC_INT_STATUS_CHANNEL_INT_STATUS) {
->>> +		info->value = imx7d_adc_read_data(info);
->>> +		complete(&info->completion);
->>> +	}
->>> +	writel(0, info->regs + IMX7D_REG_ADC_INT_STATUS);
->>
->> Is the hardware really this broken? If the interrupt happens between reading
->> the status register and clearing it here it will be missed.
->>
-> 
-> I think interrupt can't happen between reading the status register and clearing it.
-> Because in function imx7d_adc_read_raw(), we call the function 
-> imx7d_adc_channel_set(info), in this function, we config the register
-> REG_ADC_CH_A\B\C\D_CFG1 and REG_ADC_CH_A\B\C\D_CFG2, only when these registers
-> is configed, ADC start a conversion. Once the conversion complete, ADC trigger an 
-> interrupt, and call the imx7d_adc_isr().
+> This seems fine. Do you have any performance numbers to show how much
+> we save per call on a platform you care about, and how often it is
+> called for a typical workload?
 
-Well an interrupt can always happen, its running fully asynchronous to the
-CPU. If you have multiple interrupt sources enabled and the first one fires
-and you run then start the irq handler, read the status register, now the
-second irq sources fires, and then you clear the status interrupt register.
-This means the driver will not see the irq from the second source.
+To be honest, all my platforms don't make use of global timer for clockevent,
+we use dw_apb_timer and twd or arch_timer instead, but one performance impact
+I saw in our case can also apply for the case with global timer as clokevent:
+
+there are 500-1000 short sleeps, yes not good userspace behavior, so we
+program clockevent device 500-1000 times/s. If the system is powered by CA9
+with outer L2 cache, the writel will contend for l2x0_lock for 500-1000 times/s.
+Then the L2 cache maintenance from other device driver have more chance to
+spinning at the l2x0_lock, so other device driver performance is impacted.
+
+Thanks,
+Jisheng
 
 > 
->>> +
->>> +	return IRQ_HANDLED;
->>
->> You should only return IRQ_HANDLED if you actually handled are interrupt.
->>
+> I see that _gt_counter_read() already uses readl_relaxed(), and it
+> seems to be a much bigger win there, as we read the clock more
+> often than we write the comparator, so the person who did that
+> probably thought that this one wasn't important enough. Can you
+> add an explanation in the changelog why you think that was a
+> mistake?
 > 
-> Here in the interrupt, we just handle the channel conversion finished flag, for
-> other flag, ignore them this time, Will add other flag in future.
-
-Yeah, but if you don't handle any interrupt you should return IRQ_NONE. This
-will make sure that the system can recover in case the hardware (or the
-driver) is broken and generates unexpected interrupts. If there are a 1000
-or so IRQ_NONEs in a row in a short time frame the kernel will disable the IRQ.
-
->> [...]
->>> +	ret  = of_property_read_u32(pdev->dev.of_node,
->>
->> Extra space.
->>
->>> +					"num-channels", &channels);
->>
->> What decides how many channels are in use?
->>
+> Unifying the accessors across a driver is not enough of a reason
+> I think.
 > 
-> The board decides the channel number.
-> In dts file, there is a line:     num-channels = <4>;
-
-Yes, but what decides how this property should be configured?
-
+> > >  static int gt_clockevent_shutdown(struct clock_event_device *evt)
+> > >  {
+> > >  	unsigned long ctrl;
+> > >  
+> > > -	ctrl = readl(gt_base + GT_CONTROL);
+> > > +	ctrl = readl_relaxed(gt_base + GT_CONTROL);
+> > >  	ctrl &= ~(GT_CONTROL_COMP_ENABLE | GT_CONTROL_IRQ_ENABLE |
+> > >  		  GT_CONTROL_AUTO_INC);
+> > > -	writel(ctrl, gt_base + GT_CONTROL);
+> > > +	writel_relaxed(ctrl, gt_base + GT_CONTROL);
+> > >  	return 0;
+> > >  }  
 > 
+> This is certainly not performance critical, better leave it using
+> the standard accessors.
 > 
->>> +	if (ret)
->>> +		channels = ARRAY_SIZE(imx7d_adc_iio_channels);
->>> +
->>> +	indio_dev->name = dev_name(&pdev->dev);
->>> +	indio_dev->dev.parent = &pdev->dev;
->>> +	indio_dev->dev.of_node = pdev->dev.of_node;
->>> +	indio_dev->info = &imx7d_adc_iio_info;
->>> +	indio_dev->modes = INDIO_DIRECT_MODE;
->>> +	indio_dev->channels = imx7d_adc_iio_channels;
->>> +	indio_dev->num_channels = (int)channels;
->>
->> I don't think you need the case here.
->>
+> > > @@ -212,11 +212,11 @@ static u64 notrace gt_sched_clock_read(void)
+> > >  
+> > >  static void __init gt_clocksource_init(void)
+> > >  {
+> > > -	writel(0, gt_base + GT_CONTROL);
+> > > -	writel(0, gt_base + GT_COUNTER0);
+> > > -	writel(0, gt_base + GT_COUNTER1);
+> > > +	writel_relaxed(0, gt_base + GT_CONTROL);
+> > > +	writel_relaxed(0, gt_base + GT_COUNTER0);
+> > > +	writel_relaxed(0, gt_base + GT_COUNTER1);
+> > >  	/* enables timer on all the cores */
+> > > -	writel(GT_CONTROL_TIMER_ENABLE, gt_base + GT_CONTROL);
+> > > +	writel_relaxed(GT_CONTROL_TIMER_ENABLE, gt_base + GT_CONTROL);
+> > >  
+> > >  #ifdef CONFIG_CLKSRC_ARM_GLOBAL_TIMER_SCHED_CLOCK
+> > >  	sched_clock_register(gt_sched_clock_read, 64, gt_clk_rate);  
+> > 
+> >   
 > 
-> Sorry, can't get your point, you mean I should not indio_dev-> ?
-
-Sorry, I meant the (int) cast.
-
+> Same here.
 > 
->>> [...]
-> 
+> 	Arnd
