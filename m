@@ -1,51 +1,37 @@
-From: robh@kernel.org (Rob Herring)
-Date: Fri, 13 Nov 2015 08:44:57 -0600
-Subject: [PATCH] net: hisilicon: fix binding document of mdio
-In-Reply-To: <1447381424-107248-1-git-send-email-huangdaode@hisilicon.com>
-References: <1447381424-107248-1-git-send-email-huangdaode@hisilicon.com>
-Message-ID: <20151113144457.GA18563@rob-hp-laptop>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 13 Nov 2015 06:52:16 -0800
+Subject: Minimal support for dm814x
+In-Reply-To: <CAALWOA-29pK=GbNKhdY=4oJzhnueVxNAPruu9Uacqi5vMJN=OA@mail.gmail.com>
+References: <4999BB3D-4BB5-4F7C-96D7-FB687725CDCC@audioscience.com>
+ <20151109150602.GR3199@atomide.com>
+ <CAALWOA-NUyRYaGbmBZpc6CcFga8_BKPZ9WQTxa3t09bHS_6=qA@mail.gmail.com>
+ <7933071D-84FD-4A85-8CD0-CC504CE1D9D1@audioscience.com>
+ <20151111174028.GF3218@atomide.com>
+ <CAALWOA_dEtajQBLrXesQ2bRCDf-1Dzg_tJw_=yAmaO=T3=KMZQ@mail.gmail.com>
+ <20151112174155.GM3218@atomide.com>
+ <CAALWOA9o80rhaqwaa6=XxmNN1FcWzHDXiaqkqFVO81CAMX=04w@mail.gmail.com>
+ <CAALWOA-29pK=GbNKhdY=4oJzhnueVxNAPruu9Uacqi5vMJN=OA@mail.gmail.com>
+Message-ID: <20151113145216.GC2517@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 13, 2015 at 10:23:44AM +0800, huangdaode wrote:
-> This patch fixes explain the occasion of "hisilcon,mdio" according to
-> Arnd's comments. specify it is only used for hip04.
+* Matthijs van Duin <matthijsvanduin@gmail.com> [151113 03:00]:
+> On 13 November 2015 at 08:14, Matthijs van Duin
+> <matthijsvanduin@gmail.com> wrote:
+> > It seems this is how the old TI kernel handles them: http://goo.gl/3I3OEL
 > 
-> First, please give your commnents.
+> Never mind, wasn't paying attention and managed to overlook that
+> google had found me the u-boot tree instead of the kernel tree I
+> intended to search for. -.-
 > 
-> Signed-off-by: huangdaode <huangdaode@hisilicon.com>
-> ---
->  Documentation/devicetree/bindings/net/hisilicon-hns-mdio.txt | 4 +++-
->  1 file changed, 3 insertions(+), 1 deletion(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/net/hisilicon-hns-mdio.txt b/Documentation/devicetree/bindings/net/hisilicon-hns-mdio.txt
-> index 9c23fdf..f650e78 100644
-> --- a/Documentation/devicetree/bindings/net/hisilicon-hns-mdio.txt
-> +++ b/Documentation/devicetree/bindings/net/hisilicon-hns-mdio.txt
-> @@ -1,7 +1,9 @@
->  Hisilicon MDIO bus controller
->  
->  Properties:
-> -- compatible: "hisilicon,mdio","hisilicon,hns-mdio".
-> +- compatible: can be one of "hisilicon,hns-mdio","hisilicon,mdio",
-> +  for hip04 board, please use "hisilicon,mdio",
-> +  other boards, "hisilicon,hns-mdio" is OK.
+> Sorry about that, when I find a moment I'll locate the correct files
+> and check those.
 
-Please reformat like this:
+I think this is the most recent TI git repo for dm81xx changes:
 
-- compatible: can be one of:
-	"hisilicon,hns-mdio"
-	"hisilicon,mdio"
-  For hip04 board, must be "hisilicon,mdio".
-  Otherwise, must be "hisilicon,hns-mdio".
+http://arago-project.org/git/projects/?p=linux-omap3.git;a=summary
+git://arago-project.org/git/projects/linux-omap3.git
 
->  - reg: The base address of the MDIO bus controller register bank.
->  - #address-cells: Must be <1>.
->  - #size-cells: Must be <0>.  MDIO addresses have no size component.
-> -- 
-> 1.9.1
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe devicetree" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Regards,
+
+Tony
