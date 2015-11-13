@@ -1,87 +1,67 @@
-From: julien.grall@citrix.com (Julien Grall)
-Date: Fri, 13 Nov 2015 13:56:55 +0000
-Subject: [Xen-devel] [PATCH v4 6/7] xen/arm: set the system time in Xen
- via the XENPF_settime64 hypercall
-In-Reply-To: <1447349448-22610-6-git-send-email-stefano.stabellini@eu.citrix.com>
-References: <alpine.DEB.2.02.1511121726370.526@kaball.uk.xensource.com>
- <1447349448-22610-6-git-send-email-stefano.stabellini@eu.citrix.com>
-Message-ID: <5645EC27.3000104@citrix.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 13 Nov 2015 14:59:40 +0100
+Subject: PCIe host controller behind IOMMU on ARM
+In-Reply-To: <PS1PR06MB11801D6BBC939517912BE185F5110@PS1PR06MB1180.apcprd06.prod.outlook.com>
+References: <PS1PR06MB11807CBE8EB2AC6B0158D2B5F52A0@PS1PR06MB1180.apcprd06.prod.outlook.com>
+ <4169020.aC5VXkILQm@wuerfel>
+ <PS1PR06MB11801D6BBC939517912BE185F5110@PS1PR06MB1180.apcprd06.prod.outlook.com>
+Message-ID: <4744053.Iz6Y8QJQYF@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12/11/15 17:30, Stefano Stabellini wrote:
-> +static int xen_pvclock_gtod_notify(struct notifier_block *nb,
-> +				   unsigned long was_set, void *priv)
-> +{
-> +	/* Protected by the calling core code serialization */
-> +	static struct timespec64 next_sync;
-> +
-> +	struct xen_platform_op op;
-> +	struct timespec64 now, system_time;
-> +	struct timekeeper *tk = priv;
-> +
-> +	now.tv_sec = tk->xtime_sec;
-> +	now.tv_nsec = (long)(tk->tkr_mono.xtime_nsec >> tk->tkr_mono.shift);
-> +	system_time = timespec64_add(now, tk->wall_to_monotonic);
-> +
-> +	/*
-> +	 * We only take the expensive HV call when the clock was set
-> +	 * or when the 11 minutes RTC synchronization time elapsed.
-> +	 */
-> +	if (!was_set && timespec64_compare(&now, &next_sync) < 0)
-> +		return NOTIFY_OK;
-> +
-> +	op.interface_version = XENPF_INTERFACE_VERSION;
-> +	op.cmd = XENPF_settime64;
-> +	op.u.settime64.mbz = 0;
-> +	op.u.settime64.secs = now.tv_sec;
-> +	op.u.settime64.nsecs = now.tv_nsec;
-> +	op.u.settime64.system_time = timespec64_to_ns(&system_time);
-> +	printk("GTOD: Setting to %llu.%09u at %llu\n",
-> +	       op.u.settime64.secs,
-> +	       op.u.settime64.nsecs,
-> +	       op.u.settime64.system_time);
-
-Is this printk really useful?
-
-> +	(void)HYPERVISOR_platform_op(&op);
-> +
-> +	/*
-> +	 * Move the next drift compensation time 11 minutes
-> +	 * ahead. That's emulating the sync_cmos_clock() update for
-> +	 * the hardware RTC.
-> +	 */
-> +	next_sync = now;
-> +	next_sync.tv_sec += 11 * 60;
-> +
-> +	return NOTIFY_OK;
-> +}
-> +
-> +static struct notifier_block xen_pvclock_gtod_notifier = {
-> +	.notifier_call = xen_pvclock_gtod_notify,
-> +};
-> +
->  static void xen_percpu_init(void)
->  {
->  	struct vcpu_register_vcpu_info info;
-> @@ -313,7 +364,9 @@ static int __init xen_guest_init(void)
->  
->  	pv_time_ops.steal_clock = xen_stolen_accounting;
->  	static_key_slow_inc(&paravirt_steal_enabled);
-> -
-> +	if (xen_initial_domain())
-> +		pvclock_gtod_register_notifier(&xen_pvclock_gtod_notifier);
-> + 
-
-I think, you've introduced a trailing whitespace.
-
->  	return 0;
->  }
->  early_initcall(xen_guest_init);
+On Friday 13 November 2015 13:03:11 Phil Edworthy wrote:
 > 
+> > > Then pci_device_add() sets the devices coherent_dma_mask to 4GiB before
+> > > calling of_pci_dma_configure(). I assume it does this on the basis that this is a
+> > > good default for PCI drivers that don't call dma_set_mask().
+> > > So if arch_setup_dma_ops() walks up the parents to limit the mask, you'll hit
+> > > this mask.
+> > 
+> > arch_setup_dma_ops() does not walk up the hierarchy, of_dma_configure()
+> > does this before calling arch_setup_dma_ops(). The PCI devices start out
+> > with the 32-bit mask, but the limit should be whatever PCI host uses.
+> Ok, so of_dma_configure() could walk up the tree and restrict the dma
+> mask to whatever parents limit it to. Then it could be overridden by
+> a dma-ranges entry in the DT node, right?
 
-Regards,
+No, the dma-ranges properties tell you what the allowed masks are,
+this is what of_dma_configure() looks at.
 
+> If so, one problem I can see is PCI controllers already use the
+> dma-ranges binding but with 3 address cells since it also specifies
+> the PCI address range.
+> 
+> I noticed that of_dma_get_range() skips straight to the parent node.
+> Shouldn't it attempt to get the dma-ranges for the device's node
+> first?
 
--- 
-Julien Grall
+No, the dma-ranges explain the capabilities of the bus, this is
+what you have to look at. The device itself may have additional
+restrictions, but those are what the driver knows based on the
+compatibility value when it passes the device specific mask into
+dma_set_mask()
+
+> I mean most hardware is limited by the peripheral's
+> capabilities, not the bus. If fact, of_dma_get_range() gets the number
+> of address and size cells from the device node, but gets the dma-ranges
+> from the parent. That seems a little odd to me.
+
+of_dma_get_range() calls of_n_addr_cells()/of_n_size_cells(), which get
+the #address-cells/#size-cells property from the parent device (except
+for the root, which is special).
+
+> The only other problem I can see is that currently all PCI drivers can
+> try to set their dma mask to 64 bits. At the moment that succeeds
+> because there are no checks.
+
+Right, this is the main bug we need to fix.
+
+> Until devices using them have their DTs
+> updated with dma-ranges, we would be limiting them to a 32 bit mask. I
+> guess that's not much of an issue in practice.
+
+Correct. I've tried to tell everyone about this when they added device
+nodes for DMA capable devices. In most cases, they want 32-bit masks
+anyway.
+
+	Arnd
