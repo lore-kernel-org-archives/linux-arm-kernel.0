@@ -1,33 +1,50 @@
-From: khilman@kernel.org (Kevin Hilman)
-Date: Fri, 13 Nov 2015 07:59:04 -0800
-Subject: [PATCH] soc: Mediatek: Enable SCPSYS power domain driver by
- default
-In-Reply-To: <1447411835-19035-1-git-send-email-eddie.huang@mediatek.com>
- (Eddie Huang's message of "Fri, 13 Nov 2015 18:50:35 +0800")
-References: <1447411835-19035-1-git-send-email-eddie.huang@mediatek.com>
-Message-ID: <7h4mgpdh6f.fsf@deeprootsystems.com>
+From: robh+dt@kernel.org (Rob Herring)
+Date: Fri, 13 Nov 2015 10:02:52 -0600
+Subject: [PATCH v8 1/4] Documentation: dt-bindings: Describe SROMc
+ configuration
+In-Reply-To: <e9e18ab5aa7a147aaa63d1900ad52174413e86d9.1447333689.git.p.fedin@samsung.com>
+References: <cover.1447333689.git.p.fedin@samsung.com>
+ <e9e18ab5aa7a147aaa63d1900ad52174413e86d9.1447333689.git.p.fedin@samsung.com>
+Message-ID: <CAL_JsqLfzGjNwH=kqwcZXvPRSc_m1NgxhFcenu6L1Efva+k9Fw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Eddie Huang <eddie.huang@mediatek.com> writes:
-
-> If enable Mediatek 8173 SoC, it should also enable power domain
-> driver. Otherwise access clk subsystem register will fail.
+On Thu, Nov 12, 2015 at 7:12 AM, Pavel Fedin <p.fedin@samsung.com> wrote:
+> Add documentation for new subnode properties, allowing bank configuration.
+> Based on u-boot implementation, but heavily reworked.
 >
-> Signed-off-by: Eddie Huang <eddie.huang@mediatek.com>
+> Also, fix size of SROMc mapping in the example.
+>
+> Signed-off-by: Pavel Fedin <p.fedin@samsung.com>
+> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 
-Tested-by: Kevin Hilman <khilman@linaro.org>
+Acked-by: Rob Herring <robh@kernel.org>
 
-This gets the mt8173-evb booting again with arm-soc/for-next and
-mainline for me.
+One nit below.
 
-I'll let Matthias queue this up and send it with any other fixes for
-v4.4-rc1.
+>                 compatible = "samsung,exynos-srom";
+> -               reg = <0x12570000 0x10>;
+> +               reg = <0x12570000 0x14>;
+> +
+> +               ethernet at 3 {
 
-Thanks for the fix,
+This should actually be "ethernet at 3,0"
 
-Kevin
+Fields (not cells) in the unit address should be separated by commas.
 
-P.S. it's curious that nobody caught this basic boot failure before.  Is
-nobody else testing mainline on this board?  or maybe not using the
-upstream defconfig?
+> +                       compatible = "smsc,lan9115";
+> +                       reg = <3 0 0x10000>;       // Bank 3, offset = 0
+> +                       phy-mode = "mii";
+> +                       interrupt-parent = <&gpx0>;
+> +                       interrupts = <5 8>;
+> +                       reg-io-width = <2>;
+> +                       smsc,irq-push-pull;
+> +                       smsc,force-internal-phy;
+> +
+> +                       samsung,srom-page-mode = <1>;
+> +                       samsung,srom-timing = <9 12 1 9 1 1>;
+> +               };
+>         };
+> --
+> 2.4.4
+>
