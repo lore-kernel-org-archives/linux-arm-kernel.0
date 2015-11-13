@@ -1,122 +1,39 @@
-From: mchehab@osg.samsung.com (Mauro Carvalho Chehab)
-Date: Fri, 13 Nov 2015 20:57:28 -0200
-Subject: [PATCH 2/2] [media] include/media: move platform driver headers
- to a separate dir
-In-Reply-To: <4273019.OjrpsKyH2t@wuerfel>
-References: <413d2bb0b813a7e62867de7a94b0ab61e16cb1cb.1447261977.git.mchehab@osg.samsung.com>
- <4220808.QEkJDXYE1T@wuerfel> <20151113171341.0972ef7a@recife.lan>
- <4273019.OjrpsKyH2t@wuerfel>
-Message-ID: <20151113205728.39c12b7b@recife.lan>
+From: rjw@rjwysocki.net (Rafael J. Wysocki)
+Date: Sat, 14 Nov 2015 00:38:50 +0100
+Subject: [PATCH v2 10/11] PM / Hibernate: clean cached pages on
+ architectures that require it
+In-Reply-To: <20151112114705.GA2657@red-moon>
+References: <1445966960-31724-1-git-send-email-james.morse@arm.com>
+ <2039611.PJaFlk1sMi@vostro.rjw.lan> <20151112114705.GA2657@red-moon>
+Message-ID: <3180507.pKM8OzKjXO@vostro.rjw.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Em Fri, 13 Nov 2015 22:31:15 +0100
-Arnd Bergmann <arnd@arndb.de> escreveu:
-
-> On Friday 13 November 2015 17:13:41 Mauro Carvalho Chehab wrote:
-> > Em Wed, 11 Nov 2015 21:26:31 +0100
-> > Arnd Bergmann <arnd@arndb.de> escreveu:
+On Thursday, November 12, 2015 11:47:05 AM Lorenzo Pieralisi wrote:
+> On Thu, Nov 12, 2015 at 01:48:32AM +0100, Rafael J. Wysocki wrote:
+> > On Wednesday, November 11, 2015 11:40:39 AM Lorenzo Pieralisi wrote:
+> > > Hi Pavel, Rafael,
+> > > 
+> > > Do you have any feedback on this patch ?
+> > > 
+> > > It is fundamental to this series and affects Hibernate core code so if you
+> > > have any feedback that would be much appreciated.
 > > 
+> > I'm really not familiar with the flush_icache_range() interface.
+> > 
+> > What exactly does it do?
 > 
-> >  include/media/{ => drv-intf}/cx2341x.h                   | 0
-> >  include/media/{ => drv-intf}/cx25840.h                   | 0
-> >  include/media/{ => drv-intf}/exynos-fimc.h               | 0
-> >  include/media/{ => drv-intf}/msp3400.h                   | 0
-> >  include/media/{ => drv-intf}/s3c_camif.h                 | 0
-> >  include/media/{ => drv-intf}/saa7146.h                   | 0
-> >  include/media/{ => drv-intf}/saa7146_vv.h                | 2 +-
-> >  include/media/{ => drv-intf}/sh_mobile_ceu.h             | 0
-> >  include/media/{ => drv-intf}/sh_mobile_csi2.h            | 0
-> >  include/media/{ => drv-intf}/sh_vou.h                    | 0
-> >  include/media/{ => drv-intf}/si476x.h                    | 0
-> >  include/media/{ => drv-intf}/soc_mediabus.h              | 0
-> >  include/media/{ => drv-intf}/tea575x.h                   | 0
-> >  include/media/i2c/tw9910.h                               | 2 +-
-> >  include/media/{ => platform_data}/gpio-ir-recv.h         | 0
-> >  include/media/{ => platform_data}/ir-rx51.h              | 0
-> >  include/media/{ => platform_data}/mmp-camera.h           | 0
-> >  include/media/{ => platform_data}/omap1_camera.h         | 0
-> >  include/media/{ => platform_data}/omap4iss.h             | 0
-> >  include/media/{ => platform_data}/s5p_hdmi.h             | 0
-> >  include/media/{ => platform_data}/si4713.h               | 0
-> >  include/media/{ => platform_data}/sii9234.h              | 0
-> >  include/media/{ => platform_data}/smiapp.h               | 0
-> >  include/media/{ => platform_data}/soc_camera.h           | 0
-> >  include/media/{ => platform_data}/soc_camera_platform.h  | 2 +-
-> >  include/media/{ => platform_data}/timb_radio.h           | 0
-> >  include/media/{ => platform_data}/timb_video.h           | 0
-> >  sound/pci/es1968.c                                       | 2 +-
-> >  sound/pci/fm801.c                                        | 2 +-
-> >  155 files changed, 158 insertions(+), 158 deletions(-)
+> It is used to sync a memory range that is written into (eg loading
+> modules, copying from snapshot is basically the same thing, reads from
+> storage and restore pages that might well be executable code), in particular
+> to sync the I-cache and the D-cache, eg on arm64 the page that the snapshot
+> code is copying might be executable code that has to be cleaned from the
+> D-cache so that it is made visible to the I-cache.
 > 
-> As Geert said, include/linux/platform_data/media/ would be nicer for
-> consistency with other subsystems.
+> On x86 it is a NOP AFAIK.
 
-OK! I have a new series of patches almost ready. I'll be sending it
-tomorrow, after addressing your concerns.
+If that's the case, I have no problems with this change as long as the code
+works on architectures with non-trivial flush_icache_range().
 
-> 
-> > diff --git a/arch/arm/mach-imx/mach-imx27_visstrim_m10.c b/arch/arm/mach-imx/mach-imx27_visstrim_m10.c
-> > index ede2bdbb5dd5..44ba1f28bb34 100644
-> > --- a/arch/arm/mach-imx/mach-imx27_visstrim_m10.c
-> > +++ b/arch/arm/mach-imx/mach-imx27_visstrim_m10.c
-> > @@ -33,7 +33,7 @@
-> >  #include <linux/dma-mapping.h>
-> >  #include <linux/leds.h>
-> >  #include <linux/platform_data/asoc-mx27vis.h>
-> > -#include <media/soc_camera.h>
-> > +#include <media/platform_data/soc_camera.h>
-> >  #include <sound/tlv320aic32x4.h>
-> >  #include <asm/mach-types.h>
-> >  #include <asm/mach/arch.h>
-> 
-> This looks like a mistake: the header contains the string 'platform_data',
-> but it is not actually a platform data header file in the sense
-> that it defines the interface between platform and driver.
-> 
-> Maybe soc_camera.h is important enough to still leave it as a core
-> file in the existing location? Or possibly a separate directory for
-> media/soc_camera/*.h
-
-Ok, I'll fix it. 
-
-> 
-> > @@ -24,7 +24,7 @@
-> >  #include <linux/slab.h>
-> >  #include <linux/kfifo.h>
-> >  #include <linux/module.h>
-> > -#include <media/cx25840.h>
-> > +#include <media/drv-intf/cx25840.h>
-> >  #include <media/rc-core.h>
-> >  
-> >  #include "cx25840-core.h"
-> 
-> For this case, I think the original patch to move it into include/media/i2c
-> was more logical as it mirrors the file structure. I was mainly talking
-> about the platform_data being different from the rest.
-
-cx25840 is not (always) an I2C. On most devices, this is actually an IP
-block inside the bridge chipset. 
-
-That's why I didn't include it on patch 1/1. There's one thing to
-notice about that, though: while most of the header is describing
-the driver interface, it does contain one platform_data in the end:
-
-/* pvr150_workaround activates a workaround for a hardware bug that is
-   present in Hauppauge PVR-150 (and possibly PVR-500) cards that have
-   certain NTSC tuners (tveeprom tuner model numbers 85, 99 and 112). The
-   audio autodetect fails on some channels for these models and the workaround
-   is to select the audio standard explicitly. Many thanks to Hauppauge for
-   providing this information.
-   This platform data only needs to be supplied by the ivtv driver. */
-struct cx25840_platform_data {
-	int pvr150_workaround;
-};
-
-While we might split it, I guess it is not worth, specially since
-I don't think we'll see any new driver using it.
-
-Also, this is actually a hack used only by the ivtv driver.
-
-Regards,
-Mauro
+Thanks,
+Rafael
