@@ -1,131 +1,126 @@
-From: yang.shi@linaro.org (Yang Shi)
-Date: Fri, 13 Nov 2015 10:09:57 -0800
-Subject: [PATCH V3 2/2] arm64: bpf: make BPF prologue and epilogue align with
- ARM64 AAPCS
-In-Reply-To: <CABg9mct-hnEhvT6y9ZgCC8nMan5YbmByQa_ViUWzeea6ToqG4A@mail.gmail.com>
-References: <CABg9mct-hnEhvT6y9ZgCC8nMan5YbmByQa_ViUWzeea6ToqG4A@mail.gmail.com>
-Message-ID: <1447438197-31838-1-git-send-email-yang.shi@linaro.org>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Fri, 13 Nov 2015 20:29:30 +0200
+Subject: [PATCH] clocksource: arm_global_timer: fix suspend resume
+In-Reply-To: <87si49ojed.fsf@saruman.tx.rr.com>
+References: <1447431951-23713-1-git-send-email-grygorii.strashko@ti.com>
+ <87a8qhq284.fsf@saruman.tx.rr.com> <56461688.1090809@ti.com>
+ <87y4e1ol0g.fsf@saruman.tx.rr.com> <56462742.3020300@ti.com>
+ <87si49ojed.fsf@saruman.tx.rr.com>
+Message-ID: <56462C0A.6070802@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Save and restore FP/LR in BPF prog prologue and epilogue, save SP to FP
-in prologue in order to get the correct stack backtrace.
+On 11/13/2015 08:15 PM, Felipe Balbi wrote:
+>
+> Hi,
+>
+> Grygorii Strashko <grygorii.strashko@ti.com> writes:
+>> On 11/13/2015 07:40 PM, Felipe Balbi wrote:
+>>>
+>>> Hi,
+>>>
+>>> Grygorii Strashko <grygorii.strashko@ti.com> writes:
+>>>> On 11/13/2015 06:43 PM, Felipe Balbi wrote:
+>>>>>
+>>>>> Hi,
+>>>>>
+>>>>> Grygorii Strashko <grygorii.strashko@ti.com> writes:
+>>>>>> Now the System stall is observed on TI AM437x based board
+>>>>>> (am437x-gp-evm) during resuming from System suspend when ARM Global
+>>>>>> timer is selected as clocksource device - SysRq are working, but
+>>>>>> nothing else. The reason of stall is that ARM Global timer loses its
+>>>>>> contexts.
+>>>>>>
+>>>>>> The reason of stall is that ARM Global timer loses its contexts during
+>>>>>> System suspend:
+>>>>>>       GT_CONTROL.TIMER_ENABLE = 0 (unbanked)
+>>>>>>       GT_COUNTERx = 0
+>>>>>>
+>>>>>> Hence, update ARM Global timer driver to reflect above behaviour
+>>>>>> - save GT_CONTROL.TIMER_ENABLE during suspend and restore on resume;
+>>>>>> - ensure clocksource and clockevent devices have coresponding flags
+>>>>>>      (CLOCK_SOURCE_SUSPEND_NONSTOP and CLOCK_EVT_FEAT_C3STOP) set
+>>>>>>      depending on presence of "always-on" DT property.
+>>>>>>
+>>>>>> CC: Arnd Bergmann <arnd@arndb.de>
+>>>>>> Cc: John Stultz <john.stultz@linaro.org>
+>>>>>> Cc: Felipe Balbi <balbi@ti.com>
+>>>>>> Cc: Tony Lindgren <tony@atomide.com>
+>>>>>> Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
+>>>>>> ---
+>>>>>>     drivers/clocksource/arm_global_timer.c | 23 +++++++++++++++++++++++
+>>>>>>     1 file changed, 23 insertions(+)
+>>>>>>
+>>>>>> diff --git a/drivers/clocksource/arm_global_timer.c b/drivers/clocksource/arm_global_timer.c
+>>>>>> index a2cb6fa..1bbaf64 100644
+>>>>>> --- a/drivers/clocksource/arm_global_timer.c
+>>>>>> +++ b/drivers/clocksource/arm_global_timer.c
+>>>>>> @@ -51,6 +51,8 @@ static void __iomem *gt_base;
+>>>>>>     static unsigned long gt_clk_rate;
+>>>>>>     static int gt_ppi;
+>>>>>>     static struct clock_event_device __percpu *gt_evt;
+>>>>>> +static bool gt_always_on;
+>>>>>> +static u32 gt_control;
+>>>>>>
+>>>>>>     /*
+>>>>>>      * To get the value from the Global Timer Counter register proceed as follows:
+>>>>>> @@ -168,6 +170,9 @@ static int gt_clockevents_init(struct clock_event_device *clk)
+>>>>>>     {
+>>>>>>     	int cpu = smp_processor_id();
+>>>>>>
+>>>>>> +	if (!gt_always_on)
+>>>>>> +		clk->features |= CLOCK_EVT_FEAT_C3STOP;
+>>>>>> +
+>>>>>>     	clk->name = "arm_global_timer";
+>>>>>>     	clk->features = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT |
+>>>>>>     		CLOCK_EVT_FEAT_PERCPU;
+>>>>>> @@ -195,12 +200,25 @@ static cycle_t gt_clocksource_read(struct clocksource *cs)
+>>>>>>     	return gt_counter_read();
+>>>>>>     }
+>>>>>>
+>>>>>> +static void gt_suspend(struct clocksource *cs)
+>>>>>> +{
+>>>>>> +	gt_control = readl(gt_base + GT_CONTROL);
+>>>>>> +}
+>>>>>> +
+>>>>>> +static void gt_resume(struct clocksource *cs)
+>>>>>> +{
+>>>>>> +	/* enables timer on all the cores */
+>>>>>> +	writel(gt_control & GT_CONTROL_TIMER_ENABLE, gt_base + GT_CONTROL);
+>>>>>
+>>>>> do you really need to save context if all you restore is TIMER_ENABLE
+>>>>> bit ? seems like you could skip gt_suspend altogether. Is there really a
+>>>>> situation where this driver is running and GT isn't enabled ?
+>>>>
+>>>> Now It's not. It's always enabled. I did it because .suspend() is called for
+>>>> all registered clock sources regardless of their usage. So, potentially
+>>>> in the future, at the moment when .suspend() is called it might be disabled
+>>>> (for example, .enable/disable() callbacks can be added and, if ARM Global timer
+>>>> will not be registered as sched_clock, it will be possible to keep it disabled
+>>>> if not used now).
+>>>>
+>>>> But It's not essentially now - I can update it and drop save restore.
+>>>> Pls, confirm.
+>>>
+>>> I think it's best to skip suspend completely. You're not restoring
+>>> anything you saved during suspend, unless you meant | where you used &.
+>>>
+>>
+>> I didn't get it - I'm restoring one bit(0) only.
+>
+> that's the point, if you know you're restoring only that bit. Why save
+> anything at all ?
+>
 
-However, ARM64 JIT used FP (x29) as eBPF fp register, FP is subjected to
-change during function call so it may cause the BPF prog stack base address
-change too.
+i think there are difference between "restoring" and "re-enabling".
+"restoring" - assume saving smth.. then restore saving value.
+I'm saving & restoring one bit here.
 
-Use x25 to replace FP as BPF stack base register (fp). Since x25 is callee
-saved register, so it will keep intact during function call.
-It is initialized in BPF prog prologue when BPF prog is started to run
-everytime. When BPF prog exits, it could be just tossed.
+But I can do just "re-enabling" -
+   writel(GT_CONTROL_TIMER_ENABLE, gt_base + GT_CONTROL);
+and then I don't need to save anything. It will work with current
+code.
 
-So, the BPF stack layout looks like:
-
-                                 high
-         original A64_SP =>   0:+-----+ BPF prologue
-                                |FP/LR|
-         current A64_FP =>  -16:+-----+
-                                | ... | callee saved registers
-         BPF fp register => -64:+-----+
-                                |     |
-                                | ... | BPF prog stack
-                                |     |
-                                |     |
-         current A64_SP =>      +-----+
-                                |     |
-                                | ... | Function call stack
-                                |     |
-                                +-----+
-                                  low
-
-CC: Zi Shen Lim <zlim.lnx@gmail.com>
-CC: Xi Wang <xi.wang@gmail.com>
-Signed-off-by: Yang Shi <yang.shi@linaro.org>
----
-V3 --> V2:
-* Make FP point to FP'
-* Fix a compile warning
-
- arch/arm64/net/bpf_jit_comp.c | 37 +++++++++++++++++++++++++++++++------
- 1 file changed, 31 insertions(+), 6 deletions(-)
-
-diff --git a/arch/arm64/net/bpf_jit_comp.c b/arch/arm64/net/bpf_jit_comp.c
-index ac8b548..c131e38 100644
---- a/arch/arm64/net/bpf_jit_comp.c
-+++ b/arch/arm64/net/bpf_jit_comp.c
-@@ -50,7 +50,7 @@ static const int bpf2a64[] = {
- 	[BPF_REG_8] = A64_R(21),
- 	[BPF_REG_9] = A64_R(22),
- 	/* read-only frame pointer to access stack */
--	[BPF_REG_FP] = A64_FP,
-+	[BPF_REG_FP] = A64_R(25),
- 	/* temporary register for internal BPF JIT */
- 	[TMP_REG_1] = A64_R(23),
- 	[TMP_REG_2] = A64_R(24),
-@@ -155,16 +155,42 @@ static void build_prologue(struct jit_ctx *ctx)
- 	stack_size += 4; /* extra for skb_copy_bits buffer */
- 	stack_size = STACK_ALIGN(stack_size);
- 
-+	/*
-+	 * BPF prog stack layout
-+	 *
-+	 *                         high
-+	 * original A64_SP =>   0:+-----+ BPF prologue
-+	 *                        |FP/LR|
-+	 * current A64_FP =>  -16:+-----+
-+	 *                        | ... | callee saved registers
-+	 * BPF fp register => -64:+-----+
-+	 *                        |     |
-+	 *                        | ... | BPF prog stack
-+	 *                        |     |
-+	 *                        |     |
-+	 * current A64_SP =>      +-----+
-+	 *                        |     |
-+	 *                        | ... | Function call stack
-+	 *                        |     |
-+	 *                        +-----+
-+	 *                          low
-+	 *
-+	 */
-+
-+	/* Save FP and LR registers to stay align with ARM64 AAPCS */
-+	emit(A64_PUSH(A64_FP, A64_LR, A64_SP), ctx);
-+	emit(A64_MOV(1, A64_FP, A64_SP), ctx);
-+
- 	/* Save callee-saved register */
- 	emit(A64_PUSH(r6, r7, A64_SP), ctx);
- 	emit(A64_PUSH(r8, r9, A64_SP), ctx);
- 	if (ctx->tmp_used)
- 		emit(A64_PUSH(tmp1, tmp2, A64_SP), ctx);
- 
--	/* Set up frame pointer */
-+	/* Set up BPF prog stack base register (x25) */
- 	emit(A64_MOV(1, fp, A64_SP), ctx);
- 
--	/* Set up BPF stack */
-+	/* Set up function call stack */
- 	emit(A64_SUB_I(1, A64_SP, A64_SP, stack_size), ctx);
- 
- 	/* Clear registers A and X */
-@@ -179,7 +205,6 @@ static void build_epilogue(struct jit_ctx *ctx)
- 	const u8 r7 = bpf2a64[BPF_REG_7];
- 	const u8 r8 = bpf2a64[BPF_REG_8];
- 	const u8 r9 = bpf2a64[BPF_REG_9];
--	const u8 fp = bpf2a64[BPF_REG_FP];
- 	const u8 tmp1 = bpf2a64[TMP_REG_1];
- 	const u8 tmp2 = bpf2a64[TMP_REG_2];
- 	int stack_size = MAX_BPF_STACK;
-@@ -196,8 +221,8 @@ static void build_epilogue(struct jit_ctx *ctx)
- 	emit(A64_POP(r8, r9, A64_SP), ctx);
- 	emit(A64_POP(r6, r7, A64_SP), ctx);
- 
--	/* Restore frame pointer */
--	emit(A64_MOV(1, fp, A64_SP), ctx);
-+	/* Restore FP/LR registers */
-+	emit(A64_POP(A64_FP, A64_LR, A64_SP), ctx);
- 
- 	/* Set return value */
- 	emit(A64_MOV(1, A64_R(0), r0), ctx);
 -- 
-2.0.2
+regards,
+-grygorii
