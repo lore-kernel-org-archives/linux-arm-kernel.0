@@ -1,127 +1,68 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Fri, 13 Nov 2015 19:28:55 +0900
-Subject: [PATCH v5 9/9] drivers: soc: Add support for Exynos PMU driver
-In-Reply-To: <1447406983-27835-10-git-send-email-pankaj.dubey@samsung.com>
-References: <1447406983-27835-1-git-send-email-pankaj.dubey@samsung.com>
- <1447406983-27835-10-git-send-email-pankaj.dubey@samsung.com>
-Message-ID: <5645BB67.8050102@samsung.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 13 Nov 2015 11:33:12 +0100
+Subject: [PATCH] clocksource/drivers/arm_global_timer: Always use
+ {readl|writel}_relaxed
+In-Reply-To: <20151113175948.69f610e9@xhacker>
+References: <1447403678-7217-1-git-send-email-jszhang@marvell.com>
+ <10575502.sxpiT76bOp@wuerfel> <20151113175948.69f610e9@xhacker>
+Message-ID: <25602407.8sIohphlWH@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13.11.2015 18:29, Pankaj Dubey wrote:
-> This patch moves Exynos PMU driver implementation from "arm/mach-exynos"
-> to "drivers/soc/samsung". This driver is mainly used for setting misc
-> bits of register from PMU IP of Exynos SoC which will be required to
-> configure before Suspend/Resume. Currently all these settings are done
-> in "arch/arm/mach-exynos/pmu.c" but moving ahead for ARM64 based SoC
-> support, there is a need of this PMU driver in driver/* folder.
+On Friday 13 November 2015 17:59:48 Jisheng Zhang wrote:
+> On Fri, 13 Nov 2015 10:28:01 +0100
+> Arnd Bergmann <arnd@arndb.de> wrote:
+> > On Friday 13 November 2015 16:40:25 Jisheng Zhang wrote:
+> > > On Fri, 13 Nov 2015 16:34:38 +0800
+> > > > diff --git a/drivers/clocksource/arm_global_timer.c b/drivers/clocksource/arm_global_timer.c
+> > > > index a2cb6fa..84a5a5d 100644
+> > > > --- a/drivers/clocksource/arm_global_timer.c
+> > > > +++ b/drivers/clocksource/arm_global_timer.c
+> > > > @@ -99,27 +99,27 @@ static void gt_compare_set(unsigned long delta, int periodic)
+> > > >  
+> > > >  	counter += delta;
+> > > >  	ctrl = GT_CONTROL_TIMER_ENABLE;
+> > > > -	writel(ctrl, gt_base + GT_CONTROL);
+> > > > -	writel(lower_32_bits(counter), gt_base + GT_COMP0);
+> > > > -	writel(upper_32_bits(counter), gt_base + GT_COMP1);
+> > > > +	writel_relaxed(ctrl, gt_base + GT_CONTROL);
+> > > > +	writel_relaxed(lower_32_bits(counter), gt_base + GT_COMP0);
+> > > > +	writel_relaxed(upper_32_bits(counter), gt_base + GT_COMP1);
+> > > >  
+> > > >  	if (periodic) {
+> > > > -		writel(delta, gt_base + GT_AUTO_INC);
+> > > > +		writel_relaxed(delta, gt_base + GT_AUTO_INC);
+> > > >  		ctrl |= GT_CONTROL_AUTO_INC;
+> > > >  	}
+> > > >  
+> > > >  	ctrl |= GT_CONTROL_COMP_ENABLE | GT_CONTROL_IRQ_ENABLE;
+> > > > -	writel(ctrl, gt_base + GT_CONTROL);
+> > > > +	writel_relaxed(ctrl, gt_base + GT_CONTROL);
+> > > >  }  
+> > 
+> > This seems fine. Do you have any performance numbers to show how much
+> > we save per call on a platform you care about, and how often it is
+> > called for a typical workload?
 > 
-> This driver uses existing DT binding information and there should
-> be no functionality change in the supported platforms.
+> To be honest, all my platforms don't make use of global timer for clockevent,
+> we use dw_apb_timer and twd or arch_timer instead, but one performance impact
+> I saw in our case can also apply for the case with global timer as clokevent:
 > 
-> Signed-off-by: Amit Daniel Kachhap <amitdanielk@gmail.com>
-> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
-> ---
->  arch/arm/mach-exynos/Kconfig                                   | 1 +
->  arch/arm/mach-exynos/Makefile                                  | 4 +---
->  drivers/soc/samsung/Kconfig                                    | 4 ++++
->  drivers/soc/samsung/Makefile                                   | 4 ++++
->  arch/arm/mach-exynos/pmu.c => drivers/soc/samsung/exynos-pmu.c | 0
->  {arch/arm/mach-exynos => drivers/soc/samsung}/exynos-pmu.h     | 0
->  {arch/arm/mach-exynos => drivers/soc/samsung}/exynos3250-pmu.c | 0
->  {arch/arm/mach-exynos => drivers/soc/samsung}/exynos4-pmu.c    | 0
->  {arch/arm/mach-exynos => drivers/soc/samsung}/exynos5250-pmu.c | 0
->  {arch/arm/mach-exynos => drivers/soc/samsung}/exynos5420-pmu.c | 0
->  10 files changed, 10 insertions(+), 3 deletions(-)
->  rename arch/arm/mach-exynos/pmu.c => drivers/soc/samsung/exynos-pmu.c (100%)
->  rename {arch/arm/mach-exynos => drivers/soc/samsung}/exynos-pmu.h (100%)
->  rename {arch/arm/mach-exynos => drivers/soc/samsung}/exynos3250-pmu.c (100%)
->  rename {arch/arm/mach-exynos => drivers/soc/samsung}/exynos4-pmu.c (100%)
->  rename {arch/arm/mach-exynos => drivers/soc/samsung}/exynos5250-pmu.c (100%)
->  rename {arch/arm/mach-exynos => drivers/soc/samsung}/exynos5420-pmu.c (100%)
-> 
-> diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
-> index 83c85f5..874cb38 100644
-> --- a/arch/arm/mach-exynos/Kconfig
-> +++ b/arch/arm/mach-exynos/Kconfig
-> @@ -16,6 +16,7 @@ menuconfig ARCH_EXYNOS
->  	select ARM_GIC
->  	select COMMON_CLK_SAMSUNG
->  	select EXYNOS_THERMAL
-> +	select EXYNOS_PMU
->  	select EXYNOS_SROM if PM
->  	select HAVE_ARM_SCU if SMP
->  	select HAVE_S3C2410_I2C if I2C
-> diff --git a/arch/arm/mach-exynos/Makefile b/arch/arm/mach-exynos/Makefile
-> index 2d58063..34d29df 100644
-> --- a/arch/arm/mach-exynos/Makefile
-> +++ b/arch/arm/mach-exynos/Makefile
-> @@ -9,9 +9,7 @@ ccflags-$(CONFIG_ARCH_MULTIPLATFORM) += -I$(srctree)/$(src)/include -I$(srctree)
->  
->  # Core
->  
-> -obj-$(CONFIG_ARCH_EXYNOS)	+= exynos.o pmu.o exynos-smc.o firmware.o \
-> -					exynos3250-pmu.o exynos4-pmu.o \
-> -					exynos5250-pmu.o exynos5420-pmu.o
-> +obj-$(CONFIG_ARCH_EXYNOS)	+= exynos.o exynos-smc.o firmware.o
->  
->  obj-$(CONFIG_EXYNOS_CPU_SUSPEND) += pm.o sleep.o
->  obj-$(CONFIG_PM_SLEEP)		+= suspend.o
-> diff --git a/drivers/soc/samsung/Kconfig b/drivers/soc/samsung/Kconfig
-> index 2833b5b..f545d6c 100644
-> --- a/drivers/soc/samsung/Kconfig
-> +++ b/drivers/soc/samsung/Kconfig
-> @@ -10,4 +10,8 @@ config EXYNOS_SROM
->  	bool
->  	depends on ARM && ARCH_EXYNOS && PM
->  
-> +config EXYNOS_PMU
-> +	bool
-> +	depends on ARCH_EXYNOS
-> +
->  endmenu
-> diff --git a/drivers/soc/samsung/Makefile b/drivers/soc/samsung/Makefile
-> index 9c554d5..26fb489 100644
-> --- a/drivers/soc/samsung/Makefile
-> +++ b/drivers/soc/samsung/Makefile
-> @@ -1 +1,5 @@
->  obj-$(CONFIG_EXYNOS_SROM)	+= exynos-srom.o
-> +ifdef CONFIG_ARM
-> +obj-$(CONFIG_EXYNOS_PMU)	+= exynos-pmu.o exynos3250-pmu.o exynos4-pmu.o \
-> +					exynos5250-pmu.o exynos5420-pmu.o
-> +endif
+> there are 500-1000 short sleeps, yes not good userspace behavior, so we
+> program clockevent device 500-1000 times/s. If the system is powered by CA9
+> with outer L2 cache, the writel will contend for l2x0_lock for 500-1000 times/s.
+> Then the L2 cache maintenance from other device driver have more chance to
+> spinning at the l2x0_lock, so other device driver performance is impacted.
 
-Why ifdef CONFIG_ARM? This already depends on ARCH_EXYNOS. If you want
-to limit to ARMv7 then add the dependency to Kconfig (just like
-EXYNOS_SROM).
+Just to make sure I get this right: which outer cache implementation do you
+use in this case? Most Cortex-A9 use pl310, which does not require l2x0_lock
+for outer_cache.sync(). The Aurora outer cache sync has a different method
+and also doesn't use l2x0_lock. Finally, tauros3 doesn't need a cache sync
+at all.
 
-Rest looks ok - nice renames.
+Did you look at an older kernel version? We used to do a loop in the
+Aurora cache sync operation until I fixed that, so it should be a bit
+faster now. It will still require doing the actual sync, but at least
+there should not be any lock contention these days.
 
-Best regards,
-Krzysztof
-
-> diff --git a/arch/arm/mach-exynos/pmu.c b/drivers/soc/samsung/exynos-pmu.c
-> similarity index 100%
-> rename from arch/arm/mach-exynos/pmu.c
-> rename to drivers/soc/samsung/exynos-pmu.c
-> diff --git a/arch/arm/mach-exynos/exynos-pmu.h b/drivers/soc/samsung/exynos-pmu.h
-> similarity index 100%
-> rename from arch/arm/mach-exynos/exynos-pmu.h
-> rename to drivers/soc/samsung/exynos-pmu.h
-> diff --git a/arch/arm/mach-exynos/exynos3250-pmu.c b/drivers/soc/samsung/exynos3250-pmu.c
-> similarity index 100%
-> rename from arch/arm/mach-exynos/exynos3250-pmu.c
-> rename to drivers/soc/samsung/exynos3250-pmu.c
-> diff --git a/arch/arm/mach-exynos/exynos4-pmu.c b/drivers/soc/samsung/exynos4-pmu.c
-> similarity index 100%
-> rename from arch/arm/mach-exynos/exynos4-pmu.c
-> rename to drivers/soc/samsung/exynos4-pmu.c
-> diff --git a/arch/arm/mach-exynos/exynos5250-pmu.c b/drivers/soc/samsung/exynos5250-pmu.c
-> similarity index 100%
-> rename from arch/arm/mach-exynos/exynos5250-pmu.c
-> rename to drivers/soc/samsung/exynos5250-pmu.c
-> diff --git a/arch/arm/mach-exynos/exynos5420-pmu.c b/drivers/soc/samsung/exynos5420-pmu.c
-> similarity index 100%
-> rename from arch/arm/mach-exynos/exynos5420-pmu.c
-> rename to drivers/soc/samsung/exynos5420-pmu.c
-> 
+	Arnd
