@@ -1,15 +1,15 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 13 Nov 2015 11:23:50 +0900
-Subject: [PATCH 3/4] ARM: shmobile: r8a7793: Use SoC specific binding for
+Date: Fri, 13 Nov 2015 11:23:49 +0900
+Subject: [PATCH 2/4] ARM: shmobile: r8a7791: Use SoC specific binding for
  rcar-dmac nodes
 In-Reply-To: <1447381431-2255-1-git-send-email-horms+renesas@verge.net.au>
 References: <1447381431-2255-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1447381431-2255-4-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1447381431-2255-3-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Use the new SoC specific binding for rcar-dmac and the generic
-binding as a fall-back in the r8a7793 device tree.
+binding as a fall-back in the r8a7791 device tree.
 
 In general Renesas hardware is not documented to the extent where the
 relationship between IP blocks on different SoCs can be assumed although
@@ -24,30 +24,48 @@ update the Renesas R-Car DMA Controller nodes to follow this convention.
 
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
 ---
- arch/arm/boot/dts/r8a7793.dtsi | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/r8a7791.dtsi | 8 ++++----
+ 1 file changed, 4 insertions(+), 4 deletions(-)
 
-diff --git a/arch/arm/boot/dts/r8a7793.dtsi b/arch/arm/boot/dts/r8a7793.dtsi
-index aa9b64c14a09..51099fe6f8db 100644
---- a/arch/arm/boot/dts/r8a7793.dtsi
-+++ b/arch/arm/boot/dts/r8a7793.dtsi
-@@ -133,7 +133,7 @@
+diff --git a/arch/arm/boot/dts/r8a7791.dtsi b/arch/arm/boot/dts/r8a7791.dtsi
+index d79102c0e7d3..3776974e3273 100644
+--- a/arch/arm/boot/dts/r8a7791.dtsi
++++ b/arch/arm/boot/dts/r8a7791.dtsi
+@@ -255,7 +255,7 @@
  	};
  
  	dmac0: dma-controller at e6700000 {
 -		compatible = "renesas,rcar-dmac";
-+		compatible = "renesas,dmac-r8a7793", "renesas,rcar-dmac";
++		compatible = "renesas,dmac-r8a7791", "renesas,rcar-dmac";
  		reg = <0 0xe6700000 0 0x20000>;
  		interrupts = <0 197 IRQ_TYPE_LEVEL_HIGH
  			      0 200 IRQ_TYPE_LEVEL_HIGH
-@@ -164,7 +164,7 @@
+@@ -286,7 +286,7 @@
  	};
  
  	dmac1: dma-controller@e6720000 {
 -		compatible = "renesas,rcar-dmac";
-+		compatible = "renesas,dmac-r8a7793", "renesas,rcar-dmac";
++		compatible = "renesas,dmac-r8a7791", "renesas,rcar-dmac";
  		reg = <0 0xe6720000 0 0x20000>;
  		interrupts = <0 220 IRQ_TYPE_LEVEL_HIGH
  			      0 216 IRQ_TYPE_LEVEL_HIGH
+@@ -317,7 +317,7 @@
+ 	};
+ 
+ 	audma0: dma-controller@ec700000 {
+-		compatible = "renesas,rcar-dmac";
++		compatible = "renesas,dmac-r8a7791", "renesas,rcar-dmac";
+ 		reg = <0 0xec700000 0 0x10000>;
+ 		interrupts =	<0 346 IRQ_TYPE_LEVEL_HIGH
+ 				 0 320 IRQ_TYPE_LEVEL_HIGH
+@@ -346,7 +346,7 @@
+ 	};
+ 
+ 	audma1: dma-controller@ec720000 {
+-		compatible = "renesas,rcar-dmac";
++		compatible = "renesas,dmac-r8a7791", "renesas,rcar-dmac";
+ 		reg = <0 0xec720000 0 0x10000>;
+ 		interrupts =	<0 347 IRQ_TYPE_LEVEL_HIGH
+ 				 0 333 IRQ_TYPE_LEVEL_HIGH
 -- 
 2.1.4
