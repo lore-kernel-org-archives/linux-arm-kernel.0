@@ -1,211 +1,92 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Fri, 13 Nov 2015 11:45:09 -0700
-Subject: [PATCH V4 18/26] coresight: adding operation mode for sink->enable()
-In-Reply-To: <1447440317-1977-1-git-send-email-mathieu.poirier@linaro.org>
-References: <1447440317-1977-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1447440317-1977-19-git-send-email-mathieu.poirier@linaro.org>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Fri, 13 Nov 2015 20:48:11 +0200
+Subject: [PATCH] PCI: dra7xx: mark dra7xx_pcie_msi irq as IRQF_NO_THREAD
+In-Reply-To: <5644599C.8030905@linutronix.de>
+References: <1446748990-27722-1-git-send-email-grygorii.strashko@ti.com>
+ <563C6A7D.7040503@linutronix.de> <563D06BF.5010707@ti.com>
+ <5644599C.8030905@linutronix.de>
+Message-ID: <5646306B.9040805@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adding an operation mode to sink->enable() API in order
-to prevent simultaneous access from different callers.
+On 11/12/2015 11:19 AM, Sebastian Andrzej Siewior wrote:
+> On 11/06/2015 08:59 PM, Grygorii Strashko wrote:
+>> Hi Sebastian,
+> 
+> Hi Grygorii,
+> 
+>> - IRQF_NO_THREAD is the first considered option for such kind of issues.
+>>    But: Now in LKML there are ~60 occurrences of IRQF_NO_THREAD - most of
+>>    them are used by Arch code. And It's only used by 6 drivers (drivers/*) [Addendum 2].
+>>    During past year, I've found only two threads related to IRQF_NO_THREAD
+>>    and, in both cases, IRQF_NO_THREAD was added for arch specific IRQs which
+>>    can't be threaded (https://lists.ozlabs.org/pipermail/linuxppc-dev/2014-November/122659.html,
+>>    https://lkml.org/lkml/2015/4/21/404).
+> 
+> That powerpc patch you reference is doing the same thing you are doing
+> here.
 
-TPIU and TMC won't be supplemented with the AUX area
-API immediately and as such ignore the new mode.
+Probably. I don't know this hw, so my assumption was based on commits descriptions.
 
-Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
----
- drivers/hwtracing/coresight/coresight-etb10.c | 31 +++++++++++++++++++++------
- drivers/hwtracing/coresight/coresight-priv.h  |  2 +-
- drivers/hwtracing/coresight/coresight-tmc.c   |  2 +-
- drivers/hwtracing/coresight/coresight-tpiu.c  |  2 +-
- drivers/hwtracing/coresight/coresight.c       | 10 ++++-----
- include/linux/coresight.h                     |  2 +-
- 6 files changed, 33 insertions(+), 16 deletions(-)
+> 
+>> - ARM UP system: TI's am437xx SoCs for example.
+>>     Here everything is started from /drivers/irqchip/irq-gic.c -> gic_handle_irq()
+>>
+> 
+>> GIC IRQ handler gic_handle_irq() may process more than one IRQ without leaving HW IRQ mode
+>> (during my experiments I saw up to 6 IRQs processed in one cycle).
+> 
+> not only GIC. But then what good does it do if it leaves and returns
+> immediately back to the routine?
+> 
+>> As result, It was concluded, that having such current HW/SW and all IRQs forced threaded [1],
+>> it will be potentially possible to predict system behavior, because gic_handle_irq() will
+>> do the same things for most of processed IRQs.
+>> But, once there will be chained [2] or IRQF_NO_THREAD [3] IRQs - complete unpredictability.
+> 
+> I would not go as far as "complete unpredictability". What you do (or
+> should do) is testing the system for longer period of time with
+> different behavior in order to estimate the worst case.
+> You can't predict the system anyway since it is way too complex. Just
+> try something that ensures that cyclictest is no longer cache hot and
+> see what happens then.
 
-diff --git a/drivers/hwtracing/coresight/coresight-etb10.c b/drivers/hwtracing/coresight/coresight-etb10.c
-index 09e306361e4f..dc4d707b28aa 100644
---- a/drivers/hwtracing/coresight/coresight-etb10.c
-+++ b/drivers/hwtracing/coresight/coresight-etb10.c
-@@ -73,9 +73,9 @@
-  * @miscdev:	specifics to handle "/dev/xyz.etb" entry.
-  * @spinlock:	only one at a time pls.
-  * @reading:	synchronise user space access to etb buffer.
-+ * @mode:	this ETB is being used.
-  * @buf:	area of memory where ETB buffer content gets sent.
-  * @buffer_depth: size of @buf.
-- * @enable:	this ETB is being used.
-  * @trigger_cntr: amount of words to store after a trigger.
-  */
- struct etb_drvdata {
-@@ -86,9 +86,9 @@ struct etb_drvdata {
- 	struct miscdevice	miscdev;
- 	spinlock_t		spinlock;
- 	local_t			reading;
-+	local_t			mode;
- 	u8			*buf;
- 	u32			buffer_depth;
--	bool			enable;
- 	u32			trigger_cntr;
- };
- 
-@@ -133,18 +133,34 @@ static void etb_enable_hw(struct etb_drvdata *drvdata)
- 	CS_LOCK(drvdata->base);
- }
- 
--static int etb_enable(struct coresight_device *csdev)
-+static int etb_enable(struct coresight_device *csdev, u32 mode)
- {
--	struct etb_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
-+	u32 val;
- 	unsigned long flags;
-+	struct etb_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
-+
-+	val = local_cmpxchg(&drvdata->mode,
-+			    CS_MODE_DISABLED, mode);
-+	/*
-+	 * When accessing from Perf, a HW buffer can be handled
-+	 * by a single trace entity.  In sysFS mode many tracers
-+	 * can be logging to the same HW buffer.
-+	 */
-+	if (val == CS_MODE_PERF)
-+		return -EBUSY;
-+
-+	/* Nothing to do, the tracer is already enabled. */
-+	if (val == CS_MODE_SYSFS)
-+		goto out;
- 
- 	spin_lock_irqsave(&drvdata->spinlock, flags);
- 	etb_enable_hw(drvdata);
--	drvdata->enable = true;
- 	spin_unlock_irqrestore(&drvdata->spinlock, flags);
- 
-+out:
- 	dev_info(drvdata->dev, "ETB enabled\n");
- 	return 0;
-+
- }
- 
- static void etb_disable_hw(struct etb_drvdata *drvdata)
-@@ -243,9 +259,10 @@ static void etb_disable(struct coresight_device *csdev)
- 	spin_lock_irqsave(&drvdata->spinlock, flags);
- 	etb_disable_hw(drvdata);
- 	etb_dump_hw(drvdata);
--	drvdata->enable = false;
- 	spin_unlock_irqrestore(&drvdata->spinlock, flags);
- 
-+	local_set(&drvdata->mode, CS_MODE_DISABLED);
-+
- 	dev_info(drvdata->dev, "ETB disabled\n");
- }
- 
-@@ -263,7 +280,7 @@ static void etb_dump(struct etb_drvdata *drvdata)
- 	unsigned long flags;
- 
- 	spin_lock_irqsave(&drvdata->spinlock, flags);
--	if (drvdata->enable) {
-+	if (local_read(&drvdata->mode) == CS_MODE_SYSFS) {
- 		etb_disable_hw(drvdata);
- 		etb_dump_hw(drvdata);
- 		etb_enable_hw(drvdata);
-diff --git a/drivers/hwtracing/coresight/coresight-priv.h b/drivers/hwtracing/coresight/coresight-priv.h
-index 932f34a84d96..333eddaed339 100644
---- a/drivers/hwtracing/coresight/coresight-priv.h
-+++ b/drivers/hwtracing/coresight/coresight-priv.h
-@@ -62,7 +62,7 @@ static inline void CS_UNLOCK(void __iomem *addr)
- }
- 
- void coresight_disable_path(struct list_head *path);
--int coresight_enable_path(struct list_head *path);
-+int coresight_enable_path(struct list_head *path, u32 mode);
- struct coresight_device *coresight_get_sink(struct list_head *path);
- struct list_head *coresight_build_path(struct coresight_device *csdev);
- void coresight_release_path(struct list_head *path);
-diff --git a/drivers/hwtracing/coresight/coresight-tmc.c b/drivers/hwtracing/coresight/coresight-tmc.c
-index 5e2a71767870..d7e83da7a621 100644
---- a/drivers/hwtracing/coresight/coresight-tmc.c
-+++ b/drivers/hwtracing/coresight/coresight-tmc.c
-@@ -265,7 +265,7 @@ static int tmc_enable(struct tmc_drvdata *drvdata, enum tmc_mode mode)
- 	return 0;
- }
- 
--static int tmc_enable_sink(struct coresight_device *csdev)
-+static int tmc_enable_sink(struct coresight_device *csdev, u32 mode)
- {
- 	struct tmc_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
- 
-diff --git a/drivers/hwtracing/coresight/coresight-tpiu.c b/drivers/hwtracing/coresight/coresight-tpiu.c
-index e19b86e61c38..0a09135382f6 100644
---- a/drivers/hwtracing/coresight/coresight-tpiu.c
-+++ b/drivers/hwtracing/coresight/coresight-tpiu.c
-@@ -70,7 +70,7 @@ static void tpiu_enable_hw(struct tpiu_drvdata *drvdata)
- 	CS_LOCK(drvdata->base);
- }
- 
--static int tpiu_enable(struct coresight_device *csdev)
-+static int tpiu_enable(struct coresight_device *csdev, u32 mode)
- {
- 	struct tpiu_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
- 
-diff --git a/drivers/hwtracing/coresight/coresight.c b/drivers/hwtracing/coresight/coresight.c
-index 47a4e109f700..52311e77da9d 100644
---- a/drivers/hwtracing/coresight/coresight.c
-+++ b/drivers/hwtracing/coresight/coresight.c
-@@ -121,13 +121,13 @@ static int coresight_find_link_outport(struct coresight_device *csdev,
- 	return 0;
- }
- 
--static int coresight_enable_sink(struct coresight_device *csdev)
-+static int coresight_enable_sink(struct coresight_device *csdev, u32 mode)
- {
- 	int ret;
- 
- 	if (!csdev->enable) {
- 		if (sink_ops(csdev)->enable) {
--			ret = sink_ops(csdev)->enable(csdev);
-+			ret = sink_ops(csdev)->enable(csdev, mode);
- 			if (ret)
- 				return ret;
- 		}
-@@ -283,7 +283,7 @@ void coresight_disable_path(struct list_head *path)
- 	}
- }
- 
--int coresight_enable_path(struct list_head *path)
-+int coresight_enable_path(struct list_head *path, u32 mode)
- {
- 
- 	int ret = 0;
-@@ -296,7 +296,7 @@ int coresight_enable_path(struct list_head *path)
- 		switch (csdev->type) {
- 		case CORESIGHT_DEV_TYPE_SINK:
- 		case CORESIGHT_DEV_TYPE_LINKSINK:
--			ret = coresight_enable_sink(csdev);
-+			ret = coresight_enable_sink(csdev, mode);
- 			if (ret)
- 				goto err;
- 			break;
-@@ -454,7 +454,7 @@ int coresight_enable(struct coresight_device *csdev)
- 		goto out;
- 	}
- 
--	ret = coresight_enable_path(path);
-+	ret = coresight_enable_path(path, CS_MODE_SYSFS);
- 	if (ret)
- 		goto err_path;
- 
-diff --git a/include/linux/coresight.h b/include/linux/coresight.h
-index f2148bc2bcfe..80b3465bd459 100644
---- a/include/linux/coresight.h
-+++ b/include/linux/coresight.h
-@@ -185,7 +185,7 @@ struct coresight_device {
-  * @disable:	disables the sink.
-  */
- struct coresight_ops_sink {
--	int (*enable)(struct coresight_device *csdev);
-+	int (*enable)(struct coresight_device *csdev, u32 mode);
- 	void (*disable)(struct coresight_device *csdev);
- };
- 
+I understand that. That's the current plan and work is in progress.
+The nearest target is to get rid of all -RT specific backtracks and
+ensure TI -RT kernel supports the same functionality as non-RT.
+next step - try to optimize.
+
+> 
+>> So, It was selected as goal to have all PPI IRQs (forced) threaded. And if someone
+>> will require faster IRQ handling - IRQF_NO_THREAD can be always added, but it will
+>> be custom solution then.
+>>
+>> I'd be appreciated for your comments - if above problem is not a problem.
+>> Good - IRQF_NO_THREAD forever!
+> 
+> Yes, we try to avoid IRQF_NO_THREAD under all circumstances. However it
+> is required for low-level arch code. This includes basically
+> everything that is using raw-locks which includes interrupt controller
+> (the "real" ones like GIC or cascading like MSI or GPIO).
+> Here it is simple - you have a cascading MSI-interrupt controller and
+> as such it should be IRQF_NO_THREAD marked.
+> The latency spikes in worst case are not huge as explained earlier: The
+> only thing your cascading controller is allowed to do is to mark
+> interrupt as pending (which is with threaded interrupts just a task
+> wakeup).
+> And this is not a -RT only problem: it is broken in vanilla linux with
+> threaded interrupts as well.
+> 
+
+Ok. I've got it.  IRQF_NO_THREAD will be a solution for reference code and
+for issues like this. I understand, that each, -RT based, real solution is
+unique and need to be specifically tuned, so if someone will have problem
+with IRQF_NO_THREAD - it can be removed easily and replaced with any sort of
+custom hacks/improvements.
+
+Thanks a lot for your comments.
+I'll apply your previous comments and re-send.
+
 -- 
-1.9.1
+regards,
+-grygorii
