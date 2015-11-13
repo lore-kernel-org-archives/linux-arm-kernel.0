@@ -1,120 +1,88 @@
 From: bayi.cheng@mediatek.com (bayi cheng)
-Date: Fri, 13 Nov 2015 15:20:45 +0800
-Subject: [PATCH v6 1/3] doc: dt: add documentation for Mediatek spi-nor
- controller
-In-Reply-To: <20151111203823.GJ12143@google.com>
+Date: Fri, 13 Nov 2015 15:25:37 +0800
+Subject: [PATCH v6 2/3] mtd: mtk-nor: mtk serial flash controller driver
+In-Reply-To: <20151111214146.GL12143@google.com>
 References: <1446824889-16144-1-git-send-email-bayi.cheng@mediatek.com>
- <1446824889-16144-2-git-send-email-bayi.cheng@mediatek.com>
- <20151111203823.GJ12143@google.com>
-Message-ID: <1447399245.9118.14.camel@mhfsdcap03>
+ <1446824889-16144-3-git-send-email-bayi.cheng@mediatek.com>
+ <20151111214146.GL12143@google.com>
+Message-ID: <1447399537.9118.18.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2015-11-11 at 12:38 -0800, Brian Norris wrote:
-> On Fri, Nov 06, 2015 at 11:48:07PM +0800, Bayi Cheng wrote:
-> > Add device tree binding documentation for serial flash with
-> > Mediatek serial flash controller
-> > 
-> > Signed-off-by: Bayi Cheng <bayi.cheng@mediatek.com>
-> > ---
+On Wed, 2015-11-11 at 13:41 -0800, Brian Norris wrote:
+> One more small comment, since you're respinning this:
 > 
-> Applied to l2-mtd.git/next (for 4.5). This will show up in
-> linux-next.git after the merge window.
-> 
-> Also squashed in a small diff (below), to fix up some language issues
-> and to refer the reader to the jedec,spi-nor.txt document.
-> 
-
-OK, I will fix it in next patch!
-
-> >  .../devicetree/bindings/mtd/mtk-quadspi.txt        | 41 ++++++++++++++++++++++
-> >  1 file changed, 41 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/mtd/mtk-quadspi.txt
-> > 
-> > diff --git a/Documentation/devicetree/bindings/mtd/mtk-quadspi.txt b/Documentation/devicetree/bindings/mtd/mtk-quadspi.txt
+> On Fri, Nov 06, 2015 at 11:48:08PM +0800, Bayi Cheng wrote:
+> > diff --git a/drivers/mtd/spi-nor/mtk-quadspi.c b/drivers/mtd/spi-nor/mtk-quadspi.c
 > > new file mode 100644
-> > index 0000000..866b492
+> > index 0000000..6582811
 > > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/mtd/mtk-quadspi.txt
-> > @@ -0,0 +1,41 @@
-> > +* MTD SPI nor driver for MTK MT81xx (and similar) serial flash controller
+> > +++ b/drivers/mtd/spi-nor/mtk-quadspi.c
+> > @@ -0,0 +1,475 @@
 > 
-> The DT binding document shouldn't be talking about software (i.e.,
-> shouldn't be talking about "drivers").
+> ...
 > 
-
-OK, I will fix it.
-
+> > +static int mtk_nor_drv_probe(struct platform_device *pdev)
+> > +{
+> > +	struct device_node *flash_np;
+> > +	struct resource *res;
+> > +	int ret;
+> > +	struct mt8173_nor *mt8173_nor;
 > > +
-> > +Required properties:
-> > +- compatible: 	  should be "mediatek,mt8173-nor";
-> > +- reg: 		  physical base address and length of the controller's register
-> > +- clocks: 	  the phandle of the clock needed by the nor controller
-> > +- clock-names: 	  the name of the clocks
-> > +		  the clocks needed "spi" and "sf". "spi" is used for spi bus,
-> > +		  and "sf" is used for controller, these are the clocks witch
-> > +		  hardware needs to enabling nor flash and nor flash controller.
-> > +		  See Documentation/devicetree/bindings/clock/clock-bindings.txt for details.
-> > +- #address-cells: should be <1>
-> > +- #size-cells:	  should be <0>
+> > +	if (!pdev->dev.of_node) {
+> > +		dev_err(&pdev->dev, "No DT found\n");
+> > +		return -EINVAL;
+> > +	}
 > > +
-> > +The SPI Flash must be a child of the nor_flash node and must have a
-> > +compatible property.
+> > +	mt8173_nor = devm_kzalloc(&pdev->dev, sizeof(*mt8173_nor), GFP_KERNEL);
+> > +	if (!mt8173_nor)
+> > +		return -ENOMEM;
+> > +	platform_set_drvdata(pdev, mt8173_nor);
 > > +
-> > +Required properties:
-> > +- compatible:	  May include a device-specific string consisting of the manufacturer
-> > +		  and name of the chip. Must also include "jedec,spi-nor" for any
-> > +		  SPI NOR flash that can be identified by the JEDEC READ ID opcode (0x9F).
-> > +- reg :		  Chip-Select number
+> > +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+> > +	mt8173_nor->base = devm_ioremap_resource(&pdev->dev, res);
+> > +	if (IS_ERR(mt8173_nor->base))
+> > +		return PTR_ERR(mt8173_nor->base);
 > > +
-> > +Example:
+> > +	mt8173_nor->spi_clk = devm_clk_get(&pdev->dev, "spi");
+> > +	if (IS_ERR(mt8173_nor->spi_clk)) {
+> > +		ret = PTR_ERR(mt8173_nor->spi_clk);
+> > +		goto nor_free;
+> > +	}
 > > +
-> > +nor_flash: spi at 1100d000 {
-> > +	compatible = "mediatek,mt8173-nor";
-> > +	reg = <0 0x1100d000 0 0xe0>;
-> > +	clocks = <&pericfg CLK_PERI_SPI>,
-> > +		 <&topckgen CLK_TOP_SPINFI_IFR_SEL>;
-> > +	clock-names = "spi", "sf";
-> > +	#address-cells = <1>;
-> > +	#size-cells = <0>;
-> > +	status = "disabled";
+> > +	mt8173_nor->nor_clk = devm_clk_get(&pdev->dev, "sf");
+> > +	if (IS_ERR(mt8173_nor->nor_clk)) {
+> > +		ret = PTR_ERR(mt8173_nor->nor_clk);
+> > +		goto nor_free;
+> > +	}
 > > +
-> > +	flash at 0 {
-> > +		compatible = "jedec,spi-nor";
-> > +		reg = <0>;
-> > +	};
-> > +};
-> > +
+> > +	mt8173_nor->dev = &pdev->dev;
+> > +	clk_prepare_enable(mt8173_nor->spi_clk);
+> > +	clk_prepare_enable(mt8173_nor->nor_clk);
 > 
-> diff --git a/Documentation/devicetree/bindings/mtd/mtk-quadspi.txt b/Documentation/devicetree/bindings/mtd/mtk-quadspi.txt
-> index 866b492c38d2..fb314f09861b 100644
-> --- a/Documentation/devicetree/bindings/mtd/mtk-quadspi.txt
-> +++ b/Documentation/devicetree/bindings/mtd/mtk-quadspi.txt
-> @@ -1,19 +1,19 @@
-> -* MTD SPI nor driver for MTK MT81xx (and similar) serial flash controller
-> +* Serial NOR flash controller for MTK MT81xx (and similar)
->  
->  Required properties:
->  - compatible: 	  should be "mediatek,mt8173-nor";
->  - reg: 		  physical base address and length of the controller's register
-> -- clocks: 	  the phandle of the clock needed by the nor controller
-> -- clock-names: 	  the name of the clocks
-> -		  the clocks needed "spi" and "sf". "spi" is used for spi bus,
-> +- clocks: 	  the phandle of the clocks needed by the nor controller
-> +- clock-names: 	  the names of the clocks
-> +		  the clocks should be named "spi" and "sf". "spi" is used for spi bus,
->  		  and "sf" is used for controller, these are the clocks witch
->  		  hardware needs to enabling nor flash and nor flash controller.
->  		  See Documentation/devicetree/bindings/clock/clock-bindings.txt for details.
->  - #address-cells: should be <1>
->  - #size-cells:	  should be <0>
->  
-> -The SPI Flash must be a child of the nor_flash node and must have a
-> -compatible property.
-> +The SPI flash must be a child of the nor_flash node and must have a
-> +compatible property. Also see jedec,spi-nor.txt.
->  
->  Required properties:
->  - compatible:	  May include a device-specific string consisting of the manufacturer
+> You enable the clocks here, but...
+> 
+> > +
+> > +	/* only support one attached flash */
+> > +	flash_np = of_get_next_available_child(pdev->dev.of_node, NULL);
+> > +	if (!flash_np) {
+> 
+> ... you might bail out here if there is no available flash node, and you
+> never disable the clocks. (Same is true if we fail to detect the flash;
+> you leave the no-longer-needed clocks enabled.) Seems like maybe you
+> should disable clocks on failure.
 
-Thanks for your instruction! and I will fix it in the next patch!
+Yes, I have forgot to disable these clocks on failure. and I will fix it
+in the next patch! Thanks!
+> 
+> > +		dev_err(&pdev->dev, "no SPI flash device to configure\n");
+> > +		ret = -ENODEV;
+> > +		goto nor_free;
+> > +	}
+> > +	ret = mtk_nor_init(mt8173_nor, flash_np);
+> > +
+> > +nor_free:
+> > +	return ret;
+> > +}
+> 
+> Brian
