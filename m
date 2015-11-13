@@ -1,24 +1,30 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 13 Nov 2015 17:44:15 +0100
-Subject: [PATCH] net: hisilicon: fix binding document of mdio
-In-Reply-To: <20151113144457.GA18563@rob-hp-laptop>
-References: <1447381424-107248-1-git-send-email-huangdaode@hisilicon.com>
- <20151113144457.GA18563@rob-hp-laptop>
-Message-ID: <4637718.UGnlN7fHno@wuerfel>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Fri, 13 Nov 2015 13:56:29 -0300
+Subject: [PATCH 1/2] ARM: ux500: remove regulator-compatible usage
+In-Reply-To: <1443189092-16430-1-git-send-email-javier@osg.samsung.com>
+References: <1443189092-16430-1-git-send-email-javier@osg.samsung.com>
+Message-ID: <5646163D.6090804@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 13 November 2015 08:44:57 Rob Herring wrote:
-> 
-> Please reformat like this:
-> 
-> - compatible: can be one of:
->         "hisilicon,hns-mdio"
->         "hisilicon,mdio"
->   For hip04 board, must be "hisilicon,mdio".
->   Otherwise, must be "hisilicon,hns-mdio".
+Hello,
 
-should we recommend the use of "hisilicon,hns-mdio" unconditionally
-and only list "hisilicon,mdio" for backwards compatibility?
+On 09/25/2015 09:51 AM, Javier Martinez Canillas wrote:
+> The regulator-compatible property from the regulator DT binding was
+> deprecated and the correct approach is to use the node's name.
+> 
+> This patch has no functional changes since the values of the node's
+> name and the regulator-compatible match for all the regulators.
+> 
+> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+> 
 
-	Arnd
+Any comments about this patch?
+
+Same question about patch 2/2: https://lkml.org/lkml/2015/9/25/288
+
+Best regards,
+-- 
+Javier Martinez Canillas
+Open Source Group
+Samsung Research America
