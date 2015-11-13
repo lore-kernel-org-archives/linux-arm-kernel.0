@@ -1,51 +1,140 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 13 Nov 2015 19:10:25 +0900
-Subject: [PATCH v13 7/7] MAINTAINERS: Add entry Renesas arm64 architecture
+Date: Fri, 13 Nov 2015 19:10:23 +0900
+Subject: [PATCH v13 5/7] arm64: renesas: add Salvator-X board support on DTS
 In-Reply-To: <1447409425-14831-1-git-send-email-horms+renesas@verge.net.au>
 References: <1447409425-14831-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1447409425-14831-8-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1447409425-14831-6-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Initial Renesas arm64 architecture support will be for the R-Car H3,
-r8a7795, SoC and its Salvator-X board.
+From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 
+Add initial board support for r8a7795 Salvator-X. At this point
+only DEBUG0 and DEBUG1 serial ports are supported.
+
+Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Signed-off-by: Gaku Inami <gaku.inami.xw@bp.renesas.com>
+Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
+Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Signed-off-by: Magnus Damm <damm+renesas@opensource.se>
 Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
-Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
-
 ---
 Changes since v12:
-- Added Ack from Geert Uytterhoeven
-
-Changes since v11:
-- As suggested by Khiem Nguyen:
-  + Removed reference to http://oss.renesas.com as that web site is closed
+- Include rate in stdout-path, as suggested by Mark Rutland.
 
 Changes since v10:
-- New Patch
----
- MAINTAINERS | 9 +++++++++
- 1 file changed, 9 insertions(+)
+- None
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index 7ba7ab749c85..e35134f7d128 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -1392,6 +1392,15 @@ M:	Lennert Buytenhek <kernel@wantstofly.org>
- L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
- S:	Maintained
+Changes since V9: (Magnus Damm <damm+renesas@opensource.se>)
+ - Added board specific EXTAL information by folding in:
+  [PATCH][RFC] arm64: renesas: Add EXTAL configuration to Salvator-X
+
+Changes since V8: (Magnus Damm <damm+renesas@opensource.se>)
+- None
+
+Changes since V7: (Magnus Damm <damm+renesas@opensource.se>)
+- Added changelog
+
+Based on:
+ [PATCH 15/25] arm64: renesas: add Salvator-X board support on DTS
+ [PATCH 5/5] arm64: renesas: salvator-x: Update SCIF2 pin group
+ [PATCH 5/6] arm64: renesas: salvator-x: Enable SCIF1 on serial1
+---
+ Documentation/devicetree/bindings/arm/shmobile.txt |  2 +
+ arch/arm64/boot/dts/renesas/Makefile               |  2 +
+ arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts | 62 ++++++++++++++++++++++
+ 3 files changed, 66 insertions(+)
+ create mode 100644 arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts
+
+diff --git a/Documentation/devicetree/bindings/arm/shmobile.txt b/Documentation/devicetree/bindings/arm/shmobile.txt
+index 8d696a0d62b3..95d0aea4c701 100644
+--- a/Documentation/devicetree/bindings/arm/shmobile.txt
++++ b/Documentation/devicetree/bindings/arm/shmobile.txt
+@@ -59,6 +59,8 @@ Boards:
+     compatible = "renesas,lager", "renesas,r8a7790"
+   - Marzen
+     compatible = "renesas,marzen", "renesas,r8a7779"
++  - Salvator-X
++    compatible = "renesas,salvator-x", "renesas,r8a7795";
  
-+ARM/RENESAS ARM64 ARCHITECTURE
-+M:	Simon Horman <horms@verge.net.au>
-+M:	Magnus Damm <magnus.damm@gmail.com>
-+L:	linux-sh at vger.kernel.org
-+Q:	http://patchwork.kernel.org/project/linux-sh/list/
-+T:	git git://git.kernel.org/pub/scm/linux/kernel/git/horms/renesas.git next
-+S:	Supported
-+F:	arch/arm64/boot/dts/renesas/
+ Note: Reference Device Tree Implementations are temporary implementations
+       to ease the migration from platform devices to Device Tree, and are
+diff --git a/arch/arm64/boot/dts/renesas/Makefile b/arch/arm64/boot/dts/renesas/Makefile
+index fec69f46d65b..9ce1890a650e 100644
+--- a/arch/arm64/boot/dts/renesas/Makefile
++++ b/arch/arm64/boot/dts/renesas/Makefile
+@@ -1,2 +1,4 @@
++dtb-$(CONFIG_ARCH_R8A7795) += r8a7795-salvator-x.dtb
 +
- ARM/RISCPC ARCHITECTURE
- M:	Russell King <linux@arm.linux.org.uk>
- L:	linux-arm-kernel at lists.infradead.org (moderated for non-subscribers)
+ always		:= $(dtb-y)
+ clean-files	:= *.dtb
+diff --git a/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts b/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts
+new file mode 100644
+index 000000000000..a3db98384e53
+--- /dev/null
++++ b/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts
+@@ -0,0 +1,62 @@
++/*
++ * Device Tree Source for the Salvator-X board
++ *
++ * Copyright (C) 2015 Renesas Electronics Corp.
++ *
++ * This file is licensed under the terms of the GNU General Public License
++ * version 2.  This program is licensed "as is" without any warranty of any
++ * kind, whether express or implied.
++ */
++
++/dts-v1/;
++#include "r8a7795.dtsi"
++
++/ {
++	model = "Renesas Salvator-X board based on r8a7795";
++	compatible = "renesas,salvator-x", "renesas,r8a7795";
++
++	aliases {
++		serial0 = &scif2;
++		serial1 = &scif1;
++	};
++
++	chosen {
++		bootargs = "ignore_loglevel";
++		stdout-path = "serial0:115200n8";
++	};
++
++	memory at 48000000 {
++		device_type = "memory";
++		/* first 128MB is reserved for secure area. */
++		reg = <0x0 0x48000000 0x0 0x38000000>;
++	};
++};
++
++&extal_clk {
++	clock-frequency = <16666666>;
++};
++
++&pfc {
++	scif1_pins: scif1 {
++		renesas,groups = "scif1_data_a", "scif1_ctrl";
++		renesas,function = "scif1";
++	};
++	scif2_pins: scif2 {
++		renesas,groups = "scif2_data_a";
++		renesas,function = "scif2";
++	};
++};
++
++&scif1 {
++	pinctrl-0 = <&scif1_pins>;
++	pinctrl-names = "default";
++
++	status = "okay";
++};
++
++&scif2 {
++	pinctrl-0 = <&scif2_pins>;
++	pinctrl-names = "default";
++
++	status = "okay";
++};
 -- 
 2.1.4
