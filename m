@@ -1,86 +1,51 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Fri, 13 Nov 2015 09:00:26 +0100
-Subject: [PATCH v2] stmmac: avoid ipq806x constant overflow warning
-In-Reply-To: <1447401166.6012.2.camel@perches.com>
-References: <4391788.dtYArQ4mVi@wuerfel>
- <20151112.122528.1794206832971213176.davem@davemloft.net>
- <3729464.5X0HBxzvx5@wuerfel> <3825178.3luTQFAgny@wuerfel>
- <CAMuHMdXp67RwBATtoqfs=XVza7UAOu+GByZ9a8CLsvntXqM2tw@mail.gmail.com>
- <1447401166.6012.2.camel@perches.com>
-Message-ID: <CAMuHMdUMokQztvW2JhZ9xdspZyOuJOkzueQwvNJ6ZkeN=SYigQ@mail.gmail.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Fri, 13 Nov 2015 16:08:53 +0800
+Subject: [PATCH 05/19] clk: sunxi: add DRAM gates
+In-Reply-To: <CAGb2v66B7X5xQGMq_MzAHGz4OLsnDQStVHcQaMGO+HYY43kjBQ@mail.gmail.com>
+References: <1446214865-3972-1-git-send-email-maxime.ripard@free-electrons.com>
+ <1446214865-3972-6-git-send-email-maxime.ripard@free-electrons.com>
+ <CAGb2v66B7X5xQGMq_MzAHGz4OLsnDQStVHcQaMGO+HYY43kjBQ@mail.gmail.com>
+Message-ID: <CAGb2v65qjKCNER=5Gq5UXnvY_nia+EQYRAk3U9hokmXuxHoi_Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Joe,
-
-On Fri, Nov 13, 2015 at 8:52 AM, Joe Perches <joe@perches.com> wrote:
-> On Fri, 2015-11-13 at 08:37 +0100, Geert Uytterhoeven wrote:
->> On Thu, Nov 12, 2015 at 10:03 PM, Arnd Bergmann <arnd@arndb.de>
->> wrote:
->> > Building dwmac-ipq806x on a 64-bit architecture produces a harmless
->> > warning from gcc:
->> >
->> > stmmac/dwmac-ipq806x.c: In function 'ipq806x_gmac_probe':
->> > include/linux/bitops.h:6:19: warning: overflow in implicit constant
->> > conversion [-Woverflow]
->> >   val = QSGMII_PHY_CDR_EN |
->> > stmmac/dwmac-ipq806x.c:333:8: note: in expansion of macro
->> > 'QSGMII_PHY_CDR_EN'
->> >  #define QSGMII_PHY_CDR_EN   BIT(0)
->> >  #define BIT(nr)   (1UL << (nr))
->> >
->> > This is a result of the type conversion rules in C, when we take
->> > the
->> > logical OR of multiple different types. In particular, we have
->> > and unsigned long
->> >
->> >         QSGMII_PHY_CDR_EN == BIT(0) == (1ul << 0) ==
->> > 0x0000000000000001ul
->> >
->> > and a signed int
->> >
->> >         0xC << QSGMII_PHY_TX_DRV_AMP_OFFSET == 0xc0000000
->> >
->> > which together gives a signed long value
->> >
->> >         0xffffffffc0000001l
->> >
->> > and when this is passed into a function that takes an unsigned int
->> > type,
->> > gcc warns about the signed overflow and the loss of the upper 32
->> > -bits that
->> > are all ones.
->> >
->> > This patch adds 'ul' type modifiers to the literal numbers passed
->> > in
->> > here, so now the expression remains an 'unsigned long' with the
->> > upper
->> > bits all zero, and that avoids the signed overflow and the warning.
+On Mon, Nov 9, 2015 at 12:18 PM, Chen-Yu Tsai <wens@csie.org> wrote:
+> On Fri, Oct 30, 2015 at 10:20 PM, Maxime Ripard
+> <maxime.ripard@free-electrons.com> wrote:
+>> The Allwinner SoCs have a gate controller to gate the access to the DRAM
+>> clock to the some devices that need to access the DRAM directly (mostly
+>> display / image related IPs).
 >>
->> FWIW, the 64-bitness of BIT() on 64-bit platforms is also causing
->> subtle
->> warnings in other places, e.g. when inverting them to create bit
->> mask, cfr.
->> https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commi
->> t/?id=a9efeca613a8fe5281d7c91f5c8c9ea46f2312f6
+>> Use a simple gates driver to support it.
+>>
+>> Signed-off-by: Maxime Ripard <maxime.ripard@free-electrons.com>
 >
-> I still think specific length BIT macros
-> can be useful.
+> Acked-by: Chen-Yu Tsai <wens@csie.org>
 >
-> https://lkml.org/lkml/2015/10/16/852
+>> ---
+>>  drivers/clk/sunxi/clk-simple-gates.c | 2 ++
+>>  1 file changed, 2 insertions(+)
+>>
+>> diff --git a/drivers/clk/sunxi/clk-simple-gates.c b/drivers/clk/sunxi/clk-simple-gates.c
+>> index 0214c6548afd..5666c767fa14 100644
+>> --- a/drivers/clk/sunxi/clk-simple-gates.c
+>> +++ b/drivers/clk/sunxi/clk-simple-gates.c
+>> @@ -112,6 +112,8 @@ CLK_OF_DECLARE(sun5i_a13_apb0, "allwinner,sun5i-a13-apb0-gates-clk",
+>>                sunxi_simple_gates_init);
+>>  CLK_OF_DECLARE(sun5i_a13_apb1, "allwinner,sun5i-a13-apb1-gates-clk",
+>>                sunxi_simple_gates_init);
+>> +CLK_OF_DECLARE(sun5i_a13_dram, "allwinner,sun5i-a13-dram-gates-clk",
+>> +              sunxi_simple_gates_init);
 
-Yeah!
+Nit: Since the compatible added is sun5i, could you mention it in the
+commit message,
+to avoid confusion when we do this for the other families?
 
-I only recently started liking the BIT() macro (before I preferred hex, too).
-Perhaps because Renesas datasheets use bit numbers all over the place ;-)
+Thanks
 
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+>>  CLK_OF_DECLARE(sun6i_a31_ahb1, "allwinner,sun6i-a31-ahb1-gates-clk",
+>>                sunxi_simple_gates_init);
+>>  CLK_OF_DECLARE(sun6i_a31_apb1, "allwinner,sun6i-a31-apb1-gates-clk",
+>> --
+>> 2.6.2
+>>
