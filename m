@@ -1,56 +1,94 @@
-From: robh@kernel.org (Rob Herring)
-Date: Fri, 13 Nov 2015 08:40:32 -0600
-Subject: [PATCH v2 1/9] mfd: axp20x: Add AXP223 to list of supported
- PMICs in DT bindings
-In-Reply-To: <1447387456-9912-2-git-send-email-wens@csie.org>
-References: <1447387456-9912-1-git-send-email-wens@csie.org>
- <1447387456-9912-2-git-send-email-wens@csie.org>
-Message-ID: <20151113144032.GA17530@rob-hp-laptop>
+From: tony@atomide.com (Tony Lindgren)
+Date: Fri, 13 Nov 2015 06:41:59 -0800
+Subject: [PATCH 1/4] arm: omap2+: add missing HWMOD_NO_IDLEST in 81xx
+ hwmod data
+In-Reply-To: <56449F15.10508@baylibre.com>
+References: <5628A9F2.3010801@baylibre.com> <20151024012112.GA3078@atomide.com>
+ <CAA3gFWs8-3pqiZR8vYLDWdXwWjUcd9UK23W3dODGTT+FY55E7g@mail.gmail.com>
+ <56449F15.10508@baylibre.com>
+Message-ID: <20151113144158.GA2517@atomide.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 13, 2015 at 12:04:06PM +0800, Chen-Yu Tsai wrote:
-> The AXP223 is a new PMIC commonly paired with Allwinner A23/A33 SoCs.
-> It is functionally identical to AXP221; only the regulator default
-> voltage/status and the external host interface are different.
+* Neil Armstrong <narmstrong@baylibre.com> [151112 06:16]:
+> On 10/24/2015 12:09 PM, Neil Armstrong wrote:
+> > Hi,
+> > 
+> > 2015-10-24 3:21 GMT+02:00 Tony Lindgren <tony@atomide.com>:
+> >>
+> >> Hi,
+> >>
+> >> * Neil Armstrong <narmstrong@baylibre.com> [151022 02:19]:
+> >>> Add missing HWMOD_NO_IDLEST hwmod flag for entries no
+> >>> having omap4 clkctrl values.
+> >>
+> >> Have you checked this is the case both in dm814x and dm816x TRM?
+> >> Also the documentation may not be complete FYI, might be also
+> >> worth checking the legacy TI kernel tree to be sure.
+> >>
+> >> Regards,
+> >>
+> >> Tony
+> >>
+> >>> Cc: Brian Hutchinson <b.hutchman@gmail.com>
+> >>> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+> >>> ---
+> >>>  arch/arm/mach-omap2/omap_hwmod_81xx_data.c | 3 +++
+> >>>  1 file changed, 3 insertions(+)
+> >>>
+> >>> diff --git a/arch/arm/mach-omap2/omap_hwmod_81xx_data.c b/arch/arm/mach-omap2/omap_hwmod_81xx_data.c
+> >>> index b1288f5..6256052 100644
+> >>> --- a/arch/arm/mach-omap2/omap_hwmod_81xx_data.c
+> >>> +++ b/arch/arm/mach-omap2/omap_hwmod_81xx_data.c
+> >>> @@ -144,6 +144,7 @@ static struct omap_hwmod dm81xx_l4_ls_hwmod = {
+> >>>       .name           = "l4_ls",
+> >>>       .clkdm_name     = "alwon_l3s_clkdm",
+> >>>       .class          = &l4_hwmod_class,
+> >>> +     .flags          = HWMOD_NO_IDLEST,
+> >>>  };
+> > In DM814x TRM, the CM_ALWON_L3_SLOW_CLKSTCTRL does not have IDLEST field.
+> > Same in DM816x TRM.
+> > 
+> >>>
+> >>>  /*
+> >>> @@ -155,6 +156,7 @@ static struct omap_hwmod dm81xx_l4_hs_hwmod = {
+> >>>       .name           = "l4_hs",
+> >>>       .clkdm_name     = "alwon_l3_med_clkdm",
+> >>>       .class          = &l4_hwmod_class,
+> >>> +     .flags          = HWMOD_NO_IDLEST,
+> >>>  };
+> > In DM814x TRM, the CM_ALWON_L3_MED_CLKSTCTRL does not have IDLEST field.
+> > Same in DM816x TRM.
+> > 
+> >>>
+> >>>  /* L3 slow -> L4 ls peripheral interface running at 125MHz */
+> >>> @@ -850,6 +852,7 @@ static struct omap_hwmod dm816x_emac0_hwmod = {
+> >>>       .name           = "emac0",
+> >>>       .clkdm_name     = "alwon_ethernet_clkdm",
+> >>>       .class          = &dm816x_emac_hwmod_class,
+> >>> +     .flags          = HWMOD_NO_IDLEST,
+> >>>  };
+> > In this particular case, the IDLEST is handled in the MDIO hwmod.
+> > 
+> >>>
+> >>>  static struct omap_hwmod_ocp_if dm81xx_l4_hs__emac0 = {
+> >>> --
+> >>> 1.9.1
+> > 
+> > I'll check the TI tree to be sure...
+> > 
+> > Regards,
+> > Neil
+> > 
+> Tony,
 > 
-> Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-> Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+> In TI's tree, there is no L3_MED hwmod but the L3_SLOW hwmod has NO_IDLEST flag.
+> 
+> Is there any other issue about this patchset ?
 
-Acked-by: Rob Herring <robh@kernel.org>
+Thanks for checking. Well one thing, if this is needed as fix, then a
+description of what happens without it would be good to have.
 
-> ---
->  Documentation/devicetree/bindings/mfd/axp20x.txt | 7 ++++---
->  1 file changed, 4 insertions(+), 3 deletions(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/mfd/axp20x.txt b/Documentation/devicetree/bindings/mfd/axp20x.txt
-> index a474359dd206..fd39fa54571b 100644
-> --- a/Documentation/devicetree/bindings/mfd/axp20x.txt
-> +++ b/Documentation/devicetree/bindings/mfd/axp20x.txt
-> @@ -5,11 +5,12 @@ axp152 (X-Powers)
->  axp202 (X-Powers)
->  axp209 (X-Powers)
->  axp221 (X-Powers)
-> +axp223 (X-Powers)
->  
->  Required properties:
->  - compatible: "x-powers,axp152", "x-powers,axp202", "x-powers,axp209",
-> -	      "x-powers,axp221"
-> -- reg: The I2C slave address for the AXP chip
-> +	      "x-powers,axp221", "x-powers,axp223"
-> +- reg: The I2C slave address or RSB hardware address for the AXP chip
->  - interrupt-parent: The parent interrupt controller
->  - interrupts: SoC NMI / GPIO interrupt connected to the PMIC's IRQ pin
->  - interrupt-controller: The PMIC has its own internal IRQs
-> @@ -51,7 +52,7 @@ LDO3		: LDO		: ldo3in-supply
->  LDO4		: LDO		: ldo24in-supply	: shared supply
->  LDO5		: LDO		: ldo5in-supply
->  
-> -AXP221 regulators, type, and corresponding input supply names:
-> +AXP221/AXP223 regulators, type, and corresponding input supply names:
->  
->  Regulator	  Type		  Supply Name		  Notes
->  ---------	  ----		  -----------		  -----
-> -- 
-> 2.6.2
-> 
+Regards,
+
+Tony
