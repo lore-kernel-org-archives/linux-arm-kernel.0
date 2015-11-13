@@ -1,491 +1,654 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Fri, 13 Nov 2015 11:44:57 -0700
-Subject: [PATCH V4 06/26] coresight: associating path with session rather than
- tracer
+Date: Fri, 13 Nov 2015 11:45:17 -0700
+Subject: [PATCH V4 26/26] perf tools: adding coresight etm PMU record
+ capabilities
 In-Reply-To: <1447440317-1977-1-git-send-email-mathieu.poirier@linaro.org>
 References: <1447440317-1977-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1447440317-1977-7-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1447440317-1977-27-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When using the Coresight framework from the sysFS interface a
-tracer is always handling a single session and as such, a path
-can be associated with a tracer.  But when supporting multiple
-session per tracer there is no guarantee that sessions will always
-have the same path from source to sink.
-
-This patch is removing the automatic association between path and
-tracers.  The building of a path and enablement of the components
-in the path are decoupled, allowing for the association of a path
-with a session rather than a tracer.
-
-To keep backward functionality with the current sysFS access methods
-a per-cpu place holder is used to keep a handle on the path built when
-tracers are enabled.  Lastly APIs to build paths and enable tracers are
-made public so that other subsystem can interact with the Coresight
-framework.
+Coresight ETMs are IP blocks used to perform HW assisted tracing
+on a CPU core.  This patch introduce the required auxiliary API
+functions allowing the perf core to interact with a tracer.
 
 Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 ---
- drivers/hwtracing/coresight/coresight-priv.h |   5 +
- drivers/hwtracing/coresight/coresight.c      | 300 ++++++++++++++++++---------
- include/linux/coresight.h                    |   2 -
- 3 files changed, 208 insertions(+), 99 deletions(-)
+ MAINTAINERS                         |   3 +
+ tools/perf/arch/arm/util/Build      |   2 +-
+ tools/perf/arch/arm/util/auxtrace.c |  48 ++++
+ tools/perf/arch/arm/util/cs_etm.c   | 466 ++++++++++++++++++++++++++++++++++++
+ tools/perf/arch/arm/util/cs_etm.h   |  44 ++++
+ tools/perf/util/auxtrace.c          |   1 +
+ tools/perf/util/auxtrace.h          |   1 +
+ 7 files changed, 564 insertions(+), 1 deletion(-)
+ create mode 100644 tools/perf/arch/arm/util/auxtrace.c
+ create mode 100644 tools/perf/arch/arm/util/cs_etm.c
+ create mode 100644 tools/perf/arch/arm/util/cs_etm.h
 
-diff --git a/drivers/hwtracing/coresight/coresight-priv.h b/drivers/hwtracing/coresight/coresight-priv.h
-index 62fcd98cc7cf..7b193a34d709 100644
---- a/drivers/hwtracing/coresight/coresight-priv.h
-+++ b/drivers/hwtracing/coresight/coresight-priv.h
-@@ -52,6 +52,11 @@ static inline void CS_UNLOCK(void __iomem *addr)
- 	} while (0);
- }
+diff --git a/MAINTAINERS b/MAINTAINERS
+index d73f35aeaf3b..7b7646931886 100644
+--- a/MAINTAINERS
++++ b/MAINTAINERS
+@@ -1000,6 +1000,9 @@ F:	Documentation/trace/coresight.txt
+ F:	Documentation/devicetree/bindings/arm/coresight.txt
+ F:	Documentation/ABI/testing/sysfs-bus-coresight-devices-*
+ F:	tools/perf/arch/arm/util/pmu.c
++F:	tools/perf/arch/arm/util/auxtrace.c
++F:	tools/perf/arch/arm/util/cs_etm.c
++F:	tools/perf/arch/arm/util/cs_etm.h
  
-+void coresight_disable_path(struct list_head *path);
-+int coresight_enable_path(struct list_head *path);
-+struct list_head *coresight_build_path(struct coresight_device *csdev);
-+void coresight_release_path(struct list_head *path);
-+
- #ifdef CONFIG_CORESIGHT_SOURCE_ETM3X
- extern int etm_readl_cp14(u32 off, unsigned int *val);
- extern int etm_writel_cp14(u32 off, u32 val);
-diff --git a/drivers/hwtracing/coresight/coresight.c b/drivers/hwtracing/coresight/coresight.c
-index e25492137d8b..4beea67fd5a1 100644
---- a/drivers/hwtracing/coresight/coresight.c
-+++ b/drivers/hwtracing/coresight/coresight.c
-@@ -29,6 +29,22 @@
+ ARM/CORGI MACHINE SUPPORT
+ M:	Richard Purdie <rpurdie@rpsys.net>
+diff --git a/tools/perf/arch/arm/util/Build b/tools/perf/arch/arm/util/Build
+index 66ab0b05549c..0a25a1248f42 100644
+--- a/tools/perf/arch/arm/util/Build
++++ b/tools/perf/arch/arm/util/Build
+@@ -3,4 +3,4 @@ libperf-$(CONFIG_DWARF) += dwarf-regs.o
+ libperf-$(CONFIG_LIBUNWIND)          += unwind-libunwind.o
+ libperf-$(CONFIG_LIBDW_DWARF_UNWIND) += unwind-libdw.o
  
- static DEFINE_MUTEX(coresight_mutex);
- 
-+/**
-+ * struct coresight_node - elements of a path, from source to sink
-+ * @csdev:	Address of an element.
-+ * @link:	hook to the list.
-+ */
-+struct coresight_node {
-+	struct coresight_device *csdev;
-+	struct list_head link;
-+};
-+
+-libperf-$(CONFIG_AUXTRACE) += pmu.o
++libperf-$(CONFIG_AUXTRACE) += pmu.o auxtrace.o cs_etm.o
+diff --git a/tools/perf/arch/arm/util/auxtrace.c b/tools/perf/arch/arm/util/auxtrace.c
+new file mode 100644
+index 000000000000..4988fdf7cb8a
+--- /dev/null
++++ b/tools/perf/arch/arm/util/auxtrace.c
+@@ -0,0 +1,48 @@
 +/*
-+ * When operating Coresight drivers from the sysFS interface, only a single
-+ * path can exist from a tracer (associated to a CPU) to a sink.
-+ */
-+static DEFINE_PER_CPU(struct list_head *, sysfs_path);
-+
- static int coresight_id_match(struct device *dev, void *data)
- {
- 	int trace_id, i_trace_id;
-@@ -68,15 +84,12 @@ static int coresight_source_is_unique(struct coresight_device *csdev)
- 				 csdev, coresight_id_match);
- }
- 
--static int coresight_find_link_inport(struct coresight_device *csdev)
-+static int coresight_find_link_inport(struct coresight_device *csdev,
-+				      struct coresight_device *parent)
- {
- 	int i;
--	struct coresight_device *parent;
- 	struct coresight_connection *conn;
- 
--	parent = container_of(csdev->path_link.next,
--			      struct coresight_device, path_link);
--
- 	for (i = 0; i < parent->nr_outport; i++) {
- 		conn = &parent->conns[i];
- 		if (conn->child_dev == csdev)
-@@ -89,15 +102,12 @@ static int coresight_find_link_inport(struct coresight_device *csdev)
- 	return 0;
- }
- 
--static int coresight_find_link_outport(struct coresight_device *csdev)
-+static int coresight_find_link_outport(struct coresight_device *csdev,
-+				       struct coresight_device *child)
- {
- 	int i;
--	struct coresight_device *child;
- 	struct coresight_connection *conn;
- 
--	child = container_of(csdev->path_link.prev,
--			     struct coresight_device, path_link);
--
- 	for (i = 0; i < csdev->nr_outport; i++) {
- 		conn = &csdev->conns[i];
- 		if (conn->child_dev == child)
-@@ -138,14 +148,19 @@ static void coresight_disable_sink(struct coresight_device *csdev)
- 	}
- }
- 
--static int coresight_enable_link(struct coresight_device *csdev)
-+static int coresight_enable_link(struct coresight_device *csdev,
-+				 struct coresight_device *parent,
-+				 struct coresight_device *child)
- {
- 	int ret;
- 	int link_subtype;
- 	int refport, inport, outport;
- 
--	inport = coresight_find_link_inport(csdev);
--	outport = coresight_find_link_outport(csdev);
-+	if (!parent || !child)
-+		return -EINVAL;
-+
-+	inport = coresight_find_link_inport(csdev, parent);
-+	outport = coresight_find_link_outport(csdev, child);
- 	link_subtype = csdev->subtype.link_subtype;
- 
- 	if (link_subtype == CORESIGHT_DEV_SUBTYPE_LINK_MERG)
-@@ -168,14 +183,19 @@ static int coresight_enable_link(struct coresight_device *csdev)
- 	return 0;
- }
- 
--static void coresight_disable_link(struct coresight_device *csdev)
-+static void coresight_disable_link(struct coresight_device *csdev,
-+				   struct coresight_device *parent,
-+				   struct coresight_device *child)
- {
- 	int i, nr_conns;
- 	int link_subtype;
- 	int refport, inport, outport;
- 
--	inport = coresight_find_link_inport(csdev);
--	outport = coresight_find_link_outport(csdev);
-+	if (!parent || !child)
-+		return;
-+
-+	inport = coresight_find_link_inport(csdev, parent);
-+	outport = coresight_find_link_outport(csdev, child);
- 	link_subtype = csdev->subtype.link_subtype;
- 
- 	if (link_subtype == CORESIGHT_DEV_SUBTYPE_LINK_MERG) {
-@@ -235,109 +255,167 @@ static void coresight_disable_source(struct coresight_device *csdev)
- 	}
- }
- 
--static int coresight_enable_path(struct list_head *path)
-+void coresight_disable_path(struct list_head *path)
- {
--	int ret = 0;
--	struct coresight_device *cd;
--
--	/*
--	 * At this point we have a full @path, from source to sink.  The
--	 * sink is the first entry and the source the last one.  Go through
--	 * all the components and enable them one by one.
--	 */
--	list_for_each_entry(cd, path, path_link) {
--		if (cd == list_first_entry(path, struct coresight_device,
--					   path_link)) {
--			ret = coresight_enable_sink(cd);
--		} else if (list_is_last(&cd->path_link, path)) {
--			/*
--			 * Don't enable the source just yet - this needs to
--			 * happen at the very end when all links and sink
--			 * along the path have been configured properly.
--			 */
--			;
--		} else {
--			ret = coresight_enable_link(cd);
-+	struct coresight_node *nd;
-+	struct coresight_device *csdev, *parent, *child;
-+
-+	list_for_each_entry(nd, path, link) {
-+		csdev = nd->csdev;
-+
-+		switch (csdev->type) {
-+		case CORESIGHT_DEV_TYPE_SINK:
-+		case CORESIGHT_DEV_TYPE_LINKSINK:
-+			coresight_disable_sink(csdev);
-+			break;
-+		case CORESIGHT_DEV_TYPE_SOURCE:
-+			/* sources are disabled from either sysFS or Perf */
-+			break;
-+		case CORESIGHT_DEV_TYPE_LINK:
-+			parent = list_prev_entry(nd, link)->csdev;
-+			child = list_next_entry(nd, link)->csdev;
-+			coresight_disable_link(csdev, parent, child);
-+			break;
-+		default:
-+			break;
- 		}
--		if (ret)
--			goto err;
- 	}
-+}
- 
--	return 0;
--err:
--	list_for_each_entry_continue_reverse(cd, path, path_link) {
--		if (cd == list_first_entry(path, struct coresight_device,
--					   path_link)) {
--			coresight_disable_sink(cd);
--		} else if (list_is_last(&cd->path_link, path)) {
--			;
--		} else {
--			coresight_disable_link(cd);
-+int coresight_enable_path(struct list_head *path)
-+{
-+
-+	int ret = 0;
-+	struct coresight_node *nd;
-+	struct coresight_device *csdev, *parent, *child;
-+
-+	list_for_each_entry_reverse(nd, path, link) {
-+		csdev = nd->csdev;
-+
-+		switch (csdev->type) {
-+		case CORESIGHT_DEV_TYPE_SINK:
-+		case CORESIGHT_DEV_TYPE_LINKSINK:
-+			ret = coresight_enable_sink(csdev);
-+			if (ret)
-+				goto err;
-+			break;
-+		case CORESIGHT_DEV_TYPE_SOURCE:
-+			/* sources are enabled from either sysFS or Perf */
-+			break;
-+		case CORESIGHT_DEV_TYPE_LINK:
-+			parent = list_prev_entry(nd, link)->csdev;
-+			child = list_next_entry(nd, link)->csdev;
-+			ret = coresight_enable_link(csdev, parent, child);
-+			if (ret)
-+				goto err;
-+			break;
-+		default:
-+			goto err;
- 		}
- 	}
- 
-+out:
- 	return ret;
-+err:
-+	coresight_disable_path(path);
-+	goto out;
- }
- 
--static int coresight_disable_path(struct list_head *path)
-+/**
-+ * _coresight_build_path - recursively build a path from a @csdev to a sink.
-+ * @csdev:	The device to start from.
-+ * @path:	The list to add devices to.
++ * Copyright(C) 2015 Linaro Limited. All rights reserved.
++ * Author: Mathieu Poirier <mathieu.poirier@linaro.org>
 + *
-+ * The tree of Coresight device is traversed until an activated sink is
-+ * found.  From there the sink is added to the list along with all the
-+ * devices that led to that point - the end result is a list from source
-+ * to sink. In that list the source is the first device and the sink the
-+ * last one.
-+ */
-+static int _coresight_build_path(struct coresight_device *csdev,
-+				 struct list_head *path)
- {
--	struct coresight_device *cd;
--
--	list_for_each_entry_reverse(cd, path, path_link) {
--		if (cd == list_first_entry(path, struct coresight_device,
--					   path_link)) {
--			coresight_disable_sink(cd);
--		} else if (list_is_last(&cd->path_link, path)) {
--			/*
--			 * The source has already been stopped, no need
--			 * to do it again here.
--			 */
--			;
--		} else {
--			coresight_disable_link(cd);
-+	int i;
-+	bool found = false;
-+	struct coresight_node *node;
-+	struct coresight_connection *conn;
-+
-+	/* An activated sink has been found.  Enqueue the element */
-+	if ((csdev->type == CORESIGHT_DEV_TYPE_SINK ||
-+	     csdev->type == CORESIGHT_DEV_TYPE_LINKSINK) && csdev->activated)
-+		goto out;
-+
-+	/* Not a sink - recursively explore each port found on this element */
-+	for (i = 0; i < csdev->nr_outport; i++) {
-+		conn = &csdev->conns[i];
-+		if (_coresight_build_path(conn->child_dev, path) == 0) {
-+			found = true;
-+			break;
- 		}
- 	}
- 
-+	if (!found)
-+		return -ENODEV;
-+
-+out:
-+	/*
-+	 * A path from this element to a sink has been found.  The elements
-+	 * leading to the sink are already enqueued, all that is left to do
-+	 * is add a node for this element.
-+	 */
-+	node = kzalloc(sizeof(struct coresight_node), GFP_KERNEL);
-+	if (!node)
-+		return -ENOMEM;
-+
-+	node->csdev = csdev;
-+	list_add(&node->link, path);
-+
- 	return 0;
- }
- 
--static int coresight_build_paths(struct coresight_device *csdev,
--				 struct list_head *path,
--				 bool enable)
-+struct list_head *coresight_build_path(struct coresight_device *csdev)
- {
--	int i, ret = -EINVAL;
--	struct coresight_connection *conn;
-+	struct list_head *path;
- 
--	list_add(&csdev->path_link, path);
-+	path = kzalloc(sizeof(struct list_head), GFP_KERNEL);
-+	if (!path)
-+		return NULL;
- 
--	if ((csdev->type == CORESIGHT_DEV_TYPE_SINK ||
--	    csdev->type == CORESIGHT_DEV_TYPE_LINKSINK) &&
--	    csdev->activated) {
--		if (enable)
--			ret = coresight_enable_path(path);
--		else
--			ret = coresight_disable_path(path);
--	} else {
--		for (i = 0; i < csdev->nr_outport; i++) {
--			conn = &csdev->conns[i];
--			if (coresight_build_paths(conn->child_dev,
--						    path, enable) == 0)
--				ret = 0;
--		}
-+	INIT_LIST_HEAD(path);
-+
-+	if (_coresight_build_path(csdev, path)) {
-+		kfree(path);
-+		path = NULL;
- 	}
- 
--	if (list_first_entry(path, struct coresight_device, path_link) != csdev)
--		dev_err(&csdev->dev, "wrong device in %s\n", __func__);
-+	return path;
-+}
- 
--	list_del(&csdev->path_link);
-+/**
-+ * coresight_release_path - release a previously built path.
-+ * @path:	the path to release.
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms of the GNU General Public License version 2 as published by
++ * the Free Software Foundation.
 + *
-+ * Go through all the elements of a path and 1) removed it from the list and
-+ * 2) free the memory allocated for each node.
++ * This program is distributed in the hope that it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
++ * more details.
++ *
++ * You should have received a copy of the GNU General Public License along with
++ * this program.  If not, see <http://www.gnu.org/licenses/>.
 + */
-+void coresight_release_path(struct list_head *path)
++
++#include <stdbool.h>
++#include <linux/coresight-pmu.h>
++
++#include "../../util/auxtrace.h"
++#include "../../util/evlist.h"
++#include "../../util/pmu.h"
++#include "cs_etm.h"
++
++struct auxtrace_record
++*auxtrace_record__init(struct perf_evlist *evlist, int *err)
 +{
-+	struct coresight_node *nd, *next;
- 
--	return ret;
-+	list_for_each_entry_safe(nd, next, path, link) {
-+		list_del(&nd->link);
-+		kfree(nd);
++	struct perf_pmu	*cs_etm_pmu;
++	struct perf_evsel *evsel;
++	bool found_etm = false;
++
++	cs_etm_pmu = perf_pmu__find(CORESIGHT_ETM_PMU_NAME);
++
++	 if (evlist) {
++		evlist__for_each(evlist, evsel) {
++			if (cs_etm_pmu &&
++			    evsel->attr.type == cs_etm_pmu->type)
++				found_etm = true;
++		}
 +	}
 +
-+	kfree(path);
-+	path = NULL;
- }
- 
- int coresight_enable(struct coresight_device *csdev)
- {
- 	int ret = 0;
--	LIST_HEAD(path);
-+	int cpu;
-+	struct list_head *path;
- 
- 	mutex_lock(&coresight_mutex);
- 	if (csdev->type != CORESIGHT_DEV_TYPE_SOURCE) {
-@@ -348,22 +426,47 @@ int coresight_enable(struct coresight_device *csdev)
- 	if (csdev->enable)
- 		goto out;
- 
--	if (coresight_build_paths(csdev, &path, true)) {
--		dev_err(&csdev->dev, "building path(s) failed\n");
-+	path = coresight_build_path(csdev);
-+	if (!path) {
-+		pr_err("building path(s) failed\n");
- 		goto out;
- 	}
- 
--	if (coresight_enable_source(csdev))
--		dev_err(&csdev->dev, "source enable failed\n");
-+	ret = coresight_enable_path(path);
-+	if (ret)
-+		goto err_path;
++	if (found_etm)
++		return cs_etm_record_init(err);
 +
-+	ret = coresight_enable_source(csdev);
-+	if (ret)
-+		goto err_source;
++	*err = -EINVAL;
++	return NULL;
++}
+diff --git a/tools/perf/arch/arm/util/cs_etm.c b/tools/perf/arch/arm/util/cs_etm.c
+new file mode 100644
+index 000000000000..ea68a99310fe
+--- /dev/null
++++ b/tools/perf/arch/arm/util/cs_etm.c
+@@ -0,0 +1,466 @@
++/*
++ * Copyright(C) 2015 Linaro Limited. All rights reserved.
++ * Author: Mathieu Poirier <mathieu.poirier@linaro.org>
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms of the GNU General Public License version 2 as published by
++ * the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
++ * more details.
++ *
++ * You should have received a copy of the GNU General Public License along with
++ * this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
 +
-+	/*
-+	 * When working from sysFS it is important to keep track
-+	 * of the paths that were created so that they can be
-+	 * undone in 'coresight_disable()'.  Since there can only
-+	 * be a single session per tracer (when working from sysFS)
-+	 * a per-cpu variable will do just fine.
-+	 */
-+	cpu = source_ops(csdev)->cpu_id(csdev);
-+	per_cpu(sysfs_path, cpu) = path;
++#include <api/fs/fs.h>
++#include <linux/bitops.h>
++#include <linux/coresight-pmu.h>
++#include <linux/kernel.h>
++#include <linux/log2.h>
++#include <linux/types.h>
 +
- out:
- 	mutex_unlock(&coresight_mutex);
- 	return ret;
++#include "../../perf.h"
++#include "../../util/auxtrace.h"
++#include "../../util/cpumap.h"
++#include "../../util/evlist.h"
++#include "../../util/pmu.h"
++#include "../../util/thread_map.h"
++#include "cs_etm.h"
 +
-+err_source:
-+	coresight_disable_path(path);
++#include <stdlib.h>
 +
-+err_path:
-+	coresight_release_path(path);
-+	goto out;
- }
- EXPORT_SYMBOL_GPL(coresight_enable);
++#define KiB(x) ((x) * 1024)
++#define MiB(x) ((x) * 1024 * 1024)
++
++struct cs_etm_recording {
++	struct auxtrace_record	itr;
++	struct perf_pmu		*cs_etm_pmu;
++	struct perf_evlist	*evlist;
++	bool			snapshot_mode;
++	size_t			snapshot_size;
++};
++
++static int cs_etm_parse_snapshot_options(struct auxtrace_record *itr,
++					 struct record_opts *opts,
++					 const char *str)
++{
++	struct cs_etm_recording *ptr =
++				container_of(itr, struct cs_etm_recording, itr);
++	unsigned long long snapshot_size = 0;
++	char *endptr;
++
++	if (str) {
++		snapshot_size = strtoull(str, &endptr, 0);
++		if (*endptr || snapshot_size > SIZE_MAX)
++			return -1;
++	}
++
++	opts->auxtrace_snapshot_mode = true;
++	opts->auxtrace_snapshot_size = snapshot_size;
++	ptr->snapshot_size = snapshot_size;
++
++	return 0;
++}
++
++static int cs_etm_recording_options(struct auxtrace_record *itr,
++				    struct perf_evlist *evlist,
++				    struct record_opts *opts)
++{
++	struct cs_etm_recording *ptr =
++				container_of(itr, struct cs_etm_recording, itr);
++	struct perf_pmu *cs_etm_pmu = ptr->cs_etm_pmu;
++	struct perf_evsel *evsel, *cs_etm_evsel = NULL;
++	const struct cpu_map *cpus = evlist->cpus;
++	bool privileged = (geteuid() == 0 || perf_event_paranoid() < 0);
++
++	ptr->evlist = evlist;
++	ptr->snapshot_mode = opts->auxtrace_snapshot_mode;
++
++	evlist__for_each(evlist, evsel) {
++		if (evsel->attr.type == cs_etm_pmu->type) {
++			if (cs_etm_evsel) {
++				pr_err("There may be only one %s event\n",
++				       CORESIGHT_ETM_PMU_NAME);
++				return -EINVAL;
++			}
++			evsel->attr.freq = 0;
++			evsel->attr.sample_period = 1;
++			cs_etm_evsel = evsel;
++			opts->full_auxtrace = true;
++		}
++	}
++
++	/* no need to continue if at least one event of interest was found */
++	if (!cs_etm_evsel)
++		return 0;
++
++	if (opts->use_clockid) {
++		pr_err("Cannot use clockid (-k option) with %s\n",
++		       CORESIGHT_ETM_PMU_NAME);
++		return -EINVAL;
++	}
++
++	/* we are in snapshot mode */
++	if (opts->auxtrace_snapshot_mode) {
++		/*
++		 * No size were given to '-S' or '-m,', so go with
++		 * the default
++		 */
++		if (!opts->auxtrace_snapshot_size &&
++		    !opts->auxtrace_mmap_pages) {
++			if (privileged) {
++				opts->auxtrace_mmap_pages = MiB(4) / page_size;
++			} else {
++				opts->auxtrace_mmap_pages =
++							KiB(128) / page_size;
++				if (opts->mmap_pages == UINT_MAX)
++					opts->mmap_pages = KiB(256) / page_size;
++			}
++		} else if (!opts->auxtrace_mmap_pages && !privileged &&
++						opts->mmap_pages == UINT_MAX) {
++			opts->mmap_pages = KiB(256) / page_size;
++		}
++
++		/*
++		 * '-m,xyz' was specified but no snapshot size, so make the
++		 * snapshot size as big as the auxtrace mmap area.
++		 */
++		if (!opts->auxtrace_snapshot_size) {
++			opts->auxtrace_snapshot_size =
++				opts->auxtrace_mmap_pages * (size_t)page_size;
++		}
++
++		/*
++		 * -Sxyz was specified but no auxtrace mmap area, so make the
++		 * auxtrace mmap area big enough to fit the requested snapshot
++		 * size.
++		 */
++		if (!opts->auxtrace_mmap_pages) {
++			size_t sz = opts->auxtrace_snapshot_size;
++
++			sz = round_up(sz, page_size) / page_size;
++			opts->auxtrace_mmap_pages = roundup_pow_of_two(sz);
++		}
++
++		/* Snapshost size can't be bigger than the auxtrace area */
++		if (opts->auxtrace_snapshot_size >
++				opts->auxtrace_mmap_pages * (size_t)page_size) {
++			pr_err("Snapshot size %zu must not be greater than AUX area tracing mmap size %zu\n",
++			       opts->auxtrace_snapshot_size,
++			       opts->auxtrace_mmap_pages * (size_t)page_size);
++			return -EINVAL;
++		}
++
++		/* Something went wrong somewhere - this shouldn't happen */
++		if (!opts->auxtrace_snapshot_size ||
++		    !opts->auxtrace_mmap_pages) {
++			pr_err("Failed to calculate default snapshot size and/or AUX area tracing mmap pages\n");
++			return -EINVAL;
++		}
++	}
++
++	/* We are in full trace mode but '-m,xyz' wasn't specified */
++	 if (opts->full_auxtrace && !opts->auxtrace_mmap_pages) {
++		if (privileged) {
++			opts->auxtrace_mmap_pages = MiB(4) / page_size;
++		} else {
++			opts->auxtrace_mmap_pages = KiB(128) / page_size;
++			if (opts->mmap_pages == UINT_MAX)
++				opts->mmap_pages = KiB(256) / page_size;
++		}
++
++	}
++
++	/* Validate auxtrace_mmap_pages provided by user */
++	if (opts->auxtrace_mmap_pages) {
++		unsigned int max_page = (KiB(128) / page_size);
++		size_t sz = opts->auxtrace_mmap_pages * (size_t)page_size;
++
++		if (!privileged &&
++		    opts->auxtrace_mmap_pages > max_page) {
++			opts->auxtrace_mmap_pages = max_page;
++			pr_err("auxtrace too big, truncating to %d\n",
++			       max_page);
++		}
++
++		if (!is_power_of_2(sz)) {
++			pr_err("Invalid mmap size for %s: must be a power of 2\n",
++			       CORESIGHT_ETM_PMU_NAME);
++			return -EINVAL;
++		}
++	}
++
++	if (opts->auxtrace_snapshot_mode)
++		pr_debug2("%s snapshot size: %zu\n", CORESIGHT_ETM_PMU_NAME,
++			  opts->auxtrace_snapshot_size);
++
++	if (cs_etm_evsel) {
++		/*
++		 * To obtain the auxtrace buffer file descriptor, the auxtrace
++		 * event must come first.
++		 */
++		perf_evlist__to_front(evlist, cs_etm_evsel);
++		/*
++		 * In the case of per-cpu mmaps, we need the CPU on the
++		 * AUX event.
++		 */
++		if (!cpu_map__empty(cpus))
++			perf_evsel__set_sample_bit(cs_etm_evsel, CPU);
++	}
++
++	/* Add dummy event to keep tracking */
++	if (opts->full_auxtrace) {
++		struct perf_evsel *tracking_evsel;
++		int err;
++
++		err = parse_events(evlist, "dummy:u", NULL);
++		if (err)
++			return err;
++
++		tracking_evsel = perf_evlist__last(evlist);
++		perf_evlist__set_tracking_event(evlist, tracking_evsel);
++
++		tracking_evsel->attr.freq = 0;
++		tracking_evsel->attr.sample_period = 1;
++
++		/* In per-cpu case, always need the time of mmap events etc */
++		if (!cpu_map__empty(cpus))
++			perf_evsel__set_sample_bit(tracking_evsel, TIME);
++	}
++
++	return 0;
++}
++
++static u64 cs_etm_get_config(struct auxtrace_record *itr)
++{
++	u64 config = 0;
++	struct cs_etm_recording *ptr =
++			container_of(itr, struct cs_etm_recording, itr);
++	struct perf_pmu *cs_etm_pmu = ptr->cs_etm_pmu;
++	struct perf_evlist *evlist = ptr->evlist;
++	struct perf_evsel *evsel;
++
++	evlist__for_each(evlist, evsel) {
++		if (evsel->attr.type == cs_etm_pmu->type) {
++			/*
++			 * Variable perf_event_attr::config is assigned to
++			 * ETMv3/PTM.  The bit fields have been made to match
++			 * the ETMv3.5 ETRMCR register specification.  See the
++			 * PMU_FORMAT_ATTR() declarations in
++			 * drivers/hwtracing/coresight/coresight-perf.c for
++			 * details.
++			 */
++			config = evsel->attr.config;
++			break;
++		}
++	}
++
++	return config;
++}
++
++static size_t
++cs_etm_info_priv_size(struct auxtrace_record *itr __maybe_unused,
++		      struct perf_session *session __maybe_unused)
++{
++	int records;
++	const struct cpu_map *cpus = session->evlist->cpus;
++
++	if (!cpu_map__empty(cpus)) {
++		records = cpu_map__nr(cpus);
++		goto out;
++	}
++
++	set_max_cpu_num();
++	records = cpu__max_cpu();
++out:
++	return records * CS_ETM_PRIV_SIZE;
++}
++
++static const char *metadata_etmv3_ro[CS_ETM_PRIV_MAX] = {
++	[CS_ETM_ETMCCER]	= "mgmt/etmccer",
++	[CS_ETM_ETMIDR]		= "mgmt/etmidr",
++};
++
++static int cs_etm_get_metadata(int cpu, int index,
++			       struct auxtrace_record *itr,
++			       struct auxtrace_info_event *info)
++{
++	char path[PATH_MAX];
++	int offset = 0, ret = 0;
++	int i, scan;
++	unsigned int val;
++	struct cs_etm_recording *ptr =
++			container_of(itr, struct cs_etm_recording, itr);
++	struct perf_pmu *cs_etm_pmu = ptr->cs_etm_pmu;
++
++	offset = index * CS_ETM_PRIV_MAX;
++
++	/* Build generic header portion */
++	info->priv[offset + CS_ETM_MAGIC] = __perf_cs_etm_magic;
++	info->priv[offset + CS_ETM_CPU] = cpu;
++	info->priv[offset + CS_ETM_SNAPSHOT] = ptr->snapshot_mode;
++
++	/* Get user configurables from the session */
++	info->priv[offset + CS_ETM_ETMCR] = cs_etm_get_config(itr);
++	info->priv[offset + CS_ETM_ETMTRACEIDR] = coresight_get_trace_id(cpu);
++
++	/* Get RO metadata from sysfs */
++	for (i = CS_ETM_ETMCCER; i < CS_ETM_PRIV_MAX; i++) {
++		snprintf(path, PATH_MAX, "cpu%d/%s", cpu, metadata_etmv3_ro[i]);
++
++		scan = perf_pmu__scan_file(cs_etm_pmu, path, "%x", &val);
++		if (scan != 1) {
++			ret = -EINVAL;
++			break;
++		}
++
++		info->priv[offset + i] = val;
++	}
++
++	return ret;
++}
++
++static int cs_etm_info_fill(struct auxtrace_record *itr,
++			    struct perf_session *session,
++			    struct auxtrace_info_event *auxtrace_info,
++			    size_t priv_size)
++{
++	int i, nr_cpu, ret = 0;
++	const struct cpu_map *cpus = session->evlist->cpus;
++
++	if (priv_size != cs_etm_info_priv_size(itr, session))
++		return -EINVAL;
++
++	if (!session->evlist->nr_mmaps)
++		return -EINVAL;
++
++	auxtrace_info->type = PERF_AUXTRACE_CS_ETM;
++
++	/* cpu map is not empty, we have specific CPUs to work with */
++	if (!cpu_map__empty(cpus)) {
++		for (i = 0; i < cpu_map__nr(cpus); i++) {
++			ret = cs_etm_get_metadata(cpus->map[i], i,
++						  itr, auxtrace_info);
++			if (ret)
++				goto out;
++		}
++	} else {
++		/* get configuration for all CPUs in the system */
++		nr_cpu = cpu__max_cpu();
++		for (i = 0; i < nr_cpu; i++) {
++			ret = cs_etm_get_metadata(i, i, itr, auxtrace_info);
++			if (ret)
++				goto out;
++		}
++	}
++
++out:
++	return ret;
++}
++
++static int cs_etm_find_snapshot(struct auxtrace_record *itr __maybe_unused,
++				int idx, struct auxtrace_mmap *mm,
++				unsigned char *data __maybe_unused,
++				u64 *head, u64 *old)
++{
++	pr_debug3("%s: mmap index %d old head %zu new head %zu size %zu\n",
++		  __func__, idx, (size_t)*old, (size_t)*head, mm->len);
++
++	*old = *head;
++	*head += mm->len;
++
++	return 0;
++}
++
++static int cs_etm_snapshot_start(struct auxtrace_record *itr)
++{
++	struct cs_etm_recording *ptr =
++			container_of(itr, struct cs_etm_recording, itr);
++	struct perf_evsel *evsel;
++
++	evlist__for_each(ptr->evlist, evsel) {
++		if (evsel->attr.type == ptr->cs_etm_pmu->type)
++			return perf_evlist__disable_event(ptr->evlist, evsel);
++	}
++	return -EINVAL;
++}
++
++static int cs_etm_snapshot_finish(struct auxtrace_record *itr)
++{
++	struct cs_etm_recording *ptr =
++			container_of(itr, struct cs_etm_recording, itr);
++	struct perf_evsel *evsel;
++
++	evlist__for_each(ptr->evlist, evsel) {
++		if (evsel->attr.type == ptr->cs_etm_pmu->type)
++			return perf_evlist__enable_event(ptr->evlist, evsel);
++	}
++	return -EINVAL;
++}
++
++static u64 cs_etm_reference(struct auxtrace_record *itr __maybe_unused)
++{
++	return (((u64) rand() <<  0) & 0x00000000FFFFFFFFull) |
++		(((u64) rand() << 32) & 0xFFFFFFFF00000000ull);
++}
++
++static void cs_etm_recording_free(struct auxtrace_record *itr)
++{
++	struct cs_etm_recording *ptr =
++			container_of(itr, struct cs_etm_recording, itr);
++	free(ptr);
++}
++
++static int cs_etm_read_finish(struct auxtrace_record *itr, int idx)
++{
++	struct cs_etm_recording *ptr =
++			container_of(itr, struct cs_etm_recording, itr);
++	struct perf_evsel *evsel;
++
++	evlist__for_each(ptr->evlist, evsel) {
++		if (evsel->attr.type == ptr->cs_etm_pmu->type)
++			return perf_evlist__enable_event_idx(ptr->evlist,
++							     evsel, idx);
++	}
++
++	return -EINVAL;
++}
++
++struct auxtrace_record *cs_etm_record_init(int *err)
++{
++	struct perf_pmu *cs_etm_pmu;
++	struct cs_etm_recording *ptr;
++
++	cs_etm_pmu = perf_pmu__find(CORESIGHT_ETM_PMU_NAME);
++
++	if (!cs_etm_pmu) {
++		*err = -EINVAL;
++		goto out;
++	}
++
++	ptr = zalloc(sizeof(struct cs_etm_recording));
++	if (!ptr) {
++		*err = -ENOMEM;
++		goto out;
++	}
++
++	ptr->cs_etm_pmu			= cs_etm_pmu;
++	ptr->itr.parse_snapshot_options	= cs_etm_parse_snapshot_options;
++	ptr->itr.recording_options	= cs_etm_recording_options;
++	ptr->itr.info_priv_size		= cs_etm_info_priv_size;
++	ptr->itr.info_fill		= cs_etm_info_fill;
++	ptr->itr.find_snapshot		= cs_etm_find_snapshot;
++	ptr->itr.snapshot_start		= cs_etm_snapshot_start;
++	ptr->itr.snapshot_finish	= cs_etm_snapshot_finish;
++	ptr->itr.reference		= cs_etm_reference;
++	ptr->itr.free			= cs_etm_recording_free;
++	ptr->itr.read_finish		= cs_etm_read_finish;
++
++	*err = 0;
++	return &ptr->itr;
++out:
++	return NULL;
++}
+diff --git a/tools/perf/arch/arm/util/cs_etm.h b/tools/perf/arch/arm/util/cs_etm.h
+new file mode 100644
+index 000000000000..7e85c1b43598
+--- /dev/null
++++ b/tools/perf/arch/arm/util/cs_etm.h
+@@ -0,0 +1,44 @@
++/*
++ * Copyright(C) 2015 Linaro Limited. All rights reserved.
++ * Author: Mathieu Poirier <mathieu.poirier@linaro.org>
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms of the GNU General Public License version 2 as published by
++ * the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
++ * more details.
++ *
++ * You should have received a copy of the GNU General Public License along with
++ * this program.  If not, see <http://www.gnu.org/licenses/>.
++ */
++
++#ifndef INCLUDE__PERF_CS_ETM_H__
++#define INCLUDE__PERF_CS_ETM_H__
++
++/* Beginning of header common to both ETMv3 and V4 */
++enum {
++	CS_ETM_MAGIC,
++	CS_ETM_CPU,
++	CS_ETM_SNAPSHOT,
++};
++
++/* ETMv3/PTM metadata */
++enum {
++	/* Dynamic, configurable parameters */
++	CS_ETM_ETMCR = CS_ETM_SNAPSHOT + 1,
++	CS_ETM_ETMTRACEIDR,
++	/* RO, taken from sysFS */
++	CS_ETM_ETMCCER,
++	CS_ETM_ETMIDR,
++	CS_ETM_PRIV_MAX,
++};
++
++static const u64 __perf_cs_etm_magic   = 0x3030303030303030ULL;
++#define CS_ETM_PRIV_SIZE (CS_ETM_PRIV_MAX * sizeof(u64))
++
++struct auxtrace_record *cs_etm_record_init(int *err);
++
++#endif
+diff --git a/tools/perf/util/auxtrace.c b/tools/perf/util/auxtrace.c
+index 430df9575dbe..666773d4e942 100644
+--- a/tools/perf/util/auxtrace.c
++++ b/tools/perf/util/auxtrace.c
+@@ -892,6 +892,7 @@ int perf_event__process_auxtrace_info(struct perf_tool *tool __maybe_unused,
+ 		return intel_pt_process_auxtrace_info(event, session);
+ 	case PERF_AUXTRACE_INTEL_BTS:
+ 		return intel_bts_process_auxtrace_info(event, session);
++	case PERF_AUXTRACE_CS_ETM:
+ 	case PERF_AUXTRACE_UNKNOWN:
+ 	default:
+ 		return -EINVAL;
+diff --git a/tools/perf/util/auxtrace.h b/tools/perf/util/auxtrace.h
+index d76177169484..d52db67da08d 100644
+--- a/tools/perf/util/auxtrace.h
++++ b/tools/perf/util/auxtrace.h
+@@ -41,6 +41,7 @@ enum auxtrace_type {
+ 	PERF_AUXTRACE_UNKNOWN,
+ 	PERF_AUXTRACE_INTEL_PT,
+ 	PERF_AUXTRACE_INTEL_BTS,
++	PERF_AUXTRACE_CS_ETM,
+ };
  
- void coresight_disable(struct coresight_device *csdev)
- {
--	LIST_HEAD(path);
-+	int cpu;
-+	struct list_head *path;
- 
- 	mutex_lock(&coresight_mutex);
- 	if (csdev->type != CORESIGHT_DEV_TYPE_SOURCE) {
-@@ -373,9 +476,12 @@ void coresight_disable(struct coresight_device *csdev)
- 	if (!csdev->enable)
- 		goto out;
- 
-+	cpu = source_ops(csdev)->cpu_id(csdev);
-+	path = per_cpu(sysfs_path, cpu);
- 	coresight_disable_source(csdev);
--	if (coresight_build_paths(csdev, &path, false))
--		dev_err(&csdev->dev, "releasing path(s) failed\n");
-+	coresight_disable_path(path);
-+	coresight_release_path(path);
-+	per_cpu(sysfs_path, cpu) = NULL;
- 
- out:
- 	mutex_unlock(&coresight_mutex);
-diff --git a/include/linux/coresight.h b/include/linux/coresight.h
-index bf62b265bf52..851ecb22397e 100644
---- a/include/linux/coresight.h
-+++ b/include/linux/coresight.h
-@@ -152,7 +152,6 @@ struct coresight_connection {
- 		by @coresight_ops.
-  * @dev:	The device entity associated to this component.
-  * @refcnt:	keep track of what is in use.
-- * @path_link:	link of current component into the path being enabled.
-  * @orphan:	true if the component has connections that haven't been linked.
-  * @enable:	'true' if component is currently part of an active path.
-  * @activated:	'true' only if a _sink_ has been activated.  A sink can be
-@@ -168,7 +167,6 @@ struct coresight_device {
- 	const struct coresight_ops *ops;
- 	struct device dev;
- 	atomic_t *refcnt;
--	struct list_head path_link;
- 	bool orphan;
- 	bool enable;	/* true only if configured as part of a path */
- 	bool activated;	/* true only if a sink is part of a path */
+ enum itrace_period_type {
 -- 
 1.9.1
