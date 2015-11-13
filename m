@@ -1,31 +1,46 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Fri, 13 Nov 2015 15:11:16 -0500 (EST)
-Subject: [PATCH 0/5] Fix regression introduced by set_irq_flags() removal
-In-Reply-To: <20151111092638.587a53a4@free-electrons.com>
-References: <1445347435-2333-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <20151020140427.GE3953@io.lakedaemon.net>
- <20151020160828.497fcc80@free-electrons.com>
- <alpine.DEB.2.11.1510202121590.8159@nanos>
- <20151111092638.587a53a4@free-electrons.com>
-Message-ID: <alpine.DEB.2.11.1511131509180.3987@nanos>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Fri, 13 Nov 2015 21:15:49 +0100
+Subject: [PATCH 2/2] [media] include/media: move platform driver headers
+ to a separate dir
+In-Reply-To: <20151113171341.0972ef7a@recife.lan>
+References: <413d2bb0b813a7e62867de7a94b0ab61e16cb1cb.1447261977.git.mchehab@osg.samsung.com>
+ <09e182fa61a7122356b790cd2a4a7f622dabb4ce.1447261977.git.mchehab@osg.samsung.com>
+ <4220808.QEkJDXYE1T@wuerfel> <20151113171341.0972ef7a@recife.lan>
+Message-ID: <CAMuHMdUBmMOHZ1mo3S5_K0B=0YywA3Xm5VyZ1Kk1UOsLUt_fPQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thomas,
+On Fri, Nov 13, 2015 at 8:13 PM, Mauro Carvalho Chehab
+<mchehab@osg.samsung.com> wrote:
+>> I think the latter should go into include/linux/platform_data/media/*.h instead.
+>
+> Agreed.
+>
+> Please see the enclosed patch:
+>
+>
+> Subject: [PATCH] [media] include/media: move platform driver headers to a
+>  separate dirs
+>
+> Let's not mix headers used by the core with those headers that
+> are needed by some specific platform drivers or by platform data.
+>
+> This patch was made via this script:
+>         mkdir include/media/platform mkdir include/media/platform_data
+>         (cd include/media/; git mv $(grep -l platform_data *.h|grep -v v4l2)
 
-On Wed, 11 Nov 2015, Thomas Petazzoni wrote:
-> Have you had the time to consider the proposed solution? For 4.3 we
-> implemented the quick work-around that consisted in clearing
-> IRQ_NOAUTOEN, but it's probably not a very good long-term solution.
-> 
-> Don't hesitate to let me know if you'd like to see some modifications
-> to the proposed approach, or if you have a totally different approach
-> in mind.
+I think include/linux/platform_data/media/, like Arnd suggested,
+would be better.
 
-I'm not sure if we really need all that muck if we can just rely on
-that flag. I don't see the extra value, but you might have something
-in mind which does not jump into my face right now.
+Then we can make it a common goal to empty include/linux/platform_data/ ;-)
 
-Thanks,
+Gr{oetje,eeting}s,
 
-	tglx
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
