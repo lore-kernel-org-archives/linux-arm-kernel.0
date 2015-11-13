@@ -1,40 +1,101 @@
-From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Fri, 13 Nov 2015 09:17:18 -0700
-Subject: [PATCH V3 02/26] coresight: etm3x: moving sysFS entries to
- dedicated file
-In-Reply-To: <4446604.iDni9pkfpc@wuerfel>
-References: <1447280296-19147-1-git-send-email-mathieu.poirier@linaro.org>
- <1447280296-19147-3-git-send-email-mathieu.poirier@linaro.org>
- <4446604.iDni9pkfpc@wuerfel>
-Message-ID: <CANLsYkyEHEUu6TAgL4Av=Ucvs3U-K3+3J9mHN8=k4LXGLMGGcQ@mail.gmail.com>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Fri, 13 Nov 2015 17:18:23 +0100
+Subject: [PATCH 1/4] arm: omap2+: add missing HWMOD_NO_IDLEST in 81xx
+ hwmod data
+In-Reply-To: <20151113144158.GA2517@atomide.com>
+References: <5628A9F2.3010801@baylibre.com> <20151024012112.GA3078@atomide.com>
+ <CAA3gFWs8-3pqiZR8vYLDWdXwWjUcd9UK23W3dODGTT+FY55E7g@mail.gmail.com>
+ <56449F15.10508@baylibre.com> <20151113144158.GA2517@atomide.com>
+Message-ID: <56460D4F.5010807@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11 November 2015 at 15:30, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Wednesday 11 November 2015 15:17:52 Mathieu Poirier wrote:
->> SysFS entries are big enough to justify their own file.
->> As such moving all sysFS related declarations to a dedicated
->> location.
+On 11/13/2015 03:41 PM, Tony Lindgren wrote:
+> * Neil Armstrong <narmstrong@baylibre.com> [151112 06:16]:
+>> On 10/24/2015 12:09 PM, Neil Armstrong wrote:
+>>> Hi,
+>>>
+>>> 2015-10-24 3:21 GMT+02:00 Tony Lindgren <tony@atomide.com>:
+>>>>
+>>>> Hi,
+>>>>
+>>>> * Neil Armstrong <narmstrong@baylibre.com> [151022 02:19]:
+>>>>> Add missing HWMOD_NO_IDLEST hwmod flag for entries no
+>>>>> having omap4 clkctrl values.
+>>>>
+>>>> Have you checked this is the case both in dm814x and dm816x TRM?
+>>>> Also the documentation may not be complete FYI, might be also
+>>>> worth checking the legacy TI kernel tree to be sure.
+>>>>
+>>>> Regards,
+>>>>
+>>>> Tony
+>>>>
+>>>>> Cc: Brian Hutchinson <b.hutchman@gmail.com>
+>>>>> Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+>>>>> ---
+>>>>>  arch/arm/mach-omap2/omap_hwmod_81xx_data.c | 3 +++
+>>>>>  1 file changed, 3 insertions(+)
+>>>>>
+>>>>> diff --git a/arch/arm/mach-omap2/omap_hwmod_81xx_data.c b/arch/arm/mach-omap2/omap_hwmod_81xx_data.c
+>>>>> index b1288f5..6256052 100644
+>>>>> --- a/arch/arm/mach-omap2/omap_hwmod_81xx_data.c
+>>>>> +++ b/arch/arm/mach-omap2/omap_hwmod_81xx_data.c
+>>>>> @@ -144,6 +144,7 @@ static struct omap_hwmod dm81xx_l4_ls_hwmod = {
+>>>>>       .name           = "l4_ls",
+>>>>>       .clkdm_name     = "alwon_l3s_clkdm",
+>>>>>       .class          = &l4_hwmod_class,
+>>>>> +     .flags          = HWMOD_NO_IDLEST,
+>>>>>  };
+>>> In DM814x TRM, the CM_ALWON_L3_SLOW_CLKSTCTRL does not have IDLEST field.
+>>> Same in DM816x TRM.
+>>>
+>>>>>
+>>>>>  /*
+>>>>> @@ -155,6 +156,7 @@ static struct omap_hwmod dm81xx_l4_hs_hwmod = {
+>>>>>       .name           = "l4_hs",
+>>>>>       .clkdm_name     = "alwon_l3_med_clkdm",
+>>>>>       .class          = &l4_hwmod_class,
+>>>>> +     .flags          = HWMOD_NO_IDLEST,
+>>>>>  };
+>>> In DM814x TRM, the CM_ALWON_L3_MED_CLKSTCTRL does not have IDLEST field.
+>>> Same in DM816x TRM.
+>>>
+>>>>>
+>>>>>  /* L3 slow -> L4 ls peripheral interface running at 125MHz */
+>>>>> @@ -850,6 +852,7 @@ static struct omap_hwmod dm816x_emac0_hwmod = {
+>>>>>       .name           = "emac0",
+>>>>>       .clkdm_name     = "alwon_ethernet_clkdm",
+>>>>>       .class          = &dm816x_emac_hwmod_class,
+>>>>> +     .flags          = HWMOD_NO_IDLEST,
+>>>>>  };
+>>> In this particular case, the IDLEST is handled in the MDIO hwmod.
+>>>
+>>>>>
+>>>>>  static struct omap_hwmod_ocp_if dm81xx_l4_hs__emac0 = {
+>>>>> --
+>>>>> 1.9.1
+>>>
+>>> I'll check the TI tree to be sure...
+>>>
+>>> Regards,
+>>> Neil
+>>>
+>> Tony,
 >>
->> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
->> ---
->>  drivers/hwtracing/coresight/Makefile               |    3 +-
->>  drivers/hwtracing/coresight/coresight-etm.h        |    4 +
->>  .../hwtracing/coresight/coresight-etm3x-sysfs.c    | 1218 +++++++++++++++++++
->>  drivers/hwtracing/coresight/coresight-etm3x.c      | 1234 +-------------------
+>> In TI's tree, there is no L3_MED hwmod but the L3_SLOW hwmod has NO_IDLEST flag.
 >>
->
-> You are adding a lot of interfaces here, make sure that each one is documented
-> in Documentation/ABI/.
+>> Is there any other issue about this patchset ?
+> 
+> Thanks for checking. Well one thing, if this is needed as fix, then a
+> description of what happens without it would be good to have.
+> 
+> Regards,
+> 
+> Tony
+> 
+Tony,
 
-Everything is documented in
-Documentation/ABI/testing/sysfs-bus-coresight-devices-etm3x.
+I'll send a patchset with the error lines in a few minutes.
 
->
-> Your patch series doesn't add anything here, are you just using an existing
-> ABI?
-
-That is correct.
-
->
->         Arnd
+Neil
