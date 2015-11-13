@@ -1,69 +1,92 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Fri, 13 Nov 2015 11:45:08 -0700
-Subject: [PATCH V4 17/26] coresight: etb10: moving to local atomic operations
+Date: Fri, 13 Nov 2015 11:45:07 -0700
+Subject: [PATCH V4 16/26] perf: changing pmu::setup_aux() parameter to include
+ event
 In-Reply-To: <1447440317-1977-1-git-send-email-mathieu.poirier@linaro.org>
 References: <1447440317-1977-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1447440317-1977-18-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1447440317-1977-17-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Moving to use local atomic operations to take advantage of the
-lockless implementation, something that will come handy when
-the ETB is accessed from the Perf subsystem. Also changing the
-name of the variable to something more meaningful.
+For Coresight ETMv3/4 tracers the event carries information
+about trace modes such as user or kernel space tracing and
+whether tracing is allowed when operating in secure mode.
+
+Since this information is to be embedded in the private
+structure returned by setup_aux(),  changing the first
+parameter to be of type struct perf_event * so that all
+the necessary information can be conveyed.  Also changing
+current customer of the API to reflect the modification.
 
 Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 ---
- drivers/hwtracing/coresight/coresight-etb10.c | 9 +++++----
- 1 file changed, 5 insertions(+), 4 deletions(-)
+ arch/x86/kernel/cpu/perf_event_intel_bts.c | 4 +++-
+ arch/x86/kernel/cpu/perf_event_intel_pt.c  | 5 +++--
+ include/linux/perf_event.h                 | 2 +-
+ kernel/events/ring_buffer.c                | 2 +-
+ 4 files changed, 8 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/hwtracing/coresight/coresight-etb10.c b/drivers/hwtracing/coresight/coresight-etb10.c
-index 1301edc44629..09e306361e4f 100644
---- a/drivers/hwtracing/coresight/coresight-etb10.c
-+++ b/drivers/hwtracing/coresight/coresight-etb10.c
-@@ -10,6 +10,7 @@
-  * GNU General Public License for more details.
-  */
+diff --git a/arch/x86/kernel/cpu/perf_event_intel_bts.c b/arch/x86/kernel/cpu/perf_event_intel_bts.c
+index d1c0f254afbe..773600b2f313 100644
+--- a/arch/x86/kernel/cpu/perf_event_intel_bts.c
++++ b/arch/x86/kernel/cpu/perf_event_intel_bts.c
+@@ -68,10 +68,12 @@ static size_t buf_size(struct page *page)
+ }
  
-+#include <asm/local.h>
- #include <linux/kernel.h>
- #include <linux/module.h>
- #include <linux/init.h>
-@@ -71,7 +72,7 @@
-  * @csdev:	component vitals needed by the framework.
-  * @miscdev:	specifics to handle "/dev/xyz.etb" entry.
-  * @spinlock:	only one at a time pls.
-- * @in_use:	synchronise user space access to etb buffer.
-+ * @reading:	synchronise user space access to etb buffer.
-  * @buf:	area of memory where ETB buffer content gets sent.
-  * @buffer_depth: size of @buf.
-  * @enable:	this ETB is being used.
-@@ -84,7 +85,7 @@ struct etb_drvdata {
- 	struct coresight_device	*csdev;
- 	struct miscdevice	miscdev;
- 	spinlock_t		spinlock;
--	atomic_t		in_use;
-+	local_t			reading;
- 	u8			*buf;
- 	u32			buffer_depth;
- 	bool			enable;
-@@ -277,7 +278,7 @@ static int etb_open(struct inode *inode, struct file *file)
- 	struct etb_drvdata *drvdata = container_of(file->private_data,
- 						   struct etb_drvdata, miscdev);
- 
--	if (atomic_cmpxchg(&drvdata->in_use, 0, 1))
-+	if (local_cmpxchg(&drvdata->reading, 0, 1))
- 		return -EBUSY;
- 
- 	dev_dbg(drvdata->dev, "%s: successfully opened\n", __func__);
-@@ -313,7 +314,7 @@ static int etb_release(struct inode *inode, struct file *file)
+ static void *
+-bts_buffer_setup_aux(int cpu, void **pages, int nr_pages, bool overwrite)
++bts_buffer_setup_aux(struct perf_event *event, void **pages,
++		     int nr_pages, bool overwrite)
  {
- 	struct etb_drvdata *drvdata = container_of(file->private_data,
- 						   struct etb_drvdata, miscdev);
--	atomic_set(&drvdata->in_use, 0);
-+	local_set(&drvdata->reading, 0);
+ 	struct bts_buffer *buf;
+ 	struct page *page;
++	int cpu = event->cpu;
+ 	int node = (cpu == -1) ? cpu : cpu_to_node(cpu);
+ 	unsigned long offset;
+ 	size_t size = nr_pages << PAGE_SHIFT;
+diff --git a/arch/x86/kernel/cpu/perf_event_intel_pt.c b/arch/x86/kernel/cpu/perf_event_intel_pt.c
+index 42169283448b..f8b881210648 100644
+--- a/arch/x86/kernel/cpu/perf_event_intel_pt.c
++++ b/arch/x86/kernel/cpu/perf_event_intel_pt.c
+@@ -863,10 +863,11 @@ static int pt_buffer_init_topa(struct pt_buffer *buf, unsigned long nr_pages,
+  * Return:	Our private PT buffer structure.
+  */
+ static void *
+-pt_buffer_setup_aux(int cpu, void **pages, int nr_pages, bool snapshot)
++pt_buffer_setup_aux(struct perf_event *event, void **pages,
++		    int nr_pages, bool snapshot)
+ {
+ 	struct pt_buffer *buf;
+-	int node, ret;
++	int node, ret, cpu = event->cpu;
  
- 	dev_dbg(drvdata->dev, "%s: released\n", __func__);
- 	return 0;
+ 	if (!nr_pages)
+ 		return NULL;
+diff --git a/include/linux/perf_event.h b/include/linux/perf_event.h
+index 092a0e8a479a..0d9964b5ed4d 100644
+--- a/include/linux/perf_event.h
++++ b/include/linux/perf_event.h
+@@ -292,7 +292,7 @@ struct pmu {
+ 	/*
+ 	 * Set up pmu-private data structures for an AUX area
+ 	 */
+-	void *(*setup_aux)		(int cpu, void **pages,
++	void *(*setup_aux)		(struct perf_event *event, void **pages,
+ 					 int nr_pages, bool overwrite);
+ 					/* optional */
+ 
+diff --git a/kernel/events/ring_buffer.c b/kernel/events/ring_buffer.c
+index 182bc30899d5..87171b700c77 100644
+--- a/kernel/events/ring_buffer.c
++++ b/kernel/events/ring_buffer.c
+@@ -522,7 +522,7 @@ int rb_alloc_aux(struct ring_buffer *rb, struct perf_event *event,
+ 			goto out;
+ 	}
+ 
+-	rb->aux_priv = event->pmu->setup_aux(event->cpu, rb->aux_pages, nr_pages,
++	rb->aux_priv = event->pmu->setup_aux(event, rb->aux_pages, nr_pages,
+ 					     overwrite);
+ 	if (!rb->aux_priv)
+ 		goto out;
 -- 
 1.9.1
