@@ -1,30 +1,56 @@
 From: narmstrong@baylibre.com (Neil Armstrong)
-Date: Fri, 13 Nov 2015 17:29:48 +0100
-Subject: [PATCH v2 0/4] arm: omap2+: complete dm816x hwmod and clkdev
-Message-ID: <56460FFC.1000808@baylibre.com>
+Date: Fri, 13 Nov 2015 17:29:53 +0100
+Subject: [PATCH v2 1/4] arm: omap2+: add missing HWMOD_NO_IDLEST in 81xx hwmod
+ data
+Message-ID: <56461001.3050707@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-In order to fix support for the dm816x platform, add missing bits in
-the 81xx hwmod data.
+Add missing HWMOD_NO_IDLEST hwmod flag for entries not
+having omap4 clkctrl values.
+The emac0 hwmod flag fixes the davinci_emac driver probe
+since the return of pm_resume() call is now checked.
 
-The clk related patch adds the missing clkdev entries to fix all source
-selection in the dmtimer driver.
+This solves the following boot errors :
+[    0.121429] omap_hwmod: l4_ls: _wait_target_ready failed: -16
+[    0.121441] omap_hwmod: l4_ls: cannot be enabled for reset (3)
+[    0.124342] omap_hwmod: l4_hs: _wait_target_ready failed: -16
+[    0.124352] omap_hwmod: l4_hs: cannot be enabled for reset (3)
+[    1.967228] omap_hwmod: emac0: _wait_target_ready failed: -16
 
-The last patch adds hwmod support of the spinbox module.
+Cc: Brian Hutchinson <b.hutchman@gmail.com>
+Signed-off-by: Neil Armstrong <narmstrong@baylibre.com>
+---
+ arch/arm/mach-omap2/omap_hwmod_81xx_data.c | 3 +++
+ 1 file changed, 3 insertions(+)
 
-v2: add error logs for first patch
+diff --git a/arch/arm/mach-omap2/omap_hwmod_81xx_data.c b/arch/arm/mach-omap2/omap_hwmod_81xx_data.c
+index b1288f5..6256052 100644
+--- a/arch/arm/mach-omap2/omap_hwmod_81xx_data.c
++++ b/arch/arm/mach-omap2/omap_hwmod_81xx_data.c
+@@ -144,6 +144,7 @@ static struct omap_hwmod dm81xx_l4_ls_hwmod = {
+ 	.name		= "l4_ls",
+ 	.clkdm_name	= "alwon_l3s_clkdm",
+ 	.class		= &l4_hwmod_class,
++	.flags		= HWMOD_NO_IDLEST,
+ };
 
-Neil Armstrong (4):
-  arm: omap2+: add missing HWMOD_NO_IDLEST in 81xx hwmod data
-  clk: ti816x: Add missing dmtimer clkdev entries
-  arm: plat-omap: add DT support for ti,dm816-timer
-  arm: omap2+: Add hwmod spinbox support for dm816x
+ /*
+@@ -155,6 +156,7 @@ static struct omap_hwmod dm81xx_l4_hs_hwmod = {
+ 	.name		= "l4_hs",
+ 	.clkdm_name	= "alwon_l3_med_clkdm",
+ 	.class		= &l4_hwmod_class,
++	.flags		= HWMOD_NO_IDLEST,
+ };
 
- arch/arm/mach-omap2/omap_hwmod_81xx_data.c | 38 ++++++++++++++++++++++++++++++
- arch/arm/plat-omap/dmtimer.c               |  4 ++++
- drivers/clk/ti/clk-816x.c                  |  2 ++
- 3 files changed, 44 insertions(+)
+ /* L3 slow -> L4 ls peripheral interface running at 125MHz */
+@@ -850,6 +852,7 @@ static struct omap_hwmod dm816x_emac0_hwmod = {
+ 	.name		= "emac0",
+ 	.clkdm_name	= "alwon_ethernet_clkdm",
+ 	.class		= &dm816x_emac_hwmod_class,
++	.flags		= HWMOD_NO_IDLEST,
+ };
 
+ static struct omap_hwmod_ocp_if dm81xx_l4_hs__emac0 = {
 -- 
 1.9.1
