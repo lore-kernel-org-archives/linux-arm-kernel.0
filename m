@@ -1,25 +1,26 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Fri, 13 Nov 2015 12:04:13 +0800
-Subject: [PATCH v2 7/9] ARM: dts: sun8i: q8-common: Add device node for AXP223
- PMIC
+Date: Fri, 13 Nov 2015 12:04:12 +0800
+Subject: [PATCH v2 7/9] ARM: dts: sun8i: q8-common: Add AXP223 PMIC device and
+ regulator nodes
 In-Reply-To: <1447387456-9912-1-git-send-email-wens@csie.org>
 References: <1447387456-9912-1-git-send-email-wens@csie.org>
-Message-ID: <1447387456-9912-9-git-send-email-wens@csie.org>
+Message-ID: <1447387456-9912-8-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 A23/A33 Q8 tablets have an X-Powers AXP223 PMIC connected via RSB. It's
 regulators provide power to various parts of the SoC and the board.
 
-Also add simplefb regulator supplies and update existing ones.
+Also add lcd regulator supply for simplefb and update the existing
+vmmc-supply for mmc0.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- arch/arm/boot/dts/sun8i-q8-common.dtsi | 84 +++++++++++++++++++++++++++++++++-
- 1 file changed, 83 insertions(+), 1 deletion(-)
+ arch/arm/boot/dts/sun8i-q8-common.dtsi | 86 +++++++++++++++++++++++++++++++++-
+ 1 file changed, 84 insertions(+), 2 deletions(-)
 
 diff --git a/arch/arm/boot/dts/sun8i-q8-common.dtsi b/arch/arm/boot/dts/sun8i-q8-common.dtsi
-index 1a69231d2da5..df7777918527 100644
+index 1a69231d2da5..01ab47b32d8d 100644
 --- a/arch/arm/boot/dts/sun8i-q8-common.dtsi
 +++ b/arch/arm/boot/dts/sun8i-q8-common.dtsi
 @@ -56,7 +56,6 @@
@@ -30,6 +31,15 @@ index 1a69231d2da5..df7777918527 100644
  	};
  
  	chosen {
+@@ -67,7 +66,7 @@
+ &mmc0 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_q8>;
+-	vmmc-supply = <&reg_vcc3v0>;
++	vmmc-supply = <&reg_dcdc1>;
+ 	bus-width = <4>;
+ 	cd-gpios = <&pio 1 4 GPIO_ACTIVE_HIGH>; /* PB4 */
+ 	cd-inverted;
 @@ -92,6 +91,85 @@
  
  &r_rsb {
