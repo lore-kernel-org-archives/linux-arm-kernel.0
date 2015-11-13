@@ -1,50 +1,47 @@
 From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Fri, 13 Nov 2015 08:37:57 +0100
-Subject: [PATCH v2] stmmac: avoid ipq806x constant overflow warning
-In-Reply-To: <3825178.3luTQFAgny@wuerfel>
-References: <4391788.dtYArQ4mVi@wuerfel>
- <20151112.122528.1794206832971213176.davem@davemloft.net>
- <3729464.5X0HBxzvx5@wuerfel> <3825178.3luTQFAgny@wuerfel>
-Message-ID: <CAMuHMdXp67RwBATtoqfs=XVza7UAOu+GByZ9a8CLsvntXqM2tw@mail.gmail.com>
+Date: Fri, 13 Nov 2015 08:46:24 +0100
+Subject: [PATCH v2] ARM: xip: Use correct symbol for end of ROM marker
+In-Reply-To: <1447362108-4333-1-git-send-email-chris.brandt@renesas.com>
+References: <1447251455-22731-1-git-send-email-chris.brandt@renesas.com>
+ <1447362108-4333-1-git-send-email-chris.brandt@renesas.com>
+Message-ID: <CAMuHMdXsw8BBCY5-fxWLvF1vxh83DhhKGD113LTBu-8ZFV68gw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 12, 2015 at 10:03 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> Building dwmac-ipq806x on a 64-bit architecture produces a harmless
-> warning from gcc:
->
-> stmmac/dwmac-ipq806x.c: In function 'ipq806x_gmac_probe':
-> include/linux/bitops.h:6:19: warning: overflow in implicit constant conversion [-Woverflow]
->   val = QSGMII_PHY_CDR_EN |
-> stmmac/dwmac-ipq806x.c:333:8: note: in expansion of macro 'QSGMII_PHY_CDR_EN'
->  #define QSGMII_PHY_CDR_EN   BIT(0)
->  #define BIT(nr)   (1UL << (nr))
->
-> This is a result of the type conversion rules in C, when we take the
-> logical OR of multiple different types. In particular, we have
-> and unsigned long
->
->         QSGMII_PHY_CDR_EN == BIT(0) == (1ul << 0) == 0x0000000000000001ul
->
-> and a signed int
->
->         0xC << QSGMII_PHY_TX_DRV_AMP_OFFSET == 0xc0000000
->
-> which together gives a signed long value
->
->         0xffffffffc0000001l
->
-> and when this is passed into a function that takes an unsigned int type,
-> gcc warns about the signed overflow and the loss of the upper 32-bits that
-> are all ones.
->
-> This patch adds 'ul' type modifiers to the literal numbers passed in
-> here, so now the expression remains an 'unsigned long' with the upper
-> bits all zero, and that avoids the signed overflow and the warning.
+Hi Chris,
 
-FWIW, the 64-bitness of BIT() on 64-bit platforms is also causing subtle
-warnings in other places, e.g. when inverting them to create bit mask, cfr.
-https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=a9efeca613a8fe5281d7c91f5c8c9ea46f2312f6
+On Thu, Nov 12, 2015 at 10:01 PM, Chris Brandt <chris.brandt@renesas.com> wrote:
+> For an XIP build, _edata_loc, not _etext, represents the end of the
+> binary image that will be programmed into ROM and mapped into the
+> MODULES_VADDR area.
+> With an XIP kernel, nothing is loaded into RAM before boot, meaning
+> you have to take into account the size of the entire binary image
+> that was programmed, including the init data values that will be copied
+> to RAM during kernel boot.
+>
+> This fixes the bug where you might lose the end of your kernel area
+> after page table setup is complete.
+
+Thanks for your patch!
+
+> Signed-off-by: Chris Brandt <chris.brandt@renesas.com>
+> ---
+> v2
+> * Added change for MODULES_VADDR
+> * Moved extern to new file asm/sections.h
+> ---
+>  arch/arm/include/asm/sections.h |    8 ++++++++
+>  arch/arm/kernel/module.c        |    2 +-
+>  arch/arm/mm/mmu.c               |    4 ++--
+>  3 files changed, 11 insertions(+), 3 deletions(-)
+>  create mode 100644 arch/arm/include/asm/sections.h
+
+If you create an arm-specific <asm/sections.h>, you also have to remove the
+line
+
+        generic-y += sections.h
+
+from arch/arm/include/asm/Kbuild.
 
 Gr{oetje,eeting}s,
 
