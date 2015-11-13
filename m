@@ -1,75 +1,47 @@
-From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Fri, 13 Nov 2015 14:59:42 +0530
-Subject: [PATCH v5 8/9] ARM: EXYNOS: rearrange static and non-static functions
- of PMU driver
-In-Reply-To: <1447406983-27835-1-git-send-email-pankaj.dubey@samsung.com>
-References: <1447406983-27835-1-git-send-email-pankaj.dubey@samsung.com>
-Message-ID: <1447406983-27835-9-git-send-email-pankaj.dubey@samsung.com>
+From: slash.tmp@free.fr (Mason)
+Date: Fri, 13 Nov 2015 10:33:50 +0100
+Subject: Conditionals in dtsi files
+Message-ID: <5645AE7E.4090003@free.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch moves exynos_sys_powerdown_conf function above all
-static functions, to avoid confusion causing due to mixing of
-static-nonstatic-static functions and to improve readability of this
-driver.
+Hello,
 
-Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
-Suggested-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
----
- arch/arm/mach-exynos/pmu.c | 34 +++++++++++++++++-----------------
- 1 file changed, 17 insertions(+), 17 deletions(-)
+I'm wondering how much C preprocessor syntax one can use in DT files.
 
-diff --git a/arch/arm/mach-exynos/pmu.c b/arch/arm/mach-exynos/pmu.c
-index 01cb649..a7741d4 100644
---- a/arch/arm/mach-exynos/pmu.c
-+++ b/arch/arm/mach-exynos/pmu.c
-@@ -39,23 +39,6 @@ u32 pmu_raw_readl(u32 offset)
- 	return readl_relaxed(pmu_base_addr + offset);
- }
- 
--static void exynos_power_off(void)
--{
--	unsigned int tmp;
--
--	pr_info("Power down.\n");
--	tmp = pmu_raw_readl(EXYNOS_PS_HOLD_CONTROL);
--	tmp ^= (1 << 8);
--	pmu_raw_writel(tmp, EXYNOS_PS_HOLD_CONTROL);
--
--	/* Wait a little so we don't give a false warning below */
--	mdelay(100);
--
--	pr_err("Power down failed, please power off system manually.\n");
--	while (1)
--		;
--}
--
- void exynos_sys_powerdown_conf(enum sys_powerdown mode)
- {
- 	unsigned int i;
-@@ -85,6 +68,23 @@ void exynos_sys_powerdown_conf(enum sys_powerdown mode)
- 	}
- }
- 
-+static void exynos_power_off(void)
-+{
-+	unsigned int tmp;
-+
-+	pr_info("Power down.\n");
-+	tmp = pmu_raw_readl(EXYNOS_PS_HOLD_CONTROL);
-+	tmp ^= (1 << 8);
-+	pmu_raw_writel(tmp, EXYNOS_PS_HOLD_CONTROL);
-+
-+	/* Wait a little so we don't give a false warning below */
-+	mdelay(100);
-+
-+	pr_err("Power down failed, please power off system manually.\n");
-+	while (1)
-+		;
-+}
-+
- static int pmu_restart_notify(struct notifier_block *this,
- 		unsigned long code, void *unused)
- {
--- 
-2.4.5
+Suppose I have 2 board DTS (both including common.dtsi)
+
+board_A.dts (1-core), board_B.dts (2-core)
+
+Can I have in common.dtsi something along these lines:
+
+	cpus {
+		enable-method = "foo,bar";
+		#address-cells = <1>;
+		#size-cells = <0>;
+
+		cpu0: cpu at 0 {
+			compatible = "arm,cortex-a9";
+			device_type = "cpu";
+			reg = <0>;
+		};
+
+#if CORE_COUNT > 1
+		cpu1: cpu at 1 {
+			compatible = "arm,cortex-a9";
+			device_type = "cpu";
+			reg = <1>;
+		};
+#endif
+	};
+
+
+board_A.dts would have
+#define CORE_COUNT 1
+#include "common.dtsi"
+
+board_B.dts would have
+#define CORE_COUNT 2
+#include "common.dtsi"
+
+Regards.
