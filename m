@@ -1,42 +1,63 @@
-From: clabbe.montjoie@gmail.com (LABBE Corentin)
-Date: Fri, 13 Nov 2015 14:10:28 +0100
-Subject: [PATCH] crypto: sun4i-ss: add missing statesize
-Message-ID: <1447420229-17911-1-git-send-email-clabbe.montjoie@gmail.com>
+From: julien.grall@citrix.com (Julien Grall)
+Date: Fri, 13 Nov 2015 13:40:56 +0000
+Subject: [Xen-devel] [PATCH v4 2/7] xen/arm: introduce
+ HYPERVISOR_platform_op on arm and arm64
+In-Reply-To: <1447349448-22610-2-git-send-email-stefano.stabellini@eu.citrix.com>
+References: <alpine.DEB.2.02.1511121726370.526@kaball.uk.xensource.com>
+ <1447349448-22610-2-git-send-email-stefano.stabellini@eu.citrix.com>
+Message-ID: <5645E868.30706@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-sun4i-ss implementaton of md5/sha1 is via ahash algorithms.
-Commit 8996eafdcbad ("crypto: ahash - ensure statesize is non-zero")
-made impossible to load them without giving statesize. This patch
-specifiy statesize for sha1 and md5.
+Hi Stefano,
 
-Fixes: 6298e948215f ("crypto: sunxi-ss - Add Allwinner Security System crypto accelerator")
-Cc: <stable@vger.kernel.org> # v4.3+
-Tested-by: Chen-Yu Tsai <wens@csie.org>
-Signed-off-by: LABBE Corentin <clabbe.montjoie@gmail.com>
----
- drivers/crypto/sunxi-ss/sun4i-ss-core.c | 2 ++
- 1 file changed, 2 insertions(+)
+On 12/11/15 17:30, Stefano Stabellini wrote:
+> Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+> 
+> ---
+> 
+> Changes in v2:
+> - rename dom0_op to platform_op
+> ---
+>  arch/arm/include/asm/xen/hypercall.h |    2 ++
+>  arch/arm/xen/enlighten.c             |    1 +
+>  arch/arm/xen/hypercall.S             |    1 +
+>  arch/arm64/xen/hypercall.S           |    1 +
+>  4 files changed, 5 insertions(+)
+> 
+> diff --git a/arch/arm/include/asm/xen/hypercall.h b/arch/arm/include/asm/xen/hypercall.h
+> index 712b50e..c3e00d0 100644
+> --- a/arch/arm/include/asm/xen/hypercall.h
+> +++ b/arch/arm/include/asm/xen/hypercall.h
+> @@ -35,6 +35,7 @@
+>  
+>  #include <xen/interface/xen.h>
+>  #include <xen/interface/sched.h>
+> +#include <xen/interface/platform.h>
+>  
+>  long privcmd_call(unsigned call, unsigned long a1,
+>  		unsigned long a2, unsigned long a3,
+> @@ -49,6 +50,7 @@ int HYPERVISOR_memory_op(unsigned int cmd, void *arg);
+>  int HYPERVISOR_physdev_op(int cmd, void *arg);
+>  int HYPERVISOR_vcpu_op(int cmd, int vcpuid, void *extra_args);
+>  int HYPERVISOR_tmem_op(void *arg);
+> +int HYPERVISOR_platform_op(void *arg);
 
-diff --git a/drivers/crypto/sunxi-ss/sun4i-ss-core.c b/drivers/crypto/sunxi-ss/sun4i-ss-core.c
-index eab6fe2..107cd2a 100644
---- a/drivers/crypto/sunxi-ss/sun4i-ss-core.c
-+++ b/drivers/crypto/sunxi-ss/sun4i-ss-core.c
-@@ -39,6 +39,7 @@ static struct sun4i_ss_alg_template ss_algs[] = {
- 		.import = sun4i_hash_import_md5,
- 		.halg = {
- 			.digestsize = MD5_DIGEST_SIZE,
-+			.statesize = sizeof(struct md5_state),
- 			.base = {
- 				.cra_name = "md5",
- 				.cra_driver_name = "md5-sun4i-ss",
-@@ -66,6 +67,7 @@ static struct sun4i_ss_alg_template ss_algs[] = {
- 		.import = sun4i_hash_import_sha1,
- 		.halg = {
- 			.digestsize = SHA1_DIGEST_SIZE,
-+			.statesize = sizeof(struct sha1_state),
- 			.base = {
- 				.cra_name = "sha1",
- 				.cra_driver_name = "sha1-sun4i-ss",
+int HYPERVISOR_platform_op(struct xen_platform_op *platform_op) to allow
+compiler type checking and match the x86 version.
+
+Also, the implementation of the helper differ from x86. On x86, the
+helper takes care of setting the interface_version while here you
+request the caller to do it.
+
+It's better if we have similar requirement across the architecture as
+this helpers may be called from common code.
+
+>  int HYPERVISOR_multicall(struct multicall_entry *calls, uint32_t nr);
+>  
+>  static inline int
+
+Regards,
+
 -- 
-2.4.10
+Julien Grall
