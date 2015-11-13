@@ -1,26 +1,23 @@
 From: jszhang@marvell.com (Jisheng Zhang)
-Date: Fri, 13 Nov 2015 16:37:13 +0800
-Subject: [PATCH] clocksource/drivers/arm_global_timer: Always use use
+Date: Fri, 13 Nov 2015 16:40:25 +0800
+Subject: [PATCH] clocksource/drivers/arm_global_timer: Always use
  {readl|writel}_relaxed
-In-Reply-To: <1447403558-7139-1-git-send-email-jszhang@marvell.com>
-References: <1447403558-7139-1-git-send-email-jszhang@marvell.com>
-Message-ID: <20151113163713.39b0b7e2@xhacker>
+In-Reply-To: <1447403678-7217-1-git-send-email-jszhang@marvell.com>
+References: <1447403678-7217-1-git-send-email-jszhang@marvell.com>
+Message-ID: <20151113164025.344a0faf@xhacker>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear all,
-
-On Fri, 13 Nov 2015 16:32:38 +0800
+On Fri, 13 Nov 2015 16:34:38 +0800
 Jisheng Zhang <jszhang@marvell.com> wrote:
 
 > This driver use both readl/writel and their relaxed version, this patch
 > tries to unify the io accesses.
 
+I'm sorry. This is the version I'd like to send for review and merge. Can you
+please kindly have a review?
 
-I'm very sorry. Hit the "Enter" key too quickly. Please kindly ignore this one
-
-Thanks,
-Jisheng
+Thanks
 
 > 
 > Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
