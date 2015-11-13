@@ -1,79 +1,69 @@
-From: s.hauer@pengutronix.de (Sascha Hauer)
-Date: Fri, 13 Nov 2015 11:09:12 +0100
-Subject: [PATCH 2/3] thermal: Add Mediatek thermal controller support
-In-Reply-To: <20151111072747.GI8526@pengutronix.de>
-References: <1447064013-13026-1-git-send-email-s.hauer@pengutronix.de>
- <1447064013-13026-3-git-send-email-s.hauer@pengutronix.de>
- <20151110120554.GB3551@e104805>
- <20151110182629.GA5240@localhost.localdomain>
- <20151111072747.GI8526@pengutronix.de>
-Message-ID: <20151113100912.GE8526@pengutronix.de>
+From: horms+renesas@verge.net.au (Simon Horman)
+Date: Fri, 13 Nov 2015 19:10:18 +0900
+Subject: [PATCH v13 0/7] arm64: renesas: Add Renesas R8A7795 SoC support
+Message-ID: <1447409425-14831-1-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 11, 2015 at 08:27:47AM +0100, Sascha Hauer wrote:
-> On Tue, Nov 10, 2015 at 10:26:30AM -0800, Eduardo Valentin wrote:
-> > On Tue, Nov 10, 2015 at 12:05:54PM +0000, Javi Merino wrote:
-> > > On Mon, Nov 09, 2015 at 11:13:32AM +0100, Sascha Hauer wrote:
-> > 
-> > <cut>
-> > 
-> > > > +
-> > > > +/*
-> > > > + * The MT8173 thermal controller has four banks. Each bank can read up to
-> > > > + * four temperature sensors simultaneously. The MT8173 has a total of 5
-> > > > + * temperature sensors. We use each bank to measure a certain area of the
-> > > > + * SoC. Since TS2 is located centrally in the SoC it is influenced by multiple
-> > > > + * areas, hence is used in different banks.
-> > > > + */
-> > > > +static const struct mtk_thermal_bank_cfg bank_data[] = {
-> > > > +	{
-> > > > +		.num_sensors = 2,
-> > > > +		.sensors = { MT8173_TS2, MT8173_TS3 },
-> > > > +	}, {
-> > > > +		.num_sensors = 2,
-> > > > +		.sensors = { MT8173_TS2, MT8173_TS4 },
-> > > > +	}, {
-> > > > +		.num_sensors = 3,
-> > > > +		.sensors = { MT8173_TS1, MT8173_TS2, MT8173_TSABB },
-> > > > +	}, {
-> > > > +		.num_sensors = 1,
-> > > > +		.sensors = { MT8173_TS2 },
-> > > > +	},
-> > > > +};
-> > 
-> > Would it make sense to simply expose all sensors and let the
-> > configuration of their aggregation be done by DT?
-> 
-> This particular layout has been chosen because there's also the Smart
-> Voltage Scaler (SVS) in the SoC. The SVS uses the same banks for
-> measuring temperatures. I don't know the details yet, I just asked the
-> Mediatek guys.
+Hi,
 
-Ok, the job of the SVS is to always pick the best voltage for a given
-CPU frequency based on the temperature of the CPU cluster. How I
-understand it the SVS engine automatically reads temperatures from bank0
-for the first CPU cluster and from bank1 for the second CPU cluster. For
-this to work we are not free to assign the sensors to the banks
-arbitrarily.
+this patchset adds basic support for the Renesas R-Car H3 (R8A7795) SoC
+and its Saovator-X board.
 
-I was told that controlling the CPU frequency the performance is better
-if we use the maximum temperature of the whole die rather than the
-temperature of individual clusters.
+Based on a merge of:
+* v4.3-rc1
+* clk-shmobile-for-v4.4 branch of
+  git://git.kernel.org/pub/scm/linux/kernel/git/geert/renesas-drivers
+  This provides the bindings and includes for the new CPG driver.
+  These are queued up by the subsystem maintainer, Mike Turquette,
+  for v4.4.
 
-I would prefer to keep the sensor/bank association like it currently is
-as it allows for easy SVS engine integration. Also I would prefer to
-expose a single thermal zone for now, it will be easier to add
-additional zones later than it is to remove them later once we have
-exposed them to the device tree.
+Run-time dependencies:
+* The base
+* The new GPG driver
+  "[PATCH/RFC v4 0/5] clk: shmobile: Add new Renesas CPG/MSSR DT bindings"
+  and its dependencies. This may be found in the
+  topic/cpg-mssr-v4 branch of
+  git://git.kernel.org/pub/scm/linux/kernel/git/geert/renesas-drivers
 
-Is that ok with you?
 
-Sascha
+For changes see per-patch changelogs.
 
+Availability
+
+To aid review and testing the following branches are available in
+my renesas tree on kernel.org:
+* topic/arm64-rcar-gen3-v13: This patchset
+* topic/arm64-rcar-gen3-v13.runtime: This patchset and its runtime dependencies
+
+
+Gaku Inami (1):
+  arm64: renesas: r8a7795: Add Renesas R8A7795 SoC support
+
+Geert Uytterhoeven (2):
+  arm64: renesas: r8a7795 dtsi: Add dummy dma-controller nodes
+  arm64: renesas: r8a7795 dtsi: Add all SCIF nodes
+
+Kuninori Morimoto (3):
+  arm64: renesas: r8a7795: enable PFC
+  arm64: renesas: add Salvator-X board support on DTS
+  arm64: defconfig: renesas: Enable Renesas r8a7795 SoC
+
+Simon Horman (1):
+  MAINTAINERS: Add entry Renesas arm64 architecture
+
+ Documentation/devicetree/bindings/arm/shmobile.txt |   4 +
+ MAINTAINERS                                        |   9 ++
+ arch/arm64/Kconfig.platforms                       |  17 ++
+ arch/arm64/boot/dts/Makefile                       |   1 +
+ arch/arm64/boot/dts/renesas/Makefile               |   4 +
+ arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts |  62 ++++++++
+ arch/arm64/boot/dts/renesas/r8a7795.dtsi           | 173 +++++++++++++++++++++
+ arch/arm64/configs/defconfig                       |   5 +
+ 8 files changed, 275 insertions(+)
+ create mode 100644 arch/arm64/boot/dts/renesas/Makefile
+ create mode 100644 arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts
+ create mode 100644 arch/arm64/boot/dts/renesas/r8a7795.dtsi
 
 -- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+2.1.4
