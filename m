@@ -1,66 +1,26 @@
-From: gabriele.paoloni@huawei.com (Gabriele Paoloni)
-Date: Fri, 13 Nov 2015 03:06:27 +0000
-Subject: [PATCH] PCI: hisi: fix deferred probing
-In-Reply-To: <4417267.EzK5DAjM5p@wuerfel>
-References: <1447329728-1589-1-git-send-email-jszhang@marvell.com>
- <4417267.EzK5DAjM5p@wuerfel>
-Message-ID: <EE11001F9E5DDD47B7634E2F8A612F2E162AA609@lhreml503-mbs>
+From: zlim.lnx@gmail.com (Z Lim)
+Date: Thu, 12 Nov 2015 19:21:13 -0800
+Subject: [PATCH 1/2] arm64: bpf: fix JIT frame pointer setup
+In-Reply-To: <1447365421-1309-2-git-send-email-yang.shi@linaro.org>
+References: <1447365421-1309-1-git-send-email-yang.shi@linaro.org>
+ <1447365421-1309-2-git-send-email-yang.shi@linaro.org>
+Message-ID: <CABg9mctFoXuttJkGaqOBWm-beDKzui_Fwhj4u+iBBWPXAFsYwQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks Arnd, this looks ok to me
+On Thu, Nov 12, 2015 at 1:57 PM, Yang Shi <yang.shi@linaro.org> wrote:
+> BPF fp should point to the top of the BPF prog stack. The original
+> implementation made it point to the bottom incorrectly.
+> Move A64_SP to fp before reserve BPF prog stack space.
+>
+> CC: Zi Shen Lim <zlim.lnx@gmail.com>
+> CC: Xi Wang <xi.wang@gmail.com>
+> Signed-off-by: Yang Shi <yang.shi@linaro.org>
+> ---
 
-Zhou Wang can you please Ack?
+Reviewed-by: Zi Shen Lim <zlim.lnx@gmail.com>
 
-> -----Original Message-----
-> From: linux-kernel-owner at vger.kernel.org [mailto:linux-kernel-
-> owner at vger.kernel.org] On Behalf Of Arnd Bergmann
-> Sent: 12 November 2015 12:22
-> To: linux-arm-kernel at lists.infradead.org
-> Cc: Jisheng Zhang; Wangzhou (B); bhelgaas at google.com; linux-
-> pci at vger.kernel.org; linux-kernel at vger.kernel.org
-> Subject: [PATCH] PCI: hisi: fix deferred probing
-> 
-> The hisi_pcie_probe function is incorrectly marked as __init, as Kconfig
-> tells us:
-> 
-> WARNING: drivers/pci/host/built-in.o(.data+0x7780): Section mismatch in
-> reference from the variable hisi_pcie_driver to the
-> function .init.text:hisi_pcie_probe()
-> 
-> If the probe for this device gets deferred past the point where __init
-> functions are removed, or the device is unbound and then reattached to
-> the driver, we branch into uninitialized memory, which is bad.
-> 
-> This removes the __init annotation.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> 
-> diff --git a/drivers/pci/host/pcie-hisi.c b/drivers/pci/host/pcie-hisi.c
-> index 35457ecd8e70..163671a4f798 100644
-> --- a/drivers/pci/host/pcie-hisi.c
-> +++ b/drivers/pci/host/pcie-hisi.c
-> @@ -111,7 +111,7 @@ static struct pcie_host_ops hisi_pcie_host_ops = {
->  	.link_up = hisi_pcie_link_up,
->  };
-> 
-> -static int __init hisi_add_pcie_port(struct pcie_port *pp,
-> +static int hisi_add_pcie_port(struct pcie_port *pp,
->  				     struct platform_device *pdev)
->  {
->  	int ret;
-> @@ -139,7 +139,7 @@ static int __init hisi_add_pcie_port(struct pcie_port *pp,
->  	return 0;
->  }
-> 
-> -static int __init hisi_pcie_probe(struct platform_device *pdev)
-> +static int hisi_pcie_probe(struct platform_device *pdev)
->  {
->  	struct hisi_pcie *hisi_pcie;
->  	struct pcie_port *pp;
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+Also,
+
+Fixes: e54bcde3d69d ("arm64: eBPF JIT compiler")
+Cc: <stable@vger.kernel.org> # 3.18+
