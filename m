@@ -1,107 +1,112 @@
-From: bayi.cheng@mediatek.com (bayi cheng)
-Date: Fri, 13 Nov 2015 14:45:07 +0800
-Subject: [PATCH v6 0/3] Mediatek SPI-NOR flash driver
-In-Reply-To: <20151111202621.GI12143@google.com>
-References: <1446824889-16144-1-git-send-email-bayi.cheng@mediatek.com>
- <20151110024611.GL12143@google.com> <1447250654.19991.15.camel@mhfsdcap03>
- <20151111202621.GI12143@google.com>
-Message-ID: <1447397107.9118.10.camel@mhfsdcap03>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Fri, 13 Nov 2015 07:58:53 +0100
+Subject: [PATCH] ARM: PJ4: move coprocessor register access sequences to
+ iwmmxt.S
+Message-ID: <1447397933-13379-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2015-11-11 at 12:26 -0800, Brian Norris wrote:
-> On Wed, Nov 11, 2015 at 10:04:14PM +0800, Bayi Cheng wrote:
-> > On Mon, 2015-11-09 at 18:46 -0800, Brian Norris wrote:
-> > > I believe you didn't completely answer all my questions from v5 though.
-> > > I'll repeat a bit here. Particularly, refer to [1].
-> > > I'll summarize; I understand that your common transmit/receive operation
-> > > works something like this:
-> > > 
-> > > Quoting from [1]:
-> > > > (1) total number of bits to send/receive goes in the COUNT register (so
-> > > >     far, as many as 7*8=56?)
-> > > > (2) opcode is written to PRGDATA5
-> > > > (3) other "transmit" data (like addresses), if any, are placed on PRGDATA4..0
-> > > > (4) command is sent (execute_cmd())
-> > > > (5) data is read back in SHREG{X..0}, if needed
-> > > 
-> > > My questions were:
-> > > 
-> > > (a) Why does mt8173_nor_set_read_mode() use PRGDATA3? That's not
-> > >     mentioned in the SoC manual, and it doesn't really match any of the
-> > >     steps above. Perhaps it's just a quirk of the controller's
-> > >     programming model?
-> > > 
-> > yes, for this question, I have done some testes, If I change the
-> > PRGDATA3 to PRGDATA5 for mt8173_nor_set_read_mode() like others
-> > functions, then the controller will be hanged, and I have asked our
-> > designer for double confirm.
-> 
-> I wasn't suggesting to change this to PRGDATA5. I just was wondering why
-> the difference. It's not documented. (I suppose an acceptable answer is
-> just "because that's how the HW works.")
-> 
-I have synced with our designer, and just as you said, that's how the HW
-works, and the read operation is different is different from other
-operation. By the way, I have double confirm our driver code, and I have
-made a mistake for quad read operation, the quad command need use
-PRGDATA4 Instead PRGDATA3.
-PS: write PRGDATA4 0xEB(4bit I/O read mode) or 0x6B(4 bit output mode),
-So I will modify mt8173_nor_set_read_mode function in next patch.
+The PJ4 inline asm sequences in pj4-cp0.c cannot be built in Thumb-2 mode,
+due to the way it performs arithmetic on the program counter, so it is
+built in ARM mode instead. However, building C files in ARM mode under
+CONFIG_THUMB2_KERNEL is problematic, since the instrumentation performed
+by subsystems like ftrace does not expect having to deal with interworking
+branches.
 
+So instead, revert to building pj4-cp0.c in Thumb-2 mode, and move the
+offending sequence to iwmmxt.S, which is not instrumented anyway, and is
+already built in ARM mode unconditionally.
 
-> > > (b) How do you determine X from step (5)?
-> > > 
-> > > Right now, your code seems to answer that X is "rxlen - 1". Correct?
-> > > 
-> > yes, I have used "rxlen -1", because the first of nor flash output is
-> > located at SHREG[0], in the other words, the output data starts at
-> > SHREG[0] and go up to SHREG[relen -1]
-> 
-> But, we aren't reading from SHREG[0] first; we're reading backwards from
-> SHREG[rxlen - 1] down to SHREG[0]. It seems that's correct, right?
+Reported-by: Stephen Boyd <sboyd@codeaurora.org>
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+---
+ arch/arm/kernel/Makefile  |  1 -
+ arch/arm/kernel/iwmmxt.S  | 21 +++++++++++++++++++++
+ arch/arm/kernel/pj4-cp0.c | 24 ++----------------------
+ 3 files changed, 23 insertions(+), 23 deletions(-)
 
-Yes, You are right!
-> 
-> > > If that's correct and if I put all of my understanding together
-> > > correctly, this means that you can actually shift out (in PRGDATA) up to
-> > > 6 bytes (that is, 1 opcode and 5 tx bytes) and shift in (in SHREG) up to
-> > > 7 bytes, except that the first byte is received during the opcode cycle,
-> > > and so it is discarded, and we effectively receive only 6 bytes.
-> > > 
-> > > Is that all correct? If so, then I think you still need to adjust the
-> > > boundary conditions in your do_tx_rx() function. (I'll comment on the
-> > > driver to point out the specifics.)
-> > 
-> > Yes, you are right! and I will adjust the boundary conditions in
-> > do_tx_rx() function.
-> 
-> OK, good. BTW, can you make sure to rewrite the appropriate MAX macro(s)
-> to reflect the right values? It seems like maybe you'll want separate
-> macros for the maximum TX and RX -- and total (?), or is this just the
-> same as RX? -- since they seem to have different limits.
-> 
-
-OK, I will use two MAX macros, one is for TX&RX, and the other is for 
-the total.
-
-> > By the way, could you tell me whether I need to publish a new patch? or
-> > you can fix them up directly?
-> 
-> I think there are a few more adjustments to make, so please just post a
-> new version of the driver only. The DT binding and DTS changes look good
-> to go now.
-
-Yes, I will publish a new patch next week, and Thanks again for your
-grate help and support!
-
-> 
-> Regards,
-> Brian
-> 
-> > > [1] http://lists.infradead.org/pipermail/linux-mtd/2015-October/062951.html
-> 
-> _______________________________________________
-> Linux-mediatek mailing list
-> Linux-mediatek at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-mediatek
+diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
+index af9e59bf3831..3c789496297f 100644
+--- a/arch/arm/kernel/Makefile
++++ b/arch/arm/kernel/Makefile
+@@ -73,7 +73,6 @@ obj-$(CONFIG_IWMMXT)		+= iwmmxt.o
+ obj-$(CONFIG_PERF_EVENTS)	+= perf_regs.o perf_callchain.o
+ obj-$(CONFIG_HW_PERF_EVENTS)	+= perf_event_xscale.o perf_event_v6.o \
+ 				   perf_event_v7.o
+-CFLAGS_pj4-cp0.o		:= -marm
+ AFLAGS_iwmmxt.o			:= -Wa,-mcpu=iwmmxt
+ obj-$(CONFIG_ARM_CPU_TOPOLOGY)  += topology.o
+ obj-$(CONFIG_VDSO)		+= vdso.o
+diff --git a/arch/arm/kernel/iwmmxt.S b/arch/arm/kernel/iwmmxt.S
+index 49fadbda8c63..e1776bf52480 100644
+--- a/arch/arm/kernel/iwmmxt.S
++++ b/arch/arm/kernel/iwmmxt.S
+@@ -14,6 +14,7 @@
+  * published by the Free Software Foundation.
+  */
+ 
++#include <linux/init.h>
+ #include <linux/linkage.h>
+ #include <asm/ptrace.h>
+ #include <asm/thread_info.h>
+@@ -370,3 +371,23 @@ ENDPROC(iwmmxt_task_release)
+ concan_owner:
+ 	.word	0
+ 
++#if defined(CONFIG_CPU_PJ4) || defined(CONFIG_CPU_PJ4B)
++
++	__INIT
++
++ENTRY(pj4_cp_access_read)
++	mrc	p15, 0, r0, c1, c0, 2
++	ret	lr
++ENDPROC(pj4_cp_access_read)
++
++ENTRY(pj4_cp_access_write)
++	mcr	p15, 0, r0, c1, c0, 2
++	mrc	p15, 0, r0, c1, c0, 2
++	mov	r0, r0
++	sub	pc, pc, #4
++	ret	lr
++ENDPROC(pj4_cp_access_write)
++
++	__FINIT
++
++#endif
+diff --git a/arch/arm/kernel/pj4-cp0.c b/arch/arm/kernel/pj4-cp0.c
+index 8153e36b2491..4f226e175734 100644
+--- a/arch/arm/kernel/pj4-cp0.c
++++ b/arch/arm/kernel/pj4-cp0.c
+@@ -49,28 +49,8 @@ static struct notifier_block __maybe_unused iwmmxt_notifier_block = {
+ 	.notifier_call	= iwmmxt_do,
+ };
+ 
+-
+-static u32 __init pj4_cp_access_read(void)
+-{
+-	u32 value;
+-
+-	__asm__ __volatile__ (
+-		"mrc	p15, 0, %0, c1, c0, 2\n\t"
+-		: "=r" (value));
+-	return value;
+-}
+-
+-static void __init pj4_cp_access_write(u32 value)
+-{
+-	u32 temp;
+-
+-	__asm__ __volatile__ (
+-		"mcr	p15, 0, %1, c1, c0, 2\n\t"
+-		"mrc	p15, 0, %0, c1, c0, 2\n\t"
+-		"mov	%0, %0\n\t"
+-		"sub	pc, pc, #4\n\t"
+-		: "=r" (temp) : "r" (value));
+-}
++asmlinkage u32 pj4_cp_access_read(void);
++asmlinkage void pj4_cp_access_write(u32 value);
+ 
+ static int __init pj4_get_iwmmxt_version(void)
+ {
+-- 
+1.9.1
