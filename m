@@ -1,69 +1,56 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 13 Nov 2015 19:10:18 +0900
-Subject: [PATCH v13 0/7] arm64: renesas: Add Renesas R8A7795 SoC support
-Message-ID: <1447409425-14831-1-git-send-email-horms+renesas@verge.net.au>
+Date: Fri, 13 Nov 2015 19:10:22 +0900
+Subject: [PATCH v13 4/7] arm64: renesas: r8a7795: enable PFC
+In-Reply-To: <1447409425-14831-1-git-send-email-horms+renesas@verge.net.au>
+References: <1447409425-14831-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1447409425-14831-5-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
 
-this patchset adds basic support for the Renesas R-Car H3 (R8A7795) SoC
-and its Saovator-X board.
+Add a PFC node for the on-chip r8a7795 pin controller.
 
-Based on a merge of:
-* v4.3-rc1
-* clk-shmobile-for-v4.4 branch of
-  git://git.kernel.org/pub/scm/linux/kernel/git/geert/renesas-drivers
-  This provides the bindings and includes for the new CPG driver.
-  These are queued up by the subsystem maintainer, Mike Turquette,
-  for v4.4.
+Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
+Acked-by: Laurent Pinchart <laurent.pinchart@ideasonboard.com>
+Signed-off-by: Magnus Damm <damm+renesas@opensource.se>
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
+Changes since v10:
+- None
 
-Run-time dependencies:
-* The base
-* The new GPG driver
-  "[PATCH/RFC v4 0/5] clk: shmobile: Add new Renesas CPG/MSSR DT bindings"
-  and its dependencies. This may be found in the
-  topic/cpg-mssr-v4 branch of
-  git://git.kernel.org/pub/scm/linux/kernel/git/geert/renesas-drivers
+Changes since V9: (Magnus Damm <damm+renesas@opensource.se>)
+- None
 
+Changes since V8: (Magnus Damm <damm+renesas@opensource.se>)
+- Dropped Kconfig TODO - select PINCTRL happens in patch 1
+- Added Acked-by from Laurent
 
-For changes see per-patch changelogs.
+Changes since V7: (Magnus Damm <damm+renesas@opensource.se>)
+- Added changelog
 
-Availability
+Based on:
+ [PATCH 10/25 v7][RFC] arm64: renesas: r8a7795: enable PFC
+---
+ arch/arm64/boot/dts/renesas/r8a7795.dtsi | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-To aid review and testing the following branches are available in
-my renesas tree on kernel.org:
-* topic/arm64-rcar-gen3-v13: This patchset
-* topic/arm64-rcar-gen3-v13.runtime: This patchset and its runtime dependencies
-
-
-Gaku Inami (1):
-  arm64: renesas: r8a7795: Add Renesas R8A7795 SoC support
-
-Geert Uytterhoeven (2):
-  arm64: renesas: r8a7795 dtsi: Add dummy dma-controller nodes
-  arm64: renesas: r8a7795 dtsi: Add all SCIF nodes
-
-Kuninori Morimoto (3):
-  arm64: renesas: r8a7795: enable PFC
-  arm64: renesas: add Salvator-X board support on DTS
-  arm64: defconfig: renesas: Enable Renesas r8a7795 SoC
-
-Simon Horman (1):
-  MAINTAINERS: Add entry Renesas arm64 architecture
-
- Documentation/devicetree/bindings/arm/shmobile.txt |   4 +
- MAINTAINERS                                        |   9 ++
- arch/arm64/Kconfig.platforms                       |  17 ++
- arch/arm64/boot/dts/Makefile                       |   1 +
- arch/arm64/boot/dts/renesas/Makefile               |   4 +
- arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts |  62 ++++++++
- arch/arm64/boot/dts/renesas/r8a7795.dtsi           | 173 +++++++++++++++++++++
- arch/arm64/configs/defconfig                       |   5 +
- 8 files changed, 275 insertions(+)
- create mode 100644 arch/arm64/boot/dts/renesas/Makefile
- create mode 100644 arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts
- create mode 100644 arch/arm64/boot/dts/renesas/r8a7795.dtsi
-
+diff --git a/arch/arm64/boot/dts/renesas/r8a7795.dtsi b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+index 002b828e8230..e26eecf1230f 100644
+--- a/arch/arm64/boot/dts/renesas/r8a7795.dtsi
++++ b/arch/arm64/boot/dts/renesas/r8a7795.dtsi
+@@ -81,6 +81,11 @@
+ 			#power-domain-cells = <0>;
+ 		};
+ 
++		pfc: pfc at e6060000 {
++			compatible = "renesas,pfc-r8a7795";
++			reg = <0 0xe6060000 0 0x50c>;
++		};
++
+ 		dmac0: dma-controller at e6700000 {
+ 			/* Empty node for now */
+ 		};
 -- 
 2.1.4
