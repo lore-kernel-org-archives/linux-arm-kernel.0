@@ -1,103 +1,46 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 13 Nov 2015 10:28:01 +0100
-Subject: [PATCH] clocksource/drivers/arm_global_timer: Always use
- {readl|writel}_relaxed
-In-Reply-To: <20151113164025.344a0faf@xhacker>
-References: <1447403678-7217-1-git-send-email-jszhang@marvell.com>
- <20151113164025.344a0faf@xhacker>
-Message-ID: <10575502.sxpiT76bOp@wuerfel>
+From: narmstrong@baylibre.com (Neil Armstrong)
+Date: Fri, 13 Nov 2015 10:29:17 +0100
+Subject: [PATCH v2 0/5] arm: dts: complete dm816x device tree
+In-Reply-To: <20151112174706.GN3218@atomide.com>
+References: <56449D1D.4030803@baylibre.com> <20151112174706.GN3218@atomide.com>
+Message-ID: <5645AD6D.8010706@baylibre.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 13 November 2015 16:40:25 Jisheng Zhang wrote:
-> On Fri, 13 Nov 2015 16:34:38 +0800
-> Jisheng Zhang <jszhang@marvell.com> wrote:
+On 11/12/2015 06:47 PM, Tony Lindgren wrote:
+> * Neil Armstrong <narmstrong@baylibre.com> [151112 06:08]:
+>> In order to fix support for the dm816x platform, add missing bits in
+>> the dm816x dtsi and cleanup OCP.
 > 
-> > This driver use both readl/writel and their relaxed version, this patch
-> > tries to unify the io accesses.
+> Which ones are needed as fixes for the v4.4-rc kernel?
 > 
-> I'm sorry. This is the version I'd like to send for review and merge. Can you
-> please kindly have a review?
-
-I would prefer to use write_relaxed() as sparingly as we can, it is too
-hard to verify each case to ensure that we don't have to watch out
-for ordering or locking issues.
-
-> > diff --git a/drivers/clocksource/arm_global_timer.c b/drivers/clocksource/arm_global_timer.c
-> > index a2cb6fa..84a5a5d 100644
-> > --- a/drivers/clocksource/arm_global_timer.c
-> > +++ b/drivers/clocksource/arm_global_timer.c
-> > @@ -99,27 +99,27 @@ static void gt_compare_set(unsigned long delta, int periodic)
-> >  
-> >  	counter += delta;
-> >  	ctrl = GT_CONTROL_TIMER_ENABLE;
-> > -	writel(ctrl, gt_base + GT_CONTROL);
-> > -	writel(lower_32_bits(counter), gt_base + GT_COMP0);
-> > -	writel(upper_32_bits(counter), gt_base + GT_COMP1);
-> > +	writel_relaxed(ctrl, gt_base + GT_CONTROL);
-> > +	writel_relaxed(lower_32_bits(counter), gt_base + GT_COMP0);
-> > +	writel_relaxed(upper_32_bits(counter), gt_base + GT_COMP1);
-> >  
-> >  	if (periodic) {
-> > -		writel(delta, gt_base + GT_AUTO_INC);
-> > +		writel_relaxed(delta, gt_base + GT_AUTO_INC);
-> >  		ctrl |= GT_CONTROL_AUTO_INC;
-> >  	}
-> >  
-> >  	ctrl |= GT_CONTROL_COMP_ENABLE | GT_CONTROL_IRQ_ENABLE;
-> > -	writel(ctrl, gt_base + GT_CONTROL);
-> > +	writel_relaxed(ctrl, gt_base + GT_CONTROL);
-> >  }
-
-This seems fine. Do you have any performance numbers to show how much
-we save per call on a platform you care about, and how often it is
-called for a typical workload?
-
-I see that _gt_counter_read() already uses readl_relaxed(), and it
-seems to be a much bigger win there, as we read the clock more
-often than we write the comparator, so the person who did that
-probably thought that this one wasn't important enough. Can you
-add an explanation in the changelog why you think that was a
-mistake?
-
-Unifying the accessors across a driver is not enough of a reason
-I think.
-
-> >  static int gt_clockevent_shutdown(struct clock_event_device *evt)
-> >  {
-> >  	unsigned long ctrl;
-> >  
-> > -	ctrl = readl(gt_base + GT_CONTROL);
-> > +	ctrl = readl_relaxed(gt_base + GT_CONTROL);
-> >  	ctrl &= ~(GT_CONTROL_COMP_ENABLE | GT_CONTROL_IRQ_ENABLE |
-> >  		  GT_CONTROL_AUTO_INC);
-> > -	writel(ctrl, gt_base + GT_CONTROL);
-> > +	writel_relaxed(ctrl, gt_base + GT_CONTROL);
-> >  	return 0;
-> >  }
-
-This is certainly not performance critical, better leave it using
-the standard accessors.
-
-> > @@ -212,11 +212,11 @@ static u64 notrace gt_sched_clock_read(void)
-> >  
-> >  static void __init gt_clocksource_init(void)
-> >  {
-> > -	writel(0, gt_base + GT_CONTROL);
-> > -	writel(0, gt_base + GT_COUNTER0);
-> > -	writel(0, gt_base + GT_COUNTER1);
-> > +	writel_relaxed(0, gt_base + GT_CONTROL);
-> > +	writel_relaxed(0, gt_base + GT_COUNTER0);
-> > +	writel_relaxed(0, gt_base + GT_COUNTER1);
-> >  	/* enables timer on all the cores */
-> > -	writel(GT_CONTROL_TIMER_ENABLE, gt_base + GT_CONTROL);
-> > +	writel_relaxed(GT_CONTROL_TIMER_ENABLE, gt_base + GT_CONTROL);
-> >  
-> >  #ifdef CONFIG_CLKSRC_ARM_GLOBAL_TIMER_SCHED_CLOCK
-> >  	sched_clock_register(gt_sched_clock_read, 64, gt_clk_rate);
+> Regards,
 > 
+> Tony
 > 
+>> The last patch adds support for the omap4-hwspinlock.
+>>
+>> v2: add ocp hwmod cleanup
+>>
+>> Neil Armstrong (5):
+>>   arm: dts: add dm816x missing #mbox-cells
+>>   arm: dts: add dm816x missing spi DT dma handles
+Tony,
 
-Same here.
+The two first are fixes for v4.4-rc.
 
-	Arnd
+>>   arm: dts: add dm816x pwm property to timers
+>>   arm: dts: remove dm816x invalid DT l3_main hwmod
+>>   arm: dts: Add omap4-hwspinlock support in dm816x
+
+the 3 following can wait.
+
+>>
+>>  arch/arm/boot/dts/dm816x.dtsi | 20 +++++++++++++++++---
+>>  1 file changed, 17 insertions(+), 3 deletions(-)
+>>
+>> -- 
+>> 1.9.1
+
+Thanks,
+Neil
