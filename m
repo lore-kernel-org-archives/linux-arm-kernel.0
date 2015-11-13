@@ -1,87 +1,73 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 13 Nov 2015 22:31:15 +0100
-Subject: [PATCH 2/2] [media] include/media: move platform driver headers
- to a separate dir
-In-Reply-To: <20151113171341.0972ef7a@recife.lan>
-References: <413d2bb0b813a7e62867de7a94b0ab61e16cb1cb.1447261977.git.mchehab@osg.samsung.com>
- <4220808.QEkJDXYE1T@wuerfel> <20151113171341.0972ef7a@recife.lan>
-Message-ID: <4273019.OjrpsKyH2t@wuerfel>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Fri, 13 Nov 2015 14:00:39 -0800
+Subject: [PATCH 1/3] mtd: create a partition type device tree binding
+In-Reply-To: <CAL_JsqL2F3p7qBPbOiGytVyzF_aNLWbrCT0mAX1WZo6SxE3JoA@mail.gmail.com>
+References: <1446123152-22666-1-git-send-email-linus.walleij@linaro.org>
+ <20151029162908.GA13275@localhost>
+ <CACRpkdYS5Jf8UC2K0bNdEQZDjTeZZx44Uu-kkof+9E=4Ny0oDg@mail.gmail.com>
+ <20151030175145.GF13239@google.com>
+ <CAL_JsqL2F3p7qBPbOiGytVyzF_aNLWbrCT0mAX1WZo6SxE3JoA@mail.gmail.com>
+Message-ID: <20151113220039.GA74382@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 13 November 2015 17:13:41 Mauro Carvalho Chehab wrote:
-> Em Wed, 11 Nov 2015 21:26:31 +0100
-> Arnd Bergmann <arnd@arndb.de> escreveu:
-> 
+On Fri, Nov 06, 2015 at 08:13:13AM -0600, Rob Herring wrote:
+> Since we now have partitions contained in a sub node, how about using
+> compatible for that sub node instead.
 
->  include/media/{ => drv-intf}/cx2341x.h                   | 0
->  include/media/{ => drv-intf}/cx25840.h                   | 0
->  include/media/{ => drv-intf}/exynos-fimc.h               | 0
->  include/media/{ => drv-intf}/msp3400.h                   | 0
->  include/media/{ => drv-intf}/s3c_camif.h                 | 0
->  include/media/{ => drv-intf}/saa7146.h                   | 0
->  include/media/{ => drv-intf}/saa7146_vv.h                | 2 +-
->  include/media/{ => drv-intf}/sh_mobile_ceu.h             | 0
->  include/media/{ => drv-intf}/sh_mobile_csi2.h            | 0
->  include/media/{ => drv-intf}/sh_vou.h                    | 0
->  include/media/{ => drv-intf}/si476x.h                    | 0
->  include/media/{ => drv-intf}/soc_mediabus.h              | 0
->  include/media/{ => drv-intf}/tea575x.h                   | 0
->  include/media/i2c/tw9910.h                               | 2 +-
->  include/media/{ => platform_data}/gpio-ir-recv.h         | 0
->  include/media/{ => platform_data}/ir-rx51.h              | 0
->  include/media/{ => platform_data}/mmp-camera.h           | 0
->  include/media/{ => platform_data}/omap1_camera.h         | 0
->  include/media/{ => platform_data}/omap4iss.h             | 0
->  include/media/{ => platform_data}/s5p_hdmi.h             | 0
->  include/media/{ => platform_data}/si4713.h               | 0
->  include/media/{ => platform_data}/sii9234.h              | 0
->  include/media/{ => platform_data}/smiapp.h               | 0
->  include/media/{ => platform_data}/soc_camera.h           | 0
->  include/media/{ => platform_data}/soc_camera_platform.h  | 2 +-
->  include/media/{ => platform_data}/timb_radio.h           | 0
->  include/media/{ => platform_data}/timb_video.h           | 0
->  sound/pci/es1968.c                                       | 2 +-
->  sound/pci/fm801.c                                        | 2 +-
->  155 files changed, 158 insertions(+), 158 deletions(-)
+I see that Linus and I spoke up in agreement on this one.
 
-As Geert said, include/linux/platform_data/media/ would be nicer for
-consistency with other subsystems.
+I took a little look at adding of_match_table support to the core MTD
+partitioning code (not sure if that's duplicating anything Linus was
+attempting on his own?), and I'm observing that there's potential for
+conflict with the new binding [1]. If we're going to start overloading
+the 'partitions' node to support other partitioning types via
+'compatible' property, then we either need to:
 
-> diff --git a/arch/arm/mach-imx/mach-imx27_visstrim_m10.c b/arch/arm/mach-imx/mach-imx27_visstrim_m10.c
-> index ede2bdbb5dd5..44ba1f28bb34 100644
-> --- a/arch/arm/mach-imx/mach-imx27_visstrim_m10.c
-> +++ b/arch/arm/mach-imx/mach-imx27_visstrim_m10.c
-> @@ -33,7 +33,7 @@
->  #include <linux/dma-mapping.h>
->  #include <linux/leds.h>
->  #include <linux/platform_data/asoc-mx27vis.h>
-> -#include <media/soc_camera.h>
-> +#include <media/platform_data/soc_camera.h>
->  #include <sound/tlv320aic32x4.h>
->  #include <asm/mach-types.h>
->  #include <asm/mach/arch.h>
+ (1) go back to specifying that full ofpart specifications must have
+ *no* compatible property or
 
-This looks like a mistake: the header contains the string 'platform_data',
-but it is not actually a platform data header file in the sense
-that it defines the interface between platform and driver.
+ (2) we should define a comptible property for the hard-coded
+ partitioning case (e.g., compatible = "partitions")
 
-Maybe soc_camera.h is important enough to still leave it as a core
-file in the existing location? Or possibly a separate directory for
-media/soc_camera/*.h
+IOW, I could imagine a new partition parser that needs a DT like this:
 
-> @@ -24,7 +24,7 @@
->  #include <linux/slab.h>
->  #include <linux/kfifo.h>
->  #include <linux/module.h>
-> -#include <media/cx25840.h>
-> +#include <media/drv-intf/cx25840.h>
->  #include <media/rc-core.h>
->  
->  #include "cx25840-core.h"
+	flash at xxx {
+		compatible = "vendor,flash-type";
+		...
+		partitions {
+			compatible = "some-new-partition-parser";
+			...
+			subnode {
+				// "some-new-partition-parser" might
+				// need to put something here
+			};
+		};
+	};
 
-For this case, I think the original patch to move it into include/media/i2c
-was more logical as it mirrors the file structure. I was mainly talking
-about the platform_data being different from the rest.
+But currently, the binding would say that 'subnode' must be a partition,
+even if it's really something else auxiliary to
+"some-new-partition-parser" [2].
 
-	Arnd
+If we went with option (1), then we'd just have ofpart.c see that
+'partitions' has a compatible property and bail out. That seems kinda
+hacky.
+
+If we went with option (2), then ofpart.c could just check only for
+'compatible = "partitions"' (or similar), and if not found bail out.
+
+I think option (2) makes more sense. But it would require an update to
+the binding and code for 4.4, since [1] was only introduced during this
+release cycle.
+
+Brian
+
+[1] fe2585e9c29a ("doc: dt: mtd: support partitions in a special 'partitions' subnode")
+
+[2] Possibilities: something relevant to partition splitting. See some
+previous work, which I haven't gotten around to fully addressing yet,
+but can hopefully be rolled into this work:
+
+http://patchwork.ozlabs.org/patch/476373/
+http://patchwork.ozlabs.org/patch/473364/
+http://patchwork.ozlabs.org/patch/475988/
