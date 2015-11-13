@@ -1,140 +1,120 @@
-From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 13 Nov 2015 19:10:23 +0900
-Subject: [PATCH v13 5/7] arm64: renesas: add Salvator-X board support on DTS
-In-Reply-To: <1447409425-14831-1-git-send-email-horms+renesas@verge.net.au>
-References: <1447409425-14831-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <1447409425-14831-6-git-send-email-horms+renesas@verge.net.au>
+From: Liviu.Dudau@arm.com (Liviu Dudau)
+Date: Fri, 13 Nov 2015 10:11:56 +0000
+Subject: [PATCH v2 1/4] drm: arm: Add DT bindings documentation for HDLCD
+ driver.
+In-Reply-To: <CAL_Jsq+M8cEgLpRJ9j_ULRaGcLgaTZ8rr2F1nv7wUxfEEpZinw@mail.gmail.com>
+References: <1447258010-2234-1-git-send-email-Liviu.Dudau@arm.com>
+ <1447258010-2234-2-git-send-email-Liviu.Dudau@arm.com>
+ <20151111184849.GA9172@rob-hp-laptop>
+ <20151112104210.GZ963@e106497-lin.cambridge.arm.com>
+ <CAL_Jsq+M8cEgLpRJ9j_ULRaGcLgaTZ8rr2F1nv7wUxfEEpZinw@mail.gmail.com>
+Message-ID: <20151113101156.GE963@e106497-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
+On Thu, Nov 12, 2015 at 09:30:31PM -0600, Rob Herring wrote:
+> On Thu, Nov 12, 2015 at 4:42 AM, Liviu Dudau <Liviu.Dudau@arm.com> wrote:
+> > On Wed, Nov 11, 2015 at 12:48:50PM -0600, Rob Herring wrote:
+> >> On Wed, Nov 11, 2015 at 04:06:47PM +0000, Liviu Dudau wrote:
+> >> > Cc: Rob Herring <robh+dt@kernel.org>
+> >> > Cc: Pawel Moll <pawel.moll@arm.com>
+> >> > Cc: Mark Rutland <mark.rutland@arm.com>
+> >> > Cc: Ian Campbell <ijc+devicetree@hellion.org.uk>
+> >> > Cc: Kumar Gala <galak@codeaurora.org>
+> >> >
+> >> > Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
+> >>
+> >> Looks pretty good, but a few comments.
+> >>
+> >> > ---
+> >> >  .../devicetree/bindings/drm/arm/arm,hdlcd.txt      | 74 ++++++++++++++++++++++
+> >> >  1 file changed, 74 insertions(+)
+> >> >  create mode 100644 Documentation/devicetree/bindings/drm/arm/arm,hdlcd.txt
+> >> >
+> >> > diff --git a/Documentation/devicetree/bindings/drm/arm/arm,hdlcd.txt b/Documentation/devicetree/bindings/drm/arm/arm,hdlcd.txt
+> >> > new file mode 100644
+> >> > index 0000000..b57f1b9
+> >> > --- /dev/null
+> >> > +++ b/Documentation/devicetree/bindings/drm/arm/arm,hdlcd.txt
+> >> > @@ -0,0 +1,74 @@
+> >> > +ARM HDLCD
+> >> > +
+> >> > +This is a display controller found on several development platforms produced
+> >> > +by ARM Ltd and in more modern of its' Fast Models. The HDLCD is an RGB
+> >> > +streamer that reads the data from a framebuffer and sends it to a single
+> >> > +digital encoder (DVI or HDMI).
+> >> > +
+> >> > +Required properties:
+> >> > +  - compatible: "arm,hdlcd"
+> >>
+> >> Kind of generic. Something more specific please.
+> >
+> > "There can be only one!" (hdlcd) :) This is going to be a "one version only" HW part.
+> > ARM has now switched to a new display hardware that has more features and a new name,
+> > and work on mainlining support for that will start once I get the HDLCD driver accepted.
+> 
+> So there is never going to be a single difference across platforms.
 
-Add initial board support for r8a7795 Salvator-X. At this point
-only DEBUG0 and DEBUG1 serial ports are supported.
+Correct, there is only one implementation available. AFAIK there are no plans to make changes to it.
 
-Signed-off-by: Kuninori Morimoto <kuninori.morimoto.gx@renesas.com>
-Signed-off-by: Gaku Inami <gaku.inami.xw@bp.renesas.com>
-Signed-off-by: Takeshi Kihara <takeshi.kihara.df@renesas.com>
-Signed-off-by: Geert Uytterhoeven <geert+renesas@glider.be>
-Signed-off-by: Magnus Damm <damm+renesas@opensource.se>
-Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
----
-Changes since v12:
-- Include rate in stdout-path, as suggested by Mark Rutland.
+> Variations in max clock for different FPGAs?
 
-Changes since v10:
-- None
+The clock is external to the part and there is a check in the driver if we can set the frequency
+to match the requested dotclock by the video_mode. It does not affect the hardware or how it presents
+itself to the driver.
 
-Changes since V9: (Magnus Damm <damm+renesas@opensource.se>)
- - Added board specific EXTAL information by folding in:
-  [PATCH][RFC] arm64: renesas: Add EXTAL configuration to Salvator-X
+> 
+> 
+> >> > +  - reg: Physical base address and length of the controller's registers.
+> >> > +    If a second pair of address and length values is present this specifies
+> >> > +    the presence of a DMA coherent memory area that the HDLCD can use as
+> >> > +    framebuffer instead of normal CMA memory.
+> >>
+> >> This is on-chip RAM or nornal system RAM? We already have bindings for
+> >> both.
+> >
+> > Juno has a set of TLX (ThinLinks) connectors on the board where an FPGA can be attached. On r1
+> > the code running on FPGA can even participate as an AXI master with full coherency. The FPGA
+> > has local memory that we want to share with the HDLCD to be used as a framebuffer.
+> 
+> So describe the memory region and then use a memory-region phandle to
+> the memory here.
 
-Changes since V8: (Magnus Damm <damm+renesas@opensource.se>)
-- None
+OK, I will.
 
-Changes since V7: (Magnus Damm <damm+renesas@opensource.se>)
-- Added changelog
+> 
+> >> > +  - interrupts: One interrupt used by the display controller to notify the
+> >> > +    interrupt controller when any of the interrupt sources programmed in
+> >> > +    the interrupt mask register have activated.
+> >> > +  - clocks: A list of phandle + clock-specifier pairs, one for each
+> >> > +    entry in 'clock-names'.
+> >> > +  - clock-names: A list of clock names. For HDLD it should contain:
+> 
+> typo: HDLD
 
-Based on:
- [PATCH 15/25] arm64: renesas: add Salvator-X board support on DTS
- [PATCH 5/5] arm64: renesas: salvator-x: Update SCIF2 pin group
- [PATCH 5/6] arm64: renesas: salvator-x: Enable SCIF1 on serial1
----
- Documentation/devicetree/bindings/arm/shmobile.txt |  2 +
- arch/arm64/boot/dts/renesas/Makefile               |  2 +
- arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts | 62 ++++++++++++++++++++++
- 3 files changed, 66 insertions(+)
- create mode 100644 arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts
+oops, thanks, will fix.
 
-diff --git a/Documentation/devicetree/bindings/arm/shmobile.txt b/Documentation/devicetree/bindings/arm/shmobile.txt
-index 8d696a0d62b3..95d0aea4c701 100644
---- a/Documentation/devicetree/bindings/arm/shmobile.txt
-+++ b/Documentation/devicetree/bindings/arm/shmobile.txt
-@@ -59,6 +59,8 @@ Boards:
-     compatible = "renesas,lager", "renesas,r8a7790"
-   - Marzen
-     compatible = "renesas,marzen", "renesas,r8a7779"
-+  - Salvator-X
-+    compatible = "renesas,salvator-x", "renesas,r8a7795";
- 
- Note: Reference Device Tree Implementations are temporary implementations
-       to ease the migration from platform devices to Device Tree, and are
-diff --git a/arch/arm64/boot/dts/renesas/Makefile b/arch/arm64/boot/dts/renesas/Makefile
-index fec69f46d65b..9ce1890a650e 100644
---- a/arch/arm64/boot/dts/renesas/Makefile
-+++ b/arch/arm64/boot/dts/renesas/Makefile
-@@ -1,2 +1,4 @@
-+dtb-$(CONFIG_ARCH_R8A7795) += r8a7795-salvator-x.dtb
-+
- always		:= $(dtb-y)
- clean-files	:= *.dtb
-diff --git a/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts b/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts
-new file mode 100644
-index 000000000000..a3db98384e53
---- /dev/null
-+++ b/arch/arm64/boot/dts/renesas/r8a7795-salvator-x.dts
-@@ -0,0 +1,62 @@
-+/*
-+ * Device Tree Source for the Salvator-X board
-+ *
-+ * Copyright (C) 2015 Renesas Electronics Corp.
-+ *
-+ * This file is licensed under the terms of the GNU General Public License
-+ * version 2.  This program is licensed "as is" without any warranty of any
-+ * kind, whether express or implied.
-+ */
-+
-+/dts-v1/;
-+#include "r8a7795.dtsi"
-+
-+/ {
-+	model = "Renesas Salvator-X board based on r8a7795";
-+	compatible = "renesas,salvator-x", "renesas,r8a7795";
-+
-+	aliases {
-+		serial0 = &scif2;
-+		serial1 = &scif1;
-+	};
-+
-+	chosen {
-+		bootargs = "ignore_loglevel";
-+		stdout-path = "serial0:115200n8";
-+	};
-+
-+	memory at 48000000 {
-+		device_type = "memory";
-+		/* first 128MB is reserved for secure area. */
-+		reg = <0x0 0x48000000 0x0 0x38000000>;
-+	};
-+};
-+
-+&extal_clk {
-+	clock-frequency = <16666666>;
-+};
-+
-+&pfc {
-+	scif1_pins: scif1 {
-+		renesas,groups = "scif1_data_a", "scif1_ctrl";
-+		renesas,function = "scif1";
-+	};
-+	scif2_pins: scif2 {
-+		renesas,groups = "scif2_data_a";
-+		renesas,function = "scif2";
-+	};
-+};
-+
-+&scif1 {
-+	pinctrl-0 = <&scif1_pins>;
-+	pinctrl-names = "default";
-+
-+	status = "okay";
-+};
-+
-+&scif2 {
-+	pinctrl-0 = <&scif2_pins>;
-+	pinctrl-names = "default";
-+
-+	status = "okay";
-+};
+> 
+> >> > +      - "pxlclk" for the clock feeding the output PLL of the controller.
+> >> > +  - port: The HDLCD connection to an encoder chip. The connection is modelled
+> 
+> s/modelled/modeled/
+
+ditto.
+
+Thanks for reviewing it,
+Liviu
+
+> 
+> Rob
+> 
+
 -- 
-2.1.4
+====================
+| I would like to |
+| fix the world,  |
+| but they're not |
+| giving me the   |
+ \ source code!  /
+  ---------------
+    ?\_(?)_/?
