@@ -1,58 +1,46 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 13 Nov 2015 10:35:16 +0100
-Subject: [PATCH] mmc: dw_mmc: use resource_size_t to store physical address
-In-Reply-To: <CAHp75VfyOWrihHC4nhpKQrjH9SjP0NnaN1WU8se3PL4biWtz4g@mail.gmail.com>
-References: <28102387.ALpaBHpim0@wuerfel>
- <CAHp75VfyOWrihHC4nhpKQrjH9SjP0NnaN1WU8se3PL4biWtz4g@mail.gmail.com>
-Message-ID: <6288847.N1QBIiXedG@wuerfel>
+Date: Fri, 13 Nov 2015 10:40:29 +0100
+Subject: ARM Linux Kernel Update
+In-Reply-To: <CAMu38xLbRcOfdGLF+ozMA7G-tqzqykvsaDToY43sdMO4FP4b5w@mail.gmail.com>
+References: <CADohWC9sCwFbhtryZi-EbOvcBayh_6O2bEjzFaLMxHYXYBEhQg@mail.gmail.com>
+ <CAMu38xLbRcOfdGLF+ozMA7G-tqzqykvsaDToY43sdMO4FP4b5w@mail.gmail.com>
+Message-ID: <9020659.GYXS8BbG6X@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 13 November 2015 03:10:13 Andy Shevchenko wrote:
-> On Thu, Nov 12, 2015 at 4:14 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > The dw_mmc driver stores the physical address of the MMIO registers
-> > in a pointer, which requires the use of type casts, and is actually
-> > broken if anyone ever has this device on a 32-bit SoC in registers
-> > above 4GB. Gcc warns about this possibility when the driver is built
-> > with ARM LPAE enabled:
-> 
-> > -       host->phy_regs = (void *)(regs->start);
-> > +       host->phy_regs = regs->start;
-> 
-> >         /* Set external dma config: burst size, burst width */
-> > -       cfg.dst_addr = (dma_addr_t)(host->phy_regs + fifo_offset);
-> > +       cfg.dst_addr = host->phy_regs + fifo_offset;
-> 
-> dst_addr is dma_addr_t?
+On Thursday 12 November 2015 22:43:53 Albino B Neto wrote:
+> 2015-11-12 21:46 GMT-02:00 Satay Epic <satayepic@gmail.com>:
+> > Hello,
+> >
+> > I've an ARM SL3516  board with Linux 2.6.15 and I've tool-chain setup.
+> > I could able to compile the GPL source.  This board has red-boot.
+> >
+> > I would like to update the kernel to 3.8.24.  My first attempt so not
+> > sure about anything I should know, gotchas  etc.
+> >
+> > Any advice about the compilation , config will be appreciated.
 
-Sort of. It doesn't really fit into any of the categories, and we actually
-had a patch to change the type in the past, see
-https://lkml.org/lkml/2015/7/10/167. Not sure what is going on there.
+3.8.24 is also really old already, try going to 4.1 or 4.3 right away,
+and submit any patches that you might need for integration into
+mainline Linux once you are done.
 
-> >         /* Registers's physical base address */
-> > -       void                    *phy_regs;
-> > +       resource_size_t         phy_regs;
-> 
-> If dst_addr is dma_addr_t wouldn't be a problem when
-> resource_size_t is defined as 64-bit address, and dma_addr_t as 32-bit?
-> 
-> Btw, for me casting to dma_addr_t looks sane.
+See http://git.openwrt.org/?p=openwrt.git;a=tree;f=target/linux/gemini;h=b74c3d8f0100e2ac8a4d71c4d23c082db2993e63;hb=HEAD
 
-The background here is that the address comes from a resource_size_t
-that describes the MMIO register area as seen from the CPU, and that
-is normally a phys_addr_t (resource_size_t is defined as being long
-enough to store a phys_addr_t or various other things depending on
-resource->flags).
+for a tree that has some of the missing parts for gemini, including a
+config and some drivers that might be helpful. This is based on 4.1
+and should be easy enough to forward-port to 4.3 if you want.
 
-dma_addr_t strictly speaking refers to a RAM location as seen by a
-DMA master, and that only comes out of dma_map_*() or
-dma_alloc_coherent().
+> > I tried using the  existing  ".config" but not sure some SL3512
+> > specific options would work?
 
-The DMA engine wants something else here, which is an MMIO register
-address as seen by a DMA master, and we don't have a separate typedef
-for that. Almost universally all of resource_size_t, phys_addr_t and
-dma_addr_t are the same type, and if we ever get a platform that
-wants something other than a phys_addr_t to put into cfg.dst_addr,
-we are in deep trouble.
+Start with the config-4.1 file from openwrt.
+
+> > Looking at the distribution,  I don't see the  "mach-sl2312" listed.
+> > Can you just copy it from the old distribution and does it work this
+> > way?
+> >
+> > There is this "mach-gemini" but it seems only for some W boards.
+
+mach-gemini is what you want.
 
 	Arnd
