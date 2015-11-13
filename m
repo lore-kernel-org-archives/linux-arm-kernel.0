@@ -1,103 +1,43 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Fri, 13 Nov 2015 18:25:51 +0200
-Subject: [PATCH] clocksource: arm_global_timer: fix suspend resume
-Message-ID: <1447431951-23713-1-git-send-email-grygorii.strashko@ti.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 13 Nov 2015 17:26:52 +0100
+Subject: [PATCH V3 02/26] coresight: etm3x: moving sysFS entries to
+ dedicated file
+In-Reply-To: <CANLsYkyEHEUu6TAgL4Av=Ucvs3U-K3+3J9mHN8=k4LXGLMGGcQ@mail.gmail.com>
+References: <1447280296-19147-1-git-send-email-mathieu.poirier@linaro.org>
+ <4446604.iDni9pkfpc@wuerfel>
+ <CANLsYkyEHEUu6TAgL4Av=Ucvs3U-K3+3J9mHN8=k4LXGLMGGcQ@mail.gmail.com>
+Message-ID: <24873197.N72CP7Wh3q@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now the System stall is observed on TI AM437x based board
-(am437x-gp-evm) during resuming from System suspend when ARM Global
-timer is selected as clocksource device - SysRq are working, but
-nothing else. The reason of stall is that ARM Global timer loses its
-contexts.
+On Friday 13 November 2015 09:17:18 Mathieu Poirier wrote:
+> On 11 November 2015 at 15:30, Arnd Bergmann <arnd@arndb.de> wrote:
+> > On Wednesday 11 November 2015 15:17:52 Mathieu Poirier wrote:
+> >> SysFS entries are big enough to justify their own file.
+> >> As such moving all sysFS related declarations to a dedicated
+> >> location.
+> >>
+> >> Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
+> >> ---
+> >>  drivers/hwtracing/coresight/Makefile               |    3 +-
+> >>  drivers/hwtracing/coresight/coresight-etm.h        |    4 +
+> >>  .../hwtracing/coresight/coresight-etm3x-sysfs.c    | 1218 +++++++++++++++++++
+> >>  drivers/hwtracing/coresight/coresight-etm3x.c      | 1234 +-------------------
+> >>
+> >
+> > You are adding a lot of interfaces here, make sure that each one is documented
+> > in Documentation/ABI/.
+> 
+> Everything is documented in
+> Documentation/ABI/testing/sysfs-bus-coresight-devices-etm3x.
+> 
+> >
+> > Your patch series doesn't add anything here, are you just using an existing
+> > ABI?
+> 
+> That is correct.
 
-The reason of stall is that ARM Global timer loses its contexts during
-System suspend:
-   GT_CONTROL.TIMER_ENABLE = 0 (unbanked)
-   GT_COUNTERx = 0
+Ok, excellent. I failed to see that all the implementations are just moved
+from one file to another, should really have read the patch description better.
 
-Hence, update ARM Global timer driver to reflect above behaviour
-- save GT_CONTROL.TIMER_ENABLE during suspend and restore on resume;
-- ensure clocksource and clockevent devices have coresponding flags
-  (CLOCK_SOURCE_SUSPEND_NONSTOP and CLOCK_EVT_FEAT_C3STOP) set
-  depending on presence of "always-on" DT property.
-
-CC: Arnd Bergmann <arnd@arndb.de>
-Cc: John Stultz <john.stultz@linaro.org>
-Cc: Felipe Balbi <balbi@ti.com>
-Cc: Tony Lindgren <tony@atomide.com>
-Signed-off-by: Grygorii Strashko <grygorii.strashko@ti.com>
----
- drivers/clocksource/arm_global_timer.c | 23 +++++++++++++++++++++++
- 1 file changed, 23 insertions(+)
-
-diff --git a/drivers/clocksource/arm_global_timer.c b/drivers/clocksource/arm_global_timer.c
-index a2cb6fa..1bbaf64 100644
---- a/drivers/clocksource/arm_global_timer.c
-+++ b/drivers/clocksource/arm_global_timer.c
-@@ -51,6 +51,8 @@ static void __iomem *gt_base;
- static unsigned long gt_clk_rate;
- static int gt_ppi;
- static struct clock_event_device __percpu *gt_evt;
-+static bool gt_always_on;
-+static u32 gt_control;
- 
- /*
-  * To get the value from the Global Timer Counter register proceed as follows:
-@@ -168,6 +170,9 @@ static int gt_clockevents_init(struct clock_event_device *clk)
- {
- 	int cpu = smp_processor_id();
- 
-+	if (!gt_always_on)
-+		clk->features |= CLOCK_EVT_FEAT_C3STOP;
-+
- 	clk->name = "arm_global_timer";
- 	clk->features = CLOCK_EVT_FEAT_PERIODIC | CLOCK_EVT_FEAT_ONESHOT |
- 		CLOCK_EVT_FEAT_PERCPU;
-@@ -195,12 +200,25 @@ static cycle_t gt_clocksource_read(struct clocksource *cs)
- 	return gt_counter_read();
- }
- 
-+static void gt_suspend(struct clocksource *cs)
-+{
-+	gt_control = readl(gt_base + GT_CONTROL);
-+}
-+
-+static void gt_resume(struct clocksource *cs)
-+{
-+	/* enables timer on all the cores */
-+	writel(gt_control & GT_CONTROL_TIMER_ENABLE, gt_base + GT_CONTROL);
-+}
-+
- static struct clocksource gt_clocksource = {
- 	.name	= "arm_global_timer",
- 	.rating	= 300,
- 	.read	= gt_clocksource_read,
- 	.mask	= CLOCKSOURCE_MASK(64),
- 	.flags	= CLOCK_SOURCE_IS_CONTINUOUS,
-+	.suspend = gt_suspend,
-+	.resume = gt_resume,
- };
- 
- #ifdef CONFIG_CLKSRC_ARM_GLOBAL_TIMER_SCHED_CLOCK
-@@ -218,6 +236,9 @@ static void __init gt_clocksource_init(void)
- 	/* enables timer on all the cores */
- 	writel(GT_CONTROL_TIMER_ENABLE, gt_base + GT_CONTROL);
- 
-+	if (gt_always_on)
-+		gt_clocksource.flags |= CLOCK_SOURCE_SUSPEND_NONSTOP;
-+
- #ifdef CONFIG_CLKSRC_ARM_GLOBAL_TIMER_SCHED_CLOCK
- 	sched_clock_register(gt_sched_clock_read, 64, gt_clk_rate);
- #endif
-@@ -289,6 +310,8 @@ static void __init global_timer_of_register(struct device_node *np)
- 		goto out_clk;
- 	}
- 
-+	gt_always_on = of_property_read_bool(np, "always-on");
-+
- 	err = request_percpu_irq(gt_ppi, gt_clockevent_interrupt,
- 				 "gt", gt_evt);
- 	if (err) {
--- 
-2.6.3
+	Arnd
