@@ -1,13 +1,15 @@
 From: horms+renesas@verge.net.au (Simon Horman)
-Date: Fri, 13 Nov 2015 11:23:47 +0900
-Subject: [PATCH 0/4] ARM: shmobile: Use SoC specific binding for rcar-dmac
- nodes
-Message-ID: <1447381431-2255-1-git-send-email-horms+renesas@verge.net.au>
+Date: Fri, 13 Nov 2015 11:23:50 +0900
+Subject: [PATCH 3/4] ARM: shmobile: r8a7793: Use SoC specific binding for
+ rcar-dmac nodes
+In-Reply-To: <1447381431-2255-1-git-send-email-horms+renesas@verge.net.au>
+References: <1447381431-2255-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <1447381431-2255-4-git-send-email-horms+renesas@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Use the new SoC specific binding for rcar-dmac and the generic
-binding as a fall-back in the r8a779[0134] device trees.
+binding as a fall-back in the r8a7793 device tree.
 
 In general Renesas hardware is not documented to the extent where the
 relationship between IP blocks on different SoCs can be assumed although
@@ -20,17 +22,32 @@ Although not universally liked this convention is used in the bindings for
 most drivers for Renesas hardware. The purpose of this patch is to
 update the Renesas R-Car DMA Controller nodes to follow this convention.
 
-Simon Horman (4):
-  ARM: shmobile: r8a7790: Use SoC specific binding for rcar-dmac nodes
-  ARM: shmobile: r8a7791: Use SoC specific binding for rcar-dmac nodes
-  ARM: shmobile: r8a7793: Use SoC specific binding for rcar-dmac nodes
-  ARM: shmobile: r8a7794: Use SoC specific binding for rcar-dmac nodes
-
- arch/arm/boot/dts/r8a7790.dtsi | 8 ++++----
- arch/arm/boot/dts/r8a7791.dtsi | 8 ++++----
+Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+---
  arch/arm/boot/dts/r8a7793.dtsi | 4 ++--
- arch/arm/boot/dts/r8a7794.dtsi | 4 ++--
- 4 files changed, 12 insertions(+), 12 deletions(-)
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
+diff --git a/arch/arm/boot/dts/r8a7793.dtsi b/arch/arm/boot/dts/r8a7793.dtsi
+index aa9b64c14a09..51099fe6f8db 100644
+--- a/arch/arm/boot/dts/r8a7793.dtsi
++++ b/arch/arm/boot/dts/r8a7793.dtsi
+@@ -133,7 +133,7 @@
+ 	};
+ 
+ 	dmac0: dma-controller at e6700000 {
+-		compatible = "renesas,rcar-dmac";
++		compatible = "renesas,dmac-r8a7793", "renesas,rcar-dmac";
+ 		reg = <0 0xe6700000 0 0x20000>;
+ 		interrupts = <0 197 IRQ_TYPE_LEVEL_HIGH
+ 			      0 200 IRQ_TYPE_LEVEL_HIGH
+@@ -164,7 +164,7 @@
+ 	};
+ 
+ 	dmac1: dma-controller@e6720000 {
+-		compatible = "renesas,rcar-dmac";
++		compatible = "renesas,dmac-r8a7793", "renesas,rcar-dmac";
+ 		reg = <0 0xe6720000 0 0x20000>;
+ 		interrupts = <0 220 IRQ_TYPE_LEVEL_HIGH
+ 			      0 216 IRQ_TYPE_LEVEL_HIGH
 -- 
 2.1.4
