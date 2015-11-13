@@ -1,45 +1,40 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Fri, 13 Nov 2015 20:31:23 +0800
-Subject: [PATCH v2] clocksource/drivers/dw_apb_timer: Use
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 13 Nov 2015 13:37:24 +0100
+Subject: [PATCH] clocksource/drivers/arm_global_timer: Always use
  {readl|writel}_relaxed
-Message-ID: <1447417883-7881-1-git-send-email-jszhang@marvell.com>
+In-Reply-To: <20151113202001.5933ae54@xhacker>
+References: <1447403678-7217-1-git-send-email-jszhang@marvell.com>
+ <25602407.8sIohphlWH@wuerfel> <20151113202001.5933ae54@xhacker>
+Message-ID: <53950580.slDxBxJnNC@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The driver is safe to use the relaxed version. From another side, the
-relaxed io accessor macros are available on all architectures now, so
-we can use the relaxed versions to get a trivial overall system
-performance improvement and reduce the latency a bit on some
-architectures.
+On Friday 13 November 2015 20:20:01 Jisheng Zhang wrote:
+> 
+> > for outer_cache.sync(). The Aurora outer cache sync has a different method
+> > and also doesn't use l2x0_lock. Finally, tauros3 doesn't need a cache sync
+> > at all.
+> > 
+> > Did you look at an older kernel version? We used to do a loop in the
+> 
+> oops, yes. The kernel version in product still needs the spinlock in sync.
+> I didn't check the L2 cache code for about 1 year, sorry for that.
+> If we upgrade to newer kernel version, yes, the bit performance bottleneck -- 
+> spinlock contention won't exist anymore. Thanks for pointing out this.
 
-Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
----
-since v1:
- - correct the wrong sentence in commit msg about writel performance on
-   CA9 with outer L2 cache. Thank Arnd for pointing out this in another
-   thread
- drivers/clocksource/dw_apb_timer.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+If you still see lock contention on the l2x0 lock with your patch applied,
+you might want to backport the optimizations to your product kernel, even
+more so for the aurora controller in the Armada 370 that had some extra
+optimizations.
 
-diff --git a/drivers/clocksource/dw_apb_timer.c b/drivers/clocksource/dw_apb_timer.c
-index c76c750..04282ee 100644
---- a/drivers/clocksource/dw_apb_timer.c
-+++ b/drivers/clocksource/dw_apb_timer.c
-@@ -51,13 +51,13 @@ clocksource_to_dw_apb_clocksource(struct clocksource *cs)
- 
- static unsigned long apbt_readl(struct dw_apb_timer *timer, unsigned long offs)
- {
--	return readl(timer->base + offs);
-+	return readl_relaxed(timer->base + offs);
- }
- 
- static void apbt_writel(struct dw_apb_timer *timer, unsigned long val,
- 		 unsigned long offs)
- {
--	writel(val, timer->base + offs);
-+	writel_relaxed(val, timer->base + offs);
- }
- 
- static void apbt_disable_int(struct dw_apb_timer *timer)
--- 
-2.6.2
+> But I think we may still see trivial system performance improvement in 500-1000
+> times/s of clockevent programming case due to the mb() in writel.
+
+Yes, I think it's fine. Just try to put your best estimate of the
+overhead in the patch description when you do the new version.
+
+Unfortunately, it is not easy to measure what the actual overhead is
+because low-level benchmarks of outer_cache.sync will show a much lower
+overhead than doing it occasionally with an active cache.
+
+	Arnd
