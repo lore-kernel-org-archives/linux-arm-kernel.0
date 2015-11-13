@@ -1,60 +1,80 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Fri, 13 Nov 2015 20:57:27 +0800
-Subject: [PATCH v2] clocksource/drivers/dw_apb_timer: Use
- {readl|writel}_relaxed
-In-Reply-To: <3713227.4t0cg6qNF9@wuerfel>
-References: <1447417883-7881-1-git-send-email-jszhang@marvell.com>
- <3713227.4t0cg6qNF9@wuerfel>
-Message-ID: <20151113205727.24354052@xhacker>
+From: phil.edworthy@renesas.com (Phil Edworthy)
+Date: Fri, 13 Nov 2015 13:03:11 +0000
+Subject: PCIe host controller behind IOMMU on ARM
+In-Reply-To: <4169020.aC5VXkILQm@wuerfel>
+References: <PS1PR06MB11807CBE8EB2AC6B0158D2B5F52A0@PS1PR06MB1180.apcprd06.prod.outlook.com>
+ <6255198.JqytBn7T9E@wuerfel>
+ <PS1PR06MB11802B4278C95E3808EEBDD5F5120@PS1PR06MB1180.apcprd06.prod.outlook.com>
+ <4169020.aC5VXkILQm@wuerfel>
+Message-ID: <PS1PR06MB11801D6BBC939517912BE185F5110@PS1PR06MB1180.apcprd06.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Dear Arnd,
+Hi Arnd,
 
-On Fri, 13 Nov 2015 13:42:09 +0100
-Arnd Bergmann <arnd@arndb.de> wrote:
-
-> On Friday 13 November 2015 20:31:23 Jisheng Zhang wrote:
-> > diff --git a/drivers/clocksource/dw_apb_timer.c b/drivers/clocksource/dw_apb_timer.c
-> > index c76c750..04282ee 100644
-> > --- a/drivers/clocksource/dw_apb_timer.c
-> > +++ b/drivers/clocksource/dw_apb_timer.c
-> > @@ -51,13 +51,13 @@ clocksource_to_dw_apb_clocksource(struct clocksource *cs)
-> >  
-> >  static unsigned long apbt_readl(struct dw_apb_timer *timer, unsigned long offs)
-> >  {
-> > -       return readl(timer->base + offs);
-> > +       return readl_relaxed(timer->base + offs);
-> >  }
-> >  
-> >  static void apbt_writel(struct dw_apb_timer *timer, unsigned long val,
-> >                  unsigned long offs)
-> >  {
-> > -       writel(val, timer->base + offs);
-> > +       writel_relaxed(val, timer->base + offs);
-> >  }
-> >  
-> >   
+On 12 November 2015 16:17, Arnd Bergmann wrote:
+> On Thursday 12 November 2015 15:33:41 Phil Edworthy wrote:
+> > On 12 November 2015 09:49, Arnd Bergmann wrote:
+> > > On Thursday 12 November 2015 09:26:33 Phil Edworthy wrote:
+> > > > On 11 November 2015 18:25, LIviu wrote:
+> > > > > On Mon, Nov 09, 2015 at 12:32:13PM +0000, Phil Edworthy wrote:
+> > >
+> > > of_dma_configure calls of_dma_get_range to do all this for the PCIe host,
+> > > and then calls arch_setup_dma_ops() so the architecture specific code can
+> > > enforce the limits in dma_set_mask and pick an appropriate set of dma
+> > > operations. The missing part is in the implementation of
+> arch_setup_dma_ops,
+> > > which currently happily ignores the base and limit.
+> > I don't think it's as simple as that, though I could be wrong!
+> >
+> > First off, of_dma_configure() sets a default coherent_dma_mask to 4GiB.
+> > This default is set for the 'platform soc' device. For my own testing I increased
+> > this to DMA_BIT_MASK(63). Note that setting it to DMA_BIT_MASK(64) causes
+> > boot failure that I haven't looked into.
 > 
-> As with the other patch, I think it would be nicer to only change the
-> functions that benefit from the change, to make it easier to prove
+> Most platform devices actually need the 32-bit mask, so we intentionally
+> followed what PCI does here and default to that and require platform drivers
+> to explicitly ask for a larger mask if they need it.
+Ok, that makes sense.
 
-I think to show performance improvement for this dw_apb_timer case is much
-easier, because the clocksource ->read() function also calls the apbt_readl.
-I will add some performance numbers in v3
 
-> that the conversion is correct. You could introduce apbt_readl_releaxed()
-> etc functions and call them from __apbt_read_clocksource()
-> and apbt_next_event().
+> > Then pci_device_add() sets the devices coherent_dma_mask to 4GiB before
+> > calling of_pci_dma_configure(). I assume it does this on the basis that this is a
+> > good default for PCI drivers that don't call dma_set_mask().
+> > So if arch_setup_dma_ops() walks up the parents to limit the mask, you'll hit
+> > this mask.
+> 
+> arch_setup_dma_ops() does not walk up the hierarchy, of_dma_configure()
+> does this before calling arch_setup_dma_ops(). The PCI devices start out
+> with the 32-bit mask, but the limit should be whatever PCI host uses.
+Ok, so of_dma_configure() could walk up the tree and restrict the dma
+mask to whatever parents limit it to. Then it could be overridden by
+a dma-ranges entry in the DT node, right?
+If so, one problem I can see is PCI controllers already use the
+dma-ranges binding but with 3 address cells since it also specifies
+the PCI address range.
 
-I'm not sure whether such changes would make the code a bit complex. From
-another side, it's safe to always use relaxed version in this driver, so
-is it better to switch to relaxed version no matter the code path benefit from
-it or not?
+I noticed that of_dma_get_range() skips straight to the parent node.
+Shouldn't it attempt to get the dma-ranges for the device's node
+first? I mean most hardware is limited by the peripheral's
+capabilities, not the bus. If fact, of_dma_get_range() gets the number
+of address and size cells from the device node, but gets the dma-ranges
+from the parent. That seems a little odd to me.
 
-PS: for the global timer related patch, I just hack code a bit to make it works
-as clockevent on my platform, and I still try to think about a test case to
-measure the improvement, cyclictest? Any idea is appreciated.
+The only other problem I can see is that currently all PCI drivers can
+try to set their dma mask to 64 bits. At the moment that succeeds
+because there are no checks. Until devices using them have their DTs
+updated with dma-ranges, we would be limiting them to a 32 bit mask. I
+guess that's not much of an issue in practice.
 
-Thanks in advance,
-Jisheng
+
+> > Finally, dma_set_mask_and_coherent() is called from the PCI card driver
+> > but it doesn't check the parents dma masks either.
+> 
+> The way I think this should work is that arch_setup_dma_ops() stores the
+> allowed mask in the struct device, and that dma_set_mask compares the
+> mask against that.
+That makes sense.
+
+Thanks for your help,
+Phil
