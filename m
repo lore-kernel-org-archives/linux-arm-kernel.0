@@ -1,67 +1,67 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Fri, 13 Nov 2015 14:59:40 +0100
-Subject: PCIe host controller behind IOMMU on ARM
-In-Reply-To: <PS1PR06MB11801D6BBC939517912BE185F5110@PS1PR06MB1180.apcprd06.prod.outlook.com>
-References: <PS1PR06MB11807CBE8EB2AC6B0158D2B5F52A0@PS1PR06MB1180.apcprd06.prod.outlook.com>
- <4169020.aC5VXkILQm@wuerfel>
- <PS1PR06MB11801D6BBC939517912BE185F5110@PS1PR06MB1180.apcprd06.prod.outlook.com>
-Message-ID: <4744053.Iz6Y8QJQYF@wuerfel>
+From: mike.looijmans@topic.nl (Mike Looijmans)
+Date: Fri, 13 Nov 2015 15:06:55 +0100
+Subject: [PATCH v3 1/5] spi: introduce mmap read support for spi flash
+ devices
+In-Reply-To: <5642E546.3040806@ti.com>
+References: <1447133399-25658-1-git-send-email-vigneshr@ti.com>
+ <1447133399-25658-2-git-send-email-vigneshr@ti.com>
+ <20151110232341.GU12143@google.com> <5642E546.3040806@ti.com>
+Message-ID: <5645EE7F.5040101@topic.nl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Friday 13 November 2015 13:03:11 Phil Edworthy wrote:
-> 
-> > > Then pci_device_add() sets the devices coherent_dma_mask to 4GiB before
-> > > calling of_pci_dma_configure(). I assume it does this on the basis that this is a
-> > > good default for PCI drivers that don't call dma_set_mask().
-> > > So if arch_setup_dma_ops() walks up the parents to limit the mask, you'll hit
-> > > this mask.
-> > 
-> > arch_setup_dma_ops() does not walk up the hierarchy, of_dma_configure()
-> > does this before calling arch_setup_dma_ops(). The PCI devices start out
-> > with the 32-bit mask, but the limit should be whatever PCI host uses.
-> Ok, so of_dma_configure() could walk up the tree and restrict the dma
-> mask to whatever parents limit it to. Then it could be overridden by
-> a dma-ranges entry in the DT node, right?
+?On 11-11-15 07:50, R, Vignesh wrote:
+> Hi Brain,
+>
+> On 11/11/2015 4:53 AM, Brian Norris wrote:
+>> Hi Vignesh,
+...
 
-No, the dma-ranges properties tell you what the allowed masks are,
-this is what of_dma_configure() looks at.
+>> Also, this API doesn't actually have anything to do with memory mapping.
+>> It has to do with the de facto standard flash protocol. So I don't think
+>> mmap belongs in the name; it should be something about flash. (I know of
+>> at least one other controller that could probably use this API, excpet
+>> it doesn't use memory mapping to accomplish the accelerated flash read.)
 
-> If so, one problem I can see is PCI controllers already use the
-> dma-ranges binding but with 3 address cells since it also specifies
-> the PCI address range.
-> 
-> I noticed that of_dma_get_range() skips straight to the parent node.
-> Shouldn't it attempt to get the dma-ranges for the device's node
-> first?
+The Zynq has a similar way of accessing QSPI flash through a memory map. The 
+memory window is only 16MB, so some form of paging would be needed.
 
-No, the dma-ranges explain the capabilities of the bus, this is
-what you have to look at. The device itself may have additional
-restrictions, but those are what the driver knows based on the
-compatibility value when it passes the device specific mask into
-dma_set_mask()
+It's why I have been following this thread with great interest, since the QSPI 
+performance on the Zynq is way below what it could potentially be.
 
-> I mean most hardware is limited by the peripheral's
-> capabilities, not the bus. If fact, of_dma_get_range() gets the number
-> of address and size cells from the device node, but gets the dma-ranges
-> from the parent. That seems a little odd to me.
+> As far as TI QSPI controller is concerned, the accelerated read happens
+> via mmap port whereby a predefined memory address space of SoC is
+> exposed as QSPI mmap region. This region can be accessed like normal
+> RAM(via memcpy()) and the QSPI controller interface takes care of
+> fetching data from flash on SPI bus automatically hence, I named it as
+> above. But, I have no hard feelings if it needs to be generalized to
+> spi_mtd_read() or something else.
 
-of_dma_get_range() calls of_n_addr_cells()/of_n_size_cells(), which get
-the #address-cells/#size-cells property from the parent device (except
-for the root, which is special).
+I know that on the Zynq, you can even let the DMA controller access the QSPI 
+flash via this memory mapping. The QSPI controller itself doesn't support any 
+DMA at all.
 
-> The only other problem I can see is that currently all PCI drivers can
-> try to set their dma mask to 64 bits. At the moment that succeeds
-> because there are no checks.
+If something similar applies to the TI platform (most of the TI procs have 
+nice DMA controllers) one could go one step further and implement a generic 
+DMA-through-mmap access to QSPI flash.
 
-Right, this is the main bug we need to fix.
+Mike.
 
-> Until devices using them have their DTs
-> updated with dma-ranges, we would be limiting them to a 32 bit mask. I
-> guess that's not much of an issue in practice.
 
-Correct. I've tried to tell everyone about this when they added device
-nodes for DMA capable devices. In most cases, they want 32-bit masks
-anyway.
+Kind regards,
 
-	Arnd
+Mike Looijmans
+System Expert
+
+TOPIC Embedded Products
+Eindhovenseweg 32-C, NL-5683 KH Best
+Postbus 440, NL-5680 AK Best
+Telefoon: +31 (0) 499 33 69 79
+Telefax: +31 (0) 499 33 69 70
+E-mail: mike.looijmans at topicproducts.com
+Website: www.topicproducts.com
+
+Please consider the environment before printing this e-mail
+
+Visit us at : Aerospace Electrical Systems Expo Europe which will be held from 17.11.2015 till 19.11.2015, Findorffstrasse 101 Bremen, Germany, Hall 5, stand number C65
+http://www.aesexpo.eu
