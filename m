@@ -1,114 +1,76 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Fri, 13 Nov 2015 11:45:06 -0700
-Subject: [PATCH V4 15/26] coresight: etm3x: implementing perf_enable/disable()
- API
+Date: Fri, 13 Nov 2015 11:45:12 -0700
+Subject: [PATCH V4 21/26] coresight: introducing a global trace ID function
 In-Reply-To: <1447440317-1977-1-git-send-email-mathieu.poirier@linaro.org>
 References: <1447440317-1977-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1447440317-1977-16-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1447440317-1977-22-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-That way traces can be enabled and disabled automatically
-from the Perf subystem using the PMU abstraction.
+TraceID values have to be unique for all tracers and
+consistent between drivers and user space.  As such
+introducing a central function to be used whenever a
+traceID value is required.
+
+The patch also account for data traceIDs, which are usually
+I(N) + 1.
 
 Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 ---
- drivers/hwtracing/coresight/coresight-etm3x.c | 47 ++++++++++++++++++++++++---
- 1 file changed, 43 insertions(+), 4 deletions(-)
+ drivers/hwtracing/coresight/coresight-etm3x.c |  7 ++-----
+ include/linux/coresight-pmu.h                 | 12 ++++++++++++
+ 2 files changed, 14 insertions(+), 5 deletions(-)
 
 diff --git a/drivers/hwtracing/coresight/coresight-etm3x.c b/drivers/hwtracing/coresight/coresight-etm3x.c
-index dd319ef0f1ac..4ff3e1419fde 100644
+index c07b7d3eee86..ebd569986bd4 100644
 --- a/drivers/hwtracing/coresight/coresight-etm3x.c
 +++ b/drivers/hwtracing/coresight/coresight-etm3x.c
-@@ -372,8 +372,10 @@ static void etm_enable_hw(void *info)
- 	etm_set_prog(drvdata);
+@@ -27,6 +27,7 @@
+ #include <linux/cpu.h>
+ #include <linux/of.h>
+ #include <linux/coresight.h>
++#include <linux/coresight-pmu.h>
+ #include <linux/amba/bus.h>
+ #include <linux/seq_file.h>
+ #include <linux/uaccess.h>
+@@ -784,11 +785,7 @@ static void etm_init_arch_data(void *info)
  
- 	etmcr = etm_readl(drvdata, ETMCR);
--	etmcr &= (ETMCR_PWD_DWN | ETMCR_ETM_PRG);
-+	/* Clear setting from a previous run if need be */
-+	etmcr &= ~ETM3X_SUPPORTED_OPTIONS;
- 	etmcr |= drvdata->port_size;
-+	etmcr |= ETMCR_ETM_EN;
- 	etm_writel(drvdata, config->ctrl | etmcr, ETMCR);
- 	etm_writel(drvdata, config->trigger_event, ETMTRIGGER);
- 	etm_writel(drvdata, config->startstop_ctrl, ETMTSSCR);
-@@ -413,9 +415,6 @@ static void etm_enable_hw(void *info)
- 	/* No VMID comparator value selected */
- 	etm_writel(drvdata, 0x0, ETMVMIDCVR);
- 
--	/* Ensures trace output is enabled from this ETM */
--	etm_writel(drvdata, config->ctrl | ETMCR_ETM_EN | etmcr, ETMCR);
--
- 	etm_clr_prog(drvdata);
- 	CS_LOCK(drvdata->base);
- 
-@@ -488,6 +487,18 @@ static void etm_set_config(struct coresight_device *csdev, void *config)
- 	drvdata->config = config;
- }
- 
-+static int etm_enable_perf(struct coresight_device *csdev)
-+{
-+	struct etm_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
-+
-+	if (WARN_ON_ONCE(drvdata->cpu != smp_processor_id()))
-+		return -EINVAL;
-+
-+	etm_enable_hw(drvdata);
-+
-+	return 0;
-+}
-+
- static int etm_enable_sysfs(struct coresight_device *csdev)
+ static void etm_init_trace_id(struct etm_drvdata *drvdata)
  {
- 	struct etm_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
-@@ -534,6 +545,9 @@ static int etm_enable(struct coresight_device *csdev, u32 mode)
- 	case CS_MODE_SYSFS:
- 		ret = etm_enable_sysfs(csdev);
- 		break;
-+	case CS_MODE_PERF:
-+		ret = etm_enable_perf(csdev);
-+		break;
- 	default:
- 		ret = -EINVAL;
- 	}
-@@ -573,6 +587,28 @@ static void etm_disable_hw(void *info)
- 	dev_dbg(drvdata->dev, "cpu: %d disable smp call done\n", drvdata->cpu);
+-	/*
+-	 * A trace ID of value 0 is invalid, so let's start at some
+-	 * random value that fits in 7 bits and go from there.
+-	 */
+-	drvdata->traceid = 0x10 + drvdata->cpu;
++	drvdata->traceid = coresight_get_trace_id(drvdata->cpu);
  }
  
-+static void etm_disable_perf(struct coresight_device *csdev)
+ static int etm_probe(struct amba_device *adev, const struct amba_id *id)
+diff --git a/include/linux/coresight-pmu.h b/include/linux/coresight-pmu.h
+index 6c5386b23b10..7d410260661b 100644
+--- a/include/linux/coresight-pmu.h
++++ b/include/linux/coresight-pmu.h
+@@ -19,9 +19,21 @@
+ #define _LINUX_CORESIGHT_PMU_H
+ 
+ #define CORESIGHT_ETM_PMU_NAME "cs_etm"
++#define CORESIGHT_ETM_PMU_SEED  0x10
+ 
+ /* ETMv3.5/PTM's ETMCR config bit */
+ #define ETM_OPT_CYCACC  12
+ #define ETM_OPT_TS      28
+ 
++static inline int coresight_get_trace_id(int cpu)
 +{
-+	struct etm_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
-+
-+	if (WARN_ON_ONCE(drvdata->cpu != smp_processor_id()))
-+		return;
-+
-+	CS_UNLOCK(drvdata->base);
-+
-+	/* Setting the prog bit disables tracing immediately */
-+	etm_set_prog(drvdata);
-+	/* Get ready for another session */
-+	drvdata->config = NULL;
 +	/*
-+	 * There is no way to know when the tracer will be used again so
-+	 * power down the tracer.
++	 * A trace ID of value 0 is invalid, so let's start at some
++	 * random value that fits in 7 bits and go from there.  Since
++	 * the common convention is to have data trace IDs be I(N) + 1,
++	 * set instruction trace IDs as a function of the CPU number.
 +	 */
-+	etm_set_pwrdwn(drvdata);
-+
-+	CS_LOCK(drvdata->base);
++	return (CORESIGHT_ETM_PMU_SEED + (cpu * 2));
 +}
 +
- static void etm_disable_sysfs(struct coresight_device *csdev)
- {
- 	struct etm_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
-@@ -616,6 +652,9 @@ static void etm_disable(struct coresight_device *csdev)
- 	case CS_MODE_SYSFS:
- 		etm_disable_sysfs(csdev);
- 		break;
-+	case CS_MODE_PERF:
-+		etm_disable_perf(csdev);
-+		break;
- 	default:
- 		WARN_ON_ONCE(mode);
- 		return;
+ #endif
 -- 
 1.9.1
