@@ -1,143 +1,197 @@
 From: jungseoklee85@gmail.com (Jungseok Lee)
-Date: Sat, 14 Nov 2015 00:01:55 +0900
-Subject: [PATCH v5 2/6] arm64: ftrace: fix a stack tracer's output under
- function graph tracer
-In-Reply-To: <56415997.1040207@linaro.org>
-References: <1446792285-1154-1-git-send-email-takahiro.akashi@linaro.org>
- <1446792285-1154-3-git-send-email-takahiro.akashi@linaro.org>
- <3F63B5BC-C21A-4ECA-9800-374B924DB98D@gmail.com>
- <56415997.1040207@linaro.org>
-Message-ID: <01313E85-ED3B-4E3A-A193-033A393A93F8@gmail.com>
+Date: Sat, 14 Nov 2015 00:16:53 +0900
+Subject: arm64 function_graph tracer panic with CONFIG_DYNAMIC_FTRACE
+In-Reply-To: <56457A4B.601@linaro.org>
+References: <20151112104243.GF5627@e104818-lin.cambridge.arm.com>
+ <56457A4B.601@linaro.org>
+Message-ID: <7D1A1F09-183C-4111-A646-A6B6767D1356@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(+ Li Bin in CC)
+On Nov 13, 2015, at 2:51 PM, AKASHI Takahiro wrote:
 
-On Nov 10, 2015, at 11:42 AM, AKASHI Takahiro wrote:
-> On 11/09/2015 11:04 PM, Jungseok Lee wrote:
->> On Nov 6, 2015, at 3:44 PM, AKASHI Takahiro wrote:
->> 
->> Hi Akashi,
->> 
->>> Function graph tracer modifies a return address (LR) in a stack frame
->>> to hook a function return. This will result in many useless entries
->>> (return_to_handler) showing up in a stack tracer's output.
->>> 
->>> This patch replaces such entries with originals values preserved in
->>> current->ret_stack[].
->>> 
->>> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
->>> ---
->>> arch/arm64/include/asm/ftrace.h |    2 ++
->>> arch/arm64/kernel/stacktrace.c  |   21 +++++++++++++++++++++
->>> 2 files changed, 23 insertions(+)
->>> 
->>> diff --git a/arch/arm64/include/asm/ftrace.h b/arch/arm64/include/asm/ftrace.h
->>> index c5534fa..3c60f37 100644
->>> --- a/arch/arm64/include/asm/ftrace.h
->>> +++ b/arch/arm64/include/asm/ftrace.h
->>> @@ -28,6 +28,8 @@ struct dyn_arch_ftrace {
->>> 
->>> extern unsigned long ftrace_graph_call;
->>> 
->>> +extern void return_to_handler(void);
->>> +
->>> static inline unsigned long ftrace_call_adjust(unsigned long addr)
->>> {
->>> 	/*
->>> diff --git a/arch/arm64/kernel/stacktrace.c b/arch/arm64/kernel/stacktrace.c
->>> index ccb6078..5fd3477 100644
->>> --- a/arch/arm64/kernel/stacktrace.c
->>> +++ b/arch/arm64/kernel/stacktrace.c
->>> @@ -17,6 +17,7 @@
->>>  */
->>> #include <linux/kernel.h>
->>> #include <linux/export.h>
->>> +#include <linux/ftrace.h>
->>> #include <linux/sched.h>
->>> #include <linux/stacktrace.h>
->>> 
->>> @@ -73,6 +74,9 @@ struct stack_trace_data {
->>> 	struct stack_trace *trace;
->>> 	unsigned int no_sched_functions;
->>> 	unsigned int skip;
->>> +#ifdef CONFIG_FUNCTION_GRAPH_TRACER
->>> +	unsigned int ret_stack_index;
->>> +#endif
->>> };
->>> 
->>> static int save_trace(struct stackframe *frame, void *d)
->>> @@ -81,6 +85,20 @@ static int save_trace(struct stackframe *frame, void *d)
->>> 	struct stack_trace *trace = data->trace;
->>> 	unsigned long addr = frame->pc;
->>> 
->>> +#ifdef CONFIG_FUNCTION_GRAPH_TRACER
->>> +	if (addr == (unsigned long)return_to_handler - AARCH64_INSN_SIZE) {
->> 
->> not if (adds == (unsigned long)return_to_handler)?
->> 
->>> +		/*
->>> +		 * This is a case where function graph tracer has
->>> +		 * modified a return address (LR) in a stack frame
->>> +		 * to hook a function return.
->>> +		 * So replace it to an original value.
->>> +		 */
->>> +		frame->pc = addr =
->>> +			current->ret_stack[data->ret_stack_index--].ret
->>> +							- AARCH64_INSN_SIZE;
->> 
->> Ditto. not without AARCH64_INSN_SIZE?
->> 
->> I've observed many return_to_handler without the changes.
->> Am I missing something?
+Hi Akashi and Catalin,
+
+> Catalin,
+> (add lakml back to Cc)
 > 
-> You're right!
-> I thought I had tested the patches, but...
+> On 11/13/2015 01:01 AM, Catalin Marinas wrote:
+> > On Fri, Nov 13, 2015 at 12:00:42AM +0900, AKASHI Takahiro wrote:
+> >> If possible, please try again with "select HAVE_FUNCTION_GRAPH_FP_TEST" added
+> >> to CONFIG_ARM64.
+> >> It will insert an additional check. I hope this will help.
+> >
+> > So it looks the the frame is off by some amount:
 > 
->>> +	}
->>> +#endif /* CONFIG_FUNCTION_GRAPH_TRACER */
->>> +
->>> 	if (data->no_sched_functions && in_sched_functions(addr))
->>> 		return 0;
->>> 	if (data->skip) {
->>> @@ -100,6 +118,9 @@ void save_stack_trace_tsk(struct task_struct *tsk, struct stack_trace *trace)
->>> 
->>> 	data.trace = trace;
->>> 	data.skip = trace->skip;
->>> +#ifdef CONFIG_FUNCTION_GRAPH_TRACER
->>> +	data.ret_stack_index = current->curr_ret_stack;
->> 
->> Can I get an idea on why current->curr_ret_stack is used instead of
->> tsk->curr_ret_stack?
+> I was able to reproduce the problem on hikey, too.
+
+Hmm, I don't find a 100% reproduction step yet.
+
+> > # echo function_graph > /sys/kernel/debug/tracing/current_tracer
+> > Bad frame pointer: expected ffffffc976b3bd50, received ffffffc976b3be60
 > 
-> Thanks for pointing this out.
-> Will fix it although it works without a change since save_stack_trace_sp() is
-> called only in a 'current task' context.
-> 
-> -Takahiro AKASHI
+> The difference of fp's was 0x110(sizeof(pt_reg_t)=0x120).
+> It seems that an interrupt happened here (and we might have unwound one extra frame?).
 
-As reading function_graph related codes in arm64, I've realized that this issue
-can be observed from three different sources.
+Am I the only person to observe the following log?
 
- (A) stack tracer of ftrace
- (B) perf call trace (perf record with '-g' option)
- (C) dump_backtrace
+ NOHZ: local_softirq_pending 20
 
-The issue is orthogonal to the commit, e306dfd06f, and its revert. It seems that
-Steve's approach, 7ee991fbc6, would be valid on arm64 and cover all three cases.
-It does in case of x86. Li Bin posted a patch [1] to solve the issue from case(C)
-in Steve's way. This hunk deals with case(A) with its own implementation. But,
-case(B) is not covered yet. It can be reproduced easily with the following steps.
+The log comes from line760 of kernel/time/tick-sched.c.
 
- # echo function_graph > /sys/kernel/debug/tracing/current_tracer
- # perf record -g sleep 2
- # perf report --call-graph
-
-So, how about considering Steve's approach on arm64 and then covering all three
-cases with it? It would be good in code consolidation perspective. Note that the
-idea is applied to arch/sh.
+I will update if I figure out something useful.
 
 Best Regards
 Jungseok Lee
 
-[1] https://lkml.org/lkml/2015/10/15/368
+> >    from func psci_cpu_suspend return to ffffffc00008d058
+> 
+> Always in the same place.
+> 
+> > ------------[ cut here ]------------
+> > WARNING: at /work/Linux/linux-2.6-aarch64/kernel/trace/trace_functions_graph.c:223
+> > Modules linked in:
+> >
+> > CPU: 4 PID: 0 Comm: swapper/4 Not tainted 4.3.0+ #584
+> > Hardware name: Juno (DT)
+> > task: ffffffc976b22f00 ti: ffffffc976b38000 task.ti: ffffffc976b38000
+> > PC is at ftrace_return_to_handler+0x11c/0x150
+> > LR is at ftrace_return_to_handler+0x11c/0x150
+> > pc : [<ffffffc000172034>] lr : [<ffffffc000172034>] pstate: 800001c5
+> > sp : ffffffc976b3bdd0
+> > x29: ffffffc976b3bdd0 x28: ffffffc0006c9000
+> > x27: ffffffc000a29f20 x26: ffffffc976b3bf70
+> > x25: 000000cc2c13e054 x24: 0000000000000004
+> > x23: ffffffc000aeb790 x22: 0000000000000002
+> > x21: ffffffc975503200 x20: ffffffc000aeb850
+> > x19: 0000000000000002 x18: ffffffc000b3a920
+> > x17: 0000000000000000 x16: 0000000000000000
+> > x15: ffffffc000b3a5bf x14: 3739636666666666
+> > x13: 6620646576696563 x12: 6572202c30356462
+> > x11: 3362363739636666 x10: 00000000000000fc
+> > x9 : ffffffc9768070c0 x8 : 0000000000001dd0
+> > x7 : ffffffc9760f4c80 x6 : ffffffc9760f4c00
+> > x5 : 00000000000084c0 x4 : 0000000000000001
+> > x3 : ffffffc976b3bc50 x2 : 0000000000000001
+> > x1 : 000000000000007f x0 : 000000000000007f
+> >
+> > ---[ end trace ac97c44ba7dabcce ]---
+> > Call trace:
+> > [<ffffffc000172034>] ftrace_return_to_handler+0x11c/0x150
+> > [<ffffffc0000924bc>] return_to_handler+0x1c/0x40
+> > [<ffffffc0000924a0>] return_to_handler+0x0/0x40
+> > [<ffffffc0000924a0>] return_to_handler+0x0/0x40
+> > [<ffffffc0000924a0>] return_to_handler+0x0/0x40
+> > [<ffffffc0000924a0>] return_to_handler+0x0/0x40
+> > [<ffffffc0000924a0>] return_to_handler+0x0/0x40
+> > [<ffffffc0000924a0>] return_to_handler+0x0/0x40
+> 
+> These call stacks were:
+>  (psci_cpu_suspend)
+>  psci_suspend_finisher
+>  (cpu_suspend_enter?)
+>  cpu_suspend
+>  cpu_psci_cpu_suspend
+>  arm_cpuidle_suspend
+>  arm_enter_idle_state
+>  cpuidle_enter_state
+>  cpuidle_enter
+>  call_cpuidle
+>  (cpu_startup_entry?)
+> 
+> and if cpuidle is turned off(cpuidle.off=1), the panic never happens.
+> That is all what I know at this moment.
+> 
+> -Takahiro AKASHI
+> 
+> 
+> > [<ffffffc000090208>] secondary_start_kernel+0x130/0x158
+> > Unable to handle kernel NULL pointer dereference at virtual address 00000000
+> > pgd = ffffffc000b68000
+> > [00000000] *pgd=00000009f69ea003, *pud=00000009f69ea003, *pmd=00000009f69eb003, *pte=006000002c010707
+> > Internal error: Oops: 96000006 [#1] PREEMPT SMP
+>  [snip]
+> 
+> 
+> On 11/12/2015 07:42 PM, Catalin Marinas wrote:
+>> Hi Takahiro,
+>> 
+>> I was trying to assess what's working/not working in ftrace on arm64 and
+>> whether your recent patches are meant for 4.4 or can wait until 4.5.
+>> However, without any patches applied on a 4.3 kernel, enabling the
+>> function_graph tracer when CONFIG_DYNAMIC_FTRACE is enabled panics the
+>> kernel. Strangely, it does not happen if only a single CPU is on.
+>> However, with function_graph tracer on, onlining a second CPU leads to a
+>> similar panic.
+>> 
+>> Below is the kernel panic with 2 CPUs online on a Juno board. There
+>> isn't much stack trace information for CPU 5 where the fault happened,
+>> the frame pointer (x29) seems corrupted as well. Any idea? Thanks.
+>> 
+>> # echo function_graph > /sys/kernel/debug/tracing/current_tracer
+>> swapper/5[0]: undefined instruction: pc=ffffffc000a46698
+>> Code: 0009ccf8 ffffffc0 00000000 00000000 (00000030)
+>> Internal error: Oops - undefined instruction: 0 [#1] PREEMPT SMP
+>> Modules linked in:
+>> CPU: 5 PID: 0 Comm: swapper/5 Not tainted 4.3.0 #574
+>> Hardware name: Juno (DT)
+>> task: ffffffc976b23ac0 ti: ffffffc976b3c000 task.ti: ffffffc976b3c000
+>> PC is at cpu_online_bits+0x0/0x8
+>> LR is at cpu_online_bits+0x0/0x8
+>> pc : [<ffffffc000a46698>] lr : [<ffffffc000a46698>] pstate: 600001c5
+>> sp : ffffffc976b3ff40
+>> x29: 0000000000000002 x28: ffffffc000100c0c
+>> x27: ffffffc000aeb790 x26: ffffffc9758d5800
+>> x25: 0000000000000002 x24: ffffffc0000924a0
+>> x23: ffffffc976b3ff40 x22: ffffffc00056841c
+>> x21: ffffffc000a25b80 x20: ffffffc000aeb790
+>> x19: ffffffc9758d5800 x18: 0000000000000000
+>> x17: 0000000000000000 x16: 0000000000000000
+>> x15: 0000000000000000 x14: 0000000000000000
+>> x13: 0000000000000000 x12: 0000000034d5d91d
+>> x11: 0000000000000000 x10: 0000000000001000
+>> x9 : ffffffc9768070c0 x8 : 00000000000007d8
+>> x7 : 0000001b280eb7c4 x6 : 0000000000000015
+>> x5 : 000000000000000a x4 : ffffffc0792a4990
+>> x3 : ffffffffffffffa1 x2 : ffffffc0792a4800
+>> x1 : ffffffc0000949e0 x0 : ffffffffffffffa1
+>> 
+>> Process swapper/5 (pid: 0, stack limit = 0xffffffc976b3c020)
+>> Stack: (0xffffffc976b3ff40 to 0xffffffc976b40000)
+>> ff40: ffffffc976b3ff70 ffffffc0000924a0 ffffffc976b3c000 ffffffc000a46000
+>> ff60: ffffffc000b20000 0000001b27d716c0 ffffffc976b3ffd0 ffffffc000090208
+>> ff80: 0000000000000005 0000000000000e12 ffffffc000b306a0 0000000000000000
+>> ffa0: 0000000000000000 0000000000000000 0000000080b65000 0000000080b68000
+>> ffc0: ffffffc0000827f0 0000000000000000 0000000000000000 00000000800827dc
+>> ffe0: 0000000000000000 0000000000000000 068824085611a721 280b8a0b05808446
+>> Call trace:
+>> Code: 0009ccf8 ffffffc0 00000000 00000000 (00000030)
+>> ---[ end trace 702bb2ed35464601 ]---
+>> Kernel panic - not syncing: Attempted to kill the idle task!
+>> CPU4: stopping
+>> CPU: 4 PID: 0 Comm: swapper/4 Tainted: G      D         4.3.0 #574
+>> Hardware name: Juno (DT)
+>> Call trace:
+>> [<ffffffc00008aaa8>] dump_backtrace+0x0/0x150
+>> [<ffffffc00008ac1c>] show_stack+0x24/0x30
+>> [<ffffffc0003b21a0>] dump_stack+0x90/0xd0
+>> [<ffffffc000090880>] handle_IPI+0x280/0x290
+>> [<ffffffc00008255c>] gic_handle_irq+0x94/0xb0
+>> Exception stack(0xffffffc976b3bd70 to 0xffffffc976b3be90)
+>> bd60:                                   0000001b2ed1ee8c ffffffc000aeb850
+>> bd80: ffffffc976b3bec0 ffffffc0005681dc 0000000080000145 ffffffc00009244c
+>> bda0: 0000000000000000 0000000000000001 ffffffc976b38000 0000000000000003
+>> bdc0: ffffffc976b38000 ffffffc000a282a8 ffffffc976b38000 ffffffc0000ecb28
+>> bde0: 00000000000006ed ffffffc9768070c0 00000000000007e0 ffffffc0006d04a8
+>> be00: 0000000000000001 0000000000005a0e 0000000000000001 ffffffc0006d04a8
+>> be20: 0000000000000000 0000000000000000 0000000000000001 0000001b2ed1ee8c
+>> be40: ffffffc000aeb850 ffffffc9758d5600 0000000000000000 ffffffc000aeb790
+>> be60: 0000000000000004 0000001b2e40a7ec ffffffc976b3bf70 ffffffc000a29f20
+>> be80: ffffffc0006c9000 ffffffc976b3bec0
+>> [<ffffffc0000855ac>] el1_irq+0x6c/0xe0
+>> [<ffffffc00056842c>] cpuidle_enter+0x34/0x48
+>> [<ffffffc000100c30>] call_cpuidle+0x48/0x80
+>> [<ffffffc000100e90>] cpu_startup_entry+0x228/0x308
+>> [<ffffffc000090208>] secondary_start_kernel+0x130/0x158
+>> ---[ end Kernel panic - not syncing: Attempted to kill the idle task!
+>> 
