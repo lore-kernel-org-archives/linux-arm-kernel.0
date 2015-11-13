@@ -1,67 +1,103 @@
-From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Fri, 13 Nov 2015 14:57:26 +0530
-Subject: [PATCH v4 3/9] ARM: EXYNOS: Move pmu specific headers under
- "linux/soc/samsung"
-In-Reply-To: <564410FB.2000802@samsung.com>
-References: <1447155784-12667-1-git-send-email-pankaj.dubey@samsung.com>
- <1447155784-12667-4-git-send-email-pankaj.dubey@samsung.com>
- <564410FB.2000802@samsung.com>
-Message-ID: <000801d11df5$86ccd960$94668c20$@samsung.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 13 Nov 2015 10:28:01 +0100
+Subject: [PATCH] clocksource/drivers/arm_global_timer: Always use
+ {readl|writel}_relaxed
+In-Reply-To: <20151113164025.344a0faf@xhacker>
+References: <1447403678-7217-1-git-send-email-jszhang@marvell.com>
+ <20151113164025.344a0faf@xhacker>
+Message-ID: <10575502.sxpiT76bOp@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Krzysztof,
+On Friday 13 November 2015 16:40:25 Jisheng Zhang wrote:
+> On Fri, 13 Nov 2015 16:34:38 +0800
+> Jisheng Zhang <jszhang@marvell.com> wrote:
+> 
+> > This driver use both readl/writel and their relaxed version, this patch
+> > tries to unify the io accesses.
+> 
+> I'm sorry. This is the version I'd like to send for review and merge. Can you
+> please kindly have a review?
 
-> -----Original Message-----
-> From: Krzysztof Kozlowski [mailto:k.kozlowski at samsung.com]
-> Sent: Thursday, November 12, 2015 9:40 AM
-> To: Pankaj Dubey; linux-samsung-soc at vger.kernel.org; linux-
-> kernel at vger.kernel.org; linux-arm-kernel at lists.infradead.org
-> Cc: kgene.kim at samsung.com; thomas.ab at samsung.com; amitdanielk at gmail.com;
-> olof at lixom.net; khilman at linaro.org; arnd at arndb.de
-> Subject: Re: [PATCH v4 3/9] ARM: EXYNOS: Move pmu specific headers under
-> "linux/soc/samsung"
+I would prefer to use write_relaxed() as sparingly as we can, it is too
+hard to verify each case to ensure that we don't have to watch out
+for ordering or locking issues.
+
+> > diff --git a/drivers/clocksource/arm_global_timer.c b/drivers/clocksource/arm_global_timer.c
+> > index a2cb6fa..84a5a5d 100644
+> > --- a/drivers/clocksource/arm_global_timer.c
+> > +++ b/drivers/clocksource/arm_global_timer.c
+> > @@ -99,27 +99,27 @@ static void gt_compare_set(unsigned long delta, int periodic)
+> >  
+> >  	counter += delta;
+> >  	ctrl = GT_CONTROL_TIMER_ENABLE;
+> > -	writel(ctrl, gt_base + GT_CONTROL);
+> > -	writel(lower_32_bits(counter), gt_base + GT_COMP0);
+> > -	writel(upper_32_bits(counter), gt_base + GT_COMP1);
+> > +	writel_relaxed(ctrl, gt_base + GT_CONTROL);
+> > +	writel_relaxed(lower_32_bits(counter), gt_base + GT_COMP0);
+> > +	writel_relaxed(upper_32_bits(counter), gt_base + GT_COMP1);
+> >  
+> >  	if (periodic) {
+> > -		writel(delta, gt_base + GT_AUTO_INC);
+> > +		writel_relaxed(delta, gt_base + GT_AUTO_INC);
+> >  		ctrl |= GT_CONTROL_AUTO_INC;
+> >  	}
+> >  
+> >  	ctrl |= GT_CONTROL_COMP_ENABLE | GT_CONTROL_IRQ_ENABLE;
+> > -	writel(ctrl, gt_base + GT_CONTROL);
+> > +	writel_relaxed(ctrl, gt_base + GT_CONTROL);
+> >  }
+
+This seems fine. Do you have any performance numbers to show how much
+we save per call on a platform you care about, and how often it is
+called for a typical workload?
+
+I see that _gt_counter_read() already uses readl_relaxed(), and it
+seems to be a much bigger win there, as we read the clock more
+often than we write the comparator, so the person who did that
+probably thought that this one wasn't important enough. Can you
+add an explanation in the changelog why you think that was a
+mistake?
+
+Unifying the accessors across a driver is not enough of a reason
+I think.
+
+> >  static int gt_clockevent_shutdown(struct clock_event_device *evt)
+> >  {
+> >  	unsigned long ctrl;
+> >  
+> > -	ctrl = readl(gt_base + GT_CONTROL);
+> > +	ctrl = readl_relaxed(gt_base + GT_CONTROL);
+> >  	ctrl &= ~(GT_CONTROL_COMP_ENABLE | GT_CONTROL_IRQ_ENABLE |
+> >  		  GT_CONTROL_AUTO_INC);
+> > -	writel(ctrl, gt_base + GT_CONTROL);
+> > +	writel_relaxed(ctrl, gt_base + GT_CONTROL);
+> >  	return 0;
+> >  }
+
+This is certainly not performance critical, better leave it using
+the standard accessors.
+
+> > @@ -212,11 +212,11 @@ static u64 notrace gt_sched_clock_read(void)
+> >  
+> >  static void __init gt_clocksource_init(void)
+> >  {
+> > -	writel(0, gt_base + GT_CONTROL);
+> > -	writel(0, gt_base + GT_COUNTER0);
+> > -	writel(0, gt_base + GT_COUNTER1);
+> > +	writel_relaxed(0, gt_base + GT_CONTROL);
+> > +	writel_relaxed(0, gt_base + GT_COUNTER0);
+> > +	writel_relaxed(0, gt_base + GT_COUNTER1);
+> >  	/* enables timer on all the cores */
+> > -	writel(GT_CONTROL_TIMER_ENABLE, gt_base + GT_CONTROL);
+> > +	writel_relaxed(GT_CONTROL_TIMER_ENABLE, gt_base + GT_CONTROL);
+> >  
+> >  #ifdef CONFIG_CLKSRC_ARM_GLOBAL_TIMER_SCHED_CLOCK
+> >  	sched_clock_register(gt_sched_clock_read, 64, gt_clk_rate);
 > 
-> On 10.11.2015 20:42, Pankaj Dubey wrote:
-> > Moving Exynos PMU specific header file into "include/linux/soc/samsung"
-> > thus updated affected files under "mach-exynos" to use new location of
-> > these header files.
-> >
-> > Signed-off-by: Amit Daniel Kachhap <amitdanielk@gmail.com>
-> > Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
-> > ---
-> >  arch/arm/mach-exynos/exynos-pmu.h           |  24 -
-> >  arch/arm/mach-exynos/exynos.c               |   2 +-
-> >  arch/arm/mach-exynos/mcpm-exynos.c          |   2 +-
-> >  arch/arm/mach-exynos/platsmp.c              |   2 +-
-> >  arch/arm/mach-exynos/pm.c                   |   4 +-
-> >  arch/arm/mach-exynos/pmu.c                  |   6 +-
-> >  arch/arm/mach-exynos/regs-pmu.h             | 693
-----------------------------
-> >  arch/arm/mach-exynos/suspend.c              |   4 +-
-> >  include/linux/soc/samsung/exynos-pmu.h      |  24 +
-> >  include/linux/soc/samsung/exynos-regs-pmu.h | 693
-> > ++++++++++++++++++++++++++++
-> 
-> Did you disable the rename-detection for format-patch? Default rename
-detection
-> mechanism (50% of similarity) should detect two renames here:
-> exynos-pmu.h and exynos-regs-pmu.h
 > 
 
-Yes. I missed to enable rename detection while creating patches.
-Soon will resubmit patches with addressing your comments to all the patches
-reviewed.
+Same here.
 
-Thanks,
-Pankaj Dubey
-
-> Best regards,
-> Krzysztof
-> 
-> 
-> >  10 files changed, 727 insertions(+), 727 deletions(-)  delete mode
-> > 100644 arch/arm/mach-exynos/exynos-pmu.h  delete mode 100644
-> > arch/arm/mach-exynos/regs-pmu.h  create mode 100644
-> > include/linux/soc/samsung/exynos-pmu.h
-> >  create mode 100644 include/linux/soc/samsung/exynos-regs-pmu.h
+	Arnd
