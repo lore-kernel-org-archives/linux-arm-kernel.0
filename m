@@ -1,28 +1,25 @@
-From: tglx@linutronix.de (Thomas Gleixner)
-Date: Fri, 13 Nov 2015 14:34:43 -0500 (EST)
-Subject: [PATCH] clocksource: arm_global_timer: fix suspend resume
-In-Reply-To: <5646369F.8040300@ti.com>
-References: <1447431951-23713-1-git-send-email-grygorii.strashko@ti.com>
- <87a8qhq284.fsf@saruman.tx.rr.com> <56461688.1090809@ti.com>
- <87y4e1ol0g.fsf@saruman.tx.rr.com> <56462742.3020300@ti.com>
- <87si49ojed.fsf@saruman.tx.rr.com> <56462C0A.6070802@ti.com>
- <87mvuhoimr.fsf@saruman.tx.rr.com> <56463304.2040009@ti.com>
- <5646369F.8040300@ti.com>
-Message-ID: <alpine.DEB.2.11.1511131431090.3987@nanos>
+From: Chris.Brandt@renesas.com (Chris Brandt)
+Date: Fri, 13 Nov 2015 20:03:02 +0000
+Subject: [PATCH v2] ARM: xip: Use correct symbol for end of ROM marker
+In-Reply-To: <CAMuHMdXsw8BBCY5-fxWLvF1vxh83DhhKGD113LTBu-8ZFV68gw@mail.gmail.com>
+References: <1447251455-22731-1-git-send-email-chris.brandt@renesas.com>
+ <1447362108-4333-1-git-send-email-chris.brandt@renesas.com>
+ <CAMuHMdXsw8BBCY5-fxWLvF1vxh83DhhKGD113LTBu-8ZFV68gw@mail.gmail.com>
+Message-ID: <HK2PR06MB056157A6457CA47C24BE30608A110@HK2PR06MB0561.apcprd06.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 13 Nov 2015, Grygorii Strashko wrote:
+Hi Geert,
 
-<Delete 100 lines of useless information>
+> If you create an arm-specific <asm/sections.h>, you also have to remove the line
+>
+>         generic-y += sections.h
+>
+> from arch/arm/include/asm/Kbuild.
 
-> Any way, I'll wait for other comments a bit, replace save/restore with
-> just pure re-enabling and re-send.
 
-Please folks, trim your emails! I'm really tired of going through
-hundreds of quoted (quoting level here was 10!!!) useless lines to
-find a single line of useful information. 
+That, I didn't know about. Thank you.
 
-Thanks,
+I'll submit a new patch on Monday.
 
-	tglx
+Chris
