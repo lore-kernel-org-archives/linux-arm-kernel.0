@@ -1,41 +1,89 @@
-From: alex.aring@gmail.com (Alexander Aring)
-Date: Fri, 13 Nov 2015 13:22:37 +0100
-Subject: [RFCv2 2/2] rpi: add support to enable usb power domain
-In-Reply-To: <563B0217.4030307@lategoodbye.de>
-References: <1446590711-18928-1-git-send-email-alex.aring@gmail.com>
- <1446590711-18928-3-git-send-email-alex.aring@gmail.com>
- <563B0217.4030307@lategoodbye.de>
-Message-ID: <20151113122231.GA2959@omega>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Fri, 13 Nov 2015 20:20:01 +0800
+Subject: [PATCH] clocksource/drivers/arm_global_timer: Always use
+ {readl|writel}_relaxed
+In-Reply-To: <25602407.8sIohphlWH@wuerfel>
+References: <1447403678-7217-1-git-send-email-jszhang@marvell.com>
+ <10575502.sxpiT76bOp@wuerfel>	<20151113175948.69f610e9@xhacker>
+ <25602407.8sIohphlWH@wuerfel>
+Message-ID: <20151113202001.5933ae54@xhacker>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 05, 2015 at 08:15:35AM +0100, Stefan Wahren wrote:
-...
-> >+	bool "Raspberry Pi power domain driver"
-> >+	depends on ARCH_BCM2835
-> >+	depends on RASPBERRYPI_FIRMWARE
-> >+	select PM_GENERIC_DOMAINS if PM
+Dear Arnd,
+
+On Fri, 13 Nov 2015 11:33:12 +0100
+Arnd Bergmann wrote:
+
+> On Friday 13 November 2015 17:59:48 Jisheng Zhang wrote:
+> > On Fri, 13 Nov 2015 10:28:01 +0100
+> > Arnd Bergmann wrote:  
+> > > On Friday 13 November 2015 16:40:25 Jisheng Zhang wrote:  
+> > > > On Fri, 13 Nov 2015 16:34:38 +0800  
+> > > > > diff --git a/drivers/clocksource/arm_global_timer.c b/drivers/clocksource/arm_global_timer.c
+> > > > > index a2cb6fa..84a5a5d 100644
+> > > > > --- a/drivers/clocksource/arm_global_timer.c
+> > > > > +++ b/drivers/clocksource/arm_global_timer.c
+> > > > > @@ -99,27 +99,27 @@ static void gt_compare_set(unsigned long delta, int periodic)
+> > > > >  
+> > > > >  	counter += delta;
+> > > > >  	ctrl = GT_CONTROL_TIMER_ENABLE;
+> > > > > -	writel(ctrl, gt_base + GT_CONTROL);
+> > > > > -	writel(lower_32_bits(counter), gt_base + GT_COMP0);
+> > > > > -	writel(upper_32_bits(counter), gt_base + GT_COMP1);
+> > > > > +	writel_relaxed(ctrl, gt_base + GT_CONTROL);
+> > > > > +	writel_relaxed(lower_32_bits(counter), gt_base + GT_COMP0);
+> > > > > +	writel_relaxed(upper_32_bits(counter), gt_base + GT_COMP1);
+> > > > >  
+> > > > >  	if (periodic) {
+> > > > > -		writel(delta, gt_base + GT_AUTO_INC);
+> > > > > +		writel_relaxed(delta, gt_base + GT_AUTO_INC);
+> > > > >  		ctrl |= GT_CONTROL_AUTO_INC;
+> > > > >  	}
+> > > > >  
+> > > > >  	ctrl |= GT_CONTROL_COMP_ENABLE | GT_CONTROL_IRQ_ENABLE;
+> > > > > -	writel(ctrl, gt_base + GT_CONTROL);
+> > > > > +	writel_relaxed(ctrl, gt_base + GT_CONTROL);
+> > > > >  }    
+> > > 
+> > > This seems fine. Do you have any performance numbers to show how much
+> > > we save per call on a platform you care about, and how often it is
+> > > called for a typical workload?  
+> > 
+> > To be honest, all my platforms don't make use of global timer for clockevent,
+> > we use dw_apb_timer and twd or arch_timer instead, but one performance impact
+> > I saw in our case can also apply for the case with global timer as clokevent:
+> > 
+> > there are 500-1000 short sleeps, yes not good userspace behavior, so we
+> > program clockevent device 500-1000 times/s. If the system is powered by CA9
+> > with outer L2 cache, the writel will contend for l2x0_lock for 500-1000 times/s.
+> > Then the L2 cache maintenance from other device driver have more chance to
+> > spinning at the l2x0_lock, so other device driver performance is impacted.  
 > 
-> Since PM_GENERIC_DOMAINS_OF depends on PM_GENERIC_DOMAINS this line should
-> be redundant.
+> Just to make sure I get this right: which outer cache implementation do you
+> use in this case? Most Cortex-A9 use pl310, which does not require l2x0_lock
+
+PL310
+
+> for outer_cache.sync(). The Aurora outer cache sync has a different method
+> and also doesn't use l2x0_lock. Finally, tauros3 doesn't need a cache sync
+> at all.
 > 
+> Did you look at an older kernel version? We used to do a loop in the
 
-I can't remove the line:
+oops, yes. The kernel version in product still needs the spinlock in sync.
+I didn't check the L2 cache code for about 1 year, sorry for that.
+If we upgrade to newer kernel version, yes, the bit performance bottleneck -- 
+spinlock contention won't exist anymore. Thanks for pointing out this.
 
-select PM_GENERIC_DOMAINS if PM
+But I think we may still see trivial system performance improvement in 500-1000
+times/s of clockevent programming case due to the mb() in writel.
 
-here. It's true that "PM_GENERIC_DOMAINS_OF depends on PM_GENERIC_DOMAINS",
-but Kconfig can't handle the dependency here with select. That's why
-sometimes people teaches me "select is evil".
+Thanks,
+Jisheng
 
-I will get:
-
-warning: (RASPBERRYPI_POWER) selects PM_GENERIC_DOMAINS_OF which has
-unmet direct dependencies (PM_GENERIC_DOMAINS && OF)
-
-otherwise.
-
-Nevertheless we can't also use "depends on PM_GENERIC_DOMAINS if PM"
-because, PM_GENERIC_DOMAINS is a hidden entry (has no Kconfig prompt).
-
-- Alex
+> Aurora cache sync operation until I fixed that, so it should be a bit
+> faster now. It will still require doing the actual sync, but at least
+> there should not be any lock contention these days.
+> 
+> 	Arnd
