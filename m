@@ -1,199 +1,58 @@
-From: haibo.chen@freescale.com (Haibo Chen)
-Date: Fri, 13 Nov 2015 17:39:36 +0800
-Subject: [PATCH v2 1/4] iio: adc: add IMX7D ADC driver support
-In-Reply-To: <56420606.4070505@metafoo.de>
-References: <1447075704-4605-1-git-send-email-haibo.chen@freescale.com>
- <1447075704-4605-2-git-send-email-haibo.chen@freescale.com>
- <56420606.4070505@metafoo.de>
-Message-ID: <20151113093934.GA21068@b51421-server.ap.freescale.net>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Fri, 13 Nov 2015 10:35:16 +0100
+Subject: [PATCH] mmc: dw_mmc: use resource_size_t to store physical address
+In-Reply-To: <CAHp75VfyOWrihHC4nhpKQrjH9SjP0NnaN1WU8se3PL4biWtz4g@mail.gmail.com>
+References: <28102387.ALpaBHpim0@wuerfel>
+ <CAHp75VfyOWrihHC4nhpKQrjH9SjP0NnaN1WU8se3PL4biWtz4g@mail.gmail.com>
+Message-ID: <6288847.N1QBIiXedG@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 10, 2015 at 03:58:14PM +0100, Lars-Peter Clausen wrote:
-> On 11/09/2015 02:28 PM, Haibo Chen wrote:
-> > Freescale i.MX7D soc contains a new ADC IP. This patch add this ADC
-> > driver support, and the driver only support ADC software trigger.
-> > 
-> > Signed-off-by: Haibo Chen <haibo.chen@freescale.com>
+On Friday 13 November 2015 03:10:13 Andy Shevchenko wrote:
+> On Thu, Nov 12, 2015 at 4:14 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> > The dw_mmc driver stores the physical address of the MMIO registers
+> > in a pointer, which requires the use of type casts, and is actually
+> > broken if anyone ever has this device on a 32-bit SoC in registers
+> > above 4GB. Gcc warns about this possibility when the driver is built
+> > with ARM LPAE enabled:
 > 
-> Looks pretty good, a few comments inline.
+> > -       host->phy_regs = (void *)(regs->start);
+> > +       host->phy_regs = regs->start;
 > 
-> [...]
-> > +#include <linux/module.h>
-> > +#include <linux/platform_device.h>
-> > +#include <linux/interrupt.h>
-> > +#include <linux/delay.h>
-> > +#include <linux/kernel.h>
-> > +#include <linux/slab.h>
-> > +#include <linux/io.h>
-> > +#include <linux/clk.h>
-> > +#include <linux/completion.h>
-> > +#include <linux/of.h>
-> > +#include <linux/of_irq.h>
-> > +#include <linux/regulator/consumer.h>
-> > +#include <linux/of_platform.h>
-> > +#include <linux/err.h>
+> >         /* Set external dma config: burst size, burst width */
+> > -       cfg.dst_addr = (dma_addr_t)(host->phy_regs + fifo_offset);
+> > +       cfg.dst_addr = host->phy_regs + fifo_offset;
 > 
-> I don't think you need all of these.
-> 
-> [...]
+> dst_addr is dma_addr_t?
 
-Yes, I will remove delay.h slab.h of_irq.h and of_platform.h
+Sort of. It doesn't really fit into any of the categories, and we actually
+had a patch to change the type in the past, see
+https://lkml.org/lkml/2015/7/10/167. Not sure what is going on there.
 
-> > +static void imx7d_adc_feature_config(struct imx7d_adc *info)
-> > +{
-> > +	info->adc_feature.clk_pre_div = IMX7D_ADC_ANALOG_CLK_PRE_DIV_4;
-> > +	info->adc_feature.avg_num = IMX7D_ADC_AVERAGE_NUM_32;
-> > +	info->adc_feature.core_time_unit = 1;
-> > +	info->adc_feature.average_en = true;
+> >         /* Registers's physical base address */
+> > -       void                    *phy_regs;
+> > +       resource_size_t         phy_regs;
 > 
-> What's the plan for these? Right now they are always initialized to the same
-> static value.
+> If dst_addr is dma_addr_t wouldn't be a problem when
+> resource_size_t is defined as 64-bit address, and dma_addr_t as 32-bit?
 > 
+> Btw, for me casting to dma_addr_t looks sane.
 
-In future, we can get these values from dts file, currently we just use the static value.
+The background here is that the address comes from a resource_size_t
+that describes the MMIO register area as seen from the CPU, and that
+is normally a phys_addr_t (resource_size_t is defined as being long
+enough to store a phys_addr_t or various other things depending on
+resource->flags).
 
-> 
-> > +}
-> [...]
-> > +static int imx7d_adc_read_raw(struct iio_dev *indio_dev,
-> > +			struct iio_chan_spec const *chan,
-> > +			int *val,
-> > +			int *val2,
-> > +			long mask)
-> > +{
-> > +	struct imx7d_adc *info = iio_priv(indio_dev);
-> > +
-> > +	u32 channel;
-> > +	long ret;
-> > +
-> > +	switch (mask) {
-> > +	case IIO_CHAN_INFO_RAW:
-> > +		mutex_lock(&indio_dev->mlock);
-> > +		reinit_completion(&info->completion);
-> > +
-> > +		channel = (chan->channel) & 0x0f;
-> > +		info->channel = channel;
-> > +		imx7d_adc_channel_set(info);
-> 
-> How about just passing channel directy adc_channel_set() instead of doing it
-> implicitly through the info struct?
-> 
+dma_addr_t strictly speaking refers to a RAM location as seen by a
+DMA master, and that only comes out of dma_map_*() or
+dma_alloc_coherent().
 
-I think there is no difference, besides, using this parameter info struct can keep align with other functions.
-eg.  imx7d_adc_sample_set(), imx7d_adc_hw_init(), imx7d_adc_get_sample_rate(), all these functions have the same parameter.
+The DMA engine wants something else here, which is an MMIO register
+address as seen by a DMA master, and we don't have a separate typedef
+for that. Almost universally all of resource_size_t, phys_addr_t and
+dma_addr_t are the same type, and if we ever get a platform that
+wants something other than a phys_addr_t to put into cfg.dst_addr,
+we are in deep trouble.
 
-> [...]
-> > +static irqreturn_t imx7d_adc_isr(int irq, void *dev_id)
-> > +{
-> > +	struct imx7d_adc *info = (struct imx7d_adc *)dev_id;
-> > +	int status;
-> > +
-> > +	status = readl(info->regs + IMX7D_REG_ADC_INT_STATUS);
-> > +	if (status & IMX7D_REG_ADC_INT_STATUS_CHANNEL_INT_STATUS) {
-> > +		info->value = imx7d_adc_read_data(info);
-> > +		complete(&info->completion);
-> > +	}
-> > +	writel(0, info->regs + IMX7D_REG_ADC_INT_STATUS);
-> 
-> Is the hardware really this broken? If the interrupt happens between reading
-> the status register and clearing it here it will be missed.
-> 
-
-I think interrupt can't happen between reading the status register and clearing it.
-Because in function imx7d_adc_read_raw(), we call the function 
-imx7d_adc_channel_set(info), in this function, we config the register
-REG_ADC_CH_A\B\C\D_CFG1 and REG_ADC_CH_A\B\C\D_CFG2, only when these registers
-is configed, ADC start a conversion. Once the conversion complete, ADC trigger an 
-interrupt, and call the imx7d_adc_isr().
-
-> > +
-> > +	return IRQ_HANDLED;
-> 
-> You should only return IRQ_HANDLED if you actually handled are interrupt.
-> 
-
-Here in the interrupt, we just handle the channel conversion finished flag, for
-other flag, ignore them this time, Will add other flag in future.
-
-> > +}
-> [...]
-> > +
-> > +static int imx7d_adc_probe(struct platform_device *pdev)
-> > +{
-> > +	struct imx7d_adc *info;
-> > +	struct iio_dev *indio_dev;
-> > +	struct resource *mem;
-> > +	int irq;
-> > +	int ret;
-> > +	u32 channels;
-> > +
-> > +	indio_dev = devm_iio_device_alloc(&pdev->dev, sizeof(struct imx7d_adc));
-> > +	if (!indio_dev) {
-> > +		dev_err(&pdev->dev, "Failed allocating iio device\n");
-> > +		return -ENOMEM;
-> > +	}
-> > +
-> > +	info = iio_priv(indio_dev);
-> > +	info->dev = &pdev->dev;
-> > +
-> > +	mem = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> > +	info->regs = devm_ioremap_resource(&pdev->dev, mem);
-> > +	if (IS_ERR(info->regs)) {
-> > +		ret = PTR_ERR(info->regs);
-> > +		dev_err(&pdev->dev, "failed to remap adc memory: %d\n", ret);
-> > +		return ret;
-> > +	}
-> > +
-> > +	irq = platform_get_irq(pdev, 0);
-> > +	if (irq < 0) {
-> > +		dev_err(&pdev->dev, "no irq resource?\n");
-> > +		return irq;
-> > +	}
-> > +
-> > +	ret = devm_request_irq(info->dev, irq,
-> > +				imx7d_adc_isr, 0,
-> > +				dev_name(&pdev->dev), info);
-> 
-> This is too early. Completion is not initialized, clocks are not enabled, etc...
-> 
-
-You are right, I will move the request irq function down.
-> > +	if (ret < 0) {
-> > +		dev_err(&pdev->dev, "failed requesting irq, irq = %d\n", irq);
-> > +		return ret;
-> > +	}
-> > +
-> [...]
-> > +	ret  = of_property_read_u32(pdev->dev.of_node,
-> 
-> Extra space.
-> 
-> > +					"num-channels", &channels);
-> 
-> What decides how many channels are in use?
-> 
-
-The board decides the channel number.
-In dts file, there is a line:     num-channels = <4>;
-
-
-> > +	if (ret)
-> > +		channels = ARRAY_SIZE(imx7d_adc_iio_channels);
-> > +
-> > +	indio_dev->name = dev_name(&pdev->dev);
-> > +	indio_dev->dev.parent = &pdev->dev;
-> > +	indio_dev->dev.of_node = pdev->dev.of_node;
-> > +	indio_dev->info = &imx7d_adc_iio_info;
-> > +	indio_dev->modes = INDIO_DIRECT_MODE;
-> > +	indio_dev->channels = imx7d_adc_iio_channels;
-> > +	indio_dev->num_channels = (int)channels;
-> 
-> I don't think you need the case here.
-> 
-
-Sorry, can't get your point, you mean I should not indio_dev-> ?
-
-> >[...]
-
--- 
+	Arnd
