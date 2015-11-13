@@ -1,61 +1,78 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Fri, 13 Nov 2015 11:15:00 +0000
-Subject: Conditionals in dtsi files
-In-Reply-To: <5151887.Q3EmlRO4WY@wuerfel>
-References: <5645AE7E.4090003@free.fr>
- <5151887.Q3EmlRO4WY@wuerfel>
-Message-ID: <20151113111459.GA22469@leverpostej>
+From: javi.merino@arm.com (Javi Merino)
+Date: Fri, 13 Nov 2015 11:26:37 +0000
+Subject: [PATCH 2/3] thermal: Add Mediatek thermal controller support
+In-Reply-To: <20151113100912.GE8526@pengutronix.de>
+References: <1447064013-13026-1-git-send-email-s.hauer@pengutronix.de>
+ <1447064013-13026-3-git-send-email-s.hauer@pengutronix.de>
+ <20151110120554.GB3551@e104805>
+ <20151110182629.GA5240@localhost.localdomain>
+ <20151111072747.GI8526@pengutronix.de>
+ <20151113100912.GE8526@pengutronix.de>
+Message-ID: <20151113112636.GA12760@e104805>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 13, 2015 at 10:43:11AM +0100, Arnd Bergmann wrote:
-> On Friday 13 November 2015 10:33:50 Mason wrote:
-> > Hello,
+On Fri, Nov 13, 2015 at 11:09:12AM +0100, Sascha Hauer wrote:
+> On Wed, Nov 11, 2015 at 08:27:47AM +0100, Sascha Hauer wrote:
+> > On Tue, Nov 10, 2015 at 10:26:30AM -0800, Eduardo Valentin wrote:
+> > > On Tue, Nov 10, 2015 at 12:05:54PM +0000, Javi Merino wrote:
+> > > > On Mon, Nov 09, 2015 at 11:13:32AM +0100, Sascha Hauer wrote:
+> > > 
+> > > <cut>
+> > > 
+> > > > > +
+> > > > > +/*
+> > > > > + * The MT8173 thermal controller has four banks. Each bank can read up to
+> > > > > + * four temperature sensors simultaneously. The MT8173 has a total of 5
+> > > > > + * temperature sensors. We use each bank to measure a certain area of the
+> > > > > + * SoC. Since TS2 is located centrally in the SoC it is influenced by multiple
+> > > > > + * areas, hence is used in different banks.
+> > > > > + */
+> > > > > +static const struct mtk_thermal_bank_cfg bank_data[] = {
+> > > > > +	{
+> > > > > +		.num_sensors = 2,
+> > > > > +		.sensors = { MT8173_TS2, MT8173_TS3 },
+> > > > > +	}, {
+> > > > > +		.num_sensors = 2,
+> > > > > +		.sensors = { MT8173_TS2, MT8173_TS4 },
+> > > > > +	}, {
+> > > > > +		.num_sensors = 3,
+> > > > > +		.sensors = { MT8173_TS1, MT8173_TS2, MT8173_TSABB },
+> > > > > +	}, {
+> > > > > +		.num_sensors = 1,
+> > > > > +		.sensors = { MT8173_TS2 },
+> > > > > +	},
+> > > > > +};
+> > > 
+> > > Would it make sense to simply expose all sensors and let the
+> > > configuration of their aggregation be done by DT?
 > > 
-> > I'm wondering how much C preprocessor syntax one can use in DT files.
-> > 
-> > Suppose I have 2 board DTS (both including common.dtsi)
-> > 
-> > board_A.dts (1-core), board_B.dts (2-core)
-> > 
-> > Can I have in common.dtsi something along these lines:
-> > 
-> > 	cpus {
-> > 		enable-method = "foo,bar";
-> > 		#address-cells = <1>;
-> > 		#size-cells = <0>;
-> > 
-> > 		cpu0: cpu at 0 {
-> > 			compatible = "arm,cortex-a9";
-> > 			device_type = "cpu";
-> > 			reg = <0>;
-> > 		};
-> > 
-> > #if CORE_COUNT > 1
-> > 		cpu1: cpu at 1 {
-> > 			compatible = "arm,cortex-a9";
-> > 			device_type = "cpu";
-> > 			reg = <1>;
-> > 		};
-> > #endif
-> > 	};
-> > 
-> > 
-> > board_A.dts would have
-> > #define CORE_COUNT 1
-> > #include "common.dtsi"
-> > 
-> > board_B.dts would have
-> > #define CORE_COUNT 2
-> > #include "common.dtsi"
+> > This particular layout has been chosen because there's also the Smart
+> > Voltage Scaler (SVS) in the SoC. The SVS uses the same banks for
+> > measuring temperatures. I don't know the details yet, I just asked the
+> > Mediatek guys.
 > 
-> I would prefer not using any preprocessor statements other than
-> #include in .dts files.
+> Ok, the job of the SVS is to always pick the best voltage for a given
+> CPU frequency based on the temperature of the CPU cluster. How I
+> understand it the SVS engine automatically reads temperatures from bank0
+> for the first CPU cluster and from bank1 for the second CPU cluster. For
+> this to work we are not free to assign the sensors to the banks
+> arbitrarily.
+> 
+> I was told that controlling the CPU frequency the performance is better
+> if we use the maximum temperature of the whole die rather than the
+> temperature of individual clusters.
+> 
+> I would prefer to keep the sensor/bank association like it currently is
+> as it allows for easy SVS engine integration. Also I would prefer to
+> expose a single thermal zone for now, it will be easier to add
+> additional zones later than it is to remove them later once we have
+> exposed them to the device tree.
+> 
+> Is that ok with you?
 
-I very much agree with this.
+Fair enough.  I agree that it's easier to add thermal zones in the
+future than to remove it.  Thanks for the explanation.
 
-We should only have (simple) macros for symbolic names, and #includes
-required for those to work.
-
-Thanks,
-Mark.
+Cheers,
+Javi
