@@ -1,88 +1,59 @@
-From: bayi.cheng@mediatek.com (bayi cheng)
-Date: Fri, 13 Nov 2015 15:25:37 +0800
-Subject: [PATCH v6 2/3] mtd: mtk-nor: mtk serial flash controller driver
-In-Reply-To: <20151111214146.GL12143@google.com>
-References: <1446824889-16144-1-git-send-email-bayi.cheng@mediatek.com>
- <1446824889-16144-3-git-send-email-bayi.cheng@mediatek.com>
- <20151111214146.GL12143@google.com>
-Message-ID: <1447399537.9118.18.camel@mhfsdcap03>
+From: wangzhou1@hisilicon.com (Zhou Wang)
+Date: Fri, 13 Nov 2015 15:29:13 +0800
+Subject: [PATCH] PCI: hisi: fix deferred probing
+In-Reply-To: <4417267.EzK5DAjM5p@wuerfel>
+References: <1447329728-1589-1-git-send-email-jszhang@marvell.com>
+ <4417267.EzK5DAjM5p@wuerfel>
+Message-ID: <56459149.8090709@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 2015-11-11 at 13:41 -0800, Brian Norris wrote:
-> One more small comment, since you're respinning this:
+On 2015/11/12 20:21, Arnd Bergmann wrote:
+> The hisi_pcie_probe function is incorrectly marked as __init, as Kconfig
+> tells us:
 > 
-> On Fri, Nov 06, 2015 at 11:48:08PM +0800, Bayi Cheng wrote:
-> > diff --git a/drivers/mtd/spi-nor/mtk-quadspi.c b/drivers/mtd/spi-nor/mtk-quadspi.c
-> > new file mode 100644
-> > index 0000000..6582811
-> > --- /dev/null
-> > +++ b/drivers/mtd/spi-nor/mtk-quadspi.c
-> > @@ -0,0 +1,475 @@
+> WARNING: drivers/pci/host/built-in.o(.data+0x7780): Section mismatch in reference from the variable hisi_pcie_driver to the function .init.text:hisi_pcie_probe()
 > 
-> ...
+> If the probe for this device gets deferred past the point where __init
+> functions are removed, or the device is unbound and then reattached to
+> the driver, we branch into uninitialized memory, which is bad.
 > 
-> > +static int mtk_nor_drv_probe(struct platform_device *pdev)
-> > +{
-> > +	struct device_node *flash_np;
-> > +	struct resource *res;
-> > +	int ret;
-> > +	struct mt8173_nor *mt8173_nor;
-> > +
-> > +	if (!pdev->dev.of_node) {
-> > +		dev_err(&pdev->dev, "No DT found\n");
-> > +		return -EINVAL;
-> > +	}
-> > +
-> > +	mt8173_nor = devm_kzalloc(&pdev->dev, sizeof(*mt8173_nor), GFP_KERNEL);
-> > +	if (!mt8173_nor)
-> > +		return -ENOMEM;
-> > +	platform_set_drvdata(pdev, mt8173_nor);
-> > +
-> > +	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
-> > +	mt8173_nor->base = devm_ioremap_resource(&pdev->dev, res);
-> > +	if (IS_ERR(mt8173_nor->base))
-> > +		return PTR_ERR(mt8173_nor->base);
-> > +
-> > +	mt8173_nor->spi_clk = devm_clk_get(&pdev->dev, "spi");
-> > +	if (IS_ERR(mt8173_nor->spi_clk)) {
-> > +		ret = PTR_ERR(mt8173_nor->spi_clk);
-> > +		goto nor_free;
-> > +	}
-> > +
-> > +	mt8173_nor->nor_clk = devm_clk_get(&pdev->dev, "sf");
-> > +	if (IS_ERR(mt8173_nor->nor_clk)) {
-> > +		ret = PTR_ERR(mt8173_nor->nor_clk);
-> > +		goto nor_free;
-> > +	}
-> > +
-> > +	mt8173_nor->dev = &pdev->dev;
-> > +	clk_prepare_enable(mt8173_nor->spi_clk);
-> > +	clk_prepare_enable(mt8173_nor->nor_clk);
+> This removes the __init annotation.
 > 
-> You enable the clocks here, but...
-> 
-> > +
-> > +	/* only support one attached flash */
-> > +	flash_np = of_get_next_available_child(pdev->dev.of_node, NULL);
-> > +	if (!flash_np) {
-> 
-> ... you might bail out here if there is no available flash node, and you
-> never disable the clocks. (Same is true if we fail to detect the flash;
-> you leave the no-longer-needed clocks enabled.) Seems like maybe you
-> should disable clocks on failure.
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+>
 
-Yes, I have forgot to disable these clocks on failure. and I will fix it
-in the next patch! Thanks!
+Hi Arnd,
+
+Many thanks, it looks good to me. so
+Acked-by: Zhou Wang <wangzhou1@hisilicon.com>
+
+Regards,
+Zhou
+
+> diff --git a/drivers/pci/host/pcie-hisi.c b/drivers/pci/host/pcie-hisi.c
+> index 35457ecd8e70..163671a4f798 100644
+> --- a/drivers/pci/host/pcie-hisi.c
+> +++ b/drivers/pci/host/pcie-hisi.c
+> @@ -111,7 +111,7 @@ static struct pcie_host_ops hisi_pcie_host_ops = {
+>  	.link_up = hisi_pcie_link_up,
+>  };
+>  
+> -static int __init hisi_add_pcie_port(struct pcie_port *pp,
+> +static int hisi_add_pcie_port(struct pcie_port *pp,
+>  				     struct platform_device *pdev)
+>  {
+>  	int ret;
+> @@ -139,7 +139,7 @@ static int __init hisi_add_pcie_port(struct pcie_port *pp,
+>  	return 0;
+>  }
+>  
+> -static int __init hisi_pcie_probe(struct platform_device *pdev)
+> +static int hisi_pcie_probe(struct platform_device *pdev)
+>  {
+>  	struct hisi_pcie *hisi_pcie;
+>  	struct pcie_port *pp;
 > 
-> > +		dev_err(&pdev->dev, "no SPI flash device to configure\n");
-> > +		ret = -ENODEV;
-> > +		goto nor_free;
-> > +	}
-> > +	ret = mtk_nor_init(mt8173_nor, flash_np);
-> > +
-> > +nor_free:
-> > +	return ret;
-> > +}
 > 
-> Brian
+> .
+> 
