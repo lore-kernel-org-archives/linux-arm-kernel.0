@@ -1,63 +1,68 @@
 From: mathieu.poirier@linaro.org (Mathieu Poirier)
-Date: Fri, 13 Nov 2015 11:44:54 -0700
-Subject: [PATCH V4 03/26] coresight: etm3x: unlocking tracers in default arch
- init
+Date: Fri, 13 Nov 2015 11:44:56 -0700
+Subject: [PATCH V4 05/26] coresight: etm3x: implementing 'cpu_id()' API
 In-Reply-To: <1447440317-1977-1-git-send-email-mathieu.poirier@linaro.org>
 References: <1447440317-1977-1-git-send-email-mathieu.poirier@linaro.org>
-Message-ID: <1447440317-1977-4-git-send-email-mathieu.poirier@linaro.org>
+Message-ID: <1447440317-1977-6-git-send-email-mathieu.poirier@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Calling function 'smp_call_function_single()' to unlock a
-tracer and calling it again right after to perform the
-default initialisation doesn't make sense.
-
-Moving 'etm_os_unlock()' just before making the default
-initialisation results in the same outcome while saving
-one call to 'smp_call_function_single()'.
+Other than plainly parsing the device tree there is no way to
+know which CPU a tracer is affined to.  As such adding an
+interface to lookup the CPU field enclosed in the etm_drvdata
+structure that was initialised at boot time.
 
 Signed-off-by: Mathieu Poirier <mathieu.poirier@linaro.org>
 ---
- drivers/hwtracing/coresight/coresight-etm3x.c | 10 +++++-----
- 1 file changed, 5 insertions(+), 5 deletions(-)
+ drivers/hwtracing/coresight/coresight-etm3x.c | 8 ++++++++
+ include/linux/coresight.h                     | 3 +++
+ 2 files changed, 11 insertions(+)
 
 diff --git a/drivers/hwtracing/coresight/coresight-etm3x.c b/drivers/hwtracing/coresight/coresight-etm3x.c
-index 2a1950d0753d..737b6164f4a5 100644
+index 67af548a874d..74526f044a06 100644
 --- a/drivers/hwtracing/coresight/coresight-etm3x.c
 +++ b/drivers/hwtracing/coresight/coresight-etm3x.c
-@@ -47,11 +47,11 @@ static struct etm_drvdata *etmdrvdata[NR_CPUS];
-  * and OS lock must be unlocked before any memory mapped access on such
-  * processors, otherwise memory mapped reads/writes will be invalid.
-  */
--static void etm_os_unlock(void *info)
-+static void etm_os_unlock(struct etm_drvdata *drvdata)
- {
--	struct etm_drvdata *drvdata = (struct etm_drvdata *)info;
- 	/* Writing any value to ETMOSLAR unlocks the trace registers */
- 	etm_writel(drvdata, 0x0, ETMOSLAR);
-+	drvdata->os_unlock = true;
- 	isb();
+@@ -312,6 +312,13 @@ static void etm_enable_hw(void *info)
+ 	dev_dbg(drvdata->dev, "cpu: %d enable smp call done\n", drvdata->cpu);
  }
  
-@@ -478,6 +478,9 @@ static void etm_init_arch_data(void *info)
- 	u32 etmccr;
- 	struct etm_drvdata *drvdata = info;
- 
-+	/* Make sure all registers are accessible */
-+	etm_os_unlock(drvdata);
++static int etm_cpu_id(struct coresight_device *csdev)
++{
++	struct etm_drvdata *drvdata = dev_get_drvdata(csdev->dev.parent);
 +
- 	CS_UNLOCK(drvdata->base);
++	return drvdata->cpu;
++}
++
+ int etm_get_trace_id(struct etm_drvdata *drvdata)
+ {
+ 	unsigned long flags;
+@@ -438,6 +445,7 @@ static void etm_disable(struct coresight_device *csdev)
+ }
  
- 	/* First dummy read */
-@@ -602,9 +605,6 @@ static int etm_probe(struct amba_device *adev, const struct amba_id *id)
- 	get_online_cpus();
- 	etmdrvdata[drvdata->cpu] = drvdata;
- 
--	if (!smp_call_function_single(drvdata->cpu, etm_os_unlock, drvdata, 1))
--		drvdata->os_unlock = true;
--
- 	if (smp_call_function_single(drvdata->cpu,
- 				     etm_init_arch_data,  drvdata, 1))
- 		dev_err(dev, "ETM arch init failed\n");
+ static const struct coresight_ops_source etm_source_ops = {
++	.cpu_id		= etm_cpu_id,
+ 	.trace_id	= etm_trace_id,
+ 	.enable		= etm_enable,
+ 	.disable	= etm_disable,
+diff --git a/include/linux/coresight.h b/include/linux/coresight.h
+index a7cabfa23b55..bf62b265bf52 100644
+--- a/include/linux/coresight.h
++++ b/include/linux/coresight.h
+@@ -205,12 +205,15 @@ struct coresight_ops_link {
+ /**
+  * struct coresight_ops_source - basic operations for a source
+  * Operations available for sources.
++ * @cpu_id:	returns the value of the CPU number this component
++ *		is associated to.
+  * @trace_id:	returns the value of the component's trace ID as known
+ 		to the HW.
+  * @enable:	enables tracing for a source.
+  * @disable:	disables tracing for a source.
+  */
+ struct coresight_ops_source {
++	int (*cpu_id)(struct coresight_device *csdev);
+ 	int (*trace_id)(struct coresight_device *csdev);
+ 	int (*enable)(struct coresight_device *csdev);
+ 	void (*disable)(struct coresight_device *csdev);
 -- 
 1.9.1
