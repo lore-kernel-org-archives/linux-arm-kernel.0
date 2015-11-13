@@ -1,32 +1,41 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Fri, 13 Nov 2015 00:57:22 +0000
-Subject: [BISECTED] v4.3-rc5: OMAP1 boot hang
-In-Reply-To: <20151111214444.GF2260@blackmetal.musicnaut.iki.fi>
-References: <20151013073046.GB7588@blackmetal.musicnaut.iki.fi>
- <20151111214444.GF2260@blackmetal.musicnaut.iki.fi>
-Message-ID: <20151113005722.GQ32536@n2100.arm.linux.org.uk>
+From: satayepic@gmail.com (Satay Epic)
+Date: Thu, 12 Nov 2015 17:07:54 -0800
+Subject: ARM Linux Kernel Update
+In-Reply-To: <CAMu38xLbRcOfdGLF+ozMA7G-tqzqykvsaDToY43sdMO4FP4b5w@mail.gmail.com>
+References: <CADohWC9sCwFbhtryZi-EbOvcBayh_6O2bEjzFaLMxHYXYBEhQg@mail.gmail.com>
+ <CAMu38xLbRcOfdGLF+ozMA7G-tqzqykvsaDToY43sdMO4FP4b5w@mail.gmail.com>
+Message-ID: <CADohWC-rYhkTm+TOWx8ZMkv1LgcqnVq4x1LtiEjJN0GK_uB8Xw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 11, 2015 at 11:44:44PM +0200, Aaro Koskinen wrote:
-> Hi,
-> 
-> Any suggestions how to debug this further? This happens also with v4.3
-> final. Is the CPU_SW_DOMAIN_PAN supposed to work with this CPU?
-> 
-> I tried to disable various drivers (e.g. NAND, USB) and it still
-> hangs... And it seems always at the same printk time stamp (roughly at
-> 25 seconds).
+Thanks Albino
 
-No idea what so ever, and I have zero knowledge of this ARM925 thing -
-never had one, and never seen any specs on it.  The weird thing is
-that it's not producing any oops dump - I guess the kernel is totally
-dead and unresponsive.  I'd ask if you have a heartbeat LED, but I'd
-guess the answer will be that the hardware is too limited.
-
-Any additional information you can give might help, but I wouldn't hold
-out any hopes...
-
--- 
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+On Thu, Nov 12, 2015 at 4:43 PM, Albino B Neto <bino@bino.us> wrote:
+> 2015-11-12 21:46 GMT-02:00 Satay Epic <satayepic@gmail.com>:
+>> Hello,
+>>
+>> I've an ARM SL3516  board with Linux 2.6.15 and I've tool-chain setup.
+>> I could able to compile the GPL source.  This board has red-boot.
+>>
+>> I would like to update the kernel to 3.8.24.  My first attempt so not
+>> sure about anything I should know, gotchas  etc.
+>>
+>> Any advice about the compilation , config will be appreciated.
+>>
+>> Redboot has option  to upgrade kernel.  So I guess I can use it once I
+>> get the kernel image compiled.
+>>
+>> I tried using the  existing  ".config" but not sure some SL3512
+>> specific options would work?
+>>
+>> Looking at the distribution,  I don't see the  "mach-sl2312" listed.
+>> Can you just copy it from the old distribution and does it work this
+>> way?
+>>
+>> There is this "mach-gemini" but it seems only for some W boards.
+>>
+>> Thanks in advance
+>
+> add mailing linux-arm-kernel.
+>
+>             Albino
