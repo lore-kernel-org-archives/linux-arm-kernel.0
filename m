@@ -1,59 +1,58 @@
-From: wangzhou1@hisilicon.com (Zhou Wang)
-Date: Fri, 13 Nov 2015 15:29:13 +0800
-Subject: [PATCH] PCI: hisi: fix deferred probing
-In-Reply-To: <4417267.EzK5DAjM5p@wuerfel>
-References: <1447329728-1589-1-git-send-email-jszhang@marvell.com>
- <4417267.EzK5DAjM5p@wuerfel>
-Message-ID: <56459149.8090709@hisilicon.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Fri, 13 Nov 2015 08:37:57 +0100
+Subject: [PATCH v2] stmmac: avoid ipq806x constant overflow warning
+In-Reply-To: <3825178.3luTQFAgny@wuerfel>
+References: <4391788.dtYArQ4mVi@wuerfel>
+ <20151112.122528.1794206832971213176.davem@davemloft.net>
+ <3729464.5X0HBxzvx5@wuerfel> <3825178.3luTQFAgny@wuerfel>
+Message-ID: <CAMuHMdXp67RwBATtoqfs=XVza7UAOu+GByZ9a8CLsvntXqM2tw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015/11/12 20:21, Arnd Bergmann wrote:
-> The hisi_pcie_probe function is incorrectly marked as __init, as Kconfig
-> tells us:
-> 
-> WARNING: drivers/pci/host/built-in.o(.data+0x7780): Section mismatch in reference from the variable hisi_pcie_driver to the function .init.text:hisi_pcie_probe()
-> 
-> If the probe for this device gets deferred past the point where __init
-> functions are removed, or the device is unbound and then reattached to
-> the driver, we branch into uninitialized memory, which is bad.
-> 
-> This removes the __init annotation.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+On Thu, Nov 12, 2015 at 10:03 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+> Building dwmac-ipq806x on a 64-bit architecture produces a harmless
+> warning from gcc:
 >
+> stmmac/dwmac-ipq806x.c: In function 'ipq806x_gmac_probe':
+> include/linux/bitops.h:6:19: warning: overflow in implicit constant conversion [-Woverflow]
+>   val = QSGMII_PHY_CDR_EN |
+> stmmac/dwmac-ipq806x.c:333:8: note: in expansion of macro 'QSGMII_PHY_CDR_EN'
+>  #define QSGMII_PHY_CDR_EN   BIT(0)
+>  #define BIT(nr)   (1UL << (nr))
+>
+> This is a result of the type conversion rules in C, when we take the
+> logical OR of multiple different types. In particular, we have
+> and unsigned long
+>
+>         QSGMII_PHY_CDR_EN == BIT(0) == (1ul << 0) == 0x0000000000000001ul
+>
+> and a signed int
+>
+>         0xC << QSGMII_PHY_TX_DRV_AMP_OFFSET == 0xc0000000
+>
+> which together gives a signed long value
+>
+>         0xffffffffc0000001l
+>
+> and when this is passed into a function that takes an unsigned int type,
+> gcc warns about the signed overflow and the loss of the upper 32-bits that
+> are all ones.
+>
+> This patch adds 'ul' type modifiers to the literal numbers passed in
+> here, so now the expression remains an 'unsigned long' with the upper
+> bits all zero, and that avoids the signed overflow and the warning.
 
-Hi Arnd,
+FWIW, the 64-bitness of BIT() on 64-bit platforms is also causing subtle
+warnings in other places, e.g. when inverting them to create bit mask, cfr.
+https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/?id=a9efeca613a8fe5281d7c91f5c8c9ea46f2312f6
 
-Many thanks, it looks good to me. so
-Acked-by: Zhou Wang <wangzhou1@hisilicon.com>
+Gr{oetje,eeting}s,
 
-Regards,
-Zhou
+                        Geert
 
-> diff --git a/drivers/pci/host/pcie-hisi.c b/drivers/pci/host/pcie-hisi.c
-> index 35457ecd8e70..163671a4f798 100644
-> --- a/drivers/pci/host/pcie-hisi.c
-> +++ b/drivers/pci/host/pcie-hisi.c
-> @@ -111,7 +111,7 @@ static struct pcie_host_ops hisi_pcie_host_ops = {
->  	.link_up = hisi_pcie_link_up,
->  };
->  
-> -static int __init hisi_add_pcie_port(struct pcie_port *pp,
-> +static int hisi_add_pcie_port(struct pcie_port *pp,
->  				     struct platform_device *pdev)
->  {
->  	int ret;
-> @@ -139,7 +139,7 @@ static int __init hisi_add_pcie_port(struct pcie_port *pp,
->  	return 0;
->  }
->  
-> -static int __init hisi_pcie_probe(struct platform_device *pdev)
-> +static int hisi_pcie_probe(struct platform_device *pdev)
->  {
->  	struct hisi_pcie *hisi_pcie;
->  	struct pcie_port *pp;
-> 
-> 
-> .
-> 
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
