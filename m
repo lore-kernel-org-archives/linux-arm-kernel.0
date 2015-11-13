@@ -1,125 +1,57 @@
-From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Fri, 13 Nov 2015 21:06:20 +0530
-Subject: [PATCH v5 9/9] drivers: soc: Add support for Exynos PMU driver
-In-Reply-To: <5645BB67.8050102@samsung.com>
-References: <1447406983-27835-1-git-send-email-pankaj.dubey@samsung.com>
- <1447406983-27835-10-git-send-email-pankaj.dubey@samsung.com>
- <5645BB67.8050102@samsung.com>
-Message-ID: <CAGcde9HMDNgu2YHXE7=KqhxdXwyNwqCZn0BLsoHtaOvpYjjSqw@mail.gmail.com>
+From: pinskia@gmail.com (Andrew Pinski)
+Date: Fri, 13 Nov 2015 07:38:49 -0800
+Subject: [PATCH v6 13/17] arm64:ilp32: add sys_ilp32.c and a separate
+ table (in entry.S) to use it
+In-Reply-To: <3810107.ZiMyX4Iloo@wuerfel>
+References: <1446507046-24604-1-git-send-email-ynorov@caviumnetworks.com>
+ <16446627.b0Lo936ZJj@wuerfel> <mvm4mgrxrbt.fsf@hawking.suse.de>
+ <3810107.ZiMyX4Iloo@wuerfel>
+Message-ID: <CA+=Sn1mQ+1HRS_=X-RN92yRXD6Xt6xk-ATiX+u=c3_KYsWgtKg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13 November 2015 at 15:58, Krzysztof Kozlowski
-<k.kozlowski@samsung.com> wrote:
+On Fri, Nov 13, 2015 at 7:34 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Thursday 12 November 2015 14:47:18 Andreas Schwab wrote:
+>> Arnd Bergmann <arnd@arndb.de> writes:
+>>
+>> > On Thursday 12 November 2015 10:44:55 Andreas Schwab wrote:
+>> >> Arnd Bergmann <arnd@arndb.de> writes:
+>> >>
+>> >> > What do you mean with 32-bit off_t?
+>> >>
+>> >> An ABI with 32-bit off_t, ie. all currently implemented 32-bit ABIs.
+>> >>
+>> >> > Do you mean that glibc emulates a 32-bit off_t on top of the 64-bit
+>> >> > __kernel_loff_t?
+>> >>
+>> >> Glibc is bridging the user-space ABI to the kernel ABI.
+>> >
+>> > Ok, but why?
+>>
+>> That's how the ABI is defined right now.  I didn't make that up.
 >
-> On 13.11.2015 18:29, Pankaj Dubey wrote:
-> > This patch moves Exynos PMU driver implementation from "arm/mach-exynos"
-> > to "drivers/soc/samsung". This driver is mainly used for setting misc
-> > bits of register from PMU IP of Exynos SoC which will be required to
-> > configure before Suspend/Resume. Currently all these settings are done
-> > in "arch/arm/mach-exynos/pmu.c" but moving ahead for ARM64 based SoC
-> > support, there is a need of this PMU driver in driver/* folder.
-> >
-> > This driver uses existing DT binding information and there should
-> > be no functionality change in the supported platforms.
-> >
-> > Signed-off-by: Amit Daniel Kachhap <amitdanielk@gmail.com>
-> > Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
-> > ---
-> >  arch/arm/mach-exynos/Kconfig                                   | 1 +
-> >  arch/arm/mach-exynos/Makefile                                  | 4 +---
-> >  drivers/soc/samsung/Kconfig                                    | 4 ++++
-> >  drivers/soc/samsung/Makefile                                   | 4 ++++
-> >  arch/arm/mach-exynos/pmu.c => drivers/soc/samsung/exynos-pmu.c | 0
-> >  {arch/arm/mach-exynos => drivers/soc/samsung}/exynos-pmu.h     | 0
-> >  {arch/arm/mach-exynos => drivers/soc/samsung}/exynos3250-pmu.c | 0
-> >  {arch/arm/mach-exynos => drivers/soc/samsung}/exynos4-pmu.c    | 0
-> >  {arch/arm/mach-exynos => drivers/soc/samsung}/exynos5250-pmu.c | 0
-> >  {arch/arm/mach-exynos => drivers/soc/samsung}/exynos5420-pmu.c | 0
-> >  10 files changed, 10 insertions(+), 3 deletions(-)
-> >  rename arch/arm/mach-exynos/pmu.c => drivers/soc/samsung/exynos-pmu.c (100%)
-> >  rename {arch/arm/mach-exynos => drivers/soc/samsung}/exynos-pmu.h (100%)
-> >  rename {arch/arm/mach-exynos => drivers/soc/samsung}/exynos3250-pmu.c (100%)
-> >  rename {arch/arm/mach-exynos => drivers/soc/samsung}/exynos4-pmu.c (100%)
-> >  rename {arch/arm/mach-exynos => drivers/soc/samsung}/exynos5250-pmu.c (100%)
-> >  rename {arch/arm/mach-exynos => drivers/soc/samsung}/exynos5420-pmu.c (100%)
-> >
-> > diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
-> > index 83c85f5..874cb38 100644
-> > --- a/arch/arm/mach-exynos/Kconfig
-> > +++ b/arch/arm/mach-exynos/Kconfig
-> > @@ -16,6 +16,7 @@ menuconfig ARCH_EXYNOS
-> >       select ARM_GIC
-> >       select COMMON_CLK_SAMSUNG
-> >       select EXYNOS_THERMAL
-> > +     select EXYNOS_PMU
-> >       select EXYNOS_SROM if PM
-> >       select HAVE_ARM_SCU if SMP
-> >       select HAVE_S3C2410_I2C if I2C
-> > diff --git a/arch/arm/mach-exynos/Makefile b/arch/arm/mach-exynos/Makefile
-> > index 2d58063..34d29df 100644
-> > --- a/arch/arm/mach-exynos/Makefile
-> > +++ b/arch/arm/mach-exynos/Makefile
-> > @@ -9,9 +9,7 @@ ccflags-$(CONFIG_ARCH_MULTIPLATFORM) += -I$(srctree)/$(src)/include -I$(srctree)
-> >
-> >  # Core
-> >
-> > -obj-$(CONFIG_ARCH_EXYNOS)    += exynos.o pmu.o exynos-smc.o firmware.o \
-> > -                                     exynos3250-pmu.o exynos4-pmu.o \
-> > -                                     exynos5250-pmu.o exynos5420-pmu.o
-> > +obj-$(CONFIG_ARCH_EXYNOS)    += exynos.o exynos-smc.o firmware.o
-> >
-> >  obj-$(CONFIG_EXYNOS_CPU_SUSPEND) += pm.o sleep.o
-> >  obj-$(CONFIG_PM_SLEEP)               += suspend.o
-> > diff --git a/drivers/soc/samsung/Kconfig b/drivers/soc/samsung/Kconfig
-> > index 2833b5b..f545d6c 100644
-> > --- a/drivers/soc/samsung/Kconfig
-> > +++ b/drivers/soc/samsung/Kconfig
-> > @@ -10,4 +10,8 @@ config EXYNOS_SROM
-> >       bool
-> >       depends on ARM && ARCH_EXYNOS && PM
-> >
-> > +config EXYNOS_PMU
-> > +     bool
-> > +     depends on ARCH_EXYNOS
-> > +
-> >  endmenu
-> > diff --git a/drivers/soc/samsung/Makefile b/drivers/soc/samsung/Makefile
-> > index 9c554d5..26fb489 100644
-> > --- a/drivers/soc/samsung/Makefile
-> > +++ b/drivers/soc/samsung/Makefile
-> > @@ -1 +1,5 @@
-> >  obj-$(CONFIG_EXYNOS_SROM)    += exynos-srom.o
-> > +ifdef CONFIG_ARM
-> > +obj-$(CONFIG_EXYNOS_PMU)     += exynos-pmu.o exynos3250-pmu.o exynos4-pmu.o \
-> > +                                     exynos5250-pmu.o exynos5420-pmu.o
-> > +endif
+> Ok, I guess it will remain a mystery then.
+
+The biggest question is here is how much compatibility do we want with
+other 32bit ABIs?
+Do we want off_t to be 32bit or 64bit?
+
 >
-> Why ifdef CONFIG_ARM? This already depends on ARCH_EXYNOS. If you want
-> to limit to ARMv7 then add the dependency to Kconfig (just like
-> EXYNOS_SROM).
+> Should we perhaps define __ARCH_WANT_SYSCALL_OFF_T for the unistd.h
+> file then, so we provide both the off_t and the loff_t based syscalls?
+
+I think that is backwards ...
+
 >
+> That would avoid the extra wrapper in glibc when using a 32-bit
+> off_t if that is the preferred mode for user space.
 
-This is required, so that 32-bit based Exynos SoC's PMU should not get
-compiled when we are compiling for ARM64 and vice-versa.
 
-For example: In future, I have plan to add exynos7 PMU support as -
-
-ifdef CONFIG_ARM64
-obj-$(CONFIG_EXYNOS_PMU) += exynos-pmu.o exynos7-pmu.o
-endif
-
-Thus preventing compilation of ARM64 based SoCs PMU data files when we
-are compiling for ARM.
-
-Only exynos-pmu.c will be shared and compiled in both cases.
+Other targets like tilegx does not do that and has a pure 32bit mode.
+Only score does that.
 
 Thanks,
-Pankaj Dubey
+Andrew
 
 >
-> Rest looks ok - nice renames.
->
-> Best regards,
-> Krzysztof
->
+>         Arnd
