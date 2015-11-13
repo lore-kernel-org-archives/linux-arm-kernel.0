@@ -1,43 +1,32 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Fri, 13 Nov 2015 09:51:58 +0900
-Subject: [PATCH v2 3/3] ARM: shmobile: gose: Add QSPI device to DT
-In-Reply-To: <CAMuHMdWi=uTAtNvhSA54JDms_pLW0zjKQ_VH8xU3eY6BGiwV5A@mail.gmail.com>
-References: <1447291763-27527-1-git-send-email-horms+renesas@verge.net.au>
- <1447291763-27527-4-git-send-email-horms+renesas@verge.net.au>
- <CAMuHMdWi=uTAtNvhSA54JDms_pLW0zjKQ_VH8xU3eY6BGiwV5A@mail.gmail.com>
-Message-ID: <20151113005157.GF20462@verge.net.au>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Fri, 13 Nov 2015 00:57:22 +0000
+Subject: [BISECTED] v4.3-rc5: OMAP1 boot hang
+In-Reply-To: <20151111214444.GF2260@blackmetal.musicnaut.iki.fi>
+References: <20151013073046.GB7588@blackmetal.musicnaut.iki.fi>
+ <20151111214444.GF2260@blackmetal.musicnaut.iki.fi>
+Message-ID: <20151113005722.GQ32536@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 12, 2015 at 11:44:15AM +0100, Geert Uytterhoeven wrote:
-> Hi Simon,
+On Wed, Nov 11, 2015 at 11:44:44PM +0200, Aaro Koskinen wrote:
+> Hi,
 > 
-> On Thu, Nov 12, 2015 at 2:29 AM, Simon Horman
-> <horms+renesas@verge.net.au> wrote:
-> > Enable the QSPI controller in the gose device tree.
-> >
-> > Based similar work for the silk board by by Vladimir Barinov and
-> > Sergei Shtylyov.
-> >
-> > Cc: Vladimir Barinov <vladimir.barinov@cogentembedded.com>
-> > Cc: Sergei Shtylyov <sergei.shtylyov@cogentembedded.com>
-> > Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> Any suggestions how to debug this further? This happens also with v4.3
+> final. Is the CPU_SW_DOMAIN_PAN supposed to work with this CPU?
 > 
-> Acked-by: Geert Uytterhoeven <geert+renesas@glider.be>
-> 
-> > ---
-> > Tested: Read /dev/mtd0 with 512K blocks at 1.7MB/s
-> 
-> That's slow: I get 6.7 MB/s on koelsch (69.9 Mbps for Quad Read according
-> to my in-kernel QSPI debug code). Is this with SYS-DMAC enabled?
+> I tried to disable various drivers (e.g. NAND, USB) and it still
+> hangs... And it seems always at the same printk time stamp (roughly at
+> 25 seconds).
 
-Yes it does seem very small.
+No idea what so ever, and I have zero knowledge of this ARM925 thing -
+never had one, and never seen any specs on it.  The weird thing is
+that it's not producing any oops dump - I guess the kernel is totally
+dead and unresponsive.  I'd ask if you have a heartbeat LED, but I'd
+guess the answer will be that the hardware is too limited.
 
-I think that the problem is that /dev/mtd0 is very small, only 262kB.
-And I do not see any interrupts for dma-controllers when reading from hit.
+Any additional information you can give might help, but I wouldn't hold
+out any hopes...
 
-/dev/mdt1 is much later, 4.2MB.
-dd reads that at ~7MB/s using 512kB blocks.
-In that test I see interrupts for one of the dma-controllers.
-
-I plan to go ahead and apply this series.
+-- 
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
