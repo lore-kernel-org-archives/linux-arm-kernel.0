@@ -1,37 +1,19 @@
-From: andy.shevchenko@gmail.com (Andy Shevchenko)
-Date: Fri, 13 Nov 2015 03:10:13 +0200
-Subject: [PATCH] mmc: dw_mmc: use resource_size_t to store physical address
-In-Reply-To: <28102387.ALpaBHpim0@wuerfel>
-References: <28102387.ALpaBHpim0@wuerfel>
-Message-ID: <CAHp75VfyOWrihHC4nhpKQrjH9SjP0NnaN1WU8se3PL4biWtz4g@mail.gmail.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Fri, 13 Nov 2015 10:11:17 +0900
+Subject: [PATCH v2 1/3] ARM: shmobile: r8a7793: Add DMAC devices to DT
+In-Reply-To: <1447291763-27527-2-git-send-email-horms+renesas@verge.net.au>
+References: <1447291763-27527-1-git-send-email-horms+renesas@verge.net.au>
+ <1447291763-27527-2-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <20151113011116.GG20462@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 12, 2015 at 4:14 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> The dw_mmc driver stores the physical address of the MMIO registers
-> in a pointer, which requires the use of type casts, and is actually
-> broken if anyone ever has this device on a 32-bit SoC in registers
-> above 4GB. Gcc warns about this possibility when the driver is built
-> with ARM LPAE enabled:
+On Thu, Nov 12, 2015 at 10:29:21AM +0900, Simon Horman wrote:
+> Instantiate the two system DMA controllers in the r8a7793 device tree.
+> 
+> Based on similar work for the r8a7793 by Laurent Pinchart.
+> 
+> Signed-off-by: Simon Horman <horms+renesas@verge.net.au>
+> Reviewed-by: Laurent Pinchart <laurent.pinchart+renesas@ideasonboard.com>
 
-> -       host->phy_regs = (void *)(regs->start);
-> +       host->phy_regs = regs->start;
-
->         /* Set external dma config: burst size, burst width */
-> -       cfg.dst_addr = (dma_addr_t)(host->phy_regs + fifo_offset);
-> +       cfg.dst_addr = host->phy_regs + fifo_offset;
-
-dst_addr is dma_addr_t?
-
->         /* Registers's physical base address */
-> -       void                    *phy_regs;
-> +       resource_size_t         phy_regs;
-
-If dst_addr is dma_addr_t wouldn't be a problem when
-resource_size_t is defined as 64-bit address, and dma_addr_t as 32-bit?
-
-Btw, for me casting to dma_addr_t looks sane.
-
--- 
-With Best Regards,
-Andy Shevchenko
+For the record: I have queued this up for v4.5.
