@@ -1,128 +1,139 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Sat, 14 Nov 2015 20:30:07 +0900
-Subject: [PATCH v5 9/9] drivers: soc: Add support for Exynos PMU driver
-In-Reply-To: <CAGcde9HMDNgu2YHXE7=KqhxdXwyNwqCZn0BLsoHtaOvpYjjSqw@mail.gmail.com>
-References: <1447406983-27835-1-git-send-email-pankaj.dubey@samsung.com>
- <1447406983-27835-10-git-send-email-pankaj.dubey@samsung.com>
- <5645BB67.8050102@samsung.com>
- <CAGcde9HMDNgu2YHXE7=KqhxdXwyNwqCZn0BLsoHtaOvpYjjSqw@mail.gmail.com>
-Message-ID: <56471B3F.5060201@samsung.com>
+From: djkurtz@chromium.org (Daniel Kurtz)
+Date: Sat, 14 Nov 2015 22:38:42 +0800
+Subject: [PATCH v2 2/2] i2c: mediatek: fix i2c multi transfer issue in
+ high speed mode
+In-Reply-To: <1447047839-5223-3-git-send-email-liguo.zhang@mediatek.com>
+References: <1447047839-5223-1-git-send-email-liguo.zhang@mediatek.com>
+ <1447047839-5223-3-git-send-email-liguo.zhang@mediatek.com>
+Message-ID: <CAGS+omAixwqw2QwR5_4VffHN66aAYNXP1ZJPxsq2WKcgzVxOZw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-W dniu 14.11.2015 o 00:36, Pankaj Dubey pisze:
-> On 13 November 2015 at 15:58, Krzysztof Kozlowski
-> <k.kozlowski@samsung.com> wrote:
->>
->> On 13.11.2015 18:29, Pankaj Dubey wrote:
->>> This patch moves Exynos PMU driver implementation from "arm/mach-exynos"
->>> to "drivers/soc/samsung". This driver is mainly used for setting misc
->>> bits of register from PMU IP of Exynos SoC which will be required to
->>> configure before Suspend/Resume. Currently all these settings are done
->>> in "arch/arm/mach-exynos/pmu.c" but moving ahead for ARM64 based SoC
->>> support, there is a need of this PMU driver in driver/* folder.
->>>
->>> This driver uses existing DT binding information and there should
->>> be no functionality change in the supported platforms.
->>>
->>> Signed-off-by: Amit Daniel Kachhap <amitdanielk@gmail.com>
->>> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
->>> ---
->>>  arch/arm/mach-exynos/Kconfig                                   | 1 +
->>>  arch/arm/mach-exynos/Makefile                                  | 4 +---
->>>  drivers/soc/samsung/Kconfig                                    | 4 ++++
->>>  drivers/soc/samsung/Makefile                                   | 4 ++++
->>>  arch/arm/mach-exynos/pmu.c => drivers/soc/samsung/exynos-pmu.c | 0
->>>  {arch/arm/mach-exynos => drivers/soc/samsung}/exynos-pmu.h     | 0
->>>  {arch/arm/mach-exynos => drivers/soc/samsung}/exynos3250-pmu.c | 0
->>>  {arch/arm/mach-exynos => drivers/soc/samsung}/exynos4-pmu.c    | 0
->>>  {arch/arm/mach-exynos => drivers/soc/samsung}/exynos5250-pmu.c | 0
->>>  {arch/arm/mach-exynos => drivers/soc/samsung}/exynos5420-pmu.c | 0
->>>  10 files changed, 10 insertions(+), 3 deletions(-)
->>>  rename arch/arm/mach-exynos/pmu.c => drivers/soc/samsung/exynos-pmu.c (100%)
->>>  rename {arch/arm/mach-exynos => drivers/soc/samsung}/exynos-pmu.h (100%)
->>>  rename {arch/arm/mach-exynos => drivers/soc/samsung}/exynos3250-pmu.c (100%)
->>>  rename {arch/arm/mach-exynos => drivers/soc/samsung}/exynos4-pmu.c (100%)
->>>  rename {arch/arm/mach-exynos => drivers/soc/samsung}/exynos5250-pmu.c (100%)
->>>  rename {arch/arm/mach-exynos => drivers/soc/samsung}/exynos5420-pmu.c (100%)
->>>
->>> diff --git a/arch/arm/mach-exynos/Kconfig b/arch/arm/mach-exynos/Kconfig
->>> index 83c85f5..874cb38 100644
->>> --- a/arch/arm/mach-exynos/Kconfig
->>> +++ b/arch/arm/mach-exynos/Kconfig
->>> @@ -16,6 +16,7 @@ menuconfig ARCH_EXYNOS
->>>       select ARM_GIC
->>>       select COMMON_CLK_SAMSUNG
->>>       select EXYNOS_THERMAL
->>> +     select EXYNOS_PMU
->>>       select EXYNOS_SROM if PM
->>>       select HAVE_ARM_SCU if SMP
->>>       select HAVE_S3C2410_I2C if I2C
->>> diff --git a/arch/arm/mach-exynos/Makefile b/arch/arm/mach-exynos/Makefile
->>> index 2d58063..34d29df 100644
->>> --- a/arch/arm/mach-exynos/Makefile
->>> +++ b/arch/arm/mach-exynos/Makefile
->>> @@ -9,9 +9,7 @@ ccflags-$(CONFIG_ARCH_MULTIPLATFORM) += -I$(srctree)/$(src)/include -I$(srctree)
->>>
->>>  # Core
->>>
->>> -obj-$(CONFIG_ARCH_EXYNOS)    += exynos.o pmu.o exynos-smc.o firmware.o \
->>> -                                     exynos3250-pmu.o exynos4-pmu.o \
->>> -                                     exynos5250-pmu.o exynos5420-pmu.o
->>> +obj-$(CONFIG_ARCH_EXYNOS)    += exynos.o exynos-smc.o firmware.o
->>>
->>>  obj-$(CONFIG_EXYNOS_CPU_SUSPEND) += pm.o sleep.o
->>>  obj-$(CONFIG_PM_SLEEP)               += suspend.o
->>> diff --git a/drivers/soc/samsung/Kconfig b/drivers/soc/samsung/Kconfig
->>> index 2833b5b..f545d6c 100644
->>> --- a/drivers/soc/samsung/Kconfig
->>> +++ b/drivers/soc/samsung/Kconfig
->>> @@ -10,4 +10,8 @@ config EXYNOS_SROM
->>>       bool
->>>       depends on ARM && ARCH_EXYNOS && PM
->>>
->>> +config EXYNOS_PMU
->>> +     bool
->>> +     depends on ARCH_EXYNOS
->>> +
->>>  endmenu
->>> diff --git a/drivers/soc/samsung/Makefile b/drivers/soc/samsung/Makefile
->>> index 9c554d5..26fb489 100644
->>> --- a/drivers/soc/samsung/Makefile
->>> +++ b/drivers/soc/samsung/Makefile
->>> @@ -1 +1,5 @@
->>>  obj-$(CONFIG_EXYNOS_SROM)    += exynos-srom.o
->>> +ifdef CONFIG_ARM
->>> +obj-$(CONFIG_EXYNOS_PMU)     += exynos-pmu.o exynos3250-pmu.o exynos4-pmu.o \
->>> +                                     exynos5250-pmu.o exynos5420-pmu.o
->>> +endif
->>
->> Why ifdef CONFIG_ARM? This already depends on ARCH_EXYNOS. If you want
->> to limit to ARMv7 then add the dependency to Kconfig (just like
->> EXYNOS_SROM).
->>
-> 
-> This is required, so that 32-bit based Exynos SoC's PMU should not get
-> compiled when we are compiling for ARM64 and vice-versa.
-> 
-> For example: In future, I have plan to add exynos7 PMU support as -
-> 
-> ifdef CONFIG_ARM64
-> obj-$(CONFIG_EXYNOS_PMU) += exynos-pmu.o exynos7-pmu.o
-> endif
-> 
-> Thus preventing compilation of ARM64 based SoCs PMU data files when we
-> are compiling for ARM.
-> 
-> Only exynos-pmu.c will be shared and compiled in both cases.
+On Mon, Nov 9, 2015 at 1:43 PM, Liguo Zhang <liguo.zhang@mediatek.com> wrote:
+> For platform with auto restart support, when doing i2c multi transfer
+> in high speed, for example, doing write-then-read transfer, the master
+> code will occupy the first transfer, and the second transfer will be
+> the read transfer, the write transfer will be discarded. So we should
+> first send the master code, and then start i2c multi transfer.
+>
+> Signed-off-by: Liguo Zhang <liguo.zhang@mediatek.com>
+> Reviewed-by: Eddie Huang <eddie.huang@mediatek.com>
+> ---
+>  drivers/i2c/busses/i2c-mt65xx.c | 45 +++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 45 insertions(+)
+>
+> diff --git a/drivers/i2c/busses/i2c-mt65xx.c b/drivers/i2c/busses/i2c-mt65xx.c
+> index dc4aac6..249df86 100644
+> --- a/drivers/i2c/busses/i2c-mt65xx.c
+> +++ b/drivers/i2c/busses/i2c-mt65xx.c
+> @@ -53,6 +53,8 @@
+>  #define I2C_FS_TIME_INIT_VALUE         0x1303
+>  #define I2C_WRRD_TRANAC_VALUE          0x0002
+>  #define I2C_RD_TRANAC_VALUE            0x0001
+> +#define I2C_TRAN_DEFAULT_VALUE         0x0001
+> +#define I2C_TRANAC_DEFAULT_VALUE       0x0001
 
-But this actually spreads Kconfig configuration over different places:
-Kconfig and Makefile. It confuses and makes it more difficult in the
-future to maintain and extend.
+"TRAN" and "TRANAC" are not good names; this should be "TRANSFER_LEN"
+and "TRANSAC", based on the names of the registers to which you write
+these constants.
 
-This should be in Kconfig. If you want to limit this per architecture
-(is it really needed?) then maybe define different EXYNOS_PMU config
-symbols?
+Furthermore, these are not "default" values, they are the transfer
+length and number of transactions for sending the "master code", so:
 
-Best regards,
-Krzysztof
+#define I2C_TRANSFER_LEN_MASTER_CODE         0x0001
+#define I2C_TRANSAC_LEN_MASTER_CODE       0x0001
+
+Similarly, I think the "TRANAC" in I2C_WRRD_TRANAC_VALUE and
+I2C_RD_TRANAC_VALUE should also be TRANSAC.
+
+>
+>  #define I2C_DMA_CON_TX                 0x0000
+>  #define I2C_DMA_CON_RX                 0x0001
+> @@ -365,6 +367,43 @@ static int mtk_i2c_set_speed(struct mtk_i2c *i2c, unsigned int parent_clk,
+>         return 0;
+>  }
+>
+> +static int mtk_i2c_send_master_code(struct mtk_i2c *i2c)
+> +{
+> +       int ret = 0;
+> +
+> +       reinit_completion(&i2c->msg_complete);
+> +
+> +       writew(I2C_CONTROL_RS | I2C_CONTROL_ACKERR_DET_EN |
+> +              I2C_CONTROL_CLK_EXT_EN | I2C_CONTROL_DMA_EN,
+> +              i2c->base + OFFSET_CONTROL);
+> +
+> +       /* Clear interrupt status */
+> +       writew(I2C_RS_TRANSFER | I2C_TRANSAC_COMP | I2C_HS_NACKERR | I2C_ACKERR,
+> +              i2c->base + OFFSET_INTR_STAT);
+> +
+> +       /* Enable interrupt */
+> +       writew(I2C_RS_TRANSFER | I2C_TRANSAC_COMP, i2c->base +
+> +              OFFSET_INTR_MASK);
+> +
+> +       writew(I2C_TRAN_DEFAULT_VALUE, i2c->base + OFFSET_TRANSFER_LEN);
+> +       writew(I2C_TRANAC_DEFAULT_VALUE, i2c->base + OFFSET_TRANSAC_LEN);
+> +
+> +       writew(I2C_TRANSAC_START | I2C_RS_MUL_CNFG, i2c->base + OFFSET_START);
+> +
+> +       ret = wait_for_completion_timeout(&i2c->msg_complete,
+> +                                         i2c->adap.timeout);
+
+How does the hardware know that this transaction should be a "master code"?
+Do you have to tell the hardware what value ('00001XXX') to use as the
+master code?
+The Master Code must be sent at <= 400 kHz, not the target clock.  How
+does the hardware know what rate to use?
+When sending the master code, arbitration is supposed to occur, such
+that only one winning master can proceed with the following high speed
+transaction.
+Where do you check that you won this arbitration?
+If this is not implemented, adding a "TODO" would be helpful.
+
+> +
+> +       completion_done(&i2c->msg_complete);
+
+This completion_done() is only useful if you check the return value.
+You should check it too, since we should only check for timeout if the
+message hasn't completed.
+
+> +
+> +       if (ret == 0) {
+> +               dev_dbg(i2c->dev, "send master code timeout.\n");
+> +               mtk_i2c_init_hw(i2c);
+> +               return -ETIMEDOUT;
+> +       }
+> +
+> +       return 0;
+> +}
+> +
+>  static int mtk_i2c_do_transfer(struct mtk_i2c *i2c, struct i2c_msg *msgs,
+>                                int num, int left_num)
+>  {
+> @@ -539,6 +578,12 @@ static int mtk_i2c_transfer(struct i2c_adapter *adap,
+>                 }
+>         }
+>
+> +       if (i2c->auto_restart && i2c->speed_hz > 400000) {
+
+Don't we need to send the master code for *every* HS transaction, not
+just "auto_restart"?
+
+"400000" => You already have a macro for this: MAX_FS_MODE_SPEED
+
+> +               ret = mtk_i2c_send_master_code(i2c);
+> +               if (ret)
+> +                       return ret;
+> +       }
+> +
+>         while (left_num--) {
+>                 if (!msgs->buf) {
+>                         dev_dbg(i2c->dev, "data buffer is NULL.\n");
+> --
+> 1.8.1.1.dirty
+>
+> --
+> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Please read the FAQ at  http://www.tux.org/lkml/
