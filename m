@@ -1,60 +1,76 @@
-From: hongzhou.yang@mediatek.com (Hongzhou Yang)
-Date: Fri, 13 Nov 2015 16:49:24 -0800
-Subject: [PATCH] pinctrl: mediatek: Add get_direction support.
-Message-ID: <1447462164-34639-1-git-send-email-hongzhou.yang@mediatek.com>
+From: leilk.liu@mediatek.com (lei liu)
+Date: Sat, 14 Nov 2015 10:27:19 +0800
+Subject: [PATCH v2] spi: mediatek: single device does not require cs_gpios
+In-Reply-To: <1447042491-1199-1-git-send-email-drinkcat@chromium.org>
+References: <1447042491-1199-1-git-send-email-drinkcat@chromium.org>
+Message-ID: <1447468039.27169.1.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since Linux gpio framework return 0 for output, 1 for input.
-But HW use 0 stands for input, and 1 stands for output.
-So use negative to correct it.
+On Mon, 2015-11-09 at 12:14 +0800, Nicolas Boichat wrote:
+> When only one device is present, it is not necessary to specify
+> cs_gpios, as the CS line can be controlled by the hardware
+> module.
+> 
+> Without this patch, older device tree bindings used before
+> 37457607 "spi: mediatek: mt8173 spi multiple devices support"
+> would cause a panic on boot. This fixes the crash, and
+> re-introduces backward compatibility.
+> 
+> Signed-off-by: Nicolas Boichat <drinkcat@chromium.org>
 
-And gpio_chip.get is used to get input value, no need to get
-output value, so removing it.
+Acked-by: Leilk Liu <leilk.liu@mediatek.com>
 
-Signed-off-by: Hongzhou Yang <hongzhou.yang@mediatek.com>
----
- Add get direction support.
- Remove gpio_chip.get value for output direction.
-
- drivers/pinctrl/mediatek/pinctrl-mtk-common.c |   11 ++++-------
- 1 file changed, 4 insertions(+), 7 deletions(-)
-
-diff --git a/drivers/pinctrl/mediatek/pinctrl-mtk-common.c b/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
-index 7726c6c..bbf0230 100644
---- a/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
-+++ b/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
-@@ -757,7 +757,7 @@ static int mtk_gpio_get_direction(struct gpio_chip *chip, unsigned offset)
- 	reg_addr =  mtk_get_port(pctl, offset) + pctl->devdata->dir_offset;
- 	bit = BIT(offset & 0xf);
- 	regmap_read(pctl->regmap1, reg_addr, &read_val);
--	return !!(read_val & bit);
-+	return !(read_val & bit);
- }
- 
- static int mtk_gpio_get(struct gpio_chip *chip, unsigned offset)
-@@ -767,12 +767,8 @@ static int mtk_gpio_get(struct gpio_chip *chip, unsigned offset)
- 	unsigned int read_val = 0;
- 	struct mtk_pinctrl *pctl = dev_get_drvdata(chip->dev);
- 
--	if (mtk_gpio_get_direction(chip, offset))
--		reg_addr = mtk_get_port(pctl, offset) +
--			pctl->devdata->dout_offset;
--	else
--		reg_addr = mtk_get_port(pctl, offset) +
--			pctl->devdata->din_offset;
-+	reg_addr = mtk_get_port(pctl, offset) +
-+		pctl->devdata->din_offset;
- 
- 	bit = BIT(offset & 0xf);
- 	regmap_read(pctl->regmap1, reg_addr, &read_val);
-@@ -1007,6 +1003,7 @@ static struct gpio_chip mtk_gpio_chip = {
- 	.owner			= THIS_MODULE,
- 	.request		= mtk_gpio_request,
- 	.free			= mtk_gpio_free,
-+	.get_direction		= mtk_gpio_get_direction,
- 	.direction_input	= mtk_gpio_direction_input,
- 	.direction_output	= mtk_gpio_direction_output,
- 	.get			= mtk_gpio_get,
--- 
-1.7.9.5
+> ---
+> 
+> v2: Use gpio_is_valid()
+> 
+> Applies on top of broonie/spi.git/for-next.
+> 
+>  drivers/spi/spi-mt65xx.c | 26 ++++++++++++++++++--------
+>  1 file changed, 18 insertions(+), 8 deletions(-)
+> 
+> diff --git a/drivers/spi/spi-mt65xx.c b/drivers/spi/spi-mt65xx.c
+> index 563954a..7840067 100644
+> --- a/drivers/spi/spi-mt65xx.c
+> +++ b/drivers/spi/spi-mt65xx.c
+> @@ -410,7 +410,7 @@ static int mtk_spi_setup(struct spi_device *spi)
+>  	if (!spi->controller_data)
+>  		spi->controller_data = (void *)&mtk_default_chip_info;
+>  
+> -	if (mdata->dev_comp->need_pad_sel)
+> +	if (mdata->dev_comp->need_pad_sel && gpio_is_valid(spi->cs_gpio))
+>  		gpio_direction_output(spi->cs_gpio, !(spi->mode & SPI_CS_HIGH));
+>  
+>  	return 0;
+> @@ -632,13 +632,23 @@ static int mtk_spi_probe(struct platform_device *pdev)
+>  			goto err_put_master;
+>  		}
+>  
+> -		for (i = 0; i < master->num_chipselect; i++) {
+> -			ret = devm_gpio_request(&pdev->dev, master->cs_gpios[i],
+> -						dev_name(&pdev->dev));
+> -			if (ret) {
+> -				dev_err(&pdev->dev,
+> -					"can't get CS GPIO %i\n", i);
+> -				goto err_put_master;
+> +		if (!master->cs_gpios && master->num_chipselect > 1) {
+> +			dev_err(&pdev->dev,
+> +				"cs_gpios not specified and num_chipselect > 1\n");
+> +			ret = -EINVAL;
+> +			goto err_put_master;
+> +		}
+> +
+> +		if (master->cs_gpios) {
+> +			for (i = 0; i < master->num_chipselect; i++) {
+> +				ret = devm_gpio_request(&pdev->dev,
+> +							master->cs_gpios[i],
+> +							dev_name(&pdev->dev));
+> +				if (ret) {
+> +					dev_err(&pdev->dev,
+> +						"can't get CS GPIO %i\n", i);
+> +					goto err_put_master;
+> +				}
+>  			}
+>  		}
+>  	}
