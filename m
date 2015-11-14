@@ -1,48 +1,53 @@
 From: anton.bondarenko.sama@gmail.com (Anton Bondarenko)
-Date: Sat, 14 Nov 2015 11:02:58 +0100
-Subject: [PATCH v3 1/7] spi: imx: Fix DMA transfer
-In-Reply-To: <563B88FD.8050702@gmail.com>
+Date: Sat, 14 Nov 2015 11:03:25 +0100
+Subject: [PATCH v3 7/7] spi: imx: defer spi initialization, if DMA engine
+ is pending
+In-Reply-To: <563B8157.9030104@gmail.com>
 References: <1446388901-6073-1-git-send-email-anton.bondarenko.sama@gmail.com>
- <1446388901-6073-2-git-send-email-anton.bondarenko.sama@gmail.com>
- <20151105083422.GH8526@pengutronix.de> <563B88FD.8050702@gmail.com>
-Message-ID: <564706D2.5050607@gmail.com>
+ <1446388901-6073-8-git-send-email-anton.bondarenko.sama@gmail.com>
+ <20151105085926.GK8526@pengutronix.de> <563B8157.9030104@gmail.com>
+Message-ID: <564706ED.70102@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-On 05.11.2015 17:51, Anton Bondarenko wrote:
-> On 05.11.2015 09:34, Sascha Hauer wrote:
->> On Sun, Nov 01, 2015 at 03:41:35PM +0100, Anton Bondarenko wrote:
+
+On 05.11.2015 17:18, Anton Bondarenko wrote:
+> On 05.11.2015 09:59, Sascha Hauer wrote:
+>> On Sun, Nov 01, 2015 at 03:41:41PM +0100, Anton Bondarenko wrote:
 >>> From: Anton Bondarenko <anton_bondarenko@mentor.com>
 >>>
->>> RX DMA tail data handling doesn't work correctly in many cases with
->>> current implementation. It happens because SPI core was setup
->>> to generates both RX watermark level and RX DATA TAIL events
->>> incorrectly. SPI transfer triggering for DMA also done in wrong way.
+>>> If SPI device supports DMA mode, but DMA controller is not yet
+>>> available due to e.g. a delay in the corresponding kernel module
+>>> initialization, retry to initialize SPI driver later on instead of
+>>> falling back into PIO only mode.
 >>>
->>> SPI client wants to transfer 70 words for example. The old DMA
->>> implementation setup RX DATA TAIL equal 6 words. In this case
->>> RX DMA event will be generated after 6 words read from RX FIFO.
->>> The garbage can be read out from RX FIFO because SPI HW does
->>> not receive all required words to trigger RX watermark event.
->>>
->>> New implementation change handling of RX data tail. DMA is used to
->>> process
->>> all TX data and only full chunks of RX data with size aligned to FIFO/2.
->>> Driver is waiting until both TX and RX DMA transaction done and all
->>> TX data are pushed out. At that moment there is only RX data tail in
->>> the RX FIFO. This data read out using PIO.
+>>> Signed-off-by: Vladimir Zapolskiy <vladimir_zapolskiy@mentor.com>
+>>> Signed-off-by: Anton Bondarenko <anton_bondarenko@mentor.com>
 >>
->> Have you looked at the RX_DMA_LENGTH and RXTDEN fields of the DMA
->> register? These seem to be for handling the remaining bytes of a DMA
->> transfer which do not reach the watermark level. From reading the
->> documentation I haven't really understood how it works though.
+>> Ok, so 6/7 is only part of the deferral story. Maybe squash the two
+>> patches into one?
 >>
 >> Sascha
->>
 >
-> A lot of times. Current implementation is trying to use it, but works
-> incorrectly if length % WML != 0 (which means RX_DMA_LENGTH == 0).
+> I would like to keep these two changes separately since I have a small
+> concern about this exact change.
+>
+> Let's assume such scenario:
+> - ECSPI configured to use DMA in device tree and DMA controller
+> description specified. But there is no driver for this controller in
+> kernel.
+> In this case dmaengine will always return -EDEFER and driver postpone
+> spi-imx initialization. So finally there will be no SPI support even in
+> PIO mode.
+> Or for example spi-imx will be compiled into kernel, but DMA controller
+> driver will be on SPI-NOR based rootfs.
+>
+> So the question is "Should we allow user to use incorrect combination of
+> kernel configuration and DTS and work at least with some limitation?" Or
+> should we try to guarantee device tree file requirement to use DMA.
+>
+> Any thoughts?
 >
 > Regards, Anton
 
