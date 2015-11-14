@@ -1,56 +1,46 @@
 From: pavel@ucw.cz (Pavel Machek)
-Date: Sat, 14 Nov 2015 21:26:24 +0100
-Subject: [PATCH v2 10/11] PM / Hibernate: clean cached pages on
- architectures that require it
-In-Reply-To: <1445966960-31724-11-git-send-email-james.morse@arm.com>
+Date: Sat, 14 Nov 2015 22:25:15 +0100
+Subject: [PATCH v2 02/11] arm64: Fold proc-macros.S into assembler.h
+In-Reply-To: <1445966960-31724-3-git-send-email-james.morse@arm.com>
 References: <1445966960-31724-1-git-send-email-james.morse@arm.com>
- <1445966960-31724-11-git-send-email-james.morse@arm.com>
-Message-ID: <20151114202623.GC20429@amd>
+ <1445966960-31724-3-git-send-email-james.morse@arm.com>
+Message-ID: <20151114212515.GF20429@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue 2015-10-27 17:29:19, James Morse wrote:
-> Some architectures require code written to memory as if it were data to be
-> 'cleaned' from any data caches so that the processor can fetch them as new
-> instructions.
+On Tue 2015-10-27 17:29:11, James Morse wrote:
+> From: Geoff Levand <geoff@infradead.org>
 > 
-> During resume from hibernate, the snapshot code copies some pages directly,
-> meaning these architectures do not get a chance to perform their cache
-> maintenance. Add a call to flush_icache_range(), which is provided by
-> architectures that require it, to perform the maintenance.
+> To allow the assembler macros defined in arch/arm64/mm/proc-macros.S to
+> be used outside the mm code move the contents of proc-macros.S to
+> asm/assembler.h.  Also, delete proc-macros.S, and fix up all references
+> to proc-macros.S.
 > 
-> This mirrors the kernel's behaviour when loading kernel modules and when
-> mapping executable pages to user space.
-> 
+> Signed-off-by: Geoff Levand <geoff@infradead.org>
 > Signed-off-by: James Morse <james.morse@arm.com>
-
-Looks reasonable.
-
-Acked-by: Pavel Machek <pavel@ucw.cz>
-
 > ---
->  kernel/power/snapshot.c | 4 ++++
->  1 file changed, 4 insertions(+)
+>  arch/arm64/include/asm/assembler.h | 48 +++++++++++++++++++++++++++-
+>  arch/arm64/kernel/head.S           |  1 -
+>  arch/arm64/kvm/hyp-init.S          |  1 -
+>  arch/arm64/mm/cache.S              |  2 --
+>  arch/arm64/mm/proc-macros.S        | 64 --------------------------------------
+>  arch/arm64/mm/proc.S               |  3 --
+>  6 files changed, 47 insertions(+), 72 deletions(-)
+>  delete mode 100644 arch/arm64/mm/proc-macros.S
 > 
-> diff --git a/kernel/power/snapshot.c b/kernel/power/snapshot.c
-> index 5235dd4e1e2f..139fc449ad75 100644
-> --- a/kernel/power/snapshot.c
-> +++ b/kernel/power/snapshot.c
-> @@ -1196,9 +1197,12 @@ static unsigned int count_data_pages(void)
->  static inline void do_copy_page(long *dst, long *src)
->  {
->  	int n;
-> +	unsigned long __maybe_unused start = (unsigned long)dst;
+> diff --git a/arch/arm64/include/asm/assembler.h b/arch/arm64/include/asm/assembler.h
+> index b51f2cc22ca9..91cb311d33de 100644
+> --- a/arch/arm64/include/asm/assembler.h
+> +++ b/arch/arm64/include/asm/assembler.h
+> @@ -1,5 +1,5 @@
+>  /*
+> - * Based on arch/arm/include/asm/assembler.h
+> + * * Based on arch/arm/include/asm/assembler.h, arch/arm/mm/proc-macros.S
 
-Why the "maybe unused"?
+Why the two stars?
 
->  	for (n = PAGE_SIZE / sizeof(long); n; n--)
->  		*dst++ = *src++;
-> +
-> +	flush_icache_range(start, start+PAGE_SIZE);
->  }
+Otherwise looks ok.
 
-									Pavel
 -- 
 (english) http://www.livejournal.com/~pavelmachek
 (cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
