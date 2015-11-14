@@ -1,50 +1,56 @@
-From: satayepic@gmail.com (Satay Epic)
-Date: Sat, 14 Nov 2015 11:57:23 -0800
-Subject: ARM Linux Kernel Update
-In-Reply-To: <9020659.GYXS8BbG6X@wuerfel>
-References: <CADohWC9sCwFbhtryZi-EbOvcBayh_6O2bEjzFaLMxHYXYBEhQg@mail.gmail.com>
- <CAMu38xLbRcOfdGLF+ozMA7G-tqzqykvsaDToY43sdMO4FP4b5w@mail.gmail.com>
- <9020659.GYXS8BbG6X@wuerfel>
-Message-ID: <CADohWC_Oh2w=bGgxPnVZWnouWS2k=1PAk2M3cV0qKr5jFX_o5Q@mail.gmail.com>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Sat, 14 Nov 2015 21:26:24 +0100
+Subject: [PATCH v2 10/11] PM / Hibernate: clean cached pages on
+ architectures that require it
+In-Reply-To: <1445966960-31724-11-git-send-email-james.morse@arm.com>
+References: <1445966960-31724-1-git-send-email-james.morse@arm.com>
+ <1445966960-31724-11-git-send-email-james.morse@arm.com>
+Message-ID: <20151114202623.GC20429@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Thanks Arnd. I will try it out.
+On Tue 2015-10-27 17:29:19, James Morse wrote:
+> Some architectures require code written to memory as if it were data to be
+> 'cleaned' from any data caches so that the processor can fetch them as new
+> instructions.
+> 
+> During resume from hibernate, the snapshot code copies some pages directly,
+> meaning these architectures do not get a chance to perform their cache
+> maintenance. Add a call to flush_icache_range(), which is provided by
+> architectures that require it, to perform the maintenance.
+> 
+> This mirrors the kernel's behaviour when loading kernel modules and when
+> mapping executable pages to user space.
+> 
+> Signed-off-by: James Morse <james.morse@arm.com>
 
-On Fri, Nov 13, 2015 at 1:40 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Thursday 12 November 2015 22:43:53 Albino B Neto wrote:
->> 2015-11-12 21:46 GMT-02:00 Satay Epic <satayepic@gmail.com>:
->> > Hello,
->> >
->> > I've an ARM SL3516  board with Linux 2.6.15 and I've tool-chain setup.
->> > I could able to compile the GPL source.  This board has red-boot.
->> >
->> > I would like to update the kernel to 3.8.24.  My first attempt so not
->> > sure about anything I should know, gotchas  etc.
->> >
->> > Any advice about the compilation , config will be appreciated.
->
-> 3.8.24 is also really old already, try going to 4.1 or 4.3 right away,
-> and submit any patches that you might need for integration into
-> mainline Linux once you are done.
->
-> See http://git.openwrt.org/?p=openwrt.git;a=tree;f=target/linux/gemini;h=b74c3d8f0100e2ac8a4d71c4d23c082db2993e63;hb=HEAD
->
-> for a tree that has some of the missing parts for gemini, including a
-> config and some drivers that might be helpful. This is based on 4.1
-> and should be easy enough to forward-port to 4.3 if you want.
->
->> > I tried using the  existing  ".config" but not sure some SL3512
->> > specific options would work?
->
-> Start with the config-4.1 file from openwrt.
->
->> > Looking at the distribution,  I don't see the  "mach-sl2312" listed.
->> > Can you just copy it from the old distribution and does it work this
->> > way?
->> >
->> > There is this "mach-gemini" but it seems only for some W boards.
->
-> mach-gemini is what you want.
->
->         Arnd
+Looks reasonable.
+
+Acked-by: Pavel Machek <pavel@ucw.cz>
+
+> ---
+>  kernel/power/snapshot.c | 4 ++++
+>  1 file changed, 4 insertions(+)
+> 
+> diff --git a/kernel/power/snapshot.c b/kernel/power/snapshot.c
+> index 5235dd4e1e2f..139fc449ad75 100644
+> --- a/kernel/power/snapshot.c
+> +++ b/kernel/power/snapshot.c
+> @@ -1196,9 +1197,12 @@ static unsigned int count_data_pages(void)
+>  static inline void do_copy_page(long *dst, long *src)
+>  {
+>  	int n;
+> +	unsigned long __maybe_unused start = (unsigned long)dst;
+
+Why the "maybe unused"?
+
+>  	for (n = PAGE_SIZE / sizeof(long); n; n--)
+>  		*dst++ = *src++;
+> +
+> +	flush_icache_range(start, start+PAGE_SIZE);
+>  }
+
+									Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
