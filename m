@@ -1,77 +1,39 @@
-From: afenkart@gmail.com (Andreas Fenkart)
-Date: Sat, 14 Nov 2015 00:37:35 +0100
-Subject: [PATCH] ARM: kexec: backup the machine id reported by boot loader
-Message-ID: <1447457855-11099-1-git-send-email-afenkart@gmail.com>
+From: daniel@iogearbox.net (Daniel Borkmann)
+Date: Sat, 14 Nov 2015 01:16:18 +0100
+Subject: [PATCH] bpf, arm64: start flushing icache range from header
+Message-ID: <41c4a481eb665a492c3b2df16af219b1250224a0.1447446460.git.daniel@iogearbox.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Starting a non-devicetree kernel via kexec from a devicetree kernel,
-fails since the machine id as received from the bootloader has been
-overwritten.
+While recently going over ARM64's BPF code, I noticed that the icache
+range we're flushing should start at header already and not at ctx.image.
 
-Signed-off-by: Andreas Fenkart <afenkart@gmail.com>
+Reason is that after b569c1c622c5 ("net: bpf: arm64: address randomize
+and write protect JIT code"), we also want to make sure to flush the
+random-sized trap in front of the start of the actual program (analogous
+to x86). No operational differences from user side.
+
+Signed-off-by: Daniel Borkmann <daniel@iogearbox.net>
+Acked-by: Zi Shen Lim <zlim.lnx@gmail.com>
+Cc: Alexei Starovoitov <ast@kernel.org>
 ---
- arch/arm/include/asm/setup.h    | 1 +
- arch/arm/kernel/machine_kexec.c | 4 ++--
- arch/arm/kernel/setup.c         | 5 +++++
- 3 files changed, 8 insertions(+), 2 deletions(-)
+ ( As arm64 jit fixes seem to go via arm64 tree, sending them here. )
 
-diff --git a/arch/arm/include/asm/setup.h b/arch/arm/include/asm/setup.h
-index e0adb9f..a26165b 100644
---- a/arch/arm/include/asm/setup.h
-+++ b/arch/arm/include/asm/setup.h
-@@ -16,6 +16,7 @@
+ arch/arm64/net/bpf_jit_comp.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm64/net/bpf_jit_comp.c b/arch/arm64/net/bpf_jit_comp.c
+index a44e529..ee06570 100644
+--- a/arch/arm64/net/bpf_jit_comp.c
++++ b/arch/arm64/net/bpf_jit_comp.c
+@@ -740,7 +740,7 @@ void bpf_int_jit_compile(struct bpf_prog *prog)
+ 	if (bpf_jit_enable > 1)
+ 		bpf_jit_dump(prog->len, image_size, 2, ctx.image);
  
- #include <uapi/asm/setup.h>
+-	bpf_flush_icache(ctx.image, ctx.image + ctx.idx);
++	bpf_flush_icache(header, ctx.image + ctx.idx);
  
-+extern unsigned int __machine_arch_type_bootloader;
- 
- #define __tag __used __attribute__((__section__(".taglist.init")))
- #define __tagtable(tag, fn) \
-diff --git a/arch/arm/kernel/machine_kexec.c b/arch/arm/kernel/machine_kexec.c
-index 8bf3b7c..d602b6f 100644
---- a/arch/arm/kernel/machine_kexec.c
-+++ b/arch/arm/kernel/machine_kexec.c
-@@ -15,7 +15,7 @@
- #include <asm/mmu_context.h>
- #include <asm/cacheflush.h>
- #include <asm/fncpy.h>
--#include <asm/mach-types.h>
-+#include <asm/setup.h>
- #include <asm/smp_plat.h>
- #include <asm/system_misc.h>
- 
-@@ -168,7 +168,7 @@ void machine_kexec(struct kimage *image)
- 	set_kernel_text_rw();
- 	kexec_start_address = image->start;
- 	kexec_indirection_page = page_list;
--	kexec_mach_type = machine_arch_type;
-+	kexec_mach_type = __machine_arch_type_bootloader;
- 	kexec_boot_atags = dt_mem ?: image->start - KEXEC_ARM_ZIMAGE_OFFSET
- 				     + KEXEC_ARM_ATAGS_OFFSET;
- 
-diff --git a/arch/arm/kernel/setup.c b/arch/arm/kernel/setup.c
-index 6c777e9..8314e76 100644
---- a/arch/arm/kernel/setup.c
-+++ b/arch/arm/kernel/setup.c
-@@ -83,6 +83,8 @@ extern void setup_dma_zone(const struct machine_desc *desc);
- 
- unsigned int processor_id;
- EXPORT_SYMBOL(processor_id);
-+unsigned int __machine_arch_type_bootloader __read_mostly;
-+EXPORT_SYMBOL(__machine_arch_type_bootloader);
- unsigned int __machine_arch_type __read_mostly;
- EXPORT_SYMBOL(__machine_arch_type);
- unsigned int cacheid __read_mostly;
-@@ -914,6 +916,9 @@ void __init setup_arch(char **cmdline_p)
- {
- 	const struct machine_desc *mdesc;
- 
-+	/* save machine type as received by the boot loader */
-+	__machine_arch_type_bootloader = __machine_arch_type;
-+
- 	setup_processor();
- 	mdesc = setup_machine_fdt(__atags_pointer);
- 	if (!mdesc)
+ 	set_memory_ro((unsigned long)header, header->pages);
+ 	prog->bpf_func = (void *)ctx.image;
 -- 
-2.6.1
+1.9.3
