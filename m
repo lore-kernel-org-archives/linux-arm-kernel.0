@@ -1,29 +1,59 @@
-From: zlim.lnx@gmail.com (Z Lim)
-Date: Fri, 13 Nov 2015 18:39:33 -0800
-Subject: [PATCH V3 2/2] arm64: bpf: make BPF prologue and epilogue align
- with ARM64 AAPCS
-In-Reply-To: <1447438197-31838-1-git-send-email-yang.shi@linaro.org>
-References: <CABg9mct-hnEhvT6y9ZgCC8nMan5YbmByQa_ViUWzeea6ToqG4A@mail.gmail.com>
- <1447438197-31838-1-git-send-email-yang.shi@linaro.org>
-Message-ID: <CABg9mcvomep=M1As_Vj=XuTNk=jiGwXQqQWbjotMXP2csKX=Bg@mail.gmail.com>
+From: wxt@rock-chips.com (Caesar Wang)
+Date: Sat, 14 Nov 2015 14:30:46 +0800
+Subject: [PATCH v4 00/10] Better compatible for the rockchip thermal and
+ support RK3368 SoCs
+In-Reply-To: <20151112182950.GB4361@localhost.localdomain>
+References: <1447044542-30859-1-git-send-email-wxt@rock-chips.com>
+ <20151112182950.GB4361@localhost.localdomain>
+Message-ID: <5646D516.9040404@rock-chips.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Yang, I noticed another thing...
+Eduardo,
 
-On Fri, Nov 13, 2015 at 10:09 AM, Yang Shi <yang.shi@linaro.org> wrote:
-> Save and restore FP/LR in BPF prog prologue and epilogue, save SP to FP
-> in prologue in order to get the correct stack backtrace.
->
-> However, ARM64 JIT used FP (x29) as eBPF fp register, FP is subjected to
-> change during function call so it may cause the BPF prog stack base address
-> change too.
->
-> Use x25 to replace FP as BPF stack base register (fp). Since x25 is callee
-> saved register, so it will keep intact during function call.
+? 2015?11?13? 02:29, Eduardo Valentin ??:
+> On Mon, Nov 09, 2015 at 12:48:52PM +0800, Caesar Wang wrote:
+>> Thank you all for providing inputs and comments on previous versions of
+>> this patchset.
+>> Especially thanks to the (Eduardo, Dmitry, Heiko,....).
+>>
+>> This series patchs are working for RK3368 on Rockchip platform.
+> Do you have any results on existing support? Is the driver still in one
+> piece for rk3288?
 
-Can you please add save/restore for x25 also? :)
+Yep. that's still happy work for rk3288 SoCs.
 
-> It is initialized in BPF prog prologue when BPF prog is started to run
-> everytime. When BPF prog exits, it could be just tossed.
+$while true; do grep "" /sys/class/thermal/thermal_zone[1-2]/temp; sleep 
+.5; done
+...
+/sys/class/thermal/thermal_zone1/temp:70833
+/sys/class/thermal/thermal_zone2/temp:69615
+/sys/class/thermal/thermal_zone1/temp:70416
+/sys/class/thermal/thermal_zone2/temp:68846
+/sys/class/thermal/thermal_zone1/temp:70416
+/sys/class/thermal/thermal_zone2/temp:70833
+/sys/class/thermal/thermal_zone1/temp:70833
+/sys/class/thermal/thermal_zone2/temp:69615
+/sys/class/thermal/thermal_zone1/temp:71666
+/sys/class/thermal/thermal_zone2/temp:69615
+/sys/class/thermal/thermal_zone1/temp:70416
+/sys/class/thermal/thermal_zone2/temp:69615
+/sys/class/thermal/thermal_zone1/temp:70833
+
+> I am planing to send your series in next rc cycles. It won't appear in
+> linux-next until merge window finishes.
+
+Thanks!
 >
+> BR,
+>
+> Eduardo Valentin
+>
+> _______________________________________________
+> Linux-rockchip mailing list
+> Linux-rockchip at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-rockchip
+
+
+-- 
+caesar wang | software engineer | wxt at rock-chip.com
