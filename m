@@ -1,41 +1,61 @@
-From: wxt@rock-chips.com (Caesar Wang)
-Date: Sat, 14 Nov 2015 14:31:50 +0800
-Subject: [PATCH v4 00/10] Better compatible for the rockchip thermal and
- support RK3368 SoCs
-In-Reply-To: <3751572.i2tVkgaN1o@phil>
-References: <1447044542-30859-1-git-send-email-wxt@rock-chips.com>
- <20151112182950.GB4361@localhost.localdomain> <3751572.i2tVkgaN1o@phil>
-Message-ID: <5646D556.1010803@rock-chips.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Sat, 14 Nov 2015 08:02:37 +0100
+Subject: [PATCH 2/2] arm: kvm: Fix STRICT_MM_TYPECHECK errors
+In-Reply-To: <1447207401-12023-2-git-send-email-labbott@fedoraproject.org>
+References: <1447207401-12023-1-git-send-email-labbott@fedoraproject.org>
+ <1447207401-12023-2-git-send-email-labbott@fedoraproject.org>
+Message-ID: <CAKv+Gu-2yx2j-ke2DNTq7aiNyzrog2fQxsWaSwwF1FPUR-nr0w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-? 2015?11?13? 06:14, Heiko Stuebner ??:
-> Hi Eduardo,
+On 11 November 2015 at 03:03, Laura Abbott <labbott@fedoraproject.org> wrote:
 >
-> Am Donnerstag, 12. November 2015, 10:29:52 schrieb Eduardo Valentin:
->> On Mon, Nov 09, 2015 at 12:48:52PM +0800, Caesar Wang wrote:
->>> Thank you all for providing inputs and comments on previous versions of
->>> this patchset.
->>> Especially thanks to the (Eduardo, Dmitry, Heiko,....).
->>>
->>> This series patchs are working for RK3368 on Rockchip platform.
->> Do you have any results on existing support? Is the driver still in one
->> piece for rk3288?
-> I've tested this series on a rk3288-veyron-jerry and everything still
-> runs just fine, so
+> PAGE_S2_DEVICE is a pgprot val and needs to be accessed using the proper
+> accessors. Switch to these accessors to avoid errors with
+> STRICT_MM_TYPECHECK.
 >
-> Tested-by: Heiko Stuebner <heiko@sntech.de>
+> Signed-off-by: Laura Abbott <labbott@fedoraproject.org>
+> ---
+> Found in the course of other work
 
-Thanks Heiko for testing.:-)
+Already fixed here:
+http://thread.gmane.org/gmane.comp.emulators.kvm.devel/142953
 
+Looks like we may need a mutex :-)
+
+> ---
+>  arch/arm/kvm/mmu.c | 6 ++++--
+>  1 file changed, 4 insertions(+), 2 deletions(-)
+>
+> diff --git a/arch/arm/kvm/mmu.c b/arch/arm/kvm/mmu.c
+> index 6984342..43f8162 100644
+> --- a/arch/arm/kvm/mmu.c
+> +++ b/arch/arm/kvm/mmu.c
+> @@ -213,7 +213,8 @@ static void unmap_ptes(struct kvm *kvm, pmd_t *pmd,
+>                         kvm_tlb_flush_vmid_ipa(kvm, addr);
+>
+>                         /* No need to invalidate the cache for device mappings */
+> -                       if ((pte_val(old_pte) & PAGE_S2_DEVICE) != PAGE_S2_DEVICE)
+> +                       if ((pte_val(old_pte) & pgprot_val(PAGE_S2_DEVICE)) !=
+> +                            pgprot_val(PAGE_S2_DEVICE))
+>                                 kvm_flush_dcache_pte(old_pte);
+>
+>                         put_page(virt_to_page(pte));
+> @@ -306,7 +307,8 @@ static void stage2_flush_ptes(struct kvm *kvm, pmd_t *pmd,
+>         pte = pte_offset_kernel(pmd, addr);
+>         do {
+>                 if (!pte_none(*pte) &&
+> -                   (pte_val(*pte) & PAGE_S2_DEVICE) != PAGE_S2_DEVICE)
+> +                   (pte_val(*pte) & pgprot_val(PAGE_S2_DEVICE)) !=
+> +                    pgprot_val(PAGE_S2_DEVICE))
+>                         kvm_flush_dcache_pte(*pte);
+>         } while (pte++, addr += PAGE_SIZE, addr != end);
+>  }
+> --
+> 2.5.0
+>
 >
 > _______________________________________________
-> Linux-rockchip mailing list
-> Linux-rockchip at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-rockchip
-
-
--- 
-caesar wang | software engineer | wxt at rock-chip.com
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
