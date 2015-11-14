@@ -1,11 +1,11 @@
 From: anton.bondarenko.sama@gmail.com (Anton Bondarenko)
-Date: Sat, 14 Nov 2015 11:03:41 +0100
+Date: Sat, 14 Nov 2015 11:05:31 +0100
 Subject: [PATCH v3 6/7] spi: imx: return error from dma channel request
 In-Reply-To: <563B7D1C.7010105@gmail.com>
 References: <1446388901-6073-1-git-send-email-anton.bondarenko.sama@gmail.com>
  <1446388901-6073-7-git-send-email-anton.bondarenko.sama@gmail.com>
  <20151105085637.GJ8526@pengutronix.de> <563B7D1C.7010105@gmail.com>
-Message-ID: <564706FD.5060305@gmail.com>
+Message-ID: <5647076B.3080709@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
