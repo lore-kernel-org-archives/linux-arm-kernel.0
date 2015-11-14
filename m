@@ -1,160 +1,50 @@
-From: jic23@kernel.org (Jonathan Cameron)
-Date: Sat, 14 Nov 2015 17:49:14 +0000
-Subject: [PATCH v2 1/4] iio: adc: add IMX7D ADC driver support
-In-Reply-To: <5645B2E8.8070906@metafoo.de>
-References: <1447075704-4605-1-git-send-email-haibo.chen@freescale.com>
- <1447075704-4605-2-git-send-email-haibo.chen@freescale.com>
- <56420606.4070505@metafoo.de>
- <20151113093934.GA21068@b51421-server.ap.freescale.net>
- <5645B2E8.8070906@metafoo.de>
-Message-ID: <5647741A.1010905@kernel.org>
+From: satayepic@gmail.com (Satay Epic)
+Date: Sat, 14 Nov 2015 11:57:23 -0800
+Subject: ARM Linux Kernel Update
+In-Reply-To: <9020659.GYXS8BbG6X@wuerfel>
+References: <CADohWC9sCwFbhtryZi-EbOvcBayh_6O2bEjzFaLMxHYXYBEhQg@mail.gmail.com>
+ <CAMu38xLbRcOfdGLF+ozMA7G-tqzqykvsaDToY43sdMO4FP4b5w@mail.gmail.com>
+ <9020659.GYXS8BbG6X@wuerfel>
+Message-ID: <CADohWC_Oh2w=bGgxPnVZWnouWS2k=1PAk2M3cV0qKr5jFX_o5Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13/11/15 09:52, Lars-Peter Clausen wrote:
-> On 11/13/2015 10:39 AM, Haibo Chen wrote:
-> [...]
->>>> +static void imx7d_adc_feature_config(struct imx7d_adc *info)
->>>> +{
->>>> +	info->adc_feature.clk_pre_div = IMX7D_ADC_ANALOG_CLK_PRE_DIV_4;
->>>> +	info->adc_feature.avg_num = IMX7D_ADC_AVERAGE_NUM_32;
->>>> +	info->adc_feature.core_time_unit = 1;
->>>> +	info->adc_feature.average_en = true;
->>>
->>> What's the plan for these? Right now they are always initialized to the same
->>> static value.
->>>
->>
->> In future, we can get these values from dts file, currently we just use the static value.
-> 
-> Those seem to be software configuration values though, not part of hardware
-> description.
-> 
->>
->>>
->>>> +}
->>> [...]
->>>> +static int imx7d_adc_read_raw(struct iio_dev *indio_dev,
->>>> +			struct iio_chan_spec const *chan,
->>>> +			int *val,
->>>> +			int *val2,
->>>> +			long mask)
->>>> +{
->>>> +	struct imx7d_adc *info = iio_priv(indio_dev);
->>>> +
->>>> +	u32 channel;
->>>> +	long ret;
->>>> +
->>>> +	switch (mask) {
->>>> +	case IIO_CHAN_INFO_RAW:
->>>> +		mutex_lock(&indio_dev->mlock);
->>>> +		reinit_completion(&info->completion);
->>>> +
->>>> +		channel = (chan->channel) & 0x0f;
->>>> +		info->channel = channel;
->>>> +		imx7d_adc_channel_set(info);
->>>
->>> How about just passing channel directy adc_channel_set() instead of doing it
->>> implicitly through the info struct?
->>>
->>
->> I think there is no difference, besides, using this parameter info struct can keep align with other functions.
->> eg.  imx7d_adc_sample_set(), imx7d_adc_hw_init(), imx7d_adc_get_sample_rate(), all these functions have the same parameter.
->>
->>> [...]
->>>> +static irqreturn_t imx7d_adc_isr(int irq, void *dev_id)
->>>> +{
->>>> +	struct imx7d_adc *info = (struct imx7d_adc *)dev_id;
->>>> +	int status;
->>>> +
->>>> +	status = readl(info->regs + IMX7D_REG_ADC_INT_STATUS);
->>>> +	if (status & IMX7D_REG_ADC_INT_STATUS_CHANNEL_INT_STATUS) {
->>>> +		info->value = imx7d_adc_read_data(info);
->>>> +		complete(&info->completion);
->>>> +	}
->>>> +	writel(0, info->regs + IMX7D_REG_ADC_INT_STATUS);
->>>
->>> Is the hardware really this broken? If the interrupt happens between reading
->>> the status register and clearing it here it will be missed.
->>>
->>
->> I think interrupt can't happen between reading the status register and clearing it.
->> Because in function imx7d_adc_read_raw(), we call the function 
->> imx7d_adc_channel_set(info), in this function, we config the register
->> REG_ADC_CH_A\B\C\D_CFG1 and REG_ADC_CH_A\B\C\D_CFG2, only when these registers
->> is configed, ADC start a conversion. Once the conversion complete, ADC trigger an 
->> interrupt, and call the imx7d_adc_isr().
-> 
-> Well an interrupt can always happen, its running fully asynchronous to the
-> CPU. If you have multiple interrupt sources enabled and the first one fires
-> and you run then start the irq handler, read the status register, now the
-> second irq sources fires, and then you clear the status interrupt register.
-> This means the driver will not see the irq from the second source.
-I'd agree with this, would normally expect to see only the relevant parts of the
-register 'cleared'.  Usually this is done by explicitly picking those bits
-out (normally writing 1 to the bit to clear the interrupt source).
+Thanks Arnd. I will try it out.
 
-If there is anything else of interest in that register this is nasty!
-
-Hmm. looking at the bits you have defined and the way it is used you only
-ever have one interrupt at a time possibly occurring at the moment?
-
-If this is actually the case, then why read the register at all?
-
-If there is anything in the other bits of that register it would be interesting to
-know what is there!
-> 
->>
->>>> +
->>>> +	return IRQ_HANDLED;
->>>
->>> You should only return IRQ_HANDLED if you actually handled are interrupt.
->>>
->>
->> Here in the interrupt, we just handle the channel conversion finished flag, for
->> other flag, ignore them this time, Will add other flag in future.
-> 
-> Yeah, but if you don't handle any interrupt you should return IRQ_NONE. This
-> will make sure that the system can recover in case the hardware (or the
-> driver) is broken and generates unexpected interrupts. If there are a 1000
-> or so IRQ_NONEs in a row in a short time frame the kernel will disable the IRQ.
-> 
->>> [...]
->>>> +	ret  = of_property_read_u32(pdev->dev.of_node,
->>>
->>> Extra space.
->>>
->>>> +					"num-channels", &channels);
->>>
->>> What decides how many channels are in use?
->>>
->>
->> The board decides the channel number.
->> In dts file, there is a line:     num-channels = <4>;
-> 
-> Yes, but what decides how this property should be configured?
-> 
->>
->>
->>>> +	if (ret)
->>>> +		channels = ARRAY_SIZE(imx7d_adc_iio_channels);
->>>> +
->>>> +	indio_dev->name = dev_name(&pdev->dev);
->>>> +	indio_dev->dev.parent = &pdev->dev;
->>>> +	indio_dev->dev.of_node = pdev->dev.of_node;
->>>> +	indio_dev->info = &imx7d_adc_iio_info;
->>>> +	indio_dev->modes = INDIO_DIRECT_MODE;
->>>> +	indio_dev->channels = imx7d_adc_iio_channels;
->>>> +	indio_dev->num_channels = (int)channels;
->>>
->>> I don't think you need the case here.
->>>
->>
->> Sorry, can't get your point, you mean I should not indio_dev-> ?
-> 
-> Sorry, I meant the (int) cast.
-> 
->>
->>>> [...]
->>
-> 
+On Fri, Nov 13, 2015 at 1:40 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Thursday 12 November 2015 22:43:53 Albino B Neto wrote:
+>> 2015-11-12 21:46 GMT-02:00 Satay Epic <satayepic@gmail.com>:
+>> > Hello,
+>> >
+>> > I've an ARM SL3516  board with Linux 2.6.15 and I've tool-chain setup.
+>> > I could able to compile the GPL source.  This board has red-boot.
+>> >
+>> > I would like to update the kernel to 3.8.24.  My first attempt so not
+>> > sure about anything I should know, gotchas  etc.
+>> >
+>> > Any advice about the compilation , config will be appreciated.
+>
+> 3.8.24 is also really old already, try going to 4.1 or 4.3 right away,
+> and submit any patches that you might need for integration into
+> mainline Linux once you are done.
+>
+> See http://git.openwrt.org/?p=openwrt.git;a=tree;f=target/linux/gemini;h=b74c3d8f0100e2ac8a4d71c4d23c082db2993e63;hb=HEAD
+>
+> for a tree that has some of the missing parts for gemini, including a
+> config and some drivers that might be helpful. This is based on 4.1
+> and should be easy enough to forward-port to 4.3 if you want.
+>
+>> > I tried using the  existing  ".config" but not sure some SL3512
+>> > specific options would work?
+>
+> Start with the config-4.1 file from openwrt.
+>
+>> > Looking at the distribution,  I don't see the  "mach-sl2312" listed.
+>> > Can you just copy it from the old distribution and does it work this
+>> > way?
+>> >
+>> > There is this "mach-gemini" but it seems only for some W boards.
+>
+> mach-gemini is what you want.
+>
+>         Arnd
