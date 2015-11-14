@@ -1,39 +1,60 @@
-From: daniel@iogearbox.net (Daniel Borkmann)
-Date: Sat, 14 Nov 2015 01:26:53 +0100
-Subject: [PATCH net] bpf, arm: start flushing icache range from header
-Message-ID: <971980449d680e6b26e273130d74546c5148893c.1447446440.git.daniel@iogearbox.net>
+From: hongzhou.yang@mediatek.com (Hongzhou Yang)
+Date: Fri, 13 Nov 2015 16:49:24 -0800
+Subject: [PATCH] pinctrl: mediatek: Add get_direction support.
+Message-ID: <1447462164-34639-1-git-send-email-hongzhou.yang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-During review I noticed that the icache range we're flushing should
-start at header already and not at ctx.image.
+Since Linux gpio framework return 0 for output, 1 for input.
+But HW use 0 stands for input, and 1 stands for output.
+So use negative to correct it.
 
-Reason is that after 55309dd3d4cd ("net: bpf: arm: address randomize
-and write protect JIT code"), we also want to make sure to flush the
-random-sized trap in front of the start of the actual program (analogous
-to x86). No operational differences from user side.
+And gpio_chip.get is used to get input value, no need to get
+output value, so removing it.
 
-Signed-off-by: Daniel Borkmann <daniel@iogearbox.net>
-Tested-by: Nicolas Schichan <nschichan@freebox.fr>
-Cc: Alexei Starovoitov <ast@kernel.org>
+Signed-off-by: Hongzhou Yang <hongzhou.yang@mediatek.com>
 ---
- ( As arm32 fixes usually go via Dave's tree, targeting -net. )
+ Add get direction support.
+ Remove gpio_chip.get value for output direction.
 
- arch/arm/net/bpf_jit_32.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/pinctrl/mediatek/pinctrl-mtk-common.c |   11 ++++-------
+ 1 file changed, 4 insertions(+), 7 deletions(-)
 
-diff --git a/arch/arm/net/bpf_jit_32.c b/arch/arm/net/bpf_jit_32.c
-index 2f4b14c..591f9db 100644
---- a/arch/arm/net/bpf_jit_32.c
-+++ b/arch/arm/net/bpf_jit_32.c
-@@ -1061,7 +1061,7 @@ void bpf_jit_compile(struct bpf_prog *fp)
- 	}
- 	build_epilogue(&ctx);
+diff --git a/drivers/pinctrl/mediatek/pinctrl-mtk-common.c b/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
+index 7726c6c..bbf0230 100644
+--- a/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
++++ b/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
+@@ -757,7 +757,7 @@ static int mtk_gpio_get_direction(struct gpio_chip *chip, unsigned offset)
+ 	reg_addr =  mtk_get_port(pctl, offset) + pctl->devdata->dir_offset;
+ 	bit = BIT(offset & 0xf);
+ 	regmap_read(pctl->regmap1, reg_addr, &read_val);
+-	return !!(read_val & bit);
++	return !(read_val & bit);
+ }
  
--	flush_icache_range((u32)ctx.target, (u32)(ctx.target + ctx.idx));
-+	flush_icache_range((u32)header, (u32)(ctx.target + ctx.idx));
+ static int mtk_gpio_get(struct gpio_chip *chip, unsigned offset)
+@@ -767,12 +767,8 @@ static int mtk_gpio_get(struct gpio_chip *chip, unsigned offset)
+ 	unsigned int read_val = 0;
+ 	struct mtk_pinctrl *pctl = dev_get_drvdata(chip->dev);
  
- #if __LINUX_ARM_ARCH__ < 7
- 	if (ctx.imm_count)
+-	if (mtk_gpio_get_direction(chip, offset))
+-		reg_addr = mtk_get_port(pctl, offset) +
+-			pctl->devdata->dout_offset;
+-	else
+-		reg_addr = mtk_get_port(pctl, offset) +
+-			pctl->devdata->din_offset;
++	reg_addr = mtk_get_port(pctl, offset) +
++		pctl->devdata->din_offset;
+ 
+ 	bit = BIT(offset & 0xf);
+ 	regmap_read(pctl->regmap1, reg_addr, &read_val);
+@@ -1007,6 +1003,7 @@ static struct gpio_chip mtk_gpio_chip = {
+ 	.owner			= THIS_MODULE,
+ 	.request		= mtk_gpio_request,
+ 	.free			= mtk_gpio_free,
++	.get_direction		= mtk_gpio_get_direction,
+ 	.direction_input	= mtk_gpio_direction_input,
+ 	.direction_output	= mtk_gpio_direction_output,
+ 	.get			= mtk_gpio_get,
 -- 
-1.9.3
+1.7.9.5
