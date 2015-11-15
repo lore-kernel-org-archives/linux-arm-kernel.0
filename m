@@ -1,40 +1,73 @@
-From: lars@metafoo.de (Lars-Peter Clausen)
-Date: Sun, 15 Nov 2015 21:19:38 +0100
-Subject: [PATCH] iio: adc: xilinx: constify iio_buffer_setup_ops structure
-In-Reply-To: <1447617602-12922-1-git-send-email-Julia.Lawall@lip6.fr>
-References: <1447617602-12922-1-git-send-email-Julia.Lawall@lip6.fr>
-Message-ID: <5648E8DA.3070509@metafoo.de>
+From: Julia.Lawall@lip6.fr (Julia Lawall)
+Date: Sun, 15 Nov 2015 21:08:23 +0100
+Subject: [PATCH] drivers/media/platform/s5p-tv: constify mxr_layer_ops
+ structures
+Message-ID: <1447618103-20329-1-git-send-email-Julia.Lawall@lip6.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/15/2015 09:00 PM, Julia Lawall wrote:
-> The iio_buffer_setup_ops structures are never modified, so declare this one
-> as const, like the others.
-> 
-> Done with the help of Coccinelle.
-> 
-> Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
+The mxr_layer_ops structures are never modified, so declare them as const.
 
-Acked-by: Lars-Peter Clausen <lars@metafoo.de>
+Done with the help of Coccinelle.
 
-Thanks.
+Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
 
-> 
-> ---
->  drivers/iio/adc/xilinx-xadc-core.c |    2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/iio/adc/xilinx-xadc-core.c b/drivers/iio/adc/xilinx-xadc-core.c
-> index 0370624..c2b5f10 100644
-> --- a/drivers/iio/adc/xilinx-xadc-core.c
-> +++ b/drivers/iio/adc/xilinx-xadc-core.c
-> @@ -803,7 +803,7 @@ err:
->  	return ret;
->  }
->  
-> -static struct iio_buffer_setup_ops xadc_buffer_ops = {
-> +static const struct iio_buffer_setup_ops xadc_buffer_ops = {
->  	.preenable = &xadc_preenable,
->  	.postenable = &iio_triggered_buffer_postenable,
->  	.predisable = &iio_triggered_buffer_predisable,
-> 
+---
+ drivers/media/platform/s5p-tv/mixer.h           |    2 +-
+ drivers/media/platform/s5p-tv/mixer_grp_layer.c |    2 +-
+ drivers/media/platform/s5p-tv/mixer_video.c     |    2 +-
+ drivers/media/platform/s5p-tv/mixer_vp_layer.c  |    2 +-
+ 4 files changed, 4 insertions(+), 4 deletions(-)
+
+diff --git a/drivers/media/platform/s5p-tv/mixer.h b/drivers/media/platform/s5p-tv/mixer.h
+index 42cd270..4dd62a9 100644
+--- a/drivers/media/platform/s5p-tv/mixer.h
++++ b/drivers/media/platform/s5p-tv/mixer.h
+@@ -300,7 +300,7 @@ void mxr_release_video(struct mxr_device *mdev);
+ struct mxr_layer *mxr_graph_layer_create(struct mxr_device *mdev, int idx);
+ struct mxr_layer *mxr_vp_layer_create(struct mxr_device *mdev, int idx);
+ struct mxr_layer *mxr_base_layer_create(struct mxr_device *mdev,
+-	int idx, char *name, struct mxr_layer_ops *ops);
++	int idx, char *name, const struct mxr_layer_ops *ops);
+ 
+ void mxr_base_layer_release(struct mxr_layer *layer);
+ void mxr_layer_release(struct mxr_layer *layer);
+diff --git a/drivers/media/platform/s5p-tv/mixer_grp_layer.c b/drivers/media/platform/s5p-tv/mixer_grp_layer.c
+index db3163b..d4d2564 100644
+--- a/drivers/media/platform/s5p-tv/mixer_grp_layer.c
++++ b/drivers/media/platform/s5p-tv/mixer_grp_layer.c
+@@ -235,7 +235,7 @@ struct mxr_layer *mxr_graph_layer_create(struct mxr_device *mdev, int idx)
+ {
+ 	struct mxr_layer *layer;
+ 	int ret;
+-	struct mxr_layer_ops ops = {
++	const struct mxr_layer_ops ops = {
+ 		.release = mxr_graph_layer_release,
+ 		.buffer_set = mxr_graph_buffer_set,
+ 		.stream_set = mxr_graph_stream_set,
+diff --git a/drivers/media/platform/s5p-tv/mixer_video.c b/drivers/media/platform/s5p-tv/mixer_video.c
+index dc1c679..abcc36a 100644
+--- a/drivers/media/platform/s5p-tv/mixer_video.c
++++ b/drivers/media/platform/s5p-tv/mixer_video.c
+@@ -1070,7 +1070,7 @@ static void mxr_vfd_release(struct video_device *vdev)
+ }
+ 
+ struct mxr_layer *mxr_base_layer_create(struct mxr_device *mdev,
+-	int idx, char *name, struct mxr_layer_ops *ops)
++	int idx, char *name, const struct mxr_layer_ops *ops)
+ {
+ 	struct mxr_layer *layer;
+ 
+diff --git a/drivers/media/platform/s5p-tv/mixer_vp_layer.c b/drivers/media/platform/s5p-tv/mixer_vp_layer.c
+index dd002a4..6fa6f67 100644
+--- a/drivers/media/platform/s5p-tv/mixer_vp_layer.c
++++ b/drivers/media/platform/s5p-tv/mixer_vp_layer.c
+@@ -207,7 +207,7 @@ struct mxr_layer *mxr_vp_layer_create(struct mxr_device *mdev, int idx)
+ {
+ 	struct mxr_layer *layer;
+ 	int ret;
+-	struct mxr_layer_ops ops = {
++	const struct mxr_layer_ops ops = {
+ 		.release = mxr_vp_layer_release,
+ 		.buffer_set = mxr_vp_buffer_set,
+ 		.stream_set = mxr_vp_stream_set,
