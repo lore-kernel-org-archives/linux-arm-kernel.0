@@ -1,61 +1,63 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Sun, 15 Nov 2015 08:38:25 +0100
-Subject: [PATCHv2] arm64: Fix R/O permissions in mark_rodata_ro
-In-Reply-To: <1447359670-23652-1-git-send-email-labbott@fedoraproject.org>
-References: <CAKv+Gu8Z7bkogGUGcNbuSoEbUBAwVmtFNhX9VcbypucaUGd+HQ@mail.gmail.com>
- <1447359670-23652-1-git-send-email-labbott@fedoraproject.org>
-Message-ID: <CAKv+Gu_xkiH8w2gor8SEp4y2UV9KSKTp9Kjtr6C9aU7XduZ06g@mail.gmail.com>
+From: geert@linux-m68k.org (Geert Uytterhoeven)
+Date: Sun, 15 Nov 2015 10:06:07 +0100
+Subject: [PATCH 1/3] mtd: create a partition type device tree binding
+In-Reply-To: <CAL_JsqL2F3p7qBPbOiGytVyzF_aNLWbrCT0mAX1WZo6SxE3JoA@mail.gmail.com>
+References: <1446123152-22666-1-git-send-email-linus.walleij@linaro.org>
+ <20151029162908.GA13275@localhost>
+ <CACRpkdYS5Jf8UC2K0bNdEQZDjTeZZx44Uu-kkof+9E=4Ny0oDg@mail.gmail.com>
+ <20151030175145.GF13239@google.com>
+ <CAL_JsqL2F3p7qBPbOiGytVyzF_aNLWbrCT0mAX1WZo6SxE3JoA@mail.gmail.com>
+Message-ID: <CAMuHMdVBdnjH0xQoMY7yT6Q-Z4bnukWgjBcWNYzhhNpO6263Rg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 12 November 2015 at 21:21, Laura Abbott <labbott@fedoraproject.org> wrote:
-> The permissions in mark_rodata_ro trigger a build error
-> with STRICT_MM_TYPECHECKS. Fix this by introducing
-> PAGE_KERNEL_ROX for the same reasons as PAGE_KERNEL_RO.
+On Fri, Nov 6, 2015 at 3:13 PM, Rob Herring <robh@kernel.org> wrote:
+> On Fri, Oct 30, 2015 at 12:51 PM, Brian Norris
+> <computersforpeace@gmail.com> wrote:
+>> On Fri, Oct 30, 2015 at 03:00:57PM +0100, Linus Walleij wrote:
+>>> On Thu, Oct 29, 2015 at 5:29 PM, Brian Norris
+>>> <computersforpeace@gmail.com> wrote:
+>>>
+>>> >> +Required properties:
+>>> >> +- partition-type : the type of partition. Only one type can be specified.
+>>> >
+>>> > You're supporting this as a list property (for future expansion,
+>>> > presumably), so I can only assume the "only one type" is referring to
+>>> > the number of different parsers available currently, not the behavior of
+>>> > the property itself?
+>>>
+>>> I was thinking that it would not be a list actually.
 
-Forgive the bikeshedding but perhaps PAGE_KERNEL_EXEC_RO is more consistent?
+Why not? It is (was) not uncommon to have multiple partition table types on
+hard disks (e.g. bsd disklabel and msdos and/or amiga rdb).
 
-> From Ard:
+>>> The reason being that if you're anyways going to the trouble of
+>>> specifying exactly what partition type is going to be used, you're
+>>> not really interested in specifying a few different ones, you know
+>>> exactly what type it is going to be.
+>>
+>> OK, that makes sense. I think it's still *possible* that a board might
+>> have the option of more than one partition parser, and so they might
+>> just include both in the DTS, but that seems unlikely and so it makes
+>> sense not to (over)engineer for it before it's needed. Anyway, your
+>> binding can easily be expanded in the future if needed.
 >
-> "PAGE_KERNEL_EXEC has PTE_WRITE set as well, making the range
-> writeable under the ARMv8.1 DBM feature, that manages the
-> dirty bit in hardware (writing to a page with the PTE_RDONLY
-> and PTE_WRITE bits both set will clear the PTE_RDONLY bit in that case)"
->
-> Signed-off-by: Laura Abbott <labbott@fedoraproject.org>
+> Since we now have partitions contained in a sub node, how about using
+> compatible for that sub node instead.
 
-Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+And "compatible" supports a list of multiple values.
 
-> ---
->  arch/arm64/include/asm/pgtable.h | 1 +
->  arch/arm64/mm/mmu.c              | 2 +-
->  2 files changed, 2 insertions(+), 1 deletion(-)
->
-> diff --git a/arch/arm64/include/asm/pgtable.h b/arch/arm64/include/asm/pgtable.h
-> index 9819a94..7e074f9 100644
-> --- a/arch/arm64/include/asm/pgtable.h
-> +++ b/arch/arm64/include/asm/pgtable.h
-> @@ -81,6 +81,7 @@ extern void __pgd_error(const char *file, int line, unsigned long val);
->
->  #define PAGE_KERNEL            __pgprot(_PAGE_DEFAULT | PTE_PXN | PTE_UXN | PTE_DIRTY | PTE_WRITE)
->  #define PAGE_KERNEL_RO         __pgprot(_PAGE_DEFAULT | PTE_PXN | PTE_UXN | PTE_DIRTY | PTE_RDONLY)
-> +#define PAGE_KERNEL_ROX        __pgprot(_PAGE_DEFAULT | PTE_UXN | PTE_DIRTY | PTE_RDONLY)
->  #define PAGE_KERNEL_EXEC       __pgprot(_PAGE_DEFAULT | PTE_UXN | PTE_DIRTY | PTE_WRITE)
->  #define PAGE_KERNEL_EXEC_CONT  __pgprot(_PAGE_DEFAULT | PTE_UXN | PTE_DIRTY | PTE_WRITE | PTE_CONT)
->
-> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-> index 9ca5996..6598c48 100644
-> --- a/arch/arm64/mm/mmu.c
-> +++ b/arch/arm64/mm/mmu.c
-> @@ -475,7 +475,7 @@ void mark_rodata_ro(void)
->  {
->         create_mapping_late(__pa(_stext), (unsigned long)_stext,
->                                 (unsigned long)_etext - (unsigned long)_stext,
-> -                               PAGE_KERNEL_EXEC | PTE_RDONLY);
-> +                               PAGE_KERNEL_ROX);
->
->  }
->  #endif
-> --
-> 2.5.0
->
+BTW, this means it also (can) becomes more generic. Will it be applicable
+to other block devices (e.g. hard disks), too?
+Integration with block/partitions?
+
+Gr{oetje,eeting}s,
+
+                        Geert
+
+--
+Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
+
+In personal conversations with technical people, I call myself a hacker. But
+when I'm talking to journalists I just say "programmer" or something like that.
+                                -- Linus Torvalds
