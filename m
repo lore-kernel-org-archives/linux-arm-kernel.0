@@ -1,50 +1,29 @@
-From: m.smarduch@samsung.com (Mario Smarduch)
-Date: Sat, 14 Nov 2015 15:04:23 -0800
-Subject: [PATCH 3/3] KVM/arm64: enable enhanced armv8 fp/simd lazy switch
-In-Reply-To: <20151110111822.GC12968@cbox>
-References: <1446242193-8424-1-git-send-email-m.smarduch@samsung.com>
- <1446242193-8424-4-git-send-email-m.smarduch@samsung.com>
- <20151105150255.GD5819@cbox> <5641288B.90105@samsung.com>
- <20151110111822.GC12968@cbox>
-Message-ID: <5647BDF7.5070209@samsung.com>
+From: dgilbert@interlog.com (Douglas Gilbert)
+Date: Sat, 14 Nov 2015 19:02:54 -0500
+Subject: [PATCH] Atmel USB High speed device port, speed fix
+Message-ID: <5647CBAE.4070908@interlog.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Following changes that appeared in lk 4.0.0, the gadget udc driver for
+some ARM based Atmel SoCs (e.g. at91sam9x5 and sama5d3 families)
+incorrectly deduced full-speed USB link speed even when the hardware
+had negotiated a high-speed link. The fix is to make sure that the
+UDPHS Interrupt Enable Register value does not mask the SPEED bit
+in the Interrupt Status Register.
+
+For a mass storage gadget this problem lead to failures when the host
+had a USB 3 port with the xhci_hcd driver. If the host was a USB 2
+port using the ehci_hcd driver then the mass storage gadget worked
+(but probably at a lower speed than it should have).
 
 
-On 11/10/2015 3:18 AM, Christoffer Dall wrote:
-> On Mon, Nov 09, 2015 at 03:13:15PM -0800, Mario Smarduch wrote:
->>
->>
->> On 11/5/2015 7:02 AM, Christoffer Dall wrote:
->>> On Fri, Oct 30, 2015 at 02:56:33PM -0700, Mario Smarduch wrote:
-[....]
->> kern_hyp_va x0
->> add x2, x0, #VCPU_CONTEXT
->> mrs x1, fpexec32_el2
->> str x1, [x2, #CPU_SYSREG_OFFSET(FPEXC32_EL2)]
->> ret
->>
->> Of course each hyp call has additional overhead, at a high exit to
->> vcpu_put ratio hyp call appears better. But all this is very
->> highly dependent on exit rate and fp/simd usage. IMO hyp call
->> works better under extreme loads should be pretty close
->> for general loads.
->>
->> Any thoughts?
->>
-> I think the typical case will be lots of exits and few
-> vcpu_load/vcpu_put, and I think it's reasonable to write the code that
-> way.
-
-Yes, especially for RT guests where vCPU is pinned.
-
-Thanks.
-> 
-> That should also be much better for VHE.
-> 
-> So I would go that direction.
-> 
-> Thanks,
-> -Christoffer
-> 
+Signed-of-by: Douglas Gilbert <dgilbert@interlog.com>
+Cc: <stable@vger.kernel.org> #4.0+
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: atmel_udhs_int_mask.patch
+Type: text/x-patch
+Size: 553 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151114/264e3f38/attachment.bin>
