@@ -1,197 +1,44 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Sun, 15 Nov 2015 20:46:14 +0100
-Subject: [PATCH 2/5] phy-sun4i-usb: Add support for the host usb-phys found on
- the H3 SoC
+Date: Sun, 15 Nov 2015 20:46:15 +0100
+Subject: [PATCH 3/5] ARM: dts: sun8i: Add support for H3 usb clocks
 In-Reply-To: <1447616777-24660-1-git-send-email-hdegoede@redhat.com>
 References: <1447616777-24660-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1447616777-24660-2-git-send-email-hdegoede@redhat.com>
+Message-ID: <1447616777-24660-3-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Reinder de Haan <patchesrdh@mveas.com>
 
-Note this commit only adds support for phys 1-3, phy 0, the otg phy, is
-not yet (fully) supported after this commit.
+Add a node describing the usb-clks found on the H3.
 
 Signed-off-by: Reinder de Haan <patchesrdh@mveas.com>
 Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 ---
- .../devicetree/bindings/phy/sun4i-usb-phy.txt      |  1 +
- drivers/phy/phy-sun4i-usb.c                        | 67 +++++++++++++++++-----
- 2 files changed, 53 insertions(+), 15 deletions(-)
+ arch/arm/boot/dts/sun8i-h3.dtsi | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
-diff --git a/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt b/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt
-index 0cebf74..95736d7 100644
---- a/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt
-+++ b/Documentation/devicetree/bindings/phy/sun4i-usb-phy.txt
-@@ -9,6 +9,7 @@ Required properties:
-   * allwinner,sun7i-a20-usb-phy
-   * allwinner,sun8i-a23-usb-phy
-   * allwinner,sun8i-a33-usb-phy
-+  * allwinner,sun8i-h3-usb-phy
- - reg : a list of offset + length pairs
- - reg-names :
-   * "phy_ctrl"
-diff --git a/drivers/phy/phy-sun4i-usb.c b/drivers/phy/phy-sun4i-usb.c
-index b12964b..17f97ab 100644
---- a/drivers/phy/phy-sun4i-usb.c
-+++ b/drivers/phy/phy-sun4i-usb.c
-@@ -46,6 +46,9 @@
- #define REG_PHYBIST			0x08
- #define REG_PHYTUNE			0x0c
- #define REG_PHYCTL_A33			0x10
-+#define REG_PHY_UNK_H3			0x20
+diff --git a/arch/arm/boot/dts/sun8i-h3.dtsi b/arch/arm/boot/dts/sun8i-h3.dtsi
+index c18b5f7..22ff593 100644
+--- a/arch/arm/boot/dts/sun8i-h3.dtsi
++++ b/arch/arm/boot/dts/sun8i-h3.dtsi
+@@ -266,6 +266,18 @@
+ 					     "mmc2_sample";
+ 		};
+ 
++		usb_clk: clk at 01c200cc {
++			#clock-cells = <1>;
++			#reset-cells = <1>;
++			compatible = "allwinner,sun8i-h3-usb-clk";
++			reg = <0x01c200cc 0x4>;
++			clocks = <&osc24M>;
++			clock-output-names = "usb_phy0", "usb_phy1",
++					     "usb_phy2", "usb_phy3",
++					     "usb_ohci0", "usb_ohci1",
++					     "usb_ohci2", "usb_ohci3";
++		};
 +
-+#define REG_PMU_UNK_H3			0x10
- 
- #define PHYCTL_DATA			BIT(7)
- 
-@@ -79,7 +82,7 @@
- #define PHY_DISCON_TH_SEL		0x2a
- #define PHY_SQUELCH_DETECT		0x3c
- 
--#define MAX_PHYS			3
-+#define MAX_PHYS			4
- 
- /*
-  * Note do not raise the debounce time, we must report Vusb high within 100ms
-@@ -88,12 +91,19 @@
- #define DEBOUNCE_TIME			msecs_to_jiffies(50)
- #define POLL_TIME			msecs_to_jiffies(250)
- 
-+enum sun4i_usb_phy_type {
-+	sun4i_a10_phy,
-+	sun8i_a33_phy,
-+	sun8i_h3_phy
-+};
-+
- struct sun4i_usb_phy_data {
-+	struct device *dev;
- 	void __iomem *base;
- 	struct mutex mutex;
- 	int num_phys;
- 	u32 disc_thresh;
--	bool has_a33_phyctl;
-+	enum sun4i_usb_phy_type type;
- 	struct sun4i_usb_phy {
- 		struct phy *phy;
- 		void __iomem *pmu;
-@@ -164,12 +174,18 @@ static void sun4i_usb_phy_write(struct sun4i_usb_phy *phy, u32 addr, u32 data,
- 
- 	mutex_lock(&phy_data->mutex);
- 
--	if (phy_data->has_a33_phyctl) {
-+	switch (phy_data->type) {
-+	case sun4i_a10_phy:
-+		phyctl = phy_data->base + REG_PHYCTL_A10;
-+		break;
-+	case sun8i_a33_phy:
- 		phyctl = phy_data->base + REG_PHYCTL_A33;
- 		/* A33 needs us to set phyctl to 0 explicitly */
- 		writel(0, phyctl);
--	} else {
--		phyctl = phy_data->base + REG_PHYCTL_A10;
-+		break;
-+	case sun8i_h3_phy:
-+		dev_err(phy_data->dev, "H3 usb_phy_write is not supported\n");
-+		break;
- 	}
- 
- 	for (i = 0; i < len; i++) {
-@@ -230,6 +246,7 @@ static int sun4i_usb_phy_init(struct phy *_phy)
- 	struct sun4i_usb_phy *phy = phy_get_drvdata(_phy);
- 	struct sun4i_usb_phy_data *data = to_sun4i_usb_phy_data(phy);
- 	int ret;
-+	u32 val;
- 
- 	ret = clk_prepare_enable(phy->clk);
- 	if (ret)
-@@ -241,15 +258,26 @@ static int sun4i_usb_phy_init(struct phy *_phy)
- 		return ret;
- 	}
- 
--	/* Enable USB 45 Ohm resistor calibration */
--	if (phy->index == 0)
--		sun4i_usb_phy_write(phy, PHY_RES45_CAL_EN, 0x01, 1);
-+	if (data->type == sun8i_h3_phy) {
-+		if (phy->index == 0) {
-+			val = readl(data->base + REG_PHY_UNK_H3);
-+			writel(val & ~1, data->base + REG_PHY_UNK_H3);
-+		}
-+
-+		val = readl(phy->pmu + REG_PMU_UNK_H3);
-+		writel(val & ~2, phy->pmu + REG_PMU_UNK_H3);
-+	} else {
-+		/* Enable USB 45 Ohm resistor calibration */
-+		if (phy->index == 0)
-+			sun4i_usb_phy_write(phy, PHY_RES45_CAL_EN, 0x01, 1);
- 
--	/* Adjust PHY's magnitude and rate */
--	sun4i_usb_phy_write(phy, PHY_TX_AMPLITUDE_TUNE, 0x14, 5);
-+		/* Adjust PHY's magnitude and rate */
-+		sun4i_usb_phy_write(phy, PHY_TX_AMPLITUDE_TUNE, 0x14, 5);
- 
--	/* Disconnect threshold adjustment */
--	sun4i_usb_phy_write(phy, PHY_DISCON_TH_SEL, data->disc_thresh, 2);
-+		/* Disconnect threshold adjustment */
-+		sun4i_usb_phy_write(phy, PHY_DISCON_TH_SEL,
-+				    data->disc_thresh, 2);
-+	}
- 
- 	sun4i_usb_phy_passby(phy, 1);
- 
-@@ -522,11 +550,14 @@ static int sun4i_usb_phy_probe(struct platform_device *pdev)
- 	mutex_init(&data->mutex);
- 	INIT_DELAYED_WORK(&data->detect, sun4i_usb_phy0_id_vbus_det_scan);
- 	dev_set_drvdata(dev, data);
-+	data->dev = dev;
- 
- 	if (of_device_is_compatible(np, "allwinner,sun5i-a13-usb-phy") ||
- 	    of_device_is_compatible(np, "allwinner,sun8i-a23-usb-phy") ||
- 	    of_device_is_compatible(np, "allwinner,sun8i-a33-usb-phy"))
- 		data->num_phys = 2;
-+	else if (of_device_is_compatible(np, "allwinner,sun8i-h3-usb-phy"))
-+		data->num_phys = 4;
- 	else
- 		data->num_phys = 3;
- 
-@@ -538,13 +569,18 @@ static int sun4i_usb_phy_probe(struct platform_device *pdev)
- 
- 	if (of_device_is_compatible(np, "allwinner,sun6i-a31-usb-phy") ||
- 	    of_device_is_compatible(np, "allwinner,sun8i-a23-usb-phy") ||
--	    of_device_is_compatible(np, "allwinner,sun8i-a33-usb-phy"))
-+	    of_device_is_compatible(np, "allwinner,sun8i-a33-usb-phy") ||
-+	    of_device_is_compatible(np, "allwinner,sun8i-h3-usb-phy"))
- 		dedicated_clocks = true;
- 	else
- 		dedicated_clocks = false;
- 
- 	if (of_device_is_compatible(np, "allwinner,sun8i-a33-usb-phy"))
--		data->has_a33_phyctl = true;
-+		data->type = sun8i_a33_phy;
-+	else if (of_device_is_compatible(np, "allwinner,sun8i-h3-usb-phy"))
-+		data->type = sun8i_h3_phy;
-+	else
-+		data->type = sun4i_a10_phy;
- 
- 	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "phy_ctrl");
- 	data->base = devm_ioremap_resource(dev, res);
-@@ -620,7 +656,7 @@ static int sun4i_usb_phy_probe(struct platform_device *pdev)
- 			return PTR_ERR(phy->reset);
- 		}
- 
--		if (i) { /* No pmu for usbc0 */
-+		if (data->type == sun8i_h3_phy || i != 0) {
- 			snprintf(name, sizeof(name), "pmu%d", i);
- 			res = platform_get_resource_byname(pdev,
- 							IORESOURCE_MEM, name);
-@@ -696,6 +732,7 @@ static const struct of_device_id sun4i_usb_phy_of_match[] = {
- 	{ .compatible = "allwinner,sun7i-a20-usb-phy" },
- 	{ .compatible = "allwinner,sun8i-a23-usb-phy" },
- 	{ .compatible = "allwinner,sun8i-a33-usb-phy" },
-+	{ .compatible = "allwinner,sun8i-h3-usb-phy" },
- 	{ },
- };
- MODULE_DEVICE_TABLE(of, sun4i_usb_phy_of_match);
+ 		mbus_clk: clk at 01c2015c {
+ 			#clock-cells = <0>;
+ 			compatible = "allwinner,sun8i-a23-mbus-clk";
 -- 
 2.5.0
