@@ -1,133 +1,70 @@
 From: hdegoede@redhat.com (Hans de Goede)
-Date: Sun, 15 Nov 2015 20:46:16 +0100
-Subject: [PATCH 4/5] ARM: dts: sun8i: Add usbphy and usb host controller nodes
+Date: Sun, 15 Nov 2015 20:46:17 +0100
+Subject: [PATCH 5/5] ARM: dts: sun8i-h3-orangepi-plus: Enable USB host
+ controllers
 In-Reply-To: <1447616777-24660-1-git-send-email-hdegoede@redhat.com>
 References: <1447616777-24660-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <1447616777-24660-4-git-send-email-hdegoede@redhat.com>
+Message-ID: <1447616777-24660-5-git-send-email-hdegoede@redhat.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Reinder de Haan <patchesrdh@mveas.com>
 
-Add nodes describing the H3's usbphy and usb host controller nodes.
+Enable the 3 pairs of USB host controllers used on the Orange Pi Plus.
 
 Signed-off-by: Reinder de Haan <patchesrdh@mveas.com>
 Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 ---
- arch/arm/boot/dts/sun8i-h3.dtsi | 101 ++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 101 insertions(+)
+ arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts | 28 ++++++++++++++++++++++++++++
+ 1 file changed, 28 insertions(+)
 
-diff --git a/arch/arm/boot/dts/sun8i-h3.dtsi b/arch/arm/boot/dts/sun8i-h3.dtsi
-index 22ff593..0faa38a 100644
---- a/arch/arm/boot/dts/sun8i-h3.dtsi
-+++ b/arch/arm/boot/dts/sun8i-h3.dtsi
-@@ -359,6 +359,107 @@
- 			#size-cells = <0>;
- 		};
+diff --git a/arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts b/arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts
+index e67df59..e05a409 100644
+--- a/arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts
++++ b/arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts
+@@ -60,6 +60,18 @@
+ 	};
+ };
  
-+		usbphy: phy at 01c19400 {
-+			compatible = "allwinner,sun8i-h3-usb-phy";
-+			reg = <0x01c19400 0x2c>,
-+			      <0x01c1a800 0x4>,
-+			      <0x01c1b800 0x4>,
-+			      <0x01c1c800 0x4>,
-+			      <0x01c1d800 0x4>;
-+			reg-names = "phy_ctrl",
-+				    "pmu0",
-+				    "pmu1",
-+				    "pmu2",
-+				    "pmu3";
-+			clocks = <&usb_clk 8>,
-+				 <&usb_clk 9>,
-+				 <&usb_clk 10>,
-+				 <&usb_clk 11>;
-+			clock-names = "usb0_phy",
-+				      "usb1_phy",
-+				      "usb2_phy",
-+				      "usb3_phy";
-+			resets = <&usb_clk 0>,
-+				 <&usb_clk 1>,
-+				 <&usb_clk 2>,
-+				 <&usb_clk 3>;
-+			reset-names = "usb0_reset",
-+				      "usb1_reset",
-+				      "usb2_reset",
-+				      "usb3_reset";
-+			status = "disabled";
-+			#phy-cells = <1>;
-+		};
++&ehci1 {
++	status = "okay";
++};
 +
-+		ehci1: usb at 01c1b000 {
-+			compatible = "allwinner,sun8i-h3-ehci", "generic-ehci";
-+			reg = <0x01c1b000 0x100>;
-+			interrupts = <GIC_SPI 74 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&bus_gates 25>, <&bus_gates 29>;
-+			resets = <&bus_rst 25>, <&bus_rst 29>;
-+			phys = <&usbphy 1>;
-+			phy-names = "usb";
-+			status = "disabled";
-+		};
++&ehci2 {
++	status = "okay";
++};
 +
-+		ohci1: usb at 01c1b400 {
-+			compatible = "allwinner,sun8i-h3-ohci", "generic-ohci";
-+			reg = <0x01c1b400 0x100>;
-+			interrupts = <GIC_SPI 75 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&bus_gates 29>, <&bus_gates 25>,
-+				 <&usb_clk 17>;
-+			resets = <&bus_rst 29>, <&bus_rst 25>;
-+			phys = <&usbphy 1>;
-+			phy-names = "usb";
-+			status = "disabled";
-+		};
++&ehci3 {
++	status = "okay";
++};
 +
-+		ehci2: usb at 01c1c000 {
-+			compatible = "allwinner,sun8i-h3-ehci", "generic-ehci";
-+			reg = <0x01c1c000 0x100>;
-+			interrupts = <GIC_SPI 76 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&bus_gates 26>, <&bus_gates 30>;
-+			resets = <&bus_rst 26>, <&bus_rst 30>;
-+			phys = <&usbphy 2>;
-+			phy-names = "usb";
-+			status = "disabled";
-+		};
+ &mmc0 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin>;
+@@ -70,8 +82,24 @@
+ 	status = "okay";
+ };
+ 
++&ohci1 {
++	status = "okay";
++};
 +
-+		ohci2: usb at 01c1c400 {
-+			compatible = "allwinner,sun8i-h3-ohci", "generic-ohci";
-+			reg = <0x01c1c400 0x100>;
-+			interrupts = <GIC_SPI 77 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&bus_gates 30>, <&bus_gates 26>,
-+				 <&usb_clk 18>;
-+			resets = <&bus_rst 30>, <&bus_rst 26>;
-+			phys = <&usbphy 2>;
-+			phy-names = "usb";
-+			status = "disabled";
-+		};
++&ohci2 {
++	status = "okay";
++};
 +
-+		ehci3: usb at 01c1d000 {
-+			compatible = "allwinner,sun8i-h3-ehci", "generic-ehci";
-+			reg = <0x01c1d000 0x100>;
-+			interrupts = <GIC_SPI 78 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&bus_gates 27>, <&bus_gates 31>;
-+			resets = <&bus_rst 27>, <&bus_rst 31>;
-+			phys = <&usbphy 3>;
-+			phy-names = "usb";
-+			status = "disabled";
-+		};
++&ohci3 {
++	status = "okay";
++};
 +
-+		ohci3: usb at 01c1d400 {
-+			compatible = "allwinner,sun8i-h3-ohci", "generic-ohci";
-+			reg = <0x01c1d400 0x100>;
-+			interrupts = <GIC_SPI 79 IRQ_TYPE_LEVEL_HIGH>;
-+			clocks = <&bus_gates 31>, <&bus_gates 27>,
-+				 <&usb_clk 19>;
-+			resets = <&bus_rst 31>, <&bus_rst 27>;
-+			phys = <&usbphy 3>;
-+			phy-names = "usb";
-+			status = "disabled";
-+		};
+ &uart0 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&uart0_pins_a>;
+ 	status = "okay";
+ };
 +
- 		pio: pinctrl at 01c20800 {
- 			compatible = "allwinner,sun8i-h3-pinctrl";
- 			reg = <0x01c20800 0x400>;
++&usbphy {
++	status = "okay";
++};
 -- 
 2.5.0
