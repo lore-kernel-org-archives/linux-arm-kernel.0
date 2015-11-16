@@ -1,56 +1,41 @@
-From: peter@hurleysoftware.com (Peter Hurley)
-Date: Mon, 16 Nov 2015 16:18:19 -0500
-Subject: [PATCH 10/12] tty: amba-pl011: add support for 32-bit register
- access
-In-Reply-To: <20151116183006.GZ8644@n2100.arm.linux.org.uk>
-References: <20151116173935.GQ8644@n2100.arm.linux.org.uk>
- <E1ZyNls-0003kA-Fe@rmk-PC.arm.linux.org.uk> <564A1628.9010900@codeaurora.org>
- <20151116175217.GT8644@n2100.arm.linux.org.uk>
- <564A1FA9.8010109@codeaurora.org>
- <20151116183006.GZ8644@n2100.arm.linux.org.uk>
-Message-ID: <564A481B.6050304@hurleysoftware.com>
+From: elfring@users.sourceforge.net (SF Markus Elfring)
+Date: Mon, 16 Nov 2015 22:20:25 +0100
+Subject: [PATCH 0/3] ste_dma40: Deletion of a few unnecessary checks
+In-Reply-To: <5317A59D.4@users.sourceforge.net>
+References: <5307CAA2.8060406@users.sourceforge.net>
+ <alpine.DEB.2.02.1402212321410.2043@localhost6.localdomain6>
+ <530A086E.8010901@users.sourceforge.net>
+ <alpine.DEB.2.02.1402231635510.1985@localhost6.localdomain6>
+ <530A72AA.3000601@users.sourceforge.net>
+ <alpine.DEB.2.02.1402240658210.2090@localhost6.localdomain6>
+ <530B5FB6.6010207@users.sourceforge.net>
+ <alpine.DEB.2.10.1402241710370.2074@hadrien>
+ <530C5E18.1020800@users.sourceforge.net>
+ <alpine.DEB.2.10.1402251014170.2080@hadrien>
+ <530CD2C4.4050903@users.sourceforge.net>
+ <alpine.DEB.2.10.1402251840450.7035@hadrien>
+ <530CF8FF.8080600@users.sourceforge.net>
+ <alpine.DEB.2.02.1402252117150.2047@localhost6.localdomain6>
+ <530DD06F.4090703@users.sourceforge.net>
+ <alpine.DEB.2.02.1402262129250.2221@localhost6.localdomain6>
+ <5317A59D.4@users.sourceforge.net>
+Message-ID: <564A4899.8040109@users.sourceforge.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/16/2015 01:30 PM, Russell King - ARM Linux wrote:
-> On Mon, Nov 16, 2015 at 12:25:45PM -0600, Timur Tabi wrote:
->> How is it touching core files?  Granted, we might still need access_32b in
->> vendor_data, but not for SBSA, since SBSA already has a mechanism to
->> determine what 32-bit is needed or not.
->>
->> Then in pl011_probe(), just have:
->>
->> 	uap->port.iotype = vendor->access_32b ? UPIO_MEM32 : 0;
-> 
-> That fails my sanity filters, sorry.  iotype takes these values, and
-> these values only:
-> 
-> #define UPIO_PORT               (SERIAL_IO_PORT)        /* 8b I/O port access */#define UPIO_HUB6               (SERIAL_IO_HUB6)        /* Hub6 ISA card */
-> #define UPIO_MEM                (SERIAL_IO_MEM)         /* 8b MMIO access */
-> #define UPIO_MEM32              (SERIAL_IO_MEM32)       /* 32b little endian */
-> #define UPIO_AU                 (SERIAL_IO_AU)          /* Au1x00 and RT288x type IO */
-> #define UPIO_TSI                (SERIAL_IO_TSI)         /* Tsi108/109 type IO */#define UPIO_MEM32BE            (SERIAL_IO_MEM32BE)     /* 32b big endian */
-> 
-> These are exposed to userspace, and they have meaning.
-> 
-> We _could_ augment include/uapi/linux/serial.h and
-> include/linux/serial_core.h to add a 16-bit LE MMIO accessor identifier,
-> but hacking it by deciding to re-use SERIAL_IO_PORT for something it
-> isn't is abhorrent to me.
+From: Markus Elfring <elfring@users.sourceforge.net>
+Date: Mon, 16 Nov 2015 22:12:23 +0100
 
+Further update suggestions were taken into account after a patch
+was applied from static source code analysis.
 
-The UPIO_* comments were added recently.
+Markus Elfring (3):
+  Delete an unnecessary check before the function call "kmem_cache_destroy"
+  Delete another unnecessary check in d40_probe()
+  Delete an unnecessary variable initialisation in d40_probe()
 
-The proliferation of different bitness and endianness implied that
-UPIO_MEM was strictly 8-bit, but that's not true and I'll remove the
-UPIO_MEM bitness notation from the header.
+ drivers/dma/ste_dma40.c | 87 ++++++++++++++++++++++++-------------------------
+ 1 file changed, 42 insertions(+), 45 deletions(-)
 
-The uapi header has no such notation and I think the original value and
-meaning of UPIO_MEM used by the pl011 driver should remain.
-
-I see no real issue with using different iotype values to describe
-the register access method required when other than what the driver
-originally used.
-
-Regards,
-Peter Hurley
+-- 
+2.6.2
