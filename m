@@ -1,153 +1,258 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Mon, 16 Nov 2015 14:37:33 +0100
-Subject: [PATCH 00/27] mtd: nand: refactor the NAND subsystem (part 1)
-Message-ID: <1447681080-31232-1-git-send-email-boris.brezillon@free-electrons.com>
+Date: Mon, 16 Nov 2015 14:37:34 +0100
+Subject: [PATCH 01/27] mtd: nand: fix drivers abusing mtd->priv
+In-Reply-To: <1447681080-31232-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1447681080-31232-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1447681080-31232-2-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+The ->priv field of the mtd_info object attached to a nand_chip device
+should point to the nand_chip device. The pxa and cafe drivers are
+assigning this field their own private structure, which works fine as long
+as the nand_chip field is the first one in the driver private struct but
+seems a bit fragile.
+Fix that by setting mtd->priv to point the nand_chip field and assigning
+chip->priv to the private structure head.
 
-This huge series aims at clarifying the relationship between the mtd and
-nand_chip structures and hiding NAND framework internals to NAND
-controller drivers.
+Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+---
+ drivers/mtd/nand/cafe_nand.c   | 34 ++++++++++++++++++++++------------
+ drivers/mtd/nand/pxa3xx_nand.c | 30 +++++++++++++++++++-----------
+ 2 files changed, 41 insertions(+), 23 deletions(-)
 
-The first part of the series provide an mtd_to_nand() helper to hide the
-way mtd and nand_chip are linked together.
-
-The second part of the series embeds the mtd structure into the nand_chip
-one so that NAND controller drivers don't have to bother allocating the
-MTD device and linking it with the NAND chip.
-
-The last part of the series hides accesses to the chip->priv field behind
-two helper functions.
-
-This allows removal of some of the boilerplate code done in all NAND
-controller drivers, but most importantly, it unifies a bit the way NAND
-chip structures are instantiated (even though we still have two different
-kinds of drivers: those embedding the nand_chip struct into their private
-nand chip representation, and those allocating two different structures
-and linking them together with the chip->priv field).
-
-As said in the title, this refactoring is only the first step. I plan to
-rework the NAND controller / NAND chip separation for pretty much the same
-reasons: clarifying the separation between the two concepts, and getting
-rid of more boilerplate code in NAND controller drivers.
-
-Stay tuned ;-).
-
-Best Regards,
-
-Boris
-
-Boris Brezillon (27):
-  mtd: nand: fix drivers abusing mtd->priv
-  mtd: nand: add an mtd_to_nand() helper
-  mtd: nand: update examples in the documentation to use mtd_to_nand()
-  ARM: nand: make use of mtd_to_nand() where appropriate
-  blackfin: nand: make use of mtd_to_nand() where appropriate
-  cris: nand: make use of mtd_to_nand() where appropriate
-  mips: nand: make use of mtd_to_nand() where appropriate
-  sh: nand: make use of mtd_to_nand() where appropriate
-  mtd: nand: make use of mtd_to_nand() in NAND core code
-  mtd: nand: make use of mtd_to_nand() in NAND drivers
-  staging: mt29f_spinand: make use of mtd_to_nand()
-  mtd: nand: embed an mtd_info structure into nand_chip
-  mtd: nand: add nand_to_mtd() helper
-  mtd: nand: use the mtd instance embedded in struct nand_chip
-  mtd: nand: update the documentation to reflect framework changes
-  staging: mt29f_spinand: use the mtd instance embedded in struct
-    nand_chip
-  cris: nand: use the mtd instance embedded in struct nand_chip
-  mtd: nand: update mtd_to_nand()
-  mtd: nand: remove useless mtd->priv = chip assignments
-  cris: nand: remove useless mtd->priv = chip assignments
-  staging: mt29f_spinand: remove useless mtd->priv = chip assignment
-  mtd: nand: simplify nand_dt_init() usage
-  mtd: nand: kill the chip->flash_node field
-  mtd: nand: add helpers to access ->priv
-  ARM: make use of nand_set/get_controller_data() helpers
-  mtd: nand: make use of nand_set/get_controller_data() helpers
-  staging: mt29f_spinand: make use of nand_set/get_controller_data()
-    helpers
-
- Documentation/DocBook/mtdnand.tmpl             |  35 +++---
- arch/arm/mach-ep93xx/snappercl15.c             |   4 +-
- arch/arm/mach-ep93xx/ts72xx.c                  |   4 +-
- arch/arm/mach-imx/mach-qong.c                  |   2 +-
- arch/arm/mach-ixp4xx/ixdp425-setup.c           |   6 +-
- arch/arm/mach-omap1/board-nand.c               |   2 +-
- arch/arm/mach-orion5x/ts78xx-setup.c           |   6 +-
- arch/arm/mach-pxa/balloon3.c                   |   2 +-
- arch/arm/mach-pxa/em-x270.c                    |   2 +-
- arch/arm/mach-pxa/palmtx.c                     |   2 +-
- arch/blackfin/mach-bf537/boards/stamp.c        |   2 +-
- arch/blackfin/mach-bf561/boards/acvilon.c      |   2 +-
- arch/cris/arch-v32/drivers/mach-a3/nandflash.c |   8 +-
- arch/cris/arch-v32/drivers/mach-fs/nandflash.c |   8 +-
- arch/mips/alchemy/devboards/db1200.c           |   2 +-
- arch/mips/alchemy/devboards/db1300.c           |   2 +-
- arch/mips/alchemy/devboards/db1550.c           |   2 +-
- arch/mips/pnx833x/common/platform.c            |   2 +-
- arch/mips/rb532/devices.c                      |   2 +-
- arch/sh/boards/mach-migor/setup.c              |   2 +-
- drivers/mtd/nand/ams-delta.c                   |  26 ++---
- drivers/mtd/nand/atmel_nand.c                  | 116 ++++++++++---------
- drivers/mtd/nand/au1550nd.c                    |  40 +++----
- drivers/mtd/nand/bcm47xxnflash/bcm47xxnflash.h |   1 -
- drivers/mtd/nand/bcm47xxnflash/main.c          |   9 +-
- drivers/mtd/nand/bcm47xxnflash/ops_bcm4706.c   |  34 +++---
- drivers/mtd/nand/bf5xx_nand.c                  |  27 +++--
- drivers/mtd/nand/brcmnand/brcmnand.c           |  54 +++++----
- drivers/mtd/nand/cafe_nand.c                   |  41 ++++---
- drivers/mtd/nand/cmx270_nand.c                 |  20 ++--
- drivers/mtd/nand/cs553x_nand.c                 |  30 +++--
- drivers/mtd/nand/davinci_nand.c                |  33 +++---
- drivers/mtd/nand/denali.c                      |  61 +++++-----
- drivers/mtd/nand/denali.h                      |   1 -
- drivers/mtd/nand/diskonchip.c                  | 148 ++++++++++++-------------
- drivers/mtd/nand/docg4.c                       |  93 ++++++++--------
- drivers/mtd/nand/fsl_elbc_nand.c               |  58 +++++-----
- drivers/mtd/nand/fsl_ifc_nand.c                |  67 ++++++-----
- drivers/mtd/nand/fsl_upm.c                     |  30 ++---
- drivers/mtd/nand/fsmc_nand.c                   |  72 ++++++------
- drivers/mtd/nand/gpio.c                        |  16 +--
- drivers/mtd/nand/gpmi-nand/gpmi-lib.c          |   2 +-
- drivers/mtd/nand/gpmi-nand/gpmi-nand.c         |  67 ++++++-----
- drivers/mtd/nand/gpmi-nand/gpmi-nand.h         |   1 -
- drivers/mtd/nand/hisi504_nand.c                |  48 ++++----
- drivers/mtd/nand/jz4740_nand.c                 |  14 +--
- drivers/mtd/nand/lpc32xx_mlc.c                 |  32 +++---
- drivers/mtd/nand/lpc32xx_slc.c                 |  42 ++++---
- drivers/mtd/nand/mpc5121_nfc.c                 |  52 +++++----
- drivers/mtd/nand/mxc_nand.c                    |  76 +++++++------
- drivers/mtd/nand/nand_base.c                   | 102 +++++++++--------
- drivers/mtd/nand/nand_bbt.c                    |  32 +++---
- drivers/mtd/nand/nand_bch.c                    |   4 +-
- drivers/mtd/nand/nand_ecc.c                    |   4 +-
- drivers/mtd/nand/nandsim.c                     |  34 +++---
- drivers/mtd/nand/ndfc.c                        |  52 ++++-----
- drivers/mtd/nand/nuc900_nand.c                 |  23 ++--
- drivers/mtd/nand/omap2.c                       | 107 ++++++++++--------
- drivers/mtd/nand/orion_nand.c                  |  13 +--
- drivers/mtd/nand/pasemi_nand.c                 |  21 ++--
- drivers/mtd/nand/plat_nand.c                   |  16 +--
- drivers/mtd/nand/pxa3xx_nand.c                 |  66 ++++++-----
- drivers/mtd/nand/r852.c                        |  41 +++----
- drivers/mtd/nand/r852.h                        |   1 -
- drivers/mtd/nand/s3c2410.c                     |  29 ++---
- drivers/mtd/nand/sh_flctl.c                    |   9 +-
- drivers/mtd/nand/sharpsl.c                     |  20 ++--
- drivers/mtd/nand/sm_common.c                   |   2 +-
- drivers/mtd/nand/socrates_nand.c               |  24 ++--
- drivers/mtd/nand/sunxi_nand.c                  |  40 +++----
- drivers/mtd/nand/tmio_nand.c                   |  10 +-
- drivers/mtd/nand/txx9ndfmc.c                   |  25 ++---
- drivers/mtd/nand/vf610_nfc.c                   |   6 +-
- drivers/mtd/nand/xway_nand.c                   |   4 +-
- drivers/staging/mt29f_spinand/mt29f_spinand.c  |  19 ++--
- include/linux/mtd/nand.h                       |  29 ++++-
- include/linux/mtd/sh_flctl.h                   |   3 +-
- 77 files changed, 1067 insertions(+), 1077 deletions(-)
-
+diff --git a/drivers/mtd/nand/cafe_nand.c b/drivers/mtd/nand/cafe_nand.c
+index 9de78d2..cce3ac4 100644
+--- a/drivers/mtd/nand/cafe_nand.c
++++ b/drivers/mtd/nand/cafe_nand.c
+@@ -101,7 +101,8 @@ static const char *part_probes[] = { "cmdlinepart", "RedBoot", NULL };
+ 
+ static int cafe_device_ready(struct mtd_info *mtd)
+ {
+-	struct cafe_priv *cafe = mtd->priv;
++	struct nand_chip *chip = mtd->priv;
++	struct cafe_priv *cafe = chip->priv;
+ 	int result = !!(cafe_readl(cafe, NAND_STATUS) & 0x40000000);
+ 	uint32_t irqs = cafe_readl(cafe, NAND_IRQ);
+ 
+@@ -117,7 +118,8 @@ static int cafe_device_ready(struct mtd_info *mtd)
+ 
+ static void cafe_write_buf(struct mtd_info *mtd, const uint8_t *buf, int len)
+ {
+-	struct cafe_priv *cafe = mtd->priv;
++	struct nand_chip *chip = mtd->priv;
++	struct cafe_priv *cafe = chip->priv;
+ 
+ 	if (usedma)
+ 		memcpy(cafe->dmabuf + cafe->datalen, buf, len);
+@@ -132,7 +134,8 @@ static void cafe_write_buf(struct mtd_info *mtd, const uint8_t *buf, int len)
+ 
+ static void cafe_read_buf(struct mtd_info *mtd, uint8_t *buf, int len)
+ {
+-	struct cafe_priv *cafe = mtd->priv;
++	struct nand_chip *chip = mtd->priv;
++	struct cafe_priv *cafe = chip->priv;
+ 
+ 	if (usedma)
+ 		memcpy(buf, cafe->dmabuf + cafe->datalen, len);
+@@ -146,7 +149,8 @@ static void cafe_read_buf(struct mtd_info *mtd, uint8_t *buf, int len)
+ 
+ static uint8_t cafe_read_byte(struct mtd_info *mtd)
+ {
+-	struct cafe_priv *cafe = mtd->priv;
++	struct nand_chip *chip = mtd->priv;
++	struct cafe_priv *cafe = chip->priv;
+ 	uint8_t d;
+ 
+ 	cafe_read_buf(mtd, &d, 1);
+@@ -158,7 +162,8 @@ static uint8_t cafe_read_byte(struct mtd_info *mtd)
+ static void cafe_nand_cmdfunc(struct mtd_info *mtd, unsigned command,
+ 			      int column, int page_addr)
+ {
+-	struct cafe_priv *cafe = mtd->priv;
++	struct nand_chip *chip = mtd->priv;
++	struct cafe_priv *cafe = chip->priv;
+ 	int adrbytes = 0;
+ 	uint32_t ctl1;
+ 	uint32_t doneint = 0x80000000;
+@@ -313,7 +318,8 @@ static void cafe_nand_cmdfunc(struct mtd_info *mtd, unsigned command,
+ 
+ static void cafe_select_chip(struct mtd_info *mtd, int chipnr)
+ {
+-	struct cafe_priv *cafe = mtd->priv;
++	struct nand_chip *chip = mtd->priv;
++	struct cafe_priv *cafe = chip->priv;
+ 
+ 	cafe_dev_dbg(&cafe->pdev->dev, "select_chip %d\n", chipnr);
+ 
+@@ -328,7 +334,8 @@ static void cafe_select_chip(struct mtd_info *mtd, int chipnr)
+ static irqreturn_t cafe_nand_interrupt(int irq, void *id)
+ {
+ 	struct mtd_info *mtd = id;
+-	struct cafe_priv *cafe = mtd->priv;
++	struct nand_chip *chip = mtd->priv;
++	struct cafe_priv *cafe = chip->priv;
+ 	uint32_t irqs = cafe_readl(cafe, NAND_IRQ);
+ 	cafe_writel(cafe, irqs & ~0x90000000, NAND_IRQ);
+ 	if (!irqs)
+@@ -377,7 +384,7 @@ static int cafe_nand_read_oob(struct mtd_info *mtd, struct nand_chip *chip,
+ static int cafe_nand_read_page(struct mtd_info *mtd, struct nand_chip *chip,
+ 			       uint8_t *buf, int oob_required, int page)
+ {
+-	struct cafe_priv *cafe = mtd->priv;
++	struct cafe_priv *cafe = chip->priv;
+ 	unsigned int max_bitflips = 0;
+ 
+ 	cafe_dev_dbg(&cafe->pdev->dev, "ECC result %08x SYN1,2 %08x\n",
+@@ -519,7 +526,7 @@ static int cafe_nand_write_page_lowlevel(struct mtd_info *mtd,
+ 					  const uint8_t *buf, int oob_required,
+ 					  int page)
+ {
+-	struct cafe_priv *cafe = mtd->priv;
++	struct cafe_priv *cafe = chip->priv;
+ 
+ 	chip->write_buf(mtd, buf, mtd->writesize);
+ 	chip->write_buf(mtd, chip->oob_poi, mtd->oobsize);
+@@ -604,7 +611,8 @@ static int cafe_nand_probe(struct pci_dev *pdev,
+ 	cafe = (void *)(&mtd[1]);
+ 
+ 	mtd->dev.parent = &pdev->dev;
+-	mtd->priv = cafe;
++	mtd->priv = &cafe->nand;
++	cafe->nand.priv = cafe;
+ 
+ 	cafe->pdev = pdev;
+ 	cafe->mmio = pci_iomap(pdev, 0, 0);
+@@ -792,7 +800,8 @@ static int cafe_nand_probe(struct pci_dev *pdev,
+ static void cafe_nand_remove(struct pci_dev *pdev)
+ {
+ 	struct mtd_info *mtd = pci_get_drvdata(pdev);
+-	struct cafe_priv *cafe = mtd->priv;
++	struct nand_chip *chip = mtd->priv;
++	struct cafe_priv *cafe = chip->priv;
+ 
+ 	/* Disable NAND IRQ in global IRQ mask register */
+ 	cafe_writel(cafe, ~1 & cafe_readl(cafe, GLOBAL_IRQ_MASK), GLOBAL_IRQ_MASK);
+@@ -819,7 +828,8 @@ static int cafe_nand_resume(struct pci_dev *pdev)
+ {
+ 	uint32_t ctrl;
+ 	struct mtd_info *mtd = pci_get_drvdata(pdev);
+-	struct cafe_priv *cafe = mtd->priv;
++	struct nand_chip *chip = mtd->priv;
++	struct cafe_priv *cafe = chip->priv;
+ 
+        /* Start off by resetting the NAND controller completely */
+ 	cafe_writel(cafe, 1, NAND_RESET);
+diff --git a/drivers/mtd/nand/pxa3xx_nand.c b/drivers/mtd/nand/pxa3xx_nand.c
+index 37df51d..ec421ad 100644
+--- a/drivers/mtd/nand/pxa3xx_nand.c
++++ b/drivers/mtd/nand/pxa3xx_nand.c
+@@ -1118,7 +1118,8 @@ static int prepare_set_command(struct pxa3xx_nand_info *info, int command,
+ static void nand_cmdfunc(struct mtd_info *mtd, unsigned command,
+ 			 int column, int page_addr)
+ {
+-	struct pxa3xx_nand_host *host = mtd->priv;
++	struct nand_chip *chip = mtd->priv;
++	struct pxa3xx_nand_host *host = chip->priv;
+ 	struct pxa3xx_nand_info *info = host->info_data;
+ 	int exec_cmd;
+ 
+@@ -1166,7 +1167,8 @@ static void nand_cmdfunc_extended(struct mtd_info *mtd,
+ 				  const unsigned command,
+ 				  int column, int page_addr)
+ {
+-	struct pxa3xx_nand_host *host = mtd->priv;
++	struct nand_chip *chip = mtd->priv;
++	struct pxa3xx_nand_host *host = chip->priv;
+ 	struct pxa3xx_nand_info *info = host->info_data;
+ 	int exec_cmd, ext_cmd_type;
+ 
+@@ -1286,7 +1288,7 @@ static int pxa3xx_nand_read_page_hwecc(struct mtd_info *mtd,
+ 		struct nand_chip *chip, uint8_t *buf, int oob_required,
+ 		int page)
+ {
+-	struct pxa3xx_nand_host *host = mtd->priv;
++	struct pxa3xx_nand_host *host = chip->priv;
+ 	struct pxa3xx_nand_info *info = host->info_data;
+ 
+ 	chip->read_buf(mtd, buf, mtd->writesize);
+@@ -1312,7 +1314,8 @@ static int pxa3xx_nand_read_page_hwecc(struct mtd_info *mtd,
+ 
+ static uint8_t pxa3xx_nand_read_byte(struct mtd_info *mtd)
+ {
+-	struct pxa3xx_nand_host *host = mtd->priv;
++	struct nand_chip *chip = mtd->priv;
++	struct pxa3xx_nand_host *host = chip->priv;
+ 	struct pxa3xx_nand_info *info = host->info_data;
+ 	char retval = 0xFF;
+ 
+@@ -1325,7 +1328,8 @@ static uint8_t pxa3xx_nand_read_byte(struct mtd_info *mtd)
+ 
+ static u16 pxa3xx_nand_read_word(struct mtd_info *mtd)
+ {
+-	struct pxa3xx_nand_host *host = mtd->priv;
++	struct nand_chip *chip = mtd->priv;
++	struct pxa3xx_nand_host *host = chip->priv;
+ 	struct pxa3xx_nand_info *info = host->info_data;
+ 	u16 retval = 0xFFFF;
+ 
+@@ -1338,7 +1342,8 @@ static u16 pxa3xx_nand_read_word(struct mtd_info *mtd)
+ 
+ static void pxa3xx_nand_read_buf(struct mtd_info *mtd, uint8_t *buf, int len)
+ {
+-	struct pxa3xx_nand_host *host = mtd->priv;
++	struct nand_chip *chip = mtd->priv;
++	struct pxa3xx_nand_host *host = chip->priv;
+ 	struct pxa3xx_nand_info *info = host->info_data;
+ 	int real_len = min_t(size_t, len, info->buf_count - info->buf_start);
+ 
+@@ -1349,7 +1354,8 @@ static void pxa3xx_nand_read_buf(struct mtd_info *mtd, uint8_t *buf, int len)
+ static void pxa3xx_nand_write_buf(struct mtd_info *mtd,
+ 		const uint8_t *buf, int len)
+ {
+-	struct pxa3xx_nand_host *host = mtd->priv;
++	struct nand_chip *chip = mtd->priv;
++	struct pxa3xx_nand_host *host = chip->priv;
+ 	struct pxa3xx_nand_info *info = host->info_data;
+ 	int real_len = min_t(size_t, len, info->buf_count - info->buf_start);
+ 
+@@ -1364,7 +1370,8 @@ static void pxa3xx_nand_select_chip(struct mtd_info *mtd, int chip)
+ 
+ static int pxa3xx_nand_waitfunc(struct mtd_info *mtd, struct nand_chip *this)
+ {
+-	struct pxa3xx_nand_host *host = mtd->priv;
++	struct nand_chip *chip = mtd->priv;
++	struct pxa3xx_nand_host *host = chip->priv;
+ 	struct pxa3xx_nand_info *info = host->info_data;
+ 
+ 	if (info->need_wait) {
+@@ -1580,11 +1587,11 @@ static int pxa_ecc_init(struct pxa3xx_nand_info *info,
+ 
+ static int pxa3xx_nand_scan(struct mtd_info *mtd)
+ {
+-	struct pxa3xx_nand_host *host = mtd->priv;
++	struct nand_chip *chip = mtd->priv;
++	struct pxa3xx_nand_host *host = chip->priv;
+ 	struct pxa3xx_nand_info *info = host->info_data;
+ 	struct platform_device *pdev = info->pdev;
+ 	struct pxa3xx_nand_platform_data *pdata = dev_get_platdata(&pdev->dev);
+-	struct nand_chip *chip = mtd->priv;
+ 	int ret;
+ 	uint16_t ecc_strength, ecc_step;
+ 
+@@ -1724,11 +1731,12 @@ static int alloc_nand_resource(struct platform_device *pdev)
+ 		host->mtd = mtd;
+ 		host->cs = cs;
+ 		host->info_data = info;
+-		mtd->priv = host;
++		mtd->priv = chip;
+ 		mtd->dev.parent = &pdev->dev;
+ 		/* FIXME: all chips use the same device tree partitions */
+ 		nand_set_flash_node(chip, np);
+ 
++		chip->priv = host;
+ 		chip->ecc.read_page	= pxa3xx_nand_read_page_hwecc;
+ 		chip->ecc.write_page	= pxa3xx_nand_write_page_hwecc;
+ 		chip->controller        = &info->controller;
 -- 
 2.1.4
