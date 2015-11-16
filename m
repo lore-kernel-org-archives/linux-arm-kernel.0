@@ -1,83 +1,152 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 16 Nov 2015 12:23:17 +0100
-Subject: [PATCH v3 6/7] arm64: map linear region as non-executable
+Date: Mon, 16 Nov 2015 12:23:14 +0100
+Subject: [PATCH v3 3/7] arm64: split off early mapping code from
+ early_fixmap_init()
 In-Reply-To: <1447672998-20981-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1447672998-20981-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1447672998-20981-7-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1447672998-20981-4-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that we moved the kernel text out of the linear region, there
-is no longer a reason to map the linear region as executable. This
-also allows us to completely get rid of the __map_mem() variant that
-only maps some of it executable if CONFIG_DEBUG_RODATA is selected.
+This splits off and generalises the population of the statically
+allocated fixmap page tables so that we may reuse it later for
+the linear mapping once we move the kernel text mapping out of it.
+
+This also involves taking into account that table entries at any of
+the levels we are populating may have been populated already, since
+the fixmap mapping might not be disjoint up to the pgd level anymore
+from other early mappings.
 
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm64/mm/mmu.c | 41 +-------------------
- 1 file changed, 2 insertions(+), 39 deletions(-)
+ arch/arm64/include/asm/compiler.h |  2 +
+ arch/arm64/kernel/vmlinux.lds.S   | 12 ++--
+ arch/arm64/mm/mmu.c               | 60 ++++++++++++++------
+ 3 files changed, 51 insertions(+), 23 deletions(-)
 
+diff --git a/arch/arm64/include/asm/compiler.h b/arch/arm64/include/asm/compiler.h
+index ee35fd0f2236..dd342af63673 100644
+--- a/arch/arm64/include/asm/compiler.h
++++ b/arch/arm64/include/asm/compiler.h
+@@ -27,4 +27,6 @@
+  */
+ #define __asmeq(x, y)  ".ifnc " x "," y " ; .err ; .endif\n\t"
+ 
++#define __pgdir		__attribute__((section(".pgdir"),aligned(PAGE_SIZE)))
++
+ #endif	/* __ASM_COMPILER_H */
+diff --git a/arch/arm64/kernel/vmlinux.lds.S b/arch/arm64/kernel/vmlinux.lds.S
+index 1ee2c3937d4e..87a596246ec7 100644
+--- a/arch/arm64/kernel/vmlinux.lds.S
++++ b/arch/arm64/kernel/vmlinux.lds.S
+@@ -164,11 +164,13 @@ SECTIONS
+ 
+ 	BSS_SECTION(0, 0, 0)
+ 
+-	. = ALIGN(PAGE_SIZE);
+-	idmap_pg_dir = .;
+-	. += IDMAP_DIR_SIZE;
+-	swapper_pg_dir = .;
+-	. += SWAPPER_DIR_SIZE;
++	.pgdir (NOLOAD) : ALIGN(PAGE_SIZE) {
++		idmap_pg_dir = .;
++		. += IDMAP_DIR_SIZE;
++		swapper_pg_dir = .;
++		. += SWAPPER_DIR_SIZE;
++		*(.pgdir)
++	}
+ 
+ 	_end = .;
+ 
 diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-index c7ba171951c8..526eeb7e1e97 100644
+index 32ddd893da9a..4f397a87c2be 100644
 --- a/arch/arm64/mm/mmu.c
 +++ b/arch/arm64/mm/mmu.c
-@@ -357,47 +357,10 @@ static void create_mapping_late(phys_addr_t phys, unsigned long virt,
- 				phys, virt, size, prot, late_alloc);
+@@ -396,6 +396,44 @@ static void __init __map_memblock(phys_addr_t start, phys_addr_t end)
  }
+ #endif
  
--#ifdef CONFIG_DEBUG_RODATA
- static void __init __map_memblock(phys_addr_t start, phys_addr_t end)
++struct bootstrap_pgtables {
++	pte_t	pte[PTRS_PER_PTE];
++	pmd_t	pmd[PTRS_PER_PMD > 1 ? PTRS_PER_PMD : 0];
++	pud_t	pud[PTRS_PER_PUD > 1 ? PTRS_PER_PUD : 0];
++};
++
++static void __init bootstrap_early_mapping(unsigned long addr,
++					   struct bootstrap_pgtables *reg,
++					   bool pte_level)
++{
++	pgd_t *pgd;
++	pud_t *pud;
++	pmd_t *pmd;
++
++	pgd = pgd_offset_k(addr);
++	if (pgd_none(*pgd)) {
++		clear_page(reg->pud);
++		memblock_reserve(__pa(reg->pud), PAGE_SIZE);
++		pgd_populate(&init_mm, pgd, reg->pud);
++	}
++	pud = pud_offset(pgd, addr);
++	if (pud_none(*pud)) {
++		clear_page(reg->pmd);
++		memblock_reserve(__pa(reg->pmd), PAGE_SIZE);
++		pud_populate(&init_mm, pud, reg->pmd);
++	}
++
++	if (!pte_level)
++		return;
++
++	pmd = pmd_offset(pud, addr);
++	if (pmd_none(*pmd)) {
++		clear_page(reg->pte);
++		memblock_reserve(__pa(reg->pte), PAGE_SIZE);
++		pmd_populate_kernel(&init_mm, pmd, reg->pte);
++	}
++}
++
+ static void __init map_mem(void)
  {
--	/*
--	 * Set up the executable regions using the existing section mappings
--	 * for now. This will get more fine grained later once all memory
--	 * is mapped
--	 */
--	unsigned long kernel_x_start = round_down(__pa(_stext), SWAPPER_BLOCK_SIZE);
--	unsigned long kernel_x_end = round_up(__pa(__init_end), SWAPPER_BLOCK_SIZE);
--
--	if (end < kernel_x_start) {
--		create_mapping(start, __phys_to_virt(start),
--			end - start, PAGE_KERNEL);
--	} else if (start >= kernel_x_end) {
--		create_mapping(start, __phys_to_virt(start),
--			end - start, PAGE_KERNEL);
--	} else {
--		if (start < kernel_x_start)
--			create_mapping(start, __phys_to_virt(start),
--				kernel_x_start - start,
--				PAGE_KERNEL);
--		create_mapping(kernel_x_start,
--				__phys_to_virt(kernel_x_start),
--				kernel_x_end - kernel_x_start,
--				PAGE_KERNEL_EXEC);
--		if (kernel_x_end < end)
--			create_mapping(kernel_x_end,
--				__phys_to_virt(kernel_x_end),
--				end - kernel_x_end,
--				PAGE_KERNEL);
--	}
--
--}
--#else
--static void __init __map_memblock(phys_addr_t start, phys_addr_t end)
--{
--	create_mapping(start, __phys_to_virt(start), end - start,
--			PAGE_KERNEL_EXEC);
-+	create_mapping(start, __phys_to_virt(start), end - start, PAGE_KERNEL);
+ 	struct memblock_region *reg;
+@@ -598,14 +636,6 @@ void vmemmap_free(unsigned long start, unsigned long end)
  }
+ #endif	/* CONFIG_SPARSEMEM_VMEMMAP */
+ 
+-static pte_t bm_pte[PTRS_PER_PTE] __page_aligned_bss;
+-#if CONFIG_PGTABLE_LEVELS > 2
+-static pmd_t bm_pmd[PTRS_PER_PMD] __page_aligned_bss;
 -#endif
+-#if CONFIG_PGTABLE_LEVELS > 3
+-static pud_t bm_pud[PTRS_PER_PUD] __page_aligned_bss;
+-#endif
+-
+ static inline pud_t * fixmap_pud(unsigned long addr)
+ {
+ 	pgd_t *pgd = pgd_offset_k(addr);
+@@ -635,21 +665,15 @@ static inline pte_t * fixmap_pte(unsigned long addr)
  
- struct bootstrap_pgtables {
- 	pte_t	pte[PTRS_PER_PTE];
-@@ -471,7 +434,7 @@ static unsigned long __init bootstrap_region(struct bootstrap_pgtables *reg,
- 				      SWAPPER_BLOCK_SIZE));
+ void __init early_fixmap_init(void)
+ {
+-	pgd_t *pgd;
+-	pud_t *pud;
++	static struct bootstrap_pgtables fixmap_bs_pgtables __pgdir;
+ 	pmd_t *pmd;
+-	unsigned long addr = FIXADDR_START;
  
- 		create_mapping(__pa(vstart - va_offset), vstart, vend - vstart,
--			       PAGE_KERNEL_EXEC);
-+			       PAGE_KERNEL);
+-	pgd = pgd_offset_k(addr);
+-	pgd_populate(&init_mm, pgd, bm_pud);
+-	pud = pud_offset(pgd, addr);
+-	pud_populate(&init_mm, pud, bm_pmd);
+-	pmd = pmd_offset(pud, addr);
+-	pmd_populate_kernel(&init_mm, pmd, bm_pte);
++	bootstrap_early_mapping(FIXADDR_START, &fixmap_bs_pgtables, true);
++	pmd = fixmap_pmd(FIXADDR_START);
  
- 		return vend;
- 	}
+ 	/*
+ 	 * The boot-ioremap range spans multiple pmds, for which
+-	 * we are not preparted:
++	 * we are not prepared:
+ 	 */
+ 	BUILD_BUG_ON((__fix_to_virt(FIX_BTMAP_BEGIN) >> PMD_SHIFT)
+ 		     != (__fix_to_virt(FIX_BTMAP_END) >> PMD_SHIFT));
 -- 
 1.9.1
