@@ -1,64 +1,41 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Mon, 16 Nov 2015 14:37:55 +0100
-Subject: [PATCH 22/27] mtd: nand: simplify nand_dt_init() usage
+Date: Mon, 16 Nov 2015 14:37:58 +0100
+Subject: [PATCH 25/27] ARM: make use of nand_set/get_controller_data() helpers
 In-Reply-To: <1447681080-31232-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1447681080-31232-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1447681080-31232-23-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1447681080-31232-26-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-nand_dt_init() function requires 3 arguments where it actually needs one
-(dn and mtd can both be retrieved from chip). Drop these parameters.
-
-Testing for dn != NULL inside nand_dt_init() also helps simplifying the
-caller code.
+New helpers have been added to avoid directly accessing chip->field. Use
+them where appropriate.
 
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 ---
- drivers/mtd/nand/nand_base.c | 21 +++++++++++----------
- 1 file changed, 11 insertions(+), 10 deletions(-)
+ arch/arm/mach-ixp4xx/ixdp425-setup.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/drivers/mtd/nand/nand_base.c b/drivers/mtd/nand/nand_base.c
-index 71cc029..2f75eb1 100644
---- a/drivers/mtd/nand/nand_base.c
-+++ b/drivers/mtd/nand/nand_base.c
-@@ -3937,11 +3937,17 @@ ident_done:
- 	return type;
- }
- 
--static int nand_dt_init(struct mtd_info *mtd, struct nand_chip *chip,
--			struct device_node *dn)
-+static int nand_dt_init(struct nand_chip *chip)
+diff --git a/arch/arm/mach-ixp4xx/ixdp425-setup.c b/arch/arm/mach-ixp4xx/ixdp425-setup.c
+index 333b0f9..508c2d7 100644
+--- a/arch/arm/mach-ixp4xx/ixdp425-setup.c
++++ b/arch/arm/mach-ixp4xx/ixdp425-setup.c
+@@ -77,7 +77,7 @@ static void
+ ixdp425_flash_nand_cmd_ctrl(struct mtd_info *mtd, int cmd, unsigned int ctrl)
  {
-+	struct device_node *dn = nand_get_flash_node(chip);
- 	int ecc_mode, ecc_strength, ecc_step;
+ 	struct nand_chip *this = mtd_to_nand(mtd);
+-	int offset = (int)this->priv;
++	int offset = (int)nand_get_controller_data(this);
  
-+	if (!dn)
-+		return 0;
-+
-+	/* MTD can automatically handle DT partitions, etc. */
-+	mtd_set_of_node(nand_to_mtd(chip), dn);
-+
- 	if (of_get_nand_bus_width(dn) == 16)
- 		chip->options |= NAND_BUSWIDTH_16;
+ 	if (ctrl & NAND_CTRL_CHANGE) {
+ 		if (ctrl & NAND_NCE) {
+@@ -88,7 +88,7 @@ ixdp425_flash_nand_cmd_ctrl(struct mtd_info *mtd, int cmd, unsigned int ctrl)
  
-@@ -3989,14 +3995,9 @@ int nand_scan_ident(struct mtd_info *mtd, int maxchips,
- 	struct nand_flash_dev *type;
- 	int ret;
+ 		offset = (ctrl & NAND_CLE) ? IXDP425_NAND_CMD_BYTE : 0;
+ 		offset |= (ctrl & NAND_ALE) ? IXDP425_NAND_ADDR_BYTE : 0;
+-		this->priv = (void *)offset;
++		nand_set_controller_data(this, (void *)offset);
+ 	}
  
--	if (nand_get_flash_node(chip)) {
--		/* MTD can automatically handle DT partitions, etc. */
--		mtd_set_of_node(mtd, nand_get_flash_node(chip));
--
--		ret = nand_dt_init(mtd, chip, nand_get_flash_node(chip));
--		if (ret)
--			return ret;
--	}
-+	ret = nand_dt_init(chip);
-+	if (ret)
-+		return ret;
- 
- 	/* Set the default functions */
- 	nand_set_defaults(chip, chip->options & NAND_BUSWIDTH_16);
+ 	if (cmd != NAND_CMD_NONE)
 -- 
 2.1.4
