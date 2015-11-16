@@ -1,56 +1,44 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Mon, 16 Nov 2015 09:56:37 +0100
-Subject: [PATCH v4 14/24] clk: pwm: use pwm_get/set_default_xxx() helpers
- where appropriate
+Date: Mon, 16 Nov 2015 09:56:40 +0100
+Subject: [PATCH v4 17/24] backlight: pwm_bl: remove useless call to
+ pwm_set_period
 In-Reply-To: <1447664207-24370-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1447664207-24370-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1447664207-24370-15-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1447664207-24370-18-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-pwm_set/get_default_xxx() helpers have been introduced to differentiate
-the default PWM states (those retrieved through DT, PWM lookup table or
-statically assigned by the driver) and the current ones.
-Make use of those helpers where appropriate.
+The PWM period will be set when calling pwm_config. Remove this useless
+call to pwm_set_period, which might mess up with the initial PWM state
+once we have added proper support for PWM init state retrieval.
 
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+Acked-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/clk/clk-pwm.c | 12 ++++++------
- 1 file changed, 6 insertions(+), 6 deletions(-)
+ drivers/video/backlight/pwm_bl.c | 8 +++++---
+ 1 file changed, 5 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/clk/clk-pwm.c b/drivers/clk/clk-pwm.c
-index b6306a2..642a49a 100644
---- a/drivers/clk/clk-pwm.c
-+++ b/drivers/clk/clk-pwm.c
-@@ -71,23 +71,23 @@ static int clk_pwm_probe(struct platform_device *pdev)
- 	if (IS_ERR(pwm))
- 		return PTR_ERR(pwm);
+diff --git a/drivers/video/backlight/pwm_bl.c b/drivers/video/backlight/pwm_bl.c
+index 54d5a03..5ff2976 100644
+--- a/drivers/video/backlight/pwm_bl.c
++++ b/drivers/video/backlight/pwm_bl.c
+@@ -292,12 +292,14 @@ static int pwm_backlight_probe(struct platform_device *pdev)
+ 	 * period, parsed from the DT, in the PWM device. For the non-DT case,
+ 	 * set the period from platform data if it has not already been set
+ 	 * via the PWM lookup table.
++	 * FIXME: This assignment should be dropped as soon as all the boards
++	 * have moved to the PWM lookup table approach. The same goes for the
++	 * pb->period field which should be replaced by
++	 * pwm_get_default_period() calls.
+ 	 */
+ 	pb->period = pwm_get_default_period(pb->pwm);
+-	if (!pb->period && (data->pwm_period_ns > 0)) {
++	if (!pb->period && (data->pwm_period_ns > 0))
+ 		pb->period = data->pwm_period_ns;
+-		pwm_set_period(pb->pwm, data->pwm_period_ns);
+-	}
  
--	if (!pwm_get_period((pwm))) {
-+	if (!pwm_get_default_period((pwm))) {
- 		dev_err(&pdev->dev, "invalid PWM period\n");
- 		return -EINVAL;
- 	}
- 
- 	if (of_property_read_u32(node, "clock-frequency", &clk_pwm->fixed_rate))
--		clk_pwm->fixed_rate = NSEC_PER_SEC / pwm_get_period((pwm));
-+		clk_pwm->fixed_rate = NSEC_PER_SEC / pwm_get_default_period((pwm));
- 
--	if (pwm_get_period((pwm)) != NSEC_PER_SEC / clk_pwm->fixed_rate &&
--	    pwm_get_period((pwm)) != DIV_ROUND_UP(NSEC_PER_SEC, clk_pwm->fixed_rate)) {
-+	if (pwm_get_default_period((pwm)) != NSEC_PER_SEC / clk_pwm->fixed_rate &&
-+	    pwm_get_default_period((pwm)) != DIV_ROUND_UP(NSEC_PER_SEC, clk_pwm->fixed_rate)) {
- 		dev_err(&pdev->dev,
- 			"clock-frequency does not match PWM period\n");
- 		return -EINVAL;
- 	}
- 
--	ret = pwm_config(pwm, (pwm_get_period((pwm)) + 1) >> 1,
--			 pwm_get_period((pwm)));
-+	ret = pwm_config(pwm, (pwm_get_default_period((pwm)) + 1) >> 1,
-+			 pwm_get_default_period((pwm)));
- 	if (ret < 0)
- 		return ret;
+ 	pb->lth_brightness = data->lth_brightness * (pb->period / pb->scale);
  
 -- 
 2.1.4
