@@ -1,112 +1,91 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Mon, 16 Nov 2015 14:55:09 +0100
-Subject: [PATCH v4 05/24] misc: max77693-haptic: use pwm_get_xxx()
- helpers where appropriate
-In-Reply-To: <5649D5D0.6080204@samsung.com>
-References: <1447664207-24370-1-git-send-email-boris.brezillon@free-electrons.com>
- <1447664207-24370-6-git-send-email-boris.brezillon@free-electrons.com>
- <5649D5D0.6080204@samsung.com>
-Message-ID: <20151116145509.3ea50eb0@bbrezillon>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 16 Nov 2015 08:01:19 -0600
+Subject: [PATCH v8 1/8] ARM: dt: Binding documentation for imx25 ADC/TSC
+In-Reply-To: <1447675269-8831-2-git-send-email-mpa@pengutronix.de>
+References: <1447675269-8831-1-git-send-email-mpa@pengutronix.de>
+ <1447675269-8831-2-git-send-email-mpa@pengutronix.de>
+Message-ID: <20151116140119.GA30407@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Krzysztof,
-
-On Mon, 16 Nov 2015 22:10:40 +0900
-Krzysztof Kozlowski <k.kozlowski@samsung.com> wrote:
-
-> W dniu 16.11.2015 o 17:56, Boris Brezillon pisze:
-> > Use pwm_get_xxx() helpers instead of directly accessing the pwm->xxx field.
-> > Doing that will ease adaptation of the PWM framework to support atomic
-> > update.
-> > 
-> > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> > ---
-> > Patch generated with the following coccinelle script:
-> > 
-> > --->8---
-> > virtual patch
-> > 
-> > @@
-> > struct pwm_device *p;
-> > expression e;
-> > @@
-> > (
-> > -(p)->polarity = e;
-> > +pwm_set_polarity((p), e);
-> > |
-> > -(p)->polarity
-> > +pwm_get_polarity((p))
-> > |
-> > -(p)->period = e;
-> > +pwm_set_period((p), e);
-> > |
-> > -(p)->period
-> > +pwm_get_period((p))
-> > |
-> > -(p)->duty_cycle = e;
-> > +pwm_set_duty_cycle((p), e);
-> > |
-> > -(p)->duty_cycle
-> > +pwm_get_duty_cycle((p))
-> > )
-> > --->8---
-> > ---
-> >  drivers/input/misc/max77693-haptic.c | 7 ++++---
-> >  1 file changed, 4 insertions(+), 3 deletions(-)
-> > 
-> > diff --git a/drivers/input/misc/max77693-haptic.c b/drivers/input/misc/max77693-haptic.c
-> > index 6d96bff..a038fb3 100644
-> > --- a/drivers/input/misc/max77693-haptic.c
-> > +++ b/drivers/input/misc/max77693-haptic.c
-> > @@ -70,10 +70,11 @@ struct max77693_haptic {
-> >  
-> >  static int max77693_haptic_set_duty_cycle(struct max77693_haptic *haptic)
-> >  {
-> > -	int delta = (haptic->pwm_dev->period + haptic->pwm_duty) / 2;
-> > +	int delta = (pwm_get_period((haptic->pwm_dev)) + haptic->pwm_duty) / 2;
+On Mon, Nov 16, 2015 at 01:01:02PM +0100, Markus Pargmann wrote:
+> This documentation describes the devicetree bindings for the
+> ADC/Touchscreen unit of the i.MX25 SoC.
 > 
-> Double parentheses over argument are not needed so just:
-> pwm_get_period(haptic->pwm_dev) + ...
+> Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+> Acked-by: Jonathan Cameron <jic23@kernel.org>
 
-Actually it was generated with coccinelle, hence I didn't fix existing
-coding style issues, but I have no problem fixing them.
+Acked-by: Rob Herring <robh@kernel.org>
 
-Thanks,
-
-Boris
-
+> ---
 > 
-> Beside that patch looks good, so with removing parentheses here and below:
+> Notes:
+>     Changes in v6:
+>      - Removed adc-ref property and replaced it with refp and refn for positive and
+>        negative references. The properties are optional now as the default
+>        behaviour is a positive internal reference voltage and ADC GND as negative
+>        reference.
 > 
-> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+>  .../devicetree/bindings/mfd/fsl-imx25-tsadc.txt    | 46 ++++++++++++++++++++++
+>  1 file changed, 46 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/mfd/fsl-imx25-tsadc.txt
 > 
-> Best regards,
-> Krzysztof
+> diff --git a/Documentation/devicetree/bindings/mfd/fsl-imx25-tsadc.txt b/Documentation/devicetree/bindings/mfd/fsl-imx25-tsadc.txt
+> new file mode 100644
+> index 000000000000..a857af0eb68c
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/mfd/fsl-imx25-tsadc.txt
+> @@ -0,0 +1,46 @@
+> +Freescale mx25 ADC/TSC multifunction device
+> +
+> +This device combines two general purpose conversion queues one used for general
+> +ADC and the other used for touchscreens.
+> +
+> +Required properties:
+> + - compatible: Should be "fsl,imx25-tsadc".
+> + - reg: Memory range of the device.
+> + - interrupts: Interrupt for this device as described in
+> +   interrupts/interrupts.txt
+> + - clocks: An 'ipg' clock defined as described in clocks/clock.txt
+> + - interrupt-controller: This device is an interrupt controller. It controls
+> +   the interrupts of both conversion queues.
+> + - #interrupt-cells: Should be '<1>'.
+> + - #address-cells: Should be '<1>'.
+> + - #size-cells: Should be '<1>'.
+> + - ranges
+> +
+> +This device includes two conversion queues which can be added as subnodes.
+> +The first queue is for the touchscreen, the second for general purpose ADC.
+> +
+> +Example:
+> +	tscadc: tscadc at 50030000 {
+> +		compatible = "fsl,imx25-tsadc";
+> +		reg = <0x50030000 0xc>;
+> +		interrupts = <46>;
+> +		clocks = <&clks 119>;
+> +		clock-names = "ipg";
+> +		interrupt-controller;
+> +		#interrupt-cells = <1>;
+> +		#address-cells = <1>;
+> +		#size-cells = <1>;
+> +		ranges;
+> +
+> +		tsc: tcq at 50030400 {
+> +			compatible = "fsl,imx25-tcq";
+> +			reg = <0x50030400 0x60>;
+> +			...
+> +		};
+> +
+> +		adc: gcq at 50030800 {
+> +			compatible = "fsl,imx25-gcq";
+> +			reg = <0x50030800 0x60>;
+> +			...
+> +		};
+> +	};
+> -- 
+> 2.6.1
 > 
-> >  	int error;
-> >  
-> > -	error = pwm_config(haptic->pwm_dev, delta, haptic->pwm_dev->period);
-> > +	error = pwm_config(haptic->pwm_dev, delta,
-> > +			   pwm_get_period((haptic->pwm_dev)));
-> >  	if (error) {
-> >  		dev_err(haptic->dev, "failed to configure pwm: %d\n", error);
-> >  		return error;
-> > @@ -245,7 +246,7 @@ static int max77693_haptic_play_effect(struct input_dev *dev, void *data,
-> >  	 * The formula to convert magnitude to pwm_duty as follows:
-> >  	 * - pwm_duty = (magnitude * pwm_period) / MAX_MAGNITUDE(0xFFFF)
-> >  	 */
-> > -	period_mag_multi = (u64)haptic->pwm_dev->period * haptic->magnitude;
-> > +	period_mag_multi = (u64)pwm_get_period((haptic->pwm_dev)) * haptic->magnitude;
-> >  	haptic->pwm_duty = (unsigned int)(period_mag_multi >>
-> >  						MAX_MAGNITUDE_SHIFT);
-> >  
-> > 
-> 
-
-
-
--- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+> --
+> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
