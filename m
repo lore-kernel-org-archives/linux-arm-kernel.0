@@ -1,37 +1,24 @@
-From: yang.shi@linaro.org (Shi, Yang)
-Date: Mon, 16 Nov 2015 11:48:57 -0800
-Subject: [PATCH V3 2/2] arm64: bpf: make BPF prologue and epilogue align
- with ARM64 AAPCS
-In-Reply-To: <CABg9mcvomep=M1As_Vj=XuTNk=jiGwXQqQWbjotMXP2csKX=Bg@mail.gmail.com>
-References: <CABg9mct-hnEhvT6y9ZgCC8nMan5YbmByQa_ViUWzeea6ToqG4A@mail.gmail.com>	<1447438197-31838-1-git-send-email-yang.shi@linaro.org>
- <CABg9mcvomep=M1As_Vj=XuTNk=jiGwXQqQWbjotMXP2csKX=Bg@mail.gmail.com>
-Message-ID: <564A3329.1070504@linaro.org>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 16 Nov 2015 19:49:15 +0000
+Subject: [PATCH v2 01/12] mm/memblock: add MEMBLOCK_NOMAP attribute to
+ memblock memory table
+In-Reply-To: <CAKv+Gu-COD0eSWqaTfV_QgCDEiBg5Af8FDVx+TMiYuVkqgTrvw@mail.gmail.com>
+References: <1447698757-8762-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1447698757-8762-2-git-send-email-ard.biesheuvel@linaro.org>
+ <20151116185859.GF8644@n2100.arm.linux.org.uk>
+ <CAKv+Gu-COD0eSWqaTfV_QgCDEiBg5Af8FDVx+TMiYuVkqgTrvw@mail.gmail.com>
+Message-ID: <20151116194914.GK8644@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/13/2015 6:39 PM, Z Lim wrote:
-> Yang, I noticed another thing...
->
-> On Fri, Nov 13, 2015 at 10:09 AM, Yang Shi <yang.shi@linaro.org> wrote:
->> Save and restore FP/LR in BPF prog prologue and epilogue, save SP to FP
->> in prologue in order to get the correct stack backtrace.
->>
->> However, ARM64 JIT used FP (x29) as eBPF fp register, FP is subjected to
->> change during function call so it may cause the BPF prog stack base address
->> change too.
->>
->> Use x25 to replace FP as BPF stack base register (fp). Since x25 is callee
->> saved register, so it will keep intact during function call.
->
-> Can you please add save/restore for x25 also? :)
+On Mon, Nov 16, 2015 at 08:09:38PM +0100, Ard Biesheuvel wrote:
+> The main difference is that memblock_is_memory() still returns true
+> for the region. This is useful in some cases, e.g., to decide which
+> attributes to use when mapping.
 
-Sure. BTW, since PUSH invokes stp instruction and SP need 16-bytes 
-alignment, so we have to save x26 with x25 together. Anyway, it won't 
-introduce any harm overhead since one instruction saves two registers.
+Ok, so we'd need to switch to using memblock_is_map_memory() instead
+for pfn_valid() then.
 
-Yang
-
->
->> It is initialized in BPF prog prologue when BPF prog is started to run
->> everytime. When BPF prog exits, it could be just tossed.
->>
+-- 
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
