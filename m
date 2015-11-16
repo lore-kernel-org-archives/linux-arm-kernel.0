@@ -1,152 +1,73 @@
-From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Mon, 16 Nov 2015 14:44:53 +0000
-Subject: [PATCH 2/2] drm/rockchip: Convert the probe function to the generic
- drm_of_component_probe()
-In-Reply-To: <1447685093-26129-1-git-send-email-Liviu.Dudau@arm.com>
-References: <1447685093-26129-1-git-send-email-Liviu.Dudau@arm.com>
-Message-ID: <1447685093-26129-3-git-send-email-Liviu.Dudau@arm.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 16 Nov 2015 14:45:25 +0000
+Subject: [PATCH 1/2] Documentation: DT: Add entry for ARM SP805-WDT
+In-Reply-To: <1447683883-6600-2-git-send-email-bhupesh.sharma@freescale.com>
+References: <1447683883-6600-1-git-send-email-bhupesh.sharma@freescale.com>
+ <1447683883-6600-2-git-send-email-bhupesh.sharma@freescale.com>
+Message-ID: <20151116144525.GM20696@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Take two: Initial attempt to convert rockchip to drm_of_component_probe()
-missed the difference between ports and encoders when using the
-compare_of() function. Now that drm_of_component_probe() has been enhanced,
-let's try again the conversion.
+On Mon, Nov 16, 2015 at 07:54:42PM +0530, Bhupesh Sharma wrote:
+> This patch adds a devicetree binding documentation for ARM's
+> SP805 WatchDog Timer.
+> 
+> Signed-off-by: Bhupesh Sharma <bhupesh.sharma@freescale.com>
+> ---
+>  .../devicetree/bindings/watchdog/sp805-wdt.txt     |   33 ++++++++++++++++++++
+>  1 file changed, 33 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/watchdog/sp805-wdt.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/watchdog/sp805-wdt.txt b/Documentation/devicetree/bindings/watchdog/sp805-wdt.txt
+> new file mode 100644
+> index 0000000..ec70fe9
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/watchdog/sp805-wdt.txt
+> @@ -0,0 +1,33 @@
+> +* ARM SP805 Watchdog Timer (WDT) Controller
+> +
+> +SP805 WDT is a ARM Primecell Peripheral and has a standard-id register that
+> +can be used to identify the peripheral type, vendor, and revision.
+> +This value can be used for driver matching.
+> +
+> +Note that the current sp805_wdt driver relies on the 'drivers/amba/bus.c'
+> +framework to invoke the probe function of the sp805_wdt driver using the
+> +unique PRIMECELL identifiers of the sp805 wdt IP.
 
-Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
----
- drivers/gpu/drm/rockchip/rockchip_drm_drv.c | 98 ++++++-----------------------
- 1 file changed, 18 insertions(+), 80 deletions(-)
+This paragraph can go. We shouldn't describe kernel internals.
 
-diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_drv.c b/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
-index f22e1e1..581e98c 100644
---- a/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
-+++ b/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
-@@ -19,6 +19,7 @@
- #include <drm/drmP.h>
- #include <drm/drm_crtc_helper.h>
- #include <drm/drm_fb_helper.h>
-+#include <drm/drm_of.h>
- #include <linux/dma-mapping.h>
- #include <linux/pm_runtime.h>
- #include <linux/module.h>
-@@ -411,36 +412,6 @@ int rockchip_drm_encoder_get_mux_id(struct device_node *node,
- }
- EXPORT_SYMBOL_GPL(rockchip_drm_encoder_get_mux_id);
- 
--static int compare_of(struct device *dev, void *data)
--{
--	struct device_node *np = data;
--
--	return dev->of_node == np;
--}
--
--static void rockchip_add_endpoints(struct device *dev,
--				   struct component_match **match,
--				   struct device_node *port)
--{
--	struct device_node *ep, *remote;
--
--	for_each_child_of_node(port, ep) {
--		remote = of_graph_get_remote_port_parent(ep);
--		if (!remote || !of_device_is_available(remote)) {
--			of_node_put(remote);
--			continue;
--		} else if (!of_device_is_available(remote->parent)) {
--			dev_warn(dev, "parent device of %s is not available\n",
--				 remote->full_name);
--			of_node_put(remote);
--			continue;
--		}
--
--		component_match_add(dev, match, compare_of, remote);
--		of_node_put(remote);
--	}
--}
--
- static int rockchip_drm_bind(struct device *dev)
- {
- 	struct drm_device *drm;
-@@ -481,63 +452,30 @@ static const struct component_master_ops rockchip_drm_ops = {
- 	.unbind = rockchip_drm_unbind,
- };
- 
--static int rockchip_drm_platform_probe(struct platform_device *pdev)
-+static int compare_port(struct device *dev, void *data)
- {
--	struct device *dev = &pdev->dev;
--	struct component_match *match = NULL;
--	struct device_node *np = dev->of_node;
--	struct device_node *port;
--	int i;
-+	struct device_node *np = data;
- 
--	if (!np)
--		return -ENODEV;
--	/*
--	 * Bind the crtc ports first, so that
--	 * drm_of_find_possible_crtcs called from encoder .bind callbacks
--	 * works as expected.
--	 */
--	for (i = 0;; i++) {
--		port = of_parse_phandle(np, "ports", i);
--		if (!port)
--			break;
--
--		if (!of_device_is_available(port->parent)) {
--			of_node_put(port);
--			continue;
--		}
-+	return dev->parent->of_node == np;
-+}
- 
--		component_match_add(dev, &match, compare_of, port->parent);
--		of_node_put(port);
--	}
-+static int compare_encoder(struct device *dev, void *data)
-+{
-+	struct device_node *np = data;
- 
--	if (i == 0) {
--		dev_err(dev, "missing 'ports' property\n");
--		return -ENODEV;
--	}
-+	return dev->of_node == np;
-+}
- 
--	if (!match) {
--		dev_err(dev, "No available vop found for display-subsystem.\n");
--		return -ENODEV;
--	}
--	/*
--	 * For each bound crtc, bind the encoders attached to its
--	 * remote endpoint.
--	 */
--	for (i = 0;; i++) {
--		port = of_parse_phandle(np, "ports", i);
--		if (!port)
--			break;
--
--		if (!of_device_is_available(port->parent)) {
--			of_node_put(port);
--			continue;
--		}
-+static int rockchip_drm_platform_probe(struct platform_device *pdev)
-+{
-+	int ret = drm_of_component_probe(&pdev->dev, compare_port,
-+					 compare_encoder, &rockchip_drm_ops);
- 
--		rockchip_add_endpoints(dev, &match, port);
--		of_node_put(port);
--	}
-+	/* keep compatibility with old code that was returning -ENODEV */
-+	if (ret == -EINVAL)
-+		return -ENODEV;
- 
--	return component_master_add_with_match(dev, &rockchip_drm_ops, match);
-+	return ret;
- }
- 
- static int rockchip_drm_platform_remove(struct platform_device *pdev)
--- 
-2.6.0
+> +As SP805 WDT is a primecell IP, it follows the base bindings specified in
+> +'arm/primecell.txt'
+> +
+> +Required properties:
+> +- compatible : Should be "arm,sp805-wdt", "arm,primecell"
+> +- reg : Base address and size of the watchdog timer registers.
+> +- interrupts : Should specify WDT interrupt number.
+> +
+> +Optional properties:
+> +- clocks : From common clock binding. First clock is phandle to clock for apb
+> +           pclk. Additional clocks are optional.
+> +- clock-names : From common clock binding. Shall be "apb_pclk" for first clock.
+
+The hardware has "WDOGCLK", which is what the driver appears to expect
+first implicitly.
+
+> +Examples:
+> +
+> +		cluster1_core0_watchdog: wdt at c000000 {
+> +			compatible = "arm,sp805-wdt", "arm,primecell";
+> +			reg = <0x0 0xc000000 0x0 0x1000>;
+> +			interrupts = <1 12 0x8>; /* PPI, Level low type */
+
+I don't see how you can use PPIs here. This is not banked per CPU.
+
+Mark.
+
+> +			clocks = <&clockgen 4 3>;
+> +			clock-names = "apb_pclk";
+> +		};
+> +
+> -- 
+> 1.7.9.5
+> 
+> 
