@@ -1,43 +1,148 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Mon, 16 Nov 2015 15:57:36 -0500 (EST)
-Subject: [PATCH v3] ARM: xip: Use correct symbol for end of ROM marker
-In-Reply-To: <20151116181718.GW8644@n2100.arm.linux.org.uk>
-References: <1447362108-4333-1-git-send-email-chris.brandt@renesas.com>
- <1447697140-4099-1-git-send-email-chris.brandt@renesas.com>
- <20151116181718.GW8644@n2100.arm.linux.org.uk>
-Message-ID: <alpine.LFD.2.20.1511161550370.5826@knanqh.ubzr>
+From: mmcclint@qca.qualcomm.com (Matthew McClintock)
+Date: Mon, 16 Nov 2015 15:02:04 -0600
+Subject: [PATCH v2 4/5] qcom: ipq4019: Add basic board/dts support for IPQ4019
+ SoC
+In-Reply-To: <1447707725-19449-1-git-send-email-mmcclint@qca.qualcomm.com>
+References: <1446758697-31198-1-git-send-email-mmcclint@codeaurora.org>
+ <1447707725-19449-1-git-send-email-mmcclint@qca.qualcomm.com>
+Message-ID: <1447707725-19449-4-git-send-email-mmcclint@qca.qualcomm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 16 Nov 2015, Russell King - ARM Linux wrote:
+From: Matthew McClintock <mmcclint@codeaurora.org>
 
-> Nico,
-> 
-> As you originally created the XIP stuff, I hope you can remember
-> the details - can you check this patch please?
-> 
-> I'm thinking that we need a new symbol around here:
-> 
-> #ifdef CONFIG_XIP_KERNEL
->         __data_loc = ALIGN(4);          /* location in binary */
-> 					<=== here
->         . = PAGE_OFFSET + TEXT_OFFSET;
-> #else
-> 
-> to denote the end of the XIP kernel image which must remain
-> accessible after boot.  We don't need the data sections because
-> they will have been copied to RAM, and we probably don't want to
-> keep those exposed (it's potentially useful for attackers.)
+Add initial dts files and SoC support for IPQ4019
 
-The _etext symbol is already used for that purpose.
+Signed-off-by: Varadarajan Narayanan <varada@codeaurora.org>
+---
 
-Now we round it up to the next section mapping which might leave quite a 
-lot of data content exposed in ROM.  But given it is more or less the 
-same data present in RAM except for those bits that are modified at run 
-time, I don't see what an attacker would gain from the data in ROM   
-that cannot already be obtained from kernel RAM.  If the section mapping 
-extends to part of the ROM that is no longer kernel data then maybe this 
-would expose sensitive data.  Is that what you're worried about?
+v2 - add sleep_clk
 
+ arch/arm/boot/dts/qcom-ipq4019.dtsi | 115 ++++++++++++++++++++++++++++++++++++
+ 1 file changed, 115 insertions(+)
+ create mode 100644 arch/arm/boot/dts/qcom-ipq4019.dtsi
 
-Nicolas
+diff --git a/arch/arm/boot/dts/qcom-ipq4019.dtsi b/arch/arm/boot/dts/qcom-ipq4019.dtsi
+new file mode 100644
+index 0000000..fc73822
+--- /dev/null
++++ b/arch/arm/boot/dts/qcom-ipq4019.dtsi
+@@ -0,0 +1,115 @@
++/*
++ * Copyright (c) 2015, The Linux Foundation. All rights reserved.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 and
++ * only version 2 as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++
++/dts-v1/;
++
++#include "skeleton.dtsi"
++#include <dt-bindings/clock/qcom,gcc-ipq4019.h>
++
++/ {
++	model = "Qualcomm Technologies, Inc. IPQ4019";
++	compatible = "qcom,ipq4019";
++	interrupt-parent = <&intc>;
++
++	cpus {
++		#address-cells = <1>;
++		#size-cells = <0>;
++		cpu at 0 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a7";
++			reg = <0x0>;
++			clocks = <&gcc GCC_APPS_CLK_SRC>;
++		};
++
++		cpu at 1 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a7";
++			reg = <0x1>;
++			clocks = <&gcc GCC_APPS_CLK_SRC>;
++		};
++
++		cpu at 2 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a7";
++			reg = <0x2>;
++			clocks = <&gcc GCC_APPS_CLK_SRC>;
++		};
++
++		cpu at 3 {
++			device_type = "cpu";
++			compatible = "arm,cortex-a7";
++			reg = <0x3>;
++			clocks = <&gcc GCC_APPS_CLK_SRC>;
++		};
++	};
++
++	clocks {
++		sleep_clk: sleep_clk {
++			compatible = "fixed-clock";
++			clock-frequency = <32768>;
++			#clock-cells = <0>;
++		};
++	};
++
++	soc {
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges;
++		compatible = "simple-bus";
++
++		intc: interrupt-controller at b000000 {
++			compatible = "qcom,msm-qgic2";
++			interrupt-controller;
++			#interrupt-cells = <3>;
++			reg = <0x0b000000 0x1000>,
++			<0x0b002000 0x1000>;
++		};
++
++		gcc: clock-controller at 1800000 {
++			compatible = "qcom,gcc-ipq4019";
++			#clock-cells = <1>;
++			#reset-cells = <1>;
++			reg = <0x1800000 0x60000>;
++		};
++
++		tlmm: pinctrl at 0x01000000 {
++			compatible = "qcom,ipq4019-pinctrl";
++			reg = <0x01000000 0x300000>;
++			gpio-controller;
++			#gpio-cells = <2>;
++			interrupt-controller;
++			#interrupt-cells = <2>;
++			interrupts = <0 208 0>;
++		};
++
++		serial at 78af000 {
++			compatible = "qcom,msm-uartdm-v1.4", "qcom,msm-uartdm";
++			reg = <0x78af000 0x200>;
++			interrupts = <0 107 0>;
++			status = "disabled";
++			clocks = <&gcc GCC_BLSP1_UART1_APPS_CLK>,
++				<&gcc GCC_BLSP1_AHB_CLK>;
++			clock-names = "core", "iface";
++		};
++
++		serial at 78b0000 {
++			compatible = "qcom,msm-uartdm-v1.4", "qcom,msm-uartdm";
++			reg = <0x78b0000 0x200>;
++			interrupts = <0 108 0>;
++			status = "disabled";
++			clocks = <&gcc GCC_BLSP1_UART2_APPS_CLK>,
++				<&gcc GCC_BLSP1_AHB_CLK>;
++			clock-names = "core", "iface";
++		};
++	};
++};
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
