@@ -1,81 +1,54 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Mon, 16 Nov 2015 09:56:26 +0100
-Subject: [PATCH v4 03/24] clk: pwm: use pwm_get_xxx() helpers where appropriate
+Date: Mon, 16 Nov 2015 09:56:37 +0100
+Subject: [PATCH v4 14/24] clk: pwm: use pwm_get/set_default_xxx() helpers
+ where appropriate
 In-Reply-To: <1447664207-24370-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1447664207-24370-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1447664207-24370-4-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1447664207-24370-15-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Use pwm_get_xxx() helpers instead of directly accessing the pwm->xxx field.
-Doing that will ease adaptation of the PWM framework to support atomic
-update.
+pwm_set/get_default_xxx() helpers have been introduced to differentiate
+the default PWM states (those retrieved through DT, PWM lookup table or
+statically assigned by the driver) and the current ones.
+Make use of those helpers where appropriate.
 
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 ---
-Patch generated with the following coccinelle script:
-
---->8---
-virtual patch
-
-@@
-struct pwm_device *p;
-expression e;
-@@
-(
--(p)->polarity = e;
-+pwm_set_polarity((p), e);
-|
--(p)->polarity
-+pwm_get_polarity((p))
-|
--(p)->period = e;
-+pwm_set_period((p), e);
-|
--(p)->period
-+pwm_get_period((p))
-|
--(p)->duty_cycle = e;
-+pwm_set_duty_cycle((p), e);
-|
--(p)->duty_cycle
-+pwm_get_duty_cycle((p))
-)
---->8---
----
- drivers/clk/clk-pwm.c | 11 ++++++-----
- 1 file changed, 6 insertions(+), 5 deletions(-)
+ drivers/clk/clk-pwm.c | 12 ++++++------
+ 1 file changed, 6 insertions(+), 6 deletions(-)
 
 diff --git a/drivers/clk/clk-pwm.c b/drivers/clk/clk-pwm.c
-index 328fcfc..b6306a2 100644
+index b6306a2..642a49a 100644
 --- a/drivers/clk/clk-pwm.c
 +++ b/drivers/clk/clk-pwm.c
-@@ -71,22 +71,23 @@ static int clk_pwm_probe(struct platform_device *pdev)
+@@ -71,23 +71,23 @@ static int clk_pwm_probe(struct platform_device *pdev)
  	if (IS_ERR(pwm))
  		return PTR_ERR(pwm);
  
--	if (!pwm->period) {
-+	if (!pwm_get_period((pwm))) {
+-	if (!pwm_get_period((pwm))) {
++	if (!pwm_get_default_period((pwm))) {
  		dev_err(&pdev->dev, "invalid PWM period\n");
  		return -EINVAL;
  	}
  
  	if (of_property_read_u32(node, "clock-frequency", &clk_pwm->fixed_rate))
--		clk_pwm->fixed_rate = NSEC_PER_SEC / pwm->period;
-+		clk_pwm->fixed_rate = NSEC_PER_SEC / pwm_get_period((pwm));
+-		clk_pwm->fixed_rate = NSEC_PER_SEC / pwm_get_period((pwm));
++		clk_pwm->fixed_rate = NSEC_PER_SEC / pwm_get_default_period((pwm));
  
--	if (pwm->period != NSEC_PER_SEC / clk_pwm->fixed_rate &&
--	    pwm->period != DIV_ROUND_UP(NSEC_PER_SEC, clk_pwm->fixed_rate)) {
-+	if (pwm_get_period((pwm)) != NSEC_PER_SEC / clk_pwm->fixed_rate &&
-+	    pwm_get_period((pwm)) != DIV_ROUND_UP(NSEC_PER_SEC, clk_pwm->fixed_rate)) {
+-	if (pwm_get_period((pwm)) != NSEC_PER_SEC / clk_pwm->fixed_rate &&
+-	    pwm_get_period((pwm)) != DIV_ROUND_UP(NSEC_PER_SEC, clk_pwm->fixed_rate)) {
++	if (pwm_get_default_period((pwm)) != NSEC_PER_SEC / clk_pwm->fixed_rate &&
++	    pwm_get_default_period((pwm)) != DIV_ROUND_UP(NSEC_PER_SEC, clk_pwm->fixed_rate)) {
  		dev_err(&pdev->dev,
  			"clock-frequency does not match PWM period\n");
  		return -EINVAL;
  	}
  
--	ret = pwm_config(pwm, (pwm->period + 1) >> 1, pwm->period);
-+	ret = pwm_config(pwm, (pwm_get_period((pwm)) + 1) >> 1,
-+			 pwm_get_period((pwm)));
+-	ret = pwm_config(pwm, (pwm_get_period((pwm)) + 1) >> 1,
+-			 pwm_get_period((pwm)));
++	ret = pwm_config(pwm, (pwm_get_default_period((pwm)) + 1) >> 1,
++			 pwm_get_default_period((pwm)));
  	if (ret < 0)
  		return ret;
  
