@@ -1,58 +1,38 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Mon, 16 Nov 2015 14:34:11 -0800
-Subject: [PATCH] drm/fsl-dcu: Fix no fb check bug
-In-Reply-To: <1440992397-40533-1-git-send-email-jianwei.wang.chn@gmail.com>
-References: <1440992397-40533-1-git-send-email-jianwei.wang.chn@gmail.com>
-Message-ID: <c1f2ea5c161e8bdd4d3c6109543404d0@agner.ch>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 16 Nov 2015 22:39:02 +0000
+Subject: [PATCH] stm: select CONFIG_SRCU
+In-Reply-To: <12747713.N26XusNZpW@wuerfel>
+References: <12747713.N26XusNZpW@wuerfel>
+Message-ID: <20151116223902.GO8644@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-This avoids a NULL pointer dereference when no crtc is available (e.g.
-the fsl,panel not assigned).
-
-Any chance to get this into 4.4?
-
-Tested-by: Stefan Agner <stefan@agner.ch>
-
---
-Stefan
-
-On 2015-08-30 20:39, Jianwei Wang wrote:
-> For state->fb may be NULL in fsl_dcu_drm_plane_atomic_check function,
-> if so, return -EINVAL. No need check in fsl_dcu_drm_plane_atomic_update
-> anymore.
+On Mon, Nov 16, 2015 at 10:14:35PM +0100, Arnd Bergmann wrote:
+> The newly added STM code uses SRCU, but does not ensure that
+> this code is part of the kernel:
 > 
-> Signed-off-by: Jianwei Wang <jianwei.wang.chn@gmail.com>
-> ---
->  drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_plane.c | 6 +++---
->  1 file changed, 3 insertions(+), 3 deletions(-)
+> drivers/built-in.o: In function `stm_source_link_show':
+> include/linux/srcu.h:221: undefined reference to `__srcu_read_lock'
+> include/linux/srcu.h:238: undefined reference to `__srcu_read_unlock'
+> drivers/built-in.o: In function `stm_source_link_drop':
+> include/linux/srcu.h:221: undefined reference to `__srcu_read_lock'
+> include/linux/srcu.h:238: undefined reference to `__srcu_read_unlock'
 > 
-> diff --git a/drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_plane.c
-> b/drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_plane.c
-> index 82be6b8..8787920 100644
-> --- a/drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_plane.c
-> +++ b/drivers/gpu/drm/fsl-dcu/fsl_dcu_drm_plane.c
-> @@ -41,6 +41,9 @@ static int fsl_dcu_drm_plane_atomic_check(struct
-> drm_plane *plane,
->  {
->  	struct drm_framebuffer *fb = state->fb;
->  
-> +	if (!fb)
-> +		return -EINVAL;
-> +
->  	switch (fb->pixel_format) {
->  	case DRM_FORMAT_RGB565:
->  	case DRM_FORMAT_RGB888:
-> @@ -84,9 +87,6 @@ static void fsl_dcu_drm_plane_atomic_update(struct
-> drm_plane *plane,
->  	unsigned int alpha, bpp;
->  	int index, ret;
->  
-> -	if (!fb)
-> -		return;
-> -
->  	index = fsl_dcu_drm_plane_index(plane);
->  	if (index < 0)
->  		return;
+> This adds a Kconfig 'select' statement like all the other SRCU using
+> drivers have.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Fixes: 7bd1d4093c2f ("stm class: Introduce an abstraction for System Trace Module devices")
+
+Related to this, I have to ask why if I answer to N to STM, I'm then
+presented with the STM driver options in this file.  It's not like
+they'll be built, as drivers/Makefile has:
+
+obj-$(CONFIG_STM)               += hwtracing/stm/
+
+so it seems rather pointless..  Maybe the other options here should
+be wrapped with if STM..endif ?
+
+-- 
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
