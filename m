@@ -1,94 +1,49 @@
-From: Julia.Lawall@lip6.fr (Julia Lawall)
-Date: Mon, 16 Nov 2015 12:33:20 +0100
-Subject: [PATCH 7/7] phy: cygnus: pcie: add missing of_node_put
-In-Reply-To: <1447673600-8881-1-git-send-email-Julia.Lawall@lip6.fr>
-References: <1447673600-8881-1-git-send-email-Julia.Lawall@lip6.fr>
-Message-ID: <1447673600-8881-8-git-send-email-Julia.Lawall@lip6.fr>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Mon, 16 Nov 2015 13:01:09 +0100
+Subject: [PATCH v8 8/8] ARM: imx_v4_v5_defconfig: Add I.MX25 Touchscreen
+ controller and ADC support.
+In-Reply-To: <1447675269-8831-1-git-send-email-mpa@pengutronix.de>
+References: <1447675269-8831-1-git-send-email-mpa@pengutronix.de>
+Message-ID: <1447675269-8831-9-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-for_each_available_child_of_node performs an of_node_get on each iteration,
-so a return from the middle of the loop requires an of_node_put.
+From: Denis Carikli <denis@eukrea.com>
 
-A simplified version of the semantic patch that finds this problem is as
-follows (http://coccinelle.lip6.fr):
-
-// <smpl>
-@@
-expression root,e;
-local idexpression child;
-@@
-
- for_each_available_child_of_node(root, child) {
-   ... when != of_node_put(child)
-       when != e = child
-(
-   return child;
-|
-*  return ...;
-)
-   ...
- }
-// </smpl>
-
-Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
-
+Signed-off-by: Denis Carikli <denis@eukrea.com>
+Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
 ---
- drivers/phy/phy-bcm-cygnus-pcie.c |   16 ++++++++++++----
- 1 file changed, 12 insertions(+), 4 deletions(-)
+ arch/arm/configs/imx_v4_v5_defconfig | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-diff --git a/drivers/phy/phy-bcm-cygnus-pcie.c b/drivers/phy/phy-bcm-cygnus-pcie.c
-index 7ad72b7..082c03f 100644
---- a/drivers/phy/phy-bcm-cygnus-pcie.c
-+++ b/drivers/phy/phy-bcm-cygnus-pcie.c
-@@ -128,6 +128,7 @@ static int cygnus_pcie_phy_probe(struct platform_device *pdev)
- 	struct phy_provider *provider;
- 	struct resource *res;
- 	unsigned cnt = 0;
-+	int ret;
- 
- 	if (of_get_child_count(node) == 0) {
- 		dev_err(dev, "PHY no child node\n");
-@@ -154,24 +155,28 @@ static int cygnus_pcie_phy_probe(struct platform_device *pdev)
- 		if (of_property_read_u32(child, "reg", &id)) {
- 			dev_err(dev, "missing reg property for %s\n",
- 				child->name);
--			return -EINVAL;
-+			ret = -EINVAL;
-+			goto put_child;
- 		}
- 
- 		if (id >= MAX_NUM_PHYS) {
- 			dev_err(dev, "invalid PHY id: %u\n", id);
--			return -EINVAL;
-+			ret = -EINVAL;
-+			goto put_child;
- 		}
- 
- 		if (core->phys[id].phy) {
- 			dev_err(dev, "duplicated PHY id: %u\n", id);
--			return -EINVAL;
-+			ret = -EINVAL;
-+			goto put_child;
- 		}
- 
- 		p = &core->phys[id];
- 		p->phy = devm_phy_create(dev, child, &cygnus_pcie_phy_ops);
- 		if (IS_ERR(p->phy)) {
- 			dev_err(dev, "failed to create PHY\n");
--			return PTR_ERR(p->phy);
-+			ret = PTR_ERR(p->phy);
-+			goto put_child;
- 		}
- 
- 		p->core = core;
-@@ -191,6 +196,9 @@ static int cygnus_pcie_phy_probe(struct platform_device *pdev)
- 	dev_dbg(dev, "registered %u PCIe PHY(s)\n", cnt);
- 
- 	return 0;
-+put_child:
-+	of_node_put(child);
-+	return ret;
- }
- 
- static const struct of_device_id cygnus_pcie_phy_match_table[] = {
+diff --git a/arch/arm/configs/imx_v4_v5_defconfig b/arch/arm/configs/imx_v4_v5_defconfig
+index d3a8018639de..d6754ac47788 100644
+--- a/arch/arm/configs/imx_v4_v5_defconfig
++++ b/arch/arm/configs/imx_v4_v5_defconfig
+@@ -88,6 +88,7 @@ CONFIG_KEYBOARD_IMX=y
+ # CONFIG_INPUT_MOUSE is not set
+ CONFIG_INPUT_TOUCHSCREEN=y
+ CONFIG_TOUCHSCREEN_ADS7846=m
++CONFIG_TOUCHSCREEN_MX25=y
+ CONFIG_TOUCHSCREEN_MC13783=y
+ # CONFIG_LEGACY_PTYS is not set
+ CONFIG_SERIAL_8250=m
+@@ -107,6 +108,7 @@ CONFIG_HWMON=m
+ CONFIG_SENSORS_MC13783_ADC=m
+ CONFIG_WATCHDOG=y
+ CONFIG_IMX2_WDT=y
++CONFIG_MFD_MX25_TSADC=y
+ CONFIG_MFD_MC13XXX_SPI=y
+ CONFIG_REGULATOR=y
+ CONFIG_REGULATOR_FIXED_VOLTAGE=y
+@@ -172,6 +174,8 @@ CONFIG_DMADEVICES=y
+ CONFIG_IMX_SDMA=y
+ CONFIG_IMX_DMA=y
+ # CONFIG_IOMMU_SUPPORT is not set
++CONFIG_IIO=y
++CONFIG_FSL_MX25_ADC=y
+ CONFIG_EXT2_FS=y
+ CONFIG_EXT3_FS=y
+ CONFIG_EXT4_FS=y
+-- 
+2.6.1
