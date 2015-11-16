@@ -1,96 +1,80 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Mon, 16 Nov 2015 11:00:12 +0800
-Subject: [linux-sunxi] [PATCH 5/5] ARM: dts: sun8i-h3-orangepi-plus:
- Enable USB host controllers
-In-Reply-To: <1447616777-24660-5-git-send-email-hdegoede@redhat.com>
-References: <1447616777-24660-1-git-send-email-hdegoede@redhat.com>
- <1447616777-24660-5-git-send-email-hdegoede@redhat.com>
-Message-ID: <CAGb2v669Cu6+G=P8yH-g5KbOsWTHBgnYUYf2fGt+jKXbqVAKfQ@mail.gmail.com>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Mon, 16 Nov 2015 12:05:05 +0900
+Subject: [PATCH 1/2] clk: samsung: Don't build ARMv8 clock drivers on ARMv7
+In-Reply-To: <1447637775-9887-2-git-send-email-k.kozlowski@samsung.com>
+References: <1447637775-9887-1-git-send-email-k.kozlowski@samsung.com>
+ <1447637775-9887-2-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <564947E1.1030409@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On Mon, Nov 16, 2015 at 3:46 AM, Hans de Goede <hdegoede@redhat.com> wrote:
-> From: Reinder de Haan <patchesrdh@mveas.com>
->
-> Enable the 3 pairs of USB host controllers used on the Orange Pi Plus.
->
-> Signed-off-by: Reinder de Haan <patchesrdh@mveas.com>
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+On 2015? 11? 16? 10:36, Krzysztof Kozlowski wrote:
+> Currently the Exynos5433 (ARMv8 SoC) clock driver depends on ARCH_EXYNOS
+> so it is built also on ARMv7. This does not bring any kind of benefit.
+> There won't be a single kernel image for ARMv7 and ARMv8 SoCs (like
+> multi_v7 for ARMv7).
+> 
+> Instead build clock drivers only for respective SoC's architecture.
+> 
+> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 > ---
->  arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts | 28 ++++++++++++++++++++++++++++
->  1 file changed, 28 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts b/arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts
-> index e67df59..e05a409 100644
-> --- a/arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts
-> +++ b/arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts
-> @@ -60,6 +60,18 @@
->         };
->  };
->
-> +&ehci1 {
-> +       status = "okay";
-> +};
+>  drivers/clk/samsung/Kconfig  | 13 +++++++++++++
+>  drivers/clk/samsung/Makefile |  4 ++--
+>  2 files changed, 15 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/clk/samsung/Kconfig b/drivers/clk/samsung/Kconfig
+> index 84196ecdaa12..5f138fc4d84d 100644
+> --- a/drivers/clk/samsung/Kconfig
+> +++ b/drivers/clk/samsung/Kconfig
+> @@ -2,6 +2,7 @@ config COMMON_CLK_SAMSUNG
+>  	bool
+>  	select COMMON_CLK
+>  
+> +# ARMv7 SoCs:
+>  config S3C2410_COMMON_CLK
+>  	bool
+>  	select COMMON_CLK_SAMSUNG
+> @@ -24,3 +25,15 @@ config S3C2443_COMMON_CLK
+>  	bool
+>  	select COMMON_CLK_SAMSUNG
+>  
+> +# ARMv8 SoCs:
+> +config EXYNOS5433_COMMON_CLK
+> +	bool
+> +	depends on ARM64 || COMPILE_TEST
+> +	default ARCH_EXYNOS
+> +	select COMMON_CLK_SAMSUNG
 > +
-> +&ehci2 {
-> +       status = "okay";
-> +};
-> +
-> +&ehci3 {
-> +       status = "okay";
-> +};
-> +
->  &mmc0 {
->         pinctrl-names = "default";
->         pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin>;
-> @@ -70,8 +82,24 @@
->         status = "okay";
->  };
->
-> +&ohci1 {
-> +       status = "okay";
-> +};
+> +config EXYNOS7_COMMON_CLK
+> +	bool
+> +	depends on ARM64 || COMPILE_TEST
+> +	default ARCH_EXYNOS
+> +	select COMMON_CLK_SAMSUNG
+> diff --git a/drivers/clk/samsung/Makefile b/drivers/clk/samsung/Makefile
+> index 5f6833ea355d..a31332a24ef4 100644
+> --- a/drivers/clk/samsung/Makefile
+> +++ b/drivers/clk/samsung/Makefile
+> @@ -10,11 +10,11 @@ obj-$(CONFIG_SOC_EXYNOS5250)	+= clk-exynos5250.o
+>  obj-$(CONFIG_SOC_EXYNOS5260)	+= clk-exynos5260.o
+>  obj-$(CONFIG_SOC_EXYNOS5410)	+= clk-exynos5410.o
+>  obj-$(CONFIG_SOC_EXYNOS5420)	+= clk-exynos5420.o
+> -obj-$(CONFIG_ARCH_EXYNOS)	+= clk-exynos5433.o
+> +obj-$(CONFIG_EXYNOS5433_COMMON_CLK)	+= clk-exynos5433.o
+>  obj-$(CONFIG_SOC_EXYNOS5440)	+= clk-exynos5440.o
+>  obj-$(CONFIG_ARCH_EXYNOS)	+= clk-exynos-audss.o
+>  obj-$(CONFIG_ARCH_EXYNOS)	+= clk-exynos-clkout.o
+> -obj-$(CONFIG_ARCH_EXYNOS7)	+= clk-exynos7.o
+> +obj-$(CONFIG_EXYNOS7_COMMON_CLK)	+= clk-exynos7.o
+>  obj-$(CONFIG_S3C2410_COMMON_CLK)+= clk-s3c2410.o
+>  obj-$(CONFIG_S3C2410_COMMON_DCLK)+= clk-s3c2410-dclk.o
+>  obj-$(CONFIG_S3C2412_COMMON_CLK)+= clk-s3c2412.o
+> 
 
-This controller is connected to a FE1.1s USB 2.0 hub, giving us the
-four usable external USB ports. We shouldn't need to enable OHCI.
+Looks good to me.
 
-> +
-> +&ohci2 {
-> +       status = "okay";
-> +};
+Reviewed-by: Chanwoo Choi <cw00.choi@samsung.com>
 
-According to the schematics, this port is never used. Please remove.
-
-> +&ohci3 {
-> +       status = "okay";
-> +};
-
-This is connected to the GL830 USB-SATA bridge. Again, OHCI isn't
-needed.
-
-> +
->  &uart0 {
->         pinctrl-names = "default";
->         pinctrl-0 = <&uart0_pins_a>;
->         status = "okay";
->  };
-> +
-> +&usbphy {
-> +       status = "okay";
-
-And what about power supplies / regulators?
-
-
-Regards
-ChenYu
-
-> +};
-> --
-> 2.5.0
->
-> --
-> You received this message because you are subscribed to the Google Groups "linux-sunxi" group.
-> To unsubscribe from this group and stop receiving emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
-> For more options, visit https://groups.google.com/d/optout.
+Regards,
+Chanwoo Choi
