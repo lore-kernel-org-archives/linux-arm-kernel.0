@@ -1,41 +1,64 @@
-From: joseph@codesourcery.com (Joseph Myers)
-Date: Mon, 16 Nov 2015 12:34:55 +0000
-Subject: [PATCH v6 13/17] arm64:ilp32: add sys_ilp32.c and a separate
- table (in entry.S) to use it
-In-Reply-To: <5753873.3bKWvUrKmj@wuerfel>
-References: <1446507046-24604-1-git-send-email-ynorov@caviumnetworks.com>
- <4389139.prTLIyjV9Z@wuerfel>
- <alpine.DEB.2.10.1511161159290.25844@digraph.polyomino.org.uk>
- <5753873.3bKWvUrKmj@wuerfel>
-Message-ID: <alpine.DEB.2.10.1511161230220.25844@digraph.polyomino.org.uk>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Mon, 16 Nov 2015 13:36:15 +0100
+Subject: [PATCH v2 10/11] PM / Hibernate: clean cached pages on
+ architectures that require it
+In-Reply-To: <5649CB9B.30102@arm.com>
+References: <1445966960-31724-1-git-send-email-james.morse@arm.com>
+ <1445966960-31724-11-git-send-email-james.morse@arm.com>
+ <20151114202623.GC20429@amd> <5649CB9B.30102@arm.com>
+Message-ID: <20151116123615.GB9125@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 16 Nov 2015, Arnd Bergmann wrote:
-
-> > It's not a matter of leaving anything out - these would simply use 64-bit 
-> > off_t (__off_t and __off64_t would be the same type) and the *64 versions 
-> > would be aliases, exactly the same as on 64-bit architectures.  (And 
-> > _FILE_OFFSET_BITS handling would also be exactly the same as on 64-bit 
-> > architectures.)  I see no reason for the set of off_t-related symbols that 
-> > exist, or which symbols are aliases of which others, to vary between pure 
-> > 64-bit systems and ILP32 ABIs (for 32-bit or 64-bit architectures) that 
-> > simply happen to have had 64-bit off_t from the start.
+On Mon 2015-11-16 12:27:07, James Morse wrote:
+> On 14/11/15 20:26, Pavel Machek wrote:
+> > On Tue 2015-10-27 17:29:19, James Morse wrote:
+> >> Some architectures require code written to memory as if it were data to be
+> >> 'cleaned' from any data caches so that the processor can fetch them as new
+> >> instructions.
+> >>
+> >> During resume from hibernate, the snapshot code copies some pages directly,
+> >> meaning these architectures do not get a chance to perform their cache
+> >> maintenance. Add a call to flush_icache_range(), which is provided by
+> >> architectures that require it, to perform the maintenance.
+> >>
+> >> This mirrors the kernel's behaviour when loading kernel modules and when
+> >> mapping executable pages to user space.
+> >>
+> >> Signed-off-by: James Morse <james.morse@arm.com>
+> > 
+> > Looks reasonable.
+> > 
+> > Acked-by: Pavel Machek <pavel@ucw.cz>
 > 
-> Ok, fair enough. So we just change the global __OFF_T_TYPE definition
-> in bits/typesizes.h and override it for all the existing 32-bit ports,
-> correct?
+> Thanks!
+> 
+> > 
+> >> ---
+> >>  kernel/power/snapshot.c | 4 ++++
+> >>  1 file changed, 4 insertions(+)
+> >>
+> >> diff --git a/kernel/power/snapshot.c b/kernel/power/snapshot.c
+> >> index 5235dd4e1e2f..139fc449ad75 100644
+> >> --- a/kernel/power/snapshot.c
+> >> +++ b/kernel/power/snapshot.c
+> >> @@ -1196,9 +1197,12 @@ static unsigned int count_data_pages(void)
+> >>  static inline void do_copy_page(long *dst, long *src)
+> >>  {
+> >>  	int n;
+> >> +	unsigned long __maybe_unused start = (unsigned long)dst;
+> > 
+> > Why the "maybe unused"?
+> 
+> To avoid a build warning on x86_64, and any other architectures that don't
+> use the arguments in their flush_icache_range() implementation.
 
-Well, it's sysdeps/unix/sysv/linux/generic/bits/typesizes.h that's 
-relevant - so if future generic architectures will use 64-bit off_t, I 
-suppose the existing file could be cloned for existing generic 
-architectures with 32-bit support.  And all the types involved in struct 
-stat are affected (e.g. ino_t), not just off_t.  And getting the aliases 
-right may involve disentangling the different meanings of wordsize-64 into 
-different sysdeps directories.  ("off_t is off64_t" and "stat is stat64" 
-are not the same thing.  See MIPS n64.)  And the design work needs to be 
-done on libc-alpha, not in a random discussion elsewhere.
+That's wrong fix, I believe.
 
+flush_icache_range() should use their arguments. We should not have
+all the callers caring about this.
+
+								Pavel
 -- 
-Joseph S. Myers
-joseph at codesourcery.com
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
