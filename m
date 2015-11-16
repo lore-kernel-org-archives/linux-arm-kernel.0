@@ -1,66 +1,64 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Mon, 16 Nov 2015 14:37:53 +0100
-Subject: [PATCH 20/27] cris: nand: remove useless mtd->priv = chip assignments
+Date: Mon, 16 Nov 2015 14:37:55 +0100
+Subject: [PATCH 22/27] mtd: nand: simplify nand_dt_init() usage
 In-Reply-To: <1447681080-31232-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1447681080-31232-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1447681080-31232-21-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1447681080-31232-23-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-mtd_to_nand_chip() now uses the container_of() approach to transform an
-mtd_info pointer into a nand_chip one. Drop useless mtd->priv
-assignments from NAND controller drivers.
+nand_dt_init() function requires 3 arguments where it actually needs one
+(dn and mtd can both be retrieved from chip). Drop these parameters.
+
+Testing for dn != NULL inside nand_dt_init() also helps simplifying the
+caller code.
 
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 ---
-Patch generated with the following coccinelle script:
+ drivers/mtd/nand/nand_base.c | 21 +++++++++++----------
+ 1 file changed, 11 insertions(+), 10 deletions(-)
 
----8<----
-virtual patch
-
-@@
-struct mtd_info mtd;
-struct mtd_info *mtdptr;
-struct nand_chip *chipptr;
-expression d;
-@@
-(
--(mtd).priv = (chipptr);
-|
--(mtdptr)->priv = (chipptr);
----8<----
----
- arch/cris/arch-v32/drivers/mach-a3/nandflash.c | 3 ---
- arch/cris/arch-v32/drivers/mach-fs/nandflash.c | 3 ---
- 2 files changed, 6 deletions(-)
-
-diff --git a/arch/cris/arch-v32/drivers/mach-a3/nandflash.c b/arch/cris/arch-v32/drivers/mach-a3/nandflash.c
-index ad78b97..2f65261 100644
---- a/arch/cris/arch-v32/drivers/mach-a3/nandflash.c
-+++ b/arch/cris/arch-v32/drivers/mach-a3/nandflash.c
-@@ -149,9 +149,6 @@ struct mtd_info *__init crisv32_nand_flash_probe(void)
- 	this = &wrapper->chip;
- 	crisv32_mtd = nand_to_mtd(&wrapper->chip);
+diff --git a/drivers/mtd/nand/nand_base.c b/drivers/mtd/nand/nand_base.c
+index 71cc029..2f75eb1 100644
+--- a/drivers/mtd/nand/nand_base.c
++++ b/drivers/mtd/nand/nand_base.c
+@@ -3937,11 +3937,17 @@ ident_done:
+ 	return type;
+ }
  
--	/* Link the private data with the MTD structure */
--	crisv32_mtd->priv = this;
--
- 	/* Set address of NAND IO lines */
- 	this->IO_ADDR_R = read_cs;
- 	this->IO_ADDR_W = write_cs;
-diff --git a/arch/cris/arch-v32/drivers/mach-fs/nandflash.c b/arch/cris/arch-v32/drivers/mach-fs/nandflash.c
-index 00a277b..4ab9d4e 100644
---- a/arch/cris/arch-v32/drivers/mach-fs/nandflash.c
-+++ b/arch/cris/arch-v32/drivers/mach-fs/nandflash.c
-@@ -140,9 +140,6 @@ struct mtd_info *__init crisv32_nand_flash_probe(void)
- 	bif_cfg.gated_csp1 = regk_bif_core_wr;
- 	REG_WR(bif_core, regi_bif_core, rw_grp3_cfg, bif_cfg);
+-static int nand_dt_init(struct mtd_info *mtd, struct nand_chip *chip,
+-			struct device_node *dn)
++static int nand_dt_init(struct nand_chip *chip)
+ {
++	struct device_node *dn = nand_get_flash_node(chip);
+ 	int ecc_mode, ecc_strength, ecc_step;
  
--	/* Link the private data with the MTD structure */
--	crisv32_mtd->priv = this;
++	if (!dn)
++		return 0;
++
++	/* MTD can automatically handle DT partitions, etc. */
++	mtd_set_of_node(nand_to_mtd(chip), dn);
++
+ 	if (of_get_nand_bus_width(dn) == 16)
+ 		chip->options |= NAND_BUSWIDTH_16;
+ 
+@@ -3989,14 +3995,9 @@ int nand_scan_ident(struct mtd_info *mtd, int maxchips,
+ 	struct nand_flash_dev *type;
+ 	int ret;
+ 
+-	if (nand_get_flash_node(chip)) {
+-		/* MTD can automatically handle DT partitions, etc. */
+-		mtd_set_of_node(mtd, nand_get_flash_node(chip));
 -
- 	/* Set address of NAND IO lines */
- 	this->IO_ADDR_R = read_cs;
- 	this->IO_ADDR_W = write_cs;
+-		ret = nand_dt_init(mtd, chip, nand_get_flash_node(chip));
+-		if (ret)
+-			return ret;
+-	}
++	ret = nand_dt_init(chip);
++	if (ret)
++		return ret;
+ 
+ 	/* Set the default functions */
+ 	nand_set_defaults(chip, chip->options & NAND_BUSWIDTH_16);
 -- 
 2.1.4
