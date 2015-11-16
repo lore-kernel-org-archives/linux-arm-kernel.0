@@ -1,34 +1,51 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 16 Nov 2015 22:34:58 +0100
-Subject: [PATCH] scpi: hide get_scpi_ops in module from built-in code
-Message-ID: <4740279.aWlP1tqJLa@wuerfel>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Mon, 16 Nov 2015 16:47:12 -0500 (EST)
+Subject: [PATCH v3] ARM: xip: Use correct symbol for end of ROM marker
+In-Reply-To: <HK2PR06MB05619FACB3725B6F5B2299718A1E0@HK2PR06MB0561.apcprd06.prod.outlook.com>
+References: <1447362108-4333-1-git-send-email-chris.brandt@renesas.com>
+ <1447697140-4099-1-git-send-email-chris.brandt@renesas.com>
+ <alpine.LFD.2.20.1511161515100.5826@knanqh.ubzr>
+ <HK2PR06MB05619FACB3725B6F5B2299718A1E0@HK2PR06MB0561.apcprd06.prod.outlook.com>
+Message-ID: <alpine.LFD.2.20.1511161605070.5826@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The scpi_clock driver can be built-in when CONFIG_COMPILE_TEST
-is set even when ARM_SCPI_PROTOCOL is a loadable module, and
-that results in a link error:
+On Mon, 16 Nov 2015, Chris Brandt wrote:
 
-drivers/built-in.o: In function `scpi_clocks_probe':
-(.text+0x14453c): undefined reference to `get_scpi_ops'
+> >> For an XIP build, _edata_loc, not _etext, represents the end of the 
+> >> binary image that will be programmed into ROM and mapped into the 
+> >> MODULES_VADDR area.
+> >
+> > This statement is wrong.  The kernel data is copied to RAM before the
+> > MMU is turned on and that's the copy that the kernel must use.  There
+> > is no reason having anything past _etext accessible from ROM.
+> 
+> If I remember correctly, when I first ran into an issue was my
+> initramfs got cut off because it spanned the 1MB boundary after
+> _etext.
 
-Using #if IS_REACHABLE() around the get_scpi_ops() declaration
-makes it build successfully in this case for compile-testing,
-but the effect is the same as when ARM_SCPI_PROTOCOL is
-disabled, as the code will not be used.
+If you are convinced that you need kernel XIP, then you normally would 
+want _not_ to use initramfs at all.
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Also, your init code resides after _etext, so that get cut off
+> too.
 
-diff --git a/include/linux/scpi_protocol.h b/include/linux/scpi_protocol.h
-index 80af3cd35ae4..72ce932c69b2 100644
---- a/include/linux/scpi_protocol.h
-+++ b/include/linux/scpi_protocol.h
-@@ -71,7 +71,7 @@ struct scpi_ops {
- 	int (*sensor_get_value)(u16, u32 *);
- };
- 
--#if IS_ENABLED(CONFIG_ARM_SCPI_PROTOCOL)
-+#if IS_REACHABLE(CONFIG_ARM_SCPI_PROTOCOL)
- struct scpi_ops *get_scpi_ops(void);
- #else
- static inline struct scpi_ops *get_scpi_ops(void) { return NULL; }
+/me looks at the linker script and cry
+
+Forget it.  XIP kernel is simply completely broken at the moment.  
+
+There used to be conditional placement of .init.text that was located in 
+the .text section when XIP_KERNEL was selected, or in the .init section 
+otherwise.  This particular section was abstracted away into an 
+INIT_TEXT_SECTION macro defined in include/asm-generic/vmlinux.lds.h and 
+the XIP conditional placement got lost.  New sections (lots of them) 
+were added as well since the introduction of XIP kernel with no 
+consideration for XIP usage.
+
+The old method with conditional placement in the linker script is broken 
+beyond repair.  There is simply way too much stuff these days to do this 
+sanely.  I think the only way to fix it properly is to have a separate 
+linker script for XIP usage with proper (and obvious) section placement.
+
+
+Nicolas
