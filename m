@@ -1,52 +1,54 @@
 From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 16 Nov 2015 17:52:17 +0000
-Subject: [PATCH 10/12] tty: amba-pl011: add support for 32-bit register
- access
-In-Reply-To: <564A1628.9010900@codeaurora.org>
-References: <20151116173935.GQ8644@n2100.arm.linux.org.uk>
- <E1ZyNls-0003kA-Fe@rmk-PC.arm.linux.org.uk>
- <564A1628.9010900@codeaurora.org>
-Message-ID: <20151116175217.GT8644@n2100.arm.linux.org.uk>
+Date: Mon, 16 Nov 2015 17:53:48 +0000
+Subject: [PATCH 1/2] drm: Improve drm_of_component_probe() to correctly
+ handle ports and remote ports.
+In-Reply-To: <CAPj87rPFXN=hONwcR+9gN844kTxr1wu4tfSRKpsXjaURxS1=eA@mail.gmail.com>
+References: <1447685093-26129-1-git-send-email-Liviu.Dudau@arm.com>
+ <1447685093-26129-2-git-send-email-Liviu.Dudau@arm.com>
+ <20151116162241.GN8644@n2100.arm.linux.org.uk>
+ <20151116164907.GA4158@e106497-lin.cambridge.arm.com>
+ <20151116172248.GP8644@n2100.arm.linux.org.uk>
+ <CAPj87rP_qPk0dKhLQDpFAsAqL2LxG=_5n+0KMRW=qEih4mBTJA@mail.gmail.com>
+ <20151116174321.GR8644@n2100.arm.linux.org.uk>
+ <CAPj87rPFXN=hONwcR+9gN844kTxr1wu4tfSRKpsXjaURxS1=eA@mail.gmail.com>
+Message-ID: <20151116175348.GU8644@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 16, 2015 at 11:45:12AM -0600, Timur Tabi wrote:
-> Russell King wrote:
-> >Add support for 32-bit register accesses to the AMBA PL011 UART.  This
-> >is needed for ZTE UARTs, which require 32-bit accesses as opposed to
-> >the more normal 16-bit accesses.
+On Mon, Nov 16, 2015 at 05:48:32PM +0000, Daniel Stone wrote:
+> On 16 November 2015 at 17:43, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+> > On Mon, Nov 16, 2015 at 05:32:05PM +0000, Daniel Stone wrote:
+> >> On 16 November 2015 at 17:22, Russell King - ARM Linux
+> >> <linux@arm.linux.org.uk> wrote:
+> >> > Please sensibly wrap your messages.  Your lines are longer than 80
+> >> > characters which makes it exceedingly difficult for some people to reply
+> >> > to your very very very very very very very very very very very very
+> >> > very very very very very very very very very very very very very very
+> >> > very very very very very very very very very very very very very very
+> >> > very very very very very very very very very very very very very very
+> >> > very very very very very very very very very very very very very very
+> >> > very very very very very very long lines without first reformatting
+> >> > them manually - and why should they bother to reply if they have that
+> >> > kind of additional work?  Thanks.
+> >>
+> >> His lines are wrapped mostly at 80, but sometimes at 86, characters.
+> >> You should probably look into fixing your MUA.
 > >
-> >Signed-off-by: Russell King<rmk+kernel@arm.linux.org.uk>
-> >---
-> >  drivers/tty/serial/amba-pl011.c | 15 +++++++++++++--
-> >  1 file changed, 13 insertions(+), 2 deletions(-)
+> > No.
 > >
-> >diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
-> >index afa0de7d481f..3470a1e67bbc 100644
-> >--- a/drivers/tty/serial/amba-pl011.c
-> >+++ b/drivers/tty/serial/amba-pl011.c
-> >@@ -93,6 +93,7 @@ static u16 pl011_std_offsets[REG_ARRAY_SIZE] = {
-> >  struct vendor_data {
-> >  	const u16		*reg_offset;
-> >  	unsigned int		ifls;
-> >+	bool			access_32b;
+> > Standard net etiquette is that email should be wrapped around 72
+> > characters to give space for reply indentation to remain readable
+> > on an 80 column screen. Most of my email replies are written on an
+> > 80 column screen.
 > 
-> So no love for my suggestion to use port->iotype instead of this new field?
-> 
-> static void pl011_write(unsigned int val, const struct uart_amba_port *uap,
->     unsigned int reg)
-> {
->     void __iomem *addr = uap->port.membase + pl011_reg_to_offset(uap, reg);
-> 
->     if (uap->port.iotype == UPIO_MEM32)
->         writel(val, addr);
->     else
->         writew(val, addr);
-> }
+> Oh, I just thought there was
+> a greater reason for your
+> 660-character tantrum
 
-Well, it looks a bit weird, because we use 16-bit accesses for other
-values, and there isn't a UPIO_MEM16 type.  Although that could be
-added, it's extending the scope of the patch to touching core files.
+Sorry, I've stopped reading at this point, at the point where you start
+slinging crap around.  If you have a serious point to make, maybe you
+could grow up in the next five minutes and write a proper email, thanks.
 
 -- 
 FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
