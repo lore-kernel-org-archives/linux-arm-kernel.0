@@ -1,88 +1,77 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Mon, 16 Nov 2015 09:56:23 +0100
-Subject: [PATCH v4 00/24] pwm: add support for atomic update
-Message-ID: <1447664207-24370-1-git-send-email-boris.brezillon@free-electrons.com>
+Date: Mon, 16 Nov 2015 09:56:25 +0100
+Subject: [PATCH v4 02/24] pwm: use pwm_get_xxx() helpers where appropriate
+In-Reply-To: <1447664207-24370-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1447664207-24370-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1447664207-24370-3-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello,
+Use pwm_get_xxx() helpers instead of directly accessing the pwm->xxx field.
+Doing that will ease adaptation of the PWM framework to support atomic
+update.
 
-This series adds support for atomic PWM update, or IOW, the capability
-to update all the parameters of a PWM device (enabled/disabled, period,
-duty and polarity) in one go.
+Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+---
+Patch generated with the following coccinelle script:
 
-Best Regards,
+--->8---
+virtual patch
 
-Boris
+@@
+struct pwm_device *p;
+expression e;
+@@
+(
+-(p)->polarity = e;
++pwm_set_polarity((p), e);
+|
+-(p)->polarity
++pwm_get_polarity((p))
+|
+-(p)->period = e;
++pwm_set_period((p), e);
+|
+-(p)->period
++pwm_get_period((p))
+|
+-(p)->duty_cycle = e;
++pwm_set_duty_cycle((p), e);
+|
+-(p)->duty_cycle
++pwm_get_duty_cycle((p))
+)
+--->8---
+---
+ drivers/pwm/pwm-crc.c         | 2 +-
+ drivers/pwm/pwm-lpc18xx-sct.c | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-Changes since v3:
-- rebased on pwm/for-next after pulling 4.4-rc1
-- replace direct access to pwm fields by pwm_get/set_xxx() helpers, thus
-  fixing some build errors
-- split changes to allow each maintainer to review/ack or take the
-  modification through its subsystem
-
-Changes since v2:
-- rebased on top of 4.3-rc2
-- reintroduced pwm-regulator patches
-
-Changes since v1:
-- dropped applied patches
-- squashed Heiko's fixes into the rockchip driver changes
-- made a few cosmetic changes
-- added kerneldoc comments
-- added Heiko's patch to display more information in debugfs
-- dropped pwm-regulator patches (should be submitted separately)
-
-Boris Brezillon (23):
-  pwm: rcar: make use of pwm_is_enabled()
-  pwm: use pwm_get_xxx() helpers where appropriate
-  clk: pwm: use pwm_get_xxx() helpers where appropriate
-  hwmon: pwm-fan: use pwm_get_xxx() helpers where appropriate
-  misc: max77693-haptic: use pwm_get_xxx() helpers where appropriate
-  pwm: introduce default period and polarity concepts
-  pwm: use pwm_get/set_default_xxx() helpers where appropriate
-  leds: pwm: use pwm_get/set_default_xxx() helpers where appropriate
-  regulator: pwm: use pwm_get/set_default_xxx() helpers where
-    appropriate
-  backlight: pwm: use pwm_get/set_default_xxx() helpers where
-    appropriate
-  fbdev: use pwm_get/set_default_xxx() helpers where appropriate
-  misc: max77693: use pwm_get/set_default_xxx() helpers where
-    appropriate
-  hwmon: pwm-fan: use pwm_get/set_default_xxx() helpers where
-    appropriate
-  clk: pwm: use pwm_get/set_default_xxx() helpers where appropriate
-  pwm: define a new pwm_state struct
-  pwm: move the enabled/disabled info to pwm_state struct
-  backlight: pwm_bl: remove useless call to pwm_set_period
-  pwm: declare a default PWM state
-  pwm: add the PWM initial state retrieval infra
-  pwm: add the core infrastructure to allow atomic update
-  pwm: rockchip: add initial state retrieval
-  pwm: rockchip: add support for atomic update
-  regulator: pwm: properly initialize the ->state field
-
-Heiko St?bner (1):
-  pwm: add information about polarity, duty cycle and period to debugfs
-
- drivers/clk/clk-pwm.c                |  11 +--
- drivers/hwmon/pwm-fan.c              |  16 ++--
- drivers/input/misc/max77693-haptic.c |   9 +-
- drivers/leds/leds-pwm.c              |   2 +-
- drivers/pwm/core.c                   | 169 +++++++++++++++++++++++++++++++----
- drivers/pwm/pwm-crc.c                |   2 +-
- drivers/pwm/pwm-lpc18xx-sct.c        |   2 +-
- drivers/pwm/pwm-pxa.c                |   2 +-
- drivers/pwm/pwm-rcar.c               |   2 +-
- drivers/pwm/pwm-rockchip.c           | 119 +++++++++++++++++++-----
- drivers/pwm/pwm-sun4i.c              |   3 +-
- drivers/regulator/pwm-regulator.c    |  30 ++++++-
- drivers/video/backlight/lm3630a_bl.c |   4 +-
- drivers/video/backlight/pwm_bl.c     |  10 ++-
- drivers/video/fbdev/ssd1307fb.c      |   2 +-
- include/linux/pwm.h                  |  89 +++++++++++++++---
- 16 files changed, 386 insertions(+), 86 deletions(-)
-
+diff --git a/drivers/pwm/pwm-crc.c b/drivers/pwm/pwm-crc.c
+index 7101c70..2f88543 100644
+--- a/drivers/pwm/pwm-crc.c
++++ b/drivers/pwm/pwm-crc.c
+@@ -75,7 +75,7 @@ static int crc_pwm_config(struct pwm_chip *c, struct pwm_device *pwm,
+ 		return -EINVAL;
+ 	}
+ 
+-	if (pwm->period != period_ns) {
++	if (pwm_get_period((pwm)) != period_ns) {
+ 		int clk_div;
+ 
+ 		/* changing the clk divisor, need to disable fisrt */
+diff --git a/drivers/pwm/pwm-lpc18xx-sct.c b/drivers/pwm/pwm-lpc18xx-sct.c
+index 9163085..091fa13 100644
+--- a/drivers/pwm/pwm-lpc18xx-sct.c
++++ b/drivers/pwm/pwm-lpc18xx-sct.c
+@@ -249,7 +249,7 @@ static int lpc18xx_pwm_enable(struct pwm_chip *chip, struct pwm_device *pwm)
+ 			   LPC18XX_PWM_EVSTATEMSK(lpc18xx_data->duty_event),
+ 			   LPC18XX_PWM_EVSTATEMSK_ALL);
+ 
+-	if (pwm->polarity == PWM_POLARITY_NORMAL) {
++	if (pwm_get_polarity((pwm)) == PWM_POLARITY_NORMAL) {
+ 		set_event = lpc18xx_pwm->period_event;
+ 		clear_event = lpc18xx_data->duty_event;
+ 		res_action = LPC18XX_PWM_RES_SET;
 -- 
 2.1.4
