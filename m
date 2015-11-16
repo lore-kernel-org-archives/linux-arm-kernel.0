@@ -1,36 +1,67 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 17 Nov 2015 00:38:25 +0800
-Subject: [PATCH v3 6/9] ARM: dts: sun8i: Add simplefb node labels to reference
- at board level
-In-Reply-To: <1447691908-25456-1-git-send-email-wens@csie.org>
-References: <1447691908-25456-1-git-send-email-wens@csie.org>
-Message-ID: <1447691908-25456-7-git-send-email-wens@csie.org>
+From: p.zabel@pengutronix.de (Philipp Zabel)
+Date: Mon, 16 Nov 2015 17:45:09 +0100
+Subject: [GIT PULL] Reset controller changes for v4.5
+Message-ID: <1447692309.3312.26.camel@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Some boards, such as tablets, have regulators providing power to parts
-of the display pipeline, like signal converters and LCD panels.
+Dear arm-soc maintainers,
 
-Add labels to the simplefb device nodes so that we can reference them
-in the board dts files to add regulator supply properties.
+This tag includes co-processor reset support for STi and a few accumulated fixes.
 
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
----
- arch/arm/boot/dts/sun8i-a23-a33.dtsi | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+regards
+Philipp
 
-diff --git a/arch/arm/boot/dts/sun8i-a23-a33.dtsi b/arch/arm/boot/dts/sun8i-a23-a33.dtsi
-index 0c0964d4fa1f..6f88fb0ddbc7 100644
---- a/arch/arm/boot/dts/sun8i-a23-a33.dtsi
-+++ b/arch/arm/boot/dts/sun8i-a23-a33.dtsi
-@@ -56,7 +56,7 @@
- 		#size-cells = <1>;
- 		ranges;
- 
--		framebuffer at 0 {
-+		simplefb_lcd: framebuffer at 0 {
- 			compatible = "allwinner,simple-framebuffer",
- 				     "simple-framebuffer";
- 			allwinner,pipeline = "de_be0-lcd0";
--- 
-2.6.2
+The following changes since commit 8005c49d9aea74d382f474ce11afbbc7d7130bec:
+
+  Linux 4.4-rc1 (2015-11-15 17:00:27 -0800)
+
+are available in the git repository at:
+
+  git://git.pengutronix.de/git/pza/linux.git tags/reset-for-4.5
+
+for you to fetch changes up to d1f15aa09558d00ed23168686156f7341f9d9d86:
+
+  reset: check return value of reset_controller_register() (2015-11-16 09:23:47 +0100)
+
+----------------------------------------------------------------
+Reset controller changes for v4.5
+
+- oftree support for getting reset devices by index
+- fixed return value consistency of of_reset_control_get
+- added support for STi co-processor resets
+- added STi status callback
+- various fixes
+
+----------------------------------------------------------------
+Alban Bedel (1):
+      reset: Fix of_reset_control_get() for consistent return values
+
+Lee Jones (3):
+      ARM: STi: Add DT defines for co-processor reset lines
+      reset: sti: Add support for resetting co-processors
+      reset: sti: Provide ops .status() call-back
+
+Masahiro Yamada (2):
+      reset: remove redundant $(CONFIG_RESET_CONTROLLER) from Makefile
+      reset: check return value of reset_controller_register()
+
+Philipp Zabel (3):
+      reset: sti: add a missing blank line after declaration
+      reset: sunxi: mark the of_device_id array as __initconst
+      reset: use ENOTSUPP instead of ENOSYS
+
+Vince Hsu (1):
+      reset: add of_reset_control_get_by_index()
+
+ drivers/reset/Makefile                     |  2 +-
+ drivers/reset/core.c                       | 51 +++++++++++++++++++++---------
+ drivers/reset/reset-berlin.c               |  4 +--
+ drivers/reset/reset-socfpga.c              |  3 +-
+ drivers/reset/reset-sunxi.c                |  5 ++-
+ drivers/reset/reset-zynq.c                 |  3 +-
+ drivers/reset/sti/reset-stih407.c          |  5 +++
+ drivers/reset/sti/reset-syscfg.c           | 27 +++++++++++++++-
+ include/dt-bindings/reset/stih407-resets.h |  4 +++
+ include/linux/reset.h                      | 17 +++++++---
+ 10 files changed, 90 insertions(+), 31 deletions(-)
