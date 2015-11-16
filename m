@@ -1,68 +1,96 @@
-From: daniel@fooishbar.org (Daniel Stone)
-Date: Mon, 16 Nov 2015 17:48:32 +0000
-Subject: [PATCH 1/2] drm: Improve drm_of_component_probe() to correctly
- handle ports and remote ports.
-In-Reply-To: <20151116174321.GR8644@n2100.arm.linux.org.uk>
-References: <1447685093-26129-1-git-send-email-Liviu.Dudau@arm.com>
- <1447685093-26129-2-git-send-email-Liviu.Dudau@arm.com>
- <20151116162241.GN8644@n2100.arm.linux.org.uk>
- <20151116164907.GA4158@e106497-lin.cambridge.arm.com>
- <20151116172248.GP8644@n2100.arm.linux.org.uk>
- <CAPj87rP_qPk0dKhLQDpFAsAqL2LxG=_5n+0KMRW=qEih4mBTJA@mail.gmail.com>
- <20151116174321.GR8644@n2100.arm.linux.org.uk>
-Message-ID: <CAPj87rPFXN=hONwcR+9gN844kTxr1wu4tfSRKpsXjaURxS1=eA@mail.gmail.com>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 16 Nov 2015 11:48:25 -0600
+Subject: [PATCH 01/13 v2] ARM: add some L220 DT settings
+In-Reply-To: <1445521493-21509-1-git-send-email-linus.walleij@linaro.org>
+References: <1445521493-21509-1-git-send-email-linus.walleij@linaro.org>
+Message-ID: <20151116174825.GA14634@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16 November 2015 at 17:43, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Mon, Nov 16, 2015 at 05:32:05PM +0000, Daniel Stone wrote:
->> On 16 November 2015 at 17:22, Russell King - ARM Linux
->> <linux@arm.linux.org.uk> wrote:
->> > Please sensibly wrap your messages.  Your lines are longer than 80
->> > characters which makes it exceedingly difficult for some people to reply
->> > to your very very very very very very very very very very very very
->> > very very very very very very very very very very very very very very
->> > very very very very very very very very very very very very very very
->> > very very very very very very very very very very very very very very
->> > very very very very very very very very very very very very very very
->> > very very very very very very long lines without first reformatting
->> > them manually - and why should they bother to reply if they have that
->> > kind of additional work?  Thanks.
->>
->> His lines are wrapped mostly at 80, but sometimes at 86, characters.
->> You should probably look into fixing your MUA.
->
-> No.
->
-> Standard net etiquette is that email should be wrapped around 72
-> characters to give space for reply indentation to remain readable
-> on an 80 column screen. Most of my email replies are written on an
-> 80 column screen.
+On Thu, Oct 22, 2015 at 03:44:53PM +0200, Linus Walleij wrote:
+> The RealView ARM11MPCore enables parity, eventmon and shared
+> override in the cache controller through its current boardfile,
+> but the code and DT bindings for the ARM L220 is currently
+> lacking the ability to set this up from DT. Add the required
+> bool parameters for parity and shared override, but keep
+> eventmon out of it: this should be enabled by the event
+> monitor code.
+> 
+> Cc: devicetree at vger.kernel.org
+> Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> ---
+> ChangeLog v1->v2:
+> - Drop event monitor setup.
+> - Support both parity enable and disable: could be useful.
+> ---
+>  Documentation/devicetree/bindings/arm/l2cc.txt | 10 ++++++----
 
-Oh, I just thought there was
-a greater reason for your
-660-character tantrum
-than someone overshooting
-by 14 characters on
-a couple of lines.
+Acked-by: Rob Herring <robh@kernel.org>
 
-Then again,
-having read the
-rest of the
-pointlessly hostile mail,
-it's entirely in keeping
-with the rest.
-
-Shame that your
-needless aggression
-obscures a
-fairly valid
-point.
-
-Have
-a
-lovely
-even
-ing
-.
+>  arch/arm/mm/cache-l2x0.c                       | 20 ++++++++++++++++++++
+>  2 files changed, 26 insertions(+), 4 deletions(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/l2cc.txt b/Documentation/devicetree/bindings/arm/l2cc.txt
+> index 06c88a4d28ac..d181b7c4c522 100644
+> --- a/Documentation/devicetree/bindings/arm/l2cc.txt
+> +++ b/Documentation/devicetree/bindings/arm/l2cc.txt
+> @@ -67,12 +67,14 @@ Optional properties:
+>    disable if zero.
+>  - arm,prefetch-offset : Override prefetch offset value. Valid values are
+>    0-7, 15, 23, and 31.
+> -- arm,shared-override : The default behavior of the pl310 cache controller with
+> -  respect to the shareable attribute is to transform "normal memory
+> -  non-cacheable transactions" into "cacheable no allocate" (for reads) or
+> -  "write through no write allocate" (for writes).
+> +- arm,shared-override : The default behavior of the L220 or PL310 cache
+> +  controllers with respect to the shareable attribute is to transform "normal
+> +  memory non-cacheable transactions" into "cacheable no allocate" (for reads)
+> +  or "write through no write allocate" (for writes).
+>    On systems where this may cause DMA buffer corruption, this property must be
+>    specified to indicate that such transforms are precluded.
+> +- arm,parity-enable : enable parity checking on the L2 cache (L220 or PL310).
+> +- arm,parity-disable : disable parity checking on the L2 cache (L220 or PL310).
+>  - prefetch-data : Data prefetch. Value: <0> (forcibly disable), <1>
+>    (forcibly enable), property absent (retain settings set by firmware)
+>  - prefetch-instr : Instruction prefetch. Value: <0> (forcibly disable),
+> diff --git a/arch/arm/mm/cache-l2x0.c b/arch/arm/mm/cache-l2x0.c
+> index 493692d838c6..3f3008e5c662 100644
+> --- a/arch/arm/mm/cache-l2x0.c
+> +++ b/arch/arm/mm/cache-l2x0.c
+> @@ -1060,6 +1060,18 @@ static void __init l2x0_of_parse(const struct device_node *np,
+>  		val |= (dirty - 1) << L2X0_AUX_CTRL_DIRTY_LATENCY_SHIFT;
+>  	}
+>  
+> +	if (of_property_read_bool(np, "arm,parity-enable")) {
+> +		mask &= ~L2C_AUX_CTRL_PARITY_ENABLE;
+> +		val |= L2C_AUX_CTRL_PARITY_ENABLE;
+> +	} else if (of_property_read_bool(np, "arm,parity-disable")) {
+> +		mask &= ~L2C_AUX_CTRL_PARITY_ENABLE;
+> +	}
+> +
+> +	if (of_property_read_bool(np, "arm,shared-override")) {
+> +		mask &= ~L2C_AUX_CTRL_SHARED_OVERRIDE;
+> +		val |= L2C_AUX_CTRL_SHARED_OVERRIDE;
+> +	}
+> +
+>  	ret = l2x0_cache_size_of_parse(np, aux_val, aux_mask, &assoc, SZ_256K);
+>  	if (ret)
+>  		return;
+> @@ -1176,6 +1188,14 @@ static void __init l2c310_of_parse(const struct device_node *np,
+>  		*aux_mask &= ~L2C_AUX_CTRL_SHARED_OVERRIDE;
+>  	}
+>  
+> +	if (of_property_read_bool(np, "arm,parity-enable")) {
+> +		*aux_val |= L2C_AUX_CTRL_PARITY_ENABLE;
+> +		*aux_mask &= ~L2C_AUX_CTRL_PARITY_ENABLE;
+> +	} else if (of_property_read_bool(np, "arm,parity-disable")) {
+> +		*aux_val &= ~L2C_AUX_CTRL_PARITY_ENABLE;
+> +		*aux_mask &= ~L2C_AUX_CTRL_PARITY_ENABLE;
+> +	}
+> +
+>  	prefetch = l2x0_saved_regs.prefetch_ctrl;
+>  
+>  	ret = of_property_read_u32(np, "arm,double-linefill", &val);
+> -- 
+> 2.4.3
+> 
