@@ -1,22 +1,25 @@
 From: davem@davemloft.net (David Miller)
-Date: Mon, 16 Nov 2015 14:39:27 -0500 (EST)
-Subject: [PATCH 1/2] arm64: bpf: fix JIT frame pointer setup
-In-Reply-To: <1447365421-1309-2-git-send-email-yang.shi@linaro.org>
-References: <1447365421-1309-1-git-send-email-yang.shi@linaro.org>
- <1447365421-1309-2-git-send-email-yang.shi@linaro.org>
-Message-ID: <20151116.143927.1891085632150496414.davem@davemloft.net>
+Date: Mon, 16 Nov 2015 14:41:46 -0500 (EST)
+Subject: [PATCH net] bpf, arm: start flushing icache range from header
+In-Reply-To: <971980449d680e6b26e273130d74546c5148893c.1447446440.git.daniel@iogearbox.net>
+References: <971980449d680e6b26e273130d74546c5148893c.1447446440.git.daniel@iogearbox.net>
+Message-ID: <20151116.144146.1598629493151443362.davem@davemloft.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Yang Shi <yang.shi@linaro.org>
-Date: Thu, 12 Nov 2015 13:57:00 -0800
+From: Daniel Borkmann <daniel@iogearbox.net>
+Date: Sat, 14 Nov 2015 01:26:53 +0100
 
-> BPF fp should point to the top of the BPF prog stack. The original
-> implementation made it point to the bottom incorrectly.
-> Move A64_SP to fp before reserve BPF prog stack space.
+> During review I noticed that the icache range we're flushing should
+> start at header already and not at ctx.image.
 > 
-> CC: Zi Shen Lim <zlim.lnx@gmail.com>
-> CC: Xi Wang <xi.wang@gmail.com>
-> Signed-off-by: Yang Shi <yang.shi@linaro.org>
+> Reason is that after 55309dd3d4cd ("net: bpf: arm: address randomize
+> and write protect JIT code"), we also want to make sure to flush the
+> random-sized trap in front of the start of the actual program (analogous
+> to x86). No operational differences from user side.
+> 
+> Signed-off-by: Daniel Borkmann <daniel@iogearbox.net>
+> Tested-by: Nicolas Schichan <nschichan@freebox.fr>
+> Cc: Alexei Starovoitov <ast@kernel.org>
 
 Applied.
