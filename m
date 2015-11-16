@@ -1,128 +1,34 @@
-From: ryan.harkin@linaro.org (Ryan Harkin)
-Date: Mon, 16 Nov 2015 19:50:11 +0000
-Subject: [PATCH v2 00/12] UEFI boot and runtime services support for
- 32-bit ARM
-In-Reply-To: <1447698757-8762-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1447698757-8762-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <CAD0U-hKfQvV_Dagc2BomK1wuJQG_-bsnLSyGcRduUN9zf30AHg@mail.gmail.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 16 Nov 2015 19:53:34 +0000
+Subject: [PATCH v3] ARM: xip: Use correct symbol for end of ROM marker
+In-Reply-To: <HK2PR06MB056161DA1A57638A1D7305D58A1E0@HK2PR06MB0561.apcprd06.prod.outlook.com>
+References: <1447362108-4333-1-git-send-email-chris.brandt@renesas.com>
+ <1447697140-4099-1-git-send-email-chris.brandt@renesas.com>
+ <20151116181718.GW8644@n2100.arm.linux.org.uk>
+ <HK2PR06MB056161DA1A57638A1D7305D58A1E0@HK2PR06MB0561.apcprd06.prod.outlook.com>
+Message-ID: <20151116195334.GL8644@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ard,
+On Mon, Nov 16, 2015 at 07:46:05PM +0000, Chris Brandt wrote:
+> > We don't need the data sections because they will have been copied to RAM, and
+> > we probably don't want to keep those exposed (it's potentially useful for
+> > attackers.)
+> 
+> The init sections also hang around after boot as well (it's XIP code, so
+> there is nothing to 'free' in terms of executable init code).
+> Any potential security issues there as well? Should the data and init-
+> text sections be put in a separate section that gets blown away after
+> init-data is freed?
 
-On 16 November 2015 at 18:32, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> This series adds support for booting the 32-bit ARM kernel directly from
-> UEFI firmware using a builtin UEFI stub. It mostly reuses refactored arm64
-> code, and the differences (primarily the PE/COFF header and entry point and
-> the efi_create_mapping() implementation) are split out into arm64 and ARM
-> versions.
->
-> Changes since v1:
-> - The primary difference between this version and the first one is that all
->   prerequisites have either been merged, dropped for now (early FDT handling)
->   or folded into this series (MEMBLOCK_NOMAP). IOW, this series can be applied
->   on top of v4.4-rc1 directly.
-> - Dropped handling of UEFI permission bits. The reason is that the UEFIv2.5
->   approach (EFI_PROPERTIES_TABLE) is flawed, and will be replaced by something
->   better in the next version of the spec.
->
-> Patch #1 adds support for the MEMBLOCK_NOMAP attribute to the generic memblock
-> code. Its purpose is to annotate memory regions as normal memory even if they
-> are removed from the kernel direct mapping.
->
-> Patch #2 implements MEMBLOCK_NOMAP support for arm64
->
-> Patch #3 updates the EFI init code to remove UEFI reserved regions and regions
-> used by runtime services from the kernel direct mapping
->
-> Patch #4 splits off most of arch/arm64/kernel/efi.c into arch agnostic files
-> arm-init.c and arm-runtime.c under drivers/firmware/efi.
->
-> Patch #5 refactors the code split off in patch #1 to isolate the arm64 specific
-> pieces, and change a couple of arm64-isms that ARM handles slightly differently.
->
-> Patch #6 enables the generic early_ioremap and early_memremap implementations
-> for ARM. It reuses the kmap fixmap region, which is not used that early anyway.
->
-> Patch #7 splits off the core functionality of create_mapping() into a new
-> function __create_mapping() that we can reuse for mapping UEFI runtime regions.
->
-> Patch #8 factors out the early_alloc() routine so we can invoke __create_mapping
-> using another (late) allocator.
->
-> Patch #9 implements create_mapping_late() that uses a late allocator.
->
-> Patch #10 implements MEMBLOCK_NOMAP support for ARM
->
-> Patch #11 implements the UEFI support in the kernel proper to probe the UEFI
-> memory map and map the runtime services.
->
-> Patch #12 ties together all of the above, by implementing the UEFI stub, and
-> introducing the Kconfig symbols that allow all of this to be built.
->
-> Instructions how to build and run the 32-bit ARM UEFI firmware can be found here:
-> https://wiki.linaro.org/LEG/UEFIforQEMU
->
-> Ard Biesheuvel (11):
->   mm/memblock: add MEMBLOCK_NOMAP attribute to memblock memory table
->   arm64: only consider memblocks with NOMAP cleared for linear mapping
->   arm64/efi: mark UEFI reserved regions as MEMBLOCK_NOMAP
->   arm64/efi: split off EFI init and runtime code for reuse by 32-bit ARM
->   arm64/efi: refactor EFI init and runtime code for reuse by 32-bit ARM
->   ARM: add support for generic early_ioremap/early_memremap
->   ARM: split off core mapping logic from create_mapping
->   ARM: factor out allocation routine from __create_mapping()
->   ARM: implement create_mapping_late() for EFI use
->   ARM: only consider memblocks with NOMAP cleared for linear mapping
->   ARM: wire up UEFI init and runtime support
->
-> Roy Franz (1):
->   ARM: add UEFI stub support
->
->  arch/arm/Kconfig                          |  20 ++
->  arch/arm/boot/compressed/Makefile         |   4 +-
->  arch/arm/boot/compressed/efi-header.S     | 130 ++++++++
->  arch/arm/boot/compressed/head.S           |  54 +++-
->  arch/arm/boot/compressed/vmlinux.lds.S    |   7 +
->  arch/arm/include/asm/Kbuild               |   1 +
->  arch/arm/include/asm/efi.h                |  90 ++++++
->  arch/arm/include/asm/fixmap.h             |  29 +-
->  arch/arm/include/asm/mach/map.h           |   1 +
->  arch/arm/kernel/Makefile                  |   1 +
->  arch/arm/kernel/efi.c                     |  38 +++
->  arch/arm/kernel/setup.c                   |  10 +-
->  arch/arm/mm/init.c                        |   5 +-
->  arch/arm/mm/ioremap.c                     |   9 +
->  arch/arm/mm/mmu.c                         | 110 ++++---
->  arch/arm64/include/asm/efi.h              |  16 +
->  arch/arm64/kernel/efi.c                   | 331 ++------------------
->  arch/arm64/mm/init.c                      |   2 +-
->  arch/arm64/mm/mmu.c                       |   2 +
->  drivers/firmware/efi/Makefile             |   4 +
->  drivers/firmware/efi/arm-init.c           | 197 ++++++++++++
->  drivers/firmware/efi/arm-runtime.c        | 134 ++++++++
->  drivers/firmware/efi/efi.c                |   2 +
->  drivers/firmware/efi/libstub/Makefile     |   9 +
->  drivers/firmware/efi/libstub/arm-stub.c   |   4 +-
->  drivers/firmware/efi/libstub/arm32-stub.c |  85 +++++
->  include/linux/memblock.h                  |   8 +
->  mm/memblock.c                             |  28 ++
->  28 files changed, 975 insertions(+), 356 deletions(-)
->  create mode 100644 arch/arm/boot/compressed/efi-header.S
->  create mode 100644 arch/arm/include/asm/efi.h
->  create mode 100644 arch/arm/kernel/efi.c
->  create mode 100644 drivers/firmware/efi/arm-init.c
->  create mode 100644 drivers/firmware/efi/arm-runtime.c
->  create mode 100644 drivers/firmware/efi/libstub/arm32-stub.c
->
-> --
-> 1.9.1
->
+That's much harder to do - generally for XIP, people are space limited
+(which is why they're using XIP rather than putting the kernel in RAM.)
+They won't take kindly to having the kernel image bloated by 1MB just
+to pad it out so that the init stuff can be unmapped.
 
-I've tested this series against 4.4-rc1 on Versatile Express TC2,
-booting both as a "regular" kernel and as a EFI Stub on BusyBox and
-OpenEmbedded.  So if it helps any, you can add my:
+However, from the security point of view, the less that's mapped at
+known addresses, the better.
 
-Tested-by: Ryan Harkin <ryan.harkin@linaro.org>
-
-I'm afraid I'm not knowledgeable enough to review the code.
+-- 
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
