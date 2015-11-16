@@ -1,195 +1,452 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 16 Nov 2015 17:22:48 +0000
-Subject: [PATCH 1/2] drm: Improve drm_of_component_probe() to correctly
- handle ports and remote ports.
-In-Reply-To: <20151116164907.GA4158@e106497-lin.cambridge.arm.com>
-References: <1447685093-26129-1-git-send-email-Liviu.Dudau@arm.com>
- <1447685093-26129-2-git-send-email-Liviu.Dudau@arm.com>
- <20151116162241.GN8644@n2100.arm.linux.org.uk>
- <20151116164907.GA4158@e106497-lin.cambridge.arm.com>
-Message-ID: <20151116172248.GP8644@n2100.arm.linux.org.uk>
+From: michael@amarulasolutions.com (Michael Trimarchi)
+Date: Mon, 16 Nov 2015 18:23:24 +0100
+Subject: [PATCH V2] ARM: dts: imx6q-icore-rqs: Add Engicam IMX6 Q7 initial
+ support
+In-Reply-To: <20151116115421.GC10464@panicking>
+References: <1447584853-12560-1-git-send-email-michael@amarulasolutions.com>
+ <1447665552.3144.6.camel@pengutronix.de>
+ <20151116112931.GA10464@panicking>
+ <1447673895.3144.16.camel@pengutronix.de>
+ <20151116114127.GB10464@panicking>
+ <1447674695.3144.21.camel@pengutronix.de>
+ <20151116115421.GC10464@panicking>
+Message-ID: <20151116172318.GA513@panicking>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Please sensibly wrap your messages.  Your lines are longer than 80 characters which makes it exceedingly difficult for some people to reply to your very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very very long lines without first reformatting them manually - and why should they bother to reply if they have that kind of additional work?  Thanks.
+www.engicam.com/en/products/embedded/som/standard/i-core-rqs-m6s-dl-d-q
 
-On Mon, Nov 16, 2015 at 04:49:07PM +0000, Liviu Dudau wrote:
-> On Mon, Nov 16, 2015 at 04:22:41PM +0000, Russell King - ARM Linux wrote:
-> > On Mon, Nov 16, 2015 at 02:44:52PM +0000, Liviu Dudau wrote:
-> > > Rockchip DRM driver cannot use the same compare_of() function to match
-> > > ports and remote ports (aka encoders) as their OF sub-trees look different.
-> > > Add a second compare function to be used when encoders are added to the
-> > > component framework and patch the existing users of the function
-> > > accordingly.
-> > > 
-> > > Signed-off-by: Liviu Dudau <Liviu.Dudau@arm.com>
-> > > ---
-> > >  drivers/gpu/drm/armada/armada_drv.c |  3 ++-
-> > >  drivers/gpu/drm/drm_of.c            | 23 ++++++++++++++++++-----
-> > >  drivers/gpu/drm/imx/imx-drm-core.c  |  3 ++-
-> > >  include/drm/drm_of.h                |  6 ++++--
-> > >  4 files changed, 26 insertions(+), 9 deletions(-)
-> > > 
-> > > diff --git a/drivers/gpu/drm/armada/armada_drv.c b/drivers/gpu/drm/armada/armada_drv.c
-> > > index 77ab93d..3a2a929 100644
-> > > --- a/drivers/gpu/drm/armada/armada_drv.c
-> > > +++ b/drivers/gpu/drm/armada/armada_drv.c
-> > > @@ -274,7 +274,8 @@ static int armada_drm_probe(struct platform_device *pdev)
-> > >  	struct device *dev = &pdev->dev;
-> > >  	int ret;
-> > >  
-> > > -	ret = drm_of_component_probe(dev, compare_dev_name, &armada_master_ops);
-> > > +	ret = drm_of_component_probe(dev, compare_dev_name, compare_dev_name,
-> > > +				     &armada_master_ops);
-> > >  	if (ret != -EINVAL)
-> > >  		return ret;
-> > >  
-> > > diff --git a/drivers/gpu/drm/drm_of.c b/drivers/gpu/drm/drm_of.c
-> > > index 493c05c..58fafd7 100644
-> > > --- a/drivers/gpu/drm/drm_of.c
-> > > +++ b/drivers/gpu/drm/drm_of.c
-> > > @@ -77,7 +77,8 @@ EXPORT_SYMBOL(drm_of_find_possible_crtcs);
-> > >   * Returns zero if successful, or one of the standard error codes if it fails.
-> > >   */
-> > >  int drm_of_component_probe(struct device *dev,
-> > > -			   int (*compare_of)(struct device *, void *),
-> > > +			   int (*compare_port)(struct device *, void *),
-> > > +			   int (*compare_encoder)(struct device *, void *),
-> > >  			   const struct component_master_ops *m_ops)
-> > >  {
-> > >  	struct device_node *ep, *port, *remote;
-> > > @@ -101,8 +102,14 @@ int drm_of_component_probe(struct device *dev,
-> > >  			continue;
-> > >  		}
-> > >  
-> > > -		component_match_add(dev, &match, compare_of, port);
-> > > -		of_node_put(port);
-> > > +		component_match_add(dev, &match, compare_port, port);
-> > > +		/*
-> > > +		 * component_match_add keeps a reference to the port
-> > > +		 * variable but does not do proper reference counting,
-> > > +		 * so we cannot release the reference here. If that
-> > > +		 * gets fixed, the following line should be uncommented
-> > > +		 */
-> > > +		/* of_node_put(port); */
-> > 
-> > Even if it is fixed, this line should _never_ be uncommented.  This is
-> > totally the wrong place to drop the reference.
-> 
-> What if (as implied by the comment) component_match_add() does some
-> reference counting of sorts? (I know it doesn't get used only with
-> OF nodes, it is more generic).
+Signed-off-by: Michael Trimarchi <michael@amarulasolutions.com>
+---
+Changes in v2:
+	- add the board in alphabetic order
+	- remove cpu operating point
+	- remove simple-bus and adjust regulaotor
+	- add gpios to correct pinctrl
+	- remove no mainline binding of gpc
 
-Put those two sentences together and please think about it.  If the
-pointer type is unknown to component_match_add(), how could it ever
-use of_node_get() on it?  What if it's a string?  Or a struct device?
-Or something else.
+ arch/arm/boot/dts/Makefile               |   1 +
+ arch/arm/boot/dts/imx6q-icore-rqs.dts    |  21 ++
+ arch/arm/boot/dts/imx6qdl-icore-rqs.dtsi | 365 +++++++++++++++++++++++++++++++
+ 3 files changed, 387 insertions(+)
+ create mode 100644 arch/arm/boot/dts/imx6q-icore-rqs.dts
+ create mode 100644 arch/arm/boot/dts/imx6qdl-icore-rqs.dtsi
 
-> I feel that holding onto a reference to a counted resource without
-> incrementing the use count is not the right way of doing things, or
-> at least it should be clearly documented in the interface of
-> component_match_add() so that people understand the mess they are
-> getting into.
-
-That's just crap.  You're not thinking before you hit your keyboard.
-Why should component_match_add(), which has _zero_ knowledge about
-what it's being used with, have documentation attached to it which
-would be:
-
-"If you use component_match_add() with X, you need to do X'.  If you
-use it with Y, you need to do Y'.  If you use it with Z, you need to
-do Z'."
-
-No, that's utterly insane.
-
-> > Where it does make sense is when the array of matches is destroyed.  For
-> > that, we'd need to add a callback to the master ops struct so that the
-> > master driver can properly release these pointers.
-> > 
-> > I'd keep most of the big comments though (up to "... varable") to
-> > explain why we don't drop the reference.
-> 
-> Sorry, if I understand you correctly, you're saying that we should keep
-> the following comment:
-> 
-> 			/*
-> 			 * component_match_add keeps a reference to the port
-> 			 * variable.
-> 			 */
-
-Exactly.
-
-> How does that explain why we don't drop the reference? Did you mean the
-> comment should be truncated somewhere else by chance (like including the
-> fact the reference counting is not done)?
-
-I'm sorry, I totally fail to understand what's soo difficult for you to
-understand about the above comment.  I can only conclude that there's
-something wrong in your understanding of memory pointers, aka addresses.
-
-Each and every memory pointer is a _reference_ to a piece of data - just
-like your home address is a _reference_ to the location where you live.
-
-Some references we explicitly count, other references we implicitly count,
-and others we don't bother.
-
-In this case, of_parse_phandle() looks up the reference to the requested
-device_node struct - and of_parse_phandle() knows that the reference is
-going to be passed to the caller, outside it's control, so it increments
-the count of references.
-
-So, the code in drm_of_component_probe() gains a reference _and_ a count
-against the device_node, the count being a tool to ensure that the
-reference doesn't become invalid.
-
-We then store _our_ reference to this inside the component helper by
-means of calling component_add_match().  We don't care about how or
-where it's stored, only that it is stored.
-
-Hence, because we want to _store_ that away, it would now be incorrect
-to drop the count against the reference.  We have stored a reference
-to it inside a helper which knows nothing about the refcounting of this
-structure.
-
-When the helper gets fixed, it will have a callback to release the stored
-data, which becomes the responsibility of the creator to provide.  In
-this case, the reference to the device node by way of pointer value is
-passed back to the creating code, at which point the refcount is dropped.
-
-There is no need what so ever for the component stuff to mess around
-with reference counts itself - and adding it will only make things
-more messy.  I can't see why anyone would even suggest crap like that.
-
-Whenever something takes an opaque object, refcounting has to be done
-by the code using the opaque object, which has to ensure that the
-lifetime of the references stored in the opaque object are longer than
-the opaque object itself.  That's exactly what's going on here.
-
-Please bear in mind that a _reference_ and a _refcount_ are two totally
-separate things.  A reference would be a copy of your home postal
-address.  A refcounter would be a box kept at your home address which
-indicates how many references there are out there.
-
-If you gave me your home postal address on a piece of paper, and I then
-photocopied it, stored it in a safe, and then destroyed the original
-copy you gave me, why should I have to increment the refcounter and
-then immediately decrement it again...
-
-That's exactly what's going on here: we're _temporarily_ transferring
-the responsibility for the held refcount to the opaque component
-helper.  The fact that the component helper has no way to transfer
-responsibility for that held refcount back to us is neither here nor
-there...
-
-To rephrase using the example above - the reference is stored in the
-safe, but the safe has been destroyed without regard for its contents.
-That's where the problem lies: the safe should have been opened, the
-address obtained, and the refcounter for the address decremented.
-
-If you separate the concept of "reference" from "refcount" and realise
-that a reference is merely a pointer to something, then I don't see
-what the issue is with understanding what's going on here.
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index bb8fa02..7e8f29c 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -312,6 +312,7 @@ dtb-$(CONFIG_SOC_IMX6Q) += \
+ 	imx6q-gw551x.dtb \
+ 	imx6q-gw552x.dtb \
+ 	imx6q-hummingboard.dtb \
++	imx6q-icore-rqs.dtb \
+ 	imx6q-nitrogen6x.dtb \
+ 	imx6q-phytec-pbab01.dtb \
+ 	imx6q-rex-pro.dtb \
+diff --git a/arch/arm/boot/dts/imx6q-icore-rqs.dts b/arch/arm/boot/dts/imx6q-icore-rqs.dts
+new file mode 100644
+index 0000000..96f167f
+--- /dev/null
++++ b/arch/arm/boot/dts/imx6q-icore-rqs.dts
+@@ -0,0 +1,21 @@
++/*
++ * Copyright (C) 2015 Amarula Solutions B.V.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ */
++
++/dts-v1/;
++
++#include "imx6q.dtsi"
++#include "imx6qdl-icore-rqs.dtsi"
++
++/ {
++	model = "Engicam i.CoreM6 Quad SOM";
++	compatible = "fsl,imx6-icore-rqs", "fsl,imx6q";
++};
++
++&sata {
++	status = "okay";
++};
+diff --git a/arch/arm/boot/dts/imx6qdl-icore-rqs.dtsi b/arch/arm/boot/dts/imx6qdl-icore-rqs.dtsi
+new file mode 100644
+index 0000000..678ff0a
+--- /dev/null
++++ b/arch/arm/boot/dts/imx6qdl-icore-rqs.dtsi
+@@ -0,0 +1,365 @@
++/*
++ * Copyright 2015 Amarula Solutions B.V.
++ *
++ * The code contained herein is licensed under the GNU General Public
++ * License. You may obtain a copy of the GNU General Public License
++ * Version 2 or later at the following locations:
++ *
++ * http://www.opensource.org/licenses/gpl-license.html
++ * http://www.gnu.org/copyleft/gpl.html
++ */
++#include <dt-bindings/gpio/gpio.h>
++#include <dt-bindings/clock/imx6qdl-clock.h>
++
++/ {
++	memory {
++		reg = <0x10000000 0x80000000>;
++	};
++
++	reg_1p8v: 1p8v {
++		compatible = "regulator-fixed";
++		regulator-name = "1P8V";
++		regulator-min-microvolt = <1800000>;
++		regulator-max-microvolt = <1800000>;
++		regulator-boot-on;
++		regulator-always-on;
++	};
++
++	reg_2p5v: 2p5v {
++		compatible = "regulator-fixed";
++		regulator-name = "2P5V";
++		regulator-min-microvolt = <2500000>;
++		regulator-max-microvolt = <2500000>;
++		regulator-boot-on;
++		regulator-always-on;
++	};
++
++	reg_3p3v: 3p3v {
++		compatible = "regulator-fixed";
++		regulator-name = "3P3V";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		regulator-boot-on;
++		regulator-always-on;
++	};
++
++	reg_sd3_vmmc: sd3_vmmc {
++		compatible = "regulator-fixed";
++		regulator-name = "P3V3_SD3_SWITCHED";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		gpio = <&gpio1 4 GPIO_ACTIVE_LOW>;
++		enable-active-high;
++	};
++
++	reg_sd4_vmmc: sd4_vmmc {
++		compatible = "regulator-fixed";
++		regulator-name = "P3V3_SD4_SWITCHED";
++		regulator-min-microvolt = <3300000>;
++		regulator-max-microvolt = <3300000>;
++		regulator-boot-on;
++		regulator-always-on;
++	};
++
++	reg_usb_h1_vbus: usb_h1_vbus {
++		compatible = "regulator-fixed";
++		regulator-name = "usb_h1_vbus";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++		gpio = <&gpio1 6 GPIO_ACTIVE_HIGH>;
++		enable-active-high;
++	};
++
++	reg_usb_otg_vbus: usb_otg_vbus {
++		compatible = "regulator-fixed";
++		regulator-name = "usb_otg_vbus";
++		regulator-min-microvolt = <5000000>;
++		regulator-max-microvolt = <5000000>;
++		regulator-boot-on;
++		regulator-always-on;
++	};
++
++	usb_hub: usb-hub {
++		pinctrl-names = "default";
++		pinctrl-0 = <&pinctrl_usbhub>;
++		compatible = "smsc,usb3503a";
++		reset-gpios = <&gpio1 6 GPIO_ACTIVE_LOW>;
++		clocks = <&clks IMX6QDL_CLK_LVDS2_GATE>;
++		clock-names = "refclk";
++	};
++};
++
++&iomuxc {
++	imx6qdl-icore-rqs {
++
++		pinctrl_audmux_4: audmux-4 {
++			fsl,pins = <
++				MX6QDL_PAD_DISP0_DAT20__AUD4_TXC  0x130b0
++				MX6QDL_PAD_DISP0_DAT21__AUD4_TXD  0x110b0
++				MX6QDL_PAD_DISP0_DAT22__AUD4_TXFS 0x130b0
++				MX6QDL_PAD_DISP0_DAT23__AUD4_RXD  0x130b0
++			>;
++		};
++
++		pinctrl_enet_3: enetgrp-3 {
++			fsl,pins = <
++				MX6QDL_PAD_ENET_MDIO__ENET_MDIO       0x1b0b0
++				MX6QDL_PAD_ENET_MDC__ENET_MDC         0x1b0b0
++				MX6QDL_PAD_RGMII_TXC__RGMII_TXC       0x1b0b0
++				MX6QDL_PAD_RGMII_TD0__RGMII_TD0       0x1b0b0
++				MX6QDL_PAD_RGMII_TD1__RGMII_TD1       0x1b0b0
++				MX6QDL_PAD_RGMII_TD2__RGMII_TD2       0x1b0b0
++				MX6QDL_PAD_RGMII_TD3__RGMII_TD3       0x1b0b0
++				MX6QDL_PAD_RGMII_TX_CTL__RGMII_TX_CTL 0x1b0b0
++				MX6QDL_PAD_ENET_REF_CLK__ENET_TX_CLK  0x1b0b0
++				MX6QDL_PAD_RGMII_RXC__RGMII_RXC       0x1b0b0
++				MX6QDL_PAD_RGMII_RD0__RGMII_RD0       0x1b0b0
++				MX6QDL_PAD_RGMII_RD1__RGMII_RD1       0x1b0b0
++				MX6QDL_PAD_RGMII_RD2__RGMII_RD2       0x1b0b0
++				MX6QDL_PAD_RGMII_RD3__RGMII_RD3       0x1b0b0
++				MX6QDL_PAD_RGMII_RX_CTL__RGMII_RX_CTL 0x1b0b0
++				MX6QDL_PAD_ENET_TX_EN__ENET_TX_EN     0x1b0b0
++			>;
++		};
++
++		pinctrl_i2c1_1: i2c1grp-1 {
++			fsl,pins = <
++				MX6QDL_PAD_EIM_D21__I2C1_SCL 0x4001b8b1
++				MX6QDL_PAD_EIM_D28__I2C1_SDA 0x4001b8b1
++			>;
++		};
++
++		pinctrl_i2c2_2: i2c2grp-2 {
++			fsl,pins = <
++				MX6QDL_PAD_KEY_COL3__I2C2_SCL 0x4001b8b1
++				MX6QDL_PAD_KEY_ROW3__I2C2_SDA 0x4001b8b1
++			>;
++		};
++
++		pinctrl_i2c3_4: i2c3grp-4 {
++			fsl,pins = <
++				MX6QDL_PAD_GPIO_5__I2C3_SCL  0x4001b8b1
++				MX6QDL_PAD_EIM_D18__I2C3_SDA 0x4001b8b1
++				MX6QDL_PAD_GPIO_0__CCM_CLKO1    0x130b0
++			>;
++		};
++
++		pinctrl_pcie: pciegrp {
++			fsl,pins = <
++				MX6QDL_PAD_EIM_D29__GPIO3_IO29 0x1f059	/* PCIe Reset */
++			>;
++		};
++
++		pinctrl_uart4_1: uart4grp-1 {
++			fsl,pins = <
++				MX6QDL_PAD_KEY_COL0__UART4_TX_DATA 0x1b0b1
++				MX6QDL_PAD_KEY_ROW0__UART4_RX_DATA 0x1b0b1
++			>;
++		};
++
++		pinctrl_usbhub: usbhubgrp {
++			fsl,pins = <
++				MX6QDL_PAD_GPIO_6__GPIO1_IO06  0x1f059	/* HUB USB Reset */
++			>;
++		};
++
++		pinctrl_usbotg_2: usbotggrp-2 {
++			fsl,pins = <
++				MX6QDL_PAD_ENET_RX_ER__USB_OTG_ID 0x17059
++			>;
++		};
++
++		pinctrl_usdhc1_1: usdhc1grp-1 {
++			fsl,pins = <
++				MX6QDL_PAD_SD1_CMD__SD1_CMD    0x17071
++				MX6QDL_PAD_SD1_CLK__SD1_CLK    0x10071
++				MX6QDL_PAD_SD1_DAT0__SD1_DATA0 0x17071
++				MX6QDL_PAD_SD1_DAT1__SD1_DATA1 0x17071
++				MX6QDL_PAD_SD1_DAT2__SD1_DATA2 0x17071
++				MX6QDL_PAD_SD1_DAT3__SD1_DATA3 0x17071
++			>;
++		};
++
++		pinctrl_usdhc3_2: usdhc3grp-2 {
++			fsl,pins = <
++				MX6QDL_PAD_SD3_CMD__SD3_CMD    0x17070
++				MX6QDL_PAD_SD3_CLK__SD3_CLK    0x10070
++				MX6QDL_PAD_SD3_DAT0__SD3_DATA0 0x17070
++				MX6QDL_PAD_SD3_DAT1__SD3_DATA1 0x17070
++				MX6QDL_PAD_SD3_DAT2__SD3_DATA2 0x17070
++				MX6QDL_PAD_SD3_DAT3__SD3_DATA3 0x17070
++				MX6QDL_PAD_GPIO_1__GPIO1_IO01  0x1f059	/* CD */
++				MX6QDL_PAD_GPIO_4__GPIO1_IO04  0x1f059	/* PWR */
++			>;
++		};
++
++		pinctrl_usdhc3_2_100mhz: usdhc3grp-2_100mhz {
++			fsl,pins = <
++				MX6QDL_PAD_SD3_CMD__SD3_CMD    0x170B1
++				MX6QDL_PAD_SD3_CLK__SD3_CLK    0x100B1
++				MX6QDL_PAD_SD3_DAT0__SD3_DATA0 0x170B1
++				MX6QDL_PAD_SD3_DAT1__SD3_DATA1 0x170B1
++				MX6QDL_PAD_SD3_DAT2__SD3_DATA2 0x170B1
++				MX6QDL_PAD_SD3_DAT3__SD3_DATA3 0x170B1
++			>;
++		};
++
++		pinctrl_usdhc3_2_200mhz: usdhc3grp-2_200mhz {
++			fsl,pins = <
++				MX6QDL_PAD_SD3_CMD__SD3_CMD    0x170F9
++				MX6QDL_PAD_SD3_CLK__SD3_CLK    0x100F9
++				MX6QDL_PAD_SD3_DAT0__SD3_DATA0 0x170F9
++				MX6QDL_PAD_SD3_DAT1__SD3_DATA1 0x170F9
++				MX6QDL_PAD_SD3_DAT2__SD3_DATA2 0x170F9
++				MX6QDL_PAD_SD3_DAT3__SD3_DATA3 0x170F9
++			>;
++		};
++
++		pinctrl_usdhc4_1: usdhc4grp-1 {
++			fsl,pins = <
++				MX6QDL_PAD_SD4_CMD__SD4_CMD    0x17070
++				MX6QDL_PAD_SD4_CLK__SD4_CLK    0x10070
++				MX6QDL_PAD_SD4_DAT0__SD4_DATA0 0x17070
++				MX6QDL_PAD_SD4_DAT1__SD4_DATA1 0x17070
++				MX6QDL_PAD_SD4_DAT2__SD4_DATA2 0x17070
++				MX6QDL_PAD_SD4_DAT3__SD4_DATA3 0x17070
++				MX6QDL_PAD_SD4_DAT4__SD4_DATA4 0x17070
++				MX6QDL_PAD_SD4_DAT5__SD4_DATA5 0x17070
++				MX6QDL_PAD_SD4_DAT6__SD4_DATA6 0x17070
++				MX6QDL_PAD_SD4_DAT7__SD4_DATA7 0x17070
++			>;
++		};
++
++		pinctrl_usdhc4_1_100mhz: usdhc4grp-1_100mhz {
++			fsl,pins = <
++				MX6QDL_PAD_SD4_CMD__SD4_CMD    0x170B1
++				MX6QDL_PAD_SD4_CLK__SD4_CLK    0x100B1
++				MX6QDL_PAD_SD4_DAT0__SD4_DATA0 0x170B1
++				MX6QDL_PAD_SD4_DAT1__SD4_DATA1 0x170B1
++				MX6QDL_PAD_SD4_DAT2__SD4_DATA2 0x170B1
++				MX6QDL_PAD_SD4_DAT3__SD4_DATA3 0x170B1
++				MX6QDL_PAD_SD4_DAT4__SD4_DATA4 0x170B1
++				MX6QDL_PAD_SD4_DAT5__SD4_DATA5 0x170B1
++				MX6QDL_PAD_SD4_DAT6__SD4_DATA6 0x170B1
++				MX6QDL_PAD_SD4_DAT7__SD4_DATA7 0x170B1
++			>;
++		};
++
++		pinctrl_usdhc4_1_200mhz: usdhc4grp-2_200mhz {
++			fsl,pins = <
++				MX6QDL_PAD_SD4_CMD__SD4_CMD    0x170F9
++				MX6QDL_PAD_SD4_CLK__SD4_CLK    0x100F9
++				MX6QDL_PAD_SD4_DAT0__SD4_DATA0 0x170F9
++				MX6QDL_PAD_SD4_DAT1__SD4_DATA1 0x170F9
++				MX6QDL_PAD_SD4_DAT2__SD4_DATA2 0x170F9
++				MX6QDL_PAD_SD4_DAT3__SD4_DATA3 0x170F9
++				MX6QDL_PAD_SD4_DAT4__SD4_DATA4 0x170F9
++				MX6QDL_PAD_SD4_DAT5__SD4_DATA5 0x170F9
++				MX6QDL_PAD_SD4_DAT6__SD4_DATA6 0x170F9
++				MX6QDL_PAD_SD4_DAT7__SD4_DATA7 0x170F9
++			>;
++		};
++	};
++};
++
++&clks {
++	assigned-clocks = <&clks IMX6QDL_CLK_LVDS2_SEL>;
++	assigned-clock-parents = <&clks IMX6QDL_CLK_OSC>;
++};
++
++&audmux {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_audmux_4>;
++	status = "okay";
++};
++
++&fec {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_enet_3>;
++	phy-mode = "rgmii";
++	status = "okay";
++};
++
++&i2c1 {
++	status = "okay";
++	clock-frequency = <100000>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_i2c1_1>;
++};
++
++&i2c2 {
++	clock-frequency = <100000>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_i2c2_2>;
++	status = "okay";
++};
++
++&i2c3 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_i2c3_4>;
++	status = "okay";
++};
++
++&pcie {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_pcie>;
++	reset-gpio = <&gpio3 29 GPIO_ACTIVE_LOW>;
++	status = "okay";
++};
++
++&ssi1 {
++	fsl,mode = "i2s-slave";
++	status = "okay";
++};
++
++&uart4 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_uart4_1>;
++	status = "okay";
++};
++
++&usbh1 {
++	vbus-supply = <&reg_usb_h1_vbus>;
++	disable-over-current;
++	clocks = <&clks IMX6QDL_CLK_USBOH3>;
++	status = "okay";
++};
++
++&usbotg {
++	vbus-supply = <&reg_usb_otg_vbus>;
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_usbotg_2>;
++	disable-over-current;
++	status = "okay";
++};
++
++&usdhc1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&pinctrl_usdhc1_1>;
++	no-1-8-v;
++	status = "okay";
++};
++
++&usdhc3 {
++	pinctrl-names = "default", "state_100mhz", "state_200mhz";
++	pinctrl-0 = <&pinctrl_usdhc3_2>;
++	pinctrl-1 = <&pinctrl_usdhc3_2_100mhz>;
++	pinctrl-2 = <&pinctrl_usdhc3_2_200mhz>;
++	vmcc-supply = <&reg_sd3_vmmc>;
++	cd-gpios = <&gpio1 1 GPIO_ACTIVE_LOW>;
++	bus-witdh=<4>;
++	no-1-8-v;
++	status = "okay";
++};
++
++&usdhc4 {
++	pinctrl-names = "default", "state_100mhz", "state_200mhz";
++	pinctrl-0 = <&pinctrl_usdhc4_1>;
++	pinctrl-1 = <&pinctrl_usdhc4_1_100mhz>;
++	pinctrl-2 = <&pinctrl_usdhc4_1_200mhz>;
++	vmcc-supply = <&reg_sd4_vmmc>;
++	bus-witdh=<8>;
++	no-1-8-v;
++	non-removable;
++	status = "okay";
++};
+-- 
+2.6.3
 
 -- 
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+| Michael Nazzareno Trimarchi                     Amarula Solutions BV |
+| COO  -  Founder                                      Cruquiuskade 47 |
+| +31(0)851119172                                 Amsterdam 1018 AM NL |
+|                  [`as] http://www.amarulasolutions.com               |
