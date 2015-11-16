@@ -1,151 +1,122 @@
-From: daniel@ffwll.ch (Daniel Vetter)
-Date: Mon, 16 Nov 2015 17:25:47 +0100
-Subject: [RESEND PATCH] drm/rockchip: import dma_buf to gem
-In-Reply-To: <1447146717-11423-1-git-send-email-mark.yao@rock-chips.com>
-References: <1447146717-11423-1-git-send-email-mark.yao@rock-chips.com>
-Message-ID: <20151116162547.GE16848@phenom.ffwll.local>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 16 Nov 2015 17:25:48 +0100
+Subject: [RFC] ARM64: simplify dma_get_ops
+Message-ID: <4270550.cGd11OgA5n@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 10, 2015 at 05:11:57PM +0800, Mark Yao wrote:
-> We want to display a buffer allocated by other driver, need import
-> the buffer to gem.
+Including linux/acpi.h from asm/dma-mapping.h causes tons of compile-time
+warnings, e.g.
 
-Does this work with some open-source driver/userspace or is this for the
-proprietary stack only? A bit a grey area I guess, but if it's only for
-the proprietary stack I think it shouldn't land in upstream - making sure
-it works with open-source (e.g. Xorg prime) first would be good.
--Daniel
+ drivers/isdn/mISDN/dsp_ecdis.h:43:0: warning: "FALSE" redefined
+ drivers/isdn/mISDN/dsp_ecdis.h:44:0: warning: "TRUE" redefined
+ drivers/net/fddi/skfp/h/targetos.h:62:0: warning: "TRUE" redefined
+ drivers/net/fddi/skfp/h/targetos.h:63:0: warning: "FALSE" redefined
 
-> 
-> Signed-off-by: Mark Yao <mark.yao@rock-chips.com>
-> ---
-> Changes in resend:
-> - rebase to this patch to newest origin/drm-next 4.3-rc5
-> Changes in v2:
-> Adviced by Russell King
-> - check sgt-nents == 1 when get iova from scatterlist
-> - remove unused dma_map_sg/dma_unmap_sg, dma_buf_map_attachment->map_dma_buf
->   should do the dma_map
-> 
->  drivers/gpu/drm/rockchip/rockchip_drm_drv.c |    1 +
->  drivers/gpu/drm/rockchip/rockchip_drm_gem.c |   40 +++++++++++++++++++++++++--
->  drivers/gpu/drm/rockchip/rockchip_drm_gem.h |    5 +++-
->  3 files changed, 42 insertions(+), 4 deletions(-)
-> 
-> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_drv.c b/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
-> index f22e1e1..ea5b19e 100644
-> --- a/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
-> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_drv.c
-> @@ -290,6 +290,7 @@ static struct drm_driver rockchip_drm_driver = {
->  	.prime_handle_to_fd	= drm_gem_prime_handle_to_fd,
->  	.prime_fd_to_handle	= drm_gem_prime_fd_to_handle,
->  	.gem_prime_import	= drm_gem_prime_import,
-> +	.gem_prime_import_sg_table = rockchip_gem_prime_import_sg_table,
->  	.gem_prime_export	= drm_gem_prime_export,
->  	.gem_prime_get_sg_table	= rockchip_gem_prime_get_sg_table,
->  	.gem_prime_vmap		= rockchip_gem_prime_vmap,
-> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_gem.c b/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
-> index 8caea0a..1c94a30 100644
-> --- a/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
-> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_gem.c
-> @@ -18,6 +18,7 @@
->  #include <drm/drm_vma_manager.h>
->  
->  #include <linux/dma-attrs.h>
-> +#include <linux/dma-buf.h>
->  
->  #include "rockchip_drm_drv.h"
->  #include "rockchip_drm_gem.h"
-> @@ -103,6 +104,36 @@ int rockchip_gem_mmap(struct file *filp, struct vm_area_struct *vma)
->  	return rockchip_drm_gem_object_mmap(obj, vma);
->  }
->  
-> +struct drm_gem_object *
-> +rockchip_gem_prime_import_sg_table(struct drm_device *drm,
-> +				   struct dma_buf_attachment *attach,
-> +				   struct sg_table *sgt)
-> +{
-> +	struct rockchip_gem_object *rk_obj;
-> +	struct drm_gem_object *obj;
-> +
-> +	/*
-> +	 * Todo: only support continuous buffer now, plan to found a method
-> +	 * to import non continuous with iommu.
-> +	 */
-> +	if (sgt->nents != 1)
-> +		return ERR_PTR(-EINVAL);
-> +
-> +	rk_obj = kzalloc(sizeof(*rk_obj), GFP_KERNEL);
-> +	if (!rk_obj)
-> +		return ERR_PTR(-ENOMEM);
-> +
-> +	obj = &rk_obj->base;
-> +
-> +	drm_gem_private_object_init(drm, obj, attach->dmabuf->size);
-> +
-> +	rk_obj->dma_addr = sg_dma_address(sgt->sgl);
-> +	rk_obj->sgt = sgt;
-> +	obj->size = sg_dma_len(sgt->sgl);
-> +
-> +	return obj;
-> +}
-> +
->  struct rockchip_gem_object *
->  	rockchip_gem_create_object(struct drm_device *drm, unsigned int size,
->  				   bool alloc_kmap)
-> @@ -140,11 +171,14 @@ void rockchip_gem_free_object(struct drm_gem_object *obj)
->  {
->  	struct rockchip_gem_object *rk_obj;
->  
-> -	drm_gem_free_mmap_offset(obj);
-> -
->  	rk_obj = to_rockchip_obj(obj);
->  
-> -	rockchip_gem_free_buf(rk_obj);
-> +	if (obj->import_attach) {
-> +		drm_prime_gem_destroy(obj, rk_obj->sgt);
-> +	} else {
-> +		drm_gem_free_mmap_offset(obj);
-> +		rockchip_gem_free_buf(rk_obj);
-> +	}
->  
->  	kfree(rk_obj);
->  }
-> diff --git a/drivers/gpu/drm/rockchip/rockchip_drm_gem.h b/drivers/gpu/drm/rockchip/rockchip_drm_gem.h
-> index ad22618..9fd58e3 100644
-> --- a/drivers/gpu/drm/rockchip/rockchip_drm_gem.h
-> +++ b/drivers/gpu/drm/rockchip/rockchip_drm_gem.h
-> @@ -21,6 +21,7 @@ struct rockchip_gem_object {
->  	struct drm_gem_object base;
->  	unsigned int flags;
->  
-> +	struct sg_table *sgt;
->  	void *kvaddr;
->  	dma_addr_t dma_addr;
->  	struct dma_attrs dma_attrs;
-> @@ -28,8 +29,10 @@ struct rockchip_gem_object {
->  
->  struct sg_table *rockchip_gem_prime_get_sg_table(struct drm_gem_object *obj);
->  struct drm_gem_object *
-> -rockchip_gem_prime_import_sg_table(struct drm_device *dev, size_t size,
-> +rockchip_gem_prime_import_sg_table(struct drm_device *drm,
-> +				   struct dma_buf_attachment *attach,
->  				   struct sg_table *sgt);
-> +
->  void *rockchip_gem_prime_vmap(struct drm_gem_object *obj);
->  void rockchip_gem_prime_vunmap(struct drm_gem_object *obj, void *vaddr);
->  
-> -- 
-> 1.7.9.5
-> 
-> 
-> _______________________________________________
-> dri-devel mailing list
-> dri-devel at lists.freedesktop.org
-> http://lists.freedesktop.org/mailman/listinfo/dri-devel
+However, it looks like the dependency should not even there as
+I do not see why __generic_dma_ops() cares about whether we have
+an ACPI based system or not.
 
--- 
-Daniel Vetter
-Software Engineer, Intel Corporation
-http://blog.ffwll.ch
+The current behavior is to fall back to the global dma_ops when
+a device has not set its own dma_ops, but only for DT based systems.
+This seems dangerous, as a random device might have different
+requirements regarding IOMMU or coherency, so we should really
+never have that fallback and just forbid DMA when we have not
+initialized DMA for a device.
+
+This removes the global dma_ops variable and the special-casing
+for ACPI, and just returns the dma ops that got set for the
+device, or the dummy_dma_ops if none were present.
+
+The original code has apparently been copied from arm32 where we
+rely on it for ISA devices things like the floppy controller, but
+we should have no such devices on ARM64.
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+
+diff --git a/arch/arm64/include/asm/dma-mapping.h b/arch/arm64/include/asm/dma-mapping.h
+index 54d0ead41afc..04e841a1c1f3 100644
+--- a/arch/arm64/include/asm/dma-mapping.h
++++ b/arch/arm64/include/asm/dma-mapping.h
+@@ -18,7 +18,6 @@
+ 
+ #ifdef __KERNEL__
+ 
+-#include <linux/acpi.h>
+ #include <linux/types.h>
+ #include <linux/vmalloc.h>
+ 
+@@ -26,22 +25,17 @@
+ #include <asm/xen/hypervisor.h>
+ 
+ #define DMA_ERROR_CODE	(~(dma_addr_t)0)
+-extern struct dma_map_ops *dma_ops;
+ extern struct dma_map_ops dummy_dma_ops;
+ 
+ static inline struct dma_map_ops *__generic_dma_ops(struct device *dev)
+ {
+-	if (unlikely(!dev))
+-		return dma_ops;
+-	else if (dev->archdata.dma_ops)
++	if (dev && dev->archdata.dma_ops)
+ 		return dev->archdata.dma_ops;
+-	else if (acpi_disabled)
+-		return dma_ops;
+ 
+ 	/*
+-	 * When ACPI is enabled, if arch_set_dma_ops is not called,
+-	 * we will disable device DMA capability by setting it
+-	 * to dummy_dma_ops.
++	 * we expect no ISA devices, and all other DMA masters are
++	 * expected to have someone call arch_setup_dma_ops at
++	 * device creation time
+ 	 */
+ 	return &dummy_dma_ops;
+ }
+diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
+index 131a199114b4..9e351c1f89e2 100644
+--- a/arch/arm64/mm/dma-mapping.c
++++ b/arch/arm64/mm/dma-mapping.c
+@@ -18,6 +18,7 @@
+  */
+ 
+ #include <linux/gfp.h>
++#include <linux/acpi.h>
+ #include <linux/export.h>
+ #include <linux/slab.h>
+ #include <linux/genalloc.h>
+@@ -28,9 +29,6 @@
+ 
+ #include <asm/cacheflush.h>
+ 
+-struct dma_map_ops *dma_ops;
+-EXPORT_SYMBOL(dma_ops);
+-
+ static pgprot_t __get_dma_pgprot(struct dma_attrs *attrs, pgprot_t prot,
+ 				 bool coherent)
+ {
+@@ -515,13 +513,7 @@ EXPORT_SYMBOL(dummy_dma_ops);
+ 
+ static int __init arm64_dma_init(void)
+ {
+-	int ret;
+-
+-	dma_ops = &swiotlb_dma_ops;
+-
+-	ret = atomic_pool_init();
+-
+-	return ret;
++	return atomic_pool_init();
+ }
+ arch_initcall(arm64_dma_init);
+ 
+@@ -985,7 +977,7 @@ void arch_setup_dma_ops(struct device *dev, u64 dma_base, u64 size,
+ 			struct iommu_ops *iommu, bool coherent)
+ {
+ 	if (!acpi_disabled && !dev->archdata.dma_ops)
+-		dev->archdata.dma_ops = dma_ops;
++		dev->archdata.dma_ops = &swiotlb_dma_ops;
+ 
+ 	dev->archdata.dma_coherent = coherent;
+ 	__iommu_setup_dma_ops(dev, dma_base, size, iommu);
