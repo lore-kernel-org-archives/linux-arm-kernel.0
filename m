@@ -1,37 +1,37 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 16 Nov 2015 13:11:51 +0000
-Subject: [PATCH 13/21] arm64: KVM: Implement TLB handling
+Date: Mon, 16 Nov 2015 13:11:52 +0000
+Subject: [PATCH 14/21] arm64: KVM: HYP mode entry points
 In-Reply-To: <1447679519-17888-1-git-send-email-marc.zyngier@arm.com>
 References: <1447679519-17888-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1447679519-17888-14-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1447679519-17888-15-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Implement the TLB handling as a direct translation of the assembly
-code version.
+Add the entry points for HYP mode (both for hypercalls and
+exception handling).
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/kvm/hyp/Makefile |  1 +
- arch/arm64/kvm/hyp/tlb.c    | 72 +++++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 73 insertions(+)
- create mode 100644 arch/arm64/kvm/hyp/tlb.c
+ arch/arm64/kvm/hyp/Makefile    |   1 +
+ arch/arm64/kvm/hyp/hyp-entry.S | 189 +++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 190 insertions(+)
+ create mode 100644 arch/arm64/kvm/hyp/hyp-entry.S
 
 diff --git a/arch/arm64/kvm/hyp/Makefile b/arch/arm64/kvm/hyp/Makefile
-index 56238d0..1a529f5 100644
+index 1a529f5..826032b 100644
 --- a/arch/arm64/kvm/hyp/Makefile
 +++ b/arch/arm64/kvm/hyp/Makefile
-@@ -10,3 +10,4 @@ obj-$(CONFIG_KVM_ARM_HOST) += debug-sr.o
- obj-$(CONFIG_KVM_ARM_HOST) += entry.o
+@@ -11,3 +11,4 @@ obj-$(CONFIG_KVM_ARM_HOST) += entry.o
  obj-$(CONFIG_KVM_ARM_HOST) += switch.o
  obj-$(CONFIG_KVM_ARM_HOST) += fpsimd.o
-+obj-$(CONFIG_KVM_ARM_HOST) += tlb.o
-diff --git a/arch/arm64/kvm/hyp/tlb.c b/arch/arm64/kvm/hyp/tlb.c
+ obj-$(CONFIG_KVM_ARM_HOST) += tlb.o
++obj-$(CONFIG_KVM_ARM_HOST) += hyp-entry.o
+diff --git a/arch/arm64/kvm/hyp/hyp-entry.S b/arch/arm64/kvm/hyp/hyp-entry.S
 new file mode 100644
-index 0000000..d4a07d0
+index 0000000..e11a129
 --- /dev/null
-+++ b/arch/arm64/kvm/hyp/tlb.c
-@@ -0,0 +1,72 @@
++++ b/arch/arm64/kvm/hyp/hyp-entry.S
+@@ -0,0 +1,189 @@
 +/*
 + * Copyright (C) 2015 - ARM Ltd
 + * Author: Marc Zyngier <marc.zyngier@arm.com>
@@ -49,60 +49,177 @@ index 0000000..d4a07d0
 + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
 + */
 +
-+#include "hyp.h"
++#include <linux/linkage.h>
 +
-+void __hyp_text __tlb_flush_vmid_ipa(struct kvm *kvm, phys_addr_t ipa)
-+{
-+	dsb(ishst);
++#include <asm/assembler.h>
++#include <asm/asm-offsets.h>
++#include <asm/kvm_arm.h>
++#include <asm/kvm_asm.h>
++#include <asm/kvm_mmu.h>
 +
-+	/* Switch to requested VMID */
-+	kvm = kern_hyp_va(kvm);
-+	write_sysreg(kvm->arch.vttbr, vttbr_el2);
-+	isb();
++	.text
++	.pushsection	.hyp.text, "ax"
++
++el1_sync:					// Guest trapped into EL2
++	push	x0, x1
++	push	x2, x3
++
++	mrs	x1, esr_el2
++	lsr	x2, x1, #ESR_ELx_EC_SHIFT
++
++	cmp	x2, #ESR_ELx_EC_HVC64
++	b.ne	el1_trap
++
++	mrs	x3, vttbr_el2			// If vttbr is valid, the 64bit guest
++	cbnz	x3, el1_trap			// called HVC
++
++	/* Here, we're pretty sure the host called HVC. */
++	pop	x2, x3
++	pop	x0, x1
++
++	/* Check for __hyp_get_vectors */
++	cbnz	x0, 1f
++	mrs	x0, vbar_el2
++	b	2f
++
++1:	push	lr, xzr
 +
 +	/*
-+	 * We could do so much better if we had the VA as well.
-+	 * Instead, we invalidate Stage-2 for this IPA, and the
-+	 * whole of Stage-1. Weep...
++	 * Compute the function address in EL2, and shuffle the parameters.
 +	 */
-+	ipa >>= 12;
-+	asm volatile("tlbi ipas2e1is, %0" : : "r" (ipa));
-+	dsb(ish);
++	kern_hyp_va	x0
++	mov	lr, x0
++	mov	x0, x1
++	mov	x1, x2
++	mov	x2, x3
++	blr	lr
++
++	pop	lr, xzr
++2:	eret
++
++el1_trap:
 +	/*
-+	 * We have to ensure completion of the invalidation at Stage-2,
-+	 * since a table walk on another CPU could refill a TLB with a
-+	 * complete (S1 + S2) walk based on the old Stage-2 mapping if
-+	 * the Stage-1 invalidation happened first.
++	 * x1: ESR
++	 * x2: ESR_EC
 +	 */
-+	asm volatile("tlbi vmalle1is" : : );
-+	dsb(ish);
-+	isb();
 +
-+	write_sysreg(0, vttbr_el2);
-+}
++	/* Guest accessed VFP/SIMD registers, save host, restore Guest */
++	cmp	x2, #ESR_ELx_EC_FP_ASIMD
++	b.eq	__fpsimd_guest_restore
 +
-+void __hyp_text __tlb_flush_vmid(struct kvm *kvm)
-+{
-+	dsb(ishst);
++	cmp	x2, #ESR_ELx_EC_DABT_LOW
++	mov	x0, #ESR_ELx_EC_IABT_LOW
++	ccmp	x2, x0, #4, ne
++	b.ne	1f		// Not an abort we care about
 +
-+	/* Switch to requested VMID */
-+	kvm = kern_hyp_va(kvm);
-+	write_sysreg(kvm->arch.vttbr, vttbr_el2);
-+	isb();
++	/* This is an abort. Check for permission fault */
++	and	x2, x1, #ESR_ELx_FSC_TYPE
++	cmp	x2, #FSC_PERM
++	b.ne	1f		// Not a permission fault
 +
-+	asm volatile("tlbi vmalls12e1is" : : );
-+	dsb(ish);
-+	isb();
++	/*
++	 * Check for Stage-1 page table walk, which is guaranteed
++	 * to give a valid HPFAR_EL2.
++	 */
++	tbnz	x1, #7, 1f	// S1PTW is set
 +
-+	write_sysreg(0, vttbr_el2);
-+}
++	/* Preserve PAR_EL1 */
++	mrs	x3, par_el1
++	push	x3, xzr
 +
-+void __hyp_text __tlb_flush_vm_context(void)
-+{
-+	dsb(ishst);
-+	asm volatile("tlbi alle1is	\n"
-+		     "ic ialluis	  ": : );
-+	dsb(ish);
-+}
++	/*
++	 * Permission fault, HPFAR_EL2 is invalid.
++	 * Resolve the IPA the hard way using the guest VA.
++	 * Stage-1 translation already validated the memory access rights.
++	 * As such, we can use the EL1 translation regime, and don't have
++	 * to distinguish between EL0 and EL1 access.
++	 */
++	mrs	x2, far_el2
++	at	s1e1r, x2
++	isb
++
++	/* Read result */
++	mrs	x3, par_el1
++	pop	x0, xzr			// Restore PAR_EL1 from the stack
++	msr	par_el1, x0
++	tbnz	x3, #0, 3f		// Bail out if we failed the translation
++	ubfx	x3, x3, #12, #36	// Extract IPA
++	lsl	x3, x3, #4		// and present it like HPFAR
++	b	2f
++
++1:	mrs	x3, hpfar_el2
++	mrs	x2, far_el2
++
++2:	mrs	x0, tpidr_el2
++	str	w1, [x0, #VCPU_ESR_EL2]
++	str	x2, [x0, #VCPU_FAR_EL2]
++	str	x3, [x0, #VCPU_HPFAR_EL2]
++
++	mov	x1, #ARM_EXCEPTION_TRAP
++	b	__guest_exit
++
++	/*
++	 * Translation failed. Just return to the guest and
++	 * let it fault again. Another CPU is probably playing
++	 * behind our back.
++	 */
++3:	pop	x2, x3
++	pop	x0, x1
++
++	eret
++
++el1_irq:
++	push	x0, x1
++	push	x2, x3
++	mrs	x0, tpidr_el2
++	mov	x1, #ARM_EXCEPTION_IRQ
++	b	__guest_exit
++
++.macro invalid_vector	label, target = __kvm_hyp_panic
++	.align	2
++\label:
++	b \target
++ENDPROC(\label)
++.endm
++
++	/* None of these should ever happen */
++	invalid_vector	el2t_sync_invalid
++	invalid_vector	el2t_irq_invalid
++	invalid_vector	el2t_fiq_invalid
++	invalid_vector	el2t_error_invalid
++	invalid_vector	el2h_sync_invalid
++	invalid_vector	el2h_irq_invalid
++	invalid_vector	el2h_fiq_invalid
++	invalid_vector	el2h_error_invalid
++	invalid_vector	el1_sync_invalid
++	invalid_vector	el1_irq_invalid
++	invalid_vector	el1_fiq_invalid
++	invalid_vector	el1_error_invalid
++
++	.ltorg
++
++	.align 11
++
++ENTRY(__hyp_vector)
++	ventry	el2t_sync_invalid		// Synchronous EL2t
++	ventry	el2t_irq_invalid		// IRQ EL2t
++	ventry	el2t_fiq_invalid		// FIQ EL2t
++	ventry	el2t_error_invalid		// Error EL2t
++
++	ventry	el2h_sync_invalid		// Synchronous EL2h
++	ventry	el2h_irq_invalid		// IRQ EL2h
++	ventry	el2h_fiq_invalid		// FIQ EL2h
++	ventry	el2h_error_invalid		// Error EL2h
++
++	ventry	el1_sync			// Synchronous 64-bit EL1
++	ventry	el1_irq				// IRQ 64-bit EL1
++	ventry	el1_fiq_invalid			// FIQ 64-bit EL1
++	ventry	el1_error_invalid		// Error 64-bit EL1
++
++	ventry	el1_sync			// Synchronous 32-bit EL1
++	ventry	el1_irq				// IRQ 32-bit EL1
++	ventry	el1_fiq_invalid			// FIQ 32-bit EL1
++	ventry	el1_error_invalid		// Error 32-bit EL1
++ENDPROC(__hyp_vector)
 -- 
 2.1.4
