@@ -1,53 +1,28 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 16 Nov 2015 10:38:54 +0100
-Subject: [PATCH v2 net-next] net: hisilicon: fix binding document of mdio
-In-Reply-To: <1447666704-200773-1-git-send-email-huangdaode@hisilicon.com>
-References: <1447666704-200773-1-git-send-email-huangdaode@hisilicon.com>
-Message-ID: <6897029.2fyR9qGpEn@wuerfel>
+From: ian.campbell@citrix.com (Ian Campbell)
+Date: Mon, 16 Nov 2015 09:42:57 +0000
+Subject: [Xen-devel] [PATCH v4 2/7] xen/arm: introduce
+ HYPERVISOR_platform_op on arm and arm64
+In-Reply-To: <alpine.DEB.2.02.1511131757360.2653@kaball.uk.xensource.com>
+References: <alpine.DEB.2.02.1511121726370.526@kaball.uk.xensource.com>
+ <1447349448-22610-2-git-send-email-stefano.stabellini@eu.citrix.com>
+ <5645E868.30706@citrix.com>
+ <alpine.DEB.2.02.1511131757360.2653@kaball.uk.xensource.com>
+Message-ID: <1447666977.15629.9.camel@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 16 November 2015 17:38:24 huangdaode wrote:
-> This patch explains the occasion of "hisilcon,mdio" and
-> "hisilicon,hns-mdio" according to Arnd's comments.
-> and reformat it according to comments from Rob<robh@kernel.org>.
+On Fri, 2015-11-13 at 18:10 +0000, Stefano Stabellini wrote:
 > 
-> chang log:
-> 
-> v2:
->   1) reformat the style.
->   2) make it more clearity.
-> 
-> v1:
->   initial version.
-> 
-> Signed-off-by: huangdaode <huangdaode@hisilicon.com>
-> ---
+> I agree with your point (I thought about it myself) but the current
+> assembly scheme for hypercalls doesn't work well with that. I would have
+> to introduce, and maintain going forward, two special hypercall
+> implementations in assembly, one for arm and another for arm64, just to
+> set interface_version. I don't think it is worth it; I prefer to have to
+> maintain the explicit interface_version setting at the call sites (that
+> today is just one).
 
-The new version looks ok, but your changelog above is formatted
-incorrectly. Please put only the contents you want in the git history
-above the '---' line and your Signed-off-by, but put the parts that
-refer to previous versions of the submission below the ---.
+You could give the bare assembly stub a different name (append _core or
+_raw or something) and make HYPERVISOR_platform_op a C wrapper for it which
+DTRT.
 
->  Documentation/devicetree/bindings/net/hisilicon-hns-mdio.txt | 7 ++++++-
->  1 file changed, 6 insertions(+), 1 deletion(-)
-> 
-> diff --git a/Documentation/devicetree/bindings/net/hisilicon-hns-mdio.txt b/Documentation/devicetree/bindings/net/hisilicon-hns-mdio.txt
-> index 9c23fdf..4942d20 100644
-> --- a/Documentation/devicetree/bindings/net/hisilicon-hns-mdio.txt
-> +++ b/Documentation/devicetree/bindings/net/hisilicon-hns-mdio.txt
-> @@ -1,7 +1,12 @@
->  Hisilicon MDIO bus controller
->  
->  Properties:
-> -- compatible: "hisilicon,mdio","hisilicon,hns-mdio".
-> +- compatible: can be one of:
-> +	"hisilicon,hns-mdio"
-> +	"hisilicon,mdio"
-> +  "hisilicon,hns-mdio" is recommendly to be used for hip05 and later SOCs,
-> +  while "hisilicon,mdio" is optional for backwards compatibility, only
-> +  support for hip04 Soc.
->  - reg: The base address of the MDIO bus controller register bank.
->  - #address-cells: Must be <1>.
->  - #size-cells: Must be <0>.  MDIO addresses have no size component.
-> 
+Ian.
