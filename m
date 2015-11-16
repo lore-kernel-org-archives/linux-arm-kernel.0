@@ -1,43 +1,37 @@
-From: labbott@redhat.com (Laura Abbott)
-Date: Mon, 16 Nov 2015 15:14:16 -0800
-Subject: [PATCH] arm64: mm: use correct mapping granularity under
- DEBUG_RODATA
-In-Reply-To: <1447669094-31076-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1447669094-31076-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <564A6348.5040200@redhat.com>
+From: okaya@codeaurora.org (Sinan Kaya)
+Date: Mon, 16 Nov 2015 18:19:14 -0500
+Subject: [RFC] User space to kernel space copy optimization
+In-Reply-To: <1447714667.83864.212.camel@intel.com>
+References: <564A5057.9080203@codeaurora.org>
+ <1447714667.83864.212.camel@intel.com>
+Message-ID: <564A6472.5010100@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/16/2015 02:18 AM, Ard Biesheuvel wrote:
-> When booting a 64k pages kernel that is built with CONFIG_DEBUG_RODATA
-> and resides at an offset that is not a multiple of 512 MB, the rounding
-> that occurs in __map_memblock() and fixup_executable() results in
-> incorrect regions being mapped.
->
-> The following snippet from /sys/kernel/debug/kernel_page_tables shows
-> how, when the kernel is loaded 2 MB above the base of DRAM at 0x40000000,
-> the first 2 MB of memory (which may be inaccessible from non-secure EL1
-> or just reserved by the firmware) is inadvertently mapped into the end of
-> the module region.
->
->    ---[ Modules start ]---
->    0xfffffdffffe00000-0xfffffe0000000000     2M RW NX ... UXN MEM/NORMAL
->    ---[ Modules end ]---
->    ---[ Kernel Mapping ]---
->    0xfffffe0000000000-0xfffffe0000090000   576K RW NX ... UXN MEM/NORMAL
->    0xfffffe0000090000-0xfffffe0000200000  1472K ro x  ... UXN MEM/NORMAL
->    0xfffffe0000200000-0xfffffe0000800000     6M ro x  ... UXN MEM/NORMAL
->    0xfffffe0000800000-0xfffffe0000810000    64K ro x  ... UXN MEM/NORMAL
->    0xfffffe0000810000-0xfffffe0000a00000  1984K RW NX ... UXN MEM/NORMAL
->    0xfffffe0000a00000-0xfffffe00ffe00000  4084M RW NX ... UXN MEM/NORMAL
->
-> The same issue is likely to occur on 16k pages kernels whose load
-> address is not a multiple of 32 MB (i.e., SECTION_SIZE). So round to
-> SWAPPER_BLOCK_SIZE instead of SECTION_SIZE.
->
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+On 11/16/2015 5:57 PM, Jiang, Dave wrote:
+>> One of the things I'm interested in is to use a memcpy capable DMA
+>> > engine HW to optimize user space and kernel space parameter copying.
+> Have you looked at why NET_DMA was deprecated and using DMA engine to
+> do kernel->user copy could be a problem?
+> https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/
+> ?id=77873803363c
+> 
 
-Acked-by: Laura Abbott <labbott@redhat.com>
+As far as I know, the problem was the TCP/IP stack trying to work on a
+buffer that was given to the DMA engine for moving. It was causing stale
+data problems.
 
-Thanks,
-Laura
+The goal was to let DMA engine move the data while TCP/IP stack was
+working on something else. Then, synchronize on a known point. Of
+course, when above violation happens; things break.
+
+Are you expecting a similar problem on user space to kernel space
+interaction? I think the ownership buffers are pretty much defined,
+isn't it?
+
+
+-- 
+Sinan Kaya
+Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc.
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a
+Linux Foundation Collaborative Project
