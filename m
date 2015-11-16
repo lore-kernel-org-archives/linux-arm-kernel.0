@@ -1,166 +1,113 @@
-From: fengguang.wu@intel.com (kbuild test robot)
-Date: Tue, 17 Nov 2015 02:30:06 +0800
-Subject: [arm:drm-etnaviv-devel 3/149]
- drivers/staging/etnaviv/etnaviv_iommu.c:96:8: error: 'struct iommu_domain'
- has no member named 'priv'
-Message-ID: <201511170205.1DddFiK9%fengguang.wu@intel.com>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 16 Nov 2015 19:32:25 +0100
+Subject: [PATCH v2 00/12] UEFI boot and runtime services support for 32-bit ARM
+Message-ID: <1447698757-8762-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-tree:   http://repo.or.cz/linux-2.6/linux-2.6-arm.git drm-etnaviv-devel
-head:   77c57a5498ebe5c85b4a71fbcf800a9140f9a697
-commit: b920a1d21ac9c12ddb174daca7d99ab81d791ad6 [3/149] staging: etnaviv: add drm driver
-config: i386-randconfig-r0-201546 (attached as .config)
-reproduce:
-        git checkout b920a1d21ac9c12ddb174daca7d99ab81d791ad6
-        # save the attached .config to linux build tree
-        make ARCH=i386 
+This series adds support for booting the 32-bit ARM kernel directly from
+UEFI firmware using a builtin UEFI stub. It mostly reuses refactored arm64
+code, and the differences (primarily the PE/COFF header and entry point and
+the efi_create_mapping() implementation) are split out into arm64 and ARM
+versions.
 
-Note: the arm/drm-etnaviv-devel HEAD 77c57a5498ebe5c85b4a71fbcf800a9140f9a697 builds fine.
-      It only hurts bisectibility.
+Changes since v1:
+- The primary difference between this version and the first one is that all
+  prerequisites have either been merged, dropped for now (early FDT handling)
+  or folded into this series (MEMBLOCK_NOMAP). IOW, this series can be applied
+  on top of v4.4-rc1 directly.
+- Dropped handling of UEFI permission bits. The reason is that the UEFIv2.5
+  approach (EFI_PROPERTIES_TABLE) is flawed, and will be replaced by something
+  better in the next version of the spec.
 
-All errors (new ones prefixed by >>):
+Patch #1 adds support for the MEMBLOCK_NOMAP attribute to the generic memblock
+code. Its purpose is to annotate memory regions as normal memory even if they
+are removed from the kernel direct mapping.
 
-   drivers/staging/etnaviv/etnaviv_iommu.c: In function 'etnaviv_iommu_domain_init':
->> drivers/staging/etnaviv/etnaviv_iommu.c:96:8: error: 'struct iommu_domain' has no member named 'priv'
-     domain->priv = etnaviv_domain;
-           ^
-   drivers/staging/etnaviv/etnaviv_iommu.c: In function 'etnaviv_iommu_domain_destroy':
-   drivers/staging/etnaviv/etnaviv_iommu.c:102:54: error: 'struct iommu_domain' has no member named 'priv'
-     struct etnaviv_iommu_domain *etnaviv_domain = domain->priv;
-                                                         ^
-   drivers/staging/etnaviv/etnaviv_iommu.c:107:8: error: 'struct iommu_domain' has no member named 'priv'
-     domain->priv = NULL;
-           ^
-   drivers/staging/etnaviv/etnaviv_iommu.c: In function 'etnaviv_iommu_map':
-   drivers/staging/etnaviv/etnaviv_iommu.c:113:54: error: 'struct iommu_domain' has no member named 'priv'
-     struct etnaviv_iommu_domain *etnaviv_domain = domain->priv;
-                                                         ^
-   drivers/staging/etnaviv/etnaviv_iommu.c: In function 'etnaviv_iommu_unmap':
-   drivers/staging/etnaviv/etnaviv_iommu.c:128:54: error: 'struct iommu_domain' has no member named 'priv'
-     struct etnaviv_iommu_domain *etnaviv_domain = domain->priv;
-                                                         ^
-   drivers/staging/etnaviv/etnaviv_iommu.c: In function 'etnaviv_iommu_iova_to_phys':
-   drivers/staging/etnaviv/etnaviv_iommu.c:143:54: error: 'struct iommu_domain' has no member named 'priv'
-     struct etnaviv_iommu_domain *etnaviv_domain = domain->priv;
-                                                         ^
-   drivers/staging/etnaviv/etnaviv_iommu.c: At top level:
->> drivers/staging/etnaviv/etnaviv_iommu.c:149:3: error: unknown field 'domain_init' specified in initializer
-      .domain_init = etnaviv_iommu_domain_init,
-      ^
->> drivers/staging/etnaviv/etnaviv_iommu.c:149:18: error: initialization from incompatible pointer type [-Werror=incompatible-pointer-types]
-      .domain_init = etnaviv_iommu_domain_init,
-                     ^
-   drivers/staging/etnaviv/etnaviv_iommu.c:149:18: note: (near initialization for 'etnaviv_iommu_ops.capable')
->> drivers/staging/etnaviv/etnaviv_iommu.c:150:3: error: unknown field 'domain_destroy' specified in initializer
-      .domain_destroy = etnaviv_iommu_domain_destroy,
-      ^
-   drivers/staging/etnaviv/etnaviv_iommu.c:150:21: error: initialization from incompatible pointer type [-Werror=incompatible-pointer-types]
-      .domain_destroy = etnaviv_iommu_domain_destroy,
-                        ^
-   drivers/staging/etnaviv/etnaviv_iommu.c:150:21: note: (near initialization for 'etnaviv_iommu_ops.domain_alloc')
-   drivers/staging/etnaviv/etnaviv_iommu.c: In function 'etnaviv_iommu_domain_alloc':
->> drivers/staging/etnaviv/etnaviv_iommu.c:169:19: error: 'const struct iommu_ops' has no member named 'domain_init'
-     ret = domain->ops->domain_init(domain);
-                      ^
-   drivers/staging/etnaviv/etnaviv_iommu.c:174:25: error: 'struct iommu_domain' has no member named 'priv'
-     etnaviv_domain = domain->priv;
-                            ^
-   cc1: all warnings being treated as errors
+Patch #2 implements MEMBLOCK_NOMAP support for arm64
 
-vim +96 drivers/staging/etnaviv/etnaviv_iommu.c
+Patch #3 updates the EFI init code to remove UEFI reserved regions and regions
+used by runtime services from the kernel direct mapping
 
-    90		if (ret < 0) {
-    91			kfree(etnaviv_domain);
-    92			return ret;
-    93		}
-    94	
-    95		spin_lock_init(&etnaviv_domain->map_lock);
-  > 96		domain->priv = etnaviv_domain;
-    97		return 0;
-    98	}
-    99	
-   100	static void etnaviv_iommu_domain_destroy(struct iommu_domain *domain)
-   101	{
-   102		struct etnaviv_iommu_domain *etnaviv_domain = domain->priv;
-   103	
-   104		pgtable_free(&etnaviv_domain->pgtable, PT_SIZE);
-   105	
-   106		kfree(etnaviv_domain);
-   107		domain->priv = NULL;
-   108	}
-   109	
-   110	static int etnaviv_iommu_map(struct iommu_domain *domain, unsigned long iova,
-   111		   phys_addr_t paddr, size_t size, int prot)
-   112	{
-   113		struct etnaviv_iommu_domain *etnaviv_domain = domain->priv;
-   114	
-   115		if (size != SZ_4K)
-   116			return -EINVAL;
-   117	
-   118		spin_lock(&etnaviv_domain->map_lock);
-   119		pgtable_write(&etnaviv_domain->pgtable, iova, paddr);
-   120		spin_unlock(&etnaviv_domain->map_lock);
-   121	
-   122		return 0;
-   123	}
-   124	
-   125	static size_t etnaviv_iommu_unmap(struct iommu_domain *domain, unsigned long iova,
-   126		     size_t size)
-   127	{
- > 128		struct etnaviv_iommu_domain *etnaviv_domain = domain->priv;
-   129	
-   130		if (size != SZ_4K)
-   131			return -EINVAL;
-   132	
-   133		spin_lock(&etnaviv_domain->map_lock);
-   134		pgtable_write(&etnaviv_domain->pgtable, iova, ~0);
-   135		spin_unlock(&etnaviv_domain->map_lock);
-   136	
-   137		return 0;
-   138	}
-   139	
-   140	static phys_addr_t etnaviv_iommu_iova_to_phys(struct iommu_domain *domain,
-   141		dma_addr_t iova)
-   142	{
- > 143		struct etnaviv_iommu_domain *etnaviv_domain = domain->priv;
-   144	
-   145		return pgtable_read(&etnaviv_domain->pgtable, iova);
-   146	}
-   147	
-   148	static struct iommu_ops etnaviv_iommu_ops = {
- > 149			.domain_init = etnaviv_iommu_domain_init,
- > 150			.domain_destroy = etnaviv_iommu_domain_destroy,
-   151			.map = etnaviv_iommu_map,
-   152			.unmap = etnaviv_iommu_unmap,
-   153			.iova_to_phys = etnaviv_iommu_iova_to_phys,
-   154			.pgsize_bitmap = SZ_4K,
-   155	};
-   156	
-   157	struct iommu_domain *etnaviv_iommu_domain_alloc(struct etnaviv_gpu *gpu)
-   158	{
-   159		struct iommu_domain *domain;
-   160		struct etnaviv_iommu_domain *etnaviv_domain;
-   161		int ret;
-   162	
-   163		domain = kzalloc(sizeof(*domain), GFP_KERNEL);
-   164		if (!domain)
-   165			return NULL;
-   166	
-   167		domain->ops = &etnaviv_iommu_ops;
-   168	
- > 169		ret = domain->ops->domain_init(domain);
-   170		if (ret)
-   171			goto out_free;
-   172	
+Patch #4 splits off most of arch/arm64/kernel/efi.c into arch agnostic files
+arm-init.c and arm-runtime.c under drivers/firmware/efi.
 
----
-0-DAY kernel test infrastructure                Open Source Technology Center
-https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: .config.gz
-Type: application/octet-stream
-Size: 22037 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151117/63299304/attachment-0001.obj>
+Patch #5 refactors the code split off in patch #1 to isolate the arm64 specific
+pieces, and change a couple of arm64-isms that ARM handles slightly differently.
+
+Patch #6 enables the generic early_ioremap and early_memremap implementations
+for ARM. It reuses the kmap fixmap region, which is not used that early anyway.
+
+Patch #7 splits off the core functionality of create_mapping() into a new
+function __create_mapping() that we can reuse for mapping UEFI runtime regions.
+
+Patch #8 factors out the early_alloc() routine so we can invoke __create_mapping
+using another (late) allocator.
+
+Patch #9 implements create_mapping_late() that uses a late allocator.
+
+Patch #10 implements MEMBLOCK_NOMAP support for ARM
+
+Patch #11 implements the UEFI support in the kernel proper to probe the UEFI
+memory map and map the runtime services.
+
+Patch #12 ties together all of the above, by implementing the UEFI stub, and
+introducing the Kconfig symbols that allow all of this to be built.
+
+Instructions how to build and run the 32-bit ARM UEFI firmware can be found here:
+https://wiki.linaro.org/LEG/UEFIforQEMU
+
+Ard Biesheuvel (11):
+  mm/memblock: add MEMBLOCK_NOMAP attribute to memblock memory table
+  arm64: only consider memblocks with NOMAP cleared for linear mapping
+  arm64/efi: mark UEFI reserved regions as MEMBLOCK_NOMAP
+  arm64/efi: split off EFI init and runtime code for reuse by 32-bit ARM
+  arm64/efi: refactor EFI init and runtime code for reuse by 32-bit ARM
+  ARM: add support for generic early_ioremap/early_memremap
+  ARM: split off core mapping logic from create_mapping
+  ARM: factor out allocation routine from __create_mapping()
+  ARM: implement create_mapping_late() for EFI use
+  ARM: only consider memblocks with NOMAP cleared for linear mapping
+  ARM: wire up UEFI init and runtime support
+
+Roy Franz (1):
+  ARM: add UEFI stub support
+
+ arch/arm/Kconfig                          |  20 ++
+ arch/arm/boot/compressed/Makefile         |   4 +-
+ arch/arm/boot/compressed/efi-header.S     | 130 ++++++++
+ arch/arm/boot/compressed/head.S           |  54 +++-
+ arch/arm/boot/compressed/vmlinux.lds.S    |   7 +
+ arch/arm/include/asm/Kbuild               |   1 +
+ arch/arm/include/asm/efi.h                |  90 ++++++
+ arch/arm/include/asm/fixmap.h             |  29 +-
+ arch/arm/include/asm/mach/map.h           |   1 +
+ arch/arm/kernel/Makefile                  |   1 +
+ arch/arm/kernel/efi.c                     |  38 +++
+ arch/arm/kernel/setup.c                   |  10 +-
+ arch/arm/mm/init.c                        |   5 +-
+ arch/arm/mm/ioremap.c                     |   9 +
+ arch/arm/mm/mmu.c                         | 110 ++++---
+ arch/arm64/include/asm/efi.h              |  16 +
+ arch/arm64/kernel/efi.c                   | 331 ++------------------
+ arch/arm64/mm/init.c                      |   2 +-
+ arch/arm64/mm/mmu.c                       |   2 +
+ drivers/firmware/efi/Makefile             |   4 +
+ drivers/firmware/efi/arm-init.c           | 197 ++++++++++++
+ drivers/firmware/efi/arm-runtime.c        | 134 ++++++++
+ drivers/firmware/efi/efi.c                |   2 +
+ drivers/firmware/efi/libstub/Makefile     |   9 +
+ drivers/firmware/efi/libstub/arm-stub.c   |   4 +-
+ drivers/firmware/efi/libstub/arm32-stub.c |  85 +++++
+ include/linux/memblock.h                  |   8 +
+ mm/memblock.c                             |  28 ++
+ 28 files changed, 975 insertions(+), 356 deletions(-)
+ create mode 100644 arch/arm/boot/compressed/efi-header.S
+ create mode 100644 arch/arm/include/asm/efi.h
+ create mode 100644 arch/arm/kernel/efi.c
+ create mode 100644 drivers/firmware/efi/arm-init.c
+ create mode 100644 drivers/firmware/efi/arm-runtime.c
+ create mode 100644 drivers/firmware/efi/libstub/arm32-stub.c
+
+-- 
+1.9.1
