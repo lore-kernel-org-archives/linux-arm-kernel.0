@@ -1,89 +1,112 @@
-From: james.morse@arm.com (James Morse)
-Date: Mon, 16 Nov 2015 14:01:04 +0000
-Subject: [PATCH v2 11/11] arm64: kernel: Add support for
- hibernate/suspend-to-disk.
-In-Reply-To: <20151116124116.GC9125@amd>
-References: <1445966960-31724-1-git-send-email-james.morse@arm.com>
- <1445966960-31724-12-git-send-email-james.morse@arm.com>
- <20151114213415.GG20429@amd> <5649CC40.9010805@arm.com>
- <20151116124116.GC9125@amd>
-Message-ID: <5649E1A0.7020001@arm.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Mon, 16 Nov 2015 14:55:09 +0100
+Subject: [PATCH v4 05/24] misc: max77693-haptic: use pwm_get_xxx()
+ helpers where appropriate
+In-Reply-To: <5649D5D0.6080204@samsung.com>
+References: <1447664207-24370-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1447664207-24370-6-git-send-email-boris.brezillon@free-electrons.com>
+ <5649D5D0.6080204@samsung.com>
+Message-ID: <20151116145509.3ea50eb0@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Krzysztof,
 
-On 16/11/15 12:41, Pavel Machek wrote:
->> On 14/11/15 21:34, Pavel Machek wrote:
->>>> The implementation assumes that exactly the same kernel is booted on the
->>>> same hardware, and that the kernel is loaded at the same physical address.
->>>
->>> BTW... on newer implementations (and I have patch for x86, too), we
->>> try to make it so that resume kernel does not have to be same as
->>> suspend one. It would be nice to move there with arm64, too. 
->>
->> Yes, that is a neat trick, can I leave it as future work?
+On Mon, 16 Nov 2015 22:10:40 +0900
+Krzysztof Kozlowski <k.kozlowski@samsung.com> wrote:
+
+> W dniu 16.11.2015 o 17:56, Boris Brezillon pisze:
+> > Use pwm_get_xxx() helpers instead of directly accessing the pwm->xxx field.
+> > Doing that will ease adaptation of the PWM framework to support atomic
+> > update.
+> > 
+> > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> > ---
+> > Patch generated with the following coccinelle script:
+> > 
+> > --->8---
+> > virtual patch
+> > 
+> > @@
+> > struct pwm_device *p;
+> > expression e;
+> > @@
+> > (
+> > -(p)->polarity = e;
+> > +pwm_set_polarity((p), e);
+> > |
+> > -(p)->polarity
+> > +pwm_get_polarity((p))
+> > |
+> > -(p)->period = e;
+> > +pwm_set_period((p), e);
+> > |
+> > -(p)->period
+> > +pwm_get_period((p))
+> > |
+> > -(p)->duty_cycle = e;
+> > +pwm_set_duty_cycle((p), e);
+> > |
+> > -(p)->duty_cycle
+> > +pwm_get_duty_cycle((p))
+> > )
+> > --->8---
+> > ---
+> >  drivers/input/misc/max77693-haptic.c | 7 ++++---
+> >  1 file changed, 4 insertions(+), 3 deletions(-)
+> > 
+> > diff --git a/drivers/input/misc/max77693-haptic.c b/drivers/input/misc/max77693-haptic.c
+> > index 6d96bff..a038fb3 100644
+> > --- a/drivers/input/misc/max77693-haptic.c
+> > +++ b/drivers/input/misc/max77693-haptic.c
+> > @@ -70,10 +70,11 @@ struct max77693_haptic {
+> >  
+> >  static int max77693_haptic_set_duty_cycle(struct max77693_haptic *haptic)
+> >  {
+> > -	int delta = (haptic->pwm_dev->period + haptic->pwm_duty) / 2;
+> > +	int delta = (pwm_get_period((haptic->pwm_dev)) + haptic->pwm_duty) / 2;
 > 
-> Yes. But it is really not hard.
+> Double parentheses over argument are not needed so just:
+> pwm_get_period(haptic->pwm_dev) + ...
 
-I think its harder than it looks:
-It means the MMU has to be turned off, as two different kernels may not
-have used the same configuration for the MMU - and I don't think its safe
-to change while the MMU is running. There are also going to be
-complications with resetting the hypervisor/el2 configuration, which I need
-to spend more time thinking about (and probably ask for advice!).
-
-
->>>> + * Because this code has to be copied to a safe_page, it can't call out to
->>>> + * other functions by pc-relative address. Also remember that it
->>>
->>> PC-relative?
->>
->> The linker may (often!) use program-counter relative addresses for loads
->> and stores. This code gets copied, so the linker doesn't know where the
->> code will be executed from, so any instructions using pc-relative addresses
->> will get the wrong result, (if they reference something outside the
->> function).
-> 
-> I was wondering if it should be spelled "PC-relative", not
-> "pc-relative" :-).
-
-Hah - sorry!
-Fixed.
-
-
->>>> + * and executable pages mapped to user space are also written as data, we
->>>> + * clean all pages we touch to the PoU.
->>>
->>> What is PoC and PoU?
->>
->> They are points in the CPU's cache hierarchy:
->>
->> ARM processors are of a 'modified Harvard' architecture, their paths to
->> read instructions and data are different. The 'Point of Unification' is the
->> first point in the cache hierarchy that is the same for both. On ARM,
->> flush_icache_range() makes sure code written as data is pushed through any
->> data caches to this point, and then evicts any stale copies in the
->> instruction caches.
->>
->> PoC is the 'Point of Coherency', it is the first point that is the same for
->> all devices, (e.g. a cpu with caches turned on, and one with them off), it
->> is normally main memory. The kernel text has to be pushed to this point, so
->> that secondary cores, while running early-boot code with their MMU and
->> caches turned off, don't get incorrect code/data from before resume.
->>
->> I have resisted the urge to draw some ascii-art!
-> 
-> That's ok, you just might want to replace PoI -> 'Point of
-> Unification' and PoC -> 'Point of Coherency' in the comments. That
-> should make googling easier for people not familiar with arm
-> terminology.
-
-There aren't any other points under arch/arm64 that use the full expansion,
-but it can't hurt to include both.
-
-
+Actually it was generated with coccinelle, hence I didn't fix existing
+coding style issues, but I have no problem fixing them.
 
 Thanks,
 
-James
+Boris
+
+> 
+> Beside that patch looks good, so with removing parentheses here and below:
+> 
+> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> 
+> Best regards,
+> Krzysztof
+> 
+> >  	int error;
+> >  
+> > -	error = pwm_config(haptic->pwm_dev, delta, haptic->pwm_dev->period);
+> > +	error = pwm_config(haptic->pwm_dev, delta,
+> > +			   pwm_get_period((haptic->pwm_dev)));
+> >  	if (error) {
+> >  		dev_err(haptic->dev, "failed to configure pwm: %d\n", error);
+> >  		return error;
+> > @@ -245,7 +246,7 @@ static int max77693_haptic_play_effect(struct input_dev *dev, void *data,
+> >  	 * The formula to convert magnitude to pwm_duty as follows:
+> >  	 * - pwm_duty = (magnitude * pwm_period) / MAX_MAGNITUDE(0xFFFF)
+> >  	 */
+> > -	period_mag_multi = (u64)haptic->pwm_dev->period * haptic->magnitude;
+> > +	period_mag_multi = (u64)pwm_get_period((haptic->pwm_dev)) * haptic->magnitude;
+> >  	haptic->pwm_duty = (unsigned int)(period_mag_multi >>
+> >  						MAX_MAGNITUDE_SHIFT);
+> >  
+> > 
+> 
+
+
+
+-- 
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
