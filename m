@@ -1,42 +1,56 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 16 Nov 2015 11:40:55 +0000
-Subject: [PATCH net] bpf, arm: start flushing icache range from header
-In-Reply-To: <971980449d680e6b26e273130d74546c5148893c.1447446440.git.daniel@iogearbox.net>
-References: <971980449d680e6b26e273130d74546c5148893c.1447446440.git.daniel@iogearbox.net>
-Message-ID: <20151116114055.GC20696@leverpostej>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 16 Nov 2015 12:40:35 +0100
+Subject: [PATCH v6 13/17] arm64:ilp32: add sys_ilp32.c and a separate
+ table (in entry.S) to use it
+In-Reply-To: <alpine.DEB.2.10.1511161109130.25844@digraph.polyomino.org.uk>
+References: <1446507046-24604-1-git-send-email-ynorov@caviumnetworks.com>
+ <4814795.z9jdqoW8IP@wuerfel>
+ <alpine.DEB.2.10.1511161109130.25844@digraph.polyomino.org.uk>
+Message-ID: <4389139.prTLIyjV9Z@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Nov 14, 2015 at 01:26:53AM +0100, Daniel Borkmann wrote:
-> During review I noticed that the icache range we're flushing should
-> start at header already and not at ctx.image.
+On Monday 16 November 2015 11:12:08 Joseph Myers wrote:
+> On Mon, 16 Nov 2015, Arnd Bergmann wrote:
 > 
-> Reason is that after 55309dd3d4cd ("net: bpf: arm: address randomize
-> and write protect JIT code"), we also want to make sure to flush the
-> random-sized trap in front of the start of the actual program (analogous
-> to x86). No operational differences from user side.
+> > Let's not get into the tv_nsec discussion today, that is not thankfully
+> > not relevant for arm64 any more at this point. The system call ABI for
+> > arm64/ilp32 is now the same as for any other 32-bit architecture using
+> > the generic ABI, the question we're trying to solve here is only whether it
+> > is ok for new 32-bit glibc ports to only offer a 64-bit off_t as the kernel
+> > currently does (using __kernel_loff_t) or if we still need to support the
+> > _FILE_OFFSET_BITS=32 case.
+> > 
+> > If I got you right, we can use 64-bit off_t now, so we just need someone
+> > to figure out how to make that the default in glibc for new architectures
+> > while keeping the existing 32-bit architectures unchanged.
 > 
-> Signed-off-by: Daniel Borkmann <daniel@iogearbox.net>
-> Tested-by: Nicolas Schichan <nschichan@freebox.fr>
-> Cc: Alexei Starovoitov <ast@kernel.org>
-> ---
->  ( As arm32 fixes usually go via Dave's tree, targeting -net. )
-> 
->  arch/arm/net/bpf_jit_32.c | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/arch/arm/net/bpf_jit_32.c b/arch/arm/net/bpf_jit_32.c
-> index 2f4b14c..591f9db 100644
-> --- a/arch/arm/net/bpf_jit_32.c
-> +++ b/arch/arm/net/bpf_jit_32.c
-> @@ -1061,7 +1061,7 @@ void bpf_jit_compile(struct bpf_prog *fp)
->  	}
->  	build_epilogue(&ctx);
->  
-> -	flush_icache_range((u32)ctx.target, (u32)(ctx.target + ctx.idx));
-> +	flush_icache_range((u32)header, (u32)(ctx.target + ctx.idx));
+> It would be an entirely new combination.  Presumably such a port would 
+> want the "function X is an alias of function Y" aspects of wordsize-64 
+> directories (where that relates to off_t, struct stat etc. as opposed to 
+> long and long long), and the "registers are 64-bit so 64-bit operations 
+> are efficient" aspects, but not all the "64-bit syscall interface" 
+> aspects, so someone would need to review wordsize-64 sysdeps files and 
+> figure out what is or is not relevant to this port.
 
-As with the arm64 patch, doesn't this prevent us from flushing the end
-of the image? ctx.idx doesn't seem to take into account the header size.
+There are two separate aspects here:
 
-Mark.
+a) leave out the support for all __off_t based syscalls (__ftruncate,
+   __lseek, __lxstat, __pread, __preadv, __pwrite, __pwritev, __truncate,
+   __xstat) as they are no longer needed, and change the handling of
+   _FILE_OFFSET_BITS so that we default to 64 and error out for anything
+   else.
+   This needs to be done for all new 32-bit architectures if you think we
+   should use a 64-bit off_t from now on, it's not arm64 specific.
+
+b) For an arbitrary subset of these, introduce optimized versions that
+   are architecture specific and take advantage of the fact that we can
+   pass 64-bit register arguments on arm64-ilp32.
+   This is only needed because we diverge from the generic ABI in order
+   to avoid the silliness of splitting up a 64-bit argument and then
+   re-assembling it in the kernel.
+   This should not be needed in the generic ABI and could just live in
+   sysdeps/unix/sysv/linux/aarch64/wordsize-32, just like we have
+   special handling for each one in the arm64 in the kernel code for them.
+
+	Arnd
