@@ -1,115 +1,53 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Mon, 16 Nov 2015 07:55:33 -0800
-Subject: [PATCH v4 05/24] misc: max77693-haptic: use pwm_get_xxx() helpers
- where appropriate
-In-Reply-To: <20151116145509.3ea50eb0@bbrezillon>
-References: <1447664207-24370-1-git-send-email-boris.brezillon@free-electrons.com>
- <1447664207-24370-6-git-send-email-boris.brezillon@free-electrons.com>
- <5649D5D0.6080204@samsung.com> <20151116145509.3ea50eb0@bbrezillon>
-Message-ID: <5649FC75.8020203@roeck-us.net>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 16 Nov 2015 16:58:21 +0100
+Subject: [PATCH V5 2/3] dma: add Qualcomm Technologies HIDMA management
+ driver
+In-Reply-To: <1447620855-4974-3-git-send-email-okaya@codeaurora.org>
+References: <1447620855-4974-1-git-send-email-okaya@codeaurora.org>
+ <1447620855-4974-3-git-send-email-okaya@codeaurora.org>
+Message-ID: <6159200.u9U0p8aIkU@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/16/2015 05:55 AM, Boris Brezillon wrote:
-> Hi Krzysztof,
->
-> On Mon, 16 Nov 2015 22:10:40 +0900
-> Krzysztof Kozlowski <k.kozlowski@samsung.com> wrote:
->
->> W dniu 16.11.2015 o 17:56, Boris Brezillon pisze:
->>> Use pwm_get_xxx() helpers instead of directly accessing the pwm->xxx field.
->>> Doing that will ease adaptation of the PWM framework to support atomic
->>> update.
->>>
->>> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
->>> ---
->>> Patch generated with the following coccinelle script:
->>>
->>> --->8---
->>> virtual patch
->>>
->>> @@
->>> struct pwm_device *p;
->>> expression e;
->>> @@
->>> (
->>> -(p)->polarity = e;
->>> +pwm_set_polarity((p), e);
->>> |
->>> -(p)->polarity
->>> +pwm_get_polarity((p))
->>> |
->>> -(p)->period = e;
->>> +pwm_set_period((p), e);
->>> |
->>> -(p)->period
->>> +pwm_get_period((p))
->>> |
->>> -(p)->duty_cycle = e;
->>> +pwm_set_duty_cycle((p), e);
->>> |
->>> -(p)->duty_cycle
->>> +pwm_get_duty_cycle((p))
->>> )
->>> --->8---
->>> ---
->>>   drivers/input/misc/max77693-haptic.c | 7 ++++---
->>>   1 file changed, 4 insertions(+), 3 deletions(-)
->>>
->>> diff --git a/drivers/input/misc/max77693-haptic.c b/drivers/input/misc/max77693-haptic.c
->>> index 6d96bff..a038fb3 100644
->>> --- a/drivers/input/misc/max77693-haptic.c
->>> +++ b/drivers/input/misc/max77693-haptic.c
->>> @@ -70,10 +70,11 @@ struct max77693_haptic {
->>>
->>>   static int max77693_haptic_set_duty_cycle(struct max77693_haptic *haptic)
->>>   {
->>> -	int delta = (haptic->pwm_dev->period + haptic->pwm_duty) / 2;
->>> +	int delta = (pwm_get_period((haptic->pwm_dev)) + haptic->pwm_duty) / 2;
->>
->> Double parentheses over argument are not needed so just:
->> pwm_get_period(haptic->pwm_dev) + ...
->
-> Actually it was generated with coccinelle, hence I didn't fix existing
-> coding style issues, but I have no problem fixing them.
->
-There was no existing coding style issue. Your coccinelle script introduces it.
-You might want to consider updating your script and remove the unnecessary (( ))
-from it.
+On Sunday 15 November 2015 15:54:13 Sinan Kaya wrote:
+> The Qualcomm Technologies HIDMA device has been designed
+> to support virtualization technology. The driver has been
+> divided into two to follow the hardware design.
+> 
+> 1. HIDMA Management driver
+> 2. HIDMA Channel driver
+> 
+> Each HIDMA HW consists of multiple channels. These channels
+> share some set of common parameters. These parameters are
+> initialized by the management driver during power up.
+> Same management driver is used for monitoring the execution
+> of the channels. Management driver can change the performance
+> behavior dynamically such as bandwidth allocation and
+> prioritization.
+> 
+> The management driver is executed in hypervisor context and
+> is the main management entity for all channels provided by
+> the device.
 
-Guenter
+Sorry for asking this question so late, but can you explain what the
+point is behind this? It seems counterintuitive to me to have a
+DMA engine that is meant for speeding up memory-to-memory transfers
+when you run it in a virtual machine where you either need to go
+through a virtual IOMMU to set up page table entries, as that will
+likely cause more performance overhead than you could possibly
+gain, or you assume that all the guest memory is pinned, which
+in turn destroys a lot of the assumptions that we are making
+in KVM to have useful VM guests.
 
-> Thanks,
->
-> Boris
->
->>
->> Beside that patch looks good, so with removing parentheses here and below:
->>
->> Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
->>
->> Best regards,
->> Krzysztof
->>
->>>   	int error;
->>>
->>> -	error = pwm_config(haptic->pwm_dev, delta, haptic->pwm_dev->period);
->>> +	error = pwm_config(haptic->pwm_dev, delta,
->>> +			   pwm_get_period((haptic->pwm_dev)));
->>>   	if (error) {
->>>   		dev_err(haptic->dev, "failed to configure pwm: %d\n", error);
->>>   		return error;
->>> @@ -245,7 +246,7 @@ static int max77693_haptic_play_effect(struct input_dev *dev, void *data,
->>>   	 * The formula to convert magnitude to pwm_duty as follows:
->>>   	 * - pwm_duty = (magnitude * pwm_period) / MAX_MAGNITUDE(0xFFFF)
->>>   	 */
->>> -	period_mag_multi = (u64)haptic->pwm_dev->period * haptic->magnitude;
->>> +	period_mag_multi = (u64)pwm_get_period((haptic->pwm_dev)) * haptic->magnitude;
->>>   	haptic->pwm_duty = (unsigned int)(period_mag_multi >>
->>>   						MAX_MAGNITUDE_SHIFT);
->>>
->>>
->>
->
->
->
+Where am I going wrong here?
+
+>  .../devicetree/bindings/dma/qcom_hidma_mgmt.txt    |  61 ++++
+>  drivers/dma/qcom/Kconfig                           |  10 +
+>  drivers/dma/qcom/Makefile                          |   1 +
+>  drivers/dma/qcom/hidma_mgmt.c                      | 306 +++++++++++++++++++++
+>  drivers/dma/qcom/hidma_mgmt.h                      |  38 +++
+>  drivers/dma/qcom/hidma_mgmt_sys.c                  | 231 ++++++++++++++++
+
+Each sysfs file API you add needs a documentation in Documentation/ABI/.
+
+	Arnd
