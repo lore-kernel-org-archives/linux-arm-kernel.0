@@ -1,86 +1,71 @@
-From: ryabinin.a.a@gmail.com (Andrey Ryabinin)
-Date: Mon, 16 Nov 2015 18:34:27 +0300
-Subject: [PATCH v7 0/4] KASAN for arm64
-In-Reply-To: <5649BAFD.6030005@arm.com>
-References: <1444665180-301-1-git-send-email-ryabinin.a.a@gmail.com>
- <20151013083432.GG6320@e104818-lin.cambridge.arm.com>
- <5649BAFD.6030005@arm.com>
-Message-ID: <5649F783.40109@gmail.com>
+From: srinivas.kandagatla@linaro.org (Srinivas Kandagatla)
+Date: Mon, 16 Nov 2015 15:37:58 +0000
+Subject: [PATCH v2 2/4] nvmem: NXP LPC18xx EEPROM memory NVMEM driver
+In-Reply-To: <5649F74A.9020706@vanguardiasur.com.ar>
+References: <1445275946-32653-1-git-send-email-ariel@vanguardiasur.com.ar>
+ <1445275946-32653-3-git-send-email-ariel@vanguardiasur.com.ar>
+ <CAGhQ9Vyg6sScq7yM=7judsMPHOc5VF2zf=7LPxmbmL7wF=vvgw@mail.gmail.com>
+ <562E2CB1.80706@linaro.org> <563385B2.90403@vanguardiasur.com.ar>
+ <5649F74A.9020706@vanguardiasur.com.ar>
+Message-ID: <5649F856.9000101@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/16/2015 02:16 PM, Suzuki K. Poulose wrote:
-> On 13/10/15 09:34, Catalin Marinas wrote:
->> On Mon, Oct 12, 2015 at 06:52:56PM +0300, Andrey Ryabinin wrote:
->>> Andrey Ryabinin (3):
->>>    arm64: move PGD_SIZE definition to pgalloc.h
->>>    arm64: add KASAN support
->>>    Documentation/features/KASAN: arm64 supports KASAN now
->>>
->>> Linus Walleij (1):
->>>    ARM64: kasan: print memory assignment
->>
->> Patches queued for 4.4. Thanks.
->>
-> 
-> Hi,
-> 
-> I get the following failure with KASAN + 16K_PAGES + 48BIT_VA, with 4.4-rc1:
-> 
-> 
-> arch/arm64/mm/kasan_init.c: In function ?kasan_early_init?:
-> include/linux/compiler.h:484:38: error: call to ?__compiletime_assert_95? declared with attribute error: BUILD_BUG_ON failed: !IS_ALIGNED(KASAN_SHADOW_END, PGDIR_SIZE)
->   _compiletime_assert(condition, msg, __compiletime_assert_, __LINE__)
->                                       ^
-> include/linux/compiler.h:467:4: note: in definition of macro ?__compiletime_assert?
->     prefix ## suffix();    \
->     ^
-> include/linux/compiler.h:484:2: note: in expansion of macro ?_compiletime_assert?
->   _compiletime_assert(condition, msg, __compiletime_assert_, __LINE__)
->   ^
-> include/linux/bug.h:50:37: note: in expansion of macro ?compiletime_assert?
->  #define BUILD_BUG_ON_MSG(cond, msg) compiletime_assert(!(cond), msg)
->                                      ^
-> include/linux/bug.h:74:2: note: in expansion of macro ?BUILD_BUG_ON_MSG?
->   BUILD_BUG_ON_MSG(condition, "BUILD_BUG_ON failed: " #condition)
->   ^
-> arch/arm64/mm/kasan_init.c:95:2: note: in expansion of macro ?BUILD_BUG_ON?
->   BUILD_BUG_ON(!IS_ALIGNED(KASAN_SHADOW_END, PGDIR_SIZE));
-> 
-> 
-> ---
-> 
-> The problem is that the PGDIR_SIZE is (1UL << 47) with 16K+48bit, which makes
-> the KASAN_SHADOW_END unaligned(which is aligned to (1UL << (48 - 3)) ). Is the
-> alignment really needed ? Thoughts on how best we could fix this ?
-> 
-
-Yes, it's really needed, because some code relies on this (e.g.  clear_pgs() and kasan_init()).
-But it should be possible to get rid of this requirement.
-
-At first we need to rework clear_pgs().
-The purpose of clear_pgs() is to remove kasan shadow from swapper_pg_dir.
-So clear_pgs() should clear the top most kasan_zero_* entries from page tables.
-Previously it was enough to clear PGDs, in case of 16K_PAGES + 48BIT_VA we probably need to clear PMDs
 
 
-We also have to change following part of kasan_init()
-...
-	/*
-	 * We are going to perform proper setup of shadow memory.
-	 * At first we should unmap early shadow (clear_pgds() call bellow).
-	 * However, instrumented code couldn't execute without shadow memory.
-	 * tmp_pg_dir used to keep early shadow mapped until full shadow
-	 * setup will be finished.
-	 */
-	memcpy(tmp_pg_dir, swapper_pg_dir, sizeof(tmp_pg_dir));
+On 16/11/15 15:33, Ariel D'Alessandro wrote:
+>>> >>-------------------------------->cut<----------------------------------
+>>> >> From 8cae10eff8ea8da9c5a8058ff75abeeddd8a8224 Mon Sep 17 00:00:00 2001
+>>> >>From: Srinivas Kandagatla<srinivas.kandagatla@linaro.org>
+>>> >>Date: Mon, 26 Oct 2015 13:30:24 +0000
+>>> >>Subject: [PATCH] nvmem: core: return error for non word aligned bytes
+>>> >>
+>>> >>nvmem providers have restrictions on register strides, so return error
+>>> >>code when users attempt to read/write buffers with sizes which are not
+>>> >>aligned to the word boundary.
+>>> >>
+>>> >>Without this patch the userspace would continue to try as it does not
+>>> >>get any error from the nvmem core, resulting in a hang.
+>>> >>
+>>> >>Signed-off-by: Srinivas Kandagatla<srinivas.kandagatla@linaro.org>
+>>> >>---
+>>> >>  drivers/nvmem/core.c | 6 ++++++
+>>> >>  1 file changed, 6 insertions(+)
+>>> >>
+>>> >>diff --git a/drivers/nvmem/core.c b/drivers/nvmem/core.c
+>>> >>index 6fd4e5a..9d11d98 100644
+>>> >>--- a/drivers/nvmem/core.c
+>>> >>+++ b/drivers/nvmem/core.c
+>>> >>@@ -70,6 +70,9 @@ static ssize_t bin_attr_nvmem_read(struct file *filp,
+>>> >>struct kobject *kobj,
+>>> >>      if (pos >= nvmem->size)
+>>> >>          return 0;
+>>> >>
+>>> >>+    if (count < nvmem->word_size)
+>>> >>+        return -EINVAL;
+>>> >>+
+>>> >>      if (pos + count > nvmem->size)
+>>> >>          count = nvmem->size - pos;
+>>> >>
+>>> >>@@ -95,6 +98,9 @@ static ssize_t bin_attr_nvmem_write(struct file *filp,
+>>> >>struct kobject *kobj,
+>>> >>      if (pos >= nvmem->size)
+>>> >>          return 0;
+>>> >>
+>>> >>+    if (count < nvmem->word_size)
+>>> >>+        return -EINVAL;
+>>> >>+
+>>> >>      if (pos + count > nvmem->size)
+>>> >>          count = nvmem->size - pos;
+>>> >>
+>> >
+>> >Patch looks good to me. I think that it solves the issue.
+>> >I don't have the board here right now, so I'll check it ASAP and give
+>> >some feedback.
+> Finally tested this. As it seemed, it solved the issue.
+> Are you submitting a patch for this?
+Yes, I will send a patch to the mailing list.
 
-
-Besides tmp_pg_dir we will need one more temporary page table to store those entries
-which later will be removed from swapper_pg_dir by clear_pgds().
-
-
-
-> Cheers
-> Suzuki
-> 
+--srini
+>
+> Thanks again.
