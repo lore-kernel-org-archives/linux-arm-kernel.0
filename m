@@ -1,37 +1,57 @@
-From: okaya@codeaurora.org (Sinan Kaya)
-Date: Mon, 16 Nov 2015 18:19:14 -0500
-Subject: [RFC] User space to kernel space copy optimization
-In-Reply-To: <1447714667.83864.212.camel@intel.com>
-References: <564A5057.9080203@codeaurora.org>
- <1447714667.83864.212.camel@intel.com>
-Message-ID: <564A6472.5010100@codeaurora.org>
+From: lkp@intel.com (kbuild test robot)
+Date: Tue, 17 Nov 2015 07:35:07 +0800
+Subject: [PATCH RESEND 3/4] ARM: BCM: Add SMP support for Broadcom NSP
+In-Reply-To: <1446702681-45339-4-git-send-email-kapilh@broadcom.com>
+Message-ID: <201511170703.AuUjhIQf%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/16/2015 5:57 PM, Jiang, Dave wrote:
->> One of the things I'm interested in is to use a memcpy capable DMA
->> > engine HW to optimize user space and kernel space parameter copying.
-> Have you looked at why NET_DMA was deprecated and using DMA engine to
-> do kernel->user copy could be a problem?
-> https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/
-> ?id=77873803363c
-> 
+Hi Kapil,
 
-As far as I know, the problem was the TCP/IP stack trying to work on a
-buffer that was given to the DMA engine for moving. It was causing stale
-data problems.
+[auto build test ERROR on: arm-soc/for-next]
+[also build test ERROR on: v4.4-rc1 next-20151116]
 
-The goal was to let DMA engine move the data while TCP/IP stack was
-working on something else. Then, synchronize on a known point. Of
-course, when above violation happens; things break.
+url:    https://github.com/0day-ci/linux/commits/Kapil-Hali/dt-bindings-add-SMP-enable-method-for-Broadcom-NSP/20151105-135452
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/arm/arm-soc.git for-next
+config: arm-bcm_defconfig (attached as .config)
+reproduce:
+        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm 
 
-Are you expecting a similar problem on user space to kernel space
-interaction? I think the ownership buffers are pretty much defined,
-isn't it?
+All errors (new ones prefixed by >>):
 
+   arch/arm/mach-bcm/built-in.o: In function `__virt_to_phys':
+>> arch/arm/include/asm/memory.h:206: undefined reference to `nsp_secondary_startup'
+>> arch/arm/include/asm/memory.h:206: undefined reference to `nsp_secondary_startup'
 
--- 
-Sinan Kaya
-Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center, Inc.
-Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a
-Linux Foundation Collaborative Project
+vim +206 arch/arm/include/asm/memory.h
+
+f52bb722 Sricharan R       2013-07-29  200  
+ca5a45c0 Santosh Shilimkar 2013-07-31  201  static inline phys_addr_t __virt_to_phys(unsigned long x)
+dc21af99 Russell King      2011-01-04  202  {
+f52bb722 Sricharan R       2013-07-29  203  	phys_addr_t t;
+f52bb722 Sricharan R       2013-07-29  204  
+f52bb722 Sricharan R       2013-07-29  205  	if (sizeof(phys_addr_t) == 4) {
+cada3c08 Russell King      2011-01-04 @206  		__pv_stub(x, t, "add", __PV_BITS_31_24);
+f52bb722 Sricharan R       2013-07-29  207  	} else {
+f52bb722 Sricharan R       2013-07-29  208  		__pv_stub_mov_hi(t);
+f52bb722 Sricharan R       2013-07-29  209  		__pv_add_carry_stub(x, t);
+
+:::::: The code at line 206 was first introduced by commit
+:::::: cada3c0841e1deaec4c0f92654610b028dc683ff ARM: P2V: extend to 16-bit translation offsets
+
+:::::: TO: Russell King <rmk+kernel@arm.linux.org.uk>
+:::::: CC: Russell King <rmk+kernel@arm.linux.org.uk>
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 13666 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151117/9ecfc2c3/attachment.obj>
