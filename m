@@ -1,55 +1,48 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 16 Nov 2015 17:53:48 +0000
-Subject: [PATCH 1/2] drm: Improve drm_of_component_probe() to correctly
- handle ports and remote ports.
-In-Reply-To: <CAPj87rPFXN=hONwcR+9gN844kTxr1wu4tfSRKpsXjaURxS1=eA@mail.gmail.com>
-References: <1447685093-26129-1-git-send-email-Liviu.Dudau@arm.com>
- <1447685093-26129-2-git-send-email-Liviu.Dudau@arm.com>
- <20151116162241.GN8644@n2100.arm.linux.org.uk>
- <20151116164907.GA4158@e106497-lin.cambridge.arm.com>
- <20151116172248.GP8644@n2100.arm.linux.org.uk>
- <CAPj87rP_qPk0dKhLQDpFAsAqL2LxG=_5n+0KMRW=qEih4mBTJA@mail.gmail.com>
- <20151116174321.GR8644@n2100.arm.linux.org.uk>
- <CAPj87rPFXN=hONwcR+9gN844kTxr1wu4tfSRKpsXjaURxS1=eA@mail.gmail.com>
-Message-ID: <20151116175348.GU8644@n2100.arm.linux.org.uk>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Mon, 16 Nov 2015 09:55:59 -0800
+Subject: [PATCH] hwmon: scpi: add thermal-of dependency
+In-Reply-To: <4264967.aVlONpCXFM@wuerfel>
+References: <4264967.aVlONpCXFM@wuerfel>
+Message-ID: <564A18AF.1030804@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 16, 2015 at 05:48:32PM +0000, Daniel Stone wrote:
-> On 16 November 2015 at 17:43, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> > On Mon, Nov 16, 2015 at 05:32:05PM +0000, Daniel Stone wrote:
-> >> On 16 November 2015 at 17:22, Russell King - ARM Linux
-> >> <linux@arm.linux.org.uk> wrote:
-> >> > Please sensibly wrap your messages.  Your lines are longer than 80
-> >> > characters which makes it exceedingly difficult for some people to reply
-> >> > to your very very very very very very very very very very very very
-> >> > very very very very very very very very very very very very very very
-> >> > very very very very very very very very very very very very very very
-> >> > very very very very very very very very very very very very very very
-> >> > very very very very very very very very very very very very very very
-> >> > very very very very very very long lines without first reformatting
-> >> > them manually - and why should they bother to reply if they have that
-> >> > kind of additional work?  Thanks.
-> >>
-> >> His lines are wrapped mostly at 80, but sometimes at 86, characters.
-> >> You should probably look into fixing your MUA.
-> >
-> > No.
-> >
-> > Standard net etiquette is that email should be wrapped around 72
-> > characters to give space for reply indentation to remain readable
-> > on an 80 column screen. Most of my email replies are written on an
-> > 80 column screen.
-> 
-> Oh, I just thought there was
-> a greater reason for your
-> 660-character tantrum
+On 11/16/2015 08:56 AM, Arnd Bergmann wrote:
+> The newly added scpi thermal support is broken when the scpi driver
+> is built-in but the thermal driver is a loadable module:
+>
+> drivers/built-in.o: In function `scpi_hwmon_probe':
+> (.text+0x444d70): undefined reference to `thermal_zone_of_sensor_unregister'
+> (.text+0x444d94): undefined reference to `thermal_zone_of_sensor_register'
+> drivers/built-in.o: In function `scpi_hwmon_remove':
+> (text+0x444e6c): undefined reference to `thermal_zone_of_sensor_unregister'
+>
+> This uses the same Kconfig trick that we have in a couple of other
+> drivers already to ensure we can only select the driver in valid
+> configurations when either THERMAL_OF is disabled, or when with a
+> dependency on CONFIG_THERMAL that can force SCPI to be a loadable
+> module in the case I was hitting.
+>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Fixes: 68acc77a2d51 ("hwmon: Support thermal zones registration for SCP temperature sensors")
 
-Sorry, I've stopped reading at this point, at the point where you start
-slinging crap around.  If you have a serious point to make, maybe you
-could grow up in the next five minutes and write a proper email, thanks.
+Applied.
 
--- 
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Thanks,
+Guenter
+
+>
+> diff --git a/drivers/hwmon/Kconfig b/drivers/hwmon/Kconfig
+> index 842b0043ad94..597814177f50 100644
+> --- a/drivers/hwmon/Kconfig
+> +++ b/drivers/hwmon/Kconfig
+> @@ -324,6 +324,7 @@ config SENSORS_APPLESMC
+>   config SENSORS_ARM_SCPI
+>   	tristate "ARM SCPI Sensors"
+>   	depends on ARM_SCPI_PROTOCOL
+> +	depends on THERMAL || !THERMAL_OF
+>   	help
+>   	  This driver provides support for temperature, voltage, current
+>   	  and power sensors available on ARM Ltd's SCP based platforms. The
+>
+>
