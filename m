@@ -1,7 +1,8 @@
 From: elfring@users.sourceforge.net (SF Markus Elfring)
-Date: Mon, 16 Nov 2015 22:20:25 +0100
-Subject: [PATCH 0/3] ste_dma40: Deletion of a few unnecessary checks
-In-Reply-To: <5317A59D.4@users.sourceforge.net>
+Date: Mon, 16 Nov 2015 22:23:01 +0100
+Subject: [PATCH 1/3] ste_dma40: Delete an unnecessary check before the
+ function call "kmem_cache_destroy"
+In-Reply-To: <564A4899.8040109@users.sourceforge.net>
 References: <5307CAA2.8060406@users.sourceforge.net>
  <alpine.DEB.2.02.1402212321410.2043@localhost6.localdomain6>
  <530A086E.8010901@users.sourceforge.net>
@@ -18,24 +19,37 @@ References: <5307CAA2.8060406@users.sourceforge.net>
  <alpine.DEB.2.02.1402252117150.2047@localhost6.localdomain6>
  <530DD06F.4090703@users.sourceforge.net>
  <alpine.DEB.2.02.1402262129250.2221@localhost6.localdomain6>
- <5317A59D.4@users.sourceforge.net>
-Message-ID: <564A4899.8040109@users.sourceforge.net>
+ <5317A59D.4@users.sourceforge.net> <564A4899.8040109@users.sourceforge.net>
+Message-ID: <564A4935.6010307@users.sourceforge.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Markus Elfring <elfring@users.sourceforge.net>
-Date: Mon, 16 Nov 2015 22:12:23 +0100
+Date: Mon, 16 Nov 2015 20:26:27 +0100
 
-Further update suggestions were taken into account after a patch
-was applied from static source code analysis.
+The kmem_cache_destroy() function tests whether its argument is NULL
+and then returns immediately. Thus the test around the call is not needed.
 
-Markus Elfring (3):
-  Delete an unnecessary check before the function call "kmem_cache_destroy"
-  Delete another unnecessary check in d40_probe()
-  Delete an unnecessary variable initialisation in d40_probe()
+This issue was detected by using the Coccinelle software.
 
- drivers/dma/ste_dma40.c | 87 ++++++++++++++++++++++++-------------------------
- 1 file changed, 42 insertions(+), 45 deletions(-)
+Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
+---
+ drivers/dma/ste_dma40.c | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
 
+diff --git a/drivers/dma/ste_dma40.c b/drivers/dma/ste_dma40.c
+index dd3e7ba..9132ae0 100644
+--- a/drivers/dma/ste_dma40.c
++++ b/drivers/dma/ste_dma40.c
+@@ -3694,8 +3694,7 @@ static int __init d40_probe(struct platform_device *pdev)
+ 
+ failure:
+ 	if (base) {
+-		if (base->desc_slab)
+-			kmem_cache_destroy(base->desc_slab);
++		kmem_cache_destroy(base->desc_slab);
+ 		if (base->virtbase)
+ 			iounmap(base->virtbase);
+ 
 -- 
 2.6.2
