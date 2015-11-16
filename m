@@ -1,93 +1,96 @@
-From: cw00.choi@samsung.com (Chanwoo Choi)
-Date: Mon, 16 Nov 2015 11:55:34 +0900
-Subject: [PATCH 2/2] arm64: EXYNOS: Consolidate ARCH_EXYNOS7 symbol into
- ARCH_EXYNOS
-In-Reply-To: <1447637775-9887-3-git-send-email-k.kozlowski@samsung.com>
-References: <1447637775-9887-1-git-send-email-k.kozlowski@samsung.com>
- <1447637775-9887-3-git-send-email-k.kozlowski@samsung.com>
-Message-ID: <564945A6.904@samsung.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Mon, 16 Nov 2015 11:00:12 +0800
+Subject: [linux-sunxi] [PATCH 5/5] ARM: dts: sun8i-h3-orangepi-plus:
+ Enable USB host controllers
+In-Reply-To: <1447616777-24660-5-git-send-email-hdegoede@redhat.com>
+References: <1447616777-24660-1-git-send-email-hdegoede@redhat.com>
+ <1447616777-24660-5-git-send-email-hdegoede@redhat.com>
+Message-ID: <CAGb2v669Cu6+G=P8yH-g5KbOsWTHBgnYUYf2fGt+jKXbqVAKfQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi,
 
-On 2015? 11? 16? 10:36, Krzysztof Kozlowski wrote:
-> The ARMv8 Exynos family SoCs in Linux kernel are currently:
->  - Exynos5433 (controlled by ARCH_EXYNOS),
->  - Exynos7 (controlled by ARCH_EXYNOS7).
-> 
-> It duplicates Kconfig symbols unnecessarily, so consolidate them into
-> one ARCH_EXYNOS. Future SoCs could fall also under the ARCH_EXYNOS
-> symbol.
-> 
-> The commit should not bring any visible functional change.
-> 
-> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+On Mon, Nov 16, 2015 at 3:46 AM, Hans de Goede <hdegoede@redhat.com> wrote:
+> From: Reinder de Haan <patchesrdh@mveas.com>
+>
+> Enable the 3 pairs of USB host controllers used on the Orange Pi Plus.
+>
+> Signed-off-by: Reinder de Haan <patchesrdh@mveas.com>
+> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
 > ---
->  arch/arm64/Kconfig.platforms        | 11 ++---------
->  arch/arm64/boot/dts/exynos/Makefile |  2 +-
->  arch/arm64/configs/defconfig        |  2 +-
->  3 files changed, 4 insertions(+), 11 deletions(-)
-> 
-> diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
-> index 4043c35962cc..afa19baca94e 100644
-> --- a/arch/arm64/Kconfig.platforms
-> +++ b/arch/arm64/Kconfig.platforms
-> @@ -13,21 +13,14 @@ config ARCH_BERLIN
->  	  This enables support for Marvell Berlin SoC Family
->  
->  config ARCH_EXYNOS
-> -	bool
-> -	help
-> -	  This enables support for Samsung Exynos SoC family
-> -
-> -config ARCH_EXYNOS7
-> -	bool "ARMv8 based Samsung Exynos7"
-> -	select ARCH_EXYNOS
-> +	bool "ARMv8 based Samsung Exynos SoC family"
->  	select COMMON_CLK_SAMSUNG
->  	select HAVE_S3C2410_WATCHDOG if WATCHDOG
->  	select HAVE_S3C_RTC if RTC_CLASS
->  	select PINCTRL
->  	select PINCTRL_EXYNOS
-> -
->  	help
-> -	  This enables support for Samsung Exynos7 SoC family
-> +	  This enables support for Samsung Exynos ARMv8 SoC family
->  
->  config ARCH_LAYERSCAPE
->  	bool "ARMv8 based Freescale Layerscape SoC family"
-> diff --git a/arch/arm64/boot/dts/exynos/Makefile b/arch/arm64/boot/dts/exynos/Makefile
-> index 20310e5b6d6f..50c9b9383cfa 100644
-> --- a/arch/arm64/boot/dts/exynos/Makefile
-> +++ b/arch/arm64/boot/dts/exynos/Makefile
-> @@ -1,4 +1,4 @@
-> -dtb-$(CONFIG_ARCH_EXYNOS7) += exynos7-espresso.dtb
-> +dtb-$(CONFIG_ARCH_EXYNOS) += exynos7-espresso.dtb
->  
->  always		:= $(dtb-y)
->  subdir-y	:= $(dts-dirs)
-> diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
-> index bdd7aa358d2a..a396fa7c69a5 100644
-> --- a/arch/arm64/configs/defconfig
-> +++ b/arch/arm64/configs/defconfig
-> @@ -33,7 +33,7 @@ CONFIG_MODULE_UNLOAD=y
->  # CONFIG_IOSCHED_DEADLINE is not set
->  CONFIG_ARCH_BCM_IPROC=y
->  CONFIG_ARCH_BERLIN=y
-> -CONFIG_ARCH_EXYNOS7=y
-> +CONFIG_ARCH_EXYNOS=y
->  CONFIG_ARCH_LAYERSCAPE=y
->  CONFIG_ARCH_HISI=y
->  CONFIG_ARCH_MEDIATEK=y
-> 
+>  arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts | 28 ++++++++++++++++++++++++++++
+>  1 file changed, 28 insertions(+)
+>
+> diff --git a/arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts b/arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts
+> index e67df59..e05a409 100644
+> --- a/arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts
+> +++ b/arch/arm/boot/dts/sun8i-h3-orangepi-plus.dts
+> @@ -60,6 +60,18 @@
+>         };
+>  };
+>
+> +&ehci1 {
+> +       status = "okay";
+> +};
+> +
+> +&ehci2 {
+> +       status = "okay";
+> +};
+> +
+> +&ehci3 {
+> +       status = "okay";
+> +};
+> +
+>  &mmc0 {
+>         pinctrl-names = "default";
+>         pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin>;
+> @@ -70,8 +82,24 @@
+>         status = "okay";
+>  };
+>
+> +&ohci1 {
+> +       status = "okay";
+> +};
 
-When I sent the EXYNOS5433 patch[1], we don't want to add the each config
-for each Exynos SoC. So, I think this patch is good to use only one ARCH_EXYNOS config
-for all ARMv8 Exynos SoC.
-[1] https://lkml.org/lkml/2015/2/24/85
+This controller is connected to a FE1.1s USB 2.0 hub, giving us the
+four usable external USB ports. We shouldn't need to enable OHCI.
 
-Reviewed-by: Chanwoo Choi <cw00.choi@samsung.com>
+> +
+> +&ohci2 {
+> +       status = "okay";
+> +};
 
-Regards,
-Chanwoo Choi
+According to the schematics, this port is never used. Please remove.
+
+> +&ohci3 {
+> +       status = "okay";
+> +};
+
+This is connected to the GL830 USB-SATA bridge. Again, OHCI isn't
+needed.
+
+> +
+>  &uart0 {
+>         pinctrl-names = "default";
+>         pinctrl-0 = <&uart0_pins_a>;
+>         status = "okay";
+>  };
+> +
+> +&usbphy {
+> +       status = "okay";
+
+And what about power supplies / regulators?
+
+
+Regards
+ChenYu
+
+> +};
+> --
+> 2.5.0
+>
+> --
+> You received this message because you are subscribed to the Google Groups "linux-sunxi" group.
+> To unsubscribe from this group and stop receiving emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
+> For more options, visit https://groups.google.com/d/optout.
