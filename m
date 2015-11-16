@@ -1,21 +1,31 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Mon, 16 Nov 2015 10:27:54 -0800
-Subject: [PATCH v13 0/7] arm64: renesas: Add Renesas R8A7795 SoC support
-In-Reply-To: <1447409425-14831-1-git-send-email-horms+renesas@verge.net.au>
-References: <1447409425-14831-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <20151116182754.GB9473@verge.net.au>
+From: bjorn.andersson@sonymobile.com (Bjorn Andersson)
+Date: Mon, 16 Nov 2015 10:28:27 -0800
+Subject: [PATCH] pinctrl: fix qcom ssbi drivers for 64-bit compilation
+In-Reply-To: <5235862.Gokjxf5QH1@wuerfel>
+References: <5235862.Gokjxf5QH1@wuerfel>
+Message-ID: <20151116182826.GD30882@usrtlx11787.corpusers.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 13, 2015 at 07:10:18PM +0900, Simon Horman wrote:
-> Hi,
+On Mon 16 Nov 08:41 PST 2015, Arnd Bergmann wrote:
+
+> When building pinctrl-ssbi-gpio and pinctrl-ssbi-mpp for ARM64, we get
+> a compile warning about invalid types:
 > 
-> this patchset adds basic support for the Renesas R-Car H3 (R8A7795) SoC
-> and its Saovator-X board.
+> drivers/pinctrl/qcom/pinctrl-ssbi-gpio.c: In function 'pm8xxx_gpio_probe':
+> drivers/pinctrl/qcom/pinctrl-ssbi-gpio.c:675:17: warning: cast from pointer to integer of different size [-Wpointer-to-int-cast]
+> drivers/pinctrl/qcom/pinctrl-ssbi-mpp.c: In function 'pm8xxx_mpp_probe':
+> drivers/pinctrl/qcom/pinctrl-ssbi-mpp.c:766:17: warning: cast from pointer to integer of different size [-Wpointer-to-int-cast]
+> 
+> This changes the code so we cast the pointer to 'unsigned long', which
+> is the right thing to do here.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> 
 
-I have queued up this patch-set for v4.5.
+Thanks Arnd,
 
-It is included in renesas-next-20151116-v4.4-rc1 and
-renesas-devel-20151116-v4.4-rc1, which I have pushed to my
-renesas tree on kernel.org. Accordingly it should also show up
-in linux-next.
+Reviewed-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
+
+Regards,
+Bjorn
