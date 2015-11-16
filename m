@@ -1,103 +1,65 @@
-From: Julia.Lawall@lip6.fr (Julia Lawall)
-Date: Mon, 16 Nov 2015 12:33:15 +0100
-Subject: [PATCH 2/7] phy: mt65xx-usb3: add missing of_node_put
-In-Reply-To: <1447673600-8881-1-git-send-email-Julia.Lawall@lip6.fr>
-References: <1447673600-8881-1-git-send-email-Julia.Lawall@lip6.fr>
-Message-ID: <1447673600-8881-3-git-send-email-Julia.Lawall@lip6.fr>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 16 Nov 2015 13:00:54 +0100
+Subject: [PATCH] arm64: mm: use correct mapping granularity under
+ DEBUG_RODATA
+In-Reply-To: <20151116115740.GD20696@leverpostej>
+References: <1447669094-31076-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20151116115740.GD20696@leverpostej>
+Message-ID: <CAKv+Gu9ZoRx8i8ppNxiuS9FfRONzLK5TVPe33W-dirfO702zOQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-for_each_child_of_node performs an of_node_get on each iteration,
-so a return from the middle of the loop requires an of_node_put.
+On 16 November 2015 at 12:57, Mark Rutland <mark.rutland@arm.com> wrote:
+> Hi Ard,
+>
+> On Mon, Nov 16, 2015 at 11:18:14AM +0100, Ard Biesheuvel wrote:
+>> When booting a 64k pages kernel that is built with CONFIG_DEBUG_RODATA
+>> and resides at an offset that is not a multiple of 512 MB, the rounding
+>> that occurs in __map_memblock() and fixup_executable() results in
+>> incorrect regions being mapped.
+>>
+>> The following snippet from /sys/kernel/debug/kernel_page_tables shows
+>> how, when the kernel is loaded 2 MB above the base of DRAM at 0x40000000,
+>> the first 2 MB of memory (which may be inaccessible from non-secure EL1
+>> or just reserved by the firmware) is inadvertently mapped into the end of
+>> the module region.
+>
+> I assume for the above that you mean the kernel is loaded TEXT_OFFSET
+> above these addresses. It's only a nit, but it might make things harder
+> for otehrs to reason about in future.
+>
+> Perhaps re-word in terms of PHYS_OFFSET/memstart_addr? e.g. "when
+> PHYS_OFFSET is not a multiple of SECTION_SIZE ...".
+>
 
-A simplified version of the semantic patch that finds this problem is as
-follows (http://coccinelle.lip6.fr):
+The clearer the better, so yes, let's reword it.
 
-// <smpl>
-@@
-expression root,e;
-local idexpression child;
-@@
+>>   ---[ Modules start ]---
+>>   0xfffffdffffe00000-0xfffffe0000000000     2M RW NX ... UXN MEM/NORMAL
+>>   ---[ Modules end ]---
+>>   ---[ Kernel Mapping ]---
+>>   0xfffffe0000000000-0xfffffe0000090000   576K RW NX ... UXN MEM/NORMAL
+>>   0xfffffe0000090000-0xfffffe0000200000  1472K ro x  ... UXN MEM/NORMAL
+>>   0xfffffe0000200000-0xfffffe0000800000     6M ro x  ... UXN MEM/NORMAL
+>>   0xfffffe0000800000-0xfffffe0000810000    64K ro x  ... UXN MEM/NORMAL
+>>   0xfffffe0000810000-0xfffffe0000a00000  1984K RW NX ... UXN MEM/NORMAL
+>>   0xfffffe0000a00000-0xfffffe00ffe00000  4084M RW NX ... UXN MEM/NORMAL
+>>
+>> The same issue is likely to occur on 16k pages kernels whose load
+>> address is not a multiple of 32 MB (i.e., SECTION_SIZE). So round to
+>> SWAPPER_BLOCK_SIZE instead of SECTION_SIZE.
+>>
+>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>
+> This looks good to me. With or without the rewording above:
+>
+> Acked-by: Mark Rutland <mark.rutland@arm.com>
+>
+> Does this need to be backported to stable?
+>
 
- for_each_child_of_node(root, child) {
-   ... when != of_node_put(child)
-       when != e = child
-(
-   return child;
-|
-*  return ...;
-)
-   ...
- }
-// </smpl>
+It should be fixed in stable, I think, but SWAPPER_BLOCK_SIZE is new
+in v4.4 so we'd need another patch anyway.
 
-Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
-
----
- drivers/phy/phy-mt65xx-usb3.c |   20 +++++++++++++-------
- 1 file changed, 13 insertions(+), 7 deletions(-)
-
-diff --git a/drivers/phy/phy-mt65xx-usb3.c b/drivers/phy/phy-mt65xx-usb3.c
-index f30b28b..e427c3b 100644
---- a/drivers/phy/phy-mt65xx-usb3.c
-+++ b/drivers/phy/phy-mt65xx-usb3.c
-@@ -415,7 +415,7 @@ static int mt65xx_u3phy_probe(struct platform_device *pdev)
- 	struct resource *sif_res;
- 	struct mt65xx_u3phy *u3phy;
- 	struct resource res;
--	int port;
-+	int port, retval;
- 
- 	u3phy = devm_kzalloc(dev, sizeof(*u3phy), GFP_KERNEL);
- 	if (!u3phy)
-@@ -447,31 +447,34 @@ static int mt65xx_u3phy_probe(struct platform_device *pdev)
- 	for_each_child_of_node(np, child_np) {
- 		struct mt65xx_phy_instance *instance;
- 		struct phy *phy;
--		int retval;
- 
- 		instance = devm_kzalloc(dev, sizeof(*instance), GFP_KERNEL);
--		if (!instance)
--			return -ENOMEM;
-+		if (!instance) {
-+			retval = -ENOMEM;
-+			goto put_child;
-+		}
- 
- 		u3phy->phys[port] = instance;
- 
- 		phy = devm_phy_create(dev, child_np, &mt65xx_u3phy_ops);
- 		if (IS_ERR(phy)) {
- 			dev_err(dev, "failed to create phy\n");
--			return PTR_ERR(phy);
-+			retval = PTR_ERR(phy);
-+			goto put_child;
- 		}
- 
- 		retval = of_address_to_resource(child_np, 0, &res);
- 		if (retval) {
- 			dev_err(dev, "failed to get address resource(id-%d)\n",
- 				port);
--			return retval;
-+			goto put_child;
- 		}
- 
- 		instance->port_base = devm_ioremap_resource(&phy->dev, &res);
- 		if (IS_ERR(instance->port_base)) {
- 			dev_err(dev, "failed to remap phy regs\n");
--			return PTR_ERR(instance->port_base);
-+			retval = PTR_ERR(instance->port_base);
-+			goto put_child;
- 		}
- 
- 		instance->phy = phy;
-@@ -483,6 +486,9 @@ static int mt65xx_u3phy_probe(struct platform_device *pdev)
- 	provider = devm_of_phy_provider_register(dev, mt65xx_phy_xlate);
- 
- 	return PTR_ERR_OR_ZERO(provider);
-+put_child:
-+	of_node_put(child_np);
-+	return retval;
- }
- 
- static const struct of_device_id mt65xx_u3phy_id_table[] = {
+-- 
+Ard.
