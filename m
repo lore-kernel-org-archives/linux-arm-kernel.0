@@ -1,48 +1,49 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 16 Nov 2015 14:54:31 +0100
-Subject: [PATCH v6 13/17] arm64:ilp32: add sys_ilp32.c and a separate
- table (in entry.S) to use it
-In-Reply-To: <mvmziyeukxx.fsf@hawking.suse.de>
-References: <1446507046-24604-1-git-send-email-ynorov@caviumnetworks.com>
- <4164423.46Jfedud5Y@wuerfel> <mvmziyeukxx.fsf@hawking.suse.de>
-Message-ID: <13567088.yUyVvkDQhR@wuerfel>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 16 Nov 2015 13:58:29 +0000
+Subject: [PATCH] arm64: kvm: report original PAR_EL1 upon panic
+Message-ID: <1447682309-5875-1-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 16 November 2015 14:34:50 Andreas Schwab wrote:
-> Arnd Bergmann <arnd@arndb.de> writes:
-> 
-> > ino_t seems to be the only other type in 'struct stat' that depends
-> > on _FILE_OFFSET_BITS in glibc.
-> 
-> There is also blkcnt_t, and then there is fsblkcnt_t, fsfilcnt_t and
-> fsword_t in struct statfs.
+If we call __kvm_hyp_panic while a guest context is active, we call
+__restore_sysregs before acquiring the system register values for the
+panic, in the process throwing away the PAR_EL1 value at the point of
+the panic.
 
-Ok, got it.
+This patch modifies __kvm_hyp_panic to stash the PAR_EL1 value prior to
+restoring host register values, enabling us to report the original
+values at the point of the panic.
 
-Again these are just internal to glibc, the kernel just uses fixed width
-types in
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Cc: Marc Zyngier <marc.zyngier@arm.com>
+Cc: Christoffer Dall <christoffer.dall@linaro.org>
+---
+ arch/arm64/kvm/hyp.S | 6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
 
-typedef struct {
-        int     val[2];
-} __kernel_fsid_t;
-
-struct statfs64 {
-        __u32 f_type;
-        __u32 f_bsize;
-        __u64 f_blocks; 
-        __u64 f_bfree;  
-        __u64 f_bavail;
-        __u64 f_files;
-        __u64 f_ffree;
-        __kernel_fsid_t f_fsid;
-        __u32 f_namelen;
-        __u32 f_frsize;
-        __u32 f_flags;
-        __u32 f_spare[4];
-};
-
-so we need to be careful to define them in glibc to match the kernel
-types, but the kernel definition doesn't need changes.
-
-	Arnd
+diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
+index 11183ce..2a8a4aa 100644
+--- a/arch/arm64/kvm/hyp.S
++++ b/arch/arm64/kvm/hyp.S
+@@ -864,6 +864,10 @@ ENTRY(__kvm_flush_vm_context)
+ ENDPROC(__kvm_flush_vm_context)
+ 
+ __kvm_hyp_panic:
++	// Stash PAR_EL1 before corrupting it in __restore_sysregs
++	mrs	x0, par_el1
++	push	x0, xzr
++
+ 	// Guess the context by looking at VTTBR:
+ 	// If zero, then we're already a host.
+ 	// Otherwise restore a minimal host context before panicing.
+@@ -898,7 +902,7 @@ __kvm_hyp_panic:
+ 	mrs	x3, esr_el2
+ 	mrs	x4, far_el2
+ 	mrs	x5, hpfar_el2
+-	mrs	x6, par_el1
++	pop	x6, xzr		// active context PAR_EL1
+ 	mrs	x7, tpidr_el2
+ 
+ 	mov	lr, #(PSR_F_BIT | PSR_I_BIT | PSR_A_BIT | PSR_D_BIT |\
+-- 
+1.9.1
