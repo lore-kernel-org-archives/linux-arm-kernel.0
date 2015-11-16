@@ -1,194 +1,39 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 16 Nov 2015 12:23:18 +0100
-Subject: [PATCH v3 7/7] arm64: allow kernel Image to be loaded anywhere in
- physical memory
-In-Reply-To: <1447672998-20981-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1447672998-20981-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1447672998-20981-8-git-send-email-ard.biesheuvel@linaro.org>
+From: l.stach@pengutronix.de (Lucas Stach)
+Date: Mon, 16 Nov 2015 12:25:17 +0100
+Subject: [PATCH] ARM: OMAP4: execute initcall to reserve SRAM for I688 only on
+ OMAP4
+Message-ID: <1447673117-32719-1-git-send-email-l.stach@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This relaxes the kernel Image placement requirements, so that it
-may be placed at any 2 MB aligned offset in physical memory.
+omap_interconnect_sync() is the only user of the SRAM scratch area
+allocated in the omap4_sram_init initcall. The interconnect sync is
+used exclusively in the OMAP4 specific WFI implementation, so there
+is no point in allocating the SRAM scratch on other SoC types.
 
-This is accomplished by ignoring PHYS_OFFSET when installing
-memblocks, and accounting for the apparent virtual offset of
-the kernel Image (in addition to the 64 MB that it is moved
-below PAGE_OFFSET). As a result, virtual address references
-below PAGE_OFFSET are correctly mapped onto physical references
-into the kernel Image regardless of where it sits in memory.
+Bail out of the initcall if the kernel is not running on OMAP4 to
+avoid a confusing warning about being unable to allocate the SRAM
+needed for I688 handling.
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+Tested-by: Bastian Stender <bst@pengutronix.de>
 ---
- Documentation/arm64/booting.txt | 12 ++---
- arch/arm64/include/asm/memory.h |  9 ++--
- arch/arm64/mm/init.c            | 49 +++++++++++++++++++-
- arch/arm64/mm/mmu.c             | 29 ++++++++++--
- 4 files changed, 83 insertions(+), 16 deletions(-)
+ arch/arm/mach-omap2/omap4-common.c | 3 +++
+ 1 file changed, 3 insertions(+)
 
-diff --git a/Documentation/arm64/booting.txt b/Documentation/arm64/booting.txt
-index 701d39d3171a..f190e708bb9b 100644
---- a/Documentation/arm64/booting.txt
-+++ b/Documentation/arm64/booting.txt
-@@ -117,14 +117,14 @@ Header notes:
-   depending on selected features, and is effectively unbound.
+diff --git a/arch/arm/mach-omap2/omap4-common.c b/arch/arm/mach-omap2/omap4-common.c
+index 949696b6f17b..6db393a30a28 100644
+--- a/arch/arm/mach-omap2/omap4-common.c
++++ b/arch/arm/mach-omap2/omap4-common.c
+@@ -131,6 +131,9 @@ static int __init omap4_sram_init(void)
+ 	struct device_node *np;
+ 	struct gen_pool *sram_pool;
  
- The Image must be placed text_offset bytes from a 2MB aligned base
--address near the start of usable system RAM and called there. Memory
--below that base address is currently unusable by Linux, and therefore it
--is strongly recommended that this location is the start of system RAM.
--The region between the 2 MB aligned base address and the start of the
--image has no special significance to the kernel, and may be used for
--other purposes.
-+address anywhere in usable system RAM and called there. The region
-+between the 2 MB aligned base address and the start of the image has no
-+special significance to the kernel, and may be used for other purposes.
- At least image_size bytes from the start of the image must be free for
- use by the kernel.
-+NOTE: versions prior to v4.5 cannot make use of memory below the
-+physical offset of the Image so it is recommended that the Image be
-+placed as close as possible to the start of system RAM.
- 
- Any memory described to the kernel (even that below the start of the
- image) which is not marked as reserved from the kernel (e.g., with a
-diff --git a/arch/arm64/include/asm/memory.h b/arch/arm64/include/asm/memory.h
-index 3148691bc80a..d6a237bda1f9 100644
---- a/arch/arm64/include/asm/memory.h
-+++ b/arch/arm64/include/asm/memory.h
-@@ -120,13 +120,10 @@ extern phys_addr_t		memstart_addr;
- extern u64 kernel_va_offset;
- 
- /*
-- * The maximum physical address that the linear direct mapping
-- * of system RAM can cover. (PAGE_OFFSET can be interpreted as
-- * a 2's complement signed quantity and negated to derive the
-- * maximum size of the linear mapping.)
-+ * Allow all memory at the discovery stage. We will clip it later.
-  */
--#define MAX_MEMBLOCK_ADDR	({ memstart_addr - PAGE_OFFSET - 1; })
--#define MIN_MEMBLOCK_ADDR	__pa(KIMAGE_VADDR)
-+#define MIN_MEMBLOCK_ADDR	0
-+#define MAX_MEMBLOCK_ADDR	U64_MAX
- 
- /*
-  * PFNs are used to describe any physical page; this means
-diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-index b3b0175d7135..29a7dc5327b6 100644
---- a/arch/arm64/mm/init.c
-+++ b/arch/arm64/mm/init.c
-@@ -35,6 +35,7 @@
- #include <linux/efi.h>
- #include <linux/swiotlb.h>
- 
-+#include <asm/boot.h>
- #include <asm/fixmap.h>
- #include <asm/kernel-pgtable.h>
- #include <asm/memory.h>
-@@ -158,9 +159,55 @@ static int __init early_mem(char *p)
- }
- early_param("mem", early_mem);
- 
-+static void __init enforce_memory_limit(void)
-+{
-+	const phys_addr_t kbase = round_down(__pa(_text), MIN_KIMG_ALIGN);
-+	u64 to_remove = memblock_phys_mem_size() - memory_limit;
-+	phys_addr_t max_addr = 0;
-+	struct memblock_region *r;
++	if (!cpu_is_omap44xx())
++		return 0;
 +
-+	if (memory_limit == (phys_addr_t)ULLONG_MAX)
-+		return;
-+
-+	/*
-+	 * The kernel may be high up in physical memory, so try to apply the
-+	 * limit below the kernel first, and only let the generic handling
-+	 * take over if it turns out we haven't clipped enough memory yet.
-+	 */
-+	for_each_memblock(memory, r) {
-+		if (r->base + r->size > kbase) {
-+			u64 rem = min(to_remove, kbase - r->base);
-+
-+			max_addr = r->base + rem;
-+			to_remove -= rem;
-+			break;
-+		}
-+		if (to_remove <= r->size) {
-+			max_addr = r->base + to_remove;
-+			to_remove = 0;
-+			break;
-+		}
-+		to_remove -= r->size;
-+	}
-+
-+	memblock_remove(0, max_addr);
-+
-+	if (to_remove)
-+		memblock_enforce_memory_limit(memory_limit);
-+}
-+
- void __init arm64_memblock_init(void)
- {
--	memblock_enforce_memory_limit(memory_limit);
-+	/*
-+	 * Remove the memory that we will not be able to cover
-+	 * with the linear mapping.
-+	 */
-+	const s64 linear_region_size = -(s64)PAGE_OFFSET;
-+
-+	memblock_remove(round_down(memblock_start_of_DRAM(), SZ_1G) +
-+			linear_region_size, ULLONG_MAX);
-+
-+	enforce_memory_limit();
- 
- 	/*
- 	 * Register the kernel text, kernel data, initrd, and initial
-diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-index 526eeb7e1e97..1b9d7e48ba1e 100644
---- a/arch/arm64/mm/mmu.c
-+++ b/arch/arm64/mm/mmu.c
-@@ -21,6 +21,7 @@
- #include <linux/kernel.h>
- #include <linux/errno.h>
- #include <linux/init.h>
-+#include <linux/initrd.h>
- #include <linux/libfdt.h>
- #include <linux/mman.h>
- #include <linux/nodemask.h>
-@@ -481,11 +482,33 @@ static void __init bootstrap_linear_mapping(unsigned long va_offset)
- static void __init map_mem(void)
- {
- 	struct memblock_region *reg;
-+	u64 new_memstart_addr;
-+	u64 new_va_offset;
- 
--	bootstrap_linear_mapping(KIMAGE_OFFSET);
-+	/*
-+	 * Select a suitable value for the base of physical memory.
-+	 * This should be equal to or below the lowest usable physical
-+	 * memory address, and aligned to PUD/PMD size so that we can map
-+	 * it efficiently.
-+	 */
-+	new_memstart_addr = round_down(memblock_start_of_DRAM(), SZ_1G);
-+
-+	/*
-+	 * Calculate the offset between the kernel text mapping that exists
-+	 * outside of the linear mapping, and its mapping in the linear region.
-+	 */
-+	new_va_offset = memstart_addr - new_memstart_addr;
-+
-+	bootstrap_linear_mapping(new_va_offset);
- 
--	kernel_va_offset = KIMAGE_OFFSET;
--	memstart_addr -= KIMAGE_OFFSET;
-+	kernel_va_offset = new_va_offset;
-+	memstart_addr = new_memstart_addr;
-+
-+	/* Recalculate virtual addresses of initrd region */
-+	if (IS_ENABLED(CONFIG_BLK_DEV_INITRD) && initrd_start) {
-+		initrd_start += new_va_offset;
-+		initrd_end += new_va_offset;
-+	}
- 
- 	/* map all the memory banks */
- 	for_each_memblock(memory, reg) {
+ 	np = of_find_compatible_node(NULL, NULL, "ti,omap4-mpu");
+ 	if (!np)
+ 		pr_warn("%s:Unable to allocate sram needed to handle errata I688\n",
 -- 
-1.9.1
+2.6.1
