@@ -1,91 +1,92 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 16 Nov 2015 08:01:19 -0600
-Subject: [PATCH v8 1/8] ARM: dt: Binding documentation for imx25 ADC/TSC
-In-Reply-To: <1447675269-8831-2-git-send-email-mpa@pengutronix.de>
-References: <1447675269-8831-1-git-send-email-mpa@pengutronix.de>
- <1447675269-8831-2-git-send-email-mpa@pengutronix.de>
-Message-ID: <20151116140119.GA30407@rob-hp-laptop>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 16 Nov 2015 13:45:19 +0000
+Subject: arm64 function_graph tracer panic with CONFIG_DYNAMIC_FTRACE
+In-Reply-To: <564937E3.3090501@linaro.org>
+References: <20151112104243.GF5627@e104818-lin.cambridge.arm.com>
+ <56457A4B.601@linaro.org> <564937E3.3090501@linaro.org>
+Message-ID: <20151116134518.GC6556@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 16, 2015 at 01:01:02PM +0100, Markus Pargmann wrote:
-> This documentation describes the devicetree bindings for the
-> ADC/Touchscreen unit of the i.MX25 SoC.
+Hi Takahiro,
+
+(+ Lorenzo and Mark)
+
+On Mon, Nov 16, 2015 at 10:56:51AM +0900, AKASHI Takahiro wrote:
+> I think I fixed the problem.
+> As you can see stack dump traces above, psci_cpu_suspend() and psci_suspend_finisher()
+> are called in cpu suspend path, but they never return in cpu resume path and
+> cpu_suspend() will resume directly via cpu_resume(). So those two functions should not be
+> ftrace'd.
 > 
-> Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
-> Acked-by: Jonathan Cameron <jic23@kernel.org>
-
-Acked-by: Rob Herring <robh@kernel.org>
-
+> Please try this patch:
+> ----8<----
+> From c3aaaab52cf51879ae8e112f80790075425ba9be Mon Sep 17 00:00:00 2001
+> From: AKASHI Takahiro <takahiro.akashi@linaro.org>
+> Date: Mon, 16 Nov 2015 10:29:21 +0900
+> Subject: [PATCH] arm64: disable ftrace in suspend path
+> 
+> 
+> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
 > ---
+>  arch/arm64/kernel/psci.c    |    2 +-
+>  arch/arm64/kernel/suspend.c |    2 +-
+>  drivers/firmware/psci.c     |    2 +-
+>  3 files changed, 3 insertions(+), 3 deletions(-)
 > 
-> Notes:
->     Changes in v6:
->      - Removed adc-ref property and replaced it with refp and refn for positive and
->        negative references. The properties are optional now as the default
->        behaviour is a positive internal reference voltage and ADC GND as negative
->        reference.
+> diff --git a/arch/arm64/kernel/psci.c b/arch/arm64/kernel/psci.c
+> index f67f35b..78414d7 100644
+> --- a/arch/arm64/kernel/psci.c
+> +++ b/arch/arm64/kernel/psci.c
+> @@ -178,7 +178,7 @@ static int cpu_psci_cpu_kill(unsigned int cpu)
+>  }
+>  #endif
 > 
->  .../devicetree/bindings/mfd/fsl-imx25-tsadc.txt    | 46 ++++++++++++++++++++++
->  1 file changed, 46 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/mfd/fsl-imx25-tsadc.txt
+> -static int psci_suspend_finisher(unsigned long index)
+> +static int notrace psci_suspend_finisher(unsigned long index)
+>  {
+>  	u32 *state = __this_cpu_read(psci_power_state);
 > 
-> diff --git a/Documentation/devicetree/bindings/mfd/fsl-imx25-tsadc.txt b/Documentation/devicetree/bindings/mfd/fsl-imx25-tsadc.txt
-> new file mode 100644
-> index 000000000000..a857af0eb68c
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/mfd/fsl-imx25-tsadc.txt
-> @@ -0,0 +1,46 @@
-> +Freescale mx25 ADC/TSC multifunction device
-> +
-> +This device combines two general purpose conversion queues one used for general
-> +ADC and the other used for touchscreens.
-> +
-> +Required properties:
-> + - compatible: Should be "fsl,imx25-tsadc".
-> + - reg: Memory range of the device.
-> + - interrupts: Interrupt for this device as described in
-> +   interrupts/interrupts.txt
-> + - clocks: An 'ipg' clock defined as described in clocks/clock.txt
-> + - interrupt-controller: This device is an interrupt controller. It controls
-> +   the interrupts of both conversion queues.
-> + - #interrupt-cells: Should be '<1>'.
-> + - #address-cells: Should be '<1>'.
-> + - #size-cells: Should be '<1>'.
-> + - ranges
-> +
-> +This device includes two conversion queues which can be added as subnodes.
-> +The first queue is for the touchscreen, the second for general purpose ADC.
-> +
-> +Example:
-> +	tscadc: tscadc at 50030000 {
-> +		compatible = "fsl,imx25-tsadc";
-> +		reg = <0x50030000 0xc>;
-> +		interrupts = <46>;
-> +		clocks = <&clks 119>;
-> +		clock-names = "ipg";
-> +		interrupt-controller;
-> +		#interrupt-cells = <1>;
-> +		#address-cells = <1>;
-> +		#size-cells = <1>;
-> +		ranges;
-> +
-> +		tsc: tcq at 50030400 {
-> +			compatible = "fsl,imx25-tcq";
-> +			reg = <0x50030400 0x60>;
-> +			...
-> +		};
-> +
-> +		adc: gcq at 50030800 {
-> +			compatible = "fsl,imx25-gcq";
-> +			reg = <0x50030800 0x60>;
-> +			...
-> +		};
-> +	};
-> -- 
-> 2.6.1
+> diff --git a/arch/arm64/kernel/suspend.c b/arch/arm64/kernel/suspend.c
+> index 44ca414..12280ef 100644
+> --- a/arch/arm64/kernel/suspend.c
+> +++ b/arch/arm64/kernel/suspend.c
+> @@ -19,7 +19,7 @@ extern int __cpu_suspend_enter(unsigned long arg, int (*fn)(unsigned long));
+>   * save_ptr: address of the location where the context physical address
+>   *           must be saved
+>   */
+> -void notrace __cpu_suspend_save(struct cpu_suspend_ctx *ptr,
+> +void __cpu_suspend_save(struct cpu_suspend_ctx *ptr,
+>  				phys_addr_t *save_ptr)
+>  {
+>  	*save_ptr = virt_to_phys(ptr);
+> diff --git a/drivers/firmware/psci.c b/drivers/firmware/psci.c
+> index 838298f..8fce2c5 100644
+> --- a/drivers/firmware/psci.c
+> +++ b/drivers/firmware/psci.c
+> @@ -129,7 +129,7 @@ static u32 psci_get_version(void)
+>  	return invoke_psci_fn(PSCI_0_2_FN_PSCI_VERSION, 0, 0, 0);
+>  }
 > 
-> --
-> To unsubscribe from this list: send the line "unsubscribe devicetree" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> -static int psci_cpu_suspend(u32 state, unsigned long entry_point)
+> +static int notrace psci_cpu_suspend(u32 state, unsigned long entry_point)
+>  {
+>  	int err;
+>  	u32 fn;
+
+The patch indeed fixes the crash.
+
+> There are some other functions which are called by cpu_suspend(), e.g. psci_system_suspend().
+> Should we apply a similar fix to them?
+
+I think we need to apply the fix to any function which does not return.
+In general, this should apply to all finishers passed to cpu_suspend()
+and the subsequent callees.
+
+Do we need such annotation for cpu_die() as well? It probably doesn't
+matter as the CPU is coming back on a completely different path anyway.
+
+Thanks.
+
+-- 
+Catalin
