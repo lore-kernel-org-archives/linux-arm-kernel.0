@@ -1,34 +1,35 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Mon, 16 Nov 2015 14:37:46 +0100
-Subject: [PATCH 13/27] mtd: nand: add nand_to_mtd() helper
-In-Reply-To: <1447681080-31232-1-git-send-email-boris.brezillon@free-electrons.com>
-References: <1447681080-31232-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1447681080-31232-14-git-send-email-boris.brezillon@free-electrons.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 16 Nov 2015 13:55:51 +0000
+Subject: [PATCH] arm64: kvm: avoid %p in __kvm_hyp_panic
+Message-ID: <1447682151-5827-1-git-send-email-mark.rutland@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add a new helper to retrieve the MTD device attached to a NAND chip.
+Currently __kvm_hyp_panic uses %p for values which are not pointers,
+such as the ESR value. This can confusingly lead to "(null)" being
+printed for the value.
 
-Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+Use %x instead, and only use %p for host pointers.
+
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+Cc: Christoffer Dall <christoffer.dall@linaro.org>
 ---
- include/linux/mtd/nand.h | 5 +++++
- 1 file changed, 5 insertions(+)
+ arch/arm64/kvm/hyp.S | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/include/linux/mtd/nand.h b/include/linux/mtd/nand.h
-index c4e39ff..8ec071e 100644
---- a/include/linux/mtd/nand.h
-+++ b/include/linux/mtd/nand.h
-@@ -737,6 +737,11 @@ static inline struct nand_chip *mtd_to_nand(struct mtd_info *mtd)
- 	return mtd->priv;
- }
+diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
+index 1599701..11183ce 100644
+--- a/arch/arm64/kvm/hyp.S
++++ b/arch/arm64/kvm/hyp.S
+@@ -914,7 +914,7 @@ __kvm_hyp_panic:
+ ENDPROC(__kvm_hyp_panic)
  
-+static inline struct mtd_info *nand_to_mtd(struct nand_chip *chip)
-+{
-+	return &chip->mtd;
-+}
-+
- /*
-  * NAND Flash Manufacturer ID Codes
-  */
+ __hyp_panic_str:
+-	.ascii	"HYP panic:\nPS:%08x PC:%p ESR:%p\nFAR:%p HPFAR:%p PAR:%p\nVCPU:%p\n\0"
++	.ascii	"HYP panic:\nPS:%08x PC:%016x ESR:%08x\nFAR:%016x HPFAR:%016x PAR:%016x\nVCPU:%p\n\0"
+ 
+ 	.align	2
+ 
 -- 
-2.1.4
+1.9.1
