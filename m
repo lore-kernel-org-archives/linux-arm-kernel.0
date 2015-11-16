@@ -1,145 +1,103 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Mon, 16 Nov 2015 09:56:45 +0100
-Subject: [PATCH v4 22/24] pwm: rockchip: add initial state retrieval
+Date: Mon, 16 Nov 2015 09:56:30 +0100
+Subject: [PATCH v4 07/24] pwm: use pwm_get/set_default_xxx() helpers where
+ appropriate
 In-Reply-To: <1447664207-24370-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1447664207-24370-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1447664207-24370-23-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1447664207-24370-8-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Implement the ->reset_state() function to expose initial state.
+pwm_set/get_default_xxx() helpers have been introduced to differentiate
+the default PWM states (those retrieved through DT, PWM lookup table or
+statically assigned by the driver) and the current PWM ones.
+Make use of those helpers where appropriate.
 
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 Tested-by: Heiko Stuebner <heiko@sntech.de>
+Reviewed-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+Acked-by: Robert Jarzmik <robert.jarzmik@free.fr>
 ---
- drivers/pwm/pwm-rockchip.c | 66 ++++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 66 insertions(+)
+ drivers/pwm/core.c      | 14 +++++++-------
+ drivers/pwm/pwm-pxa.c   |  2 +-
+ drivers/pwm/pwm-sun4i.c |  3 ++-
+ 3 files changed, 10 insertions(+), 9 deletions(-)
 
-diff --git a/drivers/pwm/pwm-rockchip.c b/drivers/pwm/pwm-rockchip.c
-index 7d9cc90..6eab25c 100644
---- a/drivers/pwm/pwm-rockchip.c
-+++ b/drivers/pwm/pwm-rockchip.c
-@@ -51,6 +51,7 @@ struct rockchip_pwm_data {
+diff --git a/drivers/pwm/core.c b/drivers/pwm/core.c
+index d24ca5f..59073a1 100644
+--- a/drivers/pwm/core.c
++++ b/drivers/pwm/core.c
+@@ -146,12 +146,12 @@ of_pwm_xlate_with_flags(struct pwm_chip *pc, const struct of_phandle_args *args)
+ 	if (IS_ERR(pwm))
+ 		return pwm;
  
- 	void (*set_enable)(struct pwm_chip *chip,
- 			   struct pwm_device *pwm, bool enable);
-+	void (*reset_state)(struct pwm_chip *chip, struct pwm_device *pwm);
- };
+-	pwm_set_period(pwm, args->args[1]);
++	pwm_set_default_period(pwm, args->args[1]);
  
- static inline struct rockchip_pwm_chip *to_rockchip_pwm_chip(struct pwm_chip *c)
-@@ -75,6 +76,18 @@ static void rockchip_pwm_set_enable_v1(struct pwm_chip *chip,
- 	writel_relaxed(val, pc->base + pc->data->regs.ctrl);
+ 	if (args->args[2] & PWM_POLARITY_INVERTED)
+-		pwm_set_polarity(pwm, PWM_POLARITY_INVERSED);
++		pwm_set_default_polarity(pwm, PWM_POLARITY_INVERSED);
+ 	else
+-		pwm_set_polarity(pwm, PWM_POLARITY_NORMAL);
++		pwm_set_default_polarity(pwm, PWM_POLARITY_NORMAL);
+ 
+ 	return pwm;
  }
+@@ -172,7 +172,7 @@ of_pwm_simple_xlate(struct pwm_chip *pc, const struct of_phandle_args *args)
+ 	if (IS_ERR(pwm))
+ 		return pwm;
  
-+static void rockchip_pwm_reset_state_v1(struct pwm_chip *chip,
-+					struct pwm_device *pwm)
-+{
-+	struct rockchip_pwm_chip *pc = to_rockchip_pwm_chip(chip);
-+	u32 enable_conf = PWM_CTRL_OUTPUT_EN | PWM_CTRL_TIMER_EN;
-+	u32 val;
-+
-+	val = readl(pc->base + pc->data->regs.ctrl);
-+	if ((val & enable_conf) == enable_conf)
-+		pwm->state.enabled = true;
-+}
-+
- static void rockchip_pwm_set_enable_v2(struct pwm_chip *chip,
- 				       struct pwm_device *pwm, bool enable)
- {
-@@ -98,6 +111,54 @@ static void rockchip_pwm_set_enable_v2(struct pwm_chip *chip,
- 	writel_relaxed(val, pc->base + pc->data->regs.ctrl);
+-	pwm_set_period(pwm, args->args[1]);
++	pwm_set_default_period(pwm, args->args[1]);
+ 
+ 	return pwm;
  }
+@@ -268,7 +268,7 @@ int pwmchip_add_with_polarity(struct pwm_chip *chip,
+ 		pwm->chip = chip;
+ 		pwm->pwm = chip->base + i;
+ 		pwm->hwpwm = i;
+-		pwm->polarity = polarity;
++		pwm_set_default_polarity(pwm, polarity);
+ 		mutex_init(&pwm->lock);
  
-+static void rockchip_pwm_reset_state_v2(struct pwm_chip *chip,
-+					struct pwm_device *pwm)
-+{
-+	struct rockchip_pwm_chip *pc = to_rockchip_pwm_chip(chip);
-+	u32 enable_conf = PWM_OUTPUT_LEFT | PWM_LP_DISABLE | PWM_ENABLE |
-+			  PWM_CONTINUOUS;
-+	u32 val;
-+
-+	val = readl(pc->base + pc->data->regs.ctrl);
-+	if ((val & enable_conf) != enable_conf)
-+		return;
-+
-+	pwm->state.enabled = true;
-+
-+	if (!(val & PWM_DUTY_POSITIVE))
-+		pwm->state.polarity = PWM_POLARITY_INVERSED;
-+}
-+
-+static void rockchip_pwm_reset_state(struct pwm_chip *chip,
-+				     struct pwm_device *pwm)
-+{
-+	struct rockchip_pwm_chip *pc = to_rockchip_pwm_chip(chip);
-+	unsigned long clk_rate;
-+	u64 tmp;
-+	int ret;
-+
-+	ret = clk_enable(pc->clk);
-+	if (ret)
-+		return;
-+
-+	clk_rate = clk_get_rate(pc->clk);
-+
-+	tmp = readl(pc->base + pc->data->regs.period);
-+	tmp *= pc->data->prescaler * NSEC_PER_SEC;
-+	do_div(tmp, clk_rate);
-+	pwm->state.period = tmp;
-+
-+	tmp = readl(pc->base + pc->data->regs.duty);
-+	tmp *= pc->data->prescaler * NSEC_PER_SEC;
-+	do_div(tmp, clk_rate);
-+	pwm->state.duty_cycle = tmp;
-+
-+	pc->data->reset_state(chip, chip->pwms);
-+
-+	if (!pwm_is_enabled(pwm))
-+		clk_disable(pc->clk);
-+}
-+
- static int rockchip_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
- 			       int duty_ns, int period_ns)
- {
-@@ -171,6 +232,7 @@ static void rockchip_pwm_disable(struct pwm_chip *chip, struct pwm_device *pwm)
+ 		radix_tree_insert(&pwm_tree, pwm->pwm, pwm);
+@@ -751,8 +751,8 @@ struct pwm_device *pwm_get(struct device *dev, const char *con_id)
+ 	if (IS_ERR(pwm))
+ 		goto out;
+ 
+-	pwm_set_period(pwm, chosen->period);
+-	pwm_set_polarity(pwm, chosen->polarity);
++	pwm_set_default_period(pwm, chosen->period);
++	pwm_set_default_polarity(pwm, chosen->polarity);
+ 
+ out:
+ 	mutex_unlock(&pwm_lookup_lock);
+diff --git a/drivers/pwm/pwm-pxa.c b/drivers/pwm/pwm-pxa.c
+index cb2f702..65b80aa 100644
+--- a/drivers/pwm/pwm-pxa.c
++++ b/drivers/pwm/pwm-pxa.c
+@@ -160,7 +160,7 @@ pxa_pwm_of_xlate(struct pwm_chip *pc, const struct of_phandle_args *args)
+ 	if (IS_ERR(pwm))
+ 		return pwm;
+ 
+-	pwm_set_period(pwm, args->args[0]);
++	pwm_set_default_period(pwm, args->args[0]);
+ 
+ 	return pwm;
  }
+diff --git a/drivers/pwm/pwm-sun4i.c b/drivers/pwm/pwm-sun4i.c
+index 67af9f6..f6a7451 100644
+--- a/drivers/pwm/pwm-sun4i.c
++++ b/drivers/pwm/pwm-sun4i.c
+@@ -354,7 +354,8 @@ static int sun4i_pwm_probe(struct platform_device *pdev)
+ 	val = sun4i_pwm_readl(pwm, PWM_CTRL_REG);
+ 	for (i = 0; i < pwm->chip.npwm; i++)
+ 		if (!(val & BIT_CH(PWM_ACT_STATE, i)))
+-			pwm->chip.pwms[i].polarity = PWM_POLARITY_INVERSED;
++			pwm_set_default_polarity(&pwm->chip.pwms[i],
++						 PWM_POLARITY_INVERSED);
+ 	clk_disable_unprepare(pwm->clk);
  
- static const struct pwm_ops rockchip_pwm_ops_v1 = {
-+	.reset_state = rockchip_pwm_reset_state,
- 	.config = rockchip_pwm_config,
- 	.enable = rockchip_pwm_enable,
- 	.disable = rockchip_pwm_disable,
-@@ -178,6 +240,7 @@ static const struct pwm_ops rockchip_pwm_ops_v1 = {
- };
- 
- static const struct pwm_ops rockchip_pwm_ops_v2 = {
-+	.reset_state = rockchip_pwm_reset_state,
- 	.config = rockchip_pwm_config,
- 	.set_polarity = rockchip_pwm_set_polarity,
- 	.enable = rockchip_pwm_enable,
-@@ -195,6 +258,7 @@ static const struct rockchip_pwm_data pwm_data_v1 = {
- 	.prescaler = 2,
- 	.ops = &rockchip_pwm_ops_v1,
- 	.set_enable = rockchip_pwm_set_enable_v1,
-+	.reset_state = rockchip_pwm_reset_state_v1,
- };
- 
- static const struct rockchip_pwm_data pwm_data_v2 = {
-@@ -207,6 +271,7 @@ static const struct rockchip_pwm_data pwm_data_v2 = {
- 	.prescaler = 1,
- 	.ops = &rockchip_pwm_ops_v2,
- 	.set_enable = rockchip_pwm_set_enable_v2,
-+	.reset_state = rockchip_pwm_reset_state_v2,
- };
- 
- static const struct rockchip_pwm_data pwm_data_vop = {
-@@ -219,6 +284,7 @@ static const struct rockchip_pwm_data pwm_data_vop = {
- 	.prescaler = 1,
- 	.ops = &rockchip_pwm_ops_v2,
- 	.set_enable = rockchip_pwm_set_enable_v2,
-+	.reset_state = rockchip_pwm_reset_state_v2,
- };
- 
- static const struct of_device_id rockchip_pwm_dt_ids[] = {
+ 	return 0;
 -- 
 2.1.4
