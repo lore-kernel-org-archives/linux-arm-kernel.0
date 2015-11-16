@@ -1,41 +1,65 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Mon, 16 Nov 2015 09:56:44 +0100
-Subject: [PATCH v4 21/24] pwm: add information about polarity,
- duty cycle and period to debugfs
+Date: Mon, 16 Nov 2015 09:56:36 +0100
+Subject: [PATCH v4 13/24] hwmon: pwm-fan: use pwm_get/set_default_xxx()
+ helpers where appropriate
 In-Reply-To: <1447664207-24370-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1447664207-24370-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1447664207-24370-22-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1447664207-24370-14-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Heiko St?bner <heiko@sntech.de>
+pwm_set/get_default_xxx() helpers have been introduced to differentiate
+the default PWM states (those retrieved through DT, PWM lookup table or
+statically assigned by the driver) and the current ones.
+Make use of those helpers where appropriate.
 
-The pwm-states make it possible to also output the polarity, duty cycle
-and period information in the debugfs pwm summary-outout.
-This makes it easier to gather overview information about pwms without
-needing to walk through the sysfs attributes of every pwm.
-
-Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 ---
- drivers/pwm/core.c | 5 +++++
- 1 file changed, 5 insertions(+)
+ drivers/hwmon/pwm-fan.c | 15 +++++++++------
+ 1 file changed, 9 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/pwm/core.c b/drivers/pwm/core.c
-index fbc71d3..1619101 100644
---- a/drivers/pwm/core.c
-+++ b/drivers/pwm/core.c
-@@ -1035,6 +1035,11 @@ static void pwm_dbg_show(struct pwm_chip *chip, struct seq_file *s)
- 		if (pwm_is_enabled(pwm))
- 			seq_puts(s, " enabled");
+diff --git a/drivers/hwmon/pwm-fan.c b/drivers/hwmon/pwm-fan.c
+index 105b964..989d7b4 100644
+--- a/drivers/hwmon/pwm-fan.c
++++ b/drivers/hwmon/pwm-fan.c
+@@ -47,8 +47,9 @@ static int  __set_pwm(struct pwm_fan_ctx *ctx, unsigned long pwm)
+ 	if (ctx->pwm_value == pwm)
+ 		goto exit_set_pwm_err;
  
-+		seq_printf(s, " period:%uns", pwm_get_period(pwm));
-+		seq_printf(s, " duty:%uns", pwm_get_duty_cycle(pwm));
-+		seq_printf(s, " polarity:%s", pwm_get_polarity(pwm) ? "inverse"
-+								    : "normal");
-+
- 		seq_puts(s, "\n");
- 	}
- }
+-	duty = DIV_ROUND_UP(pwm * (pwm_get_period((ctx->pwm)) - 1), MAX_PWM);
+-	ret = pwm_config(ctx->pwm, duty, pwm_get_period((ctx->pwm)));
++	duty = DIV_ROUND_UP(pwm * (pwm_get_default_period((ctx->pwm)) - 1),
++			    MAX_PWM);
++	ret = pwm_config(ctx->pwm, duty, pwm_get_default_period((ctx->pwm)));
+ 	if (ret)
+ 		goto exit_set_pwm_err;
+ 
+@@ -234,10 +235,11 @@ static int pwm_fan_probe(struct platform_device *pdev)
+ 	platform_set_drvdata(pdev, ctx);
+ 
+ 	/* Set duty cycle to maximum allowed */
+-	duty_cycle = pwm_get_period((ctx->pwm)) - 1;
++	duty_cycle = pwm_get_default_period((ctx->pwm)) - 1;
+ 	ctx->pwm_value = MAX_PWM;
+ 
+-	ret = pwm_config(ctx->pwm, duty_cycle, pwm_get_period((ctx->pwm)));
++	ret = pwm_config(ctx->pwm, duty_cycle,
++			 pwm_get_default_period((ctx->pwm)));
+ 	if (ret) {
+ 		dev_err(&pdev->dev, "Failed to configure PWM\n");
+ 		return ret;
+@@ -309,9 +311,10 @@ static int pwm_fan_resume(struct device *dev)
+ 	if (ctx->pwm_value == 0)
+ 		return 0;
+ 
+-	duty = DIV_ROUND_UP(ctx->pwm_value * (pwm_get_period((ctx->pwm)) - 1),
++	duty = DIV_ROUND_UP(ctx->pwm_value *
++			    (pwm_get_default_period((ctx->pwm)) - 1),
+ 			    MAX_PWM);
+-	ret = pwm_config(ctx->pwm, duty, pwm_get_period((ctx->pwm)));
++	ret = pwm_config(ctx->pwm, duty, pwm_get_default_period((ctx->pwm)));
+ 	if (ret)
+ 		return ret;
+ 	return pwm_enable(ctx->pwm);
 -- 
 2.1.4
