@@ -1,44 +1,65 @@
-From: clabbe.montjoie@gmail.com (LABBE Corentin)
-Date: Mon, 16 Nov 2015 09:35:54 +0100
-Subject: [PATCH v2] crypto: sun4i-ss: add missing statesize
-In-Reply-To: <1447662954-1788-1-git-send-email-clabbe.montjoie@gmail.com>
-References: <1447662954-1788-1-git-send-email-clabbe.montjoie@gmail.com>
-Message-ID: <1447662954-1788-2-git-send-email-clabbe.montjoie@gmail.com>
+From: pmallapp@broadcom.com (pmallapp at broadcom.com)
+Date: Mon, 16 Nov 2015 14:18:20 +0530
+Subject: [PATCH] IOMMU: arm-smmu-v3: Use STE.S1STALLD only when supported
+Message-ID: <1447663700-13309-1-git-send-email-pmallapp@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-sun4i-ss implementaton of md5/sha1 is via ahash algorithms.
-Commit 8996eafdcbad ("crypto: ahash - ensure statesize is non-zero")
-made impossible to load them without giving statesize. This patch
-specifiy statesize for sha1 and md5.
+From: Prem Mallappa <pmallapp@broadcom.com>
 
-Fixes: 6298e948215f ("crypto: sunxi-ss - Add Allwinner Security System crypto accelerator")
-Cc: <stable@vger.kernel.org> # v4.3+
-Tested-by: Chen-Yu Tsai <wens@csie.org>
-Signed-off-by: LABBE Corentin <clabbe.montjoie@gmail.com>
+Also fix the STALLD check.
+
+Signed-off-by: Prem Mallappa <pmallapp@broadcom.com>
 ---
- drivers/crypto/sunxi-ss/sun4i-ss-core.c | 2 ++
- 1 file changed, 2 insertions(+)
+ drivers/iommu/arm-smmu-v3.c | 16 +++++++++++++---
+ 1 file changed, 13 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/crypto/sunxi-ss/sun4i-ss-core.c b/drivers/crypto/sunxi-ss/sun4i-ss-core.c
-index eab6fe2..107cd2a 100644
---- a/drivers/crypto/sunxi-ss/sun4i-ss-core.c
-+++ b/drivers/crypto/sunxi-ss/sun4i-ss-core.c
-@@ -39,6 +39,7 @@ static struct sun4i_ss_alg_template ss_algs[] = {
- 		.import = sun4i_hash_import_md5,
- 		.halg = {
- 			.digestsize = MD5_DIGEST_SIZE,
-+			.statesize = sizeof(struct md5_state),
- 			.base = {
- 				.cra_name = "md5",
- 				.cra_driver_name = "md5-sun4i-ss",
-@@ -66,6 +67,7 @@ static struct sun4i_ss_alg_template ss_algs[] = {
- 		.import = sun4i_hash_import_sha1,
- 		.halg = {
- 			.digestsize = SHA1_DIGEST_SIZE,
-+			.statesize = sizeof(struct sha1_state),
- 			.base = {
- 				.cra_name = "sha1",
- 				.cra_driver_name = "sha1-sun4i-ss",
+diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+index ed409cb..804671c 100644
+--- a/drivers/iommu/arm-smmu-v3.c
++++ b/drivers/iommu/arm-smmu-v3.c
+@@ -38,7 +38,9 @@
+ #define IDR0_ST_LVL_SHIFT		27
+ #define IDR0_ST_LVL_MASK		0x3
+ #define IDR0_ST_LVL_2LVL		(1 << IDR0_ST_LVL_SHIFT)
+-#define IDR0_STALL_MODEL		(3 << 24)
++#define IDR0_STALL_SHIFT		24
++#define IDR0_STALL_MODEL_STALL		0x0
++#define IDR0_STALL_MODEL_FORCE		0x2
+ #define IDR0_TTENDIAN_SHIFT		21
+ #define IDR0_TTENDIAN_MASK		0x3
+ #define IDR0_TTENDIAN_LE		(2 << IDR0_TTENDIAN_SHIFT)
+@@ -1051,12 +1053,14 @@ static void arm_smmu_write_strtab_ent(struct arm_smmu_device *smmu, u32 sid,
+ 			 STRTAB_STE_1_S1C_CACHE_WBRA
+ 			 << STRTAB_STE_1_S1COR_SHIFT |
+ 			 STRTAB_STE_1_S1C_SH_ISH << STRTAB_STE_1_S1CSH_SHIFT |
+-			 STRTAB_STE_1_S1STALLD |
+ #ifdef CONFIG_PCI_ATS
+ 			 STRTAB_STE_1_EATS_TRANS << STRTAB_STE_1_EATS_SHIFT |
+ #endif
+ 			 STRTAB_STE_1_STRW_NSEL1 << STRTAB_STE_1_STRW_SHIFT);
+ 
++		if (smmu->features & ARM_SMMU_FEAT_STALLS)
++			dst[1] |= cpu_to_le64(STRTAB_STE_1_S1STALLD);
++
+ 		val |= (ste->s1_cfg->cdptr_dma & STRTAB_STE_0_S1CTXPTR_MASK
+ 		        << STRTAB_STE_0_S1CTXPTR_SHIFT) |
+ 			STRTAB_STE_0_CFG_S1_TRANS;
+@@ -2483,8 +2487,14 @@ static int arm_smmu_device_probe(struct arm_smmu_device *smmu)
+ 		dev_warn(smmu->dev, "IDR0.COHACC overridden by dma-coherent property (%s)\n",
+ 			 coherent ? "true" : "false");
+ 
+-	if (reg & IDR0_STALL_MODEL)
++	switch ((reg >> IDR0_STALL_SHIFT) & 0x3) {
++	case IDR0_STALL_MODEL_STALL:
++	case IDR0_STALL_MODEL_FORCE:
+ 		smmu->features |= ARM_SMMU_FEAT_STALLS;
++		break;
++	default:
++		break;
++	}
+ 
+ 	if (reg & IDR0_S1P)
+ 		smmu->features |= ARM_SMMU_FEAT_TRANS_S1;
 -- 
-2.4.10
+2.6.0
