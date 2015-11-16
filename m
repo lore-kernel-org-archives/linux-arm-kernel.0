@@ -1,57 +1,53 @@
-From: Sanjeev_Sharma@mentor.com (Sharma, Sanjeev)
-Date: Mon, 16 Nov 2015 09:36:17 +0000
-Subject: [PATCH] PCI: imx6:don't sleep in atomic context
-In-Reply-To: <6415545.xzR4A6SaUL@wuerfel>
-References: <1447066080-5859-1-git-send-email-sanjeev_sharma@mentor.com>
- <4800389.dqcmlJY3HC@wuerfel> <1447148110.3142.6.camel@pengutronix.de>
- <6415545.xzR4A6SaUL@wuerfel>
-Message-ID: <FDC088D3B5555644AE135ED28A7ABDE98636E07B@EU-MBX-02.mgc.mentorg.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 16 Nov 2015 10:38:54 +0100
+Subject: [PATCH v2 net-next] net: hisilicon: fix binding document of mdio
+In-Reply-To: <1447666704-200773-1-git-send-email-huangdaode@hisilicon.com>
+References: <1447666704-200773-1-git-send-email-huangdaode@hisilicon.com>
+Message-ID: <6897029.2fyR9qGpEn@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 10 November 2015 10:35:10 Lucas Stach wrote:
-> Am Dienstag, den 10.11.2015, 10:28 +0100 schrieb Arnd Bergmann:
-> > On Tuesday 10 November 2015 09:41:18 Lucas Stach wrote:
-> > > > diff --git a/drivers/pci/host/pci-imx6.c 
-> > > > b/drivers/pci/host/pci-imx6.c index 233a196..9769b13 100644
-> > > > --- a/drivers/pci/host/pci-imx6.c
-> > > > +++ b/drivers/pci/host/pci-imx6.c
-> > > > @@ -499,7 +499,7 @@ static int imx6_pcie_link_up(struct pcie_port *pp)
-> > > >                * Wait a little bit, then re-check if the link finished
-> > > >                * the training.
-> > > >                */
-> > > > -             usleep_range(1000, 2000);
-> > > > +             mdelay(1000);
-> > > 
-> > > A mdelay(1000) is a whole different timescale than a usleep(1000). 
-> > > If this patch works for you with mdelay(1) or maybe mdelay(2) I 
-> > > would be fine with it.
-> > 
-> > mdelay(1) is still a really long time to block the CPU for, on 
-> > potentially every config space access.
-> > 
-> > Everybody else just returns the link status here, which seems to be 
-> > the better alternative. If you need to delay the startup, better 
-> > have a msleep(1) loop in the initial probe function where you are 
-> > allowed to sleep.
-> > 
-> Yes, it's somewhere on my TODO list to rework the link-up handling 
-> here, but as there are quite a few timing and ordering implications in 
-> that code, this needs a good thought and a good deal of testing. So 
-> I'm inclined to ACK the current patch to get rid of the obvious bug 
-> and sort things out properly in a follow on patchset.
+On Monday 16 November 2015 17:38:24 huangdaode wrote:
+> This patch explains the occasion of "hisilcon,mdio" and
+> "hisilicon,hns-mdio" according to Arnd's comments.
+> and reformat it according to comments from Rob<robh@kernel.org>.
+> 
+> chang log:
+> 
+> v2:
+>   1) reformat the style.
+>   2) make it more clearity.
+> 
+> v1:
+>   initial version.
+> 
+> Signed-off-by: huangdaode <huangdaode@hisilicon.com>
+> ---
 
-Maybe use that patch with some modifications then:
+The new version looks ok, but your changelog above is formatted
+incorrectly. Please put only the contents you want in the git history
+above the '---' line and your Signed-off-by, but put the parts that
+refer to previous versions of the submission below the ---.
 
-* add a comment to explain that this is currently called from possibly
-  atomic context through pci_config_{read,write} and that the link
-  state handling never belonged here.
-
-* instead of looping five times for up to 2ms each, loop 100 times
-  around a udelay(20) to hopefully be done earlier. I was going to
-  suggest using time_before(timeout, jiffies) as the condition to
-  wait for, but that doesn't work if called with interrupts disabled.
-
-	Arnd
-Shall I go ahead by changing only current patch to mdelay(1). I will also
-Incorporate comment  #1 given by Arnd above. 
+>  Documentation/devicetree/bindings/net/hisilicon-hns-mdio.txt | 7 ++++++-
+>  1 file changed, 6 insertions(+), 1 deletion(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/net/hisilicon-hns-mdio.txt b/Documentation/devicetree/bindings/net/hisilicon-hns-mdio.txt
+> index 9c23fdf..4942d20 100644
+> --- a/Documentation/devicetree/bindings/net/hisilicon-hns-mdio.txt
+> +++ b/Documentation/devicetree/bindings/net/hisilicon-hns-mdio.txt
+> @@ -1,7 +1,12 @@
+>  Hisilicon MDIO bus controller
+>  
+>  Properties:
+> -- compatible: "hisilicon,mdio","hisilicon,hns-mdio".
+> +- compatible: can be one of:
+> +	"hisilicon,hns-mdio"
+> +	"hisilicon,mdio"
+> +  "hisilicon,hns-mdio" is recommendly to be used for hip05 and later SOCs,
+> +  while "hisilicon,mdio" is optional for backwards compatibility, only
+> +  support for hip04 Soc.
+>  - reg: The base address of the MDIO bus controller register bank.
+>  - #address-cells: Must be <1>.
+>  - #size-cells: Must be <0>.  MDIO addresses have no size component.
+> 
