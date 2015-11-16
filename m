@@ -1,69 +1,30 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 16 Nov 2015 14:16:29 +0000
-Subject: [PATCH 15/21] arm64: KVM: Add panic handling
-In-Reply-To: <1447679519-17888-16-git-send-email-marc.zyngier@arm.com>
-References: <1447679519-17888-1-git-send-email-marc.zyngier@arm.com>
- <1447679519-17888-16-git-send-email-marc.zyngier@arm.com>
-Message-ID: <20151116141629.GH20696@leverpostej>
+From: rostedt@goodmis.org (Steven Rostedt)
+Date: Mon, 16 Nov 2015 09:20:27 -0500
+Subject: arm64 function_graph tracer panic with CONFIG_DYNAMIC_FTRACE
+In-Reply-To: <564937E3.3090501@linaro.org>
+References: <20151112104243.GF5627@e104818-lin.cambridge.arm.com>
+ <56457A4B.601@linaro.org> <564937E3.3090501@linaro.org>
+Message-ID: <20151116092027.705361fc@gandalf.local.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
-> index 06d3e20..cdc2a96 100644
-> --- a/arch/arm64/kvm/hyp/switch.c
-> +++ b/arch/arm64/kvm/hyp/switch.c
-> @@ -140,3 +140,38 @@ int __hyp_text __guest_run(struct kvm_vcpu *vcpu)
->  
->  	return exit_code;
->  }
-> +
-> +static const char *__hyp_panic_string = "HYP panic:\nPS:%08x PC:%p ESR:%p\nFAR:%p HPFAR:%p PAR:%p\nVCPU:%p\n";
+On Mon, 16 Nov 2015 10:56:51 +0900
+AKASHI Takahiro <takahiro.akashi@linaro.org> wrote:
 
-I assume that if [1] goes in we'll update this to match.
+> I think I fixed the problem.
+> As you can see stack dump traces above, psci_cpu_suspend() and psci_suspend_finisher()
+> are called in cpu suspend path, but they never return in cpu resume path and
+> cpu_suspend() will resume directly via cpu_resume(). So those two functions should not be
+> ftrace'd.
 
-> +
-> +void __hyp_text __noreturn __hyp_panic(void)
-> +{
-> +	u64 spsr = read_sysreg(spsr_el2);
-> +	u64 elr = read_sysreg(elr_el2);
-> +	u64 par = read_sysreg(par_el1);
-> +
-> +	if (read_sysreg(vttbr_el2)) {
-> +		struct kvm_vcpu *vcpu;
-> +		struct kvm_cpu_context *host_ctxt;
-> +
-> +		vcpu = (struct kvm_vcpu *)read_sysreg(tpidr_el2);
-> +		host_ctxt = kern_hyp_va(vcpu->arch.host_cpu_context);
-> +		__deactivate_traps(vcpu);
-> +		__deactivate_vm(vcpu);
-> +		__sysreg_restore_state(host_ctxt);
-> +
-> +		write_sysreg(host_ctxt->gp_regs.sp_el1, sp_el1);
+Does this crash with just the function graph tracer, or does the
+function tracer show the same issue? If it is just the function graph
+tracer, lets not cripple function tracing because of it.
 
-__sysreg_restore_state restores the host sp_el1, no?
+Just call pause_graph_tracing() before the suspend code, and
+unpause_graph_tracing() when returning.
 
-> +	}
-> +
-> +	/* Call panic for real */
-> +	while (1) {
-> +		unsigned long str_va = (unsigned long)__hyp_panic_string;
-> +
-> +		str_va -= HYP_PAGE_OFFSET;
-> +		str_va += PAGE_OFFSET;
-> +		__hyp_do_panic(str_va,
-> +			       spsr,  elr,
-> +			       read_sysreg(esr_el2),   read_sysreg(far_el2),
-> +			       read_sysreg(hpfar_el2), par,
-> +			       read_sysreg(tpidr_el2));
-> +	}
-> +}
+This will also help keep you from playing whack-a-mole, when there are
+other functions that have this issue.
 
-I think the while (1) here is confusing.
-
-Can we not jsut declare str_va at the start of the function and get rid
-of the loop?
-
-Thanks,
-Mark.
-
-[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-November/385199.html
+-- Steve
