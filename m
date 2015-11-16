@@ -1,65 +1,37 @@
-From: pmallapp@broadcom.com (pmallapp at broadcom.com)
-Date: Mon, 16 Nov 2015 14:18:20 +0530
-Subject: [PATCH] IOMMU: arm-smmu-v3: Use STE.S1STALLD only when supported
-Message-ID: <1447663700-13309-1-git-send-email-pmallapp@broadcom.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Mon, 16 Nov 2015 09:56:24 +0100
+Subject: [PATCH v4 01/24] pwm: rcar: make use of pwm_is_enabled()
+In-Reply-To: <1447664207-24370-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1447664207-24370-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1447664207-24370-2-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Prem Mallappa <pmallapp@broadcom.com>
+Commit 5c31252c4a86 ("pwm: Add the pwm_is_enabled() helper") introduced a
+new function to test whether a PWM device is enabled or not without
+manipulating PWM internal fields.
+Hiding this is necessary if we want to smoothly move to the atomic PWM
+config approach without impacting PWM drivers.
+Fix this driver to use pwm_is_enabled() instead of directly accessing the
+->flags field.
 
-Also fix the STALLD check.
-
-Signed-off-by: Prem Mallappa <pmallapp@broadcom.com>
+Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 ---
- drivers/iommu/arm-smmu-v3.c | 16 +++++++++++++---
- 1 file changed, 13 insertions(+), 3 deletions(-)
+ drivers/pwm/pwm-rcar.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-index ed409cb..804671c 100644
---- a/drivers/iommu/arm-smmu-v3.c
-+++ b/drivers/iommu/arm-smmu-v3.c
-@@ -38,7 +38,9 @@
- #define IDR0_ST_LVL_SHIFT		27
- #define IDR0_ST_LVL_MASK		0x3
- #define IDR0_ST_LVL_2LVL		(1 << IDR0_ST_LVL_SHIFT)
--#define IDR0_STALL_MODEL		(3 << 24)
-+#define IDR0_STALL_SHIFT		24
-+#define IDR0_STALL_MODEL_STALL		0x0
-+#define IDR0_STALL_MODEL_FORCE		0x2
- #define IDR0_TTENDIAN_SHIFT		21
- #define IDR0_TTENDIAN_MASK		0x3
- #define IDR0_TTENDIAN_LE		(2 << IDR0_TTENDIAN_SHIFT)
-@@ -1051,12 +1053,14 @@ static void arm_smmu_write_strtab_ent(struct arm_smmu_device *smmu, u32 sid,
- 			 STRTAB_STE_1_S1C_CACHE_WBRA
- 			 << STRTAB_STE_1_S1COR_SHIFT |
- 			 STRTAB_STE_1_S1C_SH_ISH << STRTAB_STE_1_S1CSH_SHIFT |
--			 STRTAB_STE_1_S1STALLD |
- #ifdef CONFIG_PCI_ATS
- 			 STRTAB_STE_1_EATS_TRANS << STRTAB_STE_1_EATS_SHIFT |
- #endif
- 			 STRTAB_STE_1_STRW_NSEL1 << STRTAB_STE_1_STRW_SHIFT);
+diff --git a/drivers/pwm/pwm-rcar.c b/drivers/pwm/pwm-rcar.c
+index 6e99a63..70899c9 100644
+--- a/drivers/pwm/pwm-rcar.c
++++ b/drivers/pwm/pwm-rcar.c
+@@ -157,7 +157,7 @@ static int rcar_pwm_config(struct pwm_chip *chip, struct pwm_device *pwm,
+ 		return div;
  
-+		if (smmu->features & ARM_SMMU_FEAT_STALLS)
-+			dst[1] |= cpu_to_le64(STRTAB_STE_1_S1STALLD);
-+
- 		val |= (ste->s1_cfg->cdptr_dma & STRTAB_STE_0_S1CTXPTR_MASK
- 		        << STRTAB_STE_0_S1CTXPTR_SHIFT) |
- 			STRTAB_STE_0_CFG_S1_TRANS;
-@@ -2483,8 +2487,14 @@ static int arm_smmu_device_probe(struct arm_smmu_device *smmu)
- 		dev_warn(smmu->dev, "IDR0.COHACC overridden by dma-coherent property (%s)\n",
- 			 coherent ? "true" : "false");
+ 	/* Let the core driver set pwm->period if disabled and duty_ns == 0 */
+-	if (!test_bit(PWMF_ENABLED, &pwm->flags) && !duty_ns)
++	if (!pwm_is_enabled(pwm) && !duty_ns)
+ 		return 0;
  
--	if (reg & IDR0_STALL_MODEL)
-+	switch ((reg >> IDR0_STALL_SHIFT) & 0x3) {
-+	case IDR0_STALL_MODEL_STALL:
-+	case IDR0_STALL_MODEL_FORCE:
- 		smmu->features |= ARM_SMMU_FEAT_STALLS;
-+		break;
-+	default:
-+		break;
-+	}
- 
- 	if (reg & IDR0_S1P)
- 		smmu->features |= ARM_SMMU_FEAT_TRANS_S1;
+ 	rcar_pwm_update(rp, RCAR_PWMCR_SYNC, RCAR_PWMCR_SYNC, RCAR_PWMCR);
 -- 
-2.6.0
+2.1.4
