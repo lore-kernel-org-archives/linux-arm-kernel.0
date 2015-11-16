@@ -1,65 +1,57 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Mon, 16 Nov 2015 09:56:36 +0100
-Subject: [PATCH v4 13/24] hwmon: pwm-fan: use pwm_get/set_default_xxx()
- helpers where appropriate
+Date: Mon, 16 Nov 2015 09:56:42 +0100
+Subject: [PATCH v4 19/24] pwm: add the PWM initial state retrieval infra
 In-Reply-To: <1447664207-24370-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1447664207-24370-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1447664207-24370-14-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1447664207-24370-20-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-pwm_set/get_default_xxx() helpers have been introduced to differentiate
-the default PWM states (those retrieved through DT, PWM lookup table or
-statically assigned by the driver) and the current ones.
-Make use of those helpers where appropriate.
+Add a ->reset_state() function to the pwm_ops struct to let PWM drivers
+initialize the PWM state attached to a PWM device.
 
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+Tested-by: Heiko Stuebner <heiko@sntech.de>
 ---
- drivers/hwmon/pwm-fan.c | 15 +++++++++------
- 1 file changed, 9 insertions(+), 6 deletions(-)
+ drivers/pwm/core.c  | 3 +++
+ include/linux/pwm.h | 4 ++++
+ 2 files changed, 7 insertions(+)
 
-diff --git a/drivers/hwmon/pwm-fan.c b/drivers/hwmon/pwm-fan.c
-index 105b964..989d7b4 100644
---- a/drivers/hwmon/pwm-fan.c
-+++ b/drivers/hwmon/pwm-fan.c
-@@ -47,8 +47,9 @@ static int  __set_pwm(struct pwm_fan_ctx *ctx, unsigned long pwm)
- 	if (ctx->pwm_value == pwm)
- 		goto exit_set_pwm_err;
+diff --git a/drivers/pwm/core.c b/drivers/pwm/core.c
+index 6bbda6c..ce8b373 100644
+--- a/drivers/pwm/core.c
++++ b/drivers/pwm/core.c
+@@ -271,6 +271,9 @@ int pwmchip_add_with_polarity(struct pwm_chip *chip,
+ 		pwm_set_default_polarity(pwm, polarity);
+ 		mutex_init(&pwm->lock);
  
--	duty = DIV_ROUND_UP(pwm * (pwm_get_period((ctx->pwm)) - 1), MAX_PWM);
--	ret = pwm_config(ctx->pwm, duty, pwm_get_period((ctx->pwm)));
-+	duty = DIV_ROUND_UP(pwm * (pwm_get_default_period((ctx->pwm)) - 1),
-+			    MAX_PWM);
-+	ret = pwm_config(ctx->pwm, duty, pwm_get_default_period((ctx->pwm)));
- 	if (ret)
- 		goto exit_set_pwm_err;
++		if (chip->ops->reset_state)
++			chip->ops->reset_state(chip, pwm);
++
+ 		radix_tree_insert(&pwm_tree, pwm->pwm, pwm);
+ 	}
  
-@@ -234,10 +235,11 @@ static int pwm_fan_probe(struct platform_device *pdev)
- 	platform_set_drvdata(pdev, ctx);
- 
- 	/* Set duty cycle to maximum allowed */
--	duty_cycle = pwm_get_period((ctx->pwm)) - 1;
-+	duty_cycle = pwm_get_default_period((ctx->pwm)) - 1;
- 	ctx->pwm_value = MAX_PWM;
- 
--	ret = pwm_config(ctx->pwm, duty_cycle, pwm_get_period((ctx->pwm)));
-+	ret = pwm_config(ctx->pwm, duty_cycle,
-+			 pwm_get_default_period((ctx->pwm)));
- 	if (ret) {
- 		dev_err(&pdev->dev, "Failed to configure PWM\n");
- 		return ret;
-@@ -309,9 +311,10 @@ static int pwm_fan_resume(struct device *dev)
- 	if (ctx->pwm_value == 0)
- 		return 0;
- 
--	duty = DIV_ROUND_UP(ctx->pwm_value * (pwm_get_period((ctx->pwm)) - 1),
-+	duty = DIV_ROUND_UP(ctx->pwm_value *
-+			    (pwm_get_default_period((ctx->pwm)) - 1),
- 			    MAX_PWM);
--	ret = pwm_config(ctx->pwm, duty, pwm_get_period((ctx->pwm)));
-+	ret = pwm_config(ctx->pwm, duty, pwm_get_default_period((ctx->pwm)));
- 	if (ret)
- 		return ret;
- 	return pwm_enable(ctx->pwm);
+diff --git a/include/linux/pwm.h b/include/linux/pwm.h
+index 292e7da..caa0ffe 100644
+--- a/include/linux/pwm.h
++++ b/include/linux/pwm.h
+@@ -182,6 +182,9 @@ static inline enum pwm_polarity pwm_get_polarity(const struct pwm_device *pwm)
+  * @set_polarity: configure the polarity of this PWM
+  * @enable: enable PWM output toggling
+  * @disable: disable PWM output toggling
++ * @reset_state: reset the current PWM state (pwm->state) to the actual
++ *		 hardware state. This function is only called once per
++ *		 PWM device when the PWM chip is registered.
+  * @dbg_show: optional routine to show contents in debugfs
+  * @owner: helps prevent removal of modules exporting active PWMs
+  */
+@@ -194,6 +197,7 @@ struct pwm_ops {
+ 			    enum pwm_polarity polarity);
+ 	int (*enable)(struct pwm_chip *chip, struct pwm_device *pwm);
+ 	void (*disable)(struct pwm_chip *chip, struct pwm_device *pwm);
++	void (*reset_state)(struct pwm_chip *chip, struct pwm_device *pwm);
+ #ifdef CONFIG_DEBUG_FS
+ 	void (*dbg_show)(struct pwm_chip *chip, struct seq_file *s);
+ #endif
 -- 
 2.1.4
