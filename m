@@ -1,10 +1,9 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Mon, 16 Nov 2015 09:56:27 +0100
-Subject: [PATCH v4 04/24] hwmon: pwm-fan: use pwm_get_xxx() helpers where
- appropriate
+Date: Mon, 16 Nov 2015 09:56:26 +0100
+Subject: [PATCH v4 03/24] clk: pwm: use pwm_get_xxx() helpers where appropriate
 In-Reply-To: <1447664207-24370-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1447664207-24370-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1447664207-24370-5-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1447664207-24370-4-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -44,48 +43,41 @@ expression e;
 )
 --->8---
 ---
- drivers/hwmon/pwm-fan.c | 13 +++++++------
- 1 file changed, 7 insertions(+), 6 deletions(-)
+ drivers/clk/clk-pwm.c | 11 ++++++-----
+ 1 file changed, 6 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/hwmon/pwm-fan.c b/drivers/hwmon/pwm-fan.c
-index 3e23003..105b964 100644
---- a/drivers/hwmon/pwm-fan.c
-+++ b/drivers/hwmon/pwm-fan.c
-@@ -47,8 +47,8 @@ static int  __set_pwm(struct pwm_fan_ctx *ctx, unsigned long pwm)
- 	if (ctx->pwm_value == pwm)
- 		goto exit_set_pwm_err;
+diff --git a/drivers/clk/clk-pwm.c b/drivers/clk/clk-pwm.c
+index 328fcfc..b6306a2 100644
+--- a/drivers/clk/clk-pwm.c
++++ b/drivers/clk/clk-pwm.c
+@@ -71,22 +71,23 @@ static int clk_pwm_probe(struct platform_device *pdev)
+ 	if (IS_ERR(pwm))
+ 		return PTR_ERR(pwm);
  
--	duty = DIV_ROUND_UP(pwm * (ctx->pwm->period - 1), MAX_PWM);
--	ret = pwm_config(ctx->pwm, duty, ctx->pwm->period);
-+	duty = DIV_ROUND_UP(pwm * (pwm_get_period((ctx->pwm)) - 1), MAX_PWM);
-+	ret = pwm_config(ctx->pwm, duty, pwm_get_period((ctx->pwm)));
- 	if (ret)
- 		goto exit_set_pwm_err;
+-	if (!pwm->period) {
++	if (!pwm_get_period((pwm))) {
+ 		dev_err(&pdev->dev, "invalid PWM period\n");
+ 		return -EINVAL;
+ 	}
  
-@@ -234,10 +234,10 @@ static int pwm_fan_probe(struct platform_device *pdev)
- 	platform_set_drvdata(pdev, ctx);
+ 	if (of_property_read_u32(node, "clock-frequency", &clk_pwm->fixed_rate))
+-		clk_pwm->fixed_rate = NSEC_PER_SEC / pwm->period;
++		clk_pwm->fixed_rate = NSEC_PER_SEC / pwm_get_period((pwm));
  
- 	/* Set duty cycle to maximum allowed */
--	duty_cycle = ctx->pwm->period - 1;
-+	duty_cycle = pwm_get_period((ctx->pwm)) - 1;
- 	ctx->pwm_value = MAX_PWM;
+-	if (pwm->period != NSEC_PER_SEC / clk_pwm->fixed_rate &&
+-	    pwm->period != DIV_ROUND_UP(NSEC_PER_SEC, clk_pwm->fixed_rate)) {
++	if (pwm_get_period((pwm)) != NSEC_PER_SEC / clk_pwm->fixed_rate &&
++	    pwm_get_period((pwm)) != DIV_ROUND_UP(NSEC_PER_SEC, clk_pwm->fixed_rate)) {
+ 		dev_err(&pdev->dev,
+ 			"clock-frequency does not match PWM period\n");
+ 		return -EINVAL;
+ 	}
  
--	ret = pwm_config(ctx->pwm, duty_cycle, ctx->pwm->period);
-+	ret = pwm_config(ctx->pwm, duty_cycle, pwm_get_period((ctx->pwm)));
- 	if (ret) {
- 		dev_err(&pdev->dev, "Failed to configure PWM\n");
+-	ret = pwm_config(pwm, (pwm->period + 1) >> 1, pwm->period);
++	ret = pwm_config(pwm, (pwm_get_period((pwm)) + 1) >> 1,
++			 pwm_get_period((pwm)));
+ 	if (ret < 0)
  		return ret;
-@@ -309,8 +309,9 @@ static int pwm_fan_resume(struct device *dev)
- 	if (ctx->pwm_value == 0)
- 		return 0;
  
--	duty = DIV_ROUND_UP(ctx->pwm_value * (ctx->pwm->period - 1), MAX_PWM);
--	ret = pwm_config(ctx->pwm, duty, ctx->pwm->period);
-+	duty = DIV_ROUND_UP(ctx->pwm_value * (pwm_get_period((ctx->pwm)) - 1),
-+			    MAX_PWM);
-+	ret = pwm_config(ctx->pwm, duty, pwm_get_period((ctx->pwm)));
- 	if (ret)
- 		return ret;
- 	return pwm_enable(ctx->pwm);
 -- 
 2.1.4
