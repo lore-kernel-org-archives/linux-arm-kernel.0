@@ -1,48 +1,36 @@
-From: balbi@ti.com (Felipe Balbi)
-Date: Mon, 16 Nov 2015 15:13:55 -0600
-Subject: [PATCH] ARM: OMAP2: use correct timer function for AM43XX and
- TI81XX
-In-Reply-To: <4016134.4bReocePei@wuerfel>
-References: <4016134.4bReocePei@wuerfel>
-Message-ID: <87egfplka4.fsf@saruman.tx.rr.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 16 Nov 2015 22:14:35 +0100
+Subject: [PATCH] stm: select CONFIG_SRCU
+Message-ID: <12747713.N26XusNZpW@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The newly added STM code uses SRCU, but does not ensure that
+this code is part of the kernel:
 
-Hi,
+drivers/built-in.o: In function `stm_source_link_show':
+include/linux/srcu.h:221: undefined reference to `__srcu_read_lock'
+include/linux/srcu.h:238: undefined reference to `__srcu_read_unlock'
+drivers/built-in.o: In function `stm_source_link_drop':
+include/linux/srcu.h:221: undefined reference to `__srcu_read_lock'
+include/linux/srcu.h:238: undefined reference to `__srcu_read_unlock'
 
-Arnd Bergmann <arnd@arndb.de> writes:
-> AM43XX and TI81XX use omap3_gptimer_timer_init(), but that is only
-> built into the kernel for OMAP3 and AM33XX, otherwise we get:
->
-> arch/arm/mach-omap2/built-in.o:(.arch.info.init+0x124): undefined reference to `omap3_gptimer_timer_init'
->
-> This changes the Kconfig logic for building the function to
-> match the callers. Consequently, we no longer need to build
-> the omap3_secure_sync32k_timer_init and omap4_local_timer_init
-> for the platforms that have been moved over to other functions.
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+This adds a Kconfig 'select' statement like all the other SRCU using
+drivers have.
 
-no, AM43xx uses omap4_local_timer_init(), there's already a fix in
-Tony's tree IIRC.
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Fixes: 7bd1d4093c2f ("stm class: Introduce an abstraction for System Trace Module devices")
+---
 
-> +#if defined(CONFIG_ARCH_OMAP3) || defined(CONFIG_SOC_AM33XX) || defined(CONFIG_SOC_TI81XX)
-
-[...]
-
-> +#if defined(CONFIG_ARCH_OMAP4) || defined(CONFIG_SOC_OMAP5) || defined(CONFIG_SOC_DRA7XX) || defined(CONFIG_SOC_AM43XX)
-
-someone doesn't like to run checkpatch.pl
-
-care to provide a defconfig which would cause a build error ?
-
--- 
-balbi
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 818 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151116/c77afd4f/attachment.sig>
+diff --git a/drivers/hwtracing/stm/Kconfig b/drivers/hwtracing/stm/Kconfig
+index 83e9f591a54b..e7a348807f0c 100644
+--- a/drivers/hwtracing/stm/Kconfig
++++ b/drivers/hwtracing/stm/Kconfig
+@@ -1,6 +1,7 @@
+ config STM
+ 	tristate "System Trace Module devices"
+ 	select CONFIGFS_FS
++	select SRCU
+ 	help
+ 	  A System Trace Module (STM) is a device exporting data in System
+ 	  Trace Protocol (STP) format as defined by MIPI STP standards.
