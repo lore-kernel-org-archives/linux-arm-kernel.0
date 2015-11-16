@@ -1,73 +1,103 @@
-From: ariel@vanguardiasur.com.ar (Ariel D'Alessandro)
-Date: Mon, 16 Nov 2015 14:11:55 -0300
-Subject: [PATCH v3 0/4] Add support for NXP LPC18xx EEPROM using nvmem
-In-Reply-To: <1447690798-14641-1-git-send-email-ariel@vanguardiasur.com.ar>
-References: <1447690798-14641-1-git-send-email-ariel@vanguardiasur.com.ar>
-Message-ID: <564A0E5B.7090105@vanguardiasur.com.ar>
+From: rjui@broadcom.com (Ray Jui)
+Date: Mon, 16 Nov 2015 09:12:26 -0800
+Subject: [PATCH 7/7] phy: cygnus: pcie: add missing of_node_put
+In-Reply-To: <1447673600-8881-8-git-send-email-Julia.Lawall@lip6.fr>
+References: <1447673600-8881-1-git-send-email-Julia.Lawall@lip6.fr>
+ <1447673600-8881-8-git-send-email-Julia.Lawall@lip6.fr>
+Message-ID: <564A0E7A.4080105@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi Julia,
 
-El 16/11/15 a las 13:19, Ariel D'Alessandro escribi?:
-> This patch series adds support for NXP LPC18xx EEPROM memory found in
-> NXP LPC185x/3x and LPC435x/3x/2x/1x devices.
-> 
-> This patchset is based on tag next-20151116 of the linux-next
-> repository. It has been successfully tested on a LPC4337 CIAA-NXP
-> Board.
+On 11/16/2015 3:33 AM, Julia Lawall wrote:
+> for_each_available_child_of_node performs an of_node_get on each iteration,
+> so a return from the middle of the loop requires an of_node_put.
+>
+> A simplified version of the semantic patch that finds this problem is as
+> follows (http://coccinelle.lip6.fr):
+>
+> // <smpl>
+> @@
+> expression root,e;
+> local idexpression child;
+> @@
+>
+>   for_each_available_child_of_node(root, child) {
+>     ... when != of_node_put(child)
+>         when != e = child
+> (
+>     return child;
+> |
+> *  return ...;
+> )
+>     ...
+>   }
+> // </smpl>
+>
+> Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
+>
+> ---
+>   drivers/phy/phy-bcm-cygnus-pcie.c |   16 ++++++++++++----
+>   1 file changed, 12 insertions(+), 4 deletions(-)
+>
+> diff --git a/drivers/phy/phy-bcm-cygnus-pcie.c b/drivers/phy/phy-bcm-cygnus-pcie.c
+> index 7ad72b7..082c03f 100644
+> --- a/drivers/phy/phy-bcm-cygnus-pcie.c
+> +++ b/drivers/phy/phy-bcm-cygnus-pcie.c
+> @@ -128,6 +128,7 @@ static int cygnus_pcie_phy_probe(struct platform_device *pdev)
+>   	struct phy_provider *provider;
+>   	struct resource *res;
+>   	unsigned cnt = 0;
+> +	int ret;
+>
+>   	if (of_get_child_count(node) == 0) {
+>   		dev_err(dev, "PHY no child node\n");
+> @@ -154,24 +155,28 @@ static int cygnus_pcie_phy_probe(struct platform_device *pdev)
+>   		if (of_property_read_u32(child, "reg", &id)) {
+>   			dev_err(dev, "missing reg property for %s\n",
+>   				child->name);
+> -			return -EINVAL;
+> +			ret = -EINVAL;
+> +			goto put_child;
+>   		}
+>
+>   		if (id >= MAX_NUM_PHYS) {
+>   			dev_err(dev, "invalid PHY id: %u\n", id);
+> -			return -EINVAL;
+> +			ret = -EINVAL;
+> +			goto put_child;
+>   		}
+>
+>   		if (core->phys[id].phy) {
+>   			dev_err(dev, "duplicated PHY id: %u\n", id);
+> -			return -EINVAL;
+> +			ret = -EINVAL;
+> +			goto put_child;
+>   		}
+>
+>   		p = &core->phys[id];
+>   		p->phy = devm_phy_create(dev, child, &cygnus_pcie_phy_ops);
+>   		if (IS_ERR(p->phy)) {
+>   			dev_err(dev, "failed to create PHY\n");
+> -			return PTR_ERR(p->phy);
+> +			ret = PTR_ERR(p->phy);
+> +			goto put_child;
+>   		}
+>
+>   		p->core = core;
+> @@ -191,6 +196,9 @@ static int cygnus_pcie_phy_probe(struct platform_device *pdev)
+>   	dev_dbg(dev, "registered %u PCIe PHY(s)\n", cnt);
+>
+>   	return 0;
+> +put_child:
+> +	of_node_put(child);
+> +	return ret;
+>   }
+>
+>   static const struct of_device_id cygnus_pcie_phy_match_table[] = {
+>
 
-Forgot to say that there's a known issue related to the nvmem core. It
-will be solved when the following patch gets submitted and applied.
+This fix looks good to me. Thanks!
 
--------------------------------->cut<----------------------------------
->From 8cae10eff8ea8da9c5a8058ff75abeeddd8a8224 Mon Sep 17 00:00:00 2001
-From: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
-Date: Mon, 26 Oct 2015 13:30:24 +0000
-Subject: [PATCH] nvmem: core: return error for non word aligned bytes
-
-nvmem providers have restrictions on register strides, so return error
-code when users attempt to read/write buffers with sizes which are not
-aligned to the word boundary.
-
-Without this patch the userspace would continue to try as it does not
-get any error from the nvmem core, resulting in a hang.
-
-Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
----
- drivers/nvmem/core.c | 6 ++++++
- 1 file changed, 6 insertions(+)
-
-diff --git a/drivers/nvmem/core.c b/drivers/nvmem/core.c
-index 6fd4e5a..9d11d98 100644
---- a/drivers/nvmem/core.c
-+++ b/drivers/nvmem/core.c
-@@ -70,6 +70,9 @@ static ssize_t bin_attr_nvmem_read(struct file *filp,
-struct kobject *kobj,
-     if (pos >= nvmem->size)
-         return 0;
-
-+    if (count < nvmem->word_size)
-+        return -EINVAL;
-+
-     if (pos + count > nvmem->size)
-         count = nvmem->size - pos;
-
-@@ -95,6 +98,9 @@ static ssize_t bin_attr_nvmem_write(struct file *filp,
-struct kobject *kobj,
-     if (pos >= nvmem->size)
-         return 0;
-
-+    if (count < nvmem->word_size)
-+        return -EINVAL;
-+
-     if (pos + count > nvmem->size)
-         count = nvmem->size - pos;
-
--- 
-1.9.1
-
--------------------------------->cut<----------------------------------
-
--- 
-Ariel D'Alessandro, VanguardiaSur
-www.vanguardiasur.com.ar
+Reviewed-by: Ray Jui <rjui@broadcom.com>
