@@ -1,48 +1,87 @@
-From: timur@codeaurora.org (Timur Tabi)
-Date: Mon, 16 Nov 2015 11:45:12 -0600
-Subject: [PATCH 10/12] tty: amba-pl011: add support for 32-bit register
- access
-In-Reply-To: <E1ZyNls-0003kA-Fe@rmk-PC.arm.linux.org.uk>
-References: <20151116173935.GQ8644@n2100.arm.linux.org.uk>
- <E1ZyNls-0003kA-Fe@rmk-PC.arm.linux.org.uk>
-Message-ID: <564A1628.9010900@codeaurora.org>
+From: manabian@gmail.com (Joachim Eastwood)
+Date: Mon, 16 Nov 2015 18:46:44 +0100
+Subject: [PATCH v4 02/24] pwm: use pwm_get_xxx() helpers where appropriate
+In-Reply-To: <1447664207-24370-3-git-send-email-boris.brezillon@free-electrons.com>
+References: <1447664207-24370-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1447664207-24370-3-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <CAGhQ9VwEuwazF5Kdw=9R60EovVoiwen6fXiVjL+=EddXPYVGAg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Russell King wrote:
-> Add support for 32-bit register accesses to the AMBA PL011 UART.  This
-> is needed for ZTE UARTs, which require 32-bit accesses as opposed to
-> the more normal 16-bit accesses.
+Hi Boris
+
+(Adding Ariel for pwm-lpc18xx-sct)
+
+On 16 November 2015 at 09:56, Boris Brezillon
+<boris.brezillon@free-electrons.com> wrote:
+> Use pwm_get_xxx() helpers instead of directly accessing the pwm->xxx field.
+> Doing that will ease adaptation of the PWM framework to support atomic
+> update.
 >
-> Signed-off-by: Russell King<rmk+kernel@arm.linux.org.uk>
+> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 > ---
->   drivers/tty/serial/amba-pl011.c | 15 +++++++++++++--
->   1 file changed, 13 insertions(+), 2 deletions(-)
+> Patch generated with the following coccinelle script:
 >
-> diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
-> index afa0de7d481f..3470a1e67bbc 100644
-> --- a/drivers/tty/serial/amba-pl011.c
-> +++ b/drivers/tty/serial/amba-pl011.c
-> @@ -93,6 +93,7 @@ static u16 pl011_std_offsets[REG_ARRAY_SIZE] = {
->   struct vendor_data {
->   	const u16		*reg_offset;
->   	unsigned int		ifls;
-> +	bool			access_32b;
+> --->8---
+> virtual patch
+>
+> @@
+> struct pwm_device *p;
+> expression e;
+> @@
+> (
+> -(p)->polarity = e;
+> +pwm_set_polarity((p), e);
+> |
+> -(p)->polarity
+> +pwm_get_polarity((p))
+> |
+> -(p)->period = e;
+> +pwm_set_period((p), e);
+> |
+> -(p)->period
+> +pwm_get_period((p))
+> |
+> -(p)->duty_cycle = e;
+> +pwm_set_duty_cycle((p), e);
+> |
+> -(p)->duty_cycle
+> +pwm_get_duty_cycle((p))
+> )
+> --->8---
+> ---
+>  drivers/pwm/pwm-crc.c         | 2 +-
+>  drivers/pwm/pwm-lpc18xx-sct.c | 2 +-
+>  2 files changed, 2 insertions(+), 2 deletions(-)
+>
+> diff --git a/drivers/pwm/pwm-crc.c b/drivers/pwm/pwm-crc.c
+> index 7101c70..2f88543 100644
+> --- a/drivers/pwm/pwm-crc.c
+> +++ b/drivers/pwm/pwm-crc.c
+> @@ -75,7 +75,7 @@ static int crc_pwm_config(struct pwm_chip *c, struct pwm_device *pwm,
+>                 return -EINVAL;
+>         }
+>
+> -       if (pwm->period != period_ns) {
+> +       if (pwm_get_period((pwm)) != period_ns) {
+>                 int clk_div;
+>
+>                 /* changing the clk divisor, need to disable fisrt */
+> diff --git a/drivers/pwm/pwm-lpc18xx-sct.c b/drivers/pwm/pwm-lpc18xx-sct.c
+> index 9163085..091fa13 100644
+> --- a/drivers/pwm/pwm-lpc18xx-sct.c
+> +++ b/drivers/pwm/pwm-lpc18xx-sct.c
+> @@ -249,7 +249,7 @@ static int lpc18xx_pwm_enable(struct pwm_chip *chip, struct pwm_device *pwm)
+>                            LPC18XX_PWM_EVSTATEMSK(lpc18xx_data->duty_event),
+>                            LPC18XX_PWM_EVSTATEMSK_ALL);
+>
+> -       if (pwm->polarity == PWM_POLARITY_NORMAL) {
+> +       if (pwm_get_polarity((pwm)) == PWM_POLARITY_NORMAL) {
 
-So no love for my suggestion to use port->iotype instead of this new field?
+What is the deal with the double parentheses?
 
-static void pl011_write(unsigned int val, const struct uart_amba_port *uap,
-     unsigned int reg)
-{
-     void __iomem *addr = uap->port.membase + pl011_reg_to_offset(uap, reg);
+Think I saw that in some of the other patches as well.
 
-     if (uap->port.iotype == UPIO_MEM32)
-         writel(val, addr);
-     else
-         writew(val, addr);
-}
 
--- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the
-Code Aurora Forum, a Linux Foundation Collaborative Project.
+regards,
+Joachim Eastwood
