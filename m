@@ -1,46 +1,56 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 16 Nov 2015 14:32:25 +0000
-Subject: [PATCH 15/21] arm64: KVM: Add panic handling
-In-Reply-To: <5649E7A0.3050109@arm.com>
-References: <1447679519-17888-1-git-send-email-marc.zyngier@arm.com>
- <1447679519-17888-16-git-send-email-marc.zyngier@arm.com>
- <20151116141629.GH20696@leverpostej> <5649E7A0.3050109@arm.com>
-Message-ID: <20151116143224.GK20696@leverpostej>
+Date: Mon, 16 Nov 2015 14:40:34 +0000
+Subject: [PATCH 2/2] dts/ls2080a: Update DTSI to add support of SP805 WDT
+In-Reply-To: <1447683883-6600-3-git-send-email-bhupesh.sharma@freescale.com>
+References: <1447683883-6600-1-git-send-email-bhupesh.sharma@freescale.com>
+ <1447683883-6600-3-git-send-email-bhupesh.sharma@freescale.com>
+Message-ID: <20151116144034.GL20696@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> >> +	/* Call panic for real */
-> >> +	while (1) {
-> >> +		unsigned long str_va = (unsigned long)__hyp_panic_string;
-> >> +
-> >> +		str_va -= HYP_PAGE_OFFSET;
-> >> +		str_va += PAGE_OFFSET;
-> >> +		__hyp_do_panic(str_va,
-> >> +			       spsr,  elr,
-> >> +			       read_sysreg(esr_el2),   read_sysreg(far_el2),
-> >> +			       read_sysreg(hpfar_el2), par,
-> >> +			       read_sysreg(tpidr_el2));
-> >> +	}
-> >> +}
-> > 
-> > I think the while (1) here is confusing.
-> > 
-> > Can we not jsut declare str_va at the start of the function and get rid
-> > of the loop?
+On Mon, Nov 16, 2015 at 07:54:43PM +0530, Bhupesh Sharma wrote:
+> This patch updates the LS2080a DTSI (DTS Include) file to add
+> support for eight SP805 Watchdog units which can be used to
+> reset the eight Cortex-A57 cores available on LS2080A.
 > 
-> The while(1) is to prevent GCC from screaming (it otherwise believes
-> that the function actually returns, despite the __noreturn attribute).
+> Signed-off-by: Bhupesh Sharma <bhupesh.sharma@freescale.com>
+> ---
+>  arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi |   64 ++++++++++++++++++++++++
+>  1 file changed, 64 insertions(+)
+> 
+> diff --git a/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
+> index e81cd48..15637ab 100644
+> --- a/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
+> +++ b/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
+> @@ -193,6 +193,70 @@
+>  			interrupts = <0 32 0x4>; /* Level high type */
+>  		};
+>  
+> +		cluster1_core0_watchdog: wdt at c000000 {
+> +			compatible = "arm,sp805-wdt", "arm,primecell";
+> +			reg = <0x0 0xc000000 0x0 0x1000>;
+> +			interrupts = <1 12 0x8>; /* PPI, Level low type */
+> +			clocks = <&clockgen 4 3>;
+> +			clock-names = "apb_pclk";
+> +		};
+> +
+> +		cluster1_core1_watchdog: wdt at c010000 {
+> +			compatible = "arm,sp805-wdt", "arm,primecell";
+> +			reg = <0x0 0xc010000 0x0 0x1000>;
+> +			interrupts = <1 12 0x8>; /* PPI, Level low type */
+> +			clocks = <&clockgen 4 3>;
+> +			clock-names = "apb_pclk";
+> +		};
 
-Aha!
+How does this pseudo-banking work?
 
-Perhaps a comment to that effect...?
+For one thing as far as I can see, the SP805 driver can't handle PPIs in
+mainline.
 
-> Or were you thinking of something else?
+Additionally, the kernel has no idea which CPU each of these is
+associated with, and we effectively need to deal with shared PPIs in
+order to use this appropriately in the kernel (if each WDT's interrupt
+is wired to a particular core).
 
-I just failed to derive the __noreturn problem from first principles.
-
-Perhaps follow the __hyp_do_panic() call with an unreachable(), with the
-comment as to GCC failing to reason about the __noreturn? That would be
-less confusing than the loop, assuming that it works.
-
+Thanks,
 Mark.
