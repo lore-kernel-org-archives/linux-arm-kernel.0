@@ -1,48 +1,47 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Mon, 16 Nov 2015 09:55:59 -0800
-Subject: [PATCH] hwmon: scpi: add thermal-of dependency
-In-Reply-To: <4264967.aVlONpCXFM@wuerfel>
-References: <4264967.aVlONpCXFM@wuerfel>
-Message-ID: <564A18AF.1030804@roeck-us.net>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Mon, 16 Nov 2015 19:01:03 +0100
+Subject: [PATCH v2 11/11] arm64: kernel: Add support for
+ hibernate/suspend-to-disk.
+In-Reply-To: <5649E1A0.7020001@arm.com>
+References: <1445966960-31724-1-git-send-email-james.morse@arm.com>
+ <1445966960-31724-12-git-send-email-james.morse@arm.com>
+ <20151114213415.GG20429@amd> <5649CC40.9010805@arm.com>
+ <20151116124116.GC9125@amd> <5649E1A0.7020001@arm.com>
+Message-ID: <20151116180103.GA27405@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/16/2015 08:56 AM, Arnd Bergmann wrote:
-> The newly added scpi thermal support is broken when the scpi driver
-> is built-in but the thermal driver is a loadable module:
->
-> drivers/built-in.o: In function `scpi_hwmon_probe':
-> (.text+0x444d70): undefined reference to `thermal_zone_of_sensor_unregister'
-> (.text+0x444d94): undefined reference to `thermal_zone_of_sensor_register'
-> drivers/built-in.o: In function `scpi_hwmon_remove':
-> (text+0x444e6c): undefined reference to `thermal_zone_of_sensor_unregister'
->
-> This uses the same Kconfig trick that we have in a couple of other
-> drivers already to ensure we can only select the driver in valid
-> configurations when either THERMAL_OF is disabled, or when with a
-> dependency on CONFIG_THERMAL that can force SCPI to be a loadable
-> module in the case I was hitting.
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Fixes: 68acc77a2d51 ("hwmon: Support thermal zones registration for SCP temperature sensors")
+On Mon 2015-11-16 14:01:04, James Morse wrote:
+> Hi,
+> 
+> On 16/11/15 12:41, Pavel Machek wrote:
+> >> On 14/11/15 21:34, Pavel Machek wrote:
+> >>>> The implementation assumes that exactly the same kernel is booted on the
+> >>>> same hardware, and that the kernel is loaded at the same physical address.
+> >>>
+> >>> BTW... on newer implementations (and I have patch for x86, too), we
+> >>> try to make it so that resume kernel does not have to be same as
+> >>> suspend one. It would be nice to move there with arm64, too. 
+> >>
+> >> Yes, that is a neat trick, can I leave it as future work?
+> > 
+> > Yes. But it is really not hard.
+> 
+> I think its harder than it looks:
+> It means the MMU has to be turned off, as two different kernels may not
+> have used the same configuration for the MMU - and I don't think its safe
+> to change while the MMU is running. There are also going to be
+> complications with resetting the hypervisor/el2 configuration, which I need
+> to spend more time thinking about (and probably ask for advice!).
 
-Applied.
+Well, you can simplify it here: If MMU configuration is stable between
+4.3, 4.4 and 4.5 kernels, you just use suspend signature for 4.3-like
+kernels. If you need to change it in future, you change the signature.
 
-Thanks,
-Guenter
+(If it changes too often, this might not work).
 
->
-> diff --git a/drivers/hwmon/Kconfig b/drivers/hwmon/Kconfig
-> index 842b0043ad94..597814177f50 100644
-> --- a/drivers/hwmon/Kconfig
-> +++ b/drivers/hwmon/Kconfig
-> @@ -324,6 +324,7 @@ config SENSORS_APPLESMC
->   config SENSORS_ARM_SCPI
->   	tristate "ARM SCPI Sensors"
->   	depends on ARM_SCPI_PROTOCOL
-> +	depends on THERMAL || !THERMAL_OF
->   	help
->   	  This driver provides support for temperature, voltage, current
->   	  and power sensors available on ARM Ltd's SCP based platforms. The
->
->
+Best regards,
+									Pavel
+-- 
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
