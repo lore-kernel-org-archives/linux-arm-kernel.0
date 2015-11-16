@@ -1,72 +1,61 @@
-From: Liviu.Dudau@arm.com (Liviu Dudau)
-Date: Mon, 16 Nov 2015 16:50:24 +0000
-Subject: [PATCH 0/2] Improve drm_of_component_probe() and move rockchip
- to use it
-In-Reply-To: <2290660.pLIRHdxPYF@diego>
-References: <1447685093-26129-1-git-send-email-Liviu.Dudau@arm.com>
- <2290660.pLIRHdxPYF@diego>
-Message-ID: <20151116165024.GB4158@e106497-lin.cambridge.arm.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Mon, 16 Nov 2015 16:51:00 +0000
+Subject: [PATCH v7 0/4] KASAN for arm64
+In-Reply-To: <5649F783.40109@gmail.com>
+References: <1444665180-301-1-git-send-email-ryabinin.a.a@gmail.com>
+ <20151013083432.GG6320@e104818-lin.cambridge.arm.com>
+ <5649BAFD.6030005@arm.com> <5649F783.40109@gmail.com>
+Message-ID: <20151116165100.GE6556@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 16, 2015 at 05:07:17PM +0100, Heiko St?bner wrote:
-> Hi Liviu,
-> 
-> Am Montag, 16. November 2015, 14:44:51 schrieb Liviu Dudau:
-> > When I have introduced the drm_of_component_probe() function I have managed
-> > to break rockchip's DRM driver as the compare_of() function had to match
-> > both local crtc ports and remote encoder ones. As suggested by Russell
-> > King, I have now enhanced the drm_of_component_probe() function to take two
-> > comparison functions, and converted (again) rockchip driver to use it.
+On Mon, Nov 16, 2015 at 06:34:27PM +0300, Andrey Ryabinin wrote:
+> On 11/16/2015 02:16 PM, Suzuki K. Poulose wrote:
+> > On 13/10/15 09:34, Catalin Marinas wrote:
+> >> On Mon, Oct 12, 2015 at 06:52:56PM +0300, Andrey Ryabinin wrote:
+> >>> Andrey Ryabinin (3):
+> >>>    arm64: move PGD_SIZE definition to pgalloc.h
+> >>>    arm64: add KASAN support
+> >>>    Documentation/features/KASAN: arm64 supports KASAN now
+> >>>
+> >>> Linus Walleij (1):
+> >>>    ARM64: kasan: print memory assignment
+> >>
+> >> Patches queued for 4.4. Thanks.
 > > 
-> > I would really like to get some Tested-By this time if possible from IMX,
-> > Armada and Rockchip developers as I lack hardware to do that myself.
+> > I get the following failure with KASAN + 16K_PAGES + 48BIT_VA, with 4.4-rc1:
 > > 
-> > The only thing not implemented from Russell's suggestion list is the
-> > renaming of the function into drm_kms_component_probe().
+> > arch/arm64/mm/kasan_init.c: In function ?kasan_early_init?:
+> > include/linux/compiler.h:484:38: error: call to ?__compiletime_assert_95? declared with attribute error: BUILD_BUG_ON failed: !IS_ALIGNED(KASAN_SHADOW_END, PGDIR_SIZE)
+> >   _compiletime_assert(condition, msg, __compiletime_assert_, __LINE__)
+> >                                       ^
+> > include/linux/compiler.h:467:4: note: in definition of macro ?__compiletime_assert?
+> >     prefix ## suffix();    \
+> >     ^
+> > include/linux/compiler.h:484:2: note: in expansion of macro ?_compiletime_assert?
+> >   _compiletime_assert(condition, msg, __compiletime_assert_, __LINE__)
+> >   ^
+> > include/linux/bug.h:50:37: note: in expansion of macro ?compiletime_assert?
+> >  #define BUILD_BUG_ON_MSG(cond, msg) compiletime_assert(!(cond), msg)
+> >                                      ^
+> > include/linux/bug.h:74:2: note: in expansion of macro ?BUILD_BUG_ON_MSG?
+> >   BUILD_BUG_ON_MSG(condition, "BUILD_BUG_ON failed: " #condition)
+> >   ^
+> > arch/arm64/mm/kasan_init.c:95:2: note: in expansion of macro ?BUILD_BUG_ON?
+> >   BUILD_BUG_ON(!IS_ALIGNED(KASAN_SHADOW_END, PGDIR_SIZE));
+> > 
+> > The problem is that the PGDIR_SIZE is (1UL << 47) with 16K+48bit, which makes
+> > the KASAN_SHADOW_END unaligned(which is aligned to (1UL << (48 - 3)) ). Is the
+> > alignment really needed ? Thoughts on how best we could fix this ?
 > 
->  with these patches applied I loose the display on my rk3288. A bit of dumb
-> debug-output shows that the compare function does seem to do strange things:
-> 
-> [    1.020476] [drm] Initialized drm 1.1.0 20060810
-> [    1.025943] drm_of_component_probe: adding port /vop at ff940000/port
-> [    1.032225] drm_of_component_probe: adding port /vop at ff930000/port
-> [    1.038421] drm_of_component_probe: adding encoder /hdmi at ff980000
-> [    1.044535] drm_of_component_probe: adding encoder /edp at ff970000
-> [    1.050562] drm_of_component_probe: adding encoder /hdmi at ff980000
-> [    1.056663] drm_of_component_probe: adding encoder /edp at ff970000
-> 
-> ---- Columns:	dev->parent / dev	comparing	dev->parent->of_node	with	np
-> 
-> [    1.062683] compare_port: platform/ff980000.hdmi comparing NULL with /vop at ff940000/port
-> [    1.071017] compare_port: platform/ff980000.hdmi comparing NULL with /vop at ff940000/port
-> [    1.079024] compare_port: platform/ff930000.vop comparing NULL with /vop at ff940000/port
-> [    1.087117] compare_port: platform/ff980000.hdmi comparing NULL with /vop at ff940000/port
-> [    1.095130] compare_port: platform/ff930000.vop comparing NULL with /vop at ff940000/port
-> [    1.103054] compare_port: platform/ff940000.vop comparing NULL with /vop at ff940000/port
-> [    1.111553] panel_regulator: supplied by vcc33_sys
-> 
-> 
-> I need to dig deeper to find out what's happening there, but maybe you
-> already have some idea in the meantime :-)
+> Yes, it's really needed, because some code relies on this (e.g.
+> clear_pgs() and kasan_init()). But it should be possible to get rid of
+> this requirement.
 
-Did I got the content of the compare_{port,encoder}() functions the wrong way around?
-
-Best regards,
-Liviu
-
-> 
-> 
-> Thanks
-> Heiko
-> 
+I don't think clear_pgds() and kasan_init() are the only problems. IIUC,
+kasan_populate_zero_shadow() also assumes that KASan shadow covers
+multiple pgds. You need some kind of recursive writing which avoids
+populating an entry which is not empty (like kasan_early_pud_populate).
 
 -- 
-====================
-| I would like to |
-| fix the world,  |
-| but they're not |
-| giving me the   |
- \ source code!  /
-  ---------------
-    ?\_(?)_/?
+Catalin
