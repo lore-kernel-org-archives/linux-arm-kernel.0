@@ -1,37 +1,81 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 16 Nov 2015 18:01:19 +0100
-Subject: [PATCH] ARM: zx: only build power domain code when CONFIG_PM=y
-Message-ID: <5298444.vriZVZrvnf@wuerfel>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Mon, 16 Nov 2015 18:01:30 +0100
+Subject: [PATCH 2/2] drm/rockchip: Convert the probe function to the
+ generic drm_of_component_probe()
+In-Reply-To: <20151116165206.GC4158@e106497-lin.cambridge.arm.com>
+References: <1447685093-26129-1-git-send-email-Liviu.Dudau@arm.com>
+ <20151116163016.GO8644@n2100.arm.linux.org.uk>
+ <20151116165206.GC4158@e106497-lin.cambridge.arm.com>
+Message-ID: <1568703.PCC29q0Px2@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The newly added zx power domain code causes build errors in
-some configurations:
+Am Montag, 16. November 2015, 16:52:06 schrieb Liviu Dudau:
+> On Mon, Nov 16, 2015 at 04:30:16PM +0000, Russell King - ARM Linux wrote:
+> > I've tweaked your patch to make the above (buggy) change a little clearer.
+> > 
+> > On Mon, Nov 16, 2015 at 02:44:53PM +0000, Liviu Dudau wrote:
+> > > -	for (i = 0;; i++) {
+> > > -		port = of_parse_phandle(np, "ports", i);
+> > > -		if (!port)
+> > > -			break;
+> > > -
+> > > -		if (!of_device_is_available(port->parent)) {
+> > > -			of_node_put(port);
+> > > -			continue;
+> > > -		}
+> > > 
+> > > -		component_match_add(dev, &match, compare_of, port->parent);
+> > > -		of_node_put(port);
+> > > -	}
+> > > 
+> > > -static int compare_of(struct device *dev, void *data)
+> > > -{
+> > > -	struct device_node *np = data;
+> > > -
+> > > -	return dev->of_node == np;
+> > > -}
+> > 
+> > The original above passes port->parent to component_match_add().  This
+> > means 'np' in the above compare_of() function is 'port->parent'.
+> > 
+> > This means the above comparison is effectively:
+> > 	dev->of_node == port->parent
+> > 
+> > The generic code instead does this:
+> >                 component_match_add(dev, &match, compare_of, port);
+> > 
+> > So what we get in the comparison function is 'port' rather than
+> > 
+> > 'port->parent':
+> > > +static int compare_port(struct device *dev, void *data)
+> > > 
+> > >  {
+> > > 
+> > > +	struct device_node *np = data;
+> > > +	return dev->parent->of_node == np;
+> > > +}
+> > 
+> > which means the comparison is:
+> > 	dev->parent->of_node == port
+> > 
+> > which is a different comparison from the above.
+> > 
+> > You instead want this to be:
+> > 	return dev->of_node == np->parent;
+> > 
+> > Heiko, please test the above change to compare_port() - I think you'll
+> > find that will fix your issue.
+> 
+> Sorry, I admit I'm not very good at doing patches without being able
+> to test them. :(
+> 
+> Thanks for helping on this!
 
-warning: (PM_RMOBILE && SOC_ZX296702) selects PM_GENERIC_DOMAINS which has unmet direct dependencies (PM)
-warning: (ARCH_EXYNOS) selects EXYNOS_THERMAL which has unmet direct dependencies (THERMAL && (ARCH_EXYNOS || COMPILE_TEST) && THERMAL_OF)
-power/domain.c: In function 'genpd_queue_power_off_work':
-power/domain.c:192:13: error: 'pm_wq' undeclared (first use in this function)
-  queue_work(pm_wq, &genpd->power_off_work);
-             ^
-power/domain.c:192:13: note: each undeclared identifier is reported only once for each function it appears in
+Russell's hint was correct. With the compare function changed like he pointed 
+out, I again get a working display with your patches :-)
 
-This ensures we don't try to enable it when CONFIG_PM is
-disabled, mirroring what we do on most other platforms.
+So, thanks Russell for spotting this.
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: f15107f41282 ("ARM: zx: Add power domains for ZX296702")
 
-diff --git a/arch/arm/mach-zx/Kconfig b/arch/arm/mach-zx/Kconfig
-index 7fdc5bf24f9b..446334a25cf5 100644
---- a/arch/arm/mach-zx/Kconfig
-+++ b/arch/arm/mach-zx/Kconfig
-@@ -13,7 +13,7 @@ config SOC_ZX296702
- 	select ARM_GLOBAL_TIMER
- 	select HAVE_ARM_SCU if SMP
- 	select HAVE_ARM_TWD if SMP
--	select PM_GENERIC_DOMAINS
-+	select PM_GENERIC_DOMAINS if PM
- 	help
- 	  Support for ZTE ZX296702 SoC which is a dual core CortexA9MP
- endif
+Heiko
