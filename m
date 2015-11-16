@@ -1,47 +1,39 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Mon, 16 Nov 2015 19:01:03 +0100
-Subject: [PATCH v2 11/11] arm64: kernel: Add support for
- hibernate/suspend-to-disk.
-In-Reply-To: <5649E1A0.7020001@arm.com>
-References: <1445966960-31724-1-git-send-email-james.morse@arm.com>
- <1445966960-31724-12-git-send-email-james.morse@arm.com>
- <20151114213415.GG20429@amd> <5649CC40.9010805@arm.com>
- <20151116124116.GC9125@amd> <5649E1A0.7020001@arm.com>
-Message-ID: <20151116180103.GA27405@amd>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 16 Nov 2015 18:02:11 +0000
+Subject: [PATCH 01/13 v2] ARM: add some L220 DT settings
+In-Reply-To: <20151116174825.GA14634@rob-hp-laptop>
+References: <1445521493-21509-1-git-send-email-linus.walleij@linaro.org>
+ <20151116174825.GA14634@rob-hp-laptop>
+Message-ID: <20151116180210.GV8644@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon 2015-11-16 14:01:04, James Morse wrote:
-> Hi,
-> 
-> On 16/11/15 12:41, Pavel Machek wrote:
-> >> On 14/11/15 21:34, Pavel Machek wrote:
-> >>>> The implementation assumes that exactly the same kernel is booted on the
-> >>>> same hardware, and that the kernel is loaded at the same physical address.
-> >>>
-> >>> BTW... on newer implementations (and I have patch for x86, too), we
-> >>> try to make it so that resume kernel does not have to be same as
-> >>> suspend one. It would be nice to move there with arm64, too. 
-> >>
-> >> Yes, that is a neat trick, can I leave it as future work?
+On Mon, Nov 16, 2015 at 11:48:25AM -0600, Rob Herring wrote:
+> On Thu, Oct 22, 2015 at 03:44:53PM +0200, Linus Walleij wrote:
+> > The RealView ARM11MPCore enables parity, eventmon and shared
+> > override in the cache controller through its current boardfile,
+> > but the code and DT bindings for the ARM L220 is currently
+> > lacking the ability to set this up from DT. Add the required
+> > bool parameters for parity and shared override, but keep
+> > eventmon out of it: this should be enabled by the event
+> > monitor code.
 > > 
-> > Yes. But it is really not hard.
+> > Cc: devicetree at vger.kernel.org
+> > Signed-off-by: Linus Walleij <linus.walleij@linaro.org>
+> > ---
+> > ChangeLog v1->v2:
+> > - Drop event monitor setup.
+> > - Support both parity enable and disable: could be useful.
+> > ---
+> >  Documentation/devicetree/bindings/arm/l2cc.txt | 10 ++++++----
 > 
-> I think its harder than it looks:
-> It means the MMU has to be turned off, as two different kernels may not
-> have used the same configuration for the MMU - and I don't think its safe
-> to change while the MMU is running. There are also going to be
-> complications with resetting the hypervisor/el2 configuration, which I need
-> to spend more time thinking about (and probably ask for advice!).
+> Acked-by: Rob Herring <robh@kernel.org>
 
-Well, you can simplify it here: If MMU configuration is stable between
-4.3, 4.4 and 4.5 kernels, you just use suspend signature for 4.3-like
-kernels. If you need to change it in future, you change the signature.
+Thanks Rob, this has been in the patch system since the 27th October,
+but as DT people hadn't acked it, I didn't take it into my tree.  We're
+now too late for this merge window, so it's going to wait for the 4.5
+window.
 
-(If it changes too often, this might not work).
-
-Best regards,
-									Pavel
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
