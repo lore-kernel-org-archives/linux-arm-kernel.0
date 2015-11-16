@@ -1,41 +1,53 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 16 Nov 2015 13:11:47 +0000
-Subject: [PATCH 09/21] arm64: KVM: Implement guest entry
+Date: Mon, 16 Nov 2015 13:11:44 +0000
+Subject: [PATCH 06/21] arm64: KVM: Implement system register save/restore
 In-Reply-To: <1447679519-17888-1-git-send-email-marc.zyngier@arm.com>
 References: <1447679519-17888-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1447679519-17888-10-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1447679519-17888-7-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Contrary to the previous patch, the guest entry is fairly different
-from its assembly counterpart, mostly because it is only concerned
-with saving/restoring the GP registers, and nothing else.
+Implement the system registe save restore as a direct translation of
+the assembly code version.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/kvm/hyp/Makefile |   1 +
- arch/arm64/kvm/hyp/entry.S  | 155 ++++++++++++++++++++++++++++++++++++++++++++
- arch/arm64/kvm/hyp/hyp.h    |   2 +
- 3 files changed, 158 insertions(+)
- create mode 100644 arch/arm64/kvm/hyp/entry.S
+ arch/arm64/kvm/hyp/Makefile    |  1 +
+ arch/arm64/kvm/hyp/hyp.h       |  3 ++
+ arch/arm64/kvm/hyp/sysreg-sr.c | 90 ++++++++++++++++++++++++++++++++++++++++++
+ 3 files changed, 94 insertions(+)
+ create mode 100644 arch/arm64/kvm/hyp/sysreg-sr.c
 
 diff --git a/arch/arm64/kvm/hyp/Makefile b/arch/arm64/kvm/hyp/Makefile
-index ec14cac..1e1ff06 100644
+index 455dc0a..ec94200 100644
 --- a/arch/arm64/kvm/hyp/Makefile
 +++ b/arch/arm64/kvm/hyp/Makefile
-@@ -7,3 +7,4 @@ obj-$(CONFIG_KVM_ARM_HOST) += vgic-v3-sr.o
+@@ -5,3 +5,4 @@
+ obj-$(CONFIG_KVM_ARM_HOST) += vgic-v2-sr.o
+ obj-$(CONFIG_KVM_ARM_HOST) += vgic-v3-sr.o
  obj-$(CONFIG_KVM_ARM_HOST) += timer-sr.o
- obj-$(CONFIG_KVM_ARM_HOST) += sysreg-sr.o
- obj-$(CONFIG_KVM_ARM_HOST) += debug-sr.o
-+obj-$(CONFIG_KVM_ARM_HOST) += entry.o
-diff --git a/arch/arm64/kvm/hyp/entry.S b/arch/arm64/kvm/hyp/entry.S
++obj-$(CONFIG_KVM_ARM_HOST) += sysreg-sr.o
+diff --git a/arch/arm64/kvm/hyp/hyp.h b/arch/arm64/kvm/hyp/hyp.h
+index 86aa5a2..087d3a5 100644
+--- a/arch/arm64/kvm/hyp/hyp.h
++++ b/arch/arm64/kvm/hyp/hyp.h
+@@ -36,5 +36,8 @@ void __vgic_v3_restore_state(struct kvm_vcpu *vcpu);
+ void __timer_save_state(struct kvm_vcpu *vcpu);
+ void __timer_restore_state(struct kvm_vcpu *vcpu);
+ 
++void __sysreg_save_state(struct kvm_cpu_context *ctxt);
++void __sysreg_restore_state(struct kvm_cpu_context *ctxt);
++
+ #endif /* __ARM64_KVM_HYP_H__ */
+ 
+diff --git a/arch/arm64/kvm/hyp/sysreg-sr.c b/arch/arm64/kvm/hyp/sysreg-sr.c
 new file mode 100644
-index 0000000..2c4449a
+index 0000000..add8fcb
 --- /dev/null
-+++ b/arch/arm64/kvm/hyp/entry.S
-@@ -0,0 +1,155 @@
++++ b/arch/arm64/kvm/hyp/sysreg-sr.c
+@@ -0,0 +1,90 @@
 +/*
-+ * Copyright (C) 2015 - ARM Ltd
++ * Copyright (C) 2012-2015 - ARM Ltd
 + * Author: Marc Zyngier <marc.zyngier@arm.com>
 + *
 + * This program is free software; you can redistribute it and/or modify
@@ -51,155 +63,78 @@ index 0000000..2c4449a
 + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
 + */
 +
-+#include <linux/linkage.h>
++#include <linux/compiler.h>
++#include <linux/kvm_host.h>
 +
-+#include <asm/asm-offsets.h>
-+#include <asm/assembler.h>
-+#include <asm/fpsimdmacros.h>
-+#include <asm/kvm.h>
-+#include <asm/kvm_arm.h>
-+#include <asm/kvm_asm.h>
 +#include <asm/kvm_mmu.h>
 +
-+#define CPU_GP_REG_OFFSET(x)	(CPU_GP_REGS + x)
-+#define CPU_XREG_OFFSET(x)	CPU_GP_REG_OFFSET(CPU_USER_PT_REGS + 8*x)
++#include "hyp.h"
 +
-+	.text
-+	.pushsection	.hyp.text, "ax"
++/* ctxt is already in the HYP VA space */
++void __hyp_text __sysreg_save_state(struct kvm_cpu_context *ctxt)
++{
++	ctxt->sys_regs[MPIDR_EL1]	= read_sysreg(vmpidr_el2);
++	ctxt->sys_regs[CSSELR_EL1]	= read_sysreg(csselr_el1);
++	ctxt->sys_regs[SCTLR_EL1]	= read_sysreg(sctlr_el1);
++	ctxt->sys_regs[ACTLR_EL1]	= read_sysreg(actlr_el1);
++	ctxt->sys_regs[CPACR_EL1]	= read_sysreg(cpacr_el1);
++	ctxt->sys_regs[TTBR0_EL1]	= read_sysreg(ttbr0_el1);
++	ctxt->sys_regs[TTBR1_EL1]	= read_sysreg(ttbr1_el1);
++	ctxt->sys_regs[TCR_EL1]		= read_sysreg(tcr_el1);
++	ctxt->sys_regs[ESR_EL1]		= read_sysreg(esr_el1);
++	ctxt->sys_regs[AFSR0_EL1]	= read_sysreg(afsr0_el1);
++	ctxt->sys_regs[AFSR1_EL1]	= read_sysreg(afsr1_el1);
++	ctxt->sys_regs[FAR_EL1]		= read_sysreg(far_el1);
++	ctxt->sys_regs[MAIR_EL1]	= read_sysreg(mair_el1);
++	ctxt->sys_regs[VBAR_EL1]	= read_sysreg(vbar_el1);
++	ctxt->sys_regs[CONTEXTIDR_EL1]	= read_sysreg(contextidr_el1);
++	ctxt->sys_regs[TPIDR_EL0]	= read_sysreg(tpidr_el0);
++	ctxt->sys_regs[TPIDRRO_EL0]	= read_sysreg(tpidrro_el0);
++	ctxt->sys_regs[TPIDR_EL1]	= read_sysreg(tpidr_el1);
++	ctxt->sys_regs[AMAIR_EL1]	= read_sysreg(amair_el1);
++	ctxt->sys_regs[CNTKCTL_EL1]	= read_sysreg(cntkctl_el1);
++	ctxt->sys_regs[PAR_EL1]		= read_sysreg(par_el1);
++	ctxt->sys_regs[MDSCR_EL1]	= read_sysreg(mdscr_el1);
 +
-+.macro save_common_regs ctxt
-+	stp	x19, x20, [\ctxt, #CPU_XREG_OFFSET(19)]
-+	stp	x21, x22, [\ctxt, #CPU_XREG_OFFSET(21)]
-+	stp	x23, x24, [\ctxt, #CPU_XREG_OFFSET(23)]
-+	stp	x25, x26, [\ctxt, #CPU_XREG_OFFSET(25)]
-+	stp	x27, x28, [\ctxt, #CPU_XREG_OFFSET(27)]
-+	stp	x29, lr,  [\ctxt, #CPU_XREG_OFFSET(29)]
-+.endm
++	ctxt->gp_regs.regs.sp		= read_sysreg(sp_el0);
++	ctxt->gp_regs.regs.pc		= read_sysreg(elr_el2);
++	ctxt->gp_regs.regs.pstate	= read_sysreg(spsr_el2);
++	ctxt->gp_regs.sp_el1		= read_sysreg(sp_el1);
++	ctxt->gp_regs.elr_el1		= read_sysreg(elr_el1);
++	ctxt->gp_regs.spsr[KVM_SPSR_EL1]= read_sysreg(spsr_el1);
++}
 +
-+.macro restore_common_regs ctxt
-+	ldp	x19, x20, [\ctxt, #CPU_XREG_OFFSET(19)]
-+	ldp	x21, x22, [\ctxt, #CPU_XREG_OFFSET(21)]
-+	ldp	x23, x24, [\ctxt, #CPU_XREG_OFFSET(23)]
-+	ldp	x25, x26, [\ctxt, #CPU_XREG_OFFSET(25)]
-+	ldp	x27, x28, [\ctxt, #CPU_XREG_OFFSET(27)]
-+	ldp	x29, lr,  [\ctxt, #CPU_XREG_OFFSET(29)]
-+.endm
++void __hyp_text __sysreg_restore_state(struct kvm_cpu_context *ctxt)
++{
++	write_sysreg(ctxt->sys_regs[MPIDR_EL1],	  vmpidr_el2);
++	write_sysreg(ctxt->sys_regs[CSSELR_EL1],  csselr_el1);
++	write_sysreg(ctxt->sys_regs[SCTLR_EL1],	  sctlr_el1);
++	write_sysreg(ctxt->sys_regs[ACTLR_EL1],	  actlr_el1);
++	write_sysreg(ctxt->sys_regs[CPACR_EL1],	  cpacr_el1);
++	write_sysreg(ctxt->sys_regs[TTBR0_EL1],	  ttbr0_el1);
++	write_sysreg(ctxt->sys_regs[TTBR1_EL1],	  ttbr1_el1);
++	write_sysreg(ctxt->sys_regs[TCR_EL1],	  tcr_el1);
++	write_sysreg(ctxt->sys_regs[ESR_EL1],	  esr_el1);
++	write_sysreg(ctxt->sys_regs[AFSR0_EL1],	  afsr0_el1);
++	write_sysreg(ctxt->sys_regs[AFSR1_EL1],	  afsr1_el1);
++	write_sysreg(ctxt->sys_regs[FAR_EL1],	  far_el1);
++	write_sysreg(ctxt->sys_regs[MAIR_EL1],	  mair_el1);
++	write_sysreg(ctxt->sys_regs[VBAR_EL1],	  vbar_el1);
++	write_sysreg(ctxt->sys_regs[CONTEXTIDR_EL1], contextidr_el1);
++	write_sysreg(ctxt->sys_regs[TPIDR_EL0],	  tpidr_el0);
++	write_sysreg(ctxt->sys_regs[TPIDRRO_EL0], tpidrro_el0);
++	write_sysreg(ctxt->sys_regs[TPIDR_EL1],	  tpidr_el1);
++	write_sysreg(ctxt->sys_regs[AMAIR_EL1],	  amair_el1);
++	write_sysreg(ctxt->sys_regs[CNTKCTL_EL1], cntkctl_el1);
++	write_sysreg(ctxt->sys_regs[PAR_EL1],	  par_el1);
++	write_sysreg(ctxt->sys_regs[MDSCR_EL1],	  mdscr_el1);
 +
-+.macro save_host_regs reg
-+	save_common_regs \reg
-+.endm
-+
-+.macro restore_host_regs reg
-+	restore_common_regs \reg
-+.endm
-+
-+.macro save_guest_regs
-+	// x0 is the vcpu address
-+	// x1 is the return code, do not corrupt!
-+	// x2 is the cpu context
-+	// x3 is a tmp register
-+	// Guest's x0-x3 are on the stack
-+
-+	add	x2, x0, #VCPU_CONTEXT
-+
-+	// Compute base to save registers
-+	stp	x4, x5,   [x2, #CPU_XREG_OFFSET(4)]
-+	stp	x6, x7,   [x2, #CPU_XREG_OFFSET(6)]
-+	stp	x8, x9,   [x2, #CPU_XREG_OFFSET(8)]
-+	stp	x10, x11, [x2, #CPU_XREG_OFFSET(10)]
-+	stp	x12, x13, [x2, #CPU_XREG_OFFSET(12)]
-+	stp	x14, x15, [x2, #CPU_XREG_OFFSET(14)]
-+	stp	x16, x17, [x2, #CPU_XREG_OFFSET(16)]
-+	str	x18,      [x2, #CPU_XREG_OFFSET(18)]
-+
-+	pop	x6, x7			// x2, x3
-+	pop	x4, x5			// x0, x1
-+
-+	stp	x4, x5, [x2, #CPU_XREG_OFFSET(0)]
-+	stp	x6, x7, [x2, #CPU_XREG_OFFSET(2)]
-+
-+	save_common_regs x2
-+.endm
-+
-+.macro restore_guest_regs
-+	// Assume vcpu in x0, clobbers everything else
-+
-+	add	x2, x0, #VCPU_CONTEXT
-+
-+	// Prepare x0-x3 for later restore
-+	ldp	x4, x5, [x2, #CPU_XREG_OFFSET(0)]
-+	ldp	x6, x7, [x2, #CPU_XREG_OFFSET(2)]
-+	push	x4, x5		// Push x0-x3 on the stack
-+	push	x6, x7
-+
-+	// x4-x18
-+	ldp	x4, x5,   [x2, #CPU_XREG_OFFSET(4)] 
-+	ldp	x6, x7,   [x2, #CPU_XREG_OFFSET(6)] 
-+	ldp	x8, x9,   [x2, #CPU_XREG_OFFSET(8)] 
-+	ldp	x10, x11, [x2, #CPU_XREG_OFFSET(10)]
-+	ldp	x12, x13, [x2, #CPU_XREG_OFFSET(12)]
-+	ldp	x14, x15, [x2, #CPU_XREG_OFFSET(14)]
-+	ldp	x16, x17, [x2, #CPU_XREG_OFFSET(16)]
-+	ldr	x18,      [x2, #CPU_XREG_OFFSET(18)]
-+
-+	// x19-x29, lr
-+	restore_common_regs x2
-+
-+	// Last bits of the 64bit state
-+	pop	x2, x3
-+	pop	x0, x1
-+
-+	// Do not touch any register after this!
-+.endm
-+
-+/*
-+ * u64 __guest_enter(struct kvm_vcpu *vcpu,
-+ *		     struct kvm_cpu_context *host_ctxt);
-+ */
-+ENTRY(__guest_enter)
-+	// x0: vcpu
-+	// x1: host_ctxt
-+	// x2, x3: parameter registers
-+	// x4-x18: clobbered by macros
-+
-+	save_host_regs x1
-+
-+	// Preserve vcpu & host_ctxt for use at exit time
-+	stp	x0, x1, [sp, #-16]!
-+
-+	restore_guest_regs
-+	eret
-+ENDPROC(__guest_enter)
-+
-+ENTRY(__guest_exit)
-+	// x0: vcpu
-+	// x1: return code
-+	// x2-x3: free
-+	// x4-x29,lr: vcpu regs
-+	// vcpu x0-x3 on the stack
-+	save_guest_regs
-+
-+	// Restore vcpu & host_ctxt from the stack
-+	// (preserving return code in x1)
-+	ldp	x0, x2, [sp], #16
-+	restore_host_regs x2
-+
-+	mov	x0, x1
-+	ret
-+ENDPROC(__guest_exit)
-+
-+	/* Insert fault handling here */
-diff --git a/arch/arm64/kvm/hyp/hyp.h b/arch/arm64/kvm/hyp/hyp.h
-index 9da4205..2937552 100644
---- a/arch/arm64/kvm/hyp/hyp.h
-+++ b/arch/arm64/kvm/hyp/hyp.h
-@@ -54,5 +54,7 @@ void __debug_clear_restore_state(struct kvm_vcpu *vcpu,
- 				 struct kvm_guest_debug_arch *dbg,
- 				 struct kvm_cpu_context *ctxt);
- 
-+u64 __guest_enter(struct kvm_vcpu *vcpu, struct kvm_cpu_context *host_ctxt);
-+
- #endif /* __ARM64_KVM_HYP_H__ */
- 
++	write_sysreg(ctxt->gp_regs.regs.sp,	sp_el0);
++	write_sysreg(ctxt->gp_regs.regs.pc,	elr_el2);
++	write_sysreg(ctxt->gp_regs.regs.pstate,	spsr_el2);
++	write_sysreg(ctxt->gp_regs.sp_el1,	sp_el1);
++	write_sysreg(ctxt->gp_regs.elr_el1,	elr_el1);
++	write_sysreg(ctxt->gp_regs.spsr[KVM_SPSR_EL1], spsr_el1);
++}
 -- 
 2.1.4
