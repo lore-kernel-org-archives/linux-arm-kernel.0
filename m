@@ -1,49 +1,36 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Mon, 16 Nov 2015 13:01:09 +0100
-Subject: [PATCH v8 8/8] ARM: imx_v4_v5_defconfig: Add I.MX25 Touchscreen
- controller and ADC support.
-In-Reply-To: <1447675269-8831-1-git-send-email-mpa@pengutronix.de>
-References: <1447675269-8831-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <1447675269-8831-9-git-send-email-mpa@pengutronix.de>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 16 Nov 2015 13:12:48 +0100
+Subject: [PATCH] arm64: crypto: reduce priority of core AES cipher
+Message-ID: <1447675968-21991-1-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Denis Carikli <denis@eukrea.com>
+The asynchronous, merged implementations of AES in CBC, CTR and XTS
+modes are preferred when available (i.e., when instantiating ablkciphers
+explicitly). However, the synchronous core AES cipher combined with the
+generic CBC mode implementation will produce a 'cbc(aes)' blkcipher that
+is callable asynchronously as well. To prevent this implementation from
+being used when the accelerated asynchronous implemenation is also
+available, lower its priority to 250 (i.e., below the asynchronous
+module's priority of 300).
 
-Signed-off-by: Denis Carikli <denis@eukrea.com>
-Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm/configs/imx_v4_v5_defconfig | 4 ++++
- 1 file changed, 4 insertions(+)
+ arch/arm64/crypto/aes-ce-cipher.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-diff --git a/arch/arm/configs/imx_v4_v5_defconfig b/arch/arm/configs/imx_v4_v5_defconfig
-index d3a8018639de..d6754ac47788 100644
---- a/arch/arm/configs/imx_v4_v5_defconfig
-+++ b/arch/arm/configs/imx_v4_v5_defconfig
-@@ -88,6 +88,7 @@ CONFIG_KEYBOARD_IMX=y
- # CONFIG_INPUT_MOUSE is not set
- CONFIG_INPUT_TOUCHSCREEN=y
- CONFIG_TOUCHSCREEN_ADS7846=m
-+CONFIG_TOUCHSCREEN_MX25=y
- CONFIG_TOUCHSCREEN_MC13783=y
- # CONFIG_LEGACY_PTYS is not set
- CONFIG_SERIAL_8250=m
-@@ -107,6 +108,7 @@ CONFIG_HWMON=m
- CONFIG_SENSORS_MC13783_ADC=m
- CONFIG_WATCHDOG=y
- CONFIG_IMX2_WDT=y
-+CONFIG_MFD_MX25_TSADC=y
- CONFIG_MFD_MC13XXX_SPI=y
- CONFIG_REGULATOR=y
- CONFIG_REGULATOR_FIXED_VOLTAGE=y
-@@ -172,6 +174,8 @@ CONFIG_DMADEVICES=y
- CONFIG_IMX_SDMA=y
- CONFIG_IMX_DMA=y
- # CONFIG_IOMMU_SUPPORT is not set
-+CONFIG_IIO=y
-+CONFIG_FSL_MX25_ADC=y
- CONFIG_EXT2_FS=y
- CONFIG_EXT3_FS=y
- CONFIG_EXT4_FS=y
+diff --git a/arch/arm64/crypto/aes-ce-cipher.c b/arch/arm64/crypto/aes-ce-cipher.c
+index ce47792a983d..f7bd9bf0bbb3 100644
+--- a/arch/arm64/crypto/aes-ce-cipher.c
++++ b/arch/arm64/crypto/aes-ce-cipher.c
+@@ -237,7 +237,7 @@ EXPORT_SYMBOL(ce_aes_setkey);
+ static struct crypto_alg aes_alg = {
+ 	.cra_name		= "aes",
+ 	.cra_driver_name	= "aes-ce",
+-	.cra_priority		= 300,
++	.cra_priority		= 250,
+ 	.cra_flags		= CRYPTO_ALG_TYPE_CIPHER,
+ 	.cra_blocksize		= AES_BLOCK_SIZE,
+ 	.cra_ctxsize		= sizeof(struct crypto_aes_ctx),
 -- 
-2.6.1
+1.9.1
