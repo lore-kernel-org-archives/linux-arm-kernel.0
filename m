@@ -1,49 +1,46 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 16 Nov 2015 13:58:29 +0000
-Subject: [PATCH] arm64: kvm: report original PAR_EL1 upon panic
-Message-ID: <1447682309-5875-1-git-send-email-mark.rutland@arm.com>
+From: hs@denx.de (Heiko Schocher)
+Date: Mon, 16 Nov 2015 15:11:54 +0100
+Subject: [PATCH] arm, am335x: add support for the bosch shc board
+In-Reply-To: <CAOCHtYjBPxQBCy6LUnj9ZWpJLXQngLZYn0z+=VMsL38QwFrDpA@mail.gmail.com>
+References: <1447661758-5095-1-git-send-email-hs@denx.de>
+ <CAOCHtYjBPxQBCy6LUnj9ZWpJLXQngLZYn0z+=VMsL38QwFrDpA@mail.gmail.com>
+Message-ID: <5649E42A.9090703@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-If we call __kvm_hyp_panic while a guest context is active, we call
-__restore_sysregs before acquiring the system register values for the
-panic, in the process throwing away the PAR_EL1 value at the point of
-the panic.
+Hello Robert,
 
-This patch modifies __kvm_hyp_panic to stash the PAR_EL1 value prior to
-restoring host register values, enabling us to report the original
-values at the point of the panic.
+Am 16.11.2015 um 14:23 schrieb Robert Nelson:
+>> +
+>> +       cpsw_default: cpsw_default {
+>> +               pinctrl-single,pins = <
+>> +                       /* Slave 1 */
+>> +                       0x110 (PIN_INPUT_PULLDOWN | MUX_MODE0)
+>> +                       0x114 (PIN_OUTPUT_PULLDOWN | MUX_MODE0)
+>> +                       0x118 (PIN_INPUT_PULLDOWN | MUX_MODE0)
+>> +                       0x11c (PIN_OUTPUT_PULLDOWN | MUX_MODE0)
+>> +                       0x120 (PIN_OUTPUT_PULLDOWN | MUX_MODE0)
+>> +                       0x124 (PIN_INPUT_PULLDOWN | MUX_MODE0)
+>> +                       0x128 (PIN_INPUT_PULLDOWN | MUX_MODE0)
+>> +                       0x12c (PIN_INPUT_PULLUP | MUX_MODE0)
+>> +                       0x130 (PIN_INPUT_PULLDOWN | MUX_MODE0)
+>> +                       0x134 (PIN_INPUT_PULLDOWN | MUX_MODE0)
+>> +                       0x138 (PIN_INPUT_PULLDOWN | MUX_MODE0)
+>> +                       0x13c (PIN_INPUT_PULLDOWN | MUX_MODE0)
+>> +                       0x140 (PIN_INPUT_PULLDOWN | MUX_MODE0)
+>
+> Please use the AM33XX_IOPAD pinmux macro:
+>
+> All boards have recently be converted:
+>
+> https://www.mail-archive.com/linux-omap at vger.kernel.org/msg121329.html
 
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Cc: Marc Zyngier <marc.zyngier@arm.com>
-Cc: Christoffer Dall <christoffer.dall@linaro.org>
----
- arch/arm64/kvm/hyp.S | 6 +++++-
- 1 file changed, 5 insertions(+), 1 deletion(-)
+Uh.. missed this, changed. Wait for more comments before posting v2.
 
-diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
-index 11183ce..2a8a4aa 100644
---- a/arch/arm64/kvm/hyp.S
-+++ b/arch/arm64/kvm/hyp.S
-@@ -864,6 +864,10 @@ ENTRY(__kvm_flush_vm_context)
- ENDPROC(__kvm_flush_vm_context)
- 
- __kvm_hyp_panic:
-+	// Stash PAR_EL1 before corrupting it in __restore_sysregs
-+	mrs	x0, par_el1
-+	push	x0, xzr
-+
- 	// Guess the context by looking at VTTBR:
- 	// If zero, then we're already a host.
- 	// Otherwise restore a minimal host context before panicing.
-@@ -898,7 +902,7 @@ __kvm_hyp_panic:
- 	mrs	x3, esr_el2
- 	mrs	x4, far_el2
- 	mrs	x5, hpfar_el2
--	mrs	x6, par_el1
-+	pop	x6, xzr		// active context PAR_EL1
- 	mrs	x7, tpidr_el2
- 
- 	mov	lr, #(PSR_F_BIT | PSR_I_BIT | PSR_A_BIT | PSR_D_BIT |\
+Thanks!
+
+bye,
+Heiko
 -- 
-1.9.1
+DENX Software Engineering GmbH,      Managing Director: Wolfgang Denk
+HRB 165235 Munich, Office: Kirchenstr.5, D-82194 Groebenzell, Germany
