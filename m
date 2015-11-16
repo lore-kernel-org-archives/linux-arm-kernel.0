@@ -1,98 +1,44 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 16 Nov 2015 13:11:53 +0000
-Subject: [PATCH 15/21] arm64: KVM: Add panic handling
+Date: Mon, 16 Nov 2015 13:11:55 +0000
+Subject: [PATCH 17/21] arm64: KVM: Map the kernel RO section into HYP
 In-Reply-To: <1447679519-17888-1-git-send-email-marc.zyngier@arm.com>
 References: <1447679519-17888-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1447679519-17888-16-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1447679519-17888-18-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add the panic handler, together with the small bits of assembly
-code to call the kernel's panic implementation.
+In order to run C code in HYP, we must make sure that the kernel's
+RO section in mapped into HYP (otherwise things break badly).
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/kvm/hyp/hyp-entry.S | 11 ++++++++++-
- arch/arm64/kvm/hyp/hyp.h       |  1 +
- arch/arm64/kvm/hyp/switch.c    | 35 +++++++++++++++++++++++++++++++++++
- 3 files changed, 46 insertions(+), 1 deletion(-)
+ arch/arm/kvm/arm.c | 7 +++++++
+ 1 file changed, 7 insertions(+)
 
-diff --git a/arch/arm64/kvm/hyp/hyp-entry.S b/arch/arm64/kvm/hyp/hyp-entry.S
-index e11a129..7218eed 100644
---- a/arch/arm64/kvm/hyp/hyp-entry.S
-+++ b/arch/arm64/kvm/hyp/hyp-entry.S
-@@ -141,7 +141,16 @@ el1_irq:
- 	mov	x1, #ARM_EXCEPTION_IRQ
- 	b	__guest_exit
+diff --git a/arch/arm/kvm/arm.c b/arch/arm/kvm/arm.c
+index eab83b2..6c4549a 100644
+--- a/arch/arm/kvm/arm.c
++++ b/arch/arm/kvm/arm.c
+@@ -44,6 +44,7 @@
+ #include <asm/kvm_emulate.h>
+ #include <asm/kvm_coproc.h>
+ #include <asm/kvm_psci.h>
++#include <asm/sections.h>
  
--.macro invalid_vector	label, target = __kvm_hyp_panic
-+ENTRY(__hyp_do_panic)
-+	mov	lr, #(PSR_F_BIT | PSR_I_BIT | PSR_A_BIT | PSR_D_BIT |\
-+		      PSR_MODE_EL1h)
-+	msr	spsr_el2, lr
-+	ldr	lr, =panic
-+	msr	elr_el2, lr
-+	eret
-+ENDPROC(__hyp_do_panic)
-+
-+.macro invalid_vector	label, target = __hyp_panic
- 	.align	2
- \label:
- 	b \target
-diff --git a/arch/arm64/kvm/hyp/hyp.h b/arch/arm64/kvm/hyp/hyp.h
-index 240fb79..d5d500d 100644
---- a/arch/arm64/kvm/hyp/hyp.h
-+++ b/arch/arm64/kvm/hyp/hyp.h
-@@ -74,6 +74,7 @@ void __fpsimd_save_state(struct user_fpsimd_state *fp_regs);
- void __fpsimd_restore_state(struct user_fpsimd_state *fp_regs);
+ #ifdef REQUIRES_VIRT
+ __asm__(".arch_extension	virt");
+@@ -1072,6 +1073,12 @@ static int init_hyp_mode(void)
+ 		goto out_free_mappings;
+ 	}
  
- u64 __guest_enter(struct kvm_vcpu *vcpu, struct kvm_cpu_context *host_ctxt);
-+void __noreturn __hyp_do_panic(unsigned long, ...);
- 
- #endif /* __ARM64_KVM_HYP_H__ */
- 
-diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
-index 06d3e20..cdc2a96 100644
---- a/arch/arm64/kvm/hyp/switch.c
-+++ b/arch/arm64/kvm/hyp/switch.c
-@@ -140,3 +140,38 @@ int __hyp_text __guest_run(struct kvm_vcpu *vcpu)
- 
- 	return exit_code;
- }
-+
-+static const char *__hyp_panic_string = "HYP panic:\nPS:%08x PC:%p ESR:%p\nFAR:%p HPFAR:%p PAR:%p\nVCPU:%p\n";
-+
-+void __hyp_text __noreturn __hyp_panic(void)
-+{
-+	u64 spsr = read_sysreg(spsr_el2);
-+	u64 elr = read_sysreg(elr_el2);
-+	u64 par = read_sysreg(par_el1);
-+
-+	if (read_sysreg(vttbr_el2)) {
-+		struct kvm_vcpu *vcpu;
-+		struct kvm_cpu_context *host_ctxt;
-+
-+		vcpu = (struct kvm_vcpu *)read_sysreg(tpidr_el2);
-+		host_ctxt = kern_hyp_va(vcpu->arch.host_cpu_context);
-+		__deactivate_traps(vcpu);
-+		__deactivate_vm(vcpu);
-+		__sysreg_restore_state(host_ctxt);
-+
-+		write_sysreg(host_ctxt->gp_regs.sp_el1, sp_el1);
++	err = create_hyp_mappings(__start_rodata, __end_rodata);
++	if (err) {
++		kvm_err("Cannot map rodata section\n");
++		goto out_free_mappings;
 +	}
 +
-+	/* Call panic for real */
-+	while (1) {
-+		unsigned long str_va = (unsigned long)__hyp_panic_string;
-+
-+		str_va -= HYP_PAGE_OFFSET;
-+		str_va += PAGE_OFFSET;
-+		__hyp_do_panic(str_va,
-+			       spsr,  elr,
-+			       read_sysreg(esr_el2),   read_sysreg(far_el2),
-+			       read_sysreg(hpfar_el2), par,
-+			       read_sysreg(tpidr_el2));
-+	}
-+}
+ 	/*
+ 	 * Map the Hyp stack pages
+ 	 */
 -- 
 2.1.4
