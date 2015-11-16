@@ -1,30 +1,48 @@
-From: rostedt@goodmis.org (Steven Rostedt)
-Date: Mon, 16 Nov 2015 09:20:27 -0500
-Subject: arm64 function_graph tracer panic with CONFIG_DYNAMIC_FTRACE
-In-Reply-To: <564937E3.3090501@linaro.org>
-References: <20151112104243.GF5627@e104818-lin.cambridge.arm.com>
- <56457A4B.601@linaro.org> <564937E3.3090501@linaro.org>
-Message-ID: <20151116092027.705361fc@gandalf.local.home>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 16 Nov 2015 14:23:10 +0000
+Subject: [PATCH v2 11/11] arm64: kernel: Add support for
+ hibernate/suspend-to-disk.
+In-Reply-To: <5649E1A0.7020001@arm.com>
+References: <1445966960-31724-1-git-send-email-james.morse@arm.com>
+ <1445966960-31724-12-git-send-email-james.morse@arm.com>
+ <20151114213415.GG20429@amd> <5649CC40.9010805@arm.com>
+ <20151116124116.GC9125@amd> <5649E1A0.7020001@arm.com>
+Message-ID: <20151116142309.GI20696@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 16 Nov 2015 10:56:51 +0900
-AKASHI Takahiro <takahiro.akashi@linaro.org> wrote:
+> >>> What is PoC and PoU?
+> >>
+> >> They are points in the CPU's cache hierarchy:
+> >>
+> >> ARM processors are of a 'modified Harvard' architecture, their paths to
+> >> read instructions and data are different. The 'Point of Unification' is the
+> >> first point in the cache hierarchy that is the same for both. On ARM,
+> >> flush_icache_range() makes sure code written as data is pushed through any
+> >> data caches to this point, and then evicts any stale copies in the
+> >> instruction caches.
+> >>
+> >> PoC is the 'Point of Coherency', it is the first point that is the same for
+> >> all devices, (e.g. a cpu with caches turned on, and one with them off), it
+> >> is normally main memory. The kernel text has to be pushed to this point, so
+> >> that secondary cores, while running early-boot code with their MMU and
+> >> caches turned off, don't get incorrect code/data from before resume.
+> >>
+> >> I have resisted the urge to draw some ascii-art!
+> > 
+> > That's ok, you just might want to replace PoI -> 'Point of
+> > Unification' and PoC -> 'Point of Coherency' in the comments. That
+> > should make googling easier for people not familiar with arm
+> > terminology.
+> 
+> There aren't any other points under arch/arm64 that use the full expansion,
+> but it can't hurt to include both.
 
-> I think I fixed the problem.
-> As you can see stack dump traces above, psci_cpu_suspend() and psci_suspend_finisher()
-> are called in cpu suspend path, but they never return in cpu resume path and
-> cpu_suspend() will resume directly via cpu_resume(). So those two functions should not be
-> ftrace'd.
+I would prefer to keep PoC/PoU as they are for consistency.
 
-Does this crash with just the function graph tracer, or does the
-function tracer show the same issue? If it is just the function graph
-tracer, lets not cripple function tracing because of it.
+The abbreviations are provided by the architecture, and much like
+register names that we do not expand, to reason about them you need to
+read the architecture documentation anyway. So the short forms alone are
+fine.
 
-Just call pause_graph_tracing() before the suspend code, and
-unpause_graph_tracing() when returning.
-
-This will also help keep you from playing whack-a-mole, when there are
-other functions that have this issue.
-
--- Steve
+Mark.
