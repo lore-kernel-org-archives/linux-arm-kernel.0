@@ -1,90 +1,72 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Mon, 16 Nov 2015 22:10:40 +0900
-Subject: [PATCH v4 05/24] misc: max77693-haptic: use pwm_get_xxx() helpers
- where appropriate
-In-Reply-To: <1447664207-24370-6-git-send-email-boris.brezillon@free-electrons.com>
-References: <1447664207-24370-1-git-send-email-boris.brezillon@free-electrons.com>
- <1447664207-24370-6-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <5649D5D0.6080204@samsung.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 16 Nov 2015 13:11:39 +0000
+Subject: [PATCH 01/21] arm64: add macros to read/write system registers
+In-Reply-To: <1447679519-17888-1-git-send-email-marc.zyngier@arm.com>
+References: <1447679519-17888-1-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1447679519-17888-2-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-W dniu 16.11.2015 o 17:56, Boris Brezillon pisze:
-> Use pwm_get_xxx() helpers instead of directly accessing the pwm->xxx field.
-> Doing that will ease adaptation of the PWM framework to support atomic
-> update.
-> 
-> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> ---
-> Patch generated with the following coccinelle script:
-> 
-> --->8---
-> virtual patch
-> 
-> @@
-> struct pwm_device *p;
-> expression e;
-> @@
-> (
-> -(p)->polarity = e;
-> +pwm_set_polarity((p), e);
-> |
-> -(p)->polarity
-> +pwm_get_polarity((p))
-> |
-> -(p)->period = e;
-> +pwm_set_period((p), e);
-> |
-> -(p)->period
-> +pwm_get_period((p))
-> |
-> -(p)->duty_cycle = e;
-> +pwm_set_duty_cycle((p), e);
-> |
-> -(p)->duty_cycle
-> +pwm_get_duty_cycle((p))
-> )
-> --->8---
-> ---
->  drivers/input/misc/max77693-haptic.c | 7 ++++---
->  1 file changed, 4 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/input/misc/max77693-haptic.c b/drivers/input/misc/max77693-haptic.c
-> index 6d96bff..a038fb3 100644
-> --- a/drivers/input/misc/max77693-haptic.c
-> +++ b/drivers/input/misc/max77693-haptic.c
-> @@ -70,10 +70,11 @@ struct max77693_haptic {
->  
->  static int max77693_haptic_set_duty_cycle(struct max77693_haptic *haptic)
->  {
-> -	int delta = (haptic->pwm_dev->period + haptic->pwm_duty) / 2;
-> +	int delta = (pwm_get_period((haptic->pwm_dev)) + haptic->pwm_duty) / 2;
+From: Mark Rutland <mark.rutland@arm.com>
 
-Double parentheses over argument are not needed so just:
-pwm_get_period(haptic->pwm_dev) + ...
+Rather than crafting custom macros for reading/writing each system
+register provide generics accessors, read_sysreg and write_sysreg, for
+this purpose.
 
-Beside that patch looks good, so with removing parentheses here and below:
+Unlike read_cpuid, calls to read_exception_reg are never expected
+to be optimized away or replaced with synthetic values.
 
-Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Signed-off-by: Mark Rutland <mark.rutland@arm.com>
+Cc: Catalin Marinas <catalin.marinas@arm.com>
+Cc: Marc Zyngier <marc.zyngier@arm.com>
+Cc: Suzuki Poulose <suzuki.poulose@arm.com>
+Cc: Will Deacon <will.deacon@arm.com>
+Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+---
+ arch/arm64/include/asm/sysreg.h | 17 +++++++++++++++++
+ 1 file changed, 17 insertions(+)
 
-Best regards,
-Krzysztof
-
->  	int error;
->  
-> -	error = pwm_config(haptic->pwm_dev, delta, haptic->pwm_dev->period);
-> +	error = pwm_config(haptic->pwm_dev, delta,
-> +			   pwm_get_period((haptic->pwm_dev)));
->  	if (error) {
->  		dev_err(haptic->dev, "failed to configure pwm: %d\n", error);
->  		return error;
-> @@ -245,7 +246,7 @@ static int max77693_haptic_play_effect(struct input_dev *dev, void *data,
->  	 * The formula to convert magnitude to pwm_duty as follows:
->  	 * - pwm_duty = (magnitude * pwm_period) / MAX_MAGNITUDE(0xFFFF)
->  	 */
-> -	period_mag_multi = (u64)haptic->pwm_dev->period * haptic->magnitude;
-> +	period_mag_multi = (u64)pwm_get_period((haptic->pwm_dev)) * haptic->magnitude;
->  	haptic->pwm_duty = (unsigned int)(period_mag_multi >>
->  						MAX_MAGNITUDE_SHIFT);
->  
-> 
+diff --git a/arch/arm64/include/asm/sysreg.h b/arch/arm64/include/asm/sysreg.h
+index d48ab5b..c9c283a 100644
+--- a/arch/arm64/include/asm/sysreg.h
++++ b/arch/arm64/include/asm/sysreg.h
+@@ -20,6 +20,8 @@
+ #ifndef __ASM_SYSREG_H
+ #define __ASM_SYSREG_H
+ 
++#include <linux/stringify.h>
++
+ #include <asm/opcodes.h>
+ 
+ /*
+@@ -208,6 +210,8 @@
+ 
+ #else
+ 
++#include <linux/types.h>
++
+ asm(
+ "	.irp	num,0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30\n"
+ "	.equ	__reg_num_x\\num, \\num\n"
+@@ -232,6 +236,19 @@ static inline void config_sctlr_el1(u32 clear, u32 set)
+ 	val |= set;
+ 	asm volatile("msr sctlr_el1, %0" : : "r" (val));
+ }
++
++#define read_sysreg(r) ({					\
++	u64 __val;						\
++	asm volatile("mrs %0, " __stringify(r) : "=r" (__val));	\
++	__val;							\
++})
++
++#define write_sysreg(v, r) do {					\
++	u64 __val = (u64)v;					\
++	asm volatile("msr " __stringify(r) ", %0"		\
++		     : : "r" (__val));				\
++} while (0)
++
+ #endif
+ 
+ #endif	/* __ASM_SYSREG_H */
+-- 
+2.1.4
