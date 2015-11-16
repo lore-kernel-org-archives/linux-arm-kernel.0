@@ -1,117 +1,129 @@
-From: michael@amarulasolutions.com (Michael Trimarchi)
-Date: Mon, 16 Nov 2015 12:54:28 +0100
-Subject: [PATCH] ARM: dts: imx6q-icore-rqs: Add Engicam IMX6 Q7 initial
- support
-In-Reply-To: <1447674695.3144.21.camel@pengutronix.de>
-References: <1447584853-12560-1-git-send-email-michael@amarulasolutions.com>
- <1447665552.3144.6.camel@pengutronix.de>
- <20151116112931.GA10464@panicking>
- <1447673895.3144.16.camel@pengutronix.de>
- <20151116114127.GB10464@panicking>
- <1447674695.3144.21.camel@pengutronix.de>
-Message-ID: <20151116115421.GC10464@panicking>
+From: Julia.Lawall@lip6.fr (Julia Lawall)
+Date: Mon, 16 Nov 2015 12:33:13 +0100
+Subject: [PATCH 0/7] add missing of_node_put
+Message-ID: <1447673600-8881-1-git-send-email-Julia.Lawall@lip6.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
+The various for_each device_node iterators performs an of_node_get on each
+iteration, so a break out of the loop requires an of_node_put.
 
-On Mon, Nov 16, 2015 at 12:51:35PM +0100, Lucas Stach wrote:
-> Am Montag, den 16.11.2015, 12:41 +0100 schrieb Michael Trimarchi:
-> > Hi
-> > 
-> > On Mon, Nov 16, 2015 at 12:38:15PM +0100, Lucas Stach wrote:
-> > > Am Montag, den 16.11.2015, 12:29 +0100 schrieb Michael Trimarchi:
-> > > > Hi
-> > > > 
-> > > > On Mon, Nov 16, 2015 at 10:19:12AM +0100, Lucas Stach wrote:
-> > > > > Am Sonntag, den 15.11.2015, 11:54 +0100 schrieb Michael Trimarchi:
-> > > > > > www.engicam.com/en/products/embedded/som/standard/i-core-rqs-m6s-dl-d-q
-> > > > > > 
-> > > > > > Signed-off-by: Michael Trimarchi <michael@amarulasolutions.com>
-> > > > > > ---
-> > > > > >  arch/arm/boot/dts/Makefile               |   1 +
-> > > > > >  arch/arm/boot/dts/imx6q-icore-rqs.dts    |  36 +++
-> > > > > >  arch/arm/boot/dts/imx6qdl-icore-rqs.dtsi | 372 +++++++++++++++++++++++++++++++
-> > > > > >  3 files changed, 409 insertions(+)
-> > > > > >  create mode 100644 arch/arm/boot/dts/imx6q-icore-rqs.dts
-> > > > > >  create mode 100644 arch/arm/boot/dts/imx6qdl-icore-rqs.dtsi
-> > > > > > 
-> > > [...]
-> > > > > > diff --git a/arch/arm/boot/dts/imx6q-icore-rqs.dts b/arch/arm/boot/dts/imx6q-icore-rqs.dts
-> > > > > > new file mode 100644
-> > > > > > index 0000000..cded07d
-> > > > > > --- /dev/null
-> > > > > > +++ b/arch/arm/boot/dts/imx6q-icore-rqs.dts
-> > > > > > @@ -0,0 +1,36 @@
-> > > > > > +/*
-> > > > > > + * Copyright (C) 2015 Amarula Solutions B.V.
-> > > > > > + *
-> > > > > > + * This program is free software; you can redistribute it and/or modify
-> > > > > > + * it under the terms of the GNU General Public License version 2 as
-> > > > > > + * published by the Free Software Foundation.
-> > > > > > + */
-> > > > > > +
-> > > > > > +/dts-v1/;
-> > > > > > +
-> > > > > > +#include "imx6q.dtsi"
-> > > > > > +#include "imx6qdl-icore-rqs.dtsi"
-> > > > > > +
-> > > > > > +/ {
-> > > > > > +	model = "Engicam i.CoreM6 Quad SOM";
-> > > > > > +	compatible = "fsl,imx6-icore-rqs", "fsl,imx6q";
-> > > > > > +	cpus {
-> > > > > > +		cpu at 0 {
-> > > > > > +			operating-points = <
-> > > > > > +				/* kHz    uV */
-> > > > > > +				792000  1150000
-> > > > > > +				396000  1150000
-> > > > > > +			>;
-> > > > > > +
-> > > > > > +			fsl,soc-operating-points = <
-> > > > > > +				/* ARM kHz  SOC-PU uV */
-> > > > > > +				792000        1175000
-> > > > > > +				396000        1175000
-> > > > > > +			>;
-> > > > > > +		};
-> > > > > Why do you need to edit the OPPS here? Just to fix them on a specific
-> > > > > voltage? Why?
-> > > > > 
-> > > > 
-> > > > Board has no pmu regulator
-> > > > 
-> > > The default i.MX6 configuration (see imx6q.dtsi) is to connect the ARM
-> > > and SOC domain to the internal LDOs, so voltage scaling is not dependent
-> > > on an external PMIC being present.
-> > > 
-> > 
-> > Sorry, It was a mistake based on original patch. So I need to limit the max
-> > allowed frequency suggested by the vendor. So including the operating points
-> > that I support. Is this fine?
-> > 
-> Do you really want to remove the ability to lower voltage for the slower
-> OPPs? Also you only need this if the module includes a higher rated SKU,
-> that needs to be throttled below its rated max frequency.
-> 
-> If the module includes a SKU that is rated for 792MHz by Freescale (like
-> the industrial ones) the kernel will read the SoC fuses and disable any
-> OPPs that are unsupported by the SKU on its own.
->
+The complete semantic patch that finds this problem is
+(http://coccinelle.lip6.fr):
 
-Yes I will drop. It's totally wrong, thank you for the lesson on fuses
+// <smpl>
+@r@
+local idexpression n;
+expression e1,e2;
+iterator name for_each_node_by_name, for_each_node_by_type,
+for_each_compatible_node, for_each_matching_node,
+for_each_matching_node_and_match, for_each_child_of_node,
+for_each_available_child_of_node, for_each_node_with_property;
+iterator i;
+statement S;
+expression list [n1] es;
+@@
 
+(
+(
+for_each_node_by_name(n,e1) S
+|
+for_each_node_by_type(n,e1) S
+|
+for_each_compatible_node(n,e1,e2) S
+|
+for_each_matching_node(n,e1) S
+|
+for_each_matching_node_and_match(n,e1,e2) S
+|
+for_each_child_of_node(e1,n) S
+|
+for_each_available_child_of_node(e1,n) S
+|
+for_each_node_with_property(n,e1) S
+)
+&
+i(es,n,...) S
+)
 
-Michael
+@@
+local idexpression r.n;
+iterator r.i;
+expression e;
+expression list [r.n1] es;
+@@
 
-> Regards,
-> Lucas
-> 
-> -- 
-> Pengutronix e.K.             | Lucas Stach                 |
-> Industrial Linux Solutions   | http://www.pengutronix.de/  |
-> 
+ i(es,n,...) {
+   ...
+(
+   of_node_put(n);
+|
+   e = n
+|
+   return n;
+|
++  of_node_put(n);
+?  return ...;
+)
+   ...
+ }
 
--- 
-| Michael Nazzareno Trimarchi                     Amarula Solutions BV |
-| COO  -  Founder                                      Cruquiuskade 47 |
-| +31(0)851119172                                 Amsterdam 1018 AM NL |
-|                  [`as] http://www.amarulasolutions.com               |
+@@
+local idexpression r.n;
+iterator r.i;
+expression e;
+expression list [r.n1] es;
+@@
+
+ i(es,n,...) {
+   ...
+(
+   of_node_put(n);
+|
+   e = n
+|
++  of_node_put(n);
+?  break;
+)
+   ...
+ }
+... when != n
+
+@@
+local idexpression r.n;
+iterator r.i;
+expression e;
+identifier l;
+expression list [r.n1] es;
+@@
+
+ i(es,n,...) {
+   ...
+(
+   of_node_put(n);
+|
+   e = n
+|
++  of_node_put(n);
+?  goto l;
+)
+   ...
+ }
+...
+l: ... when != n
+// </smpl>
+
+This semantic patch puts an of_node_put before a return, but in each of
+these patches, we have grouped the multiple resulting of_node_puts into a
+single call at an error exit label.
+
+---
+
+ drivers/phy/phy-bcm-cygnus-pcie.c |   16 ++++++++++++----
+ drivers/phy/phy-berlin-sata.c     |   20 ++++++++++++++------
+ drivers/phy/phy-brcmstb-sata.c    |   17 ++++++++++++-----
+ drivers/phy/phy-miphy28lp.c       |   16 +++++++++++-----
+ drivers/phy/phy-miphy365x.c       |   16 +++++++++++-----
+ drivers/phy/phy-mt65xx-usb3.c     |   20 +++++++++++++-------
+ drivers/phy/phy-rockchip-usb.c    |   17 ++++++++++++-----
+ 7 files changed, 85 insertions(+), 37 deletions(-)
