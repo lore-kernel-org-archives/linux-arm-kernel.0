@@ -1,64 +1,64 @@
 From: mpa@pengutronix.de (Markus Pargmann)
-Date: Mon, 16 Nov 2015 13:01:08 +0100
-Subject: [PATCH v8 7/8] ARM: dts: imx25: Add TSC and ADC support
+Date: Mon, 16 Nov 2015 13:01:04 +0100
+Subject: [PATCH v8 3/8] ARM: dt: Binding documentation for imx25 touchscreen
+ controller
 In-Reply-To: <1447675269-8831-1-git-send-email-mpa@pengutronix.de>
 References: <1447675269-8831-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <1447675269-8831-8-git-send-email-mpa@pengutronix.de>
+Message-ID: <1447675269-8831-4-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Denis Carikli <denis@eukrea.com>
+This is the touchscreen conversion queue binding documentation. It uses
+the shared imx25 ADC.
 
-Signed-off-by: Denis Carikli <denis@eukrea.com>
 Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
 ---
- arch/arm/boot/dts/imx25.dtsi | 30 +++++++++++++++++++++++++++---
- 1 file changed, 27 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm/boot/dts/imx25.dtsi b/arch/arm/boot/dts/imx25.dtsi
-index 677f81d9dcd5..7b7fc7dd10bd 100644
---- a/arch/arm/boot/dts/imx25.dtsi
-+++ b/arch/arm/boot/dts/imx25.dtsi
-@@ -265,13 +265,37 @@
- 				status = "disabled";
- 			};
- 
--			tsc: tsc at 50030000 {
--				compatible = "fsl,imx25-adc", "fsl,imx21-tsc";
--				reg = <0x50030000 0x4000>;
-+			tscadc: tscadc at 50030000 {
-+				compatible = "fsl,imx25-tsadc";
-+				reg = <0x50030000 0xc>;
- 				interrupts = <46>;
- 				clocks = <&clks 119>;
- 				clock-names = "ipg";
-+				interrupt-controller;
-+				#interrupt-cells = <1>;
-+				#address-cells = <1>;
-+				#size-cells = <1>;
-+				ranges;
- 				status = "disabled";
+Notes:
+    Changes in v5:
+     - Fix signed/unsigned comparison
+     - Fix unused variable settling_time by putting it in the correct argument list
+     - Use continous conversion queue with the repeat feature and a proper
+       repeat-wait. Previously the touchscreen caused massive number of interrupts.
+
+ .../bindings/input/touchscreen/fsl-mx25-tcq.txt    | 29 ++++++++++++++++++++++
+ 1 file changed, 29 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/input/touchscreen/fsl-mx25-tcq.txt
+
+diff --git a/Documentation/devicetree/bindings/input/touchscreen/fsl-mx25-tcq.txt b/Documentation/devicetree/bindings/input/touchscreen/fsl-mx25-tcq.txt
+new file mode 100644
+index 000000000000..89ab47a3acc1
+--- /dev/null
++++ b/Documentation/devicetree/bindings/input/touchscreen/fsl-mx25-tcq.txt
+@@ -0,0 +1,29 @@
++Freescale mx25 TS conversion queue module
 +
-+				adc: adc at 50030800 {
-+					compatible = "fsl,imx25-gcq";
-+					reg = <0x50030800 0x60>;
-+					interrupt-parent = <&tscadc>;
-+					interrupts = <1>;
-+					#address-cells = <1>;
-+					#size-cells = <0>;
-+					status = "disabled";
-+				};
++mx25 touchscreen conversion queue module which controls the ADC unit of the
++mx25 for attached touchscreens.
 +
-+				tsc: tcq at 50030400 {
-+					compatible = "fsl,imx25-tcq";
-+					reg = <0x50030400 0x60>;
-+					interrupt-parent = <&tscadc>;
-+					interrupts = <0>;
-+					fsl,wires = <4>;
-+					status = "disabled";
-+				};
- 			};
- 
- 			ssi1: ssi at 50034000 {
++Required properties:
++ - compatible: Should be "fsl,imx25-tcq".
++ - reg: Memory range of the device.
++ - interrupts: Should be the interrupt number associated with this module within
++   the tscadc unit (<0>).
++ - interrupt-parent: Should be a phandle to the tscadc unit.
++ - fsl,wires: Should be '<4>' or '<5>'
++
++Optional properties:
++ - fsl,pen-debounce: Pen debounce time in nanoseconds.
++ - fsl,pen-threshold: Pen-down threshold for the touchscreen.
++ - fsl,settling-time: Settling time in nanoseconds.
++
++This device includes two conversion queues which can be added as subnodes.
++The first queue is for the touchscreen, the second for general purpose ADC.
++
++Example:
++	tsc: tcq at 50030400 {
++		compatible = "fsl,imx25-tcq";
++		reg = <0x50030400 0x60>;
++		interrupt-parent = <&tscadc>;
++		interrupts = <0>;
++		fsl,wires = <4>;
++	};
 -- 
 2.6.1
