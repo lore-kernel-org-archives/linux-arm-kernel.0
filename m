@@ -1,73 +1,40 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 16 Nov 2015 16:30:16 +0000
-Subject: [PATCH 2/2] drm/rockchip: Convert the probe function to the
- generic drm_of_component_probe()
-In-Reply-To: <1447685093-26129-3-git-send-email-Liviu.Dudau@arm.com>
-References: <1447685093-26129-1-git-send-email-Liviu.Dudau@arm.com>
- <1447685093-26129-3-git-send-email-Liviu.Dudau@arm.com>
-Message-ID: <20151116163016.GO8644@n2100.arm.linux.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 16 Nov 2015 17:32:15 +0100
+Subject: [PATCH] ARM64: do not include ptrace.h from compat.h
+Message-ID: <4870233.DUFZXD30Rq@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-I've tweaked your patch to make the above (buggy) change a little clearer.
+including ptrace.h brings a definition of BITS_PER_PAGE into device
+drivers and cause a build warning in allmodconfig builds:
 
-On Mon, Nov 16, 2015 at 02:44:53PM +0000, Liviu Dudau wrote:
-> -	for (i = 0;; i++) {
-> -		port = of_parse_phandle(np, "ports", i);
-> -		if (!port)
-> -			break;
-> -
-> -		if (!of_device_is_available(port->parent)) {
-> -			of_node_put(port);
-> -			continue;
-> -		}
->  
-> -		component_match_add(dev, &match, compare_of, port->parent);
-> -		of_node_put(port);
-> -	}
+drivers/block/drbd/drbd_bitmap.c:482:0: warning: "BITS_PER_PAGE" redefined
+ #define BITS_PER_PAGE  (1UL << (PAGE_SHIFT + 3))
 
-> -static int compare_of(struct device *dev, void *data)
-> -{
-> -	struct device_node *np = data;
-> -
-> -	return dev->of_node == np;
-> -}
+This uses a slightly different way to express current_pt_regs()
+that avoids the use of the header and gets away with the already
+included asm/ptrace.h.
 
-The original above passes port->parent to component_match_add().  This
-means 'np' in the above compare_of() function is 'port->parent'.
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-This means the above comparison is effectively:
-
-	dev->of_node == port->parent
-
-The generic code instead does this:
-
-                component_match_add(dev, &match, compare_of, port);
-
-So what we get in the comparison function is 'port' rather than
-'port->parent':
-
-> +static int compare_port(struct device *dev, void *data)
->  {
-> +	struct device_node *np = data;
-> +	return dev->parent->of_node == np;
-> +}
-
-which means the comparison is:
-
-	dev->parent->of_node == port
-
-which is a different comparison from the above.
-
-You instead want this to be:
-
-	return dev->of_node == np->parent;
-
-Heiko, please test the above change to compare_port() - I think you'll
-find that will fix your issue.
-
-Thanks.
-
--- 
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+diff --git a/arch/arm64/include/asm/compat.h b/arch/arm64/include/asm/compat.h
+index 7fbed6919b54..eb8432bb82b8 100644
+--- a/arch/arm64/include/asm/compat.h
++++ b/arch/arm64/include/asm/compat.h
+@@ -23,7 +23,6 @@
+  */
+ #include <linux/types.h>
+ #include <linux/sched.h>
+-#include <linux/ptrace.h>
+ 
+ #define COMPAT_USER_HZ		100
+ #ifdef __AARCH64EB__
+@@ -234,7 +233,7 @@ static inline compat_uptr_t ptr_to_compat(void __user *uptr)
+ 	return (u32)(unsigned long)uptr;
+ }
+ 
+-#define compat_user_stack_pointer() (user_stack_pointer(current_pt_regs()))
++#define compat_user_stack_pointer() (user_stack_pointer(task_pt_regs(current)))
+ 
+ static inline void __user *arch_compat_alloc_user_space(long len)
+ {
