@@ -1,48 +1,55 @@
 From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 16 Nov 2015 19:32:27 +0100
-Subject: [PATCH v2 02/12] arm64: only consider memblocks with NOMAP cleared
- for linear mapping
+Date: Mon, 16 Nov 2015 19:32:28 +0100
+Subject: [PATCH v2 03/12] arm64/efi: mark UEFI reserved regions as
+ MEMBLOCK_NOMAP
 In-Reply-To: <1447698757-8762-1-git-send-email-ard.biesheuvel@linaro.org>
 References: <1447698757-8762-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <1447698757-8762-3-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <1447698757-8762-4-git-send-email-ard.biesheuvel@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Take the new memblock attribute MEMBLOCK_NOMAP into account when
-deciding whether a certain region is or should be covered by the
-kernel direct mapping.
+Change the EFI memory reservation logic to use memblock_mark_nomap()
+rather than memblock_reserve() to mark UEFI reserved regions as
+occupied. In addition to reserving them against allocations done by
+memblock, this will also prevent them from being covered by the linear
+mapping.
 
 Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 ---
- arch/arm64/mm/init.c | 2 +-
- arch/arm64/mm/mmu.c  | 2 ++
- 2 files changed, 3 insertions(+), 1 deletion(-)
+ arch/arm64/kernel/efi.c | 7 ++++---
+ 1 file changed, 4 insertions(+), 3 deletions(-)
 
-diff --git a/arch/arm64/mm/init.c b/arch/arm64/mm/init.c
-index 17bf39ac83ba..ac4d7cbbdd2d 100644
---- a/arch/arm64/mm/init.c
-+++ b/arch/arm64/mm/init.c
-@@ -120,7 +120,7 @@ static void __init zone_sizes_init(unsigned long min, unsigned long max)
- #ifdef CONFIG_HAVE_ARCH_PFN_VALID
- int pfn_valid(unsigned long pfn)
- {
--	return memblock_is_memory(pfn << PAGE_SHIFT);
-+	return memblock_is_map_memory(pfn << PAGE_SHIFT);
+diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
+index de46b50f4cdf..c7c7fb417110 100644
+--- a/arch/arm64/kernel/efi.c
++++ b/arch/arm64/kernel/efi.c
+@@ -183,7 +183,7 @@ static __init void reserve_regions(void)
+ 			early_init_dt_add_memory_arch(paddr, size);
+ 
+ 		if (is_reserve_region(md)) {
+-			memblock_reserve(paddr, size);
++			memblock_mark_nomap(paddr, size);
+ 			if (efi_enabled(EFI_DBG))
+ 				pr_cont("*");
+ 		}
+@@ -205,8 +205,6 @@ void __init efi_init(void)
+ 
+ 	efi_system_table = params.system_table;
+ 
+-	memblock_reserve(params.mmap & PAGE_MASK,
+-			 PAGE_ALIGN(params.mmap_size + (params.mmap & ~PAGE_MASK)));
+ 	memmap.phys_map = params.mmap;
+ 	memmap.map = early_memremap(params.mmap, params.mmap_size);
+ 	memmap.map_end = memmap.map + params.mmap_size;
+@@ -218,6 +216,9 @@ void __init efi_init(void)
+ 
+ 	reserve_regions();
+ 	early_memunmap(memmap.map, params.mmap_size);
++	memblock_mark_nomap(params.mmap & PAGE_MASK,
++			    PAGE_ALIGN(params.mmap_size +
++				       (params.mmap & ~PAGE_MASK)));
  }
- EXPORT_SYMBOL(pfn_valid);
- #endif
-diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-index e3f563c81c48..0cf325c8dc55 100644
---- a/arch/arm64/mm/mmu.c
-+++ b/arch/arm64/mm/mmu.c
-@@ -421,6 +421,8 @@ static void __init map_mem(void)
  
- 		if (start >= end)
- 			break;
-+		if (memblock_is_nomap(reg))
-+			continue;
- 
- 		if (ARM64_SWAPPER_USES_SECTION_MAPS) {
- 			/*
+ static bool __init efi_virtmap_init(void)
 -- 
 1.9.1
