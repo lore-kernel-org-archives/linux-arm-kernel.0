@@ -1,50 +1,33 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Mon, 16 Nov 2015 14:37:54 +0100
-Subject: [PATCH 21/27] staging: mt29f_spinand: remove useless mtd->priv = chip
- assignment
+Date: Mon, 16 Nov 2015 14:37:41 +0100
+Subject: [PATCH 08/27] sh: nand: make use of mtd_to_nand() where appropriate
 In-Reply-To: <1447681080-31232-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1447681080-31232-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1447681080-31232-22-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1447681080-31232-9-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-mtd_to_nand_chip() now uses the container_of() approach to transform an
-mtd_info pointer into a nand_chip one. Drop useless mtd->priv
-assignments from NAND controller drivers.
+mtd_to_nand() was recently introduced to avoid direct accesses to the
+mtd->priv field. Update all SH specific implementations to use this
+helper.
 
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 ---
-Patch generated with the following coccinelle script:
+ arch/sh/boards/mach-migor/setup.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
----8<----
-virtual patch
-
-@@
-struct mtd_info mtd;
-struct mtd_info *mtdptr;
-struct nand_chip *chipptr;
-expression d;
-@@
-(
--(mtd).priv = (chipptr);
-|
--(mtdptr)->priv = (chipptr);
----8<----
----
- drivers/staging/mt29f_spinand/mt29f_spinand.c | 1 -
- 1 file changed, 1 deletion(-)
-
-diff --git a/drivers/staging/mt29f_spinand/mt29f_spinand.c b/drivers/staging/mt29f_spinand/mt29f_spinand.c
-index 8171b74..b7d429d 100644
---- a/drivers/staging/mt29f_spinand/mt29f_spinand.c
-+++ b/drivers/staging/mt29f_spinand/mt29f_spinand.c
-@@ -907,7 +907,6 @@ static int spinand_probe(struct spi_device *spi_nand)
+diff --git a/arch/sh/boards/mach-migor/setup.c b/arch/sh/boards/mach-migor/setup.c
+index 29b7c0d..8673f91 100644
+--- a/arch/sh/boards/mach-migor/setup.c
++++ b/arch/sh/boards/mach-migor/setup.c
+@@ -167,7 +167,7 @@ static struct mtd_partition migor_nand_flash_partitions[] = {
+ static void migor_nand_flash_cmd_ctl(struct mtd_info *mtd, int cmd,
+ 				     unsigned int ctrl)
+ {
+-	struct nand_chip *chip = mtd->priv;
++	struct nand_chip *chip = mtd_to_nand(mtd);
  
- 	dev_set_drvdata(&spi_nand->dev, mtd);
- 
--	mtd->priv = chip;
- 	mtd->dev.parent = &spi_nand->dev;
- 	mtd->oobsize = 64;
- 
+ 	if (cmd == NAND_CMD_NONE)
+ 		return;
 -- 
 2.1.4
