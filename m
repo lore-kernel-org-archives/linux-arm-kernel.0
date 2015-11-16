@@ -1,31 +1,42 @@
-From: bjorn.andersson@sonymobile.com (Bjorn Andersson)
-Date: Mon, 16 Nov 2015 10:28:27 -0800
-Subject: [PATCH] pinctrl: fix qcom ssbi drivers for 64-bit compilation
-In-Reply-To: <5235862.Gokjxf5QH1@wuerfel>
-References: <5235862.Gokjxf5QH1@wuerfel>
-Message-ID: <20151116182826.GD30882@usrtlx11787.corpusers.net>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 16 Nov 2015 18:30:06 +0000
+Subject: [PATCH 10/12] tty: amba-pl011: add support for 32-bit register
+ access
+In-Reply-To: <564A1FA9.8010109@codeaurora.org>
+References: <20151116173935.GQ8644@n2100.arm.linux.org.uk>
+ <E1ZyNls-0003kA-Fe@rmk-PC.arm.linux.org.uk>
+ <564A1628.9010900@codeaurora.org>
+ <20151116175217.GT8644@n2100.arm.linux.org.uk>
+ <564A1FA9.8010109@codeaurora.org>
+Message-ID: <20151116183006.GZ8644@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon 16 Nov 08:41 PST 2015, Arnd Bergmann wrote:
-
-> When building pinctrl-ssbi-gpio and pinctrl-ssbi-mpp for ARM64, we get
-> a compile warning about invalid types:
+On Mon, Nov 16, 2015 at 12:25:45PM -0600, Timur Tabi wrote:
+> How is it touching core files?  Granted, we might still need access_32b in
+> vendor_data, but not for SBSA, since SBSA already has a mechanism to
+> determine what 32-bit is needed or not.
 > 
-> drivers/pinctrl/qcom/pinctrl-ssbi-gpio.c: In function 'pm8xxx_gpio_probe':
-> drivers/pinctrl/qcom/pinctrl-ssbi-gpio.c:675:17: warning: cast from pointer to integer of different size [-Wpointer-to-int-cast]
-> drivers/pinctrl/qcom/pinctrl-ssbi-mpp.c: In function 'pm8xxx_mpp_probe':
-> drivers/pinctrl/qcom/pinctrl-ssbi-mpp.c:766:17: warning: cast from pointer to integer of different size [-Wpointer-to-int-cast]
+> Then in pl011_probe(), just have:
 > 
-> This changes the code so we cast the pointer to 'unsigned long', which
-> is the right thing to do here.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> 
+> 	uap->port.iotype = vendor->access_32b ? UPIO_MEM32 : 0;
 
-Thanks Arnd,
+That fails my sanity filters, sorry.  iotype takes these values, and
+these values only:
 
-Reviewed-by: Bjorn Andersson <bjorn.andersson@sonymobile.com>
+#define UPIO_PORT               (SERIAL_IO_PORT)        /* 8b I/O port access */#define UPIO_HUB6               (SERIAL_IO_HUB6)        /* Hub6 ISA card */
+#define UPIO_MEM                (SERIAL_IO_MEM)         /* 8b MMIO access */
+#define UPIO_MEM32              (SERIAL_IO_MEM32)       /* 32b little endian */
+#define UPIO_AU                 (SERIAL_IO_AU)          /* Au1x00 and RT288x type IO */
+#define UPIO_TSI                (SERIAL_IO_TSI)         /* Tsi108/109 type IO */#define UPIO_MEM32BE            (SERIAL_IO_MEM32BE)     /* 32b big endian */
 
-Regards,
-Bjorn
+These are exposed to userspace, and they have meaning.
+
+We _could_ augment include/uapi/linux/serial.h and
+include/linux/serial_core.h to add a 16-bit LE MMIO accessor identifier,
+but hacking it by deciding to re-use SERIAL_IO_PORT for something it
+isn't is abhorrent to me.
+
+-- 
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
