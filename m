@@ -1,60 +1,69 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 16 Nov 2015 08:16:09 -0600
-Subject: [PATCH v8 3/8] ARM: dt: Binding documentation for imx25
- touchscreen controller
-In-Reply-To: <1447675269-8831-4-git-send-email-mpa@pengutronix.de>
-References: <1447675269-8831-1-git-send-email-mpa@pengutronix.de>
- <1447675269-8831-4-git-send-email-mpa@pengutronix.de>
-Message-ID: <20151116141609.GA6167@rob-hp-laptop>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 16 Nov 2015 14:16:29 +0000
+Subject: [PATCH 15/21] arm64: KVM: Add panic handling
+In-Reply-To: <1447679519-17888-16-git-send-email-marc.zyngier@arm.com>
+References: <1447679519-17888-1-git-send-email-marc.zyngier@arm.com>
+ <1447679519-17888-16-git-send-email-marc.zyngier@arm.com>
+Message-ID: <20151116141629.GH20696@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 16, 2015 at 01:01:04PM +0100, Markus Pargmann wrote:
-> This is the touchscreen conversion queue binding documentation. It uses
-> the shared imx25 ADC.
-> 
-> Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
-> ---
-> 
-> Notes:
->     Changes in v5:
->      - Fix signed/unsigned comparison
->      - Fix unused variable settling_time by putting it in the correct argument list
->      - Use continous conversion queue with the repeat feature and a proper
->        repeat-wait. Previously the touchscreen caused massive number of interrupts.
-> 
->  .../bindings/input/touchscreen/fsl-mx25-tcq.txt    | 29 ++++++++++++++++++++++
->  1 file changed, 29 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/input/touchscreen/fsl-mx25-tcq.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/input/touchscreen/fsl-mx25-tcq.txt b/Documentation/devicetree/bindings/input/touchscreen/fsl-mx25-tcq.txt
-> new file mode 100644
-> index 000000000000..89ab47a3acc1
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/input/touchscreen/fsl-mx25-tcq.txt
-> @@ -0,0 +1,29 @@
-> +Freescale mx25 TS conversion queue module
+> diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+> index 06d3e20..cdc2a96 100644
+> --- a/arch/arm64/kvm/hyp/switch.c
+> +++ b/arch/arm64/kvm/hyp/switch.c
+> @@ -140,3 +140,38 @@ int __hyp_text __guest_run(struct kvm_vcpu *vcpu)
+>  
+>  	return exit_code;
+>  }
 > +
-> +mx25 touchscreen conversion queue module which controls the ADC unit of the
-> +mx25 for attached touchscreens.
+> +static const char *__hyp_panic_string = "HYP panic:\nPS:%08x PC:%p ESR:%p\nFAR:%p HPFAR:%p PAR:%p\nVCPU:%p\n";
+
+I assume that if [1] goes in we'll update this to match.
+
 > +
-> +Required properties:
-> + - compatible: Should be "fsl,imx25-tcq".
-> + - reg: Memory range of the device.
-> + - interrupts: Should be the interrupt number associated with this module within
-> +   the tscadc unit (<0>).
-> + - interrupt-parent: Should be a phandle to the tscadc unit.
-> + - fsl,wires: Should be '<4>' or '<5>'
+> +void __hyp_text __noreturn __hyp_panic(void)
+> +{
+> +	u64 spsr = read_sysreg(spsr_el2);
+> +	u64 elr = read_sysreg(elr_el2);
+> +	u64 par = read_sysreg(par_el1);
 > +
-> +Optional properties:
-> + - fsl,pen-debounce: Pen debounce time in nanoseconds.
-> + - fsl,pen-threshold: Pen-down threshold for the touchscreen.
-> + - fsl,settling-time: Settling time in nanoseconds.
+> +	if (read_sysreg(vttbr_el2)) {
+> +		struct kvm_vcpu *vcpu;
+> +		struct kvm_cpu_context *host_ctxt;
+> +
+> +		vcpu = (struct kvm_vcpu *)read_sysreg(tpidr_el2);
+> +		host_ctxt = kern_hyp_va(vcpu->arch.host_cpu_context);
+> +		__deactivate_traps(vcpu);
+> +		__deactivate_vm(vcpu);
+> +		__sysreg_restore_state(host_ctxt);
+> +
+> +		write_sysreg(host_ctxt->gp_regs.sp_el1, sp_el1);
 
-Don't we have standard properties for these? If not, these should have 
-units.
+__sysreg_restore_state restores the host sp_el1, no?
 
-I don't understand the difference between debounce and settling times. 
-Please make that clear in the doc.
+> +	}
+> +
+> +	/* Call panic for real */
+> +	while (1) {
+> +		unsigned long str_va = (unsigned long)__hyp_panic_string;
+> +
+> +		str_va -= HYP_PAGE_OFFSET;
+> +		str_va += PAGE_OFFSET;
+> +		__hyp_do_panic(str_va,
+> +			       spsr,  elr,
+> +			       read_sysreg(esr_el2),   read_sysreg(far_el2),
+> +			       read_sysreg(hpfar_el2), par,
+> +			       read_sysreg(tpidr_el2));
+> +	}
+> +}
 
-Rob
+I think the while (1) here is confusing.
+
+Can we not jsut declare str_va at the start of the function and get rid
+of the loop?
+
+Thanks,
+Mark.
+
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-November/385199.html
