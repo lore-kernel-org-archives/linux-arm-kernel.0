@@ -1,65 +1,132 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 16 Nov 2015 09:30:24 -0600
-Subject: [PATCH 1/5] clk: sunxi: Add support for the H3 usb phy clocks
-In-Reply-To: <1447616777-24660-1-git-send-email-hdegoede@redhat.com>
-References: <1447616777-24660-1-git-send-email-hdegoede@redhat.com>
-Message-ID: <20151116153024.GA13168@rob-hp-laptop>
+From: ariel@vanguardiasur.com.ar (Ariel D'Alessandro)
+Date: Mon, 16 Nov 2015 12:33:30 -0300
+Subject: [PATCH v2 2/4] nvmem: NXP LPC18xx EEPROM memory NVMEM driver
+In-Reply-To: <563385B2.90403@vanguardiasur.com.ar>
+References: <1445275946-32653-1-git-send-email-ariel@vanguardiasur.com.ar>
+ <1445275946-32653-3-git-send-email-ariel@vanguardiasur.com.ar>
+ <CAGhQ9Vyg6sScq7yM=7judsMPHOc5VF2zf=7LPxmbmL7wF=vvgw@mail.gmail.com>
+ <562E2CB1.80706@linaro.org> <563385B2.90403@vanguardiasur.com.ar>
+Message-ID: <5649F74A.9020706@vanguardiasur.com.ar>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sun, Nov 15, 2015 at 08:46:13PM +0100, Hans de Goede wrote:
-> From: Reinder de Haan <patchesrdh@mveas.com>
-> 
-> The H3 has a usb-phy clk register which is similar to that of earlier
-> SoCs, but with support for a larger number of phys. So we can simply add
-> a new set of clk-data and a new compatible and be done with it.
-> 
-> Signed-off-by: Reinder de Haan <patchesrdh@mveas.com>
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+Srinivas,
 
-Acked-by: Rob Herring <robh@kernel.org>
+Sorry for the delay, I finally got the hardware again.
 
-> ---
->  Documentation/devicetree/bindings/clock/sunxi.txt |  1 +
->  drivers/clk/sunxi/clk-usb.c                       | 12 ++++++++++++
->  2 files changed, 13 insertions(+)
+El 30/10/15 a las 11:58, Ariel D'Alessandro escribi?:
+> Srinivas,
 > 
-> diff --git a/Documentation/devicetree/bindings/clock/sunxi.txt b/Documentation/devicetree/bindings/clock/sunxi.txt
-> index d303dec..23e7bce 100644
-> --- a/Documentation/devicetree/bindings/clock/sunxi.txt
-> +++ b/Documentation/devicetree/bindings/clock/sunxi.txt
-> @@ -70,6 +70,7 @@ Required properties:
->  	"allwinner,sun5i-a13-usb-clk" - for usb gates + resets on A13
->  	"allwinner,sun6i-a31-usb-clk" - for usb gates + resets on A31
->  	"allwinner,sun8i-a23-usb-clk" - for usb gates + resets on A23
-> +	"allwinner,sun8i-h3-usb-clk" - for usb gates + resets on H3
->  	"allwinner,sun9i-a80-usb-mod-clk" - for usb gates + resets on A80
->  	"allwinner,sun9i-a80-usb-phy-clk" - for usb phy gates + resets on A80
->  
-> diff --git a/drivers/clk/sunxi/clk-usb.c b/drivers/clk/sunxi/clk-usb.c
-> index 1a72cd6..67b8e38 100644
-> --- a/drivers/clk/sunxi/clk-usb.c
-> +++ b/drivers/clk/sunxi/clk-usb.c
-> @@ -243,3 +243,15 @@ static void __init sun9i_a80_usb_phy_setup(struct device_node *node)
->  	sunxi_usb_clk_setup(node, &sun9i_a80_usb_phy_data, &a80_usb_phy_lock);
->  }
->  CLK_OF_DECLARE(sun9i_a80_usb_phy, "allwinner,sun9i-a80-usb-phy-clk", sun9i_a80_usb_phy_setup);
-> +
-> +static const struct usb_clk_data sun8i_h3_usb_clk_data __initconst = {
-> +	.clk_mask =  BIT(19) | BIT(18) | BIT(17) | BIT(16) |
-> +		     BIT(11) | BIT(10) | BIT(9) | BIT(8),
-> +	.reset_mask = BIT(3) | BIT(2) | BIT(1) | BIT(0),
-> +};
-> +
-> +static void __init sun8i_h3_usb_setup(struct device_node *node)
-> +{
-> +	sunxi_usb_clk_setup(node, &sun8i_h3_usb_clk_data, &sun4i_a10_usb_lock);
-> +}
-> +CLK_OF_DECLARE(sun8i_h3_usb, "allwinner,sun8i-h3-usb-clk", sun8i_h3_usb_setup);
-> -- 
-> 2.5.0
+> El 26/10/15 a las 10:37, Srinivas Kandagatla escribi?:
+>>
+>>
+>> On 24/10/15 23:04, Joachim Eastwood wrote:
+>>> Hi Ariel,
+>>>
+>>> On 19 October 2015 at 19:32, Ariel D'Alessandro
+>>> <ariel@vanguardiasur.com.ar> wrote:
+>>>> This commit adds support for NXP LPC18xx EEPROM memory found in NXP
+>>>> LPC185x/3x and LPC435x/3x/2x/1x devices.
+>>>>
+>>>> EEPROM size is 16384 bytes and it can be entirely read and
+>>>> written/erased with 1 word (4 bytes) granularity. The last page
+>>>> (128 bytes) contains the EEPROM initialization data and is not writable.
+>>>>
+>>>> Erase/program time is less than 3ms. The EEPROM device requires a
+>>>> ~1500 kHz clock (min 800 kHz, max 1600 kHz) that is generated dividing
+>>>> the system bus clock by the division factor, contained in the divider
+>>>> register (minus 1 encoded).
+>>>>
+>>>> Signed-off-by: Ariel D'Alessandro <ariel@vanguardiasur.com.ar>
+>>>> ---
+>>>>   drivers/nvmem/Kconfig          |   9 ++
+>>>>   drivers/nvmem/Makefile         |   2 +
+>>>>   drivers/nvmem/lpc18xx_eeprom.c | 266
+>>>> +++++++++++++++++++++++++++++++++++++++++
+>>>>   3 files changed, 277 insertions(+)
+>>>>   create mode 100644 drivers/nvmem/lpc18xx_eeprom.c
+>>>
+>>>> +static int lpc18xx_eeprom_gather_write(void *context, const void *reg,
+>>>> +                                      size_t reg_size, const void *val,
+>>>> +                                      size_t val_size)
+>>>> +{
+>>>> +       struct lpc18xx_eeprom_dev *eeprom = context;
+>>>> +       unsigned int offset = *(u32 *)reg;
+>>>> +
+>>>> +       /* 3 ms of erase/program time between each writing */
+>>>> +       while (val_size) {
+>>>> +               writel(*(u32 *)val, eeprom->mem_base + offset);
+>>>> +               usleep_range(3000, 4000);
+>>>> +               val_size -= eeprom->val_bytes;
+>>>> +               val += eeprom->val_bytes;
+>>>> +               offset += eeprom->val_bytes;
+>>>> +       }
+>>>
+>>> What happens here if 'val_size' is less than 4 or not dividable by 4?
+>>> Same thing for 'offset'.
+>>>
+>>> I tested the driver from sysfs by writing strings into the nvmem-file
+>>> with echo. Writing a string not dividable by 4 seems to hang the
+>>> system.
+>>>
+>>
+>> I think I know the issue here:
+>> Could you try this patch:
+>>
+>> -------------------------------->cut<----------------------------------
+>> From 8cae10eff8ea8da9c5a8058ff75abeeddd8a8224 Mon Sep 17 00:00:00 2001
+>> From: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+>> Date: Mon, 26 Oct 2015 13:30:24 +0000
+>> Subject: [PATCH] nvmem: core: return error for non word aligned bytes
+>>
+>> nvmem providers have restrictions on register strides, so return error
+>> code when users attempt to read/write buffers with sizes which are not
+>> aligned to the word boundary.
+>>
+>> Without this patch the userspace would continue to try as it does not
+>> get any error from the nvmem core, resulting in a hang.
+>>
+>> Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+>> ---
+>>  drivers/nvmem/core.c | 6 ++++++
+>>  1 file changed, 6 insertions(+)
+>>
+>> diff --git a/drivers/nvmem/core.c b/drivers/nvmem/core.c
+>> index 6fd4e5a..9d11d98 100644
+>> --- a/drivers/nvmem/core.c
+>> +++ b/drivers/nvmem/core.c
+>> @@ -70,6 +70,9 @@ static ssize_t bin_attr_nvmem_read(struct file *filp,
+>> struct kobject *kobj,
+>>      if (pos >= nvmem->size)
+>>          return 0;
+>>
+>> +    if (count < nvmem->word_size)
+>> +        return -EINVAL;
+>> +
+>>      if (pos + count > nvmem->size)
+>>          count = nvmem->size - pos;
+>>
+>> @@ -95,6 +98,9 @@ static ssize_t bin_attr_nvmem_write(struct file *filp,
+>> struct kobject *kobj,
+>>      if (pos >= nvmem->size)
+>>          return 0;
+>>
+>> +    if (count < nvmem->word_size)
+>> +        return -EINVAL;
+>> +
+>>      if (pos + count > nvmem->size)
+>>          count = nvmem->size - pos;
+>>
 > 
-> --
-> To unsubscribe from this list: send the line "unsubscribe devicetree" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> Patch looks good to me. I think that it solves the issue.
+> I don't have the board here right now, so I'll check it ASAP and give
+> some feedback.
+
+Finally tested this. As it seemed, it solved the issue.
+Are you submitting a patch for this?
+
+Thanks again.
+
+-- 
+Ariel D'Alessandro, VanguardiaSur
+www.vanguardiasur.com.ar
