@@ -1,32 +1,34 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 16 Nov 2015 22:27:55 +0100
-Subject: [PATCH] cpufreq: mediatek: fix build error
-Message-ID: <3905943.jgsUmEgmnP@wuerfel>
+Date: Mon, 16 Nov 2015 22:34:58 +0100
+Subject: [PATCH] scpi: hide get_scpi_ops in module from built-in code
+Message-ID: <4740279.aWlP1tqJLa@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The recently added mt8173 cpufreq driver relies on the cpu topology
-that is always present on ARM64 but optional on ARM32:
+The scpi_clock driver can be built-in when CONFIG_COMPILE_TEST
+is set even when ARM_SCPI_PROTOCOL is a loadable module, and
+that results in a link error:
 
-drivers/cpufreq/mt8173-cpufreq.c: In function 'mtk_cpufreq_init':
-drivers/cpufreq/mt8173-cpufreq.c:441:30: error: 'cpu_topology' undeclared (first use in this function)
-  cpumask_copy(policy->cpus, &cpu_topology[policy->cpu].core_sibling);
+drivers/built-in.o: In function `scpi_clocks_probe':
+(.text+0x14453c): undefined reference to `get_scpi_ops'
 
-This refines the Kconfig dependencies so that we can still build on
-ARM32, but only if COMPILE_TEST is selected and the CPU topology
-code is present.
+Using #if IS_REACHABLE() around the get_scpi_ops() declaration
+makes it build successfully in this case for compile-testing,
+but the effect is the same as when ARM_SCPI_PROTOCOL is
+disabled, as the code will not be used.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-diff --git a/drivers/cpufreq/Kconfig.arm b/drivers/cpufreq/Kconfig.arm
-index 1582c1c016b0..8014c2307332 100644
---- a/drivers/cpufreq/Kconfig.arm
-+++ b/drivers/cpufreq/Kconfig.arm
-@@ -84,6 +84,7 @@ config ARM_KIRKWOOD_CPUFREQ
- config ARM_MT8173_CPUFREQ
- 	bool "Mediatek MT8173 CPUFreq support"
- 	depends on ARCH_MEDIATEK && REGULATOR
-+	depends on ARM64 || (ARM_CPU_TOPOLOGY && COMPILE_TEST)
- 	depends on !CPU_THERMAL || THERMAL=y
- 	select PM_OPP
- 	help
+diff --git a/include/linux/scpi_protocol.h b/include/linux/scpi_protocol.h
+index 80af3cd35ae4..72ce932c69b2 100644
+--- a/include/linux/scpi_protocol.h
++++ b/include/linux/scpi_protocol.h
+@@ -71,7 +71,7 @@ struct scpi_ops {
+ 	int (*sensor_get_value)(u16, u32 *);
+ };
+ 
+-#if IS_ENABLED(CONFIG_ARM_SCPI_PROTOCOL)
++#if IS_REACHABLE(CONFIG_ARM_SCPI_PROTOCOL)
+ struct scpi_ops *get_scpi_ops(void);
+ #else
+ static inline struct scpi_ops *get_scpi_ops(void) { return NULL; }
