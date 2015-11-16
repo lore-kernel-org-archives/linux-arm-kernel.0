@@ -1,49 +1,46 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 17 Nov 2015 00:38:23 +0800
-Subject: [PATCH v3 4/9] regulator: axp20x: Support new AXP223 PMIC
-In-Reply-To: <1447691908-25456-1-git-send-email-wens@csie.org>
-References: <1447691908-25456-1-git-send-email-wens@csie.org>
-Message-ID: <1447691908-25456-5-git-send-email-wens@csie.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 16 Nov 2015 17:41:18 +0100
+Subject: [PATCH] pinctrl: fix qcom ssbi drivers for 64-bit compilation
+Message-ID: <5235862.Gokjxf5QH1@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The AXP223 is a new PMIC commonly paired with Allwinner A23/A33 SoCs.
-It is functionally identical to AXP221; only the regulator default
-voltage/status and the external host interface are different.
+When building pinctrl-ssbi-gpio and pinctrl-ssbi-mpp for ARM64, we get
+a compile warning about invalid types:
 
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
-Reviewed-by: Mark Brown <broonie@kernel.org>
----
- drivers/regulator/axp20x-regulator.c | 3 +++
- 1 file changed, 3 insertions(+)
+drivers/pinctrl/qcom/pinctrl-ssbi-gpio.c: In function 'pm8xxx_gpio_probe':
+drivers/pinctrl/qcom/pinctrl-ssbi-gpio.c:675:17: warning: cast from pointer to integer of different size [-Wpointer-to-int-cast]
+drivers/pinctrl/qcom/pinctrl-ssbi-mpp.c: In function 'pm8xxx_mpp_probe':
+drivers/pinctrl/qcom/pinctrl-ssbi-mpp.c:766:17: warning: cast from pointer to integer of different size [-Wpointer-to-int-cast]
 
-diff --git a/drivers/regulator/axp20x-regulator.c b/drivers/regulator/axp20x-regulator.c
-index 35de22fdb7a0..55cce8125716 100644
---- a/drivers/regulator/axp20x-regulator.c
-+++ b/drivers/regulator/axp20x-regulator.c
-@@ -244,6 +244,7 @@ static int axp20x_set_dcdc_freq(struct platform_device *pdev, u32 dcdcfreq)
- 		step = 75;
- 		break;
- 	case AXP221_ID:
-+	case AXP223_ID:
- 		min = 1800;
- 		max = 4050;
- 		def = 3000;
-@@ -322,6 +323,7 @@ static int axp20x_set_dcdc_workmode(struct regulator_dev *rdev, int id, u32 work
- 		break;
+This changes the code so we cast the pointer to 'unsigned long', which
+is the right thing to do here.
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+
+diff --git a/drivers/pinctrl/qcom/pinctrl-ssbi-gpio.c b/drivers/pinctrl/qcom/pinctrl-ssbi-gpio.c
+index d809c9eaa323..19a3c3bc2f1f 100644
+--- a/drivers/pinctrl/qcom/pinctrl-ssbi-gpio.c
++++ b/drivers/pinctrl/qcom/pinctrl-ssbi-gpio.c
+@@ -672,7 +672,7 @@ static int pm8xxx_gpio_probe(struct platform_device *pdev)
+ 		return -ENOMEM;
  
- 	case AXP221_ID:
-+	case AXP223_ID:
- 		if (id < AXP22X_DCDC1 || id > AXP22X_DCDC5)
- 			return -EINVAL;
+ 	pctrl->dev = &pdev->dev;
+-	pctrl->npins = (unsigned)of_device_get_match_data(&pdev->dev);
++	pctrl->npins = (unsigned long)of_device_get_match_data(&pdev->dev);
  
-@@ -360,6 +362,7 @@ static int axp20x_regulator_probe(struct platform_device *pdev)
- 		nregulators = AXP20X_REG_ID_MAX;
- 		break;
- 	case AXP221_ID:
-+	case AXP223_ID:
- 		regulators = axp22x_regulators;
- 		nregulators = AXP22X_REG_ID_MAX;
- 		break;
--- 
-2.6.2
+ 	pctrl->regmap = dev_get_regmap(pdev->dev.parent, NULL);
+ 	if (!pctrl->regmap) {
+diff --git a/drivers/pinctrl/qcom/pinctrl-ssbi-mpp.c b/drivers/pinctrl/qcom/pinctrl-ssbi-mpp.c
+index 8982027de8e8..b868ef1766a0 100644
+--- a/drivers/pinctrl/qcom/pinctrl-ssbi-mpp.c
++++ b/drivers/pinctrl/qcom/pinctrl-ssbi-mpp.c
+@@ -763,7 +763,7 @@ static int pm8xxx_mpp_probe(struct platform_device *pdev)
+ 		return -ENOMEM;
+ 
+ 	pctrl->dev = &pdev->dev;
+-	pctrl->npins = (unsigned)of_device_get_match_data(&pdev->dev);
++	pctrl->npins = (unsigned long)of_device_get_match_data(&pdev->dev);
+ 
+ 	pctrl->regmap = dev_get_regmap(pdev->dev.parent, NULL);
+ 	if (!pctrl->regmap) {
