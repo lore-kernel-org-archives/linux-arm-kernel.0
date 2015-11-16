@@ -1,34 +1,73 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 16 Nov 2015 18:05:09 +0100
-Subject: [PATCH 3/6] serial: mid8250: select CONFIG_RATIONAL
-In-Reply-To: <1447692962.31665.145.camel@linux.intel.com>
-References: <1447688894-2936779-1-git-send-email-arnd@arndb.de>
- <1447688894-2936779-4-git-send-email-arnd@arndb.de>
- <1447692962.31665.145.camel@linux.intel.com>
-Message-ID: <28108741.gZodRCNg2d@wuerfel>
+From: ariel@vanguardiasur.com.ar (Ariel D'Alessandro)
+Date: Mon, 16 Nov 2015 14:11:55 -0300
+Subject: [PATCH v3 0/4] Add support for NXP LPC18xx EEPROM using nvmem
+In-Reply-To: <1447690798-14641-1-git-send-email-ariel@vanguardiasur.com.ar>
+References: <1447690798-14641-1-git-send-email-ariel@vanguardiasur.com.ar>
+Message-ID: <564A0E5B.7090105@vanguardiasur.com.ar>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 16 November 2015 18:56:02 Andy Shevchenko wrote:
-> On Mon, 2015-11-16 at 16:48 +0100, Arnd Bergmann wrote:
-> > The Intel MID support got split out from the PCI 8250 driver,
-> > and that now causes a build error when no other driver selects
-> > CONFIG_RATIONAL:
-> 
-> Already published.
-> https://lkml.org/lkml/2015/11/12/272
-> 
-> It's not first time you send patches that already have been published.
-> 
-> I think you use some testing automation which doesn't take into
-> consideration what is sent in mailing lists.
 
-Correct, it also ignores whatever patches other people have in private
-git trees, in their mail clients or in their heads.
+El 16/11/15 a las 13:19, Ariel D'Alessandro escribi?:
+> This patch series adds support for NXP LPC18xx EEPROM memory found in
+> NXP LPC185x/3x and LPC435x/3x/2x/1x devices.
+> 
+> This patchset is based on tag next-20151116 of the linux-next
+> repository. It has been successfully tested on a LPC4337 CIAA-NXP
+> Board.
 
-I try to send patches for things that break either on the first
-day they are broken so mine comes first, or I wait a while to see
-if a fix ends up in linux-next to give everyone else a chance to
-get their patch into next so I can catch it on a rebase.
+Forgot to say that there's a known issue related to the nvmem core. It
+will be solved when the following patch gets submitted and applied.
 
-	Arnd
+-------------------------------->cut<----------------------------------
+>From 8cae10eff8ea8da9c5a8058ff75abeeddd8a8224 Mon Sep 17 00:00:00 2001
+From: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+Date: Mon, 26 Oct 2015 13:30:24 +0000
+Subject: [PATCH] nvmem: core: return error for non word aligned bytes
+
+nvmem providers have restrictions on register strides, so return error
+code when users attempt to read/write buffers with sizes which are not
+aligned to the word boundary.
+
+Without this patch the userspace would continue to try as it does not
+get any error from the nvmem core, resulting in a hang.
+
+Signed-off-by: Srinivas Kandagatla <srinivas.kandagatla@linaro.org>
+---
+ drivers/nvmem/core.c | 6 ++++++
+ 1 file changed, 6 insertions(+)
+
+diff --git a/drivers/nvmem/core.c b/drivers/nvmem/core.c
+index 6fd4e5a..9d11d98 100644
+--- a/drivers/nvmem/core.c
++++ b/drivers/nvmem/core.c
+@@ -70,6 +70,9 @@ static ssize_t bin_attr_nvmem_read(struct file *filp,
+struct kobject *kobj,
+     if (pos >= nvmem->size)
+         return 0;
+
++    if (count < nvmem->word_size)
++        return -EINVAL;
++
+     if (pos + count > nvmem->size)
+         count = nvmem->size - pos;
+
+@@ -95,6 +98,9 @@ static ssize_t bin_attr_nvmem_write(struct file *filp,
+struct kobject *kobj,
+     if (pos >= nvmem->size)
+         return 0;
+
++    if (count < nvmem->word_size)
++        return -EINVAL;
++
+     if (pos + count > nvmem->size)
+         count = nvmem->size - pos;
+
+-- 
+1.9.1
+
+-------------------------------->cut<----------------------------------
+
+-- 
+Ariel D'Alessandro, VanguardiaSur
+www.vanguardiasur.com.ar
