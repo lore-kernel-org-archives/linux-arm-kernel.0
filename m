@@ -1,40 +1,42 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 16 Nov 2015 17:32:15 +0100
-Subject: [PATCH] ARM64: do not include ptrace.h from compat.h
-Message-ID: <4870233.DUFZXD30Rq@wuerfel>
+Date: Mon, 16 Nov 2015 17:34:50 +0100
+Subject: [PATCH] clocksource: fsl: avoid harmless 64-bit warnings
+Message-ID: <3990834.xnjhm37Grs@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-including ptrace.h brings a definition of BITS_PER_PAGE into device
-drivers and cause a build warning in allmodconfig builds:
+The ftm_clockevent_init passes the value of "~0UL" into a function
+that takes a 32-bit argument, which drops the upper 32 bits, as
+gcc warns about on ARM64:
 
-drivers/block/drbd/drbd_bitmap.c:482:0: warning: "BITS_PER_PAGE" redefined
- #define BITS_PER_PAGE  (1UL << (PAGE_SHIFT + 3))
+clocksource/fsl_ftm_timer.c: In function 'ftm_clockevent_init':
+clocksource/fsl_ftm_timer.c:206:13: warning: large integer implicitly truncated to unsigned type [-Woverflow]
 
-This uses a slightly different way to express current_pt_regs()
-that avoids the use of the header and gets away with the already
-included asm/ptrace.h.
+This was obviously unintended behavior, and is easily avoided by
+using '~0u' as the integer literal, because that is 32-bit wide
+on all architectures.
 
 Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-diff --git a/arch/arm64/include/asm/compat.h b/arch/arm64/include/asm/compat.h
-index 7fbed6919b54..eb8432bb82b8 100644
---- a/arch/arm64/include/asm/compat.h
-+++ b/arch/arm64/include/asm/compat.h
-@@ -23,7 +23,6 @@
-  */
- #include <linux/types.h>
- #include <linux/sched.h>
--#include <linux/ptrace.h>
+diff --git a/drivers/clocksource/fsl_ftm_timer.c b/drivers/clocksource/fsl_ftm_timer.c
+index 10202f1fdfd7..517e1c7624d4 100644
+--- a/drivers/clocksource/fsl_ftm_timer.c
++++ b/drivers/clocksource/fsl_ftm_timer.c
+@@ -203,7 +203,7 @@ static int __init ftm_clockevent_init(unsigned long freq, int irq)
+ 	int err;
  
- #define COMPAT_USER_HZ		100
- #ifdef __AARCH64EB__
-@@ -234,7 +233,7 @@ static inline compat_uptr_t ptr_to_compat(void __user *uptr)
- 	return (u32)(unsigned long)uptr;
- }
+ 	ftm_writel(0x00, priv->clkevt_base + FTM_CNTIN);
+-	ftm_writel(~0UL, priv->clkevt_base + FTM_MOD);
++	ftm_writel(~0u, priv->clkevt_base + FTM_MOD);
  
--#define compat_user_stack_pointer() (user_stack_pointer(current_pt_regs()))
-+#define compat_user_stack_pointer() (user_stack_pointer(task_pt_regs(current)))
+ 	ftm_reset_counter(priv->clkevt_base);
  
- static inline void __user *arch_compat_alloc_user_space(long len)
- {
+@@ -230,7 +230,7 @@ static int __init ftm_clocksource_init(unsigned long freq)
+ 	int err;
+ 
+ 	ftm_writel(0x00, priv->clksrc_base + FTM_CNTIN);
+-	ftm_writel(~0UL, priv->clksrc_base + FTM_MOD);
++	ftm_writel(~0u, priv->clksrc_base + FTM_MOD);
+ 
+ 	ftm_reset_counter(priv->clksrc_base);
+ 
