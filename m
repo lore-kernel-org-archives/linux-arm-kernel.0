@@ -1,87 +1,15 @@
-From: manabian@gmail.com (Joachim Eastwood)
-Date: Mon, 16 Nov 2015 18:46:44 +0100
-Subject: [PATCH v4 02/24] pwm: use pwm_get_xxx() helpers where appropriate
-In-Reply-To: <1447664207-24370-3-git-send-email-boris.brezillon@free-electrons.com>
-References: <1447664207-24370-1-git-send-email-boris.brezillon@free-electrons.com>
- <1447664207-24370-3-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <CAGhQ9VwEuwazF5Kdw=9R60EovVoiwen6fXiVjL+=EddXPYVGAg@mail.gmail.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Mon, 16 Nov 2015 09:48:02 -0800
+Subject: [PATCH v13 7/7] MAINTAINERS: Add entry Renesas arm64 architecture
+In-Reply-To: <5645D0EF.2070201@cogentembedded.com>
+References: <1447409425-14831-1-git-send-email-horms+renesas@verge.net.au>
+ <1447409425-14831-8-git-send-email-horms+renesas@verge.net.au>
+ <5645D0EF.2070201@cogentembedded.com>
+Message-ID: <20151116174759.GA9473@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Boris
+On Fri, Nov 13, 2015 at 03:00:47PM +0300, Sergei Shtylyov wrote:
+> "Add entry for Renesas", perhaps?
 
-(Adding Ariel for pwm-lpc18xx-sct)
-
-On 16 November 2015 at 09:56, Boris Brezillon
-<boris.brezillon@free-electrons.com> wrote:
-> Use pwm_get_xxx() helpers instead of directly accessing the pwm->xxx field.
-> Doing that will ease adaptation of the PWM framework to support atomic
-> update.
->
-> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> ---
-> Patch generated with the following coccinelle script:
->
-> --->8---
-> virtual patch
->
-> @@
-> struct pwm_device *p;
-> expression e;
-> @@
-> (
-> -(p)->polarity = e;
-> +pwm_set_polarity((p), e);
-> |
-> -(p)->polarity
-> +pwm_get_polarity((p))
-> |
-> -(p)->period = e;
-> +pwm_set_period((p), e);
-> |
-> -(p)->period
-> +pwm_get_period((p))
-> |
-> -(p)->duty_cycle = e;
-> +pwm_set_duty_cycle((p), e);
-> |
-> -(p)->duty_cycle
-> +pwm_get_duty_cycle((p))
-> )
-> --->8---
-> ---
->  drivers/pwm/pwm-crc.c         | 2 +-
->  drivers/pwm/pwm-lpc18xx-sct.c | 2 +-
->  2 files changed, 2 insertions(+), 2 deletions(-)
->
-> diff --git a/drivers/pwm/pwm-crc.c b/drivers/pwm/pwm-crc.c
-> index 7101c70..2f88543 100644
-> --- a/drivers/pwm/pwm-crc.c
-> +++ b/drivers/pwm/pwm-crc.c
-> @@ -75,7 +75,7 @@ static int crc_pwm_config(struct pwm_chip *c, struct pwm_device *pwm,
->                 return -EINVAL;
->         }
->
-> -       if (pwm->period != period_ns) {
-> +       if (pwm_get_period((pwm)) != period_ns) {
->                 int clk_div;
->
->                 /* changing the clk divisor, need to disable fisrt */
-> diff --git a/drivers/pwm/pwm-lpc18xx-sct.c b/drivers/pwm/pwm-lpc18xx-sct.c
-> index 9163085..091fa13 100644
-> --- a/drivers/pwm/pwm-lpc18xx-sct.c
-> +++ b/drivers/pwm/pwm-lpc18xx-sct.c
-> @@ -249,7 +249,7 @@ static int lpc18xx_pwm_enable(struct pwm_chip *chip, struct pwm_device *pwm)
->                            LPC18XX_PWM_EVSTATEMSK(lpc18xx_data->duty_event),
->                            LPC18XX_PWM_EVSTATEMSK_ALL);
->
-> -       if (pwm->polarity == PWM_POLARITY_NORMAL) {
-> +       if (pwm_get_polarity((pwm)) == PWM_POLARITY_NORMAL) {
-
-What is the deal with the double parentheses?
-
-Think I saw that in some of the other patches as well.
-
-
-regards,
-Joachim Eastwood
+Thanks, I will fix that.
