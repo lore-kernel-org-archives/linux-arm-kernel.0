@@ -1,41 +1,43 @@
-From: timur@codeaurora.org (Timur Tabi)
-Date: Mon, 16 Nov 2015 14:52:00 -0600
-Subject: [PATCH 10/12] tty: amba-pl011: add support for 32-bit register
- access
-In-Reply-To: <20151116183006.GZ8644@n2100.arm.linux.org.uk>
-References: <20151116173935.GQ8644@n2100.arm.linux.org.uk>
- <E1ZyNls-0003kA-Fe@rmk-PC.arm.linux.org.uk> <564A1628.9010900@codeaurora.org>
- <20151116175217.GT8644@n2100.arm.linux.org.uk>
- <564A1FA9.8010109@codeaurora.org>
- <20151116183006.GZ8644@n2100.arm.linux.org.uk>
-Message-ID: <564A41F0.3030105@codeaurora.org>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Mon, 16 Nov 2015 15:57:36 -0500 (EST)
+Subject: [PATCH v3] ARM: xip: Use correct symbol for end of ROM marker
+In-Reply-To: <20151116181718.GW8644@n2100.arm.linux.org.uk>
+References: <1447362108-4333-1-git-send-email-chris.brandt@renesas.com>
+ <1447697140-4099-1-git-send-email-chris.brandt@renesas.com>
+ <20151116181718.GW8644@n2100.arm.linux.org.uk>
+Message-ID: <alpine.LFD.2.20.1511161550370.5826@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/16/2015 12:30 PM, Russell King - ARM Linux wrote:
-> We_could_  augment include/uapi/linux/serial.h and
-> include/linux/serial_core.h to add a 16-bit LE MMIO accessor identifier,
-> but hacking it by deciding to re-use SERIAL_IO_PORT for something it
-> isn't is abhorrent to me.
+On Mon, 16 Nov 2015, Russell King - ARM Linux wrote:
 
-I don't want to belabor this, because there's nothing wrong with your 
-patch.  I can understand that we shouldn't be mis-using a variable, but 
-I don't understand how this is a misuse of SERIAL_IO_PORT.
+> Nico,
+> 
+> As you originally created the XIP stuff, I hope you can remember
+> the details - can you check this patch please?
+> 
+> I'm thinking that we need a new symbol around here:
+> 
+> #ifdef CONFIG_XIP_KERNEL
+>         __data_loc = ALIGN(4);          /* location in binary */
+> 					<=== here
+>         . = PAGE_OFFSET + TEXT_OFFSET;
+> #else
+> 
+> to denote the end of the XIP kernel image which must remain
+> accessible after boot.  We don't need the data sections because
+> they will have been copied to RAM, and we probably don't want to
+> keep those exposed (it's potentially useful for attackers.)
 
-We could do something like:
+The _etext symbol is already used for that purpose.
 
-#define UPIO_PORT               (SERIAL_IO_PORT)
-#define UPIO_HUB6               (SERIAL_IO_HUB6)
-#define UPIO_MEM                (SERIAL_IO_MEM)		// 8-bit
-#define UPIO_MEM32              (SERIAL_IO_MEM32)   	// 32-bit
-#define UPIO_AU                 (SERIAL_IO_AU)
-#define UPIO_TSI                (SERIAL_IO_TSI)
-#define UPIO_MEM32BE            (SERIAL_IO_MEM32BE)
-#define UPIO_MEMx		(SERIAL_IO_MEMx)	// any bit
+Now we round it up to the next section mapping which might leave quite a 
+lot of data content exposed in ROM.  But given it is more or less the 
+same data present in RAM except for those bits that are modified at run 
+time, I don't see what an attacker would gain from the data in ROM   
+that cannot already be obtained from kernel RAM.  If the section mapping 
+extends to part of the ROM that is no longer kernel data then maybe this 
+would expose sensitive data.  Is that what you're worried about?
 
-uap->port.iotype = vendor->access_32b ? UPIO_MEM32 : UPIO_MEMx;
 
--- 
-Qualcomm Innovation Center, Inc.
-The Qualcomm Innovation Center, Inc. is a member of the
-Code Aurora Forum, a Linux Foundation Collaborative Project.
+Nicolas
