@@ -1,19 +1,44 @@
 From: clabbe.montjoie@gmail.com (LABBE Corentin)
-Date: Mon, 16 Nov 2015 09:35:53 +0100
+Date: Mon, 16 Nov 2015 09:35:54 +0100
 Subject: [PATCH v2] crypto: sun4i-ss: add missing statesize
-Message-ID: <1447662954-1788-1-git-send-email-clabbe.montjoie@gmail.com>
+In-Reply-To: <1447662954-1788-1-git-send-email-clabbe.montjoie@gmail.com>
+References: <1447662954-1788-1-git-send-email-clabbe.montjoie@gmail.com>
+Message-ID: <1447662954-1788-2-git-send-email-clabbe.montjoie@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+sun4i-ss implementaton of md5/sha1 is via ahash algorithms.
+Commit 8996eafdcbad ("crypto: ahash - ensure statesize is non-zero")
+made impossible to load them without giving statesize. This patch
+specifiy statesize for sha1 and md5.
 
-Hello
+Fixes: 6298e948215f ("crypto: sunxi-ss - Add Allwinner Security System crypto accelerator")
+Cc: <stable@vger.kernel.org> # v4.3+
+Tested-by: Chen-Yu Tsai <wens@csie.org>
+Signed-off-by: LABBE Corentin <clabbe.montjoie@gmail.com>
+---
+ drivers/crypto/sunxi-ss/sun4i-ss-core.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
-The current sun4i-ss cannot be loaded with the error "Failed to load md5".
-The following patch will fix that.
-
-Changes since v1:
-- Add the correct fixes tag.
-- Add the correct #version comment for stable.
-- Be more precise against the commit who made this change necessary.
-
-Regards
+diff --git a/drivers/crypto/sunxi-ss/sun4i-ss-core.c b/drivers/crypto/sunxi-ss/sun4i-ss-core.c
+index eab6fe2..107cd2a 100644
+--- a/drivers/crypto/sunxi-ss/sun4i-ss-core.c
++++ b/drivers/crypto/sunxi-ss/sun4i-ss-core.c
+@@ -39,6 +39,7 @@ static struct sun4i_ss_alg_template ss_algs[] = {
+ 		.import = sun4i_hash_import_md5,
+ 		.halg = {
+ 			.digestsize = MD5_DIGEST_SIZE,
++			.statesize = sizeof(struct md5_state),
+ 			.base = {
+ 				.cra_name = "md5",
+ 				.cra_driver_name = "md5-sun4i-ss",
+@@ -66,6 +67,7 @@ static struct sun4i_ss_alg_template ss_algs[] = {
+ 		.import = sun4i_hash_import_sha1,
+ 		.halg = {
+ 			.digestsize = SHA1_DIGEST_SIZE,
++			.statesize = sizeof(struct sha1_state),
+ 			.base = {
+ 				.cra_name = "sha1",
+ 				.cra_driver_name = "sha1-sun4i-ss",
+-- 
+2.4.10
