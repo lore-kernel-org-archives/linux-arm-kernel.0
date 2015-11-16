@@ -1,46 +1,36 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 16 Nov 2015 17:41:18 +0100
-Subject: [PATCH] pinctrl: fix qcom ssbi drivers for 64-bit compilation
-Message-ID: <5235862.Gokjxf5QH1@wuerfel>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Tue, 17 Nov 2015 00:38:25 +0800
+Subject: [PATCH v3 6/9] ARM: dts: sun8i: Add simplefb node labels to reference
+ at board level
+In-Reply-To: <1447691908-25456-1-git-send-email-wens@csie.org>
+References: <1447691908-25456-1-git-send-email-wens@csie.org>
+Message-ID: <1447691908-25456-7-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When building pinctrl-ssbi-gpio and pinctrl-ssbi-mpp for ARM64, we get
-a compile warning about invalid types:
+Some boards, such as tablets, have regulators providing power to parts
+of the display pipeline, like signal converters and LCD panels.
 
-drivers/pinctrl/qcom/pinctrl-ssbi-gpio.c: In function 'pm8xxx_gpio_probe':
-drivers/pinctrl/qcom/pinctrl-ssbi-gpio.c:675:17: warning: cast from pointer to integer of different size [-Wpointer-to-int-cast]
-drivers/pinctrl/qcom/pinctrl-ssbi-mpp.c: In function 'pm8xxx_mpp_probe':
-drivers/pinctrl/qcom/pinctrl-ssbi-mpp.c:766:17: warning: cast from pointer to integer of different size [-Wpointer-to-int-cast]
+Add labels to the simplefb device nodes so that we can reference them
+in the board dts files to add regulator supply properties.
 
-This changes the code so we cast the pointer to 'unsigned long', which
-is the right thing to do here.
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+---
+ arch/arm/boot/dts/sun8i-a23-a33.dtsi | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-
-diff --git a/drivers/pinctrl/qcom/pinctrl-ssbi-gpio.c b/drivers/pinctrl/qcom/pinctrl-ssbi-gpio.c
-index d809c9eaa323..19a3c3bc2f1f 100644
---- a/drivers/pinctrl/qcom/pinctrl-ssbi-gpio.c
-+++ b/drivers/pinctrl/qcom/pinctrl-ssbi-gpio.c
-@@ -672,7 +672,7 @@ static int pm8xxx_gpio_probe(struct platform_device *pdev)
- 		return -ENOMEM;
+diff --git a/arch/arm/boot/dts/sun8i-a23-a33.dtsi b/arch/arm/boot/dts/sun8i-a23-a33.dtsi
+index 0c0964d4fa1f..6f88fb0ddbc7 100644
+--- a/arch/arm/boot/dts/sun8i-a23-a33.dtsi
++++ b/arch/arm/boot/dts/sun8i-a23-a33.dtsi
+@@ -56,7 +56,7 @@
+ 		#size-cells = <1>;
+ 		ranges;
  
- 	pctrl->dev = &pdev->dev;
--	pctrl->npins = (unsigned)of_device_get_match_data(&pdev->dev);
-+	pctrl->npins = (unsigned long)of_device_get_match_data(&pdev->dev);
- 
- 	pctrl->regmap = dev_get_regmap(pdev->dev.parent, NULL);
- 	if (!pctrl->regmap) {
-diff --git a/drivers/pinctrl/qcom/pinctrl-ssbi-mpp.c b/drivers/pinctrl/qcom/pinctrl-ssbi-mpp.c
-index 8982027de8e8..b868ef1766a0 100644
---- a/drivers/pinctrl/qcom/pinctrl-ssbi-mpp.c
-+++ b/drivers/pinctrl/qcom/pinctrl-ssbi-mpp.c
-@@ -763,7 +763,7 @@ static int pm8xxx_mpp_probe(struct platform_device *pdev)
- 		return -ENOMEM;
- 
- 	pctrl->dev = &pdev->dev;
--	pctrl->npins = (unsigned)of_device_get_match_data(&pdev->dev);
-+	pctrl->npins = (unsigned long)of_device_get_match_data(&pdev->dev);
- 
- 	pctrl->regmap = dev_get_regmap(pdev->dev.parent, NULL);
- 	if (!pctrl->regmap) {
+-		framebuffer at 0 {
++		simplefb_lcd: framebuffer at 0 {
+ 			compatible = "allwinner,simple-framebuffer",
+ 				     "simple-framebuffer";
+ 			allwinner,pipeline = "de_be0-lcd0";
+-- 
+2.6.2
