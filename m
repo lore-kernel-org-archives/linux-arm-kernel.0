@@ -1,73 +1,23 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 16 Nov 2015 14:45:25 +0000
-Subject: [PATCH 1/2] Documentation: DT: Add entry for ARM SP805-WDT
-In-Reply-To: <1447683883-6600-2-git-send-email-bhupesh.sharma@freescale.com>
-References: <1447683883-6600-1-git-send-email-bhupesh.sharma@freescale.com>
- <1447683883-6600-2-git-send-email-bhupesh.sharma@freescale.com>
-Message-ID: <20151116144525.GM20696@leverpostej>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Mon, 16 Nov 2015 15:45:17 +0100
+Subject: [PATCH v4 00/24] pwm: add support for atomic update
+In-Reply-To: <1447664207-24370-1-git-send-email-boris.brezillon@free-electrons.com>
+References: <1447664207-24370-1-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <3500453.9dNCEh5KzI@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 16, 2015 at 07:54:42PM +0530, Bhupesh Sharma wrote:
-> This patch adds a devicetree binding documentation for ARM's
-> SP805 WatchDog Timer.
+Hi Boris,
+
+Am Montag, 16. November 2015, 09:56:23 schrieb Boris Brezillon:
+> Hello,
 > 
-> Signed-off-by: Bhupesh Sharma <bhupesh.sharma@freescale.com>
-> ---
->  .../devicetree/bindings/watchdog/sp805-wdt.txt     |   33 ++++++++++++++++++++
->  1 file changed, 33 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/watchdog/sp805-wdt.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/watchdog/sp805-wdt.txt b/Documentation/devicetree/bindings/watchdog/sp805-wdt.txt
-> new file mode 100644
-> index 0000000..ec70fe9
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/watchdog/sp805-wdt.txt
-> @@ -0,0 +1,33 @@
-> +* ARM SP805 Watchdog Timer (WDT) Controller
-> +
-> +SP805 WDT is a ARM Primecell Peripheral and has a standard-id register that
-> +can be used to identify the peripheral type, vendor, and revision.
-> +This value can be used for driver matching.
-> +
-> +Note that the current sp805_wdt driver relies on the 'drivers/amba/bus.c'
-> +framework to invoke the probe function of the sp805_wdt driver using the
-> +unique PRIMECELL identifiers of the sp805 wdt IP.
+> This series adds support for atomic PWM update, or IOW, the capability
+> to update all the parameters of a PWM device (enabled/disabled, period,
+> duty and polarity) in one go.
 
-This paragraph can go. We shouldn't describe kernel internals.
+you already include my tested-by tags, but anyway, the series still works 
+nicely on 4.4-rc1 on my veyron chromebook.
 
-> +As SP805 WDT is a primecell IP, it follows the base bindings specified in
-> +'arm/primecell.txt'
-> +
-> +Required properties:
-> +- compatible : Should be "arm,sp805-wdt", "arm,primecell"
-> +- reg : Base address and size of the watchdog timer registers.
-> +- interrupts : Should specify WDT interrupt number.
-> +
-> +Optional properties:
-> +- clocks : From common clock binding. First clock is phandle to clock for apb
-> +           pclk. Additional clocks are optional.
-> +- clock-names : From common clock binding. Shall be "apb_pclk" for first clock.
 
-The hardware has "WDOGCLK", which is what the driver appears to expect
-first implicitly.
-
-> +Examples:
-> +
-> +		cluster1_core0_watchdog: wdt at c000000 {
-> +			compatible = "arm,sp805-wdt", "arm,primecell";
-> +			reg = <0x0 0xc000000 0x0 0x1000>;
-> +			interrupts = <1 12 0x8>; /* PPI, Level low type */
-
-I don't see how you can use PPIs here. This is not banked per CPU.
-
-Mark.
-
-> +			clocks = <&clockgen 4 3>;
-> +			clock-names = "apb_pclk";
-> +		};
-> +
-> -- 
-> 1.7.9.5
-> 
-> 
+Heiko
