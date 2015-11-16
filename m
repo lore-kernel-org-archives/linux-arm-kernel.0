@@ -1,47 +1,40 @@
-From: dhdang@apm.com (Duc Dang)
-Date: Mon, 16 Nov 2015 11:22:01 -0800
-Subject: [PATCH v3 0/3] mailbox: Add APM X-Gene platform mailbox driver
-In-Reply-To: <cover.1447091625.git.dhdang@apm.com>
-References: <1429863912.2927.43.camel@x220>
- <cover.1447091625.git.dhdang@apm.com>
-Message-ID: <CADaLNDkjS+LstNcgKoLWHrMdgU9cmZ7vrCSp-du=FNoCTKFJ0w@mail.gmail.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 16 Nov 2015 19:26:28 +0000
+Subject: A problem about interrupt when booting a captured kernel
+In-Reply-To: <5645B6D3.60305@huawei.com>
+References: <5645B6D3.60305@huawei.com>
+Message-ID: <564A2DE4.4030702@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 9, 2015 at 10:05 AM, Duc Dang <dhdang@apm.com> wrote:
-> APM X-Gene SoC has a mailbox controller that provides
-> communication mechanism for X-Gene Arm64 cores to communicate
-> with X-Gene SoC's Cortex M3 (SLIMpro) processor.
->
-> X-Gene mailbox controller provides 8 mailbox channels, with
-> each channel has a dedicated interrupt line.
->
-> Changes since v2:
->         - Rebase Feng's patch set over v4.3-rc5
->         - Remove uneccessary 'inline' in function definition
->         - Use module_platform_driver instead of subsys_initcall
->         - Minor coding stype clean up
->
-> Changes since v1:
->         - Add ACPI support
->         - Use defines for reg offset
->
->  .../bindings/mailbox/xgene-slimpro-mailbox.txt     |  34 +++
->  arch/arm64/boot/dts/apm/apm-storm.dtsi             |  14 ++
->  drivers/mailbox/Kconfig                            |   9 +
->  drivers/mailbox/Makefile                           |   2 +
->  drivers/mailbox/mailbox-xgene-slimpro.c            | 264 +++++++++++++++++++++
->  5 files changed, 323 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/mailbox/xgene-slimpro-mailbox.txt
->  create mode 100644 drivers/mailbox/mailbox-xgene-slimpro.c
->
+On 13/11/15 10:09, Yang Yingliang wrote:
+> Hi, Marc
+> 
+> 
+>      The kexec will boot a captured kernel while the kernel panic. But
+> it boots failed if the kernel panic in handler function of PPI. The 
+> reason is that the PPI has not been 'eoi', other interrupts can not be 
+> handled when booting  the captured kernel.
+> 
+>      The kexec will call irq_eoi to end the irqs that have
+> IRQD_IRQ_INPROGRESS flag. But PPIs don't have this flag, so it won't be 
+> ended.
+> 
+>     Three ways to solve this problem we can think :
+>     1. Is there a way to reset gic like its_reset ?
+>     2. Can we add some flag for calling irq_eoi ?
+>     3. Just 'eoi' all PPIs without checking flags in kexec.
+> 
+>      Please give some advice.
 
-Hi Jassi, Paul,
+Good timing. Please see:
 
-Do you have any comment on this patch set?
+http://lists.infradead.org/pipermail/linux-arm-kernel/2015-November/385383.html
 
-> --
-> 1.9.1
->
-Regards,
-Duc dang.
+and let me know if that fixes things for you.
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
