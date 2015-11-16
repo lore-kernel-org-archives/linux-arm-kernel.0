@@ -1,41 +1,35 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Mon, 16 Nov 2015 14:37:57 +0100
-Subject: [PATCH 24/27] mtd: nand: add helpers to access ->priv
+Date: Mon, 16 Nov 2015 14:37:49 +0100
+Subject: [PATCH 16/27] staging: mt29f_spinand: use the mtd instance embedded
+ in struct nand_chip
 In-Reply-To: <1447681080-31232-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1447681080-31232-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1447681080-31232-25-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1447681080-31232-17-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add two helpers to access the field reserved for private controller data.
-This makes it clearer what this field is reserved for and ease future
-refactoring.
+struct nand_chip now embeds an mtd device, use it instead of allocating
+a new one.
 
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 ---
- include/linux/mtd/nand.h | 10 ++++++++++
- 1 file changed, 10 insertions(+)
+ drivers/staging/mt29f_spinand/mt29f_spinand.c | 4 +---
+ 1 file changed, 1 insertion(+), 3 deletions(-)
 
-diff --git a/include/linux/mtd/nand.h b/include/linux/mtd/nand.h
-index f12efe1..4afa263 100644
---- a/include/linux/mtd/nand.h
-+++ b/include/linux/mtd/nand.h
-@@ -739,6 +739,16 @@ static inline struct mtd_info *nand_to_mtd(struct nand_chip *chip)
- 	return &chip->mtd;
- }
+diff --git a/drivers/staging/mt29f_spinand/mt29f_spinand.c b/drivers/staging/mt29f_spinand/mt29f_spinand.c
+index 8924a96..8171b74 100644
+--- a/drivers/staging/mt29f_spinand/mt29f_spinand.c
++++ b/drivers/staging/mt29f_spinand/mt29f_spinand.c
+@@ -903,9 +903,7 @@ static int spinand_probe(struct spi_device *spi_nand)
+ 	chip->options	|= NAND_CACHEPRG;
+ 	chip->select_chip = spinand_select_chip;
  
-+static inline void *nand_get_controller_data(struct nand_chip *chip)
-+{
-+	return chip->priv;
-+}
-+
-+static inline void nand_set_controller_data(struct nand_chip *chip, void *priv)
-+{
-+	chip->priv = priv;
-+}
-+
- /*
-  * NAND Flash Manufacturer ID Codes
-  */
+-	mtd = devm_kzalloc(&spi_nand->dev, sizeof(struct mtd_info), GFP_KERNEL);
+-	if (!mtd)
+-		return -ENOMEM;
++	mtd = nand_to_mtd(chip);
+ 
+ 	dev_set_drvdata(&spi_nand->dev, mtd);
+ 
 -- 
 2.1.4
