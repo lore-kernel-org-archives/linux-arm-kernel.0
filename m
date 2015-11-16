@@ -1,53 +1,110 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 16 Nov 2015 16:58:21 +0100
-Subject: [PATCH V5 2/3] dma: add Qualcomm Technologies HIDMA management
- driver
-In-Reply-To: <1447620855-4974-3-git-send-email-okaya@codeaurora.org>
-References: <1447620855-4974-1-git-send-email-okaya@codeaurora.org>
- <1447620855-4974-3-git-send-email-okaya@codeaurora.org>
-Message-ID: <6159200.u9U0p8aIkU@wuerfel>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Mon, 16 Nov 2015 07:59:23 -0800
+Subject: [PATCH v4 04/24] hwmon: pwm-fan: use pwm_get_xxx() helpers where
+ appropriate
+In-Reply-To: <1447664207-24370-5-git-send-email-boris.brezillon@free-electrons.com>
+References: <1447664207-24370-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1447664207-24370-5-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <5649FD5B.3000208@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sunday 15 November 2015 15:54:13 Sinan Kaya wrote:
-> The Qualcomm Technologies HIDMA device has been designed
-> to support virtualization technology. The driver has been
-> divided into two to follow the hardware design.
-> 
-> 1. HIDMA Management driver
-> 2. HIDMA Channel driver
-> 
-> Each HIDMA HW consists of multiple channels. These channels
-> share some set of common parameters. These parameters are
-> initialized by the management driver during power up.
-> Same management driver is used for monitoring the execution
-> of the channels. Management driver can change the performance
-> behavior dynamically such as bandwidth allocation and
-> prioritization.
-> 
-> The management driver is executed in hypervisor context and
-> is the main management entity for all channels provided by
-> the device.
+On 11/16/2015 12:56 AM, Boris Brezillon wrote:
+> Use pwm_get_xxx() helpers instead of directly accessing the pwm->xxx field.
+> Doing that will ease adaptation of the PWM framework to support atomic
+> update.
+>
+> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> ---
+> Patch generated with the following coccinelle script:
+>
+> --->8---
+> virtual patch
+>
+> @@
+> struct pwm_device *p;
+> expression e;
+> @@
+> (
+> -(p)->polarity = e;
+> +pwm_set_polarity((p), e);
+> |
+> -(p)->polarity
+> +pwm_get_polarity((p))
 
-Sorry for asking this question so late, but can you explain what the
-point is behind this? It seems counterintuitive to me to have a
-DMA engine that is meant for speeding up memory-to-memory transfers
-when you run it in a virtual machine where you either need to go
-through a virtual IOMMU to set up page table entries, as that will
-likely cause more performance overhead than you could possibly
-gain, or you assume that all the guest memory is pinned, which
-in turn destroys a lot of the assumptions that we are making
-in KVM to have useful VM guests.
+s/((p))/(p)/
 
-Where am I going wrong here?
+> |
+> -(p)->period = e;
+> +pwm_set_period((p), e);
+> |
+> -(p)->period
+> +pwm_get_period((p))
 
->  .../devicetree/bindings/dma/qcom_hidma_mgmt.txt    |  61 ++++
->  drivers/dma/qcom/Kconfig                           |  10 +
->  drivers/dma/qcom/Makefile                          |   1 +
->  drivers/dma/qcom/hidma_mgmt.c                      | 306 +++++++++++++++++++++
->  drivers/dma/qcom/hidma_mgmt.h                      |  38 +++
->  drivers/dma/qcom/hidma_mgmt_sys.c                  | 231 ++++++++++++++++
+s/((p))/(p)/
 
-Each sysfs file API you add needs a documentation in Documentation/ABI/.
+> |
+> -(p)->duty_cycle = e;
+> +pwm_set_duty_cycle((p), e);
 
-	Arnd
+The (p) seems unnecessary here.
+
+> |
+> -(p)->duty_cycle
+> +pwm_get_duty_cycle((p))
+
+s/((p))/(p)/
+
+> )
+> --->8---
+> ---
+>   drivers/hwmon/pwm-fan.c | 13 +++++++------
+>   1 file changed, 7 insertions(+), 6 deletions(-)
+>
+> diff --git a/drivers/hwmon/pwm-fan.c b/drivers/hwmon/pwm-fan.c
+> index 3e23003..105b964 100644
+> --- a/drivers/hwmon/pwm-fan.c
+> +++ b/drivers/hwmon/pwm-fan.c
+> @@ -47,8 +47,8 @@ static int  __set_pwm(struct pwm_fan_ctx *ctx, unsigned long pwm)
+>   	if (ctx->pwm_value == pwm)
+>   		goto exit_set_pwm_err;
+>
+> -	duty = DIV_ROUND_UP(pwm * (ctx->pwm->period - 1), MAX_PWM);
+> -	ret = pwm_config(ctx->pwm, duty, ctx->pwm->period);
+> +	duty = DIV_ROUND_UP(pwm * (pwm_get_period((ctx->pwm)) - 1), MAX_PWM);
+> +	ret = pwm_config(ctx->pwm, duty, pwm_get_period((ctx->pwm)));
+
+Please drop all the unnecessary ( ).
+
+Thanks,
+Guenter
+
+>   	if (ret)
+>   		goto exit_set_pwm_err;
+>
+> @@ -234,10 +234,10 @@ static int pwm_fan_probe(struct platform_device *pdev)
+>   	platform_set_drvdata(pdev, ctx);
+>
+>   	/* Set duty cycle to maximum allowed */
+> -	duty_cycle = ctx->pwm->period - 1;
+> +	duty_cycle = pwm_get_period((ctx->pwm)) - 1;
+>   	ctx->pwm_value = MAX_PWM;
+>
+> -	ret = pwm_config(ctx->pwm, duty_cycle, ctx->pwm->period);
+> +	ret = pwm_config(ctx->pwm, duty_cycle, pwm_get_period((ctx->pwm)));
+>   	if (ret) {
+>   		dev_err(&pdev->dev, "Failed to configure PWM\n");
+>   		return ret;
+> @@ -309,8 +309,9 @@ static int pwm_fan_resume(struct device *dev)
+>   	if (ctx->pwm_value == 0)
+>   		return 0;
+>
+> -	duty = DIV_ROUND_UP(ctx->pwm_value * (ctx->pwm->period - 1), MAX_PWM);
+> -	ret = pwm_config(ctx->pwm, duty, ctx->pwm->period);
+> +	duty = DIV_ROUND_UP(ctx->pwm_value * (pwm_get_period((ctx->pwm)) - 1),
+> +			    MAX_PWM);
+> +	ret = pwm_config(ctx->pwm, duty, pwm_get_period((ctx->pwm)));
+>   	if (ret)
+>   		return ret;
+>   	return pwm_enable(ctx->pwm);
+>
