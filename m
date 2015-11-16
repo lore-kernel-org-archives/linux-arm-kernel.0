@@ -1,30 +1,38 @@
-From: nizamhaider786@gmail.com (Nizam Haider)
-Date: Mon, 16 Nov 2015 04:41:51 +0530
-Subject: [PATCH] IIO: adc: xilinx-xadc-core.c: constify iio_buffer_setup_ops
- structure
-Message-ID: <1447629111-6400-1-git-send-email-nizamhaider786@gmail.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Mon, 16 Nov 2015 10:36:13 +0900
+Subject: [PATCH 0/2] arm64: EXYNOS: Consolidate Exynos7 symbol
+Message-ID: <1447637775-9887-1-git-send-email-k.kozlowski@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-structure iio_buffer_setup_ops is never modified, so declare it as const.
+Hi,
 
-Signed-off-by: Nizam Haider <nijamh@cdac.in>
----
- drivers/iio/adc/xilinx-xadc-core.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+We don't need ARCH_EXYNOS7 symbol because all ARMv8 platforms should
+fall under generic ARCH_EXYNOS. In the same time there is no sense
+in building clocks for these ARMv8 SoCs on ARMv7 builds. In future
+this will also influence PMU [1] driver.
 
-diff --git a/drivers/iio/adc/xilinx-xadc-core.c b/drivers/iio/adc/xilinx-xadc-core.c
-index 0370624..c2b5f10 100644
---- a/drivers/iio/adc/xilinx-xadc-core.c
-+++ b/drivers/iio/adc/xilinx-xadc-core.c
-@@ -803,7 +803,7 @@ err:
- 	return ret;
- }
- 
--static struct iio_buffer_setup_ops xadc_buffer_ops = {
-+static const struct iio_buffer_setup_ops xadc_buffer_ops = {
- 	.preenable = &xadc_preenable,
- 	.postenable = &iio_triggered_buffer_postenable,
- 	.predisable = &iio_triggered_buffer_predisable,
+Patch 2 *depends* on patch 1. With ack from clock guys everything could
+go through ARM64 tree... or the opposite path.
+
+Best regards,
+Krzysztof
+
+
+[1] https://www.mail-archive.com/linux-samsung-soc at vger.kernel.org/msg48090.html
+
+
+
+Krzysztof Kozlowski (2):
+  clk: samsung: Don't build ARMv8 clock drivers on ARMv7
+  arm64: EXYNOS: Consolidate ARCH_EXYNOS7 symbol into ARCH_EXYNOS
+
+ arch/arm64/Kconfig.platforms        | 11 ++---------
+ arch/arm64/boot/dts/exynos/Makefile |  2 +-
+ arch/arm64/configs/defconfig        |  2 +-
+ drivers/clk/samsung/Kconfig         | 13 +++++++++++++
+ drivers/clk/samsung/Makefile        |  4 ++--
+ 5 files changed, 19 insertions(+), 13 deletions(-)
+
 -- 
-1.8.1.4
+1.9.1
