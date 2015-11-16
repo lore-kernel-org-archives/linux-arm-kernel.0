@@ -1,122 +1,73 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 16 Nov 2015 17:25:48 +0100
-Subject: [RFC] ARM64: simplify dma_get_ops
-Message-ID: <4270550.cGd11OgA5n@wuerfel>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 16 Nov 2015 16:30:16 +0000
+Subject: [PATCH 2/2] drm/rockchip: Convert the probe function to the
+ generic drm_of_component_probe()
+In-Reply-To: <1447685093-26129-3-git-send-email-Liviu.Dudau@arm.com>
+References: <1447685093-26129-1-git-send-email-Liviu.Dudau@arm.com>
+ <1447685093-26129-3-git-send-email-Liviu.Dudau@arm.com>
+Message-ID: <20151116163016.GO8644@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Including linux/acpi.h from asm/dma-mapping.h causes tons of compile-time
-warnings, e.g.
+I've tweaked your patch to make the above (buggy) change a little clearer.
 
- drivers/isdn/mISDN/dsp_ecdis.h:43:0: warning: "FALSE" redefined
- drivers/isdn/mISDN/dsp_ecdis.h:44:0: warning: "TRUE" redefined
- drivers/net/fddi/skfp/h/targetos.h:62:0: warning: "TRUE" redefined
- drivers/net/fddi/skfp/h/targetos.h:63:0: warning: "FALSE" redefined
+On Mon, Nov 16, 2015 at 02:44:53PM +0000, Liviu Dudau wrote:
+> -	for (i = 0;; i++) {
+> -		port = of_parse_phandle(np, "ports", i);
+> -		if (!port)
+> -			break;
+> -
+> -		if (!of_device_is_available(port->parent)) {
+> -			of_node_put(port);
+> -			continue;
+> -		}
+>  
+> -		component_match_add(dev, &match, compare_of, port->parent);
+> -		of_node_put(port);
+> -	}
 
-However, it looks like the dependency should not even there as
-I do not see why __generic_dma_ops() cares about whether we have
-an ACPI based system or not.
+> -static int compare_of(struct device *dev, void *data)
+> -{
+> -	struct device_node *np = data;
+> -
+> -	return dev->of_node == np;
+> -}
 
-The current behavior is to fall back to the global dma_ops when
-a device has not set its own dma_ops, but only for DT based systems.
-This seems dangerous, as a random device might have different
-requirements regarding IOMMU or coherency, so we should really
-never have that fallback and just forbid DMA when we have not
-initialized DMA for a device.
+The original above passes port->parent to component_match_add().  This
+means 'np' in the above compare_of() function is 'port->parent'.
 
-This removes the global dma_ops variable and the special-casing
-for ACPI, and just returns the dma ops that got set for the
-device, or the dummy_dma_ops if none were present.
+This means the above comparison is effectively:
 
-The original code has apparently been copied from arm32 where we
-rely on it for ISA devices things like the floppy controller, but
-we should have no such devices on ARM64.
+	dev->of_node == port->parent
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
+The generic code instead does this:
 
-diff --git a/arch/arm64/include/asm/dma-mapping.h b/arch/arm64/include/asm/dma-mapping.h
-index 54d0ead41afc..04e841a1c1f3 100644
---- a/arch/arm64/include/asm/dma-mapping.h
-+++ b/arch/arm64/include/asm/dma-mapping.h
-@@ -18,7 +18,6 @@
- 
- #ifdef __KERNEL__
- 
--#include <linux/acpi.h>
- #include <linux/types.h>
- #include <linux/vmalloc.h>
- 
-@@ -26,22 +25,17 @@
- #include <asm/xen/hypervisor.h>
- 
- #define DMA_ERROR_CODE	(~(dma_addr_t)0)
--extern struct dma_map_ops *dma_ops;
- extern struct dma_map_ops dummy_dma_ops;
- 
- static inline struct dma_map_ops *__generic_dma_ops(struct device *dev)
- {
--	if (unlikely(!dev))
--		return dma_ops;
--	else if (dev->archdata.dma_ops)
-+	if (dev && dev->archdata.dma_ops)
- 		return dev->archdata.dma_ops;
--	else if (acpi_disabled)
--		return dma_ops;
- 
- 	/*
--	 * When ACPI is enabled, if arch_set_dma_ops is not called,
--	 * we will disable device DMA capability by setting it
--	 * to dummy_dma_ops.
-+	 * we expect no ISA devices, and all other DMA masters are
-+	 * expected to have someone call arch_setup_dma_ops at
-+	 * device creation time
- 	 */
- 	return &dummy_dma_ops;
- }
-diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
-index 131a199114b4..9e351c1f89e2 100644
---- a/arch/arm64/mm/dma-mapping.c
-+++ b/arch/arm64/mm/dma-mapping.c
-@@ -18,6 +18,7 @@
-  */
- 
- #include <linux/gfp.h>
-+#include <linux/acpi.h>
- #include <linux/export.h>
- #include <linux/slab.h>
- #include <linux/genalloc.h>
-@@ -28,9 +29,6 @@
- 
- #include <asm/cacheflush.h>
- 
--struct dma_map_ops *dma_ops;
--EXPORT_SYMBOL(dma_ops);
--
- static pgprot_t __get_dma_pgprot(struct dma_attrs *attrs, pgprot_t prot,
- 				 bool coherent)
- {
-@@ -515,13 +513,7 @@ EXPORT_SYMBOL(dummy_dma_ops);
- 
- static int __init arm64_dma_init(void)
- {
--	int ret;
--
--	dma_ops = &swiotlb_dma_ops;
--
--	ret = atomic_pool_init();
--
--	return ret;
-+	return atomic_pool_init();
- }
- arch_initcall(arm64_dma_init);
- 
-@@ -985,7 +977,7 @@ void arch_setup_dma_ops(struct device *dev, u64 dma_base, u64 size,
- 			struct iommu_ops *iommu, bool coherent)
- {
- 	if (!acpi_disabled && !dev->archdata.dma_ops)
--		dev->archdata.dma_ops = dma_ops;
-+		dev->archdata.dma_ops = &swiotlb_dma_ops;
- 
- 	dev->archdata.dma_coherent = coherent;
- 	__iommu_setup_dma_ops(dev, dma_base, size, iommu);
+                component_match_add(dev, &match, compare_of, port);
+
+So what we get in the comparison function is 'port' rather than
+'port->parent':
+
+> +static int compare_port(struct device *dev, void *data)
+>  {
+> +	struct device_node *np = data;
+> +	return dev->parent->of_node == np;
+> +}
+
+which means the comparison is:
+
+	dev->parent->of_node == port
+
+which is a different comparison from the above.
+
+You instead want this to be:
+
+	return dev->of_node == np->parent;
+
+Heiko, please test the above change to compare_port() - I think you'll
+find that will fix your issue.
+
+Thanks.
+
+-- 
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
