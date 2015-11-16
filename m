@@ -1,72 +1,59 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Mon, 16 Nov 2015 09:56:29 +0100
-Subject: [PATCH v4 06/24] pwm: introduce default period and polarity concepts
+Date: Mon, 16 Nov 2015 09:56:33 +0100
+Subject: [PATCH v4 10/24] backlight: pwm: use pwm_get/set_default_xxx()
+ helpers where appropriate
 In-Reply-To: <1447664207-24370-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1447664207-24370-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1447664207-24370-7-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1447664207-24370-11-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When requested by a user, the PWM is assigned a default period and polarity
-extracted from the DT, the platform data or statically set by the driver.
-Those default values are currently stored in the period and polarity
-fields of the pwm_device struct, but they will be stored somewhere else
-once we have introduced the architecture allowing for hardware state
-retrieval.
-
-The pwm_set_default_polarity and pwm_set_default_period should only be
-used by PWM drivers or the PWM core infrastructure to specify the
-default period and polarity values.
-
-PWM users might call the pwm_get_default_period to query the default
-period value. There is currently no helper to query the default
-polarity, but it might be added later on if there is a need for it.
+pwm_set/get_default_xxx() helpers have been introduced to differentiate
+the default PWM states (those retrieved through DT, PWM lookup table or
+statically assigned by the driver) and the current ones.
+Make use of those helpers where appropriate.
 
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-Tested-by: Heiko Stuebner <heiko@sntech.de>
+Acked-by: Lee Jones <lee.jones@linaro.org>
 ---
- include/linux/pwm.h | 17 +++++++++++++++++
- 1 file changed, 17 insertions(+)
+ drivers/video/backlight/lm3630a_bl.c | 4 ++--
+ drivers/video/backlight/pwm_bl.c     | 2 +-
+ 2 files changed, 3 insertions(+), 3 deletions(-)
 
-diff --git a/include/linux/pwm.h b/include/linux/pwm.h
-index cfc3ed4..8ba57fc 100644
---- a/include/linux/pwm.h
-+++ b/include/linux/pwm.h
-@@ -118,11 +118,22 @@ static inline void pwm_set_period(struct pwm_device *pwm, unsigned int period)
- 		pwm->period = period;
- }
+diff --git a/drivers/video/backlight/lm3630a_bl.c b/drivers/video/backlight/lm3630a_bl.c
+index 35fe482..449ebc3 100644
+--- a/drivers/video/backlight/lm3630a_bl.c
++++ b/drivers/video/backlight/lm3630a_bl.c
+@@ -162,7 +162,7 @@ static int lm3630a_intr_config(struct lm3630a_chip *pchip)
  
-+static inline void pwm_set_default_period(struct pwm_device *pwm,
-+					  unsigned int period)
-+{
-+	pwm_set_period(pwm, period);
-+}
-+
- static inline unsigned int pwm_get_period(const struct pwm_device *pwm)
+ static void lm3630a_pwm_ctrl(struct lm3630a_chip *pchip, int br, int br_max)
  {
- 	return pwm ? pwm->period : 0;
- }
+-	unsigned int period = pwm_get_period(pchip->pwmd);
++	unsigned int period = pwm_get_default_period(pchip->pwmd);
+ 	unsigned int duty = br * period / br_max;
  
-+static inline unsigned int pwm_get_default_period(const struct pwm_device *pwm)
-+{
-+	return pwm_get_period(pwm);
-+}
-+
- static inline void pwm_set_duty_cycle(struct pwm_device *pwm, unsigned int duty)
- {
- 	if (pwm)
-@@ -139,6 +150,12 @@ static inline unsigned int pwm_get_duty_cycle(const struct pwm_device *pwm)
-  */
- int pwm_set_polarity(struct pwm_device *pwm, enum pwm_polarity polarity);
+ 	pwm_config(pchip->pwmd, duty, period);
+@@ -425,7 +425,7 @@ static int lm3630a_probe(struct i2c_client *client,
+ 			return PTR_ERR(pchip->pwmd);
+ 		}
+ 	}
+-	pchip->pwmd->period = pdata->pwm_period;
++	pwm_set_default_period(pchip->pwmd, pdata->pwm_period);
  
-+static inline void pwm_set_default_polarity(struct pwm_device *pwm,
-+					    enum pwm_polarity polarity)
-+{
-+	pwm_set_polarity(pwm, polarity);
-+}
-+
- static inline enum pwm_polarity pwm_get_polarity(const struct pwm_device *pwm)
- {
- 	return pwm ? pwm->polarity : PWM_POLARITY_NORMAL;
+ 	/* interrupt enable  : irq 0 is not allowed */
+ 	pchip->irq = client->irq;
+diff --git a/drivers/video/backlight/pwm_bl.c b/drivers/video/backlight/pwm_bl.c
+index ae3c6b6..54d5a03 100644
+--- a/drivers/video/backlight/pwm_bl.c
++++ b/drivers/video/backlight/pwm_bl.c
+@@ -293,7 +293,7 @@ static int pwm_backlight_probe(struct platform_device *pdev)
+ 	 * set the period from platform data if it has not already been set
+ 	 * via the PWM lookup table.
+ 	 */
+-	pb->period = pwm_get_period(pb->pwm);
++	pb->period = pwm_get_default_period(pb->pwm);
+ 	if (!pb->period && (data->pwm_period_ns > 0)) {
+ 		pb->period = data->pwm_period_ns;
+ 		pwm_set_period(pb->pwm, data->pwm_period_ns);
 -- 
 2.1.4
