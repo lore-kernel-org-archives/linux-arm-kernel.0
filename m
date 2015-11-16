@@ -1,29 +1,43 @@
-From: davem@davemloft.net (David Miller)
-Date: Mon, 16 Nov 2015 14:42:16 -0500 (EST)
-Subject: [PATCH] bpf, arm64: start flushing icache range from header
-In-Reply-To: <41c4a481eb665a492c3b2df16af219b1250224a0.1447446460.git.daniel@iogearbox.net>
-References: <41c4a481eb665a492c3b2df16af219b1250224a0.1447446460.git.daniel@iogearbox.net>
-Message-ID: <20151116.144216.8808948219258398.davem@davemloft.net>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 16 Nov 2015 19:45:28 +0000
+Subject: [PATCH v2 07/12] ARM: split off core mapping logic from
+ create_mapping
+In-Reply-To: <CAKv+Gu-P45_S2aHE2Dr=i-2e29-DvmSBR_JWec=JPcZeTMn02Q@mail.gmail.com>
+References: <1447698757-8762-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1447698757-8762-8-git-send-email-ard.biesheuvel@linaro.org>
+ <20151116185519.GE8644@n2100.arm.linux.org.uk>
+ <CAKv+Gu-P45_S2aHE2Dr=i-2e29-DvmSBR_JWec=JPcZeTMn02Q@mail.gmail.com>
+Message-ID: <20151116194528.GI8644@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Daniel Borkmann <daniel@iogearbox.net>
-Date: Sat, 14 Nov 2015 01:16:18 +0100
-
-> While recently going over ARM64's BPF code, I noticed that the icache
-> range we're flushing should start at header already and not at ctx.image.
+On Mon, Nov 16, 2015 at 08:01:03PM +0100, Ard Biesheuvel wrote:
+> On 16 November 2015 at 19:55, Russell King - ARM Linux
+> <linux@arm.linux.org.uk> wrote:
+> > I'm slightly worried about this.  Generally, these functions setup
+> > global mappings.  If you're wanting to have a private set of page
+> > tables for UEFI, and those private page tables contain global
+> > mappings which are different from the mappings in the kernel's page
+> > tables, then you need careful break-TLBflush-make handling when
+> > switching from the kernel's page tables to the private UEFI ones,
+> > and vice versa.
+> >
+> > Has this aspect been considered?
 > 
-> Reason is that after b569c1c622c5 ("net: bpf: arm64: address randomize
-> and write protect JIT code"), we also want to make sure to flush the
-> random-sized trap in front of the start of the actual program (analogous
-> to x86). No operational differences from user side.
-> 
-> Signed-off-by: Daniel Borkmann <daniel@iogearbox.net>
-> Acked-by: Zi Shen Lim <zlim.lnx@gmail.com>
-> Cc: Alexei Starovoitov <ast@kernel.org>
-> ---
->  ( As arm64 jit fixes seem to go via arm64 tree, sending them here. )
+> Yes. The UEFI mappings are all below 1 GB, and the top kernel end is
+> reused as we do for ordinary userland page tables. The switch to the
+> UEFI page tables performs a full TLB flush. What it does not do is
+> break before make, as far as I can tell, so any pointers regarding how
+> to implement that would be appreciated (this is implemented in 11/12)
 
-I'm applying this directly, please CC: netdev on future patches
-to the BPF JIT's regardless of where you think the patch will
-be applied as it should be _REVIEWED_ on netdev regardless.
+What matters is whether they are global mappings or not.  If they are,
+when the TLB can contain conflicting entries.  If they are non-global
+mappings, they will be tagged with the ASID which makes them unique
+to each mm.
+
+The simple solution is to ensure that they're non-global, and then you
+don't need to even worry about flushing the TLB when switching.
+
+-- 
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
