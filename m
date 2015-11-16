@@ -1,52 +1,192 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 16 Nov 2015 13:11:48 +0000
-Subject: [PATCH 10/21] arm64: KVM: Add patchable function selector
+Date: Mon, 16 Nov 2015 13:11:46 +0000
+Subject: [PATCH 08/21] arm64: KVM: Implement debug save/restore
 In-Reply-To: <1447679519-17888-1-git-send-email-marc.zyngier@arm.com>
 References: <1447679519-17888-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1447679519-17888-11-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1447679519-17888-9-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-KVM so far relies on code patching, and is likely to use it more
-in the future. The main issue is that our alternative system works
-at the instruction level, while we'd like to have alternatives at
-the function level.
-
-In order to cope with this, add the "hyp_alternate_select" macro that
-outputs a brief sequence of code that in turn can be patched, allowing
-al alternative function to be selected.
+Implement the debug save restore as a direct translation of
+the assembly code version.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/kvm/hyp/hyp.h | 16 ++++++++++++++++
- 1 file changed, 16 insertions(+)
+ arch/arm64/kvm/hyp/Makefile   |   1 +
+ arch/arm64/kvm/hyp/debug-sr.c | 132 ++++++++++++++++++++++++++++++++++++++++++
+ arch/arm64/kvm/hyp/hyp.h      |  13 +++++
+ 3 files changed, 146 insertions(+)
+ create mode 100644 arch/arm64/kvm/hyp/debug-sr.c
 
-diff --git a/arch/arm64/kvm/hyp/hyp.h b/arch/arm64/kvm/hyp/hyp.h
-index 2937552..bf13238 100644
---- a/arch/arm64/kvm/hyp/hyp.h
-+++ b/arch/arm64/kvm/hyp/hyp.h
-@@ -27,6 +27,22 @@
- 
- #define kern_hyp_va(v) (typeof(v))((unsigned long)v & HYP_PAGE_OFFSET_MASK)
- 
+diff --git a/arch/arm64/kvm/hyp/Makefile b/arch/arm64/kvm/hyp/Makefile
+index ec94200..ec14cac 100644
+--- a/arch/arm64/kvm/hyp/Makefile
++++ b/arch/arm64/kvm/hyp/Makefile
+@@ -6,3 +6,4 @@ obj-$(CONFIG_KVM_ARM_HOST) += vgic-v2-sr.o
+ obj-$(CONFIG_KVM_ARM_HOST) += vgic-v3-sr.o
+ obj-$(CONFIG_KVM_ARM_HOST) += timer-sr.o
+ obj-$(CONFIG_KVM_ARM_HOST) += sysreg-sr.o
++obj-$(CONFIG_KVM_ARM_HOST) += debug-sr.o
+diff --git a/arch/arm64/kvm/hyp/debug-sr.c b/arch/arm64/kvm/hyp/debug-sr.c
+new file mode 100644
+index 0000000..118ea39
+--- /dev/null
++++ b/arch/arm64/kvm/hyp/debug-sr.c
+@@ -0,0 +1,132 @@
 +/*
-+ * Generates patchable code sequences that are used to switch between
-+ * two implementations of a function, depending on the availability of
-+ * a feature.
++ * Copyright (C) 2015 - ARM Ltd
++ * Author: Marc Zyngier <marc.zyngier@arm.com>
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ *
++ * You should have received a copy of the GNU General Public License
++ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
 + */
-+#define hyp_alternate_select(fname, orig, alt, cond)			\
-+typeof(orig) * __hyp_text fname(void)					\
-+{									\
-+	typeof(alt) *val = orig;					\
-+	asm volatile(ALTERNATIVE("nop		\n",			\
-+				 "mov	%0, %1	\n",			\
-+				 cond)					\
-+		     : "+r" (val) : "r" (alt));				\
-+	return val;							\
++
++#include <linux/compiler.h>
++#include <linux/kvm_host.h>
++
++#include <asm/kvm_mmu.h>
++
++#include "hyp.h"
++
++#define read_debug(r,n)		read_sysreg(r##n##_el1)
++#define write_debug(v,r,n)	write_sysreg(v, r##n##_el1)
++
++#define save_debug(ptr,reg,nr)						\
++	switch (nr) {							\
++	case 15:	ptr[15] = read_debug(reg, 15);			\
++	case 14:	ptr[14] = read_debug(reg, 14);			\
++	case 13:	ptr[13] = read_debug(reg, 13);			\
++	case 12:	ptr[12] = read_debug(reg, 12);			\
++	case 11:	ptr[11] = read_debug(reg, 11);			\
++	case 10:	ptr[10] = read_debug(reg, 10);			\
++	case 9:		ptr[9] = read_debug(reg, 9);			\
++	case 8:		ptr[8] = read_debug(reg, 8);			\
++	case 7:		ptr[7] = read_debug(reg, 7);			\
++	case 6:		ptr[6] = read_debug(reg, 6);			\
++	case 5:		ptr[5] = read_debug(reg, 5);			\
++	case 4:		ptr[4] = read_debug(reg, 4);			\
++	case 3:		ptr[3] = read_debug(reg, 3);			\
++	case 2:		ptr[2] = read_debug(reg, 2);			\
++	case 1:		ptr[1] = read_debug(reg, 1);			\
++	default:	ptr[0] = read_debug(reg, 0);			\
++	}
++
++#define restore_debug(ptr,reg,nr)					\
++	switch (nr) {							\
++	case 15:	write_debug(ptr[15], reg, 15);			\
++	case 14:	write_debug(ptr[14], reg, 14);			\
++	case 13:	write_debug(ptr[13], reg, 13);			\
++	case 12:	write_debug(ptr[12], reg, 12);			\
++	case 11:	write_debug(ptr[11], reg, 11);			\
++	case 10:	write_debug(ptr[10], reg, 10);			\
++	case 9:		write_debug(ptr[9], reg, 9);			\
++	case 8:		write_debug(ptr[8], reg, 8);			\
++	case 7:		write_debug(ptr[7], reg, 7);			\
++	case 6:		write_debug(ptr[6], reg, 6);			\
++	case 5:		write_debug(ptr[5], reg, 5);			\
++	case 4:		write_debug(ptr[4], reg, 4);			\
++	case 3:		write_debug(ptr[3], reg, 3);			\
++	case 2:		write_debug(ptr[2], reg, 2);			\
++	case 1:		write_debug(ptr[1], reg, 1);			\
++	default:	write_debug(ptr[0], reg, 0);			\
++	}
++
++void __hyp_text __debug_save_state(struct kvm_vcpu *vcpu,
++				   struct kvm_guest_debug_arch *dbg,
++				   struct kvm_cpu_context *ctxt)
++{
++	if (vcpu->arch.debug_flags & KVM_ARM64_DEBUG_DIRTY) {
++		u64 aa64dfr0 = read_sysreg(id_aa64dfr0_el1);
++		int brps, wrps;
++
++		brps = (aa64dfr0 >> 12) & 0xf;
++		wrps = (aa64dfr0 >> 20) & 0xf;
++
++		save_debug(dbg->dbg_bcr, dbgbcr, brps);
++		save_debug(dbg->dbg_bvr, dbgbvr, brps);
++		save_debug(dbg->dbg_wcr, dbgwcr, wrps);
++		save_debug(dbg->dbg_wvr, dbgwvr, wrps);
++
++		ctxt->sys_regs[MDCCINT_EL1] = read_sysreg(mdccint_el1);
++	}
 +}
 +
- void __vgic_v2_save_state(struct kvm_vcpu *vcpu);
- void __vgic_v2_restore_state(struct kvm_vcpu *vcpu);
++void __hyp_text __debug_restore_state(struct kvm_vcpu *vcpu,
++				      struct kvm_guest_debug_arch *dbg,
++				      struct kvm_cpu_context *ctxt)
++{
++	if (vcpu->arch.debug_flags & KVM_ARM64_DEBUG_DIRTY) {
++		u64 aa64dfr0 = read_sysreg(id_aa64dfr0_el1);
++		int brps, wrps;
++
++		brps = (aa64dfr0 >> 12) & 0xf;
++		wrps = (aa64dfr0 >> 20) & 0xf;
++
++		restore_debug(dbg->dbg_bcr, dbgbcr, brps);
++		restore_debug(dbg->dbg_bvr, dbgbvr, brps);
++		restore_debug(dbg->dbg_wcr, dbgwcr, wrps);
++		restore_debug(dbg->dbg_wvr, dbgwvr, wrps);
++
++		write_sysreg(ctxt->sys_regs[MDCCINT_EL1], mdccint_el1);
++	}
++}
++
++void __hyp_text __debug_cond_save_state(struct kvm_vcpu *vcpu,
++					struct kvm_guest_debug_arch *dbg,
++					struct kvm_cpu_context *ctxt)
++{
++	if ((vcpu->arch.ctxt.sys_regs[MDSCR_EL1] & DBG_MDSCR_KDE) ||
++	    (vcpu->arch.ctxt.sys_regs[MDSCR_EL1] & DBG_MDSCR_KDE))
++		vcpu->arch.debug_flags = KVM_ARM64_DEBUG_DIRTY;
++
++	__debug_save_state(vcpu, dbg, ctxt);
++}
++
++void __hyp_text __debug_clear_restore_state(struct kvm_vcpu *vcpu,
++					    struct kvm_guest_debug_arch *dbg,
++					    struct kvm_cpu_context *ctxt)
++{
++	if (vcpu->arch.debug_flags & KVM_ARM64_DEBUG_DIRTY) {
++		__debug_save_state(vcpu, dbg, ctxt);
++		vcpu->arch.debug_flags = 0;
++	}
++}
++
++u32 __hyp_text __debug_read_mdcr_el2(void)
++{
++	return read_sysreg(mdcr_el2);
++}
+diff --git a/arch/arm64/kvm/hyp/hyp.h b/arch/arm64/kvm/hyp/hyp.h
+index 4639330..9da4205 100644
+--- a/arch/arm64/kvm/hyp/hyp.h
++++ b/arch/arm64/kvm/hyp/hyp.h
+@@ -41,5 +41,18 @@ void __sysreg_restore_state(struct kvm_cpu_context *ctxt);
+ void __sysreg32_save_state(struct kvm_vcpu *vcpu);
+ void __sysreg32_restore_state(struct kvm_vcpu *vcpu);
+ 
++void __debug_save_state(struct kvm_vcpu *vcpu,
++			struct kvm_guest_debug_arch *dbg,
++			struct kvm_cpu_context *ctxt);
++void __debug_restore_state(struct kvm_vcpu *vcpu,
++			   struct kvm_guest_debug_arch *dbg,
++			   struct kvm_cpu_context *ctxt);
++void __debug_cond_save_state(struct kvm_vcpu *vcpu,
++			     struct kvm_guest_debug_arch *dbg,
++			     struct kvm_cpu_context *ctxt);
++void __debug_clear_restore_state(struct kvm_vcpu *vcpu,
++				 struct kvm_guest_debug_arch *dbg,
++				 struct kvm_cpu_context *ctxt);
++
+ #endif /* __ARM64_KVM_HYP_H__ */
  
 -- 
 2.1.4
