@@ -1,35 +1,48 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 16 Nov 2015 13:55:51 +0000
-Subject: [PATCH] arm64: kvm: avoid %p in __kvm_hyp_panic
-Message-ID: <1447682151-5827-1-git-send-email-mark.rutland@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 16 Nov 2015 14:54:31 +0100
+Subject: [PATCH v6 13/17] arm64:ilp32: add sys_ilp32.c and a separate
+ table (in entry.S) to use it
+In-Reply-To: <mvmziyeukxx.fsf@hawking.suse.de>
+References: <1446507046-24604-1-git-send-email-ynorov@caviumnetworks.com>
+ <4164423.46Jfedud5Y@wuerfel> <mvmziyeukxx.fsf@hawking.suse.de>
+Message-ID: <13567088.yUyVvkDQhR@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently __kvm_hyp_panic uses %p for values which are not pointers,
-such as the ESR value. This can confusingly lead to "(null)" being
-printed for the value.
+On Monday 16 November 2015 14:34:50 Andreas Schwab wrote:
+> Arnd Bergmann <arnd@arndb.de> writes:
+> 
+> > ino_t seems to be the only other type in 'struct stat' that depends
+> > on _FILE_OFFSET_BITS in glibc.
+> 
+> There is also blkcnt_t, and then there is fsblkcnt_t, fsfilcnt_t and
+> fsword_t in struct statfs.
 
-Use %x instead, and only use %p for host pointers.
+Ok, got it.
 
-Signed-off-by: Mark Rutland <mark.rutland@arm.com>
-Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-Cc: Christoffer Dall <christoffer.dall@linaro.org>
----
- arch/arm64/kvm/hyp.S | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Again these are just internal to glibc, the kernel just uses fixed width
+types in
 
-diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
-index 1599701..11183ce 100644
---- a/arch/arm64/kvm/hyp.S
-+++ b/arch/arm64/kvm/hyp.S
-@@ -914,7 +914,7 @@ __kvm_hyp_panic:
- ENDPROC(__kvm_hyp_panic)
- 
- __hyp_panic_str:
--	.ascii	"HYP panic:\nPS:%08x PC:%p ESR:%p\nFAR:%p HPFAR:%p PAR:%p\nVCPU:%p\n\0"
-+	.ascii	"HYP panic:\nPS:%08x PC:%016x ESR:%08x\nFAR:%016x HPFAR:%016x PAR:%016x\nVCPU:%p\n\0"
- 
- 	.align	2
- 
--- 
-1.9.1
+typedef struct {
+        int     val[2];
+} __kernel_fsid_t;
+
+struct statfs64 {
+        __u32 f_type;
+        __u32 f_bsize;
+        __u64 f_blocks; 
+        __u64 f_bfree;  
+        __u64 f_bavail;
+        __u64 f_files;
+        __u64 f_ffree;
+        __kernel_fsid_t f_fsid;
+        __u32 f_namelen;
+        __u32 f_frsize;
+        __u32 f_flags;
+        __u32 f_spare[4];
+};
+
+so we need to be careful to define them in glibc to match the kernel
+types, but the kernel definition doesn't need changes.
+
+	Arnd
