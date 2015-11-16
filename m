@@ -1,9 +1,10 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Mon, 16 Nov 2015 09:56:25 +0100
-Subject: [PATCH v4 02/24] pwm: use pwm_get_xxx() helpers where appropriate
+Date: Mon, 16 Nov 2015 09:56:27 +0100
+Subject: [PATCH v4 04/24] hwmon: pwm-fan: use pwm_get_xxx() helpers where
+ appropriate
 In-Reply-To: <1447664207-24370-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1447664207-24370-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1447664207-24370-3-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1447664207-24370-5-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -43,35 +44,48 @@ expression e;
 )
 --->8---
 ---
- drivers/pwm/pwm-crc.c         | 2 +-
- drivers/pwm/pwm-lpc18xx-sct.c | 2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+ drivers/hwmon/pwm-fan.c | 13 +++++++------
+ 1 file changed, 7 insertions(+), 6 deletions(-)
 
-diff --git a/drivers/pwm/pwm-crc.c b/drivers/pwm/pwm-crc.c
-index 7101c70..2f88543 100644
---- a/drivers/pwm/pwm-crc.c
-+++ b/drivers/pwm/pwm-crc.c
-@@ -75,7 +75,7 @@ static int crc_pwm_config(struct pwm_chip *c, struct pwm_device *pwm,
- 		return -EINVAL;
- 	}
+diff --git a/drivers/hwmon/pwm-fan.c b/drivers/hwmon/pwm-fan.c
+index 3e23003..105b964 100644
+--- a/drivers/hwmon/pwm-fan.c
++++ b/drivers/hwmon/pwm-fan.c
+@@ -47,8 +47,8 @@ static int  __set_pwm(struct pwm_fan_ctx *ctx, unsigned long pwm)
+ 	if (ctx->pwm_value == pwm)
+ 		goto exit_set_pwm_err;
  
--	if (pwm->period != period_ns) {
-+	if (pwm_get_period((pwm)) != period_ns) {
- 		int clk_div;
+-	duty = DIV_ROUND_UP(pwm * (ctx->pwm->period - 1), MAX_PWM);
+-	ret = pwm_config(ctx->pwm, duty, ctx->pwm->period);
++	duty = DIV_ROUND_UP(pwm * (pwm_get_period((ctx->pwm)) - 1), MAX_PWM);
++	ret = pwm_config(ctx->pwm, duty, pwm_get_period((ctx->pwm)));
+ 	if (ret)
+ 		goto exit_set_pwm_err;
  
- 		/* changing the clk divisor, need to disable fisrt */
-diff --git a/drivers/pwm/pwm-lpc18xx-sct.c b/drivers/pwm/pwm-lpc18xx-sct.c
-index 9163085..091fa13 100644
---- a/drivers/pwm/pwm-lpc18xx-sct.c
-+++ b/drivers/pwm/pwm-lpc18xx-sct.c
-@@ -249,7 +249,7 @@ static int lpc18xx_pwm_enable(struct pwm_chip *chip, struct pwm_device *pwm)
- 			   LPC18XX_PWM_EVSTATEMSK(lpc18xx_data->duty_event),
- 			   LPC18XX_PWM_EVSTATEMSK_ALL);
+@@ -234,10 +234,10 @@ static int pwm_fan_probe(struct platform_device *pdev)
+ 	platform_set_drvdata(pdev, ctx);
  
--	if (pwm->polarity == PWM_POLARITY_NORMAL) {
-+	if (pwm_get_polarity((pwm)) == PWM_POLARITY_NORMAL) {
- 		set_event = lpc18xx_pwm->period_event;
- 		clear_event = lpc18xx_data->duty_event;
- 		res_action = LPC18XX_PWM_RES_SET;
+ 	/* Set duty cycle to maximum allowed */
+-	duty_cycle = ctx->pwm->period - 1;
++	duty_cycle = pwm_get_period((ctx->pwm)) - 1;
+ 	ctx->pwm_value = MAX_PWM;
+ 
+-	ret = pwm_config(ctx->pwm, duty_cycle, ctx->pwm->period);
++	ret = pwm_config(ctx->pwm, duty_cycle, pwm_get_period((ctx->pwm)));
+ 	if (ret) {
+ 		dev_err(&pdev->dev, "Failed to configure PWM\n");
+ 		return ret;
+@@ -309,8 +309,9 @@ static int pwm_fan_resume(struct device *dev)
+ 	if (ctx->pwm_value == 0)
+ 		return 0;
+ 
+-	duty = DIV_ROUND_UP(ctx->pwm_value * (ctx->pwm->period - 1), MAX_PWM);
+-	ret = pwm_config(ctx->pwm, duty, ctx->pwm->period);
++	duty = DIV_ROUND_UP(ctx->pwm_value * (pwm_get_period((ctx->pwm)) - 1),
++			    MAX_PWM);
++	ret = pwm_config(ctx->pwm, duty, pwm_get_period((ctx->pwm)));
+ 	if (ret)
+ 		return ret;
+ 	return pwm_enable(ctx->pwm);
 -- 
 2.1.4
