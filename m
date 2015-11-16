@@ -1,75 +1,138 @@
 From: wens@csie.org (Chen-Yu Tsai)
-Date: Tue, 17 Nov 2015 00:38:28 +0800
-Subject: [PATCH v3 9/9] ARM: multi_v7_defconfig: Enable RSB and AXP20X related
- drivers as modules
+Date: Tue, 17 Nov 2015 00:38:26 +0800
+Subject: [PATCH v3 7/9] ARM: dts: sun8i: q8-common: Add AXP223 PMIC device and
+ regulator nodes
 In-Reply-To: <1447691908-25456-1-git-send-email-wens@csie.org>
 References: <1447691908-25456-1-git-send-email-wens@csie.org>
-Message-ID: <1447691908-25456-10-git-send-email-wens@csie.org>
+Message-ID: <1447691908-25456-8-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-axp20x support has been split into 2 parts, I2C and RSB interface
-variants.
+A23/A33 Q8 tablets have an X-Powers AXP223 PMIC connected via RSB. Its
+regulators provide power to various parts of the SoC and the board.
 
-Update the MFD_AXP20X symbol for I2C support. Also enable SUNXI_RSB
-MFD_AXP20X_RSB to support RSB variants. Build these drivers as
-modules.
-
-Keep MFD_AXP20X enabled for now, to ease migration for automated
-boot farms while the patches are being merged. This should be
-removed in the next release.
+Also add lcd regulator supply for simplefb and update the existing
+vmmc-supply for mmc0.
 
 Signed-off-by: Chen-Yu Tsai <wens@csie.org>
 ---
- arch/arm/configs/multi_v7_defconfig | 8 ++++++--
- 1 file changed, 6 insertions(+), 2 deletions(-)
+ arch/arm/boot/dts/sun8i-q8-common.dtsi | 86 +++++++++++++++++++++++++++++++++-
+ 1 file changed, 84 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-index 69a22fdb52a5..bf6dac096bb6 100644
---- a/arch/arm/configs/multi_v7_defconfig
-+++ b/arch/arm/configs/multi_v7_defconfig
-@@ -169,6 +169,7 @@ CONFIG_DMA_CMA=y
- CONFIG_CMA_SIZE_MBYTES=64
- CONFIG_OMAP_OCP2SCP=y
- CONFIG_SIMPLE_PM_BUS=y
-+CONFIG_SUNXI_RSB=m
- CONFIG_MTD=y
- CONFIG_MTD_CMDLINE_PARTS=y
- CONFIG_MTD_BLOCK=y
-@@ -253,7 +254,7 @@ CONFIG_TOUCHSCREEN_SUN4I=y
- CONFIG_TOUCHSCREEN_WM97XX=m
- CONFIG_INPUT_MISC=y
- CONFIG_INPUT_MPU3050=y
--CONFIG_INPUT_AXP20X_PEK=y
-+CONFIG_INPUT_AXP20X_PEK=m
- CONFIG_INPUT_ADXL34X=m
- CONFIG_SERIO_AMBAKMI=y
- CONFIG_SERIAL_8250=y
-@@ -366,6 +367,7 @@ CONFIG_BATTERY_MAX17042=m
- CONFIG_CHARGER_MAX14577=m
- CONFIG_CHARGER_MAX77693=m
- CONFIG_CHARGER_TPS65090=y
-+CONFIG_AXP20X_POWER=m
- CONFIG_POWER_RESET_AS3722=y
- CONFIG_POWER_RESET_GPIO=y
- CONFIG_POWER_RESET_GPIO_RESTART=y
-@@ -397,6 +399,8 @@ CONFIG_MFD_AS3722=y
- CONFIG_MFD_ATMEL_FLEXCOM=y
- CONFIG_MFD_BCM590XX=y
- CONFIG_MFD_AXP20X=y
-+CONFIG_MFD_AXP20X_I2C=m
-+CONFIG_MFD_AXP20X_RSB=m
- CONFIG_MFD_CROS_EC=y
- CONFIG_MFD_CROS_EC_I2C=m
- CONFIG_MFD_CROS_EC_SPI=y
-@@ -417,7 +421,7 @@ CONFIG_REGULATOR_AB8500=y
- CONFIG_REGULATOR_ACT8865=y
- CONFIG_REGULATOR_AS3711=y
- CONFIG_REGULATOR_AS3722=y
--CONFIG_REGULATOR_AXP20X=y
-+CONFIG_REGULATOR_AXP20X=m
- CONFIG_REGULATOR_BCM590XX=y
- CONFIG_REGULATOR_DA9210=y
- CONFIG_REGULATOR_FAN53555=y
+diff --git a/arch/arm/boot/dts/sun8i-q8-common.dtsi b/arch/arm/boot/dts/sun8i-q8-common.dtsi
+index 1a69231d2da5..01ab47b32d8d 100644
+--- a/arch/arm/boot/dts/sun8i-q8-common.dtsi
++++ b/arch/arm/boot/dts/sun8i-q8-common.dtsi
+@@ -56,7 +56,6 @@
+ 		brightness-levels = <0 10 20 30 40 50 60 70 80 90 100>;
+ 		default-brightness-level = <8>;
+ 		enable-gpios = <&pio 7 6 GPIO_ACTIVE_HIGH>; /* PH6 */
+-		/* backlight is powered by AXP223 DC1SW */
+ 	};
+ 
+ 	chosen {
+@@ -67,7 +66,7 @@
+ &mmc0 {
+ 	pinctrl-names = "default";
+ 	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin_q8>;
+-	vmmc-supply = <&reg_vcc3v0>;
++	vmmc-supply = <&reg_dcdc1>;
+ 	bus-width = <4>;
+ 	cd-gpios = <&pio 1 4 GPIO_ACTIVE_HIGH>; /* PB4 */
+ 	cd-inverted;
+@@ -92,6 +91,85 @@
+ 
+ &r_rsb {
+ 	status = "okay";
++
++	axp22x: pmic at 3e3 {
++		compatible = "x-powers,axp223";
++		reg = <0x3e3>;
++		interrupt-parent = <&nmi_intc>;
++		interrupts = <0 IRQ_TYPE_LEVEL_LOW>;
++		eldoin-supply = <&reg_dcdc1>;
++	};
++};
++
++#include "axp22x.dtsi"
++
++&reg_aldo1 {
++	regulator-always-on;
++	regulator-min-microvolt = <3000000>;
++	regulator-max-microvolt = <3000000>;
++	regulator-name = "vcc-io";
++};
++
++&reg_aldo2 {
++	regulator-always-on;
++	regulator-min-microvolt = <2350000>;
++	regulator-max-microvolt = <2650000>;
++	regulator-name = "vdd-dll";
++};
++
++&reg_aldo3 {
++	regulator-always-on;
++	regulator-min-microvolt = <2700000>;
++	regulator-max-microvolt = <3300000>;
++	regulator-name = "vcc-pll-avcc";
++};
++
++&reg_dc1sw {
++	regulator-min-microvolt = <3000000>;
++	regulator-max-microvolt = <3000000>;
++	regulator-name = "vcc-lcd";
++};
++
++&reg_dc5ldo {
++	regulator-always-on;
++	regulator-min-microvolt = <900000>;
++	regulator-max-microvolt = <1400000>;
++	regulator-name = "vdd-cpus";
++};
++
++&reg_dcdc1 {
++	regulator-always-on;
++	regulator-min-microvolt = <3000000>;
++	regulator-max-microvolt = <3000000>;
++	regulator-name = "vcc-3v0";
++};
++
++&reg_dcdc2 {
++	regulator-always-on;
++	regulator-min-microvolt = <900000>;
++	regulator-max-microvolt = <1400000>;
++	regulator-name = "vdd-sys";
++};
++
++&reg_dcdc3 {
++	regulator-always-on;
++	regulator-min-microvolt = <900000>;
++	regulator-max-microvolt = <1400000>;
++	regulator-name = "vdd-cpu";
++};
++
++&reg_dcdc5 {
++	regulator-always-on;
++	regulator-min-microvolt = <1500000>;
++	regulator-max-microvolt = <1500000>;
++	regulator-name = "vcc-dram";
++};
++
++&reg_rtc_ldo {
++	regulator-always-on;
++	regulator-min-microvolt = <3000000>;
++	regulator-max-microvolt = <3000000>;
++	regulator-name = "vcc-rtc";
+ };
+ 
+ &r_uart {
+@@ -99,3 +177,7 @@
+ 	pinctrl-0 = <&r_uart_pins_a>;
+ 	status = "okay";
+ };
++
++&simplefb_lcd {
++	vcc-lcd-supply = <&reg_dc1sw>;
++};
 -- 
 2.6.2
