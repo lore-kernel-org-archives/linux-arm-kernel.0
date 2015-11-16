@@ -1,69 +1,73 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 16 Nov 2015 09:12:55 -0600
-Subject: [PATCH v8 2/8] ARM: dt: Binding documentation for imx25 GCQ
-In-Reply-To: <1447675269-8831-3-git-send-email-mpa@pengutronix.de>
-References: <1447675269-8831-1-git-send-email-mpa@pengutronix.de>
- <1447675269-8831-3-git-send-email-mpa@pengutronix.de>
-Message-ID: <20151116151255.GA8302@rob-hp-laptop>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 16 Nov 2015 15:14:33 +0000
+Subject: [PATCH v8] PCI: Xilinx-NWL-PCIe: Added support for Xilinx NWL
+ PCIe Host Controller
+In-Reply-To: <1447223619-30945-1-git-send-email-bharatku@xilinx.com>
+References: <1447223619-30945-1-git-send-email-bharatku@xilinx.com>
+Message-ID: <5649F2D9.7070902@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 16, 2015 at 01:01:03PM +0100, Markus Pargmann wrote:
-> The documentation describes the bindings for the imx25 GCQ unit which is
-> essentially a generic conversion queue using the imx25 ADC.
+On 11/11/15 06:33, Bharat Kumar Gogada wrote:
+> Adding PCIe Root Port driver for Xilinx PCIe NWL bridge IP.
 > 
-> Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+> Signed-off-by: Bharat Kumar Gogada <bharatku@xilinx.com>
+> Signed-off-by: Ravi Kiran Gummaluri <rgummal@xilinx.com>
 > ---
+> Added logic to allocate contiguous hwirq in nwl_irq_domain_alloc function.
+> Moved MSI functionality to separate functions.
+> Changed error return values.
+> ---
+>  .../devicetree/bindings/pci/xilinx-nwl-pcie.txt    |   68 ++
+>  drivers/pci/host/Kconfig                           |   16 +-
+>  drivers/pci/host/Makefile                          |    1 +
+>  drivers/pci/host/pcie-xilinx-nwl.c                 | 1062 ++++++++++++++++++++
+>  4 files changed, 1144 insertions(+), 3 deletions(-)
+>  create mode 100644 Documentation/devicetree/bindings/pci/xilinx-nwl-pcie.txt
+>  create mode 100644 drivers/pci/host/pcie-xilinx-nwl.c
 > 
-> Notes:
->     Changes in v6:
->      - Changed bindings to use adc-refp and adc-refn. Also a bit of cleanup in the
->        setup routine.
->     
->     Changes in v5:
->      - Fixed locking
->      - Removed module owner
-> 
->  .../devicetree/bindings/iio/adc/fsl,imx25-gcq.txt  | 58 ++++++++++++++++++++++
->  1 file changed, 58 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/iio/adc/fsl,imx25-gcq.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/iio/adc/fsl,imx25-gcq.txt b/Documentation/devicetree/bindings/iio/adc/fsl,imx25-gcq.txt
-> new file mode 100644
-> index 000000000000..b0866d36a307
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/iio/adc/fsl,imx25-gcq.txt
 
+[...]
 
-> +Optional properties for subnodes:
-> + - fsl,adc-refp: specifies the positive reference input as defined in
-> +     <dt-bindings/iio/adc/fsl-imx25-gcq.h>
-> + - fsl,adc-refn: specifies the negative reference input as defined in
-> +     <dt-bindings/iio/adc/fsl-imx25-gcq.h>
-
-This header should be part of this commit.
-
+> +static int nwl_pcie_enable_msi(struct nwl_pcie *pcie, struct pci_bus *bus)
+> +{
+> +	struct platform_device *pdev = to_platform_device(pcie->dev);
+> +	struct nwl_msi *msi = &pcie->msi;
+> +	unsigned long base;
+> +	int ret;
 > +
-> +Example:
+> +	mutex_init(&msi->lock);
 > +
-> +	adc: adc at 50030800 {
-> +		compatible = "fsl,imx25-gcq";
-> +		reg = <0x50030800 0x60>;
-> +		interrupt-parent = <&tscadc>;
-> +		interrupts = <1>;
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
+> +	/* Check for msii_present bit */
+> +	ret = nwl_bridge_readl(pcie, I_MSII_CAPABILITIES) & MSII_PRESENT;
+> +	if (!ret) {
+> +		dev_err(pcie->dev, "MSI not present\n");
+> +		ret = -EIO;
+> +		goto err;
+> +	}
 > +
-> +		inaux at 5 {
-> +			reg = <5>;
-> +			fsl,adc-refp = <MX25_ADC_REFP_INT>;
-> +			fsl,adc-refn = <MX25_ADC_REFN_NGND>;
-> +		};
-> +	};
-> -- 
-> 2.6.1
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe devicetree" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> +	/* Enable MSII */
+> +	nwl_bridge_writel(pcie, nwl_bridge_readl(pcie, I_MSII_CONTROL) |
+> +			  MSII_ENABLE, I_MSII_CONTROL);
+> +
+> +	/* Enable MSII status */
+> +	nwl_bridge_writel(pcie, nwl_bridge_readl(pcie, I_MSII_CONTROL) |
+> +			  MSII_STATUS_ENABLE, I_MSII_CONTROL);
+> +
+> +	/* setup AFI/FPCI range */
+> +	msi->pages = __get_free_pages(GFP_KERNEL, 0);
+> +	base = virt_to_phys((void *)msi->pages);
+> +	nwl_bridge_writel(pcie, lower_32_bits(base), I_MSII_BASE_LO);
+> +	nwl_bridge_writel(pcie, upper_32_bits(base), I_MSII_BASE_HI);
+
+BTW, you still haven't answered my question as to why you need to waste
+a page of memory here, and why putting a device address doesn't work.
+
+As this is (to the best of my knowledge) the only driver doing so, I'd
+really like you to explain the rational behind this.
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
