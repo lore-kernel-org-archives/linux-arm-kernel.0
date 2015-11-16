@@ -1,95 +1,80 @@
-From: bhupesh.sharma@freescale.com (Bhupesh Sharma)
-Date: Mon, 16 Nov 2015 19:54:43 +0530
-Subject: [PATCH 2/2] dts/ls2080a: Update DTSI to add support of SP805 WDT
-In-Reply-To: <1447683883-6600-1-git-send-email-bhupesh.sharma@freescale.com>
-References: <1447683883-6600-1-git-send-email-bhupesh.sharma@freescale.com>
-Message-ID: <1447683883-6600-3-git-send-email-bhupesh.sharma@freescale.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 16 Nov 2015 14:26:40 +0000
+Subject: [PATCH 15/21] arm64: KVM: Add panic handling
+In-Reply-To: <20151116141629.GH20696@leverpostej>
+References: <1447679519-17888-1-git-send-email-marc.zyngier@arm.com>
+ <1447679519-17888-16-git-send-email-marc.zyngier@arm.com>
+ <20151116141629.GH20696@leverpostej>
+Message-ID: <5649E7A0.3050109@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch updates the LS2080a DTSI (DTS Include) file to add
-support for eight SP805 Watchdog units which can be used to
-reset the eight Cortex-A57 cores available on LS2080A.
+On 16/11/15 14:16, Mark Rutland wrote:
+>> diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+>> index 06d3e20..cdc2a96 100644
+>> --- a/arch/arm64/kvm/hyp/switch.c
+>> +++ b/arch/arm64/kvm/hyp/switch.c
+>> @@ -140,3 +140,38 @@ int __hyp_text __guest_run(struct kvm_vcpu *vcpu)
+>>  
+>>  	return exit_code;
+>>  }
+>> +
+>> +static const char *__hyp_panic_string = "HYP panic:\nPS:%08x PC:%p ESR:%p\nFAR:%p HPFAR:%p PAR:%p\nVCPU:%p\n";
+> 
+> I assume that if [1] goes in we'll update this to match.
 
-Signed-off-by: Bhupesh Sharma <bhupesh.sharma@freescale.com>
----
- arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi |   64 ++++++++++++++++++++++++
- 1 file changed, 64 insertions(+)
+Definitely.
 
-diff --git a/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
-index e81cd48..15637ab 100644
---- a/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
-+++ b/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
-@@ -193,6 +193,70 @@
- 			interrupts = <0 32 0x4>; /* Level high type */
- 		};
- 
-+		cluster1_core0_watchdog: wdt at c000000 {
-+			compatible = "arm,sp805-wdt", "arm,primecell";
-+			reg = <0x0 0xc000000 0x0 0x1000>;
-+			interrupts = <1 12 0x8>; /* PPI, Level low type */
-+			clocks = <&clockgen 4 3>;
-+			clock-names = "apb_pclk";
-+		};
-+
-+		cluster1_core1_watchdog: wdt at c010000 {
-+			compatible = "arm,sp805-wdt", "arm,primecell";
-+			reg = <0x0 0xc010000 0x0 0x1000>;
-+			interrupts = <1 12 0x8>; /* PPI, Level low type */
-+			clocks = <&clockgen 4 3>;
-+			clock-names = "apb_pclk";
-+		};
-+
-+		cluster2_core0_watchdog: wdt at c100000 {
-+			compatible = "arm,sp805-wdt", "arm,primecell";
-+			reg = <0x0 0xc100000 0x0 0x1000>;
-+			interrupts = <1 12 0x8>; /* PPI, Level low type */
-+			clocks = <&clockgen 4 3>;
-+			clock-names = "apb_pclk";
-+		};
-+
-+		cluster2_core1_watchdog: wdt at c110000 {
-+			compatible = "arm,sp805-wdt", "arm,primecell";
-+			reg = <0x0 0xc110000 0x0 0x1000>;
-+			interrupts = <1 12 0x8>; /* PPI, Level low type */
-+			clocks = <&clockgen 4 3>;
-+			clock-names = "apb_pclk";
-+		};
-+
-+		cluster3_core0_watchdog: wdt at c200000 {
-+			compatible = "arm,sp805-wdt", "arm,primecell";
-+			reg = <0x0 0xc200000 0x0 0x1000>;
-+			interrupts = <1 12 0x8>; /* PPI, Level low type */
-+			clocks = <&clockgen 4 3>;
-+			clock-names = "apb_pclk";
-+		};
-+
-+		cluster3_core1_watchdog: wdt at c210000 {
-+			compatible = "arm,sp805-wdt", "arm,primecell";
-+			reg = <0x0 0xc210000 0x0 0x1000>;
-+			interrupts = <1 12 0x8>; /* PPI, Level low type */
-+			clocks = <&clockgen 4 3>;
-+			clock-names = "apb_pclk";
-+		};
-+
-+		cluster4_core0_watchdog: wdt at c300000 {
-+			compatible = "arm,sp805-wdt", "arm,primecell";
-+			reg = <0x0 0xc300000 0x0 0x1000>;
-+			interrupts = <1 12 0x8>; /* PPI, Level low type */
-+			clocks = <&clockgen 4 3>;
-+			clock-names = "apb_pclk";
-+		};
-+
-+		cluster4_core1_watchdog: wdt at c310000 {
-+			compatible = "arm,sp805-wdt", "arm,primecell";
-+			reg = <0x0 0xc310000 0x0 0x1000>;
-+			interrupts = <1 12 0x8>; /* PPI, Level low type */
-+			clocks = <&clockgen 4 3>;
-+			clock-names = "apb_pclk";
-+		};
-+
- 		fsl_mc: fsl-mc at 80c000000 {
- 			compatible = "fsl,qoriq-mc";
- 			reg = <0x00000008 0x0c000000 0 0x40>,	 /* MC portal base */
+>> +
+>> +void __hyp_text __noreturn __hyp_panic(void)
+>> +{
+>> +	u64 spsr = read_sysreg(spsr_el2);
+>> +	u64 elr = read_sysreg(elr_el2);
+>> +	u64 par = read_sysreg(par_el1);
+>> +
+>> +	if (read_sysreg(vttbr_el2)) {
+>> +		struct kvm_vcpu *vcpu;
+>> +		struct kvm_cpu_context *host_ctxt;
+>> +
+>> +		vcpu = (struct kvm_vcpu *)read_sysreg(tpidr_el2);
+>> +		host_ctxt = kern_hyp_va(vcpu->arch.host_cpu_context);
+>> +		__deactivate_traps(vcpu);
+>> +		__deactivate_vm(vcpu);
+>> +		__sysreg_restore_state(host_ctxt);
+>> +
+>> +		write_sysreg(host_ctxt->gp_regs.sp_el1, sp_el1);
+> 
+> __sysreg_restore_state restores the host sp_el1, no?
+
+Better safe than sorry! ;-) Looks like a leftover from some ancient
+version... I'll fix that.
+
+>> +	}
+>> +
+>> +	/* Call panic for real */
+>> +	while (1) {
+>> +		unsigned long str_va = (unsigned long)__hyp_panic_string;
+>> +
+>> +		str_va -= HYP_PAGE_OFFSET;
+>> +		str_va += PAGE_OFFSET;
+>> +		__hyp_do_panic(str_va,
+>> +			       spsr,  elr,
+>> +			       read_sysreg(esr_el2),   read_sysreg(far_el2),
+>> +			       read_sysreg(hpfar_el2), par,
+>> +			       read_sysreg(tpidr_el2));
+>> +	}
+>> +}
+> 
+> I think the while (1) here is confusing.
+> 
+> Can we not jsut declare str_va at the start of the function and get rid
+> of the loop?
+
+The while(1) is to prevent GCC from screaming (it otherwise believes
+that the function actually returns, despite the __noreturn attribute).
+
+Or were you thinking of something else?
+
+	M.
 -- 
-1.7.9.5
+Jazz is not dead. It just smells funny...
