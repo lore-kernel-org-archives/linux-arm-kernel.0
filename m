@@ -1,42 +1,51 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 16 Nov 2015 17:34:50 +0100
-Subject: [PATCH] clocksource: fsl: avoid harmless 64-bit warnings
-Message-ID: <3990834.xnjhm37Grs@wuerfel>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Tue, 17 Nov 2015 00:38:20 +0800
+Subject: [PATCH v3 1/9] mfd: axp20x: Add AXP223 to list of supported PMICs in
+ DT bindings
+In-Reply-To: <1447691908-25456-1-git-send-email-wens@csie.org>
+References: <1447691908-25456-1-git-send-email-wens@csie.org>
+Message-ID: <1447691908-25456-2-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The ftm_clockevent_init passes the value of "~0UL" into a function
-that takes a 32-bit argument, which drops the upper 32 bits, as
-gcc warns about on ARM64:
+The AXP223 is a new PMIC commonly paired with Allwinner A23/A33 SoCs.
+It is functionally identical to AXP221; only the regulator default
+voltage/status and the external host interface are different.
 
-clocksource/fsl_ftm_timer.c: In function 'ftm_clockevent_init':
-clocksource/fsl_ftm_timer.c:206:13: warning: large integer implicitly truncated to unsigned type [-Woverflow]
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+Acked-by: Maxime Ripard <maxime.ripard@free-electrons.com>
+Acked-by: Rob Herring <robh@kernel.org>
+---
+ Documentation/devicetree/bindings/mfd/axp20x.txt | 7 ++++---
+ 1 file changed, 4 insertions(+), 3 deletions(-)
 
-This was obviously unintended behavior, and is easily avoided by
-using '~0u' as the integer literal, because that is 32-bit wide
-on all architectures.
-
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-
-diff --git a/drivers/clocksource/fsl_ftm_timer.c b/drivers/clocksource/fsl_ftm_timer.c
-index 10202f1fdfd7..517e1c7624d4 100644
---- a/drivers/clocksource/fsl_ftm_timer.c
-+++ b/drivers/clocksource/fsl_ftm_timer.c
-@@ -203,7 +203,7 @@ static int __init ftm_clockevent_init(unsigned long freq, int irq)
- 	int err;
+diff --git a/Documentation/devicetree/bindings/mfd/axp20x.txt b/Documentation/devicetree/bindings/mfd/axp20x.txt
+index a474359dd206..fd39fa54571b 100644
+--- a/Documentation/devicetree/bindings/mfd/axp20x.txt
++++ b/Documentation/devicetree/bindings/mfd/axp20x.txt
+@@ -5,11 +5,12 @@ axp152 (X-Powers)
+ axp202 (X-Powers)
+ axp209 (X-Powers)
+ axp221 (X-Powers)
++axp223 (X-Powers)
  
- 	ftm_writel(0x00, priv->clkevt_base + FTM_CNTIN);
--	ftm_writel(~0UL, priv->clkevt_base + FTM_MOD);
-+	ftm_writel(~0u, priv->clkevt_base + FTM_MOD);
+ Required properties:
+ - compatible: "x-powers,axp152", "x-powers,axp202", "x-powers,axp209",
+-	      "x-powers,axp221"
+-- reg: The I2C slave address for the AXP chip
++	      "x-powers,axp221", "x-powers,axp223"
++- reg: The I2C slave address or RSB hardware address for the AXP chip
+ - interrupt-parent: The parent interrupt controller
+ - interrupts: SoC NMI / GPIO interrupt connected to the PMIC's IRQ pin
+ - interrupt-controller: The PMIC has its own internal IRQs
+@@ -51,7 +52,7 @@ LDO3		: LDO		: ldo3in-supply
+ LDO4		: LDO		: ldo24in-supply	: shared supply
+ LDO5		: LDO		: ldo5in-supply
  
- 	ftm_reset_counter(priv->clkevt_base);
+-AXP221 regulators, type, and corresponding input supply names:
++AXP221/AXP223 regulators, type, and corresponding input supply names:
  
-@@ -230,7 +230,7 @@ static int __init ftm_clocksource_init(unsigned long freq)
- 	int err;
- 
- 	ftm_writel(0x00, priv->clksrc_base + FTM_CNTIN);
--	ftm_writel(~0UL, priv->clksrc_base + FTM_MOD);
-+	ftm_writel(~0u, priv->clksrc_base + FTM_MOD);
- 
- 	ftm_reset_counter(priv->clksrc_base);
- 
+ Regulator	  Type		  Supply Name		  Notes
+ ---------	  ----		  -----------		  -----
+-- 
+2.6.2
