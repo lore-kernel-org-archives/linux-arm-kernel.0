@@ -1,349 +1,98 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 16 Nov 2015 13:11:57 +0000
-Subject: [PATCH 19/21] arm64: KVM: Turn system register numbers to an enum
+Date: Mon, 16 Nov 2015 13:11:53 +0000
+Subject: [PATCH 15/21] arm64: KVM: Add panic handling
 In-Reply-To: <1447679519-17888-1-git-send-email-marc.zyngier@arm.com>
 References: <1447679519-17888-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1447679519-17888-20-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1447679519-17888-16-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Having the system register numbers as #defines has been a pain
-since day one, as the ordering is pretty fragile, and moving
-things around leads to renumbering and epic conflict resolutions.
-
-Now that we're mostly acessing the sysreg file in C, an enum is
-a much better type to use, and we can clean things up a bit.
+Add the panic handler, together with the small bits of assembly
+code to call the kernel's panic implementation.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm64/include/asm/kvm_asm.h     | 76 ---------------------------------
- arch/arm64/include/asm/kvm_emulate.h |  1 -
- arch/arm64/include/asm/kvm_host.h    | 81 +++++++++++++++++++++++++++++++++++-
- arch/arm64/include/asm/kvm_mmio.h    |  1 -
- arch/arm64/kernel/asm-offsets.c      |  1 +
- arch/arm64/kvm/guest.c               |  1 -
- arch/arm64/kvm/handle_exit.c         |  1 +
- arch/arm64/kvm/hyp/debug-sr.c        |  1 +
- arch/arm64/kvm/hyp/entry.S           |  3 +-
- arch/arm64/kvm/hyp/sysreg-sr.c       |  1 +
- arch/arm64/kvm/sys_regs.c            |  1 +
- virt/kvm/arm/vgic-v3.c               |  1 +
- 12 files changed, 87 insertions(+), 82 deletions(-)
+ arch/arm64/kvm/hyp/hyp-entry.S | 11 ++++++++++-
+ arch/arm64/kvm/hyp/hyp.h       |  1 +
+ arch/arm64/kvm/hyp/switch.c    | 35 +++++++++++++++++++++++++++++++++++
+ 3 files changed, 46 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/include/asm/kvm_asm.h b/arch/arm64/include/asm/kvm_asm.h
-index 5e37710..52b777b 100644
---- a/arch/arm64/include/asm/kvm_asm.h
-+++ b/arch/arm64/include/asm/kvm_asm.h
-@@ -20,82 +20,6 @@
+diff --git a/arch/arm64/kvm/hyp/hyp-entry.S b/arch/arm64/kvm/hyp/hyp-entry.S
+index e11a129..7218eed 100644
+--- a/arch/arm64/kvm/hyp/hyp-entry.S
++++ b/arch/arm64/kvm/hyp/hyp-entry.S
+@@ -141,7 +141,16 @@ el1_irq:
+ 	mov	x1, #ARM_EXCEPTION_IRQ
+ 	b	__guest_exit
  
- #include <asm/virt.h>
- 
--/*
-- * 0 is reserved as an invalid value.
-- * Order *must* be kept in sync with the hyp switch code.
-- */
--#define	MPIDR_EL1	1	/* MultiProcessor Affinity Register */
--#define	CSSELR_EL1	2	/* Cache Size Selection Register */
--#define	SCTLR_EL1	3	/* System Control Register */
--#define	ACTLR_EL1	4	/* Auxiliary Control Register */
--#define	CPACR_EL1	5	/* Coprocessor Access Control */
--#define	TTBR0_EL1	6	/* Translation Table Base Register 0 */
--#define	TTBR1_EL1	7	/* Translation Table Base Register 1 */
--#define	TCR_EL1		8	/* Translation Control Register */
--#define	ESR_EL1		9	/* Exception Syndrome Register */
--#define	AFSR0_EL1	10	/* Auxilary Fault Status Register 0 */
--#define	AFSR1_EL1	11	/* Auxilary Fault Status Register 1 */
--#define	FAR_EL1		12	/* Fault Address Register */
--#define	MAIR_EL1	13	/* Memory Attribute Indirection Register */
--#define	VBAR_EL1	14	/* Vector Base Address Register */
--#define	CONTEXTIDR_EL1	15	/* Context ID Register */
--#define	TPIDR_EL0	16	/* Thread ID, User R/W */
--#define	TPIDRRO_EL0	17	/* Thread ID, User R/O */
--#define	TPIDR_EL1	18	/* Thread ID, Privileged */
--#define	AMAIR_EL1	19	/* Aux Memory Attribute Indirection Register */
--#define	CNTKCTL_EL1	20	/* Timer Control Register (EL1) */
--#define	PAR_EL1		21	/* Physical Address Register */
--#define MDSCR_EL1	22	/* Monitor Debug System Control Register */
--#define MDCCINT_EL1	23	/* Monitor Debug Comms Channel Interrupt Enable Reg */
--
--/* 32bit specific registers. Keep them at the end of the range */
--#define	DACR32_EL2	24	/* Domain Access Control Register */
--#define	IFSR32_EL2	25	/* Instruction Fault Status Register */
--#define	FPEXC32_EL2	26	/* Floating-Point Exception Control Register */
--#define	DBGVCR32_EL2	27	/* Debug Vector Catch Register */
--#define	NR_SYS_REGS	28
--
--/* 32bit mapping */
--#define c0_MPIDR	(MPIDR_EL1 * 2)	/* MultiProcessor ID Register */
--#define c0_CSSELR	(CSSELR_EL1 * 2)/* Cache Size Selection Register */
--#define c1_SCTLR	(SCTLR_EL1 * 2)	/* System Control Register */
--#define c1_ACTLR	(ACTLR_EL1 * 2)	/* Auxiliary Control Register */
--#define c1_CPACR	(CPACR_EL1 * 2)	/* Coprocessor Access Control */
--#define c2_TTBR0	(TTBR0_EL1 * 2)	/* Translation Table Base Register 0 */
--#define c2_TTBR0_high	(c2_TTBR0 + 1)	/* TTBR0 top 32 bits */
--#define c2_TTBR1	(TTBR1_EL1 * 2)	/* Translation Table Base Register 1 */
--#define c2_TTBR1_high	(c2_TTBR1 + 1)	/* TTBR1 top 32 bits */
--#define c2_TTBCR	(TCR_EL1 * 2)	/* Translation Table Base Control R. */
--#define c3_DACR		(DACR32_EL2 * 2)/* Domain Access Control Register */
--#define c5_DFSR		(ESR_EL1 * 2)	/* Data Fault Status Register */
--#define c5_IFSR		(IFSR32_EL2 * 2)/* Instruction Fault Status Register */
--#define c5_ADFSR	(AFSR0_EL1 * 2)	/* Auxiliary Data Fault Status R */
--#define c5_AIFSR	(AFSR1_EL1 * 2)	/* Auxiliary Instr Fault Status R */
--#define c6_DFAR		(FAR_EL1 * 2)	/* Data Fault Address Register */
--#define c6_IFAR		(c6_DFAR + 1)	/* Instruction Fault Address Register */
--#define c7_PAR		(PAR_EL1 * 2)	/* Physical Address Register */
--#define c7_PAR_high	(c7_PAR + 1)	/* PAR top 32 bits */
--#define c10_PRRR	(MAIR_EL1 * 2)	/* Primary Region Remap Register */
--#define c10_NMRR	(c10_PRRR + 1)	/* Normal Memory Remap Register */
--#define c12_VBAR	(VBAR_EL1 * 2)	/* Vector Base Address Register */
--#define c13_CID		(CONTEXTIDR_EL1 * 2)	/* Context ID Register */
--#define c13_TID_URW	(TPIDR_EL0 * 2)	/* Thread ID, User R/W */
--#define c13_TID_URO	(TPIDRRO_EL0 * 2)/* Thread ID, User R/O */
--#define c13_TID_PRIV	(TPIDR_EL1 * 2)	/* Thread ID, Privileged */
--#define c10_AMAIR0	(AMAIR_EL1 * 2)	/* Aux Memory Attr Indirection Reg */
--#define c10_AMAIR1	(c10_AMAIR0 + 1)/* Aux Memory Attr Indirection Reg */
--#define c14_CNTKCTL	(CNTKCTL_EL1 * 2) /* Timer Control Register (PL1) */
--
--#define cp14_DBGDSCRext	(MDSCR_EL1 * 2)
--#define cp14_DBGBCR0	(DBGBCR0_EL1 * 2)
--#define cp14_DBGBVR0	(DBGBVR0_EL1 * 2)
--#define cp14_DBGBXVR0	(cp14_DBGBVR0 + 1)
--#define cp14_DBGWCR0	(DBGWCR0_EL1 * 2)
--#define cp14_DBGWVR0	(DBGWVR0_EL1 * 2)
--#define cp14_DBGDCCINT	(MDCCINT_EL1 * 2)
--
--#define NR_COPRO_REGS	(NR_SYS_REGS * 2)
--
- #define ARM_EXCEPTION_IRQ	  0
- #define ARM_EXCEPTION_TRAP	  1
- 
-diff --git a/arch/arm64/include/asm/kvm_emulate.h b/arch/arm64/include/asm/kvm_emulate.h
-index 17e92f0..e095872 100644
---- a/arch/arm64/include/asm/kvm_emulate.h
-+++ b/arch/arm64/include/asm/kvm_emulate.h
-@@ -26,7 +26,6 @@
- 
- #include <asm/esr.h>
- #include <asm/kvm_arm.h>
--#include <asm/kvm_asm.h>
- #include <asm/kvm_mmio.h>
- #include <asm/ptrace.h>
- #include <asm/cputype.h>
-diff --git a/arch/arm64/include/asm/kvm_host.h b/arch/arm64/include/asm/kvm_host.h
-index a35ce72..2fae2d4 100644
---- a/arch/arm64/include/asm/kvm_host.h
-+++ b/arch/arm64/include/asm/kvm_host.h
-@@ -25,7 +25,6 @@
- #include <linux/types.h>
- #include <linux/kvm_types.h>
- #include <asm/kvm.h>
--#include <asm/kvm_asm.h>
- #include <asm/kvm_mmio.h>
- 
- #define __KVM_HAVE_ARCH_INTC_INITIALIZED
-@@ -85,6 +84,86 @@ struct kvm_vcpu_fault_info {
- 	u64 hpfar_el2;		/* Hyp IPA Fault Address Register */
- };
- 
-+/*
-+ * 0 is reserved as an invalid value.
-+ * Order *must* be kept in sync with the hyp switch code.
-+ */
-+enum vcpu_sysreg {
-+	__INVALID_SYSREG__,
-+	MPIDR_EL1,	/* MultiProcessor Affinity Register */
-+	CSSELR_EL1,	/* Cache Size Selection Register */
-+	SCTLR_EL1,	/* System Control Register */
-+	ACTLR_EL1,	/* Auxiliary Control Register */
-+	CPACR_EL1,	/* Coprocessor Access Control */
-+	TTBR0_EL1,	/* Translation Table Base Register 0 */
-+	TTBR1_EL1,	/* Translation Table Base Register 1 */
-+	TCR_EL1,	/* Translation Control Register */
-+	ESR_EL1,	/* Exception Syndrome Register */
-+	AFSR0_EL1,	/* Auxilary Fault Status Register 0 */
-+	AFSR1_EL1,	/* Auxilary Fault Status Register 1 */
-+	FAR_EL1,	/* Fault Address Register */
-+	MAIR_EL1,	/* Memory Attribute Indirection Register */
-+	VBAR_EL1,	/* Vector Base Address Register */
-+	CONTEXTIDR_EL1,	/* Context ID Register */
-+	TPIDR_EL0,	/* Thread ID, User R/W */
-+	TPIDRRO_EL0,	/* Thread ID, User R/O */
-+	TPIDR_EL1,	/* Thread ID, Privileged */
-+	AMAIR_EL1,	/* Aux Memory Attribute Indirection Register */
-+	CNTKCTL_EL1,	/* Timer Control Register (EL1) */
-+	PAR_EL1,	/* Physical Address Register */
-+	MDSCR_EL1,	/* Monitor Debug System Control Register */
-+	MDCCINT_EL1,	/* Monitor Debug Comms Channel Interrupt Enable Reg */
+-.macro invalid_vector	label, target = __kvm_hyp_panic
++ENTRY(__hyp_do_panic)
++	mov	lr, #(PSR_F_BIT | PSR_I_BIT | PSR_A_BIT | PSR_D_BIT |\
++		      PSR_MODE_EL1h)
++	msr	spsr_el2, lr
++	ldr	lr, =panic
++	msr	elr_el2, lr
++	eret
++ENDPROC(__hyp_do_panic)
 +
-+	/* 32bit specific registers. Keep them at the end of the range */
-+	DACR32_EL2,	/* Domain Access Control Register */
-+	IFSR32_EL2,	/* Instruction Fault Status Register */
-+	FPEXC32_EL2,	/* Floating-Point Exception Control Register */
-+	DBGVCR32_EL2,	/* Debug Vector Catch Register */
++.macro invalid_vector	label, target = __hyp_panic
+ 	.align	2
+ \label:
+ 	b \target
+diff --git a/arch/arm64/kvm/hyp/hyp.h b/arch/arm64/kvm/hyp/hyp.h
+index 240fb79..d5d500d 100644
+--- a/arch/arm64/kvm/hyp/hyp.h
++++ b/arch/arm64/kvm/hyp/hyp.h
+@@ -74,6 +74,7 @@ void __fpsimd_save_state(struct user_fpsimd_state *fp_regs);
+ void __fpsimd_restore_state(struct user_fpsimd_state *fp_regs);
+ 
+ u64 __guest_enter(struct kvm_vcpu *vcpu, struct kvm_cpu_context *host_ctxt);
++void __noreturn __hyp_do_panic(unsigned long, ...);
+ 
+ #endif /* __ARM64_KVM_HYP_H__ */
+ 
+diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+index 06d3e20..cdc2a96 100644
+--- a/arch/arm64/kvm/hyp/switch.c
++++ b/arch/arm64/kvm/hyp/switch.c
+@@ -140,3 +140,38 @@ int __hyp_text __guest_run(struct kvm_vcpu *vcpu)
+ 
+ 	return exit_code;
+ }
 +
-+	NR_SYS_REGS	/* Nothing after this line! */
-+};
++static const char *__hyp_panic_string = "HYP panic:\nPS:%08x PC:%p ESR:%p\nFAR:%p HPFAR:%p PAR:%p\nVCPU:%p\n";
 +
-+/* 32bit mapping */
-+#define c0_MPIDR	(MPIDR_EL1 * 2)	/* MultiProcessor ID Register */
-+#define c0_CSSELR	(CSSELR_EL1 * 2)/* Cache Size Selection Register */
-+#define c1_SCTLR	(SCTLR_EL1 * 2)	/* System Control Register */
-+#define c1_ACTLR	(ACTLR_EL1 * 2)	/* Auxiliary Control Register */
-+#define c1_CPACR	(CPACR_EL1 * 2)	/* Coprocessor Access Control */
-+#define c2_TTBR0	(TTBR0_EL1 * 2)	/* Translation Table Base Register 0 */
-+#define c2_TTBR0_high	(c2_TTBR0 + 1)	/* TTBR0 top 32 bits */
-+#define c2_TTBR1	(TTBR1_EL1 * 2)	/* Translation Table Base Register 1 */
-+#define c2_TTBR1_high	(c2_TTBR1 + 1)	/* TTBR1 top 32 bits */
-+#define c2_TTBCR	(TCR_EL1 * 2)	/* Translation Table Base Control R. */
-+#define c3_DACR		(DACR32_EL2 * 2)/* Domain Access Control Register */
-+#define c5_DFSR		(ESR_EL1 * 2)	/* Data Fault Status Register */
-+#define c5_IFSR		(IFSR32_EL2 * 2)/* Instruction Fault Status Register */
-+#define c5_ADFSR	(AFSR0_EL1 * 2)	/* Auxiliary Data Fault Status R */
-+#define c5_AIFSR	(AFSR1_EL1 * 2)	/* Auxiliary Instr Fault Status R */
-+#define c6_DFAR		(FAR_EL1 * 2)	/* Data Fault Address Register */
-+#define c6_IFAR		(c6_DFAR + 1)	/* Instruction Fault Address Register */
-+#define c7_PAR		(PAR_EL1 * 2)	/* Physical Address Register */
-+#define c7_PAR_high	(c7_PAR + 1)	/* PAR top 32 bits */
-+#define c10_PRRR	(MAIR_EL1 * 2)	/* Primary Region Remap Register */
-+#define c10_NMRR	(c10_PRRR + 1)	/* Normal Memory Remap Register */
-+#define c12_VBAR	(VBAR_EL1 * 2)	/* Vector Base Address Register */
-+#define c13_CID		(CONTEXTIDR_EL1 * 2)	/* Context ID Register */
-+#define c13_TID_URW	(TPIDR_EL0 * 2)	/* Thread ID, User R/W */
-+#define c13_TID_URO	(TPIDRRO_EL0 * 2)/* Thread ID, User R/O */
-+#define c13_TID_PRIV	(TPIDR_EL1 * 2)	/* Thread ID, Privileged */
-+#define c10_AMAIR0	(AMAIR_EL1 * 2)	/* Aux Memory Attr Indirection Reg */
-+#define c10_AMAIR1	(c10_AMAIR0 + 1)/* Aux Memory Attr Indirection Reg */
-+#define c14_CNTKCTL	(CNTKCTL_EL1 * 2) /* Timer Control Register (PL1) */
++void __hyp_text __noreturn __hyp_panic(void)
++{
++	u64 spsr = read_sysreg(spsr_el2);
++	u64 elr = read_sysreg(elr_el2);
++	u64 par = read_sysreg(par_el1);
 +
-+#define cp14_DBGDSCRext	(MDSCR_EL1 * 2)
-+#define cp14_DBGBCR0	(DBGBCR0_EL1 * 2)
-+#define cp14_DBGBVR0	(DBGBVR0_EL1 * 2)
-+#define cp14_DBGBXVR0	(cp14_DBGBVR0 + 1)
-+#define cp14_DBGWCR0	(DBGWCR0_EL1 * 2)
-+#define cp14_DBGWVR0	(DBGWVR0_EL1 * 2)
-+#define cp14_DBGDCCINT	(MDCCINT_EL1 * 2)
++	if (read_sysreg(vttbr_el2)) {
++		struct kvm_vcpu *vcpu;
++		struct kvm_cpu_context *host_ctxt;
 +
-+#define NR_COPRO_REGS	(NR_SYS_REGS * 2)
++		vcpu = (struct kvm_vcpu *)read_sysreg(tpidr_el2);
++		host_ctxt = kern_hyp_va(vcpu->arch.host_cpu_context);
++		__deactivate_traps(vcpu);
++		__deactivate_vm(vcpu);
++		__sysreg_restore_state(host_ctxt);
 +
- struct kvm_cpu_context {
- 	struct kvm_regs	gp_regs;
- 	union {
-diff --git a/arch/arm64/include/asm/kvm_mmio.h b/arch/arm64/include/asm/kvm_mmio.h
-index 889c908..fe612a9 100644
---- a/arch/arm64/include/asm/kvm_mmio.h
-+++ b/arch/arm64/include/asm/kvm_mmio.h
-@@ -19,7 +19,6 @@
- #define __ARM64_KVM_MMIO_H__
- 
- #include <linux/kvm_host.h>
--#include <asm/kvm_asm.h>
- #include <asm/kvm_arm.h>
- 
- /*
-diff --git a/arch/arm64/kernel/asm-offsets.c b/arch/arm64/kernel/asm-offsets.c
-index 25de8b2..4b72231 100644
---- a/arch/arm64/kernel/asm-offsets.c
-+++ b/arch/arm64/kernel/asm-offsets.c
-@@ -112,6 +112,7 @@ int main(void)
-   DEFINE(CPU_ELR_EL1,		offsetof(struct kvm_regs, elr_el1));
-   DEFINE(CPU_SPSR,		offsetof(struct kvm_regs, spsr));
-   DEFINE(CPU_SYSREGS,		offsetof(struct kvm_cpu_context, sys_regs));
-+  DEFINE(VCPU_FPEXC32_EL2,	offsetof(struct kvm_vcpu, arch.ctxt.sys_regs[FPEXC32_EL2]));
-   DEFINE(VCPU_ESR_EL2,		offsetof(struct kvm_vcpu, arch.fault.esr_el2));
-   DEFINE(VCPU_FAR_EL2,		offsetof(struct kvm_vcpu, arch.fault.far_el2));
-   DEFINE(VCPU_HPFAR_EL2,	offsetof(struct kvm_vcpu, arch.fault.hpfar_el2));
-diff --git a/arch/arm64/kvm/guest.c b/arch/arm64/kvm/guest.c
-index d250160..88e59f2 100644
---- a/arch/arm64/kvm/guest.c
-+++ b/arch/arm64/kvm/guest.c
-@@ -28,7 +28,6 @@
- #include <asm/cputype.h>
- #include <asm/uaccess.h>
- #include <asm/kvm.h>
--#include <asm/kvm_asm.h>
- #include <asm/kvm_emulate.h>
- #include <asm/kvm_coproc.h>
- 
-diff --git a/arch/arm64/kvm/handle_exit.c b/arch/arm64/kvm/handle_exit.c
-index 68a0759..4323627 100644
---- a/arch/arm64/kvm/handle_exit.c
-+++ b/arch/arm64/kvm/handle_exit.c
-@@ -23,6 +23,7 @@
- #include <linux/kvm_host.h>
- 
- #include <asm/esr.h>
-+#include <asm/kvm_asm.h>
- #include <asm/kvm_coproc.h>
- #include <asm/kvm_emulate.h>
- #include <asm/kvm_mmu.h>
-diff --git a/arch/arm64/kvm/hyp/debug-sr.c b/arch/arm64/kvm/hyp/debug-sr.c
-index 042d074..c7da3ec 100644
---- a/arch/arm64/kvm/hyp/debug-sr.c
-+++ b/arch/arm64/kvm/hyp/debug-sr.c
-@@ -18,6 +18,7 @@
- #include <linux/compiler.h>
- #include <linux/kvm_host.h>
- 
-+#include <asm/kvm_asm.h>
- #include <asm/kvm_mmu.h>
- 
- #include "hyp.h"
-diff --git a/arch/arm64/kvm/hyp/entry.S b/arch/arm64/kvm/hyp/entry.S
-index 7552922..599911c 100644
---- a/arch/arm64/kvm/hyp/entry.S
-+++ b/arch/arm64/kvm/hyp/entry.S
-@@ -27,7 +27,6 @@
- 
- #define CPU_GP_REG_OFFSET(x)	(CPU_GP_REGS + x)
- #define CPU_XREG_OFFSET(x)	CPU_GP_REG_OFFSET(CPU_USER_PT_REGS + 8*x)
--#define CPU_SYSREG_OFFSET(x)	(CPU_SYSREGS + 8*x)
- 
- 	.text
- 	.pushsection	.hyp.text, "ax"
-@@ -174,7 +173,7 @@ ENTRY(__fpsimd_guest_restore)
- 
- 	mrs	x1, hcr_el2
- 	tbnz	x1, #HCR_RW_SHIFT, 1f
--	ldr	x4, [x2, #CPU_SYSREG_OFFSET(FPEXC32_EL2)]
-+	ldr	x4, [x3, #VCPU_FPEXC32_EL2]
- 	msr	fpexc32_el2, x4
- 1:
- 	pop	x4, lr
-diff --git a/arch/arm64/kvm/hyp/sysreg-sr.c b/arch/arm64/kvm/hyp/sysreg-sr.c
-index 3f81a4d..15f6e42 100644
---- a/arch/arm64/kvm/hyp/sysreg-sr.c
-+++ b/arch/arm64/kvm/hyp/sysreg-sr.c
-@@ -18,6 +18,7 @@
- #include <linux/compiler.h>
- #include <linux/kvm_host.h>
- 
-+#include <asm/kvm_asm.h>
- #include <asm/kvm_mmu.h>
- 
- #include "hyp.h"
-diff --git a/arch/arm64/kvm/sys_regs.c b/arch/arm64/kvm/sys_regs.c
-index 87a64e8..0db5311 100644
---- a/arch/arm64/kvm/sys_regs.c
-+++ b/arch/arm64/kvm/sys_regs.c
-@@ -29,6 +29,7 @@
- #include <asm/debug-monitors.h>
- #include <asm/esr.h>
- #include <asm/kvm_arm.h>
-+#include <asm/kvm_asm.h>
- #include <asm/kvm_coproc.h>
- #include <asm/kvm_emulate.h>
- #include <asm/kvm_host.h>
-diff --git a/virt/kvm/arm/vgic-v3.c b/virt/kvm/arm/vgic-v3.c
-index 487d635..c8506a2 100644
---- a/virt/kvm/arm/vgic-v3.c
-+++ b/virt/kvm/arm/vgic-v3.c
-@@ -28,6 +28,7 @@
- 
- #include <asm/kvm_emulate.h>
- #include <asm/kvm_arm.h>
-+#include <asm/kvm_asm.h>
- #include <asm/kvm_mmu.h>
- 
- /* These are for GICv2 emulation only */
++		write_sysreg(host_ctxt->gp_regs.sp_el1, sp_el1);
++	}
++
++	/* Call panic for real */
++	while (1) {
++		unsigned long str_va = (unsigned long)__hyp_panic_string;
++
++		str_va -= HYP_PAGE_OFFSET;
++		str_va += PAGE_OFFSET;
++		__hyp_do_panic(str_va,
++			       spsr,  elr,
++			       read_sysreg(esr_el2),   read_sysreg(far_el2),
++			       read_sysreg(hpfar_el2), par,
++			       read_sysreg(tpidr_el2));
++	}
++}
 -- 
 2.1.4
