@@ -1,35 +1,69 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Mon, 16 Nov 2015 14:37:51 +0100
-Subject: [PATCH 18/27] mtd: nand: update mtd_to_nand()
+Date: Mon, 16 Nov 2015 14:38:00 +0100
+Subject: [PATCH 27/27] staging: mt29f_spinand: make use of
+ nand_set/get_controller_data() helpers
 In-Reply-To: <1447681080-31232-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1447681080-31232-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1447681080-31232-19-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1447681080-31232-28-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Now that all drivers are using the mtd instance embedded in the nand_chip
-struct we can safely update the mtd_to_nand_chip() implementation to use
-the container_of macro instead of returning the content of mtd->priv.
-This will allow us to remove mtd->priv = chip assignments done in all
-NAND controller drivers.
+New helpers have been added to avoid directly accessing chip->field. Use
+them where appropriate.
 
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 ---
- include/linux/mtd/nand.h | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ drivers/staging/mt29f_spinand/mt29f_spinand.c | 10 +++++-----
+ 1 file changed, 5 insertions(+), 5 deletions(-)
 
-diff --git a/include/linux/mtd/nand.h b/include/linux/mtd/nand.h
-index 8ec071e..873646d 100644
---- a/include/linux/mtd/nand.h
-+++ b/include/linux/mtd/nand.h
-@@ -734,7 +734,7 @@ static inline struct device_node *nand_get_flash_node(struct nand_chip *chip)
- 
- static inline struct nand_chip *mtd_to_nand(struct mtd_info *mtd)
+diff --git a/drivers/staging/mt29f_spinand/mt29f_spinand.c b/drivers/staging/mt29f_spinand/mt29f_spinand.c
+index b7d429d..5b3027a 100644
+--- a/drivers/staging/mt29f_spinand/mt29f_spinand.c
++++ b/drivers/staging/mt29f_spinand/mt29f_spinand.c
+@@ -32,7 +32,7 @@
+ static inline struct spinand_state *mtd_to_state(struct mtd_info *mtd)
  {
--	return mtd->priv;
-+	return container_of(mtd, struct nand_chip, mtd);
- }
+ 	struct nand_chip *chip = mtd_to_nand(mtd);
+-	struct spinand_info *info = (struct spinand_info *)chip->priv;
++	struct spinand_info *info = (struct spinand_info *)nand_get_controller_data(chip);
+ 	struct spinand_state *state = (struct spinand_state *)info->priv;
  
- static inline struct mtd_info *nand_to_mtd(struct nand_chip *chip)
+ 	return state;
+@@ -633,7 +633,7 @@ static int spinand_read_page_hwecc(struct mtd_info *mtd, struct nand_chip *chip,
+ 	u8 *p = buf;
+ 	int eccsize = chip->ecc.size;
+ 	int eccsteps = chip->ecc.steps;
+-	struct spinand_info *info = (struct spinand_info *)chip->priv;
++	struct spinand_info *info = (struct spinand_info *)nand_get_controller_data(chip);
+ 
+ 	enable_read_hw_ecc = 1;
+ 
+@@ -679,7 +679,7 @@ static u8 spinand_read_byte(struct mtd_info *mtd)
+ 
+ static int spinand_wait(struct mtd_info *mtd, struct nand_chip *chip)
+ {
+-	struct spinand_info *info = (struct spinand_info *)chip->priv;
++	struct spinand_info *info = (struct spinand_info *)nand_get_controller_data(chip);
+ 
+ 	unsigned long timeo = jiffies;
+ 	int retval, state = chip->state;
+@@ -745,7 +745,7 @@ static void spinand_cmdfunc(struct mtd_info *mtd, unsigned int command,
+ 			    int column, int page)
+ {
+ 	struct nand_chip *chip = mtd_to_nand(mtd);
+-	struct spinand_info *info = (struct spinand_info *)chip->priv;
++	struct spinand_info *info = (struct spinand_info *)nand_get_controller_data(chip);
+ 	struct spinand_state *state = (struct spinand_state *)info->priv;
+ 
+ 	switch (command) {
+@@ -894,7 +894,7 @@ static int spinand_probe(struct spi_device *spi_nand)
+ #endif
+ 
+ 	nand_set_flash_node(chip, spi_nand->dev.of_node);
+-	chip->priv	= info;
++	nand_set_controller_data(chip, info);
+ 	chip->read_buf	= spinand_read_buf;
+ 	chip->write_buf	= spinand_write_buf;
+ 	chip->read_byte	= spinand_read_byte;
 -- 
 2.1.4
