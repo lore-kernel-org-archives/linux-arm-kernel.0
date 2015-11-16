@@ -1,19 +1,32 @@
-From: Chris.Brandt@renesas.com (Chris Brandt)
-Date: Mon, 16 Nov 2015 19:46:05 +0000
-Subject: [PATCH v3] ARM: xip: Use correct symbol for end of ROM marker
-In-Reply-To: <20151116181718.GW8644@n2100.arm.linux.org.uk>
-References: <1447362108-4333-1-git-send-email-chris.brandt@renesas.com>
- <1447697140-4099-1-git-send-email-chris.brandt@renesas.com>
- <20151116181718.GW8644@n2100.arm.linux.org.uk>
-Message-ID: <HK2PR06MB056161DA1A57638A1D7305D58A1E0@HK2PR06MB0561.apcprd06.prod.outlook.com>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 16 Nov 2015 19:48:13 +0000
+Subject: [PATCH v2 11/12] ARM: wire up UEFI init and runtime support
+In-Reply-To: <CAKv+Gu8w+2GA5tV4roYtEsza+mkCZKYX_=tT2t=+eh-ZO1Y2fA@mail.gmail.com>
+References: <1447698757-8762-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1447698757-8762-12-git-send-email-ard.biesheuvel@linaro.org>
+ <20151116190156.GH8644@n2100.arm.linux.org.uk>
+ <CAKv+Gu8w+2GA5tV4roYtEsza+mkCZKYX_=tT2t=+eh-ZO1Y2fA@mail.gmail.com>
+Message-ID: <20151116194812.GJ8644@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> We don't need the data sections because they will have been copied to RAM, and
-> we probably don't want to keep those exposed (it's potentially useful for
-> attackers.)
+On Mon, Nov 16, 2015 at 08:04:00PM +0100, Ard Biesheuvel wrote:
+> OK. So you mean set TTBR to the zero page, perform the TLB flush and
+> only then switch to the new page tables?
 
-The init sections also hang around after boot as well (it's XIP code, so there is nothing to 'free' in terms of executable init code).
-Any potential security issues there as well? Should the data and init-text sections be put in a separate section that gets blown away after init-data is freed?
+Not quite.
 
-Chris
+If you have global mappings below TASK_SIZE, you would need this
+sequence when switching either to or from the UEFI page tables:
+
+- switch to another set of page tables which only map kernel space
+  with nothing at all in userspace.
+- flush the TLB.
+- switch to your target page tables.
+
+As I say in response to one of your other patches, it's probably
+much easier to avoid any global mappings below TASK_SIZE.
+
+-- 
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
