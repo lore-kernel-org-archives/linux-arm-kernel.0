@@ -1,37 +1,87 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Mon, 16 Nov 2015 15:48:22 +0000
-Subject: arm64 function_graph tracer panic with CONFIG_DYNAMIC_FTRACE
-In-Reply-To: <20151116134518.GC6556@e104818-lin.cambridge.arm.com>
-References: <20151112104243.GF5627@e104818-lin.cambridge.arm.com>
- <56457A4B.601@linaro.org> <564937E3.3090501@linaro.org>
- <20151116134518.GC6556@e104818-lin.cambridge.arm.com>
-Message-ID: <20151116154822.GA19228@red-moon>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 16 Nov 2015 16:48:13 +0100
+Subject: [PATCH 5/6] serial: of: CONFIG_SERIAL_8250 is always set
+In-Reply-To: <1447688894-2936779-1-git-send-email-arnd@arndb.de>
+References: <1447688894-2936779-1-git-send-email-arnd@arndb.de>
+Message-ID: <1447688894-2936779-6-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 16, 2015 at 01:45:19PM +0000, Catalin Marinas wrote:
+The only other user of this code was the nwp-serial driver, but that
+is now gone, so we can remove a couple of #ifdef statments in this
+driver.
 
-[...]
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+ drivers/tty/serial/of_serial.c | 18 ------------------
+ 1 file changed, 18 deletions(-)
 
-> > There are some other functions which are called by cpu_suspend(), e.g. psci_system_suspend().
-> > Should we apply a similar fix to them?
-> 
-> I think we need to apply the fix to any function which does not return.
-> In general, this should apply to all finishers passed to cpu_suspend()
-> and the subsequent callees.
-
-Yes, I prefer Steven's suggestion though it seems to me the issue
-is only related to the graph tracer and by pausing/resuming tracing
-across cpu_suspend() we would solve the problem without having to
-patch the finishers (and we can still trace them with the function
-tracer).
-
-Takahiro, do you want me to send a patch or you update yours ?
-
-> Do we need such annotation for cpu_die() as well? It probably doesn't
-> matter as the CPU is coming back on a completely different path anyway.
-
-I will test this too in the process.
-
-Thanks for debugging this,
-Lorenzo
+diff --git a/drivers/tty/serial/of_serial.c b/drivers/tty/serial/of_serial.c
+index 276c804e7eb4..7044eb2be91b 100644
+--- a/drivers/tty/serial/of_serial.c
++++ b/drivers/tty/serial/of_serial.c
+@@ -21,10 +21,6 @@
+ #include <linux/nwpserial.h>
+ #include <linux/clk.h>
+ 
+-#ifdef CONFIG_SERIAL_8250_MODULE
+-#define CONFIG_SERIAL_8250 CONFIG_SERIAL_8250_MODULE
+-#endif
+-
+ #include "8250/8250.h"
+ 
+ struct of_serial_info {
+@@ -195,7 +191,6 @@ static int of_platform_serial_probe(struct platform_device *ofdev)
+ 		goto out;
+ 
+ 	switch (port_type) {
+-#ifdef CONFIG_SERIAL_8250
+ 	case PORT_8250 ... PORT_MAX_8250:
+ 	{
+ 		struct uart_8250_port port8250;
+@@ -212,7 +207,6 @@ static int of_platform_serial_probe(struct platform_device *ofdev)
+ 		ret = serial8250_register_8250_port(&port8250);
+ 		break;
+ 	}
+-#endif
+ 	default:
+ 		/* need to add code for these */
+ 	case PORT_UNKNOWN:
+@@ -240,11 +234,9 @@ static int of_platform_serial_remove(struct platform_device *ofdev)
+ {
+ 	struct of_serial_info *info = platform_get_drvdata(ofdev);
+ 	switch (info->type) {
+-#ifdef CONFIG_SERIAL_8250
+ 	case PORT_8250 ... PORT_MAX_8250:
+ 		serial8250_unregister_port(info->line);
+ 		break;
+-#endif
+ 	default:
+ 		/* need to add code for these */
+ 		break;
+@@ -257,7 +249,6 @@ static int of_platform_serial_remove(struct platform_device *ofdev)
+ }
+ 
+ #ifdef CONFIG_PM_SLEEP
+-#ifdef CONFIG_SERIAL_8250
+ static void of_serial_suspend_8250(struct of_serial_info *info)
+ {
+ 	struct uart_8250_port *port8250 = serial8250_get_port(info->line);
+@@ -278,15 +269,6 @@ static void of_serial_resume_8250(struct of_serial_info *info)
+ 
+ 	serial8250_resume_port(info->line);
+ }
+-#else
+-static inline void of_serial_suspend_8250(struct of_serial_info *info)
+-{
+-}
+-
+-static inline void of_serial_resume_8250(struct of_serial_info *info)
+-{
+-}
+-#endif
+ 
+ static int of_serial_suspend(struct device *dev)
+ {
+-- 
+2.1.0.rc2
