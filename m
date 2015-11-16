@@ -1,35 +1,50 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Mon, 16 Nov 2015 14:37:49 +0100
-Subject: [PATCH 16/27] staging: mt29f_spinand: use the mtd instance embedded
- in struct nand_chip
+Date: Mon, 16 Nov 2015 14:37:54 +0100
+Subject: [PATCH 21/27] staging: mt29f_spinand: remove useless mtd->priv = chip
+ assignment
 In-Reply-To: <1447681080-31232-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1447681080-31232-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1447681080-31232-17-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1447681080-31232-22-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-struct nand_chip now embeds an mtd device, use it instead of allocating
-a new one.
+mtd_to_nand_chip() now uses the container_of() approach to transform an
+mtd_info pointer into a nand_chip one. Drop useless mtd->priv
+assignments from NAND controller drivers.
 
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 ---
- drivers/staging/mt29f_spinand/mt29f_spinand.c | 4 +---
- 1 file changed, 1 insertion(+), 3 deletions(-)
+Patch generated with the following coccinelle script:
+
+---8<----
+virtual patch
+
+@@
+struct mtd_info mtd;
+struct mtd_info *mtdptr;
+struct nand_chip *chipptr;
+expression d;
+@@
+(
+-(mtd).priv = (chipptr);
+|
+-(mtdptr)->priv = (chipptr);
+---8<----
+---
+ drivers/staging/mt29f_spinand/mt29f_spinand.c | 1 -
+ 1 file changed, 1 deletion(-)
 
 diff --git a/drivers/staging/mt29f_spinand/mt29f_spinand.c b/drivers/staging/mt29f_spinand/mt29f_spinand.c
-index 8924a96..8171b74 100644
+index 8171b74..b7d429d 100644
 --- a/drivers/staging/mt29f_spinand/mt29f_spinand.c
 +++ b/drivers/staging/mt29f_spinand/mt29f_spinand.c
-@@ -903,9 +903,7 @@ static int spinand_probe(struct spi_device *spi_nand)
- 	chip->options	|= NAND_CACHEPRG;
- 	chip->select_chip = spinand_select_chip;
- 
--	mtd = devm_kzalloc(&spi_nand->dev, sizeof(struct mtd_info), GFP_KERNEL);
--	if (!mtd)
--		return -ENOMEM;
-+	mtd = nand_to_mtd(chip);
+@@ -907,7 +907,6 @@ static int spinand_probe(struct spi_device *spi_nand)
  
  	dev_set_drvdata(&spi_nand->dev, mtd);
+ 
+-	mtd->priv = chip;
+ 	mtd->dev.parent = &spi_nand->dev;
+ 	mtd->oobsize = 64;
  
 -- 
 2.1.4
