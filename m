@@ -1,55 +1,25 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Mon, 16 Nov 2015 18:18:54 +0800
-Subject: [PATCH v2 RESEND] arm: add cpu_idle tracepoints to arch_cpu_idle
-Message-ID: <1447669134-6705-1-git-send-email-jszhang@marvell.com>
+From: bharat.kumar.gogada@xilinx.com (Bharat Kumar Gogada)
+Date: Mon, 16 Nov 2015 10:27:27 +0000
+Subject: [PATCH v8] PCI: Xilinx-NWL-PCIe: Added support for Xilinx NWL
+ PCIe Host Controller
+In-Reply-To: <20151111202919.GA7281@rob-hp-laptop>
+References: <1447223619-30945-1-git-send-email-bharatku@xilinx.com>
+ <20151111202919.GA7281@rob-hp-laptop>
+Message-ID: <8520D5D51A55D047800579B0941471982585C806@XAP-PVEXMBX01.xlnx.xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Currently, if cpuidle is disabled or not supported, powertop reports
-zero wakeups and zero events. This is due to the cpu_idle tracepoints
-are missing.
+ > On Wed, Nov 11, 2015 at 12:03:39PM +0530, Bharat Kumar Gogada wrote:
+> > Adding PCIe Root Port driver for Xilinx PCIe NWL bridge IP.
+> >
+> > Signed-off-by: Bharat Kumar Gogada <bharatku@xilinx.com>
+> > Signed-off-by: Ravi Kiran Gummaluri <rgummal@xilinx.com>
+> 
+> I acked v7. Please add acks when sending a new version.
+Hi Rob, 
+I'm sorry for not adding I forgot to do so, I will definitely add this in next patch.
 
-This patch is to make cpu_idle tracepoints always available even if
-cpuidle is disabled or not supported.
-
-Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
----
- Since v1:
-   - ignore arm_pm_idle.
-
- arch/arm/kernel/process.c | 11 ++++++++---
- 1 file changed, 8 insertions(+), 3 deletions(-)
-
-diff --git a/arch/arm/kernel/process.c b/arch/arm/kernel/process.c
-index 7a7c4ce..83d2dc5 100644
---- a/arch/arm/kernel/process.c
-+++ b/arch/arm/kernel/process.c
-@@ -28,6 +28,7 @@
- #include <linux/random.h>
- #include <linux/hw_breakpoint.h>
- #include <linux/leds.h>
-+#include <trace/events/power.h>
- 
- #include <asm/processor.h>
- #include <asm/thread_notify.h>
-@@ -66,11 +67,15 @@ void (*arm_pm_idle)(void);
- 
- void arch_cpu_idle(void)
- {
--	if (arm_pm_idle)
-+	if (arm_pm_idle) {
- 		arm_pm_idle();
--	else
-+		local_irq_enable();
-+	} else {
-+		trace_cpu_idle_rcuidle(1, smp_processor_id());
- 		cpu_do_idle();
--	local_irq_enable();
-+		local_irq_enable();
-+		trace_cpu_idle_rcuidle(PWR_EVENT_EXIT, smp_processor_id());
-+	}
- }
- 
- void arch_cpu_idle_prepare(void)
--- 
-2.6.2
+Regards,
+Bharat Kumar Gogada
+> 
+> Acked-by: Rob Herring <robh@kernel.org>
