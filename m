@@ -1,37 +1,71 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 16 Nov 2015 17:56:39 +0100
-Subject: [PATCH] hwmon: scpi: add thermal-of dependency
-Message-ID: <4264967.aVlONpCXFM@wuerfel>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Mon, 16 Nov 2015 09:00:05 -0800
+Subject: [PATCH v4 04/24] hwmon: pwm-fan: use pwm_get_xxx() helpers where
+ appropriate
+In-Reply-To: <20151116175322.48dba6f9@bbrezillon>
+References: <1447664207-24370-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1447664207-24370-5-git-send-email-boris.brezillon@free-electrons.com>
+ <5649FD5B.3000208@roeck-us.net> <20151116175322.48dba6f9@bbrezillon>
+Message-ID: <564A0B95.6010603@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The newly added scpi thermal support is broken when the scpi driver
-is built-in but the thermal driver is a loadable module:
+On 11/16/2015 08:53 AM, Boris Brezillon wrote:
+> On Mon, 16 Nov 2015 07:59:23 -0800
+> Guenter Roeck <linux@roeck-us.net> wrote:
+>
+>> On 11/16/2015 12:56 AM, Boris Brezillon wrote:
+>>> Use pwm_get_xxx() helpers instead of directly accessing the pwm->xxx field.
+>>> Doing that will ease adaptation of the PWM framework to support atomic
+>>> update.
+>>>
+>>> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+>>> ---
+>>> Patch generated with the following coccinelle script:
+>>>
+>>> --->8---
+>>> virtual patch
+>>>
+>>> @@
+>>> struct pwm_device *p;
+>>> expression e;
+>>> @@
+>>> (
+>>> -(p)->polarity = e;
+>>> +pwm_set_polarity((p), e);
+>>> |
+>>> -(p)->polarity
+>>> +pwm_get_polarity((p))
+>>
+>> s/((p))/(p)/
+>>
+>>> |
+>>> -(p)->period = e;
+>>> +pwm_set_period((p), e);
+>>> |
+>>> -(p)->period
+>>> +pwm_get_period((p))
+>>
+>> s/((p))/(p)/
+>>
+>>> |
+>>> -(p)->duty_cycle = e;
+>>> +pwm_set_duty_cycle((p), e);
+>>
+>> The (p) seems unnecessary here.
+>
+> I don't get this one. You mean I should drop one the parenthesis around
+> p, right?
+>
 
-drivers/built-in.o: In function `scpi_hwmon_probe':
-(.text+0x444d70): undefined reference to `thermal_zone_of_sensor_unregister'
-(.text+0x444d94): undefined reference to `thermal_zone_of_sensor_register'
-drivers/built-in.o: In function `scpi_hwmon_remove':
-(text+0x444e6c): undefined reference to `thermal_zone_of_sensor_unregister'
+Same as above - s/(p)/p/. It should never be necessary to write
+	pwm_set_duty_cycle((p), e)
+since
+	pwm_set_duty_cycle(p, e)
+should be the same.
 
-This uses the same Kconfig trick that we have in a couple of other
-drivers already to ensure we can only select the driver in valid
-configurations when either THERMAL_OF is disabled, or when with a
-dependency on CONFIG_THERMAL that can force SCPI to be a loadable
-module in the case I was hitting.
+On the other side, I did not see this expression used in any of the patches,
+though maybe I missed it.
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: 68acc77a2d51 ("hwmon: Support thermal zones registration for SCP temperature sensors")
-
-diff --git a/drivers/hwmon/Kconfig b/drivers/hwmon/Kconfig
-index 842b0043ad94..597814177f50 100644
---- a/drivers/hwmon/Kconfig
-+++ b/drivers/hwmon/Kconfig
-@@ -324,6 +324,7 @@ config SENSORS_APPLESMC
- config SENSORS_ARM_SCPI
- 	tristate "ARM SCPI Sensors"
- 	depends on ARM_SCPI_PROTOCOL
-+	depends on THERMAL || !THERMAL_OF
- 	help
- 	  This driver provides support for temperature, voltage, current
- 	  and power sensors available on ARM Ltd's SCP based platforms. The
+Thanks,
+Guenter
