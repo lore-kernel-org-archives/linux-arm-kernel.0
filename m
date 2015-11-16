@@ -1,65 +1,57 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Mon, 16 Nov 2015 17:53:22 +0100
-Subject: [PATCH v4 04/24] hwmon: pwm-fan: use pwm_get_xxx() helpers
- where appropriate
-In-Reply-To: <5649FD5B.3000208@roeck-us.net>
-References: <1447664207-24370-1-git-send-email-boris.brezillon@free-electrons.com>
- <1447664207-24370-5-git-send-email-boris.brezillon@free-electrons.com>
- <5649FD5B.3000208@roeck-us.net>
-Message-ID: <20151116175322.48dba6f9@bbrezillon>
+From: andriy.shevchenko@linux.intel.com (Andy Shevchenko)
+Date: Mon, 16 Nov 2015 18:56:02 +0200
+Subject: [PATCH 3/6] serial: mid8250: select CONFIG_RATIONAL
+In-Reply-To: <1447688894-2936779-4-git-send-email-arnd@arndb.de>
+References: <1447688894-2936779-1-git-send-email-arnd@arndb.de>
+ <1447688894-2936779-4-git-send-email-arnd@arndb.de>
+Message-ID: <1447692962.31665.145.camel@linux.intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 16 Nov 2015 07:59:23 -0800
-Guenter Roeck <linux@roeck-us.net> wrote:
+On Mon, 2015-11-16 at 16:48 +0100, Arnd Bergmann wrote:
+> The Intel MID support got split out from the PCI 8250 driver,
+> and that now causes a build error when no other driver selects
+> CONFIG_RATIONAL:
 
-> On 11/16/2015 12:56 AM, Boris Brezillon wrote:
-> > Use pwm_get_xxx() helpers instead of directly accessing the pwm->xxx field.
-> > Doing that will ease adaptation of the PWM framework to support atomic
-> > update.
-> >
-> > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> > ---
-> > Patch generated with the following coccinelle script:
-> >
-> > --->8---
-> > virtual patch
-> >
-> > @@
-> > struct pwm_device *p;
-> > expression e;
-> > @@
-> > (
-> > -(p)->polarity = e;
-> > +pwm_set_polarity((p), e);
-> > |
-> > -(p)->polarity
-> > +pwm_get_polarity((p))
-> 
-> s/((p))/(p)/
-> 
-> > |
-> > -(p)->period = e;
-> > +pwm_set_period((p), e);
-> > |
-> > -(p)->period
-> > +pwm_get_period((p))
-> 
-> s/((p))/(p)/
-> 
-> > |
-> > -(p)->duty_cycle = e;
-> > +pwm_set_duty_cycle((p), e);
-> 
-> The (p) seems unnecessary here.
+Already published.
+https://lkml.org/lkml/2015/11/12/272
 
-I don't get this one. You mean I should drop one the parenthesis around
-p, right?
+It's not first time you send patches that already have been published.
 
+I think you use some testing automation which doesn't take into
+consideration what is sent in mailing lists.
 
-
+> 
+> drivers/built-in.o: In function `mid8250_set_termios':
+> (.text+0x77418): undefined reference to `rational_best_approximation'
+> 
+> This adds an explicit 'select' like the combined driver had before.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Fixes: d9eda9bab237 ("serial: 8250_pci: Intel MID UART support to its
+> own driver")
+> Cc: Heikki Krogerus <heikki.krogerus@linux.intel.com>
+> Cc: Andy Shevchenko <andriy.shevchenko@linux.intel.com>
+> ---
+> ?drivers/tty/serial/8250/Kconfig | 1 +
+> ?1 file changed, 1 insertion(+)
+> 
+> diff --git a/drivers/tty/serial/8250/Kconfig
+> b/drivers/tty/serial/8250/Kconfig
+> index e6f5e12a2d83..6412f1455beb 100644
+> --- a/drivers/tty/serial/8250/Kconfig
+> +++ b/drivers/tty/serial/8250/Kconfig
+> @@ -373,6 +373,7 @@ config SERIAL_8250_MID
+> ?	depends on SERIAL_8250 && PCI
+> ?	select HSU_DMA if SERIAL_8250_DMA
+> ?	select HSU_DMA_PCI if X86_INTEL_MID
+> +	select RATIONAL
+> ?	help
+> ?	??Selecting this option will enable handling of the extra
+> features
+> ?	??present on the UART found on Intel Medfield SOC and
+> various other
 
 -- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Andy Shevchenko <andriy.shevchenko@linux.intel.com>
+Intel Finland Oy
