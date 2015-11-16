@@ -1,55 +1,39 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 16 Nov 2015 13:45:45 +0100
-Subject: [PATCH] arm64/efi: register UEFI runtime mmio regions as iomem
- resources
-In-Reply-To: <CAKv+Gu-12azUSe_V9Cx58fd5YyO8RMO4qSOs1afQ8iAc71cC9g@mail.gmail.com>
-References: <CAD0U-h+cr0xpAAcCD1P8k2hUcJJL2Ga+-Grrb8WaZrgm08G2nA@mail.gmail.com>
- <1445848860-9547-1-git-send-email-ard.biesheuvel@linaro.org>
- <CACRpkdact=Jh5WpghnyPU1Oaiu8pgvb=kwva-nEkJUX9NKL6xw@mail.gmail.com>
- <CAKv+Gu-12azUSe_V9Cx58fd5YyO8RMO4qSOs1afQ8iAc71cC9g@mail.gmail.com>
-Message-ID: <CAKv+Gu-W5iWG5-AqS4dBgB=hU2T+kQfkBtLmrCZaVdhdxZzkPw@mail.gmail.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Mon, 16 Nov 2015 12:52:51 +0000
+Subject: [PATCH v2 9/9] ARM: multi_v7_defconfig: Build AXP20X related
+ drivers as modules
+In-Reply-To: <CAGb2v66WEiqgmx-3rL6ksuu-Zq+iridUcpu-Nshbnqcp7Pgfaw@mail.gmail.com>
+References: <1447387456-9912-1-git-send-email-wens@csie.org>
+ <1447387456-9912-11-git-send-email-wens@csie.org>
+ <CAGb2v66WEiqgmx-3rL6ksuu-Zq+iridUcpu-Nshbnqcp7Pgfaw@mail.gmail.com>
+Message-ID: <20151116125251.GD17829@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 27 October 2015 at 13:31, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
-> On 27 October 2015 at 21:08, Linus Walleij <linus.walleij@linaro.org> wrote:
->> On Mon, Oct 26, 2015 at 9:41 AM, Ard Biesheuvel
->> <ard.biesheuvel@linaro.org> wrote:
->>
->>> In order to prevent kernel drivers from attaching to MMIO regions
->>> that are owned by the firmware, register them as iomem resources.
->>>
->>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->>
->> Is this related to the flash memory discussion so that NOR flash
->> will be part of what is considered "I/O memory"
->
-> Yes
->
->> and flash
->> protection achieved this way?
->>
->
-> ... and no, not entirely. Note that this is not about 'protecting' the
-> flash in a security sense. It is simply to reserve the resources that
-> should be considered occupied by the UEFI firmware drivers. This may
-> be NOR flash, but it may just as well be the RTC or potentially a
-> syscon register block to do reset and/or poweroff.
->
-> My QEMU mach-virt /proc/iomem looks like this with the patch applied:
->
-> 04000000-07ffffff : UEFI Runtime MMIO
-> 09000000-09000fff : /pl011 at 9000000
->   09000000-09000fff : /pl011 at 9000000
-> 09010000-0901ffff : UEFI Runtime MMIO
-> 40000000-7fffffff : System RAM
->   40080000-408a27d3 : Kernel code
->   40970000-40adffff : Kernel data
->
-> where the first UEFI mmio region is the second bank of NOR flash (the
-> first one holds the firmware image itself, so that is not claimed
-> since the variable store driver never accesses it) and the second UEFI
-> mmio region is the PL031 RTC.
->
+On Fri, 13 Nov 2015, Chen-Yu Tsai wrote:
 
-Ping?
+> On Fri, Nov 13, 2015 at 12:04 PM, Chen-Yu Tsai <wens@csie.org> wrote:
+> > axp20x support has been split into 2 parts, I2C and RSB interface
+> > variants.
+> >
+> > Update the MFD_AXP20X symbol for I2C support, and also enable
+> > MFD_AXP20X_RSB to support RSB variants. Build these drivers as
+> > modules.
+> >
+> > Keep MFD_AXP20X enabled for now, to ease migration for automated
+> > boot farms while the patches are being merged. This should be
+> > removed in the next release.
+> >
+> > Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> 
+> Sorry. This is an old file with an old commit message. Please see the
+> other patch 9 ("ARM: multi_v7_defconfig: Enable RSB and AXP20X related
+> drivers as modules").
+
+Can you re-submit the set please?
+
+-- 
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
