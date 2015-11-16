@@ -1,54 +1,72 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 16 Nov 2015 17:49:23 +0100
-Subject: [PATCH, resend] scsi: advansys: fix big-endian builds
-Message-ID: <4411376.blKgWIg75B@wuerfel>
+From: Liviu.Dudau@arm.com (Liviu Dudau)
+Date: Mon, 16 Nov 2015 16:50:24 +0000
+Subject: [PATCH 0/2] Improve drm_of_component_probe() and move rockchip
+ to use it
+In-Reply-To: <2290660.pLIRHdxPYF@diego>
+References: <1447685093-26129-1-git-send-email-Liviu.Dudau@arm.com>
+ <2290660.pLIRHdxPYF@diego>
+Message-ID: <20151116165024.GB4158@e106497-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Building the advansys driver in a big-endian configuration such as
-ARM allmodconfig shows a warning:
+On Mon, Nov 16, 2015 at 05:07:17PM +0100, Heiko St?bner wrote:
+> Hi Liviu,
+> 
+> Am Montag, 16. November 2015, 14:44:51 schrieb Liviu Dudau:
+> > When I have introduced the drm_of_component_probe() function I have managed
+> > to break rockchip's DRM driver as the compare_of() function had to match
+> > both local crtc ports and remote encoder ones. As suggested by Russell
+> > King, I have now enhanced the drm_of_component_probe() function to take two
+> > comparison functions, and converted (again) rockchip driver to use it.
+> > 
+> > I would really like to get some Tested-By this time if possible from IMX,
+> > Armada and Rockchip developers as I lack hardware to do that myself.
+> > 
+> > The only thing not implemented from Russell's suggestion list is the
+> > renaming of the function into drm_kms_component_probe().
+> 
+>  with these patches applied I loose the display on my rk3288. A bit of dumb
+> debug-output shows that the compare function does seem to do strange things:
+> 
+> [    1.020476] [drm] Initialized drm 1.1.0 20060810
+> [    1.025943] drm_of_component_probe: adding port /vop at ff940000/port
+> [    1.032225] drm_of_component_probe: adding port /vop at ff930000/port
+> [    1.038421] drm_of_component_probe: adding encoder /hdmi at ff980000
+> [    1.044535] drm_of_component_probe: adding encoder /edp at ff970000
+> [    1.050562] drm_of_component_probe: adding encoder /hdmi at ff980000
+> [    1.056663] drm_of_component_probe: adding encoder /edp at ff970000
+> 
+> ---- Columns:	dev->parent / dev	comparing	dev->parent->of_node	with	np
+> 
+> [    1.062683] compare_port: platform/ff980000.hdmi comparing NULL with /vop at ff940000/port
+> [    1.071017] compare_port: platform/ff980000.hdmi comparing NULL with /vop at ff940000/port
+> [    1.079024] compare_port: platform/ff930000.vop comparing NULL with /vop at ff940000/port
+> [    1.087117] compare_port: platform/ff980000.hdmi comparing NULL with /vop at ff940000/port
+> [    1.095130] compare_port: platform/ff930000.vop comparing NULL with /vop at ff940000/port
+> [    1.103054] compare_port: platform/ff940000.vop comparing NULL with /vop at ff940000/port
+> [    1.111553] panel_regulator: supplied by vcc33_sys
+> 
+> 
+> I need to dig deeper to find out what's happening there, but maybe you
+> already have some idea in the meantime :-)
 
- drivers/scsi/advansys.c: In function 'adv_build_req':
- include/uapi/linux/byteorder/big_endian.h:32:26: warning: large integer implicitly truncated to unsigned type [-Woverflow]
-  #define __cpu_to_le32(x) ((__force __le32)__swab32((x)))
- drivers/scsi/advansys.c:7806:22: note: in expansion of macro 'cpu_to_le32'
-   scsiqp->sense_len = cpu_to_le32(SCSI_SENSE_BUFFERSIZE);
+Did I got the content of the compare_{port,encoder}() functions the wrong way around?
 
-It turns out that the commit that introduced this used the cpu_to_le32()
-incorrectly on an 8-bit field, which results in the sense_len to always
-be set to zero, as the SCSI_SENSE_BUFFERSIZE value gets moved to upper
-byte of the 32-bit intermediate.
+Best regards,
+Liviu
 
-This removes the cpu_to_le32() call to restore the original version.
+> 
+> 
+> Thanks
+> Heiko
+> 
 
-I found this only by looking at the compiler output and have not done
-a full review for possible further endianess bugs in the same driver.
-
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: 811ddc057aac ("advansys: use DMA-API for mapping sense buffer")
-Cc: stable at vger.kernel.org # v4.2+
----
-Using willy at linux.intel.com, as the address listed in MAINTAINERS
-failed:
-
-Failed to transport message. Message sending failed since the following recipients were rejected by the server: matthew at wil.cx (The server responded: Requested action not taken: mailbox unavailable invalid DNS MX or A/AAAA resource record)
-
-Geert found the same bug and submitted the same patch earlier:
-https://lkml.org/lkml/2015/6/24/89
-
-Neither one has been reviewed or accepted so far. Can we get one of the
-two merged please?
-
-diff --git a/drivers/scsi/advansys.c b/drivers/scsi/advansys.c
-index 4305178e4e01..1c1cd657c380 100644
---- a/drivers/scsi/advansys.c
-+++ b/drivers/scsi/advansys.c
-@@ -7803,7 +7803,7 @@ adv_build_req(struct asc_board *boardp, struct scsi_cmnd *scp,
- 		return ASC_BUSY;
- 	}
- 	scsiqp->sense_addr = cpu_to_le32(sense_addr);
--	scsiqp->sense_len = cpu_to_le32(SCSI_SENSE_BUFFERSIZE);
-+	scsiqp->sense_len = SCSI_SENSE_BUFFERSIZE;
- 
- 	/* Build ADV_SCSI_REQ_Q */
- 
+-- 
+====================
+| I would like to |
+| fix the world,  |
+| but they're not |
+| giving me the   |
+ \ source code!  /
+  ---------------
+    ?\_(?)_/?
