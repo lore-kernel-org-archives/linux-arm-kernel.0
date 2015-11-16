@@ -1,34 +1,105 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 16 Nov 2015 19:53:34 +0000
-Subject: [PATCH v3] ARM: xip: Use correct symbol for end of ROM marker
-In-Reply-To: <HK2PR06MB056161DA1A57638A1D7305D58A1E0@HK2PR06MB0561.apcprd06.prod.outlook.com>
-References: <1447362108-4333-1-git-send-email-chris.brandt@renesas.com>
- <1447697140-4099-1-git-send-email-chris.brandt@renesas.com>
- <20151116181718.GW8644@n2100.arm.linux.org.uk>
- <HK2PR06MB056161DA1A57638A1D7305D58A1E0@HK2PR06MB0561.apcprd06.prod.outlook.com>
-Message-ID: <20151116195334.GL8644@n2100.arm.linux.org.uk>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 16 Nov 2015 20:57:41 +0100
+Subject: [RFC] ARM64: simplify dma_get_ops
+In-Reply-To: <20151116183941.GF6556@e104818-lin.cambridge.arm.com>
+References: <4270550.cGd11OgA5n@wuerfel>
+ <20151116183941.GF6556@e104818-lin.cambridge.arm.com>
+Message-ID: <5118146.8KqrJiJrDe@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 16, 2015 at 07:46:05PM +0000, Chris Brandt wrote:
-> > We don't need the data sections because they will have been copied to RAM, and
-> > we probably don't want to keep those exposed (it's potentially useful for
-> > attackers.)
+On Monday 16 November 2015 18:39:41 Catalin Marinas wrote:
+> On Mon, Nov 16, 2015 at 05:25:48PM +0100, Arnd Bergmann wrote:
+> > Including linux/acpi.h from asm/dma-mapping.h causes tons of compile-time
+> > warnings, e.g.
+> > 
+> >  drivers/isdn/mISDN/dsp_ecdis.h:43:0: warning: "FALSE" redefined
+> >  drivers/isdn/mISDN/dsp_ecdis.h:44:0: warning: "TRUE" redefined
+> >  drivers/net/fddi/skfp/h/targetos.h:62:0: warning: "TRUE" redefined
+> >  drivers/net/fddi/skfp/h/targetos.h:63:0: warning: "FALSE" redefined
+> > 
+> > However, it looks like the dependency should not even there as
+> > I do not see why __generic_dma_ops() cares about whether we have
+> > an ACPI based system or not.
+> > 
+> > The current behavior is to fall back to the global dma_ops when
+> > a device has not set its own dma_ops, but only for DT based systems.
+> > This seems dangerous, as a random device might have different
+> > requirements regarding IOMMU or coherency, so we should really
+> > never have that fallback and just forbid DMA when we have not
+> > initialized DMA for a device.
 > 
-> The init sections also hang around after boot as well (it's XIP code, so
-> there is nothing to 'free' in terms of executable init code).
-> Any potential security issues there as well? Should the data and init-
-> text sections be put in a separate section that gets blown away after
-> init-data is freed?
+> I think this is from the days when we didn't have an
+> arch_setup_dma_ops() to be called from the DT code.
 
-That's much harder to do - generally for XIP, people are space limited
-(which is why they're using XIP rather than putting the kernel in RAM.)
-They won't take kindly to having the kernel image bloated by 1MB just
-to pad it out so that the init stuff can be unmapped.
+Makes sense.
 
-However, from the security point of view, the less that's mapped at
-known addresses, the better.
+> I did placed a WARN_ON() to see who's getting the dummy_dma_ops and it
+> triggered this call trace:
+> 
+> WARNING: at /work/Linux/linux-2.6-aarch64/arch/arm64/include/asm/dma-mapping.h:40
+> Modules linked in:
+> 
+> CPU: 3 PID: 1 Comm: swapper/0 Tainted: G        W       4.4.0-rc1+ #601
+> Hardware name: Juno (DT)
+> task: ffffffc9768a0000 ti: ffffffc9768a8000 task.ti: ffffffc9768a8000
+> PC is at ohci_platform_probe+0x2b8/0x518
+> LR is at ohci_platform_probe+0x2c/0x518
+> Call trace:
+> [<ffffffc0004920e0>] ohci_platform_probe+0x2b8/0x518
+> [<ffffffc0003e842c>] platform_drv_probe+0x54/0xb8
+> [<ffffffc0003e68d4>] driver_probe_device+0x1ec/0x2f0
+> [<ffffffc0003e6a74>] __driver_attach+0x9c/0xa0
+> [<ffffffc0003e4a10>] bus_for_each_dev+0x60/0xa0
+> [<ffffffc0003e61b8>] driver_attach+0x20/0x28
+> [<ffffffc0003e5dd8>] bus_add_driver+0x1d0/0x238
+> [<ffffffc0003e7218>] driver_register+0x60/0xf8
+> [<ffffffc0003e8328>] __platform_driver_register+0x40/0x48
+> [<ffffffc00086f720>] ohci_platform_init+0x50/0x60
+> [<ffffffc000082938>] do_one_initcall+0x90/0x1a0
+> [<ffffffc00084caac>] kernel_init_freeable+0x154/0x1f8
+> [<ffffffc0005e9c40>] kernel_init+0x10/0xe0
+> [<ffffffc000085c50>] ret_from_fork+0x10/0x40
+> ohci-platform: probe of 7ffb0000.ohci failed with error -5
+> 
+> I need to check whether we break anything by no longer returning
+> swiotlb_dma_ops.
 
--- 
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Interesting. Note that this driver calls 'dma_coerce_mask_and_coherent()',
+which can be regarded a bug by itself, because it overrides the
+platform specific DMA mask.
+
+> > This removes the global dma_ops variable and the special-casing
+> > for ACPI, and just returns the dma ops that got set for the
+> > device, or the dummy_dma_ops if none were present.
+> > 
+> > The original code has apparently been copied from arm32 where we
+> > rely on it for ISA devices things like the floppy controller, but
+> > we should have no such devices on ARM64.
+> 
+> IIRC, this was required for DT before we had the arch_set_dma_ops()
+> (though I may be wrong, I haven't checked the logs). The dummy ops were
+> introduced with ACPI to avoid any default, I think this was related to
+> the _CCA property.
+
+Right.
+
+> > @@ -985,7 +977,7 @@ void arch_setup_dma_ops(struct device *dev, u64 dma_base, u64 size,
+> >  			struct iommu_ops *iommu, bool coherent)
+> >  {
+> >  	if (!acpi_disabled && !dev->archdata.dma_ops)
+> > -		dev->archdata.dma_ops = dma_ops;
+> > +		dev->archdata.dma_ops = &swiotlb_dma_ops;
+> 
+> Why do we still keep the !acpi_disabled check here? If I remove it, the
+> WARN_ON() above disappears.
+
+Ah, good. That must be my mistake then. This looks much better. On a
+related note, we should also urgently fix the arch_setup_dma_ops() function
+to no longer ignore the base and size arguments. For dma_mase, we can simply
+WARN_ON(dma_base != 0), so we can implement support for that whenever we need
+it, but for the size we need to prevent drivers from calling dma_set_mask()
+with an argument larger than the size we pass in here, unless the size is
+also larger than max_pfn.
+
+	Arnd
