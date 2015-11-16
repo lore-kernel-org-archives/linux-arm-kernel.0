@@ -1,189 +1,94 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 16 Nov 2015 17:00:21 +0100
-Subject: [PATCH] SPI: s3c64xx: pass DMA arguments in platform data
-Message-ID: <8391350.6B0EUH1WXO@wuerfel>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Mon, 16 Nov 2015 17:00:40 +0100
+Subject: [PATCH v4 05/24] misc: max77693-haptic: use pwm_get_xxx()
+ helpers where appropriate
+In-Reply-To: <5649FC75.8020203@roeck-us.net>
+References: <1447664207-24370-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1447664207-24370-6-git-send-email-boris.brezillon@free-electrons.com>
+ <5649D5D0.6080204@samsung.com> <20151116145509.3ea50eb0@bbrezillon>
+ <5649FC75.8020203@roeck-us.net>
+Message-ID: <20151116170040.00110079@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The s3c64xx platform data already contains a pointer to the
-DMA filter function, but not to the associated data.
+On Mon, 16 Nov 2015 07:55:33 -0800
+Guenter Roeck <linux@roeck-us.net> wrote:
 
-This simplifies the code and makes it more generic by
-passing the data along with the filter function like
-we do for other drivers.
+> On 11/16/2015 05:55 AM, Boris Brezillon wrote:
+> > Hi Krzysztof,
+> >
+> > On Mon, 16 Nov 2015 22:10:40 +0900
+> > Krzysztof Kozlowski <k.kozlowski@samsung.com> wrote:
+> >
+> >> W dniu 16.11.2015 o 17:56, Boris Brezillon pisze:
+> >>> Use pwm_get_xxx() helpers instead of directly accessing the pwm->xxx field.
+> >>> Doing that will ease adaptation of the PWM framework to support atomic
+> >>> update.
+> >>>
+> >>> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> >>> ---
+> >>> Patch generated with the following coccinelle script:
+> >>>
+> >>> --->8---
+> >>> virtual patch
+> >>>
+> >>> @@
+> >>> struct pwm_device *p;
+> >>> expression e;
+> >>> @@
+> >>> (
+> >>> -(p)->polarity = e;
+> >>> +pwm_set_polarity((p), e);
+> >>> |
+> >>> -(p)->polarity
+> >>> +pwm_get_polarity((p))
+> >>> |
+> >>> -(p)->period = e;
+> >>> +pwm_set_period((p), e);
+> >>> |
+> >>> -(p)->period
+> >>> +pwm_get_period((p))
+> >>> |
+> >>> -(p)->duty_cycle = e;
+> >>> +pwm_set_duty_cycle((p), e);
+> >>> |
+> >>> -(p)->duty_cycle
+> >>> +pwm_get_duty_cycle((p))
+> >>> )
+> >>> --->8---
+> >>> ---
+> >>>   drivers/input/misc/max77693-haptic.c | 7 ++++---
+> >>>   1 file changed, 4 insertions(+), 3 deletions(-)
+> >>>
+> >>> diff --git a/drivers/input/misc/max77693-haptic.c b/drivers/input/misc/max77693-haptic.c
+> >>> index 6d96bff..a038fb3 100644
+> >>> --- a/drivers/input/misc/max77693-haptic.c
+> >>> +++ b/drivers/input/misc/max77693-haptic.c
+> >>> @@ -70,10 +70,11 @@ struct max77693_haptic {
+> >>>
+> >>>   static int max77693_haptic_set_duty_cycle(struct max77693_haptic *haptic)
+> >>>   {
+> >>> -	int delta = (haptic->pwm_dev->period + haptic->pwm_duty) / 2;
+> >>> +	int delta = (pwm_get_period((haptic->pwm_dev)) + haptic->pwm_duty) / 2;
+> >>
+> >> Double parentheses over argument are not needed so just:
+> >> pwm_get_period(haptic->pwm_dev) + ...
+> >
+> > Actually it was generated with coccinelle, hence I didn't fix existing
+> > coding style issues, but I have no problem fixing them.
+> >
+> There was no existing coding style issue. Your coccinelle script introduces it.
+> You might want to consider updating your script and remove the unnecessary (( ))
+> from it.
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
- arch/arm/plat-samsung/devs.c              | 32 ++++++++++++++------------------
- drivers/spi/spi-s3c64xx.c                 | 28 ++++++++--------------------
- include/linux/platform_data/spi-s3c64xx.h |  2 ++
- 3 files changed, 24 insertions(+), 38 deletions(-)
+My bad, you are right: my script is buggy. I'll fix that.
 
-diff --git a/arch/arm/plat-samsung/devs.c b/arch/arm/plat-samsung/devs.c
-index 314131a4525d..817981c05d73 100644
---- a/arch/arm/plat-samsung/devs.c
-+++ b/arch/arm/plat-samsung/devs.c
-@@ -1105,9 +1105,7 @@ struct platform_device s3c_device_wdt = {
- #ifdef CONFIG_S3C64XX_DEV_SPI0
- static struct resource s3c64xx_spi0_resource[] = {
- 	[0] = DEFINE_RES_MEM(S3C_PA_SPI0, SZ_256),
--	[1] = DEFINE_RES_DMA((uintptr_t)DMACH_SPI0_TX),
--	[2] = DEFINE_RES_DMA((uintptr_t)DMACH_SPI0_RX),
--	[3] = DEFINE_RES_IRQ(IRQ_SPI0),
-+	[1] = DEFINE_RES_IRQ(IRQ_SPI0),
- };
- 
- struct platform_device s3c64xx_device_spi0 = {
-@@ -1135,11 +1133,13 @@ void __init s3c64xx_spi0_set_platdata(int (*cfg_gpio)(void), int src_clk_nr,
- 	pd.num_cs = num_cs;
- 	pd.src_clk_nr = src_clk_nr;
- 	pd.cfg_gpio = (cfg_gpio) ? cfg_gpio : s3c64xx_spi0_cfg_gpio;
--#if defined(CONFIG_PL330_DMA)
--	pd.filter = pl330_filter;
--#elif defined(CONFIG_S3C64XX_PL080)
-+#if defined(CONFIG_S3C64XX_PL080)
-+	pd.dma_tx = DMACH_SPI0_TX;
-+	pd.dma_rx = DMACH_SPI0_RX;
- 	pd.filter = pl08x_filter_id;
- #elif defined(CONFIG_S3C24XX_DMAC)
-+	pd.dma_tx = (void *)DMACH_SPI0_TX;
-+	pd.dma_rx = (void *)DMACH_SPI0_RX;
- 	pd.filter = s3c24xx_dma_filter;
- #endif
- 
-@@ -1150,9 +1150,7 @@ void __init s3c64xx_spi0_set_platdata(int (*cfg_gpio)(void), int src_clk_nr,
- #ifdef CONFIG_S3C64XX_DEV_SPI1
- static struct resource s3c64xx_spi1_resource[] = {
- 	[0] = DEFINE_RES_MEM(S3C_PA_SPI1, SZ_256),
--	[1] = DEFINE_RES_DMA((uintptr_t)DMACH_SPI1_TX),
--	[2] = DEFINE_RES_DMA((uintptr_t)DMACH_SPI1_RX),
--	[3] = DEFINE_RES_IRQ(IRQ_SPI1),
-+	[1] = DEFINE_RES_IRQ(IRQ_SPI1),
- };
- 
- struct platform_device s3c64xx_device_spi1 = {
-@@ -1180,9 +1178,9 @@ void __init s3c64xx_spi1_set_platdata(int (*cfg_gpio)(void), int src_clk_nr,
- 	pd.num_cs = num_cs;
- 	pd.src_clk_nr = src_clk_nr;
- 	pd.cfg_gpio = (cfg_gpio) ? cfg_gpio : s3c64xx_spi1_cfg_gpio;
--#if defined(CONFIG_PL330_DMA)
--	pd.filter = pl330_filter;
--#elif defined(CONFIG_S3C64XX_PL080)
-+#if defined(CONFIG_S3C64XX_PL080)
-+	pd.dma_tx = DMACH_SPI1_TX;
-+	pd.dma_rx = DMACH_SPI1_RX;
- 	pd.filter = pl08x_filter_id;
- #endif
- 
-@@ -1193,9 +1191,7 @@ void __init s3c64xx_spi1_set_platdata(int (*cfg_gpio)(void), int src_clk_nr,
- #ifdef CONFIG_S3C64XX_DEV_SPI2
- static struct resource s3c64xx_spi2_resource[] = {
- 	[0] = DEFINE_RES_MEM(S3C_PA_SPI2, SZ_256),
--	[1] = DEFINE_RES_DMA((uintptr_t)DMACH_SPI2_TX),
--	[2] = DEFINE_RES_DMA((uintptr_t)DMACH_SPI2_RX),
--	[3] = DEFINE_RES_IRQ(IRQ_SPI2),
-+	[1] = DEFINE_RES_IRQ(IRQ_SPI2),
- };
- 
- struct platform_device s3c64xx_device_spi2 = {
-@@ -1223,9 +1219,9 @@ void __init s3c64xx_spi2_set_platdata(int (*cfg_gpio)(void), int src_clk_nr,
- 	pd.num_cs = num_cs;
- 	pd.src_clk_nr = src_clk_nr;
- 	pd.cfg_gpio = (cfg_gpio) ? cfg_gpio : s3c64xx_spi2_cfg_gpio;
--#if defined(CONFIG_PL330_DMA)
--	pd.filter = pl330_filter;
--#elif defined(CONFIG_S3C64XX_PL080)
-+#if defined(CONFIG_S3C64XX_PL080)
-+	pd.dma_tx = DMACH_SPI2_TX;
-+	pd.dma_rx = DMACH_SPI2_RX;
- 	pd.filter = pl08x_filter_id;
- #endif
- 
-diff --git a/drivers/spi/spi-s3c64xx.c b/drivers/spi/spi-s3c64xx.c
-index 8e86e7f6663a..8b7499623957 100644
---- a/drivers/spi/spi-s3c64xx.c
-+++ b/drivers/spi/spi-s3c64xx.c
-@@ -133,7 +133,6 @@
- struct s3c64xx_spi_dma_data {
- 	struct dma_chan *ch;
- 	enum dma_transfer_direction direction;
--	unsigned int dmach;
- };
- 
- /**
-@@ -325,7 +324,7 @@ static int s3c64xx_spi_prepare_transfer(struct spi_master *spi)
- 
- 		/* Acquire DMA channels */
- 		sdd->rx_dma.ch = dma_request_slave_channel_compat(mask, filter,
--				   (void *)(long)sdd->rx_dma.dmach, dev, "rx");
-+				   sdd->cntrlr_info->dma_rx, dev, "rx");
- 		if (!sdd->rx_dma.ch) {
- 			dev_err(dev, "Failed to get RX DMA channel\n");
- 			ret = -EBUSY;
-@@ -334,7 +333,7 @@ static int s3c64xx_spi_prepare_transfer(struct spi_master *spi)
- 		spi->dma_rx = sdd->rx_dma.ch;
- 
- 		sdd->tx_dma.ch = dma_request_slave_channel_compat(mask, filter,
--				   (void *)(long)sdd->tx_dma.dmach, dev, "tx");
-+				   sdd->cntrlr_info->dma_tx, dev, "tx");
- 		if (!sdd->tx_dma.ch) {
- 			dev_err(dev, "Failed to get TX DMA channel\n");
- 			ret = -EBUSY;
-@@ -1028,7 +1027,6 @@ static inline struct s3c64xx_spi_port_config *s3c64xx_spi_get_port_config(
- static int s3c64xx_spi_probe(struct platform_device *pdev)
- {
- 	struct resource	*mem_res;
--	struct resource	*res;
- 	struct s3c64xx_spi_driver_data *sdd;
- 	struct s3c64xx_spi_info *sci = dev_get_platdata(&pdev->dev);
- 	struct spi_master *master;
-@@ -1087,20 +1085,9 @@ static int s3c64xx_spi_probe(struct platform_device *pdev)
- 
- 	sdd->cur_bpw = 8;
- 
--	if (!sdd->pdev->dev.of_node) {
--		res = platform_get_resource(pdev, IORESOURCE_DMA,  0);
--		if (!res) {
--			dev_warn(&pdev->dev, "Unable to get SPI tx dma resource. Switching to poll mode\n");
--			sdd->port_conf->quirks = S3C64XX_SPI_QUIRK_POLL;
--		} else
--			sdd->tx_dma.dmach = res->start;
--
--		res = platform_get_resource(pdev, IORESOURCE_DMA,  1);
--		if (!res) {
--			dev_warn(&pdev->dev, "Unable to get SPI rx dma resource. Switching to poll mode\n");
--			sdd->port_conf->quirks = S3C64XX_SPI_QUIRK_POLL;
--		} else
--			sdd->rx_dma.dmach = res->start;
-+	if (sci && (!sci->dma_tx || !sci->dma_rx)) {
-+		dev_warn(&pdev->dev, "Unable to get SPI tx data. Switching to poll mode\n");
-+		sdd->port_conf->quirks = S3C64XX_SPI_QUIRK_POLL;
- 	}
- 
- 	sdd->tx_dma.direction = DMA_MEM_TO_DEV;
-@@ -1197,9 +1184,10 @@ static int s3c64xx_spi_probe(struct platform_device *pdev)
- 
- 	dev_dbg(&pdev->dev, "Samsung SoC SPI Driver loaded for Bus SPI-%d with %d Slaves attached\n",
- 					sdd->port_id, master->num_chipselect);
--	dev_dbg(&pdev->dev, "\tIOmem=[%pR]\tFIFO %dbytes\tDMA=[Rx-%d, Tx-%d]\n",
-+	dev_dbg(&pdev->dev, "\tIOmem=[%pR]\tFIFO %dbytes\tDMA=[Rx-%p, Tx-%p]\n",
- 					mem_res, (FIFO_LVL_MASK(sdd) >> 1) + 1,
--					sdd->rx_dma.dmach, sdd->tx_dma.dmach);
-+					sdd->cntrlr_info->dma_rx,
-+					sdd->cntrlr_info->dma_tx);
- 
- 	pm_runtime_mark_last_busy(&pdev->dev);
- 	pm_runtime_put_autosuspend(&pdev->dev);
-diff --git a/include/linux/platform_data/spi-s3c64xx.h b/include/linux/platform_data/spi-s3c64xx.h
-index d3889b98a1a1..fb5625bcca9a 100644
---- a/include/linux/platform_data/spi-s3c64xx.h
-+++ b/include/linux/platform_data/spi-s3c64xx.h
-@@ -40,6 +40,8 @@ struct s3c64xx_spi_info {
- 	int num_cs;
- 	int (*cfg_gpio)(void);
- 	dma_filter_fn filter;
-+	void *dma_tx;
-+	void *dma_rx;
- };
- 
- /**
+Thanks,
+
+Boris
+
+
+-- 
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
