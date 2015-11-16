@@ -1,46 +1,42 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 16 Nov 2015 11:39:12 +0000
-Subject: [PATCH] bpf, arm64: start flushing icache range from header
-In-Reply-To: <41c4a481eb665a492c3b2df16af219b1250224a0.1447446460.git.daniel@iogearbox.net>
-References: <41c4a481eb665a492c3b2df16af219b1250224a0.1447446460.git.daniel@iogearbox.net>
-Message-ID: <20151116113912.GB20696@leverpostej>
+Date: Mon, 16 Nov 2015 11:40:55 +0000
+Subject: [PATCH net] bpf, arm: start flushing icache range from header
+In-Reply-To: <971980449d680e6b26e273130d74546c5148893c.1447446440.git.daniel@iogearbox.net>
+References: <971980449d680e6b26e273130d74546c5148893c.1447446440.git.daniel@iogearbox.net>
+Message-ID: <20151116114055.GC20696@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Sat, Nov 14, 2015 at 01:16:18AM +0100, Daniel Borkmann wrote:
-> While recently going over ARM64's BPF code, I noticed that the icache
-> range we're flushing should start at header already and not at ctx.image.
+On Sat, Nov 14, 2015 at 01:26:53AM +0100, Daniel Borkmann wrote:
+> During review I noticed that the icache range we're flushing should
+> start at header already and not at ctx.image.
 > 
-> Reason is that after b569c1c622c5 ("net: bpf: arm64: address randomize
+> Reason is that after 55309dd3d4cd ("net: bpf: arm: address randomize
 > and write protect JIT code"), we also want to make sure to flush the
 > random-sized trap in front of the start of the actual program (analogous
 > to x86). No operational differences from user side.
 > 
 > Signed-off-by: Daniel Borkmann <daniel@iogearbox.net>
-> Acked-by: Zi Shen Lim <zlim.lnx@gmail.com>
+> Tested-by: Nicolas Schichan <nschichan@freebox.fr>
 > Cc: Alexei Starovoitov <ast@kernel.org>
 > ---
->  ( As arm64 jit fixes seem to go via arm64 tree, sending them here. )
+>  ( As arm32 fixes usually go via Dave's tree, targeting -net. )
 > 
->  arch/arm64/net/bpf_jit_comp.c | 2 +-
+>  arch/arm/net/bpf_jit_32.c | 2 +-
 >  1 file changed, 1 insertion(+), 1 deletion(-)
 > 
-> diff --git a/arch/arm64/net/bpf_jit_comp.c b/arch/arm64/net/bpf_jit_comp.c
-> index a44e529..ee06570 100644
-> --- a/arch/arm64/net/bpf_jit_comp.c
-> +++ b/arch/arm64/net/bpf_jit_comp.c
-> @@ -740,7 +740,7 @@ void bpf_int_jit_compile(struct bpf_prog *prog)
->  	if (bpf_jit_enable > 1)
->  		bpf_jit_dump(prog->len, image_size, 2, ctx.image);
+> diff --git a/arch/arm/net/bpf_jit_32.c b/arch/arm/net/bpf_jit_32.c
+> index 2f4b14c..591f9db 100644
+> --- a/arch/arm/net/bpf_jit_32.c
+> +++ b/arch/arm/net/bpf_jit_32.c
+> @@ -1061,7 +1061,7 @@ void bpf_jit_compile(struct bpf_prog *fp)
+>  	}
+>  	build_epilogue(&ctx);
 >  
-> -	bpf_flush_icache(ctx.image, ctx.image + ctx.idx);
-> +	bpf_flush_icache(header, ctx.image + ctx.idx);
+> -	flush_icache_range((u32)ctx.target, (u32)(ctx.target + ctx.idx));
+> +	flush_icache_range((u32)header, (u32)(ctx.target + ctx.idx));
 
-As far as I can see, ctx.idx doesn't take into account the size of the
-header, given we zero it after bpf_jit_binary_alloc, and increment it
-for each instruction.
-
-So won't this prevent us from flushing the end of the image? Or did I
-miss something?
+As with the arm64 patch, doesn't this prevent us from flushing the end
+of the image? ctx.idx doesn't seem to take into account the header size.
 
 Mark.
