@@ -1,97 +1,51 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Mon, 16 Nov 2015 09:56:39 +0100
-Subject: [PATCH v4 16/24] pwm: move the enabled/disabled info to pwm_state
- struct
+Date: Mon, 16 Nov 2015 09:56:35 +0100
+Subject: [PATCH v4 12/24] misc: max77693: use pwm_get/set_default_xxx()
+ helpers where appropriate
 In-Reply-To: <1447664207-24370-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1447664207-24370-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1447664207-24370-17-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1447664207-24370-13-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Prepare the transition to PWM atomic update by moving the enabled/disabled
-state into the pwm_state struct. This way we can easily update the whole
-PWM state by copying the new state in the ->state field.
+pwm_set/get_default_xxx() helpers have been introduced to differentiate
+the default PWM states (those retrieved through DT, PWM lookup table or
+statically assigned by the driver) and the current ones.
+Make use of those helpers where appropriate.
 
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-Tested-by: Heiko Stuebner <heiko@sntech.de>
 ---
- drivers/pwm/core.c  | 17 +++++++++++++----
- include/linux/pwm.h |  7 ++++---
- 2 files changed, 17 insertions(+), 7 deletions(-)
+ drivers/input/misc/max77693-haptic.c | 8 +++++---
+ 1 file changed, 5 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/pwm/core.c b/drivers/pwm/core.c
-index f1c6769..6bbda6c 100644
---- a/drivers/pwm/core.c
-+++ b/drivers/pwm/core.c
-@@ -508,10 +508,10 @@ int pwm_enable(struct pwm_device *pwm)
+diff --git a/drivers/input/misc/max77693-haptic.c b/drivers/input/misc/max77693-haptic.c
+index a038fb3..89f5055 100644
+--- a/drivers/input/misc/max77693-haptic.c
++++ b/drivers/input/misc/max77693-haptic.c
+@@ -70,11 +70,12 @@ struct max77693_haptic {
  
- 	mutex_lock(&pwm->lock);
- 
--	if (!test_and_set_bit(PWMF_ENABLED, &pwm->flags)) {
-+	if (!pwm_is_enabled(pwm)) {
- 		err = pwm->chip->ops->enable(pwm->chip, pwm);
--		if (err)
--			clear_bit(PWMF_ENABLED, &pwm->flags);
-+		if (!err)
-+			pwm->state.enabled = true;
- 	}
- 
- 	mutex_unlock(&pwm->lock);
-@@ -526,8 +526,17 @@ EXPORT_SYMBOL_GPL(pwm_enable);
-  */
- void pwm_disable(struct pwm_device *pwm)
+ static int max77693_haptic_set_duty_cycle(struct max77693_haptic *haptic)
  {
--	if (pwm && test_and_clear_bit(PWMF_ENABLED, &pwm->flags))
-+	if (!pwm)
-+		return;
-+
-+	mutex_lock(&pwm->lock);
-+
-+	if (pwm_is_enabled(pwm)) {
- 		pwm->chip->ops->disable(pwm->chip, pwm);
-+		pwm->state.enabled = false;
-+	}
-+
-+	mutex_unlock(&pwm->lock);
- }
- EXPORT_SYMBOL_GPL(pwm_disable);
+-	int delta = (pwm_get_period((haptic->pwm_dev)) + haptic->pwm_duty) / 2;
++	int delta = (pwm_get_default_period((haptic->pwm_dev)) +
++		     haptic->pwm_duty) / 2;
+ 	int error;
  
-diff --git a/include/linux/pwm.h b/include/linux/pwm.h
-index af42299..398c58c 100644
---- a/include/linux/pwm.h
-+++ b/include/linux/pwm.h
-@@ -76,8 +76,7 @@ enum pwm_polarity {
+ 	error = pwm_config(haptic->pwm_dev, delta,
+-			   pwm_get_period((haptic->pwm_dev)));
++			   pwm_get_default_period((haptic->pwm_dev)));
+ 	if (error) {
+ 		dev_err(haptic->dev, "failed to configure pwm: %d\n", error);
+ 		return error;
+@@ -246,7 +247,8 @@ static int max77693_haptic_play_effect(struct input_dev *dev, void *data,
+ 	 * The formula to convert magnitude to pwm_duty as follows:
+ 	 * - pwm_duty = (magnitude * pwm_period) / MAX_MAGNITUDE(0xFFFF)
+ 	 */
+-	period_mag_multi = (u64)pwm_get_period((haptic->pwm_dev)) * haptic->magnitude;
++	period_mag_multi = (u64)pwm_get_default_period((haptic->pwm_dev)) *
++			   haptic->magnitude;
+ 	haptic->pwm_duty = (unsigned int)(period_mag_multi >>
+ 						MAX_MAGNITUDE_SHIFT);
  
- enum {
- 	PWMF_REQUESTED = 1 << 0,
--	PWMF_ENABLED = 1 << 1,
--	PWMF_EXPORTED = 1 << 2,
-+	PWMF_EXPORTED = 1 << 1,
- };
- 
- /*
-@@ -85,11 +84,13 @@ enum {
-  * @period: PWM period (in nanoseconds)
-  * @duty_cycle: PWM duty cycle (in nanoseconds)
-  * @polarity: PWM polarity
-+ * @enabled: PWM enabled status
-  */
- struct pwm_state {
- 	unsigned int period;
- 	unsigned int duty_cycle;
- 	enum pwm_polarity polarity;
-+	bool enabled;
- };
- 
- /**
-@@ -117,7 +118,7 @@ struct pwm_device {
- 
- static inline bool pwm_is_enabled(const struct pwm_device *pwm)
- {
--	return test_bit(PWMF_ENABLED, &pwm->flags);
-+	return pwm->state.enabled;
- }
- 
- static inline void pwm_set_period(struct pwm_device *pwm, unsigned int period)
 -- 
 2.1.4
