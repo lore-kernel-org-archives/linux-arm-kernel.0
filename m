@@ -1,36 +1,110 @@
 From: lee.jones@linaro.org (Lee Jones)
-Date: Mon, 16 Nov 2015 12:52:51 +0000
-Subject: [PATCH v2 9/9] ARM: multi_v7_defconfig: Build AXP20X related
- drivers as modules
-In-Reply-To: <CAGb2v66WEiqgmx-3rL6ksuu-Zq+iridUcpu-Nshbnqcp7Pgfaw@mail.gmail.com>
-References: <1447387456-9912-1-git-send-email-wens@csie.org>
- <1447387456-9912-11-git-send-email-wens@csie.org>
- <CAGb2v66WEiqgmx-3rL6ksuu-Zq+iridUcpu-Nshbnqcp7Pgfaw@mail.gmail.com>
-Message-ID: <20151116125251.GD17829@x1>
+Date: Mon, 16 Nov 2015 13:01:26 +0000
+Subject: [PATCH v2 3/3] [media] include/media: move platform_data to
+ linux/platform_data/media
+In-Reply-To: <b8bd73bedde742571b1ab8a7c0917a732dbf2ca1.1447671420.git.mchehab@osg.samsung.com>
+References: <013152dcb3d4eaddd39aa4a37868430567bdc2d6.1447671420.git.mchehab@osg.samsung.com>
+ <b8bd73bedde742571b1ab8a7c0917a732dbf2ca1.1447671420.git.mchehab@osg.samsung.com>
+Message-ID: <20151116130126.GE17829@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 13 Nov 2015, Chen-Yu Tsai wrote:
+On Mon, 16 Nov 2015, Mauro Carvalho Chehab wrote:
 
-> On Fri, Nov 13, 2015 at 12:04 PM, Chen-Yu Tsai <wens@csie.org> wrote:
-> > axp20x support has been split into 2 parts, I2C and RSB interface
-> > variants.
-> >
-> > Update the MFD_AXP20X symbol for I2C support, and also enable
-> > MFD_AXP20X_RSB to support RSB variants. Build these drivers as
-> > modules.
-> >
-> > Keep MFD_AXP20X enabled for now, to ease migration for automated
-> > boot farms while the patches are being merged. This should be
-> > removed in the next release.
-> >
-> > Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+> Let's not mix platform_data headers with the core headers. Instead, let's
+> create a subdir at linux/platform_data and move the headers to that
+> common place, adding it to MAINTAINERS.
 > 
-> Sorry. This is an old file with an old commit message. Please see the
-> other patch 9 ("ARM: multi_v7_defconfig: Enable RSB and AXP20X related
-> drivers as modules").
+> The headers were moved with:
+> 	mkdir include/linux/platform_data/media/; git mv include/media/gpio-ir-recv.h include/media/ir-rx51.h include/media/mmp-camera.h include/media/omap1_camera.h include/media/omap4iss.h include/media/s5p_hdmi.h include/media/si4713.h include/media/sii9234.h include/media/smiapp.h include/media/soc_camera.h include/media/soc_camera_platform.h include/media/timb_radio.h include/media/timb_video.h include/linux/platform_data/media/
+> 
+> And the references fixed with this script:
+>     MAIN_DIR="linux/platform_data/"
+>     PREV_DIR="media/"
+>     DIRS="media/"
+> 
+>     echo "Checking affected files" >&2
+>     for i in $DIRS; do
+> 	for j in $(find include/$MAIN_DIR/$i -type f -name '*.h'); do
+> 		 n=`basename $j`
+> 		git grep -l $n
+> 	done
+>     done|sort|uniq >files && (
+> 	echo "Handling files..." >&2;
+> 	echo "for i in \$(cat files|grep -v Documentation); do cat \$i | \\";
+> 	(
+> 		cd include/$MAIN_DIR;
+> 		for j in $DIRS; do
+> 			for i in $(ls $j); do
+> 				echo "perl -ne 's,(include [\\\"\\<])$PREV_DIR($i)([\\\"\\>]),\1$MAIN_DIR$j\2\3,; print \$_' |\\";
+> 			done;
+> 		done;
+> 		echo "cat > a && mv a \$i; done";
+> 	);
+> 	echo "Handling documentation..." >&2;
+> 	echo "for i in MAINTAINERS \$(cat files); do cat \$i | \\";
+> 	(
+> 		cd include/$MAIN_DIR;
+> 		for j in $DIRS; do
+> 			for i in $(ls $j); do
+> 				echo "  perl -ne 's,include/$PREV_DIR($i)\b,include/$MAIN_DIR$j\1,; print \$_' |\\";
+> 			done;
+> 		done;
+> 		echo "cat > a && mv a \$i; done"
+> 	);
+>     ) >script && . ./script
+> 
+> Signed-off-by: Mauro Carvalho Chehab <mchehab@osg.samsung.com>
+> ---
+>  Documentation/video4linux/omap4_camera.txt                    | 2 +-
+>  Documentation/video4linux/si4713.txt                          | 2 +-
+>  MAINTAINERS                                                   | 1 +
+>  arch/arm/mach-omap1/include/mach/camera.h                     | 2 +-
+>  arch/arm/mach-omap2/board-rx51-peripherals.c                  | 4 ++--
+>  arch/arm/plat-samsung/devs.c                                  | 2 +-
+>  arch/sh/boards/mach-ap325rxa/setup.c                          | 2 +-
+>  drivers/media/platform/marvell-ccic/mmp-driver.c              | 2 +-
+>  drivers/media/platform/s5p-tv/hdmi_drv.c                      | 2 +-
+>  drivers/media/platform/s5p-tv/sii9234_drv.c                   | 2 +-
+>  drivers/media/platform/soc_camera/omap1_camera.c              | 2 +-
+>  drivers/media/platform/soc_camera/soc_camera_platform.c       | 2 +-
+>  drivers/media/platform/timblogiw.c                            | 2 +-
+>  drivers/media/radio/radio-timb.c                              | 2 +-
+>  drivers/media/radio/si4713/radio-usb-si4713.c                 | 2 +-
+>  drivers/media/radio/si4713/si4713.h                           | 2 +-
+>  drivers/media/rc/gpio-ir-recv.c                               | 2 +-
+>  drivers/media/rc/ir-rx51.c                                    | 2 +-
+>  drivers/mfd/timberdale.c                                      | 4 ++--
 
-Can you re-submit the set please?
+Acked-by: Lee Jones <lee.jones@linaro.org>
+  
+>  drivers/staging/media/omap4iss/iss.h                          | 2 +-
+>  drivers/staging/media/omap4iss/iss_csiphy.h                   | 2 +-
+>  include/{ => linux/platform_data}/media/gpio-ir-recv.h        | 1 -
+>  include/{ => linux/platform_data}/media/ir-rx51.h             | 0
+>  include/{ => linux/platform_data}/media/mmp-camera.h          | 0
+>  include/{ => linux/platform_data}/media/omap1_camera.h        | 0
+>  include/{ => linux/platform_data}/media/omap4iss.h            | 0
+>  include/{ => linux/platform_data}/media/s5p_hdmi.h            | 1 -
+>  include/{ => linux/platform_data}/media/si4713.h              | 2 +-
+>  include/{ => linux/platform_data}/media/sii9234.h             | 0
+>  include/{ => linux/platform_data}/media/soc_camera_platform.h | 0
+>  include/{ => linux/platform_data}/media/timb_radio.h          | 0
+>  include/{ => linux/platform_data}/media/timb_video.h          | 0
+>  32 files changed, 24 insertions(+), 25 deletions(-)
+>  rename include/{ => linux/platform_data}/media/gpio-ir-recv.h (99%)
+>  rename include/{ => linux/platform_data}/media/ir-rx51.h (100%)
+>  rename include/{ => linux/platform_data}/media/mmp-camera.h (100%)
+>  rename include/{ => linux/platform_data}/media/omap1_camera.h (100%)
+>  rename include/{ => linux/platform_data}/media/omap4iss.h (100%)
+>  rename include/{ => linux/platform_data}/media/s5p_hdmi.h (99%)
+>  rename include/{ => linux/platform_data}/media/si4713.h (96%)
+>  rename include/{ => linux/platform_data}/media/sii9234.h (100%)
+>  rename include/{ => linux/platform_data}/media/soc_camera_platform.h (100%)
+>  rename include/{ => linux/platform_data}/media/timb_radio.h (100%)
+>  rename include/{ => linux/platform_data}/media/timb_video.h (100%)
+
+[...]
 
 -- 
 Lee Jones
