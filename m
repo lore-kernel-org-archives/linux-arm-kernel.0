@@ -1,44 +1,58 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Mon, 16 Nov 2015 19:22:08 +0100
-Subject: [PATCH] usb: gadget: atmel_usba_udc: Expose correct device speed
-Message-ID: <1447698128-15568-1-git-send-email-boris.brezillon@free-electrons.com>
+From: james.morse@arm.com (James Morse)
+Date: Mon, 16 Nov 2015 18:22:04 +0000
+Subject: [PATCH v7 0/3] arm64: Add support for IRQ stack
+Message-ID: <1447698128-8490-1-git-send-email-james.morse@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Douglas Gilbert <dgilbert@interlog.com>
+This consolidated series adds a per-cpu irq_stack, which will eventually allow
+us to reduce the size of task stacks.
 
-Following changes that appeared in lk 4.0.0, the gadget udc driver for
-some ARM based Atmel SoCs (e.g. at91sam9x5 and sama5d3 families)
-incorrectly deduced full-speed USB link speed even when the hardware
-had negotiated a high-speed link. The fix is to make sure that the
-UDPHS Interrupt Enable Register value does not mask the SPEED bit
-in the Interrupt Status Register.
+Code in entry.S switches to the per-cpu irq_stack when irq_count is zero.
+This counter is updated in do_softirq_own_stack(), which is called before
+__do_softirq() re-enables interrupts, which could cause recursive use of the
+irq stack.
 
-For a mass storage gadget this problem lead to failures when the host
-had a USB 3 port with the xhci_hcd driver. If the host was a USB 2
-port using the ehci_hcd driver then the mass storage gadget worked
-(but probably at a lower speed than it should have).
+sp_el0 is used as a scratch register to store struct thread_info during el1
+execution, this means code to find it by masking the stack pointer no longer
+needs to be inlined. This also lets us remove the alignment requirements for
+the irq stack, (task stacks still need to be naturally aligned).
 
-Signed-of-by: Douglas Gilbert <dgilbert@interlog.com>
-Reviewed-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-Cc: <stable@vger.kernel.org> #4.0+
-Fixes: 9870d895ad87 ("usb: atmel_usba_udc: Mask status with enabled irqs")
----
- drivers/usb/gadget/udc/atmel_usba_udc.c | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+Patch 2 is a combination of Akashi Takahiro's 'arm64: unwind_frame for
+interrupt stack' and 'arm64: fix dump_backtrace() to show correct pt_regs at
+interrupt', both of which need to be present before irq_stack is enabled in
+Patch 3.
 
-diff --git a/drivers/usb/gadget/udc/atmel_usba_udc.c b/drivers/usb/gadget/udc/atmel_usba_udc.c
-index f0f2b06..f92f5af 100644
---- a/drivers/usb/gadget/udc/atmel_usba_udc.c
-+++ b/drivers/usb/gadget/udc/atmel_usba_udc.c
-@@ -1633,7 +1633,7 @@ static irqreturn_t usba_udc_irq(int irq, void *devid)
- 	spin_lock(&udc->lock);
- 
- 	int_enb = usba_int_enb_get(udc);
--	status = usba_readl(udc, INT_STA) & int_enb;
-+	status = usba_readl(udc, INT_STA) & (int_enb | USBA_HIGH_SPEED);
- 	DBG(DBG_INT, "irq, status=%#08x\n", status);
- 
- 	if (status & USBA_DET_SUSPEND) {
+This series is split into three for reasons of (coarse) attribution, although
+I've added bugs to all the patches...
+
+This series is based on the v4.4-rc1.
+The series can be pulled from git://linux-arm.org/linux-jm.git -b irq_stack/v7
+
+Comments welcome,
+
+
+James
+
+AKASHI Takahiro (1):
+  arm64: Modify stack trace and dump for use with irq_stack
+
+James Morse (1):
+  arm64: Add do_softirq_own_stack() and enable irq_stacks
+
+Jungseok Lee (1):
+  arm64: Add irq_stack boiler plate, store struct task_info in sp_el0
+
+ arch/arm64/include/asm/irq.h         | 26 +++++++++++++++++++
+ arch/arm64/include/asm/thread_info.h | 10 ++++++--
+ arch/arm64/kernel/entry.S            | 48 ++++++++++++++++++++++++++++++++----
+ arch/arm64/kernel/head.S             |  5 ++++
+ arch/arm64/kernel/irq.c              | 47 +++++++++++++++++++++++++++++++++++
+ arch/arm64/kernel/sleep.S            |  3 +++
+ arch/arm64/kernel/smp.c              |  5 ++++
+ arch/arm64/kernel/stacktrace.c       | 29 ++++++++++++++++++++--
+ arch/arm64/kernel/traps.c            | 14 ++++++++++-
+ 9 files changed, 177 insertions(+), 10 deletions(-)
+
 -- 
 2.1.4
