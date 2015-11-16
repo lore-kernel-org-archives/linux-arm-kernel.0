@@ -1,102 +1,124 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Mon, 16 Nov 2015 19:06:46 +0100
-Subject: [PATCH v4 02/24] pwm: use pwm_get_xxx() helpers where appropriate
-In-Reply-To: <CAGhQ9VwEuwazF5Kdw=9R60EovVoiwen6fXiVjL+=EddXPYVGAg@mail.gmail.com>
-References: <1447664207-24370-1-git-send-email-boris.brezillon@free-electrons.com>
- <1447664207-24370-3-git-send-email-boris.brezillon@free-electrons.com>
- <CAGhQ9VwEuwazF5Kdw=9R60EovVoiwen6fXiVjL+=EddXPYVGAg@mail.gmail.com>
-Message-ID: <20151116190646.1d5ba16e@bbrezillon>
+From: linux@arm.linux.org.uk (Russell King - ARM Linux)
+Date: Mon, 16 Nov 2015 18:17:18 +0000
+Subject: [PATCH v3] ARM: xip: Use correct symbol for end of ROM marker
+In-Reply-To: <1447697140-4099-1-git-send-email-chris.brandt@renesas.com>
+References: <1447362108-4333-1-git-send-email-chris.brandt@renesas.com>
+ <1447697140-4099-1-git-send-email-chris.brandt@renesas.com>
+Message-ID: <20151116181718.GW8644@n2100.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Joachim,
+Nico,
 
-On Mon, 16 Nov 2015 18:46:44 +0100
-Joachim  Eastwood <manabian@gmail.com> wrote:
+As you originally created the XIP stuff, I hope you can remember
+the details - can you check this patch please?
 
-> Hi Boris
+I'm thinking that we need a new symbol around here:
+
+#ifdef CONFIG_XIP_KERNEL
+        __data_loc = ALIGN(4);          /* location in binary */
+					<=== here
+        . = PAGE_OFFSET + TEXT_OFFSET;
+#else
+
+to denote the end of the XIP kernel image which must remain
+accessible after boot.  We don't need the data sections because
+they will have been copied to RAM, and we probably don't want to
+keep those exposed (it's potentially useful for attackers.)
+
+On Mon, Nov 16, 2015@01:05:40PM -0500, Chris Brandt wrote:
+> For an XIP build, _edata_loc, not _etext, represents the end of the
+> binary image that will be programmed into ROM and mapped into the
+> MODULES_VADDR area.
+> With an XIP kernel, nothing is loaded into RAM before boot, meaning
+> you have to take into account the size of the entire binary image
+> that was programmed, including the init data values that will be copied
+> to RAM during kernel boot.
 > 
-> (Adding Ariel for pwm-lpc18xx-sct)
+> This fixes the bug where you might lose the end of your kernel area
+> after page table setup is complete.
 > 
-> On 16 November 2015 at 09:56, Boris Brezillon
-> <boris.brezillon@free-electrons.com> wrote:
-> > Use pwm_get_xxx() helpers instead of directly accessing the pwm->xxx field.
-> > Doing that will ease adaptation of the PWM framework to support atomic
-> > update.
-> >
-> > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> > ---
-> > Patch generated with the following coccinelle script:
-> >
-> > --->8---
-> > virtual patch
-> >
-> > @@
-> > struct pwm_device *p;
-> > expression e;
-> > @@
-> > (
-> > -(p)->polarity = e;
-> > +pwm_set_polarity((p), e);
-> > |
-> > -(p)->polarity
-> > +pwm_get_polarity((p))
-> > |
-> > -(p)->period = e;
-> > +pwm_set_period((p), e);
-> > |
-> > -(p)->period
-> > +pwm_get_period((p))
-> > |
-> > -(p)->duty_cycle = e;
-> > +pwm_set_duty_cycle((p), e);
-> > |
-> > -(p)->duty_cycle
-> > +pwm_get_duty_cycle((p))
-> > )
-> > --->8---
-> > ---
-> >  drivers/pwm/pwm-crc.c         | 2 +-
-> >  drivers/pwm/pwm-lpc18xx-sct.c | 2 +-
-> >  2 files changed, 2 insertions(+), 2 deletions(-)
-> >
-> > diff --git a/drivers/pwm/pwm-crc.c b/drivers/pwm/pwm-crc.c
-> > index 7101c70..2f88543 100644
-> > --- a/drivers/pwm/pwm-crc.c
-> > +++ b/drivers/pwm/pwm-crc.c
-> > @@ -75,7 +75,7 @@ static int crc_pwm_config(struct pwm_chip *c, struct pwm_device *pwm,
-> >                 return -EINVAL;
-> >         }
-> >
-> > -       if (pwm->period != period_ns) {
-> > +       if (pwm_get_period((pwm)) != period_ns) {
-> >                 int clk_div;
-> >
-> >                 /* changing the clk divisor, need to disable fisrt */
-> > diff --git a/drivers/pwm/pwm-lpc18xx-sct.c b/drivers/pwm/pwm-lpc18xx-sct.c
-> > index 9163085..091fa13 100644
-> > --- a/drivers/pwm/pwm-lpc18xx-sct.c
-> > +++ b/drivers/pwm/pwm-lpc18xx-sct.c
-> > @@ -249,7 +249,7 @@ static int lpc18xx_pwm_enable(struct pwm_chip *chip, struct pwm_device *pwm)
-> >                            LPC18XX_PWM_EVSTATEMSK(lpc18xx_data->duty_event),
-> >                            LPC18XX_PWM_EVSTATEMSK_ALL);
-> >
-> > -       if (pwm->polarity == PWM_POLARITY_NORMAL) {
-> > +       if (pwm_get_polarity((pwm)) == PWM_POLARITY_NORMAL) {
+> Signed-off-by: Chris Brandt <chris.brandt@renesas.com>
+> ---
+> v3:
+> * Removed sections.h from Kbuild
+> v2:
+> * Added change for MODULES_VADDR
+> * Moved extern to new file asm/sections.h
+> ---
+>  arch/arm/include/asm/Kbuild     |    1 -
+>  arch/arm/include/asm/sections.h |    8 ++++++++
+>  arch/arm/kernel/module.c        |    2 +-
+>  arch/arm/mm/mmu.c               |    4 ++--
+>  4 files changed, 11 insertions(+), 4 deletions(-)
+>  create mode 100644 arch/arm/include/asm/sections.h
 > 
-> What is the deal with the double parentheses?
+> diff --git a/arch/arm/include/asm/Kbuild b/arch/arm/include/asm/Kbuild
+> index be648eb..6d3da22 100644
+> --- a/arch/arm/include/asm/Kbuild
+> +++ b/arch/arm/include/asm/Kbuild
+> @@ -21,7 +21,6 @@ generic-y += preempt.h
+>  generic-y += resource.h
+>  generic-y += rwsem.h
+>  generic-y += seccomp.h
+> -generic-y += sections.h
+>  generic-y += segment.h
+>  generic-y += sembuf.h
+>  generic-y += serial.h
+> diff --git a/arch/arm/include/asm/sections.h b/arch/arm/include/asm/sections.h
+> new file mode 100644
+> index 0000000..401eb3c2
+> --- /dev/null
+> +++ b/arch/arm/include/asm/sections.h
+> @@ -0,0 +1,8 @@
+> +#ifndef _ASM_ARM_SECTIONS_H
+> +#define _ASM_ARM_SECTIONS_H
+> +
+> +#include <asm-generic/sections.h>
+> +
+> +extern char _edata_loc[];
+> +
+> +#endif	/* _ASM_ARM_SECTIONS_H */
+> diff --git a/arch/arm/kernel/module.c b/arch/arm/kernel/module.c
+> index efdddcb..41ae2cc 100644
+> --- a/arch/arm/kernel/module.c
+> +++ b/arch/arm/kernel/module.c
+> @@ -34,7 +34,7 @@
+>   * recompiling the whole kernel when CONFIG_XIP_KERNEL is turned on/off.
+>   */
+>  #undef MODULES_VADDR
+> -#define MODULES_VADDR	(((unsigned long)_etext + ~PMD_MASK) & PMD_MASK)
+> +#define MODULES_VADDR	(((unsigned long)_edata_loc + ~PMD_MASK) & PMD_MASK)
+>  #endif
+>  
+>  #ifdef CONFIG_MMU
+> diff --git a/arch/arm/mm/mmu.c b/arch/arm/mm/mmu.c
+> index 4867f5d..dd5a56b 100644
+> --- a/arch/arm/mm/mmu.c
+> +++ b/arch/arm/mm/mmu.c
+> @@ -1210,7 +1210,7 @@ static inline void prepare_page_table(void)
+>  
+>  #ifdef CONFIG_XIP_KERNEL
+>  	/* The XIP kernel is mapped in the module area -- skip over it */
+> -	addr = ((unsigned long)_etext + PMD_SIZE - 1) & PMD_MASK;
+> +	addr = ((unsigned long)_edata_loc + PMD_SIZE - 1) & PMD_MASK;
+>  #endif
+>  	for ( ; addr < PAGE_OFFSET; addr += PMD_SIZE)
+>  		pmd_clear(pmd_off_k(addr));
+> @@ -1292,7 +1292,7 @@ static void __init devicemaps_init(const struct machine_desc *mdesc)
+>  #ifdef CONFIG_XIP_KERNEL
+>  	map.pfn = __phys_to_pfn(CONFIG_XIP_PHYS_ADDR & SECTION_MASK);
+>  	map.virtual = MODULES_VADDR;
+> -	map.length = ((unsigned long)_etext - map.virtual + ~SECTION_MASK) & SECTION_MASK;
+> +	map.length = ((unsigned long)_edata_loc - map.virtual + ~SECTION_MASK) & SECTION_MASK;
+>  	map.type = MT_ROM;
+>  	create_mapping(&map);
+>  #endif
+> -- 
+> 1.7.9.5
 > 
-> Think I saw that in some of the other patches as well.
-
-It comes from a typo in my coccinelle script. I already fixed it and
-regenerated the faulty patches, so please ignore this aspect while
-reviewing (this will be addressed in the next version).
-
-Thanks,
-
-Boris
+> 
 
 -- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
+according to speedtest.net.
