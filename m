@@ -1,52 +1,71 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Mon, 16 Nov 2015 14:24:54 +0200
-Subject: [PATCH] ARM: OMAP4: execute initcall to reserve SRAM for I688
- only on OMAP4
-In-Reply-To: <1447673117-32719-1-git-send-email-l.stach@pengutronix.de>
-References: <1447673117-32719-1-git-send-email-l.stach@pengutronix.de>
-Message-ID: <5649CB16.2030706@ti.com>
+From: james.morse@arm.com (James Morse)
+Date: Mon, 16 Nov 2015 12:27:07 +0000
+Subject: [PATCH v2 10/11] PM / Hibernate: clean cached pages on
+ architectures that require it
+In-Reply-To: <20151114202623.GC20429@amd>
+References: <1445966960-31724-1-git-send-email-james.morse@arm.com>
+ <1445966960-31724-11-git-send-email-james.morse@arm.com>
+ <20151114202623.GC20429@amd>
+Message-ID: <5649CB9B.30102@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/16/2015 01:25 PM, Lucas Stach wrote:
-> omap_interconnect_sync() is the only user of the SRAM scratch area
-> allocated in the omap4_sram_init initcall. The interconnect sync is
-> used exclusively in the OMAP4 specific WFI implementation, so there
-> is no point in allocating the SRAM scratch on other SoC types.
+On 14/11/15 20:26, Pavel Machek wrote:
+> On Tue 2015-10-27 17:29:19, James Morse wrote:
+>> Some architectures require code written to memory as if it were data to be
+>> 'cleaned' from any data caches so that the processor can fetch them as new
+>> instructions.
+>>
+>> During resume from hibernate, the snapshot code copies some pages directly,
+>> meaning these architectures do not get a chance to perform their cache
+>> maintenance. Add a call to flush_icache_range(), which is provided by
+>> architectures that require it, to perform the maintenance.
+>>
+>> This mirrors the kernel's behaviour when loading kernel modules and when
+>> mapping executable pages to user space.
+>>
+>> Signed-off-by: James Morse <james.morse@arm.com>
 > 
-> Bail out of the initcall if the kernel is not running on OMAP4 to
-> avoid a confusing warning about being unable to allocate the SRAM
-> needed for I688 handling.
+> Looks reasonable.
 > 
-> Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
-> Tested-by: Bastian Stender <bst@pengutronix.de>
-> ---
->   arch/arm/mach-omap2/omap4-common.c | 3 +++
->   1 file changed, 3 insertions(+)
+> Acked-by: Pavel Machek <pavel@ucw.cz>
+
+Thanks!
+
 > 
-> diff --git a/arch/arm/mach-omap2/omap4-common.c b/arch/arm/mach-omap2/omap4-common.c
-> index 949696b6f17b..6db393a30a28 100644
-> --- a/arch/arm/mach-omap2/omap4-common.c
-> +++ b/arch/arm/mach-omap2/omap4-common.c
-> @@ -131,6 +131,9 @@ static int __init omap4_sram_init(void)
->   	struct device_node *np;
->   	struct gen_pool *sram_pool;
->   
-> +	if (!cpu_is_omap44xx())
-> +		return 0;
+>> ---
+>>  kernel/power/snapshot.c | 4 ++++
+>>  1 file changed, 4 insertions(+)
+>>
+>> diff --git a/kernel/power/snapshot.c b/kernel/power/snapshot.c
+>> index 5235dd4e1e2f..139fc449ad75 100644
+>> --- a/kernel/power/snapshot.c
+>> +++ b/kernel/power/snapshot.c
+>> @@ -1196,9 +1197,12 @@ static unsigned int count_data_pages(void)
+>>  static inline void do_copy_page(long *dst, long *src)
+>>  {
+>>  	int n;
+>> +	unsigned long __maybe_unused start = (unsigned long)dst;
+> 
+> Why the "maybe unused"?
 
-This one affects on am43xx also
+To avoid a build warning on x86_64, and any other architectures that don't
+use the arguments in their flush_icache_range() implementation.
+
+Without __maybe_unused, gcc 4.9.2, building for x86_64:
+> ../kernel/power/snapshot.c: In function ?do_copy_page?:
+> ../kernel/power/snapshot.c:1200:16: warning: unused variable ?start?
+> [-Wunused-variable]
+>  unsigned long start = (unsigned long)dst;
 
 
-> +
->   	np = of_find_compatible_node(NULL, NULL, "ti,omap4-mpu");
->   	if (!np)
->   		pr_warn("%s:Unable to allocate sram needed to handle errata I688\n",
-
-Since all OMAP4+ platforms are now DT based why can't we just return from here silently?
-
+>>  	for (n = PAGE_SIZE / sizeof(long); n; n--)
+>>  		*dst++ = *src++;
+>> +
+>> +	flush_icache_range(start, start+PAGE_SIZE);
+>>  }
 
 
--- 
-regards,
--grygorii
+Thanks,
+
+James
