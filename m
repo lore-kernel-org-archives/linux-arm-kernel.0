@@ -1,67 +1,48 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Mon, 16 Nov 2015 14:37:50 +0100
-Subject: [PATCH 17/27] cris: nand: use the mtd instance embedded in struct
- nand_chip
+Date: Mon, 16 Nov 2015 14:37:38 +0100
+Subject: [PATCH 05/27] blackfin: nand: make use of mtd_to_nand() where
+ appropriate
 In-Reply-To: <1447681080-31232-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1447681080-31232-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1447681080-31232-18-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1447681080-31232-6-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-struct nand_chip now embeds an mtd device. Patch all drivers to make use
-of this mtd instance instead of using the instance embedded in their
-private struct or dynamically allocated.
+mtd_to_nand() was recently introduced to avoid direct accesses to the
+mtd->priv field. Update all blackfin specific implementations to use
+this helper.
 
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 ---
-Most of those changes were generate with this coccinelle script:
-http://code.bulix.org/5vxuih-89429
----
- arch/cris/arch-v32/drivers/mach-a3/nandflash.c | 3 +--
- arch/cris/arch-v32/drivers/mach-fs/nandflash.c | 3 +--
- 2 files changed, 2 insertions(+), 4 deletions(-)
+ arch/blackfin/mach-bf537/boards/stamp.c   | 2 +-
+ arch/blackfin/mach-bf561/boards/acvilon.c | 2 +-
+ 2 files changed, 2 insertions(+), 2 deletions(-)
 
-diff --git a/arch/cris/arch-v32/drivers/mach-a3/nandflash.c b/arch/cris/arch-v32/drivers/mach-a3/nandflash.c
-index db953cf..ad78b97 100644
---- a/arch/cris/arch-v32/drivers/mach-a3/nandflash.c
-+++ b/arch/cris/arch-v32/drivers/mach-a3/nandflash.c
-@@ -36,7 +36,6 @@
- #define CE_BIT 12
+diff --git a/arch/blackfin/mach-bf537/boards/stamp.c b/arch/blackfin/mach-bf537/boards/stamp.c
+index 88a19fc..c181543 100644
+--- a/arch/blackfin/mach-bf537/boards/stamp.c
++++ b/arch/blackfin/mach-bf537/boards/stamp.c
+@@ -404,7 +404,7 @@ static struct mtd_partition bfin_plat_nand_partitions[] = {
+ #define BFIN_NAND_PLAT_ALE 1
+ static void bfin_plat_nand_cmd_ctrl(struct mtd_info *mtd, int cmd, unsigned int ctrl)
+ {
+-	struct nand_chip *this = mtd->priv;
++	struct nand_chip *this = mtd_to_nand(mtd);
  
- struct mtd_info_wrapper {
--	struct mtd_info info;
- 	struct nand_chip chip;
- };
+ 	if (cmd == NAND_CMD_NONE)
+ 		return;
+diff --git a/arch/blackfin/mach-bf561/boards/acvilon.c b/arch/blackfin/mach-bf561/boards/acvilon.c
+index 6ab9515..37f8f25 100644
+--- a/arch/blackfin/mach-bf561/boards/acvilon.c
++++ b/arch/blackfin/mach-bf561/boards/acvilon.c
+@@ -267,7 +267,7 @@ static struct mtd_partition bfin_plat_nand_partitions[] = {
+ static void bfin_plat_nand_cmd_ctrl(struct mtd_info *mtd, int cmd,
+ 				    unsigned int ctrl)
+ {
+-	struct nand_chip *this = mtd->priv;
++	struct nand_chip *this = mtd_to_nand(mtd);
  
-@@ -148,7 +147,7 @@ struct mtd_info *__init crisv32_nand_flash_probe(void)
- 
- 	/* Get pointer to private data */
- 	this = &wrapper->chip;
--	crisv32_mtd = &wrapper->info;
-+	crisv32_mtd = nand_to_mtd(&wrapper->chip);
- 
- 	/* Link the private data with the MTD structure */
- 	crisv32_mtd->priv = this;
-diff --git a/arch/cris/arch-v32/drivers/mach-fs/nandflash.c b/arch/cris/arch-v32/drivers/mach-fs/nandflash.c
-index 22a6467..00a277b 100644
---- a/arch/cris/arch-v32/drivers/mach-fs/nandflash.c
-+++ b/arch/cris/arch-v32/drivers/mach-fs/nandflash.c
-@@ -31,7 +31,6 @@
- #define BY_BIT 7
- 
- struct mtd_info_wrapper {
--	struct mtd_info info;
- 	struct nand_chip chip;
- };
- 
-@@ -129,7 +128,7 @@ struct mtd_info *__init crisv32_nand_flash_probe(void)
- 
- 	/* Get pointer to private data */
- 	this = &wrapper->chip;
--	crisv32_mtd = &wrapper->info;
-+	crisv32_mtd = nand_to_mtd(&wrapper->chip);
- 
- 	pa_oe.oe |= 1 << CE_BIT;
- 	pa_oe.oe |= 1 << ALE_BIT;
+ 	if (cmd == NAND_CMD_NONE)
+ 		return;
 -- 
 2.1.4
