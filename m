@@ -1,59 +1,78 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Mon, 16 Nov 2015 09:56:33 +0100
-Subject: [PATCH v4 10/24] backlight: pwm: use pwm_get/set_default_xxx()
- helpers where appropriate
+Date: Mon, 16 Nov 2015 09:56:28 +0100
+Subject: [PATCH v4 05/24] misc: max77693-haptic: use pwm_get_xxx() helpers
+ where appropriate
 In-Reply-To: <1447664207-24370-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1447664207-24370-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1447664207-24370-11-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1447664207-24370-6-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-pwm_set/get_default_xxx() helpers have been introduced to differentiate
-the default PWM states (those retrieved through DT, PWM lookup table or
-statically assigned by the driver) and the current ones.
-Make use of those helpers where appropriate.
+Use pwm_get_xxx() helpers instead of directly accessing the pwm->xxx field.
+Doing that will ease adaptation of the PWM framework to support atomic
+update.
 
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-Acked-by: Lee Jones <lee.jones@linaro.org>
 ---
- drivers/video/backlight/lm3630a_bl.c | 4 ++--
- drivers/video/backlight/pwm_bl.c     | 2 +-
- 2 files changed, 3 insertions(+), 3 deletions(-)
+Patch generated with the following coccinelle script:
 
-diff --git a/drivers/video/backlight/lm3630a_bl.c b/drivers/video/backlight/lm3630a_bl.c
-index 35fe482..449ebc3 100644
---- a/drivers/video/backlight/lm3630a_bl.c
-+++ b/drivers/video/backlight/lm3630a_bl.c
-@@ -162,7 +162,7 @@ static int lm3630a_intr_config(struct lm3630a_chip *pchip)
+--->8---
+virtual patch
+
+@@
+struct pwm_device *p;
+expression e;
+@@
+(
+-(p)->polarity = e;
++pwm_set_polarity((p), e);
+|
+-(p)->polarity
++pwm_get_polarity((p))
+|
+-(p)->period = e;
++pwm_set_period((p), e);
+|
+-(p)->period
++pwm_get_period((p))
+|
+-(p)->duty_cycle = e;
++pwm_set_duty_cycle((p), e);
+|
+-(p)->duty_cycle
++pwm_get_duty_cycle((p))
+)
+--->8---
+---
+ drivers/input/misc/max77693-haptic.c | 7 ++++---
+ 1 file changed, 4 insertions(+), 3 deletions(-)
+
+diff --git a/drivers/input/misc/max77693-haptic.c b/drivers/input/misc/max77693-haptic.c
+index 6d96bff..a038fb3 100644
+--- a/drivers/input/misc/max77693-haptic.c
++++ b/drivers/input/misc/max77693-haptic.c
+@@ -70,10 +70,11 @@ struct max77693_haptic {
  
- static void lm3630a_pwm_ctrl(struct lm3630a_chip *pchip, int br, int br_max)
+ static int max77693_haptic_set_duty_cycle(struct max77693_haptic *haptic)
  {
--	unsigned int period = pwm_get_period(pchip->pwmd);
-+	unsigned int period = pwm_get_default_period(pchip->pwmd);
- 	unsigned int duty = br * period / br_max;
+-	int delta = (haptic->pwm_dev->period + haptic->pwm_duty) / 2;
++	int delta = (pwm_get_period((haptic->pwm_dev)) + haptic->pwm_duty) / 2;
+ 	int error;
  
- 	pwm_config(pchip->pwmd, duty, period);
-@@ -425,7 +425,7 @@ static int lm3630a_probe(struct i2c_client *client,
- 			return PTR_ERR(pchip->pwmd);
- 		}
- 	}
--	pchip->pwmd->period = pdata->pwm_period;
-+	pwm_set_default_period(pchip->pwmd, pdata->pwm_period);
- 
- 	/* interrupt enable  : irq 0 is not allowed */
- 	pchip->irq = client->irq;
-diff --git a/drivers/video/backlight/pwm_bl.c b/drivers/video/backlight/pwm_bl.c
-index ae3c6b6..54d5a03 100644
---- a/drivers/video/backlight/pwm_bl.c
-+++ b/drivers/video/backlight/pwm_bl.c
-@@ -293,7 +293,7 @@ static int pwm_backlight_probe(struct platform_device *pdev)
- 	 * set the period from platform data if it has not already been set
- 	 * via the PWM lookup table.
+-	error = pwm_config(haptic->pwm_dev, delta, haptic->pwm_dev->period);
++	error = pwm_config(haptic->pwm_dev, delta,
++			   pwm_get_period((haptic->pwm_dev)));
+ 	if (error) {
+ 		dev_err(haptic->dev, "failed to configure pwm: %d\n", error);
+ 		return error;
+@@ -245,7 +246,7 @@ static int max77693_haptic_play_effect(struct input_dev *dev, void *data,
+ 	 * The formula to convert magnitude to pwm_duty as follows:
+ 	 * - pwm_duty = (magnitude * pwm_period) / MAX_MAGNITUDE(0xFFFF)
  	 */
--	pb->period = pwm_get_period(pb->pwm);
-+	pb->period = pwm_get_default_period(pb->pwm);
- 	if (!pb->period && (data->pwm_period_ns > 0)) {
- 		pb->period = data->pwm_period_ns;
- 		pwm_set_period(pb->pwm, data->pwm_period_ns);
+-	period_mag_multi = (u64)haptic->pwm_dev->period * haptic->magnitude;
++	period_mag_multi = (u64)pwm_get_period((haptic->pwm_dev)) * haptic->magnitude;
+ 	haptic->pwm_duty = (unsigned int)(period_mag_multi >>
+ 						MAX_MAGNITUDE_SHIFT);
+ 
 -- 
 2.1.4
