@@ -1,45 +1,56 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 16 Nov 2015 18:41:06 +0000
-Subject: [arm:drm-etnaviv-devel 3/149]
- drivers/staging/etnaviv/etnaviv_iommu.c:96:8: error: 'struct iommu_domain'
- has no member named 'priv'
-In-Reply-To: <201511170205.1DddFiK9%fengguang.wu@intel.com>
-References: <201511170205.1DddFiK9%fengguang.wu@intel.com>
-Message-ID: <20151116184106.GA8644@n2100.arm.linux.org.uk>
+From: broonie@kernel.org (Mark Brown)
+Date: Mon, 16 Nov 2015 18:42:38 +0000
+Subject: [PATCH v4 09/24] regulator: pwm: use pwm_get/set_default_xxx()
+ helpers where appropriate
+In-Reply-To: <20151116132359.39d84279@bbrezillon>
+References: <1447664207-24370-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1447664207-24370-10-git-send-email-boris.brezillon@free-electrons.com>
+ <20151116105558.GB31303@sirena.org.uk>
+ <20151116132359.39d84279@bbrezillon>
+Message-ID: <20151116184238.GJ31303@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 17, 2015 at 02:30:06AM +0800, kbuild test robot wrote:
-> tree:   http://repo.or.cz/linux-2.6/linux-2.6-arm.git drm-etnaviv-devel
-> head:   77c57a5498ebe5c85b4a71fbcf800a9140f9a697
-> commit: b920a1d21ac9c12ddb174daca7d99ab81d791ad6 [3/149] staging: etnaviv: add drm driver
-> config: i386-randconfig-r0-201546 (attached as .config)
-> reproduce:
->         git checkout b920a1d21ac9c12ddb174daca7d99ab81d791ad6
->         # save the attached .config to linux build tree
->         make ARCH=i386 
-> 
-> Note: the arm/drm-etnaviv-devel HEAD 77c57a5498ebe5c85b4a71fbcf800a9140f9a697 builds fine.
->       It only hurts bisectibility.
+On Mon, Nov 16, 2015 at 01:23:59PM +0100, Boris Brezillon wrote:
+> Mark Brown <broonie@kernel.org> wrote:
+> > On Mon, Nov 16, 2015 at 09:56:32AM +0100, Boris Brezillon wrote:
 
-It's great that this is getting some testing, but it doesn't need to be
-on a per-commit basis as this is a development branch for this driver.
+> > > -	pwm_reg_period = pwm_get_period(drvdata->pwm);
+> > > +	pwm_reg_period = pwm_get_default_period(drvdata->pwm);
 
-The failing commit is a consolidation commit of Christian's work which
-has been forward-ported across different kernel versions (and will
-remain so.)  So, each time I forward-port this branch, you're going
-to hit the same error but with a different commit ID.
+> > It's not clear to me that we're not looking for the current period here
+> > or in the other use.  Won't configuring based on a period other than the
+> > one that has been set give the wrong answer?
 
-As it's someone elses work, I won't be merging a fix into the commit.
+> Hm, maybe that's naming problem. What I call the 'default' period here
+> is actually the period configured in your board file (using a PWM lookup
+> table) or your DT. This value represent the period requested by the PWM
+> user not a default value specified by the PWM chip driver.
 
-The other point is that the branch as it stands will never be going into
-the mainline kernel: when the driver does get merged, it will be as a
-very small number of consolidated patches.
+> The reason we're not using the 'current' period value is because it may
+> have been set by the bootloader, and may be inappropriate for our use
+> case (ie. the period may be to small to represent the different
+> voltages).
 
-It does make sense to build-test the branch head commit though.
+> ITOH, we're using the current period value when calculating the current
+> voltage, because we want to get the correct voltage value, and the PWM
+> device may still use the configuration set by the bootloader (not the
+> default one specified in your board or DT files).
 
-Thanks.
+> I hope this clarifies the differences between the current and default
+> period, and why we should use the default value here.
 
--- 
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+To be honest I'm still a bit confused here.  When do we actually apply
+the default setting and why do we keep on having to constantly override
+it rather than doing this once at boot?  It feels wrong to be using it
+every time we set anything.  I'd expect it to be something we only need
+to do at probe time or which would automatically be handled by the PWM
+framework (but that'd have issues changing the state and potentially
+breaking things if done in an uncoordiated fashion).
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151116/e7cb878e/attachment.sig>
