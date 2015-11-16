@@ -1,59 +1,103 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 16 Nov 2015 11:59:20 +0000
-Subject: [PATCH] bpf, arm64: start flushing icache range from header
-In-Reply-To: <5649C278.2030803@iogearbox.net>
-References: <41c4a481eb665a492c3b2df16af219b1250224a0.1447446460.git.daniel@iogearbox.net>
- <20151116113912.GB20696@leverpostej>
- <5649C278.2030803@iogearbox.net>
-Message-ID: <20151116115920.GE20696@leverpostej>
+From: Julia.Lawall@lip6.fr (Julia Lawall)
+Date: Mon, 16 Nov 2015 12:33:15 +0100
+Subject: [PATCH 2/7] phy: mt65xx-usb3: add missing of_node_put
+In-Reply-To: <1447673600-8881-1-git-send-email-Julia.Lawall@lip6.fr>
+References: <1447673600-8881-1-git-send-email-Julia.Lawall@lip6.fr>
+Message-ID: <1447673600-8881-3-git-send-email-Julia.Lawall@lip6.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 16, 2015 at 12:48:08PM +0100, Daniel Borkmann wrote:
-> On 11/16/2015 12:39 PM, Mark Rutland wrote:
-> >On Sat, Nov 14, 2015 at 01:16:18AM +0100, Daniel Borkmann wrote:
-> >>While recently going over ARM64's BPF code, I noticed that the icache
-> >>range we're flushing should start at header already and not at ctx.image.
-> >>
-> >>Reason is that after b569c1c622c5 ("net: bpf: arm64: address randomize
-> >>and write protect JIT code"), we also want to make sure to flush the
-> >>random-sized trap in front of the start of the actual program (analogous
-> >>to x86). No operational differences from user side.
-> >>
-> >>Signed-off-by: Daniel Borkmann <daniel@iogearbox.net>
-> >>Acked-by: Zi Shen Lim <zlim.lnx@gmail.com>
-> >>Cc: Alexei Starovoitov <ast@kernel.org>
-> >>---
-> >>  ( As arm64 jit fixes seem to go via arm64 tree, sending them here. )
-> >>
-> >>  arch/arm64/net/bpf_jit_comp.c | 2 +-
-> >>  1 file changed, 1 insertion(+), 1 deletion(-)
-> >>
-> >>diff --git a/arch/arm64/net/bpf_jit_comp.c b/arch/arm64/net/bpf_jit_comp.c
-> >>index a44e529..ee06570 100644
-> >>--- a/arch/arm64/net/bpf_jit_comp.c
-> >>+++ b/arch/arm64/net/bpf_jit_comp.c
-> >>@@ -740,7 +740,7 @@ void bpf_int_jit_compile(struct bpf_prog *prog)
-> >>  	if (bpf_jit_enable > 1)
-> >>  		bpf_jit_dump(prog->len, image_size, 2, ctx.image);
-> >>
-> >>-	bpf_flush_icache(ctx.image, ctx.image + ctx.idx);
-> >>+	bpf_flush_icache(header, ctx.image + ctx.idx);
-> >
-> >As far as I can see, ctx.idx doesn't take into account the size of the
-> >header, given we zero it after bpf_jit_binary_alloc, and increment it
-> >for each instruction.
-> >
-> >So won't this prevent us from flushing the end of the image? Or did I
-> >miss something?
-> 
-> Nope, bpf_flush_icache() takes start and end pointer ... header starts
-> before ctx.image on the linear buffer. Why should this prevent us from
-> flushing the end of the image?
+for_each_child_of_node performs an of_node_get on each iteration,
+so a return from the middle of the loop requires an of_node_put.
 
-I erroneously thought the second parameter was a size (which it clearly
-isn't given it's bsed on the ctx.image pointer).
+A simplified version of the semantic patch that finds this problem is as
+follows (http://coccinelle.lip6.fr):
 
-My bad, apologies for the noise.
+// <smpl>
+@@
+expression root,e;
+local idexpression child;
+@@
 
-Mark.
+ for_each_child_of_node(root, child) {
+   ... when != of_node_put(child)
+       when != e = child
+(
+   return child;
+|
+*  return ...;
+)
+   ...
+ }
+// </smpl>
+
+Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
+
+---
+ drivers/phy/phy-mt65xx-usb3.c |   20 +++++++++++++-------
+ 1 file changed, 13 insertions(+), 7 deletions(-)
+
+diff --git a/drivers/phy/phy-mt65xx-usb3.c b/drivers/phy/phy-mt65xx-usb3.c
+index f30b28b..e427c3b 100644
+--- a/drivers/phy/phy-mt65xx-usb3.c
++++ b/drivers/phy/phy-mt65xx-usb3.c
+@@ -415,7 +415,7 @@ static int mt65xx_u3phy_probe(struct platform_device *pdev)
+ 	struct resource *sif_res;
+ 	struct mt65xx_u3phy *u3phy;
+ 	struct resource res;
+-	int port;
++	int port, retval;
+ 
+ 	u3phy = devm_kzalloc(dev, sizeof(*u3phy), GFP_KERNEL);
+ 	if (!u3phy)
+@@ -447,31 +447,34 @@ static int mt65xx_u3phy_probe(struct platform_device *pdev)
+ 	for_each_child_of_node(np, child_np) {
+ 		struct mt65xx_phy_instance *instance;
+ 		struct phy *phy;
+-		int retval;
+ 
+ 		instance = devm_kzalloc(dev, sizeof(*instance), GFP_KERNEL);
+-		if (!instance)
+-			return -ENOMEM;
++		if (!instance) {
++			retval = -ENOMEM;
++			goto put_child;
++		}
+ 
+ 		u3phy->phys[port] = instance;
+ 
+ 		phy = devm_phy_create(dev, child_np, &mt65xx_u3phy_ops);
+ 		if (IS_ERR(phy)) {
+ 			dev_err(dev, "failed to create phy\n");
+-			return PTR_ERR(phy);
++			retval = PTR_ERR(phy);
++			goto put_child;
+ 		}
+ 
+ 		retval = of_address_to_resource(child_np, 0, &res);
+ 		if (retval) {
+ 			dev_err(dev, "failed to get address resource(id-%d)\n",
+ 				port);
+-			return retval;
++			goto put_child;
+ 		}
+ 
+ 		instance->port_base = devm_ioremap_resource(&phy->dev, &res);
+ 		if (IS_ERR(instance->port_base)) {
+ 			dev_err(dev, "failed to remap phy regs\n");
+-			return PTR_ERR(instance->port_base);
++			retval = PTR_ERR(instance->port_base);
++			goto put_child;
+ 		}
+ 
+ 		instance->phy = phy;
+@@ -483,6 +486,9 @@ static int mt65xx_u3phy_probe(struct platform_device *pdev)
+ 	provider = devm_of_phy_provider_register(dev, mt65xx_phy_xlate);
+ 
+ 	return PTR_ERR_OR_ZERO(provider);
++put_child:
++	of_node_put(child_np);
++	return retval;
+ }
+ 
+ static const struct of_device_id mt65xx_u3phy_id_table[] = {
