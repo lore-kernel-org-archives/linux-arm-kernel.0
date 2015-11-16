@@ -1,73 +1,64 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 16 Nov 2015 15:14:33 +0000
-Subject: [PATCH v8] PCI: Xilinx-NWL-PCIe: Added support for Xilinx NWL
- PCIe Host Controller
-In-Reply-To: <1447223619-30945-1-git-send-email-bharatku@xilinx.com>
-References: <1447223619-30945-1-git-send-email-bharatku@xilinx.com>
-Message-ID: <5649F2D9.7070902@arm.com>
+From: ynezz@true.cz (=?UTF-8?q?Petr=20=C5=A0tetiar?=)
+Date: Mon, 16 Nov 2015 16:19:07 +0100
+Subject: [PATCH] PCI: imx6: Fix reset-gpio to work with active low GPIO
+Message-ID: <1447687147-19436-1-git-send-email-ynezz@true.cz>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/11/15 06:33, Bharat Kumar Gogada wrote:
-> Adding PCIe Root Port driver for Xilinx PCIe NWL bridge IP.
-> 
-> Signed-off-by: Bharat Kumar Gogada <bharatku@xilinx.com>
-> Signed-off-by: Ravi Kiran Gummaluri <rgummal@xilinx.com>
-> ---
-> Added logic to allocate contiguous hwirq in nwl_irq_domain_alloc function.
-> Moved MSI functionality to separate functions.
-> Changed error return values.
-> ---
->  .../devicetree/bindings/pci/xilinx-nwl-pcie.txt    |   68 ++
->  drivers/pci/host/Kconfig                           |   16 +-
->  drivers/pci/host/Makefile                          |    1 +
->  drivers/pci/host/pcie-xilinx-nwl.c                 | 1062 ++++++++++++++++++++
->  4 files changed, 1144 insertions(+), 3 deletions(-)
->  create mode 100644 Documentation/devicetree/bindings/pci/xilinx-nwl-pcie.txt
->  create mode 100644 drivers/pci/host/pcie-xilinx-nwl.c
-> 
+It's currently not possible to use reset-gpio on board where the GPIO is
+active low as the code incorrectly assumes, that reset-gpio will be
+always active high.
 
-[...]
+In my case the broken behavior was observed on Toradex Apalis SoM with
+Ixora base board.
 
-> +static int nwl_pcie_enable_msi(struct nwl_pcie *pcie, struct pci_bus *bus)
-> +{
-> +	struct platform_device *pdev = to_platform_device(pcie->dev);
-> +	struct nwl_msi *msi = &pcie->msi;
-> +	unsigned long base;
-> +	int ret;
-> +
-> +	mutex_init(&msi->lock);
-> +
-> +	/* Check for msii_present bit */
-> +	ret = nwl_bridge_readl(pcie, I_MSII_CAPABILITIES) & MSII_PRESENT;
-> +	if (!ret) {
-> +		dev_err(pcie->dev, "MSI not present\n");
-> +		ret = -EIO;
-> +		goto err;
-> +	}
-> +
-> +	/* Enable MSII */
-> +	nwl_bridge_writel(pcie, nwl_bridge_readl(pcie, I_MSII_CONTROL) |
-> +			  MSII_ENABLE, I_MSII_CONTROL);
-> +
-> +	/* Enable MSII status */
-> +	nwl_bridge_writel(pcie, nwl_bridge_readl(pcie, I_MSII_CONTROL) |
-> +			  MSII_STATUS_ENABLE, I_MSII_CONTROL);
-> +
-> +	/* setup AFI/FPCI range */
-> +	msi->pages = __get_free_pages(GFP_KERNEL, 0);
-> +	base = virt_to_phys((void *)msi->pages);
-> +	nwl_bridge_writel(pcie, lower_32_bits(base), I_MSII_BASE_LO);
-> +	nwl_bridge_writel(pcie, upper_32_bits(base), I_MSII_BASE_HI);
+Signed-off-by: Petr ?tetiar <ynezz@true.cz>
+---
+ drivers/pci/host/pci-imx6.c |   15 +++++++++++----
+ 1 file changed, 11 insertions(+), 4 deletions(-)
 
-BTW, you still haven't answered my question as to why you need to waste
-a page of memory here, and why putting a device address doesn't work.
-
-As this is (to the best of my knowledge) the only driver doing so, I'd
-really like you to explain the rational behind this.
-
-Thanks,
-
-	M.
+diff --git a/drivers/pci/host/pci-imx6.c b/drivers/pci/host/pci-imx6.c
+index fdb9536..cd7ed71 100644
+--- a/drivers/pci/host/pci-imx6.c
++++ b/drivers/pci/host/pci-imx6.c
+@@ -293,9 +293,11 @@ static int imx6_pcie_deassert_core_reset(struct pcie_port *pp)
+ 
+ 	/* Some boards don't have PCIe reset GPIO. */
+ 	if (gpio_is_valid(imx6_pcie->reset_gpio)) {
+-		gpio_set_value(imx6_pcie->reset_gpio, 0);
++		struct gpio_desc *gd = gpio_to_desc(imx6_pcie->reset_gpio);
++
++		gpiod_set_value(gd, 0);
+ 		msleep(100);
+-		gpio_set_value(imx6_pcie->reset_gpio, 1);
++		gpiod_set_value(gd, 1);
+ 	}
+ 	return 0;
+ 
+@@ -559,6 +561,8 @@ static int __init imx6_pcie_probe(struct platform_device *pdev)
+ 	struct pcie_port *pp;
+ 	struct device_node *np = pdev->dev.of_node;
+ 	struct resource *dbi_base;
++	enum of_gpio_flags of_flags;
++	int flags = GPIOF_OUT_INIT_LOW;
+ 	int ret;
+ 
+ 	imx6_pcie = devm_kzalloc(&pdev->dev, sizeof(*imx6_pcie), GFP_KERNEL);
+@@ -578,10 +582,13 @@ static int __init imx6_pcie_probe(struct platform_device *pdev)
+ 		return PTR_ERR(pp->dbi_base);
+ 
+ 	/* Fetch GPIOs */
+-	imx6_pcie->reset_gpio = of_get_named_gpio(np, "reset-gpio", 0);
++	imx6_pcie->reset_gpio = of_get_named_gpio_flags(np, "reset-gpio", 0,
++							&of_flags);
+ 	if (gpio_is_valid(imx6_pcie->reset_gpio)) {
++		if (of_flags & OF_GPIO_ACTIVE_LOW)
++			flags |= GPIOF_ACTIVE_LOW;
+ 		ret = devm_gpio_request_one(&pdev->dev, imx6_pcie->reset_gpio,
+-					    GPIOF_OUT_INIT_LOW, "PCIe reset");
++					    flags, "PCIe reset");
+ 		if (ret) {
+ 			dev_err(&pdev->dev, "unable to get reset gpio\n");
+ 			return ret;
 -- 
-Jazz is not dead. It just smells funny...
+1.7.9.5
