@@ -1,72 +1,44 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Mon, 16 Nov 2015 08:00:54 -0800
-Subject: [PATCH v4 13/24] hwmon: pwm-fan: use pwm_get/set_default_xxx()
- helpers where appropriate
-In-Reply-To: <1447664207-24370-14-git-send-email-boris.brezillon@free-electrons.com>
-References: <1447664207-24370-1-git-send-email-boris.brezillon@free-electrons.com>
- <1447664207-24370-14-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <5649FDB6.9070305@roeck-us.net>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Mon, 16 Nov 2015 16:05:13 +0000
+Subject: [Query] How to measure the entry-latency-us and exit-latency-us
+ on arm PSCI system
+In-Reply-To: <20151116201055.00567e90@xhacker>
+References: <20151116201055.00567e90@xhacker>
+Message-ID: <20151116160513.GB19228@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/16/2015 12:56 AM, Boris Brezillon wrote:
-> pwm_set/get_default_xxx() helpers have been introduced to differentiate
-> the default PWM states (those retrieved through DT, PWM lookup table or
-> statically assigned by the driver) and the current ones.
-> Make use of those helpers where appropriate.
->
-> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
-> ---
->   drivers/hwmon/pwm-fan.c | 15 +++++++++------
->   1 file changed, 9 insertions(+), 6 deletions(-)
->
-> diff --git a/drivers/hwmon/pwm-fan.c b/drivers/hwmon/pwm-fan.c
-> index 105b964..989d7b4 100644
-> --- a/drivers/hwmon/pwm-fan.c
-> +++ b/drivers/hwmon/pwm-fan.c
-> @@ -47,8 +47,9 @@ static int  __set_pwm(struct pwm_fan_ctx *ctx, unsigned long pwm)
->   	if (ctx->pwm_value == pwm)
->   		goto exit_set_pwm_err;
->
-> -	duty = DIV_ROUND_UP(pwm * (pwm_get_period((ctx->pwm)) - 1), MAX_PWM);
-> -	ret = pwm_config(ctx->pwm, duty, pwm_get_period((ctx->pwm)));
-> +	duty = DIV_ROUND_UP(pwm * (pwm_get_default_period((ctx->pwm)) - 1),
-> +			    MAX_PWM);
-> +	ret = pwm_config(ctx->pwm, duty, pwm_get_default_period((ctx->pwm)));
+On Mon, Nov 16, 2015 at 08:10:55PM +0800, Jisheng Zhang wrote:
+> Hi all,
+> 
+> Now, I'd like to add cpuidle support to Marvell berlin arm64 soc via
+> drivers/cpuidle/dt_idle_states.c. The system is PSCI-1.0 compatible. 
+> 
+> Per my understanding:
+> 
+> The entry-latency-us: the time from beginning of cpuidle_idle_call()
+> to the firmware's last WFI instruction. Should test more times to find
+> the longest time.
+> 
+> The exit-latency-us: the time from the first instruction of waken up cpu
+> to the end of cpuidle_idle_call(). Should test more times to find the longest
+> time.
+> 
+> If cpufreq is available, we should fix the cpufreq to the lowest freq to do
+> the above test.
+> 
+> Even I have a look at idle-states binding doc, I'm still not sure whether my
+> solution to measure the entry-latency-us and exit-latency-us is correct or not,
+> could you please give suggestions?
 
-Same here - please no unnecessary ( ) [ which were first introduced by
-the other patch ].
+It is correct and yes for the time being they represent the global worst
+case so your assumption on cpufreq is reasonable, you should set the
+system in the worst case conditions.
 
-Guenter
+If the entry phase is interruptible on pending irq (which means that
+your firmware has checkpoints in the power down sequence) please define
+wakeup-latency according to the docs, it might be < entry+exit,
+otherwise your measurements are just fine.
 
->   	if (ret)
->   		goto exit_set_pwm_err;
->
-> @@ -234,10 +235,11 @@ static int pwm_fan_probe(struct platform_device *pdev)
->   	platform_set_drvdata(pdev, ctx);
->
->   	/* Set duty cycle to maximum allowed */
-> -	duty_cycle = pwm_get_period((ctx->pwm)) - 1;
-> +	duty_cycle = pwm_get_default_period((ctx->pwm)) - 1;
->   	ctx->pwm_value = MAX_PWM;
->
-> -	ret = pwm_config(ctx->pwm, duty_cycle, pwm_get_period((ctx->pwm)));
-> +	ret = pwm_config(ctx->pwm, duty_cycle,
-> +			 pwm_get_default_period((ctx->pwm)));
->   	if (ret) {
->   		dev_err(&pdev->dev, "Failed to configure PWM\n");
->   		return ret;
-> @@ -309,9 +311,10 @@ static int pwm_fan_resume(struct device *dev)
->   	if (ctx->pwm_value == 0)
->   		return 0;
->
-> -	duty = DIV_ROUND_UP(ctx->pwm_value * (pwm_get_period((ctx->pwm)) - 1),
-> +	duty = DIV_ROUND_UP(ctx->pwm_value *
-> +			    (pwm_get_default_period((ctx->pwm)) - 1),
->   			    MAX_PWM);
-> -	ret = pwm_config(ctx->pwm, duty, pwm_get_period((ctx->pwm)));
-> +	ret = pwm_config(ctx->pwm, duty, pwm_get_default_period((ctx->pwm)));
->   	if (ret)
->   		return ret;
->   	return pwm_enable(ctx->pwm);
->
+Thanks,
+Lorenzo
