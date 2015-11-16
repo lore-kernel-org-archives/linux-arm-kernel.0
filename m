@@ -1,60 +1,58 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 16 Nov 2015 19:13:27 +0000
-Subject: [PATCH 3/4] irqchip/gic: Clear enable bits before restoring them
+Date: Mon, 16 Nov 2015 19:13:26 +0000
+Subject: [PATCH 2/4] irqchip/gic: Make sure all interrupts are deactivated at
+ boot
 In-Reply-To: <1447701208-18150-1-git-send-email-marc.zyngier@arm.com>
 References: <1447701208-18150-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1447701208-18150-4-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1447701208-18150-3-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When restoring the GIC state (after a suspend/resume cycle,
-for example), the driver directly writes the 'enabled' state
-it has saved by accessing GICD_ISENABLERn, which performs
-an OR operation between the value present in the register
-and the value we write.
+When booting a GIC/GICv3 based system, we have no idea what
+state the firmware (or previous kernel in the case of kexec)
+has left the GIC, and some interrupts may still be active.
 
-If whatever code that has run before we reentered the kernel
-has enabled an interrupt that was previously disabled, we won't
-restore that disabled state.
-
-Making sure we first clear the register (by writting to
-GICD_ICENABLERn) before restoring the enabled state.
+In order to garantee that we have a clean state, make sure
+the active bits are cleared at init time.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- drivers/irqchip/irq-gic.c | 10 ++++++++--
- 1 file changed, 8 insertions(+), 2 deletions(-)
+ drivers/irqchip/irq-gic-common.c | 13 +++++++++----
+ 1 file changed, 9 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
-index 515c823..bc846e7 100644
---- a/drivers/irqchip/irq-gic.c
-+++ b/drivers/irqchip/irq-gic.c
-@@ -604,9 +604,12 @@ static void gic_dist_restore(unsigned int gic_nr)
- 		writel_relaxed(gic_data[gic_nr].saved_spi_target[i],
- 			dist_base + GIC_DIST_TARGET + i * 4);
+diff --git a/drivers/irqchip/irq-gic-common.c b/drivers/irqchip/irq-gic-common.c
+index 44a077f..f174ce0 100644
+--- a/drivers/irqchip/irq-gic-common.c
++++ b/drivers/irqchip/irq-gic-common.c
+@@ -84,12 +84,15 @@ void __init gic_dist_config(void __iomem *base, int gic_irqs,
+ 		writel_relaxed(GICD_INT_DEF_PRI_X4, base + GIC_DIST_PRI + i);
  
--	for (i = 0; i < DIV_ROUND_UP(gic_irqs, 32); i++)
-+	for (i = 0; i < DIV_ROUND_UP(gic_irqs, 32); i++) {
+ 	/*
+-	 * Disable all interrupts.  Leave the PPI and SGIs alone
+-	 * as they are enabled by redistributor registers.
++	 * Deactivate and disable all SPIs. Leave the PPI and SGIs
++	 * alone as they are in the redistributor registers on GICv3.
+ 	 */
+-	for (i = 32; i < gic_irqs; i += 32)
++	for (i = 32; i < gic_irqs; i += 32) {
+ 		writel_relaxed(GICD_INT_EN_CLR_X32,
+-					base + GIC_DIST_ENABLE_CLEAR + i / 8);
++			       base + GIC_DIST_ACTIVE_CLEAR + i / 8);
 +		writel_relaxed(GICD_INT_EN_CLR_X32,
-+			dist_base + GIC_DIST_ENABLE_CLEAR + i * 4);
- 		writel_relaxed(gic_data[gic_nr].saved_spi_enable[i],
- 			dist_base + GIC_DIST_ENABLE_SET + i * 4);
++			       base + GIC_DIST_ENABLE_CLEAR + i / 8);
 +	}
  
- 	writel_relaxed(GICD_ENABLE, dist_base + GIC_DIST_CTRL);
- }
-@@ -654,8 +657,11 @@ static void gic_cpu_restore(unsigned int gic_nr)
- 		return;
+ 	if (sync_access)
+ 		sync_access();
+@@ -102,7 +105,9 @@ void gic_cpu_config(void __iomem *base, void (*sync_access)(void))
+ 	/*
+ 	 * Deal with the banked PPI and SGI interrupts - disable all
+ 	 * PPI interrupts, ensure all SGI interrupts are enabled.
++	 * Make sure everything is deactivated.
+ 	 */
++	writel_relaxed(GICD_INT_EN_CLR_X32, base + GIC_DIST_ACTIVE_CLEAR);
+ 	writel_relaxed(GICD_INT_EN_CLR_PPI, base + GIC_DIST_ENABLE_CLEAR);
+ 	writel_relaxed(GICD_INT_EN_SET_SGI, base + GIC_DIST_ENABLE_SET);
  
- 	ptr = raw_cpu_ptr(gic_data[gic_nr].saved_ppi_enable);
--	for (i = 0; i < DIV_ROUND_UP(32, 32); i++)
-+	for (i = 0; i < DIV_ROUND_UP(32, 32); i++) {
-+		writel_relaxed(GICD_INT_EN_CLR_X32,
-+			       dist_base + GIC_DIST_ENABLE_CLEAR + i * 4);
- 		writel_relaxed(ptr[i], dist_base + GIC_DIST_ENABLE_SET + i * 4);
-+	}
- 
- 	ptr = raw_cpu_ptr(gic_data[gic_nr].saved_ppi_conf);
- 	for (i = 0; i < DIV_ROUND_UP(32, 16); i++)
 -- 
 2.1.4
