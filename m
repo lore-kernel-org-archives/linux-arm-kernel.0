@@ -1,41 +1,34 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Mon, 16 Nov 2015 14:37:58 +0100
-Subject: [PATCH 25/27] ARM: make use of nand_set/get_controller_data() helpers
+Date: Mon, 16 Nov 2015 14:37:46 +0100
+Subject: [PATCH 13/27] mtd: nand: add nand_to_mtd() helper
 In-Reply-To: <1447681080-31232-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1447681080-31232-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1447681080-31232-26-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1447681080-31232-14-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-New helpers have been added to avoid directly accessing chip->field. Use
-them where appropriate.
+Add a new helper to retrieve the MTD device attached to a NAND chip.
 
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 ---
- arch/arm/mach-ixp4xx/ixdp425-setup.c | 4 ++--
- 1 file changed, 2 insertions(+), 2 deletions(-)
+ include/linux/mtd/nand.h | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/arch/arm/mach-ixp4xx/ixdp425-setup.c b/arch/arm/mach-ixp4xx/ixdp425-setup.c
-index 333b0f9..508c2d7 100644
---- a/arch/arm/mach-ixp4xx/ixdp425-setup.c
-+++ b/arch/arm/mach-ixp4xx/ixdp425-setup.c
-@@ -77,7 +77,7 @@ static void
- ixdp425_flash_nand_cmd_ctrl(struct mtd_info *mtd, int cmd, unsigned int ctrl)
- {
- 	struct nand_chip *this = mtd_to_nand(mtd);
--	int offset = (int)this->priv;
-+	int offset = (int)nand_get_controller_data(this);
+diff --git a/include/linux/mtd/nand.h b/include/linux/mtd/nand.h
+index c4e39ff..8ec071e 100644
+--- a/include/linux/mtd/nand.h
++++ b/include/linux/mtd/nand.h
+@@ -737,6 +737,11 @@ static inline struct nand_chip *mtd_to_nand(struct mtd_info *mtd)
+ 	return mtd->priv;
+ }
  
- 	if (ctrl & NAND_CTRL_CHANGE) {
- 		if (ctrl & NAND_NCE) {
-@@ -88,7 +88,7 @@ ixdp425_flash_nand_cmd_ctrl(struct mtd_info *mtd, int cmd, unsigned int ctrl)
- 
- 		offset = (ctrl & NAND_CLE) ? IXDP425_NAND_CMD_BYTE : 0;
- 		offset |= (ctrl & NAND_ALE) ? IXDP425_NAND_ADDR_BYTE : 0;
--		this->priv = (void *)offset;
-+		nand_set_controller_data(this, (void *)offset);
- 	}
- 
- 	if (cmd != NAND_CMD_NONE)
++static inline struct mtd_info *nand_to_mtd(struct nand_chip *chip)
++{
++	return &chip->mtd;
++}
++
+ /*
+  * NAND Flash Manufacturer ID Codes
+  */
 -- 
 2.1.4
