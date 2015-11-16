@@ -1,32 +1,37 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 16 Nov 2015 19:48:13 +0000
-Subject: [PATCH v2 11/12] ARM: wire up UEFI init and runtime support
-In-Reply-To: <CAKv+Gu8w+2GA5tV4roYtEsza+mkCZKYX_=tT2t=+eh-ZO1Y2fA@mail.gmail.com>
-References: <1447698757-8762-1-git-send-email-ard.biesheuvel@linaro.org>
- <1447698757-8762-12-git-send-email-ard.biesheuvel@linaro.org>
- <20151116190156.GH8644@n2100.arm.linux.org.uk>
- <CAKv+Gu8w+2GA5tV4roYtEsza+mkCZKYX_=tT2t=+eh-ZO1Y2fA@mail.gmail.com>
-Message-ID: <20151116194812.GJ8644@n2100.arm.linux.org.uk>
+From: yang.shi@linaro.org (Shi, Yang)
+Date: Mon, 16 Nov 2015 11:48:57 -0800
+Subject: [PATCH V3 2/2] arm64: bpf: make BPF prologue and epilogue align
+ with ARM64 AAPCS
+In-Reply-To: <CABg9mcvomep=M1As_Vj=XuTNk=jiGwXQqQWbjotMXP2csKX=Bg@mail.gmail.com>
+References: <CABg9mct-hnEhvT6y9ZgCC8nMan5YbmByQa_ViUWzeea6ToqG4A@mail.gmail.com>	<1447438197-31838-1-git-send-email-yang.shi@linaro.org>
+ <CABg9mcvomep=M1As_Vj=XuTNk=jiGwXQqQWbjotMXP2csKX=Bg@mail.gmail.com>
+Message-ID: <564A3329.1070504@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 16, 2015 at 08:04:00PM +0100, Ard Biesheuvel wrote:
-> OK. So you mean set TTBR to the zero page, perform the TLB flush and
-> only then switch to the new page tables?
+On 11/13/2015 6:39 PM, Z Lim wrote:
+> Yang, I noticed another thing...
+>
+> On Fri, Nov 13, 2015 at 10:09 AM, Yang Shi <yang.shi@linaro.org> wrote:
+>> Save and restore FP/LR in BPF prog prologue and epilogue, save SP to FP
+>> in prologue in order to get the correct stack backtrace.
+>>
+>> However, ARM64 JIT used FP (x29) as eBPF fp register, FP is subjected to
+>> change during function call so it may cause the BPF prog stack base address
+>> change too.
+>>
+>> Use x25 to replace FP as BPF stack base register (fp). Since x25 is callee
+>> saved register, so it will keep intact during function call.
+>
+> Can you please add save/restore for x25 also? :)
 
-Not quite.
+Sure. BTW, since PUSH invokes stp instruction and SP need 16-bytes 
+alignment, so we have to save x26 with x25 together. Anyway, it won't 
+introduce any harm overhead since one instruction saves two registers.
 
-If you have global mappings below TASK_SIZE, you would need this
-sequence when switching either to or from the UEFI page tables:
+Yang
 
-- switch to another set of page tables which only map kernel space
-  with nothing at all in userspace.
-- flush the TLB.
-- switch to your target page tables.
-
-As I say in response to one of your other patches, it's probably
-much easier to avoid any global mappings below TASK_SIZE.
-
--- 
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+>
+>> It is initialized in BPF prog prologue when BPF prog is started to run
+>> everytime. When BPF prog exits, it could be just tossed.
+>>
