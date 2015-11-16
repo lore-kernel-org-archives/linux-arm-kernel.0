@@ -1,160 +1,57 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Mon, 16 Nov 2015 18:23:51 +0900
-Subject: [PATCH v5 2/6] arm64: ftrace: fix a stack tracer's output under
- function graph tracer
-In-Reply-To: <01313E85-ED3B-4E3A-A193-033A393A93F8@gmail.com>
-References: <1446792285-1154-1-git-send-email-takahiro.akashi@linaro.org>
- <1446792285-1154-3-git-send-email-takahiro.akashi@linaro.org>
- <3F63B5BC-C21A-4ECA-9800-374B924DB98D@gmail.com>
- <56415997.1040207@linaro.org>
- <01313E85-ED3B-4E3A-A193-033A393A93F8@gmail.com>
-Message-ID: <5649A0A7.7040809@linaro.org>
+From: Sanjeev_Sharma@mentor.com (Sharma, Sanjeev)
+Date: Mon, 16 Nov 2015 09:36:17 +0000
+Subject: [PATCH] PCI: imx6:don't sleep in atomic context
+In-Reply-To: <6415545.xzR4A6SaUL@wuerfel>
+References: <1447066080-5859-1-git-send-email-sanjeev_sharma@mentor.com>
+ <4800389.dqcmlJY3HC@wuerfel> <1447148110.3142.6.camel@pengutronix.de>
+ <6415545.xzR4A6SaUL@wuerfel>
+Message-ID: <FDC088D3B5555644AE135ED28A7ABDE98636E07B@EU-MBX-02.mgc.mentorg.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Jungseok,
+On Tuesday 10 November 2015 10:35:10 Lucas Stach wrote:
+> Am Dienstag, den 10.11.2015, 10:28 +0100 schrieb Arnd Bergmann:
+> > On Tuesday 10 November 2015 09:41:18 Lucas Stach wrote:
+> > > > diff --git a/drivers/pci/host/pci-imx6.c 
+> > > > b/drivers/pci/host/pci-imx6.c index 233a196..9769b13 100644
+> > > > --- a/drivers/pci/host/pci-imx6.c
+> > > > +++ b/drivers/pci/host/pci-imx6.c
+> > > > @@ -499,7 +499,7 @@ static int imx6_pcie_link_up(struct pcie_port *pp)
+> > > >                * Wait a little bit, then re-check if the link finished
+> > > >                * the training.
+> > > >                */
+> > > > -             usleep_range(1000, 2000);
+> > > > +             mdelay(1000);
+> > > 
+> > > A mdelay(1000) is a whole different timescale than a usleep(1000). 
+> > > If this patch works for you with mdelay(1) or maybe mdelay(2) I 
+> > > would be fine with it.
+> > 
+> > mdelay(1) is still a really long time to block the CPU for, on 
+> > potentially every config space access.
+> > 
+> > Everybody else just returns the link status here, which seems to be 
+> > the better alternative. If you need to delay the startup, better 
+> > have a msleep(1) loop in the initial probe function where you are 
+> > allowed to sleep.
+> > 
+> Yes, it's somewhere on my TODO list to rework the link-up handling 
+> here, but as there are quite a few timing and ordering implications in 
+> that code, this needs a good thought and a good deal of testing. So 
+> I'm inclined to ACK the current patch to get rid of the obvious bug 
+> and sort things out properly in a follow on patchset.
 
-On 11/14/2015 12:01 AM, Jungseok Lee wrote:
-> (+ Li Bin in CC)
->
-> On Nov 10, 2015, at 11:42 AM, AKASHI Takahiro wrote:
->> On 11/09/2015 11:04 PM, Jungseok Lee wrote:
->>> On Nov 6, 2015, at 3:44 PM, AKASHI Takahiro wrote:
->>>
->>> Hi Akashi,
->>>
->>>> Function graph tracer modifies a return address (LR) in a stack frame
->>>> to hook a function return. This will result in many useless entries
->>>> (return_to_handler) showing up in a stack tracer's output.
->>>>
->>>> This patch replaces such entries with originals values preserved in
->>>> current->ret_stack[].
->>>>
->>>> Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
->>>> ---
->>>> arch/arm64/include/asm/ftrace.h |    2 ++
->>>> arch/arm64/kernel/stacktrace.c  |   21 +++++++++++++++++++++
->>>> 2 files changed, 23 insertions(+)
->>>>
->>>> diff --git a/arch/arm64/include/asm/ftrace.h b/arch/arm64/include/asm/ftrace.h
->>>> index c5534fa..3c60f37 100644
->>>> --- a/arch/arm64/include/asm/ftrace.h
->>>> +++ b/arch/arm64/include/asm/ftrace.h
->>>> @@ -28,6 +28,8 @@ struct dyn_arch_ftrace {
->>>>
->>>> extern unsigned long ftrace_graph_call;
->>>>
->>>> +extern void return_to_handler(void);
->>>> +
->>>> static inline unsigned long ftrace_call_adjust(unsigned long addr)
->>>> {
->>>> 	/*
->>>> diff --git a/arch/arm64/kernel/stacktrace.c b/arch/arm64/kernel/stacktrace.c
->>>> index ccb6078..5fd3477 100644
->>>> --- a/arch/arm64/kernel/stacktrace.c
->>>> +++ b/arch/arm64/kernel/stacktrace.c
->>>> @@ -17,6 +17,7 @@
->>>>   */
->>>> #include <linux/kernel.h>
->>>> #include <linux/export.h>
->>>> +#include <linux/ftrace.h>
->>>> #include <linux/sched.h>
->>>> #include <linux/stacktrace.h>
->>>>
->>>> @@ -73,6 +74,9 @@ struct stack_trace_data {
->>>> 	struct stack_trace *trace;
->>>> 	unsigned int no_sched_functions;
->>>> 	unsigned int skip;
->>>> +#ifdef CONFIG_FUNCTION_GRAPH_TRACER
->>>> +	unsigned int ret_stack_index;
->>>> +#endif
->>>> };
->>>>
->>>> static int save_trace(struct stackframe *frame, void *d)
->>>> @@ -81,6 +85,20 @@ static int save_trace(struct stackframe *frame, void *d)
->>>> 	struct stack_trace *trace = data->trace;
->>>> 	unsigned long addr = frame->pc;
->>>>
->>>> +#ifdef CONFIG_FUNCTION_GRAPH_TRACER
->>>> +	if (addr == (unsigned long)return_to_handler - AARCH64_INSN_SIZE) {
->>>
->>> not if (adds == (unsigned long)return_to_handler)?
->>>
->>>> +		/*
->>>> +		 * This is a case where function graph tracer has
->>>> +		 * modified a return address (LR) in a stack frame
->>>> +		 * to hook a function return.
->>>> +		 * So replace it to an original value.
->>>> +		 */
->>>> +		frame->pc = addr =
->>>> +			current->ret_stack[data->ret_stack_index--].ret
->>>> +							- AARCH64_INSN_SIZE;
->>>
->>> Ditto. not without AARCH64_INSN_SIZE?
->>>
->>> I've observed many return_to_handler without the changes.
->>> Am I missing something?
->>
->> You're right!
->> I thought I had tested the patches, but...
->>
->>>> +	}
->>>> +#endif /* CONFIG_FUNCTION_GRAPH_TRACER */
->>>> +
->>>> 	if (data->no_sched_functions && in_sched_functions(addr))
->>>> 		return 0;
->>>> 	if (data->skip) {
->>>> @@ -100,6 +118,9 @@ void save_stack_trace_tsk(struct task_struct *tsk, struct stack_trace *trace)
->>>>
->>>> 	data.trace = trace;
->>>> 	data.skip = trace->skip;
->>>> +#ifdef CONFIG_FUNCTION_GRAPH_TRACER
->>>> +	data.ret_stack_index = current->curr_ret_stack;
->>>
->>> Can I get an idea on why current->curr_ret_stack is used instead of
->>> tsk->curr_ret_stack?
->>
->> Thanks for pointing this out.
->> Will fix it although it works without a change since save_stack_trace_sp() is
->> called only in a 'current task' context.
->>
->> -Takahiro AKASHI
->
-> As reading function_graph related codes in arm64, I've realized that this issue
-> can be observed from three different sources.
->
->   (A) stack tracer of ftrace
->   (B) perf call trace (perf record with '-g' option)
->   (C) dump_backtrace
->
-> The issue is orthogonal to the commit, e306dfd06f, and its revert. It seems that
-> Steve's approach, 7ee991fbc6, would be valid on arm64 and cover all three cases.
-> It does in case of x86. Li Bin posted a patch [1] to solve the issue from case(C)
-> in Steve's way. This hunk deals with case(A) with its own implementation. But,
-> case(B) is not covered yet. It can be reproduced easily with the following steps.
->
->   # echo function_graph > /sys/kernel/debug/tracing/current_tracer
->   # perf record -g sleep 2
->   # perf report --call-graph
->
-> So, how about considering Steve's approach on arm64 and then covering all three
-> cases with it? It would be good in code consolidation perspective. Note that the
-> idea is applied to arch/sh.
+Maybe use that patch with some modifications then:
 
-Thank you for pointing this out.
-I've already fixed all the cases, (A),(B) and (C), but in a different way.
-I think that the point is that we should take care of frame->pc under function
-graph tracer in one place, that is, unwind_frame().
+* add a comment to explain that this is currently called from possibly
+  atomic context through pci_config_{read,write} and that the link
+  state handling never belonged here.
 
-After a bit more testing, I will submit a new version.
-Then please review it again.
+* instead of looping five times for up to 2ms each, loop 100 times
+  around a udelay(20) to hopefully be done earlier. I was going to
+  suggest using time_before(timeout, jiffies) as the condition to
+  wait for, but that doesn't work if called with interrupts disabled.
 
-Thanks,
--Takahiro AKASHI
-
-
-> Best Regards
-> Jungseok Lee
->
-> [1] https://lkml.org/lkml/2015/10/15/368
->
+	Arnd
+Shall I go ahead by changing only current patch to mdelay(1). I will also
+Incorporate comment  #1 given by Arnd above. 
