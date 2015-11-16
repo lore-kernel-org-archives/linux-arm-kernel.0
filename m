@@ -1,56 +1,32 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 16 Nov 2015 14:40:34 +0000
-Subject: [PATCH 2/2] dts/ls2080a: Update DTSI to add support of SP805 WDT
-In-Reply-To: <1447683883-6600-3-git-send-email-bhupesh.sharma@freescale.com>
-References: <1447683883-6600-1-git-send-email-bhupesh.sharma@freescale.com>
- <1447683883-6600-3-git-send-email-bhupesh.sharma@freescale.com>
-Message-ID: <20151116144034.GL20696@leverpostej>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 16 Nov 2015 14:43:26 +0000
+Subject: [PATCH 17/21] arm64: KVM: Map the kernel RO section into HYP
+In-Reply-To: <20151116142728.GJ20696@leverpostej>
+References: <1447679519-17888-1-git-send-email-marc.zyngier@arm.com>
+ <1447679519-17888-18-git-send-email-marc.zyngier@arm.com>
+ <20151116142728.GJ20696@leverpostej>
+Message-ID: <5649EB8E.2030305@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 16, 2015 at 07:54:43PM +0530, Bhupesh Sharma wrote:
-> This patch updates the LS2080a DTSI (DTS Include) file to add
-> support for eight SP805 Watchdog units which can be used to
-> reset the eight Cortex-A57 cores available on LS2080A.
+On 16/11/15 14:27, Mark Rutland wrote:
+> On Mon, Nov 16, 2015 at 01:11:55PM +0000, Marc Zyngier wrote:
+>> In order to run C code in HYP, we must make sure that the kernel's
+>> RO section in mapped into HYP (otherwise things break badly).
 > 
-> Signed-off-by: Bhupesh Sharma <bhupesh.sharma@freescale.com>
-> ---
->  arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi |   64 ++++++++++++++++++++++++
->  1 file changed, 64 insertions(+)
+> Somewhat tangential, but do we have any strong guarantees that the hyp
+> text is otherwise safe in its address space which differs from that of
+> the kernel proper?
 > 
-> diff --git a/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi b/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
-> index e81cd48..15637ab 100644
-> --- a/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
-> +++ b/arch/arm64/boot/dts/freescale/fsl-ls2080a.dtsi
-> @@ -193,6 +193,70 @@
->  			interrupts = <0 32 0x4>; /* Level high type */
->  		};
->  
-> +		cluster1_core0_watchdog: wdt at c000000 {
-> +			compatible = "arm,sp805-wdt", "arm,primecell";
-> +			reg = <0x0 0xc000000 0x0 0x1000>;
-> +			interrupts = <1 12 0x8>; /* PPI, Level low type */
-> +			clocks = <&clockgen 4 3>;
-> +			clock-names = "apb_pclk";
-> +		};
-> +
-> +		cluster1_core1_watchdog: wdt at c010000 {
-> +			compatible = "arm,sp805-wdt", "arm,primecell";
-> +			reg = <0x0 0xc010000 0x0 0x1000>;
-> +			interrupts = <1 12 0x8>; /* PPI, Level low type */
-> +			clocks = <&clockgen 4 3>;
-> +			clock-names = "apb_pclk";
-> +		};
+> i.e. do we need something like we did for the EFI stub in commit
+> e8f3010f7326c003 ("arm64/efi: isolate EFI stub from the kernel proper")?
 
-How does this pseudo-banking work?
+Probably. That will make things more difficult for VHE, where there are
+function calls between the kernel and the "hypervisor" (kvm_call_hyp()
+and panic() are the most obvious ones).
 
-For one thing as far as I can see, the SP805 driver can't handle PPIs in
-mainline.
+I'll have a look, thanks for the pointer.
 
-Additionally, the kernel has no idea which CPU each of these is
-associated with, and we effectively need to deal with shared PPIs in
-order to use this appropriately in the kernel (if each WDT's interrupt
-is wired to a particular core).
-
-Thanks,
-Mark.
+	M.
+-- 
+Jazz is not dead. It just smells funny...
