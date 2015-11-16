@@ -1,101 +1,59 @@
 From: mark.rutland@arm.com (Mark Rutland)
-Date: Mon, 16 Nov 2015 11:57:40 +0000
-Subject: [PATCH] arm64: mm: use correct mapping granularity under
- DEBUG_RODATA
-In-Reply-To: <1447669094-31076-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1447669094-31076-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20151116115740.GD20696@leverpostej>
+Date: Mon, 16 Nov 2015 11:59:20 +0000
+Subject: [PATCH] bpf, arm64: start flushing icache range from header
+In-Reply-To: <5649C278.2030803@iogearbox.net>
+References: <41c4a481eb665a492c3b2df16af219b1250224a0.1447446460.git.daniel@iogearbox.net>
+ <20151116113912.GB20696@leverpostej>
+ <5649C278.2030803@iogearbox.net>
+Message-ID: <20151116115920.GE20696@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ard,
-
-On Mon, Nov 16, 2015 at 11:18:14AM +0100, Ard Biesheuvel wrote:
-> When booting a 64k pages kernel that is built with CONFIG_DEBUG_RODATA
-> and resides at an offset that is not a multiple of 512 MB, the rounding
-> that occurs in __map_memblock() and fixup_executable() results in
-> incorrect regions being mapped.
+On Mon, Nov 16, 2015 at 12:48:08PM +0100, Daniel Borkmann wrote:
+> On 11/16/2015 12:39 PM, Mark Rutland wrote:
+> >On Sat, Nov 14, 2015 at 01:16:18AM +0100, Daniel Borkmann wrote:
+> >>While recently going over ARM64's BPF code, I noticed that the icache
+> >>range we're flushing should start at header already and not at ctx.image.
+> >>
+> >>Reason is that after b569c1c622c5 ("net: bpf: arm64: address randomize
+> >>and write protect JIT code"), we also want to make sure to flush the
+> >>random-sized trap in front of the start of the actual program (analogous
+> >>to x86). No operational differences from user side.
+> >>
+> >>Signed-off-by: Daniel Borkmann <daniel@iogearbox.net>
+> >>Acked-by: Zi Shen Lim <zlim.lnx@gmail.com>
+> >>Cc: Alexei Starovoitov <ast@kernel.org>
+> >>---
+> >>  ( As arm64 jit fixes seem to go via arm64 tree, sending them here. )
+> >>
+> >>  arch/arm64/net/bpf_jit_comp.c | 2 +-
+> >>  1 file changed, 1 insertion(+), 1 deletion(-)
+> >>
+> >>diff --git a/arch/arm64/net/bpf_jit_comp.c b/arch/arm64/net/bpf_jit_comp.c
+> >>index a44e529..ee06570 100644
+> >>--- a/arch/arm64/net/bpf_jit_comp.c
+> >>+++ b/arch/arm64/net/bpf_jit_comp.c
+> >>@@ -740,7 +740,7 @@ void bpf_int_jit_compile(struct bpf_prog *prog)
+> >>  	if (bpf_jit_enable > 1)
+> >>  		bpf_jit_dump(prog->len, image_size, 2, ctx.image);
+> >>
+> >>-	bpf_flush_icache(ctx.image, ctx.image + ctx.idx);
+> >>+	bpf_flush_icache(header, ctx.image + ctx.idx);
+> >
+> >As far as I can see, ctx.idx doesn't take into account the size of the
+> >header, given we zero it after bpf_jit_binary_alloc, and increment it
+> >for each instruction.
+> >
+> >So won't this prevent us from flushing the end of the image? Or did I
+> >miss something?
 > 
-> The following snippet from /sys/kernel/debug/kernel_page_tables shows
-> how, when the kernel is loaded 2 MB above the base of DRAM at 0x40000000,
-> the first 2 MB of memory (which may be inaccessible from non-secure EL1
-> or just reserved by the firmware) is inadvertently mapped into the end of
-> the module region.
+> Nope, bpf_flush_icache() takes start and end pointer ... header starts
+> before ctx.image on the linear buffer. Why should this prevent us from
+> flushing the end of the image?
 
-I assume for the above that you mean the kernel is loaded TEXT_OFFSET
-above these addresses. It's only a nit, but it might make things harder
-for otehrs to reason about in future.
+I erroneously thought the second parameter was a size (which it clearly
+isn't given it's bsed on the ctx.image pointer).
 
-Perhaps re-word in terms of PHYS_OFFSET/memstart_addr? e.g. "when
-PHYS_OFFSET is not a multiple of SECTION_SIZE ...".
-
->   ---[ Modules start ]---
->   0xfffffdffffe00000-0xfffffe0000000000     2M RW NX ... UXN MEM/NORMAL
->   ---[ Modules end ]---
->   ---[ Kernel Mapping ]---
->   0xfffffe0000000000-0xfffffe0000090000   576K RW NX ... UXN MEM/NORMAL
->   0xfffffe0000090000-0xfffffe0000200000  1472K ro x  ... UXN MEM/NORMAL
->   0xfffffe0000200000-0xfffffe0000800000     6M ro x  ... UXN MEM/NORMAL
->   0xfffffe0000800000-0xfffffe0000810000    64K ro x  ... UXN MEM/NORMAL
->   0xfffffe0000810000-0xfffffe0000a00000  1984K RW NX ... UXN MEM/NORMAL
->   0xfffffe0000a00000-0xfffffe00ffe00000  4084M RW NX ... UXN MEM/NORMAL
-> 
-> The same issue is likely to occur on 16k pages kernels whose load
-> address is not a multiple of 32 MB (i.e., SECTION_SIZE). So round to
-> SWAPPER_BLOCK_SIZE instead of SECTION_SIZE.
-> 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-
-This looks good to me. With or without the rewording above:
-
-Acked-by: Mark Rutland <mark.rutland@arm.com>
-
-Does this need to be backported to stable?
+My bad, apologies for the noise.
 
 Mark.
-
-> ---
->  arch/arm64/mm/mmu.c | 12 ++++++------
->  1 file changed, 6 insertions(+), 6 deletions(-)
-> 
-> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-> index e3f563c81c48..32ddd893da9a 100644
-> --- a/arch/arm64/mm/mmu.c
-> +++ b/arch/arm64/mm/mmu.c
-> @@ -362,8 +362,8 @@ static void __init __map_memblock(phys_addr_t start, phys_addr_t end)
->  	 * for now. This will get more fine grained later once all memory
->  	 * is mapped
->  	 */
-> -	unsigned long kernel_x_start = round_down(__pa(_stext), SECTION_SIZE);
-> -	unsigned long kernel_x_end = round_up(__pa(__init_end), SECTION_SIZE);
-> +	unsigned long kernel_x_start = round_down(__pa(_stext), SWAPPER_BLOCK_SIZE);
-> +	unsigned long kernel_x_end = round_up(__pa(__init_end), SWAPPER_BLOCK_SIZE);
->  
->  	if (end < kernel_x_start) {
->  		create_mapping(start, __phys_to_virt(start),
-> @@ -451,18 +451,18 @@ static void __init fixup_executable(void)
->  {
->  #ifdef CONFIG_DEBUG_RODATA
->  	/* now that we are actually fully mapped, make the start/end more fine grained */
-> -	if (!IS_ALIGNED((unsigned long)_stext, SECTION_SIZE)) {
-> +	if (!IS_ALIGNED((unsigned long)_stext, SWAPPER_BLOCK_SIZE)) {
->  		unsigned long aligned_start = round_down(__pa(_stext),
-> -							SECTION_SIZE);
-> +							 SWAPPER_BLOCK_SIZE);
->  
->  		create_mapping(aligned_start, __phys_to_virt(aligned_start),
->  				__pa(_stext) - aligned_start,
->  				PAGE_KERNEL);
->  	}
->  
-> -	if (!IS_ALIGNED((unsigned long)__init_end, SECTION_SIZE)) {
-> +	if (!IS_ALIGNED((unsigned long)__init_end, SWAPPER_BLOCK_SIZE)) {
->  		unsigned long aligned_end = round_up(__pa(__init_end),
-> -							SECTION_SIZE);
-> +							  SWAPPER_BLOCK_SIZE);
->  		create_mapping(__pa(__init_end), (unsigned long)__init_end,
->  				aligned_end - __pa(__init_end),
->  				PAGE_KERNEL);
-> -- 
-> 1.9.1
-> 
