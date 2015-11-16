@@ -1,59 +1,52 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Mon, 16 Nov 2015 13:23:59 +0100
-Subject: [PATCH v4 09/24] regulator: pwm: use pwm_get/set_default_xxx()
- helpers where appropriate
-In-Reply-To: <20151116105558.GB31303@sirena.org.uk>
-References: <1447664207-24370-1-git-send-email-boris.brezillon@free-electrons.com>
- <1447664207-24370-10-git-send-email-boris.brezillon@free-electrons.com>
- <20151116105558.GB31303@sirena.org.uk>
-Message-ID: <20151116132359.39d84279@bbrezillon>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Mon, 16 Nov 2015 14:24:54 +0200
+Subject: [PATCH] ARM: OMAP4: execute initcall to reserve SRAM for I688
+ only on OMAP4
+In-Reply-To: <1447673117-32719-1-git-send-email-l.stach@pengutronix.de>
+References: <1447673117-32719-1-git-send-email-l.stach@pengutronix.de>
+Message-ID: <5649CB16.2030706@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
-
-On Mon, 16 Nov 2015 10:55:58 +0000
-Mark Brown <broonie@kernel.org> wrote:
-
-> On Mon, Nov 16, 2015 at 09:56:32AM +0100, Boris Brezillon wrote:
+On 11/16/2015 01:25 PM, Lucas Stach wrote:
+> omap_interconnect_sync() is the only user of the SRAM scratch area
+> allocated in the omap4_sram_init initcall. The interconnect sync is
+> used exclusively in the OMAP4 specific WFI implementation, so there
+> is no point in allocating the SRAM scratch on other SoC types.
 > 
-> > +++ b/drivers/regulator/pwm-regulator.c
-> > @@ -56,7 +56,7 @@ static int pwm_regulator_set_voltage_sel(struct regulator_dev *rdev,
-> >  	int dutycycle;
-> >  	int ret;
-> >  
-> > -	pwm_reg_period = pwm_get_period(drvdata->pwm);
-> > +	pwm_reg_period = pwm_get_default_period(drvdata->pwm);
-> >  
-> >  	dutycycle = (pwm_reg_period *
-> >  		    drvdata->duty_cycle_table[selector].dutycycle) / 100;
+> Bail out of the initcall if the kernel is not running on OMAP4 to
+> avoid a confusing warning about being unable to allocate the SRAM
+> needed for I688 handling.
 > 
-> It's not clear to me that we're not looking for the current period here
-> or in the other use.  Won't configuring based on a period other than the
-> one that has been set give the wrong answer?
+> Signed-off-by: Lucas Stach <l.stach@pengutronix.de>
+> Tested-by: Bastian Stender <bst@pengutronix.de>
+> ---
+>   arch/arm/mach-omap2/omap4-common.c | 3 +++
+>   1 file changed, 3 insertions(+)
+> 
+> diff --git a/arch/arm/mach-omap2/omap4-common.c b/arch/arm/mach-omap2/omap4-common.c
+> index 949696b6f17b..6db393a30a28 100644
+> --- a/arch/arm/mach-omap2/omap4-common.c
+> +++ b/arch/arm/mach-omap2/omap4-common.c
+> @@ -131,6 +131,9 @@ static int __init omap4_sram_init(void)
+>   	struct device_node *np;
+>   	struct gen_pool *sram_pool;
+>   
+> +	if (!cpu_is_omap44xx())
+> +		return 0;
 
-Hm, maybe that's naming problem. What I call the 'default' period here
-is actually the period configured in your board file (using a PWM lookup
-table) or your DT. This value represent the period requested by the PWM
-user not a default value specified by the PWM chip driver.
+This one affects on am43xx also
 
-The reason we're not using the 'current' period value is because it may
-have been set by the bootloader, and may be inappropriate for our use
-case (ie. the period may be to small to represent the different
-voltages).
-ITOH, we're using the current period value when calculating the current
-voltage, because we want to get the correct voltage value, and the PWM
-device may still use the configuration set by the bootloader (not the
-default one specified in your board or DT files).
 
-I hope this clarifies the differences between the current and default
-period, and why we should use the default value here.
+> +
+>   	np = of_find_compatible_node(NULL, NULL, "ti,omap4-mpu");
+>   	if (!np)
+>   		pr_warn("%s:Unable to allocate sram needed to handle errata I688\n",
 
-Best Regards,
+Since all OMAP4+ platforms are now DT based why can't we just return from here silently?
 
-Boris
+
 
 -- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+regards,
+-grygorii
