@@ -1,53 +1,159 @@
-From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
-Date: Mon, 16 Nov 2015 17:07:17 +0100
-Subject: [PATCH 0/2] Improve drm_of_component_probe() and move rockchip to
- use it
-In-Reply-To: <1447685093-26129-1-git-send-email-Liviu.Dudau@arm.com>
-References: <1447685093-26129-1-git-send-email-Liviu.Dudau@arm.com>
-Message-ID: <2290660.pLIRHdxPYF@diego>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 16 Nov 2015 17:08:41 +0100
+Subject: [PATCH] mmc: sh_mmcif: rework dma channel handling
+Message-ID: <5324212.8m5CM0vuVo@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Liviu,
+When compiling the sh_mmcif driver for ARM64, we currently
+get a harmless build warning:
 
-Am Montag, 16. November 2015, 14:44:51 schrieb Liviu Dudau:
-> When I have introduced the drm_of_component_probe() function I have managed
-> to break rockchip's DRM driver as the compare_of() function had to match
-> both local crtc ports and remote encoder ones. As suggested by Russell
-> King, I have now enhanced the drm_of_component_probe() function to take two
-> comparison functions, and converted (again) rockchip driver to use it.
-> 
-> I would really like to get some Tested-By this time if possible from IMX,
-> Armada and Rockchip developers as I lack hardware to do that myself.
-> 
-> The only thing not implemented from Russell's suggestion list is the
-> renaming of the function into drm_kms_component_probe().
+../drivers/mmc/host/sh_mmcif.c: In function 'sh_mmcif_request_dma_one':
+../drivers/mmc/host/sh_mmcif.c:417:4: warning: cast to pointer from integer of different size [-Wint-to-pointer-cast]
+    (void *)pdata->slave_id_tx :
+    ^
+../drivers/mmc/host/sh_mmcif.c:418:4: warning: cast to pointer from integer of different size [-Wint-to-pointer-cast]
+    (void *)pdata->slave_id_rx;
 
- with these patches applied I loose the display on my rk3288. A bit of dumb
-debug-output shows that the compare function does seem to do strange things:
+This could be worked around by adding another cast to uintptr_t, but
+I decided to simplify the code a little more to avoid that. This
+splits out the platform data using code into a separate function
+and builds that only for CONFIG_SUPERH. This part still has a typecast
+but does not need a second one. The SH platform code could be further
+modified to pass a pointer directly as we do on other architectures
+when we have a filter function.
 
-[    1.020476] [drm] Initialized drm 1.1.0 20060810
-[    1.025943] drm_of_component_probe: adding port /vop at ff940000/port
-[    1.032225] drm_of_component_probe: adding port /vop at ff930000/port
-[    1.038421] drm_of_component_probe: adding encoder /hdmi at ff980000
-[    1.044535] drm_of_component_probe: adding encoder /edp at ff970000
-[    1.050562] drm_of_component_probe: adding encoder /hdmi at ff980000
-[    1.056663] drm_of_component_probe: adding encoder /edp at ff970000
+The normal case is simplified further and now just calls
+dma_request_slave_channel() directly without going through the
+compat handling.
 
----- Columns:	dev->parent / dev	comparing	dev->parent->of_node	with	np
-
-[    1.062683] compare_port: platform/ff980000.hdmi comparing NULL with /vop at ff940000/port
-[    1.071017] compare_port: platform/ff980000.hdmi comparing NULL with /vop at ff940000/port
-[    1.079024] compare_port: platform/ff930000.vop comparing NULL with /vop at ff940000/port
-[    1.087117] compare_port: platform/ff980000.hdmi comparing NULL with /vop at ff940000/port
-[    1.095130] compare_port: platform/ff930000.vop comparing NULL with /vop at ff940000/port
-[    1.103054] compare_port: platform/ff940000.vop comparing NULL with /vop at ff940000/port
-[    1.111553] panel_regulator: supplied by vcc33_sys
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+ drivers/mmc/host/sh_mmcif.c | 80 +++++++++++++++++---------------------------------
+ 1 file changed, 34 insertions(+), 46 deletions(-)
 
 
-I need to dig deeper to find out what's happening there, but maybe you
-already have some idea in the meantime :-)
-
-
-Thanks
-Heiko
+diff --git a/drivers/mmc/host/sh_mmcif.c b/drivers/mmc/host/sh_mmcif.c
+index ad9ffea7d659..d964c99f3a30 100644
+--- a/drivers/mmc/host/sh_mmcif.c
++++ b/drivers/mmc/host/sh_mmcif.c
+@@ -397,38 +397,26 @@ static void sh_mmcif_start_dma_tx(struct sh_mmcif_host *host)
+ }
+ 
+ static struct dma_chan *
+-sh_mmcif_request_dma_one(struct sh_mmcif_host *host,
+-			 struct sh_mmcif_plat_data *pdata,
+-			 enum dma_transfer_direction direction)
++sh_mmcif_request_dma_pdata(struct sh_mmcif_host *host, uintptr_t slave_id)
+ {
+-	struct dma_slave_config cfg = { 0, };
+-	struct dma_chan *chan;
+-	void *slave_data = NULL;
+-	struct resource *res;
+-	struct device *dev = sh_mmcif_host_to_dev(host);
+ 	dma_cap_mask_t mask;
+-	int ret;
+ 
+ 	dma_cap_zero(mask);
+ 	dma_cap_set(DMA_SLAVE, mask);
++	if (slave_id <= 0)
++		return NULL;
+ 
+-	if (pdata)
+-		slave_data = direction == DMA_MEM_TO_DEV ?
+-			(void *)pdata->slave_id_tx :
+-			(void *)pdata->slave_id_rx;
+-
+-	chan = dma_request_slave_channel_compat(mask, shdma_chan_filter,
+-				slave_data, dev,
+-				direction == DMA_MEM_TO_DEV ? "tx" : "rx");
+-
+-	dev_dbg(dev, "%s: %s: got channel %p\n", __func__,
+-		direction == DMA_MEM_TO_DEV ? "TX" : "RX", chan);
++	return dma_request_channel(mask, shdma_chan_filter, (void *)slave_id);
++}
+ 
+-	if (!chan)
+-		return NULL;
++static int sh_mmcif_dma_slave_config(struct sh_mmcif_host *host,
++				     struct dma_chan *chan,
++				     enum dma_transfer_direction direction)
++{
++	struct resource *res;
++	struct dma_slave_config cfg = { 0, };
+ 
+ 	res = platform_get_resource(host->pd, IORESOURCE_MEM, 0);
+-
+ 	cfg.direction = direction;
+ 
+ 	if (direction == DMA_DEV_TO_MEM) {
+@@ -439,38 +427,38 @@ sh_mmcif_request_dma_one(struct sh_mmcif_host *host,
+ 		cfg.dst_addr_width = DMA_SLAVE_BUSWIDTH_4_BYTES;
+ 	}
+ 
+-	ret = dmaengine_slave_config(chan, &cfg);
+-	if (ret < 0) {
+-		dma_release_channel(chan);
+-		return NULL;
+-	}
+-
+-	return chan;
++	return dmaengine_slave_config(chan, &cfg);
+ }
+ 
+-static void sh_mmcif_request_dma(struct sh_mmcif_host *host,
+-				 struct sh_mmcif_plat_data *pdata)
++static void sh_mmcif_request_dma(struct sh_mmcif_host *host)
+ {
+ 	struct device *dev = sh_mmcif_host_to_dev(host);
+ 	host->dma_active = false;
+ 
+-	if (pdata) {
+-		if (pdata->slave_id_tx <= 0 || pdata->slave_id_rx <= 0)
+-			return;
+-	} else if (!dev->of_node) {
+-		return;
++	/* We can only either use DMA for both Tx and Rx or not use it at all */
++	if (IS_ENABLED(CONFIG_SUPERH) && dev->platform_data) {
++		struct sh_mmcif_plat_data *pdata = dev->platform_data;
++		host->chan_tx = sh_mmcif_request_dma_pdata(host, pdata->slave_id_tx);
++		host->chan_rx = sh_mmcif_request_dma_pdata(host, pdata->slave_id_rx);
++	} else {
++		host->chan_tx = dma_request_slave_channel(dev, "tx");
++		host->chan_tx = dma_request_slave_channel(dev, "rx");
+ 	}
++	dev_dbg(dev, "%s: got channel TX %p RX %p\n", __func__, host->chan_tx, host->chan_rx);
+ 
+-	/* We can only either use DMA for both Tx and Rx or not use it at all */
+-	host->chan_tx = sh_mmcif_request_dma_one(host, pdata, DMA_MEM_TO_DEV);
+-	if (!host->chan_tx)
+-		return;
++	if (!host->chan_tx || !host->chan_rx ||
++	    sh_mmcif_dma_slave_config(host, host->chan_tx, DMA_MEM_TO_DEV) ||
++	    sh_mmcif_dma_slave_config(host, host->chan_rx, DMA_DEV_TO_MEM))
++		goto error;
+ 
+-	host->chan_rx = sh_mmcif_request_dma_one(host, pdata, DMA_DEV_TO_MEM);
+-	if (!host->chan_rx) {
++	return;
++
++error:
++	if (host->chan_tx)
+ 		dma_release_channel(host->chan_tx);
+-		host->chan_tx = NULL;
+-	}
++	if (host->chan_rx)
++		dma_release_channel(host->chan_rx);
++	host->chan_tx = host->chan_rx = NULL;
+ }
+ 
+ static void sh_mmcif_release_dma(struct sh_mmcif_host *host)
+@@ -1102,7 +1090,7 @@ static void sh_mmcif_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
+ 	if (ios->power_mode == MMC_POWER_UP) {
+ 		if (!host->card_present) {
+ 			/* See if we also get DMA */
+-			sh_mmcif_request_dma(host, dev->platform_data);
++			sh_mmcif_request_dma(host);
+ 			host->card_present = true;
+ 		}
+ 		sh_mmcif_set_power(host, ios);
