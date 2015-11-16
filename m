@@ -1,37 +1,81 @@
-From: joseph@codesourcery.com (Joseph Myers)
-Date: Mon, 16 Nov 2015 12:03:09 +0000
-Subject: [PATCH v6 13/17] arm64:ilp32: add sys_ilp32.c and a separate
- table (in entry.S) to use it
-In-Reply-To: <4389139.prTLIyjV9Z@wuerfel>
-References: <1446507046-24604-1-git-send-email-ynorov@caviumnetworks.com>
- <4814795.z9jdqoW8IP@wuerfel>
- <alpine.DEB.2.10.1511161109130.25844@digraph.polyomino.org.uk>
- <4389139.prTLIyjV9Z@wuerfel>
-Message-ID: <alpine.DEB.2.10.1511161159290.25844@digraph.polyomino.org.uk>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Mon, 16 Nov 2015 13:01:02 +0100
+Subject: [PATCH v8 1/8] ARM: dt: Binding documentation for imx25 ADC/TSC
+In-Reply-To: <1447675269-8831-1-git-send-email-mpa@pengutronix.de>
+References: <1447675269-8831-1-git-send-email-mpa@pengutronix.de>
+Message-ID: <1447675269-8831-2-git-send-email-mpa@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 16 Nov 2015, Arnd Bergmann wrote:
+This documentation describes the devicetree bindings for the
+ADC/Touchscreen unit of the i.MX25 SoC.
 
-> There are two separate aspects here:
-> 
-> a) leave out the support for all __off_t based syscalls (__ftruncate,
->    __lseek, __lxstat, __pread, __preadv, __pwrite, __pwritev, __truncate,
->    __xstat) as they are no longer needed, and change the handling of
->    _FILE_OFFSET_BITS so that we default to 64 and error out for anything
->    else.
->    This needs to be done for all new 32-bit architectures if you think we
->    should use a 64-bit off_t from now on, it's not arm64 specific.
+Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+Acked-by: Jonathan Cameron <jic23@kernel.org>
+---
 
-It's not a matter of leaving anything out - these would simply use 64-bit 
-off_t (__off_t and __off64_t would be the same type) and the *64 versions 
-would be aliases, exactly the same as on 64-bit architectures.  (And 
-_FILE_OFFSET_BITS handling would also be exactly the same as on 64-bit 
-architectures.)  I see no reason for the set of off_t-related symbols that 
-exist, or which symbols are aliases of which others, to vary between pure 
-64-bit systems and ILP32 ABIs (for 32-bit or 64-bit architectures) that 
-simply happen to have had 64-bit off_t from the start.
+Notes:
+    Changes in v6:
+     - Removed adc-ref property and replaced it with refp and refn for positive and
+       negative references. The properties are optional now as the default
+       behaviour is a positive internal reference voltage and ADC GND as negative
+       reference.
 
+ .../devicetree/bindings/mfd/fsl-imx25-tsadc.txt    | 46 ++++++++++++++++++++++
+ 1 file changed, 46 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/mfd/fsl-imx25-tsadc.txt
+
+diff --git a/Documentation/devicetree/bindings/mfd/fsl-imx25-tsadc.txt b/Documentation/devicetree/bindings/mfd/fsl-imx25-tsadc.txt
+new file mode 100644
+index 000000000000..a857af0eb68c
+--- /dev/null
++++ b/Documentation/devicetree/bindings/mfd/fsl-imx25-tsadc.txt
+@@ -0,0 +1,46 @@
++Freescale mx25 ADC/TSC multifunction device
++
++This device combines two general purpose conversion queues one used for general
++ADC and the other used for touchscreens.
++
++Required properties:
++ - compatible: Should be "fsl,imx25-tsadc".
++ - reg: Memory range of the device.
++ - interrupts: Interrupt for this device as described in
++   interrupts/interrupts.txt
++ - clocks: An 'ipg' clock defined as described in clocks/clock.txt
++ - interrupt-controller: This device is an interrupt controller. It controls
++   the interrupts of both conversion queues.
++ - #interrupt-cells: Should be '<1>'.
++ - #address-cells: Should be '<1>'.
++ - #size-cells: Should be '<1>'.
++ - ranges
++
++This device includes two conversion queues which can be added as subnodes.
++The first queue is for the touchscreen, the second for general purpose ADC.
++
++Example:
++	tscadc: tscadc at 50030000 {
++		compatible = "fsl,imx25-tsadc";
++		reg = <0x50030000 0xc>;
++		interrupts = <46>;
++		clocks = <&clks 119>;
++		clock-names = "ipg";
++		interrupt-controller;
++		#interrupt-cells = <1>;
++		#address-cells = <1>;
++		#size-cells = <1>;
++		ranges;
++
++		tsc: tcq at 50030400 {
++			compatible = "fsl,imx25-tcq";
++			reg = <0x50030400 0x60>;
++			...
++		};
++
++		adc: gcq at 50030800 {
++			compatible = "fsl,imx25-gcq";
++			reg = <0x50030800 0x60>;
++			...
++		};
++	};
 -- 
-Joseph S. Myers
-joseph at codesourcery.com
+2.6.1
