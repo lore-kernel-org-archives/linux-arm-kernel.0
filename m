@@ -1,72 +1,55 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Mon, 16 Nov 2015 13:41:16 +0100
-Subject: [PATCH v2 11/11] arm64: kernel: Add support for
- hibernate/suspend-to-disk.
-In-Reply-To: <5649CC40.9010805@arm.com>
-References: <1445966960-31724-1-git-send-email-james.morse@arm.com>
- <1445966960-31724-12-git-send-email-james.morse@arm.com>
- <20151114213415.GG20429@amd> <5649CC40.9010805@arm.com>
-Message-ID: <20151116124116.GC9125@amd>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Mon, 16 Nov 2015 13:45:45 +0100
+Subject: [PATCH] arm64/efi: register UEFI runtime mmio regions as iomem
+ resources
+In-Reply-To: <CAKv+Gu-12azUSe_V9Cx58fd5YyO8RMO4qSOs1afQ8iAc71cC9g@mail.gmail.com>
+References: <CAD0U-h+cr0xpAAcCD1P8k2hUcJJL2Ga+-Grrb8WaZrgm08G2nA@mail.gmail.com>
+ <1445848860-9547-1-git-send-email-ard.biesheuvel@linaro.org>
+ <CACRpkdact=Jh5WpghnyPU1Oaiu8pgvb=kwva-nEkJUX9NKL6xw@mail.gmail.com>
+ <CAKv+Gu-12azUSe_V9Cx58fd5YyO8RMO4qSOs1afQ8iAc71cC9g@mail.gmail.com>
+Message-ID: <CAKv+Gu-W5iWG5-AqS4dBgB=hU2T+kQfkBtLmrCZaVdhdxZzkPw@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi!
+On 27 October 2015 at 13:31, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+> On 27 October 2015 at 21:08, Linus Walleij <linus.walleij@linaro.org> wrote:
+>> On Mon, Oct 26, 2015 at 9:41 AM, Ard Biesheuvel
+>> <ard.biesheuvel@linaro.org> wrote:
+>>
+>>> In order to prevent kernel drivers from attaching to MMIO regions
+>>> that are owned by the firmware, register them as iomem resources.
+>>>
+>>> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>>
+>> Is this related to the flash memory discussion so that NOR flash
+>> will be part of what is considered "I/O memory"
+>
+> Yes
+>
+>> and flash
+>> protection achieved this way?
+>>
+>
+> ... and no, not entirely. Note that this is not about 'protecting' the
+> flash in a security sense. It is simply to reserve the resources that
+> should be considered occupied by the UEFI firmware drivers. This may
+> be NOR flash, but it may just as well be the RTC or potentially a
+> syscon register block to do reset and/or poweroff.
+>
+> My QEMU mach-virt /proc/iomem looks like this with the patch applied:
+>
+> 04000000-07ffffff : UEFI Runtime MMIO
+> 09000000-09000fff : /pl011 at 9000000
+>   09000000-09000fff : /pl011 at 9000000
+> 09010000-0901ffff : UEFI Runtime MMIO
+> 40000000-7fffffff : System RAM
+>   40080000-408a27d3 : Kernel code
+>   40970000-40adffff : Kernel data
+>
+> where the first UEFI mmio region is the second bank of NOR flash (the
+> first one holds the firmware image itself, so that is not claimed
+> since the variable store driver never accesses it) and the second UEFI
+> mmio region is the PL031 RTC.
+>
 
-> On 14/11/15 21:34, Pavel Machek wrote:
-> >> The implementation assumes that exactly the same kernel is booted on the
-> >> same hardware, and that the kernel is loaded at the same physical address.
-> > 
-> > BTW... on newer implementations (and I have patch for x86, too), we
-> > try to make it so that resume kernel does not have to be same as
-> > suspend one. It would be nice to move there with arm64, too. 
-> 
-> Yes, that is a neat trick, can I leave it as future work?
-
-Yes. But it is really not hard.
-
-> >> + * Because this code has to be copied to a safe_page, it can't call out to
-> >> + * other functions by pc-relative address. Also remember that it
-> > 
-> > PC-relative?
-> 
-> The linker may (often!) use program-counter relative addresses for loads
-> and stores. This code gets copied, so the linker doesn't know where the
-> code will be executed from, so any instructions using pc-relative addresses
-> will get the wrong result, (if they reference something outside the
-> function).
-
-I was wondering if it should be spelled "PC-relative", not
-"pc-relative" :-).
-
-> >> + * and executable pages mapped to user space are also written as data, we
-> >> + * clean all pages we touch to the PoU.
-> > 
-> > What is PoC and PoU?
-> 
-> They are points in the CPU's cache hierarchy:
-> 
-> ARM processors are of a 'modified Harvard' architecture, their paths to
-> read instructions and data are different. The 'Point of Unification' is the
-> first point in the cache hierarchy that is the same for both. On ARM,
-> flush_icache_range() makes sure code written as data is pushed through any
-> data caches to this point, and then evicts any stale copies in the
-> instruction caches.
-> 
-> PoC is the 'Point of Coherency', it is the first point that is the same for
-> all devices, (e.g. a cpu with caches turned on, and one with them off), it
-> is normally main memory. The kernel text has to be pushed to this point, so
-> that secondary cores, while running early-boot code with their MMU and
-> caches turned off, don't get incorrect code/data from before resume.
-> 
-> I have resisted the urge to draw some ascii-art!
-
-That's ok, you just might want to replace PoI -> 'Point of
-Unification' and PoC -> 'Point of Coherency' in the comments. That
-should make googling easier for people not familiar with arm
-terminology.
-
-Thanks,
-									Pavel
--- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+Ping?
