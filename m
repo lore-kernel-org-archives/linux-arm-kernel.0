@@ -1,28 +1,30 @@
-From: ian.campbell@citrix.com (Ian Campbell)
-Date: Mon, 16 Nov 2015 09:42:57 +0000
-Subject: [Xen-devel] [PATCH v4 2/7] xen/arm: introduce
- HYPERVISOR_platform_op on arm and arm64
-In-Reply-To: <alpine.DEB.2.02.1511131757360.2653@kaball.uk.xensource.com>
-References: <alpine.DEB.2.02.1511121726370.526@kaball.uk.xensource.com>
- <1447349448-22610-2-git-send-email-stefano.stabellini@eu.citrix.com>
- <5645E868.30706@citrix.com>
- <alpine.DEB.2.02.1511131757360.2653@kaball.uk.xensource.com>
-Message-ID: <1447666977.15629.9.camel@citrix.com>
+From: catalin.crenguta@gmail.com (Catalin Crenguta)
+Date: Mon, 16 Nov 2015 11:43:43 +0200
+Subject: Freescale IMX6 active cooling
+Message-ID: <CABH3fy-He02iVU7FzqcPApPemeoqQP15+gr9+Hx87-OEBuHvCg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, 2015-11-13 at 18:10 +0000, Stefano Stabellini wrote:
-> 
-> I agree with your point (I thought about it myself) but the current
-> assembly scheme for hypercalls doesn't work well with that. I would have
-> to introduce, and maintain going forward, two special hypercall
-> implementations in assembly, one for arm and another for arm64, just to
-> set interface_version. I don't think it is worth it; I prefer to have to
-> maintain the explicit interface_version setting at the call sites (that
-> today is just one).
+Hello,
 
-You could give the bare assembly stub a different name (append _core or
-_raw or something) and make HYPERVISOR_platform_op a C wrapper for it which
-DTRT.
+I'm trying to use a GPIO Fan to cool down a Riotboard (I.MX6 Solo).
+I've read [0], investigated the driver which provides the on-die
+temperature ( fsl,imx6q-tempmon [1]) but it seems to provide the
+temperature by creating a thermal zone (relevant dts: [2][3][4]).
+I don't know how I should proceed:
+1) Should I research how can I attach a cooling device to this already
+existing thermal zone? (I believe it involves modifying the existing
+driver by adding new device tree handles)
+2) Should I create another thermal zone, use the existing driver to
+get the temperature and bind to a cooling device?
+3) Should I modify the existing driver to not create a thermal zone
+and move the creation in the device tree using the of-thermal driver ?
 
-Ian.
+Best regards,
+Catalin Crenguta
+
+[0] http://lxr.free-electrons.com/source/Documentation/devicetree/bindings/thermal/thermal.txt
+[1] http://lxr.free-electrons.com/source/drivers/thermal/imx_thermal.c
+[2] http://lxr.free-electrons.com/source/arch/arm/boot/dts/imx6dl-riotboard.dts
+[3] http://lxr.free-electrons.com/source/arch/arm/boot/dts/imx6dl.dtsi
+[4] http://lxr.free-electrons.com/source/arch/arm/boot/dts/imx6qdl.dtsi
