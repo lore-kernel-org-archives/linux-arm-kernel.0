@@ -1,48 +1,49 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 16 Nov 2015 17:43:21 +0000
-Subject: [PATCH 1/2] drm: Improve drm_of_component_probe() to correctly
- handle ports and remote ports.
-In-Reply-To: <CAPj87rP_qPk0dKhLQDpFAsAqL2LxG=_5n+0KMRW=qEih4mBTJA@mail.gmail.com>
-References: <1447685093-26129-1-git-send-email-Liviu.Dudau@arm.com>
- <1447685093-26129-2-git-send-email-Liviu.Dudau@arm.com>
- <20151116162241.GN8644@n2100.arm.linux.org.uk>
- <20151116164907.GA4158@e106497-lin.cambridge.arm.com>
- <20151116172248.GP8644@n2100.arm.linux.org.uk>
- <CAPj87rP_qPk0dKhLQDpFAsAqL2LxG=_5n+0KMRW=qEih4mBTJA@mail.gmail.com>
-Message-ID: <20151116174321.GR8644@n2100.arm.linux.org.uk>
+From: rmk+kernel@arm.linux.org.uk (Russell King)
+Date: Mon, 16 Nov 2015 17:40:47 +0000
+Subject: [PATCH 09/12] tty: amba-pl011: remove ST micro registers from
+ standard table
+In-Reply-To: <20151116173935.GQ8644@n2100.arm.linux.org.uk>
+References: <20151116173935.GQ8644@n2100.arm.linux.org.uk>
+Message-ID: <E1ZyNln-0003k4-3U@rmk-PC.arm.linux.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 16, 2015 at 05:32:05PM +0000, Daniel Stone wrote:
-> On 16 November 2015 at 17:22, Russell King - ARM Linux
-> <linux@arm.linux.org.uk> wrote:
-> > Please sensibly wrap your messages.  Your lines are longer than 80
-> > characters which makes it exceedingly difficult for some people to reply
-> > to your very very very very very very very very very very very very
-> > very very very very very very very very very very very very very very
-> > very very very very very very very very very very very very very very
-> > very very very very very very very very very very very very very very
-> > very very very very very very very very very very very very very very
-> > very very very very very very long lines without first reformatting
-> > them manually - and why should they bother to reply if they have that
-> > kind of additional work?  Thanks.
-> 
-> His lines are wrapped mostly at 80, but sometimes at 86, characters.
-> You should probably look into fixing your MUA.
+Remove the ST micro registers from the standard table.  These registers
+should never be accessed in non-ST micro variants.
 
-No.
+Signed-off-by: Russell King <rmk+kernel@arm.linux.org.uk>
+---
+ drivers/tty/serial/amba-pl011.c | 11 -----------
+ 1 file changed, 11 deletions(-)
 
-Standard net etiquette is that email should be wrapped around 72
-characters to give space for reply indentation to remain readable
-on an 80 column screen. Most of my email replies are written on an
-80 column screen.
-
-Wrapping at 80+ characters is against proper net etiquette.
-
-Same applies to GIT commits: wrap at around 72 characters to allow
-them to be readable on an 80 column display.  Linus will hate you
-if you don't.
-
+diff --git a/drivers/tty/serial/amba-pl011.c b/drivers/tty/serial/amba-pl011.c
+index f859aea50dbc..afa0de7d481f 100644
+--- a/drivers/tty/serial/amba-pl011.c
++++ b/drivers/tty/serial/amba-pl011.c
+@@ -75,8 +75,6 @@
+ 
+ static u16 pl011_std_offsets[REG_ARRAY_SIZE] = {
+ 	[REG_DR] = UART01x_DR,
+-	[REG_ST_DMAWM] = ST_UART011_DMAWM,
+-	[REG_ST_TIMEOUT] = ST_UART011_TIMEOUT,
+ 	[REG_FR] = UART01x_FR,
+ 	[REG_LCRH_RX] = UART011_LCRH,
+ 	[REG_LCRH_TX] = UART011_LCRH,
+@@ -89,15 +87,6 @@ static u16 pl011_std_offsets[REG_ARRAY_SIZE] = {
+ 	[REG_MIS] = UART011_MIS,
+ 	[REG_ICR] = UART011_ICR,
+ 	[REG_DMACR] = UART011_DMACR,
+-	[REG_ST_XFCR] = ST_UART011_XFCR,
+-	[REG_ST_XON1] = ST_UART011_XON1,
+-	[REG_ST_XON2] = ST_UART011_XON2,
+-	[REG_ST_XOFF1] = ST_UART011_XOFF1,
+-	[REG_ST_XOFF2] = ST_UART011_XOFF2,
+-	[REG_ST_ITCR] = ST_UART011_ITCR,
+-	[REG_ST_ITIP] = ST_UART011_ITIP,
+-	[REG_ST_ABCR] = ST_UART011_ABCR,
+-	[REG_ST_ABIMSC] = ST_UART011_ABIMSC,
+ };
+ 
+ /* There is by now at least one vendor with differing details, so handle it */
 -- 
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+2.1.0
