@@ -1,113 +1,34 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 16 Nov 2015 10:28:18 +0000
-Subject: [PATCH 2/2] arm64: KVM: Add workaround for Cortex-A57 erratum 834220
-In-Reply-To: <1447669698-15939-1-git-send-email-marc.zyngier@arm.com>
-References: <1447669698-15939-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1447669698-15939-3-git-send-email-marc.zyngier@arm.com>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Mon, 16 Nov 2015 18:36:10 +0800
+Subject: [PATCH RESEND] arm64: berlin: add the pinctrl dependency for Marvell
+ Berlin SoCs
+Message-ID: <1447670170-7597-1-git-send-email-jszhang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Cortex-A57 parts up to r1p2 can misreport Stage 2 translation faults
-when a Stage 1 permission fault or device alignment fault should
-have been reported.
+This is to add the pinctrl dependency for Marvell Berlin SoCs.
 
-This patch implements the workaround (which is to validate that the
-Stage-1 translation actually succeeds) by using code patching.
-
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+Acked-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
+Acked-by: Antoine Tenart <antoine.tenart@free-electrons.com>
+Acked-by: Linus Walleij <linus.walleij@linaro.org>
 ---
- arch/arm64/Kconfig                  | 21 +++++++++++++++++++++
- arch/arm64/include/asm/cpufeature.h |  3 ++-
- arch/arm64/kernel/cpu_errata.c      |  9 +++++++++
- arch/arm64/kvm/hyp.S                |  6 ++++++
- 4 files changed, 38 insertions(+), 1 deletion(-)
+ this small patch is missed:
+ http://lists.infradead.org/pipermail/linux-arm-kernel/2015-October/378638.html
+ arch/arm64/Kconfig.platforms | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 9ac16a4..746d985 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -316,6 +316,27 @@ config ARM64_ERRATUM_832075
+diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
+index 4043c35..905d308 100644
+--- a/arch/arm64/Kconfig.platforms
++++ b/arch/arm64/Kconfig.platforms
+@@ -9,6 +9,7 @@ config ARCH_BERLIN
+ 	bool "Marvell Berlin SoC Family"
+ 	select ARCH_REQUIRE_GPIOLIB
+ 	select DW_APB_ICTL
++	select PINCTRL
+ 	help
+ 	  This enables support for Marvell Berlin SoC Family
  
- 	  If unsure, say Y.
- 
-+config ARM64_ERRATUM_834220
-+	bool "Cortex-A57: 834220: Stage 2 translation fault might be incorrectly reported in presence of a Stage 1 fault"
-+	depends on KVM
-+	default y
-+	help
-+	  This option adds an alternative code sequence to work around ARM
-+	  erratum 834220 on Cortex-A57 parts up to r1p2.
-+
-+	  Affected Cortex-A57 parts might report a Stage 2 translation
-+	  fault as a the result of a Stage 1 fault for load crossing a
-+	  page boundary when there is a permission or device memory
-+	  alignment fault at Stage 1 and a translation fault at Stage 2.
-+
-+	  The workaround is to verify that the Stage-1 translation
-+	  doesn't generate a fault before handling the Stage-2 fault.
-+	  Please note that this does not necessarily enable the workaround,
-+	  as it depends on the alternative framework, which will only patch
-+	  the kernel if an affected CPU is detected.
-+
-+	  If unsure, say Y.
-+
- config ARM64_ERRATUM_845719
- 	bool "Cortex-A53: 845719: a load might read incorrect data"
- 	depends on COMPAT
-diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
-index 11d5bb0f..52722ee 100644
---- a/arch/arm64/include/asm/cpufeature.h
-+++ b/arch/arm64/include/asm/cpufeature.h
-@@ -29,8 +29,9 @@
- #define ARM64_HAS_PAN				4
- #define ARM64_HAS_LSE_ATOMICS			5
- #define ARM64_WORKAROUND_CAVIUM_23154		6
-+#define ARM64_WORKAROUND_834220			7
- 
--#define ARM64_NCAPS				7
-+#define ARM64_NCAPS				8
- 
- #ifndef __ASSEMBLY__
- 
-diff --git a/arch/arm64/kernel/cpu_errata.c b/arch/arm64/kernel/cpu_errata.c
-index 24926f2..feb6b4e 100644
---- a/arch/arm64/kernel/cpu_errata.c
-+++ b/arch/arm64/kernel/cpu_errata.c
-@@ -75,6 +75,15 @@ const struct arm64_cpu_capabilities arm64_errata[] = {
- 			   (1 << MIDR_VARIANT_SHIFT) | 2),
- 	},
- #endif
-+#ifdef CONFIG_ARM64_ERRATUM_834220
-+	{
-+	/* Cortex-A57 r0p0 - r1p2 */
-+		.desc = "ARM erratum 834220",
-+		.capability = ARM64_WORKAROUND_834220,
-+		MIDR_RANGE(MIDR_CORTEX_A57, 0x00,
-+			   (1 << MIDR_VARIANT_SHIFT) | 2),
-+	},
-+#endif
- #ifdef CONFIG_ARM64_ERRATUM_845719
- 	{
- 	/* Cortex-A53 r0p[01234] */
-diff --git a/arch/arm64/kvm/hyp.S b/arch/arm64/kvm/hyp.S
-index 1599701..ff2e038 100644
---- a/arch/arm64/kvm/hyp.S
-+++ b/arch/arm64/kvm/hyp.S
-@@ -1015,9 +1015,15 @@ el1_trap:
- 	b.ne	1f		// Not an abort we care about
- 
- 	/* This is an abort. Check for permission fault */
-+alternative_if_not ARM64_WORKAROUND_834220
- 	and	x2, x1, #ESR_ELx_FSC_TYPE
- 	cmp	x2, #FSC_PERM
- 	b.ne	1f		// Not a permission fault
-+alternative_else
-+	nop			// Use the permission fault path to
-+	nop			// check for a valid S1 translation,
-+	nop			// regardless of the ESR value.
-+alternative_endif
- 
- 	/*
- 	 * Check for Stage-1 page table walk, which is guaranteed
 -- 
-2.1.4
+2.6.2
