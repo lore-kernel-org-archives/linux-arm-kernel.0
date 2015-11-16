@@ -1,71 +1,68 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Mon, 16 Nov 2015 09:00:05 -0800
-Subject: [PATCH v4 04/24] hwmon: pwm-fan: use pwm_get_xxx() helpers where
- appropriate
-In-Reply-To: <20151116175322.48dba6f9@bbrezillon>
-References: <1447664207-24370-1-git-send-email-boris.brezillon@free-electrons.com>
- <1447664207-24370-5-git-send-email-boris.brezillon@free-electrons.com>
- <5649FD5B.3000208@roeck-us.net> <20151116175322.48dba6f9@bbrezillon>
-Message-ID: <564A0B95.6010603@roeck-us.net>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 16 Nov 2015 11:01:10 -0600
+Subject: [PATCH v6 3/6] dt/bindings: add bindings for optee
+In-Reply-To: <1446106888-8983-4-git-send-email-jens.wiklander@linaro.org>
+References: <1446106888-8983-1-git-send-email-jens.wiklander@linaro.org>
+ <1446106888-8983-4-git-send-email-jens.wiklander@linaro.org>
+Message-ID: <20151116170109.GA20076@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/16/2015 08:53 AM, Boris Brezillon wrote:
-> On Mon, 16 Nov 2015 07:59:23 -0800
-> Guenter Roeck <linux@roeck-us.net> wrote:
->
->> On 11/16/2015 12:56 AM, Boris Brezillon wrote:
->>> Use pwm_get_xxx() helpers instead of directly accessing the pwm->xxx field.
->>> Doing that will ease adaptation of the PWM framework to support atomic
->>> update.
->>>
->>> Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
->>> ---
->>> Patch generated with the following coccinelle script:
->>>
->>> --->8---
->>> virtual patch
->>>
->>> @@
->>> struct pwm_device *p;
->>> expression e;
->>> @@
->>> (
->>> -(p)->polarity = e;
->>> +pwm_set_polarity((p), e);
->>> |
->>> -(p)->polarity
->>> +pwm_get_polarity((p))
->>
->> s/((p))/(p)/
->>
->>> |
->>> -(p)->period = e;
->>> +pwm_set_period((p), e);
->>> |
->>> -(p)->period
->>> +pwm_get_period((p))
->>
->> s/((p))/(p)/
->>
->>> |
->>> -(p)->duty_cycle = e;
->>> +pwm_set_duty_cycle((p), e);
->>
->> The (p) seems unnecessary here.
->
-> I don't get this one. You mean I should drop one the parenthesis around
-> p, right?
->
+On Thu, Oct 29, 2015 at 09:21:25AM +0100, Jens Wiklander wrote:
+> Introduces optee prefix and adds bindings for ARM TrustZone based OP-TEE
+> implementation.
+> 
+> Signed-off-by: Jens Wiklander <jens.wiklander@linaro.org>
+> ---
+>  .../bindings/arm/firmware/optee,optee-tz.txt       | 29 ++++++++++++++++++++++
+>  .../devicetree/bindings/vendor-prefixes.txt        |  1 +
+>  2 files changed, 30 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/arm/firmware/optee,optee-tz.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/arm/firmware/optee,optee-tz.txt b/Documentation/devicetree/bindings/arm/firmware/optee,optee-tz.txt
+> new file mode 100644
+> index 0000000..0a8ed0d
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/arm/firmware/optee,optee-tz.txt
+> @@ -0,0 +1,29 @@
+> +OP-TEE Device Tree Bindings
+> +
+> +OP-TEE is a piece of software using hardware features to provide a Trusted
+> +Execution Environment. The security can be provided with ARM TrustZone, but
+> +also by virtualization or a separate chip. As there's no single OP-TEE
+> +vendor we're using "optee" as the first part of compatible property,
+> +indicating the OP-TEE protocol is used when communicating with the secure
+> +world.
+> +
+> +* OP-TEE based on ARM TrustZone required properties:
+> +
+> +- compatible     : should contain "optee,optee-tz"
 
-Same as above - s/(p)/p/. It should never be necessary to write
-	pwm_set_duty_cycle((p), e)
-since
-	pwm_set_duty_cycle(p, e)
-should be the same.
+I would leave off optee as a vendor. Different implementations by 
+vendors should then add their vendor prefix as they all have the chance 
+to screw-up something. I suppose we could do "linaro" as the reference 
+implementation.
 
-On the other side, I did not see this expression used in any of the patches,
-though maybe I missed it.
+> +
+> +- method         : The method of calling the OP-TEE Trusted OS. Permitted
+> +                   values are:
+> +
+> +                   "smc" : SMC #0, with the register assignments specified
+> +		           in drivers/tee/optee/optee_smc.h
+> +
+> +                   "hvc" : HVC #0, with the register assignments specified
+> +		           in drivers/tee/optee/optee_smc.h
 
-Thanks,
-Guenter
+The use here would be a guest VM calling thru to hypervisor and then 
+hypervisor calling optee?
+
+> +
+> +
+> +
+> +Example:
+> +	optee {
+
+This should go under a /firmware node similar to 
+Documentation/devicetree/bindings/arm/firmware/tlm,trusted-foundations.txt.
+
+Rob
