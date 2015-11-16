@@ -1,144 +1,42 @@
-From: yang.shi@linaro.org (Yang Shi)
-Date: Mon, 16 Nov 2015 14:35:35 -0800
-Subject: [PATCH V4 2/2] arm64: bpf: make BPF prologue and epilogue align with
- ARM64 AAPCS
-In-Reply-To: <CABg9mcvomep=M1As_Vj=XuTNk=jiGwXQqQWbjotMXP2csKX=Bg@mail.gmail.com>
-References: <CABg9mcvomep=M1As_Vj=XuTNk=jiGwXQqQWbjotMXP2csKX=Bg@mail.gmail.com>
-Message-ID: <1447713335-29707-1-git-send-email-yang.shi@linaro.org>
+From: dave.jiang@intel.com (Jiang, Dave)
+Date: Mon, 16 Nov 2015 22:57:47 +0000
+Subject: [RFC] User space to kernel space copy optimization
+In-Reply-To: <564A5057.9080203@codeaurora.org>
+References: <564A5057.9080203@codeaurora.org>
+Message-ID: <1447714667.83864.212.camel@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Save and restore FP/LR in BPF prog prologue and epilogue, save SP to FP
-in prologue in order to get the correct stack backtrace.
 
-However, ARM64 JIT used FP (x29) as eBPF fp register, FP is subjected to
-change during function call so it may cause the BPF prog stack base address
-change too.
 
-Use x25 to replace FP as BPF stack base register (fp). Since x25 is callee
-saved register, so it will keep intact during function call.
-It is initialized in BPF prog prologue when BPF prog is started to run
-everytime. Save and restore x25/x26 in BPF prologue and epilogue to keep
-them intact for the outside of BPF. Actually, x26 is unnecessary, but SP
-requires 16 bytes alignment.
+On Mon, 2015-11-16 at 21:53 +0000, Sinan Kaya wrote:
+> One of the things I'm interested in is to use a memcpy capable DMA
+> engine HW to optimize user space and kernel space parameter copying.
 
-So, the BPF stack layout looks like:
+Have you looked at why NET_DMA was deprecated and using DMA engine to
+do kernel->user copy could be a problem?
+https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/commit/
+?id=77873803363c
 
-                                 high
-         original A64_SP =>   0:+-----+ BPF prologue
-                                |FP/LR|
-         current A64_FP =>  -16:+-----+
-                                | ... | callee saved registers
-                                +-----+
-                                |     | x25/x26
-         BPF fp register => -80:+-----+
-                                |     |
-                                | ... | BPF prog stack
-                                |     |
-                                |     |
-         current A64_SP =>      +-----+
-                                |     |
-                                | ... | Function call stack
-                                |     |
-                                +-----+
-                                  low
-
-CC: Zi Shen Lim <zlim.lnx@gmail.com>
-CC: Xi Wang <xi.wang@gmail.com>
-Signed-off-by: Yang Shi <yang.shi@linaro.org>
----
-V4 --> V3:
-* Save/restore x25 and x26
-
-V3 --> V2:
-* Make FP point to FP'
-* Fix a compile warning
-
- arch/arm64/net/bpf_jit_comp.c | 44 ++++++++++++++++++++++++++++++++++++++-----
- 1 file changed, 39 insertions(+), 5 deletions(-)
-
-diff --git a/arch/arm64/net/bpf_jit_comp.c b/arch/arm64/net/bpf_jit_comp.c
-index ac8b548..86a3253 100644
---- a/arch/arm64/net/bpf_jit_comp.c
-+++ b/arch/arm64/net/bpf_jit_comp.c
-@@ -50,7 +50,7 @@ static const int bpf2a64[] = {
- 	[BPF_REG_8] = A64_R(21),
- 	[BPF_REG_9] = A64_R(22),
- 	/* read-only frame pointer to access stack */
--	[BPF_REG_FP] = A64_FP,
-+	[BPF_REG_FP] = A64_R(25),
- 	/* temporary register for internal BPF JIT */
- 	[TMP_REG_1] = A64_R(23),
- 	[TMP_REG_2] = A64_R(24),
-@@ -155,16 +155,47 @@ static void build_prologue(struct jit_ctx *ctx)
- 	stack_size += 4; /* extra for skb_copy_bits buffer */
- 	stack_size = STACK_ALIGN(stack_size);
- 
-+	/*
-+	 * BPF prog stack layout
-+	 *
-+	 *                         high
-+	 * original A64_SP =>   0:+-----+ BPF prologue
-+	 *                        |FP/LR|
-+	 * current A64_FP =>  -16:+-----+
-+	 *                        | ... | callee saved registers
-+	 *                        +-----+
-+	 *                        |     | x25/x26
-+	 * BPF fp register => -80:+-----+
-+	 *                        |     |
-+	 *                        | ... | BPF prog stack
-+	 *                        |     |
-+	 *                        |     |
-+	 * current A64_SP =>      +-----+
-+	 *                        |     |
-+	 *                        | ... | Function call stack
-+	 *                        |     |
-+	 *                        +-----+
-+	 *                          low
-+	 *
-+	 */
-+
-+	/* Save FP and LR registers to stay align with ARM64 AAPCS */
-+	emit(A64_PUSH(A64_FP, A64_LR, A64_SP), ctx);
-+	emit(A64_MOV(1, A64_FP, A64_SP), ctx);
-+
- 	/* Save callee-saved register */
- 	emit(A64_PUSH(r6, r7, A64_SP), ctx);
- 	emit(A64_PUSH(r8, r9, A64_SP), ctx);
- 	if (ctx->tmp_used)
- 		emit(A64_PUSH(tmp1, tmp2, A64_SP), ctx);
- 
--	/* Set up frame pointer */
-+	/* Save fp (x25) and x26. SP requires 16 bytes alignment */
-+	emit(A64_PUSH(fp, A64_R(26), A64_SP), ctx);
-+
-+	/* Set up BPF prog stack base register (x25) */
- 	emit(A64_MOV(1, fp, A64_SP), ctx);
- 
--	/* Set up BPF stack */
-+	/* Set up function call stack */
- 	emit(A64_SUB_I(1, A64_SP, A64_SP, stack_size), ctx);
- 
- 	/* Clear registers A and X */
-@@ -190,14 +221,17 @@ static void build_epilogue(struct jit_ctx *ctx)
- 	/* We're done with BPF stack */
- 	emit(A64_ADD_I(1, A64_SP, A64_SP, stack_size), ctx);
- 
-+	/* Restore fs (x25) and x26 */
-+	emit(A64_POP(fp, A64_R(26), A64_SP), ctx);
-+
- 	/* Restore callee-saved register */
- 	if (ctx->tmp_used)
- 		emit(A64_POP(tmp1, tmp2, A64_SP), ctx);
- 	emit(A64_POP(r8, r9, A64_SP), ctx);
- 	emit(A64_POP(r6, r7, A64_SP), ctx);
- 
--	/* Restore frame pointer */
--	emit(A64_MOV(1, fp, A64_SP), ctx);
-+	/* Restore FP/LR registers */
-+	emit(A64_POP(A64_FP, A64_LR, A64_SP), ctx);
- 
- 	/* Set return value */
- 	emit(A64_MOV(1, A64_R(0), r0), ctx);
--- 
-2.0.2
+> 
+> Of course, this will not be viable for all parameter sizes but I can
+> see
+> this being useful. The goal is to save power in the cost of little
+> performance.
+> 
+> Before I go and invent my own mechanism, I'd like to have ideas on
+> what
+> an acceptable solution would look like. Especially, I'm looking for a
+> generic implementation that could plug into any DMA engine HW.
+> 
+> -- 
+> Sinan Kaya
+> Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center,
+> Inc.
+> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a
+> Linux Foundation Collaborative Project
+> --
+> To unsubscribe from this list: send the line "unsubscribe dmaengine"
+> in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
