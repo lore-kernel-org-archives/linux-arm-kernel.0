@@ -1,104 +1,70 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 16 Nov 2015 19:13:28 +0000
-Subject: [PATCH 4/4] irqchip/gic: Add save/restore of the active state
-In-Reply-To: <1447701208-18150-1-git-send-email-marc.zyngier@arm.com>
-References: <1447701208-18150-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1447701208-18150-5-git-send-email-marc.zyngier@arm.com>
+From: fengguang.wu@intel.com (kbuild test robot)
+Date: Tue, 17 Nov 2015 03:18:42 +0800
+Subject: [arm:drm-etnaviv-devel 3/149]
+ drivers/staging/etnaviv/etnaviv_iommu.c:53:13: error: conflicting types for
+ 'pgtable_free'
+Message-ID: <201511170340.1q6ZhNK8%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When using EOImode==1, we may mark interrupts as being forwarded
-to a virtual machine. In that case, the interrupt is left active
-while being passed to the VM.
+tree:   http://repo.or.cz/linux-2.6/linux-2.6-arm.git drm-etnaviv-devel
+head:   77c57a5498ebe5c85b4a71fbcf800a9140f9a697
+commit: b920a1d21ac9c12ddb174daca7d99ab81d791ad6 [3/149] staging: etnaviv: add drm driver
+config: tile-allmodconfig (attached as .config)
+reproduce:
+        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        git checkout b920a1d21ac9c12ddb174daca7d99ab81d791ad6
+        # save the attached .config to linux build tree
+        make.cross ARCH=tile 
 
-If we suspend the system before the VM has deactivated the interrupt,
-the active state will be lost (which may be very annoying, as this
-may result in spurious interrupts and a confused guest).
+All errors (new ones prefixed by >>):
 
-To avoid this, save and restore the active state together with the
-rest of the GIC registers.
+>> drivers/staging/etnaviv/etnaviv_iommu.c:53:13: error: conflicting types for 'pgtable_free'
+   arch/tile/include/asm/pgalloc.h:73:13: note: previous declaration of 'pgtable_free' was here
+   drivers/staging/etnaviv/etnaviv_iommu.c: In function 'etnaviv_iommu_domain_init':
+   drivers/staging/etnaviv/etnaviv_iommu.c:96:8: error: 'struct iommu_domain' has no member named 'priv'
+   drivers/staging/etnaviv/etnaviv_iommu.c: In function 'etnaviv_iommu_domain_destroy':
+   drivers/staging/etnaviv/etnaviv_iommu.c:102:54: error: 'struct iommu_domain' has no member named 'priv'
+   drivers/staging/etnaviv/etnaviv_iommu.c:107:8: error: 'struct iommu_domain' has no member named 'priv'
+   drivers/staging/etnaviv/etnaviv_iommu.c: In function 'etnaviv_iommu_map':
+   drivers/staging/etnaviv/etnaviv_iommu.c:113:54: error: 'struct iommu_domain' has no member named 'priv'
+   drivers/staging/etnaviv/etnaviv_iommu.c: In function 'etnaviv_iommu_unmap':
+   drivers/staging/etnaviv/etnaviv_iommu.c:128:54: error: 'struct iommu_domain' has no member named 'priv'
+   drivers/staging/etnaviv/etnaviv_iommu.c: In function 'etnaviv_iommu_iova_to_phys':
+   drivers/staging/etnaviv/etnaviv_iommu.c:143:54: error: 'struct iommu_domain' has no member named 'priv'
+   drivers/staging/etnaviv/etnaviv_iommu.c: At top level:
+   drivers/staging/etnaviv/etnaviv_iommu.c:149:3: error: unknown field 'domain_init' specified in initializer
+   drivers/staging/etnaviv/etnaviv_iommu.c:149:3: error: initialization from incompatible pointer type
+   drivers/staging/etnaviv/etnaviv_iommu.c:149:3: error: (near initialization for 'etnaviv_iommu_ops.capable')
+   drivers/staging/etnaviv/etnaviv_iommu.c:150:3: error: unknown field 'domain_destroy' specified in initializer
+   drivers/staging/etnaviv/etnaviv_iommu.c:150:3: error: initialization from incompatible pointer type
+   drivers/staging/etnaviv/etnaviv_iommu.c:150:3: error: (near initialization for 'etnaviv_iommu_ops.domain_alloc')
+   drivers/staging/etnaviv/etnaviv_iommu.c: In function 'etnaviv_iommu_domain_alloc':
+   drivers/staging/etnaviv/etnaviv_iommu.c:169:19: error: 'const struct iommu_ops' has no member named 'domain_init'
+   drivers/staging/etnaviv/etnaviv_iommu.c:174:25: error: 'struct iommu_domain' has no member named 'priv'
+   cc1: all warnings being treated as errors
 
-Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+vim +/pgtable_free +53 drivers/staging/etnaviv/etnaviv_iommu.c
+
+    47		if (!pgtable->pgtable)
+    48			return -ENOMEM;
+    49	
+    50		return 0;
+    51	}
+    52	
+  > 53	static void pgtable_free(struct etnaviv_iommu_domain_pgtable *pgtable,
+    54				 size_t size)
+    55	{
+    56		dma_free_coherent(NULL, size, pgtable->pgtable, pgtable->paddr);
+
 ---
- drivers/irqchip/irq-gic.c | 28 ++++++++++++++++++++++++++++
- 1 file changed, 28 insertions(+)
-
-diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
-index bc846e7..abf2ffa 100644
---- a/drivers/irqchip/irq-gic.c
-+++ b/drivers/irqchip/irq-gic.c
-@@ -73,9 +73,11 @@ struct gic_chip_data {
- 	union gic_base cpu_base;
- #ifdef CONFIG_CPU_PM
- 	u32 saved_spi_enable[DIV_ROUND_UP(1020, 32)];
-+	u32 saved_spi_active[DIV_ROUND_UP(1020, 32)];
- 	u32 saved_spi_conf[DIV_ROUND_UP(1020, 16)];
- 	u32 saved_spi_target[DIV_ROUND_UP(1020, 4)];
- 	u32 __percpu *saved_ppi_enable;
-+	u32 __percpu *saved_ppi_active;
- 	u32 __percpu *saved_ppi_conf;
- #endif
- 	struct irq_domain *domain;
-@@ -566,6 +568,10 @@ static void gic_dist_save(unsigned int gic_nr)
- 	for (i = 0; i < DIV_ROUND_UP(gic_irqs, 32); i++)
- 		gic_data[gic_nr].saved_spi_enable[i] =
- 			readl_relaxed(dist_base + GIC_DIST_ENABLE_SET + i * 4);
-+
-+	for (i = 0; i < DIV_ROUND_UP(gic_irqs, 32); i++)
-+		gic_data[gic_nr].saved_spi_active[i] =
-+			readl_relaxed(dist_base + GIC_DIST_ACTIVE_SET + i * 4);
- }
- 
- /*
-@@ -611,6 +617,13 @@ static void gic_dist_restore(unsigned int gic_nr)
- 			dist_base + GIC_DIST_ENABLE_SET + i * 4);
- 	}
- 
-+	for (i = 0; i < DIV_ROUND_UP(gic_irqs, 32); i++) {
-+		writel_relaxed(GICD_INT_EN_CLR_X32,
-+			dist_base + GIC_DIST_ACTIVE_CLEAR + i * 4);
-+		writel_relaxed(gic_data[gic_nr].saved_spi_active[i],
-+			dist_base + GIC_DIST_ACTIVE_SET + i * 4);
-+	}
-+
- 	writel_relaxed(GICD_ENABLE, dist_base + GIC_DIST_CTRL);
- }
- 
-@@ -634,6 +647,10 @@ static void gic_cpu_save(unsigned int gic_nr)
- 	for (i = 0; i < DIV_ROUND_UP(32, 32); i++)
- 		ptr[i] = readl_relaxed(dist_base + GIC_DIST_ENABLE_SET + i * 4);
- 
-+	ptr = raw_cpu_ptr(gic_data[gic_nr].saved_ppi_active);
-+	for (i = 0; i < DIV_ROUND_UP(32, 32); i++)
-+		ptr[i] = readl_relaxed(dist_base + GIC_DIST_ACTIVE_SET + i * 4);
-+
- 	ptr = raw_cpu_ptr(gic_data[gic_nr].saved_ppi_conf);
- 	for (i = 0; i < DIV_ROUND_UP(32, 16); i++)
- 		ptr[i] = readl_relaxed(dist_base + GIC_DIST_CONFIG + i * 4);
-@@ -663,6 +680,13 @@ static void gic_cpu_restore(unsigned int gic_nr)
- 		writel_relaxed(ptr[i], dist_base + GIC_DIST_ENABLE_SET + i * 4);
- 	}
- 
-+	ptr = raw_cpu_ptr(gic_data[gic_nr].saved_ppi_active);
-+	for (i = 0; i < DIV_ROUND_UP(32, 32); i++) {
-+		writel_relaxed(GICD_INT_EN_CLR_X32,
-+			       dist_base + GIC_DIST_ACTIVE_CLEAR + i * 4);
-+		writel_relaxed(ptr[i], dist_base + GIC_DIST_ACTIVE_SET + i * 4);
-+	}
-+
- 	ptr = raw_cpu_ptr(gic_data[gic_nr].saved_ppi_conf);
- 	for (i = 0; i < DIV_ROUND_UP(32, 16); i++)
- 		writel_relaxed(ptr[i], dist_base + GIC_DIST_CONFIG + i * 4);
-@@ -716,6 +740,10 @@ static void __init gic_pm_init(struct gic_chip_data *gic)
- 		sizeof(u32));
- 	BUG_ON(!gic->saved_ppi_enable);
- 
-+	gic->saved_ppi_active = __alloc_percpu(DIV_ROUND_UP(32, 32) * 4,
-+		sizeof(u32));
-+	BUG_ON(!gic->saved_ppi_active);
-+
- 	gic->saved_ppi_conf = __alloc_percpu(DIV_ROUND_UP(32, 16) * 4,
- 		sizeof(u32));
- 	BUG_ON(!gic->saved_ppi_conf);
--- 
-2.1.4
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 41456 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151117/e5f84ecc/attachment-0001.obj>
