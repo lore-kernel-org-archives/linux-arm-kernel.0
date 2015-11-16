@@ -1,68 +1,37 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 16 Nov 2015 11:01:10 -0600
-Subject: [PATCH v6 3/6] dt/bindings: add bindings for optee
-In-Reply-To: <1446106888-8983-4-git-send-email-jens.wiklander@linaro.org>
-References: <1446106888-8983-1-git-send-email-jens.wiklander@linaro.org>
- <1446106888-8983-4-git-send-email-jens.wiklander@linaro.org>
-Message-ID: <20151116170109.GA20076@rob-hp-laptop>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 16 Nov 2015 18:01:19 +0100
+Subject: [PATCH] ARM: zx: only build power domain code when CONFIG_PM=y
+Message-ID: <5298444.vriZVZrvnf@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Oct 29, 2015 at 09:21:25AM +0100, Jens Wiklander wrote:
-> Introduces optee prefix and adds bindings for ARM TrustZone based OP-TEE
-> implementation.
-> 
-> Signed-off-by: Jens Wiklander <jens.wiklander@linaro.org>
-> ---
->  .../bindings/arm/firmware/optee,optee-tz.txt       | 29 ++++++++++++++++++++++
->  .../devicetree/bindings/vendor-prefixes.txt        |  1 +
->  2 files changed, 30 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/arm/firmware/optee,optee-tz.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/firmware/optee,optee-tz.txt b/Documentation/devicetree/bindings/arm/firmware/optee,optee-tz.txt
-> new file mode 100644
-> index 0000000..0a8ed0d
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/arm/firmware/optee,optee-tz.txt
-> @@ -0,0 +1,29 @@
-> +OP-TEE Device Tree Bindings
-> +
-> +OP-TEE is a piece of software using hardware features to provide a Trusted
-> +Execution Environment. The security can be provided with ARM TrustZone, but
-> +also by virtualization or a separate chip. As there's no single OP-TEE
-> +vendor we're using "optee" as the first part of compatible property,
-> +indicating the OP-TEE protocol is used when communicating with the secure
-> +world.
-> +
-> +* OP-TEE based on ARM TrustZone required properties:
-> +
-> +- compatible     : should contain "optee,optee-tz"
+The newly added zx power domain code causes build errors in
+some configurations:
 
-I would leave off optee as a vendor. Different implementations by 
-vendors should then add their vendor prefix as they all have the chance 
-to screw-up something. I suppose we could do "linaro" as the reference 
-implementation.
+warning: (PM_RMOBILE && SOC_ZX296702) selects PM_GENERIC_DOMAINS which has unmet direct dependencies (PM)
+warning: (ARCH_EXYNOS) selects EXYNOS_THERMAL which has unmet direct dependencies (THERMAL && (ARCH_EXYNOS || COMPILE_TEST) && THERMAL_OF)
+power/domain.c: In function 'genpd_queue_power_off_work':
+power/domain.c:192:13: error: 'pm_wq' undeclared (first use in this function)
+  queue_work(pm_wq, &genpd->power_off_work);
+             ^
+power/domain.c:192:13: note: each undeclared identifier is reported only once for each function it appears in
 
-> +
-> +- method         : The method of calling the OP-TEE Trusted OS. Permitted
-> +                   values are:
-> +
-> +                   "smc" : SMC #0, with the register assignments specified
-> +		           in drivers/tee/optee/optee_smc.h
-> +
-> +                   "hvc" : HVC #0, with the register assignments specified
-> +		           in drivers/tee/optee/optee_smc.h
+This ensures we don't try to enable it when CONFIG_PM is
+disabled, mirroring what we do on most other platforms.
 
-The use here would be a guest VM calling thru to hypervisor and then 
-hypervisor calling optee?
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Fixes: f15107f41282 ("ARM: zx: Add power domains for ZX296702")
 
-> +
-> +
-> +
-> +Example:
-> +	optee {
-
-This should go under a /firmware node similar to 
-Documentation/devicetree/bindings/arm/firmware/tlm,trusted-foundations.txt.
-
-Rob
+diff --git a/arch/arm/mach-zx/Kconfig b/arch/arm/mach-zx/Kconfig
+index 7fdc5bf24f9b..446334a25cf5 100644
+--- a/arch/arm/mach-zx/Kconfig
++++ b/arch/arm/mach-zx/Kconfig
+@@ -13,7 +13,7 @@ config SOC_ZX296702
+ 	select ARM_GLOBAL_TIMER
+ 	select HAVE_ARM_SCU if SMP
+ 	select HAVE_ARM_TWD if SMP
+-	select PM_GENERIC_DOMAINS
++	select PM_GENERIC_DOMAINS if PM
+ 	help
+ 	  Support for ZTE ZX296702 SoC which is a dual core CortexA9MP
+ endif
