@@ -1,55 +1,37 @@
-From: scottwood@freescale.com (Scott Wood)
-Date: Mon, 16 Nov 2015 13:12:05 -0600
-Subject: [PATCH 1/2] ls2080a/dts: Add little endian property for GPIO IP
- block
-In-Reply-To: <CADRPPNROHmnOHfpAtaii5Hr3hzUmn4BL5OpQ4Q4hr9BGLq8s0Q@mail.gmail.com>
-References: <1446549552-40675-1-git-send-email-Gang.Liu@freescale.com>
- <CACRpkdbf4X=dcZhtNrcJp7Zp_hnVDGH1gpKML-e=qcAgEzb0Nw@mail.gmail.com>
- <CADRPPNROHmnOHfpAtaii5Hr3hzUmn4BL5OpQ4Q4hr9BGLq8s0Q@mail.gmail.com>
-Message-ID: <1447701125.2262.356.camel@freescale.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Mon, 16 Nov 2015 19:13:24 +0000
+Subject: [PATCH 0/4] irqchip/gic: Deal with the active state across kexec and
+ suspend/resume
+Message-ID: <1447701208-18150-1-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2015-11-16 at 12:56 -0600, Li Yang wrote:
-> On Mon, Nov 16, 2015 at 9:11 AM, Linus Walleij <linus.walleij@linaro.org>
-> wrote:
-> > On Tue, Nov 3, 2015 at 12:19 PM, Liu Gang <Gang.Liu@freescale.com> wrote:
-> > 
-> > > The GPIO block for ls2080a platform has little endian registers,
-> > > the GPIO driver needs this property to read/write registers by
-> > > right interface.
-> > > 
-> > > Signed-off-by: Liu Gang <Gang.Liu@freescale.com>
-> > > 
-> > > diff --git a/Documentation/devicetree/bindings/gpio/gpio-mpc8xxx.txt
-> > > b/Documentation/devicetree/bindings/gpio/gpio-mpc8xxx.txt
-> > > index f2455c5..c836dab 100644
-> > > --- a/Documentation/devicetree/bindings/gpio/gpio-mpc8xxx.txt
-> > > +++ b/Documentation/devicetree/bindings/gpio/gpio-mpc8xxx.txt
-> > > @@ -10,6 +10,9 @@ Required properties:
-> > >    the second cell is used to specify the gpio polarity:
-> > >        0 = active high
-> > >        1 = active low
-> > > +- little-endian : Should be set if the GPIO has little endian
-> > > +                 registers. No the property means the GPIO
-> > > +                 registers are big endian mode.
-> > 
-> > That is a very generic binding and I would like the devicetree
-> > maintainers to say something about this.
-> > 
-> > I would be OK if this is specified for *all* gpiochips in
-> > Documentation/devicetree/bindings/gpio/gpio.txt
-> > or even higher up in the desriptions.
-> > 
-> > Just for Freescale seems a bit too local.
-> 
-> There is already a generic definition at
-> Documentation/devicetree/bindings/common-properties.txt.  But it will
-> be special for Freescale controller to say that the default is
-> big-endian for backward compatibility.
+Now that the kernel uses EOImode==1 for the GIC, this uncovers a
+number of cases where the active state is not correctly handled:
 
-Also, common-properties.txt says "if a binding supports these properties" so
-this patch serves to indicate that this binding does support the little-endian
-property.
+- When doing kexec, we directly call the irq_eoi() method, which may
+  violate ordering constraints, or leave interrupts active.
+- When booting, we don't reset the active state, trusting whatever was
+  there before.
+- When doing suspend/resume, we're not saving/restoring the active
+  state, which could result in lost interrupts if VMs were running at
+  this precise moment.
 
--Scott
+This has also uncovered a small bug in the way we restore enabled
+interrupts (which could result in a fix to stable).
+
+These patches are on top of v4.4-rc1.
+
+Marc Zyngier (4):
+  arm: kexec: Deactivate in-flight interrupts
+  irqchip/gic: Make sure all interrupts are deactivated at boot
+  irqchip/gic: Clear enable bits before restoring them
+  irqchip/gic: Add save/restore of the active state
+
+ arch/arm/kernel/machine_kexec.c  | 11 ++++++++++-
+ drivers/irqchip/irq-gic-common.c | 13 +++++++++----
+ drivers/irqchip/irq-gic.c        | 38 ++++++++++++++++++++++++++++++++++++--
+ 3 files changed, 55 insertions(+), 7 deletions(-)
+
+-- 
+2.1.4
