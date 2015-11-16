@@ -1,36 +1,48 @@
-From: geert@linux-m68k.org (Geert Uytterhoeven)
-Date: Mon, 16 Nov 2015 19:56:03 +0100
-Subject: [PATCH, resend] scsi: advansys: fix big-endian builds
-In-Reply-To: <20151116182031.GX8644@n2100.arm.linux.org.uk>
-References: <4411376.blKgWIg75B@wuerfel>
- <20151116182031.GX8644@n2100.arm.linux.org.uk>
-Message-ID: <CAMuHMdX7O2LD_F2eomSEyBPKfpcgLbZRPzqRGBkqFVPx5s6mdw@mail.gmail.com>
+From: leoli@freescale.com (Li Yang)
+Date: Mon, 16 Nov 2015 12:56:46 -0600
+Subject: [PATCH 1/2] ls2080a/dts: Add little endian property for GPIO IP
+ block
+In-Reply-To: <CACRpkdbf4X=dcZhtNrcJp7Zp_hnVDGH1gpKML-e=qcAgEzb0Nw@mail.gmail.com>
+References: <1446549552-40675-1-git-send-email-Gang.Liu@freescale.com>
+ <CACRpkdbf4X=dcZhtNrcJp7Zp_hnVDGH1gpKML-e=qcAgEzb0Nw@mail.gmail.com>
+Message-ID: <CADRPPNROHmnOHfpAtaii5Hr3hzUmn4BL5OpQ4Q4hr9BGLq8s0Q@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 16, 2015 at 7:20 PM, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Mon, Nov 16, 2015 at 05:49:23PM +0100, Arnd Bergmann wrote:
->> It turns out that the commit that introduced this used the cpu_to_le32()
->> incorrectly on an 8-bit field, which results in the sense_len to always
->> be set to zero, as the SCSI_SENSE_BUFFERSIZE value gets moved to upper
->> byte of the 32-bit intermediate.
+On Mon, Nov 16, 2015 at 9:11 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
+> On Tue, Nov 3, 2015 at 12:19 PM, Liu Gang <Gang.Liu@freescale.com> wrote:
 >
-> More people need to run the sparse checker with -D__CHECK_ENDIAN__ and
-> have proper endian annotations?
+>> The GPIO block for ls2080a platform has little endian registers,
+>> the GPIO driver needs this property to read/write registers by
+>> right interface.
+>>
+>> Signed-off-by: Liu Gang <Gang.Liu@freescale.com>
+>>
+>> diff --git a/Documentation/devicetree/bindings/gpio/gpio-mpc8xxx.txt b/Documentation/devicetree/bindings/gpio/gpio-mpc8xxx.txt
+>> index f2455c5..c836dab 100644
+>> --- a/Documentation/devicetree/bindings/gpio/gpio-mpc8xxx.txt
+>> +++ b/Documentation/devicetree/bindings/gpio/gpio-mpc8xxx.txt
+>> @@ -10,6 +10,9 @@ Required properties:
+>>    the second cell is used to specify the gpio polarity:
+>>        0 = active high
+>>        1 = active low
+>> +- little-endian : Should be set if the GPIO has little endian
+>> +                 registers. No the property means the GPIO
+>> +                 registers are big endian mode.
+>
+> That is a very generic binding and I would like the devicetree
+> maintainers to say something about this.
+>
+> I would be OK if this is specified for *all* gpiochips in
+> Documentation/devicetree/bindings/gpio/gpio.txt
+> or even higher up in the desriptions.
+>
+> Just for Freescale seems a bit too local.
 
-Sure.
+There is already a generic definition at
+Documentation/devicetree/bindings/common-properties.txt.  But it will
+be special for Freescale controller to say that the default is
+big-endian for backward compatibility.
 
-But in this case, it shows up as a normal compiler warning on all big endian
-platforms.
-
-Gr{oetje,eeting}s,
-
-                        Geert
-
---
-Geert Uytterhoeven -- There's lots of Linux beyond ia32 -- geert at linux-m68k.org
-
-In personal conversations with technical people, I call myself a hacker. But
-when I'm talking to journalists I just say "programmer" or something like that.
-                                -- Linus Torvalds
+Regards,
+Leo
