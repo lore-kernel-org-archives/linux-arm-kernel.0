@@ -1,95 +1,101 @@
-From: Julia.Lawall@lip6.fr (Julia Lawall)
-Date: Mon, 16 Nov 2015 12:33:14 +0100
-Subject: [PATCH 1/7] phy: brcmstb-sata: add missing of_node_put
-In-Reply-To: <1447673600-8881-1-git-send-email-Julia.Lawall@lip6.fr>
-References: <1447673600-8881-1-git-send-email-Julia.Lawall@lip6.fr>
-Message-ID: <1447673600-8881-2-git-send-email-Julia.Lawall@lip6.fr>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 16 Nov 2015 11:57:40 +0000
+Subject: [PATCH] arm64: mm: use correct mapping granularity under
+ DEBUG_RODATA
+In-Reply-To: <1447669094-31076-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1447669094-31076-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20151116115740.GD20696@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-for_each_available_child_of_node performs an of_node_get on each iteration,
-so a return from the middle of the loop requires an of_node_put.
+Hi Ard,
 
-A simplified version of the semantic patch that finds this problem is as
-follows (http://coccinelle.lip6.fr):
+On Mon, Nov 16, 2015 at 11:18:14AM +0100, Ard Biesheuvel wrote:
+> When booting a 64k pages kernel that is built with CONFIG_DEBUG_RODATA
+> and resides at an offset that is not a multiple of 512 MB, the rounding
+> that occurs in __map_memblock() and fixup_executable() results in
+> incorrect regions being mapped.
+> 
+> The following snippet from /sys/kernel/debug/kernel_page_tables shows
+> how, when the kernel is loaded 2 MB above the base of DRAM at 0x40000000,
+> the first 2 MB of memory (which may be inaccessible from non-secure EL1
+> or just reserved by the firmware) is inadvertently mapped into the end of
+> the module region.
 
-// <smpl>
-@@
-expression root,e;
-local idexpression child;
-@@
+I assume for the above that you mean the kernel is loaded TEXT_OFFSET
+above these addresses. It's only a nit, but it might make things harder
+for otehrs to reason about in future.
 
- for_each_available_child_of_node(root, child) {
-   ... when != of_node_put(child)
-       when != e = child
-(
-   return child;
-|
-*  return ...;
-)
-   ...
- }
-// </smpl>
+Perhaps re-word in terms of PHYS_OFFSET/memstart_addr? e.g. "when
+PHYS_OFFSET is not a multiple of SECTION_SIZE ...".
 
-Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
+>   ---[ Modules start ]---
+>   0xfffffdffffe00000-0xfffffe0000000000     2M RW NX ... UXN MEM/NORMAL
+>   ---[ Modules end ]---
+>   ---[ Kernel Mapping ]---
+>   0xfffffe0000000000-0xfffffe0000090000   576K RW NX ... UXN MEM/NORMAL
+>   0xfffffe0000090000-0xfffffe0000200000  1472K ro x  ... UXN MEM/NORMAL
+>   0xfffffe0000200000-0xfffffe0000800000     6M ro x  ... UXN MEM/NORMAL
+>   0xfffffe0000800000-0xfffffe0000810000    64K ro x  ... UXN MEM/NORMAL
+>   0xfffffe0000810000-0xfffffe0000a00000  1984K RW NX ... UXN MEM/NORMAL
+>   0xfffffe0000a00000-0xfffffe00ffe00000  4084M RW NX ... UXN MEM/NORMAL
+> 
+> The same issue is likely to occur on 16k pages kernels whose load
+> address is not a multiple of 32 MB (i.e., SECTION_SIZE). So round to
+> SWAPPER_BLOCK_SIZE instead of SECTION_SIZE.
+> 
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
 
----
- drivers/phy/phy-brcmstb-sata.c |   17 ++++++++++++-----
- 1 file changed, 12 insertions(+), 5 deletions(-)
+This looks good to me. With or without the rewording above:
 
-diff --git a/drivers/phy/phy-brcmstb-sata.c b/drivers/phy/phy-brcmstb-sata.c
-index 8a2cb16..cd9dba8 100644
---- a/drivers/phy/phy-brcmstb-sata.c
-+++ b/drivers/phy/phy-brcmstb-sata.c
-@@ -140,7 +140,7 @@ static int brcm_sata_phy_probe(struct platform_device *pdev)
- 	struct brcm_sata_phy *priv;
- 	struct resource *res;
- 	struct phy_provider *provider;
--	int count = 0;
-+	int ret, count = 0;
- 
- 	if (of_get_child_count(dn) == 0)
- 		return -ENODEV;
-@@ -163,16 +163,19 @@ static int brcm_sata_phy_probe(struct platform_device *pdev)
- 		if (of_property_read_u32(child, "reg", &id)) {
- 			dev_err(dev, "missing reg property in node %s\n",
- 					child->name);
--			return -EINVAL;
-+			ret = -EINVAL;
-+			goto put_child;
- 		}
- 
- 		if (id >= MAX_PORTS) {
- 			dev_err(dev, "invalid reg: %u\n", id);
--			return -EINVAL;
-+			ret = -EINVAL;
-+			goto put_child;
- 		}
- 		if (priv->phys[id].phy) {
- 			dev_err(dev, "already registered port %u\n", id);
--			return -EINVAL;
-+			ret = -EINVAL;
-+			goto put_child;
- 		}
- 
- 		port = &priv->phys[id];
-@@ -182,7 +185,8 @@ static int brcm_sata_phy_probe(struct platform_device *pdev)
- 		port->ssc_en = of_property_read_bool(child, "brcm,enable-ssc");
- 		if (IS_ERR(port->phy)) {
- 			dev_err(dev, "failed to create PHY\n");
--			return PTR_ERR(port->phy);
-+			ret = PTR_ERR(port->phy);
-+			goto put_child;
- 		}
- 
- 		phy_set_drvdata(port->phy, port);
-@@ -198,6 +202,9 @@ static int brcm_sata_phy_probe(struct platform_device *pdev)
- 	dev_info(dev, "registered %d port(s)\n", count);
- 
- 	return 0;
-+put_child:
-+	of_node_put(child);
-+	return ret;
- }
- 
- static struct platform_driver brcm_sata_phy_driver = {
+Acked-by: Mark Rutland <mark.rutland@arm.com>
+
+Does this need to be backported to stable?
+
+Mark.
+
+> ---
+>  arch/arm64/mm/mmu.c | 12 ++++++------
+>  1 file changed, 6 insertions(+), 6 deletions(-)
+> 
+> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+> index e3f563c81c48..32ddd893da9a 100644
+> --- a/arch/arm64/mm/mmu.c
+> +++ b/arch/arm64/mm/mmu.c
+> @@ -362,8 +362,8 @@ static void __init __map_memblock(phys_addr_t start, phys_addr_t end)
+>  	 * for now. This will get more fine grained later once all memory
+>  	 * is mapped
+>  	 */
+> -	unsigned long kernel_x_start = round_down(__pa(_stext), SECTION_SIZE);
+> -	unsigned long kernel_x_end = round_up(__pa(__init_end), SECTION_SIZE);
+> +	unsigned long kernel_x_start = round_down(__pa(_stext), SWAPPER_BLOCK_SIZE);
+> +	unsigned long kernel_x_end = round_up(__pa(__init_end), SWAPPER_BLOCK_SIZE);
+>  
+>  	if (end < kernel_x_start) {
+>  		create_mapping(start, __phys_to_virt(start),
+> @@ -451,18 +451,18 @@ static void __init fixup_executable(void)
+>  {
+>  #ifdef CONFIG_DEBUG_RODATA
+>  	/* now that we are actually fully mapped, make the start/end more fine grained */
+> -	if (!IS_ALIGNED((unsigned long)_stext, SECTION_SIZE)) {
+> +	if (!IS_ALIGNED((unsigned long)_stext, SWAPPER_BLOCK_SIZE)) {
+>  		unsigned long aligned_start = round_down(__pa(_stext),
+> -							SECTION_SIZE);
+> +							 SWAPPER_BLOCK_SIZE);
+>  
+>  		create_mapping(aligned_start, __phys_to_virt(aligned_start),
+>  				__pa(_stext) - aligned_start,
+>  				PAGE_KERNEL);
+>  	}
+>  
+> -	if (!IS_ALIGNED((unsigned long)__init_end, SECTION_SIZE)) {
+> +	if (!IS_ALIGNED((unsigned long)__init_end, SWAPPER_BLOCK_SIZE)) {
+>  		unsigned long aligned_end = round_up(__pa(__init_end),
+> -							SECTION_SIZE);
+> +							  SWAPPER_BLOCK_SIZE);
+>  		create_mapping(__pa(__init_end), (unsigned long)__init_end,
+>  				aligned_end - __pa(__init_end),
+>  				PAGE_KERNEL);
+> -- 
+> 1.9.1
+> 
