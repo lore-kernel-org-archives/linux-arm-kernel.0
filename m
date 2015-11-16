@@ -1,81 +1,89 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Mon, 16 Nov 2015 13:01:02 +0100
-Subject: [PATCH v8 1/8] ARM: dt: Binding documentation for imx25 ADC/TSC
-In-Reply-To: <1447675269-8831-1-git-send-email-mpa@pengutronix.de>
-References: <1447675269-8831-1-git-send-email-mpa@pengutronix.de>
-Message-ID: <1447675269-8831-2-git-send-email-mpa@pengutronix.de>
+From: Julia.Lawall@lip6.fr (Julia Lawall)
+Date: Mon, 16 Nov 2015 12:33:18 +0100
+Subject: [PATCH 5/7] phy: miphy28lp: add missing of_node_put
+In-Reply-To: <1447673600-8881-1-git-send-email-Julia.Lawall@lip6.fr>
+References: <1447673600-8881-1-git-send-email-Julia.Lawall@lip6.fr>
+Message-ID: <1447673600-8881-6-git-send-email-Julia.Lawall@lip6.fr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This documentation describes the devicetree bindings for the
-ADC/Touchscreen unit of the i.MX25 SoC.
+for_each_child_of_node performs an of_node_get on each iteration,
+so a return from the middle of the loop requires an of_node_put.
 
-Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
-Acked-by: Jonathan Cameron <jic23@kernel.org>
+A simplified version of the semantic patch that finds this problem is as
+follows (http://coccinelle.lip6.fr):
+
+// <smpl>
+@@
+expression root,e;
+local idexpression child;
+@@
+
+ for_each_child_of_node(root, child) {
+   ... when != of_node_put(child)
+       when != e = child
+(
+   return child;
+|
+*  return ...;
+)
+   ...
+ }
+// </smpl>
+
+Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
+
 ---
+ drivers/phy/phy-miphy28lp.c |   16 +++++++++++-----
+ 1 file changed, 11 insertions(+), 5 deletions(-)
 
-Notes:
-    Changes in v6:
-     - Removed adc-ref property and replaced it with refp and refn for positive and
-       negative references. The properties are optional now as the default
-       behaviour is a positive internal reference voltage and ADC GND as negative
-       reference.
-
- .../devicetree/bindings/mfd/fsl-imx25-tsadc.txt    | 46 ++++++++++++++++++++++
- 1 file changed, 46 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/mfd/fsl-imx25-tsadc.txt
-
-diff --git a/Documentation/devicetree/bindings/mfd/fsl-imx25-tsadc.txt b/Documentation/devicetree/bindings/mfd/fsl-imx25-tsadc.txt
-new file mode 100644
-index 000000000000..a857af0eb68c
---- /dev/null
-+++ b/Documentation/devicetree/bindings/mfd/fsl-imx25-tsadc.txt
-@@ -0,0 +1,46 @@
-+Freescale mx25 ADC/TSC multifunction device
-+
-+This device combines two general purpose conversion queues one used for general
-+ADC and the other used for touchscreens.
-+
-+Required properties:
-+ - compatible: Should be "fsl,imx25-tsadc".
-+ - reg: Memory range of the device.
-+ - interrupts: Interrupt for this device as described in
-+   interrupts/interrupts.txt
-+ - clocks: An 'ipg' clock defined as described in clocks/clock.txt
-+ - interrupt-controller: This device is an interrupt controller. It controls
-+   the interrupts of both conversion queues.
-+ - #interrupt-cells: Should be '<1>'.
-+ - #address-cells: Should be '<1>'.
-+ - #size-cells: Should be '<1>'.
-+ - ranges
-+
-+This device includes two conversion queues which can be added as subnodes.
-+The first queue is for the touchscreen, the second for general purpose ADC.
-+
-+Example:
-+	tscadc: tscadc at 50030000 {
-+		compatible = "fsl,imx25-tsadc";
-+		reg = <0x50030000 0xc>;
-+		interrupts = <46>;
-+		clocks = <&clks 119>;
-+		clock-names = "ipg";
-+		interrupt-controller;
-+		#interrupt-cells = <1>;
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges;
-+
-+		tsc: tcq at 50030400 {
-+			compatible = "fsl,imx25-tcq";
-+			reg = <0x50030400 0x60>;
-+			...
-+		};
-+
-+		adc: gcq at 50030800 {
-+			compatible = "fsl,imx25-gcq";
-+			reg = <0x50030800 0x60>;
-+			...
-+		};
-+	};
--- 
-2.6.1
+diff --git a/drivers/phy/phy-miphy28lp.c b/drivers/phy/phy-miphy28lp.c
+index c47b56b..3acd2a1 100644
+--- a/drivers/phy/phy-miphy28lp.c
++++ b/drivers/phy/phy-miphy28lp.c
+@@ -1226,15 +1226,18 @@ static int miphy28lp_probe(struct platform_device *pdev)
+ 
+ 		miphy_phy = devm_kzalloc(&pdev->dev, sizeof(*miphy_phy),
+ 					 GFP_KERNEL);
+-		if (!miphy_phy)
+-			return -ENOMEM;
++		if (!miphy_phy) {
++			ret = -ENOMEM;
++			goto put_child;
++		}
+ 
+ 		miphy_dev->phys[port] = miphy_phy;
+ 
+ 		phy = devm_phy_create(&pdev->dev, child, &miphy28lp_ops);
+ 		if (IS_ERR(phy)) {
+ 			dev_err(&pdev->dev, "failed to create PHY\n");
+-			return PTR_ERR(phy);
++			ret = PTR_ERR(phy);
++			goto put_child;
+ 		}
+ 
+ 		miphy_dev->phys[port]->phy = phy;
+@@ -1242,11 +1245,11 @@ static int miphy28lp_probe(struct platform_device *pdev)
+ 
+ 		ret = miphy28lp_of_probe(child, miphy_phy);
+ 		if (ret)
+-			return ret;
++			goto put_child;
+ 
+ 		ret = miphy28lp_probe_resets(child, miphy_dev->phys[port]);
+ 		if (ret)
+-			return ret;
++			goto put_child;
+ 
+ 		phy_set_drvdata(phy, miphy_dev->phys[port]);
+ 		port++;
+@@ -1255,6 +1258,9 @@ static int miphy28lp_probe(struct platform_device *pdev)
+ 
+ 	provider = devm_of_phy_provider_register(&pdev->dev, miphy28lp_xlate);
+ 	return PTR_ERR_OR_ZERO(provider);
++put_child:
++	of_node_put(child);
++	return ret;
+ }
+ 
+ static const struct of_device_id miphy28lp_of_match[] = {
