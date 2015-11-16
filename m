@@ -1,103 +1,267 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Mon, 16 Nov 2015 09:56:30 +0100
-Subject: [PATCH v4 07/24] pwm: use pwm_get/set_default_xxx() helpers where
- appropriate
+Date: Mon, 16 Nov 2015 09:56:43 +0100
+Subject: [PATCH v4 20/24] pwm: add the core infrastructure to allow atomic
+ update
 In-Reply-To: <1447664207-24370-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1447664207-24370-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1447664207-24370-8-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1447664207-24370-21-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-pwm_set/get_default_xxx() helpers have been introduced to differentiate
-the default PWM states (those retrieved through DT, PWM lookup table or
-statically assigned by the driver) and the current PWM ones.
-Make use of those helpers where appropriate.
+Add an ->apply() method to the pwm_ops struct to allow PWM drivers to
+implement atomic update.
+This method will be preferred over the ->enable(), ->disable() and
+->config() methods if available.
+
+Add the pwm_get_state(), pwm_get_default_state() and pwm_apply_state()
+functions for PWM users to be able to use the atomic update feature.
+
+Note that the pwm_apply_state() does not guarantee the atomicity of the
+update operation, it all depends on the availability and implementation
+of the ->apply() method.
 
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 Tested-by: Heiko Stuebner <heiko@sntech.de>
-Reviewed-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-Acked-by: Robert Jarzmik <robert.jarzmik@free.fr>
 ---
- drivers/pwm/core.c      | 14 +++++++-------
- drivers/pwm/pwm-pxa.c   |  2 +-
- drivers/pwm/pwm-sun4i.c |  3 ++-
- 3 files changed, 10 insertions(+), 9 deletions(-)
+ drivers/pwm/core.c  | 124 +++++++++++++++++++++++++++++++++++++++++++++++++---
+ include/linux/pwm.h |  27 ++++++++++++
+ 2 files changed, 146 insertions(+), 5 deletions(-)
 
 diff --git a/drivers/pwm/core.c b/drivers/pwm/core.c
-index d24ca5f..59073a1 100644
+index ce8b373..fbc71d3 100644
 --- a/drivers/pwm/core.c
 +++ b/drivers/pwm/core.c
-@@ -146,12 +146,12 @@ of_pwm_xlate_with_flags(struct pwm_chip *pc, const struct of_phandle_args *args)
- 	if (IS_ERR(pwm))
- 		return pwm;
- 
--	pwm_set_period(pwm, args->args[1]);
-+	pwm_set_default_period(pwm, args->args[1]);
- 
- 	if (args->args[2] & PWM_POLARITY_INVERTED)
--		pwm_set_polarity(pwm, PWM_POLARITY_INVERSED);
-+		pwm_set_default_polarity(pwm, PWM_POLARITY_INVERSED);
- 	else
--		pwm_set_polarity(pwm, PWM_POLARITY_NORMAL);
-+		pwm_set_default_polarity(pwm, PWM_POLARITY_NORMAL);
- 
- 	return pwm;
+@@ -46,6 +46,12 @@ static struct pwm_device *pwm_to_device(unsigned int pwm)
+ 	return radix_tree_lookup(&pwm_tree, pwm);
  }
-@@ -172,7 +172,7 @@ of_pwm_simple_xlate(struct pwm_chip *pc, const struct of_phandle_args *args)
- 	if (IS_ERR(pwm))
- 		return pwm;
  
--	pwm_set_period(pwm, args->args[1]);
-+	pwm_set_default_period(pwm, args->args[1]);
- 
- 	return pwm;
++static void pwm_set_state(struct pwm_device *pwm,
++			  const struct pwm_state *state)
++{
++	pwm->state = *state;
++}
++
+ static int alloc_pwms(int pwm, unsigned int count)
+ {
+ 	unsigned int from = 0;
+@@ -226,6 +232,19 @@ void *pwm_get_chip_data(struct pwm_device *pwm)
  }
-@@ -268,7 +268,7 @@ int pwmchip_add_with_polarity(struct pwm_chip *chip,
- 		pwm->chip = chip;
- 		pwm->pwm = chip->base + i;
- 		pwm->hwpwm = i;
--		pwm->polarity = polarity;
-+		pwm_set_default_polarity(pwm, polarity);
- 		mutex_init(&pwm->lock);
+ EXPORT_SYMBOL_GPL(pwm_get_chip_data);
  
- 		radix_tree_insert(&pwm_tree, pwm->pwm, pwm);
-@@ -751,8 +751,8 @@ struct pwm_device *pwm_get(struct device *dev, const char *con_id)
- 	if (IS_ERR(pwm))
- 		goto out;
++static bool pwm_ops_check(const struct pwm_ops *ops)
++{
++	/* driver supports legacy, non-atomic operation */
++	if (ops->config && ops->enable && ops->disable)
++		return true;
++
++	/* driver supports atomic operation */
++	if (ops->apply)
++		return true;
++
++	return false;
++}
++
+ /**
+  * pwmchip_add_with_polarity() - register a new PWM chip
+  * @chip: the PWM chip to add
+@@ -244,8 +263,10 @@ int pwmchip_add_with_polarity(struct pwm_chip *chip,
+ 	unsigned int i;
+ 	int ret;
  
--	pwm_set_period(pwm, chosen->period);
--	pwm_set_polarity(pwm, chosen->polarity);
-+	pwm_set_default_period(pwm, chosen->period);
-+	pwm_set_default_polarity(pwm, chosen->polarity);
+-	if (!chip || !chip->dev || !chip->ops || !chip->ops->config ||
+-	    !chip->ops->enable || !chip->ops->disable || !chip->npwm)
++	if (!chip || !chip->dev || !chip->ops || !chip->npwm)
++		return -EINVAL;
++
++	if (!pwm_ops_check(chip->ops))
+ 		return -EINVAL;
  
- out:
- 	mutex_unlock(&pwm_lookup_lock);
-diff --git a/drivers/pwm/pwm-pxa.c b/drivers/pwm/pwm-pxa.c
-index cb2f702..65b80aa 100644
---- a/drivers/pwm/pwm-pxa.c
-+++ b/drivers/pwm/pwm-pxa.c
-@@ -160,7 +160,7 @@ pxa_pwm_of_xlate(struct pwm_chip *pc, const struct of_phandle_args *args)
- 	if (IS_ERR(pwm))
- 		return pwm;
+ 	mutex_lock(&pwm_lock);
+@@ -446,7 +467,19 @@ int pwm_config(struct pwm_device *pwm, int duty_ns, int period_ns)
+ 	if (!pwm || duty_ns < 0 || period_ns <= 0 || duty_ns > period_ns)
+ 		return -EINVAL;
  
--	pwm_set_period(pwm, args->args[0]);
-+	pwm_set_default_period(pwm, args->args[0]);
+-	err = pwm->chip->ops->config(pwm->chip, pwm, duty_ns, period_ns);
++	if (pwm->chip->ops->apply) {
++		struct pwm_state state;
++
++		pwm_get_state(pwm, &state);
++		state.period = period_ns;
++		state.duty_cycle = duty_ns;
++
++		err = pwm->chip->ops->apply(pwm->chip, pwm, &state);
++	} else {
++		err = pwm->chip->ops->config(pwm->chip, pwm, duty_ns,
++					     period_ns);
++	}
++
+ 	if (err)
+ 		return err;
  
- 	return pwm;
+@@ -474,6 +507,18 @@ int pwm_set_polarity(struct pwm_device *pwm, enum pwm_polarity polarity)
+ 	if (!pwm || !pwm->chip->ops)
+ 		return -EINVAL;
+ 
++	if (pwm->chip->ops->apply) {
++		struct pwm_state state;
++
++		pwm_get_state(pwm, &state);
++		state.polarity = polarity;
++		err = pwm->chip->ops->apply(pwm->chip, pwm, &state);
++		if (!err)
++			pwm->state.polarity = polarity;
++
++		return err;
++	}
++
+ 	if (!pwm->chip->ops->set_polarity)
+ 		return -ENOSYS;
+ 
+@@ -512,7 +557,17 @@ int pwm_enable(struct pwm_device *pwm)
+ 	mutex_lock(&pwm->lock);
+ 
+ 	if (!pwm_is_enabled(pwm)) {
+-		err = pwm->chip->ops->enable(pwm->chip, pwm);
++		if (pwm->chip->ops->apply) {
++			struct pwm_state state;
++
++			pwm_get_state(pwm, &state);
++			state.enabled = true;
++
++			err = pwm->chip->ops->apply(pwm->chip, pwm, &state);
++		} else {
++			err = pwm->chip->ops->enable(pwm->chip, pwm);
++		}
++
+ 		if (!err)
+ 			pwm->state.enabled = true;
+ 	}
+@@ -535,7 +590,16 @@ void pwm_disable(struct pwm_device *pwm)
+ 	mutex_lock(&pwm->lock);
+ 
+ 	if (pwm_is_enabled(pwm)) {
+-		pwm->chip->ops->disable(pwm->chip, pwm);
++		if (pwm->chip->ops->apply) {
++			struct pwm_state state;
++
++			pwm_get_state(pwm, &state);
++			state.enabled = false;
++
++			pwm->chip->ops->apply(pwm->chip, pwm, &state);
++		} else {
++			pwm->chip->ops->disable(pwm->chip, pwm);
++		}
+ 		pwm->state.enabled = false;
+ 	}
+ 
+@@ -543,6 +607,56 @@ void pwm_disable(struct pwm_device *pwm)
  }
-diff --git a/drivers/pwm/pwm-sun4i.c b/drivers/pwm/pwm-sun4i.c
-index 67af9f6..f6a7451 100644
---- a/drivers/pwm/pwm-sun4i.c
-+++ b/drivers/pwm/pwm-sun4i.c
-@@ -354,7 +354,8 @@ static int sun4i_pwm_probe(struct platform_device *pdev)
- 	val = sun4i_pwm_readl(pwm, PWM_CTRL_REG);
- 	for (i = 0; i < pwm->chip.npwm; i++)
- 		if (!(val & BIT_CH(PWM_ACT_STATE, i)))
--			pwm->chip.pwms[i].polarity = PWM_POLARITY_INVERSED;
-+			pwm_set_default_polarity(&pwm->chip.pwms[i],
-+						 PWM_POLARITY_INVERSED);
- 	clk_disable_unprepare(pwm->clk);
+ EXPORT_SYMBOL_GPL(pwm_disable);
  
- 	return 0;
++/**
++ * pwm_apply_state() - atomically apply a new state to a PWM device
++ * @pwm: PWM device
++ * @state: new state to apply
++ */
++int pwm_apply_state(struct pwm_device *pwm, const struct pwm_state *state)
++{
++	int err = 0;
++
++	if (!pwm)
++		return -EINVAL;
++
++	if (!memcmp(state, &pwm->state, sizeof(*state)))
++		return 0;
++
++	if (pwm->chip->ops->apply) {
++		err = pwm->chip->ops->apply(pwm->chip, pwm, state);
++		if (!err)
++			pwm_set_state(pwm, state);
++	} else {
++		/*
++		 * FIXME: restore the initial state in case of error.
++		 */
++		if (state->polarity != pwm->state.polarity) {
++			pwm_disable(pwm);
++			err = pwm_set_polarity(pwm, state->polarity);
++			if (err)
++				goto out;
++		}
++
++		if (state->period != pwm->state.period ||
++		    state->duty_cycle != pwm->state.duty_cycle) {
++			err = pwm_config(pwm, state->period, state->duty_cycle);
++			if (err)
++				goto out;
++		}
++
++		if (state->enabled != pwm->state.enabled) {
++			if (state->enabled)
++				err = pwm_enable(pwm);
++			else
++				pwm_disable(pwm);
++		}
++	}
++
++out:
++	return err;
++}
++EXPORT_SYMBOL_GPL(pwm_apply_state);
++
+ static struct pwm_chip *of_node_to_pwmchip(struct device_node *np)
+ {
+ 	struct pwm_chip *chip;
+diff --git a/include/linux/pwm.h b/include/linux/pwm.h
+index caa0ffe..5e7b378 100644
+--- a/include/linux/pwm.h
++++ b/include/linux/pwm.h
+@@ -174,6 +174,30 @@ static inline enum pwm_polarity pwm_get_polarity(const struct pwm_device *pwm)
+ 	return pwm ? pwm->state.polarity : PWM_POLARITY_NORMAL;
+ }
+ 
++int pwm_apply_state(struct pwm_device *pwm, const struct pwm_state *state);
++
++/**
++ * pwm_get_state() - retrieve the current PWM state
++ * @pwm: PWM device
++ * @state: state to fill with the current PWM state
++ */
++static inline void pwm_get_state(struct pwm_device *pwm,
++				 struct pwm_state *state)
++{
++	*state = pwm->state;
++}
++
++/**
++ * pwm_get_default_state() - retrieve the default PWM state
++ * @pwm: PWM device
++ * @state: state to fill with the default PWM state
++ */
++static inline void pwm_get_default_state(struct pwm_device *pwm,
++					 struct pwm_state *state)
++{
++	*state = pwm->default_state;
++}
++
+ /**
+  * struct pwm_ops - PWM controller operations
+  * @request: optional hook for requesting a PWM
+@@ -182,6 +206,7 @@ static inline enum pwm_polarity pwm_get_polarity(const struct pwm_device *pwm)
+  * @set_polarity: configure the polarity of this PWM
+  * @enable: enable PWM output toggling
+  * @disable: disable PWM output toggling
++ * @apply: atomically apply a new PWM config
+  * @reset_state: reset the current PWM state (pwm->state) to the actual
+  *		 hardware state. This function is only called once per
+  *		 PWM device when the PWM chip is registered.
+@@ -197,6 +222,8 @@ struct pwm_ops {
+ 			    enum pwm_polarity polarity);
+ 	int (*enable)(struct pwm_chip *chip, struct pwm_device *pwm);
+ 	void (*disable)(struct pwm_chip *chip, struct pwm_device *pwm);
++	int (*apply)(struct pwm_chip *chip, struct pwm_device *pwm,
++		     const struct pwm_state *state);
+ 	void (*reset_state)(struct pwm_chip *chip, struct pwm_device *pwm);
+ #ifdef CONFIG_DEBUG_FS
+ 	void (*dbg_show)(struct pwm_chip *chip, struct seq_file *s);
 -- 
 2.1.4
