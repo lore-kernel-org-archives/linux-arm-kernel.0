@@ -1,51 +1,41 @@
 From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Mon, 16 Nov 2015 09:56:35 +0100
-Subject: [PATCH v4 12/24] misc: max77693: use pwm_get/set_default_xxx()
- helpers where appropriate
+Date: Mon, 16 Nov 2015 09:56:44 +0100
+Subject: [PATCH v4 21/24] pwm: add information about polarity,
+ duty cycle and period to debugfs
 In-Reply-To: <1447664207-24370-1-git-send-email-boris.brezillon@free-electrons.com>
 References: <1447664207-24370-1-git-send-email-boris.brezillon@free-electrons.com>
-Message-ID: <1447664207-24370-13-git-send-email-boris.brezillon@free-electrons.com>
+Message-ID: <1447664207-24370-22-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-pwm_set/get_default_xxx() helpers have been introduced to differentiate
-the default PWM states (those retrieved through DT, PWM lookup table or
-statically assigned by the driver) and the current ones.
-Make use of those helpers where appropriate.
+From: Heiko St?bner <heiko@sntech.de>
 
+The pwm-states make it possible to also output the polarity, duty cycle
+and period information in the debugfs pwm summary-outout.
+This makes it easier to gather overview information about pwms without
+needing to walk through the sysfs attributes of every pwm.
+
+Signed-off-by: Heiko Stuebner <heiko@sntech.de>
 Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
 ---
- drivers/input/misc/max77693-haptic.c | 8 +++++---
- 1 file changed, 5 insertions(+), 3 deletions(-)
+ drivers/pwm/core.c | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/drivers/input/misc/max77693-haptic.c b/drivers/input/misc/max77693-haptic.c
-index a038fb3..89f5055 100644
---- a/drivers/input/misc/max77693-haptic.c
-+++ b/drivers/input/misc/max77693-haptic.c
-@@ -70,11 +70,12 @@ struct max77693_haptic {
+diff --git a/drivers/pwm/core.c b/drivers/pwm/core.c
+index fbc71d3..1619101 100644
+--- a/drivers/pwm/core.c
++++ b/drivers/pwm/core.c
+@@ -1035,6 +1035,11 @@ static void pwm_dbg_show(struct pwm_chip *chip, struct seq_file *s)
+ 		if (pwm_is_enabled(pwm))
+ 			seq_puts(s, " enabled");
  
- static int max77693_haptic_set_duty_cycle(struct max77693_haptic *haptic)
- {
--	int delta = (pwm_get_period((haptic->pwm_dev)) + haptic->pwm_duty) / 2;
-+	int delta = (pwm_get_default_period((haptic->pwm_dev)) +
-+		     haptic->pwm_duty) / 2;
- 	int error;
- 
- 	error = pwm_config(haptic->pwm_dev, delta,
--			   pwm_get_period((haptic->pwm_dev)));
-+			   pwm_get_default_period((haptic->pwm_dev)));
- 	if (error) {
- 		dev_err(haptic->dev, "failed to configure pwm: %d\n", error);
- 		return error;
-@@ -246,7 +247,8 @@ static int max77693_haptic_play_effect(struct input_dev *dev, void *data,
- 	 * The formula to convert magnitude to pwm_duty as follows:
- 	 * - pwm_duty = (magnitude * pwm_period) / MAX_MAGNITUDE(0xFFFF)
- 	 */
--	period_mag_multi = (u64)pwm_get_period((haptic->pwm_dev)) * haptic->magnitude;
-+	period_mag_multi = (u64)pwm_get_default_period((haptic->pwm_dev)) *
-+			   haptic->magnitude;
- 	haptic->pwm_duty = (unsigned int)(period_mag_multi >>
- 						MAX_MAGNITUDE_SHIFT);
- 
++		seq_printf(s, " period:%uns", pwm_get_period(pwm));
++		seq_printf(s, " duty:%uns", pwm_get_duty_cycle(pwm));
++		seq_printf(s, " polarity:%s", pwm_get_polarity(pwm) ? "inverse"
++								    : "normal");
++
+ 		seq_puts(s, "\n");
+ 	}
+ }
 -- 
 2.1.4
