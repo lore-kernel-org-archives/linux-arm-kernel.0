@@ -1,64 +1,72 @@
 From: pavel@ucw.cz (Pavel Machek)
-Date: Mon, 16 Nov 2015 13:36:15 +0100
-Subject: [PATCH v2 10/11] PM / Hibernate: clean cached pages on
- architectures that require it
-In-Reply-To: <5649CB9B.30102@arm.com>
+Date: Mon, 16 Nov 2015 13:41:16 +0100
+Subject: [PATCH v2 11/11] arm64: kernel: Add support for
+ hibernate/suspend-to-disk.
+In-Reply-To: <5649CC40.9010805@arm.com>
 References: <1445966960-31724-1-git-send-email-james.morse@arm.com>
- <1445966960-31724-11-git-send-email-james.morse@arm.com>
- <20151114202623.GC20429@amd> <5649CB9B.30102@arm.com>
-Message-ID: <20151116123615.GB9125@amd>
+ <1445966960-31724-12-git-send-email-james.morse@arm.com>
+ <20151114213415.GG20429@amd> <5649CC40.9010805@arm.com>
+Message-ID: <20151116124116.GC9125@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon 2015-11-16 12:27:07, James Morse wrote:
-> On 14/11/15 20:26, Pavel Machek wrote:
-> > On Tue 2015-10-27 17:29:19, James Morse wrote:
-> >> Some architectures require code written to memory as if it were data to be
-> >> 'cleaned' from any data caches so that the processor can fetch them as new
-> >> instructions.
-> >>
-> >> During resume from hibernate, the snapshot code copies some pages directly,
-> >> meaning these architectures do not get a chance to perform their cache
-> >> maintenance. Add a call to flush_icache_range(), which is provided by
-> >> architectures that require it, to perform the maintenance.
-> >>
-> >> This mirrors the kernel's behaviour when loading kernel modules and when
-> >> mapping executable pages to user space.
-> >>
-> >> Signed-off-by: James Morse <james.morse@arm.com>
-> > 
-> > Looks reasonable.
-> > 
-> > Acked-by: Pavel Machek <pavel@ucw.cz>
-> 
-> Thanks!
-> 
-> > 
-> >> ---
-> >>  kernel/power/snapshot.c | 4 ++++
-> >>  1 file changed, 4 insertions(+)
-> >>
-> >> diff --git a/kernel/power/snapshot.c b/kernel/power/snapshot.c
-> >> index 5235dd4e1e2f..139fc449ad75 100644
-> >> --- a/kernel/power/snapshot.c
-> >> +++ b/kernel/power/snapshot.c
-> >> @@ -1196,9 +1197,12 @@ static unsigned int count_data_pages(void)
-> >>  static inline void do_copy_page(long *dst, long *src)
-> >>  {
-> >>  	int n;
-> >> +	unsigned long __maybe_unused start = (unsigned long)dst;
-> > 
-> > Why the "maybe unused"?
-> 
-> To avoid a build warning on x86_64, and any other architectures that don't
-> use the arguments in their flush_icache_range() implementation.
+Hi!
 
-That's wrong fix, I believe.
+> On 14/11/15 21:34, Pavel Machek wrote:
+> >> The implementation assumes that exactly the same kernel is booted on the
+> >> same hardware, and that the kernel is loaded at the same physical address.
+> > 
+> > BTW... on newer implementations (and I have patch for x86, too), we
+> > try to make it so that resume kernel does not have to be same as
+> > suspend one. It would be nice to move there with arm64, too. 
+> 
+> Yes, that is a neat trick, can I leave it as future work?
 
-flush_icache_range() should use their arguments. We should not have
-all the callers caring about this.
+Yes. But it is really not hard.
 
-								Pavel
+> >> + * Because this code has to be copied to a safe_page, it can't call out to
+> >> + * other functions by pc-relative address. Also remember that it
+> > 
+> > PC-relative?
+> 
+> The linker may (often!) use program-counter relative addresses for loads
+> and stores. This code gets copied, so the linker doesn't know where the
+> code will be executed from, so any instructions using pc-relative addresses
+> will get the wrong result, (if they reference something outside the
+> function).
+
+I was wondering if it should be spelled "PC-relative", not
+"pc-relative" :-).
+
+> >> + * and executable pages mapped to user space are also written as data, we
+> >> + * clean all pages we touch to the PoU.
+> > 
+> > What is PoC and PoU?
+> 
+> They are points in the CPU's cache hierarchy:
+> 
+> ARM processors are of a 'modified Harvard' architecture, their paths to
+> read instructions and data are different. The 'Point of Unification' is the
+> first point in the cache hierarchy that is the same for both. On ARM,
+> flush_icache_range() makes sure code written as data is pushed through any
+> data caches to this point, and then evicts any stale copies in the
+> instruction caches.
+> 
+> PoC is the 'Point of Coherency', it is the first point that is the same for
+> all devices, (e.g. a cpu with caches turned on, and one with them off), it
+> is normally main memory. The kernel text has to be pushed to this point, so
+> that secondary cores, while running early-boot code with their MMU and
+> caches turned off, don't get incorrect code/data from before resume.
+> 
+> I have resisted the urge to draw some ascii-art!
+
+That's ok, you just might want to replace PoI -> 'Point of
+Unification' and PoC -> 'Point of Coherency' in the comments. That
+should make googling easier for people not familiar with arm
+terminology.
+
+Thanks,
+									Pavel
 -- 
 (english) http://www.livejournal.com/~pavelmachek
 (cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
