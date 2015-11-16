@@ -1,32 +1,27 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Mon, 16 Nov 2015 20:10:55 +0800
-Subject: [Query] How to measure the entry-latency-us and exit-latency-us on
- arm PSCI system
-Message-ID: <20151116201055.00567e90@xhacker>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Mon, 16 Nov 2015 12:16:29 +0000
+Subject: [PATCH] arm64: mm: use correct mapping granularity under
+ DEBUG_RODATA
+In-Reply-To: <CAKv+Gu9ZoRx8i8ppNxiuS9FfRONzLK5TVPe33W-dirfO702zOQ@mail.gmail.com>
+References: <1447669094-31076-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20151116115740.GD20696@leverpostej>
+ <CAKv+Gu9ZoRx8i8ppNxiuS9FfRONzLK5TVPe33W-dirfO702zOQ@mail.gmail.com>
+Message-ID: <20151116121628.GG20696@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi all,
+> > Does this need to be backported to stable?
+> 
+> It should be fixed in stable, I think, but SWAPPER_BLOCK_SIZE is new
+> in v4.4 so we'd need another patch anyway.
 
-Now, I'd like to add cpuidle support to Marvell berlin arm64 soc via
-drivers/cpuidle/dt_idle_states.c. The system is PSCI-1.0 compatible. 
+I was hoping 87d1587bef394cd8 ("arm64: Move swapper pagetable
+definitions") would backport easily. I just had a go and that's not the
+case, and the conflict is non-trivial.
 
-Per my understanding:
+Regardless, we should probably mark this with a fixes tag so it doesn't
+get lost:
 
-The entry-latency-us: the time from beginning of cpuidle_idle_call()
-to the firmware's last WFI instruction. Should test more times to find
-the longest time.
+Fixes: da141706aea52c1a ("arm64: add better page protections to arm64")
 
-The exit-latency-us: the time from the first instruction of waken up cpu
-to the end of cpuidle_idle_call(). Should test more times to find the longest
-time.
-
-If cpufreq is available, we should fix the cpufreq to the lowest freq to do
-the above test.
-
-Even I have a look at idle-states binding doc, I'm still not sure whether my
-solution to measure the entry-latency-us and exit-latency-us is correct or not,
-could you please give suggestions?
-
-Thanks in advance,
-Jisheng
+Mark.
