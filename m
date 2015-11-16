@@ -1,31 +1,41 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Mon, 16 Nov 2015 21:33:47 +0100
-Subject: [PATCH v2 01/12] mm/memblock: add MEMBLOCK_NOMAP attribute to
- memblock memory table
-In-Reply-To: <20151116194914.GK8644@n2100.arm.linux.org.uk>
-References: <1447698757-8762-1-git-send-email-ard.biesheuvel@linaro.org>
- <1447698757-8762-2-git-send-email-ard.biesheuvel@linaro.org>
- <20151116185859.GF8644@n2100.arm.linux.org.uk>
- <CAKv+Gu-COD0eSWqaTfV_QgCDEiBg5Af8FDVx+TMiYuVkqgTrvw@mail.gmail.com>
- <20151116194914.GK8644@n2100.arm.linux.org.uk>
-Message-ID: <35E90006-1E43-4483-8B18-7123E12E68FF@linaro.org>
+From: timur@codeaurora.org (Timur Tabi)
+Date: Mon, 16 Nov 2015 14:52:00 -0600
+Subject: [PATCH 10/12] tty: amba-pl011: add support for 32-bit register
+ access
+In-Reply-To: <20151116183006.GZ8644@n2100.arm.linux.org.uk>
+References: <20151116173935.GQ8644@n2100.arm.linux.org.uk>
+ <E1ZyNls-0003kA-Fe@rmk-PC.arm.linux.org.uk> <564A1628.9010900@codeaurora.org>
+ <20151116175217.GT8644@n2100.arm.linux.org.uk>
+ <564A1FA9.8010109@codeaurora.org>
+ <20151116183006.GZ8644@n2100.arm.linux.org.uk>
+Message-ID: <564A41F0.3030105@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 11/16/2015 12:30 PM, Russell King - ARM Linux wrote:
+> We_could_  augment include/uapi/linux/serial.h and
+> include/linux/serial_core.h to add a 16-bit LE MMIO accessor identifier,
+> but hacking it by deciding to re-use SERIAL_IO_PORT for something it
+> isn't is abhorrent to me.
 
+I don't want to belabor this, because there's nothing wrong with your 
+patch.  I can understand that we shouldn't be mis-using a variable, but 
+I don't understand how this is a misuse of SERIAL_IO_PORT.
 
-> On 16 nov. 2015, at 20:49, Russell King - ARM Linux <linux@arm.linux.org.uk> wrote:
-> 
->> On Mon, Nov 16, 2015 at 08:09:38PM +0100, Ard Biesheuvel wrote:
->> The main difference is that memblock_is_memory() still returns true
->> for the region. This is useful in some cases, e.g., to decide which
->> attributes to use when mapping.
-> 
-> Ok, so we'd need to switch to using memblock_is_map_memory() instead
-> for pfn_valid() then.
+We could do something like:
 
-Indeed, as is implemented by 10/12
+#define UPIO_PORT               (SERIAL_IO_PORT)
+#define UPIO_HUB6               (SERIAL_IO_HUB6)
+#define UPIO_MEM                (SERIAL_IO_MEM)		// 8-bit
+#define UPIO_MEM32              (SERIAL_IO_MEM32)   	// 32-bit
+#define UPIO_AU                 (SERIAL_IO_AU)
+#define UPIO_TSI                (SERIAL_IO_TSI)
+#define UPIO_MEM32BE            (SERIAL_IO_MEM32BE)
+#define UPIO_MEMx		(SERIAL_IO_MEMx)	// any bit
 
-> -- 
-> FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-> according to speedtest.net.
+uap->port.iotype = vendor->access_32b ? UPIO_MEM32 : UPIO_MEMx;
+
+-- 
+Qualcomm Innovation Center, Inc.
+The Qualcomm Innovation Center, Inc. is a member of the
+Code Aurora Forum, a Linux Foundation Collaborative Project.
