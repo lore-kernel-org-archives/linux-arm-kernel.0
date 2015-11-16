@@ -1,32 +1,59 @@
-From: fabio.estevam@freescale.com (Fabio Estevam)
-Date: Mon, 16 Nov 2015 13:20:38 -0200
-Subject: [PATCH v2] ARM: imx_v6_v7_defconfig: Select HDMI audio support
-Message-ID: <1447687238-11559-1-git-send-email-fabio.estevam@freescale.com>
+From: robh@kernel.org (Rob Herring)
+Date: Mon, 16 Nov 2015 09:20:51 -0600
+Subject: [PATCH v2 net-next] net: hisilicon: fix binding document of mdio
+In-Reply-To: <1447666704-200773-1-git-send-email-huangdaode@hisilicon.com>
+References: <1447666704-200773-1-git-send-email-huangdaode@hisilicon.com>
+Message-ID: <20151116152051.GA7183@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Select CONFIG_DRM_DW_HDMI_AHB_AUDIO so that we have HDMI audio
-supported by default.
+On Mon, Nov 16, 2015 at 05:38:24PM +0800, huangdaode wrote:
+> This patch explains the occasion of "hisilcon,mdio" and
+> "hisilicon,hns-mdio" according to Arnd's comments.
+> and reformat it according to comments from Rob<robh@kernel.org>.
+> 
+> chang log:
+> 
+> v2:
+>   1) reformat the style.
+>   2) make it more clearity.
+> 
+> v1:
+>   initial version.
+> 
+> Signed-off-by: huangdaode <huangdaode@hisilicon.com>
+> ---
+>  Documentation/devicetree/bindings/net/hisilicon-hns-mdio.txt | 7 ++++++-
+>  1 file changed, 6 insertions(+), 1 deletion(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/net/hisilicon-hns-mdio.txt b/Documentation/devicetree/bindings/net/hisilicon-hns-mdio.txt
+> index 9c23fdf..4942d20 100644
+> --- a/Documentation/devicetree/bindings/net/hisilicon-hns-mdio.txt
+> +++ b/Documentation/devicetree/bindings/net/hisilicon-hns-mdio.txt
+> @@ -1,7 +1,12 @@
+>  Hisilicon MDIO bus controller
+>  
+>  Properties:
+> -- compatible: "hisilicon,mdio","hisilicon,hns-mdio".
+> +- compatible: can be one of:
+> +	"hisilicon,hns-mdio"
+> +	"hisilicon,mdio"
+> +  "hisilicon,hns-mdio" is recommendly to be used for hip05 and later SOCs,
 
-Signed-off-by: Fabio Estevam <fabio.estevam@freescale.com>
----
-Changes since v1:
-- Select the driver as module instead of built-in
+s/recommendly/recommended/
 
- arch/arm/configs/imx_v6_v7_defconfig | 1 +
- 1 file changed, 1 insertion(+)
+> +  while "hisilicon,mdio" is optional for backwards compatibility, only
+> +  support for hip04 Soc.
 
-diff --git a/arch/arm/configs/imx_v6_v7_defconfig b/arch/arm/configs/imx_v6_v7_defconfig
-index 4187f69..f5ca938 100644
---- a/arch/arm/configs/imx_v6_v7_defconfig
-+++ b/arch/arm/configs/imx_v6_v7_defconfig
-@@ -224,6 +224,7 @@ CONFIG_SOC_CAMERA_OV2640=y
- CONFIG_IMX_IPUV3_CORE=y
- CONFIG_DRM=y
- CONFIG_DRM_PANEL_SIMPLE=y
-+CONFIG_DRM_DW_HDMI_AHB_AUDIO=m
- CONFIG_DRM_IMX=y
- CONFIG_DRM_IMX_FB_HELPER=y
- CONFIG_DRM_IMX_PARALLEL_DISPLAY=y
--- 
-1.9.1
+...compatibility only on hip04 SOC.
+
+>  - reg: The base address of the MDIO bus controller register bank.
+>  - #address-cells: Must be <1>.
+>  - #size-cells: Must be <0>.  MDIO addresses have no size component.
+> -- 
+> 1.9.1
+> 
+> --
+> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
