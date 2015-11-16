@@ -1,93 +1,37 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 16 Nov 2015 16:57:32 +0000
-Subject: [PATCH 15/21] arm64: KVM: Add panic handling
-In-Reply-To: <CAKv+Gu-4OCaoFp4myi3YNGNeoSmhw7pURqmgW_gb5kSQCGoFQA@mail.gmail.com>
-References: <1447679519-17888-1-git-send-email-marc.zyngier@arm.com>	<1447679519-17888-16-git-send-email-marc.zyngier@arm.com>
- <CAKv+Gu-4OCaoFp4myi3YNGNeoSmhw7pURqmgW_gb5kSQCGoFQA@mail.gmail.com>
-Message-ID: <564A0AFC.7070204@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Mon, 16 Nov 2015 17:56:39 +0100
+Subject: [PATCH] hwmon: scpi: add thermal-of dependency
+Message-ID: <4264967.aVlONpCXFM@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16/11/15 15:53, Ard Biesheuvel wrote:
-> On 16 November 2015 at 14:11, Marc Zyngier <marc.zyngier@arm.com> wrote:
->> Add the panic handler, together with the small bits of assembly
->> code to call the kernel's panic implementation.
->>
->> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
->> ---
->>  arch/arm64/kvm/hyp/hyp-entry.S | 11 ++++++++++-
->>  arch/arm64/kvm/hyp/hyp.h       |  1 +
->>  arch/arm64/kvm/hyp/switch.c    | 35 +++++++++++++++++++++++++++++++++++
->>  3 files changed, 46 insertions(+), 1 deletion(-)
->>
->> diff --git a/arch/arm64/kvm/hyp/hyp-entry.S b/arch/arm64/kvm/hyp/hyp-entry.S
->> index e11a129..7218eed 100644
->> --- a/arch/arm64/kvm/hyp/hyp-entry.S
->> +++ b/arch/arm64/kvm/hyp/hyp-entry.S
->> @@ -141,7 +141,16 @@ el1_irq:
->>         mov     x1, #ARM_EXCEPTION_IRQ
->>         b       __guest_exit
->>
->> -.macro invalid_vector  label, target = __kvm_hyp_panic
->> +ENTRY(__hyp_do_panic)
->> +       mov     lr, #(PSR_F_BIT | PSR_I_BIT | PSR_A_BIT | PSR_D_BIT |\
->> +                     PSR_MODE_EL1h)
->> +       msr     spsr_el2, lr
->> +       ldr     lr, =panic
->> +       msr     elr_el2, lr
->> +       eret
->> +ENDPROC(__hyp_do_panic)
->> +
->> +.macro invalid_vector  label, target = __hyp_panic
->>         .align  2
->>  \label:
->>         b \target
->> diff --git a/arch/arm64/kvm/hyp/hyp.h b/arch/arm64/kvm/hyp/hyp.h
->> index 240fb79..d5d500d 100644
->> --- a/arch/arm64/kvm/hyp/hyp.h
->> +++ b/arch/arm64/kvm/hyp/hyp.h
->> @@ -74,6 +74,7 @@ void __fpsimd_save_state(struct user_fpsimd_state *fp_regs);
->>  void __fpsimd_restore_state(struct user_fpsimd_state *fp_regs);
->>
->>  u64 __guest_enter(struct kvm_vcpu *vcpu, struct kvm_cpu_context *host_ctxt);
->> +void __noreturn __hyp_do_panic(unsigned long, ...);
->>
->>  #endif /* __ARM64_KVM_HYP_H__ */
->>
->> diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
->> index 06d3e20..cdc2a96 100644
->> --- a/arch/arm64/kvm/hyp/switch.c
->> +++ b/arch/arm64/kvm/hyp/switch.c
->> @@ -140,3 +140,38 @@ int __hyp_text __guest_run(struct kvm_vcpu *vcpu)
->>
->>         return exit_code;
->>  }
->> +
->> +static const char *__hyp_panic_string = "HYP panic:\nPS:%08x PC:%p ESR:%p\nFAR:%p HPFAR:%p PAR:%p\nVCPU:%p\n";
->> +
-> 
-> Re separating the HYP text from the kernel proper: this is exactly the
-> thing that is likely to cause trouble when you execute the kernel text
-> from HYP.
-> 
-> __hyp_panic_string is a non-const char pointer containing the absolute
-> address of the string in the initializer, as seen from the high kernel
-> virtual mapping.
-> Better use 'static const char __hyp_panic_string[]' instead.
+The newly added scpi thermal support is broken when the scpi driver
+is built-in but the thermal driver is a loadable module:
 
-Definitely.
+drivers/built-in.o: In function `scpi_hwmon_probe':
+(.text+0x444d70): undefined reference to `thermal_zone_of_sensor_unregister'
+(.text+0x444d94): undefined reference to `thermal_zone_of_sensor_register'
+drivers/built-in.o: In function `scpi_hwmon_remove':
+(text+0x444e6c): undefined reference to `thermal_zone_of_sensor_unregister'
 
-> (If it currenty works fine, it is only because the compiler optimizes
-> the entire variable away, and performs a relative access in the place
-> where the variable is referenced.)
+This uses the same Kconfig trick that we have in a couple of other
+drivers already to ensure we can only select the driver in valid
+configurations when either THERMAL_OF is disabled, or when with a
+dependency on CONFIG_THERMAL that can force SCPI to be a loadable
+module in the case I was hitting.
 
-That, and the fact that only panic() gets passed a pointer to this
-string, so it doesn't really matter where it lives in this case.
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Fixes: 68acc77a2d51 ("hwmon: Support thermal zones registration for SCP temperature sensors")
 
-But you do have a point here, and I'll address this for the next round.
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+diff --git a/drivers/hwmon/Kconfig b/drivers/hwmon/Kconfig
+index 842b0043ad94..597814177f50 100644
+--- a/drivers/hwmon/Kconfig
++++ b/drivers/hwmon/Kconfig
+@@ -324,6 +324,7 @@ config SENSORS_APPLESMC
+ config SENSORS_ARM_SCPI
+ 	tristate "ARM SCPI Sensors"
+ 	depends on ARM_SCPI_PROTOCOL
++	depends on THERMAL || !THERMAL_OF
+ 	help
+ 	  This driver provides support for temperature, voltage, current
+ 	  and power sensors available on ARM Ltd's SCP based platforms. The
