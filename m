@@ -1,21 +1,44 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Mon, 16 Nov 2015 18:20:31 +0000
-Subject: [PATCH, resend] scsi: advansys: fix big-endian builds
-In-Reply-To: <4411376.blKgWIg75B@wuerfel>
-References: <4411376.blKgWIg75B@wuerfel>
-Message-ID: <20151116182031.GX8644@n2100.arm.linux.org.uk>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Mon, 16 Nov 2015 19:22:08 +0100
+Subject: [PATCH] usb: gadget: atmel_usba_udc: Expose correct device speed
+Message-ID: <1447698128-15568-1-git-send-email-boris.brezillon@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 16, 2015 at 05:49:23PM +0100, Arnd Bergmann wrote:
-> It turns out that the commit that introduced this used the cpu_to_le32()
-> incorrectly on an 8-bit field, which results in the sense_len to always
-> be set to zero, as the SCSI_SENSE_BUFFERSIZE value gets moved to upper
-> byte of the 32-bit intermediate.
+From: Douglas Gilbert <dgilbert@interlog.com>
 
-More people need to run the sparse checker with -D__CHECK_ENDIAN__ and
-have proper endian annotations?
+Following changes that appeared in lk 4.0.0, the gadget udc driver for
+some ARM based Atmel SoCs (e.g. at91sam9x5 and sama5d3 families)
+incorrectly deduced full-speed USB link speed even when the hardware
+had negotiated a high-speed link. The fix is to make sure that the
+UDPHS Interrupt Enable Register value does not mask the SPEED bit
+in the Interrupt Status Register.
 
+For a mass storage gadget this problem lead to failures when the host
+had a USB 3 port with the xhci_hcd driver. If the host was a USB 2
+port using the ehci_hcd driver then the mass storage gadget worked
+(but probably at a lower speed than it should have).
+
+Signed-of-by: Douglas Gilbert <dgilbert@interlog.com>
+Reviewed-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+Cc: <stable@vger.kernel.org> #4.0+
+Fixes: 9870d895ad87 ("usb: atmel_usba_udc: Mask status with enabled irqs")
+---
+ drivers/usb/gadget/udc/atmel_usba_udc.c | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/usb/gadget/udc/atmel_usba_udc.c b/drivers/usb/gadget/udc/atmel_usba_udc.c
+index f0f2b06..f92f5af 100644
+--- a/drivers/usb/gadget/udc/atmel_usba_udc.c
++++ b/drivers/usb/gadget/udc/atmel_usba_udc.c
+@@ -1633,7 +1633,7 @@ static irqreturn_t usba_udc_irq(int irq, void *devid)
+ 	spin_lock(&udc->lock);
+ 
+ 	int_enb = usba_int_enb_get(udc);
+-	status = usba_readl(udc, INT_STA) & int_enb;
++	status = usba_readl(udc, INT_STA) & (int_enb | USBA_HIGH_SPEED);
+ 	DBG(DBG_INT, "irq, status=%#08x\n", status);
+ 
+ 	if (status & USBA_DET_SUSPEND) {
 -- 
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+2.1.4
