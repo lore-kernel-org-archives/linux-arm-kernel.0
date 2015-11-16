@@ -1,30 +1,37 @@
-From: yamada.masahiro@socionext.com (Masahiro Yamada)
-Date: Mon, 16 Nov 2015 19:04:16 +0900
-Subject: moderator approval?
-Message-ID: <CAK7LNASWDx9Sk_QWS7Hsj+=5J53N6Vw8+QMgt+wPd3R1=DnS0w@mail.gmail.com>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Mon, 16 Nov 2015 18:09:21 +0800
+Subject: [PATCH RESEND] ARM: OMAP2+: PM: Denote the cpuidle tracepoints as
+ _rcuidle()
+Message-ID: <1447668561-6587-1-git-send-email-jszhang@marvell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi.
+The cpuidle tracepoints are called within a rcu_idle_exit() section, and
+must be denoted with the _rcuidle() version of the tracepoint.
 
+Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
+Acked-by: Kevin Hilman <khilman@linaro.org>
+---
+ arch/arm/mach-omap2/pm34xx.c | 4 ++--
+ 1 file changed, 2 insertions(+), 2 deletions(-)
 
-I sent some patches a couple days ago.
-
-I received "Your message to linux-arm-kernel awaits moderator approval".
-(similar ones from other mailing lists, too).
-
-I think it was becuase of too many recipients.
-
-
-I still do not see my patches delivered to the ML.
-
-
-Is anybody taking care of the approval?
-Or, already refused permanently?
-
-
-
-
+diff --git a/arch/arm/mach-omap2/pm34xx.c b/arch/arm/mach-omap2/pm34xx.c
+index 87b98bf9..2dbd378 100644
+--- a/arch/arm/mach-omap2/pm34xx.c
++++ b/arch/arm/mach-omap2/pm34xx.c
+@@ -301,11 +301,11 @@ static void omap3_pm_idle(void)
+ 	if (omap_irq_pending())
+ 		return;
+ 
+-	trace_cpu_idle(1, smp_processor_id());
++	trace_cpu_idle_rcuidle(1, smp_processor_id());
+ 
+ 	omap_sram_idle();
+ 
+-	trace_cpu_idle(PWR_EVENT_EXIT, smp_processor_id());
++	trace_cpu_idle_rcuidle(PWR_EVENT_EXIT, smp_processor_id());
+ }
+ 
+ #ifdef CONFIG_SUSPEND
 -- 
-Best Regards
-Masahiro Yamada
+2.6.2
