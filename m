@@ -1,34 +1,46 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Mon, 16 Nov 2015 16:48:09 +0100
-Subject: [PATCH 1/6] serial: export fsl8250_handle_irq
-In-Reply-To: <1447688894-2936779-1-git-send-email-arnd@arndb.de>
-References: <1447688894-2936779-1-git-send-email-arnd@arndb.de>
-Message-ID: <1447688894-2936779-2-git-send-email-arnd@arndb.de>
+Date: Mon, 16 Nov 2015 16:48:08 +0100
+Subject: [PATCH 0/6] serial: fixes and cleanups
+Message-ID: <1447688894-2936779-1-git-send-email-arnd@arndb.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-fsl8250_handle_irq is now used by the of_serial driver, and that fails
-if it is a loadable module:
+I've had these patches sitting in my randconfig branch for a while,
+but have now gotten around to sending them. The first three are
+bug fixes for harmless problems that have shown up recently,
+so they should go into 4.4.
 
-ERROR: "fsl8250_handle_irq" [drivers/tty/serial/of_serial.ko] undefined!
+The other three are part of a cleanup that we've been meaning
+to do for a while but that is not urgent at all.
 
-This exports the symbol to avoid randconfig errors.
+Arnd Bergmann (6):
+  serial: export fsl8250_handle_irq
+  serial: fsl-lpuart: move SERIAL_EARLYCON dependency to console
+  serial: mid8250: select CONFIG_RATIONAL
+  serial: remove NWP serial support
+  serial: of: CONFIG_SERIAL_8250 is always set
+  serial: 8250: move of_serial code to 8250 directory
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: d43b54d269d2 ("serial: Enable Freescale 16550 workaround on arm")
-Cc: Scott Wood <scottwood@freescale.com>
----
- drivers/tty/serial/8250/8250_fsl.c | 1 +
- 1 file changed, 1 insertion(+)
+ drivers/tty/serial/8250/8250_fsl.c                 |   1 +
+ drivers/tty/serial/{of_serial.c => 8250/8250_of.c} |  32 --
+ drivers/tty/serial/8250/Kconfig                    |  10 +
+ drivers/tty/serial/8250/Makefile                   |   1 +
+ drivers/tty/serial/Kconfig                         |  29 +-
+ drivers/tty/serial/Makefile                        |   2 -
+ drivers/tty/serial/nwpserial.c                     | 477 ---------------------
+ include/linux/nwpserial.h                          |  18 -
+ include/uapi/linux/serial_core.h                   |   2 +-
+ 9 files changed, 14 insertions(+), 558 deletions(-)
+ rename drivers/tty/serial/{of_serial.c => 8250/8250_of.c} (92%)
+ delete mode 100644 drivers/tty/serial/nwpserial.c
+ delete mode 100644 include/linux/nwpserial.h
 
-diff --git a/drivers/tty/serial/8250/8250_fsl.c b/drivers/tty/serial/8250/8250_fsl.c
-index c0533a57ec53..910bfee5a88b 100644
---- a/drivers/tty/serial/8250/8250_fsl.c
-+++ b/drivers/tty/serial/8250/8250_fsl.c
-@@ -60,3 +60,4 @@ int fsl8250_handle_irq(struct uart_port *port)
- 	spin_unlock_irqrestore(&up->port.lock, flags);
- 	return 1;
- }
-+EXPORT_SYMBOL_GPL(fsl8250_handle_irq);
 -- 
 2.1.0.rc2
+
+Cc: Scott Wood <scottwood@freescale.com>
+Cc: Stefan Agner <stefan@agner.ch>
+Cc: Heikki Krogerus <heikki.krogerus@linux.intel.com>
+Cc: Andy Shevchenko <andriy.shevchenko@linux.intel.com>
+Cc: Benjamin Krill <ben@codiert.org>
+Cc: linuxppc-dev at lists.ozlabs.org
