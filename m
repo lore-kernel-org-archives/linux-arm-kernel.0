@@ -1,57 +1,93 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Mon, 16 Nov 2015 10:41:45 +0800
-Subject: [linux-sunxi] [PATCH 3/5] ARM: dts: sun8i: Add support for H3 usb
- clocks
-In-Reply-To: <1447616777-24660-3-git-send-email-hdegoede@redhat.com>
-References: <1447616777-24660-1-git-send-email-hdegoede@redhat.com>
- <1447616777-24660-3-git-send-email-hdegoede@redhat.com>
-Message-ID: <CAGb2v65H0FbyeX4KuymuCQpYEZsv=GfigVkD4bA0_OGxyX2gVQ@mail.gmail.com>
+From: cw00.choi@samsung.com (Chanwoo Choi)
+Date: Mon, 16 Nov 2015 11:55:34 +0900
+Subject: [PATCH 2/2] arm64: EXYNOS: Consolidate ARCH_EXYNOS7 symbol into
+ ARCH_EXYNOS
+In-Reply-To: <1447637775-9887-3-git-send-email-k.kozlowski@samsung.com>
+References: <1447637775-9887-1-git-send-email-k.kozlowski@samsung.com>
+ <1447637775-9887-3-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <564945A6.904@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 16, 2015 at 3:46 AM, Hans de Goede <hdegoede@redhat.com> wrote:
-> From: Reinder de Haan <patchesrdh@mveas.com>
->
-> Add a node describing the usb-clks found on the H3.
->
-> Signed-off-by: Reinder de Haan <patchesrdh@mveas.com>
-> Signed-off-by: Hans de Goede <hdegoede@redhat.com>
+Hi,
 
-Acked-by: Chen-Yu Tsai <wens@csie.org>
-
-(Also updated Mike's email in my reply.)
-
+On 2015? 11? 16? 10:36, Krzysztof Kozlowski wrote:
+> The ARMv8 Exynos family SoCs in Linux kernel are currently:
+>  - Exynos5433 (controlled by ARCH_EXYNOS),
+>  - Exynos7 (controlled by ARCH_EXYNOS7).
+> 
+> It duplicates Kconfig symbols unnecessarily, so consolidate them into
+> one ARCH_EXYNOS. Future SoCs could fall also under the ARCH_EXYNOS
+> symbol.
+> 
+> The commit should not bring any visible functional change.
+> 
+> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 > ---
->  arch/arm/boot/dts/sun8i-h3.dtsi | 12 ++++++++++++
->  1 file changed, 12 insertions(+)
->
-> diff --git a/arch/arm/boot/dts/sun8i-h3.dtsi b/arch/arm/boot/dts/sun8i-h3.dtsi
-> index c18b5f7..22ff593 100644
-> --- a/arch/arm/boot/dts/sun8i-h3.dtsi
-> +++ b/arch/arm/boot/dts/sun8i-h3.dtsi
-> @@ -266,6 +266,18 @@
->                                              "mmc2_sample";
->                 };
->
-> +               usb_clk: clk at 01c200cc {
-> +                       #clock-cells = <1>;
-> +                       #reset-cells = <1>;
-> +                       compatible = "allwinner,sun8i-h3-usb-clk";
-> +                       reg = <0x01c200cc 0x4>;
-> +                       clocks = <&osc24M>;
-> +                       clock-output-names = "usb_phy0", "usb_phy1",
-> +                                            "usb_phy2", "usb_phy3",
-> +                                            "usb_ohci0", "usb_ohci1",
-> +                                            "usb_ohci2", "usb_ohci3";
-> +               };
-> +
->                 mbus_clk: clk at 01c2015c {
->                         #clock-cells = <0>;
->                         compatible = "allwinner,sun8i-a23-mbus-clk";
-> --
-> 2.5.0
->
-> --
-> You received this message because you are subscribed to the Google Groups "linux-sunxi" group.
-> To unsubscribe from this group and stop receiving emails from it, send an email to linux-sunxi+unsubscribe at googlegroups.com.
-> For more options, visit https://groups.google.com/d/optout.
+>  arch/arm64/Kconfig.platforms        | 11 ++---------
+>  arch/arm64/boot/dts/exynos/Makefile |  2 +-
+>  arch/arm64/configs/defconfig        |  2 +-
+>  3 files changed, 4 insertions(+), 11 deletions(-)
+> 
+> diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
+> index 4043c35962cc..afa19baca94e 100644
+> --- a/arch/arm64/Kconfig.platforms
+> +++ b/arch/arm64/Kconfig.platforms
+> @@ -13,21 +13,14 @@ config ARCH_BERLIN
+>  	  This enables support for Marvell Berlin SoC Family
+>  
+>  config ARCH_EXYNOS
+> -	bool
+> -	help
+> -	  This enables support for Samsung Exynos SoC family
+> -
+> -config ARCH_EXYNOS7
+> -	bool "ARMv8 based Samsung Exynos7"
+> -	select ARCH_EXYNOS
+> +	bool "ARMv8 based Samsung Exynos SoC family"
+>  	select COMMON_CLK_SAMSUNG
+>  	select HAVE_S3C2410_WATCHDOG if WATCHDOG
+>  	select HAVE_S3C_RTC if RTC_CLASS
+>  	select PINCTRL
+>  	select PINCTRL_EXYNOS
+> -
+>  	help
+> -	  This enables support for Samsung Exynos7 SoC family
+> +	  This enables support for Samsung Exynos ARMv8 SoC family
+>  
+>  config ARCH_LAYERSCAPE
+>  	bool "ARMv8 based Freescale Layerscape SoC family"
+> diff --git a/arch/arm64/boot/dts/exynos/Makefile b/arch/arm64/boot/dts/exynos/Makefile
+> index 20310e5b6d6f..50c9b9383cfa 100644
+> --- a/arch/arm64/boot/dts/exynos/Makefile
+> +++ b/arch/arm64/boot/dts/exynos/Makefile
+> @@ -1,4 +1,4 @@
+> -dtb-$(CONFIG_ARCH_EXYNOS7) += exynos7-espresso.dtb
+> +dtb-$(CONFIG_ARCH_EXYNOS) += exynos7-espresso.dtb
+>  
+>  always		:= $(dtb-y)
+>  subdir-y	:= $(dts-dirs)
+> diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+> index bdd7aa358d2a..a396fa7c69a5 100644
+> --- a/arch/arm64/configs/defconfig
+> +++ b/arch/arm64/configs/defconfig
+> @@ -33,7 +33,7 @@ CONFIG_MODULE_UNLOAD=y
+>  # CONFIG_IOSCHED_DEADLINE is not set
+>  CONFIG_ARCH_BCM_IPROC=y
+>  CONFIG_ARCH_BERLIN=y
+> -CONFIG_ARCH_EXYNOS7=y
+> +CONFIG_ARCH_EXYNOS=y
+>  CONFIG_ARCH_LAYERSCAPE=y
+>  CONFIG_ARCH_HISI=y
+>  CONFIG_ARCH_MEDIATEK=y
+> 
+
+When I sent the EXYNOS5433 patch[1], we don't want to add the each config
+for each Exynos SoC. So, I think this patch is good to use only one ARCH_EXYNOS config
+for all ARMv8 Exynos SoC.
+[1] https://lkml.org/lkml/2015/2/24/85
+
+Reviewed-by: Chanwoo Choi <cw00.choi@samsung.com>
+
+Regards,
+Chanwoo Choi
