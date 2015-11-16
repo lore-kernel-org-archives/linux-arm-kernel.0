@@ -1,73 +1,104 @@
 From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Mon, 16 Nov 2015 19:13:25 +0000
-Subject: [PATCH 1/4] arm: kexec: Deactivate in-flight interrupts
+Date: Mon, 16 Nov 2015 19:13:28 +0000
+Subject: [PATCH 4/4] irqchip/gic: Add save/restore of the active state
 In-Reply-To: <1447701208-18150-1-git-send-email-marc.zyngier@arm.com>
 References: <1447701208-18150-1-git-send-email-marc.zyngier@arm.com>
-Message-ID: <1447701208-18150-2-git-send-email-marc.zyngier@arm.com>
+Message-ID: <1447701208-18150-5-git-send-email-marc.zyngier@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-machine_kexec_mask_interrupts iterates over the system interrupts
-and tries to mask all interrupts, including those that are currently
-being handled.
+When using EOImode==1, we may mark interrupts as being forwarded
+to a virtual machine. In that case, the interrupt is left active
+while being passed to the VM.
 
-The current method includes finding out if an interrupt is in progress,
-and call the EOI method if that's the case. This methods has a few
-issues when used with the GIC:
+If we suspend the system before the VM has deactivated the interrupt,
+the active state will be lost (which may be very annoying, as this
+may result in spurious interrupts and a confused guest).
 
-- In a hypothetical GIC centric world where we can handle
-  interrupts at different priorities, nothing guarantees that
-  we're going to EOI the interrupts in the mandated reverse order
-  we have taken them.
-
-- With the split EOI/Deactivate mode the GIC runs in when using
-  virtualization, an interrupt can be EOIed, and still be active.
-  The current code would not recognize that state (the interrupt
-  is not flagged as being in progress from a host PoV).
-
-A sensible way of avoiding these issues is to forcefully deactivate
-the interrupt at the distributor level, and to only use EOI if
-the deactivation has failed (which probably means that the irqchip
-is not a GIC).
+To avoid this, save and restore the active state together with the
+rest of the GIC registers.
 
 Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
 ---
- arch/arm/kernel/machine_kexec.c | 11 ++++++++++-
- 1 file changed, 10 insertions(+), 1 deletion(-)
+ drivers/irqchip/irq-gic.c | 28 ++++++++++++++++++++++++++++
+ 1 file changed, 28 insertions(+)
 
-diff --git a/arch/arm/kernel/machine_kexec.c b/arch/arm/kernel/machine_kexec.c
-index 8bf3b7c..66662e6 100644
---- a/arch/arm/kernel/machine_kexec.c
-+++ b/arch/arm/kernel/machine_kexec.c
-@@ -8,6 +8,7 @@
- #include <linux/reboot.h>
- #include <linux/io.h>
- #include <linux/irq.h>
-+#include <linux/interrupt.h>
- #include <linux/memblock.h>
- #include <asm/pgtable.h>
- #include <linux/of_fdt.h>
-@@ -98,12 +99,20 @@ static void machine_kexec_mask_interrupts(void)
- 
- 	for_each_irq_desc(i, desc) {
- 		struct irq_chip *chip;
-+		int ret;
- 
- 		chip = irq_desc_get_chip(desc);
- 		if (!chip)
- 			continue;
- 
--		if (chip->irq_eoi && irqd_irq_inprogress(&desc->irq_data))
-+		/*
-+		 * First try to remove the active state. If this
-+		 * fails, try to EOI the interrupt.
-+		 */
-+		ret = irq_set_irqchip_state(i, IRQCHIP_STATE_ACTIVE, false);
+diff --git a/drivers/irqchip/irq-gic.c b/drivers/irqchip/irq-gic.c
+index bc846e7..abf2ffa 100644
+--- a/drivers/irqchip/irq-gic.c
++++ b/drivers/irqchip/irq-gic.c
+@@ -73,9 +73,11 @@ struct gic_chip_data {
+ 	union gic_base cpu_base;
+ #ifdef CONFIG_CPU_PM
+ 	u32 saved_spi_enable[DIV_ROUND_UP(1020, 32)];
++	u32 saved_spi_active[DIV_ROUND_UP(1020, 32)];
+ 	u32 saved_spi_conf[DIV_ROUND_UP(1020, 16)];
+ 	u32 saved_spi_target[DIV_ROUND_UP(1020, 4)];
+ 	u32 __percpu *saved_ppi_enable;
++	u32 __percpu *saved_ppi_active;
+ 	u32 __percpu *saved_ppi_conf;
+ #endif
+ 	struct irq_domain *domain;
+@@ -566,6 +568,10 @@ static void gic_dist_save(unsigned int gic_nr)
+ 	for (i = 0; i < DIV_ROUND_UP(gic_irqs, 32); i++)
+ 		gic_data[gic_nr].saved_spi_enable[i] =
+ 			readl_relaxed(dist_base + GIC_DIST_ENABLE_SET + i * 4);
 +
-+		if (ret && irqd_irq_inprogress(&desc->irq_data) &&
-+		    chip->irq_eoi)
- 			chip->irq_eoi(&desc->irq_data);
++	for (i = 0; i < DIV_ROUND_UP(gic_irqs, 32); i++)
++		gic_data[gic_nr].saved_spi_active[i] =
++			readl_relaxed(dist_base + GIC_DIST_ACTIVE_SET + i * 4);
+ }
  
- 		if (chip->irq_mask)
+ /*
+@@ -611,6 +617,13 @@ static void gic_dist_restore(unsigned int gic_nr)
+ 			dist_base + GIC_DIST_ENABLE_SET + i * 4);
+ 	}
+ 
++	for (i = 0; i < DIV_ROUND_UP(gic_irqs, 32); i++) {
++		writel_relaxed(GICD_INT_EN_CLR_X32,
++			dist_base + GIC_DIST_ACTIVE_CLEAR + i * 4);
++		writel_relaxed(gic_data[gic_nr].saved_spi_active[i],
++			dist_base + GIC_DIST_ACTIVE_SET + i * 4);
++	}
++
+ 	writel_relaxed(GICD_ENABLE, dist_base + GIC_DIST_CTRL);
+ }
+ 
+@@ -634,6 +647,10 @@ static void gic_cpu_save(unsigned int gic_nr)
+ 	for (i = 0; i < DIV_ROUND_UP(32, 32); i++)
+ 		ptr[i] = readl_relaxed(dist_base + GIC_DIST_ENABLE_SET + i * 4);
+ 
++	ptr = raw_cpu_ptr(gic_data[gic_nr].saved_ppi_active);
++	for (i = 0; i < DIV_ROUND_UP(32, 32); i++)
++		ptr[i] = readl_relaxed(dist_base + GIC_DIST_ACTIVE_SET + i * 4);
++
+ 	ptr = raw_cpu_ptr(gic_data[gic_nr].saved_ppi_conf);
+ 	for (i = 0; i < DIV_ROUND_UP(32, 16); i++)
+ 		ptr[i] = readl_relaxed(dist_base + GIC_DIST_CONFIG + i * 4);
+@@ -663,6 +680,13 @@ static void gic_cpu_restore(unsigned int gic_nr)
+ 		writel_relaxed(ptr[i], dist_base + GIC_DIST_ENABLE_SET + i * 4);
+ 	}
+ 
++	ptr = raw_cpu_ptr(gic_data[gic_nr].saved_ppi_active);
++	for (i = 0; i < DIV_ROUND_UP(32, 32); i++) {
++		writel_relaxed(GICD_INT_EN_CLR_X32,
++			       dist_base + GIC_DIST_ACTIVE_CLEAR + i * 4);
++		writel_relaxed(ptr[i], dist_base + GIC_DIST_ACTIVE_SET + i * 4);
++	}
++
+ 	ptr = raw_cpu_ptr(gic_data[gic_nr].saved_ppi_conf);
+ 	for (i = 0; i < DIV_ROUND_UP(32, 16); i++)
+ 		writel_relaxed(ptr[i], dist_base + GIC_DIST_CONFIG + i * 4);
+@@ -716,6 +740,10 @@ static void __init gic_pm_init(struct gic_chip_data *gic)
+ 		sizeof(u32));
+ 	BUG_ON(!gic->saved_ppi_enable);
+ 
++	gic->saved_ppi_active = __alloc_percpu(DIV_ROUND_UP(32, 32) * 4,
++		sizeof(u32));
++	BUG_ON(!gic->saved_ppi_active);
++
+ 	gic->saved_ppi_conf = __alloc_percpu(DIV_ROUND_UP(32, 16) * 4,
+ 		sizeof(u32));
+ 	BUG_ON(!gic->saved_ppi_conf);
 -- 
 2.1.4
