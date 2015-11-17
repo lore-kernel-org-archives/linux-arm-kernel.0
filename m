@@ -1,52 +1,51 @@
-From: mchehab@osg.samsung.com (Mauro Carvalho Chehab)
-Date: Tue, 17 Nov 2015 17:00:12 -0200
-Subject: [PATCH] [MEDIA] dvb: usb: fix dib3000mc dependencies
-In-Reply-To: <5525192.eyIcy1NRHy@wuerfel>
-References: <3984729.n55BH9Zr8c@wuerfel>
-	<5525192.eyIcy1NRHy@wuerfel>
-Message-ID: <20151117170012.24fe7f58@recife.lan>
+From: laura@labbott.name (Laura Abbott)
+Date: Tue, 17 Nov 2015 11:02:35 -0800
+Subject: [PATCHv2 0/3] Devicetree bindings for Ion
+In-Reply-To: <8990901.B0bMvlhTJH@wuerfel>
+References: <1447721855-7574-1-git-send-email-laura@labbott.name>
+ <8990901.B0bMvlhTJH@wuerfel>
+Message-ID: <564B79CB.3040004@labbott.name>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Em Tue, 17 Nov 2015 17:24:23 +0100
-Arnd Bergmann <arnd@arndb.de> escreveu:
+On 11/17/15 7:15 AM, Arnd Bergmann wrote:
+> On Monday 16 November 2015 16:57:32 Laura Abbott wrote:
+>> Hi,
+>>
+>> This is another attempt at devicetree bindings for Ion. The big complaint from
+>> v1 was that too much unnecessary data was being pushed into devicetree.
+>> v2 takes a different approach of using just compatbile strings for the heaps.
+>> This gets closer to the devicetree philosophy of describing just the hardware.
+>> Each heap ultimately represents some kind of memory that exists in the system.
+>> The compatible string indicates the match for how to handle the type of memory
+>> on this system. The details like heap-id, name etc. are now pushed out to C
+>> files. This makes Ion heaps look closer to something like a quirks framework.
+>> (I'd argue this isn't a complete mischaracterization given the type of setup
+>> Ion gets used for...) The one downside here is that this leads to more new
+>> bindings for each board that gets added.
+>>
+>> This version also includes a sample C file which shows what the structure
+>> might look like. As always, your comments and reviews are appreciated.
+>
+> I'm still a bit unsure about the concept of hardwiring ion in the DT
+> bindings. It's not just Linux-specific, it's specific to the implementation
+> of one or two GPU drivers, and if we fix the bindings for Ion, we might
+> never be able to migrate them away from this framework.
+>
 
-> On Tuesday 17 November 2015 17:17:39 Arnd Bergmann wrote:
-> > The dibusb_read_eeprom_byte function is defined in dibusb-common.c,
-> > but that file is not compiled for CONFIG_DVB_USB_DIBUSB_MB as it
-> > is for the other driver using the common functions, so we can
-> > get a link error:
-> > 
-> > drivers/built-in.o: In function `dibusb_dib3000mc_tuner_attach':
-> > (.text+0x2c5124): undefined reference to `dibusb_read_eeprom_byte'
-> > (.text+0x2c5134): undefined reference to `dibusb_read_eeprom_byte'
-> > 
-> > This changes the Makefile to treat the file like all the others
-> > in this directory, and enforce building dvb-usb-dibusb-common.o
-> > as a dependency.
-> > 
-> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> > 
-> 
-> I just realized that this depends on another patch I've sent back
-> in April, so that is probably no longer in the patch queue. Please
-> disregard for now.
+Ion isn't just for GPU drivers. It certainly started out that way but
+it still fills some gaps in APIs (e.g. the use cases mentioned by
+Andrew Andrianov). The goal here was get those who are using Ion
+standardized on something and possibly treat those bindings as unstable.
+Devicetree bindings are probably going to be very low on the list of
+things that will keep drivers from migrating away from Ion. There's
+still an implicit assumption there that drivers will be migrating away
+from Ion though. I think part of the problem here may be the lack of
+direction right now for moving Ion forward. Progress has been slow.
+The thought was to at least enable those who are using Ion now and
+then revisit whatever we come up with later. If this isn't a good
+approach, I'd rather hear consensus now to know where to put effort
+and tell people to keep doing whatever outside the mainline kernel.
 
-Hi Arnd,
-
-The better way to fix it is to do a patch like this one:
-	http://git.linuxtv.org/cgit.cgi/media_tree.git/commit/?id=8abe4a0a3f6d4217b16a1a3f68cd5c72ab5a058e
-
-The problem with those dib drivers is that there's no way to latter
-remove them with rmmod. Using the above techinique, not only ranconfig
-compilation will work, but it will also allow module remove and having
-drivers with some frontends disabled.
-
-The drawback is that it is not a very trivial patch, so I did the
-changes only for devices that I have (all based on dib0700).
-
-Unfortunately, I don't have any device currently based on dib3000.
-I could work on such patchset, but someone would need to test it ;)
-
-Regards,
-Mauro
+Thanks,
+Laura
