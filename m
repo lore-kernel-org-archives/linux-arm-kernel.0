@@ -1,37 +1,88 @@
 From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 17 Nov 2015 17:12:37 +0000
-Subject: next build: 235 warnings 3 failures (next/next-20151117)
-In-Reply-To: <6370082.rfihnaNWhf@wuerfel>
-References: <564a9961.878b420a.331b8.fffffd62@mx.google.com>
- <4694362.ZPL12j6kR2@wuerfel> <20151117164453.GF30101@arm.com>
- <6370082.rfihnaNWhf@wuerfel>
-Message-ID: <20151117171236.GJ30101@arm.com>
+Date: Tue, 17 Nov 2015 17:08:17 +0000
+Subject: [RFC PATCH] arm64: use non-global mappings for UEFI runtime
+ regions
+In-Reply-To: <1447750411-6424-1-git-send-email-ard.biesheuvel@linaro.org>
+References: <1447750411-6424-1-git-send-email-ard.biesheuvel@linaro.org>
+Message-ID: <20151117170816.GI30101@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 17, 2015 at 06:03:40PM +0100, Arnd Bergmann wrote:
-> On Tuesday 17 November 2015 16:44:53 Will Deacon wrote:
-> > > 8<----
-> > > Subject: ARM64: make smp_load_acquire() work with const arguments
-> > > 
-> > > smp_load_acquire() uses typeof() to declare a local variable for temporarily
-> > > storing the output of the memory access. This fails when the argument is
-> > > constant, because the assembler complains about using a constant register
-> > > as output:
-> > > 
-> > >  arch/arm64/include/asm/barrier.h:71:3: error: read-only variable '___p1'
-> > >  used as 'asm' output
-> > 
-> > Do you know the usage in the kernel causing this warning?
+On Tue, Nov 17, 2015 at 09:53:31AM +0100, Ard Biesheuvel wrote:
+> As pointed out by Russell King in response to the proposed ARM version
+> of this code, the sequence to switch between the UEFI runtime mapping
+> and current's actual userland mapping (and vice versa) is potentially
+> unsafe, since it leaves a time window between the switch to the new
+> page tables and the TLB flush where speculative accesses may hit on
+> stale global TLB entries.
 > 
-> A newly introduced function in include/net/sock.h:
+> So instead, use non-global mappings, and perform the switch via the
+> ordinary ASID-aware context switch routines.
 > 
-> static inline int sk_state_load(const struct sock *sk)
-> {
->         return smp_load_acquire(&sk->sk_state);
-> }
+> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> ---
+>  arch/arm64/include/asm/mmu_context.h |  2 +-
+>  arch/arm64/kernel/efi.c              | 14 +++++---------
+>  2 files changed, 6 insertions(+), 10 deletions(-)
 
-Hmm, maybe we could play a similar trick to READ_ONCE by declaring an
-anonymous union and writing through the non-const member?
+Acked-by: Will Deacon <will.deacon@arm.com>
+
+Please do *not* tag this for stable! ;)
 
 Will
+
+> diff --git a/arch/arm64/include/asm/mmu_context.h b/arch/arm64/include/asm/mmu_context.h
+> index c0e87898ba96..24165784b803 100644
+> --- a/arch/arm64/include/asm/mmu_context.h
+> +++ b/arch/arm64/include/asm/mmu_context.h
+> @@ -101,7 +101,7 @@ static inline void cpu_set_default_tcr_t0sz(void)
+>  #define destroy_context(mm)		do { } while(0)
+>  void check_and_switch_context(struct mm_struct *mm, unsigned int cpu);
+>  
+> -#define init_new_context(tsk,mm)	({ atomic64_set(&mm->context.id, 0); 0; })
+> +#define init_new_context(tsk,mm)	({ atomic64_set(&(mm)->context.id, 0); 0; })
+>  
+>  /*
+>   * This is called when "tsk" is about to enter lazy TLB mode.
+> diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
+> index de46b50f4cdf..fc5508e0df57 100644
+> --- a/arch/arm64/kernel/efi.c
+> +++ b/arch/arm64/kernel/efi.c
+> @@ -224,6 +224,8 @@ static bool __init efi_virtmap_init(void)
+>  {
+>  	efi_memory_desc_t *md;
+>  
+> +	init_new_context(NULL, &efi_mm);
+> +
+>  	for_each_efi_memory_desc(&memmap, md) {
+>  		u64 paddr, npages, size;
+>  		pgprot_t prot;
+> @@ -254,7 +256,8 @@ static bool __init efi_virtmap_init(void)
+>  		else
+>  			prot = PAGE_KERNEL;
+>  
+> -		create_pgd_mapping(&efi_mm, paddr, md->virt_addr, size, prot);
+> +		create_pgd_mapping(&efi_mm, paddr, md->virt_addr, size,
+> +				   __pgprot(pgprot_val(prot) | PTE_NG));
+>  	}
+>  	return true;
+>  }
+> @@ -329,14 +332,7 @@ core_initcall(arm64_dmi_init);
+>  
+>  static void efi_set_pgd(struct mm_struct *mm)
+>  {
+> -	if (mm == &init_mm)
+> -		cpu_set_reserved_ttbr0();
+> -	else
+> -		cpu_switch_mm(mm->pgd, mm);
+> -
+> -	local_flush_tlb_all();
+> -	if (icache_is_aivivt())
+> -		__local_flush_icache_all();
+> +	switch_mm(NULL, mm, NULL);
+>  }
+>  
+>  void efi_virtmap_load(void)
+> -- 
+> 1.9.1
+> 
