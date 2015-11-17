@@ -1,45 +1,199 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 17 Nov 2015 17:12:13 +0000
-Subject: [PATCH] arm64: kernel: pause/unpause function graph tracer in
- cpu_suspend()
-In-Reply-To: <1447761051-811-1-git-send-email-lorenzo.pieralisi@arm.com>
-References: <1447761051-811-1-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <20151117171213.GL6556@e104818-lin.cambridge.arm.com>
+From: moritz.fischer@ettus.com (Moritz Fischer)
+Date: Tue, 17 Nov 2015 09:11:57 -0800
+Subject: [PATCH] fpga: zynq-fpga: Avoid hammering clk_{enable/disable}.
+Message-ID: <1447780317-27758-1-git-send-email-moritz.fischer@ettus.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 17, 2015 at 11:50:51AM +0000, Lorenzo Pieralisi wrote:
-> The function graph tracer adds instrumentation that is required to trace
-> both entry and exit of a function. In particular the function graph
-> tracer updates the "return address" of a function in order to insert
-> a trace callback on function exit.
-> 
-> Kernel power management functions like cpu_suspend() are called
-> upon power down entry with functions called "finishers" that are in turn
-> called to trigger the power down sequence but they may not return to the
-> kernel through the normal return path.
-> 
-> When the core resumes from low-power it returns to the cpu_suspend()
-> function through the cpu_resume path, which leaves the trace stack frame
-> set-up by the function tracer in an incosistent state upon return to the
-> kernel when tracing is enabled.
-> 
-> This patch fixes the issue by pausing/resuming the function graph
-> tracer on the thread executing cpu_suspend() (ie the function call that
-> subsequently triggers the "suspend finishers"), so that the function graph
-> tracer state is kept consistent across functions that enter power down
-> states and never return by effectively disabling graph tracer while they
-> are executing.
-> 
-> Fixes: 819e50e25d0c ("arm64: Add ftrace support")
-> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Reported-by: Catalin Marinas <catalin.marinas@arm.com>
-> Reported-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-> Suggested-by: Steven Rostedt <rostedt@goodmis.org>
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: <stable@vger.kernel.org> # 3.16+
+Replaced constant clock_{enable,disable} calls with pm_runtime
+hooks.
 
-Patch applied. Thanks.
+Signed-off-by: Moritz Fischer <moritz.fischer@ettus.com>
+---
+ drivers/fpga/zynq-fpga.c | 79 +++++++++++++++++++++++++++++++++++++-----------
+ 1 file changed, 62 insertions(+), 17 deletions(-)
 
+diff --git a/drivers/fpga/zynq-fpga.c b/drivers/fpga/zynq-fpga.c
+index c2fb412..5c03fb8 100644
+--- a/drivers/fpga/zynq-fpga.c
++++ b/drivers/fpga/zynq-fpga.c
+@@ -28,6 +28,7 @@
+ #include <linux/of_address.h>
+ #include <linux/of_irq.h>
+ #include <linux/pm.h>
++#include <linux/pm_runtime.h>
+ #include <linux/regmap.h>
+ #include <linux/string.h>
+ 
+@@ -184,8 +185,8 @@ static int zynq_fpga_ops_write_init(struct fpga_manager *mgr, u32 flags,
+ 
+ 	priv = mgr->priv;
+ 
+-	err = clk_enable(priv->clk);
+-	if (err)
++	err = pm_runtime_get_sync(priv->dev);
++	if (err < 0)
+ 		return err;
+ 
+ 	/* don't globally reset PL if we're doing partial reconfig */
+@@ -271,12 +272,12 @@ static int zynq_fpga_ops_write_init(struct fpga_manager *mgr, u32 flags,
+ 	ctrl = zynq_fpga_read(priv, MCTRL_OFFSET);
+ 	zynq_fpga_write(priv, MCTRL_OFFSET, (~MCTRL_PCAP_LPBK_MASK & ctrl));
+ 
+-	clk_disable(priv->clk);
++	pm_runtime_put(priv->dev);
+ 
+ 	return 0;
+ 
+ out_err:
+-	clk_disable(priv->clk);
++	pm_runtime_put(priv->dev);
+ 
+ 	return err;
+ }
+@@ -301,9 +302,8 @@ static int zynq_fpga_ops_write(struct fpga_manager *mgr,
+ 
+ 	memcpy(kbuf, buf, count);
+ 
+-	/* enable clock */
+-	err = clk_enable(priv->clk);
+-	if (err)
++	err = pm_runtime_get_sync(priv->dev);
++	if (err < 0)
+ 		goto out_free;
+ 
+ 	zynq_fpga_write(priv, INT_STS_OFFSET, IXR_ALL_MASK);
+@@ -335,7 +335,7 @@ static int zynq_fpga_ops_write(struct fpga_manager *mgr,
+ 		err = -EFAULT;
+ 	}
+ 
+-	clk_disable(priv->clk);
++	pm_runtime_put(priv->dev);
+ 
+ out_free:
+ 	dma_free_coherent(priv->dev, in_count, kbuf, dma_addr);
+@@ -349,8 +349,8 @@ static int zynq_fpga_ops_write_complete(struct fpga_manager *mgr, u32 flags)
+ 	int err;
+ 	u32 intr_status;
+ 
+-	err = clk_enable(priv->clk);
+-	if (err)
++	err = pm_runtime_get_sync(priv->dev);
++	if (err < 0)
+ 		return err;
+ 
+ 	err = zynq_fpga_poll_timeout(priv, INT_STS_OFFSET, intr_status,
+@@ -358,7 +358,7 @@ static int zynq_fpga_ops_write_complete(struct fpga_manager *mgr, u32 flags)
+ 				     INIT_POLL_DELAY,
+ 				     INIT_POLL_TIMEOUT);
+ 
+-	clk_disable(priv->clk);
++	pm_runtime_put(priv->dev);
+ 
+ 	if (err)
+ 		return err;
+@@ -385,12 +385,12 @@ static enum fpga_mgr_states zynq_fpga_ops_state(struct fpga_manager *mgr)
+ 
+ 	priv = mgr->priv;
+ 
+-	err = clk_enable(priv->clk);
+-	if (err)
++	err = pm_runtime_get_sync(priv->dev);
++	if (err < 0)
+ 		return FPGA_MGR_STATE_UNKNOWN;
+ 
+ 	intr_status = zynq_fpga_read(priv, INT_STS_OFFSET);
+-	clk_disable(priv->clk);
++	pm_runtime_put(priv->dev);
+ 
+ 	if (intr_status & IXR_PCFG_DONE_MASK)
+ 		return FPGA_MGR_STATE_OPERATING;
+@@ -457,19 +457,26 @@ static int zynq_fpga_probe(struct platform_device *pdev)
+ 		return err;
+ 	}
+ 
++	pm_runtime_get_noresume(&pdev->dev);
++	pm_runtime_set_active(&pdev->dev);
++	pm_runtime_enable(&pdev->dev);
++
+ 	/* unlock the device */
+ 	zynq_fpga_write(priv, UNLOCK_OFFSET, UNLOCK_MASK);
+ 
+-	clk_disable(priv->clk);
+ 
+ 	err = fpga_mgr_register(dev, "Xilinx Zynq FPGA Manager",
+ 				&zynq_fpga_ops, priv);
+ 	if (err) {
+ 		dev_err(dev, "unable to register FPGA manager");
+-		clk_unprepare(priv->clk);
++		clk_disable_unprepare(priv->clk);
++		pm_runtime_put_noidle(&pdev->dev);
++		pm_runtime_disable(&pdev->dev);
+ 		return err;
+ 	}
+ 
++	pm_runtime_put(&pdev->dev);
++
+ 	return 0;
+ }
+ 
+@@ -483,11 +490,48 @@ static int zynq_fpga_remove(struct platform_device *pdev)
+ 
+ 	fpga_mgr_unregister(&pdev->dev);
+ 
+-	clk_unprepare(priv->clk);
++	pm_runtime_get_sync(&pdev->dev);
++	clk_disable_unprepare(priv->clk);
++	pm_runtime_put_noidle(&pdev->dev);
++	pm_runtime_disable(&pdev->dev);
+ 
+ 	return 0;
+ }
+ 
++#ifdef CONFIG_PM
++static int zynq_fpga_runtime_suspend(struct device *dev)
++{
++	struct zynq_fpga_priv *priv;
++	struct fpga_manager *mgr;
++
++	mgr = dev_get_drvdata(dev);
++	priv = mgr->priv;
++
++	clk_disable(priv->clk);
++
++	return 0;
++}
++
++static int zynq_fpga_runtime_resume(struct device *dev)
++{
++	struct zynq_fpga_priv *priv;
++	struct fpga_manager *mgr;
++
++	mgr = dev_get_drvdata(dev);
++	priv = mgr->priv;
++
++	clk_enable(priv->clk);
++
++	return 0;
++}
++
++#endif
++
++static const struct dev_pm_ops zynq_fpga_pm_ops = {
++	SET_RUNTIME_PM_OPS(zynq_fpga_runtime_suspend,
++			   zynq_fpga_runtime_resume, NULL)
++};
++
+ #ifdef CONFIG_OF
+ static const struct of_device_id zynq_fpga_of_match[] = {
+ 	{ .compatible = "xlnx,zynq-devcfg-1.0", },
+@@ -503,6 +547,7 @@ static struct platform_driver zynq_fpga_driver = {
+ 	.driver = {
+ 		.name = "zynq_fpga_manager",
+ 		.of_match_table = of_match_ptr(zynq_fpga_of_match),
++		.pm = &zynq_fpga_pm_ops,
+ 	},
+ };
+ 
 -- 
-Catalin
+2.4.3
