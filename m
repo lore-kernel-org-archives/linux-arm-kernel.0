@@ -1,49 +1,52 @@
 From: shannon.zhao@linaro.org (shannon.zhao at linaro.org)
-Date: Tue, 17 Nov 2015 17:40:02 +0800
-Subject: [PATCH v3 03/62] acpi/pmstat: Build pmstat for x86 only
+Date: Tue, 17 Nov 2015 17:40:03 +0800
+Subject: [PATCH v3 04/62] arm/acpi: Emulate io ports for arm
 In-Reply-To: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
 References: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
-Message-ID: <1447753261-7552-4-git-send-email-shannon.zhao@linaro.org>
+Message-ID: <1447753261-7552-5-git-send-email-shannon.zhao@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Parth Dixit <parth.dixit@linaro.org>
 
-Pmstat is currently not supported for ARM in Xen. Configure and build
-pmstat for x86 architecture only.
+Add macros to emulate x86 style ports for arm. This avoids modification in
+common code for acpi.
 
 Signed-off-by: Parth Dixit <parth.dixit@linaro.org>
 Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
 ---
- xen/common/sysctl.c       | 2 +-
- xen/drivers/acpi/Makefile | 2 +-
- 2 files changed, 2 insertions(+), 2 deletions(-)
+ xen/include/asm-arm/arm64/io.h | 14 ++++++++++++++
+ 1 file changed, 14 insertions(+)
 
-diff --git a/xen/common/sysctl.c b/xen/common/sysctl.c
-index 85e853f..8273ad4 100644
---- a/xen/common/sysctl.c
-+++ b/xen/common/sysctl.c
-@@ -171,7 +171,7 @@ long do_sysctl(XEN_GUEST_HANDLE_PARAM(xen_sysctl_t) u_sysctl)
-         op->u.availheap.avail_bytes <<= PAGE_SHIFT;
-         break;
+diff --git a/xen/include/asm-arm/arm64/io.h b/xen/include/asm-arm/arm64/io.h
+index 37abc47..7ad9b65 100644
+--- a/xen/include/asm-arm/arm64/io.h
++++ b/xen/include/asm-arm/arm64/io.h
+@@ -20,6 +20,7 @@
+ #ifndef _ARM_ARM64_IO_H
+ #define _ARM_ARM64_IO_H
  
--#ifdef HAS_ACPI
-+#ifdef HAS_CPUFREQ
-     case XEN_SYSCTL_get_pmstat:
-         ret = do_get_pm_info(&op->u.get_pmstat);
-         break;
-diff --git a/xen/drivers/acpi/Makefile b/xen/drivers/acpi/Makefile
-index 3bb626e..c7d006a 100644
---- a/xen/drivers/acpi/Makefile
-+++ b/xen/drivers/acpi/Makefile
-@@ -5,7 +5,7 @@ subdir-$(x86) += apei
- obj-bin-y += tables.init.o
- obj-$(HAS_NUMA) += numa.o
- obj-y += osl.o
--obj-y += pmstat.o
-+obj-$(HAS_CPUFREQ) += pmstat.o
++#include <asm/system.h>
+ #include <asm/byteorder.h>
  
- obj-$(x86) += hwregs.o
- obj-$(x86) += reboot.o
+ /*
+@@ -109,4 +110,17 @@ static inline u64 __raw_readq(const volatile void __iomem *addr)
+ #define writel(v,c)             ({ __iowmb(); writel_relaxed((v),(c)); })
+ #define writeq(v,c)             ({ __iowmb(); writeq_relaxed((v),(c)); })
+ 
++/*
++ * Emulate x86 io ports for arm.
++ */
++#define __armio(addr) ( (void __iomem *)addr )
++
++#define inb(c) ( readb( __armio(c) ) )
++#define inw(c) ( readw( __armio(c) ) )
++#define inl(c) ( readl( __armio(c) ) )
++
++#define outb(v, c) ( writeb(v, __armio(c) ) )
++#define outw(v, c) ( writew(v, __armio(c) ) )
++#define outl(v, c) ( writel(v, __armio(c) ) )
++
+ #endif /* _ARM_ARM64_IO_H */
 -- 
 2.1.0
