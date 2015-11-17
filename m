@@ -1,100 +1,46 @@
-From: s.nawrocki@samsung.com (Sylwester Nawrocki)
-Date: Tue, 17 Nov 2015 15:01:18 +0100
-Subject: [PATCH 1/2] clk: samsung: Don't build ARMv8 clock drivers on ARMv7
-In-Reply-To: <564AAF70.9080507@samsung.com>
-References: <1447637775-9887-1-git-send-email-k.kozlowski@samsung.com>
- <1447637775-9887-2-git-send-email-k.kozlowski@samsung.com>
- <564AADB2.3030400@samsung.com> <564AAF70.9080507@samsung.com>
-Message-ID: <564B332E.6010608@samsung.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 17 Nov 2015 15:03:56 +0100
+Subject: [RFC PATCH 4/7] pinctrl: sunxi: remove redundant "depends on
+ RESET_CONTROLLER"
+In-Reply-To: <CAK7LNAThCGYWjXD4=OdgukUBLhyAtmHFH6VXO1V4DCFCpfTRjg@mail.gmail.com>
+References: <1446722128-11961-1-git-send-email-yamada.masahiro@socionext.com>
+ <1446722128-11961-5-git-send-email-yamada.masahiro@socionext.com>
+ <CACRpkdYmdyxi+6fZNGffE6-JBZGkyq3F__Ywc4rCYYEsQeimMQ@mail.gmail.com>
+ <CAK7LNAThCGYWjXD4=OdgukUBLhyAtmHFH6VXO1V4DCFCpfTRjg@mail.gmail.com>
+Message-ID: <CACRpkdbPPPfwrvLpG_NSBAxHzUpTYZN2e+foAEVPisV5HxHUPA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/11/15 05:39, Krzysztof Kozlowski wrote:
-> On 17.11.2015 13:31, pankaj.dubey wrote:
->> On Monday 16 November 2015 07:06 AM, Krzysztof Kozlowski wrote:
->>> Currently the Exynos5433 (ARMv8 SoC) clock driver depends on ARCH_EXYNOS
->>> so it is built also on ARMv7. This does not bring any kind of benefit.
->>> There won't be a single kernel image for ARMv7 and ARMv8 SoCs (like
->>> multi_v7 for ARMv7).
->>>
->>> Instead build clock drivers only for respective SoC's architecture.
->>>
->>> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
->>> ---
->>>  drivers/clk/samsung/Kconfig  | 13 +++++++++++++
->>>  drivers/clk/samsung/Makefile |  4 ++--
->>>  2 files changed, 15 insertions(+), 2 deletions(-)
->>>
->>> diff --git a/drivers/clk/samsung/Kconfig b/drivers/clk/samsung/Kconfig
->>> index 84196ecdaa12..5f138fc4d84d 100644
->>> --- a/drivers/clk/samsung/Kconfig
->>> +++ b/drivers/clk/samsung/Kconfig
->>> @@ -2,6 +2,7 @@ config COMMON_CLK_SAMSUNG
->>>  	bool
->>>  	select COMMON_CLK
->>>  
->>> +# ARMv7 SoCs:
->>>  config S3C2410_COMMON_CLK
->>>  	bool
->>>  	select COMMON_CLK_SAMSUNG
->>> @@ -24,3 +25,15 @@ config S3C2443_COMMON_CLK
->>>  	bool
->>>  	select COMMON_CLK_SAMSUNG
->>>  
->>> +# ARMv8 SoCs:
->>> +config EXYNOS5433_COMMON_CLK
->>> +	bool
->>> +	depends on ARM64 || COMPILE_TEST
->>> +	default ARCH_EXYNOS
->>> +	select COMMON_CLK_SAMSUNG
->>> +
->>> +config EXYNOS7_COMMON_CLK
->>> +	bool
->>> +	depends on ARM64 || COMPILE_TEST
->>> +	default ARCH_EXYNOS
->>> +	select COMMON_CLK_SAMSUNG
->>> diff --git a/drivers/clk/samsung/Makefile b/drivers/clk/samsung/Makefile
->>> index 5f6833ea355d..a31332a24ef4 100644
->>> --- a/drivers/clk/samsung/Makefile
->>> +++ b/drivers/clk/samsung/Makefile
->>> @@ -10,11 +10,11 @@ obj-$(CONFIG_SOC_EXYNOS5250)	+= clk-exynos5250.o
->>>  obj-$(CONFIG_SOC_EXYNOS5260)	+= clk-exynos5260.o
->>>  obj-$(CONFIG_SOC_EXYNOS5410)	+= clk-exynos5410.o
->>>  obj-$(CONFIG_SOC_EXYNOS5420)	+= clk-exynos5420.o
->>> -obj-$(CONFIG_ARCH_EXYNOS)	+= clk-exynos5433.o
->>> +obj-$(CONFIG_EXYNOS5433_COMMON_CLK)	+= clk-exynos5433.o
->>>  obj-$(CONFIG_SOC_EXYNOS5440)	+= clk-exynos5440.o
->>>  obj-$(CONFIG_ARCH_EXYNOS)	+= clk-exynos-audss.o
->>>  obj-$(CONFIG_ARCH_EXYNOS)	+= clk-exynos-clkout.o
->>> -obj-$(CONFIG_ARCH_EXYNOS7)	+= clk-exynos7.o
->>> +obj-$(CONFIG_EXYNOS7_COMMON_CLK)	+= clk-exynos7.o
->>>  obj-$(CONFIG_S3C2410_COMMON_CLK)+= clk-s3c2410.o
->>>  obj-$(CONFIG_S3C2410_COMMON_DCLK)+= clk-s3c2410-dclk.o
->>>  obj-$(CONFIG_S3C2412_COMMON_CLK)+= clk-s3c2412.o
->>>
+On Mon, Nov 16, 2015 at 4:40 AM, Masahiro Yamada
+<yamada.masahiro@socionext.com> wrote:
+> 2015-11-05 22:40 GMT+09:00 Linus Walleij <linus.walleij@linaro.org>:
+>> On Thu, Nov 5, 2015 at 12:15 PM, Masahiro Yamada
+>> <yamada.masahiro@socionext.com> wrote:
 >>
->> So in this approach we need to add separate config for clock support of
->> each ARM64 Exynos64 SoC. Is this fine?
+>>> ARCH_SUNXI selects RESET_CONTROLLER.
+>>> The dependency "depends on RESET_CONTROLLER" is already met.
+>>>
+>>> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
 >>
->> Can we club compilation of each ARM64 Exynos SoC clock file under
->> EXYNOS7_COMMON_CLK? As for all ARM64 SoC there is single defconfig and
->> binary.
-> 
-> Yes, it can be one config symbol for all clocks of ARMv8 Exynos SoCs.
-> From my point of view both has some advantages and disadvantages (kernel
-> size, granularity, number of Kconfig symbols etc.) and I don't mind
-> choosing different than I selected before.
-> 
-> Any opinion from Samsung clock maintainers? Which do you prefer?
+>> NACK, this pin controller needs that as dependency, I don't worry
+>> that it's overspecified.
+>>
+>> They both do this:
+>> #include <linux/reset.h>
+>>
+>> And the object should specify its dependencies, not rely on them
+>> being implicitly available.
+>>
+>> The dep is there for human readers too, not just machines. And to
+>> them, this is helpful information.
+>
+> How strict we should follow this rule?
+>
+> Many drivers depend on OF, but do they all have "depends on OF"?
 
-It would have been a bit unfortunate to not be able to exclude
-the unneeded clk drivers from build.  From my side both patches
-look like a step in right direction.
+I think they should, and if they are in my subsystems I consider
+it a bug if they don't have this dependency. Also it is a very common
+reason why test compiles fail.
 
-For the $subject patch:
-
-Acked-by: Sylwester Nawrocki <s.nawrocki@samsung.com>
-
--- 
-Thanks
-Sylwester
+Yours,
+Linus Walleij
