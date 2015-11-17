@@ -1,27 +1,27 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 17 Nov 2015 11:58:52 +0100
-Subject: [PATCH] [media] move media platform data to
- linux/platform_data/media
-In-Reply-To: <564B04CF.1090507@gmail.com>
-References: <4d99e49726942dc4d6a6ee1debf6665b2b47908b.1447751746.git.mchehab@osg.samsung.com>
- <7319142.Cp8MurgLWk@wuerfel> <564B04CF.1090507@gmail.com>
-Message-ID: <17824361.38HLxMaChG@wuerfel>
+From: JBeulich@suse.com (Jan Beulich)
+Date: Tue, 17 Nov 2015 04:04:58 -0700
+Subject: [PATCH v3 59/62] xen/arm: Add a hypercall for device mmio mapping
+In-Reply-To: <1447753261-7552-60-git-send-email-shannon.zhao@linaro.org>
+References: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
+ <1447753261-7552-60-git-send-email-shannon.zhao@linaro.org>
+Message-ID: <564B17EA02000078000B5D34@prv-mh.provo.novell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 17 November 2015 11:43:27 Anton Bondarenko wrote:
-> On 17.11.2015 10:23, Arnd Bergmann wrote:
-> > On Tuesday 17 November 2015 07:15:59 Mauro Carvalho Chehab wrote:
-> >> Now that media has its own subdirectory inside platform_data,
-> >> let's move the headers that are already there to such subdir.
-> >>
-> >>
-> >
-> > Acked-by: Arnd Bergmann <arnd@arndb.de>
-> 
-> Why does dma-imx.h also moved? It's the generic file, not a media specific.
+>>> On 17.11.15 at 10:40, <shannon.zhao@linaro.org> wrote:
+> --- a/xen/arch/arm/mm.c
+> +++ b/xen/arch/arm/mm.c
+> @@ -1138,6 +1138,10 @@ int xenmem_add_to_physmap_one(
+>          rcu_unlock_domain(od);
+>          break;
+>      }
+> +    case XENMAPSPACE_dev_mmio:
+> +        rc = map_dev_mmio_region(d, gpfn, 1, idx);
+> +        return rc;
+> +        break;
 
-You are right, I missed that when I looked at the patch. That part
-of the patch needs to be taken out.
+Blindly for any kind of domain? The XSM check in the
+XENMEM_add_to_physmap_batch handler (in common code) doesn't
+even know which map space is to be used...
 
-	Arnd
+Jan
