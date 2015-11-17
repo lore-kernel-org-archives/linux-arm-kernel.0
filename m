@@ -1,86 +1,132 @@
 From: shannon.zhao@linaro.org (shannon.zhao at linaro.org)
-Date: Tue, 17 Nov 2015 17:40:41 +0800
-Subject: [PATCH v3 42/62] arm/acpi: Prepare FADT table for Dom0
+Date: Tue, 17 Nov 2015 17:40:42 +0800
+Subject: [PATCH v3 43/62] arm/acpi: Prepare MADT table for Dom0
 In-Reply-To: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
 References: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
-Message-ID: <1447753261-7552-43-git-send-email-shannon.zhao@linaro.org>
+Message-ID: <1447753261-7552-44-git-send-email-shannon.zhao@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Shannon Zhao <shannon.zhao@linaro.org>
 
-Copy and modify FADT table before passing it to Dom0. Set PSCI_COMPLIANT
-and PSCI_USE_HVC.
+Copy and modify MADT table before passing it to Dom0. Copy
+dom0_max_vcpus of GICCs and GICD as well.
 
 Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
 ---
- xen/arch/arm/domain_build.c | 45 +++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 45 insertions(+)
+ xen/arch/arm/domain_build.c | 98 +++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 98 insertions(+)
 
 diff --git a/xen/arch/arm/domain_build.c b/xen/arch/arm/domain_build.c
-index b5ed44c..5d03dc0 100644
+index 5d03dc0..4591955 100644
 --- a/xen/arch/arm/domain_build.c
 +++ b/xen/arch/arm/domain_build.c
-@@ -1357,6 +1357,46 @@ static int prepare_dtb(struct domain *d, struct kernel_info *kinfo)
- }
- 
+@@ -1359,6 +1359,100 @@ static int prepare_dtb(struct domain *d, struct kernel_info *kinfo)
  #ifdef CONFIG_ACPI
-+#define XEN_HYPERVISOR_ID 0x000058656E564D4D  /* "XenVMM" */
-+
-+static int acpi_create_fadt(struct domain *d, struct membank tbl_add[])
+ #define XEN_HYPERVISOR_ID 0x000058656E564D4D  /* "XenVMM" */
+ 
++static int acpi_create_madt(struct domain *d, struct membank tbl_add[])
 +{
 +    struct acpi_table_header *table = NULL;
-+    struct acpi_table_fadt *fadt = NULL;
-+    u64 table_size;
++    struct acpi_table_madt *madt = NULL;
++    struct acpi_madt_generic_distributor gicd;
++    u64 table_size = sizeof(struct acpi_table_madt);
 +    acpi_status status;
++    int i;
 +    u8 *base_ptr;
 +    u8 checksum;
 +
-+    status = acpi_get_table(ACPI_SIG_FADT, 0, &table);
++    status = acpi_get_table(ACPI_SIG_MADT, 0, &table);
 +
 +    if ( ACPI_FAILURE(status) )
 +    {
 +        const char *msg = acpi_format_exception(status);
 +
-+        printk("Failed to get FADT table, %s\n", msg);
++        printk("Failed to get MADT table, %s\n", msg);
 +        return -EINVAL;
 +    }
 +
-+    table_size = table->length;
 +    base_ptr = d->arch.efi_acpi_table
-+               + acpi_get_table_offset(tbl_add, TBL_FADT);
++               + acpi_get_table_offset(tbl_add, TBL_MADT);
 +    ACPI_MEMCPY(base_ptr, table, table_size);
-+    fadt = (struct acpi_table_fadt *)base_ptr;
 +
-+    /* Set PSCI_COMPLIANT and PSCI_USE_HVC */
-+    fadt->arm_boot_flags |= (ACPI_FADT_PSCI_COMPLIANT | ACPI_FADT_PSCI_USE_HVC);
-+    fadt->hypervisor_id = XEN_HYPERVISOR_ID;
-+    checksum = acpi_tb_checksum(ACPI_CAST_PTR(u8, fadt), table_size);
-+    fadt->header.checksum -= checksum;
++    /* Add Generic Distributor */
++    memset(&gicd, 0, sizeof(gicd));
++    gicd.header.type = ACPI_MADT_TYPE_GENERIC_DISTRIBUTOR;
++    gicd.header.length = sizeof(gicd);
++    gicd.base_address = d->arch.vgic.dbase;
++    if ( d->arch.vgic.version == GIC_V2 )
++        gicd.version = ACPI_MADT_GIC_VERSION_V2;
++    else if ( d->arch.vgic.version == GIC_V3 )
++        gicd.version = ACPI_MADT_GIC_VERSION_V3;
++    else
++        gicd.version = ACPI_MADT_GIC_VERSION_NONE;
++    ACPI_MEMCPY(base_ptr + table_size, &gicd, sizeof(gicd));
++    table_size += sizeof(gicd);
 +
-+    tbl_add[TBL_FADT].start = d->arch.efi_acpi_gpa
-+                              + acpi_get_table_offset(tbl_add, TBL_FADT);
-+    tbl_add[TBL_FADT].size = table_size;
++    if ( d->arch.vgic.version == GIC_V3 ) {
++        /* Add Generic Redistributor */
++        for ( i = 0; i < d->arch.vgic.nr_regions; i++ ) {
++            struct acpi_madt_generic_redistributor gicr;
++
++            memset(&gicr, 0, sizeof(gicr));
++            gicr.header.type = ACPI_MADT_TYPE_GENERIC_REDISTRIBUTOR;
++            gicr.header.length = sizeof(gicr);
++            gicr.base_address = d->arch.vgic.rdist_regions[i].base;
++            gicr.length = d->arch.vgic.rdist_regions[i].size;
++            ACPI_MEMCPY(base_ptr + table_size, &gicr, sizeof(gicr));
++            table_size += sizeof(gicr);
++        }
++    } else {
++        /* Add Generic Interrupt */
++        for ( i = 0; i < d->max_vcpus; i++ )
++        {
++            struct acpi_madt_generic_interrupt gicc;
++            u64 mpidr = 0;
++            u32 id = i, j = 0;
++
++            memset(&gicc, 0, sizeof(gicc));
++            gicc.header.type = ACPI_MADT_TYPE_GENERIC_INTERRUPT;
++            gicc.header.length = sizeof(gicc);
++            gicc.cpu_interface_number = i;
++            gicc.uid = i;
++            gicc.flags = ACPI_MADT_ENABLED;
++            gicc.base_address = d->arch.vgic.cbase;
++
++            do {
++                mpidr |= (id % 4) << (8 * j);
++                j++;
++                if ( j ==3 )
++                    j++;
++                id = id / 4;
++            } while(id > 0);
++            gicc.arm_mpidr = mpidr;
++
++            ACPI_MEMCPY(base_ptr + table_size, &gicc, sizeof(gicc));
++            table_size += sizeof(gicc);
++        }
++    }
++
++    madt = (struct acpi_table_madt *)base_ptr;
++    madt->header.length = table_size;
++    checksum = acpi_tb_checksum(ACPI_CAST_PTR(u8, madt), table_size);
++    madt->header.checksum -= checksum;
++
++    tbl_add[TBL_MADT].start = d->arch.efi_acpi_gpa
++                              + acpi_get_table_offset(tbl_add, TBL_MADT);
++    tbl_add[TBL_MADT].size = table_size;
 +
 +    return 0;
 +}
 +
- static int estimate_acpi_efi_size(struct domain *d, struct kernel_info *kinfo)
+ static int acpi_create_fadt(struct domain *d, struct membank tbl_add[])
  {
-     u64 efi_size, acpi_size = 0, addr;
-@@ -1400,6 +1440,7 @@ static int prepare_acpi(struct domain *d, struct kernel_info *kinfo)
- {
-     int rc = 0;
-     int order;
-+    struct membank tbl_add[TBL_MMAX] = {};
- 
-     rc = estimate_acpi_efi_size(d, kinfo);
+     struct acpi_table_header *table = NULL;
+@@ -1463,6 +1557,10 @@ static int prepare_acpi(struct domain *d, struct kernel_info *kinfo)
      if ( rc != 0 )
-@@ -1418,6 +1459,10 @@ static int prepare_acpi(struct domain *d, struct kernel_info *kinfo)
-      * region. So we use it as the ACPI table mapped address. */
-     d->arch.efi_acpi_gpa = kinfo->gnttab_start;
+         return rc;
  
-+    rc = acpi_create_fadt(d, tbl_add);
++    rc = acpi_create_madt(d, tbl_add);
 +    if ( rc != 0 )
 +        return rc;
 +
