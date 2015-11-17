@@ -1,40 +1,60 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 17 Nov 2015 10:01:36 +0100
-Subject: [PATCH] cpufreq: do not mark s3c2410_plls_add as __init
-In-Reply-To: <564A899C.4040402@samsung.com>
-References: <8497197.sYxqVOch7s@wuerfel> <4389196.cuM78vZZnJ@wuerfel>
- <564A899C.4040402@samsung.com>
-Message-ID: <4654010.UfKTsDKyes@wuerfel>
+From: public_timo.s@silentcreek.de (Timo Sigurdsson)
+Date: Tue, 17 Nov 2015 10:03:09 +0100 (CET)
+Subject: [PATCH] ARM: sunxi: Re-enable SID driver in multi_v7_defconfig
+In-Reply-To: <CAJKOXPdBnMcoFDuVMm3zgDcZwDVfeotySvAbO+bvzDX0T-AX4g@mail.gmail.com>
+References: <1447724947-4851-1-git-send-email-public_timo.s@silentcreek.de>
+ <564A8CAD.8050004@samsung.com>
+ <1447747294.6274.8.camel@silentcreek.de><CAJKOXPdBnMcoFDuVMm3zgDcZwDVfeotySvAbO+bvzDX0T-AX4g@mail.gmail.com>
+Message-ID: <20151117090309.09ACC6C80816@dd34104.kasserver.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 17 November 2015 10:57:48 Krzysztof Kozlowski wrote:
-> On 17.11.2015 07:17, Arnd Bergmann wrote:
-> > On Monday 16 November 2015 23:36:42 Rafael J. Wysocki wrote:
-> >>
-> >> This should go in through the Samsung tree, so I'll leave it for them to pick
-> >> it up (at least for the time being).
-> > 
-> > Ok, fair enough. Kukjin or Krzysztof, can you pick this up?
+Hi,
+
+Krzysztof Kozlowski schrieb am 17.11.2015 09:21:
+
+[...]
+
+>>> > @@ -450,8 +431,7 @@ CONFIG_MEDIA_CAMERA_SUPPORT=y
+>>> >  CONFIG_MEDIA_CONTROLLER=y
+>>> >  CONFIG_VIDEO_V4L2_SUBDEV_API=y
+>>> >  CONFIG_MEDIA_USB_SUPPORT=y
+>>> > -CONFIG_USB_VIDEO_CLASS=y
+>>> > -CONFIG_USB_GSPCA=y
+>>> > +CONFIG_USB_VIDEO_CLASS=m
+>>> >  CONFIG_V4L_PLATFORM_DRIVERS=y
+>>> >  CONFIG_SOC_CAMERA=m
+>>> >  CONFIG_SOC_CAMERA_PLATFORM=m
+>>> > @@ -465,28 +445,25 @@ CONFIG_DRM=y
+>>> >  CONFIG_DRM_I2C_ADV7511=m
+>>> >  # CONFIG_DRM_I2C_CH7006 is not set
+>>> >  # CONFIG_DRM_I2C_SIL164 is not set
+>>> > -CONFIG_DRM_NXP_PTN3460=m
+>>> > -CONFIG_DRM_PARADE_PS8622=m
+>>> >  CONFIG_DRM_NOUVEAU=m
+>>> >  CONFIG_DRM_EXYNOS=m
+>>> > -CONFIG_DRM_EXYNOS_DSI=y
+>>> >  CONFIG_DRM_EXYNOS_FIMD=y
+>>> > -CONFIG_DRM_EXYNOS_HDMI=y
+>>>
+>>> I would prefer leaving the EXYNOS_HDMI. Dependencies are now not enabled
+>>> but we are fixing it in:
+>>> http://www.spinics.net/lists/dri-devel/msg93299.html
+>>
+>> I think the problem here is that I don't see this patch in linux-next
+>> yet.
+>>
 > 
-> Sure.
-> 
-> As for the patch I think everything can be converted to init/initdata
-> (as in attachment).
-> 
+> Indeed... and I don't know when it will go there so actually maybe it
+> should be removed... but in the same time removing DRM_EXYNOS_HDMI
+> will probably make some conflicts because mentioned patch will go
+> through Exynos DRM tree or Samsung SoC.
 
-I don't think so:
+Since you suggested to split my patch into two, I might as well just
+hold off the "cleanup" patch until Andrzejs patch hits linux-next.
+Is that ok?
 
-static struct subsys_interface s3c2442_plls169344_interface __initdata = {
-        .name           = "s3c2442_plls169344",
-        .subsys         = &s3c2442_subsys,
-        .add_dev        = s3c2440_plls169344_add,
-};
 
-This gets passed into subsys_interface_register(), which is not __init
-in turn. subsys_interface_register() then goes on to add
-s3c2442_plls169344_interface into a linked list that is traversed
-at runtime, but the __initdata section gets discarded so you now
-have a broken list.
+Regards,
 
-	Arnd
+Timo
