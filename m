@@ -1,29 +1,49 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 17 Nov 2015 10:50:44 +0100
-Subject: [PATCH v3 04/62] arm/acpi: Emulate io ports for arm
-In-Reply-To: <1447753261-7552-5-git-send-email-shannon.zhao@linaro.org>
-References: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
- <1447753261-7552-5-git-send-email-shannon.zhao@linaro.org>
-Message-ID: <4167037.Po02bj0iif@wuerfel>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 17 Nov 2015 10:56:10 +0100
+Subject: [PATCHv2] arm64: Fix R/O permissions in mark_rodata_ro
+In-Reply-To: <564A5DC8.9090307@redhat.com>
+References: <CAKv+Gu8Z7bkogGUGcNbuSoEbUBAwVmtFNhX9VcbypucaUGd+HQ@mail.gmail.com>
+ <1447359670-23652-1-git-send-email-labbott@fedoraproject.org>
+ <CAKv+Gu_xkiH8w2gor8SEp4y2UV9KSKTp9Kjtr6C9aU7XduZ06g@mail.gmail.com>
+ <564A5DC8.9090307@redhat.com>
+Message-ID: <CAKv+Gu9qoZBJRzmKvi_MrbUJgqqwvC+y=v_vUap+m1FW==Tb9w@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 17 November 2015 17:40:03 shannon.zhao at linaro.org wrote:
-> +/*
-> + * Emulate x86 io ports for arm.
-> + */
-> +#define __armio(addr) ( (void __iomem *)addr )
-> +
-> +#define inb(c) ( readb( __armio(c) ) )
-> +#define inw(c) ( readw( __armio(c) ) )
-> +#define inl(c) ( readl( __armio(c) ) )
-> +
-> +#define outb(v, c) ( writeb(v, __armio(c) ) )
-> +#define outw(v, c) ( writew(v, __armio(c) ) )
-> +#define outl(v, c) ( writel(v, __armio(c) ) )
-> +
+On 16 November 2015 at 23:50, Laura Abbott <labbott@redhat.com> wrote:
+> On 11/14/2015 11:38 PM, Ard Biesheuvel wrote:
+>>
+>> On 12 November 2015 at 21:21, Laura Abbott <labbott@fedoraproject.org>
+>> wrote:
+>>>
+>>> The permissions in mark_rodata_ro trigger a build error
+>>> with STRICT_MM_TYPECHECKS. Fix this by introducing
+>>> PAGE_KERNEL_ROX for the same reasons as PAGE_KERNEL_RO.
+>>
+>>
+>> Forgive the bikeshedding but perhaps PAGE_KERNEL_EXEC_RO is more
+>> consistent?
+>>
+>
+> powerpc was using PAGE_KERNEL_ROX so I went with that. Blame powerpc ;)
+>
 
-This is almost certainly wrong. There might be I/O port accesses, but they
-won't be in the same place as normal pointers.
+OK, in that case, let's keep PAGE_KERNEL_ROX
 
-	Arnd
+>>>
+>>>  From Ard:
+>>>
+>>> "PAGE_KERNEL_EXEC has PTE_WRITE set as well, making the range
+>>> writeable under the ARMv8.1 DBM feature, that manages the
+>>> dirty bit in hardware (writing to a page with the PTE_RDONLY
+>>> and PTE_WRITE bits both set will clear the PTE_RDONLY bit in that case)"
+>>>
+>>> Signed-off-by: Laura Abbott <labbott@fedoraproject.org>
+>>
+>>
+>> Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>>
+>
+> Thanks,
+> Laura
+>
