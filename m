@@ -1,75 +1,78 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 17 Nov 2015 10:21:44 +0100
-Subject: [PATCH v2 04/12] arm64/efi: split off EFI init and runtime code
- for reuse by 32-bit ARM
-In-Reply-To: <20151116184821.GC8644@n2100.arm.linux.org.uk>
-References: <1447698757-8762-1-git-send-email-ard.biesheuvel@linaro.org>
- <1447698757-8762-5-git-send-email-ard.biesheuvel@linaro.org>
- <20151116184821.GC8644@n2100.arm.linux.org.uk>
-Message-ID: <CAKv+Gu8+0ezm-8En6MGkjRmb1VkU8tN38rSRixqf0JjL8nDVsg@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 17 Nov 2015 10:22:06 +0100
+Subject: [PATCH] crypto: atmel: fix 64-bit warnings
+Message-ID: <4444008.DmhAgm3J77@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16 November 2015 at 19:48, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Mon, Nov 16, 2015 at 07:32:29PM +0100, Ard Biesheuvel wrote:
->> +/*
->> + * Enable the UEFI Runtime Services if all prerequisites are in place, i.e.,
->> + * non-early mapping of the UEFI system table and virtual mappings for all
->> + * EFI_MEMORY_RUNTIME regions.
->> + */
->> +static int __init arm64_enable_runtime_services(void)
->> +{
->> +     u64 mapsize;
->> +
->> +     if (!efi_enabled(EFI_BOOT)) {
->> +             pr_info("EFI services will not be available.\n");
->> +             return -1;
->> +     }
->> +
->> +     if (efi_runtime_disabled()) {
->> +             pr_info("EFI runtime services will be disabled.\n");
->> +             return -1;
->> +     }
->> +
->> +     pr_info("Remapping and enabling EFI services.\n");
->> +
->> +     mapsize = memmap.map_end - memmap.map;
->> +     memmap.map = (__force void *)ioremap_cache(memmap.phys_map,
->> +                                                mapsize);
->> +     if (!memmap.map) {
->> +             pr_err("Failed to remap EFI memory map\n");
->> +             return -1;
->> +     }
->> +     memmap.map_end = memmap.map + mapsize;
->> +     efi.memmap = &memmap;
->> +
->> +     efi.systab = (__force void *)ioremap_cache(efi_system_table,
->> +                                                sizeof(efi_system_table_t));
->> +     if (!efi.systab) {
->> +             pr_err("Failed to remap EFI System Table\n");
->> +             return -1;
->> +     }
->> +     set_bit(EFI_SYSTEM_TABLES, &efi.flags);
->> +
->> +     if (!efi_virtmap_init()) {
->> +             pr_err("No UEFI virtual mapping was installed -- runtime services will not be available\n");
->> +             return -1;
->> +     }
->> +
->> +     /* Set up runtime services function pointers */
->> +     efi_native_runtime_setup();
->> +     set_bit(EFI_RUNTIME_SERVICES, &efi.flags);
->> +
->> +     efi.runtime_version = efi.systab->hdr.revision;
->> +
->> +     return 0;
->> +}
->> +early_initcall(arm64_enable_runtime_services);
->
-> The above ought to be fixed - initcalls return negative errno numbers,
-> so returning -1 from them is really not acceptable.  (The original code
-> was doing the same - so it should be fixed as a separate patch.)
->
+The atmel AES driver assumes that 'int' and 'size_t' are the same
+type in multiple locations, which the compiler warns about when
+building it for 64-bit systems:
 
-Indeed. I will add a patch to v3 to address this.
+In file included from ../drivers/crypto/atmel-aes.c:17:0:
+drivers/crypto/atmel-aes.c: In function 'atmel_aes_sg_copy':
+include/linux/kernel.h:724:17: warning: comparison of distinct pointer types lacks a cast
+drivers/crypto/atmel-aes.c:448:11: note: in expansion of macro 'min'
+
+drivers/crypto/atmel-aes.c: In function 'atmel_aes_crypt_dma_stop':
+include/linux/kern_levels.h:4:18: warning: format '%u' expects argument of type 'unsigned int', but argument 2 has type 'size_t {aka long unsigned int}' [-Wformat=]
+
+This changes the format strings to use the %z modifier when printing
+a size_t, and makes sure that we use the correct size_t type where
+needed. In case of sg_dma_len(), the type of the result depends
+on CONFIG_NEED_SG_DMA_LENGTH, so we have to use min_t to get it to
+work in all configurations.
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+
+diff --git a/drivers/crypto/atmel-aes.c b/drivers/crypto/atmel-aes.c
+index fb16d812c8f5..bfb1f799bf56 100644
+--- a/drivers/crypto/atmel-aes.c
++++ b/drivers/crypto/atmel-aes.c
+@@ -184,7 +184,7 @@ static int atmel_aes_sg_length(struct ablkcipher_request *req,
+ static int atmel_aes_sg_copy(struct scatterlist **sg, size_t *offset,
+ 			void *buf, size_t buflen, size_t total, int out)
+ {
+-	unsigned int count, off = 0;
++	size_t count, off = 0;
+ 
+ 	while (buflen && total) {
+ 		count = min((*sg)->length - *offset, total);
+@@ -444,8 +444,8 @@ static int atmel_aes_crypt_dma_start(struct atmel_aes_dev *dd)
+ 
+ 
+ 	if (fast)  {
+-		count = min(dd->total, sg_dma_len(dd->in_sg));
+-		count = min(count, sg_dma_len(dd->out_sg));
++		count = min_t(size_t, dd->total, sg_dma_len(dd->in_sg));
++		count = min_t(size_t, count, sg_dma_len(dd->out_sg));
+ 
+ 		err = dma_map_sg(dd->dev, dd->in_sg, 1, DMA_TO_DEVICE);
+ 		if (!err) {
+@@ -639,7 +639,7 @@ static int atmel_aes_crypt_dma_stop(struct atmel_aes_dev *dd)
+ 				dd->buf_out, dd->buflen, dd->dma_size, 1);
+ 			if (count != dd->dma_size) {
+ 				err = -EINVAL;
+-				pr_err("not all data converted: %u\n", count);
++				pr_err("not all data converted: %zu\n", count);
+ 			}
+ 		}
+ 	}
+@@ -666,7 +666,7 @@ static int atmel_aes_buff_init(struct atmel_aes_dev *dd)
+ 	dd->dma_addr_in = dma_map_single(dd->dev, dd->buf_in,
+ 					dd->buflen, DMA_TO_DEVICE);
+ 	if (dma_mapping_error(dd->dev, dd->dma_addr_in)) {
+-		dev_err(dd->dev, "dma %d bytes error\n", dd->buflen);
++		dev_err(dd->dev, "dma %zd bytes error\n", dd->buflen);
+ 		err = -EINVAL;
+ 		goto err_map_in;
+ 	}
+@@ -674,7 +674,7 @@ static int atmel_aes_buff_init(struct atmel_aes_dev *dd)
+ 	dd->dma_addr_out = dma_map_single(dd->dev, dd->buf_out,
+ 					dd->buflen, DMA_FROM_DEVICE);
+ 	if (dma_mapping_error(dd->dev, dd->dma_addr_out)) {
+-		dev_err(dd->dev, "dma %d bytes error\n", dd->buflen);
++		dev_err(dd->dev, "dma %zd bytes error\n", dd->buflen);
+ 		err = -EINVAL;
+ 		goto err_map_out;
+ 	}
