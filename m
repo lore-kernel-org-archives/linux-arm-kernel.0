@@ -1,60 +1,71 @@
-From: public_timo.s@silentcreek.de (Timo Sigurdsson)
-Date: Tue, 17 Nov 2015 10:03:09 +0100 (CET)
-Subject: [PATCH] ARM: sunxi: Re-enable SID driver in multi_v7_defconfig
-In-Reply-To: <CAJKOXPdBnMcoFDuVMm3zgDcZwDVfeotySvAbO+bvzDX0T-AX4g@mail.gmail.com>
-References: <1447724947-4851-1-git-send-email-public_timo.s@silentcreek.de>
- <564A8CAD.8050004@samsung.com>
- <1447747294.6274.8.camel@silentcreek.de><CAJKOXPdBnMcoFDuVMm3zgDcZwDVfeotySvAbO+bvzDX0T-AX4g@mail.gmail.com>
-Message-ID: <20151117090309.09ACC6C80816@dd34104.kasserver.com>
+From: info@lategoodbye.de (Stefan Wahren)
+Date: Tue, 17 Nov 2015 10:04:53 +0100
+Subject: [PATCH] dmaengine: bcm2835-dma: Convert to use DMA pool
+In-Reply-To: <564ADB44.9050005@ti.com>
+References: <1447672143-14201-1-git-send-email-peter.ujfalusi@ti.com>
+ <564ADB44.9050005@ti.com>
+Message-ID: <564AEDB5.7000201@lategoodbye.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Peter,
 
-Krzysztof Kozlowski schrieb am 17.11.2015 09:21:
-
-[...]
-
->>> > @@ -450,8 +431,7 @@ CONFIG_MEDIA_CAMERA_SUPPORT=y
->>> >  CONFIG_MEDIA_CONTROLLER=y
->>> >  CONFIG_VIDEO_V4L2_SUBDEV_API=y
->>> >  CONFIG_MEDIA_USB_SUPPORT=y
->>> > -CONFIG_USB_VIDEO_CLASS=y
->>> > -CONFIG_USB_GSPCA=y
->>> > +CONFIG_USB_VIDEO_CLASS=m
->>> >  CONFIG_V4L_PLATFORM_DRIVERS=y
->>> >  CONFIG_SOC_CAMERA=m
->>> >  CONFIG_SOC_CAMERA_PLATFORM=m
->>> > @@ -465,28 +445,25 @@ CONFIG_DRM=y
->>> >  CONFIG_DRM_I2C_ADV7511=m
->>> >  # CONFIG_DRM_I2C_CH7006 is not set
->>> >  # CONFIG_DRM_I2C_SIL164 is not set
->>> > -CONFIG_DRM_NXP_PTN3460=m
->>> > -CONFIG_DRM_PARADE_PS8622=m
->>> >  CONFIG_DRM_NOUVEAU=m
->>> >  CONFIG_DRM_EXYNOS=m
->>> > -CONFIG_DRM_EXYNOS_DSI=y
->>> >  CONFIG_DRM_EXYNOS_FIMD=y
->>> > -CONFIG_DRM_EXYNOS_HDMI=y
->>>
->>> I would prefer leaving the EXYNOS_HDMI. Dependencies are now not enabled
->>> but we are fixing it in:
->>> http://www.spinics.net/lists/dri-devel/msg93299.html
+Am 17.11.2015 um 08:46 schrieb Peter Ujfalusi:
+> Hi,
+>
+> On 11/16/2015 01:09 PM, Peter Ujfalusi wrote:
+>> f93178291712 dmaengine: bcm2835-dma: Fix memory leak when stopping a
+>> 	     running transfer
 >>
->> I think the problem here is that I don't see this patch in linux-next
->> yet.
+>> Fixed the memleak, but introduced another issue: the terminate_all callback
+>> might be called with interrupts disabled and the dma_free_coherent() is
+>> not allowed to be called when IRQs are disabled.
+>> Convert the driver to use dma_pool_* for managing the list of control
+>> blocks for the transfer.
+>
+> FWIW: the patch has been tested and verified on Raspbery Pi:
+> https://github.com/raspberrypi/linux/pull/1178#issuecomment-157026794
+> https://github.com/raspberrypi/linux/pull/1178#issuecomment-157030190
+>
+> It needed some modification since the Raspberry Pi kernel have non upstreamed
+> changes in bcm2835-dma driver (slave_sg support for example).
+>
+> It would be great if this patch can make it to 4.4 as a fix.
+>
+> Thanks,
+> P?ter
+>
 >>
-> 
-> Indeed... and I don't know when it will go there so actually maybe it
-> should be removed... but in the same time removing DRM_EXYNOS_HDMI
-> will probably make some conflicts because mentioned patch will go
-> through Exynos DRM tree or Samsung SoC.
+>> Fixes: f93178291712 ("dmaengine: bcm2835-dma: Fix memory leak when stopping a running transfer")
+>> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
+>> ---
+>> Hi,
+>>
+>> It was brought to my attention that the memleak fix broke the bcm2835 DMA. I did
+>> not noticed the use of dma_free_coherent() in the driver when I did the memleak
+>> fix.
+>> Since the driver does leaking memory every time the audio is stopped, the other
+>> option is to convert it to use DMA pool.
+>> I do not have access the Raspberry Pi, so I can not test this patch but it
+>> compiles ;)
+>> Can someone test this one out if it is working?
 
-Since you suggested to split my patch into two, I might as well just
-hold off the "cleanup" patch until Andrzejs patch hits linux-next.
-Is that ok?
+i tried to test it yesterday with dmatest until i noticed that the 
+bcm2835 dmaengine didn't provide the necessary capabilities (DMA_MEMCPY).
 
+Sorry, i'm not an expert here. Could you please provide at least one 
+test scenario which should work with Linux 4.4-rc1 without any special 
+hardware?
 
-Regards,
+Do you know which bcm2835 drivers make use of the relevant code?
 
-Timo
+Btw if you want that somebody test the patch for you, then it's possible 
+to mark it as request for testing "[PATCH RFT]".
+
+Best regards
+Stefan
+
+>>
+>> Regards,
+>> Peter
+>>
