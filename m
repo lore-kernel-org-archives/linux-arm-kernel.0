@@ -1,56 +1,26 @@
-From: ludovic.desroches@atmel.com (Ludovic Desroches)
-Date: Tue, 17 Nov 2015 14:33:41 +0100
-Subject: [PATCH] pinctrl: at91-pio4: use %pr format string for resource
-In-Reply-To: <3726450.XyTgssZ1KT@wuerfel>
-References: <3726450.XyTgssZ1KT@wuerfel>
-Message-ID: <20151117133341.GG16931@odux.rfo.atmel.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 17 Nov 2015 14:33:49 +0100
+Subject: [PATCH] pinctrl: qcom: qdf2xxx: improve error checking and
+ reporting
+In-Reply-To: <1447171030-15056-1-git-send-email-timur@codeaurora.org>
+References: <1447171030-15056-1-git-send-email-timur@codeaurora.org>
+Message-ID: <CACRpkdb4Ck4XCUEKX7TEgCg8723vZA-sxqmd753O1q9uTBszfQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+On Tue, Nov 10, 2015 at 4:57 PM, Timur Tabi <timur@codeaurora.org> wrote:
 
-On Thu, Nov 12, 2015 at 03:15:38PM +0100, Arnd Bergmann wrote:
-> resource_size_t may be defined as 32 or 64 bit depending on configuration,
-> so it cannot be printed using the normal format strings, as gcc correctly
-> warns:
-> 
-> pinctrl-at91-pio4.c: In function 'atmel_pinctrl_probe':
-> pinctrl-at91-pio4.c:1003:41: warning: format '%u' expects argument of type 'unsigned int', but argument 5 has type 'resource_size_t {aka long long unsigned int}' [-Wformat=]
->    dev_dbg(dev, "bank %i: hwirq=%u\n", i, res->start);
-> 
-> This changes the format string to use the special "%pr" format
-> string that prints a resource, and changes the arguments so we
-> the resource structure directly. I'm also swapping out the arguments
-> to match the text in the format string.
-> 
+> The driver doesn't report an error message if the ACPI tables are missing
+> the num-gpios property (which indicates how many GPIOs there are on this
+> SOC), and it didn't check to ensure that the mallocs didn't fail.
+>
+> Signed-off-by: Timur Tabi <timur@codeaurora.org>
 
-I agree the format change but not swapping out the arguments. Why do you have
-the feeling they are not matching the text?
+Waiting for Bj?rn's ACK on this.
 
-Few lines before you have:
-res = platform_get_resource(pdev, IORESOURCE_IRQ, i);
-atmel_pioctrl->irqs[i] = res->start;
+And I suspect Arnd would be interested to know if you are doing
+ACPI on something that is certainly not a server-class hardware.
+Because you shouldn't.
 
-Each bank has its own irq line this is what I want to print with hwirq.
-Of course it assumes that interrupts are declared in the right order.
-
-Regards
-
-Ludovic
-
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> 
-> diff --git a/drivers/pinctrl/pinctrl-at91-pio4.c b/drivers/pinctrl/pinctrl-at91-pio4.c
-> index 33edd07d9149..23217e990eaf 100644
-> --- a/drivers/pinctrl/pinctrl-at91-pio4.c
-> +++ b/drivers/pinctrl/pinctrl-at91-pio4.c
-> @@ -1000,7 +1000,7 @@ static int atmel_pinctrl_probe(struct platform_device *pdev)
->  		atmel_pioctrl->irqs[i] = res->start;
->  		irq_set_chained_handler(res->start, atmel_gpio_irq_handler);
->  		irq_set_handler_data(res->start, atmel_pioctrl);
-> -		dev_dbg(dev, "bank %i: hwirq=%u\n", i, res->start);
-> +		dev_dbg(dev, "bank %pr: hwirq=%u\n", res, i);
->  	}
->  
->  	atmel_pioctrl->irq_domain = irq_domain_add_linear(dev->of_node,
-> 
+Yours,
+Linus Walleij
