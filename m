@@ -1,33 +1,24 @@
-From: julien.grall@citrix.com (Julien Grall)
-Date: Tue, 17 Nov 2015 14:25:58 +0000
-Subject: [PATCH v3 24/62] arm: Introduce a generic way to use a device
- from acpi
-In-Reply-To: <564B29EA.3060107@huawei.com>
-References: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
- <1447753261-7552-25-git-send-email-shannon.zhao@linaro.org>
- <564B2023.8010801@citrix.com> <564B29EA.3060107@huawei.com>
-Message-ID: <564B38F6.9070101@citrix.com>
+From: herbert@gondor.apana.org.au (Herbert Xu)
+Date: Tue, 17 Nov 2015 22:27:42 +0800
+Subject: [PATCH] crypto: sun4i-ss: add missing statesize
+In-Reply-To: <20151117142603.GA1669@Red>
+References: <1447420229-17911-1-git-send-email-clabbe.montjoie@gmail.com>
+ <20151117140938.GH9546@gondor.apana.org.au>
+ <20151117142603.GA1669@Red>
+Message-ID: <20151117142742.GA10019@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/11/15 13:21, Shannon Zhao wrote:
->> AFAICT, it does only works for SPCR table used for UART device. For the
->> GIC you've hardcoded the value and I can't find any version number in
->> the table.
->>
-> No, I didn't hardcode the GIC version. Since ACPI 6.0 introduces GIC
-> version in generic distributor table, it could get the version from
-> that. Please see [PATCH v3 28/62].
+On Tue, Nov 17, 2015 at 03:26:03PM +0100, LABBE Corentin wrote:
+>
+> I have lots of user reporting that they cannot use the device since it wont load.
+> For me it need to go stable since it respect all "stable rules", simple, tested, minimal, and fix a real bug that bother people.
 
-+    if ( dist->version == ACPI_MADT_GIC_VERSION_V2 )
-+        rc = acpi_device_init(DEVICE_GIC, NULL, GIC_V2);
-+    else if ( dist->version == ACPI_MADT_GIC_VERSION_V3 )
-+        rc = acpi_device_init(DEVICE_GIC, NULL, GIC_V3);
+Well it will hit stable eventually.  I just don't feel comfortable
+with sending it in straight away.
 
-Every single time a new GIC version will be added, we will had to add
-another else if. I'm sorry but it's what I call hardcoding.
-
-Regards,
-
+Cheers,
 -- 
-Julien Grall
+Email: Herbert Xu <herbert@gondor.apana.org.au>
+Home Page: http://gondor.apana.org.au/~herbert/
+PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
