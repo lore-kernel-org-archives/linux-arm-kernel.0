@@ -1,75 +1,48 @@
-From: shannon.zhao@linaro.org (shannon.zhao at linaro.org)
-Date: Tue, 17 Nov 2015 17:40:38 +0800
-Subject: [PATCH v3 39/62] arm/acpi: Read acpi memory info from uefi
-In-Reply-To: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
-References: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
-Message-ID: <1447753261-7552-40-git-send-email-shannon.zhao@linaro.org>
+From: bayi.cheng@mediatek.com (Bayi Cheng)
+Date: Tue, 17 Nov 2015 17:46:16 +0800
+Subject: [PATCH v7 2/2] arm64: dts: mt8173: Add nor flash node
+In-Reply-To: <1447753576-28528-1-git-send-email-bayi.cheng@mediatek.com>
+References: <1447753576-28528-1-git-send-email-bayi.cheng@mediatek.com>
+Message-ID: <1447753576-28528-3-git-send-email-bayi.cheng@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Parth Dixit <parth.dixit@linaro.org>
+Add Mediatek nor flash node
 
-ACPI memory is seperate from conventional memory and should be marked
-as reserved while passing to DOM0. Create a new meminfo structure to
-store all the acpi tables listed in uefi.
-
-Signed-off-by: Parth Dixit <parth.dixit@linaro.org>
-Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+Signed-off-by: Bayi Cheng <bayi.cheng@mediatek.com>
+Acked-by: Brian Norris <computersforpeace@gmail.com>
 ---
- xen/arch/arm/efi/efi-boot.h | 23 +++++++++++++++++++++++
- 1 file changed, 23 insertions(+)
+ arch/arm64/boot/dts/mediatek/mt8173.dtsi | 18 +++++++++++++++++-
+ 1 file changed, 17 insertions(+), 1 deletion(-)
 
-diff --git a/xen/arch/arm/efi/efi-boot.h b/xen/arch/arm/efi/efi-boot.h
-index e427e5f..c58caca 100644
---- a/xen/arch/arm/efi/efi-boot.h
-+++ b/xen/arch/arm/efi/efi-boot.h
-@@ -17,6 +17,9 @@ void __flush_dcache_area(const void *vaddr, unsigned long size);
- static struct file __initdata dtbfile;
- static void __initdata *fdt;
- static void __initdata *memmap;
-+#ifdef CONFIG_ACPI
-+static struct meminfo __initdata acpi_mem;
-+#endif
+diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+index 4dd5f93..7988656 100644
+--- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
++++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+@@ -387,7 +387,23 @@
+ 			status = "disabled";
+ 		};
  
- static int __init setup_chosen_node(void *fdt, int *addr_cells, int *size_cells)
- {
-@@ -129,6 +132,9 @@ static EFI_STATUS __init efi_process_memory_map_bootinfo(EFI_MEMORY_DESCRIPTOR *
- {
-     int Index;
-     int i = 0;
-+#ifdef CONFIG_ACPI
-+    int j = 0;
-+#endif
-     EFI_MEMORY_DESCRIPTOR *desc_ptr = map;
- 
-     for ( Index = 0; Index < (mmap_size / desc_size); Index++ )
-@@ -148,10 +154,27 @@ static EFI_STATUS __init efi_process_memory_map_bootinfo(EFI_MEMORY_DESCRIPTOR *
-             bootinfo.mem.bank[i].size = desc_ptr->NumberOfPages * EFI_PAGE_SIZE;
-             ++i;
-         }
-+#ifdef CONFIG_ACPI
-+        else if ( desc_ptr->Type == EfiACPIReclaimMemory )
-+        {
-+            if ( j >= NR_MEM_BANKS )
-+            {
-+                PrintStr(L"Error: All " __stringify(NR_MEM_BANKS)
-+                          " acpi meminfo mem banks exhausted.\r\n");
-+                return EFI_LOAD_ERROR;
-+            }
-+            acpi_mem.bank[j].start = desc_ptr->PhysicalStart;
-+            acpi_mem.bank[j].size  = desc_ptr->NumberOfPages * EFI_PAGE_SIZE;
-+            ++j;
-+        }
-+#endif
-         desc_ptr = NextMemoryDescriptor(desc_ptr, desc_size);
-     }
- 
-     bootinfo.mem.nr_banks = i;
-+#ifdef CONFIG_ACPI
-+    acpi_mem.nr_banks = j;
-+#endif
-     return EFI_SUCCESS;
- }
- 
+-		i2c3: i2c at 11010000 {
++		nor_flash: spi at 1100d000 {
++			compatible = "mediatek,mt8173-nor";
++			reg = <0 0x1100d000 0 0xe0>;
++			clocks = <&pericfg CLK_PERI_SPI>,
++				 <&topckgen CLK_TOP_SPINFI_IFR_SEL>;
++			clock-names = "spi", "sf";
++			#address-cells = <1>;
++			#size-cells = <0>;
++			status = "disabled";
++
++			flash at 0 {
++				compatible = "jedec,spi-nor";
++				reg = <0>;
++			};
++		};
++
++		i2c3: i2c3 at 11010000 {
+ 			compatible = "mediatek,mt8173-i2c";
+ 			reg = <0 0x11010000 0 0x70>,
+ 			      <0 0x11000280 0 0x80>;
 -- 
-2.1.0
+1.8.1.1.dirty
