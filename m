@@ -1,46 +1,26 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 17 Nov 2015 15:03:56 +0100
-Subject: [RFC PATCH 4/7] pinctrl: sunxi: remove redundant "depends on
- RESET_CONTROLLER"
-In-Reply-To: <CAK7LNAThCGYWjXD4=OdgukUBLhyAtmHFH6VXO1V4DCFCpfTRjg@mail.gmail.com>
-References: <1446722128-11961-1-git-send-email-yamada.masahiro@socionext.com>
- <1446722128-11961-5-git-send-email-yamada.masahiro@socionext.com>
- <CACRpkdYmdyxi+6fZNGffE6-JBZGkyq3F__Ywc4rCYYEsQeimMQ@mail.gmail.com>
- <CAK7LNAThCGYWjXD4=OdgukUBLhyAtmHFH6VXO1V4DCFCpfTRjg@mail.gmail.com>
-Message-ID: <CACRpkdbPPPfwrvLpG_NSBAxHzUpTYZN2e+foAEVPisV5HxHUPA@mail.gmail.com>
+From: herbert@gondor.apana.org.au (Herbert Xu)
+Date: Tue, 17 Nov 2015 22:09:38 +0800
+Subject: [PATCH] crypto: sun4i-ss: add missing statesize
+In-Reply-To: <1447420229-17911-1-git-send-email-clabbe.montjoie@gmail.com>
+References: <1447420229-17911-1-git-send-email-clabbe.montjoie@gmail.com>
+Message-ID: <20151117140938.GH9546@gondor.apana.org.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 16, 2015 at 4:40 AM, Masahiro Yamada
-<yamada.masahiro@socionext.com> wrote:
-> 2015-11-05 22:40 GMT+09:00 Linus Walleij <linus.walleij@linaro.org>:
->> On Thu, Nov 5, 2015 at 12:15 PM, Masahiro Yamada
->> <yamada.masahiro@socionext.com> wrote:
->>
->>> ARCH_SUNXI selects RESET_CONTROLLER.
->>> The dependency "depends on RESET_CONTROLLER" is already met.
->>>
->>> Signed-off-by: Masahiro Yamada <yamada.masahiro@socionext.com>
->>
->> NACK, this pin controller needs that as dependency, I don't worry
->> that it's overspecified.
->>
->> They both do this:
->> #include <linux/reset.h>
->>
->> And the object should specify its dependencies, not rely on them
->> being implicitly available.
->>
->> The dep is there for human readers too, not just machines. And to
->> them, this is helpful information.
->
-> How strict we should follow this rule?
->
-> Many drivers depend on OF, but do they all have "depends on OF"?
+On Fri, Nov 13, 2015 at 02:10:28PM +0100, LABBE Corentin wrote:
+> sun4i-ss implementaton of md5/sha1 is via ahash algorithms.
+> Commit 8996eafdcbad ("crypto: ahash - ensure statesize is non-zero")
+> made impossible to load them without giving statesize. This patch
+> specifiy statesize for sha1 and md5.
+> 
+> Fixes: 6298e948215f ("crypto: sunxi-ss - Add Allwinner Security System crypto accelerator")
+> Cc: <stable@vger.kernel.org> # v4.3+
+> Tested-by: Chen-Yu Tsai <wens@csie.org>
+> Signed-off-by: LABBE Corentin <clabbe.montjoie@gmail.com>
 
-I think they should, and if they are in my subsystems I consider
-it a bug if they don't have this dependency. Also it is a very common
-reason why test compiles fail.
-
-Yours,
-Linus Walleij
+Patch applied to cryptodev as I don't think it needs to go into
+stable straight away.  Thanks.
+-- 
+Email: Herbert Xu <herbert@gondor.apana.org.au>
+Home Page: http://gondor.apana.org.au/~herbert/
+PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
