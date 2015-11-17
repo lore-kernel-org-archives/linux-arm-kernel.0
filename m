@@ -1,40 +1,119 @@
 From: shannon.zhao@linaro.org (shannon.zhao at linaro.org)
-Date: Tue, 17 Nov 2015 17:40:42 +0800
-Subject: [PATCH v3 43/62] arm/acpi: Prepare MADT table for Dom0
+Date: Tue, 17 Nov 2015 17:40:26 +0800
+Subject: [PATCH v3 27/62] arm/gic-v3: Add ACPI boot support for GICv3
 In-Reply-To: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
 References: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
-Message-ID: <1447753261-7552-44-git-send-email-shannon.zhao@linaro.org>
+Message-ID: <1447753261-7552-28-git-send-email-shannon.zhao@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Shannon Zhao <shannon.zhao@linaro.org>
 
-Copy and modify MADT table before passing it to Dom0. Copy
-dom0_max_vcpus of GICCs and GICD as well.
+Like GICv2, ACPI on Xen hypervisor uses MADT table for proper GICv3
+initialization. Parse GIC distributor subtable, redistributor subtable
+and interrupt subtable.
 
 Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
 ---
- xen/arch/arm/domain_build.c | 98 +++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 98 insertions(+)
+ xen/arch/arm/gic-v3.c | 182 +++++++++++++++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 181 insertions(+), 1 deletion(-)
 
-diff --git a/xen/arch/arm/domain_build.c b/xen/arch/arm/domain_build.c
-index 5d03dc0..4591955 100644
---- a/xen/arch/arm/domain_build.c
-+++ b/xen/arch/arm/domain_build.c
-@@ -1359,6 +1359,100 @@ static int prepare_dtb(struct domain *d, struct kernel_info *kinfo)
- #ifdef CONFIG_ACPI
- #define XEN_HYPERVISOR_ID 0x000058656E564D4D  /* "XenVMM" */
+diff --git a/xen/arch/arm/gic-v3.c b/xen/arch/arm/gic-v3.c
+index bd13010..fa732d7 100644
+--- a/xen/arch/arm/gic-v3.c
++++ b/xen/arch/arm/gic-v3.c
+@@ -34,6 +34,8 @@
+ #include <xen/sizes.h>
+ #include <xen/libfdt/libfdt.h>
+ #include <xen/sort.h>
++#include <xen/acpi.h>
++#include <acpi/actables.h>
+ #include <asm/p2m.h>
+ #include <asm/domain.h>
+ #include <asm/io.h>
+@@ -41,6 +43,7 @@
+ #include <asm/gic.h>
+ #include <asm/gic_v3_defs.h>
+ #include <asm/cpufeature.h>
++#include <asm/acpi.h>
  
-+static int acpi_create_madt(struct domain *d, struct membank tbl_add[])
+ /* Global state */
+ static struct {
+@@ -1242,6 +1245,164 @@ static void __init dt_gicv3_init(void)
+     }
+ }
+ 
++#ifdef CONFIG_ACPI
++static int __init
++gic_acpi_parse_madt_cpu(struct acpi_subtable_header *header,
++                        const unsigned long end)
 +{
-+    struct acpi_table_header *table = NULL;
-+    struct acpi_table_madt *madt = NULL;
-+    struct acpi_madt_generic_distributor gicd;
-+    u64 table_size = sizeof(struct acpi_table_madt);
++    static bool cpu_base_assigned = false;
++    struct acpi_madt_generic_interrupt *processor;
++
++    processor = (struct acpi_madt_generic_interrupt *)header;
++
++    if ( BAD_MADT_ENTRY(processor, end) )
++        return -EINVAL;
++
++    /* Read from APIC table and fill up the GIC variables */
++    if ( !cpu_base_assigned )
++    {
++        cbase = processor->base_address;
++        csize = SZ_8K;
++        vbase = processor->gicv_base_address;
++        gicv3_info.maintenance_irq = processor->vgic_interrupt;
++
++        if( processor->flags & ACPI_MADT_VGIC_IRQ_MODE )
++            irq_set_type(gicv3_info.maintenance_irq, ACPI_IRQ_TYPE_EDGE_BOTH);
++        else
++            irq_set_type(gicv3_info.maintenance_irq, ACPI_IRQ_TYPE_LEVEL_MASK);
++
++	cpu_base_assigned = true;
++    }
++    else
++    {
++        if ( cbase != processor->base_address
++             || vbase != processor->gicv_base_address
++             || gicv3_info.maintenance_irq != processor->vgic_interrupt )
++        {
++	    printk("GICv3: GICC entries are not same in MADT table\n");
++	    return -EINVAL;
++        }
++    }
++
++    return 0;
++}
++
++static int __init
++gic_acpi_parse_madt_distributor(struct acpi_subtable_header *header,
++                                const unsigned long end)
++{
++    struct acpi_madt_generic_distributor *dist;
++
++    dist = (struct acpi_madt_generic_distributor *)header;
++
++    if ( BAD_MADT_ENTRY(dist, end) )
++        return -EINVAL;
++
++    dbase = dist->base_address;
++
++    return 0;
++}
++static int __init
++gic_acpi_get_madt_redistributor_num(struct acpi_subtable_header *header,
++                                    const unsigned long end)
++{
++    return 0;
++}
++
++static void __init acpi_gicv3_init(void)
++{
++    struct acpi_table_header *table;
++    struct rdist_region *rdist_regs;
 +    acpi_status status;
-+    int i;
-+    u8 *base_ptr;
-+    u8 checksum;
++    int count, i;
++    uint32_t reg;
 +
 +    status = acpi_get_table(ACPI_SIG_MADT, 0, &table);
 +
@@ -42,96 +121,123 @@ index 5d03dc0..4591955 100644
 +    {
 +        const char *msg = acpi_format_exception(status);
 +
-+        printk("Failed to get MADT table, %s\n", msg);
-+        return -EINVAL;
++        panic("GICv3: Failed to get MADT table, %s", msg);
 +    }
 +
-+    base_ptr = d->arch.efi_acpi_table
-+               + acpi_get_table_offset(tbl_add, TBL_MADT);
-+    ACPI_MEMCPY(base_ptr, table, table_size);
++    /*
++     * Find distributor base address. We expect one distributor entry since
++     * ACPI 5.0 spec neither support multi-GIC instances nor GIC cascade.
++     */
++    count = acpi_parse_entries(ACPI_SIG_MADT, sizeof(struct acpi_table_madt),
++                               gic_acpi_parse_madt_distributor, table,
++                               ACPI_MADT_TYPE_GENERIC_DISTRIBUTOR, 0);
 +
-+    /* Add Generic Distributor */
-+    memset(&gicd, 0, sizeof(gicd));
-+    gicd.header.type = ACPI_MADT_TYPE_GENERIC_DISTRIBUTOR;
-+    gicd.header.length = sizeof(gicd);
-+    gicd.base_address = d->arch.vgic.dbase;
-+    if ( d->arch.vgic.version == GIC_V2 )
-+        gicd.version = ACPI_MADT_GIC_VERSION_V2;
-+    else if ( d->arch.vgic.version == GIC_V3 )
-+        gicd.version = ACPI_MADT_GIC_VERSION_V3;
++    if ( count <= 0 )
++        panic("GICv3: No valid GICD entries exists");
++
++    if ( (dbase & ~PAGE_MASK) )
++        panic("GICv3: Found unaligned distributor address %"PRIpaddr"",
++              dbase);
++
++    gicv3.map_dbase = ioremap_nocache(dbase, SZ_64K);
++    if ( !gicv3.map_dbase )
++        panic("GICv3: Failed to ioremap for GIC distributor\n");
++
++    reg = readl_relaxed(GICD + GICD_PIDR2) & GIC_PIDR2_ARCH_MASK;
++    if ( reg != GIC_PIDR2_ARCH_GICv3 )
++         panic("GICv3: no distributor detected\n");
++
++    /* Get number of redistributor */
++    count = acpi_parse_entries(ACPI_SIG_MADT, sizeof(struct acpi_table_madt),
++                               gic_acpi_get_madt_redistributor_num, table,
++                               ACPI_MADT_TYPE_GENERIC_REDISTRIBUTOR, 0);
++    if ( count <= 0 )
++        panic("GICv3: No valid GICR entries exists");
++
++    gicv3.rdist_count = count;
++
++    if ( gicv3.rdist_count > MAX_RDIST_COUNT )
++        panic("GICv3: Number of redistributor regions is more than"
++              "%d (Increase MAX_RDIST_COUNT!!)\n", MAX_RDIST_COUNT);
++
++    rdist_regs = xzalloc_array(struct rdist_region, gicv3.rdist_count);
++    if ( !rdist_regs )
++        panic("GICv3: Failed to allocate memory for rdist regions\n");
++
++    for ( i = 0; i < gicv3.rdist_count; i++ )
++    {
++        struct acpi_subtable_header *subtable;
++        struct acpi_madt_generic_redistributor *gic_rdist;
++
++        subtable = acpi_get_entry(ACPI_SIG_MADT, sizeof(struct acpi_table_madt),
++                                  table, ACPI_MADT_TYPE_GENERIC_REDISTRIBUTOR,
++                                  i);
++        if ( !subtable )
++            panic("GICv3: Can't get GICR entry");
++
++	gic_rdist = (struct acpi_madt_generic_redistributor *)subtable;
++        rdist_regs[i].base = gic_rdist->base_address;
++        rdist_regs[i].size = gic_rdist->length;
++    }
++
++    /* The vGIC code requires the region to be sorted */
++    sort(rdist_regs, gicv3.rdist_count, sizeof(*rdist_regs), cmp_rdist, NULL);
++
++    gicv3.rdist_regions= rdist_regs;
++
++    /* Collect CPU base addresses */
++    count = acpi_parse_entries(ACPI_SIG_MADT, sizeof(struct acpi_table_madt),
++                               gic_acpi_parse_madt_cpu, table,
++                               ACPI_MADT_TYPE_GENERIC_INTERRUPT, 0);
++    if ( count <= 0 )
++        panic("GICv3: No valid GICC entries exists");
++
++    gicv3.rdist_stride = 0;
++}
++#else
++static void __init acpi_gicv3_init(void)
++{
++/* Should never reach here */
++}
++#endif
++
+ /* Set up the GIC */
+ static int __init gicv3_init(void)
+ {
+@@ -1253,7 +1414,10 @@ static int __init gicv3_init(void)
+         return -ENODEV;
+     }
+ 
+-    dt_gicv3_init();
++    if( acpi_disabled )
++        dt_gicv3_init();
 +    else
-+        gicd.version = ACPI_MADT_GIC_VERSION_NONE;
-+    ACPI_MEMCPY(base_ptr + table_size, &gicd, sizeof(gicd));
-+    table_size += sizeof(gicd);
-+
-+    if ( d->arch.vgic.version == GIC_V3 ) {
-+        /* Add Generic Redistributor */
-+        for ( i = 0; i < d->arch.vgic.nr_regions; i++ ) {
-+            struct acpi_madt_generic_redistributor gicr;
-+
-+            memset(&gicr, 0, sizeof(gicr));
-+            gicr.header.type = ACPI_MADT_TYPE_GENERIC_REDISTRIBUTOR;
-+            gicr.header.length = sizeof(gicr);
-+            gicr.base_address = d->arch.vgic.rdist_regions[i].base;
-+            gicr.length = d->arch.vgic.rdist_regions[i].size;
-+            ACPI_MEMCPY(base_ptr + table_size, &gicr, sizeof(gicr));
-+            table_size += sizeof(gicr);
-+        }
-+    } else {
-+        /* Add Generic Interrupt */
-+        for ( i = 0; i < d->max_vcpus; i++ )
-+        {
-+            struct acpi_madt_generic_interrupt gicc;
-+            u64 mpidr = 0;
-+            u32 id = i, j = 0;
-+
-+            memset(&gicc, 0, sizeof(gicc));
-+            gicc.header.type = ACPI_MADT_TYPE_GENERIC_INTERRUPT;
-+            gicc.header.length = sizeof(gicc);
-+            gicc.cpu_interface_number = i;
-+            gicc.uid = i;
-+            gicc.flags = ACPI_MADT_ENABLED;
-+            gicc.base_address = d->arch.vgic.cbase;
-+
-+            do {
-+                mpidr |= (id % 4) << (8 * j);
-+                j++;
-+                if ( j ==3 )
-+                    j++;
-+                id = id / 4;
-+            } while(id > 0);
-+            gicc.arm_mpidr = mpidr;
-+
-+            ACPI_MEMCPY(base_ptr + table_size, &gicc, sizeof(gicc));
-+            table_size += sizeof(gicc);
-+        }
-+    }
-+
-+    madt = (struct acpi_table_madt *)base_ptr;
-+    madt->header.length = table_size;
-+    checksum = acpi_tb_checksum(ACPI_CAST_PTR(u8, madt), table_size);
-+    madt->header.checksum -= checksum;
-+
-+    tbl_add[TBL_MADT].start = d->arch.efi_acpi_gpa
-+                              + acpi_get_table_offset(tbl_add, TBL_MADT);
-+    tbl_add[TBL_MADT].size = table_size;
++        acpi_gicv3_init();
+ 
+     for ( i = 0; i < gicv3.rdist_count; i++ )
+     {
+@@ -1345,6 +1509,22 @@ DT_DEVICE_START(gicv3, "GICv3", DEVICE_GIC)
+         .init = dt_gicv3_preinit,
+ DT_DEVICE_END
+ 
++#ifdef CONFIG_ACPI
++/* Set up the GIC */
++static int __init acpi_gicv3_preinit(const void *data)
++{
++    gicv3_info.hw_version = GIC_V3;
++    register_gic_ops(&gicv3_ops);
 +
 +    return 0;
 +}
 +
- static int acpi_create_fadt(struct domain *d, struct membank tbl_add[])
- {
-     struct acpi_table_header *table = NULL;
-@@ -1463,6 +1557,10 @@ static int prepare_acpi(struct domain *d, struct kernel_info *kinfo)
-     if ( rc != 0 )
-         return rc;
- 
-+    rc = acpi_create_madt(d, tbl_add);
-+    if ( rc != 0 )
-+        return rc;
++ACPI_DEVICE_START(agicv3, "GICv3", DEVICE_GIC)
++        .class_type = GIC_V3,
++        .init = acpi_gicv3_preinit,
++ACPI_DEVICE_END
++#endif
 +
-     return 0;
- }
- #else
+ /*
+  * Local variables:
+  * mode: C
 -- 
 2.1.0
