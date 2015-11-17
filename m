@@ -1,61 +1,200 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Tue, 17 Nov 2015 09:48:56 -0800
-Subject: [PATCH v3 1/5] spi: introduce mmap read support for spi flash
- devices
-In-Reply-To: <564AC9FD.6090909@ti.com>
-References: <1447133399-25658-1-git-send-email-vigneshr@ti.com>
- <1447133399-25658-2-git-send-email-vigneshr@ti.com>
- <20151110232341.GU12143@google.com> <5642E546.3040806@ti.com>
- <20151111072041.GA13174@localhost> <56460A4D.30303@atmel.com>
- <564AC9FD.6090909@ti.com>
-Message-ID: <20151117174856.GB8456@google.com>
+From: michal.simek@xilinx.com (Michal Simek)
+Date: Tue, 17 Nov 2015 18:53:12 +0100
+Subject: [PATCH] fpga: zynq-fpga: Avoid hammering clk_{enable/disable}.
+In-Reply-To: <1447780317-27758-1-git-send-email-moritz.fischer@ettus.com>
+References: <1447780317-27758-1-git-send-email-moritz.fischer@ettus.com>
+Message-ID: <564B6988.5020104@xilinx.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
-
-On Tue, Nov 17, 2015 at 12:02:29PM +0530, Vignesh R wrote:
-> On 11/13/2015 09:35 PM, Cyrille Pitchen wrote:
-> > 
-> > In September I've sent a series of patches to enhance the support of QSPI flash
-> > memories. Patch 4 was dedicated to the m25p80 driver and set the
-> > rx_nbits / tx_nbits fields of spi_transfer struct(s) in order to configure the
-> > number of I/O lines independently for the opcode, address and data parts.
-> > The work was done for m25p80_read() but also for _read_reg(), _write_reg() and
-> > _write().
-> > The patched m25p80 driver was then tested with an at25 memory to check non-
-> > regression.
-> > 
-> > This series of patches also added 4 enum spi_protocol fields inside struct
-> > spi_nor so the spi-nor framework can tell the (Q)SPI controller driver what SPI
-> > protocol should be use for erase, read, write and register read/write
-> > operations, depending on the memory manufacturer and the command opcode.
-> > This was done to better support Micron, Spansion and Macronix QSPI memories.
-> > 
-> > I have tested the series with Micron QSPI memories and Atmel QSPI controller
-> > and I guess Marek also tested it on his side with Spansion QSPI memories and
-> > another QSPI controller.
-> > 
-> > So if it can help other developers to develop QSPI controller drivers, the
-> > series is still available there:
-> > 
-> > for the whole series:
-> > http://lists.infradead.org/pipermail/linux-arm-kernel/2015-September/371170.html
-> > 
-> > for patch 4 (depends on patch 2 for enum spi_protocol):
-> > http://lists.infradead.org/pipermail/linux-arm-kernel/2015-September/371173.html
-> > 
+On 17.11.2015 18:11, Moritz Fischer wrote:
+> Replaced constant clock_{enable,disable} calls with pm_runtime
+> hooks.
 > 
-> Should I rebase my next version on top of above patches by Cyrille or
-> shall I post on top of 4.4-rc1?
+> Signed-off-by: Moritz Fischer <moritz.fischer@ettus.com>
+> ---
+>  drivers/fpga/zynq-fpga.c | 79 +++++++++++++++++++++++++++++++++++++-----------
+>  1 file changed, 62 insertions(+), 17 deletions(-)
+> 
+> diff --git a/drivers/fpga/zynq-fpga.c b/drivers/fpga/zynq-fpga.c
+> index c2fb412..5c03fb8 100644
+> --- a/drivers/fpga/zynq-fpga.c
+> +++ b/drivers/fpga/zynq-fpga.c
+> @@ -28,6 +28,7 @@
+>  #include <linux/of_address.h>
+>  #include <linux/of_irq.h>
+>  #include <linux/pm.h>
+> +#include <linux/pm_runtime.h>
+>  #include <linux/regmap.h>
+>  #include <linux/string.h>
+>  
+> @@ -184,8 +185,8 @@ static int zynq_fpga_ops_write_init(struct fpga_manager *mgr, u32 flags,
+>  
+>  	priv = mgr->priv;
+>  
+> -	err = clk_enable(priv->clk);
+> -	if (err)
+> +	err = pm_runtime_get_sync(priv->dev);
+> +	if (err < 0)
+>  		return err;
+>  
+>  	/* don't globally reset PL if we're doing partial reconfig */
+> @@ -271,12 +272,12 @@ static int zynq_fpga_ops_write_init(struct fpga_manager *mgr, u32 flags,
+>  	ctrl = zynq_fpga_read(priv, MCTRL_OFFSET);
+>  	zynq_fpga_write(priv, MCTRL_OFFSET, (~MCTRL_PCAP_LPBK_MASK & ctrl));
+>  
+> -	clk_disable(priv->clk);
+> +	pm_runtime_put(priv->dev);
+>  
+>  	return 0;
+>  
+>  out_err:
+> -	clk_disable(priv->clk);
+> +	pm_runtime_put(priv->dev);
+>  
+>  	return err;
+>  }
+> @@ -301,9 +302,8 @@ static int zynq_fpga_ops_write(struct fpga_manager *mgr,
+>  
+>  	memcpy(kbuf, buf, count);
+>  
+> -	/* enable clock */
+> -	err = clk_enable(priv->clk);
+> -	if (err)
+> +	err = pm_runtime_get_sync(priv->dev);
+> +	if (err < 0)
+>  		goto out_free;
+>  
+>  	zynq_fpga_write(priv, INT_STS_OFFSET, IXR_ALL_MASK);
+> @@ -335,7 +335,7 @@ static int zynq_fpga_ops_write(struct fpga_manager *mgr,
+>  		err = -EFAULT;
+>  	}
+>  
+> -	clk_disable(priv->clk);
+> +	pm_runtime_put(priv->dev);
+>  
+>  out_free:
+>  	dma_free_coherent(priv->dev, in_count, kbuf, dma_addr);
+> @@ -349,8 +349,8 @@ static int zynq_fpga_ops_write_complete(struct fpga_manager *mgr, u32 flags)
+>  	int err;
+>  	u32 intr_status;
+>  
+> -	err = clk_enable(priv->clk);
+> -	if (err)
+> +	err = pm_runtime_get_sync(priv->dev);
+> +	if (err < 0)
+>  		return err;
+>  
+>  	err = zynq_fpga_poll_timeout(priv, INT_STS_OFFSET, intr_status,
+> @@ -358,7 +358,7 @@ static int zynq_fpga_ops_write_complete(struct fpga_manager *mgr, u32 flags)
+>  				     INIT_POLL_DELAY,
+>  				     INIT_POLL_TIMEOUT);
+>  
+> -	clk_disable(priv->clk);
+> +	pm_runtime_put(priv->dev);
+>  
+>  	if (err)
+>  		return err;
+> @@ -385,12 +385,12 @@ static enum fpga_mgr_states zynq_fpga_ops_state(struct fpga_manager *mgr)
+>  
+>  	priv = mgr->priv;
+>  
+> -	err = clk_enable(priv->clk);
+> -	if (err)
+> +	err = pm_runtime_get_sync(priv->dev);
+> +	if (err < 0)
+>  		return FPGA_MGR_STATE_UNKNOWN;
+>  
+>  	intr_status = zynq_fpga_read(priv, INT_STS_OFFSET);
+> -	clk_disable(priv->clk);
+> +	pm_runtime_put(priv->dev);
+>  
+>  	if (intr_status & IXR_PCFG_DONE_MASK)
+>  		return FPGA_MGR_STATE_OPERATING;
+> @@ -457,19 +457,26 @@ static int zynq_fpga_probe(struct platform_device *pdev)
+>  		return err;
+>  	}
+>  
+> +	pm_runtime_get_noresume(&pdev->dev);
+> +	pm_runtime_set_active(&pdev->dev);
+> +	pm_runtime_enable(&pdev->dev);
+> +
+>  	/* unlock the device */
+>  	zynq_fpga_write(priv, UNLOCK_OFFSET, UNLOCK_MASK);
+>  
+> -	clk_disable(priv->clk);
+>  
+>  	err = fpga_mgr_register(dev, "Xilinx Zynq FPGA Manager",
+>  				&zynq_fpga_ops, priv);
+>  	if (err) {
+>  		dev_err(dev, "unable to register FPGA manager");
+> -		clk_unprepare(priv->clk);
+> +		clk_disable_unprepare(priv->clk);
+> +		pm_runtime_put_noidle(&pdev->dev);
+> +		pm_runtime_disable(&pdev->dev);
+>  		return err;
+>  	}
+>  
+> +	pm_runtime_put(&pdev->dev);
+> +
+>  	return 0;
+>  }
+>  
+> @@ -483,11 +490,48 @@ static int zynq_fpga_remove(struct platform_device *pdev)
+>  
+>  	fpga_mgr_unregister(&pdev->dev);
+>  
+> -	clk_unprepare(priv->clk);
+> +	pm_runtime_get_sync(&pdev->dev);
+> +	clk_disable_unprepare(priv->clk);
+> +	pm_runtime_put_noidle(&pdev->dev);
+> +	pm_runtime_disable(&pdev->dev);
+>  
+>  	return 0;
+>  }
+>  
+> +#ifdef CONFIG_PM
 
-I'm sorry to say I really haven't had the time to review that properly.
-I'm also not sure it is a true dependency for your series, as you're
-tackling different pieces of the puzzle. So it's mostly just a conflict,
-not a real direct help.
+remove this
 
-So unless I'm misunderstanding, I'd suggest submitting MTD stuff against
-the latest l2-mtd.git (or linux-next.git; l2-mtd.git is included there),
-and I'll let you know if conflicts come up that need fixing.
+> +static int zynq_fpga_runtime_suspend(struct device *dev)
 
-Brian
+add __maybe_unused here
+
+> +{
+> +	struct zynq_fpga_priv *priv;
+> +	struct fpga_manager *mgr;
+> +
+> +	mgr = dev_get_drvdata(dev);
+> +	priv = mgr->priv;
+> +
+> +	clk_disable(priv->clk);
+> +
+> +	return 0;
+> +}
+> +
+> +static int zynq_fpga_runtime_resume(struct device *dev)
+
+and here
+
+> +{
+> +	struct zynq_fpga_priv *priv;
+> +	struct fpga_manager *mgr;
+> +
+> +	mgr = dev_get_drvdata(dev);
+> +	priv = mgr->priv;
+> +
+> +	clk_enable(priv->clk);
+> +
+> +	return 0;
+> +}
+> +
+> +#endif
+
+and remove this.
+
+Body has nothing specific what it is available only for CONFIG_PM that's
+why it should just work.
+
+Thanks,
+Michal
