@@ -1,52 +1,59 @@
 From: shannon.zhao@linaro.org (shannon.zhao at linaro.org)
-Date: Tue, 17 Nov 2015 17:40:15 +0800
-Subject: [PATCH v3 16/62] ACPICA: ACPI 6.0: Add values for MADT GIC version
- field
+Date: Tue, 17 Nov 2015 17:40:16 +0800
+Subject: [PATCH v3 17/62] arm/acpi: Print GIC information when MADT is parsed
 In-Reply-To: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
 References: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
-Message-ID: <1447753261-7552-17-git-send-email-shannon.zhao@linaro.org>
+Message-ID: <1447753261-7552-18-git-send-email-shannon.zhao@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Hanjun Guo <hanjun.guo@linaro.org>
+From: Naresh Bhat <naresh.bhat@linaro.org>
 
-ACPICA commit 4b100dc43e8baee8c8b4891b23bc7ad03eba6a28
+When MADT is parsed, print GIC information to make the boot
+log look pretty.
 
-Support for the new version field in the generic distributor
-subtable. Hanjun Guo <hanjun.guo@linaro.org>
-
-Link: https://github.com/acpica/acpica/commit/4b100dc4
 Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-Signed-off-by: Bob Moore <robert.moore@intel.com>
-Signed-off-by: Lv Zheng <lv.zheng@intel.com>
-Signed-off-by: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
-[Linux commit a8bd0f07eb594df51845d33f272fb1952fec1a6f]
+Signed-off-by: Tomasz Nowicki <tomasz.nowicki@linaro.org>
+Signed-off-by: Naresh Bhat <naresh.bhat@linaro.org>
 Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
 ---
- xen/include/acpi/actbl1.h | 11 +++++++++++
- 1 file changed, 11 insertions(+)
+ xen/drivers/acpi/tables.c | 24 ++++++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
 
-diff --git a/xen/include/acpi/actbl1.h b/xen/include/acpi/actbl1.h
-index 7dd6960..cf31837 100644
---- a/xen/include/acpi/actbl1.h
-+++ b/xen/include/acpi/actbl1.h
-@@ -804,6 +804,17 @@ struct acpi_madt_generic_distributor {
- 	u8 reserved2[3];          /* reserved - must be zero */
- };
+diff --git a/xen/drivers/acpi/tables.c b/xen/drivers/acpi/tables.c
+index 60c4ab1..6573175 100644
+--- a/xen/drivers/acpi/tables.c
++++ b/xen/drivers/acpi/tables.c
+@@ -189,6 +189,30 @@ void __init acpi_table_print_madt_entry(struct acpi_subtable_header *header)
+ 		}
+ 		break;
  
-+/* Values for Version field above */
++	case ACPI_MADT_TYPE_GENERIC_INTERRUPT:
++		{
++			struct acpi_madt_generic_interrupt *p =
++				(struct acpi_madt_generic_interrupt *)header;
++			printk(KERN_INFO PREFIX
++			       "GICC (acpi_id[0x%04x] address[%llx] MPIDR[0x%llx] %s)\n",
++			       p->uid, (long long unsigned int)p->base_address,
++			       (long long unsigned int)p->arm_mpidr,
++			       (p->flags & ACPI_MADT_ENABLED) ? "enabled" : "disabled");
 +
-+enum acpi_madt_gic_version {
-+	ACPI_MADT_GIC_VERSION_NONE = 0,
-+	ACPI_MADT_GIC_VERSION_V1 = 1,
-+	ACPI_MADT_GIC_VERSION_V2 = 2,
-+	ACPI_MADT_GIC_VERSION_V3 = 3,
-+	ACPI_MADT_GIC_VERSION_V4 = 4,
-+	ACPI_MADT_GIC_VERSION_RESERVED = 5      /* 5 and greater are reserved */
-+};
++		}
++		break;
 +
- /* 13: GIC MSI Frame (ACPI 5.1) */
- 
- struct acpi_madt_generic_msi_frame {
++	case ACPI_MADT_TYPE_GENERIC_DISTRIBUTOR:
++		{
++			struct acpi_madt_generic_distributor *p =
++				(struct acpi_madt_generic_distributor *)header;
++			printk(KERN_INFO PREFIX
++			       "GIC Distributor (gic_id[0x%04x] address[%llx] gsi_base[%d])\n",
++			       p->gic_id, (long long unsigned int)p->base_address,
++			       p->global_irq_base);
++		}
++		break;
++
+ 	default:
+ 		printk(KERN_WARNING PREFIX
+ 		       "Found unsupported MADT entry (type = %#x)\n",
 -- 
 2.1.0
