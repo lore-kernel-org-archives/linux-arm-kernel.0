@@ -1,44 +1,54 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 17 Nov 2015 11:50:47 +0100
-Subject: [PATCH] pinctrl: Delete unnecessary checks before the function
- call "pinctrl_unregister"
-In-Reply-To: <563B810B.6050401@users.sourceforge.net>
-References: <5307CAA2.8060406@users.sourceforge.net>
- <alpine.DEB.2.02.1402212321410.2043@localhost6.localdomain6>
- <530A086E.8010901@users.sourceforge.net>
- <alpine.DEB.2.02.1402231635510.1985@localhost6.localdomain6>
- <530A72AA.3000601@users.sourceforge.net>
- <alpine.DEB.2.02.1402240658210.2090@localhost6.localdomain6>
- <530B5FB6.6010207@users.sourceforge.net>
- <alpine.DEB.2.10.1402241710370.2074@hadrien>
- <530C5E18.1020800@users.sourceforge.net>
- <alpine.DEB.2.10.1402251014170.2080@hadrien>
- <530CD2C4.4050903@users.sourceforge.net>
- <alpine.DEB.2.10.1402251840450.7035@hadrien>
- <530CF8FF.8080600@users.sourceforge.net>
- <alpine.DEB.2.02.1402252117150.2047@localhost6.localdomain6>
- <530DD06F.4090703@users.sourceforge.net>
- <alpine.DEB.2.02.1402262129250.2221@localhost6.localdomain6>
- <5317A59D.4@users.sourceforge.net>
- <563B810B.6050401@users.sourceforge.net>
-Message-ID: <CACRpkdYDwOLsG3NVN36OJo0V+XgU4Z4r6KGy7RpYrmmdJVTyng@mail.gmail.com>
+From: shannon.zhao@linaro.org (shannon.zhao at linaro.org)
+Date: Tue, 17 Nov 2015 17:57:08 +0800
+Subject: [PATCH 10/13] ARM64: ACPI: Check if it runs on Xen to enable or
+ disable ACPI
+In-Reply-To: <1447754231-7772-1-git-send-email-shannon.zhao@linaro.org>
+References: <1447754231-7772-1-git-send-email-shannon.zhao@linaro.org>
+Message-ID: <1447754231-7772-11-git-send-email-shannon.zhao@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 5, 2015 at 5:17 PM, SF Markus Elfring
-<elfring@users.sourceforge.net> wrote:
+From: Shannon Zhao <shannon.zhao@linaro.org>
 
-> From: Markus Elfring <elfring@users.sourceforge.net>
-> Date: Thu, 5 Nov 2015 17:10:22 +0100
->
-> The pinctrl_unregister() function tests whether its argument is NULL
-> and then returns immediately. Thus the test around the call is not needed.
->
-> This issue was detected by using the Coccinelle software.
->
-> Signed-off-by: Markus Elfring <elfring@users.sourceforge.net>
+When it's a Xen domain0 booting with ACPI, it will supply a /chosen and
+a /hypervisor node in DT. So check if it needs to enable ACPI.
 
-Patch applied with Ray's Review tag.
+Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+---
+ arch/arm64/kernel/acpi.c | 12 ++++++++----
+ 1 file changed, 8 insertions(+), 4 deletions(-)
 
-Yours,
-Linus Walleij
+diff --git a/arch/arm64/kernel/acpi.c b/arch/arm64/kernel/acpi.c
+index 19de753..7b67426 100644
+--- a/arch/arm64/kernel/acpi.c
++++ b/arch/arm64/kernel/acpi.c
+@@ -62,10 +62,13 @@ static int __init dt_scan_depth1_nodes(unsigned long node,
+ {
+ 	/*
+ 	 * Return 1 as soon as we encounter a node at depth 1 that is
+-	 * not the /chosen node.
++	 * not the /chosen node or to Xen initial domain that is not
++	 * either /chosen or /hypervisor node.
+ 	 */
+ 	if (depth == 1 && (strcmp(uname, "chosen") != 0))
+-		return 1;
++		if (!xen_initial_domain() || (strcmp(uname, "hypervisor") != 0))
++			return 1;
++
+ 	return 0;
+ }
+ 
+@@ -179,8 +182,9 @@ void __init acpi_boot_table_init(void)
+ 	/*
+ 	 * Enable ACPI instead of device tree unless
+ 	 * - ACPI has been disabled explicitly (acpi=off), or
+-	 * - the device tree is not empty (it has more than just a /chosen node)
+-	 *   and ACPI has not been force enabled (acpi=force)
++	 * - the device tree is not empty (it has more than just a /chosen node
++	 *   or to Xen initial domain it has more than a /chosen node and
++	 *   /hypervisor node) and ACPI has not been force enabled (acpi=force)
+ 	 */
+ 	if (param_acpi_off ||
+ 	    (!param_acpi_force && of_scan_flat_dt(dt_scan_depth1_nodes, NULL)))
+-- 
+2.1.0
