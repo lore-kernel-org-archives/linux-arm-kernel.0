@@ -1,64 +1,30 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 17 Nov 2015 14:13:20 +0000
-Subject: [RESEND RFC/PATCH 1/8] dt-bindings: Add a binding for Mediatek
- Video Processor Unit
-In-Reply-To: <1447764885-23100-2-git-send-email-tiffany.lin@mediatek.com>
-References: <1447764885-23100-1-git-send-email-tiffany.lin@mediatek.com>
- <1447764885-23100-2-git-send-email-tiffany.lin@mediatek.com>
-Message-ID: <20151117141320.GJ12586@leverpostej>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 17 Nov 2015 15:15:31 +0100
+Subject: [PATCH] pinctrl: qcom: qdf2xxx: improve error checking and
+ reporting
+In-Reply-To: <CACRpkdb4Ck4XCUEKX7TEgCg8723vZA-sxqmd753O1q9uTBszfQ@mail.gmail.com>
+References: <1447171030-15056-1-git-send-email-timur@codeaurora.org>
+ <CACRpkdb4Ck4XCUEKX7TEgCg8723vZA-sxqmd753O1q9uTBszfQ@mail.gmail.com>
+Message-ID: <7846916.TvyJAMuMZQ@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 17, 2015 at 08:54:38PM +0800, Tiffany Lin wrote:
-> From: Andrew-CT Chen <andrew-ct.chen@mediatek.com>
+On Tuesday 17 November 2015 14:33:49 Linus Walleij wrote:
+> On Tue, Nov 10, 2015 at 4:57 PM, Timur Tabi <timur@codeaurora.org> wrote:
 > 
-> Add a DT binding documentation of Video Processor Unit for the
-> MT8173 SoC from Mediatek.
+> > The driver doesn't report an error message if the ACPI tables are missing
+> > the num-gpios property (which indicates how many GPIOs there are on this
+> > SOC), and it didn't check to ensure that the mallocs didn't fail.
+> >
+> > Signed-off-by: Timur Tabi <timur@codeaurora.org>
 > 
-> Signed-off-by: Andrew-CT Chen <andrew-ct.chen@mediatek.com>
-> ---
->  .../devicetree/bindings/media/mediatek-vpu.txt     |   27 ++++++++++++++++++++
->  1 file changed, 27 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/media/mediatek-vpu.txt
+> Waiting for Bj?rn's ACK on this.
 > 
-> diff --git a/Documentation/devicetree/bindings/media/mediatek-vpu.txt b/Documentation/devicetree/bindings/media/mediatek-vpu.txt
-> new file mode 100644
-> index 0000000..99a4e5e
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/media/mediatek-vpu.txt
-> @@ -0,0 +1,27 @@
-> +* Mediatek Video Processor Unit
-> +
-> +Video Processor Unit is a HW video controller. It controls HW Codec including
-> +H.264/VP8/VP9 Decode, H.264/VP8 Encode and Image Processor (scale/rotate/color convert).
-> +
-> +Required properties:
-> +  - compatible: "mediatek,mt8173-vpu"
-> +  - reg: Must contain an entry for each entry in reg-names.
-> +  - reg-names: Must include the following entries:
-> +    "sram": SRAM base
-> +    "cfg_reg": Main configuration registers base
-> +  - interrupts: interrupt number to the cpu.
-> +  - clocks : clock name from clock manager
-> +  - clock-names: the clocks of the VPU H/W
+> And I suspect Arnd would be interested to know if you are doing
+> ACPI on something that is certainly not a server-class hardware.
+> Because you shouldn't.
+> 
 
-You need to explicitly define the set of clock-names you expect here.
+It's more fun just watching this really. No comment.
 
-Mark.
-
-> +  - iommus : phandle and IOMMU spcifier for the IOMMU that serves the VPU.
-> +
-> +Example:
-> +	vpu: vpu at 10020000 {
-> +		compatible = "mediatek,mt8173-vpu";
-> +		reg = <0 0x10020000 0 0x30000>,
-> +		      <0 0x10050000 0 0x100>;
-> +		reg-names = "sram", "cfg_reg";
-> +		interrupts = <GIC_SPI 166 IRQ_TYPE_LEVEL_HIGH>;
-> +		clocks = <&topckgen TOP_SCP_SEL>;
-> +		clock-names = "main";
-> +		iommus = <&iommu M4U_PORT_VENC_RCPU>;
-> +	};
-> -- 
-> 1.7.9.5
-> 
+	Arnd
