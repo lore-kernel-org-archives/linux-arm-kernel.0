@@ -1,61 +1,38 @@
-From: Wenyou.Yang@atmel.com (Yang, Wenyou)
-Date: Tue, 17 Nov 2015 10:25:00 +0000
-Subject: [PATCH] MAINTAINERS: Atmel drivers: change NAND and ISI entries
-In-Reply-To: <1447755695-18034-1-git-send-email-nicolas.ferre@atmel.com>
-References: <1447755695-18034-1-git-send-email-nicolas.ferre@atmel.com>
-Message-ID: <B256D81BAE5131468A838E5D7A243641D63678E9@penmbx01>
+From: Zhiqiang.Hou@freescale.com (Zhiqiang Hou)
+Date: Tue, 17 Nov 2015 17:53:20 +0800
+Subject: [PATCHv8 3/5] Documentation: DT: Add entry for Freescale LS1043a-RDB
+ board
+In-Reply-To: <1447754002-40555-1-git-send-email-Zhiqiang.Hou@freescale.com>
+References: <1447754002-40555-1-git-send-email-Zhiqiang.Hou@freescale.com>
+Message-ID: <1447754002-40555-3-git-send-email-Zhiqiang.Hou@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Mingkai Hu <Mingkai.Hu@freescale.com>
 
+Signed-off-by: Mingkai Hu <Mingkai.Hu@freescale.com>
+Signed-off-by: Hou Zhiqiang <B48286@freescale.com>
+---
+V8 - V2:
+ - No change.
 
-> -----Original Message-----
-> From: Nicolas Ferre [mailto:nicolas.ferre at atmel.com]
-> Sent: 2015?11?17? 18:22
-> To: linux-arm-kernel at lists.infradead.org
-> Cc: linux-kernel at vger.kernel.org; Ferre, Nicolas; Desroches, Ludovic; Yang,
-> Wenyou; Josh Wu
-> Subject: [PATCH] MAINTAINERS: Atmel drivers: change NAND and ISI entries
-> 
-> Update Josh's entries about NAND and ISI drivers.
-> Thanks for your work with Atmel Josh!
-> 
-> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-> Cc: Ludovic Desroches <ludovic.desroches@atmel.com>
-> Cc: Wenyou Yang <wenyou.yang@atmel.com>
-> Cc: Josh Wu <rainyfeeling@outlook.com>
-Acked-by: Wenyou Yang <wenyou.yang@atmel.com>
+ Documentation/devicetree/bindings/arm/fsl.txt | 4 ++++
+ 1 file changed, 4 insertions(+)
 
-> ---
->  MAINTAINERS | 5 +++--
->  1 file changed, 3 insertions(+), 2 deletions(-)
-> 
-> diff --git a/MAINTAINERS b/MAINTAINERS
-> index e9caa4b28828..3c9d0d0ba0e8 100644
-> --- a/MAINTAINERS
-> +++ b/MAINTAINERS
-> @@ -1931,7 +1931,7 @@ S:	Supported
->  F:	drivers/i2c/busses/i2c-at91.c
-> 
->  ATMEL ISI DRIVER
-> -M:	Josh Wu <josh.wu@atmel.com>
-> +M:	Ludovic Desroches <ludovic.desroches@atmel.com>
->  L:	linux-media at vger.kernel.org
->  S:	Supported
->  F:	drivers/media/platform/soc_camera/atmel-isi.c
-> @@ -1950,7 +1950,8 @@ S:	Supported
->  F:	drivers/net/ethernet/cadence/
-> 
->  ATMEL NAND DRIVER
-> -M:	Josh Wu <josh.wu@atmel.com>
-> +M:	Wenyou Yang <wenyou.yang@atmel.com>
-> +M:	Josh Wu <rainyfeeling@outlook.com>
->  L:	linux-mtd at lists.infradead.org
->  S:	Supported
->  F:	drivers/mtd/nand/atmel_nand*
-> --
-> 2.1.3
-
-
-Best Regards,
-Wenyou Yang
+diff --git a/Documentation/devicetree/bindings/arm/fsl.txt b/Documentation/devicetree/bindings/arm/fsl.txt
+index 34c88b0..752a685 100644
+--- a/Documentation/devicetree/bindings/arm/fsl.txt
++++ b/Documentation/devicetree/bindings/arm/fsl.txt
+@@ -131,6 +131,10 @@ Example:
+ Freescale ARMv8 based Layerscape SoC family Device Tree Bindings
+ ----------------------------------------------------------------
+ 
++LS1043A ARMv8 based RDB Board
++Required root node properties:
++    - compatible = "fsl,ls1043a-rdb", "fsl,ls1043a";
++
+ LS2080A ARMv8 based Simulator model
+ Required root node properties:
+     - compatible = "fsl,ls2080a-simu", "fsl,ls2080a";
+-- 
+2.1.0.27.g96db324
