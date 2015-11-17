@@ -1,120 +1,108 @@
 From: shannon.zhao@linaro.org (shannon.zhao at linaro.org)
-Date: Tue, 17 Nov 2015 17:40:50 +0800
-Subject: [PATCH v3 51/62] arm/acpi: Prepare EFI system table for Dom0
+Date: Tue, 17 Nov 2015 17:40:51 +0800
+Subject: [PATCH v3 52/62] arm/acpi: Prepare EFI memory descriptor for Dom0
 In-Reply-To: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
 References: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
-Message-ID: <1447753261-7552-52-git-send-email-shannon.zhao@linaro.org>
+Message-ID: <1447753261-7552-53-git-send-email-shannon.zhao@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Shannon Zhao <shannon.zhao@linaro.org>
 
+Create a few EFI memory descriptors to tell Dom0 the RAM region
+information, ACPI table regions and EFI tables reserved resions.
+
 Signed-off-by: Parth Dixit <parth.dixit@linaro.org>
 Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
 ---
  xen/arch/arm/domain_build.c |  2 ++
- xen/common/efi/boot.c       | 64 +++++++++++++++++++++++++++++++++++++++++++++
- xen/include/asm-arm/setup.h |  3 +++
- 3 files changed, 69 insertions(+)
+ xen/common/efi/boot.c       | 48 +++++++++++++++++++++++++++++++++++++++++++++
+ xen/include/asm-arm/setup.h |  4 ++++
+ 3 files changed, 54 insertions(+)
 
 diff --git a/xen/arch/arm/domain_build.c b/xen/arch/arm/domain_build.c
-index da4e271..9d667ea 100644
+index 9d667ea..073c634 100644
 --- a/xen/arch/arm/domain_build.c
 +++ b/xen/arch/arm/domain_build.c
-@@ -1735,6 +1735,8 @@ static int prepare_acpi(struct domain *d, struct kernel_info *kinfo)
-         return rc;
- 
+@@ -1737,6 +1737,8 @@ static int prepare_acpi(struct domain *d, struct kernel_info *kinfo)
      acpi_map_rest_tables(d);
-+    acpi_create_efi_system_table(d->arch.efi_acpi_gpa, d->arch.efi_acpi_table,
-+                                 tbl_add);
+     acpi_create_efi_system_table(d->arch.efi_acpi_gpa, d->arch.efi_acpi_table,
+                                  tbl_add);
++    acpi_create_efi_mmap_table(d->arch.efi_acpi_gpa, d->arch.efi_acpi_table,
++                               &kinfo->mem, tbl_add);
  
      return 0;
  }
 diff --git a/xen/common/efi/boot.c b/xen/common/efi/boot.c
-index 6a48624..75835ae 100644
+index 75835ae..ff2faed 100644
 --- a/xen/common/efi/boot.c
 +++ b/xen/common/efi/boot.c
-@@ -1192,6 +1192,70 @@ int __init estimate_efi_size(int mem_nr_banks)
- 
-     return size;
+@@ -1256,6 +1256,54 @@ void __init acpi_create_efi_system_table(paddr_t paddr, void *efi_acpi_table,
+     tbl_add[TBL_EFIT].start = table_addr;
+     tbl_add[TBL_EFIT].size = table_size;
  }
 +
-+static uint32_t __init xz_crc32(uint8_t *buf, size_t size, uint32_t crc)
++void __init acpi_create_efi_mmap_table(paddr_t paddr, void *efi_acpi_table,
++                                       const struct meminfo *mem,
++                                       struct membank tbl_add[])
 +{
-+    uint32_t xz_crc32_table[256];
-+    const uint32_t poly = 0xEDB88320;
-+    uint32_t i;
-+    uint32_t j;
-+    uint32_t r;
-+
-+    for (i = 0; i < 256; ++i) {
-+        r = i;
-+        for (j = 0; j < 8; ++j)
-+            r = (r >> 1) ^ (poly & ~((r & 1) - 1));
-+
-+        xz_crc32_table[i] = r;
-+    }
-+
-+    crc = ~crc;
-+    while (size != 0) {
-+            crc = xz_crc32_table[*buf++ ^ (crc & 0xFF)] ^ (crc >> 8);
-+            --size;
-+    }
-+
-+    return ~crc;
-+}
-+
-+void __init acpi_create_efi_system_table(paddr_t paddr, void *efi_acpi_table,
-+                                         struct membank tbl_add[])
-+{
-+    u64 table_addr, table_size, offset = 0;
++    EFI_MEMORY_DESCRIPTOR *memory_map;
++    int i, offset;
 +    u8 *base_ptr;
-+    EFI_CONFIGURATION_TABLE *efi_conf_tbl;
-+    EFI_SYSTEM_TABLE *efi_sys_tbl;
-+    EFI_SYSTEM_TABLE *est = (EFI_SYSTEM_TABLE *)maddr_to_virt(efi.est);
 +
-+    table_addr = paddr + acpi_get_table_offset(tbl_add, TBL_EFIT);
-+    table_size = sizeof(EFI_SYSTEM_TABLE) + sizeof(EFI_CONFIGURATION_TABLE)
-+                 + sizeof(XEN_EFI_FW_VENDOR);
-+    base_ptr = efi_acpi_table + acpi_get_table_offset(tbl_add, TBL_EFIT);
-+    efi_sys_tbl = (EFI_SYSTEM_TABLE *)base_ptr;
++    tbl_add[TBL_MMAP].start = paddr + acpi_get_table_offset(tbl_add, TBL_MMAP);
++    tbl_add[TBL_MMAP].size = sizeof(EFI_MEMORY_DESCRIPTOR)
++                             * (mem->nr_banks + acpi_mem.nr_banks + TBL_MMAX);
++    base_ptr = efi_acpi_table + acpi_get_table_offset(tbl_add, TBL_MMAP);
++    memory_map = (EFI_MEMORY_DESCRIPTOR *)(base_ptr);
 +
-+    memcpy((EFI_TABLE_HEADER *)&(efi_sys_tbl->Hdr),
-+           (EFI_TABLE_HEADER *)&(est->Hdr), sizeof(EFI_TABLE_HEADER));
-+    efi_sys_tbl->Hdr.HeaderSize = table_size;
++    offset = 0;
++    for( i = 0; i < mem->nr_banks; i++, offset++ )
++    {
++        memory_map[offset].Type = EfiConventionalMemory;
++        memory_map[offset].PhysicalStart = mem->bank[i].start;
++        memory_map[offset].NumberOfPages = mem->bank[i].size/PAGE_SIZE;
++        memory_map[offset].Attribute = EFI_MEMORY_WB;
++    }
 +
-+    efi_sys_tbl->FirmwareRevision = est->FirmwareRevision;
-+    efi_sys_tbl->NumberOfTableEntries = 1;
-+    offset += sizeof(EFI_SYSTEM_TABLE);
-+    memcpy((u16 *)(base_ptr + offset), XEN_EFI_FW_VENDOR,
-+           sizeof(XEN_EFI_FW_VENDOR));
-+    efi_sys_tbl->FirmwareVendor = (CHAR16 *)(table_addr + offset);
++    for( i = 0; i < acpi_mem.nr_banks; i++, offset++ )
++    {
++        memory_map[offset].Type = EfiACPIReclaimMemory;
++        memory_map[offset].PhysicalStart = acpi_mem.bank[i].start;
++        memory_map[offset].NumberOfPages = acpi_mem.bank[i].size/PAGE_SIZE;
++        memory_map[offset].Attribute = EFI_MEMORY_WB;
++    }
 +
-+    offset += sizeof(XEN_EFI_FW_VENDOR);
-+    efi_conf_tbl = (EFI_CONFIGURATION_TABLE *)(base_ptr + offset);
-+    efi_conf_tbl->VendorGuid = (EFI_GUID)ACPI_20_TABLE_GUID;
-+    efi_conf_tbl->VendorTable = (VOID *)tbl_add[TBL_RSDP].start;
-+    efi_sys_tbl->ConfigurationTable = (EFI_CONFIGURATION_TABLE *)(table_addr
-+                                                                  + offset);
-+    efi_sys_tbl->Hdr.CRC32 = xz_crc32((uint8_t *)efi_sys_tbl,
-+                                      efi_sys_tbl->Hdr.HeaderSize, 0);
++    for( i = 0; i < TBL_EFIT; i++, offset++ )
++    {
++        memory_map[offset].Type = EfiACPIReclaimMemory;
++        memory_map[offset].PhysicalStart = tbl_add[i].start;
++        memory_map[offset].NumberOfPages =tbl_add[i].size/PAGE_SIZE;
++        memory_map[offset].Attribute = EFI_MEMORY_WB;
++    }
 +
-+    tbl_add[TBL_EFIT].start = table_addr;
-+    tbl_add[TBL_EFIT].size = table_size;
++    for( i = TBL_EFIT; i < TBL_MMAX; i++, offset++ )
++    {
++        memory_map[offset].Type = EfiReservedMemoryType;
++        memory_map[offset].PhysicalStart = tbl_add[i].start;
++        memory_map[offset].NumberOfPages =tbl_add[i].size/PAGE_SIZE;
++        memory_map[offset].Attribute = EFI_MEMORY_WB;
++    }
 +}
  #endif
  
  #ifndef CONFIG_ARM /* TODO - runtime service support */
 diff --git a/xen/include/asm-arm/setup.h b/xen/include/asm-arm/setup.h
-index b759813..2d65796 100644
+index 2d65796..35447ee 100644
 --- a/xen/include/asm-arm/setup.h
 +++ b/xen/include/asm-arm/setup.h
-@@ -53,6 +53,9 @@ void copy_from_paddr(void *dst, paddr_t paddr, unsigned long len);
+@@ -56,6 +56,10 @@ int estimate_efi_size(int mem_nr_banks);
+ void acpi_create_efi_system_table(paddr_t paddr, void *efi_acpi_table,
+                                   struct membank tbl_add[]);
  
- int estimate_efi_size(int mem_nr_banks);
- 
-+void acpi_create_efi_system_table(paddr_t paddr, void *efi_acpi_table,
-+                                  struct membank tbl_add[]);
++void acpi_create_efi_mmap_table(paddr_t paddr, void *efi_acpi_table,
++                                const struct meminfo *mem,
++                                struct membank tbl_add[]);
 +
  int construct_dom0(struct domain *d);
  
