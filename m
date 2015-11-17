@@ -1,69 +1,64 @@
 From: shannon.zhao@linaro.org (shannon.zhao at linaro.org)
-Date: Tue, 17 Nov 2015 17:41:00 +0800
-Subject: [PATCH v3 61/62] arm/acpi: Add acpi parameter to enable/disable acpi
+Date: Tue, 17 Nov 2015 17:41:01 +0800
+Subject: [PATCH v3 62/62] xen/arm64: Add ACPI support
 In-Reply-To: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
 References: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
-Message-ID: <1447753261-7552-62-git-send-email-shannon.zhao@linaro.org>
+Message-ID: <1447753261-7552-63-git-send-email-shannon.zhao@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Parth Dixit <parth.dixit@linaro.org>
+From: Naresh Bhat <naresh.bhat@linaro.org>
 
-ACPI will be disabled by default. Define new command line parameter
-"acpi" for enabling it.
+Add ACPI support on arm64 xen hypervisor. Enable EFI support on ARM.
 
-Signed-off-by: Parth Dixit <parth.dixit@linaro.org>
+Signed-off-by: Naresh Bhat <naresh.bhat@linaro.org>
 Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
 ---
- xen/arch/arm/setup.c | 22 ++++++++++++++++++++++
- 1 file changed, 22 insertions(+)
+ config/arm64.mk              | 1 +
+ xen/common/efi/runtime.c     | 2 +-
+ xen/include/asm-arm/config.h | 5 +++++
+ 3 files changed, 7 insertions(+), 1 deletion(-)
 
-diff --git a/xen/arch/arm/setup.c b/xen/arch/arm/setup.c
-index 63feadf..1a40323 100644
---- a/xen/arch/arm/setup.c
-+++ b/xen/arch/arm/setup.c
-@@ -59,6 +59,10 @@ static unsigned long opt_xenheap_megabytes __initdata;
- integer_param("xenheap_megabytes", opt_xenheap_megabytes);
- #endif
+diff --git a/config/arm64.mk b/config/arm64.mk
+index c5deb4e..c6a040b 100644
+--- a/config/arm64.mk
++++ b/config/arm64.mk
+@@ -11,6 +11,7 @@ HAS_CADENCE_UART := y
+ HAS_NS16550 := y
+ HAS_MEM_ACCESS := y
+ HAS_GICV3 := y
++HAS_ACPI := y
  
-+/* "acpi=force" : Enables acpi */
-+static void parse_acpi_param(char *s);
-+custom_param("acpi", parse_acpi_param);
-+
- static __used void init_done(void)
- {
-     free_init_memory();
-@@ -84,6 +88,23 @@ static const char * __initdata processor_implementers[] = {
-     ['i'] = "Intel Corporation",
- };
+ # Use only if calling $(LD) directly.
+ LDFLAGS_DIRECT += -EL
+diff --git a/xen/common/efi/runtime.c b/xen/common/efi/runtime.c
+index ae87557..7748056 100644
+--- a/xen/common/efi/runtime.c
++++ b/xen/common/efi/runtime.c
+@@ -11,7 +11,7 @@ DEFINE_XEN_GUEST_HANDLE(CHAR16);
+ #ifndef COMPAT
  
-+static char __initdata acpi_param[10] = "";
-+static void __init parse_acpi_param(char *s)
-+{
-+    /* Save the parameter so it can be propagated to domain0. */
-+    safe_strcpy(acpi_param, s);
-+
-+    /* Interpret the parameter for use within Xen. */
-+    if ( !parse_bool(s) )
-+    {
-+        disable_acpi();
-+    }
-+    else if ( !strcmp(s, "force") )
-+    {
-+        acpi_disabled = 0;
-+    }
-+}
-+
- static void __init processor_id(void)
- {
-     const char *implementer = "Unknown";
-@@ -729,6 +750,7 @@ void __init start_xen(unsigned long boot_phys_offset,
-         + (fdt_paddr & ((1 << SECOND_SHIFT) - 1));
-     fdt_size = boot_fdt_info(device_tree_flattened, fdt_paddr);
+ #ifdef CONFIG_ARM  /* Disabled until runtime services implemented */
+-const bool_t efi_enabled = 0;
++const bool_t efi_enabled = 1;
+ #else
+ # include <asm/i387.h>
+ # include <asm/xstate.h>
+diff --git a/xen/include/asm-arm/config.h b/xen/include/asm-arm/config.h
+index 817c216..e87fd27 100644
+--- a/xen/include/asm-arm/config.h
++++ b/xen/include/asm-arm/config.h
+@@ -33,6 +33,11 @@
  
-+    disable_acpi();
-     cmdline = boot_fdt_cmdline(device_tree_flattened);
-     printk("Command line: %s\n", cmdline);
-     cmdline_parse(cmdline);
+ #define CONFIG_ARM_L1_CACHE_SHIFT 7 /* XXX */
+ 
++#if defined(CONFIG_ARM_64)
++#define CONFIG_ACPI 1
++#define CONFIG_ACPI_BOOT 1
++#endif
++
+ #define CONFIG_SMP 1
+ 
+ #define CONFIG_VIDEO 1
 -- 
 2.1.0
