@@ -1,131 +1,98 @@
-From: gkulkarni@caviumnetworks.com (Ganapatrao Kulkarni)
-Date: Tue, 17 Nov 2015 23:55:33 +0530
-Subject: [PATCH v2 4/4] acpi, numa: Enable ACPI based NUMA on ARM64
-In-Reply-To: <1447784733-10419-1-git-send-email-gkulkarni@caviumnetworks.com>
-References: <1447784733-10419-1-git-send-email-gkulkarni@caviumnetworks.com>
-Message-ID: <1447784733-10419-5-git-send-email-gkulkarni@caviumnetworks.com>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Tue, 17 Nov 2015 10:28:38 -0800
+Subject: [PATCH] input: st1232.c: Add devicetree attributes
+In-Reply-To: <1447604447-8932-1-git-send-email-sander@vermin.nl>
+References: <1447604447-8932-1-git-send-email-sander@vermin.nl>
+Message-ID: <20151117182838.GE29423@dtor-ws>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add function needed for cpu to node mapping, and enable
-ACPI based NUMA for ARM64 in Kconfig
+Hi Sander,
 
-Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
----
- drivers/acpi/Kconfig |  4 ++--
- drivers/acpi/numa.c  | 35 +++++++++++++++++++++++++++++++++++
- include/linux/acpi.h | 15 +++++++++++++++
- 3 files changed, 52 insertions(+), 2 deletions(-)
+On Sun, Nov 15, 2015 at 05:20:47PM +0100, Sander Vermin wrote:
+> -static int __maybe_unused st1232_ts_suspend(struct device *dev)
+> +#ifdef CONFIG_PM_SLEEP
 
-diff --git a/drivers/acpi/Kconfig b/drivers/acpi/Kconfig
-index 25dbb76..06ea7dc 100644
---- a/drivers/acpi/Kconfig
-+++ b/drivers/acpi/Kconfig
-@@ -280,8 +280,8 @@ config ACPI_THERMAL
- config ACPI_NUMA
- 	bool "NUMA support"
- 	depends on NUMA
--	depends on (X86 || IA64)
--	default y if IA64_GENERIC || IA64_SGI_SN2
-+	depends on (X86 || IA64 || ARM64)
-+	default y if IA64_GENERIC || IA64_SGI_SN2 || ARM64
- 
- config ACPI_CUSTOM_DSDT_FILE
- 	string "Custom DSDT Table file to include"
-diff --git a/drivers/acpi/numa.c b/drivers/acpi/numa.c
-index 36683d0..807083a 100644
---- a/drivers/acpi/numa.c
-+++ b/drivers/acpi/numa.c
-@@ -175,6 +175,18 @@ acpi_table_print_srat_entry(struct acpi_subtable_header *header)
- 		}
- 		break;
- 
-+	case ACPI_SRAT_TYPE_GICC_AFFINITY:
-+		{
-+			struct acpi_srat_gicc_affinity *p =
-+			    (struct acpi_srat_gicc_affinity *)header;
-+			pr_debug("SRAT Processor (acpi id[0x%04x]) in proximity domain %d %s\n",
-+				 p->acpi_processor_uid,
-+				 p->proximity_domain,
-+				 (p->flags & ACPI_SRAT_GICC_ENABLED) ?
-+				 "enabled" : "disabled");
-+		}
-+		break;
-+
- 	default:
- 		pr_warn("Found unsupported SRAT entry (type = 0x%x)\n",
- 			header->type);
-@@ -260,6 +272,24 @@ acpi_parse_processor_affinity(struct acpi_subtable_header *header,
- 	return 0;
- }
- 
-+static int __init
-+acpi_parse_gicc_affinity(struct acpi_subtable_header *header,
-+			      const unsigned long end)
-+{
-+	struct acpi_srat_gicc_affinity *processor_affinity;
-+
-+	processor_affinity = (struct acpi_srat_gicc_affinity *)header;
-+	if (!processor_affinity)
-+		return -EINVAL;
-+
-+	acpi_table_print_srat_entry(header);
-+
-+	/* let architecture-dependent part to do it */
-+	acpi_numa_gicc_affinity_init(processor_affinity);
-+
-+	return 0;
-+}
-+
- static int __initdata parsed_numa_memblks;
- 
- static int __init
-@@ -304,6 +334,9 @@ int __init acpi_numa_init(void)
- {
- 	int cnt = 0;
- 
-+	if (acpi_disabled)
-+		return -EINVAL;
-+
- 	/*
- 	 * Should not limit number with cpu num that is from NR_CPUS or nr_cpus=
- 	 * SRAT cpu entries could have different order with that in MADT.
-@@ -316,6 +349,8 @@ int __init acpi_numa_init(void)
- 				     acpi_parse_x2apic_affinity, 0);
- 		acpi_table_parse_srat(ACPI_SRAT_TYPE_CPU_AFFINITY,
- 				     acpi_parse_processor_affinity, 0);
-+		acpi_table_parse_srat(ACPI_SRAT_TYPE_GICC_AFFINITY,
-+				     acpi_parse_gicc_affinity, 0);
- 		cnt = acpi_table_parse_srat(ACPI_SRAT_TYPE_MEMORY_AFFINITY,
- 					    acpi_parse_memory_affinity,
- 					    NR_NODE_MEMBLKS);
-diff --git a/include/linux/acpi.h b/include/linux/acpi.h
-index 0548339..ff56702 100644
---- a/include/linux/acpi.h
-+++ b/include/linux/acpi.h
-@@ -170,8 +170,23 @@ void acpi_table_print_madt_entry (struct acpi_subtable_header *madt);
- 
- /* the following four functions are architecture-dependent */
- void acpi_numa_slit_init (struct acpi_table_slit *slit);
-+
-+#if defined(CONFIG_X86) || defined(CONFIG_IA64)
- void acpi_numa_processor_affinity_init (struct acpi_srat_cpu_affinity *pa);
-+#else
-+static inline void
-+acpi_numa_processor_affinity_init(struct acpi_srat_cpu_affinity *pa) { }
-+#endif
-+
- void acpi_numa_x2apic_affinity_init(struct acpi_srat_x2apic_cpu_affinity *pa);
-+
-+#ifdef CONFIG_ARM64
-+void acpi_numa_gicc_affinity_init(struct acpi_srat_gicc_affinity *pa);
-+#else
-+static inline void
-+acpi_numa_gicc_affinity_init(struct acpi_srat_gicc_affinity *pa) { }
-+#endif
-+
- int acpi_numa_memory_affinity_init (struct acpi_srat_mem_affinity *ma);
- void acpi_numa_arch_fixup(void);
- 
+Why?
+
+> +static int st1232_ts_suspend(struct device *dev)
+>  {
+>  	struct i2c_client *client = to_i2c_client(dev);
+> -	struct st1232_ts_data *ts = i2c_get_clientdata(client);
+> +	struct st1232_data *data = i2c_get_clientdata(client);
+>  
+> -	if (device_may_wakeup(&client->dev)) {
+> -		enable_irq_wake(client->irq);
+> -	} else {
+> -		disable_irq(client->irq);
+> -		st1232_ts_power(ts, false);
+> -	}
+> +	mutex_lock(&data->input_dev->mutex);
+> +	if (data->input_dev->users)
+> +		st1232_stop(data->input_dev);
+> +	mutex_unlock(&data->input_dev->mutex);
+>  
+>  	return 0;
+>  }
+>  
+> -static int __maybe_unused st1232_ts_resume(struct device *dev)
+> +static int st1232_ts_resume(struct device *dev)
+>  {
+>  	struct i2c_client *client = to_i2c_client(dev);
+> -	struct st1232_ts_data *ts = i2c_get_clientdata(client);
+> +	struct st1232_data *data = i2c_get_clientdata(client);
+>  
+> -	if (device_may_wakeup(&client->dev)) {
+> -		disable_irq_wake(client->irq);
+> -	} else {
+> -		st1232_ts_power(ts, true);
+> -		enable_irq(client->irq);
+> -	}
+> +	mutex_lock(&data->input_dev->mutex);
+> +	if (data->input_dev->users)
+> +		st1232_start(data->input_dev);
+> +	mutex_unlock(&data->input_dev->mutex);
+>  
+>  	return 0;
+>  }
+> +#endif
+>  
+>  static SIMPLE_DEV_PM_OPS(st1232_ts_pm_ops,
+>  			 st1232_ts_suspend, st1232_ts_resume);
+> @@ -282,13 +436,12 @@ static const struct i2c_device_id st1232_ts_id[] = {
+>  };
+>  MODULE_DEVICE_TABLE(i2c, st1232_ts_id);
+>  
+> -#ifdef CONFIG_OF
+
+Why?
+
+> -static const struct of_device_id st1232_ts_dt_ids[] = {
+> +static const struct of_device_id st1232_of_match[] = {
+>  	{ .compatible = "sitronix,st1232", },
+>  	{ }
+>  };
+> -MODULE_DEVICE_TABLE(of, st1232_ts_dt_ids);
+> -#endif
+> +MODULE_DEVICE_TABLE(of, st1232_of_match);
+> +
+>  
+>  static struct i2c_driver st1232_ts_driver = {
+>  	.probe		= st1232_ts_probe,
+> @@ -296,13 +449,14 @@ static struct i2c_driver st1232_ts_driver = {
+>  	.id_table	= st1232_ts_id,
+>  	.driver = {
+>  		.name	= ST1232_TS_NAME,
+> -		.of_match_table = of_match_ptr(st1232_ts_dt_ids),
+> +		.owner	= THIS_MODULE,
+> +		.of_match_table = st1232_of_match,
+
+Why?
+
+There seems many intermingled changes that are done to the driver, you
+need to split them apart and explain why they are needed.
+
+Thanks!
+
 -- 
-1.8.1.4
+Dmitry
