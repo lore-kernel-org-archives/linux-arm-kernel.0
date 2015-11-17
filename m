@@ -1,102 +1,75 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Tue, 17 Nov 2015 09:21:26 +0000
-Subject: [PATCH v3 2/5] mfd: syscon: add a DT property to set value width
-In-Reply-To: <20151117091946.GG17829@x1>
-References: <1447700814-5391-1-git-send-email-damien.riegel@savoirfairelinux.com>
- <1447700814-5391-3-git-send-email-damien.riegel@savoirfairelinux.com>
- <20151117091946.GG17829@x1>
-Message-ID: <20151117092126.GH17829@x1>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 17 Nov 2015 10:21:44 +0100
+Subject: [PATCH v2 04/12] arm64/efi: split off EFI init and runtime code
+ for reuse by 32-bit ARM
+In-Reply-To: <20151116184821.GC8644@n2100.arm.linux.org.uk>
+References: <1447698757-8762-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1447698757-8762-5-git-send-email-ard.biesheuvel@linaro.org>
+ <20151116184821.GC8644@n2100.arm.linux.org.uk>
+Message-ID: <CAKv+Gu8+0ezm-8En6MGkjRmb1VkU8tN38rSRixqf0JjL8nDVsg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Looks like you forgot to Cc Arnd too.
+On 16 November 2015 at 19:48, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Mon, Nov 16, 2015 at 07:32:29PM +0100, Ard Biesheuvel wrote:
+>> +/*
+>> + * Enable the UEFI Runtime Services if all prerequisites are in place, i.e.,
+>> + * non-early mapping of the UEFI system table and virtual mappings for all
+>> + * EFI_MEMORY_RUNTIME regions.
+>> + */
+>> +static int __init arm64_enable_runtime_services(void)
+>> +{
+>> +     u64 mapsize;
+>> +
+>> +     if (!efi_enabled(EFI_BOOT)) {
+>> +             pr_info("EFI services will not be available.\n");
+>> +             return -1;
+>> +     }
+>> +
+>> +     if (efi_runtime_disabled()) {
+>> +             pr_info("EFI runtime services will be disabled.\n");
+>> +             return -1;
+>> +     }
+>> +
+>> +     pr_info("Remapping and enabling EFI services.\n");
+>> +
+>> +     mapsize = memmap.map_end - memmap.map;
+>> +     memmap.map = (__force void *)ioremap_cache(memmap.phys_map,
+>> +                                                mapsize);
+>> +     if (!memmap.map) {
+>> +             pr_err("Failed to remap EFI memory map\n");
+>> +             return -1;
+>> +     }
+>> +     memmap.map_end = memmap.map + mapsize;
+>> +     efi.memmap = &memmap;
+>> +
+>> +     efi.systab = (__force void *)ioremap_cache(efi_system_table,
+>> +                                                sizeof(efi_system_table_t));
+>> +     if (!efi.systab) {
+>> +             pr_err("Failed to remap EFI System Table\n");
+>> +             return -1;
+>> +     }
+>> +     set_bit(EFI_SYSTEM_TABLES, &efi.flags);
+>> +
+>> +     if (!efi_virtmap_init()) {
+>> +             pr_err("No UEFI virtual mapping was installed -- runtime services will not be available\n");
+>> +             return -1;
+>> +     }
+>> +
+>> +     /* Set up runtime services function pointers */
+>> +     efi_native_runtime_setup();
+>> +     set_bit(EFI_RUNTIME_SERVICES, &efi.flags);
+>> +
+>> +     efi.runtime_version = efi.systab->hdr.revision;
+>> +
+>> +     return 0;
+>> +}
+>> +early_initcall(arm64_enable_runtime_services);
+>
+> The above ought to be fixed - initcalls return negative errno numbers,
+> so returning -1 from them is really not acceptable.  (The original code
+> was doing the same - so it should be fixed as a separate patch.)
+>
 
-Doing that for you now.
-
-On Tue, 17 Nov 2015, Lee Jones wrote:
-> On Mon, 16 Nov 2015, Damien Riegel wrote:
-> 
-> > Currently syscon has a fixed configuration of 32 bits for register and
-> > values widths. In some cases, it would be desirable to be able to
-> > customize the value width.
-> > 
-> > For example, certain boards (like the ones manufactured by Technologic
-> > Systems) have a FPGA that is memory-mapped, but its registers are only
-> > 16-bit wide.
-> > 
-> > This patch adds an optional "bus-width" DT binding for syscon that
-> > allows to change the width for the data bus (i.e. val_bits). If this
-> > property is provided, it will also adjust the register stride to
-> > bus-width / 8. If not provided, the default configuration is used.
-> > 
-> > Signed-off-by: Damien Riegel <damien.riegel@savoirfairelinux.com>
-> > ---
-> >  Documentation/devicetree/bindings/mfd/syscon.txt |  3 +++
-> >  drivers/mfd/syscon.c                             | 12 ++++++++++++
-> >  2 files changed, 15 insertions(+)
-> > 
-> > diff --git a/Documentation/devicetree/bindings/mfd/syscon.txt b/Documentation/devicetree/bindings/mfd/syscon.txt
-> > index fe8150b..4c9d187 100644
-> > --- a/Documentation/devicetree/bindings/mfd/syscon.txt
-> > +++ b/Documentation/devicetree/bindings/mfd/syscon.txt
-> > @@ -13,6 +13,9 @@ Required properties:
-> >  - compatible: Should contain "syscon".
-> >  - reg: the register region can be accessed from syscon
-> >  
-> > +Optional property:
-> > +- bus-width: width of the data bus. Can be <8>, <16>, <32>, or <64>.
-> > +
-> >  Examples:
-> >  gpr: iomuxc-gpr at 020e0000 {
-> >  	compatible = "fsl,imx6q-iomuxc-gpr", "syscon";
-> > diff --git a/drivers/mfd/syscon.c b/drivers/mfd/syscon.c
-> > index 176bf0f..00b0995 100644
-> > --- a/drivers/mfd/syscon.c
-> > +++ b/drivers/mfd/syscon.c
-> > @@ -47,6 +47,7 @@ static struct syscon *of_syscon_register(struct device_node *np)
-> >  	struct syscon *syscon;
-> >  	struct regmap *regmap;
-> >  	void __iomem *base;
-> > +	u32 bus_width;
-> >  	int ret;
-> >  	struct regmap_config syscon_config = syscon_regmap_config;
-> >  
-> > @@ -69,6 +70,17 @@ static struct syscon *of_syscon_register(struct device_node *np)
-> >  	 else if (of_property_read_bool(np, "little-endian"))
-> >  		syscon_config.val_format_endian = REGMAP_ENDIAN_LITTLE;
-> >  
-> > +	 ret = of_property_read_u32(np, "bus-width", &bus_width);
-> > +	 if (!ret) {
-> 
-> This syntax is confusing, as we normally associate it with an error
-> condition.  Instead, I'd use:
-> 
->   if (of_property_read_u32(np, "bus-width", &bus_width) == 0)
-> 
-> Or, for more clarity:
-> 
->   of_property_read_u32(np, "bus-width", &bus_width);
->   if (bus_width)
-> 
-> If you choose this version (which I think is my preferred method, don't
-> forget to initialise 'bus_width' to zero.
-> 
-> > +		 /*
-> > +		  * the property has been provided, regmap_init_mmio
-> > +		  * will return an error if these values are invalid
-> > +		  * so there is no need to check them here.
-> > +		  */
-> > +		 syscon_config.val_bits = bus_width;
-> > +		 syscon_config.reg_stride = syscon_config.val_bits / 8;
-> > +	 }
-> > +
-> >  	regmap = regmap_init_mmio(NULL, base, &syscon_config);
-> >  	if (IS_ERR(regmap)) {
-> >  		pr_err("regmap init failed\n");
-> 
-
--- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+Indeed. I will add a patch to v3 to address this.
