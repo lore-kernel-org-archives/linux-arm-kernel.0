@@ -1,63 +1,30 @@
-From: salil.mehta@huawei.com (Salil)
-Date: Wed, 18 Nov 2015 02:52:27 +0800
-Subject: [PATCH V2 net-next 5/5] net:hns: Add the init code to disable Hip06
- "Hardware VLAN assist"
-In-Reply-To: <1447786347-147518-1-git-send-email-salil.mehta@huawei.com>
-References: <1447786347-147518-1-git-send-email-salil.mehta@huawei.com>
-Message-ID: <1447786347-147518-6-git-send-email-salil.mehta@huawei.com>
+From: stillcompiling@gmail.com (Joshua Clayton)
+Date: Tue, 17 Nov 2015 10:58:54 -0800
+Subject: [PATCH 1/8] Documentation/spi/spidev_test.c: use one rx buffer
+In-Reply-To: <20151117174156.GX31303@sirena.org.uk>
+References: <cover.1447773299.git.stillcompiling@gmail.com>
+ <2f17ae29e75967b4522b080c275b907622e1d353.1447773299.git.stillcompiling@gmail.com>
+ <20151117174156.GX31303@sirena.org.uk>
+Message-ID: <2858640.EtAPBOce2G@jclayton-pc>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Salil Mehta <salil.mehta@huawei.com>
+On Tuesday, November 17, 2015 05:41:56 PM Mark Brown wrote:
+> On Tue, Nov 17, 2015 at 07:24:21AM -0800, Joshua Clayton wrote:
+> 
+> > default_rx and rx are needlessly different.
+> > Use one buffer, local to transmit()
+> 
+> Why?  This isn't what I'd expect from black boxing the API, from a
+> userspace point of view the transfer is atomic and in an ideal world
+> we'd be able to do direct to/from memory transfers rather than memcpy()
+> into kernel space which means that userspace should assume the transfers
+> are going on simultaneously even if they don't currently.
 
-This patch adds the initializzation code to disable the hardware
-vlan support for VLAN Tag stripping by default for now.
+The important thing here was to get rid of the default_rx buffer.
+I just noticed that the output can be set up completely within the scope
+of the transmit function, since the operands are global. But I would be
+just as happy to set it up at the top level. I'll change this in V2
 
-Proper support of "hardware VLAN assitance" feature would
-soon come in the next coming patches.
-
-Signed-off-by: Salil Mehta <salil.mehta@huawei.com>
----
- drivers/net/ethernet/hisilicon/hns/hns_dsaf_ppe.c |    7 +++++++
- drivers/net/ethernet/hisilicon/hns/hns_dsaf_reg.h |    1 +
- 2 files changed, 8 insertions(+)
-
-diff --git a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_ppe.c b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_ppe.c
-index b6bf292..544f323 100644
---- a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_ppe.c
-+++ b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_ppe.c
-@@ -176,6 +176,11 @@ static void hns_ppe_cnt_clr_ce(struct hns_ppe_cb *ppe_cb)
- 			 PPE_CNT_CLR_CE_B, 1);
- }
- 
-+static void hns_ppe_set_vlan_strip(struct hns_ppe_cb *ppe_cb, int en)
-+{
-+	dsaf_write_dev(ppe_cb, PPEV2_VLAN_STRIP_EN_REG, en);
-+}
-+
- /**
-  * hns_ppe_checksum_hw - set ppe checksum caculate
-  * @ppe_device: ppe device
-@@ -345,6 +350,8 @@ static void hns_ppe_init_hw(struct hns_ppe_cb *ppe_cb)
- 	hns_ppe_cnt_clr_ce(ppe_cb);
- 
- 	if (!AE_IS_VER1(dsaf_dev->dsaf_ver)) {
-+		hns_ppe_set_vlan_strip(ppe_cb, 0);
-+
- 		hns_ppe_set_rss_key(ppe_cb, rss_key);
- 
- 		for (i = 0; i < HNS_PPEV2_RSS_IND_TBL_SIZE; i++)
-diff --git a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_reg.h b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_reg.h
-index 98c163e..6c18ca9 100644
---- a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_reg.h
-+++ b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_reg.h
-@@ -318,6 +318,7 @@
- #define PPE_CFG_PARSE_TAG_REG			0x94
- #define PPE_CFG_PRO_CHECK_EN_REG		0x98
- #define PPEV2_CFG_TSO_EN_REG                    0xA0
-+#define PPEV2_VLAN_STRIP_EN_REG                 0xAC
- #define PPE_INTEN_REG				0x100
- #define PPE_RINT_REG				0x104
- #define PPE_INTSTS_REG				0x108
--- 
-1.7.9.5
+--
+~Joshua Clayton
