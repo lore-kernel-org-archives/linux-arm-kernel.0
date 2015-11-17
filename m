@@ -1,83 +1,41 @@
-From: david.vrabel@citrix.com (David Vrabel)
-Date: Tue, 17 Nov 2015 16:02:08 +0000
-Subject: [Xen-devel] [PATCH 02/13] xen/grant-table: Move
- xlated_setup_gnttab_pages to common place
-In-Reply-To: <1447754231-7772-3-git-send-email-shannon.zhao@linaro.org>
-References: <1447754231-7772-1-git-send-email-shannon.zhao@linaro.org>
- <1447754231-7772-3-git-send-email-shannon.zhao@linaro.org>
-Message-ID: <564B4F80.2020402@citrix.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 17 Nov 2015 17:08:33 +0100
+Subject: [PATCH] PCI: iproc: hide CONFIG_PCIE_IPROC
+Message-ID: <11420214.lrdhuUq0ZO@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/11/15 09:57, shannon.zhao at linaro.org wrote:
-> From: Shannon Zhao <shannon.zhao@linaro.org>
-> 
-> Move xlated_setup_gnttab_pages to common place, so it can be reused by
-> ARM to setup grant table when booting with ACPI.
-[...]
-> --- a/drivers/xen/grant-table.c
-> +++ b/drivers/xen/grant-table.c
-> @@ -664,6 +664,55 @@ int gnttab_setup_auto_xlat_frames(phys_addr_t addr)
->  }
->  EXPORT_SYMBOL_GPL(gnttab_setup_auto_xlat_frames);
->  
-> +int __init xlated_setup_gnttab_pages(void)
-> +{
-> +	struct page **pages;
-> +	xen_pfn_t *pfns;
-> +	void *vaddr;
-> +	int rc;
-> +	unsigned int i;
-> +	unsigned long nr_grant_frames = gnttab_max_grant_frames();
-> +
-> +	BUG_ON(nr_grant_frames == 0);
-> +	pages = kcalloc(nr_grant_frames, sizeof(pages[0]), GFP_KERNEL);
-> +	if (!pages)
-> +		return -ENOMEM;
-> +
-> +	pfns = kcalloc(nr_grant_frames, sizeof(pfns[0]), GFP_KERNEL);
-> +	if (!pfns) {
-> +		kfree(pages);
-> +		return -ENOMEM;
-> +	}
-> +	rc = alloc_xenballooned_pages(nr_grant_frames, pages, 0 /* lowmem */);
-> +	if (rc) {
-> +		pr_warn("%s Couldn't balloon alloc %ld pfns rc:%d\n", __func__,
-> +			nr_grant_frames, rc);
-> +		kfree(pages);
-> +		kfree(pfns);
-> +		return rc;
-> +	}
-> +	for (i = 0; i < nr_grant_frames; i++)
-> +		pfns[i] = page_to_pfn(pages[i]);
-> +
-> +	vaddr = vmap(pages, nr_grant_frames, 0, PAGE_KERNEL);
-> +	if (!vaddr) {
-> +		pr_warn("%s Couldn't map %ld pfns rc:%d\n", __func__,
-> +			nr_grant_frames, rc);
-> +		free_xenballooned_pages(nr_grant_frames, pages);
-> +		kfree(pages);
-> +		kfree(pfns);
-> +		return -ENOMEM;
-> +	}
-> +	kfree(pages);
+PCIE_IPROC_BCMA does not require CONFIG_OF in Kconfig, but
+CONFIG_PCIE_IPROC does, so we can get a warning when building
+for an ARM platform without DT support:
 
-Can you move most of this function into drivers/xen/xlate_mmu.c in a
-function like:
+warning: (PCIE_IPROC_PLATFORM && PCIE_IPROC_BCMA) selects PCIE_IPROC which has unmet direct dependencies (PCI && OF && (ARM || ARM64))
 
-/**
- * xen_xlate_map_ballooned_pages - map a new set of ballooned pages
- * count: number of GFNs.
- * pages: returns the array of (now) ballooned pages.
- * gfns: returns the array of corresponding GFNs.
- * virt: returns the virtual address of the mapped region.
- *
- * This allocate a set of ballooned pages and maps them into the
- * kernel's address space.
- */
-void *xen_xlate_map_ballooned_pages(
-    unsigned int count,
-    struct page **pages,
-    xen_pfn_t **gfns);
+It turns out that CONFIG_PCIE_IPROC never needs to be enabled
+by a user anyway, we can simply rely on it being selected
+implictly through either PCIE_IPROC_PLATFORM or PCIE_IPROC_BCMA.
 
-David
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Fixes: 4785ffbdc9b5 ("PCI: iproc: Add BCMA PCIe driver")
+
+diff --git a/drivers/pci/host/Kconfig b/drivers/pci/host/Kconfig
+index f131ba947dc6..767605a5c659 100644
+--- a/drivers/pci/host/Kconfig
++++ b/drivers/pci/host/Kconfig
+@@ -118,13 +118,11 @@ config PCI_VERSATILE
+ 	depends on ARCH_VERSATILE
+ 
+ config PCIE_IPROC
+-	tristate "Broadcom iProc PCIe controller"
+-	depends on OF && (ARM || ARM64)
+-	default n
++	tristate
+ 	help
+ 	  This enables the iProc PCIe core controller support for Broadcom's
+-	  iProc family of SoCs. An appropriate bus interface driver also needs
+-	  to be enabled
++	  iProc family of SoCs. An appropriate bus interface driver needs
++	  to be enabled to select this.
+ 
+ config PCIE_IPROC_PLATFORM
+ 	tristate "Broadcom iProc PCIe platform bus driver"
