@@ -1,120 +1,63 @@
 From: shannon.zhao@linaro.org (shannon.zhao at linaro.org)
-Date: Tue, 17 Nov 2015 17:57:06 +0800
-Subject: [PATCH 08/13] Xen: EFI: Parse DT parameters for Xen specific UEFI
+Date: Tue, 17 Nov 2015 17:57:10 +0800
+Subject: [PATCH 12/13] arm/xen: Get event-channel irq through HVM_PARAM when
+ booting with ACPI
 In-Reply-To: <1447754231-7772-1-git-send-email-shannon.zhao@linaro.org>
 References: <1447754231-7772-1-git-send-email-shannon.zhao@linaro.org>
-Message-ID: <1447754231-7772-9-git-send-email-shannon.zhao@linaro.org>
+Message-ID: <1447754231-7772-13-git-send-email-shannon.zhao@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Shannon Zhao <shannon.zhao@linaro.org>
 
-Add a new function to parse DT parameters for Xen specific UEFI just
-like the way for normal UEFI. Then it could reuse the existing codes.
+When booting with ACPI, it could get the event-channel irq through
+HVM_PARAM_CALLBACK_IRQ.
 
 Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
 ---
- drivers/firmware/efi/efi.c | 67 ++++++++++++++++++++++++++++++++++++++++++----
- 1 file changed, 62 insertions(+), 5 deletions(-)
+ arch/arm/xen/enlighten.c | 23 +++++++++++++++++++----
+ 1 file changed, 19 insertions(+), 4 deletions(-)
 
-diff --git a/drivers/firmware/efi/efi.c b/drivers/firmware/efi/efi.c
-index d6144e3..629bd06 100644
---- a/drivers/firmware/efi/efi.c
-+++ b/drivers/firmware/efi/efi.c
-@@ -24,6 +24,7 @@
- #include <linux/of_fdt.h>
- #include <linux/io.h>
- #include <linux/platform_device.h>
-+#include <xen/xen.h>
+diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
+index 1373d6d..b8e9db8 100644
+--- a/arch/arm/xen/enlighten.c
++++ b/arch/arm/xen/enlighten.c
+@@ -25,6 +25,7 @@
+ #include <linux/cpufreq.h>
+ #include <linux/cpu.h>
+ #include <linux/console.h>
++#include <linux/acpi.h>
  
- struct efi __read_mostly efi = {
- 	.mps        = EFI_INVALID_TABLE_ADDR,
-@@ -488,12 +489,60 @@ static __initdata struct {
- 	UEFI_PARAM("MemMap Desc. Version", "linux,uefi-mmap-desc-ver", desc_ver)
- };
+ #include <linux/mm.h>
  
-+static __initdata struct {
-+	const char name[32];
-+	const char propname[32];
-+	int offset;
-+	int size;
-+} xen_dt_params[] = {
-+	UEFI_PARAM("System Table", "xen,uefi-system-table", system_table),
-+	UEFI_PARAM("MemMap Address", "xen,uefi-mmap-start", mmap),
-+	UEFI_PARAM("MemMap Size", "xen,uefi-mmap-size", mmap_size),
-+	UEFI_PARAM("MemMap Desc. Size", "xen,uefi-mmap-desc-size", desc_size),
-+	UEFI_PARAM("MemMap Desc. Version", "xen,uefi-mmap-desc-ver", desc_ver)
-+};
-+
- struct param_info {
- 	int verbose;
- 	int found;
- 	void *params;
- };
+@@ -190,10 +191,24 @@ static int __init xen_guest_init(void)
+ 	if (!xen_domain())
+ 		return 0;
  
-+static int __init fdt_find_xen_uefi_params(unsigned long node,
-+					   const char *uname, int depth,
-+					   void *data)
-+{
-+	struct param_info *info = data;
-+	const void *prop;
-+	void *dest;
-+	u64 val;
-+	int i, len;
+-	xen_events_irq = irq_of_parse_and_map(xen_node, 0);
+-	if (!xen_events_irq) {
+-		pr_err("Xen event channel interrupt not found\n");
+-		return -ENODEV;
++	if (!acpi_disabled) {
++		struct xen_hvm_param a;
 +
-+	if (xen_initial_domain() && (depth != 2 || strcmp(uname, "uefi") != 0))
-+		return 0;
-+
-+	for (i = 0; i < ARRAY_SIZE(xen_dt_params); i++) {
-+		prop = of_get_flat_dt_prop(node, xen_dt_params[i].propname,
-+					   &len);
-+		if (!prop)
-+			return 0;
-+		dest = info->params + xen_dt_params[i].offset;
-+		info->found++;
-+
-+		val = of_read_number(prop, len / sizeof(u32));
-+
-+		if (dt_params[i].size == sizeof(u32))
-+			*(u32 *)dest = val;
-+		else
-+			*(u64 *)dest = val;
-+
-+		if (info->verbose)
-+			pr_info("  %s: 0x%0*llx\n", xen_dt_params[i].name,
-+				xen_dt_params[i].size * 2, val);
-+	}
-+
-+	return 1;
-+}
- static int __init fdt_find_uefi_params(unsigned long node, const char *uname,
- 				       int depth, void *data)
- {
-@@ -538,12 +587,20 @@ int __init efi_get_fdt_params(struct efi_fdt_params *params, int verbose)
- 	info.found = 0;
- 	info.params = params;
++		a.domid = DOMID_SELF;
++		a.index = HVM_PARAM_CALLBACK_IRQ;
++		if (HYPERVISOR_hvm_op(HVMOP_get_param, &a)) {
++			if ((a.value >> 56) != 3) {
++				pr_err("Can't get Xen event-channel irq\n");
++				return -ENODEV;
++			}
++		}
++		xen_events_irq = a.value & 0xff;
++	} else {
++		xen_events_irq = irq_of_parse_and_map(xen_node, 0);
++		if (!xen_events_irq) {
++			pr_err("Xen event channel interrupt not found\n");
++			return -ENODEV;
++		}
+ 	}
  
--	ret = of_scan_flat_dt(fdt_find_uefi_params, &info);
--	if (!info.found)
-+	if (xen_initial_domain())
-+		ret = of_scan_flat_dt(fdt_find_xen_uefi_params, &info);
-+	else
-+		ret = of_scan_flat_dt(fdt_find_uefi_params, &info);
-+	if (!info.found) {
- 		pr_info("UEFI not found.\n");
--	else if (!ret)
--		pr_err("Can't find '%s' in device tree!\n",
--		       dt_params[info.found].name);
-+	} else if (!ret) {
-+		if (xen_initial_domain())
-+			pr_err("Can't find '%s' in device tree!\n",
-+			       xen_dt_params[info.found].name);
-+		else
-+			pr_err("Can't find '%s' in device tree!\n",
-+			       xen_dt_params[info.found].name);
-+	}
- 
- 	return ret;
- }
+ 	shared_info_page = (struct shared_info *)get_zeroed_page(GFP_KERNEL);
 -- 
 2.1.0
