@@ -1,63 +1,54 @@
 From: shannon.zhao@linaro.org (shannon.zhao at linaro.org)
-Date: Tue, 17 Nov 2015 17:57:05 +0800
-Subject: [PATCH 07/13] ARM: Xen: Document UEFI support on Xen ARM virtual
- platforms
+Date: Tue, 17 Nov 2015 17:57:01 +0800
+Subject: [PATCH 03/13] arm/xen: Use xlated_setup_gnttab_pages to setup grant
+ table
 In-Reply-To: <1447754231-7772-1-git-send-email-shannon.zhao@linaro.org>
 References: <1447754231-7772-1-git-send-email-shannon.zhao@linaro.org>
-Message-ID: <1447754231-7772-8-git-send-email-shannon.zhao@linaro.org>
+Message-ID: <1447754231-7772-4-git-send-email-shannon.zhao@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Shannon Zhao <shannon.zhao@linaro.org>
 
-Add a "uefi" node under /hypervisor node in FDT, then Linux kernel could
-scan this to get the UEFI information.
+Use xlated_setup_gnttab_pages to setup grant table. Then it doesn't rely
+on DT or ACPI to pass the start address and size of grant table.
 
 Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
 ---
- Documentation/devicetree/bindings/arm/xen.txt | 25 +++++++++++++++++++++++++
- 1 file changed, 25 insertions(+)
+ arch/arm/xen/enlighten.c | 10 +---------
+ 1 file changed, 1 insertion(+), 9 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/arm/xen.txt b/Documentation/devicetree/bindings/arm/xen.txt
-index 0f7b9c2..c375d67 100644
---- a/Documentation/devicetree/bindings/arm/xen.txt
-+++ b/Documentation/devicetree/bindings/arm/xen.txt
-@@ -15,6 +15,24 @@ the following properties:
- - interrupts: the interrupt used by Xen to inject event notifications.
-   A GIC node is also required.
+diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
+index eeeab07..7cb82f7 100644
+--- a/arch/arm/xen/enlighten.c
++++ b/arch/arm/xen/enlighten.c
+@@ -186,18 +186,10 @@ static int __init xen_guest_init(void)
+ {
+ 	struct xen_add_to_physmap xatp;
+ 	struct shared_info *shared_info_page = NULL;
+-	struct resource res;
+-	phys_addr_t grant_frames;
  
-+To support UEFI on Xen ARM virtual platforms, Xen pupulates the FDT "uefi" node
-+under /hypervisor with following parameters:
-+
-+________________________________________________________________________________
-+Name                      | Size   | Description
-+================================================================================
-+xen,uefi-system-table     | 64-bit | Physical address of the UEFI System Table.
-+--------------------------------------------------------------------------------
-+xen,uefi-mmap-start       | 64-bit | Physical address of the UEFI memory map.
-+--------------------------------------------------------------------------------
-+xen,uefi-mmap-size        | 32-bit | Size in bytes of the UEFI memory map
-+                          |        | pointed to in previous entry.
-+--------------------------------------------------------------------------------
-+xen,uefi-mmap-desc-size   | 32-bit | Size in bytes of each entry in the UEFI
-+                          |        | memory map.
-+--------------------------------------------------------------------------------
-+xen,uefi-mmap-desc-ver    | 32-bit | Version of the mmap descriptor format.
-+--------------------------------------------------------------------------------
+ 	if (!xen_domain())
+ 		return 0;
  
- Example (assuming #address-cells = <2> and #size-cells = <2>):
+-	if (of_address_to_resource(xen_node, GRANT_TABLE_PHYSADDR, &res)) {
+-		pr_err("Xen grant table base address not found\n");
+-		return -ENODEV;
+-	}
+-	grant_frames = res.start;
+-
+ 	xen_events_irq = irq_of_parse_and_map(xen_node, 0);
+ 	if (!xen_events_irq) {
+ 		pr_err("Xen event channel interrupt not found\n");
+@@ -232,7 +224,7 @@ static int __init xen_guest_init(void)
+ 	if (xen_vcpu_info == NULL)
+ 		return -ENOMEM;
  
-@@ -22,4 +40,11 @@ hypervisor {
- 	compatible = "xen,xen-4.3", "xen,xen";
- 	reg = <0 0xb0000000 0 0x20000>;
- 	interrupts = <1 15 0xf08>;
-+	uefi {
-+		xen,uefi-system-table = <0xXXXXXXXX>;
-+		xen,uefi-mmap-start = <0xXXXXXXXX>;
-+		xen,uefi-mmap-size = <0xXXXXXXXX>;
-+		xen,uefi-mmap-desc-size = <0xXXXXXXXX>;
-+		xen,uefi-mmap-desc-ver = <0xXXXXXXXX>;
-+        };
- };
+-	if (gnttab_setup_auto_xlat_frames(grant_frames)) {
++	if (xlated_setup_gnttab_pages()) {
+ 		free_percpu(xen_vcpu_info);
+ 		return -ENOMEM;
+ 	}
 -- 
 2.1.0
