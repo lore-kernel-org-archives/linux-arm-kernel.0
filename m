@@ -1,107 +1,61 @@
-From: julia.lawall@lip6.fr (Julia Lawall)
-Date: Tue, 17 Nov 2015 18:48:39 +0100 (CET)
-Subject: [PATCH 1/7] phy: brcmstb-sata: add missing of_node_put
-In-Reply-To: <20151117174430.GA8456@google.com>
-References: <1447673600-8881-1-git-send-email-Julia.Lawall@lip6.fr>
- <1447673600-8881-2-git-send-email-Julia.Lawall@lip6.fr>
- <20151117013830.GV8456@google.com>
- <alpine.DEB.2.02.1511170711340.2045@localhost6.localdomain6>
- <20151117174430.GA8456@google.com>
-Message-ID: <alpine.DEB.2.10.1511171846120.2455@hadrien>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Tue, 17 Nov 2015 09:48:56 -0800
+Subject: [PATCH v3 1/5] spi: introduce mmap read support for spi flash
+ devices
+In-Reply-To: <564AC9FD.6090909@ti.com>
+References: <1447133399-25658-1-git-send-email-vigneshr@ti.com>
+ <1447133399-25658-2-git-send-email-vigneshr@ti.com>
+ <20151110232341.GU12143@google.com> <5642E546.3040806@ti.com>
+ <20151111072041.GA13174@localhost> <56460A4D.30303@atmel.com>
+ <564AC9FD.6090909@ti.com>
+Message-ID: <20151117174856.GB8456@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Hi,
 
+On Tue, Nov 17, 2015 at 12:02:29PM +0530, Vignesh R wrote:
+> On 11/13/2015 09:35 PM, Cyrille Pitchen wrote:
+> > 
+> > In September I've sent a series of patches to enhance the support of QSPI flash
+> > memories. Patch 4 was dedicated to the m25p80 driver and set the
+> > rx_nbits / tx_nbits fields of spi_transfer struct(s) in order to configure the
+> > number of I/O lines independently for the opcode, address and data parts.
+> > The work was done for m25p80_read() but also for _read_reg(), _write_reg() and
+> > _write().
+> > The patched m25p80 driver was then tested with an at25 memory to check non-
+> > regression.
+> > 
+> > This series of patches also added 4 enum spi_protocol fields inside struct
+> > spi_nor so the spi-nor framework can tell the (Q)SPI controller driver what SPI
+> > protocol should be use for erase, read, write and register read/write
+> > operations, depending on the memory manufacturer and the command opcode.
+> > This was done to better support Micron, Spansion and Macronix QSPI memories.
+> > 
+> > I have tested the series with Micron QSPI memories and Atmel QSPI controller
+> > and I guess Marek also tested it on his side with Spansion QSPI memories and
+> > another QSPI controller.
+> > 
+> > So if it can help other developers to develop QSPI controller drivers, the
+> > series is still available there:
+> > 
+> > for the whole series:
+> > http://lists.infradead.org/pipermail/linux-arm-kernel/2015-September/371170.html
+> > 
+> > for patch 4 (depends on patch 2 for enum spi_protocol):
+> > http://lists.infradead.org/pipermail/linux-arm-kernel/2015-September/371173.html
+> > 
+> 
+> Should I rebase my next version on top of above patches by Cyrille or
+> shall I post on top of 4.4-rc1?
 
-On Tue, 17 Nov 2015, Brian Norris wrote:
+I'm sorry to say I really haven't had the time to review that properly.
+I'm also not sure it is a true dependency for your series, as you're
+tackling different pieces of the puzzle. So it's mostly just a conflict,
+not a real direct help.
 
-> On Tue, Nov 17, 2015 at 07:12:22AM +0100, Julia Lawall wrote:
-> > On Mon, 16 Nov 2015, Brian Norris wrote:
-> > >
-> > > This reminds me of a potential problem I'm looking at in other
-> > > subsystems: from code reading (I haven't seen any issues in practice,
-> > > probably because I don't use OF_DYNAMIC) it looks like device-creating
-> > > infrastructure like the PHY subsystem should be acquiring a reference to
-> > > the device_node when they stash it away. But drivers/phy/phy-core.c does
-> > > not do this, AFAICT.
-> > >
-> > > See phy_create(), which does
-> > >
-> > > 	phy->dev.of_node = node ?: dev->of_node;
-> > >
-> > > and later might reuse this of_node pointer, even though it never called
-> > > of_node_get() on this node.
-> > >
-> > > Potential patch to fix this (not tested).
-> > >
-> > > Signed-off-by: Brian Norris <computersforpeace@gmail.com>
-> > >
-> > > diff --git a/drivers/phy/phy-core.c b/drivers/phy/phy-core.c
-> > > index fc48fac003a6..8df29caeeef9 100644
-> > > --- a/drivers/phy/phy-core.c
-> > > +++ b/drivers/phy/phy-core.c
-> > > @@ -697,6 +697,7 @@ struct phy *phy_create(struct device *dev, struct device_node *node,
-> > >  	phy->dev.class = phy_class;
-> > >  	phy->dev.parent = dev;
-> > >  	phy->dev.of_node = node ?: dev->of_node;
-> > > +	of_node_get(phy->dev.of_node);
-> >
-> > Why not put of_node_get around dev->of_node?
->
-> Like this?
->
-> 	phy->dev.of_node = node ?: of_node_get(dev->of_node);
->
-> Or this?
->
-> 	phy->dev.of_node = of_node_get(node ?: dev->of_node);
->
-> The former wouldn't do what I proposed; if this PHY device is created
-> with a sub-node of 'dev' rather than dev->of_node, then the caller will
-> pass it in as the 2nd argument to phy_create (i.e., 'node'), and then I
-> expect it's the PHY core's responsibility to refcount it.
->
-> I'd be fine with the latter. Looks a little better, I suppose.
+So unless I'm misunderstanding, I'd suggest submitting MTD stuff against
+the latest l2-mtd.git (or linux-next.git; l2-mtd.git is included there),
+and I'll let you know if conflicts come up that need fixing.
 
-I proposed it because I was worried that the of_node field could end up
-containing something that had been freed.  But probably this is not
-possible?  If it is not possible, then the ?: in the function argument is
-probably a bit ugly...
-
-Is this something that should be checked for elsewhere?
-
-julia
-
-> If my understanding is correct, I'll send a proper patch to do the
-> latter.
->
-> Regards,
-> Brian
->
-> > julia
-> >
-> > >  	phy->id = id;
-> > >  	phy->ops = ops;
-> > >
-> > > @@ -726,6 +727,7 @@ struct phy *phy_create(struct device *dev, struct device_node *node,
-> > >  	return phy;
-> > >
-> > >  put_dev:
-> > > +	of_node_put(phy->dev.of_node);
-> > >  	put_device(&phy->dev);  /* calls phy_release() which frees resources */
-> > >  	return ERR_PTR(ret);
-> > >
-> > > @@ -775,6 +777,7 @@ EXPORT_SYMBOL_GPL(devm_phy_create);
-> > >   */
-> > >  void phy_destroy(struct phy *phy)
-> > >  {
-> > > +	of_node_put(phy->dev.of_node);
-> > >  	pm_runtime_disable(&phy->dev);
-> > >  	device_unregister(&phy->dev);
-> > >  }
-> > > --
-> > > To unsubscribe from this list: send the line "unsubscribe kernel-janitors" in
-> > > the body of a message to majordomo at vger.kernel.org
-> > > More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> > >
->
+Brian
