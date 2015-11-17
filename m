@@ -1,34 +1,63 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 17 Nov 2015 11:25:44 +0100
-Subject: [PATCH 3/3] ASoC: samsung: pass filter function as pointer
-In-Reply-To: <564A78A6.9010501@samsung.com>
-References: <5466463.9HBcuLFGQf@wuerfel> <8896684.3di3I3vzeA@wuerfel>
- <564A78A6.9010501@samsung.com>
-Message-ID: <22364793.tICMzOOh4L@wuerfel>
+From: shannon.zhao@linaro.org (shannon.zhao at linaro.org)
+Date: Tue, 17 Nov 2015 17:57:05 +0800
+Subject: [PATCH 07/13] ARM: Xen: Document UEFI support on Xen ARM virtual
+ platforms
+In-Reply-To: <1447754231-7772-1-git-send-email-shannon.zhao@linaro.org>
+References: <1447754231-7772-1-git-send-email-shannon.zhao@linaro.org>
+Message-ID: <1447754231-7772-8-git-send-email-shannon.zhao@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 17 November 2015 09:45:26 Krzysztof Kozlowski wrote:
-> On 14.11.2015 02:24, Arnd Bergmann wrote:
-> > diff --git a/sound/soc/samsung/i2s.c b/sound/soc/samsung/i2s.c
-> > index 0945b5de39e7..5a4133b6e6a6 100644
-> > --- a/sound/soc/samsung/i2s.c
-> > +++ b/sound/soc/samsung/i2s.c
-> > @@ -1244,7 +1244,8 @@ static int samsung_i2s_probe(struct platform_device *pdev)
-> >  		if (ret != 0)
-> >  			return ret;
-> >  
-> > -		return samsung_asoc_dma_platform_register(&pdev->dev);
-> > +		return samsung_asoc_dma_platform_register(&pdev->dev,
-> > +						  i2s_pdata->dma_filter);
-> >  	}
-> 
-> Here (and maybe in other places?) - NULL pointer exception. The pdata is
-> NULL on all newer platforms (e.g. all Exynos).
-> 
-> BTW, later there is even check for NULL pdata which is pointed also by
-> Smatch.
+From: Shannon Zhao <shannon.zhao@linaro.org>
 
-Thanks for spotting this! I'll fix it up.
+Add a "uefi" node under /hypervisor node in FDT, then Linux kernel could
+scan this to get the UEFI information.
 
-	Arnd
+Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+---
+ Documentation/devicetree/bindings/arm/xen.txt | 25 +++++++++++++++++++++++++
+ 1 file changed, 25 insertions(+)
+
+diff --git a/Documentation/devicetree/bindings/arm/xen.txt b/Documentation/devicetree/bindings/arm/xen.txt
+index 0f7b9c2..c375d67 100644
+--- a/Documentation/devicetree/bindings/arm/xen.txt
++++ b/Documentation/devicetree/bindings/arm/xen.txt
+@@ -15,6 +15,24 @@ the following properties:
+ - interrupts: the interrupt used by Xen to inject event notifications.
+   A GIC node is also required.
+ 
++To support UEFI on Xen ARM virtual platforms, Xen pupulates the FDT "uefi" node
++under /hypervisor with following parameters:
++
++________________________________________________________________________________
++Name                      | Size   | Description
++================================================================================
++xen,uefi-system-table     | 64-bit | Physical address of the UEFI System Table.
++--------------------------------------------------------------------------------
++xen,uefi-mmap-start       | 64-bit | Physical address of the UEFI memory map.
++--------------------------------------------------------------------------------
++xen,uefi-mmap-size        | 32-bit | Size in bytes of the UEFI memory map
++                          |        | pointed to in previous entry.
++--------------------------------------------------------------------------------
++xen,uefi-mmap-desc-size   | 32-bit | Size in bytes of each entry in the UEFI
++                          |        | memory map.
++--------------------------------------------------------------------------------
++xen,uefi-mmap-desc-ver    | 32-bit | Version of the mmap descriptor format.
++--------------------------------------------------------------------------------
+ 
+ Example (assuming #address-cells = <2> and #size-cells = <2>):
+ 
+@@ -22,4 +40,11 @@ hypervisor {
+ 	compatible = "xen,xen-4.3", "xen,xen";
+ 	reg = <0 0xb0000000 0 0x20000>;
+ 	interrupts = <1 15 0xf08>;
++	uefi {
++		xen,uefi-system-table = <0xXXXXXXXX>;
++		xen,uefi-mmap-start = <0xXXXXXXXX>;
++		xen,uefi-mmap-size = <0xXXXXXXXX>;
++		xen,uefi-mmap-desc-size = <0xXXXXXXXX>;
++		xen,uefi-mmap-desc-ver = <0xXXXXXXXX>;
++        };
+ };
+-- 
+2.1.0
