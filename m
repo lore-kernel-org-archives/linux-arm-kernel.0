@@ -1,34 +1,46 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 17 Nov 2015 16:57:20 +0100
-Subject: [PATCH] ARM: mvebu: add reference to ETH connectors for A385-AP
-In-Reply-To: <1447775620-25919-1-git-send-email-thomas.petazzoni@free-electrons.com>
-References: <1447775620-25919-1-git-send-email-thomas.petazzoni@free-electrons.com>
-Message-ID: <7560280.yqEeu9J2fA@wuerfel>
+From: javier@osg.samsung.com (Javier Martinez Canillas)
+Date: Tue, 17 Nov 2015 12:58:44 -0300
+Subject: [PATCH] ARM: multi_v7_defconfig: Build ChromeOS EC drivers as modules
+Message-ID: <1447775924-2189-1-git-send-email-javier@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 17 November 2015 16:53:40 Thomas Petazzoni wrote:
-> This commit adds some comments to the Armada 385 AP Device Tree
-> description to indicate which Ethernet interface matches which
-> physical connector on the board.
-> 
-> This is especially useful on this board, since the mapping between the
-> logical interface names and the physical ports is not very
-> straightforward. It also doesn't match the numbering of the interfaces
-> done by U-Boot:
-> 
->  U-Boot interface | Linux interface | Physical port
->  -----------------+-----------------+--------------
->    egiga0         |     eth2        |   CON4
->    egiga1         |     eth0        |   CON2
->    egiga2         |     eth1        |   CON3
->  -----------------+-----------------+--------------
-> 
-> Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
-> Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
-> 
+Since the multi_v7_defconfig is used to build an image for different
+platforms, the options should be enabled as module whenever possible.
 
-Would it be possible to use entries in /aliases to fix the order of the
-interfaces and make them match the physical ports?
+Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
 
-	Arnd
+---
+The patch was tested on an Exynos5800 Peach Pi Chromebook
+and the drivers' modules were correctly autoloaded.
+
+ arch/arm/configs/multi_v7_defconfig | 6 +++---
+ 1 file changed, 3 insertions(+), 3 deletions(-)
+
+diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
+index 69a22fdb52a5..a38a1b0f2657 100644
+--- a/arch/arm/configs/multi_v7_defconfig
++++ b/arch/arm/configs/multi_v7_defconfig
+@@ -241,7 +241,7 @@ CONFIG_KEYBOARD_GPIO=y
+ CONFIG_KEYBOARD_TEGRA=y
+ CONFIG_KEYBOARD_SPEAR=y
+ CONFIG_KEYBOARD_ST_KEYSCAN=y
+-CONFIG_KEYBOARD_CROS_EC=y
++CONFIG_KEYBOARD_CROS_EC=m
+ CONFIG_MOUSE_PS2_ELANTECH=y
+ CONFIG_MOUSE_CYAPA=m
+ CONFIG_MOUSE_ELAN_I2C=y
+@@ -397,9 +397,9 @@ CONFIG_MFD_AS3722=y
+ CONFIG_MFD_ATMEL_FLEXCOM=y
+ CONFIG_MFD_BCM590XX=y
+ CONFIG_MFD_AXP20X=y
+-CONFIG_MFD_CROS_EC=y
++CONFIG_MFD_CROS_EC=m
+ CONFIG_MFD_CROS_EC_I2C=m
+-CONFIG_MFD_CROS_EC_SPI=y
++CONFIG_MFD_CROS_EC_SPI=m
+ CONFIG_MFD_MAX14577=y
+ CONFIG_MFD_MAX77686=y
+ CONFIG_MFD_MAX77693=y
+-- 
+2.4.3
