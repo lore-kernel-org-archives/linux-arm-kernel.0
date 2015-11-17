@@ -1,109 +1,107 @@
-From: yingjoe.chen@mediatek.com (Yingjoe Chen)
-Date: Tue, 17 Nov 2015 22:18:01 +0800
-Subject: [PATCH] pinctrl: mediatek: fix a memleak when do dt maps.
-In-Reply-To: <1447734177-17258-1-git-send-email-hongzhou.yang@mediatek.com>
-References: <1447734177-17258-1-git-send-email-hongzhou.yang@mediatek.com>
-Message-ID: <1447769881.3218.2.camel@mtksdaap41>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Tue, 17 Nov 2015 15:22:16 +0100
+Subject: [PATCH 14/27] mtd: nand: use the mtd instance embedded in
+ struct nand_chip
+In-Reply-To: <alpine.DEB.2.10.1511170957100.2455@hadrien>
+References: <1447681080-31232-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1447681080-31232-15-git-send-email-boris.brezillon@free-electrons.com>
+ <20151117030019.GY8456@google.com>
+ <20151117093836.052c86b5@bbrezillon>
+ <alpine.DEB.2.10.1511170957100.2455@hadrien>
+Message-ID: <20151117152216.539fc09b@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2015-11-16 at 20:22 -0800, Hongzhou Yang wrote:
-> configs will kmemdup to dup_configs in pictrl util function.
-> So configs need to be freed.
+Hi Julia,
+
+On Tue, 17 Nov 2015 10:05:03 +0100 (CET)
+Julia Lawall <julia.lawall@lip6.fr> wrote:
+
+> > > (This isn't the worst one, but it just happens to be one of the first.)
+> > > There are many cases where the typical style would be to declare a new
+> > > variable at the top of the function, where you perform the
+> > > macro/function-call to convert from one abstraction to another. Like
+> > >
+> > > static int nfc_set_sram_bank(struct atmel_nand_host *host, unsigned int bank)
+> > > {
+> > > 	struct mtd_info *mtd = nand_to_mtd(&hot->nand_chip);
+> > > 	...
+> > >
+> > > and then use it later. Can that be done very easily?
+> > >
+> > > >  			return -EINVAL;
+> > > >  		nfc_writel(host->nfc->hsmc_regs, BANK, ATMEL_HSMC_NFC_BANK1);
+> > > >  	} else {
+> > >
+> > > ...
+> >
+> > Honestly, I don't know how to do that with a coccinelle script, and it
+> > will probably take me more time to find how to do it than addressing
+> > those problems manually.
+> >
+> > Julia, could you give us some hint?
 > 
-> Signed-off-by: Hongzhou Yang <hongzhou.yang@mediatek.com>
-> ---
->  Fix a memleak issue.
+> Probably something like the following would be easiest.  You can just run
+> it after your other transformations:
 > 
->  drivers/pinctrl/mediatek/pinctrl-mtk-common.c |   24 ++++++++++++++----------
->  1 file changed, 14 insertions(+), 10 deletions(-)
+> @r exists@
+> identifier f;
+> expression e;
+> @@
 > 
-> diff --git a/drivers/pinctrl/mediatek/pinctrl-mtk-common.c b/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
-> index bbf0230..0f9e416 100644
-> --- a/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
-> +++ b/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
-> @@ -520,21 +520,23 @@ static int mtk_pctrl_dt_subnode_to_map(struct pinctrl_dev *pctldev,
->  	if (has_config && num_pins >= 1)
->  		maps_per_pin++;
->  
-> -	if (!num_pins || !maps_per_pin)
-> -		return -EINVAL;
-> +	if (!num_pins || !maps_per_pin) {
-> +		err = -EINVAL;
-> +		goto exit;
-> +	}
+> f(...) { <+...  nand_to_mtd(e) ...+> }
+> 
+> @@
+> identifier r.f;
+> expression r.e;
+> @@
+> 
+> f(...) {
+> + struct mtd_info *mtd = nand_to_mtd(e);
+> ...
+> }
 
+Thanks for the the suggestion...
 
-In line 510:
+> 
+> This won't work if there is more than one possible value of e.  If that is
+> likely, then I could come up with something more complex.  It also assumes
+> that you want to convert all such calls.  If you only want to convert calls
+> that occur in a particular context, eg a field reference, then you could
+> enhance the pattern inside the <+... ...+> in the first rule.
 
-        err = pinconf_generic_parse_dt_config(node, pctldev, &configs,
-                &num_configs);
-        if (num_configs)
-                has_config = 1;
+... unfortunately, as you've guessed, it's a bit more complicated.
+This mtd local variable is usually extracted from another local
+variable (struct nand_chip *chip), so we have to declare
 
-if the function return err<0, configs and num_configs might not be
-initialized and you'll crash the kernel when doing kfree(configs);
+struct mtd_info *mtd = nand_to_mtd(e);
 
-Joe.C
+after
 
->  
->  	reserve = num_pins * maps_per_pin;
->  
->  	err = pinctrl_utils_reserve_map(pctldev, map,
->  			reserved_maps, num_maps, reserve);
->  	if (err < 0)
-> -		goto fail;
-> +		goto exit;
->  
->  	for (i = 0; i < num_pins; i++) {
->  		err = of_property_read_u32_index(node, "pinmux",
->  				i, &pinfunc);
->  		if (err)
-> -			goto fail;
-> +			goto exit;
->  
->  		pin = MTK_GET_PIN_NO(pinfunc);
->  		func = MTK_GET_PIN_FUNC(pinfunc);
-> @@ -543,20 +545,21 @@ static int mtk_pctrl_dt_subnode_to_map(struct pinctrl_dev *pctldev,
->  				func >= ARRAY_SIZE(mtk_gpio_functions)) {
->  			dev_err(pctl->dev, "invalid pins value.\n");
->  			err = -EINVAL;
-> -			goto fail;
-> +			goto exit;
->  		}
->  
->  		grp = mtk_pctrl_find_group_by_pin(pctl, pin);
->  		if (!grp) {
->  			dev_err(pctl->dev, "unable to match pin %d to group\n",
->  					pin);
-> -			return -EINVAL;
-> +			err = -EINVAL;
-> +			goto exit;
->  		}
->  
->  		err = mtk_pctrl_dt_node_to_map_func(pctl, pin, func, grp, map,
->  				reserved_maps, num_maps);
->  		if (err < 0)
-> -			goto fail;
-> +			goto exit;
->  
->  		if (has_config) {
->  			err = pinctrl_utils_add_map_configs(pctldev, map,
-> @@ -564,13 +567,14 @@ static int mtk_pctrl_dt_subnode_to_map(struct pinctrl_dev *pctldev,
->  					configs, num_configs,
->  					PIN_MAP_TYPE_CONFIGS_GROUP);
->  			if (err < 0)
-> -				goto fail;
-> +				goto exit;
->  		}
->  	}
->  
-> -	return 0;
-> +	err = 0;
->  
-> -fail:
-> +exit:
-> +	kfree(configs);
->  	return err;
->  }
->  
+struct nand_chip *chip = expression;
+
+But this is not the only particular case. Sometime the chip variable is
+not assigned where it's declared (especially when it is dynamically
+allocated), and sometime it does not exist at all (we just extract it
+from a private struct: &priv->chip).
+The mtd variable can also be declared in sub-code blocks (loop or
+conditional statements).
+And, as you stated, we might want to keep direct calls to nand_to_mtd()
+if it's only called once in a function context.
+
+I'm pretty sure we could describe all those cases with specific context
+description, but I must admit that it takes less time for me to fix
+those specific cases manually than figuring out how to describe them
+correctly in a coccinelle script :).
+
+This being said, I'd be happy to see how you would handle all these
+different cases.
+
+Thanks,
+
+Boris
+
+-- 
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
