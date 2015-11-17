@@ -1,67 +1,43 @@
-From: zhaoshenglong@huawei.com (Shannon Zhao)
-Date: Tue, 17 Nov 2015 20:45:06 +0800
-Subject: [PATCH v3 38/62] arm/acpi: Add placeholder for efi and acpi load
- address
-In-Reply-To: <564B1666.4060008@citrix.com>
-References: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
- <1447753261-7552-39-git-send-email-shannon.zhao@linaro.org>
- <564B1666.4060008@citrix.com>
-Message-ID: <564B2152.9000904@huawei.com>
+From: tiffany.lin@mediatek.com (Tiffany Lin)
+Date: Tue, 17 Nov 2015 20:54:39 +0800
+Subject: [RESEND RFC/PATCH 2/8] arm64: dts: mediatek: Add node for Mediatek
+ Video Processor Unit
+In-Reply-To: <1447764885-23100-1-git-send-email-tiffany.lin@mediatek.com>
+References: <1447764885-23100-1-git-send-email-tiffany.lin@mediatek.com>
+Message-ID: <1447764885-23100-3-git-send-email-tiffany.lin@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+From: Andrew-CT Chen <andrew-ct.chen@mediatek.com>
 
+add VPU drivers for MT8173
 
-On 2015/11/17 19:58, Julien Grall wrote:
-> Hi Shannon,
-> 
-> On 17/11/15 09:40, shannon.zhao at linaro.org wrote:
->> From: Shannon Zhao <shannon.zhao@linaro.org>
->>
->> EFI table, memory description table and some of acpi tables will be
->> placed after DOM0 memory space. Add placeholder for the starting address
->> for loading in DOM0 and the size of new added tables. Also add a
->> placeholder to store the new created tables.
->>
->> Signed-off-by: Parth Dixit <parth.dixit@linaro.org>
->> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
->> ---
->>  xen/include/asm-arm/domain.h | 5 +++++
->>  1 file changed, 5 insertions(+)
->>
->> diff --git a/xen/include/asm-arm/domain.h b/xen/include/asm-arm/domain.h
->> index 1e61f30..91272e5 100644
->> --- a/xen/include/asm-arm/domain.h
->> +++ b/xen/include/asm-arm/domain.h
->> @@ -125,6 +125,11 @@ struct arch_domain
->>      } vuart;
->>  
->>      unsigned int evtchn_irq;
->> +#ifdef CONFIG_ACPI
->> +    void *efi_acpi_table;
->> +    paddr_t efi_acpi_gpa;
->> +    paddr_t efi_acpi_len;
->> +#endif
-> 
-> Why do you need this in the arch_domain? AFAICT those 3 variables should
-> only be used while building DOM0, so a better place would be in struct
-> kernel_info (see xen/arch/arm/kernel.h).
-> 
+Signed-off-by: Andrew-CT Chen <andrew-ct.chen@mediatek.com>
+---
+ arch/arm64/boot/dts/mediatek/mt8173.dtsi |   11 +++++++++++
+ 1 file changed, 11 insertions(+)
 
-Since I use efi_acpi_table to store the allocated pages pointer which
-are used to store newly created ACPI and EFI tables.
-See [PATCH v3 40/62]:
-+    order = get_order_from_bytes(d->arch.efi_acpi_len);
-+    d->arch.efi_acpi_table = alloc_xenheap_pages(order, 0);
-
-And it free these pages when destroying this domain:
-+#ifdef CONFIG_ACPI
-+    free_xenheap_pages(d->arch.efi_acpi_table,
-+                       get_order_from_bytes(d->arch.efi_acpi_len));
-+#endif
-
-efi_acpi_gpa might not need.
-
-Thanks,
+diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+index 4dd5f93..098c15e 100644
+--- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
++++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+@@ -258,6 +258,17 @@
+ 			clock-names = "spi", "wrap";
+ 		};
+ 
++		vpu: vpu at 10020000 {
++			compatible = "mediatek,mt8173-vpu";
++			reg = <0 0x10020000 0 0x30000>,
++			      <0 0x10050000 0 0x100>;
++			reg-names = "sram", "cfg_reg";
++			interrupts = <GIC_SPI 166 IRQ_TYPE_LEVEL_HIGH>;
++			clocks = <&topckgen CLK_TOP_SCP_SEL>;
++			clock-names = "main";
++			iommus = <&iommu M4U_LARB3_ID M4U_PORT_VENC_RCPU>;
++		};
++
+ 		sysirq: intpol-controller at 10200620 {
+ 			compatible = "mediatek,mt8173-sysirq",
+ 				     "mediatek,mt6577-sysirq";
 -- 
-Shannon
+1.7.9.5
