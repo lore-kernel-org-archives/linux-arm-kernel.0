@@ -1,47 +1,94 @@
-From: jszhang@marvell.com (Jisheng Zhang)
-Date: Tue, 17 Nov 2015 11:56:02 +0800
-Subject: [Query] How to measure the entry-latency-us and exit-latency-us
- on arm PSCI system
-In-Reply-To: <20151116160513.GB19228@red-moon>
-References: <20151116201055.00567e90@xhacker> <20151116160513.GB19228@red-moon>
-Message-ID: <20151117115602.6f3626be@xhacker>
+From: hongzhou.yang@mediatek.com (Hongzhou Yang)
+Date: Mon, 16 Nov 2015 20:22:57 -0800
+Subject: [PATCH] pinctrl: mediatek: fix a memleak when do dt maps.
+Message-ID: <1447734177-17258-1-git-send-email-hongzhou.yang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 16 Nov 2015 16:05:13 +0000
-Lorenzo Pieralisi wrote:
+configs will kmemdup to dup_configs in pictrl util function.
+So configs need to be freed.
 
-> On Mon, Nov 16, 2015 at 08:10:55PM +0800, Jisheng Zhang wrote:
-> > Hi all,
-> > 
-> > Now, I'd like to add cpuidle support to Marvell berlin arm64 soc via
-> > drivers/cpuidle/dt_idle_states.c. The system is PSCI-1.0 compatible. 
-> > 
-> > Per my understanding:
-> > 
-> > The entry-latency-us: the time from beginning of cpuidle_idle_call()
-> > to the firmware's last WFI instruction. Should test more times to find
-> > the longest time.
-> > 
-> > The exit-latency-us: the time from the first instruction of waken up cpu
-> > to the end of cpuidle_idle_call(). Should test more times to find the longest
-> > time.
-> > 
-> > If cpufreq is available, we should fix the cpufreq to the lowest freq to do
-> > the above test.
-> > 
-> > Even I have a look at idle-states binding doc, I'm still not sure whether my
-> > solution to measure the entry-latency-us and exit-latency-us is correct or not,
-> > could you please give suggestions?  
-> 
-> It is correct and yes for the time being they represent the global worst
-> case so your assumption on cpufreq is reasonable, you should set the
-> system in the worst case conditions.
-> 
-> If the entry phase is interruptible on pending irq (which means that
-> your firmware has checkpoints in the power down sequence) please define
-> wakeup-latency according to the docs, it might be < entry+exit,
-> otherwise your measurements are just fine.
-> 
+Signed-off-by: Hongzhou Yang <hongzhou.yang@mediatek.com>
+---
+ Fix a memleak issue.
 
-Got it. Thanks for detailed explanations
+ drivers/pinctrl/mediatek/pinctrl-mtk-common.c |   24 ++++++++++++++----------
+ 1 file changed, 14 insertions(+), 10 deletions(-)
+
+diff --git a/drivers/pinctrl/mediatek/pinctrl-mtk-common.c b/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
+index bbf0230..0f9e416 100644
+--- a/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
++++ b/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
+@@ -520,21 +520,23 @@ static int mtk_pctrl_dt_subnode_to_map(struct pinctrl_dev *pctldev,
+ 	if (has_config && num_pins >= 1)
+ 		maps_per_pin++;
+ 
+-	if (!num_pins || !maps_per_pin)
+-		return -EINVAL;
++	if (!num_pins || !maps_per_pin) {
++		err = -EINVAL;
++		goto exit;
++	}
+ 
+ 	reserve = num_pins * maps_per_pin;
+ 
+ 	err = pinctrl_utils_reserve_map(pctldev, map,
+ 			reserved_maps, num_maps, reserve);
+ 	if (err < 0)
+-		goto fail;
++		goto exit;
+ 
+ 	for (i = 0; i < num_pins; i++) {
+ 		err = of_property_read_u32_index(node, "pinmux",
+ 				i, &pinfunc);
+ 		if (err)
+-			goto fail;
++			goto exit;
+ 
+ 		pin = MTK_GET_PIN_NO(pinfunc);
+ 		func = MTK_GET_PIN_FUNC(pinfunc);
+@@ -543,20 +545,21 @@ static int mtk_pctrl_dt_subnode_to_map(struct pinctrl_dev *pctldev,
+ 				func >= ARRAY_SIZE(mtk_gpio_functions)) {
+ 			dev_err(pctl->dev, "invalid pins value.\n");
+ 			err = -EINVAL;
+-			goto fail;
++			goto exit;
+ 		}
+ 
+ 		grp = mtk_pctrl_find_group_by_pin(pctl, pin);
+ 		if (!grp) {
+ 			dev_err(pctl->dev, "unable to match pin %d to group\n",
+ 					pin);
+-			return -EINVAL;
++			err = -EINVAL;
++			goto exit;
+ 		}
+ 
+ 		err = mtk_pctrl_dt_node_to_map_func(pctl, pin, func, grp, map,
+ 				reserved_maps, num_maps);
+ 		if (err < 0)
+-			goto fail;
++			goto exit;
+ 
+ 		if (has_config) {
+ 			err = pinctrl_utils_add_map_configs(pctldev, map,
+@@ -564,13 +567,14 @@ static int mtk_pctrl_dt_subnode_to_map(struct pinctrl_dev *pctldev,
+ 					configs, num_configs,
+ 					PIN_MAP_TYPE_CONFIGS_GROUP);
+ 			if (err < 0)
+-				goto fail;
++				goto exit;
+ 		}
+ 	}
+ 
+-	return 0;
++	err = 0;
+ 
+-fail:
++exit:
++	kfree(configs);
+ 	return err;
+ }
+ 
+-- 
+1.7.9.5
