@@ -1,86 +1,63 @@
 From: salil.mehta@huawei.com (Salil)
-Date: Wed, 18 Nov 2015 02:52:26 +0800
-Subject: [PATCH V2 net-next 4/5] net:hns: Add support of ethtool TSO set
- option for Hip06 in HNS
+Date: Wed, 18 Nov 2015 02:52:27 +0800
+Subject: [PATCH V2 net-next 5/5] net:hns: Add the init code to disable Hip06
+ "Hardware VLAN assist"
 In-Reply-To: <1447786347-147518-1-git-send-email-salil.mehta@huawei.com>
 References: <1447786347-147518-1-git-send-email-salil.mehta@huawei.com>
-Message-ID: <1447786347-147518-5-git-send-email-salil.mehta@huawei.com>
+Message-ID: <1447786347-147518-6-git-send-email-salil.mehta@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch adds the support of ethtool TSO option to V1 patch,
-meant to add support of Hip06 SoC to HNS
+From: Salil Mehta <salil.mehta@huawei.com>
+
+This patch adds the initializzation code to disable the hardware
+vlan support for VLAN Tag stripping by default for now.
+
+Proper support of "hardware VLAN assitance" feature would
+soon come in the next coming patches.
 
 Signed-off-by: Salil Mehta <salil.mehta@huawei.com>
-Signed-off-by: lisheng <lisheng011@huawei.com>
 ---
- drivers/net/ethernet/hisilicon/hns/hns_enet.c |   47 +++++++++++++++++++++++++
- 1 file changed, 47 insertions(+)
+ drivers/net/ethernet/hisilicon/hns/hns_dsaf_ppe.c |    7 +++++++
+ drivers/net/ethernet/hisilicon/hns/hns_dsaf_reg.h |    1 +
+ 2 files changed, 8 insertions(+)
 
-diff --git a/drivers/net/ethernet/hisilicon/hns/hns_enet.c b/drivers/net/ethernet/hisilicon/hns/hns_enet.c
-index 055e14c..a0763ab 100644
---- a/drivers/net/ethernet/hisilicon/hns/hns_enet.c
-+++ b/drivers/net/ethernet/hisilicon/hns/hns_enet.c
-@@ -1386,6 +1386,51 @@ static int hns_nic_change_mtu(struct net_device *ndev, int new_mtu)
- 	return ret;
+diff --git a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_ppe.c b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_ppe.c
+index b6bf292..544f323 100644
+--- a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_ppe.c
++++ b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_ppe.c
+@@ -176,6 +176,11 @@ static void hns_ppe_cnt_clr_ce(struct hns_ppe_cb *ppe_cb)
+ 			 PPE_CNT_CLR_CE_B, 1);
  }
  
-+static int hns_nic_set_features(struct net_device *netdev,
-+				netdev_features_t features)
++static void hns_ppe_set_vlan_strip(struct hns_ppe_cb *ppe_cb, int en)
 +{
-+	struct hns_nic_priv *priv = netdev_priv(netdev);
-+	struct hnae_handle *h = priv->ae_handle;
-+
-+	switch (priv->enet_ver) {
-+	case AE_VERSION_1:
-+		if ((features & NETIF_F_TSO) || (features & NETIF_F_TSO6))
-+			netdev_info(netdev, "enet v1 do not support tso!\n");
-+	break;
-+	default:
-+		if ((features & NETIF_F_TSO) || (features & NETIF_F_TSO6)) {
-+			priv->ops.fill_desc = fill_tso_desc;
-+			priv->ops.maybe_stop_tx = hns_nic_maybe_stop_tso;
-+			/* The chip only support 7*4096 */
-+			netif_set_gso_max_size(netdev, 7 * 4096);
-+			h->dev->ops->set_tso_stats(h, 1);
-+		} else {
-+			priv->ops.fill_desc = fill_v2_desc;
-+			priv->ops.maybe_stop_tx = hns_nic_maybe_stop_tx;
-+			h->dev->ops->set_tso_stats(h, 0);
-+		}
-+	break;
-+	}
-+	netdev->features = features;
-+	return 0;
-+}
-+
-+static netdev_features_t hns_nic_fix_features(
-+		struct net_device *netdev, netdev_features_t features)
-+{
-+	struct hns_nic_priv *priv = netdev_priv(netdev);
-+
-+	switch (priv->enet_ver) {
-+	case AE_VERSION_1:
-+		features &= ~(NETIF_F_TSO | NETIF_F_TSO6 |
-+				NETIF_F_HW_VLAN_CTAG_FILTER);
-+		break;
-+	default:
-+		break;
-+	}
-+	return features;
++	dsaf_write_dev(ppe_cb, PPEV2_VLAN_STRIP_EN_REG, en);
 +}
 +
  /**
-  * nic_set_multicast_list - set mutl mac address
-  * @netdev: net device
-@@ -1481,6 +1526,8 @@ static const struct net_device_ops hns_nic_netdev_ops = {
- 	.ndo_set_mac_address = hns_nic_net_set_mac_address,
- 	.ndo_change_mtu = hns_nic_change_mtu,
- 	.ndo_do_ioctl = hns_nic_do_ioctl,
-+	.ndo_set_features = hns_nic_set_features,
-+	.ndo_fix_features = hns_nic_fix_features,
- 	.ndo_get_stats64 = hns_nic_get_stats64,
- #ifdef CONFIG_NET_POLL_CONTROLLER
- 	.ndo_poll_controller = hns_nic_poll_controller,
+  * hns_ppe_checksum_hw - set ppe checksum caculate
+  * @ppe_device: ppe device
+@@ -345,6 +350,8 @@ static void hns_ppe_init_hw(struct hns_ppe_cb *ppe_cb)
+ 	hns_ppe_cnt_clr_ce(ppe_cb);
+ 
+ 	if (!AE_IS_VER1(dsaf_dev->dsaf_ver)) {
++		hns_ppe_set_vlan_strip(ppe_cb, 0);
++
+ 		hns_ppe_set_rss_key(ppe_cb, rss_key);
+ 
+ 		for (i = 0; i < HNS_PPEV2_RSS_IND_TBL_SIZE; i++)
+diff --git a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_reg.h b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_reg.h
+index 98c163e..6c18ca9 100644
+--- a/drivers/net/ethernet/hisilicon/hns/hns_dsaf_reg.h
++++ b/drivers/net/ethernet/hisilicon/hns/hns_dsaf_reg.h
+@@ -318,6 +318,7 @@
+ #define PPE_CFG_PARSE_TAG_REG			0x94
+ #define PPE_CFG_PRO_CHECK_EN_REG		0x98
+ #define PPEV2_CFG_TSO_EN_REG                    0xA0
++#define PPEV2_VLAN_STRIP_EN_REG                 0xAC
+ #define PPE_INTEN_REG				0x100
+ #define PPE_RINT_REG				0x104
+ #define PPE_INTSTS_REG				0x108
 -- 
 1.7.9.5
