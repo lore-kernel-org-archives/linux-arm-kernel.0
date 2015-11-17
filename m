@@ -1,382 +1,58 @@
-From: gkulkarni@caviumnetworks.com (Ganapatrao Kulkarni)
-Date: Tue, 17 Nov 2015 22:50:42 +0530
-Subject: [PATCH v7 3/4] arm64/arm, numa,
- dt: adding numa dt binding implementation for arm64 platforms.
-In-Reply-To: <1447780843-9223-1-git-send-email-gkulkarni@caviumnetworks.com>
-References: <1447780843-9223-1-git-send-email-gkulkarni@caviumnetworks.com>
-Message-ID: <1447780843-9223-4-git-send-email-gkulkarni@caviumnetworks.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 17 Nov 2015 17:21:48 +0000
+Subject: [RFC PATCH] arm64: use non-global mappings for UEFI runtime
+ regions
+In-Reply-To: <CAKv+Gu-L+YKonkzE2fyH9AzXcBERjMREMrHRXFu=xy2f+4gwpw@mail.gmail.com>
+References: <1447750411-6424-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20151117170816.GI30101@arm.com>
+ <CAKv+Gu-L+YKonkzE2fyH9AzXcBERjMREMrHRXFu=xy2f+4gwpw@mail.gmail.com>
+Message-ID: <20151117172107.GK30101@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Adding numa dt binding support for arm64 based platforms.
-dt node parsing for numa topology is done using device property
-proximity and device node distance-map.
+On Tue, Nov 17, 2015 at 06:11:56PM +0100, Ard Biesheuvel wrote:
+> On 17 November 2015 at 18:08, Will Deacon <will.deacon@arm.com> wrote:
+> > On Tue, Nov 17, 2015 at 09:53:31AM +0100, Ard Biesheuvel wrote:
+> >> As pointed out by Russell King in response to the proposed ARM version
+> >> of this code, the sequence to switch between the UEFI runtime mapping
+> >> and current's actual userland mapping (and vice versa) is potentially
+> >> unsafe, since it leaves a time window between the switch to the new
+> >> page tables and the TLB flush where speculative accesses may hit on
+> >> stale global TLB entries.
+> >>
+> >> So instead, use non-global mappings, and perform the switch via the
+> >> ordinary ASID-aware context switch routines.
+> >>
+> >> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> >> ---
+> >>  arch/arm64/include/asm/mmu_context.h |  2 +-
+> >>  arch/arm64/kernel/efi.c              | 14 +++++---------
+> >>  2 files changed, 6 insertions(+), 10 deletions(-)
+> >
+> > Acked-by: Will Deacon <will.deacon@arm.com>
+> >
+> > Please do *not* tag this for stable! ;)
+> >
+> 
+> OK, thanks for clarifying.
+> 
+> So for stable, should we keep the global mappings and do something
+> like this instead?
+> 
+> """
+>        cpu_set_reserved_ttbr0();
+> 
+>        local_flush_tlb_all();
+>        if (icache_is_aivivt())
+>                __local_flush_icache_all();
+> 
+>        if (mm != &init_mm)
+>                cpu_switch_mm(mm->pgd, mm);
+> """
 
-Reviewed-by: Robert Richter <rrichter@cavium.com>
-Signed-off-by: Ganapatrao Kulkarni <gkulkarni@caviumnetworks.com>
----
- arch/arm64/Kconfig            |  10 ++
- arch/arm64/include/asm/numa.h |   9 ++
- arch/arm64/kernel/Makefile    |   1 +
- arch/arm64/kernel/of_numa.c   | 265 ++++++++++++++++++++++++++++++++++++++++++
- arch/arm64/kernel/smp.c       |   2 +
- arch/arm64/mm/numa.c          |  10 +-
- 6 files changed, 296 insertions(+), 1 deletion(-)
- create mode 100644 arch/arm64/kernel/of_numa.c
+That looks good to me, but I think we'd want to give it a good testing
+given that we're solving a problem that has been spotted by code inspection
+as opposed to real failures on hardware. There's even an argument that
+it's not worth doing anything for -stable.
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 7d8fb42..a18a154 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -494,6 +494,16 @@ config NUMA
- 	  local memory controller of the CPU and add some more
- 	  NUMA awareness to the kernel.
- 
-+config OF_NUMA
-+	bool "Device Tree NUMA support"
-+	depends on NUMA
-+	depends on OF
-+	default y
-+	help
-+	  Enable Device Tree NUMA support.
-+	  This enables the numa mapping of cpu, memory, io and
-+	  inter node distances using dt bindings.
-+
- config NODES_SHIFT
- 	int "Maximum NUMA Nodes (as a power of 2)"
- 	range 1 10
-diff --git a/arch/arm64/include/asm/numa.h b/arch/arm64/include/asm/numa.h
-index c00f3a4..b8c2a3f 100644
---- a/arch/arm64/include/asm/numa.h
-+++ b/arch/arm64/include/asm/numa.h
-@@ -44,4 +44,13 @@ void numa_store_cpu_info(unsigned int cpu);
- static inline void numa_store_cpu_info(unsigned int cpu)		{ }
- static inline void arm64_numa_init(void)		{ }
- #endif	/* CONFIG_NUMA */
-+
-+struct device_node;
-+#ifdef CONFIG_OF_NUMA
-+int __init arm64_of_numa_init(void);
-+void __init of_numa_set_node_info(unsigned int cpu, struct device_node *dn);
-+#else
-+static inline void of_numa_set_node_info(unsigned int cpu,
-+		struct device_node *dn) { }
-+#endif
- #endif	/* _ASM_NUMA_H */
-diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
-index 474691f..7987763 100644
---- a/arch/arm64/kernel/Makefile
-+++ b/arch/arm64/kernel/Makefile
-@@ -41,6 +41,7 @@ arm64-obj-$(CONFIG_EFI)			+= efi.o efi-entry.stub.o
- arm64-obj-$(CONFIG_PCI)			+= pci.o
- arm64-obj-$(CONFIG_ARMV8_DEPRECATED)	+= armv8_deprecated.o
- arm64-obj-$(CONFIG_ACPI)		+= acpi.o
-+arm64-obj-$(CONFIG_OF_NUMA)		+= of_numa.o
- 
- obj-y					+= $(arm64-obj-y) vdso/
- obj-m					+= $(arm64-obj-m)
-diff --git a/arch/arm64/kernel/of_numa.c b/arch/arm64/kernel/of_numa.c
-new file mode 100644
-index 0000000..6ecb9a4
---- /dev/null
-+++ b/arch/arm64/kernel/of_numa.c
-@@ -0,0 +1,265 @@
-+/*
-+ * OF NUMA Parsing support.
-+ *
-+ * Copyright (C) 2015 Cavium Inc.
-+ * Author: Ganapatrao Kulkarni <gkulkarni@cavium.com>
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope that it will be useful,
-+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ * GNU General Public License for more details.
-+ *
-+ * You should have received a copy of the GNU General Public License
-+ * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-+ */
-+
-+#include <linux/ctype.h>
-+#include <linux/memblock.h>
-+#include <linux/module.h>
-+#include <linux/nodemask.h>
-+#include <linux/of.h>
-+#include <linux/of_fdt.h>
-+
-+#include <asm/smp_plat.h>
-+
-+/* define default numa node to 0 */
-+#define DEFAULT_NODE 0
-+#define OF_NUMA_PROP "numa-node-id"
-+
-+/* Returns nid in the range [0..MAX_NUMNODES-1],
-+ * or NUMA_NO_NODE if no valid numa-node-id entry found
-+ * or DEFAULT_NODE if no numa-node-id entry exists
-+ */
-+static int of_numa_prop_to_nid(const __be32 *of_numa_prop, int length)
-+{
-+	int nid;
-+
-+	if (!of_numa_prop)
-+		return DEFAULT_NODE;
-+
-+	if (length != sizeof(*of_numa_prop)) {
-+		pr_warn("NUMA: Invalid of_numa_prop length %d found.\n",
-+				length);
-+		return NUMA_NO_NODE;
-+	}
-+
-+	nid = of_read_number(of_numa_prop, 1);
-+	if (nid >= MAX_NUMNODES) {
-+		pr_warn("NUMA: Invalid numa node %d found.\n", nid);
-+		return NUMA_NO_NODE;
-+	}
-+
-+	return nid;
-+}
-+
-+/* Must hold reference to node during call */
-+static int of_get_numa_nid(struct device_node *device)
-+{
-+	int length;
-+	const __be32 *of_numa_prop;
-+
-+	of_numa_prop = of_get_property(device, OF_NUMA_PROP, &length);
-+
-+	return of_numa_prop_to_nid(of_numa_prop, length);
-+}
-+
-+static int __init early_init_of_get_numa_nid(unsigned long node)
-+{
-+	int length;
-+	const __be32 *of_numa_prop;
-+
-+	of_numa_prop = of_get_flat_dt_prop(node, OF_NUMA_PROP, &length);
-+
-+	return of_numa_prop_to_nid(of_numa_prop, length);
-+}
-+
-+/* Walk the device tree upwards, looking for a numa-node-id property */
-+int of_node_to_nid(struct device_node *device)
-+{
-+	struct device_node *parent;
-+	int nid = NUMA_NO_NODE;
-+
-+	of_node_get(device);
-+	while (device) {
-+		const __be32 *of_numa_prop;
-+		int length;
-+
-+		of_numa_prop = of_get_property(device, OF_NUMA_PROP, &length);
-+		if (of_numa_prop) {
-+			nid = of_numa_prop_to_nid(of_numa_prop, length);
-+			break;
-+		}
-+
-+		parent = device;
-+		device = of_get_parent(parent);
-+		of_node_put(parent);
-+	}
-+	of_node_put(device);
-+
-+	return nid;
-+}
-+
-+void __init of_numa_set_node_info(unsigned int cpu, struct device_node *device)
-+{
-+	int nid = DEFAULT_NODE;
-+
-+	if (device)
-+		nid = of_get_numa_nid(device);
-+
-+	cpu_to_node_map[cpu] = nid;
-+}
-+
-+/*
-+ * Even though we connect cpus to numa domains later in SMP
-+ * init, we need to know the node ids now for all cpus.
-+*/
-+static int __init early_init_parse_cpu_node(unsigned long node)
-+{
-+	int nid;
-+
-+	const char *type = of_get_flat_dt_prop(node, "device_type", NULL);
-+
-+	/* We are scanning "cpu" nodes only */
-+	if (type == NULL)
-+		return 0;
-+	else if (strcmp(type, "cpu") != 0)
-+		return 0;
-+
-+	nid = early_init_of_get_numa_nid(node);
-+
-+	if (nid == NUMA_NO_NODE)
-+		return -EINVAL;
-+
-+	node_set(nid, numa_nodes_parsed);
-+	return 0;
-+}
-+
-+static int __init early_init_parse_memory_node(unsigned long node)
-+{
-+	const __be32 *reg, *endp;
-+	int length;
-+	int nid;
-+
-+	const char *type = of_get_flat_dt_prop(node, "device_type", NULL);
-+
-+	/* We are scanning "memory" nodes only */
-+	if (type == NULL)
-+		return 0;
-+	else if (strcmp(type, "memory") != 0)
-+		return 0;
-+
-+	nid = early_init_of_get_numa_nid(node);
-+
-+	if (nid == NUMA_NO_NODE)
-+		return -EINVAL;
-+
-+	reg = of_get_flat_dt_prop(node, "reg", &length);
-+	endp = reg + (length / sizeof(__be32));
-+
-+	while ((endp - reg) >= (dt_root_addr_cells + dt_root_size_cells)) {
-+		u64 base, size;
-+		struct memblock_region *mblk;
-+
-+		base = dt_mem_next_cell(dt_root_addr_cells, &reg);
-+		size = dt_mem_next_cell(dt_root_size_cells, &reg);
-+		pr_debug("NUMA-DT:  base = %llx , node = %u\n",
-+				base, nid);
-+
-+		for_each_memblock(memory, mblk) {
-+			if (mblk->base == base) {
-+				if (numa_add_memblk(nid,
-+							mblk->base,
-+							mblk->size) < 0)
-+					return -EINVAL;
-+				break;
-+			}
-+		}
-+	}
-+
-+	return 0;
-+}
-+
-+static int __init early_init_parse_distance_map_v1(unsigned long node,
-+		const char *uname)
-+{
-+
-+	const __be32 *prop_dist_matrix;
-+	int length = 0, i, matrix_count;
-+	int nr_size_cells = OF_ROOT_NODE_SIZE_CELLS_DEFAULT;
-+
-+	pr_info("NUMA: parsing numa,distance-map-v1\n");
-+
-+	prop_dist_matrix =
-+		of_get_flat_dt_prop(node, "distance-matrix", &length);
-+
-+	if (!length) {
-+		pr_err("NUMA: failed to parse distance-matrix\n");
-+		return  -ENODEV;
-+	}
-+
-+	matrix_count = ((length / sizeof(__be32)) / (3 * nr_size_cells));
-+
-+	if ((matrix_count * sizeof(__be32) * 3 * nr_size_cells) !=  length) {
-+		pr_warn("NUMA: invalid distance-matrix length %d\n", length);
-+		return -EINVAL;
-+	}
-+
-+	for (i = 0; i < matrix_count; i++) {
-+		u32 nodea, nodeb, distance;
-+
-+		nodea = dt_mem_next_cell(nr_size_cells, &prop_dist_matrix);
-+		nodeb = dt_mem_next_cell(nr_size_cells, &prop_dist_matrix);
-+		distance = dt_mem_next_cell(nr_size_cells, &prop_dist_matrix);
-+		numa_set_distance(nodea, nodeb, distance);
-+		pr_debug("NUMA-DT:  distance[node%d -> node%d] = %d\n",
-+				nodea, nodeb, distance);
-+
-+		/* Set default distance of node B->A same as A->B */
-+		if (nodeb > nodea)
-+			numa_set_distance(nodeb, nodea, distance);
-+	}
-+
-+	return 0;
-+}
-+
-+static int __init early_init_parse_distance_map(unsigned long node,
-+		const char *uname)
-+{
-+
-+	if (strcmp(uname, "distance-map") != 0)
-+		return 0;
-+
-+	if (of_flat_dt_is_compatible(node, "numa,distance-map-v1"))
-+		return early_init_parse_distance_map_v1(node, uname);
-+
-+	return -EINVAL;
-+}
-+
-+/**
-+ * early_init_of_scan_numa_map - parse memory node and map nid to memory range.
-+ */
-+int __init early_init_of_scan_numa_map(unsigned long node, const char *uname,
-+				     int depth, void *data)
-+{
-+	int ret;
-+
-+	ret = early_init_parse_cpu_node(node);
-+
-+	if (!ret)
-+		ret = early_init_parse_memory_node(node);
-+
-+	if (!ret)
-+		ret = early_init_parse_distance_map(node, uname);
-+
-+	return ret;
-+}
-+
-+/* DT node mapping is done already early_init_of_scan_memory */
-+int __init arm64_of_numa_init(void)
-+{
-+	return of_scan_flat_dt(early_init_of_scan_numa_map, NULL);
-+}
-diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
-index d6e7d6a..a2a8c2d 100644
---- a/arch/arm64/kernel/smp.c
-+++ b/arch/arm64/kernel/smp.c
-@@ -520,6 +520,8 @@ static void __init of_parse_and_init_cpus(void)
- 
- 		pr_debug("cpu logical map 0x%llx\n", hwid);
- 		cpu_logical_map(cpu_count) = hwid;
-+		/* map logical cpu to node */
-+		of_numa_set_node_info(cpu_count, dn);
- next:
- 		cpu_count++;
- 	}
-diff --git a/arch/arm64/mm/numa.c b/arch/arm64/mm/numa.c
-index e3afbf8..209c7a9 100644
---- a/arch/arm64/mm/numa.c
-+++ b/arch/arm64/mm/numa.c
-@@ -380,5 +380,13 @@ static int __init dummy_numa_init(void)
-  */
- void __init arm64_numa_init(void)
- {
--	numa_init(dummy_numa_init);
-+	int ret = -ENODEV;
-+
-+#ifdef CONFIG_OF_NUMA
-+	if (!numa_off)
-+		ret = numa_init(arm64_of_numa_init);
-+#endif
-+
-+	if (ret)
-+		numa_init(dummy_numa_init);
- }
--- 
-1.8.1.4
+Will
