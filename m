@@ -1,74 +1,140 @@
 From: shannon.zhao@linaro.org (shannon.zhao at linaro.org)
-Date: Tue, 17 Nov 2015 17:56:59 +0800
-Subject: [PATCH 01/13] Xen : Hide UART used by Xen
+Date: Tue, 17 Nov 2015 17:57:04 +0800
+Subject: [PATCH 06/13] Xen: ARM: Add support for mapping amba device mmio
 In-Reply-To: <1447754231-7772-1-git-send-email-shannon.zhao@linaro.org>
 References: <1447754231-7772-1-git-send-email-shannon.zhao@linaro.org>
-Message-ID: <1447754231-7772-2-git-send-email-shannon.zhao@linaro.org>
+Message-ID: <1447754231-7772-7-git-send-email-shannon.zhao@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Shannon Zhao <shannon.zhao@linaro.org>
 
-According to the STAO table, hide UART used by Xen from Dom0.
+Add a bus_notifier for AMBA bus device in order to map the device
+mmio regions when DOM0 booting with ACPI.
 
 Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
 ---
- drivers/acpi/bus.c | 22 ++++++++++++++++++++++
- 1 file changed, 22 insertions(+)
+ drivers/xen/Makefile |  1 +
+ drivers/xen/amba.c   | 99 ++++++++++++++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 100 insertions(+)
+ create mode 100644 drivers/xen/amba.c
 
-diff --git a/drivers/acpi/bus.c b/drivers/acpi/bus.c
-index a212cef..e93806b 100644
---- a/drivers/acpi/bus.c
-+++ b/drivers/acpi/bus.c
-@@ -46,6 +46,7 @@ ACPI_MODULE_NAME("bus");
- struct acpi_device *acpi_root;
- struct proc_dir_entry *acpi_root_dir;
- EXPORT_SYMBOL(acpi_root_dir);
-+static u64 uart_addr;
+diff --git a/drivers/xen/Makefile b/drivers/xen/Makefile
+index 2f867e7..139bd0b 100644
+--- a/drivers/xen/Makefile
++++ b/drivers/xen/Makefile
+@@ -12,6 +12,7 @@ CFLAGS_features.o			:= $(nostackp)
+ CFLAGS_efi.o				+= -fshort-wchar
  
- #ifdef CONFIG_X86
- #ifdef CONFIG_ACPI_CUSTOM_DSDT
-@@ -93,6 +94,16 @@ acpi_status acpi_bus_get_status_handle(acpi_handle handle,
- {
- 	acpi_status status;
- 
-+	if (uart_addr) {
-+		u64 addr;
-+		status = acpi_evaluate_integer(handle, METHOD_NAME__ADR, NULL,
-+					       &addr);
-+		if (ACPI_SUCCESS(status) && (addr == uart_addr)) {
-+			*sta = 0;
-+			return AE_OK;
-+		}
-+	}
+ dom0-$(CONFIG_ARM64) += platform.o
++dom0-$(CONFIG_ARM_AMBA) += amba.o
+ dom0-$(CONFIG_PCI) += pci.o
+ dom0-$(CONFIG_USB_SUPPORT) += dbgp.o
+ dom0-$(CONFIG_XEN_ACPI) += acpi.o $(xen-pad-y)
+diff --git a/drivers/xen/amba.c b/drivers/xen/amba.c
+new file mode 100644
+index 0000000..e491c8e
+--- /dev/null
++++ b/drivers/xen/amba.c
+@@ -0,0 +1,99 @@
++/*
++ * Copyright (c) 2015, Linaro Limited.
++ *
++ * This program is free software; you can redistribute it and/or modify it
++ * under the terms and conditions of the GNU General Public License,
++ * version 2, as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope it will be useful, but WITHOUT
++ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
++ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
++ * more details.
++ *
++ * You should have received a copy of the GNU General Public License along with
++ * this program; if not, write to the Free Software Foundation, Inc., 59 Temple
++ * Place - Suite 330, Boston, MA 02111-1307 USA.
++ *
++ * Author: Shannon Zhao <shannon.zhao@linaro.org>
++ */
 +
- 	status = acpi_evaluate_integer(handle, "_STA", NULL, sta);
- 	if (ACPI_SUCCESS(status))
- 		return AE_OK;
-@@ -1069,6 +1080,7 @@ EXPORT_SYMBOL_GPL(acpi_kobj);
- static int __init acpi_init(void)
- {
- 	int result;
-+	struct acpi_table_stao *stao_ptr;
- 
- 	if (acpi_disabled) {
- 		printk(KERN_INFO PREFIX "Interpreter disabled.\n");
-@@ -1081,6 +1093,16 @@ static int __init acpi_init(void)
- 		acpi_kobj = NULL;
- 	}
- 
-+	acpi_get_table(ACPI_SIG_STAO, 1,
-+		       (struct acpi_table_header **)&stao_ptr);
-+	if(stao_ptr->ignore_uart)
++#include <linux/amba/bus.h>
++#include <linux/acpi.h>
++#include <xen/xen.h>
++#include <xen/interface/memory.h>
++#include <asm/xen/hypervisor.h>
++#include <asm/xen/hypercall.h>
++
++static int xen_map_amba_device_mmio(struct amba_device *adev)
++{
++	int rc = 0;
++	struct resource *r = &adev->res;
++
++	if (resource_type(r) == IORESOURCE_MEM)
 +	{
-+		struct acpi_table_spcr *spcr_ptr;
-+		acpi_get_table(ACPI_SIG_SPCR, 1,
-+			       (struct acpi_table_header **)&spcr_ptr);
-+		uart_addr = spcr_ptr->serial_port.address;
++		int j;
++		int nr = DIV_ROUND_UP(resource_size(r), PAGE_SIZE);
++		xen_pfn_t *gpfns = kmalloc(sizeof(xen_pfn_t) * nr, GFP_KERNEL);
++		xen_ulong_t *idxs = kmalloc(sizeof(xen_ulong_t) * nr,
++					    GFP_KERNEL);
++		int *errs = kmalloc(sizeof(int) * nr, GFP_KERNEL);
++		struct xen_add_to_physmap_range xatp;
++
++		for (j = 0; j < nr; j++) {
++			gpfns[j] = (r->start >> PAGE_SHIFT) + j;
++			idxs[j] = (r->start >> PAGE_SHIFT) + j;
++			errs[j] = 0;
++		}
++
++		xatp.domid = DOMID_SELF;
++		xatp.size = nr;
++		xatp.space = XENMAPSPACE_dev_mmio;
++
++		set_xen_guest_handle(xatp.gpfns, gpfns);
++		set_xen_guest_handle(xatp.idxs, idxs);
++		set_xen_guest_handle(xatp.errs, errs);
++
++		rc = HYPERVISOR_memory_op(XENMEM_add_to_physmap_range, &xatp);
++
++		kfree(gpfns);
++		kfree(idxs);
++		kfree(errs);
++		if (rc != 0)
++			return rc;
 +	}
 +
- 	init_acpi_device_notify();
- 	result = acpi_bus_init();
- 	if (result) {
++	return rc;
++}
++
++static int xen_amba_notifier(struct notifier_block *nb,
++			     unsigned long action, void *data)
++{
++	struct amba_device *adev = to_amba_device(data);
++	int r = 0;
++
++	if (!acpi_disabled && (action == BUS_NOTIFY_ADD_DEVICE))
++		r = xen_map_amba_device_mmio(adev);
++
++	if (r)
++	{
++		dev_err(&adev->dev, "Failed to add_to_physmap device (%s) mmio!\n",
++			adev->dev.init_name);
++		return NOTIFY_OK;
++	}
++
++	return NOTIFY_DONE;
++}
++
++static struct notifier_block amba_device_nb = {
++	.notifier_call = xen_amba_notifier,
++};
++
++static int __init register_xen_amba_notifier(void)
++{
++	if (!xen_initial_domain())
++		return 0;
++
++	return bus_register_notifier(&amba_bustype, &amba_device_nb);
++}
++
++arch_initcall(register_xen_amba_notifier);
 -- 
 2.1.0
