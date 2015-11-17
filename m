@@ -1,505 +1,111 @@
-From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Tue, 17 Nov 2015 11:35:47 +0530
-Subject: [PATCH v6 5/9] ARM: EXYNOS: split up exynos4 SoC specific PMU data
-In-Reply-To: <1447740351-14246-1-git-send-email-pankaj.dubey@samsung.com>
-References: <1447740351-14246-1-git-send-email-pankaj.dubey@samsung.com>
-Message-ID: <1447740351-14246-6-git-send-email-pankaj.dubey@samsung.com>
+From: julia.lawall@lip6.fr (Julia Lawall)
+Date: Tue, 17 Nov 2015 07:12:22 +0100 (CET)
+Subject: [PATCH 1/7] phy: brcmstb-sata: add missing of_node_put
+In-Reply-To: <20151117013830.GV8456@google.com>
+References: <1447673600-8881-1-git-send-email-Julia.Lawall@lip6.fr>
+ <1447673600-8881-2-git-send-email-Julia.Lawall@lip6.fr>
+ <20151117013830.GV8456@google.com>
+Message-ID: <alpine.DEB.2.02.1511170711340.2045@localhost6.localdomain6>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch splits up mach-exynos/pmu.c file, and moves exynos4210,
-exynos4412 and exynos4212 PMU configuration data and functions handing
-data into a common exynos4 SoC specific PMU file mach-exynos/exynos4-pmu.c.
 
-Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
-Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
----
- arch/arm/mach-exynos/Makefile      |   2 +-
- arch/arm/mach-exynos/exynos-pmu.h  |   3 +
- arch/arm/mach-exynos/exynos4-pmu.c | 222 +++++++++++++++++++++++++++++++++++++
- arch/arm/mach-exynos/pmu.c         | 207 ----------------------------------
- 4 files changed, 226 insertions(+), 208 deletions(-)
- create mode 100644 arch/arm/mach-exynos/exynos4-pmu.c
 
-diff --git a/arch/arm/mach-exynos/Makefile b/arch/arm/mach-exynos/Makefile
-index e869f86..8969683 100644
---- a/arch/arm/mach-exynos/Makefile
-+++ b/arch/arm/mach-exynos/Makefile
-@@ -9,7 +9,7 @@ ccflags-$(CONFIG_ARCH_MULTIPLATFORM) += -I$(srctree)/$(src)/include -I$(srctree)
- 
- # Core
- 
--obj-$(CONFIG_ARCH_EXYNOS)	+= exynos.o pmu.o exynos-smc.o firmware.o exynos3250-pmu.o
-+obj-$(CONFIG_ARCH_EXYNOS)	+= exynos.o pmu.o exynos-smc.o firmware.o exynos3250-pmu.o exynos4-pmu.o
- 
- obj-$(CONFIG_EXYNOS_CPU_SUSPEND) += pm.o sleep.o
- obj-$(CONFIG_PM_SLEEP)		+= suspend.o
-diff --git a/arch/arm/mach-exynos/exynos-pmu.h b/arch/arm/mach-exynos/exynos-pmu.h
-index 5d09fa3..3d21aad 100644
---- a/arch/arm/mach-exynos/exynos-pmu.h
-+++ b/arch/arm/mach-exynos/exynos-pmu.h
-@@ -33,6 +33,9 @@ struct exynos_pmu_data {
- extern void __iomem *pmu_base_addr;
- /* list of all exported SoC specific data */
- extern const struct exynos_pmu_data exynos3250_pmu_data;
-+extern const struct exynos_pmu_data exynos4210_pmu_data;
-+extern const struct exynos_pmu_data exynos4212_pmu_data;
-+extern const struct exynos_pmu_data exynos4412_pmu_data;
- 
- extern void pmu_raw_writel(u32 val, u32 offset);
- extern u32 pmu_raw_readl(u32 offset);
-diff --git a/arch/arm/mach-exynos/exynos4-pmu.c b/arch/arm/mach-exynos/exynos4-pmu.c
-new file mode 100644
-index 0000000..bc4fa73
---- /dev/null
-+++ b/arch/arm/mach-exynos/exynos4-pmu.c
-@@ -0,0 +1,222 @@
-+/*
-+ * Copyright (c) 2011-2015 Samsung Electronics Co., Ltd.
-+ *		http://www.samsung.com/
-+ *
-+ * EXYNOS4 - CPU PMU(Power Management Unit) support
-+ *
-+ * This program is free software; you can redistribute it and/or modify
-+ * it under the terms of the GNU General Public License version 2 as
-+ * published by the Free Software Foundation.
-+ */
-+
-+#include <linux/soc/samsung/exynos-regs-pmu.h>
-+#include <linux/soc/samsung/exynos-pmu.h>
-+
-+#include "exynos-pmu.h"
-+
-+static const struct exynos_pmu_conf exynos4210_pmu_config[] = {
-+	/* { .offset = offset, .val = { AFTR, LPA, SLEEP } */
-+	{ S5P_ARM_CORE0_LOWPWR,			{ 0x0, 0x0, 0x2 } },
-+	{ S5P_DIS_IRQ_CORE0,			{ 0x0, 0x0, 0x0 } },
-+	{ S5P_DIS_IRQ_CENTRAL0,			{ 0x0, 0x0, 0x0 } },
-+	{ S5P_ARM_CORE1_LOWPWR,			{ 0x0, 0x0, 0x2 } },
-+	{ S5P_DIS_IRQ_CORE1,			{ 0x0, 0x0, 0x0 } },
-+	{ S5P_DIS_IRQ_CENTRAL1,			{ 0x0, 0x0, 0x0 } },
-+	{ S5P_ARM_COMMON_LOWPWR,		{ 0x0, 0x0, 0x2 } },
-+	{ S5P_L2_0_LOWPWR,			{ 0x2, 0x2, 0x3 } },
-+	{ S5P_L2_1_LOWPWR,			{ 0x2, 0x2, 0x3 } },
-+	{ S5P_CMU_ACLKSTOP_LOWPWR,		{ 0x1, 0x0, 0x0 } },
-+	{ S5P_CMU_SCLKSTOP_LOWPWR,		{ 0x1, 0x0, 0x0 } },
-+	{ S5P_CMU_RESET_LOWPWR,			{ 0x1, 0x1, 0x0 } },
-+	{ S5P_APLL_SYSCLK_LOWPWR,		{ 0x1, 0x0, 0x0 } },
-+	{ S5P_MPLL_SYSCLK_LOWPWR,		{ 0x1, 0x0, 0x0 } },
-+	{ S5P_VPLL_SYSCLK_LOWPWR,		{ 0x1, 0x0, 0x0 } },
-+	{ S5P_EPLL_SYSCLK_LOWPWR,		{ 0x1, 0x1, 0x0 } },
-+	{ S5P_CMU_CLKSTOP_GPS_ALIVE_LOWPWR,	{ 0x1, 0x1, 0x0 } },
-+	{ S5P_CMU_RESET_GPSALIVE_LOWPWR,	{ 0x1, 0x1, 0x0 } },
-+	{ S5P_CMU_CLKSTOP_CAM_LOWPWR,		{ 0x1, 0x1, 0x0 } },
-+	{ S5P_CMU_CLKSTOP_TV_LOWPWR,		{ 0x1, 0x1, 0x0 } },
-+	{ S5P_CMU_CLKSTOP_MFC_LOWPWR,		{ 0x1, 0x1, 0x0 } },
-+	{ S5P_CMU_CLKSTOP_G3D_LOWPWR,		{ 0x1, 0x1, 0x0 } },
-+	{ S5P_CMU_CLKSTOP_LCD0_LOWPWR,		{ 0x1, 0x1, 0x0 } },
-+	{ S5P_CMU_CLKSTOP_LCD1_LOWPWR,		{ 0x1, 0x1, 0x0 } },
-+	{ S5P_CMU_CLKSTOP_MAUDIO_LOWPWR,	{ 0x1, 0x1, 0x0 } },
-+	{ S5P_CMU_CLKSTOP_GPS_LOWPWR,		{ 0x1, 0x1, 0x0 } },
-+	{ S5P_CMU_RESET_CAM_LOWPWR,		{ 0x1, 0x1, 0x0 } },
-+	{ S5P_CMU_RESET_TV_LOWPWR,		{ 0x1, 0x1, 0x0 } },
-+	{ S5P_CMU_RESET_MFC_LOWPWR,		{ 0x1, 0x1, 0x0 } },
-+	{ S5P_CMU_RESET_G3D_LOWPWR,		{ 0x1, 0x1, 0x0 } },
-+	{ S5P_CMU_RESET_LCD0_LOWPWR,		{ 0x1, 0x1, 0x0 } },
-+	{ S5P_CMU_RESET_LCD1_LOWPWR,		{ 0x1, 0x1, 0x0 } },
-+	{ S5P_CMU_RESET_MAUDIO_LOWPWR,		{ 0x1, 0x1, 0x0 } },
-+	{ S5P_CMU_RESET_GPS_LOWPWR,		{ 0x1, 0x1, 0x0 } },
-+	{ S5P_TOP_BUS_LOWPWR,			{ 0x3, 0x0, 0x0 } },
-+	{ S5P_TOP_RETENTION_LOWPWR,		{ 0x1, 0x0, 0x1 } },
-+	{ S5P_TOP_PWR_LOWPWR,			{ 0x3, 0x0, 0x3 } },
-+	{ S5P_LOGIC_RESET_LOWPWR,		{ 0x1, 0x1, 0x0 } },
-+	{ S5P_ONENAND_MEM_LOWPWR,		{ 0x3, 0x0, 0x0 } },
-+	{ S5P_MODIMIF_MEM_LOWPWR,		{ 0x3, 0x0, 0x0 } },
-+	{ S5P_G2D_ACP_MEM_LOWPWR,		{ 0x3, 0x0, 0x0 } },
-+	{ S5P_USBOTG_MEM_LOWPWR,		{ 0x3, 0x0, 0x0 } },
-+	{ S5P_HSMMC_MEM_LOWPWR,			{ 0x3, 0x0, 0x0 } },
-+	{ S5P_CSSYS_MEM_LOWPWR,			{ 0x3, 0x0, 0x0 } },
-+	{ S5P_SECSS_MEM_LOWPWR,			{ 0x3, 0x0, 0x0 } },
-+	{ S5P_PCIE_MEM_LOWPWR,			{ 0x3, 0x0, 0x0 } },
-+	{ S5P_SATA_MEM_LOWPWR,			{ 0x3, 0x0, 0x0 } },
-+	{ S5P_PAD_RETENTION_DRAM_LOWPWR,	{ 0x1, 0x0, 0x0 } },
-+	{ S5P_PAD_RETENTION_MAUDIO_LOWPWR,	{ 0x1, 0x1, 0x0 } },
-+	{ S5P_PAD_RETENTION_GPIO_LOWPWR,	{ 0x1, 0x0, 0x0 } },
-+	{ S5P_PAD_RETENTION_UART_LOWPWR,	{ 0x1, 0x0, 0x0 } },
-+	{ S5P_PAD_RETENTION_MMCA_LOWPWR,	{ 0x1, 0x0, 0x0 } },
-+	{ S5P_PAD_RETENTION_MMCB_LOWPWR,	{ 0x1, 0x0, 0x0 } },
-+	{ S5P_PAD_RETENTION_EBIA_LOWPWR,	{ 0x1, 0x0, 0x0 } },
-+	{ S5P_PAD_RETENTION_EBIB_LOWPWR,	{ 0x1, 0x0, 0x0 } },
-+	{ S5P_PAD_RETENTION_ISOLATION_LOWPWR,	{ 0x1, 0x0, 0x0 } },
-+	{ S5P_PAD_RETENTION_ALV_SEL_LOWPWR,	{ 0x1, 0x0, 0x0 } },
-+	{ S5P_XUSBXTI_LOWPWR,			{ 0x1, 0x1, 0x0 } },
-+	{ S5P_XXTI_LOWPWR,			{ 0x1, 0x1, 0x0 } },
-+	{ S5P_EXT_REGULATOR_LOWPWR,		{ 0x1, 0x1, 0x0 } },
-+	{ S5P_GPIO_MODE_LOWPWR,			{ 0x1, 0x0, 0x0 } },
-+	{ S5P_GPIO_MODE_MAUDIO_LOWPWR,		{ 0x1, 0x1, 0x0 } },
-+	{ S5P_CAM_LOWPWR,			{ 0x7, 0x0, 0x0 } },
-+	{ S5P_TV_LOWPWR,			{ 0x7, 0x0, 0x0 } },
-+	{ S5P_MFC_LOWPWR,			{ 0x7, 0x0, 0x0 } },
-+	{ S5P_G3D_LOWPWR,			{ 0x7, 0x0, 0x0 } },
-+	{ S5P_LCD0_LOWPWR,			{ 0x7, 0x0, 0x0 } },
-+	{ S5P_LCD1_LOWPWR,			{ 0x7, 0x0, 0x0 } },
-+	{ S5P_MAUDIO_LOWPWR,			{ 0x7, 0x7, 0x0 } },
-+	{ S5P_GPS_LOWPWR,			{ 0x7, 0x0, 0x0 } },
-+	{ S5P_GPS_ALIVE_LOWPWR,			{ 0x7, 0x0, 0x0 } },
-+	{ PMU_TABLE_END,},
-+};
-+
-+static const struct exynos_pmu_conf exynos4x12_pmu_config[] = {
-+	{ S5P_ARM_CORE0_LOWPWR,			{ 0x0, 0x0, 0x2 } },
-+	{ S5P_DIS_IRQ_CORE0,			{ 0x0, 0x0, 0x0 } },
-+	{ S5P_DIS_IRQ_CENTRAL0,			{ 0x0, 0x0, 0x0 } },
-+	{ S5P_ARM_CORE1_LOWPWR,			{ 0x0, 0x0, 0x2 } },
-+	{ S5P_DIS_IRQ_CORE1,			{ 0x0, 0x0, 0x0 } },
-+	{ S5P_DIS_IRQ_CENTRAL1,			{ 0x0, 0x0, 0x0 } },
-+	{ S5P_ISP_ARM_LOWPWR,			{ 0x1, 0x0, 0x0 } },
-+	{ S5P_DIS_IRQ_ISP_ARM_LOCAL_LOWPWR,	{ 0x0, 0x0, 0x0 } },
-+	{ S5P_DIS_IRQ_ISP_ARM_CENTRAL_LOWPWR,	{ 0x0, 0x0, 0x0 } },
-+	{ S5P_ARM_COMMON_LOWPWR,		{ 0x0, 0x0, 0x2 } },
-+	{ S5P_L2_0_LOWPWR,			{ 0x0, 0x0, 0x3 } },
-+	/* XXX_OPTION register should be set other field */
-+	{ S5P_ARM_L2_0_OPTION,			{ 0x10, 0x10, 0x0 } },
-+	{ S5P_L2_1_LOWPWR,			{ 0x0, 0x0, 0x3 } },
-+	{ S5P_ARM_L2_1_OPTION,			{ 0x10, 0x10, 0x0 } },
-+	{ S5P_CMU_ACLKSTOP_LOWPWR,		{ 0x1, 0x0, 0x0 } },
-+	{ S5P_CMU_SCLKSTOP_LOWPWR,		{ 0x1, 0x0, 0x0 } },
-+	{ S5P_CMU_RESET_LOWPWR,			{ 0x1, 0x1, 0x0 } },
-+	{ S5P_DRAM_FREQ_DOWN_LOWPWR,		{ 0x1, 0x1, 0x1 } },
-+	{ S5P_DDRPHY_DLLOFF_LOWPWR,		{ 0x1, 0x1, 0x1 } },
-+	{ S5P_LPDDR_PHY_DLL_LOCK_LOWPWR,	{ 0x1, 0x1, 0x1 } },
-+	{ S5P_CMU_ACLKSTOP_COREBLK_LOWPWR,	{ 0x1, 0x0, 0x0 } },
-+	{ S5P_CMU_SCLKSTOP_COREBLK_LOWPWR,	{ 0x1, 0x0, 0x0 } },
-+	{ S5P_CMU_RESET_COREBLK_LOWPWR,		{ 0x1, 0x1, 0x0 } },
-+	{ S5P_APLL_SYSCLK_LOWPWR,		{ 0x1, 0x0, 0x0 } },
-+	{ S5P_MPLL_SYSCLK_LOWPWR,		{ 0x1, 0x0, 0x0 } },
-+	{ S5P_VPLL_SYSCLK_LOWPWR,		{ 0x1, 0x0, 0x0 } },
-+	{ S5P_EPLL_SYSCLK_LOWPWR,		{ 0x1, 0x1, 0x0 } },
-+	{ S5P_MPLLUSER_SYSCLK_LOWPWR,		{ 0x1, 0x0, 0x0 } },
-+	{ S5P_CMU_CLKSTOP_GPS_ALIVE_LOWPWR,	{ 0x1, 0x0, 0x0 } },
-+	{ S5P_CMU_RESET_GPSALIVE_LOWPWR,	{ 0x1, 0x0, 0x0 } },
-+	{ S5P_CMU_CLKSTOP_CAM_LOWPWR,		{ 0x1, 0x0, 0x0 } },
-+	{ S5P_CMU_CLKSTOP_TV_LOWPWR,		{ 0x1, 0x0, 0x0 } },
-+	{ S5P_CMU_CLKSTOP_MFC_LOWPWR,		{ 0x1, 0x0, 0x0 } },
-+	{ S5P_CMU_CLKSTOP_G3D_LOWPWR,		{ 0x1, 0x0, 0x0 } },
-+	{ S5P_CMU_CLKSTOP_LCD0_LOWPWR,		{ 0x1, 0x0, 0x0 } },
-+	{ S5P_CMU_CLKSTOP_ISP_LOWPWR,		{ 0x1, 0x0, 0x0 } },
-+	{ S5P_CMU_CLKSTOP_MAUDIO_LOWPWR,	{ 0x1, 0x0, 0x0 } },
-+	{ S5P_CMU_CLKSTOP_GPS_LOWPWR,		{ 0x1, 0x0, 0x0 } },
-+	{ S5P_CMU_RESET_CAM_LOWPWR,		{ 0x1, 0x0, 0x0 } },
-+	{ S5P_CMU_RESET_TV_LOWPWR,		{ 0x1, 0x0, 0x0 } },
-+	{ S5P_CMU_RESET_MFC_LOWPWR,		{ 0x1, 0x0, 0x0 } },
-+	{ S5P_CMU_RESET_G3D_LOWPWR,		{ 0x1, 0x0, 0x0 } },
-+	{ S5P_CMU_RESET_LCD0_LOWPWR,		{ 0x1, 0x0, 0x0 } },
-+	{ S5P_CMU_RESET_ISP_LOWPWR,		{ 0x1, 0x0, 0x0 } },
-+	{ S5P_CMU_RESET_MAUDIO_LOWPWR,		{ 0x1, 0x1, 0x0 } },
-+	{ S5P_CMU_RESET_GPS_LOWPWR,		{ 0x1, 0x0, 0x0 } },
-+	{ S5P_TOP_BUS_LOWPWR,			{ 0x3, 0x0, 0x0 } },
-+	{ S5P_TOP_RETENTION_LOWPWR,		{ 0x1, 0x0, 0x1 } },
-+	{ S5P_TOP_PWR_LOWPWR,			{ 0x3, 0x0, 0x3 } },
-+	{ S5P_TOP_BUS_COREBLK_LOWPWR,		{ 0x3, 0x0, 0x0 } },
-+	{ S5P_TOP_RETENTION_COREBLK_LOWPWR,	{ 0x1, 0x0, 0x1 } },
-+	{ S5P_TOP_PWR_COREBLK_LOWPWR,		{ 0x3, 0x0, 0x3 } },
-+	{ S5P_LOGIC_RESET_LOWPWR,		{ 0x1, 0x1, 0x0 } },
-+	{ S5P_OSCCLK_GATE_LOWPWR,		{ 0x1, 0x0, 0x1 } },
-+	{ S5P_LOGIC_RESET_COREBLK_LOWPWR,	{ 0x1, 0x1, 0x0 } },
-+	{ S5P_OSCCLK_GATE_COREBLK_LOWPWR,	{ 0x1, 0x0, 0x1 } },
-+	{ S5P_ONENAND_MEM_LOWPWR,		{ 0x3, 0x0, 0x0 } },
-+	{ S5P_ONENAND_MEM_OPTION,		{ 0x10, 0x10, 0x0 } },
-+	{ S5P_HSI_MEM_LOWPWR,			{ 0x3, 0x0, 0x0 } },
-+	{ S5P_HSI_MEM_OPTION,			{ 0x10, 0x10, 0x0 } },
-+	{ S5P_G2D_ACP_MEM_LOWPWR,		{ 0x3, 0x0, 0x0 } },
-+	{ S5P_G2D_ACP_MEM_OPTION,		{ 0x10, 0x10, 0x0 } },
-+	{ S5P_USBOTG_MEM_LOWPWR,		{ 0x3, 0x0, 0x0 } },
-+	{ S5P_USBOTG_MEM_OPTION,		{ 0x10, 0x10, 0x0 } },
-+	{ S5P_HSMMC_MEM_LOWPWR,			{ 0x3, 0x0, 0x0 } },
-+	{ S5P_HSMMC_MEM_OPTION,			{ 0x10, 0x10, 0x0 } },
-+	{ S5P_CSSYS_MEM_LOWPWR,			{ 0x3, 0x0, 0x0 } },
-+	{ S5P_CSSYS_MEM_OPTION,			{ 0x10, 0x10, 0x0 } },
-+	{ S5P_SECSS_MEM_LOWPWR,			{ 0x3, 0x0, 0x0 } },
-+	{ S5P_SECSS_MEM_OPTION,			{ 0x10, 0x10, 0x0 } },
-+	{ S5P_ROTATOR_MEM_LOWPWR,		{ 0x3, 0x0, 0x0 } },
-+	{ S5P_ROTATOR_MEM_OPTION,		{ 0x10, 0x10, 0x0 } },
-+	{ S5P_PAD_RETENTION_DRAM_LOWPWR,	{ 0x1, 0x0, 0x0 } },
-+	{ S5P_PAD_RETENTION_MAUDIO_LOWPWR,	{ 0x1, 0x1, 0x0 } },
-+	{ S5P_PAD_RETENTION_GPIO_LOWPWR,	{ 0x1, 0x0, 0x0 } },
-+	{ S5P_PAD_RETENTION_UART_LOWPWR,	{ 0x1, 0x0, 0x0 } },
-+	{ S5P_PAD_RETENTION_MMCA_LOWPWR,	{ 0x1, 0x0, 0x0 } },
-+	{ S5P_PAD_RETENTION_MMCB_LOWPWR,	{ 0x1, 0x0, 0x0 } },
-+	{ S5P_PAD_RETENTION_EBIA_LOWPWR,	{ 0x1, 0x0, 0x0 } },
-+	{ S5P_PAD_RETENTION_EBIB_LOWPWR,	{ 0x1, 0x0, 0x0 } },
-+	{ S5P_PAD_RETENTION_GPIO_COREBLK_LOWPWR, { 0x1, 0x0, 0x0 } },
-+	{ S5P_PAD_RETENTION_ISOLATION_LOWPWR,	{ 0x1, 0x0, 0x0 } },
-+	{ S5P_PAD_ISOLATION_COREBLK_LOWPWR,	{ 0x1, 0x0, 0x0 } },
-+	{ S5P_PAD_RETENTION_ALV_SEL_LOWPWR,	{ 0x1, 0x0, 0x0 } },
-+	{ S5P_XUSBXTI_LOWPWR,			{ 0x1, 0x1, 0x0 } },
-+	{ S5P_XXTI_LOWPWR,			{ 0x1, 0x1, 0x0 } },
-+	{ S5P_EXT_REGULATOR_LOWPWR,		{ 0x1, 0x1, 0x0 } },
-+	{ S5P_GPIO_MODE_LOWPWR,			{ 0x1, 0x0, 0x0 } },
-+	{ S5P_GPIO_MODE_COREBLK_LOWPWR,		{ 0x1, 0x0, 0x0 } },
-+	{ S5P_GPIO_MODE_MAUDIO_LOWPWR,		{ 0x1, 0x1, 0x0 } },
-+	{ S5P_TOP_ASB_RESET_LOWPWR,		{ 0x1, 0x1, 0x1 } },
-+	{ S5P_TOP_ASB_ISOLATION_LOWPWR,		{ 0x1, 0x0, 0x1 } },
-+	{ S5P_CAM_LOWPWR,			{ 0x7, 0x0, 0x0 } },
-+	{ S5P_TV_LOWPWR,			{ 0x7, 0x0, 0x0 } },
-+	{ S5P_MFC_LOWPWR,			{ 0x7, 0x0, 0x0 } },
-+	{ S5P_G3D_LOWPWR,			{ 0x7, 0x0, 0x0 } },
-+	{ S5P_LCD0_LOWPWR,			{ 0x7, 0x0, 0x0 } },
-+	{ S5P_ISP_LOWPWR,			{ 0x7, 0x0, 0x0 } },
-+	{ S5P_MAUDIO_LOWPWR,			{ 0x7, 0x7, 0x0 } },
-+	{ S5P_GPS_LOWPWR,			{ 0x7, 0x0, 0x0 } },
-+	{ S5P_GPS_ALIVE_LOWPWR,			{ 0x7, 0x0, 0x0 } },
-+	{ S5P_CMU_SYSCLK_ISP_LOWPWR,		{ 0x1, 0x0, 0x0 } },
-+	{ S5P_CMU_SYSCLK_GPS_LOWPWR,		{ 0x1, 0x0, 0x0 } },
-+	{ PMU_TABLE_END,},
-+};
-+
-+static const struct exynos_pmu_conf exynos4412_pmu_config[] = {
-+	{ S5P_ARM_CORE2_LOWPWR,			{ 0x0, 0x0, 0x2 } },
-+	{ S5P_DIS_IRQ_CORE2,			{ 0x0, 0x0, 0x0 } },
-+	{ S5P_DIS_IRQ_CENTRAL2,			{ 0x0, 0x0, 0x0 } },
-+	{ S5P_ARM_CORE3_LOWPWR,			{ 0x0, 0x0, 0x2 } },
-+	{ S5P_DIS_IRQ_CORE3,			{ 0x0, 0x0, 0x0 } },
-+	{ S5P_DIS_IRQ_CENTRAL3,			{ 0x0, 0x0, 0x0 } },
-+	{ PMU_TABLE_END,},
-+};
-+
-+const struct exynos_pmu_data exynos4210_pmu_data = {
-+	.pmu_config	= exynos4210_pmu_config,
-+};
-+
-+const struct exynos_pmu_data exynos4212_pmu_data = {
-+	.pmu_config	= exynos4x12_pmu_config,
-+};
-+
-+const struct exynos_pmu_data exynos4412_pmu_data = {
-+	.pmu_config		= exynos4x12_pmu_config,
-+	.pmu_config_extra	= exynos4412_pmu_config,
-+};
-diff --git a/arch/arm/mach-exynos/pmu.c b/arch/arm/mach-exynos/pmu.c
-index c594804..73a5030 100644
---- a/arch/arm/mach-exynos/pmu.c
-+++ b/arch/arm/mach-exynos/pmu.c
-@@ -41,200 +41,6 @@ u32 pmu_raw_readl(u32 offset)
- 	return readl_relaxed(pmu_base_addr + offset);
- }
- 
--static const struct exynos_pmu_conf exynos4210_pmu_config[] = {
--	/* { .offset = offset, .val = { AFTR, LPA, SLEEP } */
--	{ S5P_ARM_CORE0_LOWPWR,			{ 0x0, 0x0, 0x2 } },
--	{ S5P_DIS_IRQ_CORE0,			{ 0x0, 0x0, 0x0 } },
--	{ S5P_DIS_IRQ_CENTRAL0,			{ 0x0, 0x0, 0x0 } },
--	{ S5P_ARM_CORE1_LOWPWR,			{ 0x0, 0x0, 0x2 } },
--	{ S5P_DIS_IRQ_CORE1,			{ 0x0, 0x0, 0x0 } },
--	{ S5P_DIS_IRQ_CENTRAL1,			{ 0x0, 0x0, 0x0 } },
--	{ S5P_ARM_COMMON_LOWPWR,		{ 0x0, 0x0, 0x2 } },
--	{ S5P_L2_0_LOWPWR,			{ 0x2, 0x2, 0x3 } },
--	{ S5P_L2_1_LOWPWR,			{ 0x2, 0x2, 0x3 } },
--	{ S5P_CMU_ACLKSTOP_LOWPWR,		{ 0x1, 0x0, 0x0 } },
--	{ S5P_CMU_SCLKSTOP_LOWPWR,		{ 0x1, 0x0, 0x0 } },
--	{ S5P_CMU_RESET_LOWPWR,			{ 0x1, 0x1, 0x0 } },
--	{ S5P_APLL_SYSCLK_LOWPWR,		{ 0x1, 0x0, 0x0 } },
--	{ S5P_MPLL_SYSCLK_LOWPWR,		{ 0x1, 0x0, 0x0 } },
--	{ S5P_VPLL_SYSCLK_LOWPWR,		{ 0x1, 0x0, 0x0 } },
--	{ S5P_EPLL_SYSCLK_LOWPWR,		{ 0x1, 0x1, 0x0 } },
--	{ S5P_CMU_CLKSTOP_GPS_ALIVE_LOWPWR,	{ 0x1, 0x1, 0x0 } },
--	{ S5P_CMU_RESET_GPSALIVE_LOWPWR,	{ 0x1, 0x1, 0x0 } },
--	{ S5P_CMU_CLKSTOP_CAM_LOWPWR,		{ 0x1, 0x1, 0x0 } },
--	{ S5P_CMU_CLKSTOP_TV_LOWPWR,		{ 0x1, 0x1, 0x0 } },
--	{ S5P_CMU_CLKSTOP_MFC_LOWPWR,		{ 0x1, 0x1, 0x0 } },
--	{ S5P_CMU_CLKSTOP_G3D_LOWPWR,		{ 0x1, 0x1, 0x0 } },
--	{ S5P_CMU_CLKSTOP_LCD0_LOWPWR,		{ 0x1, 0x1, 0x0 } },
--	{ S5P_CMU_CLKSTOP_LCD1_LOWPWR,		{ 0x1, 0x1, 0x0 } },
--	{ S5P_CMU_CLKSTOP_MAUDIO_LOWPWR,	{ 0x1, 0x1, 0x0 } },
--	{ S5P_CMU_CLKSTOP_GPS_LOWPWR,		{ 0x1, 0x1, 0x0 } },
--	{ S5P_CMU_RESET_CAM_LOWPWR,		{ 0x1, 0x1, 0x0 } },
--	{ S5P_CMU_RESET_TV_LOWPWR,		{ 0x1, 0x1, 0x0 } },
--	{ S5P_CMU_RESET_MFC_LOWPWR,		{ 0x1, 0x1, 0x0 } },
--	{ S5P_CMU_RESET_G3D_LOWPWR,		{ 0x1, 0x1, 0x0 } },
--	{ S5P_CMU_RESET_LCD0_LOWPWR,		{ 0x1, 0x1, 0x0 } },
--	{ S5P_CMU_RESET_LCD1_LOWPWR,		{ 0x1, 0x1, 0x0 } },
--	{ S5P_CMU_RESET_MAUDIO_LOWPWR,		{ 0x1, 0x1, 0x0 } },
--	{ S5P_CMU_RESET_GPS_LOWPWR,		{ 0x1, 0x1, 0x0 } },
--	{ S5P_TOP_BUS_LOWPWR,			{ 0x3, 0x0, 0x0 } },
--	{ S5P_TOP_RETENTION_LOWPWR,		{ 0x1, 0x0, 0x1 } },
--	{ S5P_TOP_PWR_LOWPWR,			{ 0x3, 0x0, 0x3 } },
--	{ S5P_LOGIC_RESET_LOWPWR,		{ 0x1, 0x1, 0x0 } },
--	{ S5P_ONENAND_MEM_LOWPWR,		{ 0x3, 0x0, 0x0 } },
--	{ S5P_MODIMIF_MEM_LOWPWR,		{ 0x3, 0x0, 0x0 } },
--	{ S5P_G2D_ACP_MEM_LOWPWR,		{ 0x3, 0x0, 0x0 } },
--	{ S5P_USBOTG_MEM_LOWPWR,		{ 0x3, 0x0, 0x0 } },
--	{ S5P_HSMMC_MEM_LOWPWR,			{ 0x3, 0x0, 0x0 } },
--	{ S5P_CSSYS_MEM_LOWPWR,			{ 0x3, 0x0, 0x0 } },
--	{ S5P_SECSS_MEM_LOWPWR,			{ 0x3, 0x0, 0x0 } },
--	{ S5P_PCIE_MEM_LOWPWR,			{ 0x3, 0x0, 0x0 } },
--	{ S5P_SATA_MEM_LOWPWR,			{ 0x3, 0x0, 0x0 } },
--	{ S5P_PAD_RETENTION_DRAM_LOWPWR,	{ 0x1, 0x0, 0x0 } },
--	{ S5P_PAD_RETENTION_MAUDIO_LOWPWR,	{ 0x1, 0x1, 0x0 } },
--	{ S5P_PAD_RETENTION_GPIO_LOWPWR,	{ 0x1, 0x0, 0x0 } },
--	{ S5P_PAD_RETENTION_UART_LOWPWR,	{ 0x1, 0x0, 0x0 } },
--	{ S5P_PAD_RETENTION_MMCA_LOWPWR,	{ 0x1, 0x0, 0x0 } },
--	{ S5P_PAD_RETENTION_MMCB_LOWPWR,	{ 0x1, 0x0, 0x0 } },
--	{ S5P_PAD_RETENTION_EBIA_LOWPWR,	{ 0x1, 0x0, 0x0 } },
--	{ S5P_PAD_RETENTION_EBIB_LOWPWR,	{ 0x1, 0x0, 0x0 } },
--	{ S5P_PAD_RETENTION_ISOLATION_LOWPWR,	{ 0x1, 0x0, 0x0 } },
--	{ S5P_PAD_RETENTION_ALV_SEL_LOWPWR,	{ 0x1, 0x0, 0x0 } },
--	{ S5P_XUSBXTI_LOWPWR,			{ 0x1, 0x1, 0x0 } },
--	{ S5P_XXTI_LOWPWR,			{ 0x1, 0x1, 0x0 } },
--	{ S5P_EXT_REGULATOR_LOWPWR,		{ 0x1, 0x1, 0x0 } },
--	{ S5P_GPIO_MODE_LOWPWR,			{ 0x1, 0x0, 0x0 } },
--	{ S5P_GPIO_MODE_MAUDIO_LOWPWR,		{ 0x1, 0x1, 0x0 } },
--	{ S5P_CAM_LOWPWR,			{ 0x7, 0x0, 0x0 } },
--	{ S5P_TV_LOWPWR,			{ 0x7, 0x0, 0x0 } },
--	{ S5P_MFC_LOWPWR,			{ 0x7, 0x0, 0x0 } },
--	{ S5P_G3D_LOWPWR,			{ 0x7, 0x0, 0x0 } },
--	{ S5P_LCD0_LOWPWR,			{ 0x7, 0x0, 0x0 } },
--	{ S5P_LCD1_LOWPWR,			{ 0x7, 0x0, 0x0 } },
--	{ S5P_MAUDIO_LOWPWR,			{ 0x7, 0x7, 0x0 } },
--	{ S5P_GPS_LOWPWR,			{ 0x7, 0x0, 0x0 } },
--	{ S5P_GPS_ALIVE_LOWPWR,			{ 0x7, 0x0, 0x0 } },
--	{ PMU_TABLE_END,},
--};
--
--static const struct exynos_pmu_conf exynos4x12_pmu_config[] = {
--	{ S5P_ARM_CORE0_LOWPWR,			{ 0x0, 0x0, 0x2 } },
--	{ S5P_DIS_IRQ_CORE0,			{ 0x0, 0x0, 0x0 } },
--	{ S5P_DIS_IRQ_CENTRAL0,			{ 0x0, 0x0, 0x0 } },
--	{ S5P_ARM_CORE1_LOWPWR,			{ 0x0, 0x0, 0x2 } },
--	{ S5P_DIS_IRQ_CORE1,			{ 0x0, 0x0, 0x0 } },
--	{ S5P_DIS_IRQ_CENTRAL1,			{ 0x0, 0x0, 0x0 } },
--	{ S5P_ISP_ARM_LOWPWR,			{ 0x1, 0x0, 0x0 } },
--	{ S5P_DIS_IRQ_ISP_ARM_LOCAL_LOWPWR,	{ 0x0, 0x0, 0x0 } },
--	{ S5P_DIS_IRQ_ISP_ARM_CENTRAL_LOWPWR,	{ 0x0, 0x0, 0x0 } },
--	{ S5P_ARM_COMMON_LOWPWR,		{ 0x0, 0x0, 0x2 } },
--	{ S5P_L2_0_LOWPWR,			{ 0x0, 0x0, 0x3 } },
--	/* XXX_OPTION register should be set other field */
--	{ S5P_ARM_L2_0_OPTION,			{ 0x10, 0x10, 0x0 } },
--	{ S5P_L2_1_LOWPWR,			{ 0x0, 0x0, 0x3 } },
--	{ S5P_ARM_L2_1_OPTION,			{ 0x10, 0x10, 0x0 } },
--	{ S5P_CMU_ACLKSTOP_LOWPWR,		{ 0x1, 0x0, 0x0 } },
--	{ S5P_CMU_SCLKSTOP_LOWPWR,		{ 0x1, 0x0, 0x0 } },
--	{ S5P_CMU_RESET_LOWPWR,			{ 0x1, 0x1, 0x0 } },
--	{ S5P_DRAM_FREQ_DOWN_LOWPWR,		{ 0x1, 0x1, 0x1 } },
--	{ S5P_DDRPHY_DLLOFF_LOWPWR,		{ 0x1, 0x1, 0x1 } },
--	{ S5P_LPDDR_PHY_DLL_LOCK_LOWPWR,	{ 0x1, 0x1, 0x1 } },
--	{ S5P_CMU_ACLKSTOP_COREBLK_LOWPWR,	{ 0x1, 0x0, 0x0 } },
--	{ S5P_CMU_SCLKSTOP_COREBLK_LOWPWR,	{ 0x1, 0x0, 0x0 } },
--	{ S5P_CMU_RESET_COREBLK_LOWPWR,		{ 0x1, 0x1, 0x0 } },
--	{ S5P_APLL_SYSCLK_LOWPWR,		{ 0x1, 0x0, 0x0 } },
--	{ S5P_MPLL_SYSCLK_LOWPWR,		{ 0x1, 0x0, 0x0 } },
--	{ S5P_VPLL_SYSCLK_LOWPWR,		{ 0x1, 0x0, 0x0 } },
--	{ S5P_EPLL_SYSCLK_LOWPWR,		{ 0x1, 0x1, 0x0 } },
--	{ S5P_MPLLUSER_SYSCLK_LOWPWR,		{ 0x1, 0x0, 0x0 } },
--	{ S5P_CMU_CLKSTOP_GPS_ALIVE_LOWPWR,	{ 0x1, 0x0, 0x0 } },
--	{ S5P_CMU_RESET_GPSALIVE_LOWPWR,	{ 0x1, 0x0, 0x0 } },
--	{ S5P_CMU_CLKSTOP_CAM_LOWPWR,		{ 0x1, 0x0, 0x0 } },
--	{ S5P_CMU_CLKSTOP_TV_LOWPWR,		{ 0x1, 0x0, 0x0 } },
--	{ S5P_CMU_CLKSTOP_MFC_LOWPWR,		{ 0x1, 0x0, 0x0 } },
--	{ S5P_CMU_CLKSTOP_G3D_LOWPWR,		{ 0x1, 0x0, 0x0 } },
--	{ S5P_CMU_CLKSTOP_LCD0_LOWPWR,		{ 0x1, 0x0, 0x0 } },
--	{ S5P_CMU_CLKSTOP_ISP_LOWPWR,		{ 0x1, 0x0, 0x0 } },
--	{ S5P_CMU_CLKSTOP_MAUDIO_LOWPWR,	{ 0x1, 0x0, 0x0 } },
--	{ S5P_CMU_CLKSTOP_GPS_LOWPWR,		{ 0x1, 0x0, 0x0 } },
--	{ S5P_CMU_RESET_CAM_LOWPWR,		{ 0x1, 0x0, 0x0 } },
--	{ S5P_CMU_RESET_TV_LOWPWR,		{ 0x1, 0x0, 0x0 } },
--	{ S5P_CMU_RESET_MFC_LOWPWR,		{ 0x1, 0x0, 0x0 } },
--	{ S5P_CMU_RESET_G3D_LOWPWR,		{ 0x1, 0x0, 0x0 } },
--	{ S5P_CMU_RESET_LCD0_LOWPWR,		{ 0x1, 0x0, 0x0 } },
--	{ S5P_CMU_RESET_ISP_LOWPWR,		{ 0x1, 0x0, 0x0 } },
--	{ S5P_CMU_RESET_MAUDIO_LOWPWR,		{ 0x1, 0x1, 0x0 } },
--	{ S5P_CMU_RESET_GPS_LOWPWR,		{ 0x1, 0x0, 0x0 } },
--	{ S5P_TOP_BUS_LOWPWR,			{ 0x3, 0x0, 0x0 } },
--	{ S5P_TOP_RETENTION_LOWPWR,		{ 0x1, 0x0, 0x1 } },
--	{ S5P_TOP_PWR_LOWPWR,			{ 0x3, 0x0, 0x3 } },
--	{ S5P_TOP_BUS_COREBLK_LOWPWR,		{ 0x3, 0x0, 0x0 } },
--	{ S5P_TOP_RETENTION_COREBLK_LOWPWR,	{ 0x1, 0x0, 0x1 } },
--	{ S5P_TOP_PWR_COREBLK_LOWPWR,		{ 0x3, 0x0, 0x3 } },
--	{ S5P_LOGIC_RESET_LOWPWR,		{ 0x1, 0x1, 0x0 } },
--	{ S5P_OSCCLK_GATE_LOWPWR,		{ 0x1, 0x0, 0x1 } },
--	{ S5P_LOGIC_RESET_COREBLK_LOWPWR,	{ 0x1, 0x1, 0x0 } },
--	{ S5P_OSCCLK_GATE_COREBLK_LOWPWR,	{ 0x1, 0x0, 0x1 } },
--	{ S5P_ONENAND_MEM_LOWPWR,		{ 0x3, 0x0, 0x0 } },
--	{ S5P_ONENAND_MEM_OPTION,		{ 0x10, 0x10, 0x0 } },
--	{ S5P_HSI_MEM_LOWPWR,			{ 0x3, 0x0, 0x0 } },
--	{ S5P_HSI_MEM_OPTION,			{ 0x10, 0x10, 0x0 } },
--	{ S5P_G2D_ACP_MEM_LOWPWR,		{ 0x3, 0x0, 0x0 } },
--	{ S5P_G2D_ACP_MEM_OPTION,		{ 0x10, 0x10, 0x0 } },
--	{ S5P_USBOTG_MEM_LOWPWR,		{ 0x3, 0x0, 0x0 } },
--	{ S5P_USBOTG_MEM_OPTION,		{ 0x10, 0x10, 0x0 } },
--	{ S5P_HSMMC_MEM_LOWPWR,			{ 0x3, 0x0, 0x0 } },
--	{ S5P_HSMMC_MEM_OPTION,			{ 0x10, 0x10, 0x0 } },
--	{ S5P_CSSYS_MEM_LOWPWR,			{ 0x3, 0x0, 0x0 } },
--	{ S5P_CSSYS_MEM_OPTION,			{ 0x10, 0x10, 0x0 } },
--	{ S5P_SECSS_MEM_LOWPWR,			{ 0x3, 0x0, 0x0 } },
--	{ S5P_SECSS_MEM_OPTION,			{ 0x10, 0x10, 0x0 } },
--	{ S5P_ROTATOR_MEM_LOWPWR,		{ 0x3, 0x0, 0x0 } },
--	{ S5P_ROTATOR_MEM_OPTION,		{ 0x10, 0x10, 0x0 } },
--	{ S5P_PAD_RETENTION_DRAM_LOWPWR,	{ 0x1, 0x0, 0x0 } },
--	{ S5P_PAD_RETENTION_MAUDIO_LOWPWR,	{ 0x1, 0x1, 0x0 } },
--	{ S5P_PAD_RETENTION_GPIO_LOWPWR,	{ 0x1, 0x0, 0x0 } },
--	{ S5P_PAD_RETENTION_UART_LOWPWR,	{ 0x1, 0x0, 0x0 } },
--	{ S5P_PAD_RETENTION_MMCA_LOWPWR,	{ 0x1, 0x0, 0x0 } },
--	{ S5P_PAD_RETENTION_MMCB_LOWPWR,	{ 0x1, 0x0, 0x0 } },
--	{ S5P_PAD_RETENTION_EBIA_LOWPWR,	{ 0x1, 0x0, 0x0 } },
--	{ S5P_PAD_RETENTION_EBIB_LOWPWR,	{ 0x1, 0x0, 0x0 } },
--	{ S5P_PAD_RETENTION_GPIO_COREBLK_LOWPWR,{ 0x1, 0x0, 0x0 } },
--	{ S5P_PAD_RETENTION_ISOLATION_LOWPWR,	{ 0x1, 0x0, 0x0 } },
--	{ S5P_PAD_ISOLATION_COREBLK_LOWPWR,	{ 0x1, 0x0, 0x0 } },
--	{ S5P_PAD_RETENTION_ALV_SEL_LOWPWR,	{ 0x1, 0x0, 0x0 } },
--	{ S5P_XUSBXTI_LOWPWR,			{ 0x1, 0x1, 0x0 } },
--	{ S5P_XXTI_LOWPWR,			{ 0x1, 0x1, 0x0 } },
--	{ S5P_EXT_REGULATOR_LOWPWR,		{ 0x1, 0x1, 0x0 } },
--	{ S5P_GPIO_MODE_LOWPWR,			{ 0x1, 0x0, 0x0 } },
--	{ S5P_GPIO_MODE_COREBLK_LOWPWR,		{ 0x1, 0x0, 0x0 } },
--	{ S5P_GPIO_MODE_MAUDIO_LOWPWR,		{ 0x1, 0x1, 0x0 } },
--	{ S5P_TOP_ASB_RESET_LOWPWR,		{ 0x1, 0x1, 0x1 } },
--	{ S5P_TOP_ASB_ISOLATION_LOWPWR,		{ 0x1, 0x0, 0x1 } },
--	{ S5P_CAM_LOWPWR,			{ 0x7, 0x0, 0x0 } },
--	{ S5P_TV_LOWPWR,			{ 0x7, 0x0, 0x0 } },
--	{ S5P_MFC_LOWPWR,			{ 0x7, 0x0, 0x0 } },
--	{ S5P_G3D_LOWPWR,			{ 0x7, 0x0, 0x0 } },
--	{ S5P_LCD0_LOWPWR,			{ 0x7, 0x0, 0x0 } },
--	{ S5P_ISP_LOWPWR,			{ 0x7, 0x0, 0x0 } },
--	{ S5P_MAUDIO_LOWPWR,			{ 0x7, 0x7, 0x0 } },
--	{ S5P_GPS_LOWPWR,			{ 0x7, 0x0, 0x0 } },
--	{ S5P_GPS_ALIVE_LOWPWR,			{ 0x7, 0x0, 0x0 } },
--	{ S5P_CMU_SYSCLK_ISP_LOWPWR,		{ 0x1, 0x0, 0x0 } },
--	{ S5P_CMU_SYSCLK_GPS_LOWPWR,		{ 0x1, 0x0, 0x0 } },
--	{ PMU_TABLE_END,},
--};
--
--static const struct exynos_pmu_conf exynos4412_pmu_config[] = {
--	{ S5P_ARM_CORE2_LOWPWR,			{ 0x0, 0x0, 0x2 } },
--	{ S5P_DIS_IRQ_CORE2,			{ 0x0, 0x0, 0x0 } },
--	{ S5P_DIS_IRQ_CENTRAL2,			{ 0x0, 0x0, 0x0 } },
--	{ S5P_ARM_CORE3_LOWPWR,			{ 0x0, 0x0, 0x2 } },
--	{ S5P_DIS_IRQ_CORE3,			{ 0x0, 0x0, 0x0 } },
--	{ S5P_DIS_IRQ_CENTRAL3,			{ 0x0, 0x0, 0x0 } },
--	{ PMU_TABLE_END,},
--};
--
- static const struct exynos_pmu_conf exynos5250_pmu_config[] = {
- 	/* { .offset = offset, .val = { AFTR, LPA, SLEEP } */
- 	{ EXYNOS5_ARM_CORE0_SYS_PWR_REG,		{ 0x0, 0x0, 0x2} },
-@@ -718,19 +524,6 @@ static int pmu_restart_notify(struct notifier_block *this,
- 	return NOTIFY_DONE;
- }
- 
--static const struct exynos_pmu_data exynos4210_pmu_data = {
--	.pmu_config	= exynos4210_pmu_config,
--};
--
--static const struct exynos_pmu_data exynos4212_pmu_data = {
--	.pmu_config	= exynos4x12_pmu_config,
--};
--
--static const struct exynos_pmu_data exynos4412_pmu_data = {
--	.pmu_config		= exynos4x12_pmu_config,
--	.pmu_config_extra	= exynos4412_pmu_config,
--};
--
- static const struct exynos_pmu_data exynos5250_pmu_data = {
- 	.pmu_config	= exynos5250_pmu_config,
- 	.pmu_init	= exynos5250_pmu_init,
--- 
-2.4.5
+On Mon, 16 Nov 2015, Brian Norris wrote:
+
+> On Mon, Nov 16, 2015 at 12:33:14PM +0100, Julia Lawall wrote:
+> > for_each_available_child_of_node performs an of_node_get on each iteration,
+> > so a return from the middle of the loop requires an of_node_put.
+> > 
+> > A simplified version of the semantic patch that finds this problem is as
+> > follows (http://coccinelle.lip6.fr):
+> > 
+> > // <smpl>
+> > @@
+> > expression root,e;
+> > local idexpression child;
+> > @@
+> > 
+> >  for_each_available_child_of_node(root, child) {
+> >    ... when != of_node_put(child)
+> >        when != e = child
+> > (
+> >    return child;
+> > |
+> > *  return ...;
+> > )
+> >    ...
+> >  }
+> > // </smpl>
+> > 
+> > Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
+> > 
+> > ---
+> 
+> For this patch:
+> 
+> Acked-by: Brian Norris <computersforpeace@gmail.com>
+> 
+> >  drivers/phy/phy-brcmstb-sata.c |   17 ++++++++++++-----
+> >  1 file changed, 12 insertions(+), 5 deletions(-)
+> 
+> [snip patch, which fixes of_node_put() handling for
+> for_each_available_child_of_node() loop, which creates PHY devices with
+> devm_phy_create()]
+> 
+> This reminds me of a potential problem I'm looking at in other
+> subsystems: from code reading (I haven't seen any issues in practice,
+> probably because I don't use OF_DYNAMIC) it looks like device-creating
+> infrastructure like the PHY subsystem should be acquiring a reference to
+> the device_node when they stash it away. But drivers/phy/phy-core.c does
+> not do this, AFAICT.
+> 
+> See phy_create(), which does
+> 
+> 	phy->dev.of_node = node ?: dev->of_node;
+> 
+> and later might reuse this of_node pointer, even though it never called
+> of_node_get() on this node.
+> 
+> Potential patch to fix this (not tested).
+> 
+> Signed-off-by: Brian Norris <computersforpeace@gmail.com>
+> 
+> diff --git a/drivers/phy/phy-core.c b/drivers/phy/phy-core.c
+> index fc48fac003a6..8df29caeeef9 100644
+> --- a/drivers/phy/phy-core.c
+> +++ b/drivers/phy/phy-core.c
+> @@ -697,6 +697,7 @@ struct phy *phy_create(struct device *dev, struct device_node *node,
+>  	phy->dev.class = phy_class;
+>  	phy->dev.parent = dev;
+>  	phy->dev.of_node = node ?: dev->of_node;
+> +	of_node_get(phy->dev.of_node);
+
+Why not put of_node_get around dev->of_node?
+
+julia
+
+>  	phy->id = id;
+>  	phy->ops = ops;
+>  
+> @@ -726,6 +727,7 @@ struct phy *phy_create(struct device *dev, struct device_node *node,
+>  	return phy;
+>  
+>  put_dev:
+> +	of_node_put(phy->dev.of_node);
+>  	put_device(&phy->dev);  /* calls phy_release() which frees resources */
+>  	return ERR_PTR(ret);
+>  
+> @@ -775,6 +777,7 @@ EXPORT_SYMBOL_GPL(devm_phy_create);
+>   */
+>  void phy_destroy(struct phy *phy)
+>  {
+> +	of_node_put(phy->dev.of_node);
+>  	pm_runtime_disable(&phy->dev);
+>  	device_unregister(&phy->dev);
+>  }
+> --
+> To unsubscribe from this list: send the line "unsubscribe kernel-janitors" in
+> the body of a message to majordomo at vger.kernel.org
+> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> 
