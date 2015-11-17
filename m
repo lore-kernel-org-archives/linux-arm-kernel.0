@@ -1,88 +1,109 @@
 From: shannon.zhao@linaro.org (shannon.zhao at linaro.org)
-Date: Tue, 17 Nov 2015 17:56:58 +0800
-Subject: [PATCH 00/13] Add ACPI support for Xen Dom0 on ARM64
-Message-ID: <1447754231-7772-1-git-send-email-shannon.zhao@linaro.org>
+Date: Tue, 17 Nov 2015 17:40:27 +0800
+Subject: [PATCH v3 28/62] arm/gic: Add ACPI support for GIC preinit
+In-Reply-To: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
+References: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
+Message-ID: <1447753261-7552-29-git-send-email-shannon.zhao@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Shannon Zhao <shannon.zhao@linaro.org>
 
-This patch set adds ACPI support for Xen Dom0 on ARM64. The relevant Xen
-ACPI on ARM64 design document could be found from [1].
+Since ACPI 6.0 defines that GIC Distributor Structure contains the GIC
+version filed, it could get GIC version from that. According to the
+version, call different preinit functions.
 
-This patch set adds a new FDT node "uefi" under /hypervisor to pass UEFI
-information. Introduce a bus notifier of AMBA and Platform bus to map
-the new added device's MMIO space. Make Xen domain use
-xlated_setup_gnttab_pages to setup grant table and a new hypercall to
-get event-channel irq.
+Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+---
+ xen/arch/arm/gic.c | 55 ++++++++++++++++++++++++++++++++++++++++++++++++++----
+ 1 file changed, 51 insertions(+), 4 deletions(-)
 
-Regarding the initialization flow of Linux kernel, it needs to move
-xen_early_init() before efi_init(). Then xen_early_init() will check
-whether it runs on Xen through the /hypervisor node and efi_init() will
-call a new function fdt_find_xen_uefi_params(), to parse those
-xen,uefi-* parameters just like the existing efi_get_fdt_params().
-
-And in arm64_enable_runtime_services() it will check whether it runs on
-Xen and call another new function xen_efi_runtime_setup() to setup
-runtime service instead of efi_native_runtime_setup(). The
-xen_efi_runtime_setup() will assign the runtime function pointers with
-the functions of driver/xen/efi.c.
-
-And since we pass a /hypervisor node and a /chosen node to Dom0, it
-needs to check whether the DTS only contains a /hypervisor node and a
-/chosen node in acpi_boot_table_init().
-
-Patches are tested on FVP base model. This patch set can be found from
-[2] and the corresponding Xen patches can be found from [3].
-
-Thanks,
-Shannon
-
-[1] http://lists.xen.org/archives/html/xen-devel/2015-11/msg00488.html
-[2] http://git.linaro.org/people/shannon.zhao/linux-mainline.git  ACPI_XEN_ARM_Linux_V1
-[3] http://git.linaro.org/people/shannon.zhao/xen.git  ACPI_XEN_ARM_V3
-
-Shannon Zhao (13):
-  Xen : Hide UART used by Xen
-  xen/grant-table: Move xlated_setup_gnttab_pages to common place
-  arm/xen: Use xlated_setup_gnttab_pages to setup grant table
-  xen: memory : Add new XENMAPSPACE type XENMAPSPACE_dev_mmio
-  Xen: ARM: Add support for mapping platform device mmio
-  Xen: ARM: Add support for mapping amba device mmio
-  ARM: Xen: Document UEFI support on Xen ARM virtual platforms
-  Xen: EFI: Parse DT parameters for Xen specific UEFI
-  ARM: Xen: Initialize Xen specific UEFI runtime services
-  ARM64: ACPI: Check if it runs on Xen to enable or disable ACPI
-  xen/hvm/params: Add a new dilivery type for event-channel in
-    HVM_PARAM_CALLBACK_IRQ
-  arm/xen: Get event-channel irq through HVM_PARAM when booting with
-    ACPI
-  ARM: XEN: Move xen_early_init() before efi_init()
-
- Documentation/devicetree/bindings/arm/xen.txt |  25 +++++++
- arch/arm/include/asm/xen/hypercall.h          |   1 +
- arch/arm/xen/enlighten.c                      |  96 +++++++++++++++++-------
- arch/arm/xen/hypercall.S                      |   1 +
- arch/arm64/kernel/acpi.c                      |  12 ++-
- arch/arm64/kernel/efi.c                       |  20 +++--
- arch/arm64/kernel/setup.c                     |   2 +-
- arch/arm64/xen/hypercall.S                    |   1 +
- arch/x86/xen/grant-table.c                    |  51 -------------
- drivers/acpi/bus.c                            |  22 ++++++
- drivers/firmware/efi/efi.c                    |  67 +++++++++++++++--
- drivers/xen/Kconfig                           |   2 +-
- drivers/xen/Makefile                          |   2 +
- drivers/xen/amba.c                            |  99 ++++++++++++++++++++++++
- drivers/xen/efi.c                             |  22 ++++++
- drivers/xen/grant-table.c                     |  49 ++++++++++++
- drivers/xen/platform.c                        | 104 ++++++++++++++++++++++++++
- include/xen/grant_table.h                     |   1 +
- include/xen/interface/hvm/params.h            |   5 ++
- include/xen/interface/memory.h                |   1 +
- include/xen/xen-ops.h                         |  10 +++
- 21 files changed, 498 insertions(+), 95 deletions(-)
- create mode 100644 drivers/xen/amba.c
- create mode 100644 drivers/xen/platform.c
-
+diff --git a/xen/arch/arm/gic.c b/xen/arch/arm/gic.c
+index 1e1e5ba..ac82588 100644
+--- a/xen/arch/arm/gic.c
++++ b/xen/arch/arm/gic.c
+@@ -27,6 +27,7 @@
+ #include <xen/softirq.h>
+ #include <xen/list.h>
+ #include <xen/device_tree.h>
++#include <xen/acpi.h>
+ #include <asm/p2m.h>
+ #include <asm/domain.h>
+ #include <asm/platform.h>
+@@ -34,6 +35,7 @@
+ #include <asm/io.h>
+ #include <asm/gic.h>
+ #include <asm/vgic.h>
++#include <asm/acpi.h>
+ 
+ static void gic_restore_pending_irqs(struct vcpu *v);
+ 
+@@ -228,10 +230,7 @@ int gic_irq_xlate(const u32 *intspec, unsigned int intsize,
+     return 0;
+ }
+ 
+-/* Find the interrupt controller and set up the callback to translate
+- * device tree IRQ.
+- */
+-void __init gic_preinit(void)
++void __init dt_gic_preinit(void)
+ {
+     int rc;
+     struct dt_device_node *node;
+@@ -261,6 +260,54 @@ void __init gic_preinit(void)
+     dt_device_set_used_by(node, DOMID_XEN);
+ }
+ 
++#ifdef CONFIG_ACPI
++static void __init acpi_gic_preinit(void)
++{
++    int rc = 0;
++    acpi_status status;
++    struct acpi_table_header *table;
++    struct acpi_subtable_header * subtable;
++    struct acpi_madt_generic_distributor *dist;
++
++    status = acpi_get_table(ACPI_SIG_MADT, 0, &table);
++    if ( ACPI_FAILURE(status) )
++    {
++        const char *msg = acpi_format_exception(status);
++
++        panic("Failed to get MADT table, %s", msg);
++    }
++
++    subtable = acpi_get_entry(ACPI_SIG_MADT, sizeof(struct acpi_table_madt),
++                              table, ACPI_MADT_TYPE_GENERIC_DISTRIBUTOR, 0);
++    if ( !subtable )
++        panic("No valid GICD entries exists");
++
++    dist = (struct acpi_madt_generic_distributor *)subtable;
++
++    if ( dist->version == ACPI_MADT_GIC_VERSION_V2 )
++        rc = acpi_device_init(DEVICE_GIC, NULL, GIC_V2);
++    else if ( dist->version == ACPI_MADT_GIC_VERSION_V3 )
++        rc = acpi_device_init(DEVICE_GIC, NULL, GIC_V3);
++    else
++        panic("Wrong GIC version or unsupported GIC");
++    if ( rc )
++        panic("Unable to find compatible GIC in the ACPI table");
++}
++#else
++static void __init acpi_gic_preinit(void) {}
++#endif
++
++/* Find the interrupt controller and set up the callback to translate
++ * device tree IRQ.
++ */
++void __init gic_preinit(void)
++{
++    if( acpi_disabled )
++        dt_gic_preinit();
++    else
++        acpi_gic_preinit();
++}
++
+ /* Set up the GIC */
+ void __init gic_init(void)
+ {
 -- 
 2.1.0
