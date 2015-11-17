@@ -1,38 +1,36 @@
 From: Zhiqiang.Hou@freescale.com (Zhiqiang Hou)
-Date: Tue, 17 Nov 2015 17:53:20 +0800
-Subject: [PATCHv8 3/5] Documentation: DT: Add entry for Freescale LS1043a-RDB
- board
-In-Reply-To: <1447754002-40555-1-git-send-email-Zhiqiang.Hou@freescale.com>
-References: <1447754002-40555-1-git-send-email-Zhiqiang.Hou@freescale.com>
-Message-ID: <1447754002-40555-3-git-send-email-Zhiqiang.Hou@freescale.com>
+Date: Tue, 17 Nov 2015 17:53:18 +0800
+Subject: [PATCHv8 1/5] i2c: imx: fix a compiling error
+Message-ID: <1447754002-40555-1-git-send-email-Zhiqiang.Hou@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Mingkai Hu <Mingkai.Hu@freescale.com>
+From: Hou Zhiqiang <Zhiqiang.Hou@freescale.com>
 
-Signed-off-by: Mingkai Hu <Mingkai.Hu@freescale.com>
-Signed-off-by: Hou Zhiqiang <B48286@freescale.com>
+drivers/i2c/busses/i2c-imx.c:978:2: error: implicit declaration of
+function ?pinctrl_select_state? [-Werror=implicit-function-declaration]
+  pinctrl_select_state(i2c_imx->pinctrl, i2c_imx->pinctrl_pins_gpio);
+  ^
+
+Signed-off-by: Hou Zhiqiang <Zhiqiang.Hou@freescale.com>
 ---
-V8 - V2:
- - No change.
+V8:
+ - New patch.
 
- Documentation/devicetree/bindings/arm/fsl.txt | 4 ++++
- 1 file changed, 4 insertions(+)
+ drivers/i2c/busses/i2c-imx.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/Documentation/devicetree/bindings/arm/fsl.txt b/Documentation/devicetree/bindings/arm/fsl.txt
-index 34c88b0..752a685 100644
---- a/Documentation/devicetree/bindings/arm/fsl.txt
-+++ b/Documentation/devicetree/bindings/arm/fsl.txt
-@@ -131,6 +131,10 @@ Example:
- Freescale ARMv8 based Layerscape SoC family Device Tree Bindings
- ----------------------------------------------------------------
- 
-+LS1043A ARMv8 based RDB Board
-+Required root node properties:
-+    - compatible = "fsl,ls1043a-rdb", "fsl,ls1043a";
-+
- LS2080A ARMv8 based Simulator model
- Required root node properties:
-     - compatible = "fsl,ls2080a-simu", "fsl,ls2080a";
+diff --git a/drivers/i2c/busses/i2c-imx.c b/drivers/i2c/busses/i2c-imx.c
+index 1e4d99d..9bb0b05 100644
+--- a/drivers/i2c/busses/i2c-imx.c
++++ b/drivers/i2c/busses/i2c-imx.c
+@@ -50,6 +50,7 @@
+ #include <linux/of_device.h>
+ #include <linux/of_dma.h>
+ #include <linux/of_gpio.h>
++#include <linux/pinctrl/consumer.h>
+ #include <linux/platform_data/i2c-imx.h>
+ #include <linux/platform_device.h>
+ #include <linux/sched.h>
 -- 
 2.1.0.27.g96db324
