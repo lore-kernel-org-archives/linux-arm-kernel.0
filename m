@@ -1,35 +1,30 @@
-From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Tue, 17 Nov 2015 18:14:19 +0000
-Subject: [PATCH] cpufreq: scpi: Add dependency on SCPI clk driver
-Message-ID: <1447784059-22769-1-git-send-email-punit.agrawal@arm.com>
+From: gkulkarni@caviumnetworks.com (Ganapatrao Kulkarni)
+Date: Tue, 17 Nov 2015 23:55:29 +0530
+Subject: [PATCH v2 0/4] ACPI based NUMA support for ARM64
+Message-ID: <1447784733-10419-1-git-send-email-gkulkarni@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The SCPI clk driver registers the virtual cpufreq device that kicks off
-initialisation of the SCPI cpufreq driver. Make the dependendency
-explicit in Kconfig.
+ -v2 rebased on arm64-numa v7 patches.
+ http://www.spinics.net/lists/arm-kernel/msg460813.html
 
-Fixes: 8def31034d03 ("cpufreq: arm_big_little: add SCPI interface driver")
-Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
-Cc: Sudeep Holla <sudeep.holla@arm.com>
-Cc: Rafael J. Wysocki <rjw@rjwysocki.net>
-Cc: Viresh Kumar <viresh.kumar@linaro.org>
----
- drivers/cpufreq/Kconfig.arm | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+ -v1 initial patches from Hanjun Guo
 
-diff --git a/drivers/cpufreq/Kconfig.arm b/drivers/cpufreq/Kconfig.arm
-index 1582c1c..dadfdd4 100644
---- a/drivers/cpufreq/Kconfig.arm
-+++ b/drivers/cpufreq/Kconfig.arm
-@@ -201,7 +201,7 @@ config ARM_SA1110_CPUFREQ
- 
- config ARM_SCPI_CPUFREQ
-         tristate "SCPI based CPUfreq driver"
--	depends on ARM_BIG_LITTLE_CPUFREQ && ARM_SCPI_PROTOCOL
-+	depends on ARM_BIG_LITTLE_CPUFREQ && ARM_SCPI_PROTOCOL && COMMON_CLK_SCPI
-         help
- 	  This adds the CPUfreq driver support for ARM big.LITTLE platforms
- 	  using SCPI protocol for CPU power management.
+Hanjun Guo (4):
+  acpi, numa: Use pr_fmt() instead of printk
+  acpi, numa: Replace ACPI_DEBUG_PRINT() with pr_debug()
+  arm64, acpi, numa: NUMA support based on SRAT and SLIT
+  acpi, numa: Enable ACPI based NUMA on ARM64
+
+ arch/arm64/include/asm/acpi.h |   4 +
+ arch/arm64/kernel/Makefile    |   1 +
+ arch/arm64/kernel/acpi_numa.c | 215 ++++++++++++++++++++++++++++++++++++++++++
+ arch/arm64/mm/numa.c          |   7 +-
+ drivers/acpi/Kconfig          |   4 +-
+ drivers/acpi/numa.c           | 106 ++++++++++++---------
+ include/linux/acpi.h          |  15 +++
+ 7 files changed, 306 insertions(+), 46 deletions(-)
+ create mode 100644 arch/arm64/kernel/acpi_numa.c
+
 -- 
-2.6.2
+1.8.1.4
