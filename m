@@ -1,373 +1,267 @@
-From: linux@roeck-us.net (Guenter Roeck)
-Date: Tue, 17 Nov 2015 09:56:44 -0800
-Subject: [PATCH v3 3/5] watchdog: ts4800: add driver for TS-4800 watchdog
-In-Reply-To: <1447700814-5391-4-git-send-email-damien.riegel@savoirfairelinux.com>
-References: <1447700814-5391-1-git-send-email-damien.riegel@savoirfairelinux.com>
- <1447700814-5391-4-git-send-email-damien.riegel@savoirfairelinux.com>
-Message-ID: <564B6A5C.8020400@roeck-us.net>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 17 Nov 2015 17:58:00 +0000
+Subject: [PATCH] iommu/arm-smmu: Convert DMA buffer allocations to the managed
+ API
+Message-ID: <1447783080-18592-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/16/2015 11:06 AM, Damien Riegel wrote:
-> This watchdog is instantiated in a FPGA that is memory mapped. It is
-> made of only one register, called the feed register. Writing to this
-> register will re-arm the watchdog for a given time (and enable it if it
-> was disable). It can be disabled by writing a special value into it.
->
-> It is part of a syscon block, and the watchdog register offset in this
-> block varies from board to board. This offset is passed in the syscon
-> property after the phandle to the syscon node.
->
-> This watchdog is present on several of Technologic Systems' boards, and
-> having a kernel driver allows to use these boards without relying on a
-> userspace tool to ping their watchdog.
->
+The ARM SMMUv3 driver uses dma_{alloc,free}_coherent to manage its
+queues and configuration data structures.
 
-Last part should be obvious.
+This patch converts the driver to the managed (dmam_*) API, so that
+resources are freed automatically on device teardown. This greatly
+simplifies the failure paths and allows us to remove a bunch of
+handcrafted freeing code.
 
-> Signed-off-by: Damien Riegel <damien.riegel@savoirfairelinux.com>
-> ---
->   .../devicetree/bindings/watchdog/ts4800-wdt.txt    |  21 ++
->   drivers/watchdog/Kconfig                           |  10 +
->   drivers/watchdog/Makefile                          |   1 +
->   drivers/watchdog/ts4800_wdt.c                      | 219 +++++++++++++++++++++
->   4 files changed, 251 insertions(+)
->   create mode 100644 Documentation/devicetree/bindings/watchdog/ts4800-wdt.txt
->   create mode 100644 drivers/watchdog/ts4800_wdt.c
->
-> diff --git a/Documentation/devicetree/bindings/watchdog/ts4800-wdt.txt b/Documentation/devicetree/bindings/watchdog/ts4800-wdt.txt
-> new file mode 100644
-> index 0000000..7d5dcfb
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/watchdog/ts4800-wdt.txt
-> @@ -0,0 +1,21 @@
-> +Technologic Systems Watchdog
-> +
-> +Required properties:
-> +- compatible: must be "technologic,ts4800-wdt"
-> +- syscon: phandle / integer array that points to the syscon node which
-> +          describes the FPGA's syscon registers.
-> +          - phandle to FPGA's syscon
-> +          - offset to the watchdog register
-> +
-> +Example:
-> +
-> +syscon: syscon at b0010000 {
-> +	compatible = "syscon", "simple-mfd";
-> +	reg = <0xb0010000 0x3d>;
-> +	bus-width = <16>;
-> +
-> +	wdt at e {
-> +		compatible = "technologic,ts4800-wdt";
-> +		syscon = <&syscon 0xe>;
-> +	};
-> +}
-> diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
-> index 79e1aa1..2914594 100644
-> --- a/drivers/watchdog/Kconfig
-> +++ b/drivers/watchdog/Kconfig
-> @@ -426,6 +426,16 @@ config NUC900_WATCHDOG
->   	  To compile this driver as a module, choose M here: the
->   	  module will be called nuc900_wdt.
->
-> +config TS4800_WATCHDOG
-> +	tristate "TS-4800 Watchdog"
-> +	depends on OF
-> +	select WATCHDOG_CORE
-> +	select MFD_SYSCON
-> +	help
-> +	  Technologic Systems TS-4800 has watchdog timer implemented in
-> +	  an external FPGA. Say Y here if you want to support for the
-> +	  watchdog timer on TS-4800 board.
-> +
->   config TS72XX_WATCHDOG
->   	tristate "TS-72XX SBC Watchdog"
->   	depends on MACH_TS72XX
-> diff --git a/drivers/watchdog/Makefile b/drivers/watchdog/Makefile
-> index 0c616e3..3863ce0 100644
-> --- a/drivers/watchdog/Makefile
-> +++ b/drivers/watchdog/Makefile
-> @@ -53,6 +53,7 @@ obj-$(CONFIG_RN5T618_WATCHDOG) += rn5t618_wdt.o
->   obj-$(CONFIG_COH901327_WATCHDOG) += coh901327_wdt.o
->   obj-$(CONFIG_STMP3XXX_RTC_WATCHDOG) += stmp3xxx_rtc_wdt.o
->   obj-$(CONFIG_NUC900_WATCHDOG) += nuc900_wdt.o
-> +obj-$(CONFIG_TS4800_WATCHDOG) += ts4800_wdt.o
->   obj-$(CONFIG_TS72XX_WATCHDOG) += ts72xx_wdt.o
->   obj-$(CONFIG_IMX2_WDT) += imx2_wdt.o
->   obj-$(CONFIG_UX500_WATCHDOG) += ux500_wdt.o
-> diff --git a/drivers/watchdog/ts4800_wdt.c b/drivers/watchdog/ts4800_wdt.c
-> new file mode 100644
-> index 0000000..658d0ca
-> --- /dev/null
-> +++ b/drivers/watchdog/ts4800_wdt.c
-> @@ -0,0 +1,219 @@
-> +/*
-> + * Watchdog driver for TS-4800 based boards
-> + *
-> + * Copyright (c) 2015 - Savoir-faire Linux
-> + *
-> + * This file is licensed under the terms of the GNU General Public
-> + * License version 2. This program is licensed "as is" without any
-> + * warranty of any kind, whether express or implied.
-> + */
-> +
-> +#include <linux/kernel.h>
-> +#include <linux/mfd/syscon.h>
-> +#include <linux/module.h>
-> +#include <linux/of.h>
-> +#include <linux/platform_device.h>
-> +#include <linux/regmap.h>
-> +#include <linux/watchdog.h>
-> +
-> +static bool nowayout = WATCHDOG_NOWAYOUT;
-> +module_param(nowayout, bool, 0);
-> +MODULE_PARM_DESC(nowayout,
-> +	"Watchdog cannot be stopped once started (default="
-> +	__MODULE_STRING(WATCHDOG_NOWAYOUT) ")");
-> +
-> +/* possible feed values */
-> +#define TS4800_WDT_FEED_2S       0x1
-> +#define TS4800_WDT_FEED_10S      0x2
-> +#define TS4800_WDT_DISABLE       0x3
-> +
-> +struct ts4800_wdt {
-> +	struct watchdog_device  wdd;
-> +	struct regmap           *regmap;
-> +	u32                     feed_offset;
-> +	u16                     feed_val;
+Signed-off-by: Will Deacon <will.deacon@arm.com>
+---
+ drivers/iommu/arm-smmu-v3.c | 132 +++++++-------------------------------------
+ 1 file changed, 21 insertions(+), 111 deletions(-)
 
-u16 doesn't save you anything here. In many cases it actually makes
-the code more complex. Might as well use u32.
-
-> +};
-> +
-> +/*
-> + * TS-4800 supports the following timeout values:
-> + *
-> + *   value desc
-> + *   ---------------------
-> + *     0    feed for 338ms
-> + *     1    feed for 2.706s
-> + *     2    feed for 10.824s
-> + *     3    disable watchdog
-> + *
-> + * Keep the regmap/timeout map ordered by timeout
-> + */
-> +static const struct {
-> +	const int timeout;
-> +	const int regval;
-> +} ts4800_wdt_map[] = {
-> +	{ 2,  TS4800_WDT_FEED_2S },
-> +	{ 10, TS4800_WDT_FEED_10S },
-> +};
-> +
-> +static int timeout_to_regval(struct watchdog_device *wdd, int new_timeout)
-> +{
-> +	int i;
-> +
-> +	new_timeout = clamp_val(new_timeout,
-> +				wdd->min_timeout, wdd->max_timeout);
-> +
-This should not be necessary. The value is already checked by the infrastructure.
-
-> +	for (i = 0; i < ARRAY_SIZE(ts4800_wdt_map); i++) {
-> +		if (ts4800_wdt_map[i].timeout >= new_timeout)
-> +			return ts4800_wdt_map[i].timeout;
-> +	}
-> +
-> +	return -EINVAL;
-
-I think it would be easier here to just return TS4800_WDT_FEED_10S.
-
-Overall, there are three "defenses" against bad values:
-The infrastructure code, the clamp_val above, and the error return here.
-One should be enough.
-
-> +}
-> +
-> +static void ts4800_write_feed(struct ts4800_wdt *wdt, u16 val)
-> +{
-> +	regmap_write(wdt->regmap, wdt->feed_offset, val);
-> +}
-> +
-> +static int ts4800_wdt_start(struct watchdog_device *wdd)
-> +{
-> +	struct ts4800_wdt *wdt = watchdog_get_drvdata(wdd);
-> +
-> +	ts4800_write_feed(wdt, wdt->feed_val);
-> +	return 0;
-> +}
-> +
-> +static int ts4800_wdt_stop(struct watchdog_device *wdd)
-> +{
-> +	struct ts4800_wdt *wdt = watchdog_get_drvdata(wdd);
-> +
-> +	ts4800_write_feed(wdt, TS4800_WDT_DISABLE);
-> +	return 0;
-> +}
-> +
-> +static int ts4800_wdt_set_timeout(struct watchdog_device *wdd,
-> +				  unsigned int new_timeout)
-> +{
-> +	struct ts4800_wdt *wdt = watchdog_get_drvdata(wdd);
-> +	int val = timeout_to_regval(wdd, new_timeout);
-> +
-> +	if (val < 0)
-> +		return val;
-> +
-This should never happen, since the range was already verified by the infrastructure.
-Another reason to not return an error from timeout_to_regval().
-
-> +	wdt->feed_val = (u16) val;
-> +
-Then you could just make this
-
-	wdt->feed_val = timeout_to_regval(wdd, new_timeout);
-
-Also, you need to set the timeout value in the wdd structure to the actually
-selected timeout, to let user space know which timeout was selected.
-
-	wdt->timeout = ???;
-
-This can be important in situations where the requested timeout is, say,
-3 seconds, but the code actually sets it to 10 seconds. User space might
-need to know about that.
-
-> +	return 0;
-> +}
-> +
-> +static const struct watchdog_ops ts4800_wdt_ops = {
-> +	.owner = THIS_MODULE,
-> +	.start = ts4800_wdt_start,
-> +	.stop = ts4800_wdt_stop,
-> +	.set_timeout = ts4800_wdt_set_timeout,
-> +};
-> +
-> +static const struct watchdog_info ts4800_wdt_info = {
-> +	.options = WDIOF_SETTIMEOUT | WDIOF_MAGICCLOSE | WDIOF_KEEPALIVEPING,
-> +	.identity = "TS-4800 Watchdog",
-> +};
-> +
-> +static int ts4800_wdt_probe(struct platform_device *pdev)
-> +{
-> +	const int max_timeout_index = ARRAY_SIZE(ts4800_wdt_map) - 1;
-
-Might as well use
-
-#define MAX_TIMEOUT_INDEX	(ARRAY_SIZE(ts4800_wdt_map) - 1)
-
-and reduce runtime complexity.
-
-> +	struct device_node *np = pdev->dev.of_node;
-> +	struct device_node *syscon_np;
-> +	struct watchdog_device *wdd;
-> +	struct ts4800_wdt *wdt;
-> +	u32 reg;
-> +	int ret;
-> +
-> +	syscon_np = of_parse_phandle(np, "syscon", 0);
-> +	if (!syscon_np) {
-> +		dev_err(&pdev->dev, "no syscon property\n");
-> +		return -ENODEV;
-> +	}
-> +
-> +	ret = of_property_read_u32_index(np, "syscon", 1, &reg);
-> +	if (ret < 0) {
-> +		dev_err(&pdev->dev, "no offset in syscon\n");
-> +		return -EINVAL;
-
-return -EINVAL or ret ? I think some static checkers may complain
-if you don't return ret.
-
-> +	}
-> +
-> +	/* allocate memory for watchdog struct */
-> +	wdt = devm_kzalloc(&pdev->dev, sizeof(*wdt), GFP_KERNEL);
-> +	if (!wdt)
-> +		return -ENOMEM;
-> +
-> +	/* set regmap and offset to know where to write */
-> +	wdt->feed_offset = reg;
-> +	wdt->regmap = syscon_node_to_regmap(syscon_np);
-> +	if (!wdt->regmap) {
-
-syscon_node_to_regmap() returns an error pointer.
-
-> +		dev_err(&pdev->dev, "cannot get parent's regmap\n");
-> +		return -EINVAL;
-> +	}
-> +
-> +	/* Initialize struct watchdog_device */
-> +	wdd = &wdt->wdd;
-> +	wdd->parent = &pdev->dev;
-> +	wdd->info = &ts4800_wdt_info;
-> +	wdd->ops = &ts4800_wdt_ops;
-> +	wdd->min_timeout = ts4800_wdt_map[0].timeout;
-> +	wdd->max_timeout = ts4800_wdt_map[max_timeout_index].timeout;
-> +	wdd->timeout = wdd->max_timeout;
-> +	wdt->feed_val = ts4800_wdt_map[max_timeout_index].regval;
-> +
-> +	watchdog_set_drvdata(wdd, wdt);
-> +	watchdog_set_nowayout(wdd, nowayout);
-> +
-
-Calling watchdog_init_timeout() might be useful as well, to get a timeout value
-from devicetree if provided.
-
-> +	/*
-> +	 * Must be called after watchdog_set_drvdata to dereference a valid
-> +	 * pointer. The feed register is write-only, so it is not possible to
-> +	 * determine if watchdog is already started or not. Disable it to be in
-> +	 * a known state.
-
-Annoying :-(. I keep wondering who comes up with those HW implementations.
-
-> +	 */
-> +	ts4800_wdt_stop(wdd);
-> +
-> +	ret = watchdog_register_device(wdd);
-> +	if (ret) {
-> +		dev_err(&pdev->dev,
-> +			"failed to register watchdog device\n");
-> +		return ret;
-> +	}
-> +
-> +	platform_set_drvdata(pdev, wdt);
-> +
-> +	dev_info(&pdev->dev,
-> +		 "initialized (timeout = %d sec, nowayout = %d)\n",
-> +		 wdd->timeout, nowayout);
-> +
-> +	return 0;
-> +}
-> +
-> +static int ts4800_wdt_remove(struct platform_device *pdev)
-> +{
-> +	struct ts4800_wdt *wdt = platform_get_drvdata(pdev);
-> +
-> +	watchdog_unregister_device(&wdt->wdd);
-> +
-> +	return 0;
-> +}
-> +
-> +static const struct of_device_id ts4800_wdt_of_match[] = {
-> +	{ .compatible = "technologic,ts4800-wdt", },
-> +	{ },
-> +};
-> +MODULE_DEVICE_TABLE(of, ts4800_wdt_of_match);
-> +
-> +static struct platform_driver ts4800_wdt_driver = {
-> +	.probe		= ts4800_wdt_probe,
-> +	.remove		= ts4800_wdt_remove,
-> +	.driver		= {
-> +		.name	= "ts4800_wdt",
-> +		.of_match_table = ts4800_wdt_of_match,
-> +	},
-> +};
-> +
-> +module_platform_driver(ts4800_wdt_driver);
-> +
-> +MODULE_AUTHOR("Damien Riegel <damien.riegel@savoirfairelinux.com>");
-> +MODULE_LICENSE("GPL v2");
-> +MODULE_ALIAS("platform:ts4800_wdt");
->
+diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+index e0032c098b32..86480480895d 100644
+--- a/drivers/iommu/arm-smmu-v3.c
++++ b/drivers/iommu/arm-smmu-v3.c
+@@ -1122,8 +1122,8 @@ static int arm_smmu_init_l2_strtab(struct arm_smmu_device *smmu, u32 sid)
+ 	strtab = &cfg->strtab[(sid >> STRTAB_SPLIT) * STRTAB_L1_DESC_DWORDS];
+ 
+ 	desc->span = STRTAB_SPLIT + 1;
+-	desc->l2ptr = dma_zalloc_coherent(smmu->dev, size, &desc->l2ptr_dma,
+-					  GFP_KERNEL);
++	desc->l2ptr = dmam_alloc_coherent(smmu->dev, size, &desc->l2ptr_dma,
++					  GFP_KERNEL | __GFP_ZERO);
+ 	if (!desc->l2ptr) {
+ 		dev_err(smmu->dev,
+ 			"failed to allocate l2 stream table for SID %u\n",
+@@ -1428,10 +1428,10 @@ static void arm_smmu_domain_free(struct iommu_domain *domain)
+ 		struct arm_smmu_s1_cfg *cfg = &smmu_domain->s1_cfg;
+ 
+ 		if (cfg->cdptr) {
+-			dma_free_coherent(smmu_domain->smmu->dev,
+-					  CTXDESC_CD_DWORDS << 3,
+-					  cfg->cdptr,
+-					  cfg->cdptr_dma);
++			dmam_free_coherent(smmu_domain->smmu->dev,
++					   CTXDESC_CD_DWORDS << 3,
++					   cfg->cdptr,
++					   cfg->cdptr_dma);
+ 
+ 			arm_smmu_bitmap_free(smmu->asid_map, cfg->cd.asid);
+ 		}
+@@ -1456,8 +1456,9 @@ static int arm_smmu_domain_finalise_s1(struct arm_smmu_domain *smmu_domain,
+ 	if (IS_ERR_VALUE(asid))
+ 		return asid;
+ 
+-	cfg->cdptr = dma_zalloc_coherent(smmu->dev, CTXDESC_CD_DWORDS << 3,
+-					 &cfg->cdptr_dma, GFP_KERNEL);
++	cfg->cdptr = dmam_alloc_coherent(smmu->dev, CTXDESC_CD_DWORDS << 3,
++					 &cfg->cdptr_dma,
++					 GFP_KERNEL | __GFP_ZERO);
+ 	if (!cfg->cdptr) {
+ 		dev_warn(smmu->dev, "failed to allocate context descriptor\n");
+ 		ret = -ENOMEM;
+@@ -1936,7 +1937,7 @@ static int arm_smmu_init_one_queue(struct arm_smmu_device *smmu,
+ {
+ 	size_t qsz = ((1 << q->max_n_shift) * dwords) << 3;
+ 
+-	q->base = dma_alloc_coherent(smmu->dev, qsz, &q->base_dma, GFP_KERNEL);
++	q->base = dmam_alloc_coherent(smmu->dev, qsz, &q->base_dma, GFP_KERNEL);
+ 	if (!q->base) {
+ 		dev_err(smmu->dev, "failed to allocate queue (0x%zx bytes)\n",
+ 			qsz);
+@@ -1956,23 +1957,6 @@ static int arm_smmu_init_one_queue(struct arm_smmu_device *smmu,
+ 	return 0;
+ }
+ 
+-static void arm_smmu_free_one_queue(struct arm_smmu_device *smmu,
+-				    struct arm_smmu_queue *q)
+-{
+-	size_t qsz = ((1 << q->max_n_shift) * q->ent_dwords) << 3;
+-
+-	dma_free_coherent(smmu->dev, qsz, q->base, q->base_dma);
+-}
+-
+-static void arm_smmu_free_queues(struct arm_smmu_device *smmu)
+-{
+-	arm_smmu_free_one_queue(smmu, &smmu->cmdq.q);
+-	arm_smmu_free_one_queue(smmu, &smmu->evtq.q);
+-
+-	if (smmu->features & ARM_SMMU_FEAT_PRI)
+-		arm_smmu_free_one_queue(smmu, &smmu->priq.q);
+-}
+-
+ static int arm_smmu_init_queues(struct arm_smmu_device *smmu)
+ {
+ 	int ret;
+@@ -1982,49 +1966,20 @@ static int arm_smmu_init_queues(struct arm_smmu_device *smmu)
+ 	ret = arm_smmu_init_one_queue(smmu, &smmu->cmdq.q, ARM_SMMU_CMDQ_PROD,
+ 				      ARM_SMMU_CMDQ_CONS, CMDQ_ENT_DWORDS);
+ 	if (ret)
+-		goto out;
++		return ret;
+ 
+ 	/* evtq */
+ 	ret = arm_smmu_init_one_queue(smmu, &smmu->evtq.q, ARM_SMMU_EVTQ_PROD,
+ 				      ARM_SMMU_EVTQ_CONS, EVTQ_ENT_DWORDS);
+ 	if (ret)
+-		goto out_free_cmdq;
++		return ret;
+ 
+ 	/* priq */
+ 	if (!(smmu->features & ARM_SMMU_FEAT_PRI))
+ 		return 0;
+ 
+-	ret = arm_smmu_init_one_queue(smmu, &smmu->priq.q, ARM_SMMU_PRIQ_PROD,
+-				      ARM_SMMU_PRIQ_CONS, PRIQ_ENT_DWORDS);
+-	if (ret)
+-		goto out_free_evtq;
+-
+-	return 0;
+-
+-out_free_evtq:
+-	arm_smmu_free_one_queue(smmu, &smmu->evtq.q);
+-out_free_cmdq:
+-	arm_smmu_free_one_queue(smmu, &smmu->cmdq.q);
+-out:
+-	return ret;
+-}
+-
+-static void arm_smmu_free_l2_strtab(struct arm_smmu_device *smmu)
+-{
+-	int i;
+-	size_t size;
+-	struct arm_smmu_strtab_cfg *cfg = &smmu->strtab_cfg;
+-
+-	size = 1 << (STRTAB_SPLIT + ilog2(STRTAB_STE_DWORDS) + 3);
+-	for (i = 0; i < cfg->num_l1_ents; ++i) {
+-		struct arm_smmu_strtab_l1_desc *desc = &cfg->l1_desc[i];
+-
+-		if (!desc->l2ptr)
+-			continue;
+-
+-		dma_free_coherent(smmu->dev, size, desc->l2ptr,
+-				  desc->l2ptr_dma);
+-	}
++	return arm_smmu_init_one_queue(smmu, &smmu->priq.q, ARM_SMMU_PRIQ_PROD,
++				       ARM_SMMU_PRIQ_CONS, PRIQ_ENT_DWORDS);
+ }
+ 
+ static int arm_smmu_init_l1_strtab(struct arm_smmu_device *smmu)
+@@ -2053,7 +2008,6 @@ static int arm_smmu_init_strtab_2lvl(struct arm_smmu_device *smmu)
+ 	void *strtab;
+ 	u64 reg;
+ 	u32 size, l1size;
+-	int ret;
+ 	struct arm_smmu_strtab_cfg *cfg = &smmu->strtab_cfg;
+ 
+ 	/*
+@@ -2076,8 +2030,8 @@ static int arm_smmu_init_strtab_2lvl(struct arm_smmu_device *smmu)
+ 			 size, smmu->sid_bits);
+ 
+ 	l1size = cfg->num_l1_ents * (STRTAB_L1_DESC_DWORDS << 3);
+-	strtab = dma_zalloc_coherent(smmu->dev, l1size, &cfg->strtab_dma,
+-				     GFP_KERNEL);
++	strtab = dmam_alloc_coherent(smmu->dev, l1size, &cfg->strtab_dma,
++				     GFP_KERNEL | __GFP_ZERO);
+ 	if (!strtab) {
+ 		dev_err(smmu->dev,
+ 			"failed to allocate l1 stream table (%u bytes)\n",
+@@ -2094,13 +2048,7 @@ static int arm_smmu_init_strtab_2lvl(struct arm_smmu_device *smmu)
+ 		<< STRTAB_BASE_CFG_SPLIT_SHIFT;
+ 	cfg->strtab_base_cfg = reg;
+ 
+-	ret = arm_smmu_init_l1_strtab(smmu);
+-	if (ret)
+-		dma_free_coherent(smmu->dev,
+-				  l1size,
+-				  strtab,
+-				  cfg->strtab_dma);
+-	return ret;
++	return arm_smmu_init_l1_strtab(smmu);
+ }
+ 
+ static int arm_smmu_init_strtab_linear(struct arm_smmu_device *smmu)
+@@ -2111,8 +2059,8 @@ static int arm_smmu_init_strtab_linear(struct arm_smmu_device *smmu)
+ 	struct arm_smmu_strtab_cfg *cfg = &smmu->strtab_cfg;
+ 
+ 	size = (1 << smmu->sid_bits) * (STRTAB_STE_DWORDS << 3);
+-	strtab = dma_zalloc_coherent(smmu->dev, size, &cfg->strtab_dma,
+-				     GFP_KERNEL);
++	strtab = dmam_alloc_coherent(smmu->dev, size, &cfg->strtab_dma,
++				     GFP_KERNEL | __GFP_ZERO);
+ 	if (!strtab) {
+ 		dev_err(smmu->dev,
+ 			"failed to allocate linear stream table (%u bytes)\n",
+@@ -2156,21 +2104,6 @@ static int arm_smmu_init_strtab(struct arm_smmu_device *smmu)
+ 	return 0;
+ }
+ 
+-static void arm_smmu_free_strtab(struct arm_smmu_device *smmu)
+-{
+-	struct arm_smmu_strtab_cfg *cfg = &smmu->strtab_cfg;
+-	u32 size = cfg->num_l1_ents;
+-
+-	if (smmu->features & ARM_SMMU_FEAT_2_LVL_STRTAB) {
+-		arm_smmu_free_l2_strtab(smmu);
+-		size *= STRTAB_L1_DESC_DWORDS << 3;
+-	} else {
+-		size *= STRTAB_STE_DWORDS * 3;
+-	}
+-
+-	dma_free_coherent(smmu->dev, size, cfg->strtab, cfg->strtab_dma);
+-}
+-
+ static int arm_smmu_init_structures(struct arm_smmu_device *smmu)
+ {
+ 	int ret;
+@@ -2179,21 +2112,7 @@ static int arm_smmu_init_structures(struct arm_smmu_device *smmu)
+ 	if (ret)
+ 		return ret;
+ 
+-	ret = arm_smmu_init_strtab(smmu);
+-	if (ret)
+-		goto out_free_queues;
+-
+-	return 0;
+-
+-out_free_queues:
+-	arm_smmu_free_queues(smmu);
+-	return ret;
+-}
+-
+-static void arm_smmu_free_structures(struct arm_smmu_device *smmu)
+-{
+-	arm_smmu_free_strtab(smmu);
+-	arm_smmu_free_queues(smmu);
++	return arm_smmu_init_strtab(smmu);
+ }
+ 
+ static int arm_smmu_write_reg_sync(struct arm_smmu_device *smmu, u32 val,
+@@ -2698,15 +2617,7 @@ static int arm_smmu_device_dt_probe(struct platform_device *pdev)
+ 	platform_set_drvdata(pdev, smmu);
+ 
+ 	/* Reset the device */
+-	ret = arm_smmu_device_reset(smmu);
+-	if (ret)
+-		goto out_free_structures;
+-
+-	return 0;
+-
+-out_free_structures:
+-	arm_smmu_free_structures(smmu);
+-	return ret;
++	return arm_smmu_device_reset(smmu);
+ }
+ 
+ static int arm_smmu_device_remove(struct platform_device *pdev)
+@@ -2714,7 +2625,6 @@ static int arm_smmu_device_remove(struct platform_device *pdev)
+ 	struct arm_smmu_device *smmu = platform_get_drvdata(pdev);
+ 
+ 	arm_smmu_device_disable(smmu);
+-	arm_smmu_free_structures(smmu);
+ 	return 0;
+ }
+ 
+-- 
+2.1.4
