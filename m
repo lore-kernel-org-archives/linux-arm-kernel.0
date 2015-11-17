@@ -1,36 +1,44 @@
 From: Zhiqiang.Hou@freescale.com (Zhiqiang Hou)
-Date: Tue, 17 Nov 2015 17:53:18 +0800
-Subject: [PATCHv8 1/5] i2c: imx: fix a compiling error
-Message-ID: <1447754002-40555-1-git-send-email-Zhiqiang.Hou@freescale.com>
+Date: Tue, 17 Nov 2015 17:53:19 +0800
+Subject: [PATCHv8 2/5] watchdog: Add support for Freescale Layerscape platforms
+In-Reply-To: <1447754002-40555-1-git-send-email-Zhiqiang.Hou@freescale.com>
+References: <1447754002-40555-1-git-send-email-Zhiqiang.Hou@freescale.com>
+Message-ID: <1447754002-40555-2-git-send-email-Zhiqiang.Hou@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Hou Zhiqiang <Zhiqiang.Hou@freescale.com>
+From: Shaohui Xie <Shaohui.Xie@freescale.com>
 
-drivers/i2c/busses/i2c-imx.c:978:2: error: implicit declaration of
-function ?pinctrl_select_state? [-Werror=implicit-function-declaration]
-  pinctrl_select_state(i2c_imx->pinctrl, i2c_imx->pinctrl_pins_gpio);
-  ^
+Modify watchdog/Kconfig file to support Layerscape platforms.
 
-Signed-off-by: Hou Zhiqiang <Zhiqiang.Hou@freescale.com>
+Signed-off-by: Shaohui Xie <Shaohui.Xie@freescale.com>
+Signed-off-by: Hou Zhiqiang <B48286@freescale.com>
+Acked-by: Guenter Roeck <linux@roeck-us.net>
 ---
 V8:
- - New patch.
+ - No change.
 
- drivers/i2c/busses/i2c-imx.c | 1 +
- 1 file changed, 1 insertion(+)
+V6:
+ - Remove a Signed-off.
 
-diff --git a/drivers/i2c/busses/i2c-imx.c b/drivers/i2c/busses/i2c-imx.c
-index 1e4d99d..9bb0b05 100644
---- a/drivers/i2c/busses/i2c-imx.c
-+++ b/drivers/i2c/busses/i2c-imx.c
-@@ -50,6 +50,7 @@
- #include <linux/of_device.h>
- #include <linux/of_dma.h>
- #include <linux/of_gpio.h>
-+#include <linux/pinctrl/consumer.h>
- #include <linux/platform_data/i2c-imx.h>
- #include <linux/platform_device.h>
- #include <linux/sched.h>
+V5: V4 V3 V2
+ - No change.
+
+ drivers/watchdog/Kconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
+index 7a8a6c6..1c427be 100644
+--- a/drivers/watchdog/Kconfig
++++ b/drivers/watchdog/Kconfig
+@@ -446,7 +446,7 @@ config MAX63XX_WATCHDOG
+ 
+ config IMX2_WDT
+ 	tristate "IMX2+ Watchdog"
+-	depends on ARCH_MXC
++	depends on ARCH_MXC || ARCH_LAYERSCAPE
+ 	select REGMAP_MMIO
+ 	select WATCHDOG_CORE
+ 	help
 -- 
 2.1.0.27.g96db324
