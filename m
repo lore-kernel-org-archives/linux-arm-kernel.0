@@ -1,138 +1,95 @@
 From: shannon.zhao@linaro.org (shannon.zhao at linaro.org)
-Date: Tue, 17 Nov 2015 17:40:31 +0800
-Subject: [PATCH v3 32/62] arm/acpi: Parse GTDT to initialize timer
+Date: Tue, 17 Nov 2015 17:40:35 +0800
+Subject: [PATCH v3 36/62] arm/acpi: Initialize serial port from ACPI SPCR table
 In-Reply-To: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
 References: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
-Message-ID: <1447753261-7552-33-git-send-email-shannon.zhao@linaro.org>
+Message-ID: <1447753261-7552-37-git-send-email-shannon.zhao@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Parth Dixit <parth.dixit@linaro.org>
 
-Parse GTDT (Generic Timer Descriptor Table) to initialize timer. Using
-the information presented by GTDT to initialize the arch timer (not
-memory-mapped).
+Parse ACPI SPCR (Serial Port Console Redirection table) table and
+initialize the serial port pl011.
 
 Signed-off-by: Naresh Bhat <naresh.bhat@linaro.org>
 Signed-off-by: Parth Dixit <parth.dixit@linaro.org>
 Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
 ---
- xen/arch/arm/time.c | 73 +++++++++++++++++++++++++++++++++++++++++++++--------
- 1 file changed, 62 insertions(+), 11 deletions(-)
+ xen/drivers/char/pl011.c  | 37 +++++++++++++++++++++++++++++++++++++
+ xen/include/acpi/actbl2.h |  5 +++++
+ 2 files changed, 42 insertions(+)
 
-diff --git a/xen/arch/arm/time.c b/xen/arch/arm/time.c
-index 5ded30c..adbfc2a 100644
---- a/xen/arch/arm/time.c
-+++ b/xen/arch/arm/time.c
-@@ -29,6 +29,7 @@
- #include <xen/time.h>
- #include <xen/sched.h>
- #include <xen/event.h>
+diff --git a/xen/drivers/char/pl011.c b/xen/drivers/char/pl011.c
+index 1efb1cf..7106f1c 100644
+--- a/xen/drivers/char/pl011.c
++++ b/xen/drivers/char/pl011.c
+@@ -27,6 +27,7 @@
+ #include <asm/device.h>
+ #include <xen/mm.h>
+ #include <xen/vmap.h>
 +#include <xen/acpi.h>
- #include <asm/system.h>
- #include <asm/time.h>
- #include <asm/gic.h>
-@@ -65,8 +66,45 @@ unsigned int timer_get_irq(enum timer_ppi ppi)
+ #include <asm/pl011-uart.h>
+ #include <asm/io.h>
  
- static __initdata struct dt_device_node *timer;
+@@ -308,6 +309,42 @@ DT_DEVICE_START(pl011, "PL011 UART", DEVICE_SERIAL)
+         .init = dt_pl011_uart_init,
+ DT_DEVICE_END
  
 +#ifdef CONFIG_ACPI
-+/* Initialize per-processor generic timer */
-+static int __init arch_timer_acpi_init(struct acpi_table_header *table)
++static int __init acpi_pl011_uart_init(const void *data)
 +{
-+    unsigned int irq_type;
-+    struct acpi_table_gtdt *gtdt;
++    acpi_status status;
++    struct acpi_table_spcr *spcr=NULL;
++    int res;
 +
-+    gtdt = container_of(table, struct acpi_table_gtdt, header);
++    status = acpi_get_table(ACPI_SIG_SPCR, 0,
++                            (struct acpi_table_header **)&spcr);
 +
-+    /* Initialize all the generic timer IRQ variable from GTDT table */
-+    irq_type = acpi_get_irq_type(gtdt->non_secure_el1_flags);
-+    irq_set_type(gtdt->non_secure_el1_interrupt, irq_type);
-+    timer_irq[TIMER_PHYS_NONSECURE_PPI] = gtdt->non_secure_el1_interrupt;
++    if ( ACPI_FAILURE(status) )
++    {
++        printk("pl011: Failed to get SPCR table\n");
++        return -EINVAL;
++    }
 +
-+    irq_type = acpi_get_irq_type(gtdt->secure_el1_flags);
-+    irq_set_type(gtdt->secure_el1_interrupt, irq_type);
-+    timer_irq[TIMER_PHYS_SECURE_PPI] = gtdt->secure_el1_interrupt;
++    /* trigger/polarity information is not available in spcr */
++    irq_set_type(spcr->interrupt, ACPI_IRQ_TYPE_EDGE_BOTH);
 +
-+    irq_type = acpi_get_irq_type(gtdt->virtual_timer_flags);
-+    irq_set_type(gtdt->virtual_timer_interrupt, irq_type);
-+    timer_irq[TIMER_VIRT_PPI] = gtdt->virtual_timer_interrupt;
-+
-+    irq_type = acpi_get_irq_type(gtdt->non_secure_el2_flags);
-+    irq_set_type(gtdt->non_secure_el2_interrupt, irq_type);
-+    timer_irq[TIMER_HYP_PPI] = gtdt->non_secure_el2_interrupt;
++    res = pl011_uart_init(spcr->interrupt, spcr->serial_port.address,
++                          PAGE_SIZE);
++    if ( res < 0 )
++    {
++        printk("pl011: Unable to initialize\n");
++        return res;
++    }
 +
 +    return 0;
 +}
 +
-+void __init acpi_preinit_xen_time(void)
-+{
-+	acpi_table_parse(ACPI_SIG_GTDT, arch_timer_acpi_init);
-+}
-+#else
-+static inline void acpi_preinit_xen_time(void) { }
++ACPI_DEVICE_START(apl011, "PL011 UART", DEVICE_SERIAL)
++        .class_type = ACPI_SPCR_TYPE_PL011,
++        .init = acpi_pl011_uart_init,
++ACPI_DEVICE_END
 +#endif
 +
- /* Set up the timer on the boot CPU (early init function) */
--void __init preinit_xen_time(void)
-+static void __init dt_preinit_xen_time(void)
- {
-     static const struct dt_device_match timer_ids[] __initconst =
-     {
-@@ -74,7 +112,6 @@ void __init preinit_xen_time(void)
-         { /* sentinel */ },
-     };
-     int res;
--    u32 rate;
+ /*
+  * Local variables:
+  * mode: C
+diff --git a/xen/include/acpi/actbl2.h b/xen/include/acpi/actbl2.h
+index 87bc6b3..25be429 100644
+--- a/xen/include/acpi/actbl2.h
++++ b/xen/include/acpi/actbl2.h
+@@ -815,6 +815,11 @@ struct acpi_table_spcr {
  
-     timer = dt_find_matching_node(NULL, timer_ids);
-     if ( !timer )
-@@ -86,8 +123,19 @@ void __init preinit_xen_time(void)
-     if ( res )
-         panic("Timer: Cannot initialize platform timer");
+ #define ACPI_SPCR_DO_NOT_DISABLE    (1)
  
--    res = dt_property_read_u32(timer, "clock-frequency", &rate);
--    if ( res )
-+}
++/* UART Interface type */
++#define ACPI_SPCR_TYPE_16550 0
++#define ACPI_SPCR_TYPE_16550_SUB 1
++#define ACPI_SPCR_TYPE_PL011 3
 +
-+void __init preinit_xen_time(void)
-+{
-+    u32 rate;
-+
-+    /* Initialize all the generic timers presented in GTDT */
-+    if ( acpi_disabled )
-+        dt_preinit_xen_time();
-+    else
-+        acpi_preinit_xen_time();
-+
-+    if( acpi_disabled && dt_property_read_u32(timer, "clock-frequency", &rate) )
-     {
-         cpu_khz = rate / 1000;
-         timer_dt_clock_frequency = rate;
-@@ -104,14 +152,17 @@ int __init init_xen_time(void)
-     int res;
-     unsigned int i;
- 
--    /* Retrieve all IRQs for the timer */
--    for ( i = TIMER_PHYS_SECURE_PPI; i < MAX_TIMER_PPI; i++ )
-+    if( acpi_disabled )
-     {
--        res = platform_get_irq(timer, i);
--
--        if ( res < 0 )
--            panic("Timer: Unable to retrieve IRQ %u from the device tree", i);
--        timer_irq[i] = res;
-+        /* Retrieve all IRQs for the timer */
-+        for ( i = TIMER_PHYS_SECURE_PPI; i < MAX_TIMER_PPI; i++ )
-+        {
-+            res = platform_get_irq(timer, i);
-+
-+            if ( res < 0 )
-+                panic("Timer: Unable to retrieve IRQ %u from the device tree", i);
-+            timer_irq[i] = res;
-+        }
-     }
- 
-     /* Check that this CPU supports the Generic Timer interface */
+ /*******************************************************************************
+  *
+  * SPMI - Server Platform Management Interface table
 -- 
 2.1.0
