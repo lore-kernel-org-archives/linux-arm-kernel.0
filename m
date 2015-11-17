@@ -1,31 +1,27 @@
-From: stillcompiling@gmail.com (Joshua Clayton)
-Date: Tue, 17 Nov 2015 11:28:29 -0800
-Subject: [PATCH 3/8] Documentation/spi/spidev_test.c: accept input from a
- file
-In-Reply-To: <564B716E.5020605@gmail.com>
-References: <cover.1447773299.git.stillcompiling@gmail.com>
- <d90d749776cf562bc9922aff5e97cb911a77b22b.1447773299.git.stillcompiling@gmail.com>
- <564B716E.5020605@gmail.com>
-Message-ID: <5345438.ORMdKP6N7u@jclayton-pc>
+From: horms@verge.net.au (Simon Horman)
+Date: Tue, 17 Nov 2015 11:28:32 -0800
+Subject: [PATCH 0/4] ARM: shmobile: Use SoC specific binding for
+ rcar-dmac nodes
+In-Reply-To: <1447381431-2255-1-git-send-email-horms+renesas@verge.net.au>
+References: <1447381431-2255-1-git-send-email-horms+renesas@verge.net.au>
+Message-ID: <20151117192832.GN23979@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, November 17, 2015 07:26:54 PM Anton Bondarenko wrote:
-> On 17.11.2015 16:24, Joshua Clayton wrote:
-> > +	if (sb.st_size > 4096)
-> > +		pabort("input file exceeds spidev's 4k limit");
-> This is not a true. IIRC PAGE_SIZE is the default buffer size for 
-> spidev, but can be changed using bufsiz module parameter.
-> Just 'insmod spidev bufsiz=X', where X is number of bytes.
+On Fri, Nov 13, 2015 at 11:23:47AM +0900, Simon Horman wrote:
+> Use the new SoC specific binding for rcar-dmac and the generic
+> binding as a fall-back in the r8a779[0134] device trees.
+> 
+> In general Renesas hardware is not documented to the extent where the
+> relationship between IP blocks on different SoCs can be assumed although
+> they may appear to operate the same way. Furthermore the documentation
+> typically does not specify a version for individual IP blocks. For these
+> reasons a convention of using the SoC name in place of a version and
+> providing SoC-specific compat strings has been adopted.
+> 
+> Although not universally liked this convention is used in the bindings for
+> most drivers for Renesas hardware. The purpose of this patch is to
+> update the Renesas R-Car DMA Controller nodes to follow this convention.
 
-You are right. I will drop this. As Mark suggests.
-The ioctl gives a nice error code if the buffer is too big.
-
-...
-> > +	tx = malloc(sb.st_size);
-> It would be good to check new allocations for fail.
-
-I will add a check for this. 
-
--- 
-~Joshua Clayton
+As the bindings in question have now been accepted
+I have queued up this series for v4.5.
