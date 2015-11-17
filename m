@@ -1,28 +1,50 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 17 Nov 2015 11:33:45 +0100
-Subject: [PATCH] SPI: s3c64xx: pass DMA arguments in platform data
-In-Reply-To: <8391350.6B0EUH1WXO@wuerfel>
-References: <8391350.6B0EUH1WXO@wuerfel>
-Message-ID: <16591294.iqvGkiFfez@wuerfel>
+From: ludovic.desroches@atmel.com (Ludovic Desroches)
+Date: Tue, 17 Nov 2015 11:27:23 +0100
+Subject: [PATCH] MAINTAINERS: Atmel drivers: change NAND and ISI entries
+In-Reply-To: <1447755695-18034-1-git-send-email-nicolas.ferre@atmel.com>
+References: <1447755695-18034-1-git-send-email-nicolas.ferre@atmel.com>
+Message-ID: <20151117102723.GE16931@odux.rfo.atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 16 November 2015 17:00:21 Arnd Bergmann wrote:
-> The s3c64xx platform data already contains a pointer to the
-> DMA filter function, but not to the associated data.
+On Tue, Nov 17, 2015 at 11:21:35AM +0100, Nicolas Ferre wrote:
+> Update Josh's entries about NAND and ISI drivers.
+> Thanks for your work with Atmel Josh!
 > 
-> This simplifies the code and makes it more generic by
-> passing the data along with the filter function like
-> we do for other drivers.
+> Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
+> Cc: Ludovic Desroches <ludovic.desroches@atmel.com>
+> Cc: Wenyou Yang <wenyou.yang@atmel.com>
+> Cc: Josh Wu <rainyfeeling@outlook.com>
+
+Acked-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+
+> ---
+>  MAINTAINERS | 5 +++--
+>  1 file changed, 3 insertions(+), 2 deletions(-)
 > 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-
-While rebasing the ASoC patches, I realized that they are not independent
-of this one, which I did on top of the others.
-
-None of them are urgent, so if the maintainers all agree that we want them,
-I can wait another merge window with this one. Alternatively, I could
-rework the patches to avoid the dependency, or we could merge them
-all through the samsung git tree in order.
-
-	Arnd
+> diff --git a/MAINTAINERS b/MAINTAINERS
+> index e9caa4b28828..3c9d0d0ba0e8 100644
+> --- a/MAINTAINERS
+> +++ b/MAINTAINERS
+> @@ -1931,7 +1931,7 @@ S:	Supported
+>  F:	drivers/i2c/busses/i2c-at91.c
+>  
+>  ATMEL ISI DRIVER
+> -M:	Josh Wu <josh.wu@atmel.com>
+> +M:	Ludovic Desroches <ludovic.desroches@atmel.com>
+>  L:	linux-media at vger.kernel.org
+>  S:	Supported
+>  F:	drivers/media/platform/soc_camera/atmel-isi.c
+> @@ -1950,7 +1950,8 @@ S:	Supported
+>  F:	drivers/net/ethernet/cadence/
+>  
+>  ATMEL NAND DRIVER
+> -M:	Josh Wu <josh.wu@atmel.com>
+> +M:	Wenyou Yang <wenyou.yang@atmel.com>
+> +M:	Josh Wu <rainyfeeling@outlook.com>
+>  L:	linux-mtd at lists.infradead.org
+>  S:	Supported
+>  F:	drivers/mtd/nand/atmel_nand*
+> -- 
+> 2.1.3
+> 
