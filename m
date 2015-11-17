@@ -1,132 +1,71 @@
-From: shannon.zhao@linaro.org (shannon.zhao at linaro.org)
-Date: Tue, 17 Nov 2015 17:40:34 +0800
-Subject: [PATCH v3 35/62] serial: Rename SERHND_DTUART to SERHND_UART
-In-Reply-To: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
-References: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
-Message-ID: <1447753261-7552-36-git-send-email-shannon.zhao@linaro.org>
+From: bayi.cheng@mediatek.com (Bayi Cheng)
+Date: Tue, 17 Nov 2015 17:46:14 +0800
+Subject: [PATCH v7 0/2] Mediatek SPI-NOR flash driver 
+Message-ID: <1447753576-28528-1-git-send-email-bayi.cheng@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Shannon Zhao <shannon.zhao@linaro.org>
+This series is based on v4.4-rc1 and l2-mtd.git [0] and erase_sector
+implementation patch [1]
 
-Rename SERHND_DTUART to SERHND_UART in order to reuse it when booting
-with ACPI.
+[0]: git://git.infradead.org/l2-mtd.git
+[1]: http://lists.infradead.org/pipermail/linux-mtd/2015-October//062959.html
 
-Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
----
- xen/arch/arm/vuart.c               | 2 +-
- xen/drivers/char/cadence-uart.c    | 2 +-
- xen/drivers/char/exynos4210-uart.c | 2 +-
- xen/drivers/char/omap-uart.c       | 2 +-
- xen/drivers/char/pl011.c           | 2 +-
- xen/drivers/char/scif-uart.c       | 2 +-
- xen/drivers/char/serial.c          | 2 +-
- xen/include/xen/serial.h           | 2 +-
- 8 files changed, 8 insertions(+), 8 deletions(-)
+Change in v7:
+1: change PRGDATA3 to PRGDATA4 for quad mode
+2: drop  PRGDATA3 for signal read mode
+3: drop unnecessary partition parser data
+4: convert mtd_device_parse_register to mtd_device_register
+5: disable clocks on failure
 
-diff --git a/xen/arch/arm/vuart.c b/xen/arch/arm/vuart.c
-index b5c9288..6619b33 100644
---- a/xen/arch/arm/vuart.c
-+++ b/xen/arch/arm/vuart.c
-@@ -59,7 +59,7 @@ int domain_vuart_init(struct domain *d)
- {
-     ASSERT( is_hardware_domain(d) );
- 
--    d->arch.vuart.info = serial_vuart_info(SERHND_DTUART);
-+    d->arch.vuart.info = serial_vuart_info(SERHND_UART);
-     if ( !d->arch.vuart.info )
-         return 0;
- 
-diff --git a/xen/drivers/char/cadence-uart.c b/xen/drivers/char/cadence-uart.c
-index 933672f..ed65004 100644
---- a/xen/drivers/char/cadence-uart.c
-+++ b/xen/drivers/char/cadence-uart.c
-@@ -196,7 +196,7 @@ static int __init cuart_init(struct dt_device_node *dev, const void *data)
-     uart->vuart.status = UART_SR_INTR_TEMPTY;
- 
-     /* Register with generic serial driver. */
--    serial_register_uart(SERHND_DTUART, &cuart_driver, uart);
-+    serial_register_uart(SERHND_UART, &cuart_driver, uart);
- 
-     dt_device_set_used_by(dev, DOMID_XEN);
- 
-diff --git a/xen/drivers/char/exynos4210-uart.c b/xen/drivers/char/exynos4210-uart.c
-index bac1c2b..43f5313 100644
---- a/xen/drivers/char/exynos4210-uart.c
-+++ b/xen/drivers/char/exynos4210-uart.c
-@@ -345,7 +345,7 @@ static int __init exynos4210_uart_init(struct dt_device_node *dev,
-     uart->vuart.status = UTRSTAT_TXE | UTRSTAT_TXFE;
- 
-     /* Register with generic serial driver. */
--    serial_register_uart(SERHND_DTUART, &exynos4210_uart_driver, uart);
-+    serial_register_uart(SERHND_UART, &exynos4210_uart_driver, uart);
- 
-     dt_device_set_used_by(dev, DOMID_XEN);
- 
-diff --git a/xen/drivers/char/omap-uart.c b/xen/drivers/char/omap-uart.c
-index d8f64ea..98c3892 100644
---- a/xen/drivers/char/omap-uart.c
-+++ b/xen/drivers/char/omap-uart.c
-@@ -343,7 +343,7 @@ static int __init omap_uart_init(struct dt_device_node *dev,
-     uart->vuart.status = UART_LSR_THRE;
- 
-     /* Register with generic serial driver */
--    serial_register_uart(SERHND_DTUART, &omap_uart_driver, uart);
-+    serial_register_uart(SERHND_UART, &omap_uart_driver, uart);
- 
-     dt_device_set_used_by(dev, DOMID_XEN);
- 
-diff --git a/xen/drivers/char/pl011.c b/xen/drivers/char/pl011.c
-index 16abaa5..1efb1cf 100644
---- a/xen/drivers/char/pl011.c
-+++ b/xen/drivers/char/pl011.c
-@@ -252,7 +252,7 @@ static int __init pl011_uart_init(int irq, u64 addr, u64 size)
-     uart->vuart.status = 0;
- 
-     /* Register with generic serial driver. */
--    serial_register_uart(SERHND_DTUART, &pl011_driver, uart);
-+    serial_register_uart(SERHND_UART, &pl011_driver, uart);
- 
-     return 0;
- }
-diff --git a/xen/drivers/char/scif-uart.c b/xen/drivers/char/scif-uart.c
-index 51a2233..739317c 100644
---- a/xen/drivers/char/scif-uart.c
-+++ b/xen/drivers/char/scif-uart.c
-@@ -339,7 +339,7 @@ static int __init scif_uart_init(struct dt_device_node *dev,
-     uart->vuart.status     = SCFSR_TDFE;
- 
-     /* Register with generic serial driver */
--    serial_register_uart(SERHND_DTUART, &scif_uart_driver, uart);
-+    serial_register_uart(SERHND_UART, &scif_uart_driver, uart);
- 
-     dt_device_set_used_by(dev, DOMID_XEN);
- 
-diff --git a/xen/drivers/char/serial.c b/xen/drivers/char/serial.c
-index c583a48..659e10d 100644
---- a/xen/drivers/char/serial.c
-+++ b/xen/drivers/char/serial.c
-@@ -312,7 +312,7 @@ int __init serial_parse_handle(char *conf)
- 
-     if ( !strncmp(conf, "dtuart", 5) )
-     {
--        handle = SERHND_DTUART;
-+        handle = SERHND_UART;
-         goto common;
-     }
- 
-diff --git a/xen/include/xen/serial.h b/xen/include/xen/serial.h
-index 5e1a536..a6e7c22 100644
---- a/xen/include/xen/serial.h
-+++ b/xen/include/xen/serial.h
-@@ -94,7 +94,7 @@ struct uart_driver {
- # define SERHND_COM1    (0<<0)
- # define SERHND_COM2    (1<<0)
- # define SERHND_DBGP    (2<<0)
--# define SERHND_DTUART  (0<<0) /* Steal SERHND_COM1 value */
-+# define SERHND_UART    (0<<0) /* Steal SERHND_COM1 value */
- #define SERHND_HI       (1<<2) /* Mux/demux each transferred char by MSB. */
- #define SERHND_LO       (1<<3) /* Ditto, except that the MSB is cleared.  */
- #define SERHND_COOKED   (1<<4) /* Newline/carriage-return translation?    */
--- 
-2.1.0
+Change in v6:
+1: delete mt8173_nor_do_rx
+2: delete mt8173_nor_do_rx
+3: add mt8173_nor_do_tx_rx for general usage
+4: support nor flash with 6 IDs
+5: delete mt8173_nor_erase_sector and use "nor->erase_opcode"
+6: add mt8173_nor_set_addr to programming the address register
+7: initialize the ppdata in mtk_nor_init
+
+Change in v5:
+1: add "status = "disable"" to device tree
+2: add document "flash" node
+3: fix some statement error in Kconfig file
+4: fix alphabetical order error in makefile
+5: delete the parament "mtd_info *mtd" in mt8173_nor structure
+6: delete SPINOR_OP_WREN repeated calls
+7: add mt8173_nor_do_tx & mt8173_nor_do_rx for them full potential
+8: use a subnode to represent the flash
+
+Change in v4:
+1: delete the parament "write_enable" for mt8173_nor_write_reg
+2: fix the build warning for calling mt8173_nor_write_single_byte
+
+Change in v3:
+1: use switch() to replace some if-else statement
+2: use shifts to replace endianness statement
+3: delete some unused macros
+4: use auto-increment mechanism for single write
+5: write address added to 32bytes
+
+Change in v2:
+1. Rebase to 4.3-rc1
+2. propagate error code
+3. delete mux clock and axi clock in dts file
+4. descripts more exactly for binding file
+5. change file names from mtk-nor.c to mtk_quadspi.c
+6. delete some functions witch were used once time
+
+Bayi Cheng (2):
+  mtd: mtk-nor: mtk serial flash controller driver
+  arm64: dts: mt8173: Add nor flash node
+
+ arch/arm64/boot/dts/mediatek/mt8173.dtsi |  18 +-
+ drivers/mtd/spi-nor/Kconfig              |   7 +
+ drivers/mtd/spi-nor/Makefile             |   1 +
+ drivers/mtd/spi-nor/mtk-quadspi.c        | 483 +++++++++++++++++++++++++++++++
+ 4 files changed, 508 insertions(+), 1 deletion(-)
+ create mode 100644 drivers/mtd/spi-nor/mtk-quadspi.c
+
+--
+1.8.1.1.dirty
