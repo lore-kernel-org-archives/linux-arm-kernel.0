@@ -1,132 +1,96 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 17 Nov 2015 12:25:58 +0100
-Subject: [PATCH 08/13] Xen: EFI: Parse DT parameters for Xen specific UEFI
-In-Reply-To: <1447754231-7772-9-git-send-email-shannon.zhao@linaro.org>
-References: <1447754231-7772-1-git-send-email-shannon.zhao@linaro.org>
- <1447754231-7772-9-git-send-email-shannon.zhao@linaro.org>
-Message-ID: <CAKv+Gu98L_dQYVhvGQG=d9Uga-x3mJ=4oxtQqvgU-D3DvcrwHg@mail.gmail.com>
+From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
+Date: Tue, 17 Nov 2015 12:26:33 +0100
+Subject: [PATCH] clk: at91: Revert "keep slow clk enabled to prevent system
+ hang"
+Message-ID: <1447759593-20816-1-git-send-email-alexandre.belloni@free-electrons.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17 November 2015 at 10:57,  <shannon.zhao@linaro.org> wrote:
-> From: Shannon Zhao <shannon.zhao@linaro.org>
->
-> Add a new function to parse DT parameters for Xen specific UEFI just
-> like the way for normal UEFI. Then it could reuse the existing codes.
->
-> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
-> ---
->  drivers/firmware/efi/efi.c | 67 ++++++++++++++++++++++++++++++++++++++++++----
->  1 file changed, 62 insertions(+), 5 deletions(-)
->
-> diff --git a/drivers/firmware/efi/efi.c b/drivers/firmware/efi/efi.c
-> index d6144e3..629bd06 100644
-> --- a/drivers/firmware/efi/efi.c
-> +++ b/drivers/firmware/efi/efi.c
-> @@ -24,6 +24,7 @@
->  #include <linux/of_fdt.h>
->  #include <linux/io.h>
->  #include <linux/platform_device.h>
-> +#include <xen/xen.h>
->
->  struct efi __read_mostly efi = {
->         .mps        = EFI_INVALID_TABLE_ADDR,
-> @@ -488,12 +489,60 @@ static __initdata struct {
->         UEFI_PARAM("MemMap Desc. Version", "linux,uefi-mmap-desc-ver", desc_ver)
->  };
->
-> +static __initdata struct {
-> +       const char name[32];
-> +       const char propname[32];
-> +       int offset;
-> +       int size;
-> +} xen_dt_params[] = {
-> +       UEFI_PARAM("System Table", "xen,uefi-system-table", system_table),
-> +       UEFI_PARAM("MemMap Address", "xen,uefi-mmap-start", mmap),
-> +       UEFI_PARAM("MemMap Size", "xen,uefi-mmap-size", mmap_size),
-> +       UEFI_PARAM("MemMap Desc. Size", "xen,uefi-mmap-desc-size", desc_size),
-> +       UEFI_PARAM("MemMap Desc. Version", "xen,uefi-mmap-desc-ver", desc_ver)
-> +};
-> +
+Commit dca1a4b5ff6e ("clk: at91: keep slow clk enabled to prevent system
+hang") added a workaround for the slow clock as it is not properly handled
+by its users.
 
-We discussed (and agreed afair) that dropping the "linux," prefix from
-the DT properties was an acceptable change. If we do that, and reuse
-the same names in the xen version (i.e., drop the "xen," prefix), we
-could make this change a *lot* simpler.
+Now that the slow clock is taken properly by the drivers, this workaround
+is not necessary anymore, revert it.
 
->  struct param_info {
->         int verbose;
->         int found;
->         void *params;
->  };
->
-> +static int __init fdt_find_xen_uefi_params(unsigned long node,
-> +                                          const char *uname, int depth,
-> +                                          void *data)
-> +{
-> +       struct param_info *info = data;
-> +       const void *prop;
-> +       void *dest;
-> +       u64 val;
-> +       int i, len;
-> +
-> +       if (xen_initial_domain() && (depth != 2 || strcmp(uname, "uefi") != 0))
-> +               return 0;
-> +
-> +       for (i = 0; i < ARRAY_SIZE(xen_dt_params); i++) {
-> +               prop = of_get_flat_dt_prop(node, xen_dt_params[i].propname,
-> +                                          &len);
-> +               if (!prop)
-> +                       return 0;
-> +               dest = info->params + xen_dt_params[i].offset;
-> +               info->found++;
-> +
-> +               val = of_read_number(prop, len / sizeof(u32));
-> +
-> +               if (dt_params[i].size == sizeof(u32))
-> +                       *(u32 *)dest = val;
-> +               else
-> +                       *(u64 *)dest = val;
-> +
-> +               if (info->verbose)
-> +                       pr_info("  %s: 0x%0*llx\n", xen_dt_params[i].name,
-> +                               xen_dt_params[i].size * 2, val);
-> +       }
-> +
-> +       return 1;
-> +}
->  static int __init fdt_find_uefi_params(unsigned long node, const char *uname,
->                                        int depth, void *data)
->  {
-> @@ -538,12 +587,20 @@ int __init efi_get_fdt_params(struct efi_fdt_params *params, int verbose)
->         info.found = 0;
->         info.params = params;
->
-> -       ret = of_scan_flat_dt(fdt_find_uefi_params, &info);
-> -       if (!info.found)
-> +       if (xen_initial_domain())
-> +               ret = of_scan_flat_dt(fdt_find_xen_uefi_params, &info);
-> +       else
-> +               ret = of_scan_flat_dt(fdt_find_uefi_params, &info);
-> +       if (!info.found) {
->                 pr_info("UEFI not found.\n");
-> -       else if (!ret)
-> -               pr_err("Can't find '%s' in device tree!\n",
-> -                      dt_params[info.found].name);
-> +       } else if (!ret) {
-> +               if (xen_initial_domain())
-> +                       pr_err("Can't find '%s' in device tree!\n",
-> +                              xen_dt_params[info.found].name);
-> +               else
-> +                       pr_err("Can't find '%s' in device tree!\n",
-> +                              xen_dt_params[info.found].name);
+Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
+Acked-by: Michael Turquette <mturquette@baylibre.com>
+---
+This patch is now ready to be applied as all the other necessary changes are in
+4.4.
 
-Wrong array here
+Changes in v5:
+ - rebased on v4.4-rc1
+ - removed a blank line
+ - remove clk.h inclusion
 
-> +       }
->
->         return ret;
->  }
-> --
-> 2.1.0
->
+ drivers/clk/at91/clk-slow.c | 29 -----------------------------
+ 1 file changed, 29 deletions(-)
+
+diff --git a/drivers/clk/at91/clk-slow.c b/drivers/clk/at91/clk-slow.c
+index d0d5076a9b94..6f99a530ead6 100644
+--- a/drivers/clk/at91/clk-slow.c
++++ b/drivers/clk/at91/clk-slow.c
+@@ -10,7 +10,6 @@
+  *
+  */
+ 
+-#include <linux/clk.h>
+ #include <linux/clk-provider.h>
+ #include <linux/clkdev.h>
+ #include <linux/slab.h>
+@@ -72,8 +71,6 @@ struct clk_sam9x5_slow {
+ 
+ #define to_clk_sam9x5_slow(hw) container_of(hw, struct clk_sam9x5_slow, hw)
+ 
+-static struct clk *slow_clk;
+-
+ static int clk_slow_osc_prepare(struct clk_hw *hw)
+ {
+ 	struct clk_slow_osc *osc = to_clk_slow_osc(hw);
+@@ -360,8 +357,6 @@ at91_clk_register_sam9x5_slow(void __iomem *sckcr,
+ 	clk = clk_register(NULL, &slowck->hw);
+ 	if (IS_ERR(clk))
+ 		kfree(slowck);
+-	else
+-		slow_clk = clk;
+ 
+ 	return clk;
+ }
+@@ -433,8 +428,6 @@ at91_clk_register_sam9260_slow(struct at91_pmc *pmc,
+ 	clk = clk_register(NULL, &slowck->hw);
+ 	if (IS_ERR(clk))
+ 		kfree(slowck);
+-	else
+-		slow_clk = clk;
+ 
+ 	return clk;
+ }
+@@ -462,25 +455,3 @@ void __init of_at91sam9260_clk_slow_setup(struct device_node *np,
+ 
+ 	of_clk_add_provider(np, of_clk_src_simple_get, clk);
+ }
+-
+-/*
+- * FIXME: All slow clk users are not properly claiming it (get + prepare +
+- * enable) before using it.
+- * If all users properly claiming this clock decide that they don't need it
+- * anymore (or are removed), it is disabled while faulty users are still
+- * requiring it, and the system hangs.
+- * Prevent this clock from being disabled until all users are properly
+- * requesting it.
+- * Once this is done we should remove this function and the slow_clk variable.
+- */
+-static int __init of_at91_clk_slow_retain(void)
+-{
+-	if (!slow_clk)
+-		return 0;
+-
+-	__clk_get(slow_clk);
+-	clk_prepare_enable(slow_clk);
+-
+-	return 0;
+-}
+-arch_initcall(of_at91_clk_slow_retain);
+-- 
+2.5.0
