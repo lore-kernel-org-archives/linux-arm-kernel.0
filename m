@@ -1,32 +1,113 @@
 From: matthias.bgg@gmail.com (Matthias Brugger)
-Date: Tue, 17 Nov 2015 11:49:14 +0100
-Subject: [PATCH v2] spi: mediatek: single device does not require cs_gpios
-In-Reply-To: <1447468039.27169.1.camel@mhfsdcap03>
-References: <1447042491-1199-1-git-send-email-drinkcat@chromium.org>
- <1447468039.27169.1.camel@mhfsdcap03>
-Message-ID: <564B062A.90003@gmail.com>
+Date: Tue, 17 Nov 2015 11:50:38 +0100
+Subject: [PATCH] pinctrl: mediatek: fix a memleak when do dt maps.
+In-Reply-To: <CAGS+omCiaD-JJdvL77Y4HuvWjgC5tvLDLspsAgXPtD5AP3JA7w@mail.gmail.com>
+References: <1447734177-17258-1-git-send-email-hongzhou.yang@mediatek.com>
+ <CAGS+omCiaD-JJdvL77Y4HuvWjgC5tvLDLspsAgXPtD5AP3JA7w@mail.gmail.com>
+Message-ID: <564B067E.2010000@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
 
-On 14/11/15 03:27, lei liu wrote:
-> On Mon, 2015-11-09 at 12:14 +0800, Nicolas Boichat wrote:
->> When only one device is present, it is not necessary to specify
->> cs_gpios, as the CS line can be controlled by the hardware
->> module.
+On 17/11/15 09:25, Daniel Kurtz wrote:
+> On Tue, Nov 17, 2015 at 12:22 PM, Hongzhou Yang
+> <hongzhou.yang@mediatek.com> wrote:
+>> configs will kmemdup to dup_configs in pictrl util function.
+>> So configs need to be freed.
 >>
->> Without this patch, older device tree bindings used before
->> 37457607 "spi: mediatek: mt8173 spi multiple devices support"
->> would cause a panic on boot. This fixes the crash, and
->> re-introduces backward compatibility.
+>> Signed-off-by: Hongzhou Yang <hongzhou.yang@mediatek.com>
+>
+> Reviewed-by: Daniel Kurtz <djkurtz@chromium.org>
+
+Reviewed-by: Matthias Brugger <matthias.bgg@gmail.com>
+>
+>> ---
+>>   Fix a memleak issue.
 >>
->> Signed-off-by: Nicolas Boichat <drinkcat@chromium.org>
->
-> Acked-by: Leilk Liu <leilk.liu@mediatek.com>
->
-
-Please make sure this fix get applied to v4.3 as well.
-
-Thanks,
-Matthias
+>>   drivers/pinctrl/mediatek/pinctrl-mtk-common.c |   24 ++++++++++++++----------
+>>   1 file changed, 14 insertions(+), 10 deletions(-)
+>>
+>> diff --git a/drivers/pinctrl/mediatek/pinctrl-mtk-common.c b/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
+>> index bbf0230..0f9e416 100644
+>> --- a/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
+>> +++ b/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
+>> @@ -520,21 +520,23 @@ static int mtk_pctrl_dt_subnode_to_map(struct pinctrl_dev *pctldev,
+>>          if (has_config && num_pins >= 1)
+>>                  maps_per_pin++;
+>>
+>> -       if (!num_pins || !maps_per_pin)
+>> -               return -EINVAL;
+>> +       if (!num_pins || !maps_per_pin) {
+>> +               err = -EINVAL;
+>> +               goto exit;
+>> +       }
+>>
+>>          reserve = num_pins * maps_per_pin;
+>>
+>>          err = pinctrl_utils_reserve_map(pctldev, map,
+>>                          reserved_maps, num_maps, reserve);
+>>          if (err < 0)
+>> -               goto fail;
+>> +               goto exit;
+>>
+>>          for (i = 0; i < num_pins; i++) {
+>>                  err = of_property_read_u32_index(node, "pinmux",
+>>                                  i, &pinfunc);
+>>                  if (err)
+>> -                       goto fail;
+>> +                       goto exit;
+>>
+>>                  pin = MTK_GET_PIN_NO(pinfunc);
+>>                  func = MTK_GET_PIN_FUNC(pinfunc);
+>> @@ -543,20 +545,21 @@ static int mtk_pctrl_dt_subnode_to_map(struct pinctrl_dev *pctldev,
+>>                                  func >= ARRAY_SIZE(mtk_gpio_functions)) {
+>>                          dev_err(pctl->dev, "invalid pins value.\n");
+>>                          err = -EINVAL;
+>> -                       goto fail;
+>> +                       goto exit;
+>>                  }
+>>
+>>                  grp = mtk_pctrl_find_group_by_pin(pctl, pin);
+>>                  if (!grp) {
+>>                          dev_err(pctl->dev, "unable to match pin %d to group\n",
+>>                                          pin);
+>> -                       return -EINVAL;
+>> +                       err = -EINVAL;
+>> +                       goto exit;
+>>                  }
+>>
+>>                  err = mtk_pctrl_dt_node_to_map_func(pctl, pin, func, grp, map,
+>>                                  reserved_maps, num_maps);
+>>                  if (err < 0)
+>> -                       goto fail;
+>> +                       goto exit;
+>>
+>>                  if (has_config) {
+>>                          err = pinctrl_utils_add_map_configs(pctldev, map,
+>> @@ -564,13 +567,14 @@ static int mtk_pctrl_dt_subnode_to_map(struct pinctrl_dev *pctldev,
+>>                                          configs, num_configs,
+>>                                          PIN_MAP_TYPE_CONFIGS_GROUP);
+>>                          if (err < 0)
+>> -                               goto fail;
+>> +                               goto exit;
+>>                  }
+>>          }
+>>
+>> -       return 0;
+>> +       err = 0;
+>>
+>> -fail:
+>> +exit:
+>> +       kfree(configs);
+>>          return err;
+>>   }
+>>
+>> --
+>> 1.7.9.5
+>>
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+>> Please read the FAQ at  http://www.tux.org/lkml/
