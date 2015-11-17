@@ -1,100 +1,102 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 17 Nov 2015 09:21:00 +0000
-Subject: [PATCH v8] PCI: Xilinx-NWL-PCIe: Added support for Xilinx NWL
- PCIe Host Controller
-In-Reply-To: <8520D5D51A55D047800579B0941471982585CBDA@XAP-PVEXMBX01.xlnx.xilinx.com>
-References: <1447223619-30945-1-git-send-email-bharatku@xilinx.com>
- <5649F2D9.7070902@arm.com> <564A5255.3020603@broadcom.com>
- <8520D5D51A55D047800579B0941471982585CBDA@XAP-PVEXMBX01.xlnx.xilinx.com>
-Message-ID: <20151117092100.76babf7f@arm.com>
+From: lee.jones@linaro.org (Lee Jones)
+Date: Tue, 17 Nov 2015 09:21:26 +0000
+Subject: [PATCH v3 2/5] mfd: syscon: add a DT property to set value width
+In-Reply-To: <20151117091946.GG17829@x1>
+References: <1447700814-5391-1-git-send-email-damien.riegel@savoirfairelinux.com>
+ <1447700814-5391-3-git-send-email-damien.riegel@savoirfairelinux.com>
+ <20151117091946.GG17829@x1>
+Message-ID: <20151117092126.GH17829@x1>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 17 Nov 2015 04:59:39 +0000
-Bharat Kumar Gogada <bharat.kumar.gogada@xilinx.com> wrote:
+Looks like you forgot to Cc Arnd too.
 
-> > On 11/16/2015 7:14 AM, Marc Zyngier wrote:
-> > > On 11/11/15 06:33, Bharat Kumar Gogada wrote:
-> > >> Adding PCIe Root Port driver for Xilinx PCIe NWL bridge IP.
-> > >>
-> > >> Signed-off-by: Bharat Kumar Gogada <bharatku@xilinx.com>
-> > >> Signed-off-by: Ravi Kiran Gummaluri <rgummal@xilinx.com>
-> > >> ---
-> > >> Added logic to allocate contiguous hwirq in nwl_irq_domain_alloc
-> > function.
-> > >> Moved MSI functionality to separate functions.
-> > >> Changed error return values.
-> > >> ---
-> > >>   .../devicetree/bindings/pci/xilinx-nwl-pcie.txt    |   68 ++
-> > >>   drivers/pci/host/Kconfig                           |   16 +-
-> > >>   drivers/pci/host/Makefile                          |    1 +
-> > >>   drivers/pci/host/pcie-xilinx-nwl.c                 | 1062
-> > ++++++++++++++++++++
-> > >>   4 files changed, 1144 insertions(+), 3 deletions(-)
-> > >>   create mode 100644 Documentation/devicetree/bindings/pci/xilinx-nwl-
-> > pcie.txt
-> > >>   create mode 100644 drivers/pci/host/pcie-xilinx-nwl.c
-> > >>
-> > >
-> > > [...]
-> > >
-> > >> +static int nwl_pcie_enable_msi(struct nwl_pcie *pcie, struct pci_bus
-> > >> +*bus) {
-> > >> +	struct platform_device *pdev = to_platform_device(pcie->dev);
-> > >> +	struct nwl_msi *msi = &pcie->msi;
-> > >> +	unsigned long base;
-> > >> +	int ret;
-> > >> +
-> > >> +	mutex_init(&msi->lock);
-> > >> +
-> > >> +	/* Check for msii_present bit */
-> > >> +	ret = nwl_bridge_readl(pcie, I_MSII_CAPABILITIES) & MSII_PRESENT;
-> > >> +	if (!ret) {
-> > >> +		dev_err(pcie->dev, "MSI not present\n");
-> > >> +		ret = -EIO;
-> > >> +		goto err;
-> > >> +	}
-> > >> +
-> > >> +	/* Enable MSII */
-> > >> +	nwl_bridge_writel(pcie, nwl_bridge_readl(pcie, I_MSII_CONTROL) |
-> > >> +			  MSII_ENABLE, I_MSII_CONTROL);
-> > >> +
-> > >> +	/* Enable MSII status */
-> > >> +	nwl_bridge_writel(pcie, nwl_bridge_readl(pcie, I_MSII_CONTROL) |
-> > >> +			  MSII_STATUS_ENABLE, I_MSII_CONTROL);
-> > >> +
-> > >> +	/* setup AFI/FPCI range */
-> > >> +	msi->pages = __get_free_pages(GFP_KERNEL, 0);
-> > >> +	base = virt_to_phys((void *)msi->pages);
-> > >> +	nwl_bridge_writel(pcie, lower_32_bits(base), I_MSII_BASE_LO);
-> > >> +	nwl_bridge_writel(pcie, upper_32_bits(base), I_MSII_BASE_HI);
-> > >
-> > > BTW, you still haven't answered my question as to why you need to
-> > > waste a page of memory here, and why putting a device address doesn't
-> > work.
-> > >
-> > > As this is (to the best of my knowledge) the only driver doing so, I'd
-> > > really like you to explain the rational behind this.
-> > 
-> > Might not be the only driver doing so after I start sending out patches for the
-> > iProc MSI support (soon), :)
-> > 
-> > I'm not sure how it works for the Xilinx NWL controller, which Bharat should
-> > be able to help to explain. But for the iProc MSI controller, there's no device
-> > I/O memory reserved for MSI posted writes in the ASIC.
-> > Therefore one needs to reserve host memory for these writes.
-> > >
+Doing that for you now.
+
+On Tue, 17 Nov 2015, Lee Jones wrote:
+> On Mon, 16 Nov 2015, Damien Riegel wrote:
 > 
-> Our SoC doesn't reserve any memory for MSI, hence we need to assign a
-> memory space for it out of RAM.
+> > Currently syscon has a fixed configuration of 32 bits for register and
+> > values widths. In some cases, it would be desirable to be able to
+> > customize the value width.
+> > 
+> > For example, certain boards (like the ones manufactured by Technologic
+> > Systems) have a FPGA that is memory-mapped, but its registers are only
+> > 16-bit wide.
+> > 
+> > This patch adds an optional "bus-width" DT binding for syscon that
+> > allows to change the width for the data bus (i.e. val_bits). If this
+> > property is provided, it will also adjust the register stride to
+> > bus-width / 8. If not provided, the default configuration is used.
+> > 
+> > Signed-off-by: Damien Riegel <damien.riegel@savoirfairelinux.com>
+> > ---
+> >  Documentation/devicetree/bindings/mfd/syscon.txt |  3 +++
+> >  drivers/mfd/syscon.c                             | 12 ++++++++++++
+> >  2 files changed, 15 insertions(+)
+> > 
+> > diff --git a/Documentation/devicetree/bindings/mfd/syscon.txt b/Documentation/devicetree/bindings/mfd/syscon.txt
+> > index fe8150b..4c9d187 100644
+> > --- a/Documentation/devicetree/bindings/mfd/syscon.txt
+> > +++ b/Documentation/devicetree/bindings/mfd/syscon.txt
+> > @@ -13,6 +13,9 @@ Required properties:
+> >  - compatible: Should contain "syscon".
+> >  - reg: the register region can be accessed from syscon
+> >  
+> > +Optional property:
+> > +- bus-width: width of the data bus. Can be <8>, <16>, <32>, or <64>.
+> > +
+> >  Examples:
+> >  gpr: iomuxc-gpr at 020e0000 {
+> >  	compatible = "fsl,imx6q-iomuxc-gpr", "syscon";
+> > diff --git a/drivers/mfd/syscon.c b/drivers/mfd/syscon.c
+> > index 176bf0f..00b0995 100644
+> > --- a/drivers/mfd/syscon.c
+> > +++ b/drivers/mfd/syscon.c
+> > @@ -47,6 +47,7 @@ static struct syscon *of_syscon_register(struct device_node *np)
+> >  	struct syscon *syscon;
+> >  	struct regmap *regmap;
+> >  	void __iomem *base;
+> > +	u32 bus_width;
+> >  	int ret;
+> >  	struct regmap_config syscon_config = syscon_regmap_config;
+> >  
+> > @@ -69,6 +70,17 @@ static struct syscon *of_syscon_register(struct device_node *np)
+> >  	 else if (of_property_read_bool(np, "little-endian"))
+> >  		syscon_config.val_format_endian = REGMAP_ENDIAN_LITTLE;
+> >  
+> > +	 ret = of_property_read_u32(np, "bus-width", &bus_width);
+> > +	 if (!ret) {
+> 
+> This syntax is confusing, as we normally associate it with an error
+> condition.  Instead, I'd use:
+> 
+>   if (of_property_read_u32(np, "bus-width", &bus_width) == 0)
+> 
+> Or, for more clarity:
+> 
+>   of_property_read_u32(np, "bus-width", &bus_width);
+>   if (bus_width)
+> 
+> If you choose this version (which I think is my preferred method, don't
+> forget to initialise 'bus_width' to zero.
+> 
+> > +		 /*
+> > +		  * the property has been provided, regmap_init_mmio
+> > +		  * will return an error if these values are invalid
+> > +		  * so there is no need to check them here.
+> > +		  */
+> > +		 syscon_config.val_bits = bus_width;
+> > +		 syscon_config.reg_stride = syscon_config.val_bits / 8;
+> > +	 }
+> > +
+> >  	regmap = regmap_init_mmio(NULL, base, &syscon_config);
+> >  	if (IS_ERR(regmap)) {
+> >  		pr_err("regmap init failed\n");
+> 
 
-Question to both of you: Does the write make it to memory? Or is it
-sampled by the bridge and dropped?
-
-What happens if you replace the page in RAM with a dummy address?
-
-Thanks,
-
-	M.
 -- 
-Jazz is not dead. It just smells funny.
+Lee Jones
+Linaro STMicroelectronics Landing Team Lead
+Linaro.org ? Open source software for ARM SoCs
+Follow Linaro: Facebook | Twitter | Blog
