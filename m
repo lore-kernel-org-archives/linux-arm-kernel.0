@@ -1,100 +1,66 @@
 From: robh@kernel.org (Rob Herring)
-Date: Tue, 17 Nov 2015 13:30:46 -0600
-Subject: [PATCH 5/7] Documentation: bindings: Add SMP related documentation
-In-Reply-To: <1447772202-12418-6-git-send-email-carlo@caione.org>
+Date: Tue, 17 Nov 2015 13:32:18 -0600
+Subject: [PATCH 2/7] Documentation: bindings: Define CPU reset controller
+In-Reply-To: <1447772202-12418-3-git-send-email-carlo@caione.org>
 References: <1447772202-12418-1-git-send-email-carlo@caione.org>
- <1447772202-12418-6-git-send-email-carlo@caione.org>
-Message-ID: <20151117193046.GA31149@rob-hp-laptop>
+ <1447772202-12418-3-git-send-email-carlo@caione.org>
+Message-ID: <20151117193218.GA2096@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 17, 2015 at 03:56:40PM +0100, Carlo Caione wrote:
+On Tue, Nov 17, 2015 at 03:56:37PM +0100, Carlo Caione wrote:
 > From: Carlo Caione <carlo@endlessm.com>
 
-Please give some indication in the subject what platform this change is 
-for:
+Same here, a more specific subject please.
 
-dt-bindings: amlogic: ...
+Otherwise, looks fine.
 
 > 
-> With this patch we add documentation for:
+> The clock controller on Amlogic Meson8b SoCs has been extended with a
+> reset controller used to reset the CPU cores. It is used during SMP
+> bringup.
 > 
-> * power-management-unit: the PMU is used to bring up the cores during
->   SMP operations
-> * sram: among other things the sram is used to store the first code
->   executed by the core when it is powered up
-> * cpu-enable-method: the CPU enable method used by Amlogic Meson8b SoCs
+> With this patch we extend the clock controller documentation.
 > 
 > Signed-off-by: Carlo Caione <carlo@endlessm.com>
 > ---
->  .../devicetree/bindings/arm/amlogic/pmu.txt        | 16 +++++++
->  .../devicetree/bindings/arm/amlogic/smp-sram.txt   | 32 +++++++++++++
->  .../arm/cpu-enable-method/amlogic,meson8b-smp      | 53 ++++++++++++++++++++++
-
-
-> diff --git a/Documentation/devicetree/bindings/arm/cpu-enable-method/amlogic,meson8b-smp b/Documentation/devicetree/bindings/arm/cpu-enable-method/amlogic,meson8b-smp
-> new file mode 100644
-> index 0000000..95ee458b
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/arm/cpu-enable-method/amlogic,meson8b-smp
-> @@ -0,0 +1,53 @@
-> +=========================================================
-> +Secondary CPU enable-method "amlogic,meson8b-smp" binding
-> +=========================================================
-> +
-> +This document describes the "amlogic,meson8b-smp" method for enabling secondary
-> +CPUs. To apply to all CPUs, a single "amlogic,meson8b-smp" enable method should
-> +be defined in the "cpus" node.
-> +
-> +Enable method name:	"amlogic,meson8b-smp"
-
-Just add this to Documentation/devicetree/bindings/arm/cpus.txt and 
-remove this file.
-
-> +Compatible machines:	"amlogic,meson8b"
-> +Compatible CPUs:	"arm,cortex-a5"
-> +Related properties:	(none)
-> +
-> +Example:
-> +
-> +	cpus {
-> +		#address-cells = <1>;
-> +		#size-cells = <0>;
-> +		enable-method = "amlogic,meson8b-smp";
-> +
-> +		cpu at 200 {
-> +			device_type = "cpu";
-> +			compatible = "arm,cortex-a5";
-> +			next-level-cache = <&L2>;
-> +			reg = <0x200>;
-> +			resets = <&clkc RST_CORE0>;
-> +		};
-> +
-> +		cpu at 201 {
-> +			device_type = "cpu";
-> +			compatible = "arm,cortex-a5";
-> +			next-level-cache = <&L2>;
-> +			reg = <0x201>;
-> +			resets = <&clkc RST_CORE1>;
-> +		};
-> +
-> +		cpu at 202 {
-> +			device_type = "cpu";
-> +			compatible = "arm,cortex-a5";
-> +			next-level-cache = <&L2>;
-> +			reg = <0x202>;
-> +			resets = <&clkc RST_CORE2>;
-> +		};
-> +
-> +		cpu at 203 {
-> +			device_type = "cpu";
-> +			compatible = "arm,cortex-a5";
-> +			next-level-cache = <&L2>;
-> +			reg = <0x203>;
-> +			resets = <&clkc RST_CORE3>;
-> +		};
-> +	};
-> +
+>  Documentation/devicetree/bindings/clock/amlogic,meson8b-clkc.txt | 6 +++++-
+>  1 file changed, 5 insertions(+), 1 deletion(-)
+> 
+> diff --git a/Documentation/devicetree/bindings/clock/amlogic,meson8b-clkc.txt b/Documentation/devicetree/bindings/clock/amlogic,meson8b-clkc.txt
+> index 2b7b3fa..feeb4de 100644
+> --- a/Documentation/devicetree/bindings/clock/amlogic,meson8b-clkc.txt
+> +++ b/Documentation/devicetree/bindings/clock/amlogic,meson8b-clkc.txt
+> @@ -1,7 +1,8 @@
+>  * Amlogic Meson8b Clock and Reset Unit
+>  
+>  The Amlogic Meson8b clock controller generates and supplies clock to various
+> -controllers within the SoC.
+> +controllers within the SoC and also implements a reset controller for the CPU
+> +cores.
+>  
+>  Required Properties:
+>  
+> @@ -13,16 +14,19 @@ Required Properties:
+>  	   mapped region.
+>  
+>  - #clock-cells: should be 1.
+> +- #reset-cells: should be 1.
+>  
+>  Each clock is assigned an identifier and client nodes can use this identifier
+>  to specify the clock which they consume. All available clocks are defined as
+>  preprocessor macros in the dt-bindings/clock/meson8b-clkc.h header and can be
+>  used in device tree sources.
+> +Similar identifiers exist for the CPU core reset lines.
+>  
+>  Example: Clock controller node:
+>  
+>  	clkc: clock-controller at c1104000 {
+>  		#clock-cells = <1>;
+> +		#reset-cells = <1>;
+>  		compatible = "amlogic,meson8b-clkc";
+>  		reg = <0xc1108000 0x4>, <0xc1104000 0x460>;
+>  	};
 > -- 
 > 2.5.0
 > 
