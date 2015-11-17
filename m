@@ -1,45 +1,35 @@
 From: carlo@caione.org (Carlo Caione)
-Date: Tue, 17 Nov 2015 15:56:35 +0100
-Subject: [PATCH 0/7] Add basic SMP support for Amlogic Meson8b
-Message-ID: <1447772202-12418-1-git-send-email-carlo@caione.org>
+Date: Tue, 17 Nov 2015 15:56:36 +0100
+Subject: [PATCH 1/7] ARM: DTS: meson8b: Extend L2 cache controller node
+In-Reply-To: <1447772202-12418-1-git-send-email-carlo@caione.org>
+References: <1447772202-12418-1-git-send-email-carlo@caione.org>
+Message-ID: <1447772202-12418-2-git-send-email-carlo@caione.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Carlo Caione <carlo@endlessm.com>
 
-This patchset adds SMP support for Amlogic Meson8b SoCs.
+This patch extends the L2 cache controller node for Amlogic Meson8b
+SoCs with some missing parameters.
 
-Patch 1 fix some paramater for L2 cache needed for SMP.
-Patches 2-4 add a small reset controller used to reset the CPU cores at boot.
-Patches 5-7 deal with the SMP code itself.
+Signed-off-by: Carlo Caione <carlo@endlessm.com>
+---
+ arch/arm/boot/dts/meson8b.dtsi | 3 +++
+ 1 file changed, 3 insertions(+)
 
-Carlo Caione (7):
-  ARM: DTS: meson8b: Extend L2 cache controller node
-  Documentation: bindings: Define CPU reset controller
-  clk: meson8b: Add reset controller for CPU cores
-  ARM: DTS: meson8b: Enable reset controller
-  Documentation: bindings: Add SMP related documentation
-  ARM: meson8b: Add SMP bringup code
-  ARM: DTS: meson8b: Add SMP related nodes
-
- .../devicetree/bindings/arm/amlogic/pmu.txt        |  16 ++
- .../devicetree/bindings/arm/amlogic/smp-sram.txt   |  32 +++
- .../arm/cpu-enable-method/amlogic,meson8b-smp      |  53 +++++
- .../bindings/clock/amlogic,meson8b-clkc.txt        |   6 +-
- arch/arm/boot/dts/meson8b.dtsi                     |  32 +++
- arch/arm/mach-meson/Kconfig                        |   1 +
- arch/arm/mach-meson/Makefile                       |   1 +
- arch/arm/mach-meson/platsmp.c                      | 228 +++++++++++++++++++++
- drivers/clk/meson/clk-cpu.c                        |  60 +++++-
- drivers/clk/meson/clkc.c                           |   5 +-
- drivers/clk/meson/clkc.h                           |   6 +-
- drivers/clk/meson/meson8b-clkc.c                   |   4 +-
- include/dt-bindings/clock/meson8b-clkc.h           |   5 +
- 13 files changed, 441 insertions(+), 8 deletions(-)
- create mode 100644 Documentation/devicetree/bindings/arm/amlogic/pmu.txt
- create mode 100644 Documentation/devicetree/bindings/arm/amlogic/smp-sram.txt
- create mode 100644 Documentation/devicetree/bindings/arm/cpu-enable-method/amlogic,meson8b-smp
- create mode 100644 arch/arm/mach-meson/platsmp.c
-
+diff --git a/arch/arm/boot/dts/meson8b.dtsi b/arch/arm/boot/dts/meson8b.dtsi
+index 8bad557..745f0f9 100644
+--- a/arch/arm/boot/dts/meson8b.dtsi
++++ b/arch/arm/boot/dts/meson8b.dtsi
+@@ -93,6 +93,9 @@
+ 		L2: l2-cache-controller at c4200000 {
+ 			compatible = "arm,pl310-cache";
+ 			reg = <0xc4200000 0x1000>;
++			arm,data-latency = <3 3 3>;
++			arm,tag-latency = <2 2 2>;
++			arm,filter-ranges = <0x100000 0xc0000000>;
+ 			cache-unified;
+ 			cache-level = <2>;
+ 		};
 -- 
 2.5.0
