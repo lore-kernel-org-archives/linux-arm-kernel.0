@@ -1,73 +1,42 @@
 From: lina.iyer@linaro.org (Lina Iyer)
-Date: Tue, 17 Nov 2015 15:37:38 -0700
-Subject: [PATCH RFC 14/27] tick: get next wakeup event for the CPU
+Date: Tue, 17 Nov 2015 15:37:39 -0700
+Subject: [PATCH RFC 15/27] PM / Domains: Add next_wakeup to device's timing
+ data
 In-Reply-To: <1447799871-56374-1-git-send-email-lina.iyer@linaro.org>
 References: <1447799871-56374-1-git-send-email-lina.iyer@linaro.org>
-Message-ID: <1447799871-56374-15-git-send-email-lina.iyer@linaro.org>
+Message-ID: <1447799871-56374-16-git-send-email-lina.iyer@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-CPUidle governors use the sleep time of the CPU to determine the idle
-state of the CPU. However, to determine a common sleep time between CPUs
-that enter idle at different times, the tick_nohz_get_sleep_length() API
-is not very helpful.
+Allow devices that know when their next wakeup event is, to record save
+it as part of timing data. A genpd governor may use this data to
+determine if suspending the domain is going to affect the QoS of its
+devices.
 
-Add API to read the next event for the CPU. The value can be evaluated
-at any time to determine the remaining sleep time of the CPU.
-
-Cc: Thomas Gleixner <tglx@linutronix.de>
 Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
 ---
- include/linux/tick.h     | 10 ++++++++++
- kernel/time/tick-sched.c |  8 ++++++++
- 2 files changed, 18 insertions(+)
+ include/linux/pm_domain.h | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/include/linux/tick.h b/include/linux/tick.h
-index e312219..6db3e52 100644
---- a/include/linux/tick.h
-+++ b/include/linux/tick.h
-@@ -103,6 +103,7 @@ extern void tick_nohz_idle_enter(void);
- extern void tick_nohz_idle_exit(void);
- extern void tick_nohz_irq_exit(void);
- extern ktime_t tick_nohz_get_sleep_length(void);
-+extern ktime_t tick_nohz_get_next_wakeup(void);
- extern u64 get_cpu_idle_time_us(int cpu, u64 *last_update_time);
- extern u64 get_cpu_iowait_time_us(int cpu, u64 *last_update_time);
- #else /* !CONFIG_NO_HZ_COMMON */
-@@ -116,6 +117,15 @@ static inline ktime_t tick_nohz_get_sleep_length(void)
+diff --git a/include/linux/pm_domain.h b/include/linux/pm_domain.h
+index f1329ea..9ac089d 100644
+--- a/include/linux/pm_domain.h
++++ b/include/linux/pm_domain.h
+@@ -16,6 +16,7 @@
+ #include <linux/of.h>
+ #include <linux/notifier.h>
+ #include <linux/spinlock.h>
++#include <linux/ktime.h>
  
- 	return len;
- }
-+
-+static inline ktime_t tick_nohz_get_next_wakeup(void)
-+{
-+	ktime_t len = { .tv64 = NSEC_PER_SEC/HZ };
-+
-+	/* Next wake up is the tick period, assume it starts now */
-+	return ktime_add(len, ktime_get());
-+}
-+
- static inline u64 get_cpu_idle_time_us(int cpu, u64 *unused) { return -1; }
- static inline u64 get_cpu_iowait_time_us(int cpu, u64 *unused) { return -1; }
- #endif /* !CONFIG_NO_HZ_COMMON */
-diff --git a/kernel/time/tick-sched.c b/kernel/time/tick-sched.c
-index 7c7ec45..e130edd 100644
---- a/kernel/time/tick-sched.c
-+++ b/kernel/time/tick-sched.c
-@@ -870,6 +870,14 @@ ktime_t tick_nohz_get_sleep_length(void)
- 	return ts->sleep_length;
- }
+ /* Defines used for the flags field in the struct generic_pm_domain */
+ #define GENPD_FLAG_PM_CLK	(1U << 0) /* PM domain uses PM clk */
+@@ -104,6 +105,7 @@ struct gpd_timing_data {
+ 	s64 effective_constraint_ns;
+ 	bool constraint_changed;
+ 	bool cached_stop_ok;
++	ktime_t next_wakeup;
+ };
  
-+ktime_t tick_nohz_get_next_wakeup(void)
-+{
-+	struct clock_event_device *dev =
-+			__this_cpu_read(tick_cpu_device.evtdev);
-+
-+	return dev->next_event;
-+}
-+
- static void tick_nohz_account_idle_ticks(struct tick_sched *ts)
- {
- #ifndef CONFIG_VIRT_CPU_ACCOUNTING_NATIVE
+ struct pm_domain_data {
 -- 
 2.1.4
