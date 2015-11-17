@@ -1,75 +1,257 @@
 From: shannon.zhao@linaro.org (shannon.zhao at linaro.org)
-Date: Tue, 17 Nov 2015 17:40:47 +0800
-Subject: [PATCH v3 48/62] arm/acpi: Prepare RSDP table for Dom0
+Date: Tue, 17 Nov 2015 17:40:53 +0800
+Subject: [PATCH v3 54/62] arm/acpi: Create min DT stub for Dom0
 In-Reply-To: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
 References: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
-Message-ID: <1447753261-7552-49-git-send-email-shannon.zhao@linaro.org>
+Message-ID: <1447753261-7552-55-git-send-email-shannon.zhao@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Shannon Zhao <shannon.zhao@linaro.org>
 
-Copy RSDP table and replace rsdp->xsdt_physical_address with new address
-of XSDT table, so it can point to the right XSDT table.
+Create a DT for Dom0 for ACPI-case only. DT contains minimal required
+informations such as Dom0 bootargs, initrd, efi description table and
+address of uefi memory table.
 
+Signed-off-by: Naresh Bhat <naresh.bhat@linaro.org>
+Signed-off-by: Parth Dixit <parth.dixit@linaro.org>
 Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
 ---
- xen/arch/arm/domain_build.c | 36 ++++++++++++++++++++++++++++++++++++
- 1 file changed, 36 insertions(+)
+ xen/arch/arm/domain_build.c | 142 ++++++++++++++++++++++++++++++++++++++++++++
+ xen/common/efi/boot.c       |  47 +++++++++++++++
+ xen/include/asm-arm/setup.h |   2 +
+ 3 files changed, 191 insertions(+)
 
 diff --git a/xen/arch/arm/domain_build.c b/xen/arch/arm/domain_build.c
-index 894328f..6ae5761 100644
+index 55f85b4..6d8536b 100644
 --- a/xen/arch/arm/domain_build.c
 +++ b/xen/arch/arm/domain_build.c
-@@ -1359,6 +1359,38 @@ static int prepare_dtb(struct domain *d, struct kernel_info *kinfo)
+@@ -1358,6 +1358,144 @@ static int prepare_dtb(struct domain *d, struct kernel_info *kinfo)
+ 
  #ifdef CONFIG_ACPI
  #define XEN_HYPERVISOR_ID 0x000058656E564D4D  /* "XenVMM" */
- 
-+static int acpi_create_rsdp(struct domain *d, struct membank tbl_add[])
++#define ACPI_DOM0_FDT_MIN_SIZE 4096
++
++static int make_chosen_node(const struct kernel_info *kinfo,
++                            struct membank tbl_add[])
 +{
++    int res;
++    const char *bootargs = NULL;
++    const struct bootmodule *mod = kinfo->kernel_bootmodule;
++    void *fdt = kinfo->fdt;
 +
-+    struct acpi_table_rsdp *rsdp = NULL;
-+    u64 addr;
-+    u64 table_size = sizeof(struct acpi_table_rsdp);
-+    u8 *base_ptr;
-+    u8 checksum;
++    DPRINT("Create chosen node\n");
++    res = fdt_begin_node(fdt, "chosen");
++    if ( res )
++        return res;
 +
-+    addr = acpi_os_get_root_pointer();
-+    if( !addr )
-+        panic("Unable to get acpi root pointer\n");
++    if ( mod && mod->cmdline[0] )
++    {
++        bootargs = &mod->cmdline[0];
++        res = fdt_property(fdt, "bootargs", bootargs, strlen(bootargs) + 1);
++        if ( res )
++           return res;
++    }
 +
-+    rsdp = acpi_os_map_memory(addr, table_size);
-+    base_ptr = d->arch.efi_acpi_table
-+               + acpi_get_table_offset(tbl_add, TBL_RSDP);
-+    ACPI_MEMCPY(base_ptr, rsdp, table_size);
-+    acpi_os_unmap_memory(rsdp, table_size);
++    /*
++     * If the bootloader provides an initrd, we must create a placeholder
++     * for the initrd properties. The values will be replaced later.
++     */
++    if ( mod && mod->size )
++    {
++        u64 a = 0;
++        res = fdt_property(kinfo->fdt, "linux,initrd-start", &a, sizeof(a));
++        if ( res )
++            return res;
 +
-+    rsdp = (struct acpi_table_rsdp *)base_ptr;
-+    /* Replace xsdt_physical_address */
-+    rsdp->xsdt_physical_address = tbl_add[TBL_XSDT].start;
-+    checksum = acpi_tb_checksum(ACPI_CAST_PTR(u8, rsdp), table_size);
-+    rsdp->checksum = rsdp->checksum - checksum;
++        res = fdt_property(kinfo->fdt, "linux,initrd-end", &a, sizeof(a));
++        if ( res )
++            return res;
++    }
 +
-+    tbl_add[TBL_RSDP].start = d->arch.efi_acpi_gpa
-+                              + acpi_get_table_offset(tbl_add, TBL_RSDP);
-+    tbl_add[TBL_RSDP].size = table_size;
++    res = fdt_end_node(fdt);
 +
-+    return 0;
++    return res;
 +}
 +
- static void acpi_xsdt_modify_entry(u64 entry[], unsigned long entry_count,
-                                    char *signature, u64 addr)
- {
-@@ -1675,6 +1707,10 @@ static int prepare_acpi(struct domain *d, struct kernel_info *kinfo)
-     if ( rc != 0 )
-         return rc;
++static int acpi_make_hypervisor_node(const struct kernel_info *kinfo,
++                                     struct membank tbl_add[])
++{
++    const char compat[] =
++        "xen,xen-"__stringify(XEN_VERSION)"."__stringify(XEN_SUBVERSION)"\0"
++        "xen,xen";
++    int res;
++    /* Convenience alias */
++    void *fdt = kinfo->fdt;
++
++    DPRINT("Create hypervisor node\n");
++
++    /* See linux Documentation/devicetree/bindings/arm/xen.txt */
++    res = fdt_begin_node(fdt, "hypervisor");
++    if ( res )
++        return res;
++
++    /* Cannot use fdt_property_string due to embedded nulls */
++    res = fdt_property(fdt, "compatible", compat, sizeof(compat));
++    if ( res )
++        return res;
++
++    res = arm_acpi_make_efi_nodes(fdt, tbl_add);
++    if ( res )
++        return res;
++
++    res = fdt_end_node(fdt);
++
++    return res;
++}
++
++/*
++ * Prepare a minimal DTB for Dom0 which contains bootargs, initrd, memory
++ * information, EFI table.
++ */
++static int create_acpi_dtb(struct kernel_info *kinfo, struct membank tbl_add[])
++{
++    int new_size;
++    int ret;
++
++    DPRINT("Prepare a min DTB for DOM0\n");
++
++    /* Allocate min size for DT */
++    new_size = ACPI_DOM0_FDT_MIN_SIZE;
++    kinfo->fdt = xmalloc_bytes(new_size);
++
++    if ( kinfo->fdt == NULL )
++        return -ENOMEM;
++
++    /* Create a new empty DT for DOM0 */
++    ret = fdt_create(kinfo->fdt, new_size);
++    if ( ret < 0 )
++        goto err;
++
++    ret = fdt_finish_reservemap(kinfo->fdt);
++    if ( ret < 0 )
++        goto err;
++
++    ret = fdt_begin_node(kinfo->fdt, "/");
++    if ( ret < 0 )
++        goto err;
++
++    ret = fdt_property_cell(kinfo->fdt, "#address-cells", 2);
++    if ( ret )
++        return ret;
++
++    ret = fdt_property_cell(kinfo->fdt, "#size-cells", 1);
++    if ( ret )
++        return ret;
++
++    /* Create a chosen node for DOM0 */
++    ret = make_chosen_node(kinfo, tbl_add);
++    if ( ret )
++        goto err;
++
++    ret = acpi_make_hypervisor_node(kinfo, tbl_add);
++    if ( ret )
++        goto err;
++
++    ret = fdt_end_node(kinfo->fdt);
++    if ( ret < 0 )
++        goto err;
++
++    ret = fdt_finish(kinfo->fdt);
++    if ( ret < 0 )
++        goto err;
++
++    return 0;
++
++  err:
++    printk("Device tree generation failed (%d).\n", ret);
++    xfree(kinfo->fdt);
++    return -EINVAL;
++}
  
-+    rc = acpi_create_rsdp(d, tbl_add);
+ static void acpi_map_rest_tables(struct domain *d)
+ {
+@@ -1755,6 +1893,10 @@ static int prepare_acpi(struct domain *d, struct kernel_info *kinfo)
+         return rc;
+     }
+ 
++    rc = create_acpi_dtb(kinfo, tbl_add);
 +    if ( rc != 0 )
 +        return rc;
 +
      return 0;
  }
  #else
+diff --git a/xen/common/efi/boot.c b/xen/common/efi/boot.c
+index ff2faed..d233cef 100644
+--- a/xen/common/efi/boot.c
++++ b/xen/common/efi/boot.c
+@@ -1304,6 +1304,53 @@ void __init acpi_create_efi_mmap_table(paddr_t paddr, void *efi_acpi_table,
+         memory_map[offset].Attribute = EFI_MEMORY_WB;
+     }
+ }
++
++/* Create place holder for efi values. */
++int __init arm_acpi_make_efi_nodes(void *fdt, struct membank tbl_add[])
++{
++    u64 fdt_val64;
++    u32 fdt_val32;
++    int desc_ver = mdesc_ver;
++    int res;
++
++    res = fdt_begin_node(fdt, "uefi");
++    if ( res )
++        return res;
++
++    fdt_val64 = cpu_to_fdt64(tbl_add[TBL_EFIT].start);
++    res = fdt_property(fdt, "xen,uefi-system-table",
++                       &fdt_val64, sizeof(fdt_val64));
++    if ( res )
++        return res;
++
++    fdt_val64 = cpu_to_fdt64(tbl_add[TBL_MMAP].start);
++    res = fdt_property(fdt, "xen,uefi-mmap-start",
++                       &fdt_val64,  sizeof(fdt_val64));
++    if ( res )
++        return res;
++
++    fdt_val32 = cpu_to_fdt32(tbl_add[TBL_MMAP].size);
++    res = fdt_property(fdt, "xen,uefi-mmap-size",
++                       &fdt_val32,  sizeof(fdt_val32));
++    if ( res )
++        return res;
++
++    fdt_val32 = cpu_to_fdt32(sizeof(EFI_MEMORY_DESCRIPTOR));
++    res = fdt_property(fdt, "xen,uefi-mmap-desc-size",
++                         &fdt_val32, sizeof(fdt_val32));
++    if ( res )
++        return res;
++
++    fdt_val32 = cpu_to_fdt32(desc_ver);
++    res = fdt_property(fdt, "xen,uefi-mmap-desc-ver",
++                         &fdt_val32, sizeof(fdt_val32));
++    if ( res )
++        return res;
++
++    res = fdt_end_node(fdt);
++
++    return res;
++}
+ #endif
+ 
+ #ifndef CONFIG_ARM /* TODO - runtime service support */
+diff --git a/xen/include/asm-arm/setup.h b/xen/include/asm-arm/setup.h
+index 35447ee..c4cf5ea 100644
+--- a/xen/include/asm-arm/setup.h
++++ b/xen/include/asm-arm/setup.h
+@@ -60,6 +60,8 @@ void acpi_create_efi_mmap_table(paddr_t paddr, void *efi_acpi_table,
+                                 const struct meminfo *mem,
+                                 struct membank tbl_add[]);
+ 
++int arm_acpi_make_efi_nodes(void *fdt, struct membank tbl_add[]);
++
+ int construct_dom0(struct domain *d);
+ 
+ void discard_initial_modules(void);
 -- 
 2.1.0
