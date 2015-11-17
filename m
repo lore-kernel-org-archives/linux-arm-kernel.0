@@ -1,100 +1,46 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 17 Nov 2015 15:25:58 +0000
-Subject: [RFC PATCH] arm64: use non-global mappings for UEFI runtime
- regions
-In-Reply-To: <1447750411-6424-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1447750411-6424-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20151117152558.GK12586@leverpostej>
+From: stillcompiling@gmail.com (Joshua Clayton)
+Date: Tue, 17 Nov 2015 07:30:48 -0800
+Subject: [PATCH 0/9] rtc-2123: access the clock offset feature
+In-Reply-To: <cover.1446587705.git.stillcompiling@gmail.com>
+References: <cover.1446587705.git.stillcompiling@gmail.com>
+Message-ID: <2107368.j5bIbb5cBF@jclayton-pc>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 17, 2015 at 09:53:31AM +0100, Ard Biesheuvel wrote:
-> As pointed out by Russell King in response to the proposed ARM version
-> of this code, the sequence to switch between the UEFI runtime mapping
-> and current's actual userland mapping (and vice versa) is potentially
-> unsafe, since it leaves a time window between the switch to the new
-> page tables and the TLB flush where speculative accesses may hit on
-> stale global TLB entries.
-
-Wow, annoying that we missed that.
-
-> So instead, use non-global mappings, and perform the switch via the
-> ordinary ASID-aware context switch routines.
+On Wednesday, November 04, 2015 07:36:31 AM Joshua Clayton wrote:
+> Greetings,
+> This series was prompted by a need to adjust the clock rate of the rtc
+> The existing code performs a soft reset during probe, which wipes out
+> several registers including the offset register, which performs adjustments
+> to the clock rate.
 > 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-
->From digging into the way the ASID allocator works, I believe this is
-correct. FWIW:
-
-Reviewed-by: Mark Rutland <mark.rutland@arm.com>
-
-For backporting, I'm not sure that this is necessarily safe prior to
-Will's rework of the ASID allocator. I think we can IPI in this context,
-and it looks like the cpu_set_reserved_ttbr0() in flush_context() would
-save us from the problem described above, but I may have missed
-something.
-
-Will, are you aware of anything that could bite us here?
-
-Mark.
-
-> ---
->  arch/arm64/include/asm/mmu_context.h |  2 +-
->  arch/arm64/kernel/efi.c              | 14 +++++---------
->  2 files changed, 6 insertions(+), 10 deletions(-)
+> The first several patches are cleanup, with patch 5 and 6 avoiding the reset,
+> and patch 9 adding a nice sysfs interface to the clock offset.
 > 
-> diff --git a/arch/arm64/include/asm/mmu_context.h b/arch/arm64/include/asm/mmu_context.h
-> index c0e87898ba96..24165784b803 100644
-> --- a/arch/arm64/include/asm/mmu_context.h
-> +++ b/arch/arm64/include/asm/mmu_context.h
-> @@ -101,7 +101,7 @@ static inline void cpu_set_default_tcr_t0sz(void)
->  #define destroy_context(mm)		do { } while(0)
->  void check_and_switch_context(struct mm_struct *mm, unsigned int cpu);
->  
-> -#define init_new_context(tsk,mm)	({ atomic64_set(&mm->context.id, 0); 0; })
-> +#define init_new_context(tsk,mm)	({ atomic64_set(&(mm)->context.id, 0); 0; })
->  
->  /*
->   * This is called when "tsk" is about to enter lazy TLB mode.
-> diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
-> index de46b50f4cdf..fc5508e0df57 100644
-> --- a/arch/arm64/kernel/efi.c
-> +++ b/arch/arm64/kernel/efi.c
-> @@ -224,6 +224,8 @@ static bool __init efi_virtmap_init(void)
->  {
->  	efi_memory_desc_t *md;
->  
-> +	init_new_context(NULL, &efi_mm);
-> +
->  	for_each_efi_memory_desc(&memmap, md) {
->  		u64 paddr, npages, size;
->  		pgprot_t prot;
-> @@ -254,7 +256,8 @@ static bool __init efi_virtmap_init(void)
->  		else
->  			prot = PAGE_KERNEL;
->  
-> -		create_pgd_mapping(&efi_mm, paddr, md->virt_addr, size, prot);
-> +		create_pgd_mapping(&efi_mm, paddr, md->virt_addr, size,
-> +				   __pgprot(pgprot_val(prot) | PTE_NG));
->  	}
->  	return true;
->  }
-> @@ -329,14 +332,7 @@ core_initcall(arm64_dmi_init);
->  
->  static void efi_set_pgd(struct mm_struct *mm)
->  {
-> -	if (mm == &init_mm)
-> -		cpu_set_reserved_ttbr0();
-> -	else
-> -		cpu_switch_mm(mm->pgd, mm);
-> -
-> -	local_flush_tlb_all();
-> -	if (icache_is_aivivt())
-> -		__local_flush_icache_all();
-> +	switch_mm(NULL, mm, NULL);
->  }
->  
->  void efi_virtmap_load(void)
-> -- 
-> 1.9.1
+> I know that this is not the only rtc to provide a programmable clock offset
+> I wonder if this interface would make a good addition to the rtc api?
 > 
+> The rtc chips I have seen list their clock adjustments in parts per million.
+> I went with parts per billion, since the ppm listed was listed with a
+> fractional component.
+> 
+> Joshua Clayton (9):
+>   rtc-pcf2123: Document all registers and useful bits
+>   rtc-pcf2123: clean up reads from the chip
+>   rtc-pcf2123: clean up writes to the rtc chip
+>   rtc-pcf2123: replace magic numbers with defines
+>   rtc-pcf2123: put the chip reset into a function
+>   rtc-pcf2123: avoid resetting the clock if possible
+>   rtc-pcf2123: allow sysfs to accept hexidecimal
+>   rtc-pcf2123: use sysfs groups
+>   rtc-pcf2123: adjust the clock rate via sysfs
+> 
+>  drivers/rtc/rtc-pcf2123.c | 391 ++++++++++++++++++++++++++++++----------------
+>  1 file changed, 257 insertions(+), 134 deletions(-)
+> 
+> 
+Any comments on this series?
+I realize now that I submitted it during the merge window, so it may have been overlooked.
+
+-- 
+~Joshua Clayton
