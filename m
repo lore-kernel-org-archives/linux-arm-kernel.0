@@ -1,97 +1,72 @@
 From: lina.iyer@linaro.org (Lina Iyer)
-Date: Tue, 17 Nov 2015 15:37:36 -0700
-Subject: [PATCH RFC 12/27] ARM: cpuidle: remove cpu parameter from the
- cpuidle_ops suspend hook
+Date: Tue, 17 Nov 2015 15:37:43 -0700
+Subject: [PATCH RFC 19/27] drivers: cpu-pd: Invoke CPU PM runtime on hotplug
 In-Reply-To: <1447799871-56374-1-git-send-email-lina.iyer@linaro.org>
 References: <1447799871-56374-1-git-send-email-lina.iyer@linaro.org>
-Message-ID: <1447799871-56374-13-git-send-email-lina.iyer@linaro.org>
+Message-ID: <1447799871-56374-20-git-send-email-lina.iyer@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+When a CPU is hotplugged off invoke CPU runtime suspend to notify
+runtime PM of the CPU being powered down and opportunistically power
+down the domain as well. Do that independent of the architecture using
+hotplug notifiers.
 
-The suspend() hook in the cpuidle_ops struct is always called on
-the cpu entering idle, which means that the cpu parameter passed
-to the suspend hook always corresponds to the local cpu, making
-it somewhat redundant.
-
-This patch removes the logical cpu parameter from the ARM
-cpuidle_ops.suspend hook and updates all the existing kernel
-implementations to reflect this change.
-
-Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Cc: Lina Iyer <lina.iyer@linaro.org>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
 ---
- arch/arm/include/asm/cpuidle.h |  2 +-
- arch/arm/kernel/cpuidle.c      |  2 +-
- drivers/soc/qcom/spm.c         | 10 +++++-----
- 3 files changed, 7 insertions(+), 7 deletions(-)
+ drivers/base/power/cpu-pd.c | 31 +++++++++++++++++++++++++++++--
+ 1 file changed, 29 insertions(+), 2 deletions(-)
 
-diff --git a/arch/arm/include/asm/cpuidle.h b/arch/arm/include/asm/cpuidle.h
-index 0f84249..3848259 100644
---- a/arch/arm/include/asm/cpuidle.h
-+++ b/arch/arm/include/asm/cpuidle.h
-@@ -30,7 +30,7 @@ static inline int arm_cpuidle_simple_enter(struct cpuidle_device *dev,
- struct device_node;
- 
- struct cpuidle_ops {
--	int (*suspend)(int cpu, unsigned long arg);
-+	int (*suspend)(unsigned long arg);
- 	int (*init)(struct device_node *, int cpu);
- };
- 
-diff --git a/arch/arm/kernel/cpuidle.c b/arch/arm/kernel/cpuidle.c
-index 318da33..703926e 100644
---- a/arch/arm/kernel/cpuidle.c
-+++ b/arch/arm/kernel/cpuidle.c
-@@ -56,7 +56,7 @@ int arm_cpuidle_suspend(int index)
- 	int cpu = smp_processor_id();
- 
- 	if (cpuidle_ops[cpu].suspend)
--		ret = cpuidle_ops[cpu].suspend(cpu, index);
-+		ret = cpuidle_ops[cpu].suspend(index);
- 
- 	return ret;
- }
-diff --git a/drivers/soc/qcom/spm.c b/drivers/soc/qcom/spm.c
-index b04b05a..0ad66fa 100644
---- a/drivers/soc/qcom/spm.c
-+++ b/drivers/soc/qcom/spm.c
-@@ -116,7 +116,7 @@ static const struct spm_reg_data spm_reg_8064_cpu = {
- 
- static DEFINE_PER_CPU(struct spm_driver_data *, cpu_spm_drv);
- 
--typedef int (*idle_fn)(int);
-+typedef int (*idle_fn)(void);
- static DEFINE_PER_CPU(idle_fn*, qcom_idle_ops);
- 
- static inline void spm_register_write(struct spm_driver_data *drv,
-@@ -179,10 +179,10 @@ static int qcom_pm_collapse(unsigned long int unused)
- 	return -1;
+diff --git a/drivers/base/power/cpu-pd.c b/drivers/base/power/cpu-pd.c
+index a00abc1..e331ae6 100644
+--- a/drivers/base/power/cpu-pd.c
++++ b/drivers/base/power/cpu-pd.c
+@@ -237,6 +237,30 @@ static int of_pm_domain_attach_cpus(struct device_node *dn,
+ 	return 0;
  }
  
--static int qcom_cpu_spc(int cpu)
-+static int qcom_cpu_spc(void)
++static int cpu_hotplug(struct notifier_block *nb,
++			unsigned long action, void *data)
++{
++	struct device *dev = get_cpu_device(smp_processor_id());
++
++	/* Execute CPU runtime PM on that CPU */
++	switch (action) {
++	case CPU_DYING:
++	case CPU_DYING_FROZEN:
++		pm_runtime_put_sync_suspend(dev);
++		pm_runtime_disable(dev);
++		break;
++	case CPU_STARTING:
++	case CPU_STARTING_FROZEN:
++		pm_runtime_enable(dev);
++		pm_runtime_get_sync(dev);
++		break;
++	default:
++		break;
++	}
++
++	return NOTIFY_OK;
++}
++
+ int of_register_cpu_pm_domain(struct device_node *dn,
+ 		struct cpu_pm_domain *pd)
  {
- 	int ret;
--	struct spm_driver_data *drv = per_cpu(cpu_spm_drv, cpu);
-+	struct spm_driver_data *drv = __this_cpu_read(cpu_spm_drv);
+@@ -277,10 +301,13 @@ int of_register_cpu_pm_domain(struct device_node *dn,
  
- 	spm_set_low_power_mode(drv, PM_SLEEP_MODE_SPC);
- 	ret = cpu_suspend(0, qcom_pm_collapse);
-@@ -197,9 +197,9 @@ static int qcom_cpu_spc(int cpu)
- 	return ret;
+ 	/* Attach the CPUs to the CPU PM domain */
+ 	ret = of_pm_domain_attach_cpus(dn, pd);
+-	if (ret)
++	if (ret) {
+ 		of_genpd_del_provider(dn);
++		return ret;
++	}
+ 
+-	return ret;
++	hotcpu_notifier(cpu_hotplug, 0)
++	return 0;
  }
  
--static int qcom_idle_enter(int cpu, unsigned long index)
-+static int qcom_idle_enter(unsigned long index)
- {
--	return per_cpu(qcom_idle_ops, cpu)[index](cpu);
-+	return __this_cpu_read(qcom_idle_ops)[index]();
- }
- 
- static const struct of_device_id qcom_idle_state_match[] __initconst = {
+ /**
 -- 
 2.1.4
