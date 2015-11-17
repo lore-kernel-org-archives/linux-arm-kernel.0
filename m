@@ -1,26 +1,45 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 17 Nov 2015 15:44:04 +0100
-Subject: [PATCH] pinctrl: qcom: qdf2xxx: improve error checking and
- reporting
-In-Reply-To: <564B2D57.2080508@codeaurora.org>
-References: <1447171030-15056-1-git-send-email-timur@codeaurora.org>
- <CACRpkdb4Ck4XCUEKX7TEgCg8723vZA-sxqmd753O1q9uTBszfQ@mail.gmail.com>
- <564B2D57.2080508@codeaurora.org>
-Message-ID: <CACRpkdYhwEqiVJtD_Qn655-Fq5W3Q5yvMkt_dkHum4dkfLvBsA@mail.gmail.com>
+From: carlo@caione.org (Carlo Caione)
+Date: Tue, 17 Nov 2015 15:56:35 +0100
+Subject: [PATCH 0/7] Add basic SMP support for Amlogic Meson8b
+Message-ID: <1447772202-12418-1-git-send-email-carlo@caione.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 17, 2015 at 2:36 PM, Timur Tabi <timur@codeaurora.org> wrote:
-> Linus Walleij wrote:
->>
->> And I suspect Arnd would be interested to know if you are doing
->> ACPI on something that is certainly not a server-class hardware.
->> Because you shouldn't.
->
-> This driver is for the TLMM pin control device on Qualcomm's ARM64 Server
-> chip.
+From: Carlo Caione <carlo@endlessm.com>
 
-Ohhh sweet. OK then.
+This patchset adds SMP support for Amlogic Meson8b SoCs.
 
-Yours,
-Linus Walleij
+Patch 1 fix some paramater for L2 cache needed for SMP.
+Patches 2-4 add a small reset controller used to reset the CPU cores at boot.
+Patches 5-7 deal with the SMP code itself.
+
+Carlo Caione (7):
+  ARM: DTS: meson8b: Extend L2 cache controller node
+  Documentation: bindings: Define CPU reset controller
+  clk: meson8b: Add reset controller for CPU cores
+  ARM: DTS: meson8b: Enable reset controller
+  Documentation: bindings: Add SMP related documentation
+  ARM: meson8b: Add SMP bringup code
+  ARM: DTS: meson8b: Add SMP related nodes
+
+ .../devicetree/bindings/arm/amlogic/pmu.txt        |  16 ++
+ .../devicetree/bindings/arm/amlogic/smp-sram.txt   |  32 +++
+ .../arm/cpu-enable-method/amlogic,meson8b-smp      |  53 +++++
+ .../bindings/clock/amlogic,meson8b-clkc.txt        |   6 +-
+ arch/arm/boot/dts/meson8b.dtsi                     |  32 +++
+ arch/arm/mach-meson/Kconfig                        |   1 +
+ arch/arm/mach-meson/Makefile                       |   1 +
+ arch/arm/mach-meson/platsmp.c                      | 228 +++++++++++++++++++++
+ drivers/clk/meson/clk-cpu.c                        |  60 +++++-
+ drivers/clk/meson/clkc.c                           |   5 +-
+ drivers/clk/meson/clkc.h                           |   6 +-
+ drivers/clk/meson/meson8b-clkc.c                   |   4 +-
+ include/dt-bindings/clock/meson8b-clkc.h           |   5 +
+ 13 files changed, 441 insertions(+), 8 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/amlogic/pmu.txt
+ create mode 100644 Documentation/devicetree/bindings/arm/amlogic/smp-sram.txt
+ create mode 100644 Documentation/devicetree/bindings/arm/cpu-enable-method/amlogic,meson8b-smp
+ create mode 100644 arch/arm/mach-meson/platsmp.c
+
+-- 
+2.5.0
