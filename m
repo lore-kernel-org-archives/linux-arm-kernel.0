@@ -1,30 +1,32 @@
-From: anton.bondarenko.sama@gmail.com (Anton Bondarenko)
-Date: Tue, 17 Nov 2015 11:43:27 +0100
-Subject: [PATCH] [media] move media platform data to
- linux/platform_data/media
-In-Reply-To: <7319142.Cp8MurgLWk@wuerfel>
-References: <4d99e49726942dc4d6a6ee1debf6665b2b47908b.1447751746.git.mchehab@osg.samsung.com>
- <7319142.Cp8MurgLWk@wuerfel>
-Message-ID: <564B04CF.1090507@gmail.com>
+From: matthias.bgg@gmail.com (Matthias Brugger)
+Date: Tue, 17 Nov 2015 11:49:14 +0100
+Subject: [PATCH v2] spi: mediatek: single device does not require cs_gpios
+In-Reply-To: <1447468039.27169.1.camel@mhfsdcap03>
+References: <1447042491-1199-1-git-send-email-drinkcat@chromium.org>
+ <1447468039.27169.1.camel@mhfsdcap03>
+Message-ID: <564B062A.90003@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-On 17.11.2015 10:23, Arnd Bergmann wrote:
-> On Tuesday 17 November 2015 07:15:59 Mauro Carvalho Chehab wrote:
->> Now that media has its own subdirectory inside platform_data,
->> let's move the headers that are already there to such subdir.
+
+On 14/11/15 03:27, lei liu wrote:
+> On Mon, 2015-11-09 at 12:14 +0800, Nicolas Boichat wrote:
+>> When only one device is present, it is not necessary to specify
+>> cs_gpios, as the CS line can be controlled by the hardware
+>> module.
 >>
+>> Without this patch, older device tree bindings used before
+>> 37457607 "spi: mediatek: mt8173 spi multiple devices support"
+>> would cause a panic on boot. This fixes the crash, and
+>> re-introduces backward compatibility.
 >>
+>> Signed-off-by: Nicolas Boichat <drinkcat@chromium.org>
 >
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> Acked-by: Leilk Liu <leilk.liu@mediatek.com>
 >
 
-Why does dma-imx.h also moved? It's the generic file, not a media specific.
+Please make sure this fix get applied to v4.3 as well.
 
-BR, Anton
+Thanks,
+Matthias
