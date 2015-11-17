@@ -1,34 +1,44 @@
-From: yang.shi@linaro.org (Shi, Yang)
-Date: Mon, 16 Nov 2015 20:43:52 -0800
-Subject: [PATCH V4 2/2] arm64: bpf: make BPF prologue and epilogue align
- with ARM64 AAPCS
-In-Reply-To: <20151117044145.GA71069@ast-mbp.thefacebook.com>
-References: <CABg9mcvomep=M1As_Vj=XuTNk=jiGwXQqQWbjotMXP2csKX=Bg@mail.gmail.com>
- <1447713335-29707-1-git-send-email-yang.shi@linaro.org>
- <CABg9mcvh+SLK-1iF28pCQgXt5WM_H4tH3ntgKSkMHCyMygThgw@mail.gmail.com>
- <20151117044145.GA71069@ast-mbp.thefacebook.com>
-Message-ID: <564AB088.8030903@linaro.org>
+From: pankaj.dubey@samsung.com (pankaj.dubey)
+Date: Tue, 17 Nov 2015 10:29:10 +0530
+Subject: [PATCH v5 0/8] Add support for Exynos SROM Controller driver
+In-Reply-To: <562A7A03.8040704@kernel.org>
+References: <1445332540-12814-1-git-send-email-pankaj.dubey@samsung.com>
+ <5626DD9A.9030603@samsung.com> <00ba01d10d78$177c1720$46744560$@samsung.com>
+ <562A7A03.8040704@kernel.org>
+Message-ID: <564AB41E.4090107@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/16/2015 8:41 PM, Alexei Starovoitov wrote:
-> On Mon, Nov 16, 2015 at 08:37:11PM -0800, Z Lim wrote:
->> On Mon, Nov 16, 2015 at 2:35 PM, Yang Shi <yang.shi@linaro.org> wrote:
->>> Save and restore FP/LR in BPF prog prologue and epilogue, save SP to FP
->>> in prologue in order to get the correct stack backtrace.
-> ...
->>> CC: Zi Shen Lim <zlim.lnx@gmail.com>
->>> CC: Xi Wang <xi.wang@gmail.com>
->>> Signed-off-by: Yang Shi <yang.shi@linaro.org>
+Hi Kukjin
+
+On Friday 23 October 2015 11:48 PM, Kukjin Kim wrote:
+> On 10/23/15 18:49, Pavel Fedin wrote:
+>>  Hello!
 >>
->> Acked-by: Zi Shen Lim <zlim.lnx@gmail.com>
->
-> great that it's finalized.
-> Yang, please resubmit both patches to netdev as fresh submission so it
-> gets picked up by patchwork.
+>>>> This patchset, I have tested on Peach-Pi (Exynos5880) based chromebook for boot
+>>>> and S2R functionality.
+>>>>
+>>>
+>>> Entire patchset tested on Trats2 (Exynos4412) board. Unless Kukjin picks
+>>> it also, I plan to take it for v4.5.
+>>
+>>  Tested on SMDK5410. By the way, what is current status? If this is final revision, can i post my Ethernet support patchset on top
+>> of it?
+>>
+>>  Tested-by: Pavel Fedin <p.fedin@samsung.com>
+>>
+> Applied, this whole series.
+> 
 
-OK, btw the first one has been applied by David.
+I just pulled your tree, and I can't find these SROM patches in for-next
+(earlier they were present). Also I can see samsung for-next is pointing
+to linus/master branch. As this series not landed in linus tree due last
+moment changes, So do I need to rebase SROM patches on top of latest
+for-next, and send it once again?
 
-Yang
+Thanks,
+Pankaj Dubey
 
->
+> Thanks,
+> Kukjin
+> 
