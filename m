@@ -1,31 +1,78 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 17 Nov 2015 10:18:37 +0100
-Subject: [PATCH v2 05/12] arm64/efi: refactor EFI init and runtime code
- for reuse by 32-bit ARM
-In-Reply-To: <20151116184919.GD8644@n2100.arm.linux.org.uk>
-References: <1447698757-8762-1-git-send-email-ard.biesheuvel@linaro.org>
- <1447698757-8762-6-git-send-email-ard.biesheuvel@linaro.org>
- <20151116184919.GD8644@n2100.arm.linux.org.uk>
-Message-ID: <CAKv+Gu9+Pw3vv-EiZYg1zNmoBYPqcWY=XECzTcVV8WtY5WjpTg@mail.gmail.com>
+From: chunfeng.yun@mediatek.com (Chunfeng Yun)
+Date: Tue, 17 Nov 2015 17:18:39 +0800
+Subject: [PATCH v12 1/3] dt-bindings: Add a binding for Mediatek xHCI host
+ controller
+In-Reply-To: <1447751921-26746-1-git-send-email-chunfeng.yun@mediatek.com>
+References: <1447751921-26746-1-git-send-email-chunfeng.yun@mediatek.com>
+Message-ID: <1447751921-26746-2-git-send-email-chunfeng.yun@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16 November 2015 at 19:49, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Mon, Nov 16, 2015 at 07:32:30PM +0100, Ard Biesheuvel wrote:
->> diff --git a/drivers/firmware/efi/arm-runtime.c b/drivers/firmware/efi/arm-runtime.c
->> index e62ee5df96ca..ad11ba6964f6 100644
->> --- a/drivers/firmware/efi/arm-runtime.c
->> +++ b/drivers/firmware/efi/arm-runtime.c
->> @@ -23,18 +23,15 @@
->>
->>  #include <asm/cacheflush.h>
->>  #include <asm/efi.h>
->> -#include <asm/tlbflush.h>
->> -#include <asm/mmu_context.h>
->> +#include <asm/io.h>
->
-> Shouldn't this be linux/io.h ?
->
+add a DT binding documentation of xHCI host controller for the
+MT8173 SoC from Mediatek.
 
-Yes. Will change it for v3
+Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
+---
+ .../devicetree/bindings/usb/mt8173-xhci.txt        | 51 ++++++++++++++++++++++
+ 1 file changed, 51 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/usb/mt8173-xhci.txt
+
+diff --git a/Documentation/devicetree/bindings/usb/mt8173-xhci.txt b/Documentation/devicetree/bindings/usb/mt8173-xhci.txt
+new file mode 100644
+index 0000000..a78f20b
+--- /dev/null
++++ b/Documentation/devicetree/bindings/usb/mt8173-xhci.txt
+@@ -0,0 +1,51 @@
++MT8173 xHCI
++
++The device node for Mediatek SOC USB3.0 host controller
++
++Required properties:
++ - compatible : should contain "mediatek,mt8173-xhci"
++ - reg : specifies physical base address and size of the registers,
++	the first one for MAC, the second for IPPC
++ - interrupts : interrupt used by the controller
++ - power-domains : a phandle to USB power domain node to control USB's
++	mtcmos
++ - vusb33-supply : regulator of USB avdd3.3v
++
++ - clocks : a list of phandle + clock-specifier pairs, one for each
++	entry in clock-names
++ - clock-names : must contain
++	"sys_ck": for clock of xHCI MAC
++	"wakeup_deb_p0": for USB wakeup debounce clock of port0
++	"wakeup_deb_p0": for USB wakeup debounce clock of port1
++
++ - phys : a list of phandle + phy specifier pairs
++
++Optional properties:
++ - mediatek,wakeup-src : 1: ip sleep wakeup mode; 2: line state wakeup
++	mode;
++ - mediatek,syscon-wakeup : phandle to syscon used to access USB wakeup
++	control register, it depends on "mediatek,wakeup-src".
++ - vbus-supply : reference to the VBUS regulator;
++ - usb3-lpm-capable : supports USB3.0 LPM
++
++Example:
++usb30: usb at 11270000 {
++	compatible = "mediatek,mt8173-xhci";
++	reg = <0 0x11270000 0 0x1000>,
++	      <0 0x11280700 0 0x0100>;
++	interrupts = <GIC_SPI 115 IRQ_TYPE_LEVEL_LOW>;
++	power-domains = <&scpsys MT8173_POWER_DOMAIN_USB>;
++	clocks = <&topckgen CLK_TOP_USB30_SEL>,
++		 <&pericfg CLK_PERI_USB0>,
++		 <&pericfg CLK_PERI_USB1>;
++	clock-names = "sys_ck",
++		      "wakeup_deb_p0",
++		      "wakeup_deb_p1";
++	phys = <&phy_port0 PHY_TYPE_USB3>,
++	       <&phy_port1 PHY_TYPE_USB2>;
++	vusb33-supply = <&mt6397_vusb_reg>;
++	vbus-supply = <&usb_p1_vbus>;
++	usb3-lpm-capable;
++	mediatek,syscon-wakeup = <&pericfg>;
++	mediatek,wakeup-src = <1>;
++};
+-- 
+1.8.1.1.dirty
