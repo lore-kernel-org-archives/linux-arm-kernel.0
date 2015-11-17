@@ -1,64 +1,29 @@
-From: pavel@ucw.cz (Pavel Machek)
-Date: Tue, 17 Nov 2015 14:13:45 +0100
-Subject: [PATCH v2 10/11] PM / Hibernate: clean cached pages on
- architectures that require it
-In-Reply-To: <20151117123807.GA22216@red-moon>
-References: <1445966960-31724-1-git-send-email-james.morse@arm.com>
- <2039611.PJaFlk1sMi@vostro.rjw.lan>
- <20151112114705.GA2657@red-moon>
- <3180507.pKM8OzKjXO@vostro.rjw.lan>
- <20151117123807.GA22216@red-moon>
-Message-ID: <20151117131345.GA11870@amd>
+From: zhaoshenglong@huawei.com (Shannon Zhao)
+Date: Tue, 17 Nov 2015 21:10:50 +0800
+Subject: [PATCH v3 56/62] arm/acpi: Deny MMIO access of UART
+In-Reply-To: <564B17E2.8030205@citrix.com>
+References: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
+ <1447753261-7552-57-git-send-email-shannon.zhao@linaro.org>
+ <564B17E2.8030205@citrix.com>
+Message-ID: <564B275A.6060309@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue 2015-11-17 12:38:07, Lorenzo Pieralisi wrote:
-> [Cc'ed maintainers of affected arches]
+
+
+On 2015/11/17 20:04, Julien Grall wrote:
+> On 17/11/15 09:40, shannon.zhao at linaro.org wrote:
+>> From: Shannon Zhao <shannon.zhao@linaro.org>
+>>
+>> Firstly it permits full MMIO capabilities for Dom0. Then deny MMIO
+>> access of UART device.
 > 
-> On Sat, Nov 14, 2015 at 12:38:50AM +0100, Rafael J. Wysocki wrote:
-> > On Thursday, November 12, 2015 11:47:05 AM Lorenzo Pieralisi wrote:
-> > > On Thu, Nov 12, 2015 at 01:48:32AM +0100, Rafael J. Wysocki wrote:
-> > > > On Wednesday, November 11, 2015 11:40:39 AM Lorenzo Pieralisi wrote:
-> > > > > Hi Pavel, Rafael,
-> > > > > 
-> > > > > Do you have any feedback on this patch ?
-> > > > > 
-> > > > > It is fundamental to this series and affects Hibernate core code so if you
-> > > > > have any feedback that would be much appreciated.
-> > > > 
-> > > > I'm really not familiar with the flush_icache_range() interface.
-> > > > 
-> > > > What exactly does it do?
-> > > 
-> > > It is used to sync a memory range that is written into (eg loading
-> > > modules, copying from snapshot is basically the same thing, reads from
-> > > storage and restore pages that might well be executable code), in particular
-> > > to sync the I-cache and the D-cache, eg on arm64 the page that the snapshot
-> > > code is copying might be executable code that has to be cleaned from the
-> > > D-cache so that it is made visible to the I-cache.
-> > > 
-> > > On x86 it is a NOP AFAIK.
-> > 
-> > If that's the case, I have no problems with this change as long as the code
-> > works on architectures with non-trivial flush_icache_range().
+> I'm nearly sure we want to deny other MMIO such as the GIC regions and SMMU.
 > 
-> I Cc'ed the respective arches maintainers, it should work (it may
-> make resuming a bit slower, owing to the cache syncing), problem is
-> that we have no way of testing it on platforms other than arm/arm64.
+But Dom0 will not know the real GIC hardware MMIO space, how would it
+map these regions? In case of wrong use?
+Regarding SMMU, since it doesn't support now, so I didn't add it but it
+could be added later.
 
-Sure you can find x86 and x86-64 machine near you?
-
-And as hibernation is only supported on x86 and arm, that should be
-ok.
-
-Or just merge it to the next and let the world do testing for you...
-
-> How do you want us to go on about this ? Should we add a config option
-> to prevent calling flush_icache_range() on all platforms (where it
-> is not a nop) ?
-
-Config option is definitely not an option ;-).
-									Pavel
 -- 
-(english) http://www.livejournal.com/~pavelmachek
-(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
+Shannon
