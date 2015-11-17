@@ -1,109 +1,159 @@
 From: shannon.zhao@linaro.org (shannon.zhao at linaro.org)
-Date: Tue, 17 Nov 2015 17:40:27 +0800
-Subject: [PATCH v3 28/62] arm/gic: Add ACPI support for GIC preinit
+Date: Tue, 17 Nov 2015 17:40:28 +0800
+Subject: [PATCH v3 29/62] arm/acpi: Add GTDT support updated by ACPI 5.1
 In-Reply-To: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
 References: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
-Message-ID: <1447753261-7552-29-git-send-email-shannon.zhao@linaro.org>
+Message-ID: <1447753261-7552-30-git-send-email-shannon.zhao@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Shannon Zhao <shannon.zhao@linaro.org>
+From: Parth Dixit <parth.dixit@linaro.org>
 
-Since ACPI 6.0 defines that GIC Distributor Structure contains the GIC
-version filed, it could get GIC version from that. According to the
-version, call different preinit functions.
+With ACPI 5.0, we got per-processor timer support in GTDT,
+and ACPI 5.1 introduced the support for platform (memory-mapped)
+timers: GT Block and SBSA watchdog timer, add the code needed
+for the spec change.
 
+Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+Signed-off-by: Naresh Bhat <naresh.bhat@linaro.org>
+Signed-off-by: Parth Dixit <parth.dixit@linaro.org>
 Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
 ---
- xen/arch/arm/gic.c | 55 ++++++++++++++++++++++++++++++++++++++++++++++++++----
- 1 file changed, 51 insertions(+), 4 deletions(-)
+ xen/include/acpi/actbl3.h  | 98 +++++++++++++++++++++++++++++++++++++++-------
+ xen/include/asm-arm/acpi.h |  2 +
+ 2 files changed, 85 insertions(+), 15 deletions(-)
 
-diff --git a/xen/arch/arm/gic.c b/xen/arch/arm/gic.c
-index 1e1e5ba..ac82588 100644
---- a/xen/arch/arm/gic.c
-+++ b/xen/arch/arm/gic.c
-@@ -27,6 +27,7 @@
- #include <xen/softirq.h>
- #include <xen/list.h>
- #include <xen/device_tree.h>
-+#include <xen/acpi.h>
- #include <asm/p2m.h>
- #include <asm/domain.h>
- #include <asm/platform.h>
-@@ -34,6 +35,7 @@
- #include <asm/io.h>
- #include <asm/gic.h>
- #include <asm/vgic.h>
-+#include <asm/acpi.h>
+diff --git a/xen/include/acpi/actbl3.h b/xen/include/acpi/actbl3.h
+index 8c61b5f..fc96963 100644
+--- a/xen/include/acpi/actbl3.h
++++ b/xen/include/acpi/actbl3.h
+@@ -241,33 +241,101 @@ struct acpi_s3pt_suspend {
  
- static void gic_restore_pending_irqs(struct vcpu *v);
+ /*******************************************************************************
+  *
+- * GTDT - Generic Timer Description Table (ACPI 5.0)
+- *        Version 1
++ * GTDT - Generic Timer Description Table (ACPI 5.1)
++ *        Version 2
+  *
+  ******************************************************************************/
  
-@@ -228,10 +230,7 @@ int gic_irq_xlate(const u32 *intspec, unsigned int intsize,
-     return 0;
+ struct acpi_table_gtdt {
+ 	struct acpi_table_header header;	/* Common ACPI table header */
+-	u64 address;
+-	u32 flags;
+-	u32 secure_pl1_interrupt;
+-	u32 secure_pl1_flags;
+-	u32 non_secure_pl1_interrupt;
+-	u32 non_secure_pl1_flags;
++	u64 counter_block_addresss;
++	u32 reserved;
++	u32 secure_el1_interrupt;
++	u32 secure_el1_flags;
++	u32 non_secure_el1_interrupt;
++	u32 non_secure_el1_flags;
+ 	u32 virtual_timer_interrupt;
+ 	u32 virtual_timer_flags;
+-	u32 non_secure_pl2_interrupt;
+-	u32 non_secure_pl2_flags;
++	u32 non_secure_el2_interrupt;
++	u32 non_secure_el2_flags;
++	u64 counter_read_block_address;
++	u32 platform_timer_count;
++	u32 platform_timer_offset;
+ };
+ 
+-/* Values for Flags field above */
++/* Flag Definitions: Timer Block Physical Timers and Virtual timers */
++
++#define ACPI_GTDT_INTERRUPT_MODE        (1)
++#define ACPI_GTDT_INTERRUPT_POLARITY    (1<<1)
++#define ACPI_GTDT_ALWAYS_ON             (1<<2)
++
++/* Common GTDT subtable header */
++
++struct acpi_gtdt_header {
++	u8 type;
++	u16 length;
++};
++
++/* Values for GTDT subtable type above */
++
++enum acpi_gtdt_type {
++	ACPI_GTDT_TYPE_TIMER_BLOCK = 0,
++	ACPI_GTDT_TYPE_WATCHDOG = 1,
++	ACPI_GTDT_TYPE_RESERVED = 2	/* 2 and greater are reserved */
++};
++
++/* GTDT Subtables, correspond to Type in struct acpi_gtdt_header */
+ 
+-#define ACPI_GTDT_MAPPED_BLOCK_PRESENT      1
++/* 0: Generic Timer Block */
++
++struct acpi_gtdt_timer_block {
++	struct acpi_gtdt_header header;
++	u8 reserved;
++	u64 block_address;
++	u32 timer_count;
++	u32 timer_offset;
++};
++
++/* Timer Sub-Structure, one per timer */
++
++struct acpi_gtdt_timer_entry {
++	u8 frame_number;
++	u8 reserved[3];
++	u64 base_address;
++	u64 el0_base_address;
++	u32 timer_interrupt;
++	u32 timer_flags;
++	u32 virtual_timer_interrupt;
++	u32 virtual_timer_flags;
++	u32 common_flags;
++};
++
++/* Flag Definitions: timer_flags and virtual_timer_flags above */
++
++#define ACPI_GTDT_GT_IRQ_MODE               (1)
++#define ACPI_GTDT_GT_IRQ_POLARITY           (1<<1)
++
++/* Flag Definitions: common_flags above */
++
++#define ACPI_GTDT_GT_IS_SECURE_TIMER        (1)
++#define ACPI_GTDT_GT_ALWAYS_ON              (1<<1)
++
++/* 1: SBSA Generic Watchdog Structure */
++
++struct acpi_gtdt_watchdog {
++	struct acpi_gtdt_header header;
++	u8 reserved;
++	u64 refresh_frame_address;
++	u64 control_frame_address;
++	u32 timer_interrupt;
++	u32 timer_flags;
++};
+ 
+-/* Values for all "TimerFlags" fields above */
++/* Flag Definitions: timer_flags above */
+ 
+-#define ACPI_GTDT_INTERRUPT_MODE            1
+-#define ACPI_GTDT_INTERRUPT_POLARITY        2
++#define ACPI_GTDT_WATCHDOG_IRQ_MODE         (1)
++#define ACPI_GTDT_WATCHDOG_IRQ_POLARITY     (1<<1)
++#define ACPI_GTDT_WATCHDOG_SECURE           (1<<2)
+ 
+ /*******************************************************************************
+  *
+diff --git a/xen/include/asm-arm/acpi.h b/xen/include/asm-arm/acpi.h
+index 1efa29d..714e596 100644
+--- a/xen/include/asm-arm/acpi.h
++++ b/xen/include/asm-arm/acpi.h
+@@ -46,4 +46,6 @@ static inline void disable_acpi(void)
+     acpi_disabled = 1;
  }
  
--/* Find the interrupt controller and set up the callback to translate
-- * device tree IRQ.
-- */
--void __init gic_preinit(void)
-+void __init dt_gic_preinit(void)
- {
-     int rc;
-     struct dt_device_node *node;
-@@ -261,6 +260,54 @@ void __init gic_preinit(void)
-     dt_device_set_used_by(node, DOMID_XEN);
- }
- 
-+#ifdef CONFIG_ACPI
-+static void __init acpi_gic_preinit(void)
-+{
-+    int rc = 0;
-+    acpi_status status;
-+    struct acpi_table_header *table;
-+    struct acpi_subtable_header * subtable;
-+    struct acpi_madt_generic_distributor *dist;
++#define ACPI_GTDT_INTR_MASK ( ACPI_GTDT_INTERRUPT_MODE | ACPI_GTDT_INTERRUPT_POLARITY )
 +
-+    status = acpi_get_table(ACPI_SIG_MADT, 0, &table);
-+    if ( ACPI_FAILURE(status) )
-+    {
-+        const char *msg = acpi_format_exception(status);
-+
-+        panic("Failed to get MADT table, %s", msg);
-+    }
-+
-+    subtable = acpi_get_entry(ACPI_SIG_MADT, sizeof(struct acpi_table_madt),
-+                              table, ACPI_MADT_TYPE_GENERIC_DISTRIBUTOR, 0);
-+    if ( !subtable )
-+        panic("No valid GICD entries exists");
-+
-+    dist = (struct acpi_madt_generic_distributor *)subtable;
-+
-+    if ( dist->version == ACPI_MADT_GIC_VERSION_V2 )
-+        rc = acpi_device_init(DEVICE_GIC, NULL, GIC_V2);
-+    else if ( dist->version == ACPI_MADT_GIC_VERSION_V3 )
-+        rc = acpi_device_init(DEVICE_GIC, NULL, GIC_V3);
-+    else
-+        panic("Wrong GIC version or unsupported GIC");
-+    if ( rc )
-+        panic("Unable to find compatible GIC in the ACPI table");
-+}
-+#else
-+static void __init acpi_gic_preinit(void) {}
-+#endif
-+
-+/* Find the interrupt controller and set up the callback to translate
-+ * device tree IRQ.
-+ */
-+void __init gic_preinit(void)
-+{
-+    if( acpi_disabled )
-+        dt_gic_preinit();
-+    else
-+        acpi_gic_preinit();
-+}
-+
- /* Set up the GIC */
- void __init gic_init(void)
- {
+ #endif /*_ASM_ARM_ACPI_H*/
 -- 
 2.1.0
