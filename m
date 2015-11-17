@@ -1,112 +1,67 @@
-From: bharat.kumar.gogada@xilinx.com (Bharat Kumar Gogada)
-Date: Tue, 17 Nov 2015 13:27:39 +0000
-Subject: [PATCH v8] PCI: Xilinx-NWL-PCIe: Added support for Xilinx NWL
- PCIe Host Controller
-In-Reply-To: <20151117092100.76babf7f@arm.com>
-References: <1447223619-30945-1-git-send-email-bharatku@xilinx.com>
- <5649F2D9.7070902@arm.com>	<564A5255.3020603@broadcom.com>
- <8520D5D51A55D047800579B0941471982585CBDA@XAP-PVEXMBX01.xlnx.xilinx.com>
- <20151117092100.76babf7f@arm.com>
-Message-ID: <8520D5D51A55D047800579B0941471982585CD78@XAP-PVEXMBX01.xlnx.xilinx.com>
+From: zhaoshenglong@huawei.com (Shannon Zhao)
+Date: Tue, 17 Nov 2015 21:21:46 +0800
+Subject: [PATCH v3 24/62] arm: Introduce a generic way to use a device
+ from acpi
+In-Reply-To: <564B2023.8010801@citrix.com>
+References: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
+ <1447753261-7552-25-git-send-email-shannon.zhao@linaro.org>
+ <564B2023.8010801@citrix.com>
+Message-ID: <564B29EA.3060107@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> 
-> On Tue, 17 Nov 2015 04:59:39 +0000
-> Bharat Kumar Gogada <bharat.kumar.gogada@xilinx.com> wrote:
-> 
-> > > On 11/16/2015 7:14 AM, Marc Zyngier wrote:
-> > > > On 11/11/15 06:33, Bharat Kumar Gogada wrote:
-> > > >> Adding PCIe Root Port driver for Xilinx PCIe NWL bridge IP.
-> > > >>
-> > > >> Signed-off-by: Bharat Kumar Gogada <bharatku@xilinx.com>
-> > > >> Signed-off-by: Ravi Kiran Gummaluri <rgummal@xilinx.com>
-> > > >> ---
-> > > >> Added logic to allocate contiguous hwirq in nwl_irq_domain_alloc
-> > > function.
-> > > >> Moved MSI functionality to separate functions.
-> > > >> Changed error return values.
-> > > >> ---
-> > > >>   .../devicetree/bindings/pci/xilinx-nwl-pcie.txt    |   68 ++
-> > > >>   drivers/pci/host/Kconfig                           |   16 +-
-> > > >>   drivers/pci/host/Makefile                          |    1 +
-> > > >>   drivers/pci/host/pcie-xilinx-nwl.c                 | 1062
-> > > ++++++++++++++++++++
-> > > >>   4 files changed, 1144 insertions(+), 3 deletions(-)
-> > > >>   create mode 100644
-> > > >> Documentation/devicetree/bindings/pci/xilinx-nwl-
-> > > pcie.txt
-> > > >>   create mode 100644 drivers/pci/host/pcie-xilinx-nwl.c
-> > > >>
-> > > >
-> > > > [...]
-> > > >
-> > > >> +static int nwl_pcie_enable_msi(struct nwl_pcie *pcie, struct
-> > > >> +pci_bus
-> > > >> +*bus) {
-> > > >> +	struct platform_device *pdev = to_platform_device(pcie-
-> >dev);
-> > > >> +	struct nwl_msi *msi = &pcie->msi;
-> > > >> +	unsigned long base;
-> > > >> +	int ret;
-> > > >> +
-> > > >> +	mutex_init(&msi->lock);
-> > > >> +
-> > > >> +	/* Check for msii_present bit */
-> > > >> +	ret = nwl_bridge_readl(pcie, I_MSII_CAPABILITIES) &
-> MSII_PRESENT;
-> > > >> +	if (!ret) {
-> > > >> +		dev_err(pcie->dev, "MSI not present\n");
-> > > >> +		ret = -EIO;
-> > > >> +		goto err;
-> > > >> +	}
-> > > >> +
-> > > >> +	/* Enable MSII */
-> > > >> +	nwl_bridge_writel(pcie, nwl_bridge_readl(pcie,
-> I_MSII_CONTROL) |
-> > > >> +			  MSII_ENABLE, I_MSII_CONTROL);
-> > > >> +
-> > > >> +	/* Enable MSII status */
-> > > >> +	nwl_bridge_writel(pcie, nwl_bridge_readl(pcie,
-> I_MSII_CONTROL) |
-> > > >> +			  MSII_STATUS_ENABLE, I_MSII_CONTROL);
-> > > >> +
-> > > >> +	/* setup AFI/FPCI range */
-> > > >> +	msi->pages = __get_free_pages(GFP_KERNEL, 0);
-> > > >> +	base = virt_to_phys((void *)msi->pages);
-> > > >> +	nwl_bridge_writel(pcie, lower_32_bits(base),
-> I_MSII_BASE_LO);
-> > > >> +	nwl_bridge_writel(pcie, upper_32_bits(base),
-> I_MSII_BASE_HI);
-> > > >
-> > > > BTW, you still haven't answered my question as to why you need to
-> > > > waste a page of memory here, and why putting a device address
-> > > > doesn't
-> > > work.
-> > > >
-> > > > As this is (to the best of my knowledge) the only driver doing so,
-> > > > I'd really like you to explain the rational behind this.
-> > >
-> > > Might not be the only driver doing so after I start sending out
-> > > patches for the iProc MSI support (soon), :)
-> > >
-> > > I'm not sure how it works for the Xilinx NWL controller, which
-> > > Bharat should be able to help to explain. But for the iProc MSI
-> > > controller, there's no device I/O memory reserved for MSI posted writes
-> in the ASIC.
-> > > Therefore one needs to reserve host memory for these writes.
-> > > >
-> >
-> > Our SoC doesn't reserve any memory for MSI, hence we need to assign a
-> > memory space for it out of RAM.
-> 
-> Question to both of you: Does the write make it to memory? Or is it sampled
-> by the bridge and dropped?
-> 
-No, write will not do any modification in memory, it is consumed by bridge.
 
-> What happens if you replace the page in RAM with a dummy address?
-What do you mean by dummy address ?
 
-Regards,
-Bharat
+On 2015/11/17 20:40, Julien Grall wrote:
+> Hi Shannon,
+> 
+> On 17/11/15 09:40, shannon.zhao at linaro.org wrote:
+>> From: Parth Dixit <parth.dixit@linaro.org>
+>>
+>> Add generic way to use device from acpi similar to the way it is
+>> supported in device tree.
+>>
+>> Signed-off-by: Parth Dixit <parth.dixit@linaro.org>
+>> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+>> ---
+>>  xen/arch/arm/device.c        | 19 +++++++++++++++++++
+>>  xen/arch/arm/xen.lds.S       |  7 +++++++
+>>  xen/include/asm-arm/device.h | 30 ++++++++++++++++++++++++++++++
+>>  3 files changed, 56 insertions(+)
+>>
+>> diff --git a/xen/arch/arm/device.c b/xen/arch/arm/device.c
+>> index 0b53f6a..5494de0 100644
+>> --- a/xen/arch/arm/device.c
+>> +++ b/xen/arch/arm/device.c
+>> @@ -22,6 +22,7 @@
+>>  #include <xen/lib.h>
+>>  
+>>  extern const struct device_desc _sdevice[], _edevice[];
+>> +extern const struct acpi_device_desc _asdevice[], _aedevice[];
+>>  
+>>  int __init device_init(struct dt_device_node *dev, enum device_class class,
+>>                         const void *data)
+>> @@ -50,6 +51,24 @@ int __init device_init(struct dt_device_node *dev, enum device_class class,
+>>      return -EBADF;
+>>  }
+>>  
+>> +int __init acpi_device_init(enum device_class class, const void *data, int class_type)
+> 
+> As said on a previous version, please explain what means class_type and
+> how this will fit with every
+> ACPI device tables.
+> 
+> AFAICT, it does only works for SPCR table used for UART device. For the
+> GIC you've hardcoded the value and I can't find any version number in
+> the table.
+> 
+No, I didn't hardcode the GIC version. Since ACPI 6.0 introduces GIC
+version in generic distributor table, it could get the version from
+that. Please see [PATCH v3 28/62].
+
+> You may need to introduce another way to find the device such as a
+> callback taking the table in parameter.
+> 
+
+-- 
+Shannon
