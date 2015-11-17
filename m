@@ -1,53 +1,36 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 17 Nov 2015 16:48:00 +0000
-Subject: [RFC PATCH] arm64: use non-global mappings for UEFI runtime
- regions
-In-Reply-To: <20151117163445.GE30101@arm.com>
-References: <1447750411-6424-1-git-send-email-ard.biesheuvel@linaro.org>
- <20151117152558.GK12586@leverpostej>
- <20151117163445.GE30101@arm.com>
-Message-ID: <20151117164759.GA12266@leverpostej>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 17 Nov 2015 17:48:52 +0100
+Subject: [PATCH] thermal: fix thermal_zone_bind_cooling_device prototype
+Message-ID: <5439003.qQElgLSp5g@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 17, 2015 at 04:34:46PM +0000, Will Deacon wrote:
-> On Tue, Nov 17, 2015 at 03:25:58PM +0000, Mark Rutland wrote:
-> > On Tue, Nov 17, 2015 at 09:53:31AM +0100, Ard Biesheuvel wrote:
-> > > As pointed out by Russell King in response to the proposed ARM version
-> > > of this code, the sequence to switch between the UEFI runtime mapping
-> > > and current's actual userland mapping (and vice versa) is potentially
-> > > unsafe, since it leaves a time window between the switch to the new
-> > > page tables and the TLB flush where speculative accesses may hit on
-> > > stale global TLB entries.
-> > 
-> > Wow, annoying that we missed that.
-> > 
-> > > So instead, use non-global mappings, and perform the switch via the
-> > > ordinary ASID-aware context switch routines.
-> > > 
-> > > Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> > 
-> > From digging into the way the ASID allocator works, I believe this is
-> > correct. FWIW:
-> > 
-> > Reviewed-by: Mark Rutland <mark.rutland@arm.com>
-> > 
-> > For backporting, I'm not sure that this is necessarily safe prior to
-> > Will's rework of the ASID allocator. I think we can IPI in this context,
-> > and it looks like the cpu_set_reserved_ttbr0() in flush_context() would
-> > save us from the problem described above, but I may have missed
-> > something.
-> > 
-> > Will, are you aware of anything that could bite us here?
-> 
-> Can we guarantee that efi_virtmap_{load,unload} are called with interrupts
-> enabled?
+When the prototype for thermal_zone_bind_cooling_device
+changed, the static inline wrapper function was left alone,
+which in theory can cause build warnings:
 
-Unfortuantely, it looks like we can guarantee interrupts are _disabled_.
+I have seen this error in the past:
+drivers/thermal/db8500_thermal.c: In function 'db8500_cdev_bind':
+drivers/thermal/db8500_thermal.c:78:9: error: too many arguments to function 'thermal_zone_bind_cooling_device'
+   ret = thermal_zone_bind_cooling_device(thermal, i, cdev,
 
-Every function in drivers/firmware/efi/runtime-wrappers.c which uses
-efi_call_virt (and hence efi_virtmap_{load,unload}) wraps the call in a
-spin_lock_irq{save,restore} pair. Those appear to be the only uses of
-efi_call_virt.
+while this one no longer shows up, there is no doubt that
+the prototype is still wrong, so let's just fix it anyway.
 
-Mark.
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+Fixes: 6cd9e9f629f1 ("thermal: of: fix cooling device weights in device tree")
+
+diff --git a/include/linux/thermal.h b/include/linux/thermal.h
+index 4014a59828fc..613c29bd6baf 100644
+--- a/include/linux/thermal.h
++++ b/include/linux/thermal.h
+@@ -438,7 +438,8 @@ static inline void thermal_zone_device_unregister(
+ static inline int thermal_zone_bind_cooling_device(
+ 	struct thermal_zone_device *tz, int trip,
+ 	struct thermal_cooling_device *cdev,
+-	unsigned long upper, unsigned long lower)
++	unsigned long upper, unsigned long lower,
++	unsigned int weight)
+ { return -ENODEV; }
+ static inline int thermal_zone_unbind_cooling_device(
+ 	struct thermal_zone_device *tz, int trip,
