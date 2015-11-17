@@ -1,52 +1,51 @@
 From: shannon.zhao@linaro.org (shannon.zhao at linaro.org)
-Date: Tue, 17 Nov 2015 17:40:06 +0800
-Subject: [PATCH v3 07/62] arm/acpi: Add arch_acpi_os_map_memory helper
- function for ARM
+Date: Tue, 17 Nov 2015 17:40:07 +0800
+Subject: [PATCH v3 08/62] arm/acpi: Add arm specific acpi header file
 In-Reply-To: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
 References: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
-Message-ID: <1447753261-7552-8-git-send-email-shannon.zhao@linaro.org>
+Message-ID: <1447753261-7552-9-git-send-email-shannon.zhao@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Shannon Zhao <shannon.zhao@linaro.org>
 
+Add architecture specific definitions and calls required for acpi in new
+header file.
+
+Signed-off-by: Parth Dixit <parth.dixit@linaro.org>
 Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
 ---
- xen/arch/arm/Makefile      |  1 +
- xen/arch/arm/acpi/Makefile |  1 +
- xen/arch/arm/acpi/lib.c    | 33 +++++++++++++++++++++++++++++++++
- 3 files changed, 35 insertions(+)
- create mode 100644 xen/arch/arm/acpi/Makefile
- create mode 100644 xen/arch/arm/acpi/lib.c
+ xen/arch/arm/setup.c       |  3 +++
+ xen/include/asm-arm/acpi.h | 38 ++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 41 insertions(+)
+ create mode 100644 xen/include/asm-arm/acpi.h
 
-diff --git a/xen/arch/arm/Makefile b/xen/arch/arm/Makefile
-index 1ef39f7..1851ae8 100644
---- a/xen/arch/arm/Makefile
-+++ b/xen/arch/arm/Makefile
-@@ -2,6 +2,7 @@ subdir-$(arm32) += arm32
- subdir-$(arm64) += arm64
- subdir-y += platforms
- subdir-$(arm64) += efi
-+subdir-$(HAS_ACPI) += acpi
+diff --git a/xen/arch/arm/setup.c b/xen/arch/arm/setup.c
+index e95759d..3b29904 100644
+--- a/xen/arch/arm/setup.c
++++ b/xen/arch/arm/setup.c
+@@ -45,11 +45,14 @@
+ #include <asm/procinfo.h>
+ #include <asm/setup.h>
+ #include <xsm/xsm.h>
++#include <asm/acpi.h>
  
- obj-$(EARLY_PRINTK) += early_printk.o
- obj-y += cpu.o
-diff --git a/xen/arch/arm/acpi/Makefile b/xen/arch/arm/acpi/Makefile
+ struct bootinfo __initdata bootinfo;
+ 
+ struct cpuinfo_arm __read_mostly boot_cpu_data;
+ 
++bool_t __read_mostly acpi_disabled;
++
+ #ifdef CONFIG_ARM_32
+ static unsigned long opt_xenheap_megabytes __initdata;
+ integer_param("xenheap_megabytes", opt_xenheap_megabytes);
+diff --git a/xen/include/asm-arm/acpi.h b/xen/include/asm-arm/acpi.h
 new file mode 100644
-index 0000000..b5be22d
+index 0000000..e41e03b
 --- /dev/null
-+++ b/xen/arch/arm/acpi/Makefile
-@@ -0,0 +1 @@
-+obj-y += lib.o
-diff --git a/xen/arch/arm/acpi/lib.c b/xen/arch/arm/acpi/lib.c
-new file mode 100644
-index 0000000..b68623b
---- /dev/null
-+++ b/xen/arch/arm/acpi/lib.c
-@@ -0,0 +1,33 @@
++++ b/xen/include/asm-arm/acpi.h
+@@ -0,0 +1,38 @@
 +/*
-+ *  lib.c - Architecture-Specific Low-Level ACPI Support
-+ *
 + *  Copyright (C) 2015, Shannon Zhao <shannon.zhao@linaro.org>
 + *
 + * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -68,14 +67,21 @@ index 0000000..b68623b
 + * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 + */
 +
-+#include <xen/acpi.h>
-+#include <xen/mm.h>
-+#include <asm/mm.h>
++#ifndef _ASM_ARM_ACPI_H
++#define _ASM_ARM_ACPI_H
 +
-+void __iomem *
-+arch_acpi_os_map_memory(acpi_physical_address phys, acpi_size size)
++#include <xen/init.h>
++
++#define COMPILER_DEPENDENT_INT64   long long
++#define COMPILER_DEPENDENT_UINT64  unsigned long long
++
++extern bool_t acpi_disabled;
++/* Basic configuration for ACPI */
++static inline void disable_acpi(void)
 +{
-+    return __va(phys);
++    acpi_disabled = 1;
 +}
++
++#endif /*_ASM_ARM_ACPI_H*/
 -- 
 2.1.0
