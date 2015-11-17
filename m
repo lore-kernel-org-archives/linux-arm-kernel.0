@@ -1,37 +1,40 @@
-From: linux@arm.linux.org.uk (Russell King - ARM Linux)
-Date: Tue, 17 Nov 2015 17:33:11 +0000
-Subject: [PATCH v3] ARM: xip: Use correct symbol for end of ROM marker
-In-Reply-To: <alpine.LFD.2.20.1511161605070.5826@knanqh.ubzr>
-References: <1447362108-4333-1-git-send-email-chris.brandt@renesas.com>
- <1447697140-4099-1-git-send-email-chris.brandt@renesas.com>
- <alpine.LFD.2.20.1511161515100.5826@knanqh.ubzr>
- <HK2PR06MB05619FACB3725B6F5B2299718A1E0@HK2PR06MB0561.apcprd06.prod.outlook.com>
- <alpine.LFD.2.20.1511161605070.5826@knanqh.ubzr>
-Message-ID: <20151117173311.GR8644@n2100.arm.linux.org.uk>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 17 Nov 2015 17:34:36 +0000
+Subject: [PATCH v11 4/5] arm64: introduce CONFIG_PARAVIRT,
+ PARAVIRT_TIME_ACCOUNTING and pv_time_ops
+In-Reply-To: <20151117172914.GL30101@arm.com>
+References: <alpine.DEB.2.02.1511051502270.13541@kaball.uk.xensource.com>
+ <1446737696-9749-4-git-send-email-stefano.stabellini@eu.citrix.com>
+ <alpine.DEB.2.02.1511101410550.5676@kaball.uk.xensource.com>
+ <20151117172914.GL30101@arm.com>
+Message-ID: <564B652C.8060409@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 16, 2015 at 04:47:12PM -0500, Nicolas Pitre wrote:
-> The old method with conditional placement in the linker script is broken 
-> beyond repair.  There is simply way too much stuff these days to do this 
-> sanely.  I think the only way to fix it properly is to have a separate 
-> linker script for XIP usage with proper (and obvious) section placement.
+On 17/11/15 17:29, Will Deacon wrote:
+> On Tue, Nov 10, 2015 at 02:11:38PM +0000, Stefano Stabellini wrote:
+>> On Thu, 5 Nov 2015, Stefano Stabellini wrote:
+>>> Introduce CONFIG_PARAVIRT and PARAVIRT_TIME_ACCOUNTING on ARM64.
+>>> Necessary duplication of paravirt.h and paravirt.c with ARM.
+>>>
+>>> The only paravirt interface supported is pv_time_ops.steal_clock, so no
+>>> runtime pvops patching needed.
+>>>
+>>> This allows us to make use of steal_account_process_tick for stolen
+>>> ticks accounting.
+>>>
+>>> Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
+>>> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
+>>
+>> Ping?
+>>
+>> Catalin, Will,
+>> are you happy with this change?
+> 
+> I'm happy if Marc's happy. Marc?
 
-Absolutely the right thing to do.
+My Ack is already on the tin! ;-)
 
-The XIP stuff has been broken and getting in the way for a long time
-now because of the preprocessor mess.  I've made several changes to
-the linker script over the years, and each time I've ended up deciding
-to I'll do the best job I can for XIP, but I'm not going to spend
-too long making sure that it's correct - especially as there appeared
-to be no users of it.  I wouldn't describe the current file as being
-"maintainable" in any way - It has devolved into a total mess, and I
-would like to see the XIP stuff gone from the non-XIP linker script
-- and doing that should mean it's less likely for XIP to break.
-
-I'd also like to see a lot more of the preprocessor gunk gone (or at
-least cleaned up) in that file too...
-
+	M.
 -- 
-FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-according to speedtest.net.
+Jazz is not dead. It just smells funny...
