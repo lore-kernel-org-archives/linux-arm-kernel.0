@@ -1,55 +1,53 @@
-From: david.vrabel@citrix.com (David Vrabel)
-Date: Tue, 17 Nov 2015 16:46:43 +0000
-Subject: [Xen-devel] [PATCH 07/13] ARM: Xen: Document UEFI support on
- Xen ARM virtual platforms
-In-Reply-To: <1447754231-7772-8-git-send-email-shannon.zhao@linaro.org>
-References: <1447754231-7772-1-git-send-email-shannon.zhao@linaro.org>
- <1447754231-7772-8-git-send-email-shannon.zhao@linaro.org>
-Message-ID: <564B59F3.2060801@citrix.com>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 17 Nov 2015 16:48:00 +0000
+Subject: [RFC PATCH] arm64: use non-global mappings for UEFI runtime
+ regions
+In-Reply-To: <20151117163445.GE30101@arm.com>
+References: <1447750411-6424-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20151117152558.GK12586@leverpostej>
+ <20151117163445.GE30101@arm.com>
+Message-ID: <20151117164759.GA12266@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/11/15 09:57, shannon.zhao at linaro.org wrote:
-> From: Shannon Zhao <shannon.zhao@linaro.org>
+On Tue, Nov 17, 2015 at 04:34:46PM +0000, Will Deacon wrote:
+> On Tue, Nov 17, 2015 at 03:25:58PM +0000, Mark Rutland wrote:
+> > On Tue, Nov 17, 2015 at 09:53:31AM +0100, Ard Biesheuvel wrote:
+> > > As pointed out by Russell King in response to the proposed ARM version
+> > > of this code, the sequence to switch between the UEFI runtime mapping
+> > > and current's actual userland mapping (and vice versa) is potentially
+> > > unsafe, since it leaves a time window between the switch to the new
+> > > page tables and the TLB flush where speculative accesses may hit on
+> > > stale global TLB entries.
+> > 
+> > Wow, annoying that we missed that.
+> > 
+> > > So instead, use non-global mappings, and perform the switch via the
+> > > ordinary ASID-aware context switch routines.
+> > > 
+> > > Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> > 
+> > From digging into the way the ASID allocator works, I believe this is
+> > correct. FWIW:
+> > 
+> > Reviewed-by: Mark Rutland <mark.rutland@arm.com>
+> > 
+> > For backporting, I'm not sure that this is necessarily safe prior to
+> > Will's rework of the ASID allocator. I think we can IPI in this context,
+> > and it looks like the cpu_set_reserved_ttbr0() in flush_context() would
+> > save us from the problem described above, but I may have missed
+> > something.
+> > 
+> > Will, are you aware of anything that could bite us here?
 > 
-> Add a "uefi" node under /hypervisor node in FDT, then Linux kernel could
-> scan this to get the UEFI information.
-[...]
-> --- a/Documentation/devicetree/bindings/arm/xen.txt
-> +++ b/Documentation/devicetree/bindings/arm/xen.txt
-> @@ -15,6 +15,24 @@ the following properties:
->  - interrupts: the interrupt used by Xen to inject event notifications.
->    A GIC node is also required.
->  
-> +To support UEFI on Xen ARM virtual platforms, Xen pupulates the FDT "uefi" node
-> +under /hypervisor with following parameters:
+> Can we guarantee that efi_virtmap_{load,unload} are called with interrupts
+> enabled?
 
-It's not really clear why this is under /hypervisor and why xen needs to
-define its own nodes.
+Unfortuantely, it looks like we can guarantee interrupts are _disabled_.
 
-The handling of the existing linux standard nodes can be made
-Xen-specific by the presence of the /hypervisor/compatible == "xen" node
-(or similar), right?
+Every function in drivers/firmware/efi/runtime-wrappers.c which uses
+efi_call_virt (and hence efi_virtmap_{load,unload}) wraps the call in a
+spin_lock_irq{save,restore} pair. Those appear to be the only uses of
+efi_call_virt.
 
-> +________________________________________________________________________________
-> +Name                      | Size   | Description
-> +================================================================================
-> +xen,uefi-system-table     | 64-bit | Physical address of the UEFI System Table.
-> +--------------------------------------------------------------------------------
-> +xen,uefi-mmap-start       | 64-bit | Physical address of the UEFI memory map.
-> +--------------------------------------------------------------------------------
-
-I would probably say "Guest physical address..." just to be clear.
-
-> +xen,uefi-mmap-size        | 32-bit | Size in bytes of the UEFI memory map
-> +                          |        | pointed to in previous entry.
-> +--------------------------------------------------------------------------------
-> +xen,uefi-mmap-desc-size   | 32-bit | Size in bytes of each entry in the UEFI
-> +                          |        | memory map.
-> +--------------------------------------------------------------------------------
-> +xen,uefi-mmap-desc-ver    | 32-bit | Version of the mmap descriptor format.
-> +--------------------------------------------------------------------------------
-
-Need a reference to the mmap descriptor format here.
-
-David
+Mark.
