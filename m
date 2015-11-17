@@ -1,27 +1,36 @@
-From: JBeulich@suse.com (Jan Beulich)
-Date: Tue, 17 Nov 2015 04:04:58 -0700
-Subject: [PATCH v3 59/62] xen/arm: Add a hypercall for device mmio mapping
-In-Reply-To: <1447753261-7552-60-git-send-email-shannon.zhao@linaro.org>
-References: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
- <1447753261-7552-60-git-send-email-shannon.zhao@linaro.org>
-Message-ID: <564B17EA02000078000B5D34@prv-mh.provo.novell.com>
+From: linus.walleij@linaro.org (Linus Walleij)
+Date: Tue, 17 Nov 2015 12:06:03 +0100
+Subject: [PATCH v2 4/7] ARM: at91/dt: sama5d2: add pio controller node
+In-Reply-To: <CAOesGMhXtACRaTurWfQgHNr_mU+VF9TjQJz5wQ4RsSVS+WZ0cA@mail.gmail.com>
+References: <1442417823-15850-1-git-send-email-ludovic.desroches@atmel.com>
+ <1442417823-15850-5-git-send-email-ludovic.desroches@atmel.com>
+ <CACRpkdapS-Vi_F-MqOFOPTHa2+zbrsPfPsbQA-Eks+tR3Wjg2A@mail.gmail.com>
+ <CAOesGMhXtACRaTurWfQgHNr_mU+VF9TjQJz5wQ4RsSVS+WZ0cA@mail.gmail.com>
+Message-ID: <CACRpkdbhFi531Dm9AgOGhc7XHnnyJ+L3t0FvHOPV-fC2f9X6QQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->>> On 17.11.15 at 10:40, <shannon.zhao@linaro.org> wrote:
-> --- a/xen/arch/arm/mm.c
-> +++ b/xen/arch/arm/mm.c
-> @@ -1138,6 +1138,10 @@ int xenmem_add_to_physmap_one(
->          rcu_unlock_domain(od);
->          break;
->      }
-> +    case XENMAPSPACE_dev_mmio:
-> +        rc = map_dev_mmio_region(d, gpfn, 1, idx);
-> +        return rc;
-> +        break;
+On Tue, Nov 10, 2015 at 1:30 AM, Olof Johansson <olof@lixom.net> wrote:
+> On Mon, Sep 21, 2015 at 11:24 AM, Linus Walleij
+> <linus.walleij@linaro.org> wrote:
+>> On Wed, Sep 16, 2015 at 8:37 AM, Ludovic Desroches
+>> <ludovic.desroches@atmel.com> wrote:
+>>
+>>> Add pio4 controller node to enable pinmux and gpio.
+>>>
+>>> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
+>>
+>> Patch applied.
+>
+> Please don't merge DT changes through driver trees unless there's a
+> very specific reason to do so, since it introduces random conflicts.
 
-Blindly for any kind of domain? The XSM check in the
-XENMEM_add_to_physmap_batch handler (in common code) doesn't
-even know which map space is to be used...
+Sorry :(
 
-Jan
+Even noted this in the pull request to Torvalds, it was in the bottom
+of my patch stack so had been in -next for ages, I was afraid it
+would create more problem than it solves if I reverted the patch,
+but I guess I should have done so anyways.
+
+Yours,
+Linus Walleij
