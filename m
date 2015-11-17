@@ -1,25 +1,34 @@
-From: robert.jarzmik@free.fr (Robert Jarzmik)
-Date: Tue, 17 Nov 2015 21:46:08 +0100
-Subject: [PATCH] [media] move media platform data to
- linux/platform_data/media
-In-Reply-To: <20151117103708.GL31303@sirena.org.uk> (Mark Brown's message of
- "Tue, 17 Nov 2015 10:37:08 +0000")
-References: <4d99e49726942dc4d6a6ee1debf6665b2b47908b.1447751746.git.mchehab@osg.samsung.com>
- <20151117103708.GL31303@sirena.org.uk>
-Message-ID: <87wptg8icv.fsf@belgarion.home>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 17 Nov 2015 22:01:37 +0100
+Subject: [PATCH] USB: USB_OTG does not depend on PM
+Message-ID: <7521777.8ZmnT3AlIC@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Mark Brown <broonie@kernel.org> writes:
+USB_OTG initially depended on USB_SUSPEND, which was later turned into
+PM_RUNTIME and finally into PM. I don't know at what point the dependency
+became unnecessary but it appears to work fine without CONFIG_PM now.
 
-> On Tue, Nov 17, 2015 at 07:15:59AM -0200, Mauro Carvalho Chehab wrote:
->> Now that media has its own subdirectory inside platform_data,
->> let's move the headers that are already there to such subdir.
->
-> Acked-by: Mark Brown <broonie@kernel.org>
-Acked-by: Robert Jarzmik <robert.jarzmik@free.fr>
+However, we get lots of warnings in randconfig kernels like:
 
-Cheers.
+warning: (USB_OTG_FSM && FSL_USB2_OTG && USB_MV_OTG) selects USB_OTG which has unmet direct dependencies (USB_SUPPORT && USB && PM)
 
--- 
-Robert
+whenever CONFIG_PM is disabled and something else selects USB_OTG.
+Let's just drop the dependency to avoid the warnings.
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+I keep seeing this one in my ARM randconfig test
+
+diff --git a/drivers/usb/core/Kconfig b/drivers/usb/core/Kconfig
+index a99c89e78126..9c5cdf30ca74 100644
+--- a/drivers/usb/core/Kconfig
++++ b/drivers/usb/core/Kconfig
+@@ -43,7 +43,6 @@ config USB_DYNAMIC_MINORS
+ 
+ config USB_OTG
+ 	bool "OTG support"
+-	depends on PM
+ 	default n
+ 	help
+ 	  The most notable feature of USB OTG is support for a
