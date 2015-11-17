@@ -1,61 +1,64 @@
-From: rostedt@goodmis.org (Steven Rostedt)
-Date: Tue, 17 Nov 2015 09:11:42 -0500
-Subject: [PATCH] arm64: kernel: pause/unpause function graph tracer in
- cpu_suspend()
-In-Reply-To: <1447761051-811-1-git-send-email-lorenzo.pieralisi@arm.com>
-References: <1447761051-811-1-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <20151117091142.49a70517@gandalf.local.home>
+From: mark.rutland@arm.com (Mark Rutland)
+Date: Tue, 17 Nov 2015 14:13:20 +0000
+Subject: [RESEND RFC/PATCH 1/8] dt-bindings: Add a binding for Mediatek
+ Video Processor Unit
+In-Reply-To: <1447764885-23100-2-git-send-email-tiffany.lin@mediatek.com>
+References: <1447764885-23100-1-git-send-email-tiffany.lin@mediatek.com>
+ <1447764885-23100-2-git-send-email-tiffany.lin@mediatek.com>
+Message-ID: <20151117141320.GJ12586@leverpostej>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 17 Nov 2015 11:50:51 +0000
-Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote:
-
-
-> Fixes: 819e50e25d0c ("arm64: Add ftrace support")
-> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Reported-by: Catalin Marinas <catalin.marinas@arm.com>
-> Reported-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-> Suggested-by: Steven Rostedt <rostedt@goodmis.org>
-
-Acked-by: Steven Rostedt <rostedt@goodmis.org>
-
--- Steve
-
-> Cc: Will Deacon <will.deacon@arm.com>
-> Cc: <stable@vger.kernel.org> # 3.16+
-> ---
->  arch/arm64/kernel/suspend.c | 9 +++++++++
->  1 file changed, 9 insertions(+)
+On Tue, Nov 17, 2015 at 08:54:38PM +0800, Tiffany Lin wrote:
+> From: Andrew-CT Chen <andrew-ct.chen@mediatek.com>
 > 
-> diff --git a/arch/arm64/kernel/suspend.c b/arch/arm64/kernel/suspend.c
-> index fce95e1..521448d 100644
-> --- a/arch/arm64/kernel/suspend.c
-> +++ b/arch/arm64/kernel/suspend.c
-> @@ -1,3 +1,4 @@
-> +#include <linux/ftrace.h>
->  #include <linux/percpu.h>
->  #include <linux/slab.h>
->  #include <asm/cacheflush.h>
-> @@ -71,6 +72,13 @@ int cpu_suspend(unsigned long arg, int (*fn)(unsigned long))
->  	local_dbg_save(flags);
->  
->  	/*
-> +	 * Function graph tracer state gets incosistent when the kernel
-> +	 * calls functions that never return (aka suspend finishers) hence
-> +	 * disable graph tracing during their execution.
-> +	 */
-> +	pause_graph_tracing();
+> Add a DT binding documentation of Video Processor Unit for the
+> MT8173 SoC from Mediatek.
+> 
+> Signed-off-by: Andrew-CT Chen <andrew-ct.chen@mediatek.com>
+> ---
+>  .../devicetree/bindings/media/mediatek-vpu.txt     |   27 ++++++++++++++++++++
+>  1 file changed, 27 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/media/mediatek-vpu.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/media/mediatek-vpu.txt b/Documentation/devicetree/bindings/media/mediatek-vpu.txt
+> new file mode 100644
+> index 0000000..99a4e5e
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/media/mediatek-vpu.txt
+> @@ -0,0 +1,27 @@
+> +* Mediatek Video Processor Unit
 > +
-> +	/*
->  	 * mm context saved on the stack, it will be restored when
->  	 * the cpu comes out of reset through the identity mapped
->  	 * page tables, so that the thread address space is properly
-> @@ -111,6 +119,7 @@ int cpu_suspend(unsigned long arg, int (*fn)(unsigned long))
->  			hw_breakpoint_restore(NULL);
->  	}
->  
-> +	unpause_graph_tracing();
->  	/*
->  	 * Restore pstate flags. OS lock and mdscr have been already
->  	 * restored, so from this point onwards, debugging is fully
+> +Video Processor Unit is a HW video controller. It controls HW Codec including
+> +H.264/VP8/VP9 Decode, H.264/VP8 Encode and Image Processor (scale/rotate/color convert).
+> +
+> +Required properties:
+> +  - compatible: "mediatek,mt8173-vpu"
+> +  - reg: Must contain an entry for each entry in reg-names.
+> +  - reg-names: Must include the following entries:
+> +    "sram": SRAM base
+> +    "cfg_reg": Main configuration registers base
+> +  - interrupts: interrupt number to the cpu.
+> +  - clocks : clock name from clock manager
+> +  - clock-names: the clocks of the VPU H/W
+
+You need to explicitly define the set of clock-names you expect here.
+
+Mark.
+
+> +  - iommus : phandle and IOMMU spcifier for the IOMMU that serves the VPU.
+> +
+> +Example:
+> +	vpu: vpu at 10020000 {
+> +		compatible = "mediatek,mt8173-vpu";
+> +		reg = <0 0x10020000 0 0x30000>,
+> +		      <0 0x10050000 0 0x100>;
+> +		reg-names = "sram", "cfg_reg";
+> +		interrupts = <GIC_SPI 166 IRQ_TYPE_LEVEL_HIGH>;
+> +		clocks = <&topckgen TOP_SCP_SEL>;
+> +		clock-names = "main";
+> +		iommus = <&iommu M4U_PORT_VENC_RCPU>;
+> +	};
+> -- 
+> 1.7.9.5
+> 
