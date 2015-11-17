@@ -1,150 +1,207 @@
 From: carlo@caione.org (Carlo Caione)
-Date: Tue, 17 Nov 2015 15:56:40 +0100
-Subject: [PATCH 5/7] Documentation: bindings: Add SMP related documentation
+Date: Tue, 17 Nov 2015 15:56:38 +0100
+Subject: [PATCH 3/7] clk: meson8b: Add reset controller for CPU cores
 In-Reply-To: <1447772202-12418-1-git-send-email-carlo@caione.org>
 References: <1447772202-12418-1-git-send-email-carlo@caione.org>
-Message-ID: <1447772202-12418-6-git-send-email-carlo@caione.org>
+Message-ID: <1447772202-12418-4-git-send-email-carlo@caione.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Carlo Caione <carlo@endlessm.com>
 
-With this patch we add documentation for:
-
-* power-management-unit: the PMU is used to bring up the cores during
-  SMP operations
-* sram: among other things the sram is used to store the first code
-  executed by the core when it is powered up
-* cpu-enable-method: the CPU enable method used by Amlogic Meson8b SoCs
+In the Amlogic Meson8b SoC we need to soft reset the CPU cores during
+the boot to enable the SMP support. With this patch we extend the clock
+controller adding a small reset controller in charge of resetting the
+cores.
 
 Signed-off-by: Carlo Caione <carlo@endlessm.com>
 ---
- .../devicetree/bindings/arm/amlogic/pmu.txt        | 16 +++++++
- .../devicetree/bindings/arm/amlogic/smp-sram.txt   | 32 +++++++++++++
- .../arm/cpu-enable-method/amlogic,meson8b-smp      | 53 ++++++++++++++++++++++
- 3 files changed, 101 insertions(+)
- create mode 100644 Documentation/devicetree/bindings/arm/amlogic/pmu.txt
- create mode 100644 Documentation/devicetree/bindings/arm/amlogic/smp-sram.txt
- create mode 100644 Documentation/devicetree/bindings/arm/cpu-enable-method/amlogic,meson8b-smp
+ drivers/clk/meson/clk-cpu.c              | 60 +++++++++++++++++++++++++++++++-
+ drivers/clk/meson/clkc.c                 |  5 +--
+ drivers/clk/meson/clkc.h                 |  6 ++--
+ drivers/clk/meson/meson8b-clkc.c         |  4 +--
+ include/dt-bindings/clock/meson8b-clkc.h |  5 +++
+ 5 files changed, 73 insertions(+), 7 deletions(-)
 
-diff --git a/Documentation/devicetree/bindings/arm/amlogic/pmu.txt b/Documentation/devicetree/bindings/arm/amlogic/pmu.txt
-new file mode 100644
-index 0000000..7b9b2da
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/amlogic/pmu.txt
-@@ -0,0 +1,16 @@
-+Amlogic power-management-unit:
-+-------------------------------
+diff --git a/drivers/clk/meson/clk-cpu.c b/drivers/clk/meson/clk-cpu.c
+index f7c30ea..8836fa9 100644
+--- a/drivers/clk/meson/clk-cpu.c
++++ b/drivers/clk/meson/clk-cpu.c
+@@ -37,9 +37,14 @@
+ #include <linux/slab.h>
+ #include <linux/clk.h>
+ #include <linux/clk-provider.h>
++#include <linux/reset.h>
++#include <linux/reset-controller.h>
+ 
+ #define MESON_CPU_CLK_CNTL1		0x00
+ #define MESON_CPU_CLK_CNTL		0x40
++#define MESON_CPU_CLK_CNTL_CPU		0x19c
 +
-+The pmu is used to turn off and on different power domains of the SoCs
-+This includes the power to the CPU cores.
++#define MESON_MAX_CPU_RST		4
+ 
+ #define MESON_CPU_CLK_MUX1		BIT(7)
+ #define MESON_CPU_CLK_MUX2		BIT(0)
+@@ -51,6 +56,11 @@
+ 
+ #include "clkc.h"
+ 
++struct meson_reset_cpu {
++	void __iomem			*reset_base;
++	struct reset_controller_dev	rcdev;
++};
 +
-+Required node properties:
-+- compatible value : = "amlogic,meson8b-pmu";
-+- reg : physical base address and the size of the registers window
+ struct meson_clk_cpu {
+ 	struct notifier_block		clk_nb;
+ 	const struct clk_div_table	*div_table;
+@@ -182,13 +192,50 @@ static const struct clk_ops meson_clk_cpu_ops = {
+ 	.set_rate	= meson_clk_cpu_set_rate,
+ };
+ 
+-struct clk *meson_clk_register_cpu(const struct clk_conf *clk_conf,
++static int meson_reset_cpu_assert(struct reset_controller_dev *rcdev,
++				  unsigned long id)
++{
++	u32 reg;
++	struct meson_reset_cpu *reset_cpu = container_of(rcdev,
++							 struct meson_reset_cpu,
++							 rcdev);
 +
-+Example:
++	reg = readl(reset_cpu->reset_base);
++	reg |= BIT(id + 24);
++	writel(reg, reset_cpu->reset_base);
 +
-+	pmu at c81000e4 {
-+		compatible = "amlogic,meson8b-pmu", "syscon";
-+		reg = <0xc81000e0 0x18>;
-+	};
-diff --git a/Documentation/devicetree/bindings/arm/amlogic/smp-sram.txt b/Documentation/devicetree/bindings/arm/amlogic/smp-sram.txt
-new file mode 100644
-index 0000000..455ca20
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/amlogic/smp-sram.txt
-@@ -0,0 +1,32 @@
-+Amlogic SRAM for smp bringup:
-+------------------------------
++	return 0;
++}
 +
-+Amlogic's smp-capable SoCs use part of the sram for the bringup of the cores.
-+Once the core gets powered up it executes the code that is residing at a
-+specific location.
++static int meson_reset_cpu_deassert(struct reset_controller_dev *rcdev,
++				    unsigned long id)
++{
++	u32 reg;
++	struct meson_reset_cpu *reset_cpu = container_of(rcdev,
++							 struct meson_reset_cpu,
++							 rcdev);
 +
-+Therefore a reserved section sub-node has to be added to the mmio-sram
-+declaration.
++	reg = readl(reset_cpu->reset_base);
++	reg &= ~BIT(id + 24);
++	writel(reg, reset_cpu->reset_base);
 +
-+Required sub-node properties:
-+- compatible : should be "amlogic,meson8b-smp-sram"
++	return 0;
++}
 +
-+The rest of the properties should follow the generic mmio-sram discription
-+found in ../../misc/sram.txt
++static struct reset_control_ops meson_cpu_reset_ops = {
++	.assert		= meson_reset_cpu_assert,
++	.deassert	= meson_reset_cpu_deassert,
++};
 +
-+Example:
++struct clk *meson_clk_register_cpu(struct device_node *np,
++				   const struct clk_conf *clk_conf,
+ 				   void __iomem *reg_base,
+ 				   spinlock_t *lock)
+ {
+ 	struct clk *clk;
+ 	struct clk *pclk;
+ 	struct meson_clk_cpu *clk_cpu;
++	struct meson_reset_cpu *reset_cpu;
+ 	struct clk_init_data init;
+ 	int ret;
+ 
+@@ -231,6 +278,17 @@ struct clk *meson_clk_register_cpu(const struct clk_conf *clk_conf,
+ 		goto unregister_clk_nb;
+ 	}
+ 
++	reset_cpu = kzalloc(sizeof(*reset_cpu), GFP_KERNEL);
++	if (!reset_cpu)
++		goto out;
 +
-+	sram: sram at d9000000 {
-+		compatible = "mmio-sram";
-+		reg = <0xd9000000 0x20000>;
-+		#address-cells = <1>;
-+		#size-cells = <1>;
-+		ranges = <0 0xd9000000 0x20000>;
++	reset_cpu->reset_base = reg_base + MESON_CPU_CLK_CNTL_CPU;
++	reset_cpu->rcdev.nr_resets = MESON_MAX_CPU_RST;
++	reset_cpu->rcdev.ops = &meson_cpu_reset_ops;
++	reset_cpu->rcdev.of_node = np;
++	reset_controller_register(&reset_cpu->rcdev);
 +
-+		smp-sram at 1ff80 {
-+			compatible = "amlogic,meson8b-smp-sram";
-+			reg = <0x1ff80 0x8>;
-+		};
-+	};
++out:
+ 	return clk;
+ 
+ unregister_clk_nb:
+diff --git a/drivers/clk/meson/clkc.c b/drivers/clk/meson/clkc.c
+index c83ae13..df71e82 100644
+--- a/drivers/clk/meson/clkc.c
++++ b/drivers/clk/meson/clkc.c
+@@ -197,7 +197,8 @@ meson_clk_register_fixed_rate(const struct clk_conf *clk_conf,
+ 	return clk;
+ }
+ 
+-void __init meson_clk_register_clks(const struct clk_conf *clk_confs,
++void __init meson_clk_register_clks(struct device_node *np,
++				    const struct clk_conf *clk_confs,
+ 				    size_t nr_confs,
+ 				    void __iomem *clk_base)
+ {
+@@ -221,7 +222,7 @@ void __init meson_clk_register_clks(const struct clk_conf *clk_confs,
+ 							   clk_base);
+ 			break;
+ 		case CLK_CPU:
+-			clk = meson_clk_register_cpu(clk_conf, clk_base,
++			clk = meson_clk_register_cpu(np, clk_conf, clk_base,
+ 						     &clk_lock);
+ 			break;
+ 		case CLK_PLL:
+diff --git a/drivers/clk/meson/clkc.h b/drivers/clk/meson/clkc.h
+index 609ae92..648d41d 100644
+--- a/drivers/clk/meson/clkc.h
++++ b/drivers/clk/meson/clkc.h
+@@ -177,9 +177,11 @@ struct clk_conf {
+ 	}								\
+ 
+ struct clk **meson_clk_init(struct device_node *np, unsigned long nr_clks);
+-void meson_clk_register_clks(const struct clk_conf *clk_confs,
++void meson_clk_register_clks(struct device_node *np,
++			     const struct clk_conf *clk_confs,
+ 			     unsigned int nr_confs, void __iomem *clk_base);
+-struct clk *meson_clk_register_cpu(const struct clk_conf *clk_conf,
++struct clk *meson_clk_register_cpu(struct device_node *np,
++				   const struct clk_conf *clk_conf,
+ 				   void __iomem *reg_base, spinlock_t *lock);
+ struct clk *meson_clk_register_pll(const struct clk_conf *clk_conf,
+ 				   void __iomem *reg_base, spinlock_t *lock);
+diff --git a/drivers/clk/meson/meson8b-clkc.c b/drivers/clk/meson/meson8b-clkc.c
+index 61f6d55..98f1ebd 100644
+--- a/drivers/clk/meson/meson8b-clkc.c
++++ b/drivers/clk/meson/meson8b-clkc.c
+@@ -179,7 +179,7 @@ static void __init meson8b_clkc_init(struct device_node *np)
+ 		return;
+ 	}
+ 
+-	meson_clk_register_clks(&meson8b_xtal_conf, 1, clk_base);
++	meson_clk_register_clks(np, &meson8b_xtal_conf, 1, clk_base);
+ 	iounmap(clk_base);
+ 
+ 	/*  Generic clocks and PLLs */
+@@ -189,7 +189,7 @@ static void __init meson8b_clkc_init(struct device_node *np)
+ 		return;
+ 	}
+ 
+-	meson_clk_register_clks(meson8b_clk_confs,
++	meson_clk_register_clks(np, meson8b_clk_confs,
+ 				ARRAY_SIZE(meson8b_clk_confs),
+ 				clk_base);
+ }
+diff --git a/include/dt-bindings/clock/meson8b-clkc.h b/include/dt-bindings/clock/meson8b-clkc.h
+index bd2720d..bbdadca 100644
+--- a/include/dt-bindings/clock/meson8b-clkc.h
++++ b/include/dt-bindings/clock/meson8b-clkc.h
+@@ -5,6 +5,11 @@
+ #ifndef __MESON8B_CLKC_H
+ #define __MESON8B_CLKC_H
+ 
++#define RST_CORE0		0
++#define RST_CORE1		1
++#define RST_CORE2		2
++#define RST_CORE3		3
 +
-+
-diff --git a/Documentation/devicetree/bindings/arm/cpu-enable-method/amlogic,meson8b-smp b/Documentation/devicetree/bindings/arm/cpu-enable-method/amlogic,meson8b-smp
-new file mode 100644
-index 0000000..95ee458b
---- /dev/null
-+++ b/Documentation/devicetree/bindings/arm/cpu-enable-method/amlogic,meson8b-smp
-@@ -0,0 +1,53 @@
-+=========================================================
-+Secondary CPU enable-method "amlogic,meson8b-smp" binding
-+=========================================================
-+
-+This document describes the "amlogic,meson8b-smp" method for enabling secondary
-+CPUs. To apply to all CPUs, a single "amlogic,meson8b-smp" enable method should
-+be defined in the "cpus" node.
-+
-+Enable method name:	"amlogic,meson8b-smp"
-+Compatible machines:	"amlogic,meson8b"
-+Compatible CPUs:	"arm,cortex-a5"
-+Related properties:	(none)
-+
-+Example:
-+
-+	cpus {
-+		#address-cells = <1>;
-+		#size-cells = <0>;
-+		enable-method = "amlogic,meson8b-smp";
-+
-+		cpu at 200 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a5";
-+			next-level-cache = <&L2>;
-+			reg = <0x200>;
-+			resets = <&clkc RST_CORE0>;
-+		};
-+
-+		cpu at 201 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a5";
-+			next-level-cache = <&L2>;
-+			reg = <0x201>;
-+			resets = <&clkc RST_CORE1>;
-+		};
-+
-+		cpu at 202 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a5";
-+			next-level-cache = <&L2>;
-+			reg = <0x202>;
-+			resets = <&clkc RST_CORE2>;
-+		};
-+
-+		cpu at 203 {
-+			device_type = "cpu";
-+			compatible = "arm,cortex-a5";
-+			next-level-cache = <&L2>;
-+			reg = <0x203>;
-+			resets = <&clkc RST_CORE3>;
-+		};
-+	};
-+
+ #define CLKID_UNUSED		0
+ #define CLKID_XTAL		1
+ #define CLKID_PLL_FIXED		2
 -- 
 2.5.0
