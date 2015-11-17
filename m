@@ -1,64 +1,46 @@
-From: bharat.kumar.gogada@xilinx.com (Bharat Kumar Gogada)
-Date: Tue, 17 Nov 2015 05:01:54 +0000
-Subject: [PATCH v8] PCI: Xilinx-NWL-PCIe: Added support for Xilinx NWL
- PCIe Host Controller
-In-Reply-To: <564A55C9.40200@broadcom.com>
-References: <1447223619-30945-1-git-send-email-bharatku@xilinx.com>
- <564A55C9.40200@broadcom.com>
-Message-ID: <8520D5D51A55D047800579B0941471982585CBE6@XAP-PVEXMBX01.xlnx.xilinx.com>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Tue, 17 Nov 2015 14:05:39 +0900
+Subject: [PATCH] arm64: extract a field correctly in
+ cpuid_feature_extract_field()
+Message-ID: <1447736739-4131-1-git-send-email-takahiro.akashi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+Basically, cpuid_feature_extract_field() does shift-left and then
+shift-right to extract a specific field in an operand. But
+a shift-left'ed value is casted to 's64' and so a succeeding shift-right
+operation results in creating a sign-extended (and bogus) value.
+
+For example, commit 3085bb01b406 ("arm64/debug: Make use of the system
+wide safe value") changed get_num_brps() using this function, and so
+we cannot identify the correct number of hw breakpoints available:
+
+> hw-breakpoint: found 0 breakpoint and 0 watchpoint registers.
+
+ID_AARCH64DFR0_EL1 is 0xf0f0f106 (on fast model), but get_num_brps()
+returns zero.
+
+This patch fixes the issue by removing the casting.
+I think that cpuid_featuer_extract_field(), arm64_ftr_value() and others
+should return an unsigned value as an extracted field.
+
+Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+---
+ arch/arm64/include/asm/cpufeature.h |    2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm64/include/asm/cpufeature.h b/arch/arm64/include/asm/cpufeature.h
+index 11d5bb0f..ab01508 100644
+--- a/arch/arm64/include/asm/cpufeature.h
++++ b/arch/arm64/include/asm/cpufeature.h
+@@ -114,7 +114,7 @@ static inline void cpus_set_cap(unsigned int num)
+ static inline int __attribute_const__
+ cpuid_feature_extract_field_width(u64 features, int field, int width)
+ {
+-	return (s64)(features << (64 - width - field)) >> (64 - width);
++	return (features << (64 - width - field)) >> (64 - width);
+ }
  
-> On 11/10/2015 10:33 PM, Bharat Kumar Gogada wrote:
-> > Adding PCIe Root Port driver for Xilinx PCIe NWL bridge IP.
-> >
-> > Signed-off-by: Bharat Kumar Gogada <bharatku@xilinx.com>
-> > Signed-off-by: Ravi Kiran Gummaluri <rgummal@xilinx.com>
-> > ---
-> > Added logic to allocate contiguous hwirq in nwl_irq_domain_alloc function.
-> > Moved MSI functionality to separate functions.
-> > Changed error return values.
-> > +static int nwl_irq_domain_alloc(struct irq_domain *domain, unsigned int
-> virq,
-> > +				unsigned int nr_irqs, void *args) {
-> > +	struct nwl_pcie *pcie = domain->host_data;
-> > +	struct nwl_msi *msi = &pcie->msi;
-> > +	unsigned long bit;
-> > +	int i;
-> > +
-> > +	mutex_lock(&msi->lock);
-> > +	for (i = 0; i < nr_irqs; i++) {
-> > +		bit = find_first_zero_bit(msi->used, INT_PCI_MSI_NR);
-> > +		if (bit < INT_PCI_MSI_NR)
-> > +			set_bit(bit, msi->used);
-> > +		else
-> > +			bit = -ENOSPC;
-> 
-> Don't you get a compiler warning with this? Note bit is unsigned long and you
-> assign -ENOSPC to it.
-> 
-Ya that's a mistake, I will address these in next patch.
-> > +
-> > +		if (bit < 0) {
-> 
-> how can bit < 0 if it's unsigned long?
-> 
-> > +			mutex_unlock(&msi->lock);
-> > +			return bit;
-> > +		}
-> > +
-> > +		irq_domain_set_info(domain, virq, bit, &nwl_irq_chip,
-> > +				domain->host_data, handle_simple_irq,
-> > +				NULL, NULL);
-> 
-> nit, but if you do irq_domain_set_info(domain, virq + i, ...
-> 
-> then you can get rid of the code below.
-> 
-> > +		virq = virq + 1;
-> > +	}
-> > +	mutex_unlock(&msi->lock);
-> > +	return 0;
-> > +}
-> > +
+ static inline int __attribute_const__
+-- 
+1.7.9.5
