@@ -1,73 +1,52 @@
-From: julien.grall@citrix.com (Julien Grall)
-Date: Tue, 17 Nov 2015 12:33:48 +0000
-Subject: [PATCH v3 55/62] arm/acpi: Route all Xen unused SPIs to Dom0
-In-Reply-To: <1447753261-7552-56-git-send-email-shannon.zhao@linaro.org>
-References: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
- <1447753261-7552-56-git-send-email-shannon.zhao@linaro.org>
-Message-ID: <564B1EAC.2050904@citrix.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Tue, 17 Nov 2015 12:38:07 +0000
+Subject: [PATCH v2 10/11] PM / Hibernate: clean cached pages on
+ architectures that require it
+In-Reply-To: <3180507.pKM8OzKjXO@vostro.rjw.lan>
+References: <1445966960-31724-1-git-send-email-james.morse@arm.com>
+ <2039611.PJaFlk1sMi@vostro.rjw.lan>
+ <20151112114705.GA2657@red-moon>
+ <3180507.pKM8OzKjXO@vostro.rjw.lan>
+Message-ID: <20151117123807.GA22216@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shannon,
+[Cc'ed maintainers of affected arches]
 
-On 17/11/15 09:40, shannon.zhao at linaro.org wrote:
-> From: Shannon Zhao <shannon.zhao@linaro.org>
+On Sat, Nov 14, 2015 at 12:38:50AM +0100, Rafael J. Wysocki wrote:
+> On Thursday, November 12, 2015 11:47:05 AM Lorenzo Pieralisi wrote:
+> > On Thu, Nov 12, 2015 at 01:48:32AM +0100, Rafael J. Wysocki wrote:
+> > > On Wednesday, November 11, 2015 11:40:39 AM Lorenzo Pieralisi wrote:
+> > > > Hi Pavel, Rafael,
+> > > > 
+> > > > Do you have any feedback on this patch ?
+> > > > 
+> > > > It is fundamental to this series and affects Hibernate core code so if you
+> > > > have any feedback that would be much appreciated.
+> > > 
+> > > I'm really not familiar with the flush_icache_range() interface.
+> > > 
+> > > What exactly does it do?
+> > 
+> > It is used to sync a memory range that is written into (eg loading
+> > modules, copying from snapshot is basically the same thing, reads from
+> > storage and restore pages that might well be executable code), in particular
+> > to sync the I-cache and the D-cache, eg on arm64 the page that the snapshot
+> > code is copying might be executable code that has to be cleaned from the
+> > D-cache so that it is made visible to the I-cache.
+> > 
+> > On x86 it is a NOP AFAIK.
 > 
-> Route all SPIs to Dom0 except the interrupts that Xen uses. Since Xen
-> already uses the uart interrupt, the desc->action will not be NULL, so
-> it will skip it.
-> 
-> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
-> ---
->  xen/arch/arm/domain_build.c | 33 +++++++++++++++++++++++++++++++++
->  1 file changed, 33 insertions(+)
-> 
-> diff --git a/xen/arch/arm/domain_build.c b/xen/arch/arm/domain_build.c
-> index 6d8536b..6945f89 100644
-> --- a/xen/arch/arm/domain_build.c
-> +++ b/xen/arch/arm/domain_build.c
-> @@ -1360,6 +1360,35 @@ static int prepare_dtb(struct domain *d, struct kernel_info *kinfo)
->  #define XEN_HYPERVISOR_ID 0x000058656E564D4D  /* "XenVMM" */
->  #define ACPI_DOM0_FDT_MIN_SIZE 4096
->  
-> +static int acpi_route_spi(struct domain *d)
-> +{
-> +    int i, res;
-> +    struct irq_desc *desc;
-> +
-> +    /* Don't route Xen used interrupt to Dom0. Since Xen already uses the uart
-> +     * interrupt, the desc->action will not be NULL, so it will skip it.
-> +     */
-> +    for( i = NR_LOCAL_IRQS; i < vgic_num_irqs(d); i++ )
-> +    {
-> +        /* Don't route uart interrupt to Dom0 */
+> If that's the case, I have no problems with this change as long as the code
+> works on architectures with non-trivial flush_icache_range().
 
-Your comments are wrong. desc->action != NULL means Xen is using the
-interrupt. It could be for the SMMU, the UART...
+I Cc'ed the respective arches maintainers, it should work (it may
+make resuming a bit slower, owing to the cache syncing), problem is
+that we have no way of testing it on platforms other than arm/arm64.
 
-> +        desc = irq_to_desc(i);
-> +        if( desc->action != NULL)
+How do you want us to go on about this ? Should we add a config option
+to prevent calling flush_icache_range() on all platforms (where it
+is not a nop) ?
 
-Coding style.
-
-> +            continue;
-> +
-> +        vgic_reserve_virq(d, i);
-> +        irq_set_type(i, ACPI_IRQ_TYPE_NONE);
-> +        res = route_irq_to_guest(d, i, i, NULL);
-> +        if ( res )
-> +        {
-> +            printk(XENLOG_ERR "Unable to route IRQ %u to domain %u\n",
-> +                   i, d->domain_id);
-> +            continue;
-> +        }
-> +    }
-> +
-> +    return 0;
-> +}
-> +
-
-Regards,
-
--- 
-Julien Grall
+Thanks a lot !
+Lorenzo
