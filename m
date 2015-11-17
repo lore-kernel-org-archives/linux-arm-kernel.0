@@ -1,77 +1,73 @@
-From: mw@semihalf.com (Marcin Wojtas)
-Date: Tue, 17 Nov 2015 17:37:27 +0100
-Subject: [PATCH] ARM: mvebu: add reference to ETH connectors for A385-AP
-In-Reply-To: <20151117162118.GQ8644@n2100.arm.linux.org.uk>
-References: <1447775620-25919-1-git-send-email-thomas.petazzoni@free-electrons.com>
- <7560280.yqEeu9J2fA@wuerfel>
- <20151117162118.GQ8644@n2100.arm.linux.org.uk>
-Message-ID: <CAPv3WKduZLK1_cgnWYUnBYw19YFxik9B8o-MPiZO6OvfvhhEWQ@mail.gmail.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 17 Nov 2015 16:44:53 +0000
+Subject: next build: 235 warnings 3 failures (next/next-20151117)
+In-Reply-To: <4694362.ZPL12j6kR2@wuerfel>
+References: <564a9961.878b420a.331b8.fffffd62@mx.google.com>
+ <4694362.ZPL12j6kR2@wuerfel>
+Message-ID: <20151117164453.GF30101@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+Hi Arnd,
 
-How about swapping the ethernet@ entries in the board DT files to gain
-following order:
-ethernet at 70000
-...
-ethernet at 30000
-...
-ethernet at 34000
+On Tue, Nov 17, 2015 at 09:57:30AM +0100, Arnd Bergmann wrote:
+> On Monday 16 November 2015 19:05:05 Olof's autobuilder wrote:
+> > 
+> > Errors:
+> > 
+> >         arm64.allmodconfig:
+> > arch/arm64/include/asm/barrier.h:71:3: error: read-only variable '___p1' used as 'asm' output
+> > arch/arm64/include/asm/barrier.h:75:3: error: read-only variable '___p1' used as 'asm' output
+> > arch/arm64/include/asm/barrier.h:79:3: error: read-only variable '___p1' used as 'asm' output
+> > arch/arm64/include/asm/barrier.h:83:3: error: read-only variable '___p1' used as 'asm' output
+> > arch/arm64/include/asm/barrier.h:71:3: error: read-only variable '___p1' used as 'asm' output
+> > arch/arm64/include/asm/barrier.h:75:3: error: read-only variable '___p1' used as 'asm' output
+> > arch/arm64/include/asm/barrier.h:79:3: error: read-only variable '___p1' used as 'asm' output
+> > arch/arm64/include/asm/barrier.h:83:3: error: read-only variable '___p1' used as 'asm' output
+> > arch/arm64/include/asm/barrier.h:71:3: error: read-only variable '___p1' used as 'asm' output
+> 
+> The patch below seems to fix it. Please review/apply.
+> 
+> 8<----
+> Subject: ARM64: make smp_load_acquire() work with const arguments
+> 
+> smp_load_acquire() uses typeof() to declare a local variable for temporarily
+> storing the output of the memory access. This fails when the argument is
+> constant, because the assembler complains about using a constant register
+> as output:
+> 
+>  arch/arm64/include/asm/barrier.h:71:3: error: read-only variable '___p1'
+>  used as 'asm' output
 
-I know this would introduce deviation from epapr rules, but it always
-worked for me.
+Do you know the usage in the kernel causing this warning?
 
-Best regards,
-Marcin
+> This changes the implementation to use an 'unsigned long' for the temporary value
+> and only cast it to the original type in the end.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> 
+> diff --git a/arch/arm64/include/asm/barrier.h b/arch/arm64/include/asm/barrier.h
+> index 624f9679f4b0..05fa329467f6 100644
+> --- a/arch/arm64/include/asm/barrier.h
+> +++ b/arch/arm64/include/asm/barrier.h
+> @@ -64,7 +64,7 @@ do {									\
+>  
+>  #define smp_load_acquire(p)						\
+>  ({									\
+> -	typeof(*p) ___p1;						\
+> +	unsigned long ___p1;						\
+>  	compiletime_assert_atomic_type(*p);				\
+>  	switch (sizeof(*p)) {						\
+>  	case 1:								\
+> @@ -84,7 +84,7 @@ do {									\
+>  			: "=r" (___p1) : "Q" (*p) : "memory");		\
+>  		break;							\
+>  	}								\
+> -	___p1;								\
+> +	(typeof(*p))___p1;								\
 
-2015-11-17 17:21 GMT+01:00 Russell King - ARM Linux <linux@arm.linux.org.uk>:
-> On Tue, Nov 17, 2015 at 04:57:20PM +0100, Arnd Bergmann wrote:
->> On Tuesday 17 November 2015 16:53:40 Thomas Petazzoni wrote:
->> > This commit adds some comments to the Armada 385 AP Device Tree
->> > description to indicate which Ethernet interface matches which
->> > physical connector on the board.
->> >
->> > This is especially useful on this board, since the mapping between the
->> > logical interface names and the physical ports is not very
->> > straightforward. It also doesn't match the numbering of the interfaces
->> > done by U-Boot:
->> >
->> >  U-Boot interface | Linux interface | Physical port
->> >  -----------------+-----------------+--------------
->> >    egiga0         |     eth2        |   CON4
->> >    egiga1         |     eth0        |   CON2
->> >    egiga2         |     eth1        |   CON3
->> >  -----------------+-----------------+--------------
->> >
->> > Signed-off-by: Thomas Petazzoni <thomas.petazzoni@free-electrons.com>
->> > Cc: Maxime Ripard <maxime.ripard@free-electrons.com>
->> >
->>
->> Would it be possible to use entries in /aliases to fix the order of the
->> interfaces and make them match the physical ports?
->
-> Unfortunately not, and I believe davem is averse to "fixing" this problem
-> in the kernel.  It's really problematical, especially if you are running
-> a debian based distro and want to be able to say "I want egiga0 configured
-> like _this_".  You're entirely at the mercy of the ordering that the DT
-> compiler decides to place the nodes, and the ordering which the kernel
-> decides to probe the interfaces, etc.
->
-> Yes, there's always the ethernet MAC which can be used to identify them,
-> but debian at least doesn't have a way to identify interfaces in its
-> /etc/network/interfaces file by ethernet MAC.
->
-> So, use the modern network-manager daemon... umm no, not if you want to
-> use bridging or any of the other such facilities.
->
-> This whole area is really very annoying.
->
-> --
-> FTTC broadband for 0.8mile line: currently at 9.6Mbps down 400kbps up
-> according to speedtest.net.
->
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+My worry about having the cast here is if somebody decides to
+smp_load_acquire from a packed 64-bit structure (e.g. some sort of lock),
+then we'll get a conversion to non-scalar type error from the compiler.
+
+Will
