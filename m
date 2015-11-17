@@ -1,104 +1,78 @@
 From: shannon.zhao@linaro.org (shannon.zhao at linaro.org)
-Date: Tue, 17 Nov 2015 17:40:18 +0800
-Subject: [PATCH v3 19/62] arm/smpboot: Move dt specific code in smp to
- seperate functions
+Date: Tue, 17 Nov 2015 17:40:20 +0800
+Subject: [PATCH v3 21/62] arm/gic-v2: Refactor gicv2_init into generic and dt
+ specific parts
 In-Reply-To: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
 References: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
-Message-ID: <1447753261-7552-20-git-send-email-shannon.zhao@linaro.org>
+Message-ID: <1447753261-7552-22-git-send-email-shannon.zhao@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Parth Dixit <parth.dixit@linaro.org>
+From: Shannon Zhao <shannon.zhao@linaro.org>
 
-Partition smp initialization functions into generic and dt specific
-parts, this will be useful when introducing new functions for smp
-initialization based on acpi.
+Refactor gic-v2 related functions into dt and generic parts. This will be
+helpful when adding acpi support for gic.
 
 Signed-off-by: Parth Dixit <parth.dixit@linaro.org>
 Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
 ---
- xen/arch/arm/arm64/smpboot.c |  7 ++++++-
- xen/arch/arm/smpboot.c       | 29 ++++++++++++++++++-----------
- 2 files changed, 24 insertions(+), 12 deletions(-)
+ xen/arch/arm/gic-v2.c | 21 ++++++++++++++-------
+ 1 file changed, 14 insertions(+), 7 deletions(-)
 
-diff --git a/xen/arch/arm/arm64/smpboot.c b/xen/arch/arm/arm64/smpboot.c
-index 62e6abb..7928f69 100644
---- a/xen/arch/arm/arm64/smpboot.c
-+++ b/xen/arch/arm/arm64/smpboot.c
-@@ -70,7 +70,7 @@ int __init arch_smp_init(void)
-     return 0;
+diff --git a/xen/arch/arm/gic-v2.c b/xen/arch/arm/gic-v2.c
+index 01e36b5..e31d38e 100644
+--- a/xen/arch/arm/gic-v2.c
++++ b/xen/arch/arm/gic-v2.c
+@@ -628,13 +628,12 @@ static bool_t gicv2_is_aliased(paddr_t cbase, paddr_t csize)
+     return ((val_low & 0xfff0fff) == 0x0202043B && val_low == val_high);
  }
  
--int __init arch_cpu_init(int cpu, struct dt_device_node *dn)
-+static int __init dt_arch_cpu_init(int cpu, struct dt_device_node *dn)
+-static int __init gicv2_init(void)
++static paddr_t __initdata hbase, dbase, cbase, csize, vbase;
++
++static void __init dt_gicv2_init(void)
  {
-     const char *enable_method;
+     int res;
+-    paddr_t hbase, dbase;
+-    paddr_t cbase, csize;
+-    paddr_t vbase, vsize;
+-    uint32_t aliased_offset = 0;
++    paddr_t vsize;
+     const struct dt_device_node *node = gicv2_info.node;
  
-@@ -94,6 +94,11 @@ int __init arch_cpu_init(int cpu, struct dt_device_node *dn)
-     return 0;
- }
- 
-+int __init arch_cpu_init(int cpu, struct dt_device_node *dn)
-+{
-+    return dt_arch_cpu_init(cpu, dn);
+     res = dt_device_get_address(node, 0, &dbase, NULL);
+@@ -680,6 +679,13 @@ static int __init gicv2_init(void)
+     if ( csize != vsize )
+         panic("GICv2: Sizes of GICC (%#"PRIpaddr") and GICV (%#"PRIpaddr") don't match\n",
+                csize, vsize);
 +}
 +
- int __init arch_cpu_up(int cpu)
- {
-     if ( !smp_enable_ops[cpu].prepare_cpu )
-diff --git a/xen/arch/arm/smpboot.c b/xen/arch/arm/smpboot.c
-index a96cda2..d115228 100644
---- a/xen/arch/arm/smpboot.c
-+++ b/xen/arch/arm/smpboot.c
-@@ -92,7 +92,7 @@ smp_clear_cpu_maps (void)
-  * MPIDR values related to logical cpus
-  * Code base on Linux arch/arm/kernel/devtree.c
-  */
--void __init smp_init_cpus(void)
-+static void __init dt_smp_init_cpus(void)
- {
-     register_t mpidr;
-     struct dt_device_node *cpus = dt_find_node_by_path("/cpus");
-@@ -106,16 +106,6 @@ void __init smp_init_cpus(void)
-     bool_t bootcpu_valid = 0;
-     int rc;
- 
--    /* scan the DTB for a PSCI node and set a global variable */
--    psci_init();
--
--    if ( (rc = arch_smp_init()) < 0 )
--    {
--        printk(XENLOG_WARNING "SMP init failed (%d)\n"
--               "Using only 1 CPU\n", rc);
--        return;
--    }
--
-     mpidr = boot_cpu_data.mpidr.bits & MPIDR_HWID_MASK;
- 
-     if ( !cpus )
-@@ -243,6 +233,23 @@ void __init smp_init_cpus(void)
-     }
- }
- 
-+void __init smp_init_cpus(void)
++static int __init gicv2_init(void)
 +{
-+    int rc;
++    uint32_t aliased_offset = 0;
 +
-+    /* initialize PSCI and set a global variable */
-+    psci_init();
-+
-+    if ( (rc = arch_smp_init()) < 0 )
-+    {
-+        printk(XENLOG_WARNING "SMP init failed (%d)\n"
-+               "Using only 1 CPU\n", rc);
-+        return;
-+    }
-+
-+    dt_smp_init_cpus();
-+}
-+
- int __init
- smp_get_max_cpus (void)
++    dt_gicv2_init();
+ 
+     printk("GICv2 initialization:\n"
+               "        gic_dist_addr=%"PRIpaddr"\n"
+@@ -765,7 +771,8 @@ const static struct gic_hw_operations gicv2_ops = {
+ };
+ 
+ /* Set up the GIC */
+-static int __init gicv2_preinit(struct dt_device_node *node, const void *data)
++static int __init dt_gicv2_preinit(struct dt_device_node *node,
++                                   const void *data)
  {
+     gicv2_info.hw_version = GIC_V2;
+     gicv2_info.node = node;
+@@ -783,7 +790,7 @@ static const struct dt_device_match gicv2_dt_match[] __initconst =
+ 
+ DT_DEVICE_START(gicv2, "GICv2", DEVICE_GIC)
+         .dt_match = gicv2_dt_match,
+-        .init = gicv2_preinit,
++        .init = dt_gicv2_preinit,
+ DT_DEVICE_END
+ 
+ /*
 -- 
 2.1.0
