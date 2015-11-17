@@ -1,64 +1,58 @@
 From: carlo@caione.org (Carlo Caione)
-Date: Tue, 17 Nov 2015 15:56:39 +0100
-Subject: [PATCH 4/7] ARM: DTS: meson8b: Enable reset controller
+Date: Tue, 17 Nov 2015 15:56:37 +0100
+Subject: [PATCH 2/7] Documentation: bindings: Define CPU reset controller
 In-Reply-To: <1447772202-12418-1-git-send-email-carlo@caione.org>
 References: <1447772202-12418-1-git-send-email-carlo@caione.org>
-Message-ID: <1447772202-12418-5-git-send-email-carlo@caione.org>
+Message-ID: <1447772202-12418-3-git-send-email-carlo@caione.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Carlo Caione <carlo@endlessm.com>
 
-Extend the CPU nodes to use the reset controller.
+The clock controller on Amlogic Meson8b SoCs has been extended with a
+reset controller used to reset the CPU cores. It is used during SMP
+bringup.
+
+With this patch we extend the clock controller documentation.
 
 Signed-off-by: Carlo Caione <carlo@endlessm.com>
 ---
- arch/arm/boot/dts/meson8b.dtsi | 5 +++++
- 1 file changed, 5 insertions(+)
+ Documentation/devicetree/bindings/clock/amlogic,meson8b-clkc.txt | 6 +++++-
+ 1 file changed, 5 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm/boot/dts/meson8b.dtsi b/arch/arm/boot/dts/meson8b.dtsi
-index 745f0f9..977d55f 100644
---- a/arch/arm/boot/dts/meson8b.dtsi
-+++ b/arch/arm/boot/dts/meson8b.dtsi
-@@ -60,6 +60,7 @@
- 			compatible = "arm,cortex-a5";
- 			next-level-cache = <&L2>;
- 			reg = <0x200>;
-+			resets = <&clkc RST_CORE0>;
- 		};
+diff --git a/Documentation/devicetree/bindings/clock/amlogic,meson8b-clkc.txt b/Documentation/devicetree/bindings/clock/amlogic,meson8b-clkc.txt
+index 2b7b3fa..feeb4de 100644
+--- a/Documentation/devicetree/bindings/clock/amlogic,meson8b-clkc.txt
++++ b/Documentation/devicetree/bindings/clock/amlogic,meson8b-clkc.txt
+@@ -1,7 +1,8 @@
+ * Amlogic Meson8b Clock and Reset Unit
  
- 		cpu at 201 {
-@@ -67,6 +68,7 @@
- 			compatible = "arm,cortex-a5";
- 			next-level-cache = <&L2>;
- 			reg = <0x201>;
-+			resets = <&clkc RST_CORE1>;
- 		};
+ The Amlogic Meson8b clock controller generates and supplies clock to various
+-controllers within the SoC.
++controllers within the SoC and also implements a reset controller for the CPU
++cores.
  
- 		cpu at 202 {
-@@ -74,6 +76,7 @@
- 			compatible = "arm,cortex-a5";
- 			next-level-cache = <&L2>;
- 			reg = <0x202>;
-+			resets = <&clkc RST_CORE2>;
- 		};
+ Required Properties:
  
- 		cpu at 203 {
-@@ -81,6 +84,7 @@
- 			compatible = "arm,cortex-a5";
- 			next-level-cache = <&L2>;
- 			reg = <0x203>;
-+			resets = <&clkc RST_CORE3>;
- 		};
+@@ -13,16 +14,19 @@ Required Properties:
+ 	   mapped region.
+ 
+ - #clock-cells: should be 1.
++- #reset-cells: should be 1.
+ 
+ Each clock is assigned an identifier and client nodes can use this identifier
+ to specify the clock which they consume. All available clocks are defined as
+ preprocessor macros in the dt-bindings/clock/meson8b-clkc.h header and can be
+ used in device tree sources.
++Similar identifiers exist for the CPU core reset lines.
+ 
+ Example: Clock controller node:
+ 
+ 	clkc: clock-controller at c1104000 {
+ 		#clock-cells = <1>;
++		#reset-cells = <1>;
+ 		compatible = "amlogic,meson8b-clkc";
+ 		reg = <0xc1108000 0x4>, <0xc1104000 0x460>;
  	};
- 
-@@ -153,6 +157,7 @@
- 		};
- 
- 		clkc: clock-controller at c1104000 {
-+			#reset-cells = <1>;
- 			#clock-cells = <1>;
- 			compatible = "amlogic,meson8b-clkc";
- 			reg = <0xc1108000 0x4>, <0xc1104000 0x460>;
 -- 
 2.5.0
