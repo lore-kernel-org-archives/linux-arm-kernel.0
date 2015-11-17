@@ -1,47 +1,55 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Tue, 17 Nov 2015 15:16:57 +0900
-Subject: [PATCH v6 9/9] drivers: soc: Add support for Exynos PMU driver
-In-Reply-To: <1447740351-14246-10-git-send-email-pankaj.dubey@samsung.com>
-References: <1447740351-14246-1-git-send-email-pankaj.dubey@samsung.com>
- <1447740351-14246-10-git-send-email-pankaj.dubey@samsung.com>
-Message-ID: <564AC659.5090409@samsung.com>
+From: vigneshr@ti.com (Vignesh R)
+Date: Tue, 17 Nov 2015 12:02:29 +0530
+Subject: [PATCH v3 1/5] spi: introduce mmap read support for spi flash
+ devices
+In-Reply-To: <56460A4D.30303@atmel.com>
+References: <1447133399-25658-1-git-send-email-vigneshr@ti.com>
+ <1447133399-25658-2-git-send-email-vigneshr@ti.com>
+ <20151110232341.GU12143@google.com> <5642E546.3040806@ti.com>
+ <20151111072041.GA13174@localhost> <56460A4D.30303@atmel.com>
+Message-ID: <564AC9FD.6090909@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17.11.2015 15:05, Pankaj Dubey wrote:
-> This patch moves Exynos PMU driver implementation from "arm/mach-exynos"
-> to "drivers/soc/samsung". This driver is mainly used for setting misc
-> bits of register from PMU IP of Exynos SoC which will be required to
-> configure before Suspend/Resume. Currently all these settings are done
-> in "arch/arm/mach-exynos/pmu.c" but moving ahead for ARM64 based SoC
-> support, there is a need of this PMU driver in driver/* folder.
+Hi Brian,
+
+On 11/13/2015 09:35 PM, Cyrille Pitchen wrote:
+
+[...]
+
 > 
-> This driver uses existing DT binding information and there should
-> be no functionality change in the supported platforms.
+> In September I've sent a series of patches to enhance the support of QSPI flash
+> memories. Patch 4 was dedicated to the m25p80 driver and set the
+> rx_nbits / tx_nbits fields of spi_transfer struct(s) in order to configure the
+> number of I/O lines independently for the opcode, address and data parts.
+> The work was done for m25p80_read() but also for _read_reg(), _write_reg() and
+> _write().
+> The patched m25p80 driver was then tested with an at25 memory to check non-
+> regression.
 > 
-> Signed-off-by: Amit Daniel Kachhap <amitdanielk@gmail.com>
-> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
-> ---
->  arch/arm/mach-exynos/Kconfig                                   | 1 +
->  arch/arm/mach-exynos/Makefile                                  | 4 +---
->  drivers/soc/samsung/Kconfig                                    | 4 ++++
->  drivers/soc/samsung/Makefile                                   | 2 ++
->  arch/arm/mach-exynos/pmu.c => drivers/soc/samsung/exynos-pmu.c | 0
->  {arch/arm/mach-exynos => drivers/soc/samsung}/exynos-pmu.h     | 0
->  {arch/arm/mach-exynos => drivers/soc/samsung}/exynos3250-pmu.c | 0
->  {arch/arm/mach-exynos => drivers/soc/samsung}/exynos4-pmu.c    | 0
->  {arch/arm/mach-exynos => drivers/soc/samsung}/exynos5250-pmu.c | 0
->  {arch/arm/mach-exynos => drivers/soc/samsung}/exynos5420-pmu.c | 0
->  10 files changed, 8 insertions(+), 3 deletions(-)
->  rename arch/arm/mach-exynos/pmu.c => drivers/soc/samsung/exynos-pmu.c (100%)
->  rename {arch/arm/mach-exynos => drivers/soc/samsung}/exynos-pmu.h (100%)
->  rename {arch/arm/mach-exynos => drivers/soc/samsung}/exynos3250-pmu.c (100%)
->  rename {arch/arm/mach-exynos => drivers/soc/samsung}/exynos4-pmu.c (100%)
->  rename {arch/arm/mach-exynos => drivers/soc/samsung}/exynos5250-pmu.c (100%)
->  rename {arch/arm/mach-exynos => drivers/soc/samsung}/exynos5420-pmu.c (100%)
+> This series of patches also added 4 enum spi_protocol fields inside struct
+> spi_nor so the spi-nor framework can tell the (Q)SPI controller driver what SPI
+> protocol should be use for erase, read, write and register read/write
+> operations, depending on the memory manufacturer and the command opcode.
+> This was done to better support Micron, Spansion and Macronix QSPI memories.
+> 
+> I have tested the series with Micron QSPI memories and Atmel QSPI controller
+> and I guess Marek also tested it on his side with Spansion QSPI memories and
+> another QSPI controller.
+> 
+> So if it can help other developers to develop QSPI controller drivers, the
+> series is still available there:
+> 
+> for the whole series:
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-September/371170.html
+> 
+> for patch 4 (depends on patch 2 for enum spi_protocol):
+> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-September/371173.html
 > 
 
-Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Should I rebase my next version on top of above patches by Cyrille or
+shall I post on top of 4.4-rc1?
 
-Best regards,
-Krzysztof
+-- 
+Regards
+Vignesh
