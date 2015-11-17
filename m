@@ -1,52 +1,36 @@
 From: shannon.zhao@linaro.org (shannon.zhao at linaro.org)
-Date: Tue, 17 Nov 2015 17:40:03 +0800
-Subject: [PATCH v3 04/62] arm/acpi: Emulate io ports for arm
+Date: Tue, 17 Nov 2015 17:40:04 +0800
+Subject: [PATCH v3 05/62] acpi: Don't do traditional BIOS table scan for ARM64
 In-Reply-To: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
 References: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
-Message-ID: <1447753261-7552-5-git-send-email-shannon.zhao@linaro.org>
+Message-ID: <1447753261-7552-6-git-send-email-shannon.zhao@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Parth Dixit <parth.dixit@linaro.org>
+From: Shannon Zhao <shannon.zhao@linaro.org>
 
-Add macros to emulate x86 style ports for arm. This avoids modification in
-common code for acpi.
+With the addition of ARM64 that does not have a traditional BIOS to
+scan, add a #ifdef option for x86 to do the traditional BIOS scanning
+for tables.
 
-Signed-off-by: Parth Dixit <parth.dixit@linaro.org>
 Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
 ---
- xen/include/asm-arm/arm64/io.h | 14 ++++++++++++++
- 1 file changed, 14 insertions(+)
+ xen/drivers/acpi/osl.c | 2 ++
+ 1 file changed, 2 insertions(+)
 
-diff --git a/xen/include/asm-arm/arm64/io.h b/xen/include/asm-arm/arm64/io.h
-index 37abc47..7ad9b65 100644
---- a/xen/include/asm-arm/arm64/io.h
-+++ b/xen/include/asm-arm/arm64/io.h
-@@ -20,6 +20,7 @@
- #ifndef _ARM_ARM64_IO_H
- #define _ARM_ARM64_IO_H
+diff --git a/xen/drivers/acpi/osl.c b/xen/drivers/acpi/osl.c
+index ce15470..db74a90 100644
+--- a/xen/drivers/acpi/osl.c
++++ b/xen/drivers/acpi/osl.c
+@@ -78,7 +78,9 @@ acpi_physical_address __init acpi_os_get_root_pointer(void)
+ 	} else {
+ 		acpi_physical_address pa = 0;
  
-+#include <asm/system.h>
- #include <asm/byteorder.h>
- 
- /*
-@@ -109,4 +110,17 @@ static inline u64 __raw_readq(const volatile void __iomem *addr)
- #define writel(v,c)             ({ __iowmb(); writel_relaxed((v),(c)); })
- #define writeq(v,c)             ({ __iowmb(); writeq_relaxed((v),(c)); })
- 
-+/*
-+ * Emulate x86 io ports for arm.
-+ */
-+#define __armio(addr) ( (void __iomem *)addr )
-+
-+#define inb(c) ( readb( __armio(c) ) )
-+#define inw(c) ( readw( __armio(c) ) )
-+#define inl(c) ( readl( __armio(c) ) )
-+
-+#define outb(v, c) ( writeb(v, __armio(c) ) )
-+#define outw(v, c) ( writew(v, __armio(c) ) )
-+#define outl(v, c) ( writel(v, __armio(c) ) )
-+
- #endif /* _ARM_ARM64_IO_H */
++		#ifdef CONFIG_X86
+ 		acpi_find_root_pointer(&pa);
++		#endif
+ 		return pa;
+ 	}
+ }
 -- 
 2.1.0
