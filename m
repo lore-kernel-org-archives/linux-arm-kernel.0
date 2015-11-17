@@ -1,128 +1,95 @@
 From: shannon.zhao@linaro.org (shannon.zhao at linaro.org)
-Date: Tue, 17 Nov 2015 17:40:23 +0800
-Subject: [PATCH v3 24/62] arm: Introduce a generic way to use a device from
- acpi
+Date: Tue, 17 Nov 2015 17:40:24 +0800
+Subject: [PATCH v3 25/62] acpi/table: Introduce acpi_get_entry to get
+ specified entry
 In-Reply-To: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
 References: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
-Message-ID: <1447753261-7552-25-git-send-email-shannon.zhao@linaro.org>
+Message-ID: <1447753261-7552-26-git-send-email-shannon.zhao@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Parth Dixit <parth.dixit@linaro.org>
+From: Shannon Zhao <shannon.zhao@linaro.org>
 
-Add generic way to use device from acpi similar to the way it is
-supported in device tree.
+When constructing MADT table for Dom0, it needs to create GICC subtable
+according to the dom0_max_vcpus. This function could be used for get the
+specified entry.
 
-Signed-off-by: Parth Dixit <parth.dixit@linaro.org>
 Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
 ---
- xen/arch/arm/device.c        | 19 +++++++++++++++++++
- xen/arch/arm/xen.lds.S       |  7 +++++++
- xen/include/asm-arm/device.h | 30 ++++++++++++++++++++++++++++++
- 3 files changed, 56 insertions(+)
+ xen/drivers/acpi/tables.c | 45 +++++++++++++++++++++++++++++++++++++++++++++
+ xen/include/xen/acpi.h    |  4 ++++
+ 2 files changed, 49 insertions(+)
 
-diff --git a/xen/arch/arm/device.c b/xen/arch/arm/device.c
-index 0b53f6a..5494de0 100644
---- a/xen/arch/arm/device.c
-+++ b/xen/arch/arm/device.c
-@@ -22,6 +22,7 @@
- #include <xen/lib.h>
- 
- extern const struct device_desc _sdevice[], _edevice[];
-+extern const struct acpi_device_desc _asdevice[], _aedevice[];
- 
- int __init device_init(struct dt_device_node *dev, enum device_class class,
-                        const void *data)
-@@ -50,6 +51,24 @@ int __init device_init(struct dt_device_node *dev, enum device_class class,
-     return -EBADF;
+diff --git a/xen/drivers/acpi/tables.c b/xen/drivers/acpi/tables.c
+index 2fba206..3ba8bad 100644
+--- a/xen/drivers/acpi/tables.c
++++ b/xen/drivers/acpi/tables.c
+@@ -221,6 +221,51 @@ void __init acpi_table_print_madt_entry(struct acpi_subtable_header *header)
+ 	}
  }
  
-+int __init acpi_device_init(enum device_class class, const void *data, int class_type)
++struct acpi_subtable_header * __init
++acpi_get_entry(char *id, unsigned long table_size,
++	       struct acpi_table_header *table_header, int entry_id,
++	       unsigned int entry_index)
 +{
-+    const struct acpi_device_desc *desc;
++	struct acpi_subtable_header *entry;
++	unsigned int count = 0;
++	unsigned long table_end;
 +
-+    for ( desc = _asdevice; desc != _aedevice; desc++ )
-+    {
-+        if ( ( desc->class != class ) && ( desc->class_type != class_type ) )
-+            continue;
++	if ( !table_size )
++		return NULL;
 +
++	if ( !table_header )
++	{
++		printk("Table header not present\n");
++		return NULL;
++	}
 +
-+        ASSERT(desc->init != NULL);
++	table_end = (unsigned long)table_header + table_header->length;
 +
-+        return desc->init(data);
-+    }
++	/* Parse all entries looking for a match. */
++	entry = (struct acpi_subtable_header *)
++	    ((unsigned long)table_header + table_size);
 +
-+    return -EBADF;
++	while (((unsigned long)entry) + sizeof(struct acpi_subtable_header) <
++	       table_end) {
++		if (entry->length < sizeof(*entry)) {
++			printk(KERN_ERR PREFIX "[%4.4s:%#x] Invalid length\n",
++			       id, entry_id);
++			return NULL;
++		}
++
++		if (entry->type == entry_id) {
++			if (count == entry_index)
++				return entry;
++			count++;
++		}
++
++		entry = (struct acpi_subtable_header *)
++		    ((unsigned long)entry + entry->length);
++	}
++
++	return NULL;
 +}
 +
- enum device_class device_get_class(const struct dt_device_node *dev)
- {
-     const struct device_desc *desc;
-diff --git a/xen/arch/arm/xen.lds.S b/xen/arch/arm/xen.lds.S
-index 0488f37..60802f6 100644
---- a/xen/arch/arm/xen.lds.S
-+++ b/xen/arch/arm/xen.lds.S
-@@ -100,6 +100,13 @@ SECTIONS
-       _edevice = .;
-   } :text
- 
-+  . = ALIGN(8);
-+  .adev.info : {
-+      _asdevice = .;
-+      *(.adev.info)
-+      _aedevice = .;
-+  } :text
-+
-   . = ALIGN(PAGE_SIZE);             /* Init code and data */
-   __init_begin = .;
-   .init.text : {
-diff --git a/xen/include/asm-arm/device.h b/xen/include/asm-arm/device.h
-index 5d0a4cd..085f221 100644
---- a/xen/include/asm-arm/device.h
-+++ b/xen/include/asm-arm/device.h
-@@ -50,6 +50,27 @@ struct device_desc {
-     int (*init)(struct dt_device_node *dev, const void *data);
- };
- 
-+struct acpi_device_desc {
-+    /* Device name */
-+    const char *name;
-+    /* Device class */
-+    enum device_class class;
-+    /* type of device supported by the driver */
-+    const int class_type;
-+    /* Device initialization */
-+    int (*init)(const void *data);
-+};
-+
-+/**
-+ *  acpi_device_init - Initialize a device
-+ *  @class: class of the device (serial, network...)
-+ *  @data: specific data for initializing the device
-+ *
-+ *  Return 0 on success.
-+ */
-+int __init acpi_device_init(enum device_class class,
-+                            const void *data, int class_type);
-+
- /**
-  *  device_init - Initialize a device
-  *  @dev: device to initialize
-@@ -78,6 +99,15 @@ __section(".dev.info") = {                                          \
- #define DT_DEVICE_END                                               \
- };
- 
-+#define ACPI_DEVICE_START(_name, _namestr, _class)                    \
-+static const struct acpi_device_desc __dev_desc_##_name __used           \
-+__attribute__((__section__(".adev.info"))) = {                       \
-+    .name = _namestr,                                               \
-+    .class = _class,                                                \
-+
-+#define ACPI_DEVICE_END                                               \
-+};
-+
- #endif /* __ASM_ARM_DEVICE_H */
- 
- /*
+ int __init
+ acpi_parse_entries(char *id,
+ 		      unsigned long table_size,
+diff --git a/xen/include/xen/acpi.h b/xen/include/xen/acpi.h
+index 23f8261..3339374 100644
+--- a/xen/include/xen/acpi.h
++++ b/xen/include/xen/acpi.h
+@@ -72,6 +72,10 @@ int acpi_table_init (void);
+ int acpi_table_parse(char *id, acpi_table_handler handler);
+ int acpi_table_parse_entries(char *id, unsigned long table_size,
+ 	int entry_id, acpi_table_entry_handler handler, unsigned int max_entries);
++struct acpi_subtable_header *
++acpi_get_entry(char *id, unsigned long table_size,
++	       struct acpi_table_header *table_header, int entry_id,
++	       unsigned int entry_index);
+ int acpi_parse_entries(char *id, unsigned long table_size,
+ 	acpi_table_entry_handler handler, struct acpi_table_header *table_header,
+ 	int entry_id, unsigned int max_entries);
 -- 
 2.1.0
