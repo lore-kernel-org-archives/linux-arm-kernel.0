@@ -1,40 +1,41 @@
-From: zhaoshenglong@huawei.com (Shannon Zhao)
-Date: Tue, 17 Nov 2015 20:17:35 +0800
-Subject: [PATCH 09/13] ARM: Xen: Initialize Xen specific UEFI runtime
- services
-In-Reply-To: <CAKv+Gu9-g6fttchWkg_ptCGwUD-hbyM2F0x1Wrv=dAa6bsMVBQ@mail.gmail.com>
-References: <1447754231-7772-1-git-send-email-shannon.zhao@linaro.org>	<1447754231-7772-10-git-send-email-shannon.zhao@linaro.org>
- <CAKv+Gu9-g6fttchWkg_ptCGwUD-hbyM2F0x1Wrv=dAa6bsMVBQ@mail.gmail.com>
-Message-ID: <564B1ADF.70105@huawei.com>
+From: daniel.lezcano@linaro.org (Daniel Lezcano)
+Date: Tue, 17 Nov 2015 13:22:52 +0100
+Subject: [PATCH] clocksource/drivers/tango-xtal: Replace code by
+ clocksource_mmio_init
+In-Reply-To: <5645D5A0.1000502@sigmadesigns.com>
+References: <1447412292-841-1-git-send-email-daniel.lezcano@linaro.org>
+ <5645D5A0.1000502@sigmadesigns.com>
+Message-ID: <564B1C1C.7070801@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+On 11/13/2015 01:20 PM, Marc Gonzalez wrote:
+> On 13/11/2015 11:58, Daniel Lezcano wrote:
+>
+>> The current code to initialize, register and read the clocksource is
+>> already factored out in mmio.c via the clocksource_mmio_init function.
+>>
+>> Factor out the code with the clocksource_mmio_init function.
+>
+> The reason I didn't like clocksource_mmio_init() is because it exports
+> 4 generic accessors.
+>
+> I guess this function makes more sense when all platforms are using it,
+> in an ARCH_MULTIPLATFORM kernel. (Also the accessors are probably quite
+> small, so the waste is probably minimal.)
 
+Hi Marc,
 
-On 2015/11/17 19:28, Ard Biesheuvel wrote:
->> @@ -308,13 +311,18 @@ static int __init arm64_enable_runtime_services(void)
->> >         }
->> >         set_bit(EFI_SYSTEM_TABLES, &efi.flags);
->> >
->> > -       if (!efi_virtmap_init()) {
->> > -               pr_err("No UEFI virtual mapping was installed -- runtime services will not be available\n");
->> > -               return -1;
->> > -       }
->> > +       if (!xen_initial_domain()) {
->> > +               if (!efi_virtmap_init()) {
->> > +                       pr_err("No UEFI virtual mapping was installed -- runtime services will not be available\n");
->> > +                       return -1;
->> > +               }
->> >
-> I'd prefer it if we could separate the code logically, rather than
-> putting xen_initial_domain() tests in all the code paths.
-> 
-> For instance, we could re-use the EFI_PARAVIRT flag, and set if from
-> the Xen init code. Then, we could simply test it here, and bail early.
-> That way, you can have a Xen specific alternative (which does not use
-> the virtmap etc anyway) in a xen source file.
-> 
-Ok, will do. Thanks.
+it is not clear for me if you agree with this patch or not. Can you 
+clarify ?
+
+Thanks
+
+   -- Daniel
 
 -- 
-Shannon
+  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
+
+Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
+<http://twitter.com/#!/linaroorg> Twitter |
+<http://www.linaro.org/linaro-blog/> Blog
