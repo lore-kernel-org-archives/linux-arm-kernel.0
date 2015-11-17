@@ -1,43 +1,153 @@
-From: nicolas.ferre@atmel.com (Nicolas Ferre)
-Date: Tue, 17 Nov 2015 11:21:35 +0100
-Subject: [PATCH] MAINTAINERS: Atmel drivers: change NAND and ISI entries
-Message-ID: <1447755695-18034-1-git-send-email-nicolas.ferre@atmel.com>
+From: shannon.zhao@linaro.org (shannon.zhao at linaro.org)
+Date: Tue, 17 Nov 2015 17:57:11 +0800
+Subject: [PATCH 13/13] ARM: XEN: Move xen_early_init() before efi_init()
+In-Reply-To: <1447754231-7772-1-git-send-email-shannon.zhao@linaro.org>
+References: <1447754231-7772-1-git-send-email-shannon.zhao@linaro.org>
+Message-ID: <1447754231-7772-14-git-send-email-shannon.zhao@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Update Josh's entries about NAND and ISI drivers.
-Thanks for your work with Atmel Josh!
+From: Shannon Zhao <shannon.zhao@linaro.org>
 
-Signed-off-by: Nicolas Ferre <nicolas.ferre@atmel.com>
-Cc: Ludovic Desroches <ludovic.desroches@atmel.com>
-Cc: Wenyou Yang <wenyou.yang@atmel.com>
-Cc: Josh Wu <rainyfeeling@outlook.com>
+Move xen_early_init() before efi_init(), then when calling efi_init()
+could initialize Xen specific UEFI.
+
+Check if it runs on Xen hypervisor through the flat dts.
+
+Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
 ---
- MAINTAINERS | 5 +++--
- 1 file changed, 3 insertions(+), 2 deletions(-)
+ arch/arm/xen/enlighten.c  | 62 ++++++++++++++++++++++++++++++++++++-----------
+ arch/arm64/kernel/setup.c |  2 +-
+ 2 files changed, 49 insertions(+), 15 deletions(-)
 
-diff --git a/MAINTAINERS b/MAINTAINERS
-index e9caa4b28828..3c9d0d0ba0e8 100644
---- a/MAINTAINERS
-+++ b/MAINTAINERS
-@@ -1931,7 +1931,7 @@ S:	Supported
- F:	drivers/i2c/busses/i2c-at91.c
+diff --git a/arch/arm/xen/enlighten.c b/arch/arm/xen/enlighten.c
+index b8e9db8..d4f884c 100644
+--- a/arch/arm/xen/enlighten.c
++++ b/arch/arm/xen/enlighten.c
+@@ -19,6 +19,7 @@
+ #include <linux/irqreturn.h>
+ #include <linux/module.h>
+ #include <linux/of.h>
++#include <linux/of_fdt.h>
+ #include <linux/of_irq.h>
+ #include <linux/of_address.h>
+ #include <linux/cpuidle.h>
+@@ -48,8 +49,6 @@ struct xen_memory_region xen_extra_mem[XEN_EXTRA_MEM_MAX_REGIONS] __initdata;
  
- ATMEL ISI DRIVER
--M:	Josh Wu <josh.wu@atmel.com>
-+M:	Ludovic Desroches <ludovic.desroches@atmel.com>
- L:	linux-media at vger.kernel.org
- S:	Supported
- F:	drivers/media/platform/soc_camera/atmel-isi.c
-@@ -1950,7 +1950,8 @@ S:	Supported
- F:	drivers/net/ethernet/cadence/
+ static __read_mostly unsigned int xen_events_irq;
  
- ATMEL NAND DRIVER
--M:	Josh Wu <josh.wu@atmel.com>
-+M:	Wenyou Yang <wenyou.yang@atmel.com>
-+M:	Josh Wu <rainyfeeling@outlook.com>
- L:	linux-mtd at lists.infradead.org
- S:	Supported
- F:	drivers/mtd/nand/atmel_nand*
+-static __initdata struct device_node *xen_node;
+-
+ int xen_remap_domain_gfn_array(struct vm_area_struct *vma,
+ 			       unsigned long addr,
+ 			       xen_pfn_t *gfn, int nr,
+@@ -142,6 +141,34 @@ static irqreturn_t xen_arm_callback(int irq, void *arg)
+ 	return IRQ_HANDLED;
+ }
+ 
++struct xen_node_info {
++	const char *compat;
++	const char *prefix;
++	const char *version;
++	bool found;
++};
++
++static int __init fdt_find_xen_node(unsigned long node, const char *uname,
++				    int depth, void *data)
++{
++	struct xen_node_info *info = data;
++	const void *s = NULL;
++	int len;
++
++	if (depth != 1 || strcmp(uname, "hypervisor") != 0)
++		return 0;
++
++	if (of_flat_dt_is_compatible(node, info->compat))
++		info->found = true;
++
++	s = of_get_flat_dt_prop(node, "compatible", &len);
++	if (strlen(info->prefix) + 3  < len &&
++                        !strncmp(info->prefix, s, strlen(info->prefix)))
++                info->version = s + strlen(info->prefix);
++
++	return 0;
++}
++
+ /*
+  * see Documentation/devicetree/bindings/arm/xen.txt for the
+  * documentation of the Xen Device Tree format.
+@@ -149,26 +176,25 @@ static irqreturn_t xen_arm_callback(int irq, void *arg)
+ #define GRANT_TABLE_PHYSADDR 0
+ void __init xen_early_init(void)
+ {
+-	int len;
+-	const char *s = NULL;
+-	const char *version = NULL;
+-	const char *xen_prefix = "xen,xen-";
++	struct xen_node_info info;
++
++	info.compat = "xen,xen";
++	info.prefix = "xen,xen-";
++	info.version = NULL;
++	info.found = false;
+ 
+-	xen_node = of_find_compatible_node(NULL, NULL, "xen,xen");
+-	if (!xen_node) {
++	of_scan_flat_dt(fdt_find_xen_node, &info);
++	if (!info.found) {
+ 		pr_debug("No Xen support\n");
+ 		return;
+ 	}
+-	s = of_get_property(xen_node, "compatible", &len);
+-	if (strlen(xen_prefix) + 3  < len &&
+-			!strncmp(xen_prefix, s, strlen(xen_prefix)))
+-		version = s + strlen(xen_prefix);
+-	if (version == NULL) {
++
++	if (info.version == NULL) {
+ 		pr_debug("Xen version not found\n");
+ 		return;
+ 	}
+ 
+-	pr_info("Xen %s support found\n", version);
++	pr_info("Xen %s support found\n", info.version);
+ 
+ 	xen_domain_type = XEN_HVM_DOMAIN;
+ 
+@@ -204,6 +230,14 @@ static int __init xen_guest_init(void)
+ 		}
+ 		xen_events_irq = a.value & 0xff;
+ 	} else {
++		struct device_node *xen_node;
++
++		xen_node = of_find_compatible_node(NULL, NULL, "xen,xen");
++		if (!xen_node) {
++			pr_debug("No Xen support\n");
++			return -ENODEV;
++		}
++
+ 		xen_events_irq = irq_of_parse_and_map(xen_node, 0);
+ 		if (!xen_events_irq) {
+ 			pr_err("Xen event channel interrupt not found\n");
+diff --git a/arch/arm64/kernel/setup.c b/arch/arm64/kernel/setup.c
+index 2322479..ee95593 100644
+--- a/arch/arm64/kernel/setup.c
++++ b/arch/arm64/kernel/setup.c
+@@ -428,6 +428,7 @@ void __init setup_arch(char **cmdline_p)
+ 	 */
+ 	local_async_enable();
+ 
++	xen_early_init();
+ 	efi_init();
+ 	arm64_memblock_init();
+ 
+@@ -446,7 +447,6 @@ void __init setup_arch(char **cmdline_p)
+ 	} else {
+ 		psci_acpi_init();
+ 	}
+-	xen_early_init();
+ 
+ 	cpu_read_bootcpu_ops();
+ 	smp_init_cpus();
 -- 
-2.1.3
+2.1.0
