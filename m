@@ -1,41 +1,46 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Tue, 17 Nov 2015 13:22:52 +0100
-Subject: [PATCH] clocksource/drivers/tango-xtal: Replace code by
- clocksource_mmio_init
-In-Reply-To: <5645D5A0.1000502@sigmadesigns.com>
-References: <1447412292-841-1-git-send-email-daniel.lezcano@linaro.org>
- <5645D5A0.1000502@sigmadesigns.com>
-Message-ID: <564B1C1C.7070801@linaro.org>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 17 Nov 2015 12:22:51 +0000
+Subject: [RFC] ARM64: simplify dma_get_ops
+In-Reply-To: <5118146.8KqrJiJrDe@wuerfel>
+References: <4270550.cGd11OgA5n@wuerfel>
+ <20151116183941.GF6556@e104818-lin.cambridge.arm.com>
+ <5118146.8KqrJiJrDe@wuerfel>
+Message-ID: <20151117122250.GH6556@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/13/2015 01:20 PM, Marc Gonzalez wrote:
-> On 13/11/2015 11:58, Daniel Lezcano wrote:
->
->> The current code to initialize, register and read the clocksource is
->> already factored out in mmio.c via the clocksource_mmio_init function.
->>
->> Factor out the code with the clocksource_mmio_init function.
->
-> The reason I didn't like clocksource_mmio_init() is because it exports
-> 4 generic accessors.
->
-> I guess this function makes more sense when all platforms are using it,
-> in an ARCH_MULTIPLATFORM kernel. (Also the accessors are probably quite
-> small, so the waste is probably minimal.)
+On Mon, Nov 16, 2015 at 08:57:41PM +0100, Arnd Bergmann wrote:
+> On Monday 16 November 2015 18:39:41 Catalin Marinas wrote:
+> > On Mon, Nov 16, 2015 at 05:25:48PM +0100, Arnd Bergmann wrote:
+> > > @@ -985,7 +977,7 @@ void arch_setup_dma_ops(struct device *dev, u64 dma_base, u64 size,
+> > >  			struct iommu_ops *iommu, bool coherent)
+> > >  {
+> > >  	if (!acpi_disabled && !dev->archdata.dma_ops)
+> > > -		dev->archdata.dma_ops = dma_ops;
+> > > +		dev->archdata.dma_ops = &swiotlb_dma_ops;
+> > 
+> > Why do we still keep the !acpi_disabled check here? If I remove it, the
+> > WARN_ON() above disappears.
+> 
+> Ah, good. That must be my mistake then. This looks much better.
 
-Hi Marc,
+I merged this patch with the above change. Thanks.
 
-it is not clear for me if you agree with this patch or not. Can you 
-clarify ?
+> On a related note, we should also urgently fix the
+> arch_setup_dma_ops() function to no longer ignore the base and size
+> arguments. For dma_base, we can simply WARN_ON(dma_base != 0), so we
+> can implement support for that whenever we need it,
 
-Thanks
+I think we should, at least until we implement support for
+dev->dma_pfn_offset. I'm not sure about iommu though, maybe there are
+working configurations with dma_base != 0.
 
-   -- Daniel
+> but for the size we need to prevent drivers from calling
+> dma_set_mask() with an argument larger than the size we pass in here,
+> unless the size is also larger than max_pfn.
+
+We have a default mask set up in of_dma_configure() based on size and
+dma_base. Can we check the new mask against the default one?
 
 -- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+Catalin
