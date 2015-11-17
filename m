@@ -1,29 +1,26 @@
-From: zhaoshenglong@huawei.com (Shannon Zhao)
-Date: Tue, 17 Nov 2015 21:10:50 +0800
-Subject: [PATCH v3 56/62] arm/acpi: Deny MMIO access of UART
-In-Reply-To: <564B17E2.8030205@citrix.com>
-References: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
- <1447753261-7552-57-git-send-email-shannon.zhao@linaro.org>
- <564B17E2.8030205@citrix.com>
-Message-ID: <564B275A.6060309@huawei.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 17 Nov 2015 13:24:28 +0000
+Subject: [PATCH] ARM64: do not include ptrace.h from compat.h
+In-Reply-To: <4870233.DUFZXD30Rq@wuerfel>
+References: <4870233.DUFZXD30Rq@wuerfel>
+Message-ID: <20151117132428.GI6556@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 2015/11/17 20:04, Julien Grall wrote:
-> On 17/11/15 09:40, shannon.zhao at linaro.org wrote:
->> From: Shannon Zhao <shannon.zhao@linaro.org>
->>
->> Firstly it permits full MMIO capabilities for Dom0. Then deny MMIO
->> access of UART device.
+On Mon, Nov 16, 2015 at 05:32:15PM +0100, Arnd Bergmann wrote:
+> including ptrace.h brings a definition of BITS_PER_PAGE into device
+> drivers and cause a build warning in allmodconfig builds:
 > 
-> I'm nearly sure we want to deny other MMIO such as the GIC regions and SMMU.
+> drivers/block/drbd/drbd_bitmap.c:482:0: warning: "BITS_PER_PAGE" redefined
+>  #define BITS_PER_PAGE  (1UL << (PAGE_SHIFT + 3))
 > 
-But Dom0 will not know the real GIC hardware MMIO space, how would it
-map these regions? In case of wrong use?
-Regarding SMMU, since it doesn't support now, so I didn't add it but it
-could be added later.
+> This uses a slightly different way to express current_pt_regs()
+> that avoids the use of the header and gets away with the already
+> included asm/ptrace.h.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+
+Applied. Thanks.
 
 -- 
-Shannon
+Catalin
