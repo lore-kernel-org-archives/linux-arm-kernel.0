@@ -1,89 +1,41 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Tue, 17 Nov 2015 11:10:53 +0900
-Subject: [PATCH] ARM: sunxi: Re-enable SID driver in multi_v7_defconfig
-In-Reply-To: <1447724947-4851-1-git-send-email-public_timo.s@silentcreek.de>
-References: <1447724947-4851-1-git-send-email-public_timo.s@silentcreek.de>
-Message-ID: <564A8CAD.8050004@samsung.com>
+From: Chris.Brandt@renesas.com (Chris Brandt)
+Date: Tue, 17 Nov 2015 02:11:30 +0000
+Subject: [PATCH v3] ARM: xip: Use correct symbol for end of ROM marker
+In-Reply-To: <alpine.LFD.2.20.1511161730030.5826@knanqh.ubzr>
+References: <1447362108-4333-1-git-send-email-chris.brandt@renesas.com>
+ <1447697140-4099-1-git-send-email-chris.brandt@renesas.com>
+ <alpine.LFD.2.20.1511161515100.5826@knanqh.ubzr>
+ <HK2PR06MB05619FACB3725B6F5B2299718A1E0@HK2PR06MB0561.apcprd06.prod.outlook.com>
+ <alpine.LFD.2.20.1511161605070.5826@knanqh.ubzr>
+ <HK2PR06MB056142FFDA4E99A764DF9ECB8A1E0@HK2PR06MB0561.apcprd06.prod.outlook.com>
+ <alpine.LFD.2.20.1511161730030.5826@knanqh.ubzr>
+Message-ID: <HK2PR06MB05614D47A9C35ECB4CA72D3F8A1D0@HK2PR06MB0561.apcprd06.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17.11.2015 10:49, Timo Sigurdsson wrote:
-> Commit 3d0b16a66c8a ("nvmem: sunxi: Move the SID driver to the nvmem
-> framework") moved the the sunxi SID driver to a new framework, but left
-> multi_v7_defconfig with the deprecated config symbol EEPROM_SUNXI_SID
-> instead of the new symbold NVMEM_SUNXI_SID. Hence, re-enable the driver
-> in multi_v7_defconfig.
-> 
-> While at it, clean up multi_v7_defconfig by generating a fresh file via
->   make multi_v7_defconfig
->   make savedefconfig
-> While this moves around a few lines and removes unnecessary symbols,
-> it doesn't introduce any functional changes.
+>> So I've noticed. As far as I can tell, the XIP kernel stuff broke 
+>> years ago.
+>
+> That, of course, brings the question about keeping XIP around.
 
-Split it per change. One change is savedefconfig and second is removing
-or enabling other drivers.
+Well, as the email address suggests, I work for Renesas. And since
+the ARCH_R7S72100 has up to 10MB internal RAM and can XIP directly from
+QSPI Flash, that's a pretty simple BOM.
 
-On which tree you generated the defconfig? There is a minor nit below
-(at least for Exynos platform, I did not checked the others).
+I also revisted the AXFS file system (that never made it into the
+kernel) and like the kernel, required some fixing up.
+However, I can get a functioning and usefull ARMv7 system up and
+running in under 3MB of total system RAM.
+That's got to be worth something to someone ;)
 
-> 
-> Signed-off-by: Timo Sigurdsson <public_timo.s@silentcreek.de>
-> 
-> diff --git a/arch/arm/configs/multi_v7_defconfig b/arch/arm/configs/multi_v7_defconfig
-> index 69a22fd..f712ea3 100644
-> --- a/arch/arm/configs/multi_v7_defconfig
-> +++ b/arch/arm/configs/multi_v7_defconfig
 
-(...)
+> Everything can be fixed at once with a new linker script.
 
-> @@ -450,8 +431,7 @@ CONFIG_MEDIA_CAMERA_SUPPORT=y
->  CONFIG_MEDIA_CONTROLLER=y
->  CONFIG_VIDEO_V4L2_SUBDEV_API=y
->  CONFIG_MEDIA_USB_SUPPORT=y
-> -CONFIG_USB_VIDEO_CLASS=y
-> -CONFIG_USB_GSPCA=y
-> +CONFIG_USB_VIDEO_CLASS=m
->  CONFIG_V4L_PLATFORM_DRIVERS=y
->  CONFIG_SOC_CAMERA=m
->  CONFIG_SOC_CAMERA_PLATFORM=m
-> @@ -465,28 +445,25 @@ CONFIG_DRM=y
->  CONFIG_DRM_I2C_ADV7511=m
->  # CONFIG_DRM_I2C_CH7006 is not set
->  # CONFIG_DRM_I2C_SIL164 is not set
-> -CONFIG_DRM_NXP_PTN3460=m
-> -CONFIG_DRM_PARADE_PS8622=m
->  CONFIG_DRM_NOUVEAU=m
->  CONFIG_DRM_EXYNOS=m
-> -CONFIG_DRM_EXYNOS_DSI=y
->  CONFIG_DRM_EXYNOS_FIMD=y
-> -CONFIG_DRM_EXYNOS_HDMI=y
+I do have to agree that a separate linker script would be a cleaner
+solution for the section arrangements.
+Of course, there are still some other XIP patches needed (like you can't
+use text areas as a temporary stack on boot), but the sections are a
+pretty logical place to start.
 
-I would prefer leaving the EXYNOS_HDMI. Dependencies are now not enabled
-but we are fixing it in:
-http://www.spinics.net/lists/dri-devel/msg93299.html
 
-Best regards,
-Krzysztof
-
-> +CONFIG_DRM_EXYNOS_DSI=y
->  CONFIG_DRM_ROCKCHIP=m
->  CONFIG_ROCKCHIP_DW_HDMI=m
->  CONFIG_DRM_RCAR_DU=m
->  CONFIG_DRM_RCAR_HDMI=y
->  CONFIG_DRM_RCAR_LVDS=y
->  CONFIG_DRM_TEGRA=y
-> -CONFIG_DRM_PANEL_SAMSUNG_S6E8AA0=m
->  CONFIG_DRM_PANEL_SIMPLE=y
-> +CONFIG_DRM_PANEL_SAMSUNG_S6E8AA0=m
-> +CONFIG_DRM_NXP_PTN3460=m
-> +CONFIG_DRM_PARADE_PS8622=m
->  CONFIG_FB_ARMCLCD=y
->  CONFIG_FB_WM8505=y
->  CONFIG_FB_SH_MOBILE_LCDC=y
->  CONFIG_FB_SIMPLE=y
->  CONFIG_FB_SH_MOBILE_MERAM=y
-> -CONFIG_BACKLIGHT_LCD_SUPPORT=y
-> -CONFIG_BACKLIGHT_CLASS_DEVICE=y
->  CONFIG_LCD_PLATFORM=m
->  CONFIG_BACKLIGHT_PWM=y
->  CONFIG_BACKLIGHT_AS3711=y
+Chris
