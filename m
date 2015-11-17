@@ -1,94 +1,88 @@
-From: hongzhou.yang@mediatek.com (Hongzhou Yang)
-Date: Mon, 16 Nov 2015 20:22:57 -0800
-Subject: [PATCH] pinctrl: mediatek: fix a memleak when do dt maps.
-Message-ID: <1447734177-17258-1-git-send-email-hongzhou.yang@mediatek.com>
+From: pankaj.dubey@samsung.com (pankaj.dubey)
+Date: Tue, 17 Nov 2015 09:55:56 +0530
+Subject: [PATCH 2/2] arm64: EXYNOS: Consolidate ARCH_EXYNOS7 symbol into
+ ARCH_EXYNOS
+In-Reply-To: <1447637775-9887-3-git-send-email-k.kozlowski@samsung.com>
+References: <1447637775-9887-1-git-send-email-k.kozlowski@samsung.com>
+ <1447637775-9887-3-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <564AAC54.8000800@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-configs will kmemdup to dup_configs in pictrl util function.
-So configs need to be freed.
 
-Signed-off-by: Hongzhou Yang <hongzhou.yang@mediatek.com>
----
- Fix a memleak issue.
 
- drivers/pinctrl/mediatek/pinctrl-mtk-common.c |   24 ++++++++++++++----------
- 1 file changed, 14 insertions(+), 10 deletions(-)
+On Monday 16 November 2015 07:06 AM, Krzysztof Kozlowski wrote:
+> The ARMv8 Exynos family SoCs in Linux kernel are currently:
+>  - Exynos5433 (controlled by ARCH_EXYNOS),
+>  - Exynos7 (controlled by ARCH_EXYNOS7).
+> 
+> It duplicates Kconfig symbols unnecessarily, so consolidate them into
+> one ARCH_EXYNOS. Future SoCs could fall also under the ARCH_EXYNOS
+> symbol.
+> 
+> The commit should not bring any visible functional change.
+> 
+> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> ---
+>  arch/arm64/Kconfig.platforms        | 11 ++---------
+>  arch/arm64/boot/dts/exynos/Makefile |  2 +-
+>  arch/arm64/configs/defconfig        |  2 +-
+>  3 files changed, 4 insertions(+), 11 deletions(-)
+> 
+> diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
+> index 4043c35962cc..afa19baca94e 100644
+> --- a/arch/arm64/Kconfig.platforms
+> +++ b/arch/arm64/Kconfig.platforms
+> @@ -13,21 +13,14 @@ config ARCH_BERLIN
+>  	  This enables support for Marvell Berlin SoC Family
+>  
+>  config ARCH_EXYNOS
+> -	bool
+> -	help
+> -	  This enables support for Samsung Exynos SoC family
+> -
+> -config ARCH_EXYNOS7
+> -	bool "ARMv8 based Samsung Exynos7"
+> -	select ARCH_EXYNOS
+> +	bool "ARMv8 based Samsung Exynos SoC family"
+>  	select COMMON_CLK_SAMSUNG
+>  	select HAVE_S3C2410_WATCHDOG if WATCHDOG
+>  	select HAVE_S3C_RTC if RTC_CLASS
+>  	select PINCTRL
+>  	select PINCTRL_EXYNOS
+> -
+>  	help
+> -	  This enables support for Samsung Exynos7 SoC family
+> +	  This enables support for Samsung Exynos ARMv8 SoC family
+>  
+>  config ARCH_LAYERSCAPE
+>  	bool "ARMv8 based Freescale Layerscape SoC family"
+> diff --git a/arch/arm64/boot/dts/exynos/Makefile b/arch/arm64/boot/dts/exynos/Makefile
+> index 20310e5b6d6f..50c9b9383cfa 100644
+> --- a/arch/arm64/boot/dts/exynos/Makefile
+> +++ b/arch/arm64/boot/dts/exynos/Makefile
+> @@ -1,4 +1,4 @@
+> -dtb-$(CONFIG_ARCH_EXYNOS7) += exynos7-espresso.dtb
+> +dtb-$(CONFIG_ARCH_EXYNOS) += exynos7-espresso.dtb
+>  
+>  always		:= $(dtb-y)
+>  subdir-y	:= $(dts-dirs)
+> diff --git a/arch/arm64/configs/defconfig b/arch/arm64/configs/defconfig
+> index bdd7aa358d2a..a396fa7c69a5 100644
+> --- a/arch/arm64/configs/defconfig
+> +++ b/arch/arm64/configs/defconfig
+> @@ -33,7 +33,7 @@ CONFIG_MODULE_UNLOAD=y
+>  # CONFIG_IOSCHED_DEADLINE is not set
+>  CONFIG_ARCH_BCM_IPROC=y
+>  CONFIG_ARCH_BERLIN=y
+> -CONFIG_ARCH_EXYNOS7=y
+> +CONFIG_ARCH_EXYNOS=y
+>  CONFIG_ARCH_LAYERSCAPE=y
+>  CONFIG_ARCH_HISI=y
+>  CONFIG_ARCH_MEDIATEK=y
+> 
 
-diff --git a/drivers/pinctrl/mediatek/pinctrl-mtk-common.c b/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
-index bbf0230..0f9e416 100644
---- a/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
-+++ b/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
-@@ -520,21 +520,23 @@ static int mtk_pctrl_dt_subnode_to_map(struct pinctrl_dev *pctldev,
- 	if (has_config && num_pins >= 1)
- 		maps_per_pin++;
- 
--	if (!num_pins || !maps_per_pin)
--		return -EINVAL;
-+	if (!num_pins || !maps_per_pin) {
-+		err = -EINVAL;
-+		goto exit;
-+	}
- 
- 	reserve = num_pins * maps_per_pin;
- 
- 	err = pinctrl_utils_reserve_map(pctldev, map,
- 			reserved_maps, num_maps, reserve);
- 	if (err < 0)
--		goto fail;
-+		goto exit;
- 
- 	for (i = 0; i < num_pins; i++) {
- 		err = of_property_read_u32_index(node, "pinmux",
- 				i, &pinfunc);
- 		if (err)
--			goto fail;
-+			goto exit;
- 
- 		pin = MTK_GET_PIN_NO(pinfunc);
- 		func = MTK_GET_PIN_FUNC(pinfunc);
-@@ -543,20 +545,21 @@ static int mtk_pctrl_dt_subnode_to_map(struct pinctrl_dev *pctldev,
- 				func >= ARRAY_SIZE(mtk_gpio_functions)) {
- 			dev_err(pctl->dev, "invalid pins value.\n");
- 			err = -EINVAL;
--			goto fail;
-+			goto exit;
- 		}
- 
- 		grp = mtk_pctrl_find_group_by_pin(pctl, pin);
- 		if (!grp) {
- 			dev_err(pctl->dev, "unable to match pin %d to group\n",
- 					pin);
--			return -EINVAL;
-+			err = -EINVAL;
-+			goto exit;
- 		}
- 
- 		err = mtk_pctrl_dt_node_to_map_func(pctl, pin, func, grp, map,
- 				reserved_maps, num_maps);
- 		if (err < 0)
--			goto fail;
-+			goto exit;
- 
- 		if (has_config) {
- 			err = pinctrl_utils_add_map_configs(pctldev, map,
-@@ -564,13 +567,14 @@ static int mtk_pctrl_dt_subnode_to_map(struct pinctrl_dev *pctldev,
- 					configs, num_configs,
- 					PIN_MAP_TYPE_CONFIGS_GROUP);
- 			if (err < 0)
--				goto fail;
-+				goto exit;
- 		}
- 	}
- 
--	return 0;
-+	err = 0;
- 
--fail:
-+exit:
-+	kfree(configs);
- 	return err;
- }
- 
--- 
-1.7.9.5
+Reviewed-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+
+Thanks,
+Pankaj Dubey
