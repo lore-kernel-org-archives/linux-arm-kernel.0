@@ -1,62 +1,48 @@
 From: lina.iyer@linaro.org (Lina Iyer)
-Date: Tue, 17 Nov 2015 15:37:29 -0700
-Subject: [PATCH RFC 05/27] PM / Domains: remove old power on/off latencies.
+Date: Tue, 17 Nov 2015 15:37:46 -0700
+Subject: [PATCH RFC 22/27] drivers: firmware: PSCI: Export
+ psci_has_ext_power_state()
 In-Reply-To: <1447799871-56374-1-git-send-email-lina.iyer@linaro.org>
 References: <1447799871-56374-1-git-send-email-lina.iyer@linaro.org>
-Message-ID: <1447799871-56374-6-git-send-email-lina.iyer@linaro.org>
+Message-ID: <1447799871-56374-23-git-send-email-lina.iyer@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Axel Haslam <ahaslam+renesas@baylibre.com>
+Export psci_has_ext_power_state() to allow PSCI layers to determine and
+pass the correct state id in the format supported.
 
-Now that all known users have been converted to use state latencies,
-we can remove the latency field in the generic_pm_domain structure.
-
-Signed-off-by: Axel Haslam <ahaslam+renesas@baylibre.com>
+Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
+Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
 ---
- drivers/base/power/domain.c | 15 ---------------
- include/linux/pm_domain.h   |  2 --
- 2 files changed, 17 deletions(-)
+ drivers/firmware/psci.c | 2 +-
+ include/linux/psci.h    | 1 +
+ 2 files changed, 2 insertions(+), 1 deletion(-)
 
-diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
-index 3fb4c93..c300293 100644
---- a/drivers/base/power/domain.c
-+++ b/drivers/base/power/domain.c
-@@ -1248,21 +1248,6 @@ static int genpd_alloc_states_data(struct generic_pm_domain *genpd,
- 		genpd->states[i].param = st[i].param;
- 	}
+diff --git a/drivers/firmware/psci.c b/drivers/firmware/psci.c
+index d24f35d..3fd42e4 100644
+--- a/drivers/firmware/psci.c
++++ b/drivers/firmware/psci.c
+@@ -83,7 +83,7 @@ static u32 psci_function_id[PSCI_FN_MAX];
  
--	/*
--	 * Copy the latency values To keep compatibility with
--	 * platforms that are not converted to use the multiple states.
--	 * This will be removed once all platforms are converted to use
--	 * multiple states. note that non converted platforms will use the
--	 * default single off state.
--	 */
--	if (genpd->power_on_latency_ns != 0)
--		genpd->states[0].power_on_latency_ns =
--				genpd->power_on_latency_ns;
--
--	if (genpd->power_off_latency_ns != 0)
--		genpd->states[0].power_off_latency_ns =
--				genpd->power_off_latency_ns;
--
- 	genpd->state_count = st_count;
+ static u32 psci_cpu_suspend_feature;
  
- 	/* to save memory, Name allocation will happen if debug is enabled */
-diff --git a/include/linux/pm_domain.h b/include/linux/pm_domain.h
-index 15df24c..108a4b3 100644
---- a/include/linux/pm_domain.h
-+++ b/include/linux/pm_domain.h
-@@ -61,9 +61,7 @@ struct generic_pm_domain {
- 	unsigned int prepared_count;	/* Suspend counter of prepared devices */
- 	bool suspend_power_off;	/* Power status before system suspend */
- 	int (*power_off)(struct generic_pm_domain *domain);
--	s64 power_off_latency_ns;
- 	int (*power_on)(struct generic_pm_domain *domain);
--	s64 power_on_latency_ns;
- 	struct gpd_dev_ops dev_ops;
- 	s64 max_off_time_ns;	/* Maximum allowed "suspended" time. */
- 	bool max_off_time_changed;
+-static inline bool psci_has_ext_power_state(void)
++bool psci_has_ext_power_state(void)
+ {
+ 	return psci_cpu_suspend_feature &
+ 				PSCI_1_0_FEATURES_CPU_SUSPEND_PF_MASK;
+diff --git a/include/linux/psci.h b/include/linux/psci.h
+index 12c4865..b9afbe2 100644
+--- a/include/linux/psci.h
++++ b/include/linux/psci.h
+@@ -23,6 +23,7 @@
+ bool psci_tos_resident_on(int cpu);
+ bool psci_power_state_loses_context(u32 state);
+ bool psci_power_state_is_valid(u32 state);
++bool psci_has_ext_power_state(void);
+ 
+ struct psci_operations {
+ 	int (*cpu_suspend)(u32 state, unsigned long entry_point);
 -- 
 2.1.4
