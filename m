@@ -1,119 +1,81 @@
 From: shannon.zhao@linaro.org (shannon.zhao at linaro.org)
-Date: Tue, 17 Nov 2015 17:40:22 +0800
-Subject: [PATCH v3 23/62] acpi/table: Introduce acpi_parse_entries
+Date: Tue, 17 Nov 2015 17:40:06 +0800
+Subject: [PATCH v3 07/62] arm/acpi: Add arch_acpi_os_map_memory helper
+ function for ARM
 In-Reply-To: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
 References: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
-Message-ID: <1447753261-7552-24-git-send-email-shannon.zhao@linaro.org>
+Message-ID: <1447753261-7552-8-git-send-email-shannon.zhao@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Parth Dixit <parth.dixit@linaro.org>
+From: Shannon Zhao <shannon.zhao@linaro.org>
 
-Add new function acpi_parse_entries which takes acpi table as argument.
-This will avoid fetching table everytime in acpi_table_parse_entries.
-This function will be used in acpi_gicv2_init within another patch.
-
-Signed-off-by: Naresh Bhat <Naresh.Bhat@linaro.org>
-Signed-off-by: Parth Dixit <parth.dixit@linaro.org>
 Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
 ---
- xen/drivers/acpi/tables.c | 53 ++++++++++++++++++++++++++++++++++-------------
- xen/include/xen/acpi.h    |  3 +++
- 2 files changed, 42 insertions(+), 14 deletions(-)
+ xen/arch/arm/Makefile      |  1 +
+ xen/arch/arm/acpi/Makefile |  1 +
+ xen/arch/arm/acpi/lib.c    | 33 +++++++++++++++++++++++++++++++++
+ 3 files changed, 35 insertions(+)
+ create mode 100644 xen/arch/arm/acpi/Makefile
+ create mode 100644 xen/arch/arm/acpi/lib.c
 
-diff --git a/xen/drivers/acpi/tables.c b/xen/drivers/acpi/tables.c
-index 6573175..2fba206 100644
---- a/xen/drivers/acpi/tables.c
-+++ b/xen/drivers/acpi/tables.c
-@@ -221,29 +221,27 @@ void __init acpi_table_print_madt_entry(struct acpi_subtable_header *header)
- 	}
- }
+diff --git a/xen/arch/arm/Makefile b/xen/arch/arm/Makefile
+index 1ef39f7..1851ae8 100644
+--- a/xen/arch/arm/Makefile
++++ b/xen/arch/arm/Makefile
+@@ -2,6 +2,7 @@ subdir-$(arm32) += arm32
+ subdir-$(arm64) += arm64
+ subdir-y += platforms
+ subdir-$(arm64) += efi
++subdir-$(HAS_ACPI) += acpi
  
--
- int __init
--acpi_table_parse_entries(char *id,
--			     unsigned long table_size,
--			     int entry_id,
--			     acpi_table_entry_handler handler,
--			     unsigned int max_entries)
-+acpi_parse_entries(char *id,
-+		      unsigned long table_size,
-+		      acpi_table_entry_handler handler,
-+		      struct acpi_table_header *table_header,
-+		      int entry_id,
-+		      unsigned int max_entries)
- {
--	struct acpi_table_header *table_header = NULL;
- 	struct acpi_subtable_header *entry;
- 	unsigned int count = 0;
- 	unsigned long table_end;
- 
--	if (!handler)
-+	if ( !handler )
- 		return -EINVAL;
- 
--	if (strncmp(id, ACPI_SIG_MADT, 4) == 0)
--		acpi_get_table(id, acpi_apic_instance, &table_header);
--	else
--		acpi_get_table(id, 0, &table_header);
-+	if ( !table_size )
-+		return -EINVAL;
- 
--	if (!table_header) {
--		printk(KERN_WARNING PREFIX "%4.4s not present\n", id);
-+	if ( !table_header )
-+	{
-+		printk("Table header not present\n");
- 		return -ENODEV;
- 	}
- 
-@@ -279,6 +277,33 @@ acpi_table_parse_entries(char *id,
- 	}
- 
- 	return count;
+ obj-$(EARLY_PRINTK) += early_printk.o
+ obj-y += cpu.o
+diff --git a/xen/arch/arm/acpi/Makefile b/xen/arch/arm/acpi/Makefile
+new file mode 100644
+index 0000000..b5be22d
+--- /dev/null
++++ b/xen/arch/arm/acpi/Makefile
+@@ -0,0 +1 @@
++obj-y += lib.o
+diff --git a/xen/arch/arm/acpi/lib.c b/xen/arch/arm/acpi/lib.c
+new file mode 100644
+index 0000000..b68623b
+--- /dev/null
++++ b/xen/arch/arm/acpi/lib.c
+@@ -0,0 +1,33 @@
++/*
++ *  lib.c - Architecture-Specific Low-Level ACPI Support
++ *
++ *  Copyright (C) 2015, Shannon Zhao <shannon.zhao@linaro.org>
++ *
++ * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
++ *
++ *  This program is free software; you can redistribute it and/or modify
++ *  it under the terms of the GNU General Public License as published by
++ *  the Free Software Foundation; either version 2 of the License, or
++ *  (at your option) any later version.
++ *
++ *  This program is distributed in the hope that it will be useful,
++ *  but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *  GNU General Public License for more details.
++ *
++ *  You should have received a copy of the GNU General Public License
++ *  along with this program; if not, write to the Free Software
++ *  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
++ *
++ * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
++ */
 +
-+}
++#include <xen/acpi.h>
++#include <xen/mm.h>
++#include <asm/mm.h>
 +
-+int __init
-+acpi_table_parse_entries(char *id,
-+			     unsigned long table_size,
-+			     int entry_id,
-+			     acpi_table_entry_handler handler,
-+			     unsigned int max_entries)
++void __iomem *
++arch_acpi_os_map_memory(acpi_physical_address phys, acpi_size size)
 +{
-+	struct acpi_table_header *table_header = NULL;
-+
-+	if (!handler)
-+		return -EINVAL;
-+
-+	if (strncmp(id, ACPI_SIG_MADT, 4) == 0)
-+		acpi_get_table(id, acpi_apic_instance, &table_header);
-+	else
-+		acpi_get_table(id, 0, &table_header);
-+
-+	if (!table_header) {
-+		printk(KERN_WARNING PREFIX "%4.4s not present\n", id);
-+		return -ENODEV;
-+	}
-+
-+	return acpi_parse_entries(id, table_size, handler, table_header,
-+				  entry_id, max_entries);
- }
- 
- int __init
-diff --git a/xen/include/xen/acpi.h b/xen/include/xen/acpi.h
-index 723ece8..23f8261 100644
---- a/xen/include/xen/acpi.h
-+++ b/xen/include/xen/acpi.h
-@@ -72,6 +72,9 @@ int acpi_table_init (void);
- int acpi_table_parse(char *id, acpi_table_handler handler);
- int acpi_table_parse_entries(char *id, unsigned long table_size,
- 	int entry_id, acpi_table_entry_handler handler, unsigned int max_entries);
-+int acpi_parse_entries(char *id, unsigned long table_size,
-+	acpi_table_entry_handler handler, struct acpi_table_header *table_header,
-+	int entry_id, unsigned int max_entries);
- int acpi_table_parse_madt(enum acpi_madt_type id, acpi_table_entry_handler handler, unsigned int max_entries);
- int acpi_table_parse_srat(int id, acpi_madt_entry_handler handler,
- 	unsigned int max_entries);
++    return __va(phys);
++}
 -- 
 2.1.0
