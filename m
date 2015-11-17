@@ -1,91 +1,62 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Tue, 17 Nov 2015 11:57:31 -0500 (EST)
-Subject: [PATCH v3] ARM: xip: Use correct symbol for end of ROM marker
-In-Reply-To: <HK2PR06MB056196B2E169A504A16ED9738A1D0@HK2PR06MB0561.apcprd06.prod.outlook.com>
-References: <1447362108-4333-1-git-send-email-chris.brandt@renesas.com>
- <1447697140-4099-1-git-send-email-chris.brandt@renesas.com>
- <alpine.LFD.2.20.1511161515100.5826@knanqh.ubzr>
- <HK2PR06MB05619FACB3725B6F5B2299718A1E0@HK2PR06MB0561.apcprd06.prod.outlook.com>
- <alpine.LFD.2.20.1511161605070.5826@knanqh.ubzr>
- <HK2PR06MB056196B2E169A504A16ED9738A1D0@HK2PR06MB0561.apcprd06.prod.outlook.com>
-Message-ID: <alpine.LFD.2.20.1511171155240.5826@knanqh.ubzr>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 17 Nov 2015 18:00:36 +0100
+Subject: [RFC PATCH] arm64: use non-global mappings for UEFI runtime
+ regions
+In-Reply-To: <20151117164759.GA12266@leverpostej>
+References: <1447750411-6424-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20151117152558.GK12586@leverpostej>
+ <20151117163445.GE30101@arm.com>
+ <20151117164759.GA12266@leverpostej>
+Message-ID: <CAKv+Gu8Z=Jb-x1ZL7YSYpLWsEBqh7z0EQ0myg2Gz5asAuHdNbg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 17 Nov 2015, Chris Brandt wrote:
+On 17 November 2015 at 17:48, Mark Rutland <mark.rutland@arm.com> wrote:
+> On Tue, Nov 17, 2015 at 04:34:46PM +0000, Will Deacon wrote:
+>> On Tue, Nov 17, 2015 at 03:25:58PM +0000, Mark Rutland wrote:
+>> > On Tue, Nov 17, 2015 at 09:53:31AM +0100, Ard Biesheuvel wrote:
+>> > > As pointed out by Russell King in response to the proposed ARM version
+>> > > of this code, the sequence to switch between the UEFI runtime mapping
+>> > > and current's actual userland mapping (and vice versa) is potentially
+>> > > unsafe, since it leaves a time window between the switch to the new
+>> > > page tables and the TLB flush where speculative accesses may hit on
+>> > > stale global TLB entries.
+>> >
+>> > Wow, annoying that we missed that.
+>> >
+>> > > So instead, use non-global mappings, and perform the switch via the
+>> > > ordinary ASID-aware context switch routines.
+>> > >
+>> > > Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+>> >
+>> > From digging into the way the ASID allocator works, I believe this is
+>> > correct. FWIW:
+>> >
+>> > Reviewed-by: Mark Rutland <mark.rutland@arm.com>
+>> >
+>> > For backporting, I'm not sure that this is necessarily safe prior to
+>> > Will's rework of the ASID allocator. I think we can IPI in this context,
+>> > and it looks like the cpu_set_reserved_ttbr0() in flush_context() would
+>> > save us from the problem described above, but I may have missed
+>> > something.
+>> >
+>> > Will, are you aware of anything that could bite us here?
+>>
+>> Can we guarantee that efi_virtmap_{load,unload} are called with interrupts
+>> enabled?
+>
+> Unfortuantely, it looks like we can guarantee interrupts are _disabled_.
+>
+> Every function in drivers/firmware/efi/runtime-wrappers.c which uses
+> efi_call_virt (and hence efi_virtmap_{load,unload}) wraps the call in a
+> spin_lock_irq{save,restore} pair. Those appear to be the only uses of
+> efi_call_virt.
+>
 
-> > The old method with conditional placement in the linker script is
-> > broken beyond repair.  There is simply way too much stuff these days
-> > to do this sanely.  I think the only way to fix it properly is to
-> > have a separate linker script for XIP usage with proper (and obvious)
-> > section placement.
-> 
-> 
-> 
-> Step 1: Change the Makefiles to select an alternative linker script.
-> 
-> What do you think about doing the following?
+There is actually no need from the UEFI pov to invoke the UEFI runtime
+services with interrupts disabled, this is simply an implementation
+detail of the kernel support, and I think it is primarily for x86 (but
+I have to dig up the old thread for the details)
 
-
-
-
-That's fine.  Obviously this is the first step when developing this, but 
-logically this will have to be the last patch in the series when you're 
-done.
-
-> 
-> 
-> diff --git a/Makefile b/Makefile
-> index fd46821..956ad21 100644
-> --- a/Makefile
-> +++ b/Makefile
-> @@ -898,7 +898,11 @@ libs-y		:= $(libs-y1) $(libs-y2)
->  # Externally visible symbols (used by link-vmlinux.sh)
->  export KBUILD_VMLINUX_INIT := $(head-y) $(init-y)
->  export KBUILD_VMLINUX_MAIN := $(core-y) $(libs-y) $(drivers-y) $(net-y)
-> +ifdef CONFIG_XIP_KERNEL
-> +export KBUILD_LDS          := arch/$(SRCARCH)/kernel/vmlinux-xip.lds
-> +else
->  export KBUILD_LDS          := arch/$(SRCARCH)/kernel/vmlinux.lds
-> +endif
->  export LDFLAGS_vmlinux
->  # used by scripts/pacmage/Makefile
->  export KBUILD_ALLDIRS := $(sort $(filter-out arch/%,$(vmlinux-alldirs)) arch Documentation include samples scripts tools virt)
->  
->  
-> 
-> diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
-> index af9e59b..d97fc2e 100644
-> --- a/arch/arm/kernel/Makefile
-> +++ b/arch/arm/kernel/Makefile
-> @@ -3,6 +3,7 @@
->  #
->  
->  CPPFLAGS_vmlinux.lds := -DTEXT_OFFSET=$(TEXT_OFFSET)
-> +CPPFLAGS_vmlinux-xip.lds := -DTEXT_OFFSET=$(TEXT_OFFSET)
->  AFLAGS_head.o        := -DTEXT_OFFSET=$(TEXT_OFFSET)
->  
->  ifdef CONFIG_FUNCTION_TRACER
-> @@ -92,4 +93,8 @@ obj-y				+= psci-call.o
->  obj-$(CONFIG_SMP)		+= psci_smp.o
->  endif
->  
-> +ifdef CONFIG_XIP_KERNEL
-> +extra-y := $(head-y) vmlinux-xip.lds
-> +else
->  extra-y := $(head-y) vmlinux.lds
-> +endif
-> 
-> 
-> 
-> 
-> 
-> 
-> Chris
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
-> 
+And even if we stick with spin_lock_irqsave(), we could refactor the
+runtime wrappers to perform the mm switch outside of them.
