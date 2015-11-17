@@ -1,73 +1,73 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 17 Nov 2015 16:44:53 +0000
-Subject: next build: 235 warnings 3 failures (next/next-20151117)
-In-Reply-To: <4694362.ZPL12j6kR2@wuerfel>
-References: <564a9961.878b420a.331b8.fffffd62@mx.google.com>
- <4694362.ZPL12j6kR2@wuerfel>
-Message-ID: <20151117164453.GF30101@arm.com>
+From: Chris.Brandt@renesas.com (Chris Brandt)
+Date: Tue, 17 Nov 2015 16:45:58 +0000
+Subject: [PATCH v3] ARM: xip: Use correct symbol for end of ROM marker
+In-Reply-To: <alpine.LFD.2.20.1511161605070.5826@knanqh.ubzr>
+References: <1447362108-4333-1-git-send-email-chris.brandt@renesas.com>
+ <1447697140-4099-1-git-send-email-chris.brandt@renesas.com>
+ <alpine.LFD.2.20.1511161515100.5826@knanqh.ubzr>
+ <HK2PR06MB05619FACB3725B6F5B2299718A1E0@HK2PR06MB0561.apcprd06.prod.outlook.com>
+ <alpine.LFD.2.20.1511161605070.5826@knanqh.ubzr>
+Message-ID: <HK2PR06MB056196B2E169A504A16ED9738A1D0@HK2PR06MB0561.apcprd06.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
+> The old method with conditional placement in the linker script is
+> broken beyond repair.  There is simply way too much stuff these days
+> to do this sanely.  I think the only way to fix it properly is to
+> have a separate linker script for XIP usage with proper (and obvious)
+> section placement.
 
-On Tue, Nov 17, 2015 at 09:57:30AM +0100, Arnd Bergmann wrote:
-> On Monday 16 November 2015 19:05:05 Olof's autobuilder wrote:
-> > 
-> > Errors:
-> > 
-> >         arm64.allmodconfig:
-> > arch/arm64/include/asm/barrier.h:71:3: error: read-only variable '___p1' used as 'asm' output
-> > arch/arm64/include/asm/barrier.h:75:3: error: read-only variable '___p1' used as 'asm' output
-> > arch/arm64/include/asm/barrier.h:79:3: error: read-only variable '___p1' used as 'asm' output
-> > arch/arm64/include/asm/barrier.h:83:3: error: read-only variable '___p1' used as 'asm' output
-> > arch/arm64/include/asm/barrier.h:71:3: error: read-only variable '___p1' used as 'asm' output
-> > arch/arm64/include/asm/barrier.h:75:3: error: read-only variable '___p1' used as 'asm' output
-> > arch/arm64/include/asm/barrier.h:79:3: error: read-only variable '___p1' used as 'asm' output
-> > arch/arm64/include/asm/barrier.h:83:3: error: read-only variable '___p1' used as 'asm' output
-> > arch/arm64/include/asm/barrier.h:71:3: error: read-only variable '___p1' used as 'asm' output
-> 
-> The patch below seems to fix it. Please review/apply.
-> 
-> 8<----
-> Subject: ARM64: make smp_load_acquire() work with const arguments
-> 
-> smp_load_acquire() uses typeof() to declare a local variable for temporarily
-> storing the output of the memory access. This fails when the argument is
-> constant, because the assembler complains about using a constant register
-> as output:
-> 
->  arch/arm64/include/asm/barrier.h:71:3: error: read-only variable '___p1'
->  used as 'asm' output
 
-Do you know the usage in the kernel causing this warning?
 
-> This changes the implementation to use an 'unsigned long' for the temporary value
-> and only cast it to the original type in the end.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> 
-> diff --git a/arch/arm64/include/asm/barrier.h b/arch/arm64/include/asm/barrier.h
-> index 624f9679f4b0..05fa329467f6 100644
-> --- a/arch/arm64/include/asm/barrier.h
-> +++ b/arch/arm64/include/asm/barrier.h
-> @@ -64,7 +64,7 @@ do {									\
->  
->  #define smp_load_acquire(p)						\
->  ({									\
-> -	typeof(*p) ___p1;						\
-> +	unsigned long ___p1;						\
->  	compiletime_assert_atomic_type(*p);				\
->  	switch (sizeof(*p)) {						\
->  	case 1:								\
-> @@ -84,7 +84,7 @@ do {									\
->  			: "=r" (___p1) : "Q" (*p) : "memory");		\
->  		break;							\
->  	}								\
-> -	___p1;								\
-> +	(typeof(*p))___p1;								\
+Step 1: Change the Makefiles to select an alternative linker script.
 
-My worry about having the cast here is if somebody decides to
-smp_load_acquire from a packed 64-bit structure (e.g. some sort of lock),
-then we'll get a conversion to non-scalar type error from the compiler.
+What do you think about doing the following?
 
-Will
+
+diff --git a/Makefile b/Makefile
+index fd46821..956ad21 100644
+--- a/Makefile
++++ b/Makefile
+@@ -898,7 +898,11 @@ libs-y		:= $(libs-y1) $(libs-y2)
+ # Externally visible symbols (used by link-vmlinux.sh)
+ export KBUILD_VMLINUX_INIT := $(head-y) $(init-y)
+ export KBUILD_VMLINUX_MAIN := $(core-y) $(libs-y) $(drivers-y) $(net-y)
++ifdef CONFIG_XIP_KERNEL
++export KBUILD_LDS          := arch/$(SRCARCH)/kernel/vmlinux-xip.lds
++else
+ export KBUILD_LDS          := arch/$(SRCARCH)/kernel/vmlinux.lds
++endif
+ export LDFLAGS_vmlinux
+ # used by scripts/pacmage/Makefile
+ export KBUILD_ALLDIRS := $(sort $(filter-out arch/%,$(vmlinux-alldirs)) arch Documentation include samples scripts tools virt)
+ 
+ 
+
+diff --git a/arch/arm/kernel/Makefile b/arch/arm/kernel/Makefile
+index af9e59b..d97fc2e 100644
+--- a/arch/arm/kernel/Makefile
++++ b/arch/arm/kernel/Makefile
+@@ -3,6 +3,7 @@
+ #
+ 
+ CPPFLAGS_vmlinux.lds := -DTEXT_OFFSET=$(TEXT_OFFSET)
++CPPFLAGS_vmlinux-xip.lds := -DTEXT_OFFSET=$(TEXT_OFFSET)
+ AFLAGS_head.o        := -DTEXT_OFFSET=$(TEXT_OFFSET)
+ 
+ ifdef CONFIG_FUNCTION_TRACER
+@@ -92,4 +93,8 @@ obj-y				+= psci-call.o
+ obj-$(CONFIG_SMP)		+= psci_smp.o
+ endif
+ 
++ifdef CONFIG_XIP_KERNEL
++extra-y := $(head-y) vmlinux-xip.lds
++else
+ extra-y := $(head-y) vmlinux.lds
++endif
+
+
+
+
+
+
+Chris
