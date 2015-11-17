@@ -1,150 +1,137 @@
 From: lina.iyer@linaro.org (Lina Iyer)
-Date: Tue, 17 Nov 2015 15:37:47 -0700
-Subject: [PATCH RFC 23/27] ARM64: psci: Support cluster idle states for
- OS-Initated
+Date: Tue, 17 Nov 2015 15:37:49 -0700
+Subject: [PATCH RFC 25/27] devicetree: bindings: Document qcom, msm-id and qcom,
+ board-id
 In-Reply-To: <1447799871-56374-1-git-send-email-lina.iyer@linaro.org>
 References: <1447799871-56374-1-git-send-email-lina.iyer@linaro.org>
-Message-ID: <1447799871-56374-24-git-send-email-lina.iyer@linaro.org>
+Message-ID: <1447799871-56374-26-git-send-email-lina.iyer@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ARMv8 PSCI firmware may allow Linux to determine the state of the CPU
-cluster and the cluster at coherency level to enter idle states when
-there are no active CPUs. Since Linux has a better idea of the QoS and
-the wakeup pattern of the CPUs, the cluster idle states may be better
-determined by the OS instead of the firmware.
+From: Kumar Gala <galak@codeaurora.org>
 
-The last CPU entering idle in a cluster, holds the responsibility of
-selecting the state of the cluster. Only one CPU in a cluster may
-provide the cluster idle state to the firmware. Similarly, the last CPU
-in the cluster of clusters may provide the state of the coherency
-domain.
+The top level qcom,msm-id and qcom,board-id are utilized by bootloaders
+on Qualcomm MSM platforms to determine which device tree should be
+utilized and passed to the kernel.
 
-The CPU PM domain framework facilitates registration of CPU PM domains
-and reference counting for the last man down and the first man up. But
-the organzation of CPUs into clusters must be provided. The cpu-map
-topology node provides the information. Call into the CPU PM framework
-to parse the CPU topology node and setup the PM domains. The state id
-for the cluster ids is available with the domain idle state.
-
-The last CPU PSCI state id of the entire system would therefore be -
-Coherency State ID + Cluster State ID + CPU idle state ID, that is
-passed into the PSCI firmware when the CPU makes the PSCI enable-method.
-
-Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
-Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
+Cc: <devicetree@vger.kernel.org>
+Signed-off-by: Kumar Gala <galak@codeaurora.org>
 ---
- arch/arm64/kernel/psci.c | 54 +++++++++++++++++++++++++++++++++++++++++++++---
- 1 file changed, 51 insertions(+), 3 deletions(-)
+ Documentation/devicetree/bindings/arm/msm/ids.txt | 65 +++++++++++++++++++++++
+ include/dt-bindings/arm/qcom-ids.h                | 33 ++++++++++++
+ 2 files changed, 98 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/arm/msm/ids.txt
+ create mode 100644 include/dt-bindings/arm/qcom-ids.h
 
-diff --git a/arch/arm64/kernel/psci.c b/arch/arm64/kernel/psci.c
-index f67f35b..6618d33 100644
---- a/arch/arm64/kernel/psci.c
-+++ b/arch/arm64/kernel/psci.c
-@@ -15,10 +15,12 @@
- 
- #define pr_fmt(fmt) "psci: " fmt
- 
-+#include <linux/cpu-pd.h>
- #include <linux/init.h>
- #include <linux/of.h>
- #include <linux/smp.h>
- #include <linux/delay.h>
-+#include <linux/pm_domain.h>
- #include <linux/psci.h>
- #include <linux/slab.h>
- 
-@@ -31,6 +33,44 @@
- #include <asm/suspend.h>
- 
- static DEFINE_PER_CPU_READ_MOSTLY(u32 *, psci_power_state);
-+static DEFINE_PER_CPU(u32, cluster_state_id);
+diff --git a/Documentation/devicetree/bindings/arm/msm/ids.txt b/Documentation/devicetree/bindings/arm/msm/ids.txt
+new file mode 100644
+index 0000000..9ee8428
+--- /dev/null
++++ b/Documentation/devicetree/bindings/arm/msm/ids.txt
+@@ -0,0 +1,65 @@
++* MSM-ID
 +
-+static inline u32 psci_get_composite_state_id(u32 cpu_state)
-+{
-+	u32 val = cpu_state;
++The qcom,msm-id entry specifies the MSM chipset and hardware revision.  It can
++optionally be an array of these to indicate multiple hardware that use the same
++device tree.  It is expected that the bootloader will use this information at
++boot-up to decide which device tree to use when given multiple device trees,
++some of which may not be compatible with the actual hardware.  It is the
++bootloader's responsibility to pass the correct device tree to the kernel.
 +
-+	if (psci_has_ext_power_state())
-+		val += this_cpu_read(cluster_state_id);
++PROPERTIES
 +
-+	return val;
-+}
++- qcom,msm-id:
++	Usage: required
++	Value type: <prop-encoded-array> (<chipset_id, rev_id> [, <c2, r2> ..])
++	Definition:
++		The "chipset_id" consists of three fields as below:
 +
-+static inline void psci_reset_composite_state_id(void)
-+{
-+	this_cpu_write(cluster_state_id, 0);
-+}
++		bits 0-15  = The unique MSM chipset id.
++		bits 16-31 = Reserved.  Should be 0
 +
-+static int psci_pd_power_on(struct generic_pm_domain *genpd)
-+{
-+	return 0;
-+}
++		chipset_id is an exact match value
 +
-+static int psci_pd_power_off(struct generic_pm_domain *genpd)
-+{
-+	__this_cpu_add(cluster_state_id, genpd->states[genpd->state_idx].param);
-+	return 0;
-+}
++		The "rev_id" is a chipset specific 32-bit id that represents
++		the version of the chipset.
 +
-+static const struct cpu_pd_ops psci_pd_ops = {
-+	.power_on = psci_pd_power_on,
-+	.power_off = psci_pd_power_off,
-+};
++		The rev_id is a best match id.  The bootloader will look for
++		the closest possible patch.
 +
-+static int __init psci_setup_cpu_domains(void)
-+{
-+	return of_setup_cpu_domain_topology(&psci_pd_ops);
-+}
-+subsys_initcall(psci_setup_cpu_domains);
- 
- static int __maybe_unused cpu_psci_cpu_init_idle(unsigned int cpu)
- {
-@@ -117,6 +157,8 @@ static int cpu_psci_cpu_boot(unsigned int cpu)
- 	if (err)
- 		pr_err("failed to boot CPU%d (%d)\n", cpu, err);
- 
-+	/* Reset CPU cluster states */
-+	psci_reset_composite_state_id();
- 	return err;
- }
- 
-@@ -181,15 +223,16 @@ static int cpu_psci_cpu_kill(unsigned int cpu)
- static int psci_suspend_finisher(unsigned long index)
- {
- 	u32 *state = __this_cpu_read(psci_power_state);
-+	u32 ext_state = psci_get_composite_state_id(state[index - 1]);
- 
--	return psci_ops.cpu_suspend(state[index - 1],
--				    virt_to_phys(cpu_resume));
-+	return psci_ops.cpu_suspend(ext_state, virt_to_phys(cpu_resume));
- }
- 
- static int __maybe_unused cpu_psci_cpu_suspend(unsigned long index)
- {
- 	int ret;
- 	u32 *state = __this_cpu_read(psci_power_state);
-+	u32 ext_state = psci_get_composite_state_id(state[index - 1]);
- 	/*
- 	 * idle state index 0 corresponds to wfi, should never be called
- 	 * from the cpu_suspend operations
-@@ -198,10 +241,15 @@ static int __maybe_unused cpu_psci_cpu_suspend(unsigned long index)
- 		return -EINVAL;
- 
- 	if (!psci_power_state_loses_context(state[index - 1]))
--		ret = psci_ops.cpu_suspend(state[index - 1], 0);
-+		ret = psci_ops.cpu_suspend(ext_state, 0);
- 	else
- 		ret = cpu_suspend(index, psci_suspend_finisher);
- 
-+	/*
-+	 * Clear the CPU's cluster states, we start afresh after coming
-+	 * out of idle.
-+	 */
-+	psci_reset_composite_state_id();
- 	return ret;
- }
- 
++* BOARD-ID
++
++The qcom,board-id entry specifies the board type and revision information.  It
++can optionally be an array of these to indicate multiple boards that use the
++same device tree.  It is expected that the bootloader will use this information
++at boot-up to decide which device tree to use when given multiple device trees,
++some of which may not be compatible with the actual hardware.  It is the
++bootloader's responsibility to pass the correct device tree to the kernel.
++
++PROPERTIES
++
++- qcom,board-id:
++	Usage: required
++	Value type: <prop-encoded-array> (<board_id, subtype_id> [, <b2, s2> ..])
++	Definition:
++		The "board_id" consists of three fields as below:
++
++		bits 31-24 = Unusued.
++		bits 23-16 = Platform Version Major
++		bits 15-8  = Platfrom Version Minor
++		bits 7-0   = Platform Type
++
++		Platform Type field is an exact match value.  The Platform
++		Major/Minor field is a best match.  The bootloader will look
++		for the closest possible match.
++
++		The "subtype_id" is unique to a Platform Type/Chipset ID.  For
++		a given Platform Type, there will typically only be a single
++		board and the subtype_id will be 0.  However in some cases board
++		variants may need to be distinquished by different subtype_id
++		values.
++
++		subtype_id is an exact match value.
++
++EXAMPLE:
++	qcom,board-id = <15 2>;
++	qcom,msm-id = <0x1007e 0>;
+diff --git a/include/dt-bindings/arm/qcom-ids.h b/include/dt-bindings/arm/qcom-ids.h
+new file mode 100644
+index 0000000..a18f34e
+--- /dev/null
++++ b/include/dt-bindings/arm/qcom-ids.h
+@@ -0,0 +1,33 @@
++/* Copyright (c) 2015, The Linux Foundation. All rights reserved.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 and
++ * only version 2 as published by the Free Software Foundation.
++ *
++ * This program is distributed in the hope that it will be useful,
++ * but WITHOUT ANY WARRANTY; without even the implied warranty of
++ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ * GNU General Public License for more details.
++ */
++#ifndef __DT_BINDINGS_QCOM_IDS_H
++#define __DT_BINDINGS_QCOM_IDS_H
++
++/* qcom,msm-id */
++#define QCOM_ID_MSM8916		206
++#define QCOM_ID_APQ8016		247
++#define QCOM_ID_MSM8216		248
++#define QCOM_ID_MSM8116		249
++#define QCOM_ID_MSM8616		250
++
++/* qcom,board-id */
++#define QCOM_BRD_ID(a, major, minor) \
++	(((major & 0xff) << 16) | ((minor & 0xff) << 8) | QCOM_BRD_ID_##a)
++
++#define QCOM_BRD_ID_MTP		8
++#define QCOM_BRD_ID_DRAGONBRD	10
++#define QCOM_BRD_ID_SBC		24
++
++#define QCOM_BRD_SUBTYPE_DEFAULT		0
++#define QCOM_BRD_SUBTYPE_MTP8916_SMB1360	1
++
++#endif
 -- 
 2.1.4
