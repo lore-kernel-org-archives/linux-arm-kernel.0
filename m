@@ -1,78 +1,131 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 17 Nov 2015 10:22:06 +0100
-Subject: [PATCH] crypto: atmel: fix 64-bit warnings
-Message-ID: <4444008.DmhAgm3J77@wuerfel>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 17 Nov 2015 10:26:43 +0100
+Subject: [PATCH v2 00/12] UEFI boot and runtime services support for
+ 32-bit ARM
+In-Reply-To: <CAD0U-hKfQvV_Dagc2BomK1wuJQG_-bsnLSyGcRduUN9zf30AHg@mail.gmail.com>
+References: <1447698757-8762-1-git-send-email-ard.biesheuvel@linaro.org>
+ <CAD0U-hKfQvV_Dagc2BomK1wuJQG_-bsnLSyGcRduUN9zf30AHg@mail.gmail.com>
+Message-ID: <CAKv+Gu9i+t0zhLY=XqnHt9gX3OzhXGnqd9qfWy2wi0OinBzehg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The atmel AES driver assumes that 'int' and 'size_t' are the same
-type in multiple locations, which the compiler warns about when
-building it for 64-bit systems:
+On 16 November 2015 at 20:50, Ryan Harkin <ryan.harkin@linaro.org> wrote:
+> Hi Ard,
+>
+> On 16 November 2015 at 18:32, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
+>> This series adds support for booting the 32-bit ARM kernel directly from
+>> UEFI firmware using a builtin UEFI stub. It mostly reuses refactored arm64
+>> code, and the differences (primarily the PE/COFF header and entry point and
+>> the efi_create_mapping() implementation) are split out into arm64 and ARM
+>> versions.
+>>
+>> Changes since v1:
+>> - The primary difference between this version and the first one is that all
+>>   prerequisites have either been merged, dropped for now (early FDT handling)
+>>   or folded into this series (MEMBLOCK_NOMAP). IOW, this series can be applied
+>>   on top of v4.4-rc1 directly.
+>> - Dropped handling of UEFI permission bits. The reason is that the UEFIv2.5
+>>   approach (EFI_PROPERTIES_TABLE) is flawed, and will be replaced by something
+>>   better in the next version of the spec.
+>>
+>> Patch #1 adds support for the MEMBLOCK_NOMAP attribute to the generic memblock
+>> code. Its purpose is to annotate memory regions as normal memory even if they
+>> are removed from the kernel direct mapping.
+>>
+>> Patch #2 implements MEMBLOCK_NOMAP support for arm64
+>>
+>> Patch #3 updates the EFI init code to remove UEFI reserved regions and regions
+>> used by runtime services from the kernel direct mapping
+>>
+>> Patch #4 splits off most of arch/arm64/kernel/efi.c into arch agnostic files
+>> arm-init.c and arm-runtime.c under drivers/firmware/efi.
+>>
+>> Patch #5 refactors the code split off in patch #1 to isolate the arm64 specific
+>> pieces, and change a couple of arm64-isms that ARM handles slightly differently.
+>>
+>> Patch #6 enables the generic early_ioremap and early_memremap implementations
+>> for ARM. It reuses the kmap fixmap region, which is not used that early anyway.
+>>
+>> Patch #7 splits off the core functionality of create_mapping() into a new
+>> function __create_mapping() that we can reuse for mapping UEFI runtime regions.
+>>
+>> Patch #8 factors out the early_alloc() routine so we can invoke __create_mapping
+>> using another (late) allocator.
+>>
+>> Patch #9 implements create_mapping_late() that uses a late allocator.
+>>
+>> Patch #10 implements MEMBLOCK_NOMAP support for ARM
+>>
+>> Patch #11 implements the UEFI support in the kernel proper to probe the UEFI
+>> memory map and map the runtime services.
+>>
+>> Patch #12 ties together all of the above, by implementing the UEFI stub, and
+>> introducing the Kconfig symbols that allow all of this to be built.
+>>
+>> Instructions how to build and run the 32-bit ARM UEFI firmware can be found here:
+>> https://wiki.linaro.org/LEG/UEFIforQEMU
+>>
+>> Ard Biesheuvel (11):
+>>   mm/memblock: add MEMBLOCK_NOMAP attribute to memblock memory table
+>>   arm64: only consider memblocks with NOMAP cleared for linear mapping
+>>   arm64/efi: mark UEFI reserved regions as MEMBLOCK_NOMAP
+>>   arm64/efi: split off EFI init and runtime code for reuse by 32-bit ARM
+>>   arm64/efi: refactor EFI init and runtime code for reuse by 32-bit ARM
+>>   ARM: add support for generic early_ioremap/early_memremap
+>>   ARM: split off core mapping logic from create_mapping
+>>   ARM: factor out allocation routine from __create_mapping()
+>>   ARM: implement create_mapping_late() for EFI use
+>>   ARM: only consider memblocks with NOMAP cleared for linear mapping
+>>   ARM: wire up UEFI init and runtime support
+>>
+>> Roy Franz (1):
+>>   ARM: add UEFI stub support
+>>
+>>  arch/arm/Kconfig                          |  20 ++
+>>  arch/arm/boot/compressed/Makefile         |   4 +-
+>>  arch/arm/boot/compressed/efi-header.S     | 130 ++++++++
+>>  arch/arm/boot/compressed/head.S           |  54 +++-
+>>  arch/arm/boot/compressed/vmlinux.lds.S    |   7 +
+>>  arch/arm/include/asm/Kbuild               |   1 +
+>>  arch/arm/include/asm/efi.h                |  90 ++++++
+>>  arch/arm/include/asm/fixmap.h             |  29 +-
+>>  arch/arm/include/asm/mach/map.h           |   1 +
+>>  arch/arm/kernel/Makefile                  |   1 +
+>>  arch/arm/kernel/efi.c                     |  38 +++
+>>  arch/arm/kernel/setup.c                   |  10 +-
+>>  arch/arm/mm/init.c                        |   5 +-
+>>  arch/arm/mm/ioremap.c                     |   9 +
+>>  arch/arm/mm/mmu.c                         | 110 ++++---
+>>  arch/arm64/include/asm/efi.h              |  16 +
+>>  arch/arm64/kernel/efi.c                   | 331 ++------------------
+>>  arch/arm64/mm/init.c                      |   2 +-
+>>  arch/arm64/mm/mmu.c                       |   2 +
+>>  drivers/firmware/efi/Makefile             |   4 +
+>>  drivers/firmware/efi/arm-init.c           | 197 ++++++++++++
+>>  drivers/firmware/efi/arm-runtime.c        | 134 ++++++++
+>>  drivers/firmware/efi/efi.c                |   2 +
+>>  drivers/firmware/efi/libstub/Makefile     |   9 +
+>>  drivers/firmware/efi/libstub/arm-stub.c   |   4 +-
+>>  drivers/firmware/efi/libstub/arm32-stub.c |  85 +++++
+>>  include/linux/memblock.h                  |   8 +
+>>  mm/memblock.c                             |  28 ++
+>>  28 files changed, 975 insertions(+), 356 deletions(-)
+>>  create mode 100644 arch/arm/boot/compressed/efi-header.S
+>>  create mode 100644 arch/arm/include/asm/efi.h
+>>  create mode 100644 arch/arm/kernel/efi.c
+>>  create mode 100644 drivers/firmware/efi/arm-init.c
+>>  create mode 100644 drivers/firmware/efi/arm-runtime.c
+>>  create mode 100644 drivers/firmware/efi/libstub/arm32-stub.c
+>>
+>> --
+>> 1.9.1
+>>
+>
+> I've tested this series against 4.4-rc1 on Versatile Express TC2,
+> booting both as a "regular" kernel and as a EFI Stub on BusyBox and
+> OpenEmbedded.  So if it helps any, you can add my:
+>
+> Tested-by: Ryan Harkin <ryan.harkin@linaro.org>
+>
 
-In file included from ../drivers/crypto/atmel-aes.c:17:0:
-drivers/crypto/atmel-aes.c: In function 'atmel_aes_sg_copy':
-include/linux/kernel.h:724:17: warning: comparison of distinct pointer types lacks a cast
-drivers/crypto/atmel-aes.c:448:11: note: in expansion of macro 'min'
-
-drivers/crypto/atmel-aes.c: In function 'atmel_aes_crypt_dma_stop':
-include/linux/kern_levels.h:4:18: warning: format '%u' expects argument of type 'unsigned int', but argument 2 has type 'size_t {aka long unsigned int}' [-Wformat=]
-
-This changes the format strings to use the %z modifier when printing
-a size_t, and makes sure that we use the correct size_t type where
-needed. In case of sg_dma_len(), the type of the result depends
-on CONFIG_NEED_SG_DMA_LENGTH, so we have to use min_t to get it to
-work in all configurations.
-
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-
-diff --git a/drivers/crypto/atmel-aes.c b/drivers/crypto/atmel-aes.c
-index fb16d812c8f5..bfb1f799bf56 100644
---- a/drivers/crypto/atmel-aes.c
-+++ b/drivers/crypto/atmel-aes.c
-@@ -184,7 +184,7 @@ static int atmel_aes_sg_length(struct ablkcipher_request *req,
- static int atmel_aes_sg_copy(struct scatterlist **sg, size_t *offset,
- 			void *buf, size_t buflen, size_t total, int out)
- {
--	unsigned int count, off = 0;
-+	size_t count, off = 0;
- 
- 	while (buflen && total) {
- 		count = min((*sg)->length - *offset, total);
-@@ -444,8 +444,8 @@ static int atmel_aes_crypt_dma_start(struct atmel_aes_dev *dd)
- 
- 
- 	if (fast)  {
--		count = min(dd->total, sg_dma_len(dd->in_sg));
--		count = min(count, sg_dma_len(dd->out_sg));
-+		count = min_t(size_t, dd->total, sg_dma_len(dd->in_sg));
-+		count = min_t(size_t, count, sg_dma_len(dd->out_sg));
- 
- 		err = dma_map_sg(dd->dev, dd->in_sg, 1, DMA_TO_DEVICE);
- 		if (!err) {
-@@ -639,7 +639,7 @@ static int atmel_aes_crypt_dma_stop(struct atmel_aes_dev *dd)
- 				dd->buf_out, dd->buflen, dd->dma_size, 1);
- 			if (count != dd->dma_size) {
- 				err = -EINVAL;
--				pr_err("not all data converted: %u\n", count);
-+				pr_err("not all data converted: %zu\n", count);
- 			}
- 		}
- 	}
-@@ -666,7 +666,7 @@ static int atmel_aes_buff_init(struct atmel_aes_dev *dd)
- 	dd->dma_addr_in = dma_map_single(dd->dev, dd->buf_in,
- 					dd->buflen, DMA_TO_DEVICE);
- 	if (dma_mapping_error(dd->dev, dd->dma_addr_in)) {
--		dev_err(dd->dev, "dma %d bytes error\n", dd->buflen);
-+		dev_err(dd->dev, "dma %zd bytes error\n", dd->buflen);
- 		err = -EINVAL;
- 		goto err_map_in;
- 	}
-@@ -674,7 +674,7 @@ static int atmel_aes_buff_init(struct atmel_aes_dev *dd)
- 	dd->dma_addr_out = dma_map_single(dd->dev, dd->buf_out,
- 					dd->buflen, DMA_FROM_DEVICE);
- 	if (dma_mapping_error(dd->dev, dd->dma_addr_out)) {
--		dev_err(dd->dev, "dma %d bytes error\n", dd->buflen);
-+		dev_err(dd->dev, "dma %zd bytes error\n", dd->buflen);
- 		err = -EINVAL;
- 		goto err_map_out;
- 	}
+Thanks Ryan!
