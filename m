@@ -1,62 +1,30 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Tue, 17 Nov 2015 09:16:13 +0000
-Subject: A problem about interrupt when booting a captured kernel
-In-Reply-To: <564AA377.2020703@huawei.com>
-References: <5645B6D3.60305@huawei.com> <564A2DE4.4030702@arm.com>
- <564AA377.2020703@huawei.com>
-Message-ID: <20151117091613.10ce486f@arm.com>
+From: mchehab@osg.samsung.com (Mauro Carvalho Chehab)
+Date: Tue, 17 Nov 2015 07:16:56 -0200
+Subject: [PATCH v2 3/3] [media] include/media: move platform_data to
+ linux/platform_data/media
+In-Reply-To: <4084946.Zz4s9XrKbs@wuerfel>
+References: <013152dcb3d4eaddd39aa4a37868430567bdc2d6.1447671420.git.mchehab@osg.samsung.com>
+ <b8bd73bedde742571b1ab8a7c0917a732dbf2ca1.1447671420.git.mchehab@osg.samsung.com>
+ <4084946.Zz4s9XrKbs@wuerfel>
+Message-ID: <20151117071656.498013a9@recife.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 17 Nov 2015 11:48:07 +0800
-Yang Yingliang <yangyingliang@huawei.com> wrote:
+Em Mon, 16 Nov 2015 13:28:10 +0100
+Arnd Bergmann <arnd@arndb.de> escreveu:
 
-> Hi
+> I think we can also move some of the existing platform data headers to the same
+> place, but that could be a separate patch:
 > 
-> On 2015/11/17 3:26, Marc Zyngier wrote:
-> > On 13/11/15 10:09, Yang Yingliang wrote:
-> >> Hi, Marc
-> >>
-> >>
-> >>       The kexec will boot a captured kernel while the kernel panic. But
-> >> it boots failed if the kernel panic in handler function of PPI. The
-> >> reason is that the PPI has not been 'eoi', other interrupts can not be
-> >> handled when booting  the captured kernel.
-> >>
-> >>       The kexec will call irq_eoi to end the irqs that have
-> >> IRQD_IRQ_INPROGRESS flag. But PPIs don't have this flag, so it won't be
-> >> ended.
-> >>
-> >>      Three ways to solve this problem we can think :
-> >>      1. Is there a way to reset gic like its_reset ?
-> >>      2. Can we add some flag for calling irq_eoi ?
-> >>      3. Just 'eoi' all PPIs without checking flags in kexec.
-> >>
-> >>       Please give some advice.
-> >
-> > Good timing. Please see:
-> >
-> > http://lists.infradead.org/pipermail/linux-arm-kernel/2015-November/385383.html
-> >
-> > and let me know if that fixes things for you.
-> 
-> I tried patch #1, deactivating interrupt can not fix the problem. But
-> EOI the interrupt can.
+> $ git grep linux/platform_data drivers/media/
+> drivers/media/platform/coda/coda-common.c:#include <linux/platform_data/coda.h>
+> drivers/media/platform/soc_camera/mx2_camera.c:#include <linux/platform_data/camera-mx2.h>
+> drivers/media/platform/soc_camera/mx3_camera.c:#include <linux/platform_data/camera-mx3.h>
+> drivers/media/platform/soc_camera/mx3_camera.c:#include <linux/platform_data/dma-imx.h>
+> drivers/media/platform/soc_camera/pxa_camera.c:#include <linux/platform_data/camera-pxa.h>
+> drivers/media/platform/soc_camera/rcar_vin.c:#include <linux/platform_data/camera-rcar.h>
 
-You have noticed that this patch is for ARM, not arm64, right?
+Fair enough. Just sent a separate patch to address that.
 
-> I think the reason is GICC status is not cleared.
-> So if it means, in hardware, we should clear the GICC status while 
-> deactivating the.
-
-Writing to the EOI register or writing to the ACTIVE register have the
-exact same result as far as kexec is concerned (unless your GIC is not
-compliant with the architecture - in which case I can't help you).
-
-Does applying the other patches help?
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny.
+Regards,
+Mauro
