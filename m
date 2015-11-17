@@ -1,44 +1,22 @@
-From: Zhiqiang.Hou@freescale.com (Zhiqiang Hou)
-Date: Tue, 17 Nov 2015 17:53:19 +0800
-Subject: [PATCHv8 2/5] watchdog: Add support for Freescale Layerscape platforms
-In-Reply-To: <1447754002-40555-1-git-send-email-Zhiqiang.Hou@freescale.com>
-References: <1447754002-40555-1-git-send-email-Zhiqiang.Hou@freescale.com>
-Message-ID: <1447754002-40555-2-git-send-email-Zhiqiang.Hou@freescale.com>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 17 Nov 2015 10:37:08 +0000
+Subject: [PATCH] [media] move media platform data to
+ linux/platform_data/media
+In-Reply-To: <4d99e49726942dc4d6a6ee1debf6665b2b47908b.1447751746.git.mchehab@osg.samsung.com>
+References: <4d99e49726942dc4d6a6ee1debf6665b2b47908b.1447751746.git.mchehab@osg.samsung.com>
+Message-ID: <20151117103708.GL31303@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Shaohui Xie <Shaohui.Xie@freescale.com>
+On Tue, Nov 17, 2015 at 07:15:59AM -0200, Mauro Carvalho Chehab wrote:
+> Now that media has its own subdirectory inside platform_data,
+> let's move the headers that are already there to such subdir.
 
-Modify watchdog/Kconfig file to support Layerscape platforms.
-
-Signed-off-by: Shaohui Xie <Shaohui.Xie@freescale.com>
-Signed-off-by: Hou Zhiqiang <B48286@freescale.com>
-Acked-by: Guenter Roeck <linux@roeck-us.net>
----
-V8:
- - No change.
-
-V6:
- - Remove a Signed-off.
-
-V5: V4 V3 V2
- - No change.
-
- drivers/watchdog/Kconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
-
-diff --git a/drivers/watchdog/Kconfig b/drivers/watchdog/Kconfig
-index 7a8a6c6..1c427be 100644
---- a/drivers/watchdog/Kconfig
-+++ b/drivers/watchdog/Kconfig
-@@ -446,7 +446,7 @@ config MAX63XX_WATCHDOG
- 
- config IMX2_WDT
- 	tristate "IMX2+ Watchdog"
--	depends on ARCH_MXC
-+	depends on ARCH_MXC || ARCH_LAYERSCAPE
- 	select REGMAP_MMIO
- 	select WATCHDOG_CORE
- 	help
--- 
-2.1.0.27.g96db324
+Acked-by: Mark Brown <broonie@kernel.org>
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151117/5f1bbdb4/attachment-0001.sig>
