@@ -1,10 +1,11 @@
 From: julien.grall@citrix.com (Julien Grall)
-Date: Tue, 17 Nov 2015 11:57:07 +0000
-Subject: [PATCH v3 50/62] xen/efi: store EFI system table in efi structure
-In-Reply-To: <1447753261-7552-51-git-send-email-shannon.zhao@linaro.org>
+Date: Tue, 17 Nov 2015 11:58:30 +0000
+Subject: [PATCH v3 38/62] arm/acpi: Add placeholder for efi and acpi load
+ address
+In-Reply-To: <1447753261-7552-39-git-send-email-shannon.zhao@linaro.org>
 References: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
- <1447753261-7552-51-git-send-email-shannon.zhao@linaro.org>
-Message-ID: <564B1613.9060204@citrix.com>
+ <1447753261-7552-39-git-send-email-shannon.zhao@linaro.org>
+Message-ID: <564B1666.4060008@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
@@ -13,50 +14,42 @@ Hi Shannon,
 On 17/11/15 09:40, shannon.zhao at linaro.org wrote:
 > From: Shannon Zhao <shannon.zhao@linaro.org>
 > 
-> When preparing EFI tables for Dom0, it needs the information of EFI
-> system table. Here store it in efi structure.
-
-On ARM64 the EFI stub is completely independent and therefore it's not
-possible to share variable between Xen and the stub.
-
-If it's working today is only by luck as we zero the BSS after the stub
-jumped to Xen entry point.
-
-Regards,
-
+> EFI table, memory description table and some of acpi tables will be
+> placed after DOM0 memory space. Add placeholder for the starting address
+> for loading in DOM0 and the size of new added tables. Also add a
+> placeholder to store the new created tables.
+> 
 > Signed-off-by: Parth Dixit <parth.dixit@linaro.org>
 > Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
 > ---
->  xen/common/efi/boot.c | 2 ++
->  xen/include/xen/efi.h | 1 +
->  2 files changed, 3 insertions(+)
+>  xen/include/asm-arm/domain.h | 5 +++++
+>  1 file changed, 5 insertions(+)
 > 
-> diff --git a/xen/common/efi/boot.c b/xen/common/efi/boot.c
-> index 78d8ae9..6a48624 100644
-> --- a/xen/common/efi/boot.c
-> +++ b/xen/common/efi/boot.c
-> @@ -1155,6 +1155,8 @@ efi_start(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
+> diff --git a/xen/include/asm-arm/domain.h b/xen/include/asm-arm/domain.h
+> index 1e61f30..91272e5 100644
+> --- a/xen/include/asm-arm/domain.h
+> +++ b/xen/include/asm-arm/domain.h
+> @@ -125,6 +125,11 @@ struct arch_domain
+>      } vuart;
 >  
->      efi_tables();
+>      unsigned int evtchn_irq;
+> +#ifdef CONFIG_ACPI
+> +    void *efi_acpi_table;
+> +    paddr_t efi_acpi_gpa;
+> +    paddr_t efi_acpi_len;
+> +#endif
+
+Why do you need this in the arch_domain? AFAICT those 3 variables should
+only be used while building DOM0, so a better place would be in struct
+kernel_info (see xen/arch/arm/kernel.h).
+
+>  }  __cacheline_aligned;
 >  
-> +    efi.est = (long)SystemTable;
-> +
->      /* Collect PCI ROM contents. */
->      setup_efi_pci();
->  
-> diff --git a/xen/include/xen/efi.h b/xen/include/xen/efi.h
-> index e74dad1..e112296 100644
-> --- a/xen/include/xen/efi.h
-> +++ b/xen/include/xen/efi.h
-> @@ -16,6 +16,7 @@ struct efi {
->      unsigned long acpi20;       /* ACPI table (ACPI 2.0) */
->      unsigned long smbios;       /* SM BIOS table */
->      unsigned long smbios3;      /* SMBIOS v3 table */
-> +    unsigned long est;          /* EFI system table */
->  };
->  
->  extern struct efi efi;
+>  struct arch_vcpu
 > 
+
+
+Regards,
 
 
 -- 
