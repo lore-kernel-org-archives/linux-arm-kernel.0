@@ -1,61 +1,55 @@
-From: hongzhou.yang@mediatek.com (Hongzhou Yang)
-Date: Tue, 17 Nov 2015 14:17:13 -0800
-Subject: [PATCH] pinctrl: mediatek: Add get_direction support.
-Message-ID: <1447798633-24586-1-git-send-email-hongzhou.yang@mediatek.com>
+From: balbi@ti.com (Felipe Balbi)
+Date: Tue, 17 Nov 2015 16:21:06 -0600
+Subject: [PATCH] USB: USB_OTG does not depend on PM
+In-Reply-To: <5647698.81XCu85L5D@wuerfel>
+References: <7521777.8ZmnT3AlIC@wuerfel> <874mgkjoh2.fsf@saruman.tx.rr.com>
+ <5647698.81XCu85L5D@wuerfel>
+Message-ID: <871tbojmi5.fsf@saruman.tx.rr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Since Linux gpio framework return 0 for output, 1 for input.
-But HW use 0 stands for input, and 1 stands for output.
-So use negative to correct it.
 
-And gpio_chip.get is used to get input value, no need to get
-output value, so removing it.
+Hi,
 
-Signed-off-by: Hongzhou Yang <hongzhou.yang@mediatek.com>
----
- Base on v4.4-rc1, resend it.
- Add get direction support.
- Remove gpio_chip.get value for output direction.
+Arnd Bergmann <arnd@arndb.de> writes:
+> On Tuesday 17 November 2015 15:38:33 Felipe Balbi wrote:
+>> 
+>> Arnd Bergmann <arnd@arndb.de> writes:
+>> > USB_OTG initially depended on USB_SUSPEND, which was later turned into
+>> > PM_RUNTIME and finally into PM. I don't know at what point the dependency
+>> > became unnecessary but it appears to work fine without CONFIG_PM now.
+>> >
+>> > However, we get lots of warnings in randconfig kernels like:
+>> >
+>> > warning: (USB_OTG_FSM && FSL_USB2_OTG && USB_MV_OTG) selects USB_OTG which has unmet direct dependencies (USB_SUPPORT && USB && PM)
+>> >
+>> > whenever CONFIG_PM is disabled and something else selects USB_OTG.
+>> > Let's just drop the dependency to avoid the warnings.
+>> >
+>> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+>> > ---
+>> > I keep seeing this one in my ARM randconfig test
+>> 
+>> and how did you test this ? Did you make sure you're not breaking HNP ?
+>> For HNP to happen we depend on a bus_suspend and bus_suspend is only
+>> available on CONFIG_PM, unless that has changed.
+>> 
+>> Seems like you've only compile tested this patch, is that correct ?
+>
+> Yes, I compile-tested only and inspected the code briefly without finding
+> anything that contradicted this. It seems I missed the important part
+> as you say, so we should instead add 'depends on PM' for the other
+> symbols.
 
- drivers/pinctrl/mediatek/pinctrl-mtk-common.c |   11 ++++-------
- 1 file changed, 4 insertions(+), 7 deletions(-)
+right, that might be better. I'll still read that code again, it has
+been a few years since I looked at hnp at all.
 
-diff --git a/drivers/pinctrl/mediatek/pinctrl-mtk-common.c b/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
-index f307f1d..5c71727 100644
---- a/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
-+++ b/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
-@@ -747,7 +747,7 @@ static int mtk_gpio_get_direction(struct gpio_chip *chip, unsigned offset)
- 	reg_addr =  mtk_get_port(pctl, offset) + pctl->devdata->dir_offset;
- 	bit = BIT(offset & 0xf);
- 	regmap_read(pctl->regmap1, reg_addr, &read_val);
--	return !!(read_val & bit);
-+	return !(read_val & bit);
- }
- 
- static int mtk_gpio_get(struct gpio_chip *chip, unsigned offset)
-@@ -757,12 +757,8 @@ static int mtk_gpio_get(struct gpio_chip *chip, unsigned offset)
- 	unsigned int read_val = 0;
- 	struct mtk_pinctrl *pctl = dev_get_drvdata(chip->dev);
- 
--	if (mtk_gpio_get_direction(chip, offset))
--		reg_addr = mtk_get_port(pctl, offset) +
--			pctl->devdata->dout_offset;
--	else
--		reg_addr = mtk_get_port(pctl, offset) +
--			pctl->devdata->din_offset;
-+	reg_addr = mtk_get_port(pctl, offset) +
-+		pctl->devdata->din_offset;
- 
- 	bit = BIT(offset & 0xf);
- 	regmap_read(pctl->regmap1, reg_addr, &read_val);
-@@ -997,6 +993,7 @@ static struct gpio_chip mtk_gpio_chip = {
- 	.owner			= THIS_MODULE,
- 	.request		= gpiochip_generic_request,
- 	.free			= gpiochip_generic_free,
-+	.get_direction		= mtk_gpio_get_direction,
- 	.direction_input	= mtk_gpio_direction_input,
- 	.direction_output	= mtk_gpio_direction_output,
- 	.get			= mtk_gpio_get,
 -- 
-1.7.9.5
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 818 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151117/df06115e/attachment.sig>
