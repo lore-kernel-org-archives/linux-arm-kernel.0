@@ -1,86 +1,32 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 17 Nov 2015 17:03:58 +0000
-Subject: [PATCH 3/3] arm/arm64: pci: remove arch specific
- pcibios_enable_device()
-In-Reply-To: <1447779838-15585-1-git-send-email-lorenzo.pieralisi@arm.com>
-References: <1447779838-15585-1-git-send-email-lorenzo.pieralisi@arm.com>
-Message-ID: <1447779838-15585-3-git-send-email-lorenzo.pieralisi@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 17 Nov 2015 18:03:40 +0100
+Subject: next build: 235 warnings 3 failures (next/next-20151117)
+In-Reply-To: <20151117164453.GF30101@arm.com>
+References: <564a9961.878b420a.331b8.fffffd62@mx.google.com>
+ <4694362.ZPL12j6kR2@wuerfel> <20151117164453.GF30101@arm.com>
+Message-ID: <6370082.rfihnaNWhf@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The arm/arm64 pcibios_enable_device() implementations exist solely
-to prevent enabling PCI resources on PROBE_ONLY systems, since
-on those systems the PCI resources are currently not claimed (ie
-validated and inserted in the PCI resource tree) therefore they can
-not be enabled since this would trigger PCI set-ups failures.
+On Tuesday 17 November 2015 16:44:53 Will Deacon wrote:
+> > 8<----
+> > Subject: ARM64: make smp_load_acquire() work with const arguments
+> > 
+> > smp_load_acquire() uses typeof() to declare a local variable for temporarily
+> > storing the output of the memory access. This fails when the argument is
+> > constant, because the assembler complains about using a constant register
+> > as output:
+> > 
+> >  arch/arm64/include/asm/barrier.h:71:3: error: read-only variable '___p1'
+> >  used as 'asm' output
+> 
+> Do you know the usage in the kernel causing this warning?
 
-By introducing resources claiming in the PCI host controllers set-ups
-that have PROBE_ONLY as a probe option, there is no need for arch specific
-pcibios_enable_device() implementations anymore in that the kernel can
-rely on the generic pcibios_enable_device() implementation without
-resorting to arch specific code to work around the missing resources
-claiming enumeration step.
+A newly introduced function in include/net/sock.h:
 
-This patch removes the pcibios_enable_device() implementations from
-the arm/arm64 arch back-ends.
+static inline int sk_state_load(const struct sock *sk)
+{
+        return smp_load_acquire(&sk->sk_state);
+}
 
-Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Cc: Arnd Bergmann <arnd@arndb.de>
-Cc: Will Deacon <will.deacon@arm.com>
-Cc: Bjorn Helgaas <bhelgaas@google.com>
-Cc: Russell King <linux@arm.linux.org.uk>
-Cc: Catalin Marinas <catalin.marinas@arm.com>
----
- arch/arm/kernel/bios32.c | 12 ------------
- arch/arm64/kernel/pci.c  | 13 -------------
- 2 files changed, 25 deletions(-)
-
-diff --git a/arch/arm/kernel/bios32.c b/arch/arm/kernel/bios32.c
-index 6551d28..9c998d5 100644
---- a/arch/arm/kernel/bios32.c
-+++ b/arch/arm/kernel/bios32.c
-@@ -590,18 +590,6 @@ resource_size_t pcibios_align_resource(void *data, const struct resource *res,
- 	return start;
- }
- 
--/**
-- * pcibios_enable_device - Enable I/O and memory.
-- * @dev: PCI device to be enabled
-- */
--int pcibios_enable_device(struct pci_dev *dev, int mask)
--{
--	if (pci_has_flag(PCI_PROBE_ONLY))
--		return 0;
--
--	return pci_enable_resources(dev, mask);
--}
--
- int pci_mmap_page_range(struct pci_dev *dev, struct vm_area_struct *vma,
- 			enum pci_mmap_state mmap_state, int write_combine)
- {
-diff --git a/arch/arm64/kernel/pci.c b/arch/arm64/kernel/pci.c
-index b3d098b..4095379 100644
---- a/arch/arm64/kernel/pci.c
-+++ b/arch/arm64/kernel/pci.c
-@@ -38,19 +38,6 @@ resource_size_t pcibios_align_resource(void *data, const struct resource *res,
- 	return res->start;
- }
- 
--/**
-- * pcibios_enable_device - Enable I/O and memory.
-- * @dev: PCI device to be enabled
-- * @mask: bitmask of BARs to enable
-- */
--int pcibios_enable_device(struct pci_dev *dev, int mask)
--{
--	if (pci_has_flag(PCI_PROBE_ONLY))
--		return 0;
--
--	return pci_enable_resources(dev, mask);
--}
--
- /*
-  * Try to assign the IRQ number from DT when adding a new device
-  */
--- 
-2.5.1
+	Arnd
