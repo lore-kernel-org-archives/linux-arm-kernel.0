@@ -1,98 +1,69 @@
-From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
-Date: Tue, 17 Nov 2015 10:28:38 -0800
-Subject: [PATCH] input: st1232.c: Add devicetree attributes
-In-Reply-To: <1447604447-8932-1-git-send-email-sander@vermin.nl>
-References: <1447604447-8932-1-git-send-email-sander@vermin.nl>
-Message-ID: <20151117182838.GE29423@dtor-ws>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Tue, 17 Nov 2015 10:30:36 -0800
+Subject: [PATCH 1/7] phy: brcmstb-sata: add missing of_node_put
+In-Reply-To: <alpine.DEB.2.10.1511171846120.2455@hadrien>
+References: <1447673600-8881-1-git-send-email-Julia.Lawall@lip6.fr>
+ <1447673600-8881-2-git-send-email-Julia.Lawall@lip6.fr>
+ <20151117013830.GV8456@google.com>
+ <alpine.DEB.2.02.1511170711340.2045@localhost6.localdomain6>
+ <20151117174430.GA8456@google.com>
+ <alpine.DEB.2.10.1511171846120.2455@hadrien>
+Message-ID: <20151117183036.GF8456@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Sander,
+On Tue, Nov 17, 2015 at 06:48:39PM +0100, Julia Lawall wrote:
+> On Tue, 17 Nov 2015, Brian Norris wrote:
+> > On Tue, Nov 17, 2015 at 07:12:22AM +0100, Julia Lawall wrote:
+> > > On Mon, 16 Nov 2015, Brian Norris wrote:
+> > > > diff --git a/drivers/phy/phy-core.c b/drivers/phy/phy-core.c
+> > > > index fc48fac003a6..8df29caeeef9 100644
+> > > > --- a/drivers/phy/phy-core.c
+> > > > +++ b/drivers/phy/phy-core.c
+> > > > @@ -697,6 +697,7 @@ struct phy *phy_create(struct device *dev, struct device_node *node,
+> > > >  	phy->dev.class = phy_class;
+> > > >  	phy->dev.parent = dev;
+> > > >  	phy->dev.of_node = node ?: dev->of_node;
+> > > > +	of_node_get(phy->dev.of_node);
+> > >
+> > > Why not put of_node_get around dev->of_node?
+> >
+> > Like this?
+> >
+> > 	phy->dev.of_node = node ?: of_node_get(dev->of_node);
+> >
+> > Or this?
+> >
+> > 	phy->dev.of_node = of_node_get(node ?: dev->of_node);
+> >
+> > The former wouldn't do what I proposed; if this PHY device is created
+> > with a sub-node of 'dev' rather than dev->of_node, then the caller will
+> > pass it in as the 2nd argument to phy_create (i.e., 'node'), and then I
+> > expect it's the PHY core's responsibility to refcount it.
+> >
+> > I'd be fine with the latter. Looks a little better, I suppose.
+> 
+> I proposed it because I was worried that the of_node field could end up
+> containing something that had been freed.  But probably this is not
+> possible?
 
-On Sun, Nov 15, 2015 at 05:20:47PM +0100, Sander Vermin wrote:
-> -static int __maybe_unused st1232_ts_suspend(struct device *dev)
-> +#ifdef CONFIG_PM_SLEEP
+AIUI, the caller of phy_create() should already have a refcount on both
+'dev->of_node' and 'node' (if applicable), so nobody should be freeing
+it from underneath us right here. But *after* phy_create() returns,
+there's no guarantee the caller will hold a reference for us.
 
-Why?
+So even if it's ever possible, I'd consider it a bug in the caller, not
+in phy_create().
 
-> +static int st1232_ts_suspend(struct device *dev)
->  {
->  	struct i2c_client *client = to_i2c_client(dev);
-> -	struct st1232_ts_data *ts = i2c_get_clientdata(client);
-> +	struct st1232_data *data = i2c_get_clientdata(client);
->  
-> -	if (device_may_wakeup(&client->dev)) {
-> -		enable_irq_wake(client->irq);
-> -	} else {
-> -		disable_irq(client->irq);
-> -		st1232_ts_power(ts, false);
-> -	}
-> +	mutex_lock(&data->input_dev->mutex);
-> +	if (data->input_dev->users)
-> +		st1232_stop(data->input_dev);
-> +	mutex_unlock(&data->input_dev->mutex);
->  
->  	return 0;
->  }
->  
-> -static int __maybe_unused st1232_ts_resume(struct device *dev)
-> +static int st1232_ts_resume(struct device *dev)
->  {
->  	struct i2c_client *client = to_i2c_client(dev);
-> -	struct st1232_ts_data *ts = i2c_get_clientdata(client);
-> +	struct st1232_data *data = i2c_get_clientdata(client);
->  
-> -	if (device_may_wakeup(&client->dev)) {
-> -		disable_irq_wake(client->irq);
-> -	} else {
-> -		st1232_ts_power(ts, true);
-> -		enable_irq(client->irq);
-> -	}
-> +	mutex_lock(&data->input_dev->mutex);
-> +	if (data->input_dev->users)
-> +		st1232_start(data->input_dev);
-> +	mutex_unlock(&data->input_dev->mutex);
->  
->  	return 0;
->  }
-> +#endif
->  
->  static SIMPLE_DEV_PM_OPS(st1232_ts_pm_ops,
->  			 st1232_ts_suspend, st1232_ts_resume);
-> @@ -282,13 +436,12 @@ static const struct i2c_device_id st1232_ts_id[] = {
->  };
->  MODULE_DEVICE_TABLE(i2c, st1232_ts_id);
->  
-> -#ifdef CONFIG_OF
+> If it is not possible, then the ?: in the function argument is
+> probably a bit ugly...
 
-Why?
+OK, then I'll go with my first proposal.
 
-> -static const struct of_device_id st1232_ts_dt_ids[] = {
-> +static const struct of_device_id st1232_of_match[] = {
->  	{ .compatible = "sitronix,st1232", },
->  	{ }
->  };
-> -MODULE_DEVICE_TABLE(of, st1232_ts_dt_ids);
-> -#endif
-> +MODULE_DEVICE_TABLE(of, st1232_of_match);
-> +
->  
->  static struct i2c_driver st1232_ts_driver = {
->  	.probe		= st1232_ts_probe,
-> @@ -296,13 +449,14 @@ static struct i2c_driver st1232_ts_driver = {
->  	.id_table	= st1232_ts_id,
->  	.driver = {
->  		.name	= ST1232_TS_NAME,
-> -		.of_match_table = of_match_ptr(st1232_ts_dt_ids),
-> +		.owner	= THIS_MODULE,
-> +		.of_match_table = st1232_of_match,
+> Is this something that should be checked for elsewhere?
 
-Why?
+I expect the same sort of problem shows up plenty of other places. I
+don't think many people use CONFIG_OF_DYNAMIC, so the effects of these
+failures probably aren't felt by many.
 
-There seems many intermingled changes that are done to the driver, you
-need to split them apart and explain why they are needed.
-
-Thanks!
-
--- 
-Dmitry
+Brian
