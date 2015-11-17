@@ -1,107 +1,74 @@
-From: boris.brezillon@free-electrons.com (Boris Brezillon)
-Date: Tue, 17 Nov 2015 15:22:16 +0100
-Subject: [PATCH 14/27] mtd: nand: use the mtd instance embedded in
- struct nand_chip
-In-Reply-To: <alpine.DEB.2.10.1511170957100.2455@hadrien>
-References: <1447681080-31232-1-git-send-email-boris.brezillon@free-electrons.com>
- <1447681080-31232-15-git-send-email-boris.brezillon@free-electrons.com>
- <20151117030019.GY8456@google.com>
- <20151117093836.052c86b5@bbrezillon>
- <alpine.DEB.2.10.1511170957100.2455@hadrien>
-Message-ID: <20151117152216.539fc09b@bbrezillon>
+From: julien.grall@citrix.com (Julien Grall)
+Date: Tue, 17 Nov 2015 14:23:01 +0000
+Subject: [PATCH v3 38/62] arm/acpi: Add placeholder for efi and acpi load
+ address
+In-Reply-To: <564B2152.9000904@huawei.com>
+References: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
+ <1447753261-7552-39-git-send-email-shannon.zhao@linaro.org>
+ <564B1666.4060008@citrix.com> <564B2152.9000904@huawei.com>
+Message-ID: <564B3845.4060801@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Julia,
+Hi Shannon,
 
-On Tue, 17 Nov 2015 10:05:03 +0100 (CET)
-Julia Lawall <julia.lawall@lip6.fr> wrote:
-
-> > > (This isn't the worst one, but it just happens to be one of the first.)
-> > > There are many cases where the typical style would be to declare a new
-> > > variable at the top of the function, where you perform the
-> > > macro/function-call to convert from one abstraction to another. Like
-> > >
-> > > static int nfc_set_sram_bank(struct atmel_nand_host *host, unsigned int bank)
-> > > {
-> > > 	struct mtd_info *mtd = nand_to_mtd(&hot->nand_chip);
-> > > 	...
-> > >
-> > > and then use it later. Can that be done very easily?
-> > >
-> > > >  			return -EINVAL;
-> > > >  		nfc_writel(host->nfc->hsmc_regs, BANK, ATMEL_HSMC_NFC_BANK1);
-> > > >  	} else {
-> > >
-> > > ...
-> >
-> > Honestly, I don't know how to do that with a coccinelle script, and it
-> > will probably take me more time to find how to do it than addressing
-> > those problems manually.
-> >
-> > Julia, could you give us some hint?
+On 17/11/15 12:45, Shannon Zhao wrote:
 > 
-> Probably something like the following would be easiest.  You can just run
-> it after your other transformations:
 > 
-> @r exists@
-> identifier f;
-> expression e;
-> @@
+> On 2015/11/17 19:58, Julien Grall wrote:
+>> Hi Shannon,
+>>
+>> On 17/11/15 09:40, shannon.zhao at linaro.org wrote:
+>>> From: Shannon Zhao <shannon.zhao@linaro.org>
+>>>
+>>> EFI table, memory description table and some of acpi tables will be
+>>> placed after DOM0 memory space. Add placeholder for the starting address
+>>> for loading in DOM0 and the size of new added tables. Also add a
+>>> placeholder to store the new created tables.
+>>>
+>>> Signed-off-by: Parth Dixit <parth.dixit@linaro.org>
+>>> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+>>> ---
+>>>  xen/include/asm-arm/domain.h | 5 +++++
+>>>  1 file changed, 5 insertions(+)
+>>>
+>>> diff --git a/xen/include/asm-arm/domain.h b/xen/include/asm-arm/domain.h
+>>> index 1e61f30..91272e5 100644
+>>> --- a/xen/include/asm-arm/domain.h
+>>> +++ b/xen/include/asm-arm/domain.h
+>>> @@ -125,6 +125,11 @@ struct arch_domain
+>>>      } vuart;
+>>>  
+>>>      unsigned int evtchn_irq;
+>>> +#ifdef CONFIG_ACPI
+>>> +    void *efi_acpi_table;
+>>> +    paddr_t efi_acpi_gpa;
+>>> +    paddr_t efi_acpi_len;
+>>> +#endif
+>>
+>> Why do you need this in the arch_domain? AFAICT those 3 variables should
+>> only be used while building DOM0, so a better place would be in struct
+>> kernel_info (see xen/arch/arm/kernel.h).
+>>
 > 
-> f(...) { <+...  nand_to_mtd(e) ...+> }
+> Since I use efi_acpi_table to store the allocated pages pointer which
+> are used to store newly created ACPI and EFI tables.
+> See [PATCH v3 40/62]:
+> +    order = get_order_from_bytes(d->arch.efi_acpi_len);
+> +    d->arch.efi_acpi_table = alloc_xenheap_pages(order, 0);
 > 
-> @@
-> identifier r.f;
-> expression r.e;
-> @@
-> 
-> f(...) {
-> + struct mtd_info *mtd = nand_to_mtd(e);
-> ...
-> }
+> And it free these pages when destroying this domain:
+> +#ifdef CONFIG_ACPI
+> +    free_xenheap_pages(d->arch.efi_acpi_table,
+> +                       get_order_from_bytes(d->arch.efi_acpi_len));
+> +#endif
 
-Thanks for the the suggestion...
+But this is wrong. You are assuming that DOM0 memory is direct mapped
+which may not be true in the future.
 
-> 
-> This won't work if there is more than one possible value of e.  If that is
-> likely, then I could come up with something more complex.  It also assumes
-> that you want to convert all such calls.  If you only want to convert calls
-> that occur in a particular context, eg a field reference, then you could
-> enhance the pattern inside the <+... ...+> in the first rule.
+You should have at least mentioned that in the commit message.
 
-... unfortunately, as you've guessed, it's a bit more complicated.
-This mtd local variable is usually extracted from another local
-variable (struct nand_chip *chip), so we have to declare
-
-struct mtd_info *mtd = nand_to_mtd(e);
-
-after
-
-struct nand_chip *chip = expression;
-
-But this is not the only particular case. Sometime the chip variable is
-not assigned where it's declared (especially when it is dynamically
-allocated), and sometime it does not exist at all (we just extract it
-from a private struct: &priv->chip).
-The mtd variable can also be declared in sub-code blocks (loop or
-conditional statements).
-And, as you stated, we might want to keep direct calls to nand_to_mtd()
-if it's only called once in a function context.
-
-I'm pretty sure we could describe all those cases with specific context
-description, but I must admit that it takes less time for me to fix
-those specific cases manually than figuring out how to describe them
-correctly in a coccinelle script :).
-
-This being said, I'd be happy to see how you would handle all these
-different cases.
-
-Thanks,
-
-Boris
+Regards,
 
 -- 
-Boris Brezillon, Free Electrons
-Embedded Linux and Kernel engineering
-http://free-electrons.com
+Julien Grall
