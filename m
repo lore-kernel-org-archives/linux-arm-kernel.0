@@ -1,51 +1,47 @@
 From: shannon.zhao@linaro.org (shannon.zhao at linaro.org)
-Date: Tue, 17 Nov 2015 17:40:07 +0800
-Subject: [PATCH v3 08/62] arm/acpi: Add arm specific acpi header file
+Date: Tue, 17 Nov 2015 17:40:08 +0800
+Subject: [PATCH v3 09/62] arm/acpi: Add basic ACPI initialization
 In-Reply-To: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
 References: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
-Message-ID: <1447753261-7552-9-git-send-email-shannon.zhao@linaro.org>
+Message-ID: <1447753261-7552-10-git-send-email-shannon.zhao@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Shannon Zhao <shannon.zhao@linaro.org>
+From: Parth Dixit <parth.dixit@linaro.org>
 
-Add architecture specific definitions and calls required for acpi in new
-header file.
+acpi_boot_table_init() will be called in start_xen to get the RSDP and
+all the table pointers. With this patch, we can get ACPI boot-time
+tables from firmware on ARM64.
 
+Signed-off-by: Naresh Bhat <naresh.bhat@linaro.org>
 Signed-off-by: Parth Dixit <parth.dixit@linaro.org>
 Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
 ---
- xen/arch/arm/setup.c       |  3 +++
- xen/include/asm-arm/acpi.h | 38 ++++++++++++++++++++++++++++++++++++++
- 2 files changed, 41 insertions(+)
- create mode 100644 xen/include/asm-arm/acpi.h
+ xen/arch/arm/acpi/Makefile |  1 +
+ xen/arch/arm/acpi/boot.c   | 62 ++++++++++++++++++++++++++++++++++++++++++++++
+ xen/arch/arm/setup.c       |  4 +++
+ 3 files changed, 67 insertions(+)
+ create mode 100644 xen/arch/arm/acpi/boot.c
 
-diff --git a/xen/arch/arm/setup.c b/xen/arch/arm/setup.c
-index e95759d..3b29904 100644
---- a/xen/arch/arm/setup.c
-+++ b/xen/arch/arm/setup.c
-@@ -45,11 +45,14 @@
- #include <asm/procinfo.h>
- #include <asm/setup.h>
- #include <xsm/xsm.h>
-+#include <asm/acpi.h>
- 
- struct bootinfo __initdata bootinfo;
- 
- struct cpuinfo_arm __read_mostly boot_cpu_data;
- 
-+bool_t __read_mostly acpi_disabled;
-+
- #ifdef CONFIG_ARM_32
- static unsigned long opt_xenheap_megabytes __initdata;
- integer_param("xenheap_megabytes", opt_xenheap_megabytes);
-diff --git a/xen/include/asm-arm/acpi.h b/xen/include/asm-arm/acpi.h
+diff --git a/xen/arch/arm/acpi/Makefile b/xen/arch/arm/acpi/Makefile
+index b5be22d..196c40a 100644
+--- a/xen/arch/arm/acpi/Makefile
++++ b/xen/arch/arm/acpi/Makefile
+@@ -1 +1,2 @@
+ obj-y += lib.o
++obj-y += boot.o
+diff --git a/xen/arch/arm/acpi/boot.c b/xen/arch/arm/acpi/boot.c
 new file mode 100644
-index 0000000..e41e03b
+index 0000000..ad51afc
 --- /dev/null
-+++ b/xen/include/asm-arm/acpi.h
-@@ -0,0 +1,38 @@
++++ b/xen/arch/arm/acpi/boot.c
+@@ -0,0 +1,62 @@
 +/*
++ *  ARM Specific Low-Level ACPI Boot Support
++ *
++ *  Copyright (C) 2001, 2002 Paul Diefenbaugh <paul.s.diefenbaugh@intel.com>
++ *  Copyright (C) 2001 Jun Nakajima <jun.nakajima@intel.com>
++ *  Copyright (C) 2014, Naresh Bhat <naresh.bhat@linaro.org>
 + *  Copyright (C) 2015, Shannon Zhao <shannon.zhao@linaro.org>
 + *
 + * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -67,21 +63,62 @@ index 0000000..e41e03b
 + * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 + */
 +
-+#ifndef _ASM_ARM_ACPI_H
-+#define _ASM_ARM_ACPI_H
-+
 +#include <xen/init.h>
++#include <xen/acpi.h>
 +
-+#define COMPILER_DEPENDENT_INT64   long long
-+#define COMPILER_DEPENDENT_UINT64  unsigned long long
++#include <asm/acpi.h>
 +
-+extern bool_t acpi_disabled;
-+/* Basic configuration for ACPI */
-+static inline void disable_acpi(void)
++/*
++ * acpi_boot_table_init() called from setup_arch(), always.
++ *      1. find RSDP and get its address, and then find XSDT
++ *      2. extract all tables and checksums them all
++ *
++ * return value: (currently ignored)
++ *	0: success
++ *	!0: failure
++ *
++ * We can parse ACPI boot-time tables such as FADT, MADT after
++ * this function is called.
++ */
++int __init acpi_boot_table_init(void)
 +{
-+    acpi_disabled = 1;
-+}
++    int error;
 +
-+#endif /*_ASM_ARM_ACPI_H*/
++    /* If acpi_disabled, bail out */
++    if ( acpi_disabled )
++        return 1;
++
++    /* Initialize the ACPI boot-time table parser. */
++    error = acpi_table_init();
++    if ( error )
++    {
++        disable_acpi();
++        return error;
++    }
++
++    return 0;
++}
+diff --git a/xen/arch/arm/setup.c b/xen/arch/arm/setup.c
+index 3b29904..768312f 100644
+--- a/xen/arch/arm/setup.c
++++ b/xen/arch/arm/setup.c
+@@ -36,6 +36,7 @@
+ #include <xen/pfn.h>
+ #include <xen/vmap.h>
+ #include <xen/libfdt/libfdt.h>
++#include <xen/acpi.h>
+ #include <asm/page.h>
+ #include <asm/current.h>
+ #include <asm/setup.h>
+@@ -753,6 +754,9 @@ void __init start_xen(unsigned long boot_phys_offset,
+ 
+     setup_mm(fdt_paddr, fdt_size);
+ 
++    /* Parse the ACPI tables for possible boot-time configuration */
++    acpi_boot_table_init();
++
+     vm_init();
+     dt_unflatten_host_device_tree();
+ 
 -- 
 2.1.0
