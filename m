@@ -1,34 +1,43 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Tue, 17 Nov 2015 22:30:19 +0100 (CET)
-Subject: [PATCH v4 2/4] nvmem: NXP LPC18xx EEPROM memory NVMEM driver
-In-Reply-To: <1447790576-29410-3-git-send-email-ariel@vanguardiasur.com.ar>
-References: <1447790576-29410-1-git-send-email-ariel@vanguardiasur.com.ar>
- <1447790576-29410-3-git-send-email-ariel@vanguardiasur.com.ar>
-Message-ID: <1326700858.341668.1447795819246.JavaMail.open-xchange@oxbaltgw05.schlund.de>
+From: balbi@ti.com (Felipe Balbi)
+Date: Tue, 17 Nov 2015 15:38:33 -0600
+Subject: [PATCH] USB: USB_OTG does not depend on PM
+In-Reply-To: <7521777.8ZmnT3AlIC@wuerfel>
+References: <7521777.8ZmnT3AlIC@wuerfel>
+Message-ID: <874mgkjoh2.fsf@saruman.tx.rr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-> Ariel D'Alessandro <ariel@vanguardiasur.com.ar> hat am 17. November 2015 um
-> 21:02 geschrieben:
->
->
-> This commit adds support for NXP LPC18xx EEPROM memory found in NXP
-> LPC185x/3x and LPC435x/3x/2x/1x devices.
->
-> EEPROM size is 16384 bytes and it can be entirely read and
-> written/erased with 1 word (4 bytes) granularity. The last page
-> (128 bytes) contains the EEPROM initialization data and is not writable.
->
-> Erase/program time is less than 3ms. The EEPROM device requires a
-> ~1500 kHz clock (min 800 kHz, max 1600 kHz) that is generated dividing
-> the system bus clock by the division factor, contained in the divider
-> register (minus 1 encoded).
->
-> EEPROM will be kept in Power Down mode except during read/write calls.
->
-> Signed-off-by: Ariel D'Alessandro <ariel@vanguardiasur.com.ar>
+Hi,
 
-Acked-by: Stefan Wahren <stefan.wahren@i2se.com>
+Arnd Bergmann <arnd@arndb.de> writes:
+> USB_OTG initially depended on USB_SUSPEND, which was later turned into
+> PM_RUNTIME and finally into PM. I don't know at what point the dependency
+> became unnecessary but it appears to work fine without CONFIG_PM now.
+>
+> However, we get lots of warnings in randconfig kernels like:
+>
+> warning: (USB_OTG_FSM && FSL_USB2_OTG && USB_MV_OTG) selects USB_OTG which has unmet direct dependencies (USB_SUPPORT && USB && PM)
+>
+> whenever CONFIG_PM is disabled and something else selects USB_OTG.
+> Let's just drop the dependency to avoid the warnings.
+>
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> ---
+> I keep seeing this one in my ARM randconfig test
 
-Btw Rob Herring acked [PATCH v3 1/4] yesterday.
+and how did you test this ? Did you make sure you're not breaking HNP ?
+For HNP to happen we depend on a bus_suspend and bus_suspend is only
+available on CONFIG_PM, unless that has changed.
+
+Seems like you've only compile tested this patch, is that correct ?
+
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 818 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151117/f383883d/attachment.sig>
