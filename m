@@ -1,40 +1,46 @@
-From: broonie@kernel.org (Mark Brown)
-Date: Tue, 17 Nov 2015 16:53:28 +0000
-Subject: [PATCH 0/8] spi: Add file i/o to spidev_test
-In-Reply-To: <2760715.DGIOLUoqL9@jclayton-pc>
-References: <cover.1447773299.git.stillcompiling@gmail.com>
- <20151117153746.GS31303@sirena.org.uk>
- <2760715.DGIOLUoqL9@jclayton-pc>
-Message-ID: <20151117165328.GT31303@sirena.org.uk>
+From: Chris.Brandt@renesas.com (Chris Brandt)
+Date: Tue, 17 Nov 2015 16:56:58 +0000
+Subject: [PATCH v3] ARM: xip: Use correct symbol for end of ROM marker
+In-Reply-To: <alpine.LFD.2.20.1511162127180.5826@knanqh.ubzr>
+References: <1447362108-4333-1-git-send-email-chris.brandt@renesas.com>
+ <1447697140-4099-1-git-send-email-chris.brandt@renesas.com>
+ <alpine.LFD.2.20.1511161515100.5826@knanqh.ubzr>
+ <HK2PR06MB05619FACB3725B6F5B2299718A1E0@HK2PR06MB0561.apcprd06.prod.outlook.com>
+ <alpine.LFD.2.20.1511161605070.5826@knanqh.ubzr>
+ <HK2PR06MB056142FFDA4E99A764DF9ECB8A1E0@HK2PR06MB0561.apcprd06.prod.outlook.com>
+ <alpine.LFD.2.20.1511161730030.5826@knanqh.ubzr>
+ <HK2PR06MB05614D47A9C35ECB4CA72D3F8A1D0@HK2PR06MB0561.apcprd06.prod.outlook.com>
+ <alpine.LFD.2.20.1511162127180.5826@knanqh.ubzr>
+Message-ID: <HK2PR06MB056175E6E4356DD8C3566D758A1D0@HK2PR06MB0561.apcprd06.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 17, 2015 at 08:15:45AM -0800, Joshua Clayton wrote:
-> On Tuesday, November 17, 2015 03:37:46 PM Mark Brown wrote:
-> > On Tue, Nov 17, 2015 at 07:24:20AM -0800, Joshua Clayton wrote:
+> Absolutely.  I'll be glad to review your patches.
 
-> > >   Documentation/spi/spidev_test.c: use one rx buffer
-> > >   Documentation/spi/spidev_test.c: clean up input_tx
-> > >   Documentation/spi/spidev_test.c: accept input from a file
-> > >   Documentation/spi/spidev_test.c: output to a file
-> > >   Documentation/spi/spidev_test.c: check error
-> > >   Documentation/spi/spidev_test.c: fix whitespace
+What do you think about this submission?
+I think it still holds true regardless of the incorrect sectioning.
 
-> > Please use subjct lines reflecting the style for the subsystem.
+http://lists.infradead.org/pipermail/linux-arm-kernel/2015-November/384354.html
 
-> OK. Will do.
-> Assuming "spi: spidev_test: yadda..." 
 
-Something like that.
 
-> It was a bit unclear due to the location of the file.
+>> Of course, there are still some other XIP patches needed (like you
+>> can't use text areas as a temporary stack on boot), but the sections
+>> are a pretty logical place to start.
+>
+> Maybe this can be prevented automatically by the linker with some
+> read-only memory regions or the like.
 
-It's not really the location that you should be focusing on, it's other
-commits in the file.
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 473 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151117/a48258ac/attachment.sig>
+I think this one is more of a coding issue.
+These were the attempts to fix the temporary stack issue:
+
+My first patch:
+http://lists.infradead.org/pipermail/linux-arm-kernel/2015-July/357106.html
+
+
+Magnus's try:
+http://lists.infradead.org/pipermail/linux-arm-kernel/2015-November/383394.html
+
+
+
+Chris
