@@ -1,76 +1,21 @@
-From: pankaj.dubey@samsung.com (Pankaj Dubey)
-Date: Tue, 17 Nov 2015 11:35:50 +0530
-Subject: [PATCH v6 8/9] ARM: EXYNOS: rearrange static and non-static functions
- of PMU driver
-In-Reply-To: <1447740351-14246-1-git-send-email-pankaj.dubey@samsung.com>
-References: <1447740351-14246-1-git-send-email-pankaj.dubey@samsung.com>
-Message-ID: <1447740351-14246-9-git-send-email-pankaj.dubey@samsung.com>
+From: greg@kroah.com (Greg KH)
+Date: Mon, 16 Nov 2015 22:16:19 -0800
+Subject: [PATCH] phy: phy-mt65xx-usb3: fix test fail of HS receiver
+ sensitivity
+In-Reply-To: <1447740178-29588-1-git-send-email-chunfeng.yun@mediatek.com>
+References: <1447740178-29588-1-git-send-email-chunfeng.yun@mediatek.com>
+Message-ID: <20151117061619.GB18947@kroah.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch moves exynos_sys_powerdown_conf function above all
-static functions, to avoid confusion causing due to mixing of
-static-nonstatic-static functions and to improve readability of this
-driver.
+On Tue, Nov 17, 2015 at 02:02:58PM +0800, Chunfeng Yun wrote:
+> when use the default value 8 of RG_USB20_SQTH, the HS receiver
+> sensitivity test of HQA will fail, set it as 2 to fix up the
+> issue.
+> 
+> Change-Id: Ia5bdbbfc8ebb170d3ef26007e665b7350b6d28ab
 
-Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
-Suggested-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
-Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
----
- arch/arm/mach-exynos/pmu.c | 34 +++++++++++++++++-----------------
- 1 file changed, 17 insertions(+), 17 deletions(-)
+What is this field for?  Hint, it should never be there for a patch you
+submit upstream as it means nothing...
 
-diff --git a/arch/arm/mach-exynos/pmu.c b/arch/arm/mach-exynos/pmu.c
-index 01cb649..a7741d4 100644
---- a/arch/arm/mach-exynos/pmu.c
-+++ b/arch/arm/mach-exynos/pmu.c
-@@ -39,23 +39,6 @@ u32 pmu_raw_readl(u32 offset)
- 	return readl_relaxed(pmu_base_addr + offset);
- }
- 
--static void exynos_power_off(void)
--{
--	unsigned int tmp;
--
--	pr_info("Power down.\n");
--	tmp = pmu_raw_readl(EXYNOS_PS_HOLD_CONTROL);
--	tmp ^= (1 << 8);
--	pmu_raw_writel(tmp, EXYNOS_PS_HOLD_CONTROL);
--
--	/* Wait a little so we don't give a false warning below */
--	mdelay(100);
--
--	pr_err("Power down failed, please power off system manually.\n");
--	while (1)
--		;
--}
--
- void exynos_sys_powerdown_conf(enum sys_powerdown mode)
- {
- 	unsigned int i;
-@@ -85,6 +68,23 @@ void exynos_sys_powerdown_conf(enum sys_powerdown mode)
- 	}
- }
- 
-+static void exynos_power_off(void)
-+{
-+	unsigned int tmp;
-+
-+	pr_info("Power down.\n");
-+	tmp = pmu_raw_readl(EXYNOS_PS_HOLD_CONTROL);
-+	tmp ^= (1 << 8);
-+	pmu_raw_writel(tmp, EXYNOS_PS_HOLD_CONTROL);
-+
-+	/* Wait a little so we don't give a false warning below */
-+	mdelay(100);
-+
-+	pr_err("Power down failed, please power off system manually.\n");
-+	while (1)
-+		;
-+}
-+
- static int pmu_restart_notify(struct notifier_block *this,
- 		unsigned long code, void *unused)
- {
--- 
-2.4.5
+greg k-h
