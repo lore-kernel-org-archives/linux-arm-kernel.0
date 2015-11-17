@@ -1,73 +1,131 @@
 From: shannon.zhao@linaro.org (shannon.zhao at linaro.org)
-Date: Tue, 17 Nov 2015 17:40:11 +0800
-Subject: [PATCH v3 12/62] ACPICA: ACPI 6.0: Add changes for FADT table
+Date: Tue, 17 Nov 2015 17:40:12 +0800
+Subject: [PATCH v3 13/62] arm/acpi: Parse FADT table and get PSCI flags
 In-Reply-To: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
 References: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
-Message-ID: <1447753261-7552-13-git-send-email-shannon.zhao@linaro.org>
+Message-ID: <1447753261-7552-14-git-send-email-shannon.zhao@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Bob Moore <robert.moore@intel.com>
+From: Shannon Zhao <shannon.zhao@linaro.org>
 
-ACPICA commit 72b0b6741990f619f6aaa915302836b7cbb41ac4
+There are two flags: PSCI_COMPLIANT and PSCI_USE_HVC. When set,
+the former signals to the OS that the hardware is PSCI compliant.
+The latter selects the appropriate conduit for PSCI calls by
+toggling between Hypervisor Calls (HVC) and Secure Monitor Calls
+(SMC).
 
-One new 64-bit field at the end of the table.
-FADT version is now 6.
+FADT table contains such information, parse FADT to get the flags
+for furture usage. At the same time, only ACPI 5.1 or higher verison
+supports PSCI, and FADT Major.Minor version was introduced in ACPI
+5.1, but for Xen it needs FADT hypervisor_id introduced by ACPI 6.0 to
+tell Dom0 that it runs on Xen hypervisor, so we will check the version
+and only parse FADT table with version >= 6.0.
 
-Link: https://github.com/acpica/acpica/commit/72b0b674
-Signed-off-by: Bob Moore <robert.moore@intel.com>
-Signed-off-by: Lv Zheng <lv.zheng@intel.com>
-Signed-off-by: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
-[Linux commit aeb823bbacc2a3aaee29eda5875b58a049fa1f78]
+If firmware provides ACPI tables with ACPI version less than 6.0,
+OS will be messed up with those information, so disable ACPI if we
+get an FADT table with version less that 6.0.
+
+Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+Signed-off-by: Naresh Bhat <naresh.bhat@linaro.org>
+Signed-off-by: Parth Dixit <parth.dixit@linaro.org>
 Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
 ---
- xen/include/acpi/actbl.h | 17 ++++++++++-------
- 1 file changed, 10 insertions(+), 7 deletions(-)
+ xen/arch/arm/acpi/boot.c   | 31 +++++++++++++++++++++++++++++++
+ xen/arch/arm/acpi/lib.c    | 12 ++++++++++++
+ xen/include/asm-arm/acpi.h |  9 +++++++++
+ 3 files changed, 52 insertions(+)
 
-diff --git a/xen/include/acpi/actbl.h b/xen/include/acpi/actbl.h
-index 66e29c3..3079176 100644
---- a/xen/include/acpi/actbl.h
-+++ b/xen/include/acpi/actbl.h
-@@ -258,6 +258,7 @@ struct acpi_table_fadt {
- 	struct acpi_generic_address xgpe1_block;	/* 64-bit Extended General Purpose Event 1 Reg Blk address */
- 	struct acpi_generic_address sleep_control;	/* 64-bit Sleep Control register */
- 	struct acpi_generic_address sleep_status;	/* 64-bit Sleep Status register */
-+	u64 hypervisor_id;      /* Hypervisor Vendor ID (ACPI 6.0) */
- };
+diff --git a/xen/arch/arm/acpi/boot.c b/xen/arch/arm/acpi/boot.c
+index ad51afc..0fabe7d 100644
+--- a/xen/arch/arm/acpi/boot.c
++++ b/xen/arch/arm/acpi/boot.c
+@@ -27,9 +27,33 @@
  
- /* Masks for FADT IA-PC Boot Architecture Flags (boot_flags) */
-@@ -315,7 +316,7 @@ enum acpi_prefered_pm_profiles {
- 	PM_TABLET = 8
- };
+ #include <xen/init.h>
+ #include <xen/acpi.h>
++#include <xen/errno.h>
++#include <acpi/actables.h>
++#include <xen/mm.h>
  
--/* Values for sleep_status and sleep_control registers (V5 FADT) */
-+/* Values for sleep_status and sleep_control registers (V5+ FADT) */
+ #include <asm/acpi.h>
  
- #define ACPI_X_WAKE_STATUS          0x80
- #define ACPI_X_SLEEP_TYPE_MASK      0x1C
-@@ -344,15 +345,17 @@ enum acpi_prefered_pm_profiles {
-  * FADT is the bottom line as to what the version really is.
-  *
-  * For reference, the values below are as follows:
-- *     FADT V1  size: 0x074
-- *     FADT V2  size: 0x084
-- *     FADT V3  size: 0x0F4
-- *     FADT V4  size: 0x0F4
-- *     FADT V5  size: 0x10C
-+ *     FADT V1 size: 0x074
-+ *     FADT V2 size: 0x084
-+ *     FADT V3 size: 0x0F4
-+ *     FADT V4 size: 0x0F4
-+ *     FADT V5 size: 0x10C
-+ *     FADT V6 size: 0x114
-  */
- #define ACPI_FADT_V1_SIZE       (u32) (ACPI_FADT_OFFSET (flags) + 4)
- #define ACPI_FADT_V2_SIZE       (u32) (ACPI_FADT_OFFSET (minor_revision) + 1)
- #define ACPI_FADT_V3_SIZE       (u32) (ACPI_FADT_OFFSET (sleep_control))
--#define ACPI_FADT_V5_SIZE       (u32) (sizeof (struct acpi_table_fadt))
-+#define ACPI_FADT_V5_SIZE       (u32) (ACPI_FADT_OFFSET (hypervisor_id))
-+#define ACPI_FADT_V6_SIZE       (u32) (sizeof (struct acpi_table_fadt))
++static int __init acpi_parse_fadt(struct acpi_table_header *table)
++{
++    struct acpi_table_fadt *fadt = (struct acpi_table_fadt *)table;
++
++    /*
++     * Revision in table header is the FADT Major revision, and there
++     * is a minor revision of FADT which was introduced by ACPI 6.0,
++     * we only deal with ACPI 6.0 or newer revision to get GIC and SMP
++     * boot protocol configuration data, or we will disable ACPI.
++     */
++    if ( table->revision > 6
++         || (table->revision == 6 && fadt->minor_revision >= 0) )
++        return 0;
++
++    printk("Unsupported FADT revision %d.%d, should be 6.0+, will disable ACPI\n",
++            table->revision, fadt->minor_revision);
++    disable_acpi();
++
++    return -EINVAL;
++}
++
+ /*
+  * acpi_boot_table_init() called from setup_arch(), always.
+  *      1. find RSDP and get its address, and then find XSDT
+@@ -58,5 +82,12 @@ int __init acpi_boot_table_init(void)
+         return error;
+     }
  
- #endif				/* __ACTBL_H__ */
++    if ( acpi_table_parse(ACPI_SIG_FADT, acpi_parse_fadt) )
++    {
++        /* disable ACPI if no FADT is found */
++        disable_acpi();
++        printk("Can't find FADT\n");
++    }
++
+     return 0;
+ }
+diff --git a/xen/arch/arm/acpi/lib.c b/xen/arch/arm/acpi/lib.c
+index b68623b..d8b7635 100644
+--- a/xen/arch/arm/acpi/lib.c
++++ b/xen/arch/arm/acpi/lib.c
+@@ -31,3 +31,15 @@ arch_acpi_os_map_memory(acpi_physical_address phys, acpi_size size)
+ {
+     return __va(phys);
+ }
++
++/* 1 to indicate PSCI 0.2+ is implemented */
++bool_t __init acpi_psci_present(void)
++{
++    return acpi_gbl_FADT.arm_boot_flags & ACPI_FADT_PSCI_COMPLIANT;
++}
++
++/* 1 to indicate HVC is present instead of SMC as the PSCI conduit */
++bool_t __init acpi_psci_hvc_present(void)
++{
++    return acpi_gbl_FADT.arm_boot_flags & ACPI_FADT_PSCI_USE_HVC;
++}
+diff --git a/xen/include/asm-arm/acpi.h b/xen/include/asm-arm/acpi.h
+index e41e03b..65f80b1 100644
+--- a/xen/include/asm-arm/acpi.h
++++ b/xen/include/asm-arm/acpi.h
+@@ -29,6 +29,15 @@
+ #define COMPILER_DEPENDENT_UINT64  unsigned long long
+ 
+ extern bool_t acpi_disabled;
++
++#ifdef CONFIG_ACPI
++bool_t __init acpi_psci_present(void);
++bool_t __init acpi_psci_hvc_present(void);
++#else
++static inline bool_t acpi_psci_present(void) { return false; }
++static inline bool_t acpi_psci_hvc_present(void) {return false; }
++#endif /* CONFIG_ACPI */
++
+ /* Basic configuration for ACPI */
+ static inline void disable_acpi(void)
+ {
 -- 
 2.1.0
