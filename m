@@ -1,96 +1,97 @@
-From: alexandre.belloni@free-electrons.com (Alexandre Belloni)
-Date: Tue, 17 Nov 2015 12:26:33 +0100
-Subject: [PATCH] clk: at91: Revert "keep slow clk enabled to prevent system
- hang"
-Message-ID: <1447759593-20816-1-git-send-email-alexandre.belloni@free-electrons.com>
+From: robin.murphy@arm.com (Robin Murphy)
+Date: Tue, 17 Nov 2015 11:27:51 +0000
+Subject: [PATCH 1/2] arm64: KVM: Fix AArch32 to AArch64 register mapping
+In-Reply-To: <1447669698-15939-2-git-send-email-marc.zyngier@arm.com>
+References: <1447669698-15939-1-git-send-email-marc.zyngier@arm.com>
+ <1447669698-15939-2-git-send-email-marc.zyngier@arm.com>
+Message-ID: <564B0F37.6040708@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Commit dca1a4b5ff6e ("clk: at91: keep slow clk enabled to prevent system
-hang") added a workaround for the slow clock as it is not properly handled
-by its users.
+Hi Marc,
 
-Now that the slow clock is taken properly by the drivers, this workaround
-is not necessary anymore, revert it.
+On 16/11/15 10:28, Marc Zyngier wrote:
+> When running a 32bit guest under a 64bit hypervisor, the ARMv8
+> architecture defines a mapping of the 32bit registers in the 64bit
+> space. This includes banked registers that are being demultiplexed
+> over the 64bit ones.
+>
+> On exception caused by an operation involving a 32bit register, the
+> HW exposes the register number in the ESR_EL2 register. It was so
+> far understood that SW had to compute which register was AArch64
+> register was used (based on the current AArch32 mode and register
+> number).
+>
+> It turns out that I misinterpreted the ARM ARM, and the clue is in
+> D1.20.1: "For some exceptions, the exception syndrome given in the
+> ESR_ELx identifies one or more register numbers from the issued
+> instruction that generated the exception. Where the exception is
+> taken from an Exception level using AArch32 these register numbers
+> give the AArch64 view of the register."
+>
+> Which means that the HW is already giving us the translated version,
+> and that we shouldn't try to interpret it at all (for example, doing
+> an MMIO operation from the IRQ mode using the LR register leads to
+> very unexpected behaviours).
+>
+> The fix is thus not to perform a call to vcpu_reg32() at all from
+> vcpu_reg(), and use whatever register number is supplied directly.
+> The only case we need to find out about the mapping is when we
+> actively generate a register access, which only occurs when injecting
+> a fault in a guest.
+>
+> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+> ---
+>   arch/arm64/include/asm/kvm_emulate.h | 8 +++++---
+>   arch/arm64/kvm/inject_fault.c        | 2 +-
+>   2 files changed, 6 insertions(+), 4 deletions(-)
+>
+> diff --git a/arch/arm64/include/asm/kvm_emulate.h b/arch/arm64/include/asm/kvm_emulate.h
+> index 17e92f0..3ca894e 100644
+> --- a/arch/arm64/include/asm/kvm_emulate.h
+> +++ b/arch/arm64/include/asm/kvm_emulate.h
+> @@ -99,11 +99,13 @@ static inline void vcpu_set_thumb(struct kvm_vcpu *vcpu)
+>   	*vcpu_cpsr(vcpu) |= COMPAT_PSR_T_BIT;
+>   }
+>
+> +/*
+> + * vcpu_reg should always be passed a register number coming from a
+> + * read of ESR_EL2. Otherwise, it may give the wrong result on AArch32
+> + * with banked registers.
+> + */
+>   static inline unsigned long *vcpu_reg(const struct kvm_vcpu *vcpu, u8 reg_num)
+>   {
+> -	if (vcpu_mode_is_32bit(vcpu))
+> -		return vcpu_reg32(vcpu, reg_num);
+> -
+>   	return (unsigned long *)&vcpu_gp_regs(vcpu)->regs.regs[reg_num];
+>   }
+>
+> diff --git a/arch/arm64/kvm/inject_fault.c b/arch/arm64/kvm/inject_fault.c
+> index 85c5715..648112e 100644
+> --- a/arch/arm64/kvm/inject_fault.c
+> +++ b/arch/arm64/kvm/inject_fault.c
+> @@ -48,7 +48,7 @@ static void prepare_fault32(struct kvm_vcpu *vcpu, u32 mode, u32 vect_offset)
+>
+>   	/* Note: These now point to the banked copies */
+>   	*vcpu_spsr(vcpu) = new_spsr_value;
+> -	*vcpu_reg(vcpu, 14) = *vcpu_pc(vcpu) + return_offset;
+> +	*vcpu_reg32(vcpu, 14) = *vcpu_pc(vcpu) + return_offset;
 
-Signed-off-by: Alexandre Belloni <alexandre.belloni@free-electrons.com>
-Acked-by: Michael Turquette <mturquette@baylibre.com>
----
-This patch is now ready to be applied as all the other necessary changes are in
-4.4.
+To the best of my knowledge after picking through all the uses of 
+vcpu_reg, particularly in the shared 32-bit code, this does seem to be 
+the only one which involves a potentially-banked register number that 
+didn't originally come from an ESR read, and thus needs translation.
 
-Changes in v5:
- - rebased on v4.4-rc1
- - removed a blank line
- - remove clk.h inclusion
+Reviewed-by: Robin Murphy <robin.murphy@arm.com>
 
- drivers/clk/at91/clk-slow.c | 29 -----------------------------
- 1 file changed, 29 deletions(-)
+(unfortunately I don't have an actual test-case as it was already a 
+third-hand report when I started trying to look into it).
 
-diff --git a/drivers/clk/at91/clk-slow.c b/drivers/clk/at91/clk-slow.c
-index d0d5076a9b94..6f99a530ead6 100644
---- a/drivers/clk/at91/clk-slow.c
-+++ b/drivers/clk/at91/clk-slow.c
-@@ -10,7 +10,6 @@
-  *
-  */
- 
--#include <linux/clk.h>
- #include <linux/clk-provider.h>
- #include <linux/clkdev.h>
- #include <linux/slab.h>
-@@ -72,8 +71,6 @@ struct clk_sam9x5_slow {
- 
- #define to_clk_sam9x5_slow(hw) container_of(hw, struct clk_sam9x5_slow, hw)
- 
--static struct clk *slow_clk;
--
- static int clk_slow_osc_prepare(struct clk_hw *hw)
- {
- 	struct clk_slow_osc *osc = to_clk_slow_osc(hw);
-@@ -360,8 +357,6 @@ at91_clk_register_sam9x5_slow(void __iomem *sckcr,
- 	clk = clk_register(NULL, &slowck->hw);
- 	if (IS_ERR(clk))
- 		kfree(slowck);
--	else
--		slow_clk = clk;
- 
- 	return clk;
- }
-@@ -433,8 +428,6 @@ at91_clk_register_sam9260_slow(struct at91_pmc *pmc,
- 	clk = clk_register(NULL, &slowck->hw);
- 	if (IS_ERR(clk))
- 		kfree(slowck);
--	else
--		slow_clk = clk;
- 
- 	return clk;
- }
-@@ -462,25 +455,3 @@ void __init of_at91sam9260_clk_slow_setup(struct device_node *np,
- 
- 	of_clk_add_provider(np, of_clk_src_simple_get, clk);
- }
--
--/*
-- * FIXME: All slow clk users are not properly claiming it (get + prepare +
-- * enable) before using it.
-- * If all users properly claiming this clock decide that they don't need it
-- * anymore (or are removed), it is disabled while faulty users are still
-- * requiring it, and the system hangs.
-- * Prevent this clock from being disabled until all users are properly
-- * requesting it.
-- * Once this is done we should remove this function and the slow_clk variable.
-- */
--static int __init of_at91_clk_slow_retain(void)
--{
--	if (!slow_clk)
--		return 0;
--
--	__clk_get(slow_clk);
--	clk_prepare_enable(slow_clk);
--
--	return 0;
--}
--arch_initcall(of_at91_clk_slow_retain);
--- 
-2.5.0
+Thanks for picking this up,
+Robin.
+
+>
+>   	/* Branch to exception vector */
+>   	if (sctlr & (1 << 13))
+>
