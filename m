@@ -1,49 +1,158 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 17 Nov 2015 10:56:10 +0100
-Subject: [PATCHv2] arm64: Fix R/O permissions in mark_rodata_ro
-In-Reply-To: <564A5DC8.9090307@redhat.com>
-References: <CAKv+Gu8Z7bkogGUGcNbuSoEbUBAwVmtFNhX9VcbypucaUGd+HQ@mail.gmail.com>
- <1447359670-23652-1-git-send-email-labbott@fedoraproject.org>
- <CAKv+Gu_xkiH8w2gor8SEp4y2UV9KSKTp9Kjtr6C9aU7XduZ06g@mail.gmail.com>
- <564A5DC8.9090307@redhat.com>
-Message-ID: <CAKv+Gu9qoZBJRzmKvi_MrbUJgqqwvC+y=v_vUap+m1FW==Tb9w@mail.gmail.com>
+From: shannon.zhao@linaro.org (shannon.zhao at linaro.org)
+Date: Tue, 17 Nov 2015 17:57:00 +0800
+Subject: [PATCH 02/13] xen/grant-table: Move xlated_setup_gnttab_pages to
+ common place
+In-Reply-To: <1447754231-7772-1-git-send-email-shannon.zhao@linaro.org>
+References: <1447754231-7772-1-git-send-email-shannon.zhao@linaro.org>
+Message-ID: <1447754231-7772-3-git-send-email-shannon.zhao@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16 November 2015 at 23:50, Laura Abbott <labbott@redhat.com> wrote:
-> On 11/14/2015 11:38 PM, Ard Biesheuvel wrote:
->>
->> On 12 November 2015 at 21:21, Laura Abbott <labbott@fedoraproject.org>
->> wrote:
->>>
->>> The permissions in mark_rodata_ro trigger a build error
->>> with STRICT_MM_TYPECHECKS. Fix this by introducing
->>> PAGE_KERNEL_ROX for the same reasons as PAGE_KERNEL_RO.
->>
->>
->> Forgive the bikeshedding but perhaps PAGE_KERNEL_EXEC_RO is more
->> consistent?
->>
->
-> powerpc was using PAGE_KERNEL_ROX so I went with that. Blame powerpc ;)
->
+From: Shannon Zhao <shannon.zhao@linaro.org>
 
-OK, in that case, let's keep PAGE_KERNEL_ROX
+Move xlated_setup_gnttab_pages to common place, so it can be reused by
+ARM to setup grant table when booting with ACPI.
 
->>>
->>>  From Ard:
->>>
->>> "PAGE_KERNEL_EXEC has PTE_WRITE set as well, making the range
->>> writeable under the ARMv8.1 DBM feature, that manages the
->>> dirty bit in hardware (writing to a page with the PTE_RDONLY
->>> and PTE_WRITE bits both set will clear the PTE_RDONLY bit in that case)"
->>>
->>> Signed-off-by: Laura Abbott <labbott@fedoraproject.org>
->>
->>
->> Acked-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->>
->
-> Thanks,
-> Laura
->
+Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+---
+ arch/x86/xen/grant-table.c | 51 ----------------------------------------------
+ drivers/xen/grant-table.c  | 49 ++++++++++++++++++++++++++++++++++++++++++++
+ include/xen/grant_table.h  |  1 +
+ 3 files changed, 50 insertions(+), 51 deletions(-)
+
+diff --git a/arch/x86/xen/grant-table.c b/arch/x86/xen/grant-table.c
+index 1580e7a..2a99a9a 100644
+--- a/arch/x86/xen/grant-table.c
++++ b/arch/x86/xen/grant-table.c
+@@ -111,57 +111,6 @@ int arch_gnttab_init(unsigned long nr_shared)
+ }
+ 
+ #ifdef CONFIG_XEN_PVH
+-#include <xen/balloon.h>
+-#include <xen/events.h>
+-#include <linux/slab.h>
+-static int __init xlated_setup_gnttab_pages(void)
+-{
+-	struct page **pages;
+-	xen_pfn_t *pfns;
+-	void *vaddr;
+-	int rc;
+-	unsigned int i;
+-	unsigned long nr_grant_frames = gnttab_max_grant_frames();
+-
+-	BUG_ON(nr_grant_frames == 0);
+-	pages = kcalloc(nr_grant_frames, sizeof(pages[0]), GFP_KERNEL);
+-	if (!pages)
+-		return -ENOMEM;
+-
+-	pfns = kcalloc(nr_grant_frames, sizeof(pfns[0]), GFP_KERNEL);
+-	if (!pfns) {
+-		kfree(pages);
+-		return -ENOMEM;
+-	}
+-	rc = alloc_xenballooned_pages(nr_grant_frames, pages, 0 /* lowmem */);
+-	if (rc) {
+-		pr_warn("%s Couldn't balloon alloc %ld pfns rc:%d\n", __func__,
+-			nr_grant_frames, rc);
+-		kfree(pages);
+-		kfree(pfns);
+-		return rc;
+-	}
+-	for (i = 0; i < nr_grant_frames; i++)
+-		pfns[i] = page_to_pfn(pages[i]);
+-
+-	vaddr = vmap(pages, nr_grant_frames, 0, PAGE_KERNEL);
+-	if (!vaddr) {
+-		pr_warn("%s Couldn't map %ld pfns rc:%d\n", __func__,
+-			nr_grant_frames, rc);
+-		free_xenballooned_pages(nr_grant_frames, pages);
+-		kfree(pages);
+-		kfree(pfns);
+-		return -ENOMEM;
+-	}
+-	kfree(pages);
+-
+-	xen_auto_xlat_grant_frames.pfn = pfns;
+-	xen_auto_xlat_grant_frames.count = nr_grant_frames;
+-	xen_auto_xlat_grant_frames.vaddr = vaddr;
+-
+-	return 0;
+-}
+-
+ static int __init xen_pvh_gnttab_setup(void)
+ {
+ 	if (!xen_pvh_domain())
+diff --git a/drivers/xen/grant-table.c b/drivers/xen/grant-table.c
+index 62f591f..c084ba6 100644
+--- a/drivers/xen/grant-table.c
++++ b/drivers/xen/grant-table.c
+@@ -664,6 +664,55 @@ int gnttab_setup_auto_xlat_frames(phys_addr_t addr)
+ }
+ EXPORT_SYMBOL_GPL(gnttab_setup_auto_xlat_frames);
+ 
++int __init xlated_setup_gnttab_pages(void)
++{
++	struct page **pages;
++	xen_pfn_t *pfns;
++	void *vaddr;
++	int rc;
++	unsigned int i;
++	unsigned long nr_grant_frames = gnttab_max_grant_frames();
++
++	BUG_ON(nr_grant_frames == 0);
++	pages = kcalloc(nr_grant_frames, sizeof(pages[0]), GFP_KERNEL);
++	if (!pages)
++		return -ENOMEM;
++
++	pfns = kcalloc(nr_grant_frames, sizeof(pfns[0]), GFP_KERNEL);
++	if (!pfns) {
++		kfree(pages);
++		return -ENOMEM;
++	}
++	rc = alloc_xenballooned_pages(nr_grant_frames, pages, 0 /* lowmem */);
++	if (rc) {
++		pr_warn("%s Couldn't balloon alloc %ld pfns rc:%d\n", __func__,
++			nr_grant_frames, rc);
++		kfree(pages);
++		kfree(pfns);
++		return rc;
++	}
++	for (i = 0; i < nr_grant_frames; i++)
++		pfns[i] = page_to_pfn(pages[i]);
++
++	vaddr = vmap(pages, nr_grant_frames, 0, PAGE_KERNEL);
++	if (!vaddr) {
++		pr_warn("%s Couldn't map %ld pfns rc:%d\n", __func__,
++			nr_grant_frames, rc);
++		free_xenballooned_pages(nr_grant_frames, pages);
++		kfree(pages);
++		kfree(pfns);
++		return -ENOMEM;
++	}
++	kfree(pages);
++
++	xen_auto_xlat_grant_frames.pfn = pfns;
++	xen_auto_xlat_grant_frames.count = nr_grant_frames;
++	xen_auto_xlat_grant_frames.vaddr = vaddr;
++
++	return 0;
++}
++EXPORT_SYMBOL_GPL(xlated_setup_gnttab_pages);
++
+ void gnttab_free_auto_xlat_frames(void)
+ {
+ 	if (!xen_auto_xlat_grant_frames.count)
+diff --git a/include/xen/grant_table.h b/include/xen/grant_table.h
+index 4478f4b..fa31e66 100644
+--- a/include/xen/grant_table.h
++++ b/include/xen/grant_table.h
+@@ -177,6 +177,7 @@ struct grant_frames {
+ extern struct grant_frames xen_auto_xlat_grant_frames;
+ unsigned int gnttab_max_grant_frames(void);
+ int gnttab_setup_auto_xlat_frames(phys_addr_t addr);
++int xlated_setup_gnttab_pages(void);
+ void gnttab_free_auto_xlat_frames(void);
+ 
+ #define gnttab_map_vaddr(map) ((void *)(map.host_virt_addr))
+-- 
+2.1.0
