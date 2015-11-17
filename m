@@ -1,53 +1,47 @@
-From: yangyingliang@huawei.com (Yang Yingliang)
-Date: Tue, 17 Nov 2015 11:48:07 +0800
-Subject: A problem about interrupt when booting a captured kernel
-In-Reply-To: <564A2DE4.4030702@arm.com>
-References: <5645B6D3.60305@huawei.com> <564A2DE4.4030702@arm.com>
-Message-ID: <564AA377.2020703@huawei.com>
+From: jszhang@marvell.com (Jisheng Zhang)
+Date: Tue, 17 Nov 2015 11:56:02 +0800
+Subject: [Query] How to measure the entry-latency-us and exit-latency-us
+ on arm PSCI system
+In-Reply-To: <20151116160513.GB19228@red-moon>
+References: <20151116201055.00567e90@xhacker> <20151116160513.GB19228@red-moon>
+Message-ID: <20151117115602.6f3626be@xhacker>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi
+On Mon, 16 Nov 2015 16:05:13 +0000
+Lorenzo Pieralisi wrote:
 
-On 2015/11/17 3:26, Marc Zyngier wrote:
-> On 13/11/15 10:09, Yang Yingliang wrote:
->> Hi, Marc
->>
->>
->>       The kexec will boot a captured kernel while the kernel panic. But
->> it boots failed if the kernel panic in handler function of PPI. The
->> reason is that the PPI has not been 'eoi', other interrupts can not be
->> handled when booting  the captured kernel.
->>
->>       The kexec will call irq_eoi to end the irqs that have
->> IRQD_IRQ_INPROGRESS flag. But PPIs don't have this flag, so it won't be
->> ended.
->>
->>      Three ways to solve this problem we can think :
->>      1. Is there a way to reset gic like its_reset ?
->>      2. Can we add some flag for calling irq_eoi ?
->>      3. Just 'eoi' all PPIs without checking flags in kexec.
->>
->>       Please give some advice.
->
-> Good timing. Please see:
->
-> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-November/385383.html
->
-> and let me know if that fixes things for you.
+> On Mon, Nov 16, 2015 at 08:10:55PM +0800, Jisheng Zhang wrote:
+> > Hi all,
+> > 
+> > Now, I'd like to add cpuidle support to Marvell berlin arm64 soc via
+> > drivers/cpuidle/dt_idle_states.c. The system is PSCI-1.0 compatible. 
+> > 
+> > Per my understanding:
+> > 
+> > The entry-latency-us: the time from beginning of cpuidle_idle_call()
+> > to the firmware's last WFI instruction. Should test more times to find
+> > the longest time.
+> > 
+> > The exit-latency-us: the time from the first instruction of waken up cpu
+> > to the end of cpuidle_idle_call(). Should test more times to find the longest
+> > time.
+> > 
+> > If cpufreq is available, we should fix the cpufreq to the lowest freq to do
+> > the above test.
+> > 
+> > Even I have a look at idle-states binding doc, I'm still not sure whether my
+> > solution to measure the entry-latency-us and exit-latency-us is correct or not,
+> > could you please give suggestions?  
+> 
+> It is correct and yes for the time being they represent the global worst
+> case so your assumption on cpufreq is reasonable, you should set the
+> system in the worst case conditions.
+> 
+> If the entry phase is interruptible on pending irq (which means that
+> your firmware has checkpoints in the power down sequence) please define
+> wakeup-latency according to the docs, it might be < entry+exit,
+> otherwise your measurements are just fine.
+> 
 
-I tried patch #1, deactivating interrupt can not fix the problem. But
-EOI the interrupt can.
-
-I think the reason is GICC status is not cleared.
-So if it means, in hardware, we should clear the GICC status while 
-deactivating the.
-
-Thanks
-Yang
-
->
-> Thanks,
->
-> 	M.
->
+Got it. Thanks for detailed explanations
