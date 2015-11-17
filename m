@@ -1,77 +1,188 @@
-From: aryabinin@virtuozzo.com (Andrey Ryabinin)
-Date: Tue, 17 Nov 2015 18:47:08 +0300
-Subject: [PATCH v7 0/4] KASAN for arm64
-In-Reply-To: <564B40A7.1000206@arm.com>
-References: <1444665180-301-1-git-send-email-ryabinin.a.a@gmail.com>
- <20151013083432.GG6320@e104818-lin.cambridge.arm.com>
- <5649BAFD.6030005@arm.com> <5649F783.40109@gmail.com>
- <564B40A7.1000206@arm.com>
-Message-ID: <564B4BFC.1020905@virtuozzo.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 17 Nov 2015 16:48:58 +0100
+Subject: [PATCH v2] SPI: s3c64xx: pass DMA arguments in platform data
+In-Reply-To: <8391350.6B0EUH1WXO@wuerfel>
+References: <8391350.6B0EUH1WXO@wuerfel>
+Message-ID: <4634371.Kl2EUjoTtJ@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+The s3c64xx platform data already contains a pointer to the
+DMA filter function, but not to the associated data.
 
+This simplifies the code and makes it more generic by
+passing the data along with the filter function like
+we do for other drivers.
 
-On 11/17/2015 05:58 PM, Suzuki K. Poulose wrote:
-> On 16/11/15 15:34, Andrey Ryabinin wrote:
->> On 11/16/2015 02:16 PM, Suzuki K. Poulose wrote:
->>> On 13/10/15 09:34, Catalin Marinas wrote:
->>>> On Mon, Oct 12, 2015 at 06:52:56PM +0300, Andrey Ryabinin wrote:
-> 
->>> Hi,
->>>
->>> I get the following failure with KASAN + 16K_PAGES + 48BIT_VA, with 4.4-rc1:
->>>
->>>
->>> arch/arm64/mm/kasan_init.c: In function ?kasan_early_init?:
->>> include/linux/compiler.h:484:38: error: call to ?__compiletime_assert_95? declared with attribute error: BUILD_BUG_ON failed: !IS_ALIGNED(KASAN_SHADOW_END, PGDIR_SIZE)
->>>    _compiletime_assert(condition, msg, __compiletime_assert_, __LINE__)
->>>                                        ^
-> 
-> ...
-> 
->>
->> Yes, it's really needed, because some code relies on this (e.g.  clear_pgs() and kasan_init()).
->> But it should be possible to get rid of this requirement.
-> 
-> And the other important point I missed mentioning was that, my tool chain doesn't
-> support KASAN. But still the KASAN support files are still compiled and generates
-> the above error. Shouldn't we disable it at build time if we detect that compiler
-> doesn't support it ? Something like we do for LSE_ATOMICS.
-> 
-
-We should either add proper Kconfig dependency for now, or just make it work.
-
-
-From: Andrey Ryabinin <aryabinin@virtuozzo.com>
-Subject: [PATCH] arm64: KASAN depends on !(ARM64_16K_PAGES && ARM64_VA_BITS_48)
-
-On KASAN + 16K_PAGES + 48BIT_VA
- arch/arm64/mm/kasan_init.c: In function ?kasan_early_init?:
- include/linux/compiler.h:484:38: error: call to ?__compiletime_assert_95? declared with attribute error: BUILD_BUG_ON failed: !IS_ALIGNED(KASAN_SHADOW_END, PGDIR_SIZE)
-    _compiletime_assert(condition, msg, __compiletime_assert_, __LINE__)
-
-Currently KASAN will not work on 16K_PAGES and 48BIT_VA, so
-forbid such configuration to avoid above build failure.
-
-Reported-by: Suzuki K. Poulose <Suzuki.Poulose@arm.com>
-Signed-off-by: Andrey Ryabinin <aryabinin@virtuozzo.com>
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 ---
- arch/arm64/Kconfig | 2 +-
- 1 file changed, 1 insertion(+), 1 deletion(-)
+This version is now independent of the ASoC changes.
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 9ac16a4..bf7de69 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -49,7 +49,7 @@ config ARM64
- 	select HAVE_ARCH_AUDITSYSCALL
- 	select HAVE_ARCH_BITREVERSE
- 	select HAVE_ARCH_JUMP_LABEL
--	select HAVE_ARCH_KASAN if SPARSEMEM_VMEMMAP
-+	select HAVE_ARCH_KASAN if SPARSEMEM_VMEMMAP && !(ARM64_16K_PAGES && ARM64_VA_BITS_48)
- 	select HAVE_ARCH_KGDB
- 	select HAVE_ARCH_SECCOMP_FILTER
- 	select HAVE_ARCH_TRACEHOOK
--- 
-2.4.10
+diff --git a/arch/arm/plat-samsung/devs.c b/arch/arm/plat-samsung/devs.c
+index a9d535ffdfaa..9a3c090d2427 100644
+--- a/arch/arm/plat-samsung/devs.c
++++ b/arch/arm/plat-samsung/devs.c
+@@ -1105,9 +1105,7 @@ struct platform_device s3c_device_wdt = {
+ #ifdef CONFIG_S3C64XX_DEV_SPI0
+ static struct resource s3c64xx_spi0_resource[] = {
+ 	[0] = DEFINE_RES_MEM(S3C_PA_SPI0, SZ_256),
+-	[1] = DEFINE_RES_DMA(DMACH_SPI0_TX),
+-	[2] = DEFINE_RES_DMA(DMACH_SPI0_RX),
+-	[3] = DEFINE_RES_IRQ(IRQ_SPI0),
++	[1] = DEFINE_RES_IRQ(IRQ_SPI0),
+ };
+ 
+ struct platform_device s3c64xx_device_spi0 = {
+@@ -1135,11 +1133,13 @@ void __init s3c64xx_spi0_set_platdata(int (*cfg_gpio)(void), int src_clk_nr,
+ 	pd.num_cs = num_cs;
+ 	pd.src_clk_nr = src_clk_nr;
+ 	pd.cfg_gpio = (cfg_gpio) ? cfg_gpio : s3c64xx_spi0_cfg_gpio;
+-#if defined(CONFIG_PL330_DMA)
+-	pd.filter = pl330_filter;
+-#elif defined(CONFIG_S3C64XX_PL080)
++#if defined(CONFIG_S3C64XX_PL080)
++	pd.dma_tx = (void *)DMACH_SPI0_TX;
++	pd.dma_rx = (void *)DMACH_SPI0_RX;
+ 	pd.filter = pl08x_filter_id;
+ #elif defined(CONFIG_S3C24XX_DMAC)
++	pd.dma_tx = (void *)DMACH_SPI0_TX;
++	pd.dma_rx = (void *)DMACH_SPI0_RX;
+ 	pd.filter = s3c24xx_dma_filter;
+ #endif
+ 
+@@ -1150,9 +1150,7 @@ void __init s3c64xx_spi0_set_platdata(int (*cfg_gpio)(void), int src_clk_nr,
+ #ifdef CONFIG_S3C64XX_DEV_SPI1
+ static struct resource s3c64xx_spi1_resource[] = {
+ 	[0] = DEFINE_RES_MEM(S3C_PA_SPI1, SZ_256),
+-	[1] = DEFINE_RES_DMA(DMACH_SPI1_TX),
+-	[2] = DEFINE_RES_DMA(DMACH_SPI1_RX),
+-	[3] = DEFINE_RES_IRQ(IRQ_SPI1),
++	[1] = DEFINE_RES_IRQ(IRQ_SPI1),
+ };
+ 
+ struct platform_device s3c64xx_device_spi1 = {
+@@ -1180,9 +1178,9 @@ void __init s3c64xx_spi1_set_platdata(int (*cfg_gpio)(void), int src_clk_nr,
+ 	pd.num_cs = num_cs;
+ 	pd.src_clk_nr = src_clk_nr;
+ 	pd.cfg_gpio = (cfg_gpio) ? cfg_gpio : s3c64xx_spi1_cfg_gpio;
+-#if defined(CONFIG_PL330_DMA)
+-	pd.filter = pl330_filter;
+-#elif defined(CONFIG_S3C64XX_PL080)
++#if defined(CONFIG_S3C64XX_PL080)
++	pd.dma_tx = (void *)DMACH_SPI1_TX;
++	pd.dma_rx = (void *)DMACH_SPI1_RX;
+ 	pd.filter = pl08x_filter_id;
+ #endif
+ 
+@@ -1193,9 +1191,7 @@ void __init s3c64xx_spi1_set_platdata(int (*cfg_gpio)(void), int src_clk_nr,
+ #ifdef CONFIG_S3C64XX_DEV_SPI2
+ static struct resource s3c64xx_spi2_resource[] = {
+ 	[0] = DEFINE_RES_MEM(S3C_PA_SPI2, SZ_256),
+-	[1] = DEFINE_RES_DMA(DMACH_SPI2_TX),
+-	[2] = DEFINE_RES_DMA(DMACH_SPI2_RX),
+-	[3] = DEFINE_RES_IRQ(IRQ_SPI2),
++	[1] = DEFINE_RES_IRQ(IRQ_SPI2),
+ };
+ 
+ struct platform_device s3c64xx_device_spi2 = {
+@@ -1223,9 +1219,9 @@ void __init s3c64xx_spi2_set_platdata(int (*cfg_gpio)(void), int src_clk_nr,
+ 	pd.num_cs = num_cs;
+ 	pd.src_clk_nr = src_clk_nr;
+ 	pd.cfg_gpio = (cfg_gpio) ? cfg_gpio : s3c64xx_spi2_cfg_gpio;
+-#if defined(CONFIG_PL330_DMA)
+-	pd.filter = pl330_filter;
+-#elif defined(CONFIG_S3C64XX_PL080)
++#if defined(CONFIG_S3C64XX_PL080)
++	pd.dma_tx = (void *)DMACH_SPI2_TX;
++	pd.dma_rx = (void *)DMACH_SPI2_RX;
+ 	pd.filter = pl08x_filter_id;
+ #endif
+ 
+diff --git a/drivers/spi/spi-s3c64xx.c b/drivers/spi/spi-s3c64xx.c
+index 8e86e7f6663a..8b7499623957 100644
+--- a/drivers/spi/spi-s3c64xx.c
++++ b/drivers/spi/spi-s3c64xx.c
+@@ -133,7 +133,6 @@
+ struct s3c64xx_spi_dma_data {
+ 	struct dma_chan *ch;
+ 	enum dma_transfer_direction direction;
+-	unsigned int dmach;
+ };
+ 
+ /**
+@@ -325,7 +324,7 @@ static int s3c64xx_spi_prepare_transfer(struct spi_master *spi)
+ 
+ 		/* Acquire DMA channels */
+ 		sdd->rx_dma.ch = dma_request_slave_channel_compat(mask, filter,
+-				   (void *)(long)sdd->rx_dma.dmach, dev, "rx");
++				   sdd->cntrlr_info->dma_rx, dev, "rx");
+ 		if (!sdd->rx_dma.ch) {
+ 			dev_err(dev, "Failed to get RX DMA channel\n");
+ 			ret = -EBUSY;
+@@ -334,7 +333,7 @@ static int s3c64xx_spi_prepare_transfer(struct spi_master *spi)
+ 		spi->dma_rx = sdd->rx_dma.ch;
+ 
+ 		sdd->tx_dma.ch = dma_request_slave_channel_compat(mask, filter,
+-				   (void *)(long)sdd->tx_dma.dmach, dev, "tx");
++				   sdd->cntrlr_info->dma_tx, dev, "tx");
+ 		if (!sdd->tx_dma.ch) {
+ 			dev_err(dev, "Failed to get TX DMA channel\n");
+ 			ret = -EBUSY;
+@@ -1028,7 +1027,6 @@ static inline struct s3c64xx_spi_port_config *s3c64xx_spi_get_port_config(
+ static int s3c64xx_spi_probe(struct platform_device *pdev)
+ {
+ 	struct resource	*mem_res;
+-	struct resource	*res;
+ 	struct s3c64xx_spi_driver_data *sdd;
+ 	struct s3c64xx_spi_info *sci = dev_get_platdata(&pdev->dev);
+ 	struct spi_master *master;
+@@ -1087,20 +1085,9 @@ static int s3c64xx_spi_probe(struct platform_device *pdev)
+ 
+ 	sdd->cur_bpw = 8;
+ 
+-	if (!sdd->pdev->dev.of_node) {
+-		res = platform_get_resource(pdev, IORESOURCE_DMA,  0);
+-		if (!res) {
+-			dev_warn(&pdev->dev, "Unable to get SPI tx dma resource. Switching to poll mode\n");
+-			sdd->port_conf->quirks = S3C64XX_SPI_QUIRK_POLL;
+-		} else
+-			sdd->tx_dma.dmach = res->start;
+-
+-		res = platform_get_resource(pdev, IORESOURCE_DMA,  1);
+-		if (!res) {
+-			dev_warn(&pdev->dev, "Unable to get SPI rx dma resource. Switching to poll mode\n");
+-			sdd->port_conf->quirks = S3C64XX_SPI_QUIRK_POLL;
+-		} else
+-			sdd->rx_dma.dmach = res->start;
++	if (sci && (!sci->dma_tx || !sci->dma_rx)) {
++		dev_warn(&pdev->dev, "Unable to get SPI tx data. Switching to poll mode\n");
++		sdd->port_conf->quirks = S3C64XX_SPI_QUIRK_POLL;
+ 	}
+ 
+ 	sdd->tx_dma.direction = DMA_MEM_TO_DEV;
+@@ -1197,9 +1184,10 @@ static int s3c64xx_spi_probe(struct platform_device *pdev)
+ 
+ 	dev_dbg(&pdev->dev, "Samsung SoC SPI Driver loaded for Bus SPI-%d with %d Slaves attached\n",
+ 					sdd->port_id, master->num_chipselect);
+-	dev_dbg(&pdev->dev, "\tIOmem=[%pR]\tFIFO %dbytes\tDMA=[Rx-%d, Tx-%d]\n",
++	dev_dbg(&pdev->dev, "\tIOmem=[%pR]\tFIFO %dbytes\tDMA=[Rx-%p, Tx-%p]\n",
+ 					mem_res, (FIFO_LVL_MASK(sdd) >> 1) + 1,
+-					sdd->rx_dma.dmach, sdd->tx_dma.dmach);
++					sdd->cntrlr_info->dma_rx,
++					sdd->cntrlr_info->dma_tx);
+ 
+ 	pm_runtime_mark_last_busy(&pdev->dev);
+ 	pm_runtime_put_autosuspend(&pdev->dev);
+diff --git a/include/linux/platform_data/spi-s3c64xx.h b/include/linux/platform_data/spi-s3c64xx.h
+index d3889b98a1a1..fb5625bcca9a 100644
+--- a/include/linux/platform_data/spi-s3c64xx.h
++++ b/include/linux/platform_data/spi-s3c64xx.h
+@@ -40,6 +40,8 @@ struct s3c64xx_spi_info {
+ 	int num_cs;
+ 	int (*cfg_gpio)(void);
+ 	dma_filter_fn filter;
++	void *dma_tx;
++	void *dma_rx;
+ };
+ 
+ /**
