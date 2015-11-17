@@ -1,171 +1,186 @@
 From: shannon.zhao@linaro.org (shannon.zhao at linaro.org)
-Date: Tue, 17 Nov 2015 17:40:21 +0800
-Subject: [PATCH v3 22/62] arm/gic-v3: Refactor gicv3_init into generic and dt
- specific parts
+Date: Tue, 17 Nov 2015 17:40:25 +0800
+Subject: [PATCH v3 26/62] arm/gic-v2: Add ACPI boot support for GICv2
 In-Reply-To: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
 References: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
-Message-ID: <1447753261-7552-23-git-send-email-shannon.zhao@linaro.org>
+Message-ID: <1447753261-7552-27-git-send-email-shannon.zhao@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Shannon Zhao <shannon.zhao@linaro.org>
+From: Parth Dixit <parth.dixit@linaro.org>
 
-Refactor gic-v3 related functions into dt and generic parts. This will be
-helpful when adding acpi support for gic-v3.
+ACPI on Xen hypervisor uses MADT table for proper GIC initialization.
+First get the GIC version from GIC Distributor. Then parse GIC related
+subtables, collect CPU interface and distributor addresses and call
+driver initialization function (which is hardware abstraction agnostic).
+In a similar way, FDT initialize GICv2.
 
+Signed-off-by: Tomasz Nowicki <tomasz.nowicki@linaro.org>
+Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+Signed-off-by: Naresh Bhat <naresh.bhat@linaro.org>
+Signed-off-by: Parth Dixit <parth.dixit@linaro.org>
 Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
 ---
- xen/arch/arm/gic-v3.c | 95 +++++++++++++++++++++++++++------------------------
- 1 file changed, 51 insertions(+), 44 deletions(-)
+ xen/arch/arm/gic-v2.c | 122 +++++++++++++++++++++++++++++++++++++++++++++++++-
+ 1 file changed, 121 insertions(+), 1 deletion(-)
 
-diff --git a/xen/arch/arm/gic-v3.c b/xen/arch/arm/gic-v3.c
-index 4fe0c37..bd13010 100644
---- a/xen/arch/arm/gic-v3.c
-+++ b/xen/arch/arm/gic-v3.c
-@@ -1138,62 +1138,27 @@ static int __init cmp_rdist(const void *a, const void *b)
-     return ( l->base < r->base) ? -1 : 0;
- }
+diff --git a/xen/arch/arm/gic-v2.c b/xen/arch/arm/gic-v2.c
+index e31d38e..9a9fcd5 100644
+--- a/xen/arch/arm/gic-v2.c
++++ b/xen/arch/arm/gic-v2.c
+@@ -29,6 +29,8 @@
+ #include <xen/device_tree.h>
+ #include <xen/libfdt/libfdt.h>
+ #include <xen/sizes.h>
++#include <xen/acpi.h>
++#include <acpi/actables.h>
+ #include <asm/p2m.h>
+ #include <asm/domain.h>
+ #include <asm/platform.h>
+@@ -36,6 +38,7 @@
  
-+static paddr_t __initdata dbase = 0, cbase = 0, csize = 0, vbase = 0;
-+
- /* If the GICv3 supports GICv2, initialize it */
--static void __init gicv3_init_v2(const struct dt_device_node *node,
--                                 paddr_t dbase)
-+static void __init gicv3_init_v2(void)
- {
--    int res;
--    paddr_t cbase, csize;
--    paddr_t vbase, vsize;
--
--    /*
--     * For GICv3 supporting GICv2, GICC and GICV base address will be
--     * provided.
--     */
--    res = dt_device_get_address(node, 1 + gicv3.rdist_count,
--                                &cbase, &csize);
--    if ( res )
-+    if ( cbase == 0 || vbase == 0 )
-         return;
- 
--    res = dt_device_get_address(node, 1 + gicv3.rdist_count + 2,
--                                &vbase, &vsize);
--    if ( res )
--        return;
--
--    /*
--     * We emulate a vGICv2 using a GIC CPU interface of GUEST_GICC_SIZE.
--     * So only support GICv2 on GICv3 when the virtual CPU interface is
--     * at least GUEST_GICC_SIZE.
--     */
--    if ( vsize < GUEST_GICC_SIZE )
--    {
--        printk(XENLOG_WARNING
--               "GICv3: WARNING: Not enabling support for GICv2 compat mode.\n"
--               "Size of GICV (%#"PRIpaddr") must at least be %#llx.\n",
--               vsize, GUEST_GICC_SIZE);
--        return;
--    }
--
-     printk("GICv3 compatible with GICv2 cbase %#"PRIpaddr" vbase %#"PRIpaddr"\n",
-            cbase, vbase);
- 
-     vgic_v2_setup_hw(dbase, cbase, csize, vbase, 0);
- }
- 
--/* Set up the GIC */
--static int __init gicv3_init(void)
-+static void __init dt_gicv3_init(void)
- {
-     struct rdist_region *rdist_regs;
-     int res, i;
-     uint32_t reg;
-     const struct dt_device_node *node = gicv3_info.node;
--    paddr_t dbase;
--
--    if ( !cpu_has_gicv3 )
--    {
--        dprintk(XENLOG_ERR, "GICv3: driver requires system register support\n");
--        return -ENODEV;
--    }
-+    paddr_t vsize;
- 
-     res = dt_device_get_address(node, 0, &dbase, NULL);
-     if ( res )
-@@ -1248,6 +1213,48 @@ static int __init gicv3_init(void)
-         panic("GICv3: Cannot find the maintenance IRQ");
-     gicv3_info.maintenance_irq = res;
- 
-+    /*
-+     * For GICv3 supporting GICv2, GICC and GICV base address will be
-+     * provided.
-+     */
-+    res = dt_device_get_address(node, 1 + gicv3.rdist_count,
-+                                &cbase, &csize);
-+    if ( res )
-+        return;
-+
-+    res = dt_device_get_address(node, 1 + gicv3.rdist_count + 2,
-+                                &vbase, &vsize);
-+    if ( res )
-+        return;
-+
-+    /*
-+     * We emulate a vGICv2 using a GIC CPU interface of GUEST_GICC_SIZE.
-+     * So only support GICv2 on GICv3 when the virtual CPU interface is
-+     * at least GUEST_GICC_SIZE.
-+     */
-+    if ( vsize < GUEST_GICC_SIZE )
-+    {
-+        printk(XENLOG_WARNING
-+               "GICv3: WARNING: Not enabling support for GICv2 compat mode.\n"
-+               "Size of GICV (%#"PRIpaddr") must@least be %#llx.\n",
-+               vsize, GUEST_GICC_SIZE);
-+        return;
-+    }
-+}
-+
-+/* Set up the GIC */
-+static int __init gicv3_init(void)
-+{
-+    int res, i;
-+
-+    if ( !cpu_has_gicv3 )
-+    {
-+        dprintk(XENLOG_ERR, "GICv3: driver requires system register support\n");
-+        return -ENODEV;
-+    }
-+
-+    dt_gicv3_init();
-+
-     for ( i = 0; i < gicv3.rdist_count; i++ )
-     {
-         /* map dbase & rdist regions */
-@@ -1277,7 +1284,7 @@ static int __init gicv3_init(void)
- 
-     vgic_v3_setup_hw(dbase, gicv3.rdist_count, gicv3.rdist_regions,
-                      gicv3.rdist_stride);
--    gicv3_init_v2(node, dbase);
-+    gicv3_init_v2();
- 
-     spin_lock_init(&gicv3.lock);
- 
-@@ -1317,7 +1324,7 @@ static const struct gic_hw_operations gicv3_ops = {
-     .make_hwdom_dt_node  = gicv3_make_hwdom_dt_node,
- };
- 
--static int __init gicv3_preinit(struct dt_device_node *node, const void *data)
-+static int __init dt_gicv3_preinit(struct dt_device_node *node, const void *data)
- {
-     gicv3_info.hw_version = GIC_V3;
-     gicv3_info.node = node;
-@@ -1335,7 +1342,7 @@ static const struct dt_device_match gicv3_dt_match[] __initconst =
- 
- DT_DEVICE_START(gicv3, "GICv3", DEVICE_GIC)
-         .dt_match = gicv3_dt_match,
--        .init = gicv3_preinit,
-+        .init = dt_gicv3_preinit,
- DT_DEVICE_END
+ #include <asm/io.h>
+ #include <asm/gic.h>
++#include <asm/acpi.h>
  
  /*
+  * LR register definitions are GIC v2 specific.
+@@ -681,11 +684,113 @@ static void __init dt_gicv2_init(void)
+                csize, vsize);
+ }
+ 
++#ifdef CONFIG_ACPI
++static int __init
++gic_acpi_parse_madt_cpu(struct acpi_subtable_header *header,
++                        const unsigned long end)
++{
++    static int cpu_base_assigned = 0;
++    struct acpi_madt_generic_interrupt *processor;
++
++    processor = (struct acpi_madt_generic_interrupt *)header;
++
++    if ( BAD_MADT_ENTRY(processor, end) )
++        return -EINVAL;
++
++    /* Read from APIC table and fill up the GIC variables */
++    if ( cpu_base_assigned == 0 )
++    {
++        cbase = processor->base_address;
++        csize = SZ_8K;
++        hbase = processor->gich_base_address;
++        vbase = processor->gicv_base_address;
++        gicv2_info.maintenance_irq = processor->vgic_interrupt;
++
++        if( processor->flags & ACPI_MADT_VGIC_IRQ_MODE )
++            irq_set_type(gicv2_info.maintenance_irq, ACPI_IRQ_TYPE_EDGE_BOTH);
++        else
++            irq_set_type(gicv2_info.maintenance_irq, ACPI_IRQ_TYPE_LEVEL_MASK);
++
++	cpu_base_assigned = 1;
++    }
++    else
++    {
++        if ( cbase != processor->base_address
++             || hbase != processor->gich_base_address
++             || vbase != processor->gicv_base_address
++             || gicv2_info.maintenance_irq != processor->vgic_interrupt )
++        {
++	    printk("GICv2: GICC entries are not same in MADT table\n");
++	    return -EINVAL;
++        }
++    }
++
++    return 0;
++}
++
++static int __init
++gic_acpi_parse_madt_distributor(struct acpi_subtable_header *header,
++                                const unsigned long end)
++{
++    struct acpi_madt_generic_distributor *dist;
++
++    dist = (struct acpi_madt_generic_distributor *)header;
++
++    if ( BAD_MADT_ENTRY(dist, end) )
++        return -EINVAL;
++
++    dbase = dist->base_address;
++
++    return 0;
++}
++
++static void __init acpi_gicv2_init(void)
++{
++    acpi_status status;
++    struct acpi_table_header *table;
++    int count;
++
++    status = acpi_get_table(ACPI_SIG_MADT, 0, &table);
++
++    if ( ACPI_FAILURE(status) )
++    {
++        const char *msg = acpi_format_exception(status);
++
++        panic("GICv2: Failed to get MADT table, %s", msg);
++    }
++
++    /* Collect CPU base addresses */
++    count = acpi_parse_entries(ACPI_SIG_MADT, sizeof(struct acpi_table_madt),
++                               gic_acpi_parse_madt_cpu, table,
++                               ACPI_MADT_TYPE_GENERIC_INTERRUPT, 0);
++    if ( count <= 0 )
++        panic("GICv2: No valid GICC entries exists");
++
++    /*
++     * Find distributor base address. We expect one distributor entry since
++     * ACPI 5.0 spec neither support multi-GIC instances nor GIC cascade.
++     */
++    count = acpi_parse_entries(ACPI_SIG_MADT, sizeof(struct acpi_table_madt),
++                               gic_acpi_parse_madt_distributor, table,
++                               ACPI_MADT_TYPE_GENERIC_DISTRIBUTOR, 0);
++    if ( count <= 0 )
++        panic("GICv2: No valid GICD entries exists");
++}
++#else
++static void __init acpi_gicv2_init(void)
++{
++/* Should never reach here */
++}
++#endif
++
+ static int __init gicv2_init(void)
+ {
+     uint32_t aliased_offset = 0;
+ 
+-    dt_gicv2_init();
++    if( acpi_disabled )
++        dt_gicv2_init();
++    else
++        acpi_gicv2_init();
+ 
+     printk("GICv2 initialization:\n"
+               "        gic_dist_addr=%"PRIpaddr"\n"
+@@ -793,6 +898,21 @@ DT_DEVICE_START(gicv2, "GICv2", DEVICE_GIC)
+         .init = dt_gicv2_preinit,
+ DT_DEVICE_END
+ 
++#ifdef CONFIG_ACPI
++/* Set up the GIC */
++static int __init acpi_gicv2_preinit(const void *data)
++{
++    gicv2_info.hw_version = GIC_V2;
++    register_gic_ops(&gicv2_ops);
++
++    return 0;
++}
++
++ACPI_DEVICE_START(agicv2, "GICv2", DEVICE_GIC)
++        .class_type = GIC_V2,
++        .init = acpi_gicv2_preinit,
++ACPI_DEVICE_END
++#endif
+ /*
+  * Local variables:
+  * mode: C
 -- 
 2.1.0
