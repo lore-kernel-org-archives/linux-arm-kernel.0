@@ -1,63 +1,48 @@
 From: shannon.zhao@linaro.org (shannon.zhao at linaro.org)
-Date: Tue, 17 Nov 2015 17:40:48 +0800
-Subject: [PATCH v3 49/62] arm/acpi: Map rest tables for Dom0
+Date: Tue, 17 Nov 2015 17:40:49 +0800
+Subject: [PATCH v3 50/62] xen/efi: store EFI system table in efi structure
 In-Reply-To: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
 References: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
-Message-ID: <1447753261-7552-50-git-send-email-shannon.zhao@linaro.org>
+Message-ID: <1447753261-7552-51-git-send-email-shannon.zhao@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Shannon Zhao <shannon.zhao@linaro.org>
 
-Map other reused tables for Dom0.
+When preparing EFI tables for Dom0, it needs the information of EFI
+system table. Here store it in efi structure.
 
+Signed-off-by: Parth Dixit <parth.dixit@linaro.org>
 Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
 ---
- xen/arch/arm/domain_build.c | 25 +++++++++++++++++++++++++
- 1 file changed, 25 insertions(+)
+ xen/common/efi/boot.c | 2 ++
+ xen/include/xen/efi.h | 1 +
+ 2 files changed, 3 insertions(+)
 
-diff --git a/xen/arch/arm/domain_build.c b/xen/arch/arm/domain_build.c
-index 6ae5761..da4e271 100644
---- a/xen/arch/arm/domain_build.c
-+++ b/xen/arch/arm/domain_build.c
-@@ -1359,6 +1359,29 @@ static int prepare_dtb(struct domain *d, struct kernel_info *kinfo)
- #ifdef CONFIG_ACPI
- #define XEN_HYPERVISOR_ID 0x000058656E564D4D  /* "XenVMM" */
+diff --git a/xen/common/efi/boot.c b/xen/common/efi/boot.c
+index 78d8ae9..6a48624 100644
+--- a/xen/common/efi/boot.c
++++ b/xen/common/efi/boot.c
+@@ -1155,6 +1155,8 @@ efi_start(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
  
-+static void acpi_map_rest_tables(struct domain *d)
-+{
-+    int i;
-+    unsigned long res;
-+    u64 addr, size;
-+
-+    for( i = 0; i < acpi_gbl_root_table_list.count; i++ )
-+    {
-+        addr = acpi_gbl_root_table_list.tables[i].address;
-+        size = acpi_gbl_root_table_list.tables[i].length;
-+        res = map_regions(d,
-+                          paddr_to_pfn(addr & PAGE_MASK),
-+                          DIV_ROUND_UP(size, PAGE_SIZE),
-+                          paddr_to_pfn(addr & PAGE_MASK));
-+        if ( res )
-+        {
-+             panic(XENLOG_ERR "Unable to map 0x%"PRIx64
-+                   " - 0x%"PRIx64" in domain \n",
-+                   addr & PAGE_MASK, PAGE_ALIGN(addr + size) - 1);
-+        }
-+    }
-+}
-+
- static int acpi_create_rsdp(struct domain *d, struct membank tbl_add[])
- {
+     efi_tables();
  
-@@ -1711,6 +1734,8 @@ static int prepare_acpi(struct domain *d, struct kernel_info *kinfo)
-     if ( rc != 0 )
-         return rc;
- 
-+    acpi_map_rest_tables(d);
++    efi.est = (long)SystemTable;
 +
-     return 0;
- }
- #else
+     /* Collect PCI ROM contents. */
+     setup_efi_pci();
+ 
+diff --git a/xen/include/xen/efi.h b/xen/include/xen/efi.h
+index e74dad1..e112296 100644
+--- a/xen/include/xen/efi.h
++++ b/xen/include/xen/efi.h
+@@ -16,6 +16,7 @@ struct efi {
+     unsigned long acpi20;       /* ACPI table (ACPI 2.0) */
+     unsigned long smbios;       /* SM BIOS table */
+     unsigned long smbios3;      /* SMBIOS v3 table */
++    unsigned long est;          /* EFI system table */
+ };
+ 
+ extern struct efi efi;
 -- 
 2.1.0
