@@ -1,145 +1,65 @@
-From: shannon.zhao@linaro.org (shannon.zhao at linaro.org)
-Date: Tue, 17 Nov 2015 17:57:03 +0800
-Subject: [PATCH 05/13] Xen: ARM: Add support for mapping platform device mmio
-In-Reply-To: <1447754231-7772-1-git-send-email-shannon.zhao@linaro.org>
-References: <1447754231-7772-1-git-send-email-shannon.zhao@linaro.org>
-Message-ID: <1447754231-7772-6-git-send-email-shannon.zhao@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 17 Nov 2015 11:19:51 +0100
+Subject: [PATCH 2/3] ASoC: s3c24xx-i2s: pass DMA channels as platform data
+In-Reply-To: <564A84AE.2000502@samsung.com>
+References: <5466463.9HBcuLFGQf@wuerfel> <4171669.Y8FyLG5WLL@wuerfel>
+ <564A84AE.2000502@samsung.com>
+Message-ID: <5663555.neFjt3nUNJ@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Shannon Zhao <shannon.zhao@linaro.org>
+On Tuesday 17 November 2015 10:36:46 Krzysztof Kozlowski wrote:
+> On 14.11.2015 02:23, Arnd Bergmann wrote:
+> > This is a minor cleanup to make the s3c2412-i2s and s3c24xx-i2s
+> > drivers independent of the mach/dma.h header file and to allow
+> > removing the dependency on the specific dmaengine driver in the
+> > next patch.
+> > 
+> > As a side not, only the s3c24xx-i2s driver seems to still be
+> > used, while the definition of the s3c2412-i2s platform device was
+> > removed in commit 6d259a25b56d ("ARM: SAMSUNG: use static
+> > declaration when it is not used in other files") after it had
+> > never been referenced since its introduction in f0fba2ad1b6b
+> > ("ASoC: multi-component - ASoC Multi-Component Support").
+> > 
+> > Apparently it should have been used by mach-jive.c, but that
+> > never happened. My patch at this point leaves the current state
+> > unchanged, we can decide whether to fix or delete the jive
+> > driver and s3c2412-i2s another time.
+> > 
+> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> > 
+> > diff --git a/arch/arm/plat-samsung/devs.c b/arch/arm/plat-samsung/devs.c
+> > index 3ce234f4c872..e5e91669dd2b 100644
+> > --- a/arch/arm/plat-samsung/devs.c
+> > +++ b/arch/arm/plat-samsung/devs.c
+> > @@ -571,6 +571,11 @@ static struct resource s3c_iis_resource[] = {
+> >  	[0] = DEFINE_RES_MEM(S3C24XX_PA_IIS, S3C24XX_SZ_IIS),
+> >  };
+> >  
+> > +static struct s3c_audio_pdata s3c_iis_platdata = {
+> > +	.dma_playback = (void *)DMACH_I2S_OUT,
+> > +	.dma_capture = (void *)DMACH_I2S_IN,
+> 
+> Why casting? Is it needed?
 
-Add a bus_notifier for platform bus device in order to map the device
-mmio regions when DOM0 booting with ACPI.
+s3c64xx uses strings here, but s3c24xx uses integer indexes into an array.
+I thought about changing the indexes to direct pointers to entries in
+the array, but decided to leave that for another day.
 
-Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
----
- drivers/xen/Makefile   |   1 +
- drivers/xen/platform.c | 104 +++++++++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 105 insertions(+)
- create mode 100644 drivers/xen/platform.c
+> > @@ -454,6 +454,7 @@ static int s3c24xx_iis_dev_probe(struct platform_device *pdev)
+> >  {
+> >  	int ret = 0;
+> >  	struct resource *res;
+> > +	struct s3c_audio_pdata *pdata = dev_get_platdata(&pdev->dev);
+> 
+> Maybe:
+> if (!pdata) {
+> 	pr_err("bla bla bla");
+> 	return -EINVAL;
+> }
 
-diff --git a/drivers/xen/Makefile b/drivers/xen/Makefile
-index e293bc5..2f867e7 100644
---- a/drivers/xen/Makefile
-+++ b/drivers/xen/Makefile
-@@ -11,6 +11,7 @@ CFLAGS_features.o			:= $(nostackp)
- 
- CFLAGS_efi.o				+= -fshort-wchar
- 
-+dom0-$(CONFIG_ARM64) += platform.o
- dom0-$(CONFIG_PCI) += pci.o
- dom0-$(CONFIG_USB_SUPPORT) += dbgp.o
- dom0-$(CONFIG_XEN_ACPI) += acpi.o $(xen-pad-y)
-diff --git a/drivers/xen/platform.c b/drivers/xen/platform.c
-new file mode 100644
-index 0000000..0f95e7f
---- /dev/null
-+++ b/drivers/xen/platform.c
-@@ -0,0 +1,104 @@
-+/*
-+ * Copyright (c) 2015, Linaro Limited.
-+ *
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms and conditions of the GNU General Public License,
-+ * version 2, as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope it will be useful, but WITHOUT
-+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-+ * more details.
-+ *
-+ * You should have received a copy of the GNU General Public License along with
-+ * this program; if not, write to the Free Software Foundation, Inc., 59 Temple
-+ * Place - Suite 330, Boston, MA 02111-1307 USA.
-+ *
-+ * Author: Shannon Zhao <shannon.zhao@linaro.org>
-+ */
-+
-+#include <linux/platform_device.h>
-+#include <linux/acpi.h>
-+#include <xen/xen.h>
-+#include <xen/interface/memory.h>
-+#include <asm/xen/hypervisor.h>
-+#include <asm/xen/hypercall.h>
-+
-+static int xen_map_platform_device_mmio(struct platform_device *pdev)
-+{
-+	int i, rc = 0;
-+
-+	for (i = 0; i < pdev->num_resources; i++)
-+	{
-+		struct resource *r = &pdev->resource[i];
-+
-+		if (resource_type(r) == IORESOURCE_MEM)
-+		{
-+			int j;
-+			int nr = DIV_ROUND_UP(resource_size(r), PAGE_SIZE);
-+			xen_pfn_t *gpfns = kmalloc(sizeof(xen_pfn_t) * nr,
-+						   GFP_KERNEL);
-+			xen_ulong_t *idxs = kmalloc(sizeof(xen_ulong_t) * nr,
-+						    GFP_KERNEL);
-+			int *errs = kmalloc(sizeof(int) * nr, GFP_KERNEL);
-+			struct xen_add_to_physmap_range xatp;
-+
-+			for (j = 0; j < nr; j++) {
-+				gpfns[j] = (r->start >> PAGE_SHIFT) + j;
-+				idxs[j] = (r->start >> PAGE_SHIFT) + j;
-+				errs[j] = 0;
-+			}
-+
-+			xatp.domid = DOMID_SELF;
-+			xatp.size = nr;
-+			xatp.space = XENMAPSPACE_dev_mmio;
-+
-+			set_xen_guest_handle(xatp.gpfns, gpfns);
-+			set_xen_guest_handle(xatp.idxs, idxs);
-+			set_xen_guest_handle(xatp.errs, errs);
-+
-+			rc = HYPERVISOR_memory_op(XENMEM_add_to_physmap_range,
-+						  &xatp);
-+			kfree(gpfns);
-+			kfree(idxs);
-+			kfree(errs);
-+			if (rc != 0)
-+				return rc;
-+		}
-+	}
-+
-+	return rc;
-+}
-+
-+static int xen_platform_notifier(struct notifier_block *nb,
-+				 unsigned long action, void *data)
-+{
-+	struct platform_device *pdev = to_platform_device(data);
-+	int r = 0;
-+
-+	if (!acpi_disabled && (action == BUS_NOTIFY_ADD_DEVICE))
-+		r = xen_map_platform_device_mmio(pdev);
-+
-+	if (r)
-+	{
-+		dev_err(&pdev->dev, "Failed to add_to_physmap device (%s) mmio!\n",
-+			pdev->name);
-+		return NOTIFY_OK;
-+	}
-+
-+	return NOTIFY_DONE;
-+}
-+
-+static struct notifier_block platform_device_nb = {
-+	.notifier_call = xen_platform_notifier,
-+};
-+
-+static int __init register_xen_platform_notifier(void)
-+{
-+	if (!xen_initial_domain())
-+		return 0;
-+
-+	return bus_register_notifier(&platform_bus_type, &platform_device_nb);
-+}
-+
-+arch_initcall(register_xen_platform_notifier);
--- 
-2.1.0
+Yes, that might be helpful in case there are any out of tree users, or
+I missed one of the in-tree users.
+
+	Arnd
