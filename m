@@ -1,141 +1,56 @@
 From: shannon.zhao@linaro.org (shannon.zhao at linaro.org)
-Date: Tue, 17 Nov 2015 17:40:19 +0800
-Subject: [PATCH v3 20/62] arm/acpi: Add ACPI support for SMP initialization
+Date: Tue, 17 Nov 2015 17:40:09 +0800
+Subject: [PATCH v3 10/62] arm/acpi: Move end_boot_allocator after
+ acpi_boot_table_init
 In-Reply-To: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
 References: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
-Message-ID: <1447753261-7552-21-git-send-email-shannon.zhao@linaro.org>
+Message-ID: <1447753261-7552-11-git-send-email-shannon.zhao@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Shannon Zhao <shannon.zhao@linaro.org>
 
-ACPI 5.1 only has two explicit methods to boot up SMP, PSCI and Parking
-protocol, but the Parking protocol is only specified for ARMv7 now, so
-make PSCI as the only way for the SMP boot protocol before some updates
-for the ACPI spec or the Parking protocol spec.
+If ACPI is initialized after the boot allocator has ended(the system
+state is not early boot), assert happens in acpi_os_zalloc_memory and
+acpi_boot_table_init will fail. So it needs to move end_boot_allocator
+after acpi_boot_table_init.
 
-Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
 Signed-off-by: Parth Dixit <parth.dixit@linaro.org>
 Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
 ---
- xen/arch/arm/arm64/smpboot.c |  7 ++++++-
- xen/arch/arm/psci.c          | 30 +++++++++++++++++++++++-------
- xen/arch/arm/smpboot.c       |  7 ++++++-
- 3 files changed, 35 insertions(+), 9 deletions(-)
+ xen/arch/arm/setup.c | 6 ++----
+ 1 file changed, 2 insertions(+), 4 deletions(-)
 
-diff --git a/xen/arch/arm/arm64/smpboot.c b/xen/arch/arm/arm64/smpboot.c
-index 7928f69..93cb6b3 100644
---- a/xen/arch/arm/arm64/smpboot.c
-+++ b/xen/arch/arm/arm64/smpboot.c
-@@ -7,6 +7,7 @@
- #include <xen/vmap.h>
- #include <asm/io.h>
- #include <asm/psci.h>
-+#include <asm/acpi.h>
- 
- struct smp_enable_ops {
-         int             (*prepare_cpu)(int);
-@@ -96,7 +97,11 @@ static int __init dt_arch_cpu_init(int cpu, struct dt_device_node *dn)
- 
- int __init arch_cpu_init(int cpu, struct dt_device_node *dn)
- {
--    return dt_arch_cpu_init(cpu, dn);
-+    if( acpi_disabled )
-+        return dt_arch_cpu_init(cpu, dn);
-+    else
-+        /* acpi only supports psci at present */
-+        return smp_psci_init(cpu);
+diff --git a/xen/arch/arm/setup.c b/xen/arch/arm/setup.c
+index 768312f..c15a09d 100644
+--- a/xen/arch/arm/setup.c
++++ b/xen/arch/arm/setup.c
+@@ -613,8 +613,6 @@ static void __init setup_mm(unsigned long dtb_paddr, size_t dtb_size)
+        allocator. */
+     init_xenheap_pages(pfn_to_paddr(xenheap_mfn_start),
+                        pfn_to_paddr(boot_mfn_start));
+-
+-    end_boot_allocator();
  }
+ #else /* CONFIG_ARM_64 */
+ static void __init setup_mm(unsigned long dtb_paddr, size_t dtb_size)
+@@ -682,8 +680,6 @@ static void __init setup_mm(unsigned long dtb_paddr, size_t dtb_size)
  
- int __init arch_cpu_up(int cpu)
-diff --git a/xen/arch/arm/psci.c b/xen/arch/arm/psci.c
-index d800cb6..dede0e1 100644
---- a/xen/arch/arm/psci.c
-+++ b/xen/arch/arm/psci.c
-@@ -22,6 +22,7 @@
- #include <xen/mm.h>
- #include <xen/smp.h>
- #include <asm/psci.h>
-+#include <asm/acpi.h>
- 
- /*
-  * While a 64-bit OS can make calls with SMC32 calling conventions, for
-@@ -86,6 +87,9 @@ int __init psci_init_0_1(void)
-     int ret;
-     const struct dt_device_node *psci;
- 
-+    if ( !acpi_disabled )
-+        return -EINVAL;
-+
-     psci = dt_find_compatible_node(NULL, NULL, "arm,psci");
-     if ( !psci )
-         return -EOPNOTSUPP;
-@@ -116,15 +120,24 @@ int __init psci_init_0_2(void)
-         { /* sentinel */ },
-     };
-     int ret;
--    const struct dt_device_node *psci;
- 
--    psci = dt_find_matching_node(NULL, psci_ids);
--    if ( !psci )
--        return -EOPNOTSUPP;
-+    if( acpi_disabled )
-+    {
-+        const struct dt_device_node *psci;
- 
--    ret = psci_is_smc_method(psci);
--    if ( ret )
--        return -EINVAL;
-+        psci = dt_find_matching_node(NULL, psci_ids);
-+        if ( !psci )
-+            return -EOPNOTSUPP;
-+
-+        ret = psci_is_smc_method(psci);
-+        if ( ret )
-+            return -EINVAL;
-+    }
-+    else
-+    {
-+        if ( acpi_psci_hvc_present() )
-+            return -EINVAL;
-+    }
- 
-     psci_ver = call_smc(PSCI_0_2_FN_PSCI_VERSION, 0, 0, 0);
- 
-@@ -148,6 +161,9 @@ int __init psci_init(void)
- {
-     int ret;
- 
-+    if( !acpi_disabled && !acpi_psci_present() )
-+        return -EOPNOTSUPP;
-+
-     ret = psci_init_0_2();
-     if ( ret )
-         ret = psci_init_0_1();
-diff --git a/xen/arch/arm/smpboot.c b/xen/arch/arm/smpboot.c
-index d115228..513f1f6 100644
---- a/xen/arch/arm/smpboot.c
-+++ b/xen/arch/arm/smpboot.c
-@@ -31,6 +31,7 @@
- #include <xen/console.h>
- #include <asm/gic.h>
- #include <asm/psci.h>
-+#include <asm/acpi.h>
- 
- cpumask_t cpu_online_map;
- cpumask_t cpu_present_map;
-@@ -247,7 +248,11 @@ void __init smp_init_cpus(void)
-         return;
-     }
- 
--    dt_smp_init_cpus();
-+    if ( acpi_disabled )
-+        dt_smp_init_cpus();
-+    else
-+        acpi_smp_init_cpus();
-+
+     setup_frametable_mappings(ram_start, ram_end);
+     max_page = PFN_DOWN(ram_end);
+-
+-    end_boot_allocator();
  }
+ #endif
  
- int __init
+@@ -757,6 +753,8 @@ void __init start_xen(unsigned long boot_phys_offset,
+     /* Parse the ACPI tables for possible boot-time configuration */
+     acpi_boot_table_init();
+ 
++    end_boot_allocator();
++
+     vm_init();
+     dt_unflatten_host_device_tree();
+ 
 -- 
 2.1.0
