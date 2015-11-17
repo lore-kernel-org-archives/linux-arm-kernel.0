@@ -1,35 +1,64 @@
 From: carlo@caione.org (Carlo Caione)
-Date: Tue, 17 Nov 2015 15:56:36 +0100
-Subject: [PATCH 1/7] ARM: DTS: meson8b: Extend L2 cache controller node
+Date: Tue, 17 Nov 2015 15:56:39 +0100
+Subject: [PATCH 4/7] ARM: DTS: meson8b: Enable reset controller
 In-Reply-To: <1447772202-12418-1-git-send-email-carlo@caione.org>
 References: <1447772202-12418-1-git-send-email-carlo@caione.org>
-Message-ID: <1447772202-12418-2-git-send-email-carlo@caione.org>
+Message-ID: <1447772202-12418-5-git-send-email-carlo@caione.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Carlo Caione <carlo@endlessm.com>
 
-This patch extends the L2 cache controller node for Amlogic Meson8b
-SoCs with some missing parameters.
+Extend the CPU nodes to use the reset controller.
 
 Signed-off-by: Carlo Caione <carlo@endlessm.com>
 ---
- arch/arm/boot/dts/meson8b.dtsi | 3 +++
- 1 file changed, 3 insertions(+)
+ arch/arm/boot/dts/meson8b.dtsi | 5 +++++
+ 1 file changed, 5 insertions(+)
 
 diff --git a/arch/arm/boot/dts/meson8b.dtsi b/arch/arm/boot/dts/meson8b.dtsi
-index 8bad557..745f0f9 100644
+index 745f0f9..977d55f 100644
 --- a/arch/arm/boot/dts/meson8b.dtsi
 +++ b/arch/arm/boot/dts/meson8b.dtsi
-@@ -93,6 +93,9 @@
- 		L2: l2-cache-controller at c4200000 {
- 			compatible = "arm,pl310-cache";
- 			reg = <0xc4200000 0x1000>;
-+			arm,data-latency = <3 3 3>;
-+			arm,tag-latency = <2 2 2>;
-+			arm,filter-ranges = <0x100000 0xc0000000>;
- 			cache-unified;
- 			cache-level = <2>;
+@@ -60,6 +60,7 @@
+ 			compatible = "arm,cortex-a5";
+ 			next-level-cache = <&L2>;
+ 			reg = <0x200>;
++			resets = <&clkc RST_CORE0>;
  		};
+ 
+ 		cpu at 201 {
+@@ -67,6 +68,7 @@
+ 			compatible = "arm,cortex-a5";
+ 			next-level-cache = <&L2>;
+ 			reg = <0x201>;
++			resets = <&clkc RST_CORE1>;
+ 		};
+ 
+ 		cpu at 202 {
+@@ -74,6 +76,7 @@
+ 			compatible = "arm,cortex-a5";
+ 			next-level-cache = <&L2>;
+ 			reg = <0x202>;
++			resets = <&clkc RST_CORE2>;
+ 		};
+ 
+ 		cpu at 203 {
+@@ -81,6 +84,7 @@
+ 			compatible = "arm,cortex-a5";
+ 			next-level-cache = <&L2>;
+ 			reg = <0x203>;
++			resets = <&clkc RST_CORE3>;
+ 		};
+ 	};
+ 
+@@ -153,6 +157,7 @@
+ 		};
+ 
+ 		clkc: clock-controller at c1104000 {
++			#reset-cells = <1>;
+ 			#clock-cells = <1>;
+ 			compatible = "amlogic,meson8b-clkc";
+ 			reg = <0xc1108000 0x4>, <0xc1104000 0x460>;
 -- 
 2.5.0
