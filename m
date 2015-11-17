@@ -1,41 +1,35 @@
-From: Chris.Brandt@renesas.com (Chris Brandt)
-Date: Tue, 17 Nov 2015 02:11:30 +0000
-Subject: [PATCH v3] ARM: xip: Use correct symbol for end of ROM marker
-In-Reply-To: <alpine.LFD.2.20.1511161730030.5826@knanqh.ubzr>
-References: <1447362108-4333-1-git-send-email-chris.brandt@renesas.com>
- <1447697140-4099-1-git-send-email-chris.brandt@renesas.com>
- <alpine.LFD.2.20.1511161515100.5826@knanqh.ubzr>
- <HK2PR06MB05619FACB3725B6F5B2299718A1E0@HK2PR06MB0561.apcprd06.prod.outlook.com>
- <alpine.LFD.2.20.1511161605070.5826@knanqh.ubzr>
- <HK2PR06MB056142FFDA4E99A764DF9ECB8A1E0@HK2PR06MB0561.apcprd06.prod.outlook.com>
- <alpine.LFD.2.20.1511161730030.5826@knanqh.ubzr>
-Message-ID: <HK2PR06MB05614D47A9C35ECB4CA72D3F8A1D0@HK2PR06MB0561.apcprd06.prod.outlook.com>
+From: hongzhou.yang@mediatek.com (Hongzhou Yang)
+Date: Mon, 16 Nov 2015 18:34:50 -0800
+Subject: [PATCH] pinctrl: mediatek: fix a memleak when do dt maps.
+Message-ID: <1447727690-15251-1-git-send-email-hongzhou.yang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->> So I've noticed. As far as I can tell, the XIP kernel stuff broke 
->> years ago.
->
-> That, of course, brings the question about keeping XIP around.
+configs will kmemdup to dup_configs in pictrl util function.
+So configs need to be freed.
 
-Well, as the email address suggests, I work for Renesas. And since
-the ARCH_R7S72100 has up to 10MB internal RAM and can XIP directly from
-QSPI Flash, that's a pretty simple BOM.
+Signed-off-by: Hongzhou Yang <hongzhou.yang@mediatek.com>
+---
+ Fix a memleak issue.
 
-I also revisted the AXFS file system (that never made it into the
-kernel) and like the kernel, required some fixing up.
-However, I can get a functioning and usefull ARMv7 system up and
-running in under 3MB of total system RAM.
-That's got to be worth something to someone ;)
+ drivers/pinctrl/mediatek/pinctrl-mtk-common.c |    3 ++-
+ 1 file changed, 2 insertions(+), 1 deletion(-)
 
-
-> Everything can be fixed at once with a new linker script.
-
-I do have to agree that a separate linker script would be a cleaner
-solution for the section arrangements.
-Of course, there are still some other XIP patches needed (like you can't
-use text areas as a temporary stack on boot), but the sections are a
-pretty logical place to start.
-
-
-Chris
+diff --git a/drivers/pinctrl/mediatek/pinctrl-mtk-common.c b/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
+index bbf0230..0000b5a 100644
+--- a/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
++++ b/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
+@@ -568,9 +568,10 @@ static int mtk_pctrl_dt_subnode_to_map(struct pinctrl_dev *pctldev,
+ 		}
+ 	}
+ 
+-	return 0;
++	err = 0;
+ 
+ fail:
++	kfree(configs);
+ 	return err;
+ }
+ 
+-- 
+1.7.9.5
