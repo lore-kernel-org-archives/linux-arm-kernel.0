@@ -1,146 +1,183 @@
 From: lina.iyer@linaro.org (Lina Iyer)
-Date: Tue, 17 Nov 2015 15:37:28 -0700
-Subject: [PATCH RFC 04/27] PM / Domains: make governor select deepest state
+Date: Tue, 17 Nov 2015 15:37:30 -0700
+Subject: [PATCH RFC 06/27] PM / Domains: add debugfs 'states' and 'timings'
+ seq files
 In-Reply-To: <1447799871-56374-1-git-send-email-lina.iyer@linaro.org>
 References: <1447799871-56374-1-git-send-email-lina.iyer@linaro.org>
-Message-ID: <1447799871-56374-5-git-send-email-lina.iyer@linaro.org>
+Message-ID: <1447799871-56374-7-git-send-email-lina.iyer@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Axel Haslam <ahaslam+renesas@baylibre.com>
+From: Marc Titinger <mtitinger@baylibre.com>
 
-Now that the structures of genpd can support multiple state definitions,
-add the logic in the governor to select the deepest possible state when
-powering down.
+This purpose of these debug seq-files is to help investigate
+generic power domain state transitions, based on device constraints.
+requires the "multiple states" patches from Axel Haslam.
 
-For this, create the new function power_down_ok_for_state which will test
-if a particular state will not violate the devices and sub-domains
-constraints.
+also rename 'summary' from 'pm_genpd_summary'
 
-default_power_down_ok is modified to try each state starting from the
-deepest until a valid state is found or there are no more states to test.
+sample output for 'states'
+==========================
 
-the resulting state will be valid until there are latency or constraint
-changes, thus, we can avoid looping every power_down, and use the cached
-results instead.
+  Domain             State name        Eval = 2200nter + Exit = Min_off_on (ns)
+-----------------------------------------------------------------------
+a53_pd               cluster-sleep-0      1500000+800000=2300000
+a57_pd               d1-retention         1000000+800000=1800000
+a57_pd               cluster-sleep-0      1500000+800000=2300000
 
-Signed-off-by: Axel Haslam <ahaslam+renesas@baylibre.com>
+sample output for 'timings'
+===========================
+
+    Domain Devices, Timings in ns
+                       Stop/Start Save/Restore, Effective
+----------------------------------------------------  ---
+a53_pd
+    /cpus/cpu at 100        1060  /660    1580  /1940  ,0 (cached stop)
+    /cpus/cpu at 101        1060  /740    1520  /1600  ,0 (cached stop)
+    /cpus/cpu at 102        880   /620    1380  /1780  ,0 (cached stop)
+    /cpus/cpu at 103        1080  /640    1340  /1600  ,0 (cached stop)
+a57_pd
+    /cpus/cpu at 0          1160  /740    3280  /1800  ,0 (cached stop)
+    /cpus/cpu at 1          780   /1400   1440  /2080  ,0 (cached stop)
+    /D1                  600   /540    7140  /6420  ,2199460 (cached stop)
+
+Signed-off-by: Marc Titinger <mtitinger@baylibre.com>
 ---
- drivers/base/power/domain_governor.c | 75 +++++++++++++++++++++---------------
- 1 file changed, 45 insertions(+), 30 deletions(-)
+ drivers/base/power/domain.c | 115 +++++++++++++++++++++++++++++++++++++++++---
+ 1 file changed, 107 insertions(+), 8 deletions(-)
 
-diff --git a/drivers/base/power/domain_governor.c b/drivers/base/power/domain_governor.c
-index b4984f5..ad69dc0 100644
---- a/drivers/base/power/domain_governor.c
-+++ b/drivers/base/power/domain_governor.c
-@@ -98,7 +98,8 @@ static bool default_stop_ok(struct device *dev)
-  *
-  * This routine must be executed under the PM domain's lock.
-  */
--static bool default_power_down_ok(struct dev_pm_domain *pd)
-+static bool power_down_ok_for_state(struct dev_pm_domain *pd,
-+				     unsigned int state)
- {
- 	struct generic_pm_domain *genpd = pd_to_genpd(pd);
- 	struct gpd_link *link;
-@@ -106,31 +107,9 @@ static bool default_power_down_ok(struct dev_pm_domain *pd)
- 	s64 min_off_time_ns;
- 	s64 off_on_time_ns;
+diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
+index c300293..9a0df09 100644
+--- a/drivers/base/power/domain.c
++++ b/drivers/base/power/domain.c
+@@ -2169,21 +2169,120 @@ static const struct file_operations pm_genpd_summary_fops = {
+ 	.release = single_release,
+ };
  
--	if (genpd->max_off_time_changed) {
--		struct gpd_link *link;
-+	off_on_time_ns = genpd->states[state].power_off_latency_ns +
-+		genpd->states[state].power_on_latency_ns;
- 
--		/*
--		 * We have to invalidate the cached results for the masters, so
--		 * use the observation that default_power_down_ok() is not
--		 * going to be called for any master until this instance
--		 * returns.
--		 */
--		list_for_each_entry(link, &genpd->slave_links, slave_node)
--			link->master->max_off_time_changed = true;
--
--		genpd->max_off_time_changed = false;
--		genpd->cached_power_down_ok = false;
--		genpd->max_off_time_ns = -1;
--	} else {
--		return genpd->cached_power_down_ok;
--	}
--
--	/*
--	 * Use the only available state, until multiple state support is added
--	 * to the governor.
--	 */
--	off_on_time_ns = genpd->states[0].power_off_latency_ns +
--				genpd->states[0].power_on_latency_ns;
- 
- 	min_off_time_ns = -1;
- 	/*
-@@ -193,8 +172,6 @@ static bool default_power_down_ok(struct dev_pm_domain *pd)
- 			min_off_time_ns = constraint_ns;
- 	}
- 
--	genpd->cached_power_down_ok = true;
--
- 	/*
- 	 * If the computed minimum device off time is negative, there are no
- 	 * latency constraints, so the domain can spend arbitrary time in the
-@@ -207,14 +184,52 @@ static bool default_power_down_ok(struct dev_pm_domain *pd)
- 	 * The difference between the computed minimum subdomain or device off
- 	 * time and the time needed to turn the domain on is the maximum
- 	 * theoretical time this domain can spend in the "off" state.
--	 * Use the only available state, until multiple state support is added
--	 * to the governor.
- 	 */
- 	genpd->max_off_time_ns = min_off_time_ns -
--		genpd->states[0].power_on_latency_ns;
-+			genpd->states[state].power_on_latency_ns;
- 	return true;
- }
- 
-+static bool default_power_down_ok(struct dev_pm_domain *pd)
++static int pm_genpd_states_show(struct seq_file *s, void *data)
 +{
-+	struct generic_pm_domain *genpd = pd_to_genpd(pd);
-+	unsigned int last_state_idx = genpd->state_count - 1;
-+	struct gpd_link *link;
-+	bool retval = false;
-+	unsigned int i;
++	struct generic_pm_domain *genpd;
 +
-+	/*
-+	 * if there was no change on max_off_time, we can return the
-+	 * cached value and we dont need to find a new target_state
-+	 */
-+	if (!genpd->max_off_time_changed)
-+		return genpd->cached_power_down_ok;
++	seq_puts(s,
++		 "\n  Domain             State name        Enter + Exit = Min_off_on (ns)\n");
++	seq_puts(s,
++		 "-----------------------------------------------------------------------\n");
 +
-+	/*
-+	 * We have to invalidate the cached results for the masters, so
-+	 * use the observation that default_power_down_ok() is not
-+	 * going to be called for any master until this instance
-+	 * returns.
-+	 */
-+	list_for_each_entry(link, &genpd->slave_links, slave_node)
-+		link->master->max_off_time_changed = true;
++	list_for_each_entry(genpd, &gpd_list, gpd_list_node) {
 +
-+	genpd->max_off_time_ns = -1;
-+	genpd->max_off_time_changed = false;
++		int i;
 +
-+	/* find a state to power down to, starting from the deepest */
-+	for (i = 0; i < genpd->state_count; i++) {
-+		if (power_down_ok_for_state(pd, last_state_idx - i)) {
-+			genpd->state_idx = last_state_idx - i;
-+			retval = true;
-+			break;
++		for (i = 0; i < genpd->state_count; i++) {
++			seq_printf(s, "%-20s %-20s %lld+%lld=%lld\n",
++				   genpd->name,
++				   genpd->states[i].name,
++				   genpd->states[i].power_on_latency_ns,
++				   genpd->states[i].power_off_latency_ns,
++				   genpd->states[i].power_off_latency_ns
++				   + genpd->states[i].power_on_latency_ns);
 +		}
++
 +	}
 +
-+	genpd->cached_power_down_ok = retval;
-+	return retval;
++	seq_puts(s, "\n");
++
++	return 0;
 +}
 +
- static bool always_on_power_down_ok(struct dev_pm_domain *domain)
++static int pm_genpd_states_open(struct inode *inode, struct file *file)
++{
++	return single_open(file, pm_genpd_states_show, NULL);
++}
++
++static const struct file_operations pm_genpd_states_fops = {
++	.open = pm_genpd_states_open,
++	.read = seq_read,
++	.llseek = seq_lseek,
++	.release = single_release,
++};
++
++static int pm_genpd_timing_show(struct seq_file *s, void *data)
++{
++	struct generic_pm_domain *genpd;
++
++	seq_puts(s, "\n    Domain Devices, Timings in ns\n");
++	seq_puts(s,
++		 "                       Stop/Start Save/Restore, Effective\n");
++	seq_puts(s,
++		 "----------------------------------------------------  ---\n");
++
++	list_for_each_entry(genpd, &gpd_list, gpd_list_node) {
++		struct pm_domain_data *pm_data;
++
++		seq_printf(s, "%-30s", genpd->name);
++
++		list_for_each_entry(pm_data, &genpd->dev_list, list_node) {
++			struct gpd_timing_data *td = &to_gpd_data(pm_data)->td;
++
++			if (!pm_data->dev->of_node)
++				continue;
++
++			seq_printf(s,
++				   "\n    %-20s %-6lld/%-6lld %-6lld/%-6lld,%lld %s%s",
++				   pm_data->dev->of_node->full_name,
++				   td->stop_latency_ns, td->start_latency_ns,
++				   td->save_state_latency_ns,
++				   td->restore_state_latency_ns,
++				   td->effective_constraint_ns,
++				   td->cached_stop_ok ? "(cached stop) " : "",
++				   td->constraint_changed ? "(changed)" : "");
++		}
++		seq_puts(s, "\n");
++	}
++	return 0;
++}
++
++static int pm_genpd_timing_open(struct inode *inode, struct file *file)
++{
++	return single_open(file, pm_genpd_timing_show, NULL);
++}
++
++static const struct file_operations pm_genpd_timing_fops = {
++	.open = pm_genpd_timing_open,
++	.read = seq_read,
++	.llseek = seq_lseek,
++	.release = single_release,
++};
++
+ static int __init pm_genpd_debug_init(void)
  {
- 	return false;
+-	struct dentry *d;
++	struct dentry *d = NULL;
+ 
+ 	pm_genpd_debugfs_dir = debugfs_create_dir("pm_genpd", NULL);
+ 
+-	if (!pm_genpd_debugfs_dir)
+-		return -ENOMEM;
++	if (pm_genpd_debugfs_dir)
++		d = debugfs_create_file("summary", S_IRUGO,
++				pm_genpd_debugfs_dir, NULL,
++				&pm_genpd_summary_fops);
++	if (d)
++		d = debugfs_create_file("states", S_IRUGO,
++				pm_genpd_debugfs_dir, NULL,
++				&pm_genpd_states_fops);
++	if (d)
++		d = debugfs_create_file("timings", S_IRUGO,
++				pm_genpd_debugfs_dir, NULL,
++				&pm_genpd_timing_fops);
++	if (d)
++		return 0;
+ 
+-	d = debugfs_create_file("pm_genpd_summary", S_IRUGO,
+-			pm_genpd_debugfs_dir, NULL, &pm_genpd_summary_fops);
+-	if (!d)
+-		return -ENOMEM;
++	debugfs_remove_recursive(pm_genpd_debugfs_dir /*can be null*/);
+ 
+-	return 0;
++	return -ENOMEM;
+ }
+ late_initcall(pm_genpd_debug_init);
+ 
 -- 
 2.1.4
