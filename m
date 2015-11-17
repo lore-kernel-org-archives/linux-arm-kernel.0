@@ -1,131 +1,38 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 17 Nov 2015 10:26:43 +0100
-Subject: [PATCH v2 00/12] UEFI boot and runtime services support for
- 32-bit ARM
-In-Reply-To: <CAD0U-hKfQvV_Dagc2BomK1wuJQG_-bsnLSyGcRduUN9zf30AHg@mail.gmail.com>
-References: <1447698757-8762-1-git-send-email-ard.biesheuvel@linaro.org>
- <CAD0U-hKfQvV_Dagc2BomK1wuJQG_-bsnLSyGcRduUN9zf30AHg@mail.gmail.com>
-Message-ID: <CAKv+Gu9i+t0zhLY=XqnHt9gX3OzhXGnqd9qfWy2wi0OinBzehg@mail.gmail.com>
+From: Suzuki.Poulose@arm.com (Suzuki K. Poulose)
+Date: Tue, 17 Nov 2015 09:27:19 +0000
+Subject: [PATCH] arm64: extract a field correctly in
+ cpuid_feature_extract_field()
+In-Reply-To: <CAKv+Gu9=zfocXVOsqHQHGu+afZisE_nZWCQ-bN5Fe_X=NacYHg@mail.gmail.com>
+References: <1447736739-4131-1-git-send-email-takahiro.akashi@linaro.org>
+ <CAKv+Gu9=zfocXVOsqHQHGu+afZisE_nZWCQ-bN5Fe_X=NacYHg@mail.gmail.com>
+Message-ID: <564AF2F7.9030106@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16 November 2015 at 20:50, Ryan Harkin <ryan.harkin@linaro.org> wrote:
-> Hi Ard,
->
-> On 16 November 2015 at 18:32, Ard Biesheuvel <ard.biesheuvel@linaro.org> wrote:
->> This series adds support for booting the 32-bit ARM kernel directly from
->> UEFI firmware using a builtin UEFI stub. It mostly reuses refactored arm64
->> code, and the differences (primarily the PE/COFF header and entry point and
->> the efi_create_mapping() implementation) are split out into arm64 and ARM
->> versions.
->>
->> Changes since v1:
->> - The primary difference between this version and the first one is that all
->>   prerequisites have either been merged, dropped for now (early FDT handling)
->>   or folded into this series (MEMBLOCK_NOMAP). IOW, this series can be applied
->>   on top of v4.4-rc1 directly.
->> - Dropped handling of UEFI permission bits. The reason is that the UEFIv2.5
->>   approach (EFI_PROPERTIES_TABLE) is flawed, and will be replaced by something
->>   better in the next version of the spec.
->>
->> Patch #1 adds support for the MEMBLOCK_NOMAP attribute to the generic memblock
->> code. Its purpose is to annotate memory regions as normal memory even if they
->> are removed from the kernel direct mapping.
->>
->> Patch #2 implements MEMBLOCK_NOMAP support for arm64
->>
->> Patch #3 updates the EFI init code to remove UEFI reserved regions and regions
->> used by runtime services from the kernel direct mapping
->>
->> Patch #4 splits off most of arch/arm64/kernel/efi.c into arch agnostic files
->> arm-init.c and arm-runtime.c under drivers/firmware/efi.
->>
->> Patch #5 refactors the code split off in patch #1 to isolate the arm64 specific
->> pieces, and change a couple of arm64-isms that ARM handles slightly differently.
->>
->> Patch #6 enables the generic early_ioremap and early_memremap implementations
->> for ARM. It reuses the kmap fixmap region, which is not used that early anyway.
->>
->> Patch #7 splits off the core functionality of create_mapping() into a new
->> function __create_mapping() that we can reuse for mapping UEFI runtime regions.
->>
->> Patch #8 factors out the early_alloc() routine so we can invoke __create_mapping
->> using another (late) allocator.
->>
->> Patch #9 implements create_mapping_late() that uses a late allocator.
->>
->> Patch #10 implements MEMBLOCK_NOMAP support for ARM
->>
->> Patch #11 implements the UEFI support in the kernel proper to probe the UEFI
->> memory map and map the runtime services.
->>
->> Patch #12 ties together all of the above, by implementing the UEFI stub, and
->> introducing the Kconfig symbols that allow all of this to be built.
->>
->> Instructions how to build and run the 32-bit ARM UEFI firmware can be found here:
->> https://wiki.linaro.org/LEG/UEFIforQEMU
->>
->> Ard Biesheuvel (11):
->>   mm/memblock: add MEMBLOCK_NOMAP attribute to memblock memory table
->>   arm64: only consider memblocks with NOMAP cleared for linear mapping
->>   arm64/efi: mark UEFI reserved regions as MEMBLOCK_NOMAP
->>   arm64/efi: split off EFI init and runtime code for reuse by 32-bit ARM
->>   arm64/efi: refactor EFI init and runtime code for reuse by 32-bit ARM
->>   ARM: add support for generic early_ioremap/early_memremap
->>   ARM: split off core mapping logic from create_mapping
->>   ARM: factor out allocation routine from __create_mapping()
->>   ARM: implement create_mapping_late() for EFI use
->>   ARM: only consider memblocks with NOMAP cleared for linear mapping
->>   ARM: wire up UEFI init and runtime support
->>
->> Roy Franz (1):
->>   ARM: add UEFI stub support
->>
->>  arch/arm/Kconfig                          |  20 ++
->>  arch/arm/boot/compressed/Makefile         |   4 +-
->>  arch/arm/boot/compressed/efi-header.S     | 130 ++++++++
->>  arch/arm/boot/compressed/head.S           |  54 +++-
->>  arch/arm/boot/compressed/vmlinux.lds.S    |   7 +
->>  arch/arm/include/asm/Kbuild               |   1 +
->>  arch/arm/include/asm/efi.h                |  90 ++++++
->>  arch/arm/include/asm/fixmap.h             |  29 +-
->>  arch/arm/include/asm/mach/map.h           |   1 +
->>  arch/arm/kernel/Makefile                  |   1 +
->>  arch/arm/kernel/efi.c                     |  38 +++
->>  arch/arm/kernel/setup.c                   |  10 +-
->>  arch/arm/mm/init.c                        |   5 +-
->>  arch/arm/mm/ioremap.c                     |   9 +
->>  arch/arm/mm/mmu.c                         | 110 ++++---
->>  arch/arm64/include/asm/efi.h              |  16 +
->>  arch/arm64/kernel/efi.c                   | 331 ++------------------
->>  arch/arm64/mm/init.c                      |   2 +-
->>  arch/arm64/mm/mmu.c                       |   2 +
->>  drivers/firmware/efi/Makefile             |   4 +
->>  drivers/firmware/efi/arm-init.c           | 197 ++++++++++++
->>  drivers/firmware/efi/arm-runtime.c        | 134 ++++++++
->>  drivers/firmware/efi/efi.c                |   2 +
->>  drivers/firmware/efi/libstub/Makefile     |   9 +
->>  drivers/firmware/efi/libstub/arm-stub.c   |   4 +-
->>  drivers/firmware/efi/libstub/arm32-stub.c |  85 +++++
->>  include/linux/memblock.h                  |   8 +
->>  mm/memblock.c                             |  28 ++
->>  28 files changed, 975 insertions(+), 356 deletions(-)
->>  create mode 100644 arch/arm/boot/compressed/efi-header.S
->>  create mode 100644 arch/arm/include/asm/efi.h
->>  create mode 100644 arch/arm/kernel/efi.c
->>  create mode 100644 drivers/firmware/efi/arm-init.c
->>  create mode 100644 drivers/firmware/efi/arm-runtime.c
->>  create mode 100644 drivers/firmware/efi/libstub/arm32-stub.c
->>
->> --
->> 1.9.1
+On 17/11/15 07:15, Ard Biesheuvel wrote:
+> On 17 November 2015 at 06:05, AKASHI Takahiro
+> <takahiro.akashi@linaro.org> wrote:
+>> Basically, cpuid_feature_extract_field() does shift-left and then
+>> shift-right to extract a specific field in an operand. But
+>> a shift-left'ed value is casted to 's64' and so a succeeding shift-right
+>> operation results in creating a sign-extended (and bogus) value.
 >>
 >
-> I've tested this series against 4.4-rc1 on Versatile Express TC2,
-> booting both as a "regular" kernel and as a EFI Stub on BusyBox and
-> OpenEmbedded.  So if it helps any, you can add my:
+> This is intentional. This function was created specifically for
+> extracting CPU feature fields, which are signed 4-bit quantities,
+> where positive values represent incremental functionality, and
+> negative values are reserved. This is poorly documented in the ARM ARM
+> though.
+
+Right. Akash's fix could break other pieces (like FP/ASIMD support in IDAA64PFR0
+where, 0xf => function not implemented).
+
 >
-> Tested-by: Ryan Harkin <ryan.harkin@linaro.org>
+> Using this function for extracting 4-bit unsigned values is a mistake.
 >
 
-Thanks Ryan!
+I will take a look at this one.
+
+Thanks for pointing it out.
+
+Suzuki
