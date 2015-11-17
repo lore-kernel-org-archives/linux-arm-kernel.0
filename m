@@ -1,93 +1,166 @@
-From: stefan.wahren@i2se.com (Stefan Wahren)
-Date: Tue, 17 Nov 2015 11:01:39 +0100 (CET)
-Subject: [PATCH v2 2/4] nvmem: NXP LPC18xx EEPROM memory NVMEM driver
-In-Reply-To: <5649F64B.5050407@vanguardiasur.com.ar>
-References: <1445275946-32653-1-git-send-email-ariel@vanguardiasur.com.ar>
- <1445275946-32653-3-git-send-email-ariel@vanguardiasur.com.ar>
- <56386E30.4060905@i2se.com> <5649F64B.5050407@vanguardiasur.com.ar>
-Message-ID: <1526033037.5264.1447754499675.JavaMail.open-xchange@oxbaltgw01.schlund.de>
+From: Zhiqiang.Hou@freescale.com (Zhiqiang Hou)
+Date: Tue, 17 Nov 2015 17:53:22 +0800
+Subject: [PATCHv8 5/5] ARM64: dts: add LS1043a-RDB board support
+In-Reply-To: <1447754002-40555-1-git-send-email-Zhiqiang.Hou@freescale.com>
+References: <1447754002-40555-1-git-send-email-Zhiqiang.Hou@freescale.com>
+Message-ID: <1447754002-40555-5-git-send-email-Zhiqiang.Hou@freescale.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Ariel,
+From: Shaohui Xie <Shaohui.Xie@freescale.com>
 
-> Ariel D'Alessandro <ariel@vanguardiasur.com.ar> hat am 16. November 2015 um
-> 16:29 geschrieben:
->
->
-> Hi Stefan,
->
-> Sorry for the delay.
->
-> El 03/11/15 a las 05:20, Stefan Wahren escribi?:
-> > Hi Ariel,
-> >
-> > Am 19.10.2015 um 19:32 schrieb Ariel D'Alessandro:
-> >> This commit adds support for NXP LPC18xx EEPROM memory found in NXP
-> >> LPC185x/3x and LPC435x/3x/2x/1x devices.
-> >>
-> >> EEPROM size is 16384 bytes and it can be entirely read and
-> >> written/erased with 1 word (4 bytes) granularity. The last page
-> >> (128 bytes) contains the EEPROM initialization data and is not writable.
-> >>
-> >> Erase/program time is less than 3ms. The EEPROM device requires a
-> >> ~1500 kHz clock (min 800 kHz, max 1600 kHz) that is generated dividing
-> >> the system bus clock by the division factor, contained in the divider
-> >> register (minus 1 encoded).
-> >>
-> >> Signed-off-by: Ariel D'Alessandro <ariel@vanguardiasur.com.ar>
-> >> ---
-> >> drivers/nvmem/Kconfig | 9 ++
-> >> drivers/nvmem/Makefile | 2 +
-> >> drivers/nvmem/lpc18xx_eeprom.c | 266
-> >> +++++++++++++++++++++++++++++++++++++++++
-> >> 3 files changed, 277 insertions(+)
-> >> create mode 100644 drivers/nvmem/lpc18xx_eeprom.c
-> >> [...]
-> >> +
-> >> +static int lpc18xx_eeprom_gather_write(void *context, const void *reg,
-> >> + size_t reg_size, const void *val,
-> >> + size_t val_size)
-> >> +{
-> >> + struct lpc18xx_eeprom_dev *eeprom = context;
-> >> + unsigned int offset = *(u32 *)reg;
-> >> +
-> >> + /* 3 ms of erase/program time between each writing */
-> >> + while (val_size) {
-> >> + writel(*(u32 *)val, eeprom->mem_base + offset);
-> >> + usleep_range(3000, 4000);
-> >
-> > i think it would be good to verify that the EEPROM write operation has
-> > really finished.
->
-> I'm not sure what are you proposing. Why could the write operation not
-> finish?
+Signed-off-by: Shaohui Xie <Shaohui.Xie@freescale.com>
+Signed-off-by: Mingkai Hu <Mingkai.Hu@freescale.com>
+Signed-off-by: Wenbin Song <Wenbin.Song@freescale.com>
+Signed-off-by: Hou Zhiqiang <B48286@freescale.com>
+---
+V8 - V7:
+ - Rebased on latest LS2080 patches.
 
-it's always good to keep in sync with the hardware. Here is an extract of
-chapter 
-"46.6.2.1 Writing and erase/programming" from the datasheet [1]:
+V6: V5 V4 V3
+ - No change.
 
-  During programming, the EEPROM is not available for other operations. To
-prevent
-  undesired loss in performance which would be caused by stalling the bus, the
-EEPROM
-  instead generates an error for AHB read/writes and APB writes when programming
-is
-  busy. In order to prevent the error response, the program operation finished
-interrupt
-  can be enabled or the interrupt status bit can be polled.
+V2:
+ - Remove the useless compatible "simple-bus" from cpld node.
 
-Please blame me if it doesn't apply.
+ arch/arm64/boot/dts/freescale/Makefile            |   1 +
+ arch/arm64/boot/dts/freescale/fsl-ls1043a-rdb.dts | 116 ++++++++++++++++++++++
+ 2 files changed, 117 insertions(+)
+ create mode 100644 arch/arm64/boot/dts/freescale/fsl-ls1043a-rdb.dts
 
-It's only a suggestion: How about checking the interrupt status bit for
-END_OF_PROG after the 3 ms sleep?
-
-Best regards
-Stefan
-
-[1] - http://www.nxp.com/documents/user_manual/UM10430.pdf
-
->
-> --
-> Ariel D'Alessandro, VanguardiaSur
-> www.vanguardiasur.com.ar
+diff --git a/arch/arm64/boot/dts/freescale/Makefile b/arch/arm64/boot/dts/freescale/Makefile
+index c4957a4..f3c2516 100644
+--- a/arch/arm64/boot/dts/freescale/Makefile
++++ b/arch/arm64/boot/dts/freescale/Makefile
+@@ -1,6 +1,7 @@
+ dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls2080a-qds.dtb
+ dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls2080a-rdb.dtb
+ dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls2080a-simu.dtb
++dtb-$(CONFIG_ARCH_LAYERSCAPE) += fsl-ls1043a-rdb.dtb
+  
+ always		:= $(dtb-y)
+ subdir-y	:= $(dts-dirs)
+diff --git a/arch/arm64/boot/dts/freescale/fsl-ls1043a-rdb.dts b/arch/arm64/boot/dts/freescale/fsl-ls1043a-rdb.dts
+new file mode 100644
+index 0000000..ce23557
+--- /dev/null
++++ b/arch/arm64/boot/dts/freescale/fsl-ls1043a-rdb.dts
+@@ -0,0 +1,116 @@
++/*
++ * Device Tree Include file for Freescale Layerscape-1043A family SoC.
++ *
++ * Copyright 2014-2015, Freescale Semiconductor
++ *
++ * Mingkai Hu <Mingkai.hu@freescale.com>
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPLv2 or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This library is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This library is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
++
++/dts-v1/;
++/include/ "fsl-ls1043a.dtsi"
++
++/ {
++	model = "LS1043A RDB Board";
++};
++
++&i2c0 {
++	status = "okay";
++	ina220 at 40 {
++		compatible = "ti,ina220";
++		reg = <0x40>;
++		shunt-resistor = <1000>;
++	};
++	adt7461a at 4c {
++		compatible = "adi,adt7461";
++		reg = <0x4c>;
++	};
++	eeprom at 52 {
++		compatible = "at24,24c512";
++		reg = <0x52>;
++	};
++	eeprom at 53 {
++		compatible = "at24,24c512";
++		reg = <0x53>;
++	};
++	rtc at 68 {
++		compatible = "pericom,pt7c4338";
++		reg = <0x68>;
++	};
++};
++
++&ifc {
++	status = "okay";
++	#address-cells = <2>;
++	#size-cells = <1>;
++	/* NOR, NAND Flashes and FPGA on board */
++	ranges = <0x0 0x0 0x0 0x60000000 0x08000000
++		  0x1 0x0 0x0 0x7e800000 0x00010000
++		  0x2 0x0 0x0 0x7fb00000 0x00000100>;
++
++		nor at 0,0 {
++			compatible = "cfi-flash";
++			#address-cells = <1>;
++			#size-cells = <1>;
++			reg = <0x0 0x0 0x8000000>;
++			bank-width = <2>;
++			device-width = <1>;
++		};
++
++		nand at 1,0 {
++			compatible = "fsl,ifc-nand";
++			#address-cells = <1>;
++			#size-cells = <1>;
++			reg = <0x1 0x0 0x10000>;
++		};
++
++		cpld: board-control at 2,0 {
++			compatible = "fsl,ls1043ardb-cpld";
++			reg = <0x2 0x0 0x0000100>;
++		};
++};
++
++&duart0 {
++	status = "okay";
++};
++
++&duart1 {
++	status = "okay";
++};
+-- 
+2.1.0.27.g96db324
