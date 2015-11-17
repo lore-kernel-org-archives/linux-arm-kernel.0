@@ -1,49 +1,100 @@
-From: dave.jiang@intel.com (Jiang, Dave)
-Date: Tue, 17 Nov 2015 19:28:50 +0000
-Subject: [RFC] User space to kernel space copy optimization
-In-Reply-To: <564A6472.5010100@codeaurora.org>
-References: <564A5057.9080203@codeaurora.org>
- <1447714667.83864.212.camel@intel.com> <564A6472.5010100@codeaurora.org>
-Message-ID: <1447788530.83864.217.camel@intel.com>
+From: robh@kernel.org (Rob Herring)
+Date: Tue, 17 Nov 2015 13:30:46 -0600
+Subject: [PATCH 5/7] Documentation: bindings: Add SMP related documentation
+In-Reply-To: <1447772202-12418-6-git-send-email-carlo@caione.org>
+References: <1447772202-12418-1-git-send-email-carlo@caione.org>
+ <1447772202-12418-6-git-send-email-carlo@caione.org>
+Message-ID: <20151117193046.GA31149@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 2015-11-16 at 23:19 +0000, Sinan Kaya wrote:
-> On 11/16/2015 5:57 PM, Jiang, Dave wrote:
-> > > One of the things I'm interested in is to use a memcpy capable
-> > > DMA
-> > > > engine HW to optimize user space and kernel space parameter
-> > > > copying.
-> > Have you looked at why NET_DMA was deprecated and using DMA engine
-> > to
-> > do kernel->user copy could be a problem?
-> > https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/com
-> > mit/
-> > ?id=77873803363c
-> > 
-> 
-> As far as I know, the problem was the TCP/IP stack trying to work on
-> a
-> buffer that was given to the DMA engine for moving. It was causing
-> stale
-> data problems.
-> 
-> The goal was to let DMA engine move the data while TCP/IP stack was
-> working on something else. Then, synchronize on a known point. Of
-> course, when above violation happens; things break.
-> 
-> Are you expecting a similar problem on user space to kernel space
-> interaction? I think the ownership buffers are pretty much defined,
-> isn't it?
+On Tue, Nov 17, 2015 at 03:56:40PM +0100, Carlo Caione wrote:
+> From: Carlo Caione <carlo@endlessm.com>
 
-No. I thought you were investigating both ways so thought you might
-need to be aware. 
+Please give some indication in the subject what platform this change is 
+for:
+
+dt-bindings: amlogic: ...
 
 > 
+> With this patch we add documentation for:
 > 
+> * power-management-unit: the PMU is used to bring up the cores during
+>   SMP operations
+> * sram: among other things the sram is used to store the first code
+>   executed by the core when it is powered up
+> * cpu-enable-method: the CPU enable method used by Amlogic Meson8b SoCs
+> 
+> Signed-off-by: Carlo Caione <carlo@endlessm.com>
+> ---
+>  .../devicetree/bindings/arm/amlogic/pmu.txt        | 16 +++++++
+>  .../devicetree/bindings/arm/amlogic/smp-sram.txt   | 32 +++++++++++++
+>  .../arm/cpu-enable-method/amlogic,meson8b-smp      | 53 ++++++++++++++++++++++
+
+
+> diff --git a/Documentation/devicetree/bindings/arm/cpu-enable-method/amlogic,meson8b-smp b/Documentation/devicetree/bindings/arm/cpu-enable-method/amlogic,meson8b-smp
+> new file mode 100644
+> index 0000000..95ee458b
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/arm/cpu-enable-method/amlogic,meson8b-smp
+> @@ -0,0 +1,53 @@
+> +=========================================================
+> +Secondary CPU enable-method "amlogic,meson8b-smp" binding
+> +=========================================================
+> +
+> +This document describes the "amlogic,meson8b-smp" method for enabling secondary
+> +CPUs. To apply to all CPUs, a single "amlogic,meson8b-smp" enable method should
+> +be defined in the "cpus" node.
+> +
+> +Enable method name:	"amlogic,meson8b-smp"
+
+Just add this to Documentation/devicetree/bindings/arm/cpus.txt and 
+remove this file.
+
+> +Compatible machines:	"amlogic,meson8b"
+> +Compatible CPUs:	"arm,cortex-a5"
+> +Related properties:	(none)
+> +
+> +Example:
+> +
+> +	cpus {
+> +		#address-cells = <1>;
+> +		#size-cells = <0>;
+> +		enable-method = "amlogic,meson8b-smp";
+> +
+> +		cpu at 200 {
+> +			device_type = "cpu";
+> +			compatible = "arm,cortex-a5";
+> +			next-level-cache = <&L2>;
+> +			reg = <0x200>;
+> +			resets = <&clkc RST_CORE0>;
+> +		};
+> +
+> +		cpu at 201 {
+> +			device_type = "cpu";
+> +			compatible = "arm,cortex-a5";
+> +			next-level-cache = <&L2>;
+> +			reg = <0x201>;
+> +			resets = <&clkc RST_CORE1>;
+> +		};
+> +
+> +		cpu at 202 {
+> +			device_type = "cpu";
+> +			compatible = "arm,cortex-a5";
+> +			next-level-cache = <&L2>;
+> +			reg = <0x202>;
+> +			resets = <&clkc RST_CORE2>;
+> +		};
+> +
+> +		cpu at 203 {
+> +			device_type = "cpu";
+> +			compatible = "arm,cortex-a5";
+> +			next-level-cache = <&L2>;
+> +			reg = <0x203>;
+> +			resets = <&clkc RST_CORE3>;
+> +		};
+> +	};
+> +
 > -- 
-> Sinan Kaya
-> Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center,
-> Inc.
-> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a
-> Linux Foundation Collaborative Project
+> 2.5.0
+> 
