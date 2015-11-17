@@ -1,52 +1,33 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 17 Nov 2015 16:08:36 +0100
-Subject: [PATCH] drm/exynos: fix building without CONFIG_PM_SLEEP
-Message-ID: <9569056.LBRz4v8fSj@wuerfel>
+Date: Tue, 17 Nov 2015 16:15:15 +0100
+Subject: [PATCHv2 0/3] Devicetree bindings for Ion
+In-Reply-To: <1447721855-7574-1-git-send-email-laura@labbott.name>
+References: <1447721855-7574-1-git-send-email-laura@labbott.name>
+Message-ID: <8990901.B0bMvlhTJH@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The runtime PM operations use the suspend/resume functions
-even when CONFIG_PM_SLEEP is not set, but this now fails
-for the exynos DRM driver:
+On Monday 16 November 2015 16:57:32 Laura Abbott wrote:
+> Hi,
+> 
+> This is another attempt at devicetree bindings for Ion. The big complaint from
+> v1 was that too much unnecessary data was being pushed into devicetree.
+> v2 takes a different approach of using just compatbile strings for the heaps.
+> This gets closer to the devicetree philosophy of describing just the hardware.
+> Each heap ultimately represents some kind of memory that exists in the system.
+> The compatible string indicates the match for how to handle the type of memory
+> on this system. The details like heap-id, name etc. are now pushed out to C
+> files. This makes Ion heaps look closer to something like a quirks framework.
+> (I'd argue this isn't a complete mischaracterization given the type of setup
+> Ion gets used for...) The one downside here is that this leads to more new
+> bindings for each board that gets added.
+> 
+> This version also includes a sample C file which shows what the structure
+> might look like. As always, your comments and reviews are appreciated.
 
-exynos_mixer.c:1289:61: error: 'exynos_mixer_resume' undeclared here (not in a function)
-  SET_RUNTIME_PM_OPS(exynos_mixer_suspend, exynos_mixer_resume, NULL)
+I'm still a bit unsure about the concept of hardwiring ion in the DT
+bindings. It's not just Linux-specific, it's specific to the implementation
+of one or two GPU drivers, and if we fix the bindings for Ion, we might
+never be able to migrate them away from this framework.
 
-This removes the #ifdef and instead marks the functions as
-__maybe_unused, which does the right thing in all cases and
-also looks nicer.
-
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: 	 ("drm/exynos: add pm_runtime to Mixer")
-
-diff --git a/drivers/gpu/drm/exynos/exynos_mixer.c b/drivers/gpu/drm/exynos/exynos_mixer.c
-index 7498c6e76a53..fcaf71df77c1 100644
---- a/drivers/gpu/drm/exynos/exynos_mixer.c
-+++ b/drivers/gpu/drm/exynos/exynos_mixer.c
-@@ -1230,8 +1230,7 @@ static int mixer_remove(struct platform_device *pdev)
- 	return 0;
- }
- 
--#ifdef CONFIG_PM_SLEEP
--static int exynos_mixer_suspend(struct device *dev)
-+static int __maybe_unused exynos_mixer_suspend(struct device *dev)
- {
- 	struct mixer_context *ctx = dev_get_drvdata(dev);
- 	struct mixer_resources *res = &ctx->mixer_res;
-@@ -1247,7 +1246,7 @@ static int exynos_mixer_suspend(struct device *dev)
- 	return 0;
- }
- 
--static int exynos_mixer_resume(struct device *dev)
-+static int __maybe_unused exynos_mixer_resume(struct device *dev)
- {
- 	struct mixer_context *ctx = dev_get_drvdata(dev);
- 	struct mixer_resources *res = &ctx->mixer_res;
-@@ -1283,7 +1282,6 @@ static int exynos_mixer_resume(struct device *dev)
- 
- 	return 0;
- }
--#endif
- 
- static const struct dev_pm_ops exynos_mixer_pm_ops = {
- 	SET_RUNTIME_PM_OPS(exynos_mixer_suspend, exynos_mixer_resume, NULL)
+	Arnd
