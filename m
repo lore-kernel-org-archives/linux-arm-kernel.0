@@ -1,69 +1,45 @@
-From: computersforpeace@gmail.com (Brian Norris)
-Date: Tue, 17 Nov 2015 10:30:36 -0800
-Subject: [PATCH 1/7] phy: brcmstb-sata: add missing of_node_put
-In-Reply-To: <alpine.DEB.2.10.1511171846120.2455@hadrien>
-References: <1447673600-8881-1-git-send-email-Julia.Lawall@lip6.fr>
- <1447673600-8881-2-git-send-email-Julia.Lawall@lip6.fr>
- <20151117013830.GV8456@google.com>
- <alpine.DEB.2.02.1511170711340.2045@localhost6.localdomain6>
- <20151117174430.GA8456@google.com>
- <alpine.DEB.2.10.1511171846120.2455@hadrien>
-Message-ID: <20151117183036.GF8456@google.com>
+From: suzuki.poulose@arm.com (Suzuki K. Poulose)
+Date: Tue, 17 Nov 2015 18:30:38 +0000
+Subject: [PATCH 0/2] ARM CoreLink CCI-550 PMU driver
+Message-ID: <1447785040-18599-1-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 17, 2015 at 06:48:39PM +0100, Julia Lawall wrote:
-> On Tue, 17 Nov 2015, Brian Norris wrote:
-> > On Tue, Nov 17, 2015 at 07:12:22AM +0100, Julia Lawall wrote:
-> > > On Mon, 16 Nov 2015, Brian Norris wrote:
-> > > > diff --git a/drivers/phy/phy-core.c b/drivers/phy/phy-core.c
-> > > > index fc48fac003a6..8df29caeeef9 100644
-> > > > --- a/drivers/phy/phy-core.c
-> > > > +++ b/drivers/phy/phy-core.c
-> > > > @@ -697,6 +697,7 @@ struct phy *phy_create(struct device *dev, struct device_node *node,
-> > > >  	phy->dev.class = phy_class;
-> > > >  	phy->dev.parent = dev;
-> > > >  	phy->dev.of_node = node ?: dev->of_node;
-> > > > +	of_node_get(phy->dev.of_node);
-> > >
-> > > Why not put of_node_get around dev->of_node?
-> >
-> > Like this?
-> >
-> > 	phy->dev.of_node = node ?: of_node_get(dev->of_node);
-> >
-> > Or this?
-> >
-> > 	phy->dev.of_node = of_node_get(node ?: dev->of_node);
-> >
-> > The former wouldn't do what I proposed; if this PHY device is created
-> > with a sub-node of 'dev' rather than dev->of_node, then the caller will
-> > pass it in as the 2nd argument to phy_create (i.e., 'node'), and then I
-> > expect it's the PHY core's responsibility to refcount it.
-> >
-> > I'd be fine with the latter. Looks a little better, I suppose.
-> 
-> I proposed it because I was worried that the of_node field could end up
-> containing something that had been freed.  But probably this is not
-> possible?
+This series adds the driver for CCI-550 PMU. CCI-550 PMU shares
+most of the attributes (i.e, counters, event code format, event
+codes, PMU register file) with that of CCI-500, except for an
+additional master interface support (MI6). So, we share most of
+the CCI-500 PMU bits except for a CCI-550 specific event validation.
 
-AIUI, the caller of phy_create() should already have a refcount on both
-'dev->of_node' and 'node' (if applicable), so nobody should be freeing
-it from underneath us right here. But *after* phy_create() returns,
-there's no guarantee the caller will hold a reference for us.
+Patch 1 : Renames the shared bits of CCI-500 PMU defintions to
+	  CCI5xx, including the Kconfig symbol, which will support both
+	  the PMUs.
 
-So even if it's ever possible, I'd consider it a bug in the caller, not
-in phy_create().
+Patch 2 : Adds the CCI550_PMU driver
 
-> If it is not possible, then the ?: in the function argument is
-> probably a bit ugly...
+Tested on fast model and an FPGA model.
 
-OK, then I'll go with my first proposal.
+This series is based on :
+	4.4-rc1 + [1] + [2]
+and is also available at :
+	git://linux-arm.org/linux-skp.git cci-updates/4.4-rc1
 
-> Is this something that should be checked for elsewhere?
+[1] arm-cci: simplify sysfs attr handling
+http://lists.infradead.org/pipermail/linux-arm-kernel/2015-September/373129.html
 
-I expect the same sort of problem shows up plenty of other places. I
-don't think many people use CONFIG_OF_DYNAMIC, so the effects of these
-failures probably aren't felt by many.
+[2] arm-cci500: Workaround pmu_event_set_period
+http://lists.infradead.org/pipermail/linux-arm-kernel/2015-November/385849.html
 
-Brian
+
+
+Suzuki K. Poulose (2):
+  arm-cci500: Rearrange PMU driver for code sharing with CCI-550 PMU
+  arm-cci: CoreLink CCI-550 PMU driver
+
+ Documentation/devicetree/bindings/arm/cci.txt |    2 +
+ drivers/bus/Kconfig                           |   10 +-
+ drivers/bus/arm-cci.c                         |  303 ++++++++++++++++---------
+ 3 files changed, 202 insertions(+), 113 deletions(-)
+
+-- 
+1.7.9.5
