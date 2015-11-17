@@ -1,24 +1,26 @@
 From: julien.grall@citrix.com (Julien Grall)
-Date: Tue, 17 Nov 2015 11:49:16 +0000
-Subject: [PATCH v3 33/62] arm/uart: Create generic uart initialization
- function
-In-Reply-To: <1447753261-7552-34-git-send-email-shannon.zhao@linaro.org>
+Date: Tue, 17 Nov 2015 11:52:40 +0000
+Subject: [PATCH v3 00/62] Add ACPI support for arm64 on Xen
+In-Reply-To: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
 References: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
- <1447753261-7552-34-git-send-email-shannon.zhao@linaro.org>
-Message-ID: <564B143C.1070901@citrix.com>
+Message-ID: <564B1508.3060703@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Shannon,
 
-On 17/11/15 09:40, shannon.zhao at linaro.org wrote:
-> From: Parth Dixit <parth.dixit@linaro.org>
+On 17/11/15 09:39, shannon.zhao at linaro.org wrote:
+> From: Shannon Zhao <shannon.zhao@linaro.org>
 > 
-> Rename dt-uart.c to arm-uart.c and create new generic uart init function.
-> Move dt_uart_init to arm_uart_init.
+> This patch set adds ACPI support for arm64 on Xen. The design document
+> could be found from [1].
 
-It's very hard to review a patch to move existing code and add new one.
-Please split it in 2.
+Thank you for your work on it. I think this series would benefits to be
+split in smaller series.
+
+I would do a first series which split DT code from common code. So we
+can get this code as soon as possible in Xen, avoid you to spend less
+time rebasing your us to be spammed with 62 patches for each new version.
 
 Regards,
 
