@@ -1,27 +1,39 @@
-From: greg@kroah.com (Greg KH)
-Date: Tue, 17 Nov 2015 13:51:10 -0800
-Subject: [PATCH] crypto: sun4i-ss: add missing statesize
-In-Reply-To: <20151117142742.GA10019@gondor.apana.org.au>
-References: <1447420229-17911-1-git-send-email-clabbe.montjoie@gmail.com>
- <20151117140938.GH9546@gondor.apana.org.au>
- <20151117142603.GA1669@Red>
- <20151117142742.GA10019@gondor.apana.org.au>
-Message-ID: <20151117215110.GB18515@kroah.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 17 Nov 2015 23:00:18 +0100
+Subject: [PATCH] USB: USB_OTG does not depend on PM
+In-Reply-To: <874mgkjoh2.fsf@saruman.tx.rr.com>
+References: <7521777.8ZmnT3AlIC@wuerfel> <874mgkjoh2.fsf@saruman.tx.rr.com>
+Message-ID: <5647698.81XCu85L5D@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 17, 2015 at 10:27:42PM +0800, Herbert Xu wrote:
-> On Tue, Nov 17, 2015 at 03:26:03PM +0100, LABBE Corentin wrote:
-> >
-> > I have lots of user reporting that they cannot use the device since it wont load.
-> > For me it need to go stable since it respect all "stable rules", simple, tested, minimal, and fix a real bug that bother people.
+On Tuesday 17 November 2015 15:38:33 Felipe Balbi wrote:
 > 
-> Well it will hit stable eventually.  I just don't feel comfortable
-> with sending it in straight away.
+> Arnd Bergmann <arnd@arndb.de> writes:
+> > USB_OTG initially depended on USB_SUSPEND, which was later turned into
+> > PM_RUNTIME and finally into PM. I don't know at what point the dependency
+> > became unnecessary but it appears to work fine without CONFIG_PM now.
+> >
+> > However, we get lots of warnings in randconfig kernels like:
+> >
+> > warning: (USB_OTG_FSM && FSL_USB2_OTG && USB_MV_OTG) selects USB_OTG which has unmet direct dependencies (USB_SUPPORT && USB && PM)
+> >
+> > whenever CONFIG_PM is disabled and something else selects USB_OTG.
+> > Let's just drop the dependency to avoid the warnings.
+> >
+> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> > ---
+> > I keep seeing this one in my ARM randconfig test
+> 
+> and how did you test this ? Did you make sure you're not breaking HNP ?
+> For HNP to happen we depend on a bus_suspend and bus_suspend is only
+> available on CONFIG_PM, unless that has changed.
+> 
+> Seems like you've only compile tested this patch, is that correct ?
 
-You can't send it in "straight away", the rule is that it has to be in
-Linus's tree first, don't worry, you are doing it correctly.
+Yes, I compile-tested only and inspected the code briefly without finding
+anything that contradicted this. It seems I missed the important part
+as you say, so we should instead add 'depends on PM' for the other
+symbols.
 
-thanks,
-
-greg k-h
+	Arnd
