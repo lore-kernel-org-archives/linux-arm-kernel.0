@@ -1,113 +1,52 @@
 From: suzuki.poulose@arm.com (Suzuki K. Poulose)
-Date: Tue, 17 Nov 2015 18:03:27 +0000
-Subject: [PATCHv3 5/5] arm-cci: CCI-500: Work around PMU counter writes
+Date: Tue, 17 Nov 2015 18:03:24 +0000
+Subject: [PATCHv3 2/5] arm-cci: Get the status of a counter
 In-Reply-To: <1447783407-18027-1-git-send-email-suzuki.poulose@arm.com>
 References: <1447783407-18027-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1447783407-18027-6-git-send-email-suzuki.poulose@arm.com>
+Message-ID: <1447783407-18027-3-git-send-email-suzuki.poulose@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The CCI PMU driver sets the event counter to the half of the maximum
-value(2^31) it can count before we start the counters via
-pmu_event_set_period(). This is done to give us the best chance to
-handle the overflow interrupt, taking care of extreme interrupt latencies.
-
-However, CCI-500 comes with advanced power saving schemes, which
-disables the clock to the event counters unless the counters are enabled to
-count (PMCR.CEN). This prevents the driver from writing the period to the
-counters before starting them.  Also, there is no way we can reset the
-individual event counter to 0 (PMCR.RST resets all the counters, losing
-their current readings). However the value of the counter is preserved and
-could be read back, when the counters are not enabled.
-
-So we cannot reliably use the counters and compute the number of events
-generated during the sampling period since we don't have the value of the
-counter at start.
-
-This patch works around this issue by changing writes to the counter
-with the following steps.
-
- 1) Disable all the counters (remembering any counters which were enabled)
- 2) Save the current event and program the target counter to count an
-    invalid event, which by spec is guaranteed to not-generate any events.
- 3) Enable the target counter.
- 4) Enable the CCI PMU
- 5) Write to the target counter.
- 6) Disable the CCI PMU and the target counter
- 7) Restore the event back on the target counter.
- 8) Restore the status of the all the counters
+Add helper routines to get the counter status and the event
+programmed on it.
 
 Cc: Punit Agrawal <punit.agrawal@arm.com>
 Cc: Mark Rutland <mark.rutland@arm.com>
 Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
 ---
- drivers/bus/arm-cci.c |   47 +++++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 47 insertions(+)
+Changes since V2:
+ - Rename pmu_counter_get_ctrl => pmu_counter_is_enabled()
+---
+ drivers/bus/arm-cci.c |   12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
 diff --git a/drivers/bus/arm-cci.c b/drivers/bus/arm-cci.c
-index 88b612f..6020a02 100644
+index f5793b9..48936c8 100644
 --- a/drivers/bus/arm-cci.c
 +++ b/drivers/bus/arm-cci.c
-@@ -835,6 +835,52 @@ static void __pmu_write_counter(struct cci_pmu *cci_pmu, u32 value, int idx)
- 	pmu_write_register(cci_pmu, value, idx, CCI_PMU_CNTR);
+@@ -652,11 +652,23 @@ static void pmu_enable_counter(struct cci_pmu *cci_pmu, int idx)
+ 	pmu_write_register(cci_pmu, 1, idx, CCI_PMU_CNTR_CTRL);
  }
  
-+#ifdef CONFIG_ARM_CCI500_PMU
-+
-+/*
-+ * CCI-500 has advanced power saving policies, which could gate the
-+ * clocks to the PMU counters, which makes the writes to them ineffective.
-+ * The only way to write to those counters is when the global counters
-+ * are enabled and the particular counter is enabled.
-+ *
-+ * So we do the following :
-+ *
-+ * 1) Disable all the PMU counters, saving their current state
-+ * 2) Save the programmed event, and write an invalid event code
-+ *    to the event control register for the counter, so that the
-+ *    counters are not modified.
-+ * 3) Enable the counter control for the counter.
-+ * 4) Enable the global PMU profiling
-+ * 5) Set the counter value
-+ * 6) Disable the counter, global PMU.
-+ * 7) Restore the event in the target counter
-+ * 8) Restore the status of the rest of the counters.
-+ *
-+ * We choose an event code which has very little chances of getting
-+ * assigned a valid code for step(2). We use the highest possible
-+ * event code (0x1f) for the master interface 0.
-+ */
-+#define CCI500_INVALID_EVENT	((CCI500_PORT_M0 << CCI500_PMU_EVENT_SOURCE_SHIFT) | \
-+				 (CCI500_PMU_EVENT_CODE_MASK << CCI500_PMU_EVENT_CODE_SHIFT))
-+static void cci500_pmu_write_counter(struct cci_pmu *cci_pmu, u32 value, int idx)
++static bool __maybe_unused
++pmu_counter_is_enabled(struct cci_pmu *cci_pmu, int idx)
 +{
-+	unsigned long mask[BITS_TO_LONGS(cci_pmu->num_cntrs)];
-+	u32 event;
-+
-+	pmu_disable_counters(cci_pmu, mask);
-+	event = pmu_get_event(cci_pmu, idx);
-+	pmu_set_event(cci_pmu, idx, CCI500_INVALID_EVENT);
-+	pmu_enable_counter(cci_pmu, idx);
-+	__cci_pmu_enable();
-+	__pmu_write_counter(cci_pmu, value, idx);
-+	__cci_pmu_disable();
-+	pmu_disable_counter(cci_pmu, idx);
-+	pmu_set_event(cci_pmu, idx, event);
-+	pmu_restore_counters(cci_pmu, mask);
++	return (pmu_read_register(cci_pmu, idx, CCI_PMU_CNTR_CTRL) & 0x1) != 0;
 +}
 +
-+#endif	/* CONFIG_ARM_CCI500_PMU */
-+
- static void pmu_write_counter(struct perf_event *event, u32 value)
+ static void pmu_set_event(struct cci_pmu *cci_pmu, int idx, unsigned long event)
  {
- 	struct cci_pmu *cci_pmu = to_cci_pmu(event->pmu);
-@@ -1422,6 +1468,7 @@ static struct cci_pmu_model cci_pmu_models[] = {
- 			},
- 		},
- 		.validate_hw_event = cci500_validate_hw_event,
-+		.write_counter	= cci500_pmu_write_counter,
- 	},
- #endif
- };
+ 	pmu_write_register(cci_pmu, event, idx, CCI_PMU_EVT_SEL);
+ }
+ 
++static u32 __maybe_unused
++pmu_get_event(struct cci_pmu *cci_pmu, int idx)
++{
++	return pmu_read_register(cci_pmu, idx, CCI_PMU_EVT_SEL);
++}
++
+ /*
+  * Returns the number of programmable counters actually implemented
+  * by the cci
 -- 
 1.7.9.5
