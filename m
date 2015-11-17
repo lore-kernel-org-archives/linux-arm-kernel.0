@@ -1,48 +1,41 @@
 From: lina.iyer@linaro.org (Lina Iyer)
-Date: Tue, 17 Nov 2015 15:37:46 -0700
-Subject: [PATCH RFC 22/27] drivers: firmware: PSCI: Export
- psci_has_ext_power_state()
+Date: Tue, 17 Nov 2015 15:37:44 -0700
+Subject: [PATCH RFC 20/27] Documentation: ARM: topology: 'cluster' property
+ for cluster nodes
 In-Reply-To: <1447799871-56374-1-git-send-email-lina.iyer@linaro.org>
 References: <1447799871-56374-1-git-send-email-lina.iyer@linaro.org>
-Message-ID: <1447799871-56374-23-git-send-email-lina.iyer@linaro.org>
+Message-ID: <1447799871-56374-21-git-send-email-lina.iyer@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Export psci_has_ext_power_state() to allow PSCI layers to determine and
-pass the correct state id in the format supported.
+Add a place holder phandle for a cluster to define cluster specific
+properties like PM domain definitions etc.
 
+Cc: Rob Herring <robherring2@gmail.com>
 Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
 Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
 ---
- drivers/firmware/psci.c | 2 +-
- include/linux/psci.h    | 1 +
- 2 files changed, 2 insertions(+), 1 deletion(-)
+ Documentation/devicetree/bindings/arm/topology.txt | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-diff --git a/drivers/firmware/psci.c b/drivers/firmware/psci.c
-index d24f35d..3fd42e4 100644
---- a/drivers/firmware/psci.c
-+++ b/drivers/firmware/psci.c
-@@ -83,7 +83,7 @@ static u32 psci_function_id[PSCI_FN_MAX];
+diff --git a/Documentation/devicetree/bindings/arm/topology.txt b/Documentation/devicetree/bindings/arm/topology.txt
+index 1061faf..12b4082 100644
+--- a/Documentation/devicetree/bindings/arm/topology.txt
++++ b/Documentation/devicetree/bindings/arm/topology.txt
+@@ -109,6 +109,14 @@ Bindings for cluster/cpu/thread nodes are defined as follows:
+ 	The cluster node name must be "clusterN" as described in 2.1 above.
+ 	A cluster node can not be a leaf node.
  
- static u32 psci_cpu_suspend_feature;
++	Properties for a cluster node are -
++
++	-cluster
++		Usage: Optional
++		Value type: <phandle>
++		Definition: a phandle to a cluster node that corresponds to
++			    this cluster.
++
+ 	A cluster node's child nodes must be:
  
--static inline bool psci_has_ext_power_state(void)
-+bool psci_has_ext_power_state(void)
- {
- 	return psci_cpu_suspend_feature &
- 				PSCI_1_0_FEATURES_CPU_SUSPEND_PF_MASK;
-diff --git a/include/linux/psci.h b/include/linux/psci.h
-index 12c4865..b9afbe2 100644
---- a/include/linux/psci.h
-+++ b/include/linux/psci.h
-@@ -23,6 +23,7 @@
- bool psci_tos_resident_on(int cpu);
- bool psci_power_state_loses_context(u32 state);
- bool psci_power_state_is_valid(u32 state);
-+bool psci_has_ext_power_state(void);
- 
- struct psci_operations {
- 	int (*cpu_suspend)(u32 state, unsigned long entry_point);
+ 	- one or more cluster nodes; or
 -- 
 2.1.4
