@@ -1,121 +1,62 @@
 From: lina.iyer@linaro.org (Lina Iyer)
-Date: Tue, 17 Nov 2015 15:37:45 -0700
-Subject: [PATCH RFC 21/27] drivers: cpu-pd: Parse topology to setup CPU PM
- domains
+Date: Tue, 17 Nov 2015 15:37:29 -0700
+Subject: [PATCH RFC 05/27] PM / Domains: remove old power on/off latencies.
 In-Reply-To: <1447799871-56374-1-git-send-email-lina.iyer@linaro.org>
 References: <1447799871-56374-1-git-send-email-lina.iyer@linaro.org>
-Message-ID: <1447799871-56374-22-git-send-email-lina.iyer@linaro.org>
+Message-ID: <1447799871-56374-6-git-send-email-lina.iyer@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Architectures that support CPU domain control in the firmware specify
-the domain heirarchy as part of the topology nodes. Parse and initialize
-domains from the topology node for such architectures.
+From: Axel Haslam <ahaslam+renesas@baylibre.com>
 
-Cc: Rob Herring <robherring2@gmail.com>
-Cc: Stephen Boyd <sboyd@codeaurora.org>
-Cc: Kevin Hilman <khilman@linaro.org>
-Cc: Ulf Hansson <ulf.hansson@linaro.org>
-Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
+Now that all known users have been converted to use state latencies,
+we can remove the latency field in the generic_pm_domain structure.
+
+Signed-off-by: Axel Haslam <ahaslam+renesas@baylibre.com>
 ---
- drivers/base/power/cpu-pd.c | 76 +++++++++++++++++++++++++++++++++++++++++++++
- include/linux/cpu-pd.h      |  1 +
- 2 files changed, 77 insertions(+)
+ drivers/base/power/domain.c | 15 ---------------
+ include/linux/pm_domain.h   |  2 --
+ 2 files changed, 17 deletions(-)
 
-diff --git a/drivers/base/power/cpu-pd.c b/drivers/base/power/cpu-pd.c
-index e331ae6..2872c18 100644
---- a/drivers/base/power/cpu-pd.c
-+++ b/drivers/base/power/cpu-pd.c
-@@ -429,3 +429,79 @@ int of_attach_cpu_pm_domain(struct device_node *dn)
- 	return 0;
- }
- EXPORT_SYMBOL(of_attach_cpu_pm_domain);
-+
-+static int of_parse_cpu_pd(struct device_node *cluster,
-+		const struct cpu_pd_ops *ops)
-+{
-+	struct device_node *domain_node;
-+	struct generic_pm_domain *genpd;
-+	char name[10];
-+	struct device_node *c;
-+	int i, ret;
-+
-+	for (i = 0; ; i++) {
-+		snprintf(name, sizeof(name), "cluster%d", i);
-+		c = of_get_child_by_name(cluster, name);
-+		if (!c)
-+			break;
-+
-+		domain_node = of_parse_phandle(c, "cluster", 0);
-+		if (!domain_node)
-+			return -1;
-+
-+		/* Initialize CPU PM domain domain at this level */
-+		genpd = of_init_cpu_pm_domain(domain_node, ops);
-+		if (IS_ERR(genpd))
-+			return -1;
-+
-+		/* Initialize and attach child domains */
-+		ret = of_parse_cpu_pd(c, ops);
-+
-+		/*
-+		 * Attach the domain to its parent after reading
-+		 * the children, so the mask of CPUs in this domain
-+		 * are setup correctly.
-+		 */
-+		if (!ret)
-+			of_attach_cpu_pm_domain(domain_node);
-+
-+		of_node_put(c);
-+		if (ret != 0)
-+			return ret;
-+	}
-+
-+	return 0;
-+}
-+
-+/**
-+ * of_setup_cpu_domain_topology() - Setup the CPU domains from the CPU
-+ * topology node in DT.
-+ *
-+ * @ops: The PM domain suspend/resume ops for all the domains in the topology
-+ */
-+int of_setup_cpu_domain_topology(const struct cpu_pd_ops *ops)
-+{
-+	struct device_node *cn, *map;
-+	int ret = 0;
-+
-+	cn = of_find_node_by_path("/cpus");
-+	if (!cn) {
-+		pr_err("No CPU information found in DT\n");
-+		return 0;
-+	}
-+
-+	map = of_get_child_by_name(cn, "cpu-map");
-+	if (!map)
-+		goto out;
-+
-+	ret = of_parse_cpu_pd(map, ops);
-+	if (ret != 0)
-+		goto out_map;
-+
-+out_map:
-+	of_node_put(map);
-+out:
-+	of_node_put(cn);
-+	return ret;
-+}
-+EXPORT_SYMBOL(of_setup_cpu_domain_topology);
-diff --git a/include/linux/cpu-pd.h b/include/linux/cpu-pd.h
-index 489ee2f..e8290db 100644
---- a/include/linux/cpu-pd.h
-+++ b/include/linux/cpu-pd.h
-@@ -32,4 +32,5 @@ struct cpu_pm_domain {
- struct generic_pm_domain *of_init_cpu_pm_domain(struct device_node *dn,
- 		const struct cpu_pd_ops *ops);
- int of_attach_cpu_pm_domain(struct device_node *dn);
-+int of_setup_cpu_domain_topology(const struct cpu_pd_ops *ops);
- #endif /* __CPU_PD_H__ */
+diff --git a/drivers/base/power/domain.c b/drivers/base/power/domain.c
+index 3fb4c93..c300293 100644
+--- a/drivers/base/power/domain.c
++++ b/drivers/base/power/domain.c
+@@ -1248,21 +1248,6 @@ static int genpd_alloc_states_data(struct generic_pm_domain *genpd,
+ 		genpd->states[i].param = st[i].param;
+ 	}
+ 
+-	/*
+-	 * Copy the latency values To keep compatibility with
+-	 * platforms that are not converted to use the multiple states.
+-	 * This will be removed once all platforms are converted to use
+-	 * multiple states. note that non converted platforms will use the
+-	 * default single off state.
+-	 */
+-	if (genpd->power_on_latency_ns != 0)
+-		genpd->states[0].power_on_latency_ns =
+-				genpd->power_on_latency_ns;
+-
+-	if (genpd->power_off_latency_ns != 0)
+-		genpd->states[0].power_off_latency_ns =
+-				genpd->power_off_latency_ns;
+-
+ 	genpd->state_count = st_count;
+ 
+ 	/* to save memory, Name allocation will happen if debug is enabled */
+diff --git a/include/linux/pm_domain.h b/include/linux/pm_domain.h
+index 15df24c..108a4b3 100644
+--- a/include/linux/pm_domain.h
++++ b/include/linux/pm_domain.h
+@@ -61,9 +61,7 @@ struct generic_pm_domain {
+ 	unsigned int prepared_count;	/* Suspend counter of prepared devices */
+ 	bool suspend_power_off;	/* Power status before system suspend */
+ 	int (*power_off)(struct generic_pm_domain *domain);
+-	s64 power_off_latency_ns;
+ 	int (*power_on)(struct generic_pm_domain *domain);
+-	s64 power_on_latency_ns;
+ 	struct gpd_dev_ops dev_ops;
+ 	s64 max_off_time_ns;	/* Maximum allowed "suspended" time. */
+ 	bool max_off_time_changed;
 -- 
 2.1.4
