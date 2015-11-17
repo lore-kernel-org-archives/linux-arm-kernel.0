@@ -1,85 +1,46 @@
-From: david.vrabel@citrix.com (David Vrabel)
-Date: Tue, 17 Nov 2015 16:32:50 +0000
-Subject: [Xen-devel] [PATCH 05/13] Xen: ARM: Add support for mapping
- platform device mmio
-In-Reply-To: <1447754231-7772-6-git-send-email-shannon.zhao@linaro.org>
-References: <1447754231-7772-1-git-send-email-shannon.zhao@linaro.org>
- <1447754231-7772-6-git-send-email-shannon.zhao@linaro.org>
-Message-ID: <564B56B2.4030901@citrix.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Tue, 17 Nov 2015 16:34:46 +0000
+Subject: [RFC PATCH] arm64: use non-global mappings for UEFI runtime
+ regions
+In-Reply-To: <20151117152558.GK12586@leverpostej>
+References: <1447750411-6424-1-git-send-email-ard.biesheuvel@linaro.org>
+ <20151117152558.GK12586@leverpostej>
+Message-ID: <20151117163445.GE30101@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/11/15 09:57, shannon.zhao at linaro.org wrote:
-> From: Shannon Zhao <shannon.zhao@linaro.org>
+On Tue, Nov 17, 2015 at 03:25:58PM +0000, Mark Rutland wrote:
+> On Tue, Nov 17, 2015 at 09:53:31AM +0100, Ard Biesheuvel wrote:
+> > As pointed out by Russell King in response to the proposed ARM version
+> > of this code, the sequence to switch between the UEFI runtime mapping
+> > and current's actual userland mapping (and vice versa) is potentially
+> > unsafe, since it leaves a time window between the switch to the new
+> > page tables and the TLB flush where speculative accesses may hit on
+> > stale global TLB entries.
 > 
-> Add a bus_notifier for platform bus device in order to map the device
-> mmio regions when DOM0 booting with ACPI.
-[...]
-> --- /dev/null
-> +++ b/drivers/xen/platform.c
-> @@ -0,0 +1,104 @@
-> +/*
-> + * Copyright (c) 2015, Linaro Limited.
-> + *
-> + * This program is free software; you can redistribute it and/or modify it
-> + * under the terms and conditions of the GNU General Public License,
-> + * version 2, as published by the Free Software Foundation.
-> + *
-> + * This program is distributed in the hope it will be useful, but WITHOUT
-> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-> + * more details.
-> + *
-> + * You should have received a copy of the GNU General Public License along with
-> + * this program; if not, write to the Free Software Foundation, Inc., 59 Temple
-> + * Place - Suite 330, Boston, MA 02111-1307 USA.
+> Wow, annoying that we missed that.
+> 
+> > So instead, use non-global mappings, and perform the switch via the
+> > ordinary ASID-aware context switch routines.
+> > 
+> > Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
+> 
+> From digging into the way the ASID allocator works, I believe this is
+> correct. FWIW:
+> 
+> Reviewed-by: Mark Rutland <mark.rutland@arm.com>
+> 
+> For backporting, I'm not sure that this is necessarily safe prior to
+> Will's rework of the ASID allocator. I think we can IPI in this context,
+> and it looks like the cpu_set_reserved_ttbr0() in flush_context() would
+> save us from the problem described above, but I may have missed
+> something.
+> 
+> Will, are you aware of anything that could bite us here?
 
-"You should have received a copy of the GNU General Public License
-along with this program.  If not, see <http://www.gnu.org/licenses/>."
+Can we guarantee that efi_virtmap_{load,unload} are called with interrupts
+enabled? Also, the old rollover code seems to rely on current->active_mm
+being the thing to switch to, so an incoming rollover might break things
+if we're running with the efi_mm.
 
-> + *
-> + * Author: Shannon Zhao <shannon.zhao@linaro.org>
-
-Omit this since it just becomes stale and git will know the correct
-authorship.
-
-> +static int xen_platform_notifier(struct notifier_block *nb,
-> +				 unsigned long action, void *data)
-> +{
-> +	struct platform_device *pdev = to_platform_device(data);
-> +	int r = 0;
-> +
-> +	if (!acpi_disabled && (action == BUS_NOTIFY_ADD_DEVICE))
-> +		r = xen_map_platform_device_mmio(pdev);
-
-Why even register the notifier if acpi_disabled?
-
-> +
-> +	if (r)
-> +	{
-> +		dev_err(&pdev->dev, "Failed to add_to_physmap device (%s) mmio!\n",
-> +			pdev->name);
-> +		return NOTIFY_OK;
-
-Return NOTIFY_BAD here?  The device will be unusable.
-
-> +	}
-> +
-> +	return NOTIFY_DONE;
-> +}
-> +
-> +static struct notifier_block platform_device_nb = {
-> +	.notifier_call = xen_platform_notifier,
-> +};
-> +
-> +static int __init register_xen_platform_notifier(void)
-> +{
-> +	if (!xen_initial_domain())
-> +		return 0;
-> +
-> +	return bus_register_notifier(&platform_bus_type, &platform_device_nb);
-
-Why only platform busses?  What about PCI devices?  Where will they get
-added to dom0's physmap?
-
-David
+Will
