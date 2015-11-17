@@ -1,52 +1,61 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 17 Nov 2015 23:14:25 +0100
-Subject: [PATCH v6 06/19] arm64:ilp32: share signal structures between
- ILP32 and LP64 ABIs
-In-Reply-To: <1447795019-30176-7-git-send-email-ynorov@caviumnetworks.com>
-References: <1447795019-30176-1-git-send-email-ynorov@caviumnetworks.com>
- <1447795019-30176-7-git-send-email-ynorov@caviumnetworks.com>
-Message-ID: <5805597.NtPXVqS0W3@wuerfel>
+From: hongzhou.yang@mediatek.com (Hongzhou Yang)
+Date: Tue, 17 Nov 2015 14:17:13 -0800
+Subject: [PATCH] pinctrl: mediatek: Add get_direction support.
+Message-ID: <1447798633-24586-1-git-send-email-hongzhou.yang@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 18 November 2015 00:16:46 Yury Norov wrote:
-> 
-> +/* For ILP32, sigset should be the same size fields as LP64 so use
-> +   unsigned long long. */
-> +#ifdef __ILP32__
-> +#define __SIGSET_INNER_TYPE __extension__ unsigned long long
-> +#define _NSIG_BPW 64
-> +
-> +# ifdef __AARCH64EB__
-> +#  define __SIGNAL_INNER(type, field)          \
-> +       __extension__ struct {                  \
-> +               int __pad_##field;              \
-> +               type field;                     \
-> +       } __attribute__((aligned(8)))
-> +# else
-> +#  define __SIGNAL_INNER(type, field)          \
-> +       __extension__ struct {                  \
-> +               type field;                     \
-> +               int __pad_##field;              \
-> +       } __attribute__((aligned(8)))
-> +# endif
-> +
-> +# define __SIGACTION_HANDLER(field)            \
-> +       __SIGNAL_INNER(__sighandler_t, field)
-> +
-> +#define __SIGACTION_FLAGS(field)               \
-> +       __extension__ unsigned long long field
-> +
-> +#define __SIGACTION_RESTORER(field)            \
-> +       __SIGNAL_INNER(__sigrestore_t, field)
-> +
-> +#endif
+Since Linux gpio framework return 0 for output, 1 for input.
+But HW use 0 stands for input, and 1 stands for output.
+So use negative to correct it.
 
-Ah, I missed that in the comments for patch 14. I would think that
-it makes sense to share siginfo_t with the 64-bit version, when the
-normal compat_siginfo_t doesn't work, but I see no point in
-changing compat_sigset_t: There is nothing architecture specific
-in that, so you can just use the arm32 version of that, which simplifies
-both the kernel and libc sides.
+And gpio_chip.get is used to get input value, no need to get
+output value, so removing it.
 
-	Arnd
+Signed-off-by: Hongzhou Yang <hongzhou.yang@mediatek.com>
+---
+ Base on v4.4-rc1, resend it.
+ Add get direction support.
+ Remove gpio_chip.get value for output direction.
+
+ drivers/pinctrl/mediatek/pinctrl-mtk-common.c |   11 ++++-------
+ 1 file changed, 4 insertions(+), 7 deletions(-)
+
+diff --git a/drivers/pinctrl/mediatek/pinctrl-mtk-common.c b/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
+index f307f1d..5c71727 100644
+--- a/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
++++ b/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
+@@ -747,7 +747,7 @@ static int mtk_gpio_get_direction(struct gpio_chip *chip, unsigned offset)
+ 	reg_addr =  mtk_get_port(pctl, offset) + pctl->devdata->dir_offset;
+ 	bit = BIT(offset & 0xf);
+ 	regmap_read(pctl->regmap1, reg_addr, &read_val);
+-	return !!(read_val & bit);
++	return !(read_val & bit);
+ }
+ 
+ static int mtk_gpio_get(struct gpio_chip *chip, unsigned offset)
+@@ -757,12 +757,8 @@ static int mtk_gpio_get(struct gpio_chip *chip, unsigned offset)
+ 	unsigned int read_val = 0;
+ 	struct mtk_pinctrl *pctl = dev_get_drvdata(chip->dev);
+ 
+-	if (mtk_gpio_get_direction(chip, offset))
+-		reg_addr = mtk_get_port(pctl, offset) +
+-			pctl->devdata->dout_offset;
+-	else
+-		reg_addr = mtk_get_port(pctl, offset) +
+-			pctl->devdata->din_offset;
++	reg_addr = mtk_get_port(pctl, offset) +
++		pctl->devdata->din_offset;
+ 
+ 	bit = BIT(offset & 0xf);
+ 	regmap_read(pctl->regmap1, reg_addr, &read_val);
+@@ -997,6 +993,7 @@ static struct gpio_chip mtk_gpio_chip = {
+ 	.owner			= THIS_MODULE,
+ 	.request		= gpiochip_generic_request,
+ 	.free			= gpiochip_generic_free,
++	.get_direction		= mtk_gpio_get_direction,
+ 	.direction_input	= mtk_gpio_direction_input,
+ 	.direction_output	= mtk_gpio_direction_output,
+ 	.get			= mtk_gpio_get,
+-- 
+1.7.9.5
