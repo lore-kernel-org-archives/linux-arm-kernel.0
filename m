@@ -1,27 +1,49 @@
-From: horms@verge.net.au (Simon Horman)
-Date: Tue, 17 Nov 2015 11:28:32 -0800
-Subject: [PATCH 0/4] ARM: shmobile: Use SoC specific binding for
- rcar-dmac nodes
-In-Reply-To: <1447381431-2255-1-git-send-email-horms+renesas@verge.net.au>
-References: <1447381431-2255-1-git-send-email-horms+renesas@verge.net.au>
-Message-ID: <20151117192832.GN23979@verge.net.au>
+From: dave.jiang@intel.com (Jiang, Dave)
+Date: Tue, 17 Nov 2015 19:28:50 +0000
+Subject: [RFC] User space to kernel space copy optimization
+In-Reply-To: <564A6472.5010100@codeaurora.org>
+References: <564A5057.9080203@codeaurora.org>
+ <1447714667.83864.212.camel@intel.com> <564A6472.5010100@codeaurora.org>
+Message-ID: <1447788530.83864.217.camel@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 13, 2015 at 11:23:47AM +0900, Simon Horman wrote:
-> Use the new SoC specific binding for rcar-dmac and the generic
-> binding as a fall-back in the r8a779[0134] device trees.
+On Mon, 2015-11-16 at 23:19 +0000, Sinan Kaya wrote:
+> On 11/16/2015 5:57 PM, Jiang, Dave wrote:
+> > > One of the things I'm interested in is to use a memcpy capable
+> > > DMA
+> > > > engine HW to optimize user space and kernel space parameter
+> > > > copying.
+> > Have you looked at why NET_DMA was deprecated and using DMA engine
+> > to
+> > do kernel->user copy could be a problem?
+> > https://git.kernel.org/cgit/linux/kernel/git/torvalds/linux.git/com
+> > mit/
+> > ?id=77873803363c
+> > 
 > 
-> In general Renesas hardware is not documented to the extent where the
-> relationship between IP blocks on different SoCs can be assumed although
-> they may appear to operate the same way. Furthermore the documentation
-> typically does not specify a version for individual IP blocks. For these
-> reasons a convention of using the SoC name in place of a version and
-> providing SoC-specific compat strings has been adopted.
+> As far as I know, the problem was the TCP/IP stack trying to work on
+> a
+> buffer that was given to the DMA engine for moving. It was causing
+> stale
+> data problems.
 > 
-> Although not universally liked this convention is used in the bindings for
-> most drivers for Renesas hardware. The purpose of this patch is to
-> update the Renesas R-Car DMA Controller nodes to follow this convention.
+> The goal was to let DMA engine move the data while TCP/IP stack was
+> working on something else. Then, synchronize on a known point. Of
+> course, when above violation happens; things break.
+> 
+> Are you expecting a similar problem on user space to kernel space
+> interaction? I think the ownership buffers are pretty much defined,
+> isn't it?
 
-As the bindings in question have now been accepted
-I have queued up this series for v4.5.
+No. I thought you were investigating both ways so thought you might
+need to be aware. 
+
+> 
+> 
+> -- 
+> Sinan Kaya
+> Qualcomm Technologies, Inc. on behalf of Qualcomm Innovation Center,
+> Inc.
+> Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum, a
+> Linux Foundation Collaborative Project
