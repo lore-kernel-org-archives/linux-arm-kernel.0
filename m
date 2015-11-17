@@ -1,30 +1,31 @@
-From: mchehab@osg.samsung.com (Mauro Carvalho Chehab)
-Date: Tue, 17 Nov 2015 07:16:56 -0200
-Subject: [PATCH v2 3/3] [media] include/media: move platform_data to
- linux/platform_data/media
-In-Reply-To: <4084946.Zz4s9XrKbs@wuerfel>
-References: <013152dcb3d4eaddd39aa4a37868430567bdc2d6.1447671420.git.mchehab@osg.samsung.com>
- <b8bd73bedde742571b1ab8a7c0917a732dbf2ca1.1447671420.git.mchehab@osg.samsung.com>
- <4084946.Zz4s9XrKbs@wuerfel>
-Message-ID: <20151117071656.498013a9@recife.lan>
+From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
+Date: Tue, 17 Nov 2015 10:18:37 +0100
+Subject: [PATCH v2 05/12] arm64/efi: refactor EFI init and runtime code
+ for reuse by 32-bit ARM
+In-Reply-To: <20151116184919.GD8644@n2100.arm.linux.org.uk>
+References: <1447698757-8762-1-git-send-email-ard.biesheuvel@linaro.org>
+ <1447698757-8762-6-git-send-email-ard.biesheuvel@linaro.org>
+ <20151116184919.GD8644@n2100.arm.linux.org.uk>
+Message-ID: <CAKv+Gu9+Pw3vv-EiZYg1zNmoBYPqcWY=XECzTcVV8WtY5WjpTg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Em Mon, 16 Nov 2015 13:28:10 +0100
-Arnd Bergmann <arnd@arndb.de> escreveu:
+On 16 November 2015 at 19:49, Russell King - ARM Linux
+<linux@arm.linux.org.uk> wrote:
+> On Mon, Nov 16, 2015 at 07:32:30PM +0100, Ard Biesheuvel wrote:
+>> diff --git a/drivers/firmware/efi/arm-runtime.c b/drivers/firmware/efi/arm-runtime.c
+>> index e62ee5df96ca..ad11ba6964f6 100644
+>> --- a/drivers/firmware/efi/arm-runtime.c
+>> +++ b/drivers/firmware/efi/arm-runtime.c
+>> @@ -23,18 +23,15 @@
+>>
+>>  #include <asm/cacheflush.h>
+>>  #include <asm/efi.h>
+>> -#include <asm/tlbflush.h>
+>> -#include <asm/mmu_context.h>
+>> +#include <asm/io.h>
+>
+> Shouldn't this be linux/io.h ?
+>
 
-> I think we can also move some of the existing platform data headers to the same
-> place, but that could be a separate patch:
-> 
-> $ git grep linux/platform_data drivers/media/
-> drivers/media/platform/coda/coda-common.c:#include <linux/platform_data/coda.h>
-> drivers/media/platform/soc_camera/mx2_camera.c:#include <linux/platform_data/camera-mx2.h>
-> drivers/media/platform/soc_camera/mx3_camera.c:#include <linux/platform_data/camera-mx3.h>
-> drivers/media/platform/soc_camera/mx3_camera.c:#include <linux/platform_data/dma-imx.h>
-> drivers/media/platform/soc_camera/pxa_camera.c:#include <linux/platform_data/camera-pxa.h>
-> drivers/media/platform/soc_camera/rcar_vin.c:#include <linux/platform_data/camera-rcar.h>
-
-Fair enough. Just sent a separate patch to address that.
-
-Regards,
-Mauro
+Yes. Will change it for v3
