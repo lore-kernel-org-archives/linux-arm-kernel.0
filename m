@@ -1,36 +1,27 @@
-From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 17 Nov 2015 12:00:06 +0100
-Subject: [PATCH v2 3/9] includes: dt-bindings: Add STM32F429 pinctrl DT
- bindings
-In-Reply-To: <CALszF6B7928hpMDMH0_wmo-MakZX7sofO85aeBwv-aCLBHnrkA@mail.gmail.com>
-References: <1445102604-11502-1-git-send-email-mcoquelin.stm32@gmail.com>
- <1445102604-11502-4-git-send-email-mcoquelin.stm32@gmail.com>
- <56261239.5030007@linaro.org>
- <CALszF6DQ2G_Fzhk_SP+A0i_Z4mg9etdf1NcfQS3cPpB0zNot-w@mail.gmail.com>
- <CACRpkdashSEWL+KFgD+MmdoZwjXnsXpxy-MPmDciO9n87+6BBQ@mail.gmail.com>
- <CALszF6B7928hpMDMH0_wmo-MakZX7sofO85aeBwv-aCLBHnrkA@mail.gmail.com>
-Message-ID: <CACRpkdZTHcROza2diFCOj783T1zfbkd=Dov3PUzDV2U35qEFXA@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 17 Nov 2015 11:58:52 +0100
+Subject: [PATCH] [media] move media platform data to
+ linux/platform_data/media
+In-Reply-To: <564B04CF.1090507@gmail.com>
+References: <4d99e49726942dc4d6a6ee1debf6665b2b47908b.1447751746.git.mchehab@osg.samsung.com>
+ <7319142.Cp8MurgLWk@wuerfel> <564B04CF.1090507@gmail.com>
+Message-ID: <17824361.38HLxMaChG@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 6, 2015 at 1:57 PM, Maxime Coquelin
-<mcoquelin.stm32@gmail.com> wrote:
+On Tuesday 17 November 2015 11:43:27 Anton Bondarenko wrote:
+> On 17.11.2015 10:23, Arnd Bergmann wrote:
+> > On Tuesday 17 November 2015 07:15:59 Mauro Carvalho Chehab wrote:
+> >> Now that media has its own subdirectory inside platform_data,
+> >> let's move the headers that are already there to such subdir.
+> >>
+> >>
+> >
+> > Acked-by: Arnd Bergmann <arnd@arndb.de>
+> 
+> Why does dma-imx.h also moved? It's the generic file, not a media specific.
 
-> Thinking again at it, I persist to believe have the defines makes it
-> easier to use.
-> With auto-completion, it makes it faster and less error prone to
-> select the right
-> alternate function without parsing the datasheet.
+You are right, I missed that when I looked at the patch. That part
+of the patch needs to be taken out.
 
-Auto-completion ... should we design our source code to
-fit certain editors?
-
-> But as these defines are not actually used on driver side, maybe I
-> could just move
-> them to the dts directory?
-
-No strong opinion there. include/dt-bindings is part of the bindings
-documentation actually so I guess it goes there.
-
-Yours,
-Linus Walleij
+	Arnd
