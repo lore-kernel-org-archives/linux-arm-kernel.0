@@ -1,77 +1,102 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 17 Nov 2015 09:53:31 +0100
-Subject: [RFC PATCH] arm64: use non-global mappings for UEFI runtime regions
-Message-ID: <1447750411-6424-1-git-send-email-ard.biesheuvel@linaro.org>
+From: mpa@pengutronix.de (Markus Pargmann)
+Date: Tue, 17 Nov 2015 09:54:03 +0100
+Subject: [PATCH v8 3/8] ARM: dt: Binding documentation for imx25
+ touchscreen controller
+In-Reply-To: <20151116141609.GA6167@rob-hp-laptop>
+References: <1447675269-8831-1-git-send-email-mpa@pengutronix.de>
+ <1447675269-8831-4-git-send-email-mpa@pengutronix.de>
+ <20151116141609.GA6167@rob-hp-laptop>
+Message-ID: <2927401.FasWCEIy4W@adelgunde>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As pointed out by Russell King in response to the proposed ARM version
-of this code, the sequence to switch between the UEFI runtime mapping
-and current's actual userland mapping (and vice versa) is potentially
-unsafe, since it leaves a time window between the switch to the new
-page tables and the TLB flush where speculative accesses may hit on
-stale global TLB entries.
+Hi,
 
-So instead, use non-global mappings, and perform the switch via the
-ordinary ASID-aware context switch routines.
+On Monday 16 November 2015 08:16:09 Rob Herring wrote:
+> On Mon, Nov 16, 2015 at 01:01:04PM +0100, Markus Pargmann wrote:
+> > This is the touchscreen conversion queue binding documentation. It uses
+> > the shared imx25 ADC.
+> > 
+> > Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
+> > ---
+> > 
+> > Notes:
+> >     Changes in v5:
+> >      - Fix signed/unsigned comparison
+> >      - Fix unused variable settling_time by putting it in the correct argument list
+> >      - Use continous conversion queue with the repeat feature and a proper
+> >        repeat-wait. Previously the touchscreen caused massive number of interrupts.
+> > 
+> >  .../bindings/input/touchscreen/fsl-mx25-tcq.txt    | 29 ++++++++++++++++++++++
+> >  1 file changed, 29 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/input/touchscreen/fsl-mx25-tcq.txt
+> > 
+> > diff --git a/Documentation/devicetree/bindings/input/touchscreen/fsl-mx25-tcq.txt b/Documentation/devicetree/bindings/input/touchscreen/fsl-mx25-tcq.txt
+> > new file mode 100644
+> > index 000000000000..89ab47a3acc1
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/input/touchscreen/fsl-mx25-tcq.txt
+> > @@ -0,0 +1,29 @@
+> > +Freescale mx25 TS conversion queue module
+> > +
+> > +mx25 touchscreen conversion queue module which controls the ADC unit of the
+> > +mx25 for attached touchscreens.
+> > +
+> > +Required properties:
+> > + - compatible: Should be "fsl,imx25-tcq".
+> > + - reg: Memory range of the device.
+> > + - interrupts: Should be the interrupt number associated with this module within
+> > +   the tscadc unit (<0>).
+> > + - interrupt-parent: Should be a phandle to the tscadc unit.
+> > + - fsl,wires: Should be '<4>' or '<5>'
+> > +
+> > +Optional properties:
+> > + - fsl,pen-debounce: Pen debounce time in nanoseconds.
+> > + - fsl,pen-threshold: Pen-down threshold for the touchscreen.
+> > + - fsl,settling-time: Settling time in nanoseconds.
+> 
+> Don't we have standard properties for these? If not, these should have 
+> units.
 
-Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
----
- arch/arm64/include/asm/mmu_context.h |  2 +-
- arch/arm64/kernel/efi.c              | 14 +++++---------
- 2 files changed, 6 insertions(+), 10 deletions(-)
+I just found properties like 'debounce_timeout' without a vendor prefix but
+they don't seem to be standard properties:
+	Documentation/devicetree/bindings/input/touchscreen/brcm,iproc-touchscreen.txt
 
-diff --git a/arch/arm64/include/asm/mmu_context.h b/arch/arm64/include/asm/mmu_context.h
-index c0e87898ba96..24165784b803 100644
---- a/arch/arm64/include/asm/mmu_context.h
-+++ b/arch/arm64/include/asm/mmu_context.h
-@@ -101,7 +101,7 @@ static inline void cpu_set_default_tcr_t0sz(void)
- #define destroy_context(mm)		do { } while(0)
- void check_and_switch_context(struct mm_struct *mm, unsigned int cpu);
- 
--#define init_new_context(tsk,mm)	({ atomic64_set(&mm->context.id, 0); 0; })
-+#define init_new_context(tsk,mm)	({ atomic64_set(&(mm)->context.id, 0); 0; })
- 
- /*
-  * This is called when "tsk" is about to enter lazy TLB mode.
-diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
-index de46b50f4cdf..fc5508e0df57 100644
---- a/arch/arm64/kernel/efi.c
-+++ b/arch/arm64/kernel/efi.c
-@@ -224,6 +224,8 @@ static bool __init efi_virtmap_init(void)
- {
- 	efi_memory_desc_t *md;
- 
-+	init_new_context(NULL, &efi_mm);
-+
- 	for_each_efi_memory_desc(&memmap, md) {
- 		u64 paddr, npages, size;
- 		pgprot_t prot;
-@@ -254,7 +256,8 @@ static bool __init efi_virtmap_init(void)
- 		else
- 			prot = PAGE_KERNEL;
- 
--		create_pgd_mapping(&efi_mm, paddr, md->virt_addr, size, prot);
-+		create_pgd_mapping(&efi_mm, paddr, md->virt_addr, size,
-+				   __pgprot(pgprot_val(prot) | PTE_NG));
- 	}
- 	return true;
- }
-@@ -329,14 +332,7 @@ core_initcall(arm64_dmi_init);
- 
- static void efi_set_pgd(struct mm_struct *mm)
- {
--	if (mm == &init_mm)
--		cpu_set_reserved_ttbr0();
--	else
--		cpu_switch_mm(mm->pgd, mm);
--
--	local_flush_tlb_all();
--	if (icache_is_aivivt())
--		__local_flush_icache_all();
-+	switch_mm(NULL, mm, NULL);
- }
- 
- void efi_virtmap_load(void)
+For fsl,pen-threshold there is no real unit. It is the ratio between the
+internal voltage reference and the measured voltage after one of the
+touchscreen plates was precharged. However there are limits, I will add a
+better description.
+
+> 
+> I don't understand the difference between debounce and settling times. 
+> Please make that clear in the doc.
+
+The settling time is the time waited after charging the touchscreen plates. The
+pen-debounce time is a delay after a pen down has been detected.
+
+Best Regards,
+
+Markus
+
+> 
+> Rob
+> 
+> 
+> _______________________________________________
+> linux-arm-kernel mailing list
+> linux-arm-kernel at lists.infradead.org
+> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+> 
+
 -- 
-1.9.1
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 819 bytes
+Desc: This is a digitally signed message part.
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151117/097d61ed/attachment.sig>
