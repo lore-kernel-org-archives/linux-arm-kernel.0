@@ -1,39 +1,81 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Tue, 17 Nov 2015 13:41:54 +0000
-Subject: [PATCH RESEND] arm64: berlin: add the pinctrl dependency for
- Marvell Berlin SoCs
-In-Reply-To: <1447670170-7597-1-git-send-email-jszhang@marvell.com>
-References: <1447670170-7597-1-git-send-email-jszhang@marvell.com>
-Message-ID: <20151117134154.GJ6556@e104818-lin.cambridge.arm.com>
+From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
+Date: Tue, 17 Nov 2015 13:43:48 +0000
+Subject: [PATCH v2 10/11] PM / Hibernate: clean cached pages on
+ architectures that require it
+In-Reply-To: <20151117131345.GA11870@amd>
+References: <1445966960-31724-1-git-send-email-james.morse@arm.com>
+ <2039611.PJaFlk1sMi@vostro.rjw.lan>
+ <20151112114705.GA2657@red-moon>
+ <3180507.pKM8OzKjXO@vostro.rjw.lan>
+ <20151117123807.GA22216@red-moon> <20151117131345.GA11870@amd>
+Message-ID: <20151117134348.GB22216@red-moon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 16, 2015 at 06:36:10PM +0800, Jisheng Zhang wrote:
-> This is to add the pinctrl dependency for Marvell Berlin SoCs.
+On Tue, Nov 17, 2015 at 02:13:45PM +0100, Pavel Machek wrote:
+> On Tue 2015-11-17 12:38:07, Lorenzo Pieralisi wrote:
+> > [Cc'ed maintainers of affected arches]
+> > 
+> > On Sat, Nov 14, 2015 at 12:38:50AM +0100, Rafael J. Wysocki wrote:
+> > > On Thursday, November 12, 2015 11:47:05 AM Lorenzo Pieralisi wrote:
+> > > > On Thu, Nov 12, 2015 at 01:48:32AM +0100, Rafael J. Wysocki wrote:
+> > > > > On Wednesday, November 11, 2015 11:40:39 AM Lorenzo Pieralisi wrote:
+> > > > > > Hi Pavel, Rafael,
+> > > > > > 
+> > > > > > Do you have any feedback on this patch ?
+> > > > > > 
+> > > > > > It is fundamental to this series and affects Hibernate core code so if you
+> > > > > > have any feedback that would be much appreciated.
+> > > > > 
+> > > > > I'm really not familiar with the flush_icache_range() interface.
+> > > > > 
+> > > > > What exactly does it do?
+> > > > 
+> > > > It is used to sync a memory range that is written into (eg loading
+> > > > modules, copying from snapshot is basically the same thing, reads from
+> > > > storage and restore pages that might well be executable code), in particular
+> > > > to sync the I-cache and the D-cache, eg on arm64 the page that the snapshot
+> > > > code is copying might be executable code that has to be cleaned from the
+> > > > D-cache so that it is made visible to the I-cache.
+> > > > 
+> > > > On x86 it is a NOP AFAIK.
+> > > 
+> > > If that's the case, I have no problems with this change as long as the code
+> > > works on architectures with non-trivial flush_icache_range().
+> > 
+> > I Cc'ed the respective arches maintainers, it should work (it may
+> > make resuming a bit slower, owing to the cache syncing), problem is
+> > that we have no way of testing it on platforms other than arm/arm64.
 > 
-> Signed-off-by: Jisheng Zhang <jszhang@marvell.com>
-> Acked-by: Sebastian Hesselbarth <sebastian.hesselbarth@gmail.com>
-> Acked-by: Antoine Tenart <antoine.tenart@free-electrons.com>
-> Acked-by: Linus Walleij <linus.walleij@linaro.org>
-> ---
->  this small patch is missed:
->  http://lists.infradead.org/pipermail/linux-arm-kernel/2015-October/378638.html
->  arch/arm64/Kconfig.platforms | 1 +
->  1 file changed, 1 insertion(+)
+> Sure you can find x86 and x86-64 machine near you?
+
+Yes but on x86 this patch is a NOP so testing on it does not really
+add much.
+
+> And as hibernation is only supported on x86 and arm, that should be
+> ok.
+
+And what are the other arches swsusp_arch_{suspend/resume} there for
+then ?
+
+I just had a look at arch code implementing swsusp_arch_{suspend/resume},
+if it has to work only on x86 and arm we will give it a spin on arm (32-bit)
+platforms (I really doubt it is going to be even noticeable) and we
+are done.
+
+> Or just merge it to the next and let the world do testing for you...
+
+I wanted to ask before because I am not sure that's something people
+regularly test and I do not want to end up with regressions that might
+have been prevented by just enquiring, I am not sure that's something
+-next will help detect either.
+
+> > How do you want us to go on about this ? Should we add a config option
+> > to prevent calling flush_icache_range() on all platforms (where it
+> > is not a nop) ?
 > 
-> diff --git a/arch/arm64/Kconfig.platforms b/arch/arm64/Kconfig.platforms
-> index 4043c35..905d308 100644
-> --- a/arch/arm64/Kconfig.platforms
-> +++ b/arch/arm64/Kconfig.platforms
-> @@ -9,6 +9,7 @@ config ARCH_BERLIN
->  	bool "Marvell Berlin SoC Family"
->  	select ARCH_REQUIRE_GPIOLIB
->  	select DW_APB_ICTL
-> +	select PINCTRL
->  	help
->  	  This enables support for Marvell Berlin SoC Family
+> Config option is definitely not an option ;-).
 
-Cc'ing arm-soc.
+Ok, thanks.
 
--- 
-Catalin
+Lorenzo
