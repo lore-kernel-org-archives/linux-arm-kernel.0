@@ -1,90 +1,29 @@
-From: mpa@pengutronix.de (Markus Pargmann)
-Date: Tue, 17 Nov 2015 08:46:46 +0100
-Subject: [PATCH v8 2/8] ARM: dt: Binding documentation for imx25 GCQ
-In-Reply-To: <20151116151255.GA8302@rob-hp-laptop>
-References: <1447675269-8831-1-git-send-email-mpa@pengutronix.de>
- <1447675269-8831-3-git-send-email-mpa@pengutronix.de>
- <20151116151255.GA8302@rob-hp-laptop>
-Message-ID: <4058817.g5sPMk6tRK@adelgunde>
+From: chunfeng.yun@mediatek.com (chunfeng yun)
+Date: Tue, 17 Nov 2015 15:50:02 +0800
+Subject: [PATCH] phy: phy-mt65xx-usb3: fix test fail of HS receiver
+ sensitivity
+In-Reply-To: <20151117061619.GB18947@kroah.com>
+References: <1447740178-29588-1-git-send-email-chunfeng.yun@mediatek.com>
+ <20151117061619.GB18947@kroah.com>
+Message-ID: <1447746602.18917.8.camel@mhfsdcap03>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 16 November 2015 09:12:55 Rob Herring wrote:
-> On Mon, Nov 16, 2015 at 01:01:03PM +0100, Markus Pargmann wrote:
-> > The documentation describes the bindings for the imx25 GCQ unit which is
-> > essentially a generic conversion queue using the imx25 ADC.
+Hi,
+On Mon, 2015-11-16 at 22:16 -0800, Greg KH wrote:
+> On Tue, Nov 17, 2015 at 02:02:58PM +0800, Chunfeng Yun wrote:
+> > when use the default value 8 of RG_USB20_SQTH, the HS receiver
+> > sensitivity test of HQA will fail, set it as 2 to fix up the
+> > issue.
 > > 
-> > Signed-off-by: Markus Pargmann <mpa@pengutronix.de>
-> > ---
-> > 
-> > Notes:
-> >     Changes in v6:
-> >      - Changed bindings to use adc-refp and adc-refn. Also a bit of cleanup in the
-> >        setup routine.
-> >     
-> >     Changes in v5:
-> >      - Fixed locking
-> >      - Removed module owner
-> > 
-> >  .../devicetree/bindings/iio/adc/fsl,imx25-gcq.txt  | 58 ++++++++++++++++++++++
-> >  1 file changed, 58 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/iio/adc/fsl,imx25-gcq.txt
-> > 
-> > diff --git a/Documentation/devicetree/bindings/iio/adc/fsl,imx25-gcq.txt b/Documentation/devicetree/bindings/iio/adc/fsl,imx25-gcq.txt
-> > new file mode 100644
-> > index 000000000000..b0866d36a307
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/iio/adc/fsl,imx25-gcq.txt
+> > Change-Id: Ia5bdbbfc8ebb170d3ef26007e665b7350b6d28ab
 > 
+> What is this field for?  Hint, it should never be there for a patch you
+> submit upstream as it means nothing...
 > 
-> > +Optional properties for subnodes:
-> > + - fsl,adc-refp: specifies the positive reference input as defined in
-> > +     <dt-bindings/iio/adc/fsl-imx25-gcq.h>
-> > + - fsl,adc-refn: specifies the negative reference input as defined in
-> > +     <dt-bindings/iio/adc/fsl-imx25-gcq.h>
-> 
-> This header should be part of this commit.
+I'm sorry for forgetting remove it. 
+And I will remove change-id in next round after review
 
-Thanks, will fix that.
+Thanks a lot
 
-Best Regards,
-
-Markus
-
-> 
-> > +
-> > +Example:
-> > +
-> > +	adc: adc at 50030800 {
-> > +		compatible = "fsl,imx25-gcq";
-> > +		reg = <0x50030800 0x60>;
-> > +		interrupt-parent = <&tscadc>;
-> > +		interrupts = <1>;
-> > +		#address-cells = <1>;
-> > +		#size-cells = <0>;
-> > +
-> > +		inaux at 5 {
-> > +			reg = <5>;
-> > +			fsl,adc-refp = <MX25_ADC_REFP_INT>;
-> > +			fsl,adc-refn = <MX25_ADC_REFN_NGND>;
-> > +		};
-> > +	};
-> 
-> _______________________________________________
-> linux-arm-kernel mailing list
-> linux-arm-kernel at lists.infradead.org
-> http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
-> 
-
--- 
-Pengutronix e.K.                           |                             |
-Industrial Linux Solutions                 | http://www.pengutronix.de/  |
-Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
-Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: signature.asc
-Type: application/pgp-signature
-Size: 819 bytes
-Desc: This is a digitally signed message part.
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151117/767fe754/attachment.sig>
+> greg k-h
