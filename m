@@ -1,71 +1,23 @@
-From: sergei.shtylyov@cogentembedded.com (Sergei Shtylyov)
-Date: Tue, 17 Nov 2015 13:58:35 +0300
-Subject: [PATCH v12 1/3] dt-bindings: Add a binding for Mediatek xHCI host
- controller
-In-Reply-To: <1447751921-26746-2-git-send-email-chunfeng.yun@mediatek.com>
-References: <1447751921-26746-1-git-send-email-chunfeng.yun@mediatek.com>
- <1447751921-26746-2-git-send-email-chunfeng.yun@mediatek.com>
-Message-ID: <564B085B.7060706@cogentembedded.com>
+From: JBeulich@suse.com (Jan Beulich)
+Date: Tue, 17 Nov 2015 03:59:47 -0700
+Subject: [PATCH v3 00/62] Add ACPI support for arm64 on Xen
+In-Reply-To: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
+References: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
+Message-ID: <564B16B302000078000B5D0D@prv-mh.provo.novell.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello.
+>>> On 17.11.15 at 10:39, <shannon.zhao@linaro.org> wrote:
+> From: Shannon Zhao <shannon.zhao@linaro.org>
+> 
+> This patch set adds ACPI support for arm64 on Xen. The design document
+> could be found from [1].
 
-On 11/17/2015 12:18 PM, Chunfeng Yun wrote:
+Thank you very much for sending a 62-patch series to a set of people
+without tailoring the distribution list for the individual patches. I'm
+pretty sure I mentioned this to you before - please be mindful of the
+workload you impose on other people by sending out patches. I'll
+make limited effort of identifying the patches I actually need to look
+at, but the risk of patches getting discarded is going to be there.
 
-> add a DT binding documentation of xHCI host controller for the
-> MT8173 SoC from Mediatek.
->
-> Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
-> ---
->   .../devicetree/bindings/usb/mt8173-xhci.txt        | 51 ++++++++++++++++++++++
->   1 file changed, 51 insertions(+)
->   create mode 100644 Documentation/devicetree/bindings/usb/mt8173-xhci.txt
->
-> diff --git a/Documentation/devicetree/bindings/usb/mt8173-xhci.txt b/Documentation/devicetree/bindings/usb/mt8173-xhci.txt
-> new file mode 100644
-> index 0000000..a78f20b
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/usb/mt8173-xhci.txt
-> @@ -0,0 +1,51 @@
-> +MT8173 xHCI
-> +
-> +The device node for Mediatek SOC USB3.0 host controller
-> +
-> +Required properties:
-> + - compatible : should contain "mediatek,mt8173-xhci"
-> + - reg : specifies physical base address and size of the registers,
-> +	the first one for MAC, the second for IPPC
-> + - interrupts : interrupt used by the controller
-> + - power-domains : a phandle to USB power domain node to control USB's
-> +	mtcmos
-
-    What's that?
-
-> + - vusb33-supply : regulator of USB avdd3.3v
-> +
-> + - clocks : a list of phandle + clock-specifier pairs, one for each
-> +	entry in clock-names
-> + - clock-names : must contain
-> +	"sys_ck": for clock of xHCI MAC
-> +	"wakeup_deb_p0": for USB wakeup debounce clock of port0
-> +	"wakeup_deb_p0": for USB wakeup debounce clock of port1
-
-    "wakeup_deb_p1"?
-
-> +
-> + - phys : a list of phandle + phy specifier pairs
-> +
-> +Optional properties:
-> + - mediatek,wakeup-src : 1: ip sleep wakeup mode; 2: line state wakeup
-                                ^^ IP?
-
-> +	mode;
-> + - mediatek,syscon-wakeup : phandle to syscon used to access USB wakeup
-> +	control register, it depends on "mediatek,wakeup-src".
-> + - vbus-supply : reference to the VBUS regulator;
-> + - usb3-lpm-capable : supports USB3.0 LPM
-
-[...]
-
-MBR, Sergei
+Jan
