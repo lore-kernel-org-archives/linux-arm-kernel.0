@@ -1,47 +1,48 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Mon, 16 Nov 2015 19:48:56 -0500 (EST)
-Subject: [PATCH v3] ARM: xip: Use correct symbol for end of ROM marker
-In-Reply-To: <HK2PR06MB056142FFDA4E99A764DF9ECB8A1E0@HK2PR06MB0561.apcprd06.prod.outlook.com>
-References: <1447362108-4333-1-git-send-email-chris.brandt@renesas.com>
- <1447697140-4099-1-git-send-email-chris.brandt@renesas.com>
- <alpine.LFD.2.20.1511161515100.5826@knanqh.ubzr>
- <HK2PR06MB05619FACB3725B6F5B2299718A1E0@HK2PR06MB0561.apcprd06.prod.outlook.com>
- <alpine.LFD.2.20.1511161605070.5826@knanqh.ubzr>
- <HK2PR06MB056142FFDA4E99A764DF9ECB8A1E0@HK2PR06MB0561.apcprd06.prod.outlook.com>
-Message-ID: <alpine.LFD.2.20.1511161730030.5826@knanqh.ubzr>
+From: laura@labbott.name (Laura Abbott)
+Date: Mon, 16 Nov 2015 16:57:32 -0800
+Subject: [PATCHv2 0/3] Devicetree bindings for Ion
+Message-ID: <1447721855-7574-1-git-send-email-laura@labbott.name>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, 16 Nov 2015, Chris Brandt wrote:
-
-> > New sections (lots of them) were added as well since the introduction
-> > of XIP kernel with no consideration for XIP usage.
-> 
-> So I've noticed. As far as I can tell, the XIP kernel stuff broke years
-> ago.
-
-That, of course, brings the question about keeping XIP around.
-
-> > I think the only way to fix it properly is to have a separate linker
-> > script for XIP usage with proper (and obvious) section placement.
-> 
-> I guess then the parts of the kernel that refer to section locations
-> need to be looked at again. As you can see from my other patches,
-> there's a bit of miss-match that I was trying to align.
-
-I don't think that's a big issue. Those section locations are obtained 
-from symbols that the linker script creates explicitly.
-
-> So at this point...I'm assume all my XIP 'hacks' are being rejected.
-
-Pretty much.  Everything can be fixed at once with a new linker script.
-
-> As for making a new XIP-only linker script, note that I really only
-> work with the ARMv7. I know the M4 and M5 guys do XIP_KERNEL builds,
-> but I've got no way of testing their XIP_KERNEL builds or knowing
-> what will break.
-
-Things can hardly be worse than they are right now.
 
 
-Nicolas
+Hi,
+
+This is another attempt at devicetree bindings for Ion. The big complaint from
+v1 was that too much unnecessary data was being pushed into devicetree.
+v2 takes a different approach of using just compatbile strings for the heaps.
+This gets closer to the devicetree philosophy of describing just the hardware.
+Each heap ultimately represents some kind of memory that exists in the system.
+The compatible string indicates the match for how to handle the type of memory
+on this system. The details like heap-id, name etc. are now pushed out to C
+files. This makes Ion heaps look closer to something like a quirks framework.
+(I'd argue this isn't a complete mischaracterization given the type of setup
+Ion gets used for...) The one downside here is that this leads to more new
+bindings for each board that gets added.
+
+This version also includes a sample C file which shows what the structure
+might look like. As always, your comments and reviews are appreciated.
+
+Thanks,
+Laura
+
+Laura Abbott (3):
+  ion: Devicetree bindings for Ion
+  staging: ion: Add files for parsing the devicetree (WIP)
+  NOMERGE: Sample driver
+
+ drivers/staging/android/ion/Kconfig         |  16 +++
+ drivers/staging/android/ion/Makefile        |   2 +
+ drivers/staging/android/ion/devicetree.txt  |  50 +++++++++
+ drivers/staging/android/ion/ion_of.c        | 168 ++++++++++++++++++++++++++++
+ drivers/staging/android/ion/ion_of.h        |  35 ++++++
+ drivers/staging/android/ion/ion_of_sample.c |  96 ++++++++++++++++
+ 6 files changed, 367 insertions(+)
+ create mode 100644 drivers/staging/android/ion/devicetree.txt
+ create mode 100644 drivers/staging/android/ion/ion_of.c
+ create mode 100644 drivers/staging/android/ion/ion_of.h
+ create mode 100644 drivers/staging/android/ion/ion_of_sample.c
+
+-- 
+2.5.0
