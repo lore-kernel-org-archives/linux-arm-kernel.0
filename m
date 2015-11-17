@@ -1,71 +1,63 @@
-From: info@lategoodbye.de (Stefan Wahren)
-Date: Tue, 17 Nov 2015 10:04:53 +0100
-Subject: [PATCH] dmaengine: bcm2835-dma: Convert to use DMA pool
-In-Reply-To: <564ADB44.9050005@ti.com>
-References: <1447672143-14201-1-git-send-email-peter.ujfalusi@ti.com>
- <564ADB44.9050005@ti.com>
-Message-ID: <564AEDB5.7000201@lategoodbye.de>
+From: julia.lawall@lip6.fr (Julia Lawall)
+Date: Tue, 17 Nov 2015 10:05:03 +0100 (CET)
+Subject: [PATCH 14/27] mtd: nand: use the mtd instance embedded in struct
+ nand_chip
+In-Reply-To: <20151117093836.052c86b5@bbrezillon>
+References: <1447681080-31232-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1447681080-31232-15-git-send-email-boris.brezillon@free-electrons.com>
+ <20151117030019.GY8456@google.com> <20151117093836.052c86b5@bbrezillon>
+Message-ID: <alpine.DEB.2.10.1511170957100.2455@hadrien>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Peter,
-
-Am 17.11.2015 um 08:46 schrieb Peter Ujfalusi:
-> Hi,
+> > (This isn't the worst one, but it just happens to be one of the first.)
+> > There are many cases where the typical style would be to declare a new
+> > variable at the top of the function, where you perform the
+> > macro/function-call to convert from one abstraction to another. Like
+> >
+> > static int nfc_set_sram_bank(struct atmel_nand_host *host, unsigned int bank)
+> > {
+> > 	struct mtd_info *mtd = nand_to_mtd(&hot->nand_chip);
+> > 	...
+> >
+> > and then use it later. Can that be done very easily?
+> >
+> > >  			return -EINVAL;
+> > >  		nfc_writel(host->nfc->hsmc_regs, BANK, ATMEL_HSMC_NFC_BANK1);
+> > >  	} else {
+> >
+> > ...
 >
-> On 11/16/2015 01:09 PM, Peter Ujfalusi wrote:
->> f93178291712 dmaengine: bcm2835-dma: Fix memory leak when stopping a
->> 	     running transfer
->>
->> Fixed the memleak, but introduced another issue: the terminate_all callback
->> might be called with interrupts disabled and the dma_free_coherent() is
->> not allowed to be called when IRQs are disabled.
->> Convert the driver to use dma_pool_* for managing the list of control
->> blocks for the transfer.
+> Honestly, I don't know how to do that with a coccinelle script, and it
+> will probably take me more time to find how to do it than addressing
+> those problems manually.
 >
-> FWIW: the patch has been tested and verified on Raspbery Pi:
-> https://github.com/raspberrypi/linux/pull/1178#issuecomment-157026794
-> https://github.com/raspberrypi/linux/pull/1178#issuecomment-157030190
->
-> It needed some modification since the Raspberry Pi kernel have non upstreamed
-> changes in bcm2835-dma driver (slave_sg support for example).
->
-> It would be great if this patch can make it to 4.4 as a fix.
->
-> Thanks,
-> P?ter
->
->>
->> Fixes: f93178291712 ("dmaengine: bcm2835-dma: Fix memory leak when stopping a running transfer")
->> Signed-off-by: Peter Ujfalusi <peter.ujfalusi@ti.com>
->> ---
->> Hi,
->>
->> It was brought to my attention that the memleak fix broke the bcm2835 DMA. I did
->> not noticed the use of dma_free_coherent() in the driver when I did the memleak
->> fix.
->> Since the driver does leaking memory every time the audio is stopped, the other
->> option is to convert it to use DMA pool.
->> I do not have access the Raspberry Pi, so I can not test this patch but it
->> compiles ;)
->> Can someone test this one out if it is working?
+> Julia, could you give us some hint?
 
-i tried to test it yesterday with dmatest until i noticed that the 
-bcm2835 dmaengine didn't provide the necessary capabilities (DMA_MEMCPY).
+Probably something like the following would be easiest.  You can just run
+it after your other transformations:
 
-Sorry, i'm not an expert here. Could you please provide at least one 
-test scenario which should work with Linux 4.4-rc1 without any special 
-hardware?
+@r exists@
+identifier f;
+expression e;
+@@
 
-Do you know which bcm2835 drivers make use of the relevant code?
+f(...) { <+...  nand_to_mtd(e) ...+> }
 
-Btw if you want that somebody test the patch for you, then it's possible 
-to mark it as request for testing "[PATCH RFT]".
+@@
+identifier r.f;
+expression r.e;
+@@
 
-Best regards
-Stefan
+f(...) {
++ struct mtd_info *mtd = nand_to_mtd(e);
+...
+}
 
->>
->> Regards,
->> Peter
->>
+This won't work if there is more than one possible value of e.  If that is
+likely, then I could come up with something more complex.  It also assumes
+that you want to convert all such calls.  If you only want to convert calls
+that occur in a particular context, eg a field reference, then you could
+enhance the pattern inside the <+... ...+> in the first rule.
+
+julia
