@@ -1,121 +1,68 @@
 From: shannon.zhao@linaro.org (shannon.zhao at linaro.org)
-Date: Tue, 17 Nov 2015 17:40:58 +0800
-Subject: [PATCH v3 59/62] xen/arm: Add a hypercall for device mmio mapping
+Date: Tue, 17 Nov 2015 17:40:59 +0800
+Subject: [PATCH v3 60/62] arm/acpi: Configure interrupts dynamically
 In-Reply-To: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
 References: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
-Message-ID: <1447753261-7552-60-git-send-email-shannon.zhao@linaro.org>
+Message-ID: <1447753261-7552-61-git-send-email-shannon.zhao@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Shannon Zhao <shannon.zhao@linaro.org>
+From: Parth Dixit <parth.dixit@linaro.org>
 
-It needs to map platform or amba device mmio to Dom0 on ARM. But when
-booting with ACPI, it can't get the mmio region in Xen due to lack of
-AML interpreter to parse DSDT table. Therefore, let Dom0 call a
-hypercall to map mmio region when it adds the devices.
+Interrupt information is described in DSDT and is not available at
+the time of booting. Configure the interrupts dynamically when requested
+by Dom0
 
+Signed-off-by: Parth Dixit <parth.dixit@linaro.org>
 Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
 ---
- xen/arch/arm/mm.c           |  4 ++++
- xen/arch/arm/p2m.c          | 34 ++++++++++++++++++++++++++++++++++
- xen/include/asm-arm/p2m.h   |  5 +++++
- xen/include/public/memory.h |  1 +
- 4 files changed, 44 insertions(+)
+ xen/arch/arm/vgic.c | 19 +++++++++++++++++++
+ 1 file changed, 19 insertions(+)
 
-diff --git a/xen/arch/arm/mm.c b/xen/arch/arm/mm.c
-index 8b6d915..fbe0406 100644
---- a/xen/arch/arm/mm.c
-+++ b/xen/arch/arm/mm.c
-@@ -1138,6 +1138,10 @@ int xenmem_add_to_physmap_one(
-         rcu_unlock_domain(od);
-         break;
-     }
-+    case XENMAPSPACE_dev_mmio:
-+        rc = map_dev_mmio_region(d, gpfn, 1, idx);
-+        return rc;
-+        break;
+diff --git a/xen/arch/arm/vgic.c b/xen/arch/arm/vgic.c
+index 7bb4570..d05abde 100644
+--- a/xen/arch/arm/vgic.c
++++ b/xen/arch/arm/vgic.c
+@@ -25,6 +25,7 @@
+ #include <xen/irq.h>
+ #include <xen/sched.h>
+ #include <xen/perfc.h>
++#include <xen/acpi.h>
  
-     default:
-         return -ENOSYS;
-diff --git a/xen/arch/arm/p2m.c b/xen/arch/arm/p2m.c
-index 7a108d8..b44ad76 100644
---- a/xen/arch/arm/p2m.c
-+++ b/xen/arch/arm/p2m.c
-@@ -7,6 +7,7 @@
- #include <xen/bitops.h>
- #include <xen/vm_event.h>
- #include <xen/mem_access.h>
-+#include <xen/iocap.h>
- #include <public/vm_event.h>
- #include <asm/flushtlb.h>
- #include <asm/gic.h>
-@@ -1192,6 +1193,39 @@ int unmap_mmio_regions(struct domain *d,
-                              d->arch.p2m.default_access);
+ #include <asm/current.h>
+ 
+@@ -310,6 +311,8 @@ void vgic_disable_irqs(struct vcpu *v, uint32_t r, int n)
+     }
  }
  
-+int map_dev_mmio_region(struct domain *d,
-+                        unsigned long start_gfn,
-+                        unsigned long nr,
-+                        unsigned long mfn)
-+{
-+    int res;
++#define VGIC_ICFG_MASK(intr) ( 1 << ( ( 2 * ( intr % 16 ) ) + 1 ) )
 +
-+    if(!iomem_access_permitted(d, start_gfn, start_gfn + nr))
-+        return 0;
-+
-+    res = iomem_permit_access(d, start_gfn, (start_gfn + nr));
-+    if ( res )
-+    {
-+        printk(XENLOG_ERR "Unable to permit to dom%d access to"
-+               " 0x%"PRIx64" - 0x%"PRIx64"\n",
-+               d->domain_id,
-+               start_gfn << PAGE_SHIFT, (start_gfn + nr) << PAGE_SHIFT);
-+        return res;
-+    }
-+
-+    res = map_mmio_regions(d, start_gfn, nr, mfn);
-+    if ( res < 0 )
-+    {
-+        printk(XENLOG_ERR "Unable to map 0x%"PRIx64
-+               " - 0x%"PRIx64" in domain %d\n",
-+               start_gfn << PAGE_SHIFT, (start_gfn + nr) << PAGE_SHIFT,
-+               d->domain_id);
-+        return res;
-+    }
-+
-+    return 0;
-+}
-+
- int guest_physmap_add_entry(struct domain *d,
-                             unsigned long gpfn,
-                             unsigned long mfn,
-diff --git a/xen/include/asm-arm/p2m.h b/xen/include/asm-arm/p2m.h
-index b6215f9..5e9d0a1 100644
---- a/xen/include/asm-arm/p2m.h
-+++ b/xen/include/asm-arm/p2m.h
-@@ -168,6 +168,11 @@ int unmap_regions(struct domain *d,
-                     unsigned long nr_mfns,
-                     unsigned long mfn);
+ void vgic_enable_irqs(struct vcpu *v, uint32_t r, int n)
+ {
+     struct domain *d = v->domain;
+@@ -321,7 +324,23 @@ void vgic_enable_irqs(struct vcpu *v, uint32_t r, int n)
+     struct vcpu *v_target;
  
-+int map_dev_mmio_region(struct domain *d,
-+                        unsigned long start_gfn,
-+                        unsigned long nr,
-+                        unsigned long mfn);
+     while ( (i = find_next_bit(&mask, 32, i)) < 32 ) {
++#ifdef CONFIG_ACPI
++        struct vgic_irq_rank *vr = vgic_get_rank(v, n);
++        uint32_t tr;
 +
- int guest_physmap_add_entry(struct domain *d,
-                             unsigned long gfn,
-                             unsigned long mfn,
-diff --git a/xen/include/public/memory.h b/xen/include/public/memory.h
-index 4df38d6..c19da1a 100644
---- a/xen/include/public/memory.h
-+++ b/xen/include/public/memory.h
-@@ -220,6 +220,7 @@ DEFINE_XEN_GUEST_HANDLE(xen_machphys_mapping_t);
- #define XENMAPSPACE_gmfn_range   3 /* GMFN range, XENMEM_add_to_physmap only. */
- #define XENMAPSPACE_gmfn_foreign 4 /* GMFN from another dom,
-                                     * XENMEM_add_to_physmap_batch only. */
-+#define XENMAPSPACE_dev_mmio     5 /* device mmio region */
- /* ` } */
- 
- /*
+         irq = i + (32 * n);
++        if( ( !acpi_disabled ) && ( n != 0 ) && is_hardware_domain(d) )
++        {
++            tr = vr->icfg[i >> 4] ;
++
++            if( ( tr & VGIC_ICFG_MASK(i) ) )
++                irq_set_type(irq, ACPI_IRQ_TYPE_EDGE_BOTH);
++            else
++                irq_set_type(irq, ACPI_IRQ_TYPE_LEVEL_MASK);
++        }
++#else
++        irq = i + (32 * n);
++#endif
+         v_target = d->arch.vgic.handler->get_target_vcpu(v, irq);
+         p = irq_to_pending(v_target, irq);
+         set_bit(GIC_IRQ_GUEST_ENABLED, &p->status);
 -- 
 2.1.0
