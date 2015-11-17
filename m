@@ -1,63 +1,40 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 17 Nov 2015 09:57:30 +0100
-Subject: next build: 235 warnings 3 failures (next/next-20151117)
-In-Reply-To: <564a9961.878b420a.331b8.fffffd62@mx.google.com>
-References: <564a9961.878b420a.331b8.fffffd62@mx.google.com>
-Message-ID: <4694362.ZPL12j6kR2@wuerfel>
+Date: Tue, 17 Nov 2015 10:01:36 +0100
+Subject: [PATCH] cpufreq: do not mark s3c2410_plls_add as __init
+In-Reply-To: <564A899C.4040402@samsung.com>
+References: <8497197.sYxqVOch7s@wuerfel> <4389196.cuM78vZZnJ@wuerfel>
+ <564A899C.4040402@samsung.com>
+Message-ID: <4654010.UfKTsDKyes@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Monday 16 November 2015 19:05:05 Olof's autobuilder wrote:
+On Tuesday 17 November 2015 10:57:48 Krzysztof Kozlowski wrote:
+> On 17.11.2015 07:17, Arnd Bergmann wrote:
+> > On Monday 16 November 2015 23:36:42 Rafael J. Wysocki wrote:
+> >>
+> >> This should go in through the Samsung tree, so I'll leave it for them to pick
+> >> it up (at least for the time being).
+> > 
+> > Ok, fair enough. Kukjin or Krzysztof, can you pick this up?
 > 
-> Errors:
+> Sure.
 > 
->         arm64.allmodconfig:
-> arch/arm64/include/asm/barrier.h:71:3: error: read-only variable '___p1' used as 'asm' output
-> arch/arm64/include/asm/barrier.h:75:3: error: read-only variable '___p1' used as 'asm' output
-> arch/arm64/include/asm/barrier.h:79:3: error: read-only variable '___p1' used as 'asm' output
-> arch/arm64/include/asm/barrier.h:83:3: error: read-only variable '___p1' used as 'asm' output
-> arch/arm64/include/asm/barrier.h:71:3: error: read-only variable '___p1' used as 'asm' output
-> arch/arm64/include/asm/barrier.h:75:3: error: read-only variable '___p1' used as 'asm' output
-> arch/arm64/include/asm/barrier.h:79:3: error: read-only variable '___p1' used as 'asm' output
-> arch/arm64/include/asm/barrier.h:83:3: error: read-only variable '___p1' used as 'asm' output
-> arch/arm64/include/asm/barrier.h:71:3: error: read-only variable '___p1' used as 'asm' output
+> As for the patch I think everything can be converted to init/initdata
+> (as in attachment).
+> 
 
-The patch below seems to fix it. Please review/apply.
+I don't think so:
 
-8<----
-Subject: ARM64: make smp_load_acquire() work with const arguments
+static struct subsys_interface s3c2442_plls169344_interface __initdata = {
+        .name           = "s3c2442_plls169344",
+        .subsys         = &s3c2442_subsys,
+        .add_dev        = s3c2440_plls169344_add,
+};
 
-smp_load_acquire() uses typeof() to declare a local variable for temporarily
-storing the output of the memory access. This fails when the argument is
-constant, because the assembler complains about using a constant register
-as output:
+This gets passed into subsys_interface_register(), which is not __init
+in turn. subsys_interface_register() then goes on to add
+s3c2442_plls169344_interface into a linked list that is traversed
+at runtime, but the __initdata section gets discarded so you now
+have a broken list.
 
- arch/arm64/include/asm/barrier.h:71:3: error: read-only variable '___p1' used as 'asm' output
-
-This changes the implementation to use an 'unsigned long' for the temporary value
-and only cast it to the original type in the end.
-
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-
-diff --git a/arch/arm64/include/asm/barrier.h b/arch/arm64/include/asm/barrier.h
-index 624f9679f4b0..05fa329467f6 100644
---- a/arch/arm64/include/asm/barrier.h
-+++ b/arch/arm64/include/asm/barrier.h
-@@ -64,7 +64,7 @@ do {									\
- 
- #define smp_load_acquire(p)						\
- ({									\
--	typeof(*p) ___p1;						\
-+	unsigned long ___p1;						\
- 	compiletime_assert_atomic_type(*p);				\
- 	switch (sizeof(*p)) {						\
- 	case 1:								\
-@@ -84,7 +84,7 @@ do {									\
- 			: "=r" (___p1) : "Q" (*p) : "memory");		\
- 		break;							\
- 	}								\
--	___p1;								\
-+	(typeof(*p))___p1;								\
- })
- 
- #define read_barrier_depends()		do { } while(0)
+	Arnd
