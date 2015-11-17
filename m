@@ -1,115 +1,138 @@
 From: shannon.zhao@linaro.org (shannon.zhao at linaro.org)
-Date: Tue, 17 Nov 2015 17:40:30 +0800
-Subject: [PATCH v3 31/62] arm/acpi: Add a helper function to get interrupt type
+Date: Tue, 17 Nov 2015 17:40:31 +0800
+Subject: [PATCH v3 32/62] arm/acpi: Parse GTDT to initialize timer
 In-Reply-To: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
 References: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
-Message-ID: <1447753261-7552-32-git-send-email-shannon.zhao@linaro.org>
+Message-ID: <1447753261-7552-33-git-send-email-shannon.zhao@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Shannon Zhao <shannon.zhao@linaro.org>
+From: Parth Dixit <parth.dixit@linaro.org>
 
-Add a helper funtion to get the type of interrupts in ACPI table.
+Parse GTDT (Generic Timer Descriptor Table) to initialize timer. Using
+the information presented by GTDT to initialize the arch timer (not
+memory-mapped).
 
+Signed-off-by: Naresh Bhat <naresh.bhat@linaro.org>
+Signed-off-by: Parth Dixit <parth.dixit@linaro.org>
 Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
 ---
- xen/arch/arm/acpi/lib.c    | 27 +++++++++++++++++++++++++++
- xen/include/asm-arm/acpi.h | 39 +++++++++++++++++++++++++++++++++++++++
- 2 files changed, 66 insertions(+)
+ xen/arch/arm/time.c | 73 +++++++++++++++++++++++++++++++++++++++++++++--------
+ 1 file changed, 62 insertions(+), 11 deletions(-)
 
-diff --git a/xen/arch/arm/acpi/lib.c b/xen/arch/arm/acpi/lib.c
-index d8b7635..47f4c6a 100644
---- a/xen/arch/arm/acpi/lib.c
-+++ b/xen/arch/arm/acpi/lib.c
-@@ -43,3 +43,30 @@ bool_t __init acpi_psci_hvc_present(void)
- {
-     return acpi_gbl_FADT.arm_boot_flags & ACPI_FADT_PSCI_USE_HVC;
- }
-+
-+unsigned int acpi_get_irq_type(u32 flags)
+diff --git a/xen/arch/arm/time.c b/xen/arch/arm/time.c
+index 5ded30c..adbfc2a 100644
+--- a/xen/arch/arm/time.c
++++ b/xen/arch/arm/time.c
+@@ -29,6 +29,7 @@
+ #include <xen/time.h>
+ #include <xen/sched.h>
+ #include <xen/event.h>
++#include <xen/acpi.h>
+ #include <asm/system.h>
+ #include <asm/time.h>
+ #include <asm/gic.h>
+@@ -65,8 +66,45 @@ unsigned int timer_get_irq(enum timer_ppi ppi)
+ 
+ static __initdata struct dt_device_node *timer;
+ 
++#ifdef CONFIG_ACPI
++/* Initialize per-processor generic timer */
++static int __init arch_timer_acpi_init(struct acpi_table_header *table)
 +{
-+    int trigger, polarity;
++    unsigned int irq_type;
++    struct acpi_table_gtdt *gtdt;
 +
-+    trigger = (flags & ACPI_GTDT_INTERRUPT_MODE) ? ACPI_EDGE_SENSITIVE
-+               : ACPI_LEVEL_SENSITIVE;
++    gtdt = container_of(table, struct acpi_table_gtdt, header);
 +
-+    polarity = (flags & ACPI_GTDT_INTERRUPT_POLARITY) ? ACPI_ACTIVE_LOW
-+                : ACPI_ACTIVE_HIGH;
++    /* Initialize all the generic timer IRQ variable from GTDT table */
++    irq_type = acpi_get_irq_type(gtdt->non_secure_el1_flags);
++    irq_set_type(gtdt->non_secure_el1_interrupt, irq_type);
++    timer_irq[TIMER_PHYS_NONSECURE_PPI] = gtdt->non_secure_el1_interrupt;
 +
-+    switch (polarity) {
-+    case ACPI_ACTIVE_LOW:
-+        return trigger == ACPI_EDGE_SENSITIVE ?
-+            ACPI_IRQ_TYPE_EDGE_FALLING :
-+            ACPI_IRQ_TYPE_LEVEL_LOW;
-+    case ACPI_ACTIVE_HIGH:
-+        return trigger == ACPI_EDGE_SENSITIVE ?
-+            ACPI_IRQ_TYPE_EDGE_RISING :
-+            ACPI_IRQ_TYPE_LEVEL_HIGH;
-+    case ACPI_ACTIVE_BOTH:
-+        if (trigger == ACPI_EDGE_SENSITIVE)
-+            return ACPI_IRQ_TYPE_EDGE_BOTH;
-+    default:
-+        return ACPI_IRQ_TYPE_NONE;
-+    }
++    irq_type = acpi_get_irq_type(gtdt->secure_el1_flags);
++    irq_set_type(gtdt->secure_el1_interrupt, irq_type);
++    timer_irq[TIMER_PHYS_SECURE_PPI] = gtdt->secure_el1_interrupt;
++
++    irq_type = acpi_get_irq_type(gtdt->virtual_timer_flags);
++    irq_set_type(gtdt->virtual_timer_interrupt, irq_type);
++    timer_irq[TIMER_VIRT_PPI] = gtdt->virtual_timer_interrupt;
++
++    irq_type = acpi_get_irq_type(gtdt->non_secure_el2_flags);
++    irq_set_type(gtdt->non_secure_el2_interrupt, irq_type);
++    timer_irq[TIMER_HYP_PPI] = gtdt->non_secure_el2_interrupt;
++
++    return 0;
 +}
-diff --git a/xen/include/asm-arm/acpi.h b/xen/include/asm-arm/acpi.h
-index 714e596..214fc4e 100644
---- a/xen/include/asm-arm/acpi.h
-+++ b/xen/include/asm-arm/acpi.h
-@@ -34,10 +34,12 @@ extern bool_t acpi_disabled;
- bool_t __init acpi_psci_present(void);
- bool_t __init acpi_psci_hvc_present(void);
- void __init acpi_smp_init_cpus(void);
-+unsigned int acpi_get_irq_type(u32 flags);
- #else
- static inline bool_t acpi_psci_present(void) { return false; }
- static inline bool_t acpi_psci_hvc_present(void) {return false; }
- static inline void acpi_smp_init_cpus(void) { }
-+static inline unsigned int acpi_get_irq_type(u32 flags) { return 0; }
- #endif /* CONFIG_ACPI */
++
++void __init acpi_preinit_xen_time(void)
++{
++	acpi_table_parse(ACPI_SIG_GTDT, arch_timer_acpi_init);
++}
++#else
++static inline void acpi_preinit_xen_time(void) { }
++#endif
++
+ /* Set up the timer on the boot CPU (early init function) */
+-void __init preinit_xen_time(void)
++static void __init dt_preinit_xen_time(void)
+ {
+     static const struct dt_device_match timer_ids[] __initconst =
+     {
+@@ -74,7 +112,6 @@ void __init preinit_xen_time(void)
+         { /* sentinel */ },
+     };
+     int res;
+-    u32 rate;
  
- /* Basic configuration for ACPI */
-@@ -48,4 +50,41 @@ static inline void disable_acpi(void)
+     timer = dt_find_matching_node(NULL, timer_ids);
+     if ( !timer )
+@@ -86,8 +123,19 @@ void __init preinit_xen_time(void)
+     if ( res )
+         panic("Timer: Cannot initialize platform timer");
  
- #define ACPI_GTDT_INTR_MASK ( ACPI_GTDT_INTERRUPT_MODE | ACPI_GTDT_INTERRUPT_POLARITY )
+-    res = dt_property_read_u32(timer, "clock-frequency", &rate);
+-    if ( res )
++}
++
++void __init preinit_xen_time(void)
++{
++    u32 rate;
++
++    /* Initialize all the generic timers presented in GTDT */
++    if ( acpi_disabled )
++        dt_preinit_xen_time();
++    else
++        acpi_preinit_xen_time();
++
++    if( acpi_disabled && dt_property_read_u32(timer, "clock-frequency", &rate) )
+     {
+         cpu_khz = rate / 1000;
+         timer_dt_clock_frequency = rate;
+@@ -104,14 +152,17 @@ int __init init_xen_time(void)
+     int res;
+     unsigned int i;
  
-+/* Triggering */
+-    /* Retrieve all IRQs for the timer */
+-    for ( i = TIMER_PHYS_SECURE_PPI; i < MAX_TIMER_PPI; i++ )
++    if( acpi_disabled )
+     {
+-        res = platform_get_irq(timer, i);
+-
+-        if ( res < 0 )
+-            panic("Timer: Unable to retrieve IRQ %u from the device tree", i);
+-        timer_irq[i] = res;
++        /* Retrieve all IRQs for the timer */
++        for ( i = TIMER_PHYS_SECURE_PPI; i < MAX_TIMER_PPI; i++ )
++        {
++            res = platform_get_irq(timer, i);
 +
-+#define ACPI_LEVEL_SENSITIVE            (u8) 0x00
-+#define ACPI_EDGE_SENSITIVE             (u8) 0x01
-+
-+/* Polarity */
-+
-+#define ACPI_ACTIVE_HIGH                (u8) 0x00
-+#define ACPI_ACTIVE_LOW                 (u8) 0x01
-+#define ACPI_ACTIVE_BOTH                (u8) 0x02
-+
-+/**
-+ * IRQ line type.
-+ *
-+ * ACPI_IRQ_TYPE_NONE            - default, unspecified type
-+ * ACPI_IRQ_TYPE_EDGE_RISING     - rising edge triggered
-+ * ACPI_IRQ_TYPE_EDGE_FALLING    - falling edge triggered
-+ * ACPI_IRQ_TYPE_EDGE_BOTH       - rising and falling edge triggered
-+ * ACPI_IRQ_TYPE_LEVEL_HIGH      - high level triggered
-+ * ACPI_IRQ_TYPE_LEVEL_LOW       - low level triggered
-+ * ACPI_IRQ_TYPE_LEVEL_MASK      - Mask to filter out the level bits
-+ * ACPI_IRQ_TYPE_SENSE_MASK      - Mask for all the above bits
-+ * ACPI_IRQ_TYPE_INVALID         - Use to initialize the type
-+ */
-+#define ACPI_IRQ_TYPE_NONE           0x00000000
-+#define ACPI_IRQ_TYPE_EDGE_RISING    0x00000001
-+#define ACPI_IRQ_TYPE_EDGE_FALLING   0x00000002
-+#define ACPI_IRQ_TYPE_EDGE_BOTH                           \
-+    (ACPI_IRQ_TYPE_EDGE_FALLING | ACPI_IRQ_TYPE_EDGE_RISING)
-+#define ACPI_IRQ_TYPE_LEVEL_HIGH     0x00000004
-+#define ACPI_IRQ_TYPE_LEVEL_LOW      0x00000008
-+#define ACPI_IRQ_TYPE_LEVEL_MASK                          \
-+    (ACPI_IRQ_TYPE_LEVEL_LOW | ACPI_IRQ_TYPE_LEVEL_HIGH)
-+#define ACPI_IRQ_TYPE_SENSE_MASK     0x0000000f
-+
-+#define ACPI_IRQ_TYPE_INVALID        0x00000010
-+
- #endif /*_ASM_ARM_ACPI_H*/
++            if ( res < 0 )
++                panic("Timer: Unable to retrieve IRQ %u from the device tree", i);
++            timer_irq[i] = res;
++        }
+     }
+ 
+     /* Check that this CPU supports the Generic Timer interface */
 -- 
 2.1.0
