@@ -1,54 +1,54 @@
-From: stefan@agner.ch (Stefan Agner)
-Date: Mon, 16 Nov 2015 16:29:06 -0800
-Subject: [PATCH 2/6] serial: fsl-lpuart: move SERIAL_EARLYCON dependency
- to console
-In-Reply-To: <1447688894-2936779-3-git-send-email-arnd@arndb.de>
-References: <1447688894-2936779-1-git-send-email-arnd@arndb.de>
- <1447688894-2936779-3-git-send-email-arnd@arndb.de>
-Message-ID: <8865948bb89ad128dae91aca9437c581@agner.ch>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Tue, 17 Nov 2015 09:39:25 +0900
+Subject: arm64 function_graph tracer panic with CONFIG_DYNAMIC_FTRACE
+In-Reply-To: <20151116154822.GA19228@red-moon>
+References: <20151112104243.GF5627@e104818-lin.cambridge.arm.com>
+ <56457A4B.601@linaro.org> <564937E3.3090501@linaro.org>
+ <20151116134518.GC6556@e104818-lin.cambridge.arm.com>
+ <20151116154822.GA19228@red-moon>
+Message-ID: <564A773D.6040209@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-FWIW,
+On 11/17/2015 12:48 AM, Lorenzo Pieralisi wrote:
+> On Mon, Nov 16, 2015 at 01:45:19PM +0000, Catalin Marinas wrote:
+>
+> [...]
+>
+>>> There are some other functions which are called by cpu_suspend(), e.g. psci_system_suspend().
+>>> Should we apply a similar fix to them?
+>>
+>> I think we need to apply the fix to any function which does not return.
+>> In general, this should apply to all finishers passed to cpu_suspend()
+>> and the subsequent callees.
+>
+> Yes, I prefer Steven's suggestion though it seems to me the issue
+> is only related to the graph tracer and by pausing/resuming tracing
+> across cpu_suspend() we would solve the problem without having to
+> patch the finishers (and we can still trace them with the function
+> tracer).
 
-Acked-by: Stefan Agner <stefan@agner.ch>
+Aha, I didn't know this option. Yes, the issue is function_graph specific.
+I confirmed that we could fix it by sandwiching __cpu_suspend_enter()
+in cpu_suspend() between pause/unpause_graph_tracing().
 
-On 2015-11-16 07:48, Arnd Bergmann wrote:
-> The newly added earlycon support for lpuart adds a
-> 'select SERIAL_EARLYCON' statement for the tty driver, but that
-> only uses earlycon when console support is present, and otherwise
-> results in a pointless build error:
-> 
-> drivers/built-in.o: In function `setup_earlycon':
-> :(.init.text+0x2c4c): undefined reference to `uart_parse_earlycon'
-> 
-> This changes the Kconfig statement to only select the earlycon
-> code if the console is also enabled, like all the other drivers
-> do already.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Fixes: 1d59b382f1c4 ("serial: fsl_lpuart: add earlycon support")
-> Cc: Stefan Agner <stefan@agner.ch>
-> ---
->  drivers/tty/serial/Kconfig | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/tty/serial/Kconfig b/drivers/tty/serial/Kconfig
-> index 1aec4404062d..dbb8ac6afd40 100644
-> --- a/drivers/tty/serial/Kconfig
-> +++ b/drivers/tty/serial/Kconfig
-> @@ -1539,13 +1539,13 @@ config SERIAL_FSL_LPUART
->  	tristate "Freescale lpuart serial port support"
->  	depends on HAS_DMA
->  	select SERIAL_CORE
-> -	select SERIAL_EARLYCON
->  	help
->  	  Support for the on-chip lpuart on some Freescale SOCs.
->  
->  config SERIAL_FSL_LPUART_CONSOLE
->  	bool "Console on Freescale lpuart serial port"
->  	depends on SERIAL_FSL_LPUART=y
-> +	select SERIAL_EARLYCON
->  	select SERIAL_CORE_CONSOLE
->  	help
->  	  If you have enabled the lpuart serial port on the Freescale SoCs,
+> Takahiro, do you want me to send a patch or you update yours ?
+
+I think you're the best person.
+one question: do we need 'notrace' against __cpu_suspend_save()?
+
+>> Do we need such annotation for cpu_die() as well? It probably doesn't
+>> matter as the CPU is coming back on a completely different path anyway.
+>
+> I will test this too in the process.
+
+Function_graph related info is per-task, and it means that, if cpu_die()
+destroys idle thread, we don't have to care.
+But testing is always crucial.
+
+Thanks,
+-Takahiro AKASHI
+
+> Thanks for debugging this,
+> Lorenzo
+>
