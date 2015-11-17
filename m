@@ -1,95 +1,141 @@
 From: shannon.zhao@linaro.org (shannon.zhao at linaro.org)
-Date: Tue, 17 Nov 2015 17:40:24 +0800
-Subject: [PATCH v3 25/62] acpi/table: Introduce acpi_get_entry to get
- specified entry
+Date: Tue, 17 Nov 2015 17:40:19 +0800
+Subject: [PATCH v3 20/62] arm/acpi: Add ACPI support for SMP initialization
 In-Reply-To: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
 References: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
-Message-ID: <1447753261-7552-26-git-send-email-shannon.zhao@linaro.org>
+Message-ID: <1447753261-7552-21-git-send-email-shannon.zhao@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Shannon Zhao <shannon.zhao@linaro.org>
 
-When constructing MADT table for Dom0, it needs to create GICC subtable
-according to the dom0_max_vcpus. This function could be used for get the
-specified entry.
+ACPI 5.1 only has two explicit methods to boot up SMP, PSCI and Parking
+protocol, but the Parking protocol is only specified for ARMv7 now, so
+make PSCI as the only way for the SMP boot protocol before some updates
+for the ACPI spec or the Parking protocol spec.
 
+Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+Signed-off-by: Parth Dixit <parth.dixit@linaro.org>
 Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
 ---
- xen/drivers/acpi/tables.c | 45 +++++++++++++++++++++++++++++++++++++++++++++
- xen/include/xen/acpi.h    |  4 ++++
- 2 files changed, 49 insertions(+)
+ xen/arch/arm/arm64/smpboot.c |  7 ++++++-
+ xen/arch/arm/psci.c          | 30 +++++++++++++++++++++++-------
+ xen/arch/arm/smpboot.c       |  7 ++++++-
+ 3 files changed, 35 insertions(+), 9 deletions(-)
 
-diff --git a/xen/drivers/acpi/tables.c b/xen/drivers/acpi/tables.c
-index 2fba206..3ba8bad 100644
---- a/xen/drivers/acpi/tables.c
-+++ b/xen/drivers/acpi/tables.c
-@@ -221,6 +221,51 @@ void __init acpi_table_print_madt_entry(struct acpi_subtable_header *header)
- 	}
+diff --git a/xen/arch/arm/arm64/smpboot.c b/xen/arch/arm/arm64/smpboot.c
+index 7928f69..93cb6b3 100644
+--- a/xen/arch/arm/arm64/smpboot.c
++++ b/xen/arch/arm/arm64/smpboot.c
+@@ -7,6 +7,7 @@
+ #include <xen/vmap.h>
+ #include <asm/io.h>
+ #include <asm/psci.h>
++#include <asm/acpi.h>
+ 
+ struct smp_enable_ops {
+         int             (*prepare_cpu)(int);
+@@ -96,7 +97,11 @@ static int __init dt_arch_cpu_init(int cpu, struct dt_device_node *dn)
+ 
+ int __init arch_cpu_init(int cpu, struct dt_device_node *dn)
+ {
+-    return dt_arch_cpu_init(cpu, dn);
++    if( acpi_disabled )
++        return dt_arch_cpu_init(cpu, dn);
++    else
++        /* acpi only supports psci at present */
++        return smp_psci_init(cpu);
  }
  
-+struct acpi_subtable_header * __init
-+acpi_get_entry(char *id, unsigned long table_size,
-+	       struct acpi_table_header *table_header, int entry_id,
-+	       unsigned int entry_index)
-+{
-+	struct acpi_subtable_header *entry;
-+	unsigned int count = 0;
-+	unsigned long table_end;
+ int __init arch_cpu_up(int cpu)
+diff --git a/xen/arch/arm/psci.c b/xen/arch/arm/psci.c
+index d800cb6..dede0e1 100644
+--- a/xen/arch/arm/psci.c
++++ b/xen/arch/arm/psci.c
+@@ -22,6 +22,7 @@
+ #include <xen/mm.h>
+ #include <xen/smp.h>
+ #include <asm/psci.h>
++#include <asm/acpi.h>
+ 
+ /*
+  * While a 64-bit OS can make calls with SMC32 calling conventions, for
+@@ -86,6 +87,9 @@ int __init psci_init_0_1(void)
+     int ret;
+     const struct dt_device_node *psci;
+ 
++    if ( !acpi_disabled )
++        return -EINVAL;
 +
-+	if ( !table_size )
-+		return NULL;
+     psci = dt_find_compatible_node(NULL, NULL, "arm,psci");
+     if ( !psci )
+         return -EOPNOTSUPP;
+@@ -116,15 +120,24 @@ int __init psci_init_0_2(void)
+         { /* sentinel */ },
+     };
+     int ret;
+-    const struct dt_device_node *psci;
+ 
+-    psci = dt_find_matching_node(NULL, psci_ids);
+-    if ( !psci )
+-        return -EOPNOTSUPP;
++    if( acpi_disabled )
++    {
++        const struct dt_device_node *psci;
+ 
+-    ret = psci_is_smc_method(psci);
+-    if ( ret )
+-        return -EINVAL;
++        psci = dt_find_matching_node(NULL, psci_ids);
++        if ( !psci )
++            return -EOPNOTSUPP;
 +
-+	if ( !table_header )
-+	{
-+		printk("Table header not present\n");
-+		return NULL;
-+	}
++        ret = psci_is_smc_method(psci);
++        if ( ret )
++            return -EINVAL;
++    }
++    else
++    {
++        if ( acpi_psci_hvc_present() )
++            return -EINVAL;
++    }
+ 
+     psci_ver = call_smc(PSCI_0_2_FN_PSCI_VERSION, 0, 0, 0);
+ 
+@@ -148,6 +161,9 @@ int __init psci_init(void)
+ {
+     int ret;
+ 
++    if( !acpi_disabled && !acpi_psci_present() )
++        return -EOPNOTSUPP;
 +
-+	table_end = (unsigned long)table_header + table_header->length;
+     ret = psci_init_0_2();
+     if ( ret )
+         ret = psci_init_0_1();
+diff --git a/xen/arch/arm/smpboot.c b/xen/arch/arm/smpboot.c
+index d115228..513f1f6 100644
+--- a/xen/arch/arm/smpboot.c
++++ b/xen/arch/arm/smpboot.c
+@@ -31,6 +31,7 @@
+ #include <xen/console.h>
+ #include <asm/gic.h>
+ #include <asm/psci.h>
++#include <asm/acpi.h>
+ 
+ cpumask_t cpu_online_map;
+ cpumask_t cpu_present_map;
+@@ -247,7 +248,11 @@ void __init smp_init_cpus(void)
+         return;
+     }
+ 
+-    dt_smp_init_cpus();
++    if ( acpi_disabled )
++        dt_smp_init_cpus();
++    else
++        acpi_smp_init_cpus();
 +
-+	/* Parse all entries looking for a match. */
-+	entry = (struct acpi_subtable_header *)
-+	    ((unsigned long)table_header + table_size);
-+
-+	while (((unsigned long)entry) + sizeof(struct acpi_subtable_header) <
-+	       table_end) {
-+		if (entry->length < sizeof(*entry)) {
-+			printk(KERN_ERR PREFIX "[%4.4s:%#x] Invalid length\n",
-+			       id, entry_id);
-+			return NULL;
-+		}
-+
-+		if (entry->type == entry_id) {
-+			if (count == entry_index)
-+				return entry;
-+			count++;
-+		}
-+
-+		entry = (struct acpi_subtable_header *)
-+		    ((unsigned long)entry + entry->length);
-+	}
-+
-+	return NULL;
-+}
-+
+ }
+ 
  int __init
- acpi_parse_entries(char *id,
- 		      unsigned long table_size,
-diff --git a/xen/include/xen/acpi.h b/xen/include/xen/acpi.h
-index 23f8261..3339374 100644
---- a/xen/include/xen/acpi.h
-+++ b/xen/include/xen/acpi.h
-@@ -72,6 +72,10 @@ int acpi_table_init (void);
- int acpi_table_parse(char *id, acpi_table_handler handler);
- int acpi_table_parse_entries(char *id, unsigned long table_size,
- 	int entry_id, acpi_table_entry_handler handler, unsigned int max_entries);
-+struct acpi_subtable_header *
-+acpi_get_entry(char *id, unsigned long table_size,
-+	       struct acpi_table_header *table_header, int entry_id,
-+	       unsigned int entry_index);
- int acpi_parse_entries(char *id, unsigned long table_size,
- 	acpi_table_entry_handler handler, struct acpi_table_header *table_header,
- 	int entry_id, unsigned int max_entries);
 -- 
 2.1.0
