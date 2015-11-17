@@ -1,140 +1,120 @@
 From: shannon.zhao@linaro.org (shannon.zhao at linaro.org)
-Date: Tue, 17 Nov 2015 17:57:04 +0800
-Subject: [PATCH 06/13] Xen: ARM: Add support for mapping amba device mmio
+Date: Tue, 17 Nov 2015 17:57:06 +0800
+Subject: [PATCH 08/13] Xen: EFI: Parse DT parameters for Xen specific UEFI
 In-Reply-To: <1447754231-7772-1-git-send-email-shannon.zhao@linaro.org>
 References: <1447754231-7772-1-git-send-email-shannon.zhao@linaro.org>
-Message-ID: <1447754231-7772-7-git-send-email-shannon.zhao@linaro.org>
+Message-ID: <1447754231-7772-9-git-send-email-shannon.zhao@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Shannon Zhao <shannon.zhao@linaro.org>
 
-Add a bus_notifier for AMBA bus device in order to map the device
-mmio regions when DOM0 booting with ACPI.
+Add a new function to parse DT parameters for Xen specific UEFI just
+like the way for normal UEFI. Then it could reuse the existing codes.
 
 Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
 ---
- drivers/xen/Makefile |  1 +
- drivers/xen/amba.c   | 99 ++++++++++++++++++++++++++++++++++++++++++++++++++++
- 2 files changed, 100 insertions(+)
- create mode 100644 drivers/xen/amba.c
+ drivers/firmware/efi/efi.c | 67 ++++++++++++++++++++++++++++++++++++++++++----
+ 1 file changed, 62 insertions(+), 5 deletions(-)
 
-diff --git a/drivers/xen/Makefile b/drivers/xen/Makefile
-index 2f867e7..139bd0b 100644
---- a/drivers/xen/Makefile
-+++ b/drivers/xen/Makefile
-@@ -12,6 +12,7 @@ CFLAGS_features.o			:= $(nostackp)
- CFLAGS_efi.o				+= -fshort-wchar
- 
- dom0-$(CONFIG_ARM64) += platform.o
-+dom0-$(CONFIG_ARM_AMBA) += amba.o
- dom0-$(CONFIG_PCI) += pci.o
- dom0-$(CONFIG_USB_SUPPORT) += dbgp.o
- dom0-$(CONFIG_XEN_ACPI) += acpi.o $(xen-pad-y)
-diff --git a/drivers/xen/amba.c b/drivers/xen/amba.c
-new file mode 100644
-index 0000000..e491c8e
---- /dev/null
-+++ b/drivers/xen/amba.c
-@@ -0,0 +1,99 @@
-+/*
-+ * Copyright (c) 2015, Linaro Limited.
-+ *
-+ * This program is free software; you can redistribute it and/or modify it
-+ * under the terms and conditions of the GNU General Public License,
-+ * version 2, as published by the Free Software Foundation.
-+ *
-+ * This program is distributed in the hope it will be useful, but WITHOUT
-+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
-+ * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
-+ * more details.
-+ *
-+ * You should have received a copy of the GNU General Public License along with
-+ * this program; if not, write to the Free Software Foundation, Inc., 59 Temple
-+ * Place - Suite 330, Boston, MA 02111-1307 USA.
-+ *
-+ * Author: Shannon Zhao <shannon.zhao@linaro.org>
-+ */
-+
-+#include <linux/amba/bus.h>
-+#include <linux/acpi.h>
+diff --git a/drivers/firmware/efi/efi.c b/drivers/firmware/efi/efi.c
+index d6144e3..629bd06 100644
+--- a/drivers/firmware/efi/efi.c
++++ b/drivers/firmware/efi/efi.c
+@@ -24,6 +24,7 @@
+ #include <linux/of_fdt.h>
+ #include <linux/io.h>
+ #include <linux/platform_device.h>
 +#include <xen/xen.h>
-+#include <xen/interface/memory.h>
-+#include <asm/xen/hypervisor.h>
-+#include <asm/xen/hypercall.h>
-+
-+static int xen_map_amba_device_mmio(struct amba_device *adev)
-+{
-+	int rc = 0;
-+	struct resource *r = &adev->res;
-+
-+	if (resource_type(r) == IORESOURCE_MEM)
-+	{
-+		int j;
-+		int nr = DIV_ROUND_UP(resource_size(r), PAGE_SIZE);
-+		xen_pfn_t *gpfns = kmalloc(sizeof(xen_pfn_t) * nr, GFP_KERNEL);
-+		xen_ulong_t *idxs = kmalloc(sizeof(xen_ulong_t) * nr,
-+					    GFP_KERNEL);
-+		int *errs = kmalloc(sizeof(int) * nr, GFP_KERNEL);
-+		struct xen_add_to_physmap_range xatp;
-+
-+		for (j = 0; j < nr; j++) {
-+			gpfns[j] = (r->start >> PAGE_SHIFT) + j;
-+			idxs[j] = (r->start >> PAGE_SHIFT) + j;
-+			errs[j] = 0;
-+		}
-+
-+		xatp.domid = DOMID_SELF;
-+		xatp.size = nr;
-+		xatp.space = XENMAPSPACE_dev_mmio;
-+
-+		set_xen_guest_handle(xatp.gpfns, gpfns);
-+		set_xen_guest_handle(xatp.idxs, idxs);
-+		set_xen_guest_handle(xatp.errs, errs);
-+
-+		rc = HYPERVISOR_memory_op(XENMEM_add_to_physmap_range, &xatp);
-+
-+		kfree(gpfns);
-+		kfree(idxs);
-+		kfree(errs);
-+		if (rc != 0)
-+			return rc;
-+	}
-+
-+	return rc;
-+}
-+
-+static int xen_amba_notifier(struct notifier_block *nb,
-+			     unsigned long action, void *data)
-+{
-+	struct amba_device *adev = to_amba_device(data);
-+	int r = 0;
-+
-+	if (!acpi_disabled && (action == BUS_NOTIFY_ADD_DEVICE))
-+		r = xen_map_amba_device_mmio(adev);
-+
-+	if (r)
-+	{
-+		dev_err(&adev->dev, "Failed to add_to_physmap device (%s) mmio!\n",
-+			adev->dev.init_name);
-+		return NOTIFY_OK;
-+	}
-+
-+	return NOTIFY_DONE;
-+}
-+
-+static struct notifier_block amba_device_nb = {
-+	.notifier_call = xen_amba_notifier,
+ 
+ struct efi __read_mostly efi = {
+ 	.mps        = EFI_INVALID_TABLE_ADDR,
+@@ -488,12 +489,60 @@ static __initdata struct {
+ 	UEFI_PARAM("MemMap Desc. Version", "linux,uefi-mmap-desc-ver", desc_ver)
+ };
+ 
++static __initdata struct {
++	const char name[32];
++	const char propname[32];
++	int offset;
++	int size;
++} xen_dt_params[] = {
++	UEFI_PARAM("System Table", "xen,uefi-system-table", system_table),
++	UEFI_PARAM("MemMap Address", "xen,uefi-mmap-start", mmap),
++	UEFI_PARAM("MemMap Size", "xen,uefi-mmap-size", mmap_size),
++	UEFI_PARAM("MemMap Desc. Size", "xen,uefi-mmap-desc-size", desc_size),
++	UEFI_PARAM("MemMap Desc. Version", "xen,uefi-mmap-desc-ver", desc_ver)
 +};
 +
-+static int __init register_xen_amba_notifier(void)
+ struct param_info {
+ 	int verbose;
+ 	int found;
+ 	void *params;
+ };
+ 
++static int __init fdt_find_xen_uefi_params(unsigned long node,
++					   const char *uname, int depth,
++					   void *data)
 +{
-+	if (!xen_initial_domain())
++	struct param_info *info = data;
++	const void *prop;
++	void *dest;
++	u64 val;
++	int i, len;
++
++	if (xen_initial_domain() && (depth != 2 || strcmp(uname, "uefi") != 0))
 +		return 0;
 +
-+	return bus_register_notifier(&amba_bustype, &amba_device_nb);
-+}
++	for (i = 0; i < ARRAY_SIZE(xen_dt_params); i++) {
++		prop = of_get_flat_dt_prop(node, xen_dt_params[i].propname,
++					   &len);
++		if (!prop)
++			return 0;
++		dest = info->params + xen_dt_params[i].offset;
++		info->found++;
 +
-+arch_initcall(register_xen_amba_notifier);
++		val = of_read_number(prop, len / sizeof(u32));
++
++		if (dt_params[i].size == sizeof(u32))
++			*(u32 *)dest = val;
++		else
++			*(u64 *)dest = val;
++
++		if (info->verbose)
++			pr_info("  %s: 0x%0*llx\n", xen_dt_params[i].name,
++				xen_dt_params[i].size * 2, val);
++	}
++
++	return 1;
++}
+ static int __init fdt_find_uefi_params(unsigned long node, const char *uname,
+ 				       int depth, void *data)
+ {
+@@ -538,12 +587,20 @@ int __init efi_get_fdt_params(struct efi_fdt_params *params, int verbose)
+ 	info.found = 0;
+ 	info.params = params;
+ 
+-	ret = of_scan_flat_dt(fdt_find_uefi_params, &info);
+-	if (!info.found)
++	if (xen_initial_domain())
++		ret = of_scan_flat_dt(fdt_find_xen_uefi_params, &info);
++	else
++		ret = of_scan_flat_dt(fdt_find_uefi_params, &info);
++	if (!info.found) {
+ 		pr_info("UEFI not found.\n");
+-	else if (!ret)
+-		pr_err("Can't find '%s' in device tree!\n",
+-		       dt_params[info.found].name);
++	} else if (!ret) {
++		if (xen_initial_domain())
++			pr_err("Can't find '%s' in device tree!\n",
++			       xen_dt_params[info.found].name);
++		else
++			pr_err("Can't find '%s' in device tree!\n",
++			       xen_dt_params[info.found].name);
++	}
+ 
+ 	return ret;
+ }
 -- 
 2.1.0
