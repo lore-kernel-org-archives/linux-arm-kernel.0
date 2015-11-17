@@ -1,57 +1,77 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Tue, 17 Nov 2015 17:17:09 +0000
-Subject: [RFC PATCH] arm64: use non-global mappings for UEFI runtime
- regions
-In-Reply-To: <CAKv+Gu8Z=Jb-x1ZL7YSYpLWsEBqh7z0EQ0myg2Gz5asAuHdNbg@mail.gmail.com>
-References: <1447750411-6424-1-git-send-email-ard.biesheuvel@linaro.org>
- <20151117152558.GK12586@leverpostej>
- <20151117163445.GE30101@arm.com>
- <20151117164759.GA12266@leverpostej>
- <CAKv+Gu8Z=Jb-x1ZL7YSYpLWsEBqh7z0EQ0myg2Gz5asAuHdNbg@mail.gmail.com>
-Message-ID: <20151117171709.GB12266@leverpostej>
+From: gkulkarni@caviumnetworks.com (Ganapatrao Kulkarni)
+Date: Tue, 17 Nov 2015 22:50:39 +0530
+Subject: [PATCH v7 0/4] arm64, numa: Add numa support for arm64 platforms
+Message-ID: <1447780843-9223-1-git-send-email-gkulkarni@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> >> > For backporting, I'm not sure that this is necessarily safe prior to
-> >> > Will's rework of the ASID allocator. I think we can IPI in this context,
-> >> > and it looks like the cpu_set_reserved_ttbr0() in flush_context() would
-> >> > save us from the problem described above, but I may have missed
-> >> > something.
-> >> >
-> >> > Will, are you aware of anything that could bite us here?
-> >>
-> >> Can we guarantee that efi_virtmap_{load,unload} are called with interrupts
-> >> enabled?
-> >
-> > Unfortuantely, it looks like we can guarantee interrupts are _disabled_.
-> >
-> > Every function in drivers/firmware/efi/runtime-wrappers.c which uses
-> > efi_call_virt (and hence efi_virtmap_{load,unload}) wraps the call in a
-> > spin_lock_irq{save,restore} pair. Those appear to be the only uses of
-> > efi_call_virt.
-> >
-> 
-> There is actually no need from the UEFI pov to invoke the UEFI runtime
-> services with interrupts disabled, this is simply an implementation
-> detail of the kernel support, and I think it is primarily for x86 (but
-> I have to dig up the old thread for the details)
-> 
-> And even if we stick with spin_lock_irqsave(), we could refactor the
-> runtime wrappers to perform the mm switch outside of them.
+v7:
+	- managing numa memory mapping using memblock.
+	- Incorporated review comments of Mark Rutland.
 
-Ok.
+v6:
+	- defined and implemented the numa dt binding using
+	node property proximity and device node distance-map.
+	- renamed dt_numa to of_numa
 
-I'm only thinking about stable here.
+v5:
+        - created base verion of numa.c which creates dummy numa without using dt
+          on single socket platforms. Then added patches for dt support.
+        - Incorporated review comments from Hanjun Guo.
 
-In the context of a stable backport, I think the simplest thing to do is
-always go via the resesrved ttbr0 to perform the TLB flush, and
-hand-code the save/restore of the active mm's TTBR0_EL1 value rather
-than going through cpu_switch_mm (which I believe we can't call with
-interrupts disabled).
+v4:
+done changes as per Arnd review comments.
 
-It doesn't look like it's easy to stash the value given
-efi_virtmap_{load,unload} are separate functions, and I don't think we
-can just restore from current->active_mm in case there was a concurrent
-rollover on another CPU.
+v3:
+Added changes to support numa on arm64 based platforms.
+Tested these patches on cavium's multinode(2 node topology) platform.
+In this patchset, defined and implemented dt bindings for numa mapping
+for core and memory using device node property arm,associativity.
 
-Mark.
+v2:
+Defined and implemented numa map for memory, cores to node and
+proximity distance matrix of nodes.
+
+v1:
+Initial patchset to support numa on arm64 platforms.
+
+Note:
+        1. This patchset is tested for numa with dt on
+           thunderx single socket and dual socket boards.
+        2. Numa DT booting needs the dt memory nodes, which are deleted in current efi-stub,
+        hence to try numa with dt, you need to rebase with ard's patchset.
+        http://git.linaro.org/people/ard.biesheuvel/linux-arm.git/shortlog/refs/heads/arm64-uefi-early-fdt-handling
+
+Ganapatrao Kulkarni (4):
+  arm64, numa: adding numa support for arm64 platforms.
+  Documentation, dt, arm64/arm: dt bindings for numa.
+  arm64/arm, numa, dt: adding numa dt binding implementation for arm64
+    platforms.
+  arm64, dt, thunderx: Add initial dts for Cavium Thunderx in 2 node
+    topology.
+
+ Documentation/devicetree/bindings/arm/numa.txt  | 272 ++++++++
+ arch/arm64/Kconfig                              |  35 +
+ arch/arm64/boot/dts/cavium/Makefile             |   2 +-
+ arch/arm64/boot/dts/cavium/thunder-88xx-2n.dts  |  83 +++
+ arch/arm64/boot/dts/cavium/thunder-88xx-2n.dtsi | 806 ++++++++++++++++++++++++
+ arch/arm64/include/asm/mmzone.h                 |  17 +
+ arch/arm64/include/asm/numa.h                   |  56 ++
+ arch/arm64/kernel/Makefile                      |   1 +
+ arch/arm64/kernel/of_numa.c                     | 265 ++++++++
+ arch/arm64/kernel/setup.c                       |   4 +
+ arch/arm64/kernel/smp.c                         |   4 +
+ arch/arm64/mm/Makefile                          |   1 +
+ arch/arm64/mm/init.c                            |  30 +-
+ arch/arm64/mm/numa.c                            | 392 ++++++++++++
+ 14 files changed, 1963 insertions(+), 5 deletions(-)
+ create mode 100644 Documentation/devicetree/bindings/arm/numa.txt
+ create mode 100644 arch/arm64/boot/dts/cavium/thunder-88xx-2n.dts
+ create mode 100644 arch/arm64/boot/dts/cavium/thunder-88xx-2n.dtsi
+ create mode 100644 arch/arm64/include/asm/mmzone.h
+ create mode 100644 arch/arm64/include/asm/numa.h
+ create mode 100644 arch/arm64/kernel/of_numa.c
+ create mode 100644 arch/arm64/mm/numa.c
+
+-- 
+1.8.1.4
