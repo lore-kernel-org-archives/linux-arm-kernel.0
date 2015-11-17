@@ -1,400 +1,320 @@
-From: suzuki.poulose@arm.com (Suzuki K. Poulose)
-Date: Tue, 17 Nov 2015 18:30:39 +0000
-Subject: [PATCH 1/2] arm-cci500: Rearrange PMU driver for code sharing with
- CCI-550 PMU
-In-Reply-To: <1447785040-18599-1-git-send-email-suzuki.poulose@arm.com>
-References: <1447785040-18599-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1447785040-18599-2-git-send-email-suzuki.poulose@arm.com>
+From: dmitry.torokhov@gmail.com (Dmitry Torokhov)
+Date: Tue, 17 Nov 2015 10:32:05 -0800
+Subject: [PATCH] Input: pixcir_i2c_ts: add wake and enable gpios
+In-Reply-To: <20151116153906.GA16052@rob-hp-laptop>
+References: <1447603003-8130-1-git-send-email-sander@vermin.nl>
+ <20151116153906.GA16052@rob-hp-laptop>
+Message-ID: <20151117183205.GF29423@dtor-ws>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-CCI-550 PMU shares most of the CCI-500 PMU attributes including the
-event format, PMU event codes. The only difference is an additional
-master interface (MI6 - 0xe). Hence we share the driver code for both,
-except for a model specific event validate method.
-This patch renames the common CCI500 symbols to CCI5xx, including the
-Kconfig symbol.
+On Mon, Nov 16, 2015 at 09:39:06AM -0600, Rob Herring wrote:
+> On Sun, Nov 15, 2015 at 04:56:43PM +0100, Sander Vermin wrote:
+> > This patch improves the pixcir_i2c_ts touchscreen controller which is used by the POV PROTAB2 tablet.
+> > 
+> > On POV PROTAB2 tablet the WAKE and ENABLE gpios are used, and the screen is rotated, so touchscreen-inverted-x and touchscreen-inverted-y are needed.
+> > 
+> > In this patch the WAKE and ENABLE gpios are implemented and furtermore the touchscreen-inverted-x/y and touchscreen-swapped-x-y devicetree options are implemented.
+> 
+> Need to fix the line wrapping.
 
-No functional changes to the PMU driver.
+Please split up the gpio handling form coordinate conversion.
 
-Cc: Punit Agrawal <punit.agrawal@arm.com>
-Cc: Mark Rutland <mark.rutland@arm.com>
-Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
----
- drivers/bus/Kconfig   |    2 +-
- drivers/bus/arm-cci.c |  218 +++++++++++++++++++++++++------------------------
- 2 files changed, 112 insertions(+), 108 deletions(-)
+> 
+> > 
+> > Signed-off-by: Sander Vermin <sander@vermin.nl>
+> > ---
+> >  .../bindings/input/touchscreen/pixcir_i2c_ts.txt   |  24 ++--
+> >  drivers/input/touchscreen/pixcir_i2c_ts.c          | 125 +++++++++++++++++++--
+> >  2 files changed, 135 insertions(+), 14 deletions(-)
+> > 
+> > diff --git a/Documentation/devicetree/bindings/input/touchscreen/pixcir_i2c_ts.txt b/Documentation/devicetree/bindings/input/touchscreen/pixcir_i2c_ts.txt
+> > index 8eb240a..5f25e96 100644
+> > --- a/Documentation/devicetree/bindings/input/touchscreen/pixcir_i2c_ts.txt
+> > +++ b/Documentation/devicetree/bindings/input/touchscreen/pixcir_i2c_ts.txt
+> > @@ -1,15 +1,25 @@
+> >  * Pixcir I2C touchscreen controllers
+> >  
+> >  Required properties:
+> > -- compatible: must be "pixcir,pixcir_ts" or "pixcir,pixcir_tangoc"
+> > -- reg: I2C address of the chip
+> > -- interrupts: interrupt to which the chip is connected
+> > -- attb-gpio: GPIO connected to the ATTB line of the chip
+> > -- touchscreen-size-x: horizontal resolution of touchscreen (in pixels)
+> > -- touchscreen-size-y: vertical resolution of touchscreen (in pixels)
+> > +- compatible		: must be "pixcir,pixcir_ts" or "pixcir,pixcir_tangoc"
+> > +- reg			: I2C address of the chip
+> > +- interrupts		: interrupt to which the chip is connected
+> > +- attb-gpio		: GPIO connected to the ATTB line of the chip
+> > +- touchscreen-size-x	: horizontal resolution of touchscreen (in pixels)
+> > +- touchscreen-size-y	: vertical resolution of touchscreen (in pixels)
+> 
+> Please do reformatting in a separate patch.
+> 
+> >  Optional properties:
+> > -- reset-gpio: GPIO connected to the RESET line of the chip
+> > +- reset-gpio		: GPIO connected to the RESET line of the chip
+> > +- enable-gpios		: GPIO connected to the ENABLE line of the chip
+> > +- wake-gpios		: GPIO connected to the WAKE line of the chip
+> > +- touchscreen-fuzz-x	: horizontal noise value of the absolute input
+> > +			    device (in pixels)
+> > +- touchscreen-fuzz-y	: vertical noise value of the absolute input
+> > +			    device (in pixels)
+> > +- touchscreen-inverted-x: X axis is inverted (boolean)
+> > +- touchscreen-inverted-y: Y axis is inverted (boolean)
+> > +- touchscreen-swapped-x-y	  : X and Y axis are swapped (boolean)
+> > +			    Swapping is done after inverting the axis
+> 
+> Adding these touchscreen properties are not mentioned in the subject.
+> 
+> >  
+> >  Example:
+> >  
+> > diff --git a/drivers/input/touchscreen/pixcir_i2c_ts.c b/drivers/input/touchscreen/pixcir_i2c_ts.c
+> > index 4b961ad..87f86b5 100644
+> > --- a/drivers/input/touchscreen/pixcir_i2c_ts.c
+> > +++ b/drivers/input/touchscreen/pixcir_i2c_ts.c
+> > @@ -38,6 +38,13 @@ struct pixcir_i2c_ts_data {
+> >  	struct input_dev *input;
+> >  	struct gpio_desc *gpio_attb;
+> >  	struct gpio_desc *gpio_reset;
+> > +	struct gpio_desc *gpio_enable;
+> > +	struct gpio_desc *gpio_wake;
+> > +	u32 max_x;
+> > +	u32 max_y;
+> > +	bool invert_x;
+> > +	bool invert_y;
+> > +	bool swap_x_y;
+> >  	const struct pixcir_i2c_chip_data *chip;
+> >  	int max_fingers;	/* Max fingers supported in this instance */
+> >  	bool running;
+> > @@ -146,12 +153,27 @@ static void pixcir_ts_report(struct pixcir_i2c_ts_data *ts,
+> >  			slot = slots[i];
+> >  		}
+> >  
+> > +		if (ts->invert_x)
+> > +			touch->x = ts->max_x - touch->x;
+> > +
+> > +		if (ts->invert_y)
+> > +			touch->y = ts->max_y - touch->y;
+> > +
+> >  		input_mt_slot(ts->input, slot);
+> >  		input_mt_report_slot_state(ts->input,
+> >  					   MT_TOOL_FINGER, true);
+> >  
+> > -		input_event(ts->input, EV_ABS, ABS_MT_POSITION_X, touch->x);
+> > -		input_event(ts->input, EV_ABS, ABS_MT_POSITION_Y, touch->y);
+> > +		if (!ts->swap_x_y) {
+> > +			input_event(ts->input, EV_ABS, ABS_MT_POSITION_X,
+> > +					touch->x);
+> > +			input_event(ts->input, EV_ABS, ABS_MT_POSITION_Y,
+> > +					touch->y);
+> > +		} else {
+> > +			input_event(ts->input, EV_ABS, ABS_MT_POSITION_X,
+> > +					touch->y);
+> > +			input_event(ts->input, EV_ABS, ABS_MT_POSITION_Y,
+> > +					touch->x);
+> > +		}
+> >  
+> >  		dev_dbg(dev, "%d: slot %d, x %d, y %d\n",
+> >  			i, slot, touch->x, touch->y);
+> > @@ -194,6 +216,7 @@ static irqreturn_t pixcir_ts_isr(int irq, void *dev_id)
+> >  static void pixcir_reset(struct pixcir_i2c_ts_data *tsdata)
+> >  {
+> >  	if (!IS_ERR_OR_NULL(tsdata->gpio_reset)) {
+> > +		/* toggle reset pin */
+> >  		gpiod_set_value_cansleep(tsdata->gpio_reset, 1);
+> >  		ndelay(100);	/* datasheet section 1.2.3 says 80ns min. */
+> >  		gpiod_set_value_cansleep(tsdata->gpio_reset, 0);
+> > @@ -208,6 +231,14 @@ static int pixcir_set_power_mode(struct pixcir_i2c_ts_data *ts,
+> >  	struct device *dev = &ts->client->dev;
+> >  	int ret;
+> >  
+> > +	if (mode == PIXCIR_POWER_ACTIVE || mode == PIXCIR_POWER_IDLE) {
+> > +		if (!IS_ERR_OR_NULL(ts->gpio_wake)) {
+> > +			/* set wake pin */
+> > +			gpiod_set_value_cansleep(ts->gpio_wake, 1);
+> > +			dev_info(dev, "SET POWER: Set wake pin HIGH\n");
+> > +		}
+> > +	}
+> > +
+> >  	ret = i2c_smbus_read_byte_data(ts->client, PIXCIR_REG_POWER_MODE);
+> >  	if (ret < 0) {
+> >  		dev_err(dev, "%s: can't read reg 0x%x : %d\n",
+> > @@ -228,6 +259,14 @@ static int pixcir_set_power_mode(struct pixcir_i2c_ts_data *ts,
+> >  		return ret;
+> >  	}
+> >  
+> > +	if (mode == PIXCIR_POWER_HALT) {
+> > +		if (!IS_ERR_OR_NULL(ts->gpio_wake)) {
+> > +			/* set wake pin */
+> > +			gpiod_set_value_cansleep(ts->gpio_wake, 0);
+> > +			dev_info(dev, "SET POWER: Set wake pin LOW\n");
+> > +		}
+> > +	}
+> > +
+> >  	return 0;
+> >  }
+> >  
+> > @@ -302,6 +341,14 @@ static int pixcir_start(struct pixcir_i2c_ts_data *ts)
+> >  	struct device *dev = &ts->client->dev;
+> >  	int error;
+> >  
+> > +	if (!IS_ERR_OR_NULL(ts->gpio_enable)) {
+> > +		/* set enable pin */
+> > +		gpiod_set_value_cansleep(ts->gpio_enable, 1);
+> > +		dev_info(dev, "START: Set enable pin HIGH\n");
+> > +	}
+> > +
+> > +	msleep(100);
+> > +
+> >  	/* LEVEL_TOUCH interrupt with active low polarity */
+> >  	error = pixcir_set_int_mode(ts, PIXCIR_INT_LEVEL_TOUCH, 0);
+> >  	if (error) {
+> > @@ -325,6 +372,7 @@ static int pixcir_start(struct pixcir_i2c_ts_data *ts)
+> >  
+> >  static int pixcir_stop(struct pixcir_i2c_ts_data *ts)
+> >  {
+> > +	struct device *dev = &ts->client->dev;
+> >  	int error;
+> >  
+> >  	/* Disable interrupt generation */
+> > @@ -343,6 +391,12 @@ static int pixcir_stop(struct pixcir_i2c_ts_data *ts)
+> >  	/* Wait till running ISR is complete */
+> >  	synchronize_irq(ts->client->irq);
+> >  
+> > +	if (!IS_ERR_OR_NULL(ts->gpio_enable)) {
+> > +		/* set enable pin */
+> > +		gpiod_set_value_cansleep(ts->gpio_enable, 0);
+> > +		dev_info(dev, "STOP: Set enable pin LOW\n");
+> > +	}
+> > +
+> >  	return 0;
+> >  }
+> >  
+> > @@ -425,6 +479,7 @@ static int pixcir_parse_dt(struct device *dev,
+> >  			   struct pixcir_i2c_ts_data *tsdata)
+> >  {
+> >  	const struct of_device_id *match;
+> > +	struct device_node *np = dev->of_node;
+> >  
+> >  	match = of_match_device(of_match_ptr(pixcir_of_match), dev);
+> >  	if (!match)
+> > @@ -433,7 +488,12 @@ static int pixcir_parse_dt(struct device *dev,
+> >  	tsdata->chip = (const struct pixcir_i2c_chip_data *)match->data;
+> >  	if (!tsdata->chip)
+> >  		return -EINVAL;
+> > -
+> > +	
+> > +	/* Optional device tree properties */
+> > +	tsdata->swap_x_y = of_property_read_bool(np, "touchscreen-swapped-x-y");
+> > +	tsdata->invert_x = of_property_read_bool(np, "touchscreen-inverted-x");
+> > +	tsdata->invert_y = of_property_read_bool(np, "touchscreen-inverted-y");
+> > +	
+> >  	return 0;
+> >  }
+> >  #else
+> > @@ -490,19 +550,37 @@ static int pixcir_i2c_ts_probe(struct i2c_client *client,
+> >  	input->dev.parent = &client->dev;
+> >  
+> >  	if (pdata) {
+> > -		input_set_abs_params(input, ABS_MT_POSITION_X, 0, pdata->x_max, 0, 0);
+> > -		input_set_abs_params(input, ABS_MT_POSITION_Y, 0, pdata->y_max, 0, 0);
+> > +		if (!tsdata->swap_x_y) {
+> > +			input_set_abs_params(input, ABS_MT_POSITION_X, 0,
+> > +					     pdata->x_max, 0, 0);
+> > +			input_set_abs_params(input, ABS_MT_POSITION_Y, 0,
+> > +					     pdata->y_max, 0, 0);
+> > +		} else {
+> > +			input_set_abs_params(input, ABS_MT_POSITION_X, 0,
+> > +					     pdata->y_max, 0, 0);
+> > +			input_set_abs_params(input, ABS_MT_POSITION_Y, 0,
+> > +					     pdata->x_max, 0, 0);
+> > +		}
+> >  	} else {
+> >  		input_set_capability(input, EV_ABS, ABS_MT_POSITION_X);
+> >  		input_set_capability(input, EV_ABS, ABS_MT_POSITION_Y);
+> >  		touchscreen_parse_properties(input, true);
+> > -		if (!input_abs_get_max(input, ABS_MT_POSITION_X) ||
+> > -		    !input_abs_get_max(input, ABS_MT_POSITION_Y)) {
+> > +		tsdata->max_x = input_abs_get_max(input, ABS_MT_POSITION_X);
+> > +		tsdata->max_y = input_abs_get_max(input, ABS_MT_POSITION_Y);
+> > +		if (!tsdata->max_x || !tsdata->max_y) {
+> >  			dev_err(dev, "Touchscreen size is not specified\n");
+> >  			return -EINVAL;
+> >  		}
+> > +		if (tsdata->swap_x_y) {
+> > +			input_set_abs_params(input, ABS_MT_POSITION_X, 0,
+> > +					     tsdata->max_y, 0, 0);
+> > +			input_set_abs_params(input, ABS_MT_POSITION_Y, 0,
+> > +					     tsdata->max_x, 0, 0);
+> > +		}		
+> >  	}
+> >  
+> > +	
+> > +
+> >  	tsdata->max_fingers = tsdata->chip->max_fingers;
+> >  	if (tsdata->max_fingers > PIXCIR_MAX_SLOTS) {
+> >  		tsdata->max_fingers = PIXCIR_MAX_SLOTS;
+> > @@ -534,6 +612,24 @@ static int pixcir_i2c_ts_probe(struct i2c_client *client,
+> >  		return error;
+> >  	}
+> >  
+> > +	tsdata->gpio_wake = devm_gpiod_get(dev, "wake",
+> > +						     GPIOD_OUT_HIGH);
+> > +	if (IS_ERR(tsdata->gpio_wake)) {
+> > +		error = PTR_ERR(tsdata->gpio_wake);
+> > +		if (error != -EPROBE_DEFER)
+> > +			dev_err(dev, "Failed to request wake gpio: %d\n", error);
+> > +		return error;
+> > +	}
+> > +
+> > +	tsdata->gpio_enable = devm_gpiod_get(dev, "enable",
+> > +						     GPIOD_OUT_HIGH);
+> > +	if (IS_ERR(tsdata->gpio_enable)) {
+> > +		error = PTR_ERR(tsdata->gpio_enable);
+> > +		if (error != -EPROBE_DEFER)
+> > +			dev_err(dev, "Failed to request enable gpio: %d\n", error);
+> > +		return error;
+> > +	}
+> > +
+> >  	error = devm_request_threaded_irq(dev, client->irq, NULL, pixcir_ts_isr,
+> >  					  IRQF_TRIGGER_FALLING | IRQF_ONESHOT,
+> >  					  client->name, tsdata);
+> > @@ -542,6 +638,21 @@ static int pixcir_i2c_ts_probe(struct i2c_client *client,
+> >  		return error;
+> >  	}
+> >  
+> > +
+> > +	if (!IS_ERR_OR_NULL(tsdata->gpio_enable)) {
+> > +		/* set enable pin */
+> > +		gpiod_set_value_cansleep(tsdata->gpio_enable, 1);
+> > +		dev_info(dev, "PROBE: Set enable pin HIGH\n");
+> > +	}
+> > +
+> > +	if (!IS_ERR_OR_NULL(tsdata->gpio_wake)) {
+> > +		/* set wake pin */
+> > +		gpiod_set_value_cansleep(tsdata->gpio_wake, 1);
+> > +		dev_info(dev, "PROBE: Set wake pin HIGH\n");
+> > +	}
 
-diff --git a/drivers/bus/Kconfig b/drivers/bus/Kconfig
-index 116b363..3793f4e 100644
---- a/drivers/bus/Kconfig
-+++ b/drivers/bus/Kconfig
-@@ -34,7 +34,7 @@ config ARM_CCI400_PORT_CTRL
- 	  Low level power management driver for CCI400 cache coherent
- 	  interconnect for ARM platforms.
- 
--config ARM_CCI500_PMU
-+config ARM_CCI5xx_PMU
- 	bool "ARM CCI500 PMU support"
- 	depends on (ARM && CPU_V7) || ARM64
- 	depends on PERF_EVENTS
-diff --git a/drivers/bus/arm-cci.c b/drivers/bus/arm-cci.c
-index 6020a02..95e210e 100644
---- a/drivers/bus/arm-cci.c
-+++ b/drivers/bus/arm-cci.c
-@@ -52,7 +52,7 @@ static const struct of_device_id arm_cci_matches[] = {
- #ifdef CONFIG_ARM_CCI400_COMMON
- 	{.compatible = "arm,cci-400", .data = CCI400_PORTS_DATA },
- #endif
--#ifdef CONFIG_ARM_CCI500_PMU
-+#ifdef CONFIG_ARM_CCI5xx_PMU
- 	{ .compatible = "arm,cci-500", },
- #endif
- 	{},
-@@ -92,7 +92,7 @@ static const struct of_device_id arm_cci_matches[] = {
- enum {
- 	CCI_IF_SLAVE,
- 	CCI_IF_MASTER,
--#ifdef CONFIG_ARM_CCI500_PMU
-+#ifdef CONFIG_ARM_CCI5xx_PMU
- 	CCI_IF_GLOBAL,
- #endif
- 	CCI_IF_MAX,
-@@ -154,7 +154,7 @@ enum cci_models {
- 	CCI400_R0,
- 	CCI400_R1,
- #endif
--#ifdef CONFIG_ARM_CCI500_PMU
-+#ifdef CONFIG_ARM_CCI5xx_PMU
- 	CCI500_R0,
- #endif
- 	CCI_MODEL_MAX
-@@ -424,73 +424,67 @@ static inline struct cci_pmu_model *probe_cci_model(struct platform_device *pdev
- }
- #endif	/* CONFIG_ARM_CCI400_PMU */
- 
--#ifdef CONFIG_ARM_CCI500_PMU
-+#ifdef CONFIG_ARM_CCI5xx_PMU
- 
- /*
-- * CCI500 provides 8 independent event counters that can count
-- * any of the events available.
-- *
-- * CCI500 PMU event id is an 9-bit value made of two parts.
-+ * CCI5xx PMU event id is an 9-bit value made of two parts.
-  *	 bits [8:5] - Source for the event
-- *		      0x0-0x6 - Slave interfaces
-- *		      0x8-0xD - Master interfaces
-- *		      0xf     - Global Events
-- *		      0x7,0xe - Reserved
-- *
-  *	 bits [4:0] - Event code (specific to type of interface)
-+ *
-+ *
-  */
- 
- /* Port ids */
--#define CCI500_PORT_S0			0x0
--#define CCI500_PORT_S1			0x1
--#define CCI500_PORT_S2			0x2
--#define CCI500_PORT_S3			0x3
--#define CCI500_PORT_S4			0x4
--#define CCI500_PORT_S5			0x5
--#define CCI500_PORT_S6			0x6
--
--#define CCI500_PORT_M0			0x8
--#define CCI500_PORT_M1			0x9
--#define CCI500_PORT_M2			0xa
--#define CCI500_PORT_M3			0xb
--#define CCI500_PORT_M4			0xc
--#define CCI500_PORT_M5			0xd
--
--#define CCI500_PORT_GLOBAL 		0xf
--
--#define CCI500_PMU_EVENT_MASK		0x1ffUL
--#define CCI500_PMU_EVENT_SOURCE_SHIFT	0x5
--#define CCI500_PMU_EVENT_SOURCE_MASK	0xf
--#define CCI500_PMU_EVENT_CODE_SHIFT	0x0
--#define CCI500_PMU_EVENT_CODE_MASK	0x1f
--
--#define CCI500_PMU_EVENT_SOURCE(event)	\
--	((event >> CCI500_PMU_EVENT_SOURCE_SHIFT) & CCI500_PMU_EVENT_SOURCE_MASK)
--#define CCI500_PMU_EVENT_CODE(event)	\
--	((event >> CCI500_PMU_EVENT_CODE_SHIFT) & CCI500_PMU_EVENT_CODE_MASK)
--
--#define CCI500_SLAVE_PORT_MIN_EV	0x00
--#define CCI500_SLAVE_PORT_MAX_EV	0x1f
--#define CCI500_MASTER_PORT_MIN_EV	0x00
--#define CCI500_MASTER_PORT_MAX_EV	0x06
--#define CCI500_GLOBAL_PORT_MIN_EV	0x00
--#define CCI500_GLOBAL_PORT_MAX_EV	0x0f
--
--
--#define CCI500_GLOBAL_EVENT_EXT_ATTR_ENTRY(_name, _config) \
--	CCI_EXT_ATTR_ENTRY(_name, cci500_pmu_global_event_show, \
-+#define CCI5xx_PORT_S0			0x0
-+#define CCI5xx_PORT_S1			0x1
-+#define CCI5xx_PORT_S2			0x2
-+#define CCI5xx_PORT_S3			0x3
-+#define CCI5xx_PORT_S4			0x4
-+#define CCI5xx_PORT_S5			0x5
-+#define CCI5xx_PORT_S6			0x6
-+
-+#define CCI5xx_PORT_M0			0x8
-+#define CCI5xx_PORT_M1			0x9
-+#define CCI5xx_PORT_M2			0xa
-+#define CCI5xx_PORT_M3			0xb
-+#define CCI5xx_PORT_M4			0xc
-+#define CCI5xx_PORT_M5			0xd
-+
-+#define CCI5xx_PORT_GLOBAL		0xf
-+
-+#define CCI5xx_PMU_EVENT_MASK		0x1ffUL
-+#define CCI5xx_PMU_EVENT_SOURCE_SHIFT	0x5
-+#define CCI5xx_PMU_EVENT_SOURCE_MASK	0xf
-+#define CCI5xx_PMU_EVENT_CODE_SHIFT	0x0
-+#define CCI5xx_PMU_EVENT_CODE_MASK	0x1f
-+
-+#define CCI5xx_PMU_EVENT_SOURCE(event)	\
-+	((event >> CCI5xx_PMU_EVENT_SOURCE_SHIFT) & CCI5xx_PMU_EVENT_SOURCE_MASK)
-+#define CCI5xx_PMU_EVENT_CODE(event)	\
-+	((event >> CCI5xx_PMU_EVENT_CODE_SHIFT) & CCI5xx_PMU_EVENT_CODE_MASK)
-+
-+#define CCI5xx_SLAVE_PORT_MIN_EV	0x00
-+#define CCI5xx_SLAVE_PORT_MAX_EV	0x1f
-+#define CCI5xx_MASTER_PORT_MIN_EV	0x00
-+#define CCI5xx_MASTER_PORT_MAX_EV	0x06
-+#define CCI5xx_GLOBAL_PORT_MIN_EV	0x00
-+#define CCI5xx_GLOBAL_PORT_MAX_EV	0x0f
-+
-+
-+#define CCI5xx_GLOBAL_EVENT_EXT_ATTR_ENTRY(_name, _config) \
-+	CCI_EXT_ATTR_ENTRY(_name, cci5xx_pmu_global_event_show, \
- 					(unsigned long) _config)
- 
--static ssize_t cci500_pmu_global_event_show(struct device *dev,
-+static ssize_t cci5xx_pmu_global_event_show(struct device *dev,
- 				struct device_attribute *attr, char *buf);
- 
--static struct attribute *cci500_pmu_format_attrs[] = {
-+static struct attribute *cci5xx_pmu_format_attrs[] = {
- 	CCI_FORMAT_EXT_ATTR_ENTRY(event, "config:0-4"),
- 	CCI_FORMAT_EXT_ATTR_ENTRY(source, "config:5-8"),
- 	NULL,
- };
- 
--static struct attribute *cci500_pmu_event_attrs[] = {
-+static struct attribute *cci5xx_pmu_event_attrs[] = {
- 	/* Slave events */
- 	CCI_EVENT_EXT_ATTR_ENTRY(si_rrq_hs_arvalid, 0x0),
- 	CCI_EVENT_EXT_ATTR_ENTRY(si_rrq_dev, 0x1),
-@@ -535,64 +529,73 @@ static struct attribute *cci500_pmu_event_attrs[] = {
- 	CCI_EVENT_EXT_ATTR_ENTRY(mi_w_resp_stall, 0x6),
- 
- 	/* Global events */
--	CCI500_GLOBAL_EVENT_EXT_ATTR_ENTRY(cci_snoop_access_filter_bank_0_1, 0x0),
--	CCI500_GLOBAL_EVENT_EXT_ATTR_ENTRY(cci_snoop_access_filter_bank_2_3, 0x1),
--	CCI500_GLOBAL_EVENT_EXT_ATTR_ENTRY(cci_snoop_access_filter_bank_4_5, 0x2),
--	CCI500_GLOBAL_EVENT_EXT_ATTR_ENTRY(cci_snoop_access_filter_bank_6_7, 0x3),
--	CCI500_GLOBAL_EVENT_EXT_ATTR_ENTRY(cci_snoop_access_miss_filter_bank_0_1, 0x4),
--	CCI500_GLOBAL_EVENT_EXT_ATTR_ENTRY(cci_snoop_access_miss_filter_bank_2_3, 0x5),
--	CCI500_GLOBAL_EVENT_EXT_ATTR_ENTRY(cci_snoop_access_miss_filter_bank_4_5, 0x6),
--	CCI500_GLOBAL_EVENT_EXT_ATTR_ENTRY(cci_snoop_access_miss_filter_bank_6_7, 0x7),
--	CCI500_GLOBAL_EVENT_EXT_ATTR_ENTRY(cci_snoop_back_invalidation, 0x8),
--	CCI500_GLOBAL_EVENT_EXT_ATTR_ENTRY(cci_snoop_stall_alloc_busy, 0x9),
--	CCI500_GLOBAL_EVENT_EXT_ATTR_ENTRY(cci_snoop_stall_tt_full, 0xA),
--	CCI500_GLOBAL_EVENT_EXT_ATTR_ENTRY(cci_wrq, 0xB),
--	CCI500_GLOBAL_EVENT_EXT_ATTR_ENTRY(cci_snoop_cd_hs, 0xC),
--	CCI500_GLOBAL_EVENT_EXT_ATTR_ENTRY(cci_rq_stall_addr_hazard, 0xD),
--	CCI500_GLOBAL_EVENT_EXT_ATTR_ENTRY(cci_snopp_rq_stall_tt_full, 0xE),
--	CCI500_GLOBAL_EVENT_EXT_ATTR_ENTRY(cci_snoop_rq_tzmp1_prot, 0xF),
-+	CCI5xx_GLOBAL_EVENT_EXT_ATTR_ENTRY(cci_snoop_access_filter_bank_0_1, 0x0),
-+	CCI5xx_GLOBAL_EVENT_EXT_ATTR_ENTRY(cci_snoop_access_filter_bank_2_3, 0x1),
-+	CCI5xx_GLOBAL_EVENT_EXT_ATTR_ENTRY(cci_snoop_access_filter_bank_4_5, 0x2),
-+	CCI5xx_GLOBAL_EVENT_EXT_ATTR_ENTRY(cci_snoop_access_filter_bank_6_7, 0x3),
-+	CCI5xx_GLOBAL_EVENT_EXT_ATTR_ENTRY(cci_snoop_access_miss_filter_bank_0_1, 0x4),
-+	CCI5xx_GLOBAL_EVENT_EXT_ATTR_ENTRY(cci_snoop_access_miss_filter_bank_2_3, 0x5),
-+	CCI5xx_GLOBAL_EVENT_EXT_ATTR_ENTRY(cci_snoop_access_miss_filter_bank_4_5, 0x6),
-+	CCI5xx_GLOBAL_EVENT_EXT_ATTR_ENTRY(cci_snoop_access_miss_filter_bank_6_7, 0x7),
-+	CCI5xx_GLOBAL_EVENT_EXT_ATTR_ENTRY(cci_snoop_back_invalidation, 0x8),
-+	CCI5xx_GLOBAL_EVENT_EXT_ATTR_ENTRY(cci_snoop_stall_alloc_busy, 0x9),
-+	CCI5xx_GLOBAL_EVENT_EXT_ATTR_ENTRY(cci_snoop_stall_tt_full, 0xA),
-+	CCI5xx_GLOBAL_EVENT_EXT_ATTR_ENTRY(cci_wrq, 0xB),
-+	CCI5xx_GLOBAL_EVENT_EXT_ATTR_ENTRY(cci_snoop_cd_hs, 0xC),
-+	CCI5xx_GLOBAL_EVENT_EXT_ATTR_ENTRY(cci_rq_stall_addr_hazard, 0xD),
-+	CCI5xx_GLOBAL_EVENT_EXT_ATTR_ENTRY(cci_snopp_rq_stall_tt_full, 0xE),
-+	CCI5xx_GLOBAL_EVENT_EXT_ATTR_ENTRY(cci_snoop_rq_tzmp1_prot, 0xF),
- 	NULL
- };
- 
--static ssize_t cci500_pmu_global_event_show(struct device *dev,
-+static ssize_t cci5xx_pmu_global_event_show(struct device *dev,
- 				struct device_attribute *attr, char *buf)
- {
- 	struct dev_ext_attribute *eattr = container_of(attr,
- 					struct dev_ext_attribute, attr);
- 	/* Global events have single fixed source code */
- 	return snprintf(buf, PAGE_SIZE, "event=0x%lx,source=0x%x\n",
--				(unsigned long)eattr->var, CCI500_PORT_GLOBAL);
-+				(unsigned long)eattr->var, CCI5xx_PORT_GLOBAL);
- }
- 
-+/*
-+ * CCI500 provides 8 independent event counters that can count
-+ * any of the events available.
-+ * CCI500 PMU event source ids
-+ *	0x0-0x6 - Slave interfaces
-+ *	0x8-0xD - Master interfaces
-+ *	0xf     - Global Events
-+ *	0x7,0xe - Reserved
-+ */
- static int cci500_validate_hw_event(struct cci_pmu *cci_pmu,
- 					unsigned long hw_event)
- {
--	u32 ev_source = CCI500_PMU_EVENT_SOURCE(hw_event);
--	u32 ev_code = CCI500_PMU_EVENT_CODE(hw_event);
-+	u32 ev_source = CCI5xx_PMU_EVENT_SOURCE(hw_event);
-+	u32 ev_code = CCI5xx_PMU_EVENT_CODE(hw_event);
- 	int if_type;
- 
--	if (hw_event & ~CCI500_PMU_EVENT_MASK)
-+	if (hw_event & ~CCI5xx_PMU_EVENT_MASK)
- 		return -ENOENT;
- 
- 	switch (ev_source) {
--	case CCI500_PORT_S0:
--	case CCI500_PORT_S1:
--	case CCI500_PORT_S2:
--	case CCI500_PORT_S3:
--	case CCI500_PORT_S4:
--	case CCI500_PORT_S5:
--	case CCI500_PORT_S6:
-+	case CCI5xx_PORT_S0:
-+	case CCI5xx_PORT_S1:
-+	case CCI5xx_PORT_S2:
-+	case CCI5xx_PORT_S3:
-+	case CCI5xx_PORT_S4:
-+	case CCI5xx_PORT_S5:
-+	case CCI5xx_PORT_S6:
- 		if_type = CCI_IF_SLAVE;
- 		break;
--	case CCI500_PORT_M0:
--	case CCI500_PORT_M1:
--	case CCI500_PORT_M2:
--	case CCI500_PORT_M3:
--	case CCI500_PORT_M4:
--	case CCI500_PORT_M5:
-+	case CCI5xx_PORT_M0:
-+	case CCI5xx_PORT_M1:
-+	case CCI5xx_PORT_M2:
-+	case CCI5xx_PORT_M3:
-+	case CCI5xx_PORT_M4:
-+	case CCI5xx_PORT_M5:
- 		if_type = CCI_IF_MASTER;
- 		break;
--	case CCI500_PORT_GLOBAL:
-+	case CCI5xx_PORT_GLOBAL:
- 		if_type = CCI_IF_GLOBAL;
- 		break;
- 	default:
-@@ -605,7 +608,8 @@ static int cci500_validate_hw_event(struct cci_pmu *cci_pmu,
- 
- 	return -ENOENT;
- }
--#endif	/* CONFIG_ARM_CCI500_PMU */
-+
-+#endif	/* CONFIG_ARM_CCI5xx_PMU */
- 
- static ssize_t cci_pmu_format_show(struct device *dev,
- 			struct device_attribute *attr, char *buf)
-@@ -835,7 +839,7 @@ static void __pmu_write_counter(struct cci_pmu *cci_pmu, u32 value, int idx)
- 	pmu_write_register(cci_pmu, value, idx, CCI_PMU_CNTR);
- }
- 
--#ifdef CONFIG_ARM_CCI500_PMU
-+#ifdef CONFIG_ARM_CCI5xx_PMU
- 
- /*
-  * CCI-500 has advanced power saving policies, which could gate the
-@@ -860,16 +864,16 @@ static void __pmu_write_counter(struct cci_pmu *cci_pmu, u32 value, int idx)
-  * assigned a valid code for step(2). We use the highest possible
-  * event code (0x1f) for the master interface 0.
-  */
--#define CCI500_INVALID_EVENT	((CCI500_PORT_M0 << CCI500_PMU_EVENT_SOURCE_SHIFT) | \
--				 (CCI500_PMU_EVENT_CODE_MASK << CCI500_PMU_EVENT_CODE_SHIFT))
--static void cci500_pmu_write_counter(struct cci_pmu *cci_pmu, u32 value, int idx)
-+#define CCI5xx_INVALID_EVENT	((CCI5xx_PORT_M0 << CCI5xx_PMU_EVENT_SOURCE_SHIFT) | \
-+				 (CCI5xx_PMU_EVENT_CODE_MASK << CCI5xx_PMU_EVENT_CODE_SHIFT))
-+static void cci5xx_pmu_write_counter(struct cci_pmu *cci_pmu, u32 value, int idx)
- {
- 	unsigned long mask[BITS_TO_LONGS(cci_pmu->num_cntrs)];
- 	u32 event;
- 
- 	pmu_disable_counters(cci_pmu, mask);
- 	event = pmu_get_event(cci_pmu, idx);
--	pmu_set_event(cci_pmu, idx, CCI500_INVALID_EVENT);
-+	pmu_set_event(cci_pmu, idx, CCI5xx_INVALID_EVENT);
- 	pmu_enable_counter(cci_pmu, idx);
- 	__cci_pmu_enable();
- 	__pmu_write_counter(cci_pmu, value, idx);
-@@ -879,7 +883,7 @@ static void cci500_pmu_write_counter(struct cci_pmu *cci_pmu, u32 value, int idx
- 	pmu_restore_counters(cci_pmu, mask);
- }
- 
--#endif	/* CONFIG_ARM_CCI500_PMU */
-+#endif	/* CONFIG_ARM_CCI5xx_PMU */
- 
- static void pmu_write_counter(struct perf_event *event, u32 value)
- {
-@@ -1445,30 +1449,30 @@ static struct cci_pmu_model cci_pmu_models[] = {
- 		.get_event_idx = cci400_get_event_idx,
- 	},
- #endif
--#ifdef CONFIG_ARM_CCI500_PMU
-+#ifdef CONFIG_ARM_CCI5xx_PMU
- 	[CCI500_R0] = {
- 		.name = "CCI_500",
- 		.fixed_hw_cntrs = 0,
- 		.num_hw_cntrs = 8,
- 		.cntr_size = SZ_64K,
--		.format_attrs = cci500_pmu_format_attrs,
--		.event_attrs = cci500_pmu_event_attrs,
-+		.format_attrs = cci5xx_pmu_format_attrs,
-+		.event_attrs = cci5xx_pmu_event_attrs,
- 		.event_ranges = {
- 			[CCI_IF_SLAVE] = {
--				CCI500_SLAVE_PORT_MIN_EV,
--				CCI500_SLAVE_PORT_MAX_EV,
-+				CCI5xx_SLAVE_PORT_MIN_EV,
-+				CCI5xx_SLAVE_PORT_MAX_EV,
- 			},
- 			[CCI_IF_MASTER] = {
--				CCI500_MASTER_PORT_MIN_EV,
--				CCI500_MASTER_PORT_MAX_EV,
-+				CCI5xx_MASTER_PORT_MIN_EV,
-+				CCI5xx_MASTER_PORT_MAX_EV,
- 			},
- 			[CCI_IF_GLOBAL] = {
--				CCI500_GLOBAL_PORT_MIN_EV,
--				CCI500_GLOBAL_PORT_MAX_EV,
-+				CCI5xx_GLOBAL_PORT_MIN_EV,
-+				CCI5xx_GLOBAL_PORT_MAX_EV,
- 			},
- 		},
- 		.validate_hw_event = cci500_validate_hw_event,
--		.write_counter	= cci500_pmu_write_counter,
-+		.write_counter	= cci5xx_pmu_write_counter,
- 	},
- #endif
- };
-@@ -1488,7 +1492,7 @@ static const struct of_device_id arm_cci_pmu_matches[] = {
- 		.data	= &cci_pmu_models[CCI400_R1],
- 	},
- #endif
--#ifdef CONFIG_ARM_CCI500_PMU
-+#ifdef CONFIG_ARM_CCI5xx_PMU
- 	{
- 		.compatible = "arm,cci-500-pmu,r0",
- 		.data = &cci_pmu_models[CCI500_R0],
+You requested them active, why do you need to set them again to active
+here?
+
+> > +
+> > +	msleep(100);
+> > +
+> >  	pixcir_reset(tsdata);
+> >  
+> >  	/* Always be in IDLE mode to save power, device supports auto wake */
+> > -- 
+> > 2.5.0
+> > 
+> > 
+> > _______________________________________________
+> > linux-arm-kernel mailing list
+> > linux-arm-kernel at lists.infradead.org
+> > http://lists.infradead.org/mailman/listinfo/linux-arm-kernel
+
 -- 
-1.7.9.5
+Dmitry
