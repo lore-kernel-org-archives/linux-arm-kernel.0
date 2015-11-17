@@ -1,87 +1,107 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 17 Nov 2015 17:46:36 +0000
-Subject: [PATCH] IOMMU: arm-smmu-v3: Use STE.S1STALLD only when supported
-In-Reply-To: <1447663700-13309-1-git-send-email-pmallapp@broadcom.com>
-References: <1447663700-13309-1-git-send-email-pmallapp@broadcom.com>
-Message-ID: <20151117174636.GO30101@arm.com>
+From: julia.lawall@lip6.fr (Julia Lawall)
+Date: Tue, 17 Nov 2015 18:48:39 +0100 (CET)
+Subject: [PATCH 1/7] phy: brcmstb-sata: add missing of_node_put
+In-Reply-To: <20151117174430.GA8456@google.com>
+References: <1447673600-8881-1-git-send-email-Julia.Lawall@lip6.fr>
+ <1447673600-8881-2-git-send-email-Julia.Lawall@lip6.fr>
+ <20151117013830.GV8456@google.com>
+ <alpine.DEB.2.02.1511170711340.2045@localhost6.localdomain6>
+ <20151117174430.GA8456@google.com>
+Message-ID: <alpine.DEB.2.10.1511171846120.2455@hadrien>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Prem,
 
-Thanks for the patch. Just a few minor comments...
 
-On Mon, Nov 16, 2015 at 02:18:20PM +0530, pmallapp at broadcom.com wrote:
-> From: Prem Mallappa <pmallapp@broadcom.com>
-> 
-> Also fix the STALLD check.
+On Tue, 17 Nov 2015, Brian Norris wrote:
 
-Can you extend the commit message please to explain that it is ILLEGAL
-to set STE.S1STALLD to 1 if stage 1 is enabled and either the stall or
-terminate models are not supported?
-
-> Signed-off-by: Prem Mallappa <pmallapp@broadcom.com>
-> ---
->  drivers/iommu/arm-smmu-v3.c | 16 +++++++++++++---
->  1 file changed, 13 insertions(+), 3 deletions(-)
-> 
-> diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
-> index ed409cb..804671c 100644
-> --- a/drivers/iommu/arm-smmu-v3.c
-> +++ b/drivers/iommu/arm-smmu-v3.c
-> @@ -38,7 +38,9 @@
->  #define IDR0_ST_LVL_SHIFT		27
->  #define IDR0_ST_LVL_MASK		0x3
->  #define IDR0_ST_LVL_2LVL		(1 << IDR0_ST_LVL_SHIFT)
-> -#define IDR0_STALL_MODEL		(3 << 24)
-> +#define IDR0_STALL_SHIFT		24
-
-To keep the style consistent, can you also add IDR0_STALL_MASK please...
-
-> +#define IDR0_STALL_MODEL_STALL		0x0
-> +#define IDR0_STALL_MODEL_FORCE		0x2
-
-... and shift these guys left by IDR0_STALL_SHIFT?
-
+> On Tue, Nov 17, 2015 at 07:12:22AM +0100, Julia Lawall wrote:
+> > On Mon, 16 Nov 2015, Brian Norris wrote:
+> > >
+> > > This reminds me of a potential problem I'm looking at in other
+> > > subsystems: from code reading (I haven't seen any issues in practice,
+> > > probably because I don't use OF_DYNAMIC) it looks like device-creating
+> > > infrastructure like the PHY subsystem should be acquiring a reference to
+> > > the device_node when they stash it away. But drivers/phy/phy-core.c does
+> > > not do this, AFAICT.
+> > >
+> > > See phy_create(), which does
+> > >
+> > > 	phy->dev.of_node = node ?: dev->of_node;
+> > >
+> > > and later might reuse this of_node pointer, even though it never called
+> > > of_node_get() on this node.
+> > >
+> > > Potential patch to fix this (not tested).
+> > >
+> > > Signed-off-by: Brian Norris <computersforpeace@gmail.com>
+> > >
+> > > diff --git a/drivers/phy/phy-core.c b/drivers/phy/phy-core.c
+> > > index fc48fac003a6..8df29caeeef9 100644
+> > > --- a/drivers/phy/phy-core.c
+> > > +++ b/drivers/phy/phy-core.c
+> > > @@ -697,6 +697,7 @@ struct phy *phy_create(struct device *dev, struct device_node *node,
+> > >  	phy->dev.class = phy_class;
+> > >  	phy->dev.parent = dev;
+> > >  	phy->dev.of_node = node ?: dev->of_node;
+> > > +	of_node_get(phy->dev.of_node);
+> >
+> > Why not put of_node_get around dev->of_node?
 >
->  #define IDR0_TTENDIAN_SHIFT		21
->  #define IDR0_TTENDIAN_MASK		0x3
->  #define IDR0_TTENDIAN_LE		(2 << IDR0_TTENDIAN_SHIFT)
-> @@ -1051,12 +1053,14 @@ static void arm_smmu_write_strtab_ent(struct arm_smmu_device *smmu, u32 sid,
->  			 STRTAB_STE_1_S1C_CACHE_WBRA
->  			 << STRTAB_STE_1_S1COR_SHIFT |
->  			 STRTAB_STE_1_S1C_SH_ISH << STRTAB_STE_1_S1CSH_SHIFT |
-> -			 STRTAB_STE_1_S1STALLD |
->  #ifdef CONFIG_PCI_ATS
->  			 STRTAB_STE_1_EATS_TRANS << STRTAB_STE_1_EATS_SHIFT |
->  #endif
->  			 STRTAB_STE_1_STRW_NSEL1 << STRTAB_STE_1_STRW_SHIFT);
->  
-> +		if (smmu->features & ARM_SMMU_FEAT_STALLS)
-> +			dst[1] |= cpu_to_le64(STRTAB_STE_1_S1STALLD);
-> +
->  		val |= (ste->s1_cfg->cdptr_dma & STRTAB_STE_0_S1CTXPTR_MASK
->  		        << STRTAB_STE_0_S1CTXPTR_SHIFT) |
->  			STRTAB_STE_0_CFG_S1_TRANS;
-> @@ -2483,8 +2487,14 @@ static int arm_smmu_device_probe(struct arm_smmu_device *smmu)
->  		dev_warn(smmu->dev, "IDR0.COHACC overridden by dma-coherent property (%s)\n",
->  			 coherent ? "true" : "false");
->  
-> -	if (reg & IDR0_STALL_MODEL)
-> +	switch ((reg >> IDR0_STALL_SHIFT) & 0x3) {
+> Like this?
+>
+> 	phy->dev.of_node = node ?: of_node_get(dev->of_node);
+>
+> Or this?
+>
+> 	phy->dev.of_node = of_node_get(node ?: dev->of_node);
+>
+> The former wouldn't do what I proposed; if this PHY device is created
+> with a sub-node of 'dev' rather than dev->of_node, then the caller will
+> pass it in as the 2nd argument to phy_create (i.e., 'node'), and then I
+> expect it's the PHY core's responsibility to refcount it.
+>
+> I'd be fine with the latter. Looks a little better, I suppose.
 
-Then structure this more like the TTENDIAN code:
+I proposed it because I was worried that the of_node field could end up
+containing something that had been freed.  But probably this is not
+possible?  If it is not possible, then the ?: in the function argument is
+probably a bit ugly...
 
-  switch (reg & IDR0_STALL_MASK << IDR0_STALL_SHIFT) {
+Is this something that should be checked for elsewhere?
 
-> +	case IDR0_STALL_MODEL_STALL:
-> +	case IDR0_STALL_MODEL_FORCE:
->  		smmu->features |= ARM_SMMU_FEAT_STALLS;
-> +		break;
-> +	default:
-> +		break;
-> +	}
+julia
 
-I think you can drop the default case, or does GCC complain?
-
-Will
+> If my understanding is correct, I'll send a proper patch to do the
+> latter.
+>
+> Regards,
+> Brian
+>
+> > julia
+> >
+> > >  	phy->id = id;
+> > >  	phy->ops = ops;
+> > >
+> > > @@ -726,6 +727,7 @@ struct phy *phy_create(struct device *dev, struct device_node *node,
+> > >  	return phy;
+> > >
+> > >  put_dev:
+> > > +	of_node_put(phy->dev.of_node);
+> > >  	put_device(&phy->dev);  /* calls phy_release() which frees resources */
+> > >  	return ERR_PTR(ret);
+> > >
+> > > @@ -775,6 +777,7 @@ EXPORT_SYMBOL_GPL(devm_phy_create);
+> > >   */
+> > >  void phy_destroy(struct phy *phy)
+> > >  {
+> > > +	of_node_put(phy->dev.of_node);
+> > >  	pm_runtime_disable(&phy->dev);
+> > >  	device_unregister(&phy->dev);
+> > >  }
+> > > --
+> > > To unsubscribe from this list: send the line "unsubscribe kernel-janitors" in
+> > > the body of a message to majordomo at vger.kernel.org
+> > > More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> > >
+>
