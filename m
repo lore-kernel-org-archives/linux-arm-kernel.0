@@ -1,71 +1,61 @@
-From: bayi.cheng@mediatek.com (Bayi Cheng)
-Date: Tue, 17 Nov 2015 17:46:14 +0800
-Subject: [PATCH v7 0/2] Mediatek SPI-NOR flash driver 
-Message-ID: <1447753576-28528-1-git-send-email-bayi.cheng@mediatek.com>
+From: shannon.zhao@linaro.org (shannon.zhao at linaro.org)
+Date: Tue, 17 Nov 2015 17:40:43 +0800
+Subject: [PATCH v3 44/62] ACPICA: ACPI 6.0: Add support for STAO table
+In-Reply-To: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
+References: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
+Message-ID: <1447753261-7552-45-git-send-email-shannon.zhao@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This series is based on v4.4-rc1 and l2-mtd.git [0] and erase_sector
-implementation patch [1]
+From: Bob Moore <robert.moore@intel.com>
 
-[0]: git://git.infradead.org/l2-mtd.git
-[1]: http://lists.infradead.org/pipermail/linux-mtd/2015-October//062959.html
+ACPICA commit 532bf402a503061afd9d80a23e1d3c8fd99b052c
 
-Change in v7:
-1: change PRGDATA3 to PRGDATA4 for quad mode
-2: drop  PRGDATA3 for signal read mode
-3: drop unnecessary partition parser data
-4: convert mtd_device_parse_register to mtd_device_register
-5: disable clocks on failure
+_STA override table.
 
-Change in v6:
-1: delete mt8173_nor_do_rx
-2: delete mt8173_nor_do_rx
-3: add mt8173_nor_do_tx_rx for general usage
-4: support nor flash with 6 IDs
-5: delete mt8173_nor_erase_sector and use "nor->erase_opcode"
-6: add mt8173_nor_set_addr to programming the address register
-7: initialize the ppdata in mtk_nor_init
+Link: https://github.com/acpica/acpica/commit/532bf402
+Signed-off-by: Bob Moore <robert.moore@intel.com>
+Signed-off-by: Lv Zheng <lv.zheng@intel.com>
+Signed-off-by: Rafael J. Wysocki <rafael.j.wysocki@intel.com>
+[Linux commit 37e12657f8922ebc62f696494c56c81db509053e]
+Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+---
+ xen/include/acpi/actbl3.h | 16 ++++++++++++++++
+ 1 file changed, 16 insertions(+)
 
-Change in v5:
-1: add "status = "disable"" to device tree
-2: add document "flash" node
-3: fix some statement error in Kconfig file
-4: fix alphabetical order error in makefile
-5: delete the parament "mtd_info *mtd" in mt8173_nor structure
-6: delete SPINOR_OP_WREN repeated calls
-7: add mt8173_nor_do_tx & mt8173_nor_do_rx for them full potential
-8: use a subnode to represent the flash
-
-Change in v4:
-1: delete the parament "write_enable" for mt8173_nor_write_reg
-2: fix the build warning for calling mt8173_nor_write_single_byte
-
-Change in v3:
-1: use switch() to replace some if-else statement
-2: use shifts to replace endianness statement
-3: delete some unused macros
-4: use auto-increment mechanism for single write
-5: write address added to 32bytes
-
-Change in v2:
-1. Rebase to 4.3-rc1
-2. propagate error code
-3. delete mux clock and axi clock in dts file
-4. descripts more exactly for binding file
-5. change file names from mtk-nor.c to mtk_quadspi.c
-6. delete some functions witch were used once time
-
-Bayi Cheng (2):
-  mtd: mtk-nor: mtk serial flash controller driver
-  arm64: dts: mt8173: Add nor flash node
-
- arch/arm64/boot/dts/mediatek/mt8173.dtsi |  18 +-
- drivers/mtd/spi-nor/Kconfig              |   7 +
- drivers/mtd/spi-nor/Makefile             |   1 +
- drivers/mtd/spi-nor/mtk-quadspi.c        | 483 +++++++++++++++++++++++++++++++
- 4 files changed, 508 insertions(+), 1 deletion(-)
- create mode 100644 drivers/mtd/spi-nor/mtk-quadspi.c
-
---
-1.8.1.1.dirty
+diff --git a/xen/include/acpi/actbl3.h b/xen/include/acpi/actbl3.h
+index fc96963..cb9e1c0 100644
+--- a/xen/include/acpi/actbl3.h
++++ b/xen/include/acpi/actbl3.h
+@@ -68,6 +68,7 @@
+ #define ACPI_SIG_PCCT           "PCCT"	/* Platform Communications Channel Table */
+ #define ACPI_SIG_PMTT           "PMTT"	/* Platform Memory Topology Table */
+ #define ACPI_SIG_RASF           "RASF"	/* RAS Feature table */
++#define ACPI_SIG_STAO           "STAO" /* Status Override table */
+ 
+ #define ACPI_SIG_S3PT           "S3PT"	/* S3 Performance (sub)Table */
+ #define ACPI_SIG_PCCS           "PCC"	/* PCC Shared Memory Region */
+@@ -618,6 +619,21 @@ enum acpi_rasf_status {
+ #define ACPI_RASF_ERROR                 (1<<2)
+ #define ACPI_RASF_STATUS                (0x1F<<3)
+ 
++/*******************************************************************************
++ *
++ * STAO - Status Override Table (_STA override) - ACPI 6.0
++ *        Version 1
++ *
++ * Conforms to "ACPI Specification for Status Override Table"
++ * 6 January 2015
++ *
++ ******************************************************************************/
++
++struct acpi_table_stao {
++	struct acpi_table_header header;	/* Common ACPI table header */
++	u8 ignore_uart;
++};
++
+ /* Reset to default packing */
+ 
+ #pragma pack()
+-- 
+2.1.0
