@@ -1,50 +1,66 @@
-From: punit.agrawal@arm.com (Punit Agrawal)
-Date: Tue, 17 Nov 2015 17:30:14 +0000
-Subject: [PATCH] scpi: hide get_scpi_ops in module from built-in code
-In-Reply-To: <4740279.aWlP1tqJLa@wuerfel> (Arnd Bergmann's message of "Mon, 16
- Nov 2015 22:34:58 +0100")
-References: <4740279.aWlP1tqJLa@wuerfel>
-Message-ID: <9hhoaespm8p.fsf@e105922-lin.cambridge.arm.com>
+From: horms@verge.net.au (Simon Horman)
+Date: Tue, 17 Nov 2015 09:31:50 -0800
+Subject: [PATCH v11 6/8] arm64: renesas: add Salvator-X board support on
+ DTS
+In-Reply-To: <CAMuHMdV+7L9r-dHKj5x8JFFVYg0O-zAnE7R5QYZQPAOJwi5Sxw@mail.gmail.com>
+References: <1444890243-6978-1-git-send-email-horms+renesas@verge.net.au>
+ <1444890243-6978-7-git-send-email-horms+renesas@verge.net.au>
+ <20151015110139.GG8825@leverpostej>
+ <20151023070032.GA4502@verge.net.au>
+ <CAMuHMdVzUPyhkfPy3s+jBK1gQ-kZqYfrQZ8Bww-iFxGOPVZn2w@mail.gmail.com>
+ <CAMuHMdX=LS2sLqtgBUYeWjVkUVZE2WQwsWhbvK+wmdfZ0ycrjg@mail.gmail.com>
+ <CAMuHMdV+7L9r-dHKj5x8JFFVYg0O-zAnE7R5QYZQPAOJwi5Sxw@mail.gmail.com>
+Message-ID: <20151117173149.GG23979@verge.net.au>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd Bergmann <arnd@arndb.de> writes:
+On Mon, Nov 16, 2015 at 10:53:39AM +0100, Geert Uytterhoeven wrote:
+> On Tue, Nov 3, 2015 at 3:24 PM, Geert Uytterhoeven <geert@linux-m68k.org> wrote:
+> > On Thu, Oct 29, 2015 at 8:52 AM, Geert Uytterhoeven
+> > <geert@linux-m68k.org> wrote:
+> >> On Fri, Oct 23, 2015 at 9:00 AM, Simon Horman <horms@verge.net.au> wrote:
+> >>> On Thu, Oct 15, 2015 at 12:01:40PM +0100, Mark Rutland wrote:
+> >>>> > +           stdout-path = &scif2;
+> >>>>
+> >>>> No rate? It would be better to be explicit here; you should be able to
+> >>>> have:
+> >>>>
+> >>>>       stdout-path = "serial0:115200n8"
+> >>>>
+> >>>> Where "115200n8" is replaced with whatever configuration this board
+> >>>> actually has.
+> >>>
+> >>> I think that we have had this discussion before in relation to
+> >>> a different board for a different Renesas SoC but I could be mistaken.
+> >>
+> >> IIRC, at that time the code to parse the options wasn't upstream yet, so
+> >> adding the options would have broken the serial console.
+> >>
+> >> I can confirm it works fine on Salvator-X with
+> >>
+> >>         stdout-path = "serial0:115200n8";
+> >
+> > Unfortunately this breaks earlycon support:
+> >
+> >         Malformed early option 'earlycon'
+> >
+> > The call to fdt_getprop() in early_init_dt_scan_chosen_serial() fails.
+> > I guess that unlike the standard console handling code, the fdt code can't
+> > handle aliases yet?
+> 
+> Apparently this issue was fixed in v4.4-rc1. For the backport team:
+> 
+> commit 6296ad9e3375c6c1ddbb371f589ba6a145bb31df
+> Author: Stefan Agner <stefan@agner.ch>
+> Date:   Sat Oct 10 01:29:30 2015 -0700
+> 
+>     of/fdt: fix aliases with baudrate in earlycon
+> 
+> > P.S. SCIF earlycon support is not yet upstream, as it still doesn't work on
+> > arm32 (I discovered today it does on arm64 ;-): it pretends to work, but
+> > nothing is output to the serial port (until the normal serial console kicks
+> > in).
+> 
+> And this issue is mostly resolved, too. So v4.5 will be perfect ;-)
 
-> The scpi_clock driver can be built-in when CONFIG_COMPILE_TEST
-> is set even when ARM_SCPI_PROTOCOL is a loadable module, and
-> that results in a link error:
->
-> drivers/built-in.o: In function `scpi_clocks_probe':
-> (.text+0x14453c): undefined reference to `get_scpi_ops'
->
-> Using #if IS_REACHABLE() around the get_scpi_ops() declaration
-> makes it build successfully in this case for compile-testing,
-> but the effect is the same as when ARM_SCPI_PROTOCOL is
-> disabled, as the code will not be used.
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-
-Makes sense. Thanks, Arnd!
-
-       Acked-by: Punit Agrawal <punit.agrawal@arm.com>
-
->
-> diff --git a/include/linux/scpi_protocol.h b/include/linux/scpi_protocol.h
-> index 80af3cd35ae4..72ce932c69b2 100644
-> --- a/include/linux/scpi_protocol.h
-> +++ b/include/linux/scpi_protocol.h
-> @@ -71,7 +71,7 @@ struct scpi_ops {
->  	int (*sensor_get_value)(u16, u32 *);
->  };
->  
-> -#if IS_ENABLED(CONFIG_ARM_SCPI_PROTOCOL)
-> +#if IS_REACHABLE(CONFIG_ARM_SCPI_PROTOCOL)
->  struct scpi_ops *get_scpi_ops(void);
->  #else
->  static inline struct scpi_ops *get_scpi_ops(void) { return NULL; }
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+Excellent!
