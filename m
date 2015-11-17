@@ -1,111 +1,80 @@
 From: shannon.zhao@linaro.org (shannon.zhao at linaro.org)
-Date: Tue, 17 Nov 2015 17:40:45 +0800
-Subject: [PATCH v3 46/62] arm/acpi: Prepare XSDT table for Dom0
+Date: Tue, 17 Nov 2015 17:40:46 +0800
+Subject: [PATCH v3 47/62] arm/p2m: Add helper functions to map memory regions
 In-Reply-To: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
 References: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
-Message-ID: <1447753261-7552-47-git-send-email-shannon.zhao@linaro.org>
+Message-ID: <1447753261-7552-48-git-send-email-shannon.zhao@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Shannon Zhao <shannon.zhao@linaro.org>
+From: Parth Dixit <parth.dixit@linaro.org>
 
-Copy and modify XSDT table before passing it to Dom0. Repalce the entry
-value of the copied table. Add a new entry for STAO table as well. And
-keep entry value of other reused tables unchanged.
+Create a helper function for mapping with cached attributes.
 
+Signed-off-by: Parth Dixit <parth.dixit@linaro.org>
 Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
 ---
- xen/arch/arm/domain_build.c | 71 +++++++++++++++++++++++++++++++++++++++++++++
- 1 file changed, 71 insertions(+)
+ xen/arch/arm/p2m.c        | 26 ++++++++++++++++++++++++++
+ xen/include/asm-arm/p2m.h | 10 ++++++++++
+ 2 files changed, 36 insertions(+)
 
-diff --git a/xen/arch/arm/domain_build.c b/xen/arch/arm/domain_build.c
-index fb3f150..894328f 100644
---- a/xen/arch/arm/domain_build.c
-+++ b/xen/arch/arm/domain_build.c
-@@ -1359,6 +1359,73 @@ static int prepare_dtb(struct domain *d, struct kernel_info *kinfo)
- #ifdef CONFIG_ACPI
- #define XEN_HYPERVISOR_ID 0x000058656E564D4D  /* "XenVMM" */
- 
-+static void acpi_xsdt_modify_entry(u64 entry[], unsigned long entry_count,
-+                                   char *signature, u64 addr)
-+{
-+    int i;
-+    struct acpi_table_header *table;
-+    u64 size = sizeof(struct acpi_table_header);
-+
-+    for( i = 0; i < entry_count; i++ )
-+    {
-+        table = acpi_os_map_memory(entry[i], size);
-+	if ( ACPI_COMPARE_NAME(table->signature, signature) )
-+        {
-+            entry[i] = addr;
-+            acpi_os_unmap_memory(table, size);
-+            break;
-+        }
-+        acpi_os_unmap_memory(table, size);
-+    }
-+}
-+
-+static int acpi_create_xsdt(struct domain *d, struct membank tbl_add[])
-+{
-+    struct acpi_table_header *table = NULL;
-+    struct acpi_table_rsdp *rsdp_tbl;
-+    struct acpi_table_xsdt *xsdt = NULL;
-+    u64 table_size, addr;
-+    unsigned long entry_count;
-+    u8 *base_ptr;
-+    u8 checksum;
-+
-+    addr = acpi_os_get_root_pointer();
-+    if ( !addr )
-+    {
-+        printk("Unable to get acpi root pointer\n");
-+        return -EINVAL;
-+    }
-+    rsdp_tbl = acpi_os_map_memory(addr, sizeof(struct acpi_table_rsdp));
-+    table = acpi_os_map_memory(rsdp_tbl->xsdt_physical_address,
-+                               sizeof(struct acpi_table_header));
-+
-+    table_size = table->length + sizeof(u64); /* Add place for STAO table */
-+    entry_count = (table->length - sizeof(struct acpi_table_header))
-+                  / sizeof(u64);
-+    base_ptr = d->arch.efi_acpi_table
-+               + acpi_get_table_offset(tbl_add, TBL_XSDT);
-+    ACPI_MEMCPY(base_ptr, table, table->length);
-+    acpi_os_unmap_memory(table, sizeof(struct acpi_table_header));
-+    acpi_os_unmap_memory(rsdp_tbl, sizeof(struct acpi_table_rsdp));
-+
-+    xsdt = (struct acpi_table_xsdt *)base_ptr;
-+    acpi_xsdt_modify_entry(xsdt->table_offset_entry, entry_count,
-+                           ACPI_SIG_FADT, tbl_add[TBL_FADT].start);
-+    acpi_xsdt_modify_entry(xsdt->table_offset_entry, entry_count,
-+                           ACPI_SIG_MADT, tbl_add[TBL_MADT].start);
-+    xsdt->table_offset_entry[entry_count] = tbl_add[TBL_STAO].start;
-+
-+    xsdt->header.length = table_size;
-+    checksum = acpi_tb_checksum(ACPI_CAST_PTR(u8, xsdt), table_size);
-+    xsdt->header.checksum -= checksum;
-+
-+    tbl_add[TBL_XSDT].start = d->arch.efi_acpi_gpa
-+                              + acpi_get_table_offset(tbl_add, TBL_XSDT);
-+    tbl_add[TBL_XSDT].size = table_size;
-+
-+    return 0;
-+}
-+
- static int acpi_create_stao(struct domain *d, struct membank tbl_add[])
- {
-     struct acpi_table_header *table = NULL;
-@@ -1604,6 +1671,10 @@ static int prepare_acpi(struct domain *d, struct kernel_info *kinfo)
-     if ( rc != 0 )
-         return rc;
- 
-+    rc = acpi_create_xsdt(d, tbl_add);
-+    if ( rc != 0 )
-+        return rc;
-+
-     return 0;
+diff --git a/xen/arch/arm/p2m.c b/xen/arch/arm/p2m.c
+index e396c40..7a108d8 100644
+--- a/xen/arch/arm/p2m.c
++++ b/xen/arch/arm/p2m.c
+@@ -1140,6 +1140,32 @@ int p2m_populate_ram(struct domain *d,
+                              d->arch.p2m.default_access);
  }
- #else
+ 
++int map_regions(struct domain *d,
++                     unsigned long start_gfn,
++                     unsigned long nr,
++                     unsigned long mfn)
++{
++    return apply_p2m_changes(d, INSERT,
++                             pfn_to_paddr(start_gfn),
++                             pfn_to_paddr(start_gfn + nr),
++                             pfn_to_paddr(mfn),
++                             MATTR_MEM, 0, p2m_mmio_direct,
++                             d->arch.p2m.default_access);
++}
++
++int unmap_regions(struct domain *d,
++                       unsigned long start_gfn,
++                       unsigned long nr,
++                       unsigned long mfn)
++{
++    return apply_p2m_changes(d, REMOVE,
++                             pfn_to_paddr(start_gfn),
++                             pfn_to_paddr(start_gfn + nr),
++                             pfn_to_paddr(mfn),
++                             MATTR_MEM, 0, p2m_invalid,
++                             d->arch.p2m.default_access);
++}
++
+ int map_mmio_regions(struct domain *d,
+                      unsigned long start_gfn,
+                      unsigned long nr,
+diff --git a/xen/include/asm-arm/p2m.h b/xen/include/asm-arm/p2m.h
+index 08bdce3..b6215f9 100644
+--- a/xen/include/asm-arm/p2m.h
++++ b/xen/include/asm-arm/p2m.h
+@@ -158,6 +158,16 @@ int p2m_cache_flush(struct domain *d, xen_pfn_t start_mfn, xen_pfn_t end_mfn);
+ /* Setup p2m RAM mapping for domain d from start-end. */
+ int p2m_populate_ram(struct domain *d, paddr_t start, paddr_t end);
+ 
++int map_regions(struct domain *d,
++                    unsigned long start_gfn,
++                    unsigned long nr_mfns,
++                    unsigned long mfn);
++
++int unmap_regions(struct domain *d,
++                    unsigned long start_gfn,
++                    unsigned long nr_mfns,
++                    unsigned long mfn);
++
+ int guest_physmap_add_entry(struct domain *d,
+                             unsigned long gfn,
+                             unsigned long mfn,
 -- 
 2.1.0
