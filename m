@@ -1,95 +1,45 @@
 From: shannon.zhao@linaro.org (shannon.zhao at linaro.org)
-Date: Tue, 17 Nov 2015 17:40:35 +0800
-Subject: [PATCH v3 36/62] arm/acpi: Initialize serial port from ACPI SPCR table
+Date: Tue, 17 Nov 2015 17:40:36 +0800
+Subject: [PATCH v3 37/62] arm/acpi: Define a enum for reserved tables
 In-Reply-To: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
 References: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
-Message-ID: <1447753261-7552-37-git-send-email-shannon.zhao@linaro.org>
+Message-ID: <1447753261-7552-38-git-send-email-shannon.zhao@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Parth Dixit <parth.dixit@linaro.org>
+From: Shannon Zhao <shannon.zhao@linaro.org>
 
-Parse ACPI SPCR (Serial Port Console Redirection table) table and
-initialize the serial port pl011.
+It needs to copy and change the contents of some ACPI and EFI tables for
+Dom0. Here define a enum for those tables.
 
-Signed-off-by: Naresh Bhat <naresh.bhat@linaro.org>
 Signed-off-by: Parth Dixit <parth.dixit@linaro.org>
 Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
 ---
- xen/drivers/char/pl011.c  | 37 +++++++++++++++++++++++++++++++++++++
- xen/include/acpi/actbl2.h |  5 +++++
- 2 files changed, 42 insertions(+)
+ xen/include/asm-arm/acpi.h | 12 ++++++++++++
+ 1 file changed, 12 insertions(+)
 
-diff --git a/xen/drivers/char/pl011.c b/xen/drivers/char/pl011.c
-index 1efb1cf..7106f1c 100644
---- a/xen/drivers/char/pl011.c
-+++ b/xen/drivers/char/pl011.c
-@@ -27,6 +27,7 @@
- #include <asm/device.h>
- #include <xen/mm.h>
- #include <xen/vmap.h>
-+#include <xen/acpi.h>
- #include <asm/pl011-uart.h>
- #include <asm/io.h>
+diff --git a/xen/include/asm-arm/acpi.h b/xen/include/asm-arm/acpi.h
+index 214fc4e..f159d51 100644
+--- a/xen/include/asm-arm/acpi.h
++++ b/xen/include/asm-arm/acpi.h
+@@ -30,6 +30,18 @@
  
-@@ -308,6 +309,42 @@ DT_DEVICE_START(pl011, "PL011 UART", DEVICE_SERIAL)
-         .init = dt_pl011_uart_init,
- DT_DEVICE_END
+ extern bool_t acpi_disabled;
  
-+#ifdef CONFIG_ACPI
-+static int __init acpi_pl011_uart_init(const void *data)
-+{
-+    acpi_status status;
-+    struct acpi_table_spcr *spcr=NULL;
-+    int res;
++/* Tables marked as reserved in efi table */
++typedef enum {
++    TBL_FADT,
++    TBL_MADT,
++    TBL_STAO,
++    TBL_XSDT,
++    TBL_RSDP,
++    TBL_EFIT,
++    TBL_MMAP,
++    TBL_MMAX,
++} EFI_MEM_RES;
 +
-+    status = acpi_get_table(ACPI_SIG_SPCR, 0,
-+                            (struct acpi_table_header **)&spcr);
-+
-+    if ( ACPI_FAILURE(status) )
-+    {
-+        printk("pl011: Failed to get SPCR table\n");
-+        return -EINVAL;
-+    }
-+
-+    /* trigger/polarity information is not available in spcr */
-+    irq_set_type(spcr->interrupt, ACPI_IRQ_TYPE_EDGE_BOTH);
-+
-+    res = pl011_uart_init(spcr->interrupt, spcr->serial_port.address,
-+                          PAGE_SIZE);
-+    if ( res < 0 )
-+    {
-+        printk("pl011: Unable to initialize\n");
-+        return res;
-+    }
-+
-+    return 0;
-+}
-+
-+ACPI_DEVICE_START(apl011, "PL011 UART", DEVICE_SERIAL)
-+        .class_type = ACPI_SPCR_TYPE_PL011,
-+        .init = acpi_pl011_uart_init,
-+ACPI_DEVICE_END
-+#endif
-+
- /*
-  * Local variables:
-  * mode: C
-diff --git a/xen/include/acpi/actbl2.h b/xen/include/acpi/actbl2.h
-index 87bc6b3..25be429 100644
---- a/xen/include/acpi/actbl2.h
-+++ b/xen/include/acpi/actbl2.h
-@@ -815,6 +815,11 @@ struct acpi_table_spcr {
- 
- #define ACPI_SPCR_DO_NOT_DISABLE    (1)
- 
-+/* UART Interface type */
-+#define ACPI_SPCR_TYPE_16550 0
-+#define ACPI_SPCR_TYPE_16550_SUB 1
-+#define ACPI_SPCR_TYPE_PL011 3
-+
- /*******************************************************************************
-  *
-  * SPMI - Server Platform Management Interface table
+ #ifdef CONFIG_ACPI
+ bool_t __init acpi_psci_present(void);
+ bool_t __init acpi_psci_hvc_present(void);
 -- 
 2.1.0
