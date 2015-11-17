@@ -1,52 +1,32 @@
-From: lorenzo.pieralisi@arm.com (Lorenzo Pieralisi)
-Date: Tue, 17 Nov 2015 12:38:07 +0000
-Subject: [PATCH v2 10/11] PM / Hibernate: clean cached pages on
- architectures that require it
-In-Reply-To: <3180507.pKM8OzKjXO@vostro.rjw.lan>
-References: <1445966960-31724-1-git-send-email-james.morse@arm.com>
- <2039611.PJaFlk1sMi@vostro.rjw.lan>
- <20151112114705.GA2657@red-moon>
- <3180507.pKM8OzKjXO@vostro.rjw.lan>
-Message-ID: <20151117123807.GA22216@red-moon>
+From: zhaoshenglong@huawei.com (Shannon Zhao)
+Date: Tue, 17 Nov 2015 20:32:34 +0800
+Subject: [PATCH v3 01/62] Revert "xen/arm: vgic-v2: Drop cbase from
+ arch_domain"
+In-Reply-To: <564B0F1E.9040804@citrix.com>
+References: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
+ <1447753261-7552-2-git-send-email-shannon.zhao@linaro.org>
+ <564B0F1E.9040804@citrix.com>
+Message-ID: <564B1E62.8080208@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-[Cc'ed maintainers of affected arches]
+Hi Julien,
 
-On Sat, Nov 14, 2015 at 12:38:50AM +0100, Rafael J. Wysocki wrote:
-> On Thursday, November 12, 2015 11:47:05 AM Lorenzo Pieralisi wrote:
-> > On Thu, Nov 12, 2015 at 01:48:32AM +0100, Rafael J. Wysocki wrote:
-> > > On Wednesday, November 11, 2015 11:40:39 AM Lorenzo Pieralisi wrote:
-> > > > Hi Pavel, Rafael,
-> > > > 
-> > > > Do you have any feedback on this patch ?
-> > > > 
-> > > > It is fundamental to this series and affects Hibernate core code so if you
-> > > > have any feedback that would be much appreciated.
-> > > 
-> > > I'm really not familiar with the flush_icache_range() interface.
-> > > 
-> > > What exactly does it do?
-> > 
-> > It is used to sync a memory range that is written into (eg loading
-> > modules, copying from snapshot is basically the same thing, reads from
-> > storage and restore pages that might well be executable code), in particular
-> > to sync the I-cache and the D-cache, eg on arm64 the page that the snapshot
-> > code is copying might be executable code that has to be cleaned from the
-> > D-cache so that it is made visible to the I-cache.
-> > 
-> > On x86 it is a NOP AFAIK.
+On 2015/11/17 19:27, Julien Grall wrote:
+> Hi Shannon,
 > 
-> If that's the case, I have no problems with this change as long as the code
-> works on architectures with non-trivial flush_icache_range().
+> Why do you want to revert this patch?
+> 
+Because d->arch.vgic.cbase will be used by creating Dom0 MADT table
+later. See [PATCH v3 43/62].
++            gicc.base_address = d->arch.vgic.cbase;
 
-I Cc'ed the respective arches maintainers, it should work (it may
-make resuming a bit slower, owing to the cache syncing), problem is
-that we have no way of testing it on platforms other than arm/arm64.
+My previous way is get this from ACPI table but someone suggest get it
+from struct domain and I think this way is better too since it uses the
+value after being parsed.
 
-How do you want us to go on about this ? Should we add a config option
-to prevent calling flush_icache_range() on all platforms (where it
-is not a nop) ?
+And sorry that I didn't notice this patch before when you send it out to
+list.
 
-Thanks a lot !
-Lorenzo
+-- 
+Shannon
