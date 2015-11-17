@@ -1,48 +1,111 @@
-From: bayi.cheng@mediatek.com (Bayi Cheng)
-Date: Tue, 17 Nov 2015 17:46:16 +0800
-Subject: [PATCH v7 2/2] arm64: dts: mt8173: Add nor flash node
-In-Reply-To: <1447753576-28528-1-git-send-email-bayi.cheng@mediatek.com>
-References: <1447753576-28528-1-git-send-email-bayi.cheng@mediatek.com>
-Message-ID: <1447753576-28528-3-git-send-email-bayi.cheng@mediatek.com>
+From: shannon.zhao@linaro.org (shannon.zhao at linaro.org)
+Date: Tue, 17 Nov 2015 17:40:45 +0800
+Subject: [PATCH v3 46/62] arm/acpi: Prepare XSDT table for Dom0
+In-Reply-To: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
+References: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
+Message-ID: <1447753261-7552-47-git-send-email-shannon.zhao@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add Mediatek nor flash node
+From: Shannon Zhao <shannon.zhao@linaro.org>
 
-Signed-off-by: Bayi Cheng <bayi.cheng@mediatek.com>
-Acked-by: Brian Norris <computersforpeace@gmail.com>
+Copy and modify XSDT table before passing it to Dom0. Repalce the entry
+value of the copied table. Add a new entry for STAO table as well. And
+keep entry value of other reused tables unchanged.
+
+Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
 ---
- arch/arm64/boot/dts/mediatek/mt8173.dtsi | 18 +++++++++++++++++-
- 1 file changed, 17 insertions(+), 1 deletion(-)
+ xen/arch/arm/domain_build.c | 71 +++++++++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 71 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-index 4dd5f93..7988656 100644
---- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-+++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
-@@ -387,7 +387,23 @@
- 			status = "disabled";
- 		};
+diff --git a/xen/arch/arm/domain_build.c b/xen/arch/arm/domain_build.c
+index fb3f150..894328f 100644
+--- a/xen/arch/arm/domain_build.c
++++ b/xen/arch/arm/domain_build.c
+@@ -1359,6 +1359,73 @@ static int prepare_dtb(struct domain *d, struct kernel_info *kinfo)
+ #ifdef CONFIG_ACPI
+ #define XEN_HYPERVISOR_ID 0x000058656E564D4D  /* "XenVMM" */
  
--		i2c3: i2c at 11010000 {
-+		nor_flash: spi at 1100d000 {
-+			compatible = "mediatek,mt8173-nor";
-+			reg = <0 0x1100d000 0 0xe0>;
-+			clocks = <&pericfg CLK_PERI_SPI>,
-+				 <&topckgen CLK_TOP_SPINFI_IFR_SEL>;
-+			clock-names = "spi", "sf";
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			status = "disabled";
++static void acpi_xsdt_modify_entry(u64 entry[], unsigned long entry_count,
++                                   char *signature, u64 addr)
++{
++    int i;
++    struct acpi_table_header *table;
++    u64 size = sizeof(struct acpi_table_header);
 +
-+			flash at 0 {
-+				compatible = "jedec,spi-nor";
-+				reg = <0>;
-+			};
-+		};
++    for( i = 0; i < entry_count; i++ )
++    {
++        table = acpi_os_map_memory(entry[i], size);
++	if ( ACPI_COMPARE_NAME(table->signature, signature) )
++        {
++            entry[i] = addr;
++            acpi_os_unmap_memory(table, size);
++            break;
++        }
++        acpi_os_unmap_memory(table, size);
++    }
++}
 +
-+		i2c3: i2c3 at 11010000 {
- 			compatible = "mediatek,mt8173-i2c";
- 			reg = <0 0x11010000 0 0x70>,
- 			      <0 0x11000280 0 0x80>;
++static int acpi_create_xsdt(struct domain *d, struct membank tbl_add[])
++{
++    struct acpi_table_header *table = NULL;
++    struct acpi_table_rsdp *rsdp_tbl;
++    struct acpi_table_xsdt *xsdt = NULL;
++    u64 table_size, addr;
++    unsigned long entry_count;
++    u8 *base_ptr;
++    u8 checksum;
++
++    addr = acpi_os_get_root_pointer();
++    if ( !addr )
++    {
++        printk("Unable to get acpi root pointer\n");
++        return -EINVAL;
++    }
++    rsdp_tbl = acpi_os_map_memory(addr, sizeof(struct acpi_table_rsdp));
++    table = acpi_os_map_memory(rsdp_tbl->xsdt_physical_address,
++                               sizeof(struct acpi_table_header));
++
++    table_size = table->length + sizeof(u64); /* Add place for STAO table */
++    entry_count = (table->length - sizeof(struct acpi_table_header))
++                  / sizeof(u64);
++    base_ptr = d->arch.efi_acpi_table
++               + acpi_get_table_offset(tbl_add, TBL_XSDT);
++    ACPI_MEMCPY(base_ptr, table, table->length);
++    acpi_os_unmap_memory(table, sizeof(struct acpi_table_header));
++    acpi_os_unmap_memory(rsdp_tbl, sizeof(struct acpi_table_rsdp));
++
++    xsdt = (struct acpi_table_xsdt *)base_ptr;
++    acpi_xsdt_modify_entry(xsdt->table_offset_entry, entry_count,
++                           ACPI_SIG_FADT, tbl_add[TBL_FADT].start);
++    acpi_xsdt_modify_entry(xsdt->table_offset_entry, entry_count,
++                           ACPI_SIG_MADT, tbl_add[TBL_MADT].start);
++    xsdt->table_offset_entry[entry_count] = tbl_add[TBL_STAO].start;
++
++    xsdt->header.length = table_size;
++    checksum = acpi_tb_checksum(ACPI_CAST_PTR(u8, xsdt), table_size);
++    xsdt->header.checksum -= checksum;
++
++    tbl_add[TBL_XSDT].start = d->arch.efi_acpi_gpa
++                              + acpi_get_table_offset(tbl_add, TBL_XSDT);
++    tbl_add[TBL_XSDT].size = table_size;
++
++    return 0;
++}
++
+ static int acpi_create_stao(struct domain *d, struct membank tbl_add[])
+ {
+     struct acpi_table_header *table = NULL;
+@@ -1604,6 +1671,10 @@ static int prepare_acpi(struct domain *d, struct kernel_info *kinfo)
+     if ( rc != 0 )
+         return rc;
+ 
++    rc = acpi_create_xsdt(d, tbl_add);
++    if ( rc != 0 )
++        return rc;
++
+     return 0;
+ }
+ #else
 -- 
-1.8.1.1.dirty
+2.1.0
