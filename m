@@ -1,178 +1,103 @@
-From: chunfeng.yun@mediatek.com (Chunfeng Yun)
-Date: Tue, 17 Nov 2015 14:04:54 +0800
-Subject: [PATCH] phy: phy-mt65xx-usb3: improve HS eye diagram
-Message-ID: <1447740294-29677-1-git-send-email-chunfeng.yun@mediatek.com>
+From: pankaj.dubey@samsung.com (Pankaj Dubey)
+Date: Tue, 17 Nov 2015 11:35:42 +0530
+Subject: [PATCH v6 0/9] samsung: pmu: split up SoC specific PMU data
+Message-ID: <1447740351-14246-1-git-send-email-pankaj.dubey@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-calibrate HS slew rate and switch 100uA current to SSUSB
-to improve HS eye diagram of HQA test.
+In this series I am splitting up SoC specific PMU configuration data into
+mach-exynos folder itself, before moving all of them under
+drivers/soc/samsung/. Also instead of making all changes in single patch it
+has been broken into SoC specific patches to avoid large size of patch.
+With this approach there will not be unwanted big churns just after
+adding exynos-pmu under drivers/soc/samsung.
 
-Change-Id: I6d392c7fffb32b3a710e3a8dda92710886806d90
-Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
----
- drivers/phy/phy-mt65xx-usb3.c | 99 +++++++++++++++++++++++++++++++++++++++++--
- 1 file changed, 96 insertions(+), 3 deletions(-)
+All these patches are just refactoring to keep minimal changes while moving
+exynos-pmu driver under drivers/soc/samsung/. Support for exynos7 PMU can
+be added on top of it, in such a manner that for ARM64 build, ARM related
+SoC's PMU will not get compiled and thus unnecessary increasing kernel image size.
 
-diff --git a/drivers/phy/phy-mt65xx-usb3.c b/drivers/phy/phy-mt65xx-usb3.c
-index dc480d3..9069162 100644
---- a/drivers/phy/phy-mt65xx-usb3.c
-+++ b/drivers/phy/phy-mt65xx-usb3.c
-@@ -17,6 +17,7 @@
- #include <linux/clk.h>
- #include <linux/delay.h>
- #include <linux/io.h>
-+#include <linux/iopoll.h>
- #include <linux/module.h>
- #include <linux/of_address.h>
- #include <linux/phy/phy.h>
-@@ -27,6 +28,7 @@
-  * relative to USB3_SIF2_BASE base address
-  */
- #define SSUSB_SIFSLV_SPLLC		0x0000
-+#define SSUSB_SIFSLV_U2FREQ		0x0100
- 
- /* offsets of sub-segment in each port registers */
- #define SSUSB_SIFSLV_U2PHY_COM_BASE	0x0000
-@@ -41,6 +43,7 @@
- #define PA2_RG_SIF_U2PLL_FORCE_EN	BIT(18)
- 
- #define U3P_USBPHYACR5		(SSUSB_SIFSLV_U2PHY_COM_BASE + 0x0014)
-+#define PA5_RG_U2_HSTX_SRCAL_EN	BIT(15)
- #define PA5_RG_U2_HSTX_SRCTRL		GENMASK(14, 12)
- #define PA5_RG_U2_HSTX_SRCTRL_VAL(x)	((0x7 & (x)) << 12)
- #define PA5_RG_U2_HS_100U_U3_EN	BIT(11)
-@@ -113,6 +116,24 @@
- #define XC3_RG_U3_XTAL_RX_PWD		BIT(9)
- #define XC3_RG_U3_FRC_XTAL_RX_PWD	BIT(8)
- 
-+#define U3P_U2FREQ_FMCR0	(SSUSB_SIFSLV_U2FREQ + 0x00)
-+#define P2F_RG_MONCLK_SEL	GENMASK(27, 26)
-+#define P2F_RG_MONCLK_SEL_VAL(x)	((0x3 & (x)) << 26)
-+#define P2F_RG_FREQDET_EN	BIT(24)
-+#define P2F_RG_CYCLECNT		GENMASK(23, 0)
-+#define P2F_RG_CYCLECNT_VAL(x)	((P2F_RG_CYCLECNT) & (x))
-+
-+#define U3P_U2FREQ_VALUE	(SSUSB_SIFSLV_U2FREQ + 0x0c)
-+
-+#define U3P_U2FREQ_FMMONR1	(SSUSB_SIFSLV_U2FREQ + 0x10)
-+#define P2F_USB_FM_VALID	BIT(0)
-+#define P2F_RG_FRCK_EN		BIT(8)
-+
-+#define U3P_REF_CLK		26	/* MHZ */
-+#define U3P_SLEW_RATE_COEF	28
-+#define U3P_SR_COEF_DIVISOR	1000
-+#define U3P_FM_DET_CYCLE_CNT	1024
-+
- struct mt65xx_phy_instance {
- 	struct phy *phy;
- 	void __iomem *port_base;
-@@ -128,6 +149,77 @@ struct mt65xx_u3phy {
- 	int nphys;
- };
- 
-+static void hs_slew_rate_calibrate(struct mt65xx_u3phy *u3phy,
-+	struct mt65xx_phy_instance *instance)
-+{
-+	void __iomem *sif_base = u3phy->sif_base;
-+	int calibration_val;
-+	int fm_out;
-+	u32 tmp;
-+
-+	/* enable USB ring oscillator */
-+	tmp = readl(instance->port_base + U3P_USBPHYACR5);
-+	tmp |= PA5_RG_U2_HSTX_SRCAL_EN;
-+	writel(tmp, instance->port_base + U3P_USBPHYACR5);
-+	udelay(1);
-+
-+	/*enable free run clock */
-+	tmp = readl(sif_base + U3P_U2FREQ_FMMONR1);
-+	tmp |= P2F_RG_FRCK_EN;
-+	writel(tmp, sif_base + U3P_U2FREQ_FMMONR1);
-+
-+	/* set cycle count as 1024, and select u2 channel */
-+	tmp = readl(sif_base + U3P_U2FREQ_FMCR0);
-+	tmp &= ~(P2F_RG_CYCLECNT | P2F_RG_MONCLK_SEL);
-+	tmp |= P2F_RG_CYCLECNT_VAL(U3P_FM_DET_CYCLE_CNT);
-+	tmp |= P2F_RG_MONCLK_SEL_VAL(instance->index);
-+	writel(tmp, sif_base + U3P_U2FREQ_FMCR0);
-+
-+	/* enable frequency meter */
-+	tmp = readl(sif_base + U3P_U2FREQ_FMCR0);
-+	tmp |= P2F_RG_FREQDET_EN;
-+	writel(tmp, sif_base + U3P_U2FREQ_FMCR0);
-+
-+	/* ignore return value */
-+	readl_poll_timeout(sif_base + U3P_U2FREQ_FMMONR1, tmp,
-+		  (tmp & P2F_USB_FM_VALID), 10, 200);
-+
-+	fm_out = readl(sif_base + U3P_U2FREQ_VALUE);
-+
-+	/* disable frequency meter */
-+	tmp = readl(sif_base + U3P_U2FREQ_FMCR0);
-+	tmp &= ~P2F_RG_FREQDET_EN;
-+	writel(tmp, sif_base + U3P_U2FREQ_FMCR0);
-+
-+	/*disable free run clock */
-+	tmp = readl(sif_base + U3P_U2FREQ_FMMONR1);
-+	tmp &= ~P2F_RG_FRCK_EN;
-+	writel(tmp, sif_base + U3P_U2FREQ_FMMONR1);
-+
-+	if (fm_out) {
-+		/* ( 1024 / FM_OUT ) x reference clock frequency x 0.028 */
-+		tmp = U3P_FM_DET_CYCLE_CNT * U3P_REF_CLK * U3P_SLEW_RATE_COEF;
-+		tmp /= fm_out;
-+		calibration_val = DIV_ROUND_CLOSEST(tmp, U3P_SR_COEF_DIVISOR);
-+	} else {
-+		/* if FM detection fail, set default value */
-+		calibration_val = 4;
-+	}
-+	dev_dbg(u3phy->dev, "phy:%d, fm_out:%d, calib:%d\n",
-+		instance->index, fm_out, calibration_val);
-+
-+	/* set HS slew rate */
-+	tmp = readl(instance->port_base + U3P_USBPHYACR5);
-+	tmp &= ~PA5_RG_U2_HSTX_SRCTRL;
-+	tmp |= PA5_RG_U2_HSTX_SRCTRL_VAL(calibration_val);
-+	writel(tmp, instance->port_base + U3P_USBPHYACR5);
-+
-+	/* disable USB ring oscillator */
-+	tmp = readl(instance->port_base + U3P_USBPHYACR5);
-+	tmp &= ~PA5_RG_U2_HSTX_SRCAL_EN;
-+	writel(tmp, instance->port_base + U3P_USBPHYACR5);
-+}
-+
- static void phy_instance_init(struct mt65xx_u3phy *u3phy,
- 	struct mt65xx_phy_instance *instance)
- {
-@@ -226,9 +318,9 @@ static void phy_instance_power_on(struct mt65xx_u3phy *u3phy,
- 		tmp |= XC3_RG_U3_XTAL_RX_PWD | XC3_RG_U3_FRC_XTAL_RX_PWD;
- 		writel(tmp, u3phy->sif_base + U3P_XTALCTL3);
- 
--		/* [mt8173]disable Change 100uA current from SSUSB */
-+		/* [mt8173]switch 100uA current to SSUSB */
- 		tmp = readl(port_base + U3P_USBPHYACR5);
--		tmp &= ~PA5_RG_U2_HS_100U_U3_EN;
-+		tmp |= PA5_RG_U2_HS_100U_U3_EN;
- 		writel(tmp, port_base + U3P_USBPHYACR5);
- 	}
- 
-@@ -273,7 +365,7 @@ static void phy_instance_power_off(struct mt65xx_u3phy *u3phy,
- 	writel(tmp, port_base + U3P_USBPHYACR6);
- 
- 	if (!index) {
--		/* (also disable)Change 100uA current switch to USB2.0 */
-+		/* switch 100uA current back to USB2.0 */
- 		tmp = readl(port_base + U3P_USBPHYACR5);
- 		tmp &= ~PA5_RG_U2_HS_100U_U3_EN;
- 		writel(tmp, port_base + U3P_USBPHYACR5);
-@@ -343,6 +435,7 @@ static int mt65xx_phy_power_on(struct phy *phy)
- 	struct mt65xx_u3phy *u3phy = dev_get_drvdata(phy->dev.parent);
- 
- 	phy_instance_power_on(u3phy, instance);
-+	hs_slew_rate_calibrate(u3phy, instance);
- 	return 0;
- }
- 
+These patches have been prepared on top of Kukjin Kim's for-next merged with
+driver-samsung and on top of
+cherry-picked change from [1].
+
+1: ARM: EXYNOS: Constify local exynos_pmu_data structure
+   https://lkml.org/lkml/2015/10/28/917
+
+For testing entire patchset on Peach-Pi (Exynos5880) based chromebook for boot
+and S2R functionality.
+
+Tested-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+
+For testing entire patchset on on Trats2 (Exynos4412, S2R, reboot, poweroff)
+and Odroid XU3 (Exynos5422, reboot, poweroff).
+
+Tested-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+
+Changes since v5:
+ - Removed extra blank line from patch 5/9 and 6/9.
+ - Modified soc/samsung/Kconfig for config EXNOS_PMU. Added depends on ARM.
+
+Changes since v4:
+ - In v3 I missed to give -M flag to detect rename, which made patches hard
+   to review, so resubmitting patches with rename detector flag.
+ - Addressed review comments from Krzysztof.
+
+Changes since v3:
+ - Keeping intact copyright dates in existing header files.
+ - Addressed review comments from Krzysztof for v3.
+ - Removing static inline function from exynos-pmu.h and
+   keeping them in PMU driver.
+ - Added new patch (2/9) for fixing potential null pointer reference in
+   exynos_sys_powerdown_conf.
+ - Added new patch (8/9) for rearranging static and non-static function for
+   better readability.
+
+Changes since v2:
+ - Removed Amit's Samsung id as it's no more valid.
+ - Rebased on latest kgene tree.
+ - Removed redundant code from regs-pmu.h
+
+Pankaj Dubey (9):
+  ARM: EXYNOS: removing redundant code from regs-pmu.h
+  ARM: EXYNOS: Fix potential NULL pointer access in
+    exynos_sys_powerdown_conf
+  ARM: EXYNOS: Move pmu specific headers under "linux/soc/samsung"
+  ARM: EXYNOS: split up exynos3250 SoC specific PMU data
+  ARM: EXYNOS: split up exynos4 SoC specific PMU data
+  ARM: EXYNOS: split up exynos5250 SoC specific PMU data
+  ARM: EXYNOS: split up exynos5420 SoC specific PMU data
+  ARM: EXYNOS: rearrange static and non-static functions of PMU driver
+  drivers: soc: Add support for Exynos PMU driver
+
+ arch/arm/mach-exynos/Kconfig                       |    1 +
+ arch/arm/mach-exynos/Makefile                      |    2 +-
+ arch/arm/mach-exynos/exynos.c                      |    4 +-
+ arch/arm/mach-exynos/mcpm-exynos.c                 |    2 +-
+ arch/arm/mach-exynos/platsmp.c                     |    2 +-
+ arch/arm/mach-exynos/pm.c                          |    4 +-
+ arch/arm/mach-exynos/pmu.c                         | 1004 --------------------
+ arch/arm/mach-exynos/suspend.c                     |    4 +-
+ drivers/soc/samsung/Kconfig                        |    4 +
+ drivers/soc/samsung/Makefile                       |    2 +
+ drivers/soc/samsung/exynos-pmu.c                   |  183 ++++
+ drivers/soc/samsung/exynos-pmu.h                   |   44 +
+ drivers/soc/samsung/exynos3250-pmu.c               |  175 ++++
+ drivers/soc/samsung/exynos4-pmu.c                  |  222 +++++
+ drivers/soc/samsung/exynos5250-pmu.c               |  195 ++++
+ drivers/soc/samsung/exynos5420-pmu.c               |  280 ++++++
+ .../linux/soc/samsung}/exynos-pmu.h                |    6 +-
+ .../linux/soc/samsung/exynos-regs-pmu.h            |   15 +-
+ 18 files changed, 1120 insertions(+), 1029 deletions(-)
+ delete mode 100644 arch/arm/mach-exynos/pmu.c
+ create mode 100644 drivers/soc/samsung/exynos-pmu.c
+ create mode 100644 drivers/soc/samsung/exynos-pmu.h
+ create mode 100644 drivers/soc/samsung/exynos3250-pmu.c
+ create mode 100644 drivers/soc/samsung/exynos4-pmu.c
+ create mode 100644 drivers/soc/samsung/exynos5250-pmu.c
+ create mode 100644 drivers/soc/samsung/exynos5420-pmu.c
+ rename {arch/arm/mach-exynos => include/linux/soc/samsung}/exynos-pmu.h (81%)
+ rename arch/arm/mach-exynos/regs-pmu.h => include/linux/soc/samsung/exynos-regs-pmu.h (98%)
+
 -- 
-1.8.1.1.dirty
+2.4.5
