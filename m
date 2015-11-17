@@ -1,78 +1,115 @@
 From: shannon.zhao@linaro.org (shannon.zhao at linaro.org)
-Date: Tue, 17 Nov 2015 17:40:29 +0800
-Subject: [PATCH v3 30/62] arm/irq: Add helper function for setting interrupt
- type
+Date: Tue, 17 Nov 2015 17:40:30 +0800
+Subject: [PATCH v3 31/62] arm/acpi: Add a helper function to get interrupt type
 In-Reply-To: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
 References: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
-Message-ID: <1447753261-7552-31-git-send-email-shannon.zhao@linaro.org>
+Message-ID: <1447753261-7552-32-git-send-email-shannon.zhao@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Parth Dixit <parth.dixit@linaro.org>
+From: Shannon Zhao <shannon.zhao@linaro.org>
 
-Add a helper function to set edge/level type information for an
-interrupt.
+Add a helper funtion to get the type of interrupts in ACPI table.
 
-Signed-off-by: Parth Dixit <parth.dixit@linaro.org>
 Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
 ---
- xen/arch/arm/irq.c        | 22 +++++++++++++++-------
- xen/include/asm-arm/irq.h |  2 ++
- 2 files changed, 17 insertions(+), 7 deletions(-)
+ xen/arch/arm/acpi/lib.c    | 27 +++++++++++++++++++++++++++
+ xen/include/asm-arm/acpi.h | 39 +++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 66 insertions(+)
 
-diff --git a/xen/arch/arm/irq.c b/xen/arch/arm/irq.c
-index 1f38605..90b6e58 100644
---- a/xen/arch/arm/irq.c
-+++ b/xen/arch/arm/irq.c
-@@ -655,6 +655,19 @@ unlock:
-     return ret;
- }
- 
-+int irq_set_type(unsigned int irq, unsigned int type)
-+{
-+    int res;
-+
-+    /* Setup the IRQ type */
-+    if ( irq < NR_LOCAL_IRQS )
-+        res = irq_local_set_type(irq, type);
-+    else
-+        res = irq_set_spi_type(irq, type);
-+
-+    return res;
-+}
-+
- int platform_get_irq(const struct dt_device_node *device, int index)
+diff --git a/xen/arch/arm/acpi/lib.c b/xen/arch/arm/acpi/lib.c
+index d8b7635..47f4c6a 100644
+--- a/xen/arch/arm/acpi/lib.c
++++ b/xen/arch/arm/acpi/lib.c
+@@ -43,3 +43,30 @@ bool_t __init acpi_psci_hvc_present(void)
  {
-     struct dt_irq dt_irq;
-@@ -668,14 +681,9 @@ int platform_get_irq(const struct dt_device_node *device, int index)
-     irq = dt_irq.irq;
-     type = dt_irq.type;
- 
--    /* Setup the IRQ type */
--    if ( irq < NR_LOCAL_IRQS )
--        res = irq_local_set_type(irq, type);
--    else
--        res = irq_set_spi_type(irq, type);
--
-+    res = irq_set_type(irq, type);
-     if ( res )
--            return -1;
-+        return -1;
- 
-     return irq;
+     return acpi_gbl_FADT.arm_boot_flags & ACPI_FADT_PSCI_USE_HVC;
  }
-diff --git a/xen/include/asm-arm/irq.h b/xen/include/asm-arm/irq.h
-index f33c331..493773c 100644
---- a/xen/include/asm-arm/irq.h
-+++ b/xen/include/asm-arm/irq.h
-@@ -52,6 +52,8 @@ void arch_move_irqs(struct vcpu *v);
- /* Set IRQ type for an SPI */
- int irq_set_spi_type(unsigned int spi, unsigned int type);
- 
-+int irq_set_type(unsigned int irq, unsigned int type);
 +
- int platform_get_irq(const struct dt_device_node *device, int index);
++unsigned int acpi_get_irq_type(u32 flags)
++{
++    int trigger, polarity;
++
++    trigger = (flags & ACPI_GTDT_INTERRUPT_MODE) ? ACPI_EDGE_SENSITIVE
++               : ACPI_LEVEL_SENSITIVE;
++
++    polarity = (flags & ACPI_GTDT_INTERRUPT_POLARITY) ? ACPI_ACTIVE_LOW
++                : ACPI_ACTIVE_HIGH;
++
++    switch (polarity) {
++    case ACPI_ACTIVE_LOW:
++        return trigger == ACPI_EDGE_SENSITIVE ?
++            ACPI_IRQ_TYPE_EDGE_FALLING :
++            ACPI_IRQ_TYPE_LEVEL_LOW;
++    case ACPI_ACTIVE_HIGH:
++        return trigger == ACPI_EDGE_SENSITIVE ?
++            ACPI_IRQ_TYPE_EDGE_RISING :
++            ACPI_IRQ_TYPE_LEVEL_HIGH;
++    case ACPI_ACTIVE_BOTH:
++        if (trigger == ACPI_EDGE_SENSITIVE)
++            return ACPI_IRQ_TYPE_EDGE_BOTH;
++    default:
++        return ACPI_IRQ_TYPE_NONE;
++    }
++}
+diff --git a/xen/include/asm-arm/acpi.h b/xen/include/asm-arm/acpi.h
+index 714e596..214fc4e 100644
+--- a/xen/include/asm-arm/acpi.h
++++ b/xen/include/asm-arm/acpi.h
+@@ -34,10 +34,12 @@ extern bool_t acpi_disabled;
+ bool_t __init acpi_psci_present(void);
+ bool_t __init acpi_psci_hvc_present(void);
+ void __init acpi_smp_init_cpus(void);
++unsigned int acpi_get_irq_type(u32 flags);
+ #else
+ static inline bool_t acpi_psci_present(void) { return false; }
+ static inline bool_t acpi_psci_hvc_present(void) {return false; }
+ static inline void acpi_smp_init_cpus(void) { }
++static inline unsigned int acpi_get_irq_type(u32 flags) { return 0; }
+ #endif /* CONFIG_ACPI */
  
- void irq_set_affinity(struct irq_desc *desc, const cpumask_t *cpu_mask);
+ /* Basic configuration for ACPI */
+@@ -48,4 +50,41 @@ static inline void disable_acpi(void)
+ 
+ #define ACPI_GTDT_INTR_MASK ( ACPI_GTDT_INTERRUPT_MODE | ACPI_GTDT_INTERRUPT_POLARITY )
+ 
++/* Triggering */
++
++#define ACPI_LEVEL_SENSITIVE            (u8) 0x00
++#define ACPI_EDGE_SENSITIVE             (u8) 0x01
++
++/* Polarity */
++
++#define ACPI_ACTIVE_HIGH                (u8) 0x00
++#define ACPI_ACTIVE_LOW                 (u8) 0x01
++#define ACPI_ACTIVE_BOTH                (u8) 0x02
++
++/**
++ * IRQ line type.
++ *
++ * ACPI_IRQ_TYPE_NONE            - default, unspecified type
++ * ACPI_IRQ_TYPE_EDGE_RISING     - rising edge triggered
++ * ACPI_IRQ_TYPE_EDGE_FALLING    - falling edge triggered
++ * ACPI_IRQ_TYPE_EDGE_BOTH       - rising and falling edge triggered
++ * ACPI_IRQ_TYPE_LEVEL_HIGH      - high level triggered
++ * ACPI_IRQ_TYPE_LEVEL_LOW       - low level triggered
++ * ACPI_IRQ_TYPE_LEVEL_MASK      - Mask to filter out the level bits
++ * ACPI_IRQ_TYPE_SENSE_MASK      - Mask for all the above bits
++ * ACPI_IRQ_TYPE_INVALID         - Use to initialize the type
++ */
++#define ACPI_IRQ_TYPE_NONE           0x00000000
++#define ACPI_IRQ_TYPE_EDGE_RISING    0x00000001
++#define ACPI_IRQ_TYPE_EDGE_FALLING   0x00000002
++#define ACPI_IRQ_TYPE_EDGE_BOTH                           \
++    (ACPI_IRQ_TYPE_EDGE_FALLING | ACPI_IRQ_TYPE_EDGE_RISING)
++#define ACPI_IRQ_TYPE_LEVEL_HIGH     0x00000004
++#define ACPI_IRQ_TYPE_LEVEL_LOW      0x00000008
++#define ACPI_IRQ_TYPE_LEVEL_MASK                          \
++    (ACPI_IRQ_TYPE_LEVEL_LOW | ACPI_IRQ_TYPE_LEVEL_HIGH)
++#define ACPI_IRQ_TYPE_SENSE_MASK     0x0000000f
++
++#define ACPI_IRQ_TYPE_INVALID        0x00000010
++
+ #endif /*_ASM_ARM_ACPI_H*/
 -- 
 2.1.0
