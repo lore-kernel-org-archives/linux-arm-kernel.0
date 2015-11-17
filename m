@@ -1,72 +1,150 @@
 From: lina.iyer@linaro.org (Lina Iyer)
-Date: Tue, 17 Nov 2015 15:37:43 -0700
-Subject: [PATCH RFC 19/27] drivers: cpu-pd: Invoke CPU PM runtime on hotplug
+Date: Tue, 17 Nov 2015 15:37:47 -0700
+Subject: [PATCH RFC 23/27] ARM64: psci: Support cluster idle states for
+ OS-Initated
 In-Reply-To: <1447799871-56374-1-git-send-email-lina.iyer@linaro.org>
 References: <1447799871-56374-1-git-send-email-lina.iyer@linaro.org>
-Message-ID: <1447799871-56374-20-git-send-email-lina.iyer@linaro.org>
+Message-ID: <1447799871-56374-24-git-send-email-lina.iyer@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-When a CPU is hotplugged off invoke CPU runtime suspend to notify
-runtime PM of the CPU being powered down and opportunistically power
-down the domain as well. Do that independent of the architecture using
-hotplug notifiers.
+ARMv8 PSCI firmware may allow Linux to determine the state of the CPU
+cluster and the cluster at coherency level to enter idle states when
+there are no active CPUs. Since Linux has a better idea of the QoS and
+the wakeup pattern of the CPUs, the cluster idle states may be better
+determined by the OS instead of the firmware.
 
+The last CPU entering idle in a cluster, holds the responsibility of
+selecting the state of the cluster. Only one CPU in a cluster may
+provide the cluster idle state to the firmware. Similarly, the last CPU
+in the cluster of clusters may provide the state of the coherency
+domain.
+
+The CPU PM domain framework facilitates registration of CPU PM domains
+and reference counting for the last man down and the first man up. But
+the organzation of CPUs into clusters must be provided. The cpu-map
+topology node provides the information. Call into the CPU PM framework
+to parse the CPU topology node and setup the PM domains. The state id
+for the cluster ids is available with the domain idle state.
+
+The last CPU PSCI state id of the entire system would therefore be -
+Coherency State ID + Cluster State ID + CPU idle state ID, that is
+passed into the PSCI firmware when the CPU makes the PSCI enable-method.
+
+Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+Cc: Mark Rutland <mark.rutland@arm.com>
 Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
 ---
- drivers/base/power/cpu-pd.c | 31 +++++++++++++++++++++++++++++--
- 1 file changed, 29 insertions(+), 2 deletions(-)
+ arch/arm64/kernel/psci.c | 54 +++++++++++++++++++++++++++++++++++++++++++++---
+ 1 file changed, 51 insertions(+), 3 deletions(-)
 
-diff --git a/drivers/base/power/cpu-pd.c b/drivers/base/power/cpu-pd.c
-index a00abc1..e331ae6 100644
---- a/drivers/base/power/cpu-pd.c
-+++ b/drivers/base/power/cpu-pd.c
-@@ -237,6 +237,30 @@ static int of_pm_domain_attach_cpus(struct device_node *dn,
- 	return 0;
- }
+diff --git a/arch/arm64/kernel/psci.c b/arch/arm64/kernel/psci.c
+index f67f35b..6618d33 100644
+--- a/arch/arm64/kernel/psci.c
++++ b/arch/arm64/kernel/psci.c
+@@ -15,10 +15,12 @@
  
-+static int cpu_hotplug(struct notifier_block *nb,
-+			unsigned long action, void *data)
+ #define pr_fmt(fmt) "psci: " fmt
+ 
++#include <linux/cpu-pd.h>
+ #include <linux/init.h>
+ #include <linux/of.h>
+ #include <linux/smp.h>
+ #include <linux/delay.h>
++#include <linux/pm_domain.h>
+ #include <linux/psci.h>
+ #include <linux/slab.h>
+ 
+@@ -31,6 +33,44 @@
+ #include <asm/suspend.h>
+ 
+ static DEFINE_PER_CPU_READ_MOSTLY(u32 *, psci_power_state);
++static DEFINE_PER_CPU(u32, cluster_state_id);
++
++static inline u32 psci_get_composite_state_id(u32 cpu_state)
 +{
-+	struct device *dev = get_cpu_device(smp_processor_id());
++	u32 val = cpu_state;
 +
-+	/* Execute CPU runtime PM on that CPU */
-+	switch (action) {
-+	case CPU_DYING:
-+	case CPU_DYING_FROZEN:
-+		pm_runtime_put_sync_suspend(dev);
-+		pm_runtime_disable(dev);
-+		break;
-+	case CPU_STARTING:
-+	case CPU_STARTING_FROZEN:
-+		pm_runtime_enable(dev);
-+		pm_runtime_get_sync(dev);
-+		break;
-+	default:
-+		break;
-+	}
++	if (psci_has_ext_power_state())
++		val += this_cpu_read(cluster_state_id);
 +
-+	return NOTIFY_OK;
++	return val;
 +}
 +
- int of_register_cpu_pm_domain(struct device_node *dn,
- 		struct cpu_pm_domain *pd)
- {
-@@ -277,10 +301,13 @@ int of_register_cpu_pm_domain(struct device_node *dn,
- 
- 	/* Attach the CPUs to the CPU PM domain */
- 	ret = of_pm_domain_attach_cpus(dn, pd);
--	if (ret)
-+	if (ret) {
- 		of_genpd_del_provider(dn);
-+		return ret;
-+	}
- 
--	return ret;
-+	hotcpu_notifier(cpu_hotplug, 0)
++static inline void psci_reset_composite_state_id(void)
++{
++	this_cpu_write(cluster_state_id, 0);
++}
++
++static int psci_pd_power_on(struct generic_pm_domain *genpd)
++{
 +	return 0;
++}
++
++static int psci_pd_power_off(struct generic_pm_domain *genpd)
++{
++	__this_cpu_add(cluster_state_id, genpd->states[genpd->state_idx].param);
++	return 0;
++}
++
++static const struct cpu_pd_ops psci_pd_ops = {
++	.power_on = psci_pd_power_on,
++	.power_off = psci_pd_power_off,
++};
++
++static int __init psci_setup_cpu_domains(void)
++{
++	return of_setup_cpu_domain_topology(&psci_pd_ops);
++}
++subsys_initcall(psci_setup_cpu_domains);
+ 
+ static int __maybe_unused cpu_psci_cpu_init_idle(unsigned int cpu)
+ {
+@@ -117,6 +157,8 @@ static int cpu_psci_cpu_boot(unsigned int cpu)
+ 	if (err)
+ 		pr_err("failed to boot CPU%d (%d)\n", cpu, err);
+ 
++	/* Reset CPU cluster states */
++	psci_reset_composite_state_id();
+ 	return err;
  }
  
- /**
+@@ -181,15 +223,16 @@ static int cpu_psci_cpu_kill(unsigned int cpu)
+ static int psci_suspend_finisher(unsigned long index)
+ {
+ 	u32 *state = __this_cpu_read(psci_power_state);
++	u32 ext_state = psci_get_composite_state_id(state[index - 1]);
+ 
+-	return psci_ops.cpu_suspend(state[index - 1],
+-				    virt_to_phys(cpu_resume));
++	return psci_ops.cpu_suspend(ext_state, virt_to_phys(cpu_resume));
+ }
+ 
+ static int __maybe_unused cpu_psci_cpu_suspend(unsigned long index)
+ {
+ 	int ret;
+ 	u32 *state = __this_cpu_read(psci_power_state);
++	u32 ext_state = psci_get_composite_state_id(state[index - 1]);
+ 	/*
+ 	 * idle state index 0 corresponds to wfi, should never be called
+ 	 * from the cpu_suspend operations
+@@ -198,10 +241,15 @@ static int __maybe_unused cpu_psci_cpu_suspend(unsigned long index)
+ 		return -EINVAL;
+ 
+ 	if (!psci_power_state_loses_context(state[index - 1]))
+-		ret = psci_ops.cpu_suspend(state[index - 1], 0);
++		ret = psci_ops.cpu_suspend(ext_state, 0);
+ 	else
+ 		ret = cpu_suspend(index, psci_suspend_finisher);
+ 
++	/*
++	 * Clear the CPU's cluster states, we start afresh after coming
++	 * out of idle.
++	 */
++	psci_reset_composite_state_id();
+ 	return ret;
+ }
+ 
 -- 
 2.1.4
