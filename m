@@ -1,186 +1,199 @@
 From: shannon.zhao@linaro.org (shannon.zhao at linaro.org)
-Date: Tue, 17 Nov 2015 17:40:25 +0800
-Subject: [PATCH v3 26/62] arm/gic-v2: Add ACPI boot support for GICv2
+Date: Tue, 17 Nov 2015 17:40:39 +0800
+Subject: [PATCH v3 40/62] arm/acpi: Estimate memory required for acpi/efi
+ tables
 In-Reply-To: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
 References: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
-Message-ID: <1447753261-7552-27-git-send-email-shannon.zhao@linaro.org>
+Message-ID: <1447753261-7552-41-git-send-email-shannon.zhao@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Parth Dixit <parth.dixit@linaro.org>
+From: Shannon Zhao <shannon.zhao@linaro.org>
 
-ACPI on Xen hypervisor uses MADT table for proper GIC initialization.
-First get the GIC version from GIC Distributor. Then parse GIC related
-subtables, collect CPU interface and distributor addresses and call
-driver initialization function (which is hardware abstraction agnostic).
-In a similar way, FDT initialize GICv2.
+Estimate the memory required for loading acpi/efi tables in Dom0. Alloc
+the pages to store the new created EFI and ACPI tables and free these
+pages when destroying domain.
 
-Signed-off-by: Tomasz Nowicki <tomasz.nowicki@linaro.org>
-Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-Signed-off-by: Naresh Bhat <naresh.bhat@linaro.org>
 Signed-off-by: Parth Dixit <parth.dixit@linaro.org>
 Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
 ---
- xen/arch/arm/gic-v2.c | 122 +++++++++++++++++++++++++++++++++++++++++++++++++-
- 1 file changed, 121 insertions(+), 1 deletion(-)
+ xen/arch/arm/domain.c       |  4 +++
+ xen/arch/arm/domain_build.c | 80 ++++++++++++++++++++++++++++++++++++++++++++-
+ xen/common/efi/boot.c       | 21 ++++++++++++
+ xen/include/asm-arm/setup.h |  2 ++
+ 4 files changed, 106 insertions(+), 1 deletion(-)
 
-diff --git a/xen/arch/arm/gic-v2.c b/xen/arch/arm/gic-v2.c
-index e31d38e..9a9fcd5 100644
---- a/xen/arch/arm/gic-v2.c
-+++ b/xen/arch/arm/gic-v2.c
-@@ -29,6 +29,8 @@
- #include <xen/device_tree.h>
+diff --git a/xen/arch/arm/domain.c b/xen/arch/arm/domain.c
+index 880d0a6..10c58c4 100644
+--- a/xen/arch/arm/domain.c
++++ b/xen/arch/arm/domain.c
+@@ -638,6 +638,10 @@ void arch_domain_destroy(struct domain *d)
+     domain_vgic_free(d);
+     domain_vuart_free(d);
+     free_xenheap_page(d->shared_info);
++#ifdef CONFIG_ACPI
++    free_xenheap_pages(d->arch.efi_acpi_table,
++                       get_order_from_bytes(d->arch.efi_acpi_len));
++#endif
+ }
+ 
+ void arch_domain_shutdown(struct domain *d)
+diff --git a/xen/arch/arm/domain_build.c b/xen/arch/arm/domain_build.c
+index 0c3441a..b5ed44c 100644
+--- a/xen/arch/arm/domain_build.c
++++ b/xen/arch/arm/domain_build.c
+@@ -12,6 +12,8 @@
  #include <xen/libfdt/libfdt.h>
- #include <xen/sizes.h>
+ #include <xen/guest_access.h>
+ #include <xen/iocap.h>
 +#include <xen/acpi.h>
 +#include <acpi/actables.h>
- #include <asm/p2m.h>
- #include <asm/domain.h>
+ #include <asm/device.h>
+ #include <asm/setup.h>
  #include <asm/platform.h>
-@@ -36,6 +38,7 @@
- 
- #include <asm/io.h>
- #include <asm/gic.h>
-+#include <asm/acpi.h>
- 
- /*
-  * LR register definitions are GIC v2 specific.
-@@ -681,11 +684,113 @@ static void __init dt_gicv2_init(void)
-                csize, vsize);
+@@ -1354,6 +1356,78 @@ static int prepare_dtb(struct domain *d, struct kernel_info *kinfo)
+     return -EINVAL;
  }
  
 +#ifdef CONFIG_ACPI
-+static int __init
-+gic_acpi_parse_madt_cpu(struct acpi_subtable_header *header,
-+                        const unsigned long end)
++static int estimate_acpi_efi_size(struct domain *d, struct kernel_info *kinfo)
 +{
-+    static int cpu_base_assigned = 0;
-+    struct acpi_madt_generic_interrupt *processor;
++    u64 efi_size, acpi_size = 0, addr;
++    u32 madt_size;
++    struct acpi_table_rsdp *rsdp_tbl;
++    struct acpi_table_header *table = NULL;
 +
-+    processor = (struct acpi_madt_generic_interrupt *)header;
++    efi_size = estimate_efi_size(kinfo->mem.nr_banks);
 +
-+    if ( BAD_MADT_ENTRY(processor, end) )
++    acpi_size += PAGE_ALIGN(sizeof(struct acpi_table_fadt));
++    acpi_size += PAGE_ALIGN(sizeof(struct acpi_table_stao));
++
++    madt_size = sizeof(struct acpi_table_madt)
++                + sizeof(struct acpi_madt_generic_interrupt) * d->max_vcpus
++                + sizeof(struct acpi_madt_generic_distributor);
++    if ( d->arch.vgic.version == GIC_V3 )
++        madt_size += sizeof(struct acpi_madt_generic_redistributor)
++                     * d->arch.vgic.nr_regions;
++    acpi_size += PAGE_ALIGN(madt_size);
++
++    addr = acpi_os_get_root_pointer();
++    if ( !addr )
++    {
++        printk("Unable to get acpi root pointer\n");
 +        return -EINVAL;
-+
-+    /* Read from APIC table and fill up the GIC variables */
-+    if ( cpu_base_assigned == 0 )
-+    {
-+        cbase = processor->base_address;
-+        csize = SZ_8K;
-+        hbase = processor->gich_base_address;
-+        vbase = processor->gicv_base_address;
-+        gicv2_info.maintenance_irq = processor->vgic_interrupt;
-+
-+        if( processor->flags & ACPI_MADT_VGIC_IRQ_MODE )
-+            irq_set_type(gicv2_info.maintenance_irq, ACPI_IRQ_TYPE_EDGE_BOTH);
-+        else
-+            irq_set_type(gicv2_info.maintenance_irq, ACPI_IRQ_TYPE_LEVEL_MASK);
-+
-+	cpu_base_assigned = 1;
 +    }
-+    else
-+    {
-+        if ( cbase != processor->base_address
-+             || hbase != processor->gich_base_address
-+             || vbase != processor->gicv_base_address
-+             || gicv2_info.maintenance_irq != processor->vgic_interrupt )
-+        {
-+	    printk("GICv2: GICC entries are not same in MADT table\n");
-+	    return -EINVAL;
-+        }
-+    }
++    rsdp_tbl = acpi_os_map_memory(addr, sizeof(struct acpi_table_rsdp));
++    table = acpi_os_map_memory(rsdp_tbl->xsdt_physical_address,
++                               sizeof(struct acpi_table_header));
++    acpi_size += PAGE_ALIGN(table->length + sizeof(u64));
++    acpi_os_unmap_memory(table, sizeof(struct acpi_table_header));
++    acpi_os_unmap_memory(rsdp_tbl, sizeof(struct acpi_table_rsdp));
++
++    acpi_size += PAGE_ALIGN(sizeof(struct acpi_table_rsdp));
++    d->arch.efi_acpi_len = PAGE_ALIGN(efi_size) + PAGE_ALIGN(acpi_size);
 +
 +    return 0;
 +}
 +
-+static int __init
-+gic_acpi_parse_madt_distributor(struct acpi_subtable_header *header,
-+                                const unsigned long end)
++static int prepare_acpi(struct domain *d, struct kernel_info *kinfo)
 +{
-+    struct acpi_madt_generic_distributor *dist;
++    int rc = 0;
++    int order;
 +
-+    dist = (struct acpi_madt_generic_distributor *)header;
++    rc = estimate_acpi_efi_size(d, kinfo);
++    if ( rc != 0 )
++        return rc;
 +
-+    if ( BAD_MADT_ENTRY(dist, end) )
-+        return -EINVAL;
++    order = get_order_from_bytes(d->arch.efi_acpi_len);
++    d->arch.efi_acpi_table = alloc_xenheap_pages(order, 0);
++    if ( d->arch.efi_acpi_table == NULL )
++    {
++        printk("unable to allocate memory!\n");
++        return -1;
++    }
++    memset(d->arch.efi_acpi_table, 0, d->arch.efi_acpi_len);
 +
-+    dbase = dist->base_address;
++    /* For ACPI, Dom0 doesn't use kinfo->gnttab_start to get the grant table
++     * region. So we use it as the ACPI table mapped address. */
++    d->arch.efi_acpi_gpa = kinfo->gnttab_start;
 +
 +    return 0;
-+}
-+
-+static void __init acpi_gicv2_init(void)
-+{
-+    acpi_status status;
-+    struct acpi_table_header *table;
-+    int count;
-+
-+    status = acpi_get_table(ACPI_SIG_MADT, 0, &table);
-+
-+    if ( ACPI_FAILURE(status) )
-+    {
-+        const char *msg = acpi_format_exception(status);
-+
-+        panic("GICv2: Failed to get MADT table, %s", msg);
-+    }
-+
-+    /* Collect CPU base addresses */
-+    count = acpi_parse_entries(ACPI_SIG_MADT, sizeof(struct acpi_table_madt),
-+                               gic_acpi_parse_madt_cpu, table,
-+                               ACPI_MADT_TYPE_GENERIC_INTERRUPT, 0);
-+    if ( count <= 0 )
-+        panic("GICv2: No valid GICC entries exists");
-+
-+    /*
-+     * Find distributor base address. We expect one distributor entry since
-+     * ACPI 5.0 spec neither support multi-GIC instances nor GIC cascade.
-+     */
-+    count = acpi_parse_entries(ACPI_SIG_MADT, sizeof(struct acpi_table_madt),
-+                               gic_acpi_parse_madt_distributor, table,
-+                               ACPI_MADT_TYPE_GENERIC_DISTRIBUTOR, 0);
-+    if ( count <= 0 )
-+        panic("GICv2: No valid GICD entries exists");
 +}
 +#else
-+static void __init acpi_gicv2_init(void)
++static int prepare_acpi(struct domain *d, struct kernel_info *kinfo)
 +{
-+/* Should never reach here */
++    /* Only booting with ACPI will hit here */
++    BUG_ON(1);
++    return -EINVAL;
 +}
 +#endif
-+
- static int __init gicv2_init(void)
+ static void dtb_load(struct kernel_info *kinfo)
  {
-     uint32_t aliased_offset = 0;
+     void * __user dtb_virt = (void * __user)(register_t)kinfo->dtb_paddr;
+@@ -1540,7 +1614,11 @@ int construct_dom0(struct domain *d)
+     allocate_memory(d, &kinfo);
+     find_gnttab_region(d, &kinfo);
  
--    dt_gicv2_init();
-+    if( acpi_disabled )
-+        dt_gicv2_init();
+-    rc = prepare_dtb(d, &kinfo);
++    if ( acpi_disabled )
++        rc = prepare_dtb(d, &kinfo);
 +    else
-+        acpi_gicv2_init();
++        rc = prepare_acpi(d, &kinfo);
++
+     if ( rc < 0 )
+         return rc;
  
-     printk("GICv2 initialization:\n"
-               "        gic_dist_addr=%"PRIpaddr"\n"
-@@ -793,6 +898,21 @@ DT_DEVICE_START(gicv2, "GICv2", DEVICE_GIC)
-         .init = dt_gicv2_preinit,
- DT_DEVICE_END
+diff --git a/xen/common/efi/boot.c b/xen/common/efi/boot.c
+index 53c7452..78d8ae9 100644
+--- a/xen/common/efi/boot.c
++++ b/xen/common/efi/boot.c
+@@ -13,6 +13,7 @@
+ #include <xen/multiboot.h>
+ #include <xen/pci_regs.h>
+ #include <xen/pfn.h>
++#include <asm/acpi.h>
+ #if EFI_PAGE_SIZE != PAGE_SIZE
+ # error Cannot use xen/pfn.h here!
+ #endif
+@@ -1171,6 +1172,26 @@ efi_start(EFI_HANDLE ImageHandle, EFI_SYSTEM_TABLE *SystemTable)
+     for( ; ; ); /* not reached */
+ }
  
 +#ifdef CONFIG_ACPI
-+/* Set up the GIC */
-+static int __init acpi_gicv2_preinit(const void *data)
++/* Constant to indicate "Xen" in unicode u16 format */
++static const u16 XEN_EFI_FW_VENDOR[] ={0x0058,0x0065,0x006E,0x0000};
++
++int __init estimate_efi_size(int mem_nr_banks)
 +{
-+    gicv2_info.hw_version = GIC_V2;
-+    register_gic_ops(&gicv2_ops);
++    int size;
++    int est_size = sizeof(EFI_SYSTEM_TABLE);
++    int ect_size = sizeof(EFI_CONFIGURATION_TABLE);
++    int emd_size = sizeof(EFI_MEMORY_DESCRIPTOR);
++    int fw_vendor_size = sizeof(XEN_EFI_FW_VENDOR);
 +
-+    return 0;
++    size = PAGE_ALIGN(est_size + ect_size + fw_vendor_size)
++           + PAGE_ALIGN(emd_size *
++                        (mem_nr_banks + acpi_mem.nr_banks + TBL_MMAX));
++
++    return size;
 +}
-+
-+ACPI_DEVICE_START(agicv2, "GICv2", DEVICE_GIC)
-+        .class_type = GIC_V2,
-+        .init = acpi_gicv2_preinit,
-+ACPI_DEVICE_END
 +#endif
- /*
-  * Local variables:
-  * mode: C
++
+ #ifndef CONFIG_ARM /* TODO - runtime service support */
+ 
+ static bool_t __initdata efi_rs_enable = 1;
+diff --git a/xen/include/asm-arm/setup.h b/xen/include/asm-arm/setup.h
+index 30ac53b..b759813 100644
+--- a/xen/include/asm-arm/setup.h
++++ b/xen/include/asm-arm/setup.h
+@@ -51,6 +51,8 @@ void arch_init_memory(void);
+ 
+ void copy_from_paddr(void *dst, paddr_t paddr, unsigned long len);
+ 
++int estimate_efi_size(int mem_nr_banks);
++
+ int construct_dom0(struct domain *d);
+ 
+ void discard_initial_modules(void);
 -- 
 2.1.0
