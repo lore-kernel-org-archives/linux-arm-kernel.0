@@ -1,121 +1,67 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 17 Nov 2015 13:50:24 +0100
-Subject: [RFC] ARM64: simplify dma_get_ops
-In-Reply-To: <20151117122250.GH6556@e104818-lin.cambridge.arm.com>
-References: <4270550.cGd11OgA5n@wuerfel> <5118146.8KqrJiJrDe@wuerfel>
- <20151117122250.GH6556@e104818-lin.cambridge.arm.com>
-Message-ID: <7483659.O8uXXLFCFD@wuerfel>
+From: zhaoshenglong@huawei.com (Shannon Zhao)
+Date: Tue, 17 Nov 2015 20:45:06 +0800
+Subject: [PATCH v3 38/62] arm/acpi: Add placeholder for efi and acpi load
+ address
+In-Reply-To: <564B1666.4060008@citrix.com>
+References: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
+ <1447753261-7552-39-git-send-email-shannon.zhao@linaro.org>
+ <564B1666.4060008@citrix.com>
+Message-ID: <564B2152.9000904@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 17 November 2015 12:22:51 Catalin Marinas wrote:
+
+
+On 2015/11/17 19:58, Julien Grall wrote:
+> Hi Shannon,
 > 
-> > On a related note, we should also urgently fix the
-> > arch_setup_dma_ops() function to no longer ignore the base and size
-> > arguments. For dma_base, we can simply WARN_ON(dma_base != 0), so we
-> > can implement support for that whenever we need it,
+> On 17/11/15 09:40, shannon.zhao at linaro.org wrote:
+>> From: Shannon Zhao <shannon.zhao@linaro.org>
+>>
+>> EFI table, memory description table and some of acpi tables will be
+>> placed after DOM0 memory space. Add placeholder for the starting address
+>> for loading in DOM0 and the size of new added tables. Also add a
+>> placeholder to store the new created tables.
+>>
+>> Signed-off-by: Parth Dixit <parth.dixit@linaro.org>
+>> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+>> ---
+>>  xen/include/asm-arm/domain.h | 5 +++++
+>>  1 file changed, 5 insertions(+)
+>>
+>> diff --git a/xen/include/asm-arm/domain.h b/xen/include/asm-arm/domain.h
+>> index 1e61f30..91272e5 100644
+>> --- a/xen/include/asm-arm/domain.h
+>> +++ b/xen/include/asm-arm/domain.h
+>> @@ -125,6 +125,11 @@ struct arch_domain
+>>      } vuart;
+>>  
+>>      unsigned int evtchn_irq;
+>> +#ifdef CONFIG_ACPI
+>> +    void *efi_acpi_table;
+>> +    paddr_t efi_acpi_gpa;
+>> +    paddr_t efi_acpi_len;
+>> +#endif
 > 
-> I think we should, at least until we implement support for
-> dev->dma_pfn_offset. I'm not sure about iommu though, maybe there are
-> working configurations with dma_base != 0.
-
-I think we can assume for now that all IOMMUs are similar to the
-ARM SMMU and don't need this.
-
-> > but for the size we need to prevent drivers from calling
-> > dma_set_mask() with an argument larger than the size we pass in here,
-> > unless the size is also larger than max_pfn.
+> Why do you need this in the arch_domain? AFAICT those 3 variables should
+> only be used while building DOM0, so a better place would be in struct
+> kernel_info (see xen/arch/arm/kernel.h).
 > 
-> We have a default mask set up in of_dma_configure() based on size and
-> dma_base. Can we check the new mask against the default one?
 
-The size variable here is the mask that of_dma_configure() computes,
-though it is not a "default": it is whatever the parent bus can support,
-independent of additional restrictions that may be present in the
-device and that are set by the driver.
+Since I use efi_acpi_table to store the allocated pages pointer which
+are used to store newly created ACPI and EFI tables.
+See [PATCH v3 40/62]:
++    order = get_order_from_bytes(d->arch.efi_acpi_len);
++    d->arch.efi_acpi_table = alloc_xenheap_pages(order, 0);
 
-Checking against that is what I meant above, see below for a prototype
-that I have not even compile-tested and that might be missing some corner
-cases.
+And it free these pages when destroying this domain:
++#ifdef CONFIG_ACPI
++    free_xenheap_pages(d->arch.efi_acpi_table,
++                       get_order_from_bytes(d->arch.efi_acpi_len));
++#endif
 
-We actually have the option of swapping out the dev->dma_ops in set_mask
-so we don't have to go through the swiotlb code for devices that don't
-need it.
+efi_acpi_gpa might not need.
 
-	Arnd
-
-diff --git a/arch/arm64/include/asm/device.h b/arch/arm64/include/asm/device.h
-index 243ef256b8c9..2af91a5bec4e 100644
---- a/arch/arm64/include/asm/device.h
-+++ b/arch/arm64/include/asm/device.h
-@@ -22,6 +22,7 @@ struct dev_archdata {
- 	void *iommu;			/* private IOMMU data */
- #endif
- 	bool dma_coherent;
-+	parent_dma_mask;
- };
- 
- struct pdev_archdata {
-diff --git a/arch/arm64/mm/dma-mapping.c b/arch/arm64/mm/dma-mapping.c
-index 9e351c1f89e2..0433b911b1bd 100644
---- a/arch/arm64/mm/dma-mapping.c
-+++ b/arch/arm64/mm/dma-mapping.c
-@@ -341,6 +341,31 @@ static int __swiotlb_get_sgtable(struct device *dev, struct sg_table *sgt,
- 	return ret;
- }
- 
-+static int __swiotlb_set_dma_mask(struct device *dev, u64 mask)
-+{
-+	/* device is not DMA capable */
-+	if (!dev->dma_mask)
-+		return -EIO;
-+
-+	/* mask is below swiotlb bounce buffer, so fail */
-+	if (!swiotlb_dma_supported(dev, mask))
-+		return -EIO;
-+
-+	/*
-+	 * because of the swiotlb, we can return success for
-+	 * larger masks, but need to ensure that bounce buffers
-+	 * are used above parent_dma_mask, so set that as
-+	 * the effective mask.
-+	 */
-+	if (mask > dev->dev_archdata.parent_dma_mask)
-+		mask = dev->dev_archdata.parent_dma_mask;
-+
-+
-+	*dev->dma_mask = mask;
-+
-+	return 0;
-+}
-+
- static struct dma_map_ops swiotlb_dma_ops = {
- 	.alloc = __dma_alloc,
- 	.free = __dma_free,
-@@ -356,6 +381,7 @@ static struct dma_map_ops swiotlb_dma_ops = {
- 	.sync_sg_for_device = __swiotlb_sync_sg_for_device,
- 	.dma_supported = swiotlb_dma_supported,
- 	.mapping_error = swiotlb_dma_mapping_error,
-+	.set_dma_mask = __swiotlb_set_dma_mask,
- };
- 
- static int __init atomic_pool_init(void)
-@@ -979,6 +1005,18 @@ void arch_setup_dma_ops(struct device *dev, u64 dma_base, u64 size,
- 	if (!acpi_disabled && !dev->archdata.dma_ops)
- 		dev->archdata.dma_ops = &swiotlb_dma_ops;
- 
-+	/*
-+	 * we don't yet support buses that have a non-zero mapping.
-+	 *  Let's hope we won't need it
-+	 */
-+	WARN_ON(dma_base != 0);
-+
-+	/*
-+	 * Whatever the parent bus can set. A device must not set
-+	 * a DMA mask larger than this.
-+	 */
-+	dev->archdata.parent_dma_mask = size;
-+
- 	dev->archdata.dma_coherent = coherent;
- 	__iommu_setup_dma_ops(dev, dma_base, size, iommu);
- }
+Thanks,
+-- 
+Shannon
