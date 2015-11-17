@@ -1,36 +1,47 @@
-From: dan.carpenter@oracle.com (Dan Carpenter)
-Date: Tue, 17 Nov 2015 09:15:49 +0300
-Subject: [PATCHv2 2/3] staging: ion: Add files for parsing the devicetree
-In-Reply-To: <1447721855-7574-3-git-send-email-laura@labbott.name>
-References: <1447721855-7574-1-git-send-email-laura@labbott.name>
- <1447721855-7574-3-git-send-email-laura@labbott.name>
-Message-ID: <20151117061549.GM18797@mwanda>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Tue, 17 Nov 2015 15:16:57 +0900
+Subject: [PATCH v6 9/9] drivers: soc: Add support for Exynos PMU driver
+In-Reply-To: <1447740351-14246-10-git-send-email-pankaj.dubey@samsung.com>
+References: <1447740351-14246-1-git-send-email-pankaj.dubey@samsung.com>
+ <1447740351-14246-10-git-send-email-pankaj.dubey@samsung.com>
+Message-ID: <564AC659.5090409@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 16, 2015 at 04:57:34PM -0800, Laura Abbott wrote:
-> +	for_each_available_child_of_node(dt_node, node) {
-> +		struct platform_device *heap_pdev;
-> +
-> +		ret = ion_parse_dt_heap_common(node, &heaps[i], compatible);
-> +		if (ret)
-> +			return ERR_PTR(ret);
-> +
-> +		heap_pdev = of_platform_device_create(node, heaps[i].name,
-> +							&pdev->dev);
+On 17.11.2015 15:05, Pankaj Dubey wrote:
+> This patch moves Exynos PMU driver implementation from "arm/mach-exynos"
+> to "drivers/soc/samsung". This driver is mainly used for setting misc
+> bits of register from PMU IP of Exynos SoC which will be required to
+> configure before Suspend/Resume. Currently all these settings are done
+> in "arch/arm/mach-exynos/pmu.c" but moving ahead for ARM64 based SoC
+> support, there is a need of this PMU driver in driver/* folder.
+> 
+> This driver uses existing DT binding information and there should
+> be no functionality change in the supported platforms.
+> 
+> Signed-off-by: Amit Daniel Kachhap <amitdanielk@gmail.com>
+> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
+> ---
+>  arch/arm/mach-exynos/Kconfig                                   | 1 +
+>  arch/arm/mach-exynos/Makefile                                  | 4 +---
+>  drivers/soc/samsung/Kconfig                                    | 4 ++++
+>  drivers/soc/samsung/Makefile                                   | 2 ++
+>  arch/arm/mach-exynos/pmu.c => drivers/soc/samsung/exynos-pmu.c | 0
+>  {arch/arm/mach-exynos => drivers/soc/samsung}/exynos-pmu.h     | 0
+>  {arch/arm/mach-exynos => drivers/soc/samsung}/exynos3250-pmu.c | 0
+>  {arch/arm/mach-exynos => drivers/soc/samsung}/exynos4-pmu.c    | 0
+>  {arch/arm/mach-exynos => drivers/soc/samsung}/exynos5250-pmu.c | 0
+>  {arch/arm/mach-exynos => drivers/soc/samsung}/exynos5420-pmu.c | 0
+>  10 files changed, 8 insertions(+), 3 deletions(-)
+>  rename arch/arm/mach-exynos/pmu.c => drivers/soc/samsung/exynos-pmu.c (100%)
+>  rename {arch/arm/mach-exynos => drivers/soc/samsung}/exynos-pmu.h (100%)
+>  rename {arch/arm/mach-exynos => drivers/soc/samsung}/exynos3250-pmu.c (100%)
+>  rename {arch/arm/mach-exynos => drivers/soc/samsung}/exynos4-pmu.c (100%)
+>  rename {arch/arm/mach-exynos => drivers/soc/samsung}/exynos5250-pmu.c (100%)
+>  rename {arch/arm/mach-exynos => drivers/soc/samsung}/exynos5420-pmu.c (100%)
+> 
 
-We should free these if something fails later in the function.
+Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 
-> +		if (!pdev)
-> +			return ERR_PTR(-ENOMEM);
-> +		heap_pdev->dev.platform_data = &heaps[i];
-> +
-> +		heaps[i].priv = &heap_pdev->dev;
-> +
-> +		ret = ion_setup_heap_common(pdev, node, &heaps[i]);
-> +		if (ret)
-> +			return ERR_PTR(ret);
-
-
-regards,
-dan carpenter
+Best regards,
+Krzysztof
