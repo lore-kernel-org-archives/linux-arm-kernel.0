@@ -1,193 +1,104 @@
 From: shannon.zhao@linaro.org (shannon.zhao at linaro.org)
-Date: Tue, 17 Nov 2015 17:40:17 +0800
-Subject: [PATCH v3 18/62] arm/acpi: Parse MADT to map logical cpu to MPIDR and
- get cpu_possible_map
+Date: Tue, 17 Nov 2015 17:40:18 +0800
+Subject: [PATCH v3 19/62] arm/smpboot: Move dt specific code in smp to
+ seperate functions
 In-Reply-To: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
 References: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
-Message-ID: <1447753261-7552-19-git-send-email-shannon.zhao@linaro.org>
+Message-ID: <1447753261-7552-20-git-send-email-shannon.zhao@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Parth Dixit <parth.dixit@linaro.org>
 
-MADT contains the information for MPIDR which is essential for SMP
-initialization, parse the GIC cpu interface structures to get the MPIDR
-value and map it to cpu_logical_map(), and add enabled cpu with valid
-MPIDR into cpu_possible_map.
+Partition smp initialization functions into generic and dt specific
+parts, this will be useful when introducing new functions for smp
+initialization based on acpi.
 
-Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
-Signed-off-by: Tomasz Nowicki <tomasz.nowicki@linaro.org>
-Signed-off-by: Naresh Bhat <naresh.bhat@linaro.org>
 Signed-off-by: Parth Dixit <parth.dixit@linaro.org>
 Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
 ---
- xen/arch/arm/acpi/boot.c   | 121 +++++++++++++++++++++++++++++++++++++++++++++
- xen/include/asm-arm/acpi.h |   2 +
- xen/include/xen/acpi.h     |   4 ++
- 3 files changed, 127 insertions(+)
+ xen/arch/arm/arm64/smpboot.c |  7 ++++++-
+ xen/arch/arm/smpboot.c       | 29 ++++++++++++++++++-----------
+ 2 files changed, 24 insertions(+), 12 deletions(-)
 
-diff --git a/xen/arch/arm/acpi/boot.c b/xen/arch/arm/acpi/boot.c
-index 0fabe7d..913d2a5 100644
---- a/xen/arch/arm/acpi/boot.c
-+++ b/xen/arch/arm/acpi/boot.c
-@@ -32,6 +32,127 @@
- #include <xen/mm.h>
+diff --git a/xen/arch/arm/arm64/smpboot.c b/xen/arch/arm/arm64/smpboot.c
+index 62e6abb..7928f69 100644
+--- a/xen/arch/arm/arm64/smpboot.c
++++ b/xen/arch/arm/arm64/smpboot.c
+@@ -70,7 +70,7 @@ int __init arch_smp_init(void)
+     return 0;
+ }
  
- #include <asm/acpi.h>
-+#include <asm/smp.h>
-+
-+/* Processors with enabled flag and sane MPIDR */
-+static int enabled_cpus;
-+
-+/* Boot CPU is valid or not in MADT */
-+static bool_t __initdata bootcpu_valid;
-+
-+/* total number of cpus in this system */
-+static unsigned int __initdata total_cpus = 0;
-+
-+/*
-+ * acpi_map_gic_cpu_interface - generates a logical cpu number
-+ * and map to MPIDR represented by GICC structure
-+ */
-+static void __init
-+acpi_map_gic_cpu_interface(struct acpi_madt_generic_interrupt *processor)
-+{
-+    int i;
-+    u64 mpidr = processor->arm_mpidr & MPIDR_HWID_MASK;
-+    bool enabled = !!(processor->flags & ACPI_MADT_ENABLED);
-+
-+    if (mpidr == MPIDR_INVALID) {
-+        printk("Skip MADT cpu entry with invalid MPIDR\n");
-+        return;
-+    }
-+
-+    total_cpus++;
-+    if (!enabled)
-+        return;
-+
-+    if (enabled_cpus >=  NR_CPUS) {
-+        printk("NR_CPUS limit of %d reached, Processor %d/0x%"PRIx64" ignored.\n",
-+               NR_CPUS, total_cpus, mpidr);
-+        return;
-+    }
-+
-+    /* Check if GICC structure of boot CPU is available in the MADT */
-+    if (cpu_logical_map(0) == mpidr) {
-+        if (bootcpu_valid) {
-+            printk("Firmware bug, duplicate CPU MPIDR: 0x%"PRIx64" in MADT\n",
-+                   mpidr);
-+            return;
-+        }
-+
-+        bootcpu_valid = true;
-+    }
-+
-+    /*
-+     * Duplicate MPIDRs are a recipe for disaster. Scan
-+     * all initialized entries and check for
-+     * duplicates. If any is found just ignore the CPU.
-+     */
-+    for (i = 1; i < enabled_cpus; i++) {
-+        if (cpu_logical_map(i) == mpidr) {
-+            printk("Firmware bug, duplicate CPU MPIDR: 0x%"PRIx64" in MADT\n",
-+                   mpidr);
-+            return;
-+        }
-+    }
-+
-+    if (!acpi_psci_present())
-+        return;
-+
-+    /* CPU 0 was already initialized */
-+    if (enabled_cpus) {
-+        if (arch_cpu_init(enabled_cpus, NULL) < 0)
-+            return;
-+
-+        /* map the logical cpu id to cpu MPIDR */
-+        cpu_logical_map(enabled_cpus) = mpidr;
-+    }
-+
-+    enabled_cpus++;
-+}
-+
-+static int __init
-+acpi_parse_gic_cpu_interface(struct acpi_subtable_header *header,
-+                             const unsigned long end)
-+{
-+    struct acpi_madt_generic_interrupt *processor;
-+
-+    processor = (struct acpi_madt_generic_interrupt *)header;
-+
-+    if (BAD_MADT_ENTRY(processor, end))
-+        return -EINVAL;
-+
-+    acpi_table_print_madt_entry(header);
-+    acpi_map_gic_cpu_interface(processor);
-+    return 0;
-+}
-+
-+/* Parse GIC cpu interface entries in MADT for SMP init */
-+void __init acpi_smp_init_cpus(void)
-+{
-+    int count, i;
-+
-+    /*
-+     * do a partial walk of MADT to determine how many CPUs
-+     * we have including disabled CPUs, and get information
-+     * we need for SMP init
-+     */
-+    count = acpi_table_parse_madt(ACPI_MADT_TYPE_GENERIC_INTERRUPT,
-+                    acpi_parse_gic_cpu_interface, 0);
-+
-+    if (count <= 0) {
-+        printk("Error parsing GIC CPU interface entry\n");
-+        return;
-+    }
-+
-+    if (!bootcpu_valid) {
-+        printk("MADT missing boot CPU MPIDR, not enabling secondaries\n");
-+        return;
-+    }
-+
-+    for (i = 0; i < enabled_cpus; i++)
-+        cpumask_set_cpu(i, &cpu_possible_map);
-+
-+    /* Make boot-up look pretty */
-+    printk("%d CPUs enabled, %d CPUs total\n", enabled_cpus, total_cpus);
-+}
- 
- static int __init acpi_parse_fadt(struct acpi_table_header *table)
+-int __init arch_cpu_init(int cpu, struct dt_device_node *dn)
++static int __init dt_arch_cpu_init(int cpu, struct dt_device_node *dn)
  {
-diff --git a/xen/include/asm-arm/acpi.h b/xen/include/asm-arm/acpi.h
-index 65f80b1..1efa29d 100644
---- a/xen/include/asm-arm/acpi.h
-+++ b/xen/include/asm-arm/acpi.h
-@@ -33,9 +33,11 @@ extern bool_t acpi_disabled;
- #ifdef CONFIG_ACPI
- bool_t __init acpi_psci_present(void);
- bool_t __init acpi_psci_hvc_present(void);
-+void __init acpi_smp_init_cpus(void);
- #else
- static inline bool_t acpi_psci_present(void) { return false; }
- static inline bool_t acpi_psci_hvc_present(void) {return false; }
-+static inline void acpi_smp_init_cpus(void) { }
- #endif /* CONFIG_ACPI */
+     const char *enable_method;
  
- /* Basic configuration for ACPI */
-diff --git a/xen/include/xen/acpi.h b/xen/include/xen/acpi.h
-index 48d7810..723ece8 100644
---- a/xen/include/xen/acpi.h
-+++ b/xen/include/xen/acpi.h
-@@ -39,6 +39,10 @@
- #define ACPI_MADT_GET_POLARITY(inti)	ACPI_MADT_GET_(POLARITY, inti)
- #define ACPI_MADT_GET_TRIGGER(inti)	ACPI_MADT_GET_(TRIGGER, inti)
+@@ -94,6 +94,11 @@ int __init arch_cpu_init(int cpu, struct dt_device_node *dn)
+     return 0;
+ }
  
-+#define BAD_MADT_ENTRY(entry, end) (                                        \
-+                (!entry) || (unsigned long)entry + sizeof(*entry) > end ||  \
-+                ((struct acpi_subtable_header *)entry)->length < sizeof(*entry))
++int __init arch_cpu_init(int cpu, struct dt_device_node *dn)
++{
++    return dt_arch_cpu_init(cpu, dn);
++}
 +
- #ifdef CONFIG_ACPI_BOOT
+ int __init arch_cpu_up(int cpu)
+ {
+     if ( !smp_enable_ops[cpu].prepare_cpu )
+diff --git a/xen/arch/arm/smpboot.c b/xen/arch/arm/smpboot.c
+index a96cda2..d115228 100644
+--- a/xen/arch/arm/smpboot.c
++++ b/xen/arch/arm/smpboot.c
+@@ -92,7 +92,7 @@ smp_clear_cpu_maps (void)
+  * MPIDR values related to logical cpus
+  * Code base on Linux arch/arm/kernel/devtree.c
+  */
+-void __init smp_init_cpus(void)
++static void __init dt_smp_init_cpus(void)
+ {
+     register_t mpidr;
+     struct dt_device_node *cpus = dt_find_node_by_path("/cpus");
+@@ -106,16 +106,6 @@ void __init smp_init_cpus(void)
+     bool_t bootcpu_valid = 0;
+     int rc;
  
- enum acpi_interrupt_id {
+-    /* scan the DTB for a PSCI node and set a global variable */
+-    psci_init();
+-
+-    if ( (rc = arch_smp_init()) < 0 )
+-    {
+-        printk(XENLOG_WARNING "SMP init failed (%d)\n"
+-               "Using only 1 CPU\n", rc);
+-        return;
+-    }
+-
+     mpidr = boot_cpu_data.mpidr.bits & MPIDR_HWID_MASK;
+ 
+     if ( !cpus )
+@@ -243,6 +233,23 @@ void __init smp_init_cpus(void)
+     }
+ }
+ 
++void __init smp_init_cpus(void)
++{
++    int rc;
++
++    /* initialize PSCI and set a global variable */
++    psci_init();
++
++    if ( (rc = arch_smp_init()) < 0 )
++    {
++        printk(XENLOG_WARNING "SMP init failed (%d)\n"
++               "Using only 1 CPU\n", rc);
++        return;
++    }
++
++    dt_smp_init_cpus();
++}
++
+ int __init
+ smp_get_max_cpus (void)
+ {
 -- 
 2.1.0
