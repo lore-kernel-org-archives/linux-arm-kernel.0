@@ -1,93 +1,71 @@
 From: julien.grall@citrix.com (Julien Grall)
-Date: Tue, 17 Nov 2015 12:26:22 +0000
-Subject: [PATCH v3 61/62] arm/acpi: Add acpi parameter to enable/disable
- acpi
-In-Reply-To: <1447753261-7552-62-git-send-email-shannon.zhao@linaro.org>
+Date: Tue, 17 Nov 2015 12:33:48 +0000
+Subject: [PATCH v3 55/62] arm/acpi: Route all Xen unused SPIs to Dom0
+In-Reply-To: <1447753261-7552-56-git-send-email-shannon.zhao@linaro.org>
 References: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
- <1447753261-7552-62-git-send-email-shannon.zhao@linaro.org>
-Message-ID: <564B1CEE.9030008@citrix.com>
+ <1447753261-7552-56-git-send-email-shannon.zhao@linaro.org>
+Message-ID: <564B1EAC.2050904@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 Hi Shannon,
 
-I would have appreciate if you I had looked on comments made on the
-series sent by Parth.
-
-On 17/11/15 09:41, shannon.zhao at linaro.org wrote:
-> From: Parth Dixit <parth.dixit@linaro.org>
+On 17/11/15 09:40, shannon.zhao at linaro.org wrote:
+> From: Shannon Zhao <shannon.zhao@linaro.org>
 > 
-> ACPI will be disabled by default. Define new command line parameter
-> "acpi" for enabling it.
-
-I don't think this is right. We have to be able to boot platform where
-there is only ACPI provided without adding a command line option.
-
-Overall, it would be better if we follow the same behavior as Linux i.e
-ACPI is enabled instead of DT unless:
-        - ACPI has been disabled (acpi=off)
-        - the DT is not empty (it has more than just a /chosen node) and
-ACPI has not been forced to be enabled (acpi=force).
-
+> Route all SPIs to Dom0 except the interrupts that Xen uses. Since Xen
+> already uses the uart interrupt, the desc->action will not be NULL, so
+> it will skip it.
 > 
-> Signed-off-by: Parth Dixit <parth.dixit@linaro.org>
 > Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
 > ---
->  xen/arch/arm/setup.c | 22 ++++++++++++++++++++++
->  1 file changed, 22 insertions(+)
+>  xen/arch/arm/domain_build.c | 33 +++++++++++++++++++++++++++++++++
+>  1 file changed, 33 insertions(+)
 > 
-> diff --git a/xen/arch/arm/setup.c b/xen/arch/arm/setup.c
-> index 63feadf..1a40323 100644
-> --- a/xen/arch/arm/setup.c
-> +++ b/xen/arch/arm/setup.c
-> @@ -59,6 +59,10 @@ static unsigned long opt_xenheap_megabytes __initdata;
->  integer_param("xenheap_megabytes", opt_xenheap_megabytes);
->  #endif
+> diff --git a/xen/arch/arm/domain_build.c b/xen/arch/arm/domain_build.c
+> index 6d8536b..6945f89 100644
+> --- a/xen/arch/arm/domain_build.c
+> +++ b/xen/arch/arm/domain_build.c
+> @@ -1360,6 +1360,35 @@ static int prepare_dtb(struct domain *d, struct kernel_info *kinfo)
+>  #define XEN_HYPERVISOR_ID 0x000058656E564D4D  /* "XenVMM" */
+>  #define ACPI_DOM0_FDT_MIN_SIZE 4096
 >  
-> +/* "acpi=force" : Enables acpi */
-> +static void parse_acpi_param(char *s);
-> +custom_param("acpi", parse_acpi_param);
-> +
->  static __used void init_done(void)
->  {
->      free_init_memory();
-> @@ -84,6 +88,23 @@ static const char * __initdata processor_implementers[] = {
->      ['i'] = "Intel Corporation",
->  };
->  
-> +static char __initdata acpi_param[10] = "";
-> +static void __init parse_acpi_param(char *s)
+> +static int acpi_route_spi(struct domain *d)
 > +{
-> +    /* Save the parameter so it can be propagated to domain0. */
-> +    safe_strcpy(acpi_param, s);
-
-This acpi_param is never used within this series. Please drop it or
-either implement what the comment claim.
-
+> +    int i, res;
+> +    struct irq_desc *desc;
 > +
-> +    /* Interpret the parameter for use within Xen. */
-> +    if ( !parse_bool(s) )
+> +    /* Don't route Xen used interrupt to Dom0. Since Xen already uses the uart
+> +     * interrupt, the desc->action will not be NULL, so it will skip it.
+> +     */
+> +    for( i = NR_LOCAL_IRQS; i < vgic_num_irqs(d); i++ )
 > +    {
-> +        disable_acpi();
+> +        /* Don't route uart interrupt to Dom0 */
+
+Your comments are wrong. desc->action != NULL means Xen is using the
+interrupt. It could be for the SMMU, the UART...
+
+> +        desc = irq_to_desc(i);
+> +        if( desc->action != NULL)
+
+Coding style.
+
+> +            continue;
+> +
+> +        vgic_reserve_virq(d, i);
+> +        irq_set_type(i, ACPI_IRQ_TYPE_NONE);
+> +        res = route_irq_to_guest(d, i, i, NULL);
+> +        if ( res )
+> +        {
+> +            printk(XENLOG_ERR "Unable to route IRQ %u to domain %u\n",
+> +                   i, d->domain_id);
+> +            continue;
+> +        }
 > +    }
-> +    else if ( !strcmp(s, "force") )
-> +    {
-> +        acpi_disabled = 0;
-> +    }
+> +
+> +    return 0;
 > +}
 > +
->  static void __init processor_id(void)
->  {
->      const char *implementer = "Unknown";
-> @@ -729,6 +750,7 @@ void __init start_xen(unsigned long boot_phys_offset,
->          + (fdt_paddr & ((1 << SECOND_SHIFT) - 1));
->      fdt_size = boot_fdt_info(device_tree_flattened, fdt_paddr);
->  
-> +    disable_acpi();
->      cmdline = boot_fdt_cmdline(device_tree_flattened);
->      printk("Command line: %s\n", cmdline);
->      cmdline_parse(cmdline);
-> 
 
 Regards,
 
