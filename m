@@ -1,30 +1,52 @@
-From: stillcompiling@gmail.com (Joshua Clayton)
-Date: Tue, 17 Nov 2015 10:58:54 -0800
-Subject: [PATCH 1/8] Documentation/spi/spidev_test.c: use one rx buffer
-In-Reply-To: <20151117174156.GX31303@sirena.org.uk>
-References: <cover.1447773299.git.stillcompiling@gmail.com>
- <2f17ae29e75967b4522b080c275b907622e1d353.1447773299.git.stillcompiling@gmail.com>
- <20151117174156.GX31303@sirena.org.uk>
-Message-ID: <2858640.EtAPBOce2G@jclayton-pc>
+From: mchehab@osg.samsung.com (Mauro Carvalho Chehab)
+Date: Tue, 17 Nov 2015 17:00:12 -0200
+Subject: [PATCH] [MEDIA] dvb: usb: fix dib3000mc dependencies
+In-Reply-To: <5525192.eyIcy1NRHy@wuerfel>
+References: <3984729.n55BH9Zr8c@wuerfel>
+	<5525192.eyIcy1NRHy@wuerfel>
+Message-ID: <20151117170012.24fe7f58@recife.lan>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday, November 17, 2015 05:41:56 PM Mark Brown wrote:
-> On Tue, Nov 17, 2015 at 07:24:21AM -0800, Joshua Clayton wrote:
-> 
-> > default_rx and rx are needlessly different.
-> > Use one buffer, local to transmit()
-> 
-> Why?  This isn't what I'd expect from black boxing the API, from a
-> userspace point of view the transfer is atomic and in an ideal world
-> we'd be able to do direct to/from memory transfers rather than memcpy()
-> into kernel space which means that userspace should assume the transfers
-> are going on simultaneously even if they don't currently.
+Em Tue, 17 Nov 2015 17:24:23 +0100
+Arnd Bergmann <arnd@arndb.de> escreveu:
 
-The important thing here was to get rid of the default_rx buffer.
-I just noticed that the output can be set up completely within the scope
-of the transmit function, since the operands are global. But I would be
-just as happy to set it up at the top level. I'll change this in V2
+> On Tuesday 17 November 2015 17:17:39 Arnd Bergmann wrote:
+> > The dibusb_read_eeprom_byte function is defined in dibusb-common.c,
+> > but that file is not compiled for CONFIG_DVB_USB_DIBUSB_MB as it
+> > is for the other driver using the common functions, so we can
+> > get a link error:
+> > 
+> > drivers/built-in.o: In function `dibusb_dib3000mc_tuner_attach':
+> > (.text+0x2c5124): undefined reference to `dibusb_read_eeprom_byte'
+> > (.text+0x2c5134): undefined reference to `dibusb_read_eeprom_byte'
+> > 
+> > This changes the Makefile to treat the file like all the others
+> > in this directory, and enforce building dvb-usb-dibusb-common.o
+> > as a dependency.
+> > 
+> > Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> > 
+> 
+> I just realized that this depends on another patch I've sent back
+> in April, so that is probably no longer in the patch queue. Please
+> disregard for now.
 
---
-~Joshua Clayton
+Hi Arnd,
+
+The better way to fix it is to do a patch like this one:
+	http://git.linuxtv.org/cgit.cgi/media_tree.git/commit/?id=8abe4a0a3f6d4217b16a1a3f68cd5c72ab5a058e
+
+The problem with those dib drivers is that there's no way to latter
+remove them with rmmod. Using the above techinique, not only ranconfig
+compilation will work, but it will also allow module remove and having
+drivers with some frontends disabled.
+
+The drawback is that it is not a very trivial patch, so I did the
+changes only for devices that I have (all based on dib0700).
+
+Unfortunately, I don't have any device currently based on dib3000.
+I could work on such patchset, but someone would need to test it ;)
+
+Regards,
+Mauro
