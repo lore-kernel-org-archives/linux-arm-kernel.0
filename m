@@ -1,78 +1,150 @@
 From: laura@labbott.name (Laura Abbott)
-Date: Mon, 16 Nov 2015 16:57:33 -0800
-Subject: [PATCHv2 1/3] ion: Devicetree bindings for Ion
+Date: Mon, 16 Nov 2015 16:57:35 -0800
+Subject: [PATCHv2 3/3] NOMERGE: Sample driver
 In-Reply-To: <1447721855-7574-1-git-send-email-laura@labbott.name>
 References: <1447721855-7574-1-git-send-email-laura@labbott.name>
-Message-ID: <1447721855-7574-2-git-send-email-laura@labbott.name>
+Message-ID: <1447721855-7574-4-git-send-email-laura@labbott.name>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
-This adds a base set of devicetree bindings for the Ion memory
-manager. This supports setting up the generic set of heaps and
-their properties.
+
+Small sample driver to show what setup would look like with the dt
+bindings
 
 Signed-off-by: Laura Abbott <laura@labbott.name>
 ---
- drivers/staging/android/ion/devicetree.txt | 50 ++++++++++++++++++++++++++++++
- 1 file changed, 50 insertions(+)
- create mode 100644 drivers/staging/android/ion/devicetree.txt
+ drivers/staging/android/ion/Kconfig         |  6 ++
+ drivers/staging/android/ion/Makefile        |  1 +
+ drivers/staging/android/ion/ion_of_sample.c | 96 +++++++++++++++++++++++++++++
+ 3 files changed, 103 insertions(+)
+ create mode 100644 drivers/staging/android/ion/ion_of_sample.c
 
-diff --git a/drivers/staging/android/ion/devicetree.txt b/drivers/staging/android/ion/devicetree.txt
+diff --git a/drivers/staging/android/ion/Kconfig b/drivers/staging/android/ion/Kconfig
+index 9b6d65d..c2afb35 100644
+--- a/drivers/staging/android/ion/Kconfig
++++ b/drivers/staging/android/ion/Kconfig
+@@ -43,3 +43,9 @@ config ION_OF
+ 	  extensions
+ 
+ 	  If using Ion and devicetree, you should say Y here
++
++config ION_OF_SAMPLE
++	bool "Sample driver"
++	depends on ION_OF
++	help
++	  Small sample driver showing the Ion OF interface
+diff --git a/drivers/staging/android/ion/Makefile b/drivers/staging/android/ion/Makefile
+index a77417b..1309b91 100644
+--- a/drivers/staging/android/ion/Makefile
++++ b/drivers/staging/android/ion/Makefile
+@@ -8,4 +8,5 @@ endif
+ obj-$(CONFIG_ION_DUMMY) += ion_dummy_driver.o
+ obj-$(CONFIG_ION_TEGRA) += tegra/
+ obj-$(CONFIG_ION_OF) += ion_of.o ion_physmem.o
++obj-$(CONFIG_ION_OF_SAMPLE) += ion_of_sample.o
+ 
+diff --git a/drivers/staging/android/ion/ion_of_sample.c b/drivers/staging/android/ion/ion_of_sample.c
 new file mode 100644
-index 0000000..e1ea537
+index 0000000..bbcdf4d
 --- /dev/null
-+++ b/drivers/staging/android/ion/devicetree.txt
-@@ -0,0 +1,50 @@
-+Ion Memory Manager
++++ b/drivers/staging/android/ion/ion_of_sample.c
+@@ -0,0 +1,96 @@
++/*
++ * Copyright (C) 2015 RC Module
++ * Andrew Andrianov <andrew@ncrmnt.org>
++ * Also based on work from Google, The Linux Foundation
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License version 2 as
++ * published by the Free Software Foundation.
++ *
++ */
 +
-+Ion is a memory manager that allows for sharing of buffers via dma-buf.
-+Ion allows for different types of allocation via an abstraction called
-+a 'heap'. A heap represents a specific type of memory. Each heap has
-+a different type. There can be multiple instances of the same heap
-+type.
++#include <linux/init.h>
++#include <linux/platform_device.h>
++#include <linux/slab.h>
++#include <linux/of.h>
++#include <linux/of_platform.h>
++#include <linux/of_address.h>
++#include <linux/clk.h>
++#include <linux/dma-mapping.h>
++#include <linux/io.h>
++#include "ion.h"
++#include "ion_priv.h"
++#include "ion_of.h"
 +
-+Required properties for Ion
++struct sample_ion_dev {
++        struct ion_heap         **heaps;
++        struct ion_device       *idev;
++};
 +
-+- compatible: "linux,ion" PLUS a compatible property for the device
++static struct ion_of_heap heaps[] = {
++	PLATFORM_HEAP("sample-system", 0, ION_HEAP_TYPE_SYSTEM, "system"),
++	PLATFORM_HEAP("sample-camera", 1, ION_HEAP_TYPE_DMA, "camera"),
++	PLATFORM_HEAP("sample-fb", 2, ION_HEAP_TYPE_DMA, "fb"),
++	{}
++};
 +
-+All child nodes of a linux,ion node are interpreted as heaps
++static int ion_sample_probe(struct platform_device *pdev)
++{
++	struct ion_platform_data *data;
++	struct sample_ion_dev *ipdev;
++	int i;
 +
-+required properties for heaps
++	ipdev = devm_kzalloc(&pdev->dev, sizeof(*ipdev), GFP_KERNEL);
++	if (!ipdev)
++		return -ENOMEM;
 +
-+- compatible: compatible string for a heap type PLUS a compatible property
-+for the specific instance of the heap. Current heap types
-+-- linux,ion-heap-system
-+-- linux,ion-heap-system-contig
-+-- linux,ion-heap-carveout
-+-- linux,ion-heap-chunk
-+-- linux,ion-heap-dma
-+-- linux,ion-heap-custom
++	platform_set_drvdata(pdev, ipdev);
 +
-+Optional properties
-+- memory-region: A phandle to a memory region. Required for DMA heap type
-+(see reserved-memory.txt for details on the reservation)
++	ipdev->idev = ion_device_create(NULL);
++	if (!ipdev->idev)
++		return -ENOMEM;
 +
-+Example:
++	data = ion_parse_dt(pdev, heaps);
++	if (IS_ERR(data))
++		return PTR_ERR(data);
 +
-+	ion {
-+		compatbile = "qcom,msm8916-ion", "linux,ion";
-+		#address-cells = <1>;
-+		#size-cells = <0>;
++	ipdev->heaps = devm_kzalloc(&pdev->dev,
++				sizeof(struct ion_heap)*data->nr, GFP_KERNEL);
 +
-+		ion-system-heap {
-+			compatbile = "qcom,system-heap", "linux,ion-heap-system"
-+		};
++	if (!ipdev->heaps)
++		return -ENOMEM;
 +
-+		ion-camera-region {
-+			compatible = "qcom,camera-heap", "linux,ion-heap-dma"
-+			memory-region = <&camera_region>;
-+		};
-+
-+		ion-fb-region {
-+			compatbile = "qcom,fb-heap", "linux,ion-heap-dma"
-+			memory-region = <&fb_region>;
-+		};
++	for (i = 0; i < data->nr; i++) {
++		ipdev->heaps[i] = ion_heap_create(&data->heaps[i]);
++		if (!ipdev->heaps[i])
++			return -ENOMEM;
++		ion_device_add_heap(ipdev->idev, ipdev->heaps[i]);
 +	}
++	return 0;
++}
++
++static int ion_sample_remove(struct platform_device *pdev)
++{
++	/* Everything should be devm */
++	return 0;
++}
++
++static const struct of_device_id of_match_table[] = {
++	{ .compatible = "sample-ion", },
++	{ /* end of list */ }
++};
++
++static struct platform_driver ion_sample_driver = {
++	.probe		= ion_sample_probe,
++	.remove		= ion_sample_remove,
++	.driver		= {
++		.name	= "ion-of",
++		.of_match_table = of_match_ptr(of_match_table),
++	},
++};
++
++static int __init ion_sample_init(void)
++{
++	return platform_driver_register(&ion_sample_driver);
++}
++device_initcall(ion_sample_init);
 -- 
 2.5.0
