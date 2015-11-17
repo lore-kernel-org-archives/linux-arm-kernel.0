@@ -1,131 +1,121 @@
 From: shannon.zhao@linaro.org (shannon.zhao at linaro.org)
-Date: Tue, 17 Nov 2015 17:40:12 +0800
-Subject: [PATCH v3 13/62] arm/acpi: Parse FADT table and get PSCI flags
+Date: Tue, 17 Nov 2015 17:40:13 +0800
+Subject: [PATCH v3 14/62] arm/acpi: Add Generic Interrupt and Distributor
+ struct
 In-Reply-To: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
 References: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
-Message-ID: <1447753261-7552-14-git-send-email-shannon.zhao@linaro.org>
+Message-ID: <1447753261-7552-15-git-send-email-shannon.zhao@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Shannon Zhao <shannon.zhao@linaro.org>
 
-There are two flags: PSCI_COMPLIANT and PSCI_USE_HVC. When set,
-the former signals to the OS that the hardware is PSCI compliant.
-The latter selects the appropriate conduit for PSCI calls by
-toggling between Hypervisor Calls (HVC) and Secure Monitor Calls
-(SMC).
+Add Generic Interrupt and Distributor (ACPI 5.0) structure.
+Add new features for MADT introduced by ACPI 5.1.
+Comment on the GIC ID field of the GIC structure which is replaced
+by CPU Interface Number.
+Add new fields: Redistributor Base Address, GICV, GICH, and MPIDR.
+Add new structures for GIC MSI frame and GICR.
+Add flag definition for GICC flags.
 
-FADT table contains such information, parse FADT to get the flags
-for furture usage. At the same time, only ACPI 5.1 or higher verison
-supports PSCI, and FADT Major.Minor version was introduced in ACPI
-5.1, but for Xen it needs FADT hypervisor_id introduced by ACPI 6.0 to
-tell Dom0 that it runs on Xen hypervisor, so we will check the version
-and only parse FADT table with version >= 6.0.
-
-If firmware provides ACPI tables with ACPI version less than 6.0,
-OS will be messed up with those information, so disable ACPI if we
-get an FADT table with version less that 6.0.
-
+Signed-off-by: Tomasz Nowicki <tomasz.nowicki@linaro.org>
 Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
 Signed-off-by: Naresh Bhat <naresh.bhat@linaro.org>
-Signed-off-by: Parth Dixit <parth.dixit@linaro.org>
 Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
 ---
- xen/arch/arm/acpi/boot.c   | 31 +++++++++++++++++++++++++++++++
- xen/arch/arm/acpi/lib.c    | 12 ++++++++++++
- xen/include/asm-arm/acpi.h |  9 +++++++++
- 3 files changed, 52 insertions(+)
+ xen/include/acpi/actbl1.h | 69 +++++++++++++++++++++++++++++++++++++++++++++--
+ 1 file changed, 67 insertions(+), 2 deletions(-)
 
-diff --git a/xen/arch/arm/acpi/boot.c b/xen/arch/arm/acpi/boot.c
-index ad51afc..0fabe7d 100644
---- a/xen/arch/arm/acpi/boot.c
-+++ b/xen/arch/arm/acpi/boot.c
-@@ -27,9 +27,33 @@
+diff --git a/xen/include/acpi/actbl1.h b/xen/include/acpi/actbl1.h
+index 9311e3a..2fb2ad7 100644
+--- a/xen/include/acpi/actbl1.h
++++ b/xen/include/acpi/actbl1.h
+@@ -639,7 +639,11 @@ enum acpi_madt_type {
+ 	ACPI_MADT_TYPE_INTERRUPT_SOURCE = 8,
+ 	ACPI_MADT_TYPE_LOCAL_X2APIC = 9,
+ 	ACPI_MADT_TYPE_LOCAL_X2APIC_NMI = 10,
+-	ACPI_MADT_TYPE_RESERVED = 11	/* 11 and greater are reserved */
++	ACPI_MADT_TYPE_GENERIC_INTERRUPT = 11,
++	ACPI_MADT_TYPE_GENERIC_DISTRIBUTOR = 12,
++	ACPI_MADT_TYPE_GENERIC_MSI_FRAME = 13,
++	ACPI_MADT_TYPE_GENERIC_REDISTRIBUTOR = 14,
++	ACPI_MADT_TYPE_RESERVED = 15    /* 15 and greater are reserved */
+ };
  
- #include <xen/init.h>
- #include <xen/acpi.h>
-+#include <xen/errno.h>
-+#include <acpi/actables.h>
-+#include <xen/mm.h>
+ /*
+@@ -760,11 +764,72 @@ struct acpi_madt_local_x2apic_nmi {
+ 	u8 reserved[3];
+ };
  
- #include <asm/acpi.h>
- 
-+static int __init acpi_parse_fadt(struct acpi_table_header *table)
-+{
-+    struct acpi_table_fadt *fadt = (struct acpi_table_fadt *)table;
++/* 11: Generic Interrupt (ACPI 5.0) */
 +
-+    /*
-+     * Revision in table header is the FADT Major revision, and there
-+     * is a minor revision of FADT which was introduced by ACPI 6.0,
-+     * we only deal with ACPI 6.0 or newer revision to get GIC and SMP
-+     * boot protocol configuration data, or we will disable ACPI.
-+     */
-+    if ( table->revision > 6
-+         || (table->revision == 6 && fadt->minor_revision >= 0) )
-+        return 0;
++struct acpi_madt_generic_interrupt {
++	struct acpi_subtable_header header;
++	u16 reserved;           /* reserved - must be zero */
++	u32 cpu_interface_number;
++	u32 uid;
++	u32 flags;
++	u32 parking_version;
++	u32 performance_interrupt;
++	u64 parked_address;
++	u64 base_address;
++	u64 gicv_base_address;
++	u64 gich_base_address;
++	u32 vgic_interrupt;
++	u64 gicr_base_address;
++	u64 arm_mpidr;
++};
 +
-+    printk("Unsupported FADT revision %d.%d, should be 6.0+, will disable ACPI\n",
-+            table->revision, fadt->minor_revision);
-+    disable_acpi();
++/* Masks for Flags field above */
 +
-+    return -EINVAL;
-+}
++/* ACPI_MADT_ENABLED                    (1)      Processor is usable if set */
++#define ACPI_MADT_PERFORMANCE_IRQ_MODE  (1<<1) /* 01: Performance Interrupt Mode */
++#define ACPI_MADT_VGIC_IRQ_MODE         (1<<2) /* 02: VGIC Maintenance Interrupt mode */
++
++/* 12: Generic Distributor (ACPI 5.0) */
++
++struct acpi_madt_generic_distributor {
++	struct acpi_subtable_header header;
++	u16 reserved;           /* reserved - must be zero */
++	u32 gic_id;
++	u64 base_address;
++	u32 global_irq_base;
++	u32 reserved2;          /* reserved - must be zero */
++};
++
++/* 13: GIC MSI Frame (ACPI 5.1) */
++
++struct acpi_madt_generic_msi_frame {
++	struct acpi_subtable_header header;
++	u16 reserved;		/* reserved - must be zero */
++	u32 msi_frame_id;
++	u64 base_address;
++	u32 flags;
++	u16 spi_count;
++	u16 spi_base;
++};
++
++/* Masks for Flags field above */
++
++#define ACPI_MADT_OVERRIDE_SPI_VALUES   (1)
++
++/* 14: GIC Redistributor (ACPI 5.1) */
++
++struct acpi_madt_generic_redistributor {
++	struct acpi_subtable_header header;
++	u16 reserved;		/* reserved - must be zero */
++	u64 base_address;
++	u32 length;
++};
 +
  /*
-  * acpi_boot_table_init() called from setup_arch(), always.
-  *      1. find RSDP and get its address, and then find XSDT
-@@ -58,5 +82,12 @@ int __init acpi_boot_table_init(void)
-         return error;
-     }
+  * Common flags fields for MADT subtables
+  */
  
-+    if ( acpi_table_parse(ACPI_SIG_FADT, acpi_parse_fadt) )
-+    {
-+        /* disable ACPI if no FADT is found */
-+        disable_acpi();
-+        printk("Can't find FADT\n");
-+    }
-+
-     return 0;
- }
-diff --git a/xen/arch/arm/acpi/lib.c b/xen/arch/arm/acpi/lib.c
-index b68623b..d8b7635 100644
---- a/xen/arch/arm/acpi/lib.c
-+++ b/xen/arch/arm/acpi/lib.c
-@@ -31,3 +31,15 @@ arch_acpi_os_map_memory(acpi_physical_address phys, acpi_size size)
- {
-     return __va(phys);
- }
-+
-+/* 1 to indicate PSCI 0.2+ is implemented */
-+bool_t __init acpi_psci_present(void)
-+{
-+    return acpi_gbl_FADT.arm_boot_flags & ACPI_FADT_PSCI_COMPLIANT;
-+}
-+
-+/* 1 to indicate HVC is present instead of SMC as the PSCI conduit */
-+bool_t __init acpi_psci_hvc_present(void)
-+{
-+    return acpi_gbl_FADT.arm_boot_flags & ACPI_FADT_PSCI_USE_HVC;
-+}
-diff --git a/xen/include/asm-arm/acpi.h b/xen/include/asm-arm/acpi.h
-index e41e03b..65f80b1 100644
---- a/xen/include/asm-arm/acpi.h
-+++ b/xen/include/asm-arm/acpi.h
-@@ -29,6 +29,15 @@
- #define COMPILER_DEPENDENT_UINT64  unsigned long long
+-/* MADT Local APIC flags (lapic_flags) */
++/* MADT Local APIC flags */
  
- extern bool_t acpi_disabled;
-+
-+#ifdef CONFIG_ACPI
-+bool_t __init acpi_psci_present(void);
-+bool_t __init acpi_psci_hvc_present(void);
-+#else
-+static inline bool_t acpi_psci_present(void) { return false; }
-+static inline bool_t acpi_psci_hvc_present(void) {return false; }
-+#endif /* CONFIG_ACPI */
-+
- /* Basic configuration for ACPI */
- static inline void disable_acpi(void)
- {
+ #define ACPI_MADT_ENABLED           (1)	/* 00: Processor is usable if set */
+ 
 -- 
 2.1.0
