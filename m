@@ -1,94 +1,56 @@
-From: robh@kernel.org (Rob Herring)
-Date: Tue, 17 Nov 2015 13:41:00 -0600
-Subject: [RESEND RFC/PATCH 4/8] dt-bindings: Add a binding for Mediatek
- Video Encoder
-In-Reply-To: <1447764885-23100-5-git-send-email-tiffany.lin@mediatek.com>
-References: <1447764885-23100-1-git-send-email-tiffany.lin@mediatek.com>
- <1447764885-23100-5-git-send-email-tiffany.lin@mediatek.com>
-Message-ID: <20151117194100.GA3028@rob-hp-laptop>
+From: stillcompiling@gmail.com (Joshua Clayton)
+Date: Tue, 17 Nov 2015 11:41:53 -0800
+Subject: [PATCH 7/8] tools/Makefile: minor whitespace cleanup
+In-Reply-To: <20151117180924.GZ31303@sirena.org.uk>
+References: <cover.1447773299.git.stillcompiling@gmail.com>
+ <155366ac799345f42c8c342609ffa11b2df529b0.1447773299.git.stillcompiling@gmail.com>
+ <20151117180924.GZ31303@sirena.org.uk>
+Message-ID: <1991766.ZT1k1WV0Gv@jclayton-pc>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 17, 2015 at 08:54:41PM +0800, Tiffany Lin wrote:
-> add a DT binding documentation of Video Encoder for the
-> MT8173 SoC from Mediatek.
+On Tuesday, November 17, 2015 06:09:24 PM Mark Brown wrote:
+> On Tue, Nov 17, 2015 at 07:24:27AM -0800, Joshua Clayton wrote:
+> > Signed-off-by: Joshua Clayton <stillcompiling@gmail.com>
+> > ---
+> >  tools/Makefile | 37 ++++++++++++++++++++++++++++++-------
+> >  1 file changed, 30 insertions(+), 7 deletions(-)
+> > 
+> > diff --git a/tools/Makefile b/tools/Makefile
+> > index 9a617ad..428fb4d 100644
+> > --- a/tools/Makefile
+> > +++ b/tools/Makefile
+> > @@ -80,10 +80,21 @@ turbostat_install x86_energy_perf_policy_install:
+> >  tmon_install:
+> >  	$(call descend,thermal/$(@:_install=),install)
+> >  
+> > -install: acpi_install cgroup_install cpupower_install hv_install firewire_install lguest_install \
+> > -		perf_install selftests_install turbostat_install usb_install \
+> > -		virtio_install vm_install net_install x86_energy_perf_policy_install \
+> > -	tmon
+> > +install: acpi_install \
+> > +		cgroup_install \
+> > +		cpupower_install \
+> > +		hv_install \
+> > +		firewire_install \
+> > +		lguest_install \
+> > +		perf_install \
+> > +		selftests_install \
+> > +		tmon \
+> > +		turbostat_install \
+> > +		usb_install \
+> > +		virtio_install \
+> > +		vm_install \
+> > +		net_install \
+> > +		x86_energy_perf_policy_install
 > 
-> Signed-off-by: Tiffany Lin <tiffany.lin@mediatek.com>
-> ---
->  .../devicetree/bindings/media/mediatek-vcodec.txt  |   58 ++++++++++++++++++++
->  1 file changed, 58 insertions(+)
->  create mode 100644 Documentation/devicetree/bindings/media/mediatek-vcodec.txt
-> 
-> diff --git a/Documentation/devicetree/bindings/media/mediatek-vcodec.txt b/Documentation/devicetree/bindings/media/mediatek-vcodec.txt
-> new file mode 100644
-> index 0000000..fea4d7c
-> --- /dev/null
-> +++ b/Documentation/devicetree/bindings/media/mediatek-vcodec.txt
-> @@ -0,0 +1,58 @@
-> +Mediatek Video Codec
-> +
-> +Mediatek Video Codec is the video codec hw present in Mediatek SoCs which
-> +supports high resolution encoding functionalities.
-> +
-> +Required properties:
-> +- compatible : "mediatek,mt8173-vcodec-enc" for encoder
-> +- reg : Physical base address of the video codec registers and length of
-> +  memory mapped region.
-> +- interrupts : interrupt number to the cpu.
-> +- larb : must contain the larbes of current platform
+> This isn't a whitespace cleanup, this is a substantial reindentation of
+> the file :(  Please ensure your changelogs are accurate and in general
+> try to avoid mixing this sort of invasive stylistic change in with other
+> patch serieses, it reduces the potential for conflicts.
+Um.
+Inability to resist Makefile cleanup is a weakness of mine. 
+It is a tangent from the rest of the series so I'll drop it.
 
-What is this?
-
-> +- clocks : list of clock specifiers, corresponding to entries in
-> +  the clock-names property;
-> +- clock-names: must contain "vencpll", "venc_lt_sel", "vcodecpll_370p5_ck"
-> +- iommus : list of iommus specifiers should be enabled for hw encode.
-> +  There are 2 cells needed to enable/disable iommu.
-> +  The first one is local arbiter index(larbid), and the other is port
-> +  index(portid) within local arbiter. Specifies the larbid and portid
-> +  as defined in dt-binding/memory/mt8173-larb-port.h.
-> +- vpu : the node of video processor unit
-
-This should be prefixed with mediatek.
-
-> +
-> +Example:
-> +vcodec_enc: vcodec at 0x18002000 {
-> +    compatible = "mediatek,mt8173-vcodec-enc";
-> +    reg = <0 0x18002000 0 0x1000>,    /*VENC_SYS*/
-> +          <0 0x19002000 0 0x1000>;    /*VENC_LT_SYS*/
-> +    interrupts = <GIC_SPI 198 IRQ_TYPE_LEVEL_LOW>,
-> +           <GIC_SPI 202 IRQ_TYPE_LEVEL_LOW>;
-> +    larb = <&larb3>,
-> +           <&larb5>;
-> +    iommus = <&iommu M4U_LARB3_ID M4U_PORT_VENC_RCPU>,
-> +             <&iommu M4U_LARB3_ID M4U_PORT_VENC_REC>,
-> +             <&iommu M4U_LARB3_ID M4U_PORT_VENC_BSDMA>,
-> +             <&iommu M4U_LARB3_ID M4U_PORT_VENC_SV_COMV>,
-> +             <&iommu M4U_LARB3_ID M4U_PORT_VENC_RD_COMV>,
-> +             <&iommu M4U_LARB3_ID M4U_PORT_VENC_CUR_LUMA>,
-> +             <&iommu M4U_LARB3_ID M4U_PORT_VENC_CUR_CHROMA>,
-> +             <&iommu M4U_LARB3_ID M4U_PORT_VENC_REF_LUMA>,
-> +             <&iommu M4U_LARB3_ID M4U_PORT_VENC_REF_CHROMA>,
-> +             <&iommu M4U_LARB3_ID M4U_PORT_VENC_NBM_RDMA>,
-> +             <&iommu M4U_LARB3_ID M4U_PORT_VENC_NBM_WDMA>,
-> +             <&iommu M4U_LARB5_ID M4U_PORT_VENC_RCPU_SET2>,
-> +             <&iommu M4U_LARB5_ID M4U_PORT_VENC_REC_FRM_SET2>,
-> +             <&iommu M4U_LARB5_ID M4U_PORT_VENC_BSDMA_SET2>,
-> +             <&iommu M4U_LARB5_ID M4U_PORT_VENC_SV_COMA_SET2>,
-> +             <&iommu M4U_LARB5_ID M4U_PORT_VENC_RD_COMA_SET2>,
-> +             <&iommu M4U_LARB5_ID M4U_PORT_VENC_CUR_LUMA_SET2>,
-> +             <&iommu M4U_LARB5_ID M4U_PORT_VENC_CUR_CHROMA_SET2>,
-> +             <&iommu M4U_LARB5_ID M4U_PORT_VENC_REF_LUMA_SET2>,
-> +             <&iommu M4U_LARB5_ID M4U_PORT_VENC_REC_CHROMA_SET2>;
-> +    vpu = <&vpu>;
-> +    clocks = <&apmixedsys CLK_APMIXED_VENCPLL>,
-> +             <&topckgen CLK_TOP_VENC_LT_SEL>,
-> +             <&topckgen CLK_TOP_VCODECPLL_370P5>;
-> +    clock-names = "vencpll",
-> +                  "venc_lt_sel",
-> +                  "vcodecpll_370p5_ck";
-> +  };
-> -- 
-> 1.7.9.5
-> 
+-- 
+~Joshua Clayton
