@@ -1,39 +1,68 @@
-From: jonmason@broadcom.com (Jon Mason)
-Date: Tue, 17 Nov 2015 14:55:27 -0500
-Subject: [PATCH 2/2] ARM: dts: NSP: Add I2C support to the DT
-In-Reply-To: <1447790127-27237-1-git-send-email-jonmason@broadcom.com>
-References: <1447790127-27237-1-git-send-email-jonmason@broadcom.com>
-Message-ID: <1447790127-27237-3-git-send-email-jonmason@broadcom.com>
+From: ariel@vanguardiasur.com.ar (Ariel D'Alessandro)
+Date: Tue, 17 Nov 2015 17:02:52 -0300
+Subject: [PATCH v4 0/4] Add support for NXP LPC18xx EEPROM using nvmem
+Message-ID: <1447790576-29410-1-git-send-email-ariel@vanguardiasur.com.ar>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Add I2C support to the Broadcom Northstar Plus Device Tree.  Since no
-driver changes are needed to enable this hardware, only the device tree
-changes are required to make this functional.
+This patch series adds support for NXP LPC18xx EEPROM memory found in
+NXP LPC185x/3x and LPC435x/3x/2x/1x devices.
 
-Signed-off-by: Jon Mason <jonmason@broadcom.com>
----
- arch/arm/boot/dts/bcm-nsp.dtsi | 9 +++++++++
- 1 file changed, 9 insertions(+)
+This patchset is based on tag next-20151116 of the linux-next
+repository. It has been successfully tested on a LPC4337 CIAA-NXP
+Board.
 
-diff --git a/arch/arm/boot/dts/bcm-nsp.dtsi b/arch/arm/boot/dts/bcm-nsp.dtsi
-index 7335a74..b74438c 100644
---- a/arch/arm/boot/dts/bcm-nsp.dtsi
-+++ b/arch/arm/boot/dts/bcm-nsp.dtsi
-@@ -217,5 +217,14 @@
- 
- 			brcm,nand-has-wp;
- 		};
-+
-+		i2c0: i2c at 38000 {
-+			compatible = "brcm,iproc-i2c";
-+			reg = <0x38000 0x50>;
-+			#address-cells = <1>;
-+			#size-cells = <0>;
-+			interrupts = <GIC_SPI 89 IRQ_TYPE_NONE>;
-+			clock-frequency = <100000>;
-+		};
- 	};
- };
+EEPROM notes:
+------------
+
+EEPROM size is 16384 bytes and it can be entirely read and 
+written/erased with 1 word (4 bytes) granularity. The last page
+(128 bytes) contains the EEPROM initialization data and is not writable.
+
+Erase/program time is less than 3ms. The EEPROM device requires a
+~1500 kHz clock (min 800 kHz, max 1600 kHz) that is generated dividing
+the system bus clock by the division factor, contained in the divider
+register (minus 1 encoded).
+
+EEPROM will be kept in Power Down mode except during read/write calls.
+
+Changeset:
+---------
+v3 -> v4:
+* Added busywait polling for erase/program operation to finish.
+
+v2 -> v3:
+* Documented 'resets' property in devicetree bindings.
+* Added dynamic power on/off when writing/reading the EEPROM.
+* Added check for aligned offset in EEPROM writes.
+* Properly remove the driver in the reverse order of initialization.
+* Minor fixes.
+
+v1 -> v2:
+* Moved dt-bindings to be the first patch.
+* Changed compatible name from lpc1850 to lpc1857 as the former doesn't have EEPROM.
+* Fix hardware description which contained SoCs models without EEPROM.
+* Disabled fast_io and changed mdelay for msleep in regmap writes.
+* Replaced BUG_ON() in write function for an -EINVAL return.
+* Add patches for defconfig and devicetree files.
+
+Thanks,
+
+Ariel D'Alessandro (4):
+  DT: nvmem: Add NXP LPC18xx EEPROM memory binding documentation
+  nvmem: NXP LPC18xx EEPROM memory NVMEM driver
+  ARM: dts: lpc18xx: add EEPROM memory node
+  ARM: configs: lpc18xx: enable EEPROM NVMEM driver
+
+ .../devicetree/bindings/nvmem/lpc1857-eeprom.txt   |  28 ++
+ arch/arm/boot/dts/lpc18xx.dtsi                     |  12 +
+ arch/arm/configs/lpc18xx_defconfig                 |   2 +
+ drivers/nvmem/Kconfig                              |   9 +
+ drivers/nvmem/Makefile                             |   2 +
+ drivers/nvmem/lpc18xx_eeprom.c                     | 330 +++++++++++++++++++++
+ 6 files changed, 383 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/nvmem/lpc1857-eeprom.txt
+ create mode 100644 drivers/nvmem/lpc18xx_eeprom.c
+
 -- 
-1.9.1
+2.6.2
