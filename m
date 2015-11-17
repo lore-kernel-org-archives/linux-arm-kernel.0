@@ -1,16 +1,15 @@
 From: ynorov@caviumnetworks.com (Yury Norov)
-Date: Wed, 18 Nov 2015 00:16:57 +0300
-Subject: [PATCH v6 17/19] arm64:ilp32: use the native siginfo instead of the
- compat siginfo
+Date: Wed, 18 Nov 2015 00:16:59 +0300
+Subject: [PATCH v6 19/19] arm64:ilp32: add ARM64_ILP32 to Kconfig
 In-Reply-To: <1447795019-30176-1-git-send-email-ynorov@caviumnetworks.com>
 References: <1447795019-30176-1-git-send-email-ynorov@caviumnetworks.com>
-Message-ID: <1447795019-30176-18-git-send-email-ynorov@caviumnetworks.com>
+Message-ID: <1447795019-30176-20-git-send-email-ynorov@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Andrew Pinski <apinski@cavium.com>
 
-Set COMPAT_USE_NATIVE_SIGINFO to be true for non AARCH32 tasks.
+This patch adds the config option for ILP32.
 
 Reviewed-by: David Daney <ddaney@caviumnetworks.com>
 
@@ -19,22 +18,35 @@ Signed-off-by: Christoph Muellner <christoph.muellner@theobroma-systems.com>
 Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
 Signed-off-by: Andrew Pinski <Andrew.Pinski@caviumnetworks.com>
 ---
- arch/arm64/include/asm/compat.h | 3 +++
- 1 file changed, 3 insertions(+)
+ arch/arm64/Kconfig | 9 ++++++++-
+ 1 file changed, 8 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/include/asm/compat.h b/arch/arm64/include/asm/compat.h
-index 95d2d72..087f21b 100644
---- a/arch/arm64/include/asm/compat.h
-+++ b/arch/arm64/include/asm/compat.h
-@@ -214,6 +214,9 @@ typedef struct compat_siginfo {
- 	} _sifields;
- } compat_siginfo_t;
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 4753d435..deec37a 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -680,7 +680,7 @@ source "fs/Kconfig.binfmt"
  
-+/* ILP32 uses the native siginfo and not the compat struct */
-+#define COMPAT_USE_NATIVE_SIGINFO	!is_a32_compat_task()
+ config COMPAT
+ 	def_bool y
+-	depends on AARCH32_EL0
++	depends on AARCH32_EL0 || ARM64_ILP32
+ 	select COMPAT_BINFMT_ELF
+ 
+ config AARCH32_EL0
+@@ -702,6 +702,13 @@ config AARCH32_EL0
+ 
+ 	  If you want to execute 32-bit userspace applications, say Y.
+ 
++config ARM64_ILP32
++	bool "Kernel support for ILP32"
++	help
++	  This option enables support for AArch64 ILP32 user space.  ILP32
++	  is an ABI where long and pointers are 32bits but it uses the AARCH64
++	  instruction set.
 +
- #define COMPAT_OFF_T_MAX	0x7fffffff
- #define COMPAT_LOFF_T_MAX	0x7fffffffffffffffL
- 
+ config SYSVIPC_COMPAT
+ 	def_bool y
+ 	depends on COMPAT && SYSVIPC
 -- 
 2.1.4
