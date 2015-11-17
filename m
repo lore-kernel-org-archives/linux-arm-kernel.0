@@ -1,49 +1,42 @@
-From: olof@lixom.net (Olof Johansson)
-Date: Tue, 17 Nov 2015 11:15:11 -0800
-Subject: [PATCH v2 4/7] ARM: at91/dt: sama5d2: add pio controller node
-In-Reply-To: <CACRpkdbhFi531Dm9AgOGhc7XHnnyJ+L3t0FvHOPV-fC2f9X6QQ@mail.gmail.com>
-References: <1442417823-15850-1-git-send-email-ludovic.desroches@atmel.com>
- <1442417823-15850-5-git-send-email-ludovic.desroches@atmel.com>
- <CACRpkdapS-Vi_F-MqOFOPTHa2+zbrsPfPsbQA-Eks+tR3Wjg2A@mail.gmail.com>
- <CAOesGMhXtACRaTurWfQgHNr_mU+VF9TjQJz5wQ4RsSVS+WZ0cA@mail.gmail.com>
- <CACRpkdbhFi531Dm9AgOGhc7XHnnyJ+L3t0FvHOPV-fC2f9X6QQ@mail.gmail.com>
-Message-ID: <CAOesGMhOmqr15Ou_QgJuiWdn6wWFYYLmy6eyf6zOopj8tKcadA@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Tue, 17 Nov 2015 20:17:17 +0100
+Subject: next build: 235 warnings 3 failures (next/next-20151117)
+In-Reply-To: <20151117171236.GJ30101@arm.com>
+References: <564a9961.878b420a.331b8.fffffd62@mx.google.com>
+ <6370082.rfihnaNWhf@wuerfel> <20151117171236.GJ30101@arm.com>
+Message-ID: <3723928.99NZh1TC6E@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 17, 2015 at 3:06 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
-> On Tue, Nov 10, 2015 at 1:30 AM, Olof Johansson <olof@lixom.net> wrote:
->> On Mon, Sep 21, 2015 at 11:24 AM, Linus Walleij
->> <linus.walleij@linaro.org> wrote:
->>> On Wed, Sep 16, 2015 at 8:37 AM, Ludovic Desroches
->>> <ludovic.desroches@atmel.com> wrote:
->>>
->>>> Add pio4 controller node to enable pinmux and gpio.
->>>>
->>>> Signed-off-by: Ludovic Desroches <ludovic.desroches@atmel.com>
->>>
->>> Patch applied.
->>
->> Please don't merge DT changes through driver trees unless there's a
->> very specific reason to do so, since it introduces random conflicts.
->
-> Sorry :(
->
-> Even noted this in the pull request to Torvalds, it was in the bottom
-> of my patch stack so had been in -next for ages, I was afraid it
-> would create more problem than it solves if I reverted the patch,
-> but I guess I should have done so anyways.
+On Tuesday 17 November 2015 17:12:37 Will Deacon wrote:
+> On Tue, Nov 17, 2015 at 06:03:40PM +0100, Arnd Bergmann wrote:
+> > On Tuesday 17 November 2015 16:44:53 Will Deacon wrote:
+> > > > 8<----
+> > > > Subject: ARM64: make smp_load_acquire() work with const arguments
+> > > > 
+> > > > smp_load_acquire() uses typeof() to declare a local variable for temporarily
+> > > > storing the output of the memory access. This fails when the argument is
+> > > > constant, because the assembler complains about using a constant register
+> > > > as output:
+> > > > 
+> > > >  arch/arm64/include/asm/barrier.h:71:3: error: read-only variable '___p1'
+> > > >  used as 'asm' output
+> > > 
+> > > Do you know the usage in the kernel causing this warning?
+> > 
+> > A newly introduced function in include/net/sock.h:
+> > 
+> > static inline int sk_state_load(const struct sock *sk)
+> > {
+> >         return smp_load_acquire(&sk->sk_state);
+> > }
+> 
+> Hmm, maybe we could play a similar trick to READ_ONCE by declaring an
+> anonymous union and writing through the non-const member?
 
-Yeah, it's OK -- I spotted that pull request later as well.
+Yes, I think that would work, if you think we need to care about the
+case where we read into a structure.
 
-It's not a big deal in most specific instances, I'd say. It's just in
-aggregate it becomes a bother.
+Can you come up with a patch for that?
 
-So, just see this as a public reminder since we've seen it creep into
-other driver trees a bit more lately. Mistakes will still happen but
-try to keep it down. And for those who submit patches, feel free to
-point out in the patch that you don't expect the driver/subsystem
-maintainer to apply it to help them out.
-
-
--Olof
+	Arnd
