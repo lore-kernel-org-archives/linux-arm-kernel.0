@@ -1,42 +1,92 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Tue, 17 Nov 2015 17:35:58 +0000
-Subject: [PATCH v11 4/5] arm64: introduce CONFIG_PARAVIRT,
- PARAVIRT_TIME_ACCOUNTING and pv_time_ops
-In-Reply-To: <564B652C.8060409@arm.com>
-References: <alpine.DEB.2.02.1511051502270.13541@kaball.uk.xensource.com>
- <1446737696-9749-4-git-send-email-stefano.stabellini@eu.citrix.com>
- <alpine.DEB.2.02.1511101410550.5676@kaball.uk.xensource.com>
- <20151117172914.GL30101@arm.com> <564B652C.8060409@arm.com>
-Message-ID: <20151117173557.GN30101@arm.com>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Tue, 17 Nov 2015 09:44:30 -0800
+Subject: [PATCH 1/7] phy: brcmstb-sata: add missing of_node_put
+In-Reply-To: <alpine.DEB.2.02.1511170711340.2045@localhost6.localdomain6>
+References: <1447673600-8881-1-git-send-email-Julia.Lawall@lip6.fr>
+ <1447673600-8881-2-git-send-email-Julia.Lawall@lip6.fr>
+ <20151117013830.GV8456@google.com>
+ <alpine.DEB.2.02.1511170711340.2045@localhost6.localdomain6>
+Message-ID: <20151117174430.GA8456@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 17, 2015 at 05:34:36PM +0000, Marc Zyngier wrote:
-> On 17/11/15 17:29, Will Deacon wrote:
-> > On Tue, Nov 10, 2015 at 02:11:38PM +0000, Stefano Stabellini wrote:
-> >> On Thu, 5 Nov 2015, Stefano Stabellini wrote:
-> >>> Introduce CONFIG_PARAVIRT and PARAVIRT_TIME_ACCOUNTING on ARM64.
-> >>> Necessary duplication of paravirt.h and paravirt.c with ARM.
-> >>>
-> >>> The only paravirt interface supported is pv_time_ops.steal_clock, so no
-> >>> runtime pvops patching needed.
-> >>>
-> >>> This allows us to make use of steal_account_process_tick for stolen
-> >>> ticks accounting.
-> >>>
-> >>> Signed-off-by: Stefano Stabellini <stefano.stabellini@eu.citrix.com>
-> >>> Acked-by: Marc Zyngier <marc.zyngier@arm.com>
-> >>
-> >> Ping?
-> >>
-> >> Catalin, Will,
-> >> are you happy with this change?
+On Tue, Nov 17, 2015 at 07:12:22AM +0100, Julia Lawall wrote:
+> On Mon, 16 Nov 2015, Brian Norris wrote:
 > > 
-> > I'm happy if Marc's happy. Marc?
+> > This reminds me of a potential problem I'm looking at in other
+> > subsystems: from code reading (I haven't seen any issues in practice,
+> > probably because I don't use OF_DYNAMIC) it looks like device-creating
+> > infrastructure like the PHY subsystem should be acquiring a reference to
+> > the device_node when they stash it away. But drivers/phy/phy-core.c does
+> > not do this, AFAICT.
+> > 
+> > See phy_create(), which does
+> > 
+> > 	phy->dev.of_node = node ?: dev->of_node;
+> > 
+> > and later might reuse this of_node pointer, even though it never called
+> > of_node_get() on this node.
+> > 
+> > Potential patch to fix this (not tested).
+> > 
+> > Signed-off-by: Brian Norris <computersforpeace@gmail.com>
+> > 
+> > diff --git a/drivers/phy/phy-core.c b/drivers/phy/phy-core.c
+> > index fc48fac003a6..8df29caeeef9 100644
+> > --- a/drivers/phy/phy-core.c
+> > +++ b/drivers/phy/phy-core.c
+> > @@ -697,6 +697,7 @@ struct phy *phy_create(struct device *dev, struct device_node *node,
+> >  	phy->dev.class = phy_class;
+> >  	phy->dev.parent = dev;
+> >  	phy->dev.of_node = node ?: dev->of_node;
+> > +	of_node_get(phy->dev.of_node);
 > 
-> My Ack is already on the tin! ;-)
+> Why not put of_node_get around dev->of_node?
 
-Ah yes, I only saw the cc line. In which case, I assume Stefano will
-take this via the xen tree.
+Like this?
 
-Will
+	phy->dev.of_node = node ?: of_node_get(dev->of_node);
+
+Or this?
+
+	phy->dev.of_node = of_node_get(node ?: dev->of_node);
+
+The former wouldn't do what I proposed; if this PHY device is created
+with a sub-node of 'dev' rather than dev->of_node, then the caller will
+pass it in as the 2nd argument to phy_create (i.e., 'node'), and then I
+expect it's the PHY core's responsibility to refcount it.
+
+I'd be fine with the latter. Looks a little better, I suppose.
+
+If my understanding is correct, I'll send a proper patch to do the
+latter.
+
+Regards,
+Brian
+
+> julia
+> 
+> >  	phy->id = id;
+> >  	phy->ops = ops;
+> >  
+> > @@ -726,6 +727,7 @@ struct phy *phy_create(struct device *dev, struct device_node *node,
+> >  	return phy;
+> >  
+> >  put_dev:
+> > +	of_node_put(phy->dev.of_node);
+> >  	put_device(&phy->dev);  /* calls phy_release() which frees resources */
+> >  	return ERR_PTR(ret);
+> >  
+> > @@ -775,6 +777,7 @@ EXPORT_SYMBOL_GPL(devm_phy_create);
+> >   */
+> >  void phy_destroy(struct phy *phy)
+> >  {
+> > +	of_node_put(phy->dev.of_node);
+> >  	pm_runtime_disable(&phy->dev);
+> >  	device_unregister(&phy->dev);
+> >  }
+> > --
+> > To unsubscribe from this list: send the line "unsubscribe kernel-janitors" in
+> > the body of a message to majordomo at vger.kernel.org
+> > More majordomo info at  http://vger.kernel.org/majordomo-info.html
+> > 
