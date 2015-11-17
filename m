@@ -1,40 +1,61 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 17 Nov 2015 06:33:46 +0100
-Subject: [PATCH v2 11/12] ARM: wire up UEFI init and runtime support
-In-Reply-To: <20151116194812.GJ8644@n2100.arm.linux.org.uk>
-References: <1447698757-8762-1-git-send-email-ard.biesheuvel@linaro.org>
- <1447698757-8762-12-git-send-email-ard.biesheuvel@linaro.org>
- <20151116190156.GH8644@n2100.arm.linux.org.uk>
- <CAKv+Gu8w+2GA5tV4roYtEsza+mkCZKYX_=tT2t=+eh-ZO1Y2fA@mail.gmail.com>
- <20151116194812.GJ8644@n2100.arm.linux.org.uk>
-Message-ID: <CAKv+Gu8H5oqrke-TpMj9i00=OJpi82NKySF40yVQoOhXbaQvXA@mail.gmail.com>
+From: chunfeng.yun@mediatek.com (Chunfeng Yun)
+Date: Tue, 17 Nov 2015 13:56:48 +0800
+Subject: [RESEND] phy: core: Get a refcount to phy in
+ devm_of_phy_get_by_index()
+Message-ID: <1447739808-29472-1-git-send-email-chunfeng.yun@mediatek.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 16 November 2015 at 20:48, Russell King - ARM Linux
-<linux@arm.linux.org.uk> wrote:
-> On Mon, Nov 16, 2015 at 08:04:00PM +0100, Ard Biesheuvel wrote:
->> OK. So you mean set TTBR to the zero page, perform the TLB flush and
->> only then switch to the new page tables?
->
-> Not quite.
->
-> If you have global mappings below TASK_SIZE, you would need this
-> sequence when switching either to or from the UEFI page tables:
->
-> - switch to another set of page tables which only map kernel space
->   with nothing at all in userspace.
-> - flush the TLB.
-> - switch to your target page tables.
->
+On driver detach, devm_phy_release() will put a refcount to
+the phy, so gets a refconut to it before return.
 
-Doh. I am so used to always having two TTBR's available, but indeed,
-we shouldn't pull the rug from under our feet.
+Change-Id: I56fe428bf945f19c38d56245978c8ca17340eb2c
+Signed-off-by: Chunfeng Yun <chunfeng.yun@mediatek.com>
+---
+ drivers/phy/phy-core.c | 21 +++++++++++++++------
+ 1 file changed, 15 insertions(+), 6 deletions(-)
 
-> As I say in response to one of your other patches, it's probably
-> much easier to avoid any global mappings below TASK_SIZE.
-
-Let me look into that.
-
-Thanks,
-Ard.
+diff --git a/drivers/phy/phy-core.c b/drivers/phy/phy-core.c
+index fc48fac..8c7f27d 100644
+--- a/drivers/phy/phy-core.c
++++ b/drivers/phy/phy-core.c
+@@ -636,8 +636,9 @@ EXPORT_SYMBOL_GPL(devm_of_phy_get);
+  * @np: node containing the phy
+  * @index: index of the phy
+  *
+- * Gets the phy using _of_phy_get(), and associates a device with it using
+- * devres. On driver detach, release function is invoked on the devres data,
++ * Gets the phy using _of_phy_get(), then gets a refcount to it,
++ * and associates a device with it using devres. On driver detach,
++ * release function is invoked on the devres data,
+  * then, devres data is freed.
+  *
+  */
+@@ -651,13 +652,21 @@ struct phy *devm_of_phy_get_by_index(struct device *dev, struct device_node *np,
+ 		return ERR_PTR(-ENOMEM);
+ 
+ 	phy = _of_phy_get(np, index);
+-	if (!IS_ERR(phy)) {
+-		*ptr = phy;
+-		devres_add(dev, ptr);
+-	} else {
++	if (IS_ERR(phy)) {
+ 		devres_free(ptr);
++		return phy;
+ 	}
+ 
++	if (!try_module_get(phy->ops->owner)) {
++		devres_free(ptr);
++		return ERR_PTR(-EPROBE_DEFER);
++	}
++
++	get_device(&phy->dev);
++
++	*ptr = phy;
++	devres_add(dev, ptr);
++
+ 	return phy;
+ }
+ EXPORT_SYMBOL_GPL(devm_of_phy_get_by_index);
+-- 
+1.8.1.1.dirty
