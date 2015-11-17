@@ -1,52 +1,120 @@
 From: ynorov@caviumnetworks.com (Yury Norov)
-Date: Wed, 18 Nov 2015 00:16:59 +0300
-Subject: [PATCH v6 19/19] arm64:ilp32: add ARM64_ILP32 to Kconfig
+Date: Wed, 18 Nov 2015 00:16:53 +0300
+Subject: [PATCH v6 13/19] arm64: ilp32: common 32-bit wrappers
 In-Reply-To: <1447795019-30176-1-git-send-email-ynorov@caviumnetworks.com>
 References: <1447795019-30176-1-git-send-email-ynorov@caviumnetworks.com>
-Message-ID: <1447795019-30176-20-git-send-email-ynorov@caviumnetworks.com>
+Message-ID: <1447795019-30176-14-git-send-email-ynorov@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Andrew Pinski <apinski@cavium.com>
-
-This patch adds the config option for ILP32.
+From: Jan Dakinevich <jan.dakinevich@gmail.com>
 
 Reviewed-by: David Daney <ddaney@caviumnetworks.com>
 
-Signed-off-by: Philipp Tomsich <philipp.tomsich@theobroma-systems.com>
-Signed-off-by: Christoph Muellner <christoph.muellner@theobroma-systems.com>
 Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
-Signed-off-by: Andrew Pinski <Andrew.Pinski@caviumnetworks.com>
----
- arch/arm64/Kconfig | 9 ++++++++-
- 1 file changed, 8 insertions(+), 1 deletion(-)
+Signed-off-by: Jan Dakinevich <jan.dakinevich@gmail.com>
 
-diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
-index 4753d435..deec37a 100644
---- a/arch/arm64/Kconfig
-+++ b/arch/arm64/Kconfig
-@@ -680,7 +680,7 @@ source "fs/Kconfig.binfmt"
- 
- config COMPAT
- 	def_bool y
--	depends on AARCH32_EL0
-+	depends on AARCH32_EL0 || ARM64_ILP32
- 	select COMPAT_BINFMT_ELF
- 
- config AARCH32_EL0
-@@ -702,6 +702,13 @@ config AARCH32_EL0
- 
- 	  If you want to execute 32-bit userspace applications, say Y.
- 
-+config ARM64_ILP32
-+	bool "Kernel support for ILP32"
-+	help
-+	  This option enables support for AArch64 ILP32 user space.  ILP32
-+	  is an ABI where long and pointers are 32bits but it uses the AARCH64
-+	  instruction set.
+---
+ arch/arm64/kernel/Makefile         |  1 +
+ arch/arm64/kernel/entry32-common.S | 37 +++++++++++++++++++++++++++++++++++++
+ arch/arm64/kernel/entry32.S        | 29 -----------------------------
+ 3 files changed, 38 insertions(+), 29 deletions(-)
+ create mode 100644 arch/arm64/kernel/entry32-common.S
+
+diff --git a/arch/arm64/kernel/Makefile b/arch/arm64/kernel/Makefile
+index 1470332..35a59af 100644
+--- a/arch/arm64/kernel/Makefile
++++ b/arch/arm64/kernel/Makefile
+@@ -24,6 +24,7 @@ arm64-obj-$(CONFIG_AARCH32_EL0)		+= sys32.o kuser32.o signal32.o 	\
+ 					   sys_compat.o entry32.o		\
+ 					   ../../arm/kernel/opcodes.o
+ arm64-obj-$(CONFIG_FUNCTION_TRACER)	+= ftrace.o entry-ftrace.o
++arm64-obj-$(CONFIG_COMPAT)		+= entry32-common.o
+ arm64-obj-$(CONFIG_MODULES)		+= arm64ksyms.o module.o
+ arm64-obj-$(CONFIG_PERF_EVENTS)		+= perf_regs.o perf_callchain.o
+ arm64-obj-$(CONFIG_HW_PERF_EVENTS)	+= perf_event.o
+diff --git a/arch/arm64/kernel/entry32-common.S b/arch/arm64/kernel/entry32-common.S
+new file mode 100644
+index 0000000..2ad5912
+--- /dev/null
++++ b/arch/arm64/kernel/entry32-common.S
+@@ -0,0 +1,37 @@
++#include <linux/linkage.h>
++#include <linux/const.h>
 +
- config SYSVIPC_COMPAT
- 	def_bool y
- 	depends on COMPAT && SYSVIPC
++#include <asm/assembler.h>
++#include <asm/asm-offsets.h>
++#include <asm/errno.h>
++#include <asm/page.h>
++
++ENTRY(compat_sys_statfs64_wrapper)
++	mov	w3, #84
++	cmp	w1, #88
++	csel	w1, w3, w1, eq
++	b	compat_sys_statfs64
++ENDPROC(compat_sys_statfs64_wrapper)
++
++ENTRY(compat_sys_fstatfs64_wrapper)
++	mov	w3, #84
++	cmp	w1, #88
++	csel	w1, w3, w1, eq
++	b	compat_sys_fstatfs64
++ENDPROC(compat_sys_fstatfs64_wrapper)
++
++/*
++ * Note: off_4k (w5) is always in units of 4K. If we can't do the
++ * requested offset because it is not page-aligned, we return -EINVAL.
++ */
++ENTRY(compat_sys_mmap2_wrapper)
++#if PAGE_SHIFT > 12
++	tst	w5, #~PAGE_MASK >> 12
++	b.ne	1f
++	lsr	w5, w5, #PAGE_SHIFT - 12
++#endif
++	b	sys_mmap_pgoff
++1:	mov	x0, #-EINVAL
++	ret
++ENDPROC(compat_sys_mmap2_wrapper)
++
+diff --git a/arch/arm64/kernel/entry32.S b/arch/arm64/kernel/entry32.S
+index f332d5d..8026129 100644
+--- a/arch/arm64/kernel/entry32.S
++++ b/arch/arm64/kernel/entry32.S
+@@ -40,35 +40,6 @@ ENTRY(compat_sys_rt_sigreturn_wrapper)
+ 	b	compat_sys_rt_sigreturn
+ ENDPROC(compat_sys_rt_sigreturn_wrapper)
+ 
+-ENTRY(compat_sys_statfs64_wrapper)
+-	mov	w3, #84
+-	cmp	w1, #88
+-	csel	w1, w3, w1, eq
+-	b	compat_sys_statfs64
+-ENDPROC(compat_sys_statfs64_wrapper)
+-
+-ENTRY(compat_sys_fstatfs64_wrapper)
+-	mov	w3, #84
+-	cmp	w1, #88
+-	csel	w1, w3, w1, eq
+-	b	compat_sys_fstatfs64
+-ENDPROC(compat_sys_fstatfs64_wrapper)
+-
+-/*
+- * Note: off_4k (w5) is always in units of 4K. If we can't do the
+- * requested offset because it is not page-aligned, we return -EINVAL.
+- */
+-ENTRY(compat_sys_mmap2_wrapper)
+-#if PAGE_SHIFT > 12
+-	tst	w5, #~PAGE_MASK >> 12
+-	b.ne	1f
+-	lsr	w5, w5, #PAGE_SHIFT - 12
+-#endif
+-	b	sys_mmap_pgoff
+-1:	mov	x0, #-EINVAL
+-	ret
+-ENDPROC(compat_sys_mmap2_wrapper)
+-
+ /*
+  * Wrappers for AArch32 syscalls that either take 64-bit parameters
+  * in registers or that take 32-bit parameters which require sign
 -- 
 2.1.4
