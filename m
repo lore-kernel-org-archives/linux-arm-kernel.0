@@ -1,30 +1,78 @@
 From: gkulkarni@caviumnetworks.com (Ganapatrao Kulkarni)
-Date: Tue, 17 Nov 2015 23:55:29 +0530
-Subject: [PATCH v2 0/4] ACPI based NUMA support for ARM64
-Message-ID: <1447784733-10419-1-git-send-email-gkulkarni@caviumnetworks.com>
+Date: Tue, 17 Nov 2015 23:55:30 +0530
+Subject: [PATCH v2 1/4] acpi, numa: Use pr_fmt() instead of printk
+In-Reply-To: <1447784733-10419-1-git-send-email-gkulkarni@caviumnetworks.com>
+References: <1447784733-10419-1-git-send-email-gkulkarni@caviumnetworks.com>
+Message-ID: <1447784733-10419-2-git-send-email-gkulkarni@caviumnetworks.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
- -v2 rebased on arm64-numa v7 patches.
- http://www.spinics.net/lists/arm-kernel/msg460813.html
+From: Hanjun Guo <hanjun.guo@linaro.org>
 
- -v1 initial patches from Hanjun Guo
+Just do some cleanups to replace printk with pr_fmt().
 
-Hanjun Guo (4):
-  acpi, numa: Use pr_fmt() instead of printk
-  acpi, numa: Replace ACPI_DEBUG_PRINT() with pr_debug()
-  arm64, acpi, numa: NUMA support based on SRAT and SLIT
-  acpi, numa: Enable ACPI based NUMA on ARM64
+Signed-off-by: Hanjun Guo <hanjun.guo@linaro.org>
+---
+ drivers/acpi/numa.c | 17 +++++++----------
+ 1 file changed, 7 insertions(+), 10 deletions(-)
 
- arch/arm64/include/asm/acpi.h |   4 +
- arch/arm64/kernel/Makefile    |   1 +
- arch/arm64/kernel/acpi_numa.c | 215 ++++++++++++++++++++++++++++++++++++++++++
- arch/arm64/mm/numa.c          |   7 +-
- drivers/acpi/Kconfig          |   4 +-
- drivers/acpi/numa.c           | 106 ++++++++++++---------
- include/linux/acpi.h          |  15 +++
- 7 files changed, 306 insertions(+), 46 deletions(-)
- create mode 100644 arch/arm64/kernel/acpi_numa.c
-
+diff --git a/drivers/acpi/numa.c b/drivers/acpi/numa.c
+index 72b6e9e..4e427fc 100644
+--- a/drivers/acpi/numa.c
++++ b/drivers/acpi/numa.c
+@@ -18,6 +18,9 @@
+  * ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+  *
+  */
++
++#define pr_fmt(fmt) "ACPI: " fmt
++
+ #include <linux/module.h>
+ #include <linux/init.h>
+ #include <linux/kernel.h>
+@@ -28,8 +31,6 @@
+ #include <linux/nodemask.h>
+ #include <linux/topology.h>
+ 
+-#define PREFIX "ACPI: "
+-
+ #define ACPI_NUMA	0x80000000
+ #define _COMPONENT	ACPI_NUMA
+ ACPI_MODULE_NAME("numa");
+@@ -187,9 +188,8 @@ acpi_table_print_srat_entry(struct acpi_subtable_header *header)
+ #endif				/* ACPI_DEBUG_OUTPUT */
+ 		break;
+ 	default:
+-		printk(KERN_WARNING PREFIX
+-		       "Found unsupported SRAT entry (type = 0x%x)\n",
+-		       header->type);
++		pr_warn("Found unsupported SRAT entry (type = 0x%x)\n",
++			header->type);
+ 		break;
+ 	}
+ }
+@@ -222,7 +222,7 @@ static int __init acpi_parse_slit(struct acpi_table_header *table)
+ 	struct acpi_table_slit *slit = (struct acpi_table_slit *)table;
+ 
+ 	if (!slit_valid(slit)) {
+-		printk(KERN_INFO "ACPI: SLIT table looks invalid. Not used.\n");
++		pr_info("SLIT table looks invalid. Not used.\n");
+ 		return -EINVAL;
+ 	}
+ 	acpi_numa_slit_init(slit);
+@@ -233,12 +233,9 @@ static int __init acpi_parse_slit(struct acpi_table_header *table)
+ void __init __weak
+ acpi_numa_x2apic_affinity_init(struct acpi_srat_x2apic_cpu_affinity *pa)
+ {
+-	printk(KERN_WARNING PREFIX
+-	       "Found unsupported x2apic [0x%08x] SRAT entry\n", pa->apic_id);
+-	return;
++	pr_warn("Found unsupported x2apic [0x%08x] SRAT entry\n", pa->apic_id);
+ }
+ 
+-
+ static int __init
+ acpi_parse_x2apic_affinity(struct acpi_subtable_header *header,
+ 			   const unsigned long end)
 -- 
 1.8.1.4
