@@ -1,45 +1,70 @@
 From: shannon.zhao@linaro.org (shannon.zhao at linaro.org)
-Date: Tue, 17 Nov 2015 17:40:52 +0800
-Subject: [PATCH v3 53/62] arm/acpi: Map the new created EFI and ACPI tables to
- Dom0
+Date: Tue, 17 Nov 2015 17:40:54 +0800
+Subject: [PATCH v3 55/62] arm/acpi: Route all Xen unused SPIs to Dom0
 In-Reply-To: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
 References: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
-Message-ID: <1447753261-7552-54-git-send-email-shannon.zhao@linaro.org>
+Message-ID: <1447753261-7552-56-git-send-email-shannon.zhao@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Shannon Zhao <shannon.zhao@linaro.org>
 
-Here we map these new created EFI and ACPI tables to the non-RAM space
-of Dom0. Then Dom0 could visit them.
+Route all SPIs to Dom0 except the interrupts that Xen uses. Since Xen
+already uses the uart interrupt, the desc->action will not be NULL, so
+it will skip it.
 
 Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
 ---
- xen/arch/arm/domain_build.c | 15 +++++++++++++++
- 1 file changed, 15 insertions(+)
+ xen/arch/arm/domain_build.c | 33 +++++++++++++++++++++++++++++++++
+ 1 file changed, 33 insertions(+)
 
 diff --git a/xen/arch/arm/domain_build.c b/xen/arch/arm/domain_build.c
-index 073c634..55f85b4 100644
+index 6d8536b..6945f89 100644
 --- a/xen/arch/arm/domain_build.c
 +++ b/xen/arch/arm/domain_build.c
-@@ -1740,6 +1740,21 @@ static int prepare_acpi(struct domain *d, struct kernel_info *kinfo)
-     acpi_create_efi_mmap_table(d->arch.efi_acpi_gpa, d->arch.efi_acpi_table,
-                                &kinfo->mem, tbl_add);
+@@ -1360,6 +1360,35 @@ static int prepare_dtb(struct domain *d, struct kernel_info *kinfo)
+ #define XEN_HYPERVISOR_ID 0x000058656E564D4D  /* "XenVMM" */
+ #define ACPI_DOM0_FDT_MIN_SIZE 4096
  
-+    /* Map the EFI and ACPI tables to Dom0 */
-+    rc = map_regions(d,
-+                     paddr_to_pfn(d->arch.efi_acpi_gpa),
-+                     DIV_ROUND_UP(d->arch.efi_acpi_len, PAGE_SIZE),
-+                     paddr_to_pfn(virt_to_maddr(d->arch.efi_acpi_table)));
-+    if ( rc != 0 )
++static int acpi_route_spi(struct domain *d)
++{
++    int i, res;
++    struct irq_desc *desc;
++
++    /* Don't route Xen used interrupt to Dom0. Since Xen already uses the uart
++     * interrupt, the desc->action will not be NULL, so it will skip it.
++     */
++    for( i = NR_LOCAL_IRQS; i < vgic_num_irqs(d); i++ )
 +    {
-+        printk(XENLOG_ERR "Unable to map 0x%"PRIx64
-+               " - 0x%"PRIx64" in domain %d\n",
-+               d->arch.efi_acpi_gpa & PAGE_MASK,
-+               PAGE_ALIGN(d->arch.efi_acpi_gpa + d->arch.efi_acpi_len) - 1,
-+               d->domain_id);
-+        return rc;
++        /* Don't route uart interrupt to Dom0 */
++        desc = irq_to_desc(i);
++        if( desc->action != NULL)
++            continue;
++
++        vgic_reserve_virq(d, i);
++        irq_set_type(i, ACPI_IRQ_TYPE_NONE);
++        res = route_irq_to_guest(d, i, i, NULL);
++        if ( res )
++        {
++            printk(XENLOG_ERR "Unable to route IRQ %u to domain %u\n",
++                   i, d->domain_id);
++            continue;
++        }
 +    }
++
++    return 0;
++}
++
+ static int make_chosen_node(const struct kernel_info *kinfo,
+                             struct membank tbl_add[])
+ {
+@@ -1897,6 +1926,10 @@ static int prepare_acpi(struct domain *d, struct kernel_info *kinfo)
+     if ( rc != 0 )
+         return rc;
+ 
++    rc = acpi_route_spi(d);
++    if ( rc != 0 )
++        return rc;
 +
      return 0;
  }
