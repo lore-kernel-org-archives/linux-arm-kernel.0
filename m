@@ -1,72 +1,64 @@
-From: daniel.lezcano@linaro.org (Daniel Lezcano)
-Date: Tue, 17 Nov 2015 14:11:35 +0100
-Subject: [PATCH] clocksource/drivers/tango-xtal: Replace code by
- clocksource_mmio_init
-In-Reply-To: <564B222E.5080209@sigmadesigns.com>
-References: <1447412292-841-1-git-send-email-daniel.lezcano@linaro.org>
- <5645D5A0.1000502@sigmadesigns.com> <564B1C1C.7070801@linaro.org>
- <564B222E.5080209@sigmadesigns.com>
-Message-ID: <564B2787.8020202@linaro.org>
+From: pavel@ucw.cz (Pavel Machek)
+Date: Tue, 17 Nov 2015 14:13:45 +0100
+Subject: [PATCH v2 10/11] PM / Hibernate: clean cached pages on
+ architectures that require it
+In-Reply-To: <20151117123807.GA22216@red-moon>
+References: <1445966960-31724-1-git-send-email-james.morse@arm.com>
+ <2039611.PJaFlk1sMi@vostro.rjw.lan>
+ <20151112114705.GA2657@red-moon>
+ <3180507.pKM8OzKjXO@vostro.rjw.lan>
+ <20151117123807.GA22216@red-moon>
+Message-ID: <20151117131345.GA11870@amd>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/17/2015 01:48 PM, Marc Gonzalez wrote:
-> On 17/11/2015 13:22, Daniel Lezcano wrote:
->> On 11/13/2015 01:20 PM, Marc Gonzalez wrote:
->>> On 13/11/2015 11:58, Daniel Lezcano wrote:
->>>
->>>> The current code to initialize, register and read the clocksource is
->>>> already factored out in mmio.c via the clocksource_mmio_init function.
->>>>
->>>> Factor out the code with the clocksource_mmio_init function.
->>>
->>> The reason I didn't like clocksource_mmio_init() is because it exports
->>> 4 generic accessors.
->>>
->>> I guess this function makes more sense when all platforms are using it,
->>> in an ARCH_MULTIPLATFORM kernel. (Also the accessors are probably quite
->>> small, so the waste is probably minimal.)
->>
->> Hi Marc,
->>
->> it is not clear for me if you agree with this patch or not. Can you
->> clarify ?
->
-> [ Adding rmk as the original mmio.c author ]
+On Tue 2015-11-17 12:38:07, Lorenzo Pieralisi wrote:
+> [Cc'ed maintainers of affected arches]
+> 
+> On Sat, Nov 14, 2015 at 12:38:50AM +0100, Rafael J. Wysocki wrote:
+> > On Thursday, November 12, 2015 11:47:05 AM Lorenzo Pieralisi wrote:
+> > > On Thu, Nov 12, 2015 at 01:48:32AM +0100, Rafael J. Wysocki wrote:
+> > > > On Wednesday, November 11, 2015 11:40:39 AM Lorenzo Pieralisi wrote:
+> > > > > Hi Pavel, Rafael,
+> > > > > 
+> > > > > Do you have any feedback on this patch ?
+> > > > > 
+> > > > > It is fundamental to this series and affects Hibernate core code so if you
+> > > > > have any feedback that would be much appreciated.
+> > > > 
+> > > > I'm really not familiar with the flush_icache_range() interface.
+> > > > 
+> > > > What exactly does it do?
+> > > 
+> > > It is used to sync a memory range that is written into (eg loading
+> > > modules, copying from snapshot is basically the same thing, reads from
+> > > storage and restore pages that might well be executable code), in particular
+> > > to sync the I-cache and the D-cache, eg on arm64 the page that the snapshot
+> > > code is copying might be executable code that has to be cleaned from the
+> > > D-cache so that it is made visible to the I-cache.
+> > > 
+> > > On x86 it is a NOP AFAIK.
+> > 
+> > If that's the case, I have no problems with this change as long as the code
+> > works on architectures with non-trivial flush_icache_range().
+> 
+> I Cc'ed the respective arches maintainers, it should work (it may
+> make resuming a bit slower, owing to the cache syncing), problem is
+> that we have no way of testing it on platforms other than arm/arm64.
 
-Good idea. Russell, the patch is https://lkml.org/lkml/2015/11/13/261
+Sure you can find x86 and x86-64 machine near you?
 
-> Hello Daniel,
->
-> It's hard to give a straight answer. From my limited perspective (building
-> a kernel for Sigma boards only) I feel that mmio.c brings nothing. (As you
-> mentioned, it would be interesting to measure whether having reg_base in
-> the ctx, rather than as a global is better or worse for perf, though the
-> actual difference may be lost in the noise.)
->
-> On the other hand, I can see how a different perspective, such as yours,
-> may see benefits in having all drivers use the same APIs; and there may
-> be other savings for ARCH_MULTIPLATFORM builds with lots of platforms.
+And as hibernation is only supported on x86 and arm, that should be
+ok.
 
-IMO, if all the drivers are using the same code, then optimizing it will 
-benefit to all drivers at the same time.
+Or just merge it to the next and let the world do testing for you...
 
-> I guess if you think it is a good patch, I will defer to your experience.
+> How do you want us to go on about this ? Should we add a config option
+> to prevent calling flush_icache_range() on all platforms (where it
+> is not a nop) ?
 
-Ok, I will wait for Russell comments then.
-
-Thanks!
-
-   -- Daniel
-
-> I just wish Thomas would take a look at my mmio patch. I will make an
-> official submission, so that it can be properly shot down :-)
-
-
-
+Config option is definitely not an option ;-).
+									Pavel
 -- 
-  <http://www.linaro.org/> Linaro.org ? Open source software for ARM SoCs
-
-Follow Linaro:  <http://www.facebook.com/pages/Linaro> Facebook |
-<http://twitter.com/#!/linaroorg> Twitter |
-<http://www.linaro.org/linaro-blog/> Blog
+(english) http://www.livejournal.com/~pavelmachek
+(cesky, pictures) http://atrey.karlin.mff.cuni.cz/~pavel/picture/horses/blog.html
