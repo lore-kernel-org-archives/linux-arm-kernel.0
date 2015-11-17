@@ -1,111 +1,175 @@
-From: cyrille.pitchen@atmel.com (Cyrille Pitchen)
-Date: Tue, 17 Nov 2015 12:21:54 +0100
-Subject: [PATCH] crypto: atmel: fix 64-bit warnings
-In-Reply-To: <4444008.DmhAgm3J77@wuerfel>
-References: <4444008.DmhAgm3J77@wuerfel>
-Message-ID: <564B0DD2.5040103@atmel.com>
+From: marc.zyngier@arm.com (Marc Zyngier)
+Date: Tue, 17 Nov 2015 11:25:03 +0000
+Subject: [PATCH 12/21] arm64: KVM: Implement fpsimd save/restore
+In-Reply-To: <CAPvkgC0wLpRShZkHQ3KcFU0omLoACcgJ0L37f3qPEZfkONy1iQ@mail.gmail.com>
+References: <1447679519-17888-1-git-send-email-marc.zyngier@arm.com>	<1447679519-17888-13-git-send-email-marc.zyngier@arm.com>
+ <CAPvkgC0wLpRShZkHQ3KcFU0omLoACcgJ0L37f3qPEZfkONy1iQ@mail.gmail.com>
+Message-ID: <564B0E8F.9040009@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Arnd,
-
-I add my Acked-by to your patch.
-By the way, I'm currently reworking this whole driver. So I take your
-modifications into account for the new version as many parts of the source code
-such as the part dealing with DMA transfers have changed a lot.
-
-The new version fixes the 16 or 32bit counter overflow for the CTR mode,
-adds support to the GCM mode and should increase the global performances
-(the work is still in progress). For the GCM mode, it relies on the latest
-updates from Herbert in linux-next to AEAD algorithms.
-The tcrypt module was used to validate the new implementation of CTR and GCM
-modes.
-
-
-Updates in the Atmel SHA driver are also likely to follow.
-
-Thanks for your contribution!
-
-Best regards,
-
-Cyrille
-
-Le 17/11/2015 10:22, Arnd Bergmann a ?crit :
-> The atmel AES driver assumes that 'int' and 'size_t' are the same
-> type in multiple locations, which the compiler warns about when
-> building it for 64-bit systems:
+On 17/11/15 11:13, Steve Capper wrote:
+> On 16 November 2015 at 13:11, Marc Zyngier <marc.zyngier@arm.com> wrote:
+>> Implement the fpsimd save restore, keeping the lazy part in
+>> assembler (as returning to C would be overkill).
+>>
+>> Signed-off-by: Marc Zyngier <marc.zyngier@arm.com>
+>> ---
+>>  arch/arm64/kvm/hyp/Makefile |  1 +
+>>  arch/arm64/kvm/hyp/entry.S  | 32 +++++++++++++++++++++++++++++++-
+>>  arch/arm64/kvm/hyp/fpsimd.S | 33 +++++++++++++++++++++++++++++++++
+>>  arch/arm64/kvm/hyp/hyp.h    |  3 +++
+>>  arch/arm64/kvm/hyp/switch.c |  8 ++++++++
+>>  5 files changed, 76 insertions(+), 1 deletion(-)
+>>  create mode 100644 arch/arm64/kvm/hyp/fpsimd.S
+>>
+>> diff --git a/arch/arm64/kvm/hyp/Makefile b/arch/arm64/kvm/hyp/Makefile
+>> index 9c11b0f..56238d0 100644
+>> --- a/arch/arm64/kvm/hyp/Makefile
+>> +++ b/arch/arm64/kvm/hyp/Makefile
+>> @@ -9,3 +9,4 @@ obj-$(CONFIG_KVM_ARM_HOST) += sysreg-sr.o
+>>  obj-$(CONFIG_KVM_ARM_HOST) += debug-sr.o
+>>  obj-$(CONFIG_KVM_ARM_HOST) += entry.o
+>>  obj-$(CONFIG_KVM_ARM_HOST) += switch.o
+>> +obj-$(CONFIG_KVM_ARM_HOST) += fpsimd.o
+>> diff --git a/arch/arm64/kvm/hyp/entry.S b/arch/arm64/kvm/hyp/entry.S
+>> index 2c4449a..7552922 100644
+>> --- a/arch/arm64/kvm/hyp/entry.S
+>> +++ b/arch/arm64/kvm/hyp/entry.S
+>> @@ -27,6 +27,7 @@
+>>
+>>  #define CPU_GP_REG_OFFSET(x)   (CPU_GP_REGS + x)
+>>  #define CPU_XREG_OFFSET(x)     CPU_GP_REG_OFFSET(CPU_USER_PT_REGS + 8*x)
+>> +#define CPU_SYSREG_OFFSET(x)   (CPU_SYSREGS + 8*x)
+>>
+>>         .text
+>>         .pushsection    .hyp.text, "ax"
+>> @@ -152,4 +153,33 @@ ENTRY(__guest_exit)
+>>         ret
+>>  ENDPROC(__guest_exit)
+>>
+>> -       /* Insert fault handling here */
+>> +ENTRY(__fpsimd_guest_restore)
+>> +       push    x4, lr
+>> +
+>> +       mrs     x2, cptr_el2
+>> +       bic     x2, x2, #CPTR_EL2_TFP
+>> +       msr     cptr_el2, x2
+>> +       isb
+>> +
+>> +       mrs     x3, tpidr_el2
+>> +
+>> +       ldr     x0, [x3, #VCPU_HOST_CONTEXT]
+>> +       kern_hyp_va x0
+>> +       add     x0, x0, #CPU_GP_REG_OFFSET(CPU_FP_REGS)
+>> +       bl      __fpsimd_save_state
+>> +
+>> +       add     x2, x3, #VCPU_CONTEXT
+>> +       add     x0, x2, #CPU_GP_REG_OFFSET(CPU_FP_REGS)
+>> +       bl      __fpsimd_restore_state
+>> +
+>> +       mrs     x1, hcr_el2
+>> +       tbnz    x1, #HCR_RW_SHIFT, 1f
+>> +       ldr     x4, [x2, #CPU_SYSREG_OFFSET(FPEXC32_EL2)]
+>> +       msr     fpexc32_el2, x4
+>> +1:
+>> +       pop     x4, lr
+>> +       pop     x2, x3
+>> +       pop     x0, x1
+>> +
+>> +       eret
+>> +ENDPROC(__fpsimd_guest_restore)
+>> diff --git a/arch/arm64/kvm/hyp/fpsimd.S b/arch/arm64/kvm/hyp/fpsimd.S
+>> new file mode 100644
+>> index 0000000..da3f22c
+>> --- /dev/null
+>> +++ b/arch/arm64/kvm/hyp/fpsimd.S
+>> @@ -0,0 +1,33 @@
+>> +/*
+>> + * Copyright (C) 2015 - ARM Ltd
+>> + * Author: Marc Zyngier <marc.zyngier@arm.com>
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify
+>> + * it under the terms of the GNU General Public License version 2 as
+>> + * published by the Free Software Foundation.
+>> + *
+>> + * This program is distributed in the hope that it will be useful,
+>> + * but WITHOUT ANY WARRANTY; without even the implied warranty of
+>> + * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+>> + * GNU General Public License for more details.
+>> + *
+>> + * You should have received a copy of the GNU General Public License
+>> + * along with this program.  If not, see <http://www.gnu.org/licenses/>.
+>> + */
+>> +
+>> +#include <linux/linkage.h>
+>> +
+>> +#include <asm/fpsimdmacros.h>
+>> +
+>> +       .text
+>> +       .pushsection    .hyp.text, "ax"
+>> +
+>> +ENTRY(__fpsimd_save_state)
+>> +       fpsimd_save     x0, 1
+>> +       ret
+>> +ENDPROC(__fpsimd_save_state)
+>> +
+>> +ENTRY(__fpsimd_restore_state)
+>> +       fpsimd_restore  x0, 1
+>> +       ret
+>> +ENDPROC(__fpsimd_restore_state)
+>> diff --git a/arch/arm64/kvm/hyp/hyp.h b/arch/arm64/kvm/hyp/hyp.h
+>> index bf13238..240fb79 100644
+>> --- a/arch/arm64/kvm/hyp/hyp.h
+>> +++ b/arch/arm64/kvm/hyp/hyp.h
+>> @@ -70,6 +70,9 @@ void __debug_clear_restore_state(struct kvm_vcpu *vcpu,
+>>                                  struct kvm_guest_debug_arch *dbg,
+>>                                  struct kvm_cpu_context *ctxt);
+>>
+>> +void __fpsimd_save_state(struct user_fpsimd_state *fp_regs);
+>> +void __fpsimd_restore_state(struct user_fpsimd_state *fp_regs);
+>> +
+>>  u64 __guest_enter(struct kvm_vcpu *vcpu, struct kvm_cpu_context *host_ctxt);
+>>
+>>  #endif /* __ARM64_KVM_HYP_H__ */
+>> diff --git a/arch/arm64/kvm/hyp/switch.c b/arch/arm64/kvm/hyp/switch.c
+>> index a3af81a..06d3e20 100644
+>> --- a/arch/arm64/kvm/hyp/switch.c
+>> +++ b/arch/arm64/kvm/hyp/switch.c
+>> @@ -88,6 +88,7 @@ int __hyp_text __guest_run(struct kvm_vcpu *vcpu)
+>>  {
+>>         struct kvm_cpu_context *host_ctxt;
+>>         struct kvm_cpu_context *guest_ctxt;
+>> +       bool fp_enabled;
+>>         u64 exit_code;
+>>
+>>         vcpu = kern_hyp_va(vcpu);
+>> @@ -117,6 +118,8 @@ int __hyp_text __guest_run(struct kvm_vcpu *vcpu)
+>>         exit_code = __guest_enter(vcpu, host_ctxt);
+>>         /* And we're baaack! */
+>>
+>> +       fp_enabled = !!(read_sysreg(cptr_el2) & CPTR_EL2_TFP);
 > 
-> In file included from ../drivers/crypto/atmel-aes.c:17:0:
-> drivers/crypto/atmel-aes.c: In function 'atmel_aes_sg_copy':
-> include/linux/kernel.h:724:17: warning: comparison of distinct pointer types lacks a cast
-> drivers/crypto/atmel-aes.c:448:11: note: in expansion of macro 'min'
+> Should this not be a single logical not?
+> If CPTR_EL2_TFP is set then the floating point will trap in the guest,
+> thus floating point hasn't been used by the guest?
 > 
-> drivers/crypto/atmel-aes.c: In function 'atmel_aes_crypt_dma_stop':
-> include/linux/kern_levels.h:4:18: warning: format '%u' expects argument of type 'unsigned int', but argument 2 has type 'size_t {aka long unsigned int}' [-Wformat=]
+> I am chasing some issues when running kvmtool on my system with this
+> patch set applied.
+> The above change stops NetworkManager crashing on my host.
 > 
-> This changes the format strings to use the %z modifier when printing
-> a size_t, and makes sure that we use the correct size_t type where
-> needed. In case of sg_dma_len(), the type of the result depends
-> on CONFIG_NEED_SG_DMA_LENGTH, so we have to use min_t to get it to
-> work in all configurations.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Acked-by: Cyrille Pitchen <cyrille.pitchen@atmel.com>
-> 
-> diff --git a/drivers/crypto/atmel-aes.c b/drivers/crypto/atmel-aes.c
-> index fb16d812c8f5..bfb1f799bf56 100644
-> --- a/drivers/crypto/atmel-aes.c
-> +++ b/drivers/crypto/atmel-aes.c
-> @@ -184,7 +184,7 @@ static int atmel_aes_sg_length(struct ablkcipher_request *req,
->  static int atmel_aes_sg_copy(struct scatterlist **sg, size_t *offset,
->  			void *buf, size_t buflen, size_t total, int out)
->  {
-> -	unsigned int count, off = 0;
-> +	size_t count, off = 0;
->  
->  	while (buflen && total) {
->  		count = min((*sg)->length - *offset, total);
-> @@ -444,8 +444,8 @@ static int atmel_aes_crypt_dma_start(struct atmel_aes_dev *dd)
->  
->  
->  	if (fast)  {
-> -		count = min(dd->total, sg_dma_len(dd->in_sg));
-> -		count = min(count, sg_dma_len(dd->out_sg));
-> +		count = min_t(size_t, dd->total, sg_dma_len(dd->in_sg));
-> +		count = min_t(size_t, count, sg_dma_len(dd->out_sg));
->  
->  		err = dma_map_sg(dd->dev, dd->in_sg, 1, DMA_TO_DEVICE);
->  		if (!err) {
-> @@ -639,7 +639,7 @@ static int atmel_aes_crypt_dma_stop(struct atmel_aes_dev *dd)
->  				dd->buf_out, dd->buflen, dd->dma_size, 1);
->  			if (count != dd->dma_size) {
->  				err = -EINVAL;
-> -				pr_err("not all data converted: %u\n", count);
-> +				pr_err("not all data converted: %zu\n", count);
->  			}
->  		}
->  	}
-> @@ -666,7 +666,7 @@ static int atmel_aes_buff_init(struct atmel_aes_dev *dd)
->  	dd->dma_addr_in = dma_map_single(dd->dev, dd->buf_in,
->  					dd->buflen, DMA_TO_DEVICE);
->  	if (dma_mapping_error(dd->dev, dd->dma_addr_in)) {
-> -		dev_err(dd->dev, "dma %d bytes error\n", dd->buflen);
-> +		dev_err(dd->dev, "dma %zd bytes error\n", dd->buflen);
->  		err = -EINVAL;
->  		goto err_map_in;
->  	}
-> @@ -674,7 +674,7 @@ static int atmel_aes_buff_init(struct atmel_aes_dev *dd)
->  	dd->dma_addr_out = dma_map_single(dd->dev, dd->buf_out,
->  					dd->buflen, DMA_FROM_DEVICE);
->  	if (dma_mapping_error(dd->dev, dd->dma_addr_out)) {
-> -		dev_err(dd->dev, "dma %d bytes error\n", dd->buflen);
-> +		dev_err(dd->dev, "dma %zd bytes error\n", dd->buflen);
->  		err = -EINVAL;
->  		goto err_map_out;
->  	}
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-crypto" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> 
+> Unfortunately I am still chasing some problems with the guest (illegal
+> instructions).
+
+Yeah, it looks like I screwed up in the base code, and somewhat fixed it
+in the VHE branch... And as I'm testing the full setup, I didn't spot
+it, sorry.
+
+Can you please give the kvm-arm64/vhe-wsinc branch a spin and let me
+know if it works for you?
+
+Thanks,
+
+	M.
+-- 
+Jazz is not dead. It just smells funny...
