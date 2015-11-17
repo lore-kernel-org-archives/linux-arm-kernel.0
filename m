@@ -1,26 +1,61 @@
-From: herbert@gondor.apana.org.au (Herbert Xu)
-Date: Tue, 17 Nov 2015 22:09:38 +0800
-Subject: [PATCH] crypto: sun4i-ss: add missing statesize
-In-Reply-To: <1447420229-17911-1-git-send-email-clabbe.montjoie@gmail.com>
-References: <1447420229-17911-1-git-send-email-clabbe.montjoie@gmail.com>
-Message-ID: <20151117140938.GH9546@gondor.apana.org.au>
+From: rostedt@goodmis.org (Steven Rostedt)
+Date: Tue, 17 Nov 2015 09:11:42 -0500
+Subject: [PATCH] arm64: kernel: pause/unpause function graph tracer in
+ cpu_suspend()
+In-Reply-To: <1447761051-811-1-git-send-email-lorenzo.pieralisi@arm.com>
+References: <1447761051-811-1-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <20151117091142.49a70517@gandalf.local.home>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Fri, Nov 13, 2015 at 02:10:28PM +0100, LABBE Corentin wrote:
-> sun4i-ss implementaton of md5/sha1 is via ahash algorithms.
-> Commit 8996eafdcbad ("crypto: ahash - ensure statesize is non-zero")
-> made impossible to load them without giving statesize. This patch
-> specifiy statesize for sha1 and md5.
-> 
-> Fixes: 6298e948215f ("crypto: sunxi-ss - Add Allwinner Security System crypto accelerator")
-> Cc: <stable@vger.kernel.org> # v4.3+
-> Tested-by: Chen-Yu Tsai <wens@csie.org>
-> Signed-off-by: LABBE Corentin <clabbe.montjoie@gmail.com>
+On Tue, 17 Nov 2015 11:50:51 +0000
+Lorenzo Pieralisi <lorenzo.pieralisi@arm.com> wrote:
 
-Patch applied to cryptodev as I don't think it needs to go into
-stable straight away.  Thanks.
--- 
-Email: Herbert Xu <herbert@gondor.apana.org.au>
-Home Page: http://gondor.apana.org.au/~herbert/
-PGP Key: http://gondor.apana.org.au/~herbert/pubkey.txt
+
+> Fixes: 819e50e25d0c ("arm64: Add ftrace support")
+> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Reported-by: Catalin Marinas <catalin.marinas@arm.com>
+> Reported-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+> Suggested-by: Steven Rostedt <rostedt@goodmis.org>
+
+Acked-by: Steven Rostedt <rostedt@goodmis.org>
+
+-- Steve
+
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: <stable@vger.kernel.org> # 3.16+
+> ---
+>  arch/arm64/kernel/suspend.c | 9 +++++++++
+>  1 file changed, 9 insertions(+)
+> 
+> diff --git a/arch/arm64/kernel/suspend.c b/arch/arm64/kernel/suspend.c
+> index fce95e1..521448d 100644
+> --- a/arch/arm64/kernel/suspend.c
+> +++ b/arch/arm64/kernel/suspend.c
+> @@ -1,3 +1,4 @@
+> +#include <linux/ftrace.h>
+>  #include <linux/percpu.h>
+>  #include <linux/slab.h>
+>  #include <asm/cacheflush.h>
+> @@ -71,6 +72,13 @@ int cpu_suspend(unsigned long arg, int (*fn)(unsigned long))
+>  	local_dbg_save(flags);
+>  
+>  	/*
+> +	 * Function graph tracer state gets incosistent when the kernel
+> +	 * calls functions that never return (aka suspend finishers) hence
+> +	 * disable graph tracing during their execution.
+> +	 */
+> +	pause_graph_tracing();
+> +
+> +	/*
+>  	 * mm context saved on the stack, it will be restored when
+>  	 * the cpu comes out of reset through the identity mapped
+>  	 * page tables, so that the thread address space is properly
+> @@ -111,6 +119,7 @@ int cpu_suspend(unsigned long arg, int (*fn)(unsigned long))
+>  			hw_breakpoint_restore(NULL);
+>  	}
+>  
+> +	unpause_graph_tracing();
+>  	/*
+>  	 * Restore pstate flags. OS lock and mdscr have been already
+>  	 * restored, so from this point onwards, debugging is fully
