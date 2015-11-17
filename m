@@ -1,33 +1,77 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Tue, 17 Nov 2015 16:45:01 +0100
-Subject: [PATCH] drm/exynos: remove unused variables
-In-Reply-To: <9569056.LBRz4v8fSj@wuerfel>
-References: <9569056.LBRz4v8fSj@wuerfel>
-Message-ID: <3867500.zoI62Joc47@wuerfel>
+From: aryabinin@virtuozzo.com (Andrey Ryabinin)
+Date: Tue, 17 Nov 2015 18:47:08 +0300
+Subject: [PATCH v7 0/4] KASAN for arm64
+In-Reply-To: <564B40A7.1000206@arm.com>
+References: <1444665180-301-1-git-send-email-ryabinin.a.a@gmail.com>
+ <20151013083432.GG6320@e104818-lin.cambridge.arm.com>
+ <5649BAFD.6030005@arm.com> <5649F783.40109@gmail.com>
+ <564B40A7.1000206@arm.com>
+Message-ID: <564B4BFC.1020905@virtuozzo.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-After a recent change, two variables were left unused:
 
-exynos/exynos5433_drm_decon.c: In function 'decon_enable':
-exynos/exynos5433_drm_decon.c:381:6: warning: unused variable 'i' [-Wunused-variable]
-exynos/exynos5433_drm_decon.c:380:6: warning: unused variable 'ret' [-Wunused-variable]
 
-This removes them too.
+On 11/17/2015 05:58 PM, Suzuki K. Poulose wrote:
+> On 16/11/15 15:34, Andrey Ryabinin wrote:
+>> On 11/16/2015 02:16 PM, Suzuki K. Poulose wrote:
+>>> On 13/10/15 09:34, Catalin Marinas wrote:
+>>>> On Mon, Oct 12, 2015 at 06:52:56PM +0300, Andrey Ryabinin wrote:
+> 
+>>> Hi,
+>>>
+>>> I get the following failure with KASAN + 16K_PAGES + 48BIT_VA, with 4.4-rc1:
+>>>
+>>>
+>>> arch/arm64/mm/kasan_init.c: In function ?kasan_early_init?:
+>>> include/linux/compiler.h:484:38: error: call to ?__compiletime_assert_95? declared with attribute error: BUILD_BUG_ON failed: !IS_ALIGNED(KASAN_SHADOW_END, PGDIR_SIZE)
+>>>    _compiletime_assert(condition, msg, __compiletime_assert_, __LINE__)
+>>>                                        ^
+> 
+> ...
+> 
+>>
+>> Yes, it's really needed, because some code relies on this (e.g.  clear_pgs() and kasan_init()).
+>> But it should be possible to get rid of this requirement.
+> 
+> And the other important point I missed mentioning was that, my tool chain doesn't
+> support KASAN. But still the KASAN support files are still compiled and generates
+> the above error. Shouldn't we disable it at build time if we detect that compiler
+> doesn't support it ? Something like we do for LSE_ATOMICS.
+> 
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-Fixes: 186ba87a6e31 ("drm/exynos: add pm_runtime to DECON 5433")
+We should either add proper Kconfig dependency for now, or just make it work.
 
-diff --git a/drivers/gpu/drm/exynos/exynos5433_drm_decon.c b/drivers/gpu/drm/exynos/exynos5433_drm_decon.c
-index edfd6e390ef7..2ac1d4d14368 100644
---- a/drivers/gpu/drm/exynos/exynos5433_drm_decon.c
-+++ b/drivers/gpu/drm/exynos/exynos5433_drm_decon.c
-@@ -377,8 +377,6 @@ static void decon_swreset(struct decon_context *ctx)
- static void decon_enable(struct exynos_drm_crtc *crtc)
- {
- 	struct decon_context *ctx = crtc->ctx;
--	int ret;
--	int i;
- 
- 	if (!test_and_clear_bit(BIT_SUSPENDED, &ctx->flags))
- 		return;
+
+From: Andrey Ryabinin <aryabinin@virtuozzo.com>
+Subject: [PATCH] arm64: KASAN depends on !(ARM64_16K_PAGES && ARM64_VA_BITS_48)
+
+On KASAN + 16K_PAGES + 48BIT_VA
+ arch/arm64/mm/kasan_init.c: In function ?kasan_early_init?:
+ include/linux/compiler.h:484:38: error: call to ?__compiletime_assert_95? declared with attribute error: BUILD_BUG_ON failed: !IS_ALIGNED(KASAN_SHADOW_END, PGDIR_SIZE)
+    _compiletime_assert(condition, msg, __compiletime_assert_, __LINE__)
+
+Currently KASAN will not work on 16K_PAGES and 48BIT_VA, so
+forbid such configuration to avoid above build failure.
+
+Reported-by: Suzuki K. Poulose <Suzuki.Poulose@arm.com>
+Signed-off-by: Andrey Ryabinin <aryabinin@virtuozzo.com>
+---
+ arch/arm64/Kconfig | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 9ac16a4..bf7de69 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -49,7 +49,7 @@ config ARM64
+ 	select HAVE_ARCH_AUDITSYSCALL
+ 	select HAVE_ARCH_BITREVERSE
+ 	select HAVE_ARCH_JUMP_LABEL
+-	select HAVE_ARCH_KASAN if SPARSEMEM_VMEMMAP
++	select HAVE_ARCH_KASAN if SPARSEMEM_VMEMMAP && !(ARM64_16K_PAGES && ARM64_VA_BITS_48)
+ 	select HAVE_ARCH_KGDB
+ 	select HAVE_ARCH_SECCOMP_FILTER
+ 	select HAVE_ARCH_TRACEHOOK
+-- 
+2.4.10
