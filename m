@@ -1,107 +1,64 @@
-From: djkurtz@chromium.org (Daniel Kurtz)
-Date: Tue, 17 Nov 2015 16:25:34 +0800
-Subject: [PATCH] pinctrl: mediatek: fix a memleak when do dt maps.
-In-Reply-To: <1447734177-17258-1-git-send-email-hongzhou.yang@mediatek.com>
-References: <1447734177-17258-1-git-send-email-hongzhou.yang@mediatek.com>
-Message-ID: <CAGS+omCiaD-JJdvL77Y4HuvWjgC5tvLDLspsAgXPtD5AP3JA7w@mail.gmail.com>
+From: boris.brezillon@free-electrons.com (Boris Brezillon)
+Date: Tue, 17 Nov 2015 09:26:16 +0100
+Subject: [PATCH 18/27] mtd: nand: update mtd_to_nand()
+In-Reply-To: <20151117030353.GZ8456@google.com>
+References: <1447681080-31232-1-git-send-email-boris.brezillon@free-electrons.com>
+ <1447681080-31232-19-git-send-email-boris.brezillon@free-electrons.com>
+ <20151117030353.GZ8456@google.com>
+Message-ID: <20151117092616.0e33d2f3@bbrezillon>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 17, 2015 at 12:22 PM, Hongzhou Yang
-<hongzhou.yang@mediatek.com> wrote:
-> configs will kmemdup to dup_configs in pictrl util function.
-> So configs need to be freed.
->
-> Signed-off-by: Hongzhou Yang <hongzhou.yang@mediatek.com>
+On Mon, 16 Nov 2015 19:03:53 -0800
+Brian Norris <computersforpeace@gmail.com> wrote:
 
-Reviewed-by: Daniel Kurtz <djkurtz@chromium.org>
+> On Mon, Nov 16, 2015 at 02:37:51PM +0100, Boris Brezillon wrote:
+> > Now that all drivers are using the mtd instance embedded in the nand_chip
+> 
+> Do you have a script that verifies this? I thought you did at some
+> point, and it'd be nice to note it, so I can also use it to verify
+> things once it gets applied.
 
-> ---
->  Fix a memleak issue.
->
->  drivers/pinctrl/mediatek/pinctrl-mtk-common.c |   24 ++++++++++++++----------
->  1 file changed, 14 insertions(+), 10 deletions(-)
->
-> diff --git a/drivers/pinctrl/mediatek/pinctrl-mtk-common.c b/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
-> index bbf0230..0f9e416 100644
-> --- a/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
-> +++ b/drivers/pinctrl/mediatek/pinctrl-mtk-common.c
-> @@ -520,21 +520,23 @@ static int mtk_pctrl_dt_subnode_to_map(struct pinctrl_dev *pctldev,
->         if (has_config && num_pins >= 1)
->                 maps_per_pin++;
->
-> -       if (!num_pins || !maps_per_pin)
-> -               return -EINVAL;
-> +       if (!num_pins || !maps_per_pin) {
-> +               err = -EINVAL;
-> +               goto exit;
-> +       }
->
->         reserve = num_pins * maps_per_pin;
->
->         err = pinctrl_utils_reserve_map(pctldev, map,
->                         reserved_maps, num_maps, reserve);
->         if (err < 0)
-> -               goto fail;
-> +               goto exit;
->
->         for (i = 0; i < num_pins; i++) {
->                 err = of_property_read_u32_index(node, "pinmux",
->                                 i, &pinfunc);
->                 if (err)
-> -                       goto fail;
-> +                       goto exit;
->
->                 pin = MTK_GET_PIN_NO(pinfunc);
->                 func = MTK_GET_PIN_FUNC(pinfunc);
-> @@ -543,20 +545,21 @@ static int mtk_pctrl_dt_subnode_to_map(struct pinctrl_dev *pctldev,
->                                 func >= ARRAY_SIZE(mtk_gpio_functions)) {
->                         dev_err(pctl->dev, "invalid pins value.\n");
->                         err = -EINVAL;
-> -                       goto fail;
-> +                       goto exit;
->                 }
->
->                 grp = mtk_pctrl_find_group_by_pin(pctl, pin);
->                 if (!grp) {
->                         dev_err(pctl->dev, "unable to match pin %d to group\n",
->                                         pin);
-> -                       return -EINVAL;
-> +                       err = -EINVAL;
-> +                       goto exit;
->                 }
->
->                 err = mtk_pctrl_dt_node_to_map_func(pctl, pin, func, grp, map,
->                                 reserved_maps, num_maps);
->                 if (err < 0)
-> -                       goto fail;
-> +                       goto exit;
->
->                 if (has_config) {
->                         err = pinctrl_utils_add_map_configs(pctldev, map,
-> @@ -564,13 +567,14 @@ static int mtk_pctrl_dt_subnode_to_map(struct pinctrl_dev *pctldev,
->                                         configs, num_configs,
->                                         PIN_MAP_TYPE_CONFIGS_GROUP);
->                         if (err < 0)
-> -                               goto fail;
-> +                               goto exit;
->                 }
->         }
->
-> -       return 0;
-> +       err = 0;
->
-> -fail:
-> +exit:
-> +       kfree(configs);
->         return err;
->  }
->
-> --
-> 1.7.9.5
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-kernel" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
-> Please read the FAQ at  http://www.tux.org/lkml/
+No, didn't write that script, but it should probably look like the one
+I used to remove the mtd field from driver private struct.
+
+> 
+> > struct we can safely update the mtd_to_nand_chip() implementation to use
+> 
+> Nit: s/mtd_to_nand_chip/mtd_to_nand/
+
+Yep, I'll fix that.
+
+> 
+> > the container_of macro instead of returning the content of mtd->priv.
+> > This will allow us to remove mtd->priv = chip assignments done in all
+> > NAND controller drivers.
+> > 
+> > Signed-off-by: Boris Brezillon <boris.brezillon@free-electrons.com>
+> > ---
+> >  include/linux/mtd/nand.h | 2 +-
+> >  1 file changed, 1 insertion(+), 1 deletion(-)
+> > 
+> > diff --git a/include/linux/mtd/nand.h b/include/linux/mtd/nand.h
+> > index 8ec071e..873646d 100644
+> > --- a/include/linux/mtd/nand.h
+> > +++ b/include/linux/mtd/nand.h
+> > @@ -734,7 +734,7 @@ static inline struct device_node *nand_get_flash_node(struct nand_chip *chip)
+> >  
+> >  static inline struct nand_chip *mtd_to_nand(struct mtd_info *mtd)
+> >  {
+> > -	return mtd->priv;
+> > +	return container_of(mtd, struct nand_chip, mtd);
+> >  }
+> >  
+> >  static inline struct mtd_info *nand_to_mtd(struct nand_chip *chip)
+> > -- 
+> > 2.1.4
+> > 
+
+
+
+-- 
+Boris Brezillon, Free Electrons
+Embedded Linux and Kernel engineering
+http://free-electrons.com
