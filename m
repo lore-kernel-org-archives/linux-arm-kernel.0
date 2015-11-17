@@ -1,103 +1,91 @@
-From: julien.grall@citrix.com (Julien Grall)
-Date: Tue, 17 Nov 2015 11:27:26 +0000
-Subject: [PATCH v3 01/62] Revert "xen/arm: vgic-v2: Drop cbase from
- arch_domain"
-In-Reply-To: <1447753261-7552-2-git-send-email-shannon.zhao@linaro.org>
-References: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
- <1447753261-7552-2-git-send-email-shannon.zhao@linaro.org>
-Message-ID: <564B0F1E.9040804@citrix.com>
+From: nicolas.ferre@atmel.com (Nicolas Ferre)
+Date: Tue, 17 Nov 2015 12:35:58 +0100
+Subject: [GIT PULL] at91: fixes for 4.4 #1
+Message-ID: <1447760158-20204-1-git-send-email-nicolas.ferre@atmel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shannon,
+Arnd, Olof, Kevin,
 
-Why do you want to revert this patch?
+This is the first "fixes" pull-request for AT91. I tried to collect little
+patches that didn't make it for -rc1.
+It can be due to synchronization between trees like the addition of some
+sama5d2 Xplained nodes (MFD tree) or the change of the watchdog compatible
+string for sama5d4 (watchdog tree).
+It can also be due to trivial cleanups that were spotted or submitted late like
+the replacement of "wakeup" properties or removal of unneeded defconfig option.
+The removal of some dead legacy DT properties or nodes is, in my opinion worth
+it as well in order to prevent us from abusive cut'n paste.
+NAND and ISI Atmel MAINTAINERS entries are also updated.
 
-Regards,
+Tell me if it's okay for you.
 
-On 17/11/15 09:40, shannon.zhao at linaro.org wrote:
-> From: Shannon Zhao <shannon.zhao@linaro.org>
-> 
-> This reverts commit 810a50db69703f715d199d6b3a5f08193155d48b.
-> 
-> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
-> 
-> Conflicts:
-> 	xen/arch/arm/vgic-v2.c
-> ---
->  xen/arch/arm/vgic-v2.c       | 10 +++++-----
->  xen/include/asm-arm/domain.h |  1 +
->  2 files changed, 6 insertions(+), 5 deletions(-)
-> 
-> diff --git a/xen/arch/arm/vgic-v2.c b/xen/arch/arm/vgic-v2.c
-> index f7d784b..ba7ddac 100644
-> --- a/xen/arch/arm/vgic-v2.c
-> +++ b/xen/arch/arm/vgic-v2.c
-> @@ -531,7 +531,7 @@ static int vgic_v2_vcpu_init(struct vcpu *v)
->  static int vgic_v2_domain_init(struct domain *d)
->  {
->      int i, ret;
-> -    paddr_t cbase, csize;
-> +    paddr_t csize;
->      paddr_t vbase;
->  
->      /*
-> @@ -541,6 +541,7 @@ static int vgic_v2_domain_init(struct domain *d)
->      if ( is_hardware_domain(d) )
->      {
->          d->arch.vgic.dbase = vgic_v2_hw.dbase;
-> +        d->arch.vgic.cbase = vgic_v2_hw.cbase;
->          /*
->           * For the hardware domain, we always map the whole HW CPU
->           * interface region in order to match the device tree (the "reg"
-> @@ -548,13 +549,13 @@ static int vgic_v2_domain_init(struct domain *d)
->           * Note that we assume the size of the CPU interface is always
->           * aligned to PAGE_SIZE.
->           */
-> -        cbase = vgic_v2_hw.cbase;
->          csize = vgic_v2_hw.csize;
->          vbase = vgic_v2_hw.vbase;
->      }
->      else
->      {
->          d->arch.vgic.dbase = GUEST_GICD_BASE;
-> +        d->arch.vgic.cbase = GUEST_GICC_BASE;
->          /*
->           * The CPU interface exposed to the guest is always 8kB. We may
->           * need to add an offset to the virtual CPU interface base
-> @@ -562,7 +563,6 @@ static int vgic_v2_domain_init(struct domain *d)
->           * region.
->           */
->          BUILD_BUG_ON(GUEST_GICC_SIZE != SZ_8K);
-> -        cbase = GUEST_GICC_BASE;
->          csize = GUEST_GICC_SIZE;
->          vbase = vgic_v2_hw.vbase + vgic_v2_hw.aliased_offset;
->      }
-> @@ -571,8 +571,8 @@ static int vgic_v2_domain_init(struct domain *d)
->       * Map the gic virtual cpu interface in the gic cpu interface
->       * region of the guest.
->       */
-> -    ret = map_mmio_regions(d, paddr_to_pfn(cbase), csize / PAGE_SIZE,
-> -                           paddr_to_pfn(vbase));
-> +    ret = map_mmio_regions(d, paddr_to_pfn(d->arch.vgic.cbase),
-> +                           csize / PAGE_SIZE, paddr_to_pfn(vbase));
->      if ( ret )
->          return ret;
->  
-> diff --git a/xen/include/asm-arm/domain.h b/xen/include/asm-arm/domain.h
-> index e7e40da..1e61f30 100644
-> --- a/xen/include/asm-arm/domain.h
-> +++ b/xen/include/asm-arm/domain.h
-> @@ -102,6 +102,7 @@ struct arch_domain
->          struct pending_irq *pending_irqs;
->          /* Base address for guest GIC */
->          paddr_t dbase; /* Distributor base address */
-> +        paddr_t cbase; /* CPU base address */
->  #ifdef HAS_GICV3
->          /* GIC V3 addressing */
->          /* List of contiguous occupied by the redistributors */
-> 
+Thanks, best regards,
 
+The following changes since commit 8005c49d9aea74d382f474ce11afbbc7d7130bec:
+
+  Linux 4.4-rc1 (2015-11-15 17:00:27 -0800)
+
+are available in the git repository at:
+
+  git://git.kernel.org/pub/scm/linux/kernel/git/nferre/linux-at91.git tags/at91-fixes
+
+for you to fetch changes up to 50cb2efaa63bdfd4a68b94acc55a12e68d9c33d4:
+
+  MAINTAINERS: Atmel drivers: change NAND and ISI entries (2015-11-17 12:08:46 +0100)
+
+----------------------------------------------------------------
+First fixes for 4.4:
+- removal of a useless defconfig option
+- removal of some legacy DT pieces
+- use of the proper watchdog compatible string
+- addition of some sama5d2 Xplained nodes now that the MFD include is in place
+- update of the MAINTAINERS entries for some Atmel drivers
+
+----------------------------------------------------------------
+Alexandre Belloni (2):
+      ARM: at91/dt: remove leftovers clock definition
+      ARM: at91/dt: remove bootargs
+
+Ludovic Desroches (1):
+      ARM: at91/dt: sama5d2 Xplained: add several devices
+
+Nicolas Ferre (2):
+      ARM: at91/defconfig: remove CONFIG_SSB from Atmel defconfigs
+      MAINTAINERS: Atmel drivers: change NAND and ISI entries
+
+Sudeep Holla (1):
+      ARM: at91/dt: replace gpio-key,wakeup with wakeup-source property
+
+Wenyou Yang (1):
+      ARM: at91/dt: sama5d4: change watchdog compatible
+
+ MAINTAINERS                                 |   5 +-
+ arch/arm/boot/dts/animeo_ip.dts             |   6 +-
+ arch/arm/boot/dts/at91-foxg20.dts           |   2 +-
+ arch/arm/boot/dts/at91-kizbox.dts           |  13 +---
+ arch/arm/boot/dts/at91-kizbox2.dts          |   6 +-
+ arch/arm/boot/dts/at91-kizboxmini.dts       |   4 +-
+ arch/arm/boot/dts/at91-qil_a9260.dts        |   2 +-
+ arch/arm/boot/dts/at91-sama5d2_xplained.dts | 115 +++++++++++++++++++++++++---
+ arch/arm/boot/dts/at91-sama5d3_xplained.dts |   2 +-
+ arch/arm/boot/dts/at91-sama5d4_xplained.dts |  12 +--
+ arch/arm/boot/dts/at91-sama5d4ek.dts        |  12 +--
+ arch/arm/boot/dts/at91rm9200ek.dts          |   9 ---
+ arch/arm/boot/dts/at91sam9261ek.dts         |  19 ++---
+ arch/arm/boot/dts/at91sam9263ek.dts         |  13 +---
+ arch/arm/boot/dts/at91sam9g20ek_common.dtsi |  13 +---
+ arch/arm/boot/dts/at91sam9m10g45ek.dts      |  13 +---
+ arch/arm/boot/dts/at91sam9n12ek.dts         |  11 +--
+ arch/arm/boot/dts/at91sam9rlek.dts          |  13 +---
+ arch/arm/boot/dts/at91sam9x5cm.dtsi         |  11 ---
+ arch/arm/boot/dts/sama5d35ek.dts            |   2 +-
+ arch/arm/boot/dts/sama5d4.dtsi              |   2 +-
+ arch/arm/boot/dts/usb_a9260_common.dtsi     |   2 +-
+ arch/arm/boot/dts/usb_a9263.dts             |   2 +-
+ arch/arm/configs/at91_dt_defconfig          |   1 -
+ arch/arm/configs/sama5_defconfig            |   1 -
+ 25 files changed, 142 insertions(+), 149 deletions(-)
 
 -- 
-Julien Grall
+Nicolas Ferre
