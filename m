@@ -1,47 +1,62 @@
 From: lina.iyer@linaro.org (Lina Iyer)
-Date: Tue, 17 Nov 2015 15:37:35 -0700
-Subject: [PATCH RFC 11/27] drivers: cpu: Define CPU devices as IRQ safe
+Date: Tue, 17 Nov 2015 15:37:37 -0700
+Subject: [PATCH RFC 13/27] ARM: cpuidle: Add runtime PM support for CPU idle
 In-Reply-To: <1447799871-56374-1-git-send-email-lina.iyer@linaro.org>
 References: <1447799871-56374-1-git-send-email-lina.iyer@linaro.org>
-Message-ID: <1447799871-56374-12-git-send-email-lina.iyer@linaro.org>
+Message-ID: <1447799871-56374-14-git-send-email-lina.iyer@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-CPUs may be powered off from CPUIdle or hotplug and are called with
-IRQ's disabled. Define CPU devices as IRQ safe, so they may be runtime
-suspended/resumed.
+Notify runtime PM when the CPU is going to be powered off in the idle
+state. This allows for runtime PM suspend/resume of the CPU as well as
+its PM domain.
 
-Reviewed-by: Stephen Boyd <sboyd@codeaurora.org>
+Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
+Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
 Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
 ---
- drivers/base/cpu.c | 6 ++++--
- 1 file changed, 4 insertions(+), 2 deletions(-)
+ drivers/cpuidle/cpuidle-arm.c | 8 ++++++++
+ 1 file changed, 8 insertions(+)
 
-diff --git a/drivers/base/cpu.c b/drivers/base/cpu.c
-index 91bbb19..6633210 100644
---- a/drivers/base/cpu.c
-+++ b/drivers/base/cpu.c
-@@ -17,6 +17,7 @@
+diff --git a/drivers/cpuidle/cpuidle-arm.c b/drivers/cpuidle/cpuidle-arm.c
+index 545069d..8e72a23 100644
+--- a/drivers/cpuidle/cpuidle-arm.c
++++ b/drivers/cpuidle/cpuidle-arm.c
+@@ -11,13 +11,16 @@
+ 
+ #define pr_fmt(fmt) "CPUidle arm: " fmt
+ 
++#include <linux/cpu.h>
+ #include <linux/cpuidle.h>
+ #include <linux/cpumask.h>
+ #include <linux/cpu_pm.h>
+ #include <linux/kernel.h>
+ #include <linux/module.h>
  #include <linux/of.h>
- #include <linux/cpufeature.h>
- #include <linux/tick.h>
 +#include <linux/pm_runtime.h>
+ #include <linux/slab.h>
++#include <linux/rcupdate.h>
  
- #include "base.h"
+ #include <asm/cpuidle.h>
  
-@@ -371,10 +372,11 @@ int register_cpu(struct cpu *cpu, int num)
- 	if (cpu->hotpluggable)
- 		cpu->dev.groups = hotplugable_cpu_attr_groups;
- 	error = device_register(&cpu->dev);
--	if (!error)
-+	if (!error) {
-+		pm_runtime_irq_safe(&cpu->dev);
- 		per_cpu(cpu_sys_devices, num) = &cpu->dev;
--	if (!error)
- 		register_cpu_under_node(num, cpu_to_node(num));
-+	}
+@@ -45,6 +48,10 @@ static int arm_enter_idle_state(struct cpuidle_device *dev,
  
- 	return error;
- }
+ 	ret = cpu_pm_enter();
+ 	if (!ret) {
++		struct device *cpu_dev = get_cpu_device(dev->cpu);
++
++		RCU_NONIDLE(pm_runtime_put_sync_suspend(cpu_dev));
++
+ 		/*
+ 		 * Pass idle state index to cpu_suspend which in turn will
+ 		 * call the CPU ops suspend protocol with idle index as a
+@@ -52,6 +59,7 @@ static int arm_enter_idle_state(struct cpuidle_device *dev,
+ 		 */
+ 		arm_cpuidle_suspend(idx);
+ 
++		RCU_NONIDLE(pm_runtime_get_sync(cpu_dev));
+ 		cpu_pm_exit();
+ 	}
+ 
 -- 
 2.1.4
