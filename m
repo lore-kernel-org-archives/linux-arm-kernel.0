@@ -1,28 +1,53 @@
 From: linus.walleij@linaro.org (Linus Walleij)
-Date: Tue, 17 Nov 2015 15:34:52 +0100
-Subject: [PATCH] pinctrl: fix qcom ssbi drivers for 64-bit compilation
-In-Reply-To: <5235862.Gokjxf5QH1@wuerfel>
-References: <5235862.Gokjxf5QH1@wuerfel>
-Message-ID: <CACRpkdYekZ69TQbewCnr63R2qbPfuVF6gTMfpZQj07ppGsTb8w@mail.gmail.com>
+Date: Tue, 17 Nov 2015 15:36:39 +0100
+Subject: [PATCH 1/2] ls2080a/dts: Add little endian property for GPIO IP
+ block
+In-Reply-To: <CADRPPNROHmnOHfpAtaii5Hr3hzUmn4BL5OpQ4Q4hr9BGLq8s0Q@mail.gmail.com>
+References: <1446549552-40675-1-git-send-email-Gang.Liu@freescale.com>
+ <CACRpkdbf4X=dcZhtNrcJp7Zp_hnVDGH1gpKML-e=qcAgEzb0Nw@mail.gmail.com>
+ <CADRPPNROHmnOHfpAtaii5Hr3hzUmn4BL5OpQ4Q4hr9BGLq8s0Q@mail.gmail.com>
+Message-ID: <CACRpkdZ2H-L=ic+BPDY0QwR1UHq6to9iNEcDof94MXEP53HZsg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 16, 2015 at 5:41 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+On Mon, Nov 16, 2015 at 7:56 PM, Li Yang <leoli@freescale.com> wrote:
+> On Mon, Nov 16, 2015 at 9:11 AM, Linus Walleij <linus.walleij@linaro.org> wrote:
+>> On Tue, Nov 3, 2015 at 12:19 PM, Liu Gang <Gang.Liu@freescale.com> wrote:
+>>
+>>> The GPIO block for ls2080a platform has little endian registers,
+>>> the GPIO driver needs this property to read/write registers by
+>>> right interface.
+>>>
+>>> Signed-off-by: Liu Gang <Gang.Liu@freescale.com>
+>>>
+>>> diff --git a/Documentation/devicetree/bindings/gpio/gpio-mpc8xxx.txt b/Documentation/devicetree/bindings/gpio/gpio-mpc8xxx.txt
+>>> index f2455c5..c836dab 100644
+>>> --- a/Documentation/devicetree/bindings/gpio/gpio-mpc8xxx.txt
+>>> +++ b/Documentation/devicetree/bindings/gpio/gpio-mpc8xxx.txt
+>>> @@ -10,6 +10,9 @@ Required properties:
+>>>    the second cell is used to specify the gpio polarity:
+>>>        0 = active high
+>>>        1 = active low
+>>> +- little-endian : Should be set if the GPIO has little endian
+>>> +                 registers. No the property means the GPIO
+>>> +                 registers are big endian mode.
+>>
+>> That is a very generic binding and I would like the devicetree
+>> maintainers to say something about this.
+>>
+>> I would be OK if this is specified for *all* gpiochips in
+>> Documentation/devicetree/bindings/gpio/gpio.txt
+>> or even higher up in the desriptions.
+>>
+>> Just for Freescale seems a bit too local.
+>
+> There is already a generic definition at
+> Documentation/devicetree/bindings/common-properties.txt.  But it will
+> be special for Freescale controller to say that the default is
+> big-endian for backward compatibility.
 
-> When building pinctrl-ssbi-gpio and pinctrl-ssbi-mpp for ARM64, we get
-> a compile warning about invalid types:
->
-> drivers/pinctrl/qcom/pinctrl-ssbi-gpio.c: In function 'pm8xxx_gpio_probe':
-> drivers/pinctrl/qcom/pinctrl-ssbi-gpio.c:675:17: warning: cast from pointer to integer of different size [-Wpointer-to-int-cast]
-> drivers/pinctrl/qcom/pinctrl-ssbi-mpp.c: In function 'pm8xxx_mpp_probe':
-> drivers/pinctrl/qcom/pinctrl-ssbi-mpp.c:766:17: warning: cast from pointer to integer of different size [-Wpointer-to-int-cast]
->
-> This changes the code so we cast the pointer to 'unsigned long', which
-> is the right thing to do here.
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-
-Patch applied for fixes with Bj?rn's review tag.
+OK! Why not reference that just like you reference gpio.txt?
+It fooled me so it will fool others.
 
 Yours,
 Linus Walleij
