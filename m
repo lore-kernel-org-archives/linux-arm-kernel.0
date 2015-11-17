@@ -1,32 +1,40 @@
-From: davem@davemloft.net (David Miller)
-Date: Tue, 17 Nov 2015 11:51:44 -0500 (EST)
-Subject: [PATCH V4 2/2] arm64: bpf: make BPF prologue and epilogue
- align with ARM64 AAPCS
-In-Reply-To: <20151117044145.GA71069@ast-mbp.thefacebook.com>
-References: <1447713335-29707-1-git-send-email-yang.shi@linaro.org>
- <CABg9mcvh+SLK-1iF28pCQgXt5WM_H4tH3ntgKSkMHCyMygThgw@mail.gmail.com>
- <20151117044145.GA71069@ast-mbp.thefacebook.com>
-Message-ID: <20151117.115144.1827467904902947864.davem@davemloft.net>
+From: broonie@kernel.org (Mark Brown)
+Date: Tue, 17 Nov 2015 16:53:28 +0000
+Subject: [PATCH 0/8] spi: Add file i/o to spidev_test
+In-Reply-To: <2760715.DGIOLUoqL9@jclayton-pc>
+References: <cover.1447773299.git.stillcompiling@gmail.com>
+ <20151117153746.GS31303@sirena.org.uk>
+ <2760715.DGIOLUoqL9@jclayton-pc>
+Message-ID: <20151117165328.GT31303@sirena.org.uk>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Alexei Starovoitov <alexei.starovoitov@gmail.com>
-Date: Mon, 16 Nov 2015 20:41:46 -0800
+On Tue, Nov 17, 2015 at 08:15:45AM -0800, Joshua Clayton wrote:
+> On Tuesday, November 17, 2015 03:37:46 PM Mark Brown wrote:
+> > On Tue, Nov 17, 2015 at 07:24:20AM -0800, Joshua Clayton wrote:
 
-> On Mon, Nov 16, 2015 at 08:37:11PM -0800, Z Lim wrote:
->> On Mon, Nov 16, 2015 at 2:35 PM, Yang Shi <yang.shi@linaro.org> wrote:
->> > Save and restore FP/LR in BPF prog prologue and epilogue, save SP to FP
->> > in prologue in order to get the correct stack backtrace.
-> ...
->> > CC: Zi Shen Lim <zlim.lnx@gmail.com>
->> > CC: Xi Wang <xi.wang@gmail.com>
->> > Signed-off-by: Yang Shi <yang.shi@linaro.org>
->> 
->> Acked-by: Zi Shen Lim <zlim.lnx@gmail.com>
-> 
-> great that it's finalized.
-> Yang, please resubmit both patches to netdev as fresh submission so it
-> gets picked up by patchwork.
+> > >   Documentation/spi/spidev_test.c: use one rx buffer
+> > >   Documentation/spi/spidev_test.c: clean up input_tx
+> > >   Documentation/spi/spidev_test.c: accept input from a file
+> > >   Documentation/spi/spidev_test.c: output to a file
+> > >   Documentation/spi/spidev_test.c: check error
+> > >   Documentation/spi/spidev_test.c: fix whitespace
 
-He doesn't need to, I applied patch #1 independently the other day while
-the details of #2 were being worked out.
+> > Please use subjct lines reflecting the style for the subsystem.
+
+> OK. Will do.
+> Assuming "spi: spidev_test: yadda..." 
+
+Something like that.
+
+> It was a bit unclear due to the location of the file.
+
+It's not really the location that you should be focusing on, it's other
+commits in the file.
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 473 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151117/a48258ac/attachment.sig>
