@@ -1,107 +1,45 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Tue, 17 Nov 2015 18:11:56 +0100
-Subject: [RFC PATCH] arm64: use non-global mappings for UEFI runtime
- regions
-In-Reply-To: <20151117170816.GI30101@arm.com>
-References: <1447750411-6424-1-git-send-email-ard.biesheuvel@linaro.org>
- <20151117170816.GI30101@arm.com>
-Message-ID: <CAKv+Gu-L+YKonkzE2fyH9AzXcBERjMREMrHRXFu=xy2f+4gwpw@mail.gmail.com>
+From: catalin.marinas@arm.com (Catalin Marinas)
+Date: Tue, 17 Nov 2015 17:12:13 +0000
+Subject: [PATCH] arm64: kernel: pause/unpause function graph tracer in
+ cpu_suspend()
+In-Reply-To: <1447761051-811-1-git-send-email-lorenzo.pieralisi@arm.com>
+References: <1447761051-811-1-git-send-email-lorenzo.pieralisi@arm.com>
+Message-ID: <20151117171213.GL6556@e104818-lin.cambridge.arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17 November 2015 at 18:08, Will Deacon <will.deacon@arm.com> wrote:
-> On Tue, Nov 17, 2015 at 09:53:31AM +0100, Ard Biesheuvel wrote:
->> As pointed out by Russell King in response to the proposed ARM version
->> of this code, the sequence to switch between the UEFI runtime mapping
->> and current's actual userland mapping (and vice versa) is potentially
->> unsafe, since it leaves a time window between the switch to the new
->> page tables and the TLB flush where speculative accesses may hit on
->> stale global TLB entries.
->>
->> So instead, use non-global mappings, and perform the switch via the
->> ordinary ASID-aware context switch routines.
->>
->> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
->> ---
->>  arch/arm64/include/asm/mmu_context.h |  2 +-
->>  arch/arm64/kernel/efi.c              | 14 +++++---------
->>  2 files changed, 6 insertions(+), 10 deletions(-)
->
-> Acked-by: Will Deacon <will.deacon@arm.com>
->
-> Please do *not* tag this for stable! ;)
->
+On Tue, Nov 17, 2015 at 11:50:51AM +0000, Lorenzo Pieralisi wrote:
+> The function graph tracer adds instrumentation that is required to trace
+> both entry and exit of a function. In particular the function graph
+> tracer updates the "return address" of a function in order to insert
+> a trace callback on function exit.
+> 
+> Kernel power management functions like cpu_suspend() are called
+> upon power down entry with functions called "finishers" that are in turn
+> called to trigger the power down sequence but they may not return to the
+> kernel through the normal return path.
+> 
+> When the core resumes from low-power it returns to the cpu_suspend()
+> function through the cpu_resume path, which leaves the trace stack frame
+> set-up by the function tracer in an incosistent state upon return to the
+> kernel when tracing is enabled.
+> 
+> This patch fixes the issue by pausing/resuming the function graph
+> tracer on the thread executing cpu_suspend() (ie the function call that
+> subsequently triggers the "suspend finishers"), so that the function graph
+> tracer state is kept consistent across functions that enter power down
+> states and never return by effectively disabling graph tracer while they
+> are executing.
+> 
+> Fixes: 819e50e25d0c ("arm64: Add ftrace support")
+> Signed-off-by: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
+> Reported-by: Catalin Marinas <catalin.marinas@arm.com>
+> Reported-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
+> Suggested-by: Steven Rostedt <rostedt@goodmis.org>
+> Cc: Will Deacon <will.deacon@arm.com>
+> Cc: <stable@vger.kernel.org> # 3.16+
 
-OK, thanks for clarifying.
+Patch applied. Thanks.
 
-So for stable, should we keep the global mappings and do something
-like this instead?
-
-"""
-       cpu_set_reserved_ttbr0();
-
-       local_flush_tlb_all();
-       if (icache_is_aivivt())
-               __local_flush_icache_all();
-
-       if (mm != &init_mm)
-               cpu_switch_mm(mm->pgd, mm);
-"""
-
-
-
->> diff --git a/arch/arm64/include/asm/mmu_context.h b/arch/arm64/include/asm/mmu_context.h
->> index c0e87898ba96..24165784b803 100644
->> --- a/arch/arm64/include/asm/mmu_context.h
->> +++ b/arch/arm64/include/asm/mmu_context.h
->> @@ -101,7 +101,7 @@ static inline void cpu_set_default_tcr_t0sz(void)
->>  #define destroy_context(mm)          do { } while(0)
->>  void check_and_switch_context(struct mm_struct *mm, unsigned int cpu);
->>
->> -#define init_new_context(tsk,mm)     ({ atomic64_set(&mm->context.id, 0); 0; })
->> +#define init_new_context(tsk,mm)     ({ atomic64_set(&(mm)->context.id, 0); 0; })
->>
->>  /*
->>   * This is called when "tsk" is about to enter lazy TLB mode.
->> diff --git a/arch/arm64/kernel/efi.c b/arch/arm64/kernel/efi.c
->> index de46b50f4cdf..fc5508e0df57 100644
->> --- a/arch/arm64/kernel/efi.c
->> +++ b/arch/arm64/kernel/efi.c
->> @@ -224,6 +224,8 @@ static bool __init efi_virtmap_init(void)
->>  {
->>       efi_memory_desc_t *md;
->>
->> +     init_new_context(NULL, &efi_mm);
->> +
->>       for_each_efi_memory_desc(&memmap, md) {
->>               u64 paddr, npages, size;
->>               pgprot_t prot;
->> @@ -254,7 +256,8 @@ static bool __init efi_virtmap_init(void)
->>               else
->>                       prot = PAGE_KERNEL;
->>
->> -             create_pgd_mapping(&efi_mm, paddr, md->virt_addr, size, prot);
->> +             create_pgd_mapping(&efi_mm, paddr, md->virt_addr, size,
->> +                                __pgprot(pgprot_val(prot) | PTE_NG));
->>       }
->>       return true;
->>  }
->> @@ -329,14 +332,7 @@ core_initcall(arm64_dmi_init);
->>
->>  static void efi_set_pgd(struct mm_struct *mm)
->>  {
->> -     if (mm == &init_mm)
->> -             cpu_set_reserved_ttbr0();
->> -     else
->> -             cpu_switch_mm(mm->pgd, mm);
->> -
->> -     local_flush_tlb_all();
->> -     if (icache_is_aivivt())
->> -             __local_flush_icache_all();
->> +     switch_mm(NULL, mm, NULL);
->>  }
->>
->>  void efi_virtmap_load(void)
->> --
->> 1.9.1
->>
+-- 
+Catalin
