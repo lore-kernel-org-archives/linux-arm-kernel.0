@@ -1,79 +1,72 @@
 From: lina.iyer@linaro.org (Lina Iyer)
-Date: Tue, 17 Nov 2015 15:37:48 -0700
-Subject: [PATCH RFC 24/27] arm64: dts: Add Qualcomm MSM8916, MTP8916, APQ8016,
- SBC8016 ids
+Date: Tue, 17 Nov 2015 15:37:50 -0700
+Subject: [PATCH RFC 26/27] ARM64: dts: Add PSCI cpuidle support for MSM8916
 In-Reply-To: <1447799871-56374-1-git-send-email-lina.iyer@linaro.org>
 References: <1447799871-56374-1-git-send-email-lina.iyer@linaro.org>
-Message-ID: <1447799871-56374-25-git-send-email-lina.iyer@linaro.org>
+Message-ID: <1447799871-56374-27-git-send-email-lina.iyer@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Kumar Gala <galak@codeaurora.org>
+Add device bindings for CPUs to suspend using PSCI as the enable-method.
 
-Add qcom,msm-id and qcom,board-id to allow bootloader to identify which
-device tree to boot on the MTP8916 & SBC8016 boards.
-
-Signed-off-by: Kumar Gala <galak@codeaurora.org>
+Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
 ---
- arch/arm64/boot/dts/qcom/apq8016-sbc.dts | 2 ++
- arch/arm64/boot/dts/qcom/msm8916-mtp.dts | 3 +++
- arch/arm64/boot/dts/qcom/msm8916.dtsi    | 6 ++++++
- 3 files changed, 11 insertions(+)
+ arch/arm64/boot/dts/qcom/msm8916.dtsi | 24 ++++++++++++++++++++++++
+ 1 file changed, 24 insertions(+)
 
-diff --git a/arch/arm64/boot/dts/qcom/apq8016-sbc.dts b/arch/arm64/boot/dts/qcom/apq8016-sbc.dts
-index 825f489..6fea25d 100644
---- a/arch/arm64/boot/dts/qcom/apq8016-sbc.dts
-+++ b/arch/arm64/boot/dts/qcom/apq8016-sbc.dts
-@@ -13,9 +13,11 @@
- 
- /dts-v1/;
- 
-+#include <dt-bindings/arm/qcom-ids.h>
- #include "apq8016-sbc.dtsi"
- 
- / {
- 	model = "Qualcomm Technologies, Inc. APQ 8016 SBC";
- 	compatible = "qcom,apq8016-sbc", "qcom,apq8016", "qcom,sbc";
-+	qcom,board-id = <QCOM_BRD_ID(SBC, 1, 0) QCOM_BRD_SUBTYPE_DEFAULT>;
- };
-diff --git a/arch/arm64/boot/dts/qcom/msm8916-mtp.dts b/arch/arm64/boot/dts/qcom/msm8916-mtp.dts
-index fced77f..6c68b4e 100644
---- a/arch/arm64/boot/dts/qcom/msm8916-mtp.dts
-+++ b/arch/arm64/boot/dts/qcom/msm8916-mtp.dts
-@@ -13,10 +13,13 @@
- 
- /dts-v1/;
- 
-+#include <dt-bindings/arm/qcom-ids.h>
- #include "msm8916-mtp.dtsi"
- 
- / {
- 	model = "Qualcomm Technologies, Inc. MSM 8916 MTP";
- 	compatible = "qcom,msm8916-mtp", "qcom,msm8916-mtp-smb1360",
- 			"qcom,msm8916", "qcom,mtp";
-+	qcom,board-id = <QCOM_BRD_ID(MTP, 1, 0) QCOM_BRD_SUBTYPE_DEFAULT>,
-+			<QCOM_BRD_ID(MTP, 1, 0) QCOM_BRD_SUBTYPE_MTP8916_SMB1360>;
- };
 diff --git a/arch/arm64/boot/dts/qcom/msm8916.dtsi b/arch/arm64/boot/dts/qcom/msm8916.dtsi
-index 8d184ff..7be7c23 100644
+index 7be7c23..5806438 100644
 --- a/arch/arm64/boot/dts/qcom/msm8916.dtsi
 +++ b/arch/arm64/boot/dts/qcom/msm8916.dtsi
-@@ -14,10 +14,16 @@
- #include <dt-bindings/interrupt-controller/arm-gic.h>
- #include <dt-bindings/clock/qcom,gcc-msm8916.h>
- #include <dt-bindings/reset/qcom,gcc-msm8916.h>
-+#include <dt-bindings/arm/qcom-ids.h>
+@@ -51,25 +51,49 @@
+ 			device_type = "cpu";
+ 			compatible = "arm,cortex-a53", "arm,armv8";
+ 			reg = <0x0>;
++			enable-method = "psci";
++			cpu-idle-states = <&CPU_SPC>;
+ 		};
  
- / {
- 	model = "Qualcomm Technologies, Inc. MSM8916";
- 	compatible = "qcom,msm8916";
-+	qcom,msm-id =	<QCOM_ID_MSM8916 0>,
-+			<QCOM_ID_MSM8216 0>,
-+			<QCOM_ID_MSM8116 0>,
-+			<QCOM_ID_MSM8616 0>,
-+			<QCOM_ID_APQ8016 0>;
+ 		CPU1: cpu at 1 {
+ 			device_type = "cpu";
+ 			compatible = "arm,cortex-a53", "arm,armv8";
+ 			reg = <0x1>;
++			enable-method = "psci";
++			cpu-idle-states = <&CPU_SPC>;
+ 		};
  
- 	interrupt-parent = <&intc>;
+ 		CPU2: cpu at 2 {
+ 			device_type = "cpu";
+ 			compatible = "arm,cortex-a53", "arm,armv8";
+ 			reg = <0x2>;
++			enable-method = "psci";
++			cpu-idle-states = <&CPU_SPC>;
+ 		};
  
+ 		CPU3: cpu at 3 {
+ 			device_type = "cpu";
+ 			compatible = "arm,cortex-a53", "arm,armv8";
+ 			reg = <0x3>;
++			enable-method = "psci";
++			cpu-idle-states = <&CPU_SPC>;
+ 		};
++
++		idle-states {
++			CPU_SPC: spc {
++				compatible = "qcom,idle-state-spc",
++						"arm,idle-state";
++				arm,psci-suspend-param = <0x40000002>;
++				entry-latency-us = <130>;
++				exit-latency-us = <150>;
++				min-residency-us = <2000>;
++			};
++		};
++	};
++	
++	psci {
++		compatible = "arm,psci-1.0";
++		method = "smc";
+ 	};
+ 
+ 	timer {
 -- 
 2.1.4
