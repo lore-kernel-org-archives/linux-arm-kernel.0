@@ -1,60 +1,54 @@
-From: robh@kernel.org (Rob Herring)
-Date: Mon, 16 Nov 2015 18:14:39 -0600
-Subject: [PATCH 1/2] Documentation: DT: Add entry for ARM SP805-WDT
-In-Reply-To: <20151116144525.GM20696@leverpostej>
-References: <1447683883-6600-1-git-send-email-bhupesh.sharma@freescale.com>
- <1447683883-6600-2-git-send-email-bhupesh.sharma@freescale.com>
- <20151116144525.GM20696@leverpostej>
-Message-ID: <20151117001439.GA26823@rob-hp-laptop>
+From: stefan@agner.ch (Stefan Agner)
+Date: Mon, 16 Nov 2015 16:29:06 -0800
+Subject: [PATCH 2/6] serial: fsl-lpuart: move SERIAL_EARLYCON dependency
+ to console
+In-Reply-To: <1447688894-2936779-3-git-send-email-arnd@arndb.de>
+References: <1447688894-2936779-1-git-send-email-arnd@arndb.de>
+ <1447688894-2936779-3-git-send-email-arnd@arndb.de>
+Message-ID: <8865948bb89ad128dae91aca9437c581@agner.ch>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Mon, Nov 16, 2015 at 02:45:25PM +0000, Mark Rutland wrote:
-> On Mon, Nov 16, 2015 at 07:54:42PM +0530, Bhupesh Sharma wrote:
-> > This patch adds a devicetree binding documentation for ARM's
-> > SP805 WatchDog Timer.
-> > 
-> > Signed-off-by: Bhupesh Sharma <bhupesh.sharma@freescale.com>
-> > ---
-> >  .../devicetree/bindings/watchdog/sp805-wdt.txt     |   33 ++++++++++++++++++++
-> >  1 file changed, 33 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/watchdog/sp805-wdt.txt
-> > 
-> > diff --git a/Documentation/devicetree/bindings/watchdog/sp805-wdt.txt b/Documentation/devicetree/bindings/watchdog/sp805-wdt.txt
-> > new file mode 100644
-> > index 0000000..ec70fe9
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/watchdog/sp805-wdt.txt
-> > @@ -0,0 +1,33 @@
-> > +* ARM SP805 Watchdog Timer (WDT) Controller
-> > +
-> > +SP805 WDT is a ARM Primecell Peripheral and has a standard-id register that
-> > +can be used to identify the peripheral type, vendor, and revision.
-> > +This value can be used for driver matching.
-> > +
-> > +Note that the current sp805_wdt driver relies on the 'drivers/amba/bus.c'
-> > +framework to invoke the probe function of the sp805_wdt driver using the
-> > +unique PRIMECELL identifiers of the sp805 wdt IP.
-> 
-> This paragraph can go. We shouldn't describe kernel internals.
-> 
-> > +As SP805 WDT is a primecell IP, it follows the base bindings specified in
-> > +'arm/primecell.txt'
-> > +
-> > +Required properties:
-> > +- compatible : Should be "arm,sp805-wdt", "arm,primecell"
-> > +- reg : Base address and size of the watchdog timer registers.
-> > +- interrupts : Should specify WDT interrupt number.
-> > +
-> > +Optional properties:
-> > +- clocks : From common clock binding. First clock is phandle to clock for apb
-> > +           pclk. Additional clocks are optional.
-> > +- clock-names : From common clock binding. Shall be "apb_pclk" for first clock.
-> 
-> The hardware has "WDOGCLK", which is what the driver appears to expect
-> first implicitly.
+FWIW,
 
-The h/w has 2 clocks, PCLK and WDOGCLK, so both should be described and 
-neither should be optional.
+Acked-by: Stefan Agner <stefan@agner.ch>
 
-Rob
+On 2015-11-16 07:48, Arnd Bergmann wrote:
+> The newly added earlycon support for lpuart adds a
+> 'select SERIAL_EARLYCON' statement for the tty driver, but that
+> only uses earlycon when console support is present, and otherwise
+> results in a pointless build error:
+> 
+> drivers/built-in.o: In function `setup_earlycon':
+> :(.init.text+0x2c4c): undefined reference to `uart_parse_earlycon'
+> 
+> This changes the Kconfig statement to only select the earlycon
+> code if the console is also enabled, like all the other drivers
+> do already.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> Fixes: 1d59b382f1c4 ("serial: fsl_lpuart: add earlycon support")
+> Cc: Stefan Agner <stefan@agner.ch>
+> ---
+>  drivers/tty/serial/Kconfig | 2 +-
+>  1 file changed, 1 insertion(+), 1 deletion(-)
+> 
+> diff --git a/drivers/tty/serial/Kconfig b/drivers/tty/serial/Kconfig
+> index 1aec4404062d..dbb8ac6afd40 100644
+> --- a/drivers/tty/serial/Kconfig
+> +++ b/drivers/tty/serial/Kconfig
+> @@ -1539,13 +1539,13 @@ config SERIAL_FSL_LPUART
+>  	tristate "Freescale lpuart serial port support"
+>  	depends on HAS_DMA
+>  	select SERIAL_CORE
+> -	select SERIAL_EARLYCON
+>  	help
+>  	  Support for the on-chip lpuart on some Freescale SOCs.
+>  
+>  config SERIAL_FSL_LPUART_CONSOLE
+>  	bool "Console on Freescale lpuart serial port"
+>  	depends on SERIAL_FSL_LPUART=y
+> +	select SERIAL_EARLYCON
+>  	select SERIAL_CORE_CONSOLE
+>  	help
+>  	  If you have enabled the lpuart serial port on the Freescale SoCs,
