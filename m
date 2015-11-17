@@ -1,170 +1,84 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Tue, 17 Nov 2015 13:28:20 +0900
-Subject: [PATCH v5 9/9] drivers: soc: Add support for Exynos PMU driver
-In-Reply-To: <564AA2A7.7010007@samsung.com>
-References: <1447406983-27835-1-git-send-email-pankaj.dubey@samsung.com>
- <1447406983-27835-10-git-send-email-pankaj.dubey@samsung.com>
- <5645BB67.8050102@samsung.com>
- <CAGcde9HMDNgu2YHXE7=KqhxdXwyNwqCZn0BLsoHtaOvpYjjSqw@mail.gmail.com>
- <56471B3F.5060201@samsung.com> <564AA2A7.7010007@samsung.com>
-Message-ID: <564AACE4.8060701@samsung.com>
+From: pankaj.dubey@samsung.com (pankaj.dubey)
+Date: Tue, 17 Nov 2015 10:01:46 +0530
+Subject: [PATCH 1/2] clk: samsung: Don't build ARMv8 clock drivers on ARMv7
+In-Reply-To: <1447637775-9887-2-git-send-email-k.kozlowski@samsung.com>
+References: <1447637775-9887-1-git-send-email-k.kozlowski@samsung.com>
+ <1447637775-9887-2-git-send-email-k.kozlowski@samsung.com>
+Message-ID: <564AADB2.3030400@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17.11.2015 12:44, pankaj.dubey wrote:
-> 
-> 
-> On Saturday 14 November 2015 05:00 PM, Krzysztof Kozlowski wrote:
->> W dniu 14.11.2015 o 00:36, Pankaj Dubey pisze:
->>> On 13 November 2015 at 15:58, Krzysztof Kozlowski
->>> <k.kozlowski@samsung.com> wrote:
->>>>
->>>> On 13.11.2015 18:29, Pankaj Dubey wrote:
->>>>> This patch moves Exynos PMU driver implementation from
->>>>> "arm/mach-exynos"
->>>>> to "drivers/soc/samsung". This driver is mainly used for setting misc
->>>>> bits of register from PMU IP of Exynos SoC which will be required to
->>>>> configure before Suspend/Resume. Currently all these settings are done
->>>>> in "arch/arm/mach-exynos/pmu.c" but moving ahead for ARM64 based SoC
->>>>> support, there is a need of this PMU driver in driver/* folder.
->>>>>
->>>>> This driver uses existing DT binding information and there should
->>>>> be no functionality change in the supported platforms.
->>>>>
->>>>> Signed-off-by: Amit Daniel Kachhap <amitdanielk@gmail.com>
->>>>> Signed-off-by: Pankaj Dubey <pankaj.dubey@samsung.com>
->>>>> ---
->>>>>   arch/arm/mach-exynos/Kconfig                                   | 1 +
->>>>>   arch/arm/mach-exynos/Makefile                                  |
->>>>> 4 +---
->>>>>   drivers/soc/samsung/Kconfig                                    |
->>>>> 4 ++++
->>>>>   drivers/soc/samsung/Makefile                                   |
->>>>> 4 ++++
->>>>>   arch/arm/mach-exynos/pmu.c => drivers/soc/samsung/exynos-pmu.c | 0
->>>>>   {arch/arm/mach-exynos => drivers/soc/samsung}/exynos-pmu.h     | 0
->>>>>   {arch/arm/mach-exynos => drivers/soc/samsung}/exynos3250-pmu.c | 0
->>>>>   {arch/arm/mach-exynos => drivers/soc/samsung}/exynos4-pmu.c    | 0
->>>>>   {arch/arm/mach-exynos => drivers/soc/samsung}/exynos5250-pmu.c | 0
->>>>>   {arch/arm/mach-exynos => drivers/soc/samsung}/exynos5420-pmu.c | 0
->>>>>   10 files changed, 10 insertions(+), 3 deletions(-)
->>>>>   rename arch/arm/mach-exynos/pmu.c =>
->>>>> drivers/soc/samsung/exynos-pmu.c (100%)
->>>>>   rename {arch/arm/mach-exynos => drivers/soc/samsung}/exynos-pmu.h
->>>>> (100%)
->>>>>   rename {arch/arm/mach-exynos =>
->>>>> drivers/soc/samsung}/exynos3250-pmu.c (100%)
->>>>>   rename {arch/arm/mach-exynos =>
->>>>> drivers/soc/samsung}/exynos4-pmu.c (100%)
->>>>>   rename {arch/arm/mach-exynos =>
->>>>> drivers/soc/samsung}/exynos5250-pmu.c (100%)
->>>>>   rename {arch/arm/mach-exynos =>
->>>>> drivers/soc/samsung}/exynos5420-pmu.c (100%)
->>>>>
->>>>> diff --git a/arch/arm/mach-exynos/Kconfig
->>>>> b/arch/arm/mach-exynos/Kconfig
->>>>> index 83c85f5..874cb38 100644
->>>>> --- a/arch/arm/mach-exynos/Kconfig
->>>>> +++ b/arch/arm/mach-exynos/Kconfig
->>>>> @@ -16,6 +16,7 @@ menuconfig ARCH_EXYNOS
->>>>>        select ARM_GIC
->>>>>        select COMMON_CLK_SAMSUNG
->>>>>        select EXYNOS_THERMAL
->>>>> +     select EXYNOS_PMU
->>>>>        select EXYNOS_SROM if PM
->>>>>        select HAVE_ARM_SCU if SMP
->>>>>        select HAVE_S3C2410_I2C if I2C
->>>>> diff --git a/arch/arm/mach-exynos/Makefile
->>>>> b/arch/arm/mach-exynos/Makefile
->>>>> index 2d58063..34d29df 100644
->>>>> --- a/arch/arm/mach-exynos/Makefile
->>>>> +++ b/arch/arm/mach-exynos/Makefile
->>>>> @@ -9,9 +9,7 @@ ccflags-$(CONFIG_ARCH_MULTIPLATFORM) +=
->>>>> -I$(srctree)/$(src)/include -I$(srctree)
->>>>>
->>>>>   # Core
->>>>>
->>>>> -obj-$(CONFIG_ARCH_EXYNOS)    += exynos.o pmu.o exynos-smc.o
->>>>> firmware.o \
->>>>> -                                     exynos3250-pmu.o exynos4-pmu.o \
->>>>> -                                     exynos5250-pmu.o
->>>>> exynos5420-pmu.o
->>>>> +obj-$(CONFIG_ARCH_EXYNOS)    += exynos.o exynos-smc.o firmware.o
->>>>>
->>>>>   obj-$(CONFIG_EXYNOS_CPU_SUSPEND) += pm.o sleep.o
->>>>>   obj-$(CONFIG_PM_SLEEP)               += suspend.o
->>>>> diff --git a/drivers/soc/samsung/Kconfig b/drivers/soc/samsung/Kconfig
->>>>> index 2833b5b..f545d6c 100644
->>>>> --- a/drivers/soc/samsung/Kconfig
->>>>> +++ b/drivers/soc/samsung/Kconfig
->>>>> @@ -10,4 +10,8 @@ config EXYNOS_SROM
->>>>>        bool
->>>>>        depends on ARM && ARCH_EXYNOS && PM
->>>>>
->>>>> +config EXYNOS_PMU
->>>>> +     bool
->>>>> +     depends on ARCH_EXYNOS
->>>>> +
->>>>>   endmenu
->>>>> diff --git a/drivers/soc/samsung/Makefile
->>>>> b/drivers/soc/samsung/Makefile
->>>>> index 9c554d5..26fb489 100644
->>>>> --- a/drivers/soc/samsung/Makefile
->>>>> +++ b/drivers/soc/samsung/Makefile
->>>>> @@ -1 +1,5 @@
->>>>>   obj-$(CONFIG_EXYNOS_SROM)    += exynos-srom.o
->>>>> +ifdef CONFIG_ARM
->>>>> +obj-$(CONFIG_EXYNOS_PMU)     += exynos-pmu.o exynos3250-pmu.o
->>>>> exynos4-pmu.o \
->>>>> +                                     exynos5250-pmu.o
->>>>> exynos5420-pmu.o
->>>>> +endif
->>>>
->>>> Why ifdef CONFIG_ARM? This already depends on ARCH_EXYNOS. If you want
->>>> to limit to ARMv7 then add the dependency to Kconfig (just like
->>>> EXYNOS_SROM).
->>>>
->>>
->>> This is required, so that 32-bit based Exynos SoC's PMU should not get
->>> compiled when we are compiling for ARM64 and vice-versa.
->>>
->>> For example: In future, I have plan to add exynos7 PMU support as -
->>>
->>> ifdef CONFIG_ARM64
->>> obj-$(CONFIG_EXYNOS_PMU) += exynos-pmu.o exynos7-pmu.o
->>> endif
->>>
->>> Thus preventing compilation of ARM64 based SoCs PMU data files when we
->>> are compiling for ARM.
->>>
->>> Only exynos-pmu.c will be shared and compiled in both cases.
->>
->> But this actually spreads Kconfig configuration over different places:
->> Kconfig and Makefile. It confuses and makes it more difficult in the
->> future to maintain and extend.
->>
-> 
-> I could not understand your point here. Will you please explain what
-> issue you can see in this approach?
 
-You are spreading Kconfig symbols over different places. These should be
-put only in one - in Kconfig.
 
-Some time later someone will add COMPILE_TEST to Kconfig and wonder why
-it does not work... oh yeah, because dependency was put not only in
-Kconfig but also in Makefile. One place for dependency: Kconfig.
-
+On Monday 16 November 2015 07:06 AM, Krzysztof Kozlowski wrote:
+> Currently the Exynos5433 (ARMv8 SoC) clock driver depends on ARCH_EXYNOS
+> so it is built also on ARMv7. This does not bring any kind of benefit.
+> There won't be a single kernel image for ARMv7 and ARMv8 SoCs (like
+> multi_v7 for ARMv7).
 > 
->> This should be in Kconfig. If you want to limit this per architecture
->> (is it really needed?) then maybe define different EXYNOS_PMU config
->> symbols?
->>
+> Instead build clock drivers only for respective SoC's architecture.
 > 
-> Do you mean we need to have separate configs for enabling PMU on ARM and
-> ARM64 based Exynos SoCs?
+> Signed-off-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+> ---
+>  drivers/clk/samsung/Kconfig  | 13 +++++++++++++
+>  drivers/clk/samsung/Makefile |  4 ++--
+>  2 files changed, 15 insertions(+), 2 deletions(-)
+> 
+> diff --git a/drivers/clk/samsung/Kconfig b/drivers/clk/samsung/Kconfig
+> index 84196ecdaa12..5f138fc4d84d 100644
+> --- a/drivers/clk/samsung/Kconfig
+> +++ b/drivers/clk/samsung/Kconfig
+> @@ -2,6 +2,7 @@ config COMMON_CLK_SAMSUNG
+>  	bool
+>  	select COMMON_CLK
+>  
+> +# ARMv7 SoCs:
+>  config S3C2410_COMMON_CLK
+>  	bool
+>  	select COMMON_CLK_SAMSUNG
+> @@ -24,3 +25,15 @@ config S3C2443_COMMON_CLK
+>  	bool
+>  	select COMMON_CLK_SAMSUNG
+>  
+> +# ARMv8 SoCs:
+> +config EXYNOS5433_COMMON_CLK
+> +	bool
+> +	depends on ARM64 || COMPILE_TEST
+> +	default ARCH_EXYNOS
+> +	select COMMON_CLK_SAMSUNG
+> +
+> +config EXYNOS7_COMMON_CLK
+> +	bool
+> +	depends on ARM64 || COMPILE_TEST
+> +	default ARCH_EXYNOS
+> +	select COMMON_CLK_SAMSUNG
+> diff --git a/drivers/clk/samsung/Makefile b/drivers/clk/samsung/Makefile
+> index 5f6833ea355d..a31332a24ef4 100644
+> --- a/drivers/clk/samsung/Makefile
+> +++ b/drivers/clk/samsung/Makefile
+> @@ -10,11 +10,11 @@ obj-$(CONFIG_SOC_EXYNOS5250)	+= clk-exynos5250.o
+>  obj-$(CONFIG_SOC_EXYNOS5260)	+= clk-exynos5260.o
+>  obj-$(CONFIG_SOC_EXYNOS5410)	+= clk-exynos5410.o
+>  obj-$(CONFIG_SOC_EXYNOS5420)	+= clk-exynos5420.o
+> -obj-$(CONFIG_ARCH_EXYNOS)	+= clk-exynos5433.o
+> +obj-$(CONFIG_EXYNOS5433_COMMON_CLK)	+= clk-exynos5433.o
+>  obj-$(CONFIG_SOC_EXYNOS5440)	+= clk-exynos5440.o
+>  obj-$(CONFIG_ARCH_EXYNOS)	+= clk-exynos-audss.o
+>  obj-$(CONFIG_ARCH_EXYNOS)	+= clk-exynos-clkout.o
+> -obj-$(CONFIG_ARCH_EXYNOS7)	+= clk-exynos7.o
+> +obj-$(CONFIG_EXYNOS7_COMMON_CLK)	+= clk-exynos7.o
+>  obj-$(CONFIG_S3C2410_COMMON_CLK)+= clk-s3c2410.o
+>  obj-$(CONFIG_S3C2410_COMMON_DCLK)+= clk-s3c2410-dclk.o
+>  obj-$(CONFIG_S3C2412_COMMON_CLK)+= clk-s3c2412.o
+> 
 
-Yes. If you want to separate ARMv7 from ARMv8 then yes. Just like we
-have for other drivers - usually per SoC but this can be per architecture.
+So in this approach we need to add separate config for clock support of
+each ARM64 Exynos64 SoC. Is this fine?
 
-Best regards,
-Krzysztof
+Can we club compilation of each ARM64 Exynos SoC clock file under
+EXYNOS7_COMMON_CLK? As for all ARM64 SoC there is single defconfig and
+binary.
+
+
+Thanks,
+Pankaj Dubey
