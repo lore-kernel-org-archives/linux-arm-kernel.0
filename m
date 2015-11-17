@@ -1,68 +1,69 @@
 From: shannon.zhao@linaro.org (shannon.zhao at linaro.org)
-Date: Tue, 17 Nov 2015 17:40:59 +0800
-Subject: [PATCH v3 60/62] arm/acpi: Configure interrupts dynamically
+Date: Tue, 17 Nov 2015 17:41:00 +0800
+Subject: [PATCH v3 61/62] arm/acpi: Add acpi parameter to enable/disable acpi
 In-Reply-To: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
 References: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
-Message-ID: <1447753261-7552-61-git-send-email-shannon.zhao@linaro.org>
+Message-ID: <1447753261-7552-62-git-send-email-shannon.zhao@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 From: Parth Dixit <parth.dixit@linaro.org>
 
-Interrupt information is described in DSDT and is not available at
-the time of booting. Configure the interrupts dynamically when requested
-by Dom0
+ACPI will be disabled by default. Define new command line parameter
+"acpi" for enabling it.
 
 Signed-off-by: Parth Dixit <parth.dixit@linaro.org>
 Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
 ---
- xen/arch/arm/vgic.c | 19 +++++++++++++++++++
- 1 file changed, 19 insertions(+)
+ xen/arch/arm/setup.c | 22 ++++++++++++++++++++++
+ 1 file changed, 22 insertions(+)
 
-diff --git a/xen/arch/arm/vgic.c b/xen/arch/arm/vgic.c
-index 7bb4570..d05abde 100644
---- a/xen/arch/arm/vgic.c
-+++ b/xen/arch/arm/vgic.c
-@@ -25,6 +25,7 @@
- #include <xen/irq.h>
- #include <xen/sched.h>
- #include <xen/perfc.h>
-+#include <xen/acpi.h>
+diff --git a/xen/arch/arm/setup.c b/xen/arch/arm/setup.c
+index 63feadf..1a40323 100644
+--- a/xen/arch/arm/setup.c
++++ b/xen/arch/arm/setup.c
+@@ -59,6 +59,10 @@ static unsigned long opt_xenheap_megabytes __initdata;
+ integer_param("xenheap_megabytes", opt_xenheap_megabytes);
+ #endif
  
- #include <asm/current.h>
- 
-@@ -310,6 +311,8 @@ void vgic_disable_irqs(struct vcpu *v, uint32_t r, int n)
-     }
- }
- 
-+#define VGIC_ICFG_MASK(intr) ( 1 << ( ( 2 * ( intr % 16 ) ) + 1 ) )
++/* "acpi=force" : Enables acpi */
++static void parse_acpi_param(char *s);
++custom_param("acpi", parse_acpi_param);
 +
- void vgic_enable_irqs(struct vcpu *v, uint32_t r, int n)
+ static __used void init_done(void)
  {
-     struct domain *d = v->domain;
-@@ -321,7 +324,23 @@ void vgic_enable_irqs(struct vcpu *v, uint32_t r, int n)
-     struct vcpu *v_target;
+     free_init_memory();
+@@ -84,6 +88,23 @@ static const char * __initdata processor_implementers[] = {
+     ['i'] = "Intel Corporation",
+ };
  
-     while ( (i = find_next_bit(&mask, 32, i)) < 32 ) {
-+#ifdef CONFIG_ACPI
-+        struct vgic_irq_rank *vr = vgic_get_rank(v, n);
-+        uint32_t tr;
++static char __initdata acpi_param[10] = "";
++static void __init parse_acpi_param(char *s)
++{
++    /* Save the parameter so it can be propagated to domain0. */
++    safe_strcpy(acpi_param, s);
 +
-         irq = i + (32 * n);
-+        if( ( !acpi_disabled ) && ( n != 0 ) && is_hardware_domain(d) )
-+        {
-+            tr = vr->icfg[i >> 4] ;
++    /* Interpret the parameter for use within Xen. */
++    if ( !parse_bool(s) )
++    {
++        disable_acpi();
++    }
++    else if ( !strcmp(s, "force") )
++    {
++        acpi_disabled = 0;
++    }
++}
 +
-+            if( ( tr & VGIC_ICFG_MASK(i) ) )
-+                irq_set_type(irq, ACPI_IRQ_TYPE_EDGE_BOTH);
-+            else
-+                irq_set_type(irq, ACPI_IRQ_TYPE_LEVEL_MASK);
-+        }
-+#else
-+        irq = i + (32 * n);
-+#endif
-         v_target = d->arch.vgic.handler->get_target_vcpu(v, irq);
-         p = irq_to_pending(v_target, irq);
-         set_bit(GIC_IRQ_GUEST_ENABLED, &p->status);
+ static void __init processor_id(void)
+ {
+     const char *implementer = "Unknown";
+@@ -729,6 +750,7 @@ void __init start_xen(unsigned long boot_phys_offset,
+         + (fdt_paddr & ((1 << SECOND_SHIFT) - 1));
+     fdt_size = boot_fdt_info(device_tree_flattened, fdt_paddr);
+ 
++    disable_acpi();
+     cmdline = boot_fdt_cmdline(device_tree_flattened);
+     printk("Command line: %s\n", cmdline);
+     cmdline_parse(cmdline);
 -- 
 2.1.0
