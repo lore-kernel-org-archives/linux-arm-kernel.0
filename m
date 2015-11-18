@@ -1,55 +1,36 @@
-From: suravee.suthikulpanit@amd.com (Suravee Suthikulanit)
-Date: Wed, 18 Nov 2015 09:10:40 -0600
-Subject: [PATCH V5 8/9] PCI: OF: Move of_pci_dma_configure() to
- pci_dma_configure()
-In-Reply-To: <3822315.uJPjk3L2zB@wuerfel>
-References: <1446072654-5608-1-git-send-email-Suravee.Suthikulpanit@amd.com>
- <564B4111.6010805@arm.com> <564C6860.4000002@arm.com>
- <3822315.uJPjk3L2zB@wuerfel>
-Message-ID: <564C94F0.2090902@amd.com>
+From: linux@roeck-us.net (Guenter Roeck)
+Date: Wed, 18 Nov 2015 07:10:55 -0800
+Subject: [PATCH v3 2/5] mfd: syscon: add a DT property to set value width
+In-Reply-To: <20151118082144.GB3534@x1>
+References: <1447700814-5391-1-git-send-email-damien.riegel@savoirfairelinux.com>
+ <1447700814-5391-3-git-send-email-damien.riegel@savoirfairelinux.com>
+ <20151117091946.GG17829@x1> <20151117172649.GA11035@roeck-us.net>
+ <20151118082144.GB3534@x1>
+Message-ID: <564C94FF.10004@roeck-us.net>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/18/2015 6:41 AM, Arnd Bergmann wrote:
-> On Wednesday 18 November 2015 12:00:32 Robin Murphy wrote:
->> On 17/11/15 15:00, Robin Murphy wrote:
->>> On 28/10/15 22:50, Suravee Suthikulpanit wrote:
->>>> Signed-off-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
->>>> Acked-by: Rob Herring <robh+dt@kernel.org>
->>>> Acked-by: Bjorn Helgaas <bhelgaas@google.com>
->>>> Reviewed-by: Hanjun Guo <hanjun.guo@linaro.org>
->>>> CC: Rafael J. Wysocki <rjw@rjwysocki.net>
->> [...]
->>>> +/**
->>>> + * pci_dma_configure - Setup DMA configuration
->>>> + * @dev: ptr to pci_dev struct of the PCI device
->>>> + *
->>>> + * Function to update PCI devices's DMA configuration using the same
->>>> + * info from the OF node of host bridge's parent (if any).
->>>> + */
->>>> +static void pci_dma_configure(struct pci_dev *dev)
->>>> +{
->>>> +    struct device *bridge = pci_get_host_bridge_device(dev);
->>>> +
->>>> +    if (IS_ENABLED(CONFIG_OF) && dev->dev.of_node) {
+On 11/18/2015 12:21 AM, Lee Jones wrote:
+[ ... ]
+>>> Or, for more clarity:
 >>>
->>> Previously I was seeing of_dma_configure, and thus of_iommu_configure,
->>> called for every PCI device on Juno. The check above now prevents this
->>> happening, since the PCI devices are probed directly from the bus and
->>> don't have OF nodes of their own. They now get left in some
->>> half-configured state where arch_setup_dma_ops isn't called either.
->>
->> Just to follow up on that, Arnd's patch to tidy up dma_get_ops (now
->> queued[1]) makes this even worse, since preventing arch_setup_dma_ops
->> being called means the PCI devices now get the dummy DMA ops which leave
->> the drivers failing to probe at all, IOMMU hacks or not
+>>>    of_property_read_u32(np, "bus-width", &bus_width);
+>>>    if (bus_width)
+>>>
+>>> If you choose this version (which I think is my preferred method, don't
+>>> forget to initialise 'bus_width' to zero.
+>>>
+>> Ignoring an error and depending on bus_width==0 to determine if the property
+>> was provided seems odd, especially since it would "hide" if the bus-width
+>> property is set to 0. In the original code, this would be detected as error.
 >
-> Ok, glad we found that with my patch then. We really have to
-> configure the DMA (offset/size/coherency/iommu) for all devices that might
-> be masters, otherwise things can randomly go wrong.
+> I'm not sure what you mean.  If bus_width==0, then a problem has
+> occurred and we will not use the value.  If bus_width!=0 then we can
+> assume that it's been set and (as the comment describes) the value
+> will be checked for errors in regmap_init_mmio().
 >
-> 	ARnd
->
-I'm double checking this and will get back ASAP.
 
-Suravee
+Your proposed code does not distinguish a missing property from "bus-width = <0>;".
+It will silently ignore this case.
+
+Guenter
