@@ -1,84 +1,74 @@
-From: ryabinin.a.a@gmail.com (Andrey Ryabinin)
-Date: Wed, 18 Nov 2015 17:33:43 +0300
-Subject: [PATCH v7 0/4] KASAN for arm64
-In-Reply-To: <20151116165100.GE6556@e104818-lin.cambridge.arm.com>
-References: <1444665180-301-1-git-send-email-ryabinin.a.a@gmail.com>
- <20151013083432.GG6320@e104818-lin.cambridge.arm.com>
- <5649BAFD.6030005@arm.com> <5649F783.40109@gmail.com>
- <20151116165100.GE6556@e104818-lin.cambridge.arm.com>
-Message-ID: <564C8C47.1080904@gmail.com>
+From: grygorii.strashko@ti.com (Grygorii Strashko)
+Date: Wed, 18 Nov 2015 16:33:37 +0200
+Subject: [PATCH] arm: omap2: Kconfig: select TWD and global timer on
+ AM43xx devices
+In-Reply-To: <56461256.5050209@oracle.com>
+References: <1447351566-2328-1-git-send-email-balbi@ti.com>
+ <5645DC3A.4050504@ti.com> <5645E096.1030600@free.fr>
+ <56461256.5050209@oracle.com>
+Message-ID: <564C8C41.9080006@ti.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-
-
-On 11/16/2015 07:51 PM, Catalin Marinas wrote:
-> On Mon, Nov 16, 2015 at 06:34:27PM +0300, Andrey Ryabinin wrote:
->> On 11/16/2015 02:16 PM, Suzuki K. Poulose wrote:
->>> On 13/10/15 09:34, Catalin Marinas wrote:
->>>> On Mon, Oct 12, 2015 at 06:52:56PM +0300, Andrey Ryabinin wrote:
->>>>> Andrey Ryabinin (3):
->>>>>    arm64: move PGD_SIZE definition to pgalloc.h
->>>>>    arm64: add KASAN support
->>>>>    Documentation/features/KASAN: arm64 supports KASAN now
->>>>>
->>>>> Linus Walleij (1):
->>>>>    ARM64: kasan: print memory assignment
+On 11/13/2015 06:39 PM, santosh shilimkar wrote:
+> On 11/13/2015 5:07 AM, Mason wrote:
+>> On 13/11/2015 13:48, Grygorii Strashko wrote:
+>>> On 11/12/2015 08:06 PM, Felipe Balbi wrote:
+>>>> Make sure to tell the kernel that AM437x has
+>>>> TWD and global timers.
 >>>>
->>>> Patches queued for 4.4. Thanks.
->>>
->>> I get the following failure with KASAN + 16K_PAGES + 48BIT_VA, with 4.4-rc1:
->>>
->>> arch/arm64/mm/kasan_init.c: In function ?kasan_early_init?:
->>> include/linux/compiler.h:484:38: error: call to ?__compiletime_assert_95? declared with attribute error: BUILD_BUG_ON failed: !IS_ALIGNED(KASAN_SHADOW_END, PGDIR_SIZE)
->>>   _compiletime_assert(condition, msg, __compiletime_assert_, __LINE__)
->>>                                       ^
->>> include/linux/compiler.h:467:4: note: in definition of macro ?__compiletime_assert?
->>>     prefix ## suffix();    \
->>>     ^
->>> include/linux/compiler.h:484:2: note: in expansion of macro ?_compiletime_assert?
->>>   _compiletime_assert(condition, msg, __compiletime_assert_, __LINE__)
->>>   ^
->>> include/linux/bug.h:50:37: note: in expansion of macro ?compiletime_assert?
->>>  #define BUILD_BUG_ON_MSG(cond, msg) compiletime_assert(!(cond), msg)
->>>                                      ^
->>> include/linux/bug.h:74:2: note: in expansion of macro ?BUILD_BUG_ON_MSG?
->>>   BUILD_BUG_ON_MSG(condition, "BUILD_BUG_ON failed: " #condition)
->>>   ^
->>> arch/arm64/mm/kasan_init.c:95:2: note: in expansion of macro ?BUILD_BUG_ON?
->>>   BUILD_BUG_ON(!IS_ALIGNED(KASAN_SHADOW_END, PGDIR_SIZE));
->>>
->>> The problem is that the PGDIR_SIZE is (1UL << 47) with 16K+48bit, which makes
->>> the KASAN_SHADOW_END unaligned(which is aligned to (1UL << (48 - 3)) ). Is the
->>> alignment really needed ? Thoughts on how best we could fix this ?
->>
->> Yes, it's really needed, because some code relies on this (e.g.
->> clear_pgs() and kasan_init()). But it should be possible to get rid of
->> this requirement.
+>>>> Signed-off-by: Felipe Balbi <balbi@ti.com>
+>>>> ---
+>>>>
+>>>> Hi Tony,
+>>>>
+>>>> now that all dependencies are in place, we can
+>>>> finally enable twd and global_timer for AM437x.
+>>>>
+> Is AM437x SMP SOC ? 
+
+No. But it has ARM TWD and GT
+
+> Is TWD on AM437x works in low power states ?
+
+No. But TWD, seems, is not a problem here if omap gp timer
+can be used as broadcast device.
+
+> Probably I haven't followed the recent updates, but does
+> the TWD supports C3STOP on UP systems ? The broadcast
+> code was SMP only in past, and TWD use to die in
+> low power state on past OMAP SOCs.
 > 
-> I don't think clear_pgds() and kasan_init() are the only problems. IIUC,
-> kasan_populate_zero_shadow() also assumes that KASan shadow covers
-> multiple pgds. You need some kind of recursive writing which avoids
-> populating an entry which is not empty (like kasan_early_pud_populate).
+> If either of these are still the issue then
+> TWD shouldn't be used.
 > 
 
-I think kasan_populate_zero_shadow() should be fine. We call pgd_populate() only
-if address range covers the entire pgd:
+Yep. I see the problem with ARM Global timer here if
+CPUIdle is enabled and ARM Global timer is selected as
+clocksource device.
 
-		if (IS_ALIGNED(addr, PGDIR_SIZE) && end - addr >= PGDIR_SIZE) {
-....
-			pgd_populate(&init_mm, pgd, kasan_zero_pud);
-....
+I think, it will be right thing to disable "global_timer"
+and "local_timer" nodes in am437x.dtsi by default - if
+someone would like to use them then those nodes have
+to be enabled explicitly in board file.
+(TWD timer will be enabled on OMAP multi SoC build
+ irrespectively of HAVE_ARM_TWD is selected for am437x or not,
+ because it will be selected for omap4). 
+I've just sent corresponding patch: 
+ http://www.spinics.net/lists/arm-kernel/msg461141.html
 
-and otherwise we check for pgd_none(*pgd):
-		if (pgd_none(*pgd)) {
-			pgd_populate(&init_mm, pgd,
-				early_alloc(PAGE_SIZE, NUMA_NO_NODE));
-		}
+Also, probably, it could be reasonable to:
+- make ARM_GLOBAL_TIMER fully selectable option and allow select it from defconfig.
+
+- or - update this patch as below
+-       select ARM_GLOBAL_TIMER
+-       select CLKSRC_ARM_GLOBAL_TIMER_SCHED_CLOCK
++       select ARM_GLOBAL_TIMER if !CPU_IDLE
++       select CLKSRC_ARM_GLOBAL_TIMER_SCHED_CLOCK if ARM_GLOBAL_TIMER
 
 
-Is there any way to run 16K pages on emulated environment?
-I've tried:
- - ARM V8 Foundation Platformr0p0 (platform build 9.4.59)
- - QEMU 2.4.0
-and both just doesn't boot for me on 4.4-rc1 with 16k pages config.
+
+Thanks.
+-- 
+regards,
+-grygorii
