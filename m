@@ -1,48 +1,80 @@
-From: jic23@kernel.org (Jonathan Cameron)
-Date: Wed, 18 Nov 2015 19:04:21 +0000
-Subject: [PATCH] iio: adc: xilinx: constify iio_buffer_setup_ops structure
-In-Reply-To: <5648E8DA.3070509@metafoo.de>
-References: <1447617602-12922-1-git-send-email-Julia.Lawall@lip6.fr>
- <5648E8DA.3070509@metafoo.de>
-Message-ID: <564CCBB5.6000607@kernel.org>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Wed, 18 Nov 2015 11:05:00 -0800
+Subject: device_node lifetime (was: Re: [PATCH 1/7] phy: brcmstb-sata: add
+ missing of_node_put)
+In-Reply-To: <alpine.DEB.2.02.1511172327030.2121@localhost6.localdomain6>
+References: <1447673600-8881-1-git-send-email-Julia.Lawall@lip6.fr>
+ <1447673600-8881-2-git-send-email-Julia.Lawall@lip6.fr>
+ <20151117013830.GV8456@google.com>
+ <alpine.DEB.2.02.1511170711340.2045@localhost6.localdomain6>
+ <20151117174430.GA8456@google.com>
+ <alpine.DEB.2.10.1511171846120.2455@hadrien>
+ <20151117183036.GF8456@google.com>
+ <alpine.DEB.2.02.1511172327030.2121@localhost6.localdomain6>
+Message-ID: <20151118190500.GE140057@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 15/11/15 20:19, Lars-Peter Clausen wrote:
-> On 11/15/2015 09:00 PM, Julia Lawall wrote:
->> The iio_buffer_setup_ops structures are never modified, so declare this one
->> as const, like the others.
->>
->> Done with the help of Coccinelle.
->>
->> Signed-off-by: Julia Lawall <Julia.Lawall@lip6.fr>
-> 
-> Acked-by: Lars-Peter Clausen <lars@metafoo.de>
-Applied.
+(changing subject, add devicetree at vger.kernel.org)
 
-Thanks,
+On Tue, Nov 17, 2015 at 11:33:25PM +0100, Julia Lawall wrote:
+> On Tue, 17 Nov 2015, Brian Norris wrote:
+> > On Tue, Nov 17, 2015 at 06:48:39PM +0100, Julia Lawall wrote:
+> > > Is this something that should be checked for elsewhere?
+> > 
+> > I expect the same sort of problem shows up plenty of other places. I
+> > don't think many people use CONFIG_OF_DYNAMIC, so the effects of these
+> > failures probably aren't felt by many.
+> 
+> I tried the following semantic patch:
+> 
+> @@
+> struct device_node *e;
+> expression e1;
+> identifier fld;
+> @@
+> 
+>  ... when != of_node_get(...)
+> *(<+...e1->fld...+>) = e
+>  ... when != of_node_get(...)
+>  return e1;
+> 
+> basically, this says that a structure field is initilized to a device node 
+> value, the structure is returned by the containing function, and the 
+> containing function contains no of_node_get at all.  Certainly this is 
+> quite constrained, but it does produce a number of examples.
+> 
+> I looked at a few of them:
+> 
+> drivers/clk/ingenic/cgu.c, ingenic_cgu_new
+> clk/pistachio/clk.c, pistachio_clk_alloc_provider
 
-Jonathan
-> 
-> Thanks.
-> 
->>
->> ---
->>  drivers/iio/adc/xilinx-xadc-core.c |    2 +-
->>  1 file changed, 1 insertion(+), 1 deletion(-)
->>
->> diff --git a/drivers/iio/adc/xilinx-xadc-core.c b/drivers/iio/adc/xilinx-xadc-core.c
->> index 0370624..c2b5f10 100644
->> --- a/drivers/iio/adc/xilinx-xadc-core.c
->> +++ b/drivers/iio/adc/xilinx-xadc-core.c
->> @@ -803,7 +803,7 @@ err:
->>  	return ret;
->>  }
->>  
->> -static struct iio_buffer_setup_ops xadc_buffer_ops = {
->> +static const struct iio_buffer_setup_ops xadc_buffer_ops = {
->>  	.preenable = &xadc_preenable,
->>  	.postenable = &iio_triggered_buffer_postenable,
->>  	.predisable = &iio_triggered_buffer_predisable,
->>
-> 
+It looks like the clock core (drivers/clk/clk.c) initially grabs the clk
+provider node in of_clk_init(), then drops it after it's initialized,
+but most of these providers use of_clk_add_provider(), which seems to
+manage the device_node lifetime for the user. So I think these are OK.
+
+> drivers/mfd/syscon.c, of_syscon_register
+
+This one looks potentially suspect. Syscon nodes aren't usually directly
+managed by a single driver, and the device_node pointer is used for
+lookups later...so I think it should keep a kref, and it doesn't.
+
+> drivers/of/pdt.c, function of_pdt_create_node
+
+Not real sure about this one.
+
+> Any idea whether these need of_node_get?  In all cases the device node 
+> value comes in as a parameter.
+
+I'm really not an expert on this stuff. I just saw a potential problem
+that I happen to be looking at in other subsystems, and I wanted to know
+what others thought. I think this discussion should include the DT folks
+and the subsystems in question. For one, I'm as interested as anyone in
+getting this todo clarified:
+
+Documentation/devicetree/todo.txt
+- Document node lifecycle for CONFIG_OF_DYNAMIC
+
+Regards,
+Brian
