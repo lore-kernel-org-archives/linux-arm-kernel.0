@@ -1,49 +1,73 @@
 From: ulrich.hecht+renesas@gmail.com (Ulrich Hecht)
-Date: Wed, 18 Nov 2015 13:51:06 +0100
-Subject: [PATCH 1/2] ARM: shmobile: alt: add I2C1 DT support
+Date: Wed, 18 Nov 2015 13:51:07 +0100
+Subject: [PATCH 2/2] ARM: shmobile: alt: add VIN0, ADV7180 DT support
 In-Reply-To: <1447851067-8214-1-git-send-email-ulrich.hecht+renesas@gmail.com>
 References: <1447851067-8214-1-git-send-email-ulrich.hecht+renesas@gmail.com>
-Message-ID: <1447851067-8214-2-git-send-email-ulrich.hecht+renesas@gmail.com>
+Message-ID: <1447851067-8214-3-git-send-email-ulrich.hecht+renesas@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Defines the board-dependent part of the I2C1 device.
+Adds the device board-dependent part of the VIN0 device and its ADV7180
+video decoder on I2C1, and the interconnection between them.
+
+Based on silk patch by Sergei Shtylyov.
 
 Signed-off-by: Ulrich Hecht <ulrich.hecht+renesas@gmail.com>
 ---
- arch/arm/boot/dts/r8a7794-alt.dts | 13 +++++++++++++
- 1 file changed, 13 insertions(+)
+ arch/arm/boot/dts/r8a7794-alt.dts | 34 ++++++++++++++++++++++++++++++++++
+ 1 file changed, 34 insertions(+)
 
 diff --git a/arch/arm/boot/dts/r8a7794-alt.dts b/arch/arm/boot/dts/r8a7794-alt.dts
-index e7c9455..88ed017 100644
+index 88ed017..fd1cfcd 100644
 --- a/arch/arm/boot/dts/r8a7794-alt.dts
 +++ b/arch/arm/boot/dts/r8a7794-alt.dts
-@@ -115,6 +115,11 @@
- 		renesas,groups = "eth_link_b", "eth_mdio_b", "eth_rmii_b";
- 		renesas,function = "eth";
+@@ -120,6 +120,11 @@
+ 		renesas,groups = "i2c1";
+ 		renesas,function = "i2c1";
  	};
 +
-+	i2c1_pins: i2c1 {
-+		renesas,groups = "i2c1";
-+		renesas,function = "i2c1";
++	vin0_pins: vin0 {
++		renesas,groups = "vin0_data8", "vin0_clk";
++		renesas,function = "vin0";
 +	};
  };
  
  &cmt0 {
-@@ -134,6 +139,14 @@
- 	};
- };
+@@ -145,6 +150,35 @@
  
-+&i2c1 {
-+	pinctrl-0 = <&i2c1_pins>;
-+	pinctrl-names = "default";
+ 	status = "okay";
+ 	clock-frequency = <400000>;
 +
-+	status = "okay";
-+	clock-frequency = <400000>;
++	composite-in at 20 {
++		compatible = "adi,adv7180";
++		reg = <0x20>;
++		remote = <&vin0>;
++
++		port {
++			adv7180: endpoint {
++				bus-width = <8>;
++				remote-endpoint = <&vin0ep>;
++			};
++		};
++	};
 +};
 +
- &scif2 {
- 	status = "okay";
++&vin0 {
++	status = "okay";
++	pinctrl-0 = <&vin0_pins>;
++	pinctrl-names = "default";
++
++	port {
++		#address-cells = <1>;
++		#size-cells = <0>;
++
++		vin0ep: endpoint {
++			remote-endpoint = <&adv7180>;
++			bus-width = <8>;
++		};
++	};
  };
+ 
+ &scif2 {
 -- 
 2.6.1
