@@ -1,98 +1,79 @@
-From: zlim.lnx@gmail.com (Zi Shen Lim)
-Date: Wed, 18 Nov 2015 00:56:02 -0800
-Subject: [PATCH] arm64: bpf: fix buffer pointer
-Message-ID: <1447836962-4086-1-git-send-email-zlim.lnx@gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 18 Nov 2015 10:23:55 +0100
+Subject: [PATCH v6 15/19] arm64: ilp32: force IPC_64 in msgctl, shmctl,
+ semctl
+In-Reply-To: <mvmoaersohn.fsf@hawking.suse.de>
+References: <1447795019-30176-1-git-send-email-ynorov@caviumnetworks.com>
+ <26387039.NNJ6EnRrv8@wuerfel> <mvmoaersohn.fsf@hawking.suse.de>
+Message-ID: <32420376.JEdtXfitGi@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-During code review, I noticed we were passing a bad buffer pointer
-to bpf_load_pointer helper function called by jitted code.
+On Wednesday 18 November 2015 09:25:40 Andreas Schwab wrote:
+> Arnd Bergmann <arnd@arndb.de> writes:
+> 
+> > On Wednesday 18 November 2015 00:16:55 Yury Norov wrote:
+> >> 
+> >> +/* IPC_64 */
+> >> +asmlinkage long ilp32_sys_msgctl(int first, int second, void __user *uptr)
+> >> +{
+> >> +       return compat_sys_msgctl(first, second | IPC_64, uptr);
+> >> +}
+> >> +#define compat_sys_msgctl              ilp32_sys_msgctl
+> >> +
+> >> +asmlinkage long ilp32_sys_shmctl(int first, int second, void __user *uptr)
+> >> +{
+> >> +       return compat_sys_shmctl(first, second | IPC_64, uptr);
+> >> +}
+> >> +#define compat_sys_shmctl              ilp32_sys_shmctl
+> >> +
+> >> +asmlinkage long ilp32_sys_semctl(int first, int second, int third, int arg)
+> >> +{
+> >> +       return compat_sys_semctl(first, second, third | IPC_64, arg);
+> >> +}
+> >> +#define compat_sys_semctl      ilp32_sys_semctl
+> >> 
+> >
+> > I wonder if this would be any simpler by changing compat_ipc_parse_version()
+> 
+> This cries for a generic solution.  Other archs migrating to separate
+> ipc syscalls will want to avoid the whole IPC_64 business for them, even
+> if they need to retain [compat_]ipc_parse_version for sys_ipc
+> compatibility.
 
-Point to the buffer allocated by JIT, so we don't silently corrupt
-other parts of the stack.
+Agreed. I think all architectures are moving that way now, so we should
+really try to get all cases right now.
 
-Signed-off-by: Zi Shen Lim <zlim.lnx@gmail.com>
----
- arch/arm64/net/bpf_jit_comp.c | 27 +++++++++++++--------------
- 1 file changed, 13 insertions(+), 14 deletions(-)
+I've done a complete list of what the architectures (see
+https://docs.google.com/spreadsheets/d/18GxXEHE2ywnSr-SPoGFd1ABz6wEM1ex-JMu5lEraaH8/ )
 
-diff --git a/arch/arm64/net/bpf_jit_comp.c b/arch/arm64/net/bpf_jit_comp.c
-index d6a53ef..7cf032b 100644
---- a/arch/arm64/net/bpf_jit_comp.c
-+++ b/arch/arm64/net/bpf_jit_comp.c
-@@ -139,6 +139,12 @@ static inline int epilogue_offset(const struct jit_ctx *ctx)
- /* Stack must be multiples of 16B */
- #define STACK_ALIGN(sz) (((sz) + 15) & ~15)
- 
-+#define _STACK_SIZE \
-+	(MAX_BPF_STACK \
-+	 + 4 /* extra for skb_copy_bits buffer */)
-+
-+#define STACK_SIZE STACK_ALIGN(_STACK_SIZE)
-+
- static void build_prologue(struct jit_ctx *ctx)
- {
- 	const u8 r6 = bpf2a64[BPF_REG_6];
-@@ -150,10 +156,6 @@ static void build_prologue(struct jit_ctx *ctx)
- 	const u8 rx = bpf2a64[BPF_REG_X];
- 	const u8 tmp1 = bpf2a64[TMP_REG_1];
- 	const u8 tmp2 = bpf2a64[TMP_REG_2];
--	int stack_size = MAX_BPF_STACK;
--
--	stack_size += 4; /* extra for skb_copy_bits buffer */
--	stack_size = STACK_ALIGN(stack_size);
- 
- 	/*
- 	 * BPF prog stack layout
-@@ -165,12 +167,13 @@ static void build_prologue(struct jit_ctx *ctx)
- 	 *                        | ... | callee saved registers
- 	 *                        +-----+
- 	 *                        |     | x25/x26
--	 * BPF fp register => -80:+-----+
-+	 * BPF fp register => -80:+-----+ <= (BPF_FP)
- 	 *                        |     |
- 	 *                        | ... | BPF prog stack
- 	 *                        |     |
--	 *                        |     |
--	 * current A64_SP =>      +-----+
-+	 *                        +-----+ <= (BPF_FP - MAX_BPF_STACK)
-+	 *                        |RSVD | JIT scratchpad
-+	 * current A64_SP =>      +-----+ <= (BPF_FP - STACK_SIZE)
- 	 *                        |     |
- 	 *                        | ... | Function call stack
- 	 *                        |     |
-@@ -196,7 +199,7 @@ static void build_prologue(struct jit_ctx *ctx)
- 	emit(A64_MOV(1, fp, A64_SP), ctx);
- 
- 	/* Set up function call stack */
--	emit(A64_SUB_I(1, A64_SP, A64_SP, stack_size), ctx);
-+	emit(A64_SUB_I(1, A64_SP, A64_SP, STACK_SIZE), ctx);
- 
- 	/* Clear registers A and X */
- 	emit_a64_mov_i64(ra, 0, ctx);
-@@ -213,13 +216,9 @@ static void build_epilogue(struct jit_ctx *ctx)
- 	const u8 fp = bpf2a64[BPF_REG_FP];
- 	const u8 tmp1 = bpf2a64[TMP_REG_1];
- 	const u8 tmp2 = bpf2a64[TMP_REG_2];
--	int stack_size = MAX_BPF_STACK;
--
--	stack_size += 4; /* extra for skb_copy_bits buffer */
--	stack_size = STACK_ALIGN(stack_size);
- 
- 	/* We're done with BPF stack */
--	emit(A64_ADD_I(1, A64_SP, A64_SP, stack_size), ctx);
-+	emit(A64_ADD_I(1, A64_SP, A64_SP, STACK_SIZE), ctx);
- 
- 	/* Restore fs (x25) and x26 */
- 	emit(A64_POP(fp, A64_R(26), A64_SP), ctx);
-@@ -658,7 +657,7 @@ emit_cond_jmp:
- 			return -EINVAL;
- 		}
- 		emit_a64_mov_i64(r3, size, ctx);
--		emit(A64_ADD_I(1, r4, fp, MAX_BPF_STACK), ctx);
-+		emit(A64_SUB_I(1, r4, fp, STACK_SIZE), ctx);
- 		emit_a64_mov_i64(r5, (unsigned long)bpf_load_pointer, ctx);
- 		emit(A64_PUSH(A64_FP, A64_LR, A64_SP), ctx);
- 		emit(A64_MOV(1, A64_FP, A64_SP), ctx);
--- 
-1.9.1
+We have these categories:
+
+1. uses IPC_PARSE_VERSION with sys_ipc, and has just introduced
+   separate syscalls:
+
+    arm, avr32, powerpc, x86-32
+
+2. uses IPC_PARSE_VERSION with sys_ipc, and has not yet introduced
+   separate syscalls (currently producing a compile warning):
+
+   cris, frv, m32r, m68k, mips (o32), mn10300, s390, sh32, sparc
+
+3. uses IPC_PARSE_VERSION with separate syscalls:
+
+   alpha, blackfin, microblaze, mips (n32/64), xtensa
+
+4a. only new-style IPC with separate syscalls:
+
+    ia64, parisc, sh64
+
+4b. only new-style IPC with separate syscalls, using generic syscall
+    table:
+
+    arc, arm64, c6x, h8300, hexagon, metag, nios2, openrisc, score,
+    tile, unicore32
+
+So we should probably fix 1. and 2. before it's too late, but make
+sure we don't break 3. in the process.
+
+	Arnd
