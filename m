@@ -1,56 +1,39 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Wed, 18 Nov 2015 16:36:16 -0500 (EST)
-Subject: [PATCH v3] ARM: xip: Use correct symbol for end of ROM marker
-In-Reply-To: <HK2PR06MB05610952B8DAE3C16E1ABC6E8A1C0@HK2PR06MB0561.apcprd06.prod.outlook.com>
-References: <1447362108-4333-1-git-send-email-chris.brandt@renesas.com>
- <HK2PR06MB05619FACB3725B6F5B2299718A1E0@HK2PR06MB0561.apcprd06.prod.outlook.com>
- <alpine.LFD.2.20.1511161605070.5826@knanqh.ubzr>
- <HK2PR06MB056142FFDA4E99A764DF9ECB8A1E0@HK2PR06MB0561.apcprd06.prod.outlook.com>
- <alpine.LFD.2.20.1511161730030.5826@knanqh.ubzr>
- <HK2PR06MB05614D47A9C35ECB4CA72D3F8A1D0@HK2PR06MB0561.apcprd06.prod.outlook.com>
- <alpine.LFD.2.20.1511162127180.5826@knanqh.ubzr>
- <HK2PR06MB056175E6E4356DD8C3566D758A1D0@HK2PR06MB0561.apcprd06.prod.outlook.com>
- <alpine.LFD.2.20.1511172255410.22569@knanqh.ubzr>
- <CANqRtoTkHecGEsbi3EtM8dkHQ=V0RGm7iZcU_igMqLE7Od=xBA@mail.gmail.com>
- <alpine.LFD.2.20.1511180841000.22569@knanqh.ubzr>
- <alpine.LFD.2.20.1511181156250.22569@knanqh.ubzr>
- <HK2PR06MB0561CA7E856CEAA89D0752488A1C0@HK2PR06MB0561.apcprd06.prod.outlook.com>
- <alpine.LFD.2.20.1511181445550.22569@knanqh.ubzr>
- <HK2PR06MB05610952B8DAE3C16E1ABC6E8A1C0@HK2PR06MB0561.apcprd06.prod.outlook.com>
-Message-ID: <alpine.LFD.2.20.1511181635180.22569@knanqh.ubzr>
+From: zlim.lnx@gmail.com (Z Lim)
+Date: Wed, 18 Nov 2015 13:41:40 -0800
+Subject: [PATCH] arm64: bpf: fix buffer pointer
+In-Reply-To: <564CE886.5010109@linaro.org>
+References: <1447836962-4086-1-git-send-email-zlim.lnx@gmail.com>
+ <564CE886.5010109@linaro.org>
+Message-ID: <CABg9mcud=quxDbAGwXo0CyHjDa4aOL_yuk9hwRp1asu-z+fOAQ@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 18 Nov 2015, Chris Brandt wrote:
+On Wed, Nov 18, 2015 at 1:07 PM, Shi, Yang <yang.shi@linaro.org> wrote:
+> On 11/18/2015 12:56 AM, Zi Shen Lim wrote:
+>>                 emit_a64_mov_i64(r3, size, ctx);
+>> -               emit(A64_ADD_I(1, r4, fp, MAX_BPF_STACK), ctx);
+>> +               emit(A64_SUB_I(1, r4, fp, STACK_SIZE), ctx);
+>
+>
+> Should not it sub MAX_BPF_STACK?
 
-> > Probably the best way to fix it would be something like:
-> >
-> > in asm/memory.h or similar:
-> >
-> > #ifdef CONFIG_XIP_KERNEL
-> > #define PHYS_OFFSET_FIXUP \
-> >	( XIP_VIRT_ADDR(CONFIG_XIP_PHYS_ADDR) - PAGE_OFFSET + \
-> >	  PLAT_PHYS_OFFSET - CONFIG_XIP_PHYS_ADDR ) #else #define
-> > PHYS_OFFSET_FIXUP 0 #endif
-> >
-> > And then, after my patch is applied, changing:
-> >
-> > __v7_setup_stack_ptr:
-> >        .word   __v7_setup_stack - .
-> >
-> > into:
-> >
-> > __v7_setup_stack_ptr:
-> >        .word   __v7_setup_stack - . + PHYS_OFFSET_FIXUP
-> >
-> > should do the trick. This way it'll work for all those places where
-> > the code is getting at the data area when the MMU is off with no XIP
-> > conditionals in the code.
-> 
-> 
-> Tested....it works!
+No, if it's at (BPF_FP - MAX_BPF_STACK), we'll be writing into the BPF
+stack area, which should only be used by the BPF program.
 
-Excellent.
+> If you sub STACK_SIZE here, the buffer pointer will point to bottom of the
+> reserved area.
+
+Yes, that's the idea. The buffer is allocated in here. Right now we're
+using this "reserved" space for this buffer only.
+
+>
+> You stack layout change also shows this:
+>
+> +        *                        +-----+ <= (BPF_FP - MAX_BPF_STACK)
+> +        *                        |RSVD | JIT scratchpad
+> +        * current A64_SP =>      +-----+ <= (BPF_FP - STACK_SIZE)
+
+Yes, this diagram reflects the code and intention.
 
 
-Nicolas
+Thanks for reviewing, we definitely need more of these :)
