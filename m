@@ -1,51 +1,114 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Wed, 18 Nov 2015 16:04:49 +0900
-Subject: [PATCH] arm64: extract a field correctly in
- cpuid_feature_extract_field()
-In-Reply-To: <564AF2F7.9030106@arm.com>
-References: <1447736739-4131-1-git-send-email-takahiro.akashi@linaro.org>
- <CAKv+Gu9=zfocXVOsqHQHGu+afZisE_nZWCQ-bN5Fe_X=NacYHg@mail.gmail.com>
- <564AF2F7.9030106@arm.com>
-Message-ID: <564C2311.3040904@linaro.org>
+From: tiffany.lin@mediatek.com (tiffany lin)
+Date: Wed, 18 Nov 2015 15:09:48 +0800
+Subject: [RESEND RFC/PATCH 4/8] dt-bindings: Add a binding for Mediatek
+ Video Encoder
+In-Reply-To: <20151117194100.GA3028@rob-hp-laptop>
+References: <1447764885-23100-1-git-send-email-tiffany.lin@mediatek.com>
+ <1447764885-23100-5-git-send-email-tiffany.lin@mediatek.com>
+ <20151117194100.GA3028@rob-hp-laptop>
+Message-ID: <1447830588.22499.25.camel@mtksdaap41>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/17/2015 06:27 PM, Suzuki K. Poulose wrote:
-> On 17/11/15 07:15, Ard Biesheuvel wrote:
->> On 17 November 2015 at 06:05, AKASHI Takahiro
->> <takahiro.akashi@linaro.org> wrote:
->>> Basically, cpuid_feature_extract_field() does shift-left and then
->>> shift-right to extract a specific field in an operand. But
->>> a shift-left'ed value is casted to 's64' and so a succeeding shift-right
->>> operation results in creating a sign-extended (and bogus) value.
->>>
->>
->> This is intentional. This function was created specifically for
->> extracting CPU feature fields, which are signed 4-bit quantities,
->> where positive values represent incremental functionality, and
->> negative values are reserved. This is poorly documented in the ARM ARM
->> though.
+Hi Rob,
 
-Good. So please take my patch as a bug report because perf record -e mem:XXX:x
-doesn't work with v4.4-rc1 (if # of hw breakpoints is over 0x7, e.g. default
-case on fast model.)
+On Tue, 2015-11-17 at 13:41 -0600, Rob Herring wrote:
+> On Tue, Nov 17, 2015 at 08:54:41PM +0800, Tiffany Lin wrote:
+> > add a DT binding documentation of Video Encoder for the
+> > MT8173 SoC from Mediatek.
+> > 
+> > Signed-off-by: Tiffany Lin <tiffany.lin@mediatek.com>
+> > ---
+> >  .../devicetree/bindings/media/mediatek-vcodec.txt  |   58 ++++++++++++++++++++
+> >  1 file changed, 58 insertions(+)
+> >  create mode 100644 Documentation/devicetree/bindings/media/mediatek-vcodec.txt
+> > 
+> > diff --git a/Documentation/devicetree/bindings/media/mediatek-vcodec.txt b/Documentation/devicetree/bindings/media/mediatek-vcodec.txt
+> > new file mode 100644
+> > index 0000000..fea4d7c
+> > --- /dev/null
+> > +++ b/Documentation/devicetree/bindings/media/mediatek-vcodec.txt
+> > @@ -0,0 +1,58 @@
+> > +Mediatek Video Codec
+> > +
+> > +Mediatek Video Codec is the video codec hw present in Mediatek SoCs which
+> > +supports high resolution encoding functionalities.
+> > +
+> > +Required properties:
+> > +- compatible : "mediatek,mt8173-vcodec-enc" for encoder
+> > +- reg : Physical base address of the video codec registers and length of
+> > +  memory mapped region.
+> > +- interrupts : interrupt number to the cpu.
+> > +- larb : must contain the larbes of current platform
+> 
+> What is this?
+Resend due to previous mail has html format and reject by some mail
+servers.
 
-> Right. Akash's fix could break other pieces (like FP/ASIMD support in IDAA64PFR0
-> where, 0xf => function not implemented).
+This is SMI (Smart Multimedia Interface) Local Arbiter.
+MT8173 has different local arbiters (larb).
+Please see
+http://lists.linuxfoundation.org/pipermail/iommu/2015-October/014587.html
 
-IMO, 0xf is 0xf, not -1.
-(I don't think "All other values are reserved." means that the value is *signed*.)
+Video Encoder HW has it's local arbiter (larb), by configure ports in
+this larb, we can have encoder HW go through the m4u to talk with EMI.
+We will change it to mediatek,larb in next version.
 
-Thanks,
--Takahiro AKASHI
+> 
+> > +- clocks : list of clock specifiers, corresponding to entries in
+> > +  the clock-names property;
+> > +- clock-names: must contain "vencpll", "venc_lt_sel", "vcodecpll_370p5_ck"
+> > +- iommus : list of iommus specifiers should be enabled for hw encode.
+> > +  There are 2 cells needed to enable/disable iommu.
+> > +  The first one is local arbiter index(larbid), and the other is port
+> > +  index(portid) within local arbiter. Specifies the larbid and portid
+> > +  as defined in dt-binding/memory/mt8173-larb-port.h.
+> > +- vpu : the node of video processor unit
+> 
+> This should be prefixed with mediatek.
+We will prefix it with mediatek in next version.
 
->>
->> Using this function for extracting 4-bit unsigned values is a mistake.
->>
->
-> I will take a look at this one.
->
-> Thanks for pointing it out.
->
-> Suzuki
->
+> 
+> > +
+> > +Example:
+> > +vcodec_enc: vcodec at 0x18002000 {
+> > +    compatible = "mediatek,mt8173-vcodec-enc";
+> > +    reg = <0 0x18002000 0 0x1000>,    /*VENC_SYS*/
+> > +          <0 0x19002000 0 0x1000>;    /*VENC_LT_SYS*/
+> > +    interrupts = <GIC_SPI 198 IRQ_TYPE_LEVEL_LOW>,
+> > +           <GIC_SPI 202 IRQ_TYPE_LEVEL_LOW>;
+> > +    larb = <&larb3>,
+> > +           <&larb5>;
+> > +    iommus = <&iommu M4U_LARB3_ID M4U_PORT_VENC_RCPU>,
+> > +             <&iommu M4U_LARB3_ID M4U_PORT_VENC_REC>,
+> > +             <&iommu M4U_LARB3_ID M4U_PORT_VENC_BSDMA>,
+> > +             <&iommu M4U_LARB3_ID M4U_PORT_VENC_SV_COMV>,
+> > +             <&iommu M4U_LARB3_ID M4U_PORT_VENC_RD_COMV>,
+> > +             <&iommu M4U_LARB3_ID M4U_PORT_VENC_CUR_LUMA>,
+> > +             <&iommu M4U_LARB3_ID M4U_PORT_VENC_CUR_CHROMA>,
+> > +             <&iommu M4U_LARB3_ID M4U_PORT_VENC_REF_LUMA>,
+> > +             <&iommu M4U_LARB3_ID M4U_PORT_VENC_REF_CHROMA>,
+> > +             <&iommu M4U_LARB3_ID M4U_PORT_VENC_NBM_RDMA>,
+> > +             <&iommu M4U_LARB3_ID M4U_PORT_VENC_NBM_WDMA>,
+> > +             <&iommu M4U_LARB5_ID M4U_PORT_VENC_RCPU_SET2>,
+> > +             <&iommu M4U_LARB5_ID M4U_PORT_VENC_REC_FRM_SET2>,
+> > +             <&iommu M4U_LARB5_ID M4U_PORT_VENC_BSDMA_SET2>,
+> > +             <&iommu M4U_LARB5_ID M4U_PORT_VENC_SV_COMA_SET2>,
+> > +             <&iommu M4U_LARB5_ID M4U_PORT_VENC_RD_COMA_SET2>,
+> > +             <&iommu M4U_LARB5_ID M4U_PORT_VENC_CUR_LUMA_SET2>,
+> > +             <&iommu M4U_LARB5_ID M4U_PORT_VENC_CUR_CHROMA_SET2>,
+> > +             <&iommu M4U_LARB5_ID M4U_PORT_VENC_REF_LUMA_SET2>,
+> > +             <&iommu M4U_LARB5_ID M4U_PORT_VENC_REC_CHROMA_SET2>;
+> > +    vpu = <&vpu>;
+> > +    clocks = <&apmixedsys CLK_APMIXED_VENCPLL>,
+> > +             <&topckgen CLK_TOP_VENC_LT_SEL>,
+> > +             <&topckgen CLK_TOP_VCODECPLL_370P5>;
+> > +    clock-names = "vencpll",
+> > +                  "venc_lt_sel",
+> > +                  "vcodecpll_370p5_ck";
+> > +  };
+> > -- 
+> > 1.7.9.5
+> > 
+best regards,
+Tiffany
