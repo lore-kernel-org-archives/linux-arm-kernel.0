@@ -1,47 +1,52 @@
-From: suzuki.poulose@arm.com (Suzuki K. Poulose)
-Date: Wed, 18 Nov 2015 17:08:58 +0000
-Subject: [PATCH 3/5] arm64: debug: Treat the BRPs/WRPs as unsigned
-In-Reply-To: <1447866540-23207-1-git-send-email-suzuki.poulose@arm.com>
-References: <1447866238-22970-1-git-send-email-suzuki.poulose@arm.com>
- <1447866540-23207-1-git-send-email-suzuki.poulose@arm.com>
-Message-ID: <1447866540-23207-3-git-send-email-suzuki.poulose@arm.com>
+From: olof@lixom.net (Olof Johansson)
+Date: Wed, 18 Nov 2015 09:11:54 -0800
+Subject: [PATCH v9 1/2] arm-soc: Import initial tango4 device tree
+In-Reply-To: <yw1xmvubfekf.fsf@unicorn.mansr.com>
+References: <564C94A5.4060301@sigmadesigns.com>
+ <564C94FD.60607@sigmadesigns.com>
+ <yw1xr3jnfg2s.fsf@unicorn.mansr.com>
+ <564CA880.1030502@sigmadesigns.com>
+ <yw1xmvubfekf.fsf@unicorn.mansr.com>
+Message-ID: <CAOesGMjCw_DYB3OktnQvthqBAQxqeH6F0bXR-KW_36Y9sDh+fg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-IDAA64DFR0_EL1: BRPs and WRPs are unsigned values. Use
-the appropriate helpers to extract those fields.
+On Wed, Nov 18, 2015 at 8:38 AM, M?ns Rullg?rd <mans@mansr.com> wrote:
+> Marc Gonzalez <marc_gonzalez@sigmadesigns.com> writes:
+>
+>> On 18/11/2015 17:05, M?ns Rullg?rd wrote:
+>>
+>>> Marc Gonzalez wrote:
+>>>
+>>>> +           clkgen: clkgen at 10000 {
+>>>> +                   compatible = "sigma,tango4-clkgen";
+>>>> +                   reg = <0x10000 0x40>;
+>>>> +                   clocks = <&xtal>;
+>>>> +                   clock-output-names = "cpuclk", "sysclk";
+>>>> +                   #clock-cells = <1>;
+>>>> +           };
+>>>
+>>> Would you please consider using my clock driver that matches the actual
+>>> hardware, supports all the clock outputs required for USB, SATA, etc,
+>>> and works on tango3 as well?
+>>
+>> I was hoping to take baby steps to work up to a fully-functional port.
+>> The first step (in my mind) is this submission: a minimal port which
+>> only requires the two "main" clocks.
+>>
+>> The next step will add to the minimal port by supporting as many
+>> peripherals as possible, as well as their required clocks.
+>
+> But the code already exists.  Why start over?
 
-Cc: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-Reported-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
-Signed-off-by: Suzuki K. Poulose <suzuki.poulose@arm.com>
----
- arch/arm64/include/asm/hw_breakpoint.h |    6 ++++--
- 1 file changed, 4 insertions(+), 2 deletions(-)
+M?ns, I don't understand your role in this. Can you clarify?
 
-diff --git a/arch/arm64/include/asm/hw_breakpoint.h b/arch/arm64/include/asm/hw_breakpoint.h
-index e54415e..9732908 100644
---- a/arch/arm64/include/asm/hw_breakpoint.h
-+++ b/arch/arm64/include/asm/hw_breakpoint.h
-@@ -138,16 +138,18 @@ extern struct pmu perf_ops_bp;
- /* Determine number of BRP registers available. */
- static inline int get_num_brps(void)
- {
-+	u64 dfr0 = read_system_reg(SYS_ID_AA64DFR0_EL1);
- 	return 1 +
--		cpuid_feature_extract_field(read_system_reg(SYS_ID_AA64DFR0_EL1),
-+		cpuid_feature_extract_unsigned_field(dfr0,
- 						ID_AA64DFR0_BRPS_SHIFT);
- }
- 
- /* Determine number of WRP registers available. */
- static inline int get_num_wrps(void)
- {
-+	u64 dfr0 = read_system_reg(SYS_ID_AA64DFR0_EL1);
- 	return 1 +
--		cpuid_feature_extract_field(read_system_reg(SYS_ID_AA64DFR0_EL1),
-+		cpuid_feature_extract_unsigned_field(dfr0,
- 						ID_AA64DFR0_WRPS_SHIFT);
- }
- 
--- 
-1.7.9.5
+If you've already done a port, why haven't you contributed it
+yourself? Why are you driving Marc's work from the back seat like this
+instead of submitting your own work?
+
+If Marc prefers to start with a minimal implementation, that's just
+fine with me.
+
+
+-Olof
