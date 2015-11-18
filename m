@@ -1,41 +1,50 @@
-From: Chris.Brandt@renesas.com (Chris Brandt)
-Date: Wed, 18 Nov 2015 02:09:04 +0000
-Subject: [PATCH v3] ARM: xip: Use correct symbol for end of ROM marker
-In-Reply-To: <alpine.LFD.2.20.1511171155240.5826@knanqh.ubzr>
-References: <1447362108-4333-1-git-send-email-chris.brandt@renesas.com>
- <1447697140-4099-1-git-send-email-chris.brandt@renesas.com>
- <alpine.LFD.2.20.1511161515100.5826@knanqh.ubzr>
- <HK2PR06MB05619FACB3725B6F5B2299718A1E0@HK2PR06MB0561.apcprd06.prod.outlook.com>
- <alpine.LFD.2.20.1511161605070.5826@knanqh.ubzr>
- <HK2PR06MB056196B2E169A504A16ED9738A1D0@HK2PR06MB0561.apcprd06.prod.outlook.com>
- <alpine.LFD.2.20.1511171155240.5826@knanqh.ubzr>
-Message-ID: <HK2PR06MB0561B7675F17A81B54A65CA28A1C0@HK2PR06MB0561.apcprd06.prod.outlook.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Wed, 18 Nov 2015 11:13:18 +0900
+Subject: [PATCHv2 3/3] ASoC: samsung: pass filter function as pointer
+In-Reply-To: <6346833.dgFksO4fT8@wuerfel>
+References: <6346833.MfUC71I3uD@wuerfel> <6346833.dgFksO4fT8@wuerfel>
+Message-ID: <564BDEBE.2080706@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-So after looking back in history, I think I now understand how/when the XIP stuff broke.
+On 18.11.2015 00:55, Arnd Bergmann wrote:
+> As we are now passing the filter data as pointers to the drivers,
+> we can take the final step and also pass the filter function the
+> same way. I'm keeping this change separate, as there it's less
+> obvious that this is a net win.
+> 
+> Upsides of this are:
+> 
+> - The ASoC drivers are completely independent from the DMA engine
+>   implementation, which simplifies the Kconfig logic and in theory
+>   allows the same sound drivers to be built in a kernel that supports
+>   different kinds of dmaengine drivers.
+> 
+> - Consistency with other subsystems and drivers
+> 
+> On the other hand, we have a few downsides:
+> 
+> - The s3c24xx-dma driver now needs to be built-in for the ac97 platform
+>   device to be instantiated on s3c2440.
+> 
+> - samsung_dmaengine_pcm_config cannot be marked 'const' any more
+>   because the filter function pointer needs to be set at runtime.
+>   This is safe as long we don't have multiple different DMA engines
+>   in thet same system at runtime, but is nonetheless ugly.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> ---
+> v2: avoid possibly NULL pdata
+> 
 
-It looks like originally, the init section came first, followed by text and data.
+Looks good.
 
-This is why all the XIP code used _etext as its marker for the end of what needed to be mapped.
-Like you said, the initialized data values get copied from ROM to RAM early in boot so it's not an issue if the data section (that comes after text) gets blown away when the full MMU setup is done.
+I also tested entire patchset on Exynos4412/Trats2 board (custom kernel
+with audio working) for regressions and it worked fine. However, since
+this was not a S3C24xx/S3C64xx board, I don't find that testing
+sufficient for a tag. So only:
 
+Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 
-However, after the init section was moved from the first section to almost the last, all the _etext references scatter through the kernel were never updated.
-
-
-So basically, even though I've now got a separate linker script for XIP builds, it really hasn't changed much because the real issue all along was that the XIP_KERNEL references to _etext should have been changed to _data_loc.
-
-With that said, I still think the correct way to fix this issue is to export _data_loc and use that as the end marker. (notice I changed my mind and now say _data_loc instead of _edata_loc because there's no reason to map the full data section anymore).
-
-The other option, if we really wanted to keep the references to _etext as they are, is to simply move the one line " _etext = .;" to the bottom of the file....right before _data_loc is declared.
-But...that would be a bit misleading if you ask me.
-
-
-It sounds like there would still be a request to split up the linker scripts in order to remove the 6 XIP_KERNEL references scattered  throughout vmlinux.lds.S. However, it would still be nice to keep the two versions looking as close as they can to each other with only the obvious changes (like removing XIP_KERNEL from the non-XIP version, and removing SMP_ON_UP from the XIP version)
-
-
-Thoughts?
-
-
-Chris
+Best regards,
+Krzysztof
