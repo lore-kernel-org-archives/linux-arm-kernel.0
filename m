@@ -1,52 +1,71 @@
-From: andy.shevchenko@gmail.com (Andy Shevchenko)
-Date: Wed, 18 Nov 2015 20:10:25 +0200
-Subject: [PATCH] mmc: dw_mmc: use resource_size_t to store physical address
-In-Reply-To: <6347082.461jehYssD@wuerfel>
-References: <28102387.ALpaBHpim0@wuerfel> <7083277.bjzG62aVmx@wuerfel>
- <CAHp75VfnD=MPigeTdo8YKPTs4zZN+XcSiMBZkma3ibaT4DEZiQ@mail.gmail.com>
- <6347082.461jehYssD@wuerfel>
-Message-ID: <CAHp75VdFun5aLxLxau9SN_V+_aF+z2M7pvL9Cjui-i+jN-CUCg@mail.gmail.com>
+From: boris.ostrovsky@oracle.com (Boris Ostrovsky)
+Date: Wed, 18 Nov 2015 13:14:05 -0500
+Subject: [PATCH v2] xen/events: Always allocate legacy interrupts on PV guests
+Message-ID: <1447870445-17199-1-git-send-email-boris.ostrovsky@oracle.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 18, 2015 at 6:22 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> On Wednesday 18 November 2015 18:17:32 Andy Shevchenko wrote:
->> On Wed, Nov 18, 2015 at 5:45 PM, Arnd Bergmann <arnd@arndb.de> wrote:
->> > On Wednesday 18 November 2015 17:29:19 Andy Shevchenko wrote:
->
->> >> For me it clearly looks like a platform (HW / SW) configuration issue.
->> >
->> > I think some people have argued in the past that we should always use
->> > the same type for dma_addr_t, resource_size_t and phys_addr_t. That
->> > would certainly fix the problem you describe as well. In practice,
->> > everyone has that already, and my patch by itself fixes all the
->> > cases where the FIFO is at a high address and dma_addr_t is already
->> > 64-bit wide.
->>
->> Let me summarize.
->>
->> We have to have classification by address space
->> 1) physical
->> 2) virtual
->
-> That classification is oversimplified, as the DMA address space
-> is often not the same as physical.
->
+After commit 8c058b0b9c34 ("x86/irq: Probe for PIC presence before
+allocating descs for legacy IRQs") early_irq_init() will no longer
+preallocate descriptors for legacy interrupts if PIC does not
+exist, which is the case for Xen PV guests.
 
->> dma_addr_t is a physical address wrt DMA mask.
->>
->> Correct?
->
-> dma_addr_t is how a device sees RAM, it is limited by the DMA mask
-> that is a subset of the capabilities of the device and the buses
-> through which it is connected, and is subject to IOMMU translation
-> and possible platform or bus specific offsets from the physical
-> memory. I still don't know where you're getting with this.
+Therefore we may need to allocate those descriptors ourselves.
 
-This is off the review already. I'm just structuring knowledge in my head.
-In principle I agree with your patch.
+Signed-off-by: Boris Ostrovsky <boris.ostrovsky@oracle.com>
+Suggested-by: Thomas Gleixner <tglx@linutronix.de>
+---
 
+v2: Use nr_legacy_irqs() instead of NR_IRQS_LEGACY (needs definition for ARM)
 
+ arch/arm/include/asm/irq.h       | 4 ++++
+ drivers/xen/events/events_base.c | 5 +++--
+ 2 files changed, 7 insertions(+), 2 deletions(-)
+
+diff --git a/arch/arm/include/asm/irq.h b/arch/arm/include/asm/irq.h
+index be1d07d..b864f60 100644
+--- a/arch/arm/include/asm/irq.h
++++ b/arch/arm/include/asm/irq.h
+@@ -2,6 +2,10 @@
+ #define __ASM_ARM_IRQ_H
+ 
+ #define NR_IRQS_LEGACY	16
++static inline int nr_legacy_irqs(void)
++{
++	return NR_IRQS_LEGACY;
++}
+ 
+ #ifndef CONFIG_SPARSE_IRQ
+ #include <mach/irqs.h>
+diff --git a/drivers/xen/events/events_base.c b/drivers/xen/events/events_base.c
+index 849500e..524c221 100644
+--- a/drivers/xen/events/events_base.c
++++ b/drivers/xen/events/events_base.c
+@@ -39,6 +39,7 @@
+ #include <asm/irq.h>
+ #include <asm/idle.h>
+ #include <asm/io_apic.h>
++#include <asm/i8259.h>
+ #include <asm/xen/pci.h>
+ #endif
+ #include <asm/sync_bitops.h>
+@@ -420,7 +421,7 @@ static int __must_check xen_allocate_irq_gsi(unsigned gsi)
+ 		return xen_allocate_irq_dynamic();
+ 
+ 	/* Legacy IRQ descriptors are already allocated by the arch. */
+-	if (gsi < NR_IRQS_LEGACY)
++	if (gsi < nr_legacy_irqs())
+ 		irq = gsi;
+ 	else
+ 		irq = irq_alloc_desc_at(gsi, -1);
+@@ -446,7 +447,7 @@ static void xen_free_irq(unsigned irq)
+ 	kfree(info);
+ 
+ 	/* Legacy IRQ descriptors are managed by the arch. */
+-	if (irq < NR_IRQS_LEGACY)
++	if (irq < nr_legacy_irqs())
+ 		return;
+ 
+ 	irq_free_desc(irq);
 -- 
-With Best Regards,
-Andy Shevchenko
+2.1.0
