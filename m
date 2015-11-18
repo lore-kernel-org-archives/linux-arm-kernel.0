@@ -1,51 +1,47 @@
-From: will.deacon@arm.com (Will Deacon)
-Date: Wed, 18 Nov 2015 15:36:34 +0000
-Subject: next build: 235 warnings 3 failures (next/next-20151117)
-In-Reply-To: <063D6719AE5E284EB5DD2968C1650D6D1CBD57A5@AcuExch.aculab.com>
-References: <564a9961.878b420a.331b8.fffffd62@mx.google.com>
- <6370082.rfihnaNWhf@wuerfel> <20151117171236.GJ30101@arm.com>
- <3723928.99NZh1TC6E@wuerfel> <20151118101427.GC22731@arm.com>
- <063D6719AE5E284EB5DD2968C1650D6D1CBD53BB@AcuExch.aculab.com>
- <20151118122804.GD1588@arm.com>
- <063D6719AE5E284EB5DD2968C1650D6D1CBD57A5@AcuExch.aculab.com>
-Message-ID: <20151118153634.GH1588@arm.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 18 Nov 2015 16:45:23 +0100
+Subject: [PATCH] mmc: dw_mmc: use resource_size_t to store physical address
+In-Reply-To: <CAHp75VfE2DWYB5GwSe1WLPb+gTnhNpYz5qo7jNfMK4tXbEWioQ@mail.gmail.com>
+References: <28102387.ALpaBHpim0@wuerfel> <5141236.CHnzdS7Lto@wuerfel>
+ <CAHp75VfE2DWYB5GwSe1WLPb+gTnhNpYz5qo7jNfMK4tXbEWioQ@mail.gmail.com>
+Message-ID: <7083277.bjzG62aVmx@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 18, 2015 at 03:21:19PM +0000, David Laight wrote:
-> From: Will Deacon
-> > Sent: 18 November 2015 12:28
-> > On Wed, Nov 18, 2015 at 12:11:25PM +0000, David Laight wrote:
-> > > From: Will Deacon
-> > > >   http://lists.infradead.org/pipermail/linux-arm-kernel/2015-November/386094.html
-> > >
-> > > That patch forces a memory write-read and returns uninitialised stack
-> > > for short reads.
-> > 
-> > Really? The disassembly looks fine to me. Do you have a concrete example
-> > of where you think it goes wrong, please?
-> > 
-> > > Who knows what happens on big-endian systems.
-> > 
-> > The same thing as READ_ONCE? I'll test it there to make sure, but I
-> > don't see a problem.
+On Wednesday 18 November 2015 17:29:19 Andy Shevchenko wrote:
 > 
-> Ah, god, it is absolutely horrid. But probably right :-(
+> I understand most of the things here, what I don't is how a platform
+> is supposed to work if you have the following:
+> a) HW, that uses register space let's say higher than 32-bit;
+> b) DMA engine, which should provide a DMA capability for above HW block;
+> c) dma_addr_t which does not cover the HW register space.
 
-Yeah, I wasn't pretending it was nice :) FWIW, I've given it a reasonable
-testing in both little-endian and big-endian configurations and it seems
-to be happy.
+On this platform, the current code is obviously broken, because the pointer
+is 32-bit wide and cannot reach the registers. I assume you agree on that
+part.
 
-> Do all the lda variants zero extend to 64 bits ?
+With my patch, the 64-bit resource_size_t in dw_mci helps get the
+correct FIFO address to this line:
 
-Yes.
+	cfg.dst_addr = host->phy_regs + fifo_offset;
 
-> If so maybe you could use a single 64 bit variable for the result of the read
-> and then cast it to typeof(*p) to get the required sign extension for
-> small integer types.
+There, it remains broken because of the dma_addr_t being too short, and
+we also need Linus' patch from https://lkml.org/lkml/2013/4/26/120 in
+addition to mine.
 
-That was the original proposal from Arnd, but I want this to work with
-structures smaller than 64-bit (e.g. arch_spinlock_t), so that's why
-I decided to follow the approach laid down by READ_ONCE.
 
-Will
+> For me it clearly looks like a platform (HW / SW) configuration issue.
+
+I think some people have argued in the past that we should always use
+the same type for dma_addr_t, resource_size_t and phys_addr_t. That
+would certainly fix the problem you describe as well. In practice,
+everyone has that already, and my patch by itself fixes all the
+cases where the FIFO is at a high address and dma_addr_t is already
+64-bit wide.
+
+> In case of bounce buffers I can't understand how it helps there.
+
+Right, bounce buffers are irrelevant here, because the FIFO address
+is never translated and never bounced.
+
+	Arnd
