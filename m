@@ -1,64 +1,137 @@
-From: khilman@kernel.org (Kevin Hilman)
-Date: Wed, 18 Nov 2015 11:39:55 -0800
-Subject: [PATCH v9 2/2] arm-soc: Add support for tango4 platforms
-In-Reply-To: <yw1xegfnfa0g.fsf@unicorn.mansr.com> (=?utf-8?Q?=22M=C3=A5ns?=
- =?utf-8?Q?_Rullg=C3=A5rd=22's?= message
- of "Wed, 18 Nov 2015 18:16:47 +0000")
-References: <564C94A5.4060301@sigmadesigns.com>
- <564C9558.4020100@sigmadesigns.com>
- <7ha8qbyyiz.fsf@deeprootsystems.com>
- <yw1xegfnfa0g.fsf@unicorn.mansr.com>
-Message-ID: <7hegfnxfjo.fsf@deeprootsystems.com>
+From: xili_gchen_5257@hotmail.com (Chen Gang)
+Date: Thu, 19 Nov 2015 03:40:25 +0800
+Subject: [PATCH] include: asm-generic: page.h: Remove useless get_user_page
+ and free_user_page
+Message-ID: <COL130-W7B5F0BB94C76AF6B12EA7B91C0@phx.gbl>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-M?ns Rullg?rd <mans@mansr.com> writes:
+>From ba7c00c4cb976109b6a35812ce9649aaeda81e2d Mon Sep 17 00:00:00 2001
+From: Chen Gang <gang.chen.5i5j@gmail.com>
+Date: Thu, 19 Nov 2015 03:24:42 +0800
+Subject: [PATCH] include: asm-generic: page.h: Remove useless get_user_page and free_user_page
 
-> Kevin Hilman <khilman@kernel.org> writes:
->
->> Marc Gonzalez <marc_gonzalez@sigmadesigns.com> writes:
->>
->>> Add support for Sigma Designs ARM-based Tango4 "Secure Media Processor"
->>> platforms (i.e. smp8734, smp8756, smp8758, smp8759) built around the
->>> Cortex-A9 MPCore r3p0 (all dual-core, except the 8756).
->>>
->>> Support for older MIPS-based platforms can be found elsewhere:
->>> https://github.com/mansr/linux-tangox
->>>
->>> Signed-off-by: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
->>> ---
->>>  arch/arm/Kconfig              |  2 ++
->>>  arch/arm/Makefile             |  1 +
->>>  arch/arm/mach-tangox/Kconfig  | 12 ++++++++++++
->>>  arch/arm/mach-tangox/Makefile |  2 ++
->>>  arch/arm/mach-tangox/setup.c  | 32 ++++++++++++++++++++++++++++++++
->>>  arch/arm/mach-tangox/smc.S    |  9 +++++++++
->>>  arch/arm/mach-tangox/smc.h    |  5 +++++
->>
->> Potential bike-shed fodder, but, a dumb question: is the family name
->> actually "tangox" or is the "x" for the number (tango3, tango4, etc.)
->>
->> Assuming it's the later based on usage throughout the patch, I think
->> it'd be better to just use "tango" throughout instead of tangox.
->
-> The x indeed stands for a number.  I have no idea what tango1 was or if
-> it ever existed.  Tango2 (SMP863x) and tango3 (SMP86[457]x) were MIPS
-> based.  Tango4 is ARM based (mostly, the SMP8910 is MIPS) but otherwise
-> very similar to tango3.
+They are not symmetric with each other, neither are used in real world
+(can not be found by grep command in source code root directory), so
+remove them.
 
-Thanks for the clarification.
+Signed-off-by: Chen Gang <gang.chen.5i5j@gmail.com>
+---
+?arch/arc/include/asm/page.h ? ? ? | 3 ---
+?arch/arm/include/asm/page-nommu.h | 3 ---
+?arch/frv/include/asm/page.h ? ? ? | 3 ---
+?arch/m68k/include/asm/page_mm.h ? | 3 ---
+?arch/m68k/include/asm/page_no.h ? | 3 ---
+?arch/openrisc/include/asm/page.h ?| 3 ---
+?include/asm-generic/page.h ? ? ? ?| 3 ---
+?7 files changed, 21 deletions(-)
 
-> Since we don't know what tango5 will look like,
-> mach-tango4 might be more suitable here.  If tango5 turns out to be
-> sufficiently similar, there's no harm from adding support for that to
-> the mach-tango4 code (just look at mach-omap2).
+diff --git a/arch/arc/include/asm/page.h b/arch/arc/include/asm/page.h
+index 429957f..adf5cbb 100644
+--- a/arch/arc/include/asm/page.h
++++ b/arch/arc/include/asm/page.h
+@@ -13,9 +13,6 @@
+?
+?#ifndef __ASSEMBLY__
+?
+-#define get_user_page(vaddr)		__get_free_page(GFP_KERNEL)
+-#define free_user_page(page, addr)	free_page(addr)
+-
+?#define clear_page(paddr)		memset((paddr), 0, PAGE_SIZE)
+?#define copy_page(to, from)		memcpy((to), (from), PAGE_SIZE)
+?
+diff --git a/arch/arm/include/asm/page-nommu.h b/arch/arm/include/asm/page-nommu.h
+index d1b162a..503f488 100644
+--- a/arch/arm/include/asm/page-nommu.h
++++ b/arch/arm/include/asm/page-nommu.h
+@@ -17,9 +17,6 @@
+?#define KTHREAD_SIZE PAGE_SIZE
+?#endif
+??
+-#define get_user_page(vaddr)		__get_free_page(GFP_KERNEL)
+-#define free_user_page(page, addr)	free_page(addr)
+-
+?#define clear_page(page)	memset((page), 0, PAGE_SIZE)
+?#define copy_page(to,from)	memcpy((to), (from), PAGE_SIZE)
+?
+diff --git a/arch/frv/include/asm/page.h b/arch/frv/include/asm/page.h
+index 8c97068..52ace96 100644
+--- a/arch/frv/include/asm/page.h
++++ b/arch/frv/include/asm/page.h
+@@ -8,9 +8,6 @@
+?
+?#ifndef __ASSEMBLY__
+?
+-#define get_user_page(vaddr)			__get_free_page(GFP_KERNEL)
+-#define free_user_page(page, addr)		free_page(addr)
+-
+?#define clear_page(pgaddr)			memset((pgaddr), 0, PAGE_SIZE)
+?#define copy_page(to,from)			memcpy((to), (from), PAGE_SIZE)
+?
+diff --git a/arch/m68k/include/asm/page_mm.h b/arch/m68k/include/asm/page_mm.h
+index 5029f73..e7a1946 100644
+--- a/arch/m68k/include/asm/page_mm.h
++++ b/arch/m68k/include/asm/page_mm.h
+@@ -6,9 +6,6 @@
+?#include <linux/compiler.h>
+?#include <asm/module.h>
+?
+-#define get_user_page(vaddr)		__get_free_page(GFP_KERNEL)
+-#define free_user_page(page, addr)	free_page(addr)
+-
+?/*
+? * We don't need to check for alignment etc.
+? */
+diff --git a/arch/m68k/include/asm/page_no.h b/arch/m68k/include/asm/page_no.h
+index ef20916..fa7f32d 100644
+--- a/arch/m68k/include/asm/page_no.h
++++ b/arch/m68k/include/asm/page_no.h
+@@ -6,9 +6,6 @@
+?extern unsigned long memory_start;
+?extern unsigned long memory_end;
+?
+-#define get_user_page(vaddr)		__get_free_page(GFP_KERNEL)
+-#define free_user_page(page, addr)	free_page(addr)
+-
+?#define clear_page(page)	memset((page), 0, PAGE_SIZE)
+?#define copy_page(to,from)	memcpy((to), (from), PAGE_SIZE)
+?
+diff --git a/arch/openrisc/include/asm/page.h b/arch/openrisc/include/asm/page.h
+index 108906f..e613d36 100644
+--- a/arch/openrisc/include/asm/page.h
++++ b/arch/openrisc/include/asm/page.h
+@@ -40,9 +40,6 @@
+?
+?#ifndef __ASSEMBLY__
+?
+-#define get_user_page(vaddr) ? ? ? ? ? ?__get_free_page(GFP_KERNEL)
+-#define free_user_page(page, addr) ? ? ?free_page(addr)
+-
+?#define clear_page(page)	memset((page), 0, PAGE_SIZE)
+?#define copy_page(to, from)	memcpy((to), (from), PAGE_SIZE)
+?
+diff --git a/include/asm-generic/page.h b/include/asm-generic/page.h
+index 37d1fe2..67cfb7d 100644
+--- a/include/asm-generic/page.h
++++ b/include/asm-generic/page.h
+@@ -24,9 +24,6 @@
+?
+?#ifndef __ASSEMBLY__
+?
+-#define get_user_page(vaddr)		__get_free_page(GFP_KERNEL)
+-#define free_user_page(page, addr)	free_page(addr)
+-
+?#define clear_page(page)	memset((page), 0, PAGE_SIZE)
+?#define copy_page(to,from)	memcpy((to), (from), PAGE_SIZE)
+?
+--?
+1.9.3
 
-Well, mach-omap2 leads to enough confusion that I don't think we need to
-use that as a model. ;)  IMO, mach-tango is a better starting point.
-
-> Most of the drivers support both tango3 and tango4, but apparently some
-> changes are planned for tango5.
-
-Thanks for the clarification,
-
-Kevin
+ 		 	   		  
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: 0001-include-asm-generic-page.h-Remove-useless-get_user_p.patch
+Type: application/octet-stream
+Size: 4034 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151119/4822539a/attachment-0001.obj>
