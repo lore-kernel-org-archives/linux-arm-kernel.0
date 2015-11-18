@@ -1,47 +1,50 @@
 From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Wed, 18 Nov 2015 10:23:52 -0300
-Subject: [RESEND PATCH v2 4/6] ARM: dts: Remove broken-cd from eMMC node in
- exynos5800-peach-pi
+Date: Wed, 18 Nov 2015 10:23:51 -0300
+Subject: [RESEND PATCH v2 3/6] ARM: dts: Mark SDIO as non-removable in
+ exynos5250-snow-common
 In-Reply-To: <1447853034-22508-1-git-send-email-javier@osg.samsung.com>
 References: <1447853034-22508-1-git-send-email-javier@osg.samsung.com>
-Message-ID: <1447853034-22508-5-git-send-email-javier@osg.samsung.com>
+Message-ID: <1447853034-22508-4-git-send-email-javier@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The eMMC is non-removable so is marked with the non-removable DT
-property to avoid having to redetect it after a suspend/resume.
+The Exynos5250 Snow Chromebooks have a Marvell WiFi SDIO chip which
+can't neither be removed nor be detected. But the node isn't marked
+as non-removable and instead has the broken-cd DT property.
 
-But it also has the broken-cd property which is wrong since only
-one of the DT properties for card detection should be used.
+This causes the device to be removed when the system enters into a
+suspend state and the following warnings is shown after a resume:
+
+[  181.944636] mmc2: error -2 during resume (card was removed?)
 
 Also remove the card-detect-delay property that is not needed with
 non-removable.
 
 Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+Reviewed-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
+Tested-by: Tomeu Vizoso <tomeu.vizoso@collabora.com>
 Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 Reviewed-by: Alim Akhtar <alim.akhtar@samsung.com>
-Tested-by: Alim Akhtar <alim.akhtar@samsung.com>
 ---
 
- arch/arm/boot/dts/exynos5800-peach-pi.dts | 2 --
- 1 file changed, 2 deletions(-)
+ arch/arm/boot/dts/exynos5250-snow-common.dtsi | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
 
-diff --git a/arch/arm/boot/dts/exynos5800-peach-pi.dts b/arch/arm/boot/dts/exynos5800-peach-pi.dts
-index ca3a467a585d..7b018e451880 100644
---- a/arch/arm/boot/dts/exynos5800-peach-pi.dts
-+++ b/arch/arm/boot/dts/exynos5800-peach-pi.dts
-@@ -652,12 +652,10 @@
- &mmc_0 {
+diff --git a/arch/arm/boot/dts/exynos5250-snow-common.dtsi b/arch/arm/boot/dts/exynos5250-snow-common.dtsi
+index 0a7f408824d8..1822c502a25a 100644
+--- a/arch/arm/boot/dts/exynos5250-snow-common.dtsi
++++ b/arch/arm/boot/dts/exynos5250-snow-common.dtsi
+@@ -552,10 +552,9 @@
+ &mmc_3 {
  	status = "okay";
  	num-slots = <1>;
 -	broken-cd;
- 	mmc-hs200-1_8v;
- 	mmc-hs400-1_8v;
- 	cap-mmc-highspeed;
- 	non-removable;
++	non-removable;
+ 	cap-sdio-irq;
+ 	keep-power-in-suspend;
 -	card-detect-delay = <200>;
- 	clock-frequency = <800000000>;
  	samsung,dw-mshc-ciu-div = <3>;
- 	samsung,dw-mshc-sdr-timing = <0 4>;
+ 	samsung,dw-mshc-sdr-timing = <2 3>;
+ 	samsung,dw-mshc-ddr-timing = <1 2>;
 -- 
 2.4.3
