@@ -1,79 +1,86 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 18 Nov 2015 10:23:55 +0100
-Subject: [PATCH v6 15/19] arm64: ilp32: force IPC_64 in msgctl, shmctl,
- semctl
-In-Reply-To: <mvmoaersohn.fsf@hawking.suse.de>
-References: <1447795019-30176-1-git-send-email-ynorov@caviumnetworks.com>
- <26387039.NNJ6EnRrv8@wuerfel> <mvmoaersohn.fsf@hawking.suse.de>
-Message-ID: <32420376.JEdtXfitGi@wuerfel>
+From: p.fedin@samsung.com (Pavel Fedin)
+Date: Wed, 18 Nov 2015 12:28:05 +0300
+Subject: [PATCH] arm64: Implement CONFIG_CMDLINE_EXTEND
+Message-ID: <1447838885-9888-1-git-send-email-p.fedin@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 18 November 2015 09:25:40 Andreas Schwab wrote:
-> Arnd Bergmann <arnd@arndb.de> writes:
-> 
-> > On Wednesday 18 November 2015 00:16:55 Yury Norov wrote:
-> >> 
-> >> +/* IPC_64 */
-> >> +asmlinkage long ilp32_sys_msgctl(int first, int second, void __user *uptr)
-> >> +{
-> >> +       return compat_sys_msgctl(first, second | IPC_64, uptr);
-> >> +}
-> >> +#define compat_sys_msgctl              ilp32_sys_msgctl
-> >> +
-> >> +asmlinkage long ilp32_sys_shmctl(int first, int second, void __user *uptr)
-> >> +{
-> >> +       return compat_sys_shmctl(first, second | IPC_64, uptr);
-> >> +}
-> >> +#define compat_sys_shmctl              ilp32_sys_shmctl
-> >> +
-> >> +asmlinkage long ilp32_sys_semctl(int first, int second, int third, int arg)
-> >> +{
-> >> +       return compat_sys_semctl(first, second, third | IPC_64, arg);
-> >> +}
-> >> +#define compat_sys_semctl      ilp32_sys_semctl
-> >> 
-> >
-> > I wonder if this would be any simpler by changing compat_ipc_parse_version()
-> 
-> This cries for a generic solution.  Other archs migrating to separate
-> ipc syscalls will want to avoid the whole IPC_64 business for them, even
-> if they need to retain [compat_]ipc_parse_version for sys_ipc
-> compatibility.
+Add an option to extend built-in command line with one obtained from
+the device tree.
 
-Agreed. I think all architectures are moving that way now, so we should
-really try to get all cases right now.
+This option is very useful for, for example, switching between some
+stable and development version, when one of them requires additional
+arguments (e. g. to turn on some extra debug). It can be annoying to
+reprogram command line in the bootloaded every time.
 
-I've done a complete list of what the architectures (see
-https://docs.google.com/spreadsheets/d/18GxXEHE2ywnSr-SPoGFd1ABz6wEM1ex-JMu5lEraaH8/ )
+Actually, this patch introduces the necessary support to all
+architectures using the device tree, however only arm64 Kconfig is
+modified, because this is the only platform i can test.
 
-We have these categories:
+Signed-off-by: Pavel Fedin <p.fedin@samsung.com>
+---
+ arch/arm64/Kconfig | 18 ++++++++++++++++++
+ drivers/of/fdt.c   | 12 ++++++++++--
+ 2 files changed, 28 insertions(+), 2 deletions(-)
 
-1. uses IPC_PARSE_VERSION with sys_ipc, and has just introduced
-   separate syscalls:
-
-    arm, avr32, powerpc, x86-32
-
-2. uses IPC_PARSE_VERSION with sys_ipc, and has not yet introduced
-   separate syscalls (currently producing a compile warning):
-
-   cris, frv, m32r, m68k, mips (o32), mn10300, s390, sh32, sparc
-
-3. uses IPC_PARSE_VERSION with separate syscalls:
-
-   alpha, blackfin, microblaze, mips (n32/64), xtensa
-
-4a. only new-style IPC with separate syscalls:
-
-    ia64, parisc, sh64
-
-4b. only new-style IPC with separate syscalls, using generic syscall
-    table:
-
-    arc, arm64, c6x, h8300, hexagon, metag, nios2, openrisc, score,
-    tile, unicore32
-
-So we should probably fix 1. and 2. before it's too late, but make
-sure we don't break 3. in the process.
-
-	Arnd
+diff --git a/arch/arm64/Kconfig b/arch/arm64/Kconfig
+index 9ac16a4..c741837 100644
+--- a/arch/arm64/Kconfig
++++ b/arch/arm64/Kconfig
+@@ -695,6 +695,23 @@ config CMDLINE
+ 	  entering them here. As a minimum, you should specify the the
+ 	  root device (e.g. root=/dev/nfs).
+ 
++choice
++	prompt "Kernel command line type" if CMDLINE != ""
++	default CMDLINE_FROM_BOOTLOADER
++
++config CMDLINE_FROM_BOOTLOADER
++	bool "Use bootloader kernel arguments if available"
++	help
++	  Uses the command-line options passed by the boot loader. If
++	  the boot loader doesn't provide any, the default kernel command
++	  string provided in CMDLINE will be used.
++
++config CMDLINE_EXTEND
++	bool "Extend bootloader kernel arguments"
++	help
++	  The command-line arguments provided by the boot loader will be
++	  appended to the default kernel command string.
++
+ config CMDLINE_FORCE
+ 	bool "Always use the default kernel command string"
+ 	help
+@@ -702,6 +719,7 @@ config CMDLINE_FORCE
+ 	  loader passes other arguments to the kernel.
+ 	  This is useful if you cannot or don't want to change the
+ 	  command-line options your boot loader passes to the kernel.
++endchoice
+ 
+ config EFI_STUB
+ 	bool
+diff --git a/drivers/of/fdt.c b/drivers/of/fdt.c
+index d243029..494307e 100644
+--- a/drivers/of/fdt.c
++++ b/drivers/of/fdt.c
+@@ -949,8 +949,16 @@ int __init early_init_dt_scan_chosen(unsigned long node, const char *uname,
+ 
+ 	/* Retrieve command line */
+ 	p = of_get_flat_dt_prop(node, "bootargs", &l);
+-	if (p != NULL && l > 0)
+-		strlcpy(data, p, min((int)l, COMMAND_LINE_SIZE));
++	if (p != NULL && l > 0) {
++		int offset = 0;
++#ifdef CONFIG_CMDLINE
++#ifdef CONFIG_CMDLINE_EXTEND
++		strlcpy(data, CONFIG_CMDLINE, COMMAND_LINE_SIZE);
++		offset = strlcat(data, " ", COMMAND_LINE_SIZE);
++#endif
++#endif
++		strlcpy(data + offset, p, min(l, COMMAND_LINE_SIZE - offset));
++	}
+ 
+ 	/*
+ 	 * CONFIG_CMDLINE is meant to be a default in case nothing else
+-- 
+2.4.4
