@@ -1,68 +1,50 @@
-From: yang.shi@linaro.org (Yang Shi)
-Date: Wed, 18 Nov 2015 10:15:05 -0800
-Subject: [PATCH] arm64: restore bogomips information in /proc/cpuinfo
-Message-ID: <1447870505-19319-1-git-send-email-yang.shi@linaro.org>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 18 Nov 2015 18:39:02 +0000
+Subject: [PATCH] iommu/arm-smmu: Use incoming shareability attributes in
+ bypass mode
+Message-ID: <1447871942-1883-1-git-send-email-will.deacon@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As what Pavel Machek reported [1], some userspace applications depend on
-bogomips showed by /proc/cpuinfo.
+When we initialise a bypass STE, we memset the structure to zero and
+set the Valid and Config fields to indicate that the stream should
+bypass the SMMU. Unfortunately, this results in an SHCFG field of 0
+which means that the shareability of any incoming transactions is
+overridden with non-shareable, leading to potential coherence problems
+down the line.
 
-Although there is much less legacy impact on aarch64 than arm, but it does
-break libvirt.
+This patch fixes the issue by initialising bypass STEs to use the
+incoming shareability attributes. When translation is in effect at
+either stage 1 or stage 2, the shareability is determined by the
+page tables.
 
-Basically, this patch reverts commit 326b16db9f69fd0d279be873c6c00f88c0a4aad5
-("arm64: delay: don't bother reporting bogomips in /proc/cpuinfo"), but with
-some tweak due to context change.
-
-[1] https://lkml.org/lkml/2015/1/4/132
-
-Signed-off-by: Yang Shi <yang.shi@linaro.org>
+Signed-off-by: Will Deacon <will.deacon@arm.com>
 ---
- arch/arm64/kernel/cpuinfo.c | 5 +++++
- arch/arm64/kernel/smp.c     | 7 ++++++-
- 2 files changed, 11 insertions(+), 1 deletion(-)
+ drivers/iommu/arm-smmu-v3.c | 5 +++++
+ 1 file changed, 5 insertions(+)
 
-diff --git a/arch/arm64/kernel/cpuinfo.c b/arch/arm64/kernel/cpuinfo.c
-index 706679d..8d4ba77 100644
---- a/arch/arm64/kernel/cpuinfo.c
-+++ b/arch/arm64/kernel/cpuinfo.c
-@@ -30,6 +30,7 @@
- #include <linux/seq_file.h>
- #include <linux/sched.h>
- #include <linux/smp.h>
-+#include <linux/delay.h>
+diff --git a/drivers/iommu/arm-smmu-v3.c b/drivers/iommu/arm-smmu-v3.c
+index 86480480895d..2e3e235f509c 100644
+--- a/drivers/iommu/arm-smmu-v3.c
++++ b/drivers/iommu/arm-smmu-v3.c
+@@ -253,6 +253,9 @@
+ #define STRTAB_STE_1_STRW_EL2		2UL
+ #define STRTAB_STE_1_STRW_SHIFT		30
  
- /*
-  * In case the boot CPU is hotpluggable, we record its initial state and
-@@ -112,6 +113,10 @@ static int c_show(struct seq_file *m, void *v)
- 		 */
- 		seq_printf(m, "processor\t: %d\n", i);
- 
-+		seq_printf(m, "BogoMIPS\t: %lu.%02lu\n\n",
-+			   loops_per_jiffy / (500000UL/HZ),
-+			   loops_per_jiffy / (5000UL/HZ) % 100);
++#define STRTAB_STE_1_SHCFG_INCOMING	1UL
++#define STRTAB_STE_1_SHCFG_SHIFT	44
 +
- 		/*
- 		 * Dump out the common processor features in a single line.
- 		 * Userspace should read the hwcaps with getauxval(AT_HWCAP)
-diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
-index b1adc51..1bed772 100644
---- a/arch/arm64/kernel/smp.c
-+++ b/arch/arm64/kernel/smp.c
-@@ -326,7 +326,12 @@ static void __init hyp_mode_check(void)
- 
- void __init smp_cpus_done(unsigned int max_cpus)
- {
--	pr_info("SMP: Total of %d processors activated.\n", num_online_cpus());
-+	unsigned long bogosum = loops_per_jiffy * num_online_cpus();
-+
-+	pr_info("SMP: Total of %d processors activated (%lu.%02lu BogoMIPS).\n",
-+		num_online_cpus(), bogosum / (500000/HZ),
-+		(bogosum / (5000/HZ)) % 100);
-+
- 	setup_cpu_features();
- 	hyp_mode_check();
- 	apply_alternatives_all();
+ #define STRTAB_STE_2_S2VMID_SHIFT	0
+ #define STRTAB_STE_2_S2VMID_MASK	0xffffUL
+ #define STRTAB_STE_2_VTCR_SHIFT		32
+@@ -1041,6 +1044,8 @@ static void arm_smmu_write_strtab_ent(struct arm_smmu_device *smmu, u32 sid,
+ 		val |= disable_bypass ? STRTAB_STE_0_CFG_ABORT
+ 				      : STRTAB_STE_0_CFG_BYPASS;
+ 		dst[0] = cpu_to_le64(val);
++		dst[1] = cpu_to_le64(STRTAB_STE_1_SHCFG_INCOMING
++			 << STRTAB_STE_1_SHCFG_SHIFT);
+ 		dst[2] = 0; /* Nuke the VMID */
+ 		if (ste_live)
+ 			arm_smmu_sync_ste_for_sid(smmu, sid);
 -- 
-2.0.2
+2.1.4
