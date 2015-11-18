@@ -1,71 +1,80 @@
-From: marc.zyngier@arm.com (Marc Zyngier)
-Date: Wed, 18 Nov 2015 11:29:29 +0000
-Subject: A problem about interrupt when booting a captured kernel
-In-Reply-To: <564C30D9.7030108@linaro.org>
-References: <5645B6D3.60305@huawei.com> <564A2DE4.4030702@arm.com>
- <564A7D53.6010906@linaro.org> <20151117090736.7db5e646@arm.com>
- <564C30D9.7030108@linaro.org>
-Message-ID: <564C6119.2050704@arm.com>
+From: marex@denx.de (Marek Vasut)
+Date: Wed, 18 Nov 2015 12:32:42 +0100
+Subject: [PATCH 2/2] ARM: dts: imx6q: add Novena board
+In-Reply-To: <1447845958.3144.61.camel@pengutronix.de>
+References: <1447840120-8513-1-git-send-email-marex@denx.de>
+ <201511181135.40171.marex@denx.de> <1447845958.3144.61.camel@pengutronix.de>
+Message-ID: <201511181232.42446.marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18/11/15 08:03, AKASHI Takahiro wrote:
-> On 11/17/2015 06:07 PM, Marc Zyngier wrote:
->> On Tue, 17 Nov 2015 10:05:23 +0900
->> AKASHI Takahiro <takahiro.akashi@linaro.org> wrote:
->>
->>> Marc,
->>> (Cc: Mark)
->>>
->>> On 11/17/2015 04:26 AM, Marc Zyngier wrote:
->>>> On 13/11/15 10:09, Yang Yingliang wrote:
->>>>> Hi, Marc
->>>>>
->>>>>
->>>>>        The kexec will boot a captured kernel while the kernel panic. But
->>>>> it boots failed if the kernel panic in handler function of PPI. The
->>>>> reason is that the PPI has not been 'eoi', other interrupts can not be
->>>>> handled when booting  the captured kernel.
->>>>>
->>>>>        The kexec will call irq_eoi to end the irqs that have
->>>>> IRQD_IRQ_INPROGRESS flag. But PPIs don't have this flag, so it won't be
->>>>> ended.
->>>>>
->>>>>       Three ways to solve this problem we can think :
->>>>>       1. Is there a way to reset gic like its_reset ?
->>>>>       2. Can we add some flag for calling irq_eoi ?
->>>>>       3. Just 'eoi' all PPIs without checking flags in kexec.
->>>>>
->>>>>        Please give some advice.
->>>>
->>>> Good timing. Please see:
->>>>
->>>> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-November/385383.html
->>>
->>> I removed machine_kexec_mask_interrupts() from my arm64 kdump patch series[1]
->>> due to the past discussions[2].
->>>
->>> Is it the time that I should resurrect the code?
->>
->> Probably.
+On Wednesday, November 18, 2015 at 12:25:58 PM, Lucas Stach wrote:
+> Am Mittwoch, den 18.11.2015, 11:35 +0100 schrieb Marek Vasut:
+> > On Wednesday, November 18, 2015 at 11:10:12 AM, Lucas Stach wrote:
+> > > Hi Marek,
+> > 
+> > Hi!
+> > 
+> > > some comments below.
+> > 
+> > Thanks!
+> > 
+> > [...]
+> > 
+> > > > +	regulators {
+> > > > +		compatible = "simple-bus";
+> > > > +		#address-cells = <1>;
+> > > > +		#size-cells = <0>;
+> > > > +
+> > > 
+> > > Remove this simple bus. It's not there in hardware, regulators are
+> > > board level components just like the nodes below.
+> > 
+> > This is surprising to me, since all the boards I checked use this
+> > /regulators simple bus to contain all the regulators. Is this going to
+> > change now ?
 > 
-> Let me make sure.
-> Have your patches here, especially #1, also addressed the issue that you pointed out
-> in [1]?
+> Yes, there are a lot of bad examples out there, mainly because people
+> wanted to logically group the regulators together.
+
+Yeah, that's what I wanted to do as well :)
+
+> But as it isn't
+> representing any real hardware we should really try to move away from
+> this practice.
+
+Oh, thanks for this input.
+
+> > [...]
+> > 
+> > > > +&ecspi3 {
+> > > > +	pinctrl-names = "default";
+> > > > +	pinctrl-0 = <&pinctrl_ecspi3_novena>;
+> > > > +	fsl,spi-num-chipselects = <3>;
+> > > > +	status = "okay";
+> > > > +
+> > > > +	spidev at 0 {
+> > > > +		compatible = "spidev";
+> > > 
+> > > This will explode on a new kernel. Specifying spidev without using a
+> > > more specific compatible will trigger a WARN_ON(), as it's considered
+> > > bad style.
+> > 
+> > Oh, looks like imx_v6_v7_defconfig didn't have SPIDEV active, which is
+> > why I didn't catch it during my last test, dang.
+> > 
+> > This SPI interface is routed into the FPGA, so what do you suggest I put
+> > in the compatible string? There is no other sensible driver for the
+> > peripheral, since the peripheral can be anything.
 > 
-> [1] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-April/338969.html
+> I'm not really the right person to ask for that, but I would guess that
+> inventing a "novena,fpga-spi" compatible or something like that and
+> adding it to the spidev driver would be the right thing to do.
 
-Patch #1 still has the current behaviour (deactivate any in flight
-interrupt), but does it in a more complete way. The additional 3 patches
-make sure that the GIC (any version) is not affected by having active
-interrupts when getting initialized.
+So what's the rationale behind generic "spidev" being bad ? In my mind, it
+is much better to use generic driver and generic compatible prop "spidev"
+than to generate many one-off compatible props and have a driver with a list
+of all of those.
 
-These are the two sides of the same coin, basically. I'm still not fond
-of what we do in machine_kexec_mask_interrupts(), but we can't rely on
-the secondary kernel doing the right thing either.
-
-Thanks,
-
-	M.
--- 
-Jazz is not dead. It just smells funny...
+Best regards,
+Marek Vasut
