@@ -1,52 +1,34 @@
-From: peter.chen@freescale.com (Peter Chen)
-Date: Wed, 18 Nov 2015 17:41:48 +0800
-Subject: [PATCH] USB: USB_OTG does not depend on PM
-In-Reply-To: <5217888.FiujFV8yJj@wuerfel>
-References: <7521777.8ZmnT3AlIC@wuerfel> <5647698.81XCu85L5D@wuerfel>
- <20151118031748.GA4228@shlinux2> <5217888.FiujFV8yJj@wuerfel>
-Message-ID: <20151118094147.GI4228@shlinux2>
+From: marex@denx.de (Marek Vasut)
+Date: Wed, 18 Nov 2015 10:48:39 +0100
+Subject: [PATCH 1/2] devicetree: bindings: Add vendor prefix for Kosagi
+Message-ID: <1447840120-8513-1-git-send-email-marex@denx.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 18, 2015 at 10:38:18AM +0100, Arnd Bergmann wrote:
-> On Wednesday 18 November 2015 11:17:50 Peter Chen wrote:
-> > From 3a6918dae038aadc200dcf0263f4440acc2353d4 Mon Sep 17 00:00:00 2001
-> > From: Peter Chen <peter.chen@freescale.com>
-> > Date: Wed, 18 Nov 2015 11:06:34 +0800
-> > Subject: [PATCH 1/1] usb: kconfig: fix warning of select USB_OTG
-> > 
-> > When choose randconfig for kernel build, it reports below warning:
-> > "warning: (USB_OTG_FSM && FSL_USB2_OTG && USB_MV_OTG) selects USB_OTG
-> > which has unmet direct dependencies (USB_SUPPORT && USB && PM)"
-> > 
-> > In fact, USB_OTG is visual symbol and depends on PM, so the driver
-> 
->                       visible ?
+From: Sean Cross <xobs@kosagi.com>
 
-Yes, will change this typo
+Add a vendor prefix for Sutajio Ko-Usagi PTE Ltd., which goes by the
+more common name of Kosagi.
 
-> 
-> > needs to depend on it to reduce dependency problem.
-> > 
-> > Signed-off-by: Peter Chen <peter.chen@freescale.com>
-> > Reported-by: Arnd Bergmann <arnd@arndb.de>
-> > Cc: Felipe Balbi <balbi@ti.com>
-> 
-> Acked-by: Arnd Bergmann <arnd@arndb.de>
-> 
-> I was a bit worried that this might break defconfig files that now
-> no longer automatically get OSB_OTG enabled, but I have checked all
-> defconfig files we have in the kernel and none of them uses
-> USB_OTG_FSM, FSL_USB2_OTG or USB_MV_OTG, so we are fine.
+Signed-off-by: Sean Cross <xobs@kosagi.com>
+Cc: Rob Herring <robh@kernel.org>
+Cc: Shawn Guo <shawnguo@kernel.org>
+Cc: Fabio Estevam <fabio.estevam@freescale.com>
+---
+ Documentation/devicetree/bindings/vendor-prefixes.txt | 1 +
+ 1 file changed, 1 insertion(+)
 
-Thanks.
-
-> 
-> Thanks!
-> 
-> 	Arnd
-
+diff --git a/Documentation/devicetree/bindings/vendor-prefixes.txt b/Documentation/devicetree/bindings/vendor-prefixes.txt
+index 55df1d4..a51e829 100644
+--- a/Documentation/devicetree/bindings/vendor-prefixes.txt
++++ b/Documentation/devicetree/bindings/vendor-prefixes.txt
+@@ -123,6 +123,7 @@ jedec	JEDEC Solid State Technology Association
+ karo	Ka-Ro electronics GmbH
+ keymile	Keymile GmbH
+ kinetic Kinetic Technologies
++kosagi	Sutajio Ko-Usagi PTE Ltd.
+ lacie	LaCie
+ lantiq	Lantiq Semiconductor
+ lenovo	Lenovo Group Ltd.
 -- 
-
-Best Regards,
-Peter Chen
+2.1.4
