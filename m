@@ -1,30 +1,29 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 18 Nov 2015 21:47:59 +0900
-Subject: [PATCH] ARM: multi_v7_defconfig: Build ChromeOS EC drivers as
- modules
-In-Reply-To: <1447775924-2189-1-git-send-email-javier@osg.samsung.com>
-References: <1447775924-2189-1-git-send-email-javier@osg.samsung.com>
-Message-ID: <564C737F.9060405@samsung.com>
+From: ulrich.hecht+renesas@gmail.com (Ulrich Hecht)
+Date: Wed, 18 Nov 2015 13:51:05 +0100
+Subject: [PATCH 0/2] VIN, ADV7180 for r8a7794/alt
+Message-ID: <1447851067-8214-1-git-send-email-ulrich.hecht+renesas@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-W dniu 18.11.2015 o 00:58, Javier Martinez Canillas pisze:
-> Since the multi_v7_defconfig is used to build an image for different
-> platforms, the options should be enabled as module whenever possible.
-> 
-> Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
-> 
-> ---
-> The patch was tested on an Exynos5800 Peach Pi Chromebook
-> and the drivers' modules were correctly autoloaded.
-> 
->  arch/arm/configs/multi_v7_defconfig | 6 +++---
->  1 file changed, 3 insertions(+), 3 deletions(-)
+Hi!
 
-I suppose this could go through Samsung-soc. I got few other patches for
-multi_v7.
+This series adds VIN support for the Alt board.  The hardware configuration
+for I2C1 and the video decoder of Alt is exactly identical to that of Silk,
+so these are largely identical to Sergei's Silk definitions.
 
-Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+To be applied on top of Horms's "ARM: shmobile: alt: Add pfc pins to DT"
+patch.
 
-Best regards,
-Krzysztof
+CU
+Uli
+
+
+Ulrich Hecht (2):
+  ARM: shmobile: alt: add I2C1 DT support
+  ARM: shmobile: alt: add VIN0, ADV7180 DT support
+
+ arch/arm/boot/dts/r8a7794-alt.dts | 47 +++++++++++++++++++++++++++++++++++++++
+ 1 file changed, 47 insertions(+)
+
+-- 
+2.6.1
