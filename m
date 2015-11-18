@@ -1,101 +1,69 @@
-From: julien.grall@citrix.com (Julien Grall)
-Date: Wed, 18 Nov 2015 12:25:48 +0000
-Subject: [Xen-devel] [PATCH 02/13] xen/grant-table: Move
- xlated_setup_gnttab_pages to common place
-In-Reply-To: <1447754231-7772-3-git-send-email-shannon.zhao@linaro.org>
-References: <1447754231-7772-1-git-send-email-shannon.zhao@linaro.org>
- <1447754231-7772-3-git-send-email-shannon.zhao@linaro.org>
-Message-ID: <564C6E4C.9080003@citrix.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 18 Nov 2015 12:28:04 +0000
+Subject: next build: 235 warnings 3 failures (next/next-20151117)
+In-Reply-To: <063D6719AE5E284EB5DD2968C1650D6D1CBD53BB@AcuExch.aculab.com>
+References: <564a9961.878b420a.331b8.fffffd62@mx.google.com>
+ <6370082.rfihnaNWhf@wuerfel> <20151117171236.GJ30101@arm.com>
+ <3723928.99NZh1TC6E@wuerfel> <20151118101427.GC22731@arm.com>
+ <063D6719AE5E284EB5DD2968C1650D6D1CBD53BB@AcuExch.aculab.com>
+Message-ID: <20151118122804.GD1588@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Shannon,
-
-On 17/11/15 09:57, shannon.zhao at linaro.org wrote:
-> diff --git a/drivers/xen/grant-table.c b/drivers/xen/grant-table.c
-> index 62f591f..c084ba6 100644
-> --- a/drivers/xen/grant-table.c
-> +++ b/drivers/xen/grant-table.c
-> @@ -664,6 +664,55 @@ int gnttab_setup_auto_xlat_frames(phys_addr_t addr)
->  }
->  EXPORT_SYMBOL_GPL(gnttab_setup_auto_xlat_frames);
->  
-> +int __init xlated_setup_gnttab_pages(void)
-> +{
-> +	struct page **pages;
-> +	xen_pfn_t *pfns;
-> +	void *vaddr;
-> +	int rc;
-> +	unsigned int i;
-> +	unsigned long nr_grant_frames = gnttab_max_grant_frames();
-> +
-> +	BUG_ON(nr_grant_frames == 0);
-> +	pages = kcalloc(nr_grant_frames, sizeof(pages[0]), GFP_KERNEL);
-> +	if (!pages)
-> +		return -ENOMEM;
-> +
-> +	pfns = kcalloc(nr_grant_frames, sizeof(pfns[0]), GFP_KERNEL);
-> +	if (!pfns) {
-> +		kfree(pages);
-> +		return -ENOMEM;
-> +	}
-> +	rc = alloc_xenballooned_pages(nr_grant_frames, pages, 0 /* lowmem */);
-
-Can you rebase your patch on top of linux/master? The 3rd parameters has
-been dropped for alloc_xenballooned_pages.
-
-> +	if (rc) {
-> +		pr_warn("%s Couldn't balloon alloc %ld pfns rc:%d\n", __func__,
-> +			nr_grant_frames, rc);
-> +		kfree(pages);
-> +		kfree(pfns);
-> +		return rc;
-> +	}
-> +	for (i = 0; i < nr_grant_frames; i++)
-> +		pfns[i] = page_to_pfn(pages[i]);
-
-This code needs to be adapt for 64KB page granularity. Please use
-page_to_xen_pfn here.
-
-> +
-> +	vaddr = vmap(pages, nr_grant_frames, 0, PAGE_KERNEL);
-> +	if (!vaddr) {
-> +		pr_warn("%s Couldn't map %ld pfns rc:%d\n", __func__,
-> +			nr_grant_frames, rc);
-> +		free_xenballooned_pages(nr_grant_frames, pages);
-> +		kfree(pages);
-> +		kfree(pfns);
-> +		return -ENOMEM;
-> +	}
-> +	kfree(pages);
-> +
-> +	xen_auto_xlat_grant_frames.pfn = pfns;
-> +	xen_auto_xlat_grant_frames.count = nr_grant_frames;
-> +	xen_auto_xlat_grant_frames.vaddr = vaddr;
-> +
-> +	return 0;
-> +}
-> +EXPORT_SYMBOL_GPL(xlated_setup_gnttab_pages);
-> +
->  void gnttab_free_auto_xlat_frames(void)
->  {
->  	if (!xen_auto_xlat_grant_frames.count)
-> diff --git a/include/xen/grant_table.h b/include/xen/grant_table.h
-> index 4478f4b..fa31e66 100644
-> --- a/include/xen/grant_table.h
-> +++ b/include/xen/grant_table.h
-> @@ -177,6 +177,7 @@ struct grant_frames {
->  extern struct grant_frames xen_auto_xlat_grant_frames;
->  unsigned int gnttab_max_grant_frames(void);
->  int gnttab_setup_auto_xlat_frames(phys_addr_t addr);
-> +int xlated_setup_gnttab_pages(void);
->  void gnttab_free_auto_xlat_frames(void);
->  
->  #define gnttab_map_vaddr(map) ((void *)(map.host_virt_addr))
+On Wed, Nov 18, 2015 at 12:11:25PM +0000, David Laight wrote:
+> From: Will Deacon
+> > Sent: 18 November 2015 10:14
+> > On Tue, Nov 17, 2015 at 08:17:17PM +0100, Arnd Bergmann wrote:
+> > > On Tuesday 17 November 2015 17:12:37 Will Deacon wrote:
+> > > > On Tue, Nov 17, 2015 at 06:03:40PM +0100, Arnd Bergmann wrote:
+> > > > > On Tuesday 17 November 2015 16:44:53 Will Deacon wrote:
+> > > > > > > 8<----
+> > > > > > > Subject: ARM64: make smp_load_acquire() work with const arguments
+> > > > > > >
+> > > > > > > smp_load_acquire() uses typeof() to declare a local variable for temporarily
+> > > > > > > storing the output of the memory access. This fails when the argument is
+> > > > > > > constant, because the assembler complains about using a constant register
+> > > > > > > as output:
+> > > > > > >
+> > > > > > >  arch/arm64/include/asm/barrier.h:71:3: error: read-only variable '___p1'
+> > > > > > >  used as 'asm' output
+> > > > > >
+> > > > > > Do you know the usage in the kernel causing this warning?
+> > > > >
+> > > > > A newly introduced function in include/net/sock.h:
+> > > > >
+> > > > > static inline int sk_state_load(const struct sock *sk)
+> > > > > {
+> > > > >         return smp_load_acquire(&sk->sk_state);
+> > > > > }
+> > > >
+> > > > Hmm, maybe we could play a similar trick to READ_ONCE by declaring an
+> > > > anonymous union and writing through the non-const member?
+> > >
+> > > Yes, I think that would work, if you think we need to care about the
+> > > case where we read into a structure.
+> > >
+> > > Can you come up with a patch for that?
+> > 
+> > Done:
+> > 
+> >   http://lists.infradead.org/pipermail/linux-arm-kernel/2015-November/386094.html
 > 
+> That patch forces a memory write-read and returns uninitialised stack
+> for short reads.
 
-Regards,
+Really? The disassembly looks fine to me. Do you have a concrete example
+of where you think it goes wrong, please?
 
+> Who knows what happens on big-endian systems.
 
--- 
-Julien Grall
+The same thing as READ_ONCE? I'll test it there to make sure, but I
+don't see a problem.
+
+> You need a static inline function with separate temporaries in each
+> branch.
+
+I'm just following the precedent set out by READ_ONCE, since that's
+tackling exactly the same problem and appears to be working for people.
+
+Will
