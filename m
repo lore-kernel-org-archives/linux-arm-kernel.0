@@ -1,52 +1,37 @@
-From: mark.rutland@arm.com (Mark Rutland)
-Date: Wed, 18 Nov 2015 15:20:45 +0000
-Subject: [PATCH] [PATCH] arm64: Boot failure on m400 with new cont PTEs
-In-Reply-To: <1447858999-26665-1-git-send-email-jeremy.linton@arm.com>
-References: <1447858999-26665-1-git-send-email-jeremy.linton@arm.com>
-Message-ID: <20151118152044.GD10644@leverpostej>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 18 Nov 2015 16:21:17 +0100
+Subject: [PATCH v2] pinctrl: at91-pio4: use %pr format string for resource
+Message-ID: <5199877.GVYeflqET9@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Jeremy,
+resource_size_t may be defined as 32 or 64 bit depending on configuration,
+so it cannot be printed using the normal format strings, as gcc correctly
+warns:
 
-On Wed, Nov 18, 2015 at 09:03:19AM -0600, Jeremy Linton wrote:
-> The HP m400 fails to boot the linux 4.4rc1 kernel. 
+pinctrl-at91-pio4.c: In function 'atmel_pinctrl_probe':
+pinctrl-at91-pio4.c:1003:41: warning: format '%u' expects argument of type 'unsigned int', but argument 5 has type 'resource_size_t {aka long long unsigned int}' [-Wformat=]
+   dev_dbg(dev, "bank %i: hwirq=%u\n", i, res->start);
 
-Are you using defconfig? If not, can you share your config?
+This changes the format string to use the special "%pr" format
+string that prints a resource, and changes the arguments so we
+the resource structure directly.
 
-> It usually hangs or sometimes takes an unhanded exception around the
-> DMA zone messages. This was bisected to the new CONT PTE changes.
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+---
+v2: don't break ordering of arguments, that part was correct already, unlike
+what I said in v1.
 
-Do you have any examples of the unhandled exception cases? Are they a
-mixed bag, or a consistent exception class?
-
-> Adding an extra flush_tlb_all() in the code path which is
-> changing the kernel permissions allows the machine to boot
-> consistently.
-
-As you mention changing permissions, I take it you're using
-CONFIG_DEBUG_RODATA?
-
-Thanks,
-Mark.
-
-> Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
-> ---
->  arch/arm64/mm/mmu.c | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
-> index e3f563c..e92fe77 100644
-> --- a/arch/arm64/mm/mmu.c
-> +++ b/arch/arm64/mm/mmu.c
-> @@ -121,6 +121,7 @@ static void __populate_init_pte(pte_t *pte, unsigned long addr,
->  		pfn++;
->  		addr += PAGE_SIZE;
->  	} while (addr != end);
-> +	flush_tlb_all();
->  }
->  
->  static void alloc_init_pte(pmd_t *pmd, unsigned long addr,
-> -- 
-> 2.4.3
-> 
+diff --git a/drivers/pinctrl/pinctrl-at91-pio4.c b/drivers/pinctrl/pinctrl-at91-pio4.c
+index 33edd07d9149..abdc16e5a970 100644
+--- a/drivers/pinctrl/pinctrl-at91-pio4.c
++++ b/drivers/pinctrl/pinctrl-at91-pio4.c
+@@ -1000,7 +1000,7 @@ static int atmel_pinctrl_probe(struct platform_device *pdev)
+ 		atmel_pioctrl->irqs[i] = res->start;
+ 		irq_set_chained_handler(res->start, atmel_gpio_irq_handler);
+ 		irq_set_handler_data(res->start, atmel_pioctrl);
+-		dev_dbg(dev, "bank %i: hwirq=%u\n", i, res->start);
++		dev_dbg(dev, "bank %i: irq=%pr\n", i, res);
+ 	}
+ 
+ 	atmel_pioctrl->irq_domain = irq_domain_add_linear(dev->of_node,
