@@ -1,32 +1,31 @@
-From: jeremy.linton@arm.com (Jeremy Linton)
-Date: Wed, 18 Nov 2015 13:31:18 -0600
-Subject: [PATCH] [PATCH] arm64: Boot failure on m400 with new cont PTEs
-In-Reply-To: <20151118180434.GB13355@leverpostej>
-References: <1447858999-26665-1-git-send-email-jeremy.linton@arm.com>
- <20151118152044.GD10644@leverpostej> <564CA29A.9050905@arm.com>
- <20151118162932.GA13355@leverpostej> <564CB1DA.4090304@arm.com>
- <20151118180434.GB13355@leverpostej>
-Message-ID: <564CD206.9040402@arm.com>
+From: computersforpeace@gmail.com (Brian Norris)
+Date: Wed, 18 Nov 2015 11:31:29 -0800
+Subject: [PATCH 4/7] phy: rockchip-usb: add missing of_node_put
+In-Reply-To: <19587543.sZ81DoLUBT@diego>
+References: <1447673600-8881-1-git-send-email-Julia.Lawall@lip6.fr>
+ <1447673600-8881-5-git-send-email-Julia.Lawall@lip6.fr>
+ <19587543.sZ81DoLUBT@diego>
+Message-ID: <20151118193129.GA48815@google.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/18/2015 12:04 PM, Mark Rutland wrote:
+On Wed, Nov 18, 2015 at 08:27:07PM +0100, Heiko St?bner wrote:
+> Am Montag, 16. November 2015, 12:33:17 schrieb Julia Lawall:
+> hmm, while I agree that the rockchip phy has an issue in the node lifecycle, 
+> I'm not sure that patch fixes it fully.
+> 
+> It currently iterates over each phy, but would only of_node_put the phy it 
+> handled last. So if an error happens on the 3rd phy, the first 2 are already 
+> instantiated and would also get removed when the overall probe fails, but 
+> their of_node would never be "put".
 
-> You're racing against other parts of the CPU (the page table walker(s),
-> I-caches, etc). The flushing only minimises the window for a race, and
-> does not prevent the race from being possible.
->
-> Given that the envelope is constantly pushing forward w.r.t. how
-> aggressive CPUs may be in this area, we need to fix the issue by
-> reasoning against what the architecture guarantees us.
-	Its also not suppose to fault on speculative access, and to me that 
-means page table walks/etc that are the result of speculative access. 
-Which AFAIK, closes the window significantly. I would only really worry 
-about interrupt activity, and updates to the memory containing the PTE's 
-themselves. Either way the simple change (rather than rewriting the 
-whole code path) is probably to flag the fault handler to simply resume 
-from these kinds of faults during create_mapping_late().
+Note the behavior of of_get_next_child() (and
+of_get_next_available_child()); it "Decrements the refcount of prev." So
+the loop only keeps a reference for (at most) one node at a time.
 
-	But that isn't what is happening here AFAIK, the faults are long after 
-the PTE's have been updated, and are the result of failure to flush the 
-TLB..
+I believe Julia's patch is correct. It's possible the commit description
+could have made this aspect clearer though, since I was confused about
+this at first as well.
+
+Regards,
+Brian
