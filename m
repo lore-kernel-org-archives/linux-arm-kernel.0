@@ -1,64 +1,35 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 18 Nov 2015 10:09:22 +0900
-Subject: [PATCH] ARM: sunxi: Re-enable SID driver in multi_v7_defconfig
-In-Reply-To: <20151117090309.09ACC6C80816@dd34104.kasserver.com>
-References: <1447724947-4851-1-git-send-email-public_timo.s@silentcreek.de>
- <564A8CAD.8050004@samsung.com> <1447747294.6274.8.camel@silentcreek.de>
- <CAJKOXPdBnMcoFDuVMm3zgDcZwDVfeotySvAbO+bvzDX0T-AX4g@mail.gmail.com>
- <20151117090309.09ACC6C80816@dd34104.kasserver.com>
-Message-ID: <564BCFC2.8050506@samsung.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue, 17 Nov 2015 17:12:25 -0800
+Subject: [PATCH 0/4] Add DTS for MSM8996 SoC and MTP
+Message-ID: <1447809149-29724-1-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17.11.2015 18:03, Timo Sigurdsson wrote:
-> Hi,
-> 
-> Krzysztof Kozlowski schrieb am 17.11.2015 09:21:
-> 
-> [...]
-> 
->>>>> @@ -450,8 +431,7 @@ CONFIG_MEDIA_CAMERA_SUPPORT=y
->>>>>  CONFIG_MEDIA_CONTROLLER=y
->>>>>  CONFIG_VIDEO_V4L2_SUBDEV_API=y
->>>>>  CONFIG_MEDIA_USB_SUPPORT=y
->>>>> -CONFIG_USB_VIDEO_CLASS=y
->>>>> -CONFIG_USB_GSPCA=y
->>>>> +CONFIG_USB_VIDEO_CLASS=m
->>>>>  CONFIG_V4L_PLATFORM_DRIVERS=y
->>>>>  CONFIG_SOC_CAMERA=m
->>>>>  CONFIG_SOC_CAMERA_PLATFORM=m
->>>>> @@ -465,28 +445,25 @@ CONFIG_DRM=y
->>>>>  CONFIG_DRM_I2C_ADV7511=m
->>>>>  # CONFIG_DRM_I2C_CH7006 is not set
->>>>>  # CONFIG_DRM_I2C_SIL164 is not set
->>>>> -CONFIG_DRM_NXP_PTN3460=m
->>>>> -CONFIG_DRM_PARADE_PS8622=m
->>>>>  CONFIG_DRM_NOUVEAU=m
->>>>>  CONFIG_DRM_EXYNOS=m
->>>>> -CONFIG_DRM_EXYNOS_DSI=y
->>>>>  CONFIG_DRM_EXYNOS_FIMD=y
->>>>> -CONFIG_DRM_EXYNOS_HDMI=y
->>>>
->>>> I would prefer leaving the EXYNOS_HDMI. Dependencies are now not enabled
->>>> but we are fixing it in:
->>>> http://www.spinics.net/lists/dri-devel/msg93299.html
->>>
->>> I think the problem here is that I don't see this patch in linux-next
->>> yet.
->>>
->>
->> Indeed... and I don't know when it will go there so actually maybe it
->> should be removed... but in the same time removing DRM_EXYNOS_HDMI
->> will probably make some conflicts because mentioned patch will go
->> through Exynos DRM tree or Samsung SoC.
-> 
-> Since you suggested to split my patch into two, I might as well just
-> hold off the "cleanup" patch until Andrzejs patch hits linux-next.
-> Is that ok?
+These patches add the initial dts files for the MSM8996 SoC and
+MTP evaluation board.
 
->From my point of view - OK. However this may take time... I don't know
-when Andrzej's patch will be applied so for me would work also
-savedefconfig without removing HDMI.
+Stephen Boyd (4):
+  devicetree: bindings: Document Kryo cpu
+  arm64: dts: Add msm8996 SoC and MTP board support
+  arm64: dts: qcom: Add pm8994, pmi8994, pm8004 PMIC skeletons
+  arm64: dts: qcom: Add pm8994 gpios and MPPs
 
-Best regards,
-Krzysztof
+ Documentation/devicetree/bindings/arm/cpus.txt |   1 +
+ arch/arm64/boot/dts/qcom/Makefile              |   1 +
+ arch/arm64/boot/dts/qcom/msm8996-mtp.dts       |  21 ++
+ arch/arm64/boot/dts/qcom/msm8996-mtp.dtsi      |  30 +++
+ arch/arm64/boot/dts/qcom/msm8996.dtsi          | 267 +++++++++++++++++++++++++
+ arch/arm64/boot/dts/qcom/pm8004.dtsi           |  19 ++
+ arch/arm64/boot/dts/qcom/pm8994.dtsi           |  62 ++++++
+ arch/arm64/boot/dts/qcom/pmi8994.dtsi          |  19 ++
+ 8 files changed, 420 insertions(+)
+ create mode 100644 arch/arm64/boot/dts/qcom/msm8996-mtp.dts
+ create mode 100644 arch/arm64/boot/dts/qcom/msm8996-mtp.dtsi
+ create mode 100644 arch/arm64/boot/dts/qcom/msm8996.dtsi
+ create mode 100644 arch/arm64/boot/dts/qcom/pm8004.dtsi
+ create mode 100644 arch/arm64/boot/dts/qcom/pm8994.dtsi
+ create mode 100644 arch/arm64/boot/dts/qcom/pmi8994.dtsi
+
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
