@@ -1,35 +1,48 @@
-From: dbrignoli@audioscience.com (Delio Brignoli)
-Date: Wed, 18 Nov 2015 09:26:49 +0100
-Subject: Minimal support for dm814x
-In-Reply-To: <CAALWOA-PjKW9M3qqxum4OqJ3V3AwKaaEDzA17jdZmgUNNE79Wg@mail.gmail.com>
-References: <4999BB3D-4BB5-4F7C-96D7-FB687725CDCC@audioscience.com>
- <20151109150602.GR3199@atomide.com>
- <CAALWOA-NUyRYaGbmBZpc6CcFga8_BKPZ9WQTxa3t09bHS_6=qA@mail.gmail.com>
- <7933071D-84FD-4A85-8CD0-CC504CE1D9D1@audioscience.com>
- <20151111174028.GF3218@atomide.com>
- <CAALWOA_dEtajQBLrXesQ2bRCDf-1Dzg_tJw_=yAmaO=T3=KMZQ@mail.gmail.com>
- <20151112174155.GM3218@atomide.com>
- <CAALWOA9o80rhaqwaa6=XxmNN1FcWzHDXiaqkqFVO81CAMX=04w@mail.gmail.com>
- <CAALWOA-29pK=GbNKhdY=4oJzhnueVxNAPruu9Uacqi5vMJN=OA@mail.gmail.com>
- <20151113145216.GC2517@atomide.com>
- <CAALWOA-PjKW9M3qqxum4OqJ3V3AwKaaEDzA17jdZmgUNNE79Wg@mail.gmail.com>
-Message-ID: <D5E377BD-5AAE-4302-B2C3-2B17A00892B5@audioscience.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 18 Nov 2015 09:24:54 +0100
+Subject: [PATCH v3 04/62] arm/acpi: Emulate io ports for arm
+In-Reply-To: <564C2246.2010906@huawei.com>
+References: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
+ <4167037.Po02bj0iif@wuerfel> <564C2246.2010906@huawei.com>
+Message-ID: <6117965.bKauib65dS@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18 Nov 2015, at 06:22, Matthijs van Duin <matthijsvanduin@gmail.com> wrote:
-> The PLL code looks pretty mediocre to me. In particular, they make no
-> effort whatsoever to configure an exact ratio. It seems their
-> algorithm uses whatever pre divider was already programmed,
+On Wednesday 18 November 2015 15:01:26 Shannon Zhao wrote:
+> Hi Arnd,
+> 
+> On 2015/11/17 17:50, Arnd Bergmann wrote:
+> > On Tuesday 17 November 2015 17:40:03 shannon.zhao at linaro.org wrote:
+> >> +/*
+> >> + * Emulate x86 io ports for arm.
+> >> + */
+> >> +#define __armio(addr) ( (void __iomem *)addr )
+> >> +
+> >> +#define inb(c) ( readb( __armio(c) ) )
+> >> +#define inw(c) ( readw( __armio(c) ) )
+> >> +#define inl(c) ( readl( __armio(c) ) )
+> >> +
+> >> +#define outb(v, c) ( writeb(v, __armio(c) ) )
+> >> +#define outw(v, c) ( writew(v, __armio(c) ) )
+> >> +#define outl(v, c) ( writel(v, __armio(c) ) )
+> >> +
+> > 
+> > This is almost certainly wrong. There might be I/O port accesses, but they
+> > won't be in the same place as normal pointers.
+> > 
+> Sorry, maybe I didn't get what you mean. Here it just wants emulate the
+> in(b,w,l) and out(b,w,l) which exist on x86 while not on ARM. So it
+> could introduce less change to the common ACPI codes, for example
+> acpi_os_write_port().
+> 
+> I see there is the same thing in Linux arch/arm/include/asm/io.h
 
-I believe the implementors assumed the bootloader was setting up the PLL, its adjustment may have been an afterthought added in order to support PTP.
+The problem is that your definition of __armio() is wrong. If you want to
+do it right, you need to first find the PCI I/O port ranges and map them
+into a virtual address, and then define __armio() in a way to add
+the virtual address you have mapped them to.
 
-> This works in principle, but both minimizing the DCO and (often
-> needlessly) using the fractional multiplier seem like recipes to
-> maximize the clock jitter. Mind you, I don't know how much jitter
-> we?re talking about here, I don't recall having seen specs about this.
+Alternatively, define the functions so they don't try to access the
+pointers but instead just print a warning.
 
-We haven?t seen any specs either but testing shows that changing DCO mode causes the PLL to lose lock at least temporarily.
-
-?
-Delio
+	Arnd
