@@ -1,85 +1,55 @@
-From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Wed, 18 Nov 2015 17:08:21 +0900
-Subject: [PATCH] arm64: extract a field correctly in
- cpuid_feature_extract_field()
-In-Reply-To: <CAKv+Gu9wiUXt3R0psPjye0Tzn2FRNkffXyutph3PiuVtp58VsQ@mail.gmail.com>
-References: <1447736739-4131-1-git-send-email-takahiro.akashi@linaro.org>
- <CAKv+Gu9=zfocXVOsqHQHGu+afZisE_nZWCQ-bN5Fe_X=NacYHg@mail.gmail.com>
- <564AF2F7.9030106@arm.com> <564C2311.3040904@linaro.org>
- <CAKv+Gu9wiUXt3R0psPjye0Tzn2FRNkffXyutph3PiuVtp58VsQ@mail.gmail.com>
-Message-ID: <564C31F5.20306@linaro.org>
+From: zhaoshenglong@huawei.com (Shannon Zhao)
+Date: Wed, 18 Nov 2015 16:03:04 +0800
+Subject: [PATCH v3 00/62] Add ACPI support for arm64 on Xen
+In-Reply-To: <564B1508.3060703@citrix.com>
+References: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
+ <564B1508.3060703@citrix.com>
+Message-ID: <564C30B8.3050408@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/18/2015 04:26 PM, Ard Biesheuvel wrote:
-> (+ Steve)
->
-> On 18 November 2015 at 08:04, AKASHI Takahiro
-> <takahiro.akashi@linaro.org> wrote:
->> On 11/17/2015 06:27 PM, Suzuki K. Poulose wrote:
->>>
->>> On 17/11/15 07:15, Ard Biesheuvel wrote:
->>>>
->>>> On 17 November 2015 at 06:05, AKASHI Takahiro
->>>> <takahiro.akashi@linaro.org> wrote:
->>>>>
->>>>> Basically, cpuid_feature_extract_field() does shift-left and then
->>>>> shift-right to extract a specific field in an operand. But
->>>>> a shift-left'ed value is casted to 's64' and so a succeeding shift-right
->>>>> operation results in creating a sign-extended (and bogus) value.
->>>>>
->>>>
->>>> This is intentional. This function was created specifically for
->>>> extracting CPU feature fields, which are signed 4-bit quantities,
->>>> where positive values represent incremental functionality, and
->>>> negative values are reserved. This is poorly documented in the ARM ARM
->>>> though.
+On 2015/11/17 19:52, Julien Grall wrote:
+> Hi Shannon,
+> 
+> On 17/11/15 09:39, shannon.zhao at linaro.org wrote:
+>> From: Shannon Zhao <shannon.zhao@linaro.org>
 >>
->>
->> Good. So please take my patch as a bug report because perf record -e
->> mem:XXX:x
->> doesn't work with v4.4-rc1 (if # of hw breakpoints is over 0x7, e.g. default
->> case on fast model.)
->>
->>> Right. Akash's fix could break other pieces (like FP/ASIMD support in
->>> IDAA64PFR0
->>> where, 0xf => function not implemented).
->>
->>
->> IMO, 0xf is 0xf, not -1.
->> (I don't think "All other values are reserved." means that the value is
->> *signed*.)
->>
->
-> It does, but the ARM ARM does not explicitly say so. That is why I
-> said it is poorly documented.
->
-> If we ignore all values except the documented ones, we defeat the
-> purpose of describing incremental functionality, and we break forward
-> compatibility.
-> For instance, bits [7:4] of ID_AA64ISAR0_EL1 are currently defined as
->
-> """
-> 0000 No AES instructions implemented.
-> 0001 AESE, AESD, AESMC, and AESIMC instructions implemented.
-> 0010 As for 0001 , plus PMULL/PMULL2 instructions operating on 64-bit
-> data quantities.
-> All other values are reserved.
-> """
->
-> but in the future, values up to 0b0111 may be defined that each imply
-> all the preceding ones. If we don't take that into account now, older
-> kernels on newer versions of the architecture may lose the ability to
-> use AES and PMULL instructions if this field is extended.
+>> This patch set adds ACPI support for arm64 on Xen. The design document
+>> could be found from [1].
+> 
+> Thank you for your work on it. I think this series would benefits to be
+> split in smaller series.
+> 
+> I would do a first series which split DT code from common code. So we
+> can get this code as soon as possible in Xen, avoid you to spend less
+> time rebasing your us to be spammed with 62 patches for each new version.
+> 
 
-I don't fully understand yet why we should take the value as signed,
-but
+Sure, I think I can split this patch set in three parts.
 
-> That is why I said using cpuid_feature_extract_field() for other 4-bit
-> fields is a mistake. It should only be used for fields that describe
-> incremental functionality.
+First one would be porting the necessary Linux changes of ACPI 5.0~6.0.
+It includes:
 
-I agree here.
-Anyway, thank you for the clarification.
+ACPI 5.0: Add new/changed tables to headers (only changes of Generic
+Interrupt and Generic Distributor and some changes already exist)
+ACPICA/ARM: ACPI 5.1: Update for MADT changes.
+ACPICA: ACPI 6.0: Add changes for MADT table.
+ACPICA: ACPI 6.0: Add values for MADT GIC version field
+ACPICA/ARM: ACPI 5.1: Update for FADT changes.
+ACPICA: ACPI 6.0: Add changes for FADT table
+ACPICA/ARM: ACPI 5.1: Update for GTDT table changes.
+ACPICA: Headers: Add GTDT flag definitions for the timer subtable.
+ACPICA: ACPI 6.0: Add support for STAO table
 
--Takahiro AKASHI
+Second one as you suggest would be the series which split DT codes from
+common code.
+
+And the last one would be the series which add ACPI support for Xen on
+ARM and prepare the necessary things for Dom0.
+
+How about this way? The order of the first and second can be changed if
+you like.
+
+Thanks,
+-- 
+Shannon
