@@ -1,78 +1,249 @@
-From: ard.biesheuvel@linaro.org (Ard Biesheuvel)
-Date: Wed, 18 Nov 2015 08:26:23 +0100
-Subject: [PATCH] arm64: extract a field correctly in
- cpuid_feature_extract_field()
-In-Reply-To: <564C2311.3040904@linaro.org>
-References: <1447736739-4131-1-git-send-email-takahiro.akashi@linaro.org>
- <CAKv+Gu9=zfocXVOsqHQHGu+afZisE_nZWCQ-bN5Fe_X=NacYHg@mail.gmail.com>
- <564AF2F7.9030106@arm.com> <564C2311.3040904@linaro.org>
-Message-ID: <CAKv+Gu9wiUXt3R0psPjye0Tzn2FRNkffXyutph3PiuVtp58VsQ@mail.gmail.com>
+From: zhangfei.gao@linaro.org (Zhangfei Gao)
+Date: Wed, 18 Nov 2015 15:35:23 +0800
+Subject: [PATCH] phy: add phy-hi6220-usb
+Message-ID: <1447832123-27245-1-git-send-email-zhangfei.gao@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-(+ Steve)
+Support hi6220 use phy for HiKey board
 
-On 18 November 2015 at 08:04, AKASHI Takahiro
-<takahiro.akashi@linaro.org> wrote:
-> On 11/17/2015 06:27 PM, Suzuki K. Poulose wrote:
->>
->> On 17/11/15 07:15, Ard Biesheuvel wrote:
->>>
->>> On 17 November 2015 at 06:05, AKASHI Takahiro
->>> <takahiro.akashi@linaro.org> wrote:
->>>>
->>>> Basically, cpuid_feature_extract_field() does shift-left and then
->>>> shift-right to extract a specific field in an operand. But
->>>> a shift-left'ed value is casted to 's64' and so a succeeding shift-right
->>>> operation results in creating a sign-extended (and bogus) value.
->>>>
->>>
->>> This is intentional. This function was created specifically for
->>> extracting CPU feature fields, which are signed 4-bit quantities,
->>> where positive values represent incremental functionality, and
->>> negative values are reserved. This is poorly documented in the ARM ARM
->>> though.
->
->
-> Good. So please take my patch as a bug report because perf record -e
-> mem:XXX:x
-> doesn't work with v4.4-rc1 (if # of hw breakpoints is over 0x7, e.g. default
-> case on fast model.)
->
->> Right. Akash's fix could break other pieces (like FP/ASIMD support in
->> IDAA64PFR0
->> where, 0xf => function not implemented).
->
->
-> IMO, 0xf is 0xf, not -1.
-> (I don't think "All other values are reserved." means that the value is
-> *signed*.)
->
+Signed-off-by: Zhangfei Gao <zhangfei.gao@linaro.org>
+---
+ .../devicetree/bindings/phy/phy-hi6220-usb.txt     |  16 ++
+ drivers/phy/Kconfig                                |   9 ++
+ drivers/phy/Makefile                               |   1 +
+ drivers/phy/phy-hi6220-usb.c                       | 168 +++++++++++++++++++++
+ 4 files changed, 194 insertions(+)
+ create mode 100644 Documentation/devicetree/bindings/phy/phy-hi6220-usb.txt
+ create mode 100644 drivers/phy/phy-hi6220-usb.c
 
-It does, but the ARM ARM does not explicitly say so. That is why I
-said it is poorly documented.
-
-If we ignore all values except the documented ones, we defeat the
-purpose of describing incremental functionality, and we break forward
-compatibility.
-For instance, bits [7:4] of ID_AA64ISAR0_EL1 are currently defined as
-
-"""
-0000 No AES instructions implemented.
-0001 AESE, AESD, AESMC, and AESIMC instructions implemented.
-0010 As for 0001 , plus PMULL/PMULL2 instructions operating on 64-bit
-data quantities.
-All other values are reserved.
-"""
-
-but in the future, values up to 0b0111 may be defined that each imply
-all the preceding ones. If we don't take that into account now, older
-kernels on newer versions of the architecture may lose the ability to
-use AES and PMULL instructions if this field is extended.
-
-That is why I said using cpuid_feature_extract_field() for other 4-bit
-fields is a mistake. It should only be used for fields that describe
-incremental functionality.
-
+diff --git a/Documentation/devicetree/bindings/phy/phy-hi6220-usb.txt b/Documentation/devicetree/bindings/phy/phy-hi6220-usb.txt
+new file mode 100644
+index 0000000..f17a56e
+--- /dev/null
++++ b/Documentation/devicetree/bindings/phy/phy-hi6220-usb.txt
+@@ -0,0 +1,16 @@
++Hisilicon hi6220 usb PHY
++-----------------------
++
++Required properties:
++- compatible: should be "hisilicon,hi6220-usb-phy"
++- #phy-cells: must be 0
++- hisilicon,peripheral-syscon: phandle of syscon used to control phy.
++Refer to phy/phy-bindings.txt for the generic PHY binding properties
++
++Example:
++	usb_phy: usbphy {
++		compatible = "hisilicon,hi6220-usb-phy";
++		#phy-cells = <0>;
++		phy-supply = <&fixed_5v_hub>;
++		hisilicon,peripheral-syscon = <&sys_ctrl>;
++	};
+diff --git a/drivers/phy/Kconfig b/drivers/phy/Kconfig
+index 47da573..c91a612 100644
+--- a/drivers/phy/Kconfig
++++ b/drivers/phy/Kconfig
+@@ -206,6 +206,15 @@ config PHY_HIX5HD2_SATA
+ 	help
+ 	  Support for SATA PHY on Hisilicon hix5hd2 Soc.
+ 
++config PHY_HI6220_USB
++	tristate "hi6220 USB PHY support"
++	select GENERIC_PHY
++	select MFD_SYSCON
++	help
++	  Enable this to support the HISILICON HI6220 USB PHY.
++
++	  To compile this driver as a module, choose M here.
++
+ config PHY_SUN4I_USB
+ 	tristate "Allwinner sunxi SoC USB PHY driver"
+ 	depends on ARCH_SUNXI && HAS_IOMEM && OF
+diff --git a/drivers/phy/Makefile b/drivers/phy/Makefile
+index a5b18c1..0c5ccc9 100644
+--- a/drivers/phy/Makefile
++++ b/drivers/phy/Makefile
+@@ -23,6 +23,7 @@ obj-$(CONFIG_TI_PIPE3)			+= phy-ti-pipe3.o
+ obj-$(CONFIG_TWL4030_USB)		+= phy-twl4030-usb.o
+ obj-$(CONFIG_PHY_EXYNOS5250_SATA)	+= phy-exynos5250-sata.o
+ obj-$(CONFIG_PHY_HIX5HD2_SATA)		+= phy-hix5hd2-sata.o
++obj-$(CONFIG_PHY_HI6220_USB)		+= phy-hi6220-usb.o
+ obj-$(CONFIG_PHY_SUN4I_USB)		+= phy-sun4i-usb.o
+ obj-$(CONFIG_PHY_SUN9I_USB)		+= phy-sun9i-usb.o
+ obj-$(CONFIG_PHY_SAMSUNG_USB2)		+= phy-exynos-usb2.o
+diff --git a/drivers/phy/phy-hi6220-usb.c b/drivers/phy/phy-hi6220-usb.c
+new file mode 100644
+index 0000000..b2141cb
+--- /dev/null
++++ b/drivers/phy/phy-hi6220-usb.c
+@@ -0,0 +1,168 @@
++/*
++ * Copyright (c) 2015 Linaro Ltd.
++ * Copyright (c) 2015 Hisilicon Limited.
++ *
++ * This program is free software; you can redistribute it and/or modify
++ * it under the terms of the GNU General Public License as published by
++ * the Free Software Foundation; either version 2 of the License, or
++ * (at your option) any later version.
++ */
++
++#include <linux/mfd/syscon.h>
++#include <linux/module.h>
++#include <linux/platform_device.h>
++#include <linux/phy/phy.h>
++#include <linux/regmap.h>
++
++#define SC_PERIPH_CTRL4			0x00c
++
++#define CTRL4_PICO_SIDDQ		BIT(6)
++#define CTRL4_PICO_OGDISABLE		BIT(8)
++#define CTRL4_PICO_VBUSVLDEXT		BIT(10)
++#define CTRL4_PICO_VBUSVLDEXTSEL	BIT(11)
++#define CTRL4_OTG_PHY_SEL		BIT(21)
++
++#define SC_PERIPH_CTRL5			0x010
++
++#define CTRL5_USBOTG_RES_SEL		BIT(3)
++#define CTRL5_PICOPHY_ACAENB		BIT(4)
++#define CTRL5_PICOPHY_BC_MODE		BIT(5)
++#define CTRL5_PICOPHY_CHRGSEL		BIT(6)
++#define CTRL5_PICOPHY_VDATSRCEND	BIT(7)
++#define CTRL5_PICOPHY_VDATDETENB	BIT(8)
++#define CTRL5_PICOPHY_DCDENB		BIT(9)
++#define CTRL5_PICOPHY_IDDIG		BIT(10)
++
++#define SC_PERIPH_CTRL8			0x018
++#define SC_PERIPH_RSTEN0		0x300
++#define SC_PERIPH_RSTDIS0		0x304
++
++#define RST0_USBOTG_BUS			BIT(4)
++#define RST0_POR_PICOPHY		BIT(5)
++#define RST0_USBOTG			BIT(6)
++#define RST0_USBOTG_32K			BIT(7)
++
++#define EYE_PATTERN_PARA		0x7053348c
++
++struct hi6220_priv {
++	struct regmap *reg;
++	struct device *dev;
++};
++
++static void hi6220_phy_init(struct hi6220_priv *priv)
++{
++	struct regmap *reg = priv->reg;
++	u32 val, mask;
++
++	val = RST0_USBOTG_BUS | RST0_POR_PICOPHY |
++	      RST0_USBOTG | RST0_USBOTG_32K;
++	mask = val;
++	regmap_update_bits(reg, SC_PERIPH_RSTEN0, mask, val);
++	regmap_update_bits(reg, SC_PERIPH_RSTDIS0, mask, val);
++}
++
++static int hi6220_phy_setup(struct hi6220_priv *priv, bool on)
++{
++	struct regmap *reg = priv->reg;
++	u32 val, mask;
++	int ret;
++
++	if (on) {
++		val = CTRL5_USBOTG_RES_SEL | CTRL5_PICOPHY_ACAENB;
++		mask = val | CTRL5_PICOPHY_BC_MODE;
++		ret = regmap_update_bits(reg, SC_PERIPH_CTRL5, mask, val);
++		if (ret)
++			goto out;
++
++		val =  CTRL4_PICO_VBUSVLDEXT | CTRL4_PICO_VBUSVLDEXTSEL |
++		       CTRL4_OTG_PHY_SEL;
++		mask = val | CTRL4_PICO_SIDDQ | CTRL4_PICO_OGDISABLE;
++		ret = regmap_update_bits(reg, SC_PERIPH_CTRL4, mask, val);
++		if (ret)
++			goto out;
++
++		ret = regmap_write(reg, SC_PERIPH_CTRL8, EYE_PATTERN_PARA);
++		if (ret)
++			goto out;
++	} else {
++		val = CTRL4_PICO_SIDDQ;
++		mask = val;
++		ret = regmap_update_bits(reg, SC_PERIPH_CTRL4, mask, val);
++		if (ret)
++			goto out;
++	}
++
++	return 0;
++out:
++	dev_err(priv->dev, "failed to setup phy ret: %d\n", ret);
++	return ret;
++}
++
++static int hi6220_phy_start(struct phy *phy)
++{
++	struct hi6220_priv *priv = phy_get_drvdata(phy);
++
++	return hi6220_phy_setup(priv, true);
++}
++
++static int hi6220_phy_exit(struct phy *phy)
++{
++	struct hi6220_priv *priv = phy_get_drvdata(phy);
++
++	return hi6220_phy_setup(priv, false);
++}
++
++static struct phy_ops hi6220_phy_ops = {
++	.init		= hi6220_phy_start,
++	.exit		= hi6220_phy_exit,
++	.owner		= THIS_MODULE,
++};
++
++static int hi6220_phy_probe(struct platform_device *pdev)
++{
++	struct phy_provider *phy_provider;
++	struct device *dev = &pdev->dev;
++	struct phy *phy;
++	struct hi6220_priv *priv;
++
++	priv = devm_kzalloc(dev, sizeof(*priv), GFP_KERNEL);
++	if (!priv)
++		return -ENOMEM;
++
++	priv->dev = dev;
++	priv->reg = syscon_regmap_lookup_by_phandle(dev->of_node,
++					"hisilicon,peripheral-syscon");
++	if (IS_ERR(priv->reg)) {
++		dev_err(dev, "no hisilicon,peripheral-syscon\n");
++		return PTR_ERR(priv->reg);
++	}
++
++	hi6220_phy_init(priv);
++
++	phy = devm_phy_create(dev, NULL, &hi6220_phy_ops);
++	if (IS_ERR(phy))
++		return PTR_ERR(phy);
++
++	phy_set_drvdata(phy, priv);
++	phy_provider = devm_of_phy_provider_register(dev, of_phy_simple_xlate);
++	return PTR_ERR_OR_ZERO(phy_provider);
++}
++
++static const struct of_device_id hi6220_phy_of_match[] = {
++	{.compatible = "hisilicon,hi6220-usb-phy",},
++	{ },
++};
++MODULE_DEVICE_TABLE(of, hi6220_phy_of_match);
++
++static struct platform_driver hi6220_phy_driver = {
++	.probe	= hi6220_phy_probe,
++	.driver = {
++		.name	= "hi6220-usb-phy",
++		.of_match_table	= hi6220_phy_of_match,
++	}
++};
++module_platform_driver(hi6220_phy_driver);
++
++MODULE_DESCRIPTION("HISILICON HI6220 USB PHY driver");
++MODULE_ALIAS("platform:hi6220-usb-phy");
++MODULE_LICENSE("GPL");
 -- 
-Ard.
+1.9.1
