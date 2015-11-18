@@ -1,62 +1,70 @@
-From: rjw@rjwysocki.net (Rafael J. Wysocki)
-Date: Wed, 18 Nov 2015 22:24:52 +0100
-Subject: [PATCH V5 8/9] PCI: OF: Move of_pci_dma_configure() to
- pci_dma_configure()
-In-Reply-To: <564CAD63.3020306@amd.com>
-References: <1446072654-5608-1-git-send-email-Suravee.Suthikulpanit@amd.com>
- <3822315.uJPjk3L2zB@wuerfel> <564CAD63.3020306@amd.com>
-Message-ID: <7324830.G6XBOApVhh@vostro.rjw.lan>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 18 Nov 2015 22:02:39 +0100
+Subject: [PATCH] staging/emxx_udc: fix 64-bit warnings
+Message-ID: <4127718.gSaDyyMLEa@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday, November 18, 2015 10:54:59 AM Suravee Suthikulanit wrote:
-> Hi All,
-> 
-> On 11/18/2015 6:41 AM, Arnd Bergmann wrote:
-> > On Wednesday 18 November 2015 12:00:32 Robin Murphy wrote:
-> >> On 17/11/15 15:00, Robin Murphy wrote:
-> >>> On 28/10/15 22:50, Suravee Suthikulpanit wrote:
-> >>>> Signed-off-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
-> >>>> Acked-by: Rob Herring <robh+dt@kernel.org>
-> >>>> Acked-by: Bjorn Helgaas <bhelgaas@google.com>
-> >>>> Reviewed-by: Hanjun Guo <hanjun.guo@linaro.org>
-> >>>> CC: Rafael J. Wysocki <rjw@rjwysocki.net>
-> >> [...]
-> >>>> +/**
-> >>>> + * pci_dma_configure - Setup DMA configuration
-> >>>> + * @dev: ptr to pci_dev struct of the PCI device
-> >>>> + *
-> >>>> + * Function to update PCI devices's DMA configuration using the same
-> >>>> + * info from the OF node of host bridge's parent (if any).
-> >>>> + */
-> >>>> +static void pci_dma_configure(struct pci_dev *dev)
-> >>>> +{
-> >>>> +    struct device *bridge = pci_get_host_bridge_device(dev);
-> >>>> +
-> >>>> +    if (IS_ENABLED(CONFIG_OF) && dev->dev.of_node) {
-> >>>
-> >>> Previously I was seeing of_dma_configure, and thus of_iommu_configure,
-> >>> called for every PCI device on Juno. The check above now prevents this
-> >>> happening, since the PCI devices are probed directly from the bus and
-> >>> don't have OF nodes of their own. They now get left in some
-> >>> half-configured state where arch_setup_dma_ops isn't called either.
-> >>
-> >> Just to follow up on that, Arnd's patch to tidy up dma_get_ops (now
-> >> queued[1]) makes this even worse, since preventing arch_setup_dma_ops
-> >> being called means the PCI devices now get the dummy DMA ops which leave
-> >> the drivers failing to probe at all, IOMMU hacks or not
-> >
-> > Ok, glad we found that with my patch then. We really have to
-> > configure the DMA (offset/size/coherency/iommu) for all devices that might
-> > be masters, otherwise things can randomly go wrong.
-> >
-> > 	ARnd
-> 
-> Robin is correct. Thanks for catching the bug. Rafael, do you want me to 
-> submit just the fixed-up patch on top of what we had earlier. Or do you 
-> want a new revision (V6)?
+ARCH_SHMOBILE is coming to arm64, which creates new warnings in allmodconfig:
 
-This is in 4.4-rc1, right?  So new revisions surely won't work, will they?
+drivers/staging/emxx_udc/emxx_udc.c: In function '_nbu2ss_out_dma':
+drivers/staging/emxx_udc/emxx_udc.c:843:45: warning: cast from pointer to integer of different size [-Wpointer-to-int-cast]
+  _nbu2ss_writel(&preg->EP_DCR[num].EP_TADR, (u32)pBuffer);
 
-Thanks,
-Rafael
+This is clearly a mistake from confusing a dma_addr_t with a pointer,
+so the fix is to use the correct types in two places.
+
+The third warning of this kind is a check for an unaligned pointer,
+which should be done by casting the pointer to uintptr_t, not int.
+
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+
+diff --git a/drivers/staging/emxx_udc/emxx_udc.c b/drivers/staging/emxx_udc/emxx_udc.c
+index 4e6c16af40fc..c168845cbb91 100644
+--- a/drivers/staging/emxx_udc/emxx_udc.c
++++ b/drivers/staging/emxx_udc/emxx_udc.c
+@@ -823,7 +823,7 @@ static int _nbu2ss_out_dma(
+ 	u32		length
+ )
+ {
+-	u8		*pBuffer;
++	dma_addr_t	pBuffer;
+ 	u32		mpkt;
+ 	u32		lmpkt;
+ 	u32		dmacnt;
+@@ -836,7 +836,7 @@ static int _nbu2ss_out_dma(
+ 		return 1;		/* DMA is forwarded */
+ 
+ 	req->dma_flag = TRUE;
+-	pBuffer = (u8 *)req->req.dma;
++	pBuffer = req->req.dma;
+ 	pBuffer += req->req.actual;
+ 
+ 	/* DMA Address */
+@@ -1034,7 +1034,7 @@ static int _nbu2ss_in_dma(
+ 	u32		length
+ )
+ {
+-	u8		*pBuffer;
++	dma_addr_t	pBuffer;
+ 	u32		mpkt;		/* MaxPacketSize */
+ 	u32		lmpkt;		/* Last Packet Data Size */
+ 	u32		dmacnt;		/* IN Data Size */
+@@ -1080,7 +1080,7 @@ static int _nbu2ss_in_dma(
+ 	_nbu2ss_writel(&preg->EP_DCR[num].EP_DCR2, data);
+ 
+ 	/* Address setting */
+-	pBuffer = (u8 *)req->req.dma;
++	pBuffer = req->req.dma;
+ 	pBuffer += req->req.actual;
+ 	_nbu2ss_writel(&preg->EP_DCR[num].EP_TADR, (u32)pBuffer);
+ 
+@@ -2728,7 +2728,7 @@ static int nbu2ss_ep_queue(
+ 	spin_lock_irqsave(&udc->lock, flags);
+ 
+ #ifdef USE_DMA
+-	if ((u32)req->req.buf & 0x3)
++	if ((uintptr_t)req->req.buf & 0x3)
+ 		req->unaligned = TRUE;
+ 	else
+ 		req->unaligned = FALSE;
