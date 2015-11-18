@@ -1,20 +1,72 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 18 Nov 2015 10:32:18 +0100
-Subject: [PATCH v3 net-next] net: hisilicon: fix binding document of mdio
-In-Reply-To: <1447812480-190001-1-git-send-email-huangdaode@hisilicon.com>
-References: <1447812480-190001-1-git-send-email-huangdaode@hisilicon.com>
-Message-ID: <4484516.DQOP2f5rhB@wuerfel>
+From: andy.shevchenko@gmail.com (Andy Shevchenko)
+Date: Wed, 18 Nov 2015 11:35:27 +0200
+Subject: [PATCH] mmc: dw_mmc: use resource_size_t to store physical address
+In-Reply-To: <6288847.N1QBIiXedG@wuerfel>
+References: <28102387.ALpaBHpim0@wuerfel>
+ <CAHp75VfyOWrihHC4nhpKQrjH9SjP0NnaN1WU8se3PL4biWtz4g@mail.gmail.com>
+ <6288847.N1QBIiXedG@wuerfel>
+Message-ID: <CAHp75Vf4oaLZE27bC+aH9HD6W4E8Gditoz=HF0Z1WwcLWJnSKA@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 18 November 2015 10:08:00 huangdaode wrote:
-> This patch explains the occasion of "hisilcon,mdio" and
-> "hisilicon,hns-mdio" according to Arnd's comments.
-> and reformat it according to comments from Rob<robh@kernel.org>.
-> 
-> Signed-off-by: huangdaode <huangdaode@hisilicon.com>
-> 
+On Fri, Nov 13, 2015 at 11:35 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+> On Friday 13 November 2015 03:10:13 Andy Shevchenko wrote:
+>> On Thu, Nov 12, 2015 at 4:14 PM, Arnd Bergmann <arnd@arndb.de> wrote:
+>> > The dw_mmc driver stores the physical address of the MMIO registers
+>> > in a pointer, which requires the use of type casts, and is actually
+>> > broken if anyone ever has this device on a 32-bit SoC in registers
+>> > above 4GB. Gcc warns about this possibility when the driver is built
+>> > with ARM LPAE enabled:
+>>
+>> > -       host->phy_regs = (void *)(regs->start);
+>> > +       host->phy_regs = regs->start;
+>>
+>> >         /* Set external dma config: burst size, burst width */
+>> > -       cfg.dst_addr = (dma_addr_t)(host->phy_regs + fifo_offset);
+>> > +       cfg.dst_addr = host->phy_regs + fifo_offset;
+>>
+>> dst_addr is dma_addr_t?
+>
+> Sort of. It doesn't really fit into any of the categories, and we actually
+> had a patch to change the type in the past, see
+> https://lkml.org/lkml/2015/7/10/167. Not sure what is going on there.
+>
+>> >         /* Registers's physical base address */
+>> > -       void                    *phy_regs;
+>> > +       resource_size_t         phy_regs;
+>>
+>> If dst_addr is dma_addr_t wouldn't be a problem when
+>> resource_size_t is defined as 64-bit address, and dma_addr_t as 32-bit?
+>>
+>> Btw, for me casting to dma_addr_t looks sane.
+>
+> The background here is that the address comes from a resource_size_t
+> that describes the MMIO register area as seen from the CPU, and that
+> is normally a phys_addr_t (resource_size_t is defined as being long
+> enough to store a phys_addr_t or various other things depending on
+> resource->flags).
+>
+> dma_addr_t strictly speaking refers to a RAM location as seen by a
+> DMA master, and that only comes out of dma_map_*() or
+> dma_alloc_coherent().
+>
+> The DMA engine wants something else here, which is an MMIO register
+> address as seen by a DMA master, and we don't have a separate typedef
+> for that. Almost universally all of resource_size_t, phys_addr_t and
+> dma_addr_t are the same type, and if we ever get a platform that
+> wants something other than a phys_addr_t to put into cfg.dst_addr,
+> we are in deep trouble.
 
-Thanks a lot for addressing this!
+DMA operates with address space covered by dma_addr_t, if you use
+phys_addr_t you may get address out of DMA boundaries. This is should
+be done in hardware / firmware / platform representation.
+So, I don't see any reason not to use dma_addr_t here.
 
-Reviewed-by: Arnd Bergmann <arnd@arndb.de>
+>
+>         Arnd
+
+
+
+-- 
+With Best Regards,
+Andy Shevchenko
