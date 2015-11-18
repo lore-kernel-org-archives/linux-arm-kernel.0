@@ -1,27 +1,36 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 18 Nov 2015 12:14:50 +0000
-Subject: [PATCHv2] arm64: Fix R/O permissions in mark_rodata_ro
-In-Reply-To: <1447359670-23652-1-git-send-email-labbott@fedoraproject.org>
-References: <CAKv+Gu8Z7bkogGUGcNbuSoEbUBAwVmtFNhX9VcbypucaUGd+HQ@mail.gmail.com>
- <1447359670-23652-1-git-send-email-labbott@fedoraproject.org>
-Message-ID: <20151118121450.GF27495@e104818-lin.cambridge.arm.com>
+From: festevam@gmail.com (Fabio Estevam)
+Date: Wed, 18 Nov 2015 10:14:58 -0200
+Subject: [PATCH 2/2] ARM: dts: imx6q: add Novena board
+In-Reply-To: <1447845958.3144.61.camel@pengutronix.de>
+References: <1447840120-8513-1-git-send-email-marex@denx.de>
+ <1447840120-8513-2-git-send-email-marex@denx.de>
+ <1447841412.3144.57.camel@pengutronix.de>
+ <201511181135.40171.marex@denx.de>
+ <1447845958.3144.61.camel@pengutronix.de>
+Message-ID: <CAOMZO5Cdz8qi4rATd1K8vGhbuJzDD0Mt38Q9LwnrT7zbqCtxUg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thu, Nov 12, 2015 at 12:21:10PM -0800, Laura Abbott wrote:
-> The permissions in mark_rodata_ro trigger a build error
-> with STRICT_MM_TYPECHECKS. Fix this by introducing
-> PAGE_KERNEL_ROX for the same reasons as PAGE_KERNEL_RO.
-> From Ard:
-> 
-> "PAGE_KERNEL_EXEC has PTE_WRITE set as well, making the range
-> writeable under the ARMv8.1 DBM feature, that manages the
-> dirty bit in hardware (writing to a page with the PTE_RDONLY
-> and PTE_WRITE bits both set will clear the PTE_RDONLY bit in that case)"
-> 
-> Signed-off-by: Laura Abbott <labbott@fedoraproject.org>
+On Wed, Nov 18, 2015 at 9:25 AM, Lucas Stach <l.stach@pengutronix.de> wrote:
 
-Applied. Thanks.
+>> This is surprising to me, since all the boards I checked use this /regulators
+>> simple bus to contain all the regulators. Is this going to change now ?
+>
+> Yes, there are a lot of bad examples out there, mainly because people
+> wanted to logically group the regulators together. But as it isn't
+> representing any real hardware we should really try to move away from
+> this practice.
 
--- 
-Catalin
+Agreed.
+
+I have tried to fixing this usage on sabresd board:
+http://lists.infradead.org/pipermail/linux-arm-kernel/2014-February/231934.html
+
+,and there was some discussions whether this was churn or not, so I
+ended up not resending it.
+
+IMHO we should make this consistent in the various dts files.
+
+Regards,
+
+Fabio Estevam
