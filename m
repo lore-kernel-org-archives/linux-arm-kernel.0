@@ -1,42 +1,39 @@
-From: ynorov@caviumnetworks.com (Yury Norov)
-Date: Wed, 18 Nov 2015 23:25:43 +0300
-Subject: [PATCH v6 18/19] arm64:ilp32: change COMPAT_ELF_PLATFORM to
- report a a subplatform for ILP32
-In-Reply-To: <E53A0D4E-EAAF-4956-9E21-599254EB80BB@gmail.com>
-References: <1447795019-30176-1-git-send-email-ynorov@caviumnetworks.com>
- <1447795019-30176-19-git-send-email-ynorov@caviumnetworks.com>
- <564C32AB.4070901@huawei.com>
- <E53A0D4E-EAAF-4956-9E21-599254EB80BB@gmail.com>
-Message-ID: <20151118202543.GB11264@yury-N73SV>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 18 Nov 2015 21:27:59 +0100
+Subject: [PATCH] usb: musb: USB_TI_CPPI41_DMA requires dmaengine support
+In-Reply-To: <CADYTM3baomio7+nFizOKFXMav7guow+=GsVaGExBWxQyn9t=2w@mail.gmail.com>
+References: <4370741.70D0kgBgnp@wuerfel>
+ <CADYTM3baomio7+nFizOKFXMav7guow+=GsVaGExBWxQyn9t=2w@mail.gmail.com>
+Message-ID: <3958456.qUtBLJFy2S@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 18, 2015 at 03:21:05AM -0800, pinskia at gmail.com wrote:
+On Wednesday 18 November 2015 12:29:27 Bin Liu wrote:
+> > diff --git a/drivers/usb/musb/Kconfig b/drivers/usb/musb/Kconfig
+> > index 1f2037bbeb0d..45c83baf675d 100644
+> > --- a/drivers/usb/musb/Kconfig
+> > +++ b/drivers/usb/musb/Kconfig
+> > @@ -159,7 +159,7 @@ config USB_TI_CPPI_DMA
+> >
+> >  config USB_TI_CPPI41_DMA
+> >         bool 'TI CPPI 4.1 (AM335x)'
+> > -       depends on ARCH_OMAP
+> > +       depends on ARCH_OMAP && DMADEVICES
+> >         select TI_CPPI41
 > 
-> 
-> > On Nov 18, 2015, at 12:11 AM, Zhangjian (Bamvor) <bamvor.zhangjian@huawei.com> wrote:
-> > 
-> > Hi, Yury
-> > 
-> >> On 2015/11/18 5:16, Yury Norov wrote:
-> >> From: Philipp Tomsich <philipp.tomsich@theobroma-systems.com>
-> >> 
-> >> To make life for tools (such as gdb) easier when dealing with ILP32 processes,
-> >> we report a proper subarchitecture for ILP32 in the ELF auxiliary vectors.
-> > I saw some ilp32 relative patches in binutils mailing list. Does gdb
-> > fully support ilp32?
-> 
-> I have a patch set but I have not tested them with the latest kernel patch set yet. The branch is located in the binutils-gdb git is https://sourceware.org/git/?p=binutils-gdb.git;a=shortlog;h=refs/heads/users/pinskia/gdb-aarch64-ilp32 .
-> I think it will mostly work except for core support might need to be changed slightly. 
-> 
-> Thanks,
-> Andrew
-> > 
+> I am not sure what the generic policy is, but instead of hiding
+> USB_TI_CPPI41_DMA if DMADEVICES is disabled, I'd like to enable
+> DMADEVICES if USB_TI_CPPI41_DMA is enabled, from user experience
+> perspective.
 
-Yes, it works mostly. I can read and modify text/data, set breakpoints
-etc.
+General policy is that you should not 'select' a symbol that is
+also user-visible, as that tends to cause dependency loops and
+other problems when something is enabled without the user being
+aware of that.
 
-> > Regards
-> > 
-> > Bamvor
-> > 
+Ideally we should remove the 'select TI_CPPI41' here as well, but
+what we could do instead is to make that a silent symbol and remove
+the prompt so it always gets enabled implicitly when USB_TI_CPPI41_DMA
+and DMADEVICES are both enabled.
+
+	Arnd
