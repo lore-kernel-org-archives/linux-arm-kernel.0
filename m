@@ -1,67 +1,51 @@
-From: grygorii.strashko@ti.com (Grygorii Strashko)
-Date: Wed, 18 Nov 2015 17:35:43 +0200
-Subject: [4.4-rc][PATCH] ARM: dts: am4372: disable arm twd and global
- timer's nodes
-In-Reply-To: <20151118141537.GC10644@leverpostej>
-References: <1447855315-419-1-git-send-email-grygorii.strashko@ti.com>
- <20151118141537.GC10644@leverpostej>
-Message-ID: <564C9ACF.6040107@ti.com>
+From: will.deacon@arm.com (Will Deacon)
+Date: Wed, 18 Nov 2015 15:36:34 +0000
+Subject: next build: 235 warnings 3 failures (next/next-20151117)
+In-Reply-To: <063D6719AE5E284EB5DD2968C1650D6D1CBD57A5@AcuExch.aculab.com>
+References: <564a9961.878b420a.331b8.fffffd62@mx.google.com>
+ <6370082.rfihnaNWhf@wuerfel> <20151117171236.GJ30101@arm.com>
+ <3723928.99NZh1TC6E@wuerfel> <20151118101427.GC22731@arm.com>
+ <063D6719AE5E284EB5DD2968C1650D6D1CBD53BB@AcuExch.aculab.com>
+ <20151118122804.GD1588@arm.com>
+ <063D6719AE5E284EB5DD2968C1650D6D1CBD57A5@AcuExch.aculab.com>
+Message-ID: <20151118153634.GH1588@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Mark,
-
-On 11/18/2015 04:15 PM, Mark Rutland wrote:
-> On Wed, Nov 18, 2015 at 04:01:55PM +0200, Grygorii Strashko wrote:
->> Keep ARM TWD and Global timer's nodes disabled by default - if someone
->> would like to use them then those nodes have to be enabled explicitly
->> in board file.
->>
->> The reason for this change is:
->> - ARM TWD is not always-on timer on am437x and it will stop in low
->>    CPUIdle states and, therefore, broadcast timer has to configured
->>    properly if CPU_IDLE=y.
->> - ARM Global timer is not always-on timer on am437x and it can't be
->>    used as clocksource device if CPU_IDLE=y.
+On Wed, Nov 18, 2015 at 03:21:19PM +0000, David Laight wrote:
+> From: Will Deacon
+> > Sent: 18 November 2015 12:28
+> > On Wed, Nov 18, 2015 at 12:11:25PM +0000, David Laight wrote:
+> > > From: Will Deacon
+> > > >   http://lists.infradead.org/pipermail/linux-arm-kernel/2015-November/386094.html
+> > >
+> > > That patch forces a memory write-read and returns uninitialised stack
+> > > for short reads.
+> > 
+> > Really? The disassembly looks fine to me. Do you have a concrete example
+> > of where you think it goes wrong, please?
+> > 
+> > > Who knows what happens on big-endian systems.
+> > 
+> > The same thing as READ_ONCE? I'll test it there to make sure, but I
+> > don't see a problem.
 > 
-> I don't understand. What timer do you use in the absence of a TWD, and
-> if it is better why is it not used even if TWD is present?
+> Ah, god, it is absolutely horrid. But probably right :-(
 
-OMAP GP timer as clockevent device
-"ti,omap-counter32k" as clocksource
-both are in wakeup (always-on) PM domain.
+Yeah, I wasn't pretending it was nice :) FWIW, I've given it a reasonable
+testing in both little-endian and big-endian configurations and it seems
+to be happy.
 
-I see some problems with selecting clocksource/event device (but may be I'm mistaken):
-- Current clock event will be selected using "rating" field in clock_event_device
-  structure and now ARM TWD has higer value (350) vs OMAP GP timer (300),
-  so ARM TWD will be always selected if it's present. 
-- we have to force all am437x user to use kernel cmdline parameter "clocksource="
-  if ARM Global timer is present, but shouldn't be used. But even in this case,
-  it will be selected as sched_clock.
+> Do all the lda variants zero extend to 64 bits ?
 
-We can see benefits from using these timers when Power mangement is not the case,
-for example on -RT kernel where CPUIdle is not the target.
+Yes.
 
-By this change, and taking into account discovered issues, I want to make people,
-who would like to use these timers on AM437x based boards, responsible for such
-decision with assumption that they know what they are doing.
-And this is simplest way I found to disable those timers without modifying kernel.
+> If so maybe you could use a single 64 bit variable for the result of the read
+> and then cast it to typeof(*p) to get the required sign extension for
+> small integer types.
 
-> 
->> - ARM Global timer driver doesn't support CPUfreq now.
-> 
-> Surely that should be fixed in the driver (e.g. make it fail to probe if
-> CPUfreq is present)? It's broken for any other users too...
+That was the original proposal from Arnd, but I want this to work with
+structures smaller than 64-bit (e.g. arch_spinlock_t), so that's why
+I decided to follow the approach laid down by READ_ONCE.
 
-May be.
-
-Also, there is additional issue with ARM global timer which I've not
-mentioned here, because I sent the fix for it already (in progress):
-https://lkml.org/lkml/2015/11/13/456
-
-and there is ongoing discussion:
-http://www.spinics.net/lists/arm-kernel/msg459649.html
-
--- 
-regards,
--grygorii
+Will
