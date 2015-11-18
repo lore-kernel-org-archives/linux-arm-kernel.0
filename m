@@ -1,151 +1,114 @@
-From: wens@csie.org (Chen-Yu Tsai)
-Date: Wed, 18 Nov 2015 13:40:33 +0800
-Subject: [PATCH] ARM: dts: sun8i: Add Orange Pi PC support
-Message-ID: <1447825233-3325-1-git-send-email-wens@csie.org>
+From: zhaoshenglong@huawei.com (Shannon Zhao)
+Date: Wed, 18 Nov 2015 13:48:06 +0800
+Subject: [Xen-devel] [PATCH 05/13] Xen: ARM: Add support for mapping
+ platform device mmio
+In-Reply-To: <20151117143822.GH3003@char.us.oracle.com>
+References: <1447754231-7772-1-git-send-email-shannon.zhao@linaro.org>
+ <1447754231-7772-6-git-send-email-shannon.zhao@linaro.org>
+ <20151117143822.GH3003@char.us.oracle.com>
+Message-ID: <564C1116.8000603@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-The Orange Pi PC is an SBC based on the Allwinner H3 SoC with a uSD slot,
-3 USB ports directly from the SoC, a 10/100M ethernet port using the
-SoC's integrated PHY, USB OTG, HDMI, a TRRS headphone jack for stereo out
-and composite out, a microphone, an IR receiver, a CSI connector, 2 LEDs,
-a 3 pin UART header, and a 40-pin GPIO header.
+On 2015/11/17 22:38, Konrad Rzeszutek Wilk wrote:
+> On Tue, Nov 17, 2015 at 05:57:03PM +0800, shannon.zhao at linaro.org wrote:
+>> From: Shannon Zhao <shannon.zhao@linaro.org>
+>>
+>> Add a bus_notifier for platform bus device in order to map the device
+>> mmio regions when DOM0 booting with ACPI.
+>>
+>> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+>> ---
+>>  drivers/xen/Makefile   |   1 +
+>>  drivers/xen/platform.c | 104 +++++++++++++++++++++++++++++++++++++++++++++++++
+>>  2 files changed, 105 insertions(+)
+>>  create mode 100644 drivers/xen/platform.c
+>>
+>> diff --git a/drivers/xen/Makefile b/drivers/xen/Makefile
+>> index e293bc5..2f867e7 100644
+>> --- a/drivers/xen/Makefile
+>> +++ b/drivers/xen/Makefile
+>> @@ -11,6 +11,7 @@ CFLAGS_features.o			:= $(nostackp)
+>>  
+>>  CFLAGS_efi.o				+= -fshort-wchar
+>>  
+>> +dom0-$(CONFIG_ARM64) += platform.o
+>>  dom0-$(CONFIG_PCI) += pci.o
+>>  dom0-$(CONFIG_USB_SUPPORT) += dbgp.o
+>>  dom0-$(CONFIG_XEN_ACPI) += acpi.o $(xen-pad-y)
+>> diff --git a/drivers/xen/platform.c b/drivers/xen/platform.c
+>> new file mode 100644
+>> index 0000000..0f95e7f
+>> --- /dev/null
+>> +++ b/drivers/xen/platform.c
+>> @@ -0,0 +1,104 @@
+>> +/*
+>> + * Copyright (c) 2015, Linaro Limited.
+>> + *
+>> + * This program is free software; you can redistribute it and/or modify it
+>> + * under the terms and conditions of the GNU General Public License,
+>> + * version 2, as published by the Free Software Foundation.
+>> + *
+>> + * This program is distributed in the hope it will be useful, but WITHOUT
+>> + * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+>> + * FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License for
+>> + * more details.
+>> + *
+>> + * You should have received a copy of the GNU General Public License along with
+>> + * this program; if not, write to the Free Software Foundation, Inc., 59 Temple
+>> + * Place - Suite 330, Boston, MA 02111-1307 USA.
+>> + *
+>> + * Author: Shannon Zhao <shannon.zhao@linaro.org>
+>> + */
+>> +
+>> +#include <linux/platform_device.h>
+>> +#include <linux/acpi.h>
+>> +#include <xen/xen.h>
+>> +#include <xen/interface/memory.h>
+>> +#include <asm/xen/hypervisor.h>
+>> +#include <asm/xen/hypercall.h>
+>> +
+>> +static int xen_map_platform_device_mmio(struct platform_device *pdev)
+>> +{
+>> +	int i, rc = 0;
+> 
+> unsigned int i;
+>> +
+>> +	for (i = 0; i < pdev->num_resources; i++)
+>> +	{
+>> +		struct resource *r = &pdev->resource[i];
+>> +
+>> +		if (resource_type(r) == IORESOURCE_MEM)
+> 
+> Make this:
+> 
+> 	if (resource_type(r) != IORESOURCE_MEM)
+> 		continue;
+> 
+>> +		{
+> 
+> And then you don't have to move all of this code to the right.
+> 
+>> +			int j;
+> unsigned int
+>> +			int nr = DIV_ROUND_UP(resource_size(r), PAGE_SIZE);
+> 
+> unsigned int
+>> +			xen_pfn_t *gpfns = kmalloc(sizeof(xen_pfn_t) * nr,
+>> +						   GFP_KERNEL);
+>> +			xen_ulong_t *idxs = kmalloc(sizeof(xen_ulong_t) * nr,
+>> +						    GFP_KERNEL);
+>> +			int *errs = kmalloc(sizeof(int) * nr, GFP_KERNEL);
+> 
+> You can use kzalloc.
+>> +			struct xen_add_to_physmap_range xatp;
+> 
+> This declaration of variables and then setting does not look like that
+> pretty to my mind. (And it is a headache to debug if for example 'nr' ends up
+> being zero for example). Or worst -1U since you had it as 'int'.
+> 
+Yes, a little. Maybe I can add a check for nr. Would that be fine?
 
-Signed-off-by: Chen-Yu Tsai <wens@csie.org>
----
-
-This is based on Jens' H3 patches and Hans' H3 USB patches.
-USB works nicely on this board.
-
----
- arch/arm/boot/dts/Makefile                 |   1 +
- arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts | 106 +++++++++++++++++++++++++++++
- 2 files changed, 107 insertions(+)
- create mode 100644 arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts
-
-diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
-index 4e8026e85b79..0ef528a7d845 100644
---- a/arch/arm/boot/dts/Makefile
-+++ b/arch/arm/boot/dts/Makefile
-@@ -661,6 +661,7 @@ dtb-$(CONFIG_MACH_SUN8I) += \
- 	sun8i-a33-ippo-q8h-v1.2.dtb \
- 	sun8i-a33-q8-tablet.dtb \
- 	sun8i-a33-sinlinx-sina33.dtb \
-+	sun8i-h3-orangepi-pc.dtb \
- 	sun8i-h3-orangepi-plus.dtb
- dtb-$(CONFIG_MACH_SUN9I) += \
- 	sun9i-a80-optimus.dtb \
-diff --git a/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts b/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts
-new file mode 100644
-index 000000000000..4b25dcc3fdd2
---- /dev/null
-+++ b/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts
-@@ -0,0 +1,106 @@
-+/*
-+ * Copyright (C) 2015 Chen-Yu Tsai <wens@csie.org>
-+ *
-+ * This file is dual-licensed: you can use it either under the terms
-+ * of the GPL or the X11 license, at your option. Note that this dual
-+ * licensing only applies to this file, and not this project as a
-+ * whole.
-+ *
-+ *  a) This file is free software; you can redistribute it and/or
-+ *     modify it under the terms of the GNU General Public License as
-+ *     published by the Free Software Foundation; either version 2 of the
-+ *     License, or (at your option) any later version.
-+ *
-+ *     This file is distributed in the hope that it will be useful,
-+ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
-+ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-+ *     GNU General Public License for more details.
-+ *
-+ * Or, alternatively,
-+ *
-+ *  b) Permission is hereby granted, free of charge, to any person
-+ *     obtaining a copy of this software and associated documentation
-+ *     files (the "Software"), to deal in the Software without
-+ *     restriction, including without limitation the rights to use,
-+ *     copy, modify, merge, publish, distribute, sublicense, and/or
-+ *     sell copies of the Software, and to permit persons to whom the
-+ *     Software is furnished to do so, subject to the following
-+ *     conditions:
-+ *
-+ *     The above copyright notice and this permission notice shall be
-+ *     included in all copies or substantial portions of the Software.
-+ *
-+ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-+ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
-+ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
-+ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
-+ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
-+ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
-+ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-+ *     OTHER DEALINGS IN THE SOFTWARE.
-+ */
-+
-+/dts-v1/;
-+#include "sun8i-h3.dtsi"
-+#include "sunxi-common-regulators.dtsi"
-+
-+#include <dt-bindings/gpio/gpio.h>
-+#include <dt-bindings/pinctrl/sun4i-a10.h>
-+
-+/ {
-+	model = "Xunlong Orange Pi PC";
-+	compatible = "xunlong,orangepi-pc", "allwinner,sun8i-h3";
-+
-+	aliases {
-+		serial0 = &uart0;
-+	};
-+
-+	chosen {
-+		stdout-path = "serial0:115200n8";
-+	};
-+};
-+
-+&ehci1 {
-+	status = "okay";
-+};
-+
-+&ehci2 {
-+	status = "okay";
-+};
-+
-+&ehci3 {
-+	status = "okay";
-+};
-+
-+&mmc0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin>;
-+	vmmc-supply = <&reg_vcc3v3>;
-+	bus-width = <4>;
-+	cd-gpios = <&pio 5 6 GPIO_ACTIVE_HIGH>; /* PF6 */
-+	cd-inverted;
-+	status = "okay";
-+};
-+
-+&ohci1 {
-+	status = "okay";
-+};
-+
-+&ohci2 {
-+	status = "okay";
-+};
-+
-+&ohci3 {
-+	status = "okay";
-+};
-+
-+&uart0 {
-+	pinctrl-names = "default";
-+	pinctrl-0 = <&uart0_pins_a>;
-+	status = "okay";
-+};
-+
-+&usbphy {
-+	/* USB VBUS is always on */
-+	status = "okay";
-+};
+Thanks,
 -- 
-2.6.2
+Shannon
