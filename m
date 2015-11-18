@@ -1,15 +1,15 @@
 From: huangdaode@hisilicon.com (huangdaode)
-Date: Wed, 18 Nov 2015 09:42:08 +0800
+Date: Wed, 18 Nov 2015 09:43:28 +0800
 Subject: [PATCH v2 net-next] net: hisilicon: fix binding document of mdio
-In-Reply-To: <6897029.2fyR9qGpEn@wuerfel>
+In-Reply-To: <20151116152051.GA7183@rob-hp-laptop>
 References: <1447666704-200773-1-git-send-email-huangdaode@hisilicon.com>
- <6897029.2fyR9qGpEn@wuerfel>
-Message-ID: <564BD770.1080205@hisilicon.com>
+ <20151116152051.GA7183@rob-hp-laptop>
+Message-ID: <564BD7C0.9070602@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015/11/16 17:38, Arnd Bergmann wrote:
-> On Monday 16 November 2015 17:38:24 huangdaode wrote:
+On 2015/11/16 23:20, Rob Herring wrote:
+> On Mon, Nov 16, 2015 at 05:38:24PM +0800, huangdaode wrote:
 >> This patch explains the occasion of "hisilcon,mdio" and
 >> "hisilicon,hns-mdio" according to Arnd's comments.
 >> and reformat it according to comments from Rob<robh@kernel.org>.
@@ -25,16 +25,6 @@ On 2015/11/16 17:38, Arnd Bergmann wrote:
 >>
 >> Signed-off-by: huangdaode <huangdaode@hisilicon.com>
 >> ---
-> The new version looks ok, but your changelog above is formatted
-> incorrectly. Please put only the contents you want in the git history
-> above the '---' line and your Signed-off-by, but put the parts that
-> refer to previous versions of the submission below the ---.
-
-Got it.
-thanks Arnd.
-
-Daode
-
 >>   Documentation/devicetree/bindings/net/hisilicon-hns-mdio.txt | 7 ++++++-
 >>   1 file changed, 6 insertions(+), 1 deletion(-)
 >>
@@ -51,13 +41,29 @@ Daode
 >> +	"hisilicon,hns-mdio"
 >> +	"hisilicon,mdio"
 >> +  "hisilicon,hns-mdio" is recommendly to be used for hip05 and later SOCs,
+> s/recommendly/recommended/
+>
 >> +  while "hisilicon,mdio" is optional for backwards compatibility, only
 >> +  support for hip04 Soc.
+> ...compatibility only on hip04 SOC.
+>
 >>   - reg: The base address of the MDIO bus controller register bank.
 >>   - #address-cells: Must be <1>.
 >>   - #size-cells: Must be <0>.  MDIO addresses have no size component.
+>> -- 
+>> 1.9.1
 >>
->
+>> --
+>> To unsubscribe from this list: send the line "unsubscribe devicetree" in
+>> the body of a message to majordomo at vger.kernel.org
+>> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+
+Agreed.
+Will fix this in v3 patch.
+
+thanks
+Daode.
+
 > .
 >
 
