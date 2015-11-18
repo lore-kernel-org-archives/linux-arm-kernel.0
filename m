@@ -1,59 +1,101 @@
 From: julien.grall@citrix.com (Julien Grall)
-Date: Wed, 18 Nov 2015 12:18:39 +0000
-Subject: [PATCH v3 00/62] Add ACPI support for arm64 on Xen
-In-Reply-To: <564C30B8.3050408@huawei.com>
-References: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
- <564B1508.3060703@citrix.com> <564C30B8.3050408@huawei.com>
-Message-ID: <564C6C9F.7020707@citrix.com>
+Date: Wed, 18 Nov 2015 12:25:48 +0000
+Subject: [Xen-devel] [PATCH 02/13] xen/grant-table: Move
+ xlated_setup_gnttab_pages to common place
+In-Reply-To: <1447754231-7772-3-git-send-email-shannon.zhao@linaro.org>
+References: <1447754231-7772-1-git-send-email-shannon.zhao@linaro.org>
+ <1447754231-7772-3-git-send-email-shannon.zhao@linaro.org>
+Message-ID: <564C6E4C.9080003@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18/11/15 08:03, Shannon Zhao wrote:
-> On 2015/11/17 19:52, Julien Grall wrote:
->> Hi Shannon,
->>
->> On 17/11/15 09:39, shannon.zhao at linaro.org wrote:
->>> From: Shannon Zhao <shannon.zhao@linaro.org>
->>>
->>> This patch set adds ACPI support for arm64 on Xen. The design document
->>> could be found from [1].
->>
->> Thank you for your work on it. I think this series would benefits to be
->> split in smaller series.
->>
->> I would do a first series which split DT code from common code. So we
->> can get this code as soon as possible in Xen, avoid you to spend less
->> time rebasing your us to be spammed with 62 patches for each new version.
->>
-> 
-> Sure, I think I can split this patch set in three parts.
-> 
-> First one would be porting the necessary Linux changes of ACPI 5.0~6.0.
-> It includes:
-> 
-> ACPI 5.0: Add new/changed tables to headers (only changes of Generic
-> Interrupt and Generic Distributor and some changes already exist)
-> ACPICA/ARM: ACPI 5.1: Update for MADT changes.
-> ACPICA: ACPI 6.0: Add changes for MADT table.
-> ACPICA: ACPI 6.0: Add values for MADT GIC version field
-> ACPICA/ARM: ACPI 5.1: Update for FADT changes.
-> ACPICA: ACPI 6.0: Add changes for FADT table
-> ACPICA/ARM: ACPI 5.1: Update for GTDT table changes.
-> ACPICA: Headers: Add GTDT flag definitions for the timer subtable.
-> ACPICA: ACPI 6.0: Add support for STAO table
-> 
-> Second one as you suggest would be the series which split DT codes from
-> common code.
-> 
-> And the last one would be the series which add ACPI support for Xen on
-> ARM and prepare the necessary things for Dom0.
-> 
-> How about this way? The order of the first and second can be changed if
-> you like.
+Hi Shannon,
 
-I'm fine with either way.
+On 17/11/15 09:57, shannon.zhao at linaro.org wrote:
+> diff --git a/drivers/xen/grant-table.c b/drivers/xen/grant-table.c
+> index 62f591f..c084ba6 100644
+> --- a/drivers/xen/grant-table.c
+> +++ b/drivers/xen/grant-table.c
+> @@ -664,6 +664,55 @@ int gnttab_setup_auto_xlat_frames(phys_addr_t addr)
+>  }
+>  EXPORT_SYMBOL_GPL(gnttab_setup_auto_xlat_frames);
+>  
+> +int __init xlated_setup_gnttab_pages(void)
+> +{
+> +	struct page **pages;
+> +	xen_pfn_t *pfns;
+> +	void *vaddr;
+> +	int rc;
+> +	unsigned int i;
+> +	unsigned long nr_grant_frames = gnttab_max_grant_frames();
+> +
+> +	BUG_ON(nr_grant_frames == 0);
+> +	pages = kcalloc(nr_grant_frames, sizeof(pages[0]), GFP_KERNEL);
+> +	if (!pages)
+> +		return -ENOMEM;
+> +
+> +	pfns = kcalloc(nr_grant_frames, sizeof(pfns[0]), GFP_KERNEL);
+> +	if (!pfns) {
+> +		kfree(pages);
+> +		return -ENOMEM;
+> +	}
+> +	rc = alloc_xenballooned_pages(nr_grant_frames, pages, 0 /* lowmem */);
+
+Can you rebase your patch on top of linux/master? The 3rd parameters has
+been dropped for alloc_xenballooned_pages.
+
+> +	if (rc) {
+> +		pr_warn("%s Couldn't balloon alloc %ld pfns rc:%d\n", __func__,
+> +			nr_grant_frames, rc);
+> +		kfree(pages);
+> +		kfree(pfns);
+> +		return rc;
+> +	}
+> +	for (i = 0; i < nr_grant_frames; i++)
+> +		pfns[i] = page_to_pfn(pages[i]);
+
+This code needs to be adapt for 64KB page granularity. Please use
+page_to_xen_pfn here.
+
+> +
+> +	vaddr = vmap(pages, nr_grant_frames, 0, PAGE_KERNEL);
+> +	if (!vaddr) {
+> +		pr_warn("%s Couldn't map %ld pfns rc:%d\n", __func__,
+> +			nr_grant_frames, rc);
+> +		free_xenballooned_pages(nr_grant_frames, pages);
+> +		kfree(pages);
+> +		kfree(pfns);
+> +		return -ENOMEM;
+> +	}
+> +	kfree(pages);
+> +
+> +	xen_auto_xlat_grant_frames.pfn = pfns;
+> +	xen_auto_xlat_grant_frames.count = nr_grant_frames;
+> +	xen_auto_xlat_grant_frames.vaddr = vaddr;
+> +
+> +	return 0;
+> +}
+> +EXPORT_SYMBOL_GPL(xlated_setup_gnttab_pages);
+> +
+>  void gnttab_free_auto_xlat_frames(void)
+>  {
+>  	if (!xen_auto_xlat_grant_frames.count)
+> diff --git a/include/xen/grant_table.h b/include/xen/grant_table.h
+> index 4478f4b..fa31e66 100644
+> --- a/include/xen/grant_table.h
+> +++ b/include/xen/grant_table.h
+> @@ -177,6 +177,7 @@ struct grant_frames {
+>  extern struct grant_frames xen_auto_xlat_grant_frames;
+>  unsigned int gnttab_max_grant_frames(void);
+>  int gnttab_setup_auto_xlat_frames(phys_addr_t addr);
+> +int xlated_setup_gnttab_pages(void);
+>  void gnttab_free_auto_xlat_frames(void);
+>  
+>  #define gnttab_map_vaddr(map) ((void *)(map.host_virt_addr))
+> 
 
 Regards,
+
 
 -- 
 Julien Grall
