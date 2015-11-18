@@ -1,37 +1,73 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 18 Nov 2015 16:21:17 +0100
-Subject: [PATCH v2] pinctrl: at91-pio4: use %pr format string for resource
-Message-ID: <5199877.GVYeflqET9@wuerfel>
+From: David.Laight@ACULAB.COM (David Laight)
+Date: Wed, 18 Nov 2015 15:21:19 +0000
+Subject: next build: 235 warnings 3 failures (next/next-20151117)
+In-Reply-To: <20151118122804.GD1588@arm.com>
+References: <564a9961.878b420a.331b8.fffffd62@mx.google.com>
+ <6370082.rfihnaNWhf@wuerfel> <20151117171236.GJ30101@arm.com>
+ <3723928.99NZh1TC6E@wuerfel> <20151118101427.GC22731@arm.com>
+ <063D6719AE5E284EB5DD2968C1650D6D1CBD53BB@AcuExch.aculab.com>
+ <20151118122804.GD1588@arm.com>
+Message-ID: <063D6719AE5E284EB5DD2968C1650D6D1CBD57A5@AcuExch.aculab.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-resource_size_t may be defined as 32 or 64 bit depending on configuration,
-so it cannot be printed using the normal format strings, as gcc correctly
-warns:
+From: Will Deacon
+> Sent: 18 November 2015 12:28
+> On Wed, Nov 18, 2015 at 12:11:25PM +0000, David Laight wrote:
+> > From: Will Deacon
+> > > Sent: 18 November 2015 10:14
+> > > On Tue, Nov 17, 2015 at 08:17:17PM +0100, Arnd Bergmann wrote:
+> > > > On Tuesday 17 November 2015 17:12:37 Will Deacon wrote:
+> > > > > On Tue, Nov 17, 2015 at 06:03:40PM +0100, Arnd Bergmann wrote:
+> > > > > > On Tuesday 17 November 2015 16:44:53 Will Deacon wrote:
+> > > > > > > > 8<----
+> > > > > > > > Subject: ARM64: make smp_load_acquire() work with const arguments
+> > > > > > > >
+> > > > > > > > smp_load_acquire() uses typeof() to declare a local variable for temporarily
+> > > > > > > > storing the output of the memory access. This fails when the argument is
+> > > > > > > > constant, because the assembler complains about using a constant register
+> > > > > > > > as output:
+> > > > > > > >
+> > > > > > > >  arch/arm64/include/asm/barrier.h:71:3: error: read-only variable '___p1'
+> > > > > > > >  used as 'asm' output
+> > > > > > >
+> > > > > > > Do you know the usage in the kernel causing this warning?
+> > > > > >
+> > > > > > A newly introduced function in include/net/sock.h:
+> > > > > >
+> > > > > > static inline int sk_state_load(const struct sock *sk)
+> > > > > > {
+> > > > > >         return smp_load_acquire(&sk->sk_state);
+> > > > > > }
+> > > > >
+> > > > > Hmm, maybe we could play a similar trick to READ_ONCE by declaring an
+> > > > > anonymous union and writing through the non-const member?
+> > > >
+> > > > Yes, I think that would work, if you think we need to care about the
+> > > > case where we read into a structure.
+> > > >
+> > > > Can you come up with a patch for that?
+> > >
+> > > Done:
+> > >
+> > >   http://lists.infradead.org/pipermail/linux-arm-kernel/2015-November/386094.html
+> >
+> > That patch forces a memory write-read and returns uninitialised stack
+> > for short reads.
+> 
+> Really? The disassembly looks fine to me. Do you have a concrete example
+> of where you think it goes wrong, please?
+> 
+> > Who knows what happens on big-endian systems.
+> 
+> The same thing as READ_ONCE? I'll test it there to make sure, but I
+> don't see a problem.
 
-pinctrl-at91-pio4.c: In function 'atmel_pinctrl_probe':
-pinctrl-at91-pio4.c:1003:41: warning: format '%u' expects argument of type 'unsigned int', but argument 5 has type 'resource_size_t {aka long long unsigned int}' [-Wformat=]
-   dev_dbg(dev, "bank %i: hwirq=%u\n", i, res->start);
+Ah, god, it is absolutely horrid. But probably right :-(
 
-This changes the format string to use the special "%pr" format
-string that prints a resource, and changes the arguments so we
-the resource structure directly.
+Do all the lda variants zero extend to 64 bits ?
+If so maybe you could use a single 64 bit variable for the result of the read
+and then cast it to typeof(*p) to get the required sign extension for
+small integer types.
 
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
----
-v2: don't break ordering of arguments, that part was correct already, unlike
-what I said in v1.
-
-diff --git a/drivers/pinctrl/pinctrl-at91-pio4.c b/drivers/pinctrl/pinctrl-at91-pio4.c
-index 33edd07d9149..abdc16e5a970 100644
---- a/drivers/pinctrl/pinctrl-at91-pio4.c
-+++ b/drivers/pinctrl/pinctrl-at91-pio4.c
-@@ -1000,7 +1000,7 @@ static int atmel_pinctrl_probe(struct platform_device *pdev)
- 		atmel_pioctrl->irqs[i] = res->start;
- 		irq_set_chained_handler(res->start, atmel_gpio_irq_handler);
- 		irq_set_handler_data(res->start, atmel_pioctrl);
--		dev_dbg(dev, "bank %i: hwirq=%u\n", i, res->start);
-+		dev_dbg(dev, "bank %i: irq=%pr\n", i, res);
- 	}
- 
- 	atmel_pioctrl->irq_domain = irq_domain_add_linear(dev->of_node,
+	David
