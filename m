@@ -1,37 +1,41 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 18 Nov 2015 10:53:23 +0900
-Subject: [PATCHv2 2/3] ASoC: s3c24xx-i2s: pass DMA channels as platform
- data
-In-Reply-To: <4020501.kQLt6nnIEv@wuerfel>
-References: <6346833.MfUC71I3uD@wuerfel> <4020501.kQLt6nnIEv@wuerfel>
-Message-ID: <564BDA13.3040907@samsung.com>
+From: Chris.Brandt@renesas.com (Chris Brandt)
+Date: Wed, 18 Nov 2015 02:09:04 +0000
+Subject: [PATCH v3] ARM: xip: Use correct symbol for end of ROM marker
+In-Reply-To: <alpine.LFD.2.20.1511171155240.5826@knanqh.ubzr>
+References: <1447362108-4333-1-git-send-email-chris.brandt@renesas.com>
+ <1447697140-4099-1-git-send-email-chris.brandt@renesas.com>
+ <alpine.LFD.2.20.1511161515100.5826@knanqh.ubzr>
+ <HK2PR06MB05619FACB3725B6F5B2299718A1E0@HK2PR06MB0561.apcprd06.prod.outlook.com>
+ <alpine.LFD.2.20.1511161605070.5826@knanqh.ubzr>
+ <HK2PR06MB056196B2E169A504A16ED9738A1D0@HK2PR06MB0561.apcprd06.prod.outlook.com>
+ <alpine.LFD.2.20.1511171155240.5826@knanqh.ubzr>
+Message-ID: <HK2PR06MB0561B7675F17A81B54A65CA28A1C0@HK2PR06MB0561.apcprd06.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18.11.2015 00:54, Arnd Bergmann wrote:
-> This is a minor cleanup to make the s3c2412-i2s and s3c24xx-i2s
-> drivers independent of the mach/dma.h header file and to allow
-> removing the dependency on the specific dmaengine driver in the
-> next patch.
-> 
-> As a side not, only the s3c24xx-i2s driver seems to still be
-> used, while the definition of the s3c2412-i2s platform device was
-> removed in commit 6d259a25b56d ("ARM: SAMSUNG: use static
-> declaration when it is not used in other files") after it had
-> never been referenced since its introduction in f0fba2ad1b6b
-> ("ASoC: multi-component - ASoC Multi-Component Support").
-> 
-> Apparently it should have been used by mach-jive.c, but that
-> never happened. My patch at this point leaves the current state
-> unchanged, we can decide whether to fix or delete the jive
-> driver and s3c2412-i2s another time.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> ---
-> v2: check for NULL pdata
-> 
+So after looking back in history, I think I now understand how/when the XIP stuff broke.
 
-Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+It looks like originally, the init section came first, followed by text and data.
 
-Best regards,
-Krzysztof
+This is why all the XIP code used _etext as its marker for the end of what needed to be mapped.
+Like you said, the initialized data values get copied from ROM to RAM early in boot so it's not an issue if the data section (that comes after text) gets blown away when the full MMU setup is done.
+
+
+However, after the init section was moved from the first section to almost the last, all the _etext references scatter through the kernel were never updated.
+
+
+So basically, even though I've now got a separate linker script for XIP builds, it really hasn't changed much because the real issue all along was that the XIP_KERNEL references to _etext should have been changed to _data_loc.
+
+With that said, I still think the correct way to fix this issue is to export _data_loc and use that as the end marker. (notice I changed my mind and now say _data_loc instead of _edata_loc because there's no reason to map the full data section anymore).
+
+The other option, if we really wanted to keep the references to _etext as they are, is to simply move the one line " _etext = .;" to the bottom of the file....right before _data_loc is declared.
+But...that would be a bit misleading if you ask me.
+
+
+It sounds like there would still be a request to split up the linker scripts in order to remove the 6 XIP_KERNEL references scattered  throughout vmlinux.lds.S. However, it would still be nice to keep the two versions looking as close as they can to each other with only the obvious changes (like removing XIP_KERNEL from the non-XIP version, and removing SMP_ON_UP from the XIP version)
+
+
+Thoughts?
+
+
+Chris
