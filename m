@@ -1,44 +1,40 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 18 Nov 2015 20:54:03 +0100
-Subject: [PATCH v3] crypto: atmel: fix bogus select
-In-Reply-To: <201511190227.fHF3LVfw%fengguang.wu@intel.com>
-References: <201511190227.fHF3LVfw%fengguang.wu@intel.com>
-Message-ID: <3878434.NqzKGChk39@wuerfel>
+From: Chris.Brandt@renesas.com (Chris Brandt)
+Date: Wed, 18 Nov 2015 20:00:05 +0000
+Subject: [PATCH v3] ARM: xip: Use correct symbol for end of ROM marker
+In-Reply-To: <alpine.LFD.2.20.1511181437030.22569@knanqh.ubzr>
+References: <1447362108-4333-1-git-send-email-chris.brandt@renesas.com>
+ <1447697140-4099-1-git-send-email-chris.brandt@renesas.com>
+ <alpine.LFD.2.20.1511161515100.5826@knanqh.ubzr>
+ <HK2PR06MB05619FACB3725B6F5B2299718A1E0@HK2PR06MB0561.apcprd06.prod.outlook.com>
+ <alpine.LFD.2.20.1511161605070.5826@knanqh.ubzr>
+ <HK2PR06MB056196B2E169A504A16ED9738A1D0@HK2PR06MB0561.apcprd06.prod.outlook.com>
+ <alpine.LFD.2.20.1511171155240.5826@knanqh.ubzr>
+ <HK2PR06MB0561B7675F17A81B54A65CA28A1C0@HK2PR06MB0561.apcprd06.prod.outlook.com>
+ <alpine.LFD.2.20.1511172129060.22569@knanqh.ubzr>
+ <HK2PR06MB0561077CA74074E175561D7F8A1C0@HK2PR06MB0561.apcprd06.prod.outlook.com>
+ <alpine.LFD.2.20.1511181204240.22569@knanqh.ubzr>
+ <HK2PR06MB0561BAC75F605C9C51966B948A1C0@HK2PR06MB0561.apcprd06.prod.outlook.com>
+ <alpine.LFD.2.20.1511181437030.22569@knanqh.ubzr>
+Message-ID: <HK2PR06MB0561A83E36C90DA0E29FC3478A1C0@HK2PR06MB0561.apcprd06.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Thursday 19 November 2015 02:17:21 kbuild test robot wrote:
-> 
-> [auto build test WARNING on: cryptodev/master]
-> [also build test WARNING on: v4.4-rc1 next-20151118]
-> 
-> url:    https://github.com/0day-ci/linux/commits/Arnd-Bergmann/crypto-atmel-fix-bogus-select/20151118-233706
-> base:   https://git.kernel.org/pub/scm/linux/kernel/git/herbert/cryptodev-2.6.git master
-> config: tile-allmodconfig (attached as .config)
-> reproduce:
->         wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
->         chmod +x ~/bin/make.cross
->         # save the attached .config to linux build tree
->         make.cross ARCH=tile 
-> 
-> All warnings (new ones prefixed by >>):
-> 
->    drivers/crypto/atmel-aes.c: In function 'atmel_aes_sg_copy':
-> >> drivers/crypto/atmel-aes.c:191:11: warning: comparison of distinct pointer types lacks a cast [enabled by default]
->    drivers/crypto/atmel-aes.c: In function 'atmel_aes_crypt_dma_start':
->    drivers/crypto/atmel-aes.c:447:11: warning: comparison of distinct pointer types lacks a cast [enabled by default]
->    drivers/crypto/atmel-aes.c:448:11: warning: comparison of distinct pointer types lacks a cast [enabled by default]
->    drivers/crypto/atmel-aes.c: In function 'atmel_aes_crypt_dma_stop':
-> >> drivers/crypto/atmel-aes.c:642:5: warning: format '%u' expects argument of type 'unsigned int', but argument 2 has type 'size_t' [-Wformat]
->    drivers/crypto/atmel-aes.c: In function 'atmel_aes_buff_init':
-> >> drivers/crypto/atmel-aes.c:669:3: warning: format '%d' expects argument of type 'int', but argument 3 has type 'size_t' [-Wformat]
->    drivers/crypto/atmel-aes.c:677:3: warning: format '%d' expects argument of type 'int', but argument 3 has type 'size_t' [-Wformat]
-> 
-> 
+>> Are you saying I should first submit a patch that simply adds the
+>> new file, but not hook it up to any Makefiles yet?
+>> Then, once it has been updated a few times and is in better shape,
+>> I submit another patch that hooks it up with the Makefiles so I can
+>> then finally remove the XIP_KERNEL parts from the current
+>> vmlinux.lds.S?
+>
+> Well... I'm of the opinion now that the first patch should be the
+> creation of the new script being a copy of the original with the
+> XIP conditionals removed from both, plus the makefile changes. That
+> should be easy to verify that nothing changed result wise, and then
+> additional patches could bring XIP efinements on top without
+> disturbing the non-XIP case.
+>
+> Nicolas
 
-Thanks for the report. I actually submitted a patch for these yesterday, but
-I should have realized now that there is a dependency between the two patches,
-and the other one needs to be applied first to avoid generating these
-warnings in allmodconfig builds for all architectures.
+OK. I'm good with that. I'll submit a patch and see what happens.
 
-	Arnd
+Chris
