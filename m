@@ -1,58 +1,93 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 18 Nov 2015 09:30:04 +0100
-Subject: [PATCH v3] ARM: xip: Use correct symbol for end of ROM marker
-In-Reply-To: <alpine.LFD.2.20.1511172129060.22569@knanqh.ubzr>
-References: <1447362108-4333-1-git-send-email-chris.brandt@renesas.com>
- <HK2PR06MB0561B7675F17A81B54A65CA28A1C0@HK2PR06MB0561.apcprd06.prod.outlook.com>
- <alpine.LFD.2.20.1511172129060.22569@knanqh.ubzr>
-Message-ID: <5236157.AUJjCLOEeJ@wuerfel>
+Date: Wed, 18 Nov 2015 09:35:20 +0100
+Subject: [PATCH v2] SPI: s3c64xx: pass DMA arguments in platform data
+In-Reply-To: <564C01EF.60308@samsung.com>
+References: <8391350.6B0EUH1WXO@wuerfel> <4634371.Kl2EUjoTtJ@wuerfel>
+ <564C01EF.60308@samsung.com>
+Message-ID: <3885683.DJ7E2GgAz1@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 17 November 2015 22:17:41 Nicolas Pitre wrote:
-> On Wed, 18 Nov 2015, Chris Brandt wrote:
-> 
-> > It sounds like there would still be a request to split up the linker 
-> > scripts in order to remove the 6 XIP_KERNEL references scattered 
-> > throughout vmlinux.lds.S. However, it would still be nice to keep the 
-> > two versions looking as close as they can to each other with only the 
-> > obvious changes (like removing XIP_KERNEL from the non-XIP version, 
-> > and removing SMP_ON_UP from the XIP version)
-> 
-> I don't think so. XIP and non-XIP are fundamentally looking different 
-> these days.  Trying to keep them as similar as possible is rather an 
-> impediment to both cases and brings no real benefits.
-> 
-> Not only should .init.smpalt be gone from the XIP version, but it might 
-> be safer to put that into a special "should_be_empty" section and bail 
-> out with ASSERT() if that section size isn't zero. Same thing for 
-> pv_table. This way we'll be sure that nothing in the kernel config 
-> expects self-modified code to be present.
-> 
-> With XIP there is still an init section, but it is pointless to store 
-> .init.text stuff in there. That should instead stay in ROM and never be 
-> discarded (obviously). No need to page align it either at that point 
-> which should save some ROM space.
-> 
-> Things like .kprobes.text should be in ROM, but the entire executable in 
-> ROM should be surrounded by __kprobes_text_start and __kprobes_text_end 
-> to prevent any attempt to put kprobes there. This way, kprobes could 
-> still work for modules.
-> 
-> Etc. Etc.
-> 
-> There are simply too many things these days that require special 
-> considerations with XIP. And freeing the main script from XIP 
-> considerations will ease maintenance as well, more than the added 
-> maintenance from the duplicated parts.
+On Wednesday 18 November 2015 13:43:27 Krzysztof Kozlowski wrote:
+> On 18.11.2015 00:48, Arnd Bergmann wrote:
 
-[Adding Uwe and Maxime to Cc]
+> >  struct platform_device s3c64xx_device_spi0 = {
+> > @@ -1135,11 +1133,13 @@ void __init s3c64xx_spi0_set_platdata(int (*cfg_gpio)(void), int src_clk_nr,
+> >  	pd.num_cs = num_cs;
+> >  	pd.src_clk_nr = src_clk_nr;
+> >  	pd.cfg_gpio = (cfg_gpio) ? cfg_gpio : s3c64xx_spi0_cfg_gpio;
+> > -#if defined(CONFIG_PL330_DMA)
+> > -	pd.filter = pl330_filter;
+> > -#elif defined(CONFIG_S3C64XX_PL080)
+> 
+> Hmm.... why removing pl330_filter? Is it because of lack of channel
+> names? It looks unrelated to this patch.
 
-I believe Uwe has been running XIP_KERNEL on efm32 for a while now,
-but he also mentioned that he needed some extra hacks in the linker
-script and elsewhere to get it to work.
+You are right, it's an unrelated cleanup, I'll drop this change
+and add the same lines there.
 
-It would be good to coordinate this, he may have found additional
-problems, or he can maybe help test the new approach on his hardware.
+This code was only there for mach-s5p*, which is DT-only these days
+and doesn't need it any more. However, there is a lot of other code
+that falls in the same category, and we should clean that up in a
+separate patch series.
+
+I'm actually thinking about moving all device definitions from
+plat-samsung back to mach-s3c24xx and mach-s3c64xx and then remove
+all devices that are unused now. I suspect we end up with an overall
+reduction in code size that way, and it will be much easier to keep
+track of how things fit together.
+
+> > -	if (!sdd->pdev->dev.of_node) {
+> > -		res = platform_get_resource(pdev, IORESOURCE_DMA,  0);
+> > -		if (!res) {
+> > -			dev_warn(&pdev->dev, "Unable to get SPI tx dma resource. Switching to poll mode\n");
+> > -			sdd->port_conf->quirks = S3C64XX_SPI_QUIRK_POLL;
+> > -		} else
+> > -			sdd->tx_dma.dmach = res->start;
+> > -
+> > -		res = platform_get_resource(pdev, IORESOURCE_DMA,  1);
+> > -		if (!res) {
+> > -			dev_warn(&pdev->dev, "Unable to get SPI rx dma resource. Switching to poll mode\n");
+> > -			sdd->port_conf->quirks = S3C64XX_SPI_QUIRK_POLL;
+> > -		} else
+> > -			sdd->rx_dma.dmach = res->start;
+> > +	if (sci && (!sci->dma_tx || !sci->dma_rx)) {
+> 
+> No need for "sci" check. It cannot be NULL at this point - at the
+> beginning of probe it is checked already.
+> 
+> > +		dev_warn(&pdev->dev, "Unable to get SPI tx data. Switching to poll mode\n");
+> 
+> The message could be now more precise, like:
+> "Unable to get SPI rx or tx data. Switching to poll mode\n"
+
+Ok.
+
+> > +		sdd->port_conf->quirks = S3C64XX_SPI_QUIRK_POLL;
+> >  	}
+> 
+> The logic here is now different for DT boards. Previously such board
+> would not be marked as polling. Now it is always polling. If needed,
+> split it to separate patch.
+
+
+I think that was a mistake on my side, thanks for finding it.
+
+> >  
+> >  	sdd->tx_dma.direction = DMA_MEM_TO_DEV;
+> > @@ -1197,9 +1184,10 @@ static int s3c64xx_spi_probe(struct platform_device *pdev)
+> >  
+> >  	dev_dbg(&pdev->dev, "Samsung SoC SPI Driver loaded for Bus SPI-%d with %d Slaves attached\n",
+> >  					sdd->port_id, master->num_chipselect);
+> > -	dev_dbg(&pdev->dev, "\tIOmem=[%pR]\tFIFO %dbytes\tDMA=[Rx-%d, Tx-%d]\n",
+> > +	dev_dbg(&pdev->dev, "\tIOmem=[%pR]\tFIFO %dbytes\tDMA=[Rx-%p, Tx-%p]\n",
+> >  					mem_res, (FIFO_LVL_MASK(sdd) >> 1) + 1,
+> > -					sdd->rx_dma.dmach, sdd->tx_dma.dmach);
+> > +					sdd->cntrlr_info->dma_rx,
+> > +					sdd->cntrlr_info->dma_tx);
+> 
+> sci->dma_rx and sci->dma_tx would be equivalent but shorter.
+
+Ok.
 
 	Arnd
