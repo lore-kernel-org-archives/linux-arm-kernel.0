@@ -1,89 +1,63 @@
-From: dcashman@android.com (Daniel Cashman)
-Date: Wed, 18 Nov 2015 14:48:21 -0800
-Subject: [PATCH 4/4] x86: mm: support ARCH_MMAP_RND_BITS.
-In-Reply-To: <1447886901-26098-4-git-send-email-dcashman@android.com>
-References: <1447886901-26098-1-git-send-email-dcashman@android.com>
- <1447886901-26098-2-git-send-email-dcashman@android.com>
- <1447886901-26098-3-git-send-email-dcashman@android.com>
- <1447886901-26098-4-git-send-email-dcashman@android.com>
-Message-ID: <1447886901-26098-5-git-send-email-dcashman@android.com>
+From: robh@kernel.org (Rob Herring)
+Date: Wed, 18 Nov 2015 16:59:04 -0600
+Subject: [PATCH v3 2/5] dt-bindings: soc: add document for rockchip
+ reboot notifier driver
+In-Reply-To: <1447840410-19794-1-git-send-email-andy.yan@rock-chips.com>
+References: <1447840044-19689-1-git-send-email-andy.yan@rock-chips.com>
+ <1447840410-19794-1-git-send-email-andy.yan@rock-chips.com>
+Message-ID: <20151118225904.GA5429@rob-hp-laptop>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: dcashman <dcashman@google.com>
+On Wed, Nov 18, 2015 at 05:53:30PM +0800, Andy Yan wrote:
+> Add devicetree binding document for rockchip reboot nofifier driver
 
-x86: arch_mmap_rnd() uses hard-coded values, 8 for 32-bit and 28 for
-64-bit, to generate the random offset for the mmap base address.
-This value represents a compromise between increased ASLR
-effectiveness and avoiding address-space fragmentation. Replace it
-with a Kconfig option, which is sensibly bounded, so that platform
-developers may choose where to place this compromise. Keep default
-values as new minimums.
+Just reading the subject this is way too specific to the Linux driver 
+needs rather than a h/w description. Please don't create fake DT nodes 
+just to bind to drivers. Whatever &pmu is is probably what should have 
+the DT node. Let the driver for it create child devices if you need 
+that.
 
-Signed-off-by: Daniel Cashman <dcashman@google.com>
----
- arch/x86/Kconfig   | 16 ++++++++++++++++
- arch/x86/mm/mmap.c | 12 ++++++------
- 2 files changed, 22 insertions(+), 6 deletions(-)
-
-diff --git a/arch/x86/Kconfig b/arch/x86/Kconfig
-index db3622f..12768c4 100644
---- a/arch/x86/Kconfig
-+++ b/arch/x86/Kconfig
-@@ -82,6 +82,8 @@ config X86
- 	select HAVE_ARCH_KASAN			if X86_64 && SPARSEMEM_VMEMMAP
- 	select HAVE_ARCH_KGDB
- 	select HAVE_ARCH_KMEMCHECK
-+	select HAVE_ARCH_MMAP_RND_BITS
-+	select HAVE_ARCH_MMAP_RND_COMPAT_BITS if COMPAT
- 	select HAVE_ARCH_SECCOMP_FILTER
- 	select HAVE_ARCH_SOFT_DIRTY		if X86_64
- 	select HAVE_ARCH_TRACEHOOK
-@@ -183,6 +185,20 @@ config HAVE_LATENCYTOP_SUPPORT
- config MMU
- 	def_bool y
- 
-+config ARCH_MMAP_RND_BITS_MIN
-+       default 28 if 64BIT
-+       default 8
-+
-+config ARCH_MMAP_RND_BITS_MAX
-+	default 32 if 64BIT
-+	default 16
-+
-+config ARCH_MMAP_RND_COMPAT_BITS_MIN
-+	default 8
-+
-+config ARCH_MMAP_RND_COMPAT_BITS_MAX
-+	default 16
-+
- config SBUS
- 	bool
- 
-diff --git a/arch/x86/mm/mmap.c b/arch/x86/mm/mmap.c
-index 844b06d..647fecf 100644
---- a/arch/x86/mm/mmap.c
-+++ b/arch/x86/mm/mmap.c
-@@ -69,14 +69,14 @@ unsigned long arch_mmap_rnd(void)
- {
- 	unsigned long rnd;
- 
--	/*
--	 *  8 bits of randomness in 32bit mmaps, 20 address space bits
--	 * 28 bits of randomness in 64bit mmaps, 40 address space bits
--	 */
- 	if (mmap_is_ia32())
--		rnd = (unsigned long)get_random_int() % (1<<8);
-+#ifdef CONFIG_COMPAT
-+		rnd = (unsigned long)get_random_int() % (1 << mmap_rnd_compat_bits);
-+#else
-+		rnd = (unsigned long)get_random_int() % (1 << mmap_rnd_bits);
-+#endif
- 	else
--		rnd = (unsigned long)get_random_int() % (1<<28);
-+		rnd = (unsigned long)get_random_int() % (1 << mmap_rnd_bits);
- 
- 	return rnd << PAGE_SHIFT;
- }
--- 
-2.6.0.rc2.230.g3dd15c0
+Rob
+> 
+> Signed-off-by: Andy Yan <andy.yan@rock-chips.com>
+> 
+> ---
+> 
+> Changes in v3:
+>  - add dt binding
+> 
+> Changes in v2: None
+> 
+>  .../bindings/soc/rockchip/rockchip-reboot.txt          | 18 ++++++++++++++++++
+>  1 file changed, 18 insertions(+)
+>  create mode 100644 Documentation/devicetree/bindings/soc/rockchip/rockchip-reboot.txt
+> 
+> diff --git a/Documentation/devicetree/bindings/soc/rockchip/rockchip-reboot.txt b/Documentation/devicetree/bindings/soc/rockchip/rockchip-reboot.txt
+> new file mode 100644
+> index 0000000..6f69c8d
+> --- /dev/null
+> +++ b/Documentation/devicetree/bindings/soc/rockchip/rockchip-reboot.txt
+> @@ -0,0 +1,18 @@
+> +Rockchip reboot notifier driver
+> +
+> +This driver get reboot mode arguments from userspace
+> +and stores it in special register. Then the bootloader
+> +will read it and take different action according the
+> +argument stored.
+> +
+> +Required properties:
+> +- compatible: should be "rockchip,reboot"
+> +- regmap: this is phandle to the register map node
+> +- offset: offset in the register map for the storage register (in bytes)
+> +
+> +Examples:
+> +	reboot {
+> +	   compatible = "rockchip,reboot";
+> +	   regmap = <&pmu>;
+> +	   offset = <0x94>;
+> +	};
+> -- 
+> 1.9.1
+> 
+> 
