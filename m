@@ -1,38 +1,48 @@
 From: javier@osg.samsung.com (Javier Martinez Canillas)
-Date: Wed, 18 Nov 2015 10:23:48 -0300
-Subject: [RESEND PATCH v2 0/6] ARM: dts: Use correct CD properties for SDIO
- and eMMC in Snow and Peach
-Message-ID: <1447853034-22508-1-git-send-email-javier@osg.samsung.com>
+Date: Wed, 18 Nov 2015 10:23:49 -0300
+Subject: [RESEND PATCH v2 1/6] ARM: dts: Mark SDIO as non-removable in
+ exynos5800-peach-pi
+In-Reply-To: <1447853034-22508-1-git-send-email-javier@osg.samsung.com>
+References: <1447853034-22508-1-git-send-email-javier@osg.samsung.com>
+Message-ID: <1447853034-22508-2-git-send-email-javier@osg.samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Krzysztof and Kukjin,
+The Exynos5800 Peach Pi Chromebook has a Marvell WiFi SDIO chip which
+can't neither be removed nor be detected. But the node isn't marked
+as non-removable and instead has the broken-cd DT property.
 
-This is a resend of a series posted a month ago [0] that use the correct
-card detection properties in the DTS for Exynos Chromebooks but that was
-never picked.
+This causes the device to be removed when the system enters into a
+suspend state and the following warnings is shown after a resume:
 
-The patches have no changed, the only difference is that I'm including
-all the Reviewed-by and Tested-by tags that were previously collected.
+[  181.944636] mmc2: error -2 during resume (card was removed?)
 
-[0]: https://lkml.org/lkml/2015/10/15/640
+Also remove the card-detect-delay property that is not needed with
+non-removable.
 
-Best regards,
-Javier
+Signed-off-by: Javier Martinez Canillas <javier@osg.samsung.com>
+Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Reviewed-by: Alim Akhtar <alim.akhtar@samsung.com>
+---
 
+ arch/arm/boot/dts/exynos5800-peach-pi.dts | 3 +--
+ 1 file changed, 1 insertion(+), 2 deletions(-)
 
-Javier Martinez Canillas (6):
-  ARM: dts: Mark SDIO as non-removable in exynos5800-peach-pi
-  ARM: dts: Mark SDIO as non-removable in exynos5420-peach-pit
-  ARM: dts: Mark SDIO as non-removable in exynos5250-snow-common
-  ARM: dts: Remove broken-cd from eMMC node in exynos5800-peach-pi
-  ARM: dts: Remove broken-cd from eMMC node in exynos5420-peach-pi
-  ARM: dts: Mark eMMC as non-removable in exynos5250-snow-common
-
- arch/arm/boot/dts/exynos5250-snow-common.dtsi | 6 ++----
- arch/arm/boot/dts/exynos5420-peach-pit.dts    | 5 +----
- arch/arm/boot/dts/exynos5800-peach-pi.dts     | 5 +----
- 3 files changed, 4 insertions(+), 12 deletions(-)
-
+diff --git a/arch/arm/boot/dts/exynos5800-peach-pi.dts b/arch/arm/boot/dts/exynos5800-peach-pi.dts
+index 49a4f43e5ac2..ca3a467a585d 100644
+--- a/arch/arm/boot/dts/exynos5800-peach-pi.dts
++++ b/arch/arm/boot/dts/exynos5800-peach-pi.dts
+@@ -672,10 +672,9 @@
+ &mmc_1 {
+ 	status = "okay";
+ 	num-slots = <1>;
+-	broken-cd;
++	non-removable;
+ 	cap-sdio-irq;
+ 	keep-power-in-suspend;
+-	card-detect-delay = <200>;
+ 	clock-frequency = <400000000>;
+ 	samsung,dw-mshc-ciu-div = <1>;
+ 	samsung,dw-mshc-sdr-timing = <0 1>;
 -- 
 2.4.3
