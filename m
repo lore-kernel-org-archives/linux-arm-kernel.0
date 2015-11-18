@@ -1,43 +1,34 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Wed, 18 Nov 2015 14:44:10 -0500 (EST)
-Subject: [PATCH v3] ARM: xip: Use correct symbol for end of ROM marker
-In-Reply-To: <HK2PR06MB0561BAC75F605C9C51966B948A1C0@HK2PR06MB0561.apcprd06.prod.outlook.com>
-References: <1447362108-4333-1-git-send-email-chris.brandt@renesas.com>
- <1447697140-4099-1-git-send-email-chris.brandt@renesas.com>
- <alpine.LFD.2.20.1511161515100.5826@knanqh.ubzr>
- <HK2PR06MB05619FACB3725B6F5B2299718A1E0@HK2PR06MB0561.apcprd06.prod.outlook.com>
- <alpine.LFD.2.20.1511161605070.5826@knanqh.ubzr>
- <HK2PR06MB056196B2E169A504A16ED9738A1D0@HK2PR06MB0561.apcprd06.prod.outlook.com>
- <alpine.LFD.2.20.1511171155240.5826@knanqh.ubzr>
- <HK2PR06MB0561B7675F17A81B54A65CA28A1C0@HK2PR06MB0561.apcprd06.prod.outlook.com>
- <alpine.LFD.2.20.1511172129060.22569@knanqh.ubzr>
- <HK2PR06MB0561077CA74074E175561D7F8A1C0@HK2PR06MB0561.apcprd06.prod.outlook.com>
- <alpine.LFD.2.20.1511181204240.22569@knanqh.ubzr>
- <HK2PR06MB0561BAC75F605C9C51966B948A1C0@HK2PR06MB0561.apcprd06.prod.outlook.com>
-Message-ID: <alpine.LFD.2.20.1511181437030.22569@knanqh.ubzr>
+From: heiko@sntech.de (Heiko =?ISO-8859-1?Q?St=FCbner?=)
+Date: Wed, 18 Nov 2015 20:46:02 +0100
+Subject: [PATCH 4/7] phy: rockchip-usb: add missing of_node_put
+In-Reply-To: <20151118193129.GA48815@google.com>
+References: <1447673600-8881-1-git-send-email-Julia.Lawall@lip6.fr>
+ <19587543.sZ81DoLUBT@diego> <20151118193129.GA48815@google.com>
+Message-ID: <3792177.PEjN5hRYe2@diego>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 18 Nov 2015, Chris Brandt wrote:
-
-> > Sure.  You should start by splitting the XIP stuff out to a separate
-> > script so functionally it is the same (broken) end result.  And from
-> > there adding incremental fixes to the XIP script.
+Am Mittwoch, 18. November 2015, 11:31:29 schrieb Brian Norris:
+> On Wed, Nov 18, 2015 at 08:27:07PM +0100, Heiko St?bner wrote:
+> > Am Montag, 16. November 2015, 12:33:17 schrieb Julia Lawall:
+> > hmm, while I agree that the rockchip phy has an issue in the node
+> > lifecycle, I'm not sure that patch fixes it fully.
+> > 
+> > It currently iterates over each phy, but would only of_node_put the phy it
+> > handled last. So if an error happens on the 3rd phy, the first 2 are
+> > already instantiated and would also get removed when the overall probe
+> > fails, but their of_node would never be "put".
 > 
-> More or less that's what I'm doing now on my system. You can diff the 2 in order to see what I've removed.
+> Note the behavior of of_get_next_child() (and
+> of_get_next_available_child()); it "Decrements the refcount of prev." So
+> the loop only keeps a reference for (at most) one node at a time.
 > 
-> But wait...you said 'the last step' was to add a 2nd linker file and change the Makefiles to use it.
-> 
-> 
-> Are you saying I should first submit a patch that simply adds the new file, but not hook it up to any Makefiles yet?
-> Then, once it has been updated a few times and is in better shape, I submit another patch that hooks it up with the Makefiles so I can then finally remove the XIP_KERNEL parts from the current vmlinux.lds.S?
+> I believe Julia's patch is correct. It's possible the commit description
+> could have made this aspect clearer though, since I was confused about
+> this at first as well.
 
-Well... I'm of the opinion now that the first patch should be the 
-creation of the new script being a copy of the original with the XIP 
-conditionals removed from both, plus the makefile changes. That should 
-be easy to verify that nothing changed result wise, and then additional 
-patches could bring XIP efinements on top without disturbing the non-XIP 
-case.
+oh, I hadn't realized that :-) .
 
-
-Nicolas
+Although in this case, what happens with the last child, if only "prev"s get 
+decremented? When the loop finished I'd think that the last one would keep 
+it's reference, as the patch stand right - or I'm just blind.
