@@ -1,79 +1,47 @@
-From: binmlist@gmail.com (Bin Liu)
-Date: Wed, 18 Nov 2015 14:45:32 -0600
-Subject: [PATCH] usb: musb: USB_TI_CPPI41_DMA requires dmaengine support
-In-Reply-To: <87y4dvgi0j.fsf@saruman.tx.rr.com>
-References: <4370741.70D0kgBgnp@wuerfel>
- <CADYTM3baomio7+nFizOKFXMav7guow+=GsVaGExBWxQyn9t=2w@mail.gmail.com>
- <87a8qbhzvf.fsf@saruman.tx.rr.com>
- <CADYTM3Ye=7iydzeg2j3VNkiHVoZqE6Hasm6N6=2UNiHEr2Ti4g@mail.gmail.com>
- <87y4dvgi0j.fsf@saruman.tx.rr.com>
-Message-ID: <CADYTM3ZuYPw7TZaf7DeGpnnf21-uAhia+jgT1UTtEStckYgT3Q@mail.gmail.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 18 Nov 2015 21:45:14 +0100
+Subject: [PATCH v6 16/19] aarch64: ilp32: use generic stat64 structure
+In-Reply-To: <20151118203620.GC11264@yury-N73SV>
+References: <1447795019-30176-1-git-send-email-ynorov@caviumnetworks.com>
+ <4020528.IPMzSqapue@wuerfel> <20151118203620.GC11264@yury-N73SV>
+Message-ID: <4142331.V6JV5koyt3@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, Nov 18, 2015 at 2:38 PM, Felipe Balbi <balbi@ti.com> wrote:
->
-> Hi,
->
-> Bin Liu <binmlist@gmail.com> writes:
->>> Bin Liu <binmlist@gmail.com> writes:
->>>> On Wed, Nov 18, 2015 at 10:18 AM, Arnd Bergmann <arnd@arndb.de> wrote:
->>>>> The CPPI-4.1 driver selects TI_CPPI41, which is a dmaengine
->>>>> driver and that may not be available when CONFIG_DMADEVICES
->>>>> is not set:
->>>>>
->>>>> warning: (USB_TI_CPPI41_DMA) selects TI_CPPI41 which has unmet direct dependencies (DMADEVICES && ARCH_OMAP)
->>>>>
->>>>> This adds an extra dependency to avoid generating warnings in randconfig
->>>>> builds. Ideally we'd remove the 'select' statement, but that has the
->>>>> potential to break defconfig files.
->>>>>
->>>>> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
->>>>> Fixes: 411dd19c682d ("usb: musb: Kconfig: Select the DMA driver if DMA mode of MUSB is enabled")
->>>>>
->>>>> diff --git a/drivers/usb/musb/Kconfig b/drivers/usb/musb/Kconfig
->>>>> index 1f2037bbeb0d..45c83baf675d 100644
->>>>> --- a/drivers/usb/musb/Kconfig
->>>>> +++ b/drivers/usb/musb/Kconfig
->>>>> @@ -159,7 +159,7 @@ config USB_TI_CPPI_DMA
->>>>>
->>>>>  config USB_TI_CPPI41_DMA
->>>>>         bool 'TI CPPI 4.1 (AM335x)'
->>>>> -       depends on ARCH_OMAP
->>>>> +       depends on ARCH_OMAP && DMADEVICES
->>>>>         select TI_CPPI41
->>>>
->>>> I am not sure what the generic policy is, but instead of hiding
->>>> USB_TI_CPPI41_DMA if DMADEVICES is disabled, I'd like to enable
->>>> DMADEVICES if USB_TI_CPPI41_DMA is enabled, from user experience
->>>> perspective.
->>>
->>> that would mean "select DMADEVICES" and that's frowned upon.
->>
->> Currently 'select DMADEVICES' is not in there. Will adding it fix the
->> dependency warning in randconfig? Sorry for the question, but I don't
->> know enough about Kconfig to get the answer.
->
-> it certainly would, but we don't like to add "select XYZ" to Kconfig
-> because a select bypasses the dependency tree. Let me explain:
->
-> config A
->        tristate "A"
->        depends on B
->
-> config B
->        tristate "B"
->
->
-> config C
->        tristate "C"
->        select A
->
->
-> C can select A without B being enabled.
+On Wednesday 18 November 2015 23:36:20 Yury Norov wrote:
+> On Tue, Nov 17, 2015 at 11:09:05PM +0100, Arnd Bergmann wrote:
+> > On Wednesday 18 November 2015 00:16:56 Yury Norov wrote:
+> > > Generic 32-bit and AARCH32 stat64 structures has same names.
+> > > ILP32 needs generic stat64. So we can either make ILP32 mutual
+> > > exclusive with AARCH32, or duplicate generic cp_new_stat64 code
+> > > and struct stat64 to sys_ilp32.c. We choose second because it's
+> > > more flexible to have independend support for ABIs.
+> > > 
+> > 
+> > I commented on the previous version, but you have not replied to that,
+> > or changed anything.
+> > 
+> > 	Arnd
+> 
+> Hi Arnd,
+> 
+> It seems I misunderstood you.
+> 
+> Are you OK if we'll enable __ARCH_WANT_COMPAT_STAT64
+> for ILP32, as for AARCH32_EL0, and turn glibc to use
+> struct stat from sysdeps/unix/sysv/linux/bits/stat.h
+> with this calls? It seems, this is how ARM ABI works.
 
-Thanks for the explanation, very clear.
+Yes, that's fine. The other approach I suggested was to define a stat64
+structure in arch/arm64/include/uapi/asm/stat.h that has the same binary
+layout as 'struct stat' on arm64, and then use sys_newstat.
 
->
-> --
-> balbi
+We are doing it that way in the 64-bit time_t patch set for most
+architectures, and will assign a new system call number at that
+point as well.
+
+The only two differences between the arm32 'struct stat64' and the
+arm64 'struct stat' are the size of the time members and the broken
+__st_ino field on arm32, but that is already handled in glibc.
+
+	Arnd
