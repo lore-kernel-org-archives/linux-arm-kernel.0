@@ -1,114 +1,79 @@
-From: tiffany.lin@mediatek.com (tiffany lin)
-Date: Wed, 18 Nov 2015 15:09:48 +0800
-Subject: [RESEND RFC/PATCH 4/8] dt-bindings: Add a binding for Mediatek
- Video Encoder
-In-Reply-To: <20151117194100.GA3028@rob-hp-laptop>
-References: <1447764885-23100-1-git-send-email-tiffany.lin@mediatek.com>
- <1447764885-23100-5-git-send-email-tiffany.lin@mediatek.com>
- <20151117194100.GA3028@rob-hp-laptop>
-Message-ID: <1447830588.22499.25.camel@mtksdaap41>
+From: u.kleine-koenig@pengutronix.de (Uwe =?iso-8859-1?Q?Kleine-K=F6nig?=)
+Date: Wed, 18 Nov 2015 08:24:37 +0100
+Subject: [PATCH] i2c: imx: make bus recovery through pinctrl optional
+In-Reply-To: <1447804979-29550-1-git-send-email-leoli@freescale.com>
+References: <1447804979-29550-1-git-send-email-leoli@freescale.com>
+Message-ID: <20151118072437.GS22022@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Rob,
+Hello,
 
-On Tue, 2015-11-17 at 13:41 -0600, Rob Herring wrote:
-> On Tue, Nov 17, 2015 at 08:54:41PM +0800, Tiffany Lin wrote:
-> > add a DT binding documentation of Video Encoder for the
-> > MT8173 SoC from Mediatek.
-> > 
-> > Signed-off-by: Tiffany Lin <tiffany.lin@mediatek.com>
-> > ---
-> >  .../devicetree/bindings/media/mediatek-vcodec.txt  |   58 ++++++++++++++++++++
-> >  1 file changed, 58 insertions(+)
-> >  create mode 100644 Documentation/devicetree/bindings/media/mediatek-vcodec.txt
-> > 
-> > diff --git a/Documentation/devicetree/bindings/media/mediatek-vcodec.txt b/Documentation/devicetree/bindings/media/mediatek-vcodec.txt
-> > new file mode 100644
-> > index 0000000..fea4d7c
-> > --- /dev/null
-> > +++ b/Documentation/devicetree/bindings/media/mediatek-vcodec.txt
-> > @@ -0,0 +1,58 @@
-> > +Mediatek Video Codec
-> > +
-> > +Mediatek Video Codec is the video codec hw present in Mediatek SoCs which
-> > +supports high resolution encoding functionalities.
-> > +
-> > +Required properties:
-> > +- compatible : "mediatek,mt8173-vcodec-enc" for encoder
-> > +- reg : Physical base address of the video codec registers and length of
-> > +  memory mapped region.
-> > +- interrupts : interrupt number to the cpu.
-> > +- larb : must contain the larbes of current platform
+On Tue, Nov 17, 2015 at 06:02:59PM -0600, Li Yang wrote:
+> Since commit 1c4b6c3bcf30 ("i2c: imx: implement bus recovery") the driver
+> starts to use gpio/pinctrl to do i2c bus recovery.  But pinctrl is not
+> always available for platforms using this driver such as ls1021a and
+> ls1043a, and the device tree binding also mentioned this gpio based
+> recovery mechanism as optional.  The patch make it really optional that
+> the probe function won't bailout when pinctrl is not available and it
+> won't try to register recovery functions if pinctrl is NULL when the
+> PINCTRL is not enabled at all.
 > 
-> What is this?
-Resend due to previous mail has html format and reject by some mail
-servers.
-
-This is SMI (Smart Multimedia Interface) Local Arbiter.
-MT8173 has different local arbiters (larb).
-Please see
-http://lists.linuxfoundation.org/pipermail/iommu/2015-October/014587.html
-
-Video Encoder HW has it's local arbiter (larb), by configure ports in
-this larb, we can have encoder HW go through the m4u to talk with EMI.
-We will change it to mediatek,larb in next version.
-
+> Signed-off-by: Li Yang <leoli@freescale.com>
+> Cc: Gao Pan <b54642@freescale.com>
+> ---
+>  drivers/i2c/busses/i2c-imx.c | 13 ++++++-------
+>  1 file changed, 6 insertions(+), 7 deletions(-)
 > 
-> > +- clocks : list of clock specifiers, corresponding to entries in
-> > +  the clock-names property;
-> > +- clock-names: must contain "vencpll", "venc_lt_sel", "vcodecpll_370p5_ck"
-> > +- iommus : list of iommus specifiers should be enabled for hw encode.
-> > +  There are 2 cells needed to enable/disable iommu.
-> > +  The first one is local arbiter index(larbid), and the other is port
-> > +  index(portid) within local arbiter. Specifies the larbid and portid
-> > +  as defined in dt-binding/memory/mt8173-larb-port.h.
-> > +- vpu : the node of video processor unit
-> 
-> This should be prefixed with mediatek.
-We will prefix it with mediatek in next version.
+> diff --git a/drivers/i2c/busses/i2c-imx.c b/drivers/i2c/busses/i2c-imx.c
+> index 1e4d99d..7813153 100644
+> --- a/drivers/i2c/busses/i2c-imx.c
+> +++ b/drivers/i2c/busses/i2c-imx.c
+> @@ -1086,12 +1086,6 @@ static int i2c_imx_probe(struct platform_device *pdev)
+>  		return ret;
+>  	}
+>  
+> -	i2c_imx->pinctrl = devm_pinctrl_get(&pdev->dev);
+> -	if (IS_ERR(i2c_imx->pinctrl)) {
+> -		ret = PTR_ERR(i2c_imx->pinctrl);
+> -		goto clk_disable;
+> -	}
+> -
+>  	/* Request IRQ */
+>  	ret = devm_request_irq(&pdev->dev, irq, i2c_imx_isr, 0,
+>  				pdev->name, i2c_imx);
+> @@ -1125,7 +1119,12 @@ static int i2c_imx_probe(struct platform_device *pdev)
+>  		goto clk_disable;
+>  	}
+>  
+> -	i2c_imx_init_recovery_info(i2c_imx, pdev);
+> +	/* optional bus recovery feature through pinctrl */
+> +	i2c_imx->pinctrl = devm_pinctrl_get(&pdev->dev);
+> +	if (IS_ERR_OR_NULL(i2c_imx->pinctrl))
+> +		dev_info(&pdev->dev, "can't get pinctrl, bus recovery feature disabled\n");
+> +	else
+> +		i2c_imx_init_recovery_info(i2c_imx, pdev);
 
-> 
-> > +
-> > +Example:
-> > +vcodec_enc: vcodec at 0x18002000 {
-> > +    compatible = "mediatek,mt8173-vcodec-enc";
-> > +    reg = <0 0x18002000 0 0x1000>,    /*VENC_SYS*/
-> > +          <0 0x19002000 0 0x1000>;    /*VENC_LT_SYS*/
-> > +    interrupts = <GIC_SPI 198 IRQ_TYPE_LEVEL_LOW>,
-> > +           <GIC_SPI 202 IRQ_TYPE_LEVEL_LOW>;
-> > +    larb = <&larb3>,
-> > +           <&larb5>;
-> > +    iommus = <&iommu M4U_LARB3_ID M4U_PORT_VENC_RCPU>,
-> > +             <&iommu M4U_LARB3_ID M4U_PORT_VENC_REC>,
-> > +             <&iommu M4U_LARB3_ID M4U_PORT_VENC_BSDMA>,
-> > +             <&iommu M4U_LARB3_ID M4U_PORT_VENC_SV_COMV>,
-> > +             <&iommu M4U_LARB3_ID M4U_PORT_VENC_RD_COMV>,
-> > +             <&iommu M4U_LARB3_ID M4U_PORT_VENC_CUR_LUMA>,
-> > +             <&iommu M4U_LARB3_ID M4U_PORT_VENC_CUR_CHROMA>,
-> > +             <&iommu M4U_LARB3_ID M4U_PORT_VENC_REF_LUMA>,
-> > +             <&iommu M4U_LARB3_ID M4U_PORT_VENC_REF_CHROMA>,
-> > +             <&iommu M4U_LARB3_ID M4U_PORT_VENC_NBM_RDMA>,
-> > +             <&iommu M4U_LARB3_ID M4U_PORT_VENC_NBM_WDMA>,
-> > +             <&iommu M4U_LARB5_ID M4U_PORT_VENC_RCPU_SET2>,
-> > +             <&iommu M4U_LARB5_ID M4U_PORT_VENC_REC_FRM_SET2>,
-> > +             <&iommu M4U_LARB5_ID M4U_PORT_VENC_BSDMA_SET2>,
-> > +             <&iommu M4U_LARB5_ID M4U_PORT_VENC_SV_COMA_SET2>,
-> > +             <&iommu M4U_LARB5_ID M4U_PORT_VENC_RD_COMA_SET2>,
-> > +             <&iommu M4U_LARB5_ID M4U_PORT_VENC_CUR_LUMA_SET2>,
-> > +             <&iommu M4U_LARB5_ID M4U_PORT_VENC_CUR_CHROMA_SET2>,
-> > +             <&iommu M4U_LARB5_ID M4U_PORT_VENC_REF_LUMA_SET2>,
-> > +             <&iommu M4U_LARB5_ID M4U_PORT_VENC_REC_CHROMA_SET2>;
-> > +    vpu = <&vpu>;
-> > +    clocks = <&apmixedsys CLK_APMIXED_VENCPLL>,
-> > +             <&topckgen CLK_TOP_VENC_LT_SEL>,
-> > +             <&topckgen CLK_TOP_VCODECPLL_370P5>;
-> > +    clock-names = "vencpll",
-> > +                  "venc_lt_sel",
-> > +                  "vcodecpll_370p5_ck";
-> > +  };
-> > -- 
-> > 1.7.9.5
-> > 
-best regards,
-Tiffany
+I'm pretty sure this is wrong. If pinctrl isn't available
+devm_pinctrl_get returns NULL? But AFAIK you must not ignore an error,
+so the better thing to do is:
+
+	i2c_imx->pinctrl = devm_pinctrl_get(&pdev->dev);
+	if (IS_ERR(i2c_imx->pinctrl)) {
+		ret = PTR_ERR(i2c_imx->pinctrl);
+		goto errorhandling;
+	}
+
+	if (i2c_imx->pinctrl)
+		i2c_imx_init_recovery_info(i2c_imx, pdev);
+	else
+		dev_info(&pdev->dev, "can't get pinctrl, bus recovery feature disabled\n");
+
+
+right?
+
+Uwe Kleine-K?nig
+
+-- 
+Pengutronix e.K.                           | Uwe Kleine-K?nig            |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
