@@ -1,70 +1,50 @@
-From: hs@denx.de (Heiko Schocher)
-Date: Wed, 18 Nov 2015 09:24:48 +0100
-Subject: [PATCH v2] arm, am335x: add support for the bosch shc board
-In-Reply-To: <564B9C3D.7070303@ti.com>
-References: <1447748655-2088-1-git-send-email-hs@denx.de>
- <564B9C3D.7070303@ti.com>
-Message-ID: <564C35D0.8060609@denx.de>
+From: schwab@suse.de (Andreas Schwab)
+Date: Wed, 18 Nov 2015 09:25:40 +0100
+Subject: [PATCH v6 15/19] arm64: ilp32: force IPC_64 in msgctl, shmctl,
+ semctl
+In-Reply-To: <26387039.NNJ6EnRrv8@wuerfel> (Arnd Bergmann's message of "Tue,
+ 17 Nov 2015 23:07:03 +0100")
+References: <1447795019-30176-1-git-send-email-ynorov@caviumnetworks.com>
+ <1447795019-30176-16-git-send-email-ynorov@caviumnetworks.com>
+ <26387039.NNJ6EnRrv8@wuerfel>
+Message-ID: <mvmoaersohn.fsf@hawking.suse.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hello Dave,
+Arnd Bergmann <arnd@arndb.de> writes:
 
-Am 17.11.2015 um 22:29 schrieb Dave Gerlach:
-> Hi,
-> On 11/17/2015 02:24 AM, Heiko Schocher wrote:
->> add support for the am335x based shc board.
->>
->> UART: 0-2 and 4
->> DRAM: 512 MiB
->> MMC:  OMAP SD/MMC: 0 @ 26 MHz
->>        OMAP SD/MMC: 1 @ 26 MHz
->> I2C:  at24 eeprom, pcf8563
->> USB:  USB1 (host)
->>
->> Signed-off-by: Heiko Schocher <hs@denx.de>
->> ---
->> The following patches are needed to get all working
->> for the shc board:
->> - disable clkout on pcf8563
->>    accepted.
->>    http://www.spinics.net/lists/devicetree/msg98542.html
->>
->> - leds: leds-gpio: add shutdown function
->>    accepted.
->>    https://lkml.org/lkml/2015/10/13/169
->>
->> - net: phy: smsc: disable energy detect mode
->>    accepted
->>    [PATCH v2 2/2] net: phy: smsc: disable energy detect mode
->>    https://lkml.org/lkml/2015/10/17/2
->>    [PATCH v2 1/2] drivers: net: cpsw: add phy-handle parsing
->>    https://lkml.org/lkml/2015/10/17/4
->>
->> - ARM: OMAP2+: omap_hwmod: Introduce ti,no-init dt property
->>    http://lists.infradead.org/pipermail/linux-arm-kernel/2015-March/328204.html
->>    @Dave: What is the current state of this patch?
->>    I have the same problem here on this am335x based board
->>
+> On Wednesday 18 November 2015 00:16:55 Yury Norov wrote:
+>> 
+>> +/* IPC_64 */
+>> +asmlinkage long ilp32_sys_msgctl(int first, int second, void __user *uptr)
+>> +{
+>> +       return compat_sys_msgctl(first, second | IPC_64, uptr);
+>> +}
+>> +#define compat_sys_msgctl              ilp32_sys_msgctl
+>> +
+>> +asmlinkage long ilp32_sys_shmctl(int first, int second, void __user *uptr)
+>> +{
+>> +       return compat_sys_shmctl(first, second | IPC_64, uptr);
+>> +}
+>> +#define compat_sys_shmctl              ilp32_sys_shmctl
+>> +
+>> +asmlinkage long ilp32_sys_semctl(int first, int second, int third, int arg)
+>> +{
+>> +       return compat_sys_semctl(first, second, third | IPC_64, arg);
+>> +}
+>> +#define compat_sys_semctl      ilp32_sys_semctl
+>> 
 >
-> A different approach is being taken for resolving the issue of rtc hwmod on am43x epos evm [1],
-> which is what I was attempting to solve with the patch you have linked. We decided to avoid changing
-> omap_hwmod code and I haven't been pursuing the ti,no-init flag anymore.
+> I wonder if this would be any simpler by changing compat_ipc_parse_version()
 
-Maybe I overlook something, but I cannot see, how [1] solves the RTC
-hwmod problem on am335x SoC based boards. Not all boards have this problem,
-so the RTC hwmod cannot be disabled for all am335x boards ...
+This cries for a generic solution.  Other archs migrating to separate
+ipc syscalls will want to avoid the whole IPC_64 business for them, even
+if they need to retain [compat_]ipc_parse_version for sys_ipc
+compatibility.
 
-It must be somehow configurable for boards ... I have am335x boards
-which use the rtc from the SoC
+Andreas.
 
-> Regards,
-> Dave
->
-> [1] http://www.spinics.net/lists/linux-omap/msg121987.html
-
-bye,
-Heiko
 -- 
-DENX Software Engineering GmbH,      Managing Director: Wolfgang Denk
-HRB 165235 Munich, Office: Kirchenstr.5, D-82194 Groebenzell, Germany
+Andreas Schwab, SUSE Labs, schwab at suse.de
+GPG Key fingerprint = 0196 BAD8 1CE9 1970 F4BE  1748 E4D4 88E3 0EEA B9D7
+"And now for something completely different."
