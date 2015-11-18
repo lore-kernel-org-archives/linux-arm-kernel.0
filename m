@@ -1,75 +1,40 @@
-From: Chris.Brandt@renesas.com (Chris Brandt)
-Date: Wed, 18 Nov 2015 19:12:53 +0000
-Subject: [PATCH v3] ARM: xip: Use correct symbol for end of ROM marker
-In-Reply-To: <alpine.LFD.2.20.1511181156250.22569@knanqh.ubzr>
-References: <1447362108-4333-1-git-send-email-chris.brandt@renesas.com>
- <1447697140-4099-1-git-send-email-chris.brandt@renesas.com>
- <alpine.LFD.2.20.1511161515100.5826@knanqh.ubzr>
- <HK2PR06MB05619FACB3725B6F5B2299718A1E0@HK2PR06MB0561.apcprd06.prod.outlook.com>
- <alpine.LFD.2.20.1511161605070.5826@knanqh.ubzr>
- <HK2PR06MB056142FFDA4E99A764DF9ECB8A1E0@HK2PR06MB0561.apcprd06.prod.outlook.com>
- <alpine.LFD.2.20.1511161730030.5826@knanqh.ubzr>
- <HK2PR06MB05614D47A9C35ECB4CA72D3F8A1D0@HK2PR06MB0561.apcprd06.prod.outlook.com>
- <alpine.LFD.2.20.1511162127180.5826@knanqh.ubzr>
- <HK2PR06MB056175E6E4356DD8C3566D758A1D0@HK2PR06MB0561.apcprd06.prod.outlook.com>
- <alpine.LFD.2.20.1511172255410.22569@knanqh.ubzr>
- <CANqRtoTkHecGEsbi3EtM8dkHQ=V0RGm7iZcU_igMqLE7Od=xBA@mail.gmail.com>
- <alpine.LFD.2.20.1511180841000.22569@knanqh.ubzr>
- <alpine.LFD.2.20.1511181156250.22569@knanqh.ubzr>
-Message-ID: <HK2PR06MB0561CA7E856CEAA89D0752488A1C0@HK2PR06MB0561.apcprd06.prod.outlook.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Wed, 18 Nov 2015 11:24:52 -0800
+Subject: [PATCH 2/4] arm64: dts: Add msm8996 SoC and MTP board support
+In-Reply-To: <201511181303.U0nlsppa%fengguang.wu@intel.com>
+References: <201511181303.U0nlsppa%fengguang.wu@intel.com>
+Message-ID: <564CD084.1080902@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi Nicolas,
+On 11/17/2015 09:06 PM, kbuild test robot wrote:
+> Hi Stephen,
+>
+> [auto build test ERROR on robh/for-next]
+> [also build test ERROR on v4.4-rc1 next-20151117]
+>
+> url:    https://github.com/0day-ci/linux/commits/Stephen-Boyd/devicetree-bindings-Document-Kryo-cpu/20151118-091558
+> base:   https://git.kernel.org/pub/scm/linux/kernel/git/robh/linux for-next
+> config: arm64-allmodconfig (attached as .config)
+> reproduce:
+>         wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+>         chmod +x ~/bin/make.cross
+>         # save the attached .config to linux build tree
+>         make.cross ARCH=arm64 
+>
+> All errors (new ones prefixed by >>):
+>
+>    In file included from arch/arm64/boot/dts/qcom/msm8996-mtp.dtsi:14:0,
+>                     from arch/arm64/boot/dts/qcom/msm8996-mtp.dts:16:
+>>> arch/arm64/boot/dts/qcom/msm8996.dtsi:14:48: fatal error: dt-bindings/clock/qcom,gcc-msm8996.h: No such file or directory
+>     #include <dt-bindings/clock/qcom,gcc-msm8996.h>
+>                                                    ^
+>    compilation terminated.
+>
 
-> Here's the patch with proper changelog, etc.  I don't have XIP
-> capable hardware to test it with though.
+Yes. These patches depend on the clk patches that expose that header
+file. We'll have to pull in the clock branch underneath the dts branch.
 
-
-I'm testing it now...but it's crashing.
-
-I fired up GDB, so here the reason:
-
-
-__v7_ca17mp_setup:
-	mov	r10, #0
-1:	adr	r0, __v7_setup_stack_ptr
-r0=0x18213df4
-
-	ldr	r12, [r0]
-r12=0x10174cc
-
-	add	r12, r12, r0			@ the local stack
-r12=0x1922b2c0
-
-	stmia	r12, {r1-r6, lr}		@ v7_invalidate_l1 touches r0-r6
-	bl      v7_invalidate_l1
-
-
-0x1922b2c0 is NOT RAM....it's nothing.
-
-
-As point of reference, here's the memory map of my XIP system:
-  Physical ROM address: 0x18000000 (I have my XIP kernel starting at 0x18200000)
-  Physical RAM address: 0x20000000
-  Virtual ROM  address: 0xBF0000000
-  Virtual RAM  address: 0xC00000000
-
-
-Basically, you made the same mistake that Magnus first did: You can't rely on the current PC address to obtain an address in physical RAM because the ROM virt-to-phys relationship is different than the RAM virt-to-phys relationship.
-
-No matter how you look at it, this early in boot, the only 'thing' that really knows where physical RAM is located is PLAT_PHYS_OFFSET.
-
-That's why both Magnus's an my patches (that I both tested) contain PLAT_PHYS_OFFSET.
-
-
-The only other 'slight' piece of info would be the DTB pointer is still sitting in R2 from boot, and at least for my system, that is in RAM. However, the DTB could be in ROM if the user wanted it to be, and I also think that this code might run twice in a SMP system...so even R2 would not be reliable. So...forget I mentioned it...
-
-
-I don't see any way around not having a "#ifdef XIP_KERNEL" statement in order to expose PLAT_PHYS_OFFSET so you can properly do your translation math.
-
-
-Chris
-
-
-ps, I will add that I appreciate your efforts with this.
+-- 
+Qualcomm Innovation Center, Inc. is a member of Code Aurora Forum,
+a Linux Foundation Collaborative Project
