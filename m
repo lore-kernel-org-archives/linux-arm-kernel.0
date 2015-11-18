@@ -1,65 +1,70 @@
-From: l.stach@pengutronix.de (Lucas Stach)
-Date: Wed, 18 Nov 2015 12:36:16 +0100
-Subject: [PATCH 2/2] ARM: dts: imx6q: add Novena board
-In-Reply-To: <201511181232.42446.marex@denx.de>
-References: <1447840120-8513-1-git-send-email-marex@denx.de>
- <201511181135.40171.marex@denx.de>
- <1447845958.3144.61.camel@pengutronix.de>
- <201511181232.42446.marex@denx.de>
-Message-ID: <1447846576.3144.63.camel@pengutronix.de>
+From: julien.grall@citrix.com (Julien Grall)
+Date: Wed, 18 Nov 2015 11:41:26 +0000
+Subject: [PATCH v3 01/62] Revert "xen/arm: vgic-v2: Drop cbase from
+ arch_domain"
+In-Reply-To: <564BE23C.6020808@huawei.com>
+References: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
+ <1447753261-7552-2-git-send-email-shannon.zhao@linaro.org>
+ <564B0F1E.9040804@citrix.com> <564B1E62.8080208@huawei.com>
+ <564B3255.6040108@citrix.com> <564BE23C.6020808@huawei.com>
+Message-ID: <564C63E6.2080104@citrix.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Am Mittwoch, den 18.11.2015, 12:32 +0100 schrieb Marek Vasut:
-> On Wednesday, November 18, 2015 at 12:25:58 PM, Lucas Stach wrote:
-> > Am Mittwoch, den 18.11.2015, 11:35 +0100 schrieb Marek Vasut:
-> > > On Wednesday, November 18, 2015 at 11:10:12 AM, Lucas Stach wrote:
-> > > > Hi Marek,
-[...]
-> > > [...]
-> > > 
-> > > > > +&ecspi3 {
-> > > > > +	pinctrl-names = "default";
-> > > > > +	pinctrl-0 = <&pinctrl_ecspi3_novena>;
-> > > > > +	fsl,spi-num-chipselects = <3>;
-> > > > > +	status = "okay";
-> > > > > +
-> > > > > +	spidev at 0 {
-> > > > > +		compatible = "spidev";
-> > > > 
-> > > > This will explode on a new kernel. Specifying spidev without using a
-> > > > more specific compatible will trigger a WARN_ON(), as it's considered
-> > > > bad style.
-> > > 
-> > > Oh, looks like imx_v6_v7_defconfig didn't have SPIDEV active, which is
-> > > why I didn't catch it during my last test, dang.
-> > > 
-> > > This SPI interface is routed into the FPGA, so what do you suggest I put
-> > > in the compatible string? There is no other sensible driver for the
-> > > peripheral, since the peripheral can be anything.
-> > 
-> > I'm not really the right person to ask for that, but I would guess that
-> > inventing a "novena,fpga-spi" compatible or something like that and
-> > adding it to the spidev driver would be the right thing to do.
-> 
-> So what's the rationale behind generic "spidev" being bad ? In my mind, it
-> is much better to use generic driver and generic compatible prop "spidev"
-> than to generate many one-off compatible props and have a driver with a list
-> of all of those.
-> 
->From the commit log:
+Hi Shannon,
 
-"Since spidev is a detail of how Linux controls a device rather than a
-description of the hardware in the system we should never have a node
-described as "spidev" in DT, any SPI device could be a spidev so this is
-just not a useful description."
+On 18/11/15 02:28, Shannon Zhao wrote:
 
-If you want to know about the details you would have to discuss this
-with Mark Brown.
+> On 2015/11/17 21:57, Julien Grall wrote:
+>> On 17/11/15 12:32, Shannon Zhao wrote:
+>>>> Hi Julien,
+>>>>
+>>>> On 2015/11/17 19:27, Julien Grall wrote:
+>>>>>> Hi Shannon,
+>>>>>>
+>>>>>> Why do you want to revert this patch?
+>>>>>>
+>>>> Because d->arch.vgic.cbase will be used by creating Dom0 MADT table
+>>>> later. See [PATCH v3 43/62].
+>>>> +            gicc.base_address = d->arch.vgic.cbase;
+>>>>
+>>>> My previous way is get this from ACPI table but someone suggest get it
+>>>> from struct domain and I think this way is better too since it uses the
+>>>> value after being parsed.
+>> It's pointless to store the value in arch_domain for something that it's
+>> only use during building...
+>>
+>> We have struct kernel_info which store any information related to the
+>> DOM0 during the building.
+>>
+> 
+> Yeah, that would be better if it could use kernel_info. But the problem
+> is that kernel_info is firstly used in construct_dom0(), while it needs
+> to store the cbase in domain_create() which is called before
+> construct_dom0(). And if we pass kernel_info as parameter to
+> domain_create(), this would introduce more changes to common codes.
+> 
+> Do you have any better idea to handle this?
+
+Yes, introducing callback to create the ACPI table in the GIC driver.
+See what we did for make_hwdom_dt_node.
+
+We are trying to make the domain_build domain as agnostic as possible
+from the GIC version. However in patch #43, you implement specific
+version in the domain builder.
+
+It will also not scale very well when we will introduce GICv2m and ITS.
+
+The version of the GIC (ACPI_MADT_GIC_*) could be introduced in the
+vgic_ops.
+
+The re-distributor could be moved in gic-v3.c and the generic interrupt
+controller in gic-v2.c.
+
+Note it's a mandatory to emulate the same version as the hardware for
+the virtual GIC.
 
 Regards,
-Lucas
 
 -- 
-Pengutronix e.K.             | Lucas Stach                 |
-Industrial Linux Solutions   | http://www.pengutronix.de/  |
+Julien Grall
