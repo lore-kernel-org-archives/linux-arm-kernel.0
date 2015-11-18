@@ -1,32 +1,64 @@
-From: Chris.Brandt@renesas.com (Chris Brandt)
-Date: Wed, 18 Nov 2015 19:36:05 +0000
-Subject: [PATCH v3] ARM: xip: Use correct symbol for end of ROM marker
-In-Reply-To: <alpine.LFD.2.20.1511181204240.22569@knanqh.ubzr>
-References: <1447362108-4333-1-git-send-email-chris.brandt@renesas.com>
- <1447697140-4099-1-git-send-email-chris.brandt@renesas.com>
- <alpine.LFD.2.20.1511161515100.5826@knanqh.ubzr>
- <HK2PR06MB05619FACB3725B6F5B2299718A1E0@HK2PR06MB0561.apcprd06.prod.outlook.com>
- <alpine.LFD.2.20.1511161605070.5826@knanqh.ubzr>
- <HK2PR06MB056196B2E169A504A16ED9738A1D0@HK2PR06MB0561.apcprd06.prod.outlook.com>
- <alpine.LFD.2.20.1511171155240.5826@knanqh.ubzr>
- <HK2PR06MB0561B7675F17A81B54A65CA28A1C0@HK2PR06MB0561.apcprd06.prod.outlook.com>
- <alpine.LFD.2.20.1511172129060.22569@knanqh.ubzr>
- <HK2PR06MB0561077CA74074E175561D7F8A1C0@HK2PR06MB0561.apcprd06.prod.outlook.com>
- <alpine.LFD.2.20.1511181204240.22569@knanqh.ubzr>
-Message-ID: <HK2PR06MB0561BAC75F605C9C51966B948A1C0@HK2PR06MB0561.apcprd06.prod.outlook.com>
+From: khilman@kernel.org (Kevin Hilman)
+Date: Wed, 18 Nov 2015 11:39:55 -0800
+Subject: [PATCH v9 2/2] arm-soc: Add support for tango4 platforms
+In-Reply-To: <yw1xegfnfa0g.fsf@unicorn.mansr.com> (=?utf-8?Q?=22M=C3=A5ns?=
+ =?utf-8?Q?_Rullg=C3=A5rd=22's?= message
+ of "Wed, 18 Nov 2015 18:16:47 +0000")
+References: <564C94A5.4060301@sigmadesigns.com>
+ <564C9558.4020100@sigmadesigns.com>
+ <7ha8qbyyiz.fsf@deeprootsystems.com>
+ <yw1xegfnfa0g.fsf@unicorn.mansr.com>
+Message-ID: <7hegfnxfjo.fsf@deeprootsystems.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> Sure.  You should start by splitting the XIP stuff out to a separate
-> script so functionally it is the same (broken) end result.  And from
-> there adding incremental fixes to the XIP script.
+M?ns Rullg?rd <mans@mansr.com> writes:
 
-More or less that's what I'm doing now on my system. You can diff the 2 in order to see what I've removed.
+> Kevin Hilman <khilman@kernel.org> writes:
+>
+>> Marc Gonzalez <marc_gonzalez@sigmadesigns.com> writes:
+>>
+>>> Add support for Sigma Designs ARM-based Tango4 "Secure Media Processor"
+>>> platforms (i.e. smp8734, smp8756, smp8758, smp8759) built around the
+>>> Cortex-A9 MPCore r3p0 (all dual-core, except the 8756).
+>>>
+>>> Support for older MIPS-based platforms can be found elsewhere:
+>>> https://github.com/mansr/linux-tangox
+>>>
+>>> Signed-off-by: Marc Gonzalez <marc_gonzalez@sigmadesigns.com>
+>>> ---
+>>>  arch/arm/Kconfig              |  2 ++
+>>>  arch/arm/Makefile             |  1 +
+>>>  arch/arm/mach-tangox/Kconfig  | 12 ++++++++++++
+>>>  arch/arm/mach-tangox/Makefile |  2 ++
+>>>  arch/arm/mach-tangox/setup.c  | 32 ++++++++++++++++++++++++++++++++
+>>>  arch/arm/mach-tangox/smc.S    |  9 +++++++++
+>>>  arch/arm/mach-tangox/smc.h    |  5 +++++
+>>
+>> Potential bike-shed fodder, but, a dumb question: is the family name
+>> actually "tangox" or is the "x" for the number (tango3, tango4, etc.)
+>>
+>> Assuming it's the later based on usage throughout the patch, I think
+>> it'd be better to just use "tango" throughout instead of tangox.
+>
+> The x indeed stands for a number.  I have no idea what tango1 was or if
+> it ever existed.  Tango2 (SMP863x) and tango3 (SMP86[457]x) were MIPS
+> based.  Tango4 is ARM based (mostly, the SMP8910 is MIPS) but otherwise
+> very similar to tango3.
 
-But wait...you said 'the last step' was to add a 2nd linker file and change the Makefiles to use it.
+Thanks for the clarification.
 
+> Since we don't know what tango5 will look like,
+> mach-tango4 might be more suitable here.  If tango5 turns out to be
+> sufficiently similar, there's no harm from adding support for that to
+> the mach-tango4 code (just look at mach-omap2).
 
-Are you saying I should first submit a patch that simply adds the new file, but not hook it up to any Makefiles yet?
-Then, once it has been updated a few times and is in better shape, I submit another patch that hooks it up with the Makefiles so I can then finally remove the XIP_KERNEL parts from the current vmlinux.lds.S?
+Well, mach-omap2 leads to enough confusion that I don't think we need to
+use that as a model. ;)  IMO, mach-tango is a better starting point.
 
-Chris
+> Most of the drivers support both tango3 and tango4, but apparently some
+> changes are planned for tango5.
+
+Thanks for the clarification,
+
+Kevin
