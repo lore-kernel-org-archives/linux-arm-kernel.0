@@ -1,137 +1,43 @@
-From: xili_gchen_5257@hotmail.com (Chen Gang)
-Date: Thu, 19 Nov 2015 03:40:25 +0800
-Subject: [PATCH] include: asm-generic: page.h: Remove useless get_user_page
- and free_user_page
-Message-ID: <COL130-W7B5F0BB94C76AF6B12EA7B91C0@phx.gbl>
+From: nico@fluxnic.net (Nicolas Pitre)
+Date: Wed, 18 Nov 2015 14:44:10 -0500 (EST)
+Subject: [PATCH v3] ARM: xip: Use correct symbol for end of ROM marker
+In-Reply-To: <HK2PR06MB0561BAC75F605C9C51966B948A1C0@HK2PR06MB0561.apcprd06.prod.outlook.com>
+References: <1447362108-4333-1-git-send-email-chris.brandt@renesas.com>
+ <1447697140-4099-1-git-send-email-chris.brandt@renesas.com>
+ <alpine.LFD.2.20.1511161515100.5826@knanqh.ubzr>
+ <HK2PR06MB05619FACB3725B6F5B2299718A1E0@HK2PR06MB0561.apcprd06.prod.outlook.com>
+ <alpine.LFD.2.20.1511161605070.5826@knanqh.ubzr>
+ <HK2PR06MB056196B2E169A504A16ED9738A1D0@HK2PR06MB0561.apcprd06.prod.outlook.com>
+ <alpine.LFD.2.20.1511171155240.5826@knanqh.ubzr>
+ <HK2PR06MB0561B7675F17A81B54A65CA28A1C0@HK2PR06MB0561.apcprd06.prod.outlook.com>
+ <alpine.LFD.2.20.1511172129060.22569@knanqh.ubzr>
+ <HK2PR06MB0561077CA74074E175561D7F8A1C0@HK2PR06MB0561.apcprd06.prod.outlook.com>
+ <alpine.LFD.2.20.1511181204240.22569@knanqh.ubzr>
+ <HK2PR06MB0561BAC75F605C9C51966B948A1C0@HK2PR06MB0561.apcprd06.prod.outlook.com>
+Message-ID: <alpine.LFD.2.20.1511181437030.22569@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
->From ba7c00c4cb976109b6a35812ce9649aaeda81e2d Mon Sep 17 00:00:00 2001
-From: Chen Gang <gang.chen.5i5j@gmail.com>
-Date: Thu, 19 Nov 2015 03:24:42 +0800
-Subject: [PATCH] include: asm-generic: page.h: Remove useless get_user_page and free_user_page
+On Wed, 18 Nov 2015, Chris Brandt wrote:
 
-They are not symmetric with each other, neither are used in real world
-(can not be found by grep command in source code root directory), so
-remove them.
+> > Sure.  You should start by splitting the XIP stuff out to a separate
+> > script so functionally it is the same (broken) end result.  And from
+> > there adding incremental fixes to the XIP script.
+> 
+> More or less that's what I'm doing now on my system. You can diff the 2 in order to see what I've removed.
+> 
+> But wait...you said 'the last step' was to add a 2nd linker file and change the Makefiles to use it.
+> 
+> 
+> Are you saying I should first submit a patch that simply adds the new file, but not hook it up to any Makefiles yet?
+> Then, once it has been updated a few times and is in better shape, I submit another patch that hooks it up with the Makefiles so I can then finally remove the XIP_KERNEL parts from the current vmlinux.lds.S?
 
-Signed-off-by: Chen Gang <gang.chen.5i5j@gmail.com>
----
-?arch/arc/include/asm/page.h ? ? ? | 3 ---
-?arch/arm/include/asm/page-nommu.h | 3 ---
-?arch/frv/include/asm/page.h ? ? ? | 3 ---
-?arch/m68k/include/asm/page_mm.h ? | 3 ---
-?arch/m68k/include/asm/page_no.h ? | 3 ---
-?arch/openrisc/include/asm/page.h ?| 3 ---
-?include/asm-generic/page.h ? ? ? ?| 3 ---
-?7 files changed, 21 deletions(-)
+Well... I'm of the opinion now that the first patch should be the 
+creation of the new script being a copy of the original with the XIP 
+conditionals removed from both, plus the makefile changes. That should 
+be easy to verify that nothing changed result wise, and then additional 
+patches could bring XIP efinements on top without disturbing the non-XIP 
+case.
 
-diff --git a/arch/arc/include/asm/page.h b/arch/arc/include/asm/page.h
-index 429957f..adf5cbb 100644
---- a/arch/arc/include/asm/page.h
-+++ b/arch/arc/include/asm/page.h
-@@ -13,9 +13,6 @@
-?
-?#ifndef __ASSEMBLY__
-?
--#define get_user_page(vaddr)		__get_free_page(GFP_KERNEL)
--#define free_user_page(page, addr)	free_page(addr)
--
-?#define clear_page(paddr)		memset((paddr), 0, PAGE_SIZE)
-?#define copy_page(to, from)		memcpy((to), (from), PAGE_SIZE)
-?
-diff --git a/arch/arm/include/asm/page-nommu.h b/arch/arm/include/asm/page-nommu.h
-index d1b162a..503f488 100644
---- a/arch/arm/include/asm/page-nommu.h
-+++ b/arch/arm/include/asm/page-nommu.h
-@@ -17,9 +17,6 @@
-?#define KTHREAD_SIZE PAGE_SIZE
-?#endif
-??
--#define get_user_page(vaddr)		__get_free_page(GFP_KERNEL)
--#define free_user_page(page, addr)	free_page(addr)
--
-?#define clear_page(page)	memset((page), 0, PAGE_SIZE)
-?#define copy_page(to,from)	memcpy((to), (from), PAGE_SIZE)
-?
-diff --git a/arch/frv/include/asm/page.h b/arch/frv/include/asm/page.h
-index 8c97068..52ace96 100644
---- a/arch/frv/include/asm/page.h
-+++ b/arch/frv/include/asm/page.h
-@@ -8,9 +8,6 @@
-?
-?#ifndef __ASSEMBLY__
-?
--#define get_user_page(vaddr)			__get_free_page(GFP_KERNEL)
--#define free_user_page(page, addr)		free_page(addr)
--
-?#define clear_page(pgaddr)			memset((pgaddr), 0, PAGE_SIZE)
-?#define copy_page(to,from)			memcpy((to), (from), PAGE_SIZE)
-?
-diff --git a/arch/m68k/include/asm/page_mm.h b/arch/m68k/include/asm/page_mm.h
-index 5029f73..e7a1946 100644
---- a/arch/m68k/include/asm/page_mm.h
-+++ b/arch/m68k/include/asm/page_mm.h
-@@ -6,9 +6,6 @@
-?#include <linux/compiler.h>
-?#include <asm/module.h>
-?
--#define get_user_page(vaddr)		__get_free_page(GFP_KERNEL)
--#define free_user_page(page, addr)	free_page(addr)
--
-?/*
-? * We don't need to check for alignment etc.
-? */
-diff --git a/arch/m68k/include/asm/page_no.h b/arch/m68k/include/asm/page_no.h
-index ef20916..fa7f32d 100644
---- a/arch/m68k/include/asm/page_no.h
-+++ b/arch/m68k/include/asm/page_no.h
-@@ -6,9 +6,6 @@
-?extern unsigned long memory_start;
-?extern unsigned long memory_end;
-?
--#define get_user_page(vaddr)		__get_free_page(GFP_KERNEL)
--#define free_user_page(page, addr)	free_page(addr)
--
-?#define clear_page(page)	memset((page), 0, PAGE_SIZE)
-?#define copy_page(to,from)	memcpy((to), (from), PAGE_SIZE)
-?
-diff --git a/arch/openrisc/include/asm/page.h b/arch/openrisc/include/asm/page.h
-index 108906f..e613d36 100644
---- a/arch/openrisc/include/asm/page.h
-+++ b/arch/openrisc/include/asm/page.h
-@@ -40,9 +40,6 @@
-?
-?#ifndef __ASSEMBLY__
-?
--#define get_user_page(vaddr) ? ? ? ? ? ?__get_free_page(GFP_KERNEL)
--#define free_user_page(page, addr) ? ? ?free_page(addr)
--
-?#define clear_page(page)	memset((page), 0, PAGE_SIZE)
-?#define copy_page(to, from)	memcpy((to), (from), PAGE_SIZE)
-?
-diff --git a/include/asm-generic/page.h b/include/asm-generic/page.h
-index 37d1fe2..67cfb7d 100644
---- a/include/asm-generic/page.h
-+++ b/include/asm-generic/page.h
-@@ -24,9 +24,6 @@
-?
-?#ifndef __ASSEMBLY__
-?
--#define get_user_page(vaddr)		__get_free_page(GFP_KERNEL)
--#define free_user_page(page, addr)	free_page(addr)
--
-?#define clear_page(page)	memset((page), 0, PAGE_SIZE)
-?#define copy_page(to,from)	memcpy((to), (from), PAGE_SIZE)
-?
---?
-1.9.3
 
- 		 	   		  
--------------- next part --------------
-A non-text attachment was scrubbed...
-Name: 0001-include-asm-generic-page.h-Remove-useless-get_user_p.patch
-Type: application/octet-stream
-Size: 4034 bytes
-Desc: not available
-URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151119/4822539a/attachment-0001.obj>
+Nicolas
