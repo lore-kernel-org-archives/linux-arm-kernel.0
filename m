@@ -1,45 +1,53 @@
-From: viresh.kumar@linaro.org (Viresh Kumar)
-Date: Wed, 18 Nov 2015 10:49:53 +0530
-Subject: [PATCH] cpufreq: scpi: Add dependency on SCPI clk driver
-In-Reply-To: <1447784059-22769-1-git-send-email-punit.agrawal@arm.com>
-References: <1447784059-22769-1-git-send-email-punit.agrawal@arm.com>
-Message-ID: <20151118051953.GB7336@ubuntu>
+From: matthijsvanduin@gmail.com (Matthijs van Duin)
+Date: Wed, 18 Nov 2015 06:22:27 +0100
+Subject: Minimal support for dm814x
+In-Reply-To: <20151113145216.GC2517@atomide.com>
+References: <4999BB3D-4BB5-4F7C-96D7-FB687725CDCC@audioscience.com>
+ <20151109150602.GR3199@atomide.com>
+ <CAALWOA-NUyRYaGbmBZpc6CcFga8_BKPZ9WQTxa3t09bHS_6=qA@mail.gmail.com>
+ <7933071D-84FD-4A85-8CD0-CC504CE1D9D1@audioscience.com>
+ <20151111174028.GF3218@atomide.com>
+ <CAALWOA_dEtajQBLrXesQ2bRCDf-1Dzg_tJw_=yAmaO=T3=KMZQ@mail.gmail.com>
+ <20151112174155.GM3218@atomide.com>
+ <CAALWOA9o80rhaqwaa6=XxmNN1FcWzHDXiaqkqFVO81CAMX=04w@mail.gmail.com>
+ <CAALWOA-29pK=GbNKhdY=4oJzhnueVxNAPruu9Uacqi5vMJN=OA@mail.gmail.com>
+ <20151113145216.GC2517@atomide.com>
+Message-ID: <CAALWOA-PjKW9M3qqxum4OqJ3V3AwKaaEDzA17jdZmgUNNE79Wg@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17-11-15, 18:14, Punit Agrawal wrote:
-> The SCPI clk driver registers the virtual cpufreq device that kicks off
-> initialisation of the SCPI cpufreq driver. Make the dependendency
-> explicit in Kconfig.
+On 13 November 2015 at 15:52, Tony Lindgren <tony@atomide.com> wrote:
+> I think this is the most recent TI git repo for dm81xx changes:
+>
+> http://arago-project.org/git/projects/?p=linux-omap3.git;a=summary
 
-That's not a dependency. Any other part of the kernel can add this
-*virtual* cpufreq device to get it going.
+Yeah, although I usually prefer to look at the
+linux-ipnc-rdk-dm81xx.git and linux-dvr-rdk-dm81xx.git that descend
+from it since they include some fixes that the last TI kernel doesn't.
+(However they may also include patches specific to the ipnc/dvr
+hardware, so some caution is needed.)
 
-But, we do have dependency the other way round. clk_get() will fail
-for the cpufreq driver if SCPI-clk driver is missing and perhaps
-that's what you need to mention in the changelog.
+Since arago can be sluggish I just mirrored all three branches on github:
+https://github.com/dutchanddutch/ti81xx-linux
+I've also fixed an obnoxious commit in the ipnc-rdk which changed all
+files to mode 755, since this made comparisons rather unpleasant.
 
-> Fixes: 8def31034d03 ("cpufreq: arm_big_little: add SCPI interface driver")
-> Signed-off-by: Punit Agrawal <punit.agrawal@arm.com>
-> Cc: Sudeep Holla <sudeep.holla@arm.com>
-> Cc: Rafael J. Wysocki <rjw@rjwysocki.net>
-> Cc: Viresh Kumar <viresh.kumar@linaro.org>
-> ---
->  drivers/cpufreq/Kconfig.arm | 2 +-
->  1 file changed, 1 insertion(+), 1 deletion(-)
-> 
-> diff --git a/drivers/cpufreq/Kconfig.arm b/drivers/cpufreq/Kconfig.arm
-> index 1582c1c..dadfdd4 100644
-> --- a/drivers/cpufreq/Kconfig.arm
-> +++ b/drivers/cpufreq/Kconfig.arm
-> @@ -201,7 +201,7 @@ config ARM_SA1110_CPUFREQ
->  
->  config ARM_SCPI_CPUFREQ
->          tristate "SCPI based CPUfreq driver"
-> -	depends on ARM_BIG_LITTLE_CPUFREQ && ARM_SCPI_PROTOCOL
-> +	depends on ARM_BIG_LITTLE_CPUFREQ && ARM_SCPI_PROTOCOL && COMMON_CLK_SCPI
+The PLL code looks pretty mediocre to me. In particular, they make no
+effort whatsoever to configure an exact ratio. It seems their
+algorithm uses whatever predivider was already programmed, selects the
+minimum postdivider that puts the DCO clock within valid range, and
+then approximates the dco/refclk ratio using the fractional
+multiplier.
 
-This looks fine.
+This works in principle, but both minimizing the DCO and (often
+needlessly) using the fractional multiplier seem like recipes to
+maximize the clock jitter. Mind you, I don't know how much jitter
+we're talking about here, I don't recall having seen specs about this.
 
--- 
-viresh
+I also have some concerns about the correctness of the implementation.
+I haven't analyzed it in any detail, but repeated occurrences of
+expressions of the form   (unsigned long long)( foo * bar )   make me
+doubt whether the author realizes this is utterly pointless and will,
+for 32-bit arguments, still perform a 32-bit multiplication.
+
+Matthijs
