@@ -1,68 +1,78 @@
 From: zhaoshenglong@huawei.com (Shannon Zhao)
-Date: Wed, 18 Nov 2015 14:24:22 +0800
-Subject: [PATCH 07/13] ARM: Xen: Document UEFI support on Xen ARM virtual
- platforms
-In-Reply-To: <20151117204457.GA31871@rob-hp-laptop>
-References: <1447754231-7772-1-git-send-email-shannon.zhao@linaro.org>
- <1447754231-7772-8-git-send-email-shannon.zhao@linaro.org>
- <20151117204457.GA31871@rob-hp-laptop>
-Message-ID: <564C1996.80806@huawei.com>
+Date: Wed, 18 Nov 2015 14:26:11 +0800
+Subject: [PATCH 08/13] Xen: EFI: Parse DT parameters for Xen specific UEFI
+In-Reply-To: <CAKv+Gu-hjj0Mh3vUv86Y5Mk7STKP+ykBD_MXGcQWH1quWJ1jMA@mail.gmail.com>
+References: <1447754231-7772-1-git-send-email-shannon.zhao@linaro.org>	<1447754231-7772-9-git-send-email-shannon.zhao@linaro.org>	<CAKv+Gu98L_dQYVhvGQG=d9Uga-x3mJ=4oxtQqvgU-D3DvcrwHg@mail.gmail.com>	<20151117113701.GE12586@leverpostej>
+ <CAKv+Gu-hjj0Mh3vUv86Y5Mk7STKP+ykBD_MXGcQWH1quWJ1jMA@mail.gmail.com>
+Message-ID: <564C1A03.7020708@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 2015/11/18 4:44, Rob Herring wrote:
-> On Tue, Nov 17, 2015 at 05:57:05PM +0800, shannon.zhao at linaro.org wrote:
->> From: Shannon Zhao <shannon.zhao@linaro.org>
+On 2015/11/17 20:17, Ard Biesheuvel wrote:
+> On 17 November 2015 at 12:37, Mark Rutland <mark.rutland@arm.com> wrote:
+>> On Tue, Nov 17, 2015 at 12:25:58PM +0100, Ard Biesheuvel wrote:
+>>> On 17 November 2015 at 10:57,  <shannon.zhao@linaro.org> wrote:
+>>>> From: Shannon Zhao <shannon.zhao@linaro.org>
+>>>>
+>>>> Add a new function to parse DT parameters for Xen specific UEFI just
+>>>> like the way for normal UEFI. Then it could reuse the existing codes.
+>>>>
+>>>> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
+>>>> ---
+>>>>  drivers/firmware/efi/efi.c | 67 ++++++++++++++++++++++++++++++++++++++++++----
+>>>>  1 file changed, 62 insertions(+), 5 deletions(-)
+>>>>
+>>>> diff --git a/drivers/firmware/efi/efi.c b/drivers/firmware/efi/efi.c
+>>>> index d6144e3..629bd06 100644
+>>>> --- a/drivers/firmware/efi/efi.c
+>>>> +++ b/drivers/firmware/efi/efi.c
+>>>> @@ -24,6 +24,7 @@
+>>>>  #include <linux/of_fdt.h>
+>>>>  #include <linux/io.h>
+>>>>  #include <linux/platform_device.h>
+>>>> +#include <xen/xen.h>
+>>>>
+>>>>  struct efi __read_mostly efi = {
+>>>>         .mps        = EFI_INVALID_TABLE_ADDR,
+>>>> @@ -488,12 +489,60 @@ static __initdata struct {
+>>>>         UEFI_PARAM("MemMap Desc. Version", "linux,uefi-mmap-desc-ver", desc_ver)
+>>>>  };
+>>>>
+>>>> +static __initdata struct {
+>>>> +       const char name[32];
+>>>> +       const char propname[32];
+>>>> +       int offset;
+>>>> +       int size;
+>>>> +} xen_dt_params[] = {
+>>>> +       UEFI_PARAM("System Table", "xen,uefi-system-table", system_table),
+>>>> +       UEFI_PARAM("MemMap Address", "xen,uefi-mmap-start", mmap),
+>>>> +       UEFI_PARAM("MemMap Size", "xen,uefi-mmap-size", mmap_size),
+>>>> +       UEFI_PARAM("MemMap Desc. Size", "xen,uefi-mmap-desc-size", desc_size),
+>>>> +       UEFI_PARAM("MemMap Desc. Version", "xen,uefi-mmap-desc-ver", desc_ver)
+>>>> +};
+>>>> +
+>>>
+>>> We discussed (and agreed afair) that dropping the "linux," prefix from
+>>> the DT properties was an acceptable change. If we do that, and reuse
+>>> the same names in the xen version (i.e., drop the "xen," prefix), we
+>>> could make this change a *lot* simpler.
 >>
->> Add a "uefi" node under /hypervisor node in FDT, then Linux kernel could
->> scan this to get the UEFI information.
+>> Regardless of if we drop the "linux," prefix from the existing strings,
+>> I think we need the "xen," prefix here.
 >>
->> Signed-off-by: Shannon Zhao <shannon.zhao@linaro.org>
->> ---
->>  Documentation/devicetree/bindings/arm/xen.txt | 25 +++++++++++++++++++++++++
->>  1 file changed, 25 insertions(+)
+>> The xen EFI interface comes with additional caveats, and we need to
+>> treat it separately.
 >>
->> diff --git a/Documentation/devicetree/bindings/arm/xen.txt b/Documentation/devicetree/bindings/arm/xen.txt
->> index 0f7b9c2..c375d67 100644
->> --- a/Documentation/devicetree/bindings/arm/xen.txt
->> +++ b/Documentation/devicetree/bindings/arm/xen.txt
->> @@ -15,6 +15,24 @@ the following properties:
->>  - interrupts: the interrupt used by Xen to inject event notifications.
->>    A GIC node is also required.
->>  
->> +To support UEFI on Xen ARM virtual platforms, Xen pupulates the FDT "uefi" node
->> +under /hypervisor with following parameters:
->> +
->> +________________________________________________________________________________
->> +Name                      | Size   | Description
->> +================================================================================
->> +xen,uefi-system-table     | 64-bit | Physical address of the UEFI System Table.
->> +--------------------------------------------------------------------------------
->> +xen,uefi-mmap-start       | 64-bit | Physical address of the UEFI memory map.
->> +--------------------------------------------------------------------------------
->> +xen,uefi-mmap-size        | 32-bit | Size in bytes of the UEFI memory map
->> +                          |        | pointed to in previous entry.
->> +--------------------------------------------------------------------------------
->> +xen,uefi-mmap-desc-size   | 32-bit | Size in bytes of each entry in the UEFI
->> +                          |        | memory map.
->> +--------------------------------------------------------------------------------
->> +xen,uefi-mmap-desc-ver    | 32-bit | Version of the mmap descriptor format.
->> +--------------------------------------------------------------------------------
+>> Unless you're suggesting that /hypervisor/uefi-* is handled differently
+>> to /chosen/uefi-*?
+>>
+>> I think I'd still prefer the "xen," prefix regardless.
+>>
 > 
-> Why aren't you using what is already populated by UEFI as defined in 
-> Documentation/arm/uefi.txt? Seems to be about the same thing.
-> 
+> Well, we should still be able to reuse more of the existing code
+> rather than duplicating a bunch of code in fdt_find_xen_uefi_params()
 
-Yes, the parameters are similar. But since we can't find a good way to
-use normal UEFI for Xen Dom0 on ARM(there are some aspects which are not
-consistent with the UEFI spec), we have to introduce a Xen specific
-UEFI. Then we want to separate this from the normal UEFI completely and
-don't affect the normal use. So we add these parameter under Xenia
-specific node /hypervisor.
-
-For details of the previous discussion, look at below link:
-
-http://lists.xenproject.org/archives/html/xen-devel/2015-09/msg03295.html
+Sure, will try to reuse the codes.
 
 Thanks,
 -- 
