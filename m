@@ -1,49 +1,51 @@
-From: David.Laight@ACULAB.COM (David Laight)
-Date: Wed, 18 Nov 2015 10:22:04 +0000
-Subject: next build: 235 warnings 3 failures (next/next-20151117)
-In-Reply-To: <3723928.99NZh1TC6E@wuerfel>
-References: <564a9961.878b420a.331b8.fffffd62@mx.google.com>
- <6370082.rfihnaNWhf@wuerfel> <20151117171236.GJ30101@arm.com>
- <3723928.99NZh1TC6E@wuerfel>
-Message-ID: <063D6719AE5E284EB5DD2968C1650D6D1CBD51BD@AcuExch.aculab.com>
+From: andre.przywara@arm.com (Andre Przywara)
+Date: Wed, 18 Nov 2015 10:29:30 +0000
+Subject: [PATCH 0/7] kvmtool: Cleanup kernel loading
+In-Reply-To: <20151102145846.GH29657@arm.com>
+References: <1446229620-28088-1-git-send-email-andre.przywara@arm.com>
+ <20151102145846.GH29657@arm.com>
+Message-ID: <564C530A.3010604@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Arnd Bergmann
-> Sent: 17 November 2015 19:17
-> On Tuesday 17 November 2015 17:12:37 Will Deacon wrote:
-> > On Tue, Nov 17, 2015 at 06:03:40PM +0100, Arnd Bergmann wrote:
-> > > On Tuesday 17 November 2015 16:44:53 Will Deacon wrote:
-> > > > > 8<----
-> > > > > Subject: ARM64: make smp_load_acquire() work with const arguments
-> > > > >
-> > > > > smp_load_acquire() uses typeof() to declare a local variable for temporarily
-> > > > > storing the output of the memory access. This fails when the argument is
-> > > > > constant, because the assembler complains about using a constant register
-> > > > > as output:
-> > > > >
-> > > > >  arch/arm64/include/asm/barrier.h:71:3: error: read-only variable '___p1'
-> > > > >  used as 'asm' output
-> > > >
-> > > > Do you know the usage in the kernel causing this warning?
-> > >
-> > > A newly introduced function in include/net/sock.h:
-> > >
-> > > static inline int sk_state_load(const struct sock *sk)
-> > > {
-> > >         return smp_load_acquire(&sk->sk_state);
-> > > }
-> >
-> > Hmm, maybe we could play a similar trick to READ_ONCE by declaring an
-> > anonymous union and writing through the non-const member?
+Hi Will,
+
+On 02/11/15 14:58, Will Deacon wrote:
+> On Fri, Oct 30, 2015 at 06:26:53PM +0000, Andre Przywara wrote:
+>> Hi,
 > 
-> Yes, I think that would work, if you think we need to care about the
-> case where we read into a structure.
+> Hello Andre,
+> 
+>> this series cleans up kvmtool's kernel loading functionality a bit.
+>> It has been broken out of a previous series I sent [1] and contains
+>> just the cleanup and bug fix parts, which should be less controversial
+>> and thus easier to merge ;-)
+>> I will resend the pipe loading part later on as a separate series.
+>>
+>> The first patch properly abstracts kernel loading to move
+>> responsibility into each architecture's code. It removes quite some
+>> ugly code from the generic kvm.c file.
+>> The later patches address the naive usage of read(2) to, well, read
+>> data from files. Doing this without coping with the subtleties of
+>> the UNIX read semantics (returning with less or none data read is not
+>> an error) can provoke hard to debug failures.
+>> So these patches make use of the existing and one new wrapper function
+>> to make sure we read everything we actually wanted to.
+>> The last patch moves the ARM kernel loading code into the proper
+>> location to be in line with the other architectures.
+>>
+>> Please have a look and give some comments!
+> 
+> Looks good to me, but I'd like to see some comments from some mips/ppc/x86
+> people on the changes you're making over there.
 
-How are you going to find the right type/size for the non-const member of the union?
-If the type/size is fixed then why use typeof()?
+Sounds reasonable, but no answers yet.
 
-If the variable being read (sk->sk_state above) might only be 8 or 16 bits then
-you might be able to use sizeof() to select between code paths.
+Can you take at least patch 1 and 2 meanwhile, preferably 6 and 7 (the
+ARM parts) also if you are OK with it?
+I have other patches that depend on 1/7 and 2/7, so having them upstream
+would help me and reduce further dependency churn.
+I am happy to resend the remaining patches for further discussion later.
 
-	David
+Cheers,
+Andre.
