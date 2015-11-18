@@ -1,31 +1,56 @@
-From: Chris.Brandt@renesas.com (Chris Brandt)
-Date: Wed, 18 Nov 2015 15:16:58 +0000
-Subject: [PATCH v3] ARM: xip: Use correct symbol for end of ROM marker
-In-Reply-To: <alpine.LFD.2.20.1511172129060.22569@knanqh.ubzr>
-References: <1447362108-4333-1-git-send-email-chris.brandt@renesas.com>
- <1447697140-4099-1-git-send-email-chris.brandt@renesas.com>
- <alpine.LFD.2.20.1511161515100.5826@knanqh.ubzr>
- <HK2PR06MB05619FACB3725B6F5B2299718A1E0@HK2PR06MB0561.apcprd06.prod.outlook.com>
- <alpine.LFD.2.20.1511161605070.5826@knanqh.ubzr>
- <HK2PR06MB056196B2E169A504A16ED9738A1D0@HK2PR06MB0561.apcprd06.prod.outlook.com>
- <alpine.LFD.2.20.1511171155240.5826@knanqh.ubzr>
- <HK2PR06MB0561B7675F17A81B54A65CA28A1C0@HK2PR06MB0561.apcprd06.prod.outlook.com>
- <alpine.LFD.2.20.1511172129060.22569@knanqh.ubzr>
-Message-ID: <HK2PR06MB0561077CA74074E175561D7F8A1C0@HK2PR06MB0561.apcprd06.prod.outlook.com>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 18 Nov 2015 16:18:36 +0100
+Subject: [PATCH] pinctrl: at91-pio4: use %pr format string for resource
+In-Reply-To: <20151117133341.GG16931@odux.rfo.atmel.com>
+References: <3726450.XyTgssZ1KT@wuerfel>
+ <20151117133341.GG16931@odux.rfo.atmel.com>
+Message-ID: <5158594.z9FlJvJfpz@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-> With XIP there is still an init section, [snip]
-> No need to page align it either at that point which should save some
-> ROM space.
+On Tuesday 17 November 2015 14:33:41 Ludovic Desroches wrote:
+> Hi Arnd,
+> 
+> On Thu, Nov 12, 2015 at 03:15:38PM +0100, Arnd Bergmann wrote:
+> > resource_size_t may be defined as 32 or 64 bit depending on configuration,
+> > so it cannot be printed using the normal format strings, as gcc correctly
+> > warns:
+> > 
+> > pinctrl-at91-pio4.c: In function 'atmel_pinctrl_probe':
+> > pinctrl-at91-pio4.c:1003:41: warning: format '%u' expects argument of type 'unsigned int', but argument 5 has type 'resource_size_t {aka long long unsigned int}' [-Wformat=]
+> >    dev_dbg(dev, "bank %i: hwirq=%u\n", i, res->start);
+> > 
+> > This changes the format string to use the special "%pr" format
+> > string that prints a resource, and changes the arguments so we
+> > the resource structure directly. I'm also swapping out the arguments
+> > to match the text in the format string.
+> > 
+> 
+> I agree the format change but not swapping out the arguments. Why do you have
+> the feeling they are not matching the text?
+> 
+> Few lines before you have:
+> res = platform_get_resource(pdev, IORESOURCE_IRQ, i);
+> atmel_pioctrl->irqs[i] = res->start;
+> 
+> Each bank has its own irq line this is what I want to print with hwirq.
+> Of course it assumes that interrupts are declared in the right order.
 
-Good point.
+Sorry, my mistake. You are completely right and I don't know how I concluded
+it was wrong. It's possible I got confused by the 'hwirq' string and thought
+it could not refer to the resource, which is a virtual irq number rather than
+a hwirq.
 
-> Things like .kprobes.text should be in ROM, [snip]
->
-> Etc. Etc.
+Anyway, I'll submit a new version with this fixup folded in:
 
-Here's the thing...I'm probably out of my depth on most of this. But, I'd be happy to post up a RFC patch and then start collecting the feedback on what can be removed. I can at least test it on a real XIP system.
+@@ -1000,7 +1000,7 @@ static int atmel_pinctrl_probe(struct platform_device *pdev)
+                atmel_pioctrl->irqs[i] = res->start;
+                irq_set_chained_handler(res->start, atmel_gpio_irq_handler);
+                irq_set_handler_data(res->start, atmel_pioctrl);
+-               dev_dbg(dev, "bank %pr: hwirq=%u\n", res, i);
++               dev_dbg(dev, "bank %i: irq=%pr\n", i, res);
+        }
+ 
+        atmel_pioctrl->irq_domain = irq_domain_add_linear(dev->of_node,
 
-
-Chris
+	Arnd
