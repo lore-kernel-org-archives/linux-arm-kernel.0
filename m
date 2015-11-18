@@ -1,42 +1,29 @@
-From: robh@kernel.org (Rob Herring)
-Date: Wed, 18 Nov 2015 17:07:47 -0600
-Subject: [PATCH 1/4] devicetree: bindings: Document Kryo cpu
-In-Reply-To: <1447809149-29724-2-git-send-email-sboyd@codeaurora.org>
-References: <1447809149-29724-1-git-send-email-sboyd@codeaurora.org>
- <1447809149-29724-2-git-send-email-sboyd@codeaurora.org>
-Message-ID: <20151118230747.GA12253@rob-hp-laptop>
+From: jonmason@broadcom.com (Jon Mason)
+Date: Wed, 18 Nov 2015 18:13:47 -0500
+Subject: [PATCH 0/3] ARM: dts: add support for NS, NSP, and NS2 clocks
+Message-ID: <1447888430-4451-1-git-send-email-jonmason@broadcom.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 17, 2015 at 05:12:26PM -0800, Stephen Boyd wrote:
-> Document the compatible string for the Kryo family of qcom cpus.
-> 
-> Cc: <devicetree@vger.kernel.org>
-> Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 
-Acked-by: Rob Herring <robh@kernel.org>
+This patch series adds device tree support for the Broadcom Northstar,
+Northstar Plus, and Northstar 2 clocks.
 
-> ---
->  Documentation/devicetree/bindings/arm/cpus.txt | 1 +
->  1 file changed, 1 insertion(+)
-> 
-> diff --git a/Documentation/devicetree/bindings/arm/cpus.txt b/Documentation/devicetree/bindings/arm/cpus.txt
-> index 3a07a87fef20..6008b99ccb2b 100644
-> --- a/Documentation/devicetree/bindings/arm/cpus.txt
-> +++ b/Documentation/devicetree/bindings/arm/cpus.txt
-> @@ -177,6 +177,7 @@ nodes to be present and contain the properties described below.
->  			    "marvell,sheeva-v5"
->  			    "nvidia,tegra132-denver"
->  			    "qcom,krait"
-> +			    "qcom,kryo"
->  			    "qcom,scorpion"
->  	- enable-method
->  		Value type: <stringlist>
-> -- 
-> The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
-> a Linux Foundation Collaborative Project
-> 
-> --
-> To unsubscribe from this list: send the line "unsubscribe devicetree" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Last sent as an RFC (see https://lkml.org/lkml/2015/10/13/882) due to
+the inability to merge because of the driver dependencies.  Those
+necessary driver changes were merged into 4.4.  All comments have been
+addressed and it is ready to be pulled in.
+
+
+Jon Mason (3):
+  ARM: dts: enable clock support for BCM5301X
+  ARM: dts: enable clock support for Broadcom NSP
+  ARM64: dts: enable clock support for Broadcom NS2
+
+ arch/arm/boot/dts/bcm-nsp.dtsi        | 99 ++++++++++++++++++++++++++---------
+ arch/arm/boot/dts/bcm5301x.dtsi       | 92 ++++++++++++++++++++++++--------
+ arch/arm64/boot/dts/broadcom/ns2.dtsi | 80 +++++++++++++++++++++++++++-
+ 3 files changed, 225 insertions(+), 46 deletions(-)
+
+-- 
+1.9.1
