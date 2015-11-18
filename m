@@ -1,115 +1,55 @@
-From: lee.jones@linaro.org (Lee Jones)
-Date: Wed, 18 Nov 2015 08:21:44 +0000
-Subject: [PATCH v3 2/5] mfd: syscon: add a DT property to set value width
-In-Reply-To: <20151117172649.GA11035@roeck-us.net>
-References: <1447700814-5391-1-git-send-email-damien.riegel@savoirfairelinux.com>
- <1447700814-5391-3-git-send-email-damien.riegel@savoirfairelinux.com>
- <20151117091946.GG17829@x1> <20151117172649.GA11035@roeck-us.net>
-Message-ID: <20151118082144.GB3534@x1>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 18 Nov 2015 09:24:26 +0100
+Subject: [PATCH 3/3] ARM64: dts: mt8173: Add thermal/auxadc device nodes
+In-Reply-To: <1447835066-10482-1-git-send-email-s.hauer@pengutronix.de>
+References: <1447835066-10482-1-git-send-email-s.hauer@pengutronix.de>
+Message-ID: <1447835066-10482-4-git-send-email-s.hauer@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, 17 Nov 2015, Guenter Roeck wrote:
+This adds the thermal controller and auxadc nodes to the Mediatek MT8173
+dtsi file.
 
-> On Tue, Nov 17, 2015 at 09:19:46AM +0000, Lee Jones wrote:
-> > On Mon, 16 Nov 2015, Damien Riegel wrote:
-> > 
-> > > Currently syscon has a fixed configuration of 32 bits for register and
-> > > values widths. In some cases, it would be desirable to be able to
-> > > customize the value width.
-> > > 
-> > > For example, certain boards (like the ones manufactured by Technologic
-> > > Systems) have a FPGA that is memory-mapped, but its registers are only
-> > > 16-bit wide.
-> > > 
-> > > This patch adds an optional "bus-width" DT binding for syscon that
-> > > allows to change the width for the data bus (i.e. val_bits). If this
-> > > property is provided, it will also adjust the register stride to
-> > > bus-width / 8. If not provided, the default configuration is used.
-> > > 
-> > > Signed-off-by: Damien Riegel <damien.riegel@savoirfairelinux.com>
-> > > ---
-> > >  Documentation/devicetree/bindings/mfd/syscon.txt |  3 +++
-> > >  drivers/mfd/syscon.c                             | 12 ++++++++++++
-> > >  2 files changed, 15 insertions(+)
-> > > 
-> > > diff --git a/Documentation/devicetree/bindings/mfd/syscon.txt b/Documentation/devicetree/bindings/mfd/syscon.txt
-> > > index fe8150b..4c9d187 100644
-> > > --- a/Documentation/devicetree/bindings/mfd/syscon.txt
-> > > +++ b/Documentation/devicetree/bindings/mfd/syscon.txt
-> > > @@ -13,6 +13,9 @@ Required properties:
-> > >  - compatible: Should contain "syscon".
-> > >  - reg: the register region can be accessed from syscon
-> > >  
-> > > +Optional property:
-> > > +- bus-width: width of the data bus. Can be <8>, <16>, <32>, or <64>.
-> > > +
-> > >  Examples:
-> > >  gpr: iomuxc-gpr at 020e0000 {
-> > >  	compatible = "fsl,imx6q-iomuxc-gpr", "syscon";
-> > > diff --git a/drivers/mfd/syscon.c b/drivers/mfd/syscon.c
-> > > index 176bf0f..00b0995 100644
-> > > --- a/drivers/mfd/syscon.c
-> > > +++ b/drivers/mfd/syscon.c
-> > > @@ -47,6 +47,7 @@ static struct syscon *of_syscon_register(struct device_node *np)
-> > >  	struct syscon *syscon;
-> > >  	struct regmap *regmap;
-> > >  	void __iomem *base;
-> > > +	u32 bus_width;
-> > >  	int ret;
-> > >  	struct regmap_config syscon_config = syscon_regmap_config;
-> > >  
-> > > @@ -69,6 +70,17 @@ static struct syscon *of_syscon_register(struct device_node *np)
-> > >  	 else if (of_property_read_bool(np, "little-endian"))
-> > >  		syscon_config.val_format_endian = REGMAP_ENDIAN_LITTLE;
-> > >  
-> > > +	 ret = of_property_read_u32(np, "bus-width", &bus_width);
-> > > +	 if (!ret) {
-> > 
-> > This syntax is confusing, as we normally associate it with an error
-> > condition.  Instead, I'd use:
-> > 
-> >   if (of_property_read_u32(np, "bus-width", &bus_width) == 0)
-> 
-> Or maybe better
-> 
-> 	if (!of_property_read_u32(np, "bus-width", &bus_width))
+Signed-off-by: Sascha Hauer <s.hauer@pengutronix.de>
+Reviewed-by: Daniel Kurtz <djkurtz@chromium.org>
+---
+ arch/arm64/boot/dts/mediatek/mt8173.dtsi | 17 +++++++++++++++++
+ 1 file changed, 17 insertions(+)
 
-Not sure if it's better, but it's also suitable.
-
-> > Or, for more clarity:
-> > 
-> >   of_property_read_u32(np, "bus-width", &bus_width);
-> >   if (bus_width)
-> > 
-> > If you choose this version (which I think is my preferred method, don't
-> > forget to initialise 'bus_width' to zero.
-> > 
-> Ignoring an error and depending on bus_width==0 to determine if the property
-> was provided seems odd, especially since it would "hide" if the bus-width
-> property is set to 0. In the original code, this would be detected as error.
-
-I'm not sure what you mean.  If bus_width==0, then a problem has
-occurred and we will not use the value.  If bus_width!=0 then we can
-assume that it's been set and (as the comment describes) the value
-will be checked for errors in regmap_init_mmio().
-
-> > > +		 /*
-> > > +		  * the property has been provided, regmap_init_mmio
-> > > +		  * will return an error if these values are invalid
-> > > +		  * so there is no need to check them here.
-> > > +		  */
-> > > +		 syscon_config.val_bits = bus_width;
-> > > +		 syscon_config.reg_stride = syscon_config.val_bits / 8;
-> > > +	 }
-> > > +
-> > >  	regmap = regmap_init_mmio(NULL, base, &syscon_config);
-> > >  	if (IS_ERR(regmap)) {
-> > >  		pr_err("regmap init failed\n");
-> > 
-
+diff --git a/arch/arm64/boot/dts/mediatek/mt8173.dtsi b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+index 06a1564..e2ddd03 100644
+--- a/arch/arm64/boot/dts/mediatek/mt8173.dtsi
++++ b/arch/arm64/boot/dts/mediatek/mt8173.dtsi
+@@ -277,6 +277,11 @@
+ 				(GIC_CPU_MASK_SIMPLE(4) | IRQ_TYPE_LEVEL_HIGH)>;
+ 		};
+ 
++		auxadc: auxadc at 11001000 {
++			compatible = "mediatek,mt8173-auxadc";
++			reg = <0 0x11001000 0 0x1000>;
++		};
++
+ 		uart0: serial at 11002000 {
+ 			compatible = "mediatek,mt8173-uart",
+ 				     "mediatek,mt6577-uart";
+@@ -487,6 +492,18 @@
+ 			clock-names = "source", "hclk";
+ 			status = "disabled";
+ 		};
++
++		thermal: thermal at 1100b000 {
++			#thermal-sensor-cells = <0>;
++			compatible = "mediatek,mt8173-thermal";
++			reg = <0 0x1100b000 0 0x1000>;
++			interrupts = <0 70 IRQ_TYPE_LEVEL_LOW>;
++			clocks = <&pericfg CLK_PERI_THERM>, <&pericfg CLK_PERI_AUXADC>;
++			clock-names = "therm", "auxadc";
++			resets = <&pericfg MT8173_PERI_THERM_SW_RST>;
++			mediatek,auxadc = <&auxadc>;
++			mediatek,apmixedsys = <&apmixedsys>;
++		};
+ 	};
+ };
+ 
 -- 
-Lee Jones
-Linaro STMicroelectronics Landing Team Lead
-Linaro.org ? Open source software for ARM SoCs
-Follow Linaro: Facebook | Twitter | Blog
+2.6.2
