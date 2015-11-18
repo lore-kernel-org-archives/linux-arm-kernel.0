@@ -1,53 +1,30 @@
-From: zhaoshenglong@huawei.com (Shannon Zhao)
-Date: Wed, 18 Nov 2015 10:37:13 +0800
-Subject: [PATCH v3 24/62] arm: Introduce a generic way to use a device
- from acpi
-In-Reply-To: <564B38F6.9070101@citrix.com>
-References: <1447753261-7552-1-git-send-email-shannon.zhao@linaro.org>
- <1447753261-7552-25-git-send-email-shannon.zhao@linaro.org>
- <564B2023.8010801@citrix.com> <564B29EA.3060107@huawei.com>
- <564B38F6.9070101@citrix.com>
-Message-ID: <564BE459.6000006@huawei.com>
+From: drinkcat@chromium.org (Nicolas Boichat)
+Date: Wed, 18 Nov 2015 10:45:01 +0800
+Subject: [PATCH] watchdog: mtk_wdt: Use MODE_KEY when stopping the watchdog
+Message-ID: <1447814701-23504-1-git-send-email-drinkcat@chromium.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
+WDT_MODE value need to be or-ed with MODE_KEY when setting
+watchdog mode. Add it to mtk_wdt_stop function, so that the
+watchdog can be stopped (e.g. during suspend).
 
+Signed-off-by: Nicolas Boichat <drinkcat@chromium.org>
+---
+ drivers/watchdog/mtk_wdt.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-On 2015/11/17 22:25, Julien Grall wrote:
-> On 17/11/15 13:21, Shannon Zhao wrote:
->>> AFAICT, it does only works for SPCR table used for UART device. For the
->>> GIC you've hardcoded the value and I can't find any version number in
->>> the table.
->>>
->> No, I didn't hardcode the GIC version. Since ACPI 6.0 introduces GIC
->> version in generic distributor table, it could get the version from
->> that. Please see [PATCH v3 28/62].
-> 
-> +    if ( dist->version == ACPI_MADT_GIC_VERSION_V2 )
-> +        rc = acpi_device_init(DEVICE_GIC, NULL, GIC_V2);
-> +    else if ( dist->version == ACPI_MADT_GIC_VERSION_V3 )
-> +        rc = acpi_device_init(DEVICE_GIC, NULL, GIC_V3);
-> 
-> Every single time a new GIC version will be added, we will had to add
-> another else if. I'm sorry but it's what I call hardcoding.
-> 
-
-Oh, I see. If it uses the enum acpi_madt_gic_version for ACPI GIC not
-the enum gic_version, it could match 1:1. Something like below:
-
-It uses ACPI_MADT_GIC_VERSION_V2 for GICv2.
-
-ACPI_DEVICE_START(agicv2, "GICv2", DEVICE_GIC)
-        .class_type = ACPI_MADT_GIC_VERSION_V2,
-        .init = acpi_gicv2_preinit,
-ACPI_DEVICE_END
-
-Then get the GIC version from MADT table and call
-
-acpi_device_init(DEVICE_GIC, NULL, dist->version);
-
-How about this way?
-
-Thanks,
+diff --git a/drivers/watchdog/mtk_wdt.c b/drivers/watchdog/mtk_wdt.c
+index 6ad9df9..b751f43 100644
+--- a/drivers/watchdog/mtk_wdt.c
++++ b/drivers/watchdog/mtk_wdt.c
+@@ -123,6 +123,7 @@ static int mtk_wdt_stop(struct watchdog_device *wdt_dev)
+ 
+ 	reg = readl(wdt_base + WDT_MODE);
+ 	reg &= ~WDT_MODE_EN;
++	reg |= WDT_MODE_KEY;
+ 	iowrite32(reg, wdt_base + WDT_MODE);
+ 
+ 	return 0;
 -- 
-Shannon
+2.6.0.rc2.230.g3dd15c0
