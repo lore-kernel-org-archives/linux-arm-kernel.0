@@ -1,51 +1,37 @@
-From: huangdaode@hisilicon.com (huangdaode)
-Date: Wed, 18 Nov 2015 10:08:00 +0800
-Subject: [PATCH v3 net-next] net: hisilicon: fix binding document of mdio
-Message-ID: <1447812480-190001-1-git-send-email-huangdaode@hisilicon.com>
+From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
+Date: Wed, 18 Nov 2015 10:53:23 +0900
+Subject: [PATCHv2 2/3] ASoC: s3c24xx-i2s: pass DMA channels as platform
+ data
+In-Reply-To: <4020501.kQLt6nnIEv@wuerfel>
+References: <6346833.MfUC71I3uD@wuerfel> <4020501.kQLt6nnIEv@wuerfel>
+Message-ID: <564BDA13.3040907@samsung.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-This patch explains the occasion of "hisilcon,mdio" and
-"hisilicon,hns-mdio" according to Arnd's comments.
-and reformat it according to comments from Rob<robh@kernel.org>.
+On 18.11.2015 00:54, Arnd Bergmann wrote:
+> This is a minor cleanup to make the s3c2412-i2s and s3c24xx-i2s
+> drivers independent of the mach/dma.h header file and to allow
+> removing the dependency on the specific dmaengine driver in the
+> next patch.
+> 
+> As a side not, only the s3c24xx-i2s driver seems to still be
+> used, while the definition of the s3c2412-i2s platform device was
+> removed in commit 6d259a25b56d ("ARM: SAMSUNG: use static
+> declaration when it is not used in other files") after it had
+> never been referenced since its introduction in f0fba2ad1b6b
+> ("ASoC: multi-component - ASoC Multi-Component Support").
+> 
+> Apparently it should have been used by mach-jive.c, but that
+> never happened. My patch at this point leaves the current state
+> unchanged, we can decide whether to fix or delete the jive
+> driver and s3c2412-i2s another time.
+> 
+> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+> ---
+> v2: check for NULL pdata
+> 
 
-Signed-off-by: huangdaode <huangdaode@hisilicon.com>
----
-change log:
-v3:
-  1)move change log under '---' line.
-  2)change minor syntax error on description.
+Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
 
-v2:
-  1) reformat the style.
-  2) make it more clearity.
-
-v1:
-  initial version.
-
-v2 patch reference:https://lkml.org/lkml/2015/11/16/88
-v1 patch reference:https://lkml.org/lkml/2015/11/12/913
-
- Documentation/devicetree/bindings/net/hisilicon-hns-mdio.txt | 7 ++++++-
- 1 file changed, 6 insertions(+), 1 deletion(-)
-
-diff --git a/Documentation/devicetree/bindings/net/hisilicon-hns-mdio.txt b/Documentation/devicetree/bindings/net/hisilicon-hns-mdio.txt
-index 9c23fdf..4a7ede9 100644
---- a/Documentation/devicetree/bindings/net/hisilicon-hns-mdio.txt
-+++ b/Documentation/devicetree/bindings/net/hisilicon-hns-mdio.txt
-@@ -1,7 +1,12 @@
- Hisilicon MDIO bus controller
- 
- Properties:
--- compatible: "hisilicon,mdio","hisilicon,hns-mdio".
-+- compatible: can be one of:
-+	"hisilicon,hns-mdio"
-+	"hisilicon,mdio"
-+  "hisilicon,hns-mdio" is recommended to be used for hip05 and later SOCs,
-+  while "hisilicon,mdio" is optional for backwards compatibility only on
-+  hip04 Soc.
- - reg: The base address of the MDIO bus controller register bank.
- - #address-cells: Must be <1>.
- - #size-cells: Must be <0>.  MDIO addresses have no size component.
--- 
-1.9.1
+Best regards,
+Krzysztof
