@@ -1,58 +1,34 @@
-From: lina.iyer@linaro.org (Lina Iyer)
-Date: Wed, 18 Nov 2015 07:57:36 -0700
-Subject: [PATCH] ARM: imx6: pm: declare pm domain latency on power_state
- struct.
-In-Reply-To: <1447799871-56374-6-git-send-email-lina.iyer@linaro.org>
-References: <1447799871-56374-6-git-send-email-lina.iyer@linaro.org>
-Message-ID: <1447858656-62464-1-git-send-email-lina.iyer@linaro.org>
+From: jeremy.linton@arm.com (Jeremy Linton)
+Date: Wed, 18 Nov 2015 09:03:19 -0600
+Subject: [PATCH] [PATCH] arm64: Boot failure on m400 with new cont PTEs
+Message-ID: <1447858999-26665-1-git-send-email-jeremy.linton@arm.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: Axel Haslam <ahaslam+renesas@baylibre.com>
+The HP m400 fails to boot the linux 4.4rc1 kernel. It usually
+hangs or sometimes takes an unhanded exception around the DMA
+zone messages. This was bisected to the new CONT PTE changes.
 
-The generic_pm_domain structure uses an array of latencies to be able to
-declare multiple intermediate states.
+Adding an extra flush_tlb_all() in the code path which is
+changing the kernel permissions allows the machine to boot
+consistently.
 
-Declare a single "OFF" state with the default latencies So that the
-power_off_latency_ns and power_on_latency_ns fields of generic_pm_domain
-structure can be eventualy removed.
-
-Signed-off-by: Axel Haslam <ahaslam+renesas@baylibre.com>
-Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
-[Lina: pm_genpd_init() argument change]
+Signed-off-by: Jeremy Linton <jeremy.linton@arm.com>
 ---
- arch/arm/mach-imx/gpc.c | 14 ++++++++++++--
- 1 file changed, 12 insertions(+), 2 deletions(-)
+ arch/arm64/mm/mmu.c | 1 +
+ 1 file changed, 1 insertion(+)
 
-diff --git a/arch/arm/mach-imx/gpc.c b/arch/arm/mach-imx/gpc.c
-index 8e7976a..b070e06 100644
---- a/arch/arm/mach-imx/gpc.c
-+++ b/arch/arm/mach-imx/gpc.c
-@@ -368,13 +368,23 @@ static struct generic_pm_domain imx6q_arm_domain = {
- 	.name = "ARM",
- };
+diff --git a/arch/arm64/mm/mmu.c b/arch/arm64/mm/mmu.c
+index e3f563c..e92fe77 100644
+--- a/arch/arm64/mm/mmu.c
++++ b/arch/arm64/mm/mmu.c
+@@ -121,6 +121,7 @@ static void __populate_init_pte(pte_t *pte, unsigned long addr,
+ 		pfn++;
+ 		addr += PAGE_SIZE;
+ 	} while (addr != end);
++	flush_tlb_all();
+ }
  
-+static struct genpd_power_state imx6q_arm_domain_states[] = {
-+	{
-+		.name = "OFF",
-+		.power_off_latency_ns = 25000,
-+		.power_on_latency_ns = 2000000,
-+	},
-+};
-+
- static struct pu_domain imx6q_pu_domain = {
- 	.base = {
- 		.name = "PU",
- 		.power_off = imx6q_pm_pu_power_off,
- 		.power_on = imx6q_pm_pu_power_on,
--		.power_off_latency_ns = 25000,
--		.power_on_latency_ns = 2000000,
-+		.gov = NULL,
-+		.status = GPD_STATE_POWER_OFF,
-+		.states = imx6q_arm_domain_states,
-+		.state_count = ARRAY_SIZE(imx6q_arm_domain_states),
- 	},
- };
- 
+ static void alloc_init_pte(pmd_t *pmd, unsigned long addr,
 -- 
-2.1.4
+2.4.3
