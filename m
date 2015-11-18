@@ -1,209 +1,195 @@
 From: takahiro.akashi@linaro.org (AKASHI Takahiro)
-Date: Wed, 18 Nov 2015 15:43:06 +0900
-Subject: [PATCH v6 3/6] arm64: ftrace: fix a stack tracer's output under
- function graph tracer
+Date: Wed, 18 Nov 2015 15:43:07 +0900
+Subject: [PATCH v6 4/6] arm64: insn: add instruction decoders for ldp/stp and
+ add/sub
 In-Reply-To: <1447828989-4980-1-git-send-email-takahiro.akashi@linaro.org>
 References: <1447828989-4980-1-git-send-email-takahiro.akashi@linaro.org>
-Message-ID: <1447828989-4980-4-git-send-email-takahiro.akashi@linaro.org>
+Message-ID: <1447828989-4980-5-git-send-email-takahiro.akashi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Function graph tracer modifies a return address (LR) in a stack frame
-to hook a function return. This will result in many useless entries
-(return_to_handler) showing up in
- a) a stack tracer's output
- b) perf call graph (with perf record -g)
- c) dump_backtrace (at panic et al.)
+A function prologue analyzer is a requisite for implementing stack tracer
+and getting better views of stack usages on arm64.
+To implement a function prologue analyzer, we have to be able to decode,
+at least, stp, add, sub and mov instructions.
 
-For example, in case of a),
-  $ echo function_graph > /sys/kernel/debug/tracing/current_tracer
-  $ echo 1 > /proc/sys/kernel/stack_trace_enabled
-  $ cat /sys/kernel/debug/tracing/stack_trace
-        Depth    Size   Location    (54 entries)
-        -----    ----   --------
-  0)     4504      16   gic_raise_softirq+0x28/0x150
-  1)     4488      80   smp_cross_call+0x38/0xb8
-  2)     4408      48   return_to_handler+0x0/0x40
-  3)     4360      32   return_to_handler+0x0/0x40
-  ...
+This patch adds decoders for those instructions, that are used solely
+by stack tracer for now, but generic enough for other uses.
 
-In case of b),
-  $ echo function_graph > /sys/kernel/debug/tracing/current_tracer
-  $ perf record -e mem:XXX:x -ag -- sleep 10
-  $ perf report
-                  ...
-                  |          |          |--0.22%-- 0x550f8
-                  |          |          |          0x10888
-                  |          |          |          el0_svc_naked
-                  |          |          |          sys_openat
-                  |          |          |          return_to_handler
-                  |          |          |          return_to_handler
-                  ...
-
-In case of c),
-  $ echo function_graph > /sys/kernel/debug/tracing/current_tracer
-  $ echo c > /proc/sysrq-trigger
-  ...
-  Call trace:
-  [<ffffffc00044d3ac>] sysrq_handle_crash+0x24/0x30
-  [<ffffffc000092250>] return_to_handler+0x0/0x40
-  [<ffffffc000092250>] return_to_handler+0x0/0x40
-  ...
-
-This patch replaces such entries with real addresses preserved in
-current->ret_stack[] at unwind_frame(). This way, we can cover all
-the cases.
-
+Reviewed-by: Jungseok Lee <jungseoklee85@gmail.com>
+Tested-by: Jungseok Lee <jungseoklee85@gmail.com>
 Signed-off-by: AKASHI Takahiro <takahiro.akashi@linaro.org>
 ---
- arch/arm64/include/asm/ftrace.h     |    2 ++
- arch/arm64/include/asm/stacktrace.h |    3 +++
- arch/arm64/kernel/perf_callchain.c  |    3 +++
- arch/arm64/kernel/process.c         |    3 +++
- arch/arm64/kernel/return_address.c  |    3 +++
- arch/arm64/kernel/stacktrace.c      |   17 +++++++++++++++++
- arch/arm64/kernel/time.c            |    3 +++
- arch/arm64/kernel/traps.c           |    3 +++
- 8 files changed, 37 insertions(+)
+ arch/arm64/include/asm/insn.h |   18 ++++++++
+ arch/arm64/kernel/insn.c      |  102 +++++++++++++++++++++++++++++++++++++++++
+ 2 files changed, 120 insertions(+)
 
-diff --git a/arch/arm64/include/asm/ftrace.h b/arch/arm64/include/asm/ftrace.h
-index c5534fa..3c60f37 100644
---- a/arch/arm64/include/asm/ftrace.h
-+++ b/arch/arm64/include/asm/ftrace.h
-@@ -28,6 +28,8 @@ struct dyn_arch_ftrace {
- 
- extern unsigned long ftrace_graph_call;
- 
-+extern void return_to_handler(void);
-+
- static inline unsigned long ftrace_call_adjust(unsigned long addr)
- {
- 	/*
-diff --git a/arch/arm64/include/asm/stacktrace.h b/arch/arm64/include/asm/stacktrace.h
-index 6fb61c5..801a16db 100644
---- a/arch/arm64/include/asm/stacktrace.h
-+++ b/arch/arm64/include/asm/stacktrace.h
-@@ -22,6 +22,9 @@ struct stackframe {
- 	unsigned long fp;
- 	unsigned long sp;
- 	unsigned long pc;
-+#ifdef CONFIG_FUNCTION_GRAPH_TRACER
-+	unsigned int graph;
-+#endif
+diff --git a/arch/arm64/include/asm/insn.h b/arch/arm64/include/asm/insn.h
+index 30e50eb..8d5c538 100644
+--- a/arch/arm64/include/asm/insn.h
++++ b/arch/arm64/include/asm/insn.h
+@@ -165,6 +165,8 @@ enum aarch64_insn_ldst_type {
+ 	AARCH64_INSN_LDST_STORE_PAIR_PRE_INDEX,
+ 	AARCH64_INSN_LDST_LOAD_PAIR_POST_INDEX,
+ 	AARCH64_INSN_LDST_STORE_PAIR_POST_INDEX,
++	AARCH64_INSN_LDST_LOAD_PAIR,
++	AARCH64_INSN_LDST_STORE_PAIR,
  };
  
- extern int unwind_frame(struct task_struct *tsk, struct stackframe *frame);
-diff --git a/arch/arm64/kernel/perf_callchain.c b/arch/arm64/kernel/perf_callchain.c
-index 797220d..ff46654 100644
---- a/arch/arm64/kernel/perf_callchain.c
-+++ b/arch/arm64/kernel/perf_callchain.c
-@@ -164,6 +164,9 @@ void perf_callchain_kernel(struct perf_callchain_entry *entry,
- 	frame.fp = regs->regs[29];
- 	frame.sp = regs->sp;
- 	frame.pc = regs->pc;
-+#ifdef CONFIG_FUNCTION_GRAPH_TRACER
-+	frame.graph = current->curr_ret_stack;
-+#endif
+ enum aarch64_insn_adsb_type {
+@@ -225,6 +227,8 @@ static __always_inline u32 aarch64_insn_get_##abbr##_value(void) \
  
- 	walk_stackframe(current, &frame, callchain_trace, entry);
+ __AARCH64_INSN_FUNCS(str_reg,	0x3FE0EC00, 0x38206800)
+ __AARCH64_INSN_FUNCS(ldr_reg,	0x3FE0EC00, 0x38606800)
++__AARCH64_INSN_FUNCS(stp,	0x7FC00000, 0x29000000)
++__AARCH64_INSN_FUNCS(ldp,	0x7FC00000, 0x29400000)
+ __AARCH64_INSN_FUNCS(stp_post,	0x7FC00000, 0x28800000)
+ __AARCH64_INSN_FUNCS(ldp_post,	0x7FC00000, 0x28C00000)
+ __AARCH64_INSN_FUNCS(stp_pre,	0x7FC00000, 0x29800000)
+@@ -277,6 +281,7 @@ __AARCH64_INSN_FUNCS(hint,	0xFFFFF01F, 0xD503201F)
+ __AARCH64_INSN_FUNCS(br,	0xFFFFFC1F, 0xD61F0000)
+ __AARCH64_INSN_FUNCS(blr,	0xFFFFFC1F, 0xD63F0000)
+ __AARCH64_INSN_FUNCS(ret,	0xFFFFFC1F, 0xD65F0000)
++__AARCH64_INSN_FUNCS(eret,	0xFFFFFFFF, 0xD69F00E0)
+ 
+ #undef	__AARCH64_INSN_FUNCS
+ 
+@@ -370,6 +375,19 @@ bool aarch32_insn_is_wide(u32 insn);
+ u32 aarch32_insn_extract_reg_num(u32 insn, int offset);
+ u32 aarch32_insn_mcr_extract_opc2(u32 insn);
+ u32 aarch32_insn_mcr_extract_crm(u32 insn);
++int aarch64_insn_decode_add_sub_imm(u32 insn,
++				    enum aarch64_insn_register *dst,
++				    enum aarch64_insn_register *src,
++				    int *imm,
++				    enum aarch64_insn_variant *variant,
++				    enum aarch64_insn_adsb_type *type);
++int aarch64_insn_decode_load_store_pair(u32 insn,
++					enum aarch64_insn_register *reg1,
++					enum aarch64_insn_register *reg2,
++					enum aarch64_insn_register *base,
++					int *offset,
++					enum aarch64_insn_variant *variant,
++					enum aarch64_insn_ldst_type *type);
+ #endif /* __ASSEMBLY__ */
+ 
+ #endif	/* __ASM_INSN_H */
+diff --git a/arch/arm64/kernel/insn.c b/arch/arm64/kernel/insn.c
+index c08b9ad..b56a66c 100644
+--- a/arch/arm64/kernel/insn.c
++++ b/arch/arm64/kernel/insn.c
+@@ -33,6 +33,7 @@
+ #include <asm/insn.h>
+ 
+ #define AARCH64_INSN_SF_BIT	BIT(31)
++#define AARCH64_INSN_S_BIT	BIT(29)
+ #define AARCH64_INSN_N_BIT	BIT(22)
+ 
+ static int aarch64_insn_encoding_class[] = {
+@@ -1141,3 +1142,104 @@ u32 aarch32_insn_mcr_extract_crm(u32 insn)
+ {
+ 	return insn & CRM_MASK;
  }
-diff --git a/arch/arm64/kernel/process.c b/arch/arm64/kernel/process.c
-index 98bf546..88d742b 100644
---- a/arch/arm64/kernel/process.c
-+++ b/arch/arm64/kernel/process.c
-@@ -344,6 +344,9 @@ unsigned long get_wchan(struct task_struct *p)
- 	frame.fp = thread_saved_fp(p);
- 	frame.sp = thread_saved_sp(p);
- 	frame.pc = thread_saved_pc(p);
-+#ifdef CONFIG_FUNCTION_GRAPH_TRACER
-+	frame.graph = p->curr_ret_stack;
-+#endif
- 	stack_page = (unsigned long)task_stack_page(p);
- 	do {
- 		if (frame.sp < stack_page ||
-diff --git a/arch/arm64/kernel/return_address.c b/arch/arm64/kernel/return_address.c
-index 07b37ac..1718706 100644
---- a/arch/arm64/kernel/return_address.c
-+++ b/arch/arm64/kernel/return_address.c
-@@ -43,6 +43,9 @@ void *return_address(unsigned int level)
- 	frame.fp = (unsigned long)__builtin_frame_address(0);
- 	frame.sp = current_stack_pointer;
- 	frame.pc = (unsigned long)return_address; /* dummy */
-+#ifdef CONFIG_FUNCTION_GRAPH_TRACER
-+	frame.graph = current->curr_ret_stack;
-+#endif
- 
- 	walk_stackframe(current, &frame, save_return_addr, &data);
- 
-diff --git a/arch/arm64/kernel/stacktrace.c b/arch/arm64/kernel/stacktrace.c
-index 9c7acf8..0a39049 100644
---- a/arch/arm64/kernel/stacktrace.c
-+++ b/arch/arm64/kernel/stacktrace.c
-@@ -17,6 +17,7 @@
-  */
- #include <linux/kernel.h>
- #include <linux/export.h>
-+#include <linux/ftrace.h>
- #include <linux/sched.h>
- #include <linux/stacktrace.h>
- 
-@@ -66,6 +67,19 @@ int notrace unwind_frame(struct task_struct *tsk, struct stackframe *frame)
- 	frame->fp = *(unsigned long *)(fp);
- 	frame->pc = *(unsigned long *)(fp + 8);
- 
-+#ifdef CONFIG_FUNCTION_GRAPH_TRACER
-+	if (tsk && tsk->ret_stack &&
-+			(frame->pc == (unsigned long)return_to_handler)) {
-+		/*
-+		 * This is a case where function graph tracer has
-+		 * modified a return address (LR) in a stack frame
-+		 * to hook a function return.
-+		 * So replace it to an original value.
-+		 */
-+		frame->pc = tsk->ret_stack[frame->graph--].ret;
-+	}
-+#endif /* CONFIG_FUNCTION_GRAPH_TRACER */
 +
- 	/*
- 	 * Check whether we are going to walk through from interrupt stack
- 	 * to task stack.
-@@ -137,6 +151,9 @@ void save_stack_trace_tsk(struct task_struct *tsk, struct stack_trace *trace)
- 		frame.sp = current_stack_pointer;
- 		frame.pc = (unsigned long)save_stack_trace_tsk;
- 	}
-+#ifdef CONFIG_FUNCTION_GRAPH_TRACER
-+	frame.graph = tsk->curr_ret_stack;
-+#endif
- 
- 	walk_stackframe(tsk, &frame, save_trace, &data);
- 	if (trace->nr_entries < trace->max_entries)
-diff --git a/arch/arm64/kernel/time.c b/arch/arm64/kernel/time.c
-index 6e5c521..5977969 100644
---- a/arch/arm64/kernel/time.c
-+++ b/arch/arm64/kernel/time.c
-@@ -52,6 +52,9 @@ unsigned long profile_pc(struct pt_regs *regs)
- 	frame.fp = regs->regs[29];
- 	frame.sp = regs->sp;
- 	frame.pc = regs->pc;
-+#ifdef CONFIG_FUNCTION_GRAPH_TRACER
-+	frame.graph = -1; /* no task info */
-+#endif
- 	do {
- 		int ret = unwind_frame(NULL, &frame);
- 		if (ret < 0)
-diff --git a/arch/arm64/kernel/traps.c b/arch/arm64/kernel/traps.c
-index da45224..46053c2 100644
---- a/arch/arm64/kernel/traps.c
-+++ b/arch/arm64/kernel/traps.c
-@@ -169,6 +169,9 @@ static void dump_backtrace(struct pt_regs *regs, struct task_struct *tsk)
- 		frame.sp = thread_saved_sp(tsk);
- 		frame.pc = thread_saved_pc(tsk);
- 	}
-+#ifdef CONFIG_FUNCTION_GRAPH_TRACER
-+	frame.graph = tsk->curr_ret_stack;
-+#endif
- 
- 	pr_emerg("Call trace:\n");
- 	while (1) {
++enum aarch64_insn_register aarch64_insn_extract_reg_num(u32 insn,
++				enum aarch64_insn_register_type type)
++{
++	int shift;
++
++	switch (type) {
++	case AARCH64_INSN_REGTYPE_RT:
++	case AARCH64_INSN_REGTYPE_RD:
++		shift = 0;
++		break;
++	case AARCH64_INSN_REGTYPE_RN:
++		shift = 5;
++		break;
++	case AARCH64_INSN_REGTYPE_RT2:
++	case AARCH64_INSN_REGTYPE_RA:
++		shift = 10;
++		break;
++	case AARCH64_INSN_REGTYPE_RM:
++		shift = 16;
++		break;
++	default:
++		pr_err("%s: unknown register type decoding %d\n", __func__,
++		       type);
++		return ~0L;
++	}
++
++	return (insn & (GENMASK(4, 0) << shift)) >> shift;
++}
++
++int aarch64_insn_decode_add_sub_imm(u32 insn,
++				    enum aarch64_insn_register *dst,
++				    enum aarch64_insn_register *src,
++				    int *imm,
++				    enum aarch64_insn_variant *variant,
++				    enum aarch64_insn_adsb_type *type)
++{
++	if (aarch64_insn_is_add_imm(insn))
++		*type =	((insn) & AARCH64_INSN_S_BIT) ?
++				AARCH64_INSN_ADSB_ADD_SETFLAGS :
++				AARCH64_INSN_ADSB_ADD;
++	else if (aarch64_insn_is_sub_imm(insn))
++		*type =	((insn) & AARCH64_INSN_S_BIT) ?
++				AARCH64_INSN_ADSB_SUB_SETFLAGS :
++				AARCH64_INSN_ADSB_SUB;
++	else
++		return 0;
++
++	*variant = (insn & AARCH64_INSN_SF_BIT) ? AARCH64_INSN_VARIANT_64BIT :
++					AARCH64_INSN_VARIANT_32BIT;
++
++	*dst = aarch64_insn_extract_reg_num(insn, AARCH64_INSN_REGTYPE_RD);
++
++	*src = aarch64_insn_extract_reg_num(insn, AARCH64_INSN_REGTYPE_RN);
++
++	/* TODO: ignore shilft field[23:22] */
++	*imm = (int)aarch64_insn_decode_immediate(AARCH64_INSN_IMM_12, insn);
++
++	return 1;
++}
++
++int aarch64_insn_decode_load_store_pair(u32 insn,
++					enum aarch64_insn_register *reg1,
++					enum aarch64_insn_register *reg2,
++					enum aarch64_insn_register *base,
++					int *offset,
++					enum aarch64_insn_variant *variant,
++					enum aarch64_insn_ldst_type *type)
++{
++	int imm;
++
++	if (aarch64_insn_is_stp(insn))
++		*type = AARCH64_INSN_LDST_STORE_PAIR;
++	else if (aarch64_insn_is_stp_post(insn))
++		*type = AARCH64_INSN_LDST_STORE_PAIR_POST_INDEX;
++	else if (aarch64_insn_is_stp_pre(insn))
++		*type = AARCH64_INSN_LDST_STORE_PAIR_PRE_INDEX;
++	else if (aarch64_insn_is_ldp(insn))
++		*type = AARCH64_INSN_LDST_LOAD_PAIR;
++	else if (aarch64_insn_is_ldp_post(insn))
++		*type = AARCH64_INSN_LDST_LOAD_PAIR_POST_INDEX;
++	else if (aarch64_insn_is_ldp_pre(insn))
++		*type = AARCH64_INSN_LDST_LOAD_PAIR_PRE_INDEX;
++	else
++		return 0;
++
++	*variant = (insn & AARCH64_INSN_S_BIT) ? AARCH64_INSN_VARIANT_64BIT :
++				AARCH64_INSN_VARIANT_32BIT;
++
++	*reg1 = aarch64_insn_extract_reg_num(insn, AARCH64_INSN_REGTYPE_RT);
++
++	*reg2 = aarch64_insn_extract_reg_num(insn, AARCH64_INSN_REGTYPE_RT2);
++
++	*base = aarch64_insn_extract_reg_num(insn, AARCH64_INSN_REGTYPE_RN);
++
++	imm = (int)aarch64_insn_decode_immediate(AARCH64_INSN_IMM_7, insn);
++	asm("sbfm %0, %0, 0, 6" : "+r" (imm));
++	*offset = imm * 8;
++
++	return 1;
++}
 -- 
 1.7.9.5
