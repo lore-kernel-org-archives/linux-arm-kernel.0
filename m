@@ -1,51 +1,54 @@
-From: xobs@kosagi.com (Sean Cross)
-Date: Wed, 18 Nov 2015 12:53:39 +0800
-Subject: Freescale IMX6 active cooling
-In-Reply-To: <CABH3fy-QPV1bv-WaO3mWVq2RN5=f-AnBHMgFTmmU-Ve3xgyUrw@mail.gmail.com>
-References: <CABH3fy-He02iVU7FzqcPApPemeoqQP15+gr9+Hx87-OEBuHvCg@mail.gmail.com>
- <CAOMZO5AX9owvovpdmdr=rKNApbuNrkp9pKexJk_mMyMdH1=1qg@mail.gmail.com>
- <CALHpu37MNnzW=3YNKUq-aOHgF12EhjyN7g1juTwuMad_Xv891w@mail.gmail.com>
- <CABH3fy-QPV1bv-WaO3mWVq2RN5=f-AnBHMgFTmmU-Ve3xgyUrw@mail.gmail.com>
-Message-ID: <564C0453.6020400@kosagi.com>
+From: lkp@intel.com (kbuild test robot)
+Date: Wed, 18 Nov 2015 13:06:57 +0800
+Subject: [PATCH 2/4] arm64: dts: Add msm8996 SoC and MTP board support
+In-Reply-To: <1447809149-29724-3-git-send-email-sboyd@codeaurora.org>
+Message-ID: <201511181303.U0nlsppa%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17/11/2015 8:49 PM, Catalin Crenguta wrote:
-> On Tue, Nov 17, 2015 at 11:38 AM, Jon Nettleton <jon.nettleton@gmail.com> wrote:
->> I would recommend you take a look at the work that xobs did for the
->> Novena Heirloom.  If you look at this branch starting around Aug 3 you
->> can see where he has converted iMX6 to use generic thermal zones and
->> adds support for for an active cooling device/fan.
->> https://github.com/xobs/novena-linux/commits/v3.19-novena-etnadrm-r3?page=3
->>
->> -Jon
-> Thank you!
-> I have patched my 4.3 kernel (they don't apply cleanly but they are
-> straight forward to modify), added a gpio-fan and the corresponding
-> thermal-zone in my DTB and it works!
-> Sean Cross, are you interested in bringing this to mainline?
-Yes, this does seem like the sort of thing that should make it into 
-mainline.
+Hi Stephen,
 
-Would you like me to submit it as a patch against 4.3?  I'm unclear how 
-much should be added.
+[auto build test ERROR on robh/for-next]
+[also build test ERROR on v4.4-rc1 next-20151117]
 
-For example, the current code talks directly to the cpufreq cooling 
-system, but that becomes unnecessary if using generic thermal zones, 
-since the zones will bind cpufreq to the thermal sensor.  Then again, 
-with such a patch, boards that do not explicitly update their device 
-tree to support generic thermal zones will need to have their entries 
-updated.
+url:    https://github.com/0day-ci/linux/commits/Stephen-Boyd/devicetree-bindings-Document-Kryo-cpu/20151118-091558
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/robh/linux for-next
+config: arm64-allmodconfig (attached as .config)
+reproduce:
+        wget https://git.kernel.org/cgit/linux/kernel/git/wfg/lkp-tests.git/plain/sbin/make.cross -O ~/bin/make.cross
+        chmod +x ~/bin/make.cross
+        # save the attached .config to linux build tree
+        make.cross ARCH=arm64 
 
-Perhaps the correct order of patches is:
+All errors (new ones prefixed by >>):
 
-1) Add generic thermal zone support
-2) Remove zone and cdev from imx_thermal
-3) Add cpufreq-cooling to imx6
-4) Add cpufreq-cooling to all other SoCs that support imx_thermal
-5) Add default generic thermal zone support to imx6qdl.dtsi
+   In file included from arch/arm64/boot/dts/qcom/msm8996-mtp.dtsi:14:0,
+                    from arch/arm64/boot/dts/qcom/msm8996-mtp.dts:16:
+>> arch/arm64/boot/dts/qcom/msm8996.dtsi:14:48: fatal error: dt-bindings/clock/qcom,gcc-msm8996.h: No such file or directory
+    #include <dt-bindings/clock/qcom,gcc-msm8996.h>
+                                                   ^
+   compilation terminated.
 
-Comments on how it should be handled?
+vim +14 arch/arm64/boot/dts/qcom/msm8996.dtsi
 
+     8	 * but WITHOUT ANY WARRANTY; without even the implied warranty of
+     9	 * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    10	 * GNU General Public License for more details.
+    11	 */
+    12	
+    13	#include <dt-bindings/interrupt-controller/arm-gic.h>
+  > 14	#include <dt-bindings/clock/qcom,gcc-msm8996.h>
+    15	#include <dt-bindings/clock/qcom,mmcc-msm8996.h>
+    16	
+    17	/ {
 
-Sean
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 45533 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151118/49315e76/attachment-0001.obj>
