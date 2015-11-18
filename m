@@ -1,84 +1,90 @@
-From: nico@fluxnic.net (Nicolas Pitre)
-Date: Wed, 18 Nov 2015 08:45:22 -0500 (EST)
-Subject: [PATCH v3] ARM: xip: Use correct symbol for end of ROM marker
-In-Reply-To: <CANqRtoTkHecGEsbi3EtM8dkHQ=V0RGm7iZcU_igMqLE7Od=xBA@mail.gmail.com>
-References: <1447362108-4333-1-git-send-email-chris.brandt@renesas.com>
- <1447697140-4099-1-git-send-email-chris.brandt@renesas.com>
- <alpine.LFD.2.20.1511161515100.5826@knanqh.ubzr>
- <HK2PR06MB05619FACB3725B6F5B2299718A1E0@HK2PR06MB0561.apcprd06.prod.outlook.com>
- <alpine.LFD.2.20.1511161605070.5826@knanqh.ubzr>
- <HK2PR06MB056142FFDA4E99A764DF9ECB8A1E0@HK2PR06MB0561.apcprd06.prod.outlook.com>
- <alpine.LFD.2.20.1511161730030.5826@knanqh.ubzr>
- <HK2PR06MB05614D47A9C35ECB4CA72D3F8A1D0@HK2PR06MB0561.apcprd06.prod.outlook.com>
- <alpine.LFD.2.20.1511162127180.5826@knanqh.ubzr>
- <HK2PR06MB056175E6E4356DD8C3566D758A1D0@HK2PR06MB0561.apcprd06.prod.outlook.com>
- <alpine.LFD.2.20.1511172255410.22569@knanqh.ubzr>
- <CANqRtoTkHecGEsbi3EtM8dkHQ=V0RGm7iZcU_igMqLE7Od=xBA@mail.gmail.com>
-Message-ID: <alpine.LFD.2.20.1511180841000.22569@knanqh.ubzr>
+From: bhupesh.linux@gmail.com (Bhupesh SHARMA)
+Date: Wed, 18 Nov 2015 19:21:24 +0530
+Subject: [PATCH 1/2] Documentation: DT: Add entry for ARM SP805-WDT
+In-Reply-To: <20151116144525.GM20696@leverpostej>
+References: <1447683883-6600-1-git-send-email-bhupesh.sharma@freescale.com>
+ <1447683883-6600-2-git-send-email-bhupesh.sharma@freescale.com>
+ <20151116144525.GM20696@leverpostej>
+Message-ID: <CAFTCetQpb4M0dxCWYHXVZYgNKjZT7-J91hhx1=aa7FhPWgEf6A@mail.gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wed, 18 Nov 2015, Magnus Damm wrote:
+Hi Mark,
 
-> Hi Nicolas,
-> 
-> On Wed, Nov 18, 2015 at 12:58 PM, Nicolas Pitre <nico@fluxnic.net> wrote:
-> > On Tue, 17 Nov 2015, Chris Brandt wrote:
-> >
-> >> I think this one is more of a coding issue.
-> >> These were the attempts to fix the temporary stack issue:
-> >>
-> >> My first patch:
-> >> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-July/357106.html
-> >>
-> >> Magnus's try:
-> >> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-November/383394.html
-> >
-> > Here's my proposal:
-> >
-> > diff --git a/arch/arm/mm/proc-v7.S b/arch/arm/mm/proc-v7.S
-> > index de2b246fed..2d0ac32320 100644
-> > --- a/arch/arm/mm/proc-v7.S
-> > +++ b/arch/arm/mm/proc-v7.S
-> > @@ -274,10 +274,12 @@ __v7_ca15mp_setup:
-> >  __v7_b15mp_setup:
-> >  __v7_ca17mp_setup:
-> >         mov     r10, #0
-> > -1:     adr     r12, __v7_setup_stack           @ the local stack
-> > -       stmia   r12, {r0-r5, lr}                @ v7_invalidate_l1 touches r0-r6
-> > +1:     adr     r0, __v7_setup_stack_ptr
-> > +       ldr     r12, [r0]
-> > +       add     r12, r12, r0                    @ the local stack
-> > +       stmia   r12, {r1-r6, lr}                @ v7_invalidate_l1 touches r0-r6
-> >         bl      v7_invalidate_l1
-> > -       ldmia   r12, {r0-r5, lr}
-> > +       ldmia   r12, {r1-r6, lr}
-> >  #ifdef CONFIG_SMP
-> >         ALT_SMP(mrc     p15, 0, r0, c1, c0, 1)
-> >         ALT_UP(mov      r0, #(1 << 6))          @ fake it for UP
-> 
-> [snip]
-> 
-> > @@ -480,11 +484,16 @@ __errata_finish:
-> >         orr     r0, r0, r6                      @ set them
-> >   THUMB(        orr     r0, r0, #1 << 30        )       @ Thumb exceptions
-> >         ret     lr                              @ return to head.S:__ret
-> > +
-> > +       .align  2
-> > +__v7_setup_stack_ptr:
-> > +       .word   __v7_setup_stack - .
-> >  ENDPROC(__v7_setup)
-> 
-> Thanks for your take on this. I did a couple of local implementations
-> before submitting, and one of the issues I ran into was the need to
-> get rid of PAGE_OFFSET due to the code running without MMU enabled. I
-> suppose that is taken care of the "__v7_setup_stack - ." calculation
-> above?
+Thanks for the review.
 
-Yes.  That provides the offset from __v7_setup_stack_ptr to reach 
-__v7_setup_stack. And __v7_setup_stack_ptr is obtained with adr which is 
-relative to the current pc. So this works whether or not the MMU is 
-enabled.
+On Mon, Nov 16, 2015 at 8:15 PM, Mark Rutland <mark.rutland@arm.com> wrote:
+> On Mon, Nov 16, 2015 at 07:54:42PM +0530, Bhupesh Sharma wrote:
+>> This patch adds a devicetree binding documentation for ARM's
+>> SP805 WatchDog Timer.
+>>
+>> Signed-off-by: Bhupesh Sharma <bhupesh.sharma@freescale.com>
+>> ---
+>>  .../devicetree/bindings/watchdog/sp805-wdt.txt     |   33 ++++++++++++++++++++
+>>  1 file changed, 33 insertions(+)
+>>  create mode 100644 Documentation/devicetree/bindings/watchdog/sp805-wdt.txt
+>>
+>> diff --git a/Documentation/devicetree/bindings/watchdog/sp805-wdt.txt b/Documentation/devicetree/bindings/watchdog/sp805-wdt.txt
+>> new file mode 100644
+>> index 0000000..ec70fe9
+>> --- /dev/null
+>> +++ b/Documentation/devicetree/bindings/watchdog/sp805-wdt.txt
+>> @@ -0,0 +1,33 @@
+>> +* ARM SP805 Watchdog Timer (WDT) Controller
+>> +
+>> +SP805 WDT is a ARM Primecell Peripheral and has a standard-id register that
+>> +can be used to identify the peripheral type, vendor, and revision.
+>> +This value can be used for driver matching.
+>> +
+>> +Note that the current sp805_wdt driver relies on the 'drivers/amba/bus.c'
+>> +framework to invoke the probe function of the sp805_wdt driver using the
+>> +unique PRIMECELL identifiers of the sp805 wdt IP.
+>
+> This paragraph can go. We shouldn't describe kernel internals.
 
+Ok.
 
-Nicolas
+>> +As SP805 WDT is a primecell IP, it follows the base bindings specified in
+>> +'arm/primecell.txt'
+>> +
+>> +Required properties:
+>> +- compatible : Should be "arm,sp805-wdt", "arm,primecell"
+>> +- reg : Base address and size of the watchdog timer registers.
+>> +- interrupts : Should specify WDT interrupt number.
+>> +
+>> +Optional properties:
+>> +- clocks : From common clock binding. First clock is phandle to clock for apb
+>> +           pclk. Additional clocks are optional.
+>> +- clock-names : From common clock binding. Shall be "apb_pclk" for first clock.
+>
+> The hardware has "WDOGCLK", which is what the driver appears to expect
+> first implicitly.
+
+Ok.
+
+>> +Examples:
+>> +
+>> +             cluster1_core0_watchdog: wdt at c000000 {
+>> +                     compatible = "arm,sp805-wdt", "arm,primecell";
+>> +                     reg = <0x0 0xc000000 0x0 0x1000>;
+>> +                     interrupts = <1 12 0x8>; /* PPI, Level low type */
+>
+> I don't see how you can use PPIs here. This is not banked per CPU.
+
+I have raised this concern to my hardware team. This might be an issue
+with the documentation.
+I will change it in v2 as per their comments.
+
+Regards,
+Bhupesh
+
+> Mark.
+>
+>> +                     clocks = <&clockgen 4 3>;
+>> +                     clock-names = "apb_pclk";
+>> +             };
+>> +
+>> --
+>> 1.7.9.5
+>>
+>>
