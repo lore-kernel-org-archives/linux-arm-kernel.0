@@ -1,45 +1,81 @@
-From: julia.lawall@lip6.fr (Julia Lawall)
-Date: Wed, 18 Nov 2015 21:38:02 +0100 (CET)
-Subject: [PATCH 4/7] phy: rockchip-usb: add missing of_node_put
-In-Reply-To: <3792177.PEjN5hRYe2@diego>
-References: <1447673600-8881-1-git-send-email-Julia.Lawall@lip6.fr>
- <19587543.sZ81DoLUBT@diego> <20151118193129.GA48815@google.com>
- <3792177.PEjN5hRYe2@diego>
-Message-ID: <alpine.DEB.2.02.1511182136270.2059@localhost6.localdomain6>
+From: balbi@ti.com (Felipe Balbi)
+Date: Wed, 18 Nov 2015 14:38:36 -0600
+Subject: [PATCH] usb: musb: USB_TI_CPPI41_DMA requires dmaengine support
+In-Reply-To: <CADYTM3Ye=7iydzeg2j3VNkiHVoZqE6Hasm6N6=2UNiHEr2Ti4g@mail.gmail.com>
+References: <4370741.70D0kgBgnp@wuerfel>
+ <CADYTM3baomio7+nFizOKFXMav7guow+=GsVaGExBWxQyn9t=2w@mail.gmail.com>
+ <87a8qbhzvf.fsf@saruman.tx.rr.com>
+ <CADYTM3Ye=7iydzeg2j3VNkiHVoZqE6Hasm6N6=2UNiHEr2Ti4g@mail.gmail.com>
+Message-ID: <87y4dvgi0j.fsf@saruman.tx.rr.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
 
+Hi,
 
-On Wed, 18 Nov 2015, Heiko St?bner wrote:
+Bin Liu <binmlist@gmail.com> writes:
+>> Bin Liu <binmlist@gmail.com> writes:
+>>> On Wed, Nov 18, 2015 at 10:18 AM, Arnd Bergmann <arnd@arndb.de> wrote:
+>>>> The CPPI-4.1 driver selects TI_CPPI41, which is a dmaengine
+>>>> driver and that may not be available when CONFIG_DMADEVICES
+>>>> is not set:
+>>>>
+>>>> warning: (USB_TI_CPPI41_DMA) selects TI_CPPI41 which has unmet direct dependencies (DMADEVICES && ARCH_OMAP)
+>>>>
+>>>> This adds an extra dependency to avoid generating warnings in randconfig
+>>>> builds. Ideally we'd remove the 'select' statement, but that has the
+>>>> potential to break defconfig files.
+>>>>
+>>>> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
+>>>> Fixes: 411dd19c682d ("usb: musb: Kconfig: Select the DMA driver if DMA mode of MUSB is enabled")
+>>>>
+>>>> diff --git a/drivers/usb/musb/Kconfig b/drivers/usb/musb/Kconfig
+>>>> index 1f2037bbeb0d..45c83baf675d 100644
+>>>> --- a/drivers/usb/musb/Kconfig
+>>>> +++ b/drivers/usb/musb/Kconfig
+>>>> @@ -159,7 +159,7 @@ config USB_TI_CPPI_DMA
+>>>>
+>>>>  config USB_TI_CPPI41_DMA
+>>>>         bool 'TI CPPI 4.1 (AM335x)'
+>>>> -       depends on ARCH_OMAP
+>>>> +       depends on ARCH_OMAP && DMADEVICES
+>>>>         select TI_CPPI41
+>>>
+>>> I am not sure what the generic policy is, but instead of hiding
+>>> USB_TI_CPPI41_DMA if DMADEVICES is disabled, I'd like to enable
+>>> DMADEVICES if USB_TI_CPPI41_DMA is enabled, from user experience
+>>> perspective.
+>>
+>> that would mean "select DMADEVICES" and that's frowned upon.
+>
+> Currently 'select DMADEVICES' is not in there. Will adding it fix the
+> dependency warning in randconfig? Sorry for the question, but I don't
+> know enough about Kconfig to get the answer.
 
-> Am Mittwoch, 18. November 2015, 11:31:29 schrieb Brian Norris:
-> > On Wed, Nov 18, 2015 at 08:27:07PM +0100, Heiko St?bner wrote:
-> > > Am Montag, 16. November 2015, 12:33:17 schrieb Julia Lawall:
-> > > hmm, while I agree that the rockchip phy has an issue in the node
-> > > lifecycle, I'm not sure that patch fixes it fully.
-> > > 
-> > > It currently iterates over each phy, but would only of_node_put the phy it
-> > > handled last. So if an error happens on the 3rd phy, the first 2 are
-> > > already instantiated and would also get removed when the overall probe
-> > > fails, but their of_node would never be "put".
-> > 
-> > Note the behavior of of_get_next_child() (and
-> > of_get_next_available_child()); it "Decrements the refcount of prev." So
-> > the loop only keeps a reference for (at most) one node at a time.
-> > 
-> > I believe Julia's patch is correct. It's possible the commit description
-> > could have made this aspect clearer though, since I was confused about
-> > this at first as well.
-> 
-> oh, I hadn't realized that :-) .
-> 
-> Although in this case, what happens with the last child, if only "prev"s get 
-> decremented? When the loop finished I'd think that the last one would keep 
-> it's reference, as the patch stand right - or I'm just blind.
+it certainly would, but we don't like to add "select XYZ" to Kconfig
+because a select bypasses the dependency tree. Let me explain:
 
-The loop finishes when the child is NULL.  So there is nothing to put in 
-that case.  The process of getting from the last child to the NULL does 
-the of_node_put.
+config A
+       tristate "A"
+       depends on B
 
-julia
+config B
+       tristate "B"
+
+
+config C
+       tristate "C"
+       select A
+
+
+C can select A without B being enabled.
+
+-- 
+balbi
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: signature.asc
+Type: application/pgp-signature
+Size: 818 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151118/b9899acb/attachment.sig>
