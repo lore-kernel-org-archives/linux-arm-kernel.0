@@ -1,52 +1,68 @@
-From: binmlist@gmail.com (Bin Liu)
-Date: Wed, 18 Nov 2015 12:29:27 -0600
-Subject: [PATCH] usb: musb: USB_TI_CPPI41_DMA requires dmaengine support
-In-Reply-To: <4370741.70D0kgBgnp@wuerfel>
-References: <4370741.70D0kgBgnp@wuerfel>
-Message-ID: <CADYTM3baomio7+nFizOKFXMav7guow+=GsVaGExBWxQyn9t=2w@mail.gmail.com>
+From: yang.shi@linaro.org (Yang Shi)
+Date: Wed, 18 Nov 2015 10:15:05 -0800
+Subject: [PATCH] arm64: restore bogomips information in /proc/cpuinfo
+Message-ID: <1447870505-19319-1-git-send-email-yang.shi@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi,
+As what Pavel Machek reported [1], some userspace applications depend on
+bogomips showed by /proc/cpuinfo.
 
-On Wed, Nov 18, 2015 at 10:18 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> The CPPI-4.1 driver selects TI_CPPI41, which is a dmaengine
-> driver and that may not be available when CONFIG_DMADEVICES
-> is not set:
->
-> warning: (USB_TI_CPPI41_DMA) selects TI_CPPI41 which has unmet direct dependencies (DMADEVICES && ARCH_OMAP)
->
-> This adds an extra dependency to avoid generating warnings in randconfig
-> builds. Ideally we'd remove the 'select' statement, but that has the
-> potential to break defconfig files.
->
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> Fixes: 411dd19c682d ("usb: musb: Kconfig: Select the DMA driver if DMA mode of MUSB is enabled")
->
-> diff --git a/drivers/usb/musb/Kconfig b/drivers/usb/musb/Kconfig
-> index 1f2037bbeb0d..45c83baf675d 100644
-> --- a/drivers/usb/musb/Kconfig
-> +++ b/drivers/usb/musb/Kconfig
-> @@ -159,7 +159,7 @@ config USB_TI_CPPI_DMA
->
->  config USB_TI_CPPI41_DMA
->         bool 'TI CPPI 4.1 (AM335x)'
-> -       depends on ARCH_OMAP
-> +       depends on ARCH_OMAP && DMADEVICES
->         select TI_CPPI41
+Although there is much less legacy impact on aarch64 than arm, but it does
+break libvirt.
 
-I am not sure what the generic policy is, but instead of hiding
-USB_TI_CPPI41_DMA if DMADEVICES is disabled, I'd like to enable
-DMADEVICES if USB_TI_CPPI41_DMA is enabled, from user experience
-perspective.
+Basically, this patch reverts commit 326b16db9f69fd0d279be873c6c00f88c0a4aad5
+("arm64: delay: don't bother reporting bogomips in /proc/cpuinfo"), but with
+some tweak due to context change.
 
-Thanks,
--Bin.
+[1] https://lkml.org/lkml/2015/1/4/132
 
->
->  config USB_TUSB_OMAP_DMA
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-usb" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+Signed-off-by: Yang Shi <yang.shi@linaro.org>
+---
+ arch/arm64/kernel/cpuinfo.c | 5 +++++
+ arch/arm64/kernel/smp.c     | 7 ++++++-
+ 2 files changed, 11 insertions(+), 1 deletion(-)
+
+diff --git a/arch/arm64/kernel/cpuinfo.c b/arch/arm64/kernel/cpuinfo.c
+index 706679d..8d4ba77 100644
+--- a/arch/arm64/kernel/cpuinfo.c
++++ b/arch/arm64/kernel/cpuinfo.c
+@@ -30,6 +30,7 @@
+ #include <linux/seq_file.h>
+ #include <linux/sched.h>
+ #include <linux/smp.h>
++#include <linux/delay.h>
+ 
+ /*
+  * In case the boot CPU is hotpluggable, we record its initial state and
+@@ -112,6 +113,10 @@ static int c_show(struct seq_file *m, void *v)
+ 		 */
+ 		seq_printf(m, "processor\t: %d\n", i);
+ 
++		seq_printf(m, "BogoMIPS\t: %lu.%02lu\n\n",
++			   loops_per_jiffy / (500000UL/HZ),
++			   loops_per_jiffy / (5000UL/HZ) % 100);
++
+ 		/*
+ 		 * Dump out the common processor features in a single line.
+ 		 * Userspace should read the hwcaps with getauxval(AT_HWCAP)
+diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
+index b1adc51..1bed772 100644
+--- a/arch/arm64/kernel/smp.c
++++ b/arch/arm64/kernel/smp.c
+@@ -326,7 +326,12 @@ static void __init hyp_mode_check(void)
+ 
+ void __init smp_cpus_done(unsigned int max_cpus)
+ {
+-	pr_info("SMP: Total of %d processors activated.\n", num_online_cpus());
++	unsigned long bogosum = loops_per_jiffy * num_online_cpus();
++
++	pr_info("SMP: Total of %d processors activated (%lu.%02lu BogoMIPS).\n",
++		num_online_cpus(), bogosum / (500000/HZ),
++		(bogosum / (5000/HZ)) % 100);
++
+ 	setup_cpu_features();
+ 	hyp_mode_check();
+ 	apply_alternatives_all();
+-- 
+2.0.2
