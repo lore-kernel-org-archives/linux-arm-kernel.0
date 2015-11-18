@@ -1,97 +1,166 @@
-From: yang.shi@linaro.org (Shi, Yang)
-Date: Wed, 18 Nov 2015 10:54:08 -0800
-Subject: [PATCH] arm64: restore bogomips information in /proc/cpuinfo
-In-Reply-To: <20151118184736.GM1588@arm.com>
-References: <1447870505-19319-1-git-send-email-yang.shi@linaro.org>
- <20151118184736.GM1588@arm.com>
-Message-ID: <564CC950.30009@linaro.org>
+From: lkp@intel.com (kbuild test robot)
+Date: Thu, 19 Nov 2015 02:56:23 +0800
+Subject: [PATCH v3] crypto: atmel: fix bogus select
+In-Reply-To: <12173927.U7ILfy5BBh@wuerfel>
+Message-ID: <201511190217.IGFIPXYT%fengguang.wu@intel.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/18/2015 10:47 AM, Will Deacon wrote:
-> Hello,
->
-> On Wed, Nov 18, 2015 at 10:15:05AM -0800, Yang Shi wrote:
->> As what Pavel Machek reported [1], some userspace applications depend on
->> bogomips showed by /proc/cpuinfo.
->>
->> Although there is much less legacy impact on aarch64 than arm, but it does
->> break libvirt.
->>
->> Basically, this patch reverts commit 326b16db9f69fd0d279be873c6c00f88c0a4aad5
->> ("arm64: delay: don't bother reporting bogomips in /proc/cpuinfo"), but with
->> some tweak due to context change.
->>
->> [1] https://lkml.org/lkml/2015/1/4/132
->
-> I lost this argument last time around, so I won't re-tread that path this
-> time around. I do, however, have some comments on the patch.
->
->>
->> Signed-off-by: Yang Shi <yang.shi@linaro.org>
->> ---
->>   arch/arm64/kernel/cpuinfo.c | 5 +++++
->>   arch/arm64/kernel/smp.c     | 7 ++++++-
->>   2 files changed, 11 insertions(+), 1 deletion(-)
->>
->> diff --git a/arch/arm64/kernel/cpuinfo.c b/arch/arm64/kernel/cpuinfo.c
->> index 706679d..8d4ba77 100644
->> --- a/arch/arm64/kernel/cpuinfo.c
->> +++ b/arch/arm64/kernel/cpuinfo.c
->> @@ -30,6 +30,7 @@
->>   #include <linux/seq_file.h>
->>   #include <linux/sched.h>
->>   #include <linux/smp.h>
->> +#include <linux/delay.h>
->>
->>   /*
->>    * In case the boot CPU is hotpluggable, we record its initial state and
->> @@ -112,6 +113,10 @@ static int c_show(struct seq_file *m, void *v)
->>   		 */
->>   		seq_printf(m, "processor\t: %d\n", i);
->>
->> +		seq_printf(m, "BogoMIPS\t: %lu.%02lu\n\n",
->
-> This double newline makes /proc/cpuinfo looks really odd. Can we just
-> have one, please?
->
->> +			   loops_per_jiffy / (500000UL/HZ),
->> +			   loops_per_jiffy / (5000UL/HZ) % 100);
->> +
->>   		/*
->>   		 * Dump out the common processor features in a single line.
->>   		 * Userspace should read the hwcaps with getauxval(AT_HWCAP)
->> diff --git a/arch/arm64/kernel/smp.c b/arch/arm64/kernel/smp.c
->> index b1adc51..1bed772 100644
->> --- a/arch/arm64/kernel/smp.c
->> +++ b/arch/arm64/kernel/smp.c
->> @@ -326,7 +326,12 @@ static void __init hyp_mode_check(void)
->>
->>   void __init smp_cpus_done(unsigned int max_cpus)
->>   {
->> -	pr_info("SMP: Total of %d processors activated.\n", num_online_cpus());
->> +	unsigned long bogosum = loops_per_jiffy * num_online_cpus();
->> +
->> +	pr_info("SMP: Total of %d processors activated (%lu.%02lu BogoMIPS).\n",
->> +		num_online_cpus(), bogosum / (500000/HZ),
->> +		(bogosum / (5000/HZ)) % 100);
->
-> Can we drop this hunk? I don't see a pressing need to print this in
-> dmesg.
+Hi Arnd,
 
-Sure, will solve them in v2.
+[auto build test WARNING on: cryptodev/master]
+[also build test WARNING on: v4.4-rc1 next-20151118]
 
-Thanks,
-Yang
+url:    https://github.com/0day-ci/linux/commits/Arnd-Bergmann/crypto-atmel-fix-bogus-select/20151118-233706
+base:   https://git.kernel.org/pub/scm/linux/kernel/git/herbert/cryptodev-2.6.git master
+config: x86_64-allmodconfig (attached as .config)
+reproduce:
+        # save the attached .config to linux build tree
+        make ARCH=x86_64 
 
->
-> With those two changes:
->
->    Acked-by: Will Deacon <will.deacon@arm.com>
->
-> I guess this needs Cc'ing to stable, too.
->
-> Thanks,
->
-> Will
->
+All warnings (new ones prefixed by >>):
+
+   include/linux/compiler.h:228:8: sparse: attribute 'no_sanitize_address': unknown attribute
+   drivers/crypto/atmel-aes.c:191:25: sparse: incompatible types in comparison expression (different type sizes)
+   drivers/crypto/atmel-aes.c:447:25: sparse: incompatible types in comparison expression (different type sizes)
+   drivers/crypto/atmel-aes.c:448:25: sparse: incompatible types in comparison expression (different type sizes)
+   In file included from drivers/crypto/atmel-aes.c:17:0:
+   drivers/crypto/atmel-aes.c: In function 'atmel_aes_sg_copy':
+   include/linux/kernel.h:724:17: warning: comparison of distinct pointer types lacks a cast
+     (void) (&_min1 == &_min2);  \
+                    ^
+>> drivers/crypto/atmel-aes.c:191:11: note: in expansion of macro 'min'
+      count = min(count, buflen);
+              ^
+   drivers/crypto/atmel-aes.c: In function 'atmel_aes_crypt_dma_start':
+   include/linux/kernel.h:724:17: warning: comparison of distinct pointer types lacks a cast
+     (void) (&_min1 == &_min2);  \
+                    ^
+   drivers/crypto/atmel-aes.c:447:11: note: in expansion of macro 'min'
+      count = min(dd->total, sg_dma_len(dd->in_sg));
+              ^
+   include/linux/kernel.h:724:17: warning: comparison of distinct pointer types lacks a cast
+     (void) (&_min1 == &_min2);  \
+                    ^
+   drivers/crypto/atmel-aes.c:448:11: note: in expansion of macro 'min'
+      count = min(count, sg_dma_len(dd->out_sg));
+              ^
+   In file included from include/linux/printk.h:6:0,
+                    from include/linux/kernel.h:13,
+                    from drivers/crypto/atmel-aes.c:17:
+   drivers/crypto/atmel-aes.c: In function 'atmel_aes_crypt_dma_stop':
+>> include/linux/kern_levels.h:4:18: warning: format '%u' expects argument of type 'unsigned int', but argument 2 has type 'size_t {aka long unsigned int}' [-Wformat=]
+    #define KERN_SOH "\001"  /* ASCII Start Of Header */
+                     ^
+   include/linux/kern_levels.h:10:18: note: in expansion of macro 'KERN_SOH'
+    #define KERN_ERR KERN_SOH "3" /* error conditions */
+                     ^
+   include/linux/printk.h:252:9: note: in expansion of macro 'KERN_ERR'
+     printk(KERN_ERR pr_fmt(fmt), ##__VA_ARGS__)
+            ^
+>> drivers/crypto/atmel-aes.c:642:5: note: in expansion of macro 'pr_err'
+        pr_err("not all data converted: %u\n", count);
+        ^
+   drivers/crypto/atmel-aes.c: In function 'atmel_aes_buff_init':
+>> drivers/crypto/atmel-aes.c:669:20: warning: format '%d' expects argument of type 'int', but argument 3 has type 'size_t {aka long unsigned int}' [-Wformat=]
+      dev_err(dd->dev, "dma %d bytes error\n", dd->buflen);
+                       ^
+   drivers/crypto/atmel-aes.c:677:20: warning: format '%d' expects argument of type 'int', but argument 3 has type 'size_t {aka long unsigned int}' [-Wformat=]
+      dev_err(dd->dev, "dma %d bytes error\n", dd->buflen);
+                       ^
+
+sparse warnings: (new ones prefixed by >>)
+
+   include/linux/compiler.h:228:8: sparse: attribute 'no_sanitize_address': unknown attribute
+>> drivers/crypto/atmel-aes.c:191:25: sparse: incompatible types in comparison expression (different type sizes)
+   drivers/crypto/atmel-aes.c:447:25: sparse: incompatible types in comparison expression (different type sizes)
+   drivers/crypto/atmel-aes.c:448:25: sparse: incompatible types in comparison expression (different type sizes)
+   In file included from drivers/crypto/atmel-aes.c:17:0:
+   drivers/crypto/atmel-aes.c: In function 'atmel_aes_sg_copy':
+   include/linux/kernel.h:724:17: warning: comparison of distinct pointer types lacks a cast
+     (void) (&_min1 == &_min2);  \
+                    ^
+   drivers/crypto/atmel-aes.c:191:11: note: in expansion of macro 'min'
+      count = min(count, buflen);
+              ^
+   drivers/crypto/atmel-aes.c: In function 'atmel_aes_crypt_dma_start':
+   include/linux/kernel.h:724:17: warning: comparison of distinct pointer types lacks a cast
+     (void) (&_min1 == &_min2);  \
+                    ^
+   drivers/crypto/atmel-aes.c:447:11: note: in expansion of macro 'min'
+      count = min(dd->total, sg_dma_len(dd->in_sg));
+              ^
+   include/linux/kernel.h:724:17: warning: comparison of distinct pointer types lacks a cast
+     (void) (&_min1 == &_min2);  \
+                    ^
+   drivers/crypto/atmel-aes.c:448:11: note: in expansion of macro 'min'
+      count = min(count, sg_dma_len(dd->out_sg));
+              ^
+   In file included from include/linux/printk.h:6:0,
+                    from include/linux/kernel.h:13,
+                    from drivers/crypto/atmel-aes.c:17:
+   drivers/crypto/atmel-aes.c: In function 'atmel_aes_crypt_dma_stop':
+   include/linux/kern_levels.h:4:18: warning: format '%u' expects argument of type 'unsigned int', but argument 2 has type 'size_t {aka long unsigned int}' [-Wformat=]
+    #define KERN_SOH "\001"  /* ASCII Start Of Header */
+                     ^
+   include/linux/kern_levels.h:10:18: note: in expansion of macro 'KERN_SOH'
+    #define KERN_ERR KERN_SOH "3" /* error conditions */
+                     ^
+   include/linux/printk.h:252:9: note: in expansion of macro 'KERN_ERR'
+     printk(KERN_ERR pr_fmt(fmt), ##__VA_ARGS__)
+            ^
+   drivers/crypto/atmel-aes.c:642:5: note: in expansion of macro 'pr_err'
+        pr_err("not all data converted: %u\n", count);
+        ^
+   drivers/crypto/atmel-aes.c: In function 'atmel_aes_buff_init':
+   drivers/crypto/atmel-aes.c:669:20: warning: format '%d' expects argument of type 'int', but argument 3 has type 'size_t {aka long unsigned int}' [-Wformat=]
+      dev_err(dd->dev, "dma %d bytes error\n", dd->buflen);
+                       ^
+   drivers/crypto/atmel-aes.c:677:20: warning: format '%d' expects argument of type 'int', but argument 3 has type 'size_t {aka long unsigned int}' [-Wformat=]
+      dev_err(dd->dev, "dma %d bytes error\n", dd->buflen);
+                       ^
+
+vim +/min +191 drivers/crypto/atmel-aes.c
+
+bd3c7b5c Nicolas Royer 2012-07-01  175  
+bd3c7b5c Nicolas Royer 2012-07-01  176  		sg_list = sg_next(sg_list);
+bd3c7b5c Nicolas Royer 2012-07-01  177  		if (!sg_list)
+bd3c7b5c Nicolas Royer 2012-07-01  178  			total = 0;
+bd3c7b5c Nicolas Royer 2012-07-01  179  	}
+bd3c7b5c Nicolas Royer 2012-07-01  180  
+bd3c7b5c Nicolas Royer 2012-07-01  181  	return sg_nb;
+bd3c7b5c Nicolas Royer 2012-07-01  182  }
+bd3c7b5c Nicolas Royer 2012-07-01  183  
+cadc4ab8 Nicolas Royer 2013-02-20  184  static int atmel_aes_sg_copy(struct scatterlist **sg, size_t *offset,
+cadc4ab8 Nicolas Royer 2013-02-20  185  			void *buf, size_t buflen, size_t total, int out)
+cadc4ab8 Nicolas Royer 2013-02-20  186  {
+cadc4ab8 Nicolas Royer 2013-02-20  187  	unsigned int count, off = 0;
+cadc4ab8 Nicolas Royer 2013-02-20  188  
+cadc4ab8 Nicolas Royer 2013-02-20  189  	while (buflen && total) {
+cadc4ab8 Nicolas Royer 2013-02-20  190  		count = min((*sg)->length - *offset, total);
+cadc4ab8 Nicolas Royer 2013-02-20 @191  		count = min(count, buflen);
+cadc4ab8 Nicolas Royer 2013-02-20  192  
+cadc4ab8 Nicolas Royer 2013-02-20  193  		if (!count)
+cadc4ab8 Nicolas Royer 2013-02-20  194  			return off;
+cadc4ab8 Nicolas Royer 2013-02-20  195  
+cadc4ab8 Nicolas Royer 2013-02-20  196  		scatterwalk_map_and_copy(buf + off, *sg, *offset, count, out);
+cadc4ab8 Nicolas Royer 2013-02-20  197  
+cadc4ab8 Nicolas Royer 2013-02-20  198  		off += count;
+cadc4ab8 Nicolas Royer 2013-02-20  199  		buflen -= count;
+
+:::::: The code at line 191 was first introduced by commit
+:::::: cadc4ab8f6f73719ef0e124320cdd210d1c9ff3e crypto: atmel-aes - add support for latest release of the IP (0x130)
+
+:::::: TO: Nicolas Royer <nicolas@eukrea.com>
+:::::: CC: Herbert Xu <herbert@gondor.apana.org.au>
+
+---
+0-DAY kernel test infrastructure                Open Source Technology Center
+https://lists.01.org/pipermail/kbuild-all                   Intel Corporation
+-------------- next part --------------
+A non-text attachment was scrubbed...
+Name: .config.gz
+Type: application/octet-stream
+Size: 51069 bytes
+Desc: not available
+URL: <http://lists.infradead.org/pipermail/linux-arm-kernel/attachments/20151119/d0dc8111/attachment-0001.obj>
