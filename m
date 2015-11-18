@@ -1,56 +1,94 @@
-From: bamvor.zhangjian@huawei.com (Zhangjian (Bamvor))
-Date: Wed, 18 Nov 2015 16:09:03 +0800
-Subject: [PATCH v6 01/19] arm64:ilp32: add documentation on the ILP32
- ABI for ARM64
-In-Reply-To: <1447795019-30176-2-git-send-email-ynorov@caviumnetworks.com>
-References: <1447795019-30176-1-git-send-email-ynorov@caviumnetworks.com>
- <1447795019-30176-2-git-send-email-ynorov@caviumnetworks.com>
-Message-ID: <564C321F.5050707@huawei.com>
+From: s.hauer@pengutronix.de (Sascha Hauer)
+Date: Wed, 18 Nov 2015 09:18:11 +0100
+Subject: [PATCH 2/3] thermal: Add Mediatek thermal controller support
+In-Reply-To: <20151113112636.GA12760@e104805>
+References: <1447064013-13026-1-git-send-email-s.hauer@pengutronix.de>
+ <1447064013-13026-3-git-send-email-s.hauer@pengutronix.de>
+ <20151110120554.GB3551@e104805>
+ <20151110182629.GA5240@localhost.localdomain>
+ <20151111072747.GI8526@pengutronix.de>
+ <20151113100912.GE8526@pengutronix.de>
+ <20151113112636.GA12760@e104805>
+Message-ID: <20151118081811.GW8526@pengutronix.de>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Yury
+On Fri, Nov 13, 2015 at 11:26:37AM +0000, Javi Merino wrote:
+> On Fri, Nov 13, 2015 at 11:09:12AM +0100, Sascha Hauer wrote:
+> > On Wed, Nov 11, 2015 at 08:27:47AM +0100, Sascha Hauer wrote:
+> > > On Tue, Nov 10, 2015 at 10:26:30AM -0800, Eduardo Valentin wrote:
+> > > > On Tue, Nov 10, 2015 at 12:05:54PM +0000, Javi Merino wrote:
+> > > > > On Mon, Nov 09, 2015 at 11:13:32AM +0100, Sascha Hauer wrote:
+> > > > 
+> > > > <cut>
+> > > > 
+> > > > > > +
+> > > > > > +/*
+> > > > > > + * The MT8173 thermal controller has four banks. Each bank can read up to
+> > > > > > + * four temperature sensors simultaneously. The MT8173 has a total of 5
+> > > > > > + * temperature sensors. We use each bank to measure a certain area of the
+> > > > > > + * SoC. Since TS2 is located centrally in the SoC it is influenced by multiple
+> > > > > > + * areas, hence is used in different banks.
+> > > > > > + */
+> > > > > > +static const struct mtk_thermal_bank_cfg bank_data[] = {
+> > > > > > +	{
+> > > > > > +		.num_sensors = 2,
+> > > > > > +		.sensors = { MT8173_TS2, MT8173_TS3 },
+> > > > > > +	}, {
+> > > > > > +		.num_sensors = 2,
+> > > > > > +		.sensors = { MT8173_TS2, MT8173_TS4 },
+> > > > > > +	}, {
+> > > > > > +		.num_sensors = 3,
+> > > > > > +		.sensors = { MT8173_TS1, MT8173_TS2, MT8173_TSABB },
+> > > > > > +	}, {
+> > > > > > +		.num_sensors = 1,
+> > > > > > +		.sensors = { MT8173_TS2 },
+> > > > > > +	},
+> > > > > > +};
+> > > > 
+> > > > Would it make sense to simply expose all sensors and let the
+> > > > configuration of their aggregation be done by DT?
+> > > 
+> > > This particular layout has been chosen because there's also the Smart
+> > > Voltage Scaler (SVS) in the SoC. The SVS uses the same banks for
+> > > measuring temperatures. I don't know the details yet, I just asked the
+> > > Mediatek guys.
+> > 
+> > Ok, the job of the SVS is to always pick the best voltage for a given
+> > CPU frequency based on the temperature of the CPU cluster. How I
+> > understand it the SVS engine automatically reads temperatures from bank0
+> > for the first CPU cluster and from bank1 for the second CPU cluster. For
+> > this to work we are not free to assign the sensors to the banks
+> > arbitrarily.
+> > 
+> > I was told that controlling the CPU frequency the performance is better
+> > if we use the maximum temperature of the whole die rather than the
+> > temperature of individual clusters.
+> > 
+> > I would prefer to keep the sensor/bank association like it currently is
+> > as it allows for easy SVS engine integration. Also I would prefer to
+> > expose a single thermal zone for now, it will be easier to add
+> > additional zones later than it is to remove them later once we have
+> > exposed them to the device tree.
+> > 
+> > Is that ok with you?
+> 
+> Fair enough.  I agree that it's easier to add thermal zones in the
+> future than to remove it.  Thanks for the explanation.
 
-On 2015/11/18 5:16, Yury Norov wrote:
-> From: Philipp Tomsich <philipp.tomsich@theobroma-systems.com>
-> 
-> Based on Andrew Pinski's original patch-series and adapted with changes
-> to reduce the duplication of code-paths and resolve issue found during
-> LTP testing.
-> 
-> Reviewed-by: David Daney <ddaney@caviumnetworks.com>
-> 
-> 
-> Signed-off-by: Philipp Tomsich <philipp.tomsich@theobroma-systems.com>
-> Signed-off-by: Christoph Muellner <christoph.muellner@theobroma-systems.com>
-> Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
-> Signed-off-by: Andrew Pinski <Andrew.Pinski@caviumnetworks.com>
-> ---
->  Documentation/arm64/ilp32.txt | 47 +++++++++++++++++++++++++++++++++++++++++++
->  1 file changed, 47 insertions(+)
->  create mode 100644 Documentation/arm64/ilp32.txt
-> 
-> diff --git a/Documentation/arm64/ilp32.txt b/Documentation/arm64/ilp32.txt
-> new file mode 100644
-> index 0000000..93c09f2
-> --- /dev/null
-> +++ b/Documentation/arm64/ilp32.txt
-> @@ -0,0 +1,47 @@
-> +ILP32 AARCH64 SYSCALL ABI
-> +=========================
-> +Written by Andrew Pinski <apinski@cavium.com>
-> +Updated by Philipp Tomsich <philipp.tomsich@theobroma-systems.com>
-> +Updated by Yury Norov <ynorov@caviumnetworks.com>
-> +
-> +
-> +This document describes the ILP32 syscall ABI and where it differs
-> +from the generic linux syscall interface.
-> +
-> +Some structures are changed to reduce the difference in the code path
-> +for both ILP32 and LP64 ABIs for signal handling.
-Given that user may upgrade from aarch32 to ILP32. How about add abi
-comparison between aarch32 and aarch64 ilp32?
+I added this comment to make this a bit clearer for the next version:
 
-Regards
+/*
+ * The thermal core only gets the maximum temperature of all banks, so
+ * the bank concept wouldn't be necessary here. However, the SVS (Smart
+ * Voltage Scaling) unit makes its decisions based on the same bank
+ * data, and this indeed needs the temperatures of the individual
+ * banks
+ * for making better decisions.
+ */
 
-Bamvor
+-- 
+Pengutronix e.K.                           |                             |
+Industrial Linux Solutions                 | http://www.pengutronix.de/  |
+Peiner Str. 6-8, 31137 Hildesheim, Germany | Phone: +49-5121-206917-0    |
+Amtsgericht Hildesheim, HRA 2686           | Fax:   +49-5121-206917-5555 |
