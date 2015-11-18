@@ -1,93 +1,63 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 18 Nov 2015 09:35:20 +0100
-Subject: [PATCH v2] SPI: s3c64xx: pass DMA arguments in platform data
-In-Reply-To: <564C01EF.60308@samsung.com>
-References: <8391350.6B0EUH1WXO@wuerfel> <4634371.Kl2EUjoTtJ@wuerfel>
- <564C01EF.60308@samsung.com>
-Message-ID: <3885683.DJ7E2GgAz1@wuerfel>
+From: peter.chen@freescale.com (Peter Chen)
+Date: Wed, 18 Nov 2015 16:33:26 +0800
+Subject: [RESEND PATCH v2 2/2] ARM: imx6: change default burst size for USB
+In-Reply-To: <1445330509.3716.8.camel@pengutronix.de>
+References: <1443579437-845-1-git-send-email-peter.chen@freescale.com>
+ <1443579437-845-2-git-send-email-peter.chen@freescale.com>
+ <1443603159.3185.5.camel@pengutronix.de>
+ <20150930133712.GG16362@tiger> <20151020070718.GC7203@shlinux2>
+ <1445330509.3716.8.camel@pengutronix.de>
+Message-ID: <20151118083325.GG4228@shlinux2>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 18 November 2015 13:43:27 Krzysztof Kozlowski wrote:
-> On 18.11.2015 00:48, Arnd Bergmann wrote:
-
-> >  struct platform_device s3c64xx_device_spi0 = {
-> > @@ -1135,11 +1133,13 @@ void __init s3c64xx_spi0_set_platdata(int (*cfg_gpio)(void), int src_clk_nr,
-> >  	pd.num_cs = num_cs;
-> >  	pd.src_clk_nr = src_clk_nr;
-> >  	pd.cfg_gpio = (cfg_gpio) ? cfg_gpio : s3c64xx_spi0_cfg_gpio;
-> > -#if defined(CONFIG_PL330_DMA)
-> > -	pd.filter = pl330_filter;
-> > -#elif defined(CONFIG_S3C64XX_PL080)
+On Tue, Oct 20, 2015 at 10:41:49AM +0200, Lucas Stach wrote:
+> Hi Shawn,
 > 
-> Hmm.... why removing pl330_filter? Is it because of lack of channel
-> names? It looks unrelated to this patch.
-
-You are right, it's an unrelated cleanup, I'll drop this change
-and add the same lines there.
-
-This code was only there for mach-s5p*, which is DT-only these days
-and doesn't need it any more. However, there is a lot of other code
-that falls in the same category, and we should clean that up in a
-separate patch series.
-
-I'm actually thinking about moving all device definitions from
-plat-samsung back to mach-s3c24xx and mach-s3c64xx and then remove
-all devices that are unused now. I suspect we end up with an overall
-reduction in code size that way, and it will be much easier to keep
-track of how things fit together.
-
-> > -	if (!sdd->pdev->dev.of_node) {
-> > -		res = platform_get_resource(pdev, IORESOURCE_DMA,  0);
-> > -		if (!res) {
-> > -			dev_warn(&pdev->dev, "Unable to get SPI tx dma resource. Switching to poll mode\n");
-> > -			sdd->port_conf->quirks = S3C64XX_SPI_QUIRK_POLL;
-> > -		} else
-> > -			sdd->tx_dma.dmach = res->start;
-> > -
-> > -		res = platform_get_resource(pdev, IORESOURCE_DMA,  1);
-> > -		if (!res) {
-> > -			dev_warn(&pdev->dev, "Unable to get SPI rx dma resource. Switching to poll mode\n");
-> > -			sdd->port_conf->quirks = S3C64XX_SPI_QUIRK_POLL;
-> > -		} else
-> > -			sdd->rx_dma.dmach = res->start;
-> > +	if (sci && (!sci->dma_tx || !sci->dma_rx)) {
+> Am Dienstag, den 20.10.2015, 15:07 +0800 schrieb Peter Chen:
+> > On Wed, Sep 30, 2015 at 09:37:12PM +0800, Shawn Guo wrote:
+> > > On Wed, Sep 30, 2015 at 10:52:39AM +0200, Lucas Stach wrote:
+> > > > Am Mittwoch, den 30.09.2015, 10:17 +0800 schrieb Peter Chen:
+> > > > > It can improve the USB performance when choosing larger
+> > > > > burst size at some systems (bus size is larger), there is
+> > > > > no side effect if this burst size is larger than bus size.
+> > > > > 
+> > > > Just for the record, as it seems too late to stop the train now:
+> > > > 
+> > > > I am _NOT_ happy that the extended binding has been accepted into the
+> > > > USB tree despite outstanding review comments from me not being addressed
+> > > > or even answered.
+> > > 
+> > > Okay.  I'm not aware of this.  I'm dropping the patches until everyone
+> > > agrees with it.
+> > > 
+> > 
+> > Hi Shawn & Lucas, I sent the improvement patch for dt description following 
+> > Lucas's comment one week ago at below:
+> > 
+> > https://www.spinics.net/lists/linux-usb/msg131150.html
+> > 
+> > If no more comments, queue my dts patches please.
+> > 
+> While the binding hasn't received a good review in time it is already in
+> a released kernel and I'm not going to argue to change it now after the
+> fact (violating the DT stability rules) just to satisfy my rather minor
+> comments. I want to make clear that I was not happy by how this stuff
+> has been handled with the USB tree and it is my hope that this can be
+> improved for future binding changes.
 > 
-> No need for "sci" check. It cannot be NULL at this point - at the
-> beginning of probe it is checked already.
+> But please don't hold those DTS patches any longer. The binding is in,
+> there is no point in not applying the corresponding patches.
 > 
-> > +		dev_warn(&pdev->dev, "Unable to get SPI tx data. Switching to poll mode\n");
+> Regards,
+> Lucas
 > 
-> The message could be now more precise, like:
-> "Unable to get SPI rx or tx data. Switching to poll mode\n"
 
-Ok.
+Ping...
 
-> > +		sdd->port_conf->quirks = S3C64XX_SPI_QUIRK_POLL;
-> >  	}
-> 
-> The logic here is now different for DT boards. Previously such board
-> would not be marked as polling. Now it is always polling. If needed,
-> split it to separate patch.
+Shawn, I still not see these dt changes in your tree
 
+-- 
 
-I think that was a mistake on my side, thanks for finding it.
-
-> >  
-> >  	sdd->tx_dma.direction = DMA_MEM_TO_DEV;
-> > @@ -1197,9 +1184,10 @@ static int s3c64xx_spi_probe(struct platform_device *pdev)
-> >  
-> >  	dev_dbg(&pdev->dev, "Samsung SoC SPI Driver loaded for Bus SPI-%d with %d Slaves attached\n",
-> >  					sdd->port_id, master->num_chipselect);
-> > -	dev_dbg(&pdev->dev, "\tIOmem=[%pR]\tFIFO %dbytes\tDMA=[Rx-%d, Tx-%d]\n",
-> > +	dev_dbg(&pdev->dev, "\tIOmem=[%pR]\tFIFO %dbytes\tDMA=[Rx-%p, Tx-%p]\n",
-> >  					mem_res, (FIFO_LVL_MASK(sdd) >> 1) + 1,
-> > -					sdd->rx_dma.dmach, sdd->tx_dma.dmach);
-> > +					sdd->cntrlr_info->dma_rx,
-> > +					sdd->cntrlr_info->dma_tx);
-> 
-> sci->dma_rx and sci->dma_tx would be equivalent but shorter.
-
-Ok.
-
-	Arnd
+Best Regards,
+Peter Chen
