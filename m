@@ -1,53 +1,72 @@
-From: philipp.tomsich@theobroma-systems.com (Dr. Philipp Tomsich)
-Date: Wed, 18 Nov 2015 22:47:08 +0100
-Subject: [PATCH v6 18/19] arm64:ilp32: change COMPAT_ELF_PLATFORM to
- report a a subplatform for ILP32
-In-Reply-To: <20151118202543.GB11264@yury-N73SV>
-References: <1447795019-30176-1-git-send-email-ynorov@caviumnetworks.com>
- <1447795019-30176-19-git-send-email-ynorov@caviumnetworks.com>
- <564C32AB.4070901@huawei.com>
- <E53A0D4E-EAAF-4956-9E21-599254EB80BB@gmail.com>
- <20151118202543.GB11264@yury-N73SV>
-Message-ID: <85D7EAC4-B4FD-44D8-B1EC-BDEFD1DC1229@theobroma-systems.com>
+From: nicolas.pitre@linaro.org (Nicolas Pitre)
+Date: Wed, 18 Nov 2015 16:55:10 -0500 (EST)
+Subject: [PATCH] arm64: restore bogomips information in /proc/cpuinfo
+In-Reply-To: <20151118184736.GM1588@arm.com>
+References: <1447870505-19319-1-git-send-email-yang.shi@linaro.org>
+ <20151118184736.GM1588@arm.com>
+Message-ID: <alpine.LFD.2.20.1511181646090.22569@knanqh.ubzr>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Yury,
+On Wed, 18 Nov 2015, Will Deacon wrote:
 
-We had implemented gdb-support against the the earlier ILP32 incarnation.
-I?ll take a look with the latest patch-set and see whether these still apply.
+> Hello,
+> 
+> On Wed, Nov 18, 2015 at 10:15:05AM -0800, Yang Shi wrote:
+> > As what Pavel Machek reported [1], some userspace applications depend on
+> > bogomips showed by /proc/cpuinfo.
+> > 
+> > Although there is much less legacy impact on aarch64 than arm, but it does
+> > break libvirt.
+> > 
+> > Basically, this patch reverts commit 326b16db9f69fd0d279be873c6c00f88c0a4aad5
+> > ("arm64: delay: don't bother reporting bogomips in /proc/cpuinfo"), but with
+> > some tweak due to context change.
+> > 
+> > [1] https://lkml.org/lkml/2015/1/4/132
+> 
+> I lost this argument last time around, so I won't re-tread that path this
+> time around.
 
-Best,
-Philipp.
+No kidding.  ;-)
 
-> On 18 Nov 2015, at 21:25, Yury Norov <ynorov@caviumnetworks.com> wrote:
+> I do, however, have some comments on the patch.
 > 
-> On Wed, Nov 18, 2015 at 03:21:05AM -0800, pinskia at gmail.com wrote:
->> 
->> 
->>> On Nov 18, 2015, at 12:11 AM, Zhangjian (Bamvor) <bamvor.zhangjian@huawei.com> wrote:
->>> 
->>> Hi, Yury
->>> 
->>>> On 2015/11/18 5:16, Yury Norov wrote:
->>>> From: Philipp Tomsich <philipp.tomsich@theobroma-systems.com>
->>>> 
->>>> To make life for tools (such as gdb) easier when dealing with ILP32 processes,
->>>> we report a proper subarchitecture for ILP32 in the ELF auxiliary vectors.
->>> I saw some ilp32 relative patches in binutils mailing list. Does gdb
->>> fully support ilp32?
->> 
->> I have a patch set but I have not tested them with the latest kernel patch set yet. The branch is located in the binutils-gdb git is https://sourceware.org/git/?p=binutils-gdb.git;a=shortlog;h=refs/heads/users/pinskia/gdb-aarch64-ilp32 .
->> I think it will mostly work except for core support might need to be changed slightly. 
->> 
->> Thanks,
->> Andrew
->>> 
+> > 
+> > Signed-off-by: Yang Shi <yang.shi@linaro.org>
+> > ---
+> >  arch/arm64/kernel/cpuinfo.c | 5 +++++
+> >  arch/arm64/kernel/smp.c     | 7 ++++++-
+> >  2 files changed, 11 insertions(+), 1 deletion(-)
+> > 
+> > diff --git a/arch/arm64/kernel/cpuinfo.c b/arch/arm64/kernel/cpuinfo.c
+> > index 706679d..8d4ba77 100644
+> > --- a/arch/arm64/kernel/cpuinfo.c
+> > +++ b/arch/arm64/kernel/cpuinfo.c
+> > @@ -30,6 +30,7 @@
+> >  #include <linux/seq_file.h>
+> >  #include <linux/sched.h>
+> >  #include <linux/smp.h>
+> > +#include <linux/delay.h>
+> >  
+> >  /*
+> >   * In case the boot CPU is hotpluggable, we record its initial state and
+> > @@ -112,6 +113,10 @@ static int c_show(struct seq_file *m, void *v)
+> >  		 */
+> >  		seq_printf(m, "processor\t: %d\n", i);
+> >  
+> > +		seq_printf(m, "BogoMIPS\t: %lu.%02lu\n\n",
 > 
-> Yes, it works mostly. I can read and modify text/data, set breakpoints
-> etc.
+> This double newline makes /proc/cpuinfo looks really odd. Can we just
+> have one, please?
 > 
->>> Regards
->>> 
->>> Bamvor
->>> 
+> > +			   loops_per_jiffy / (500000UL/HZ),
+> > +			   loops_per_jiffy / (5000UL/HZ) % 100);
+
+Also, given nobody ever relied on any prior value here, can we at least 
+print something here with some semblance of a meaning i.e. something 
+related to the actual CPU speed and not some separate useless constant 
+timer clock please?
+
+
+Nicolas
