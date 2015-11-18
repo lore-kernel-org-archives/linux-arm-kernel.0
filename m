@@ -1,76 +1,49 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 18 Nov 2015 13:38:59 +0100
-Subject: [PATCH] mmc: dw_mmc: use resource_size_t to store physical address
-In-Reply-To: <CAHp75Vf4oaLZE27bC+aH9HD6W4E8Gditoz=HF0Z1WwcLWJnSKA@mail.gmail.com>
-References: <28102387.ALpaBHpim0@wuerfel> <6288847.N1QBIiXedG@wuerfel>
- <CAHp75Vf4oaLZE27bC+aH9HD6W4E8Gditoz=HF0Z1WwcLWJnSKA@mail.gmail.com>
-Message-ID: <5141236.CHnzdS7Lto@wuerfel>
+Date: Wed, 18 Nov 2015 13:41:39 +0100
+Subject: [PATCH V5 8/9] PCI: OF: Move of_pci_dma_configure() to
+ pci_dma_configure()
+In-Reply-To: <564C6860.4000002@arm.com>
+References: <1446072654-5608-1-git-send-email-Suravee.Suthikulpanit@amd.com>
+ <564B4111.6010805@arm.com> <564C6860.4000002@arm.com>
+Message-ID: <3822315.uJPjk3L2zB@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Wednesday 18 November 2015 11:35:27 Andy Shevchenko wrote:
-> On Fri, Nov 13, 2015 at 11:35 AM, Arnd Bergmann <arnd@arndb.de> wrote:
-> > On Friday 13 November 2015 03:10:13 Andy Shevchenko wrote:
-> >> On Thu, Nov 12, 2015 at 4:14 PM, Arnd Bergmann <arnd@arndb.de> wrote:
-> >> > The dw_mmc driver stores the physical address of the MMIO registers
-> >> > in a pointer, which requires the use of type casts, and is actually
-> >> > broken if anyone ever has this device on a 32-bit SoC in registers
-> >> > above 4GB. Gcc warns about this possibility when the driver is built
-> >> > with ARM LPAE enabled:
-> >>
-> >> > -       host->phy_regs = (void *)(regs->start);
-> >> > +       host->phy_regs = regs->start;
-> >>
-> >> >         /* Set external dma config: burst size, burst width */
-> >> > -       cfg.dst_addr = (dma_addr_t)(host->phy_regs + fifo_offset);
-> >> > +       cfg.dst_addr = host->phy_regs + fifo_offset;
-> >>
-> >> dst_addr is dma_addr_t?
+On Wednesday 18 November 2015 12:00:32 Robin Murphy wrote:
+> On 17/11/15 15:00, Robin Murphy wrote:
+> > On 28/10/15 22:50, Suravee Suthikulpanit wrote:
+> >> Signed-off-by: Suravee Suthikulpanit <Suravee.Suthikulpanit@amd.com>
+> >> Acked-by: Rob Herring <robh+dt@kernel.org>
+> >> Acked-by: Bjorn Helgaas <bhelgaas@google.com>
+> >> Reviewed-by: Hanjun Guo <hanjun.guo@linaro.org>
+> >> CC: Rafael J. Wysocki <rjw@rjwysocki.net>
+> [...]
+> >> +/**
+> >> + * pci_dma_configure - Setup DMA configuration
+> >> + * @dev: ptr to pci_dev struct of the PCI device
+> >> + *
+> >> + * Function to update PCI devices's DMA configuration using the same
+> >> + * info from the OF node of host bridge's parent (if any).
+> >> + */
+> >> +static void pci_dma_configure(struct pci_dev *dev)
+> >> +{
+> >> +    struct device *bridge = pci_get_host_bridge_device(dev);
+> >> +
+> >> +    if (IS_ENABLED(CONFIG_OF) && dev->dev.of_node) {
 > >
-> > Sort of. It doesn't really fit into any of the categories, and we actually
-> > had a patch to change the type in the past, see
-> > https://lkml.org/lkml/2015/7/10/167. Not sure what is going on there.
-> >
-> >> >         /* Registers's physical base address */
-> >> > -       void                    *phy_regs;
-> >> > +       resource_size_t         phy_regs;
-> >>
-> >> If dst_addr is dma_addr_t wouldn't be a problem when
-> >> resource_size_t is defined as 64-bit address, and dma_addr_t as 32-bit?
-> >>
-> >> Btw, for me casting to dma_addr_t looks sane.
-> >
-> > The background here is that the address comes from a resource_size_t
-> > that describes the MMIO register area as seen from the CPU, and that
-> > is normally a phys_addr_t (resource_size_t is defined as being long
-> > enough to store a phys_addr_t or various other things depending on
-> > resource->flags).
-> >
-> > dma_addr_t strictly speaking refers to a RAM location as seen by a
-> > DMA master, and that only comes out of dma_map_*() or
-> > dma_alloc_coherent().
-> >
-> > The DMA engine wants something else here, which is an MMIO register
-> > address as seen by a DMA master, and we don't have a separate typedef
-> > for that. Almost universally all of resource_size_t, phys_addr_t and
-> > dma_addr_t are the same type, and if we ever get a platform that
-> > wants something other than a phys_addr_t to put into cfg.dst_addr,
-> > we are in deep trouble.
+> > Previously I was seeing of_dma_configure, and thus of_iommu_configure,
+> > called for every PCI device on Juno. The check above now prevents this
+> > happening, since the PCI devices are probed directly from the bus and
+> > don't have OF nodes of their own. They now get left in some
+> > half-configured state where arch_setup_dma_ops isn't called either.
 > 
-> DMA operates with address space covered by dma_addr_t, if you use
-> phys_addr_t you may get address out of DMA boundaries. This is should
-> be done in hardware / firmware / platform representation.
-> So, I don't see any reason not to use dma_addr_t here.
+> Just to follow up on that, Arnd's patch to tidy up dma_get_ops (now 
+> queued[1]) makes this even worse, since preventing arch_setup_dma_ops 
+> being called means the PCI devices now get the dummy DMA ops which leave 
+> the drivers failing to probe at all, IOMMU hacks or not 
 
-As I said above, this isn't really the same as DMA: all normal
-dma_addr_t are returned from dma_alloc_* or dma_map_*, point
-to RAM and might go trhough an IOMMU, all of which is not true
-here, hence the patch to change the type to phys_addr_t.
+Ok, glad we found that with my patch then. We really have to
+configure the DMA (offset/size/coherency/iommu) for all devices that might
+be masters, otherwise things can randomly go wrong.
 
-You really can't get out of bounds because the data comes from a
-phys_addr_t and refers to a fixed location in hardware. If a
-platform has registers higher than a 32-bit address, its phys_addr_t
-must be 64-bit, but its dma_addr_t not necessarily so (even though
-the two are the same almost always in practice).
-
-	Arnd
+	ARnd
