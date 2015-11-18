@@ -1,54 +1,75 @@
-From: yang.shi@linaro.org (Yang Shi)
-Date: Wed, 18 Nov 2015 10:48:55 -0800
-Subject: [V2 PATCH] arm64: restore bogomips information in /proc/cpuinfo
-Message-ID: <1447872535-31117-1-git-send-email-yang.shi@linaro.org>
+From: Chris.Brandt@renesas.com (Chris Brandt)
+Date: Wed, 18 Nov 2015 19:12:53 +0000
+Subject: [PATCH v3] ARM: xip: Use correct symbol for end of ROM marker
+In-Reply-To: <alpine.LFD.2.20.1511181156250.22569@knanqh.ubzr>
+References: <1447362108-4333-1-git-send-email-chris.brandt@renesas.com>
+ <1447697140-4099-1-git-send-email-chris.brandt@renesas.com>
+ <alpine.LFD.2.20.1511161515100.5826@knanqh.ubzr>
+ <HK2PR06MB05619FACB3725B6F5B2299718A1E0@HK2PR06MB0561.apcprd06.prod.outlook.com>
+ <alpine.LFD.2.20.1511161605070.5826@knanqh.ubzr>
+ <HK2PR06MB056142FFDA4E99A764DF9ECB8A1E0@HK2PR06MB0561.apcprd06.prod.outlook.com>
+ <alpine.LFD.2.20.1511161730030.5826@knanqh.ubzr>
+ <HK2PR06MB05614D47A9C35ECB4CA72D3F8A1D0@HK2PR06MB0561.apcprd06.prod.outlook.com>
+ <alpine.LFD.2.20.1511162127180.5826@knanqh.ubzr>
+ <HK2PR06MB056175E6E4356DD8C3566D758A1D0@HK2PR06MB0561.apcprd06.prod.outlook.com>
+ <alpine.LFD.2.20.1511172255410.22569@knanqh.ubzr>
+ <CANqRtoTkHecGEsbi3EtM8dkHQ=V0RGm7iZcU_igMqLE7Od=xBA@mail.gmail.com>
+ <alpine.LFD.2.20.1511180841000.22569@knanqh.ubzr>
+ <alpine.LFD.2.20.1511181156250.22569@knanqh.ubzr>
+Message-ID: <HK2PR06MB0561CA7E856CEAA89D0752488A1C0@HK2PR06MB0561.apcprd06.prod.outlook.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-As what Pavel Machek reported [1], some userspace applications depend on
-bogomips showed by /proc/cpuinfo.
+Hi Nicolas,
 
-Although there is much less legacy impact on aarch64 than arm, but it does
-break libvirt.
+> Here's the patch with proper changelog, etc.  I don't have XIP
+> capable hardware to test it with though.
 
-Basically, this patch reverts commit 326b16db9f69fd0d279be873c6c00f88c0a4aad5
-("arm64: delay: don't bother reporting bogomips in /proc/cpuinfo"), but with
-some tweak due to context change.
 
-[1] https://lkml.org/lkml/2015/1/4/132
+I'm testing it now...but it's crashing.
 
-Acked-by: Will Deacon <will.deacon@arm.com>
-Cc: <stable@vger.kernel.org> #3.12+
-Signed-off-by: Yang Shi <yang.shi@linaro.org>
----
-V2 --> V1:
-* Remove double new line and unnecessary bogomips sum info
+I fired up GDB, so here the reason:
 
- arch/arm64/kernel/cpuinfo.c | 5 +++++
- 1 file changed, 5 insertions(+)
 
-diff --git a/arch/arm64/kernel/cpuinfo.c b/arch/arm64/kernel/cpuinfo.c
-index 706679d..212ae63 100644
---- a/arch/arm64/kernel/cpuinfo.c
-+++ b/arch/arm64/kernel/cpuinfo.c
-@@ -30,6 +30,7 @@
- #include <linux/seq_file.h>
- #include <linux/sched.h>
- #include <linux/smp.h>
-+#include <linux/delay.h>
- 
- /*
-  * In case the boot CPU is hotpluggable, we record its initial state and
-@@ -112,6 +113,10 @@ static int c_show(struct seq_file *m, void *v)
- 		 */
- 		seq_printf(m, "processor\t: %d\n", i);
- 
-+		seq_printf(m, "BogoMIPS\t: %lu.%02lu\n",
-+			   loops_per_jiffy / (500000UL/HZ),
-+			   loops_per_jiffy / (5000UL/HZ) % 100);
-+
- 		/*
- 		 * Dump out the common processor features in a single line.
- 		 * Userspace should read the hwcaps with getauxval(AT_HWCAP)
--- 
-2.0.2
+__v7_ca17mp_setup:
+	mov	r10, #0
+1:	adr	r0, __v7_setup_stack_ptr
+r0=0x18213df4
+
+	ldr	r12, [r0]
+r12=0x10174cc
+
+	add	r12, r12, r0			@ the local stack
+r12=0x1922b2c0
+
+	stmia	r12, {r1-r6, lr}		@ v7_invalidate_l1 touches r0-r6
+	bl      v7_invalidate_l1
+
+
+0x1922b2c0 is NOT RAM....it's nothing.
+
+
+As point of reference, here's the memory map of my XIP system:
+  Physical ROM address: 0x18000000 (I have my XIP kernel starting at 0x18200000)
+  Physical RAM address: 0x20000000
+  Virtual ROM  address: 0xBF0000000
+  Virtual RAM  address: 0xC00000000
+
+
+Basically, you made the same mistake that Magnus first did: You can't rely on the current PC address to obtain an address in physical RAM because the ROM virt-to-phys relationship is different than the RAM virt-to-phys relationship.
+
+No matter how you look at it, this early in boot, the only 'thing' that really knows where physical RAM is located is PLAT_PHYS_OFFSET.
+
+That's why both Magnus's an my patches (that I both tested) contain PLAT_PHYS_OFFSET.
+
+
+The only other 'slight' piece of info would be the DTB pointer is still sitting in R2 from boot, and at least for my system, that is in RAM. However, the DTB could be in ROM if the user wanted it to be, and I also think that this code might run twice in a SMP system...so even R2 would not be reliable. So...forget I mentioned it...
+
+
+I don't see any way around not having a "#ifdef XIP_KERNEL" statement in order to expose PLAT_PHYS_OFFSET so you can properly do your translation math.
+
+
+Chris
+
+
+ps, I will add that I appreciate your efforts with this.
