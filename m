@@ -1,46 +1,28 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 18 Nov 2015 09:44:48 +0900
-Subject: [PATCH] cpufreq: do not mark s3c2410_plls_add as __init
-In-Reply-To: <4654010.UfKTsDKyes@wuerfel>
-References: <8497197.sYxqVOch7s@wuerfel> <4389196.cuM78vZZnJ@wuerfel>
- <564A899C.4040402@samsung.com> <4654010.UfKTsDKyes@wuerfel>
-Message-ID: <564BCA00.3040906@samsung.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue, 17 Nov 2015 16:52:31 -0800
+Subject: [PATCH 0/2] Add pm8994 gpio and mpp support
+Message-ID: <1447807953-11924-1-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 17.11.2015 18:01, Arnd Bergmann wrote:
-> On Tuesday 17 November 2015 10:57:48 Krzysztof Kozlowski wrote:
->> On 17.11.2015 07:17, Arnd Bergmann wrote:
->>> On Monday 16 November 2015 23:36:42 Rafael J. Wysocki wrote:
->>>>
->>>> This should go in through the Samsung tree, so I'll leave it for them to pick
->>>> it up (at least for the time being).
->>>
->>> Ok, fair enough. Kukjin or Krzysztof, can you pick this up?
->>
->> Sure.
->>
->> As for the patch I think everything can be converted to init/initdata
->> (as in attachment).
->>
-> 
-> I don't think so:
-> 
-> static struct subsys_interface s3c2442_plls169344_interface __initdata = {
->         .name           = "s3c2442_plls169344",
->         .subsys         = &s3c2442_subsys,
->         .add_dev        = s3c2440_plls169344_add,
-> };
-> 
-> This gets passed into subsys_interface_register(), which is not __init
-> in turn. subsys_interface_register() then goes on to add
-> s3c2442_plls169344_interface into a linked list that is traversed
-> at runtime, but the __initdata section gets discarded so you now
-> have a broken list.
+This adds the support for pm8994 gpio and mpp modules. Given that there's
+nothing besides a compatible string update, I'm going to send a separate
+patch to add generic compatible strings for these sorts of things.
 
-Ah, yes, so the patch is fine:
+Stephen Boyd (2):
+  pinctrl: qcom: spmi-gpio: Add pm8994 gpio support
+  pinctrl: qcom: spmi-mpp: Add pm8994 mpp support
 
-Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Cc: <devicetree@vger.kernel.org>
+Cc: "Ivan T. Ivanov" <iivanov@mm-sol.com>
+Cc: Bjorn Andersson <bjorn.andersson@sonymobile.com>
 
-Best regards,
-Krzysztof
+ Documentation/devicetree/bindings/pinctrl/qcom,pmic-gpio.txt | 2 ++
+ Documentation/devicetree/bindings/pinctrl/qcom,pmic-mpp.txt  | 1 +
+ drivers/pinctrl/qcom/pinctrl-spmi-gpio.c                     | 1 +
+ drivers/pinctrl/qcom/pinctrl-spmi-mpp.c                      | 1 +
+ 4 files changed, 5 insertions(+)
+
+-- 
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
