@@ -1,45 +1,67 @@
-From: k.kozlowski@samsung.com (Krzysztof Kozlowski)
-Date: Wed, 18 Nov 2015 10:33:41 +0900
-Subject: [PATCHv2] ASoC: samsung: pass DMA channels as pointers
-In-Reply-To: <6346833.MfUC71I3uD@wuerfel>
-References: <6346833.MfUC71I3uD@wuerfel>
-Message-ID: <564BD575.3070702@samsung.com>
+From: huangdaode@hisilicon.com (huangdaode)
+Date: Wed, 18 Nov 2015 09:42:08 +0800
+Subject: [PATCH v2 net-next] net: hisilicon: fix binding document of mdio
+In-Reply-To: <6897029.2fyR9qGpEn@wuerfel>
+References: <1447666704-200773-1-git-send-email-huangdaode@hisilicon.com>
+ <6897029.2fyR9qGpEn@wuerfel>
+Message-ID: <564BD770.1080205@hisilicon.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18.11.2015 00:53, Arnd Bergmann wrote:
-> ARM64 allmodconfig produces a bunch of warnings when building the
-> samsung ASoC code:
-> 
-> sound/soc/samsung/dmaengine.c: In function 'samsung_asoc_init_dma_data':
-> sound/soc/samsung/dmaengine.c:53:32: warning: cast to pointer from integer of different size [-Wint-to-pointer-cast]
->    playback_data->filter_data = (void *)playback->channel;
-> sound/soc/samsung/dmaengine.c:60:31: warning: cast to pointer from integer of different size [-Wint-to-pointer-cast]
->    capture_data->filter_data = (void *)capture->channel;
-> 
-> We could easily shut up the warning by adding an intermediate cast,
-> but there is a bigger underlying problem: The use of IORESOURCE_DMA
-> to pass data from platform code to device drivers is dubious to start
-> with, as what we really want is a pointer that can be passed into
-> a filter function.
-> 
-> Note that on s3c64xx, the pl08x DMA data is already a pointer, but
-> gets cast to resource_size_t so we can pass it as a resource, and it
-> then gets converted back to a pointer. In contrast, the data we pass
-> for s3c24xx is an index into a device specific table, and we artificially
-> convert that into a pointer for the filter function.
-> 
-> Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-> ---
-> v2:
-> 
-> - no longer clash with SPI patch
-> - don't reference platform data that might be NULL
-> 
+On 2015/11/16 17:38, Arnd Bergmann wrote:
+> On Monday 16 November 2015 17:38:24 huangdaode wrote:
+>> This patch explains the occasion of "hisilcon,mdio" and
+>> "hisilicon,hns-mdio" according to Arnd's comments.
+>> and reformat it according to comments from Rob<robh@kernel.org>.
+>>
+>> chang log:
+>>
+>> v2:
+>>    1) reformat the style.
+>>    2) make it more clearity.
+>>
+>> v1:
+>>    initial version.
+>>
+>> Signed-off-by: huangdaode <huangdaode@hisilicon.com>
+>> ---
+> The new version looks ok, but your changelog above is formatted
+> incorrectly. Please put only the contents you want in the git history
+> above the '---' line and your Signed-off-by, but put the parts that
+> refer to previous versions of the submission below the ---.
 
-Looks good:
+Got it.
+thanks Arnd.
 
-Reviewed-by: Krzysztof Kozlowski <k.kozlowski@samsung.com>
+Daode
 
-Best regards,
-Krzysztof
+>>   Documentation/devicetree/bindings/net/hisilicon-hns-mdio.txt | 7 ++++++-
+>>   1 file changed, 6 insertions(+), 1 deletion(-)
+>>
+>> diff --git a/Documentation/devicetree/bindings/net/hisilicon-hns-mdio.txt b/Documentation/devicetree/bindings/net/hisilicon-hns-mdio.txt
+>> index 9c23fdf..4942d20 100644
+>> --- a/Documentation/devicetree/bindings/net/hisilicon-hns-mdio.txt
+>> +++ b/Documentation/devicetree/bindings/net/hisilicon-hns-mdio.txt
+>> @@ -1,7 +1,12 @@
+>>   Hisilicon MDIO bus controller
+>>   
+>>   Properties:
+>> -- compatible: "hisilicon,mdio","hisilicon,hns-mdio".
+>> +- compatible: can be one of:
+>> +	"hisilicon,hns-mdio"
+>> +	"hisilicon,mdio"
+>> +  "hisilicon,hns-mdio" is recommendly to be used for hip05 and later SOCs,
+>> +  while "hisilicon,mdio" is optional for backwards compatibility, only
+>> +  support for hip04 Soc.
+>>   - reg: The base address of the MDIO bus controller register bank.
+>>   - #address-cells: Must be <1>.
+>>   - #size-cells: Must be <0>.  MDIO addresses have no size component.
+>>
+>
+> .
+>
+
+
+-- 
+Best Regards
+Daode Huang
