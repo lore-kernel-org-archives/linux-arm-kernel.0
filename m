@@ -1,31 +1,52 @@
-From: catalin.marinas@arm.com (Catalin Marinas)
-Date: Wed, 18 Nov 2015 09:43:04 +0000
-Subject: [RFC PATCH] arm64: use non-global mappings for UEFI runtime
- regions
-In-Reply-To: <1447750411-6424-1-git-send-email-ard.biesheuvel@linaro.org>
-References: <1447750411-6424-1-git-send-email-ard.biesheuvel@linaro.org>
-Message-ID: <20151118094303.GB27495@e104818-lin.cambridge.arm.com>
+From: peter.chen@freescale.com (Peter Chen)
+Date: Wed, 18 Nov 2015 17:41:48 +0800
+Subject: [PATCH] USB: USB_OTG does not depend on PM
+In-Reply-To: <5217888.FiujFV8yJj@wuerfel>
+References: <7521777.8ZmnT3AlIC@wuerfel> <5647698.81XCu85L5D@wuerfel>
+ <20151118031748.GA4228@shlinux2> <5217888.FiujFV8yJj@wuerfel>
+Message-ID: <20151118094147.GI4228@shlinux2>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tue, Nov 17, 2015 at 09:53:31AM +0100, Ard Biesheuvel wrote:
-> As pointed out by Russell King in response to the proposed ARM version
-> of this code, the sequence to switch between the UEFI runtime mapping
-> and current's actual userland mapping (and vice versa) is potentially
-> unsafe, since it leaves a time window between the switch to the new
-> page tables and the TLB flush where speculative accesses may hit on
-> stale global TLB entries.
+On Wed, Nov 18, 2015 at 10:38:18AM +0100, Arnd Bergmann wrote:
+> On Wednesday 18 November 2015 11:17:50 Peter Chen wrote:
+> > From 3a6918dae038aadc200dcf0263f4440acc2353d4 Mon Sep 17 00:00:00 2001
+> > From: Peter Chen <peter.chen@freescale.com>
+> > Date: Wed, 18 Nov 2015 11:06:34 +0800
+> > Subject: [PATCH 1/1] usb: kconfig: fix warning of select USB_OTG
+> > 
+> > When choose randconfig for kernel build, it reports below warning:
+> > "warning: (USB_OTG_FSM && FSL_USB2_OTG && USB_MV_OTG) selects USB_OTG
+> > which has unmet direct dependencies (USB_SUPPORT && USB && PM)"
+> > 
+> > In fact, USB_OTG is visual symbol and depends on PM, so the driver
 > 
-> So instead, use non-global mappings, and perform the switch via the
-> ordinary ASID-aware context switch routines.
-> 
-> Signed-off-by: Ard Biesheuvel <ard.biesheuvel@linaro.org>
-> ---
->  arch/arm64/include/asm/mmu_context.h |  2 +-
->  arch/arm64/kernel/efi.c              | 14 +++++---------
->  2 files changed, 6 insertions(+), 10 deletions(-)
+>                       visible ?
 
-Patch applied. Thanks.
+Yes, will change this typo
+
+> 
+> > needs to depend on it to reduce dependency problem.
+> > 
+> > Signed-off-by: Peter Chen <peter.chen@freescale.com>
+> > Reported-by: Arnd Bergmann <arnd@arndb.de>
+> > Cc: Felipe Balbi <balbi@ti.com>
+> 
+> Acked-by: Arnd Bergmann <arnd@arndb.de>
+> 
+> I was a bit worried that this might break defconfig files that now
+> no longer automatically get OSB_OTG enabled, but I have checked all
+> defconfig files we have in the kernel and none of them uses
+> USB_OTG_FSM, FSL_USB2_OTG or USB_MV_OTG, so we are fine.
+
+Thanks.
+
+> 
+> Thanks!
+> 
+> 	Arnd
 
 -- 
-Catalin
+
+Best Regards,
+Peter Chen
