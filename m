@@ -1,53 +1,151 @@
-From: matthijsvanduin@gmail.com (Matthijs van Duin)
-Date: Wed, 18 Nov 2015 06:22:27 +0100
-Subject: Minimal support for dm814x
-In-Reply-To: <20151113145216.GC2517@atomide.com>
-References: <4999BB3D-4BB5-4F7C-96D7-FB687725CDCC@audioscience.com>
- <20151109150602.GR3199@atomide.com>
- <CAALWOA-NUyRYaGbmBZpc6CcFga8_BKPZ9WQTxa3t09bHS_6=qA@mail.gmail.com>
- <7933071D-84FD-4A85-8CD0-CC504CE1D9D1@audioscience.com>
- <20151111174028.GF3218@atomide.com>
- <CAALWOA_dEtajQBLrXesQ2bRCDf-1Dzg_tJw_=yAmaO=T3=KMZQ@mail.gmail.com>
- <20151112174155.GM3218@atomide.com>
- <CAALWOA9o80rhaqwaa6=XxmNN1FcWzHDXiaqkqFVO81CAMX=04w@mail.gmail.com>
- <CAALWOA-29pK=GbNKhdY=4oJzhnueVxNAPruu9Uacqi5vMJN=OA@mail.gmail.com>
- <20151113145216.GC2517@atomide.com>
-Message-ID: <CAALWOA-PjKW9M3qqxum4OqJ3V3AwKaaEDzA17jdZmgUNNE79Wg@mail.gmail.com>
+From: wens@csie.org (Chen-Yu Tsai)
+Date: Wed, 18 Nov 2015 13:40:33 +0800
+Subject: [PATCH] ARM: dts: sun8i: Add Orange Pi PC support
+Message-ID: <1447825233-3325-1-git-send-email-wens@csie.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 13 November 2015 at 15:52, Tony Lindgren <tony@atomide.com> wrote:
-> I think this is the most recent TI git repo for dm81xx changes:
->
-> http://arago-project.org/git/projects/?p=linux-omap3.git;a=summary
+The Orange Pi PC is an SBC based on the Allwinner H3 SoC with a uSD slot,
+3 USB ports directly from the SoC, a 10/100M ethernet port using the
+SoC's integrated PHY, USB OTG, HDMI, a TRRS headphone jack for stereo out
+and composite out, a microphone, an IR receiver, a CSI connector, 2 LEDs,
+a 3 pin UART header, and a 40-pin GPIO header.
 
-Yeah, although I usually prefer to look at the
-linux-ipnc-rdk-dm81xx.git and linux-dvr-rdk-dm81xx.git that descend
-from it since they include some fixes that the last TI kernel doesn't.
-(However they may also include patches specific to the ipnc/dvr
-hardware, so some caution is needed.)
+Signed-off-by: Chen-Yu Tsai <wens@csie.org>
+---
 
-Since arago can be sluggish I just mirrored all three branches on github:
-https://github.com/dutchanddutch/ti81xx-linux
-I've also fixed an obnoxious commit in the ipnc-rdk which changed all
-files to mode 755, since this made comparisons rather unpleasant.
+This is based on Jens' H3 patches and Hans' H3 USB patches.
+USB works nicely on this board.
 
-The PLL code looks pretty mediocre to me. In particular, they make no
-effort whatsoever to configure an exact ratio. It seems their
-algorithm uses whatever predivider was already programmed, selects the
-minimum postdivider that puts the DCO clock within valid range, and
-then approximates the dco/refclk ratio using the fractional
-multiplier.
+---
+ arch/arm/boot/dts/Makefile                 |   1 +
+ arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts | 106 +++++++++++++++++++++++++++++
+ 2 files changed, 107 insertions(+)
+ create mode 100644 arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts
 
-This works in principle, but both minimizing the DCO and (often
-needlessly) using the fractional multiplier seem like recipes to
-maximize the clock jitter. Mind you, I don't know how much jitter
-we're talking about here, I don't recall having seen specs about this.
-
-I also have some concerns about the correctness of the implementation.
-I haven't analyzed it in any detail, but repeated occurrences of
-expressions of the form   (unsigned long long)( foo * bar )   make me
-doubt whether the author realizes this is utterly pointless and will,
-for 32-bit arguments, still perform a 32-bit multiplication.
-
-Matthijs
+diff --git a/arch/arm/boot/dts/Makefile b/arch/arm/boot/dts/Makefile
+index 4e8026e85b79..0ef528a7d845 100644
+--- a/arch/arm/boot/dts/Makefile
++++ b/arch/arm/boot/dts/Makefile
+@@ -661,6 +661,7 @@ dtb-$(CONFIG_MACH_SUN8I) += \
+ 	sun8i-a33-ippo-q8h-v1.2.dtb \
+ 	sun8i-a33-q8-tablet.dtb \
+ 	sun8i-a33-sinlinx-sina33.dtb \
++	sun8i-h3-orangepi-pc.dtb \
+ 	sun8i-h3-orangepi-plus.dtb
+ dtb-$(CONFIG_MACH_SUN9I) += \
+ 	sun9i-a80-optimus.dtb \
+diff --git a/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts b/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts
+new file mode 100644
+index 000000000000..4b25dcc3fdd2
+--- /dev/null
++++ b/arch/arm/boot/dts/sun8i-h3-orangepi-pc.dts
+@@ -0,0 +1,106 @@
++/*
++ * Copyright (C) 2015 Chen-Yu Tsai <wens@csie.org>
++ *
++ * This file is dual-licensed: you can use it either under the terms
++ * of the GPL or the X11 license, at your option. Note that this dual
++ * licensing only applies to this file, and not this project as a
++ * whole.
++ *
++ *  a) This file is free software; you can redistribute it and/or
++ *     modify it under the terms of the GNU General Public License as
++ *     published by the Free Software Foundation; either version 2 of the
++ *     License, or (at your option) any later version.
++ *
++ *     This file is distributed in the hope that it will be useful,
++ *     but WITHOUT ANY WARRANTY; without even the implied warranty of
++ *     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
++ *     GNU General Public License for more details.
++ *
++ * Or, alternatively,
++ *
++ *  b) Permission is hereby granted, free of charge, to any person
++ *     obtaining a copy of this software and associated documentation
++ *     files (the "Software"), to deal in the Software without
++ *     restriction, including without limitation the rights to use,
++ *     copy, modify, merge, publish, distribute, sublicense, and/or
++ *     sell copies of the Software, and to permit persons to whom the
++ *     Software is furnished to do so, subject to the following
++ *     conditions:
++ *
++ *     The above copyright notice and this permission notice shall be
++ *     included in all copies or substantial portions of the Software.
++ *
++ *     THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
++ *     EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES
++ *     OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND
++ *     NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT
++ *     HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
++ *     WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
++ *     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
++ *     OTHER DEALINGS IN THE SOFTWARE.
++ */
++
++/dts-v1/;
++#include "sun8i-h3.dtsi"
++#include "sunxi-common-regulators.dtsi"
++
++#include <dt-bindings/gpio/gpio.h>
++#include <dt-bindings/pinctrl/sun4i-a10.h>
++
++/ {
++	model = "Xunlong Orange Pi PC";
++	compatible = "xunlong,orangepi-pc", "allwinner,sun8i-h3";
++
++	aliases {
++		serial0 = &uart0;
++	};
++
++	chosen {
++		stdout-path = "serial0:115200n8";
++	};
++};
++
++&ehci1 {
++	status = "okay";
++};
++
++&ehci2 {
++	status = "okay";
++};
++
++&ehci3 {
++	status = "okay";
++};
++
++&mmc0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&mmc0_pins_a>, <&mmc0_cd_pin>;
++	vmmc-supply = <&reg_vcc3v3>;
++	bus-width = <4>;
++	cd-gpios = <&pio 5 6 GPIO_ACTIVE_HIGH>; /* PF6 */
++	cd-inverted;
++	status = "okay";
++};
++
++&ohci1 {
++	status = "okay";
++};
++
++&ohci2 {
++	status = "okay";
++};
++
++&ohci3 {
++	status = "okay";
++};
++
++&uart0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&uart0_pins_a>;
++	status = "okay";
++};
++
++&usbphy {
++	/* USB VBUS is always on */
++	status = "okay";
++};
+-- 
+2.6.2
