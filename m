@@ -1,73 +1,98 @@
-From: zhaoyang.huang@linaro.org (Zhaoyang Huang)
-Date: Wed, 18 Nov 2015 16:50:34 +0800
-Subject: [PATCH RFC 13/27] ARM: cpuidle: Add runtime PM support for CPU
- idle
-In-Reply-To: <1447799871-56374-14-git-send-email-lina.iyer@linaro.org>
-References: <1447799871-56374-1-git-send-email-lina.iyer@linaro.org>
- <1447799871-56374-14-git-send-email-lina.iyer@linaro.org>
-Message-ID: <CAN2waFuepGZW8DdA3HqkddCH4oBo1Lpoyn7kQXh0wiKTj3xTXg@mail.gmail.com>
+From: zlim.lnx@gmail.com (Zi Shen Lim)
+Date: Wed, 18 Nov 2015 00:56:02 -0800
+Subject: [PATCH] arm64: bpf: fix buffer pointer
+Message-ID: <1447836962-4086-1-git-send-email-zlim.lnx@gmail.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 18 November 2015 at 06:37, Lina Iyer <lina.iyer@linaro.org> wrote:
-> Notify runtime PM when the CPU is going to be powered off in the idle
-> state. This allows for runtime PM suspend/resume of the CPU as well as
-> its PM domain.
->
-> Cc: Daniel Lezcano <daniel.lezcano@linaro.org>
-> Cc: Lorenzo Pieralisi <lorenzo.pieralisi@arm.com>
-> Signed-off-by: Lina Iyer <lina.iyer@linaro.org>
-> ---
->  drivers/cpuidle/cpuidle-arm.c | 8 ++++++++
->  1 file changed, 8 insertions(+)
->
-> diff --git a/drivers/cpuidle/cpuidle-arm.c b/drivers/cpuidle/cpuidle-arm.c
-> index 545069d..8e72a23 100644
-> --- a/drivers/cpuidle/cpuidle-arm.c
-> +++ b/drivers/cpuidle/cpuidle-arm.c
-> @@ -11,13 +11,16 @@
->
->  #define pr_fmt(fmt) "CPUidle arm: " fmt
->
-> +#include <linux/cpu.h>
->  #include <linux/cpuidle.h>
->  #include <linux/cpumask.h>
->  #include <linux/cpu_pm.h>
->  #include <linux/kernel.h>
->  #include <linux/module.h>
->  #include <linux/of.h>
-> +#include <linux/pm_runtime.h>
->  #include <linux/slab.h>
-> +#include <linux/rcupdate.h>
->
->  #include <asm/cpuidle.h>
->
-> @@ -45,6 +48,10 @@ static int arm_enter_idle_state(struct cpuidle_device *dev,
->
->         ret = cpu_pm_enter();
->         if (!ret) {
-> +               struct device *cpu_dev = get_cpu_device(dev->cpu);
-> +
-> +               RCU_NONIDLE(pm_runtime_put_sync_suspend(cpu_dev));
-By my test, it seems that the usage_count of cpu device will be
-decrease to -1 and the code never runs here. If it need a runtime_put
-somewhere?
-> +
->                 /*
->                  * Pass idle state index to cpu_suspend which in turn will
->                  * call the CPU ops suspend protocol with idle index as a
-> @@ -52,6 +59,7 @@ static int arm_enter_idle_state(struct cpuidle_device *dev,
->                  */
->                 arm_cpuidle_suspend(idx);
->
-> +               RCU_NONIDLE(pm_runtime_get_sync(cpu_dev));
->                 cpu_pm_exit();
->         }
->
-> --
-> 2.1.4
->
-> --
-> To unsubscribe from this list: send the line "unsubscribe linux-pm" in
-> the body of a message to majordomo at vger.kernel.org
-> More majordomo info at  http://vger.kernel.org/majordomo-info.html
+During code review, I noticed we were passing a bad buffer pointer
+to bpf_load_pointer helper function called by jitted code.
+
+Point to the buffer allocated by JIT, so we don't silently corrupt
+other parts of the stack.
+
+Signed-off-by: Zi Shen Lim <zlim.lnx@gmail.com>
+---
+ arch/arm64/net/bpf_jit_comp.c | 27 +++++++++++++--------------
+ 1 file changed, 13 insertions(+), 14 deletions(-)
+
+diff --git a/arch/arm64/net/bpf_jit_comp.c b/arch/arm64/net/bpf_jit_comp.c
+index d6a53ef..7cf032b 100644
+--- a/arch/arm64/net/bpf_jit_comp.c
++++ b/arch/arm64/net/bpf_jit_comp.c
+@@ -139,6 +139,12 @@ static inline int epilogue_offset(const struct jit_ctx *ctx)
+ /* Stack must be multiples of 16B */
+ #define STACK_ALIGN(sz) (((sz) + 15) & ~15)
+ 
++#define _STACK_SIZE \
++	(MAX_BPF_STACK \
++	 + 4 /* extra for skb_copy_bits buffer */)
++
++#define STACK_SIZE STACK_ALIGN(_STACK_SIZE)
++
+ static void build_prologue(struct jit_ctx *ctx)
+ {
+ 	const u8 r6 = bpf2a64[BPF_REG_6];
+@@ -150,10 +156,6 @@ static void build_prologue(struct jit_ctx *ctx)
+ 	const u8 rx = bpf2a64[BPF_REG_X];
+ 	const u8 tmp1 = bpf2a64[TMP_REG_1];
+ 	const u8 tmp2 = bpf2a64[TMP_REG_2];
+-	int stack_size = MAX_BPF_STACK;
+-
+-	stack_size += 4; /* extra for skb_copy_bits buffer */
+-	stack_size = STACK_ALIGN(stack_size);
+ 
+ 	/*
+ 	 * BPF prog stack layout
+@@ -165,12 +167,13 @@ static void build_prologue(struct jit_ctx *ctx)
+ 	 *                        | ... | callee saved registers
+ 	 *                        +-----+
+ 	 *                        |     | x25/x26
+-	 * BPF fp register => -80:+-----+
++	 * BPF fp register => -80:+-----+ <= (BPF_FP)
+ 	 *                        |     |
+ 	 *                        | ... | BPF prog stack
+ 	 *                        |     |
+-	 *                        |     |
+-	 * current A64_SP =>      +-----+
++	 *                        +-----+ <= (BPF_FP - MAX_BPF_STACK)
++	 *                        |RSVD | JIT scratchpad
++	 * current A64_SP =>      +-----+ <= (BPF_FP - STACK_SIZE)
+ 	 *                        |     |
+ 	 *                        | ... | Function call stack
+ 	 *                        |     |
+@@ -196,7 +199,7 @@ static void build_prologue(struct jit_ctx *ctx)
+ 	emit(A64_MOV(1, fp, A64_SP), ctx);
+ 
+ 	/* Set up function call stack */
+-	emit(A64_SUB_I(1, A64_SP, A64_SP, stack_size), ctx);
++	emit(A64_SUB_I(1, A64_SP, A64_SP, STACK_SIZE), ctx);
+ 
+ 	/* Clear registers A and X */
+ 	emit_a64_mov_i64(ra, 0, ctx);
+@@ -213,13 +216,9 @@ static void build_epilogue(struct jit_ctx *ctx)
+ 	const u8 fp = bpf2a64[BPF_REG_FP];
+ 	const u8 tmp1 = bpf2a64[TMP_REG_1];
+ 	const u8 tmp2 = bpf2a64[TMP_REG_2];
+-	int stack_size = MAX_BPF_STACK;
+-
+-	stack_size += 4; /* extra for skb_copy_bits buffer */
+-	stack_size = STACK_ALIGN(stack_size);
+ 
+ 	/* We're done with BPF stack */
+-	emit(A64_ADD_I(1, A64_SP, A64_SP, stack_size), ctx);
++	emit(A64_ADD_I(1, A64_SP, A64_SP, STACK_SIZE), ctx);
+ 
+ 	/* Restore fs (x25) and x26 */
+ 	emit(A64_POP(fp, A64_R(26), A64_SP), ctx);
+@@ -658,7 +657,7 @@ emit_cond_jmp:
+ 			return -EINVAL;
+ 		}
+ 		emit_a64_mov_i64(r3, size, ctx);
+-		emit(A64_ADD_I(1, r4, fp, MAX_BPF_STACK), ctx);
++		emit(A64_SUB_I(1, r4, fp, STACK_SIZE), ctx);
+ 		emit_a64_mov_i64(r5, (unsigned long)bpf_load_pointer, ctx);
+ 		emit(A64_PUSH(A64_FP, A64_LR, A64_SP), ctx);
+ 		emit(A64_MOV(1, A64_FP, A64_SP), ctx);
+-- 
+1.9.1
