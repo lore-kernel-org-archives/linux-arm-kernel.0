@@ -1,50 +1,35 @@
-From: schwab@suse.de (Andreas Schwab)
-Date: Wed, 18 Nov 2015 09:25:40 +0100
-Subject: [PATCH v6 15/19] arm64: ilp32: force IPC_64 in msgctl, shmctl,
- semctl
-In-Reply-To: <26387039.NNJ6EnRrv8@wuerfel> (Arnd Bergmann's message of "Tue,
- 17 Nov 2015 23:07:03 +0100")
-References: <1447795019-30176-1-git-send-email-ynorov@caviumnetworks.com>
- <1447795019-30176-16-git-send-email-ynorov@caviumnetworks.com>
- <26387039.NNJ6EnRrv8@wuerfel>
-Message-ID: <mvmoaersohn.fsf@hawking.suse.de>
+From: dbrignoli@audioscience.com (Delio Brignoli)
+Date: Wed, 18 Nov 2015 09:26:49 +0100
+Subject: Minimal support for dm814x
+In-Reply-To: <CAALWOA-PjKW9M3qqxum4OqJ3V3AwKaaEDzA17jdZmgUNNE79Wg@mail.gmail.com>
+References: <4999BB3D-4BB5-4F7C-96D7-FB687725CDCC@audioscience.com>
+ <20151109150602.GR3199@atomide.com>
+ <CAALWOA-NUyRYaGbmBZpc6CcFga8_BKPZ9WQTxa3t09bHS_6=qA@mail.gmail.com>
+ <7933071D-84FD-4A85-8CD0-CC504CE1D9D1@audioscience.com>
+ <20151111174028.GF3218@atomide.com>
+ <CAALWOA_dEtajQBLrXesQ2bRCDf-1Dzg_tJw_=yAmaO=T3=KMZQ@mail.gmail.com>
+ <20151112174155.GM3218@atomide.com>
+ <CAALWOA9o80rhaqwaa6=XxmNN1FcWzHDXiaqkqFVO81CAMX=04w@mail.gmail.com>
+ <CAALWOA-29pK=GbNKhdY=4oJzhnueVxNAPruu9Uacqi5vMJN=OA@mail.gmail.com>
+ <20151113145216.GC2517@atomide.com>
+ <CAALWOA-PjKW9M3qqxum4OqJ3V3AwKaaEDzA17jdZmgUNNE79Wg@mail.gmail.com>
+Message-ID: <D5E377BD-5AAE-4302-B2C3-2B17A00892B5@audioscience.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Arnd Bergmann <arnd@arndb.de> writes:
+On 18 Nov 2015, at 06:22, Matthijs van Duin <matthijsvanduin@gmail.com> wrote:
+> The PLL code looks pretty mediocre to me. In particular, they make no
+> effort whatsoever to configure an exact ratio. It seems their
+> algorithm uses whatever pre divider was already programmed,
 
-> On Wednesday 18 November 2015 00:16:55 Yury Norov wrote:
->> 
->> +/* IPC_64 */
->> +asmlinkage long ilp32_sys_msgctl(int first, int second, void __user *uptr)
->> +{
->> +       return compat_sys_msgctl(first, second | IPC_64, uptr);
->> +}
->> +#define compat_sys_msgctl              ilp32_sys_msgctl
->> +
->> +asmlinkage long ilp32_sys_shmctl(int first, int second, void __user *uptr)
->> +{
->> +       return compat_sys_shmctl(first, second | IPC_64, uptr);
->> +}
->> +#define compat_sys_shmctl              ilp32_sys_shmctl
->> +
->> +asmlinkage long ilp32_sys_semctl(int first, int second, int third, int arg)
->> +{
->> +       return compat_sys_semctl(first, second, third | IPC_64, arg);
->> +}
->> +#define compat_sys_semctl      ilp32_sys_semctl
->> 
->
-> I wonder if this would be any simpler by changing compat_ipc_parse_version()
+I believe the implementors assumed the bootloader was setting up the PLL, its adjustment may have been an afterthought added in order to support PTP.
 
-This cries for a generic solution.  Other archs migrating to separate
-ipc syscalls will want to avoid the whole IPC_64 business for them, even
-if they need to retain [compat_]ipc_parse_version for sys_ipc
-compatibility.
+> This works in principle, but both minimizing the DCO and (often
+> needlessly) using the fractional multiplier seem like recipes to
+> maximize the clock jitter. Mind you, I don't know how much jitter
+> we?re talking about here, I don't recall having seen specs about this.
 
-Andreas.
+We haven?t seen any specs either but testing shows that changing DCO mode causes the PLL to lose lock at least temporarily.
 
--- 
-Andreas Schwab, SUSE Labs, schwab at suse.de
-GPG Key fingerprint = 0196 BAD8 1CE9 1970 F4BE  1748 E4D4 88E3 0EEA B9D7
-"And now for something completely different."
+?
+Delio
