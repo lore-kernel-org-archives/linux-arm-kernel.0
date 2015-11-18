@@ -1,33 +1,56 @@
-From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 18 Nov 2015 09:14:32 +0100
-Subject: [PATCH v6 14/19] arm64:ilp32: add sys_ilp32.c and a separate
- table (in entry.S) to use it
-In-Reply-To: <3754277.KmO9Nk3XLD@wuerfel>
+From: bamvor.zhangjian@huawei.com (Zhangjian (Bamvor))
+Date: Wed, 18 Nov 2015 16:09:03 +0800
+Subject: [PATCH v6 01/19] arm64:ilp32: add documentation on the ILP32
+ ABI for ARM64
+In-Reply-To: <1447795019-30176-2-git-send-email-ynorov@caviumnetworks.com>
 References: <1447795019-30176-1-git-send-email-ynorov@caviumnetworks.com>
- <1447795019-30176-15-git-send-email-ynorov@caviumnetworks.com>
- <3754277.KmO9Nk3XLD@wuerfel>
-Message-ID: <3999351.LDb9Xyt8Yk@wuerfel>
+ <1447795019-30176-2-git-send-email-ynorov@caviumnetworks.com>
+Message-ID: <564C321F.5050707@huawei.com>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On Tuesday 17 November 2015 22:57:52 Arnd Bergmann wrote:
-> > +#define compat_sys_open_by_handle_at   sys_open_by_handle_at
-> 
-> The only difference here is the forced O_LARGEFILE, but that
-> is set by glibc anyway, right?
-> 
-> > +#define compat_sys_openat              sys_openat
-> 
-> same as open_by_handle_at
-> 
+Hi, Yury
 
-I gave it some more thought, and I think we should actually stay
-with sys_open_by_handle_at and sys_openat, but do it a little differently:
+On 2015/11/18 5:16, Yury Norov wrote:
+> From: Philipp Tomsich <philipp.tomsich@theobroma-systems.com>
+> 
+> Based on Andrew Pinski's original patch-series and adapted with changes
+> to reduce the duplication of code-paths and resolve issue found during
+> LTP testing.
+> 
+> Reviewed-by: David Daney <ddaney@caviumnetworks.com>
+> 
+> 
+> Signed-off-by: Philipp Tomsich <philipp.tomsich@theobroma-systems.com>
+> Signed-off-by: Christoph Muellner <christoph.muellner@theobroma-systems.com>
+> Signed-off-by: Yury Norov <ynorov@caviumnetworks.com>
+> Signed-off-by: Andrew Pinski <Andrew.Pinski@caviumnetworks.com>
+> ---
+>  Documentation/arm64/ilp32.txt | 47 +++++++++++++++++++++++++++++++++++++++++++
+>  1 file changed, 47 insertions(+)
+>  create mode 100644 Documentation/arm64/ilp32.txt
+> 
+> diff --git a/Documentation/arm64/ilp32.txt b/Documentation/arm64/ilp32.txt
+> new file mode 100644
+> index 0000000..93c09f2
+> --- /dev/null
+> +++ b/Documentation/arm64/ilp32.txt
+> @@ -0,0 +1,47 @@
+> +ILP32 AARCH64 SYSCALL ABI
+> +=========================
+> +Written by Andrew Pinski <apinski@cavium.com>
+> +Updated by Philipp Tomsich <philipp.tomsich@theobroma-systems.com>
+> +Updated by Yury Norov <ynorov@caviumnetworks.com>
+> +
+> +
+> +This document describes the ILP32 syscall ABI and where it differs
+> +from the generic linux syscall interface.
+> +
+> +Some structures are changed to reduce the difference in the code path
+> +for both ILP32 and LP64 ABIs for signal handling.
+Given that user may upgrade from aarch32 to ILP32. How about add abi
+comparison between aarch32 and aarch64 ilp32?
 
-Forcing O_LARGEFILE is probably what we want for all architectures
-going forward, so we should change asm-generic/unistd.h to use sys_openat
-for compat mode, and override it for tile32 compat, which is the only
-existing user of this table at the moment and which needs to
-retain the existing behavior.
+Regards
 
-	Arnd
+Bamvor
