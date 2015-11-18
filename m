@@ -1,58 +1,38 @@
-From: ddaney.cavm@gmail.com (David Daney)
-Date: Tue, 17 Nov 2015 16:04:53 -0800
-Subject: [PATCH] arm64: Make smp_load_acquire() work with pointer to const
- argument.
-Message-ID: <1447805093-8716-1-git-send-email-ddaney.cavm@gmail.com>
+From: sboyd@codeaurora.org (Stephen Boyd)
+Date: Tue, 17 Nov 2015 16:06:44 -0800
+Subject: [PATCH] mfd: qcom-spmi-pmic: Don't access non-existing registers
+Message-ID: <1447805204-32483-1-git-send-email-sboyd@codeaurora.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-From: David Daney <david.daney@cavium.com>
+From: "Ivan T. Ivanov" <ivan.ivanov@linaro.org>
 
-We are now getting this error when building:
+Revision ID registers are available only on devices with
+Slave IDs that are even, so don't make access to unavailable
+registers.
 
-.
-.
-.
-  CC      init/do_mounts.o
-In file included from include/linux/tcp.h:22:0,
-                 from include/linux/ipv6.h:72,
-                 from include/net/ipv6.h:16,
-                 from include/linux/sunrpc/clnt.h:27,
-                 from include/linux/nfs_fs.h:30,
-                 from init/do_mounts.c:32:
-include/net/sock.h: In function ?sk_state_load?:
-include/net/sock.h:2238:2: error: read-only variable ?___p1? used as ?asm? output
-  return smp_load_acquire(&sk->sk_state);
-  ^
-include/net/sock.h:2238:2: error: read-only variable ?___p1? used as ?asm? output
-include/net/sock.h:2238:2: error: read-only variable ?___p1? used as ?asm? output
-include/net/sock.h:2238:2: error: read-only variable ?___p1? used as ?asm? output
-.
-.
-.
-
-Fix the smp_load_acquire() implementation to discard the const
-qualifier in the type of the temporary variable with some tricky
-casting.
-
-Signed-off-by: David Daney <david.daney@cavium.com>
+Signed-off-by: Ivan T. Ivanov <ivan.ivanov@linaro.org>
+[sboyd at codeaurora.org: Consider all slave ids that are even]
+Signed-off-by: Stephen Boyd <sboyd@codeaurora.org>
 ---
- arch/arm64/include/asm/barrier.h | 3 ++-
- 1 file changed, 2 insertions(+), 1 deletion(-)
+ drivers/mfd/qcom-spmi-pmic.c | 4 +++-
+ 1 file changed, 3 insertions(+), 1 deletion(-)
 
-diff --git a/arch/arm64/include/asm/barrier.h b/arch/arm64/include/asm/barrier.h
-index 624f967..52eb9b9 100644
---- a/arch/arm64/include/asm/barrier.h
-+++ b/arch/arm64/include/asm/barrier.h
-@@ -64,7 +64,8 @@ do {									\
+diff --git a/drivers/mfd/qcom-spmi-pmic.c b/drivers/mfd/qcom-spmi-pmic.c
+index af6ac1c4b45c..8653e8b9bb4f 100644
+--- a/drivers/mfd/qcom-spmi-pmic.c
++++ b/drivers/mfd/qcom-spmi-pmic.c
+@@ -127,7 +127,9 @@ static int pmic_spmi_probe(struct spmi_device *sdev)
+ 	if (IS_ERR(regmap))
+ 		return PTR_ERR(regmap);
  
- #define smp_load_acquire(p)						\
- ({									\
--	typeof(*p) ___p1;						\
-+	typeof((typeof(*p))(*p + 0)) ___p1;				\
-+	compiletime_assert(sizeof(___p1) == sizeof(*p), "remove const"); \
- 	compiletime_assert_atomic_type(*p);				\
- 	switch (sizeof(*p)) {						\
- 	case 1:								\
+-	pmic_spmi_show_revid(regmap, &sdev->dev);
++	/* Only the first slave id for a PMIC contains this information */
++	if (sdev->usid % 2 == 0)
++		pmic_spmi_show_revid(regmap, &sdev->dev);
+ 
+ 	return of_platform_populate(root, NULL, NULL, &sdev->dev);
+ }
 -- 
-1.8.3.1
+The Qualcomm Innovation Center, Inc. is a member of the Code Aurora Forum,
+a Linux Foundation Collaborative Project
