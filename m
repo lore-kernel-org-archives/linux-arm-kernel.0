@@ -1,116 +1,48 @@
-From: yang.shi@linaro.org (Shi, Yang)
-Date: Wed, 18 Nov 2015 13:07:18 -0800
-Subject: [PATCH] arm64: bpf: fix buffer pointer
-In-Reply-To: <1447836962-4086-1-git-send-email-zlim.lnx@gmail.com>
-References: <1447836962-4086-1-git-send-email-zlim.lnx@gmail.com>
-Message-ID: <564CE886.5010109@linaro.org>
+From: arnd@arndb.de (Arnd Bergmann)
+Date: Wed, 18 Nov 2015 22:16:48 +0100
+Subject: [PATCH] ASoC: sh: fix fsi build warnings for 64 bit
+Message-ID: <4237757.xIRJLSDgsa@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-On 11/18/2015 12:56 AM, Zi Shen Lim wrote:
-> During code review, I noticed we were passing a bad buffer pointer
-> to bpf_load_pointer helper function called by jitted code.
->
-> Point to the buffer allocated by JIT, so we don't silently corrupt
-> other parts of the stack.
->
-> Signed-off-by: Zi Shen Lim <zlim.lnx@gmail.com>
-> ---
->   arch/arm64/net/bpf_jit_comp.c | 27 +++++++++++++--------------
->   1 file changed, 13 insertions(+), 14 deletions(-)
->
-> diff --git a/arch/arm64/net/bpf_jit_comp.c b/arch/arm64/net/bpf_jit_comp.c
-> index d6a53ef..7cf032b 100644
-> --- a/arch/arm64/net/bpf_jit_comp.c
-> +++ b/arch/arm64/net/bpf_jit_comp.c
-> @@ -139,6 +139,12 @@ static inline int epilogue_offset(const struct jit_ctx *ctx)
->   /* Stack must be multiples of 16B */
->   #define STACK_ALIGN(sz) (((sz) + 15) & ~15)
->
-> +#define _STACK_SIZE \
-> +	(MAX_BPF_STACK \
-> +	 + 4 /* extra for skb_copy_bits buffer */)
-> +
-> +#define STACK_SIZE STACK_ALIGN(_STACK_SIZE)
-> +
->   static void build_prologue(struct jit_ctx *ctx)
->   {
->   	const u8 r6 = bpf2a64[BPF_REG_6];
-> @@ -150,10 +156,6 @@ static void build_prologue(struct jit_ctx *ctx)
->   	const u8 rx = bpf2a64[BPF_REG_X];
->   	const u8 tmp1 = bpf2a64[TMP_REG_1];
->   	const u8 tmp2 = bpf2a64[TMP_REG_2];
-> -	int stack_size = MAX_BPF_STACK;
-> -
-> -	stack_size += 4; /* extra for skb_copy_bits buffer */
-> -	stack_size = STACK_ALIGN(stack_size);
->
->   	/*
->   	 * BPF prog stack layout
-> @@ -165,12 +167,13 @@ static void build_prologue(struct jit_ctx *ctx)
->   	 *                        | ... | callee saved registers
->   	 *                        +-----+
->   	 *                        |     | x25/x26
-> -	 * BPF fp register => -80:+-----+
-> +	 * BPF fp register => -80:+-----+ <= (BPF_FP)
->   	 *                        |     |
->   	 *                        | ... | BPF prog stack
->   	 *                        |     |
-> -	 *                        |     |
-> -	 * current A64_SP =>      +-----+
-> +	 *                        +-----+ <= (BPF_FP - MAX_BPF_STACK)
-> +	 *                        |RSVD | JIT scratchpad
-> +	 * current A64_SP =>      +-----+ <= (BPF_FP - STACK_SIZE)
->   	 *                        |     |
->   	 *                        | ... | Function call stack
->   	 *                        |     |
-> @@ -196,7 +199,7 @@ static void build_prologue(struct jit_ctx *ctx)
->   	emit(A64_MOV(1, fp, A64_SP), ctx);
->
->   	/* Set up function call stack */
-> -	emit(A64_SUB_I(1, A64_SP, A64_SP, stack_size), ctx);
-> +	emit(A64_SUB_I(1, A64_SP, A64_SP, STACK_SIZE), ctx);
->
->   	/* Clear registers A and X */
->   	emit_a64_mov_i64(ra, 0, ctx);
-> @@ -213,13 +216,9 @@ static void build_epilogue(struct jit_ctx *ctx)
->   	const u8 fp = bpf2a64[BPF_REG_FP];
->   	const u8 tmp1 = bpf2a64[TMP_REG_1];
->   	const u8 tmp2 = bpf2a64[TMP_REG_2];
-> -	int stack_size = MAX_BPF_STACK;
-> -
-> -	stack_size += 4; /* extra for skb_copy_bits buffer */
-> -	stack_size = STACK_ALIGN(stack_size);
->
->   	/* We're done with BPF stack */
-> -	emit(A64_ADD_I(1, A64_SP, A64_SP, stack_size), ctx);
-> +	emit(A64_ADD_I(1, A64_SP, A64_SP, STACK_SIZE), ctx);
->
->   	/* Restore fs (x25) and x26 */
->   	emit(A64_POP(fp, A64_R(26), A64_SP), ctx);
-> @@ -658,7 +657,7 @@ emit_cond_jmp:
->   			return -EINVAL;
->   		}
->   		emit_a64_mov_i64(r3, size, ctx);
-> -		emit(A64_ADD_I(1, r4, fp, MAX_BPF_STACK), ctx);
-> +		emit(A64_SUB_I(1, r4, fp, STACK_SIZE), ctx);
+As this driver can now be compiled for ARM64, we get a new warning
+as a result of passing a DMA filter data pointer through an 'int':
 
-Should not it sub MAX_BPF_STACK?
+sound/soc/sh/fsi.c: In function 'fsi_dma_probe':
+sound/soc/sh/fsi.c:1372:24: warning: cast to pointer from integer of different size [-Wint-to-pointer-cast]
+     shdma_chan_filter, (void *)io->dma_id,
 
-If you sub STACK_SIZE here, the buffer pointer will point to bottom of 
-the reserved area.
+We already know that we only need the legacy filter function on
+arch/sh, so we can hide the legacy DMA interface function
+behind an #ifdef. This has the other advantage of no longer
+depending on the shdma_chan_filter function to be visible.
 
-You stack layout change also shows this:
+Signed-off-by: Arnd Bergmann <arnd@arndb.de>
 
-+	 *                        +-----+ <= (BPF_FP - MAX_BPF_STACK)
-+	 *                        |RSVD | JIT scratchpad
-+	 * current A64_SP =>      +-----+ <= (BPF_FP - STACK_SIZE)
-
-Thanks,
-Yang
-
-
->   		emit_a64_mov_i64(r5, (unsigned long)bpf_load_pointer, ctx);
->   		emit(A64_PUSH(A64_FP, A64_LR, A64_SP), ctx);
->   		emit(A64_MOV(1, A64_FP, A64_SP), ctx);
->
+diff --git a/sound/soc/sh/fsi.c b/sound/soc/sh/fsi.c
+index 0215c78cbddf..ead520182e26 100644
+--- a/sound/soc/sh/fsi.c
++++ b/sound/soc/sh/fsi.c
+@@ -1362,15 +1362,18 @@ static int fsi_dma_push_start_stop(struct fsi_priv *fsi, struct fsi_stream *io,
+ 
+ static int fsi_dma_probe(struct fsi_priv *fsi, struct fsi_stream *io, struct device *dev)
+ {
+-	dma_cap_mask_t mask;
+ 	int is_play = fsi_stream_is_play(fsi, io);
+ 
++#ifdef CONFIG_SUPERH
++	dma_cap_mask_t mask;
+ 	dma_cap_zero(mask);
+ 	dma_cap_set(DMA_SLAVE, mask);
+ 
+-	io->chan = dma_request_slave_channel_compat(mask,
+-				shdma_chan_filter, (void *)io->dma_id,
+-				dev, is_play ? "tx" : "rx");
++	io->chan = dma_request_channel(mask, shdma_chan_filter,
++				       (void *)io->dma_id);
++#else
++	io->chan = dma_request_slave_channel(dev, is_play ? "tx" : "rx");
++#endif
+ 	if (io->chan) {
+ 		struct dma_slave_config cfg = {};
+ 		int ret;
