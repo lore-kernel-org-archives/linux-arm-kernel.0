@@ -1,70 +1,33 @@
 From: arnd@arndb.de (Arnd Bergmann)
-Date: Wed, 18 Nov 2015 22:02:39 +0100
-Subject: [PATCH] staging/emxx_udc: fix 64-bit warnings
-Message-ID: <4127718.gSaDyyMLEa@wuerfel>
+Date: Wed, 18 Nov 2015 22:06:36 +0100
+Subject: [PATCH] usb: musb: USB_TI_CPPI41_DMA requires dmaengine support
+In-Reply-To: <CADYTM3bwZhLWyL_D+jFwQTDGHT3VBoQdxaPjaex7YZU=POLO+A@mail.gmail.com>
+References: <4370741.70D0kgBgnp@wuerfel> <3958456.qUtBLJFy2S@wuerfel>
+ <CADYTM3bwZhLWyL_D+jFwQTDGHT3VBoQdxaPjaex7YZU=POLO+A@mail.gmail.com>
+Message-ID: <4749121.AD5OMAAsPq@wuerfel>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-ARCH_SHMOBILE is coming to arm64, which creates new warnings in allmodconfig:
+On Wednesday 18 November 2015 14:39:10 Bin Liu wrote:
+> > Ideally we should remove the 'select TI_CPPI41' here as well, but
+> > what we could do instead is to make that a silent symbol and remove
+> > the prompt so it always gets enabled implicitly when USB_TI_CPPI41_DMA
+> > and DMADEVICES are both enabled.
+> 
+> But what if DMADEVICES was disabled and USB_TI_CPPI41_DMA was enabled?
+> I would think I had CPPI fully enabled for MUSB, but it didn't because
+> TI_CPPI41 was disabled.
 
-drivers/staging/emxx_udc/emxx_udc.c: In function '_nbu2ss_out_dma':
-drivers/staging/emxx_udc/emxx_udc.c:843:45: warning: cast from pointer to integer of different size [-Wpointer-to-int-cast]
-  _nbu2ss_writel(&preg->EP_DCR[num].EP_TADR, (u32)pBuffer);
+That would cause a runtime failure, just like any other configuration
+that does not enable all the hardware you want to use.
+ 
+> I would think this patch is the test option so far, we might have to
+> document somewhere that to dmaengine has to be enabled to use MUSB
+> CPPI, but I am not sure where the best place is to document...
 
-This is clearly a mistake from confusing a dma_addr_t with a pointer,
-so the fix is to use the correct types in two places.
+There are hundreds of device drivers that use dmaengines as a
+backend, we don't normally document this, just like we don't
+document the fact that you need to enable the right gpio, irqchip,
+timer, clock etc drivers for your platform.
 
-The third warning of this kind is a check for an unaligned pointer,
-which should be done by casting the pointer to uintptr_t, not int.
-
-Signed-off-by: Arnd Bergmann <arnd@arndb.de>
-
-diff --git a/drivers/staging/emxx_udc/emxx_udc.c b/drivers/staging/emxx_udc/emxx_udc.c
-index 4e6c16af40fc..c168845cbb91 100644
---- a/drivers/staging/emxx_udc/emxx_udc.c
-+++ b/drivers/staging/emxx_udc/emxx_udc.c
-@@ -823,7 +823,7 @@ static int _nbu2ss_out_dma(
- 	u32		length
- )
- {
--	u8		*pBuffer;
-+	dma_addr_t	pBuffer;
- 	u32		mpkt;
- 	u32		lmpkt;
- 	u32		dmacnt;
-@@ -836,7 +836,7 @@ static int _nbu2ss_out_dma(
- 		return 1;		/* DMA is forwarded */
- 
- 	req->dma_flag = TRUE;
--	pBuffer = (u8 *)req->req.dma;
-+	pBuffer = req->req.dma;
- 	pBuffer += req->req.actual;
- 
- 	/* DMA Address */
-@@ -1034,7 +1034,7 @@ static int _nbu2ss_in_dma(
- 	u32		length
- )
- {
--	u8		*pBuffer;
-+	dma_addr_t	pBuffer;
- 	u32		mpkt;		/* MaxPacketSize */
- 	u32		lmpkt;		/* Last Packet Data Size */
- 	u32		dmacnt;		/* IN Data Size */
-@@ -1080,7 +1080,7 @@ static int _nbu2ss_in_dma(
- 	_nbu2ss_writel(&preg->EP_DCR[num].EP_DCR2, data);
- 
- 	/* Address setting */
--	pBuffer = (u8 *)req->req.dma;
-+	pBuffer = req->req.dma;
- 	pBuffer += req->req.actual;
- 	_nbu2ss_writel(&preg->EP_DCR[num].EP_TADR, (u32)pBuffer);
- 
-@@ -2728,7 +2728,7 @@ static int nbu2ss_ep_queue(
- 	spin_lock_irqsave(&udc->lock, flags);
- 
- #ifdef USE_DMA
--	if ((u32)req->req.buf & 0x3)
-+	if ((uintptr_t)req->req.buf & 0x3)
- 		req->unaligned = TRUE;
- 	else
- 		req->unaligned = FALSE;
+	Arnd
