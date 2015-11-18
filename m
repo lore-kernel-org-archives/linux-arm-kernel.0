@@ -1,157 +1,61 @@
-From: bamvor.zhangjian@huawei.com (Zhangjian (Bamvor))
-Date: Wed, 18 Nov 2015 16:00:26 +0800
-Subject: [RFC2 PATCH v6 00/19] ILP32 for ARM64
-In-Reply-To: <1447795019-30176-1-git-send-email-ynorov@caviumnetworks.com>
-References: <1447795019-30176-1-git-send-email-ynorov@caviumnetworks.com>
-Message-ID: <564C301A.5080707@huawei.com>
+From: takahiro.akashi@linaro.org (AKASHI Takahiro)
+Date: Wed, 18 Nov 2015 17:03:37 +0900
+Subject: A problem about interrupt when booting a captured kernel
+In-Reply-To: <20151117090736.7db5e646@arm.com>
+References: <5645B6D3.60305@huawei.com> <564A2DE4.4030702@arm.com>
+ <564A7D53.6010906@linaro.org> <20151117090736.7db5e646@arm.com>
+Message-ID: <564C30D9.7030108@linaro.org>
 To: linux-arm-kernel@lists.infradead.org
 List-Id: linux-arm-kernel.lists.infradead.org
 
-Hi, Yury
+On 11/17/2015 06:07 PM, Marc Zyngier wrote:
+> On Tue, 17 Nov 2015 10:05:23 +0900
+> AKASHI Takahiro <takahiro.akashi@linaro.org> wrote:
+>
+>> Marc,
+>> (Cc: Mark)
+>>
+>> On 11/17/2015 04:26 AM, Marc Zyngier wrote:
+>>> On 13/11/15 10:09, Yang Yingliang wrote:
+>>>> Hi, Marc
+>>>>
+>>>>
+>>>>        The kexec will boot a captured kernel while the kernel panic. But
+>>>> it boots failed if the kernel panic in handler function of PPI. The
+>>>> reason is that the PPI has not been 'eoi', other interrupts can not be
+>>>> handled when booting  the captured kernel.
+>>>>
+>>>>        The kexec will call irq_eoi to end the irqs that have
+>>>> IRQD_IRQ_INPROGRESS flag. But PPIs don't have this flag, so it won't be
+>>>> ended.
+>>>>
+>>>>       Three ways to solve this problem we can think :
+>>>>       1. Is there a way to reset gic like its_reset ?
+>>>>       2. Can we add some flag for calling irq_eoi ?
+>>>>       3. Just 'eoi' all PPIs without checking flags in kexec.
+>>>>
+>>>>        Please give some advice.
+>>>
+>>> Good timing. Please see:
+>>>
+>>> http://lists.infradead.org/pipermail/linux-arm-kernel/2015-November/385383.html
+>>
+>> I removed machine_kexec_mask_interrupts() from my arm64 kdump patch series[1]
+>> due to the past discussions[2].
+>>
+>> Is it the time that I should resurrect the code?
+>
+> Probably.
 
-Glad to see the new version of ilp32. Here is some general questions:
+Let me make sure.
+Have your patches here, especially #1, also addressed the issue that you pointed out
+in [1]?
 
-On 2015/11/18 5:16, Yury Norov wrote:
-> ------8<-----
-> Colleagues, I'm gonna to send it to list.
-> Please, take a look.
-> ------8<-----
-> 
-> This is still RFC because ~20 tests still fail,
-> and because it's based on 4.3 kernel version, and
-> some work is needed to rebase on 4.4. I'd preffer
-> to do it later. 
-> 
-> v3: https://lkml.org/lkml/2014/9/3/704
-> v4: https://lkml.org/lkml/2015/4/13/691
-> v5: https://lkml.org/lkml/2015/9/29/911
-> 
-> v6:
->  - time_t, __kenel_off_t and other types turned to be 32-bit
->    for compatibility reasons (after v5 discussion);
-Is there any performance comparison between v6 and v5, especially for
-these changes? Compatibility is important for us, meanwhile we need to
-take performance into account.
->  - related changes applied to ILP32 syscall table and handlers;
->  - ILP32 VDSO code excluded. It's not mandatory, and caused questions
->    during review process. We definitely make sure we will follow up
->    with a VDSO later on because it is needed for performance reasons;
->  - fixed build issues with different combinations of AARCH32 / ILP32
->    enabling in config;
->  - ILP32 TLS bug fixed;
->  - entry32-common.S introduced to hold wrappers needed for both ILP32
->    and AARCH32_EL0;
->  - documentation updated according to latest changes;
->  - rebased to the current head;
->  - coding style re-checked;
->  - ILP32 syscall table turned around.
-> 
-> Testing is performed using LTP with scenario 'ltplite'.
-> Tested on QEMU + vanilla defconfig kernel.
-Do you tested on both big endian and little endian?
+[1] http://lists.infradead.org/pipermail/linux-arm-kernel/2015-April/338969.html
 
-Regards
+-Takahiro AKASHI
 
-Bamvor
-> Regressions are mostly related to core dump genereation,
-> readdir(), and futex(). Some tests fail both in ILP32, and LP64.
-> 
-> The full regression table is:
-> 		ILP32		LP64
-> 
-> float_bessel    FAIL	 134    PASSED	0
-> float_exp_log   FAIL	 134    PASSED	0
-> float_iperb     FAIL	 134    PASSED	0
-> float_power     FAIL	 134    PASSED	0
-> float_trigo     FAIL	 134    PASSED	0
-> abort01         FAIL       2    FAIL 	2
-> fcntl14         FAIL       2    FAIL 	2
-> kill11          FAIL       2    FAIL 	2
-> mmap16          FAIL       6    PASSED	0
-> open12          FAIL       2    PASSED	0
-> pause01         PASSED     0    FAIL 	9
-> pipe07          FAIL       2    PASSED	0
-> readdir01       FAIL       1    PASSED	0
-> rename11        FAIL       2    PASSED	0
-> rmdir02         FAIL       2    PASSED	0
-> setregid02      FAIL       1    FAIL 	1
-> settimeofday01  FAIL       1    FAIL 	1
-> umount2_01      FAIL       2    PASSED	0
-> umount2_02      FAIL       2    PASSED	0
-> umount2_03      FAIL       2    PASSED	0
-> utime06         FAIL       2    PASSED	0
-> 
-> Kernel with this patchset, and corresponding
-> version of glibc is here:
-> https://github.com/norov/
-> 
-> Andrew Pinski (14):
->   arm64: ensure the kernel is compiled for LP64
->   arm64: rename COMPAT to AARCH32_EL0 in Kconfig
->   arm64: change some CONFIG_COMPAT over to use CONFIG_AARCH32_EL0
->     instead
->   arm64:uapi: set __BITS_PER_LONG correctly for ILP32 and LP64
->   arm64:ilp32: share signal structures between ILP32 and LP64 ABIs
->   arm64: introduce is_a32_task and is_a32_thread (for AArch32 compat)
->   arm64:ilp32: add is_ilp32_compat_{task,thread} and TIF_32BIT_AARCH64
->   arm64:ilp32: share HWCAP between LP64 and ILP32
->   arm64:ilp32 use the native LP64 'start_thread' for ILP32 threads
->   arm64:ilp32: support core dump generation for ILP32
->   ptrace: Allow compat to use the native siginfo
->   arm64:ilp32: add sys_ilp32.c and a separate table (in entry.S) to use
->     it
->   arm64:ilp32: use the native siginfo instead of the compat siginfo
->   arm64:ilp32: add ARM64_ILP32 to Kconfig
-> 
-> Jan Dakinevich (2):
->   ilp32: common 32-bit wrappers
->   arm64: ilp32: force IPC_64 in msgctl, shmctl, semctl
-> 
-> Philipp Tomsich (2):
->   arm64:ilp32: add documentation on the ILP32 ABI for ARM64
->   arm64:ilp32: change COMPAT_ELF_PLATFORM to report a a subplatform for
->     ILP32
-> 
-> Yury Norov (1):
->   aarch64: ilp32: use generic stat64 structure
-> 
->  Documentation/arm64/ilp32.txt             |  47 +++++++
->  arch/arm64/Kconfig                        |  12 ++
->  arch/arm64/Makefile                       |   5 +
->  arch/arm64/include/asm/compat.h           |  70 +++++++++-
->  arch/arm64/include/asm/elf.h              | 105 ++++++++++++--
->  arch/arm64/include/asm/fpsimd.h           |   2 +-
->  arch/arm64/include/asm/hwcap.h            |  12 +-
->  arch/arm64/include/asm/memory.h           |   2 +-
->  arch/arm64/include/asm/processor.h        |  18 ++-
->  arch/arm64/include/asm/ptrace.h           |   2 +-
->  arch/arm64/include/asm/signal32.h         |  19 +++
->  arch/arm64/include/asm/stat.h             |   2 +
->  arch/arm64/include/asm/thread_info.h      |   3 +-
->  arch/arm64/include/asm/unistd.h           |  11 +-
->  arch/arm64/include/uapi/asm/bitsperlong.h |   9 +-
->  arch/arm64/include/uapi/asm/siginfo.h     |  21 +++
->  arch/arm64/include/uapi/asm/signal.h      |  31 +++++
->  arch/arm64/kernel/Makefile                |   4 +-
->  arch/arm64/kernel/asm-offsets.c           |   2 +-
->  arch/arm64/kernel/entry.S                 |  18 ++-
->  arch/arm64/kernel/entry32-common.S        |  37 +++++
->  arch/arm64/kernel/entry32.S               |  29 ----
->  arch/arm64/kernel/head.S                  |   2 +-
->  arch/arm64/kernel/hw_breakpoint.c         |   7 +-
->  arch/arm64/kernel/perf_regs.c             |   2 +-
->  arch/arm64/kernel/process.c               |   4 +-
->  arch/arm64/kernel/ptrace.c                |  47 ++++---
->  arch/arm64/kernel/signal.c                |  21 ++-
->  arch/arm64/kernel/sys_ilp32.c             | 223 ++++++++++++++++++++++++++++++
->  arch/arm64/kernel/traps.c                 |   4 +-
->  arch/arm64/kernel/vdso.c                  |  12 +-
->  include/linux/compat.h                    |   4 +
->  include/uapi/asm-generic/siginfo.h        |  17 ++-
->  include/uapi/asm-generic/signal.h         |  27 +++-
->  kernel/ptrace.c                           |  24 +++-
->  35 files changed, 745 insertions(+), 110 deletions(-)
->  create mode 100644 Documentation/arm64/ilp32.txt
->  create mode 100644 arch/arm64/kernel/entry32-common.S
->  create mode 100644 arch/arm64/kernel/sys_ilp32.c
-> 
+> Thanks,
+>
+> 	M.
+>
